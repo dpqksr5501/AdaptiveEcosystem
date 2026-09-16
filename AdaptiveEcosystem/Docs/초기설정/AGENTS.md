@@ -5,16 +5,14 @@
 이 문서는 이 Unreal Engine 저장소에서 작업하는 모든 AI coding agent의 최상위 지침이다.
 코드를 수정하기 전에 반드시 다음 문서를 읽는다.
 
-- `docs/00_PROJECT_SCOPE.md`
-- `docs/01_ARCHITECTURE.md`
-- `docs/02_DATA_CONTRACTS.md`
-- `docs/03_TEAM_ROLES.md`
-- `docs/08_BOOTSTRAP_PLAN.md`
-- `docs/09_GIT_CONTRIBUTING.md`
+- `AdaptiveEcosystem/Docs/초기설정/01_ARCHITECTURE.md`
+- `AdaptiveEcosystem/Docs/초기설정/02_DATA_CONTRACTS.md`
+- `AdaptiveEcosystem/Docs/초기설정/03_TEAM_ROLES.md`
+- `AdaptiveEcosystem/Docs/초기설정/08_BOOTSTRAP_PLAN.md`
 
 역할별 작업이라면 해당 역할 문서와 프롬프트도 읽는다.
 
-프로젝트는 **Unreal Engine 5.7 / C++ 중심 동적 생태계 캡스톤 프로젝트**다.
+프로젝트는 **Unreal Engine 5.8 / C++ 중심 동적 생태계 캡스톤 프로젝트**다.
 플레이어 행동과 환경 변화가 장기적으로 누적되고, `Region × Species` 단위로 개체 수·분포·Trait·행동 성향·활동 시간·이주 경향이 변화한다.
 
 가장 중요한 책임 경계는 다음과 같다.

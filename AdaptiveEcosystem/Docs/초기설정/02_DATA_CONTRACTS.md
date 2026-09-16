@@ -10,18 +10,18 @@
 using FRegionId = FName;      // 또는 wrapper를 나중에 도입
 using FSpeciesId = FName;
 
-uint64 StableAgentId;
-uint64 EventId;
-uint64 ObservationId;
+int64 StableAgentId;
+int64 EventId;
+int64 ObservationId;
 
-uint32 WorldEpoch;
-uint32 ControlEpoch;
-uint32 WorldRevision;
-uint32 SummaryRevision;
-uint32 ConfigRevision;
-uint32 ProfileRevision;
-uint32 ModelRevision;
-uint32 SchemaRevision;
+int32 WorldEpoch;
+int32 ControlEpoch;
+int32 WorldRevision;
+int32 SummaryRevision;
+int32 ConfigRevision;
+int64 ProfileRevision;
+int32 ModelRevision;
+int32 SchemaRevision;
 ```
 
 초기 구현에서 Unreal reflection 때문에 alias가 불편하면 USTRUCT 내부에 `FName RegionId`, `FName SpeciesId`를 직접 사용한다.
@@ -193,6 +193,9 @@ struct FSpeciesEvolutionProfile
 | GroupAffinity | 0 ~ 1 | 0 ~ 1 |
 | HidePreference | 0 ~ 1 | 0 ~ 1 |
 | MigrationTendency | 0 ~ 1 | 0 ~ 1 |
+| RoamRadiusMultiplier | 0.50 ~ 2.00 | 0.80 ~ 1.20 |
+| DayActivityPreference | 0 ~ 1 | 0 ~ 1 |
+| NightActivityPreference | 0 ~ 1 | 0 ~ 1 |
 
 세대당 delta limit과 Mutation Budget을 둔다.
 

@@ -1,19 +1,16 @@
 # Initial Repository Bootstrap Prompt
 
-너는 Unreal Engine 5.7 C++ 팀 프로젝트의 초기 공통 구조를 세팅하는 AI coding agent다.
+너는 Unreal Engine 5.8 C++ 팀 프로젝트의 초기 공통 구조를 세팅하는 AI coding agent다.
 
 작업 전에 저장소를 탐색하고 반드시 다음을 읽어라.
 
-- `AGENTS.md`
-- `docs/00_PROJECT_SCOPE.md`
-- `docs/01_ARCHITECTURE.md`
-- `docs/02_DATA_CONTRACTS.md`
-- `docs/03_TEAM_ROLES.md`
-- `docs/08_BOOTSTRAP_PLAN.md`
-- `docs/09_GIT_CONTRIBUTING.md`
-- `docs/10_DECISIONS_OPEN_QUESTIONS.md`
+- `AGENTS.md` (Repo Root 및 Docs/초기설정/)
+- `AdaptiveEcosystem/Docs/초기설정/01_ARCHITECTURE.md`
+- `AdaptiveEcosystem/Docs/초기설정/02_DATA_CONTRACTS.md`
+- `AdaptiveEcosystem/Docs/초기설정/03_TEAM_ROLES.md`
+- `AdaptiveEcosystem/Docs/초기설정/08_BOOTSTRAP_PLAN.md`
 
-`docs/reference/` 문서는 원본 참고 자료다. 상위 통합 문서와 충돌할 경우 임의로 합치지 말고 차이를 보고하라.
+`Docs/reference/` 문서는 원본 참고 자료다. 상위 통합 문서와 충돌할 경우 임의로 합치지 말고 차이를 보고하라.
 
 ## 이번 작업 목표
 
@@ -22,14 +19,14 @@
 
 ## 먼저 확인
 
-1. repo root의 `.uproject`
-2. 실제 Project/Module 이름
+1. `AdaptiveEcosystem/AdaptiveEcosystem.uproject` 위치 및 EngineAssociation (UE 5.8)
+2. 실제 Project/Module 이름 (`AdaptiveEcosystem`)
 3. 기존 Source/Plugin 구조
 4. Build.cs
 5. Git ignore/LFS
 6. 기존 유사 USTRUCT/Class가 있는지
 
-`.uproject`가 없으면 임의 생성하지 말고 사용자가 UE 5.7 C++ project를 repo root에 만들어야 한다고 보고한다.
+`.uproject`가 없으면 임의 생성하지 말고 사용자가 UE 5.8 C++ project를 만들어야 한다고 보고한다.
 
 ## 공통 타입
 

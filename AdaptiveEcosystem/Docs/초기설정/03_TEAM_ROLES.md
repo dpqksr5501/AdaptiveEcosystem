@@ -6,7 +6,7 @@
 
 ### 첫날 해야 할 일
 
-1. Git repo / UE 5.7 C++ 프로젝트 기준점 확정
+1. Git repo / UE 5.8 C++ 프로젝트 기준점 확정 (`AdaptiveEcosystem/`)
 2. `.gitignore`, Git LFS 확인
 3. 공통 계약 PR 생성
    - `FRegionEnvironmentState`

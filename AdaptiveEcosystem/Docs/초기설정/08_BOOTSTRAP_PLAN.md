@@ -6,7 +6,7 @@
 
 조장:
 
-1. UE 5.7 C++ project가 repo root에 존재하는지 확인
+1. UE 5.8 C++ project가 `AdaptiveEcosystem/`에 존재하는지 확인
 2. 한번 build/editor launch
 3. `.gitignore`
 4. Git LFS `.uasset/.umap`

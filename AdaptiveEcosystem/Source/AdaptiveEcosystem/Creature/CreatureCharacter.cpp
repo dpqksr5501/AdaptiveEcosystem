@@ -2,8 +2,6 @@
 
 #include "Creature/CreatureCharacter.h"
 #include "Creature/CreatureTraitComponent.h"
-#include "Ecology/EcologyServerSubsystem.h"
-#include "Engine/World.h"
 #include "AdaptiveEcosystem.h"
 
 ACreatureCharacter::ACreatureCharacter()
@@ -12,35 +10,31 @@ ACreatureCharacter::ACreatureCharacter()
 
 	TraitComponent = CreateDefaultSubobject<UCreatureTraitComponent>(TEXT("TraitComponent"));
 
-	// Set default identification for vertical slice testing
+	// Default identification placeholders (to be set via InitializeCreature on spawn)
 	SpawnData.RegionId = FName(TEXT("Forest_A"));
 	SpawnData.SpeciesId = FName(TEXT("Wolf"));
-	SpawnData.Generation = 1;
-	SpawnData.ProfileRevision = 1;
-	SpawnData.StableAgentId = 1001;
+	SpawnData.Generation = 0;
+	SpawnData.ProfileRevision = 0;
+	SpawnData.StableAgentId = 0;
 }
 
 void ACreatureCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Automatically query and apply species profile from authoritative server subsystem on start
-	if (UWorld* World = GetWorld())
-	{
-		if (UEcologyServerSubsystem* ServerSubsystem = World->GetSubsystem<UEcologyServerSubsystem>())
-		{
-			FSpeciesEvolutionProfile Profile;
-			if (ServerSubsystem->GetSpeciesEvolutionProfile(SpawnData.RegionId, SpawnData.SpeciesId, Profile))
-			{
-				ApplyProfile(Profile);
-			}
-			else
-			{
-				UE_LOG(LogAdaptiveEcosystem, Warning, TEXT("CreatureCharacter [%s]: Failed to query profile for [%s x %s] on BeginPlay."),
-					*GetName(), *SpawnData.RegionId.ToString(), *SpawnData.SpeciesId.ToString());
-			}
-		}
-	}
+	// Pure representation: does not query server subsystems directly.
+	// Expected to be initialized via InitializeCreature() by Server / Spawner / Test Harness.
+	UE_LOG(LogAdaptiveEcosystem, Verbose, TEXT("CreatureCharacter [%s]: Spawned. Awaiting initialization."), *GetName());
+}
+
+void ACreatureCharacter::InitializeCreature(const FCreatureSpawnData& InSpawnData, const FSpeciesEvolutionProfile& InProfile)
+{
+	SpawnData = InSpawnData;
+	ApplyProfile(InProfile);
+
+	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("CreatureCharacter [%s]: Initialized with AgentId=%lld, [%s x %s], Gen=%d, Rev=%lld"),
+		*GetName(), SpawnData.StableAgentId, *SpawnData.RegionId.ToString(), *SpawnData.SpeciesId.ToString(),
+		SpawnData.Generation, SpawnData.ProfileRevision);
 }
 
 void ACreatureCharacter::ApplyProfile(const FSpeciesEvolutionProfile& InProfile)
@@ -53,28 +47,4 @@ void ACreatureCharacter::ApplyProfile(const FSpeciesEvolutionProfile& InProfile)
 		SpawnData.Generation = InProfile.Generation;
 		SpawnData.ProfileRevision = InProfile.ProfileRevision;
 	}
-}
-
-void ACreatureCharacter::ApplyDummyVerticalSlice()
-{
-	if (UWorld* World = GetWorld())
-	{
-		if (UEcologyServerSubsystem* ServerSubsystem = World->GetSubsystem<UEcologyServerSubsystem>())
-		{
-			FSpeciesEvolutionProfile DummyProfile;
-			if (ServerSubsystem->GetSpeciesEvolutionProfile(FName(TEXT("Forest_A")), FName(TEXT("Wolf")), DummyProfile))
-			{
-				ApplyProfile(DummyProfile);
-				UE_LOG(LogAdaptiveEcosystem, Log, TEXT("CreatureCharacter [%s] successfully applied dummy vertical slice via command: %s"),
-					*GetName(), *TraitComponent->GetDebugDescription());
-				return;
-			}
-		}
-	}
-
-	// Fallback direct dummy profile apply
-	FSpeciesEvolutionProfile DirectDummy = UEcologyServerSubsystem::CreateDummyWolfProfile();
-	ApplyProfile(DirectDummy);
-	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("CreatureCharacter [%s] applied fallback dummy vertical slice: %s"),
-		*GetName(), *TraitComponent->GetDebugDescription());
 }

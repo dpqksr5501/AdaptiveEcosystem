@@ -85,28 +85,81 @@ struct FPlayerPressureState
 // 3. Species Trait Groups
 // -----------------------------------------------------------------------------
 
+// -----------------------------------------------------------------------------
+// Trait Hard Limits & Constants (Shared between contracts and validator)
+// -----------------------------------------------------------------------------
+
+namespace EcoTraitLimits
+{
+	// Phenotype limits
+	constexpr float BodyScaleMin = 0.80f;
+	constexpr float BodyScaleMax = 1.20f;
+	constexpr float LegScaleMin = 0.90f;
+	constexpr float LegScaleMax = 1.10f;
+	constexpr float BodyBoneScaleMin = 0.90f;
+	constexpr float BodyBoneScaleMax = 1.10f;
+	constexpr float ColorBrightnessMin = 0.70f;
+	constexpr float ColorBrightnessMax = 1.20f;
+	constexpr float ColorTintStrengthMin = 0.00f;
+	constexpr float ColorTintStrengthMax = 1.00f;
+	constexpr float MorphWeightMin = 0.00f;
+	constexpr float MorphWeightMax = 1.00f;
+
+	// Gameplay limits
+	constexpr float MoveSpeedMultiplierMin = 0.80f;
+	constexpr float MoveSpeedMultiplierMax = 1.25f;
+	constexpr float HealthMultiplierMin = 0.80f;
+	constexpr float HealthMultiplierMax = 1.25f;
+	constexpr float AttackMultiplierMin = 0.80f;
+	constexpr float AttackMultiplierMax = 1.25f;
+
+	// Behavior limits
+	constexpr float FearMin = 0.00f;
+	constexpr float FearMax = 1.00f;
+	constexpr float AggressionMin = 0.00f;
+	constexpr float AggressionMax = 1.00f;
+	constexpr float GroupAffinityMin = 0.00f;
+	constexpr float GroupAffinityMax = 1.00f;
+	constexpr float HidePreferenceMin = 0.00f;
+	constexpr float HidePreferenceMax = 1.00f;
+
+	// Ecology limits
+	constexpr float MigrationTendencyMin = 0.00f;
+	constexpr float MigrationTendencyMax = 1.00f;
+	constexpr float RoamRadiusMultiplierMin = 0.50f;
+	constexpr float RoamRadiusMultiplierMax = 2.00f;
+	constexpr float DayActivityPreferenceMin = 0.00f;
+	constexpr float DayActivityPreferenceMax = 1.00f;
+	constexpr float NightActivityPreferenceMin = 0.00f;
+	constexpr float NightActivityPreferenceMax = 1.00f;
+
+	// Validation constraints
+	constexpr float DefaultMaxDeltaPerGen = 0.10f;
+	constexpr float DefaultMutationBudget = 0.35f;
+}
+
 /** Phenotype / Visual traits */
 USTRUCT(BlueprintType)
 struct FPhenotypeTraits
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.5", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.80", ClampMax = "1.20"))
 	float BodyScale = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.5", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.90", ClampMax = "1.10"))
 	float LegScale = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.5", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.90", ClampMax = "1.10"))
 	float BodyBoneScale = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.0", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.70", ClampMax = "1.20"))
 	float ColorBrightness = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float ColorTintStrength = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Phenotype", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float MorphWeight = 0.0f;
 };
 
@@ -116,13 +169,13 @@ struct FGameplayTraits
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Gameplay", meta = (ClampMin = "0.5", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Gameplay", meta = (ClampMin = "0.80", ClampMax = "1.25"))
 	float MoveSpeedMultiplier = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Gameplay", meta = (ClampMin = "0.5", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Gameplay", meta = (ClampMin = "0.80", ClampMax = "1.25"))
 	float HealthMultiplier = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Gameplay", meta = (ClampMin = "0.5", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Gameplay", meta = (ClampMin = "0.80", ClampMax = "1.25"))
 	float AttackMultiplier = 1.0f;
 };
 
@@ -132,16 +185,16 @@ struct FBehaviorTraits
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Behavior", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Behavior", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float Fear = 0.5f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Behavior", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Behavior", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float Aggression = 0.5f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Behavior", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Behavior", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float GroupAffinity = 0.5f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Behavior", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Behavior", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float HidePreference = 0.5f;
 };
 
@@ -151,16 +204,16 @@ struct FEcologyTraits
 {
 	GENERATED_BODY()
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Ecology", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Ecology", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float MigrationTendency = 0.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Ecology", meta = (ClampMin = "0.5", ClampMax = "2.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Ecology", meta = (ClampMin = "0.50", ClampMax = "2.00"))
 	float RoamRadiusMultiplier = 1.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Ecology", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Ecology", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float DayActivityPreference = 0.5f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Ecology", meta = (ClampMin = "0.0", ClampMax = "1.0"))
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Traits|Ecology", meta = (ClampMin = "0.00", ClampMax = "1.00"))
 	float NightActivityPreference = 0.5f;
 };
 

@@ -31,6 +31,7 @@ public class AdaptiveEcosystem : ModuleRules
 			"AdaptiveEcosystem/Creature",
 			"AdaptiveEcosystem/Evolution",
 			"AdaptiveEcosystem/Network",
+			"AdaptiveEcosystem/Debug",
 			"AdaptiveEcosystem/Variant_Platforming",
 			"AdaptiveEcosystem/Variant_Platforming/Animation",
 			"AdaptiveEcosystem/Variant_Combat",

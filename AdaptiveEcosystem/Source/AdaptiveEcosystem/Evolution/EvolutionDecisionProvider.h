@@ -18,7 +18,13 @@ class UEvolutionDecisionProvider : public UInterface
  * Owned by AI / LLM layer.
  * 
  * Flow:
- * FEvolutionContext -> Provider (Dummy or LLM) -> FEvolutionProposal -> Server Validator -> FSpeciesEvolutionProfile
+ * FEvolutionContext Snapshot -> Async Task/Worker -> LLM Inference -> FEvolutionProposal -> EvolutionValidator -> Committed Profile
+ * 
+ * IMPORTANT ARCHITECTURAL BOUNDARY:
+ * - RequestProposal(...) is strictly for immediate, non-blocking providers (Dummy, Rule-Based fallback).
+ * - DO NOT execute blocking LLM inference (e.g. llama.cpp, HTTP requests) inside RequestProposal on the Game Thread.
+ * - Runtime LLM inference MUST run asynchronously on background threads/tasks and deliver results via a thread-safe
+ *   proposal queue to be validated by UEvolutionValidator and committed by UEcologyServerSubsystem.
  */
 class ADAPTIVEECOSYSTEM_API IEvolutionDecisionProvider
 {
@@ -26,8 +32,8 @@ class ADAPTIVEECOSYSTEM_API IEvolutionDecisionProvider
 
 public:
 	/**
-	 * Generates an evolution proposal given the snapshot context.
-	 * Returns true if a proposal was successfully produced.
+	 * Generates an immediate evolution proposal (rule-based/dummy fallback).
+	 * Must NOT block the game thread for heavy computation or external I/O.
 	 */
 	UFUNCTION(BlueprintCallable, BlueprintNativeEvent, Category = "Ecology|Evolution")
 	bool RequestProposal(const FEvolutionContext& Context, FEvolutionProposal& OutProposal);

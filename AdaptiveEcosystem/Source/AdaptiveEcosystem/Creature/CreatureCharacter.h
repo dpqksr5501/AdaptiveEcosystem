@@ -12,6 +12,10 @@ class UCreatureTraitComponent;
 /**
  * Base creature character representing active actor representation in the world.
  * Owned by Creature Runtime / Gameplay layer.
+ * 
+ * Rules:
+ * - Does NOT directly depend on or query EcologyServerSubsystem or Evolution providers.
+ * - Pure representation layer: initialized via InitializeCreature(...) by Server / Spawner / Test Harness.
  */
 UCLASS(BlueprintType, Blueprintable)
 class ADAPTIVEECOSYSTEM_API ACreatureCharacter : public ACharacter
@@ -29,15 +33,18 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Creature", meta = (AllowPrivateAccess = "true"))
 	TObjectPtr<UCreatureTraitComponent> TraitComponent;
 
-	/** Spawn data that identifies this creature representation */
+	/** Spawn data identifying this creature representation */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Creature")
 	FCreatureSpawnData SpawnData;
 
-	/** Manually requests and applies the dummy vertical slice (Forest_A x Wolf) profile */
-	UFUNCTION(BlueprintCallable, Exec, Category = "Ecology|Creature|Debug")
-	void ApplyDummyVerticalSlice();
+	/**
+	 * Canonical initialization API called by Server / Spawner / Representation Manager.
+	 * Decouples Creature from how or where the profile was created.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Creature")
+	void InitializeCreature(const FCreatureSpawnData& InSpawnData, const FSpeciesEvolutionProfile& InProfile);
 
-	/** Applies a specific species evolution profile */
+	/** Applies a specific species evolution profile to this creature */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Creature")
 	void ApplyProfile(const FSpeciesEvolutionProfile& InProfile);
 

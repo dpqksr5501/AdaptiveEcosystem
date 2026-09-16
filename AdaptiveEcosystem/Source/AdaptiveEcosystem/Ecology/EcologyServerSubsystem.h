@@ -5,14 +5,17 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Core/EcoDataContracts.h"
+#include "Evolution/EvolutionValidator.h"
 #include "EcologyServerSubsystem.generated.h"
 
 /**
  * World-scoped authoritative server subsystem for ecology simulation and species state.
  * Owned by Server / Ecology layer.
  * 
- * Note: Does not perform replication directly (subsystems are not replication transports).
- * Replicated state will be hosted in GameState or dedicated replicated actors.
+ * Rules:
+ * - Only created on Standalone, Listen Server, and Dedicated Server (Never on pure NM_Client).
+ * - Not a replication transport (Subsystems do not replicate).
+ * - All state mutations require server authority.
  */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcologyServerSubsystem : public UWorldSubsystem
@@ -20,6 +23,9 @@ class ADAPTIVEECOSYSTEM_API UEcologyServerSubsystem : public UWorldSubsystem
 	GENERATED_BODY()
 
 public:
+	/** Only create this subsystem on server or standalone worlds */
+	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
+
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
@@ -32,9 +38,24 @@ public:
 
 	/**
 	 * Sets or updates a species evolution profile on the server.
+	 * Requires server authority (fails on NM_Client).
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Server")
 	void SetSpeciesEvolutionProfile(const FSpeciesEvolutionProfile& InProfile);
+
+	/**
+	 * Validates an AI evolution proposal via EvolutionValidator and commits it if valid.
+	 * Returns true if proposal was accepted and committed.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Server")
+	bool CommitEvolutionProposal(
+		FName RegionId,
+		FName SpeciesId,
+		const FEvolutionProposal& Proposal,
+		int32 ExpectedWorldEpoch,
+		int32 ExpectedContextRevision,
+		FSpeciesEvolutionProfile& OutCommittedProfile,
+		FString& OutRejectReason);
 
 	/**
 	 * Creates a default dummy vertical slice profile (Forest_A x Wolf).
@@ -58,4 +79,7 @@ private:
 
 	/** Helper to build map key */
 	static FName MakeProfileKey(FName RegionId, FName SpeciesId);
+
+	/** Helper to verify server authority */
+	bool HasServerAuthority() const;
 };

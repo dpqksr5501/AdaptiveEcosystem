@@ -1,7 +1,43 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Ecology/EcologyServerSubsystem.h"
+#include "Engine/World.h"
 #include "AdaptiveEcosystem.h"
+
+bool UEcologyServerSubsystem::ShouldCreateSubsystem(UObject* Outer) const
+{
+	if (!Super::ShouldCreateSubsystem(Outer))
+	{
+		return false;
+	}
+
+	const UWorld* World = Cast<UWorld>(Outer);
+	if (!World)
+	{
+		return false;
+	}
+
+	// Never create this authoritative subsystem on pure clients (NM_Client).
+	// Runs strictly on Standalone, Listen Server, or Dedicated Server.
+	const ENetMode NetMode = World->GetNetMode();
+	const bool bIsServerOrStandalone = (NetMode != NM_Client);
+
+	if (!bIsServerOrStandalone)
+	{
+		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("EcologyServerSubsystem: Skipped creation on NM_Client world."));
+	}
+
+	return bIsServerOrStandalone;
+}
+
+bool UEcologyServerSubsystem::HasServerAuthority() const
+{
+	if (const UWorld* World = GetWorld())
+	{
+		return World->GetNetMode() != NM_Client;
+	}
+	return false;
+}
 
 FName UEcologyServerSubsystem::MakeProfileKey(FName RegionId, FName SpeciesId)
 {
@@ -72,10 +108,61 @@ bool UEcologyServerSubsystem::GetSpeciesEvolutionProfile(FName RegionId, FName S
 
 void UEcologyServerSubsystem::SetSpeciesEvolutionProfile(const FSpeciesEvolutionProfile& InProfile)
 {
+	if (!HasServerAuthority())
+	{
+		UE_LOG(LogAdaptiveEcosystem, Error, TEXT("EcologyServerSubsystem: Attempted to mutate authoritative profile on NM_Client! Rejected."));
+		return;
+	}
+
 	const FName Key = MakeProfileKey(InProfile.RegionId, InProfile.SpeciesId);
 	AuthoritativeProfiles.Add(Key, InProfile);
 
 	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("EcologyServerSubsystem: Committed profile for [%s] (Rev: %lld, Scale: %.2f, Speed: %.2f, Fear: %.2f, Aggression: %.2f)"),
 		*Key.ToString(), InProfile.ProfileRevision, InProfile.Phenotype.BodyScale, InProfile.Gameplay.MoveSpeedMultiplier,
 		InProfile.Behavior.Fear, InProfile.Behavior.Aggression);
+}
+
+bool UEcologyServerSubsystem::CommitEvolutionProposal(
+	FName RegionId,
+	FName SpeciesId,
+	const FEvolutionProposal& Proposal,
+	int32 ExpectedWorldEpoch,
+	int32 ExpectedContextRevision,
+	FSpeciesEvolutionProfile& OutCommittedProfile,
+	FString& OutRejectReason)
+{
+	if (!HasServerAuthority())
+	{
+		OutRejectReason = TEXT("Must have server authority to commit evolution proposals.");
+		UE_LOG(LogAdaptiveEcosystem, Error, TEXT("EcologyServerSubsystem: %s"), *OutRejectReason);
+		return false;
+	}
+
+	FSpeciesEvolutionProfile CurrentProfile;
+	if (!GetSpeciesEvolutionProfile(RegionId, SpeciesId, CurrentProfile))
+	{
+		OutRejectReason = FString::Printf(TEXT("Base profile not found for [%s x %s]"), *RegionId.ToString(), *SpeciesId.ToString());
+		UE_LOG(LogAdaptiveEcosystem, Warning, TEXT("EcologyServerSubsystem: %s"), *OutRejectReason);
+		return false;
+	}
+
+	// Validate and apply proposal through the Evolution Validator
+	const FEvolutionValidationResult ValidationResult = UEvolutionValidator::ValidateAndApplyProposal(
+		CurrentProfile,
+		Proposal,
+		ExpectedWorldEpoch,
+		ExpectedContextRevision);
+
+	if (!ValidationResult.bAccepted)
+	{
+		OutRejectReason = ValidationResult.RejectReason;
+		UE_LOG(LogAdaptiveEcosystem, Warning, TEXT("EcologyServerSubsystem: Proposal rejected for [%s x %s]: %s"),
+			*RegionId.ToString(), *SpeciesId.ToString(), *OutRejectReason);
+		return false;
+	}
+
+	// Commit new authoritative profile
+	SetSpeciesEvolutionProfile(ValidationResult.CommittedProfile);
+	OutCommittedProfile = ValidationResult.CommittedProfile;
+	return true;
 }
