@@ -315,10 +315,13 @@ Mass를 사용할 경우 Mass Fragment는 내부 표현이고 이 구조가 외�
 Player/Creature/World에서 Server Ecology로 전달하는 명시적 사건.
 
 ```cpp
+UENUM(BlueprintType)
 enum class EEcologyEventType : uint8
 {
     CreatureKilled,
     CreatureDamaged,
+    CreatureGrazed,
+    VegetationHarvested,
     Encounter,
     Pursuit,
     RegionEntered,
@@ -327,20 +330,26 @@ enum class EEcologyEventType : uint8
     EnvironmentChanged
 };
 
+USTRUCT(BlueprintType)
 struct FEcologyEvent
 {
-    uint64 EventId;
-    uint32 WorldEpoch;
-    EEcologyEventType Type;
+    GENERATED_BODY()
+
+    int64 EventId = 0;
+    int32 WorldEpoch = 0;
+    EEcologyEventType Type = EEcologyEventType::RegionPresence;
     FName RegionId;
     FName SpeciesId;
-    uint64 StableAgentId;
-    float Magnitude;
-    double SimTimeSeconds;
+    int64 StableAgentId = 0;
+    float Magnitude = 1.0f;
+    double SimTimeSeconds = 0.0;
 };
 ```
 
-EventId는 중복 적용 방지에 사용한다.
+EventId는 중복 적용 방지에 사용하며, `UEcologyServerSubsystem::IngestEcologyEvent` 및 `RecordGrazing`을 통해 처리된다.
+초식 섭식(Grazing) 발생 시 `GrazingResistance`에 의해 식생 밀도 감소량이 완충(`EffectiveLoss = GrazingAmount * (1.0f - GrazingResistance)`)되며,
+가용 먹이(`FoodAvailability`) 감소 및 초식 압력(`GrazingPressure`) 누적이 유발된다.
+
 
 ---
 
@@ -533,3 +542,76 @@ ModelRevision
 ```
 
 Server가 기대하는 Schema와 불일치하면 Proposal을 reject/fallback한다.
+
+---
+
+## 17. Vegetation Evolution Contracts
+
+식생 종별 세대 단위 적응을 위한 데이터 계약. 단순 환경 상태(`VegetationDensity`, `FoodAvailability`)와 분리된 독립 Trait 프로필 체계를 갖는다.
+
+### Trait 범위 및 한계치
+
+| Trait | Hard Limit | 기본값 | 의미 |
+|---|---:|---:|---|
+| GrowthRate | 0.70 ~ 1.30 | 1.00 | 식생의 기본 성장 속도 배율 |
+| RegenerationRate | 0.70 ~ 1.30 | 1.00 | 채집/피식 후 회복 속도 배율 |
+| GrazingResistance | 0.00 ~ 1.00 | 0.50 | 초식동물 섭식에 대한 방어 저항성 (섭식 손실 감소) |
+
+* 세대당 최대 변화폭 (`MaxDeltaPerGen`): `0.10`
+* 돌연변이 예산 (`MutationBudget`): `0.20`
+
+### USTRUCT 정의
+
+```cpp
+USTRUCT(BlueprintType)
+struct FVegetationTraits
+{
+    GENERATED_BODY()
+
+    float GrowthRate = 1.0f;
+    float RegenerationRate = 1.0f;
+    float GrazingResistance = 0.5f;
+};
+
+USTRUCT(BlueprintType)
+struct FVegetationEvolutionProfile
+{
+    GENERATED_BODY()
+
+    FName RegionId;
+    FName VegetationSpeciesId;
+    int32 Generation = 0;
+    int64 ProfileRevision = 0;
+    FVegetationTraits Traits;
+};
+
+USTRUCT(BlueprintType)
+struct FVegetationEvolutionContext
+{
+    GENERATED_BODY()
+
+    int32 WorldEpoch = 0;
+    int32 ContextRevision = 0;
+    FName RegionId;
+    FName VegetationSpeciesId;
+    FRegionEnvironmentState Environment;
+    float HarvestPressure = 0.0f;
+    float GrazingPressure = 0.0f;
+    int32 Generation = 0;
+    FVegetationEvolutionProfile CurrentProfile;
+};
+
+USTRUCT(BlueprintType)
+struct FVegetationEvolutionProposal
+{
+    GENERATED_BODY()
+
+    int32 WorldEpoch = 0;
+    int32 ContextRevision = 0;
+    int32 ModelRevision = 0;
+    int32 SchemaRevision = 0;
+    float GrowthRateDelta = 0.0f;
+    float RegenerationRateDelta = 0.0f;
+    float GrazingResistanceDelta = 0.0f;
+};
+```

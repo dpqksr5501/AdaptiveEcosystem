@@ -43,3 +43,41 @@ void AEcologyRegion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 	Super::EndPlay(EndPlayReason);
 }
+
+void AEcologyRegion::ApplyVegetationConsumption(float ConsumedAmount, float GrazingResistance)
+{
+	if (ConsumedAmount <= 0.0f)
+	{
+		return;
+	}
+
+	// Grazing resistance softens the loss of actual plant biomass/density (clamped up to 90% resistance)
+	const float ClampedResistance = FMath::Clamp(GrazingResistance, 0.0f, 0.90f);
+	const float DensityLoss = ConsumedAmount * (1.0f - ClampedResistance);
+
+	EnvironmentState.VegetationDensity = FMath::Clamp(EnvironmentState.VegetationDensity - DensityLoss, 0.0f, 1.0f);
+	EnvironmentState.FoodAvailability = FMath::Clamp(EnvironmentState.FoodAvailability - ConsumedAmount, 0.0f, EnvironmentState.VegetationDensity);
+}
+
+void AEcologyRegion::ApplyVegetationRegrowth(float DeltaTime, float GrowthRate, float RegenerationRate)
+{
+	if (DeltaTime <= 0.0f)
+	{
+		return;
+	}
+
+	// Base regrowth speeds per second
+	constexpr float BaseGrowthSpeed = 0.02f;
+	constexpr float BaseRegenSpeed = 0.04f;
+
+	// Rainfall positively impacts plant biomass growth (Rainfall 0..1 maps to 0.5x..1.5x)
+	const float RainFactor = FMath::Clamp(0.5f + EnvironmentState.Rainfall, 0.5f, 1.5f);
+
+	const float GrowthDelta = BaseGrowthSpeed * FMath::Max(0.1f, GrowthRate) * RainFactor * DeltaTime;
+	EnvironmentState.VegetationDensity = FMath::Clamp(EnvironmentState.VegetationDensity + GrowthDelta, 0.0f, 1.0f);
+
+	// Food availability regenerates up to current vegetation density
+	const float FoodDelta = BaseRegenSpeed * FMath::Max(0.1f, RegenerationRate) * DeltaTime;
+	EnvironmentState.FoodAvailability = FMath::Clamp(EnvironmentState.FoodAvailability + FoodDelta, 0.0f, EnvironmentState.VegetationDensity);
+}
+

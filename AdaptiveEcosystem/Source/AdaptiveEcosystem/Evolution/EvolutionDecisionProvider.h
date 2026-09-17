@@ -39,8 +39,12 @@ public:
 	bool RequestProposal(const FEvolutionContext& Context, FEvolutionProposal& OutProposal);
 };
 
+DECLARE_DELEGATE_TwoParams(FOnEvolutionProposalCompleted, bool /*bSuccess*/, const FEvolutionProposal& /*Proposal*/);
+DECLARE_DELEGATE_TwoParams(FOnVegetationEvolutionProposalCompleted, bool /*bSuccess*/, const FVegetationEvolutionProposal& /*Proposal*/);
+
 /**
  * Default rule/dummy evolution decision provider used when LLM is disabled or offline.
+ * Also provides an asynchronous worker interface ensuring Game Thread non-blocking execution.
  */
 UCLASS(BlueprintType, Blueprintable)
 class ADAPTIVEECOSYSTEM_API UDummyEvolutionDecisionProvider : public UObject, public IEvolutionDecisionProvider
@@ -49,4 +53,27 @@ class ADAPTIVEECOSYSTEM_API UDummyEvolutionDecisionProvider : public UObject, pu
 
 public:
 	virtual bool RequestProposal_Implementation(const FEvolutionContext& Context, FEvolutionProposal& OutProposal) override;
+
+	/**
+	 * Generates a rule-based dummy proposal for vegetation adaptation (e.g. Grass_A response to grazing pressure).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Evolution")
+	static bool RequestVegetationProposal(const FVegetationEvolutionContext& Context, FVegetationEvolutionProposal& OutProposal);
+
+	/**
+	 * Asynchronously generates an evolution proposal on a background worker thread.
+	 * Dispatches result back to the Game Thread, preventing any game thread stalls.
+	 */
+	static void RequestProposalAsync(
+		const FEvolutionContext& Context,
+		FOnEvolutionProposalCompleted OnCompleted);
+
+	/**
+	 * Asynchronously generates a vegetation proposal on a background worker thread.
+	 * Dispatches result back to the Game Thread.
+	 */
+	static void RequestVegetationProposalAsync(
+		const FVegetationEvolutionContext& Context,
+		FOnVegetationEvolutionProposalCompleted OnCompleted);
 };
+

@@ -407,3 +407,188 @@ struct FEvolutionProposal
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Evolution")
 	float NightActivityDelta = 0.0f;
 };
+
+// -----------------------------------------------------------------------------
+// 7. Vegetation Trait Limits & Constants
+// -----------------------------------------------------------------------------
+
+namespace EcoVegetationTraitLimits
+{
+	constexpr float GrowthRateMin = 0.70f;
+	constexpr float GrowthRateMax = 1.30f;
+	constexpr float RegenerationRateMin = 0.70f;
+	constexpr float RegenerationRateMax = 1.30f;
+	constexpr float GrazingResistanceMin = 0.00f;
+	constexpr float GrazingResistanceMax = 1.00f;
+
+	constexpr float DefaultMaxDeltaPerGen = 0.10f;
+	constexpr float DefaultMutationBudget = 0.20f;
+}
+
+// -----------------------------------------------------------------------------
+// 8. Vegetation Traits & Evolution Contracts
+// -----------------------------------------------------------------------------
+
+/**
+ * Trait group representing long-term adaptive characteristics of a vegetation species.
+ */
+USTRUCT(BlueprintType)
+struct FVegetationTraits
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Traits", meta = (ClampMin = "0.70", ClampMax = "1.30"))
+	float GrowthRate = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Traits", meta = (ClampMin = "0.70", ClampMax = "1.30"))
+	float RegenerationRate = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Traits", meta = (ClampMin = "0.00", ClampMax = "1.00"))
+	float GrazingResistance = 0.5f;
+};
+
+/**
+ * Authoritative species evolution profile for vegetation (Region x VegetationSpecies).
+ */
+USTRUCT(BlueprintType)
+struct FVegetationEvolutionProfile
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Profile")
+	FName RegionId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Profile")
+	FName VegetationSpeciesId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Profile")
+	int32 Generation = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Profile")
+	int64 ProfileRevision = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Profile")
+	FVegetationTraits Traits;
+};
+
+/**
+ * Snapshot passed to Evolution LLM / decision provider for vegetation adaptation.
+ */
+USTRUCT(BlueprintType)
+struct FVegetationEvolutionContext
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	int32 WorldEpoch = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	int32 ContextRevision = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	FName RegionId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	FName VegetationSpeciesId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	FRegionEnvironmentState Environment;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	float HarvestPressure = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	float GrazingPressure = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	int32 Generation = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	FVegetationEvolutionProfile CurrentProfile;
+};
+
+/**
+ * Delta proposal generated for vegetation species before server validation.
+ */
+USTRUCT(BlueprintType)
+struct FVegetationEvolutionProposal
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	int32 WorldEpoch = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	int32 ContextRevision = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	int32 ModelRevision = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	int32 SchemaRevision = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	float GrowthRateDelta = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	float RegenerationRateDelta = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Vegetation|Evolution")
+	float GrazingResistanceDelta = 0.0f;
+};
+
+// -----------------------------------------------------------------------------
+// 9. Ecology Events & Ingestion Contracts
+// -----------------------------------------------------------------------------
+
+/**
+ * Event types ingested by the server ecology layer to track pressure and resource dynamics.
+ */
+UENUM(BlueprintType)
+enum class EEcologyEventType : uint8
+{
+	CreatureKilled       UMETA(DisplayName = "Creature Killed"),
+	CreatureDamaged      UMETA(DisplayName = "Creature Damaged"),
+	CreatureGrazed       UMETA(DisplayName = "Creature Grazed"),
+	VegetationHarvested  UMETA(DisplayName = "Vegetation Harvested"),
+	Encounter            UMETA(DisplayName = "Encounter"),
+	Pursuit              UMETA(DisplayName = "Pursuit"),
+	RegionEntered        UMETA(DisplayName = "Region Entered"),
+	RegionPresence       UMETA(DisplayName = "Region Presence"),
+	ResourceChanged      UMETA(DisplayName = "Resource Changed"),
+	EnvironmentChanged   UMETA(DisplayName = "Environment Changed")
+};
+
+/**
+ * Authoritative event passed to UEcologyServerSubsystem to accumulate pressure or trigger updates.
+ */
+USTRUCT(BlueprintType)
+struct FEcologyEvent
+{
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event")
+	int64 EventId = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event")
+	int32 WorldEpoch = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event")
+	EEcologyEventType Type = EEcologyEventType::RegionPresence;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event")
+	FName RegionId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event")
+	FName SpeciesId;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event")
+	int64 StableAgentId = 0;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event")
+	float Magnitude = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event")
+	double SimTimeSeconds = 0.0;
+};
+

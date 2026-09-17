@@ -45,4 +45,20 @@ public:
 	/** Updates current environment state */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Region")
 	void SetEnvironmentState(const FRegionEnvironmentState& InState) { EnvironmentState = InState; }
+
+	/**
+	 * Consumes vegetation in this region due to grazing or harvesting.
+	 * Effective vegetation density loss is mitigated by GrazingResistance.
+	 * Food availability is reduced by ConsumedAmount.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Region")
+	void ApplyVegetationConsumption(float ConsumedAmount, float GrazingResistance);
+
+	/**
+	 * Regrows vegetation and recovers food availability based on species traits.
+	 * FoodAvailability is capped by current VegetationDensity.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Region")
+	void ApplyVegetationRegrowth(float DeltaTime, float GrowthRate, float RegenerationRate);
+
 };

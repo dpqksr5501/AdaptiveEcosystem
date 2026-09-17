@@ -168,3 +168,101 @@ FEvolutionValidationResult UEvolutionValidator::ValidateAndApplyProposal(
 
 	return Result;
 }
+
+FVegetationValidationResult UEvolutionValidator::ValidateAndApplyVegetationProposal(
+	const FVegetationEvolutionProfile& CurrentProfile,
+	const FVegetationEvolutionProposal& Proposal,
+	int32 ExpectedWorldEpoch,
+	int32 ExpectedContextRevision,
+	float MutationBudget,
+	float MaxDeltaPerGen)
+{
+	FVegetationValidationResult Result;
+	Result.bAccepted = false;
+	Result.CommittedProfile = CurrentProfile;
+
+	// 1. Check Staleness
+	if (Proposal.WorldEpoch != ExpectedWorldEpoch)
+	{
+		Result.RejectReason = FString::Printf(TEXT("Stale WorldEpoch: Expected %d, Got %d"), ExpectedWorldEpoch, Proposal.WorldEpoch);
+		UE_LOG(LogAdaptiveEcosystem, Warning, TEXT("EvolutionValidator (Vegetation): %s"), *Result.RejectReason);
+		return Result;
+	}
+
+	if (Proposal.ContextRevision != ExpectedContextRevision)
+	{
+		Result.RejectReason = FString::Printf(TEXT("Stale ContextRevision: Expected %d, Got %d"), ExpectedContextRevision, Proposal.ContextRevision);
+		UE_LOG(LogAdaptiveEcosystem, Warning, TEXT("EvolutionValidator (Vegetation): %s"), *Result.RejectReason);
+		return Result;
+	}
+
+	// 2. Check Finite Values
+	const float Deltas[] = {
+		Proposal.GrowthRateDelta,
+		Proposal.RegenerationRateDelta,
+		Proposal.GrazingResistanceDelta
+	};
+
+	for (float Delta : Deltas)
+	{
+		if (!IsValidFloat(Delta))
+		{
+			Result.RejectReason = TEXT("Non-finite delta detected in vegetation evolution proposal.");
+			UE_LOG(LogAdaptiveEcosystem, Warning, TEXT("EvolutionValidator (Vegetation): %s"), *Result.RejectReason);
+			return Result;
+		}
+	}
+
+	// 3. Clamp Individual Deltas to MaxDeltaPerGen
+	float GrowthRateDelta = FMath::Clamp(Proposal.GrowthRateDelta, -MaxDeltaPerGen, MaxDeltaPerGen);
+	float RegenerationRateDelta = FMath::Clamp(Proposal.RegenerationRateDelta, -MaxDeltaPerGen, MaxDeltaPerGen);
+	float GrazingResistanceDelta = FMath::Clamp(Proposal.GrazingResistanceDelta, -MaxDeltaPerGen, MaxDeltaPerGen);
+
+	// 4. Calculate Total Delta and Enforce Mutation Budget
+	float TotalDelta = FMath::Abs(GrowthRateDelta) + FMath::Abs(RegenerationRateDelta) + FMath::Abs(GrazingResistanceDelta);
+	Result.TotalDeltaSum = TotalDelta;
+
+	if (TotalDelta > MutationBudget && TotalDelta > KINDA_SMALL_NUMBER)
+	{
+		const float BudgetScale = MutationBudget / TotalDelta;
+		GrowthRateDelta *= BudgetScale;
+		RegenerationRateDelta *= BudgetScale;
+		GrazingResistanceDelta *= BudgetScale;
+
+		Result.TotalDeltaSum = MutationBudget;
+		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("EvolutionValidator (Vegetation): Proposal scaled down by factor %.3f to meet Mutation Budget %.2f"),
+			BudgetScale, MutationBudget);
+	}
+
+	// 5. Apply Clamped Deltas and Enforce Trait Hard Limits
+	FVegetationEvolutionProfile NewProfile = CurrentProfile;
+
+	NewProfile.Traits.GrowthRate = FMath::Clamp(
+		CurrentProfile.Traits.GrowthRate + GrowthRateDelta,
+		EcoVegetationTraitLimits::GrowthRateMin,
+		EcoVegetationTraitLimits::GrowthRateMax);
+
+	NewProfile.Traits.RegenerationRate = FMath::Clamp(
+		CurrentProfile.Traits.RegenerationRate + RegenerationRateDelta,
+		EcoVegetationTraitLimits::RegenerationRateMin,
+		EcoVegetationTraitLimits::RegenerationRateMax);
+
+	NewProfile.Traits.GrazingResistance = FMath::Clamp(
+		CurrentProfile.Traits.GrazingResistance + GrazingResistanceDelta,
+		EcoVegetationTraitLimits::GrazingResistanceMin,
+		EcoVegetationTraitLimits::GrazingResistanceMax);
+
+	// 6. Increment Generation & Profile Revision
+	NewProfile.Generation = CurrentProfile.Generation + 1;
+	NewProfile.ProfileRevision = CurrentProfile.ProfileRevision + 1;
+
+	Result.bAccepted = true;
+	Result.CommittedProfile = NewProfile;
+
+	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("EvolutionValidator (Vegetation): Successfully validated proposal for [%s x %s] -> New Gen: %d, Rev: %lld (Growth: %.2f, Regen: %.2f, Resist: %.2f)"),
+		*NewProfile.RegionId.ToString(), *NewProfile.VegetationSpeciesId.ToString(),
+		NewProfile.Generation, NewProfile.ProfileRevision,
+		NewProfile.Traits.GrowthRate, NewProfile.Traits.RegenerationRate, NewProfile.Traits.GrazingResistance);
+
+	return Result;
+}
