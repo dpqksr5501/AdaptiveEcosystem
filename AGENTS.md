@@ -8,41 +8,49 @@
 
 - **실제 Unreal Engine 프로젝트 루트**: `AdaptiveEcosystem/` (`AdaptiveEcosystem/AdaptiveEcosystem.uproject`)
 - **표준 엔진 버전**: **Unreal Engine 5.8**
+- **핵심 목표**: **MassEntity 기반 동적 생태계 + Python PPO 학습 + Unreal C++ Policy Inference + MassFlock 조향**
 - **모듈 구조**: 단일 런타임 모듈 `AdaptiveEcosystem` (`AdaptiveEcosystem/Source/AdaptiveEcosystem/`)
 - **설계 및 참조 문서 위치**:
-  - `AdaptiveEcosystem/Docs/초기설정/`: 아키텍처, 데이터 계약, 역할 정의 문서
-  - `AdaptiveEcosystem/Docs/초기설정2/`: 부트스트랩 안정화 작업 지침
+  - `AdaptiveEcosystem/Docs/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md`: 동적 생태계 최신 아키텍처 정의서
+  - `AdaptiveEcosystem/Docs/POLICY_CONTRACT_V1.md`: PPO 관측/행동 사양 및 정규화 계약서
+  - `AdaptiveEcosystem/Docs/MASS_PROCESSOR_ORDER.md`: Mass Processor 실행 순서 및 스레드 안전성
+  - `AdaptiveEcosystem/Docs/RL_TRAINING_PIPELINE.md`: Python 학습 환경 및 Export 파이프라인
+  - `AdaptiveEcosystem/Docs/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md`: 전환 마스터 가이드라인
+  - `AdaptiveEcosystem/Docs/초기 문서/`: 초기 기반 아키텍처, 영속 식별자 계약, 에셋 감사 및 부트스트랩 히스토리
 
 ---
 
 ## 2. 필수 준수 원칙
 
-1. **Server가 최종 권위(Authority)다**:
-   - 논리적 생태계 상태, 개체군, 자원, 에너지, 환경 압력, 확정된 진화 프로필(`FSpeciesEvolutionProfile`)은 Server/Standalone World에만 존재한다.
-   - Client는 복제된 Actor 및 요약(Summary) DTO만 수신한다.
-2. **AI / LLM은 제안(Proposal)만 생성한다**:
-   - LLM 및 Policy AI는 `FEvolutionProposal` 또는 `FSimulationPolicyProposal`과 같은 구조화된 제안만 반환한다.
-   - AI가 Unreal Actor, Mass Entity, 게임 상태를 직접 수정(Mutate)하는 것은 엄격히 금지된다.
-   - 모든 제안은 Server-side Validator(`EvolutionValidator`)를 통과한 뒤에만 커밋된다.
-3. **실제 LLM Blocking Inference 금지**:
-   - Game Thread를 차단하는 동기식 LLM 추론을 만들지 않는다.
-   - `IEvolutionDecisionProvider::RequestProposal`은 Rule-based/더미 fallback용이며, 실제 LLM은 비동기 Worker/Task 및 결과 큐를 통해 통합한다.
-4. **Subsystem은 Replication Transport가 아니다**:
-   - `UEcologyServerSubsystem`, `UEcologyWorldSubsystem` 등의 `UWorldSubsystem`은 로컬 서비스 관리자이며 직접 네트워크 복제 프로퍼티나 RPC를 갖지 않는다.
-   - 복제는 `AGameStateBase` 파생 클래스 또는 명시적인 Replicated Actor/Component를 통해 수행한다.
-5. **책임 경계 (Layer Boundaries)**:
-   - **World**: 지리적 공간, 환경 파라미터(`FRegionEnvironmentState`), 스폰 영역을 제공하며, 진화나 개체군을 결정하지 않는다.
-   - **Server / Ecology**: 서버 권위 상태, 플레이어 압력 집계, 대규모 논리 시뮬레이션(Mass), 상태 커밋을 담당한다.
-   - **Creature Runtime**: 확정된 프로필(`FSpeciesEvolutionProfile`)을 받아 외형(스케일, 메시, 머티리얼) 및 행동(이동속도, AI 성향)으로 표현할 뿐, 진화의 이유나 서버 내부 상태를 알지 못한다.
-6. **영속 ID 식별 원칙**:
-   - Mass Entity handle, Actor pointer, ISM instance index는 외부 영속 ID가 아니다.
-   - 장기 논리 ID는 `StableAgentId` (`int64`), `RegionId` (`FName`), `SpeciesId` (`FName`), `WorldEpoch` / `ProfileRevision`을 사용한다.
-7. **과도한 임의 리팩터링 금지**:
-   - 팀 합의 없이 대규모 디렉터리 이동, 임의 플러그인 추출, 템플릿 에셋 일괄 삭제를 수행하지 않는다.
+1. **동적 생태계 폐루프(Feedback Loop)가 본체다**:
+   - 시스템의 성공 기준은 단순 PPO 이동이 아닌, 환경/플레이어 압력에 의해 지역 생태 상태(`FRegionEcologyState`)가 변하고, 개체 관측 및 PPO 행동이 달라지며, 먹이 소비·생존·피식·사망·이주 결과가 다시 자원(`FoodAmount`)과 개체군(`Population`)을 변화시키는 닫힌 루프의 완성이다.
+2. **Server / Standalone World가 최종 권위(Authority)다**:
+   - 논리적 생태계 상태, 자원 잔여량, 피식 기록(`PredationHistory`), Mass Entity 논리 상태는 Server / Standalone World에만 존재한다.
+   - Client는 요약(Summary) DTO 및 시각적 표현(Actor)만 수신한다.
+3. **PPO Policy는 Shared Model, Per-Agent Observation으로 동작한다**:
+   - 모든 개체는 하나의 학습된 가중치 네트워크(7 → 64 → 64 → 4)를 공유하며, 각자의 개별 관측(`FEcoObservationFragment`)을 입력받아 개별 행동 가중치(`FEcoPolicyOutputFragment`)를 출력한다.
+   - PPO 출력(forage, cohesion, flee_dist, cover)은 절대 `Shared Fragment`에 저장하지 않고 개체별 `Entity Fragment`에 저장하여 Archetype churn을 방지한다.
+4. **Unreal C++ Native Deterministic Inference**:
+   - 게임 런타임에 Python 인터프리터를 내장하거나 Game Thread를 블로킹하는 외부 프로세스 추론을 일절 사용하지 않는다.
+   - Python에서 학습/익스포트된 가중치(Weights & Biases)를 C++ Native 계산 함수로 직접 고속 추론한다.
+5. **Sim-to-Sim 파리티(Parity) 준수**:
+   - Python Gym/Aquarium 관측(7개)과 C++ 관측의 순서, 정규화 공식, 클램프 범위, 행동(4개) 역매핑 공식은 `Docs/POLICY_CONTRACT_V1.md`에 완벽히 일치해야 하며 Golden Vector 테스트로 검증한다.
+6. **Subsystem은 Replication Transport가 아니다**:
+   - `UEcologySimulationSubsystem`, `UEcologyWorldSubsystem` 등은 로컬 서비스 관리자이며 직접 네트워크 프로퍼티나 RPC를 갖지 않는다.
+7. **책임 경계 (Layer Boundaries)**:
+   - **World**: 지리적 경계(`AEcologyRegion`), 날씨/낮밤 물리 환경(`FRegionEnvironmentState`) 제공.
+   - **Ecology Simulation**: 생태계 총괄 관리(`UEcologySimulationSubsystem`), 지역 자원(`FoodAmount`), 피식 기록(`PredationHistory`), 개체군 집계 관리.
+   - **Mass Logical Creatures**: 대규모 개체 생명주기(Vitals, Travel, Observation, Policy, Steering, Lifecycle). 단일 진실값(Source of Truth).
+   - **Creature Representation**: Mass 개체의 시각화(Mesh, Anim, Collision, Actor). 논리 상태의 주인이 아님.
+8. **영속 ID 및 런타임 식별 원칙**:
+   - 장기 식별: `StableAgentId` (`int64`), `RegionId` (`FName`), `SpeciesId` (`FName`).
+   - Mass Hot-path: `RegionRuntimeIndex`, `SpeciesRuntimeIndex` 등 compact index 활용.
+9. **Legacy LLM Trait Evolution 분리**:
+   - 기존의 세대별 바디스케일 변형, LLM Proposal/Validator 기반 Trait Evolution 코드는 신규 동적 생태계 경로에 영향을 주지 않도록 격리하며, 신규 코드가 이를 의존하지 않는다.
 
 ---
 
 ## 3. 작업 전/후 확인 절차
 
-1. 소스 수정 전 항상 기존 C++ 계약(`Source/AdaptiveEcosystem/Core/EcoDataContracts.h`) 및 문서를 확인한다.
-2. 컴파일 안전성을 유지하며, 변경 후 반드시 UnrealBuildTool(`AdaptiveEcosystemEditor Win64 Development`) 빌드를 수행하여 검증한다.
+1. 소스 수정 전 항상 핵심 계약(`Source/AdaptiveEcosystem/Core/`, `AI/Policy/`, `Mass/`)을 확인한다.
+2. 컴파일 안전성을 최우선으로 유지하며, 변경 후 반드시 UnrealBuildTool(`AdaptiveEcosystemEditor Win64 Development`) 빌드를 수행하여 검증한다.

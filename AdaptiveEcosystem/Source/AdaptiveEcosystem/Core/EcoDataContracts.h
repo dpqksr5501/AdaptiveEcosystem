@@ -3,36 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/EcoIds.h"
+#include "Core/EcoRegionTypes.h"
+#include "AI/Policy/EcoPolicyContracts.h"
 #include "EcoDataContracts.generated.h"
-
-// -----------------------------------------------------------------------------
-// 1. Environment State
-// -----------------------------------------------------------------------------
-
-/**
- * World environment parameters for a specific region.
- * Owned and updated by World / Level layer.
- */
-USTRUCT(BlueprintType)
-struct FRegionEnvironmentState
-{
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Environment")
-	float Temperature = 20.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Environment")
-	float Humidity = 0.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Environment")
-	float Rainfall = 0.2f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Environment")
-	float VegetationDensity = 0.7f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Environment")
-	float FoodAvailability = 0.8f;
-};
 
 // -----------------------------------------------------------------------------
 // 2. Player Pressure State

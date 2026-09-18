@@ -18,7 +18,18 @@ public class AdaptiveEcosystem : ModuleRules
 			"StateTreeModule",
 			"GameplayStateTreeModule",
 			"UMG",
-			"Slate"
+			"Slate",
+			"StructUtils",
+			"MassCore",
+			"MassEntity",
+			"MassCommon",
+			"MassMovement",
+			"MassSpawner",
+			"MassNavigation",
+			"MassSimulation",
+			"MassLOD",
+			"MassRepresentation",
+			"MassActors"
 		});
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
@@ -32,6 +43,9 @@ public class AdaptiveEcosystem : ModuleRules
 			"AdaptiveEcosystem/Evolution",
 			"AdaptiveEcosystem/Network",
 			"AdaptiveEcosystem/Debug",
+			"AdaptiveEcosystem/Mass",
+			"AdaptiveEcosystem/AI",
+			"AdaptiveEcosystem/AI/Policy",
 			"AdaptiveEcosystem/Variant_Platforming",
 			"AdaptiveEcosystem/Variant_Platforming/Animation",
 			"AdaptiveEcosystem/Variant_Combat",
