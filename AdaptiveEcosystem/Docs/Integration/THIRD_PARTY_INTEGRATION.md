@@ -2,7 +2,7 @@
 
 > 기준 엔진: **Unreal Engine 5.8**  
 > 모듈: `AdaptiveEcosystem`  
-> 연계 문서: [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md)
+> 연계 문서: [THIRD_PARTY_NOTICES.md](../../../THIRD_PARTY_NOTICES.md)
 
 ---
 

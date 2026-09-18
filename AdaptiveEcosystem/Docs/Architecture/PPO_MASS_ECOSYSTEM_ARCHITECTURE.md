@@ -3,7 +3,7 @@
 > 기준 엔진: **Unreal Engine 5.8**  
 > 모듈: `AdaptiveEcosystem`  
 > 상태: **Active Architecture Specification**  
-> 관련 핵심 문서: [POLICY_CONTRACT_V1.md](POLICY_CONTRACT_V1.md), [MASS_PROCESSOR_ORDER.md](MASS_PROCESSOR_ORDER.md), [RL_TRAINING_PIPELINE.md](RL_TRAINING_PIPELINE.md)
+> 관련 핵심 문서: [POLICY_CONTRACT_V1.md](../RL_Policy/POLICY_CONTRACT_V1.md), [MASS_PROCESSOR_ORDER.md](../Mass/MASS_PROCESSOR_ORDER.md), [RL_TRAINING_PIPELINE.md](../RL_Policy/RL_TRAINING_PIPELINE.md)
 
 ---
 

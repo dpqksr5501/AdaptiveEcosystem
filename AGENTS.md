@@ -11,11 +11,11 @@
 - **핵심 목표**: **MassEntity 기반 동적 생태계 + Python PPO 학습 + Unreal C++ Policy Inference + MassFlock 조향**
 - **모듈 구조**: 단일 런타임 모듈 `AdaptiveEcosystem` (`AdaptiveEcosystem/Source/AdaptiveEcosystem/`)
 - **설계 및 참조 문서 위치**:
-  - `AdaptiveEcosystem/Docs/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md`: 동적 생태계 최신 아키텍처 정의서
-  - `AdaptiveEcosystem/Docs/POLICY_CONTRACT_V1.md`: PPO 관측/행동 사양 및 정규화 계약서
-  - `AdaptiveEcosystem/Docs/MASS_PROCESSOR_ORDER.md`: Mass Processor 실행 순서 및 스레드 안전성
-  - `AdaptiveEcosystem/Docs/RL_TRAINING_PIPELINE.md`: Python 학습 환경 및 Export 파이프라인
-  - `AdaptiveEcosystem/Docs/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md`: 전환 마스터 가이드라인
+  - `AdaptiveEcosystem/Docs/Architecture/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md`: 동적 생태계 최신 아키텍처 정의서
+  - `AdaptiveEcosystem/Docs/RL_Policy/POLICY_CONTRACT_V1.md`: PPO 관측/행동 사양 및 정규화 계약서
+  - `AdaptiveEcosystem/Docs/Mass/MASS_PROCESSOR_ORDER.md`: Mass Processor 실행 순서 및 스레드 안전성
+  - `AdaptiveEcosystem/Docs/RL_Policy/RL_TRAINING_PIPELINE.md`: Python 학습 환경 및 Export 파이프라인
+  - `AdaptiveEcosystem/Docs/Migration/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md`: 전환 마스터 가이드라인
   - `AdaptiveEcosystem/Docs/초기 문서/`: 초기 기반 아키텍처, 영속 식별자 계약, 에셋 감사 및 부트스트랩 히스토리
 
 ---

@@ -1,7 +1,7 @@
 # 01. 기반 아키텍처 및 Mass 설계 (Original Architecture & Mass Design)
 
 > 본 문서는 프로젝트 초기 수립된 아키텍처 계층 원칙과 대규모 군집(MassEntity) 시뮬레이션 기본 설계의 핵심 가치를 보존한 문서입니다.  
-> 최신 PPO 동적 생태계 사양은 [Docs/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md](../PPO_MASS_ECOSYSTEM_ARCHITECTURE.md)를 참조하십시오.
+> 최신 PPO 동적 생태계 사양은 [Docs/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md](../Architecture/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md)를 참조하십시오.
 
 ---
 
