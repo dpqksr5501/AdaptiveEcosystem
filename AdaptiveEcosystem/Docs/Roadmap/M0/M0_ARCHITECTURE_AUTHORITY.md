@@ -2,7 +2,8 @@
 
 ## 목표
 
-기존 LLM Trait Evolution 경로와 신규 PPO + Mass 경로가 동시에 본체가 되지 않도록 프로젝트의 활성 아키텍처를 하나로 통일한다. Network, Simulation, Mass, World와 Representation의 상태 소유권을 먼저 고정한다.
+기존 LLM Trait Evolution 경로와 신규 PPO + Mass 경로가 동시에 본체가 되지 않도록 프로젝트의 활성 아키텍처를 하나로 통일한다. 
+Network, Simulation, Mass, World와 Representation의 상태 소유권을 먼저 고정한다.
 
 ## 범위
 
@@ -16,6 +17,7 @@
 ## 주요 산출물
 
 - [Mass Network Authority Contract](../Network/MASS_NETWORK_AUTHORITY_CONTRACT.md)
+- [M0 세부 구현 계획](M0_IMPLEMENTATION_PLAN.md)
 - 정리된 공통 데이터 계약
 - Server/Client Processor 분류 기준
 - Legacy와 Active Runtime의 명확한 경계

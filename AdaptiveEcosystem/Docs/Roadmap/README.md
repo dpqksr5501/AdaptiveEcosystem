@@ -23,7 +23,7 @@
 
 | Milestone | 목표 | 주요 결과 |
 | :---: | :--- | :--- |
-| [M0](M0_ARCHITECTURE_AUTHORITY.md) | 아키텍처와 권위 통일 | 단일 상태 소유권과 Network Contract 확정 |
+| [M0](M0_ARCHITECTURE_AUTHORITY.md) · [구현 계획](M0_IMPLEMENTATION_PLAN.md) | 아키텍처와 권위 통일 | 단일 상태 소유권과 Network Contract 확정 |
 | [M1](M1_STEAM_SESSION_FOUNDATION.md) | Steam 방 생성/참가 | Listen Server 기반 멀티플레이 수직 슬라이스 |
 | [M2](M2_MASS_NETWORK_VERTICAL_SLICE.md) | Mass 네트워크 검증 | Server Entity와 Client Mass 프록시 연결 |
 | [M3](M3_ECOLOGY_SIMULATION_CORE.md) | 생태 Simulation 본체 | Food, Energy, Death, Migration 폐루프 |
