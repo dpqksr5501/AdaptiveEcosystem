@@ -30,7 +30,15 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 기존 Server+LLM 구조에서 PPO+Mass 구조로의 단계별 전환 마스터 가이드를 다룹니다.
 - 🗺️ [AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md](Migration/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md) : PR별 단계별 전환 계획 및 완료 기준(DoD)
 
-### 6. 초기 문서 (기반 문서 및 히스토리)
+### 6. Network (멀티플레이 권위 계약)
+Steam Session과 MassEntity 멀티플레이의 권위 및 복제 경계를 다룹니다.
+- 🌐 [MASS_NETWORK_AUTHORITY_CONTRACT.md](Network/MASS_NETWORK_AUTHORITY_CONTRACT.md) : Listen Server, Client Mass 프록시, Region Summary와 상태 소유권 계약
+
+### 7. Roadmap (MVP Milestones)
+PPO + Mass 생태계와 Steam 멀티플레이를 단계별로 완성하기 위한 MVP 로드맵입니다.
+- 🧭 [Roadmap/README.md](Roadmap/README.md) : 방향성 검증 결과, Milestone 순서 및 MVP 완료 기준
+
+### 8. 초기 문서 (기반 문서 및 히스토리)
 프로젝트 초기 부트스트랩 단계에서 수립된 불변 원칙과 개발 이력을 보존합니다.
 - 🏛️ [01_기반_아키텍처_및_Mass설계.md](초기%20문서/01_기반_아키텍처_및_Mass설계.md) : World vs Server vs Creature 3대 계층 경계 및 Mass 기본 설계
 - 🔑 [02_영속식별자_및_초기데이터계약.md](초기%20문서/02_영속식별자_및_초기데이터계약.md) : `StableAgentId`, `RegionId`, `SpeciesId` 등 영속 식별자 계약
@@ -43,4 +51,6 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 1. [Architecture/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md](Architecture/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md) (전체 그림 파악)
 2. [RL_Policy/POLICY_CONTRACT_V1.md](RL_Policy/POLICY_CONTRACT_V1.md) (관측 및 행동 계약 이해)
 3. [Mass/MASS_PROCESSOR_ORDER.md](Mass/MASS_PROCESSOR_ORDER.md) (Mass 실행 흐름 이해)
-4. [Migration/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md](Migration/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md) (단계별 개발 목표 확인)
+4. [Network/MASS_NETWORK_AUTHORITY_CONTRACT.md](Network/MASS_NETWORK_AUTHORITY_CONTRACT.md) (멀티플레이 권위와 복제 경계 이해)
+5. [Roadmap/README.md](Roadmap/README.md) (MVP Milestone 순서 확인)
+6. [Migration/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md](Migration/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md) (상세 전환 계획 확인)
