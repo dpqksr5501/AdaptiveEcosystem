@@ -20,9 +20,11 @@ struct FEcoIdentityFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
-	/** Globally unique and persistent logical ID */
-	UPROPERTY(EditAnywhere, Category = "Ecology|Mass")
-	int64 StableAgentId = 0;
+	/**
+	 * Globally unique logical ID issued by the authoritative server world.
+	 * This is deliberately not an FMassEntityHandle or transport/network ID.
+	 */
+	FEcoAgentId StableAgentId = EcoIds::InvalidAgentId;
 
 	/** Canonical species identifier */
 	UPROPERTY(EditAnywhere, Category = "Ecology|Mass")
