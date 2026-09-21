@@ -1,0 +1,14 @@
+# Phase 1 (환경) — 이것만 있으면 tests / bench / replay 가 전부 돈다
+numpy>=1.24
+PyYAML>=6.0
+matplotlib>=3.7
+pytest>=7.0
+imageio-ffmpeg>=0.4        # replay.py mp4 출력용 ffmpeg 바이너리. 없으면 gif로 떨어진다
+
+# Phase 2 이후 (아직 설치하지 않았다)
+# optuna>=3.4              # §5.2 Utility AI 튜닝, §6.4 PPO 하이퍼파라미터
+# stable-baselines3>=2.2   # §6.3 PPO
+# torch>=2.0               # SB3 백엔드 (이미 설치되어 있음)
+
+# marl-aquarium 은 의존성이 아니다. §11-A 판단으로 자체 World 를 쓴다.
+# 근거: docs/aquarium_notes.md §7
