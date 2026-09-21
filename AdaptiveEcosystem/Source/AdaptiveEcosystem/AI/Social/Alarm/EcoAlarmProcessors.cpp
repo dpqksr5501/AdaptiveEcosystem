@@ -19,6 +19,7 @@ UEcoAlarmPropagationProcessor::UEcoAlarmPropagationProcessor()
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	bAutoRegisterWithProcessingPhases = true;
+	bRequiresGameThreadExecution = true; // Ensures GameThread serialized access for HerdSubsystem
 }
 
 void UEcoAlarmPropagationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
@@ -40,10 +41,19 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 		return;
 	}
 
-	const UEcoHerdSubsystem* HerdSubsystem = World->GetSubsystem<UEcoHerdSubsystem>();
+	UEcoHerdSubsystem* HerdSubsystem = World->GetSubsystem<UEcoHerdSubsystem>();
 	const float DeltaTime = Context.GetDeltaTimeSeconds();
 
-	EntityQuery.ForEachEntityChunk(Context, [HerdSubsystem, DeltaTime](FMassExecutionContext& ChunkContext)
+	// Step 1: GameThread serialized decay of herd-level alarms
+	if (HerdSubsystem)
+	{
+		HerdSubsystem->DecayHerdAlarms(DeltaTime, 0.2f);
+	}
+
+	const UEcoHerdSubsystem* ConstHerdSubsystem = HerdSubsystem;
+
+	// Step 2: Per-agent alarm propagation, distance attenuation, and state transition
+	EntityQuery.ForEachEntityChunk(Context, [ConstHerdSubsystem, DeltaTime](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
 		TConstArrayView<FEcoIdentityFragment> IdentityList = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
@@ -58,17 +68,17 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 			const FVector AgentLocation = TransformList[i].GetTransform().GetLocation();
 			const int32 HerdIndex = MemberList[i].HerdRuntimeIndex;
 
-			// 1. Continuous time-based decay of alarm intensity
+			// 1. Continuous time-based decay of individual alarm intensity
 			if (Alarm.AlarmStrength > 0.0f)
 			{
 				Alarm.AlarmStrength = FMath::Max(0.0f, Alarm.AlarmStrength - SocialConfig.AlarmTimeDecay * DeltaTime);
 			}
 
 			// 2. Synchronize threat signals from herd aggregate if available
-			if (HerdSubsystem && HerdIndex != INDEX_NONE_ECO)
+			if (ConstHerdSubsystem && HerdIndex != INDEX_NONE_ECO)
 			{
 				FEcoHerdRuntimeData HerdData;
-				if (HerdSubsystem->GetHerdData(HerdIndex, HerdData) && HerdData.AlarmStrength > 0.0f)
+				if (ConstHerdSubsystem->GetHerdData(HerdIndex, HerdData) && HerdData.AlarmStrength > 0.0f)
 				{
 					// Distance-attenuated reception from herd's threat center
 					const float DistToThreat = FVector::Dist(AgentLocation, HerdData.LastThreatPosition);
@@ -94,8 +104,8 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 			}
 			else if (Alarm.AlarmStrength > 0.0f)
 			{
-				// Recovering if previously alarmed, or regrouping if herd was scattered
-				Alarm.State = (Alarm.State == EEcoSocialState::Panic || Alarm.State == EEcoSocialState::Alert)
+				// Transition to Recovering when cooling down from Panic/Alert, or Regrouping if scattered
+				Alarm.State = (Alarm.State == EEcoSocialState::Panic || Alarm.State == EEcoSocialState::Alert || Alarm.State == EEcoSocialState::Recovering)
 					? EEcoSocialState::Recovering
 					: EEcoSocialState::Regrouping;
 			}

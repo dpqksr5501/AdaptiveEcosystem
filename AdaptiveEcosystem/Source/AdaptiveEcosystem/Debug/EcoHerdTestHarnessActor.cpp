@@ -158,7 +158,19 @@ void AEcoHerdTestHarnessActor::SpawnTestHerds()
 		HerdFrag.JoinDwellTimer = 0.0f;
 		HerdFrag.LeaveDwellTimer = 0.0f;
 
+		FEcoPolicyOutputFragment& PolicyOutputFrag = EntityManager.GetFragmentDataChecked<FEcoPolicyOutputFragment>(Entity);
+		PolicyOutputFrag.Action.Forage = 0.8f;
+		PolicyOutputFrag.Action.Cohesion = 0.5f;
+		PolicyOutputFrag.Action.FleeDist = 0.2f;
+		PolicyOutputFrag.Action.Cover = 0.1f;
+
+		FEcoAlarmStateFragment& AlarmFrag = EntityManager.GetFragmentDataChecked<FEcoAlarmStateFragment>(Entity);
+		AlarmFrag.AlarmStrength = 0.0f;
+		AlarmFrag.State = EEcoSocialState::Calm;
+		AlarmFrag.LastThreatPosition = FVector::ZeroVector;
+
 		FEcoSocialBehaviorFragment& SocialFrag = EntityManager.GetFragmentDataChecked<FEcoSocialBehaviorFragment>(Entity);
+		SocialFrag.ModulatedAction = PolicyOutputFrag.Action;
 		SocialFrag.SocialCohesionMultiplier = 1.0f;
 		SocialFrag.bWantsNewHerd = false;
 	}
