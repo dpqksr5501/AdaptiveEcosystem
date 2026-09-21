@@ -154,8 +154,12 @@ void UEcoHerdSubsystem::EmitHerdAlarm(int32 HerdRuntimeIndex, const FVector& Thr
 	if (IsValidHerdIndex(HerdRuntimeIndex))
 	{
 		FEcoHerdRuntimeData& Herd = ActiveHerds[HerdRuntimeIndex];
-		Herd.AlarmStrength = FMath::Clamp(FMath::Max(Herd.AlarmStrength, Strength), 0.0f, 1.0f);
-		Herd.LastThreatPosition = ThreatLocation;
+		const float ClampedStrength = FMath::Clamp(Strength, 0.0f, 1.0f);
+		if (ClampedStrength >= Herd.AlarmStrength)
+		{
+			Herd.AlarmStrength = ClampedStrength;
+			Herd.LastThreatPosition = ThreatLocation;
+		}
 	}
 }
 

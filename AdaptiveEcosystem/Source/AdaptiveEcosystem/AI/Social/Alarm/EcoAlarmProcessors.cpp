@@ -3,6 +3,7 @@
 #include "AI/Social/Alarm/EcoAlarmProcessors.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/Herd/EcoHerdSubsystem.h"
+#include "AI/Social/Herd/EcoHerdProcessors.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassCommonTypes.h"
@@ -18,6 +19,7 @@ UEcoAlarmPropagationProcessor::UEcoAlarmPropagationProcessor()
 {
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
+	ExecutionOrder.ExecuteAfter.Add(UEcoHerdAggregateProcessor::StaticClass()->GetFName());
 	bAutoRegisterWithProcessingPhases = true;
 	bRequiresGameThreadExecution = true; // Ensures GameThread serialized access for HerdSubsystem
 }
