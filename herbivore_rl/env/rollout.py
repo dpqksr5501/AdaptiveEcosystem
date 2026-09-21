@@ -48,7 +48,12 @@ def rollout(cfg: Config, policy, seed: int, steps: int) -> dict:
 
 
 def _init_worker() -> None:
-    """배열이 작아서 BLAS 스레딩은 순손해다. 워커끼리 코어를 뺏지 않게 막는다."""
+    """배열이 작아서 BLAS 스레딩은 순손해다. 워커끼리 코어를 뺏지 않게 막는다.
+
+    `learned` 정책을 평가할 때는 워커에서도 torch가 실린다. Anaconda MKL과 torch가
+    OpenMP 런타임을 두 벌 싣는 문제(env/torch_init.py 참조)를 여기서도 막아 둔다.
+    """
+    os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
     for var in ("OMP_NUM_THREADS", "MKL_NUM_THREADS", "OPENBLAS_NUM_THREADS"):
         os.environ[var] = "1"
 

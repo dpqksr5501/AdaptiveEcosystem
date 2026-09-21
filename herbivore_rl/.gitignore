@@ -6,9 +6,12 @@ results/_*
 
 # 학습 산출물 (Phase 3 이후)
 runs/
-ckpt/
 *.zip
 optuna*.db
+# ckpt/ 는 디렉터리째 무시하면 하위 예외가 안 먹는다. 내용물을 무시한다.
+ckpt/*
+# 측정 기준선 json만 남긴다 — §6.6 판정 근거이고 몇 백 바이트다
+!ckpt/warmstart_baseline.json
 
 __pycache__/
 *.py[cod]

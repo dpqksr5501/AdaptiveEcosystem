@@ -49,6 +49,10 @@ def make_policy(spec: dict):
 
 def _make_learned(spec: dict):
     """§7.1 — sigmoid(model.predict(obs, deterministic=True)[0]). Phase 3 이후."""
+    # 워커 프로세스에서도 torch가 실리므로 여기서도 먼저 잡아 준다. 안 하면
+    # OMP Error #15 로 워커가 통째로 죽고 BrokenProcessPool 이 된다.
+    import env.torch_init  # noqa: F401
+
     try:
         from stable_baselines3 import PPO
     except ImportError as e:  # pragma: no cover - Phase 3 전

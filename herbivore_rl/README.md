@@ -3,7 +3,12 @@
 초식 몬스터 행동 정책 학습. 사양서는 `herbivore_policy_spec.md` (저장소 밖, 프로젝트 루트 상위).
 아래 §는 전부 그 사양서의 절 번호다.
 
-**현재 상태: Phase 2 (Utility AI · 튜닝) 완료.**
+**현재 상태: Phase 3 (PPO 학습) 코드 완료, §6.6 기준 미달 — §11-B 판단 대기 중.**
+
+> §6.6의 "10M 후 모방 초기화 대비 +20%" 를 달성하지 못했다 (−1.5%). 측정 결과 이
+> 환경에서는 **상태를 안 보는 고정 행동 하나가 튜닝된 Utility AI와 10M PPO를 둘 다
+> 이긴다.** 네 정책의 차이가 전부 시드 잡음 안이다. 원인과 §11-B 선택지 검토는
+> [docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md).
 
 ## 설치
 
@@ -32,7 +37,16 @@ python replay.py --policy random
 python tune_utility.py
 ```
 
-`tune_utility.py` 는 SQLite(`optuna_utility.db`)에 붙으므로 중단해도 이어서 돈다.
+```bash
+python warmstart.py && python train.py --steps 10000000
+```
+
+튜닝 스크립트는 SQLite(`optuna_*.db`)에 붙으므로 중단해도 이어서 돈다.
+
+> **Anaconda 주의.** MKL(numpy)과 torch가 Intel OpenMP 런타임을 두 벌 싣는다.
+> torch를 쓰는 진입점은 `import env.torch_init` 을 **가장 먼저** 해야 한다
+> (`train.py` / `warmstart.py` / `tune_ppo.py` 는 이미 그렇게 돼 있다).
+> 안 하면 `OMP: Error #15` 로 죽는다. 이유와 대처는 `env/torch_init.py` 참조.
 
 ## 구조
 
@@ -44,10 +58,15 @@ python tune_utility.py
 | `env/world.py` | 환경 본체 (§4). N=128 슬롯 고정, 전부 numpy 벡터 연산 |
 | `env/steering.py` | §3.3 조향 참조 구현. **언리얼 C++(§9.5)와 한 줄씩 대응한다** |
 | `env/rollout.py` | 시드별 롤아웃 → §7.2 통계. 튜닝과 평가가 **같은 목표 함수**를 쓰게 하는 한 곳 |
+| `env/vec_env.py` | §6.2 SB3 VecEnv. **(-3,3) → sigmoid 변환이 있는 유일한 곳** (§1.3) |
+| `env/torch_init.py` | Anaconda OpenMP 충돌 대처. torch 쓰는 파일이 맨 먼저 import |
 | `env/bench.py` | 속도 측정 (§4.6) |
 | `policies/utility.py` | §5.1 비교군 수식 + §5.2 탐색 범위 |
 | `policies/registry.py` | 정책 스펙(dict) → 콜러블. 워커 프로세스로 넘기려면 picklable해야 한다 |
 | `tune_utility.py` | §5.2 Optuna 튜닝 |
+| `warmstart.py` | §6.1 모방 초기화. `ckpt/warmstart.zip` + §6.6 기준선 json |
+| `train.py` | §6.3 PPO + §6.5 행동 로깅. **PPO 설정의 유일한 출처** |
+| `tune_ppo.py` | §6.4 하이퍼파라미터 탐색 (5개만. 구조는 탐색 금지) |
 | `replay.py` | 리플레이 영상 (§4.6, §5.3) |
 | `tests/` | §4.6 · §5.3 완료 기준 + 조향·수식 계약 검증 |
 | `docs/aquarium_notes.md` | §4.1 Aquarium 조사와 §11-A 판단 |
@@ -76,7 +95,7 @@ python tune_utility.py
 
 ## 다음
 
-Phase 3 (§6): `warmstart.py`, `env/vec_env.py`, `train.py`, `tune_ppo.py`.
-`pip install stable-baselines3` 가 먼저 필요하다.
-시작 전에 [docs/phase1_env_calibration.md](docs/phase1_env_calibration.md) §4의 남은
-한계를 읽을 것.
+**Phase 4로 가기 전에 §11-B 결정이 필요하다.**
+[docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md) §4의 선택지 검토를 읽을 것.
+현재 상태로 Phase 4를 돌리면 `compare.md` 는 "차이 없음"이 된다 (§7.3이 허용하는
+결과이긴 하다).
