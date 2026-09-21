@@ -53,9 +53,12 @@ void UEcoShelterQueryProcessor::Execute(FMassEntityManager& EntityManager, FMass
 
 	const double CurrentTime = World->GetTimeSeconds();
 
-	EntityQuery.ForEachEntityChunk(Context, [ShelterSubsystem, CurrentTime](FMassExecutionContext& ChunkContext)
+	int32 MatchedEntitiesCount = 0;
+
+	EntityQuery.ForEachEntityChunk(Context, [ShelterSubsystem, CurrentTime, &MatchedEntitiesCount](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
+		MatchedEntitiesCount += NumEntities;
 		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 		TConstArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetFragmentView<FEcoAlarmStateFragment>();
 		TConstArrayView<FEcoSocialBehaviorFragment> SocialList = ChunkContext.GetFragmentView<FEcoSocialBehaviorFragment>();
@@ -113,6 +116,15 @@ void UEcoShelterQueryProcessor::Execute(FMassEntityManager& EntityManager, FMass
 			}
 		}
 	});
+
+#if !(UE_BUILD_SHIPPING)
+	static int32 LastReportedMatchedCount = -1;
+	if (MatchedEntitiesCount != LastReportedMatchedCount)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[UEcoShelterQueryProcessor] Query matched %d entities in world."), MatchedEntitiesCount);
+		LastReportedMatchedCount = MatchedEntitiesCount;
+	}
+#endif
 }
 
 // -----------------------------------------------------------------------------

@@ -8,6 +8,8 @@
 #include "MassMovementFragments.h"
 #include "MassEntityManager.h"
 #include "MassEntityUtils.h"
+#include "MassEntityQuery.h"
+#include "MassExecutionContext.h"
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 
@@ -114,8 +116,13 @@ void AEcoHerdTestHarnessActor::SpawnTestHerds()
 	SpeciesShared.LeaveDwellTime = 1.0f;
 	const FSharedStruct SharedConfig = EntityManager.GetOrCreateSharedFragment(SpeciesShared);
 
+	FEcoSpeciesSharedFragment SpeciesBaseShared;
+	SpeciesBaseShared.CoverSearchRadius = CoverSearchRadius;
+	const FSharedStruct SpeciesBaseConfig = EntityManager.GetOrCreateSharedFragment(SpeciesBaseShared);
+
 	FMassArchetypeSharedFragmentValues SharedValues;
 	SharedValues.Add(SharedConfig);
+	SharedValues.Add(SpeciesBaseConfig);
 
 	const FMassArchetypeHandle Archetype = EntityManager.CreateArchetype(FragmentsAndTags);
 	EntityManager.BatchCreateEntities(Archetype, SharedValues, EntityCount, SpawnedEntities);
@@ -173,9 +180,31 @@ void AEcoHerdTestHarnessActor::SpawnTestHerds()
 		SocialFrag.ModulatedAction = PolicyOutputFrag.Action;
 		SocialFrag.SocialCohesionMultiplier = 1.0f;
 		SocialFrag.bWantsNewHerd = false;
+
+		FEcoShelterIntentFragment& ShelterFrag = EntityManager.GetFragmentDataChecked<FEcoShelterIntentFragment>(Entity);
+		ShelterFrag.Reset();
 	}
 
-	UE_LOG(LogTemp, Log, TEXT("[AEcoHerdTestHarnessActor] Spawned %d entities across %d clusters."), SpawnedEntities.Num(), SafeClusterCount);
+	// 4. Verify that UEcoShelterQueryProcessor requirements match the spawned entities
+	FMassEntityQuery ShelterMatchingQuery;
+	ShelterMatchingQuery.Initialize(EntityManager.AsShared());
+	ShelterMatchingQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
+	ShelterMatchingQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	ShelterMatchingQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
+	ShelterMatchingQuery.AddRequirement<FEcoSocialBehaviorFragment>(EMassFragmentAccess::ReadOnly);
+	ShelterMatchingQuery.AddRequirement<FEcoShelterIntentFragment>(EMassFragmentAccess::ReadOnly);
+	ShelterMatchingQuery.AddSharedRequirement<FEcoSpeciesSharedFragment>(EMassFragmentAccess::ReadOnly);
+	ShelterMatchingQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+
+	int32 MatchedCount = 0;
+	FMassExecutionContext VerifyContext(EntityManager);
+	ShelterMatchingQuery.ForEachEntityChunk(VerifyContext, [&MatchedCount](FMassExecutionContext& ChunkContext)
+	{
+		MatchedCount += ChunkContext.GetNumEntities();
+	});
+
+	UE_LOG(LogTemp, Log, TEXT("[AEcoHerdTestHarnessActor] Spawned %d entities across %d clusters. ShelterQuery matching check matched %d entities (CoverSearchRadius: %.1f)."),
+		SpawnedEntities.Num(), SafeClusterCount, MatchedCount, CoverSearchRadius);
 }
 
 void AEcoHerdTestHarnessActor::ClearTestHerds()
