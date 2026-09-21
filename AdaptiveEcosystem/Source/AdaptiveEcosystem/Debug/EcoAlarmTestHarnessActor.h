@@ -3,8 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/Actor.h"
+#include "MassEntityQuery.h"
 #include "EcoAlarmTestHarnessActor.generated.h"
+
+struct FMassEntityManager;
 
 /**
  * Debug/Test harness actor for injecting threat alarms and verifying the Alarm Communication MVP.
@@ -74,6 +76,14 @@ public:
 	void HardResetAllAlarms();
 
 private:
+	void EnsureQueriesInitialized(FMassEntityManager& EntityManager);
+
 	/** Timestamp of last triggered threat for visual pulsation */
 	double LastThreatTriggerTime = 0.0;
+
+	/** Cached Mass queries */
+	FMassEntityQuery DebugQuery;
+	FMassEntityQuery HardResetQuery;
+	bool bQueriesInitialized = false;
 };
+

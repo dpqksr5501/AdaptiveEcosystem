@@ -69,6 +69,28 @@ void AEcoAlarmTestHarnessActor::ClearAllAlarms()
 	}
 }
 
+void AEcoAlarmTestHarnessActor::EnsureQueriesInitialized(FMassEntityManager& EntityManager)
+{
+	if (bQueriesInitialized)
+	{
+		return;
+	}
+
+	DebugQuery.Initialize(EntityManager.AsShared());
+	DebugQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
+	DebugQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	DebugQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly);
+	DebugQuery.AddRequirement<FEcoSocialBehaviorFragment>(EMassFragmentAccess::ReadOnly);
+	DebugQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadOnly);
+	DebugQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+
+	HardResetQuery.Initialize(EntityManager.AsShared());
+	HardResetQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadWrite);
+	HardResetQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+
+	bQueriesInitialized = true;
+}
+
 void AEcoAlarmTestHarnessActor::HardResetAllAlarms()
 {
 	UWorld* World = GetWorld();
@@ -84,12 +106,9 @@ void AEcoAlarmTestHarnessActor::HardResetAllAlarms()
 	}
 
 	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*World);
+	EnsureQueriesInitialized(EntityManager);
+
 	FMassExecutionContext Context(EntityManager);
-
-	FMassEntityQuery HardResetQuery;
-	HardResetQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadWrite);
-	HardResetQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
-
 	HardResetQuery.ForEachEntityChunk(Context, [](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
@@ -158,16 +177,9 @@ void AEcoAlarmTestHarnessActor::Tick(float DeltaSeconds)
 	if (bDrawEntityAlarmStates)
 	{
 		FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*World);
+		EnsureQueriesInitialized(EntityManager);
+
 		FMassExecutionContext Context(EntityManager, DeltaSeconds);
-
-		FMassEntityQuery DebugQuery;
-		DebugQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
-		DebugQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-		DebugQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly);
-		DebugQuery.AddRequirement<FEcoSocialBehaviorFragment>(EMassFragmentAccess::ReadOnly);
-		DebugQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadOnly);
-		DebugQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
-
 		int32 DisplayTextBudget = 15; // Limit 3D text labels to avoid viewport clutter
 
 		DebugQuery.ForEachEntityChunk(Context, [World, &DisplayTextBudget](FMassExecutionContext& ChunkContext)
