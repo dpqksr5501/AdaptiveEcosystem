@@ -37,6 +37,7 @@ _use_korean_font()
 
 from env.config import load_config  # noqa: E402
 from env.world import World  # noqa: E402
+from policies.registry import make_policy  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
 
@@ -46,21 +47,13 @@ FOOD_CMAP = LinearSegmentedColormap.from_list(
 )
 
 
-# --------------------------------------------------------------------- #
-# 정책
-# --------------------------------------------------------------------- #
-
-
-def make_policy(name: str, cfg, seed: int = 0):
-    """관측 (N,7) → 행동 (N,4) in [0,1]. §1.3에 따라 sigmoid는 여기서 적용되지 않는다."""
-    if name == "random":
-        rng = np.random.default_rng(seed)
-        return lambda obs: rng.random((len(obs), 4))
-    if name == "utility":
-        raise SystemExit("--policy utility 는 Phase 2 (policies/utility.py) 이후에 쓸 수 있다.")
-    if name == "learned":
-        raise SystemExit("--policy learned 는 Phase 3 (ckpt/final.zip) 이후에 쓸 수 있다.")
-    raise SystemExit(f"알 수 없는 정책: {name}")
+def spec_for(args) -> dict:
+    """CLI 인자 → `policies.registry` 스펙."""
+    if args.policy == "random":
+        return {"kind": "random", "seed": args.seed}
+    if args.policy == "utility":
+        return {"kind": "utility", "params": "default" if args.default_params else None}
+    return {"kind": "learned", "model": args.model}
 
 
 # --------------------------------------------------------------------- #
@@ -196,11 +189,14 @@ def main(argv=None) -> int:
     p.add_argument("--fps", type=int, default=30)
     p.add_argument("--out", default=None)
     p.add_argument("--config", default=None)
+    p.add_argument("--model", default="ckpt/final.zip", help="--policy learned 용")
+    p.add_argument("--default-params", action="store_true",
+                   help="utility를 §5.1 기본값으로. 기본은 configs/utility_best.yaml")
     args = p.parse_args(argv)
 
     cfg = load_config(args.config)
     world = World(cfg, seeds=[args.seed])
-    policy = make_policy(args.policy, cfg, seed=args.seed)
+    policy = make_policy(spec_for(args))
 
     print(f"수집 중: {args.steps} 스텝 (매 {args.stride}스텝 1프레임)")
     frames = collect(world, policy, args.steps, args.stride)

@@ -54,7 +54,10 @@ pred_ranged_catch_r: 3.0    # §4.2 원거리형 포획 거리
 pred_ranged_catch_p: 0.02   # 원거리형 스텝당 포획 확률
 pred_ranged_speed_mult: 0.6 # §4.2 "느리게 접근"
 pred_wander_turn: 0.15      # 목표 없을 때 스텝당 최대 선회 (rad)
-pred_eat_cd: 60             # 포식 후 식사 쿨다운 (스텝). 포식 압력의 상한
+pred_eat_cd: 5              # 포식 후 식사 쿨다운 (스텝). 포식 압력의 상한.
+                            # 60은 과교정이었다 — 포식률이 슬롯당 1.9까지 내려가
+                            # flee 축이 죽었다. 5에서 도주에 내부 최적점이 생긴다.
+                            # 측정: docs/phase1_env_calibration.md §6
 
 # ── 보상 (§3.4) ──────────────────────────────────────
 rew_alive: 0.01
