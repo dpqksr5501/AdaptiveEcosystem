@@ -6,6 +6,7 @@
 #include "Core/EcoIds.h"
 #include "MassProcessor.h"
 #include "MassEntityQuery.h"
+#include "Mass/EntityHandle.h"
 #include "EcoShelterProcessors.generated.h"
 
 /**
@@ -49,11 +50,10 @@ private:
 
 	struct FSlotProposal
 	{
+		FMassEntityHandle Entity;
 		int64 StableAgentId = 0;
 		int32 SlotIndex = INDEX_NONE_ECO;
 		float Score = 0.0f;
-		int32 ChunkIndex = 0;
-		int32 EntityIndexInChunk = 0;
 	};
 
 	TArray<FSlotProposal> Proposals;

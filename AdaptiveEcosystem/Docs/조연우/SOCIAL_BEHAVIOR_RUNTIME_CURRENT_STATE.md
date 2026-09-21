@@ -3,9 +3,9 @@
 > **Project:** AdaptiveEcosystem (Unreal Engine 5.8)  
 > **Repository:** `dpqksr5501/AdaptiveEcosystem`  
 > **Target Module:** `AdaptiveEcosystem` (Source/AdaptiveEcosystem/AI/Social/)  
-> **Active Base Branch:** `feat/social-alarm-mvp` (커밋 `8a4f31d` 기준)  
-> **Last Updated:** 2026-09-21  
-> **Status:** Dynamic Herd MVP (`Editor Verified`) / Alarm Communication MVP (`Editor Verified`) / Shelter MVP (`Pending`)
+> **Active Base Branch:** `feat/social-shelter-mvp`  
+> **Last Updated:** 2026-09-22  
+> **Status:** Dynamic Herd MVP (Editor Verified) / Alarm Communication MVP (Editor Verified) / Shelter MVP (Implemented / Editor Verification Pending)
 
 ---
 
@@ -59,7 +59,8 @@
 1. **PPO Policy V1 계약 불변**: 7차원 관측, 4차원 행동의 순서, 정규화 공식, 클램프 범위 수정 금지.
 2. **PPO Raw Action 영구 보존**: `FEcoPolicyOutputFragment`는 `EMassFragmentAccess::ReadOnly`로 보호하며 직접 덮어쓰기 금지.
 3. **MassFlock 침범 금지**: 로컬 조향 로직을 Social Runtime에 작성하지 않음.
-4. **GameThread 직렬화 준수**: Mass 병렬 청크 루프 내부에서 `UWorldSubsystem`의 가변 상태를 직접 수정하지 않고, **Proposal $\to$ Reconciliation** 패턴 사용.
+4. **GameThread 직렬화 준수**: Mass 병렬 청크 루프 내부에서 `UWorldSubsystem`의 가변 상태를 직접 수정하지 않고, **Proposal $\to$ Deterministic Reconciliation $\to$ Commit** 패턴 사용.
+5. **LOS/Occlusion 검증**: 실제 언리얼 지형/구조물(`ECC_WorldStatic`) 라인트레이스를 통해 위협 대비 차폐 여부를 물리적으로 검증.
 
 ---
 
@@ -71,7 +72,9 @@
 3. **Threat 수신 & 감쇠**: 외부 위협 발생 시 Herd가 수신 후 구성원에게 거리 지수 감쇠($e^{-\alpha d}$) 전파 및 시간 감쇠.
 4. **상태 머신 전이**: 감쇠 강도에 따라 `Calm` $\leftrightarrow$ `Alert` $\leftrightarrow$ `Panic` $\leftrightarrow$ `Recovering` $\leftrightarrow$ `Regrouping` 전이.
 5. **Social Response 변조**: 개체별 상태에 따라 `FEcoSocialBehaviorFragment.ModulatedAction`에 안전하게 보정값 산출.
-6. **Shelter 질의/예약**: Panic 또는 Cover 욕구 시 유효 은신처 검색 및 결정론적 슬롯 예약.
+6. **Shelter 질의**: `Panic` 상태이거나 `ModulatedAction.Cover >= 0.25f`인 개체가 위협 위치 및 지형 차폐도를 고려하여 은신처/슬롯 탐색 (`Searching`).
+7. **결정론적 예약 중재**: 동일 슬롯 경합 시 `Score` 내림차순 및 `StableAgentId` 오름차순 타이브레이크를 거쳐 단일 승자 확정 (`Reserved`), `TargetPosition` 확정.
+8. **안전 복귀 시 슬롯 해제**: 위협이 해제되어 `Calm` 복귀 시 `ReleaseSlot` 호출로 슬롯 반환.
 
 ### 3.2 Mass Processor 명시적 실행 순서 (Phase: `PrePhysics`, Group: `Behavior`)
 ```mermaid
@@ -79,8 +82,8 @@ graph TD
     A["UEcoHerdMembershipProcessor<br/>(Join/Leave Hysteresis & Proposal)"] -->|ExecuteAfter| B["UEcoHerdAggregateProcessor<br/>(Centroid / AvgVelocity 2-Pass Reduction)"]
     B -->|ExecuteAfter| C["UEcoAlarmPropagationProcessor<br/>(Herd/Agent Decay & Distance Attenuation)"]
     C -->|ExecuteAfter| D["UEcoSocialResponseProcessor<br/>(ModulatedAction Non-destructive Blend)"]
-    D -->|ExecuteAfter| E["UEcoShelterQueryProcessor<br/>(Search & Scoring, Pending)"]
-    E -->|ExecuteAfter| F["UEcoShelterReservationProcessor<br/>(Slot Reservation, Pending)"]
+    D -->|ExecuteAfter| E["UEcoShelterQueryProcessor<br/>(Cover Trigger, LineTrace Occlusion & Proposal)"]
+    E -->|ExecuteAfter| F["UEcoShelterReservationProcessor<br/>(Deterministic Sort, Subsystem Commit & Release)"]
     F -.->|Future Hand-off| G["MassFlock Steering Processors<br/>(Movement Execution)"]
 ```
 
@@ -139,11 +142,11 @@ graph TD
 - 테스트 하네스: [`AEcoAlarmTestHarnessActor`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/Debug/EcoAlarmTestHarnessActor.h)
 - **평상시 (`Continuous Threat = false`)**: 전 개체 🟢 `[Calm] Str: 0.00`, Raw Action과 Modulated Action 일치 확인.
 - **지속 위협 (`Continuous Threat = true`)**:
-  - 위협 근접 개체: 🟡 `[Alert]` (주황색 구체)
-  - 외곽/재집결 개체: 🟣 `[Regrouping / Recovering]` (보라색 구체)
-  - 실시간 거리 감쇠 및 상태 분기 확인.
+   - 위협 근접 개체: 🟡 `[Alert]` (주황색 구체)
+   - 외곽/재집결 개체: 🟣 `[Regrouping / Recovering]` (보라색 구체)
+   - 실시간 거리 감쇠 및 상태 분기 확인.
 - **위협 종료 (`ClearAllAlarms`)**:
-  - 즉각 0 리셋이 아닌 시간 감쇠를 거쳐 `Panic` $\to$ `Alert` $\to$ `Recovering` $\to$ `Calm` 자연 복귀 확인.
+   - 즉각 0 리셋이 아닌 시간 감쇠를 거쳐 `Panic` $\to$ `Alert` $\to$ `Recovering` $\to$ `Calm` 자연 복귀 확인.
 
 ---
 
@@ -171,25 +174,47 @@ FEcoSocialBehaviorFragment::ModulatedAction (FEcoPolicyActionV1)
 
 ---
 
-## 7. Shelter / Cover Runtime 현황 (`Pending`)
+## 7. Shelter / Cover Runtime 현황 (`Implemented / Editor Verification Pending`)
 
-- **상태**: **Pending (기본 뼈대 존재, 고도화 및 검증 대기)**
-- **현재 소스 코드 위치**:
+- **상태**: **Implemented / Editor Verification Pending (구현 및 컴파일 완료, 에디터 검증 대기)**
+- **작업 브랜치**: `feat/social-shelter-mvp`
+- **핵심 소스 파일**:
   - [`EcoShelterAnchor.h / .cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterAnchor.h): 레벨 배치형 은신처 앵커 액터.
-  - [`EcoShelterSubsystem.h / .cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterSubsystem.h): 슬롯 등록/예약 및 만료 처리.
+  - [`EcoShelterSubsystem.h / .cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterSubsystem.h): 슬롯 등록/예약/해제 및 위협 지형 차폐(`LineTrace`) 판정.
   - [`EcoShelterProcessors.h / .cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterProcessors.h): `UEcoShelterQueryProcessor`, `UEcoShelterReservationProcessor`.
+  - [`EcoShelterTestHarnessActor.h / .cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/Debug/EcoShelterTestHarnessActor.h): 3D HUD 및 에디터 검증 하네스 액터.
 
-### 7.1 현재 구현된 뼈대 (Current Skeleton)
-- 은신처 등록 및 고정 용량(`Capacity`) 슬롯 분할.
-- 예약 만료 타이머(`ReservationExpireTime`) 기반 자동 슬롯 회수.
-- 에이전트의 `FEcoShelterIntentFragment` (`None`, `Searching`, `Reserved`, `Moving`, `Occupied`).
+### 7.1 구현 상세 (Implemented)
+1. **PPO Modulated Cover 트리거 연동**:
+   - `FEcoPolicyOutputFragment`의 원본을 건드리지 않고, [`FEcoSocialBehaviorFragment::ModulatedAction.Cover`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/EcoSocialFragments.h#L100-L115) $\ge 0.25f$ 또는 `EEcoSocialState::Panic` 상태를 기준으로 은신처 탐색 개시.
+2. **실제 물리 지형 차폐 검증 (Threat-relative World Occlusion)**:
+   - 단순 법선 벡터(Normal) 내적 대신, 위협 위치(`LastThreatPosition`)로부터 은신처 좌표까지 `ECC_WorldStatic` 충돌 채널로 `LineTraceSingleByChannel` 수행.
+   - 지형에 의해 완전히 가려진(Hit) 경우 은신처 차폐 점수 $1.0$, 노출된 경우 $0.1$ 부여. 위협 반대 방향 법선 보너스 가산.
+3. **복합 은신처 평가 점수 (Composite Scoring)**:
+   - $\text{Score} = \text{Quality} \times 0.25 + \text{DistanceRatio} \times 0.35 + \text{OcclusionScore} \times 0.40$
+   - 거리뿐만 아니라 실제 안전 차폐도와 은신처 품질이 반영되어 노출된 가까운 은신처보다 지형 뒤 안전한 은신처 우선 선택.
+4. **결정론적 슬롯 예약 중재 (Deterministic Reconciliation)**:
+   - 병렬 청크에서 공유 배열에 무차별 등록하지 않고, `bRequiresGameThreadExecution = true`가 보장된 프로세서에서 제안 수집 후 정렬:
+     1. `SlotIndex` 오름차순
+     2. `Candidate Score` 내림차순 (점수 높은 개체 우선)
+     3. `StableAgentId` 오름차순 (동점 시 고유 ID 기반 결정론적 타이브레이크)
+   - 선착순 경합(First-Come-First-Served Race)을 완전히 제거.
+5. **FEcoShelterIntentFragment 상태 머신 & TargetPosition 제공**:
+   - `None` $\to$ `Searching` $\to$ `Reserved` 전이 흐름 확립.
+   - 예약 승인 시 `TargetPosition = Slot.Position`을 기록하여 추후 MassFlock 이동 계층에서 참조할 단일 목적지 좌표 확립.
+   - 위협 종료 또는 위험 반경 이탈 시 `ReleaseSlot`을 호출하여 슬롯 자동 회수 및 `None` 복귀.
+6. **슬롯 원형 고른 분배 (Circular Slot Distribution)**:
+   - `AEcoShelterAnchor` 등록 시 $\text{Angle} = \frac{2\pi \cdot \text{SlotIdx}}{\text{Capacity}}$ 공식으로 `Radius` 반경에 슬롯 균등 분배.
 
-### 7.2 차기 구현 과제 (Next Tasks — `SHELTER_COVER_MVP_AGENT_PROMPT.md` 준수)
-1. **PPO Modulated Cover 연동**: `FEcoSocialBehaviorFragment.ModulatedAction.Cover` 수치와 `Panic` 상태를 트리거로 은신처 탐색 개시.
-2. **LOS / Occlusion 판정 개선**: 위협 위치(`LastThreatPosition`)로부터 은신처 지형/구조물이 시야를 차폐하는지 물리/벡터 차폐 점수 산출.
-3. **결정론적 슬롯 예약 승인 (Reconciliation)**: 복수 개체가 동일 슬롯을 동시 요청할 때 거리/위협도 기반 단일 승인 처리.
-4. **MassFlock 전달용 타겟 좌표 제공**: `TargetShelterLocation`을 프래그먼트에 기록하여 이동 계층에 전달.
-5. **독립 검증 하네스 신설**: `AEcoShelterTestHarnessActor`를 통한 은신처 점유/예약/해제 에디터 3D 시각화 검증.
+### 7.2 에디터 실증 절차 (Editor Verification Pending)
+1. **맵 구성**: `Content/Map/Lvl_JYU.umap`에 `AEcoHerdTestHarnessActor`, `AEcoAlarmTestHarnessActor`, `AEcoShelterTestHarnessActor`, 그리고 복수의 `AEcoShelterAnchor` (바위/벽 뒤 차폐 은신처 1개, 노출된 평지 은신처 1개) 배치.
+2. **평상시 점검**: 위협이 없을 때 전 개체 은신처 상태 `None` 유지 확인.
+3. **위협 주입 시 점검**: `AEcoAlarmTestHarnessActor`에서 `TriggerThreatAtActorLocation()` 또는 `bContinuousThreat = true` 설정:
+   - `Cover` 욕구 상승 개체들이 `Searching` $\to$ `Reserved`로 전이되는지 확인.
+   - 3D 뷰포트에서 지형 뒤 차폐된 은신처는 🟢 `[OCCLUDED - SAFE]` 녹색 선, 노출된 은신처는 🔴 `[EXPOSED - DANGER]` 적색 선이 그어지는지 확인.
+   - 차폐된 은신처 슬롯에 개체들의 시안색 예약 연결선(`Agent -> Slot`)이 집중되는지 확인.
+   - 단일 슬롯에 대해 높은 점수 및 낮은 AgentId 개체가 안정적으로 승리하는지 확인.
+4. **위협 해제 시 점검**: `ClearAllAlarms()` 호출 시 개체들이 시간 감쇠로 `Calm`에 도달하면 슬롯 예약이 해제되어 슬롯이 다시 🟢 `[Open]`으로 반환되는지 확인.
 
 ---
 
@@ -200,6 +225,7 @@ FEcoSocialBehaviorFragment::ModulatedAction (FEcoPolicyActionV1)
 2. **Herd Fission-Fusion (무리 분할 및 병합)**: 공황 시 무리 쪼개짐 및 평화 시 인접 무리 간 병합 토폴로지 연산.
 3. **Local Avoidance (RVO2 / ORCA)**: Mass 기본 충돌/회피 우선 평가 후 필요시 별도 추진.
 4. **실제 Player / Predator 물리 감각 센서 연동**: 현재는 테스트 하네스를 통한 위협 주입 경로만 사용.
+5. **Moving / Occupied 이동 상태 구현**: 현재 브랜치는 은신처 조향/물리 이동(MassFlock)을 구현하지 않으므로, 의도적으로 `Reserved` 상태까지만 다루며 `Moving`/`Occupied` 전이는 이동 레이어 통합 단계로 연기.
 
 ---
 
@@ -207,17 +233,19 @@ FEcoSocialBehaviorFragment::ModulatedAction (FEcoPolicyActionV1)
 
 | 카테고리 | 파일명 | 역할 및 상태 |
 | :--- | :--- | :--- |
-| **Types** | [`EcoSocialTypes.h`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/EcoSocialTypes.h) | `EEcoSocialState`, `EEcoShelterIntentState`, `FEcoHerdRuntimeData` (`Implemented`) |
+| **Types** | [`EcoSocialTypes.h`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/EcoSocialTypes.h) | `EEcoSocialState`, `EEcoShelterIntentState`, `FEcoHerdRuntimeData`, `FEcoShelterPoint`, `FEcoShelterSlot` (`Implemented`) |
 | **Fragments** | [`EcoSocialFragments.h`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/EcoSocialFragments.h) | `FEcoHerdMemberFragment`, `FEcoAlarmStateFragment`, `FEcoShelterIntentFragment`, `FEcoSocialBehaviorFragment`, `FEcoSocialSpeciesSharedFragment` (`Implemented`) |
 | **Trait** | [`EcoSocialTrait.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/EcoSocialTrait.h) | Mass Spawner 템플릿용 소셜 컴포넌트 주입기 (`Editor Verified`) |
 | **Herd** | [`EcoHerdSubsystem.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Herd/EcoHerdSubsystem.h) | 무리 중앙 레지스트리 및 위협 주입/감쇠 관리 (`Editor Verified`) |
 | **Herd** | [`EcoHerdProcessors.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Herd/EcoHerdProcessors.h) | `UEcoHerdMembershipProcessor`, `UEcoHerdAggregateProcessor` (`Editor Verified`) |
 | **Alarm** | [`EcoAlarmProcessors.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Alarm/EcoAlarmProcessors.h) | `UEcoAlarmPropagationProcessor`, `UEcoSocialResponseProcessor` (`Editor Verified`) |
-| **Shelter** | [`EcoShelterSubsystem.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterSubsystem.h) | 은신처 등록 및 슬롯 예약 서브시스템 (`Pending`) |
-| **Shelter** | [`EcoShelterProcessors.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterProcessors.h) | `UEcoShelterQueryProcessor`, `UEcoShelterReservationProcessor` (`Pending`) |
+| **Shelter** | [`EcoShelterAnchor.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterAnchor.h) | 레벨 배치형 은신처 앵커 및 원형 슬롯 분배 (`Implemented / Pending Verification`) |
+| **Shelter** | [`EcoShelterSubsystem.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterSubsystem.h) | 은신처/슬롯 중앙 관리, 지형 라인트레이스 차폐 평가, 슬롯 예약 서브시스템 (`Implemented / Pending Verification`) |
+| **Shelter** | [`EcoShelterProcessors.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterProcessors.h) | `UEcoShelterQueryProcessor`, `UEcoShelterReservationProcessor` (`Implemented / Pending Verification`) |
 | **Debug** | [`EcoHerdTestHarnessActor.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/Debug/EcoHerdTestHarnessActor.h) | 100마리 엔티티 생성 및 무리 중심/반경 3D 시각화 액터 (`Editor Verified`) |
 | **Debug** | [`EcoAlarmTestHarnessActor.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/Debug/EcoAlarmTestHarnessActor.h) | CallInEditor 위협 주입 및 실시간 개체 상태 HUD 시각화 액터 (`Editor Verified`) |
-| **Test Map** | `Content/Map/Lvl_JYU.umap` | 두 하네스 액터를 동시 배치하여 실증 완료한 에디터 테스트 맵 (`Editor Verified`) |
+| **Debug** | [`EcoShelterTestHarnessActor.h/.cpp`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/Debug/EcoShelterTestHarnessActor.h) | 은신처/슬롯 점유 현황, LOS 차폐선, 개체 예약 타겟선 3D 시각화 액터 (`Implemented / Pending Verification`) |
+| **Test Map** | `Content/Map/Lvl_JYU.umap` | 세 하네스 액터를 동시 배치하여 실증할 에디터 테스트 맵 (`Editor Verified Base`) |
 
 ---
 
@@ -229,3 +257,7 @@ FEcoSocialBehaviorFragment::ModulatedAction (FEcoPolicyActionV1)
    - 초기 가이드의 `UEcoHerdCentroidProcessor`는 실제 코드베이스에서 2-Pass 집계 패턴을 명확히 반영한 [`UEcoHerdAggregateProcessor`](file:///c:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Social/Herd/EcoHerdProcessors.h#L41)로 구현되었습니다.
 3. **위협 주입 경로 단일화**:
    - `FEcoAlarmSignal`의 가십 릴레이 대신 `UEcoHerdSubsystem::EmitHerdAlarm` 및 `EmitSpatialAlarm`을 통한 무리 기반 직렬화 주입 경로를 확립하여 멀티스레드 안정성을 확보했습니다.
+4. **단순 법선 기반 은신처 평가 탈피**:
+   - 초기 가이드의 법선 벡터 내적만으로 은신 여부를 판단하던 방식을 넘어, 실제 언리얼 지형 라인트레이스(`ECC_WorldStatic`)를 통한 직접 차폐 여부를 주 평가 요소(40% 가중치)로 반영했습니다.
+5. **결정론적 예약 중재 메커니즘**:
+   - Mass 엔티티 순회 순서에 따른 선착순 예약 문제를 제거하고, 점수(Score) 내림차순 및 `StableAgentId` 오름차순 타이브레이크를 통한 직렬화 중재를 적용했습니다.

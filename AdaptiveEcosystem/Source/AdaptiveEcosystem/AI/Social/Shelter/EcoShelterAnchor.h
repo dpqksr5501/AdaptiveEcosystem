@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "EcoShelterAnchor.generated.h"
 
+class USceneComponent;
 class UArrowComponent;
 
 /**
@@ -40,6 +41,9 @@ public:
 	/** Assigned runtime index in UEcoShelterSubsystem */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Shelter")
 	int32 ShelterRuntimeIndex = -1;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Shelter")
+	TObjectPtr<USceneComponent> SceneRoot;
 
 #if WITH_EDITORONLY_DATA
 	/** Visual indicator of defensive facing direction */

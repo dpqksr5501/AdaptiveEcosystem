@@ -2,11 +2,13 @@
 
 #include "AI/Social/Shelter/EcoShelterProcessors.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
+#include "AI/Social/Alarm/EcoAlarmProcessors.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassCommonTypes.h"
 #include "MassExecutionContext.h"
+#include "MassEntityManager.h"
 #include "Engine/World.h"
 
 // -----------------------------------------------------------------------------
@@ -18,7 +20,9 @@ UEcoShelterQueryProcessor::UEcoShelterQueryProcessor()
 {
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
+	ExecutionOrder.ExecuteAfter.Add(UEcoSocialResponseProcessor::StaticClass()->GetFName());
 	bAutoRegisterWithProcessingPhases = true;
+	bRequiresGameThreadExecution = true; // Ensures GameThread serialized LineTrace and safe queries
 }
 
 void UEcoShelterQueryProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
@@ -26,7 +30,7 @@ void UEcoShelterQueryProcessor::ConfigureQueries(const TSharedRef<FMassEntityMan
 	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FEcoSocialBehaviorFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoShelterIntentFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddSharedRequirement<FEcoSpeciesSharedFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
@@ -54,44 +58,56 @@ void UEcoShelterQueryProcessor::Execute(FMassEntityManager& EntityManager, FMass
 		const int32 NumEntities = ChunkContext.GetNumEntities();
 		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 		TConstArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetFragmentView<FEcoAlarmStateFragment>();
-		TConstArrayView<FEcoPolicyOutputFragment> PolicyOutputList = ChunkContext.GetFragmentView<FEcoPolicyOutputFragment>();
+		TConstArrayView<FEcoSocialBehaviorFragment> SocialList = ChunkContext.GetFragmentView<FEcoSocialBehaviorFragment>();
 		TArrayView<FEcoShelterIntentFragment> IntentList = ChunkContext.GetMutableFragmentView<FEcoShelterIntentFragment>();
 		const FEcoSpeciesSharedFragment& SpeciesConfig = ChunkContext.GetSharedFragment<FEcoSpeciesSharedFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
 			FEcoShelterIntentFragment& Intent = IntentList[i];
-			const FEcoPolicyActionV1& Action = PolicyOutputList[i].Action;
+			const FEcoPolicyActionV1& ModAction = SocialList[i].ModulatedAction;
 			const FEcoAlarmStateFragment& Alarm = AlarmList[i];
 
-			// Only evaluate shelter search if agent expresses substantial cover urge or is in panic
-			const bool bNeedsShelter = (Action.Cover >= 0.25f) || (Alarm.State == EEcoSocialState::Panic);
+			// 1. Evaluate whether agent requires shelter based on ModulatedAction.Cover and Alarm state
+			const bool bNeedsShelter = (ModAction.Cover >= 0.25f) || (Alarm.State == EEcoSocialState::Panic);
 
-			if (bNeedsShelter && Intent.State != EEcoShelterIntentState::Reserved && Intent.State != EEcoShelterIntentState::Occupied)
+			// 2. If agent was Reserved but no longer needs shelter (danger passed and cover urge dropped), flag for release
+			if (Intent.State == EEcoShelterIntentState::Reserved && !bNeedsShelter)
+			{
+				// Transition to None while keeping TargetSlotIndex temporarily so downstream knows which slot to release
+				Intent.State = EEcoShelterIntentState::None;
+				continue;
+			}
+
+			// 3. If agent needs shelter and is unreserved, evaluate candidates
+			if (bNeedsShelter && Intent.State == EEcoShelterIntentState::None)
 			{
 				if (CurrentTime >= Intent.NextQueryTime)
 				{
 					const FVector AgentLocation = TransformList[i].GetTransform().GetLocation();
 					int32 TargetSlotIndex = INDEX_NONE_ECO;
+					float CandidateScore = 0.0f;
 
 					const int32 BestShelterIndex = ShelterSubsystem->FindBestAvailableShelter(
 						AgentLocation,
 						Alarm.LastThreatPosition,
 						SpeciesConfig.CoverSearchRadius,
-						TargetSlotIndex
+						TargetSlotIndex,
+						CandidateScore
 					);
 
 					if (BestShelterIndex != INDEX_NONE_ECO && TargetSlotIndex != INDEX_NONE_ECO)
 					{
 						Intent.TargetShelterIndex = BestShelterIndex;
 						Intent.TargetSlotIndex = TargetSlotIndex;
-						Intent.State = EEcoShelterIntentState::Searching;
-						Intent.NextQueryTime = CurrentTime + 1.0; // 1-second evaluation cooldown
+						Intent.CurrentScore = CandidateScore;
+						Intent.State = EEcoShelterIntentState::Searching; // Proposed candidate ready for reconciliation!
+						Intent.NextQueryTime = CurrentTime + 0.8; // 0.8s evaluation cooldown
 					}
 					else
 					{
 						// No suitable shelter found in radius
-						Intent.NextQueryTime = CurrentTime + 2.0;
+						Intent.NextQueryTime = CurrentTime + 1.5;
 					}
 				}
 			}
@@ -110,12 +126,12 @@ UEcoShelterReservationProcessor::UEcoShelterReservationProcessor()
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	ExecutionOrder.ExecuteAfter.Add(UEcoShelterQueryProcessor::StaticClass()->GetFName());
 	bAutoRegisterWithProcessingPhases = true;
+	bRequiresGameThreadExecution = true; // Ensures GameThread serialized reconciliation & subsystem mutation
 }
 
 void UEcoShelterReservationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
 	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoShelterIntentFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	EntityQuery.RegisterWithProcessor(*this);
@@ -137,60 +153,113 @@ void UEcoShelterReservationProcessor::Execute(FMassEntityManager& EntityManager,
 
 	const double CurrentTime = World->GetTimeSeconds();
 
-	// Pass 1 & 2: Clean expired reservations and reconcile current proposals
+	// Step 1: Clean expired reservations
 	ShelterSubsystem->CleanExpiredReservations(CurrentTime);
 
-	EntityQuery.ForEachEntityChunk(Context, [ShelterSubsystem, CurrentTime](FMassExecutionContext& ChunkContext)
+	// Step 2: Collect proposals and handle release requests (GameThread serialized)
+	Proposals.Reset();
+
+	EntityQuery.ForEachEntityChunk(Context, [this, ShelterSubsystem, CurrentTime](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
 		TConstArrayView<FEcoIdentityFragment> IdentityList = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
-		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 		TArrayView<FEcoShelterIntentFragment> IntentList = ChunkContext.GetMutableFragmentView<FEcoShelterIntentFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
 			FEcoShelterIntentFragment& Intent = IntentList[i];
 			const int64 AgentId = IdentityList[i].StableAgentId;
-			const FVector AgentLocation = TransformList[i].GetTransform().GetLocation();
+			const FMassEntityHandle Entity = ChunkContext.GetEntity(i);
 
-			// Handle Searching agents attempting to lock their proposed slot
-			if (Intent.State == EEcoShelterIntentState::Searching)
+			// Release handling: if agent transitioned to None but still held a reserved slot, release it
+			if (Intent.State == EEcoShelterIntentState::None && Intent.TargetSlotIndex != INDEX_NONE_ECO)
 			{
-				const double ReservationDuration = 12.0; // 12 seconds reserved travel window
-				if (ShelterSubsystem->ReserveSlot(Intent.TargetSlotIndex, AgentId, CurrentTime + ReservationDuration))
-				{
-					// Reservation successfully locked
-					Intent.State = EEcoShelterIntentState::Reserved;
-				}
-				else
-				{
-					// Slot was taken by a competitor; release proposal and retry later
-					Intent.State = EEcoShelterIntentState::None;
-					Intent.TargetSlotIndex = INDEX_NONE_ECO;
-					Intent.TargetShelterIndex = INDEX_NONE_ECO;
-				}
+				ShelterSubsystem->ReleaseSlot(Intent.TargetSlotIndex, AgentId);
+				Intent.Reset();
+				continue;
 			}
-			// Handle Reserved agents reaching shelter location
-			else if (Intent.State == EEcoShelterIntentState::Reserved)
+
+			// Active reservation validation: check if reservation expired or was taken
+			if (Intent.State == EEcoShelterIntentState::Reserved)
 			{
-				const TArray<FEcoShelterSlot>& Slots = ShelterSubsystem->GetShelterSlots();
-				if (Slots.IsValidIndex(Intent.TargetSlotIndex) && Slots[Intent.TargetSlotIndex].ReservedBy == AgentId)
+				FEcoShelterSlot SlotData;
+				if (!ShelterSubsystem->GetSlotData(Intent.TargetSlotIndex, SlotData) || SlotData.ReservedBy != AgentId)
 				{
-					const float DistToSlot = FVector::Dist(AgentLocation, Slots[Intent.TargetSlotIndex].Position);
-					if (DistToSlot <= 200.0f)
-					{
-						// Agent has arrived inside shelter refuge radius
-						Intent.State = EEcoShelterIntentState::Occupied;
-					}
+					// Reservation lost or lapsed
+					Intent.Reset();
 				}
-				else
-				{
-					// Reservation lost or expired
-					Intent.State = EEcoShelterIntentState::None;
-					Intent.TargetSlotIndex = INDEX_NONE_ECO;
-					Intent.TargetShelterIndex = INDEX_NONE_ECO;
-				}
+				continue;
+			}
+
+			// Collect candidate proposals
+			if (Intent.State == EEcoShelterIntentState::Searching && Intent.TargetSlotIndex != INDEX_NONE_ECO)
+			{
+				FSlotProposal Proposal;
+				Proposal.Entity = Entity;
+				Proposal.StableAgentId = AgentId;
+				Proposal.SlotIndex = Intent.TargetSlotIndex;
+				Proposal.Score = Intent.CurrentScore;
+				Proposals.Add(Proposal);
 			}
 		}
 	});
+
+	if (Proposals.Num() == 0)
+	{
+		return;
+	}
+
+	// Step 3: Deterministic Reconciliation
+	// Sort proposals:
+	// 1. SlotIndex (ascending)
+	// 2. Score (descending)
+	// 3. StableAgentId (ascending tie-break)
+	Proposals.Sort([](const FSlotProposal& A, const FSlotProposal& B)
+	{
+		if (A.SlotIndex != B.SlotIndex)
+		{
+			return A.SlotIndex < B.SlotIndex;
+		}
+		if (!FMath::IsNearlyEqual(A.Score, B.Score, KINDA_SMALL_NUMBER))
+		{
+			return A.Score > B.Score; // Higher score wins
+		}
+		return A.StableAgentId < B.StableAgentId; // Smaller ID deterministic tie-break
+	});
+
+	// Step 4: Commit winners and reject competitors
+	int32 CurrentSlotIndex = INDEX_NONE_ECO;
+	bool bSlotAwarded = false;
+
+	for (const FSlotProposal& Proposal : Proposals)
+	{
+		if (Proposal.SlotIndex != CurrentSlotIndex)
+		{
+			CurrentSlotIndex = Proposal.SlotIndex;
+			bSlotAwarded = false;
+		}
+
+		FEcoShelterIntentFragment& Intent = EntityManager.GetFragmentDataChecked<FEcoShelterIntentFragment>(Proposal.Entity);
+
+		if (!bSlotAwarded)
+		{
+			const double ReservationDuration = 12.0; // 12-second reservation window
+			if (ShelterSubsystem->ReserveSlot(Proposal.SlotIndex, Proposal.StableAgentId, CurrentTime + ReservationDuration))
+			{
+				// Winning candidate lock
+				FEcoShelterSlot SlotData;
+				ShelterSubsystem->GetSlotData(Proposal.SlotIndex, SlotData);
+
+				Intent.State = EEcoShelterIntentState::Reserved;
+				Intent.TargetPosition = SlotData.Position;
+				Intent.CurrentScore = Proposal.Score;
+				bSlotAwarded = true;
+				continue;
+			}
+		}
+
+		// Lost competition or slot already locked: reset intent to None
+		Intent.Reset();
+		Intent.NextQueryTime = CurrentTime + 0.5; // Quick retry cooldown
+	}
 }
