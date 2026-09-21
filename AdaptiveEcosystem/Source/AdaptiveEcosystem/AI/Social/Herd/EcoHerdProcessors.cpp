@@ -6,6 +6,7 @@
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassMovementFragments.h"
+#include "MassCommonTypes.h"
 #include "MassExecutionContext.h"
 #include "Engine/World.h"
 
@@ -15,24 +16,44 @@
 
 UEcoHerdMembershipProcessor::UEcoHerdMembershipProcessor()
 	: EntityQuery(*this)
+	, ReconciliationQuery(*this)
 {
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	bAutoRegisterWithProcessingPhases = true;
+	bRequiresGameThreadExecution = true; // Ensures deterministic herd assignment
 }
 
 void UEcoHerdMembershipProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+	// Pass 1: Parallel chunk evaluation of existing herd membership and join/leave hysteresis
 	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddSharedRequirement<FEcoSocialSpeciesSharedFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	EntityQuery.RegisterWithProcessor(*this);
+
+	// Pass 2: Single-threaded reconciliation for unassigned agents requiring new herd creation
+	ReconciliationQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
+	ReconciliationQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	ReconciliationQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadWrite);
+	ReconciliationQuery.AddSharedRequirement<FEcoSocialSpeciesSharedFragment>(EMassFragmentAccess::ReadOnly);
+	ReconciliationQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+	ReconciliationQuery.RegisterWithProcessor(*this);
 }
 
 void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
+	TimeSinceLastUpdate += Context.GetDeltaTimeSeconds();
+	if (TimeSinceLastUpdate < UpdateInterval)
+	{
+		return;
+	}
+
+	const float DeltaTime = TimeSinceLastUpdate;
+	TimeSinceLastUpdate = 0.0f;
+
 	UWorld* World = Context.GetWorld();
 	if (!World)
 	{
@@ -45,8 +66,9 @@ void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMa
 		return;
 	}
 
-	const float DeltaTime = Context.GetDeltaTimeSeconds();
-
+	// -------------------------------------------------------------------------
+	// Pass 1: Evaluate existing membership and join proximity against established herds
+	// -------------------------------------------------------------------------
 	EntityQuery.ForEachEntityChunk(Context, [HerdSubsystem, DeltaTime](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
@@ -60,10 +82,9 @@ void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMa
 			const FEcoIdentityFragment& Identity = IdentityList[i];
 			const FVector AgentLocation = TransformList[i].GetTransform().GetLocation();
 			FEcoHerdMemberFragment& Member = MemberList[i];
-
 			const int32 SpeciesIdx = Identity.SpeciesRuntimeIndex;
 
-			// Case 1: Agent currently belongs to a herd
+			// Case 1: Agent currently belongs to a valid herd
 			if (Member.HerdRuntimeIndex != INDEX_NONE_ECO)
 			{
 				FEcoHerdRuntimeData CurrentHerd;
@@ -71,13 +92,13 @@ void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMa
 				{
 					const float DistToCenter = FVector::Dist(AgentLocation, CurrentHerd.Center);
 
-					// Hysteresis leave evaluation (HerdLeaveRadius > HerdJoinRadius)
+					// Hysteresis detachment check (LeaveRadius > JoinRadius)
 					if (DistToCenter > SocialConfig.HerdLeaveRadius)
 					{
 						Member.LeaveDwellTimer += DeltaTime;
 						if (Member.LeaveDwellTimer >= SocialConfig.LeaveDwellTime)
 						{
-							// Leave herd due to sustained distance
+							// Sustained detachment -> leave herd
 							Member.HerdRuntimeIndex = INDEX_NONE_ECO;
 							Member.LeaveDwellTimer = 0.0f;
 							Member.MembershipConfidence = 0.0f;
@@ -85,21 +106,21 @@ void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMa
 					}
 					else
 					{
-						// Recover leave dwell timer inside herd boundary
+						// Recover leave timer while within herd radius
 						Member.LeaveDwellTimer = FMath::Max(0.0f, Member.LeaveDwellTimer - DeltaTime);
 						Member.MembershipConfidence = FMath::Clamp(1.0f - (DistToCenter / FMath::Max(1.0f, SocialConfig.HerdLeaveRadius)), 0.0f, 1.0f);
 					}
 				}
 				else
 				{
-					// Herd no longer exists or dissolved
+					// Herd was dissolved or index invalidated
 					Member.HerdRuntimeIndex = INDEX_NONE_ECO;
 					Member.LeaveDwellTimer = 0.0f;
 					Member.MembershipConfidence = 0.0f;
 				}
 			}
 
-			// Case 2: Agent has no herd -> search nearest or form new
+			// Case 2: Agent has no herd -> check if any established herd is nearby
 			if (Member.HerdRuntimeIndex == INDEX_NONE_ECO)
 			{
 				const int32 NearestHerdIndex = HerdSubsystem->FindNearestHerd(SpeciesIdx, AgentLocation, SocialConfig.HerdJoinRadius);
@@ -108,7 +129,6 @@ void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMa
 					Member.JoinDwellTimer += DeltaTime;
 					if (Member.JoinDwellTimer >= SocialConfig.JoinDwellTime)
 					{
-						// Commit join after sustained dwell time
 						Member.HerdRuntimeIndex = NearestHerdIndex;
 						Member.JoinDwellTimer = 0.0f;
 						Member.MembershipConfidence = 0.5f;
@@ -116,19 +136,51 @@ void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMa
 				}
 				else
 				{
-					// Decay join timer if not in proximity
 					Member.JoinDwellTimer = FMath::Max(0.0f, Member.JoinDwellTimer - DeltaTime);
+				}
+			}
+		}
+	});
 
-					// Form a new herd if agent remains unassigned
-					if (Member.JoinDwellTimer == 0.0f)
-					{
-						const int32 NewHerdIndex = HerdSubsystem->AllocateHerd(SpeciesIdx, AgentLocation);
-						if (NewHerdIndex != INDEX_NONE_ECO)
-						{
-							Member.HerdRuntimeIndex = NewHerdIndex;
-							Member.MembershipConfidence = 1.0f;
-						}
-					}
+	// -------------------------------------------------------------------------
+	// Pass 2: Single-threaded reconciliation for unassigned agents to spawn new herds
+	// -------------------------------------------------------------------------
+	ReconciliationQuery.ForEachEntityChunk(Context, [HerdSubsystem](FMassExecutionContext& ChunkContext)
+	{
+		const int32 NumEntities = ChunkContext.GetNumEntities();
+		TConstArrayView<FEcoIdentityFragment> IdentityList = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
+		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
+		TArrayView<FEcoHerdMemberFragment> MemberList = ChunkContext.GetMutableFragmentView<FEcoHerdMemberFragment>();
+		const FEcoSocialSpeciesSharedFragment& SocialConfig = ChunkContext.GetSharedFragment<FEcoSocialSpeciesSharedFragment>();
+
+		for (int32 i = 0; i < NumEntities; ++i)
+		{
+			FEcoHerdMemberFragment& Member = MemberList[i];
+			if (Member.HerdRuntimeIndex != INDEX_NONE_ECO)
+			{
+				continue;
+			}
+
+			const int32 SpeciesIdx = IdentityList[i].SpeciesRuntimeIndex;
+			const FVector AgentLocation = TransformList[i].GetTransform().GetLocation();
+
+			// Re-check nearest herd (might have been formed by earlier entity in this pass)
+			const int32 NearestHerdIndex = HerdSubsystem->FindNearestHerd(SpeciesIdx, AgentLocation, SocialConfig.HerdJoinRadius);
+			if (NearestHerdIndex != INDEX_NONE_ECO)
+			{
+				Member.HerdRuntimeIndex = NearestHerdIndex;
+				Member.JoinDwellTimer = 0.0f;
+				Member.MembershipConfidence = 0.7f;
+			}
+			else
+			{
+				// Thread-safe new herd allocation performed on single thread
+				const int32 NewHerdIndex = HerdSubsystem->AllocateHerd(SpeciesIdx, AgentLocation);
+				if (NewHerdIndex != INDEX_NONE_ECO)
+				{
+					Member.HerdRuntimeIndex = NewHerdIndex;
+					Member.JoinDwellTimer = 0.0f;
+					Member.MembershipConfidence = 1.0f;
 				}
 			}
 		}
@@ -146,6 +198,7 @@ UEcoHerdAggregateProcessor::UEcoHerdAggregateProcessor()
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	ExecutionOrder.ExecuteAfter.Add(UEcoHerdMembershipProcessor::StaticClass()->GetFName());
 	bAutoRegisterWithProcessingPhases = true;
+	bRequiresGameThreadExecution = true;
 }
 
 void UEcoHerdAggregateProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
@@ -160,6 +213,13 @@ void UEcoHerdAggregateProcessor::ConfigureQueries(const TSharedRef<FMassEntityMa
 
 void UEcoHerdAggregateProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
+	TimeSinceLastUpdate += Context.GetDeltaTimeSeconds();
+	if (TimeSinceLastUpdate < UpdateInterval)
+	{
+		return;
+	}
+	TimeSinceLastUpdate = 0.0f;
+
 	UWorld* World = Context.GetWorld();
 	if (!World)
 	{
@@ -179,7 +239,7 @@ void UEcoHerdAggregateProcessor::Execute(FMassEntityManager& EntityManager, FMas
 		return;
 	}
 
-	// Prepare reduction buffers (avoids reallocation if size matches)
+	// Prepare reduction buffers
 	Accumulators.SetNum(HerdCount);
 	for (int32 i = 0; i < HerdCount; ++i)
 	{

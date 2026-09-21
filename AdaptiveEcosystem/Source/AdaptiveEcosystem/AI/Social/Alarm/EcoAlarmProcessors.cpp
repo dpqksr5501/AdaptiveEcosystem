@@ -124,7 +124,8 @@ void UEcoSocialResponseProcessor::ConfigureQueries(const TSharedRef<FMassEntityM
 {
 	EntityQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadOnly);
-	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FEcoSocialBehaviorFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	EntityQuery.RegisterWithProcessor(*this);
 }
@@ -135,43 +136,56 @@ void UEcoSocialResponseProcessor::Execute(FMassEntityManager& EntityManager, FMa
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
 		TConstArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetFragmentView<FEcoAlarmStateFragment>();
-		TArrayView<FEcoPolicyOutputFragment> PolicyOutputList = ChunkContext.GetMutableFragmentView<FEcoPolicyOutputFragment>();
+		TConstArrayView<FEcoPolicyOutputFragment> PolicyOutputList = ChunkContext.GetFragmentView<FEcoPolicyOutputFragment>();
+		TArrayView<FEcoSocialBehaviorFragment> SocialBehaviorList = ChunkContext.GetMutableFragmentView<FEcoSocialBehaviorFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
 			const FEcoAlarmStateFragment& Alarm = AlarmList[i];
-			FEcoPolicyActionV1& Action = PolicyOutputList[i].Action;
+			const FEcoPolicyActionV1& RawAction = PolicyOutputList[i].Action;
+			FEcoSocialBehaviorFragment& SocialBehavior = SocialBehaviorList[i];
+
+			// Start from the pure, uncorrupted PPO raw action
+			FEcoPolicyActionV1 Modulated = RawAction;
+			float CohesionMultiplier = 1.0f;
 
 			switch (Alarm.State)
 			{
 			case EEcoSocialState::Panic:
 				// Extreme danger: suppress foraging, boost flee sensitivity and cover intention
-				Action.Forage = FMath::Clamp(Action.Forage * 0.05f, 0.0f, 1.0f);
-				Action.FleeDist = FMath::Clamp(Action.FleeDist + 0.5f * Alarm.AlarmStrength, 0.0f, 1.0f);
-				Action.Cover = FMath::Clamp(Action.Cover + 0.6f * Alarm.AlarmStrength, 0.0f, 1.0f);
-				Action.Cohesion = FMath::Clamp(Action.Cohesion * 1.5f, 0.0f, 1.0f);
+				Modulated.Forage = FMath::Clamp(RawAction.Forage * 0.05f, 0.0f, 1.0f);
+				Modulated.FleeDist = FMath::Clamp(RawAction.FleeDist + 0.5f * Alarm.AlarmStrength, 0.0f, 1.0f);
+				Modulated.Cover = FMath::Clamp(RawAction.Cover + 0.6f * Alarm.AlarmStrength, 0.0f, 1.0f);
+				CohesionMultiplier = 1.5f;
+				Modulated.Cohesion = FMath::Clamp(RawAction.Cohesion * CohesionMultiplier, 0.0f, 1.0f);
 				break;
 
 			case EEcoSocialState::Alert:
 				// Mild danger: moderate foraging suppression, increase cohesion and readiness
-				Action.Forage = FMath::Clamp(Action.Forage * 0.4f, 0.0f, 1.0f);
-				Action.FleeDist = FMath::Clamp(Action.FleeDist + 0.25f, 0.0f, 1.0f);
-				Action.Cohesion = FMath::Clamp(Action.Cohesion * 1.25f, 0.0f, 1.0f);
-				Action.Cover = FMath::Clamp(Action.Cover + 0.2f, 0.0f, 1.0f);
+				Modulated.Forage = FMath::Clamp(RawAction.Forage * 0.4f, 0.0f, 1.0f);
+				Modulated.FleeDist = FMath::Clamp(RawAction.FleeDist + 0.25f, 0.0f, 1.0f);
+				Modulated.Cover = FMath::Clamp(RawAction.Cover + 0.2f, 0.0f, 1.0f);
+				CohesionMultiplier = 1.25f;
+				Modulated.Cohesion = FMath::Clamp(RawAction.Cohesion * CohesionMultiplier, 0.0f, 1.0f);
 				break;
 
 			case EEcoSocialState::Recovering:
 			case EEcoSocialState::Regrouping:
 				// Calming down: strong cohesion to reassemble the herd before resuming full foraging
-				Action.Cohesion = FMath::Clamp(Action.Cohesion * 1.35f, 0.0f, 1.0f);
-				Action.Forage = FMath::Clamp(Action.Forage * 0.7f, 0.0f, 1.0f);
+				CohesionMultiplier = 1.35f;
+				Modulated.Cohesion = FMath::Clamp(RawAction.Cohesion * CohesionMultiplier, 0.0f, 1.0f);
+				Modulated.Forage = FMath::Clamp(RawAction.Forage * 0.7f, 0.0f, 1.0f);
 				break;
 
 			case EEcoSocialState::Calm:
 			default:
 				// Undisturbed: retain authentic PPO inference weights unmodified
+				CohesionMultiplier = 1.0f;
 				break;
 			}
+
+			SocialBehavior.ModulatedAction = Modulated;
+			SocialBehavior.SocialCohesionMultiplier = CohesionMultiplier;
 		}
 	});
 }

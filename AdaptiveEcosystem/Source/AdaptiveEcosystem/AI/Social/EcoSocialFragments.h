@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "MassEntityTypes.h"
 #include "Core/EcoIds.h"
+#include "AI/Policy/EcoPolicyContracts.h"
 #include "AI/Social/EcoSocialTypes.h"
 #include "EcoSocialFragments.generated.h"
 
@@ -89,6 +90,28 @@ struct FEcoShelterIntentFragment : public FMassFragment
 	/** Current progress state towards shelter */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
 	EEcoShelterIntentState State = EEcoShelterIntentState::None;
+};
+
+/**
+ * Holds modulated behavior actions and social steering multipliers.
+ * Prevents compounding modification of raw PPO policy outputs.
+ */
+USTRUCT()
+struct FEcoSocialBehaviorFragment : public FMassFragment
+{
+	GENERATED_BODY()
+
+	/** Effective steering actions after social alarm and herd modulation */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	FEcoPolicyActionV1 ModulatedAction;
+
+	/** Multiplier applied to flock cohesion (1.0 = normal, >1.0 = tight herd) */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	float SocialCohesionMultiplier = 1.0f;
+
+	/** Flag set by membership processor when agent requires assignment or formation of a new herd */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	bool bWantsNewHerd = false;
 };
 
 // -----------------------------------------------------------------------------

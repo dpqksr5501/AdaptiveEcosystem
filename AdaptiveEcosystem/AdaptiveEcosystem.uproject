@@ -38,6 +38,10 @@
 		{
 			"Name": "MassAI",
 			"Enabled": true
+		},
+		{
+			"Name": "StructUtils",
+			"Enabled": true
 		}
 	]
 }
