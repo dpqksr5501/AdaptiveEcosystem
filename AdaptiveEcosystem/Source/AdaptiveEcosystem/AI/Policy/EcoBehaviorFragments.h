@@ -40,9 +40,17 @@ struct FEcoPredatorTag : public FMassTag
  * 기본값은 `EcoBehaviorConfig.h` 에서 온다 — 그 헤더는 `configs/default.yaml` 에서
  * `export_weights.py` 가 생성한다. §9.7: 두 곳에 따로 적지 않는다.
  * 여기 값을 손으로 바꾸면 파이썬 학습 조건과 갈라져 §0 의 동일 조건 비교가 깨진다.
+ *
+ * §9.2 는 `FMassSharedFragment` 상속을 적었지만 UE 5.8 의 const 공유 프래그먼트 API
+ * (`GetOrCreateConstSharedFragment`)는 `FMassConstSharedFragment` 를 요구한다. 이 설정은
+ * 런타임에 바뀌지 않으므로 const 쪽이 의미상으로도 맞다.
+ *
+ * **아직 프로세서가 이 값을 읽지 않는다.** 지금은 `EcoBehaviorConfig.h` 상수를 직접 쓴다.
+ * 트레잇 템플릿에는 들어가 있으므로, 종별로 다른 값을 주고 싶으면 프로세서에
+ * `AddConstSharedRequirement` 를 붙이면 된다 — 에셋을 다시 만들 필요는 없다.
  */
 USTRUCT()
-struct FEcoBehaviorConfigSharedFragment : public FMassSharedFragment
+struct FEcoBehaviorConfigSharedFragment : public FMassConstSharedFragment
 {
 	GENERATED_BODY()
 
