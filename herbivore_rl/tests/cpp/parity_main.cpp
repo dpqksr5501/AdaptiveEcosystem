@@ -14,7 +14,48 @@
 #include <cstdio>
 
 #include "EcoPolicyInference.h"
+#include "EcoSteering.h"
 #include "PolicyGoldenVectors.h"
+#include "SteeringGoldenVectors.h"
+
+/** §9.8-2 — 조향 단독. 파이썬 steer() 와 같은 값이 나오는가. */
+static int CheckSteering()
+{
+	EcoPolicy::FSteerConfig Cfg;
+	Cfg.SeeRadius = kSteerSeeRadius;
+	Cfg.SepWeight = kSteerSepWeight;
+	Cfg.FleeWeight = kSteerFleeWeight;
+	Cfg.HerbSpeed = kSteerHerbSpeed;
+
+	double MaxErr = 0.0;
+	for (int n = 0; n < kSteerGoldenCount; ++n)
+	{
+		const float* In = &kSteerGoldenInput[n * 11];
+		EcoPolicy::FSteerInput G;
+		G.FoodGrad[0] = In[0];      G.FoodGrad[1] = In[1];
+		G.ToCentroid[0] = In[2];    G.ToCentroid[1] = In[3];
+		G.ToCover[0] = In[4];       G.ToCover[1] = In[5];
+		G.Separation[0] = In[6];    G.Separation[1] = In[7];
+		G.AwayFromPred[0] = In[8];  G.AwayFromPred[1] = In[9];
+		G.DistPredMin = In[10];
+
+		// 골든은 (forage, cohesion, flee_dist, cover) 순서를 그대로 쓴다.
+		const float A[4] = {kSteerGoldenAction[n * 4 + 0], kSteerGoldenAction[n * 4 + 1],
+							kSteerGoldenAction[n * 4 + 2], kSteerGoldenAction[n * 4 + 3]};
+		float Out[2];
+		EcoPolicy::Steer(G, A, Cfg, Out);
+
+		for (int j = 0; j < 2; ++j)
+		{
+			const double Err = std::fabs(static_cast<double>(Out[j]) -
+										 static_cast<double>(kSteerGoldenExpected[n * 2 + j]));
+			if (Err > MaxErr) { MaxErr = Err; }
+		}
+	}
+	std::printf("steering pairs: %d\n", kSteerGoldenCount);
+	std::printf("max abs error : %.3e\n", MaxErr);
+	return MaxErr > 1e-5 ? 1 : 0;
+}
 
 int main()
 {
@@ -46,9 +87,16 @@ int main()
 
 	if (MaxErr > 1e-5)
 	{
-		std::printf("FAIL: 1e-5 tolerance exceeded\n");
+		std::printf("FAIL: policy 1e-5 tolerance exceeded\n");
 		return 1;
 	}
+
+	if (CheckSteering() != 0)
+	{
+		std::printf("FAIL: steering 1e-5 tolerance exceeded\n");
+		return 1;
+	}
+
 	std::printf("PASS\n");
 	return 0;
 }

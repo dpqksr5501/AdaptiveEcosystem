@@ -3,7 +3,7 @@
 // activation: tanh
 // output:     clamp(-3,3) -> sigmoid
 // obs_norm:   pred_count/8, kin_count/20, cover_dist/20, see_r=20, max_energy=1
-// generated:  2026-09-22T05:22:51+00:00, from C:/kwon/univ/3-1/GameContentsCapstoneDesign/AdaptiveEcosystem/herbivore_rl/ckpt/final.zip
+// generated:  2026-09-22T06:19:26+00:00, from C:/kwon/univ/3-1/GameContentsCapstoneDesign/AdaptiveEcosystem/herbivore_rl/ckpt/final.zip
 //
 // 생성: herbivore_rl/export_weights.py (§8.1)
 // 사용: RunPolicy(const float Obs[7], float Out[4])  — §9.3

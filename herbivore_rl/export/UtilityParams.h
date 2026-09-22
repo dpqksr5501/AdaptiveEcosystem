@@ -1,6 +1,6 @@
 // 자동 생성. 수정 금지.
 // §5.1 Utility AI 비교군 계수. §5.2 Optuna 튜닝 산출물에서 뽑았다.
-// generated: 2026-09-22T05:22:51+00:00, from C:/kwon/univ/3-1/GameContentsCapstoneDesign/AdaptiveEcosystem/herbivore_rl/configs/utility_best.yaml
+// generated: 2026-09-22T06:19:26+00:00, from C:/kwon/univ/3-1/GameContentsCapstoneDesign/AdaptiveEcosystem/herbivore_rl/configs/utility_best.yaml
 #pragma once
 
 namespace EcoUtilityParams

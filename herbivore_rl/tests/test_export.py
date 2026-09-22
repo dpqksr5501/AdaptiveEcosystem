@@ -142,10 +142,14 @@ def test_verify_npz_holds_post_sigmoid_outputs(golden):
 
 # §8.3은 `PolicyWeights.h` 가 "컴파일 가능한 C 문법"이기를 요구한다. 골든 벡터도 순수
 # 배열이라 C로 통과한다. `UtilityParams.h` 는 namespace를 쓰므로 C++ 로만 검사한다.
+# `EcoBehaviorConfig.h` 는 UE의 int32 때문에 CoreMinimal.h 가 필요해서 엔진 밖에서는
+# 문법 검사를 못 한다 — 대신 엔진 자동화 테스트(BehaviorConfigUnits)가 값을 검증한다.
 HEADER_LANG = {
     "PolicyWeights.h": "c",
     "PolicyGoldenVectors.h": "c",
+    "SteeringGoldenVectors.h": "c",
     "UtilityParams.h": "c++",
+    "EcoBehaviorConfig.h": None,   # 엔진 헤더 필요 — 건너뛴다
 }
 
 
@@ -155,6 +159,8 @@ HEADER_LANG = {
 def test_generated_header_compiles(name):
     """§8.3 — gcc -fsyntax-only 통과."""
     lang = HEADER_LANG[name]
+    if lang is None:
+        pytest.skip(f"{name} 은 UE 헤더가 필요해 엔진 밖에서 검사할 수 없다")
     r = subprocess.run(
         ["gcc", "-fsyntax-only", "-Wno-pragma-once-outside-header", "-x", lang,
          str(EXPORT / name)],
@@ -209,3 +215,39 @@ def test_unreal_module_has_the_generated_headers():
         ue = UE_POLICY_DIR / name
         assert ue.exists(), f"{name} 이 언리얼 모듈에 없다"
         assert ue.read_bytes() == (EXPORT / name).read_bytes(), f"{name} 내용이 다르다"
+
+
+@needs_export
+def test_steering_golden_covers_both_flee_branches():
+    """§9.8-2 — 도주 분기가 한쪽만 밟히면 `flee_weight` 가 검증되지 않는다."""
+    import re
+
+    txt = (EXPORT / "SteeringGoldenVectors.h").read_text(encoding="utf-8")
+    m = re.search(r"도주 분기: (\d+)/(\d+)", txt)
+    assert m, "골든 헤더에 도주 분기 통계가 없다"
+    fleeing, total = int(m.group(1)), int(m.group(2))
+    assert 0 < fleeing < total, f"{fleeing}/{total} — 두 분기가 다 밟혀야 한다"
+
+
+@needs_export
+def test_behavior_config_matches_spec_unit_conversion():
+    """§9.7 — 파이썬(격자 단위/스텝) → 언리얼(cm/초) 변환이 맞는가."""
+    import re
+
+    cfg = load_config()
+    txt = (EXPORT / "EcoBehaviorConfig.h").read_text(encoding="utf-8")
+
+    def value(name):
+        m = re.search(rf"{name} = ([-\d.]+)f?;", txt)
+        assert m, name
+        return float(m.group(1))
+
+    assert value("SeeRadiusCm") == pytest.approx(cfg.see_r * cfg.grid_unit_cm)
+    assert value("HerbSpeedCmS") == pytest.approx(
+        cfg.herb_speed * cfg.grid_unit_cm / (cfg.policy_interval / 60.0)
+    )
+    assert value("SepRadiusCm") == pytest.approx(cfg.sep_radius * cfg.grid_unit_cm)
+    assert value("ObsCoverNormCm") == pytest.approx(cfg.obs_cover_norm * cfg.grid_unit_cm)
+    # §3.3 조향 계수는 무차원이라 변환하지 않는다
+    assert value("SepWeight") == pytest.approx(cfg.sep_weight)
+    assert value("FleeWeight") == pytest.approx(cfg.flee_weight)

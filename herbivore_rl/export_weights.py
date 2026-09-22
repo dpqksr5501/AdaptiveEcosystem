@@ -41,7 +41,8 @@ N_VERIFY = 100
 UE_POLICY_DIR = (
     ROOT.parent / "AdaptiveEcosystem" / "Source" / "AdaptiveEcosystem" / "AI" / "Policy"
 )
-GENERATED = ("PolicyWeights.h", "PolicyGoldenVectors.h", "UtilityParams.h")
+GENERATED = ("PolicyWeights.h", "PolicyGoldenVectors.h", "UtilityParams.h",
+             "EcoBehaviorConfig.h", "SteeringGoldenVectors.h")
 
 # §3.1 관측 이름. 골든 벡터 헤더 주석에 쓴다.
 OBS_NAMES = ["food_density", "predator_count", "predator_distance", "kin_count",
@@ -154,6 +155,121 @@ namespace EcoUtilityParams
     path.write_text(body, encoding="utf-8")
 
 
+def write_steering_golden_header(path: Path, cfg, n: int = 100, seed: int = 1) -> None:
+    """§9.8-2 — "조향 단독: 같은 기하 입력에 파이썬 steer() 와 C++ 출력 일치".
+
+    단위는 **파이썬 격자 단위** 그대로 쓴다. 검증 대상이 §3.3 수식이지 단위 변환이
+    아니기 때문이다 (변환은 EcoBehaviorConfig.h 쪽에서 따로 본다). C++ 테스트가
+    같은 cfg 값을 넘겨 준다.
+    """
+    from env.steering import clamp_magnitude, normalize, steer
+
+    rng = np.random.default_rng(seed)
+    g = dict(
+        food_grad=normalize(rng.normal(size=(n, 2))),
+        to_centroid=normalize(rng.normal(size=(n, 2))),
+        to_cover=normalize(rng.normal(size=(n, 2))),
+        separation=clamp_magnitude(rng.normal(size=(n, 2)), 1.0),
+        away_from_pred=normalize(rng.normal(size=(n, 2))),
+        # 도주 분기가 양쪽 다 밟히도록 넓게 뽑는다
+        d_pred_min=rng.uniform(0.0, 1.5 * cfg.see_r, n),
+    )
+    # 일부는 방향항을 영벡터로 — normalize 의 영벡터 규약도 검증 대상이다
+    for key in ("food_grad", "to_centroid", "to_cover", "away_from_pred"):
+        g[key][rng.random(n) < 0.15] = 0.0
+    a = rng.random((n, 4))
+
+    v = steer(g, a, cfg)
+    fleeing = g["d_pred_min"] < a[:, 2] * cfg.see_r
+    assert fleeing.any() and not fleeing.all(), "도주 분기 양쪽이 다 밟혀야 한다"
+
+    # (n, 11) 입력: food_grad, to_centroid, to_cover, separation, away_from_pred, d_pred_min
+    inp = np.concatenate(
+        [g["food_grad"], g["to_centroid"], g["to_cover"], g["separation"],
+         g["away_from_pred"], g["d_pred_min"][:, None]], axis=1
+    ).astype(np.float32)
+
+    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    body = f"""// 자동 생성. 수정 금지.
+// §9.8-2 조향 파리티 골든 벡터 {n}쌍. 단위는 파이썬 격자 단위다.
+// 입력 11개: food_grad(2) to_centroid(2) to_cover(2) separation(2) away_from_pred(2) d_pred_min(1)
+// 기대 2개:  §3.3 steer() 결과 속도 (XY)
+// 설정:      see_r={cfg.see_r:g} sep_weight={cfg.sep_weight:g} """ \
+        f"""flee_weight={cfg.flee_weight:g} herb_speed={cfg.herb_speed:g}
+// 도주 분기: {int(fleeing.sum())}/{n} 이 켜진 표본
+// 허용:      max |C++ - Python| <= 1e-5
+// generated: {stamp}
+#pragma once
+
+static const int kSteerGoldenCount = {n};
+static const float kSteerSeeRadius = {cfg.see_r:.8f}f;
+static const float kSteerSepWeight = {cfg.sep_weight:.8f}f;
+static const float kSteerFleeWeight = {cfg.flee_weight:.8f}f;
+static const float kSteerHerbSpeed = {cfg.herb_speed:.8f}f;
+
+{c_array("kSteerGoldenInput", inp, per_line=11, comment="[n*11 + i]")}
+
+{c_array("kSteerGoldenAction", a.astype(np.float32), per_line=4,
+         comment="[n*4 + j] — forage, cohesion, flee_dist, cover")}
+
+{c_array("kSteerGoldenExpected", v.astype(np.float32), per_line=2, comment="[n*2 + j]")}
+"""
+    path.write_text(body, encoding="utf-8")
+
+
+def write_behavior_config_header(path: Path, cfg, src: Path) -> None:
+    """§9.7 단위 대응. `configs/default.yaml` 에서 자동 생성한다.
+
+    §9.7 "두 곳에 따로 적지 않는다" — 파이썬은 격자 단위/스텝, 언리얼은 cm/초다.
+    변환을 손으로 하면 언젠가 어긋나고, 그러면 §0 의 동일 조건 비교가 깨진다.
+    """
+    stamp = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    g = float(cfg.grid_unit_cm)
+    pi = int(cfg.policy_interval)
+    vals = {
+        # §9.7 표
+        "GridUnitCm": g,
+        "PolicyInterval": pi,
+        "SeeRadiusCm": cfg.see_r * g,
+        "HerbSpeedCmS": cfg.herb_speed * g / (pi / 60.0),
+        # §3.1 관측 정규화 — 고정 상수 (§1.2)
+        "MaxEnergy": float(cfg.max_energy),
+        "ObsPredCountNorm": float(cfg.obs_pred_count_norm),
+        "ObsKinCountNorm": float(cfg.obs_kin_count_norm),
+        "ObsCoverNormCm": cfg.obs_cover_norm * g,
+        "FovDeg": float(cfg.fov_deg),
+        # §3.3 조향 계수 — 파이썬 env/steering.py 와 공유
+        "SepWeight": float(cfg.sep_weight),
+        "SepRadiusCm": cfg.sep_radius * g,
+        "FleeWeight": float(cfg.flee_weight),
+        # §3.1 지역 피식 EMA (§9.6)
+        "PredationEmaDecay": float(cfg.predation_ema_decay),
+        "PredationEmaGain": float(cfg.predation_ema_gain),
+    }
+    lines = "\n".join(
+        f"\tstatic constexpr {'int32' if isinstance(v, int) else 'float'} {k} = "
+        f"{v}{'' if isinstance(v, int) else 'f'};"
+        for k, v in vals.items()
+    )
+    body = f"""// 자동 생성. 수정 금지.
+// §9.7 단위 대응 — 파이썬(격자 단위/스텝) -> 언리얼(cm/초).
+//   1 스텝        = PolicyInterval 틱
+//   1 격자 단위   = GridUnitCm
+//   HerbSpeed     = herb_speed × GridUnitCm ÷ (PolicyInterval/60) cm/s
+//   SeeRadius     = see_r × GridUnitCm
+// generated: {stamp}, from {src.as_posix()}
+#pragma once
+
+#include "CoreMinimal.h"
+
+namespace EcoBehaviorConfig
+{{
+{lines}
+}}
+"""
+    path.write_text(body, encoding="utf-8")
+
+
 def write_golden_header(path: Path, obs: np.ndarray, out: np.ndarray, src: Path) -> None:
     """§9.8-1 검증용. C++ 자동화 테스트가 파일 I/O 없이 쓸 수 있게 헤더로 낸다.
 
@@ -209,6 +325,9 @@ def main(argv=None) -> int:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     write_weights_header(out / "PolicyWeights.h", w, cfg, src)
+    write_behavior_config_header(out / "EcoBehaviorConfig.h", cfg,
+                                 Path(args.config or "configs/default.yaml"))
+    write_steering_golden_header(out / "SteeringGoldenVectors.h", cfg)
 
     obs = sample_observations(args.n_verify)
     ref = sigmoid(model.predict(obs, deterministic=True)[0])   # §7.1과 같은 경로

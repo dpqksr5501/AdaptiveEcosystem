@@ -3,12 +3,15 @@
 초식 몬스터 행동 정책 학습. 사양서는 `herbivore_policy_spec.md` (저장소 밖, 프로젝트 루트 상위).
 아래 §는 전부 그 사양서의 절 번호다.
 
-**현재 상태: Phase 5 (가중치 내보내기) 완료. 파이썬 → 언리얼 파이프라인 검증됨.
-Phase 6 은 추론 계층까지. §6.6 은 여전히 미달 — §11-B 판단 대기 중.**
+**현재 상태: Phase 5 완료, Phase 6 은 Mass 정책·조향 계층까지.
+§6.6 은 여전히 미달 — §11-B 판단 대기 중.**
 
 > **파이썬 → 언리얼이 끝까지 돈다.** 학습 가중치를 C 헤더로 내보내고, 실제 UE 5.8
 > 모듈에서 빌드하고, 엔진 자동화 테스트 3개를 통과했다 — 골든 벡터 100쌍 최대 오차
 > **1.192e-07** (기준 1e-5). 모델을 새로 학습해 다시 내보내도 반복 통과한다.
+>
+> 조향도 마찬가지다 — §3.3 수식을 `EcoSteering.h` 로 빼서 파이썬 `steer()` 와
+> 골든 100쌍을 대조한다 (최대 오차 **1.788e-07**, 도주 분기 32개 포함).
 >
 > §6.6의 "+20%" 는 미달이다. §4.4 완화(§11-B 결정) 후 부호는 뒤집혔지만
 > (−1.5% → 2M에서 **+11.2%**), 목표에는 못 미친다. 그리고 **2M 모델이 10M 모델보다
@@ -111,11 +114,37 @@ python export_weights.py
 | 언리얼 쪽 파일 | 내용 |
 |---|---|
 | `AI/Policy/EcoPolicyInference.h` | §9.3 `RunPolicy`. **엔진 비의존** (`<cmath>` 만) — 그래서 gcc로도 검증된다 |
+| `AI/Policy/EcoSteering.h` | §3.3 `Steer()`. 역시 엔진 비의존. 경계 반발은 여기 없다 (언리얼 전용 항) |
 | `AI/Policy/EcoPolicyInference.cpp` | §5.1 `RunUtilityPolicy` 를 C++로 |
+| `AI/Policy/EcoBehaviorFragments.h` | §9.2 태그 + 공유 설정 + 기하 캐시 |
+| `AI/Policy/EcoWorldProviders.h/.cpp` | §9.4 월드팀 인터페이스 + 더미 구현 |
+| `AI/Policy/EcoNeighborhoodSubsystem.h/.cpp` | 이웃 조회 (균일 격자) |
+| `AI/Policy/EcoRegionPredationSubsystem.h/.cpp` | §9.6 지역 피식 EMA + SaveGame |
+| `AI/Policy/EcoBehaviorProcessors.h/.cpp` | §9.4 Policy + §9.5 Steering (+ 게더·지각) |
 | `AI/Policy/PolicyWeights.h` | 자동 생성 (7-64-64-4) |
 | `AI/Policy/UtilityParams.h` | 자동 생성 (§5.2 튜닝 계수) |
-| `AI/Policy/PolicyGoldenVectors.h` | 자동 생성 (검증용 100쌍) |
-| `AI/Policy/Tests/EcoPolicyInferenceTest.cpp` | §9.8-1 엔진 내 자동화 테스트 3개 |
+| `AI/Policy/EcoBehaviorConfig.h` | 자동 생성 (§9.7 단위 대응) |
+| `AI/Policy/PolicyGoldenVectors.h` | 자동 생성 (§9.8-1 검증용 100쌍) |
+| `AI/Policy/SteeringGoldenVectors.h` | 자동 생성 (§9.8-2 검증용 100쌍) |
+| `AI/Policy/Tests/EcoPolicyInferenceTest.cpp` | 엔진 내 자동화 테스트 5개 |
+
+프로세서 실행 순서 (§9.5 "Policy → Steering → Mass 이동"):
+
+```
+NeighborhoodGather  (매 틱)  개체 위치 색인
+  → Perception      (매 틱)  §3.3 기하 입력
+  → Policy          (8틱마다) 관측 7개 → RunPolicy/RunUtilityPolicy → 행동 4개
+  → Steering        (매 틱)  §3.3 조향 → 속도
+  → (엔진) Mass 이동
+```
+
+콘솔 변수 `eco.UseLearnedPolicy` 로 학습 정책(1)과 §5.1 Utility 비교군(0)을 바꾼다.
+
+엔진 자동화 테스트 실행:
+
+```bash
+"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" <절대경로>/AdaptiveEcosystem.uproject "-ExecCmds=Automation RunTests AdaptiveEcosystem.Policy" "-testexit=Automation Test Queue Empty" -DisablePlugins=Bridge,Fab -unattended -nopause -nosplash -NullRHI -log
+```
 
 빌드·테스트:
 

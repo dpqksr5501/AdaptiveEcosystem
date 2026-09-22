@@ -3,7 +3,7 @@
 // 입력:  관측 7개 — food_density, predator_count, predator_distance, kin_count, energy, recent_predation, cover_distance
 // 기대:  행동 4개 — forage, cohesion, flee_dist, cover  (clamp(-3,3) -> sigmoid 를 거친 값)
 // 허용:  max |C++ - Python| <= 1e-5
-// generated: 2026-09-22T05:22:51+00:00, from C:/kwon/univ/3-1/GameContentsCapstoneDesign/AdaptiveEcosystem/herbivore_rl/ckpt/final.zip
+// generated: 2026-09-22T06:19:26+00:00, from C:/kwon/univ/3-1/GameContentsCapstoneDesign/AdaptiveEcosystem/herbivore_rl/ckpt/final.zip
 #pragma once
 
 static const int kGoldenCount = 100;
