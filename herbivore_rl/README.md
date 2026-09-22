@@ -16,6 +16,9 @@
 > (−1.5% → 2M에서 **+11.2%**), 목표에는 못 미친다. 그리고 **2M 모델이 10M 모델보다
 > 낫다** — 근거는 [docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md) §6.
 
+> **전체 과정과 결론은 [docs/PROJECT_SUMMARY.md](docs/PROJECT_SUMMARY.md) 에 정리돼 있다.**
+> Phase 1~6 각 단계의 판단, 사양서를 고친 3건과 그 사유, 최종 수치, 남은 한계.
+
 ## 설치
 
 ```bash
