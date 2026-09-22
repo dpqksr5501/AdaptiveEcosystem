@@ -7,7 +7,9 @@
 # ── 개체 ─────────────────────────────────────────────
 N: 128                      # §4.3 고정
 herb_speed: 0.60            # 단위/스텝
-see_r: 10.0                 # 시야 거리
+see_r: 20.0                 # 시야 거리. 10에서는 포식자가 보이는 스텝이 12%뿐이라
+                            # 반응형 행동이 이득을 못 냈다. 20이면 34%가 되고
+                            # flee_dist에 내부 최적점이 생긴다 (§11-B 정정)
 fov_deg: 120.0              # §3.1 "Aquarium 기본 FOV" = prey_fov 기본값 120도
 max_energy: 1.0
 init_energy: 0.5
@@ -47,7 +49,8 @@ cover_max_count: 32         # 면적 비율을 채우다 멈추는 상한
 cover_hide_mult: 2.5        # §4.2 안에 있으면 포식자에게 거리가 2.5배로 보임
 
 # ── 포식자 (§4.2) ────────────────────────────────────
-pred_view_r: 14.0           # 초식 see_r(10)보다 약간 넓다. 더 키우면 도주가 무의미해진다
+pred_view_r: 14.0           # 초식 see_r(20)보다 좁다. 초식이 먼저 발견해야
+                            # 도주가 성립한다 (§11-B 정정 전에는 20 vs 14로 반대였다)
 pred_fov_deg: 150.0         # Aquarium predator_fov 기본값
 pred_melee_catch_r: 1.0     # §4.2 근접형 포획 거리
 pred_ranged_catch_r: 3.0    # §4.2 원거리형 포획 거리
@@ -69,7 +72,8 @@ rew_death: -10.0
 rand:
   world_size:      [60.0, 110.0]   # 정방형
   predator_count:  [2, 12]         # M, 양끝 포함
-  pred_speed_mult: [1.0, 1.4]      # herb_speed 대비
+  pred_speed_mult: [0.8, 1.2]      # herb_speed 대비. §11-B 결정으로 1.0~1.4에서 정정 —
+                                   # 포식자가 절대 느리지 않으면 도주가 원리적으로 불가능하다
   ranged_frac:     [0.0, 0.5]
   cover_frac:      [0.05, 0.30]
   food_regen_mult: [0.5, 2.0]

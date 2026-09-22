@@ -1,15 +1,15 @@
 _generated:
-  at: '2026-09-21T16:08:14+00:00'
+  at: '2026-09-22T05:13:00+00:00'
   by: tune_ppo.py (§6.4)
   python: 3.13.5
   optuna: 5.0.0
   note: 자동 생성. 손으로 고치지 말고 tune_ppo.py를 다시 돌려라.
 params:
-  learning_rate: 7.631447033033856e-05
-  gamma: 0.9994545384609574
-  ent_coef: 0.00011729347924061376
-  clip_range: 0.35618061226200187
-  n_epochs: 5
+  learning_rate: 6.813187996724827e-05
+  gamma: 0.9916661555611042
+  ent_coef: 0.0008971496690499397
+  clip_range: 0.37816696417287243
+  n_epochs: 15
 not_searched:
   net_arch:
   - 64
@@ -18,10 +18,10 @@ not_searched:
   reason: §6.4·§12 탐색 금지. §9.3 C++ RunPolicy와 §8.1 export가 의존한다.
 objective:
   metric: mean_return
-  value: 72.57723739589328
-  warmstart_baseline: 66.26355925571846
-  ratio_vs_warmstart: 1.0952813010814832
-  policy_std_at_end: 0.9814350605010986
+  value: 86.4159351881126
+  warmstart_baseline: 77.73171580977089
+  ratio_vs_warmstart: 1.1117204128054265
+  policy_std_at_end: 0.9401702880859375
 conditions:
   seeds:
   - 16
@@ -49,14 +49,14 @@ conditions:
   trials: 50
   best_trial: 32
 stats_at_best:
-  cohesion_mean: 0.8493789375729335
-  cover_frac: 0.26459648437500005
-  flee_dist_mean: 0.6642940541481986
-  flee_dist_std: 0.015508439083815304
-  mean_return: 72.57723739589328
-  policy_std: 0.9814350605010986
-  predation_rate: 0.0024011718750000005
-  react_hunger: 0.2139889599522154
-  react_pred: 0.006146956733673161
-  repro: 10.748828125
-  survival: 441.86804902393476
+  cohesion_mean: 0.7902175789913667
+  cover_frac: 0.26564127604166665
+  flee_dist_mean: 0.37940757215051757
+  flee_dist_std: 0.009386508855660312
+  mean_return: 86.4159351881126
+  policy_std: 0.9401702880859375
+  predation_rate: 0.0019088541666666668
+  react_hunger: 0.3677947758760319
+  react_pred: 0.08473370530677479
+  repro: 10.6640625
+  survival: 533.3651011022074

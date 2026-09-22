@@ -3,12 +3,16 @@
 초식 몬스터 행동 정책 학습. 사양서는 `herbivore_policy_spec.md` (저장소 밖, 프로젝트 루트 상위).
 아래 §는 전부 그 사양서의 절 번호다.
 
-**현재 상태: Phase 3 (PPO 학습) 코드 완료, §6.6 기준 미달 — §11-B 판단 대기 중.**
+**현재 상태: Phase 5 (가중치 내보내기) 완료. 파이썬 → 언리얼 파이프라인 검증됨.
+Phase 6 은 추론 계층까지. §6.6 은 여전히 미달 — §11-B 판단 대기 중.**
 
-> §6.6의 "10M 후 모방 초기화 대비 +20%" 를 달성하지 못했다 (−1.5%). 측정 결과 이
-> 환경에서는 **상태를 안 보는 고정 행동 하나가 튜닝된 Utility AI와 10M PPO를 둘 다
-> 이긴다.** 네 정책의 차이가 전부 시드 잡음 안이다. 원인과 §11-B 선택지 검토는
-> [docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md).
+> **파이썬 → 언리얼이 끝까지 돈다.** 학습 가중치를 C 헤더로 내보내고, 실제 UE 5.8
+> 모듈에서 빌드하고, 엔진 자동화 테스트 3개를 통과했다 — 골든 벡터 100쌍 최대 오차
+> **1.192e-07** (기준 1e-5). 모델을 새로 학습해 다시 내보내도 반복 통과한다.
+>
+> §6.6의 "+20%" 는 미달이다. §4.4 완화(§11-B 결정) 후 부호는 뒤집혔지만
+> (−1.5% → 2M에서 **+11.2%**), 목표에는 못 미친다. 그리고 **2M 모델이 10M 모델보다
+> 낫다** — 근거는 [docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md) §6.
 
 ## 설치
 
@@ -67,6 +71,8 @@ python warmstart.py && python train.py --steps 10000000
 | `warmstart.py` | §6.1 모방 초기화. `ckpt/warmstart.zip` + §6.6 기준선 json |
 | `train.py` | §6.3 PPO + §6.5 행동 로깅. **PPO 설정의 유일한 출처** |
 | `tune_ppo.py` | §6.4 하이퍼파라미터 탐색 (5개만. 구조는 탐색 금지) |
+| `export_weights.py` | §8.1 가중치 → C 헤더. **언리얼 모듈에 자동 복사** |
+| `tests/cpp/parity_main.cpp` | 엔진 없이 g++ 로 §9.8-1 파리티를 재는 하네스 |
 | `replay.py` | 리플레이 영상 (§4.6, §5.3) |
 | `tests/` | §4.6 · §5.3 완료 기준 + 조향·수식 계약 검증 |
 | `docs/aquarium_notes.md` | §4.1 Aquarium 조사와 §11-A 판단 |
@@ -92,6 +98,35 @@ python warmstart.py && python train.py --steps 10000000
   0~0.078이라 `cohesion = clip(k_coh × rp)` 가 k_coh=4에서 평균 0.109에 머문다.
   기존 범위로는 §5.3의 "랜덤 대비 2배"가 원리적으로 불가능했다 (상한 1.57배).
   §3.1 EMA 수식 자체는 §11-D에 따라 **바꾸지 않았다.**
+
+## 파이썬 → 언리얼
+
+```bash
+python export_weights.py
+```
+
+`export/` 에 헤더를 만들고 **동시에** `AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/`
+에 복사한다. 손으로 옮기지 않는다 (§12).
+
+| 언리얼 쪽 파일 | 내용 |
+|---|---|
+| `AI/Policy/EcoPolicyInference.h` | §9.3 `RunPolicy`. **엔진 비의존** (`<cmath>` 만) — 그래서 gcc로도 검증된다 |
+| `AI/Policy/EcoPolicyInference.cpp` | §5.1 `RunUtilityPolicy` 를 C++로 |
+| `AI/Policy/PolicyWeights.h` | 자동 생성 (7-64-64-4) |
+| `AI/Policy/UtilityParams.h` | 자동 생성 (§5.2 튜닝 계수) |
+| `AI/Policy/PolicyGoldenVectors.h` | 자동 생성 (검증용 100쌍) |
+| `AI/Policy/Tests/EcoPolicyInferenceTest.cpp` | §9.8-1 엔진 내 자동화 테스트 3개 |
+
+빌드·테스트:
+
+```bash
+"C:/Program Files/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat" AdaptiveEcosystemEditor Win64 Development -Project=<절대경로>/AdaptiveEcosystem.uproject
+```
+
+> **이 엔진 설치본 주의.** `Bridge`(Megascans)와 `Fab` 플러그인 바이너리가 없어서
+> 에디터가 시작 직후 종료된다. 자동화 테스트를 돌릴 땐 `-DisablePlugins=Bridge,Fab`
+> 가 필요하다. 그리고 `Content/` 의 에셋 144개가 **UE 5.8보다 새 엔진**에서 저장돼
+> 로드되지 않는다 (`OpenWorld.umap` 포함). 레벨을 띄우려면 이 둘을 먼저 풀어야 한다.
 
 ## 다음
 

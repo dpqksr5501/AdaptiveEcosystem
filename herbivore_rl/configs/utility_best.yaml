@@ -1,21 +1,21 @@
 _generated:
-  at: '2026-09-21T14:38:46+00:00'
+  at: '2026-09-22T04:07:21+00:00'
   by: tune_utility.py (§5.2)
   python: 3.13.5
   optuna: 5.0.0
   note: 자동 생성. 손으로 고치지 말고 tune_utility.py를 다시 돌려라.
 params:
-  k_forage: 0.5506185695564965
-  k_coh: 36.43723208062695
-  flee_base: 0.40381331945177074
-  flee_k: 0.8626289115990198
-  k_cover: 0.3362129414464415
+  k_forage: 0.8126270485054656
+  k_coh: 39.95822951944169
+  flee_base: 0.3860808072458135
+  flee_k: 0.6327404801464074
+  k_cover: 0.7094931300545447
 objective:
   metric: mean_return
-  value: 67.60481141429588
-  std_over_seeds: 64.88631643406706
-  random_baseline: 22.617072518600512
-  ratio_vs_random: 2.989105303469182
+  value: 82.71609190408076
+  std_over_seeds: 60.58773796831774
+  random_baseline: 25.395145211372704
+  ratio_vs_random: 3.2571616037477122
   spec_5_3_pass: true
 conditions:
   seeds:
@@ -45,16 +45,16 @@ conditions:
   seed_pool_rng: 0
   steps: 3000
   trials: 300
-  best_trial: 80
+  best_trial: 277
   config: configs/default.yaml
 stats_at_best:
-  cohesion_mean: 0.7656131294523637
-  cover_frac: 0.19163958333333336
-  flee_dist_mean: 0.4267347877328594
-  flee_dist_std: 0.005076436698540703
-  mean_return: 67.60481141429588
-  predation_rate: 0.0026733072916666667
-  react_hunger: 0.24230307821030297
-  react_pred: 0.02060073402709598
-  repro: 11.129296875
-  survival: 371.48479216960095
+  cohesion_mean: 0.6489832959984584
+  cover_frac: 0.24505156250000004
+  flee_dist_mean: 0.39776228575011097
+  flee_dist_std: 0.0031924047413211835
+  mean_return: 82.71609190408076
+  predation_rate: 0.0018579427083333332
+  react_hunger: 0.3590482673981422
+  react_pred: 0.04462140350107882
+  repro: 10.34140625
+  survival: 484.11845501099543
