@@ -113,7 +113,10 @@ class BehaviorLogCallback(BaseCallback):
 
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="§6.3 PPO 학습")
-    p.add_argument("--steps", type=int, default=1_000_000)
+    # §6.3 정정: 본 학습은 2M 이다 (기존 10M). 이 환경에서 PPO 는 2M 근처가 정점이고
+    # 그 이상은 과학습이다 — 10M 모델은 도주를 거의 포기한다 (flee_dist 0.379 → 0.201).
+    # 측정: docs/phase3_ppo_findings.md §6.3
+    p.add_argument("--steps", type=int, default=2_000_000)
     p.add_argument("--init", default=str(CKPT / "warmstart.zip"),
                    help="§6.1 모방 초기화 가중치. 없으면 무작위 초기화로 시작")
     p.add_argument("--no-init", action="store_true", help="모방 초기화 없이 시작")

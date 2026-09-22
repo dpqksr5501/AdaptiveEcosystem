@@ -169,16 +169,19 @@ python evaluate.py
 |---|---|
 | random | 66.5 |
 | utility (§5.2 튜닝) | 145.9 |
-| learned (10M, §6.3 지시) | 149.6 |
 | **learned (2M)** | **164.4** |
+| learned (10M, 폐기) | 149.6 |
 
-- **learned(10M) vs utility: 차이 없음** (짝지은 차이 +3.70 ± 14.71, t=+1.13).
-- **learned(2M) vs utility: 네 성능 지표 전부 유의하게 우세**
-  (mean_return t=+4.24, survival t=+3.84, repro t=+4.12, predation_rate t=−2.44).
-- 행동은 두 경우 다 유의하게 다르다 — 같은 점수를 다른 방식으로 낸다.
+**학습 정책이 규칙 기반 비교군을 네 성능 지표 전부에서 유의하게 이긴다**
+(mean_return t=+4.24, survival t=+3.84, repro t=+4.12, predation_rate t=−2.44).
+행동도 유의하게 다르다 — 점수 차이가 행동 차이에서 온다.
 
-즉 **§11-B 선택지 ①(학습량 2M)을 택하면 학습 정책이 규칙을 이긴다.** 결정 대기 중.
+§11-B 결정으로 본 학습량을 10M → **2M** 으로 정정했다 (스펙 §6.3 에 사유·측정표 기록).
+이 환경에서 PPO 는 2M 근처가 정점이고 그 이상은 과학습이다 — 10M 모델은 도주를 거의
+포기한다 (`flee_dist` 0.379 → 0.201).
 
-## 다음
+## 남은 한계
 
-§11-B 결정. [docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md) §6.4 참조.
+**§6.6 의 "모방 초기화 대비 +20%" 는 여전히 미달이다 (+11.2%).** 그 기준 자체는 고치지
+않았다 — 달성 못 한 것을 달성한 것처럼 만들지 않기 위해서다 (§0).
+근거: [docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md) §6.

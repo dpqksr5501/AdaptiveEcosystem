@@ -5,7 +5,7 @@
 // 설정:      see_r=20 sep_weight=1.35 flee_weight=3 herb_speed=0.6
 // 도주 분기: 32/100 이 켜진 표본
 // 허용:      max |C++ - Python| <= 1e-5
-// generated: 2026-09-22T06:19:26+00:00
+// generated: 2026-09-22T09:16:52+00:00
 #pragma once
 
 static const int kSteerGoldenCount = 100;

@@ -159,15 +159,19 @@ def write_md(path: Path, cfg, args, rows_by_policy: dict[str, list[dict]],
         L.append(f"**`mean_return` 에서 {winner} 가 앞선다.** 짝지은 차이"
                  f" {md_ret:+.2f} ± {sd_ret:.2f}, t={t_ret:+.2f}.")
 
+    same_return = abs(t_ret) <= T_CRIT
+
     # 바닥선 대비 — 비교가 의미 있는 범위인지
     if "random" in rows_by_policy:
         rnd = means["random"]["mean_return"]
         L.append("")
+        tail = (" 즉 두 방식 모두 '학습된 행동'을 하고 있고, 그럼에도 갈리지 않는 것은"
+                " 그 위의 여지가 좁기 때문이다."
+                if same_return else
+                " 즉 두 방식 모두 무작위보다 훨씬 낫고, 그 위에서 다시 학습 정책이 앞선다.")
         L.append(f"둘 다 무작위 정책({rnd:.1f})은 크게 앞선다 —"
                  f" {a_name} {means[a_name]['mean_return']:.1f},"
-                 f" {b_name} {means[b_name]['mean_return']:.1f}."
-                 " 즉 두 방식 모두 '학습된 행동'을 하고 있고, 갈리지 않는 것은"
-                 " 그 위의 여지가 좁기 때문이다.")
+                 f" {b_name} {means[b_name]['mean_return']:.1f}." + tail)
 
     # 행동 차이는 유의한가 — 적응성은 있는데 성능으로 안 이어지는지 보기 위해
     beh = [c for c in STAT_COLUMNS
@@ -177,8 +181,10 @@ def write_md(path: Path, cfg, args, rows_by_policy: dict[str, list[dict]],
                and abs(welch_paired(A[c], B[c])[3]) > T_CRIT]
     if sig_beh:
         L.append("")
-        L.append(f"다만 **행동은 유의하게 다르다** — {', '.join(f'`{c}`' for c in sig_beh)}."
-                 " 두 정책이 같은 점수를 서로 다른 방식으로 낸다는 뜻이다.")
+        why = (" 두 정책이 같은 점수를 서로 다른 방식으로 낸다는 뜻이다."
+               if same_return else
+               " 점수 차이가 행동 차이에서 온다는 뜻이다.")
+        L.append(f"**행동도 유의하게 다르다** — {', '.join(f'`{c}`' for c in sig_beh)}." + why)
     L.append("")
     L.append("§0: \"규칙이 이겨도 실패가 아니다. 측정 결과 자체가 산출물이다.\"")
     path.write_text("\n".join(L) + "\n", encoding="utf-8")
@@ -188,7 +194,9 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="§7 비교 평가")
     p.add_argument("--steps", type=int, default=5000, help="§7.1 스텝 5000")
     p.add_argument("--model", default=str(ROOT / "ckpt" / "final.zip"))
-    p.add_argument("--extra-model", default=str(ROOT / "ckpt" / "final_2m.zip"),
+    # §11-B 결정으로 final.zip 은 2M 모델이다. 대조군으로 폐기된 10M 모델을 같이 잰다 —
+    # "왜 2M 인가" 의 근거가 보고서 안에 남아야 한다.
+    p.add_argument("--extra-model", default=str(ROOT / "ckpt" / "final_10m_superseded.zip"),
                    help="참고용 추가 모델. 없으면 건너뛴다")
     p.add_argument("--workers", type=int, default=None)
     p.add_argument("--config", default=None)

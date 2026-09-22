@@ -4,7 +4,7 @@
 //   1 격자 단위   = GridUnitCm
 //   HerbSpeed     = herb_speed × GridUnitCm ÷ (PolicyInterval/60) cm/s
 //   SeeRadius     = see_r × GridUnitCm
-// generated: 2026-09-22T06:19:26+00:00, from configs/default.yaml
+// generated: 2026-09-22T09:16:52+00:00, from configs/default.yaml
 #pragma once
 
 #include "CoreMinimal.h"
