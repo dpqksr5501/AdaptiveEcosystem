@@ -360,6 +360,72 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 }
 
 // -----------------------------------------------------------------------------
+// UEcoPredationProcessor  (§9.6 / §9.8-5)
+// -----------------------------------------------------------------------------
+
+UEcoPredationProcessor::UEcoPredationProcessor()
+	: HerbivoreQuery(*this)
+{
+	ExecutionFlags = static_cast<int32>(EProcessorExecutionFlags::Server
+									  | EProcessorExecutionFlags::Standalone);
+	ProcessingPhase = EMassProcessingPhase::PrePhysics;
+	// 지각이 끝난 뒤여야 DistPredMin 이 이번 틱 값이다.
+	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoPerceptionProcessor"));
+	bRequiresGameThreadExecution = true;
+}
+
+void UEcoPredationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
+{
+	HerbivoreQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+	HerbivoreQuery.AddRequirement<FEcoSteeringGeometryFragment>(EMassFragmentAccess::ReadOnly);
+	HerbivoreQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadWrite);
+	HerbivoreQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
+}
+
+void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
+									 FMassExecutionContext& Context)
+{
+	UWorld* World = GetWorld();
+	UEcoRegionPredationSubsystem* Predation =
+		World ? World->GetSubsystem<UEcoRegionPredationSubsystem>() : nullptr;
+	if (!Predation)
+	{
+		return;
+	}
+
+	// 포획 거리. 파이썬 §4.2 의 근접형 1.0 격자 단위에 대응한다.
+	const float CatchRadius = EcoBehaviorConfig::GridUnitCm * 1.0f;
+
+	HerbivoreQuery.ForEachEntityChunk(Context,
+		[Predation, CatchRadius](FMassExecutionContext& Ctx)
+	{
+		const TConstArrayView<FTransformFragment> Transforms =
+			Ctx.GetFragmentView<FTransformFragment>();
+		const TConstArrayView<FEcoSteeringGeometryFragment> Geometries =
+			Ctx.GetFragmentView<FEcoSteeringGeometryFragment>();
+		const TArrayView<FEcoVitalsFragment> Vitals =
+			Ctx.GetMutableFragmentView<FEcoVitalsFragment>();
+
+		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
+		{
+			const FVector Loc = Transforms[i].GetTransform().GetLocation();
+			// 지역 개체 수 — §3.1 EMA 의 분모다.
+			Predation->ReportPopulation(Loc, 1);
+
+			if (Geometries[i].DistPredMin >= CatchRadius || Vitals[i].HP <= 0.0f)
+			{
+				continue;
+			}
+			// 잡혔다. 파이썬은 슬롯을 리스폰하지만 여기서는 HP 를 0으로 두고
+			// 생명주기 처리는 기존 Lifecycle 계층에 맡긴다 — 이 프로세서의 책임은
+			// **피식을 지역에 보고하는 것**이다 (§9.6).
+			Vitals[i].HP = 0.0f;
+			Predation->ReportPredation(Loc);
+		}
+	});
+}
+
+// -----------------------------------------------------------------------------
 // UEcoSteeringProcessor  (§9.5)
 // -----------------------------------------------------------------------------
 

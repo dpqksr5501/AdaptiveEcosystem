@@ -82,6 +82,32 @@ private:
 	int32 TickCounter = 0;
 };
 
+/**
+ * §9.6/§9.8-5 — 포식 판정과 지역 피식 보고.
+ *
+ * 이게 없으면 `recent_predation` 이 영원히 0이고, 그러면 §5.1 Utility 비교군의
+ * `cohesion = k_coh × rp` 와 `flee_dist` 의 rp 항이 통째로 죽는다. 실제로 테스트 레벨에서
+ * Utility 의 cohesion 이 0.00 으로 찍혔다. 폐루프를 닫는 조각이다.
+ *
+ * 포식자 포획만 센다 — 아사는 §3.1 EMA 의 분자가 아니다 (파이썬도 그렇다).
+ * 플레이어 사냥은 `UEcoRegionPredationSubsystem::ReportPredation()` 을 직접 부르면 된다 (§9.6).
+ */
+UCLASS()
+class ADAPTIVEECOSYSTEM_API UEcoPredationProcessor : public UMassProcessor
+{
+	GENERATED_BODY()
+
+public:
+	UEcoPredationProcessor();
+
+protected:
+	virtual void ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager) override;
+	virtual void Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context) override;
+
+private:
+	FMassEntityQuery HerbivoreQuery;
+};
+
 /** §9.5 — §3.3 조향 수식. 파이썬 `env/steering.py` 와 한 줄씩 대응한다. */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoSteeringProcessor : public UMassProcessor

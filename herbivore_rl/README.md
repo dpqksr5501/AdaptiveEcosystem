@@ -3,8 +3,7 @@
 초식 몬스터 행동 정책 학습. 사양서는 `herbivore_policy_spec.md` (저장소 밖, 프로젝트 루트 상위).
 아래 §는 전부 그 사양서의 절 번호다.
 
-**현재 상태: Phase 5 완료, Phase 6 은 Mass 정책·조향 계층까지.
-§6.6 은 여전히 미달 — §11-B 판단 대기 중.**
+**현재 상태: Phase 1~6 전부 진행 완료. §6.6 만 미달 — §11-B 판단 대기 중.**
 
 > **파이썬 → 언리얼이 끝까지 돈다.** 학습 가중치를 C 헤더로 내보내고, 실제 UE 5.8
 > 모듈에서 빌드하고, 엔진 자동화 테스트 3개를 통과했다 — 골든 벡터 100쌍 최대 오차
@@ -75,7 +74,8 @@ python warmstart.py && python train.py --steps 10000000
 | `train.py` | §6.3 PPO + §6.5 행동 로깅. **PPO 설정의 유일한 출처** |
 | `tune_ppo.py` | §6.4 하이퍼파라미터 탐색 (5개만. 구조는 탐색 금지) |
 | `export_weights.py` | §8.1 가중치 → C 헤더. **언리얼 모듈에 자동 복사** |
-| `tests/cpp/parity_main.cpp` | 엔진 없이 g++ 로 §9.8-1 파리티를 재는 하네스 |
+| `tests/cpp/parity_main.cpp` | 엔진 없이 g++ 로 §9.8-1·§9.8-2 파리티를 재는 하네스 |
+| `evaluate.py` | §7 비교 평가. `results/compare.{csv,md}` 생성 |
 | `replay.py` | 리플레이 영상 (§4.6, §5.3) |
 | `tests/` | §4.6 · §5.3 완료 기준 + 조향·수식 계약 검증 |
 | `docs/aquarium_notes.md` | §4.1 Aquarium 조사와 §11-A 판단 |
@@ -157,9 +157,28 @@ NeighborhoodGather  (매 틱)  개체 위치 색인
 > 가 필요하다. 그리고 `Content/` 의 에셋 144개가 **UE 5.8보다 새 엔진**에서 저장돼
 > 로드되지 않는다 (`OpenWorld.umap` 포함). 레벨을 띄우려면 이 둘을 먼저 풀어야 한다.
 
+## §7 비교 평가 결과
+
+```bash
+python evaluate.py
+```
+
+시드 10000~10019 × 5000스텝, `deterministic=True` (§7.1). 산출물은 `results/`.
+
+| 정책 | mean_return |
+|---|---|
+| random | 66.5 |
+| utility (§5.2 튜닝) | 145.9 |
+| learned (10M, §6.3 지시) | 149.6 |
+| **learned (2M)** | **164.4** |
+
+- **learned(10M) vs utility: 차이 없음** (짝지은 차이 +3.70 ± 14.71, t=+1.13).
+- **learned(2M) vs utility: 네 성능 지표 전부 유의하게 우세**
+  (mean_return t=+4.24, survival t=+3.84, repro t=+4.12, predation_rate t=−2.44).
+- 행동은 두 경우 다 유의하게 다르다 — 같은 점수를 다른 방식으로 낸다.
+
+즉 **§11-B 선택지 ①(학습량 2M)을 택하면 학습 정책이 규칙을 이긴다.** 결정 대기 중.
+
 ## 다음
 
-**Phase 4로 가기 전에 §11-B 결정이 필요하다.**
-[docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md) §4의 선택지 검토를 읽을 것.
-현재 상태로 Phase 4를 돌리면 `compare.md` 는 "차이 없음"이 된다 (§7.3이 허용하는
-결과이긴 하다).
+§11-B 결정. [docs/phase3_ppo_findings.md](docs/phase3_ppo_findings.md) §6.4 참조.

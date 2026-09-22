@@ -18,7 +18,7 @@
 | §9.8-2 조향 파리티 | 〃 | 1.788e-07 |
 | §9.8-3 전체 파이프라인 | UE 자동화 테스트 + 테스트 레벨 | 통과 |
 | §9.8-4 학습 정책 교체 | 콘솔 변수만 | 통과 |
-| §9.8-5 지역 연동 | — | **미완** (§6 참조) |
+| §9.8-5 지역 연동 | 테스트 레벨 로그 | 통과 |
 
 ## 2. 파일 지도
 
@@ -76,15 +76,26 @@ python export_weights.py
 
 로그에 5초마다 `[Eco] 정책=... | 개체 N, 이동 M, 포식자 본 개체 K, 도주 F | forage ... ` 가 찍힌다.
 
-실측 비교 (96마리, 포식자 5):
+실측 비교 (96마리, 포식자 5, 피식 보고 연결 후):
 
 | 정책 | forage | cohesion | flee | cover |
 |---|---|---|---|---|
-| Utility (§5.1) | 0.34 | **0.00** | 0.39 | 0.03 |
-| 학습 (PPO) | 0.58 | **0.81** | 0.18 | 0.05 |
+| Utility (§5.1) | 0.34 | 0.16 ~ 0.71 (피식률 따라 변동) | 0.39 ~ 0.51 | 0.02 |
+| 학습 (PPO) | 0.58 | 0.81 | 0.18 | 0.05 |
 
-Utility 의 cohesion 이 0인 것은 버그가 아니다. §5.1 이 `cohesion = k_coh × recent_predation`
-인데 아직 아무도 피식을 보고하지 않아 EMA 가 0이기 때문이다 (§6 참조).
+두 정책 모두 상태에 반응하지만 반응하는 **대상이 다르다**. Utility 는 §5.1 수식상
+`recent_predation` 하나에만 반응하고, 학습 정책은 관측 7개를 전부 쓴다.
+
+§9.8-5 "사냥 후 recent_predation 상승과 행동 변화 확인" — `UEcoPredationProcessor` 가
+포획을 지역에 보고하면서 Utility 의 cohesion 이 실제로 움직인다:
+
+```
+cohesion 0.71 → 0.71 → 0.71 → 0.42 → 0.16     (보고 연결 전에는 0.00 고정)
+flee     0.51 → 0.43 → 0.40 → 0.39 → 0.39
+```
+
+포획 직후 지역 EMA 가 오르고 이후 감쇠한다. §5.1 의 `cohesion = k_coh × rp` 와
+`flee_dist` 의 rp 항이 그제서야 살아난다 — 폐루프(AGENTS.md §2.1)가 닫힌 지점이다.
 
 ## 5. 이 환경에서 막히는 것 두 가지
 
@@ -105,10 +116,13 @@ Utility 의 cohesion 이 0인 것은 버그가 아니다. §5.1 이 `cohesion = 
 
 ## 6. 아직 안 한 것
 
-- **§9.8-5 지역 연동.** `UEcoRegionPredationSubsystem` 은 있지만 **아무도 `ReportPredation()`
-  을 부르지 않는다.** 포식자 포획 판정과 플레이어 사냥이 이걸 호출해야 `recent_predation`
-  이 움직이고, 그래야 §5.1 Utility 의 cohesion·flee 항이 살아난다. 지금은 그 값이 항상 0이라
-  Utility 비교군이 제 성능을 못 낸다.
+- **플레이어 사냥이 아직 피식으로 안 잡힌다.** `UEcoPredationProcessor` 가 포식자 포획은
+  보고하지만, 플레이어가 잡은 경우는 해당 코드에서
+  `UEcoRegionPredationSubsystem::ReportPredation(Location)` 을 직접 불러야 한다 (§9.6).
+- **피식된 개체의 생명주기.** `UEcoPredationProcessor` 는 HP 를 0으로 두고 보고만 한다.
+  실제 제거·리스폰은 기존 Lifecycle 계층 몫이다. 파이썬은 슬롯을 즉시 리스폰한다 (§4.3).
+- **`UEcoPredationSaveGame` 이 자동 저장되지 않는다.** §9.6 은 세션 간 유지를 요구한다.
+  `SaveToSlot`/`LoadFromSlot` 은 구현돼 있으니 게임의 세이브 흐름에 걸면 된다.
 - **공유 설정을 프로세서가 안 읽는다.** `FEcoBehaviorConfigSharedFragment` 가 트레잇
   템플릿에는 들어가지만 프로세서는 `EcoBehaviorConfig.h` 상수를 직접 쓴다. 종별로 다른
   값을 주려면 프로세서에 `AddConstSharedRequirement` 를 붙이면 된다 — 에셋 재작성은 불필요.
