@@ -123,6 +123,7 @@ void AEcoHerdTestHarnessActor::SpawnTestHerds()
 	FMassArchetypeSharedFragmentValues SharedValues;
 	SharedValues.Add(SharedConfig);
 	SharedValues.Add(SpeciesBaseConfig);
+	SharedValues.Sort();
 
 	const FMassArchetypeHandle Archetype = EntityManager.CreateArchetype(FragmentsAndTags);
 	EntityManager.BatchCreateEntities(Archetype, SharedValues, EntityCount, SpawnedEntities);
