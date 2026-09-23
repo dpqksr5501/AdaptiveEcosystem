@@ -2,6 +2,7 @@
 
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Engine/World.h"
+#include "CollisionQueryParams.h"
 
 UEcoShelterSubsystem::UEcoShelterSubsystem()
 {
@@ -171,8 +172,19 @@ bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, c
 	const FVector Start = ThreatLocation + FVector(0.0f, 0.0f, 60.0f);
 	const FVector End = TargetLocation + FVector(0.0f, 0.0f, 40.0f);
 
-	const bool bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_WorldStatic, QueryParams);
-	return bHit; // Blocked by WorldStatic geometry = Defensively Occluded!
+	// 1. Primary Line of Sight trace using ECC_Visibility (standard for physical LOS / occlusion)
+	bool bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, QueryParams);
+
+	// 2. Secondary fallback using Object Type query (WorldStatic and WorldDynamic)
+	if (!bHit)
+	{
+		FCollisionObjectQueryParams ObjectParams;
+		ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+		ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+		bHit = World->LineTraceSingleByObjectType(HitResult, Start, End, ObjectParams, QueryParams);
+	}
+
+	return bHit; // Blocked by level geometry = Defensively Occluded!
 }
 
 int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation, float SearchRadius, int32& OutSlotIndex, float& OutScore) const
