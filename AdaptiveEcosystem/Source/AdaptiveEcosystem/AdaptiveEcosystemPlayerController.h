@@ -8,15 +8,21 @@
 
 class UInputMappingContext;
 class UUserWidget;
+class AEcoGameState;
 
 /**
  *  Basic PlayerController class for a third person game
  *  Manages input mappings
  */
-UCLASS(abstract)
-class AAdaptiveEcosystemPlayerController : public APlayerController
+UCLASS(Abstract)
+class ADAPTIVEECOSYSTEM_API AAdaptiveEcosystemPlayerController : public APlayerController
 {
 	GENERATED_BODY()
+
+public:
+	/** Read-only access to the replicated authority summary. */
+	UFUNCTION(BlueprintPure, Category = "Ecology|Match")
+	AEcoGameState* GetEcoGameState() const;
 	
 protected:
 
@@ -42,6 +48,7 @@ protected:
 
 	/** Gameplay initialization */
 	virtual void BeginPlay() override;
+	virtual void BeginPlayingState() override;
 
 	/** Input mapping context setup */
 	virtual void SetupInputComponent() override;

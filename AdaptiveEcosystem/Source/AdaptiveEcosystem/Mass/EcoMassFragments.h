@@ -20,9 +20,11 @@ struct FEcoIdentityFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
-	/** Globally unique and persistent logical ID */
-	UPROPERTY(EditAnywhere, Category = "Ecology|Mass")
-	int64 StableAgentId = 0;
+	/**
+	 * Globally unique logical ID issued by the authoritative server world.
+	 * This is deliberately not an FMassEntityHandle or transport/network ID.
+	 */
+	FEcoAgentId StableAgentId = EcoIds::InvalidAgentId;
 
 	/** Canonical species identifier */
 	UPROPERTY(EditAnywhere, Category = "Ecology|Mass")
@@ -168,22 +170,4 @@ struct FEcoSpeciesSharedFragment : public FMassSharedFragment
 
 	UPROPERTY(EditAnywhere, Category = "Ecology|Species")
 	float MigrationThreshold = 0.2f; // energy below this ratio triggers migration urge
-};
-
-// -----------------------------------------------------------------------------
-// Mass Tags (Minimal persistent categorical state)
-// -----------------------------------------------------------------------------
-
-/** Tag present on all living logical agents */
-USTRUCT()
-struct FEcoAliveTag : public FMassTag
-{
-	GENERATED_BODY()
-};
-
-/** Tag present when agent is actively performing cross-region migration */
-USTRUCT()
-struct FEcoMigratingTag : public FMassTag
-{
-	GENERATED_BODY()
 };
