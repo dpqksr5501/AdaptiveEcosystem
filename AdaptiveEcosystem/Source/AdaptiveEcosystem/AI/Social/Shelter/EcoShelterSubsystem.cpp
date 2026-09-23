@@ -165,23 +165,46 @@ bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, c
 		return false;
 	}
 
-	FHitResult HitResult;
-	FCollisionQueryParams QueryParams(SCENE_QUERY_STAT(EcoShelterOcclusion), false);
-
 	// Trace from eye-level of threat to shelter position
 	const FVector Start = ThreatLocation + FVector(0.0f, 0.0f, 60.0f);
 	const FVector End = TargetLocation + FVector(0.0f, 0.0f, 40.0f);
 
-	// 1. Primary Line of Sight trace using ECC_Visibility (standard for physical LOS / occlusion)
-	bool bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, QueryParams);
+	FHitResult HitResult;
 
-	// 2. Secondary fallback using Object Type query (WorldStatic and WorldDynamic)
+	// 1. Complex geometry trace with ECC_Visibility (detects Modeling Mode meshes, procedural walls, and static meshes)
+	FCollisionQueryParams ComplexParams(SCENE_QUERY_STAT(EcoShelterOcclusionComplex), true);
+	ComplexParams.bFindInitialOverlaps = true;
+
+	bool bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, ComplexParams);
+
+	// 2. Camera channel fallback (often blocked by meshes that ignore visibility)
+	if (!bHit)
+	{
+		bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Camera, ComplexParams);
+	}
+
+	// 3. Object Type query (WorldStatic, WorldDynamic, PhysicsBody) with complex collision
 	if (!bHit)
 	{
 		FCollisionObjectQueryParams ObjectParams;
 		ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
 		ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
-		bHit = World->LineTraceSingleByObjectType(HitResult, Start, End, ObjectParams, QueryParams);
+		ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+		bHit = World->LineTraceSingleByObjectType(HitResult, Start, End, ObjectParams, ComplexParams);
+	}
+
+	// 4. Simple collision fallback
+	if (!bHit)
+	{
+		FCollisionQueryParams SimpleParams(SCENE_QUERY_STAT(EcoShelterOcclusionSimple), false);
+		bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, SimpleParams);
+		if (!bHit)
+		{
+			FCollisionObjectQueryParams ObjectParams;
+			ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+			ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+			bHit = World->LineTraceSingleByObjectType(HitResult, Start, End, ObjectParams, SimpleParams);
+		}
 	}
 
 	return bHit; // Blocked by level geometry = Defensively Occluded!
