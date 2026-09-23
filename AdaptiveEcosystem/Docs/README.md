@@ -45,6 +45,12 @@ PPO + Mass 생태계와 Steam 멀티플레이를 단계별로 완성하기 위�
 - 📦 [03_에셋_감사_보고서.md](초기%20문서/03_에셋_감사_보고서.md) : `Content/` 폴더 내 필수 보존 에셋 및 템플릿 삭제 후보 분류표
 - 📜 [04_부트스트랩_히스토리_및_역할.md](초기%20문서/04_부트스트랩_히스토리_및_역할.md) : 1·2차 부트스트랩 안정화 진행 이력 및 팀 역할 분담
 
+### 7. Social Behavior & Shelter (사회적 행동 및 은신처 런타임)
+동적 무리(Herd), 위험 전파(Alarm), 은신처(Shelter) 예약 및 PPO 행동 변조를 다룹니다.
+- 📌 [조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md](조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md) : **현재 소셜 런타임 구현 및 에디터 검증 현황 (Source of Truth)**
+- 📘 [조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md](조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md) : 사회적 행동 및 은신처 시스템 아키텍처 명세서
+- 📋 [조연우/SHELTER_COVER_MVP_AGENT_PROMPT.md](조연우/SHELTER_COVER_MVP_AGENT_PROMPT.md) : 차기 은신처(Shelter/Cover) MVP 작업 명세서
+
 ---
 
 ## 🎯 추천 읽기 순서
