@@ -28,8 +28,8 @@ void AEcoShelterTestHarnessActor::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Register lightweight 2D Canvas HUD projection delegate (runs seamlessly in PIE and Simulate)
-	DebugDrawDelegateHandle = UDebugDrawService::Register(TEXT("Game"),
+	// Register lightweight 2D Canvas HUD projection delegate on Translucency (always active in editor, simulate, and game viewports)
+	DebugDrawDelegateHandle = UDebugDrawService::Register(TEXT("Translucency"),
 		FDebugDrawDelegate::CreateUObject(this, &AEcoShelterTestHarnessActor::DrawEntityHUD));
 }
 
@@ -354,6 +354,22 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 			}
 		});
 	}
+	// 5. Real-time On-Screen Display (OSD) in viewport top-left (Guaranteed visible in all modes)
+	if (GEngine && ShelterSub && !ThreatLocation.IsZero())
+	{
+		for (int32 i = 0; i < Shelters.Num(); ++i)
+		{
+			if (ShelterSub->IsValidShelterIndex(i))
+			{
+				const bool bOcc = ShelterSub->CheckThreatOcclusion(ThreatLocation, Shelters[i].Position);
+				const FColor OsdColor = bOcc ? FColor(50, 255, 100) : FColor(255, 140, 20);
+				GEngine->AddOnScreenDebugMessage(9900 + i, 0.0f, OsdColor,
+					FString::Printf(TEXT("[Shelter #%d] %s | OccScore: %.1f"),
+						i, bOcc ? TEXT("SAFE (Behind Wall, Score ~0.95)") : TEXT("DANGER (Exposed, Score ~0.59)"),
+						bOcc ? 1.0f : 0.1f));
+			}
+		}
+	}
 }
 
 void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerController* PC)
@@ -388,10 +404,21 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 
 			const FEcoShelterPoint& Shelter = Shelters[i];
 			const FVector WorldPos = Shelter.Position + FVector(0.0f, 0.0f, 90.0f);
-			const FVector ScreenPos = Canvas->Project(WorldPos, false);
+			FVector2D ScreenPos2D;
+			bool bInFrontOfCamera = false;
+			if (Canvas->SceneView)
+			{
+				bInFrontOfCamera = Canvas->SceneView->WorldToPixel(WorldPos, ScreenPos2D);
+			}
+			else
+			{
+				const FVector Proj = Canvas->Project(WorldPos, true);
+				bInFrontOfCamera = (Proj.Z > 0.0f);
+				ScreenPos2D = FVector2D(Proj.X, Proj.Y);
+			}
 
-			if (ScreenPos.Z <= 0.0f || ScreenPos.X < -100.0f || ScreenPos.X > Canvas->SizeX + 100.0f ||
-				ScreenPos.Y < -100.0f || ScreenPos.Y > Canvas->SizeY + 100.0f)
+			if (!bInFrontOfCamera || ScreenPos2D.X < -100.0f || ScreenPos2D.X > Canvas->SizeX + 100.0f ||
+				ScreenPos2D.Y < -100.0f || ScreenPos2D.Y > Canvas->SizeY + 100.0f)
 			{
 				continue;
 			}
@@ -417,7 +444,7 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 				bOccluded ? 1.0f : 0.1f);
 
 			const FLinearColor Color = bOccluded ? FLinearColor(0.2f, 1.0f, 0.4f) : FLinearColor(1.0f, 0.3f, 0.2f);
-			FCanvasTextItem Item(FVector2D(ScreenPos.X, ScreenPos.Y), FText::FromString(ShelterText), GEngine->GetSmallFont(), Color);
+			FCanvasTextItem Item(ScreenPos2D, FText::FromString(ShelterText), GEngine->GetSmallFont(), Color);
 			Item.bCentreX = true;
 			Item.bCentreY = true;
 			Item.EnableShadow(FLinearColor::Black);
@@ -428,11 +455,24 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 	// 2. Draw Threat Source HUD
 	if (!ThreatLocation.IsZero())
 	{
-		const FVector ThreatScreenPos = Canvas->Project(ThreatLocation + FVector(0.0f, 0.0f, 120.0f), false);
-		if (ThreatScreenPos.Z > 0.0f && ThreatScreenPos.X >= 0.0f && ThreatScreenPos.X <= Canvas->SizeX &&
-			ThreatScreenPos.Y >= 0.0f && ThreatScreenPos.Y <= Canvas->SizeY)
+		const FVector WorldPos = ThreatLocation + FVector(0.0f, 0.0f, 120.0f);
+		FVector2D ThreatScreenPos2D;
+		bool bThreatVisible = false;
+		if (Canvas->SceneView)
 		{
-			FCanvasTextItem ThreatItem(FVector2D(ThreatScreenPos.X, ThreatScreenPos.Y), FText::FromString(TEXT("[THREAT SOURCE]")), GEngine->GetSmallFont(), FLinearColor(1.0f, 0.25f, 0.25f));
+			bThreatVisible = Canvas->SceneView->WorldToPixel(WorldPos, ThreatScreenPos2D);
+		}
+		else
+		{
+			const FVector Proj = Canvas->Project(WorldPos, true);
+			bThreatVisible = (Proj.Z > 0.0f);
+			ThreatScreenPos2D = FVector2D(Proj.X, Proj.Y);
+		}
+
+		if (bThreatVisible && ThreatScreenPos2D.X >= 0.0f && ThreatScreenPos2D.X <= Canvas->SizeX &&
+			ThreatScreenPos2D.Y >= 0.0f && ThreatScreenPos2D.Y <= Canvas->SizeY)
+		{
+			FCanvasTextItem ThreatItem(ThreatScreenPos2D, FText::FromString(TEXT("[THREAT SOURCE]")), GEngine->GetSmallFont(), FLinearColor(1.0f, 0.25f, 0.25f));
 			ThreatItem.bCentreX = true;
 			ThreatItem.bCentreY = true;
 			ThreatItem.EnableShadow(FLinearColor::Black);
@@ -464,9 +504,21 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 				continue;
 			}
 
-			const FVector ScreenPos = Canvas->Project(EntityPos + FVector(0.0f, 0.0f, 65.0f), false);
-			if (ScreenPos.Z <= 0.0f || ScreenPos.X < -50.0f || ScreenPos.X > Canvas->SizeX + 50.0f ||
-				ScreenPos.Y < -50.0f || ScreenPos.Y > Canvas->SizeY + 50.0f)
+			FVector2D ScreenPos2D;
+			bool bInFrontOfCamera = false;
+			if (Canvas->SceneView)
+			{
+				bInFrontOfCamera = Canvas->SceneView->WorldToPixel(EntityPos + FVector(0.0f, 0.0f, 65.0f), ScreenPos2D);
+			}
+			else
+			{
+				const FVector Proj = Canvas->Project(EntityPos + FVector(0.0f, 0.0f, 65.0f), true);
+				bInFrontOfCamera = (Proj.Z > 0.0f);
+				ScreenPos2D = FVector2D(Proj.X, Proj.Y);
+			}
+
+			if (!bInFrontOfCamera || ScreenPos2D.X < -50.0f || ScreenPos2D.X > Canvas->SizeX + 50.0f ||
+				ScreenPos2D.Y < -50.0f || ScreenPos2D.Y > Canvas->SizeY + 50.0f)
 			{
 				continue;
 			}
@@ -517,7 +569,7 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 				}
 			}
 
-			FCanvasTextItem TextItem(FVector2D(ScreenPos.X, ScreenPos.Y), FText::FromString(ShortText), GEngine->GetSmallFont(), TextColor);
+			FCanvasTextItem TextItem(ScreenPos2D, FText::FromString(ShortText), GEngine->GetSmallFont(), TextColor);
 			TextItem.bCentreX = true;
 			TextItem.bCentreY = true;
 			TextItem.EnableShadow(FLinearColor::Black);
