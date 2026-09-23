@@ -15,10 +15,33 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "DrawDebugHelpers.h"
+#include "Debug/DebugDrawService.h"
+#include "Engine/Canvas.h"
+#include "CanvasItem.h"
 
 AEcoShelterTestHarnessActor::AEcoShelterTestHarnessActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
+}
+
+void AEcoShelterTestHarnessActor::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Register lightweight 2D Canvas HUD projection delegate (runs seamlessly in PIE and Simulate)
+	DebugDrawDelegateHandle = UDebugDrawService::Register(TEXT("Game"),
+		FDebugDrawDelegate::CreateUObject(this, &AEcoShelterTestHarnessActor::DrawEntityHUD));
+}
+
+void AEcoShelterTestHarnessActor::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+	if (DebugDrawDelegateHandle.IsValid())
+	{
+		UDebugDrawService::Unregister(DebugDrawDelegateHandle);
+		DebugDrawDelegateHandle.Reset();
+	}
+
+	Super::EndPlay(EndPlayReason);
 }
 
 void AEcoShelterTestHarnessActor::EnsureQueriesInitialized(FMassEntityManager& EntityManager)
@@ -33,6 +56,7 @@ void AEcoShelterTestHarnessActor::EnsureQueriesInitialized(FMassEntityManager& E
 	DebugQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	DebugQuery.AddRequirement<FEcoShelterIntentFragment>(EMassFragmentAccess::ReadOnly);
 	DebugQuery.AddRequirement<FEcoSocialBehaviorFragment>(EMassFragmentAccess::ReadOnly);
+	DebugQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
 	DebugQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 
 	ResetQuery.Initialize(EntityManager.AsShared());
@@ -250,11 +274,6 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 			{
 				DrawDebugDirectionalArrow(World, Shelter.Position, Shelter.Position + Shelter.SurfaceNormal * 120.0f, 30.0f, FColor::Blue, false, -1.0f, 0, 2.0f);
 			}
-
-			// HUD text
-			const FString ShelterLabel = FString::Printf(TEXT("[Shelter #%d]\nOcc: %d/%d\nQual: %.2f"),
-				i, ReservedCount, TotalSlots, Shelter.Quality);
-			DrawDebugString(World, Shelter.Position + FVector(0, 0, 80.0f), ShelterLabel, nullptr, ShelterColor, 0.0f, true, 1.1f);
 		}
 	}
 
@@ -274,16 +293,6 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 			const float SlotRadius = bReserved ? 24.0f : 16.0f;
 
 			DrawDebugSphere(World, Slot.Position, SlotRadius, 8, SlotColor, false, -1.0f, 0, 1.5f);
-
-			if (bReserved)
-			{
-				const FString SlotLabel = FString::Printf(TEXT("Slot #%d\nAgent: %lld"), s, Slot.ReservedBy);
-				DrawDebugString(World, Slot.Position + FVector(0, 0, 30.0f), SlotLabel, nullptr, FColor::Orange, 0.0f, true, 0.85f);
-			}
-			else
-			{
-				DrawDebugString(World, Slot.Position + FVector(0, 0, 25.0f), FString::Printf(TEXT("Slot #%d [Open]"), s), nullptr, FColor(100, 255, 255), 0.0f, true, 0.75f);
-			}
 		}
 	}
 
@@ -306,78 +315,213 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 
 			if (bOccluded)
 			{
-				// Line blocked by WorldStatic geometry: Defensively occluded (Safe)
-				DrawDebugLine(World, RayStart, RayEnd, FColor::Green, false, -1.0f, 0, 2.5f);
-				DrawDebugString(World, (RayStart + RayEnd) * 0.5f + FVector(0, 0, 30.0f),
-					TEXT("[OCCLUDED - SAFE]"), nullptr, FColor::Green, 0.0f, true, 1.0f);
+				// Blocked by geometry: Safe green raycast
+				DrawDebugLine(World, RayStart, RayEnd, FColor(0, 255, 100), false, -1.0f, 0, 2.5f);
 			}
 			else
 			{
-				// Line clear: Visually exposed (Dangerous)
-				DrawDebugLine(World, RayStart, RayEnd, FColor::Red, false, -1.0f, 0, 2.0f);
-				DrawDebugString(World, (RayStart + RayEnd) * 0.5f + FVector(0, 0, 30.0f),
-					TEXT("[EXPOSED - DANGER]"), nullptr, FColor::Red, 0.0f, true, 1.0f);
+				// Exposed: Dangerous red raycast
+				DrawDebugLine(World, RayStart, RayEnd, FColor(255, 60, 60), false, -1.0f, 0, 2.0f);
 			}
 		}
 	}
 
-	// 4. Draw Agent Intent Lines & HUD
+	// 4. Draw Agent Intent Lines (Color-coded: Green = Safe, Orange = Exposed)
 	if (bDrawAgentIntentLines)
 	{
 		FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*World);
 		EnsureQueriesInitialized(EntityManager);
 
 		FMassExecutionContext Context(EntityManager, DeltaSeconds);
-		int32 DisplayBudget = MaxAgentHudCount;
 
-		DebugQuery.ForEachEntityChunk(Context, [World, &DisplayBudget](FMassExecutionContext& ChunkContext)
+		DebugQuery.ForEachEntityChunk(Context, [World](FMassExecutionContext& ChunkContext)
 		{
 			const int32 NumEntities = ChunkContext.GetNumEntities();
-			TConstArrayView<FEcoIdentityFragment> IdentityList = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
 			TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 			TConstArrayView<FEcoShelterIntentFragment> IntentList = ChunkContext.GetFragmentView<FEcoShelterIntentFragment>();
-			TConstArrayView<FEcoSocialBehaviorFragment> SocialList = ChunkContext.GetFragmentView<FEcoSocialBehaviorFragment>();
 
 			for (int32 i = 0; i < NumEntities; ++i)
 			{
 				const FEcoShelterIntentFragment& Intent = IntentList[i];
-				if (Intent.State == EEcoShelterIntentState::None)
-				{
-					continue;
-				}
-
-				const FVector AgentPos = TransformList[i].GetTransform().GetLocation();
-				const int64 AgentId = IdentityList[i].StableAgentId;
-				const float EffectiveCover = SocialList[i].ModulatedAction.Cover;
-
 				if (Intent.State == EEcoShelterIntentState::Reserved)
 				{
-					// Draw line to reserved slot target position
+					const FVector AgentPos = TransformList[i].GetTransform().GetLocation();
+					// Green line for safe/occluded shelter, orange line for exposed shelter
+					const FColor LineColor = (Intent.CurrentScore >= 0.7f) ? FColor(0, 255, 120) : FColor(255, 120, 0);
 					DrawDebugLine(World, AgentPos + FVector(0, 0, 30.0f), Intent.TargetPosition + FVector(0, 0, 30.0f),
-						FColor::Cyan, false, -1.0f, 0, 2.0f);
-
-					if (DisplayBudget > 0)
-					{
-						--DisplayBudget;
-						const FString IntentText = FString::Printf(
-							TEXT("[RESERVED]\nAgent %lld -> S#%d/Slot#%d\nScore: %.2f | Cov: %.2f"),
-							AgentId, Intent.TargetShelterIndex, Intent.TargetSlotIndex, Intent.CurrentScore, EffectiveCover);
-						DrawDebugString(World, AgentPos + FVector(0, 0, 110.0f), IntentText, nullptr, FColor::Cyan, 0.0f, true, 0.9f);
-					}
-				}
-				else if (Intent.State == EEcoShelterIntentState::Searching)
-				{
-					// Candidate proposal evaluated
-					if (DisplayBudget > 0)
-					{
-						--DisplayBudget;
-						const FString IntentText = FString::Printf(
-							TEXT("[SEARCHING]\nAgent %lld -> S#%d (Score: %.2f)"),
-							AgentId, Intent.TargetShelterIndex, Intent.CurrentScore);
-						DrawDebugString(World, AgentPos + FVector(0, 0, 100.0f), IntentText, nullptr, FColor::Yellow, 0.0f, true, 0.85f);
-					}
+						LineColor, false, -1.0f, 0, 2.0f);
 				}
 			}
 		});
 	}
+}
+
+void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerController* PC)
+{
+	if (!Canvas || !GEngine || !bDrawAgentIntentLines)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	const UEcoShelterSubsystem* ShelterSub = World->GetSubsystem<UEcoShelterSubsystem>();
+	const FVector ThreatLocation = ResolveActiveThreatLocation();
+
+	// 1. Draw Shelter HUD above each shelter point
+	if (bDrawShelters && ShelterSub)
+	{
+		const TArray<FEcoShelterPoint>& Shelters = ShelterSub->GetShelters();
+		const TArray<FEcoShelterSlot>& Slots = ShelterSub->GetShelterSlots();
+		const double CurrentTime = World->GetTimeSeconds();
+
+		for (int32 i = 0; i < Shelters.Num(); ++i)
+		{
+			if (!ShelterSub->IsValidShelterIndex(i))
+			{
+				continue;
+			}
+
+			const FEcoShelterPoint& Shelter = Shelters[i];
+			const FVector WorldPos = Shelter.Position + FVector(0.0f, 0.0f, 90.0f);
+			const FVector ScreenPos = Canvas->Project(WorldPos, false);
+
+			if (ScreenPos.Z <= 0.0f || ScreenPos.X < -100.0f || ScreenPos.X > Canvas->SizeX + 100.0f ||
+				ScreenPos.Y < -100.0f || ScreenPos.Y > Canvas->SizeY + 100.0f)
+			{
+				continue;
+			}
+
+			int32 ReservedCount = 0;
+			int32 TotalSlots = 0;
+			for (const FEcoShelterSlot& Slot : Slots)
+			{
+				if (Slot.ShelterRuntimeIndex == i)
+				{
+					++TotalSlots;
+					if (Slot.ReservedBy != 0 && Slot.ReservationExpireTime > CurrentTime)
+					{
+						++ReservedCount;
+					}
+				}
+			}
+
+			const bool bOccluded = !ThreatLocation.IsZero() && ShelterSub->CheckThreatOcclusion(ThreatLocation, Shelter.Position);
+			const FString ShelterText = FString::Printf(TEXT("SHELTER #%d [%s]\nSlots: %d/%d (OccScore: %.1f)"),
+				i, bOccluded ? TEXT("SAFE (WALL)") : TEXT("EXPOSED"),
+				ReservedCount, TotalSlots,
+				bOccluded ? 1.0f : 0.1f);
+
+			const FLinearColor Color = bOccluded ? FLinearColor(0.2f, 1.0f, 0.4f) : FLinearColor(1.0f, 0.3f, 0.2f);
+			FCanvasTextItem Item(FVector2D(ScreenPos.X, ScreenPos.Y), FText::FromString(ShelterText), GEngine->GetSmallFont(), Color);
+			Item.bCentreX = true;
+			Item.bCentreY = true;
+			Item.EnableShadow(FLinearColor::Black);
+			Canvas->DrawItem(Item);
+		}
+	}
+
+	// 2. Draw Threat Source HUD
+	if (!ThreatLocation.IsZero())
+	{
+		const FVector ThreatScreenPos = Canvas->Project(ThreatLocation + FVector(0.0f, 0.0f, 120.0f), false);
+		if (ThreatScreenPos.Z > 0.0f && ThreatScreenPos.X >= 0.0f && ThreatScreenPos.X <= Canvas->SizeX &&
+			ThreatScreenPos.Y >= 0.0f && ThreatScreenPos.Y <= Canvas->SizeY)
+		{
+			FCanvasTextItem ThreatItem(FVector2D(ThreatScreenPos.X, ThreatScreenPos.Y), FText::FromString(TEXT("[THREAT SOURCE]")), GEngine->GetSmallFont(), FLinearColor(1.0f, 0.25f, 0.25f));
+			ThreatItem.bCentreX = true;
+			ThreatItem.bCentreY = true;
+			ThreatItem.EnableShadow(FLinearColor::Black);
+			Canvas->DrawItem(ThreatItem);
+		}
+	}
+
+	// 3. Draw Per-Entity HUD (Key essentials only!)
+	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(*World);
+	EnsureQueriesInitialized(EntityManager);
+
+	FMassExecutionContext Context(EntityManager);
+	const FVector CameraPos = Canvas->SceneView ? Canvas->SceneView->ViewLocation : FVector::ZeroVector;
+	const float MaxDistSq = 4000.0f * 4000.0f;
+
+	DebugQuery.ForEachEntityChunk(Context, [this, Canvas, CameraPos, MaxDistSq](FMassExecutionContext& ChunkContext)
+	{
+		const int32 NumEntities = ChunkContext.GetNumEntities();
+		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
+		TConstArrayView<FEcoShelterIntentFragment> IntentList = ChunkContext.GetFragmentView<FEcoShelterIntentFragment>();
+		TConstArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetFragmentView<FEcoAlarmStateFragment>();
+
+		for (int32 i = 0; i < NumEntities; ++i)
+		{
+			const FVector EntityPos = TransformList[i].GetTransform().GetLocation();
+
+			if (!CameraPos.IsZero() && FVector::DistSquared(EntityPos, CameraPos) > MaxDistSq)
+			{
+				continue;
+			}
+
+			const FVector ScreenPos = Canvas->Project(EntityPos + FVector(0.0f, 0.0f, 65.0f), false);
+			if (ScreenPos.Z <= 0.0f || ScreenPos.X < -50.0f || ScreenPos.X > Canvas->SizeX + 50.0f ||
+				ScreenPos.Y < -50.0f || ScreenPos.Y > Canvas->SizeY + 50.0f)
+			{
+				continue;
+			}
+
+			const FEcoShelterIntentFragment& Intent = IntentList[i];
+			const FEcoAlarmStateFragment& Alarm = AlarmList[i];
+
+			FString ShortText;
+			FLinearColor TextColor = FLinearColor::White;
+
+			if (Intent.State == EEcoShelterIntentState::Reserved)
+			{
+				const bool bSafe = (Intent.CurrentScore >= 0.7f);
+				ShortText = FString::Printf(TEXT("S#%d [%s] %.2f"),
+					Intent.TargetShelterIndex,
+					bSafe ? TEXT("Safe") : TEXT("Danger"),
+					Intent.CurrentScore);
+				TextColor = bSafe ? FLinearColor(0.2f, 1.0f, 0.4f) : FLinearColor(1.0f, 0.5f, 0.1f);
+			}
+			else if (Intent.State == EEcoShelterIntentState::Searching)
+			{
+				ShortText = TEXT("Searching");
+				TextColor = FLinearColor(1.0f, 0.9f, 0.2f);
+			}
+			else
+			{
+				switch (Alarm.State)
+				{
+				case EEcoSocialState::Panic:
+					ShortText = TEXT("[Panic]");
+					TextColor = FLinearColor(1.0f, 0.2f, 0.2f);
+					break;
+				case EEcoSocialState::Alert:
+					ShortText = TEXT("[Alert]");
+					TextColor = FLinearColor(1.0f, 0.6f, 0.1f);
+					break;
+				case EEcoSocialState::Regrouping:
+					ShortText = TEXT("[Regroup]");
+					TextColor = FLinearColor(1.0f, 0.3f, 1.0f);
+					break;
+				case EEcoSocialState::Recovering:
+					ShortText = TEXT("[Recover]");
+					TextColor = FLinearColor(0.2f, 0.9f, 1.0f);
+					break;
+				case EEcoSocialState::Calm:
+				default:
+					continue; // Clean viewport: no text for calm idle agents
+				}
+			}
+
+			FCanvasTextItem TextItem(FVector2D(ScreenPos.X, ScreenPos.Y), FText::FromString(ShortText), GEngine->GetSmallFont(), TextColor);
+			TextItem.bCentreX = true;
+			TextItem.bCentreY = true;
+			TextItem.EnableShadow(FLinearColor::Black);
+			Canvas->DrawItem(TextItem);
+		}
+	});
 }

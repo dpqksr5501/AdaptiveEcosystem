@@ -22,7 +22,12 @@ class ADAPTIVEECOSYSTEM_API AEcoShelterTestHarnessActor : public AActor
 public:
 	AEcoShelterTestHarnessActor();
 
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 	virtual void Tick(float DeltaSeconds) override;
+
+	/** High-performance 2D Canvas HUD projection callback called during viewport render */
+	void DrawEntityHUD(class UCanvas* Canvas, class APlayerController* PC);
 
 	// -------------------------------------------------------------------------
 	// Configuration
@@ -80,4 +85,7 @@ private:
 	FMassEntityQuery DebugQuery;
 	FMassEntityQuery ResetQuery;
 	bool bQueriesInitialized = false;
+
+	/** Delegate handle for UDebugDrawService Canvas drawing */
+	FDelegateHandle DebugDrawDelegateHandle;
 };

@@ -231,20 +231,10 @@ void AEcoAlarmTestHarnessActor::Tick(float DeltaSeconds)
 					break;
 				}
 
-				// Small colored indicator sphere above entity
-				DrawDebugSphere(World, EntityPos + FVector(0, 0, 40.0f), SphereRadius, 8, StateColor, false, -1.0f, 0, 1.5f);
-
-				// Render detailed HUD text for active/alarmed entities or within budget
-				if (DisplayTextBudget > 0 && (Alarm.State != EEcoSocialState::Calm || (i % 10 == 0)))
+				// Small colored indicator sphere above alarmed entity (skip Calm to maintain 120 FPS)
+				if (Alarm.State != EEcoSocialState::Calm)
 				{
-					--DisplayTextBudget;
-					const FString AgentText = FString::Printf(TEXT("[%s] Str: %.2f\nFlee: %.2f->%.2f\nForage: %.2f->%.2f"),
-						StateName,
-						Alarm.AlarmStrength,
-						RawAction.FleeDist, ModAction.FleeDist,
-						RawAction.Forage, ModAction.Forage);
-
-					DrawDebugString(World, EntityPos + FVector(0, 0, 90.0f), AgentText, nullptr, StateColor, 0.0f, true, 0.9f);
+					DrawDebugSphere(World, EntityPos + FVector(0, 0, 40.0f), SphereRadius, 8, StateColor, false, -1.0f, 0, 1.5f);
 				}
 			}
 		});
