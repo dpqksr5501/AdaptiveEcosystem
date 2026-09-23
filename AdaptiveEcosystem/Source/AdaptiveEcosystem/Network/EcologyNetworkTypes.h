@@ -3,37 +3,25 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Core/EcoDataContracts.h"
+#include "Core/EcoRepresentationTypes.h"
 #include "EcologyNetworkTypes.generated.h"
 
 /**
- * Replicated species evolution state sent infrequently from Server to Clients.
- * Designed to be held by GameState or a dedicated replicated actor.
- * 
- * NOTE (Architecture Boundary):
- * Subsystems are NOT replication transports. Do not attempt to replicate
- * UEcologyServerSubsystem or UEcologyWorldSubsystem. Place replicated states in
- * AGameStateBase or replicated actor components.
+ * Active-runtime network contracts. These DTOs carry only authoritative Mass or
+ * ecology summaries and intentionally contain no Legacy Evolution profile.
+ * Subsystems are local services, not replication transports; these values belong
+ * on GameState or a dedicated replicated actor/component.
  */
 USTRUCT(BlueprintType)
-struct FReplicatedSpeciesState
+struct FReplicatedEcoAgentState
 {
 	GENERATED_BODY()
 
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
-	FName RegionId;
+	int32 StateRevision = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
-	FName SpeciesId;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
-	int32 Generation = 0;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
-	int64 ProfileRevision = 0;
-
-	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
-	FSpeciesEvolutionProfile Profile;
+	FEcoRepresentationSnapshot Snapshot;
 };
 
 /**
@@ -57,10 +45,13 @@ struct FReplicatedRegionSummary
 	int32 Population = 0;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
-	float Resource = 0.0f;
+	float FoodAmount = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
-	float Risk = 0.0f;
+	float FoodCapacity = 0.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
+	float PredationHistory = 0.0f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
 	float AverageEnergy = 0.0f;

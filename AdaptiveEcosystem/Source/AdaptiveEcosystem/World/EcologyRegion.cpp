@@ -46,6 +46,7 @@ void AEcologyRegion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 
 void AEcologyRegion::ApplyVegetationConsumption(float ConsumedAmount, float GrazingResistance)
 {
+	// LEGACY ONLY: active resource ownership is UEcologySimulationSubsystem::FRegionEcologyState.
 	if (ConsumedAmount <= 0.0f)
 	{
 		return;
@@ -61,6 +62,7 @@ void AEcologyRegion::ApplyVegetationConsumption(float ConsumedAmount, float Graz
 
 void AEcologyRegion::ApplyVegetationRegrowth(float DeltaTime, float GrowthRate, float RegenerationRate)
 {
+	// LEGACY ONLY: active resource ownership is UEcologySimulationSubsystem::FRegionEcologyState.
 	if (DeltaTime <= 0.0f)
 	{
 		return;
@@ -80,4 +82,3 @@ void AEcologyRegion::ApplyVegetationRegrowth(float DeltaTime, float GrowthRate, 
 	const float FoodDelta = BaseRegenSpeed * FMath::Max(0.1f, RegenerationRate) * DeltaTime;
 	EnvironmentState.FoodAvailability = FMath::Clamp(EnvironmentState.FoodAvailability + FoodDelta, 0.0f, EnvironmentState.VegetationDensity);
 }
-

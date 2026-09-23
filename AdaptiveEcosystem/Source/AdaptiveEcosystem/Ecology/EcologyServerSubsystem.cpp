@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Ecology/EcologyServerSubsystem.h"
+#include "Core/EcoRuntimeSettings.h"
 #include "Engine/World.h"
 #include "World/EcologyRegion.h"
 #include "World/EcologyWorldSubsystem.h"
@@ -20,14 +21,19 @@ bool UEcologyServerSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 		return false;
 	}
 
-	// Never create this authoritative subsystem on pure clients (NM_Client).
-	// Runs strictly on Standalone, Listen Server, or Dedicated Server.
+	const UEcoRuntimeSettings* RuntimeSettings = GetDefault<UEcoRuntimeSettings>();
+	if (!RuntimeSettings || !RuntimeSettings->bEnableLegacyEvolutionSubsystem)
+	{
+		return false;
+	}
+
+	// Explicit opt-in still never creates Legacy Evolution on preview/client worlds.
 	const ENetMode NetMode = World->GetNetMode();
-	const bool bIsServerOrStandalone = (NetMode != NM_Client);
+	const bool bIsServerOrStandalone = World->IsGameWorld() && NetMode != NM_Client;
 
 	if (!bIsServerOrStandalone)
 	{
-		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("EcologyServerSubsystem: Skipped creation on NM_Client world."));
+		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("EcologyServerSubsystem: Skipped Legacy creation outside an authoritative game world."));
 	}
 
 	return bIsServerOrStandalone;
@@ -496,4 +502,3 @@ bool UEcologyServerSubsystem::BuildVegetationEvolutionContext(FName RegionId, FN
 	OutContext.HarvestPressure = GetHarvestPressure(RegionId, VegetationSpeciesId);
 	return true;
 }
-
