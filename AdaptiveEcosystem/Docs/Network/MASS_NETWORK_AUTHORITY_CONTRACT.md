@@ -99,3 +99,58 @@ Client Mass Entity는 권위 개체가 아니라 복제 프록시다. Client에�
 - [MVP 개발 로드맵](../Roadmap/README.md)
 - [UE 5.8 Online Subsystem Steam](https://dev.epicgames.com/documentation/unreal-engine/online-subsystem-steam-interface-in-unreal-engine)
 - [UE 5.8 MassReplication API](https://dev.epicgames.com/documentation/unreal-engine/API/Plugins/MassReplication)
+
+## 10. UE 5.8 Processing Queue 호환성
+
+UE 5.8의 현재 MassReplication 구현을 사용하는 동안에는
+`Config/DefaultEngine.ini`에서 `mass.UseProcessingQueue=0`을 유지한다.
+`UMassReplicationProcessor`는 등록된 엔티티 쿼리를 각
+`FMassReplicationSharedFragment`에 복사한 뒤, 클라이언트가 접속하면 그
+복사본을 실행한다. 그러나 UE 5.8 Processing Queue는 원본 쿼리 주소만
+추적하므로 복사본을 `Processor attempting to run a query it doesn't own`으로
+거부한다.
+
+이 설정은 새 Processing Queue 스케줄러만 비활성화한다. Mass Phase는 기존
+병렬 실행기를 계속 사용한다. 엔진 쪽에서 동적 복제 쿼리를 Queue에
+등록하거나 쿼리 복사 실행을 제거한 버전으로 갱신한 뒤에만 Queue를 다시
+활성화한다.
+
+## 11. Client 템플릿 등록과 Bubble 수신 순서
+
+TemplateID는 EntityConfig 에셋의 GUID로 정해지지만, 템플릿 레지스트리는
+World마다 독립적이다. 서버에서 템플릿을 생성했다고 Client에 등록되는 것은
+아니다. 서버/Client가 같은 EntityConfig 에셋을 사용하고 각자의 World에서
+등록해야 한다. 역할에 따른 Authority/ClientProxy Fragment 구성 차이는
+같은 TemplateID 안에서 허용된다.
+
+- `UEcoMassNetworkSubsystem.PostInitialize`: World별 Bubble 클래스를 등록한다.
+- `AEcoMassNetworkBootstrap.PostInitializeComponents`: 액터 초기화 중 템플릿을
+  등록한다. Client의 `BeginPlay`는 Bubble의 첫 FastArray 수신보다 늦을 수
+  있으므로, `BeginPlay`는 등록 재시도와 서버 개체 생성에 사용한다.
+- `FEcoMassClientBubbleHandler`: 수신한 TemplateID가 로컬 레지스트리에 있을
+  때만 엔진의 Add helper를 호출한다. 없으면 FastArray 항목의 ReplicationID로
+  대기 상태를 추적하고 Bubble Tick에서 재시도한다. 배열 인덱스와 수신 당시
+  데이터는 저장하지 않으므로 항목 삭제 후 인덱스 변경 및 최신 위치 갱신을
+  반영한다. 생성 전 Remove는 대기를 취소하고, Reset은 대기 상태를 비운다.
+- 대기 항목은 아직 EntityInfo/Proxy가 없으므로 Change/Remove helper에
+  전달하지 않는다. 엔진의 전체 Bubble 검증은 대기가 끝난 뒤 재개하며,
+  기존 삭제 이력 정리는 대기 중에도 계속한다.
+
+대기는 템플릿을 임의로 생성하거나 다른 TemplateID로 대체하지 않는다.
+Client에 Bootstrap이 로드되지 않거나 서로 다른 EntityConfig 에셋을 사용하는
+설정 오류가 지속되면 Proxy는 생성되지 않는다. 최초 대기 로그에 누락된
+TemplateID를 남기고, 5초 이상 지속되면 오류 로그를 한 번 출력한다.
+등록 로그에는 에셋 경로, World 경로, NetMode, TemplateID를 남긴다.
+World Partition에서는 초기 개체군의 Bootstrap이 양쪽에서 로드되도록 배치한다.
+
+에디터 수동 확인:
+
+1. 에디터를 재시작하고 같은 맵에서 Listen Server, 2 Players로 PIE를 실행한다.
+2. `Registered Eco Mass template` 로그가 서버(NetMode 2)와 Client(NetMode 3)에
+   같은 TemplateID로 기록되고, 접속 시 Assertion이 없는지 확인한다.
+3. 지연이 있었다면 `Deferring Eco Mass proxies` 뒤에 `Resumed`가 기록되고
+   대기가 해소되는지 확인한다. `still waiting` 오류가 남으면 Bootstrap의
+   Client 로딩 여부와 양쪽 EntityConfig를 확인한다.
+4. 표현 Trait/Mesh가 설정된 상태에서 Client를 관심 영역 밖과 안으로 이동해
+   Proxy 제거/재생성을 확인한다. PIE 종료 후 재실행하여 이전 대기 데이터가
+   남지 않는지도 확인한다.

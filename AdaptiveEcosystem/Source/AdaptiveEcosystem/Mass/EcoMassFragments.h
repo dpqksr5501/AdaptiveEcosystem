@@ -171,21 +171,3 @@ struct FEcoSpeciesSharedFragment : public FMassSharedFragment
 	UPROPERTY(EditAnywhere, Category = "Ecology|Species")
 	float MigrationThreshold = 0.2f; // energy below this ratio triggers migration urge
 };
-
-// -----------------------------------------------------------------------------
-// Mass Tags (Minimal persistent categorical state)
-// -----------------------------------------------------------------------------
-
-/** Tag present on all living logical agents */
-USTRUCT()
-struct FEcoAliveTag : public FMassTag
-{
-	GENERATED_BODY()
-};
-
-/** Tag present when agent is actively performing cross-region migration */
-USTRUCT()
-struct FEcoMigratingTag : public FMassTag
-{
-	GENERATED_BODY()
-};
