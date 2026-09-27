@@ -7,7 +7,13 @@
 #include "InputMappingContext.h"
 #include "Blueprint/UserWidget.h"
 #include "AdaptiveEcosystem.h"
+#include "Network/EcoGameState.h"
 #include "Widgets/Input/SVirtualJoystick.h"
+
+AEcoGameState* AAdaptiveEcosystemPlayerController::GetEcoGameState() const
+{
+	return GetWorld() ? GetWorld()->GetGameState<AEcoGameState>() : nullptr;
+}
 
 void AAdaptiveEcosystemPlayerController::BeginPlay()
 {
@@ -30,6 +36,20 @@ void AAdaptiveEcosystemPlayerController::BeginPlay()
 
 		}
 
+	}
+}
+
+void AAdaptiveEcosystemPlayerController::BeginPlayingState()
+{
+	Super::BeginPlayingState();
+
+	if (const AEcoGameState* EcoGameState = GetEcoGameState())
+	{
+		UE_LOG(LogAdaptiveEcosystem, Log,
+			TEXT("Player entered world epoch %d (phase %d, Mass ready: %s)."),
+			EcoGameState->GetWorldEpoch(),
+			static_cast<int32>(EcoGameState->GetWorldPhase()),
+			EcoGameState->IsMassReplicationReady() ? TEXT("true") : TEXT("false"));
 	}
 }
 

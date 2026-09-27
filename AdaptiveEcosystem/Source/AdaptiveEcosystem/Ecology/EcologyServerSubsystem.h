@@ -9,11 +9,11 @@
 #include "EcologyServerSubsystem.generated.h"
 
 /**
- * World-scoped authoritative server subsystem for ecology simulation and species state.
- * Owned by Server / Ecology layer.
+ * LEGACY: world-scoped LLM trait-evolution experiment retained for compatibility.
+ * It is not part of the active PPO + Mass runtime and is disabled by default.
  * 
  * Rules:
- * - Only created on Standalone, Listen Server, and Dedicated Server (Never on pure NM_Client).
+ * - Created only when UEcoRuntimeSettings explicitly enables it, and never on NM_Client.
  * - Not a replication transport (Subsystems do not replicate).
  * - All state mutations require server authority.
  */

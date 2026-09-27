@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "Core/EcoEventTypes.h"
 #include "Core/EcoIds.h"
 #include "Core/EcoRegionTypes.h"
 #include "AI/Policy/EcoPolicyContracts.h"
@@ -19,7 +20,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRegionPredationRecorded, FName, 
  * Rules:
  * - Created only on Server and Standalone worlds.
  * - Single source of truth for regional food and predation history.
- * - Thread-safe aggregation entry point.
+ * - Mutations are reconciled on the game thread after Mass work is buffered.
  */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcologySimulationSubsystem : public UWorldSubsystem
@@ -33,6 +34,10 @@ public:
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
 	virtual void Deinitialize() override;
 
+	/** True only for a live Standalone, Listen Server, or Dedicated Server game world. */
+	UFUNCTION(BlueprintPure, Category = "Ecology|Simulation")
+	bool IsAuthoritativeWorld() const;
+
 	/** Ticks regional food regeneration and decays accumulated predation history */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
 	void TickSimulation(float DeltaTime);
@@ -41,24 +46,36 @@ public:
 	// Region Ecology State Management
 	// -------------------------------------------------------------------------
 
-	/** Registers or initializes ecology state for a specific region */
+	/** Registers initial state for a region. This is not a general-purpose state replacement API. */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
-	void RegisterRegionState(const FRegionEcologyState& InState);
+	bool RegisterRegionState(const FRegionEcologyState& InState);
 
 	/** Queries regional ecology state */
 	UFUNCTION(BlueprintPure, Category = "Ecology|Simulation")
 	bool GetRegionState(FName RegionId, FRegionEcologyState& OutState) const;
 
-	/** Sets or updates regional ecology state */
-	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
-	void SetRegionState(const FRegionEcologyState& InState);
+	/** Issues the next non-zero persistent logical ID in this authoritative world. */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation|Identity")
+	int64 AllocateStableAgentId();
 
-	/** Applies consumption to region's food biomass */
+	/** Applies one buffered consumption request to authoritative regional food. */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
+	float ApplyFoodConsumption(const FEcoFoodConsumptionRequest& Request);
+
+	/** Applies one buffered predation event to authoritative regional threat history. */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
+	void ApplyPredationEvent(const FEcoPredationEvent& Event);
+
+	/** Replaces only Mass-owned aggregate metrics; resource fields are untouched. */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
+	bool UpdatePopulationMetrics(const FEcoRegionPopulationSnapshot& Snapshot);
+
+	/** Compatibility wrapper. Prefer ApplyFoodConsumption with a buffered request. */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation", meta = (DeprecatedFunction, DeprecationMessage = "Use ApplyFoodConsumption with FEcoFoodConsumptionRequest"))
 	float ConsumeFood(FName RegionId, float RequestAmount);
 
-	/** Records a predation/kill event in a region, raising threat level */
-	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
+	/** Compatibility wrapper. Prefer ApplyPredationEvent. */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation", meta = (DeprecatedFunction, DeprecationMessage = "Use ApplyPredationEvent with FEcoPredationEvent"))
 	void RecordPredationEvent(FName RegionId, float ThreatMagnitude = 0.25f);
 
 	/** Queries current predation history (0.0 .. 1.0) */
@@ -82,7 +99,13 @@ public:
 	FOnRegionPredationRecorded OnRegionPredationRecorded;
 
 private:
+	bool CanMutateAuthoritativeState(const TCHAR* OperationName) const;
+	static FRegionEcologyState MakeSanitizedRegionState(const FRegionEcologyState& InState);
+
 	/** Map of authoritative regional states keyed by RegionId */
 	UPROPERTY(Transient)
 	TMap<FName, FRegionEcologyState> RegionalStates;
+
+	/** Monotonic world-local allocator; zero is permanently reserved as invalid. */
+	FEcoAgentId NextStableAgentId = 1;
 };

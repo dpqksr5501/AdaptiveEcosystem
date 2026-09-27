@@ -18,7 +18,7 @@ AEcologyBootstrapTestActor::AEcologyBootstrapTestActor()
 	TestRegionId = FName(TEXT("Forest_A"));
 	TestSpeciesId = FName(TEXT("Wolf"));
 	TestVegetationSpeciesId = FName(TEXT("Grass_A"));
-	bAutoRunOnBeginPlay = true;
+	bAutoRunOnBeginPlay = false;
 	CreatureClassToSpawn = ACreatureCharacter::StaticClass();
 }
 
@@ -369,4 +369,3 @@ bool AEcologyBootstrapTestActor::RunEcosystemFeedbackLoopTest()
 
 	return true;
 }
-

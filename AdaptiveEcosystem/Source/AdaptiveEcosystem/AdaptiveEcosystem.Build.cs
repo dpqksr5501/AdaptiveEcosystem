@@ -12,6 +12,7 @@ public class AdaptiveEcosystem : ModuleRules
 			"Core",
 			"CoreUObject",
 			"Engine",
+			"DeveloperSettings",
 			"InputCore",
 			"EnhancedInput",
 			"AIModule",
@@ -19,7 +20,6 @@ public class AdaptiveEcosystem : ModuleRules
 			"GameplayStateTreeModule",
 			"UMG",
 			"Slate",
-			"StructUtils",
 			"MassCore",
 			"MassEntity",
 			"MassCommon",
@@ -29,8 +29,12 @@ public class AdaptiveEcosystem : ModuleRules
 			"MassSimulation",
 			"MassLOD",
 			"MassRepresentation",
-			"MassActors"
+			"MassActors",
+			"MassReplication",
+			"NetCore"
 		});
+
+		SetupIrisSupport(Target);
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
 
