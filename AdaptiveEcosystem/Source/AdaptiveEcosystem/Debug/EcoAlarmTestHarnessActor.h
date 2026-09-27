@@ -20,6 +20,9 @@ class ADAPTIVEECOSYSTEM_API AEcoAlarmTestHarnessActor : public AActor
 public:
 	AEcoAlarmTestHarnessActor();
 
+	/** True while this actor is emitting or has recently emitted a threat. */
+	bool HasActiveThreat(double CurrentTime) const;
+
 	virtual void Tick(float DeltaSeconds) override;
 
 	// -------------------------------------------------------------------------
@@ -76,14 +79,16 @@ public:
 	void HardResetAllAlarms();
 
 private:
+	UPROPERTY(VisibleAnywhere, Category = "Ecology|AlarmDebug")
+	TObjectPtr<class USceneComponent> SceneRoot;
+
 	void EnsureQueriesInitialized(FMassEntityManager& EntityManager);
 
 	/** Timestamp of last triggered threat for visual pulsation */
-	double LastThreatTriggerTime = 0.0;
+	double LastThreatTriggerTime = -1.0;
 
 	/** Cached Mass queries */
 	FMassEntityQuery DebugQuery;
 	FMassEntityQuery HardResetQuery;
 	bool bQueriesInitialized = false;
 };
-

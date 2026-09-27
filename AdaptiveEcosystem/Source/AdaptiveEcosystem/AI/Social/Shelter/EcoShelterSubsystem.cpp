@@ -3,6 +3,7 @@
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Engine/World.h"
 #include "CollisionQueryParams.h"
+#include "Components/PrimitiveComponent.h"
 
 UEcoShelterSubsystem::UEcoShelterSubsystem()
 {
@@ -157,11 +158,16 @@ void UEcoShelterSubsystem::ReleaseAgentReservations(int64 StableAgentId)
 	}
 }
 
-bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, const FVector& TargetLocation) const
+bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, const FVector& TargetLocation,
+	FHitResult* OutHit, bool bLogTrace) const
 {
 	const UWorld* World = GetWorld();
-	if (!World || ThreatLocation.IsZero())
+	if (!World)
 	{
+		if (OutHit)
+		{
+			*OutHit = FHitResult();
+		}
 		return false;
 	}
 
@@ -169,48 +175,67 @@ bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, c
 	const FVector Start = ThreatLocation + FVector(0.0f, 0.0f, 60.0f);
 	const FVector End = TargetLocation + FVector(0.0f, 0.0f, 40.0f);
 
-	FHitResult HitResult;
-
-	// 1. Complex geometry trace with ECC_Visibility (detects Modeling Mode meshes, procedural walls, and static meshes)
+	// A small sphere catches thin edges that a single center ray may miss. It cannot
+	// compensate for disabled collision or for a wall outside this segment.
+	constexpr float ProbeRadius = 12.0f;
+	const FCollisionShape ProbeShape = FCollisionShape::MakeSphere(ProbeRadius);
+	FCollisionQueryParams SimpleParams(SCENE_QUERY_STAT(EcoShelterOcclusionSimple), false);
 	FCollisionQueryParams ComplexParams(SCENE_QUERY_STAT(EcoShelterOcclusionComplex), true);
-	ComplexParams.bFindInitialOverlaps = true;
+	FCollisionObjectQueryParams ObjectParams;
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
 
-	bool bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, ComplexParams);
-
-	// 2. Camera channel fallback (often blocked by meshes that ignore visibility)
-	if (!bHit)
+	if (bLogTrace)
 	{
-		bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Camera, ComplexParams);
+		UE_LOG(LogTemp, Log, TEXT("[ShelterOcclusion] World=%s Start=%s End=%s Radius=%.1f"),
+			*GetNameSafe(World), *Start.ToString(), *End.ToString(), ProbeRadius);
 	}
 
-	// 3. Object Type query (WorldStatic, WorldDynamic, PhysicsBody) with complex collision
-	if (!bHit)
+	FHitResult HitResult;
+	auto ReportProbe = [&](const TCHAR* ProbeName, bool bHit)
 	{
-		FCollisionObjectQueryParams ObjectParams;
-		ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
-		ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
-		ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
-		bHit = World->LineTraceSingleByObjectType(HitResult, Start, End, ObjectParams, ComplexParams);
-	}
-
-	// 4. Simple collision fallback
-	if (!bHit)
-	{
-		FCollisionQueryParams SimpleParams(SCENE_QUERY_STAT(EcoShelterOcclusionSimple), false);
-		bHit = World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, SimpleParams);
-		if (!bHit)
+		if (bLogTrace)
 		{
-			FCollisionObjectQueryParams ObjectParams;
-			ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
-			ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
-			bHit = World->LineTraceSingleByObjectType(HitResult, Start, End, ObjectParams, SimpleParams);
+			const UPrimitiveComponent* Component = HitResult.GetComponent();
+			UE_LOG(LogTemp, Log,
+				TEXT("[ShelterOcclusion] %s: %s Actor=%s Component=%s Impact=%s Distance=%.1f Blocking=%d"),
+				ProbeName, bHit ? TEXT("HIT") : TEXT("MISS"),
+				*GetNameSafe(HitResult.GetActor()), *GetNameSafe(Component),
+				*HitResult.ImpactPoint.ToString(), HitResult.Distance, HitResult.bBlockingHit);
 		}
-	}
+		return bHit && HitResult.bBlockingHit;
+	};
 
-	return bHit; // Blocked by level geometry = Defensively Occluded!
+	bool bBlocked = ReportProbe(TEXT("Visibility sphere/simple"),
+		World->SweepSingleByChannel(HitResult, Start, End, FQuat::Identity, ECC_Visibility, ProbeShape, SimpleParams));
+	if (!bBlocked)
+	{
+		HitResult = FHitResult();
+		bBlocked = ReportProbe(TEXT("Visibility line/complex"),
+			World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, ComplexParams));
+	}
+	if (!bBlocked)
+	{
+		HitResult = FHitResult();
+		bBlocked = ReportProbe(TEXT("Geometry object sphere/simple"),
+			World->SweepSingleByObjectType(HitResult, Start, End, FQuat::Identity, ObjectParams, ProbeShape, SimpleParams));
+	}
+	if (!bBlocked)
+	{
+		HitResult = FHitResult();
+		bBlocked = ReportProbe(TEXT("Geometry object line/complex"),
+			World->LineTraceSingleByObjectType(HitResult, Start, End, ObjectParams, ComplexParams));
+	}
+	if (OutHit)
+	{
+		*OutHit = bBlocked ? HitResult : FHitResult();
+	}
+	return bBlocked;
 }
 
-int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation, float SearchRadius, int32& OutSlotIndex, float& OutScore) const
+int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation,
+	bool bHasThreat, float SearchRadius, int32& OutSlotIndex, float& OutScore) const
 {
 	OutSlotIndex = INDEX_NONE_ECO;
 	OutScore = 0.0f;
@@ -257,7 +282,7 @@ int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocatio
 
 		// 2. Real World Geometry LOS / Occlusion score
 		float OcclusionScore = 0.5f;
-		if (!ThreatLocation.IsZero())
+		if (bHasThreat)
 		{
 			const bool bBlocked = CheckThreatOcclusion(ThreatLocation, Shelter.Position);
 			// Completely occluded by geometry gives 1.0, otherwise baseline 0.1
@@ -316,4 +341,3 @@ void UEcoShelterSubsystem::ResetAllReservations()
 		Slot.ReservationExpireTime = 0.0;
 	}
 }
-

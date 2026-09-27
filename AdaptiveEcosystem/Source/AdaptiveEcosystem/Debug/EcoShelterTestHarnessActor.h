@@ -53,9 +53,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|ShelterDebug", meta = (ClampMin = "0"))
 	int32 ThreatHerdIndex = 0;
 
-	/** Optional threat location override if non-zero */
+	/** Optional threat location override; enable the flag to use world origin explicitly. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|ShelterDebug")
 	FVector ThreatLocationOverride = FVector::ZeroVector;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|ShelterDebug")
+	bool bUseThreatLocationOverride = false;
+
+	/** Optional wall to inspect when running DiagnoseThreatOcclusion. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|ShelterDebug")
+	TObjectPtr<AActor> OcclusionProbeWall = nullptr;
 
 	/** Maximum number of agent HUD text labels to render concurrently */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|ShelterDebug", meta = (ClampMin = "1", ClampMax = "100"))
@@ -77,9 +84,13 @@ public:
 	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Ecology|ShelterDebug")
 	void PrintShelterOccupancyStatus();
 
+	/** Logs trace coordinates/results and the selected wall's runtime collision settings. */
+	UFUNCTION(BlueprintCallable, CallInEditor, Category = "Ecology|ShelterDebug")
+	void DiagnoseThreatOcclusion();
+
 private:
 	void EnsureQueriesInitialized(FMassEntityManager& EntityManager);
-	FVector ResolveActiveThreatLocation() const;
+	bool ResolveActiveThreatLocation(FVector& OutThreatLocation) const;
 
 	/** Cached Mass queries */
 	FMassEntityQuery DebugQuery;

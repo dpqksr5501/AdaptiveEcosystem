@@ -94,6 +94,7 @@ void UEcoShelterQueryProcessor::Execute(FMassEntityManager& EntityManager, FMass
 					const int32 BestShelterIndex = ShelterSubsystem->FindBestAvailableShelter(
 						AgentLocation,
 						Alarm.LastThreatPosition,
+						Alarm.AlarmStrength > 0.05f,
 						SpeciesConfig.CoverSearchRadius,
 						TargetSlotIndex,
 						CandidateScore

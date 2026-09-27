@@ -50,18 +50,21 @@ public:
 	 * Checks physical world geometry line of sight between threat and target shelter location.
 	 * @return True if raycast is blocked by geometry (defensively occluded/safe).
 	 */
-	bool CheckThreatOcclusion(const FVector& ThreatLocation, const FVector& TargetLocation) const;
+	bool CheckThreatOcclusion(const FVector& ThreatLocation, const FVector& TargetLocation,
+		FHitResult* OutHit = nullptr, bool bLogTrace = false) const;
 
 	/**
 	 * Queries the most suitable shelter and an unreserved slot based on distance, defensive occlusion, and quality.
 	 * @param AgentLocation Current position of seeking agent.
 	 * @param ThreatLocation Current position of active threat.
+	 * @param bHasThreat Whether ThreatLocation is valid (world origin is a valid location).
 	 * @param SearchRadius Maximum query range.
 	 * @param OutSlotIndex Index of available slot in ShelterSlots array (-1 if none).
 	 * @param OutScore Computed safety/suitability score.
 	 * @return Shelter RuntimeIndex or INDEX_NONE_ECO if none suitable.
 	 */
-	int32 FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation, float SearchRadius, int32& OutSlotIndex, float& OutScore) const;
+	int32 FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation, bool bHasThreat,
+		float SearchRadius, int32& OutSlotIndex, float& OutScore) const;
 
 	/** Retrieves slot data by index */
 	bool GetSlotData(int32 SlotIndex, FEcoShelterSlot& OutSlot) const;

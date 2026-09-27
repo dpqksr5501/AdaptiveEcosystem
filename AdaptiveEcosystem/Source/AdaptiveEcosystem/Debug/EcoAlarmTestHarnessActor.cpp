@@ -11,11 +11,19 @@
 #include "MassEntityQuery.h"
 #include "MassExecutionContext.h"
 #include "Engine/World.h"
+#include "Components/SceneComponent.h"
 #include "DrawDebugHelpers.h"
 
 AEcoAlarmTestHarnessActor::AEcoAlarmTestHarnessActor()
 {
 	PrimaryActorTick.bCanEverTick = true;
+	SceneRoot = CreateDefaultSubobject<USceneComponent>(TEXT("SceneRoot"));
+	RootComponent = SceneRoot;
+}
+
+bool AEcoAlarmTestHarnessActor::HasActiveThreat(double CurrentTime) const
+{
+	return bContinuousThreat || (LastThreatTriggerTime >= 0.0 && CurrentTime - LastThreatTriggerTime < 5.0);
 }
 
 void AEcoAlarmTestHarnessActor::TriggerThreatAtTargetHerd()

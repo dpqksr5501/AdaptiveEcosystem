@@ -18,6 +18,7 @@
 #include "Debug/DebugDrawService.h"
 #include "Engine/Canvas.h"
 #include "CanvasItem.h"
+#include "Components/PrimitiveComponent.h"
 
 AEcoShelterTestHarnessActor::AEcoShelterTestHarnessActor()
 {
@@ -66,17 +67,19 @@ void AEcoShelterTestHarnessActor::EnsureQueriesInitialized(FMassEntityManager& E
 	bQueriesInitialized = true;
 }
 
-FVector AEcoShelterTestHarnessActor::ResolveActiveThreatLocation() const
+bool AEcoShelterTestHarnessActor::ResolveActiveThreatLocation(FVector& OutThreatLocation) const
 {
-	if (!ThreatLocationOverride.IsZero())
+	OutThreatLocation = FVector::ZeroVector;
+	if (bUseThreatLocationOverride || !ThreatLocationOverride.IsZero())
 	{
-		return ThreatLocationOverride;
+		OutThreatLocation = ThreatLocationOverride;
+		return true;
 	}
 
 	const UWorld* World = GetWorld();
 	if (!World)
 	{
-		return FVector::ZeroVector;
+		return false;
 	}
 
 	const UEcoHerdSubsystem* HerdSub = World->GetSubsystem<UEcoHerdSubsystem>();
@@ -86,9 +89,10 @@ FVector AEcoShelterTestHarnessActor::ResolveActiveThreatLocation() const
 		FEcoHerdRuntimeData TargetHerdData;
 		if (HerdSub->GetHerdData(ThreatHerdIndex, TargetHerdData))
 		{
-			if (TargetHerdData.AlarmStrength > 0.05f && !TargetHerdData.LastThreatPosition.IsZero())
+			if (TargetHerdData.AlarmStrength > 0.05f)
 			{
-				return TargetHerdData.LastThreatPosition;
+				OutThreatLocation = TargetHerdData.LastThreatPosition;
+				return true;
 			}
 		}
 
@@ -96,9 +100,10 @@ FVector AEcoShelterTestHarnessActor::ResolveActiveThreatLocation() const
 		const TArray<FEcoHerdRuntimeData>& AllHerds = HerdSub->GetActiveHerds();
 		for (const FEcoHerdRuntimeData& Herd : AllHerds)
 		{
-			if (Herd.AlarmStrength > 0.05f && !Herd.LastThreatPosition.IsZero())
+			if (Herd.AlarmStrength > 0.05f)
 			{
-				return Herd.LastThreatPosition;
+				OutThreatLocation = Herd.LastThreatPosition;
+				return true;
 			}
 		}
 	}
@@ -106,13 +111,14 @@ FVector AEcoShelterTestHarnessActor::ResolveActiveThreatLocation() const
 	// 3. Check for active AlarmTestHarness in the world
 	for (TActorIterator<AEcoAlarmTestHarnessActor> It(GetWorld()); It; ++It)
 	{
-		if (It->bContinuousThreat || (World->GetTimeSeconds() - 0.0 < 5.0))
+		if (It->HasActiveThreat(World->GetTimeSeconds()))
 		{
-			return It->GetActorLocation();
+			OutThreatLocation = It->GetActorLocation();
+			return true;
 		}
 	}
 
-	return FVector::ZeroVector;
+	return false;
 }
 
 void AEcoShelterTestHarnessActor::ResetAllReservations()
@@ -207,6 +213,63 @@ void AEcoShelterTestHarnessActor::PrintShelterOccupancyStatus()
 	UE_LOG(LogTemp, Log, TEXT("========================================================================"));
 }
 
+void AEcoShelterTestHarnessActor::DiagnoseThreatOcclusion()
+{
+	UWorld* World = GetWorld();
+	const UEcoShelterSubsystem* ShelterSub = World ? World->GetSubsystem<UEcoShelterSubsystem>() : nullptr;
+	if (!ShelterSub)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ShelterOcclusion] No authoritative shelter subsystem; run this in Standalone or server PIE."));
+		return;
+	}
+
+	FVector ThreatLocation;
+	const bool bHasThreat = ResolveActiveThreatLocation(ThreatLocation);
+	UE_LOG(LogTemp, Warning, TEXT("[ShelterOcclusion] HasThreat=%d Resolved threat=%s Override=%s Registered shelters=%d"),
+		bHasThreat, *ThreatLocation.ToString(), *ThreatLocationOverride.ToString(), ShelterSub->GetShelters().Num());
+	for (TActorIterator<AEcoAlarmTestHarnessActor> It(World); It; ++It)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[ShelterOcclusion] Alarm actor=%s Location=%s Continuous=%d"),
+			*GetNameSafe(*It), *It->GetActorLocation().ToString(), It->bContinuousThreat);
+	}
+
+	if (IsValid(OcclusionProbeWall))
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ShelterOcclusion] Selected wall=%s Location=%s"),
+			*GetNameSafe(OcclusionProbeWall), *OcclusionProbeWall->GetActorLocation().ToString());
+		TArray<UPrimitiveComponent*> Components;
+		OcclusionProbeWall->GetComponents<UPrimitiveComponent>(Components);
+		for (const UPrimitiveComponent* Component : Components)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("[ShelterOcclusion] Component=%s Profile=%s Enabled=%d ObjectType=%d Visibility=%d Camera=%d BoundsOrigin=%s BoundsExtent=%s"),
+				*GetNameSafe(Component), *Component->GetCollisionProfileName().ToString(), static_cast<int32>(Component->GetCollisionEnabled()),
+				static_cast<int32>(Component->GetCollisionObjectType()),
+				static_cast<int32>(Component->GetCollisionResponseToChannel(ECC_Visibility)),
+				static_cast<int32>(Component->GetCollisionResponseToChannel(ECC_Camera)),
+				*Component->Bounds.Origin.ToString(), *Component->Bounds.BoxExtent.ToString());
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[ShelterOcclusion] Assign OcclusionProbeWall in Details to inspect the wall's runtime collision."));
+	}
+
+	for (int32 Index = 0; Index < ShelterSub->GetShelters().Num(); ++Index)
+	{
+		if (!ShelterSub->IsValidShelterIndex(Index))
+		{
+			continue;
+		}
+		const FVector& ShelterPosition = ShelterSub->GetShelters()[Index].Position;
+		FHitResult Hit;
+		const bool bOccluded = bHasThreat && ShelterSub->CheckThreatOcclusion(ThreatLocation, ShelterPosition, &Hit, true);
+		UE_LOG(LogTemp, Warning, TEXT("[ShelterOcclusion] Shelter=%d Position=%s Result=%s HitActor=%s HitComponent=%s"),
+			Index, *ShelterPosition.ToString(), bOccluded ? TEXT("OCCLUDED") : TEXT("EXPOSED"),
+			*GetNameSafe(Hit.GetActor()), *GetNameSafe(Hit.GetComponent()));
+	}
+}
+
 void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
@@ -226,7 +289,8 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 	const TArray<FEcoShelterPoint>& Shelters = ShelterSub->GetShelters();
 	const TArray<FEcoShelterSlot>& Slots = ShelterSub->GetShelterSlots();
 	const double CurrentTime = World->GetTimeSeconds();
-	const FVector ThreatLocation = ResolveActiveThreatLocation();
+	FVector ThreatLocation;
+	const bool bHasThreat = ResolveActiveThreatLocation(ThreatLocation);
 
 	// 1. Draw Shelter Anchors & Capacity HUD
 	if (bDrawShelters)
@@ -297,7 +361,7 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 	}
 
 	// 3. Draw Threat-relative Occlusion Raycasts
-	if (bDrawOcclusionRaycasts && !ThreatLocation.IsZero())
+	if (bDrawOcclusionRaycasts && bHasThreat)
 	{
 		const FVector RayStart = ThreatLocation + FVector(0, 0, 60.0f);
 
@@ -311,12 +375,14 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 			const FEcoShelterPoint& Shelter = Shelters[i];
 			const FVector RayEnd = Shelter.Position + FVector(0, 0, 40.0f);
 
-			const bool bOccluded = ShelterSub->CheckThreatOcclusion(ThreatLocation, Shelter.Position);
+			FHitResult OcclusionHit;
+			const bool bOccluded = ShelterSub->CheckThreatOcclusion(ThreatLocation, Shelter.Position, &OcclusionHit);
 
 			if (bOccluded)
 			{
-				// Blocked by geometry: Safe green raycast
-				DrawDebugLine(World, RayStart, RayEnd, FColor(0, 255, 100), false, -1.0f, 0, 2.5f);
+				// Stop at the blocker so the debug line does not appear to pass through it.
+				DrawDebugLine(World, RayStart, OcclusionHit.ImpactPoint, FColor(0, 255, 100), false, -1.0f, 0, 2.5f);
+				DrawDebugSphere(World, OcclusionHit.ImpactPoint, 12.0f, 8, FColor(0, 255, 100), false, -1.0f, 0, 1.5f);
 			}
 			else
 			{
@@ -355,7 +421,7 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 		});
 	}
 	// 5. Real-time On-Screen Display (OSD) in viewport top-left (Guaranteed visible in all modes)
-	if (GEngine && ShelterSub && !ThreatLocation.IsZero())
+	if (GEngine && ShelterSub && bHasThreat)
 	{
 		for (int32 i = 0; i < Shelters.Num(); ++i)
 		{
@@ -386,7 +452,8 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 	}
 
 	const UEcoShelterSubsystem* ShelterSub = World->GetSubsystem<UEcoShelterSubsystem>();
-	const FVector ThreatLocation = ResolveActiveThreatLocation();
+	FVector ThreatLocation;
+	const bool bHasThreat = ResolveActiveThreatLocation(ThreatLocation);
 
 	// 1. Draw Shelter HUD above each shelter point
 	if (bDrawShelters && ShelterSub)
@@ -437,7 +504,7 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 				}
 			}
 
-			const bool bOccluded = !ThreatLocation.IsZero() && ShelterSub->CheckThreatOcclusion(ThreatLocation, Shelter.Position);
+			const bool bOccluded = bHasThreat && ShelterSub->CheckThreatOcclusion(ThreatLocation, Shelter.Position);
 			const FString ShelterText = FString::Printf(TEXT("SHELTER #%d [%s]\nSlots: %d/%d (OccScore: %.1f)"),
 				i, bOccluded ? TEXT("SAFE (WALL)") : TEXT("EXPOSED"),
 				ReservedCount, TotalSlots,
@@ -453,7 +520,7 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 	}
 
 	// 2. Draw Threat Source HUD
-	if (!ThreatLocation.IsZero())
+	if (bHasThreat)
 	{
 		const FVector WorldPos = ThreatLocation + FVector(0.0f, 0.0f, 120.0f);
 		FVector2D ThreatScreenPos2D;
