@@ -1,0 +1,62 @@
+_generated:
+  at: '2026-09-22T05:13:00+00:00'
+  by: tune_ppo.py (§6.4)
+  python: 3.13.5
+  optuna: 5.0.0
+  note: 자동 생성. 손으로 고치지 말고 tune_ppo.py를 다시 돌려라.
+params:
+  learning_rate: 6.813187996724827e-05
+  gamma: 0.9916661555611042
+  ent_coef: 0.0008971496690499397
+  clip_range: 0.37816696417287243
+  n_epochs: 15
+not_searched:
+  net_arch:
+  - 64
+  - 64
+  activation_fn: Tanh
+  reason: §6.4·§12 탐색 금지. §9.3 C++ RunPolicy와 §8.1 export가 의존한다.
+objective:
+  metric: mean_return
+  value: 86.4159351881126
+  warmstart_baseline: 77.73171580977089
+  ratio_vs_warmstart: 1.1117204128054265
+  policy_std_at_end: 0.9401702880859375
+conditions:
+  seeds:
+  - 16
+  - 40
+  - 74
+  - 173
+  - 265
+  - 303
+  - 500
+  - 502
+  - 542
+  - 559
+  - 602
+  - 625
+  - 630
+  - 643
+  - 726
+  - 805
+  - 834
+  - 905
+  - 935
+  - 965
+  train_steps: 2000000
+  eval_steps: 3000
+  trials: 50
+  best_trial: 32
+stats_at_best:
+  cohesion_mean: 0.7902175789913667
+  cover_frac: 0.26564127604166665
+  flee_dist_mean: 0.37940757215051757
+  flee_dist_std: 0.009386508855660312
+  mean_return: 86.4159351881126
+  policy_std: 0.9401702880859375
+  predation_rate: 0.0019088541666666668
+  react_hunger: 0.3677947758760319
+  react_pred: 0.08473370530677479
+  repro: 10.6640625
+  survival: 533.3651011022074

@@ -1,0 +1,60 @@
+_generated:
+  at: '2026-09-22T04:07:21+00:00'
+  by: tune_utility.py (§5.2)
+  python: 3.13.5
+  optuna: 5.0.0
+  note: 자동 생성. 손으로 고치지 말고 tune_utility.py를 다시 돌려라.
+params:
+  k_forage: 0.8126270485054656
+  k_coh: 39.95822951944169
+  flee_base: 0.3860808072458135
+  flee_k: 0.6327404801464074
+  k_cover: 0.7094931300545447
+objective:
+  metric: mean_return
+  value: 82.71609190408076
+  std_over_seeds: 60.58773796831774
+  random_baseline: 25.395145211372704
+  ratio_vs_random: 3.2571616037477122
+  spec_5_3_pass: true
+conditions:
+  seeds:
+  - 16
+  - 40
+  - 74
+  - 173
+  - 265
+  - 303
+  - 500
+  - 502
+  - 542
+  - 559
+  - 602
+  - 625
+  - 630
+  - 643
+  - 726
+  - 805
+  - 834
+  - 905
+  - 935
+  - 965
+  seed_pool:
+  - 0
+  - 1000
+  seed_pool_rng: 0
+  steps: 3000
+  trials: 300
+  best_trial: 277
+  config: configs/default.yaml
+stats_at_best:
+  cohesion_mean: 0.6489832959984584
+  cover_frac: 0.24505156250000004
+  flee_dist_mean: 0.39776228575011097
+  flee_dist_std: 0.0031924047413211835
+  mean_return: 82.71609190408076
+  predation_rate: 0.0018579427083333332
+  react_hunger: 0.3590482673981422
+  react_pred: 0.04462140350107882
+  repro: 10.34140625
+  survival: 484.11845501099543
