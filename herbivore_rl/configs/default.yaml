@@ -1,0 +1,87 @@
+# 파이썬 · 언리얼 공유 상수 (§9.7).
+# 언리얼 FBehaviorConfigSharedFragment 로더가 이 파일을 읽는다. 두 곳에 따로 적지 않는다.
+#
+# 단위: 길이 = 격자 단위, 시간 = 스텝.
+# 스펙(§3)이 값을 못박은 항목은 주석에 근거 절을 적었다. 나머지는 시작값이며 조정 가능하다.
+
+# ── 개체 ─────────────────────────────────────────────
+N: 128                      # §4.3 고정
+herb_speed: 0.60            # 단위/스텝
+see_r: 20.0                 # 시야 거리. 10에서는 포식자가 보이는 스텝이 12%뿐이라
+                            # 반응형 행동이 이득을 못 냈다. 20이면 34%가 되고
+                            # flee_dist에 내부 최적점이 생긴다 (§11-B 정정)
+fov_deg: 120.0              # §3.1 "Aquarium 기본 FOV" = prey_fov 기본값 120도
+max_energy: 1.0
+init_energy: 0.5
+energy_drain: 0.0020        # 스텝당 기초 대사
+repro_threshold: 0.90       # §3.4 번식 조건 energy > this
+repro_cd: 200               # §3.4 번식 후 쿨다운
+
+# ── 조향 계수 (§3.3) — C++와 공유. 임의 변경 금지 ────
+sep_weight: 1.35            # §3.3 separation 가중치
+sep_radius: 5.0             # §3.3 최소 간격 유지 반경
+flee_weight: 3.0            # §3.3 도주 항 (대체가 아니라 가산)
+
+# ── 관측 정규화 상수 (§3.1) ──────────────────────────
+# §1.2: 환경 파라미터(M, N)로 나누지 않는다. 언리얼에서 같은 상수로 나눠야 한다.
+obs_pred_count_norm: 8.0    # §3.1 idx1
+obs_kin_count_norm: 20.0    # §3.1 idx3
+obs_cover_norm: 20.0        # §3.1 idx6
+
+# ── 지역 피식 EMA (§3.1) ─────────────────────────────
+predation_ema_decay: 0.95
+predation_ema_gain: 10.0
+
+# ── 먹이 자원 (§4.2) ─────────────────────────────────
+food_cell: 2.0              # 격자 셀 한 변
+food_grad_blur: 2           # 조향용 기울기 블러 반경 (셀). 관측 밀도는 see_r 반경을 쓴다
+food_patch_blur: 5          # 먹이 패치 저주파 노이즈 블러 반경 (셀)
+food_patch_threshold: 0.60  # 이 값 아래는 용량 0 — 맵의 빈 영역을 만든다
+food_regen_base: 0.026      # 스텝당 용량을 향한 재생률 (무작위화 배수가 곱해짐)
+food_cover_regen_mult: 0.3  # §4.2 은신처 위치는 재생 속도 0.3배
+food_eat_rate: 0.060        # 스텝당 한 셀에서 뽑아낼 수 있는 최대량
+food_energy_per_unit: 0.5   # 먹이 1 → 에너지
+
+# ── 은신처 (§4.2) ────────────────────────────────────
+cover_r_min: 4.0
+cover_r_max: 9.0
+cover_max_count: 32         # 면적 비율을 채우다 멈추는 상한
+cover_hide_mult: 2.5        # §4.2 안에 있으면 포식자에게 거리가 2.5배로 보임
+
+# ── 포식자 (§4.2) ────────────────────────────────────
+pred_view_r: 14.0           # 초식 see_r(20)보다 좁다. 초식이 먼저 발견해야
+                            # 도주가 성립한다 (§11-B 정정 전에는 20 vs 14로 반대였다)
+pred_fov_deg: 150.0         # Aquarium predator_fov 기본값
+pred_melee_catch_r: 1.0     # §4.2 근접형 포획 거리
+pred_ranged_catch_r: 3.0    # §4.2 원거리형 포획 거리
+pred_ranged_catch_p: 0.02   # 원거리형 스텝당 포획 확률
+pred_ranged_speed_mult: 0.6 # §4.2 "느리게 접근"
+pred_wander_turn: 0.15      # 목표 없을 때 스텝당 최대 선회 (rad)
+pred_eat_cd: 5              # 포식 후 식사 쿨다운 (스텝). 포식 압력의 상한.
+                            # 60은 과교정이었다 — 포식률이 슬롯당 1.9까지 내려가
+                            # flee 축이 죽었다. 5에서 도주에 내부 최적점이 생긴다.
+                            # 측정: docs/phase1_env_calibration.md §6
+
+# ── 보상 (§3.4) ──────────────────────────────────────
+rew_alive: 0.01
+rew_energy: 1.0
+rew_repro: 10.0
+rew_death: -10.0
+
+# ── 환경 무작위화 (§4.4) — reset마다 ─────────────────
+rand:
+  world_size:      [60.0, 110.0]   # 정방형
+  predator_count:  [2, 12]         # M, 양끝 포함
+  pred_speed_mult: [0.8, 1.2]      # herb_speed 대비. §11-B 결정으로 1.0~1.4에서 정정 —
+                                   # 포식자가 절대 느리지 않으면 도주가 원리적으로 불가능하다
+  ranged_frac:     [0.0, 0.5]
+  cover_frac:      [0.05, 0.30]
+  food_regen_mult: [0.5, 2.0]
+
+# ── 시드 (§3.5) ──────────────────────────────────────
+train_seeds: [0, 1000]        # [start, stop) — 학습·튜닝·모방 데이터
+eval_seeds:  [10000, 10020]   # [start, stop) — 최종 비교 평가
+
+# ── 언리얼 단위 대응 (§9.7) ──────────────────────────
+grid_unit_cm: 200.0
+policy_interval: 8
