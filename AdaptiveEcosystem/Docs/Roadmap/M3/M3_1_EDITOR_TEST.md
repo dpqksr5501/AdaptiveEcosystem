@@ -8,6 +8,8 @@
 
 ## 설정
 
+M3.2 구현 이후 아래 M3.1 스폰만 확인하려면 Project Settings의 Feeding Enabled와 Day/Night Food Event Enabled를 끈다. 현재 사용자 설정(낮밤 10초, 스폰 간격 5초/4초)의 일일 기대 수량은 [M3.2 에디터 테스트](M3_2_EDITOR_TEST.md)를 참고한다.
+
 1. 기존 M2 Box 표시가 되는 맵에서 `EcologyRegion` 두 개를 배치하고 `RegionId`를 각각 `Forest_A`, `Forest_B`로 지정한다. Bounds는 겹치지 않게 배치한다. `AdjacentRegionIds`에는 상대 지역 ID를 넣는다.
 2. 각 Region Details의 **Ecology → Initial Resources**에서 `InitialFoodAmount=1000`, `FoodCapacity=2000`을 설정한다. 초기 식량은 0 이상 Capacity 이하로 지정한다. 변경한 값은 다음 Play 시작에 적용된다.
 3. `EcoMassNetworkBootstrap`을 지역별 하나씩 배치한다. `RegionActor`에 해당 Region을 연결하고, `EntityConfig`에 기존 M2 Box 설정을 지정한다. 두 Bootstrap 모두 `InitialAgentCount=8`, `SpawnSpacing=250`, `bAutoInitialize=true`로 설정한다. 기존 에셋에 저장된 64 등의 값은 직접 8로 변경한다.

@@ -45,6 +45,16 @@ void UEcologySimulationSubsystem::Deinitialize()
 	InitialRequests.Reset();
 	PendingSpawns.Reset();
 	NextSpawnRequestId = 1;
+	ResourceEpoch = 0;
+	ResourceStepId = 0;
+	ResourceTime = -1.0;
+	LastDayEventCycle = LastNightEventCycle = -1;
+	bResourceStepOpen = false;
+	bFeedingResolved = false;
+	ResourceLedger.Reset();
+	PendingManualStarvation.Reset();
+	CompletedResources.Reset();
+	LastAcceptedFeedTime.Reset();
 	Super::Deinitialize();
 }
 
@@ -144,6 +154,7 @@ float UEcologySimulationSubsystem::ApplyFoodConsumption(const FEcoFoodConsumptio
 {
 	if (!CanMutateAuthoritativeState(TEXT("ApplyFoodConsumption"))
 		|| Request.RegionId.IsNone()
+		|| !FMath::IsFinite(Request.RequestedAmount)
 		|| Request.RequestedAmount <= 0.0f)
 	{
 		return 0.0f;

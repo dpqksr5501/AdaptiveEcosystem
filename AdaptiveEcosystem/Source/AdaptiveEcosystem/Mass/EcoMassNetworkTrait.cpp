@@ -31,6 +31,7 @@ void UEcoMassNetworkTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildC
 		BuildContext.AddFragment<FEcoVitalsFragment>();
 		BuildContext.AddFragment<FEcoTravelFragment>();
 		BuildContext.AddFragment<FEcoLifetimeFragment>();
+		BuildContext.AddFragment<FEcoFeedingFragment>();
 		BuildContext.AddTag<FEcoAliveTag>();
 		BuildContext.AddTag<FEcoAuthorityTag>();
 		BuildContext.AddTag<FEcoClientProxyTag>();
@@ -44,6 +45,7 @@ void UEcoMassNetworkTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildC
 		BuildContext.AddFragment<FEcoVitalsFragment>();
 		BuildContext.AddFragment<FEcoTravelFragment>();
 		BuildContext.AddFragment<FEcoLifetimeFragment>();
+		BuildContext.AddFragment<FEcoFeedingFragment>();
 		BuildContext.AddTag<FEcoAliveTag>();
 		BuildContext.AddTag<FEcoAuthorityTag>();
 	}

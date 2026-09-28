@@ -5,6 +5,7 @@
 struct ADAPTIVEECOSYSTEM_API FEcoSpawnScheduleCursor
 {
 	bool ConsumeDueWave(const FEcoServerTimeSnapshot& Time, const FEcoSpawnScheduleSettings& Settings, FEcoSpawnRequest& Out);
+	double GetNextDueTime(const FEcoServerTimeSnapshot& Time, const FEcoSpawnScheduleSettings& Settings) const;
 private:
 	int64 CycleId = -1;
 	EEcoDayPhase Phase = EEcoDayPhase::Day;

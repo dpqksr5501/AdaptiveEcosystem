@@ -124,6 +124,7 @@ bool AEcoMassNetworkBootstrap::ValidateConfiguration(const AEcologyRegion& Regio
 	RequireElement.operator()<FEcoVitalsFragment>();
 	RequireElement.operator()<FEcoTravelFragment>();
 	RequireElement.operator()<FEcoLifetimeFragment>();
+	RequireElement.operator()<FEcoFeedingFragment>();
 	RequireElement.operator()<FTransformFragment>();
 	RequireElement.operator()<FEcoAuthorityTag>();
 	RequireElement.operator()<FEcoAliveTag>();
@@ -138,11 +139,12 @@ bool AEcoMassNetworkBootstrap::ValidateConfiguration(const AEcologyRegion& Regio
 	return true;
 }
 
-void AEcoMassNetworkBootstrap::PrepareRuntime(AEcologyRegion& Region, int32 RegionIndex, int32 SpeciesIndex)
+void AEcoMassNetworkBootstrap::PrepareRuntime(AEcologyRegion& Region, int32 RegionIndex, int32 SpeciesIndex, double FirstFeedDelay)
 {
 	RuntimeRegion = &Region;
 	RuntimeRegionIndex = RegionIndex;
 	RuntimeSpeciesIndex = SpeciesIndex;
+	FirstFeedDelaySeconds = FirstFeedDelay;
 }
 
 int32 AEcoMassNetworkBootstrap::ExecuteSpawnRequest(const FEcoSpawnRequest& Request, double ActualSpawnTime)
@@ -192,7 +194,8 @@ int32 AEcoMassNetworkBootstrap::ExecuteSpawnRequest(const FEcoSpawnRequest& Requ
 		View.GetFragmentData<FEcoTravelFragment>() = FEcoTravelFragment();
 		FEcoLifetimeFragment& Lifetime = View.GetFragmentData<FEcoLifetimeFragment>();
 		Lifetime.SpawnTimeSeconds = ActualSpawnTime;
-		Lifetime.NextFeedTimeSeconds = ActualSpawnTime + 20.0;
+		Lifetime.NextFeedTimeSeconds = ActualSpawnTime + FirstFeedDelaySeconds;
+		View.GetFragmentData<FEcoFeedingFragment>() = FEcoFeedingFragment();
 	}
 	// Publish fully initialized agents to MassReplication add observers.
 	CreationContext.Reset();

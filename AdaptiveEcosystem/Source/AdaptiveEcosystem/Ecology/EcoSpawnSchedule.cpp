@@ -1,6 +1,13 @@
 #include "Ecology/EcoSpawnSchedule.h"
 #include "World/EcoWorldClockSubsystem.h"
 
+double FEcoSpawnScheduleCursor::GetNextDueTime(const FEcoServerTimeSnapshot& Time, const FEcoSpawnScheduleSettings& Settings) const
+{
+	const int64 Wave = CycleId == Time.DayCycle.CycleId && Phase == Time.DayCycle.Phase ? NextWaveIndex : 1;
+	const double Interval = Time.DayCycle.Phase == EEcoDayPhase::Day ? Settings.DayIntervalSeconds : Settings.NightIntervalSeconds;
+	return FMath::Min(Time.DayCycle.PhaseEndSeconds, Time.DayCycle.PhaseStartSeconds + Wave * Interval);
+}
+
 bool FEcoSpawnScheduleCursor::ConsumeDueWave(const FEcoServerTimeSnapshot& Time,
 	const FEcoSpawnScheduleSettings& Settings, FEcoSpawnRequest& Out)
 {

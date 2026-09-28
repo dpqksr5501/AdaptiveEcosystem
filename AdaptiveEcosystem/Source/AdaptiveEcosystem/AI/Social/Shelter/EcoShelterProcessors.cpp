@@ -5,6 +5,7 @@
 #include "AI/Social/Alarm/EcoAlarmProcessors.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
 #include "MassCommonTypes.h"
 #include "MassExecutionContext.h"

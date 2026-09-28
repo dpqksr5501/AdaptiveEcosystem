@@ -3,7 +3,8 @@
 > 상위 계획: [M3 개발 계획](M3_IMPLEMENTATION_PLAN.md)  
 > 선행: [M3.1 — 지역·낮밤·권위 스폰](M3_1_WORLD_AND_SPAWN.md)  
 > 다음: [M3.3 — 실제 이주·표시·통합 검증](M3_3_MIGRATION_AND_VALIDATION.md)  
-> 상태: 개발 계획 / 미구현·미검증  
+> 상태: 코드 구현 및 UE 5.8 Editor 빌드 성공 / PIE 검증 대기. 자동화 테스트는 사용자 요청으로 생략.
+> 구현 상세·일일 개체 수 기준·수동 확인: [M3.2 에디터 테스트](M3_2_EDITOR_TEST.md)
 > 예상 개발량: **1.5~2인일**
 
 ## 1. 목표와 완료 결과
@@ -52,7 +53,7 @@ M3.1의 두 Region, 단일 시계, 실제 생성 시각/NextFeedTime, Alive/Auth
 
 ### 낮밤 이벤트
 
-- Day 시작 25초에 A, Night 시작 15초에 B의 Food를 설정량 감소시킨다. Phase마다 각각 한 번 실행한다.
+- 기본 이벤트 시각은 Day 구간의 25/60, Night 구간의 1/4 지점이다. 60초 Phase에서는 기존 계획의 +25초/+15초이고, 현재 10초 Phase에서는 +약 4.167초/+2.5초다. 대상 지역·비율·손실량·활성 여부는 Project Settings에서 편집한다. Phase마다 한 번 실행한다.
 - Phase 전환 시 Food를 초기화하지 않는다. 이전 Phase의 예약은 취소하고 새 Phase key를 사용한다.
 - 실제 손실은 `min(남은 Food, 요청 손실)`이며 음수·NaN/Inf·무효 Region을 거부한다.
 - 환경 손실을 Food 섭취나 PredationHistory 증가로 기록하지 않는다.
@@ -67,7 +68,7 @@ World 시간 입력 → 예정 환경 손실 → 현재 Food 기준 스폰 승�
 
 1. **순수 배분 helper:** 지역별 요청 합과 Food를 받아 비례 배분하는 순수 계산을 만든다. 지급 합≤가용량, 각 지급≤요청량을 검증한다.
 2. **요청/결과 Fragment:** chunk마다 개체 자신의 요청/결과만 기록한다. 공유 TArray에 worker들이 동시에 Add하지 않도록 한다.
-3. **소비 Processor:** M3.1의 SpawnTime/NextFeedTime에서 due 대상을 판정한다. immutable 시간/지역 snapshot을 사용하고 loop에서 Subsystem을 조회하지 않는다.
+3. **소비 Mass pass:** M3.1의 SpawnTime/NextFeedTime에서 due 대상을 판정한다. MVP 구현은 조정 경계가 동기 로컬 쿼리를 명시적으로 호출한다. immutable 시간 입력을 사용하고 loop에서 Subsystem을 조회하지 않는다. 추후 자동 Processor/병렬화로 옮기면 수집 및 완료 barrier를 유지한다.
 4. **GameThread 조정:** worker 완료 후 요청을 수집하고 ID/Region/생존/시각/유한값을 검증한다. 유효 요청만 모아 Ecology batch API를 호출하고 Region마다 Food를 한 번 차감한다.
 5. **이벤트 예약:** 기존 World clock snapshot으로 Day/Night의 due 이벤트를 수집한다. 중복 key 거부 및 실제 손실 로그를 연결한다.
 6. **고갈 결과 연결:** 조정 후 새 Food snapshot을 게시한다. M3.1의 다음 스폰 판단이 갱신된 값을 읽어 고갈 Region의 웨이브를 건너뛰게 한다.
@@ -97,6 +98,7 @@ World 시간 입력 → 예정 환경 손실 → 현재 Food 기준 스폰 승�
 - [ ] 0 Food/Capacity, 잘못된 ID/index, 중복·낡은 key 및 NaN/Inf를 안전하게 처리한다.
 - [ ] 30/60 FPS·긴 frame에서 예정 소비/이벤트가 누락·중복되지 않는다.
 - [ ] Food 고갈 후 추가 스폰이 중단되며 Vitals/Alive 수는 자원 이벤트 때문에 바뀌지 않는다.
-- [ ] Authority와 Entity 병렬 처리 경계를 지키고 UE 5.8 Editor UBT 빌드 및 핵심 자동화가 통과한다.
+- [x] UE 5.8 Editor UBT 빌드가 통과한다.
+- [ ] Authority/Entity 처리 경계와 소비·이벤트 결과를 에디터 시나리오로 확인한다. 자동화 테스트는 사용자 요청에 따라 생략한다.
 
 이 단계 종료는 Food 고갈까지다. 이주·Client 요약·전체 관찰 성공은 M3.3에서 확인한다.

@@ -5,6 +5,7 @@
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/EcoSocialTypes.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
 #include "MassEntityManager.h"
 #include "MassEntityUtils.h"

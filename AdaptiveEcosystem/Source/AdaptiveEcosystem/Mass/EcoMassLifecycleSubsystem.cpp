@@ -2,6 +2,7 @@
 #include "Mass/EcoMassNetworkBootstrap.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
+#include "Mass/EcoMassFeeding.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcologyRegion.h"
@@ -10,6 +11,7 @@
 #include "Network/EcoGameState.h"
 #include "AdaptiveEcosystem.h"
 #include "Engine/World.h"
+#include "Engine/Engine.h"
 #include "EngineUtils.h"
 #include "MassSpawnerSubsystem.h"
 #include "MassEntityManager.h"
@@ -38,6 +40,10 @@ void UEcoMassLifecycleSubsystem::Deinitialize()
 	Spawners.Reset();
 	bInitialized = false;
 	bStartRequested = false;
+	PreviousDawnPopulation.Reset();
+	StepId = 0;
+	LastReportedCycle = -1;
+	ProcessedTime = 0.0;
 	Super::Deinitialize();
 }
 
@@ -63,6 +69,12 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	if (!IsInGameThread() || !GetWorld() || !GetWorld()->IsGameWorld() || GetWorld()->GetNetMode() == NM_Client || bFailed) return false;
 	if (bInitialized) return true;
 	const UEcoRuntimeSettings* Settings = GetDefault<UEcoRuntimeSettings>();
+	FeedingSettings = Settings->Feeding;
+	bSpawnWaves = Settings->bEnableSpawnWaves;
+	bReportDaily = Settings->bPrintDailyPopulation;
+	bReportDailyToScreen = Settings->bPrintDailyPopulationToScreen;
+	if (!FeedingSettings.IsValid() || !Settings->DayFoodEvent.IsValid() || !Settings->NightFoodEvent.IsValid())
+		return Fail(TEXT("Invalid feeding or food-event settings. Restart PIE after correcting Project Settings."));
 	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
 	UEcoWorldClockSubsystem* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
 	UMassSpawnerSubsystem* Mass = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>();
@@ -83,6 +95,9 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	}
 	if (Regions.Num() < Settings->RequiredRegionCount) return Fail(FString::Printf(
 		TEXT("Place at least %d EcologyRegion actors and bind one Mass Bootstrap to each."), Settings->RequiredRegionCount));
+	if ((Settings->DayFoodEvent.bEnabled && !Regions.Contains(Settings->DayFoodEvent.RegionId))
+		|| (Settings->NightFoodEvent.bEnabled && !Regions.Contains(Settings->NightFoodEvent.RegionId)))
+		return Fail(TEXT("An enabled food event targets an unknown RegionId. Set its target or disable it in Project Settings."));
 	for (const auto& Pair : Regions)
 	{
 		for (FName Neighbor : Pair.Value->AdjacentRegionIds)
@@ -123,12 +138,14 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 		Region.MakeInitialEcologyState(Initial);
 		if (!Ecology->RegisterRegionState(Initial) || !Ecology->RegisterSpawnSchedule(RegionId, Bootstrap.SpawnSchedule))
 			return Fail(TEXT("Region state or spawn schedule already registered."));
-		Bootstrap.PrepareRuntime(Region, Ecology->GetRegionRuntimeIndex(RegionId), Ecology->RegisterSpecies(Bootstrap.SpeciesId));
+		Bootstrap.PrepareRuntime(Region, Ecology->GetRegionRuntimeIndex(RegionId), Ecology->RegisterSpecies(Bootstrap.SpeciesId), FeedingSettings.FirstFeedDelaySeconds);
 		Spawners.Add(&Bootstrap);
 		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Region] %s Food=%.2f Capacity=%.2f Regen=0"),
 			*RegionId.ToString(), Initial.FoodAmount, Initial.FoodCapacity);
 	}
 	if (!ReconcilePopulation()) return Fail(TEXT("Invalid authority entity membership before initial spawn."));
+	if (!Ecology->StartResourceSimulation(InitialTime.WorldEpoch, Settings->DayFoodEvent, Settings->NightFoodEvent, Settings->bPrintResourceChanges))
+		return Fail(TEXT("Resource simulation configuration rejected."));
 	for (const auto& Weak : Spawners)
 	{
 		AEcoMassNetworkBootstrap& Bootstrap = *Weak.Get();
@@ -143,9 +160,14 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	}
 	if (!Clock->StartClock(InitialTime.WorldEpoch, Settings->DayDurationSeconds, Settings->NightDurationSeconds))
 		return Fail(TEXT("Authority clock could not start."));
+	// Initial seeding is special. Phase-start events then run through the same ordered path as later steps.
+	if (!ProcessEcologyStep(Clock->GetServerTime(), 0.0)) return false;
 	bInitialized = true;
 	PublishReady(true);
 	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco M3.1] Ready: Regions=%d InitialAgents=%lld"), Regions.Num(), TotalInitial);
+	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco M3.2] Ready: Feeding=%d FirstFeed=%.2f Interval=%.2f Amount=%.2f Waves=%d DayEvent=%d NightEvent=%d"),
+		FeedingSettings.bEnabled, FeedingSettings.FirstFeedDelaySeconds, FeedingSettings.IntervalSeconds, FeedingSettings.Amount,
+		bSpawnWaves, Settings->DayFoodEvent.bEnabled, Settings->NightFoodEvent.bEnabled);
 	return true;
 }
 
@@ -224,24 +246,86 @@ void UEcoMassLifecycleSubsystem::AdvanceSimulation(double DeltaSeconds)
 	if (Mass->GetEntityManagerChecked().IsProcessing()) return;
 	constexpr double Step = 0.25;
 	constexpr int32 MaxCatchUpSteps = 8;
-	for (int32 Iteration = 0; Iteration < MaxCatchUpSteps && ProcessedTime + Step <= Now.ServerTimeSeconds; ++Iteration)
+	for (int32 Iteration = 0; Iteration < MaxCatchUpSteps; ++Iteration)
 	{
-		if (!ReconcilePopulation()) { Fail(TEXT("Invalid population membership.")); return; }
-		ProcessedTime += Step;
+		FEcoServerTimeSnapshot Previous;
+		if (!Clock->GetSnapshotAt(ProcessedTime, Previous)) { Fail(TEXT("Provider must evaluate historical scheduler time.")); return; }
+		double NextTime = FMath::Min(ProcessedTime + Step, Ecology->GetNextScheduledTime(Previous, bSpawnWaves));
+		if (FeedingSettings.bEnabled)
+		{
+			double NextFeed;
+			if (!EcoMassFeeding::FindNextTime(Mass->GetEntityManagerChecked(), ProcessedTime, NextFeed))
+			{ Fail(TEXT("Invalid Mass feeding reservation.")); return; }
+			NextTime = FMath::Min(NextTime, NextFeed);
+		}
+		if (NextTime > Now.ServerTimeSeconds) break;
 		FEcoServerTimeSnapshot AtStep;
-		if (!Clock->GetSnapshotAt(ProcessedTime, AtStep)) { Fail(TEXT("Provider must evaluate historical scheduler time.")); return; }
+		if (!Clock->GetSnapshotAt(NextTime, AtStep)) { Fail(TEXT("Provider must evaluate historical scheduler time.")); return; }
+		if (!ProcessEcologyStep(AtStep, Now.ServerTimeSeconds)) return;
+		ProcessedTime = NextTime;
+	}
+}
+
+bool UEcoMassLifecycleSubsystem::ProcessEcologyStep(const FEcoServerTimeSnapshot& Time, double ActualTime)
+{
+	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
+	FMassEntityManager& Manager = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+	if (Manager.IsProcessing() || !ReconcilePopulation()) return Fail(TEXT("Invalid population membership at resource boundary."));
+	if (!Ecology->BeginResourceStep(Time, ++StepId)) return Fail(TEXT("Resource step rejected (epoch/order/state)."));
+	// Equal-time priority: environmental loss -> spawn -> feeding -> completed snapshot.
+	if (bSpawnWaves)
+	{
 		for (const auto& Weak : Spawners)
 		{
 			AEcoMassNetworkBootstrap* Bootstrap = Weak.Get();
-			if (!Bootstrap) { Fail(TEXT("A required Bootstrap was unloaded during the fixed-region scenario.")); return; }
+			if (!Bootstrap) return Fail(TEXT("A required Bootstrap was unloaded during the fixed-region scenario."));
 			FEcoSpawnRequest Request;
-			while (Ecology->PollSpawnWave(Bootstrap->GetConfiguredRegionId(), AtStep, Request))
+			while (Ecology->PollSpawnWave(Bootstrap->GetConfiguredRegionId(), Time, Request))
 			{
-				const int32 Actual = Request.Count > 0 ? Bootstrap->ExecuteSpawnRequest(Request, Now.ServerTimeSeconds) : 0;
+				const int32 Actual = Request.Count > 0 ? Bootstrap->ExecuteSpawnRequest(Request, ActualTime) : 0;
 				const bool bMetricsValid = ReconcilePopulation();
-				Ecology->CompleteSpawnRequest(Request.RequestId, Actual);
-				if (!bMetricsValid || Actual != Request.Count) { Fail(TEXT("Wave spawn incomplete; request is terminal.")); return; }
+				const bool bCompleted = Ecology->CompleteSpawnRequest(Request.RequestId, Actual);
+				if (!bMetricsValid || !bCompleted || Actual != Request.Count) return Fail(TEXT("Wave spawn incomplete; request is terminal."));
+				if (Request.Count == 0)
+					UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Spawn Skipped] Region=%s Cycle=%lld Phase=%d Wave=%lld Due=%.3f (food/cap/zero count)"),
+						*Request.RegionId.ToString(), Request.CycleId, static_cast<int32>(Request.Phase), Request.WaveIndex, Request.ScheduledTime);
 			}
 		}
 	}
+	TArray<FEcoFeedRequest> Requests;
+	TArray<FEcoFeedResult> Results;
+	if (!EcoMassFeeding::Collect(Manager, Time, StepId, FeedingSettings, Requests)) return Fail(TEXT("Invalid Mass feeding request."));
+	if (!Ecology->ResolveFeeding(Requests, Results)) return Fail(TEXT("Feeding batch rejected; stopped without retry."));
+	if (!EcoMassFeeding::Apply(Manager, Results, FeedingSettings.IntervalSeconds)) return Fail(TEXT("Feeding result no longer matches its entity."));
+	if (!Ecology->CompleteResourceStep()) return Fail(TEXT("Resource conservation/snapshot failed."));
+	ReportDailyPopulation(Time, ActualTime);
+	return true;
+}
+
+void UEcoMassLifecycleSubsystem::ReportDailyPopulation(const FEcoServerTimeSnapshot& Time, double ActualTime)
+{
+	if (Time.DayCycle.Phase != EEcoDayPhase::Day || LastReportedCycle == Time.DayCycle.CycleId) return;
+	LastReportedCycle = Time.DayCycle.CycleId;
+	if (!bReportDaily) return;
+	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
+	TArray<FName> RegionIds;
+	Ecology->GetRegionIds(RegionIds);
+	int32 Total = 0;
+	for (FName RegionId : RegionIds)
+	{
+		FRegionEcologyState State;
+		if (!Ecology->GetRegionState(RegionId, State)) continue;
+		const int32* Previous = PreviousDawnPopulation.Find(RegionId);
+		const int32 Delta = Previous ? State.Population - *Previous : 0;
+		Total += State.Population;
+		const FString Message = FString::Printf(TEXT("[Eco Daily][%s] Day=%lld Phase=Day Epoch=%d Step=%lld Due=%.3f Observed=%.3f Region=%s AliveEntities=%d Delta=%+d Food=%.3f/%.3f"),
+			*GetWorld()->GetName(), Time.DayCycle.CycleId + 1, Time.WorldEpoch, StepId, Time.ServerTimeSeconds,
+			ActualTime, *RegionId.ToString(), State.Population, Delta, State.FoodAmount, State.FoodCapacity);
+		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("%s"), *Message);
+		if (bReportDailyToScreen && GEngine && GetWorld()->GetNetMode() != NM_DedicatedServer)
+			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(HashCombine(GetUniqueID(), GetTypeHash(RegionId))), 8.0f, FColor::Green, Message);
+		PreviousDawnPopulation.Add(RegionId, State.Population);
+	}
+	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Daily Total] Day=%lld Epoch=%d Step=%lld AliveEntities=%d"),
+		Time.DayCycle.CycleId + 1, Time.WorldEpoch, StepId, Total);
 }

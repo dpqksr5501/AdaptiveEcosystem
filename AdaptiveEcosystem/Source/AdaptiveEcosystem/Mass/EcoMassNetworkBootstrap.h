@@ -30,7 +30,7 @@ public:
 	bool IsMassNetworkInitialized() const { return bInitialized; }
 	FName GetConfiguredRegionId() const;
 	bool ValidateConfiguration(const AEcologyRegion& Region, FString& OutError) const;
-	void PrepareRuntime(AEcologyRegion& Region, int32 RegionIndex, int32 SpeciesIndex);
+	void PrepareRuntime(AEcologyRegion& Region, int32 RegionIndex, int32 SpeciesIndex, double FirstFeedDelay);
 	int32 ExecuteSpawnRequest(const FEcoSpawnRequest& Request, double ActualSpawnTime);
 
 protected:
@@ -75,5 +75,6 @@ private:
 	int32 RuntimeSpeciesIndex = INDEX_NONE;
 	int64 SpawnedSlotCount = 0;
 	int64 LastExecutedRequestId = 0;
+	double FirstFeedDelaySeconds = 20.0;
 	FVector GetSpawnPosition(int64 Slot) const;
 };

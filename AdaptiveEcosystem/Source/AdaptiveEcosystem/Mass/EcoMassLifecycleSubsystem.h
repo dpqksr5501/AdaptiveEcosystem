@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "Core/EcoResourceTypes.h"
+#include "Core/EcoTimeTypes.h"
 #include "EcoMassLifecycleSubsystem.generated.h"
 
 class AEcoMassNetworkBootstrap;
@@ -25,6 +27,15 @@ private:
 	void OnWorldPreActorTick(UWorld* World, ELevelTick TickType, float DeltaSeconds);
 	bool Fail(const FString& Reason);
 	void PublishReady(bool bReady);
+	bool ProcessEcologyStep(const FEcoServerTimeSnapshot& Time, double ActualTime);
+	void ReportDailyPopulation(const FEcoServerTimeSnapshot& Time, double ActualTime);
+	FEcoFeedingSettings FeedingSettings;
+	bool bSpawnWaves = true;
+	bool bReportDaily = true;
+	bool bReportDailyToScreen = true;
+	int64 StepId = 0;
+	int64 LastReportedCycle = -1;
+	TMap<FName, int32> PreviousDawnPopulation;
 	TArray<TWeakObjectPtr<AEcoMassNetworkBootstrap>> Spawners;
 	FDelegateHandle TickHandle;
 	bool bStartRequested = false;

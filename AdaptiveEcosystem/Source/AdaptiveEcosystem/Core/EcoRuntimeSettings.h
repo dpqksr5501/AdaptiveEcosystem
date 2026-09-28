@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
+#include "Core/EcoResourceTypes.h"
 #include "EcoRuntimeSettings.generated.h"
 
 /** Project-level switches for selecting explicitly opt-in legacy runtime paths. */
@@ -13,6 +14,27 @@ class ADAPTIVEECOSYSTEM_API UEcoRuntimeSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	UEcoRuntimeSettings()
+	{
+		DayFoodEvent.bEnabled = false;
+		NightFoodEvent.RegionId = TEXT("Forest_B");
+		NightFoodEvent.PhaseFraction = 0.25;
+	}
+	/** Restart PIE after changing simulation settings. */
+	UPROPERTY(Config, EditAnywhere, Category="M3|Resources")
+	FEcoFeedingSettings Feeding;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Resources")
+	FEcoFoodEventSettings DayFoodEvent;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Resources")
+	FEcoFoodEventSettings NightFoodEvent;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Resources")
+	bool bPrintResourceChanges = true;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Population")
+	bool bEnableSpawnWaves = true;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Population")
+	bool bPrintDailyPopulation = true;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Population")
+	bool bPrintDailyPopulationToScreen = true;
 	/** Fixed-cycle fallback; a registered server day-cycle provider can replace phase evaluation. */
 	UPROPERTY(Config, EditAnywhere, Category="M3|Clock", meta=(ClampMin="0.25"))
 	double DayDurationSeconds = 60.0;

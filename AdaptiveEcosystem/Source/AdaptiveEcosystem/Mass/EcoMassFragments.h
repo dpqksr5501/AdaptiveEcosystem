@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "MassEntityTypes.h"
 #include "Core/EcoIds.h"
+#include "Core/EcoResourceTypes.h"
 #include "AI/Policy/EcoPolicyContracts.h"
 #include "EcoMassFragments.generated.h"
 
@@ -146,6 +147,18 @@ struct FEcoLifetimeFragment : public FMassFragment
 	GENERATED_BODY()
 	double SpawnTimeSeconds = 0.0;
 	double NextFeedTimeSeconds = 20.0;
+};
+
+/** Per-entity request/result buffer. Regional food remains owned by Ecology. */
+USTRUCT()
+struct FEcoFeedingFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	FEcoFeedRequest PendingRequest;
+	bool bPending = false;
+	double LastFeedTime = -1.0;
+	double LastGrantedAmount = 0.0;
+	double TotalGrantedAmount = 0.0;
 };
 
 /**
