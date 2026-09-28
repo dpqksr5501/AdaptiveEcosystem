@@ -34,6 +34,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Debug", meta = (ClampMin = "500.0"))
 	float AreaRadius = 3000.0f;
 
+	/** Species cover query search radius for shelter evaluation */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Debug", meta = (ClampMin = "500.0"))
+	float CoverSearchRadius = 3000.0f;
+
 	/** Number of spatial origin clusters to seed initial entity groups */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Debug", meta = (ClampMin = "1", ClampMax = "10"))
 	int32 ClusterCount = 3;

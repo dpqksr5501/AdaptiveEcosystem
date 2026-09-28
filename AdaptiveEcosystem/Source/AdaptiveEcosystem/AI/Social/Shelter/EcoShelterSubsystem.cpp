@@ -2,6 +2,8 @@
 
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Engine/World.h"
+#include "CollisionQueryParams.h"
+#include "Components/PrimitiveComponent.h"
 
 UEcoShelterSubsystem::UEcoShelterSubsystem()
 {
@@ -40,7 +42,7 @@ void UEcoShelterSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVector& Normal, float Quality, int32 Capacity)
+int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVector& Normal, float Quality, int32 Capacity, float Radius)
 {
 	int32 ShelterIndex = INDEX_NONE_ECO;
 	if (FreeShelterIndices.Num() > 0)
@@ -59,15 +61,19 @@ int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVect
 	NewShelter.Quality = FMath::Clamp(Quality, 0.0f, 1.0f);
 	NewShelter.Capacity = FMath::Max(1, Capacity);
 
-	// Allocate discrete reservation slots clustered around shelter position
+	const float SafeRadius = FMath::Max(50.0f, Radius);
+
+	// Allocate discrete reservation slots distributed evenly in a circle around shelter center
 	for (int32 SlotIdx = 0; SlotIdx < NewShelter.Capacity; ++SlotIdx)
 	{
 		const int32 NewSlotIndex = ShelterSlots.AddDefaulted();
 		FEcoShelterSlot& Slot = ShelterSlots[NewSlotIndex];
 		Slot.ShelterRuntimeIndex = ShelterIndex;
 		Slot.SlotIndex = NewSlotIndex;
-		const float Angle = static_cast<float>(SlotIdx);
-		Slot.Position = Location + FVector(FMath::Cos(Angle) * 100.0f, FMath::Sin(Angle) * 100.0f, 0.0f);
+		
+		// Angle = 2 * PI * SlotIdx / Capacity
+		const float Angle = (float)SlotIdx / (float)NewShelter.Capacity * 2.0f * PI;
+		Slot.Position = Location + FVector(FMath::Cos(Angle) * SafeRadius, FMath::Sin(Angle) * SafeRadius, 0.0f);
 		Slot.ReservedBy = 0;
 		Slot.ReservationExpireTime = 0.0;
 	}
@@ -152,9 +158,87 @@ void UEcoShelterSubsystem::ReleaseAgentReservations(int64 StableAgentId)
 	}
 }
 
-int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation, float SearchRadius, int32& OutSlotIndex) const
+bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, const FVector& TargetLocation,
+	FHitResult* OutHit, bool bLogTrace) const
+{
+	const UWorld* World = GetWorld();
+	if (!World)
+	{
+		if (OutHit)
+		{
+			*OutHit = FHitResult();
+		}
+		return false;
+	}
+
+	// Trace from eye-level of threat to shelter position
+	const FVector Start = ThreatLocation + FVector(0.0f, 0.0f, 60.0f);
+	const FVector End = TargetLocation + FVector(0.0f, 0.0f, 40.0f);
+
+	// A small sphere catches thin edges that a single center ray may miss. It cannot
+	// compensate for disabled collision or for a wall outside this segment.
+	constexpr float ProbeRadius = 12.0f;
+	const FCollisionShape ProbeShape = FCollisionShape::MakeSphere(ProbeRadius);
+	FCollisionQueryParams SimpleParams(SCENE_QUERY_STAT(EcoShelterOcclusionSimple), false);
+	FCollisionQueryParams ComplexParams(SCENE_QUERY_STAT(EcoShelterOcclusionComplex), true);
+	FCollisionObjectQueryParams ObjectParams;
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldStatic);
+	ObjectParams.AddObjectTypesToQuery(ECC_WorldDynamic);
+	ObjectParams.AddObjectTypesToQuery(ECC_PhysicsBody);
+
+	if (bLogTrace)
+	{
+		UE_LOG(LogTemp, Log, TEXT("[ShelterOcclusion] World=%s Start=%s End=%s Radius=%.1f"),
+			*GetNameSafe(World), *Start.ToString(), *End.ToString(), ProbeRadius);
+	}
+
+	FHitResult HitResult;
+	auto ReportProbe = [&](const TCHAR* ProbeName, bool bHit)
+	{
+		if (bLogTrace)
+		{
+			const UPrimitiveComponent* Component = HitResult.GetComponent();
+			UE_LOG(LogTemp, Log,
+				TEXT("[ShelterOcclusion] %s: %s Actor=%s Component=%s Impact=%s Distance=%.1f Blocking=%d"),
+				ProbeName, bHit ? TEXT("HIT") : TEXT("MISS"),
+				*GetNameSafe(HitResult.GetActor()), *GetNameSafe(Component),
+				*HitResult.ImpactPoint.ToString(), HitResult.Distance, HitResult.bBlockingHit);
+		}
+		return bHit && HitResult.bBlockingHit;
+	};
+
+	bool bBlocked = ReportProbe(TEXT("Visibility sphere/simple"),
+		World->SweepSingleByChannel(HitResult, Start, End, FQuat::Identity, ECC_Visibility, ProbeShape, SimpleParams));
+	if (!bBlocked)
+	{
+		HitResult = FHitResult();
+		bBlocked = ReportProbe(TEXT("Visibility line/complex"),
+			World->LineTraceSingleByChannel(HitResult, Start, End, ECC_Visibility, ComplexParams));
+	}
+	if (!bBlocked)
+	{
+		HitResult = FHitResult();
+		bBlocked = ReportProbe(TEXT("Geometry object sphere/simple"),
+			World->SweepSingleByObjectType(HitResult, Start, End, FQuat::Identity, ObjectParams, ProbeShape, SimpleParams));
+	}
+	if (!bBlocked)
+	{
+		HitResult = FHitResult();
+		bBlocked = ReportProbe(TEXT("Geometry object line/complex"),
+			World->LineTraceSingleByObjectType(HitResult, Start, End, ObjectParams, ComplexParams));
+	}
+	if (OutHit)
+	{
+		*OutHit = bBlocked ? HitResult : FHitResult();
+	}
+	return bBlocked;
+}
+
+int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation,
+	bool bHasThreat, float SearchRadius, int32& OutSlotIndex, float& OutScore) const
 {
 	OutSlotIndex = INDEX_NONE_ECO;
+	OutScore = 0.0f;
 	int32 BestShelterIndex = INDEX_NONE_ECO;
 	float BestScore = -1.0f;
 
@@ -194,28 +278,47 @@ int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocatio
 
 		// Calculate composite defensive score:
 		// 1. Proximity score (0.0 .. 1.0)
-		const float DistRatio = 1.0f - FMath::Sqrt(DistSq) / FMath::Max(1.0f, SearchRadius);
+		const float DistRatio = 1.0f - FMath::Clamp(FMath::Sqrt(DistSq) / FMath::Max(1.0f, SearchRadius), 0.0f, 1.0f);
 
-		// 2. Defensive orientation score relative to threat position
+		// 2. Real World Geometry LOS / Occlusion score
 		float OcclusionScore = 0.5f;
-		if (!ThreatLocation.IsZero())
+		if (bHasThreat)
 		{
+			const bool bBlocked = CheckThreatOcclusion(ThreatLocation, Shelter.Position);
+			// Completely occluded by geometry gives 1.0, otherwise baseline 0.1
+			OcclusionScore = bBlocked ? 1.0f : 0.1f;
+
+			// Add normal orientation bonus (0.0 .. 0.15) if facing away from threat
 			const FVector DirToThreat = (ThreatLocation - Shelter.Position).GetSafeNormal();
-			// Shelter normal facing away from threat offers higher shielding
-			OcclusionScore = FMath::Clamp(FVector::DotProduct(Shelter.SurfaceNormal, -DirToThreat) * 0.5f + 0.5f, 0.0f, 1.0f);
+			const float NormalDot = FVector::DotProduct(Shelter.SurfaceNormal, -DirToThreat);
+			if (NormalDot > 0.0f)
+			{
+				OcclusionScore = FMath::Clamp(OcclusionScore + NormalDot * 0.15f, 0.0f, 1.0f);
+			}
 		}
 
-		// Composite score
-		const float Score = Shelter.Quality * 0.4f + DistRatio * 0.35f + OcclusionScore * 0.25f;
+		// Composite score: Quality (25%), Distance (35%), Occlusion (40%)
+		const float Score = Shelter.Quality * 0.25f + DistRatio * 0.35f + OcclusionScore * 0.40f;
 		if (Score > BestScore)
 		{
 			BestScore = Score;
 			BestShelterIndex = i;
 			OutSlotIndex = FoundAvailableSlot;
+			OutScore = Score;
 		}
 	}
 
 	return BestShelterIndex;
+}
+
+bool UEcoShelterSubsystem::GetSlotData(int32 SlotIndex, FEcoShelterSlot& OutSlot) const
+{
+	if (ShelterSlots.IsValidIndex(SlotIndex))
+	{
+		OutSlot = ShelterSlots[SlotIndex];
+		return true;
+	}
+	return false;
 }
 
 void UEcoShelterSubsystem::CleanExpiredReservations(double CurrentTime)
@@ -227,5 +330,14 @@ void UEcoShelterSubsystem::CleanExpiredReservations(double CurrentTime)
 			Slot.ReservedBy = 0;
 			Slot.ReservationExpireTime = 0.0;
 		}
+	}
+}
+
+void UEcoShelterSubsystem::ResetAllReservations()
+{
+	for (FEcoShelterSlot& Slot : ShelterSlots)
+	{
+		Slot.ReservedBy = 0;
+		Slot.ReservationExpireTime = 0.0;
 	}
 }
