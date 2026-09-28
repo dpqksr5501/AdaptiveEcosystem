@@ -25,6 +25,7 @@
 #include "../EcoBehaviorProcessors.h"
 #include "../EcoNeighborhoodSubsystem.h"
 #include "../EcoWorldProviders.h"
+#include "EcoTestWorld.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
@@ -41,33 +42,7 @@ namespace EcoPipelineTestImpl
 	/** 개체를 이 반경 안에 흩뿌린다. 시야 반경의 몇 배라 이웃이 생긴다. */
 	constexpr float SpreadCm = 6000.0f;
 
-	/** 테스트용 월드. 서브시스템이 만들어지도록 엔진에 알린다. */
-	struct FScopedTestWorld
-	{
-		UWorld* World = nullptr;
-
-		FScopedTestWorld()
-		{
-			World = UWorld::CreateWorld(EWorldType::Game, /*bInformEngineOfWorld*/ true);
-			if (World && GEngine)
-			{
-				FWorldContext& Ctx = GEngine->CreateNewWorldContext(EWorldType::Game);
-				Ctx.SetCurrentWorld(World);
-			}
-		}
-
-		~FScopedTestWorld()
-		{
-			if (World)
-			{
-				if (GEngine)
-				{
-					GEngine->DestroyWorldContext(World);
-				}
-				World->DestroyWorld(false);
-			}
-		}
-	};
+	using EcoTest::FScopedTestWorld;
 
 	/** 초식 아키타입에 들어가는 프래그먼트와 태그. §9.4/§9.5 쿼리 요구사항의 합집합. */
 	TArray<const UScriptStruct*> HerbivoreComposition()
@@ -124,11 +99,7 @@ namespace EcoPipelineTestImpl
 									  static_cast<UMassProcessor*>(Policy),
 									  static_cast<UMassProcessor*>(Steering)})
 			{
-				FMassExecutionContext Context(EM, Dt);
-				// 프로세서가 소유한 쿼리(FMassEntityQuery(*this))는 Processor 타입 컨텍스트를
-				// 요구한다. 기본값 Local 로 두면 MassEntityQuery.cpp 의 어설션에 걸린다.
-				Context.SetExecutionType(EMassExecutionContextType::Processor);
-				P->CallExecute(EM, Context);
+				EcoTest::RunProcessor(*P, EM, Dt);
 			}
 		}
 	};
@@ -230,8 +201,19 @@ bool FEcoPipelineSmokeTest::RunTest(const FString& Parameters)
 				 A.Forage == 0.0f && A.Cohesion == 0.0f && A.FleeDist == 0.0f && A.Cover == 0.0f);
 	}
 
+	// 속도가 위치에 반영되는지 보려면 돌리기 전 좌표를 남겨 둬야 한다.
+	// 속도만 검사하면 적분 단계가 통째로 빠져도 통과한다 — 실제로 그렇게 새어 나갔다.
+	TArray<FVector> PosBefore;
+	PosBefore.Reserve(Herbivores.Num());
+	for (const FMassEntityHandle& E : Herbivores)
+	{
+		PosBefore.Add(
+			EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation());
+	}
+
 	// 이제 충분히 돌린다.
-	for (int32 t = 0; t < Interval * 6; ++t)
+	const int32 TickCount = Interval * 6;
+	for (int32 t = 0; t < TickCount; ++t)
 	{
 		Pipeline.Tick(EM, Dt);
 	}
@@ -296,10 +278,31 @@ bool FEcoPipelineSmokeTest::RunTest(const FString& Parameters)
 		TEXT("초식 %d, 포식자 %d | 동족 본 개체 %d, 포식자 본 개체 %d, 이동 중 %d, 도주 %d"),
 		Herbivores.Num(), Predators.Num(), SawKin, SawPredator, NonZeroVelocity, Fleeing));
 
+	// --- 속도가 위치에 실제로 반영되는가 ---
+	// 조향이 FMassVelocityFragment 만 쓰고 끝나면 개체는 영원히 제자리다. 엔진의
+	// UMassApplyMovementProcessor 는 FMassDesiredMovementFragment 와
+	// FMassCodeDrivenMovementTag 를 함께 요구해서 이 아키타입에 걸리지 않는다.
+	// 그래서 UEcoSteeringProcessor 가 직접 적분한다 — 그게 도는지 여기서 본다.
+	int32 Moved = 0;
+	double MaxDisp = 0.0;
+	for (int32 i = 0; i < Herbivores.Num(); ++i)
+	{
+		const FVector Now = EM.GetFragmentDataChecked<FTransformFragment>(Herbivores[i])
+								.GetTransform().GetLocation();
+		const double Disp = FVector::Dist(Now, PosBefore[i]);
+		if (Disp > 1.0) { ++Moved; }
+		MaxDisp = FMath::Max(MaxDisp, Disp);
+	}
+	AddInfo(FString::Printf(
+		TEXT("위치 변화: %d/%d 개체, 최대 %.0fcm (속력×시간 상한 %.0fcm)"),
+		Moved, Herbivores.Num(), MaxDisp,
+		EcoBehaviorConfig::HerbSpeedCmS * Dt * TickCount));
+
 	// 아무도 이웃을 못 봤다면 색인이나 쿼리가 죽은 것이다 — 통과해도 의미가 없다.
 	TestTrue(TEXT("동족을 본 개체가 있어야 한다 (이웃 색인이 살아 있는가)"), SawKin > 0);
 	TestTrue(TEXT("포식자를 본 개체가 있어야 한다"), SawPredator > 0);
 	TestTrue(TEXT("움직이는 개체가 있어야 한다 (조향이 도는가)"), NonZeroVelocity > 0);
+	TestTrue(TEXT("속도가 위치에 반영돼야 한다 (개체가 실제로 이동하는가)"), Moved > 0);
 
 	// --- §9.4 콘솔 변수로 두 정책이 실제로 갈리는가 ---
 	const FEcoPolicyActionV1 UtilityAction =

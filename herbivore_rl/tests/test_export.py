@@ -251,3 +251,15 @@ def test_behavior_config_matches_spec_unit_conversion():
     # §3.3 조향 계수는 무차원이라 변환하지 않는다
     assert value("SepWeight") == pytest.approx(cfg.sep_weight)
     assert value("FleeWeight") == pytest.approx(cfg.flee_weight)
+    # §4.2 포식자 — 스텝 단위는 StepSeconds 로, 거리는 GridUnitCm 으로 바꾼다
+    step_s = cfg.policy_interval / 60.0
+    assert value("StepSeconds") == pytest.approx(step_s)
+    assert value("PredViewRadiusCm") == pytest.approx(cfg.pred_view_r * cfg.grid_unit_cm)
+    assert value("PredCatchRadiusCm") == pytest.approx(
+        cfg.pred_melee_catch_r * cfg.grid_unit_cm
+    )
+    assert value("PredEatCooldownS") == pytest.approx(cfg.pred_eat_cd * step_s)
+    assert value("PredFovDeg") == pytest.approx(cfg.pred_fov_deg)
+    assert value("PredWanderTurnRad") == pytest.approx(cfg.pred_wander_turn)
+    assert value("CoverHideMult") == pytest.approx(cfg.cover_hide_mult)
+    assert value("InitEnergyFrac") == pytest.approx(cfg.init_energy / cfg.max_energy)

@@ -245,6 +245,17 @@ def write_behavior_config_header(path: Path, cfg, src: Path) -> None:
         # §3.1 지역 피식 EMA (§9.6)
         "PredationEmaDecay": float(cfg.predation_ema_decay),
         "PredationEmaGain": float(cfg.predation_ema_gain),
+        # §4.2 포식자 — UEcoPredationProcessor 의 포획 판정과 테스트 레벨의 포식자 AI 가 쓴다.
+        # 정책이 이 조건에서 학습됐으므로 언리얼 쪽도 같은 규칙이어야 비교가 성립한다.
+        "StepSeconds": pi / 60.0,
+        "PredViewRadiusCm": cfg.pred_view_r * g,
+        "PredFovDeg": float(cfg.pred_fov_deg),
+        "PredCatchRadiusCm": cfg.pred_melee_catch_r * g,
+        "PredEatCooldownS": cfg.pred_eat_cd * pi / 60.0,
+        "PredWanderTurnRad": float(cfg.pred_wander_turn),
+        "CoverHideMult": float(cfg.cover_hide_mult),
+        # §4.3 리스폰 시 에너지. 언리얼 Vitals 는 절대값이라 비율로 넘긴다.
+        "InitEnergyFrac": float(cfg.init_energy) / float(cfg.max_energy),
     }
     lines = "\n".join(
         f"\tstatic constexpr {'int32' if isinstance(v, int) else 'float'} {k} = "
@@ -257,6 +268,9 @@ def write_behavior_config_header(path: Path, cfg, src: Path) -> None:
 //   1 격자 단위   = GridUnitCm
 //   HerbSpeed     = herb_speed × GridUnitCm ÷ (PolicyInterval/60) cm/s
 //   SeeRadius     = see_r × GridUnitCm
+//   StepSeconds   = PolicyInterval ÷ 60 — 스텝 단위 값(쿨다운 등)을 초로 바꿀 때 쓴다
+//   PredWanderTurnRad 는 스텝당 값이다. 틱마다 나눠 돌리면 분산이 달라지므로
+//   StepSeconds 경계마다 한 번씩 적용한다.
 // generated: {stamp}, from {src.as_posix()}
 #pragma once
 

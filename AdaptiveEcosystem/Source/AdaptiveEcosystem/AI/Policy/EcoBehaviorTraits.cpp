@@ -41,4 +41,6 @@ void UEcoPredatorTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildCont
 	BuildContext.RequireFragment<FTransformFragment>();
 	BuildContext.RequireFragment<FMassVelocityFragment>();
 	BuildContext.AddTag<FEcoPredatorTag>();
+	// §4.2 식사 쿨다운. 없으면 UEcoPredationProcessor 의 포식자 쿼리에 안 걸려 아무것도 못 잡는다.
+	BuildContext.AddFragment<FEcoPredatorStateFragment>();
 }

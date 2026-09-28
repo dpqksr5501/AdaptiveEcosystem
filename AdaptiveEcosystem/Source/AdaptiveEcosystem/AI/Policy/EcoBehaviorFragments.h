@@ -35,6 +35,23 @@ struct FEcoPredatorTag : public FMassTag
 };
 
 /**
+ * §4.2 포식자 상태. `UEcoPredationProcessor` 가 포획 판정에 쓴다.
+ *
+ * 파이썬은 포획 직후 `pred_eat_cd` 스텝 동안 사냥을 멈춘다 (`hunting = pred_cd == 0`).
+ * 그동안은 목표를 안 잡고 배회만 하며, 포획도 하지 않는다. 이게 없으면 포식자 한 마리가
+ * 무리 한가운데서 틱마다 한 마리씩 잡을 수 있어 포식 압력의 상한이 사라진다.
+ */
+USTRUCT()
+struct FEcoPredatorStateFragment : public FMassFragment
+{
+	GENERATED_BODY()
+
+	/** 남은 식사 시간. 초. 0이면 사냥 중. = pred_eat_cd × StepSeconds 에서 시작해 줄어든다. */
+	UPROPERTY(Transient)
+	float EatCooldown = 0.0f;
+};
+
+/**
  * §9.2 FBehaviorConfigSharedFragment.
  *
  * 기본값은 `EcoBehaviorConfig.h` 에서 온다 — 그 헤더는 `configs/default.yaml` 에서

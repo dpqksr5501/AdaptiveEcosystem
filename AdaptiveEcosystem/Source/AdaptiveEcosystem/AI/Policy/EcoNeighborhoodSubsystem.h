@@ -11,6 +11,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Mass/EntityHandle.h"
 #include "Subsystems/WorldSubsystem.h"
 
 #include "EcoNeighborhoodSubsystem.generated.h"
@@ -18,12 +19,14 @@
 /** 격자에 들어가는 한 개체. 조회에 필요한 것만 담는다. */
 struct FEcoNeighborEntry
 {
+	/** 포획 판정이 잡힌 개체의 Vitals 를 고칠 때 쓴다 (§9.6). */
+	FMassEntityHandle Entity;
 	FVector Location = FVector::ZeroVector;
 	/** 진행 방향 단위벡터. 시야 각도 판정에 쓴다. */
 	FVector Heading = FVector::ForwardVector;
 	/** 포식자면 true. §9.5 "이웃 순회에서 FPredatorTag면 조향 대상이 아니라 도주 판정". */
 	bool bPredator = false;
-	/** 은신처 안이면 true. §4.2 포식자에게는 거리가 CoverHideMult 배로 보인다. */
+	/** 은신처 안이면 true. §4.2 포식자에게는 거리가 EcoBehaviorConfig::CoverHideMult 배로 보인다. */
 	bool bInCover = false;
 };
 
@@ -53,9 +56,6 @@ public:
 	const TArray<FEcoNeighborEntry>& GetEntries() const { return Entries; }
 	int32 Num() const { return Entries.Num(); }
 	bool IsBuilt() const { return bBuilt; }
-
-	/** §4.2 은신처 안 개체는 포식자에게 이 배수만큼 멀어 보인다. */
-	static constexpr float CoverHideMult = 2.5f;
 
 private:
 	int64 CellKey(const FVector& Location) const;

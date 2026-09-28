@@ -91,6 +91,11 @@ private:
  *
  * 포식자 포획만 센다 — 아사는 §3.1 EMA 의 분자가 아니다 (파이썬도 그렇다).
  * 플레이어 사냥은 `UEcoRegionPredationSubsystem::ReportPredation()` 을 직접 부르면 된다 (§9.6).
+ *
+ * 포획 규칙은 파이썬 §4.2 와 같다 — `Tests/EcoPredationTest.cpp` 가 고정한다:
+ *   - **포식자 쪽에서** 판정한다. 초식이 포식자를 봤는지와 무관하다
+ *   - 체감 거리 = 거리 × (초식이 은신처 안이면 CoverHideMult)
+ *   - 포식자당 한 틱 한 마리, 잡으면 PredEatCooldownS 동안 사냥하지 않는다
  */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoPredationProcessor : public UMassProcessor
@@ -105,7 +110,10 @@ protected:
 	virtual void Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context) override;
 
 private:
+	/** 지역 개체 수 보고용. 잡힌 개체의 Vitals 를 쓴다는 선언도 여기서 한다. */
 	FMassEntityQuery HerbivoreQuery;
+	/** 포획 판정은 파이썬 §4.2 처럼 포식자 쪽에서 한다. */
+	FMassEntityQuery PredatorQuery;
 };
 
 /** §9.5 — §3.3 조향 수식. 파이썬 `env/steering.py` 와 한 줄씩 대응한다. */

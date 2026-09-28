@@ -96,9 +96,18 @@ public:
 	/** 소비분이 시간에 따라 회복된다. 테스트 레벨에서 먹이가 영구 고갈되지 않도록. */
 	void RegenerateConsumed(float DeltaSeconds);
 
-	/** 맵 반경. 경계 반발(§9.5)에 쓴다. cm. */
+	/** 맵 반경. 경계 반발·좌표 clamp(§9.5)와 은신처 배치에 쓴다. cm.
+	 *
+	 * 15000 = L_EcoPolicyTest 의 바닥(Plane 스케일 300 → 반경 15000cm)과 같은 값이다.
+	 * 전에는 20000 이라 개체가 바닥 밖 50m 띠까지 걸어 나갔다 — 오류가 아니라 시뮬레이션
+	 * 경계와 눈에 보이는 바닥이 안 맞았을 뿐이다. 바닥을 바꾸면 이 값도 같이 바꿔야 한다.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Ecology|World|Dummy")
-	float WorldExtent = 20000.0f;
+	float WorldExtent = 15000.0f;
+
+	/** 은신처 중심들 (XY). 디버그 표시용이다 — 판정은 IsInCover() 로 한다. */
+	const TArray<FVector>& GetCoverPoints() const { return CoverPoints; }
+	float GetCoverRadius() const { return CoverRadius; }
 
 protected:
 	/** 사인 패턴의 파장. cm. 클수록 먹이 패치가 넓다. */

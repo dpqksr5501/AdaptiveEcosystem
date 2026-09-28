@@ -4,7 +4,10 @@
 //   1 격자 단위   = GridUnitCm
 //   HerbSpeed     = herb_speed × GridUnitCm ÷ (PolicyInterval/60) cm/s
 //   SeeRadius     = see_r × GridUnitCm
-// generated: 2026-09-22T09:16:52+00:00, from configs/default.yaml
+//   StepSeconds   = PolicyInterval ÷ 60 — 스텝 단위 값(쿨다운 등)을 초로 바꿀 때 쓴다
+//   PredWanderTurnRad 는 스텝당 값이다. 틱마다 나눠 돌리면 분산이 달라지므로
+//   StepSeconds 경계마다 한 번씩 적용한다.
+// generated: 2026-09-23T07:11:48+00:00, from configs/default.yaml
 #pragma once
 
 #include "CoreMinimal.h"
@@ -25,4 +28,12 @@ namespace EcoBehaviorConfig
 	static constexpr float FleeWeight = 3.0f;
 	static constexpr float PredationEmaDecay = 0.95f;
 	static constexpr float PredationEmaGain = 10.0f;
+	static constexpr float StepSeconds = 0.13333333333333333f;
+	static constexpr float PredViewRadiusCm = 2800.0f;
+	static constexpr float PredFovDeg = 150.0f;
+	static constexpr float PredCatchRadiusCm = 200.0f;
+	static constexpr float PredEatCooldownS = 0.6666666666666666f;
+	static constexpr float PredWanderTurnRad = 0.15f;
+	static constexpr float CoverHideMult = 2.5f;
+	static constexpr float InitEnergyFrac = 0.5f;
 }
