@@ -139,6 +139,15 @@ struct FEcoPolicyRuntimeFragment : public FMassFragment
 // Shared Fragments (Species-wide immutable / slow-changing configuration)
 // -----------------------------------------------------------------------------
 
+/** Server-only lifetime/feeding schedule; not a replicated presentation value. */
+USTRUCT()
+struct FEcoLifetimeFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	double SpawnTimeSeconds = 0.0;
+	double NextFeedTimeSeconds = 20.0;
+};
+
 /**
  * Shared configuration shared by all agents of the same species.
  */

@@ -13,6 +13,22 @@ class ADAPTIVEECOSYSTEM_API UEcoRuntimeSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	/** Fixed-cycle fallback; a registered server day-cycle provider can replace phase evaluation. */
+	UPROPERTY(Config, EditAnywhere, Category="M3|Clock", meta=(ClampMin="0.25"))
+	double DayDurationSeconds = 60.0;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Clock", meta=(ClampMin="0.25"))
+	double NightDurationSeconds = 60.0;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Clock")
+	bool bPrintServerTime = true;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Clock")
+	bool bPrintServerTimeToScreen = true;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Clock", meta=(ClampMin="0.25"))
+	double ServerTimePrintInterval = 1.0;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Population", meta=(ClampMin="1"))
+	int32 GlobalPopulationLimit = 128;
+	UPROPERTY(Config, EditAnywhere, Category="M3|Population", meta=(ClampMin="1"))
+	int32 RequiredRegionCount = 2;
+
 	/**
 	 * Creates the legacy LLM trait-evolution subsystem in authoritative game worlds.
 	 * Disabled by default so the PPO + Mass runtime remains the only active path.

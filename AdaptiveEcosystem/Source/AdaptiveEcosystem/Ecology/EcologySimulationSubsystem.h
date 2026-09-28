@@ -8,6 +8,7 @@
 #include "Core/EcoIds.h"
 #include "Core/EcoRegionTypes.h"
 #include "AI/Policy/EcoPolicyContracts.h"
+#include "Ecology/EcoSpawnSchedule.h"
 #include "EcologySimulationSubsystem.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRegionPredationRecorded, FName, RegionId, float, NewPredationHistory);
@@ -82,6 +83,17 @@ public:
 	UFUNCTION(BlueprintPure, Category = "Ecology|Simulation")
 	float GetPredationHistory(FName RegionId) const;
 
+	int32 GetRegionRuntimeIndex(FName RegionId) const;
+	int32 RegisterSpecies(FName SpeciesId);
+	void GetRegionIds(TArray<FName>& OutIds) const { OutIds = RegionIds; }
+	bool RegisterSpawnSchedule(FName RegionId, const FEcoSpawnScheduleSettings& Settings);
+	bool ConfigurePopulationLimit(int32 Limit);
+	bool RequestInitialSpawn(FName RegionId, int32 Count, const FEcoServerTimeSnapshot& Time, FEcoSpawnRequest& Out);
+	/** Returns a terminal wave even if Count is zero (food/cap rejection). */
+	bool PollSpawnWave(FName RegionId, const FEcoServerTimeSnapshot& Time, FEcoSpawnRequest& Out);
+	/** Call after publishing actual Mass metrics; release the reservation exactly once. */
+	bool CompleteSpawnRequest(int64 RequestId, int32 ActualCount);
+
 	// -------------------------------------------------------------------------
 	// Policy Runtime Mode
 	// -------------------------------------------------------------------------
@@ -108,4 +120,13 @@ private:
 
 	/** Monotonic world-local allocator; zero is permanently reserved as invalid. */
 	FEcoAgentId NextStableAgentId = 1;
+	TArray<FName> RegionIds;
+	TArray<FName> SpeciesIds;
+	TMap<FName, FEcoSpawnScheduleSettings> SpawnSettings;
+	TMap<FName, FEcoSpawnScheduleCursor> SpawnCursors;
+	TSet<FName> InitialRequests;
+	TMap<int64, FEcoSpawnRequest> PendingSpawns;
+	int64 NextSpawnRequestId = 1;
+	int32 GlobalPopulationLimit = 128;
+	bool ReserveSpawn(FName RegionId, FEcoSpawnRequest& Request);
 };

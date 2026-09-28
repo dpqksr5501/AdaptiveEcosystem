@@ -31,6 +31,14 @@ void UEcologyWorldSubsystem::RegisterRegion(AEcologyRegion* InRegion)
 		return;
 	}
 
+	if (const TWeakObjectPtr<AEcologyRegion>* Existing = RegisteredRegions.Find(InRegion->RegionId))
+	{
+		if (Existing->IsValid() && Existing->Get() != InRegion)
+		{
+			UE_LOG(LogAdaptiveEcosystem, Error, TEXT("Duplicate Ecology RegionId: %s"), *InRegion->RegionId.ToString());
+			return;
+		}
+	}
 	RegisteredRegions.Add(InRegion->RegionId, InRegion);
 	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("Registered EcologyRegion: %s"), *InRegion->RegionId.ToString());
 }
@@ -42,7 +50,7 @@ void UEcologyWorldSubsystem::UnregisterRegion(AEcologyRegion* InRegion)
 		return;
 	}
 
-	if (RegisteredRegions.Contains(InRegion->RegionId))
+	if (RegisteredRegions.FindRef(InRegion->RegionId).Get() == InRegion)
 	{
 		RegisteredRegions.Remove(InRegion->RegionId);
 		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("Unregistered EcologyRegion: %s"), *InRegion->RegionId.ToString());
