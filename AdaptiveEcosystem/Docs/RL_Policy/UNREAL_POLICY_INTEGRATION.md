@@ -2,6 +2,9 @@
 
 `herbivore_policy_spec.md` §9 의 산출물 문서다. §은 전부 그 사양서의 절 번호.
 
+> **테스트 방법, 열어 둔 값, 다른 시스템이 연결할 API 는
+> [POLICY_TEST_AND_API_GUIDE.md](POLICY_TEST_AND_API_GUIDE.md) 에 있다.** 이 문서는 구현 세부다.
+
 > **위치 이탈 기록 (§1.8).** §10 은 이 코드를 `herbivore_rl/unreal/Source/` 에 두라고
 > 하지만 실제 UE 모듈은 `AdaptiveEcosystem/Source/AdaptiveEcosystem/` 다. 격리 폴더에
 > 두면 빌드에 안 들어가서 복사 단계가 하나 늘고, 목표가 "언리얼에서 도는 것"이므로
@@ -210,4 +213,5 @@ UE 5.8 에서 실제로 부딪힌 것들 (다음 엔진 업그레이드 때 다�
 | `EAutomationTestFlags` | `EAutomationTestFlags_ApplicationContextMask` 형태 |
 | 테스트에서 프로세서 직접 실행 | `Context.SetExecutionType(EMassExecutionContextType::Processor)` 없으면 어설션 |
 | **속도를 위치에** | `UMassApplyMovementProcessor` 는 `FMassDesiredMovementFragment` + `FMassCodeDrivenMovementTag` 를 **둘 다** 요구한다. 없으면 쿼리에 안 걸려 좌표가 영영 그대로다 (오류 없이 조용히). `UEcoSteeringProcessor` 가 직접 적분하는 이유 — 그 프래그먼트를 넣으면 엔진 가감속 모델을 타서 §3.3 의 "속력 일정" 계약과 어긋난다 |
+| 트레잇과 엔진 이동 트레잇 | `UMassMovementTrait` 는 기본값(`bIsCodeDrivenMovement = true`)에서 `FMassCodeDrivenMovementTag` 를 붙인다. 초식 트레잇이 `FMassCustomMovementTag` 를 붙여 엔진 이동 프로세서를 막는다 — 없으면 두 트레잇을 같이 쓸 때 이동이 이중으로 적용되거나 속도가 덮어써진다 |
 | `Build.cs` 의 `StructUtils` | 아직 동작하지만 `uproject` 에 플러그인 의존이 없다는 경고가 난다 |
