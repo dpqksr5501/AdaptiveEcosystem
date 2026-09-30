@@ -151,6 +151,13 @@ struct FEcoShelterSlot
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
 	int64 ReservedBy = 0;
 
+	/** World-local lease generation; changes on reacquisition, never on renewal. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
+	int64 ReservationId = 0;
+
+	/** Transient owner for Social-managed leases. Never saved or replicated. */
+	FMassEntityHandle OwnerEntity;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
 	double ReservationExpireTime = 0.0;
 };

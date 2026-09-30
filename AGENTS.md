@@ -17,6 +17,7 @@
   - `AdaptiveEcosystem/Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md`: Social의 현재 main 구현·검증 범위와 Production Integration 우선순위
   - `AdaptiveEcosystem/Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md`: Herd / Alarm / Shelter 책임 경계
   - `AdaptiveEcosystem/Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md`: 현재 TASK 4 통합 작업과 과거 MVP 구현 가이드
+  - `AdaptiveEcosystem/Docs/조연우/SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md`: Social 이동 Request/Feedback·예약 상태/유지/정리 계약 및 소비자 연결 지점
   - `AdaptiveEcosystem/Docs/RL_Policy/RL_TRAINING_PIPELINE.md`: Python 학습 환경 및 Export 파이프라인
   - `AdaptiveEcosystem/Docs/Migration/AdaptiveEcosystem_PPO_Mass_Migration_Agent_Prompt.md`: 전환 마스터 가이드라인
   - `AdaptiveEcosystem/Docs/초기 문서/`: 초기 기반 아키텍처, 영속 식별자 계약, 에셋 감사 및 부트스트랩 히스토리
@@ -57,6 +58,7 @@
    - 구현 상태는 현재 컴파일 가능한 Source를 최종 사실 기준으로 확인하고, Root AGENTS.md의 불변 원칙·Active Contract·기타 설계를 순서대로 대조한다. Source와 계약의 충돌은 기록하며 현재 동작을 의도한 계약처럼 조용히 정당화하지 않는다.
    - 목표는 `Policy Raw Action → Social ModulatedAction / TargetPosition → Steering / Movement`다. 2026-09-30 main `295ac2f`의 Steering은 아직 Raw Action과 Dummy Cover를 사용한다. M3 Box Bootstrap은 PPO Herbivore/Custom Movement 혼용을 거부한다. 이 가드를 제거하거나 Trait를 합치기 전에 단일 movement writer와 인계 계약을 정한다.
    - Social의 현재 단계는 Production Integration이다. `codex/social-threat-integration`은 기존 포식자 Grid/Actor ThreatSource를 읽는 감지→Alarm을 추가했다. 계약/검증은 `Docs/조연우/SOCIAL_THREAT_ALARM_INTEGRATION.md`를 따른다. production EntityConfig/JYU/Client 확인 후 행동·목적지 인계, 도착/점유 및 생명주기 예약 정리를 연결한다. Merge/Split, multi-hop gossip, ORCA, 자동 Cover 생성은 Deferred다.
+   - `codex/social-shelter-handoff`는 `9461ae7` 기반으로 Social Request/Feedback과 Moving/Occupied·lease·실패/죽음/삭제/이주 정리를 구현했다. 계약은 `Docs/조연우/SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md`를 따른다. 실제 이동 writer 소비와 JYU 이동/도착·Client 검증은 대기다. Social에 Transform/Velocity 적분을 추가하거나 기존 Bootstrap 가드를 제거하지 않는다.
 
 ---
 

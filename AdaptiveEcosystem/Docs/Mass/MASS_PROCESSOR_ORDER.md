@@ -4,7 +4,7 @@
 > 모듈: `AdaptiveEcosystem`  
 > 참조 C++ 헤더: `AdaptiveEcosystem/Source/AdaptiveEcosystem/Mass/EcoMassFragments.h`
 > Source 대조 기준: main `295ac2f` / 2026-09-30. 이번 감사는 빌드·PIE를 재실행하지 않음
-> 추가 변경: `codex/social-threat-integration`의 [실제 위협 감지](../조연우/SOCIAL_THREAT_ALARM_INTEGRATION.md), 직접 UBT 빌드 성공. 아래 Social 실행 순서는 작업 브랜치 기준.
+> 추가 변경: `codex/social-shelter-handoff`의 [실제 위협 감지](../조연우/SOCIAL_THREAT_ALARM_INTEGRATION.md) 및 [이동 인계·Shelter Lifecycle](../조연우/SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md). 직접 UBT 성공, Social 자동화 9/9 통과. 아래 Social 순서는 작업 브랜치 기준.
 
 ---
 
@@ -50,7 +50,7 @@
 | 경로 | 명시적 prerequisite / 처리 | 현재 한계 |
 | :--- | :--- | :--- |
 | PPO PrePhysics | Neighborhood Gather → Perception → Policy → Steering. Predation은 Perception 뒤 | Steering은 Raw Action·기하 캐시를 읽고 Velocity/Transform을 직접 쓴다. ForceFragment→별도 Movement라는 목표 그림과 다름 |
-| Social PrePhysics / Behavior | Herd Membership → Aggregate → Threat Detection → Alarm Propagation → Social Response → Shelter Query → Reservation | Detection은 Neighborhood Gather 이후, Response는 Policy 이후. Reservation→Steering 소비 연결 없음 |
+| Social PrePhysics / Behavior | Herd Membership → Aggregate → Threat Detection → Alarm Propagation → Social Response → Shelter Query → Reservation → Lifecycle | Detection은 Neighborhood Gather 이후, Response는 Policy 이후. Lifecycle은 Movement 그룹 이전. Request/Feedback 계약은 있으나 기존 Steering의 소비는 미연결 |
 | M3 PreActorTick / GameThread | 자원/스폰/소비 조정 → Migration Reconcile → 집계·요약 | Mass processing 중이면 실행하지 않음. non-Traveling Velocity/DesiredVelocity 리셋 |
 | M3 PrePhysics | ApplyForces 그룹 → Migration Steering → Movement 그룹 | Migration은 DesiredVelocity를 쓰고 엔진이 적분. 아래 §3의 Box 경로만 의미함 |
 
@@ -58,7 +58,9 @@ Source: [PPO Processors](../../Source/AdaptiveEcosystem/AI/Policy/EcoBehaviorPro
 
 Herbivore Trait의 CustomMovement Tag는 엔진 ApplyMovement에서 해당 Entity를 제외한다. M3 Bootstrap은 Herbivore/Custom/Spring/Simulation LOD 혼용을 거절한다. 현 경로에서 중복 적분이 발생한다고 단정하지 않으며, 향후 혼용은 속도 리셋·이주 목표 무시 위험이 있다. 가드를 제거하기 전에 최종 movement writer·목표 우선순위·Entity 구성을 계약으로 정한다. **Herd != Flock**; Social은 실제 위치 적분을 추가하지 않는다.
 
-Threat Detection은 `Server | Standalone`을 명시하며 GameThread에서 0.2초마다 기존 Grid를 읽는다. 다른 Social Processor는 같은 UE 5.8 기본 플래그를 상속한다. Detection/Alarm/Response는 ClientProxy/PendingDeath를 제외하며 Social Trait는 Client 논리 구성을 제외한다. production EntityConfig, 에디터 override 및 Listen Server/Client 검증은 별도 확인한다. 엔진 대조 근거와 기존 PIE 검증 범위는 [CURRENT_STATE](../조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)를 참조한다.
+Threat Detection은 `Server | Standalone`을 명시하며 GameThread에서 0.2초마다 기존 Grid를 읽는다. Shelter Query/Reservation/Lifecycle 역시 해당 플래그와 Client World guard를 명시한다. Detection/Alarm/Response는 ClientProxy/PendingDeath를 제외하며 Social Trait는 Client 논리 구성을 제외한다. Lifecycle은 invalid Entity도 조회해 요청과 예약을 비우며 `QueryBasedPruning=Never`로 마지막 owner 삭제 이후에도 정리한다. 모든 lease 변경은 GameThread에서 직렬화한다.
+
+미래 이동 소비자는 [Lifecycle Source](../../Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterLifecycleProcessor.cpp) 이후 실행하고 결과는 다음 Lifecycle 패스에 소비된다. Feedback 반환을 이유로 Lifecycle을 동일 소비자 이후에도 배치하는 순환 의존성을 만들지 않는다. production EntityConfig, 에디터 override 및 Listen Server/Client 검증은 별도 확인한다. 근거와 기존 PIE 범위는 [CURRENT_STATE](../조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)를 참조한다.
 
 ---
 

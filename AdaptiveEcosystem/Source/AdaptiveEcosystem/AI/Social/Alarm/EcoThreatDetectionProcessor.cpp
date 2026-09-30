@@ -50,9 +50,9 @@ void UEcoThreatDetectionProcessor::Execute(FMassEntityManager& EntityManager, FM
 	if (!World || World->GetNetMode() == NM_Client) { return; }
 	UEcoHerdSubsystem* Herds = World->GetSubsystem<UEcoHerdSubsystem>();
 	if (!Herds) { return; }
-	const float Dt = Context.GetDeltaTimeSeconds();
-	if (!FMath::IsFinite(Dt) || Dt < 0.0f) { return; }
-	TimeUntilScan -= Dt;
+	const float DetectionDeltaSeconds = Context.GetDeltaTimeSeconds();
+	if (!FMath::IsFinite(DetectionDeltaSeconds) || DetectionDeltaSeconds < 0.0f) { return; }
+	TimeUntilScan -= DetectionDeltaSeconds;
 	if (TimeUntilScan > 0.0f) { return; }
 	TimeUntilScan = 0.2f; // At most one pass per frame; no catch-up trace bursts after a hitch.
 

@@ -17,10 +17,10 @@
 Verified Herd / Alarm / Shelter MVP를 production PPO / Steering / Lifecycle 경로와 통합한다. 아래 기존 TASK 0~3과 후보 타입/알고리즘은 **Historical / MVP Completed 범위의 설계 이력**이다. 현재 소스를 처음부터 재구현하라는 지시가 아니다. Editor Verified는 기존 기록이며 이번 감사는 Source/Docs 검토만 수행했다.
 
 1. Real Player / Predator Threat → Alarm: 작업 브랜치에서 구현. production EntityConfig/JYU와 Client 검증은 확인 필요. [연동 계약](SOCIAL_THREAT_ALARM_INTEGRATION.md).
-2. PPO Raw Action → Social ModulatedAction → Steering handoff.
-3. Shelter TargetPosition → Movement handoff.
-4. Reserved → Moving / Occupied, 도착 판정과 예약 유지.
-5. Threat clear / Death / Despawn / Migration 시 reservation cleanup.
+2. Social EffectiveAction Request 제공 구현. 실제 Steering 소비 대기.
+3. Shelter TargetPosition → Request / Feedback 인계 계약 구현. 이동 writer 연결 대기.
+4. Reserved → Moving / Occupied, 실제 거리 도착 판정과 예약 유지 구현·자동화 검증. 실제 이동 PIE 대기.
+5. 은신 요구 종료 / Death / Despawn / Migration reservation cleanup 구현·자동화 검증. production 확인 대기.
 6. 전체 end-to-end·Server/Client 검증.
 
 **Do NOT start until production integration is complete:** Merge/Split 고도화, cross-herd multi-hop gossip, ORCA/RVO2, 자동 Cover 생성, 복잡한 Leader AI, Group Shelter 최적화, 새로운 PPO Observation/Action.
@@ -31,11 +31,11 @@ Verified Herd / Alarm / Shelter MVP를 production PPO / Steering / Lifecycle 경
 - 현재 `UEcoSteeringProcessor`는 Raw Action을 읽는다. ModulatedAction/TargetPosition 소비자는 없다. 기존 Social→Shelter 순서만으로 Policy→Social→Steering 순서를 보장하지 않는다.
 - M3 Box Bootstrap은 PPO Herbivore/Custom/Spring Movement를 거절한다. Herbivore의 CustomMovement Tag는 엔진 ApplyMovement를 제외한다. Trait 단순 결합 또는 가드 삭제로 통합하지 않는다.
 - `UEcoSocialTrait`는 Social Fragment/Shared를 추가하고 Identity/Transform/Velocity/PolicyOutput을 요구한다. Client 논리 구성은 제외한다. Alive/Authority/Species Shared는 담당 Trait/스폰 구성에서 확인한다. JYU Harness의 고정 Raw Action Entity와 production Entity는 다르다.
-- Herd/Shelter Subsystem은 Client에 생성되지 않는다. 새 Detection은 `Server | Standalone`을 명시하고 Detection/Alarm/Response는 ClientProxy/PendingDeath를 제외한다. 나머지 Social Processor는 같은 엔진 기본 플래그를 상속한다. 실제 production EntityConfig·에디터 override와 Listen Server/Client 검증은 별도 확인한다.
+- Herd/Shelter Subsystem은 Client에 생성되지 않는다. Detection 및 Shelter Query/Reservation/Lifecycle은 `Server | Standalone`을 명시한다. Lifecycle은 죽음/ClientProxy/PendingDeath/Traveling Entity의 버퍼·예약을 정리하므로 제외 태그로 쿼리 자체를 필터링하지 않는다. 실제 production EntityConfig·에디터 override와 Listen Server/Client 검증은 별도 확인한다.
 
 ### 가장 작은 다음 작업 단위
 
-이번 작업 브랜치는 기존 두 이동 경로를 유지하며 실제 위협 감지·갱신·종료를 연결했다. [실제 위협 연동 문서](SOCIAL_THREAT_ALARM_INTEGRATION.md)에 구현/테스트/설정을 기록한다. 다음은 이동 담당자와 보정 행동·예약 목적지·도착 결과의 인계 계약을 확정하는 것이다. main 감사 당시 Source 근거는 [CURRENT_STATE §1](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md#12-source-derived-audit-findings--main-295ac2f)에 보존한다.
+`codex/social-shelter-handoff`는 `9461ae7`의 실제 위협 연동을 포함하고, [이동 인계·예약 생명주기](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md)를 추가했다. 직접 UBT 성공 및 Social 자동화 9/9 통과. 이동 담당자가 기존 writer 하나에 Request 소비·Feedback 반환을 연결하는 것이 다음 작업이다. 다른 담당 영역의 위치 적분·PPO·Vitals 코드는 이번 Social 작업에 포함하지 않았다. main 감사 당시 Source 근거는 [CURRENT_STATE §1](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md#12-source-derived-audit-findings--main-295ac2f)에 보존한다.
 
 ---
 

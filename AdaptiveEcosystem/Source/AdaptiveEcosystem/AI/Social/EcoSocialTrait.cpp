@@ -23,6 +23,8 @@ void UEcoSocialTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContex
 	BuildContext.AddFragment<FEcoAlarmStateFragment>();
 	BuildContext.AddFragment<FEcoShelterIntentFragment>();
 	BuildContext.AddFragment<FEcoSocialBehaviorFragment>();
+	BuildContext.AddFragment<FEcoSocialMovementRequestFragment>();
+	BuildContext.AddFragment<FEcoShelterMovementFeedbackFragment>();
 
 	FMassEntityManager& EntityManager = UE::Mass::Utils::GetEntityManagerChecked(World);
 	const FSharedStruct SharedConfig = EntityManager.GetOrCreateSharedFragment(SocialConfig);

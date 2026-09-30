@@ -55,6 +55,7 @@ PPO + Mass 생태계와 Steam 멀티플레이를 단계별로 완성하기 위�
 동적 무리(Herd), 위험 전파(Alarm), 은신처(Shelter) 예약 및 PPO 행동 변조를 다룹니다.
 - 📌 [조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md](조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md) : **현재 소셜 런타임 구현 및 에디터 검증 현황 (Source of Truth)**
 - 🔗 [조연우/SOCIAL_THREAT_ALARM_INTEGRATION.md](조연우/SOCIAL_THREAT_ALARM_INTEGRATION.md) : 실제 포식자/플레이어 위협 → Herd Alarm 구현, 입력 종료 계약, 자동화 검증과 JYU 설정
+- 🔗 [조연우/SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md](조연우/SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md) : Social Request/Feedback 인계, Moving/Occupied·예약 유지/정리, 이동 담당자 연결 지점과 검증 범위
 - 📘 [조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md](조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md) : 사회적 행동 및 은신처 시스템 아키텍처 명세서
 - 📋 [조연우/SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md](조연우/SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md) : **CURRENT PRIORITY / TASK 4 — Production Integration** 및 과거 MVP 설계
 - 📋 [조연우/SHELTER_COVER_MVP_AGENT_PROMPT.md](조연우/SHELTER_COVER_MVP_AGENT_PROMPT.md) : **Historical** Shelter MVP 작업 범위. 현재 다음 작업 지시가 아님

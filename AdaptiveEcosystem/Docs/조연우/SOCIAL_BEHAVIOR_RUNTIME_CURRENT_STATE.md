@@ -4,12 +4,12 @@
 > **Repository:** `dpqksr5501/AdaptiveEcosystem`  
 > **Target Module:** `AdaptiveEcosystem` (Source/AdaptiveEcosystem/AI/Social/)  
 > **Current Base:** `main` — `295ac2f` (2026-09-30 Source audit)
-> **Working Branch:** `codex/social-threat-integration` — 실제 위협 연동 추가
+> **Working Branch:** `codex/social-shelter-handoff` — `9461ae7` 기반, Social 이동 인계·예약 생명주기 추가
 > **Current Phase:** Production Integration
 > **Historical MVP Branch:** `feat/social-shelter-mvp` (main에 병합됨)
-> **Last Updated:** 2026-09-30
+> **Last Updated:** 2026-10-01
 > **Status:** Dynamic Herd MVP (Editor Verified) / Alarm Communication MVP (Editor Verified) / Shelter MVP (Editor Verified: 차폐 판정 및 예약 표시)
-> **이번 검증 범위:** 작업 브랜치에서 직접 UBT 빌드 성공 및 Social Threat 자동화 **4/4 통과**. 사용자 PIE에서 캐릭터 위협 컴포넌트 접근 → Alert 반응 확인. [실제 위협 연동 기록](SOCIAL_THREAT_ALARM_INTEGRATION.md)을 따른다. 새 차폐/종료/예약 PIE와 멀티플레이는 추가 확인한다.
+> **이번 검증 범위:** 직접 UBT 빌드 성공 및 Social 자동화 **9/9 통과** (Threat 4 + Lifecycle 5). [이동 인계·예약 생명주기 기록](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md)을 따른다. 이전 사용자 PIE의 캐릭터 접근→Alert 확인은 [실제 위협 연동 기록](SOCIAL_THREAT_ALARM_INTEGRATION.md)에 보존한다. 실제 이동 소비자·Moving/Occupied PIE·멀티플레이는 연결/검증 대기다.
 
 ---
 
@@ -31,12 +31,17 @@
 | :--- | :--- |
 | Completed | Herd 가입/이탈·집계, Alarm 주입/전파·감쇠·Social Response, authored Shelter 선택·LOS/차폐·슬롯 예약. 기존 Herd/Alarm PIE 기록과 Shelter 차폐/예약 표시 기록 보존 |
 | Implemented — 작업 브랜치 | 실제 Mass 포식자/Actor 위협 컴포넌트 → 시야/LOS 감지 → Herd Alarm. 입력 갱신/종료 및 움직이는 위협 위치 수정. [연동 계약 및 검증](SOCIAL_THREAT_ALARM_INTEGRATION.md) |
-| Integration Pending | production EntityConfig와 JYU 실제 위협 PIE·Client 확인, ModulatedAction→Steering, TargetPosition→Movement, 도착/Occupied·예약 유지, Death/Despawn/Migration 정리, 전체 end-to-end 검증 |
+| Implemented — 작업 브랜치 | Request/Feedback 인계 계약, 예약 세대 번호, Reserved→Moving→Occupied 전이·lease 유지, 실패/진행 정체/위협 요구 종료·죽음/삭제/이주 예약 정리. [구현·검증 범위](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md) |
+| Implemented — 진단 로그 | `eco.Shelter.Log 1/2`와 `LogEcoSocialShelter`: 상태/lease 이벤트 및 5초 요약. 로그 활성 상태로 직접 UBT 성공·자동화 9/9 통과. [JYU 실행·로그 전달 절차](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md#61-에디터-실행과-로그-전달) |
+| 사용자 JYU 확인 — 2026-09-30 | Standalone 로그에서 100개체 요청, 은신처 3곳 예약, 12초 TTL 만료·재예약, 개별 은신 요구 종료 반환 및 PIE 재시작 초기화를 확인. 실제 이동/Occupied·전체 위협 종료·후보 없음·Client 검증과 구분. [사용자 로그 검증 기록](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md#사용자-jyu-pie-로그-확인--2026-09-30) |
+| HUD 수정 — 2026-10-01 | 예약된 개체의 Panic 글자가 점수 색상에 가려지던 표시 문제 수정. 경보/예약 정보를 두 줄로 출력하며 Agent ID·경보 강도를 함께 표시. 직접 UBT 성공, 수정 후 시각 PIE 확인 대기. [색상 해석·수정 기록](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md#hud-색상-혼동-수정--2026-10-01) |
+| 사용자 JYU 재확인 — 2026-10-01 | 차폐 1.0/노출 0.1 표시, 슬롯 예약 및 Panic 강도를 화면·로그로 재확인. 사용자가 현재 테스트 동작을 정상으로 확인. 실제 이동/점유 완료를 의미하지 않음. [브랜치 포함 관계·작업 정리](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md#9-브랜치-포함-관계와-작업-정리--2026-10-01) |
+| Integration Pending | production EntityConfig 및 JYU/Client 확인, 기존 단일 이동 writer의 Request 소비·Feedback 반환, 실제 이동/도착/종료 및 전체 end-to-end 검증 |
 | Deferred | Merge/Split 고도화, cross-herd multi-hop gossip, RVO2/ORCA, 자동 Cover 생성, 복잡한 Leader AI, Group Shelter 최적화, 새로운 PPO 관측/행동 차원 |
 
 ### 1.2 Source-derived Audit Findings — main `295ac2f`
 
-아래 표는 **수정 전 main 감사 기록**이다. 작업 브랜치에는 ThreatDetection, Actor ThreatSource, Client Trait 제외와 Policy→Response prerequisite가 추가됐다. 최신 변경은 [실제 위협 연동](SOCIAL_THREAT_ALARM_INTEGRATION.md)을 먼저 확인한다.
+아래 표는 **수정 전 main 감사 기록**이다. 최신 브랜치에는 ThreatDetection, Actor ThreatSource, Client Trait 제외, Request/Feedback 및 Lifecycle이 추가됐다. [실제 위협 연동](SOCIAL_THREAT_ALARM_INTEGRATION.md)과 [이동 인계·예약 생명주기](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md)를 먼저 확인한다. 표의 당시 미구현 사실을 현재 브랜치 상태로 읽지 않는다.
 
 | 확인 질문 | 현재 Source의 답과 근거 |
 | :--- | :--- |
@@ -64,20 +69,20 @@
 
 현재 `AI/Policy`는 자체 `UEcoNeighborhoodSubsystem` 격자와 직접 속도 조향을 사용한다. 프로젝트 Source에서 별도 `UEcoFlockSteeringProcessor`/MassFlock runtime 구현은 확인되지 않았다. 문서의 MassFlock/HashGrid/Force 합성은 설계·참조 용어다. 두 production 이동 경로의 결합을 완료했다고 표현하지 않는다.
 
-**Target handoff contract (planned):** Policy는 Raw Action을 소유하고, Social은 보정 Action/유효한 예약 목적지를 제공한다. Movement 담당 계층이 일반 행동·은신처 대피·이주의 우선순위를 선택하여 동일 Entity의 최종 속도·Transform을 한 경로에서 갱신한다. 도착/실패 결과는 Social에 반환한다. 목적지 인계는 장애물 우회·경로 도달 가능성을 보증하지 않는다.
+**Social handoff contract (Implemented; consumer pending):** Lifecycle이 `FEcoSocialMovementRequestFragment`로 보정 Action·유효 예약 목적지를 제공하며 `FEcoShelterMovementFeedbackFragment`의 예약 번호·Sequence·결과를 소비한다. Movement 담당 계층이 최종 우선순위와 실제 이동을 한 경로에서 실행한다. Raw Action은 유지한다. 목적지 인계는 장애물 우회·경로 도달 가능성을 보증하지 않는다. 상세 필드·타임아웃·담당자 인계는 [계약 문서](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md)를 따른다.
 
 ### 1.4 CURRENT PRIORITY — Production Integration
 
 1. 실제 Player / Predator Threat → Alarm 코드 연결 완료. production EntityConfig 및 JYU 실제 입력·권위/Client 확인.
-2. PPO Raw Action → Social ModulatedAction → Steering handoff.
-3. Shelter TargetPosition → Movement handoff.
-4. Reserved → Moving / Occupied lifecycle integration 및 예약 유지.
-5. Threat clear / Death / Despawn / Migration 시 예약 정리.
+2. Social은 EffectiveAction 제공까지 구현. 기존 Steering 소비는 이동 담당자 연결 대기.
+3. 유효 예약 목적지 Request와 Feedback 계약 구현. 단일 이동 writer 연결 대기.
+4. Reserved → Moving / Occupied 전이·도착 검증·예약 유지 구현 및 자동화 검증. 실제 이동 PIE 대기.
+5. 은신 요구 종료 / Death / Despawn / Migration 예약 정리 구현 및 자동화 검증. production 통합 확인 대기.
 6. 전체 end-to-end scenario validation 및 Listen Server/Client 검증.
 
 위 순서는 기능 우선순위다. 작업 브랜치에 Policy→Social Response를 명시했다. Shelter Reservation→Steering 소비 연결은 없으며, 단일 movement writer와 행동/목적지 우선순위는 이동 담당자와 확정한다.
 
-**가장 작은 다음 작업:** 실제 위협을 JYU/production EntityConfig에서 확인한 뒤, 이동 담당자와 ModulatedAction·유효 예약 목적지의 인계 계약을 확정한다. 최종 movement writer, Shelter/Migration/Flee 우선순위, 도착/실패 반환 주체를 정한다. 이동 전체 재작성이나 Bootstrap 가드 삭제를 첫 작업으로 삼지 않는다.
+**가장 작은 다음 작업:** 이동 담당자가 [Request/Feedback 계약](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md)에 맞춰 기존 writer 하나를 연결한다. production EntityConfig 구성과 Shelter/Migration/Flee 우선순위를 검토하고 실제 이동·도착·실패·종료를 JYU에서 확인한다.
 
 최종 검증 시나리오 (planned):
 
@@ -91,7 +96,7 @@ Player / Predator 접근 → Threat 감지 → Herd Alarm → 구성원 Social R
 
 - [`UEcoWorldProviderRegistry`](../../Source/AdaptiveEcosystem/AI/Policy/EcoWorldProviders.cpp)는 Dummy Food/Cover를 기본으로 설정한다. Source에서 SetFoodProvider/SetCoverProvider 교체 호출은 없다. Policy의 cover distance와 실제 예약 목적지는 의미를 분리해 유지한다.
 - 정책 recent_predation은 별도 `UEcoRegionPredationSubsystem` 격자 EMA다. Ecology의 RegionId/PredationHistory와 연결되지 않았다. 개체별 `ReportPopulation(Location, 1)`과 수신 `max`의 조합은 분모를 1에 머물게 하므로 RL 담당 수정·검증이 필요하다. 문서 감사에서는 Source를 고치지 않았다.
-- M3 Feeding은 지급량을 Fragment에 기록하지만 Energy/HP로 환산하지 않는다. Policy 포획은 HP=0과 별도 EMA 보고까지이고, 테스트 Spawner의 리스폰은 정식 Death/Despawn/Population 처리와 다르다. `ReleaseAgentReservations`도 production 생명주기 호출자가 없다.
+- M3 Feeding은 지급량을 Fragment에 기록하지만 Energy/HP로 환산하지 않는다. Policy 포획은 HP=0과 별도 EMA 보고까지이고, 테스트 Spawner의 리스폰은 정식 Death/Despawn/Population 처리와 다르다. 새 Social Lifecycle은 HP/Alive/Travel·owner를 읽어 예약을 정리하며 생명주기 자체를 구현하지 않는다.
 - V1 문서/계약 헤더와 생성된 `EcoBehaviorConfig`의 정규화 상수, 두 Utility 수식, 힘 합성 설명과 실제 일정 속력 조향이 다르다. 7→4 스키마는 유지하되 수치 계약 정합성은 RL 담당과 별도 검증한다. M3 전체/M4/M5 완료로 기록하지 않는다.
 
 ---
@@ -152,7 +157,7 @@ Player / Predator 접근 → Threat 감지 → Herd Alarm → 구성원 Social R
 5. **Social Response 변조**: 개체별 상태에 따라 `FEcoSocialBehaviorFragment.ModulatedAction`에 안전하게 보정값 산출.
 6. **Shelter 질의**: `Panic` 상태이거나 `ModulatedAction.Cover >= 0.25f`인 개체가 위협 위치 및 지형 차폐도를 고려하여 은신처/슬롯 탐색 (`Searching`).
 7. **결정론적 예약 중재**: 동일 슬롯 경합 시 `Score` 내림차순 및 `StableAgentId` 오름차순 타이브레이크를 거쳐 단일 승자 확정 (`Reserved`), `TargetPosition` 확정.
-8. **슬롯 해제 조건**: `Reserved`이고 `ModulatedAction.Cover < 0.25`이며 Panic이 아니면 None 전이 후 `ReleaseSlot`. Calm 복귀만으로 해제되는 것은 아니다. 12초 TTL 만료/예약 소실도 처리하며 이동·점유·죽음·이주 전용 정리는 미통합.
+8. **Lifecycle과 인계**: 예약 번호가 일치하는 새 이동 결과와 실제 위치로 Moving/Occupied를 판정한다. 유효한 진행/점유는 lease를 갱신한다. 은신 요구 종료, 실패/양보, heartbeat 중단/정체, 죽음/이주/삭제 시 해제한다. 실제 이동은 Request 소비자 연결 대기다.
 
 ### 3.2 Mass Processor 명시적 실행 순서 (Phase: `PrePhysics`, Group: `Behavior`)
 ```mermaid
@@ -165,7 +170,9 @@ graph TD
     P["UEcoPolicyProcessor"] --> D
     D -->|ExecuteAfter| E["UEcoShelterQueryProcessor<br/>(Cover Trigger, Collision Occlusion & Proposal)"]
     E -->|ExecuteAfter| F["UEcoShelterReservationProcessor<br/>(Deterministic Sort, Subsystem Commit & Release)"]
-    F -.->|Future Hand-off| H["Steering / Movement<br/>(목표 소비 경로)"]
+    F --> L["UEcoShelterLifecycleProcessor<br/>(Request publish / Feedback consume / lease cleanup)"]
+    L -.->|Consumer pending| H["Steering / Movement<br/>(목표 소비 경로)"]
+    H -.->|Next pass feedback| L
 ```
 
 ---
@@ -285,7 +292,7 @@ FEcoSocialBehaviorFragment::ModulatedAction (FEcoPolicyActionV1)
 5. **FEcoShelterIntentFragment 상태 머신 & TargetPosition 제공**:
    - `None` $\to$ `Searching` $\to$ `Reserved` 전이 흐름 확립.
    - 예약 승인 시 `TargetPosition = Slot.Position`을 기록하여 추후 MassFlock 이동 계층에서 참조할 단일 목적지 좌표 확립.
-   - `Reserved` 상태에서 Cover 필요 조건이 사라지면 해제한다. 별도 위험 반경 이탈 해제·도착·Occupied·생명주기 즉시 정리는 구현되어 있지 않다.
+   - 당시 MVP는 Reserved까지였다. 현재 브랜치는 [Lifecycle](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md)으로 Moving/Occupied 및 은신 요구 종료·죽음/이주/삭제 정리를 구현했다. 실제 이동 소비자와 PIE 검증은 별도 대기다.
 6. **슬롯 원형 고른 분배 (Circular Slot Distribution)**:
    - `AEcoShelterAnchor` 등록 시 $\text{Angle} = \frac{2\pi \cdot \text{SlotIdx}}{\text{Capacity}}$ 공식으로 `Radius` 반경에 슬롯 균등 분배.
 
@@ -310,7 +317,7 @@ FEcoSocialBehaviorFragment::ModulatedAction (FEcoPolicyActionV1)
 2. **Herd Fission-Fusion (무리 분할 및 병합)**: 공황 시 무리 쪼개짐 및 평화 시 인접 무리 간 병합 토폴로지 연산.
 3. **Local Avoidance (RVO2 / ORCA)**: Mass 기본 충돌/회피 우선 평가 후 필요시 별도 추진.
 
-실제 Player/Predator 입력과 Moving/Occupied는 이제 **Integration Pending / CURRENT PRIORITY**다. 초기 Shelter MVP에서 제외했던 사실을 계속 미루라는 지시로 읽지 않는다.
+실제 Player/Predator 입력과 Social Moving/Occupied 상태 처리 코드는 구현했다. production EntityConfig·이동 소비자·PIE는 **Integration Pending / CURRENT PRIORITY**다. 초기 MVP의 제외 기록과 현재 구현을 구분한다.
 
 ---
 
@@ -327,6 +334,8 @@ FEcoSocialBehaviorFragment::ModulatedAction (FEcoPolicyActionV1)
 | **Shelter** | [`EcoShelterAnchor.h/.cpp`](../../Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterAnchor.h) | 레벨 배치형 은신처 앵커 및 원형 슬롯 분배 (`Editor Verified`) |
 | **Shelter** | [`EcoShelterSubsystem.h/.cpp`](../../Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterSubsystem.h) | 은신처/슬롯 중앙 관리, 지형 차폐 평가, 슬롯 예약 서브시스템 (`Editor Verified: 차폐/점유 표시`) |
 | **Shelter** | [`EcoShelterProcessors.h/.cpp`](../../Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterProcessors.h) | `UEcoShelterQueryProcessor`, `UEcoShelterReservationProcessor` (`Editor Verified: 질의/예약 표시`) |
+| **Movement Contract** | [`EcoSocialMovementTypes.h`](../../Source/AdaptiveEcosystem/AI/Social/EcoSocialMovementTypes.h), [`EcoSocialFragments.h`](../../Source/AdaptiveEcosystem/AI/Social/EcoSocialFragments.h) | Request/Feedback와 immutable lifecycle 설정 (`Implemented`, 실제 소비자 대기) |
+| **Shelter Lifecycle** | [`EcoShelterLifecycleProcessor.cpp`](../../Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterLifecycleProcessor.cpp) | Moving/Occupied, lease·진행·도착·owner 정리 (`Implemented`, 자동화 검증) |
 | **Debug** | [`EcoHerdTestHarnessActor.h/.cpp`](../../Source/AdaptiveEcosystem/Debug/EcoHerdTestHarnessActor.h) | 100마리 엔티티 생성 및 무리 중심/반경 3D 시각화 액터 (`Editor Verified`) |
 | **Debug** | [`EcoAlarmTestHarnessActor.h/.cpp`](../../Source/AdaptiveEcosystem/Debug/EcoAlarmTestHarnessActor.h) | CallInEditor 위협 주입 및 실시간 개체 상태 HUD 시각화 액터 (`Editor Verified`) |
 | **Debug** | [`EcoShelterTestHarnessActor.h/.cpp`](../../Source/AdaptiveEcosystem/Debug/EcoShelterTestHarnessActor.h) | 은신처/슬롯 점유 현황, 차폐선, 개체 예약 연결선을 보여주는 3D/2D HUD (`Editor Verified`) |

@@ -7,6 +7,7 @@
 #include "Core/EcoIds.h"
 #include "AI/Policy/EcoPolicyContracts.h"
 #include "AI/Social/EcoSocialTypes.h"
+#include "AI/Social/EcoSocialMovementTypes.h"
 #include "EcoSocialFragments.generated.h"
 
 // -----------------------------------------------------------------------------
@@ -89,7 +90,17 @@ struct FEcoShelterIntentFragment : public FMassFragment
 
 	/** Cooldown timestamp before next candidate query */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
-	float NextQueryTime = 0.0f;
+	double NextQueryTime = 0.0;
+
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	int64 ReservationId = 0;
+
+	// Social-owned timing/ack state. Movement writes only its feedback fragment.
+	double ReservationGrantedTime = 0.0;
+	double LastMovementFeedbackTime = 0.0;
+	double LastProgressTime = 0.0;
+	float BestTargetDistance = MAX_flt;
+	int64 LastConsumedFeedbackSequence = 0;
 
 	/** Current progress state towards shelter */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
@@ -102,7 +113,45 @@ struct FEcoShelterIntentFragment : public FMassFragment
 		TargetSlotIndex = INDEX_NONE_ECO;
 		TargetPosition = FVector::ZeroVector;
 		CurrentScore = 0.0f;
+		ReservationId = 0;
+		ReservationGrantedTime = LastMovementFeedbackTime = LastProgressTime = 0.0;
+		BestTargetDistance = MAX_flt;
+		LastConsumedFeedbackSequence = 0;
 		State = EEcoShelterIntentState::None;
+	}
+};
+
+/** Social publishes a snapshot after reservation/lifecycle reconciliation. Movement reads it. */
+USTRUCT()
+struct FEcoSocialMovementRequestFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	bool bValid = false;
+	FEcoPolicyActionV1 EffectiveAction;
+	EEcoSocialMovementMode Mode = EEcoSocialMovementMode::None;
+	int64 ReservationId = 0;
+	int32 ShelterIndex = INDEX_NONE_ECO;
+	int32 SlotIndex = INDEX_NONE_ECO;
+	FVector TargetPosition = FVector::ZeroVector;
+	float ArrivalRadius = 0.0f;
+	double ValidUntilWorldTime = 0.0;
+};
+
+/** Movement publishes fresh sequence-numbered feedback; Social never writes this buffer. */
+USTRUCT()
+struct FEcoShelterMovementFeedbackFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	int64 ReservationId = 0;
+	int64 Sequence = 0;
+	EEcoShelterMovementStatus Status = EEcoShelterMovementStatus::None;
+
+	void Report(int64 InReservationId, EEcoShelterMovementStatus InStatus)
+	{
+		check(Sequence < MAX_int64);
+		ReservationId = InReservationId;
+		Status = InStatus;
+		++Sequence;
 	}
 };
 
@@ -140,6 +189,9 @@ USTRUCT()
 struct FEcoSocialSpeciesSharedFragment : public FMassSharedFragment
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category = "Ecology|Social|Shelter")
+	FEcoShelterLifecycleSettings Shelter;
 
 	/** Enable real threat sensing; manual alarm injection remains available independently. */
 	UPROPERTY(EditAnywhere, Category = "Ecology|Social|Threat")
