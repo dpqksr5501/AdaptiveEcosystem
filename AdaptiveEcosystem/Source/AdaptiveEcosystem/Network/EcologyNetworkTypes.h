@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Core/EcoRepresentationTypes.h"
+#include "Core/EcoTimeTypes.h"
 #include "EcologyNetworkTypes.generated.h"
 
 /**
@@ -53,6 +54,26 @@ struct FReplicatedRegionSummary
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
 	float PredationHistory = 0.0f;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration")
+	int32 TravelingCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration")
+	int32 WaitingCount = 0;
+
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
 	float AverageEnergy = 0.0f;
+};
+
+/** One replication property prevents mixing separately delivered clock/resource/population revisions. */
+USTRUCT(BlueprintType)
+struct FEcoCompletedWorldSummary
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly, Category="Ecology|Network")
+	FEcoServerTimeSnapshot Time;
+	UPROPERTY(BlueprintReadOnly, Category="Ecology|Network")
+	int64 StepId = 0;
+	UPROPERTY(BlueprintReadOnly, Category="Ecology|Network")
+	int32 Revision = 0;
+	UPROPERTY(BlueprintReadOnly, Category="Ecology|Network")
+	TArray<FReplicatedRegionSummary> Regions;
 };

@@ -3,6 +3,7 @@
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcologyRegion.h"
 #include "AdaptiveEcosystem.h"
+#include "Components/BoxComponent.h"
 
 void UEcologyWorldSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 {
@@ -31,6 +32,14 @@ void UEcologyWorldSubsystem::RegisterRegion(AEcologyRegion* InRegion)
 		return;
 	}
 
+	if (const TWeakObjectPtr<AEcologyRegion>* Existing = RegisteredRegions.Find(InRegion->RegionId))
+	{
+		if (Existing->IsValid() && Existing->Get() != InRegion)
+		{
+			UE_LOG(LogAdaptiveEcosystem, Error, TEXT("Duplicate Ecology RegionId: %s"), *InRegion->RegionId.ToString());
+			return;
+		}
+	}
 	RegisteredRegions.Add(InRegion->RegionId, InRegion);
 	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("Registered EcologyRegion: %s"), *InRegion->RegionId.ToString());
 }
@@ -42,7 +51,7 @@ void UEcologyWorldSubsystem::UnregisterRegion(AEcologyRegion* InRegion)
 		return;
 	}
 
-	if (RegisteredRegions.Contains(InRegion->RegionId))
+	if (RegisteredRegions.FindRef(InRegion->RegionId).Get() == InRegion)
 	{
 		RegisteredRegions.Remove(InRegion->RegionId);
 		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("Unregistered EcologyRegion: %s"), *InRegion->RegionId.ToString());
@@ -66,4 +75,32 @@ bool UEcologyWorldSubsystem::GetEnvironmentState(FName InRegionId, FRegionEnviro
 		return true;
 	}
 	return false;
+}
+
+bool UEcologyWorldSubsystem::BuildSpatialSnapshots(TConstArrayView<FName> RegionOrder, TArray<FEcoRegionSpatialSnapshot>& Out) const
+{
+	check(IsInGameThread());
+	Out.Reset();
+	for (FName Id : RegionOrder)
+	{
+		const AEcologyRegion* Region = GetRegion(Id);
+		if (!Region || !Region->RegionBounds) return false;
+		FEcoRegionSpatialSnapshot& Snapshot = Out.AddDefaulted_GetRef();
+		Snapshot.RegionId = Id;
+		Snapshot.BoundsTransform = Region->RegionBounds->GetComponentTransform();
+		Snapshot.BoundsExtent = Region->RegionBounds->GetUnscaledBoxExtent();
+		Snapshot.ArrivalPosition = Region->GetActorTransform().TransformPosition(Region->ArrivalOffset);
+		const FVector Scale = Snapshot.BoundsTransform.GetScale3D().GetAbs();
+		if (!Snapshot.BoundsTransform.IsValid() || Snapshot.BoundsExtent.ContainsNaN()
+			|| Snapshot.BoundsExtent.GetMin() <= 0.0 || Scale.GetMin() <= UE_SMALL_NUMBER
+			|| !Snapshot.Contains(Snapshot.ArrivalPosition)) return false;
+		for (FName Neighbor : Region->AdjacentRegionIds)
+		{
+			const int32 Index = RegionOrder.IndexOfByKey(Neighbor);
+			if (Index == INDEX_NONE || Neighbor == Id) return false;
+			Snapshot.AdjacentIndices.AddUnique(Index);
+		}
+		Snapshot.AdjacentIndices.Sort();
+	}
+	return true;
 }

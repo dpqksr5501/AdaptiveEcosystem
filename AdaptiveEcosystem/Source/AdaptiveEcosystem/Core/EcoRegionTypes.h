@@ -97,6 +97,12 @@ struct FRegionEcologyState
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|State")
 	int32 Population = 0;
 
+	/** Derived diagnostics from the same Mass population query, not per-agent travel ownership. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration")
+	int32 TravelingCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration")
+	int32 WaitingCount = 0;
+
 	/** Normalized average energy of living entities in this region */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|State", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float AverageEnergy = 1.0f;

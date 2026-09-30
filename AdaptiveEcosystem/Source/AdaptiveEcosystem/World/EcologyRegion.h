@@ -34,6 +34,19 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Region")
 	FRegionEnvironmentState EnvironmentState;
 
+	/** Authoring inputs only. Runtime food is owned by EcologySimulationSubsystem. Restart PIE after editing. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Initial Resources", meta=(ClampMin="0.0"))
+	float InitialFoodAmount = 1000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Initial Resources", meta=(ClampMin="0.0"))
+	float FoodCapacity = 2000.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Region")
+	TArray<FName> AdjacentRegionIds;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Region", meta=(MakeEditWidget=true))
+	FVector ArrivalOffset = FVector::ZeroVector;
+
+	bool ContainsPosition(const FVector& Position) const;
+	bool MakeInitialEcologyState(FRegionEcologyState& OutState) const;
+
 	/** Box component representing the bounding volume of this region */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Region")
 	TObjectPtr<UBoxComponent> RegionBounds;

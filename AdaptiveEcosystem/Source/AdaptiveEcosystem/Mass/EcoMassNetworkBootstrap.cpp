@@ -5,10 +5,17 @@
 #include "AdaptiveEcosystem.h"
 #include "Ecology/EcologySimulationSubsystem.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassLifecycleSubsystem.h"
+#include "World/EcologyRegion.h"
+#include "Components/SceneComponent.h"
 #include "Mass/EcoMassNetworkSubsystem.h"
 #include "Mass/EcoMassNetworkTrait.h"
 #include "Mass/EcoMassTags.h"
 #include "MassCommonFragments.h"
+#include "MassMovementFragments.h"
+#include "MassSpringMovementFragments.h"
+#include "MassSimulationLOD.h"
+#include "AI/Policy/EcoBehaviorFragments.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityManager.h"
 #include "MassEntityTemplate.h"
@@ -21,6 +28,7 @@ AEcoMassNetworkBootstrap::AEcoMassNetworkBootstrap()
 {
 	PrimaryActorTick.bCanEverTick = false;
 	bReplicates = false;
+	RootComponent = CreateDefaultSubobject<USceneComponent>(TEXT("Root"));
 }
 
 void AEcoMassNetworkBootstrap::PostInitializeComponents()
@@ -47,7 +55,12 @@ void AEcoMassNetworkBootstrap::BeginPlay()
 	}
 	else if (bAutoInitialize)
 	{
-		InitializeMassNetwork();
+		// Defer until all level actors have finished BeginPlay.
+		RegisterTemplate();
+		if (UEcoMassLifecycleSubsystem* Lifecycle = GetWorld()->GetSubsystem<UEcoMassLifecycleSubsystem>())
+		{
+			Lifecycle->RequestInitialization();
+		}
 	}
 	else
 	{
@@ -57,90 +70,157 @@ void AEcoMassNetworkBootstrap::BeginPlay()
 
 bool AEcoMassNetworkBootstrap::InitializeMassNetwork()
 {
-	if (bInitialized)
-	{
-		return true;
-	}
+	if (GetNetMode() == NM_Client || !GetWorld()) return false;
+	UEcoMassLifecycleSubsystem* Lifecycle = GetWorld()->GetSubsystem<UEcoMassLifecycleSubsystem>();
+	return Lifecycle && Lifecycle->InitializePopulation() && bInitialized;
+}
 
-	if (!RegisterTemplate())
+FName AEcoMassNetworkBootstrap::GetConfiguredRegionId() const
+{
+	return RegionActor ? RegionActor->RegionId : RegionId;
+}
+
+FVector AEcoMassNetworkBootstrap::GetSpawnPosition(int64 Slot) const
+{
+	const int32 Capacity = FMath::Max(1, SpawnSchedule.RegionPopulationLimit);
+	const int32 Side = FMath::CeilToInt(FMath::Sqrt(static_cast<float>(Capacity)));
+	const int32 Index = static_cast<int32>(Slot % Capacity);
+	return GetActorLocation() + FVector(
+		(static_cast<float>(Index % Side) - (Side - 1) * 0.5f) * SpawnSpacing,
+		(static_cast<float>(Index / Side) - (Side - 1) * 0.5f) * SpawnSpacing, 0.0f);
+}
+
+bool AEcoMassNetworkBootstrap::ValidateConfiguration(const AEcologyRegion& Region, FString& OutError) const
+{
+	if (GetNetMode() == NM_Client || !SpawnSchedule.IsValid() || SpeciesId.IsNone()
+		|| InitialAgentCount < 0 || InitialAgentCount > SpawnSchedule.RegionPopulationLimit
+		|| !FMath::IsFinite(SpawnSpacing) || SpawnSpacing < 0.0f
+		|| GetConfiguredRegionId() != Region.RegionId || Region.GetWorld() != GetWorld())
 	{
+		OutError = TEXT("Invalid species, count, interval, spacing or region binding.");
 		return false;
 	}
-
-	if (GetNetMode() == NM_Client)
+	// Validate every reusable spawn slot before any entity is created.
+	for (int32 Slot = 0; Slot < SpawnSchedule.RegionPopulationLimit; ++Slot)
 	{
-		return false;
-	}
-
-	UWorld* World = GetWorld();
-	UMassSpawnerSubsystem* SpawnerSubsystem = World ? World->GetSubsystem<UMassSpawnerSubsystem>() : nullptr;
-	UEcologySimulationSubsystem* EcologySubsystem = World ? World->GetSubsystem<UEcologySimulationSubsystem>() : nullptr;
-	if (!SpawnerSubsystem || !EcologySubsystem)
-	{
-		UE_LOG(LogAdaptiveEcosystem, Error,
-			TEXT("%s cannot initialize: Mass spawner or authoritative ecology subsystem is unavailable."), *GetName());
-		return false;
-	}
-
-	if (InitialAgentCount <= 0)
-	{
-		bInitialized = true;
-		return true;
-	}
-
-	const FMassEntityTemplate& EntityTemplate = EntityConfig->GetOrCreateEntityTemplate(*World);
-	TArray<FMassEntityHandle> SpawnedEntities;
-	auto CreationContext = SpawnerSubsystem->SpawnEntities(EntityTemplate, InitialAgentCount, SpawnedEntities);
-	if (SpawnedEntities.Num() != InitialAgentCount)
-	{
-		UE_LOG(LogAdaptiveEcosystem, Error,
-			TEXT("%s requested %d Mass agents but spawned %d."), *GetName(), InitialAgentCount, SpawnedEntities.Num());
-		return false;
-	}
-
-	FMassEntityManager& EntityManager = SpawnerSubsystem->GetEntityManagerChecked();
-	const int32 ColumnCount = FMath::Max(1, FMath::CeilToInt(FMath::Sqrt(static_cast<float>(InitialAgentCount))));
-	const FVector Origin = GetActorLocation();
-
-	for (int32 EntityIndex = 0; EntityIndex < SpawnedEntities.Num(); ++EntityIndex)
-	{
-		FMassEntityView EntityView(EntityManager, SpawnedEntities[EntityIndex]);
-		if (!ensure(EntityView.HasFragment<FTransformFragment>()
-			&& EntityView.HasFragment<FEcoIdentityFragment>()
-			&& EntityView.HasFragment<FEcoRegionFragment>()
-			&& EntityView.HasTag<FEcoAuthorityTag>()))
+		if (!Region.ContainsPosition(GetSpawnPosition(Slot)))
 		{
-			UE_LOG(LogAdaptiveEcosystem, Error,
-				TEXT("%s entity config must contain UEcoMassNetworkTrait."), *GetName());
+			OutError = FString::Printf(TEXT("Spawn slot %d is outside region %s. Move the Bootstrap or reduce SpawnSpacing."),
+				Slot, *Region.RegionId.ToString());
 			return false;
 		}
-
-		const int32 Row = EntityIndex / ColumnCount;
-		const int32 Column = EntityIndex % ColumnCount;
-		const FVector Offset(
-			(static_cast<float>(Column) - static_cast<float>(ColumnCount - 1) * 0.5f) * SpawnSpacing,
-			static_cast<float>(Row) * SpawnSpacing,
-			0.0f);
-
-		EntityView.GetFragmentData<FTransformFragment>().GetMutableTransform().SetLocation(Origin + Offset);
-
-		FEcoIdentityFragment& Identity = EntityView.GetFragmentData<FEcoIdentityFragment>();
-		Identity.StableAgentId = EcologySubsystem->AllocateStableAgentId();
-		Identity.SpeciesId = SpeciesId;
-
-		FEcoRegionFragment& Region = EntityView.GetFragmentData<FEcoRegionFragment>();
-		Region.CurrentRegionId = RegionId;
 	}
-
-	// Releasing the creation context dispatches Mass add-observers, including
-	// the server-side FMassNetworkID assignment required by MassReplication.
-	CreationContext.Reset();
-	bInitialized = true;
-
-	UE_LOG(LogAdaptiveEcosystem, Log,
-		TEXT("%s initialized %d authoritative Mass agents using template %s."),
-		*GetName(), SpawnedEntities.Num(), *EntityTemplate.GetTemplateID().ToString());
+	if (!RegisterTemplate())
+	{
+		OutError = TEXT("Mass template registration failed.");
+		return false;
+	}
+	const auto& Composition = EntityConfig->GetOrCreateEntityTemplate(*GetWorld()).GetCompositionDescriptor();
+	// UE 5.8 stores template composition in ElementsBitSet. The deprecated
+	// Fragments/Tags fields are not kept in sync by Add(), so never validate those.
+	TArray<FString> MissingElements;
+	const auto RequireElement = [&Composition, &MissingElements]<typename T>()
+	{
+		if (!Composition.Contains<T>()) MissingElements.Add(T::StaticStruct()->GetName());
+	};
+	RequireElement.operator()<FEcoIdentityFragment>();
+	RequireElement.operator()<FEcoRegionFragment>();
+	RequireElement.operator()<FEcoVitalsFragment>();
+	RequireElement.operator()<FEcoTravelFragment>();
+	RequireElement.operator()<FEcoLifetimeFragment>();
+	RequireElement.operator()<FEcoFeedingFragment>();
+	RequireElement.operator()<FMassVelocityFragment>();
+	RequireElement.operator()<FMassDesiredMovementFragment>();
+	RequireElement.operator()<FMassCodeDrivenMovementTag>();
+	RequireElement.operator()<FTransformFragment>();
+	RequireElement.operator()<FEcoAuthorityTag>();
+	RequireElement.operator()<FEcoAliveTag>();
+	const bool bHasClientProxy = Composition.Contains<FEcoClientProxyTag>();
+	// M3 Box movement has one writer. Other locomotion/simulation-LOD templates require a separate integration.
+	if (Composition.Contains<FEcoHerbivoreTag>() || Composition.Contains<FMassCustomMovementTag>()
+		|| Composition.Contains<FSpringMovementSettings>() || Composition.Contains<FMassOffLODTag>()
+		|| Composition.Contains<FMassSimulationLODFragment>())
+	{
+		OutError = TEXT("M3 Box template cannot combine PPO Herbivore, Custom/Spring movement or Simulation LOD with migration movement. Keep visualization/replication LOD only.");
+		return false;
+	}
+	if (!MissingElements.IsEmpty() || bHasClientProxy)
+	{
+		OutError = FString::Printf(TEXT("Invalid authority template: Config=%s NetMode=%d Missing=[%s] ForbiddenClientProxy=%s"),
+			*GetPathNameSafe(EntityConfig.Get()), static_cast<int32>(GetNetMode()),
+			*FString::Join(MissingElements, TEXT(", ")), bHasClientProxy ? TEXT("true") : TEXT("false"));
+		return false;
+	}
 	return true;
+}
+
+void AEcoMassNetworkBootstrap::PrepareRuntime(AEcologyRegion& Region, int32 RegionIndex, int32 SpeciesIndex, double FirstFeedDelay)
+{
+	RuntimeRegion = &Region;
+	RuntimeRegionIndex = RegionIndex;
+	RuntimeSpeciesIndex = SpeciesIndex;
+	FirstFeedDelaySeconds = FirstFeedDelay;
+}
+
+int32 AEcoMassNetworkBootstrap::ExecuteSpawnRequest(const FEcoSpawnRequest& Request, double ActualSpawnTime)
+{
+	if (!IsInGameThread() || GetNetMode() == NM_Client || !RuntimeRegion.IsValid()
+		|| RuntimeRegionIndex == INDEX_NONE || RuntimeSpeciesIndex == INDEX_NONE || !EntityConfig
+		|| Request.RegionId != RuntimeRegion->RegionId || Request.RequestId <= LastExecutedRequestId
+		|| Request.Count < 0 || !FMath::IsFinite(ActualSpawnTime) || ActualSpawnTime < 0.0)
+	{
+		return 0;
+	}
+	LastExecutedRequestId = Request.RequestId;
+	if (Request.Count == 0)
+	{
+		if (Request.bInitial) bInitialized = true;
+		return 0;
+	}
+	UMassSpawnerSubsystem* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>();
+	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
+	if (!Spawner || !Ecology) return 0;
+	FMassEntityManager& Manager = Spawner->GetEntityManagerChecked();
+	if (Manager.IsProcessing()) return 0;
+
+	// Allocate outside the entity initialization loop. Never call a UObject from a Mass query loop.
+	TArray<int64> StableIds;
+	StableIds.Reserve(Request.Count);
+	for (int32 Index = 0; Index < Request.Count; ++Index)
+	{
+		const int64 Id = Ecology->AllocateStableAgentId();
+		if (Id == EcoIds::InvalidAgentId) return 0;
+		StableIds.Add(Id);
+	}
+	TArray<FMassEntityHandle> Entities;
+	const FMassEntityTemplate& Template = EntityConfig->GetOrCreateEntityTemplate(*GetWorld());
+	auto CreationContext = Spawner->SpawnEntities(Template, Request.Count, Entities);
+	for (int32 Index = 0; Index < Entities.Num(); ++Index)
+	{
+		FMassEntityView View(Manager, Entities[Index]);
+		View.GetFragmentData<FTransformFragment>().GetMutableTransform().SetLocation(GetSpawnPosition(SpawnedSlotCount++));
+		FEcoIdentityFragment& Identity = View.GetFragmentData<FEcoIdentityFragment>();
+		Identity.StableAgentId = StableIds[Index];
+		Identity.SpeciesId = SpeciesId;
+		Identity.SpeciesRuntimeIndex = RuntimeSpeciesIndex;
+		FEcoRegionFragment& Region = View.GetFragmentData<FEcoRegionFragment>();
+		Region.CurrentRegionId = Request.RegionId;
+		Region.CurrentRegionIndex = RuntimeRegionIndex;
+		View.GetFragmentData<FEcoTravelFragment>() = FEcoTravelFragment();
+		FEcoLifetimeFragment& Lifetime = View.GetFragmentData<FEcoLifetimeFragment>();
+		Lifetime.SpawnTimeSeconds = ActualSpawnTime;
+		Lifetime.NextFeedTimeSeconds = ActualSpawnTime + FirstFeedDelaySeconds;
+		View.GetFragmentData<FEcoFeedingFragment>() = FEcoFeedingFragment();
+	}
+	// Publish fully initialized agents to MassReplication add observers.
+	CreationContext.Reset();
+	if (Request.bInitial) bInitialized = Entities.Num() == Request.Count;
+	UE_LOG(LogAdaptiveEcosystem, Log,
+		TEXT("[Eco Spawn] Region=%s Request=%lld Epoch=%d Cycle=%lld Phase=%d Wave=%lld Initial=%d Count=%d/%d Due=%.2f Born=%.2f"),
+		*Request.RegionId.ToString(), Request.RequestId, Request.WorldEpoch, Request.CycleId,
+		static_cast<int32>(Request.Phase), Request.WaveIndex, Request.bInitial, Entities.Num(), Request.Count,
+		Request.ScheduledTime, ActualSpawnTime);
+	return Entities.Num();
 }
 
 bool AEcoMassNetworkBootstrap::RegisterTemplate() const

@@ -24,7 +24,7 @@ struct FEcoPendingDeathTag : public FMassTag
 
 // Migration
 
-/** Tag present when agent is actively performing cross-region migration */
+/** Reserved for future query optimization; M3.3 uses FEcoTravelFragment::State only. */
 USTRUCT()
 struct FEcoMigratingTag : public FMassTag
 {
