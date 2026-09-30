@@ -22,6 +22,7 @@ void AEcoGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AEcoGameState, ConnectedPlayerCount);
 	DOREPLIFETIME(AEcoGameState, StateRevision);
 	DOREPLIFETIME(AEcoGameState, bMassReplicationReady);
+	DOREPLIFETIME(AEcoGameState, EcologySummary);
 }
 
 void AEcoGameState::InitializeAuthorityState(const int32 InWorldEpoch, const int32 InMaxPlayers)
@@ -37,6 +38,7 @@ void AEcoGameState::InitializeAuthorityState(const int32 InWorldEpoch, const int
 	ConnectedPlayerCount = 0;
 	WorldPhase = EEcoWorldPhase::WaitingForPlayers;
 	bMassReplicationReady = false;
+	EcologySummary = FEcoCompletedWorldSummary();
 	CommitAuthorityChange();
 }
 
@@ -71,6 +73,13 @@ void AEcoGameState::SetMassReplicationReady(const bool bInMassReplicationReady)
 void AEcoGameState::OnRep_AuthorityState()
 {
 	OnAuthorityStateChanged.Broadcast();
+}
+
+void AEcoGameState::PublishEcologySummary(const FEcoCompletedWorldSummary& Summary)
+{
+	if (!HasAuthority() || Summary.Time.WorldEpoch != WorldEpoch || Summary.StepId <= EcologySummary.StepId) return;
+	EcologySummary = Summary;
+	CommitAuthorityChange();
 }
 
 void AEcoGameState::CommitAuthorityChange()

@@ -8,6 +8,7 @@
 #include "GameFramework/GameSession.h"
 #include "Kismet/GameplayStatics.h"
 #include "Mass/EcoMassNetworkBootstrap.h"
+#include "Mass/EcoMassLifecycleSubsystem.h"
 #include "Network/EcoGameState.h"
 
 AAdaptiveEcosystemGameMode::AAdaptiveEcosystemGameMode()
@@ -57,15 +58,15 @@ void AAdaptiveEcosystemGameMode::StartPlay()
 	}
 
 	bool bFoundBootstrap = false;
-	bool bMassReady = false;
 	for (TActorIterator<AEcoMassNetworkBootstrap> It(GetWorld()); It; ++It)
 	{
 		bFoundBootstrap = true;
-		bMassReady |= It->InitializeMassNetwork();
 	}
+	UEcoMassLifecycleSubsystem* Lifecycle = GetWorld()->GetSubsystem<UEcoMassLifecycleSubsystem>();
+	const bool bMassReady = bFoundBootstrap && Lifecycle && Lifecycle->InitializePopulation();
 
 	EcoGameState->SetMassReplicationReady(bMassReady);
-	if (bMassReady || !bRequireMassNetworkBootstrap)
+	if (bMassReady || (!bFoundBootstrap && !bRequireMassNetworkBootstrap))
 	{
 		EcoGameState->SetWorldPhase(EEcoWorldPhase::Running);
 	}

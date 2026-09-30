@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Core/EcoRegionTypes.h"
+#include "Core/EcoMigrationTypes.h"
 #include "EcologyWorldSubsystem.generated.h"
 
 class AEcologyRegion;
@@ -37,6 +38,8 @@ public:
 	/** Queries environment state by RegionId. Returns true if region was found. */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|World")
 	bool GetEnvironmentState(FName InRegionId, FRegionEnvironmentState& OutState) const;
+	/** Caller supplies the Ecology runtime-index order. Geometry and adjacency remain World responsibilities. */
+	bool BuildSpatialSnapshots(TConstArrayView<FName> RegionOrder, TArray<FEcoRegionSpatialSnapshot>& Out) const;
 
 private:
 	/** Map of registered regions keyed by RegionId */

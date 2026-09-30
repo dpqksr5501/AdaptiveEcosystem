@@ -5,6 +5,7 @@
 #include "AI/Social/Herd/EcoHerdSubsystem.h"
 #include "AI/Social/Herd/EcoHerdProcessors.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
 #include "MassCommonTypes.h"
 #include "MassExecutionContext.h"

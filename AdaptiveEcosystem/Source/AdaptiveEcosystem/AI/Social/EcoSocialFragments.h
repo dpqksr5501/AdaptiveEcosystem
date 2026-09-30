@@ -79,6 +79,10 @@ struct FEcoShelterIntentFragment : public FMassFragment
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
 	int32 TargetSlotIndex = INDEX_NONE_ECO;
 
+	/** Exact world coordinates of designated shelter slot for downstream movement/steering */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	FVector TargetPosition = FVector::ZeroVector;
+
 	/** Evaluated safety / quality score of the target */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
 	float CurrentScore = 0.0f;
@@ -90,6 +94,16 @@ struct FEcoShelterIntentFragment : public FMassFragment
 	/** Current progress state towards shelter */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
 	EEcoShelterIntentState State = EEcoShelterIntentState::None;
+
+	/** Resets intent state and targets back to default */
+	void Reset()
+	{
+		TargetShelterIndex = INDEX_NONE_ECO;
+		TargetSlotIndex = INDEX_NONE_ECO;
+		TargetPosition = FVector::ZeroVector;
+		CurrentScore = 0.0f;
+		State = EEcoShelterIntentState::None;
+	}
 };
 
 /**

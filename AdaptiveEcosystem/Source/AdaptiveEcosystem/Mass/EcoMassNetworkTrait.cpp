@@ -6,6 +6,7 @@
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
 #include "MassCommonFragments.h"
+#include "MassMovementFragments.h"
 #include "MassEntityTemplateRegistry.h"
 #include "Network/Mass/EcoMassClientBubble.h"
 #include "Network/Mass/EcoMassReplicator.h"
@@ -29,6 +30,12 @@ void UEcoMassNetworkTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildC
 	if (BuildContext.IsInspectingData())
 	{
 		BuildContext.AddFragment<FEcoVitalsFragment>();
+		BuildContext.AddFragment<FEcoTravelFragment>();
+		BuildContext.AddFragment<FEcoLifetimeFragment>();
+		BuildContext.AddFragment<FEcoFeedingFragment>();
+		BuildContext.AddFragment<FMassVelocityFragment>();
+		BuildContext.AddFragment<FMassDesiredMovementFragment>();
+		BuildContext.AddTag<FMassCodeDrivenMovementTag>();
 		BuildContext.AddTag<FEcoAliveTag>();
 		BuildContext.AddTag<FEcoAuthorityTag>();
 		BuildContext.AddTag<FEcoClientProxyTag>();
@@ -40,6 +47,12 @@ void UEcoMassNetworkTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildC
 	else
 	{
 		BuildContext.AddFragment<FEcoVitalsFragment>();
+		BuildContext.AddFragment<FEcoTravelFragment>();
+		BuildContext.AddFragment<FEcoLifetimeFragment>();
+		BuildContext.AddFragment<FEcoFeedingFragment>();
+		BuildContext.AddFragment<FMassVelocityFragment>();
+		BuildContext.AddFragment<FMassDesiredMovementFragment>();
+		BuildContext.AddTag<FMassCodeDrivenMovementTag>();
 		BuildContext.AddTag<FEcoAliveTag>();
 		BuildContext.AddTag<FEcoAuthorityTag>();
 	}
