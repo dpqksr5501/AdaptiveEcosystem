@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Engine/DeveloperSettings.h"
 #include "Core/EcoResourceTypes.h"
+#include "Core/EcoMigrationTypes.h"
 #include "EcoRuntimeSettings.generated.h"
 
 /** Project-level switches for selecting explicitly opt-in legacy runtime paths. */
@@ -14,6 +15,11 @@ class ADAPTIVEECOSYSTEM_API UEcoRuntimeSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	UPROPERTY(Config, EditAnywhere, Category="M3|Migration")
+	FEcoMigrationSettings Migration;
+	/** Read-only region summaries on host/client; authoritative agent IDs and arrows on host. */
+	UPROPERTY(Config, EditAnywhere, Category="M3|Editor Test")
+	bool bDrawMigrationDebug = true;
 	UEcoRuntimeSettings()
 	{
 		DayFoodEvent.bEnabled = false;

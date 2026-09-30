@@ -39,7 +39,7 @@ bool EcoMassFeeding::FindNextTime(FMassEntityManager& Manager, double After, dou
 				bValid = false;
 				continue;
 			}
-			if (!Travel[I].bIsTraveling)
+			if (Travel[I].State == EEcoResidenceState::Resident)
 				OutTime = FMath::Min(OutTime, FMath::Max(After, Lives[I].NextFeedTimeSeconds));
 		}
 	});
@@ -69,7 +69,7 @@ bool EcoMassFeeding::Collect(FMassEntityManager& Manager, const FEcoServerTimeSn
 		for (int32 I = 0; I < Chunk.GetNumEntities(); ++I)
 		{
 			if (Feeding[I].bPending) { bValid = false; continue; }
-			if (Travel[I].bIsTraveling || Lives[I].NextFeedTimeSeconds > Time.ServerTimeSeconds) continue;
+			if (Travel[I].State != EEcoResidenceState::Resident || Lives[I].NextFeedTimeSeconds > Time.ServerTimeSeconds) continue;
 			if (Ids[I].StableAgentId <= 0 || Regions[I].CurrentRegionIndex < 0 || Regions[I].CurrentRegionId.IsNone()
 				|| !FMath::IsFinite(Lives[I].NextFeedTimeSeconds) || !FMath::IsFinite(Lives[I].SpawnTimeSeconds)
 				|| Lives[I].SpawnTimeSeconds > Time.ServerTimeSeconds || Lives[I].NextFeedTimeSeconds <= Feeding[I].LastFeedTime)
@@ -133,7 +133,7 @@ bool EcoMassFeeding::Apply(FMassEntityManager& Manager, TConstArrayView<FEcoFeed
 			if (!Found) { if (Feeding[I].bPending) bValid = false; continue; }
 			const FEcoFeedResult& Result = **Found;
 			const FEcoFeedRequest& Pending = Feeding[I].PendingRequest;
-			if (!Feeding[I].bPending || Travel[I].bIsTraveling || Pending.StepId != Result.Request.StepId
+			if (!Feeding[I].bPending || Travel[I].State != EEcoResidenceState::Resident || Pending.StepId != Result.Request.StepId
 				|| Pending.WorldEpoch != Result.Request.WorldEpoch || Pending.DueTime != Result.Request.DueTime
 				|| Lives[I].NextFeedTimeSeconds != Pending.DueTime || Pending.DueTime <= Feeding[I].LastFeedTime
 				|| Regions[I].CurrentRegionId != Result.Request.Food.RegionId || Regions[I].CurrentRegionIndex != Result.Request.RegionIndex)

@@ -4,6 +4,7 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "Core/EcoResourceTypes.h"
 #include "Core/EcoTimeTypes.h"
+#include "Core/EcoMigrationTypes.h"
 #include "EcoMassLifecycleSubsystem.generated.h"
 
 class AEcoMassNetworkBootstrap;
@@ -29,7 +30,12 @@ private:
 	void PublishReady(bool bReady);
 	bool ProcessEcologyStep(const FEcoServerTimeSnapshot& Time, double ActualTime);
 	void ReportDailyPopulation(const FEcoServerTimeSnapshot& Time, double ActualTime);
+	void PublishCompletedSummary(const FEcoServerTimeSnapshot& Time);
 	FEcoFeedingSettings FeedingSettings;
+	FEcoMigrationSettings MigrationSettings;
+	double NextMigrationTime = 0.0;
+	double NextSummaryTime = 0.0;
+	int32 SummaryRevision = 0;
 	bool bSpawnWaves = true;
 	bool bReportDaily = true;
 	bool bReportDailyToScreen = true;

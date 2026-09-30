@@ -3,6 +3,7 @@
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
 #include "Mass/EcoMassFeeding.h"
+#include "Mass/EcoMassMigration.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcologyRegion.h"
@@ -43,6 +44,9 @@ void UEcoMassLifecycleSubsystem::Deinitialize()
 	PreviousDawnPopulation.Reset();
 	StepId = 0;
 	LastReportedCycle = -1;
+	NextMigrationTime = 0.0;
+	NextSummaryTime = 0.0;
+	SummaryRevision = 0;
 	ProcessedTime = 0.0;
 	Super::Deinitialize();
 }
@@ -70,11 +74,14 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	if (bInitialized) return true;
 	const UEcoRuntimeSettings* Settings = GetDefault<UEcoRuntimeSettings>();
 	FeedingSettings = Settings->Feeding;
+	MigrationSettings = Settings->Migration;
+	const FEcoFoodEventSettings DayEvent = Settings->DayFoodEvent;
+	const FEcoFoodEventSettings NightEvent = Settings->NightFoodEvent;
 	bSpawnWaves = Settings->bEnableSpawnWaves;
 	bReportDaily = Settings->bPrintDailyPopulation;
 	bReportDailyToScreen = Settings->bPrintDailyPopulationToScreen;
-	if (!FeedingSettings.IsValid() || !Settings->DayFoodEvent.IsValid() || !Settings->NightFoodEvent.IsValid())
-		return Fail(TEXT("Invalid feeding or food-event settings. Restart PIE after correcting Project Settings."));
+	if (!FeedingSettings.IsValid() || !DayEvent.IsValid() || !NightEvent.IsValid() || !MigrationSettings.IsValid())
+		return Fail(TEXT("Invalid feeding, food-event or migration settings. Restart PIE after correcting Project Settings."));
 	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
 	UEcoWorldClockSubsystem* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
 	UMassSpawnerSubsystem* Mass = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>();
@@ -95,11 +102,13 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	}
 	if (Regions.Num() < Settings->RequiredRegionCount) return Fail(FString::Printf(
 		TEXT("Place at least %d EcologyRegion actors and bind one Mass Bootstrap to each."), Settings->RequiredRegionCount));
-	if ((Settings->DayFoodEvent.bEnabled && !Regions.Contains(Settings->DayFoodEvent.RegionId))
-		|| (Settings->NightFoodEvent.bEnabled && !Regions.Contains(Settings->NightFoodEvent.RegionId)))
+	if ((DayEvent.bEnabled && !Regions.Contains(DayEvent.RegionId))
+		|| (NightEvent.bEnabled && !Regions.Contains(NightEvent.RegionId)))
 		return Fail(TEXT("An enabled food event targets an unknown RegionId. Set its target or disable it in Project Settings."));
 	for (const auto& Pair : Regions)
 	{
+		if (MigrationSettings.bEnabled && Pair.Value->AdjacentRegionIds.IsEmpty())
+			UE_LOG(LogAdaptiveEcosystem, Warning, TEXT("[Eco Migration] Region=%s has no AdjacentRegionIds; depleted residents will wait here."), *Pair.Key.ToString());
 		for (FName Neighbor : Pair.Value->AdjacentRegionIds)
 			if (Neighbor == Pair.Key || !Regions.Contains(Neighbor)) return Fail(TEXT("Region adjacency references itself or an unregistered region."));
 	}
@@ -129,6 +138,9 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	TArray<FName> RegionOrder;
 	Regions.GetKeys(RegionOrder);
 	RegionOrder.Sort(FNameLexicalLess());
+	TArray<FEcoRegionSpatialSnapshot> InitialSpaces;
+	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionOrder, InitialSpaces))
+		return Fail(TEXT("Invalid region bounds/scale/arrival or unregistered World geometry before spawning."));
 	Spawners.Reset();
 	for (FName RegionId : RegionOrder)
 	{
@@ -144,7 +156,7 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 			*RegionId.ToString(), Initial.FoodAmount, Initial.FoodCapacity);
 	}
 	if (!ReconcilePopulation()) return Fail(TEXT("Invalid authority entity membership before initial spawn."));
-	if (!Ecology->StartResourceSimulation(InitialTime.WorldEpoch, Settings->DayFoodEvent, Settings->NightFoodEvent, Settings->bPrintResourceChanges))
+	if (!Ecology->StartResourceSimulation(InitialTime.WorldEpoch, DayEvent, NightEvent, Settings->bPrintResourceChanges))
 		return Fail(TEXT("Resource simulation configuration rejected."));
 	for (const auto& Weak : Spawners)
 	{
@@ -167,7 +179,9 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco M3.1] Ready: Regions=%d InitialAgents=%lld"), Regions.Num(), TotalInitial);
 	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco M3.2] Ready: Feeding=%d FirstFeed=%.2f Interval=%.2f Amount=%.2f Waves=%d DayEvent=%d NightEvent=%d"),
 		FeedingSettings.bEnabled, FeedingSettings.FirstFeedDelaySeconds, FeedingSettings.IntervalSeconds, FeedingSettings.Amount,
-		bSpawnWaves, Settings->DayFoodEvent.bEnabled, Settings->NightFoodEvent.bEnabled);
+		bSpawnWaves, DayEvent.bEnabled, NightEvent.bEnabled);
+	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco M3.3] Ready: Migration=%d Decision=%.2fs Speed=%.1f ArrivalRadius=%.1f Summary=1s"),
+		MigrationSettings.bEnabled, MigrationSettings.DecisionIntervalSeconds, MigrationSettings.Speed, MigrationSettings.ArrivalRadius);
 	return true;
 }
 
@@ -190,6 +204,7 @@ bool UEcoMassLifecycleSubsystem::ReconcilePopulation()
 	FMassEntityQuery Query(Manager.AsShared());
 	Query.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly);
+	Query.AddRequirement<FEcoTravelFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
 	Query.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	FMassExecutionContext Context = Manager.CreateExecutionContext(0.0f);
@@ -197,6 +212,7 @@ bool UEcoMassLifecycleSubsystem::ReconcilePopulation()
 	{
 		const auto Regions = Chunk.GetFragmentView<FEcoRegionFragment>();
 		const auto Vitals = Chunk.GetFragmentView<FEcoVitalsFragment>();
+		const auto Travels = Chunk.GetFragmentView<FEcoTravelFragment>();
 		for (int32 Index = 0; Index < Chunk.GetNumEntities(); ++Index)
 		{
 			const int32 RegionIndex = Regions[Index].CurrentRegionIndex;
@@ -207,6 +223,8 @@ bool UEcoMassLifecycleSubsystem::ReconcilePopulation()
 				continue;
 			}
 			++Metrics[RegionIndex].Population;
+			Metrics[RegionIndex].TravelingCount += Travels[Index].State == EEcoResidenceState::Traveling ? 1 : 0;
+			Metrics[RegionIndex].WaitingCount += Travels[Index].State == EEcoResidenceState::WaitingForFood ? 1 : 0;
 			Metrics[RegionIndex].AverageEnergy += Vitals[Index].MaxEnergy > 0.0f
 				? FMath::Clamp(Vitals[Index].Energy / Vitals[Index].MaxEnergy, 0.0f, 1.0f) : 0.0f;
 		}
@@ -251,6 +269,8 @@ void UEcoMassLifecycleSubsystem::AdvanceSimulation(double DeltaSeconds)
 		FEcoServerTimeSnapshot Previous;
 		if (!Clock->GetSnapshotAt(ProcessedTime, Previous)) { Fail(TEXT("Provider must evaluate historical scheduler time.")); return; }
 		double NextTime = FMath::Min(ProcessedTime + Step, Ecology->GetNextScheduledTime(Previous, bSpawnWaves));
+		if (MigrationSettings.bEnabled) NextTime = FMath::Min(NextTime, NextMigrationTime);
+		NextTime = FMath::Min(NextTime, NextSummaryTime);
 		if (FeedingSettings.bEnabled)
 		{
 			double NextFeed;
@@ -272,7 +292,7 @@ bool UEcoMassLifecycleSubsystem::ProcessEcologyStep(const FEcoServerTimeSnapshot
 	FMassEntityManager& Manager = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
 	if (Manager.IsProcessing() || !ReconcilePopulation()) return Fail(TEXT("Invalid population membership at resource boundary."));
 	if (!Ecology->BeginResourceStep(Time, ++StepId)) return Fail(TEXT("Resource step rejected (epoch/order/state)."));
-	// Equal-time priority: environmental loss -> spawn -> feeding -> completed snapshot.
+	// Equal-time priority: environmental loss -> spawn -> feeding -> completed resources -> migration/arrival -> metrics -> summary.
 	if (bSpawnWaves)
 	{
 		for (const auto& Weak : Spawners)
@@ -298,6 +318,24 @@ bool UEcoMassLifecycleSubsystem::ProcessEcologyStep(const FEcoServerTimeSnapshot
 	if (!Ecology->ResolveFeeding(Requests, Results)) return Fail(TEXT("Feeding batch rejected; stopped without retry."));
 	if (!EcoMassFeeding::Apply(Manager, Results, FeedingSettings.IntervalSeconds)) return Fail(TEXT("Feeding result no longer matches its entity."));
 	if (!Ecology->CompleteResourceStep()) return Fail(TEXT("Resource conservation/snapshot failed."));
+	TArray<FName> RegionOrder;
+	Ecology->GetRegionIds(RegionOrder);
+	TArray<FEcoRegionSpatialSnapshot> Spaces;
+	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionOrder, Spaces))
+		return Fail(TEXT("Invalid/unloaded region geometry or adjacency at migration boundary."));
+	TArray<FEcoResourceSnapshot> Resources;
+	Ecology->GetResourceSnapshots(Resources);
+	const bool bDecisionDue = Time.ServerTimeSeconds >= NextMigrationTime;
+	if (!EcoMassMigration::Reconcile(Manager, Time, ActualTime, StepId, Resources, Spaces,
+		MigrationSettings, bDecisionDue, FeedingSettings.IntervalSeconds))
+		return Fail(TEXT("Migration snapshot/membership validation failed."));
+	if (bDecisionDue) NextMigrationTime = Time.ServerTimeSeconds + MigrationSettings.DecisionIntervalSeconds;
+	if (!ReconcilePopulation()) return Fail(TEXT("Invalid membership after migration commit."));
+	if (Time.ServerTimeSeconds >= NextSummaryTime)
+	{
+		PublishCompletedSummary(Time);
+		NextSummaryTime = Time.ServerTimeSeconds + 1.0;
+	}
 	ReportDailyPopulation(Time, ActualTime);
 	return true;
 }
@@ -328,4 +366,34 @@ void UEcoMassLifecycleSubsystem::ReportDailyPopulation(const FEcoServerTimeSnaps
 	}
 	UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Daily Total] Day=%lld Epoch=%d Step=%lld AliveEntities=%d"),
 		Time.DayCycle.CycleId + 1, Time.WorldEpoch, StepId, Total);
+}
+
+void UEcoMassLifecycleSubsystem::PublishCompletedSummary(const FEcoServerTimeSnapshot& Time)
+{
+	AEcoGameState* State = GetWorld()->GetGameState<AEcoGameState>();
+	if (!State) return;
+	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
+	FEcoCompletedWorldSummary Summary;
+	Summary.Time = Time;
+	Summary.StepId = StepId;
+	Summary.Revision = ++SummaryRevision;
+	TArray<FEcoResourceSnapshot> Resources;
+	Ecology->GetResourceSnapshots(Resources);
+	for (const FEcoResourceSnapshot& Resource : Resources)
+	{
+		FRegionEcologyState Region;
+		if (!Ecology->GetRegionState(Resource.RegionId, Region)) continue;
+		FReplicatedRegionSummary& Row = Summary.Regions.AddDefaulted_GetRef();
+		Row.RegionId = Resource.RegionId;
+		Row.WorldEpoch = Time.WorldEpoch;
+		Row.SummaryRevision = Summary.Revision;
+		Row.FoodAmount = Resource.Food;
+		Row.FoodCapacity = Resource.Capacity;
+		Row.Population = Region.Population;
+		Row.AverageEnergy = Region.AverageEnergy;
+		Row.PredationHistory = Region.PredationHistory;
+		Row.TravelingCount = Region.TravelingCount;
+		Row.WaitingCount = Region.WaitingCount;
+	}
+	State->PublishEcologySummary(Summary);
 }

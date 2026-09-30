@@ -12,6 +12,10 @@
 #include "Mass/EcoMassNetworkTrait.h"
 #include "Mass/EcoMassTags.h"
 #include "MassCommonFragments.h"
+#include "MassMovementFragments.h"
+#include "MassSpringMovementFragments.h"
+#include "MassSimulationLOD.h"
+#include "AI/Policy/EcoBehaviorFragments.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityManager.h"
 #include "MassEntityTemplate.h"
@@ -125,10 +129,21 @@ bool AEcoMassNetworkBootstrap::ValidateConfiguration(const AEcologyRegion& Regio
 	RequireElement.operator()<FEcoTravelFragment>();
 	RequireElement.operator()<FEcoLifetimeFragment>();
 	RequireElement.operator()<FEcoFeedingFragment>();
+	RequireElement.operator()<FMassVelocityFragment>();
+	RequireElement.operator()<FMassDesiredMovementFragment>();
+	RequireElement.operator()<FMassCodeDrivenMovementTag>();
 	RequireElement.operator()<FTransformFragment>();
 	RequireElement.operator()<FEcoAuthorityTag>();
 	RequireElement.operator()<FEcoAliveTag>();
 	const bool bHasClientProxy = Composition.Contains<FEcoClientProxyTag>();
+	// M3 Box movement has one writer. Other locomotion/simulation-LOD templates require a separate integration.
+	if (Composition.Contains<FEcoHerbivoreTag>() || Composition.Contains<FMassCustomMovementTag>()
+		|| Composition.Contains<FSpringMovementSettings>() || Composition.Contains<FMassOffLODTag>()
+		|| Composition.Contains<FMassSimulationLODFragment>())
+	{
+		OutError = TEXT("M3 Box template cannot combine PPO Herbivore, Custom/Spring movement or Simulation LOD with migration movement. Keep visualization/replication LOD only.");
+		return false;
+	}
 	if (!MissingElements.IsEmpty() || bHasClientProxy)
 	{
 		OutError = FString::Printf(TEXT("Invalid authority template: Config=%s NetMode=%d Missing=[%s] ForbiddenClientProxy=%s"),

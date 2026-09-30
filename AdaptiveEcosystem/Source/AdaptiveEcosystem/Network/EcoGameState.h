@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/GameStateBase.h"
 #include "Network/EcoMatchTypes.h"
+#include "Network/EcologyNetworkTypes.h"
 #include "EcoGameState.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEcoAuthorityStateChanged);
@@ -37,6 +38,10 @@ public:
 
 	/** Reports whether the Mass network template and initial agents are ready. Server only. */
 	void SetMassReplicationReady(bool bInMassReplicationReady);
+	/** Transport only: accepts a completed authority snapshot, executes no simulation rules. */
+	void PublishEcologySummary(const FEcoCompletedWorldSummary& Summary);
+	UFUNCTION(BlueprintPure, Category="Ecology|Summary")
+	FEcoCompletedWorldSummary GetEcologySummary() const { return EcologySummary; }
 
 	UFUNCTION(BlueprintPure, Category = "Ecology|Match")
 	FGuid GetMatchInstanceId() const { return MatchInstanceId; }
@@ -89,4 +94,6 @@ private:
 
 	UPROPERTY(ReplicatedUsing = OnRep_AuthorityState, VisibleInstanceOnly, Category = "Ecology|Match")
 	bool bMassReplicationReady = false;
+	UPROPERTY(ReplicatedUsing=OnRep_AuthorityState, VisibleInstanceOnly, Category="Ecology|Summary")
+	FEcoCompletedWorldSummary EcologySummary;
 };

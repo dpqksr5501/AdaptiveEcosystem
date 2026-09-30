@@ -6,6 +6,7 @@
 #include "MassEntityTypes.h"
 #include "Core/EcoIds.h"
 #include "Core/EcoResourceTypes.h"
+#include "Core/EcoMigrationTypes.h"
 #include "AI/Policy/EcoPolicyContracts.h"
 #include "EcoMassFragments.generated.h"
 
@@ -86,11 +87,11 @@ struct FEcoTravelFragment : public FMassFragment
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Mass")
 	int32 TargetRegionIndex = INDEX_NONE_ECO;
 
-	UPROPERTY(EditAnywhere, Category = "Ecology|Mass", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float TravelProgress = 0.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Ecology|Mass")
-	bool bIsTraveling = false;
+	/** Sole residence-state authority. No bool or migrating tag mirrors this value. */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Mass")
+	EEcoResidenceState State = EEcoResidenceState::Resident;
+	FVector TargetPosition = FVector::ZeroVector;
+	float MoveSpeed = 0.0f;
 };
 
 /**

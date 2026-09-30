@@ -198,6 +198,8 @@ bool UEcologySimulationSubsystem::UpdatePopulationMetrics(const FEcoRegionPopula
 	if (FRegionEcologyState* Found = RegionalStates.Find(Snapshot.RegionId))
 	{
 		Found->Population = FMath::Max(0, Snapshot.Population);
+		Found->TravelingCount = FMath::Clamp(Snapshot.TravelingCount, 0, Found->Population);
+		Found->WaitingCount = FMath::Clamp(Snapshot.WaitingCount, 0, Found->Population - Found->TravelingCount);
 		Found->AverageEnergy = FMath::Clamp(Snapshot.AverageEnergy, 0.0f, 1.0f);
 		return true;
 	}
