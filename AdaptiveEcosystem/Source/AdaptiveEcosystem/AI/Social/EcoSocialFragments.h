@@ -141,6 +141,17 @@ struct FEcoSocialSpeciesSharedFragment : public FMassSharedFragment
 {
 	GENERATED_BODY()
 
+	/** Enable real threat sensing; manual alarm injection remains available independently. */
+	UPROPERTY(EditAnywhere, Category = "Ecology|Social|Threat")
+	bool bDetectThreats = true;
+
+	/** Walls must block Visibility query collision. Both simple and complex lines are checked. */
+	UPROPERTY(EditAnywhere, Category = "Ecology|Social|Threat")
+	bool bThreatRequiresLineOfSight = true;
+
+	UPROPERTY(EditAnywhere, Category = "Ecology|Social|Threat", meta = (ClampMin = "0", ClampMax = "500"))
+	float ThreatEyeHeight = 60.0f;
+
 	/** Distance within which an unassigned agent initiates join evaluation */
 	UPROPERTY(EditAnywhere, Category = "Ecology|Social|Herd")
 	float HerdJoinRadius = 800.0f;

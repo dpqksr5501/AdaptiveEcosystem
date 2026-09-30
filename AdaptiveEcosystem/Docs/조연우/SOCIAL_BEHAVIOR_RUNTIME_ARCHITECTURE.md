@@ -3,7 +3,8 @@
 > **Project:** AdaptiveEcosystem  
 > **Engine:** Unreal Engine 5.8  
 > **Repository:** `dpqksr5501/AdaptiveEcosystem`  
-> **Status:** Active extension architecture  
+> **Status:** Target architecture; current phase is Production Integration<br>
+> **Source Audit Base:** main `295ac2f` / 2026-09-30 (no new build / PIE validation)<br>
 > **Purpose:** AI coding agents and team members should read this document before implementing Social Behavior features.
 >
 > This document supplements, but does not replace:
@@ -15,7 +16,16 @@
 >
 > Detailed implementation rules live in:
 >
-> - `Docs/SocialBehavior/SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md`
+> - [Current implementation and validation status](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)
+> - [Implementation guide — CURRENT PRIORITY / TASK 4](SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md)
+
+## Current implementation versus target
+
+Herd / Alarm / authored Shelter selection, occlusion and reservation have existing Editor validation records. The working branch `codex/social-threat-integration` adds Mass predator and opt-in actor threat detection, source update/loss, and Policy-before-Response ordering. See [real threat integration](SOCIAL_THREAT_ALARM_INTEGRATION.md) for tests and setup. Production EntityConfig/JYU/Client validation, movement consumption of ModulatedAction/TargetPosition, arrival/Occupied and lifecycle cleanup remain pending. The diagrams below describe the target relationship.
+
+Current Steering reads Raw `FEcoPolicyOutputFragment::Action`, uses Dummy Cover geometry and integrates Transform directly. M3 Migration uses DesiredVelocity and engine Movement. Bootstrap rejects PPO Herbivore/Custom Movement in the M3 template; the Herbivore Trait excludes engine movement through CustomMovement Tag. Final writer ownership and common Entity configuration must be agreed before integration.
+
+Social Subsystems reject Client creation. Detection explicitly selects `Server | Standalone`; other Social Processors inherit this engine default. Detection/Alarm/Response exclude ClientProxy/PendingDeath and Social Trait excludes Client logical templates. Editor overrides, production EntityConfig composition and multiplayer behavior **require verification**. The seven questions in CURRENT_STATE §1 preserve the earlier main audit; the integration document records working-branch changes.
 
 ---
 
@@ -30,7 +40,7 @@ World / Region
 → Mass logical creature state
 → Observation
 → PPO behavior policy
-→ Runtime behavior execution
+→ Social Runtime (ModulatedAction / TargetPosition)
 → Movement / Interaction
 → Resource / Population changes
 → Region state
@@ -65,7 +75,7 @@ The Social Behavior & Shelter Runtime owns those runtime responsibilities.
 ## RL / Behavior Policy team owns
 
 ```text
-Aquarium
+herbivore_rl (current Python environment; Aquarium is an earlier design reference)
 Observation
 Action
 Reward
@@ -112,9 +122,10 @@ Social Runtime reads these states when necessary but does not become their sourc
 Region
 Weather
 Day / Night
-Food resource
 environment state
 ```
+
+World provides geography/environment. Authoritative FoodAmount/FoodCapacity belongs to Ecology Simulation; authored initial Food on the Region Actor is not a second runtime resource ledger.
 
 Social Runtime must not move these responsibilities into its own Subsystem.
 
@@ -141,9 +152,12 @@ Alarm Communication
 Shelter Resolution
 Social Response State
 
-Optional:
-Local Avoidance execution layer
+Deferred:
+Merge / Split, cross-herd multi-hop gossip, automatic cover generation,
+advanced leaders / group shelter optimization
 ```
+
+Low-level avoidance and movement remain the Movement owner's scope. RVO2/ORCA is a future candidate, not a Social runtime dependency or a current task.
 
 ---
 
@@ -191,7 +205,7 @@ Dynamic Herd          Threat / Alarm
 
 # 4. Dynamic Herd
 
-A Herd is not the same thing as flock steering.
+**Herd != Flock**. A Herd is not the same thing as flock steering.
 
 ```text
 Herd
@@ -214,6 +228,8 @@ Representative
 Threat State
 Recovery / Regroup
 ```
+
+Join/Leave, aggregate and representative context exist. Merge/Split is Deferred; the list describes ownership of the target feature, not completion of every item.
 
 MassFlock owns the actual local flock movement.
 
@@ -245,6 +261,8 @@ future alarm aggregation
 ---
 
 # 5. Alarm Communication
+
+Current working-branch input includes the existing manual Harness channel and a separate observed channel from Mass predators / EcoThreatSourceComponent actors. Detection replaces observed input per scan; source loss preserves manual input and individual decaying memory. Herd strength is received with distance/time decay. FEcoAlarmSignal buffering and cross-herd multi-hop gossip remain design candidates, not implemented relays.
 
 Alarm is an explicit runtime social signal.
 
@@ -376,6 +394,8 @@ FEcoAliveTag
 FEcoMigratingTag
 ```
 
+FEcoMigratingTag is retained as a type but current M3 migration uses FEcoTravelFragment::State (Resident/Traveling/WaitingForFood), TargetPosition and MoveSpeed. Do not add a mirrored traveling bool/tag.
+
 Do not duplicate:
 
 ```text
@@ -407,9 +427,9 @@ MigrationThreshold
 
 ---
 
-# 9. Expected new Social Runtime data
+# 9. Existing Social Runtime data and deferred candidates
 
-Candidate per-agent state:
+Implemented per-agent state:
 
 ```text
 Herd membership
@@ -417,11 +437,11 @@ Alarm state
 Shelter intent
 ```
 
-Candidate global runtime state:
+Global runtime state:
 
 ```text
 Herd runtime table
-Alarm event buffer
+Alarm context stored in Herd runtime (event buffer / gossip deferred)
 Shelter registry
 Shelter reservation table
 ```
@@ -580,6 +600,8 @@ Only port algorithmic core if there is a demonstrated gap.
 
 # 13. MVP sequence
 
+Historical sequence. Steps 0–4 have existing MVP implementation/validation records. Step 5 is the CURRENT PRIORITY; steps 6–8 remain Deferred until production integration is complete.
+
 ```text
 0. Source Audit
 1. Social data foundation
@@ -604,7 +626,7 @@ advanced fission-fusion
 
 # 14. MVP behavior scenario
 
-A successful early integrated demo:
+A successful integrated demo (planned; current JYU validation stops at occlusion/reservation visualization):
 
 ```text
 100 logical creatures
@@ -652,13 +674,15 @@ When implementing this feature, read in this order:
 3. Docs/RL_Policy/POLICY_CONTRACT_V1.md
 4. Docs/Architecture/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md
 5. Docs/Mass/MASS_PROCESSOR_ORDER.md
-6. Docs/SocialBehavior/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md
-7. Docs/SocialBehavior/SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md
+6. Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md
+7. Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md / IMPLEMENTATION_GUIDE
 8. technical research documents
 9. legacy Evolution documents
 ```
 
 If current Source and an Active Contract conflict, report the conflict instead of silently choosing one.
+
+Current Source determines implementation facts; AGENTS and Active Contracts determine intended invariants. Do not describe a contract mismatch as an approved behavior change.
 
 ---
 

@@ -4,6 +4,8 @@
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/Herd/EcoHerdSubsystem.h"
 #include "AI/Social/Herd/EcoHerdProcessors.h"
+#include "AI/Social/Alarm/EcoThreatDetectionProcessor.h"
+#include "AI/Policy/EcoBehaviorProcessors.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
@@ -21,6 +23,7 @@ UEcoAlarmPropagationProcessor::UEcoAlarmPropagationProcessor()
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	ExecutionOrder.ExecuteAfter.Add(UEcoHerdAggregateProcessor::StaticClass()->GetFName());
+	ExecutionOrder.ExecuteAfter.Add(UEcoThreatDetectionProcessor::StaticClass()->GetFName());
 	bAutoRegisterWithProcessingPhases = true;
 	bRequiresGameThreadExecution = true; // Ensures GameThread serialized access for HerdSubsystem
 }
@@ -33,6 +36,8 @@ void UEcoAlarmPropagationProcessor::ConfigureQueries(const TSharedRef<FMassEntit
 	EntityQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddSharedRequirement<FEcoSocialSpeciesSharedFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+	EntityQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	EntityQuery.AddTagRequirement<FEcoPendingDeathTag>(EMassFragmentPresence::None);
 	EntityQuery.RegisterWithProcessor(*this);
 }
 
@@ -45,7 +50,7 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 	}
 
 	UEcoHerdSubsystem* HerdSubsystem = World->GetSubsystem<UEcoHerdSubsystem>();
-	const float DeltaTime = Context.GetDeltaTimeSeconds();
+	const float DeltaTime = FMath::IsFinite(Context.GetDeltaTimeSeconds()) ? FMath::Max(0.0f, Context.GetDeltaTimeSeconds()) : 0.0f;
 
 	// Step 1: GameThread serialized decay of herd-level alarms
 	if (HerdSubsystem)
@@ -59,7 +64,6 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 	EntityQuery.ForEachEntityChunk(Context, [ConstHerdSubsystem, DeltaTime](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
-		TConstArrayView<FEcoIdentityFragment> IdentityList = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
 		TConstArrayView<FEcoHerdMemberFragment> MemberList = ChunkContext.GetFragmentView<FEcoHerdMemberFragment>();
 		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 		TArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetMutableFragmentView<FEcoAlarmStateFragment>();
@@ -88,11 +92,10 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 					const float DistanceAttenuation = FMath::Exp(-SocialConfig.AlarmDistanceDecay * DistToThreat);
 					const float ReceivedStrength = HerdData.AlarmStrength * DistanceAttenuation;
 
-					if (ReceivedStrength > Alarm.AlarmStrength)
-					{
-						Alarm.AlarmStrength = FMath::Clamp(ReceivedStrength, 0.0f, 1.0f);
-						Alarm.LastThreatPosition = HerdData.LastThreatPosition;
-					}
+					Alarm.AlarmStrength = FMath::Clamp(FMath::Max(ReceivedStrength, Alarm.AlarmStrength), 0.0f, 1.0f);
+					// Keep memory strength, but always track the currently selected live threat.
+					// Otherwise a moving/weaker source leaves shelter scoring tied to an old position.
+					Alarm.LastThreatPosition = HerdData.LastThreatPosition;
 				}
 			}
 
@@ -115,6 +118,7 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 			else
 			{
 				Alarm.State = EEcoSocialState::Calm;
+				Alarm.LastThreatPosition = FVector::ZeroVector;
 			}
 		}
 	});
@@ -130,6 +134,7 @@ UEcoSocialResponseProcessor::UEcoSocialResponseProcessor()
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	ExecutionOrder.ExecuteAfter.Add(UEcoAlarmPropagationProcessor::StaticClass()->GetFName());
+	ExecutionOrder.ExecuteAfter.Add(UEcoPolicyProcessor::StaticClass()->GetFName());
 	bAutoRegisterWithProcessingPhases = true;
 }
 
@@ -140,6 +145,8 @@ void UEcoSocialResponseProcessor::ConfigureQueries(const TSharedRef<FMassEntityM
 	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoSocialBehaviorFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+	EntityQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	EntityQuery.AddTagRequirement<FEcoPendingDeathTag>(EMassFragmentPresence::None);
 	EntityQuery.RegisterWithProcessor(*this);
 }
 

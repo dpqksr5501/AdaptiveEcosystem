@@ -3,6 +3,8 @@
 > 기준 엔진: **Unreal Engine 5.8**  
 > 모듈: `AdaptiveEcosystem`  
 > 참조 C++ 헤더: `AdaptiveEcosystem/Source/AdaptiveEcosystem/Mass/EcoMassFragments.h`
+> Source 대조 기준: main `295ac2f` / 2026-09-30. 이번 감사는 빌드·PIE를 재실행하지 않음
+> 추가 변경: `codex/social-threat-integration`의 [실제 위협 감지](../조연우/SOCIAL_THREAT_ALARM_INTEGRATION.md), 직접 UBT 빌드 성공. 아래 Social 실행 순서는 작업 브랜치 기준.
 
 ---
 
@@ -20,11 +22,12 @@
 [3. Eco.Policy Processor]
         │ FEcoObservationFragment -> C++ Native Forward / Utility -> FEcoPolicyOutputFragment (저주기 or 매 N 틱)
         ▼
-[4. Eco.Steering Processor]
-        │ HashGrid 공간 조회 + Separation/Align + PPO 가중치(Forage, Cohesion, Flee, Cover) 합성 -> FMassForceFragment
+[4. Social Runtime]
+        │ Herd / Alarm / Social Response / Shelter Query & Reservation
+        │ Raw Action 보존 -> ModulatedAction / TargetPosition (handoff 목표)
         ▼
-[5. Mass Movement Processor]
-        │ 힘 적분 및 위치/속도 업데이트 (엔진 내장 MassMovement)
+[5. Steering / Movement]
+        │ 실제 이동 의도 선택·조향·위치/속도 업데이트; 동일 Entity의 최종 writer 하나
         ▼
 [6. Eco.Interaction Processor]
         │ 먹이 도달 시 소비 요청 버퍼링, 포식 공격 판정
@@ -42,6 +45,21 @@
         │ 카메라 거리에 따른 Actor 스폰/스왑 및 ISM 렌더링 LOD 조정
 ```
 
+### 1.1 현재 Source에 선언된 경로와 미연결 순서
+
+| 경로 | 명시적 prerequisite / 처리 | 현재 한계 |
+| :--- | :--- | :--- |
+| PPO PrePhysics | Neighborhood Gather → Perception → Policy → Steering. Predation은 Perception 뒤 | Steering은 Raw Action·기하 캐시를 읽고 Velocity/Transform을 직접 쓴다. ForceFragment→별도 Movement라는 목표 그림과 다름 |
+| Social PrePhysics / Behavior | Herd Membership → Aggregate → Threat Detection → Alarm Propagation → Social Response → Shelter Query → Reservation | Detection은 Neighborhood Gather 이후, Response는 Policy 이후. Reservation→Steering 소비 연결 없음 |
+| M3 PreActorTick / GameThread | 자원/스폰/소비 조정 → Migration Reconcile → 집계·요약 | Mass processing 중이면 실행하지 않음. non-Traveling Velocity/DesiredVelocity 리셋 |
+| M3 PrePhysics | ApplyForces 그룹 → Migration Steering → Movement 그룹 | Migration은 DesiredVelocity를 쓰고 엔진이 적분. 아래 §3의 Box 경로만 의미함 |
+
+Source: [PPO Processors](../../Source/AdaptiveEcosystem/AI/Policy/EcoBehaviorProcessors.cpp), [Social Alarm](../../Source/AdaptiveEcosystem/AI/Social/Alarm/EcoAlarmProcessors.cpp), [Shelter](../../Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterProcessors.cpp), [Migration](../../Source/AdaptiveEcosystem/Mass/EcoMassMigration.cpp).
+
+Herbivore Trait의 CustomMovement Tag는 엔진 ApplyMovement에서 해당 Entity를 제외한다. M3 Bootstrap은 Herbivore/Custom/Spring/Simulation LOD 혼용을 거절한다. 현 경로에서 중복 적분이 발생한다고 단정하지 않으며, 향후 혼용은 속도 리셋·이주 목표 무시 위험이 있다. 가드를 제거하기 전에 최종 movement writer·목표 우선순위·Entity 구성을 계약으로 정한다. **Herd != Flock**; Social은 실제 위치 적분을 추가하지 않는다.
+
+Threat Detection은 `Server | Standalone`을 명시하며 GameThread에서 0.2초마다 기존 Grid를 읽는다. 다른 Social Processor는 같은 UE 5.8 기본 플래그를 상속한다. Detection/Alarm/Response는 ClientProxy/PendingDeath를 제외하며 Social Trait는 Client 논리 구성을 제외한다. production EntityConfig, 에디터 override 및 Listen Server/Client 검증은 별도 확인한다. 엔진 대조 근거와 기존 PIE 검증 범위는 [CURRENT_STATE](../조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)를 참조한다.
+
 ---
 
 ## 2. 멀티스레드 병렬 안전성 수칙 (Strict Concurrency Rules)
@@ -49,7 +67,7 @@
 MassEntity는 태스크 그래프(TaskGraph) 상에서 여러 워커 스레드에 청크(Chunk) 단위로 병렬 디스패치됩니다. 다음 행위는 엔진 크래시를 유발하므로 엄격히 금지됩니다:
 
 1. **Entity Loop 내부에서 UObject 직접 접근/수정 금지**:
-   - `AEcologyRegion`이나 `UEcologySimulationSubsystem`의 메서드를 엔티티 청크 반복문 내부에서 직접 호출하지 않습니다.
+   - 병렬 worker에서는 `AEcologyRegion`이나 `UEcologySimulationSubsystem`의 메서드를 엔티티 청크 반복문 내부에서 직접 호출하지 않습니다. 현재 GameThread 전용 Social MVP의 직렬 Subsystem 접근을 병렬 실행 완료로 해석하지 않습니다.
 2. **동기식 Food 차감 금지**:
    - 수백 마리의 엔티티가 동시에 지역의 `FoodAmount`를 깎으면 경쟁 상태(Data Race)가 발생합니다.
    - 엔티티는 소비 희망량(`FoodConsumptionRequest`)만 기록하고, 프레임 종료 전 단일 쓰레드 단계(`Aggregation / Reconciliation`)에서 지역 총량을 차감한 후 엔티티 에너지로 피드백합니다.

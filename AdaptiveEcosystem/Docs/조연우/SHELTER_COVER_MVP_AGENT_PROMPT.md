@@ -1,5 +1,7 @@
 # AdaptiveEcosystem — Shelter / Cover Runtime MVP Agent Task
 
+> **Historical — 초기 Shelter MVP 작업 명세:** `feat/social-shelter-mvp` 구현은 main에 병합되었다. 이 문서의 브랜치 생성·초기 문제 후보·구현 지시는 당시 작업 범위를 보존한 것이며 현재 다음 작업 지시가 아니다. main `295ac2f`(2026-09-30)의 차폐/선택/예약 구현과 기존 PIE 표시 기록은 [CURRENT_STATE](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)를 따른다. 단일 슬롯 경합·해제·production 이동/Occupied 완료는 별도 검증이 필요하다. 현재 작업은 [Implementation Guide의 TASK 4 — Production Integration](SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md#current-priority--task-4-production-integration)이며 아래 “actual Player/Predator integration은 non-goal”을 현 통합 단계에 적용하지 않는다.
+
 ## 0. Repository / Branch
 
 Repository:
