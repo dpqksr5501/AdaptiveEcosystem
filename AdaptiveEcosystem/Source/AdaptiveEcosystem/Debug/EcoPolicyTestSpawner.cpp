@@ -128,6 +128,8 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 		FEcoPolicyRuntimeFragment::StaticStruct(),
 		FEcoVitalsFragment::StaticStruct(),
 		FEcoHerbivoreTag::StaticStruct(),
+		// 트레잇과 같은 구성. 이동은 조향 프로세서 몫이라 엔진 이동 프로세서를 막아 둔다.
+		FMassCustomMovementTag::StaticStruct(),
 	};
 	// FEcoPredatorStateFragment 가 없으면 UEcoPredationProcessor 가 이 포식자를 못 본다.
 	const TArray<const UScriptStruct*> PredComposition = {
