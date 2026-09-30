@@ -64,6 +64,35 @@ public:
 	 */
 	int32 FindNearestHerd(int32 SpeciesRuntimeIndex, const FVector& Location, float MaxRadius) const;
 
+	/**
+	 * Injects an alarm/threat into a specific herd.
+	 * Must be called on GameThread (serialized).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Social|Alarm")
+	void EmitHerdAlarm(int32 HerdRuntimeIndex, const FVector& ThreatLocation, float Strength);
+
+	/**
+	 * Broadcasts an alarm/threat to all herds within a spatial radius.
+	 * Must be called on GameThread (serialized).
+	 * @return Number of herds affected.
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Social|Alarm")
+	int32 EmitSpatialAlarm(const FVector& ThreatLocation, float Radius, float Strength);
+
+	/**
+	 * Decays herd-level alarm intensity continuously over time.
+	 * Must be called on GameThread (serialized).
+	 */
+	void DecayHerdAlarms(float DeltaTime, float DecayRate);
+
+	/**
+	 * Clears the active threat source on all herds (AlarmStrength = 0).
+	 * Does NOT immediately reset member agent states; agents will decay naturally to Calm.
+	 * Must be called on GameThread (serialized).
+	 */
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Social|Alarm")
+	void ClearHerdAlarms();
+
 private:
 	/** Monotonically increasing unique ID for persistent herd tracking */
 	int64 NextPersistentHerdId = 1;

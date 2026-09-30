@@ -10,7 +10,7 @@
 class ACreatureCharacter;
 
 /**
- * Test harness actor for verifying the bootstrap vertical slice (Forest_A x Wolf).
+ * LEGACY test harness actor for verifying the bootstrap vertical slice (Forest_A x Wolf).
  * Queries authoritative profiles from UEcologyServerSubsystem and injects them
  * into ACreatureCharacter via InitializeCreature(...), keeping production runtime clean.
  * Owned by Debug / Integration layer.
@@ -47,8 +47,8 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Debug")
 	FName TestVegetationSpeciesId;
 
-	/** If true, automatically executes test on BeginPlay */
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Debug")
+	/** Legacy opt-in. Disabled by default so normal play never commits Evolution profiles. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Debug|Legacy")
 	bool bAutoRunOnBeginPlay;
 
 	/**
@@ -77,4 +77,3 @@ public:
 	UFUNCTION(BlueprintCallable, CallInEditor, Exec, Category = "Ecology|Debug")
 	bool RunEcosystemFeedbackLoopTest();
 };
-

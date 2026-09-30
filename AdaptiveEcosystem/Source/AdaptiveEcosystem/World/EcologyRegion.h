@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "Core/EcoDataContracts.h"
+#include "Core/EcoRegionTypes.h"
 #include "EcologyRegion.generated.h"
 
 class UBoxComponent;
@@ -51,14 +51,14 @@ public:
 	 * Effective vegetation density loss is mitigated by GrazingResistance.
 	 * Food availability is reduced by ConsumedAmount.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Ecology|Region")
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Region|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Legacy only. Active runtime consumes food through UEcologySimulationSubsystem."))
 	void ApplyVegetationConsumption(float ConsumedAmount, float GrazingResistance);
 
 	/**
 	 * Regrows vegetation and recovers food availability based on species traits.
 	 * FoodAvailability is capped by current VegetationDensity.
 	 */
-	UFUNCTION(BlueprintCallable, Category = "Ecology|Region")
+	UFUNCTION(BlueprintCallable, Category = "Ecology|Region|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Legacy only. Active runtime regenerates food in UEcologySimulationSubsystem."))
 	void ApplyVegetationRegrowth(float DeltaTime, float GrowthRate, float RegenerationRate);
 
 };

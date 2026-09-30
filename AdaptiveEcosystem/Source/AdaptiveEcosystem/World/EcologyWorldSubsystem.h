@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Subsystems/WorldSubsystem.h"
-#include "Core/EcoDataContracts.h"
+#include "Core/EcoRegionTypes.h"
 #include "EcologyWorldSubsystem.generated.h"
 
 class AEcologyRegion;

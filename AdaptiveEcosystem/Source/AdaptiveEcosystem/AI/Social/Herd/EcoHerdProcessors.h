@@ -26,6 +26,11 @@ protected:
 
 private:
 	FMassEntityQuery EntityQuery;
+	FMassEntityQuery ReconciliationQuery;
+
+	/** Execution throttling interval for low-frequency membership topology update */
+	float UpdateInterval = 0.5f;
+	float TimeSinceLastUpdate = 0.0f;
 };
 
 /**
@@ -58,4 +63,8 @@ private:
 	};
 
 	TArray<FHerdAccumulator> Accumulators;
+
+	/** Execution throttling interval for mid-frequency aggregate updates */
+	float UpdateInterval = 0.1f;
+	float TimeSinceLastUpdate = 0.0f;
 };

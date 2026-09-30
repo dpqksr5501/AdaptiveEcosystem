@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "MassEntityTypes.h"
 #include "Core/EcoIds.h"
+#include "AI/Policy/EcoPolicyContracts.h"
 #include "AI/Social/EcoSocialTypes.h"
 #include "EcoSocialFragments.generated.h"
 
@@ -78,6 +79,10 @@ struct FEcoShelterIntentFragment : public FMassFragment
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
 	int32 TargetSlotIndex = INDEX_NONE_ECO;
 
+	/** Exact world coordinates of designated shelter slot for downstream movement/steering */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	FVector TargetPosition = FVector::ZeroVector;
+
 	/** Evaluated safety / quality score of the target */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
 	float CurrentScore = 0.0f;
@@ -89,6 +94,38 @@ struct FEcoShelterIntentFragment : public FMassFragment
 	/** Current progress state towards shelter */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
 	EEcoShelterIntentState State = EEcoShelterIntentState::None;
+
+	/** Resets intent state and targets back to default */
+	void Reset()
+	{
+		TargetShelterIndex = INDEX_NONE_ECO;
+		TargetSlotIndex = INDEX_NONE_ECO;
+		TargetPosition = FVector::ZeroVector;
+		CurrentScore = 0.0f;
+		State = EEcoShelterIntentState::None;
+	}
+};
+
+/**
+ * Holds modulated behavior actions and social steering multipliers.
+ * Prevents compounding modification of raw PPO policy outputs.
+ */
+USTRUCT()
+struct FEcoSocialBehaviorFragment : public FMassFragment
+{
+	GENERATED_BODY()
+
+	/** Effective steering actions after social alarm and herd modulation */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	FEcoPolicyActionV1 ModulatedAction;
+
+	/** Multiplier applied to flock cohesion (1.0 = normal, >1.0 = tight herd) */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	float SocialCohesionMultiplier = 1.0f;
+
+	/** Flag set by membership processor when agent requires assignment or formation of a new herd */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
+	bool bWantsNewHerd = false;
 };
 
 // -----------------------------------------------------------------------------

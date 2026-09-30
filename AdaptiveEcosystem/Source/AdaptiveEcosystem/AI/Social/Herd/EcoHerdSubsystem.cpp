@@ -147,3 +147,76 @@ int32 UEcoHerdSubsystem::FindNearestHerd(int32 SpeciesRuntimeIndex, const FVecto
 
 	return BestIndex;
 }
+
+void UEcoHerdSubsystem::EmitHerdAlarm(int32 HerdRuntimeIndex, const FVector& ThreatLocation, float Strength)
+{
+	check(IsInGameThread());
+	if (IsValidHerdIndex(HerdRuntimeIndex))
+	{
+		FEcoHerdRuntimeData& Herd = ActiveHerds[HerdRuntimeIndex];
+		const float ClampedStrength = FMath::Clamp(Strength, 0.0f, 1.0f);
+		if (ClampedStrength >= Herd.AlarmStrength)
+		{
+			Herd.AlarmStrength = ClampedStrength;
+			Herd.LastThreatPosition = ThreatLocation;
+		}
+	}
+}
+
+int32 UEcoHerdSubsystem::EmitSpatialAlarm(const FVector& ThreatLocation, float Radius, float Strength)
+{
+	check(IsInGameThread());
+	int32 AffectedHerds = 0;
+	const float RadiusSq = Radius * Radius;
+
+	for (int32 i = 0; i < ActiveHerds.Num(); ++i)
+	{
+		if (!IsValidHerdIndex(i))
+		{
+			continue;
+		}
+
+		if (FVector::DistSquared(ActiveHerds[i].Center, ThreatLocation) <= RadiusSq)
+		{
+			EmitHerdAlarm(i, ThreatLocation, Strength);
+			++AffectedHerds;
+		}
+	}
+
+	return AffectedHerds;
+}
+
+void UEcoHerdSubsystem::DecayHerdAlarms(float DeltaTime, float DecayRate)
+{
+	check(IsInGameThread());
+	for (int32 i = 0; i < ActiveHerds.Num(); ++i)
+	{
+		if (!IsValidHerdIndex(i))
+		{
+			continue;
+		}
+
+		FEcoHerdRuntimeData& Herd = ActiveHerds[i];
+		if (Herd.AlarmStrength > 0.0f)
+		{
+			Herd.AlarmStrength = FMath::Max(0.0f, Herd.AlarmStrength - DecayRate * DeltaTime);
+			if (Herd.AlarmStrength <= 0.0f)
+			{
+				Herd.LastThreatPosition = FVector::ZeroVector;
+			}
+		}
+	}
+}
+
+void UEcoHerdSubsystem::ClearHerdAlarms()
+{
+	check(IsInGameThread());
+	for (int32 i = 0; i < ActiveHerds.Num(); ++i)
+	{
+		if (IsValidHerdIndex(i))
+		{
+			ActiveHerds[i].AlarmStrength = 0.0f;
+			ActiveHerds[i].LastThreatPosition = FVector::ZeroVector;
+		}
+	}
+}
