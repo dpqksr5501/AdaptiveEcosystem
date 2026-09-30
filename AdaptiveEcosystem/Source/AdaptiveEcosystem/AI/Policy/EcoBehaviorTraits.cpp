@@ -15,6 +15,11 @@ void UEcoHerbivoreTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildCon
 	BuildContext.RequireFragment<FMassVelocityFragment>();
 
 	BuildContext.AddTag<FEcoHerbivoreTag>();
+	// 이동은 UEcoSteeringProcessor 가 직접 적분한다. 엔진 UMassMovementTrait 는 기본값
+	// (bIsCodeDrivenMovement = true)에서 FMassCodeDrivenMovementTag 를 붙이므로, 같이 쓰면
+	// UMassApplyMovementProcessor 도 이 개체를 움직여 이동이 이중으로 적용되거나 속도가
+	// 덮어써진다. 이 태그가 있으면 엔진 프로세서가 건너뛴다 (엔진이 정해 둔 방법).
+	BuildContext.AddTag<FMassCustomMovementTag>();
 
 	BuildContext.AddFragment<FEcoSteeringGeometryFragment>();
 	BuildContext.AddFragment<FEcoObservationFragment>();

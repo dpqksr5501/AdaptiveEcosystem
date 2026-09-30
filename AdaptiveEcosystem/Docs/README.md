@@ -16,6 +16,9 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 개체 행동 정책(PPO), 관측/행동 사양 및 Python 학습 파이프라인을 다룹니다.
 - 📋 [POLICY_CONTRACT_V1.md](RL_Policy/POLICY_CONTRACT_V1.md) : 7차원 관측 / 4차원 행동 정규화 계약, 신경망 구조($7 \to 64 \to 64 \to 4$) 및 Utility Baseline 규격
 - 🧪 [RL_TRAINING_PIPELINE.md](RL_Policy/RL_TRAINING_PIPELINE.md) : Python Aquarium 다중 에이전트 어댑터, SB3 PPO 학습, 골든 벡터 검증 파이프라인
+- ✅ [POLICY_TEST_AND_API_GUIDE.md](RL_Policy/POLICY_TEST_AND_API_GUIDE.md) : 테스트 레벨에서 확인할 것, 열어 둔 값, 다른 시스템이 연결할 API
+- 🔧 [UNREAL_POLICY_INTEGRATION.md](RL_Policy/UNREAL_POLICY_INTEGRATION.md) : 파이썬 → 언리얼 정책 통합의 빌드·검증·가중치 갱신 절차와 구현 세부
+- 🐍 [herbivore_rl/docs/PROJECT_SUMMARY.md](../../herbivore_rl/docs/PROJECT_SUMMARY.md) : 파이썬 학습 환경·PPO 학습·평가의 전체 과정과 결과
 
 ### 3. Mass Entity (대규모 개체 시뮬레이션)
 수천 마리의 논리 개체 처리, 조향력 합성 및 멀티스레드 병렬 안전성을 다룹니다.
