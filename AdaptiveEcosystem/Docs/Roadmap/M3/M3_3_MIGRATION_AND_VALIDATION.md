@@ -2,7 +2,7 @@
 
 > 상위 계획: [M3 개발 계획](M3_IMPLEMENTATION_PLAN.md)  
 > 선행: [M3.2 — 소비·이벤트·자원 조정](M3_2_RESOURCE_AND_EVENTS.md)  
-> 상태: 개발 계획 / 미구현·미검증  
+> 상태: 코드 구현 및 UE 5.8 Editor 빌드 확인. 첨부 Standalone 로그에서 A→B 이주/집계 확인; Spawn Waves와 수동 이벤트의 동시 PIE·네트워크·장시간 실행 검증 대기. 자동화 테스트는 사용자 요청으로 생략. [에디터 테스트](M3_3_EDITOR_TEST.md), [검증 기록](M3_VALIDATION_REPORT.md) 참고.
 > 예상 개발량: **4.5~7인일** (이동 2~3 + 표시/복제 1~1.5 + 통합 검증 1.5~2.5)
 
 ## 1. 목표와 완료 화면

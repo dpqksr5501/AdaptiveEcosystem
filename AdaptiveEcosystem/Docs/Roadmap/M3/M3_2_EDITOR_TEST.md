@@ -1,5 +1,7 @@
 # M3.2 구현 및 에디터 확인
 
+> M3.3 이후에 아래의 **이주 없는 M3.2 기준값**을 재현하려면 Migration Enabled=false로 설정한다. 현재 통합 이주·Spawn Waves 동작은 [M3.3 에디터 테스트](M3_3_EDITOR_TEST.md)를 따른다.
+
 ## 구현/검증 상태
 
 2026-09-28 구현. UE 5.8 `AdaptiveEcosystemEditor Win64 Development` 빌드 성공. 자동화 테스트는 사용자 요청에 따라 작성/실행하지 않았다. 아래 PIE 시나리오는 기대 결과이며 실제 실행 완료 기록이 아니다. 기존 레벨/EntityConfig 에셋과 사용자의 낮밤·스폰 간격 설정은 변경하지 않았다.
