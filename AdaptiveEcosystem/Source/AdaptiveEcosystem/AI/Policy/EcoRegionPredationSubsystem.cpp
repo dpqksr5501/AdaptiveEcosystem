@@ -1,53 +1,43 @@
 #include "EcoRegionPredationSubsystem.h"
 
 #include "EcoBehaviorConfig.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
-int64 UEcoRegionPredationSubsystem::RegionKey(const FVector& Location) const
+float UEcoRegionPredationSubsystem::GetRecentPredation() const
 {
-	const float Size = FMath::Max(RegionSize, 1.0f);
-	const int64 X = static_cast<int64>(FMath::FloorToInt(Location.X / Size));
-	const int64 Y = static_cast<int64>(FMath::FloorToInt(Location.Y / Size));
-	return (X << 32) ^ (Y & 0xFFFFFFFF);
+	// §3.1 "clip 1" — 관측은 항상 [0,1] 이어야 한다 (world.py: min(ema, 1)).
+	return FMath::Clamp(Ema, 0.0f, 1.0f);
 }
 
-float UEcoRegionPredationSubsystem::Get(const FVector& Location) const
+void UEcoRegionPredationSubsystem::ReportPredation(const FVector& /*Location*/)
 {
-	if (const FEcoRegionPredationState* State = Regions.Find(RegionKey(Location)))
+	// 논리 상태는 서버/스탠드얼론에만 있다 (AGENTS.md §2.2).
+	const UWorld* World = GetWorld();
+	if (World && World->GetNetMode() == NM_Client)
 	{
-		// §3.1 "clip 1" — 관측은 항상 [0,1] 이어야 한다.
-		return FMath::Clamp(State->Ema, 0.0f, 1.0f);
+		return;
 	}
-	return 0.0f;
+	++PendingDeaths;
 }
 
-void UEcoRegionPredationSubsystem::ReportPredation(const FVector& Location)
+void UEcoRegionPredationSubsystem::ReportAlivePopulation(int32 AliveCount)
 {
-	Regions.FindOrAdd(RegionKey(Location)).PendingDeaths += 1;
-}
-
-void UEcoRegionPredationSubsystem::ReportPopulation(const FVector& Location, int32 Count)
-{
-	FEcoRegionPredationState& State = Regions.FindOrAdd(RegionKey(Location));
-	// 구간 안에서 본 최대값을 분모로 쓴다. 매 틱 덮어쓰면 마지막 틱 값만 남는다.
-	State.Population = FMath::Max(State.Population, Count);
+	StepPopulation = FMath::Max(StepPopulation, FMath::Max(AliveCount, 0));
 }
 
 void UEcoRegionPredationSubsystem::Tick()
 {
-	// §3.1 / §9.6: ema = decay*ema + (1-decay)*(사망 수 / 개체 수)*gain
 	const float Decay = EcoBehaviorConfig::PredationEmaDecay;
 	const float Gain = EcoBehaviorConfig::PredationEmaGain;
-
-	for (auto& Pair : Regions)
-	{
-		FEcoRegionPredationState& State = Pair.Value;
-		const float Denom = static_cast<float>(FMath::Max(State.Population, 1));
-		const float Rate = static_cast<float>(State.PendingDeaths) / Denom;
-		State.Ema = Decay * State.Ema + (1.0f - Decay) * Rate * Gain;
-		State.PendingDeaths = 0;
-		State.Population = 0;
-	}
+	// 정상 경로에서는 같은 프로세서가 포획 전에 세므로 PendingDeaths <= StepPopulation 이다.
+	// 넘는 경우는 '산 초식이 없는데 사망이 보고됨'(전멸 뒤 플레이어 사냥 보고 등)뿐이고, 그때
+	// 비율 상한을 1로 둔다. 파리티 경로가 아니다.
+	const int32 Denom = FMath::Max3(StepPopulation, PendingDeaths, 1);
+	const float Rate = static_cast<float>(PendingDeaths) / static_cast<float>(Denom);
+	Ema = Decay * Ema + (1.0f - Decay) * Rate * Gain;
+	PendingDeaths = 0;
+	StepPopulation = 0;
 }
 
 bool UEcoRegionPredationSubsystem::SaveToSlot(const FString& SlotName, int32 UserIndex) const
@@ -58,8 +48,8 @@ bool UEcoRegionPredationSubsystem::SaveToSlot(const FString& SlotName, int32 Use
 	{
 		return false;
 	}
-	Save->Regions = Regions;
-	Save->RegionSize = RegionSize;
+	Save->SchemaVersion = SaveSchemaVersion;
+	Save->Ema = Ema;
 	return UGameplayStatics::SaveGameToSlot(Save, SlotName, UserIndex);
 }
 
@@ -71,14 +61,16 @@ bool UEcoRegionPredationSubsystem::LoadFromSlot(const FString& SlotName, int32 U
 	{
 		return false;
 	}
-	// 지역 크기가 다르면 키가 다른 공간을 가리키므로 불러오지 않는다.
-	if (!FMath::IsNearlyEqual(Save->RegionSize, RegionSize))
+	if (Save->SchemaVersion != SaveSchemaVersion)
 	{
+		// v1 은 지역별 저장이고 분모 버그로 값이 최대 128배 부풀어 있다. 일부러 버린다.
 		UE_LOG(LogTemp, Warning,
-			   TEXT("EcoRegionPredation: 저장된 RegionSize(%.1f)가 현재(%.1f)와 달라 무시한다"),
-			   Save->RegionSize, RegionSize);
+			   TEXT("EcoRegionPredation: SchemaVersion %d(현재 %d) — v1 지역별 저장이라 무시한다"),
+			   Save->SchemaVersion, SaveSchemaVersion);
 		return false;
 	}
-	Regions = Save->Regions;
+	Ema = FMath::Max(Save->Ema, 0.0f);
+	PendingDeaths = 0;
+	StepPopulation = 0;
 	return true;
 }

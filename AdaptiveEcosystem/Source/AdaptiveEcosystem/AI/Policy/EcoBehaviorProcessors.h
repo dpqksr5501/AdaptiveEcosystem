@@ -79,13 +79,10 @@ protected:
 
 private:
 	FMassEntityQuery EntityQuery;
-
-	/** §9.6 — PolicyInterval 틱마다 지역 EMA 를 한 번 갱신하기 위한 카운터. */
-	int32 TickCounter = 0;
 };
 
 /**
- * §9.6/§9.8-5 — 포식 판정과 지역 피식 보고.
+ * §9.6/§9.8-5 — 포식 판정, 피식 보고, 피식 EMA 스텝.
  *
  * 이게 없으면 `recent_predation` 이 영원히 0이고, 그러면 §5.1 Utility 비교군의
  * `cohesion = k_coh × rp` 와 `flee_dist` 의 rp 항이 통째로 죽는다. 실제로 테스트 레벨에서
@@ -93,6 +90,8 @@ private:
  *
  * 포식자 포획만 센다 — 아사는 §3.1 EMA 의 분자가 아니다 (파이썬도 그렇다).
  * 플레이어 사냥은 `UEcoRegionPredationSubsystem::ReportPredation()` 을 직접 부르면 된다 (§9.6).
+ * 분모는 틱마다 센 포획 전 생존 초식 수(스텝 안 최대값)이고, PolicyInterval 틱마다 포획 직후에
+ * EMA 를 한 번 스텝한다 — 파이썬과 같은 전역 값이다 (UEcoRegionPredationSubsystem 참고).
  *
  * 포획 규칙은 파이썬 §4.2 와 같다 — `Tests/EcoPredationTest.cpp` 가 고정한다:
  *   - **포식자 쪽에서** 판정한다. 초식이 포식자를 봤는지와 무관하다
@@ -112,10 +111,13 @@ protected:
 	virtual void Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context) override;
 
 private:
-	/** 지역 개체 수 보고용. 잡힌 개체의 Vitals 를 쓴다는 선언도 여기서 한다. */
+	/** 생존 수 보고용. 잡힌 개체의 Vitals 를 쓴다는 선언도 여기서 한다. */
 	FMassEntityQuery HerbivoreQuery;
 	/** 포획 판정은 파이썬 §4.2 처럼 포식자 쪽에서 한다. */
 	FMassEntityQuery PredatorQuery;
+
+	/** §9.6 — PolicyInterval 틱마다 피식 EMA 를 한 번 스텝한다. 포획 판정 직후다. */
+	int32 StepTickCounter = 0;
 };
 
 /** §9.5 — §3.3 조향 수식. 파이썬 `env/steering.py` 와 한 줄씩 대응한다. */

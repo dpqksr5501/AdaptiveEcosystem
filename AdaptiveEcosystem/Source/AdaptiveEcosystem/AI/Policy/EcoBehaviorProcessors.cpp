@@ -299,16 +299,18 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 		return;
 	}
 	const UEcoWorldProviderRegistry* Registry = World->GetSubsystem<UEcoWorldProviderRegistry>();
-	UEcoRegionPredationSubsystem* Predation = World->GetSubsystem<UEcoRegionPredationSubsystem>();
+	const UEcoRegionPredationSubsystem* Predation = World->GetSubsystem<UEcoRegionPredationSubsystem>();
 	const IEcoWorldFoodProvider* Food = Registry ? Registry->GetFoodProvider() : nullptr;
 	const IEcoWorldCoverProvider* Cover = Registry ? Registry->GetCoverProvider() : nullptr;
 
 	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
 	const float SeeRadius = EcoBehaviorConfig::SeeRadiusCm;
 	const bool bLearned = CVarUseLearnedPolicy.GetValueOnGameThread() != 0;
+	// 관측 5는 전역 값이다(world.py). EMA 스텝은 UEcoPredationProcessor 가 포획 직후에 한다.
+	const float RecentPredation = Predation ? Predation->GetRecentPredation() : 0.0f;
 
 	EntityQuery.ForEachEntityChunk(Context,
-		[Food, Cover, Predation, Interval, SeeRadius, bLearned](FMassExecutionContext& Ctx)
+		[Food, Cover, RecentPredation, Interval, SeeRadius, bLearned](FMassExecutionContext& Ctx)
 	{
 		const TConstArrayView<FTransformFragment> Transforms =
 			Ctx.GetFragmentView<FTransformFragment>();
@@ -347,7 +349,7 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 				static_cast<float>(G.KinCount) / EcoBehaviorConfig::ObsKinCountNorm, 0.f, 1.f);
 			Obs.Energy = FMath::Clamp(
 				Vitals[i].Energy / FMath::Max(Vitals[i].MaxEnergy, KINDA_SMALL_NUMBER), 0.f, 1.f);
-			Obs.RecentPredation = Predation ? Predation->Get(Self) : 0.0f;
+			Obs.RecentPredation = RecentPredation;
 			Obs.CoverDistance = Cover
 				? FMath::Clamp(Cover->GetCoverDistance(Self) / EcoBehaviorConfig::ObsCoverNormCm,
 							   0.f, 1.f)
@@ -374,13 +376,6 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 			Out.Cover = Action[3];
 		}
 	});
-
-	// §9.6 — PolicyInterval 틱마다 지역 EMA 한 번. 개체 루프 밖이다.
-	if (Predation && ++TickCounter >= Interval)
-	{
-		TickCounter = 0;
-		Predation->Tick();
-	}
 }
 
 // -----------------------------------------------------------------------------
@@ -429,20 +424,21 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 		return;
 	}
 
-	// --- 지역 개체 수 (§3.1 EMA 의 분모). 살아 있는 개체만 센다 ---
-	HerbivoreQuery.ForEachEntityChunk(Context, [Predation](FMassExecutionContext& Ctx)
+	// --- EMA 분모: 포획 전 생존 초식 전체 수 (world.py 의 N). 틱마다 한 번 ---
+	// 쿼리가 이미 Alive 를 요구한다. HP 검사는 다른 피해 경로가 HP 만 0으로 만든 경우의 방어선이다.
+	int32 Alive = 0;
+	HerbivoreQuery.ForEachEntityChunk(Context, [&Alive](FMassExecutionContext& Ctx)
 	{
-		const TConstArrayView<FTransformFragment> Transforms =
-			Ctx.GetFragmentView<FTransformFragment>();
 		const TConstArrayView<FEcoVitalsFragment> Vitals = Ctx.GetFragmentView<FEcoVitalsFragment>();
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
 			if (Vitals[i].HP > 0.0f)
 			{
-				Predation->ReportPopulation(Transforms[i].GetTransform().GetLocation(), 1);
+				++Alive;
 			}
 		}
 	});
+	Predation->ReportAlivePopulation(Alive);
 
 	// --- 포획. 파이썬 env/world.py 의 포식자 스텝과 같은 규칙 ---
 	//   pred_cd = max(pred_cd - 1, 0);  hunting = pred_cd == 0
@@ -517,6 +513,16 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 			S.EatCooldown = EatCooldown;
 		}
 	});
+
+	// --- §9.6 스텝 경계: 포획 → EMA. 관측은 다음 틱부터의 정책 결정이 읽는다 ---
+	// 분모(개수)와 분자(포획)를 만드는 이 프로세서가 스텝도 닫는다. 정책 프로세서가 빠지거나
+	// 정책 대상이 없어도 피식 기록이 멈추지 않는다.
+	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
+	if (++StepTickCounter >= Interval)
+	{
+		StepTickCounter = 0;
+		Predation->Tick();
+	}
 }
 
 // -----------------------------------------------------------------------------

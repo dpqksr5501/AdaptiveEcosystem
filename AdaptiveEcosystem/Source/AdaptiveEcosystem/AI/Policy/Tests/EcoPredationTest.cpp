@@ -20,8 +20,10 @@
 #include "../EcoBehaviorConfig.h"
 #include "../EcoBehaviorFragments.h"
 #include "../EcoBehaviorProcessors.h"
+#include "../EcoRegionPredationSubsystem.h"
 #include "../EcoWorldProviders.h"
 #include "EcoTestWorld.h"
+#include "Kismet/GameplayStatics.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassEntityManager.h"
@@ -41,6 +43,7 @@ namespace EcoPredationTestImpl
 		FMassArchetypeHandle PredArch;
 		UEcoNeighborhoodGatherProcessor* Gather = nullptr;
 		UEcoPerceptionProcessor* Perception = nullptr;
+		UEcoPolicyProcessor* Policy = nullptr;
 		UEcoPredationProcessor* Predation = nullptr;
 
 		bool Init(FAutomationTestBase& Test)
@@ -67,9 +70,11 @@ namespace EcoPredationTestImpl
 			const TSharedRef<FMassEntityManager> Shared = EM->AsShared();
 			Gather = NewObject<UEcoNeighborhoodGatherProcessor>(Scoped.World);
 			Perception = NewObject<UEcoPerceptionProcessor>(Scoped.World);
+			Policy = NewObject<UEcoPolicyProcessor>(Scoped.World);
 			Predation = NewObject<UEcoPredationProcessor>(Scoped.World);
 			for (UMassProcessor* P : {static_cast<UMassProcessor*>(Gather),
 									  static_cast<UMassProcessor*>(Perception),
+									  static_cast<UMassProcessor*>(Policy),
 									  static_cast<UMassProcessor*>(Predation)})
 			{
 				P->CallInitialize(Scoped.World, Shared);
@@ -105,11 +110,49 @@ namespace EcoPredationTestImpl
 			EcoTest::FlushPhase(*EM);
 		}
 
+		/** 실제 프레임 순서 (Gather → Perception → Policy → Predation, 페이즈 끝 반영). */
+		void TickWithPolicy()
+		{
+			EcoTest::RunProcessor(*Gather, *EM, Dt);
+			EcoTest::RunProcessor(*Perception, *EM, Dt);
+			EcoTest::RunProcessor(*Policy, *EM, Dt);
+			EcoTest::RunProcessor(*Predation, *EM, Dt);
+			EcoTest::FlushPhase(*EM);
+		}
+
 		float HP(const FMassEntityHandle& E) const
 		{
 			return EM->GetFragmentDataChecked<FEcoVitalsFragment>(E).HP;
 		}
+
+		UEcoRegionPredationSubsystem* Sub() const
+		{
+			return Scoped.World->GetSubsystem<UEcoRegionPredationSubsystem>();
+		}
+
+		/** 포식자(원점)에서 멀리, 옛 지역 격자 여러 칸에 걸쳐 초식을 늘어놓는다. */
+		void AddFillers(int32 Count, float Y, bool bDead = false)
+		{
+			for (int32 i = 0; i < Count; ++i)
+			{
+				const FMassEntityHandle E = AddHerbivore(FVector(-19000.0f + 300.0f * i, Y, 0.0f), FVector(1, 0, 0));
+				if (bDead)
+				{
+					EM->GetFragmentDataChecked<FEcoVitalsFragment>(E).HP = 0.0f;
+					EM->SwapTagsForEntity(E, FEcoAliveTag::StaticStruct(), FEcoPendingDeathTag::StaticStruct());
+				}
+			}
+		}
 	};
+
+	/** 파이썬 world.py: ema += (1-decay) * (deaths / N) * gain — 사망 1건의 증가량. */
+	float PerCatch(int32 Population)
+	{
+		return (1.0f - EcoBehaviorConfig::PredationEmaDecay)
+			 * (1.0f / static_cast<float>(Population)) * EcoBehaviorConfig::PredationEmaGain;
+	}
+
+	constexpr float EmaTol = 1e-6f;
 }
 
 using namespace EcoPredationTestImpl;
@@ -233,6 +276,271 @@ bool FEcoPredationCoverTest::RunTest(const FString& Parameters)
 	TestEqual(FString::Printf(TEXT("은신처 안 70cm 는 체감 %.0fcm <= %.0fcm — 잡혀야 한다"),
 							  70.0f * Hide, CatchR),
 			  Rig.HP(Close), 0.0f);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 관측 5(recent_predation)의 피식 EMA. 파이썬 world.py 는 전역 스칼라 하나다:
+//   ema = decay*ema + (1-decay) * (그 스텝 피식 사망 수 / 개체 수 N) * gain
+// 예전 언리얼은 개체마다 ReportPopulation(위치, 1) 을 부르고 받는 쪽이 max 를 취해 분모가 늘 1이었다.
+// 피식 1건이 EMA 를 0.5 올렸다(파이썬 128마리면 0.0039). 지역별로 나뉘어 있기도 했다.
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPredationEmaPerCatchTest,
+	"AdaptiveEcosystem.Policy.Predation.EmaPerCatchMatchesPython",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPredationEmaPerCatchTest::RunTest(const FString& Parameters)
+{
+	FRig Rig;
+	if (!Rig.Init(*this) || !TestNotNull(TEXT("피식 서브시스템"), Rig.Sub()))
+	{
+		return false;
+	}
+	const FMassEntityHandle V = Rig.AddHerbivore(FVector(100, 0, 0), FVector(-1, 0, 0));
+	Rig.AddFillers(127, 5000.0f);   // 산 초식 128
+	Rig.AddPredator(FVector(0, 0, 0));
+
+	Rig.Tick();   // 한 틱 — 자동 EMA 스텝은 아직 없다
+	TestEqual(TEXT("전제: V 가 잡혔다"), Rig.HP(V), 0.0f);
+	Rig.Sub()->Tick();
+	const float Got = Rig.Sub()->Get(FVector(100, 0, 0));
+	TestTrue(FString::Printf(TEXT("128마리 중 1건 = %.7f (파이썬과 같아야 한다), 실제 %.7f"), PerCatch(128), Got),
+			 FMath::IsNearlyEqual(Got, PerCatch(128), EmaTol));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPredationEmaGlobalTest,
+	"AdaptiveEcosystem.Policy.Predation.EmaIsGlobal",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPredationEmaGlobalTest::RunTest(const FString& Parameters)
+{
+	FRig Rig;
+	if (!Rig.Init(*this) || !TestNotNull(TEXT("피식 서브시스템"), Rig.Sub()))
+	{
+		return false;
+	}
+	Rig.AddHerbivore(FVector(100, 0, 0), FVector(-1, 0, 0));
+	Rig.AddHerbivore(FVector(40000, 0, 0), FVector(1, 0, 0));   // 먼 곳의 산 개체
+	Rig.AddFillers(126, 5000.0f);
+	Rig.AddPredator(FVector(0, 0, 0));
+
+	Rig.Tick();
+	Rig.Sub()->Tick();
+	const float Here = Rig.Sub()->Get(FVector(100, 0, 0));
+	const float Far = Rig.Sub()->Get(FVector(40000, 0, 0));
+	const float Empty = Rig.Sub()->Get(FVector(1e6, 1e6, 0));
+	TestTrue(FString::Printf(TEXT("포획 지점 %.7f == 기대 %.7f"), Here, PerCatch(128)),
+			 FMath::IsNearlyEqual(Here, PerCatch(128), EmaTol));
+	TestTrue(FString::Printf(TEXT("먼 곳도 같은 전역 값 (%.7f)"), Far), FMath::IsNearlyEqual(Far, Here, EmaTol));
+	TestTrue(FString::Printf(TEXT("아무도 없는 곳도 같은 전역 값 (%.7f)"), Empty), FMath::IsNearlyEqual(Empty, Here, EmaTol));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPredationEmaDenominatorTest,
+	"AdaptiveEcosystem.Policy.Predation.EmaDenominatorAliveMaxOverStep",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPredationEmaDenominatorTest::RunTest(const FString& Parameters)
+{
+	// 분모 = 스텝 동안 보고된 '포획 전 생존 초식 수'의 최대값 (= 파이썬 N). 죽은 개체는 세지 않는다.
+	FRig Rig;
+	if (!Rig.Init(*this) || !TestNotNull(TEXT("피식 서브시스템"), Rig.Sub()))
+	{
+		return false;
+	}
+	Rig.AddHerbivore(FVector(100, 0, 0), FVector(-1, 0, 0));
+	Rig.AddFillers(127, 5000.0f);                       // 산 초식 128
+	Rig.AddFillers(32, -5000.0f, /*bDead*/ true);       // 시체 32 — 분모에 들어가면 안 된다
+	Rig.AddPredator(FVector(0, 0, 0));
+
+	// PolicyInterval-1 틱: 자동 스텝 직전까지. 첫 틱에 128, 이후 127 이 보고된다 → 최대값 128.
+	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
+	for (int32 t = 0; t < Interval - 1; ++t)
+	{
+		Rig.Tick();
+	}
+	Rig.Sub()->Tick();
+	const float Got = Rig.Sub()->Get(FVector(100, 0, 0));
+	TestTrue(FString::Printf(TEXT("분모는 산 개체 최대값 128 → %.7f, 실제 %.7f"), PerCatch(128), Got),
+			 FMath::IsNearlyEqual(Got, PerCatch(128), EmaTol));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPredationEmaStepOwnerTest,
+	"AdaptiveEcosystem.Policy.Predation.EmaStepOwnedByPredationProcessor",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPredationEmaStepOwnerTest::RunTest(const FString& Parameters)
+{
+	// EMA 스텝은 포획을 보고하는 프로세서가 직접 한다. 정책 프로세서가 빠지거나 정책 대상
+	// 아키타입이 없어도 피식 기록이 멈추면 안 된다.
+	FRig Rig;
+	if (!Rig.Init(*this) || !TestNotNull(TEXT("피식 서브시스템"), Rig.Sub()))
+	{
+		return false;
+	}
+	Rig.AddHerbivore(FVector(100, 0, 0), FVector(-1, 0, 0));
+	Rig.AddFillers(127, 5000.0f);
+	Rig.AddPredator(FVector(0, 0, 0));
+
+	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
+	float First = 0.0f;
+	for (int32 t = 0; t < 2 * Interval && First == 0.0f; ++t)
+	{
+		Rig.Tick();   // Policy 없이
+		First = Rig.Sub()->Get(FVector(100, 0, 0));
+	}
+	TestTrue(TEXT("Policy 없이도 EMA 가 스텝한다"), First > 0.0f);
+	TestTrue(FString::Printf(TEXT("첫 값 = %.7f, 실제 %.7f"), PerCatch(128), First),
+			 FMath::IsNearlyEqual(First, PerCatch(128), EmaTol));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPredationObsReadsGlobalTest,
+	"AdaptiveEcosystem.Policy.Predation.ObservationReadsGlobalEma",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPredationObsReadsGlobalTest::RunTest(const FString& Parameters)
+{
+	// 포획 → EMA 스텝 → 다음 결정의 관측 (world.py: 포획 → EMA → 관측). 포획 지점 근처의 개체와
+	// 먼 개체가 같은 값을 본다.
+	FRig Rig;
+	if (!Rig.Init(*this) || !TestNotNull(TEXT("피식 서브시스템"), Rig.Sub()))
+	{
+		return false;
+	}
+	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
+	Rig.AddHerbivore(FVector(100, 0, 0), FVector(-1, 0, 0));
+	const FMassEntityHandle C = Rig.AddHerbivore(FVector(0, 3000, 0), FVector(1, 0, 0));   // 포획 지점 근처
+	const FMassEntityHandle B = Rig.AddHerbivore(FVector(40000, 0, 0), FVector(1, 0, 0));  // 먼 곳
+	Rig.AddFillers(125, 5000.0f);   // 산 초식 128
+	Rig.AddPredator(FVector(0, 0, 0));
+	// B, C 는 1틱째와 Interval+1 틱째에 결정한다 — 첫 EMA 스텝(Interval 틱째 끝) 바로 다음이다.
+	for (const FMassEntityHandle& E : {B, C})
+	{
+		Rig.EM->GetFragmentDataChecked<FEcoPolicyRuntimeFragment>(E).LastPolicyStep = Interval - 1;
+	}
+
+	for (int32 t = 0; t < Interval + 1; ++t)
+	{
+		Rig.TickWithPolicy();
+	}
+	const float ObsB = Rig.EM->GetFragmentDataChecked<FEcoObservationFragment>(B).Observation.RecentPredation;
+	const float ObsC = Rig.EM->GetFragmentDataChecked<FEcoObservationFragment>(C).Observation.RecentPredation;
+	TestTrue(FString::Printf(TEXT("근처 개체 관측 %.7f == %.7f"), ObsC, PerCatch(128)),
+			 FMath::IsNearlyEqual(ObsC, PerCatch(128), EmaTol));
+	TestTrue(FString::Printf(TEXT("먼 개체 관측 %.7f == %.7f"), ObsB, PerCatch(128)),
+			 FMath::IsNearlyEqual(ObsB, PerCatch(128), EmaTol));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPredationEmaFormulaTest,
+	"AdaptiveEcosystem.Policy.Predation.EmaFormulaSequence",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPredationEmaFormulaTest::RunTest(const FString& Parameters)
+{
+	// 식 고정용. 기대값은 같은 float 식으로 테스트 안에서 계산한다.
+	EcoTest::FScopedTestWorld Scoped;
+	UEcoRegionPredationSubsystem* Sub =
+		Scoped.World ? Scoped.World->GetSubsystem<UEcoRegionPredationSubsystem>() : nullptr;
+	if (!TestNotNull(TEXT("피식 서브시스템"), Sub))
+	{
+		return false;
+	}
+	const float D = EcoBehaviorConfig::PredationEmaDecay;
+	const float G = EcoBehaviorConfig::PredationEmaGain;
+	auto Step = [&](float Prev, int32 Deaths, int32 Denom)
+	{
+		return D * Prev + (1.0f - D) * (static_cast<float>(Deaths) / static_cast<float>(Denom)) * G;
+	};
+	auto Deaths = [&](int32 N) { for (int32 i = 0; i < N; ++i) { Sub->ReportPredation(FVector::ZeroVector); } };
+
+	Sub->ReportAlivePopulation(128); Deaths(3); Sub->Tick();
+	const float E1 = Step(0.0f, 3, 128);
+	TestTrue(TEXT("s1: 128마리 중 3건"), FMath::IsNearlyEqual(Sub->GetRawEma(), E1, EmaTol));
+
+	Sub->ReportAlivePopulation(128); Sub->Tick();
+	const float E2 = Step(E1, 0, 128);
+	TestTrue(TEXT("s2: 사망 없음 → 감쇠만"), FMath::IsNearlyEqual(Sub->GetRawEma(), E2, EmaTol));
+
+	Sub->ReportAlivePopulation(100); Sub->ReportAlivePopulation(90); Deaths(1); Sub->Tick();
+	const float E3 = Step(E2, 1, 100);
+	TestTrue(TEXT("s3: 스텝 안 최대값(100)을 분모로"), FMath::IsNearlyEqual(Sub->GetRawEma(), E3, EmaTol));
+
+	Sub->Tick();
+	const float E4 = Step(E3, 0, 1);
+	TestTrue(TEXT("s4: 보고 없음 → 감쇠만"), FMath::IsNearlyEqual(Sub->GetRawEma(), E4, EmaTol));
+
+	Deaths(2); Sub->Tick();
+	const float E5 = Step(E4, 2, 2);
+	TestTrue(TEXT("s5: 산 개체 0인데 사망 보고(방어값) → 비율 상한 1"), FMath::IsNearlyEqual(Sub->GetRawEma(), E5, EmaTol));
+
+	Sub->ReportAlivePopulation(1); Deaths(1); Sub->Tick();
+	Sub->ReportAlivePopulation(1); Deaths(1); Sub->Tick();
+	TestTrue(TEXT("s7: 원시 EMA 는 1을 넘을 수 있다"), Sub->GetRawEma() > 1.0f);
+	TestEqual(TEXT("s7: 관측은 1로 자른다"), Sub->GetRecentPredation(), 1.0f);
+	TestEqual(TEXT("스텝 뒤 누적값은 비워진다"), Sub->GetPendingDeaths(), 0);
+	TestEqual(TEXT("스텝 뒤 분모도 비워진다"), Sub->GetStepPopulation(), 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPredationSaveLoadTest,
+	"AdaptiveEcosystem.Policy.Predation.SaveLoadGlobalEma",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPredationSaveLoadTest::RunTest(const FString& Parameters)
+{
+	EcoTest::FScopedTestWorld Scoped;
+	UEcoRegionPredationSubsystem* Sub =
+		Scoped.World ? Scoped.World->GetSubsystem<UEcoRegionPredationSubsystem>() : nullptr;
+	if (!TestNotNull(TEXT("피식 서브시스템"), Sub))
+	{
+		return false;
+	}
+	const FString SlotV2 = TEXT("EcoPredEmaTest_V2");
+	const FString SlotV1 = TEXT("EcoPredEmaTest_V1");
+	UGameplayStatics::DeleteGameInSlot(SlotV2, 0);
+	UGameplayStatics::DeleteGameInSlot(SlotV1, 0);
+
+	Sub->ReportAlivePopulation(128);
+	Sub->ReportPredation(FVector::ZeroVector);
+	Sub->Tick();
+	const float E1 = Sub->GetRawEma();
+	TestTrue(TEXT("저장 성공"), Sub->SaveToSlot(SlotV2));
+
+	Sub->ReportAlivePopulation(128);
+	Sub->Tick();
+	TestTrue(TEXT("불러오기 성공"), Sub->LoadFromSlot(SlotV2));
+	TestTrue(TEXT("저장 시점 값으로 돌아간다"), FMath::IsNearlyEqual(Sub->GetRawEma(), E1, EmaTol));
+	TestEqual(TEXT("불러오면 누적값은 비어 있다"), Sub->GetPendingDeaths(), 0);
+
+	// v1 지역별 저장(스키마 0)은 분모 버그 값이라 거부한다.
+	UEcoPredationSaveGame* Old = Cast<UEcoPredationSaveGame>(
+		UGameplayStatics::CreateSaveGameObject(UEcoPredationSaveGame::StaticClass()));
+	if (TestNotNull(TEXT("옛 형식 저장 객체"), Old))
+	{
+		Old->SchemaVersion = 0;
+		Old->Ema = 0.7f;
+		TestTrue(TEXT("옛 형식 파일 쓰기"), UGameplayStatics::SaveGameToSlot(Old, SlotV1, 0));
+		AddExpectedMessagePlain(TEXT("EcoRegionPredation: SchemaVersion"), ELogVerbosity::Warning,
+								EAutomationExpectedMessageFlags::Contains, 1);
+		TestFalse(TEXT("옛 형식은 불러오지 않는다"), Sub->LoadFromSlot(SlotV1));
+		TestTrue(TEXT("값은 그대로다"), FMath::IsNearlyEqual(Sub->GetRawEma(), E1, EmaTol));
+	}
+	TestFalse(TEXT("없는 슬롯은 실패"), Sub->LoadFromSlot(TEXT("EcoPredEmaTest_None")));
+
+	UGameplayStatics::DeleteGameInSlot(SlotV2, 0);
+	UGameplayStatics::DeleteGameInSlot(SlotV1, 0);
 	return true;
 }
 
