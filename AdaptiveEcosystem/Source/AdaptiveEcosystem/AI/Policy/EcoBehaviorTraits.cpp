@@ -33,10 +33,11 @@ void UEcoHerbivoreTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildCon
 	BuildContext.AddFragment<FEcoObservationFragment>();
 	BuildContext.AddFragment<FEcoPolicyOutputFragment>();
 
-	// §9.2 "스폰 시 0~PolicyInterval 랜덤으로 초기화" — 정책 계산 부하를 틱마다 고르게
-	// 흩기 위해서다. 전부 같은 틱에 몰리면 8틱에 한 번 스파이크가 생긴다.
+	// §9.2 "스폰 시 0~PolicyInterval 로 흩는다" — 정책 계산 부하를 틱마다 고르게 퍼뜨린다.
+	// 템플릿 초기값은 모든 개체에 그대로 복사되므로 여기서 난수를 뽑으면 위상이 하나로 몰린다.
+	// -1(미배정)로 두면 UEcoPolicyProcessor 가 엔티티 인덱스로 흩는다.
 	FEcoPolicyRuntimeFragment& Runtime = BuildContext.AddFragment_GetRef<FEcoPolicyRuntimeFragment>();
-	Runtime.LastPolicyStep = FMath::RandRange(0, FMath::Max(BehaviorConfig.PolicyInterval - 1, 0));
+	Runtime.LastPolicyStep = -1;
 
 	FEcoVitalsFragment& Vitals = BuildContext.AddFragment_GetRef<FEcoVitalsFragment>();
 	Vitals.MaxEnergy = MaxEnergy;

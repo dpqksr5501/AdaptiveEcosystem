@@ -3,6 +3,7 @@
 #include "EcoBehaviorConfig.h"
 #include "EcoBehaviorFragments.h"
 #include "EcoNeighborhoodSubsystem.h"
+#include "EcoPolicyClock.h"
 #include "EcoPolicyInference.h"
 #include "EcoSteering.h"
 #include "EcoRegionPredationSubsystem.h"
@@ -304,13 +305,20 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 	const IEcoWorldCoverProvider* Cover = Registry ? Registry->GetCoverProvider() : nullptr;
 
 	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
+	// §9.4 결정 주기는 프레임 수가 아니라 시간이다 (EcoPolicyClock.h). 논리 틱이 지나지 않은
+	// 프레임(60FPS 초과의 절반 프레임, dt <= 0)은 아무도 결정하지 않는다.
+	const int32 Ticks = StepClock.Advance(Context.GetDeltaTimeSeconds(), EcoBehaviorConfig::StepSeconds, Interval);
+	if (Ticks == 0)
+	{
+		return;
+	}
 	const float SeeRadius = EcoBehaviorConfig::SeeRadiusCm;
 	const bool bLearned = CVarUseLearnedPolicy.GetValueOnGameThread() != 0;
 	// 관측 5는 전역 값이다(world.py). EMA 스텝은 UEcoPredationProcessor 가 포획 직후에 한다.
 	const float RecentPredation = Predation ? Predation->GetRecentPredation() : 0.0f;
 
 	EntityQuery.ForEachEntityChunk(Context,
-		[Food, Cover, RecentPredation, Interval, SeeRadius, bLearned](FMassExecutionContext& Ctx)
+		[Food, Cover, RecentPredation, Interval, Ticks, SeeRadius, bLearned](FMassExecutionContext& Ctx)
 	{
 		const TConstArrayView<FTransformFragment> Transforms =
 			Ctx.GetFragmentView<FTransformFragment>();
@@ -326,14 +334,18 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
-			// §9.4 "++TicksSinceUpdate < PolicyInterval 이면 skip".
-			// 스폰 시 NextPolicyStep 을 0~Interval 로 흩어 두면 부하가 틱마다 고르게 퍼진다.
-			FEcoPolicyRuntimeFragment& Runtime = Runtimes[i];
-			if (++Runtime.LastPolicyStep < Interval)
+			// §9.4 "++TicksSinceUpdate < PolicyInterval 이면 skip" — 논리 틱 기준.
+			// 위상을 0~Interval 로 흩어 두면 부하가 틱마다 고르게 퍼진다.
+			int32& Phase = Runtimes[i].LastPolicyStep;
+			if (Phase < 0)
+			{
+				// 트레잇 스폰 표시(-1): 템플릿 값은 모든 개체에 같으므로 여기서 엔티티 인덱스로 흩는다.
+				Phase = static_cast<int32>(Ctx.GetEntity(i).Index % Interval);
+			}
+			if (!EcoPolicy::AdvanceDecisionPhase(Phase, Ticks, Interval))
 			{
 				continue;
 			}
-			Runtime.LastPolicyStep = 0;
 
 			const FVector Self = Transforms[i].GetTransform().GetLocation();
 			const FEcoSteeringGeometryFragment& G = Geometries[i];
@@ -516,11 +528,13 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 
 	// --- §9.6 스텝 경계: 포획 → EMA. 관측은 다음 틱부터의 정책 결정이 읽는다 ---
 	// 분모(개수)와 분자(포획)를 만드는 이 프로세서가 스텝도 닫는다. 정책 프로세서가 빠지거나
-	// 정책 대상이 없어도 피식 기록이 멈추지 않는다.
+	// 정책 대상이 없어도 피식 기록이 멈추지 않는다. StepSeconds 마다, 시간 기준이다.
+	// 큰 프레임이면 여러 스텝을 돈다 — 첫 스텝이 쌓인 사망을 반영하고 나머지는 감쇠만 한다.
 	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
-	if (++StepTickCounter >= Interval)
+	const int32 Steps = EcoPolicy::ConsumeSteps(
+		EmaPhase, StepClock.Advance(Dt, EcoBehaviorConfig::StepSeconds, Interval), Interval);
+	for (int32 s = 0; s < Steps; ++s)
 	{
-		StepTickCounter = 0;
 		Predation->Tick();
 	}
 }
