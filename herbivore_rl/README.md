@@ -122,7 +122,7 @@ python export_weights.py
 | `AI/Policy/EcoBehaviorFragments.h` | §9.2 태그 + 공유 설정 + 기하 캐시 |
 | `AI/Policy/EcoWorldProviders.h/.cpp` | §9.4 월드팀 인터페이스 + 더미 구현 |
 | `AI/Policy/EcoNeighborhoodSubsystem.h/.cpp` | 이웃 조회 (균일 격자) |
-| `AI/Policy/EcoRegionPredationSubsystem.h/.cpp` | §9.6 지역 피식 EMA + SaveGame |
+| `AI/Policy/EcoRegionPredationSubsystem.h/.cpp` | §9.6 전역 피식 EMA(관측 5) + SaveGame |
 | `AI/Policy/EcoBehaviorProcessors.h/.cpp` | §9.4 Policy + §9.5 Steering (+ 게더·지각) |
 | `AI/Policy/PolicyWeights.h` | 자동 생성 (7-64-64-4) |
 | `AI/Policy/UtilityParams.h` | 자동 생성 (§5.2 튜닝 계수) |
@@ -136,9 +136,10 @@ python export_weights.py
 ```
 NeighborhoodGather  (매 틱)  개체 위치 색인
   → Perception      (매 틱)  §3.3 기하 입력
-  → Policy          (8틱마다) 관측 7개 → RunPolicy/RunUtilityPolicy → 행동 4개
-  → Steering        (매 틱)  §3.3 조향 → 속도
-  → (엔진) Mass 이동
+  → Policy          (0.133초마다, 시간 기준) 관측 7개 → RunPolicy/RunUtilityPolicy → 행동 4개
+  → Steering        (매 틱)  §3.3 조향 → 속도, 위치 적분, 바라보는 방향(yaw)
+  → Predation       (매 틱)  포획 판정, 생존 수 보고, 0.133초마다 피식 EMA 스텝
+  (초식 쿼리는 전부 FEcoAliveTag 를 요구한다. 잡히면 Alive → PendingDeath)
 ```
 
 콘솔 변수 `eco.UseLearnedPolicy` 로 학습 정책(1)과 §5.1 Utility 비교군(0)을 바꾼다.

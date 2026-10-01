@@ -35,10 +35,12 @@
 | `EcoSteering.h` | §3.3 `Steer()`. 역시 엔진 비의존 | |
 | `EcoBehaviorFragments.h` | §9.2 태그·공유 설정·기하 캐시·포식자 상태(식사 쿨다운) | |
 | `EcoBehaviorTraits.h/.cpp` | 레벨 배치용 Mass 트레잇 | |
-| `EcoBehaviorProcessors.h/.cpp` | §9.4 Policy + §9.5 Steering (+ 게더·지각) | |
+| `EcoBehaviorProcessors.h/.cpp` | §9.4 Policy + §9.5 Steering (+ 게더·지각·포식 판정) | |
+| `EcoPolicyClock.h` | 정책 결정·피식 EMA 의 시간 기준 시계. 엔진 비의존 | |
+| `EcoHeading.h` | 바라보는 방향(heading) 규약 헬퍼 | |
 | `EcoWorldProviders.h/.cpp` | §9.4 월드팀 인터페이스 + 더미 | |
 | `EcoNeighborhoodSubsystem.h/.cpp` | 이웃 조회 (균일 격자) | |
-| `EcoRegionPredationSubsystem.h/.cpp` | §9.6 지역 EMA + SaveGame | |
+| `EcoRegionPredationSubsystem.h/.cpp` | §9.6 관측 5의 전역 피식 EMA + SaveGame(스키마 2) | |
 | `PolicyWeights.h` | 7-64-64-4 가중치 | ✅ |
 | `UtilityParams.h` | §5.2 튜닝 계수 | ✅ |
 | `EcoBehaviorConfig.h` | §9.7 단위 대응 | ✅ |
@@ -46,8 +48,11 @@
 | `SteeringGoldenVectors.h` | §9.8-2 검증용 100쌍 | ✅ |
 | `Tests/EcoPolicyInferenceTest.cpp` | 파리티·범위·단위 테스트 5개 | |
 | `Tests/EcoPipelineTest.cpp` | §9.8-3 파이프라인 테스트 (위치 변화 검사 포함) | |
-| `Tests/EcoPredationTest.cpp` | §4.2 포획 규칙 테스트 3개 — 뒤에서 포획, 한 틱 한 마리·쿨다운, 은신처 | |
-| `Tests/EcoTestWorld.h` | 두 테스트가 같이 쓰는 월드·프로세서 헬퍼 | |
+| `Tests/EcoPredationTest.cpp` | §4.2 포획 규칙 3개 + 피식 EMA 7개 | |
+| `Tests/EcoAliveFilterTest.cpp` | 생존 필터 5개 | |
+| `Tests/EcoPolicyScheduleTest.cpp` | 시간 기준 주기 6개 | |
+| `Tests/EcoHeadingTest.cpp` | 바라보는 방향 3개 | |
+| `Tests/EcoTestWorld.h` | 테스트가 같이 쓰는 월드·프로세서 헬퍼, 초식 구성 | |
 
 그리고 `Source/AdaptiveEcosystem/Debug/EcoPolicyTestSpawner.h/.cpp` — 시각 확인용.
 
@@ -86,15 +91,21 @@ Git Bash 에서 돌릴 때는 `export MSYS_NO_PATHCONV=1` 을 먼저 해야 한�
 로그에 5초마다 이런 줄이 찍힌다:
 
 ```
-[Eco] 정책=학습 | 개체 96, 이동 96, 포식자 본 개체 18, 도주 0 | 포획 5 (누적 5) | forage 0.34 cohesion 0.88 flee 0.42 cover 0.10
+[Eco] 정책=학습 | 개체 96, 이동 96, 포식자 본 개체 10, 도주 0 | 포획 5 (누적 5) | forage 0.41 cohesion 0.80 flee 0.38 cover 0.05
 ```
 
-실측 (96마리, 포식자 5, 60초, 같은 스폰 배치):
+실측 (96마리, 포식자 5, 60초, 같은 스폰 배치, 10-01 결함 4건 수정 뒤, 조건마다 한 번):
 
-| 정책 | forage | cohesion | flee | cover | 포획 (60초) |
-|---|---|---|---|---|---|
-| Utility (§5.1) | 0.34 ~ 0.37 | 0.32 ~ 1.00 (포획 따라 출렁) | 0.42 ~ 0.71 | 0.00 ~ 0.02 | 41 |
-| 학습 (PPO) | 0.30 ~ 0.39 | 0.83 ~ 0.95 | 0.39 ~ 0.43 | 0.06 ~ 0.14 | 49 |
+| 정책 | FPS | forage | cohesion | flee | cover | 포획 (60초) |
+|---|---|---|---|---|---|---|
+| Utility (§5.1) | 30 | 0.34 ~ 0.36 | 0.16 ~ 0.85 (포획 따라 출렁) | 0.39 ~ 0.40 | 0.00 ~ 0.02 | 46 |
+| Utility (§5.1) | 60 | 0.34 ~ 0.35 | 0.12 ~ 0.65 | 0.39 ~ 0.40 | 0.00 ~ 0.02 | 56 |
+| 학습 (PPO) | 30 | 0.40 ~ 0.44 | 0.65 ~ 0.93 | 0.37 ~ 0.39 | 0.05 ~ 0.06 | 44 |
+| 학습 (PPO) | 60 | 0.41 ~ 0.44 | 0.68 ~ 0.92 | 0.37 ~ 0.38 | 0.05 ~ 0.06 | 42 |
+
+학습 정책의 30·60FPS 값이 거의 같다 — 정책 주기가 FPS 와 무관해졌다(4.2절). 포획 판정은 아직
+프레임마다 하므로 포획 수는 FPS 영향을 받을 수 있다(Utility 46 vs 56, 한 번씩 돌린 값이라 잡음과
+구분하지 못한다).
 
 **포획 수로 두 정책의 우열을 말하면 안 된다.** 한 번 돌린 값이고 5초 구간마다 0~9 로
 요동한다. 게다가 이 레벨은 평가 환경이 아니라 시연용이다 — 밀도가 학습 때의 1/4 쯤이고,
@@ -102,21 +113,21 @@ Git Bash 에서 돌릴 때는 `export MSYS_NO_PATHCONV=1` 을 먼저 해야 한�
 (20시드 짝지은 비교)의 몫이다.
 
 이 레벨이 보여 주는 건 **반응하는 대상의 차이**다. Utility 는 §5.1 수식상
-`recent_predation` 하나에만 반응해 포획이 몰리면 `cohesion` 과 `flee` 가 같이 치솟고
-(9회 포획 구간: 0.32 → 0.63, 0.42 → 0.60), 조용하면 감쇠한다. 학습 정책은 관측 7개를
-다 써서 `cohesion` 을 0.83~0.95 로 안정되게 유지하고 `cover` 를 Utility 의 수 배로 쓴다.
-§9.8-5 의 폐루프(포획 → 지역 EMA → 행동)가 이제 **실제 포획으로** 돈다.
+`recent_predation` 하나에 크게 반응해 포획이 몰리면 `cohesion` 이 치솟고 조용하면 감쇠한다.
+학습 정책은 관측 7개를 다 써서 `cohesion` 을 높게 유지하고 `cover` 를 조금 쓴다.
+§9.8-5 의 폐루프(포획 → 피식 EMA → 행동)가 **실제 포획으로** 돈다.
 
-> **이전 수치는 두 번 폐기했다.** 처음 표는 개체가 정지한 상태에서 잰 값이었고
+> **이전 수치는 세 번 폐기했다.** 처음 표는 개체가 정지한 상태에서 잰 값이었고
 > (7절 "속도를 위치에"), 두 번째 표는 뒤에서 온 포식자에게는 잡히지 않는 규칙에서 잰
-> 값이었다 (4.1절). 위 표가 두 문제를 다 고친 뒤의 값이다.
+> 값이었다 (4.1절). 세 번째 표는 관측 5가 128배 부풀어 있고(분모 버그), 30FPS 헤드리스
+> 실행에서 정책이 절반 속도로 돌던 때의 값이었다 (4.2절). 위 표가 모두 고친 뒤의 값이다.
 
 화면 표시:
 
 | 표시 | 뜻 |
 |---|---|
 | 점 (화면 12픽셀) 파랑 → 빨강 | 초식. 색 = `cohesion` 0 → 1 |
-| 점에서 뻗은 가는 선 | 초식 진행 방향 |
+| 점에서 뻗은 선 | 초식이 바라보는 방향. 멈춘 개체는 유지된 방향을 회색 가는 선으로 |
 | 굵은 노란 선 | 도주 중 (§3.3 도주 분기). 포식자 반대 방향 |
 | 빨간 X / 회색 X | 포식자 — 사냥 중 / 식사 중(쿨다운) |
 | X 앞 부채꼴 | 포식자 시야. 반경 28m × 150°. 이 안의 초식만 쫓는다 |
@@ -146,8 +157,30 @@ Git Bash 에서 돌릴 때는 `export MSYS_NO_PATHCONV=1` 을 먼저 해야 한�
 테스트 레벨의 포식자 AI 도 파이썬과 맞췄다. 예전에는 맵 전체의 최근접 초식을 직선으로 쫓는
 전지적 추격이라, 초식이 먼저 발견하는 이점(초식 시야 40m > 포식자 28m)이 없었다. 지금은
 시야 부채꼴 안의 표적만 체감 거리로 고르고, 없으면 스텝마다 ±0.15rad 로 배회하고, 벽에서
-반사한다. 잡힌 초식은 파이썬 §4.3 처럼 월드 전체 랜덤 위치로 즉시 리스폰한다 — 이게 없을 때는
-HP 0 인 개체가 계속 달리고 포식자가 그 "시체"를 영원히 쫓았다.
+반사한다. 잡힌 초식은 파이썬 §4.3 처럼 월드 전체 랜덤 위치로 즉시 리스폰한다.
+
+### 4.2 언리얼 결함 4건 수정 (10-01)
+
+팀원 wonkii 님의 통합 계획(`COLLABORATOR_ECOSYSTEM_INTEGRATION_PLAN.md`)과 우리 v2 계획서
+(`RL_V2_PLAN.md` 7.1)가 짚은 결함이다. 넷 다 관측·행동 차원은 그대로이고, 결함마다 수정 전
+코드에서 실패하는 테스트를 먼저 확인한 뒤 고쳤다.
+
+| 결함 | 증상 | 고친 방법 |
+|---|---|---|
+| 생존 필터 | 잡힌 개체(HP 0)가 계속 움직이고 이웃 색인에 들어가 동료로 세어졌다 | 초식 쿼리 5개가 `FEcoAliveTag` 를 요구한다. 포획하면 HP=0(즉시) + Alive→PendingDeath(지연). 포획 판정을 조향 뒤로 옮겼다 |
+| 피식 EMA 분모 | 개체마다 1을 보고하고 max 를 취해 분모가 늘 1. 피식 1건이 0.5 올랐다(파이썬 0.0039). 지역별로 따로 돌았다 | 파이썬과 같은 전역 EMA 하나. 분모 = 스텝 내 포획 전 생존 수 최대. 포식 프로세서가 개수 보고와 스텝을 함께 한다 |
+| 정책 주기 | 8프레임마다라 60FPS 를 가정했다. 30FPS 면 결정과 EMA 감쇠가 절반 속도 | 프레임 dt 를 논리 틱(1/60초)으로 바꿔 센다(`EcoPolicyClock.h`). 누적값을 반올림해 세므로 vsync 잡음이 있어도 60·30·20FPS 에서는 매 프레임 같은 틱 수가 나온다(120Hz 는 위상이 번갈아 흔들린다) |
+| 회전 | 위치만 적분해 멈추면 모두 +X 를 봤다. 도망쳐 온 방향의 동료·포식자를 못 봤다 | 조향이 최종 속도 방향으로 yaw 를 쓰고, 멈추면 유지한다(`EcoHeading.h`) |
+
+반박 검토에서 나온 두 가지도 같이 고쳤다. (1) 시계를 버림으로 세면 실제 vsync 60Hz 에서 약 절반의
+프레임이 0틱·2틱이 됐다 → 반올림으로 바꿨다. (2) 두 포식자가 같은 틱에 같은 초식을 노리면 언리얼은
+두 번째 포식자가 옆의 다른 초식을 잡았다. 파이썬은 포식자마다 최근접(argmin)을 따로 골라 둘 다 쿨다운에
+들어가고 사망은 1건이다 → 이번 틱에 잡힌 개체를 기억해 파이썬과 같게 했다.
+
+남는 차이(파이썬은 그대로 둔다):
+- 파이썬은 사망 다음 1스텝 동안 이웃 관측에 사망 위치가 남는다. 언리얼은 다음 프레임부터 뺀다
+- 포획 판정은 게더 시점 위치로 한다. 파이썬(이동 후 초식 vs 이동 전 포식자)과 최대 약 15cm 차이
+- 포획 판정은 아직 프레임마다 한다. 파이썬은 스텝마다다
 
 ## 5. 엔진 버전 — UE 5.8.3 에서 확인
 
@@ -177,10 +210,11 @@ Epic Games Launcher 에서 5.8 을 최신 핫픽스로 업데이트한다.
 - **플레이어 사냥이 아직 피식으로 안 잡힌다.** `UEcoPredationProcessor` 가 포식자 포획은
   보고하지만, 플레이어가 잡은 경우는 해당 코드에서
   `UEcoRegionPredationSubsystem::ReportPredation(Location)` 을 직접 불러야 한다 (§9.6).
-- **피식된 개체의 생명주기.** `UEcoPredationProcessor` 는 HP 를 0으로 두고 보고만 한다.
-  실제 제거·리스폰은 기존 Lifecycle 계층 몫이다. 파이썬은 슬롯을 즉시 리스폰한다 (§4.3).
-  테스트 레벨에서는 `AEcoPolicyTestSpawner::RespawnCaught()` 가 그 대역을 한다 — 실제
-  콘텐츠에 트레잇으로 배치하면 이 대역이 없으니 Lifecycle 연결이 필요하다.
+- **피식된 개체의 생명주기.** `UEcoPredationProcessor` 는 HP=0 + Alive→PendingDeath 로 표시하고
+  보고만 한다. 시체는 정책·조향에서 빠지지만 엔티티는 남는다. 실제 제거(파괴·슬롯 해제·복제 제거)는
+  Lifecycle 계층 몫이다. 파이썬은 슬롯을 즉시 리스폰한다 (§4.3). 테스트 레벨에서는
+  `AEcoPolicyTestSpawner::RespawnCaught()` 가 그 대역을 한다 — 실제 콘텐츠에 트레잇으로 배치하면
+  이 대역이 없으니 PendingDeath 개체를 정리하는 Lifecycle 연결이 필요하다 (안 하면 시체가 쌓인다).
 - **테스트 레벨은 학습 환경과 다르다.** 시연용이라 다음이 빠져 있다. 행동을 보는 데는
   충분하지만 정책 우열을 재는 데는 쓰면 안 된다.
   - 밀도: 파이썬은 한 변 120~220m 에 128마리, 테스트 레벨은 300m 에 96마리 (약 1/4)
@@ -213,7 +247,8 @@ UE 5.8 에서 실제로 부딪힌 것들 (다음 엔진 업그레이드 때 다�
 | const 공유 프래그먼트 | `FMassConstSharedFragment` 상속 필요 (§9.2 는 `FMassSharedFragment` 로 적혀 있다) |
 | 트레잇에서 엔티티 매니저 | `UE::Mass::Utils::GetEntityManagerChecked(World)` |
 | `EAutomationTestFlags` | `EAutomationTestFlags_ApplicationContextMask` 형태 |
-| 테스트에서 프로세서 직접 실행 | `Context.SetExecutionType(EMassExecutionContextType::Processor)` 없으면 어설션 |
+| 테스트에서 프로세서 직접 실행 | `Context.SetExecutionType(EMassExecutionContextType::Processor)` 없으면 어설션. 컨텍스트는 `EntityManager.CreateExecutionContext(Dt)` 로 만들어야 지연 명령 버퍼가 묶인다(생성자로 만들면 `Defer()` 가 null) |
+| 트레잇 템플릿 테스트 | `FMassEntityTemplateBuildContext::BuildFromTraits` 는 MassSpawner 밖으로 export 되지 않아 게임 모듈 테스트에서 링크할 수 없다. `BuildTemplate` 을 직접 부르면 처리 중인 트레잇이 없어 어서션이 난다 |
 | **속도를 위치에** | `UMassApplyMovementProcessor` 는 `FMassDesiredMovementFragment` + `FMassCodeDrivenMovementTag` 를 **둘 다** 요구한다. 없으면 쿼리에 안 걸려 좌표가 영영 그대로다 (오류 없이 조용히). `UEcoSteeringProcessor` 가 직접 적분하는 이유 — 그 프래그먼트를 넣으면 엔진 가감속 모델을 타서 §3.3 의 "속력 일정" 계약과 어긋난다 |
 | 트레잇과 엔진 이동 트레잇 | `UMassMovementTrait` 는 기본값(`bIsCodeDrivenMovement = true`)에서 `FMassCodeDrivenMovementTag` 를 붙인다. 초식 트레잇이 `FMassCustomMovementTag` 를 붙여 엔진 이동 프로세서를 막는다 — 없으면 두 트레잇을 같이 쓸 때 이동이 이중으로 적용되거나 속도가 덮어써진다 |
 | `Build.cs` 의 `StructUtils` | 아직 동작하지만 `uproject` 에 플러그인 의존이 없다는 경고가 난다 |
