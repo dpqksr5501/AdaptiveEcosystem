@@ -81,8 +81,11 @@ class BehaviorLogCallbackV2(BaseCallback):
         self.logger.record("world/resets", float(env.num_resets))
 
         if self.num_timesteps >= self._next_r2:
+            # 버퍼의 행동은 정책 분포에서 뽑은 값이라 잡음이 섞여 R² 가 낮게 나온다. 정책 평균(결정적
+            # 행동)으로 잰다 — 진단 도구(diagnose_v2.py)와 같은 기준이다.
             obs = buf.observations.reshape(-1, OBS_DIM)
-            r2 = linear_r2(obs.astype(np.float64), a)
+            det, _ = self.model.predict(obs, deterministic=True)
+            r2 = linear_r2(obs.astype(np.float64), sigmoid(np.clip(det, -3.0, 3.0)))
             row = {"timesteps": int(self.num_timesteps)}
             for i, name in enumerate(ACT_NAMES):
                 self.logger.record(f"r2/{name}", float(r2[i]))
