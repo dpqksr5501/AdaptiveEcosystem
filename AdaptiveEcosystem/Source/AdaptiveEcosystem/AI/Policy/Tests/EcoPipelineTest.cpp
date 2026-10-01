@@ -44,21 +44,6 @@ namespace EcoPipelineTestImpl
 
 	using EcoTest::FScopedTestWorld;
 
-	/** 초식 아키타입에 들어가는 프래그먼트와 태그. §9.4/§9.5 쿼리 요구사항의 합집합. */
-	TArray<const UScriptStruct*> HerbivoreComposition()
-	{
-		return {
-			FTransformFragment::StaticStruct(),
-			FMassVelocityFragment::StaticStruct(),
-			FEcoSteeringGeometryFragment::StaticStruct(),
-			FEcoObservationFragment::StaticStruct(),
-			FEcoPolicyOutputFragment::StaticStruct(),
-			FEcoPolicyRuntimeFragment::StaticStruct(),
-			FEcoVitalsFragment::StaticStruct(),
-			FEcoHerbivoreTag::StaticStruct(),
-		};
-	}
-
 	TArray<const UScriptStruct*> PredatorComposition()
 	{
 		return {
@@ -101,6 +86,7 @@ namespace EcoPipelineTestImpl
 			{
 				EcoTest::RunProcessor(*P, EM, Dt);
 			}
+			EcoTest::FlushPhase(EM);
 		}
 	};
 
@@ -156,7 +142,7 @@ bool FEcoPipelineSmokeTest::RunTest(const FString& Parameters)
 	TestNotNull(TEXT("UEcoNeighborhoodSubsystem"),
 				World->GetSubsystem<UEcoNeighborhoodSubsystem>());
 
-	const FMassArchetypeHandle HerbArch = EM.CreateArchetype(HerbivoreComposition());
+	const FMassArchetypeHandle HerbArch = EM.CreateArchetype(EcoTest::HerbivoreComposition());
 	const FMassArchetypeHandle PredArch = EM.CreateArchetype(PredatorComposition());
 
 	TArray<FMassEntityHandle> Herbivores;

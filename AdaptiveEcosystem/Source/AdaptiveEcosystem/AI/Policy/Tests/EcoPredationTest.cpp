@@ -56,16 +56,7 @@ namespace EcoPredationTestImpl
 			}
 			EM = &Sub->GetMutableEntityManager();
 
-			HerbArch = EM->CreateArchetype({
-				FTransformFragment::StaticStruct(),
-				FMassVelocityFragment::StaticStruct(),
-				FEcoSteeringGeometryFragment::StaticStruct(),
-				FEcoObservationFragment::StaticStruct(),
-				FEcoPolicyOutputFragment::StaticStruct(),
-				FEcoPolicyRuntimeFragment::StaticStruct(),
-				FEcoVitalsFragment::StaticStruct(),
-				FEcoHerbivoreTag::StaticStruct(),
-			});
+			HerbArch = EM->CreateArchetype(EcoTest::HerbivoreComposition());
 			PredArch = EM->CreateArchetype({
 				FTransformFragment::StaticStruct(),
 				FMassVelocityFragment::StaticStruct(),
@@ -111,6 +102,7 @@ namespace EcoPredationTestImpl
 			EcoTest::RunProcessor(*Gather, *EM, Dt);
 			EcoTest::RunProcessor(*Perception, *EM, Dt);
 			EcoTest::RunProcessor(*Predation, *EM, Dt);
+			EcoTest::FlushPhase(*EM);
 		}
 
 		float HP(const FMassEntityHandle& E) const
