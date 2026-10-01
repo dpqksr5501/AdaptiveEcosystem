@@ -5,6 +5,8 @@
 #include "CoreMinimal.h"
 #include "MassEntityTypes.h"
 #include "Core/EcoIds.h"
+#include "Core/EcoResourceTypes.h"
+#include "Core/EcoMigrationTypes.h"
 #include "AI/Policy/EcoPolicyContracts.h"
 #include "EcoMassFragments.generated.h"
 
@@ -85,11 +87,11 @@ struct FEcoTravelFragment : public FMassFragment
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Mass")
 	int32 TargetRegionIndex = INDEX_NONE_ECO;
 
-	UPROPERTY(EditAnywhere, Category = "Ecology|Mass", meta = (ClampMin = "0.0", ClampMax = "1.0"))
-	float TravelProgress = 0.0f;
-
-	UPROPERTY(EditAnywhere, Category = "Ecology|Mass")
-	bool bIsTraveling = false;
+	/** Sole residence-state authority. No bool or migrating tag mirrors this value. */
+	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Mass")
+	EEcoResidenceState State = EEcoResidenceState::Resident;
+	FVector TargetPosition = FVector::ZeroVector;
+	float MoveSpeed = 0.0f;
 };
 
 /**
@@ -138,6 +140,27 @@ struct FEcoPolicyRuntimeFragment : public FMassFragment
 // -----------------------------------------------------------------------------
 // Shared Fragments (Species-wide immutable / slow-changing configuration)
 // -----------------------------------------------------------------------------
+
+/** Server-only lifetime/feeding schedule; not a replicated presentation value. */
+USTRUCT()
+struct FEcoLifetimeFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	double SpawnTimeSeconds = 0.0;
+	double NextFeedTimeSeconds = 20.0;
+};
+
+/** Per-entity request/result buffer. Regional food remains owned by Ecology. */
+USTRUCT()
+struct FEcoFeedingFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	FEcoFeedRequest PendingRequest;
+	bool bPending = false;
+	double LastFeedTime = -1.0;
+	double LastGrantedAmount = 0.0;
+	double TotalGrantedAmount = 0.0;
+};
 
 /**
  * Shared configuration shared by all agents of the same species.

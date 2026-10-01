@@ -60,6 +60,11 @@ struct FEcoRegionPopulationSnapshot
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event", meta = (ClampMin = "0"))
 	int32 Population = 0;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration")
+	int32 TravelingCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration")
+	int32 WaitingCount = 0;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float AverageEnergy = 0.0f;
 };

@@ -31,6 +31,29 @@ void AEcologyRegion::BeginPlay()
 	}
 }
 
+bool AEcologyRegion::ContainsPosition(const FVector& Position) const
+{
+	if (!RegionBounds || Position.ContainsNaN()) return false;
+	const FVector Local = RegionBounds->GetComponentTransform().InverseTransformPosition(Position);
+	const FVector Extent = RegionBounds->GetUnscaledBoxExtent();
+	return FMath::Abs(Local.X) <= Extent.X && FMath::Abs(Local.Y) <= Extent.Y && FMath::Abs(Local.Z) <= Extent.Z;
+}
+
+bool AEcologyRegion::MakeInitialEcologyState(FRegionEcologyState& OutState) const
+{
+	if (RegionId.IsNone() || !RegionBounds || !FMath::IsFinite(InitialFoodAmount)
+		|| !FMath::IsFinite(FoodCapacity) || FoodCapacity < 0.0f || InitialFoodAmount < 0.0f
+		|| InitialFoodAmount > FoodCapacity) return false;
+	OutState = FRegionEcologyState();
+	OutState.RegionId = RegionId;
+	OutState.FoodAmount = InitialFoodAmount;
+	OutState.FoodCapacity = FoodCapacity;
+	OutState.FoodRegenerationRate = 0.0f;
+	OutState.Population = 0;
+	OutState.AverageEnergy = 0.0f;
+	return true;
+}
+
 void AEcologyRegion::EndPlay(const EEndPlayReason::Type EndPlayReason)
 {
 	if (UWorld* World = GetWorld())
