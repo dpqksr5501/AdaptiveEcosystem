@@ -175,6 +175,22 @@ bool FEcoScheduleStepClockUnitsTest::RunTest(const FString& Parameters)
 		for (int32 i = 0; i < 384; ++i) { Sum += C.Advance(1.0f / 120.0f, Step, Interval); }
 		TestEqual(TEXT("120FPS 384프레임(3.2초) = 192틱"), Sum, 192);
 	}
+	{
+		// 실제 vsync 60Hz: 프레임 시각은 n/60 근처에서 잡음(±0.3ms)으로 흔들린다. 매 프레임 정확히 1틱이어야
+		// 결정 간격이 8프레임으로 고정된다(예전 동작·파이썬 매 스텝 결정). 버림 기준이면 약 1/4 프레임이
+		// 0틱, 1/4 이 2틱이 된다.
+		EcoPolicy::FStepClock C;
+		FRandomStream Jitter(7);
+		double Prev = 0.0;
+		int32 Bad = 0;
+		for (int32 n = 1; n <= 3600; ++n)
+		{
+			const double Now = n / 60.0 + Jitter.FRandRange(-0.0003f, 0.0003f);
+			Bad += (C.Advance(static_cast<float>(Now - Prev), Step, Interval) != 1) ? 1 : 0;
+			Prev = Now;
+		}
+		TestEqual(TEXT("잡음 섞인 60FPS 도 매 프레임 정확히 1틱"), Bad, 0);
+	}
 	struct FCase { float Dt; int32 Ticks; };
 	for (const FCase& K : {FCase{1.0f / 20.0f, 3}, FCase{1.0f / 10.0f, 6}, FCase{1.0f / 5.0f, 12},
 						   FCase{Step, Interval}, FCase{5.0f, 300}, FCase{20.0f, 64 * Interval}})

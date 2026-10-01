@@ -21,8 +21,8 @@ namespace
 	/**
 	 * 포식 사망 표시. 사망 규칙은 이 한 곳에만 둔다 — 나중에 Lifecycle 에 Kill(Entity, Cause) 가
 	 * 생기면 이 함수만 바꾼다.
-	 *  - HP = 0 은 즉시 쓴다. 태그 교체는 지연되므로 같은 틱의 다른 포식자는 HP 검사로만
-	 *    이 개체를 건너뛴다. 그 검사는 지우면 안 된다.
+	 *  - HP = 0 은 즉시 쓴다. 태그 교체는 지연되므로 같은 틱의 다른 포식자가 이 개체를 보는 방식은
+	 *    포식 프로세서가 따로 기억한다(CaughtThisTick).
 	 *  - Alive → PendingDeath 는 명령 버퍼로 넣는다(구조 변경, MASS_PROCESSOR_ORDER.md).
 	 *    이 처리 페이즈 끝에 반영되고, 다음 틱부터 초식 쿼리 다섯 개 어디에도 걸리지 않는다.
 	 *    시체 정리(파괴·슬롯 해제·복제 제거)는 Lifecycle 몫이다.
@@ -458,9 +458,12 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 	const float HideMult = EcoBehaviorConfig::CoverHideMult;
 	const float EatCooldown = EcoBehaviorConfig::PredEatCooldownS;
 	const TArray<FEcoNeighborEntry>& Entries = Grid->GetEntries();
+	// 이번 틱에 잡힌 개체. 파이썬은 포식자마다 반경 안 최근접(argmin)을 따로 고르고, 고른 포식자는
+	// 모두 식사 쿨다운에 들어간다. 두 포식자가 같은 개체를 고르면 사망은 1건, 쿨다운은 둘 다다.
+	TSet<FMassEntityHandle> CaughtThisTick;
 
 	PredatorQuery.ForEachEntityChunk(Context,
-		[&EntityManager, Predation, Grid, &Entries, Dt, CatchRadius, HideMult, EatCooldown]
+		[&EntityManager, Predation, Grid, &Entries, &CaughtThisTick, Dt, CatchRadius, HideMult, EatCooldown]
 		(FMassExecutionContext& Ctx)
 	{
 		const TConstArrayView<FTransformFragment> Transforms =
@@ -497,11 +500,15 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 				{
 					continue;
 				}
-				// 같은 틱에 다른 포식자가 먼저 잡았을 수 있다.
-				const FEcoVitalsFragment* V = EntityManager.GetFragmentDataPtr<FEcoVitalsFragment>(E.Entity);
-				if (!V || V->HP <= 0.0f)
+				// 이번 틱에 다른 포식자가 잡은 개체도 최근접 후보로 남긴다(파이썬 argmin 과 같다).
+				// 그 밖에 HP 가 0인 개체는 다른 피해 경로로 죽은 것이라 건너뛴다.
+				if (!CaughtThisTick.Contains(E.Entity))
 				{
-					continue;
+					const FEcoVitalsFragment* V = EntityManager.GetFragmentDataPtr<FEcoVitalsFragment>(E.Entity);
+					if (!V || V->HP <= 0.0f)
+					{
+						continue;
+					}
 				}
 				Best = Index;
 				BestPerceived = Perceived;
@@ -515,10 +522,14 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 			// (지연)로 표시만 하고 생명주기는 Lifecycle 계층에 맡긴다 — 이 프로세서의 책임은
 			// **판정과 피식 보고**다 (§9.6). 테스트 레벨에서는 AEcoPolicyTestSpawner 가 리스폰을 대신한다.
 			const FMassEntityHandle Victim = Entries[Best].Entity;
-			MarkPredationKill(Ctx.Defer(),
-							  EntityManager.GetFragmentDataChecked<FEcoVitalsFragment>(Victim), Victim);
-			Predation->ReportPredation(Entries[Best].Location);
-			S.EatCooldown = EatCooldown;
+			if (!CaughtThisTick.Contains(Victim))
+			{
+				MarkPredationKill(Ctx.Defer(),
+								  EntityManager.GetFragmentDataChecked<FEcoVitalsFragment>(Victim), Victim);
+				Predation->ReportPredation(Entries[Best].Location);
+				CaughtThisTick.Add(Victim);
+			}
+			S.EatCooldown = EatCooldown;   // 같은 개체를 고른 포식자도 쿨다운에 들어간다
 		}
 	});
 

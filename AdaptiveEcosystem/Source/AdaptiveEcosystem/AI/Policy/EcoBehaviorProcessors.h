@@ -103,6 +103,8 @@ private:
  *   - **포식자 쪽에서** 판정한다. 초식이 포식자를 봤는지와 무관하다
  *   - 체감 거리 = 거리 × (초식이 은신처 안이면 CoverHideMult)
  *   - 포식자당 한 틱 한 마리, 잡으면 PredEatCooldownS 동안 사냥하지 않는다
+ *   - 포식자마다 반경 안 최근접을 따로 고른다. 두 포식자가 같은 개체를 고르면 사망은 1건이고
+ *     둘 다 쿨다운에 들어간다 (파이썬 argmin 과 같다)
  */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoPredationProcessor : public UMassProcessor

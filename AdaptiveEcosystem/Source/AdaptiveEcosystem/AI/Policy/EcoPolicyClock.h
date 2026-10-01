@@ -12,10 +12,17 @@
 
 namespace EcoPolicy
 {
-	/** 프레임 dt → 지나간 논리 틱 수. */
+	/**
+	 * 프레임 dt → 지나간 논리 틱 수.
+	 *
+	 * 누적값을 **반올림**해 센다(나머지는 [-0.5, 0.5)). 실제 vsync 60Hz 프레임은 n/60초 근처에서
+	 * 잡음으로 흔들리는데, 버림으로 세면 누적값이 정수 경계에 붙어 약 절반의 프레임이 0틱이나 2틱이
+	 * 된다. 반올림하면 잡음이 반 틱(약 8ms)보다 작은 한 60·30·20FPS 처럼 1/60초의 정수배 프레임은
+	 * 매 프레임 같은 틱 수가 나온다. 120Hz 처럼 프레임당 반 틱이면 위상이 번갈아 흔들리는 것은 남는다.
+	 */
 	struct FStepClock
 	{
-		/** 논리 틱 단위 오차 허용. 1/50초 × 160 = 191.99999 → 192 로 센다. */
+		/** 이 정도 미만의 나머지는 0으로 본다(공칭 FPS 에서 부동소수 오차가 쌓이지 않게). */
 		static constexpr double Epsilon = 1e-4;
 		/** 한 프레임에 처리하는 최대 스텝. 64 × 0.1333 = 8.5초 — 엔진 dt 상한을 넉넉히 넘는다. */
 		static constexpr int MaxCatchUpSteps = 64;
@@ -30,17 +37,17 @@ namespace EcoPolicy
 			}
 			const double TickSeconds = static_cast<double>(StepSeconds) / Interval;
 			Remainder += static_cast<double>(DeltaSeconds) / TickSeconds;
-			const double Whole = std::floor(Remainder + Epsilon);
+			const double Whole = std::floor(Remainder + 0.5);
 			const int MaxTicks = MaxCatchUpSteps * Interval;
 			if (Whole > MaxTicks)
 			{
 				Remainder = 0.0;
 				return MaxTicks;
 			}
-			Remainder -= Whole;
+			Remainder -= Whole;   // [-0.5, 0.5)
 			if (std::fabs(Remainder) < Epsilon)
 			{
-				Remainder = 0.0;   // 공칭 FPS 에서 오차가 쌓이지 않게
+				Remainder = 0.0;
 			}
 			return static_cast<int>(Whole);
 		}

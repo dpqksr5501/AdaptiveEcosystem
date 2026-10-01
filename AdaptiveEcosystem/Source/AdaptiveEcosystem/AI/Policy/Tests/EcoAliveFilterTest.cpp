@@ -18,6 +18,7 @@
 #include "../EcoBehaviorFragments.h"
 #include "../EcoBehaviorProcessors.h"
 #include "../EcoNeighborhoodSubsystem.h"
+#include "../EcoRegionPredationSubsystem.h"
 #include "EcoTestWorld.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
@@ -185,16 +186,27 @@ bool FEcoAliveDeadAgentIsFrozenTest::RunTest(const FString& Parameters)
 	Rig.EM->GetFragmentDataChecked<FEcoPolicyRuntimeFragment>(D).LastPolicyStep = Interval - 1;
 	// 처리 중이 아니므로 동기 API 로 시체를 만든다.
 	Rig.EM->SwapTagsForEntity(D, FEcoAliveTag::StaticStruct(), FEcoPendingDeathTag::StaticStruct());
+	// 지각은 처리하는 개체의 기하를 매 틱 기본값으로 다시 만든다. 감시값이 남아 있으면 지각이 D 를 건너뛴 것이다.
+	{
+		FEcoSteeringGeometryFragment& G = Rig.EM->GetFragmentDataChecked<FEcoSteeringGeometryFragment>(D);
+		G.KinCount = 99;
+		G.PredatorCount = 99;
+		G.DistPredMin = 1.0f;
+	}
 
 	Rig.Tick({Rig.Gather, Rig.Perception, Rig.Policy, Rig.Steering});
 	TestEqual(TEXT("색인에는 산 개체 A 만 들어간다"), Rig.Grid->Num(), 1);
 	TestEqual(TEXT("A 는 시체를 동료로 세지 않는다"), Rig.Geo(A).KinCount, 0);
 	TestTrue(TEXT("A 는 시체에게서 비키지 않는다"), Rig.Geo(A).Separation.Size() <= 1e-4);
 
-	for (int32 t = 1; t < 2 * Interval; ++t)
+	// 2·Interval-1 틱: 위상 주기의 배수가 아니어야 정책이 D 를 돌았을 때 위상이 달라져 드러난다.
+	for (int32 t = 1; t < 2 * Interval - 1; ++t)
 	{
 		Rig.Tick({Rig.Gather, Rig.Perception, Rig.Policy, Rig.Steering});
 	}
+	const FEcoSteeringGeometryFragment& GD = Rig.EM->GetFragmentDataChecked<FEcoSteeringGeometryFragment>(D);
+	TestTrue(TEXT("지각은 시체를 건너뛴다 (감시값 그대로)"),
+			 GD.KinCount == 99 && GD.PredatorCount == 99 && GD.DistPredMin == 1.0f);
 
 	const FVector Pos = Rig.EM->GetFragmentDataChecked<FTransformFragment>(D).GetTransform().GetLocation();
 	TestTrue(FString::Printf(TEXT("시체는 움직이지 않는다 (%s)"), *Pos.ToString()),
@@ -249,23 +261,29 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 
 bool FEcoAliveNoDoubleCatchTest::RunTest(const FString& Parameters)
 {
-	// 태그 교체는 지연되므로, 같은 틱에 두 포식자가 한 개체를 잡는 것은 HP 검사만 막는다.
-	// 그 검사를 지우면 이 테스트가 깨진다.
+	// 파이썬 world.py: 포식자마다 포획 반경 안 최근접(argmin)을 고르고, 고른 포식자는 모두 식사
+	// 쿨다운에 들어간다. 두 포식자가 같은 V 를 고르면 사망은 1건, 쿨다운은 둘 다다. 그래서 P2 반경 안의
+	// 더 먼 W 는 산다. 태그 교체는 지연되므로 '이번 틱에 이미 잡힘'은 프로세서가 따로 기억한다.
 	EcoAliveFilterTestImpl::FAliveRig Rig;
-	if (!Rig.Init(*this))
+	if (!Rig.Init(*this) || !TestNotNull(TEXT("피식 서브시스템"),
+										 Rig.Scoped.World->GetSubsystem<UEcoRegionPredationSubsystem>()))
 	{
 		return false;
 	}
 	const FMassEntityHandle V = Rig.AddHerb(FVector(0, 0, 0), FVector(1, 0, 0));
+	const FMassEntityHandle W = Rig.AddHerb(FVector(250, 0, 0), FVector(1, 0, 0));   // P2 에서 150cm
 	const FMassEntityHandle P1 = Rig.AddPred(FVector(-100, 0, 0));
 	const FMassEntityHandle P2 = Rig.AddPred(FVector(100, 0, 0));
 	Rig.TickGatherPerceptionPredation();
 
 	TestEqual(TEXT("V 는 잡힌다"), Rig.HP(V), 0.0f);
+	TestEqual(TEXT("W 는 산다 (P2 의 최근접은 V 였다)"), Rig.HP(W), 100.0f);
+	TestTrue(TEXT("W 는 Alive 다"), EcoTest::HasTag<FEcoAliveTag>(*Rig.EM, W));
 	const float C1 = Rig.EM->GetFragmentDataChecked<FEcoPredatorStateFragment>(P1).EatCooldown;
 	const float C2 = Rig.EM->GetFragmentDataChecked<FEcoPredatorStateFragment>(P2).EatCooldown;
-	const int32 Eaters = (C1 > 0.0f ? 1 : 0) + (C2 > 0.0f ? 1 : 0);
-	TestEqual(TEXT("한 개체는 한 포식자만 먹는다"), Eaters, 1);
+	TestTrue(TEXT("V 를 고른 포식자는 둘 다 쿨다운에 들어간다"), C1 > 0.0f && C2 > 0.0f);
+	TestEqual(TEXT("사망 보고는 1건"),
+			  Rig.Scoped.World->GetSubsystem<UEcoRegionPredationSubsystem>()->GetPendingDeaths(), 1);
 	return true;
 }
 
