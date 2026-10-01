@@ -8,12 +8,29 @@
 #include "EcoRegionPredationSubsystem.h"
 #include "EcoWorldProviders.h"
 #include "Mass/EntityFragments.h"
+#include "MassCommandBuffer.h"
 #include "MassExecutionContext.h"
 #include "MassMovementFragments.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 
 namespace
 {
+	/**
+	 * 포식 사망 표시. 사망 규칙은 이 한 곳에만 둔다 — 나중에 Lifecycle 에 Kill(Entity, Cause) 가
+	 * 생기면 이 함수만 바꾼다.
+	 *  - HP = 0 은 즉시 쓴다. 태그 교체는 지연되므로 같은 틱의 다른 포식자는 HP 검사로만
+	 *    이 개체를 건너뛴다. 그 검사는 지우면 안 된다.
+	 *  - Alive → PendingDeath 는 명령 버퍼로 넣는다(구조 변경, MASS_PROCESSOR_ORDER.md).
+	 *    이 처리 페이즈 끝에 반영되고, 다음 틱부터 초식 쿼리 다섯 개 어디에도 걸리지 않는다.
+	 *    시체 정리(파괴·슬롯 해제·복제 제거)는 Lifecycle 몫이다.
+	 */
+	void MarkPredationKill(FMassCommandBuffer& Commands, FEcoVitalsFragment& Vitals, FMassEntityHandle Victim)
+	{
+		Vitals.HP = 0.0f;
+		Commands.SwapTags<FEcoAliveTag, FEcoPendingDeathTag>(Victim);
+	}
+
 	/** §9.4 — 학습 정책과 §5.1 Utility 비교군을 런타임에 갈아끼운다. */
 	static TAutoConsoleVariable<int32> CVarUseLearnedPolicy(
 		TEXT("eco.UseLearnedPolicy"),
@@ -56,7 +73,11 @@ void UEcoNeighborhoodGatherProcessor::ConfigureQueries(
 	HerbivoreQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	HerbivoreQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadOnly);
 	HerbivoreQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
+	// 죽은 초식은 색인에 넣지 않는다 — 동료로 세어지거나 포식자의 표적이 되면 안 된다.
+	HerbivoreQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 
+	// 포식자는 생존 태그를 요구하지 않는다. v1·파이썬 모두 포식자는 죽지 않고,
+	// 생존 태그가 없는 포식자 템플릿(플레이어 등)도 계속 보여야 한다.
 	PredatorQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	PredatorQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadOnly);
 	PredatorQuery.AddTagRequirement<FEcoPredatorTag>(EMassFragmentPresence::All);
@@ -134,6 +155,7 @@ void UEcoPerceptionProcessor::ConfigureQueries(const TSharedRef<FMassEntityManag
 	EntityQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoSteeringGeometryFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
+	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 }
 
 void UEcoPerceptionProcessor::Execute(FMassEntityManager& EntityManager,
@@ -265,6 +287,7 @@ void UEcoPolicyProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>&
 	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FEcoPolicyRuntimeFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
+	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 }
 
 void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
@@ -371,8 +394,11 @@ UEcoPredationProcessor::UEcoPredationProcessor()
 	ExecutionFlags = static_cast<int32>(EProcessorExecutionFlags::Server
 									  | EProcessorExecutionFlags::Standalone);
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
-	// 필요한 건 이번 틱 이웃 색인(게더)뿐이다. 지각 뒤에 두는 건 기존 실행 순서를 유지하려고.
+	// 포획은 이동 뒤에 판정한다 (MASS_PROCESSOR_ORDER.md: Steering → … → Interaction → Lifecycle).
+	// 그래서 잡힌 개체가 같은 틱에 정책·조향을 다시 받는 일이 없고, 다음 틱부터는 Alive 가
+	// 없어 빠진다. 판정 위치는 이번 틱 게더 시점의 색인 위치다(이동 후 위치가 아니다).
 	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoPerceptionProcessor"));
+	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoSteeringProcessor"));
 	bRequiresGameThreadExecution = true;
 }
 
@@ -383,6 +409,7 @@ void UEcoPredationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManage
 	HerbivoreQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	HerbivoreQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadWrite);
 	HerbivoreQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
+	HerbivoreQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 
 	PredatorQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	PredatorQuery.AddRequirement<FEcoPredatorStateFragment>(EMassFragmentAccess::ReadWrite);
@@ -480,10 +507,12 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 				continue;
 			}
 
-			// 잡혔다. 파이썬은 슬롯을 즉시 리스폰하지만(§4.3) 여기서는 HP 를 0으로 두고
-			// 생명주기는 Lifecycle 계층에 맡긴다 — 이 프로세서의 책임은 **판정과 지역 보고**다
-			// (§9.6). 테스트 레벨에서는 AEcoPolicyTestSpawner 가 리스폰을 대신한다.
-			EntityManager.GetFragmentDataChecked<FEcoVitalsFragment>(Entries[Best].Entity).HP = 0.0f;
+			// 잡혔다. 파이썬은 슬롯을 즉시 리스폰하지만(§4.3) 여기서는 HP=0 + Alive→PendingDeath
+			// (지연)로 표시만 하고 생명주기는 Lifecycle 계층에 맡긴다 — 이 프로세서의 책임은
+			// **판정과 피식 보고**다 (§9.6). 테스트 레벨에서는 AEcoPolicyTestSpawner 가 리스폰을 대신한다.
+			const FMassEntityHandle Victim = Entries[Best].Entity;
+			MarkPredationKill(Ctx.Defer(),
+							  EntityManager.GetFragmentDataChecked<FEcoVitalsFragment>(Victim), Victim);
 			Predation->ReportPredation(Entries[Best].Location);
 			S.EatCooldown = EatCooldown;
 		}
@@ -512,6 +541,7 @@ void UEcoSteeringProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager
 	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
+	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 }
 
 void UEcoSteeringProcessor::Execute(FMassEntityManager& EntityManager,

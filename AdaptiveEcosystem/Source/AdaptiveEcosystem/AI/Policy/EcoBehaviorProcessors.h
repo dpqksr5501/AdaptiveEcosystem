@@ -1,15 +1,17 @@
 // §9.4 PolicyProcessor + §9.5 SteeringProcessor.
 //
-// 실행 순서 (§9.5 "Policy → Steering → Mass 이동"):
+// 실행 순서 (§9.5 "Policy → Steering → 이동", MASS_PROCESSOR_ORDER.md "… → Interaction → Lifecycle"):
 //
-//   1. UEcoNeighborhoodGatherProcessor   개체 위치를 색인에 넣는다 (매 틱)
-//   2. UEcoPerceptionProcessor           §3.3 기하 입력을 만든다   (매 틱)
-//   3. UEcoPolicyProcessor               관측 7개 → 행동 4개       (PolicyInterval 틱마다)
-//   4. UEcoSteeringProcessor             §3.3 조향 → 속도          (매 틱)
-//   5. (엔진) Mass 이동
+//   1. UEcoNeighborhoodGatherProcessor   산 초식 + 포식자를 색인에 넣는다 (매 틱)
+//   2. UEcoPerceptionProcessor           산 초식의 §3.3 기하 입력         (매 틱)
+//   3. UEcoPolicyProcessor               산 초식 관측 7개 → 행동 4개      (PolicyInterval 틱마다)
+//   4. UEcoSteeringProcessor             산 초식 조향 → 속도·위치         (매 틱)
+//   5. UEcoPredationProcessor            포획 판정. 잡히면 HP=0(즉시) + Alive→PendingDeath(지연)
+//   6. (페이즈 끝) 지연 명령 반영. 시체는 다음 틱부터 1~5 어디에도 걸리지 않는다
 //
 // 1과 2가 나뉘어 있는 이유: 색인이 **모든** 개체를 담은 뒤에야 조회가 맞다.
 // 2와 3이 나뉜 이유: 조향은 매 틱 기하가 필요한데 정책은 PolicyInterval 틱마다만 돈다.
+// 초식 쿼리는 전부 FEcoAliveTag 를 요구한다. 포식자 쿼리는 요구하지 않는다.
 //
 // 스레드: 이 첫 판은 전부 게임 스레드에서 돈다. 서브시스템 색인을 공유하기 때문이다.
 // 병렬화는 색인을 읽기 전용으로 굳힌 뒤의 최적화 과제다.

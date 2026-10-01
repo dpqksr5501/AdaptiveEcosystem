@@ -1,6 +1,8 @@
 #include "EcoBehaviorTraits.h"
 
+#include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
 #include "MassCommonUtils.h"
 #include "MassEntityManager.h"
@@ -15,6 +17,12 @@ void UEcoHerbivoreTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildCon
 	BuildContext.RequireFragment<FMassVelocityFragment>();
 
 	BuildContext.AddTag<FEcoHerbivoreTag>();
+	// 초식 쿼리는 전부 생존 태그를 요구한다. 논리 상태는 서버/스탠드얼론에만 있으므로
+	// EcoMassNetworkTrait 와 같은 규칙으로 붙인다. 여러 트레잇이 같은 태그를 넣어도 된다.
+	if (BuildContext.IsInspectingData() || World.GetNetMode() != NM_Client)
+	{
+		BuildContext.AddTag<FEcoAliveTag>();
+	}
 	// 이동은 UEcoSteeringProcessor 가 직접 적분한다. 엔진 UMassMovementTrait 는 기본값
 	// (bIsCodeDrivenMovement = true)에서 FMassCodeDrivenMovementTag 를 붙이므로, 같이 쓰면
 	// UMassApplyMovementProcessor 도 이 개체를 움직여 이동이 이중으로 적용되거나 속도가

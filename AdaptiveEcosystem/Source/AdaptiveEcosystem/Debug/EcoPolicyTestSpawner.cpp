@@ -6,7 +6,9 @@
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
+#include "MassCommandBuffer.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
 #include "MassMovementFragments.h"
@@ -118,7 +120,8 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 		return;
 	}
 
-	// §9.4/§9.5 쿼리가 요구하는 프래그먼트·태그의 합집합.
+	// §9.4/§9.5 쿼리가 요구하는 프래그먼트·태그의 합집합. 트레잇(UEcoHerbivoreTrait),
+	// 테스트(EcoTest::HerbivoreComposition)와 같아야 한다 — 바꾸면 세 곳을 같이 바꾼다.
 	const TArray<const UScriptStruct*> HerbComposition = {
 		FTransformFragment::StaticStruct(),
 		FMassVelocityFragment::StaticStruct(),
@@ -130,6 +133,8 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 		FEcoHerbivoreTag::StaticStruct(),
 		// 트레잇과 같은 구성. 이동은 조향 프로세서 몫이라 엔진 이동 프로세서를 막아 둔다.
 		FMassCustomMovementTag::StaticStruct(),
+		// 초식 쿼리는 전부 생존 태그를 요구한다. 잡히면 PendingDeath 로 바뀐다.
+		FEcoAliveTag::StaticStruct(),
 	};
 	// FEcoPredatorStateFragment 가 없으면 UEcoPredationProcessor 가 이 포식자를 못 본다.
 	const TArray<const UScriptStruct*> PredComposition = {
@@ -197,9 +202,9 @@ void AEcoPolicyTestSpawner::RespawnCaught()
 {
 	// 파이썬 §4.3 — 잡힌 슬롯을 즉시 월드 전체 균일 랜덤 위치로 되살린다. 개체 수는 고정.
 	//
-	// 실제 게임에서는 Lifecycle 계층의 몫이고 UEcoPredationProcessor 는 HP=0 으로 표시만 한다.
-	// 테스트 레벨에는 그 계층이 없어서, 이게 없으면 잡힌 개체가 HP 0 인 채로 계속 달리고
-	// 포식자는 그 "시체"를 최근접 표적으로 영원히 쫓는다.
+	// 실제 게임에서는 Lifecycle 계층의 몫이고 UEcoPredationProcessor 는 HP=0 + Alive→PendingDeath
+	// 로 표시만 한다. 시체는 초식 쿼리에서 빠져 그 자리에 멈춘다. 테스트 레벨에는 그 계층이 없어서
+	// 여기서 되살리고 태그를 Alive 로 되돌린다.
 	FMassEntityManager* EM = GetEntityManager(GetWorld());
 	if (!EM)
 	{
@@ -233,6 +238,14 @@ void AEcoPolicyTestSpawner::RespawnCaught()
 			FVector(FMath::Cos(A), FMath::Sin(A), 0.0f) * 10.0f;
 		Vitals.HP = Vitals.MaxHP;
 		Vitals.Energy = Vitals.MaxEnergy * EcoBehaviorConfig::InitEnergyFrac;
+		// 포획 때 넣은 Alive→PendingDeath 는 PrePhysics 페이즈 끝에 이미 반영됐다. 되돌리는 교체도
+		// 지연으로 넣는다 — 액터 틱은 Mass 처리와 겹칠 수 있어 동기 API 를 쓰지 않는다. 다음 틱
+		// 게더 전(이후 처리 페이즈 끝)에 반영된다.
+		EM->Defer().SwapTags<FEcoPendingDeathTag, FEcoAliveTag>(E);
+		// 파이썬은 리스폰한 슬롯의 관측을 바로 다시 만든다(world.py _observe_subset).
+		// 다음 틱에 새 위치의 관측으로 정책을 돌게 한다.
+		EM->GetFragmentDataChecked<FEcoPolicyRuntimeFragment>(E).LastPolicyStep =
+			FMath::Max(EcoBehaviorConfig::PolicyInterval, 1) - 1;
 	}
 }
 
