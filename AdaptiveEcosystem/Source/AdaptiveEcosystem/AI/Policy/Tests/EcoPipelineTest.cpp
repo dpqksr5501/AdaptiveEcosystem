@@ -209,6 +209,8 @@ bool FEcoPipelineSmokeTest::RunTest(const FString& Parameters)
 	int32 SawPredator = 0;
 	int32 NonZeroVelocity = 0;
 	int32 Fleeing = 0;
+	int32 YawMismatch = 0;
+	double WorstYawDot = 1.0;
 
 	for (const FMassEntityHandle& E : Herbivores)
 	{
@@ -250,6 +252,12 @@ bool FEcoPipelineSmokeTest::RunTest(const FString& Parameters)
 									 V.Size(), EcoBehaviorConfig::HerbSpeedCmS),
 					 FMath::IsNearlyEqual(static_cast<float>(V.Size()),
 										  EcoBehaviorConfig::HerbSpeedCmS, 1.0f));
+			// 파이썬 head = normalize(v): 움직이는 개체의 바라보는 방향은 속도 방향이다.
+			const FVector Fwd = EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform()
+									.GetRotation().GetForwardVector();
+			const double Dot = FVector::DotProduct(Fwd, V.GetSafeNormal());
+			WorstYawDot = FMath::Min(WorstYawDot, Dot);
+			if (Dot < 1.0 - 1e-4) { ++YawMismatch; }
 		}
 
 		const FEcoSteeringGeometryFragment& G =
@@ -288,6 +296,8 @@ bool FEcoPipelineSmokeTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("동족을 본 개체가 있어야 한다 (이웃 색인이 살아 있는가)"), SawKin > 0);
 	TestTrue(TEXT("포식자를 본 개체가 있어야 한다"), SawPredator > 0);
 	TestTrue(TEXT("움직이는 개체가 있어야 한다 (조향이 도는가)"), NonZeroVelocity > 0);
+	AddInfo(FString::Printf(TEXT("yaw-속도 방향 최악 dot %.6f"), WorstYawDot));
+	TestEqual(TEXT("움직이는 개체의 yaw 는 속도 방향이다"), YawMismatch, 0);
 	TestTrue(TEXT("속도가 위치에 반영돼야 한다 (개체가 실제로 이동하는가)"), Moved > 0);
 
 	// --- §9.4 콘솔 변수로 두 정책이 실제로 갈리는가 ---

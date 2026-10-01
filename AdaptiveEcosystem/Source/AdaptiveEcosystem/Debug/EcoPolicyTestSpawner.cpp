@@ -2,6 +2,7 @@
 
 #include "AI/Policy/EcoBehaviorConfig.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
+#include "AI/Policy/EcoHeading.h"
 #include "AI/Policy/EcoWorldProviders.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
@@ -161,11 +162,13 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 			const float R = Radius * FMath::Sqrt(Rand.FRand());   // 면적 균등
 			const FVector Loc = Origin + FVector(R * FMath::Cos(Angle), R * FMath::Sin(Angle), 0.0f);
 
-			EM->GetFragmentDataChecked<FTransformFragment>(E).GetMutableTransform().SetLocation(Loc);
-			// 정지 상태면 시야 판정이 전방 축에 고정되므로 초기 속도를 준다.
+			FTransform& T = EM->GetFragmentDataChecked<FTransformFragment>(E).GetMutableTransform();
+			T.SetLocation(Loc);
+			// 초기 heading(파이썬은 무작위)은 회전으로 준다. 속도는 첫 틱 지각에서 같은 방향을 주므로 남겨 둔다.
 			const float A2 = Rand.FRandRange(0.0f, 2.0f * PI);
-			EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value =
-				FVector(FMath::Cos(A2), FMath::Sin(A2), 0.0f) * 10.0f;
+			const FVector Dir(FMath::Cos(A2), FMath::Sin(A2), 0.0f);
+			T.SetRotation(EcoHeading::YawQuatFromDir(Dir));
+			EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value = Dir * 10.0f;
 			Out.Add(E);
 		}
 	};
@@ -190,6 +193,8 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 	{
 		const float A = Rand.FRandRange(0.0f, 2.0f * PI);
 		PredatorHeadings[i] = FVector(FMath::Cos(A), FMath::Sin(A), 0.0f);
+		EM->GetFragmentDataChecked<FTransformFragment>(Predators[i]).GetMutableTransform()
+			.SetRotation(EcoHeading::YawQuatFromDir(PredatorHeadings[i]));
 	}
 
 	bSpawned = true;
@@ -234,8 +239,9 @@ void AEcoPolicyTestSpawner::RespawnCaught()
 		T.SetLocation(FVector(SimRand.FRandRange(-Extent, Extent),
 							  SimRand.FRandRange(-Extent, Extent), Death.Z));
 		const float A = SimRand.FRandRange(0.0f, 2.0f * PI);
-		EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value =
-			FVector(FMath::Cos(A), FMath::Sin(A), 0.0f) * 10.0f;
+		const FVector Dir(FMath::Cos(A), FMath::Sin(A), 0.0f);
+		T.SetRotation(EcoHeading::YawQuatFromDir(Dir));   // world.py 리스폰 무작위 heading
+		EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value = Dir * 10.0f;
 		Vitals.HP = Vitals.MaxHP;
 		Vitals.Energy = Vitals.MaxEnergy * EcoBehaviorConfig::InitEnergyFrac;
 		// 포획 때 넣은 Alive→PendingDeath 는 PrePhysics 페이즈 끝에 이미 반영됐다. 되돌리는 교체도
@@ -347,6 +353,7 @@ void AEcoPolicyTestSpawner::MovePredators(float DeltaSeconds)
 		}
 
 		T.SetLocation(NewPos);
+		T.SetRotation(EcoHeading::YawQuatFromDir(Dir));   // 표현·복제가 보는 방향을 시야 부채꼴과 맞춘다
 		EM->GetFragmentDataChecked<FMassVelocityFragment>(Predators[i]).Value = Dir * Speed;
 		PredatorHeadings[i] = Dir.GetSafeNormal2D();
 		PredatorTargets[i] = Target;
@@ -402,10 +409,14 @@ void AEcoPolicyTestSpawner::DrawDebug() const
 		{
 			DrawDebugPoint(World, Top, HerbivorePointSize, Color, false, -1.0f, 0);
 		}
-		if (HeadingLineLength > 0.0f && !V.IsNearlyZero())
+		if (HeadingLineLength > 0.0f)
 		{
-			DrawDebugLine(World, Top, Top + V.GetSafeNormal2D() * HeadingLineLength, Color,
-						  false, -1.0f, 0, 3.0f);
+			// 지각이 쓰는 것과 같은 방향. 멈춘 개체는 유지된 heading 을 회색 가는 선으로 보인다.
+			const FTransform& Xf = EM->GetFragmentDataChecked<FTransformFragment>(E).GetTransform();
+			const FVector Head = EcoHeading::HeadingOf(Xf, V);
+			const bool bMoving = EcoHeading::IsMoving2D(V);
+			DrawDebugLine(World, Top, Top + Head * HeadingLineLength,
+						  bMoving ? Color : FColor(140, 140, 140), false, -1.0f, 0, bMoving ? 3.0f : 1.5f);
 		}
 		// §3.3 도주 분기가 켜진 개체 — 포식자 반대쪽으로 굵게.
 		if (G.DistPredMin < A.FleeDist * EcoBehaviorConfig::SeeRadiusCm)

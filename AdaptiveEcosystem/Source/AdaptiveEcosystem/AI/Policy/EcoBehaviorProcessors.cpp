@@ -2,6 +2,7 @@
 
 #include "EcoBehaviorConfig.h"
 #include "EcoBehaviorFragments.h"
+#include "EcoHeading.h"
 #include "EcoNeighborhoodSubsystem.h"
 #include "EcoPolicyClock.h"
 #include "EcoPolicyInference.h"
@@ -119,11 +120,8 @@ void UEcoNeighborhoodGatherProcessor::Execute(FMassEntityManager& EntityManager,
 			Entry.bPredator = bPredator;
 			Entry.bInCover = Cover ? Cover->IsInCover(Location) : false;
 
-			// 진행 방향. 정지 상태면 전방 축으로 둔다 (시야 판정이 무너지지 않게).
-			const FVector V = Velocities[i].Value;
-			Entry.Heading = V.SizeSquared2D() > KINDA_SMALL_NUMBER
-								? FVector(V.X, V.Y, 0.0f).GetSafeNormal()
-								: Transforms[i].GetTransform().GetRotation().GetForwardVector();
+			// 진행 방향. 멈추면 조향이 마지막으로 쓴 yaw (world.py head 규약).
+			Entry.Heading = EcoHeading::HeadingOf(Transforms[i].GetTransform(), Velocities[i].Value);
 			Grid->Add(Entry);
 		}
 	};
@@ -196,10 +194,8 @@ void UEcoPerceptionProcessor::Execute(FMassEntityManager& EntityManager,
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
 			const FVector Self = Transforms[i].GetTransform().GetLocation();
-			const FVector V = Velocities[i].Value;
-			const FVector Heading = V.SizeSquared2D() > KINDA_SMALL_NUMBER
-				? FVector(V.X, V.Y, 0.0f).GetSafeNormal()
-				: Transforms[i].GetTransform().GetRotation().GetForwardVector();
+			// 움직이면 속도 방향, 멈추면 조향이 마지막으로 쓴 yaw (world.py head 규약).
+			const FVector Heading = EcoHeading::HeadingOf(Transforms[i].GetTransform(), Velocities[i].Value);
 
 			FEcoSteeringGeometryFragment& G = Geometries[i];
 			G = FEcoSteeringGeometryFragment();   // 매 틱 새로 만든다
@@ -555,7 +551,7 @@ UEcoSteeringProcessor::UEcoSteeringProcessor()
 
 void UEcoSteeringProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
-	// Transform 은 ReadWrite 다 — 이 프로세서가 속도를 위치에 적분까지 한다. 이유는 Execute 참조.
+	// Transform 은 ReadWrite 다 — 이 프로세서가 속도를 위치에 적분하고 yaw 도 쓴다. 이유는 Execute 참조.
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FEcoSteeringGeometryFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly);
@@ -637,6 +633,11 @@ void UEcoSteeringProcessor::Execute(FMassEntityManager& EntityManager,
 
 			Velocities[i].Value = V;
 
+			FTransform& T = Transforms[i].GetMutableTransform();
+			// world.py `head = normalize(v) if moving else head`. 경계 반발까지 반영한 **최종 V** 로
+			// 쓴다 — 지각이 읽는 값과 같아야 한다. V = 0 이면 마지막 yaw 를 유지한다.
+			EcoHeading::WriteYawIfMoving(T, V);
+
 			// §9.5 — 속도를 위치에 적분한다. 파이썬 World.step() 이 `pos += v` 를 하는 자리다.
 			//
 			// 엔진의 UMassApplyMovementProcessor 에 맡기지 않는 이유:
@@ -644,7 +645,6 @@ void UEcoSteeringProcessor::Execute(FMassEntityManager& EntityManager,
 			// 요구한다. 둘을 아키타입에 넣으면 이동이 엔진의 가감속 모델을 타게 되는데,
 			// §3.3 은 `normalize(v) * herb_speed` 로 **속력이 항상 일정**하다고 못박고 있어
 			// 파이썬과 궤적이 어긋난다. 여기서 직접 적분하는 편이 계약에 맞는다.
-			FTransform& T = Transforms[i].GetMutableTransform();
 			FVector NewPos = T.GetLocation() + V * DeltaSeconds;
 			if (WorldExtent > 0.0f)
 			{

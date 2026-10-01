@@ -5,7 +5,7 @@
 //   1. UEcoNeighborhoodGatherProcessor   산 초식 + 포식자를 색인에 넣는다 (매 틱)
 //   2. UEcoPerceptionProcessor           산 초식의 §3.3 기하 입력         (매 틱)
 //   3. UEcoPolicyProcessor               산 초식 관측 7개 → 행동 4개      (StepSeconds 마다)
-//   4. UEcoSteeringProcessor             산 초식 조향 → 속도·위치         (매 틱)
+//   4. UEcoSteeringProcessor             산 초식 조향 → 속도·위치·yaw     (매 틱)
 //   5. UEcoPredationProcessor            포획 판정. 잡히면 HP=0(즉시) + Alive→PendingDeath(지연)
 //   6. (페이즈 끝) 지연 명령 반영. 시체는 다음 틱부터 1~5 어디에도 걸리지 않는다
 //
@@ -128,7 +128,10 @@ private:
 	int32 EmaPhase = 0;
 };
 
-/** §9.5 — §3.3 조향 수식. 파이썬 `env/steering.py` 와 한 줄씩 대응한다. */
+/**
+ * §9.5 — §3.3 조향 수식. 파이썬 `env/steering.py` 와 한 줄씩 대응한다.
+ * 움직일 때 Transform yaw = 속도 방향(즉시), 멈추면 유지한다 (world.py head 규약, EcoHeading.h).
+ */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoSteeringProcessor : public UMassProcessor
 {
