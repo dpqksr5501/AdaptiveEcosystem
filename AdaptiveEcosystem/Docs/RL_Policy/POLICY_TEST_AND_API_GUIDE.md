@@ -14,8 +14,9 @@
 **`Content/EcoTest/L_EcoPolicyTest`** 를 연다. 바닥, 조명, 스포너(`EcoPolicyTestSpawner_0`)
 하나뿐인 레벨이다. Play 하면 스포너가 Mass 엔티티를 만들고 정책·조향 프로세서가 바로 돈다.
 
-> 에디터가 켜지자마자 꺼지면 엔진 설치본의 Bridge/Fab 플러그인 문제다 (우리 코드와 무관).
-> `.uproject` 에서 두 플러그인을 끄거나 `-DisablePlugins=Bridge,Fab` 로 실행한다.
+> **UE 5.8.3** 에서 확인했다 (팀 에셋은 5.8.2·5.8.3 으로 저장돼 있다). 정식 5.8.0 보다 이전
+> 빌드에서는 에디터가 켜지자마자 꺼지거나 에셋이 `Custom version is too new` 로 안 열린다.
+> Epic Games Launcher 에서 5.8 을 최신 핫픽스로 업데이트한다.
 
 ### 1.2 순서
 

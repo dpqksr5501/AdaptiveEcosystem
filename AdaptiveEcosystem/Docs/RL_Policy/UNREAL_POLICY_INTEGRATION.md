@@ -71,13 +71,13 @@ python export_weights.py
 ```
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" <절대경로>/AdaptiveEcosystem.uproject "-ExecCmds=Automation RunTests AdaptiveEcosystem.Policy" "-testexit=Automation Test Queue Empty" -DisablePlugins=Bridge,Fab -unattended -nopause -nosplash -NullRHI -log
+"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" <절대경로>/AdaptiveEcosystem.uproject "-ExecCmds=Automation RunTests AdaptiveEcosystem.Policy" "-testexit=Automation Test Queue Empty" -unattended -nopause -nosplash -NullRHI -log
 ```
 
 테스트 레벨을 헤드리스로 25초 돌려 보기:
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" <절대경로>/AdaptiveEcosystem.uproject /Game/EcoTest/L_EcoPolicyTest -game "-ExecCmds=eco.UseLearnedPolicy 1" -DisablePlugins=Bridge,Fab -unattended -nopause -nosplash -NullRHI -NoSound -benchmark -benchmarkseconds=25 -fps=30
+"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" <절대경로>/AdaptiveEcosystem.uproject /Game/EcoTest/L_EcoPolicyTest -game "-ExecCmds=eco.UseLearnedPolicy 1" -unattended -nopause -nosplash -NullRHI -NoSound -benchmark -benchmarkseconds=25 -fps=30
 ```
 
 Git Bash 에서 돌릴 때는 `export MSYS_NO_PATHCONV=1` 을 먼저 해야 한다. 안 하면
@@ -149,26 +149,28 @@ Git Bash 에서 돌릴 때는 `export MSYS_NO_PATHCONV=1` 을 먼저 해야 한�
 반사한다. 잡힌 초식은 파이썬 §4.3 처럼 월드 전체 랜덤 위치로 즉시 리스폰한다 — 이게 없을 때는
 HP 0 인 개체가 계속 달리고 포식자가 그 "시체"를 영원히 쫓았다.
 
-## 5. 이 환경에서 막히는 것 두 가지
+## 5. 엔진 버전 — UE 5.8.3 에서 확인
 
-**둘 다 우리 코드와 무관하다.**
+팀 에셋은 5.8.2·5.8.3 으로 저장돼 있다. 개발 PC 한 대의 5.8 설치본이 한동안 **정식 5.8.0
+보다 이전 빌드**(5.8.0 CL 53629095)였고, 그 때문에 아래 두 가지가 막혔다. 둘 다 우리 코드와
+무관하고, 2026-09-30 에 5.8.3(CL 58210709)으로 올린 뒤 모두 풀렸다.
 
-1. **엔진 설치본의 `Bridge`(Megascans)·`Fab` 플러그인 바이너리가 엔진과 안 맞는다.**
-   DLL 은 있지만 로드가 실패한다 (`UnrealEditor-Bridge.dll` → `GetLastError=126`,
-   `UnrealEditor-MegascansPlugin.dll` → `127` "프로시저를 찾을 수 없음"). 플러그인 DLL 은
-   2026-06-21, 엔진 코어(`UnrealEditor-Engine.dll`)는 2026-05-13 빌드다 — 플러그인이 더
-   새 엔진에 맞춰져 있다. 에디터가 시작 직후 `EngineExit()` 으로 종료된다. 위 명령들이 전부
-   `-DisablePlugins=Bridge,Fab` 를 다는 이유다. GUI 로 열려면 Epic Games Launcher 에서
-   UE 5.8 을 복구 설치하거나 `.uproject` 에 두 플러그인을 `"Enabled": false` 로 박는다.
-   (처음에는 "바이너리가 없다"고 적었는데 틀렸다. 파일은 있고 버전이 안 맞는 것이다.)
+1. **에디터가 시작 직후 꺼졌다.** 엔진에 딸린 `Bridge`(Megascans)·`Fab` 플러그인은 정식
+   5.8.0(CL 55116800)용이라 옛 엔진에서 DLL 로드가 실패했다 (`UnrealEditor-Bridge.dll` →
+   `GetLastError=126`, `UnrealEditor-MegascansPlugin.dll` → `127` "프로시저를 찾을 수 없음").
+   그동안은 `.uproject` 에서 두 플러그인을 끄고 헤드리스 명령에 `-DisablePlugins=Bridge,Fab`
+   를 달았다. 5.8.3 에서는 둘 다 정상으로 로드돼 필요 없다.
 
-2. **`Content/` 에셋 144개가 UE 5.8 보다 새 엔진에서 저장돼 로드되지 않는다.**
-   `OpenWorld.umap`, `BP_SkyManager`, `BP_WeatherManager` 등.
+2. **`Content/` 의 팀 에셋이 안 열렸다.** `OpenWorld.umap`, `BP_SkyManager` 등 전부다.
    ```
    Custom version is too new; UE5-Release: Package: 68, HeadCode: 65
    ```
-   LFS 포인터 문제가 아니라 실제 에셋이고 헤더 버전이 이 엔진보다 높다.
-   그래서 테스트 레벨을 `/Game/EcoTest/` 에 **새로** 만들었다 — 기존 콘텐츠에 의존하지 않는다.
+   LFS 포인터 문제가 아니라 실제 에셋이고, 옛 엔진이 아는 버전(65)보다 높았다. 테스트 레벨을
+   `/Game/EcoTest/` 에 **새로** 만든 것도 이때 기존 콘텐츠를 열 수 없었기 때문이다 — 지금도
+   기존 콘텐츠에 의존하지 않는다.
+
+에디터가 켜지자마자 꺼지거나 위 메시지가 보이면 `Engine/Build/Build.version` 의 버전을 확인하고
+Epic Games Launcher 에서 5.8 을 최신 핫픽스로 업데이트한다.
 
 ## 6. 아직 안 한 것
 
