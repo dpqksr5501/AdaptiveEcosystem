@@ -16,3 +16,7 @@ ckpt/*
 __pycache__/
 *.py[cod]
 .pytest_cache/
+# V2 산출물 — 영상·학습 로그는 재생성 가능하다. 진단 결과(JSON·MD)는 남긴다.
+results/v2/*.mp4
+results/v2/*.gif
+results/v2/*.log
