@@ -19,6 +19,7 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 - ✅ [POLICY_TEST_AND_API_GUIDE.md](RL_Policy/POLICY_TEST_AND_API_GUIDE.md) : 테스트 레벨에서 확인할 것, 열어 둔 값, 다른 시스템이 연결할 API
 - 🔧 [UNREAL_POLICY_INTEGRATION.md](RL_Policy/UNREAL_POLICY_INTEGRATION.md) : 파이썬 → 언리얼 정책 통합의 빌드·검증·가중치 갱신 절차와 구현 세부
 - 🗺️ [RL_V2_PLAN.md](RL_Policy/RL_V2_PLAN.md) : 초식 RL v2 계획서 (초안) — 생생한 움직임, 환경과의 상호작용(먹이 고갈·낮밤·지역 이동·날씨), 시간에 따라 달라지는 행동
+- 🔁 [RL_SEASON_RETRAIN_PLAN.md](RL_Policy/RL_SEASON_RETRAIN_PLAN.md) : 시즌 재학습 계획서(초안, 시연용) — 게임 상황 요약으로 시뮬레이터에서 이어 학습하고 검증을 통과한 가중치만 언리얼에 넣는 사이드트랙
 - 📤 [SEASON_SNAPSHOT_SPEC.md](RL_Policy/SEASON_SNAPSHOT_SPEC.md) : 시즌 내보내기 명세(초안) — 게임 서버가 시즌마다 시뮬레이터로 넘길 요약값, 서버 쪽 구현 체크리스트
 - 🐍 [herbivore_rl/docs/PROJECT_SUMMARY.md](../../herbivore_rl/docs/PROJECT_SUMMARY.md) : 파이썬 학습 환경·PPO 학습·평가의 전체 과정과 결과
 
