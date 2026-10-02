@@ -27,6 +27,15 @@
         --png 884 --png-dpi 150 \
         --caption "1-3 v2.1 · 평가 시드 10000 · 같은 세계·카메라. 점 색: 정지 회색, 걷기 초록, 뛰기 주황" \
         --out results/v2/replay_v2_1_compare.mp4
+    # 1-6 v2.2 판정 영상 (results/v2/s1_6/PREREG.md 8절, results/v2/stage1_v2_2.md). 학습 시드 0·정지 화면 스텝 0 은
+    # 사전 등록 규칙의 값이다(1차 세 지표의 크기를 모두 넘은 시드가 없어 첫 시드, C0 에 경계 개체가 없어 첫 스텝 —
+    # stage1_6_v2_2.json 의 video 칸). 장면 정지 화면과 1배속 클립은 results/v2/s1_6/video_extra.py 가 만든다.
+    python replay_v2.py --config configs/v2_2.yaml --compare learned:ckpt/v2/v2_2_s0.zip \
+        perm:learned:ckpt/v2/v2_2_s0.zip --labels "C0 학습 정책 (v2_2_s0)" \
+        "C1′ 행동 순열 (보행·경계 빈도 같음, 상태와의 짝만 끊김)" --seed 10000 --steps 1800 --stride 2 \
+        --png 0 --png-dpi 150 \
+        --caption "1-6 v2.2 · 평가 시드 10000 · 같은 세계·카메라. 점 색: 정지 회색, 걷기 초록, 뛰기 주황 · 흰 테두리 = 경계" \
+        --out results/v2/replay_v2_2_compare.mp4
 
 `env_v2.world.World` 를 돌린다. 기능 스위치를 모두 끄면 v1 과 같은 세계다.
 v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
