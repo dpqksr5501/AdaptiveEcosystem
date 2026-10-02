@@ -1,0 +1,32 @@
+# Gate E1 B1 팔 r2_5_ew0_5 — gate_e1.py configs 가 configs/v2_1.yaml 에서 만들었다. 손으로 고치지 않는다.
+# 바꾼 계수(그 밖은 configs/v2_1.yaml 와 같다): 뛰기 대사 배수 R = 2.5 (걷기 배수 1 고정) →
+#   c_rest = (21 − 4(R − 1))/21 = 0.7142857142857143, c_move = 25(R − 1)/21 = 1.7857142857142858
+#   대사 배수 [정지, 걷기, 뛰기] = [0.7143, 1.0000, 2.5000], 걷기 섭식 배수 e_walk = 0.5
+# 시도 E1-b: 포식자 속도 범위 rand.pred_speed_mult = [0.6, 0.95] (overrides 를 거친 값)
+version: '2.1'
+overrides:
+  rand:
+    pred_speed_mult:
+    - 0.6
+    - 0.95
+features:
+  speed:
+    enabled: true
+    thresholds:
+    - 0.3333333333333333
+    - 0.6666666666666666
+    gait_speed:
+    - 0.0
+    - 0.4
+    - 1.0
+    gait_eat:
+    - 1.0
+    - 0.5
+    - 0.0
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+train:
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256

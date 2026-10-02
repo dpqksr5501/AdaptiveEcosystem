@@ -1,10 +1,16 @@
 """Gate E1 — v2.1 보행·대사의 행동 게이트 (계획서 1-2, 4.4, 5.0, 6.2). 사전 등록: results/v2/e1/PREREG.md
 
-    python gate_e1.py configs --round R0 --run-mult 2 3.625 6 --walk-eat 0.5   # 회차의 팔(배수) 설정 생성
-    python gate_e1.py run --round R0 --arm r3_625_ew0_5 --workers 6               # 팔 하나: C2 → C2-seg → 고정 보행 3종 → G_0.998
-    python gate_e1.py judge                                                        # 모든 회차 판정표(judge.json·judge.md)
+    python gate_e1.py configs --round B0 --run-mult 2 3.625 6 --walk-eat 0.5   # 회차의 팔(배수) 설정 생성
+    python gate_e1.py run --round B0 --arm r3_625_ew0_5 --workers 6               # 팔 하나: C2 → C2-seg → 고정 보행 3종 → G_0.998
+    python gate_e1.py judge --attempt E1-b                                         # 그 시도의 모든 회차 판정표
 
 - 10-02 변경(계획서 1-2 행): v2.0b 를 미뤄 v1 먹이(configs/v2_1.yaml 의 v2.0 먹이) 위에서 하고 (d) 는 뺀다.
+- 시도(`ATTEMPTS`): E1(회차 R0~R2, 포식자 속도 ×0.8~1.2 = v1, FAIL로 끝남, 판정표 judge.md·judge.json)과
+  E1-b(10-02 사람 결정·사전 등록 변경, 회차 B0~B2, 포식자 속도 ×0.6~0.95 = configs/v2_1.yaml 의 overrides, 판정표
+  judge_e1b.md·judge_e1b.json). 판정 규칙·기준은 같고, 보정 예산(최대 2회)과 반복 회차 멈춤은 시도마다 따로 센다.
+  팔 설정을 만들 때·돌릴 때·판정할 때 설정의 rand.pred_speed_mult 가 그 회차 시도의 값과 같은지 확인하고, 이미 있는
+  팔 설정 파일은 내용이 다르면 덮지 않는다. 지금 configs/v2_1.yaml 은 E1-b 값이라 E1 회차(R*) 설정은 새로 만들 수 없다
+  (E1 설정은 results/v2/e1/configs/R*.yaml 에 남아 있다).
 - 팔 하나 = (뛰기 대사 배수 R, 걷기 섭식 배수 e_walk). 대사식 drain = energy_drain·(c_rest + c_move·(v/herb_speed)²)
   에서 걷기 대사 배수를 1(= v1 대사, 4.4 "평시 에너지 예산을 v1 과 같게")로 묶고 뛰기 배수를 R 로 두면
   c_move = (R − 1)/(1 − 0.4²) = 25(R − 1)/21, c_rest = 1 − 0.4²·c_move = (21 − 4(R − 1))/21 이다. R = 3.625 가
@@ -34,8 +40,18 @@ ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "results" / "v2" / "e1"
 BASE_CONFIG = ROOT / "configs" / "v2_1.yaml"
 
-ROUNDS = ("R0", "R1", "R2")               # R0 = 제안값과 배수 훑기, R1·R2 = 보정 1·2회차 (5.0 최대 2회)
-ROUND_LABEL = {"R0": "R0 제안값·배수 훑기", "R1": "R1 보정 1회차", "R2": "R2 보정 2회차"}
+# 시도마다: 회차 이름(0 = 제안값과 배수 훑기, 1·2 = 보정 1·2회차, 5.0 최대 2회), 세계의 포식자 속도 범위
+# (rand.pred_speed_mult, herb_speed 대비), 판정표 파일 이름. E1-b 는 새 시도라 보정 예산을 다시 센다(PREREG 변경 기록).
+ATTEMPTS = {
+    "E1": dict(rounds=("R0", "R1", "R2"), pred_speed_mult=(0.8, 1.2), judge_stem="judge",
+               title="Gate E1 판정표"),
+    "E1-b": dict(rounds=("B0", "B1", "B2"), pred_speed_mult=(0.6, 0.95), judge_stem="judge_e1b",
+                 title="Gate E1-b 판정표 (포식자 속도 ×0.6~0.95)"),
+}
+ROUNDS = tuple(r for a in ATTEMPTS.values() for r in a["rounds"])
+MAX_ROUNDS = 3                            # 시도마다 회차 0 + 보정 최대 2회 (5.0)
+ROUND_LABEL = {"R0": "R0 제안값·배수 훑기", "R1": "R1 보정 1회차", "R2": "R2 보정 2회차",
+               "B0": "B0 제안값·배수 훑기 (E1-b)", "B1": "B1 보정 1회차 (E1-b)", "B2": "B2 보정 2회차 (E1-b)"}
 
 # 4.4 표의 걷기 속력(× herb_speed). 걷기 대사 배수 = c_rest + c_move·WALK_SPEED² 를 1 로 묶는다.
 WALK_SPEED = 0.4
@@ -70,8 +86,27 @@ CRITERIA = ("common", "a", "b", "c")
 
 
 # --------------------------------------------------------------------- #
-# 팔(배수) 설정
+# 시도와 팔(배수) 설정
 # --------------------------------------------------------------------- #
+
+
+def attempt_of(rnd: str) -> str:
+    """회차 이름 → 시도 이름 (R* = E1, B* = E1-b)."""
+    for name, a in ATTEMPTS.items():
+        if rnd in a["rounds"]:
+            return name
+    raise ValueError(f"모르는 회차 {rnd!r}. 쓸 수 있는 회차: {', '.join(ROUNDS)}")
+
+
+def check_attempt_world(rnd: str, cfg, where: str = "설정") -> None:
+    """설정의 포식자 속도 범위가 그 회차 시도의 값과 같은지 본다. 다르면 ValueError."""
+    att = attempt_of(rnd)
+    want = [float(x) for x in ATTEMPTS[att]["pred_speed_mult"]]
+    got = [float(x) for x in cfg.rand["pred_speed_mult"]]
+    if got != want:
+        raise ValueError(f"{where} 의 rand.pred_speed_mult {got} 가 {rnd} 회차 시도 {att} 의 값 {want} 와 다르다. "
+                         "시도와 회차 이름을 맞춘다(E1 = R*, E1-b = B*). E1 의 팔 설정은 results/v2/e1/configs/R*.yaml "
+                         "에 이미 있다")
 
 
 def metabolism(run_mult: float) -> tuple[float, float]:
@@ -101,25 +136,41 @@ def arm_config(run_mult: float, walk_eat: float, base: Path = BASE_CONFIG) -> di
     return d
 
 
-def write_arm_config(rnd: str, run_mult: float, walk_eat: float, out: Path | None = None) -> Path:
+def write_arm_config(rnd: str, run_mult: float, walk_eat: float, out: Path | None = None,
+                     base: Path = BASE_CONFIG) -> Path:
+    """회차 팔 설정 yaml 을 쓴다. 바탕 설정의 포식자 속도가 회차 시도와 다르면 쓰지 않는다(ValueError).
+
+    같은 파일이 이미 있으면 내용이 같을 때만 그대로 두고, 다르면 덮지 않는다(FileExistsError).
+    """
+    from env_v2.config import load_v2_config      # 읽혀야 한다(형식 검사)
+    from env_v2.world import _speed_params
+    att = attempt_of(rnd)
+    check_attempt_world(rnd, load_v2_config(base), rel(base))
     out = OUT if out is None else out
-    d = arm_config(run_mult, walk_eat)
+    d = arm_config(run_mult, walk_eat, base)
     c_rest, c_move = metabolism(run_mult)
     sp = d["features"]["speed"]
     mult = [c_rest + c_move * s * s for s in sp["gait_speed"]]
+    psm = list(ATTEMPTS[att]["pred_speed_mult"])
     head = [
-        f"# Gate E1 {rnd} 팔 {arm_name(run_mult, walk_eat)} — gate_e1.py configs 가 configs/v2_1.yaml 에서 만들었다. 손으로 고치지 않는다.",
-        f"# 바꾼 계수(그 밖은 configs/v2_1.yaml 과 같다): 뛰기 대사 배수 R = {run_mult:g} (걷기 배수 1 고정) →",
+        f"# Gate E1 {rnd} 팔 {arm_name(run_mult, walk_eat)} — gate_e1.py configs 가 {rel(base)} 에서 만들었다. 손으로 고치지 않는다.",
+        f"# 바꾼 계수(그 밖은 {rel(base)} 와 같다): 뛰기 대사 배수 R = {run_mult:g} (걷기 배수 1 고정) →",
         f"#   c_rest = (21 − 4(R − 1))/21 = {c_rest!r}, c_move = 25(R − 1)/21 = {c_move!r}",
         f"#   대사 배수 [정지, 걷기, 뛰기] = [{', '.join(f'{m:.4f}' for m in mult)}], 걷기 섭식 배수 e_walk = {walk_eat:g}",
+        f"# 시도 {att}: 포식자 속도 범위 rand.pred_speed_mult = {psm} (overrides 를 거친 값)",
         "",
     ]
+    text = "\n".join(head) + yaml.safe_dump(d, sort_keys=False, allow_unicode=True)
     path = out / "configs" / f"{rnd}_{arm_name(run_mult, walk_eat)}.yaml"
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("\n".join(head) + yaml.safe_dump(d, sort_keys=False, allow_unicode=True), encoding="utf-8")
-    from env_v2.config import load_v2_config      # 읽혀야 한다(형식 검사)
-    from env_v2.world import _speed_params
-    p = _speed_params(load_v2_config(path).v2["features"]["speed"])
+    if path.exists():
+        if path.read_text(encoding="utf-8") != text:
+            raise FileExistsError(f"{rel(path)} 가 이미 있고 내용이 다르다. 덮지 않는다")
+    else:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(text, encoding="utf-8")
+    cfg = load_v2_config(path)
+    check_attempt_world(rnd, cfg, rel(path))
+    p = _speed_params(cfg.v2["features"]["speed"])
     assert abs(p["drain_mult"][1] - 1.0) < 1e-12 and abs(p["drain_mult"][2] - run_mult) < 1e-12, p
     return path
 
@@ -191,7 +242,12 @@ def cmd_run(args) -> int:
         raise SystemExit(f"{rel(cfg)} 가 없다. 먼저 gate_e1.py configs --round {args.round} ... 로 만든다")
     from diagnose_v2 import config_digest
     from env_v2.config import load_v2_config
-    digest = config_digest(load_v2_config(cfg))
+    arm_cfg = load_v2_config(cfg)
+    try:
+        check_attempt_world(args.round, arm_cfg, rel(cfg))
+    except ValueError as e:
+        raise SystemExit(str(e))
+    digest = config_digest(arm_cfg)
     d = arm_dir(args.round, args.arm, out)
     d.mkdir(parents=True, exist_ok=True)
     log = d / "run.log"
@@ -240,7 +296,10 @@ def cmd_configs(args) -> int:
     out = Path(args.out) if args.out else OUT
     for r in args.run_mult:
         for e in args.walk_eat:
-            p = write_arm_config(args.round, r, e, out)
+            try:
+                p = write_arm_config(args.round, r, e, out)
+            except (ValueError, FileExistsError) as err:
+                raise SystemExit(str(err))
             print(f"{rel(p)}  (arm {arm_name(r, e)})")
     return 0
 
@@ -361,7 +420,7 @@ def next_round(history: list[dict]) -> dict:
     last = history[-1]
     if last.get("selected"):
         return {"action": "pass", "reason": f"{last['round']} 에서 {last['selected']} 통과"}
-    if len(history) >= len(ROUNDS):
+    if len(history) >= MAX_ROUNDS:
         return {"action": "stop", "reason": "보정 2회 뒤에도 통과한 팔이 없다(5.0). 멈추고 보고한다"}
     if any(v["judge"].get("g998_only") for v in last["arms"].values()):
         return {"action": "stop", "reason": "γ_train 은 실패, G_0.998 로만 공통 규칙 통과인 팔이 있다 — PREREG 3.6 의 "
@@ -401,7 +460,10 @@ def _arm_set(r: dict) -> tuple:
 
 
 def _not_repeated(history: list[dict], nxt: dict) -> dict:
-    """다음 회차가 이미 돌린 회차와 같은 계수면 멈춘다(결정적이라 같은 결과가 나온다. PREREG 변경 기록 10-02)."""
+    """다음 회차가 이미 돌린 회차와 같은 계수면 멈춘다(결정적이라 같은 결과가 나온다. PREREG 변경 기록 10-02).
+
+    history 는 한 시도의 회차뿐이다. 다른 시도(세계가 다름)의 회차와는 비교하지 않는다.
+    """
     want = tuple(sorted((round(float(r), 6), round(float(nxt["walk_eat"]), 6)) for r in nxt["run_mults"]))
     for r in history:
         if _arm_set(r) == want:
@@ -423,7 +485,9 @@ def load_round(rnd: str, out: Path | None = None) -> dict | None:
     walk_eats = set()
     for cfg in cfgs:
         arm = cfg.stem[len(rnd) + 1:]
-        p = _speed_params(load_v2_config(cfg).v2["features"]["speed"])
+        arm_cfg = load_v2_config(cfg)
+        check_attempt_world(rnd, arm_cfg, rel(cfg))
+        p = _speed_params(arm_cfg.v2["features"]["speed"])
         d = base / arm
         c2, seg = load_json(d / "constsearch.json"), load_json(d / "constsearch_seg.json")
         fixed = {n: load_json(d / f"fixed_{n}.json") for n, _ in FIXED_GAITS}
@@ -510,10 +574,12 @@ def md_round(r: dict) -> list[str]:
     return L
 
 
-def cmd_judge(args) -> int:
-    out = Path(args.out) if args.out else OUT
+def judge_attempt(attempt: str, out: Path | None = None) -> tuple[dict, list[str]]:
+    """한 시도의 모든 회차를 판정한다 → (판정 json 내용, 판정표 md 줄). 파일은 쓰지 않는다."""
+    out = OUT if out is None else out
+    att = ATTEMPTS[attempt]
     history, rounds = [], {}
-    for rnd in ROUNDS:
+    for rnd in att["rounds"]:
         r = load_round(rnd, out)
         if r is None:
             break
@@ -538,16 +604,22 @@ def cmd_judge(args) -> int:
                          seg_table=arm["judge"]["common"]["table"])
         elif nx["action"] == "stop":
             final = dict(verdict="FAIL", round=history[-1]["round"], reason=nx["reason"])
-    data = {"generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    if final:
+        final["attempt"] = attempt
+    data = {"generated": datetime.now(timezone.utc).isoformat(timespec="seconds"), "attempt": attempt,
+            "pred_speed_mult": list(att["pred_speed_mult"]),
             "criteria": CRIT, "t_crit": T_CRIT, "rounds": rounds, "final": final}
-    out.mkdir(parents=True, exist_ok=True)
-    (out / "judge.json").write_text(json.dumps(data, ensure_ascii=False, indent=1, default=float), encoding="utf-8")
-    L = ["# Gate E1 판정표 (gate_e1.py judge 가 만든다. 손으로 고치지 않는다)", "",
+    L = [f"# {att['title']} (gate_e1.py judge 가 만든다. 손으로 고치지 않는다)", "",
          "- 사전 등록: `results/v2/e1/PREREG.md`. 평가 시드 10000~10019 × 5000스텝, 결정적 상수 정책, "
          "G_γ 는 γ_train(0.9917), 괄호 t 는 평가 시드 짝지은 t(자유도 19, 기준 2.093)",
          f"- 기준: 공통 = C2-seg G_γ 가 C2 보다 높고 t > {T_CRIT}, 구간별 보행이 둘 이상. (a) 아사 비중 "
          f"{CRIT['starve_lo']}~{CRIT['starve_hi']}, energy<0.5 ≥ {CRIT['hungry_min']} (C2-seg). (b) C2-seg 걷기 > "
-         f"{CRIT['walk_min']}. (c) 항상 걷기 아사율 < 항상 뛰기 아사율 (구성상 성립, sanity)", ""]
+         f"{CRIT['walk_min']}. (c) 항상 걷기 아사율 < 항상 뛰기 아사율 (구성상 성립, sanity)"]
+    if attempt != "E1":
+        L.append(f"- 시도 {attempt}(10-02 사전 등록 변경, PREREG 변경 기록): 세계의 포식자 속도 범위만 "
+                 f"rand.pred_speed_mult {list(ATTEMPTS['E1']['pred_speed_mult'])} → {list(att['pred_speed_mult'])}. "
+                 "판정 규칙·기준·보정 규칙은 E1 과 같고, 보정 예산(최대 2회)은 이 시도에서 새로 센다")
+    L.append("")
     for r in rounds.values():
         L += md_round(r)
         if "next" in r:
@@ -557,7 +629,16 @@ def cmd_judge(args) -> int:
         L += ["## 종합", "", f"- **{final['verdict']}** ({final['round']}" +
               (f", {final['arm']}: R {final['run_mult']:g}, c_rest {final['c_rest']!r}, c_move {final['c_move']!r}, "
                f"e_walk {final['walk_eat']:g})" if final["verdict"] == "PASS" else f") — {final['reason']}"), ""]
-    (out / "judge.md").write_text("\n".join(L) + "\n", encoding="utf-8")
+    return data, L
+
+
+def cmd_judge(args) -> int:
+    out = Path(args.out) if args.out else OUT
+    data, L = judge_attempt(args.attempt, out)
+    stem = ATTEMPTS[args.attempt]["judge_stem"]
+    out.mkdir(parents=True, exist_ok=True)
+    (out / f"{stem}.json").write_text(json.dumps(data, ensure_ascii=False, indent=1, default=float), encoding="utf-8")
+    (out / f"{stem}.md").write_text("\n".join(L) + "\n", encoding="utf-8")
     print("\n".join(L))
     return 0
 
@@ -576,7 +657,9 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--arm", required=True)
     s.add_argument("--workers", type=int, default=6)
     s.add_argument("--smoke", action="store_true", help="도구 시험(작은 조건). --out 을 결과 디렉터리 밖으로 준다")
-    sub.add_parser("judge", parents=[common], help="모든 회차를 판정해 judge.json·judge.md 를 만든다")
+    s = sub.add_parser("judge", parents=[common], help="한 시도의 모든 회차를 판정해 판정표(json·md)를 만든다")
+    s.add_argument("--attempt", required=True, choices=list(ATTEMPTS),
+                   help="E1 = 회차 R* → judge.json·judge.md, E1-b = 회차 B* → judge_e1b.json·judge_e1b.md")
     return p
 
 

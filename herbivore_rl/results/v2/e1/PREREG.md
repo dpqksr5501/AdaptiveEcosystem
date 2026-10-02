@@ -108,3 +108,28 @@ python diagnose_v2.py constsearch --config <같음> --workers 6 --out <같음>/g
 - 2026-10-02(R0 시작 전): 도구 시험 1회. 제안 팔 하나를 scratchpad에서 `--smoke`(탐색 3 trial·1시드·700스텝, 평가 2시드 × 1300스텝)로 돌려 명령 순서·JSON·판정표가 끝까지 도는지 봤다. 그 값은 판정에 쓰지 않는다. 이때 찾은 도구 결함 하나를 고쳤다: diagnose_v2가 nan을 null로 쓰는데 `gate_e1.judge_arm`이 그 값을 숫자로 읽어 멈췄다(규칙 변경 없음). 생성한 R0 제안 팔 설정은 `configs/v2_1.yaml`과 config_digest가 같다(50bd812219b4).
 - 2026-10-02(R0 판정 뒤, R1 결과 보기 전): R0는 세 팔 모두 실패했다(`judge.md`). 기준 팔은 통과 항목 수가 셋 다 3이라 동률 규칙으로 제안 팔(R 3.625)이고, 그 팔의 실패는 공통 규칙뿐이라 4절 규칙 4로 R1 = R {1.5, 2.5, 4.5} × e_walk 0.5로 정했다(규칙 그대로). 같은 때 4절에 빠진 경우 하나를 보충했다(규칙 해석, 판정 기준은 그대로): 규칙이 고른 다음 회차가 이미 돌린 회차와 계수가 같으면(예: 공통 규칙만 실패가 R0·R1에 이어 나와 R2도 {1.5, 2.5, 4.5} × 같은 e_walk가 됨) 결정적 탐색이라 같은 결과가 나오므로 돌리지 않고 멈춘다(`gate_e1._not_repeated`).
 - 2026-10-02(R1 판정 뒤): R1도 세 팔 모두 실패했다. 기준 팔은 R 1.5(통과 3개, 공통 규칙만 실패)라 규칙 4가 R1과 같은 계수를 내므로 위 보충대로 멈췄다(R2는 돌리지 않음, 판정 FAIL). 판정과 별도로 사전 등록 밖 참고 시험을 한 번 했다(`results/v2/e1/explore/`, 판정에 쓰지 않음): TPE가 시도하지 않은 "가까우면 뛰기, 그 밖은 걷기"(RRWW) 표를 제안 팔에서 C2 조향 그대로와 flee_dist 0.5로 바꾼 두 경우로, 보정 시드인 재측정 시드 100~119 × 3000스텝에서 쟀다. 평가 시드는 쓰지 않았다.
+- 2026-10-02(E1 FAIL 판정 뒤, E1-b 결과 보기 전): **E1-b — 포식자 속도 범위를 바꾼 새 시도. 사전 등록 변경이고 사람(sinhyeok04)이 10-02에 승인했다**(계획서 10절 10-02 결정 기록, 1-2 행).
+  - 바뀐 것은 세계의 포식자 속도 범위 하나다: `rand.pred_speed_mult`(herb_speed 대비, reset마다 균등) [0.8, 1.2] → [0.6, 0.95]. `configs/v2_1.yaml`의 `overrides: {rand: {pred_speed_mult: [0.6, 0.95]}}`로만 바꿨고 v1 `configs/default.yaml`·`env/*`는 그대로다. 근접형 ×0.6~0.95라 '걷기(0.4) < 근접 포식자 < 뛰기(1.0)'가 된다. 원거리형은 v1 `pred_ranged_speed_mult` 0.6을 더 곱해 ×0.36~0.57(전에는 0.48~0.72)이고, pred_speed_mult < 2/3인 세계(약 19%)에서는 걷기보다 느리다. 같은 시드의 세계 배치(크기, M, 원거리형, 은신처, 재생, 위치)는 E1과 같고, 배수만 0.6 + 0.875·(E1 배수 − 0.8)로 옮겨진다(`tests/test_speed_v2.py`).
+  - 이유: E1은 R0·R1 팔 6개가 모두 실패했고, C2-seg가 어느 팔에서도 뛰기를 쓰지 않았다(B1 = 0). 판정과 별도로 한 사전 등록 밖 소수 침입 시험(`report.md` 8절, 판정에 쓰지 않음)에서 ×0.8~1.2는 뛰기 속력이 포식자 범위의 가운데라 뛰기의 개체 이득이 작았다(flee_dist 0.5에서 피식 −10%, 보상 차 −2.23, t −0.68). 같은 flee_dist 0.5에서 ×0.6~0.95는 피식 −23%(t −6.04)였고, 보상 차는 +3.86(t +1.31)으로 양수였지만 유의하지 않았다. 이 범위는 4절 보정 대상(e_walk, R)이 아니라서 사람이 정했다.
+  - 그대로인 것: 1~4절의 절차와 판정 규칙·기준(공통 규칙 (i)(ii), (a) 0.10~0.30·0.15, (b) 0.20, (c), t 기준 2.093, 회차 선택, 기준 팔, 사다리, 규칙 1~4), 탐색·재측정·평가 시드와 스텝, 시작점, 구간, γ_train, 보상(4.5), 뛰기 강제 없음(#2). speed 계수는 제안값 그대로다(c_rest 0.5, c_move 3.125, gait_eat [1.0, 0.5, 0.0]). 첫 회차 B0의 팔 구성은 R0와 같다(R {2, 3.625, 6} × e_walk 0.5).
+  - 회차 이름은 B0(제안값·배수 훑기)·B1·B2(보정)다. 출력은 `results/v2/e1/configs/B*_*.yaml`, `results/v2/e1/B*/<팔>/`, 판정표 `judge_e1b.md`·`judge_e1b.json`이다. E1(R0·R1)의 설정·결과·`judge.md`·`judge.json`은 덮지 않는다.
+  - 보정 예산: E1-b는 새 시도라 5.0의 "보정 최대 2회"를 B1·B2로 다시 센다(E1의 R1은 세지 않는다). 4절 보충(같은 계수 회차 반복이면 멈춤)도 E1-b 회차끼리만 비교한다. 세계가 달라 E1 R1과 같은 계수여도 결과가 같지 않기 때문이다.
+  - 도구 변경(판정 규칙 변경 없음): `gate_e1.py`에 시도(`ATTEMPTS`: E1 = R*·×0.8~1.2·judge, E1-b = B*·×0.6~0.95·judge_e1b)를 두었다. 팔 설정을 만들 때·돌릴 때·판정할 때 설정의 rand.pred_speed_mult가 그 회차 시도의 값과 같은지 확인한다. 이미 있는 팔 설정 파일은 내용이 다르면 덮지 않는다. 그래서 지금 `configs/v2_1.yaml`로는 R* 설정을 새로 만들 수 없다. `judge`는 `--attempt`를 받는다. 7절의 `python gate_e1.py judge`는 이제 `python gate_e1.py judge --attempt E1`이다(같은 judge.md가 나온다. `tests/test_gate_e1.py`가 한 글자씩 비교한다). `env_v2/config.py`의 overrides는 묶음 값 v1 키(rand)를 한 단계 합친다. 적은 하위 키만 바꾸고, 모르는 하위 키는 실패한다. overrides가 빈 기존 설정(`configs/v2.yaml`, `v2_0b.yaml`, R0·R1 팔 설정)의 결과와 config_digest는 그대로다(`tests/test_features_v2.py`).
+  - `configs/v2_1.yaml`의 config_digest는 50bd812219b4(E1 R0 제안 팔과 같았음)에서 a34de9ad4123으로 바뀐다. E1-b 제안 팔(B0_r3_625_ew0_5)이 새 값과 같다. 도구 시험: B0 제안 팔을 scratchpad에서 `--smoke`로 끝까지 돌려 명령 순서·판정표(judge_e1b)를 확인했다. 그 값은 판정에 쓰지 않는다.
+  - 한계(결과 보기 전에 적는다): (1) 범위를 고른 근거 시험(`report.md` 8절)이 평가 시드 10000~10019 × 3000스텝을 썼다. 그래서 E1-b의 평가 시드 판정은 범위 선택과 완전히 독립이 아니다. 다만 그 시험은 소수 침입(개체 16칸, flee_dist 0.5 고정 상수)이고 E1-b가 재는 C2 대 C2-seg 집단 비교와는 다르다. (2) v2.1 세계가 v2.0(v1)과 포식자 속도도 달라져, v2.0 대 v2.1의 차이에는 보행과 포식자 속도가 섞인다. 1-3의 비교(C0 대 E1-b C2-seg)는 같은 v2.1 세계 안이라 영향이 없다. (3) 언리얼 정책 테스트 레벨의 포식자 속도(`PredatorSpeedRatio`, 기본 1.0)는 새 학습 범위 밖이다. V2a 이식 때 [0.6, 0.95] 안으로 맞춘다(계획서 7.2).
+  - 실행 명령(Git Bash, 작업 디렉터리 `herbivore_rl/`. 팔 하나 약 36분이고, 세 팔을 동시에 돌린다):
+
+```bash
+python -m pytest -q
+python gate_e1.py configs --round B0 --run-mult 2 3.625 6 --walk-eat 0.5
+python -u gate_e1.py run --round B0 --arm r2_ew0_5 --workers 6 &
+python -u gate_e1.py run --round B0 --arm r3_625_ew0_5 --workers 6 &
+python -u gate_e1.py run --round B0 --arm r6_ew0_5 --workers 6 &
+wait
+python gate_e1.py judge --attempt E1-b
+# 보정 회차(필요할 때만): judge_e1b.md 의 "다음" 줄이 정한 값으로
+# python gate_e1.py configs --round B1 --run-mult <...> --walk-eat <e>; run ×3 (--round B1); judge --attempt E1-b
+```
+
+- 2026-10-02(B0 판정 뒤, B1 결과 보기 전): B0는 세 팔 모두 실패했다(`judge_e1b.md`). 기준 팔은 R 2·R 3.625가 통과 항목 3개로 같아 동률 규칙으로 제안 팔(R 3.625)이고, 그 팔의 실패는 공통 규칙뿐이라(C2-seg = C2, 보행 같음) 4절 규칙 4로 B1 = R {1.5, 2.5, 4.5} × e_walk 0.5로 정했다(규칙 그대로, 규칙·기준 변경 없음). B0와 계수가 달라 반복 멈춤에 걸리지 않는다. 실행: `python gate_e1.py configs --round B1 --run-mult 1.5 2.5 4.5 --walk-eat 0.5`, 팔마다 `python -u gate_e1.py run --round B1 --arm <팔> --workers 6`(세 팔 동시), `python gate_e1.py judge --attempt E1-b`.
+- 2026-10-02(B1 판정 뒤): B1에서 R 2.5 팔(r2_5_ew0_5)만 통과했다(공통 Δ +0.329, t +2.65, 보행 정지·걷기·걷기·걷기. (a) 아사 비중 0.126·energy<0.5 0.342, (b) 걷기 0.938, (c) 통과). R 4.5는 공통을 통과했지만(t +3.82) (a) 아사 비중 0.084로, R 1.5는 공통(t +0.81)으로 실패했다. 3.5 규칙으로 r2_5_ew0_5를 골랐고 E1-b는 **PASS**다(B2는 돌리지 않음). 5절대로 `configs/v2_1.yaml`의 c_rest·c_move를 그 팔 값(`gate_e1.metabolism(2.5)` = 15/21, 37.5/21)으로 바꿨고 gait_eat는 그대로다. 바꾼 뒤 `configs/v2_1.yaml`의 config_digest는 f068496361f9(`results/v2/e1/configs/B1_r2_5_ew0_5.yaml`과 같음)다. 제안값을 가정하던 테스트 둘(`tests/test_gate_e1.py`, `tests/test_speed_v2.py`)을 새 값에 맞췄다(판정 규칙 변경 없음). 보고서 `report_b.md`.

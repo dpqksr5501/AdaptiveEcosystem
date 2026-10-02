@@ -30,6 +30,9 @@ from policies.registry import make_policy
 
 V2_1 = ROOT / "configs" / "v2_1.yaml"
 NAMES5 = ("forage", "cohesion", "flee_dist", "cover", "speed")
+# v2_1.yaml 의 대사 배수 [정지, 걷기, 뛰기]. 10-02 Gate E1-b 통과 계수(B1 r2_5_ew0_5: 뛰기 배수 R 2.5, 걷기 1 고정 →
+# c_rest 15/21, c_move 37.5/21). 그 전 제안값은 [0.5, 1, 3.625] 였다.
+DRAIN_MULT = (15.0 / 21.0, 1.0, 2.5)
 BASE4 = [0.4, 0.8, 0.4, 0.1]
 
 # 작은 롤아웃(1,024)에 v1 batch_size 4096 을 그대로 써서 SB3 가 내는 경고. 테스트 크기 탓이라 끈다.
@@ -75,12 +78,18 @@ def _same(d1, d2):
 
 
 def test_v2_1_config_is_v2_plus_speed(cfg1):
-    """v2_1.yaml = v2.yaml + speed (계수 전부). 학습 설정·v1 키는 같고 행동만 5개가 된다."""
+    """v2_1.yaml = v2.yaml + speed (계수 전부) + 포식자 속도 범위(E1-b, 10-02). 학습 설정은 같고, v1 키는
+    rand.pred_speed_mult 하나만 [0.8, 1.2] → [0.6, 0.95] 로 다르다(rand 의 다른 하위 키는 v1 그대로). 행동은 5개가 된다."""
     v20 = load_v2_config()
     assert cfg1.v2["version"] == "2.1"
     assert cfg1.v2["train"] == v20.v2["train"]
-    for k, v in load_config().to_dict().items():
-        assert getattr(cfg1, k) == v, k
+    v1 = load_config().to_dict()
+    for k, v in v1.items():
+        if k != "rand":
+            assert getattr(cfg1, k) == v, k
+    assert cfg1.rand == dict(v1["rand"], pred_speed_mult=[0.6, 0.95])
+    assert [k for k in v1["rand"] if cfg1.rand[k] != v1["rand"][k]] == ["pred_speed_mult"]
+    assert v1["rand"]["pred_speed_mult"] == [0.8, 1.2]           # v1 configs/default.yaml 은 그대로
     assert set(cfg1.v2["features"]["speed"]) == {"enabled"} | set(F.PARAM_KEYS["speed"])
     assert "speed" in F.IMPLEMENTED                     # test_features_v2 의 자기 스트림 검사가 speed 도 돈다
     w = World(cfg1, seeds=[0])
@@ -91,8 +100,38 @@ def test_v2_1_config_is_v2_plus_speed(cfg1):
     assert sp["thresholds"] == (1.0 / 3.0, 2.0 / 3.0)   # yaml 의 0.333…·0.666… 는 float64 1/3·2/3 그대로
     np.testing.assert_array_equal(sp["speed"], [0.0, 0.4, 1.0])
     np.testing.assert_array_equal(sp["eat"], [1.0, 0.5, 0.0])
-    np.testing.assert_allclose(sp["drain_mult"], [0.5, 1.0, 3.625], rtol=0, atol=1e-15)
+    np.testing.assert_allclose(sp["drain_mult"], DRAIN_MULT, rtol=0, atol=1e-15)
     assert sp["net_energy_reward"] is True
+
+
+def test_v2_1_predator_speeds_sit_between_walk_and_run(cfg1):
+    """E1-b(10-02): 근접형 속력 ×0.6~0.95 → 걷기(0.4) < 근접형 < 뛰기(1.0). 원거리형은 pred_ranged_speed_mult(0.6,
+    v1 그대로)를 더 곱해 ×0.36~0.57 이고 뛰기보다 느리다. 같은 시드의 세계 배치는 v1 과 같고 배수만
+    0.6 + 0.875·(v1 배수 − 0.8)로 옮겨진다(같은 uniform 한 번이라 v1 난수열을 더 쓰지 않는다)."""
+    gait = cfg1.v2["features"]["speed"]["gait_speed"]
+    assert cfg1.pred_ranged_speed_mult == load_config().pred_ranged_speed_mult == 0.6
+    slow_ranged = 0
+    for seed in range(40):
+        w, w1 = World(cfg1, seeds=[seed]), WorldV1(load_config(), seeds=[seed])
+        assert 0.6 <= w.pred_speed_mult <= 0.95
+        assert w.pred_speed_mult == pytest.approx(0.6 + 0.875 * (w1.pred_speed_mult - 0.8), abs=1e-12)
+        for k in ("size", "M", "ranged_frac", "cover_frac_target", "food_regen_mult"):
+            assert getattr(w, k) == getattr(w1, k), k
+        for k in ("pos", "head", "energy", "pred_pos", "pred_ranged", "food"):
+            np.testing.assert_array_equal(getattr(w, k), getattr(w1, k), err_msg=k)
+        rel = w.pred_speed / cfg1.herb_speed
+        melee, ranged = rel[~w.pred_ranged], rel[w.pred_ranged]
+        assert ((gait[1] < melee) & (melee < gait[2])).all()
+        np.testing.assert_allclose(ranged, w.pred_speed_mult * 0.6, rtol=1e-12)
+        assert ((0.36 - 1e-12 <= ranged) & (ranged < gait[2])).all()
+        slow_ranged += int(w.pred_speed_mult < 2.0 / 3.0)       # 원거리형이 걷기보다 느린 세계
+    assert 0 < slow_ranged < 40
+
+
+def _v1_cfg_of(cfg):
+    """cfg 의 v1 키(overrides 를 거친 값)로 만든 v1 설정. v2_1.yaml 은 E1-b 로 rand.pred_speed_mult 가 v1 과 다르다."""
+    v1 = load_config()
+    return v1.replace(**{k: getattr(cfg, k) for k in v1.to_dict()})
 
 
 @pytest.mark.parametrize("kw", [
@@ -188,7 +227,7 @@ def test_gait_speed_eat_metabolism_and_heading(cfg1, seed, a_speed, gait):
     np.testing.assert_allclose(drain, c.energy_drain * sp["drain_mult"][g], rtol=1e-12)
     np.testing.assert_allclose(w.energy, e_drained + intake, rtol=0, atol=1e-15)
     if gait == GAIT_RUN:                                     # 뛰기는 먹지 않는다: 에너지 = 대사만
-        np.testing.assert_array_equal(w.energy[has_dir], (e0 - c.energy_drain * 3.625)[has_dir])
+        np.testing.assert_array_equal(w.energy[has_dir], (e0 - c.energy_drain * DRAIN_MULT[GAIT_RUN])[has_dir])
     if gait == GAIT_STOP:
         np.testing.assert_array_equal(w.pos, pos0)
     np.testing.assert_allclose(rew, c.rew_alive + (w.energy - e0), atol=1e-15)   # 순변화 보상 (#4)
@@ -227,7 +266,7 @@ def test_energy_reward_net_change_excludes_repro_and_respawn(cfg1, net):
     a = _act(w.N, 1.0)
     has_dir = np.linalg.norm(steer(w._g, a, c), axis=1) > EPS
     _, rew, done, _ = w.step(a)
-    e_new = e0 - c.energy_drain * 3.625
+    e_new = e0 - c.energy_drain * DRAIN_MULT[GAIT_RUN]
     term = (e_new - e0) if net else np.zeros(w.N)
     want = c.rew_alive + term + c.rew_repro * (e_new > c.repro_threshold) + c.rew_death * (e_new <= 0.0)
     m = has_dir
@@ -261,11 +300,12 @@ SPECS4 = [{"kind": "fixed", "action": [0.3, 0.8, 0.4, 0.1]}, {"kind": "utility"}
 @pytest.mark.parametrize("seed", [0, 636, 10000])
 @pytest.mark.parametrize("spec", SPECS4, ids=["fixed", "utility", "random"])
 def test_speed_off_matches_v1_bitwise(cfg1, seed, spec):
-    """v2_1.yaml 에서 speed 만 끈 설정 = v1 World (관측·통계 10열·위치·heading·에너지 비트 동일). 훅도 없다."""
+    """v2_1.yaml 에서 speed 만 끈 설정 = 같은 v1 키(overrides 를 거친 값, E1-b 포식자 속도 포함)의 v1 World
+    (관측·통계 10열·위치·heading·에너지 비트 동일). 훅도 없다."""
     w2 = World(_speed(cfg1, enabled=False), seeds=[seed])
     assert w2.features.active == () and w2.act_dim == 4
     assert getattr(w2, "gait", None) is None                 # replay_v2 가 v2.0 과 같이 그린다
-    v1 = WorldV1(load_config(), seeds=[seed])
+    v1 = WorldV1(_v1_cfg_of(cfg1), seeds=[seed])
     p1, p2 = make_policy(spec), make_policy(spec)
     for _ in range(300):
         o1, o2 = v1.observe(), w2.observe()
@@ -286,9 +326,10 @@ V1_LIKE = dict(gait_speed=[0.0, 1.0, 1.0], gait_eat=[1.0, 1.0, 1.0], c_rest=1.0,
 def test_speed_on_with_v1_coefficients_matches_v1_bitwise(cfg1, seed, spec):
     """speed 를 켜도 '늘 v1 속력(걷기·뛰기 1.0), 섭식 1, 대사 c_rest 1·c_move 0, v1 획득량 보상'이면 v1 과 비트 동일.
     보행이 v1 조향 속도의 크기만 바꾸고 clamp·heading·섭식·보상 줄을 v1 그대로 쓴다는 확인이다. 방향이 없는 개체의
-    '정지'도 v1 과 같다(v = 0, 섭식 1, 대사 1). speed 행동은 [1/3, 1) 에서 뽑는다(정지 명령은 v1 에 없다)."""
+    '정지'도 v1 과 같다(v = 0, 섭식 1, 대사 1). speed 행동은 [1/3, 1) 에서 뽑는다(정지 명령은 v1 에 없다).
+    v1 쪽은 같은 v1 키(overrides 를 거친 값, E1-b 포식자 속도 포함)로 만든다."""
     w2 = World(_speed(cfg1, **V1_LIKE), seeds=[seed])
-    v1 = WorldV1(load_config(), seeds=[seed])
+    v1 = WorldV1(_v1_cfg_of(cfg1), seeds=[seed])
     p1, p2 = make_policy(spec), make_policy(spec)
     rng = np.random.default_rng(seed)
     for _ in range(300):

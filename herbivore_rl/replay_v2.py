@@ -19,6 +19,14 @@
         --overgraze-left 0.3 --steps 4200 --stride 4 --png 693 --png-dpi 150 \
         --caption "제안값 α 0.5 (yaml) — Gate F 사전 등록 실패: 땅이 하한 근처로 붕괴해 교란과 대조가 같아진다" \
         --out results/v2/replay_s7_food_v_a0.5.mp4
+    # 1-3 v2.1 학습 정책(C0, v2_1_s0) 대 행동 순열(C1′), S1·S0 장면 (results/v2/stage1_v2_1.md). 정지 화면 스텝 884 는
+    # 이 시드·1800스텝에서 C0 의 뛰기 개체가 가장 많은 프레임이다(그림용, 판정 아님). 커밋하는 것은 .png 다.
+    python replay_v2.py --config configs/v2_1.yaml --compare learned:ckpt/v2/v2_1_s0.zip \
+        perm:learned:ckpt/v2/v2_1_s0.zip --labels "C0 학습 정책 (v2_1_s0)" \
+        "C1′ 행동 순열 (보행 빈도 같음, 상태와의 짝만 끊김)" --seed 10000 --steps 1800 --stride 2 \
+        --png 884 --png-dpi 150 \
+        --caption "1-3 v2.1 · 평가 시드 10000 · 같은 세계·카메라. 점 색: 정지 회색, 걷기 초록, 뛰기 주황" \
+        --out results/v2/replay_v2_1_compare.mp4
 
 `env_v2.world.World` 를 돌린다. 기능 스위치를 모두 끄면 v1 과 같은 세계다.
 v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.

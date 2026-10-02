@@ -1,0 +1,1016 @@
+{
+ "generated": "2026-10-02T12:31:45+00:00",
+ "attempt": "E1-b",
+ "pred_speed_mult": [
+  0.6,
+  0.95
+ ],
+ "criteria": {
+  "starve_lo": 0.1,
+  "starve_hi": 0.3,
+  "hungry_min": 0.15,
+  "walk_min": 0.2
+ },
+ "t_crit": 2.093,
+ "rounds": {
+  "B0": {
+   "round": "B0",
+   "arms": {
+    "r2_ew0_5": {
+     "config": "results/v2/e1/configs/B0_r2_ew0_5.yaml",
+     "run_mult": 2.0,
+     "walk_eat": 0.5,
+     "drain_mult": [
+      0.8095238095238095,
+      1.0,
+      2.0
+     ],
+     "c_rest": 0.8095238095238095,
+     "c_move": 1.1904761904761905,
+     "judge": {
+      "common": {
+       "diff": 0.0,
+       "t": NaN,
+       "higher": false,
+       "table": [
+        0.4359374074031739,
+        0.4359374074031739,
+        0.4359374074031739,
+        0.4359374074031739
+       ],
+       "gaits": [
+        1,
+        1,
+        1,
+        1
+       ],
+       "distinct": false,
+       "pass": false
+      },
+      "a": {
+       "starve_share": 0.13471524850982336,
+       "hungry_frac": 0.36402617187499997,
+       "pass_": true,
+       "low": false,
+       "high": false
+      },
+      "b": {
+       "walk_frac": 0.9973308593749998,
+       "walk_frac_cmd": 1.0,
+       "pass_": true
+      },
+      "c": {
+       "starve_rate_walk": 0.00038140625000000007,
+       "starve_rate_run": 0.006606875,
+       "t": -34.95050885290209,
+       "pass_": true
+      },
+      "passed": {
+       "common": false,
+       "a": true,
+       "b": true,
+       "c": true
+      },
+      "pass": false,
+      "n_pass": 3,
+      "c2": {
+       "best": [
+        0.7203765843296412,
+        0.7993797902071986,
+        0.21365336570539406,
+        0.03999742564062034,
+        0.4359374074031739
+       ],
+       "gait": 1,
+       "g_gamma": 1.48269064362194,
+       "mean_return": 76.34032673268055,
+       "survival": 412.6260049095632,
+       "repro": 15.912109375,
+       "predation_rate": 0.0024446875,
+       "starve_rate": 0.00038140625000000007,
+       "starve_share": 0.13471524850982336,
+       "hungry_frac": 0.36402617187499997,
+       "walk_frac": 0.9973308593749998,
+       "stop_frac": 0.002669140625,
+       "run_frac": 0.0
+      },
+      "seg": {
+       "g_gamma": 1.48269064362194,
+       "mean_return": 76.34032673268055,
+       "survival": 412.6260049095632,
+       "repro": 15.912109375,
+       "predation_rate": 0.0024446875,
+       "starve_rate": 0.00038140625000000007,
+       "starve_share": 0.13471524850982336,
+       "hungry_frac": 0.36402617187499997,
+       "walk_frac": 0.9973308593749998,
+       "stop_frac": 0.002669140625,
+       "run_frac": 0.0,
+       "stall_frac": 0.002669140625,
+       "b1": 0.0,
+       "b2": 0.0,
+       "b8": 0.0007819472589261358,
+       "b8_cmd": 0.0,
+       "p_run_unseen": 0.0,
+       "p_run_d025": 0.0,
+       "p_run_d050": 0.0,
+       "p_run_d100": 0.0,
+       "p_stop_hungry": 0.0,
+       "p_stop_full": 0.0
+      },
+      "fixed": {
+       "stop": {
+        "g_gamma": -1.620075424843634,
+        "survival": 277.5903336448263,
+        "repro": 4.924609375,
+        "predation_rate": 0.0023530468749999997,
+        "starve_rate": 0.0013525,
+        "starve_share": 0.40052072715931225,
+        "hungry_frac": 0.7041566406250002
+       },
+       "walk": {
+        "g_gamma": 1.48269064362194,
+        "survival": 412.6260049095632,
+        "repro": 15.912109375,
+        "predation_rate": 0.0024446875,
+        "starve_rate": 0.00038140625000000007,
+        "starve_share": 0.13471524850982336,
+        "hungry_frac": 0.36402617187499997
+       },
+       "run": {
+        "g_gamma": -6.116486505701937,
+        "survival": 109.29031194365663,
+        "repro": 0.0,
+        "predation_rate": 0.002392734375,
+        "starve_rate": 0.006606875,
+        "starve_share": 0.7410995409564338,
+        "hungry_frac": 0.9908139062499999
+       }
+      },
+      "g998": {
+       "seg": 5.151359156635644,
+       "c2": 5.151359156635644,
+       "diff": 0.0,
+       "t": NaN,
+       "higher": false
+      },
+      "g998_only": false
+     },
+     "seg_labels": [
+      "pred_dist<0.5 & energy<0.5",
+      "pred_dist<0.5 & energy≥0.5",
+      "pred_dist≥0.5 & energy<0.5",
+      "pred_dist≥0.5 & energy≥0.5"
+     ],
+     "commands": [
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r2_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r2_ew0_5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.1667 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.8333 --enqueue 0.39 0.99 0.92 0.15 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r2_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r2_ew0_5 --seg-bins 2:0.5 4:0.5 --seg-dims speed",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r2_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r2_ew0_5 --tag fixed_stop --const-action 0.7203765843296412 0.7993797902071986 0.21365336570539406 0.03999742564062034 0.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r2_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r2_ew0_5 --tag fixed_walk --const-action 0.7203765843296412 0.7993797902071986 0.21365336570539406 0.03999742564062034 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r2_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r2_ew0_5 --tag fixed_run --const-action 0.7203765843296412 0.7993797902071986 0.21365336570539406 0.03999742564062034 1.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r2_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r2_ew0_5/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.7203765843296412 0.7993797902071986 0.21365336570539406 0.03999742564062034 0.4359374074031739 --const-action 0.4359374074031739 0.4359374074031739 0.4359374074031739 0.4359374074031739"
+     ],
+     "elapsed_s": 2198.1
+    },
+    "r3_625_ew0_5": {
+     "config": "results/v2/e1/configs/B0_r3_625_ew0_5.yaml",
+     "run_mult": 3.625,
+     "walk_eat": 0.5,
+     "drain_mult": [
+      0.5,
+      1.0,
+      3.625
+     ],
+     "c_rest": 0.5,
+     "c_move": 3.125,
+     "judge": {
+      "common": {
+       "diff": 0.0,
+       "t": NaN,
+       "higher": false,
+       "table": [
+        0.4822761677310872,
+        0.4822761677310872,
+        0.4822761677310872,
+        0.4822761677310872
+       ],
+       "gaits": [
+        1,
+        1,
+        1,
+        1
+       ],
+       "distinct": false,
+       "pass": false
+      },
+      "a": {
+       "starve_share": 0.1314255648477434,
+       "hungry_frac": 0.34808773437500007,
+       "pass_": true,
+       "low": false,
+       "high": false
+      },
+      "b": {
+       "walk_frac": 0.9970423437499999,
+       "walk_frac_cmd": 1.0,
+       "pass_": true
+      },
+      "c": {
+       "starve_rate_walk": 0.000377890625,
+       "starve_rate_run": 0.012921484374999997,
+       "t": -59.75352730823927,
+       "pass_": true
+      },
+      "passed": {
+       "common": false,
+       "a": true,
+       "b": true,
+       "c": true
+      },
+      "pass": false,
+      "n_pass": 3,
+      "c2": {
+       "best": [
+        0.8340684589740917,
+        0.8673857905072123,
+        0.15276665904833553,
+        0.02957586353414975,
+        0.4822761677310872
+       ],
+       "gait": 1,
+       "g_gamma": 1.6704497900195734,
+       "mean_return": 81.29598375192467,
+       "survival": 424.8747067941137,
+       "repro": 16.4453125,
+       "predation_rate": 0.002461015625,
+       "starve_rate": 0.000377890625,
+       "starve_share": 0.1314255648477434,
+       "hungry_frac": 0.34808773437500007,
+       "walk_frac": 0.9970423437499999,
+       "stop_frac": 0.00295765625,
+       "run_frac": 0.0
+      },
+      "seg": {
+       "g_gamma": 1.6704497900195734,
+       "mean_return": 81.29598375192467,
+       "survival": 424.8747067941137,
+       "repro": 16.4453125,
+       "predation_rate": 0.002461015625,
+       "starve_rate": 0.000377890625,
+       "starve_share": 0.1314255648477434,
+       "hungry_frac": 0.34808773437500007,
+       "walk_frac": 0.9970423437499999,
+       "stop_frac": 0.00295765625,
+       "run_frac": 0.0,
+       "stall_frac": 0.00295765625,
+       "b1": 0.0,
+       "b2": 0.0,
+       "b8": 0.0006914015429078976,
+       "b8_cmd": 0.0,
+       "p_run_unseen": 0.0,
+       "p_run_d025": 0.0,
+       "p_run_d050": 0.0,
+       "p_run_d100": 0.0,
+       "p_stop_hungry": 0.0,
+       "p_stop_full": 0.0
+      },
+      "fixed": {
+       "stop": {
+        "g_gamma": -0.9849340871604276,
+        "survival": 342.92450113266983,
+        "repro": 4.75625,
+        "predation_rate": 0.0023343750000000005,
+        "starve_rate": 0.00069296875,
+        "starve_share": 0.27051811537049203,
+        "hungry_frac": 0.7155717187499999
+       },
+       "walk": {
+        "g_gamma": 1.6704497900195734,
+        "survival": 424.8747067941137,
+        "repro": 16.4453125,
+        "predation_rate": 0.002461015625,
+        "starve_rate": 0.000377890625,
+        "starve_share": 0.1314255648477434,
+        "hungry_frac": 0.34808773437500007
+       },
+       "run": {
+        "g_gamma": -7.604410579255584,
+        "survival": 64.25637531761224,
+        "repro": 0.0,
+        "predation_rate": 0.0025049218749999998,
+        "starve_rate": 0.012921484374999997,
+        "starve_share": 0.8403103133431473,
+        "hungry_frac": 0.9844184374999999
+       }
+      },
+      "g998": {
+       "seg": 5.46240503601227,
+       "c2": 5.46240503601227,
+       "diff": 0.0,
+       "t": NaN,
+       "higher": false
+      },
+      "g998_only": false
+     },
+     "seg_labels": [
+      "pred_dist<0.5 & energy<0.5",
+      "pred_dist<0.5 & energy≥0.5",
+      "pred_dist≥0.5 & energy<0.5",
+      "pred_dist≥0.5 & energy≥0.5"
+     ],
+     "commands": [
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r3_625_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r3_625_ew0_5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.1667 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.8333 --enqueue 0.39 0.99 0.92 0.15 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r3_625_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r3_625_ew0_5 --seg-bins 2:0.5 4:0.5 --seg-dims speed",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r3_625_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r3_625_ew0_5 --tag fixed_stop --const-action 0.8340684589740917 0.8673857905072123 0.15276665904833553 0.02957586353414975 0.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r3_625_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r3_625_ew0_5 --tag fixed_walk --const-action 0.8340684589740917 0.8673857905072123 0.15276665904833553 0.02957586353414975 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r3_625_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r3_625_ew0_5 --tag fixed_run --const-action 0.8340684589740917 0.8673857905072123 0.15276665904833553 0.02957586353414975 1.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r3_625_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r3_625_ew0_5/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.8340684589740917 0.8673857905072123 0.15276665904833553 0.02957586353414975 0.4822761677310872 --const-action 0.4822761677310872 0.4822761677310872 0.4822761677310872 0.4822761677310872"
+     ],
+     "elapsed_s": 2197.6
+    },
+    "r6_ew0_5": {
+     "config": "results/v2/e1/configs/B0_r6_ew0_5.yaml",
+     "run_mult": 6.0,
+     "walk_eat": 0.5,
+     "drain_mult": [
+      0.047619047619047616,
+      1.0,
+      6.0
+     ],
+     "c_rest": 0.047619047619047616,
+     "c_move": 5.9523809523809526,
+     "judge": {
+      "common": {
+       "diff": 0.3110051471744092,
+       "t": 1.7529695703499713,
+       "higher": false,
+       "table": [
+        0.323450576775678,
+        0.21578654236890715,
+        0.4514306676665461,
+        0.5300479260087613
+       ],
+       "gaits": [
+        0,
+        0,
+        1,
+        1
+       ],
+       "distinct": true,
+       "pass": false
+      },
+      "a": {
+       "starve_share": 0.09743746861023457,
+       "hungry_frac": 0.3210371093749999,
+       "pass_": false,
+       "low": true,
+       "high": false
+      },
+      "b": {
+       "walk_frac": 0.821012890625,
+       "walk_frac_cmd": 0.823919296875,
+       "pass_": true
+      },
+      "c": {
+       "starve_rate_walk": 0.000396328125,
+       "starve_rate_run": 0.022250078125,
+       "t": -116.12705592479722,
+       "pass_": true
+      },
+      "passed": {
+       "common": false,
+       "a": false,
+       "b": true,
+       "c": true
+      },
+      "pass": false,
+      "n_pass": 2,
+      "c2": {
+       "best": [
+        0.9814966727581358,
+        0.9779505025866796,
+        0.16563769972771386,
+        0.011169712487204282,
+        0.39011859094031115
+       ],
+       "gait": 1,
+       "g_gamma": 1.6078769152995203,
+       "mean_return": 77.06572479324583,
+       "survival": 429.9969843565683,
+       "repro": 15.808984375,
+       "predation_rate": 0.002391328125,
+       "starve_rate": 0.000396328125,
+       "starve_share": 0.1401522625740044,
+       "hungry_frac": 0.36239570312499997,
+       "walk_frac": 0.99664078125,
+       "stop_frac": 0.0033592187499999994,
+       "run_frac": 0.0
+      },
+      "seg": {
+       "g_gamma": 1.918882062473929,
+       "mean_return": 93.03430700793758,
+       "survival": 435.48261185666223,
+       "repro": 16.553515625,
+       "predation_rate": 0.002405703125,
+       "starve_rate": 0.000226875,
+       "starve_share": 0.09743746861023457,
+       "hungry_frac": 0.3210371093749999,
+       "walk_frac": 0.821012890625,
+       "stop_frac": 0.178987109375,
+       "run_frac": 0.0,
+       "stall_frac": 0.0029064062500000006,
+       "b1": 0.0,
+       "b2": -0.05197084776657122,
+       "b8": 0.15993359382208688,
+       "b8_cmd": 0.15933706451352886,
+       "p_run_unseen": 0.0,
+       "p_run_d025": 0.0,
+       "p_run_d050": 0.0,
+       "p_run_d100": 0.0,
+       "p_stop_hungry": 0.14036879853557707,
+       "p_stop_full": 0.19233964630214828
+      },
+      "fixed": {
+       "stop": {
+        "g_gamma": -0.1321768395225088,
+        "survival": 523.7012451474244,
+        "repro": 4.237109375,
+        "predation_rate": 0.00219953125,
+        "starve_rate": 0.0,
+        "starve_share": 0.0,
+        "hungry_frac": 0.75087015625
+       },
+       "walk": {
+        "g_gamma": 1.6078769152995203,
+        "survival": 429.9969843565683,
+        "repro": 15.808984375,
+        "predation_rate": 0.002391328125,
+        "starve_rate": 0.000396328125,
+        "starve_share": 0.1401522625740044,
+        "hungry_frac": 0.36239570312499997
+       },
+       "run": {
+        "g_gamma": -8.520328118795721,
+        "survival": 40.494167979254364,
+        "repro": 0.0,
+        "predation_rate": 0.0023446875000000004,
+        "starve_rate": 0.022250078125,
+        "starve_share": 0.9054830450014812,
+        "hungry_frac": 0.975300390625
+       }
+      },
+      "g998": {
+       "seg": 5.92525080162917,
+       "c2": 5.307617398378355,
+       "diff": 0.6176334032508154,
+       "t": 1.3884559294204013,
+       "higher": false
+      },
+      "g998_only": false
+     },
+     "seg_labels": [
+      "pred_dist<0.5 & energy<0.5",
+      "pred_dist<0.5 & energy≥0.5",
+      "pred_dist≥0.5 & energy<0.5",
+      "pred_dist≥0.5 & energy≥0.5"
+     ],
+     "commands": [
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r6_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r6_ew0_5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.1667 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.8333 --enqueue 0.39 0.99 0.92 0.15 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r6_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r6_ew0_5 --seg-bins 2:0.5 4:0.5 --seg-dims speed",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r6_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r6_ew0_5 --tag fixed_stop --const-action 0.9814966727581358 0.9779505025866796 0.16563769972771386 0.011169712487204282 0.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r6_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r6_ew0_5 --tag fixed_walk --const-action 0.9814966727581358 0.9779505025866796 0.16563769972771386 0.011169712487204282 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r6_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r6_ew0_5 --tag fixed_run --const-action 0.9814966727581358 0.9779505025866796 0.16563769972771386 0.011169712487204282 1.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B0_r6_ew0_5.yaml --workers 6 --out results/v2/e1/B0/r6_ew0_5/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.9814966727581358 0.9779505025866796 0.16563769972771386 0.011169712487204282 0.39011859094031115 --const-action 0.323450576775678 0.21578654236890715 0.4514306676665461 0.5300479260087613"
+     ],
+     "elapsed_s": 2208.8
+    }
+   },
+   "incomplete": [],
+   "walk_eat": 0.5,
+   "selected": null,
+   "closest": "r3_625_ew0_5",
+   "next": {
+    "action": "calibrate",
+    "run_mults": [
+     1.5,
+     2.5,
+     4.5
+    ],
+    "walk_eat": 0.5,
+    "direction": null,
+    "basis": "r3_625_ew0_5",
+    "reason": "r3_625_ew0_5: 공통 규칙만 실패 → e_walk 0.5 그대로, 배수를 [1.5, 2.5, 4.5] 로"
+   }
+  },
+  "B1": {
+   "round": "B1",
+   "arms": {
+    "r1_5_ew0_5": {
+     "config": "results/v2/e1/configs/B1_r1_5_ew0_5.yaml",
+     "run_mult": 1.5,
+     "walk_eat": 0.5,
+     "drain_mult": [
+      0.9047619047619048,
+      1.0,
+      1.5
+     ],
+     "c_rest": 0.9047619047619048,
+     "c_move": 0.5952380952380952,
+     "judge": {
+      "common": {
+       "diff": 0.14266912390652045,
+       "t": 0.8096502787220691,
+       "higher": false,
+       "table": [
+        0.31542835092418386,
+        0.3637107709426226,
+        0.5701967704178796,
+        0.43860151346232035
+       ],
+       "gaits": [
+        0,
+        1,
+        1,
+        1
+       ],
+       "distinct": true,
+       "pass": false
+      },
+      "a": {
+       "starve_share": 0.11236969917302649,
+       "hungry_frac": 0.34829515625,
+       "pass_": true,
+       "low": false,
+       "high": false
+      },
+      "b": {
+       "walk_frac": 0.9377117187500001,
+       "walk_frac_cmd": 0.9403996875,
+       "pass_": true
+      },
+      "c": {
+       "starve_rate_walk": 0.0003459375,
+       "starve_rate_run": 0.0048585156249999996,
+       "t": -28.68400465511683,
+       "pass_": true
+      },
+      "passed": {
+       "common": false,
+       "a": true,
+       "b": true,
+       "c": true
+      },
+      "pass": false,
+      "n_pass": 3,
+      "c2": {
+       "best": [
+        0.608491755868374,
+        0.8528914663102306,
+        0.3186928974608414,
+        0.017043635014859893,
+        0.4434717061343869
+       ],
+       "gait": 1,
+       "g_gamma": 1.6633898000057932,
+       "mean_return": 83.81788632071871,
+       "survival": 422.77801025044283,
+       "repro": 16.121875,
+       "predation_rate": 0.002372734375,
+       "starve_rate": 0.0003459375,
+       "starve_share": 0.12034733886298928,
+       "hungry_frac": 0.3576779687499999,
+       "walk_frac": 0.9976245312500002,
+       "stop_frac": 0.0023754687499999995,
+       "run_frac": 0.0
+      },
+      "seg": {
+       "g_gamma": 1.8060589239123133,
+       "mean_return": 89.41969569154838,
+       "survival": 432.1520271541411,
+       "repro": 16.559765625,
+       "predation_rate": 0.0023917968750000003,
+       "starve_rate": 0.0003059375,
+       "starve_share": 0.11236969917302649,
+       "hungry_frac": 0.34829515625,
+       "walk_frac": 0.9377117187500001,
+       "stop_frac": 0.06228828125,
+       "run_frac": 0.0,
+       "stall_frac": 0.00268796875,
+       "b1": 0.0,
+       "b2": 0.1455187726185036,
+       "b8": 0.058443977416279415,
+       "b8_cmd": 0.05764000810468659,
+       "p_run_unseen": 0.0,
+       "p_run_d025": 0.0,
+       "p_run_d050": 0.0,
+       "p_run_d100": 0.0,
+       "p_stop_hungry": 0.1455187726185036,
+       "p_stop_full": 0.0
+      },
+      "fixed": {
+       "stop": {
+        "g_gamma": -1.8185781739442455,
+        "survival": 266.4679021322245,
+        "repro": 4.818359375,
+        "predation_rate": 0.0023611718750000004,
+        "starve_rate": 0.001560703125,
+        "starve_share": 0.43096438309199697,
+        "hungry_frac": 0.7055748437500001
+       },
+       "walk": {
+        "g_gamma": 1.6633898000057932,
+        "survival": 422.77801025044283,
+        "repro": 16.121875,
+        "predation_rate": 0.002372734375,
+        "starve_rate": 0.0003459375,
+        "starve_share": 0.12034733886298928,
+        "hungry_frac": 0.3576779687499999
+       },
+       "run": {
+        "g_gamma": -5.217940351665978,
+        "survival": 144.65357312252803,
+        "repro": 0.0,
+        "predation_rate": 0.0018961718750000003,
+        "starve_rate": 0.0048585156249999996,
+        "starve_share": 0.7280307415909549,
+        "hungry_frac": 0.9930357031249999
+       }
+      },
+      "g998": {
+       "seg": 5.6110556964828024,
+       "c2": 4.904108763772492,
+       "diff": 0.70694693271031,
+       "t": 1.6683940302639704,
+       "higher": false
+      },
+      "g998_only": false
+     },
+     "seg_labels": [
+      "pred_dist<0.5 & energy<0.5",
+      "pred_dist<0.5 & energy≥0.5",
+      "pred_dist≥0.5 & energy<0.5",
+      "pred_dist≥0.5 & energy≥0.5"
+     ],
+     "commands": [
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r1_5_ew0_5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.1667 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.8333 --enqueue 0.39 0.99 0.92 0.15 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r1_5_ew0_5 --seg-bins 2:0.5 4:0.5 --seg-dims speed",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r1_5_ew0_5 --tag fixed_stop --const-action 0.608491755868374 0.8528914663102306 0.3186928974608414 0.017043635014859893 0.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r1_5_ew0_5 --tag fixed_walk --const-action 0.608491755868374 0.8528914663102306 0.3186928974608414 0.017043635014859893 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r1_5_ew0_5 --tag fixed_run --const-action 0.608491755868374 0.8528914663102306 0.3186928974608414 0.017043635014859893 1.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r1_5_ew0_5/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.608491755868374 0.8528914663102306 0.3186928974608414 0.017043635014859893 0.4434717061343869 --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035"
+     ],
+     "elapsed_s": 2164.5
+    },
+    "r2_5_ew0_5": {
+     "config": "results/v2/e1/configs/B1_r2_5_ew0_5.yaml",
+     "run_mult": 2.5,
+     "walk_eat": 0.5,
+     "drain_mult": [
+      0.7142857142857143,
+      1.0,
+      2.5
+     ],
+     "c_rest": 0.7142857142857143,
+     "c_move": 1.7857142857142858,
+     "judge": {
+      "common": {
+       "diff": 0.32853255179139246,
+       "t": 2.6539439700653142,
+       "higher": true,
+       "table": [
+        0.31542835092418386,
+        0.3637107709426226,
+        0.5701967704178796,
+        0.43860151346232035
+       ],
+       "gaits": [
+        0,
+        1,
+        1,
+        1
+       ],
+       "distinct": true,
+       "pass": true
+      },
+      "a": {
+       "starve_share": 0.1259100776297407,
+       "hungry_frac": 0.34232234375,
+       "pass_": true,
+       "low": false,
+       "high": false
+      },
+      "b": {
+       "walk_frac": 0.938165234375,
+       "walk_frac_cmd": 0.941103984375,
+       "pass_": true
+      },
+      "c": {
+       "starve_rate_walk": 0.00042718749999999994,
+       "starve_rate_run": 0.00848515625,
+       "t": -39.539334061214255,
+       "pass_": true
+      },
+      "passed": {
+       "common": true,
+       "a": true,
+       "b": true,
+       "c": true
+      },
+      "pass": true,
+      "n_pass": 4,
+      "c2": {
+       "best": [
+        0.9709889334578663,
+        0.7849404966375042,
+        0.2182330585135458,
+        0.03358694847233987,
+        0.4913744307309694
+       ],
+       "gait": 1,
+       "g_gamma": 1.4820231915460726,
+       "mean_return": 73.96253652632453,
+       "survival": 421.6807090179369,
+       "repro": 15.63359375,
+       "predation_rate": 0.0023834374999999997,
+       "starve_rate": 0.00042718749999999994,
+       "starve_share": 0.15206374964084604,
+       "hungry_frac": 0.36475601562499993,
+       "walk_frac": 0.9967210937500001,
+       "stop_frac": 0.00327890625,
+       "run_frac": 0.0
+      },
+      "seg": {
+       "g_gamma": 1.8105557433374653,
+       "mean_return": 86.67754390513767,
+       "survival": 434.2379494041943,
+       "repro": 16.371875,
+       "predation_rate": 0.002391484375,
+       "starve_rate": 0.0003228125,
+       "starve_share": 0.1259100776297407,
+       "hungry_frac": 0.34232234375,
+       "walk_frac": 0.938165234375,
+       "stop_frac": 0.061834765624999996,
+       "run_frac": 0.0,
+       "stall_frac": 0.0029387500000000004,
+       "b1": 0.0,
+       "b2": 0.14793568610043903,
+       "b8": 0.056116823853884924,
+       "b8_cmd": 0.05545734456812024,
+       "p_run_unseen": 0.0,
+       "p_run_d025": 0.0,
+       "p_run_d050": 0.0,
+       "p_run_d100": 0.0,
+       "p_stop_hungry": 0.14793568610043903,
+       "p_stop_full": 0.0
+      },
+      "fixed": {
+       "stop": {
+        "g_gamma": -1.5730942055734853,
+        "survival": 289.18198155568274,
+        "repro": 4.546875,
+        "predation_rate": 0.002361015625,
+        "starve_rate": 0.0011784375000000002,
+        "starve_share": 0.3697899513258426,
+        "hungry_frac": 0.7211192968749999
+       },
+       "walk": {
+        "g_gamma": 1.4820231915460726,
+        "survival": 421.6807090179369,
+        "repro": 15.63359375,
+        "predation_rate": 0.0023834374999999997,
+        "starve_rate": 0.00042718749999999994,
+        "starve_share": 0.15206374964084604,
+        "hungry_frac": 0.36475601562499993
+       },
+       "run": {
+        "g_gamma": -6.727609802122292,
+        "survival": 89.36426095127783,
+        "repro": 0.0,
+        "predation_rate": 0.0025603124999999992,
+        "starve_rate": 0.00848515625,
+        "starve_share": 0.774038490706823,
+        "hungry_frac": 0.9887799218750001
+       }
+      },
+      "g998": {
+       "seg": 5.582158596826997,
+       "c2": 4.854914940977734,
+       "diff": 0.727243655849264,
+       "t": 3.626781018622707,
+       "higher": true
+      },
+      "g998_only": false
+     },
+     "seg_labels": [
+      "pred_dist<0.5 & energy<0.5",
+      "pred_dist<0.5 & energy≥0.5",
+      "pred_dist≥0.5 & energy<0.5",
+      "pred_dist≥0.5 & energy≥0.5"
+     ],
+     "commands": [
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r2_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r2_5_ew0_5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.1667 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.8333 --enqueue 0.39 0.99 0.92 0.15 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r2_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r2_5_ew0_5 --seg-bins 2:0.5 4:0.5 --seg-dims speed",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r2_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r2_5_ew0_5 --tag fixed_stop --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r2_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r2_5_ew0_5 --tag fixed_walk --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r2_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r2_5_ew0_5 --tag fixed_run --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 1.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r2_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r2_5_ew0_5/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035"
+     ],
+     "elapsed_s": 2186.9
+    },
+    "r4_5_ew0_5": {
+     "config": "results/v2/e1/configs/B1_r4_5_ew0_5.yaml",
+     "run_mult": 4.5,
+     "walk_eat": 0.5,
+     "drain_mult": [
+      0.3333333333333333,
+      1.0000000000000002,
+      4.5
+     ],
+     "c_rest": 0.3333333333333333,
+     "c_move": 4.166666666666667,
+     "judge": {
+      "common": {
+       "diff": 0.5090136520731817,
+       "t": 3.8241296823577087,
+       "higher": true,
+       "table": [
+        0.10233105379346588,
+        0.2076082497126884,
+        0.6340997197455132,
+        0.4116220874825391
+       ],
+       "gaits": [
+        0,
+        0,
+        1,
+        1
+       ],
+       "distinct": true,
+       "pass": true
+      },
+      "a": {
+       "starve_share": 0.08366817723904843,
+       "hungry_frac": 0.305517421875,
+       "pass_": false,
+       "low": true,
+       "high": false
+      },
+      "b": {
+       "walk_frac": 0.82421875,
+       "walk_frac_cmd": 0.8268745312499999,
+       "pass_": true
+      },
+      "c": {
+       "starve_rate_walk": 0.00037187499999999997,
+       "starve_rate_run": 0.016415781250000004,
+       "t": -88.31482716346562,
+       "pass_": true
+      },
+      "passed": {
+       "common": true,
+       "a": false,
+       "b": true,
+       "c": true
+      },
+      "pass": false,
+      "n_pass": 3,
+      "c2": {
+       "best": [
+        0.7682948980991011,
+        0.9216841923808368,
+        0.2159122493787158,
+        0.020698426383369828,
+        0.5536489064824605
+       ],
+       "gait": 1,
+       "g_gamma": 1.6199137037645361,
+       "mean_return": 79.95219230613644,
+       "survival": 429.557119771527,
+       "repro": 15.887109375,
+       "predation_rate": 0.0023764843750000006,
+       "starve_rate": 0.00037187499999999997,
+       "starve_share": 0.12789460351220797,
+       "hungry_frac": 0.363199609375,
+       "walk_frac": 0.99755109375,
+       "stop_frac": 0.00244890625,
+       "run_frac": 0.0
+      },
+      "seg": {
+       "g_gamma": 2.1289273558377175,
+       "mean_return": 101.69543777092261,
+       "survival": 449.27028937848456,
+       "repro": 17.185546875,
+       "predation_rate": 0.0024000781250000003,
+       "starve_rate": 0.00019242187500000002,
+       "starve_share": 0.08366817723904843,
+       "hungry_frac": 0.305517421875,
+       "walk_frac": 0.82421875,
+       "stop_frac": 0.17578125,
+       "run_frac": 0.0,
+       "stall_frac": 0.00265578125,
+       "b1": 0.0,
+       "b2": -0.03418498516178525,
+       "b8": 0.16281173952387154,
+       "b8_cmd": 0.16213126872379496,
+       "p_run_unseen": 0.0,
+       "p_run_d025": 0.0,
+       "p_run_d050": 0.0,
+       "p_run_d100": 0.0,
+       "p_stop_hungry": 0.14784940296287333,
+       "p_stop_full": 0.18203438812465852
+      },
+      "fixed": {
+       "stop": {
+        "g_gamma": -0.5806411929071673,
+        "survival": 399.6161465310429,
+        "repro": 4.7140625,
+        "predation_rate": 0.002289921875,
+        "starve_rate": 0.000366015625,
+        "starve_share": 0.17765217037888822,
+        "hungry_frac": 0.71791109375
+       },
+       "walk": {
+        "g_gamma": 1.6199137037645361,
+        "survival": 429.557119771527,
+        "repro": 15.887109375,
+        "predation_rate": 0.0023764843750000006,
+        "starve_rate": 0.00037187499999999997,
+        "starve_share": 0.12789460351220797,
+        "hungry_frac": 0.363199609375
+       },
+       "run": {
+        "g_gamma": -8.019821560938471,
+        "survival": 53.439049927716724,
+        "repro": 0.0,
+        "predation_rate": 0.002163046875,
+        "starve_rate": 0.016415781250000004,
+        "starve_share": 0.8848040313024006,
+        "hungry_frac": 0.9812800781250001
+       }
+      },
+      "g998": {
+       "seg": 6.2486035788142775,
+       "c2": 5.086540733633521,
+       "diff": 1.162062845180754,
+       "t": 3.2462649614566024,
+       "higher": true
+      },
+      "g998_only": false
+     },
+     "seg_labels": [
+      "pred_dist<0.5 & energy<0.5",
+      "pred_dist<0.5 & energy≥0.5",
+      "pred_dist≥0.5 & energy<0.5",
+      "pred_dist≥0.5 & energy≥0.5"
+     ],
+     "commands": [
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r4_5_ew0_5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.1667 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.8333 --enqueue 0.39 0.99 0.92 0.15 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r4_5_ew0_5 --seg-bins 2:0.5 4:0.5 --seg-dims speed",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r4_5_ew0_5 --tag fixed_stop --const-action 0.7682948980991011 0.9216841923808368 0.2159122493787158 0.020698426383369828 0.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r4_5_ew0_5 --tag fixed_walk --const-action 0.7682948980991011 0.9216841923808368 0.2159122493787158 0.020698426383369828 0.5",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r4_5_ew0_5 --tag fixed_run --const-action 0.7682948980991011 0.9216841923808368 0.2159122493787158 0.020698426383369828 1.0",
+      "python diagnose_v2.py constsearch --config results/v2/e1/configs/B1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/B1/r4_5_ew0_5/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.7682948980991011 0.9216841923808368 0.2159122493787158 0.020698426383369828 0.5536489064824605 --const-action 0.10233105379346588 0.2076082497126884 0.6340997197455132 0.4116220874825391"
+     ],
+     "elapsed_s": 2177.3
+    }
+   },
+   "incomplete": [],
+   "walk_eat": 0.5,
+   "selected": "r2_5_ew0_5",
+   "closest": "r2_5_ew0_5",
+   "direction": null,
+   "next": {
+    "action": "pass",
+    "reason": "B1 에서 r2_5_ew0_5 통과"
+   }
+  }
+ },
+ "final": {
+  "verdict": "PASS",
+  "round": "B1",
+  "arm": "r2_5_ew0_5",
+  "run_mult": 2.5,
+  "walk_eat": 0.5,
+  "c_rest": 0.7142857142857143,
+  "c_move": 1.7857142857142858,
+  "drain_mult": [
+   0.7142857142857143,
+   1.0,
+   2.5
+  ],
+  "c2": [
+   0.9709889334578663,
+   0.7849404966375042,
+   0.2182330585135458,
+   0.03358694847233987,
+   0.4913744307309694
+  ],
+  "seg_table": [
+   0.31542835092418386,
+   0.3637107709426226,
+   0.5701967704178796,
+   0.43860151346232035
+  ],
+  "attempt": "E1-b"
+ }
+}

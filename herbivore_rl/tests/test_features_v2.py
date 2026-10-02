@@ -416,3 +416,77 @@ def test_load_v2_config_overrides_only_v1_keys(tmp_path):
         p.write_text(bad, encoding="utf-8")
         with pytest.raises(ValueError, match="overrides"):
             load_v2_config(p)
+
+
+def test_load_v2_config_overrides_merge_dict_keys_one_level(tmp_path):
+    """묶음 값 v1 키(rand)는 적은 하위 키만 바꾸고 나머지 하위 키는 v1 값 그대로다(10-02, E1-b). 하위 키의 값은
+    통째로 바꾼다. v1 에 없는 하위 키, 묶음 키에 묶음이 아닌 값, 묶음이 아닌 키에 묶음 값은 읽을 때 실패한다."""
+    v1 = load_config()
+    p = tmp_path / "v2.yaml"
+    p.write_text("overrides: {rand: {pred_speed_mult: [0.6, 0.95]}, see_r: 18.0}\n", encoding="utf-8")
+    cfg = load_v2_config(p)
+    assert cfg.rand == dict(v1.rand, pred_speed_mult=[0.6, 0.95])
+    assert list(cfg.rand) == list(v1.rand)                     # 하위 키 순서·개수도 그대로
+    assert cfg.see_r == 18.0
+    for k, v in v1.to_dict().items():
+        if k not in ("rand", "see_r"):
+            assert getattr(cfg, k) == v, k
+    assert load_config().rand == v1.rand                       # v1 값은 바뀌지 않는다
+    p.write_text("overrides: {rand: {}}\n", encoding="utf-8")
+    assert load_v2_config(p).rand == v1.rand
+    for bad, match in (("overrides: {rand: {pred_speed: [0.6, 0.95]}}\n", "하위 키"),     # 오타 → 조용히 무시하지 않는다
+                       ("overrides: {rand: {pred_speed_mult: [0.6, 0.95], cover: [0.1, 0.2]}}\n", "하위 키"),
+                       ("overrides: {rand: [0.6, 0.95]}\n", "묶음"),
+                       ("overrides: {rand: null}\n", "묶음"),
+                       ("overrides: {see_r: {lo: 18.0}}\n", "묶음이 아니다")):
+        p.write_text(bad, encoding="utf-8")
+        with pytest.raises(ValueError, match=match):
+            load_v2_config(p)
+
+
+def _pre_merge_loader(path):
+    """10-02 전 로더(overrides 가 v1 최상위 키를 통째로 바꿈)의 결과 dict. 묶음 키를 덮지 않는 설정은 지금 로더와 같아야 한다."""
+    data = yaml.safe_load((ROOT / "configs" / "default.yaml").read_text(encoding="utf-8"))
+    v2 = dict(yaml.safe_load(path.read_text(encoding="utf-8")) or {})
+    data.update(v2.pop("overrides", None) or {})
+    v2["features"] = dict(v2.get("features") or {})
+    data["v2"] = v2
+    return data
+
+
+def _has_dict_override(path):
+    ov = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}).get("overrides") or {}
+    return any(isinstance(v, dict) for v in ov.values())
+
+
+E1_ARM_CONFIGS = sorted((ROOT / "results" / "v2" / "e1" / "configs").glob("R*.yaml"))
+
+
+@pytest.mark.parametrize("path", [p for p in V2_CONFIGS if not _has_dict_override(p)] + E1_ARM_CONFIGS,
+                         ids=lambda p: p.name)
+def test_load_v2_config_unchanged_without_dict_overrides(path):
+    """overrides 가 비었거나 묶음 키를 덮지 않는 설정(configs/v2.yaml·v2_0b.yaml, Gate E1 R0·R1 팔 설정)은 하위 키
+    합치기를 넣기 전 로더와 같은 설정을 낸다."""
+    assert load_v2_config(path).to_dict() == _pre_merge_loader(path)
+
+
+def test_load_v2_config_scalar_override_unchanged(tmp_path):
+    p = tmp_path / "v2.yaml"
+    p.write_text("overrides: {see_r: 18.0, train_seeds: [0, 10]}\nfeatures: {}\n", encoding="utf-8")
+    assert load_v2_config(p).to_dict() == _pre_merge_loader(p)
+
+
+def test_recorded_config_digests_unchanged():
+    """기록된 결과·캐시 키(diagnose_v2.config_digest)가 로더 확장 뒤에도 같다: configs/v2.yaml(0-3 진단
+    results/v2/diag_final) 과 Gate E1 R0·R1 팔 6개(각 run.json). configs/v2.yaml 은 결과·캐시 키 불변이다."""
+    import json
+
+    from diagnose_v2 import config_digest
+    meta = json.loads((ROOT / "results" / "v2" / "diag_final" / "constsearch.json").read_text(encoding="utf-8"))["meta"]
+    assert meta["config_version"] == "2.0"
+    assert config_digest(load_v2_config()) == meta["config_digest"]
+    runs = sorted((ROOT / "results" / "v2" / "e1").glob("R*/*/run.json"))
+    assert len(runs) == len(E1_ARM_CONFIGS) == 6
+    for rj in runs:
+        r = json.loads(rj.read_text(encoding="utf-8"))
+        assert config_digest(load_v2_config(ROOT / r["config"])) == r["config_digest"], rj
