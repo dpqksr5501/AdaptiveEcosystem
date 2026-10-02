@@ -30,6 +30,12 @@
 - 행동 모드 (6.1-7): 기본은 결정 모드(평균 행동, 언리얼 배포와 같음)다. `--act-mode stochastic` 은 학습 분포
   (평균 + exp(log_std) 잡음 → [-3,3] 자르기 → sigmoid)에서 뽑는다. 잡음은 평가 시드에서 유도한 전용 스트림이라
   재현된다(env_v2/rollout.py StochasticLearned). 사전 등록 판정은 결정 모드로 한다.
+- 행동 수는 설정을 따른다(`env_v2.world.action_names`: v2.0 4개, speed 를 켠 v2.1 은 5개 — idx 4 = speed).
+  C1·C3-k·C1′·C2·C2-seg·`--action`·`--const-action`·`--base-action` 의 길이가 모두 그 수다. 예:
+      python diagnose_v2.py constsearch --config configs/v2_1.yaml --policy fixed --action 0.4 0.8 0.4 0.1 0.5 \
+          --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.4 0.8 0.4 0.1 0.5     # Gate E1 꼴 C2-seg
+  Utility 는 v1 행동 4개만 내므로 speed 세계에서는 참고 행에서 뺀다(Utility v2 는 아직 없다, 계획서 4.8).
+  speed 세계의 결과에는 보행 지표(`World.gait_stats`: 보행 비율, energy<0.5 비율, B1·B2·B8)가 함께 남는다.
 """
 
 from __future__ import annotations
@@ -61,7 +67,8 @@ from env_v2.rollout import (
     run_specs,
     tail_steps,
 )
-from env_v2.world import ACT_DIM, OBS_DIM, OBS_RECENT_PREDATION
+from env_v2.rollout import GAIT_COLUMNS, adapt_spec
+from env_v2.world import ACT_DIM, ACT_NAMES_V1, OBS_DIM, OBS_RECENT_PREDATION, action_names
 from evaluate import T_CRIT, welch_paired
 
 ROOT = Path(__file__).resolve().parent
@@ -69,7 +76,7 @@ RESULTS = ROOT / "results" / "v2"
 # 관측 표본 캐시(수 MB). results/ 는 커밋 대상이라 .gitignore 가 무시하는 runs/ 아래에 둔다.
 CACHE = ROOT / "runs" / "v2_diag"
 
-ACT_NAMES = ["forage", "cohesion", "flee_dist", "cover"]
+ACT_NAMES = list(ACT_NAMES_V1)   # v1 행동 4개. 진단하는 세계의 행동 이름은 Ctx.act_names (결과 meta "act_names")
 OBS_NAMES = ["food_density", "pred_count", "pred_dist", "kin_count", "energy",
              "recent_predation", "cover_dist"]
 
@@ -87,6 +94,8 @@ BATCH = 7
 TOP_K = 5
 # v1 환경에서 학습 전에 찾았던 최고 상수. smart_check.py 가 탐색 시작점으로 넣었다.
 V1_PRETRAIN_BEST = [0.39, 0.99, 0.92, 0.15]
+# v1 에 없는 행동의 탐색 시작값. speed 0.5 = 걷기 구간(1/3~2/3) 가운데 — 걷기 대사가 v1 대사와 같다(계획서 4.4).
+PRETRAIN_EXTRA = {"speed": 0.5}
 # 평가 길이 기본값 (6.1-4)
 EVAL_STEPS = 5000
 # γ = 0.998 보고 평가 (6.1-4, #27). `--g998` 이 이 세 값을 한 번에 정한다. 꼬리는 ceil(5/(1-0.998)) = 2500.
@@ -97,9 +106,13 @@ OUTCOME = ["mean_return", "g_gamma", "survival", "repro", "predation_rate", "sta
 # 행동 지표. 우열이 아니라 기술이다.
 BEHAVIOR = ["cohesion_mean", "flee_dist_mean", "flee_dist_std", "cover_frac", "react_pred",
             "react_hunger", "starve_share"]
+# 보행 지표(speed 를 켠 세계만, World.gait_stats). 우열이 아니라 기술이다. 표에는 이 열만 낸다(나머지는 JSON).
+GAIT_SHOW = ["walk_frac", "stop_frac", "run_frac", "stall_frac", "hungry_frac", "b1", "b2", "b8"]
 COL_LABEL = {
     "mean_return": "리턴", "g_gamma": "G_γ", "survival": "수명", "repro": "번식",
     "predation_rate": "피식률", "starve_rate": "아사율", "starve_share": "아사 비중",
+    "walk_frac": "걷기", "stop_frac": "정지", "run_frac": "뛰기", "stall_frac": "방향 없음 정지",
+    "hungry_frac": "energy<0.5", "b1": "B1", "b2": "B2", "b8": "B8 (/초)",
 }
 COL_FMT = {
     "mean_return": ".2f", "g_gamma": ".3f", "survival": ".1f", "repro": ".2f",
@@ -276,11 +289,21 @@ def wrap(base: dict, *wrappers: dict) -> dict:
     return {"policy": base, "wrap": list(wrappers)}
 
 
-def control_specs(base: dict, mean_action) -> dict[str, dict]:
-    """C0, C1, C3-k, C1′. C1 은 학습 정책을 부르지 않는 상수 정책이다 (smart_check frozen_all 과 같다)."""
+def check_names(names, n: int) -> list[str]:
+    """행동 이름 목록. 주지 않으면 v1 4개이고, 그때 길이가 4 가 아니면 멈춘다(이름을 지어내지 않는다)."""
+    names = list(ACT_NAMES if names is None else names)
+    if len(names) != n:
+        raise ValueError(f"행동 {n}개인데 이름이 {len(names)}개다: {names}")
+    return names
+
+
+def control_specs(base: dict, mean_action, names=None) -> dict[str, dict]:
+    """C0, C1, C3-k, C1′. C1 은 학습 정책을 부르지 않는 상수 정책이다 (smart_check frozen_all 과 같다).
+
+    C3-k 는 행동마다 하나다(speed 세계는 C3-speed 까지 5개). `names` 를 주지 않으면 v1 4개다."""
     mean = [float(x) for x in mean_action]
     specs = {"C0": base, "C1": {"kind": "fixed", "action": mean}}
-    for k, name in enumerate(ACT_NAMES):
+    for k, name in enumerate(check_names(names, len(mean))):
         specs[f"C3-{name}"] = wrap(base, {"kind": "act_fix", "dims": [k], "values": mean})
     specs["C1'"] = wrap(base, {"kind": "act_permute", "salt": 0})
     return specs
@@ -370,17 +393,18 @@ def calib_from_rows(rows: list[dict]) -> dict:
     std = np.sqrt(np.maximum(sum(r["_act_sq"] for r in rows) / n - mean ** 2, 0.0))
     obs_mean = sum(r["_obs_sum"] for r in rows) / n
     obs = np.concatenate([r["_obs"] for r in rows]) if "_obs" in rows[0] else np.empty((0, OBS_DIM))
-    act = np.concatenate([r["_act"] for r in rows]) if "_act" in rows[0] else np.empty((0, ACT_DIM))
+    act = np.concatenate([r["_act"] for r in rows]) if "_act" in rows[0] else np.empty((0, len(mean)))
     return {"mean_action": mean, "std_action": std, "obs_mean": obs_mean, "obs": obs, "act": act,
             "n": int(n)}
 
 
-def calib_summary(cal: dict) -> dict:
+def calib_summary(cal: dict, names=None) -> dict:
     obs = cal["obs"]
+    names = check_names(names, len(np.ravel(cal["mean_action"])))
     return {
         "seeds": cal.get("seeds"), "steps": cal.get("steps"), "record_every": cal.get("record_every"),
-        "mean_action": dict(zip(ACT_NAMES, np.asarray(cal["mean_action"]).tolist())),
-        "std_action": dict(zip(ACT_NAMES, np.asarray(cal["std_action"]).tolist())),
+        "mean_action": dict(zip(names, np.asarray(cal["mean_action"]).tolist())),
+        "std_action": dict(zip(names, np.asarray(cal["std_action"]).tolist())),
         "obs_mean": dict(zip(OBS_NAMES, np.asarray(cal["obs_mean"]).tolist())),
         "obs_quantiles_5_50_95": {OBS_NAMES[j]: np.quantile(obs[:, j], [0.05, 0.5, 0.95]).tolist()
                                   for j in range(OBS_DIM)} if len(obs) else None,
@@ -401,7 +425,10 @@ class Ctx:
         apply_g998(args)
         self.act_mode = getattr(args, "act_mode", None) or "deterministic"
         self.cfg = load_v2_config(args.config)
-        self.spec = base_spec(args)
+        # 이 설정의 세계가 받는 행동 (v2.0 4개, speed 를 켠 v2.1 5개). 대조군·상수의 길이가 이 수다
+        self.act_names = list(action_names(self.cfg))
+        self.act_dim = len(self.act_names)
+        self.spec = base_spec(args, self.act_names)
         self.name = args.name or default_name(args, self.cfg)
         out = getattr(args, "out", None)
         self.out = Path(out) if out else RESULTS / f"diag_{self.name}"
@@ -453,6 +480,8 @@ class Ctx:
             "config_digest": config_digest(self.cfg),
             # 0-7 에서 더한 키. 예전 JSON 에는 없다 — 읽을 때 없으면 head 0, 결정 모드로 본다.
             "head": self.head, "act_mode": self.act_mode, "model_gamma": self.model_gamma,
+            # 1-1 에서 더한 키. 예전 JSON 에는 없다 — 읽을 때 없으면 v1 행동 4개로 본다(act_names_of).
+            "act_names": self.act_names,
             **kw,
         }
 
@@ -474,7 +503,9 @@ def apply_g998(args) -> None:
         raise SystemExit(f"--g998 은 꼬리를 ceil(5/(1-γ)) = {tail} 로 둔다 (받은 값 {args.tail})")
 
 
-def base_spec(args) -> dict | None:
+def base_spec(args, names=None) -> dict | None:
+    """명령줄 → 바탕 정책 스펙. `names` 는 세계의 행동 이름(없으면 v1 4개)이고 fixed·random·utility 의 길이를 정한다."""
+    names = list(ACT_NAMES if names is None else names)
     mode = getattr(args, "act_mode", None) or "deterministic"
     if mode not in ACTION_MODES:
         raise SystemExit(f"--act-mode {mode!r}: {ACTION_MODES} 중 하나")
@@ -486,12 +517,15 @@ def base_spec(args) -> dict | None:
     if args.model:
         return {"kind": "learned", "model": str(Path(args.model).resolve())}
     if args.policy == "utility":
+        if len(names) != ACT_DIM:
+            raise SystemExit(f"Utility 는 v1 행동 4개만 낸다. 이 설정은 행동 {len(names)}개 {names} 다 "
+                             "(Utility v2 는 아직 없다, 계획서 4.8)")
         return {"kind": "utility"}
     if args.policy == "random":
-        return {"kind": "random", "seed": 0}
+        return adapt_spec({"kind": "random", "seed": 0}, len(names))
     if args.policy == "fixed":
-        if not args.action or len(args.action) != ACT_DIM:
-            raise SystemExit("--policy fixed 는 --action 값 4개가 필요하다")
+        if not args.action or len(args.action) != len(names):
+            raise SystemExit(f"--policy fixed 는 --action 값 {len(names)}개가 필요하다 ({names})")
         return {"kind": "fixed", "action": [float(x) for x in args.action]}
     return None
 
@@ -571,8 +605,8 @@ def get_calib(ctx: Ctx) -> dict:
                         **{k: cal[k] for k in ("mean_action", "std_action", "obs_mean", "obs", "act")})
     save_json(ctx.out / "calib.json", {
         "meta": ctx.meta(calib_seeds=ctx.calib_seeds, calib_steps=ctx.calib_steps),
-        "calib": calib_summary(cal),
-        "outcome_mean_on_calib_seeds": {c: nanmean([r[c] for r in rows]) for c in ROW_COLUMNS},
+        "calib": calib_summary(cal, ctx.act_names),
+        "outcome_mean_on_calib_seeds": summarize(rows),
     })
     print(f"[보정] 학습 시드 {ctx.calib_seeds[0]}~{ctx.calib_seeds[-1]} × {ctx.calib_steps} "
           f"({time.time() - t0:.0f}s) 평균 행동 {np.round(cal['mean_action'], 4).tolist()}", flush=True)
@@ -585,7 +619,14 @@ def get_calib(ctx: Ctx) -> dict:
 
 
 def summarize(rows: list[dict]) -> dict:
-    return {c: nanmean([r.get(c) for r in rows]) for c in ROW_COLUMNS}
+    """시드 평균. speed 세계의 행이면 보행 지표 열(GAIT_COLUMNS)도 평균한다(v2.0 행은 예전과 같은 열)."""
+    cols = ROW_COLUMNS + ([c for c in GAIT_COLUMNS if c in rows[0]] if rows else [])
+    return {c: nanmean([r.get(c) for r in rows]) for c in cols}
+
+
+def act_names_of(d: dict) -> list[str]:
+    """결과 JSON 의 행동 이름. 1-1 전 결과(meta 에 act_names 가 없다)는 v1 4개다."""
+    return list((d.get("meta") or {}).get("act_names") or ACT_NAMES)
 
 
 def compare(rows: list[dict], ref: list[dict], cols=OUTCOME) -> dict:
@@ -654,7 +695,20 @@ def md_behavior(controls: dict) -> list[str]:
     lines = [head, "|---" * (len(BEHAVIOR) + 1) + "|"]
     for name, row in controls.items():
         lines.append(f"| {ctrl_label(name)} | " + " | ".join(fmt(c, row["mean"].get(c)) for c in BEHAVIOR) + " |")
-    return lines
+    return lines + md_gait(controls)
+
+
+def md_gait(controls: dict) -> list[str]:
+    """speed 세계의 보행 지표 표 (World.gait_stats). v2.0 결과는 열이 없어 빈 목록이다."""
+    rows = {k: v for k, v in controls.items() if "walk_frac" in v.get("mean", {})}
+    if not rows:
+        return []
+    L = ["", "### 보행 지표 (speed, 우열 아님. B1·B2 는 명령 보행, 비율은 실제 보행)", "",
+         "| 대조군 | " + " | ".join(COL_LABEL.get(c, c) for c in GAIT_SHOW) + " |",
+         "|---" * (len(GAIT_SHOW) + 1) + "|"]
+    for name, row in rows.items():
+        L.append(f"| {ctrl_label(name)} | " + " | ".join(fmt(c, row["mean"].get(c)) for c in GAIT_SHOW) + " |")
+    return L
 
 
 def md_meta(meta: dict, ref: str | None = "C0") -> list[str]:
@@ -727,12 +781,13 @@ def md_const(d: dict) -> list[str]:
                  f"{s['best_trial']}")
     else:
         L.append("- 탐색 생략: `--const-action` 으로 받은 값을 그대로 평가했다")
+    names = act_names_of(d)
     if tag == "C2":
-        L.append("- 상수: " + ", ".join(f"{k} {v:.4f}" for k, v in zip(ACT_NAMES, d["best"])))
+        L.append("- 상수: " + ", ".join(f"{k} {v:.4f}" for k, v in zip(names, d["best"])))
     else:
         L.append(f"- 바탕 C2 상수: {np.round(d['base_action'], 4).tolist()}, 구간별 행동: "
-                 f"{[ACT_NAMES[k] for k in d['dims']]}")
-        L += ["", "| 구간 | " + " | ".join(ACT_NAMES[k] for k in d["dims"]) + " |",
+                 f"{[names[k] for k in d['dims']]}")
+        L += ["", "| 구간 | " + " | ".join(names[k] for k in d["dims"]) + " |",
               "|---" * (len(d["dims"]) + 1) + "|"]
         for lab, row in zip(d["segments"], d["best_table"]):
             L.append(f"| {lab} | " + " | ".join(f"{v:.3f}" for v in row) + " |")
@@ -746,6 +801,7 @@ def md_const(d: dict) -> list[str]:
                  + " | ".join(cell(c, d["eval"]["mean"][c], d["eval"][ref][c]) for c in OUTCOME) + " |")
     for name, m in d.get("ref_mean", {}).items():
         L.append(f"| {ctrl_label(name)} | " + " | ".join(fmt(c, m[c]) for c in OUTCOME) + " |")
+    L += md_gait({tag: {"mean": d["eval"]["mean"]}, **{k: {"mean": m} for k, m in d.get("ref_mean", {}).items()}})
     return L
 
 
@@ -761,8 +817,9 @@ def md_permute(d: dict) -> list[str]:
     L += md_behavior(d["controls"])
     sens = d.get("offline_sensitivity")
     if sens:
+        names = act_names_of(d)
         L += ["", "## 오프라인 민감도 (보정 표본에서 개입 전후 평균 |Δ행동|)", "",
-              "| 대조군 | " + " | ".join(ACT_NAMES) + " |", "|---" * (ACT_DIM + 1) + "|"]
+              "| 대조군 | " + " | ".join(names) + " |", "|---" * (len(names) + 1) + "|"]
         for name, v in sens.items():
             L.append(f"| {name} | " + " | ".join(f"{x:.4f}" for x in v) + " |")
     return L
@@ -774,7 +831,7 @@ def md_r2(d: dict) -> list[str]:
          "- R² > 0.95 는 '규칙 수준'으로 적는다. 실패로 보지 않는다 (6.1-5).", "",
          "| 행동 | " + " | ".join(f"R² ({k})" for k in d["r2"]) + " | 표준편차 (C0) | 판정 |",
          "|---" * (len(d["r2"]) + 3) + "|"]
-    for i, name in enumerate(ACT_NAMES):
+    for i, name in enumerate(act_names_of(d)):
         vals = [d["r2"][k][i] for k in d["r2"]]
         c0 = d["r2"]["C0"][i]
         verdict = "규칙 수준" if c0 is not None and c0 > 0.95 else ""
@@ -784,23 +841,24 @@ def md_r2(d: dict) -> list[str]:
 
 
 def md_curves(d: dict) -> list[str]:
+    names = act_names_of(d)
     L = ["# 진단: 반응 곡선", "",
          "- 조건부: 실제 표본을 관측 분위수 구간으로 나눈 평균 행동 (smart_check react 와 같은 방식, 개입 아님)",
          "- 개입: 관측 j 만 격자값으로 바꿔 넣은 평균 행동 (부분 의존). 정책이 j 를 쓰는지는 이쪽으로 본다", ""]
     if d.get("react"):
         keys = [k for k in next(iter(d["react"].values())) if k != "n"]
         L += ["## 상황별 평균 행동", "",
-              "| 상황 | n | " + " | ".join(f"{k} {a}" for k in keys for a in ACT_NAMES) + " |",
-              "|---" * (2 + len(keys) * ACT_DIM) + "|"]
+              "| 상황 | n | " + " | ".join(f"{k} {a}" for k in keys for a in names) + " |",
+              "|---" * (2 + len(keys) * len(names)) + "|"]
         for name, row in d["react"].items():
             L.append(f"| {name} | {row['n']} | " + " | ".join(f"{x:.3f}" for k in keys for x in row[k]) + " |")
         L.append("")
     for obs_name in OBS_NAMES:
-        L += [f"## {obs_name}", "", "| 구간 | n | " + " | ".join(ACT_NAMES) + " |", "|---" * (ACT_DIM + 2) + "|"]
+        L += [f"## {obs_name}", "", "| 구간 | n | " + " | ".join(names) + " |", "|---" * (len(names) + 2) + "|"]
         for b in d["conditional"][obs_name]:
             rng = f"{b['lo']:.3f}" if b["lo"] == b["hi"] else f"{b['lo']:.3f}~{b['hi']:.3f}"
             L.append(f"| {rng} | {b['n']} | " + " | ".join(f"{x:.3f}" for x in b["act"]) + " |")
-        L += ["", "| 개입값 | " + " | ".join(ACT_NAMES) + " |", "|---" * (ACT_DIM + 1) + "|"]
+        L += ["", "| 개입값 | " + " | ".join(names) + " |", "|---" * (len(names) + 1) + "|"]
         for p in d["intervention"][obs_name]:
             L.append(f"| {p['x']:.3f} | " + " | ".join(f"{x:.3f}" for x in p["act"]) + " |")
         L.append("")
@@ -886,12 +944,15 @@ def cmd_ablate(ctx: Ctx) -> int:
     base = ctx.need_spec()
     t0 = time.time()
     cal = get_calib(ctx)
-    specs = control_specs(base, cal["mean_action"])
+    specs = control_specs(base, cal["mean_action"], ctx.act_names)
     if ctx.args.utility and base.get("kind") != "utility":
-        specs["Utility"] = {"kind": "utility"}
+        if ctx.act_dim == ACT_DIM:
+            specs["Utility"] = {"kind": "utility"}
+        else:
+            print(f"  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 {ctx.act_dim}개, Utility v2 없음)")
     res = ctx.run(specs, ctx.eval_seeds, ctx.eval_steps)
     controls = control_table(res, specs)
-    data = {"meta": ctx.meta(elapsed_s=round(time.time() - t0, 1)), "calib": calib_summary(cal),
+    data = {"meta": ctx.meta(elapsed_s=round(time.time() - t0, 1)), "calib": calib_summary(cal, ctx.act_names),
             "controls": controls, "per_seed": {k: [public_row(r) for r in v] for k, v in res.items()}}
     save(ctx, "ablate", data, md_ablate(clean(data)))
     print_controls(controls)
@@ -974,14 +1035,20 @@ def cmd_constsearch(ctx: Ctx) -> int:
     tag = "C2-seg" if seg else "C2"
     stem = a.tag or ("constsearch_seg" if seg else "constsearch")
 
+    act_names = ctx.act_names
     if seg:
-        dims = parse_dims(a.seg_dims or [], ACT_NAMES)
+        dims = parse_dims(a.seg_dims or [], act_names)
         if not dims:
             raise SystemExit("--seg-bins 를 쓰면 --seg-dims 로 구간별 행동을 정해야 한다")
+        bad = [k for k in dims if not 0 <= k < ctx.act_dim]
+        if bad:
+            raise SystemExit(f"--seg-dims {bad} 는 이 설정의 행동 {act_names} 밖이다")
         base_action = a.base_action if a.base_action is not None else c2_base_action(ctx)
         base_action = [float(x) for x in base_action]
+        if len(base_action) != ctx.act_dim:
+            raise SystemExit(f"C2-seg 바탕 상수는 값 {ctx.act_dim}개다 ({act_names}). 받은 값: {base_action}")
         S = n_segments(bins)
-        names = [f"s{s}_{ACT_NAMES[k]}" for s in range(S) for k in dims]
+        names = [f"s{s}_{act_names[k]}" for s in range(S) for k in dims]
 
         def make_spec(vec):
             return seg_spec(base_action, bins, dims, vec)
@@ -989,22 +1056,26 @@ def cmd_constsearch(ctx: Ctx) -> int:
         def default_enqueue():
             return [[base_action[k] for _ in range(S) for k in dims]]    # C2 자체(모든 구간이 C2 값)
     else:
-        dims, base_action, S = list(range(ACT_DIM)), None, 1
-        names = list(ACT_NAMES)        # smart_check 와 같은 이름 — TPE 결과가 같아진다
+        dims, base_action, S = list(range(ctx.act_dim)), None, 1
+        names = list(act_names)        # v2.0 은 smart_check 와 같은 이름 — TPE 결과가 같아진다
 
         def make_spec(vec):
             return {"kind": "fixed", "action": [float(x) for x in vec]}
 
         def default_enqueue():
-            # smart_check 와 같은 순서: C1 평균 행동, v1 학습 전 최고 상수
+            # smart_check 와 같은 순서: C1 평균 행동, v1 학습 전 최고 상수(v1 에 없는 행동은 PRETRAIN_EXTRA)
             first = [np.asarray(get_calib(ctx)["mean_action"]).tolist()] if ctx.spec is not None else []
-            return first + [V1_PRETRAIN_BEST]
+            return first + [V1_PRETRAIN_BEST + [PRETRAIN_EXTRA[k] for k in act_names[ACT_DIM:]]]
 
     if a.const_action is not None:
         if len(a.const_action) != len(names):
             raise SystemExit(f"--const-action 은 값 {len(names)}개가 필요하다 ({names})")
         best, search = [float(x) for x in a.const_action], None
     else:
+        if a.enqueue is not None and not seg:
+            bad = [v for v in a.enqueue if len(v) != len(names)]
+            if bad:
+                raise SystemExit(f"--enqueue 는 값 {len(names)}개씩이다 ({names}): {bad}")
         enqueue = a.enqueue if a.enqueue is not None else default_enqueue()
         best, search = search_constants(ctx, make_spec, names, enqueue)
 
@@ -1089,9 +1160,9 @@ def cmd_permute(ctx: Ctx) -> int:
     return 0
 
 
-def reference_actions(base: dict, obs: np.ndarray) -> dict[str, np.ndarray]:
-    """비교용 Utility 행동. 바탕 정책이 Utility 면 비운다."""
-    if base.get("kind") == "utility":
+def reference_actions(base: dict, obs: np.ndarray, act_dim: int = ACT_DIM) -> dict[str, np.ndarray]:
+    """비교용 Utility 행동. 바탕 정책이 Utility 이거나 세계의 행동이 4개가 아니면(Utility v2 없음) 비운다."""
+    if base.get("kind") == "utility" or act_dim != ACT_DIM:
         return {}
     return {"Utility": batched(build_policy({"kind": "utility"}), obs)}
 
@@ -1101,7 +1172,7 @@ def cmd_curves(ctx: Ctx) -> int:
     cal = get_calib(ctx)
     obs, act = cal["obs"], np.asarray(cal["act"], dtype=np.float64)
     pol = build_policy(base, 0)
-    acts = {"C0": act, **reference_actions(base, obs)}
+    acts = {"C0": act, **reference_actions(base, obs, ctx.act_dim)}
     data = {
         "meta": ctx.meta(samples=int(len(obs)), calib_seeds=ctx.calib_seeds, calib_steps=ctx.calib_steps),
         "react": react_table(obs, acts),
@@ -1118,14 +1189,14 @@ def cmd_r2(ctx: Ctx) -> int:
     base = ctx.need_spec()
     cal = get_calib(ctx)
     obs, act = cal["obs"], np.asarray(cal["act"], dtype=np.float64)
-    acts = {"C0": act, **reference_actions(base, obs)}
+    acts = {"C0": act, **reference_actions(base, obs, ctx.act_dim)}
     data = {"meta": ctx.meta(calib_seeds=ctx.calib_seeds, calib_steps=ctx.calib_steps),
             "samples": int(len(obs)),
             "r2": {k: linear_r2(obs, v).tolist() for k, v in acts.items()},
             "act_std": {k: np.asarray(v).std(0).tolist() for k, v in acts.items()}}
     save(ctx, "r2", data, md_r2(clean(data)))
     for k, v in data["r2"].items():
-        print(f"  R² {k}: " + " ".join(f"{n} {x:.3f}" for n, x in zip(ACT_NAMES, v)))
+        print(f"  R² {k}: " + " ".join(f"{n} {x:.3f}" for n, x in zip(ctx.act_names, v)))
     return 0
 
 
@@ -1768,7 +1839,8 @@ def build_parser() -> argparse.ArgumentParser:
     g = common.add_argument_group("정책·출력")
     g.add_argument("--model", default=None, help="학습 정책 zip")
     g.add_argument("--policy", choices=["utility", "fixed", "random"], default=None)
-    g.add_argument("--action", type=float, nargs=ACT_DIM, default=None, help="--policy fixed 의 행동 4개")
+    g.add_argument("--action", type=float, nargs="+", default=None,
+                   help="--policy fixed 의 행동. 설정의 행동 수만큼(v2.0 4개, speed 를 켠 v2.1 5개)")
     g.add_argument("--name", default=None, help="results/v2/diag_<이름>. 기본은 모델 파일 이름")
     g.add_argument("--out", default=None, help="출력 디렉터리를 직접 정한다. 기본 results/v2/diag_<이름>")
     g.add_argument("--config", default=None, help="기본 configs/v2.yaml")
@@ -1815,8 +1887,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="탐색 시작점(여러 번). 기본: C1 평균 행동, v1 학습 전 최고 상수")
     s.add_argument("--seg-bins", nargs="+", default=None, help="C2-seg 구간. 예: 2:0.5 4:0.5")
     s.add_argument("--seg-dims", nargs="+", default=None, help="구간마다 상수를 갖는 행동 (이름 또는 번호)")
-    s.add_argument("--base-action", type=float, nargs=ACT_DIM, default=None,
-                   help="C2-seg 바탕 상수. 기본은 같은 디렉터리 constsearch.json 의 C2")
+    s.add_argument("--base-action", type=float, nargs="+", default=None,
+                   help="C2-seg 바탕 상수(설정의 행동 수만큼). 기본은 같은 디렉터리 constsearch.json 의 C2")
 
     s = sub.add_parser("permute", parents=[common], help="C4-j 관측 고정·순열")
     s.add_argument("--obs", nargs="+", default=None, help="관측 (이름 또는 번호). 기본 7개 전부")
@@ -1852,11 +1924,7 @@ def main(argv=None) -> int:
     except AttributeError:  # pragma: no cover
         pass
     args = build_parser().parse_args(argv)
-    if args.cmd == "constsearch" and args.enqueue is not None:
-        bad = [v for v in args.enqueue if len(v) != ACT_DIM]
-        if bad and not args.seg_bins:
-            raise SystemExit(f"--enqueue 는 값 {ACT_DIM}개씩이다: {bad}")
-    ctx = Ctx(args)
+    ctx = Ctx(args)            # 행동 수는 설정에서 읽는다. --enqueue 길이는 constsearch 가 검사한다
     head = f", 앞 {ctx.head}스텝" if ctx.head else ""
     mode = f", {ctx.act_mode}" if ctx.act_mode != "deterministic" else ""
     print(f"[{args.cmd}] {ctx.name} → {ctx.out}  (γ={ctx.gamma}, 꼬리 {ctx.tail}스텝{head}{mode}, "

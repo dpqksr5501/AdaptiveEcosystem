@@ -13,6 +13,9 @@ v1 에 없는 것:
   학습 때의 가우시안 분포에서 뽑은 행동을 쓴다 (`StochasticLearned`). 잡음은 평가 시드에서 유도한 전용
   스트림에서 뽑아 재현된다. `mode` 가 없거나 "deterministic" 이면 지금까지와 같은 결정 모드다.
 - **앞부분 제외.** `head` 를 주면 G_γ 평균에서 롤아웃 앞 `head` 스텝(리셋 과도기)도 뺀다 (6.1-4, 기본 0).
+- **행동 수는 세계를 따른다** (`World.act_dim`: v1 4, speed 를 켜면 5). 래퍼·확률 모드는 차원과 무관하다.
+  v1 의 4개짜리 정책(Utility)은 speed 세계에 쓸 수 없다(World.step 이 모양을 검사한다). random 은 스펙의
+  `act_dim` 으로 차원을 정한다(`adapt_spec`). speed 를 켠 세계의 행에는 `World.gait_stats()` 열이 붙는다.
 
 정책 스펙 예:
     {"kind": "learned", "model": "ckpt/final.zip"}                 # policies.registry 스펙 그대로
@@ -35,7 +38,7 @@ import numpy as np
 from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
-from .world import ACT_DIM, OBS_DIM, World
+from .world import ACT_DIM, GAIT_STAT_COLUMNS, OBS_DIM, World
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -44,6 +47,8 @@ DEFAULT_GAMMA = 0.9916661555611042
 # World.stats() 10열 뒤에 붙는 열. 시드마다 하나의 값이다.
 EXTRA_COLUMNS = ["g_gamma", "starve_rate", "starve_share"]
 ROW_COLUMNS = STAT_COLUMNS + EXTRA_COLUMNS
+# speed(v2.1)를 켠 세계의 행에만 더 붙는 열 (World.gait_stats, starve_* 는 위와 같은 값이라 빼고 붙인다)
+GAIT_COLUMNS = [c for c in GAIT_STAT_COLUMNS if c not in EXTRA_COLUMNS]
 
 
 # --------------------------------------------------------------------- #
@@ -135,7 +140,7 @@ def _perm_rng(kind: str, seed: int, salt: int) -> np.random.Generator:
 
 
 class ActFix:
-    """행동 차원 `dims` 를 상수로 고정한다. `values` 는 행동 전체 길이(ACT_DIM) 벡터다 (C3-k)."""
+    """행동 차원 `dims` 를 상수로 고정한다. `values` 는 행동 전체 길이(세계의 act_dim) 벡터다 (C3-k)."""
 
     def __init__(self, base, dims, values):
         self.base, self.dims = base, list(dims)
@@ -276,7 +281,7 @@ class StochasticLearned:
     a = sigmoid(clip(μ(obs) + exp(log_std)·ε, -3, 3)), ε ~ N(0, I).
     학습 롤아웃(SB3 collect_rollouts: 분포에서 표본 → action_space 로 clip → vec_env 의 sigmoid)과 같은
     분포다. μ 는 자르기 전 평균이다 — 결정 모드는 sigmoid(clip(μ)) 이고, 잡음을 0 으로 두면 둘이 같다.
-    ε 는 평가 시드에서 유도한 전용 스트림 [seed, 303, salt] 에서 호출마다 (N, 4) 개씩 뽑는다. 그래서 같은
+    ε 는 평가 시드에서 유도한 전용 스트림 [seed, 303, salt] 에서 호출마다 (N, 행동 수) 개씩 뽑는다. 그래서 같은
     시드·같은 호출 순서면 같은 행동이 나온다. 스트림은 v1 세계·기능·순열 대조군과 겹치지 않는다(_SALT).
     """
 
@@ -285,7 +290,7 @@ class StochasticLearned:
         self.rng = _perm_rng("act_sample", seed, salt)
 
     def distribution(self, obs) -> tuple[np.ndarray, np.ndarray]:
-        """관측 → (평균 μ, 표준편차 exp(log_std)), 둘 다 (N, 4). 자르기 전 값이다."""
+        """관측 → (평균 μ, 표준편차 exp(log_std)), 둘 다 (N, 행동 수). 자르기 전 값이다."""
         import torch as th
 
         policy = self.model.policy
@@ -318,6 +323,26 @@ def _load_model(spec: dict):
     return _MODEL_CACHE[key]
 
 
+def adapt_spec(spec: dict, act_dim: int) -> dict:
+    """정책 스펙을 행동 `act_dim` 개 세계에 맞춘다. random 바탕 정책에만 `act_dim` 을 적는다(래퍼 안쪽 포함).
+
+    v1 행동 수(4)면 스펙을 그대로 돌려준다 — 예전 스펙·캐시 키가 바뀌지 않는다. fixed 는 action 길이가,
+    learned 는 모델 출력이 차원을 정하므로 건드리지 않는다. Utility(4개)는 speed 세계에서 World.step 이 거부한다.
+    """
+    if "policy" in spec:
+        return {**spec, "policy": adapt_spec(spec["policy"], act_dim)}
+    if spec.get("kind") == "random" and int(act_dim) != ACT_DIM:
+        return {**spec, "act_dim": int(act_dim)}
+    return spec
+
+
+def _random_policy(spec: dict):
+    """균등 랜덤 [0,1]^act_dim (C6). act_dim 4 는 policies.registry 의 random 과 같은 수열이다."""
+    rng = np.random.default_rng(spec.get("seed", 0))
+    d = int(spec["act_dim"])
+    return lambda obs: rng.random((len(obs), d))
+
+
 def _base_policy(spec: dict, seed: int = 0):
     from policies.registry import make_policy
 
@@ -325,6 +350,8 @@ def _base_policy(spec: dict, seed: int = 0):
         if spec.get("kind") != "learned":
             raise ValueError(f"확률 모드는 학습 정책에만 있다: {spec!r}")
         return StochasticLearned(_load_model(spec), seed, spec.get("salt", 0))
+    if spec.get("kind") == "random" and "act_dim" in spec:      # 행동 4개가 아닌 세계의 random (adapt_spec)
+        return _random_policy(spec)
     if spec.get("kind") != "learned":       # random 은 RNG 상태가 있어 잡마다 새로 만든다
         return make_policy(spec)
     key = json.dumps(spec, sort_keys=True)
@@ -334,7 +361,7 @@ def _base_policy(spec: dict, seed: int = 0):
 
 
 def build_policy(spec: dict, seed: int = 0):
-    """정책 스펙(래퍼 포함) → 관측 (N,7) → 행동 (N,4) 함수. 래퍼는 목록 순서대로 바깥에 씌운다.
+    """정책 스펙(래퍼 포함) → 관측 (N,7) → 행동 (N, 행동 수) 함수. 래퍼는 목록 순서대로 바깥에 씌운다.
 
     `seed` 는 순열 래퍼와 확률 모드 잡음 스트림의 시드다(롤아웃에서는 평가 시드).
     """
@@ -354,6 +381,7 @@ def build_policy(spec: dict, seed: int = 0):
 def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None = None,
             tail: int | None = None, record_every: int = 0, head: int = 0) -> dict:
     """시드 하나. World.stats() 10열 + G_γ + 아사율, 그리고 `_` 로 시작하는 원시 합계·표본을 돌려준다.
+    speed 를 켠 세계는 `World.gait_stats()` 열(GAIT_COLUMNS)도 붙는다.
 
     `head`·`tail` 은 G_γ 평균에서만 뺀다. World.stats() 의 다른 지표는 롤아웃 전체 값이다.
 
@@ -363,15 +391,16 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     """
     gamma = load_gamma() if gamma is None else float(gamma)
     w = World(cfg, seeds=[seed])
-    N = w.N
+    N, A = w.N, w.act_dim
     rew = np.empty((steps, N), dtype=np.float64)
     done = np.empty((steps, N), dtype=bool)
-    act_sum, act_sq = np.zeros(ACT_DIM), np.zeros(ACT_DIM)
+    act_sum, act_sq = np.zeros(A), np.zeros(A)
     obs_sum = np.zeros(OBS_DIM)
     obs_s, act_s = [], []
     for t in range(steps):
         obs = w.observe()
         a = np.asarray(policy(obs), dtype=np.float64)
+        w._check_action(a)                  # 행동 수가 세계와 다르면 합산 전에 읽기 쉬운 오류로 멈춘다
         act_sum += a.sum(0)
         act_sq += (a * a).sum(0)
         obs_sum += obs.sum(0, dtype=np.float64)
@@ -387,11 +416,14 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     deaths = w._pred_deaths + w._starve_deaths
     s["starve_rate"] = w._starve_deaths / max(steps * N, 1)
     s["starve_share"] = w._starve_deaths / deaths if deaths else float("nan")
+    if w._sp is not None:
+        gs = w.gait_stats()
+        s.update((c, gs[c]) for c in GAIT_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:
         s["_obs"] = np.concatenate(obs_s) if obs_s else np.empty((0, OBS_DIM), np.float32)
-        s["_act"] = np.concatenate(act_s) if act_s else np.empty((0, ACT_DIM))
+        s["_act"] = np.concatenate(act_s) if act_s else np.empty((0, A))
     return s
 
 

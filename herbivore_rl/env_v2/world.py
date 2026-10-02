@@ -13,6 +13,12 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
 구현한 기능 (꺼진 기능의 코드 경로는 v1 과 같다):
 - food_v (v2.0b, 계획서 4.9.1): 셀마다 식생 용량 V. 섭식이 V 를 깎고 재생은 cap0 대신 V 를 향한다.
   V 는 반감기 h 로 cap0 에 천천히 돌아온다. 스텝 순서는 `_food_v_step`, 통계는 `food_stats`·`food_cells`.
+- speed (v2.1, 계획서 4.3·4.4·4.5): 행동이 5개가 된다(idx 4 = speed). 문턱으로 정지·걷기·뛰기를 정하고,
+  상태가 v1 조향 속도의 크기, 섭식 배수, 대사를 정한다. 에너지 보상은 계수 하나로 순변화(#4)로 바꾼다.
+  난수를 쓰지 않는다. 스텝 순서는 `_gait_step`, 통계는 `gait_stats`(v1 `stats()` 10열 밖).
+
+행동 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`, 세계마다 `World.act_names`·`World.act_dim`.
+모듈 상수 `ACT_DIM`(4)은 v1 행동 수다(기능을 모두 끈 세계와 food_v 세계의 행동 수).
 """
 
 from __future__ import annotations
@@ -34,11 +40,93 @@ OBS_RECENT_PREDATION = 5
 OBS_COVER_DISTANCE = 6
 OBS_DIM = 7
 
-ACT_DIM = 4  # forage, cohesion, flee_dist, cover (§3.2)
+ACT_DIM = 4  # forage, cohesion, flee_dist, cover (§3.2). v1 행동 수 — 세계의 실제 행동 수는 World.act_dim
+ACT_NAMES_V1 = ("forage", "cohesion", "flee_dist", "cover")
+ACT_SPEED = 4  # speed 를 켠 세계의 보행 행동 열 (계획서 4.3 idx 4)
+
+# 보행 상태 번호 (계획서 4.4). replay_v2.GAIT_* 와 같다.
+GAIT_STOP, GAIT_WALK, GAIT_RUN = 0, 1, 2
 
 # food_stats 의 "하한에 붙은 셀": V/cap0 ≤ floor + 이 값. 휴식 회복이 훼손 뒤에 오므로 하한까지 깎인 셀도
 # 스텝 끝에는 ρ·(1 − floor)만큼 위에 있다(반감기 300 에서 0.0021). 통계 정의이고 동역학 계수가 아니다.
 FOOD_V_FLOOR_TOL = 0.01
+
+# gait_stats 의 지표 정의 (계획서 6.2, 통계 정의이고 동역학 계수가 아니다).
+# B1 거리 구간 [0, 0.25), [0.25, 0.5), [0.5, 1] (× see_r). "포식자 가까움" = 보임 & d_pred < B1_EDGES[1]·see_r
+# (앞 두 구간, 계획서 6.2 의 d_pred < 0.5·see_r 이고 Gate E1 구간과 같다).
+B1_EDGES = (0.25, 0.5)
+# B2·hungry_frac 의 "배고픔" = 결정 때(스텝 전) energy < HUNGRY·max_energy (v1 react_hunger 와 같은 문턱).
+HUNGRY = 0.5
+# gait_stats 누적 히스토그램 모양: [실제 보행, 명령 보행, 포식자 거리 구간(안 보임 + B1 3구간), 배부름]
+GAIT_HIST_SHAPE = (3, 3, 1 + len(B1_EDGES) + 1, 2)
+# gait_stats() 열 순서. env_v2/rollout.py 가 speed 를 켠 세계의 행에 붙인다.
+GAIT_STAT_COLUMNS = (
+    "stop_frac", "walk_frac", "run_frac", "stall_frac",
+    "stop_frac_cmd", "walk_frac_cmd", "run_frac_cmd",
+    "hungry_frac", "starve_rate", "starve_share",
+    "b1", "p_run_unseen", "p_run_d025", "p_run_d050", "p_run_d100",
+    "b2", "p_stop_hungry", "p_stop_full",
+    "b8", "b8_cmd", "intake_per_step", "drain_per_step",
+)
+
+
+def action_names(cfg) -> tuple[str, ...]:
+    """설정(또는 `Features`)의 세계가 받는 행동 이름. 순서 = 행동 열 번호 (계획서 4.3).
+
+    v1 4개 뒤에 켠 기능의 행동이 붙는다. 지금은 speed(v2.1) 하나다. 한번 정한 열 번호는 바꾸지 않는다.
+    """
+    f = cfg if isinstance(cfg, Features) else features_of(cfg)
+    names = ACT_NAMES_V1
+    if f.enabled("speed"):
+        names = names + ("speed",)
+    return names
+
+
+def action_dim(cfg) -> int:
+    """설정의 세계가 받는 행동 수. v1·v2.0·v2.0b 4, speed 를 켜면 5."""
+    return len(action_names(cfg))
+
+
+def _speed_params(p: dict) -> dict:
+    """speed 계수(yaml 블록, 키는 `features.PARAM_KEYS`)의 값 범위를 검사하고 상태별 표를 만든다. 기본값은 없다.
+
+    - thresholds [t_walk, t_run]: 0 ≤ t_walk ≤ t_run ≤ 1. a < t_walk 정지, a < t_run 걷기, 그 밖은 뛰기
+    - gait_speed [0, s_walk, s_run] (× herb_speed): 정지는 0, 0 < s_walk ≤ s_run
+    - gait_eat [e_stop, e_walk, e_run] ≥ 0: `_eat` 의 want 에 곱하는 섭식 배수
+    - c_rest, c_move ≥ 0: drain_mult[g] = c_rest + c_move·gait_speed[g]² (스텝 대사 = energy_drain × drain_mult)
+    - net_energy_reward: true 면 에너지 보상이 순변화 e_new − e_prev, false 면 v1 획득량 (#4)
+    """
+    def num(key, x):
+        if isinstance(x, bool) or not isinstance(x, (int, float, np.integer, np.floating)) \
+                or not math.isfinite(x):
+            raise ValueError(f"features.speed.{key} 는 유한한 숫자여야 한다. 받은 값: {x!r}")
+        return float(x)
+
+    def vec(key, n):
+        x = p[key]
+        if not isinstance(x, (list, tuple)) or len(x) != n:
+            raise ValueError(f"features.speed.{key} 는 값 {n}개 목록이어야 한다. 받은 값: {x!r}")
+        return tuple(num(key, v) for v in x)
+
+    t_walk, t_run = vec("thresholds", 2)
+    speed = vec("gait_speed", 3)
+    eat = vec("gait_eat", 3)
+    c_rest, c_move = num("c_rest", p["c_rest"]), num("c_move", p["c_move"])
+    net = p["net_energy_reward"]
+    if not 0.0 <= t_walk <= t_run <= 1.0:
+        raise ValueError(f"features.speed.thresholds 는 0 ≤ 걷기 ≤ 뛰기 ≤ 1 이어야 한다. 받은 값: {[t_walk, t_run]}")
+    if speed[0] != 0.0 or not 0.0 < speed[1] <= speed[2]:
+        raise ValueError(f"features.speed.gait_speed 는 [0, 걷기, 뛰기], 0 < 걷기 ≤ 뛰기 여야 한다(정지는 속력 0). "
+                         f"받은 값: {list(speed)}")
+    if min(eat) < 0.0:
+        raise ValueError(f"features.speed.gait_eat 는 0 이상이어야 한다. 받은 값: {list(eat)}")
+    if c_rest < 0.0 or c_move < 0.0:
+        raise ValueError(f"features.speed.c_rest·c_move 는 0 이상이어야 한다. 받은 값: {c_rest}, {c_move}")
+    if not isinstance(net, bool):
+        raise ValueError(f"features.speed.net_energy_reward 는 true/false 여야 한다. 받은 값: {net!r}")
+    sp = np.asarray(speed, dtype=np.float64)
+    return dict(thresholds=(t_walk, t_run), speed=sp, eat=np.asarray(eat, dtype=np.float64),
+                c_rest=c_rest, c_move=c_move, drain_mult=c_rest + c_move * sp * sp, net_energy_reward=net)
 
 
 def _food_v_params(p: dict) -> dict:
@@ -90,6 +178,9 @@ class World:
         self.features: Features = features_of(cfg)
         # 켠 기능의 계수(yaml 원본). 꺼진 기능은 None 이고 그 기능의 코드 경로를 타지 않는다.
         self._fv = _food_v_params(self.features.params("food_v")) if self.features.enabled("food_v") else None
+        self._sp = _speed_params(self.features.params("speed")) if self.features.enabled("speed") else None
+        self.act_names: tuple[str, ...] = action_names(self.features)
+        self.act_dim = len(self.act_names)
         self.reset()
 
     # ------------------------------------------------------------------ #
@@ -116,6 +207,11 @@ class World:
         self._build_world()
         if self._fv is not None:
             self._food_v_reset()
+        if self._sp is not None:
+            # v2.1 스텝 뒤 훅 (replay_v2): 실제 보행, 명령 보행, 적용 속도. 첫 스텝 전에는 정지·0 으로 둔다.
+            self.gait = np.zeros(self.N, dtype=np.int8)
+            self.gait_cmd = np.zeros(self.N, dtype=np.int8)
+            self.vel = np.zeros((self.N, 2))
         self._reset_stats()
         self._g = self._geometry()
         self._obs = self._obs_from(self._g)
@@ -419,14 +515,28 @@ class World:
     # step (§4.5)
     # ------------------------------------------------------------------ #
 
+    def _check_action(self, a: np.ndarray) -> None:
+        """행동 배열 모양 (N, act_dim). 행동 4개(v1)를 speed 를 켠 세계에 넣으면 보행 열이 없어 여기서 멈춘다."""
+        if a.ndim != 2 or a.shape != (self.N, self.act_dim):
+            raise ValueError(
+                f"행동은 ({self.N}, {self.act_dim}) [{', '.join(self.act_names)}] 이어야 한다. 받은 모양: {a.shape}"
+                + (". v1 정책(Utility·random 4개)은 speed 를 켠 세계에 그대로 쓸 수 없다" if self.act_dim != ACT_DIM
+                   and a.ndim == 2 and a.shape[1] == ACT_DIM else ""))
+
     def step(self, a: np.ndarray):
-        """`a`: (N,4) in [0,1] (§1.3). 반환: obs, reward, done, terminal_obs."""
+        """`a`: (N, act_dim) in [0,1] (§1.3). act_dim 은 v1 4, speed 를 켜면 5. 반환: obs, reward, done, terminal_obs.
+
+        speed(v2.1)를 켠 세계의 스텝 순서는 `_gait_step` docstring 에 적었다. 끈 세계는 v1 과 같은 줄을 탄다.
+        """
         cfg = self.cfg
         a = np.asarray(a, dtype=np.float64)
+        self._check_action(a)
         rew = np.full(self.N, cfg.rew_alive)
 
         # 1) 초식 이동 — §3.3 조향 수식. 벽 경계(§4.2), 토러스 없음.
         v = steer(self._g, a, cfg)
+        if self._sp is not None:
+            v = self._gait_step(v, a[:, ACT_SPEED])     # v2.1: 보행 상태가 크기만 바꾼다. 방향은 v1 조향 그대로
         self.pos = np.clip(self.pos + v, 0.0, self.size)
         moving = np.linalg.norm(v, axis=1) > EPS
         self.head = np.where(moving[:, None], normalize(v), self.head)
@@ -435,10 +545,20 @@ class World:
         caught = self._step_predators()
 
         # 3) 섭식 · 대사 (§3.4 "에너지 획득 +1.0 × 획득량")
-        e_drained = self.energy - cfg.energy_drain
-        gain = self._eat(e_drained)
+        if self._sp is None:
+            e_drained = self.energy - cfg.energy_drain
+            gain = self._eat(e_drained)
+        else:                       # v2.1: 대사와 섭식 배수가 이번 스텝의 실제 보행을 따른다
+            drain = cfg.energy_drain * self._sp["drain_mult"][self.gait]
+            e_drained = self.energy - drain
+            gain = self._eat(e_drained, self._sp["eat"][self.gait])
         e_new = np.minimum(e_drained + gain * cfg.food_energy_per_unit, cfg.max_energy)
-        rew += cfg.rew_energy * (e_new - e_drained)
+        if self._sp is not None and self._sp["net_energy_reward"]:
+            # #4 순변화 e_new − e_prev. 번식 리셋(아래 4)과 리스폰(8)은 이 뒤라 들어가지 않는다
+            rew += cfg.rew_energy * (e_new - self.energy)
+        else:
+            rew += cfg.rew_energy * (e_new - e_drained)
+        e_prev = self.energy
         self.energy = e_new
 
         # 4) 번식 — energy > threshold AND repro_cd == 0 (§3.4)
@@ -471,6 +591,8 @@ class World:
 
         self.t += 1
         self._accumulate(a, rew, repro, caught, starved, done)
+        if self._sp is not None:      # 스텝 전 기하(self._g)·결정 때 에너지로 보행 지표를 센다
+            self._gait_accumulate(e_prev, e_new - e_drained, drain)
 
         # 8) 관측 — 스텝당 observe() 한 번 (§4.5)
         g = self._geometry()
@@ -481,8 +603,42 @@ class World:
             dead = np.flatnonzero(done)
             self._respawn(dead)
             obs[dead] = self._observe_subset(dead)
+            if self._sp is not None:
+                self._gait_prev[:, dead] = -1     # 새 개체: 보행 전환(B8)을 이전 개체와 잇지 않는다
 
         return obs, rew, done, terminal_obs
+
+    def _gait_step(self, v: np.ndarray, a_speed: np.ndarray) -> np.ndarray:
+        """v2.1 보행 (계획서 4.3·4.4). `step` 1) 에서 v1 조향 속도 `v`(크기 herb_speed 또는 0)의 크기만 바꾼다.
+
+        한 스텝 순서 — C++ 로 옮길 때 이 순서를 지킨다. 상태가 없다(이전 스텝의 보행을 읽지 않는다):
+          1a) 명령 보행 cmd = [a ≥ t_walk] + [a ≥ t_run] (0 정지, 1 걷기, 2 뛰기). a 는 sigmoid 뒤 [0,1] 값이고
+              문턱은 고정값이다(최소 유지 시간 K 없음, #3)
+          1b) 실제 보행 g = cmd. 단 조향 합의 방향이 없으면(|v| ≤ EPS, v1 의 '안 움직임' 판정과 같다) g = 정지.
+              갈 방향이 없는 '걷기'는 제자리에 서 있는 것이므로 섭식·대사도 정지로 친다
+          1c) v ← v × gait_speed[g]. 조향 방향 계산(steering.py)은 그대로다. 뛰기 1.0 이면 v1 속도와 비트 단위로 같다
+          1d) (step) pos ← clip(pos + v, 0, size), |v| > EPS 면 heading ← v 방향, 아니면 유지 — v1 과 같은 줄이다.
+              정지는 v = 0 이라 heading 을 유지한다. 벽에 막혀 실제 이동이 짧아도 대사는 보행 상태의 속력으로 낸다
+              (clamp 전 v 로 heading 을 정하는 v1 과 같은 기준)
+          2)  (step) 포식자 — v1 그대로
+          3a) (step) 대사 drain = energy_drain × drain_mult[g], drain_mult = c_rest + c_move·gait_speed²
+              (계획서 drain = energy_drain·(c_rest + c_move·(v/herb_speed)²) 에서 v/herb_speed = gait_speed[g])
+          3b) (step) 섭식 want ← clip((max − e_drained)/fepu, 0, food_eat_rate) × gait_eat[g] (`_eat`), 나머지 v1
+          3c) (step) 에너지 보상: net_energy_reward 면 e_new − e_prev, 아니면 v1 획득량 e_new − e_drained.
+              번식 리셋(4)·리스폰(8)은 그 뒤라 순변화에 들어가지 않는다
+        C++ 꼴 (V = v1 조향 합을 정규화해 HerbSpeed 를 곱한 값, 지금 SteeringProcessor 의 Velocity):
+                Cmd = (A >= TWalk) + (A >= TRun); G = (V.SizeSquared() > EPS * EPS) ? Cmd : Stop;
+                Velocity = V * GaitSpeed[G]; Drain = EnergyDrain * DrainMult[G]; Want *= GaitEat[G].
+        스텝 뒤 훅(replay_v2): `self.gait` 실제 보행, `self.gait_cmd` 명령 보행, `self.vel` 적용 속도(벽 clamp 전).
+        """
+        sp = self._sp
+        t_walk, t_run = sp["thresholds"]
+        cmd = (a_speed >= t_walk).view(np.int8) + (a_speed >= t_run).view(np.int8)
+        # |v| > EPS ⇔ v·v > EPS². steer 의 v 는 0 이거나 크기 herb_speed 라 경계 근처 값이 없다. 정지 = 0 이라 곱으로 고른다
+        g = cmd * ((v * v).sum(1) > EPS * EPS)
+        v = v * sp["speed"][g][:, None]
+        self.gait, self.gait_cmd, self.vel = g, cmd, v
+        return v
 
     def _step_predators(self) -> np.ndarray:
         """포식자 2종 (§4.2). 은신처 안 초식은 거리가 `cover_hide_mult` 배로 보인다."""
@@ -545,17 +701,22 @@ class World:
         self.pred_cd[got] = int(cfg.pred_eat_cd)
         return caught
 
-    def _eat(self, e_drained: np.ndarray) -> np.ndarray:
+    def _eat(self, e_drained: np.ndarray, mult: np.ndarray | None = None) -> np.ndarray:
         """셀당 총 수요를 잔량에 비례 배분한다. 개체별 루프 없음 (§1.1).
 
         수요는 **흡수 가능량**으로 제한한다: 배부른 개체가 먹이를 계속 퍼가면 맵 전체가
         벗겨져서(측정: food가 0.02로 수렴) 먹이 탐색이 무의미해진다. 이렇게 두면 총
         소비량이 총 대사 수요를 따라가고 패치가 유지된다.
+
+        `mult` (N,) 는 v2.1 보행 섭식 배수다(speed). 흡수 가능량 상한까지 자른 want 에 곱한 뒤 셀 수요를 합친다.
+        뛰는 개체(0)는 수요가 없어 같은 셀 개체의 몫을 줄이지 않는다. None 이면 v1 과 같다.
         """
         cfg = self.cfg
         want = np.clip(
             (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
         )
+        if mult is not None:
+            want = want * mult
         ix, iy = self._cell_index(self.pos)
         flat = iy * self.gw + ix
         cells = self.gw * self.gw
@@ -640,7 +801,7 @@ class World:
         self._life_sum = 0
         self._life_count = 0
         self._life_cur = np.zeros(self.N, dtype=np.int64)
-        self._act_sum = np.zeros(ACT_DIM)
+        self._act_sum = np.zeros(self.act_dim)
         self._flee_sq = 0.0
         self._cover_steps = 0
         self._agent_steps = 0
@@ -650,6 +811,15 @@ class World:
         self._n_nopred = 0
         self._f_hungry, self._n_hungry = 0.0, 0
         self._f_full, self._n_full = 0.0, 0
+        if self._sp is not None:     # v2.1 보행 지표 (gait_stats). 모두 개체-스텝 수다
+            # 개체-스텝 히스토그램 [실제 보행 3, 명령 보행 3, 포식자 거리 구간 4, 배부름 2]. 거리 구간은
+            # [안 보임, d<0.25, 0.25≤d<0.5, d≥0.5] (d = d_pred/see_r), 배부름은 [energy<0.5, ≥0.5] (결정 때)
+            self._gait_hist = np.zeros(GAIT_HIST_SHAPE, dtype=np.int64)
+            self._sw = np.zeros(2, dtype=np.int64)            # 보행 전환 수 [실제, 명령] (B8)
+            self._sw_steps = 0                                # 직전 스텝이 같은 개체인 개체-스텝
+            self._gait_prev = np.full((2, self.N), -1, dtype=np.int8)   # 직전 [실제, 명령] 보행, −1 = 없음
+            self._intake_sum = 0.0                            # 먹이로 얻은 에너지(상한에서 잘린 몫 제외)
+            self._drain_sum = 0.0                             # 대사로 쓴 에너지
 
     def _accumulate(self, a, rew, repro, caught, starved, done) -> None:
         self._rew_total += float(rew.sum())
@@ -678,6 +848,85 @@ class World:
         self._n_hungry += int(hungry.sum())
         self._f_full += float(a[~hungry, 0].sum())
         self._n_full += int((~hungry).sum())
+
+    def _gait_accumulate(self, e_prev: np.ndarray, intake: np.ndarray, drain: np.ndarray) -> None:
+        """v2.1 보행 지표를 센다. `step` 이 `_accumulate` 바로 뒤, 관측을 새로 계산하기 전에 부른다.
+
+        조건(포식자 거리, 배고픔)은 정책이 이번 행동을 고를 때 본 상태다: 스텝 전 기하 `self._g`, 스텝 전 에너지
+        `e_prev`(리스폰 직후 개체는 init_energy, 관측 4 와 같다). B1·B2 는 명령 보행으로 잰다 — 상태를 안 보는
+        상수·순열 대조군에서 조건부 차이가 구성상 0 이 되게 한다(계획서 6.3 판정 규칙). 방향이 없어 실제로는
+        멈춘 몫은 stall_frac 로 따로 낸다.
+        """
+        cfg = self.cfg
+        g, cmd = self.gait, self.gait_cmd
+        d = self._g["d_pred_min"] / cfg.see_r                  # 안 보이면 inf
+        # 거리 구간: 안 보임 0, [0, 0.25) 1, [0.25, 0.5) 2, [0.5, 1] 3 (inf 는 두 문턱을 넘지만 seen 이 0 으로 만든다)
+        b = (d < np.inf) * (1 + (d >= B1_EDGES[0]) + (d >= B1_EDGES[1]))
+        full = e_prev >= HUNGRY * cfg.max_energy               # False 배고픔, True 배부름
+        code = ((g * 3 + cmd) * 4 + b) * 2 + full               # GAIT_HIST_SHAPE 의 C 순서 평탄 인덱스
+        self._gait_hist += np.bincount(code, minlength=self._gait_hist.size).reshape(GAIT_HIST_SHAPE)
+
+        prev = self._gait_prev
+        same = prev[0] >= 0
+        self._sw_steps += int(np.count_nonzero(same))
+        self._sw[0] += np.count_nonzero(same & (prev[0] != g))
+        self._sw[1] += np.count_nonzero(same & (prev[1] != cmd))
+        prev[0] = g
+        prev[1] = cmd
+
+        self._intake_sum += float(intake.sum())
+        self._drain_sum += float(drain.sum())
+
+    def gait_stats(self) -> dict:
+        """v2.1 보행 통계 — reset 뒤 누적 (v1 `stats()` 10열 밖, 계획서 4.8). Gate E1 과 B1·B2·B8 이 쓴다.
+
+        열 순서는 `GAIT_STAT_COLUMNS`. 비율은 모두 개체-스텝 기준이다. 분모가 0 인 열은 nan 이다.
+        - stop_frac·walk_frac·run_frac: 실제 보행 비율. stall_frac: 명령은 이동인데 방향이 없어 정지한 비율
+        - stop_frac_cmd·walk_frac_cmd·run_frac_cmd: 명령 보행(행동 idx 4 의 문턱) 비율
+        - hungry_frac: 결정 때 energy < 0.5 인 비율 (Gate E1 (a) "energy<0.5 스텝")
+        - starve_rate: 아사 / 개체-스텝, starve_share: 아사 / 사망 (env_v2/rollout.py 와 같은 정의)
+        - b1 = P(뛰기 | 보임 & d < 0.5·see_r) − P(뛰기 | 안 보임). p_run_unseen, p_run_d025 [0, 0.25),
+          p_run_d050 [0.25, 0.5), p_run_d100 [0.5, 1] (× see_r) 은 거리 구간별 P(뛰기) (6.2 B1)
+        - b2 = P(정지 | 배고픔) − P(정지 | 배부름), p_stop_hungry·p_stop_full (6.2 B2. v2.1 은 경계가 없어 모든 정지가
+          '경계가 아닌 정지'다)
+        - b8·b8_cmd: 개체당 초당 보행 전환 수(실제·명령). 직전 스텝이 같은 개체인 스텝만 센다. 1스텝 =
+          policy_interval/60 초 (replay_v2.step_seconds 와 같은 정의, §9.7)
+        - intake_per_step·drain_per_step: 개체-스텝당 먹이 에너지·대사
+        """
+        if self._sp is None:
+            raise ValueError("gait_stats 는 speed 를 켠 세계에만 있다 (끈 세계는 v1 과 같이 늘 herb_speed 로 움직인다)")
+        nan = float("nan")
+        n = self._agent_steps
+        H = self._gait_hist                                    # [실제, 명령, 거리 구간, 배부름]
+
+        def ratio(x, y):
+            return float(x) / float(y) if y else nan
+
+        gait_n, cmd_n = H.sum((1, 2, 3)), H.sum((0, 2, 3))
+        b1_n, b1_run = H.sum((0, 1, 3)), H[:, GAIT_RUN].sum((0, 2))
+        b2_n, b2_stop = H.sum((0, 1, 2)), H[:, GAIT_STOP].sum((0, 1))
+        stall = H[GAIT_STOP, GAIT_WALK:].sum()
+        p_run = [ratio(b1_run[k], b1_n[k]) for k in range(4)]
+        near = ratio(b1_run[1] + b1_run[2], b1_n[1] + b1_n[2])
+        p_stop = [ratio(b2_stop[k], b2_n[k]) for k in range(2)]
+        deaths = self._pred_deaths + self._starve_deaths
+        per_sec = 60.0 / float(self.cfg.policy_interval)
+        out = dict(
+            stop_frac=ratio(gait_n[0], n), walk_frac=ratio(gait_n[1], n),
+            run_frac=ratio(gait_n[2], n), stall_frac=ratio(stall, n),
+            stop_frac_cmd=ratio(cmd_n[0], n), walk_frac_cmd=ratio(cmd_n[1], n),
+            run_frac_cmd=ratio(cmd_n[2], n),
+            hungry_frac=ratio(b2_n[0], n),
+            starve_rate=self._starve_deaths / max(self.t * self.N, 1),
+            starve_share=ratio(self._starve_deaths, deaths),
+            b1=near - p_run[0], p_run_unseen=p_run[0], p_run_d025=p_run[1], p_run_d050=p_run[2],
+            p_run_d100=p_run[3],
+            b2=p_stop[0] - p_stop[1], p_stop_hungry=p_stop[0], p_stop_full=p_stop[1],
+            b8=ratio(self._sw[0], self._sw_steps) * per_sec, b8_cmd=ratio(self._sw[1], self._sw_steps) * per_sec,
+            intake_per_step=ratio(self._intake_sum, n), drain_per_step=ratio(self._drain_sum, n),
+        )
+        assert tuple(out) == GAIT_STAT_COLUMNS
+        return out
 
     def stats(self) -> dict:
         """§7.2 반환 열."""

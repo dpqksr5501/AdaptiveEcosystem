@@ -12,7 +12,7 @@ v1 `env/vec_env.py` 의 HerdVecEnv 는 World 하나를 감쌌다. 학습 중 res
 - 동시에 도는 세계끼리는 시드가 겹치지 않는다
 
 슬롯 하나 = SB3 환경 하나라는 v1 규약은 그대로다. 정책의 (-3,3) 출력을 [0,1] 로 바꾸는
-sigmoid 도 여기에만 있다 (§1.3).
+sigmoid 도 여기에만 있다 (§1.3). 행동 공간의 차원은 설정에서 읽는다(`World.act_dim`: v1 4, speed 를 켜면 5).
 """
 
 from __future__ import annotations
@@ -26,7 +26,12 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 from .world import ACT_DIM, OBS_DIM, World
 
 OBS_SPACE = Box(0.0, 1.0, (OBS_DIM,), np.float32)
-ACT_SPACE = Box(-3.0, 3.0, (ACT_DIM,), np.float32)
+ACT_SPACE = Box(-3.0, 3.0, (ACT_DIM,), np.float32)    # v1 행동 4개. 세계의 행동 공간은 act_space(act_dim)
+
+
+def act_space(act_dim: int) -> Box:
+    """행동 `act_dim` 개의 정책 출력 공간 (-3, 3). SB3 는 표본을 이 범위로 자른 뒤 env 에 넘긴다."""
+    return Box(-3.0, 3.0, (int(act_dim),), np.float32)
 
 
 def sigmoid(x: np.ndarray) -> np.ndarray:
@@ -55,13 +60,15 @@ class MultiWorldVecEnv(VecEnv):
             s = self._pick_seed(exclude=[w.seed for w in self.worlds])
             self.worlds.append(World(cfg, seeds=[s]))
         self.N = self.worlds[0].N
+        self.act_dim = self.worlds[0].act_dim
+        self.act_names = self.worlds[0].act_names
         self._age = self._staggered_ages()
         self._fresh = True          # 한 스텝도 안 돈 세계는 reset() 이 다시 뽑지 않는다
         self.num_resets = 0         # 시간 초과로 세계를 새로 뽑은 횟수
         self.seed_history: list[list[int]] = [[w.seed] for w in self.worlds]
         self._actions: np.ndarray | None = None
         self.render_mode = None
-        super().__init__(self.K * self.N, OBS_SPACE, ACT_SPACE)
+        super().__init__(self.K * self.N, OBS_SPACE, act_space(self.act_dim))
 
     # --- 세계 관리 ----------------------------------------------------- #
 

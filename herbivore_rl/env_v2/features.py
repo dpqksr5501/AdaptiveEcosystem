@@ -1,6 +1,7 @@
 """V2 기능 스위치와 기능별 난수 스트림 (계획서 4.8, 0-1b).
 
-버전 설정(`configs/v2.yaml`, `configs/v2_0b.yaml` ...)의 `features:` 아래에 기능마다 블록 하나를 둔다.
+버전 설정(`configs/v2.yaml`, `configs/v2_0b.yaml`, `configs/v2_1.yaml` ...)의 `features:` 아래에 기능마다
+블록 하나를 둔다.
 
     features:
       food_v: {enabled: true, alpha: 0.5, floor: 0.1, recovery_half_lives: [300, 700], init_frac: [0.3, 1.0]}
@@ -71,7 +72,7 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
-IMPLEMENTED: frozenset[str] = frozenset({"food_v"})
+IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -79,6 +80,10 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # v2.0b (env_v2/world.py `_food_v_params`): 훼손 계수 α, 하한(cap0 비율), 휴식 회복 반감기 목록(스텝,
     # reset 마다 하나), V 초기값 cap0 비율 범위 [하, 상](reset 마다 좌우 절반에 하나씩)
     "food_v": frozenset({"alpha", "floor", "recovery_half_lives", "init_frac"}),
+    # v2.1 (env_v2/world.py `_speed_params`): 행동 idx 4 의 보행 문턱 [걷기, 뛰기], 상태별 속력 [정지, 걷기,
+    # 뛰기](× herb_speed, 정지는 0), 상태별 섭식 배수(want 에 곱한다), 대사 계수 c_rest·c_move
+    # (drain = energy_drain·(c_rest + c_move·(v/herb_speed)²)), 에너지 보상을 순변화로 볼지(#4, false = v1 획득량)
+    "speed": frozenset({"thresholds", "gait_speed", "gait_eat", "c_rest", "c_move", "net_energy_reward"}),
 })
 
 

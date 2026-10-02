@@ -31,7 +31,12 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
   포식자 `--fov-preds` 마리(반경 pred_view_r, 각 pred_fov_deg). 대담함 훅이 있으면 초식은
   궤적을 그리는 두 개체를 먼저 고른다.
 - 초식 점 색 = 보행 상태. 정지 회색, 걷기 초록, 뛰기 주황.
-  v1·v2.0 은 항상 최고 속력이라 전부 주황이 정상이다.
+  v1·v2.0 은 항상 최고 속력이라 전부 주황이 정상이다. v2.1(speed)은 World.gait(실제 적용 보행)를 그대로 칠하고,
+  설명줄에 speed 계수(문턱·속력·섭식·대사 배수·에너지 보상 방식)를 한 줄 더 적는다.
+  행동 5개 세계: `fixed:a,b,c,d,s` (s = speed), `random:<seed>` 는 행동 수를 설정에서 맞춘다. Utility(4개)는 못 쓴다.
+      python replay_v2.py --config configs/v2_1.yaml --compare fixed:0.4,0.8,0.4,0.1,0.2 \
+          fixed:0.4,0.8,0.4,0.1,0.5 fixed:0.4,0.8,0.4,0.1,0.9 --labels "항상 정지" "항상 걷기" "항상 뛰기" \
+          --steps 600 --out results/v2/replay_v2_1_gaits.mp4
 - 모든 초식에 짧은 heading 화살표. 리스폰 직후 몇 프레임은 흐리게 그린다(순간이동 착시 방지).
 - 하단 시계열: 보행 비율(정지/걷기/뛰기), 경계 비율, 지역 기억, 포획 누적. 게임 시각 mm:ss.
 - `--compare` 는 같은 시드·같은 카메라로 정책 여러 개를 나란히 그린다. 칸들은 x축과
@@ -50,8 +55,8 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
 | 속성 | 모양 | 버전 | 읽는 때 | 표시 |
 |---|---|---|---|---|
 | `food_v` | (gw,gw) | v2.0b | 스텝 전 | 짓밟힌 땅 막, 좌우 절반 라벨, 하단 V/cap0·F/cap0 (`food_stats()` 를 함께 읽는다) |
-| `gait` | (N,) int | v2.1 | 스텝 뒤 | 이번 스텝에 실제로 적용된 보행 (0 정지, 1 걷기, 2 뛰기). 가장 우선 |
-| `vel` | (N,2) | v2.1 | 스텝 뒤 | 이번 스텝 속도. `gait` 가 없을 때 |v|/herb_speed 로 판정 |
+| `gait` | (N,) int | v2.1 (구현) | 스텝 뒤 | 이번 스텝에 실제로 적용된 보행 (0 정지, 1 걷기, 2 뛰기). 가장 우선 |
+| `vel` | (N,2) | v2.1 (구현) | 스텝 뒤 | 이번 스텝 속도. `gait` 가 없을 때 |v|/herb_speed 로 판정 |
 | `vigilant` | (N,) bool | v2.2 | 스텝 뒤 | 흰 테두리, 짧은 시선선, 360° 시야 원, 경계 비율 |
 | `gaze` | (N,2) | v2.2 | 스텝 뒤 | 시선 방향. 없으면 heading |
 | `region_id`, `region_mem` | (gw,gw) int, (R,) | v2.3 | 스텝 전 | 지역 배경 반투명 빨강, m_A·m_B 시계열 |
@@ -89,9 +94,9 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator  # noqa: E402
 
 from env_v2.config import load_v2_config  # noqa: E402
 from env_v2.features import features_of  # noqa: E402
-from env_v2.rollout import build_policy  # noqa: E402
+from env_v2.rollout import adapt_spec, build_policy  # noqa: E402
 from env_v2.steering import steer  # noqa: E402
-from env_v2.world import World  # noqa: E402
+from env_v2.world import ACT_DIM, World  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent
 
@@ -374,9 +379,10 @@ def perm_spec(base: dict, salt: int = 0) -> dict:
 def parse_spec(text: str) -> dict:
     """문자열 → `env_v2.rollout.build_policy` 스펙.
 
-    `learned:<zip>`, `fixed:a,b,c,d`, `utility`, `utility:default`, `random:<seed>`,
+    `learned:<zip>`, `fixed:a,b,c,d[,s]`, `utility`, `utility:default`, `random:<seed>`,
     `perm:<바탕 스펙>` (C1′ 행동 순열, 예: `perm:learned:ckpt/final.zip`),
     또는 JSON 딕셔너리 문자열 (래퍼 꼴 `{"policy": ..., "wrap": [...]}` 포함).
+    fixed 는 v1 행동 4개 이상을 받는다. 세계의 행동 수와 맞는지는 `fit_spec` 이 설정을 읽은 뒤 본다.
     """
     text = text.strip()
     if text.startswith("{"):
@@ -391,14 +397,29 @@ def parse_spec(text: str) -> dict:
         return {"kind": "learned", "model": _resolve(arg or "ckpt/final.zip")}
     if kind == "fixed":
         vals = [float(x) for x in arg.replace(" ", ",").split(",") if x]
-        if len(vals) != 4:
-            raise ValueError(f"fixed 는 행동 4개가 필요하다: {text!r}")
+        if len(vals) < ACT_DIM:
+            raise ValueError(f"fixed 는 행동 {ACT_DIM}개 이상(설정의 행동 수)이 필요하다: {text!r}")
         return {"kind": "fixed", "action": vals}
     if kind == "utility":
         return {"kind": "utility", "params": "default"} if arg == "default" else {"kind": "utility"}
     if kind == "random":
         return {"kind": "random", "seed": int(arg) if arg else 0}
     raise ValueError(f"알 수 없는 정책 스펙: {text!r}")
+
+
+def fit_spec(spec: dict, act_dim: int, act_names=()) -> dict:
+    """스펙을 행동 `act_dim` 개 세계에 맞춘다(`env_v2.rollout.adapt_spec`: random 의 행동 수). fixed 길이가 다르거나
+    Utility(행동 4개)를 행동 수가 다른 세계에 쓰면 ValueError 다. 래퍼 안쪽 바탕 정책도 본다."""
+    spec = adapt_spec(spec, act_dim)
+    base = spec
+    while "policy" in base:
+        base = base["policy"]
+    names = f" {list(act_names)}" if act_names else ""
+    if base.get("kind") == "fixed" and len(base["action"]) != act_dim:
+        raise ValueError(f"fixed 는 이 설정의 행동 {act_dim}개{names} 가 필요하다. 받은 값: {base['action']}")
+    if base.get("kind") == "utility" and act_dim != ACT_DIM:
+        raise ValueError(f"Utility 는 행동 4개만 낸다. 이 설정은 행동 {act_dim}개{names} 다 (Utility v2 없음)")
+    return spec
 
 
 _WRAP_LABELS = {"act_permute": "행동 순열", "act_fix": "행동 고정", "obs_fix": "관측 고정",
@@ -955,6 +976,17 @@ def gait_source(world) -> str:
     return f"보행 = |v|/herb_speed, v={src} (0 정지, ≤{WALK_MAX} 걷기, 초과 뛰기)"
 
 
+def speed_line(runs: list) -> str | None:
+    """v2.1 설명줄: 이 영상에 쓴 speed 계수(yaml). speed 를 끈 설정이면 None (그림이 v2.0 과 같다)."""
+    sp = getattr(runs[0].world, "_sp", None)
+    if sp is None:
+        return None
+    j = lambda xs, f: "/".join(format(float(x), f) for x in xs)      # noqa: E731
+    return (f"speed 문턱 {j(sp['thresholds'], '.3f')} | 정지/걷기/뛰기: 속력 {j(sp['speed'], 'g')}×herb_speed · "
+            f"섭식 {j(sp['eat'], 'g')} · 대사 {j(sp['drain_mult'], '.3g')}×energy_drain | 에너지 보상 "
+            + ("순변화" if sp["net_energy_reward"] else "v1 획득량"))
+
+
 def food_line(runs: list) -> str | None:
     """v2.0b 설명줄: 이 영상에 쓴 food_v 계수(yaml 또는 `--half-life`·`--alpha` 로 바꾼 값)와 V 시작 비율.
     food_v 훅이 없으면 None."""
@@ -1004,14 +1036,14 @@ def build_figure(runs: list, fps: int = 30, dpi: int = 100, fov_preds: int = 2,
     )
     sep = " | " if len(runs) > 1 else "\n"
     info = world_line + sep + time_line
-    fline = food_line(runs)
-    if fline is not None:
-        info += "\n" + fline
+    extra = [x for x in (speed_line(runs), food_line(runs)) if x is not None]
+    for line in extra:
+        info += "\n" + line
     # 설명줄(아래) → 자막 → 범례 순으로 쌓는다. 늘어난 만큼 아래 여백을 키운다.
     n_info = info.count("\n") + 1
     cap_y = 0.06 + n_info * LINE_IN + 0.04
     legend_y = 0.40
-    if fline is not None or caption:
+    if extra or caption:
         legend_y = max(0.40, cap_y + (LINE_IN + 0.04 if caption else 0.0))
     bottom_extra = (legend_y - 0.40) + LEGEND_ROW_IN * max(rows - 2, 0)
     size, rects = _layout(len(runs), col_w, food, bottom_extra)
@@ -1186,11 +1218,12 @@ def main(argv=None) -> int:
     specs, labels = specs_and_labels(p, args)
 
     cfg = load_v2_config(args.config)
-    try:                                        # 무엇을 돌리기 전에 계수·교란 비율을 검사한다
+    try:                                        # 무엇을 돌리기 전에 계수·교란 비율·행동 수를 검사한다
         cfg = food_v_config(cfg, args.half_life, args.alpha)
         probe = World(cfg, seeds=[args.seed])
         if args.overgraze_left is not None:
             overgraze_left(probe, args.overgraze_left)
+        specs = [fit_spec(sp, probe.act_dim, probe.act_names) for sp in specs]
     except ValueError as e:
         p.error(str(e))
     runs = []

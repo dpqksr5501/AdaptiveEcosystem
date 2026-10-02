@@ -18,7 +18,7 @@ import env_v2.features as F
 from env.config import ROOT, load_config
 from env.world import World as WorldV1
 from env_v2.config import load_v2_config
-from env_v2.rollout import _perm_rng
+from env_v2.rollout import _perm_rng, adapt_spec, build_policy
 from env_v2.vec_env import MultiWorldVecEnv
 from env_v2.world import ACT_DIM, World as WorldV2
 from policies.registry import make_policy
@@ -231,7 +231,8 @@ def test_implemented_features_use_only_their_own_streams(cfg2, active):
         blocks[name] = dict(_yaml_block(name), enabled=True)
     w = WorldV2(_with_features(cfg2, blocks), seeds=[636])
     assert w.features.active == active
-    p = make_policy({"kind": "random", "seed": 1})
+    # 행동 수는 세계를 따른다(speed 를 켜면 5개). 4개면 make_policy random(seed 1) 과 같은 수열이다
+    p = build_policy(adapt_spec({"kind": "random", "seed": 1}, w.act_dim))
     for _ in range(300):
         w.step(p(w.observe()))
     assert {name for name, _ in w._feature_rngs} <= set(active)

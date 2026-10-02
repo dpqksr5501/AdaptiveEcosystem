@@ -1,0 +1,66 @@
+
+$ python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r4_5_ew0_5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.1667 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.8333 --enqueue 0.39 0.99 0.92 0.15 0.5
+[constsearch] report_v2_1 → results\v2\e1\R1\r4_5_ew0_5  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+  7/112  best 0.720 [0.421, 0.866, 0.105, 0.004, 0.5]  (55s)
+  14/112  best 0.720 [0.421, 0.866, 0.105, 0.004, 0.5]  (107s)
+  21/112  best 0.734 [0.635, 0.944, 0.177, 0.183, 0.369]  (162s)
+  28/112  best 1.036 [0.821, 0.903, 0.351, 0.135, 0.336]  (215s)
+  35/112  best 1.036 [0.821, 0.903, 0.351, 0.135, 0.336]  (266s)
+  42/112  best 1.064 [0.746, 0.916, 0.26, 0.142, 0.432]  (317s)
+  49/112  best 1.249 [0.877, 0.863, 0.166, 0.005, 0.462]  (367s)
+  56/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (417s)
+  63/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (468s)
+  70/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (517s)
+  77/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (568s)
+  84/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (618s)
+  91/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (668s)
+  98/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (719s)
+  105/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (769s)
+  112/112  best 1.369 [0.758, 0.871, 0.254, 0.011, 0.436]  (821s)
+  재측정 {'t52': 0.652, 't51': 0.564, 't95': 0.821, 't101': 0.642, 't55': 0.729} → t95 [0.948, 0.992, 0.112, 0.054, 0.428]
+저장: results\v2\e1\R1\r4_5_ew0_5\constsearch.json
+      results\v2\e1\R1\r4_5_ew0_5\constsearch.md
+
+$ python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r4_5_ew0_5 --seg-bins 2:0.5 4:0.5 --seg-dims speed
+[constsearch] report_v2_1 → results\v2\e1\R1\r4_5_ew0_5  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+  7/112  best 1.310 [0.428, 0.428, 0.428, 0.428]  (57s)
+  14/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (111s)
+  21/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (163s)
+  28/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (217s)
+  35/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (269s)
+  42/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (321s)
+  49/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (373s)
+  56/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (426s)
+  63/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (478s)
+  70/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (530s)
+  77/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (582s)
+  84/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (634s)
+  91/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (686s)
+  98/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (738s)
+  105/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (790s)
+  112/112  best 1.407 [0.315, 0.364, 0.57, 0.439]  (842s)
+  재측정 {'t13': 0.908, 't17': 0.908, 't29': 0.908, 't34': 0.908, 't37': 0.908} → t13 [0.315, 0.364, 0.57, 0.439]
+저장: results\v2\e1\R1\r4_5_ew0_5\constsearch_seg.json
+      results\v2\e1\R1\r4_5_ew0_5\constsearch_seg.md
+  C2-seg vs C2: mean_return 77.35(t=+1.79, 유의 아님)  g_gamma 1.673(t=+1.49, 유의 아님)  survival 404.4(t=+1.26, 유의 아님)  repro 16.54(t=+1.00, 유의 아님)  predation_rate 0.00271(t=-1.27, 유의 아님)  starve_rate 0.00023(t=-2.35, 유의)
+
+$ python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r4_5_ew0_5 --tag fixed_stop --const-action 0.9481959239399305 0.9922532235600058 0.11183794167829866 0.054104042241970934 0.0
+[constsearch] report_v2_1 → results\v2\e1\R1\r4_5_ew0_5  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e1\R1\r4_5_ew0_5\fixed_stop.json
+      results\v2\e1\R1\r4_5_ew0_5\fixed_stop.md
+
+$ python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r4_5_ew0_5 --tag fixed_walk --const-action 0.9481959239399305 0.9922532235600058 0.11183794167829866 0.054104042241970934 0.5
+[constsearch] report_v2_1 → results\v2\e1\R1\r4_5_ew0_5  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e1\R1\r4_5_ew0_5\fixed_walk.json
+      results\v2\e1\R1\r4_5_ew0_5\fixed_walk.md
+
+$ python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r4_5_ew0_5 --tag fixed_run --const-action 0.9481959239399305 0.9922532235600058 0.11183794167829866 0.054104042241970934 1.0
+[constsearch] report_v2_1 → results\v2\e1\R1\r4_5_ew0_5  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e1\R1\r4_5_ew0_5\fixed_run.json
+      results\v2\e1\R1\r4_5_ew0_5\fixed_run.md
+
+$ python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r4_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r4_5_ew0_5/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.9481959239399305 0.9922532235600058 0.11183794167829866 0.054104042241970934 0.42817155820161756 --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+[constsearch] report_v2_1_g998 → results\v2\e1\R1\r4_5_ew0_5\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\e1\R1\r4_5_ew0_5\g998\c2seg_g998.json
+      results\v2\e1\R1\r4_5_ew0_5\g998\c2seg_g998.md
+  C2-seg vs C2: mean_return 158.65(t=+2.98, 유의)  g_gamma 5.477(t=+2.00, 유의 아님)  survival 431.1(t=+2.66, 유의)  repro 33.38(t=+2.06, 유의 아님)  predation_rate 0.00270(t=-2.48, 유의)  starve_rate 0.00023(t=-2.83, 유의)

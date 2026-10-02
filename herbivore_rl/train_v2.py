@@ -9,9 +9,15 @@ v1 train.py 와 다른 점:
 - 롤아웃 배치를 v1 과 같게(32,768) 두려고 세계당 n_steps = 256 / K 로 줄인다
 - 행동 차원별 평균·표준편차·log_std, 선형 R², 월드 상태를 기록하고, 실행 명령과 설정을 함께 저장한다
 
-PPO 구조(7-64-64-4, tanh)와 기본 하이퍼파라미터는 v1 의 `train.PPO_KWARGS` / `make_model` 을 그대로 쓴다.
+PPO 구조(7-64-64-A, tanh)와 기본 하이퍼파라미터는 v1 의 `train.PPO_KWARGS` / `make_model` 을 그대로 쓴다.
+출력 차원 A 는 설정의 행동 수다(`env_v2.world.action_dim`: v2.0 4, speed 를 켠 v2.1 5). 정책 출력 크기는
+VecEnv 의 행동 공간이 정한다.
 `--gamma` 는 할인율 γ 하나만 바꾼다(계획서 4.7 γ 비교). 나머지 튜닝값은 `--ppo-config` 그대로이고, 실제로 쓴
 γ 와 그 출처는 메타 JSON 의 `gamma`·`gamma_source` 에 남는다.
+
+시작 분포 (계획서 4.7 초기화): 무작위 초기화의 마지막 층(action_net)은 SB3 기본값 — 직교 초기화 gain 0.01,
+편향 0, log_std 0 — 이라 speed 평균 ≈ 0 → sigmoid 0.5 이고, 걷기 확률은 P(|ε| < ln 2) ≈ 51% 다(계획서의
+"speed 0, 걷기 약 51%"). 학습 전에 실제 정책으로 이 분포를 재서 출력하고 메타 JSON `init_policy` 에 남긴다.
 """
 
 from __future__ import annotations
@@ -20,6 +26,7 @@ import env.torch_init  # noqa: F401  ← torch보다 먼저
 
 import argparse
 import json
+import math
 import platform
 import sys
 import time
@@ -32,12 +39,12 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 from env_v2.config import load_v2_config
 from env_v2.vec_env import MultiWorldVecEnv, sigmoid
-from env_v2.world import ACT_DIM, OBS_DIM
+from env_v2.world import ACT_NAMES_V1, ACT_SPEED, GAIT_RUN, GAIT_STOP, GAIT_WALK, OBS_DIM
 from train import load_tuned, make_model
 
 ROOT = Path(__file__).resolve().parent
 CKPT = ROOT / "ckpt" / "v2"
-ACT_NAMES = ["forage", "cohesion", "flee_dist", "cover"]
+ACT_NAMES = list(ACT_NAMES_V1)      # v1 행동 4개. 학습하는 세계의 행동 이름은 venv.act_names
 
 
 def linear_r2(obs: np.ndarray, act: np.ndarray) -> np.ndarray:
@@ -49,8 +56,75 @@ def linear_r2(obs: np.ndarray, act: np.ndarray) -> np.ndarray:
     return np.where(var > 0, 1.0 - res.var(0) / np.maximum(var, 1e-12), np.nan)
 
 
+def gait_of(a_speed: np.ndarray, thresholds) -> np.ndarray:
+    """[0,1] speed 행동 → 명령 보행 (0 정지, 1 걷기, 2 뛰기). env_v2/world.py `_gait_step` 1a) 와 같은 식이다."""
+    t_walk, t_run = thresholds
+    return (np.asarray(a_speed) >= t_walk).astype(np.int8) + (np.asarray(a_speed) >= t_run)
+
+
+def _phi(x: float) -> float:
+    return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
+
+
+def gait_probs(mu, std, thresholds) -> np.ndarray:
+    """speed 차원 가우시안 N(μ, std²) 표본의 명령 보행 확률 [정지, 걷기, 뛰기] (개체마다, (n, 3)).
+
+    학습 롤아웃과 같은 경로다: 표본 → [-3, 3] 자르기 → sigmoid → 문턱. sigmoid 가 단조라 a ≥ t ⇔ raw ≥ logit(t)
+    이고, 자르기는 raw 를 [-3, 3] 안으로 옮길 뿐 문턱의 어느 쪽인지는 logit(t) 가 (-3, 3) 안이면 바꾸지 않는다.
+    logit(t) 가 그 밖이면 자른 값 ±3 이 그 문턱을 넘는지로 정해진다(그 상태 확률은 0 또는 1).
+    """
+    def side(t):
+        """P(자른 표본 sigmoid ≥ t) 를 계산하는 함수."""
+        if t <= 0.0:
+            return lambda m, s: 1.0
+        if t >= 1.0:
+            return lambda m, s: 0.0
+        x = math.log(t / (1.0 - t))
+        if x <= -3.0:
+            return lambda m, s: 1.0
+        if x > 3.0:
+            return lambda m, s: 0.0
+        return lambda m, s: 1.0 - _phi((x - m) / s)
+
+    ge_walk, ge_run = (side(t) for t in thresholds)
+    out = np.empty((np.size(mu), 3))
+    for i, (m, s) in enumerate(zip(np.ravel(mu), np.ravel(std))):
+        pw, pr = ge_walk(float(m), float(s)), ge_run(float(m), float(s))
+        out[i] = (1.0 - pw, pw - pr, pr)
+    return out
+
+
+def init_policy_report(model, venv) -> dict:
+    """학습 전 정책의 시작 분포 (계획서 4.7 초기화 확인). 마지막 층 편향·log_std, 그리고 speed 가 있으면 지금
+    세계들의 관측에서 잰 평균 μ 와 명령 보행 확률(가우시안 표본 → 자르기 → sigmoid → 문턱)을 낸다.
+
+    관측은 `World.observe()` 로만 읽는다 — 세계를 바꾸지 않고 난수를 쓰지 않아 학습 결과에 영향이 없다.
+    """
+    import torch as th
+
+    names = list(venv.act_names)
+    pol = model.policy
+    rep = {"act_names": names,
+           "action_bias": pol.action_net.bias.detach().cpu().numpy().astype(float).tolist(),
+           "log_std": pol.log_std.detach().cpu().numpy().astype(float).tolist()}
+    if "speed" in names:
+        obs = np.concatenate([w.observe() for w in venv.worlds])
+        with th.no_grad():
+            d = pol.get_distribution(pol.obs_to_tensor(obs)[0]).distribution
+            mu = d.mean.cpu().numpy()[:, ACT_SPEED].astype(np.float64)
+            std = d.stddev.cpu().numpy()[:, ACT_SPEED].astype(np.float64)
+        p = gait_probs(mu, std, venv.worlds[0]._sp["thresholds"]).mean(0)
+        rep["speed"] = {"mu_mean": float(mu.mean()), "mu_absmax": float(np.abs(mu).max()),
+                        "std": float(std.mean()), "gait_prob": dict(zip(("stop", "walk", "run"), p.tolist()))}
+    return rep
+
+
 class BehaviorLogCallbackV2(BaseCallback):
-    """롤아웃마다 행동 분포·정책 분산·월드 상태를, `r2_every` 스텝마다 선형 R² 를 기록한다."""
+    """롤아웃마다 행동 분포·정책 분산·월드 상태를, `r2_every` 스텝마다 선형 R² 를 기록한다.
+
+    행동 이름은 학습 VecEnv 의 `act_names` 다(speed 를 켜면 5개). speed 가 있으면 롤아웃 표본(학습 분포)의
+    명령 보행 비율(gait/stop·walk·run)도 남긴다(계획서 4.7 기록).
+    """
 
     def __init__(self, r2_every: int = 1_000_000, save_at: list[int] | None = None,
                  save_prefix: Path | None = None):
@@ -66,14 +140,20 @@ class BehaviorLogCallbackV2(BaseCallback):
 
     def _on_rollout_end(self) -> None:
         buf = self.model.rollout_buffer
-        raw = buf.actions.reshape(-1, ACT_DIM)
+        names = list(self.training_env.act_names)
+        raw = buf.actions.reshape(-1, len(names))
         a = sigmoid(np.clip(raw, -3.0, 3.0))
-        for i, name in enumerate(ACT_NAMES):
+        for i, name in enumerate(names):
             self.logger.record(f"act/{name}_mean", float(a[:, i].mean()))
             self.logger.record(f"act/{name}_std", float(a[:, i].std()))
         log_std = self.model.policy.log_std.detach().cpu().numpy()
-        for i, name in enumerate(ACT_NAMES):
+        for i, name in enumerate(names):
             self.logger.record(f"policy/{name}_log_std", float(log_std[i]))
+        if "speed" in names:
+            g = np.bincount(gait_of(a[:, ACT_SPEED], self.training_env.worlds[0]._sp["thresholds"]),
+                            minlength=3) / max(len(a), 1)
+            for k, name in ((GAIT_STOP, "stop"), (GAIT_WALK, "walk"), (GAIT_RUN, "run")):
+                self.logger.record(f"gait/{name}", float(g[k]))
         self.logger.record("rollout/reward_per_step", float(buf.rewards.mean()))
 
         env = self.training_env
@@ -90,7 +170,7 @@ class BehaviorLogCallbackV2(BaseCallback):
             det, _ = self.model.predict(obs, deterministic=True)
             r2 = linear_r2(obs.astype(np.float64), sigmoid(np.clip(det, -3.0, 3.0)))
             row = {"timesteps": int(self.num_timesteps)}
-            for i, name in enumerate(ACT_NAMES):
+            for i, name in enumerate(names):
                 self.logger.record(f"r2/{name}", float(r2[i]))
                 row[name] = float(r2[i])
             self.r2_history.append(row)
@@ -183,9 +263,17 @@ def main(argv=None) -> int:
         print(f"가중치 이식: {args.init}")
     else:
         print("무작위 초기화로 시작 (계획서 4.7)")
+    init_rep = init_policy_report(model, venv)
+    if "speed" in init_rep:
+        sp, i = init_rep["speed"], ACT_SPEED
+        gp = sp["gait_prob"]
+        print(f"시작 분포 speed: 편향 {init_rep['action_bias'][i]:+.4f}, log_std {init_rep['log_std'][i]:+.3f}, "
+              f"평균 μ {sp['mu_mean']:+.4f} → 정지 {gp['stop']:.3f} · 걷기 {gp['walk']:.3f} · 뛰기 {gp['run']:.3f} "
+              "(계획서 4.7: 편향 0, 걷기 약 51%)", flush=True)
 
     print(f"{args.steps:,} 스텝 — 세계 {venv.K}개 × {venv.N}슬롯 = num_envs {venv.num_envs}, "
-          f"세계당 n_steps {n_steps} (배치 {n_steps * venv.num_envs:,}), 리셋 {venv.T}스텝마다", flush=True)
+          f"세계당 n_steps {n_steps} (배치 {n_steps * venv.num_envs:,}), 리셋 {venv.T}스텝마다, "
+          f"행동 {venv.act_dim}개 {list(venv.act_names)}", flush=True)
     cb = BehaviorLogCallbackV2(save_at=args.save_at, save_prefix=out)
     t0 = time.time()
     model.learn(total_timesteps=args.steps, callback=cb, tb_log_name=run,
@@ -219,6 +307,9 @@ def main(argv=None) -> int:
         "world_resets": venv.num_resets,
         "r2_history": cb.r2_history,
         "init": args.init,
+        # 학습 전 정책의 시작 분포(마지막 층 편향·log_std, speed 명령 보행 확률). 계획서 4.7 초기화 확인용
+        "act_names": list(venv.act_names),
+        "init_policy": init_rep,
     }
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"학습한 세계 수: {meta['worlds_seen']} (시간 초과 리셋 {venv.num_resets}회)")
