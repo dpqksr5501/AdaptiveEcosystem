@@ -36,6 +36,14 @@
           --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.4 0.8 0.4 0.1 0.5     # Gate E1 꼴 C2-seg
   Utility 는 v1 행동 4개만 내므로 speed 세계에서는 참고 행에서 뺀다(Utility v2 는 아직 없다, 계획서 4.8).
   speed 세계의 결과에는 보행 지표(`World.gait_stats`: 보행 비율, energy<0.5 비율, B1·B2·B8)가 함께 남는다.
+- 관측 수도 설정을 따른다(`env_v2.world.obs_names`: v2.0·v2.1 7개, vigilance 를 켠 v2.2 는 8개 — idx 7 =
+  threat_recency). v2.2 의 행동은 6개(idx 5 = vigilance)다. C4(`permute --obs threat_recency`), `--seg-bins`
+  (`threat_recency:0.5` 처럼 이름도 된다), 반응 곡선·R² 가 관측 8개를 다룬다. vigilance 세계의 결과에는 경계 지표
+  (`World.vigil_stats`: 경계 비율, 구간별 P(경계), B3·B4·B5·B5′, b8_vig, 360° 시야의 동족·포식자 수)가 함께 남는다.
+  경계 지속(다음 관측 360°)이 시야를 합친 B3·B4·B5′ 를 정책과 무관하게 치우치게 하므로, 결정 관측이 기본 FOV 인
+  개체만 센 `*_narrow` 와 시야와 무관한 기준 구간 `*_truth` 를 함께 낸다(정의와 주의는 `World.vigil_stats`).
+      python diagnose_v2.py ablate --config configs/v2_2.yaml --model ckpt/v2/v2_2_s0.zip
+      python diagnose_v2.py permute --config configs/v2_2.yaml --model ckpt/v2/v2_2_s0.zip --obs threat_recency
 """
 
 from __future__ import annotations
@@ -67,8 +75,9 @@ from env_v2.rollout import (
     run_specs,
     tail_steps,
 )
-from env_v2.rollout import GAIT_COLUMNS, adapt_spec
-from env_v2.world import ACT_DIM, ACT_NAMES_V1, OBS_DIM, OBS_RECENT_PREDATION, action_names
+from env_v2.rollout import GAIT_COLUMNS, VIGIL_COLUMNS, adapt_spec
+from env_v2.world import (ACT_DIM, ACT_NAMES_V1, OBS_NAMES_V1, OBS_RECENT_PREDATION, action_names,
+                          obs_names as world_obs_names)
 from evaluate import T_CRIT, welch_paired
 
 ROOT = Path(__file__).resolve().parent
@@ -77,8 +86,8 @@ RESULTS = ROOT / "results" / "v2"
 CACHE = ROOT / "runs" / "v2_diag"
 
 ACT_NAMES = list(ACT_NAMES_V1)   # v1 행동 4개. 진단하는 세계의 행동 이름은 Ctx.act_names (결과 meta "act_names")
-OBS_NAMES = ["food_density", "pred_count", "pred_dist", "kin_count", "energy",
-             "recent_predation", "cover_dist"]
+# v1 관측 7개 (env_v2.world.OBS_NAMES_V1 과 같다). 진단하는 세계의 관측 이름은 Ctx.obs_names (결과 meta "obs_names")
+OBS_NAMES = list(OBS_NAMES_V1)
 
 # 보정(평균 행동·평균 관측·표본) 조건. smart_check.py 와 같다.
 CALIB_SEEDS = range(0, 20)
@@ -95,7 +104,8 @@ TOP_K = 5
 # v1 환경에서 학습 전에 찾았던 최고 상수. smart_check.py 가 탐색 시작점으로 넣었다.
 V1_PRETRAIN_BEST = [0.39, 0.99, 0.92, 0.15]
 # v1 에 없는 행동의 탐색 시작값. speed 0.5 = 걷기 구간(1/3~2/3) 가운데 — 걷기 대사가 v1 대사와 같다(계획서 4.4).
-PRETRAIN_EXTRA = {"speed": 0.5}
+# vigilance 0.25 = 경계 아님 구간(0~0.5) 가운데 — 상수 경계(모두 늘 경계)는 섭식 0 이라 굶는다.
+PRETRAIN_EXTRA = {"speed": 0.5, "vigilance": 0.25}
 # 평가 길이 기본값 (6.1-4)
 EVAL_STEPS = 5000
 # γ = 0.998 보고 평가 (6.1-4, #27). `--g998` 이 이 세 값을 한 번에 정한다. 꼬리는 ceil(5/(1-0.998)) = 2500.
@@ -108,11 +118,21 @@ BEHAVIOR = ["cohesion_mean", "flee_dist_mean", "flee_dist_std", "cover_frac", "r
             "react_hunger", "starve_share"]
 # 보행 지표(speed 를 켠 세계만, World.gait_stats). 우열이 아니라 기술이다. 표에는 이 열만 낸다(나머지는 JSON).
 GAIT_SHOW = ["walk_frac", "stop_frac", "run_frac", "stall_frac", "hungry_frac", "b1", "b2", "b8"]
+# 경계 지표(vigilance 를 켠 세계만, World.vigil_stats). 우열이 아니라 기술이다. 표에는 이 열만 낸다(나머지는 JSON).
+# 시야를 합친 b3·b4·b5p_pred 는 경계 지속(360°) 때문에 치우친다 — 옆에 *_narrow·*_truth 를 둔다(World.vigil_stats).
+VIGIL_SHOW = ["vig_frac", "p_vig_seen", "p_vig_recent", "p_vig_calm", "b3", "b3_narrow", "b3_truth", "b4", "b4_narrow",
+              "b5", "b5p_pred", "b5p_pred_narrow", "b5p_truth", "b5p_ema", "b8_vig", "obs_wide_frac"]
 COL_LABEL = {
     "mean_return": "리턴", "g_gamma": "G_γ", "survival": "수명", "repro": "번식",
     "predation_rate": "피식률", "starve_rate": "아사율", "starve_share": "아사 비중",
     "walk_frac": "걷기", "stop_frac": "정지", "run_frac": "뛰기", "stall_frac": "방향 없음 정지",
     "hungry_frac": "energy<0.5", "b1": "B1", "b2": "B2", "b8": "B8 (/초)",
+    "vig_frac": "경계", "p_vig_seen": "P(경계|보임)", "p_vig_recent": "P(경계|최근 위협)", "p_vig_calm": "P(경계|평시)",
+    "b3": "B3 (시야 합침)", "b3_narrow": "B3 (120° 결정)", "b3_truth": "B3 (반경 기준)",
+    "b4": "B4 (시야 합침)", "b4_narrow": "B4 (120° 결정)", "b5": "B5 (관측적)",
+    "b5p_pred": "B5′ 포식자 (관측, 360° 포함)", "b5p_pred_narrow": "B5′ 포식자 (120° 결정)",
+    "b5p_truth": "B5′ 포식자 (반경 기준)", "b5p_ema": "B5′ 피식 EMA",
+    "b8_vig": "경계 전환 (/초)", "obs_wide_frac": "360° 관측",
 }
 COL_FMT = {
     "mean_return": ".2f", "g_gamma": ".3f", "survival": ".1f", "repro": ".2f",
@@ -268,6 +288,9 @@ def react_conditions(obs: np.ndarray) -> dict[str, np.ndarray]:
         "먹이 적음 (food<0.2)": o[:, 0] < 0.2,
         "동료 많음 (kin>0.5)": o[:, 3] > 0.5,
         "동료 적음 (kin<0.1)": o[:, 3] < 0.1,
+        # v2.2 (관측 8개): 결정 때 구간 (World.vigil_stats 와 같은 문턱 0.5)
+        **({"최근 위협·안 보임 (threat>0.5, dist=1)": (o[:, 7] > 0.5) & (o[:, 2] >= 1.0),
+            "위협 없음 (threat≤0.5)": o[:, 7] <= 0.5} if o.shape[1] > 7 else {}),
     }
 
 
@@ -309,19 +332,22 @@ def control_specs(base: dict, mean_action, names=None) -> dict[str, dict]:
     return specs
 
 
-def obs_control_specs(base: dict, obs_mean, dims, modes) -> tuple[dict[str, dict], list[str]]:
-    """C4-j. fix 는 학습 시드 평균 관측으로 고정, perm 은 같은 스텝 개체끼리 섞는다."""
+def obs_control_specs(base: dict, obs_mean, dims, modes, names=None) -> tuple[dict[str, dict], list[str]]:
+    """C4-j. fix 는 학습 시드 평균 관측으로 고정, perm 은 같은 스텝 개체끼리 섞는다.
+
+    `names` 는 세계의 관측 이름(없으면 v1 7개). v2.2 의 threat_recency(7)는 개체별 값이라 순열도 의미가 있다."""
+    names = list(OBS_NAMES if names is None else names)
     specs, notes = {}, []
     for j in dims:
         if "fix" in modes:
-            specs[f"C4-{OBS_NAMES[j]}-fix"] = wrap(
+            specs[f"C4-{names[j]}-fix"] = wrap(
                 base, {"kind": "obs_fix", "dims": [j], "values": [float(obs_mean[j])]})
         if "perm" in modes:
             if j == OBS_RECENT_PREDATION:
-                notes.append(f"C4-{OBS_NAMES[j]}-perm 생략: 관측 {j} 는 모든 개체가 같은 전역 값이라 "
+                notes.append(f"C4-{names[j]}-perm 생략: 관측 {j} 는 모든 개체가 같은 전역 값이라 "
                              "개체끼리 섞어도 바뀌지 않는다. 고정(fix)만 의미가 있다.")
                 continue
-            specs[f"C4-{OBS_NAMES[j]}-perm"] = wrap(base, {"kind": "obs_permute", "dims": [j], "salt": 0})
+            specs[f"C4-{names[j]}-perm"] = wrap(base, {"kind": "obs_permute", "dims": [j], "salt": 0})
     return specs, notes
 
 
@@ -332,11 +358,12 @@ def seg_spec(base_action, bins, dims, table) -> dict:
                  "table": [float(x) for x in np.ravel(table)]})
 
 
-def seg_labels(bins) -> list[str]:
-    """구간 id 순서(segment_ids 의 혼합 기수, 앞 열이 큰 자리)대로 사람이 읽는 이름."""
+def seg_labels(bins, names=None) -> list[str]:
+    """구간 id 순서(segment_ids 의 혼합 기수, 앞 열이 큰 자리)대로 사람이 읽는 이름. `names` 는 관측 이름."""
+    names = list(OBS_NAMES if names is None else names)
     labels = [""]
     for j, thr in bins:
-        name = OBS_NAMES[int(j)]
+        name = names[int(j)]
         edges = [-math.inf] + [float(t) for t in thr] + [math.inf]
         parts = []
         for k in range(len(edges) - 1):
@@ -351,12 +378,15 @@ def seg_labels(bins) -> list[str]:
     return labels
 
 
-def parse_bins(tokens) -> list[list]:
-    """"2:0.5" 또는 "pred_dist:0.25,0.5" → [[2, [0.5]], ...]."""
+def parse_bins(tokens, names=None) -> list[list]:
+    """"2:0.5" 또는 "pred_dist:0.25,0.5" → [[2, [0.5]], ...]. `names` 는 세계의 관측 이름(없으면 v1 7개)."""
+    names = list(OBS_NAMES if names is None else names)
     out = []
     for tok in tokens or []:
         j, _, ts = tok.partition(":")
-        j = OBS_NAMES.index(j) if j in OBS_NAMES else int(j)
+        j = names.index(j) if j in names else int(j)
+        if not 0 <= j < len(names):
+            raise SystemExit(f"--seg-bins {tok!r}: 관측 {j} 는 이 설정의 관측 {names} 밖이다")
         thr = sorted(float(x) for x in ts.split(",") if x)
         if not thr:
             raise SystemExit(f"--seg-bins {tok!r}: 문턱이 없다 (예: 2:0.5)")
@@ -392,22 +422,26 @@ def calib_from_rows(rows: list[dict]) -> dict:
     mean = sum(r["_act_sum"] for r in rows) / n
     std = np.sqrt(np.maximum(sum(r["_act_sq"] for r in rows) / n - mean ** 2, 0.0))
     obs_mean = sum(r["_obs_sum"] for r in rows) / n
-    obs = np.concatenate([r["_obs"] for r in rows]) if "_obs" in rows[0] else np.empty((0, OBS_DIM))
+    obs = (np.concatenate([r["_obs"] for r in rows]) if "_obs" in rows[0]
+           else np.empty((0, len(rows[0]["_obs_sum"]))))
     act = np.concatenate([r["_act"] for r in rows]) if "_act" in rows[0] else np.empty((0, len(mean)))
     return {"mean_action": mean, "std_action": std, "obs_mean": obs_mean, "obs": obs, "act": act,
             "n": int(n)}
 
 
-def calib_summary(cal: dict, names=None) -> dict:
+def calib_summary(cal: dict, names=None, obs_names=None) -> dict:
     obs = cal["obs"]
     names = check_names(names, len(np.ravel(cal["mean_action"])))
+    obs_names = list(OBS_NAMES if obs_names is None else obs_names)
+    if len(obs_names) != len(np.ravel(cal["obs_mean"])):
+        raise ValueError(f"관측 {len(np.ravel(cal['obs_mean']))}개인데 이름이 {len(obs_names)}개다: {obs_names}")
     return {
         "seeds": cal.get("seeds"), "steps": cal.get("steps"), "record_every": cal.get("record_every"),
         "mean_action": dict(zip(names, np.asarray(cal["mean_action"]).tolist())),
         "std_action": dict(zip(names, np.asarray(cal["std_action"]).tolist())),
-        "obs_mean": dict(zip(OBS_NAMES, np.asarray(cal["obs_mean"]).tolist())),
-        "obs_quantiles_5_50_95": {OBS_NAMES[j]: np.quantile(obs[:, j], [0.05, 0.5, 0.95]).tolist()
-                                  for j in range(OBS_DIM)} if len(obs) else None,
+        "obs_mean": dict(zip(obs_names, np.asarray(cal["obs_mean"]).tolist())),
+        "obs_quantiles_5_50_95": {obs_names[j]: np.quantile(obs[:, j], [0.05, 0.5, 0.95]).tolist()
+                                  for j in range(len(obs_names))} if len(obs) else None,
         "samples": int(len(obs)),
     }
 
@@ -428,6 +462,9 @@ class Ctx:
         # 이 설정의 세계가 받는 행동 (v2.0 4개, speed 를 켠 v2.1 5개). 대조군·상수의 길이가 이 수다
         self.act_names = list(action_names(self.cfg))
         self.act_dim = len(self.act_names)
+        # 이 설정의 세계가 내는 관측 (v2.0·v2.1 7개, vigilance 를 켠 v2.2 8개). C4·구간·반응 곡선의 관측 번호다
+        self.obs_names = list(world_obs_names(self.cfg))
+        self.obs_dim = len(self.obs_names)
         self.spec = base_spec(args, self.act_names)
         self.name = args.name or default_name(args, self.cfg)
         out = getattr(args, "out", None)
@@ -482,6 +519,8 @@ class Ctx:
             "head": self.head, "act_mode": self.act_mode, "model_gamma": self.model_gamma,
             # 1-1 에서 더한 키. 예전 JSON 에는 없다 — 읽을 때 없으면 v1 행동 4개로 본다(act_names_of).
             "act_names": self.act_names,
+            # 1-4 에서 더한 키. 예전 JSON 에는 없다 — 읽을 때 없으면 v1 관측 7개로 본다(obs_names_of).
+            "obs_names": self.obs_names,
             **kw,
         }
 
@@ -605,7 +644,7 @@ def get_calib(ctx: Ctx) -> dict:
                         **{k: cal[k] for k in ("mean_action", "std_action", "obs_mean", "obs", "act")})
     save_json(ctx.out / "calib.json", {
         "meta": ctx.meta(calib_seeds=ctx.calib_seeds, calib_steps=ctx.calib_steps),
-        "calib": calib_summary(cal, ctx.act_names),
+        "calib": calib_summary(cal, ctx.act_names, ctx.obs_names),
         "outcome_mean_on_calib_seeds": summarize(rows),
     })
     print(f"[보정] 학습 시드 {ctx.calib_seeds[0]}~{ctx.calib_seeds[-1]} × {ctx.calib_steps} "
@@ -619,14 +658,20 @@ def get_calib(ctx: Ctx) -> dict:
 
 
 def summarize(rows: list[dict]) -> dict:
-    """시드 평균. speed 세계의 행이면 보행 지표 열(GAIT_COLUMNS)도 평균한다(v2.0 행은 예전과 같은 열)."""
-    cols = ROW_COLUMNS + ([c for c in GAIT_COLUMNS if c in rows[0]] if rows else [])
-    return {c: nanmean([r.get(c) for r in rows]) for c in cols}
+    """시드 평균. speed 세계의 행이면 보행 지표 열(GAIT_COLUMNS), vigilance 세계의 행이면 경계 지표 열
+    (VIGIL_COLUMNS)도 평균한다(v2.0 행은 예전과 같은 열)."""
+    extra = [c for c in GAIT_COLUMNS + VIGIL_COLUMNS if c in rows[0]] if rows else []
+    return {c: nanmean([r.get(c) for r in rows]) for c in ROW_COLUMNS + extra}
 
 
 def act_names_of(d: dict) -> list[str]:
     """결과 JSON 의 행동 이름. 1-1 전 결과(meta 에 act_names 가 없다)는 v1 4개다."""
     return list((d.get("meta") or {}).get("act_names") or ACT_NAMES)
+
+
+def obs_names_of(d: dict) -> list[str]:
+    """결과 JSON 의 관측 이름. 1-4 전 결과(meta 에 obs_names 가 없다)는 v1 7개다."""
+    return list((d.get("meta") or {}).get("obs_names") or OBS_NAMES)
 
 
 def compare(rows: list[dict], ref: list[dict], cols=OUTCOME) -> dict:
@@ -695,7 +740,7 @@ def md_behavior(controls: dict) -> list[str]:
     lines = [head, "|---" * (len(BEHAVIOR) + 1) + "|"]
     for name, row in controls.items():
         lines.append(f"| {ctrl_label(name)} | " + " | ".join(fmt(c, row["mean"].get(c)) for c in BEHAVIOR) + " |")
-    return lines + md_gait(controls)
+    return lines + md_gait(controls) + md_vigil(controls)
 
 
 def md_gait(controls: dict) -> list[str]:
@@ -708,6 +753,25 @@ def md_gait(controls: dict) -> list[str]:
          "|---" * (len(GAIT_SHOW) + 1) + "|"]
     for name, row in rows.items():
         L.append(f"| {ctrl_label(name)} | " + " | ".join(fmt(c, row["mean"].get(c)) for c in GAIT_SHOW) + " |")
+    return L
+
+
+def md_vigil(controls: dict) -> list[str]:
+    """vigilance 세계의 경계 지표 표 (World.vigil_stats). 열이 없는 결과는 빈 목록이다."""
+    rows = {k: v for k, v in controls.items() if "vig_frac" in v.get("mean", {})}
+    if not rows:
+        return []
+    L = ["", "### 경계 지표 (vigilance, 우열 아님. 구간은 결정 때: 최근 위협 = 안 보임 & threat_recency > 0.5. "
+         "B4 = 이동 도주 중 다음 스텝에 놓친 비율. 360° 관측 = 직전 스텝에 경계해 넓은 시야로 본 관측의 비율)", "",
+         "시야 합침 열은 경계 지속(다음 관측 360°) 때문에 정책과 무관하게 치우친다(B5′ +, B3 −, B4 +). "
+         "120° 결정 = 결정 관측이 기본 FOV 인 개체만(B4 는 결정·다음 관측 모두 120° — v1 기준선 59.1% 와 비교하는 값). "
+         "반경 기준 = 결정 위치에서 see_r 안 포식자 유무(FOV 무시)와 그 흔적(threat_recency 와 같은 decay)으로 나눈 구간. "
+         "B5 는 관측적 기울기라 역인과(경계 섭식 0)로 − 쪽에 치우친다 — 판정은 C4-energy 대비 차로 한다. "
+         "1차 정의는 1-6 사전 등록", "",
+         "| 대조군 | " + " | ".join(COL_LABEL.get(c, c) for c in VIGIL_SHOW) + " |",
+         "|---" * (len(VIGIL_SHOW) + 1) + "|"]
+    for name, row in rows.items():
+        L.append(f"| {ctrl_label(name)} | " + " | ".join(fmt(c, row["mean"].get(c)) for c in VIGIL_SHOW) + " |")
     return L
 
 
@@ -801,7 +865,8 @@ def md_const(d: dict) -> list[str]:
                  + " | ".join(cell(c, d["eval"]["mean"][c], d["eval"][ref][c]) for c in OUTCOME) + " |")
     for name, m in d.get("ref_mean", {}).items():
         L.append(f"| {ctrl_label(name)} | " + " | ".join(fmt(c, m[c]) for c in OUTCOME) + " |")
-    L += md_gait({tag: {"mean": d["eval"]["mean"]}, **{k: {"mean": m} for k, m in d.get("ref_mean", {}).items()}})
+    rows = {tag: {"mean": d["eval"]["mean"]}, **{k: {"mean": m} for k, m in d.get("ref_mean", {}).items()}}
+    L += md_gait(rows) + md_vigil(rows)
     return L
 
 
@@ -827,7 +892,7 @@ def md_permute(d: dict) -> list[str]:
 
 def md_r2(d: dict) -> list[str]:
     L = ["# 진단: 선형 R² (행동 차원별)", "",
-         f"- 표본: 학습 시드 보정 롤아웃 {d['samples']}개 (관측 7 + 절편으로 회귀)",
+         f"- 표본: 학습 시드 보정 롤아웃 {d['samples']}개 (관측 {len(obs_names_of(d))} + 절편으로 회귀)",
          "- R² > 0.95 는 '규칙 수준'으로 적는다. 실패로 보지 않는다 (6.1-5).", "",
          "| 행동 | " + " | ".join(f"R² ({k})" for k in d["r2"]) + " | 표준편차 (C0) | 판정 |",
          "|---" * (len(d["r2"]) + 3) + "|"]
@@ -853,7 +918,7 @@ def md_curves(d: dict) -> list[str]:
         for name, row in d["react"].items():
             L.append(f"| {name} | {row['n']} | " + " | ".join(f"{x:.3f}" for k in keys for x in row[k]) + " |")
         L.append("")
-    for obs_name in OBS_NAMES:
+    for obs_name in d["conditional"]:          # 결과의 관측 순서 (v2.2 는 threat_recency 까지 8개)
         L += [f"## {obs_name}", "", "| 구간 | n | " + " | ".join(names) + " |", "|---" * (len(names) + 2) + "|"]
         for b in d["conditional"][obs_name]:
             rng = f"{b['lo']:.3f}" if b["lo"] == b["hi"] else f"{b['lo']:.3f}~{b['hi']:.3f}"
@@ -952,7 +1017,8 @@ def cmd_ablate(ctx: Ctx) -> int:
             print(f"  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 {ctx.act_dim}개, Utility v2 없음)")
     res = ctx.run(specs, ctx.eval_seeds, ctx.eval_steps)
     controls = control_table(res, specs)
-    data = {"meta": ctx.meta(elapsed_s=round(time.time() - t0, 1)), "calib": calib_summary(cal, ctx.act_names),
+    data = {"meta": ctx.meta(elapsed_s=round(time.time() - t0, 1)),
+            "calib": calib_summary(cal, ctx.act_names, ctx.obs_names),
             "controls": controls, "per_seed": {k: [public_row(r) for r in v] for k, v in res.items()}}
     save(ctx, "ablate", data, md_ablate(clean(data)))
     print_controls(controls)
@@ -1030,7 +1096,7 @@ def c2_base_action(ctx: Ctx) -> list:
 def cmd_constsearch(ctx: Ctx) -> int:
     a = ctx.args
     t0 = time.time()
-    bins = parse_bins(a.seg_bins)
+    bins = parse_bins(a.seg_bins, ctx.obs_names)
     seg = bool(bins)
     tag = "C2-seg" if seg else "C2"
     stem = a.tag or ("constsearch_seg" if seg else "constsearch")
@@ -1108,7 +1174,7 @@ def cmd_constsearch(ctx: Ctx) -> int:
             "per_seed": {tag: [public_row(r) for r in rows],
                          **{k: [public_row(r) if "_act_sum" in r else r for r in v] for k, v in refs.items()}}}
     if seg:
-        data.update(bins=bins, dims=dims, base_action=base_action, segments=seg_labels(bins),
+        data.update(bins=bins, dims=dims, base_action=base_action, segments=seg_labels(bins, ctx.obs_names),
                     best_table=np.asarray(best).reshape(S, len(dims)).tolist(),
                     # 게이트 조건 "구간별 최적값이 서로 다르다"를 보는 값: 행동마다 구간 간 최대−최소
                     segment_spread=np.ptp(np.asarray(best).reshape(S, len(dims)), axis=0).tolist())
@@ -1136,8 +1202,11 @@ def cmd_permute(ctx: Ctx) -> int:
     a = ctx.args
     t0 = time.time()
     cal = get_calib(ctx)
-    dims = parse_dims(a.obs, OBS_NAMES) if a.obs else list(range(OBS_DIM))
-    specs, notes = obs_control_specs(base, cal["obs_mean"], dims, a.modes)
+    dims = parse_dims(a.obs, ctx.obs_names) if a.obs else list(range(ctx.obs_dim))
+    bad = [j for j in dims if not 0 <= j < ctx.obs_dim]
+    if bad:
+        raise SystemExit(f"--obs {bad} 는 이 설정의 관측 {ctx.obs_names} 밖이다")
+    specs, notes = obs_control_specs(base, cal["obs_mean"], dims, a.modes, ctx.obs_names)
     c0 = reference_rows(ctx, "C0")
     run = dict(specs)
     if c0 is None:
@@ -1152,7 +1221,7 @@ def cmd_permute(ctx: Ctx) -> int:
     act0 = np.concatenate([np.asarray(p0(cal["obs"][i:i + N]), np.float64) for i in range(0, n, N)])
     sens = {name: offline_sensitivity(sp, cal["obs"], act0, N) for name, sp in specs.items()}
     data = {"meta": ctx.meta(elapsed_s=round(time.time() - t0, 1)), "notes": notes,
-            "obs_mean": dict(zip(OBS_NAMES, np.asarray(cal["obs_mean"]).tolist())),
+            "obs_mean": dict(zip(ctx.obs_names, np.asarray(cal["obs_mean"]).tolist())),
             "controls": controls, "offline_sensitivity": sens,
             "per_seed": {k: [public_row(r) if "_act_sum" in r else r for r in v] for k, v in res.items()}}
     save(ctx, a.tag or "permute", data, md_permute(clean(data)))
@@ -1176,9 +1245,9 @@ def cmd_curves(ctx: Ctx) -> int:
     data = {
         "meta": ctx.meta(samples=int(len(obs)), calib_seeds=ctx.calib_seeds, calib_steps=ctx.calib_steps),
         "react": react_table(obs, acts),
-        "conditional": {OBS_NAMES[j]: conditional_curve(obs[:, j], act) for j in range(OBS_DIM)},
-        "intervention": {OBS_NAMES[j]: intervention_curve(pol, obs, j, quantile_grid(obs[:, j]))
-                         for j in range(OBS_DIM)},
+        "conditional": {ctx.obs_names[j]: conditional_curve(obs[:, j], act) for j in range(ctx.obs_dim)},
+        "intervention": {ctx.obs_names[j]: intervention_curve(pol, obs, j, quantile_grid(obs[:, j]))
+                         for j in range(ctx.obs_dim)},
         "act_std": {k: np.asarray(v).std(0).tolist() for k, v in acts.items()},
     }
     save(ctx, "curves", data, md_curves(clean(data)))
@@ -1840,7 +1909,7 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--model", default=None, help="학습 정책 zip")
     g.add_argument("--policy", choices=["utility", "fixed", "random"], default=None)
     g.add_argument("--action", type=float, nargs="+", default=None,
-                   help="--policy fixed 의 행동. 설정의 행동 수만큼(v2.0 4개, speed 를 켠 v2.1 5개)")
+                   help="--policy fixed 의 행동. 설정의 행동 수만큼(v2.0 4개, speed 를 켠 v2.1 5개, v2.2 6개)")
     g.add_argument("--name", default=None, help="results/v2/diag_<이름>. 기본은 모델 파일 이름")
     g.add_argument("--out", default=None, help="출력 디렉터리를 직접 정한다. 기본 results/v2/diag_<이름>")
     g.add_argument("--config", default=None, help="기본 configs/v2.yaml")
@@ -1891,7 +1960,8 @@ def build_parser() -> argparse.ArgumentParser:
                    help="C2-seg 바탕 상수(설정의 행동 수만큼). 기본은 같은 디렉터리 constsearch.json 의 C2")
 
     s = sub.add_parser("permute", parents=[common], help="C4-j 관측 고정·순열")
-    s.add_argument("--obs", nargs="+", default=None, help="관측 (이름 또는 번호). 기본 7개 전부")
+    s.add_argument("--obs", nargs="+", default=None,
+                   help="관측 (이름 또는 번호). 기본 설정의 관측 전부(v2.0·v2.1 7개, v2.2 8개)")
     s.add_argument("--modes", nargs="+", choices=["fix", "perm"], default=["fix", "perm"])
 
     sub.add_parser("curves", parents=[common], help="반응 곡선 (조건부·개입)")

@@ -12,7 +12,8 @@ v1 `env/vec_env.py` 의 HerdVecEnv 는 World 하나를 감쌌다. 학습 중 res
 - 동시에 도는 세계끼리는 시드가 겹치지 않는다
 
 슬롯 하나 = SB3 환경 하나라는 v1 규약은 그대로다. 정책의 (-3,3) 출력을 [0,1] 로 바꾸는
-sigmoid 도 여기에만 있다 (§1.3). 행동 공간의 차원은 설정에서 읽는다(`World.act_dim`: v1 4, speed 를 켜면 5).
+sigmoid 도 여기에만 있다 (§1.3). 행동·관측 공간의 차원은 설정에서 읽는다(`World.act_dim`: v1 4, speed 를 켜면 5,
+vigilance 까지 켜면 6. `World.obs_dim`: v1 7, vigilance 를 켜면 8).
 """
 
 from __future__ import annotations
@@ -25,8 +26,13 @@ from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
 from .world import ACT_DIM, OBS_DIM, World
 
-OBS_SPACE = Box(0.0, 1.0, (OBS_DIM,), np.float32)
+OBS_SPACE = Box(0.0, 1.0, (OBS_DIM,), np.float32)   # v1 관측 7개. 세계의 관측 공간은 obs_space(obs_dim)
 ACT_SPACE = Box(-3.0, 3.0, (ACT_DIM,), np.float32)    # v1 행동 4개. 세계의 행동 공간은 act_space(act_dim)
+
+
+def obs_space(obs_dim: int) -> Box:
+    """관측 `obs_dim` 개의 공간 [0, 1] (§3.1). 7 이면 OBS_SPACE 와 같다."""
+    return Box(0.0, 1.0, (int(obs_dim),), np.float32)
 
 
 def act_space(act_dim: int) -> Box:
@@ -62,13 +68,15 @@ class MultiWorldVecEnv(VecEnv):
         self.N = self.worlds[0].N
         self.act_dim = self.worlds[0].act_dim
         self.act_names = self.worlds[0].act_names
+        self.obs_dim = self.worlds[0].obs_dim
+        self.obs_names = self.worlds[0].obs_names
         self._age = self._staggered_ages()
         self._fresh = True          # 한 스텝도 안 돈 세계는 reset() 이 다시 뽑지 않는다
         self.num_resets = 0         # 시간 초과로 세계를 새로 뽑은 횟수
         self.seed_history: list[list[int]] = [[w.seed] for w in self.worlds]
         self._actions: np.ndarray | None = None
         self.render_mode = None
-        super().__init__(self.K * self.N, OBS_SPACE, act_space(self.act_dim))
+        super().__init__(self.K * self.N, obs_space(self.obs_dim), act_space(self.act_dim))
 
     # --- 세계 관리 ----------------------------------------------------- #
 
@@ -120,7 +128,7 @@ class MultiWorldVecEnv(VecEnv):
 
     def step_wait(self):
         N = self.N
-        obs_all = np.empty((self.num_envs, OBS_DIM), dtype=np.float32)
+        obs_all = np.empty((self.num_envs, self.obs_dim), dtype=np.float32)
         rew_all = np.empty(self.num_envs, dtype=np.float64)
         done_all = np.zeros(self.num_envs, dtype=bool)
         infos: list[dict[str, Any]] = [{} for _ in range(self.num_envs)]

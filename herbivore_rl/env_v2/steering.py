@@ -47,11 +47,14 @@ def clamp_magnitude(v: np.ndarray, max_len: float) -> np.ndarray:
     return v * np.minimum(1.0, max_len / np.maximum(n, EPS))
 
 
-def steer(g: dict, a: np.ndarray, cfg) -> np.ndarray:
+def steer(g: dict, a: np.ndarray, cfg, extra: np.ndarray | None = None) -> np.ndarray:
     """조향 가중치 `a` (N,4) in [0,1] → 속도 (N,2).
 
     §3.3 그대로. 도주 항은 다른 항을 **대체하지 않고 더한다** — 대체하면 도망칠 때
     무리가 흩어진다.
+
+    `extra` (N,2) 는 V2 시험 항이다(정규화 전 합에 더한다. v2.2 threat_flee, env_v2/world.py `_threat_flee_term`).
+    None 이면 v1 과 같은 줄이다(계약 조향).
     """
     v = a[:, 0:1] * g["food_grad"]
     v = v + a[:, 1:2] * g["to_centroid"]
@@ -59,4 +62,6 @@ def steer(g: dict, a: np.ndarray, cfg) -> np.ndarray:
     v = v + cfg.sep_weight * g["separation"]
     fleeing = g["d_pred_min"] < a[:, 2] * cfg.see_r
     v[fleeing] += g["away_from_pred"][fleeing] * cfg.flee_weight
+    if extra is not None:
+        v = v + extra
     return normalize(v) * cfg.herb_speed

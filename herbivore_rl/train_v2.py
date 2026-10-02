@@ -9,15 +9,18 @@ v1 train.py 와 다른 점:
 - 롤아웃 배치를 v1 과 같게(32,768) 두려고 세계당 n_steps = 256 / K 로 줄인다
 - 행동 차원별 평균·표준편차·log_std, 선형 R², 월드 상태를 기록하고, 실행 명령과 설정을 함께 저장한다
 
-PPO 구조(7-64-64-A, tanh)와 기본 하이퍼파라미터는 v1 의 `train.PPO_KWARGS` / `make_model` 을 그대로 쓴다.
-출력 차원 A 는 설정의 행동 수다(`env_v2.world.action_dim`: v2.0 4, speed 를 켠 v2.1 5). 정책 출력 크기는
-VecEnv 의 행동 공간이 정한다.
+PPO 구조(O-64-64-A, tanh)와 기본 하이퍼파라미터는 v1 의 `train.PPO_KWARGS` / `make_model` 을 그대로 쓴다.
+입력 O 는 설정의 관측 수(`env_v2.world.obs_dim`: v2.0·v2.1 7, vigilance 를 켠 v2.2 8), 출력 A 는 행동 수
+(`env_v2.world.action_dim`: v2.0 4, speed 를 켠 v2.1 5, v2.2 6)다. 두 크기는 VecEnv 의 관측·행동 공간이 정한다.
 `--gamma` 는 할인율 γ 하나만 바꾼다(계획서 4.7 γ 비교). 나머지 튜닝값은 `--ppo-config` 그대로이고, 실제로 쓴
 γ 와 그 출처는 메타 JSON 의 `gamma`·`gamma_source` 에 남는다.
 
 시작 분포 (계획서 4.7 초기화): 무작위 초기화의 마지막 층(action_net)은 SB3 기본값 — 직교 초기화 gain 0.01,
 편향 0, log_std 0 — 이라 speed 평균 ≈ 0 → sigmoid 0.5 이고, 걷기 확률은 P(|ε| < ln 2) ≈ 51% 다(계획서의
 "speed 0, 걷기 약 51%"). 학습 전에 실제 정책으로 이 분포를 재서 출력하고 메타 JSON `init_policy` 에 남긴다.
+설정 `train.init_action_bias: {행동 이름: 값}` 이 있으면 무작위 초기화 직후 그 행동의 편향만 바꾼다(`--init` 이면
+쓰지 않는다). 없으면 기존과 같다. v2.2(`configs/v2_2.yaml`)는 vigilance −0.84 다: log_std 0 에서
+P(경계) = P(N(−0.84, 1) > logit(0.5) = 0) ≈ 20% (계획서 4.7 "vigilance −0.84, 경계 확률 약 20%").
 """
 
 from __future__ import annotations
@@ -39,7 +42,7 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 from env_v2.config import load_v2_config
 from env_v2.vec_env import MultiWorldVecEnv, sigmoid
-from env_v2.world import ACT_NAMES_V1, ACT_SPEED, GAIT_RUN, GAIT_STOP, GAIT_WALK, OBS_DIM
+from env_v2.world import ACT_NAMES_V1, ACT_SPEED, GAIT_RUN, GAIT_STOP, GAIT_WALK
 from train import load_tuned, make_model
 
 ROOT = Path(__file__).resolve().parent
@@ -66,6 +69,20 @@ def _phi(x: float) -> float:
     return 0.5 * (1.0 + math.erf(x / math.sqrt(2.0)))
 
 
+def _side(t):
+    """P(자른 표본 sigmoid ≥ t) 를 계산하는 함수 (m, s) → 확률."""
+    if t <= 0.0:
+        return lambda m, s: 1.0
+    if t >= 1.0:
+        return lambda m, s: 0.0
+    x = math.log(t / (1.0 - t))
+    if x <= -3.0:
+        return lambda m, s: 1.0
+    if x > 3.0:
+        return lambda m, s: 0.0
+    return lambda m, s: 1.0 - _phi((x - m) / s)
+
+
 def gait_probs(mu, std, thresholds) -> np.ndarray:
     """speed 차원 가우시안 N(μ, std²) 표본의 명령 보행 확률 [정지, 걷기, 뛰기] (개체마다, (n, 3)).
 
@@ -73,20 +90,7 @@ def gait_probs(mu, std, thresholds) -> np.ndarray:
     이고, 자르기는 raw 를 [-3, 3] 안으로 옮길 뿐 문턱의 어느 쪽인지는 logit(t) 가 (-3, 3) 안이면 바꾸지 않는다.
     logit(t) 가 그 밖이면 자른 값 ±3 이 그 문턱을 넘는지로 정해진다(그 상태 확률은 0 또는 1).
     """
-    def side(t):
-        """P(자른 표본 sigmoid ≥ t) 를 계산하는 함수."""
-        if t <= 0.0:
-            return lambda m, s: 1.0
-        if t >= 1.0:
-            return lambda m, s: 0.0
-        x = math.log(t / (1.0 - t))
-        if x <= -3.0:
-            return lambda m, s: 1.0
-        if x > 3.0:
-            return lambda m, s: 0.0
-        return lambda m, s: 1.0 - _phi((x - m) / s)
-
-    ge_walk, ge_run = (side(t) for t in thresholds)
+    ge_walk, ge_run = (_side(t) for t in thresholds)
     out = np.empty((np.size(mu), 3))
     for i, (m, s) in enumerate(zip(np.ravel(mu), np.ravel(std))):
         pw, pr = ge_walk(float(m), float(s)), ge_run(float(m), float(s))
@@ -94,9 +98,50 @@ def gait_probs(mu, std, thresholds) -> np.ndarray:
     return out
 
 
+def vig_probs(mu, std, threshold: float) -> np.ndarray:
+    """vigilance 차원 가우시안 N(μ, std²) 표본이 경계(sigmoid(자른 표본) > threshold)일 확률 (개체마다, (n,)).
+
+    `gait_probs` 와 같은 경로다(표본 → [-3, 3] 자르기 → sigmoid → 문턱). 표본이 연속이라 > 와 ≥ 의 차이는 없다.
+    threshold 0.5·std 1 이면 1 − Φ(−μ) — μ = −0.84 에서 약 0.20.
+    """
+    ge = _side(threshold)
+    return np.array([ge(float(m), float(s)) for m, s in zip(np.ravel(mu), np.ravel(std))])
+
+
+def init_action_bias(cfg, act_names) -> dict[str, float]:
+    """설정 `train.init_action_bias` → {행동 이름: 편향}. 없으면 빈 dict(SB3 기본 편향 0 그대로, 기존과 같다).
+
+    모르는 행동 이름(이 세계에 없는 행동, 오타)과 유한한 숫자가 아닌 값은 읽을 때 멈춘다.
+    """
+    raw = (cfg.v2.get("train") or {}).get("init_action_bias")
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise SystemExit(f"train.init_action_bias 는 {{행동 이름: 편향}} 이어야 한다. 받은 값: {raw!r}")
+    out = {}
+    for k, v in raw.items():
+        if k not in act_names:
+            raise SystemExit(f"train.init_action_bias 의 '{k}' 는 이 설정의 행동 {list(act_names)} 이 아니다")
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            raise SystemExit(f"train.init_action_bias.{k} 는 유한한 숫자여야 한다. 받은 값: {v!r}")
+        out[str(k)] = float(v)
+    return out
+
+
+def apply_action_bias(model, act_names, bias: dict[str, float]) -> None:
+    """정책 마지막 층(action_net)의 편향 가운데 `bias` 에 적힌 행동만 바꾼다. 가중치·log_std·다른 편향은 그대로다."""
+    import torch as th
+
+    names = list(act_names)
+    with th.no_grad():
+        for k, v in bias.items():
+            model.policy.action_net.bias[names.index(k)] = float(v)
+
+
 def init_policy_report(model, venv) -> dict:
     """학습 전 정책의 시작 분포 (계획서 4.7 초기화 확인). 마지막 층 편향·log_std, 그리고 speed 가 있으면 지금
-    세계들의 관측에서 잰 평균 μ 와 명령 보행 확률(가우시안 표본 → 자르기 → sigmoid → 문턱)을 낸다.
+    세계들의 관측에서 잰 평균 μ 와 명령 보행 확률(가우시안 표본 → 자르기 → sigmoid → 문턱)을, vigilance 가 있으면
+    같은 방식의 경계 확률을 낸다.
 
     관측은 `World.observe()` 로만 읽는다 — 세계를 바꾸지 않고 난수를 쓰지 않아 학습 결과에 영향이 없다.
     """
@@ -107,23 +152,34 @@ def init_policy_report(model, venv) -> dict:
     rep = {"act_names": names,
            "action_bias": pol.action_net.bias.detach().cpu().numpy().astype(float).tolist(),
            "log_std": pol.log_std.detach().cpu().numpy().astype(float).tolist()}
-    if "speed" in names:
+    if "speed" in names or "vigilance" in names:
         obs = np.concatenate([w.observe() for w in venv.worlds])
         with th.no_grad():
             d = pol.get_distribution(pol.obs_to_tensor(obs)[0]).distribution
-            mu = d.mean.cpu().numpy()[:, ACT_SPEED].astype(np.float64)
-            std = d.stddev.cpu().numpy()[:, ACT_SPEED].astype(np.float64)
+            mu_all = d.mean.cpu().numpy().astype(np.float64)
+            std_all = d.stddev.cpu().numpy().astype(np.float64)
+    if "speed" in names:
+        mu, std = mu_all[:, ACT_SPEED], std_all[:, ACT_SPEED]
         p = gait_probs(mu, std, venv.worlds[0]._sp["thresholds"]).mean(0)
         rep["speed"] = {"mu_mean": float(mu.mean()), "mu_absmax": float(np.abs(mu).max()),
                         "std": float(std.mean()), "gait_prob": dict(zip(("stop", "walk", "run"), p.tolist()))}
+    if "vigilance" in names:
+        i = names.index("vigilance")
+        mu, std = mu_all[:, i], std_all[:, i]
+        p = float(vig_probs(mu, std, venv.worlds[0]._vg["threshold"]).mean())
+        # mu_spread: 개체끼리 μ 가 편향에서 얼마나 벌어졌나(action_net 가중치 gain 0.01 이라 작다)
+        rep["vigilance"] = {"mu_mean": float(mu.mean()), "mu_spread": float(np.abs(mu - mu.mean()).max()),
+                            "std": float(std.mean()), "vig_prob": p}
     return rep
 
 
 class BehaviorLogCallbackV2(BaseCallback):
     """롤아웃마다 행동 분포·정책 분산·월드 상태를, `r2_every` 스텝마다 선형 R² 를 기록한다.
 
-    행동 이름은 학습 VecEnv 의 `act_names` 다(speed 를 켜면 5개). speed 가 있으면 롤아웃 표본(학습 분포)의
-    명령 보행 비율(gait/stop·walk·run)도 남긴다(계획서 4.7 기록).
+    행동 이름은 학습 VecEnv 의 `act_names` 다(speed 를 켜면 5개, vigilance 까지 6개). speed 가 있으면 롤아웃
+    표본(학습 분포)의 명령 보행 비율(gait/stop·walk·run)을, vigilance 가 있으면 경계 비율(vig/frac, 4.7 탐색 붕괴
+    감시 '5M 시점 경계 비율 1% 미만')을 남긴다. 둘 다 행동 문턱으로만 센 값이다(gait 는 명령 보행이라 경계가 speed
+    보다 우선인 것을 반영하지 않는다).
     """
 
     def __init__(self, r2_every: int = 1_000_000, save_at: list[int] | None = None,
@@ -154,6 +210,9 @@ class BehaviorLogCallbackV2(BaseCallback):
                             minlength=3) / max(len(a), 1)
             for k, name in ((GAIT_STOP, "stop"), (GAIT_WALK, "walk"), (GAIT_RUN, "run")):
                 self.logger.record(f"gait/{name}", float(g[k]))
+        if "vigilance" in names:
+            th = self.training_env.worlds[0]._vg["threshold"]
+            self.logger.record("vig/frac", float((a[:, names.index("vigilance")] > th).mean()))
         self.logger.record("rollout/reward_per_step", float(buf.rewards.mean()))
 
         env = self.training_env
@@ -166,7 +225,7 @@ class BehaviorLogCallbackV2(BaseCallback):
         if self.num_timesteps >= self._next_r2:
             # 버퍼의 행동은 정책 분포에서 뽑은 값이라 잡음이 섞여 R² 가 낮게 나온다. 정책 평균(결정적
             # 행동)으로 잰다 — 진단 도구(diagnose_v2.py)와 같은 기준이다.
-            obs = buf.observations.reshape(-1, OBS_DIM)
+            obs = buf.observations.reshape(-1, self.training_env.obs_dim)
             det, _ = self.model.predict(obs, deterministic=True)
             r2 = linear_r2(obs.astype(np.float64), sigmoid(np.clip(det, -3.0, 3.0)))
             row = {"timesteps": int(self.num_timesteps)}
@@ -263,6 +322,12 @@ def main(argv=None) -> int:
         print(f"가중치 이식: {args.init}")
     else:
         print("무작위 초기화로 시작 (계획서 4.7)")
+    bias = init_action_bias(cfg, venv.act_names)
+    if bias and not args.init:
+        apply_action_bias(model, venv.act_names, bias)
+        print("마지막 층 편향 (train.init_action_bias): " + ", ".join(f"{k} {v:+g}" for k, v in bias.items()))
+    elif bias:
+        print(f"train.init_action_bias {bias} 는 --init 이라 쓰지 않는다 (옮겨 온 가중치 그대로)")
     init_rep = init_policy_report(model, venv)
     if "speed" in init_rep:
         sp, i = init_rep["speed"], ACT_SPEED
@@ -270,10 +335,15 @@ def main(argv=None) -> int:
         print(f"시작 분포 speed: 편향 {init_rep['action_bias'][i]:+.4f}, log_std {init_rep['log_std'][i]:+.3f}, "
               f"평균 μ {sp['mu_mean']:+.4f} → 정지 {gp['stop']:.3f} · 걷기 {gp['walk']:.3f} · 뛰기 {gp['run']:.3f} "
               "(계획서 4.7: 편향 0, 걷기 약 51%)", flush=True)
+    if "vigilance" in init_rep:
+        vp, i = init_rep["vigilance"], venv.act_names.index("vigilance")
+        print(f"시작 분포 vigilance: 편향 {init_rep['action_bias'][i]:+.4f}, log_std {init_rep['log_std'][i]:+.3f}, "
+              f"평균 μ {vp['mu_mean']:+.4f} → 경계 {vp['vig_prob']:.3f} (계획서 4.7: 편향 −0.84, 경계 약 20%)",
+              flush=True)
 
     print(f"{args.steps:,} 스텝 — 세계 {venv.K}개 × {venv.N}슬롯 = num_envs {venv.num_envs}, "
           f"세계당 n_steps {n_steps} (배치 {n_steps * venv.num_envs:,}), 리셋 {venv.T}스텝마다, "
-          f"행동 {venv.act_dim}개 {list(venv.act_names)}", flush=True)
+          f"관측 {venv.obs_dim}개, 행동 {venv.act_dim}개 {list(venv.act_names)}", flush=True)
     cb = BehaviorLogCallbackV2(save_at=args.save_at, save_prefix=out)
     t0 = time.time()
     model.learn(total_timesteps=args.steps, callback=cb, tb_log_name=run,
@@ -309,6 +379,9 @@ def main(argv=None) -> int:
         "init": args.init,
         # 학습 전 정책의 시작 분포(마지막 층 편향·log_std, speed 명령 보행 확률). 계획서 4.7 초기화 확인용
         "act_names": list(venv.act_names),
+        "obs_names": list(venv.obs_names),
+        # train.init_action_bias 로 바꾼 편향(--init 이면 쓰지 않아 빈 dict)
+        "init_action_bias": bias if not args.init else {},
         "init_policy": init_rep,
     }
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")

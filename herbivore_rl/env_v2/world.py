@@ -16,9 +16,15 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
 - speed (v2.1, 계획서 4.3·4.4·4.5): 행동이 5개가 된다(idx 4 = speed). 문턱으로 정지·걷기·뛰기를 정하고,
   상태가 v1 조향 속도의 크기, 섭식 배수, 대사를 정한다. 에너지 보상은 계수 하나로 순변화(#4)로 바꾼다.
   난수를 쓰지 않는다. 스텝 순서는 `_gait_step`, 통계는 `gait_stats`(v1 `stats()` 10열 밖).
+- vigilance (v2.2, 계획서 4.2·4.3·4.4, #1·#5): 관측 하나(threat_recency)와 행동 하나(vigilance)가 붙는다.
+  a_vig > 문턱이면 경계: 속력 0(speed 보다 우선), 섭식 배수 eat_mult(4.4 표 0), 대사는 정지 대사, 다음 관측의
+  시야각 fov_deg(360°, 반경 see_r 그대로), heading 은 위협 쪽(ThreatDir). threat_recency·ThreatDir 는 개체별이고
+  리스폰 때 초기화한다. 난수를 쓰지 않는다. 정의와 스텝 순서는 `_vigil_step`·`_perceive`, 통계는 `vigil_stats`.
+  계수 threat_flee(10-03, 1-5 Gate E2b 보고용 #18 변형)는 0 이면 꺼져 있다(`_threat_flee_term`).
 
-행동 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`, 세계마다 `World.act_names`·`World.act_dim`.
-모듈 상수 `ACT_DIM`(4)은 v1 행동 수다(기능을 모두 끈 세계와 food_v 세계의 행동 수).
+행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
+`World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
+붙는다(앞 버전을 건너뛰면 뒤 칸이 당겨진다, 계획서 4.1). 모듈 상수 `ACT_DIM`(4)·`OBS_DIM`(7)은 v1 수다.
 """
 
 from __future__ import annotations
@@ -38,11 +44,14 @@ OBS_KIN_COUNT = 3
 OBS_ENERGY = 4
 OBS_RECENT_PREDATION = 5
 OBS_COVER_DISTANCE = 6
-OBS_DIM = 7
+OBS_DIM = 7  # v1 관측 수 — 세계의 실제 관측 수는 World.obs_dim
+OBS_NAMES_V1 = ("food_density", "pred_count", "pred_dist", "kin_count", "energy", "recent_predation", "cover_dist")
+OBS_THREAT_RECENCY = 7  # vigilance 를 켠 세계의 threat_recency 열 (계획서 4.2 idx 7, 관측 첫 추가 칸)
 
 ACT_DIM = 4  # forage, cohesion, flee_dist, cover (§3.2). v1 행동 수 — 세계의 실제 행동 수는 World.act_dim
 ACT_NAMES_V1 = ("forage", "cohesion", "flee_dist", "cover")
 ACT_SPEED = 4  # speed 를 켠 세계의 보행 행동 열 (계획서 4.3 idx 4)
+# vigilance 행동 열은 speed 가 켜져 있으면 5(계획서 4.3), 아니면 4 다. 세계마다 World.act_names.index("vigilance")
 
 # 보행 상태 번호 (계획서 4.4). replay_v2.GAIT_* 와 같다.
 GAIT_STOP, GAIT_WALK, GAIT_RUN = 0, 1, 2
@@ -57,7 +66,8 @@ FOOD_V_FLOOR_TOL = 0.01
 B1_EDGES = (0.25, 0.5)
 # B2·hungry_frac 의 "배고픔" = 결정 때(스텝 전) energy < HUNGRY·max_energy (v1 react_hunger 와 같은 문턱).
 HUNGRY = 0.5
-# gait_stats 누적 히스토그램 모양: [실제 보행, 명령 보행, 포식자 거리 구간(안 보임 + B1 3구간), 배부름]
+# gait_stats 누적 히스토그램 모양: [실제 보행, 명령 보행, 포식자 거리 구간(안 보임 + B1 3구간), 배부름].
+# 세계의 누적 배열은 앞에 경계 축 [비경계, 경계]가 붙은 (2,) + GAIT_HIST_SHAPE 다(vigilance 를 끄면 경계 칸은 0).
 GAIT_HIST_SHAPE = (3, 3, 1 + len(B1_EDGES) + 1, 2)
 # gait_stats() 열 순서. env_v2/rollout.py 가 speed 를 켠 세계의 행에 붙인다.
 GAIT_STAT_COLUMNS = (
@@ -69,22 +79,108 @@ GAIT_STAT_COLUMNS = (
     "b8", "b8_cmd", "intake_per_step", "drain_per_step",
 )
 
+# vigil_stats 의 지표 정의 (계획서 6.2 B3·B4·B5·B5′, 통계 정의이고 동역학 계수가 아니다).
+# "최근 위협" = 결정 때 포식자 안 보임 & threat_recency > RECENT_THREAT (Gate E2 구간의 θ. 0.5 = 놓친 뒤 반감기 안).
+# Gate E2(10-03, results/v2/e2/PREREG.md)는 θ 를 0.5 로 고정하고 통과했다(gate_e2.THETA 와 같다).
+RECENT_THREAT = 0.5
+# B5′ 의 recent_predation 상·하위 구간 (스텝 분위수, diagnose_v2.react_conditions 의 '위험 높음/낮음'과 같은 20%)
+EMA_SPLIT_Q = 0.2
+# vigil_stats 누적 히스토그램 모양: [구간 4(평시, 최근 위협·안 보임, 포식자 1마리 보임, 2마리 이상 보임),
+# 결정 관측의 시야(0 = 기본 FOV, 1 = 경계 시야 — 직전 스텝에 경계), 배부름, 경계]
+VIG_HIST_SHAPE = (4, 2, 2, 2)
+# 시야와 무관한 기준 구간의 히스토그램 모양: [기준 구간 3(평시, 최근 반경 안·지금 밖, 지금 반경 안), 경계].
+# '반경 안' = 결정 때 위치에서 거리 ≤ see_r 인 포식자가 있다(FOV 무시). 흔적은 threat_recency 와 같은 decay 다
+VIG_TRUTH_SHAPE = (3, 2)
+# vigil_stats() 열 순서. env_v2/rollout.py 가 vigilance 를 켠 세계의 행에 붙인다. 앞 28열은 1-4 첫 구현의 순서
+# 그대로이고(rollout·diagnose 는 이름으로 읽는다), 뒤 16열은 10-03 검토에서 더한 360° 치우침 분리 열이다.
+VIGIL_STAT_COLUMNS = (
+    "vig_frac", "seg_seen_frac", "seg_recent_frac", "seg_calm_frac",
+    "p_vig_seen", "p_vig_recent", "p_vig_calm", "b3", "b3_narrow",
+    "b4", "b4_n", "b4_vig", "b4_vig_n",
+    "b5", "p_vig_hungry", "p_vig_full",
+    "b5p_pred", "p_vig_pc0", "p_vig_pc1", "p_vig_pc2", "b5p_ema",
+    "b8_vig", "obs_wide_frac", "kin_narrow", "kin_wide", "pred_narrow", "pred_wide", "threat_mean",
+    "p_vig_seen_narrow", "p_vig_pc0_narrow", "p_vig_pc1_narrow", "p_vig_pc2_narrow", "b5p_pred_narrow",
+    "b4_narrow", "b4_narrow_n", "b4_wide", "b4_wide_n",
+    "seg_near_truth_frac", "seg_recent_truth_frac", "p_vig_near_truth", "p_vig_recent_truth", "p_vig_calm_truth",
+    "b3_truth", "b5p_truth",
+)
+
 
 def action_names(cfg) -> tuple[str, ...]:
     """설정(또는 `Features`)의 세계가 받는 행동 이름. 순서 = 행동 열 번호 (계획서 4.3).
 
-    v1 4개 뒤에 켠 기능의 행동이 붙는다. 지금은 speed(v2.1) 하나다. 한번 정한 열 번호는 바꾸지 않는다.
+    v1 4개 뒤에 켠 기능의 행동이 버전 순으로 붙는다: speed(v2.1), vigilance(v2.2). 앞 기능을 끄면 뒤 칸이
+    당겨진다(speed 없이 vigilance 만 켜면 vigilance 가 열 4). 한번 정한 순서는 바꾸지 않는다.
     """
     f = cfg if isinstance(cfg, Features) else features_of(cfg)
     names = ACT_NAMES_V1
     if f.enabled("speed"):
         names = names + ("speed",)
+    if f.enabled("vigilance"):
+        names = names + ("vigilance",)
     return names
 
 
 def action_dim(cfg) -> int:
-    """설정의 세계가 받는 행동 수. v1·v2.0·v2.0b 4, speed 를 켜면 5."""
+    """설정의 세계가 받는 행동 수. v1·v2.0·v2.0b 4, speed 를 켜면 5, vigilance 까지 켜면 6."""
     return len(action_names(cfg))
+
+
+def obs_names(cfg) -> tuple[str, ...]:
+    """설정(또는 `Features`)의 세계가 내는 관측 이름. 순서 = 관측 열 번호 (계획서 4.2).
+
+    v1 7개(이름은 diagnose_v2.OBS_NAMES 와 같다) 뒤에 켠 기능의 관측이 붙는다: threat_recency(v2.2, idx 7).
+    """
+    f = cfg if isinstance(cfg, Features) else features_of(cfg)
+    names = OBS_NAMES_V1
+    if f.enabled("vigilance"):
+        names = names + ("threat_recency",)
+    return names
+
+
+def obs_dim(cfg) -> int:
+    """설정의 세계가 내는 관측 수. v1·v2.0·v2.0b·v2.1 7, vigilance 를 켜면 8."""
+    return len(obs_names(cfg))
+
+
+def _num(feature: str, key: str, x) -> float:
+    """기능 계수 하나가 유한한 숫자인지 본다(bool 은 거부)."""
+    if isinstance(x, bool) or not isinstance(x, (int, float, np.integer, np.floating)) or not math.isfinite(x):
+        raise ValueError(f"features.{feature}.{key} 는 유한한 숫자여야 한다. 받은 값: {x!r}")
+    return float(x)
+
+
+def _vigil_params(p: dict, base_fov_deg: float) -> dict:
+    """vigilance 계수(yaml 블록, 키는 `features.PARAM_KEYS`)의 값 범위를 검사한다. 기본값은 없다.
+
+    - threshold ∈ [0, 1]: a_vig > threshold 면 경계 (계획서 4.3 "0.5 를 넘으면", 같으면 경계가 아니다)
+    - decay ∈ [0, 1]: threat_recency 의 스텝당 감쇠 계수. 반감기 = ln 0.5 / ln decay 스텝 (0 이면 '지금 보임'과 같다)
+    - eat_mult ≥ 0: 경계 중 섭식 배수(`_eat` 의 want 에 곱한다)
+    - fov_deg ∈ [fov_deg(v1), 360]: 경계한 스텝 뒤 관측의 시야각. 360 이면 각도 판정 없이 반경 see_r 안 전부다
+      (cos(180°) = −1 과의 비교는 반올림으로 정반대 방향을 놓칠 수 있어 −inf 로 둔다)
+    - threat_flee ≥ 0: 10절 #18 조향 변형 항의 배수(`_threat_flee_term`). 0 이면 항이 없다(1-4 구현과 비트 단위로
+      같다 — `steer` 에 아무것도 더하지 않는다). Gate E2b 의 '계속 뛰기 + 위협 반대 항' 보고 팔만 1 로 둔다
+    """
+    th = _num("vigilance", "threshold", p["threshold"])
+    dec = _num("vigilance", "decay", p["decay"])
+    eat = _num("vigilance", "eat_mult", p["eat_mult"])
+    fov = _num("vigilance", "fov_deg", p["fov_deg"])
+    tf = _num("vigilance", "threat_flee", p["threat_flee"])
+    if not 0.0 <= th <= 1.0:
+        raise ValueError(f"features.vigilance.threshold 는 [0, 1] 이어야 한다(행동은 sigmoid 뒤 값). 받은 값: {th}")
+    if not 0.0 <= dec <= 1.0:
+        raise ValueError(f"features.vigilance.decay 는 [0, 1] 이어야 한다. 받은 값: {dec}")
+    if eat < 0.0:
+        raise ValueError(f"features.vigilance.eat_mult 는 0 이상이어야 한다. 받은 값: {eat}")
+    if not float(base_fov_deg) <= fov <= 360.0:
+        raise ValueError(f"features.vigilance.fov_deg 는 기본 시야각 {base_fov_deg} 이상 360 이하여야 한다. 받은 값: {fov}")
+    if tf < 0.0:
+        raise ValueError(f"features.vigilance.threat_flee 는 0 이상이어야 한다. 받은 값: {tf}")
+    wide_cos = -math.inf if fov >= 360.0 else math.cos(math.radians(fov) * 0.5)
+    half_life = math.log(0.5) / math.log(dec) if 0.0 < dec < 1.0 else (0.0 if dec == 0.0 else math.inf)
+    return dict(threshold=th, decay=dec, eat_mult=eat, fov_deg=fov, threat_flee=tf, wide_cos=wide_cos,
+                half_life=half_life)
 
 
 def _speed_params(p: dict) -> dict:
@@ -179,8 +275,13 @@ class World:
         # 켠 기능의 계수(yaml 원본). 꺼진 기능은 None 이고 그 기능의 코드 경로를 타지 않는다.
         self._fv = _food_v_params(self.features.params("food_v")) if self.features.enabled("food_v") else None
         self._sp = _speed_params(self.features.params("speed")) if self.features.enabled("speed") else None
+        self._vg = (_vigil_params(self.features.params("vigilance"), cfg.fov_deg)
+                    if self.features.enabled("vigilance") else None)
         self.act_names: tuple[str, ...] = action_names(self.features)
         self.act_dim = len(self.act_names)
+        self.obs_names: tuple[str, ...] = obs_names(self.features)
+        self.obs_dim = len(self.obs_names)
+        self._act_vig = self.act_names.index("vigilance") if self._vg is not None else None
         self.reset()
 
     # ------------------------------------------------------------------ #
@@ -212,8 +313,25 @@ class World:
             self.gait = np.zeros(self.N, dtype=np.int8)
             self.gait_cmd = np.zeros(self.N, dtype=np.int8)
             self.vel = np.zeros((self.N, 2))
+        if self._vg is not None:
+            # v2.2 개체별 상태 (`_perceive`): threat_recency, ThreatDir(마지막 위협 방향, 단위벡터. 본 적 없으면 0),
+            # 다음 관측의 시야(True = 경계 시야, 직전 스텝에 경계했다). 처음에는 모두 0·기본 시야다.
+            self.threat = np.zeros(self.N)
+            self.threat_dir = np.zeros((self.N, 2))
+            self._wide = np.zeros(self.N, dtype=bool)
+            # 통계 전용(vigil_stats *_truth, 관측·동역학에 들어가지 않는다): 결정 때 반경 안 포식자 유무(FOV 무시)와
+            # 그 흔적(threat_recency 와 같은 갱신·decay·리스폰 0). 시야(경계 360°)와 무관한 기준 구간을 만든다
+            self._near = np.zeros(self.N, dtype=bool)
+            self._tr_truth = np.zeros(self.N)
+            # 스텝 뒤 훅 (replay_v2): 이번 스텝의 경계, 시선(= 스텝 뒤 heading), 적용 속도(speed 를 끈 세계에도 둔다)
+            self.vigilant = np.zeros(self.N, dtype=bool)
+            self.gaze = self.head.copy()
+            if self._sp is None:
+                self.vel = np.zeros((self.N, 2))
         self._reset_stats()
         self._g = self._geometry()
+        if self._vg is not None:
+            self._perceive(self._g)
         self._obs = self._obs_from(self._g)
         return self._obs
 
@@ -402,6 +520,11 @@ class World:
         n = len(idx)
         ar = np.arange(n)
         hx, hy = Hd[:, 0:1], Hd[:, 1:2]
+        # 시야각 판정 문턱 cos(FOV/2). v2.2: 직전 스텝에 경계한 개체(self._wide)는 경계 시야(360° 면 −inf, 각도 판정
+        # 없음)로 동족·포식자를 본다 — 관측 1·2·3 과 조향 기하(to_centroid·away_from_pred·d_pred_min)가 함께 넓어진다.
+        # 반경은 see_r 그대로다(#5). vigilance 를 끈 세계는 v1 과 같은 스칼라 비교다.
+        fov_cos = (cfg.fov_cos if self._vg is None else
+                   np.where(self._wide[idx], self._vg["wide_cos"], cfg.fov_cos)[:, None])
 
         # 쌍별 계산은 전부 (n, ·) 2D로 둔다. (n,N,2) 3D 임시배열을 만들면 스텝의 75%를
         # 여기서 쓴다 (측정). 합산은 행렬곱으로 내려보낸다.
@@ -411,7 +534,7 @@ class World:
         dy = self.pos[:, 1][None, :] - P[:, 1:2]
         dist = np.sqrt(dx * dx + dy * dy)
         invd = 1.0 / np.maximum(dist, EPS)
-        kin_vis = (dist <= cfg.see_r) & ((dx * hx + dy * hy) * invd >= cfg.fov_cos)
+        kin_vis = (dist <= cfg.see_r) & ((dx * hx + dy * hy) * invd >= fov_cos)
         kin_vis[ar, idx] = False
         kin_f = kin_vis.astype(np.float64)
         kin_count = kin_f.sum(1)
@@ -431,7 +554,7 @@ class World:
             ey = self.pred_pos[:, 1][None, :] - P[:, 1:2]
             pd = np.sqrt(ex * ex + ey * ey)
             pinv = 1.0 / np.maximum(pd, EPS)
-            pvis = (pd <= cfg.see_r) & ((ex * hx + ey * hy) * pinv >= cfg.fov_cos)
+            pvis = (pd <= cfg.see_r) & ((ex * hx + ey * hy) * pinv >= fov_cos)
             pred_count = pvis.sum(1)
             masked = np.where(pvis, pd, np.inf)
             j = masked.argmin(1)
@@ -489,11 +612,14 @@ class World:
     # ------------------------------------------------------------------ #
 
     def _obs_from(self, g: dict, idx: np.ndarray | None = None) -> np.ndarray:
-        """§3.1 — 7개, float32, [0,1]. 정규화 상수는 전부 고정값이다 (§1.2)."""
+        """§3.1 — v1 7개(+ 켠 기능의 칸, `obs_names`), float32, [0,1]. 정규화 상수는 전부 고정값이다 (§1.2).
+
+        v2.2 idx 7 threat_recency 는 `_perceive` 가 이 관측의 기하로 갱신한 값 그대로다(이미 [0,1]).
+        """
         cfg = self.cfg
         sl = slice(None) if idx is None else idx
         n = self.N if idx is None else len(idx)
-        o = np.empty((n, OBS_DIM), dtype=np.float32)
+        o = np.empty((n, self.obs_dim), dtype=np.float32)
         o[:, OBS_FOOD_DENSITY] = np.clip(g["food_density"][sl], 0.0, 1.0)
         o[:, OBS_PREDATOR_COUNT] = np.clip(g["pred_count"][sl] / cfg.obs_pred_count_norm, 0.0, 1.0)
         o[:, OBS_PREDATOR_DISTANCE] = np.clip(g["d_pred_min"][sl] / cfg.see_r, 0.0, 1.0)
@@ -501,12 +627,54 @@ class World:
         o[:, OBS_ENERGY] = np.clip(self.energy[sl] / cfg.max_energy, 0.0, 1.0)
         o[:, OBS_RECENT_PREDATION] = min(self.pred_ema, 1.0)
         o[:, OBS_COVER_DISTANCE] = g["cover_dist"][sl]
+        if self._vg is not None:
+            o[:, OBS_THREAT_RECENCY] = self.threat[sl]
         return o
 
     def _observe_subset(self, idx: np.ndarray) -> np.ndarray:
-        """§4.5 — 리스폰된 슬롯만 재계산한다."""
+        """§4.5 — 리스폰된 슬롯만 재계산한다. v2.2 는 리스폰이 0 으로 되돌린 threat_recency 를 이 관측으로 갱신한다."""
         self._geometry(idx, out=self._g)
+        if self._vg is not None:
+            self._perceive(self._g, idx)
         return self._obs_from(self._g, idx)
+
+    def _perceive(self, g: dict, idx: np.ndarray | None = None) -> None:
+        """v2.2 threat_recency·ThreatDir 갱신 (계획서 4.2 idx 7, 4.4). 관측을 만들 때마다 개체당 한 번 부른다.
+
+        '보임' = 이 관측의 포식자 수(관측 1)가 0 보다 크다 — 기본 FOV 120°, 직전 스텝에 경계한 개체는 경계 시야
+        (`_geometry`). 반경은 see_r 그대로다.
+          r ← 1                  (보임)
+          r ← decay · r          (안 보임)
+          ThreatDir ← 가장 가까운 보이는 포식자 쪽 단위벡터 (= −away_from_pred. 보일 때만 바꾸고 안 보이면 그대로)
+        부르는 때: reset(r = 0·ThreatDir = 0 에서 첫 관측으로), 스텝 끝 8) 관측(스텝마다 한 번 → 놓친 뒤 k 스텝이면
+        r = decay^k), 리스폰(`_respawn` 이 r = 0·ThreatDir = 0 으로 되돌린 뒤 리스폰 관측으로. 리스폰 자리에서 포식자가
+        보이면 1, 아니면 0). 죽은 개체의 terminal_obs 는 리스폰 전 값(죽은 스텝 끝 관측)이다.
+        C++ 꼴: Recency = (PredCount > 0) ? 1 : Decay * Recency; if (PredCount > 0) ThreatDir = ToNearestPred.
+
+        같은 때에 통계 전용 기준 상태도 갱신한다(관측·동역학에 들어가지 않는다, C++ 로 옮기지 않는다):
+        `_near` = 이 관측 위치에서 거리 ≤ see_r 인 포식자가 있다(FOV 무시, `_geometry` 와 같은 거리 식이라
+        보임 ⇒ 반경 안), `_tr_truth` = 같은 규칙의 흔적(반경 안이면 1, 아니면 × decay, 리스폰 0).
+        """
+        sl = slice(None) if idx is None else idx
+        decay = self._vg["decay"]
+        seen = g["pred_count"][sl] > 0
+        r = self.threat[sl] * decay
+        r[seen] = 1.0
+        self.threat[sl] = r
+        td = self.threat_dir[sl]
+        td[seen] = -g["away_from_pred"][sl][seen]
+        self.threat_dir[sl] = td
+        P = self.pos[sl]
+        if self.M > 0:
+            ex = self.pred_pos[:, 0][None, :] - P[:, 0:1]
+            ey = self.pred_pos[:, 1][None, :] - P[:, 1:2]
+            near = (np.sqrt(ex * ex + ey * ey) <= self.cfg.see_r).any(1)
+        else:
+            near = np.zeros(len(P), dtype=bool)
+        tr = self._tr_truth[sl] * decay
+        tr[near] = 1.0
+        self._tr_truth[sl] = tr
+        self._near[sl] = near
 
     def observe(self) -> np.ndarray:
         return self._obs
@@ -516,7 +684,7 @@ class World:
     # ------------------------------------------------------------------ #
 
     def _check_action(self, a: np.ndarray) -> None:
-        """행동 배열 모양 (N, act_dim). 행동 4개(v1)를 speed 를 켠 세계에 넣으면 보행 열이 없어 여기서 멈춘다."""
+        """행동 배열 모양 (N, act_dim). 행동 4개(v1)를 speed·vigilance 를 켠 세계에 넣으면 그 열이 없어 여기서 멈춘다."""
         if a.ndim != 2 or a.shape != (self.N, self.act_dim):
             raise ValueError(
                 f"행동은 ({self.N}, {self.act_dim}) [{', '.join(self.act_names)}] 이어야 한다. 받은 모양: {a.shape}"
@@ -524,34 +692,46 @@ class World:
                    and a.ndim == 2 and a.shape[1] == ACT_DIM else ""))
 
     def step(self, a: np.ndarray):
-        """`a`: (N, act_dim) in [0,1] (§1.3). act_dim 은 v1 4, speed 를 켜면 5. 반환: obs, reward, done, terminal_obs.
+        """`a`: (N, act_dim) in [0,1] (§1.3). act_dim 은 v1 4, speed 를 켜면 5, vigilance 까지 켜면 6.
+        반환: obs, reward, done, terminal_obs.
 
-        speed(v2.1)를 켠 세계의 스텝 순서는 `_gait_step` docstring 에 적었다. 끈 세계는 v1 과 같은 줄을 탄다.
+        speed(v2.1)를 켠 세계의 스텝 순서는 `_gait_step`, vigilance(v2.2)는 `_vigil_step` docstring 에 적었다.
+        끈 세계는 v1 과 같은 줄을 탄다.
         """
         cfg = self.cfg
         a = np.asarray(a, dtype=np.float64)
         self._check_action(a)
         rew = np.full(self.N, cfg.rew_alive)
+        vg = self._vg
+        if vg is not None:
+            ema0 = min(self.pred_ema, 1.0)              # 결정 때 관측 5 (vigil_stats B5′ 용, 6) 에서 바뀐다)
 
         # 1) 초식 이동 — §3.3 조향 수식. 벽 경계(§4.2), 토러스 없음.
-        v = steer(self._g, a, cfg)
+        #    v2.2 threat_flee > 0 (#18 변형, Gate E2b 보고 팔)만 위협 반대 항을 정규화 전에 더한다. 0 이면 None 이라
+        #    steer 가 v1 줄 그대로다.
+        v = steer(self._g, a, cfg,
+                  self._threat_flee_term() if vg is not None and vg["threat_flee"] > 0.0 else None)
         if self._sp is not None:
             v = self._gait_step(v, a[:, ACT_SPEED])     # v2.1: 보행 상태가 크기만 바꾼다. 방향은 v1 조향 그대로
+        if vg is not None:
+            v = self._vigil_step(v, a[:, self._act_vig])   # v2.2: 경계면 속력 0 (speed 보다 우선)
         self.pos = np.clip(self.pos + v, 0.0, self.size)
         moving = np.linalg.norm(v, axis=1) > EPS
         self.head = np.where(moving[:, None], normalize(v), self.head)
+        if vg is not None:                  # v2.2 1e): 경계한 개체는 위협 쪽을 본다(ThreatDir, 본 적 없으면 유지)
+            self._face_threat()
 
         # 2) 포식자 이동 + 포획 판정
         caught = self._step_predators()
 
         # 3) 섭식 · 대사 (§3.4 "에너지 획득 +1.0 × 획득량")
-        if self._sp is None:
+        if self._sp is None and vg is None:
             e_drained = self.energy - cfg.energy_drain
             gain = self._eat(e_drained)
-        else:                       # v2.1: 대사와 섭식 배수가 이번 스텝의 실제 보행을 따른다
-            drain = cfg.energy_drain * self._sp["drain_mult"][self.gait]
+        else:                       # v2.1·v2.2: 대사와 섭식 배수가 이번 스텝의 실제 보행·경계를 따른다
+            drain, eat = self._drain_eat()
             e_drained = self.energy - drain
-            gain = self._eat(e_drained, self._sp["eat"][self.gait])
+            gain = self._eat(e_drained, eat)
         e_new = np.minimum(e_drained + gain * cfg.food_energy_per_unit, cfg.max_energy)
         if self._sp is not None and self._sp["net_energy_reward"]:
             # #4 순변화 e_new − e_prev. 번식 리셋(아래 4)과 리스폰(8)은 이 뒤라 들어가지 않는다
@@ -593,9 +773,17 @@ class World:
         self._accumulate(a, rew, repro, caught, starved, done)
         if self._sp is not None:      # 스텝 전 기하(self._g)·결정 때 에너지로 보행 지표를 센다
             self._gait_accumulate(e_prev, e_new - e_drained, drain)
+        if vg is not None:            # 결정 때 상태(기하·threat_recency·시야·에너지)로 경계 지표를 센다
+            flee = self._vigil_accumulate(a, e_prev, ema0, moving)
+            self._wide = self.vigilant.copy()       # 8a) 이번 스텝에 경계한 개체의 다음 관측은 경계 시야다
 
         # 8) 관측 — 스텝당 observe() 한 번 (§4.5)
         g = self._geometry()
+        if vg is not None:
+            self._perceive(g)                       # 8b) threat_recency·ThreatDir
+            if vg["fov_deg"] >= 360.0:              # 8c) 360° 경계 시야로 새로 찾은 포식자 쪽을 본다 (4.4 경계 행)
+                self._face_threat()
+            self._b4_accumulate(flee, g, done)
         obs = self._obs_from(g)
         self._g, self._obs = g, obs
         terminal_obs = obs.copy()
@@ -605,8 +793,90 @@ class World:
             obs[dead] = self._observe_subset(dead)
             if self._sp is not None:
                 self._gait_prev[:, dead] = -1     # 새 개체: 보행 전환(B8)을 이전 개체와 잇지 않는다
+            if vg is not None:
+                self._vig_prev[dead] = -1         # 새 개체: 경계 전환(b8_vig)도 잇지 않는다
 
         return obs, rew, done, terminal_obs
+
+    def _drain_eat(self) -> tuple[np.ndarray, np.ndarray]:
+        """`step` 3) 의 개체별 (대사, 섭식 배수). speed·vigilance 중 하나라도 켠 세계에서만 부른다.
+
+        - speed: 대사 energy_drain × drain_mult[실제 보행], 섭식 gait_eat[실제 보행] (v2.1 그대로)
+        - speed 를 끈 세계: 대사 energy_drain(v1), 섭식 1 (v1 그대로. 보행이 없어 대사가 속력과 무관하다)
+        - vigilance: 경계한 개체의 섭식 배수만 eat_mult 로 바꾼다. 대사는 바꾸지 않는다 — 경계 개체의 실제 보행은
+          정지(`_vigil_step`)라 speed 세계에서는 정지 대사 c_rest(= drain_mult[정지]), speed 를 끈 세계에서는 v1 대사다
+        """
+        cfg = self.cfg
+        if self._sp is not None:
+            drain = cfg.energy_drain * self._sp["drain_mult"][self.gait]
+            eat = self._sp["eat"][self.gait]
+        else:
+            drain = np.full(self.N, cfg.energy_drain)
+            eat = np.ones(self.N)
+        if self._vg is not None:
+            eat = np.where(self.vigilant, self._vg["eat_mult"], eat)
+        return drain, eat
+
+    def _vigil_step(self, v: np.ndarray, a_vig: np.ndarray) -> np.ndarray:
+        """v2.2 경계 (계획서 4.3·4.4 1단계 표, #1·#5). `step` 1) 에서 보행(`_gait_step`) 뒤에 부른다.
+
+        한 스텝 순서 — C++ 로 옮길 때 이 순서를 지킨다. 행동 쪽은 상태가 없다(문턱 고정, 최소 유지 시간 없음):
+          1-)  (step, threat_flee > 0 일 때만) v1 조향 합에 #18 위협 반대 항을 더한 뒤 정규화한다(`_threat_flee_term`).
+               threat_flee = 0(configs/v2_2.yaml)이면 이 단계가 없다
+          1a') 경계 vig = a_vig > threshold (sigmoid 뒤 [0,1] 값. 같으면 경계가 아니다)
+          1b') 경계면 v ← 0 — speed 명령보다 우선한다. speed 세계에서는 실제 보행 gait ← 정지(gait_cmd 는 speed 명령
+               그대로). 그래서 대사는 정지 대사, 섭식은 eat_mult(`_drain_eat`)다
+          1d)  (step) pos ← clip(pos + v), |v| > EPS 면 heading ← v 방향 — v1 줄 그대로. 경계는 v = 0 이라 여기서는 유지
+          1e)  (step) 경계면 heading ← ThreatDir (단위벡터, 0 이면 유지, `_face_threat`). ThreatDir 는 결정 때 관측
+               (이전 스텝 끝 8b)에서 갱신했으므로 '결정 때 포식자가 보였으면 가장 가까운 포식자 쪽, 아니면 마지막 위협
+               방향'이다
+          2)~7) (step) 포식자·섭식·대사·번식·사망·재생. 포식자는 경계를 모른다(v1 그대로)
+          8a)  (step) 다음 관측의 시야 ← vig. 경계한 개체는 시야각 fov_deg(360°)·반경 see_r 로 동족·포식자를 본다
+               (관측 1·2·3·조향 기하). 리스폰 개체는 기본 시야로 되돌린다(`_respawn`)
+          8b)  (step) threat_recency·ThreatDir 갱신 (`_perceive`)
+          8c)  (step, fov_deg = 360 일 때만) 경계면 heading ← ThreatDir 를 한 번 더 한다(`_face_threat`, 리스폰 전).
+               8b 가 360° 경계 시야로 새로 찾은 포식자(경계를 시작한 스텝의 결정 관측 120° 로는 안 보이던 뒤쪽 포식자
+               포함) 쪽을 스텝 끝 heading 으로 남긴다 — 4.4 경계 행 '보이면 가장 가까운 포식자 쪽'. 360° 시야의
+               기하는 heading 을 쓰지 않으므로(각도 판정 −inf) 이미 만든 관측이 그대로 맞다. fov_deg < 360 이면 하지
+               않는다(heading 을 바꾸면 그 heading 으로 잰 관측과 어긋난다). 그때 스텝 끝 heading 은 1e 의 값이고,
+               그 스텝에 처음 본 포식자 쪽은 다음 경계 스텝의 1e 에서 돈다
+        경계 중 FOV 가 360° 라 바라보는 방향은 그 스텝의 탐지에 영향이 없다(4.4 '위협 쪽 보기는 연출'). 다만 경계를
+        풀고 멈춰 서면 heading 이 유지되므로 그때의 120° 시야는 마지막 경계 스텝 끝에 본 위협 쪽을 향한다(8c. 한 스텝짜리
+        경계도 그 스텝에 360° 로 찾은 포식자 쪽을 남긴다). fov_deg = 360 에서 스텝 끝 heading 은 8c 만으로 정해지고
+        1e 는 2)~8b 사이의 중간 값만 바꾼다(그 사이에 heading 을 읽는 단계가 없다).
+        C++ 꼴: bVig = A[Vig] > Threshold; if (bVig) { Velocity = 0; Gait = Stop; if (!ThreatDir.IsZero())
+                Facing = ThreatDir; } Want *= bVig ? EatMult : GaitEat[Gait]; 다음 Perception 의 FOV = bVig ? 360 : 120.
+                Perception(ThreatDir 갱신) 뒤: if (bVig && Fov >= 360 && !ThreatDir.IsZero()) Facing = ThreatDir;
+        스텝 뒤 훅(replay_v2): `self.vigilant`, `self.gaze`(스텝 뒤 heading, 리스폰 전), `self.vel`(적용 속도).
+        리스폰은 이 훅을 바꾸지 않는다(죽은 슬롯의 마지막 프레임이 그 개체의 값이다).
+        """
+        vig = a_vig > self._vg["threshold"]
+        v = np.where(vig[:, None], 0.0, v)
+        if self._sp is not None:
+            self.gait = np.where(vig, GAIT_STOP, self.gait).astype(np.int8)
+        self.vel = v
+        self.vigilant = vig
+        return v
+
+    def _threat_flee_term(self) -> np.ndarray:
+        """10절 #18 조향 변형 항 (N,2). `step` 1) 에서 threat_flee > 0 일 때만 `steer` 의 정규화 전 합에 더한다.
+
+        결정 관측(이전 스텝 끝 8b)에서 포식자가 안 보인 개체: threat_flee · flee_weight · threat_recency · (−ThreatDir).
+        보인 개체는 0 이다(v1 도주 항 `d_pred < flee_dist·see_r` 이 맡는다). 위협을 본 적 없으면 ThreatDir = 0 이라 0.
+        threat_recency 가 감쇠하므로 놓친 직후에 크고(최대 flee_weight 배) 시간이 지나면 줄어든다. 구간과 무관하게
+        안 보인 모든 개체에 걸린다(threat_recency < θ 인 평시 개체에도 θ·flee_weight 이하로 남는다).
+        계약 밖의 시험 항이다(#18 '넣지 않고 시작한다'). Gate E2b 의 '계속 뛰기' 변형 팔에만 켜고, 크게 이기면 조향
+        계약 변경안에 올린다. C++ 꼴: if (PredCount == 0) V += ThreatFlee * FleeWeight * Recency * (-ThreatDir);
+        """
+        unseen = self._g["pred_count"] == 0
+        k = self._vg["threat_flee"] * self.cfg.flee_weight
+        return np.where(unseen[:, None], (-k) * self.threat[:, None] * self.threat_dir, 0.0)
+
+    def _face_threat(self) -> None:
+        """경계한 개체의 heading ← ThreatDir (0 이면 유지), 시선 훅 갱신. `step` 1e) 와 8c) (`_vigil_step` docstring)."""
+        face = self.vigilant & (self.threat_dir != 0.0).any(1)
+        self.head[face] = self.threat_dir[face]
+        self.gaze = self.head.copy()
 
     def _gait_step(self, v: np.ndarray, a_speed: np.ndarray) -> np.ndarray:
         """v2.1 보행 (계획서 4.3·4.4). `step` 1) 에서 v1 조향 속도 `v`(크기 herb_speed 또는 0)의 크기만 바꾼다.
@@ -788,6 +1058,12 @@ class World:
         self.head[dead] = np.stack([np.cos(ang), np.sin(ang)], 1)
         self.energy[dead] = self.cfg.init_energy
         self.repro_cd[dead] = 0
+        if self._vg is not None:        # v2.2 개체별 상태 초기화 (계획서 4.2·4.4). 난수를 쓰지 않는다
+            self.threat[dead] = 0.0
+            self.threat_dir[dead] = 0.0
+            self._wide[dead] = False
+            self._near[dead] = False            # 통계 전용 기준 상태도 새 개체로 (`_perceive`)
+            self._tr_truth[dead] = 0.0
 
     # ------------------------------------------------------------------ #
     # 통계 (§7.2)
@@ -812,14 +1088,28 @@ class World:
         self._f_hungry, self._n_hungry = 0.0, 0
         self._f_full, self._n_full = 0.0, 0
         if self._sp is not None:     # v2.1 보행 지표 (gait_stats). 모두 개체-스텝 수다
-            # 개체-스텝 히스토그램 [실제 보행 3, 명령 보행 3, 포식자 거리 구간 4, 배부름 2]. 거리 구간은
-            # [안 보임, d<0.25, 0.25≤d<0.5, d≥0.5] (d = d_pred/see_r), 배부름은 [energy<0.5, ≥0.5] (결정 때)
-            self._gait_hist = np.zeros(GAIT_HIST_SHAPE, dtype=np.int64)
+            # 개체-스텝 히스토그램 [경계 2, 실제 보행 3, 명령 보행 3, 포식자 거리 구간 4, 배부름 2]. 거리 구간은
+            # [안 보임, d<0.25, 0.25≤d<0.5, d≥0.5] (d = d_pred/see_r), 배부름은 [energy<0.5, ≥0.5] (결정 때).
+            # 경계 축은 [비경계, 경계]이고 vigilance 를 끈 세계는 모두 비경계 칸이다(v2.1 과 같은 수)
+            self._gait_hist = np.zeros((2,) + GAIT_HIST_SHAPE, dtype=np.int64)
             self._sw = np.zeros(2, dtype=np.int64)            # 보행 전환 수 [실제, 명령] (B8)
             self._sw_steps = 0                                # 직전 스텝이 같은 개체인 개체-스텝
             self._gait_prev = np.full((2, self.N), -1, dtype=np.int8)   # 직전 [실제, 명령] 보행, −1 = 없음
             self._intake_sum = 0.0                            # 먹이로 얻은 에너지(상한에서 잘린 몫 제외)
             self._drain_sum = 0.0                             # 대사로 쓴 에너지
+        if self._vg is not None:     # v2.2 경계 지표 (vigil_stats). 모두 개체-스텝 수·합이다
+            self._vig_hist = np.zeros(VIG_HIST_SHAPE, dtype=np.int64)   # [구간 4, 결정 관측 시야 2, 배부름 2, 경계 2]
+            self._vig_esum = np.zeros(4)               # B5 회귀: Σe, Σe², Σv, Σe·v (e = 결정 때 관측 4, v = 경계 0/1)
+            self._vig_ema: list[float] = []            # B5′: 스텝마다 결정 때 관측 5(전역 값)와 경계 개체 수
+            self._vig_ema_n: list[int] = []
+            self._vig_kin = np.zeros(2)                # 결정 관측 시야별 동족 수·포식자 수 합 (360° 해석용, 4.2)
+            self._vig_pc = np.zeros(2)
+            self._vig_threat = 0.0                     # 결정 때 threat_recency 합
+            self._vig_truth = np.zeros(VIG_TRUTH_SHAPE, dtype=np.int64)   # [기준 구간 3, 경계 2] (*_truth 열)
+            # B4 [이동 도주·결정 관측 기본 FOV, 이동 도주·결정 관측 경계 시야, 경계한 도주 분기] × [표본, 다음 관측 안 보임]
+            self._b4 = np.zeros((3, 2), dtype=np.int64)
+            self._vsw, self._vsw_steps = 0, 0          # 경계 전환 수, 직전 스텝이 같은 개체인 개체-스텝
+            self._vig_prev = np.full(self.N, -1, dtype=np.int8)
 
     def _accumulate(self, a, rew, repro, caught, starved, done) -> None:
         self._rew_total += float(rew.sum())
@@ -855,7 +1145,7 @@ class World:
         조건(포식자 거리, 배고픔)은 정책이 이번 행동을 고를 때 본 상태다: 스텝 전 기하 `self._g`, 스텝 전 에너지
         `e_prev`(리스폰 직후 개체는 init_energy, 관측 4 와 같다). B1·B2 는 명령 보행으로 잰다 — 상태를 안 보는
         상수·순열 대조군에서 조건부 차이가 구성상 0 이 되게 한다(계획서 6.3 판정 규칙). 방향이 없어 실제로는
-        멈춘 몫은 stall_frac 로 따로 낸다.
+        멈춘 몫은 stall_frac 로 따로 낸다. v2.2 는 경계 축을 앞에 둔다(경계한 개체의 실제 보행은 정지다).
         """
         cfg = self.cfg
         g, cmd = self.gait, self.gait_cmd
@@ -864,7 +1154,9 @@ class World:
         b = (d < np.inf) * (1 + (d >= B1_EDGES[0]) + (d >= B1_EDGES[1]))
         full = e_prev >= HUNGRY * cfg.max_energy               # False 배고픔, True 배부름
         code = ((g * 3 + cmd) * 4 + b) * 2 + full               # GAIT_HIST_SHAPE 의 C 순서 평탄 인덱스
-        self._gait_hist += np.bincount(code, minlength=self._gait_hist.size).reshape(GAIT_HIST_SHAPE)
+        if self._vg is not None:                                # 경계 축 (끈 세계는 모두 0 칸 — v2.1 과 같은 수)
+            code = code + self.vigilant * int(np.prod(GAIT_HIST_SHAPE))
+        self._gait_hist += np.bincount(code, minlength=self._gait_hist.size).reshape(self._gait_hist.shape)
 
         prev = self._gait_prev
         same = prev[0] >= 0
@@ -881,31 +1173,35 @@ class World:
         """v2.1 보행 통계 — reset 뒤 누적 (v1 `stats()` 10열 밖, 계획서 4.8). Gate E1 과 B1·B2·B8 이 쓴다.
 
         열 순서는 `GAIT_STAT_COLUMNS`. 비율은 모두 개체-스텝 기준이다. 분모가 0 인 열은 nan 이다.
-        - stop_frac·walk_frac·run_frac: 실제 보행 비율. stall_frac: 명령은 이동인데 방향이 없어 정지한 비율
-        - stop_frac_cmd·walk_frac_cmd·run_frac_cmd: 명령 보행(행동 idx 4 의 문턱) 비율
+        - stop_frac·walk_frac·run_frac: 실제 보행 비율(v2.2 경계는 속력 0 이라 정지에 든다. 경계 비율은 vigil_stats).
+          stall_frac: 경계가 아닌데 명령은 이동이고 방향이 없어 정지한 비율
+        - stop_frac_cmd·walk_frac_cmd·run_frac_cmd: 명령 보행(행동 idx 4 의 문턱) 비율. 경계 여부와 무관한 speed 명령이다
         - hungry_frac: 결정 때 energy < 0.5 인 비율 (Gate E1 (a) "energy<0.5 스텝")
         - starve_rate: 아사 / 개체-스텝, starve_share: 아사 / 사망 (env_v2/rollout.py 와 같은 정의)
         - b1 = P(뛰기 | 보임 & d < 0.5·see_r) − P(뛰기 | 안 보임). p_run_unseen, p_run_d025 [0, 0.25),
-          p_run_d050 [0.25, 0.5), p_run_d100 [0.5, 1] (× see_r) 은 거리 구간별 P(뛰기) (6.2 B1)
-        - b2 = P(정지 | 배고픔) − P(정지 | 배부름), p_stop_hungry·p_stop_full (6.2 B2. v2.1 은 경계가 없어 모든 정지가
-          '경계가 아닌 정지'다)
+          p_run_d050 [0.25, 0.5), p_run_d100 [0.5, 1] (× see_r) 은 거리 구간별 P(뛰기) (6.2 B1). '뛰기' = 경계가 아니고
+          명령이 뛰기(v2.2 는 경계가 speed 보다 우선이라 경계 개체는 뛰지 않는다). 분모는 경계 개체를 포함한다
+        - b2 = P(정지 | 배고픔) − P(정지 | 배부름), p_stop_hungry·p_stop_full (6.2 B2 '경계가 아닌 정지': 경계가 아니고
+          명령이 정지. v2.1 은 경계가 없어 모든 정지가 여기에 든다)
         - b8·b8_cmd: 개체당 초당 보행 전환 수(실제·명령). 직전 스텝이 같은 개체인 스텝만 센다. 1스텝 =
           policy_interval/60 초 (replay_v2.step_seconds 와 같은 정의, §9.7)
         - intake_per_step·drain_per_step: 개체-스텝당 먹이 에너지·대사
+        vigilance 를 끈 세계는 경계 칸이 비어 v2.1 과 같은 값이다(정수 합).
         """
         if self._sp is None:
             raise ValueError("gait_stats 는 speed 를 켠 세계에만 있다 (끈 세계는 v1 과 같이 늘 herb_speed 로 움직인다)")
         nan = float("nan")
         n = self._agent_steps
-        H = self._gait_hist                                    # [실제, 명령, 거리 구간, 배부름]
+        H = self._gait_hist.sum(0)                             # [실제, 명령, 거리 구간, 배부름] — 모든 개체
+        H0 = self._gait_hist[0]                                # 같은 모양 — 경계가 아닌 개체
 
         def ratio(x, y):
             return float(x) / float(y) if y else nan
 
         gait_n, cmd_n = H.sum((1, 2, 3)), H.sum((0, 2, 3))
-        b1_n, b1_run = H.sum((0, 1, 3)), H[:, GAIT_RUN].sum((0, 2))
-        b2_n, b2_stop = H.sum((0, 1, 2)), H[:, GAIT_STOP].sum((0, 1))
-        stall = H[GAIT_STOP, GAIT_WALK:].sum()
+        b1_n, b1_run = H.sum((0, 1, 3)), H0[:, GAIT_RUN].sum((0, 2))
+        b2_n, b2_stop = H.sum((0, 1, 2)), H0[:, GAIT_STOP].sum((0, 1))
+        stall = H0[GAIT_STOP, GAIT_WALK:].sum()
         p_run = [ratio(b1_run[k], b1_n[k]) for k in range(4)]
         near = ratio(b1_run[1] + b1_run[2], b1_n[1] + b1_n[2])
         p_stop = [ratio(b2_stop[k], b2_n[k]) for k in range(2)]
@@ -926,6 +1222,163 @@ class World:
             intake_per_step=ratio(self._intake_sum, n), drain_per_step=ratio(self._drain_sum, n),
         )
         assert tuple(out) == GAIT_STAT_COLUMNS
+        return out
+
+    def _vigil_accumulate(self, a: np.ndarray, e_prev: np.ndarray, ema0: float, moving: np.ndarray):
+        """v2.2 경계 지표를 센다. `step` 이 `_accumulate` 뒤, 다음 관측의 시야(8a)와 관측(8)을 바꾸기 전에 부른다.
+
+        조건은 정책이 이번 행동을 고를 때 본 상태다: 스텝 전 기하 `self._g`(포식자 수·동족 수), 결정 때 threat_recency
+        (`self.threat`, 관측 7), 결정 관측의 시야(`self._wide`), 결정 때 에너지 `e_prev`(관측 4), 관측 5 `ema0`.
+        경계는 이번 스텝에 적용된 `self.vigilant`(행동의 문턱이라 상수·순열 대조군에서 조건부 차이가 구성상 0).
+        시야와 무관한 기준 구간은 결정 관측 때 저장한 `self._near`·`self._tr_truth`(`_perceive`)로 정한다 — 스텝이
+        위치를 옮긴 뒤 다시 재지 않는다.
+        반환: B4 표본 마스크 (이동 도주·결정 관측 기본 FOV, 이동 도주·결정 관측 경계 시야, 경계한 도주 분기) — 다음
+        관측을 계산한 뒤 `_b4_accumulate` 가 센다.
+        """
+        cfg = self.cfg
+        g, vig = self._g, self.vigilant
+        pc = g["pred_count"]
+        seen = pc > 0
+        recent = ~seen & (self.threat > RECENT_THREAT)
+        seg = np.where(seen, 2 + (pc >= 2), recent)            # 0 평시, 1 최근 위협·안 보임, 2 한 마리 보임, 3 둘 이상
+        wide = self._wide
+        full = e_prev >= HUNGRY * cfg.max_energy
+        code = ((seg * 2 + wide) * 2 + full) * 2 + vig          # VIG_HIST_SHAPE 의 C 순서 평탄 인덱스
+        self._vig_hist += np.bincount(code, minlength=self._vig_hist.size).reshape(VIG_HIST_SHAPE)
+        e = np.clip(e_prev / cfg.max_energy, 0.0, 1.0)
+        vf = vig.astype(np.float64)
+        self._vig_esum += (e.sum(), (e * e).sum(), vf.sum(), (e * vf).sum())
+        self._vig_ema.append(float(ema0))
+        self._vig_ema_n.append(int(np.count_nonzero(vig)))
+        self._vig_kin += np.bincount(wide, weights=g["kin_count"], minlength=2)
+        self._vig_pc += np.bincount(wide, weights=pc, minlength=2)
+        self._vig_threat += float(self.threat.sum())
+        seg_t = np.where(self._near, 2, self._tr_truth > RECENT_THREAT)   # 0 평시, 1 최근 반경 안·지금 밖, 2 반경 안
+        self._vig_truth += np.bincount(seg_t * 2 + vig, minlength=self._vig_truth.size).reshape(VIG_TRUTH_SHAPE)
+        prev = self._vig_prev
+        same = prev >= 0
+        self._vsw_steps += int(np.count_nonzero(same))
+        self._vsw += int(np.count_nonzero(same & (prev != vig)))
+        prev[:] = vig
+        branch = g["d_pred_min"] < a[:, 2] * cfg.see_r          # 도주 분기 (steer 와 같은 식)
+        mv = branch & ~vig & moving
+        return mv & ~wide, mv & wide, branch & vig
+
+    def _b4_accumulate(self, flee: tuple, g_next: dict, done: np.ndarray) -> None:
+        """B4: 도주 표본(`_vigil_accumulate` 의 마스크 3개) 중 다음 관측(스텝 끝 8)에서 포식자가 안 보인 수.
+        이번 스텝에 죽은 개체는 뺀다."""
+        lost = g_next["pred_count"] == 0
+        for k, m in enumerate(flee):
+            m = m & ~done
+            self._b4[k, 0] += int(np.count_nonzero(m))
+            self._b4[k, 1] += int(np.count_nonzero(m & lost))
+
+    def vigil_stats(self) -> dict:
+        """v2.2 경계 통계 — reset 뒤 누적 (v1 `stats()` 10열 밖, 계획서 4.8). Gate E2 와 B3·B4·B5·B5′ 이 쓴다.
+
+        열 순서는 `VIGIL_STAT_COLUMNS`. 비율은 개체-스텝 기준이다(B4 는 표본 기준). 분모가 0 인 열은 nan 이다.
+        구간(결정 때): 보임 = 포식자 수 > 0, 최근 위협 = 안 보임 & threat_recency > RECENT_THREAT(0.5), 평시 = 그 밖.
+
+        주의 — 360° 치우침 (계획서 4.2 '360° 경계 중에는 kin_count·pred_count 도 늘어나므로 B 지표를 따로 본다',
+        10-03 검토): 경계한 개체의 다음 결정 관측은 360° 라 '보임'·'최근 위협' 구간에 더 자주 든다. 그래서 경계가
+        몇 스텝 이어지기만 하면(포식자를 전혀 보지 않는 정책이어도) 관측 구간으로 나눈 P(경계) 차가 행동이 아니라
+        시야 때문에 커진다. 상수 정책·C1′(같은 스텝 개체끼리 행동 순열)는 경계의 지속을 끊어 이 치우침이 없으므로
+        6.3 (1) 의 '대조군에서 구성상 0' 전제가 경계 지표에는 성립하지 않는다. 시야를 합친 b3·b5p_pred·p_vig_seen·
+        p_vig_pc*·b4 는 기술용이고, 판정 후보는 *_narrow(결정 관측이 기본 FOV)·*_truth(시야와 무관한 기준 구간)다.
+        1차 정의는 1-6 사전 등록에서 정한다. *_narrow 도 직전 한 스텝만 거른다 — threat 흔적을 통한 360° 선택 효과
+        (예: 배고플수록 자주 경계하는 정책은 배고픈 개체가 최근 360° 로 포식자를 봐 '최근 위협'에 더 들고, 경계를
+        시작하기도 쉽다)는 남는다. *_truth 는 시야 효과를 빼지만 경계가 위치(정지)를 통해 반경 안 여부를 바꾸는
+        동역학 경로는 남는다.
+
+        - vig_frac: 경계 비율. seg_*_frac: 구간 비율. p_vig_seen·p_vig_recent·p_vig_calm: 구간별 P(경계) (시야 합침)
+        - b3 = P(경계 | 최근 위협·안 보임) − P(경계 | 평시) (6.2 B3, 시야 합침 — 경계 지속이 '최근 위협' 표본을 늘려
+          치우친다). b3_narrow: 결정 관측이 기본 FOV 인 개체만(직전 스텝에 경계하지 않은 개체 — 경계를 '시작'하는 쪽)
+        - b4 = 이동 도주(도주 분기 & 경계 아님 & 이번 스텝에 움직임) 중 다음 관측에서 포식자를 놓친 비율 (6.2 B4,
+          시야 합침). b4_narrow: 그중 결정 관측이 기본 FOV 인 표본(결정·다음 관측 모두 120°) — **v1 기준선 59.1%
+          (v1 은 늘 120°)와 비교하는 값은 b4_narrow 다.** b4_wide: 결정 관측이 경계 시야인 표본(직전 스텝 경계, 뒤쪽
+          포식자로도 도주 분기에 들어가 다음 120° 관측에서 구성상 자주 놓친다. 보고만). b4_vig: 도주 분기에서 경계한
+          개체가 놓친 비율. *_n 은 표본 수(죽은 개체 제외, b4_n = b4_narrow_n + b4_wide_n)
+        - b5 = 결정 때 energy(관측 4)에 대한 경계(0/1) 최소제곱 기울기 (6.2 B5, 기대 −). p_vig_hungry·p_vig_full:
+          energy < 0.5 / ≥ 0.5 의 P(경계). **관측적 기울기다(기술용).** 경계는 섭식 0 이라 경계를 이어 간 개체는
+          energy 가 내려가고, 직전 뛰기(섭식 0·고대사)도 같은 쪽이다 — energy 를 보지 않는 지속·위협 반응 경계도
+          b5 < 0 이 된다(역인과, 기대 부호와 같은 쪽이라 부호 기준이 자동 통과한다). 판정은 C4-energy(관측 4 고정·
+          순열) 대비 차 또는 개입 곡선(diagnose_v2.intervention_curve, 관측 4)으로 한다(1-6 사전 등록)
+        - B5′ (6.2, 기대 +. 1차로 쓸 정의는 1-6 사전 등록에서 정한다): b5p_pred = P(경계 | 포식자 보임) −
+          P(경계 | 안 보임) (관측 기준, 360° 선택 효과 포함 — 포식자를 보지 않는 지속 경계도 + 로 치우친다),
+          p_vig_pc0·pc1·pc2 = 포식자 0 / 1 / 2마리 이상일 때 P(경계). b5p_ema = recent_predation(관측 5, 전역 값) 상위
+          20% 스텝 − 하위 20% 스텝의 P(경계) (스텝 분위수, diagnose_v2 '위험 높음/낮음'과 같은 분할. 전역 값이라 개체의
+          시야와 무관하다)
+        - *_narrow (결정 관측이 기본 FOV 인 개체만, 위 구간 그대로): p_vig_seen_narrow, p_vig_pc0_narrow·pc1·pc2,
+          b5p_pred_narrow = p_vig_seen_narrow − p_vig_pc0_narrow
+        - *_truth (시야와 무관한 기준 구간, 결정 때): 반경 안 = 결정 관측 위치에서 거리 ≤ see_r 인 포식자가 있다(FOV
+          무시), 최근 = 반경 밖 & 흔적 > RECENT_THREAT(흔적은 threat_recency 와 같은 규칙·decay 를 반경 안 여부에
+          적용한 통계 전용 값, 리스폰 0), 평시 = 그 밖. seg_near_truth_frac·seg_recent_truth_frac: 구간 비율,
+          p_vig_near_truth·p_vig_recent_truth·p_vig_calm_truth: 구간별 P(경계), b3_truth = P(경계 | 최근) − P(경계 | 평시),
+          b5p_truth = P(경계 | 반경 안) − P(경계 | 반경 밖)
+        - b8_vig: 개체당 초당 경계 전환(켜기·끄기) 수. 직전 스텝이 같은 개체인 스텝만 센다(gait b8 과 같은 규칙)
+        - 360° 해석용 (계획서 4.2 '경계 중에는 kin_count 와 pred_count 도 늘어난다'): obs_wide_frac = 결정 관측이 경계
+          시야였던 비율, kin_narrow·kin_wide·pred_narrow·pred_wide = 시야별 평균 동족 수·포식자 수(관측 정규화 전)
+        - threat_mean: 결정 때 threat_recency 평균
+        """
+        if self._vg is None:
+            raise ValueError("vigil_stats 는 vigilance 를 켠 세계에만 있다")
+        nan = float("nan")
+        H = self._vig_hist                                      # [구간, 시야, 배부름, 경계]
+        n = int(H.sum())
+
+        def ratio(x, y):
+            return float(x) / float(y) if y else nan
+
+        seg_n, seg_v = H.sum((1, 2, 3)), H[..., 1].sum((1, 2))
+        nar_n, nar_v = H[:, 0].sum((1, 2)), H[:, 0, :, 1].sum(1)
+        full_n, full_v = H.sum((0, 1, 3)), H[..., 1].sum((0, 1))
+        wide_n = H.sum((0, 2, 3))
+        p_calm, p_recent = ratio(seg_v[0], seg_n[0]), ratio(seg_v[1], seg_n[1])
+        p_seen = ratio(seg_v[2] + seg_v[3], seg_n[2] + seg_n[3])
+        p_pc0 = ratio(seg_v[0] + seg_v[1], seg_n[0] + seg_n[1])
+        se, see, sv, sev = self._vig_esum
+        var = see - se * se / n if n else 0.0
+        b5 = (sev - se * sv / n) / var if n and var > 0.0 else nan
+        ema = np.asarray(self._vig_ema)
+        if len(ema):
+            nv = np.asarray(self._vig_ema_n, dtype=np.float64)
+            lo, hi = np.quantile(ema, [EMA_SPLIT_Q, 1.0 - EMA_SPLIT_Q])
+            m_hi, m_lo = ema >= hi, ema <= lo
+            b5p_ema = nv[m_hi].sum() / (self.N * m_hi.sum()) - nv[m_lo].sum() / (self.N * m_lo.sum())
+        else:
+            b5p_ema = nan
+        per_sec = 60.0 / float(self.cfg.policy_interval)
+        p_seen_n = ratio(nar_v[2] + nar_v[3], nar_n[2] + nar_n[3])
+        p_pc0_n = ratio(nar_v[0] + nar_v[1], nar_n[0] + nar_n[1])
+        B = self._b4                                            # [120° 결정 이동 도주, 360° 결정 이동 도주, 경계] × [표본, 놓침]
+        T = self._vig_truth                                     # [기준 구간, 경계]
+        tn, tv = T.sum(1), T[:, 1]
+        p_t = [ratio(tv[k], tn[k]) for k in range(3)]           # 평시, 최근, 반경 안
+        out = dict(
+            vig_frac=ratio(seg_v.sum(), n),
+            seg_seen_frac=ratio(seg_n[2] + seg_n[3], n), seg_recent_frac=ratio(seg_n[1], n),
+            seg_calm_frac=ratio(seg_n[0], n),
+            p_vig_seen=p_seen, p_vig_recent=p_recent, p_vig_calm=p_calm, b3=p_recent - p_calm,
+            b3_narrow=ratio(nar_v[1], nar_n[1]) - ratio(nar_v[0], nar_n[0]),
+            b4=ratio(B[0, 1] + B[1, 1], B[0, 0] + B[1, 0]), b4_n=float(B[0, 0] + B[1, 0]),
+            b4_vig=ratio(B[2, 1], B[2, 0]), b4_vig_n=float(B[2, 0]),
+            b5=b5, p_vig_hungry=ratio(full_v[0], full_n[0]), p_vig_full=ratio(full_v[1], full_n[1]),
+            b5p_pred=p_seen - p_pc0, p_vig_pc0=p_pc0, p_vig_pc1=ratio(seg_v[2], seg_n[2]),
+            p_vig_pc2=ratio(seg_v[3], seg_n[3]), b5p_ema=float(b5p_ema),
+            b8_vig=ratio(self._vsw, self._vsw_steps) * per_sec,
+            obs_wide_frac=ratio(wide_n[1], n),
+            kin_narrow=ratio(self._vig_kin[0], wide_n[0]), kin_wide=ratio(self._vig_kin[1], wide_n[1]),
+            pred_narrow=ratio(self._vig_pc[0], wide_n[0]), pred_wide=ratio(self._vig_pc[1], wide_n[1]),
+            threat_mean=ratio(self._vig_threat, n),
+            p_vig_seen_narrow=p_seen_n, p_vig_pc0_narrow=p_pc0_n, p_vig_pc1_narrow=ratio(nar_v[2], nar_n[2]),
+            p_vig_pc2_narrow=ratio(nar_v[3], nar_n[3]), b5p_pred_narrow=p_seen_n - p_pc0_n,
+            b4_narrow=ratio(B[0, 1], B[0, 0]), b4_narrow_n=float(B[0, 0]),
+            b4_wide=ratio(B[1, 1], B[1, 0]), b4_wide_n=float(B[1, 0]),
+            seg_near_truth_frac=ratio(tn[2], n), seg_recent_truth_frac=ratio(tn[1], n),
+            p_vig_near_truth=p_t[2], p_vig_recent_truth=p_t[1], p_vig_calm_truth=p_t[0],
+            b3_truth=p_t[1] - p_t[0], b5p_truth=p_t[2] - ratio(tv[0] + tv[1], tn[0] + tn[1]),
+        )
+        assert tuple(out) == VIGIL_STAT_COLUMNS
         return out
 
     def stats(self) -> dict:

@@ -45,6 +45,11 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
       python replay_v2.py --config configs/v2_1.yaml --compare fixed:0.4,0.8,0.4,0.1,0.2 \
           fixed:0.4,0.8,0.4,0.1,0.5 fixed:0.4,0.8,0.4,0.1,0.9 --labels "항상 정지" "항상 걷기" "항상 뛰기" \
           --steps 600 --out results/v2/replay_v2_1_gaits.mp4
+- 경계 (v2.2, vigilance): `World.vigilant` 인 개체는 흰 테두리와 짧은 시선선(`World.gaze` = 위협 쪽 heading)으로,
+  시야 부채꼴은 360° 원으로 그린다. 점 색은 실제 보행(경계는 속력 0 이라 정지 회색)이다. 하단 흰 선은 경계 비율,
+  설명줄에 vigilance 계수(문턱·threat_recency 감쇠·섭식·시야각) 한 줄을 더 적는다. 행동 6개: `fixed:a,b,c,d,s,v`.
+      python replay_v2.py --config configs/v2_2.yaml --compare learned:ckpt/v2/v2_2_s0.zip \
+          perm:learned:ckpt/v2/v2_2_s0.zip --labels "C0" "C1′" --steps 1800 --out results/v2/replay_v2_2_compare.mp4
 - 모든 초식에 짧은 heading 화살표. 리스폰 직후 몇 프레임은 흐리게 그린다(순간이동 착시 방지).
 - 하단 시계열: 보행 비율(정지/걷기/뛰기), 경계 비율, 지역 기억, 포획 누적. 게임 시각 mm:ss.
 - `--compare` 는 같은 시드·같은 카메라로 정책 여러 개를 나란히 그린다. 칸들은 x축과
@@ -65,8 +70,8 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
 | `food_v` | (gw,gw) | v2.0b | 스텝 전 | 짓밟힌 땅 막, 좌우 절반 라벨, 하단 V/cap0·F/cap0 (`food_stats()` 를 함께 읽는다) |
 | `gait` | (N,) int | v2.1 (구현) | 스텝 뒤 | 이번 스텝에 실제로 적용된 보행 (0 정지, 1 걷기, 2 뛰기). 가장 우선 |
 | `vel` | (N,2) | v2.1 (구현) | 스텝 뒤 | 이번 스텝 속도. `gait` 가 없을 때 |v|/herb_speed 로 판정 |
-| `vigilant` | (N,) bool | v2.2 | 스텝 뒤 | 흰 테두리, 짧은 시선선, 360° 시야 원, 경계 비율 |
-| `gaze` | (N,2) | v2.2 | 스텝 뒤 | 시선 방향. 없으면 heading |
+| `vigilant` | (N,) bool | v2.2 (구현) | 스텝 뒤 | 흰 테두리, 짧은 시선선, 360° 시야 원, 경계 비율 |
+| `gaze` | (N,2) | v2.2 (구현) | 스텝 뒤 | 시선 방향(스텝 뒤 heading, 경계 개체는 ThreatDir 쪽). 없으면 heading |
 | `region_id`, `region_mem` | (gw,gw) int, (R,) | v2.3 | 스텝 전 | 지역 배경 반투명 빨강, m_A·m_B 시계열 |
 | `boldness` | (N,) | v2.4 | 스텝 전 | 대담함 최대·최소 개체 2마리 궤적 |
 
@@ -387,7 +392,7 @@ def perm_spec(base: dict, salt: int = 0) -> dict:
 def parse_spec(text: str) -> dict:
     """문자열 → `env_v2.rollout.build_policy` 스펙.
 
-    `learned:<zip>`, `fixed:a,b,c,d[,s]`, `utility`, `utility:default`, `random:<seed>`,
+    `learned:<zip>`, `fixed:a,b,c,d[,s[,v]]`, `utility`, `utility:default`, `random:<seed>`,
     `perm:<바탕 스펙>` (C1′ 행동 순열, 예: `perm:learned:ckpt/final.zip`),
     또는 JSON 딕셔너리 문자열 (래퍼 꼴 `{"policy": ..., "wrap": [...]}` 포함).
     fixed 는 v1 행동 4개 이상을 받는다. 세계의 행동 수와 맞는지는 `fit_spec` 이 설정을 읽은 뒤 본다.
@@ -862,8 +867,9 @@ class _Panel:
 
         sec = f["t"] * self.step_sec
         run_frac = float(np.mean(f["gait"] == GAIT_RUN))
+        vig_s = "" if f["vig"] is None else f"vig {float(np.mean(vig)) * 100:3.0f}%  "
         self.status.set_text(
-            f"{fmt_clock(sec)}  step {f['t']:5d}  run {run_frac*100:3.0f}%  "
+            f"{fmt_clock(sec)}  step {f['t']:5d}  run {run_frac*100:3.0f}%  {vig_s}"
             f"caught {f['caught']:4d}  starved {f['starved']:3d}"
         )
         self.mask.set_x(sec)
@@ -995,6 +1001,19 @@ def speed_line(runs: list) -> str | None:
             + ("순변화" if sp["net_energy_reward"] else "v1 획득량"))
 
 
+def vigil_line(runs: list) -> str | None:
+    """v2.2 설명줄: 이 영상에 쓴 vigilance 계수(yaml). vigilance 를 끈 설정이면 None (그림이 v2.1 과 같다)."""
+    vg = getattr(runs[0].world, "_vg", None)
+    if vg is None:
+        return None
+    hl = vg["half_life"]
+    hl_s = "∞" if not np.isfinite(hl) else f"{hl:.1f}"
+    tf = vg.get("threat_flee", 0.0)
+    return (f"vigilance 문턱 > {vg['threshold']:g} | 경계: 속력 0 · 섭식 {vg['eat_mult']:g} · 정지 대사 · "
+            f"시야 {vg['fov_deg']:g}°(반경 see_r) · 위협 쪽 보기 | threat_recency 감쇠 {vg['decay']:g}"
+            f"(반감기 {hl_s}스텝)" + (f" | #18 위협 반대 조향 ×{tf:g}" if tf > 0.0 else ""))
+
+
 def food_line(runs: list) -> str | None:
     """v2.0b 설명줄: 이 영상에 쓴 food_v 계수(yaml 또는 `--half-life`·`--alpha` 로 바꾼 값)와 V 시작 비율.
     food_v 훅이 없으면 None."""
@@ -1044,7 +1063,7 @@ def build_figure(runs: list, fps: int = 30, dpi: int = 100, fov_preds: int = 2,
     )
     sep = " | " if len(runs) > 1 else "\n"
     info = world_line + sep + time_line
-    extra = [x for x in (speed_line(runs), food_line(runs)) if x is not None]
+    extra = [x for x in (speed_line(runs), vigil_line(runs), food_line(runs)) if x is not None]
     for line in extra:
         info += "\n" + line
     # 설명줄(아래) → 자막 → 범례 순으로 쌓는다. 늘어난 만큼 아래 여백을 키운다.
@@ -1264,11 +1283,13 @@ def main(argv=None) -> int:
             print("\n".join(lines))
     for r in runs:
         g = np.mean([gait_fractions(f["gait"]) for f in r.frames], axis=0)
+        vig = [f["vig"] for f in r.frames if f["vig"] is not None]
         print(
             f"  [{r.label}] mean_return={r.stats['mean_return']:.2f}  "
             f"survival={r.stats['survival']:.0f}  repro={r.stats['repro']:.2f}  "
             f"predation_rate={r.stats['predation_rate']:.5f}  "
             f"보행 정지/걷기/뛰기={g[0]:.4f}/{g[1]:.4f}/{g[2]:.4f}"
+            + (f"  경계={float(np.mean(vig)):.4f}" if vig else "")
         )
     return 0
 

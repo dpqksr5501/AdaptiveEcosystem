@@ -13,9 +13,11 @@ v1 에 없는 것:
   학습 때의 가우시안 분포에서 뽑은 행동을 쓴다 (`StochasticLearned`). 잡음은 평가 시드에서 유도한 전용
   스트림에서 뽑아 재현된다. `mode` 가 없거나 "deterministic" 이면 지금까지와 같은 결정 모드다.
 - **앞부분 제외.** `head` 를 주면 G_γ 평균에서 롤아웃 앞 `head` 스텝(리셋 과도기)도 뺀다 (6.1-4, 기본 0).
-- **행동 수는 세계를 따른다** (`World.act_dim`: v1 4, speed 를 켜면 5). 래퍼·확률 모드는 차원과 무관하다.
-  v1 의 4개짜리 정책(Utility)은 speed 세계에 쓸 수 없다(World.step 이 모양을 검사한다). random 은 스펙의
-  `act_dim` 으로 차원을 정한다(`adapt_spec`). speed 를 켠 세계의 행에는 `World.gait_stats()` 열이 붙는다.
+- **행동·관측 수는 세계를 따른다** (`World.act_dim`: v1 4, speed 를 켜면 5, vigilance 까지 켜면 6.
+  `World.obs_dim`: v1 7, vigilance 를 켜면 8). 래퍼·확률 모드는 차원과 무관하다.
+  v1 의 4개짜리 정책(Utility)은 speed·vigilance 세계에 쓸 수 없다(World.step 이 모양을 검사한다). random 은 스펙의
+  `act_dim` 으로 차원을 정한다(`adapt_spec`). speed 를 켠 세계의 행에는 `World.gait_stats()` 열이,
+  vigilance 를 켠 세계의 행에는 `World.vigil_stats()` 열이 붙는다.
 
 정책 스펙 예:
     {"kind": "learned", "model": "ckpt/final.zip"}                 # policies.registry 스펙 그대로
@@ -38,7 +40,7 @@ import numpy as np
 from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
-from .world import ACT_DIM, GAIT_STAT_COLUMNS, OBS_DIM, World
+from .world import ACT_DIM, GAIT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, World
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -49,6 +51,8 @@ EXTRA_COLUMNS = ["g_gamma", "starve_rate", "starve_share"]
 ROW_COLUMNS = STAT_COLUMNS + EXTRA_COLUMNS
 # speed(v2.1)를 켠 세계의 행에만 더 붙는 열 (World.gait_stats, starve_* 는 위와 같은 값이라 빼고 붙인다)
 GAIT_COLUMNS = [c for c in GAIT_STAT_COLUMNS if c not in EXTRA_COLUMNS]
+# vigilance(v2.2)를 켠 세계의 행에만 더 붙는 열 (World.vigil_stats)
+VIGIL_COLUMNS = list(VIGIL_STAT_COLUMNS)
 
 
 # --------------------------------------------------------------------- #
@@ -361,7 +365,7 @@ def _base_policy(spec: dict, seed: int = 0):
 
 
 def build_policy(spec: dict, seed: int = 0):
-    """정책 스펙(래퍼 포함) → 관측 (N,7) → 행동 (N, 행동 수) 함수. 래퍼는 목록 순서대로 바깥에 씌운다.
+    """정책 스펙(래퍼 포함) → 관측 (N, 관측 수) → 행동 (N, 행동 수) 함수. 래퍼는 목록 순서대로 바깥에 씌운다.
 
     `seed` 는 순열 래퍼와 확률 모드 잡음 스트림의 시드다(롤아웃에서는 평가 시드).
     """
@@ -381,7 +385,8 @@ def build_policy(spec: dict, seed: int = 0):
 def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None = None,
             tail: int | None = None, record_every: int = 0, head: int = 0) -> dict:
     """시드 하나. World.stats() 10열 + G_γ + 아사율, 그리고 `_` 로 시작하는 원시 합계·표본을 돌려준다.
-    speed 를 켠 세계는 `World.gait_stats()` 열(GAIT_COLUMNS)도 붙는다.
+    speed 를 켠 세계는 `World.gait_stats()` 열(GAIT_COLUMNS), vigilance 를 켠 세계는 `World.vigil_stats()`
+    열(VIGIL_COLUMNS)도 붙는다.
 
     `head`·`tail` 은 G_γ 평균에서만 뺀다. World.stats() 의 다른 지표는 롤아웃 전체 값이다.
 
@@ -395,7 +400,7 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     rew = np.empty((steps, N), dtype=np.float64)
     done = np.empty((steps, N), dtype=bool)
     act_sum, act_sq = np.zeros(A), np.zeros(A)
-    obs_sum = np.zeros(OBS_DIM)
+    obs_sum = np.zeros(w.obs_dim)
     obs_s, act_s = [], []
     for t in range(steps):
         obs = w.observe()
@@ -419,10 +424,13 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     if w._sp is not None:
         gs = w.gait_stats()
         s.update((c, gs[c]) for c in GAIT_COLUMNS)
+    if w._vg is not None:
+        vs = w.vigil_stats()
+        s.update((c, vs[c]) for c in VIGIL_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:
-        s["_obs"] = np.concatenate(obs_s) if obs_s else np.empty((0, OBS_DIM), np.float32)
+        s["_obs"] = np.concatenate(obs_s) if obs_s else np.empty((0, w.obs_dim), np.float32)
         s["_act"] = np.concatenate(act_s) if act_s else np.empty((0, A))
     return s
 

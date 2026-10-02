@@ -1,0 +1,11 @@
+C2 {'g_gamma': 0.9634, 'survival': 349.03548, 'predation_rate': 0.0028, 'starve_rate': 0.00048, 'vig_frac': 0.0, 'stop_frac': 0.00512, 'seg_recent_frac': 0.18194, 'seg_seen_frac': 0.27665}
+A_allow {'g_gamma': 1.14476, 'survival': 368.12856, 'predation_rate': 0.00261, 'starve_rate': 0.00044, 'vig_frac': 0.1741, 'stop_frac': 0.17829, 'seg_recent_frac': 0.1741, 'seg_seen_frac': 0.40101}
+stop_recent {'g_gamma': 0.93022, 'survival': 339.77922, 'predation_rate': 0.00281, 'starve_rate': 0.00043, 'vig_frac': 0.0, 'stop_frac': 0.23593, 'seg_recent_frac': 0.23083, 'seg_seen_frac': 0.19651}
+A_allow_fov120 {'g_gamma': 1.23003, 'survival': 372.46629, 'predation_rate': 0.00264, 'starve_rate': 0.00042, 'vig_frac': 0.15942, 'stop_frac': 0.16441, 'seg_recent_frac': 0.15942, 'seg_seen_frac': 0.4072}
+A_allow_eat1 {'g_gamma': 1.25484, 'survival': 379.72697, 'predation_rate': 0.00259, 'starve_rate': 0.00044, 'vig_frac': 0.16675, 'stop_frac': 0.17086, 'seg_recent_frac': 0.16675, 'seg_seen_frac': 0.39125}
+A_allow - C2: {'g_gamma': (0.18136, 1.79), 'predation_rate': (-0.00019, -4.01), 'starve_rate': (-4e-05, -1.7), 'survival': (19.09308, 2.41)}
+A_allow - stop_recent: {'g_gamma': (0.21453, 1.87), 'predation_rate': (-0.0002, -4.39), 'starve_rate': (1e-05, 0.31), 'survival': (28.34933, 3.63)}
+A_allow - A_allow_fov120: {'g_gamma': (-0.08527, -0.69), 'predation_rate': (-3e-05, -0.89), 'starve_rate': (2e-05, 0.74), 'survival': (-4.33773, -0.58)}
+stop_recent - C2: {'g_gamma': (-0.03318, -0.3), 'predation_rate': (1e-05, 0.21), 'starve_rate': (-5e-05, -1.77), 'survival': (-9.25625, -1.44)}
+A_allow_fov120 - C2: {'g_gamma': (0.26663, 2.69), 'predation_rate': (-0.00016, -2.72), 'starve_rate': (-6e-05, -2.62), 'survival': (23.43081, 3.68)}
+A_allow_eat1 - A_allow: {'g_gamma': (0.11008, 1.17), 'predation_rate': (-1e-05, -0.48), 'starve_rate': (0.0, 0.02), 'survival': (11.59841, 1.52)}

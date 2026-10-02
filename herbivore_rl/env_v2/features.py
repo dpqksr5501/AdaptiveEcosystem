@@ -1,6 +1,6 @@
 """V2 기능 스위치와 기능별 난수 스트림 (계획서 4.8, 0-1b).
 
-버전 설정(`configs/v2.yaml`, `configs/v2_0b.yaml`, `configs/v2_1.yaml` ...)의 `features:` 아래에 기능마다
+버전 설정(`configs/v2.yaml`, `configs/v2_0b.yaml`, `configs/v2_1.yaml`, `configs/v2_2.yaml` ...)의 `features:` 아래에 기능마다
 블록 하나를 둔다.
 
     features:
@@ -72,7 +72,7 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
-IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed"})
+IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -84,6 +84,12 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # 뛰기](× herb_speed, 정지는 0), 상태별 섭식 배수(want 에 곱한다), 대사 계수 c_rest·c_move
     # (drain = energy_drain·(c_rest + c_move·(v/herb_speed)²)), 에너지 보상을 순변화로 볼지(#4, false = v1 획득량)
     "speed": frozenset({"thresholds", "gait_speed", "gait_eat", "c_rest", "c_move", "net_energy_reward"}),
+    # v2.2 (env_v2/world.py `_vigil_params`): 행동 vigilance 의 경계 문턱(a > threshold 면 경계), threat_recency 의
+    # 스텝당 감쇠 계수(안 보이면 r ← decay·r), 경계 중 섭식 배수(want 에 곱한다, 4.4 표는 0), 경계 중 시야 각(도,
+    # 360 = 모든 방향. 반경은 see_r 그대로, #5). 경계 중 속력 0·대사(speed 의 정지 대사)는 계수가 아니라 규칙이다.
+    # threat_flee(10-03, 1-5 Gate E2b 의 10절 #18 변형용): 포식자가 안 보일 때 조향에 더하는 위협 반대 항
+    # threat_flee·flee_weight·threat_recency·(−ThreatDir) 의 배수. 0 = 끔(1-4 구현 그대로, 규칙 5)
+    "vigilance": frozenset({"threshold", "decay", "eat_mult", "fov_deg", "threat_flee"}),
 })
 
 
