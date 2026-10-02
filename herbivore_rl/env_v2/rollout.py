@@ -9,9 +9,14 @@ v1 에 없는 것:
   로 끼운다. Windows spawn 은 클로저를 피클하지 못하므로 래퍼도 dict 로만 넘긴다.
 - **G_γ.** 스텝별 보상과 사망을 기록해 할인 리턴-투-고 평균을 낸다 (`g_gamma`).
 - **관측·행동 표본.** `record_every` 스텝마다 실제 관측과 실제로 적용된 행동을 남긴다.
+- **확률 모드** (계획서 6.1-7, #29). 학습 정책 스펙에 `"mode": "stochastic"` 을 넣으면 평균 행동 대신
+  학습 때의 가우시안 분포에서 뽑은 행동을 쓴다 (`StochasticLearned`). 잡음은 평가 시드에서 유도한 전용
+  스트림에서 뽑아 재현된다. `mode` 가 없거나 "deterministic" 이면 지금까지와 같은 결정 모드다.
+- **앞부분 제외.** `head` 를 주면 G_γ 평균에서 롤아웃 앞 `head` 스텝(리셋 과도기)도 뺀다 (6.1-4, 기본 0).
 
 정책 스펙 예:
     {"kind": "learned", "model": "ckpt/final.zip"}                 # policies.registry 스펙 그대로
+    {"kind": "learned", "model": "ckpt/final.zip", "mode": "stochastic"}   # 확률 모드
     {"policy": {"kind": "learned", "model": "..."},
      "wrap": [{"kind": "act_fix", "dims": [1], "values": [.3, .8, .4, .1]}]}
 """
@@ -95,26 +100,34 @@ def discounted_return_to_go(rew: np.ndarray, done: np.ndarray, gamma: float) -> 
     return G
 
 
-def g_gamma(rew: np.ndarray, done: np.ndarray, gamma: float, tail: int | None = None) -> float:
-    """모든 개체-스텝의 리턴-투-고 평균. 끝 `tail` 스텝(기본 ceil(5/(1-γ)))은 평균에서 뺀다.
+def g_gamma(rew: np.ndarray, done: np.ndarray, gamma: float, tail: int | None = None,
+            head: int = 0) -> float:
+    """모든 개체-스텝의 리턴-투-고 평균. 끝 `tail` 스텝(기본 ceil(5/(1-γ)))과 앞 `head` 스텝(기본 0)은
+    평균에서 뺀다. 리턴-투-고 자체는 롤아웃 전체로 계산한다 — 앞부분은 평균에서만 빠진다.
 
-    롤아웃이 tail 보다 짧으면 뺄 수 없으므로 nan 을 돌려준다.
+    `head` 는 리셋 과도기를 빼려는 것이다 (계획서 6.1-4: γ=0.998 보고 평가는 10000스텝, 앞 500스텝 제외).
+    남는 스텝이 없으면(T ≤ head + tail) nan 을 돌려준다.
     """
     if tail is None:
         tail = tail_steps(gamma)
+    head = int(head)
+    if head < 0 or tail < 0:
+        raise ValueError(f"head={head}, tail={tail} 는 0 이상이어야 한다")
     T = len(rew)
-    if T <= tail:
+    if T <= head + tail:
         return float("nan")
     G = discounted_return_to_go(rew, done, gamma)
-    return float(G[: T - tail].mean())
+    return float(G[head: T - tail].mean())
 
 
 # --------------------------------------------------------------------- #
 # 정책 래퍼 (행동·관측을 바꿔 끼우는 훅)
 # --------------------------------------------------------------------- #
 
-# 순열 래퍼의 RNG 스트림 구분값. 시드가 같아도 래퍼마다 다른 수열을 쓴다.
-_SALT = {"act_permute": 101, "obs_permute": 202}
+# 대조군·평가 모드의 RNG 스트림 구분값(시드 목록 둘째 칸). 시드가 같아도 쓰임마다 다른 수열을 쓴다.
+# v1 세계는 default_rng(seed) = [seed, 0, ...], 기능은 [seed, 2, id, part] (env_v2/features.py) 라 겹치지 않는다.
+# act_sample 은 확률 모드의 행동 잡음이다 (StochasticLearned). 번호는 바꾸지 않는다.
+_SALT = {"act_permute": 101, "obs_permute": 202, "act_sample": 303}
 
 
 def _perm_rng(kind: str, seed: int, salt: int) -> np.random.Generator:
@@ -239,13 +252,79 @@ def make_wrapper(w: dict, base, seed: int):
     raise ValueError(f"알 수 없는 래퍼: {w!r}")
 
 
+# --------------------------------------------------------------------- #
+# 행동 모드: 결정(평균 행동) / 확률(학습 분포에서 표본)
+# --------------------------------------------------------------------- #
+
+ACTION_MODES = ("deterministic", "stochastic")
+# 학습 때 SB3 가 환경에 넘기기 전에 자르는 범위 = env_v2.vec_env.ACT_SPACE (C++ 도 clamp(-3,3) → sigmoid)
+ACT_LOW, ACT_HIGH = -3.0, 3.0
+
+
+def action_mode(spec: dict) -> str:
+    """정책 스펙의 행동 모드. 래퍼 스펙이면 바탕 정책의 모드다. 없으면 결정 모드."""
+    base = spec.get("policy", spec)
+    mode = base.get("mode", "deterministic")
+    if mode not in ACTION_MODES:
+        raise ValueError(f"알 수 없는 행동 모드 {mode!r} (쓸 수 있는 값: {ACTION_MODES})")
+    return mode
+
+
+class StochasticLearned:
+    """학습 정책의 가우시안 분포에서 행동을 뽑는다 (확률 모드, 계획서 6.1-7).
+
+    a = sigmoid(clip(μ(obs) + exp(log_std)·ε, -3, 3)), ε ~ N(0, I).
+    학습 롤아웃(SB3 collect_rollouts: 분포에서 표본 → action_space 로 clip → vec_env 의 sigmoid)과 같은
+    분포다. μ 는 자르기 전 평균이다 — 결정 모드는 sigmoid(clip(μ)) 이고, 잡음을 0 으로 두면 둘이 같다.
+    ε 는 평가 시드에서 유도한 전용 스트림 [seed, 303, salt] 에서 호출마다 (N, 4) 개씩 뽑는다. 그래서 같은
+    시드·같은 호출 순서면 같은 행동이 나온다. 스트림은 v1 세계·기능·순열 대조군과 겹치지 않는다(_SALT).
+    """
+
+    def __init__(self, model, seed: int, salt: int = 0):
+        self.model = model
+        self.rng = _perm_rng("act_sample", seed, salt)
+
+    def distribution(self, obs) -> tuple[np.ndarray, np.ndarray]:
+        """관측 → (평균 μ, 표준편차 exp(log_std)), 둘 다 (N, 4). 자르기 전 값이다."""
+        import torch as th
+
+        policy = self.model.policy
+        obs_t, _ = policy.obs_to_tensor(np.asarray(obs, dtype=np.float32))
+        with th.no_grad():
+            d = policy.get_distribution(obs_t).distribution
+            return (d.mean.cpu().numpy().astype(np.float64),
+                    d.stddev.cpu().numpy().astype(np.float64))
+
+    def __call__(self, obs):
+        mu, std = self.distribution(obs)
+        eps = self.rng.standard_normal(mu.shape)
+        raw = np.clip(mu + std * eps, ACT_LOW, ACT_HIGH)
+        return 1.0 / (1.0 + np.exp(-raw))
+
+
 # 워커 안에서 학습 정책을 잡마다 다시 싣지 않는다. 결정적 추론이라 상태가 없다.
 _BASE_CACHE: dict[str, object] = {}
+# 확률 모드는 RNG 상태가 있어 정책은 잡마다 새로 만들고, 실은 모델만 돌려쓴다.
+_MODEL_CACHE: dict[str, object] = {}
 
 
-def _base_policy(spec: dict):
+def _load_model(spec: dict):
+    import env.torch_init  # noqa: F401  ← torch보다 먼저 (워커에서도)
+    from stable_baselines3 import PPO
+
+    key = json.dumps({k: spec[k] for k in ("model", "device") if k in spec}, sort_keys=True)
+    if key not in _MODEL_CACHE:
+        _MODEL_CACHE[key] = PPO.load(spec["model"], device=spec.get("device", "cpu"))
+    return _MODEL_CACHE[key]
+
+
+def _base_policy(spec: dict, seed: int = 0):
     from policies.registry import make_policy
 
+    if action_mode(spec) == "stochastic":
+        if spec.get("kind") != "learned":
+            raise ValueError(f"확률 모드는 학습 정책에만 있다: {spec!r}")
+        return StochasticLearned(_load_model(spec), seed, spec.get("salt", 0))
     if spec.get("kind") != "learned":       # random 은 RNG 상태가 있어 잡마다 새로 만든다
         return make_policy(spec)
     key = json.dumps(spec, sort_keys=True)
@@ -255,10 +334,13 @@ def _base_policy(spec: dict):
 
 
 def build_policy(spec: dict, seed: int = 0):
-    """정책 스펙(래퍼 포함) → 관측 (N,7) → 행동 (N,4) 함수. 래퍼는 목록 순서대로 바깥에 씌운다."""
+    """정책 스펙(래퍼 포함) → 관측 (N,7) → 행동 (N,4) 함수. 래퍼는 목록 순서대로 바깥에 씌운다.
+
+    `seed` 는 순열 래퍼와 확률 모드 잡음 스트림의 시드다(롤아웃에서는 평가 시드).
+    """
     if "policy" not in spec:
-        return _base_policy(spec)
-    pol = _base_policy(spec["policy"])
+        return _base_policy(spec, seed)
+    pol = _base_policy(spec["policy"], seed)
     for w in spec.get("wrap", []):
         pol = make_wrapper(w, pol, seed)
     return pol
@@ -270,8 +352,10 @@ def build_policy(spec: dict, seed: int = 0):
 
 
 def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None = None,
-            tail: int | None = None, record_every: int = 0) -> dict:
+            tail: int | None = None, record_every: int = 0, head: int = 0) -> dict:
     """시드 하나. World.stats() 10열 + G_γ + 아사율, 그리고 `_` 로 시작하는 원시 합계·표본을 돌려준다.
+
+    `head`·`tail` 은 G_γ 평균에서만 뺀다. World.stats() 의 다른 지표는 롤아웃 전체 값이다.
 
     - `_act_sum`, `_act_sq`, `_act_n`: 실제로 적용된 행동의 합·제곱합·개수 (C1 평균 행동용)
     - `_obs_sum`: 관측 합 (C4 평균 관측용)
@@ -299,7 +383,7 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
 
     s = w.stats()
     s["seed"] = int(seed)
-    s["g_gamma"] = g_gamma(rew, done, gamma, tail)
+    s["g_gamma"] = g_gamma(rew, done, gamma, tail, head)
     deaths = w._pred_deaths + w._starve_deaths
     s["starve_rate"] = w._starve_deaths / max(steps * N, 1)
     s["starve_share"] = w._starve_deaths / deaths if deaths else float("nan")
@@ -313,9 +397,9 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
 
 def _run_one(args):
     """프로세스 경계를 넘으므로 인자는 picklable 한 것만 받는다."""
-    cfg_dict, spec, seed, steps, gamma, tail, record_every = args
+    cfg_dict, spec, seed, steps, gamma, tail, record_every, head = args
     return rollout(Config(cfg_dict), build_policy(spec, seed), seed, steps,
-                   gamma=gamma, tail=tail, record_every=record_every)
+                   gamma=gamma, tail=tail, record_every=record_every, head=head)
 
 
 def default_workers(n_jobs: int, cap: int = 6) -> int:
@@ -332,7 +416,7 @@ def make_executor(workers: int) -> ProcessPoolExecutor | None:
 
 def run_specs(cfg: Config, specs: dict[str, dict], seeds, steps: int, *, workers: int | None = None,
               gamma: float | None = None, tail: int | None = None, record_every: int = 0,
-              executor: ProcessPoolExecutor | None = None) -> dict[str, list[dict]]:
+              executor: ProcessPoolExecutor | None = None, head: int = 0) -> dict[str, list[dict]]:
     """이름 → 스펙 여러 개를 시드마다 돌린다. 이름 → 시드순 행 목록.
 
     모든 (스펙, 시드) 잡을 한 풀에 넣어 코어를 고르게 쓴다. `executor` 를 주면 그 풀을 쓰고,
@@ -343,7 +427,7 @@ def run_specs(cfg: Config, specs: dict[str, dict], seeds, steps: int, *, workers
     payload, keys = [], []
     for name, spec in specs.items():
         for s in seeds:
-            payload.append((cfg.to_dict(), spec, s, steps, gamma, tail, record_every))
+            payload.append((cfg.to_dict(), spec, s, steps, gamma, tail, record_every, int(head)))
             keys.append(name)
     if executor is not None:
         results = list(executor.map(_run_one, payload))

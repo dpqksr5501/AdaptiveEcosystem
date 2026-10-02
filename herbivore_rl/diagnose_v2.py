@@ -9,17 +9,27 @@
     python diagnose_v2.py r2 --model ckpt/final.zip               # 행동 차원별 선형 R²
     python diagnose_v2.py report --name final                     # 결과 JSON → report.md
     python diagnose_v2.py report --dirs v2_0_s0 v2_0_s1 v2_0_s2 --name v2_0   # 학습 시드 IQM·CI
+    python diagnose_v2.py ablate --model ckpt/final.zip --g998                # γ=0.998 보고 평가 (6.1-4)
+    python diagnose_v2.py ablate --model ckpt/final.zip --act-mode stochastic # 확률 모드 (6.1-7)
+    python diagnose_v2.py gammasel --dirs <γ 후보별 --g998 ablate 디렉터리들>   # 4.7 γ 선택 규칙
+    python diagnose_v2.py modecmp --det <결정 모드 디렉터리들> --stoch <확률 모드 디렉터리들>  # #29
 
 정책은 `--model`(학습 zip) 또는 `--policy utility|fixed|random` 으로 준다. 산출물은
-`results/v2/diag_<이름>/` 아래 JSON + MD 다. 이름은 `--name`, 없으면 모델 파일 이름이고, 설정 version 이
-2.0 이 아니면 `_v<version>` 을 붙인다(`final` + configs/v2_0b.yaml → `diag_final_v2_0b`). 같은 모델을 다른
-설정으로 진단해도 v2.0 결과 디렉터리를 덮지 않는다.
+`results/v2/diag_<이름>/` 아래 JSON + MD 다(`--out` 으로 디렉터리를 직접 정할 수 있다). 이름은 `--name`, 없으면
+모델 파일 이름이고, 설정 version 이 2.0 이 아니면 `_v<version>` 을 붙인다(`final` + configs/v2_0b.yaml →
+`diag_final_v2_0b`). 같은 모델을 다른 설정으로 진단해도 v2.0 결과 디렉터리를 덮지 않는다. 기본 이름에는
+`--g998` 이면 `_g998`, 확률 모드면 `_stoch` 도 붙는다.
 
 판정 규칙 (6.1):
 - 판정 양은 G_γ(PPO 가 최대화하는 할인 리턴-투-고 평균)와 결과·행동 지표다. mean_return 은 보고만 한다.
 - 평가 시드 10000~10019 × 5000스텝, deterministic, 시드를 짝지은 t검정 (자유도 19, |t|>2.093).
 - 학습 시드가 여럿이면 IQM 과 층화 부트스트랩 95% CI 를 함께 낸다 (`report --dirs`).
 - 평균 행동(C1)·평균 관측(C4)은 학습 시드 0~19 × 3000스텝에서 잰다. 평가 시드를 엿보지 않는다.
+- γ = 0.998 로 보고하는 평가는 10000스텝이고 G_γ 평균에서 앞 500스텝(리셋 과도기)을 뺀다 (6.1-4). `--g998` 이
+  γ·스텝·앞 제외를 한 번에 정한다. 앞 제외만 따로 쓰려면 `--head` (기본 0 = 예전과 같은 출력).
+- 행동 모드 (6.1-7): 기본은 결정 모드(평균 행동, 언리얼 배포와 같음)다. `--act-mode stochastic` 은 학습 분포
+  (평균 + exp(log_std) 잡음 → [-3,3] 자르기 → sigmoid)에서 뽑는다. 잡음은 평가 시드에서 유도한 전용 스트림이라
+  재현된다(env_v2/rollout.py StochasticLearned). 사전 등록 판정은 결정 모드로 한다.
 """
 
 from __future__ import annotations
@@ -40,6 +50,7 @@ import numpy as np
 
 from env_v2.config import load_v2_config
 from env_v2.rollout import (
+    ACTION_MODES,
     ROW_COLUMNS,
     build_policy,
     load_gamma,
@@ -76,6 +87,10 @@ BATCH = 7
 TOP_K = 5
 # v1 환경에서 학습 전에 찾았던 최고 상수. smart_check.py 가 탐색 시작점으로 넣었다.
 V1_PRETRAIN_BEST = [0.39, 0.99, 0.92, 0.15]
+# 평가 길이 기본값 (6.1-4)
+EVAL_STEPS = 5000
+# γ = 0.998 보고 평가 (6.1-4, #27). `--g998` 이 이 세 값을 한 번에 정한다. 꼬리는 ceil(5/(1-0.998)) = 2500.
+G998 = {"gamma": 0.998, "eval_steps": 10000, "head": 500}
 
 # 결과 지표(+G_γ). 짝지은 t검정을 붙인다.
 OUTCOME = ["mean_return", "g_gamma", "survival", "repro", "predation_rate", "starve_rate"]
@@ -383,12 +398,16 @@ class Ctx:
 
     def __init__(self, args):
         self.args = args
+        apply_g998(args)
+        self.act_mode = getattr(args, "act_mode", None) or "deterministic"
         self.cfg = load_v2_config(args.config)
         self.spec = base_spec(args)
         self.name = args.name or default_name(args, self.cfg)
-        self.out = RESULTS / f"diag_{self.name}"
+        out = getattr(args, "out", None)
+        self.out = Path(out) if out else RESULTS / f"diag_{self.name}"
         # 계획서 6.1: G_γ 의 γ 는 그 정책의 학습 γ 다. 모델이 있으면 모델 γ 를 기본으로 쓴다.
         mg = model_gamma(args.model) if args.model else None
+        self.model_gamma = mg
         if args.gamma is not None:
             self.gamma = float(args.gamma)
         elif mg is not None:
@@ -396,14 +415,20 @@ class Ctx:
         else:
             self.gamma = load_gamma()
         self.tail = int(args.tail) if args.tail is not None else tail_steps(self.gamma)
+        self.head = int(args.head) if getattr(args, "head", None) is not None else 0
+        if self.head < 0:
+            raise SystemExit(f"--head {self.head} 는 0 이상이어야 한다")
         lo, hi = self.cfg.eval_seeds
         self.eval_seeds = parse_seeds(args.eval_seeds) if args.eval_seeds else list(range(lo, hi))
-        self.eval_steps = int(args.eval_steps)
+        self.eval_steps = int(args.eval_steps) if args.eval_steps is not None else EVAL_STEPS
+        if (self.eval_steps <= self.head + self.tail
+                and getattr(args, "cmd", None) not in ("report", "gammasel", "modecmp")):
+            print(f"경고: 평가 {self.eval_steps}스텝이 앞 {self.head} + 꼬리 {self.tail} 이하라 G_γ 가 nan 이 된다.")
         self.calib_seeds = parse_seeds(args.calib_seeds) if args.calib_seeds else list(CALIB_SEEDS)
         self.calib_steps = int(args.calib_steps)
         self.ex = None
         if mg is not None and abs(mg - self.gamma) > 1e-12:
-            print(f"경고: 모델 학습 γ={mg} 와 다른 γ={self.gamma} 로 G_γ 를 잰다 (--gamma 지정).")
+            print(f"경고: 모델 학습 γ={mg} 와 다른 γ={self.gamma} 로 G_γ 를 잰다 (--gamma 또는 --g998).")
         self.model_sha1 = model_fingerprint(args.model) if args.model else None
         check_disjoint("보정 시드", self.calib_seeds, self.eval_seeds, args)
 
@@ -414,7 +439,7 @@ class Ctx:
 
     def run(self, specs, seeds, steps, record_every: int = 0):
         return run_specs(self.cfg, specs, seeds, steps, workers=self.args.workers, gamma=self.gamma,
-                         tail=self.tail, record_every=record_every, executor=self.ex)
+                         tail=self.tail, record_every=record_every, executor=self.ex, head=self.head)
 
     def meta(self, **kw) -> dict:
         return {
@@ -426,11 +451,38 @@ class Ctx:
             "gamma": self.gamma, "tail": self.tail, "model_sha1": self.model_sha1,
             "config_version": (getattr(self.cfg, "v2", None) or {}).get("version"),
             "config_digest": config_digest(self.cfg),
+            # 0-7 에서 더한 키. 예전 JSON 에는 없다 — 읽을 때 없으면 head 0, 결정 모드로 본다.
+            "head": self.head, "act_mode": self.act_mode, "model_gamma": self.model_gamma,
             **kw,
         }
 
 
+def apply_g998(args) -> None:
+    """`--g998` (6.1-4 γ=0.998 보고 평가): γ 0.998, 10000스텝, 앞 500스텝 제외를 채운다.
+
+    같은 옵션을 다른 값으로 함께 주면 사전 등록 조건이 깨지므로 거부한다. 같은 값은 받는다.
+    """
+    if not getattr(args, "g998", False):
+        return
+    for key, want in G998.items():
+        got = getattr(args, key, None)
+        if got is not None and float(got) != float(want):
+            raise SystemExit(f"--g998 은 --{key.replace('_', '-')} {want} 로 고정한다 (받은 값 {got})")
+        setattr(args, key, want)
+    tail = tail_steps(G998["gamma"])
+    if getattr(args, "tail", None) is not None and int(args.tail) != tail:
+        raise SystemExit(f"--g998 은 꼬리를 ceil(5/(1-γ)) = {tail} 로 둔다 (받은 값 {args.tail})")
+
+
 def base_spec(args) -> dict | None:
+    mode = getattr(args, "act_mode", None) or "deterministic"
+    if mode not in ACTION_MODES:
+        raise SystemExit(f"--act-mode {mode!r}: {ACTION_MODES} 중 하나")
+    if mode == "stochastic":
+        if not args.model:
+            raise SystemExit("--act-mode stochastic 은 학습 정책(--model)에만 쓴다 — 상수·Utility 에는 분포가 없다")
+        # 결정 모드 스펙은 예전과 같게 둔다(키를 더하지 않는다). 그래야 예전 캐시·결과와 그대로 비교된다.
+        return {"kind": "learned", "model": str(Path(args.model).resolve()), "mode": "stochastic"}
     if args.model:
         return {"kind": "learned", "model": str(Path(args.model).resolve())}
     if args.policy == "utility":
@@ -445,10 +497,20 @@ def base_spec(args) -> dict | None:
 
 
 def default_name(args, cfg=None) -> str:
-    """모델 파일 이름(없으면 정책 종류). 설정 version 이 2.0 이 아니면 `_v2_0b` 처럼 붙인다 — v2.0 경로는 그대로다."""
+    """모델 파일 이름(없으면 정책 종류). 설정 version 이 2.0 이 아니면 `_v2_0b` 처럼 붙인다 — v2.0 경로는 그대로다.
+
+    `--g998` 이면 `_g998`, 확률 모드면 `_stoch` 를 더 붙인다. 기본 조건(결정 모드, 5000스텝)의 이름은 그대로라
+    새 조건으로 돌려도 예전 결과 디렉터리를 덮지 않는다.
+    """
     name = Path(args.model).stem if args.model else (args.policy or "report")
     ver = str((getattr(cfg, "v2", None) or {}).get("version") or "2.0")
-    return name if ver == "2.0" else f"{name}_v{ver.replace('.', '_')}"
+    if ver != "2.0":
+        name = f"{name}_v{ver.replace('.', '_')}"
+    if getattr(args, "g998", False):
+        name += "_g998"
+    if (getattr(args, "act_mode", None) or "deterministic") == "stochastic":
+        name += "_stoch"
+    return name
 
 
 def model_fingerprint(path) -> str | None:
@@ -471,13 +533,27 @@ def config_digest(cfg) -> str:
     return hashlib.sha1(json.dumps(cfg.to_dict(), sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
-def get_calib(ctx: Ctx) -> dict:
-    """보정 롤아웃(학습 시드 × 3000)을 돌리거나 캐시에서 읽는다. 요약은 calib.json 으로 남긴다."""
+def calib_cache_key(ctx: Ctx) -> tuple[Path, dict]:
+    """보정 캐시의 (파일, 메타). 메타가 같아야 캐시를 쓴다.
+
+    결정 모드는 예전과 같은 파일·메타다(기존 캐시를 그대로 쓴다). 확률 모드는 파일 이름과 메타에 모드를 넣어
+    같은 `--name` 으로 돌려도 결정 모드 캐시를 읽거나 덮지 않는다(스펙에도 "mode" 가 들어 있다).
+    """
     spec = ctx.need_spec()
     meta = {"spec": spec, "seeds": ctx.calib_seeds, "steps": ctx.calib_steps,
             "record_every": RECORD_EVERY, "config_digest": config_digest(ctx.cfg),
             "model_sha1": ctx.model_sha1}
-    path = CACHE / ctx.name / "calib.npz"
+    fname = "calib.npz"
+    if ctx.act_mode != "deterministic":
+        meta["act_mode"] = ctx.act_mode
+        fname = f"calib_{ctx.act_mode}.npz"
+    return CACHE / ctx.name / fname, meta
+
+
+def get_calib(ctx: Ctx) -> dict:
+    """보정 롤아웃(학습 시드 × 3000)을 돌리거나 캐시에서 읽는다. 요약은 calib.json 으로 남긴다."""
+    spec = ctx.need_spec()
+    path, meta = calib_cache_key(ctx)
     if path.exists() and not ctx.args.recalib:
         with np.load(path, allow_pickle=False) as z:
             if json.loads(str(z["meta"])) == meta:
@@ -584,12 +660,20 @@ def md_behavior(controls: dict) -> list[str]:
 def md_meta(meta: dict, ref: str | None = "C0") -> list[str]:
     seeds = meta.get("eval_seeds") or []
     who = f"{ref} 와 " if ref else "표에 적은 비교 대상과 "
+    head = int(meta.get("head") or 0)
+    mode = meta.get("act_mode") or "deterministic"
+    mode_s = ("deterministic" if mode == "deterministic" else
+              f"{mode} (학습 분포 표본, 잡음 스트림 [평가 시드, 303, 0])")
+    g_line = (f"- G_γ: γ={meta.get('gamma')}, 롤아웃 끝 {meta.get('tail')}스텝(ceil(5/(1-γ)))은 평균에서 뺐다"
+              if head == 0 else
+              f"- G_γ: γ={meta.get('gamma')}, 롤아웃 앞 {head}스텝(리셋 과도기)과 끝 {meta.get('tail')}스텝"
+              f"(ceil(5/(1-γ)))은 평균에서 뺐다")
     return [
         f"- 생성: {meta.get('generated')} · `{meta.get('command')}`",
         f"- 정책: `{json.dumps(meta.get('spec'), ensure_ascii=False)}`",
         f"- 평가: 시드 {seeds[0] if seeds else '?'}~{seeds[-1] if seeds else '?'} ({len(seeds)}개) × "
-        f"{meta.get('eval_steps')}스텝, deterministic",
-        f"- G_γ: γ={meta.get('gamma')}, 롤아웃 끝 {meta.get('tail')}스텝(ceil(5/(1-γ)))은 평균에서 뺐다",
+        f"{meta.get('eval_steps')}스텝, {mode_s}",
+        g_line,
         f"- 괄호는 {who}짝지은 t (자유도 {max(len(seeds) - 1, 1)}), `*` 는 |t|>{T_CRIT}",
     ]
 
@@ -773,6 +857,9 @@ def reference_rows(ctx: Ctx, name: str, stem: str = "ablate") -> list[dict] | No
             and m.get("gamma") == ctx.gamma and m.get("tail") == ctx.tail
             and m.get("config_digest") == config_digest(ctx.cfg)
             and m.get("model_sha1") == ctx.model_sha1
+            # 0-7 에서 더한 조건. 예전 JSON 은 키가 없으므로 앞 제외 0, 결정 모드로 본다.
+            and int(m.get("head") or 0) == ctx.head
+            and (m.get("act_mode") or "deterministic") == ctx.act_mode
             and (ctx.spec is None or m.get("spec") == ctx.spec or stem != "ablate"))
     rows = d.get("per_seed", {}).get(name)
     return rows if same and rows else None
@@ -1138,12 +1225,542 @@ def cmd_report(ctx: Ctx) -> int:
 
 
 # --------------------------------------------------------------------- #
+# 0-7: γ 선택 규칙 (4.7) · 행동 모드 비교 (#29)
+# 절차는 결과를 보기 전에 results/v2/g07/PREREG.md 에 적었다. 아래 계산은 그 문서를 그대로 옮긴 것이다.
+# --------------------------------------------------------------------- #
+
+ALPHA = 0.05
+# 4.7: γ 후보마다 G_0.998 과 함께 재는 결과 지표. 선택에는 쓰지 않고 보고한다(2차, Holm).
+GSEL_SECONDARY = ["survival", "starve_rate", "predation_rate"]
+# #29: 두 모드 차이를 볼 결과 지표 묶음(Holm, m=3). G_γ 는 따로 본다.
+MODE_OUTCOME = ["survival", "starve_rate", "predation_rate"]
+MODE_COLS = ["g_gamma", "mean_return", "survival", "repro", "predation_rate", "starve_rate"] + BEHAVIOR
+# gammasel 이 받는 평가 조건: --g998, 결정 모드 (6.1-4, 6.1-7)
+# 평가 시드는 계획서 6.1-4 의 10000~10019 (자유도 19 라 |t|>2.093 이 맞다).
+GSEL_REQUIRE = {"gamma": G998["gamma"], "eval_steps": G998["eval_steps"], "head": G998["head"],
+                "tail": tail_steps(G998["gamma"]), "act_mode": "deterministic",
+                "eval_seeds": list(range(10000, 10020)), "config_version": "2.0"}
+# G_γtrain 표가 받는 평가 조건(PREREG 2절 Etrain). 꼬리는 팔마다 ceil(5/(1−γ_train)) 이라 따로 본다.
+ETRAIN_REQUIRE = {"eval_steps": EVAL_STEPS, "head": 0, "act_mode": "deterministic",
+                  "eval_seeds": list(range(10000, 10020)), "config_version": "2.0"}
+
+
+def fmean(x) -> float:
+    """유한한 값만의 평균(없으면 nan). 행렬이면 전체 평균."""
+    x = np.asarray(x, dtype=np.float64).ravel()
+    x = x[np.isfinite(x)]
+    return float(x.mean()) if len(x) else float("nan")
+
+
+def col_means(M) -> np.ndarray:
+    """(R, T) → 열(평가 시드)마다 유한한 값의 평균 (T,). 학습 시드 평균을 평가 시드별로 낸다."""
+    M = np.asarray(M, dtype=np.float64)
+    return np.array([fmean(M[:, t]) for t in range(M.shape[1])])
+
+
+def _betacf(a: float, b: float, x: float) -> float:
+    """정규화 불완전 베타의 연분수(Lentz 방법). t 분포 p 값에만 쓴다."""
+    tiny = 1e-300
+    qab, qap, qam = a + b, a + 1.0, a - 1.0
+    c, d = 1.0, 1.0 - qab * x / qap
+    d = 1.0 / (d if abs(d) > tiny else tiny)
+    h = d
+    for m in range(1, 500):
+        m2 = 2 * m
+        for aa in (m * (b - m) * x / ((qam + m2) * (a + m2)),
+                   -(a + m) * (qab + m) * x / ((a + m2) * (qap + m2))):
+            d = 1.0 + aa * d
+            d = 1.0 / (d if abs(d) > tiny else tiny)
+            c = 1.0 + aa / c
+            c = c if abs(c) > tiny else tiny
+            h *= d * c
+        if abs(d * c - 1.0) < 1e-15:
+            break
+    return h
+
+
+def t_pvalue(t, df: int) -> float:
+    """스튜던트 t 의 양측 p 값 (numpy·math 만). p = I_{df/(df+t²)}(df/2, 1/2)."""
+    if t is None or not math.isfinite(float(t)) or df < 1:
+        return float("nan")
+    t = float(t)
+    x = df / (df + t * t)
+    a, b = df / 2.0, 0.5
+    if x <= 0.0:
+        return 0.0
+    if x >= 1.0:
+        return 1.0
+    lbt = math.lgamma(a + b) - math.lgamma(a) - math.lgamma(b) + a * math.log(x) + b * math.log1p(-x)
+    if x < (a + 1.0) / (a + b + 2.0):
+        return min(1.0, math.exp(lbt) * _betacf(a, b, x) / a)
+    return min(1.0, 1.0 - math.exp(lbt) * _betacf(b, a, 1.0 - x) / b)
+
+
+def holm(pvals) -> list[float]:
+    """Holm 보정 p 값(입력 순서 그대로). nan 은 nan 으로 두고 검정 수 m 에서 뺀다."""
+    p = [float(v) if v is not None else float("nan") for v in pvals]
+    idx = sorted((i for i, v in enumerate(p) if math.isfinite(v)), key=lambda i: p[i])
+    m, run = len(idx), 0.0
+    out = [float("nan")] * len(p)
+    for k, i in enumerate(idx):
+        run = max(run, min(1.0, (m - k) * p[i]))
+        out[i] = run
+    return out
+
+
+def stratified_bootstrap_diff(A, B, reps: int = 2000, alpha: float = ALPHA, seed: int = 0) -> dict:
+    """서로 다른 두 팔(학습 실행 묶음)의 평균 차 A − B 의 층화 부트스트랩 퍼센타일 CI.
+
+    A 는 (Ra 학습 시드, T 층), B 는 (Rb, T) 이고 층은 평가 시드다. 층마다 팔마다 학습 시드를 **따로**
+    복원추출한다 — 팔끼리 학습 시드 번호를 짝짓지 않는다(같은 시드 번호라도 γ 가 다르면 다른 학습이다).
+    """
+    A, B = np.asarray(A, dtype=np.float64), np.asarray(B, dtype=np.float64)
+    if A.ndim == 1:
+        A = A[:, None]
+    if B.ndim == 1:
+        B = B[:, None]
+    if A.shape[1] != B.shape[1]:
+        raise ValueError(f"층 수가 다르다: {A.shape} vs {B.shape}")
+    T = A.shape[1]
+    rng = np.random.default_rng(seed)
+    cols = np.arange(T)[None, None, :]
+    ia = rng.integers(0, A.shape[0], size=(reps, A.shape[0], T))
+    ib = rng.integers(0, B.shape[0], size=(reps, B.shape[0], T))
+    diff = A[ia, cols].mean(axis=(1, 2)) - B[ib, cols].mean(axis=(1, 2))
+    lo, hi = np.nanpercentile(diff, [100 * alpha / 2, 100 * (1 - alpha / 2)])
+    return {"point": float(A.mean() - B.mean()), "lo": float(lo), "hi": float(hi),
+            "runs": [int(A.shape[0]), int(B.shape[0])], "strata": int(T)}
+
+
+def excludes_zero(ci: dict | None) -> bool:
+    return bool(ci) and ci.get("lo") is not None and ci.get("hi") is not None and (ci["lo"] > 0 or ci["hi"] < 0)
+
+
+def load_result(d: str, stem: str = "ablate") -> dict:
+    """진단 디렉터리의 결과 JSON. 어디서 읽었는지 `_dir` 에 남긴다."""
+    p = resolve_dir(d) / f"{stem}.json"
+    data = load_json(p)
+    if not data:
+        raise SystemExit(f"{p} 가 없다")
+    data["_dir"] = str(p.parent)
+    return data
+
+
+def _model_of(d: dict) -> str | None:
+    spec = d["meta"].get("spec") or {}
+    return spec.get("policy", spec).get("model")
+
+
+def arm_gamma(d: dict) -> float:
+    """그 결과를 낸 모델의 학습 γ. 메타의 model_gamma, 없으면 모델 zip 에서 읽는다."""
+    g = d["meta"].get("model_gamma")
+    if g is None and _model_of(d):
+        g = model_gamma(_model_of(d))
+    if g is None:
+        raise SystemExit(f"{d.get('_dir')}: 모델 학습 γ 를 알 수 없다")
+    return float(g)
+
+
+def train_seed_of(d: dict) -> int | None:
+    """모델 옆 학습 메타(ckpt/v2/<run>.json)의 seed. 없으면 None."""
+    m = _model_of(d)
+    if not m:
+        return None
+    try:
+        return int(json.loads(Path(m).with_suffix(".json").read_text(encoding="utf-8"))["seed"])
+    except (OSError, KeyError, TypeError, ValueError):
+        return None
+
+
+def _cond(m: dict, key: str):
+    if key == "head":
+        return int(m.get("head") or 0)
+    if key == "act_mode":
+        return m.get("act_mode") or "deterministic"
+    return m.get(key)
+
+
+def check_same_eval(ds: list[dict], require: dict | None = None,
+                    keys=("eval_seeds", "eval_steps", "gamma", "tail", "head", "config_digest")) -> None:
+    """결과들의 평가 조건이 모두 같은지 본다(시드·스텝·γ·꼬리·앞 제외·설정). `require` 값과도 맞아야 한다."""
+    ref = ds[0]["meta"]
+    for d in ds:
+        m = d["meta"]
+        for k in keys:
+            if _cond(m, k) != _cond(ref, k):
+                raise SystemExit(f"{d.get('_dir')}: {k} 가 {ds[0].get('_dir')} 와 다르다 "
+                                 f"({_cond(m, k)!r} vs {_cond(ref, k)!r})")
+        if [r["seed"] for r in d["per_seed"]["C0"]] != list(m["eval_seeds"]):
+            raise SystemExit(f"{d.get('_dir')}: C0 행의 시드가 eval_seeds 와 다르다")
+        for k, want in (require or {}).items():
+            got = _cond(m, k)
+            ok = (got is not None and abs(float(got) - float(want)) < 1e-12) if k == "gamma" else got == want
+            if not ok:
+                raise SystemExit(f"{d.get('_dir')}: {k}={got!r} 인데 이 비교는 {want!r} 에서 잰 결과만 받는다")
+
+
+def score_matrix(ds: list[dict], col: str, ctrl: str = "C0") -> np.ndarray:
+    """(학습 시드 R, 평가 시드 T) 점수 행렬."""
+    return np.array([_floats(r.get(col) for r in d["per_seed"][ctrl]) for d in ds], dtype=np.float64)
+
+
+def group_by_gamma(ds: list[dict]) -> dict[float, list[dict]]:
+    groups: dict[float, list[dict]] = {}
+    for d in ds:
+        groups.setdefault(arm_gamma(d), []).append(d)
+    return dict(sorted(groups.items()))
+
+
+def gfmt(g: float) -> str:
+    return format(float(g), ".6g")
+
+
+def _check_unique_models(ds: list[dict]) -> None:
+    sha = [d["meta"].get("model_sha1") for d in ds]
+    dup = sorted({s for s in sha if s is not None and sha.count(s) > 1})
+    if dup:
+        raise SystemExit(f"같은 모델이 두 번 들어왔다 (model_sha1 {dup})")
+
+
+def gamma_select(ds: list[dict], reps: int = 2000, seed: int = 0,
+                 require: dict | None = GSEL_REQUIRE) -> dict:
+    """4.7 γ 선택 규칙 (사전 등록: results/v2/g07/PREREG.md).
+
+    - 점수: 결정 모드, γ=0.998, 10000스텝, 앞 500·끝 2500스텝 제외한 C0 의 G_0.998.
+    - 최고값 γ*: 팔 평균(학습 시드 R × 평가 시드 T 의 평균)이 가장 큰 γ. 같으면 작은 γ.
+    - 후보 γ 가 γ* 와 '유의하게 다르다' = 두 층이 모두 다르다고 할 때:
+      (1) 평가 시드마다 학습 시드 평균을 내 짝지은 t (자유도 T−1) |t| > 2.093, 그리고
+      (2) 층화 부트스트랩(층 = 평가 시드, 팔마다 학습 시드 복원추출) 95% CI 가 0 을 포함하지 않는다.
+    - 선택: γ* 와 유의하게 다르지 않은 γ 중 가장 작은 값. γ* 자신은 늘 자격이 있다.
+    """
+    if require:
+        check_same_eval(ds, require)
+    else:
+        check_same_eval(ds)
+    _check_unique_models(ds)
+    groups = group_by_gamma(ds)
+    if len(groups) < 2:
+        raise SystemExit(f"γ 후보가 둘 이상이어야 한다 (받은 γ: {[gfmt(g) for g in groups]})")
+    Rs = {g: len(v) for g, v in groups.items()}
+    if min(Rs.values()) < 2:
+        raise SystemExit(f"학습 시드 하나로는 결론 내지 않는다 (6.1-4). 팔마다 2개 이상: {Rs}")
+    if len(set(Rs.values())) != 1:
+        raise SystemExit(f"팔마다 학습 시드 수가 같아야 한다: {Rs}")
+    # PREREG 1절: 세 팔 모두 같은 학습 시드(0, 1). 학습 메타로 시드를 알 수 있으면 팔마다 같은 묶음인지 본다
+    # (예: 한 팔만 s1 대신 s2 를 넣는 것을 막는다).
+    tseeds = {g: sorted(train_seed_of(d) for d in v) if all(train_seed_of(d) is not None for d in v) else None
+              for g, v in groups.items()}
+    known = {g: s for g, s in tseeds.items() if s is not None}
+    if len({tuple(s) for s in known.values()}) > 1:
+        raise SystemExit(f"팔마다 학습 시드 묶음이 같아야 한다: {known}")
+    T = len(ds[0]["meta"]["eval_seeds"])
+    G = {g: score_matrix(v, "g_gamma") for g, v in groups.items()}
+    for g, M in G.items():
+        if not np.isfinite(M).all():
+            raise SystemExit(f"γ {gfmt(g)} 팔의 G 에 nan 이 있다 — 평가가 앞 제외 + 꼬리보다 짧다")
+    means = {g: float(M.mean()) for g, M in G.items()}
+    best = sorted(groups, key=lambda g: (-means[g], g))[0]
+
+    arms = []
+    for g, v in groups.items():
+        row = {
+            "gamma": g, "R": len(v), "dirs": [d.get("_dir") for d in v],
+            "train_seeds": [train_seed_of(d) for d in v],
+            "model_sha1": [d["meta"].get("model_sha1") for d in v],
+            "mean": {c: fmean(score_matrix(v, c)) for c in ["g_gamma"] + GSEL_SECONDARY + ["mean_return"]},
+            "per_run_mean": {c: [fmean(x) for x in score_matrix(v, c)] for c in ["g_gamma"] + GSEL_SECONDARY},
+            "g_iqm": iqm(G[g]),
+            "g_ci": stratified_bootstrap_ci(G[g], stat=fmean, reps=reps, seed=seed),
+            "is_best": g == best,
+        }
+        if g == best:
+            row["test"] = {"diff": 0.0, "t": None, "sig_t": False, "ci": None, "ci_excludes_0": False,
+                           "sig": False, "eligible": True, "layers_disagree": False}
+        else:
+            t = paired(G[g].mean(0), G[best].mean(0))
+            ci = stratified_bootstrap_diff(G[g], G[best], reps=reps, seed=seed)
+            excl = excludes_zero(ci)
+            sig = bool(t["sig"] and excl)
+            row["test"] = {"diff": t["diff"], "sd": t["sd"], "t": t["t"], "sig_t": t["sig"], "ci": ci,
+                           "ci_excludes_0": excl, "sig": sig, "eligible": not sig,
+                           "layers_disagree": bool(t["sig"]) != excl}
+        if all("C1" in d["per_seed"] for d in v):          # 참고: 같은 평가에서 C0 − C1 (상태 의존 이득)
+            D = G[g] - score_matrix(v, "g_gamma", "C1")
+            tc = paired(G[g].mean(0), score_matrix(v, "g_gamma", "C1").mean(0))
+            row["c0_minus_c1"] = {"diff": tc["diff"], "t": tc["t"], "sig_t": tc["sig"],
+                                  "ci": stratified_bootstrap_ci(D, stat=fmean, reps=reps, seed=seed)}
+        arms.append(row)
+    selected = min(r["gamma"] for r in arms if r["test"]["eligible"])
+
+    # 2차: 선택 γ 와 다른 팔의 결과 지표 차 (짝지은 t, 비교마다 Holm m=3). 선택에는 쓰지 않는다.
+    sel = groups[selected]
+    secondary = []
+    for g, v in groups.items():
+        if g == selected:
+            continue
+        tests = {c: paired(col_means(score_matrix(v, c)), col_means(score_matrix(sel, c))) for c in GSEL_SECONDARY}
+        ps = [t_pvalue(tests[c]["t"], T - 1) for c in GSEL_SECONDARY]
+        ph = holm(ps)
+        secondary.append({"gamma": g, "vs": selected, **{c: {**tests[c], "p": p, "p_holm": q,
+                                                             "sig_holm": bool(math.isfinite(q) and q < ALPHA)}
+                                                          for c, p, q in zip(GSEL_SECONDARY, ps, ph)}})
+    return {"rule": "4.7 (PREREG.md): 최고값 γ* 와 유의하게 다르지 않은(짝지은 t |t|>2.093 이고 층화 부트스트랩 "
+                    "95% CI 가 0 을 빼는 경우만 '다르다') 가장 작은 γ",
+            "condition": {k: _cond(ds[0]["meta"], k) for k in ("gamma", "eval_steps", "head", "tail", "act_mode")},
+            "eval_seeds": ds[0]["meta"]["eval_seeds"], "config_digest": ds[0]["meta"].get("config_digest"),
+            "t_crit": T_CRIT, "df": T - 1, "reps": reps, "boot_seed": seed,
+            "arms": arms, "best": best, "selected": selected, "secondary": secondary}
+
+
+def train_gamma_table(ds: list[dict]) -> list[dict]:
+    """각 팔의 학습 γ 로 잰 G_γtrain (표준 평가). 팔끼리 비교하지 않는다 — γ 가 달라 크기가 다르다(6.1-1).
+
+    받는 결과는 PREREG 의 Etrain 뿐이다: 결정 모드, 평가 시드 10000~10019 × 5000스텝, 앞 제외 0,
+    끝 ceil(5/(1−γ_train)), v2.0 세계.
+    """
+    check_same_eval(ds, ETRAIN_REQUIRE, keys=("eval_seeds", "eval_steps", "head", "config_digest"))
+    out = []
+    for g, v in group_by_gamma(ds).items():
+        for d in v:
+            if abs(float(d["meta"]["gamma"]) - g) > 1e-12:
+                raise SystemExit(f"{d.get('_dir')}: G 의 γ {d['meta']['gamma']} 가 모델 학습 γ {g} 와 다르다")
+            if _cond(d["meta"], "tail") != tail_steps(g):
+                raise SystemExit(f"{d.get('_dir')}: 꼬리 {_cond(d['meta'], 'tail')} 가 ceil(5/(1−γ)) = "
+                                 f"{tail_steps(g)} 가 아니다")
+        M = score_matrix(v, "g_gamma")
+        row = {"gamma": g, "R": len(v), "tail": v[0]["meta"].get("tail"), "train_seeds": [train_seed_of(d) for d in v],
+               "g_mean": fmean(M), "g_per_run": [fmean(x) for x in M], "g_iqm": iqm(M)}
+        if all("C1" in d["per_seed"] for d in v):
+            C1 = score_matrix(v, "g_gamma", "C1")
+            tc = paired(M.mean(0), C1.mean(0))
+            row["c0_minus_c1"] = {"diff": tc["diff"], "t": tc["t"], "sig_t": tc["sig"],
+                                  "ci": stratified_bootstrap_ci(M - C1, stat=fmean, seed=0)}
+        out.append(row)
+    return out
+
+
+def mode_compare(det: list[dict], stoch: list[dict], reps: int = 2000, seed: int = 0) -> dict:
+    """#29 결정 ↔ 확률 모드 (사전 등록: results/v2/g07/PREREG.md). 같은 모델·같은 평가 시드끼리 짝짓는다.
+
+    γ 팔마다 차이 D = 확률 − 결정 (학습 시드 R × 평가 시드 T). 짝지은 t 는 평가 시드마다 학습 시드 평균을
+    낸 T 쌍으로, CI 는 D 를 층화 부트스트랩(층 = 평가 시드, 학습 시드 복원추출, 평균)으로 낸다.
+    - G_γ: |t| > 2.093 이고 CI 가 0 을 빼면 유의.
+    - 결과 지표 3개(수명·아사율·피식률): Holm 보정 p < 0.05 이고 CI 가 0 을 빼면 유의.
+    - 그 밖(리턴·번식·행동 지표)은 차이와 t·CI 만 적는다(우열이 아니다).
+    `trigger` = G_γ 또는 결과 지표 하나라도 유의 (계획서 6.1-7 / #29 의 '차이가 유의하면').
+    학습 시드가 하나뿐인 팔은 판정하지 않는다(verdict·trigger = None, 6.1-4).
+
+    평가 시드·스텝·앞 제외·설정은 모든 결과가 같아야 한다. G 의 γ·꼬리는 E998 이면 모두 0.998·2500 이지만
+    Etrain 이면 팔마다 그 팔의 학습 γ 라 다르다. 그래서 γ·꼬리는 짝(같은 모델의 두 모드)과 팔 안에서 같은지
+    보고, 팔끼리 다르면 모든 결과가 자기 학습 γ 로 잰 것(Etrain)인지 본다 — E998 과 Etrain 을 섞지 않는다.
+    """
+    for d in det:
+        if _cond(d["meta"], "act_mode") != "deterministic":
+            raise SystemExit(f"{d.get('_dir')}: --det 에 결정 모드가 아닌 결과가 있다")
+    for d in stoch:
+        if _cond(d["meta"], "act_mode") != "stochastic":
+            raise SystemExit(f"{d.get('_dir')}: --stoch 에 확률 모드가 아닌 결과가 있다")
+    check_same_eval(det + stoch, keys=("eval_seeds", "eval_steps", "head", "config_digest"))
+    if len({float(d["meta"]["gamma"]) for d in det + stoch}) > 1:
+        for d in det + stoch:
+            if abs(float(d["meta"]["gamma"]) - arm_gamma(d)) > 1e-12:
+                raise SystemExit(f"{d.get('_dir')}: G 의 γ 가 결과마다 다른데 이 결과는 학습 γ {arm_gamma(d)} 가 "
+                                 f"아니라 γ {d['meta']['gamma']} 로 쟀다 (E998 과 Etrain 을 섞지 않는다)")
+    _check_unique_models(det)
+    _check_unique_models(stoch)
+    by_sha = {d["meta"].get("model_sha1"): d for d in det}
+    pairs = []
+    for s in stoch:
+        k = s["meta"].get("model_sha1")
+        if k is None or k not in by_sha:
+            raise SystemExit(f"{s.get('_dir')}: 같은 모델(model_sha1 {k})의 결정 모드 결과가 없다")
+        pairs.append((by_sha.pop(k), s))
+    if by_sha:
+        raise SystemExit(f"확률 모드 짝이 없는 결정 모드 결과: {[d.get('_dir') for d in by_sha.values()]}")
+    T = len(det[0]["meta"]["eval_seeds"])
+    groups: dict[float, list] = {}
+    for dd, ss in pairs:
+        check_same_eval([dd, ss])                       # 짝: γ·꼬리까지 모두 같다
+        groups.setdefault(arm_gamma(dd), []).append((dd, ss))
+    out = []
+    for g, prs in sorted(groups.items()):
+        dl, sl = [p[0] for p in prs], [p[1] for p in prs]
+        check_same_eval(dl + sl)                        # 팔 안: γ·꼬리까지 모두 같다
+        cols = {}
+        for c in MODE_COLS:
+            Dm, Sm = score_matrix(dl, c), score_matrix(sl, c)
+            t = paired(col_means(Sm), col_means(Dm))
+            ci = stratified_bootstrap_ci(Sm - Dm, stat=fmean, reps=reps, seed=seed)
+            cols[c] = {"det": fmean(Dm), "stoch": fmean(Sm), **t, "p": t_pvalue(t["t"], T - 1), "ci": ci,
+                       "ci_excludes_0": excludes_zero(ci)}
+        enough = len(prs) >= 2
+        g_row = cols["g_gamma"]
+        g_row["verdict"] = bool(g_row["sig"] and g_row["ci_excludes_0"]) if enough else None
+        for c, q in zip(MODE_OUTCOME, holm([cols[c]["p"] for c in MODE_OUTCOME])):
+            cols[c]["p_holm"] = q
+            cols[c]["verdict"] = (bool(math.isfinite(q) and q < ALPHA and cols[c]["ci_excludes_0"])
+                                  if enough else None)
+        trigger = (bool(g_row["verdict"] or any(cols[c]["verdict"] for c in MODE_OUTCOME))
+                   if enough else None)
+        out.append({"gamma": g, "R": len(prs), "train_seeds": [train_seed_of(d) for d in dl],
+                    "g_eval_gamma": float(dl[0]["meta"]["gamma"]), "tail": dl[0]["meta"].get("tail"),
+                    "dirs_det": [d.get("_dir") for d in dl], "dirs_stoch": [d.get("_dir") for d in sl],
+                    "cols": cols, "trigger": trigger})
+    m = det[0]["meta"]
+    cond = {k: _cond(m, k) for k in ("gamma", "eval_steps", "head", "tail")}
+    for k in ("gamma", "tail"):                          # Etrain: 팔마다 다르다 → None (팔별 값은 groups 에)
+        if len({_cond(d["meta"], k) for d in det + stoch}) > 1:
+            cond[k] = None
+    return {"condition": cond,
+            "eval_seeds": m["eval_seeds"], "t_crit": T_CRIT, "df": T - 1, "reps": reps, "boot_seed": seed,
+            "groups": out}
+
+
+def _ci_s(col: str, ci: dict | None) -> str:
+    if not ci:
+        return "—"
+    return f"[{fmt(col, ci.get('lo'))}, {fmt(col, ci.get('hi'))}]"
+
+
+def _t_s(t) -> str:
+    return "—" if t is None or not math.isfinite(float(t)) else f"{float(t):+.2f}"
+
+
+def _n(v, spec: str) -> str:
+    """숫자 하나. None·nan 은 —."""
+    return "—" if v is None or not math.isfinite(float(v)) else format(float(v), spec)
+
+
+def md_gammasel(d: dict, train: list[dict] | None = None) -> list[str]:
+    c = d["condition"]
+    L = ["# 0-7 γ 선택 (계획서 4.7, 사전 등록 results/v2/g07/PREREG.md)", "",
+         f"- 평가: 시드 {d['eval_seeds'][0]}~{d['eval_seeds'][-1]} ({len(d['eval_seeds'])}개) × {c['eval_steps']}스텝, "
+         f"{c['act_mode']}, G 는 γ={c['gamma']} · 앞 {c['head']}스텝과 끝 {c['tail']}스텝 제외",
+         f"- 규칙: {d['rule']}",
+         f"- 짝지은 t: 평가 시드마다 학습 시드 평균, 자유도 {d['df']}, |t|>{d['t_crit']}. "
+         f"CI: 층화 부트스트랩 {d['reps']}회(시드 {d['boot_seed']}), 팔마다 학습 시드를 따로 복원추출",
+         "", "## 판정표 (G_0.998, 결정 모드)", "",
+         "| γ | 학습 시드 | G_0.998 평균 [95% CI] | 학습 시드별 | IQM | Δ vs 최고 | t | Δ 95% CI | 유의 | 자격 | 선택 |",
+         "|---|---|---|---|---|---|---|---|---|---|---|"]
+    for a in d["arms"]:
+        t = a["test"]
+        seeds = ",".join("?" if s is None else str(s) for s in a["train_seeds"])
+        per = ", ".join(_n(x, ".3f") for x in a["per_run_mean"]["g_gamma"])
+        sig = "—" if a["is_best"] else ("유의" + (" (층 불일치)" if t["layers_disagree"] else "") if t["sig"] else
+                                        "유의 아님" + (" (층 불일치)" if t["layers_disagree"] else ""))
+        L.append(f"| {gfmt(a['gamma'])}{' (최고)' if a['is_best'] else ''} | {seeds} | {_n(a['mean']['g_gamma'], '.4f')} {_ci_s('g_gamma', a['g_ci'])} | "
+                 f"{per} | {_n(a['g_iqm'], '.4f')} | {_n(t['diff'], '+.4f')} | {_t_s(t['t'])} | {_ci_s('g_gamma', t['ci'])} | "
+                 f"{sig} | {'O' if t['eligible'] else 'X'} | {'**선택**' if a['gamma'] == d['selected'] else ''} |")
+    L += ["", f"- 최고값 γ* = {gfmt(d['best'])}, 선택 γ = **{gfmt(d['selected'])}**",
+          "- '층 불일치'는 t 와 CI 중 하나만 다르다고 한 경우다. 규칙상 '유의하게 다르지 않다'로 친다.", "",
+          "## 결과 지표 (같은 평가, 선택에는 쓰지 않음)", "",
+          "| γ | " + " | ".join(COL_LABEL.get(x, x) for x in GSEL_SECONDARY + ["mean_return"]) + " |",
+          "|---" * (len(GSEL_SECONDARY) + 2) + "|"]
+    for a in d["arms"]:
+        L.append(f"| {gfmt(a['gamma'])} | " + " | ".join(fmt(x, a["mean"][x]) for x in GSEL_SECONDARY + ["mean_return"])
+                 + " |")
+    if d["secondary"]:
+        L += ["", f"### 선택 γ {gfmt(d['selected'])} 와의 차 (짝지은 t, 비교마다 Holm m={len(GSEL_SECONDARY)})", "",
+              "| γ | " + " | ".join(f"{COL_LABEL.get(x, x)} Δ (t, p_Holm)" for x in GSEL_SECONDARY) + " |",
+              "|---" * (len(GSEL_SECONDARY) + 1) + "|"]
+        for s in d["secondary"]:
+            L.append(f"| {gfmt(s['gamma'])} | " + " | ".join(
+                f"{fmt(x, s[x]['diff'])} ({_t_s(s[x]['t'])}, {_n(s[x]['p_holm'], '.3f')}{'*' if s[x]['sig_holm'] else ''})"
+                for x in GSEL_SECONDARY) + " |")
+    if all("c0_minus_c1" in a for a in d["arms"]):
+        L += ["", "## 참고: 같은 평가에서 C0 − C1 (G_0.998)", "", "| γ | Δ | t | 95% CI |", "|---|---|---|---|"]
+        for a in d["arms"]:
+            x = a["c0_minus_c1"]
+            L.append(f"| {gfmt(a['gamma'])} | {_n(x['diff'], '+.4f')} | {_t_s(x['t'])}{'*' if x['sig_t'] else ''} | "
+                     f"{_ci_s('g_gamma', x['ci'])} |")
+    if train:
+        L += ["", "## 참고: 학습 γ 로 잰 G_γtrain (표준 평가, 팔끼리 비교하지 않음)", "",
+              "| γ_train | 꼬리 | G_γtrain 평균 | 학습 시드별 | C0 − C1 (t) |", "|---|---|---|---|---|"]
+        for r in train:
+            cc = r.get("c0_minus_c1")
+            L.append(f"| {gfmt(r['gamma'])} | {r['tail']} | {_n(r['g_mean'], '.4f')} | "
+                     + ", ".join(_n(x, ".3f") for x in r["g_per_run"]) + " | "
+                     + (f"{_n(cc['diff'], '+.4f')} ({_t_s(cc['t'])}{'*' if cc['sig_t'] else ''})" if cc else "—") + " |")
+    return L
+
+
+def md_modecmp(d: dict) -> list[str]:
+    c = d["condition"]
+    g_s = (f"G 는 γ={c['gamma']} · 앞 {c['head']}·끝 {c['tail']}스텝 제외" if c.get("gamma") is not None else
+           f"G 는 팔마다 그 팔의 학습 γ(γ_train) · 앞 {c['head']}스텝과 끝 ceil(5/(1−γ))스텝 제외(팔별 값은 각 절 제목)")
+    L = ["# 0-7 결정 ↔ 확률 모드 (계획서 6.1-7, #29, 사전 등록 results/v2/g07/PREREG.md)", "",
+         f"- 평가: 시드 {d['eval_seeds'][0]}~{d['eval_seeds'][-1]} × {c['eval_steps']}스텝, {g_s}",
+         f"- Δ = 확률 − 결정 (같은 모델·같은 평가 시드). t 는 평가 시드마다 학습 시드 평균(자유도 {d['df']}), CI 는 "
+         f"층화 부트스트랩 {d['reps']}회",
+         f"- 유의: G_γ 는 |t|>{d['t_crit']} 이고 CI 가 0 을 뺀다. 결과 지표 3개는 Holm p<0.05 이고 CI 가 0 을 뺀다. "
+         "나머지는 기술만 한다"]
+    if d["df"] != 19:
+        L.append(f"- 주의: 자유도 {d['df']}. 2.093 은 자유도 19(평가 시드 20개)의 값이다 — 사전 등록 평가가 아니다")
+    L.append("")
+    for gr in d["groups"]:
+        sig = "결론 없음 (학습 시드 1개)" if gr["trigger"] is None else ("**있음**" if gr["trigger"] else "없음")
+        ev = (f", G 의 γ {gfmt(gr['g_eval_gamma'])} · 끝 {gr['tail']}스텝" if "g_eval_gamma" in gr else "")
+        L += [f"## γ_train {gfmt(gr['gamma'])} (학습 시드 {gr['train_seeds']}{ev}) — #29 신호: {sig}", "",
+              "| 지표 | 결정 | 확률 | Δ | t | 95% CI | 판정 |", "|---|---|---|---|---|---|---|"]
+        for col, r in gr["cols"].items():
+            if "verdict" in r and r["verdict"] is None:
+                v = "결론 없음"
+            elif "verdict" in r:
+                v = "유의" if r["verdict"] else "유의 아님"
+                if "p_holm" in r:
+                    v += f" (p_Holm {_n(r['p_holm'], '.3f')})"
+            else:
+                v = "기술"
+            L.append(f"| {COL_LABEL.get(col, col)} | {fmt(col, r['det'])} | {fmt(col, r['stoch'])} | "
+                     f"{fmt(col, r['diff'])} | {_t_s(r['t'])} | {_ci_s(col, r['ci'])} | {v} |")
+        L.append("")
+    return L
+
+
+def _out_required(ctx: Ctx) -> None:
+    if not ctx.args.out and not ctx.args.name:
+        raise SystemExit(f"{ctx.args.cmd}: 출력 위치를 --out 이나 --name 으로 준다")
+
+
+def cmd_gammasel(ctx: Ctx) -> int:
+    a = ctx.args
+    _out_required(ctx)
+    ds = [load_result(x) for x in a.dirs]
+    data = gamma_select(ds, reps=a.reps, seed=a.boot_seed)
+    train = train_gamma_table([load_result(x) for x in a.train_dirs]) if a.train_dirs else None
+    if train is not None:
+        data["train_gamma"] = train
+    data["generated"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    data["command"] = "python diagnose_v2.py " + " ".join(sys.argv[1:])
+    save(ctx, a.tag or "gammasel", data, md_gammasel(clean(data), clean(train) if train else None))
+    print(f"  최고 γ* {gfmt(data['best'])} → 선택 γ {gfmt(data['selected'])}")
+    return 0
+
+
+def cmd_modecmp(ctx: Ctx) -> int:
+    a = ctx.args
+    _out_required(ctx)
+    data = mode_compare([load_result(x) for x in a.det], [load_result(x) for x in a.stoch],
+                        reps=a.reps, seed=a.boot_seed)
+    data["generated"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+    data["command"] = "python diagnose_v2.py " + " ".join(sys.argv[1:])
+    save(ctx, a.tag or "modecmp", data, md_modecmp(clean(data)))
+    for gr in data["groups"]:
+        sig = "결론 없음" if gr["trigger"] is None else ("있음" if gr["trigger"] else "없음")
+        print(f"  γ {gfmt(gr['gamma'])}: #29 신호 {sig}")
+    return 0
+
+
+# --------------------------------------------------------------------- #
 # CLI
 # --------------------------------------------------------------------- #
 
 
 COMMANDS = {"ablate": cmd_ablate, "constsearch": cmd_constsearch, "permute": cmd_permute,
-            "curves": cmd_curves, "r2": cmd_r2, "report": cmd_report}
+            "curves": cmd_curves, "r2": cmd_r2, "report": cmd_report,
+            "gammasel": cmd_gammasel, "modecmp": cmd_modecmp}
+# 롤아웃을 돌리지 않아 워커 풀이 필요 없는 명령
+NO_POOL = ("report", "curves", "r2", "gammasel", "modecmp")
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -1153,13 +1770,23 @@ def build_parser() -> argparse.ArgumentParser:
     g.add_argument("--policy", choices=["utility", "fixed", "random"], default=None)
     g.add_argument("--action", type=float, nargs=ACT_DIM, default=None, help="--policy fixed 의 행동 4개")
     g.add_argument("--name", default=None, help="results/v2/diag_<이름>. 기본은 모델 파일 이름")
+    g.add_argument("--out", default=None, help="출력 디렉터리를 직접 정한다. 기본 results/v2/diag_<이름>")
     g.add_argument("--config", default=None, help="기본 configs/v2.yaml")
     g.add_argument("--workers", type=int, default=6, help="워커 프로세스 수 (기본 6)")
     g.add_argument("--gamma", type=float, default=None,
                    help="G_γ 의 γ. 기본은 모델의 학습 γ, 모델이 없으면 configs/ppo_best.yaml")
     g.add_argument("--tail", type=int, default=None, help="평균에서 뺄 끝 스텝. 기본 ceil(5/(1-γ))")
     g.add_argument("--eval-seeds", nargs="+", default=None, help="기본 10000:10020")
-    g.add_argument("--eval-steps", type=int, default=5000)
+    g.add_argument("--eval-steps", type=int, default=None, help=f"기본 {EVAL_STEPS} (--g998 이면 {G998['eval_steps']})")
+    g.add_argument("--head", type=int, default=None,
+                   help="G_γ 평균에서 뺄 앞 스텝(리셋 과도기, 6.1-4). 기본 0 = 예전과 같은 출력 "
+                        f"(--g998 이면 {G998['head']})")
+    g.add_argument("--g998", action="store_true",
+                   help=f"γ=0.998 보고 평가(6.1-4): --gamma {G998['gamma']} --eval-steps {G998['eval_steps']} "
+                        f"--head {G998['head']} 를 한 번에 정한다. 기본 이름에 _g998")
+    g.add_argument("--act-mode", choices=list(ACTION_MODES), default="deterministic",
+                   help="행동 모드(6.1-7). deterministic = 평균 행동(기본, 언리얼과 같음), stochastic = 학습 "
+                        "분포에서 표본(평가 시드에서 유도한 잡음, 재현됨). 기본 이름에 _stoch")
     g.add_argument("--calib-seeds", nargs="+", default=None, help="기본 0:20")
     g.add_argument("--calib-steps", type=int, default=CALIB_STEPS)
     g.add_argument("--recalib", action="store_true", help="보정 캐시를 무시하고 다시 잰다")
@@ -1201,6 +1828,21 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("report", parents=[common], help="결과 JSON → report.md")
     s.add_argument("--dirs", nargs="+", default=None, help="여러 학습 시드 진단 디렉터리 → IQM·CI")
     s.add_argument("--reps", type=int, default=2000, help="부트스트랩 반복 수")
+
+    s = sub.add_parser("gammasel", parents=[common],
+                       help="4.7 γ 선택 규칙 (사전 등록 results/v2/g07/PREREG.md)")
+    s.add_argument("--dirs", nargs="+", required=True,
+                   help="γ 후보 × 학습 시드의 --g998 결정 모드 ablate 디렉터리. 모델 학습 γ 로 팔을 나눈다")
+    s.add_argument("--train-dirs", nargs="+", default=None,
+                   help="참고: 같은 모델들의 학습 γ 표준 평가 ablate 디렉터리 (G_γtrain 표)")
+    s.add_argument("--reps", type=int, default=2000, help="부트스트랩 반복 수")
+    s.add_argument("--boot-seed", type=int, default=0, help="부트스트랩 난수 시드")
+
+    s = sub.add_parser("modecmp", parents=[common], help="#29 결정 ↔ 확률 모드 비교")
+    s.add_argument("--det", nargs="+", required=True, help="결정 모드 ablate 디렉터리")
+    s.add_argument("--stoch", nargs="+", required=True, help="같은 모델·같은 평가 조건의 확률 모드 디렉터리")
+    s.add_argument("--reps", type=int, default=2000, help="부트스트랩 반복 수")
+    s.add_argument("--boot-seed", type=int, default=0, help="부트스트랩 난수 시드")
     return p
 
 
@@ -1215,9 +1857,11 @@ def main(argv=None) -> int:
         if bad and not args.seg_bins:
             raise SystemExit(f"--enqueue 는 값 {ACT_DIM}개씩이다: {bad}")
     ctx = Ctx(args)
-    print(f"[{args.cmd}] {ctx.name} → {ctx.out}  (γ={ctx.gamma}, 꼬리 {ctx.tail}스텝, 워커 {args.workers})",
-          flush=True)
-    ctx.ex = make_executor(args.workers) if args.cmd not in ("report", "curves", "r2") else None
+    head = f", 앞 {ctx.head}스텝" if ctx.head else ""
+    mode = f", {ctx.act_mode}" if ctx.act_mode != "deterministic" else ""
+    print(f"[{args.cmd}] {ctx.name} → {ctx.out}  (γ={ctx.gamma}, 꼬리 {ctx.tail}스텝{head}{mode}, "
+          f"워커 {args.workers})", flush=True)
+    ctx.ex = make_executor(args.workers) if args.cmd not in NO_POOL else None
     try:
         return COMMANDS[args.cmd](ctx)
     finally:

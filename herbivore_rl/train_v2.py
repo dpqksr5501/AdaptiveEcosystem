@@ -1,6 +1,7 @@
 """V2 PPO 학습 (계획서 4.7).
 
     python train_v2.py --steps 20000000 --seed 0 --run-name v2_0_s0 --save-at 10000000
+    python train_v2.py --steps 20000000 --seed 0 --gamma 0.998 --run-name g07_g998_s0   # γ 비교(0-7)
 
 v1 train.py 와 다른 점:
 - 독립 세계 K 개를 묶은 MultiWorldVecEnv 로 학습한다 (env_v2/vec_env.py). 세계는 주기적으로 바뀐다
@@ -9,6 +10,8 @@ v1 train.py 와 다른 점:
 - 행동 차원별 평균·표준편차·log_std, 선형 R², 월드 상태를 기록하고, 실행 명령과 설정을 함께 저장한다
 
 PPO 구조(7-64-64-4, tanh)와 기본 하이퍼파라미터는 v1 의 `train.PPO_KWARGS` / `make_model` 을 그대로 쓴다.
+`--gamma` 는 할인율 γ 하나만 바꾼다(계획서 4.7 γ 비교). 나머지 튜닝값은 `--ppo-config` 그대로이고, 실제로 쓴
+γ 와 그 출처는 메타 JSON 의 `gamma`·`gamma_source` 에 남는다.
 """
 
 from __future__ import annotations
@@ -101,11 +104,39 @@ class BehaviorLogCallbackV2(BaseCallback):
                 print(f"  중간 저장 {at:,} → {path.name} (실제 {self.num_timesteps:,})", flush=True)
 
 
-def default_run_name(cfg, seed: int, steps: int) -> str:
+def gamma_tag(gamma: float) -> str:
+    """γ → 이름 조각. 0.998 → g998, 0.995 → g995, 0.9916661555611042 → g991666 (유효숫자 6자리)."""
+    return "g" + format(float(gamma), ".6g").replace("0.", "", 1).replace(".", "p")
+
+
+def default_run_name(cfg, seed: int, steps: int, gamma: float | None = None) -> str:
     """--run-name 이 없을 때의 실행 이름. 설정 version 을 넣어 버전마다 체크포인트·TensorBoard 이름이 갈린다
-    (v2.0 → v2_0_s0_20m 그대로, v2.0b → v2_0b_s0_20m). version 은 선택 키라 없으면 2.0 으로 본다."""
+    (v2.0 → v2_0_s0_20m 그대로, v2.0b → v2_0b_s0_20m). version 은 선택 키라 없으면 2.0 으로 본다.
+    `--gamma` 를 주면 그 값이 튜닝값과 같아도 γ 조각을 넣는다(v2_0_g998_s0_20m) — γ 를 바꾼 실행이 기본
+    이름의 체크포인트를 덮지 않는다."""
     ver = str(cfg.v2.get("version") or "2.0").replace(".", "_")
-    return f"v{ver}_s{seed}_{steps // 1_000_000}m"
+    g = f"_{gamma_tag(gamma)}" if gamma is not None else ""
+    return f"v{ver}{g}_s{seed}_{steps // 1_000_000}m"
+
+
+def resolve_gamma(tuned: dict, gamma: float | None) -> tuple[dict, float, str]:
+    """튜닝값에 `--gamma` 를 덮는다. (새 튜닝값, 쓸 γ, 출처). 다른 키는 건드리지 않는다.
+
+    출처는 "cli"(--gamma), "ppo_config"(--ppo-config 의 params.gamma), "PPO_KWARGS"(튜닝 파일이 없을 때
+    v1 기본값) 중 하나다.
+    """
+    from train import PPO_KWARGS
+
+    out = dict(tuned)
+    if gamma is not None:
+        g = float(gamma)
+        if not 0.0 < g < 1.0:
+            raise SystemExit(f"--gamma {gamma} 는 0 과 1 사이여야 한다")
+        out["gamma"] = g
+        return out, g, "cli"
+    if "gamma" in out:
+        return out, float(out["gamma"]), "ppo_config"
+    return out, float(PPO_KWARGS["gamma"]), "PPO_KWARGS"
 
 
 def main(argv=None) -> int:
@@ -116,6 +147,9 @@ def main(argv=None) -> int:
     p.add_argument("--out", default=None, help="기본 ckpt/v2/<run-name>.zip")
     p.add_argument("--config", default=None, help="기본 configs/v2.yaml")
     p.add_argument("--ppo-config", default=str(ROOT / "configs" / "ppo_best.yaml"))
+    p.add_argument("--gamma", type=float, default=None,
+                   help="할인율 γ 만 덮는다(0-7 γ 비교). 기본은 --ppo-config 의 params.gamma. "
+                        "다른 하이퍼파라미터는 그대로다")
     p.add_argument("--init", default=None, help="가중치를 옮겨 올 체크포인트. 기본은 무작위 초기화")
     p.add_argument("--num-worlds", type=int, default=None)
     p.add_argument("--reset-interval", type=int, default=None)
@@ -131,12 +165,17 @@ def main(argv=None) -> int:
     rollout_world_steps = int(cfg.v2["train"].get("rollout_world_steps", 256))
     n_steps = max(1, rollout_world_steps // venv.K)
 
-    tuned = load_tuned(args.ppo_config)
-    run = args.run_name or default_run_name(cfg, args.seed, args.steps)
+    tuned, gamma, gamma_source = resolve_gamma(load_tuned(args.ppo_config), args.gamma)
+    if gamma_source == "cli":
+        print(f"γ = {gamma} (--gamma, 다른 튜닝값은 그대로)")
+    run = args.run_name or default_run_name(cfg, args.seed, args.steps, args.gamma)
     out = Path(args.out) if args.out else CKPT / f"{run}.zip"
     out.parent.mkdir(parents=True, exist_ok=True)
 
     model = make_model(venv, tensorboard_log=args.tb, n_steps=n_steps, seed=args.seed, **tuned)
+    # γ 는 GAE·truncation 부트스트랩이 쓰는 롤아웃 버퍼에도 들어가야 한다 (SB3 _setup_model)
+    if float(model.gamma) != gamma or float(model.rollout_buffer.gamma) != gamma:
+        raise RuntimeError(f"모델 γ {model.gamma} (버퍼 {model.rollout_buffer.gamma}) 가 지정한 γ {gamma} 와 다르다")
     if args.init:
         from stable_baselines3 import PPO
         donor = PPO.load(args.init, device="cpu")
@@ -157,12 +196,18 @@ def main(argv=None) -> int:
 
     meta = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "command": " ".join([Path(sys.executable).name] + sys.argv),
+        # main(argv) 로 부르면(테스트) sys.argv 가 아니라 받은 인자를 적는다
+        "command": " ".join([Path(sys.executable).name, Path(__file__).name]
+                            + (sys.argv[1:] if argv is None else [str(a) for a in argv])),
         "python": platform.python_version(),
         "steps": args.steps,
         "actual_timesteps": int(model.num_timesteps),
         "seed": args.seed,
         "elapsed_min": round(elapsed / 60, 2),
+        # 실제 학습 γ(모델에 들어간 값). 출처: cli(--gamma) / ppo_config / PPO_KWARGS
+        "gamma": float(model.gamma),
+        "gamma_source": gamma_source,
+        "ppo_config": args.ppo_config,
         "ppo": {k: (float(v) if isinstance(v, (int, float)) else str(v)) for k, v in {
             "n_steps": n_steps, "batch_size": model.batch_size, "n_epochs": model.n_epochs,
             "gamma": model.gamma, "gae_lambda": model.gae_lambda, "ent_coef": model.ent_coef,
