@@ -5,13 +5,19 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
 이 사본에 **스위치로** 붙인다. 스위치를 모두 끈 이 World 는 같은 시드에서 v1 World 와
 결과가 완전히 같아야 한다 — `tests/test_env_v2.py` 가 고정한다.
 
-기능 스위치는 `configs/v2.yaml` 의 `features:` 블록이다(`env_v2/features.py`). 새 기능이 뽑는
+기능 스위치는 버전 설정(`configs/v2*.yaml`)의 `features:` 블록이다(`env_v2/features.py`). 새 기능이 뽑는
 난수는 기능마다 따로 둔 스트림 `self.feature_rng(name)` 에서만 뽑는다. v1 난수 호출 순서가 바뀌면
 같은 시드의 세계가 조용히 달라지고, 기능끼리 스트림을 나눠 쓰면 기능 하나를 켜고 끌 때 다른 기능의
 세계가 바뀌기 때문이다 (계획서 4.4, 4.8).
+
+구현한 기능 (꺼진 기능의 코드 경로는 v1 과 같다):
+- food_v (v2.0b, 계획서 4.9.1): 셀마다 식생 용량 V. 섭식이 V 를 깎고 재생은 cap0 대신 V 를 향한다.
+  V 는 반감기 h 로 cap0 에 천천히 돌아온다. 스텝 순서는 `_food_v_step`, 통계는 `food_stats`·`food_cells`.
 """
 
 from __future__ import annotations
+
+import math
 
 import numpy as np
 
@@ -30,6 +36,41 @@ OBS_DIM = 7
 
 ACT_DIM = 4  # forage, cohesion, flee_dist, cover (§3.2)
 
+# food_stats 의 "하한에 붙은 셀": V/cap0 ≤ floor + 이 값. 휴식 회복이 훼손 뒤에 오므로 하한까지 깎인 셀도
+# 스텝 끝에는 ρ·(1 − floor)만큼 위에 있다(반감기 300 에서 0.0021). 통계 정의이고 동역학 계수가 아니다.
+FOOD_V_FLOOR_TOL = 0.01
+
+
+def _food_v_params(p: dict) -> dict:
+    """food_v 계수(yaml 블록, 키는 `features.PARAM_KEYS`)의 값 범위를 검사한다. 기본값은 없다.
+
+    alpha ≥ 0, 0 ≤ floor ≤ 1, 반감기는 하나 이상의 양수(스텝), floor ≤ init_frac[0] ≤ init_frac[1] ≤ 1.
+    alpha = 0 이면 훼손이 없어 V 가 cap0 로 돌아가기만 한다.
+    """
+    def num(key, x):
+        if isinstance(x, bool) or not isinstance(x, (int, float, np.integer, np.floating)) \
+                or not math.isfinite(x):
+            raise ValueError(f"features.food_v.{key} 는 유한한 숫자여야 한다. 받은 값: {x!r}")
+        return float(x)
+
+    alpha, floor = num("alpha", p["alpha"]), num("floor", p["floor"])
+    hl, fr = p["recovery_half_lives"], p["init_frac"]
+    if not isinstance(hl, (list, tuple)) or not hl:
+        raise ValueError(f"features.food_v.recovery_half_lives 는 반감기(스텝) 목록이어야 한다. 받은 값: {hl!r}")
+    if not isinstance(fr, (list, tuple)) or len(fr) != 2:
+        raise ValueError(f"features.food_v.init_frac 는 [하, 상] 두 값이어야 한다. 받은 값: {fr!r}")
+    half_lives = tuple(num("recovery_half_lives", h) for h in hl)
+    lo, hi = (num("init_frac", x) for x in fr)
+    if alpha < 0.0:
+        raise ValueError(f"features.food_v.alpha 는 0 이상이어야 한다. 받은 값: {alpha}")
+    if not 0.0 <= floor <= 1.0:
+        raise ValueError(f"features.food_v.floor 는 [0, 1] 의 cap0 비율이어야 한다. 받은 값: {floor}")
+    if min(half_lives) <= 0.0:
+        raise ValueError(f"features.food_v.recovery_half_lives 는 양수여야 한다. 받은 값: {list(half_lives)}")
+    if not floor <= lo <= hi <= 1.0:
+        raise ValueError(f"features.food_v.init_frac 는 floor({floor}) ≤ 하 ≤ 상 ≤ 1 이어야 한다. 받은 값: {[lo, hi]}")
+    return dict(alpha=alpha, floor=floor, half_lives=half_lives, init_frac=(lo, hi))
+
 
 class World:
     """N=128 슬롯 고정, 죽으면 그 슬롯에 리스폰 (§4.3).
@@ -47,6 +88,8 @@ class World:
         self.meta = np.random.default_rng(meta_seed)
         self.N = int(cfg.N)
         self.features: Features = features_of(cfg)
+        # 켠 기능의 계수(yaml 원본). 꺼진 기능은 None 이고 그 기능의 코드 경로를 타지 않는다.
+        self._fv = _food_v_params(self.features.params("food_v")) if self.features.enabled("food_v") else None
         self.reset()
 
     # ------------------------------------------------------------------ #
@@ -71,6 +114,8 @@ class World:
         self.food_regen_mult = float(r.uniform(*rd["food_regen_mult"]))
 
         self._build_world()
+        if self._fv is not None:
+            self._food_v_reset()
         self._reset_stats()
         self._g = self._geometry()
         self._obs = self._obs_from(self._g)
@@ -153,6 +198,33 @@ class World:
         # --- 지역 피식 EMA (§3.1) ---
         self.pred_ema = 0.0
         self.t = 0
+
+    def _left_half(self) -> np.ndarray:
+        """셀 중심이 맵 왼쪽 절반(x < size/2)인 셀 (gw,gw). v2.3 지역 전까지 지역 대용이다 (계획서 0-6)."""
+        return self._cell_x < 0.5 * self.size
+
+    def _food_v_reset(self) -> None:
+        """v2.0b 세계 생성 (계획서 4.9.1). v1 세계(`_build_world`)를 다 만든 뒤 부른다.
+
+        food_v 스트림 part 0 에서 난수 정확히 3개를 이 순서로 뽑는다. 목록 길이와 상관없이 소비가 같다
+        (`integers(1)` 은 난수를 소비하지 않으므로 고르기에 쓰지 않는다).
+          1) u ~ U[0,1) → 회복 반감기 h = recovery_half_lives[floor(u·n)], ρ = 1 − 2^(−1/h)
+          2) 왼쪽 절반 V 초기 비율 ~ U[init_frac]   3) 오른쪽 절반 ~ U[init_frac]
+        V = cap0 × (그 셀이 속한 절반의 비율), F = min(v1 초기값 cap0, V). cap0 = 0 셀은 F = V = 0 이다.
+        """
+        fv, g = self._fv, self.feature_rng("food_v", 0)
+        hl = fv["half_lives"]
+        h = hl[min(int(g.random() * len(hl)), len(hl) - 1)]
+        frac = g.uniform(fv["init_frac"][0], fv["init_frac"][1], 2)       # [왼쪽, 오른쪽]
+        self.food_v_half_life = h
+        self.food_v_rho = 1.0 - 2.0 ** (-1.0 / h)
+        self.food_v_init = (float(frac[0]), float(frac[1]))
+        self.food_v = self.food_cap * np.where(self._left_half(), frac[0], frac[1])
+        self._fv_floor = fv["floor"] * self.food_cap
+        np.minimum(self.food, self.food_v, out=self.food)
+        # 기록 (food_stats·food_cells): reset 뒤 셀별 누적 섭취, 마지막으로 뜯긴 스텝(self.t, 없으면 −1)
+        self._fv_eaten = np.zeros_like(self.food_cap)
+        self._fv_last_eat = np.full(self.food_cap.shape, -1, dtype=np.int64)
 
     # ------------------------------------------------------------------ #
     # 기하 (관측과 조향이 공유한다)
@@ -391,8 +463,11 @@ class World:
 
         # 7) 먹이 재생 (§4.2). 셀 용량(패치 구조)을 향해 자란다.
         #    은신처 셀은 이미 0.3배가 반영된 regen_field.
-        self.food += self.regen_field * (self.food_cap - self.food)
-        np.clip(self.food, 0.0, self.food_cap, out=self.food)
+        if self._fv is None:
+            self.food += self.regen_field * (self.food_cap - self.food)
+            np.clip(self.food, 0.0, self.food_cap, out=self.food)
+        else:
+            self._food_v_step()        # v2.0b: 훼손 → 재생(목표·상한 V) → 휴식 회복
 
         self.t += 1
         self._accumulate(a, rew, repro, caught, starved, done)
@@ -488,7 +563,61 @@ class World:
         taken = np.minimum(demand, self.food.reshape(-1))
         frac = np.divide(taken, demand, out=np.zeros(cells), where=demand > 0)
         self.food -= taken.reshape(self.gw, self.gw)
+        if self._fv is not None:
+            self._fv_taken = taken          # v2.0b 훼손이 셀별 섭취량을 쓴다 (_food_v_step)
         return want * frac[flat]
+
+    def _food_v_step(self) -> None:
+        """v2.0b 먹이 2층의 한 스텝 (계획서 4.9.1). `step` 7) 에서 v1 재생 대신 부른다.
+
+        셀마다 F = self.food, V = self.food_v(식생 용량), cap0 = self.food_cap, r = self.regen_field
+        (은신처 0.3배 포함, v1 그대로). 한 스텝의 순서 — C++ 로 옮길 때 이 순서를 지킨다:
+
+          3)  섭식 (`_eat`): F ← F − taken. taken ≤ F 라 F ≥ 0.
+              4)~6) 번식·사망·피식 EMA 는 F·V 를 읽지 않으므로 훼손을 3) 직후에 해도 결과가 같다.
+          7a) 훼손 (taken > 0 인 셀만): V ← V − α·taken·(1 − F/V). F 는 섭취 직후 값, V 는 훼손 전 값.
+              taken > 0 이면 섭취 전 F ≥ taken > 0 이고 V ≥ 섭취 전 F 라 V > 0 이다 — 0 나눗셈이 없다.
+          7b) 하한: V ← max(V, floor·cap0).
+          7c) F ← min(F, V). α ≤ 1 이면 수학적으로는 바뀌지 않지만 반올림·α > 1 대비로 둔다.
+          7d) 재생 (모든 셀): F ← F + r·(V − F), F ← min(F, V). v1 식(목표·상한 cap0)의 cap0 를 V 로
+              바꾼 것이다. v1 은 clip(F, 0, cap0) 이지만 여기서는 F ≥ 0, V ≥ F 라 r·(V − F) ≥ 0 이고
+              하한 0 이 저절로 지켜져 상한만 자른다(결과가 같다).
+          7e) 휴식 회복 (모든 셀): V ← V + ρ·(cap0 − V), ρ = 1 − 2^(−1/h). 섭식이 없으면 cap0 − V 가
+              h 스텝마다 절반이 된다. V 가 cap0 쪽으로만 움직이므로 F ≤ V ≤ cap0, V ≥ floor·cap0 가 유지된다.
+
+        taken 은 고정 스텝 하나(1스텝 = 0.133s) 동안 그 셀에 들어간 모든 개체 섭취의 합이고(`_eat` 의 셀별 합),
+        7a~7e 는 모든 섭식이 끝난 뒤 셀마다 한 번 계산한다. (1 − F/V) 가 비선형이라 개체마다·프레임마다 V 를
+        바로 깎으면 같은 섭취량에서도 훼손이 작아진다(막 자란 셀을 8번에 나눠 먹으면 약 −45%). C++ 는
+        ConsumeFood 를 셀별 버퍼에 누적했다가 같은 고정 간격으로 한 번 갱신한다. r·ρ 는 스텝당 값이라 간격 dt 를
+        바꾸면 r' = 1 − (1 − r)^(dt/0.133s), ρ' = 1 − 2^(−dt/(h·0.133s)) 로 다시 환산하고, α 는 분할에 불변이
+        아니므로 다시 보정한다.
+
+        스텝 끝 불변식: 0 ≤ F ≤ V ≤ cap0, floor·cap0 ≤ V. cap0 = 0 셀은 F = V = 0 이다.
+        taken > 0 가드는 최적화이면서 필수다. taken = 0 이고 V > 0 인 셀에서 7a~7c 는 항등이지만, cap0 = 0 셀
+        (V = F = 0)을 조밀하게 계산하면 0·(1 − 0/0) = NaN 이 되어 F 와 관측 0 의 food_blur 누적합으로 퍼진다.
+        그래서 먹힌 셀(많아야 N 개)만 계산한다(C++ 도 `if (Taken > 0)`). 가드를 단 조밀 계산과 비트 단위로 같다.
+        α = 0 이고 V = cap0 로 시작하면 V 가 비트 단위로 cap0 에 머물러 v2.0(= v1) 세계와 같다
+        (둘 다 tests/test_food_v2.py).
+        """
+        fv = self._fv
+        F, V = self.food.reshape(-1), self.food_v.reshape(-1)     # 연속 배열의 뷰 — 제자리 갱신
+        taken = self._fv_taken
+        k = (taken > 0.0).nonzero()[0]      # taken ≥ 0. float 배열의 flatnonzero 보다 몇 배 빠르다
+        if k.size:
+            tk, f, v = taken[k], F[k], V[k]
+            v = np.maximum(v - fv["alpha"] * tk * (1.0 - f / v), self._fv_floor.reshape(-1)[k])
+            V[k] = v
+            F[k] = np.minimum(f, v)
+            self._fv_eaten.reshape(-1)[k] += tk
+            self._fv_last_eat.reshape(-1)[k] = self.t + 1     # 이 스텝이 끝난 뒤의 self.t
+        # 7d·7e 는 임시 배열 하나를 같이 쓴다 (r·(V − F) 와 (V − F)·r 은 같은 값이다)
+        d = np.subtract(self.food_v, self.food)
+        d *= self.regen_field
+        self.food += d
+        np.minimum(self.food, self.food_v, out=self.food)
+        np.subtract(self.food_cap, self.food_v, out=d)
+        d *= self.food_v_rho
+        self.food_v += d
 
     def _respawn(self, dead: np.ndarray) -> None:
         """§4.3 — 죽은 슬롯에 랜덤 위치로 리스폰. 개체군 동역학은 넣지 않는다."""
@@ -580,4 +709,64 @@ class World:
                 np.array([self._f_full]),
                 self._n_full,
             ),
+        )
+
+    def food_stats(self) -> dict:
+        """v2.0b 먹이 통계 — 지금 시점의 값 (v1 `stats()` 10열 밖, 계획서 4.8). Gate F·영상·기록 학습이 쓴다.
+
+        지역은 v2.3 전까지 맵 좌우 절반(`_left_half`)으로 대신한다. 모두 cap0 > 0 셀만 센다.
+        접미사 없음 = 맵 전체, `_left`·`_right` = 절반.
+        - v_ratio, f_ratio: 지역 비율 ΣV/Σcap0, ΣF/Σcap0 (v2.3 지역 장부의 V_r·F_r 정의, 4.4)
+        - v_cell_mean: 셀별 V/cap0 의 평균 (Gate F (a) "평균 V/cap0")
+        - floor_frac: V/cap0 ≤ floor + FOOD_V_FLOOR_TOL 인 셀 비율 (Gate F (a) "하한에 붙은 셀")
+        - eaten: reset 뒤 누적 섭취량의 합
+        - half_life, rho, init_left, init_right: 이 세계에서 뽑은 회복 반감기와 V 초기 비율
+        food_v 를 끈 세계는 V = cap0 로 본다(v_ratio 1). 하한·기록·뽑은 값이 없는 열은 nan 이다.
+        절반에 cap0 > 0 셀이 없으면 그 절반의 열은 nan 이다.
+        """
+        on = self._fv is not None
+        nan = float("nan")
+        cap0, F = self.food_cap, self.food
+        V = self.food_v if on else cap0
+        pos = cap0 > 0.0
+        left = self._left_half()
+        out = dict(
+            half_life=float(self.food_v_half_life) if on else nan,
+            rho=float(self.food_v_rho) if on else nan,
+            init_left=self.food_v_init[0] if on else nan,
+            init_right=self.food_v_init[1] if on else nan,
+        )
+        tol = self._fv["floor"] + FOOD_V_FLOOR_TOL if on else nan
+        for sfx, m in (("", pos), ("_left", pos & left), ("_right", pos & ~left)):
+            c = cap0[m]
+            s = float(c.sum())
+            if s <= 0.0:
+                for key in ("v_ratio", "f_ratio", "v_cell_mean", "floor_frac", "eaten"):
+                    out[key + sfx] = nan
+                continue
+            vr = V[m] / c
+            out["v_ratio" + sfx] = float(V[m].sum()) / s
+            out["f_ratio" + sfx] = float(F[m].sum()) / s
+            out["v_cell_mean" + sfx] = float(vr.mean())
+            out["floor_frac" + sfx] = float((vr <= tol).mean()) if on else nan
+            out["eaten" + sfx] = float(self._fv_eaten[m].sum()) if on else nan
+        return out
+
+    def food_cells(self) -> dict:
+        """셀별 먹이 상태의 사본, 모두 (gw, gw) 이고 [iy, ix] 순서. Gate F (b) V 자기상관, (c) 흔적 진폭
+        (누적 섭취 상위 10% 셀 vs 같은 cap0 구간 하위 50%, 섭식이 멈춘 뒤 경과), 영상의 짓밟힌 땅이 쓴다.
+
+        - food_cap(cap0), food(F), food_v(V), left(왼쪽 절반), cover(은신처 셀)
+        - eaten: reset 뒤 누적 섭취량, last_eat: 마지막으로 뜯긴 스텝의 self.t (뜯긴 적 없으면 −1)
+        food_v 를 끈 세계는 food_v = cap0 사본이고 eaten·last_eat 는 None 이다.
+        """
+        on = self._fv is not None
+        return dict(
+            food_cap=self.food_cap.copy(),
+            food=self.food.copy(),
+            food_v=(self.food_v if on else self.food_cap).copy(),
+            left=self._left_half(),
+            cover=self.cover_cell.copy(),
+            eaten=self._fv_eaten.copy() if on else None,
+            last_eat=self._fv_last_eat.copy() if on else None,
         )

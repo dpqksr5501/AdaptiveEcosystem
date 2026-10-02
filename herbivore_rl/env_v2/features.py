@@ -1,14 +1,14 @@
 """V2 기능 스위치와 기능별 난수 스트림 (계획서 4.8, 0-1b).
 
-`configs/v2.yaml` 의 `features:` 아래에 기능마다 블록 하나를 둔다.
+버전 설정(`configs/v2.yaml`, `configs/v2_0b.yaml` ...)의 `features:` 아래에 기능마다 블록 하나를 둔다.
 
     features:
-      food_v: {enabled: true, alpha: 0.5, rho: 1.0e-3}
+      food_v: {enabled: true, alpha: 0.5, floor: 0.1, recovery_half_lives: [300, 700], init_frac: [0.3, 1.0]}
       daynight: {enabled: false}
 
 - 블록이 없거나 `enabled` 가 없는 기능은 꺼진 것이다. 모두 끄면 env_v2 World 는 v1 과 같은 세계다.
 - 블록의 나머지 키는 그 기능의 계수다(`Features.params`). **켠 기능의 계수는 yaml 에 모두 적는다.**
-  구현 코드는 기본값을 두지 않고 `p["rho"]` 처럼 읽는다. 그래야 보정한 값이 설정 파일, 진단 캐시 키
+  구현 코드는 기본값을 두지 않고 `p["alpha"]` 처럼 읽는다. 그래야 보정한 값이 설정 파일, 진단 캐시 키
   (`diagnose_v2.py` config_digest), 학습 메타 JSON 에 그대로 남는다.
 - 읽을 때 바로 실패하는 것(켰다고 적었는데 아무 일도 안 일어나는 실험을 막는다):
   등록부(`FEATURE_IDS`)에 없는 이름, 블록이 아닌 값, bool 이 아닌 `enabled`, 문자열이 아닌 키,
@@ -71,11 +71,15 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
-IMPLEMENTED: frozenset[str] = frozenset()
+IMPLEMENTED: frozenset[str] = frozenset({"food_v"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
-# 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 예: "food_v": frozenset({"alpha", "rho", "floor"})
-PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({})
+# 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
+PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
+    # v2.0b (env_v2/world.py `_food_v_params`): 훼손 계수 α, 하한(cap0 비율), 휴식 회복 반감기 목록(스텝,
+    # reset 마다 하나), V 초기값 cap0 비율 범위 [하, 상](reset 마다 좌우 절반에 하나씩)
+    "food_v": frozenset({"alpha", "floor", "recovery_half_lives", "init_frac"}),
+})
 
 
 @dataclass(frozen=True)

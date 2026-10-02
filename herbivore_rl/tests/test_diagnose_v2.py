@@ -276,3 +276,44 @@ def test_model_fingerprint_changes_with_content(tmp_path):
     p.write_bytes(b"b")
     assert model_fingerprint(p) != first
     assert model_fingerprint(tmp_path / "none.zip") is None
+
+
+# --------------------------------------------------------------------- #
+# 설정이 다른 결과를 섞지 않는다 (v2.0 ↔ v2.0b)
+# --------------------------------------------------------------------- #
+
+
+def test_seg_base_c2_must_come_from_same_config(tmp_path):
+    """C2-seg 바탕 상수: 같은 디렉터리 constsearch.json 이 다른 설정(v2.0)에서 잰 C2 면 쓰지 않는다."""
+    import json
+    from types import SimpleNamespace
+    from env.config import ROOT
+    v20, v20b = load_v2_config(), load_v2_config(ROOT / "configs" / "v2_0b.yaml")
+    with pytest.raises(SystemExit):                                       # 파일이 없다
+        dg.c2_base_action(SimpleNamespace(out=tmp_path, cfg=v20))
+    (tmp_path / "constsearch.json").write_text(json.dumps(
+        {"meta": {"config_digest": dg.config_digest(v20), "config_version": "2.0"}, "best": [0.4, 0.8, 0.1, 0.0]}),
+        encoding="utf-8")
+    assert dg.c2_base_action(SimpleNamespace(out=tmp_path, cfg=v20)) == [0.4, 0.8, 0.1, 0.0]
+    with pytest.raises(SystemExit, match="다른 설정"):
+        dg.c2_base_action(SimpleNamespace(out=tmp_path, cfg=v20b))
+
+
+def test_default_output_name_follows_config_version():
+    """--name 없이 v2.0b 로 진단해도 v2.0 결과 디렉터리(diag_final 등)를 덮지 않는다. v2.0 경로는 그대로다."""
+    import argparse
+    from env.config import ROOT
+    v20b = load_v2_config(ROOT / "configs" / "v2_0b.yaml")
+    model = argparse.Namespace(model="ckpt/final.zip", policy=None)
+    assert dg.default_name(model, load_v2_config()) == "final"
+    assert dg.default_name(model, v20b) == "final_v2_0b"
+    assert dg.default_name(argparse.Namespace(model=None, policy="utility"), v20b) == "utility_v2_0b"
+
+
+def test_aggregate_refuses_mixed_configs():
+    rows = [{"seed": s, **{c: float(s) for c in dg.OUTCOME}} for s in range(3)]
+    a = {"meta": {"config_digest": "aaa"}, "per_seed": {"C0": rows}}
+    b = {"meta": {"config_digest": "bbb"}, "per_seed": {"C0": rows}}
+    dg.aggregate([a, dict(a)], reps=10)
+    with pytest.raises(SystemExit, match="설정"):
+        dg.aggregate([a, b], reps=10)

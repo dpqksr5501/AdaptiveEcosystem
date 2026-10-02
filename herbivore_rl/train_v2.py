@@ -101,11 +101,18 @@ class BehaviorLogCallbackV2(BaseCallback):
                 print(f"  중간 저장 {at:,} → {path.name} (실제 {self.num_timesteps:,})", flush=True)
 
 
+def default_run_name(cfg, seed: int, steps: int) -> str:
+    """--run-name 이 없을 때의 실행 이름. 설정 version 을 넣어 버전마다 체크포인트·TensorBoard 이름이 갈린다
+    (v2.0 → v2_0_s0_20m 그대로, v2.0b → v2_0b_s0_20m). version 은 선택 키라 없으면 2.0 으로 본다."""
+    ver = str(cfg.v2.get("version") or "2.0").replace(".", "_")
+    return f"v{ver}_s{seed}_{steps // 1_000_000}m"
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="V2 PPO 학습 (다중 세계)")
     p.add_argument("--steps", type=int, default=20_000_000)
     p.add_argument("--seed", type=int, default=0, help="PPO 시드이자 세계 선택 시드(meta_seed)")
-    p.add_argument("--run-name", default=None)
+    p.add_argument("--run-name", default=None, help="기본 v<설정 version>_s<seed>_<M>m (예: v2_0b_s0_20m)")
     p.add_argument("--out", default=None, help="기본 ckpt/v2/<run-name>.zip")
     p.add_argument("--config", default=None, help="기본 configs/v2.yaml")
     p.add_argument("--ppo-config", default=str(ROOT / "configs" / "ppo_best.yaml"))
@@ -125,7 +132,7 @@ def main(argv=None) -> int:
     n_steps = max(1, rollout_world_steps // venv.K)
 
     tuned = load_tuned(args.ppo_config)
-    run = args.run_name or f"v2_0_s{args.seed}_{args.steps // 1_000_000}m"
+    run = args.run_name or default_run_name(cfg, args.seed, args.steps)
     out = Path(args.out) if args.out else CKPT / f"{run}.zip"
     out.parent.mkdir(parents=True, exist_ok=True)
 

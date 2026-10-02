@@ -12,9 +12,10 @@ from types import MappingProxyType
 
 import numpy as np
 import pytest
+import yaml
 
 import env_v2.features as F
-from env.config import load_config
+from env.config import ROOT, load_config
 from env.world import World as WorldV1
 from env_v2.config import load_v2_config
 from env_v2.rollout import _perm_rng
@@ -35,11 +36,23 @@ def blank_registry(monkeypatch):
     monkeypatch.setattr(F, "PARAM_KEYS", MappingProxyType({}))
 
 
-def _yaml_block(cfg, name):
-    """configs/v2.yaml 의 그 기능 블록. 구현한 기능은 계수를 모두 적어야 한다(계수는 yaml 이 유일한 원본)."""
-    block = dict(cfg.v2["features"].get(name) or {})
+# 버전 설정. 파일 이름 순이 버전 순이다(v2.yaml = v2.0 이 '.' < '_' 로 맨 앞, 그다음 v2_0b.yaml ...).
+V2_CONFIGS = sorted((ROOT / "configs").glob("v2*.yaml"))
+
+
+def _yaml_block(name):
+    """그 기능을 처음 켜는 버전 설정(configs/v2*.yaml 중 블록이 켜진 첫 파일)의 블록.
+
+    v2.yaml(v2.0)은 기능을 모두 끈 기록이라 구현한 기능의 계수는 그 기능의 버전 설정에 있다. 구현한 기능은
+    켜는 버전 설정이 있어야 하고 계수를 모두 적어야 한다(계수는 yaml 이 유일한 원본)."""
+    for path in V2_CONFIGS:
+        block = dict(load_v2_config(path).v2["features"].get(name) or {})
+        if block.get("enabled"):
+            break
+    else:
+        pytest.fail(f"configs/v2*.yaml 중 features.{name} 을 켜는 버전 설정이 없다")
     missing = sorted(set(F.PARAM_KEYS.get(name, ())) - set(block))
-    assert not missing, f"configs/v2.yaml 의 features.{name} 에 계수 {missing} 를 적는다"
+    assert not missing, f"{path.name} 의 features.{name} 에 계수 {missing} 를 적는다"
     return block
 
 
@@ -175,12 +188,12 @@ def test_multiworld_worlds_have_their_own_streams(cfg2):
 def test_toggling_one_feature_keeps_other_streams(cfg2, monkeypatch, seed):
     """food_v 를 켜고 끄고, 켠 쪽이 food_v 스트림을 마구 써도 daynight·weather 난수열은 같다.
 
-    기능 코드 없이 스트림 기반(번호·part·캐시)이 서로 격리되는지 본다. 세계(pos, stats)는 비교하지
-    않는다 — 기능을 실제로 구현하면 켠 쪽 세계가 바뀌는 게 정상이다. 기능 코드가 남의 스트림을 쓰지
-    않는지는 test_implemented_features_use_only_their_own_streams 가 본다."""
-    monkeypatch.setattr(F, "IMPLEMENTED", frozenset({"food_v", "daynight", "weather"}))
-    monkeypatch.setattr(F, "PARAM_KEYS", MappingProxyType({}))      # 계수 없는 가짜 기능으로 본다
-    on = WorldV2(_with_features(cfg2, {"food_v": {"enabled": True},
+    스트림 기반(번호·part·캐시)이 서로 격리되는지 본다. food_v 는 실제 구현(v2.0b 계수)으로 켜고,
+    daynight·weather 는 계수 없는 가짜 기능으로 켠다. 세계(pos, stats)는 비교하지 않는다 — 켠 쪽 세계가
+    바뀌는 게 정상이다. 기능 코드가 남의 스트림을 쓰지 않는지는
+    test_implemented_features_use_only_their_own_streams 가 본다."""
+    monkeypatch.setattr(F, "IMPLEMENTED", F.IMPLEMENTED | {"food_v", "daynight", "weather"})
+    on = WorldV2(_with_features(cfg2, {"food_v": dict(_yaml_block("food_v"), enabled=True),
                                        "daynight": {"enabled": True},
                                        "weather": {"enabled": True}}), seeds=[seed])
     off = WorldV2(_with_features(cfg2, {"daynight": {"enabled": True},
@@ -212,10 +225,10 @@ def test_implemented_features_use_only_their_own_streams(cfg2, active):
     """규칙 1: 기능 코드는 자기 스트림에서만 뽑는다. 구현한 기능마다 그 기능만 켜고 돌린 뒤
     만들어진 스트림이 그 기능 것뿐인지 본다. 모두 끄면 기능 스트림이 하나도 생기지 않는다.
 
-    켜는 계수는 configs/v2.yaml 의 블록에서 가져온다(계수는 yaml 이 유일한 원본, features.py)."""
+    켜는 계수는 그 기능의 버전 설정(configs/v2*.yaml) 블록에서 가져온다(계수는 yaml 이 유일한 원본)."""
     blocks = {}
     for name in active:
-        blocks[name] = dict(_yaml_block(cfg2, name), enabled=True)
+        blocks[name] = dict(_yaml_block(name), enabled=True)
     w = WorldV2(_with_features(cfg2, blocks), seeds=[636])
     assert w.features.active == active
     p = make_policy({"kind": "random", "seed": 1})
@@ -226,7 +239,7 @@ def test_implemented_features_use_only_their_own_streams(cfg2, active):
 
 def test_disabled_blocks_keep_v1_world(cfg2):
     """등록된 기능 블록을 모두 적되 끈 설정은 v1 과 비트 단위로 같다 (계수가 적혀 있어도)."""
-    blocks = {name: (dict(_yaml_block(cfg2, name), enabled=False) if name in F.IMPLEMENTED
+    blocks = {name: (dict(_yaml_block(name), enabled=False) if name in F.IMPLEMENTED
                      else {"enabled": False, "some_coeff": 0.5})
               for name in F.FEATURE_IDS}
     cfg = _with_features(cfg2, blocks)
@@ -373,6 +386,23 @@ def test_load_v2_config_validates_features(tmp_path, blank_registry):
 def test_load_v2_config_rejects_unknown_top_keys(tmp_path, text, match):
     with pytest.raises(ValueError, match=match):
         load_v2_config(_write_v2(tmp_path, text))
+
+
+def test_v2_yaml_example_block_is_valid(cfg2):
+    """configs/v2.yaml 머리 주석의 `예) food_v: {...}` 를 그대로 옮겨 쓰면 읽히고 World 가 받는다.
+
+    예전 예시 `{enabled: true, alpha: 0.5, rho: 1.0e-3}` 는 PARAM_KEYS 에 rho 가 없고 floor 등이 빠져 실패했다.
+    """
+    text = (ROOT / "configs" / "v2.yaml").read_text(encoding="utf-8")
+    lines = [ln.lstrip("# ")[len("예) "):] for ln in text.splitlines() if ln.lstrip("# ").startswith("예) ")]
+    assert len(lines) == 1, lines
+    example = yaml.safe_load(lines[0])
+    f = F.parse_features(example)                          # 지금 등록부(IMPLEMENTED·PARAM_KEYS)로 검사
+    assert f.active, "예시는 기능 하나를 켠 블록이다"
+    for name in f.active:
+        assert set(f.params(name)) == set(F.PARAM_KEYS[name]), name
+    w = WorldV2(_with_features(cfg2, example), seeds=[0])   # 계수 값 검사(_food_v_params)도 통과한다
+    assert w.features.active == f.active
 
 
 def test_load_v2_config_overrides_only_v1_keys(tmp_path):

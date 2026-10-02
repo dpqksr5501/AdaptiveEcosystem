@@ -5,6 +5,20 @@
     python replay_v2.py --compare learned:ckpt/final.zip perm:learned:ckpt/final.zip \
         fixed:0.421,0.866,0.105,0.004 --labels "C0 학습" "C1′ 행동 순열" "C2 최적 상수" \
         --steps 600 --out results/v2/replay_v1_compare.mp4
+    # S7 땅 회복 타임랩스 (부재 시험 (ii)). α 0.03 은 Gate F R1(보정 1회차)의 선택값이다. Gate F 는 이 값에서도
+    # (c) 로 실패했다(results/v2/gate_f/report.md). α 를 yaml 에 정하면 --alpha 를 뺀다.
+    python replay_v2.py --config configs/v2_0b.yaml --policy fixed:0.421,0.866,0.105,0.004 \
+        --labels "C2 최적 상수 · 왼쪽 과방목 교란 (V 0.3·cap0)" --half-life 693 --alpha 0.03 \
+        --overgraze-left 0.3 --steps 4200 --stride 4 --png 693 --png-dpi 150 \
+        --caption "환경 장면 · 상수 정책(C2)에서도 같다 — 땅의 회복은 정책이 만든 것이 아니다" \
+        --out results/v2/replay_s7_food_v.mp4
+    # 같은 장면의 제안값 α 0.5 (Gate F R0, 실패 기록). --alpha 가 없어 yaml α(지금 0.5)를 쓴다. yaml α 를 바꾸면
+    # --alpha 0.5 를 더한다(같은 세계, 같은 그림). 커밋하는 것은 .png 다(results/v2/*.mp4 는 .gitignore).
+    python replay_v2.py --config configs/v2_0b.yaml --policy fixed:0.421,0.866,0.105,0.004 \
+        --labels "C2 최적 상수 · 왼쪽 과방목 교란 (V 0.3·cap0) · α 0.5 제안값" --half-life 693 \
+        --overgraze-left 0.3 --steps 4200 --stride 4 --png 693 --png-dpi 150 \
+        --caption "제안값 α 0.5 (yaml) — Gate F 사전 등록 실패: 땅이 하한 근처로 붕괴해 교란과 대조가 같아진다" \
+        --out results/v2/replay_s7_food_v_a0.5.mp4
 
 `env_v2.world.World` 를 돌린다. 기능 스위치를 모두 끄면 v1 과 같은 세계다.
 v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
@@ -22,11 +36,20 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
 - 하단 시계열: 보행 비율(정지/걷기/뛰기), 경계 비율, 지역 기억, 포획 누적. 게임 시각 mm:ss.
 - `--compare` 는 같은 시드·같은 카메라로 정책 여러 개를 나란히 그린다. 칸들은 x축과
   포획 누적 축을 함께 쓴다(눈으로 비교할 때 높이가 같으면 수도 같다).
+- 먹이 상태 (v2.0b, `food_v` 훅): F 는 위 먹이 색 그대로. V/cap0 가 낮은 셀에 채도를 낮춘 회갈색 막
+  ("짓밟힌 땅", `trample_weight`)을 덮는다. 맵 좌우 절반(v2.3 전 지역 대용) 경계는 점선, 절반마다
+  V·F 라벨. 하단에 시계열 칸을 하나 더 붙여 절반별 V/cap0(실선)·F/cap0(점선)을 그린다
+  (지역 비율 ΣV/Σcap0, `World.food_stats`). food_v 를 끈 설정은 이 표시가 하나도 없고 그림이 v2.0 과 같다.
+- 부재 시험 (ii) 과방목 교란 (6.4, S7): `--overgraze-left 0.3` 은 reset 직후 왼쪽 절반 V 를 0.3·cap0 로
+  바꾼다(`overgraze_left`, 난수를 뽑지 않는다). 같은 시드·같은 정책의 교란 없는 대조도 돌려 왼쪽 V/cap0 를
+  하단에 가는 점선으로 겹치고, t0·t0+h·t0+3h 의 값을 출력한다(h = 이 세계의 회복 반감기).
+  `--half-life`·`--alpha` 는 장면용으로 yaml 계수 하나를 바꾼다. 바꾼 값은 화면 아래 설명줄에 남는다.
 
 뒤 버전용 훅. World 에 아래 속성이 있으면 그린다. 없으면 건너뛴다.
 
 | 속성 | 모양 | 버전 | 읽는 때 | 표시 |
 |---|---|---|---|---|
+| `food_v` | (gw,gw) | v2.0b | 스텝 전 | 짓밟힌 땅 막, 좌우 절반 라벨, 하단 V/cap0·F/cap0 (`food_stats()` 를 함께 읽는다) |
 | `gait` | (N,) int | v2.1 | 스텝 뒤 | 이번 스텝에 실제로 적용된 보행 (0 정지, 1 걷기, 2 뛰기). 가장 우선 |
 | `vel` | (N,2) | v2.1 | 스텝 뒤 | 이번 스텝 속도. `gait` 가 없을 때 |v|/herb_speed 로 판정 |
 | `vigilant` | (N,) bool | v2.2 | 스텝 뒤 | 흰 테두리, 짧은 시선선, 360° 시야 원, 경계 비율 |
@@ -65,6 +88,7 @@ from matplotlib.patches import Circle, Patch, Rectangle, Wedge  # noqa: E402
 from matplotlib.ticker import FuncFormatter, MultipleLocator  # noqa: E402
 
 from env_v2.config import load_v2_config  # noqa: E402
+from env_v2.features import features_of  # noqa: E402
 from env_v2.rollout import build_policy  # noqa: E402
 from env_v2.steering import steer  # noqa: E402
 from env_v2.world import World  # noqa: E402
@@ -102,6 +126,17 @@ DIM_ALPHA = 0.22         # 리스폰 직후 투명도 (여기서 1 로 회복)
 FOOD_CMAP = LinearSegmentedColormap.from_list(
     "food", ["#2a2118", "#4a3b23", "#5d7a35", "#8fc44a"]
 )
+
+# 짓밟힌 땅 (v2.0b, 6.4): V/cap0 가 낮은 셀에 덮는 회갈색 막. 갓 뜯겨 F 만 낮은 셀(진갈색, 곧 다시 자란다)과
+# 용량 V 자체가 깎인 셀(회갈색, 반감기 h 로 천천히 돌아온다)을 구분하려고 맨땅 색보다 밝고 채도가 낮다.
+TRAMPLE_RGB = to_rgba("#a39a8c")[:3]
+TRAMPLE_ALPHA = 0.85         # V/cap0 ≤ TRAMPLE_FULL 일 때 막의 불투명도
+TRAMPLE_FULL = 0.3           # 이 비율 이하는 막을 다 덮는다 (과방목 교란 0.3·cap0, init_frac 아래 끝)
+TRAMPLE_NONE = 0.9           # 이 비율 이상은 막이 없다 (Gate F (a) 창의 위 끝). 사이는 선형
+TRAMPLE_CAP = 0.2            # cap0 가 이보다 작은 패치 가장자리는 cap0/TRAMPLE_CAP 배로 옅게. cap0 = 0 셀은 막 없음
+HALF_COLORS = ("#f0a35e", "#6fb8ff")      # 맵 왼쪽·오른쪽 절반 (라벨, 하단 V/cap0·F/cap0)
+HALF_NAMES = ("왼쪽", "오른쪽")
+CONTROL_COLOR = "#bbbbbb"    # 부재 시험 대조(교란 없는 같은 시드)의 왼쪽 V/cap0
 
 
 def _use_korean_font() -> None:
@@ -221,6 +256,94 @@ class RespawnTracker:
 
 
 # --------------------------------------------------------------------- #
+# 먹이 상태 (v2.0b)
+# --------------------------------------------------------------------- #
+
+
+def trample_weight(food_v: np.ndarray, food_cap: np.ndarray) -> np.ndarray:
+    """짓밟힘 정도 [0,1]. V/cap0 ≤ TRAMPLE_FULL 이면 1, ≥ TRAMPLE_NONE 이면 0, 사이는 선형이다.
+
+    cap0 < TRAMPLE_CAP 인 패치 가장자리는 cap0/TRAMPLE_CAP 배로 줄인다(원래 거의 맨땅이라 회갈색 테두리가
+    패치를 감싸 보이지 않게). cap0 = 0 셀은 0 이다(0 나눗셈 없음).
+    """
+    cap = np.asarray(food_cap, dtype=np.float64)
+    ratio = np.divide(np.asarray(food_v, dtype=np.float64), cap, out=np.ones_like(cap), where=cap > 0.0)
+    w = np.clip((TRAMPLE_NONE - ratio) / (TRAMPLE_NONE - TRAMPLE_FULL), 0.0, 1.0)
+    return w * np.clip(cap / TRAMPLE_CAP, 0.0, 1.0)
+
+
+def trample_rgba(food_v: np.ndarray, food_cap: np.ndarray) -> np.ndarray:
+    """짓밟힌 땅 막 (gw,gw,4). 색은 TRAMPLE_RGB 하나, 불투명도 = TRAMPLE_ALPHA × `trample_weight`."""
+    w = trample_weight(food_v, food_cap)
+    rgba = np.empty(w.shape + (4,))
+    rgba[..., :3] = TRAMPLE_RGB
+    rgba[..., 3] = TRAMPLE_ALPHA * w
+    return rgba
+
+
+def food_v_config(cfg, half_life: float | None = None, alpha: float | None = None):
+    """food_v 계수 일부를 바꾼 설정 사본 (장면용, `--half-life`·`--alpha`). 둘 다 None 이면 `cfg` 그대로.
+
+    원본은 yaml 이다. 바꾼 블록도 World 가 같은 검사(`features.parse_features`, `_food_v_params`)를 거친다.
+    `half_life` 는 학습용 목록 대신 반감기 하나로 고정한다(판정·장면은 설계값 693 하나, v2_0b.yaml 주석).
+    """
+    if half_life is None and alpha is None:
+        return cfg
+    if not features_of(cfg).enabled("food_v"):
+        raise ValueError("--half-life·--alpha 는 food_v 를 켠 설정(예: configs/v2_0b.yaml)에서만 쓴다")
+    feats = dict(cfg.v2["features"])
+    block = dict(feats["food_v"])
+    if half_life is not None:
+        block["recovery_half_lives"] = [float(half_life)]
+    if alpha is not None:
+        block["alpha"] = float(alpha)
+    feats["food_v"] = block
+    return cfg.replace(v2=dict(cfg.v2, features=feats))
+
+
+def overgraze_left(world: World, frac: float) -> None:
+    """부재 시험 (ii) 과방목 교란 (계획서 6.4): 맵 왼쪽 절반(v2.3 전 지역 A 대용)의 V 를 frac·cap0 로 바꾼다.
+
+    reset 직후, 스텝 전에 부른다. 오른쪽 절반은 reset 이 뽑은 값 그대로다. F 는 min(F, V) 로 자르고
+    관측·기하를 다시 계산한다. 난수를 뽑지 않으므로 v1 스트림과 food_v 스트림이 교란 없는 같은 시드(대조)와
+    같다(`features.py` 규칙 2: 뽑은 뒤 결과만 덮어쓴다). `food_v_init` 은 뽑은 값 기록이라 바꾸지 않는다.
+    """
+    if getattr(world, "food_v", None) is None:
+        raise ValueError("과방목 교란은 food_v 를 켠 세계에서만 쓴다 (예: --config configs/v2_0b.yaml)")
+    if world.t != 0:
+        raise ValueError(f"과방목 교란은 reset 직후(t = 0)에만 준다. 지금 t = {world.t}")
+    floor = float(world._fv["floor"])
+    if not floor <= float(frac) <= 1.0:
+        raise ValueError(f"교란 V 비율은 floor({floor}) 이상 1 이하여야 한다. 받은 값: {frac}")
+    left = world._left_half()
+    world.food_v[left] = float(frac) * world.food_cap[left]
+    np.minimum(world.food, world.food_v, out=world.food)
+    world._g = world._geometry()
+    world._obs = world._obs_from(world._g)
+
+
+FOOD_KEYS = ("v_left", "v_right", "f_left", "f_right")
+
+
+def _food_row(fstats: dict) -> tuple:
+    """`World.food_stats()` → (왼쪽 V, 오른쪽 V, 왼쪽 F, 오른쪽 F) 지역 비율 (ΣV/Σcap0, ΣF/Σcap0)."""
+    return tuple(fstats[k] for k in ("v_ratio_left", "v_ratio_right", "f_ratio_left", "f_ratio_right"))
+
+
+def food_series(world: World, policy, steps: int, stride: int) -> dict:
+    """부재 시험 대조용: 그림 없이 `stride` 스텝마다 먹이 지역 비율만 남긴다 (`collect` 와 같은 시점, 스텝 전)."""
+    stride = max(int(stride), 1)
+    t, rows = [], []
+    for k in range(steps):
+        if k % stride == 0:
+            t.append(k)
+            rows.append(_food_row(world.food_stats()))
+        world.step(policy(world.observe()))
+    arr = np.asarray(rows, dtype=np.float64).reshape(-1, 4)
+    return dict(t=np.asarray(t), **{key: arr[:, j] for j, key in enumerate(FOOD_KEYS)})
+
+
+# --------------------------------------------------------------------- #
 # 정책 스펙
 # --------------------------------------------------------------------- #
 
@@ -313,6 +436,8 @@ class Run:
     world: World
     frames: list = field(default_factory=list)
     stats: dict = field(default_factory=dict)
+    overgraze: float | None = None       # 과방목 교란을 줬으면 왼쪽 V 시작 비율
+    control: dict | None = None          # 부재 시험 대조(교란 없는 같은 시드)의 `food_series`
 
 
 def _hook(world, name: str):
@@ -323,6 +448,7 @@ def _hook(world, name: str):
 
 def _snapshot(world: World, tracker: RespawnTracker, t: int) -> dict:
     """스텝 전 상태 중 그릴 것만 복사한다."""
+    food_v = _hook(world, "food_v")
     return dict(
         t=t,
         pos=world.pos.copy(),
@@ -336,6 +462,8 @@ def _snapshot(world: World, tracker: RespawnTracker, t: int) -> dict:
         starved=int(world._starve_deaths),
         mem=_hook(world, "region_mem"),
         bold=_hook(world, "boldness"),
+        food_v=food_v,
+        fstats=None if food_v is None else world.food_stats(),
     )
 
 
@@ -376,11 +504,16 @@ def series(frames: list) -> dict:
     )
     mems = [f["mem"] for f in frames]
     mem = None if mems[0] is None else np.stack([np.ravel(m) for m in mems])
+    food = None
+    if frames[0].get("fstats") is not None:
+        arr = np.array([_food_row(f["fstats"]) for f in frames], dtype=np.float64)
+        food = {key: arr[:, j] for j, key in enumerate(FOOD_KEYS)}
     return dict(
         t=np.array([f["t"] for f in frames]),
         gait=gait,
         vig=vig,
         mem=mem,
+        food=food,
         caught=np.array([f["caught"] for f in frames]),
         starved=np.array([f["starved"] for f in frames]),
     )
@@ -400,11 +533,44 @@ def shared_scale(runs: list, step_sec: float) -> tuple[float, int]:
 
 
 def run_policy(cfg, spec: dict, seed: int, steps: int, stride: int, label: str | None = None,
-               fade_frames: int = 6) -> Run:
-    """같은 시드의 새 세계에서 정책 하나를 돌린다. 래퍼(C1′ 순열 등)의 시드도 같은 `seed` 다."""
+               fade_frames: int = 6, overgraze: float | None = None, control: bool = True) -> Run:
+    """같은 시드의 새 세계에서 정책 하나를 돌린다. 래퍼(C1′ 순열 등)의 시드도 같은 `seed` 다.
+
+    `overgraze` 를 주면 시작 직후 과방목 교란(`overgraze_left`)을 준다. `control` 이면 교란 없는 같은 시드·
+    같은 정책도 돌려 먹이 지역 비율을 `Run.control` 에 남긴다(부재 시험의 대조, 계획서 6.4).
+    """
     world = World(cfg, seeds=[seed])
+    ctl = None
+    if overgraze is not None:
+        overgraze_left(world, overgraze)
+        if control:
+            ctl = food_series(World(cfg, seeds=[seed]), build_policy(spec, seed), steps, stride)
     frames = collect(world, build_policy(spec, seed), steps, stride, fade_frames)
-    return Run(label or spec_label(spec), world, frames, world.stats())
+    return Run(label or spec_label(spec), world, frames, world.stats(), overgraze, ctl)
+
+
+def absence_lines(run: Run, step_sec: float) -> list:
+    """부재 시험 (ii) 출력줄: 왼쪽 V/cap0·F/cap0 를 t0, t0+h, t0+3h (h = 이 세계의 회복 반감기)에서,
+    교란 vs 대조. 프레임은 stride 마다라 각 시점에 가장 가까운 프레임을 쓴다(실제 스텝을 함께 적는다).
+    마지막 프레임을 넘는 시점은 건너뛴다."""
+    if run.overgraze is None or run.frames[0].get("fstats") is None:
+        return []
+    h = float(run.frames[0]["fstats"]["half_life"])
+    t = np.array([f["t"] for f in run.frames])
+    ser = series(run.frames)["food"]
+    lines = []
+    for name, mult in (("t0", 0.0), ("t0+h", 1.0), ("t0+3h", 3.0)):
+        target = mult * h
+        if target > t[-1]:
+            continue
+        i = int(np.abs(t - target).argmin())
+        row = (f"  {name:6s} step {int(t[i]):5d} ({fmt_clock(t[i] * step_sec)})  "
+               f"교란 V {ser['v_left'][i]:.3f} F {ser['f_left'][i]:.3f}")
+        if run.control is not None:
+            j = int(np.abs(run.control["t"] - target).argmin())
+            row += f"  | 대조 V {run.control['v_left'][j]:.3f} F {run.control['f_left'][j]:.3f}"
+        lines.append(row)
+    return lines
 
 
 # --------------------------------------------------------------------- #
@@ -433,8 +599,9 @@ class _Panel:
     """정책 하나의 지도 + 시계열 칸."""
 
     def __init__(self, fig, run: Run, rect_map, rect_ser, step_sec: float, fov_preds: int,
-                 trail_len: int, x_end: float, caught_max: int, fov_herbs: int = 0):
-        """`x_end`(초)와 `caught_max` 는 칸끼리 같은 축을 쓰도록 바깥에서 정해 넘긴다."""
+                 trail_len: int, x_end: float, caught_max: int, fov_herbs: int = 0, rect_food=None):
+        """`x_end`(초)와 `caught_max` 는 칸끼리 같은 축을 쓰도록 바깥에서 정해 넘긴다.
+        `rect_food` 는 먹이 시계열 칸(v2.0b). 이 칸의 run 에 `food_v` 훅이 없으면 쓰지 않는다."""
         self.run, self.frames, self.step_sec = run, run.frames, step_sec
         self.trail_len = trail_len
         w, cfg = run.world, run.world.cfg
@@ -457,6 +624,23 @@ class _Panel:
             f0["food"], origin="lower", extent=extent, cmap=FOOD_CMAP, vmin=0.0, vmax=1.0,
             interpolation="bilinear", zorder=0,
         )
+        # 짓밟힌 땅 (v2.0b 훅): F 위에 V/cap0 막, 좌우 절반 경계 점선과 절반 라벨. 훅이 없으면 아무것도 안 만든다.
+        self.trample_im, self.half_text, self.food_ax = None, [], None
+        if f0["food_v"] is not None:
+            self.food_cap = w.food_cap.copy()
+            self.trample_im = ax.imshow(
+                trample_rgba(f0["food_v"], self.food_cap), origin="lower", extent=extent,
+                interpolation="bilinear", zorder=0.25,
+            )
+            # _left_half 는 셀 중심 x < size/2 다. 경계선은 그 셀 열의 오른쪽 끝에 긋는다.
+            x_b = float(w._left_half()[0].sum()) * cfg.food_cell
+            ax.axvline(x_b, color="white", lw=0.9, ls=(0, (3, 3)), alpha=0.5, zorder=1.5)
+            for k, (xa, ha) in enumerate(((0.01, "left"), (0.99, "right"))):
+                self.half_text.append(ax.text(
+                    xa, 0.01, "", transform=ax.transAxes, ha=ha, va="bottom", color=HALF_COLORS[k],
+                    fontsize=9, zorder=6,
+                    bbox=dict(facecolor="black", alpha=0.55, edgecolor="none", pad=2.5),
+                ))
         # 지역 기억 (v2.3 훅). region_id 는 먹이 격자와 같은 모양이다.
         self.region_id = getattr(w, "region_id", None)
         self.mem_im = None
@@ -513,8 +697,18 @@ class _Panel:
             bbox=dict(facecolor="black", alpha=0.55, edgecolor="none", pad=2.5),
         )
         self._series_axes(fig, rect_ser, x_end, caught_max)
+        if self.trample_im is not None and rect_food is not None:
+            self._food_axes(fig, rect_food, x_end)
 
     # --- 시계열 ---
+
+    @staticmethod
+    def _mask_cursor(ax, x_end: float):
+        """미래 구간 덮개와 현재 시각 세로선."""
+        mask = Rectangle((0, 0), x_end, 1, transform=ax.get_xaxis_transform(),
+                         facecolor=BG, alpha=0.72, edgecolor="none", zorder=10)
+        ax.add_patch(mask)
+        return mask, ax.axvline(0, color="white", lw=0.9, zorder=11)
 
     def _series_axes(self, fig, rect, x_end: float, caught_max: int) -> None:
         s = self.ser
@@ -542,11 +736,43 @@ class _Panel:
             for sp in a.spines.values():
                 sp.set_color("#444444")
         # 미래 구간은 어둡게 덮고, 현재 시각에 세로선을 둔다. 덮개는 위쪽(ax2)에 둔다.
-        self.mask = Rectangle((0, 0), x_end, 1, transform=ax2.get_xaxis_transform(),
-                              facecolor=BG, alpha=0.72, edgecolor="none", zorder=10)
-        ax2.add_patch(self.mask)
-        self.cursor = ax2.axvline(0, color="white", lw=0.9, zorder=11)
+        self.mask, self.cursor = self._mask_cursor(ax2, x_end)
         self.x_end = x_end
+
+    def _food_axes(self, fig, rect, x_end: float) -> None:
+        """v2.0b 먹이 시계열: 절반별 V/cap0(실선)·F/cap0(점선), 지역 비율 ΣV/Σcap0·ΣF/Σcap0.
+
+        V 하한(floor) 은 회색 일점쇄선. 부재 시험이면 대조(교란 없는 같은 시드)의 왼쪽 V/cap0 를 가는 점선으로,
+        t0+h·t0+3h 를 세로 점선으로 표시한다.
+        """
+        s, x = self.ser["food"], self.ser["t"] * self.step_sec
+        ax = self.food_ax = fig.add_axes(rect)
+        ax.set_facecolor("#1a1a1a")
+        ax.axhline(float(self.run.world._fv["floor"]), color="#777777", lw=0.7, ls="-.", zorder=1)
+        ctl = self.run.control
+        if ctl is not None:
+            ax.plot(ctl["t"] * self.step_sec, ctl["v_left"], color=CONTROL_COLOR, lw=1.1, ls=":",
+                    zorder=2)
+        if self.run.overgraze is not None:
+            h = float(self.frames[0]["fstats"]["half_life"])
+            for mult, name in ((1, "t0+h"), (3, "t0+3h")):
+                if mult * h * self.step_sec <= x_end:
+                    ax.axvline(mult * h * self.step_sec, color="#888888", lw=0.7, ls=":", zorder=1)
+                    ax.text(mult * h * self.step_sec, 0.97, f" {name}", color="#aaaaaa", fontsize=7,
+                            ha="left", va="top", transform=ax.get_xaxis_transform(), zorder=1)
+        for side, c in zip(("left", "right"), HALF_COLORS):
+            ax.plot(x, s["v_" + side], color=c, lw=1.6, zorder=3)
+            ax.plot(x, s["f_" + side], color=c, lw=1.0, ls="--", zorder=3)
+        ax.set_xlim(0, x_end)
+        ax.set_ylim(0, 1)
+        ax.set_ylabel("V·F / cap0", color=FG, fontsize=8)
+        ax.xaxis.set_major_locator(MultipleLocator(clock_tick(x_end)))
+        ax.xaxis.set_major_formatter(FuncFormatter(lambda v, _: fmt_clock(v)))
+        ax.tick_params(colors=FG, labelsize=7, length=2)
+        for sp in ax.spines.values():
+            sp.set_color("#444444")
+        self.ser_ax.tick_params(labelbottom=False)          # x 눈금 글자는 맨 아래 칸에만
+        self.food_mask, self.food_cursor = self._mask_cursor(ax, x_end)
 
     def _mem_rgba(self, mem: np.ndarray) -> np.ndarray:
         m = np.clip(np.ravel(mem)[np.asarray(self.region_id)], 0.0, 1.0)
@@ -561,6 +787,11 @@ class _Panel:
         f = self.frames[i]
         pos, alpha = f["pos"], f["alpha"]
         self.food_im.set_data(f["food"])
+        if self.trample_im is not None:
+            self.trample_im.set_data(trample_rgba(f["food_v"], self.food_cap))
+            row = _food_row(f["fstats"])
+            for k, tx in enumerate(self.half_text):
+                tx.set_text(f"{HALF_NAMES[k]} · V {row[k] * 100:.0f}% · F {row[2 + k] * 100:.0f}%")
         if self.mem_im is not None and f["mem"] is not None:
             self.mem_im.set_data(self._mem_rgba(f["mem"]))
 
@@ -609,6 +840,10 @@ class _Panel:
         self.mask.set_x(sec)
         self.mask.set_width(max(self.x_end - sec, 0.0))
         self.cursor.set_xdata([sec, sec])
+        if self.food_ax is not None:
+            self.food_mask.set_x(sec)
+            self.food_mask.set_width(max(self.x_end - sec, 0.0))
+            self.food_cursor.set_xdata([sec, sec])
 
     def _update_herb_wedges(self, f: dict, vig: np.ndarray) -> None:
         """초식 부채꼴: heading 기준 ±fov/2, 경계 중이면 360° 원. 리스폰 흐림을 따른다."""
@@ -636,13 +871,13 @@ def _n_regions(runs: list) -> int:
 
 
 def _legend_handles(runs: list, fov_herbs: int = 0, fov_preds: int = 0) -> list:
-    """범례: 보행 3색, 리스폰, 포식자, 은신처, 시야, 하단 선, 훅이 있으면 경계·궤적·지역별 기억."""
+    """범례: 보행 3색, 리스폰, 포식자, 은신처, 시야, 하단 선, 훅이 있으면 경계·궤적·지역별 기억·먹이 상태."""
     dot = dict(marker="o", ls="none", markersize=7, markeredgecolor="black")
     h = [Line2D([], [], color=c, label=n, markerfacecolor=c, **dot)
          for n, c in zip(GAIT_NAMES, GAIT_COLORS)]
     h.append(Line2D([], [], label="리스폰 직후(흐림)", markerfacecolor=(1.0, 0.58, 0.0, DIM_ALPHA),
                     **dot))
-    has = {k: any(r.frames[0][k] is not None for r in runs) for k in ("vig", "bold")}
+    has = {k: any(r.frames[0].get(k) is not None for r in runs) for k in ("vig", "bold", "food_v")}
     if has["vig"]:
         h.append(Line2D([], [], label="경계(흰 테두리)", marker="o", ls="none", markersize=7,
                         markerfacecolor=GAIT_COLORS[0], markeredgecolor="white",
@@ -653,6 +888,12 @@ def _legend_handles(runs: list, fov_herbs: int = 0, fov_preds: int = 0) -> list:
                     color="#ff7a7a", markeredgewidth=2))
     h.append(Line2D([], [], label="은신처", marker="o", ls="none", markersize=9,
                     markerfacecolor="black", markeredgecolor="#5566aa"))
+    if has["food_v"]:
+        bare = np.array(FOOD_CMAP(0.05)[:3])
+        h.append(Patch(facecolor=FOOD_CMAP(1.0), label="먹이 많음"))
+        h.append(Patch(facecolor=bare, label="맨땅·뜯긴 셀"))
+        h.append(Patch(facecolor=TRAMPLE_ALPHA * np.array(TRAMPLE_RGB) + (1 - TRAMPLE_ALPHA) * bare,
+                       label="짓밟힌 땅"))
     if fov_herbs > 0:
         label = "초식 시야(경계 시 360°)" if has["vig"] else "초식 시야"
         h.append(Patch(facecolor=HERB_FOV_FACE[:3] + (0.18,), edgecolor=HERB_FOV_EDGE, label=label))
@@ -668,6 +909,12 @@ def _legend_handles(runs: list, fov_herbs: int = 0, fov_preds: int = 0) -> list:
     for r in range(_n_regions(runs)):
         h.append(Line2D([], [], color=MEM_LINE_COLORS[r % len(MEM_LINE_COLORS)], lw=1.4, ls="--",
                         label=f"지역 기억 {region_name(r)}(하단)"))
+    if has["food_v"]:
+        for name, c in zip(HALF_NAMES, HALF_COLORS):
+            h.append(Line2D([], [], color=c, lw=1.6, label=f"{name} V/cap0"))
+        h.append(Line2D([], [], color=FG, lw=1.0, ls="--", label="F/cap0(점선)"))
+        if any(r.control is not None for r in runs):
+            h.append(Line2D([], [], color=CONTROL_COLOR, lw=1.1, ls=":", label="대조 왼쪽 V"))
     return h
 
 
@@ -678,18 +925,25 @@ def _row_major(handles: list, ncol: int) -> list:
     return [pad[i * ncol + j] for j in range(ncol) for i in range(rows)]
 
 
-def _layout(ncols: int, col_w: float):
-    """칸마다 (지도 rect, 시계열 rect) 와 그림 크기(인치). 픽셀이 짝수가 되게 맞춘다."""
-    top, gap, ser_h, bottom = 0.45, 0.30, col_w * 0.27, 1.15
+def _layout(ncols: int, col_w: float, food: bool = False, bottom_extra: float = 0.0):
+    """칸마다 (지도 rect, 시계열 rect, 먹이 시계열 rect 또는 None) 와 그림 크기(인치). 픽셀이 짝수가 되게 맞춘다.
+
+    `food` 면 시계열 아래에 먹이 칸(v2.0b)을 붙인다. `bottom_extra` 는 범례 줄·설명줄이 늘어난 만큼의 아래 여백.
+    둘 다 없으면 v2.0 그림과 같은 크기·위치다(0.0 을 더하는 것은 부동소수에서도 값이 그대로다).
+    """
+    top, gap, ser_h, bottom = 0.45, 0.30, col_w * 0.27, 1.15 + bottom_extra
+    food_h, food_gap = (col_w * 0.20, 0.10) if food else (0.0, 0.0)
     map_h = col_w - 0.25
     W = ncols * col_w
-    H = round((top + map_h + gap + ser_h + bottom) / 0.02) * 0.02
+    H = round((top + map_h + gap + ser_h + food_gap + food_h + bottom) / 0.02) * 0.02
     rects = []
     for i in range(ncols):
         x0 = i * col_w + 0.125
-        m = (x0 / W, (bottom + ser_h + gap) / H, map_h / W, map_h / H)
-        s = ((x0 + 0.45) / W, bottom / H, (map_h - 0.95) / W, ser_h / H)
-        rects.append((m, s))
+        y_ser = bottom + food_h + food_gap
+        m = (x0 / W, (y_ser + ser_h + gap) / H, map_h / W, map_h / H)
+        s = ((x0 + 0.45) / W, y_ser / H, (map_h - 0.95) / W, ser_h / H)
+        fd = ((x0 + 0.45) / W, bottom / H, (map_h - 0.95) / W, food_h / H) if food else None
+        rects.append((m, s, fd))
     return (W, H), rects
 
 
@@ -701,11 +955,31 @@ def gait_source(world) -> str:
     return f"보행 = |v|/herb_speed, v={src} (0 정지, ≤{WALK_MAX} 걷기, 초과 뛰기)"
 
 
+def food_line(runs: list) -> str | None:
+    """v2.0b 설명줄: 이 영상에 쓴 food_v 계수(yaml 또는 `--half-life`·`--alpha` 로 바꾼 값)와 V 시작 비율.
+    food_v 훅이 없으면 None."""
+    f0 = runs[0].frames[0]
+    if f0.get("fstats") is None:
+        return None
+    w0, fs = runs[0].world, f0["fstats"]
+    h, sec = float(fs["half_life"]), step_seconds(w0.cfg)
+    og = "" if runs[0].overgraze is None else "(교란)"
+    return (
+        f"food_v α {w0._fv['alpha']:g} · 하한 {w0._fv['floor']:g} · 반감기 {h:g}스텝({h * sec:.0f}초) | "
+        f"시작 V/cap0 왼쪽 {fs['v_ratio_left']:.2f}{og}·오른쪽 {fs['v_ratio_right']:.2f} | 지역 = 좌우 절반"
+    )
+
+
+LINE_IN = 8.5 * 1.4 / 72     # 설명줄 한 줄 높이(인치): 글자 8.5pt × 줄 간격 1.4
+LEGEND_ROW_IN = 0.21         # 범례 한 줄 높이(인치, 대략)
+
+
 def build_figure(runs: list, fps: int = 30, dpi: int = 100, fov_preds: int = 2,
-                 trail_len: int = 120, fov_herbs: int = 2):
+                 trail_len: int = 120, fov_herbs: int = 2, caption: str | None = None):
     """그림과 칸들을 만든다. 반환: (fig, update(i), 프레임 수, 칸 목록).
 
-    칸들은 x축 끝과 포획 누적 축 위 끝을 함께 쓴다(`shared_scale`).
+    칸들은 x축 끝과 포획 누적 축 위 끝을 함께 쓴다(`shared_scale`). `caption` 은 설명줄 위의 자막 한 줄이다.
+    먹이 칸·자막이 없고 범례가 두 줄 이하면 v2.0 그림과 크기·위치가 같다.
     """
     n_frames = min(len(r.frames) for r in runs)
     if n_frames == 0:
@@ -714,20 +988,12 @@ def build_figure(runs: list, fps: int = 30, dpi: int = 100, fov_preds: int = 2,
     step_sec = step_seconds(w0.cfg)
     stride = int(runs[0].frames[1]["t"] - runs[0].frames[0]["t"]) if n_frames > 1 else 1
     col_w = 6.4 if len(runs) == 1 else 5.6
-    size, rects = _layout(len(runs), col_w)
-    fig = plt.figure(figsize=size, dpi=dpi)
-    fig.patch.set_facecolor(BG)
-    x_end, caught_max = shared_scale(runs, step_sec)
-    panels = [_Panel(fig, r, m, s, step_sec, fov_preds, trail_len, x_end, caught_max, fov_herbs)
-              for r, (m, s) in zip(runs, rects)]
+    food = any(r.frames[0].get("food_v") is not None for r in runs)
 
     handles = _legend_handles(runs, fov_herbs=min(fov_herbs, w0.N), fov_preds=min(fov_preds, w0.M))
-    per_row = max(1, int(size[0] / 1.2))           # 범례 한 칸 약 1.2인치
+    per_row = max(1, int(len(runs) * col_w / 1.2))  # 범례 한 칸 약 1.2인치
     rows = -(-len(handles) // per_row)
     ncol = -(-len(handles) // rows)
-    fig.legend(handles=_row_major(handles, ncol), loc="lower center", ncol=ncol,
-               bbox_to_anchor=(0.5, 0.40 / size[1]), frameon=False, labelcolor=FG,
-               fontsize=8.5, handletextpad=0.3, columnspacing=1.1)
     speedup = stride * step_sec * fps
     world_line = (
         f"seed={w0.seed} | world={w0.size:.0f} | M={w0.M} (원거리 {int(w0.pred_ranged.sum())}) | "
@@ -737,8 +1003,32 @@ def build_figure(runs: list, fps: int = 30, dpi: int = 100, fov_preds: int = 2,
         f"1스텝={step_sec:.4f}초, stride {stride}, {fps}fps → x{speedup:.1f} | {gait_source(w0)}"
     )
     sep = " | " if len(runs) > 1 else "\n"
-    fig.text(0.5, 0.06 / size[1], world_line + sep + time_line, ha="center", va="bottom",
+    info = world_line + sep + time_line
+    fline = food_line(runs)
+    if fline is not None:
+        info += "\n" + fline
+    # 설명줄(아래) → 자막 → 범례 순으로 쌓는다. 늘어난 만큼 아래 여백을 키운다.
+    n_info = info.count("\n") + 1
+    cap_y = 0.06 + n_info * LINE_IN + 0.04
+    legend_y = 0.40
+    if fline is not None or caption:
+        legend_y = max(0.40, cap_y + (LINE_IN + 0.04 if caption else 0.0))
+    bottom_extra = (legend_y - 0.40) + LEGEND_ROW_IN * max(rows - 2, 0)
+    size, rects = _layout(len(runs), col_w, food, bottom_extra)
+
+    fig = plt.figure(figsize=size, dpi=dpi)
+    fig.patch.set_facecolor(BG)
+    x_end, caught_max = shared_scale(runs, step_sec)
+    panels = [_Panel(fig, r, m, s, step_sec, fov_preds, trail_len, x_end, caught_max, fov_herbs, fd)
+              for r, (m, s, fd) in zip(runs, rects)]
+
+    fig.legend(handles=_row_major(handles, ncol), loc="lower center", ncol=ncol,
+               bbox_to_anchor=(0.5, legend_y / size[1]), frameon=False, labelcolor=FG,
+               fontsize=8.5, handletextpad=0.3, columnspacing=1.1)
+    fig.text(0.5, 0.06 / size[1], info, ha="center", va="bottom",
              color="#aaaaaa", fontsize=8.5, linespacing=1.4)
+    if caption:
+        fig.text(0.5, cap_y / size[1], caption, ha="center", va="bottom", color="#ffe08a", fontsize=9)
 
     def update(i):
         for p in panels:
@@ -748,10 +1038,28 @@ def build_figure(runs: list, fps: int = 30, dpi: int = 100, fov_preds: int = 2,
     return fig, update, n_frames, panels
 
 
+def render_png(runs: list, out: Path, step: int, fps: int = 30, dpi: int = 100, fov_preds: int = 2,
+               trail_len: int = 120, fov_herbs: int = 2,
+               caption: str | None = None) -> tuple[Path, int]:
+    """스텝 `step` 에 가장 가까운 프레임 한 장을 PNG 로 (발표·문서용). 반환: (경로, 그 프레임의 스텝).
+
+    `fps` 는 설명줄의 배속 표시에만 쓴다(같이 만든 영상과 같은 글이 되게).
+    """
+    fig, update, n_frames, _ = build_figure(runs, fps, dpi, fov_preds, trail_len, fov_herbs, caption)
+    t = np.array([f["t"] for f in runs[0].frames[:n_frames]])
+    i = int(np.abs(t - int(step)).argmin())
+    update(i)
+    out = Path(out)
+    fig.savefig(str(out), dpi=dpi, facecolor=fig.get_facecolor())
+    plt.close(fig)
+    return out, int(t[i])
+
+
 def render(runs: list, out: Path, fps: int = 30, dpi: int = 100, bitrate: int | None = None,
-           fov_preds: int = 2, trail_len: int = 120, fov_herbs: int = 2) -> Path:
+           fov_preds: int = 2, trail_len: int = 120, fov_herbs: int = 2,
+           caption: str | None = None) -> Path:
     """Run 여러 개를 나란히 한 영상으로. 실제로 쓴 경로(gif 로 떨어졌으면 .gif)를 돌려준다."""
-    fig, update, n_frames, _ = build_figure(runs, fps, dpi, fov_preds, trail_len, fov_herbs)
+    fig, update, n_frames, _ = build_figure(runs, fps, dpi, fov_preds, trail_len, fov_herbs, caption)
     anim = animation.FuncAnimation(fig, update, frames=n_frames, interval=1000 // fps)
     bitrate = bitrate or 2600 * len(runs)
     writer, out = pick_writer(Path(out), fps, bitrate)
@@ -838,6 +1146,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--trail", type=int, default=120, help="궤적 길이 (프레임)")
     p.add_argument("--dpi", type=int, default=100)
     p.add_argument("--bitrate", type=int, default=None, help="kbps. 기본 칸당 2600")
+    # v2.0b 먹이 장면 (food_v 를 켠 설정에서만)
+    p.add_argument("--half-life", type=float, default=None, metavar="H",
+                   help="food_v 회복 반감기를 H 스텝 하나로 고정 (학습 목록 대신. 판정·장면 설계값 693)")
+    p.add_argument("--alpha", type=float, default=None,
+                   help="food_v 훼손 계수 α 를 바꾼다 (장면용. 기본은 yaml 값, 바꾼 값은 설명줄에 남는다)")
+    p.add_argument("--overgraze-left", type=float, default=None, metavar="FRAC",
+                   help="부재 시험 (ii) 과방목 교란: 왼쪽 절반 V 를 FRAC·cap0 로 시작 (계획서 6.4, 예: 0.3). "
+                        "교란 없는 같은 시드 대조도 돌린다")
+    p.add_argument("--no-control", action="store_true", help="--overgraze-left 의 대조 실행을 건너뛴다")
+    p.add_argument("--png", type=int, default=None, metavar="STEP",
+                   help="이 스텝에 가장 가까운 프레임을 --out 과 같은 이름의 .png 로도 저장")
+    p.add_argument("--png-dpi", type=int, default=None, help="PNG 해상도. 기본 --dpi")
+    p.add_argument("--caption", default=None, help="설명줄 위 자막 한 줄")
     return p
 
 
@@ -865,23 +1186,41 @@ def main(argv=None) -> int:
     specs, labels = specs_and_labels(p, args)
 
     cfg = load_v2_config(args.config)
+    try:                                        # 무엇을 돌리기 전에 계수·교란 비율을 검사한다
+        cfg = food_v_config(cfg, args.half_life, args.alpha)
+        probe = World(cfg, seeds=[args.seed])
+        if args.overgraze_left is not None:
+            overgraze_left(probe, args.overgraze_left)
+    except ValueError as e:
+        p.error(str(e))
     runs = []
     for spec, label in zip(specs, labels):
         print(f"수집 중: {label or spec_label(spec)} — {args.steps} 스텝, 매 {args.stride}스텝 1프레임")
         runs.append(run_policy(cfg, spec, args.seed, args.steps, args.stride, label,
-                               args.fade_frames))
+                               args.fade_frames, args.overgraze_left, not args.no_control))
 
     name = "replay_v2_compare.mp4" if len(runs) > 1 else "replay_v2.mp4"
     out = Path(args.out) if args.out else ROOT / "results" / "v2" / name
     out.parent.mkdir(parents=True, exist_ok=True)
     print(f"렌더 중: {len(runs[0].frames)} 프레임 × {len(runs)}칸 -> {out}")
     out = render(runs, out, args.fps, args.dpi, args.bitrate, args.fov_preds, args.trail,
-                 args.fov_herbs)
+                 args.fov_herbs, args.caption)
 
     info = video_info(out)
     extra = f", {info['frames']} 프레임" if "frames" in info else ""
     extra += f", {info['secs']:.1f}초" if "secs" in info else ""
     print(f"완료: {out}  ({info['mb']:.2f} MB{extra})")
+    if args.png is not None:
+        png, t_png = render_png(runs, out.with_suffix(".png"), args.png, args.fps,
+                                args.png_dpi or args.dpi, args.fov_preds, args.trail, args.fov_herbs,
+                                args.caption)
+        print(f"PNG: {png}  (step {t_png}, {png.stat().st_size / 1e6:.2f} MB)")
+    step_sec = step_seconds(cfg)
+    for r in runs:
+        lines = absence_lines(r, step_sec)
+        if lines:
+            print(f"  [{r.label}] 부재 시험 (ii) 왼쪽 V/cap0·F/cap0 (지역 비율), 교란 {r.overgraze:g}·cap0 vs 대조")
+            print("\n".join(lines))
     for r in runs:
         g = np.mean([gait_fractions(f["gait"]) for f in r.frames], axis=0)
         print(

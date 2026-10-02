@@ -1,0 +1,43 @@
+# V2 설정 — v2.0b 먹이 고갈·느린 회복 (Docs/RL_Policy/RL_V2_PLAN.md 4.9.1, 0-6).
+#
+# v2.0(configs/v2.yaml)에 food_v 하나만 켠다. 관측 7·행동 4 는 그대로다.
+# v1 configs/default.yaml 을 먼저 읽고 그 위에 이 파일을 덮는다 (env_v2/config.py):
+#   python train_v2.py --config configs/v2_0b.yaml --steps 20000000 --seed 0 --run-name v2_0b_s0 --save-at 10000000
+# 형식 규칙은 configs/v2.yaml 머리 주석과 같다(계수는 이 파일이 유일한 원본, 지수 표기는 1.0e-3 꼴).
+#
+# ※ 보정 실패, 사용 금지 (10-02): 아래 alpha 0.5 는 Gate F 에서 실패한 제안값(R0)이다. 땅이 하한 근처로 무너진다
+#   (평균 V/cap0 0.11~0.18, results/v2/gate_f/report.md). 보정 1회차(R1) 선택값 α 0.03 도 (c) 로 실패했고, 다음 선택은
+#   사람이 정한다(계획서 0-6 행). α 를 정해 이 파일에 적기 전에는 이 yaml 로 0-7 학습(train_v2.py)이나 진단
+#   (diagnose_v2.py)을 돌리지 않는다. gate_f.py 는 --alpha 를 명령줄로 받으므로 R0·R1 재현에는 영향이 없다.
+
+version: "2.0b"
+
+overrides: {}
+
+features:
+  # 셀마다 식생 용량 V (floor·cap0 ≤ V ≤ cap0, cap0 = v1 food_cap). 스텝 순서는 env_v2/world.py `_food_v_step`.
+  #   재생 F += r·(V − F), F ≤ V   (v1 재생의 목표·상한 cap0 → V. r 과 은신처 0.3배는 v1 그대로)
+  #   훼손 V −= alpha·taken·(1 − F/V)   (taken > 0 셀만. V = 0 셀은 0/0. taken = 한 스텝 동안 셀별 섭취 합,
+  #                                      F = 섭취 직후. 뜯긴 곳일수록 많이 깎인다)
+  #   회복 V += ρ·(cap0 − V), ρ = 1 − 2^(−1/h)
+  food_v:
+    enabled: true
+    # 훼손 계수 (제안, Gate F 에서 보정). 늘 뜯기는 셀의 평형 V/cap0 ≈ max(floor, ρ/(ρ + alpha·r)) 라
+    # 0.5 는 h 693 에서 0.06~0.10 → 하한에 붙는다(계획서 4.9.1 예비 측정). 보정 1회차는 h 693 고정, alpha 0.03~0.1.
+    alpha: 0.5                                  # 보정 실패, 사용 금지 — Gate F R0 실패값(머리 주석)
+    floor: 0.1                                  # V 하한 = floor·cap0. 회복이 영영 멈추지 않게 한다
+    # 휴식 회복 반감기 h (스텝). reset 마다 food_v 스트림에서 하나를 고른다. 학습 무작위화 목록이다.
+    # 판정 실행(Gate F)은 값 하나로 고정한다 — 예) [693] (ρ ≈ 1.0e-3, 약 92초)
+    # alpha 를 정한 뒤 h 마다 하한 셀 비율 < 50%·아사 ≤ 40% 를 확인한다(계획서 0-6 표). 넘는 h 가 있으면 0-7 전에
+    # 위쪽 끝을 줄이고 날짜·이유를 여기 적는다.
+    recovery_half_lives: [300, 700, 2000, 7000]
+    # V 초기값 = cap0 × U[하, 상]. reset 마다 맵 좌우 절반에 하나씩 뽑는다(v2.3 전 지역 대용).
+    init_frac: [0.3, 1.0]
+
+train:
+  # configs/v2.yaml 과 같다 (v2.0 과 학습 설정을 맞춰 기능 효과만 비교한다).
+  # 독립 세계 K 개를 한 VecEnv 로 묶는다. 세계를 T_reset 월드 스텝마다 새로 뽑고 T_reset/K 씩 엇갈린다.
+  num_worlds: 8
+  reset_interval: 4000
+  # 세계당 n_steps = 256 / K. 롤아웃 배치(256 × 128 = 32,768 timestep)를 v1 과 같게 유지한다.
+  rollout_world_steps: 256

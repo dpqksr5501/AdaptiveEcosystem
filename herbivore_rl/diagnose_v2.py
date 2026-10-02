@@ -11,7 +11,9 @@
     python diagnose_v2.py report --dirs v2_0_s0 v2_0_s1 v2_0_s2 --name v2_0   # 학습 시드 IQM·CI
 
 정책은 `--model`(학습 zip) 또는 `--policy utility|fixed|random` 으로 준다. 산출물은
-`results/v2/diag_<이름>/` 아래 JSON + MD 다. 이름은 `--name`, 없으면 모델 파일 이름이다.
+`results/v2/diag_<이름>/` 아래 JSON + MD 다. 이름은 `--name`, 없으면 모델 파일 이름이고, 설정 version 이
+2.0 이 아니면 `_v<version>` 을 붙인다(`final` + configs/v2_0b.yaml → `diag_final_v2_0b`). 같은 모델을 다른
+설정으로 진단해도 v2.0 결과 디렉터리를 덮지 않는다.
 
 판정 규칙 (6.1):
 - 판정 양은 G_γ(PPO 가 최대화하는 할인 리턴-투-고 평균)와 결과·행동 지표다. mean_return 은 보고만 한다.
@@ -383,7 +385,7 @@ class Ctx:
         self.args = args
         self.cfg = load_v2_config(args.config)
         self.spec = base_spec(args)
-        self.name = args.name or default_name(args)
+        self.name = args.name or default_name(args, self.cfg)
         self.out = RESULTS / f"diag_{self.name}"
         # 계획서 6.1: G_γ 의 γ 는 그 정책의 학습 γ 다. 모델이 있으면 모델 γ 를 기본으로 쓴다.
         mg = model_gamma(args.model) if args.model else None
@@ -442,10 +444,11 @@ def base_spec(args) -> dict | None:
     return None
 
 
-def default_name(args) -> str:
-    if args.model:
-        return Path(args.model).stem
-    return args.policy or "report"
+def default_name(args, cfg=None) -> str:
+    """모델 파일 이름(없으면 정책 종류). 설정 version 이 2.0 이 아니면 `_v2_0b` 처럼 붙인다 — v2.0 경로는 그대로다."""
+    name = Path(args.model).stem if args.model else (args.policy or "report")
+    ver = str((getattr(cfg, "v2", None) or {}).get("version") or "2.0")
+    return name if ver == "2.0" else f"{name}_v{ver.replace('.', '_')}"
 
 
 def model_fingerprint(path) -> str | None:
@@ -860,6 +863,22 @@ def search_constants(ctx: Ctx, make_spec, names: list[str], enqueue) -> tuple[li
     return params[best_key], info
 
 
+def c2_base_action(ctx: Ctx) -> list:
+    """C2-seg 의 바탕 상수 = 같은 디렉터리 constsearch.json(C2)의 best. 같은 설정에서 잰 C2 만 쓴다.
+
+    출력 디렉터리 기본 이름은 모델 파일 이름이라, 설정만 바꿔(v2.0 → v2.0b) 같은 모델을 진단하면 다른
+    설정의 C2 가 조용히 바탕이 된다. 결과 meta 에는 지금 설정이 적혀 섞인 것이 드러나지 않는다.
+    """
+    c2 = load_json(ctx.out / "constsearch.json")
+    if not c2:
+        raise SystemExit("--base-action 이 없고 같은 디렉터리에 constsearch.json(C2) 도 없다")
+    if c2.get("meta", {}).get("config_digest") != config_digest(ctx.cfg):
+        raise SystemExit(f"{ctx.out / 'constsearch.json'} 은 다른 설정에서 잰 C2 다 "
+                         f"(config_version {c2.get('meta', {}).get('config_version')!r}) — "
+                         "이 설정으로 C2 를 다시 재거나(--name 으로 디렉터리를 나눈다) --base-action 을 준다")
+    return c2["best"]
+
+
 def cmd_constsearch(ctx: Ctx) -> int:
     a = ctx.args
     t0 = time.time()
@@ -872,12 +891,7 @@ def cmd_constsearch(ctx: Ctx) -> int:
         dims = parse_dims(a.seg_dims or [], ACT_NAMES)
         if not dims:
             raise SystemExit("--seg-bins 를 쓰면 --seg-dims 로 구간별 행동을 정해야 한다")
-        base_action = a.base_action
-        if base_action is None:
-            c2 = load_json(ctx.out / "constsearch.json")
-            if not c2:
-                raise SystemExit("--base-action 이 없고 같은 디렉터리에 constsearch.json(C2) 도 없다")
-            base_action = c2["best"]
+        base_action = a.base_action if a.base_action is not None else c2_base_action(ctx)
         base_action = [float(x) for x in base_action]
         S = n_segments(bins)
         names = [f"s{s}_{ACT_NAMES[k]}" for s in range(S) for k in dims]
@@ -1036,6 +1050,9 @@ def aggregate(abl: list[dict], cols=OUTCOME, reps: int = 2000) -> dict:
     seeds = [[r["seed"] for r in d["per_seed"]["C0"]] for d in abl]
     if any(s != seeds[0] for s in seeds):
         raise SystemExit("디렉터리마다 평가 시드가 다르다 — 층화할 수 없다")
+    digests = [d.get("meta", {}).get("config_digest") for d in abl]
+    if any(g != digests[0] for g in digests):
+        raise SystemExit(f"디렉터리마다 설정이 다르다(config_digest {digests}) — 다른 세계의 결과를 묶지 않는다")
     names = [n for n in abl[0]["per_seed"] if all(n in d["per_seed"] for d in abl)]
     out = {}
     for name in names:

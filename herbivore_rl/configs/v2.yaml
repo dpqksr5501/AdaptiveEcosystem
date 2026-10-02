@@ -9,7 +9,8 @@ version: "2.0"
 overrides: {}
 
 # 기능 스위치. 기능마다 블록 하나: `이름: {enabled: true|false, 계수: 값, ...}` (env_v2/features.py).
-#   예) food_v: {enabled: true, alpha: 0.5, rho: 1.0e-3}
+#   예) food_v: {enabled: true, alpha: 0.03, floor: 0.1, recovery_half_lives: [693], init_frac: [0.3, 1.0]}
+#       (형식 예시다. 계수 키는 PARAM_KEYS, 실제 값은 configs/v2_0b.yaml. tests/test_features_v2.py 가 이 줄을 읽어 검사한다)
 # - 블록이 없는 기능은 꺼진 것이다. 모두 끄면 World 는 v1 과 같은 결과를 낸다 (tests/test_env_v2.py).
 # - 켠 기능의 계수는 여기에 모두 적는다. 코드에는 기본값이 없다(보정 값이 이 파일과 기록에 남게).
 # - 지수 표기는 소수점과 부호를 넣는다: 1e-3·1.0e3 은 PyYAML 이 문자열로 읽는다 → 1.0e-3, 1.0e+3.
