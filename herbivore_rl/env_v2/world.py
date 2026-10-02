@@ -5,14 +5,17 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
 이 사본에 **스위치로** 붙인다. 스위치를 모두 끈 이 World 는 같은 시드에서 v1 World 와
 결과가 완전히 같아야 한다 — `tests/test_env_v2.py` 가 고정한다.
 
-새 기능이 뽑는 난수는 `self.rng2`(별도 스트림)에서만 뽑는다. v1 난수 호출 순서가 바뀌면
-같은 시드의 세계가 조용히 달라지기 때문이다 (계획서 4.4).
+기능 스위치는 `configs/v2.yaml` 의 `features:` 블록이다(`env_v2/features.py`). 새 기능이 뽑는
+난수는 기능마다 따로 둔 스트림 `self.feature_rng(name)` 에서만 뽑는다. v1 난수 호출 순서가 바뀌면
+같은 시드의 세계가 조용히 달라지고, 기능끼리 스트림을 나눠 쓰면 기능 하나를 켜고 끌 때 다른 기능의
+세계가 바뀌기 때문이다 (계획서 4.4, 4.8).
 """
 
 from __future__ import annotations
 
 import numpy as np
 
+from .features import Features, _check_name, _check_part, feature_stream, features_of
 from .steering import EPS, clamp_magnitude, normalize, steer
 
 # 관측 열 인덱스 (§3.1). 이 순서가 언리얼 FEcoObservationFragment와 일치해야 한다.
@@ -43,6 +46,7 @@ class World:
         self.seeds = np.asarray(list(seeds), dtype=np.int64)
         self.meta = np.random.default_rng(meta_seed)
         self.N = int(cfg.N)
+        self.features: Features = features_of(cfg)
         self.reset()
 
     # ------------------------------------------------------------------ #
@@ -54,9 +58,9 @@ class World:
         cfg = self.cfg
         seed = int(self.meta.choice(self.seeds))
         r = self.rng = np.random.default_rng(seed)
-        # V2 기능 전용 난수 스트림. v1 스트림(self.rng)의 호출 순서를 건드리지 않는다.
-        self.rng2 = np.random.default_rng([seed, 2])
         self.seed = seed
+        # 기능별 난수 스트림은 처음 쓸 때 만든다(feature_rng). 세계를 새로 뽑으면 처음부터 다시 시작한다.
+        self._feature_rngs: dict[tuple[str, int], np.random.Generator] = {}
 
         rd = cfg.rand
         self.size = float(r.uniform(*rd["world_size"]))
@@ -71,6 +75,19 @@ class World:
         self._g = self._geometry()
         self._obs = self._obs_from(self._g)
         return self._obs
+
+    def feature_rng(self, name: str, part: int = 0) -> np.random.Generator:
+        """기능 `name` 의 난수 스트림. 이 세계의 시드에서 나오고 다른 기능·v1 스트림과 독립이다.
+
+        같은 기능에 나중에 난수를 더할 때는 새 `part` 를 쓴다 (`env_v2/features.py` 규칙 3).
+        """
+        _check_name(name)
+        _check_part(part)                   # 캐시를 찾기 전에 검사한다(True·1.0 은 키 1 과 같게 해시된다)
+        key = (name, int(part))
+        g = self._feature_rngs.get(key)
+        if g is None:
+            g = self._feature_rngs[key] = feature_stream(self.seed, name, part)
+        return g
 
     def _build_world(self) -> None:
         cfg, r = self.cfg, self.rng

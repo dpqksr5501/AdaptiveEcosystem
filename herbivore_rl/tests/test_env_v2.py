@@ -8,6 +8,7 @@ import pytest
 from env.config import load_config
 from env.world import World as WorldV1
 from env_v2.config import load_v2_config
+from env_v2.features import features_of
 from env_v2.vec_env import MultiWorldVecEnv
 from env_v2.world import World as WorldV2
 from policies.registry import make_policy
@@ -27,7 +28,7 @@ def test_v2_config_keeps_v1_values(cfg2):
     v1 = load_config()
     for k, v in v1.to_dict().items():
         assert getattr(cfg2, k) == v, k                # overrides 가 비어 있으면 v1 과 같다
-    assert cfg2.v2["features"] == {}
+    assert features_of(cfg2).active == ()             # 기본 설정은 모든 기능이 꺼져 있다
     assert cfg2.v2["train"]["num_worlds"] == 8
 
 
@@ -39,7 +40,8 @@ def test_v2_config_keeps_v1_values(cfg2):
 ])
 def test_v2_world_matches_v1_when_features_off(cfg2, seed, spec):
     """같은 시드·같은 정책이면 통계 10열과 관측·위치가 v1 과 비트 단위로 같아야 한다."""
-    v1, v2 = WorldV1(load_config(), seeds=[seed]), WorldV2(cfg2, seeds=[seed])
+    off = cfg2.replace(v2=dict(cfg2.v2, features={}))   # 기본 설정이 나중에 기능을 켜도 이 비교는 모두 끈 상태로
+    v1, v2 = WorldV1(load_config(), seeds=[seed]), WorldV2(off, seeds=[seed])
     p1, p2 = make_policy(spec), make_policy(spec)
     for _ in range(300):
         o1, o2 = v1.observe(), v2.observe()
@@ -52,9 +54,10 @@ def test_v2_world_matches_v1_when_features_off(cfg2, seed, spec):
 
 
 def test_v2_feature_rng_is_a_separate_stream(cfg2):
-    """V2 기능 난수는 rng2 에서만 뽑는다. rng2 를 써도 v1 스트림은 그대로여야 한다."""
+    """V2 기능 난수는 기능별 스트림에서만 뽑는다. 그걸 써도 v1 스트림은 그대로여야 한다."""
     a, b = WorldV2(cfg2, seeds=[5]), WorldV2(cfg2, seeds=[5])
-    b.rng2.random(1000)                                  # V2 기능이 난수를 쓴 것처럼
+    b.feature_rng("food_v").random(1000)                 # V2 기능이 난수를 쓴 것처럼
+    b.feature_rng("daynight", part=1).random(1000)
     act = np.full((a.N, 4), 0.5)
     for _ in range(50):
         a.step(act)
