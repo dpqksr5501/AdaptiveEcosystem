@@ -21,6 +21,10 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
   시야각 fov_deg(360°, 반경 see_r 그대로), heading 은 위협 쪽(ThreatDir). threat_recency·ThreatDir 는 개체별이고
   리스폰 때 초기화한다. 난수를 쓰지 않는다. 정의와 스텝 순서는 `_vigil_step`·`_perceive`, 통계는 `vigil_stats`.
   계수 threat_flee(10-03, 1-5 Gate E2b 보고용 #18 변형)는 0 이면 꺼져 있다(`_threat_flee_term`).
+- vigil_window (v2.2r, 10-03 R2·수정 제안서 3.1 (나)): vigilance 위에 얹는 경계 재설계 스위치. '창' = 결정 때 포식자
+  안 보임 & threat_recency > theta. action false 면 경계 행동 열을 빼고(관측 8 은 그대로, T1·L), window_only 면 경계가
+  창 안에서만 효력이 있고(W′), look_back 이면 '정지 중이고 창 안이면 heading ← ThreatDir' 반사를 둔다(L). 난수를
+  쓰지 않는다. 정의는 `_window_params`·`_look_back`, 통계는 `window_stats`. 끄면 v2.2 그대로다.
 
 행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
 `World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
@@ -106,24 +110,37 @@ VIGIL_STAT_COLUMNS = (
     "b3_truth", "b5p_truth",
 )
 
+# window_stats 누적 히스토그램 모양 (v2.2r, 수정 제안서 3.8 B3 정의): [구간 3(평시, 창 안, 포식자 보임), 배부름, 실제 정지,
+# 경계]. 구간·배부름은 결정 때 상태, 창은 동역학과 같은 theta 로 정한다(vigil_stats 의 RECENT_THREAT 와 별개).
+# 실제 정지 = 이번 스텝의 실제 보행이 정지(경계 포함, speed 를 끈 세계는 경계)다.
+WINDOW_HIST_SHAPE = (3, 2, 2, 2)
+# window_stats() 열 순서. env_v2/rollout.py 가 vigil_window 를 켠 세계의 행에 붙인다.
+WINDOW_STAT_COLUMNS = (
+    "win_frac", "p_stop_win", "p_stop_calm", "p_stop_win_full", "p_stop_calm_full", "b3_l",
+    "p_stop_win_hungry", "p_stop_calm_hungry",
+    "p_vig_win", "p_vig_win_full", "p_vig_win_hungry", "p_vig_calm",
+    "look_frac", "look_win_frac",
+)
+
 
 def action_names(cfg) -> tuple[str, ...]:
     """설정(또는 `Features`)의 세계가 받는 행동 이름. 순서 = 행동 열 번호 (계획서 4.3).
 
     v1 4개 뒤에 켠 기능의 행동이 버전 순으로 붙는다: speed(v2.1), vigilance(v2.2). 앞 기능을 끄면 뒤 칸이
     당겨진다(speed 없이 vigilance 만 켜면 vigilance 가 열 4). 한번 정한 순서는 바꾸지 않는다.
+    vigil_window(v2.2r)를 켜고 action 이 false 면 vigilance 열이 없다(관측 threat_recency 는 그대로).
     """
     f = cfg if isinstance(cfg, Features) else features_of(cfg)
     names = ACT_NAMES_V1
     if f.enabled("speed"):
         names = names + ("speed",)
-    if f.enabled("vigilance"):
+    if f.enabled("vigilance") and (not f.enabled("vigil_window") or f.params("vigil_window")["action"]):
         names = names + ("vigilance",)
     return names
 
 
 def action_dim(cfg) -> int:
-    """설정의 세계가 받는 행동 수. v1·v2.0·v2.0b 4, speed 를 켜면 5, vigilance 까지 켜면 6."""
+    """설정의 세계가 받는 행동 수. v1·v2.0·v2.0b 4, speed 를 켜면 5, vigilance 까지 켜면 6(v2.2r action false 면 5)."""
     return len(action_names(cfg))
 
 
@@ -181,6 +198,37 @@ def _vigil_params(p: dict, base_fov_deg: float) -> dict:
     half_life = math.log(0.5) / math.log(dec) if 0.0 < dec < 1.0 else (0.0 if dec == 0.0 else math.inf)
     return dict(threshold=th, decay=dec, eat_mult=eat, fov_deg=fov, threat_flee=tf, wide_cos=wide_cos,
                 half_life=half_life)
+
+
+def _window_params(p: dict, f: Features) -> dict:
+    """vigil_window 계수(yaml 블록, 키는 `features.PARAM_KEYS`)를 검사한다. 기본값은 없다 (v2.2r, 수정 제안서 3.1 (나)).
+
+    - action (bool): 경계 행동 열이 있나. false 면 행동에서 vigilance 열을 빼고(`action_names`) 경계는 일어나지 않는다.
+      관측 threat_recency·ThreatDir 갱신(`_perceive`)은 vigilance 그대로다 — T1(관측 8만)·L(반사)
+    - window_only (bool): 경계가 창 안 개체에서만 효력이 있다(W′). 창 밖에서 a_vig > threshold 여도 경계가 아니고
+      speed 가 보행을 정한다. action 이 true 여야 한다
+    - look_back (bool): 반사 돌아보기(L). 이번 스텝의 실제 보행이 정지이고 창 안이면 heading ← ThreatDir(`_look_back`).
+      정지를 speed 가 정하므로 speed 를 켜야 한다
+    - theta ∈ [0, 1): 창 문턱. 창 = 결정 때 포식자 안 보임(관측 1 = 0) & threat_recency > theta. Gate E2 의 θ 0.5
+      (RECENT_THREAT, 놓친 뒤 13스텝)를 적는다
+    vigilance 를 켜야 한다(threat_recency·ThreatDir·경계 계수가 거기 있다).
+    """
+    if not f.enabled("vigilance"):
+        raise ValueError("features.vigil_window 는 vigilance 를 함께 켜야 한다(threat_recency·ThreatDir 가 vigilance 에 있다)")
+    out = {}
+    for key in ("action", "window_only", "look_back"):
+        if not isinstance(p[key], bool):
+            raise ValueError(f"features.vigil_window.{key} 는 true/false 여야 한다. 받은 값: {p[key]!r}")
+        out[key] = p[key]
+    th = _num("vigil_window", "theta", p["theta"])
+    if not 0.0 <= th < 1.0:
+        raise ValueError(f"features.vigil_window.theta 는 [0, 1) 이어야 한다(threat_recency 는 보이면 1). 받은 값: {th}")
+    out["theta"] = th
+    if out["window_only"] and not out["action"]:
+        raise ValueError("features.vigil_window.window_only 는 action: true 일 때만 쓴다(경계 행동 열이 없으면 효력도 없다)")
+    if out["look_back"] and not f.enabled("speed"):
+        raise ValueError("features.vigil_window.look_back 은 speed 를 함께 켜야 한다(반사 조건 '정지'를 speed 가 정한다)")
+    return out
 
 
 def _speed_params(p: dict) -> dict:
@@ -277,11 +325,14 @@ class World:
         self._sp = _speed_params(self.features.params("speed")) if self.features.enabled("speed") else None
         self._vg = (_vigil_params(self.features.params("vigilance"), cfg.fov_deg)
                     if self.features.enabled("vigilance") else None)
+        self._vw = (_window_params(self.features.params("vigil_window"), self.features)
+                    if self.features.enabled("vigil_window") else None)
         self.act_names: tuple[str, ...] = action_names(self.features)
         self.act_dim = len(self.act_names)
         self.obs_names: tuple[str, ...] = obs_names(self.features)
         self.obs_dim = len(self.obs_names)
-        self._act_vig = self.act_names.index("vigilance") if self._vg is not None else None
+        # 경계 행동 열. vigilance 를 끈 세계와 v2.2r action false 세계는 None 이다(경계가 일어나지 않는다)
+        self._act_vig = self.act_names.index("vigilance") if "vigilance" in self.act_names else None
         self.reset()
 
     # ------------------------------------------------------------------ #
@@ -328,6 +379,10 @@ class World:
             self.gaze = self.head.copy()
             if self._sp is None:
                 self.vel = np.zeros((self.N, 2))
+        if self._vw is not None:
+            # v2.2r 스텝 뒤 훅 (replay_v2): 이번 스텝의 결정 때 창, 반사 돌아보기가 heading 을 바꾼 개체
+            self.window = np.zeros(self.N, dtype=bool)
+            self.looked = np.zeros(self.N, dtype=bool)
         self._reset_stats()
         self._g = self._geometry()
         if self._vg is not None:
@@ -702,9 +757,11 @@ class World:
         a = np.asarray(a, dtype=np.float64)
         self._check_action(a)
         rew = np.full(self.N, cfg.rew_alive)
-        vg = self._vg
+        vg, vw = self._vg, self._vw
         if vg is not None:
             ema0 = min(self.pred_ema, 1.0)              # 결정 때 관측 5 (vigil_stats B5′ 용, 6) 에서 바뀐다)
+        if vw is not None:              # v2.2r 0) 결정 때 창: 결정 관측의 포식자 수 0 & threat_recency > theta
+            self.window = (self._g["pred_count"] == 0) & (self.threat > vw["theta"])
 
         # 1) 초식 이동 — §3.3 조향 수식. 벽 경계(§4.2), 토러스 없음.
         #    v2.2 threat_flee > 0 (#18 변형, Gate E2b 보고 팔)만 위협 반대 항을 정규화 전에 더한다. 0 이면 None 이라
@@ -713,13 +770,16 @@ class World:
                   self._threat_flee_term() if vg is not None and vg["threat_flee"] > 0.0 else None)
         if self._sp is not None:
             v = self._gait_step(v, a[:, ACT_SPEED])     # v2.1: 보행 상태가 크기만 바꾼다. 방향은 v1 조향 그대로
-        if vg is not None:
-            v = self._vigil_step(v, a[:, self._act_vig])   # v2.2: 경계면 속력 0 (speed 보다 우선)
+        if self._act_vig is not None:       # v2.2: 경계면 속력 0 (speed 보다 우선). v2.2r W′ 는 창 안에서만
+            v = self._vigil_step(v, a[:, self._act_vig],
+                                 self.window if vw is not None and vw["window_only"] else None)
         self.pos = np.clip(self.pos + v, 0.0, self.size)
         moving = np.linalg.norm(v, axis=1) > EPS
         self.head = np.where(moving[:, None], normalize(v), self.head)
         if vg is not None:                  # v2.2 1e): 경계한 개체는 위협 쪽을 본다(ThreatDir, 본 적 없으면 유지)
             self._face_threat()
+        if vw is not None and vw["look_back"]:   # v2.2r 1f): 정지 중이고 창 안이면 위협 쪽을 본다(L 반사)
+            self._look_back()
 
         # 2) 포식자 이동 + 포획 판정
         caught = self._step_predators()
@@ -773,6 +833,8 @@ class World:
         self._accumulate(a, rew, repro, caught, starved, done)
         if self._sp is not None:      # 스텝 전 기하(self._g)·결정 때 에너지로 보행 지표를 센다
             self._gait_accumulate(e_prev, e_new - e_drained, drain)
+        if vw is not None:            # 결정 때 창·배부름으로 창 지표(B3_L·W′ 사용률)를 센다
+            self._window_accumulate(e_prev)
         if vg is not None:            # 결정 때 상태(기하·threat_recency·시야·에너지)로 경계 지표를 센다
             flee = self._vigil_accumulate(a, e_prev, ema0, moving)
             self._wide = self.vigilant.copy()       # 8a) 이번 스텝에 경계한 개체의 다음 관측은 경계 시야다
@@ -817,8 +879,12 @@ class World:
             eat = np.where(self.vigilant, self._vg["eat_mult"], eat)
         return drain, eat
 
-    def _vigil_step(self, v: np.ndarray, a_vig: np.ndarray) -> np.ndarray:
+    def _vigil_step(self, v: np.ndarray, a_vig: np.ndarray, win: np.ndarray | None = None) -> np.ndarray:
         """v2.2 경계 (계획서 4.3·4.4 1단계 표, #1·#5). `step` 1) 에서 보행(`_gait_step`) 뒤에 부른다.
+
+        v2.2r W′(vigil_window.window_only)면 `win`(결정 때 창, `step` 0)을 받아 1a') 를 vig = a_vig > threshold & win
+        으로 바꾼다 — 창 밖에서는 경계가 효력이 없고 speed 가 보행을 정한다. 나머지 순서는 아래 그대로다.
+        C++ 꼴: bVig = A[Vig] > Threshold && (!bWindowOnly || bWindow).
 
         한 스텝 순서 — C++ 로 옮길 때 이 순서를 지킨다. 행동 쪽은 상태가 없다(문턱 고정, 최소 유지 시간 없음):
           1-)  (step, threat_flee > 0 일 때만) v1 조향 합에 #18 위협 반대 항을 더한 뒤 정규화한다(`_threat_flee_term`).
@@ -851,6 +917,8 @@ class World:
         리스폰은 이 훅을 바꾸지 않는다(죽은 슬롯의 마지막 프레임이 그 개체의 값이다).
         """
         vig = a_vig > self._vg["threshold"]
+        if win is not None:
+            vig = vig & win
         v = np.where(vig[:, None], 0.0, v)
         if self._sp is not None:
             self.gait = np.where(vig, GAIT_STOP, self.gait).astype(np.int8)
@@ -876,6 +944,24 @@ class World:
         """경계한 개체의 heading ← ThreatDir (0 이면 유지), 시선 훅 갱신. `step` 1e) 와 8c) (`_vigil_step` docstring)."""
         face = self.vigilant & (self.threat_dir != 0.0).any(1)
         self.head[face] = self.threat_dir[face]
+        self.gaze = self.head.copy()
+
+    def _look_back(self) -> None:
+        """v2.2r L 반사 돌아보기 (수정 제안서 3.1 (나), R2). `step` 1f) — 이동·heading 갱신(1d)과 경계 돌아보기(1e) 뒤.
+
+        조건: 결정 때 창 안(`self.window`, `step` 0) & 이번 스텝의 실제 보행이 정지(`self.gait`, 경계 포함) & ThreatDir ≠ 0.
+        그러면 heading ← ThreatDir(마지막 위협 방향, 단위벡터). 섭식·대사·시야는 정지 그대로다(섭식 gait_eat[정지],
+        대사 c_rest, 다음 관측 기본 FOV). 그래서 이득은 돌아보기 하나 — 다음 관측(8)의 120° 시야가 놓친 포식자 쪽을
+        향한다. 멈출지는 RL 이 speed 로 고른다(창 밖에서 멈춰도 반사가 없고, 상수 정책은 창 안에서만 멈출 수 없다).
+        정지 개체는 v = 0 이라 1d 가 heading 을 바꾸지 않으므로 이 반사가 스텝 끝 heading 이다. 포식자는 heading 을
+        보지 않는다(v1 그대로).
+        C++ 꼴 (SteerV2, 이동 뒤): if (bWindow && Gait == Stop && !ThreatDir.IsZero()) Facing = ThreatDir;
+               bWindow = (PredCount == 0 && Recency > Theta)  — 결정 관측 기준.
+        스텝 뒤 훅(replay_v2): `self.looked`(반사가 돈 개체), `self.gaze`(스텝 뒤 heading).
+        """
+        face = self.window & (self.gait == GAIT_STOP) & (self.threat_dir != 0.0).any(1)
+        self.head[face] = self.threat_dir[face]
+        self.looked = face
         self.gaze = self.head.copy()
 
     def _gait_step(self, v: np.ndarray, a_speed: np.ndarray) -> np.ndarray:
@@ -1110,6 +1196,9 @@ class World:
             self._b4 = np.zeros((3, 2), dtype=np.int64)
             self._vsw, self._vsw_steps = 0, 0          # 경계 전환 수, 직전 스텝이 같은 개체인 개체-스텝
             self._vig_prev = np.full(self.N, -1, dtype=np.int8)
+        if self._vw is not None:     # v2.2r 창 지표 (window_stats). 개체-스텝 수다
+            self._win_hist = np.zeros(WINDOW_HIST_SHAPE, dtype=np.int64)   # [구간 3, 배부름 2, 실제 정지 2, 경계 2]
+            self._win_look = 0                         # 반사 돌아보기가 돈 개체-스텝
 
     def _accumulate(self, a, rew, repro, caught, starved, done) -> None:
         self._rew_total += float(rew.sum())
@@ -1379,6 +1468,62 @@ class World:
             b3_truth=p_t[1] - p_t[0], b5p_truth=p_t[2] - ratio(tv[0] + tv[1], tn[0] + tn[1]),
         )
         assert tuple(out) == VIGIL_STAT_COLUMNS
+        return out
+
+    def _window_accumulate(self, e_prev: np.ndarray) -> None:
+        """v2.2r 창 지표를 센다. `step` 이 `_accumulate` 뒤, 관측(8)으로 `self._g` 를 바꾸기 전에 부른다.
+
+        구간은 결정 때 상태다: 보임 = 결정 관측의 포식자 수 > 0, 창 = `self.window`(`step` 0, 동역학과 같은 theta),
+        평시 = 그 밖. 배부름 = 결정 때 energy ≥ HUNGRY·max_energy. 정지 = 이번 스텝의 실제 보행 정지(경계 포함).
+        """
+        g = self._g
+        seg = np.where(g["pred_count"] > 0, 2, self.window.astype(np.int64))   # 0 평시, 1 창 안, 2 보임
+        full = e_prev >= HUNGRY * self.cfg.max_energy
+        stop = (self.gait == GAIT_STOP) if self._sp is not None else self.vigilant
+        code = ((seg * 2 + full) * 2 + stop) * 2 + self.vigilant   # WINDOW_HIST_SHAPE 의 C 순서 평탄 인덱스
+        self._win_hist += np.bincount(code, minlength=self._win_hist.size).reshape(WINDOW_HIST_SHAPE)
+        self._win_look += int(np.count_nonzero(self.looked))
+
+    def window_stats(self) -> dict:
+        """v2.2r 창 지표 — reset 뒤 누적 (수정 제안서 3.8 선택 규칙 (i)·B3 정의). 열 순서는 `WINDOW_STAT_COLUMNS`.
+
+        비율은 개체-스텝 기준이고 분모가 0 이면 nan 이다. 창은 동역학의 theta 로 정한다.
+        - win_frac: 결정 때 창 안 비율
+        - p_stop_win·p_stop_calm: 창 안·평시의 P(실제 정지). *_full·*_hungry 는 결정 때 energy ≥ 0.5 / < 0.5 표본만
+        - b3_l = p_stop_win_full − p_stop_calm_full — L 의 새 결정 사용 지표(B3_L). 배고파서 멈춘 경우를 떼려고
+          배부른 표본만 쓴다. 상수 정책도 창 안·평시의 상태 분포 차이로 0 이 아닐 수 있다(대조군과 비교한다)
+        - p_vig_win·p_vig_win_full·p_vig_win_hungry·p_vig_calm: 경계(효력이 난 경계) 비율. W′ 의 사용 지표는
+          p_vig_win 이고, window_only 면 p_vig_calm 은 구성상 0 이다. action false 세계는 모두 0 이다
+        - look_frac·look_win_frac: 반사 돌아보기가 돈 개체-스텝 비율(전체 대비, 창 안 대비). look_back 을 끄면 0
+        """
+        nan = float("nan")
+        H = self._win_hist                                      # [구간, 배부름, 정지, 경계]
+        n = int(H.sum())
+
+        def ratio(x, y):
+            return float(x) / float(y) if y else nan
+
+        sf = H.sum(3)                                           # [구간, 배부름, 정지]
+        nf = sf.sum(2)                                          # [구간, 배부름]
+        vf = H[..., 1].sum(2)                                   # [구간, 배부름] 경계 수
+
+        def p_stop(k):
+            return ratio(sf[k, :, 1].sum(), nf[k].sum())
+
+        def p_stop_f(k, f):
+            return ratio(sf[k, f, 1], nf[k, f])
+
+        out = dict(
+            win_frac=ratio(nf[1].sum(), n),
+            p_stop_win=p_stop(1), p_stop_calm=p_stop(0),
+            p_stop_win_full=p_stop_f(1, 1), p_stop_calm_full=p_stop_f(0, 1),
+            b3_l=p_stop_f(1, 1) - p_stop_f(0, 1),
+            p_stop_win_hungry=p_stop_f(1, 0), p_stop_calm_hungry=p_stop_f(0, 0),
+            p_vig_win=ratio(vf[1].sum(), nf[1].sum()), p_vig_win_full=ratio(vf[1, 1], nf[1, 1]),
+            p_vig_win_hungry=ratio(vf[1, 0], nf[1, 0]), p_vig_calm=ratio(vf[0].sum(), nf[0].sum()),
+            look_frac=ratio(self._win_look, n), look_win_frac=ratio(self._win_look, nf[1].sum()),
+        )
+        assert tuple(out) == WINDOW_STAT_COLUMNS
         return out
 
     def stats(self) -> dict:

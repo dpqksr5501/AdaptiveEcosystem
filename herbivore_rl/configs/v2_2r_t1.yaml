@@ -1,0 +1,47 @@
+# V2 설정 — v2.2r 탐색 팔 T1: v2.1 + 관측 8(threat_recency), 경계 행동 열 없음 (수정 제안서 3.8, 10-03 R2).
+#
+# configs/v2_2.yaml 의 세계(포식자 속도 overrides, speed 블록, vigilance 블록)를 그대로 옮기고 vigil_window 로 경계 행동
+# 열만 뺀다(action: false). 관측 8 (idx 7 = threat_recency), 행동 5 (idx 4 = speed). 경계가 일어나지 않으므로
+# vigilance 의 threshold·eat_mult·fov_deg 는 쓰이지 않는다(블록은 threat_recency 의 decay 때문에 켠다. 계수는 yaml 이
+# 유일한 원본이라 v2_2.yaml 값 그대로 적는다). 묻는 것: 관측 8만으로 학습이 나빠지나(results/v2/stage1_v2_2.md 의 분리
+# 시험), L 의 대조군.
+#   python train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 20 --run-name v2_2r_t1_s20
+# 형식 규칙은 configs/v2.yaml 머리 주석과 같다.
+
+version: "2.2r_t1"
+
+overrides:
+  rand:
+    pred_speed_mult: [0.6, 0.95]
+
+features:
+  speed:
+    # configs/v2_1.yaml·v2_2.yaml 블록 그대로 (Gate E1-b 통과 계수 r2_5_ew0_5)
+    enabled: true
+    thresholds: [0.3333333333333333, 0.6666666666666666]
+    gait_speed: [0.0, 0.4, 1.0]
+    gait_eat: [1.0, 0.5, 0.0]
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+  vigilance:
+    # configs/v2_2.yaml 블록 그대로 (Gate E2 V0, decay 0.95). action: false 라 threshold·eat_mult·fov_deg 는 쓰이지 않는다
+    enabled: true
+    threshold: 0.5
+    decay: 0.95
+    eat_mult: 0.0
+    fov_deg: 360.0
+    threat_flee: 0.0
+  vigil_window:
+    enabled: true
+    action: false
+    window_only: false
+    look_back: false
+    # 창 문턱 = Gate E2 의 θ (env_v2/world.py RECENT_THREAT, 놓친 뒤 13스텝). T1 은 창 지표(window_stats)를 재는 데만 쓴다
+    theta: 0.5
+
+train:
+  # v2.1·v2.2 와 같다. 경계 행동 열이 없어 init_action_bias 를 두지 않는다(speed 는 SB3 기본 편향 0, v2.1 과 같다)
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256

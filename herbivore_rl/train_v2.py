@@ -32,6 +32,14 @@ P(경계) = P(N(−0.84, 1) > logit(0.5) = 0) ≈ 20% (계획서 4.7 "vigilance 
   두 옵션은 기본 이름(`v2_2_s0_20m` 등)의 체크포인트를 덮지 않도록 `--run-name` 이나 `--out` 과 함께 써야 한다.
   `--init` 과 `--init-bias` 는 함께 쓸 수 없다(옮겨 온 가중치에는 편향을 넣지 않는다).
 메타 JSON 에는 설정의 `config_digest`(diagnose_v2.config_digest 와 같은 값)도 남긴다.
+
+학습 가능성 탐침 기록 (10-03 R6·R8, 수정 제안서 3.2·3.3): `--probe-every N` 이면 N 스텝마다(그 뒤 첫 롤아웃 끝) 롤아웃
+버퍼의 관측(학습 분포가 실제로 간 상태)에서 새 결정의 확률을 상태 구간별로 잰다(`probe_row`). 구간은 관측으로 정한다:
+보임 = 관측 1 > 0, 창 = 안 보임 & threat_recency > theta(vigil_window 의 theta, 없으면 RECENT_THREAT 0.5), 평시 = 그 밖,
+배부름 = 관측 4 ≥ 0.5. 확률은 가우시안 표본 → [-3, 3] 자르기 → sigmoid → 문턱 경로의 해석값(`gait_probs`·`vig_probs` 와
+같은 식, 벡터화)이다. 행은 `<out>.probe.jsonl` 에 바로 덧붙이고(탐침 실행기가 2M·5M 조기 중단을 판정한다) 메타 JSON
+`probe_history` 에도 남긴다. 기본 0 은 끔(기존과 같다).
+      python train_v2.py --config configs/v2_2r_l.yaml --seed 20 --run-name v2_2r_l_s20 --probe-every 1000000
 """
 
 from __future__ import annotations
@@ -53,7 +61,8 @@ from stable_baselines3.common.callbacks import BaseCallback
 
 from env_v2.config import load_v2_config
 from env_v2.vec_env import MultiWorldVecEnv, sigmoid
-from env_v2.world import ACT_NAMES_V1, ACT_SPEED, GAIT_RUN, GAIT_STOP, GAIT_WALK
+from env_v2.world import (ACT_NAMES_V1, ACT_SPEED, GAIT_RUN, GAIT_STOP, GAIT_WALK, HUNGRY, OBS_ENERGY,
+                          OBS_PREDATOR_COUNT, RECENT_THREAT)
 from train import load_tuned, make_model
 
 ROOT = Path(__file__).resolve().parent
@@ -117,6 +126,70 @@ def vig_probs(mu, std, threshold: float) -> np.ndarray:
     """
     ge = _side(threshold)
     return np.array([ge(float(m), float(s)) for m, s in zip(np.ravel(mu), np.ravel(std))])
+
+
+def side_probs(t: float, mu, std) -> np.ndarray:
+    """`_side(t)` 의 벡터판: N(μ, std²) 표본을 [-3, 3] 로 자른 뒤 sigmoid 한 값이 t 이상일 확률 (개체마다)."""
+    from scipy.special import ndtr
+
+    mu, std = np.asarray(mu, dtype=np.float64), np.asarray(std, dtype=np.float64)
+    if t <= 0.0:
+        return np.ones_like(mu)
+    if t >= 1.0:
+        return np.zeros_like(mu)
+    x = math.log(t / (1.0 - t))
+    if x <= -3.0:
+        return np.ones_like(mu)
+    if x > 3.0:
+        return np.zeros_like(mu)
+    return 1.0 - ndtr((x - mu) / std)
+
+
+def probe_row(obs: np.ndarray, mu: np.ndarray, std: np.ndarray, act_names, obs_names, world) -> dict:
+    """탐침 기록 한 행 (모듈 docstring '학습 가능성 탐침 기록'). 관측 (n, 관측 수), 정책 평균·표준편차 (n, 행동 수).
+
+    - p_stop: 평균 P(명령 정지). threat_recency 가 있으면 구간별 값도 낸다:
+      p_stop_win·p_stop_calm, *_full(배부름 표본), b3_l_prob = p_stop_win_full − p_stop_calm_full (L 의 B3 확률판)
+    - vigilance 가 있으면 p_vig·p_vig_win·p_vig_calm·p_vig_win_full·p_vig_win_hungry (W′ 의 창 안 사용률)
+    - n·frac_win·frac_seen: 표본 수와 구간 비율. 분모가 0 이면 None
+    """
+    names, onames = list(act_names), list(obs_names)
+
+    def mean(x, m=None):
+        if m is not None:
+            x = x[m]
+        return float(x.mean()) if len(x) else None
+
+    row = {"n": int(len(obs))}
+    full = obs[:, OBS_ENERGY] >= HUNGRY
+    win = calm = None
+    if "threat_recency" in onames:
+        vw = getattr(world, "_vw", None)
+        theta = vw["theta"] if vw is not None else RECENT_THREAT
+        seen = obs[:, OBS_PREDATOR_COUNT] > 0
+        win = ~seen & (obs[:, onames.index("threat_recency")] > theta)
+        calm = ~seen & ~win
+        row.update(theta=float(theta), frac_win=mean(win.astype(np.float64)),
+                   frac_seen=mean(seen.astype(np.float64)))
+    if "speed" in names:
+        i = names.index("speed")
+        p_stop = 1.0 - side_probs(world._sp["thresholds"][0], mu[:, i], std[:, i])
+        row["p_stop"] = mean(p_stop)
+        row["speed_std"] = mean(std[:, i])
+        if win is not None:
+            row.update(p_stop_win=mean(p_stop, win), p_stop_calm=mean(p_stop, calm),
+                       p_stop_win_full=mean(p_stop, win & full), p_stop_calm_full=mean(p_stop, calm & full))
+            a, b = row["p_stop_win_full"], row["p_stop_calm_full"]
+            row["b3_l_prob"] = None if a is None or b is None else a - b
+    if "vigilance" in names:
+        i = names.index("vigilance")
+        p_vig = side_probs(world._vg["threshold"], mu[:, i], std[:, i])
+        row["p_vig"] = mean(p_vig)
+        row["vig_std"] = mean(std[:, i])
+        if win is not None:
+            row.update(p_vig_win=mean(p_vig, win), p_vig_calm=mean(p_vig, calm),
+                       p_vig_win_full=mean(p_vig, win & full), p_vig_win_hungry=mean(p_vig, win & ~full))
+    return row
 
 
 def init_action_bias(cfg, act_names) -> dict[str, float]:
@@ -310,6 +383,49 @@ class BehaviorLogCallbackV2(BaseCallback):
                 print(f"  중간 저장 {at:,} → {path.name} (실제 {self.num_timesteps:,})", flush=True)
 
 
+class ProbeLogCallbackV2(BaseCallback):
+    """`probe_every` 스텝마다 롤아웃 버퍼 관측에서 새 결정의 구간별 확률을 잰다(`probe_row`, 학습 가능성 탐침 기록).
+
+    행은 `path`(jsonl)에 바로 덧붙이고 `history` 에 모은다. 정책 분포만 읽어 학습에는 영향이 없다(난수를 쓰지 않는다).
+    """
+
+    def __init__(self, probe_every: int, path: Path | None = None):
+        super().__init__()
+        self.probe_every = int(probe_every)
+        self._next = self.probe_every
+        self.path = path
+        self.history: list[dict] = []
+        if path is not None:
+            path.write_text("", encoding="utf-8")
+
+    def _on_step(self) -> bool:
+        return True
+
+    def _on_rollout_end(self) -> None:
+        if self.probe_every <= 0 or self.num_timesteps < self._next:
+            return
+        import torch as th
+
+        env = self.training_env
+        obs = self.model.rollout_buffer.observations.reshape(-1, env.obs_dim)
+        pol = self.model.policy
+        with th.no_grad():
+            d = pol.get_distribution(pol.obs_to_tensor(obs)[0]).distribution
+            mu = d.mean.cpu().numpy().astype(np.float64)
+            std = d.stddev.cpu().numpy().astype(np.float64)
+        row = {"timesteps": int(self.num_timesteps),
+               **probe_row(obs, mu, std, env.act_names, env.obs_names, env.worlds[0])}
+        self.history.append(row)
+        for k, v in row.items():
+            if k != "timesteps" and isinstance(v, float):
+                self.logger.record(f"probe/{k}", v)
+        if self.path is not None:
+            with open(self.path, "a", encoding="utf-8") as f:
+                f.write(json.dumps(row, ensure_ascii=False) + "\n")
+        while self._next <= self.num_timesteps:
+            self._next += self.probe_every
+
+
 def gamma_tag(gamma: float) -> str:
     """γ → 이름 조각. 0.998 → g998, 0.995 → g995, 0.9916661555611042 → g991666 (유효숫자 6자리)."""
     return "g" + format(float(gamma), ".6g").replace("0.", "", 1).replace(".", "p")
@@ -368,6 +484,8 @@ def main(argv=None) -> int:
     p.add_argument("--save-at", type=int, nargs="*", default=[], help="중간 저장 시점(timestep)")
     p.add_argument("--threads", type=int, default=4, help="torch 스레드 수 (병렬 실행 시 줄인다)")
     p.add_argument("--tb", default=str(ROOT / "runs" / "v2"))
+    p.add_argument("--probe-every", type=int, default=0,
+                   help="N 스텝마다 새 결정의 구간별 확률을 <out>.probe.jsonl 에 남긴다(학습 가능성 탐침). 0 = 끔")
     args = p.parse_args(argv)
     cli_bias = parse_init_bias(args.init_bias)
     if (args.ent_coef is not None or cli_bias) and not (args.run_name or args.out):
@@ -424,7 +542,8 @@ def main(argv=None) -> int:
     if "vigilance" in init_rep:
         vp, i = init_rep["vigilance"], venv.act_names.index("vigilance")
         ref = ("--init-bias 로 덮음" if bias_source.get("vigilance") == "cli"
-               else "계획서 4.7: 편향 −0.84, 경계 약 20%")
+               else "계획서 4.7: 편향 −0.84, 경계 약 20%" if bias.get("vigilance") == -0.84
+               else f"설정 train.init_action_bias 편향 {bias.get('vigilance', 0.0):+g}")
         print(f"시작 분포 vigilance: 편향 {init_rep['action_bias'][i]:+.4f}, log_std {init_rep['log_std'][i]:+.3f}, "
               f"평균 μ {vp['mu_mean']:+.4f} → 경계 {vp['vig_prob']:.3f} ({ref})", flush=True)
 
@@ -432,8 +551,10 @@ def main(argv=None) -> int:
           f"세계당 n_steps {n_steps} (배치 {n_steps * venv.num_envs:,}), 리셋 {venv.T}스텝마다, "
           f"관측 {venv.obs_dim}개, 행동 {venv.act_dim}개 {list(venv.act_names)}", flush=True)
     cb = BehaviorLogCallbackV2(save_at=args.save_at, save_prefix=out)
+    probe = (ProbeLogCallbackV2(args.probe_every, out.with_suffix(".probe.jsonl"))
+             if args.probe_every > 0 else None)
     t0 = time.time()
-    model.learn(total_timesteps=args.steps, callback=cb, tb_log_name=run,
+    model.learn(total_timesteps=args.steps, callback=[cb, probe] if probe is not None else cb, tb_log_name=run,
                 reset_num_timesteps=True, progress_bar=False)
     elapsed = time.time() - t0
     model.save(out)
@@ -476,6 +597,8 @@ def main(argv=None) -> int:
         "init_action_bias": bias if not args.init else {},
         "init_action_bias_source": bias_source if not args.init else {},
         "init_policy": init_rep,
+        # --probe-every 의 탐침 기록(없으면 키가 없다 — 예전 메타와 같다)
+        **({"probe_every": args.probe_every, "probe_history": probe.history} if probe is not None else {}),
     }
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"config_digest {meta['config_digest']}, ent_coef {meta['ent_coef']} ({ent_coef_source})")

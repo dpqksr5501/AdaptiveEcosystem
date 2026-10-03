@@ -1,6 +1,7 @@
 """V2 기능 스위치와 기능별 난수 스트림 (계획서 4.8, 0-1b).
 
-버전 설정(`configs/v2.yaml`, `configs/v2_0b.yaml`, `configs/v2_1.yaml`, `configs/v2_2.yaml` ...)의 `features:` 아래에 기능마다
+버전 설정(`configs/v2.yaml`, `configs/v2_0b.yaml`, `configs/v2_1.yaml`, `configs/v2_2.yaml`, `configs/v2_2r_*.yaml` ...)의
+`features:` 아래에 기능마다
 블록 하나를 둔다.
 
     features:
@@ -69,10 +70,11 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "water": 10,        # v2.8 물웅덩이, 수분, 마시기
     "boundary": 11,     # R1 (i) 언리얼 경계 반발 파리티
     "obstacles": 12,    # R1 (ii) 원형 장애물 반발
+    "vigil_window": 13,  # v2.2r 경계 재설계(10-03 R2): 경계 행동 열 유무, 창 안 한정 경계(W′), 반사 돌아보기(L)
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
-IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance"})
+IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -90,6 +92,13 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # threat_flee(10-03, 1-5 Gate E2b 의 10절 #18 변형용): 포식자가 안 보일 때 조향에 더하는 위협 반대 항
     # threat_flee·flee_weight·threat_recency·(−ThreatDir) 의 배수. 0 = 끔(1-4 구현 그대로, 규칙 5)
     "vigilance": frozenset({"threshold", "decay", "eat_mult", "fov_deg", "threat_flee"}),
+    # v2.2r (env_v2/world.py `_window_params`, 10-03 R2·수정 제안서 3.1 (나)): vigilance 위에 얹는 스위치라 vigilance 를
+    # 함께 켜야 한다. action = 경계 행동 열이 있나(false 면 관측 8·threat_recency 는 그대로 두고 행동 열만 뺀다 — T1·L),
+    # window_only = 경계가 '창 안'(결정 때 포식자 안 보임 & threat_recency > theta)에서만 효력이 있나(W′),
+    # look_back = 반사 돌아보기(정지 중이고 창 안이면 heading ← ThreatDir, L), theta = 창 문턱(Gate E2 의 θ 0.5).
+    # 기능을 끄면(블록이 없으면) v2.2 그대로다 — vigilance 계수 키를 늘리지 않아 configs/v2_2.yaml 의 config_digest
+    # (efc8f775f1e1)와 기록된 결과가 그대로 남는다(규칙 5 대신 새 기능 번호, 규칙 4)
+    "vigil_window": frozenset({"action", "window_only", "look_back", "theta"}),
 })
 
 
