@@ -11,14 +11,16 @@
     python diagnose_v2.py report --dirs v2_0_s0 v2_0_s1 v2_0_s2 --name v2_0   # 학습 시드 IQM·CI
     python diagnose_v2.py ablate --model ckpt/final.zip --g998                # γ=0.998 보고 평가 (6.1-4)
     python diagnose_v2.py ablate --model ckpt/final.zip --act-mode stochastic # 확률 모드 (6.1-7)
+    python diagnose_v2.py ablate --model ckpt/final.zip --act-mode hold --hold-k 24   # 유지 표본 모드 (R1)
     python diagnose_v2.py gammasel --dirs <γ 후보별 --g998 ablate 디렉터리들>   # 4.7 γ 선택 규칙
     python diagnose_v2.py modecmp --det <결정 모드 디렉터리들> --stoch <확률 모드 디렉터리들>  # #29
+    python diagnose_v2.py modecmp --det <결정 모드 디렉터리들> --hold <유지 표본 모드 디렉터리들>  # R1
 
 정책은 `--model`(학습 zip) 또는 `--policy utility|fixed|random` 으로 준다. 산출물은
 `results/v2/diag_<이름>/` 아래 JSON + MD 다(`--out` 으로 디렉터리를 직접 정할 수 있다). 이름은 `--name`, 없으면
 모델 파일 이름이고, 설정 version 이 2.0 이 아니면 `_v<version>` 을 붙인다(`final` + configs/v2_0b.yaml →
 `diag_final_v2_0b`). 같은 모델을 다른 설정으로 진단해도 v2.0 결과 디렉터리를 덮지 않는다. 기본 이름에는
-`--g998` 이면 `_g998`, 확률 모드면 `_stoch` 도 붙는다.
+`--g998` 이면 `_g998`, 확률 모드면 `_stoch`, 유지 표본 모드면 `_hold<K>` 도 붙는다.
 
 판정 규칙 (6.1):
 - 판정 양은 G_γ(PPO 가 최대화하는 할인 리턴-투-고 평균)와 결과·행동 지표다. mean_return 은 보고만 한다.
@@ -30,6 +32,8 @@
 - 행동 모드 (6.1-7): 기본은 결정 모드(평균 행동, 언리얼 배포와 같음)다. `--act-mode stochastic` 은 학습 분포
   (평균 + exp(log_std) 잡음 → [-3,3] 자르기 → sigmoid)에서 뽑는다. 잡음은 평가 시드에서 유도한 전용 스트림이라
   재현된다(env_v2/rollout.py StochasticLearned). 사전 등록 판정은 결정 모드로 한다.
+  `--act-mode hold --hold-k K` 는 유지 표본 모드다(수정 제안서 3.1 (가) R1 출시 모드): 조향 4열은 평균, 보행·경계 열만
+  개체별 잡음을 K 스텝 유지해 뽑는다(env_v2/rollout.py HoldLearned, 해시·위상 표본기). 캐시·이름·meta 에 K 가 들어간다.
 - 행동 수는 설정을 따른다(`env_v2.world.action_names`: v2.0 4개, speed 를 켠 v2.1 은 5개 — idx 4 = speed).
   C1·C3-k·C1′·C2·C2-seg·`--action`·`--const-action`·`--base-action` 의 길이가 모두 그 수다. 예:
       python diagnose_v2.py constsearch --config configs/v2_1.yaml --policy fixed --action 0.4 0.8 0.4 0.1 0.5 \
@@ -67,6 +71,7 @@ from env_v2.rollout import (
     ACTION_MODES,
     ROW_COLUMNS,
     build_policy,
+    hold_k_of,
     load_gamma,
     make_executor,
     model_gamma,
@@ -96,8 +101,11 @@ RECORD_EVERY = 30
 # C2 탐색 조건 (계획서 2.1 의 Optuna 112회와 같다).
 SEARCH_SEEDS = range(0, 8)
 SEARCH_STEPS = 3000
-RESCORE_SEEDS = range(100, 120)
+RESCORE_SEEDS = range(100, 120)      # C2 상수 탐색의 재채점에만 쓴다
 RESCORE_STEPS = 3000
+# 탐색 층 판정 시드 (10-03 R6). 학습 시드 풀 0~999 와 평가 시드 10000~10019 밖이다. 출시 모드 선택(R1)과 탐색 배치의
+# 팔 비교가 이 시드로 한다. RESCORE_SEEDS(100~119)는 상수 탐색 전용으로 그대로 둔다.
+EXPLORE_SEEDS = range(12000, 12040)
 TRIALS = 112
 BATCH = 7
 TOP_K = 5
@@ -458,6 +466,7 @@ class Ctx:
         self.args = args
         apply_g998(args)
         self.act_mode = getattr(args, "act_mode", None) or "deterministic"
+        self.hold_k = hold_k_arg(args)          # 유지 표본 모드의 K (다른 모드는 None)
         self.cfg = load_v2_config(args.config)
         # 이 설정의 세계가 받는 행동 (v2.0 4개, speed 를 켠 v2.1 5개). 대조군·상수의 길이가 이 수다
         self.act_names = list(action_names(self.cfg))
@@ -521,6 +530,8 @@ class Ctx:
             "act_names": self.act_names,
             # 1-4 에서 더한 키. 예전 JSON 에는 없다 — 읽을 때 없으면 v1 관측 7개로 본다(obs_names_of).
             "obs_names": self.obs_names,
+            # R1(10-03)에서 더한 키. 유지 표본 모드에만 있다 — 없으면 None(결정·확률 모드)으로 본다.
+            **({"hold_k": self.hold_k} if self.hold_k is not None else {}),
             **kw,
         }
 
@@ -542,6 +553,28 @@ def apply_g998(args) -> None:
         raise SystemExit(f"--g998 은 꼬리를 ceil(5/(1-γ)) = {tail} 로 둔다 (받은 값 {args.tail})")
 
 
+def hold_k_arg(args) -> int | None:
+    """`--act-mode hold` 의 `--hold-k`. hold 면 꼭 있어야 하고(양의 정수), 다른 모드에 주면 잘못 쓴 것으로 보고 멈춘다."""
+    mode = getattr(args, "act_mode", None) or "deterministic"
+    k = getattr(args, "hold_k", None)
+    if mode != "hold":
+        if k is not None:
+            raise SystemExit(f"--hold-k 는 --act-mode hold 에만 쓴다 (받은 모드 {mode})")
+        return None
+    if k is None:
+        raise SystemExit("--act-mode hold 는 --hold-k K(양의 정수, 수정 제안서 R1 은 24)가 필요하다")
+    if int(k) < 1:
+        raise SystemExit(f"--hold-k 는 양의 정수여야 한다 (받은 값 {k})")
+    return int(k)
+
+
+def mode_tag(mode: str, hold_k: int | None = None) -> str | None:
+    """이름·캐시 파일에 붙일 모드 표시. 결정 모드는 None(예전 이름 그대로), 확률 모드 stochastic, 유지 표본 모드 hold<K>."""
+    if mode == "deterministic":
+        return None
+    return f"hold{int(hold_k)}" if mode == "hold" else mode
+
+
 def base_spec(args, names=None) -> dict | None:
     """명령줄 → 바탕 정책 스펙. `names` 는 세계의 행동 이름(없으면 v1 4개)이고 fixed·random·utility 의 길이를 정한다."""
     names = list(ACT_NAMES if names is None else names)
@@ -553,6 +586,13 @@ def base_spec(args, names=None) -> dict | None:
             raise SystemExit("--act-mode stochastic 은 학습 정책(--model)에만 쓴다 — 상수·Utility 에는 분포가 없다")
         # 결정 모드 스펙은 예전과 같게 둔다(키를 더하지 않는다). 그래야 예전 캐시·결과와 그대로 비교된다.
         return {"kind": "learned", "model": str(Path(args.model).resolve()), "mode": "stochastic"}
+    if mode == "hold":
+        if not args.model:
+            raise SystemExit("--act-mode hold 는 학습 정책(--model)에만 쓴다 — 상수·Utility 에는 분포가 없다")
+        spec = {"kind": "learned", "model": str(Path(args.model).resolve()), "mode": "hold",
+                "hold_k": hold_k_arg(args)}
+        hold_k_of(spec)                       # rollout 과 같은 검사
+        return spec
     if args.model:
         return {"kind": "learned", "model": str(Path(args.model).resolve())}
     if args.policy == "utility":
@@ -572,8 +612,8 @@ def base_spec(args, names=None) -> dict | None:
 def default_name(args, cfg=None) -> str:
     """모델 파일 이름(없으면 정책 종류). 설정 version 이 2.0 이 아니면 `_v2_0b` 처럼 붙인다 — v2.0 경로는 그대로다.
 
-    `--g998` 이면 `_g998`, 확률 모드면 `_stoch` 를 더 붙인다. 기본 조건(결정 모드, 5000스텝)의 이름은 그대로라
-    새 조건으로 돌려도 예전 결과 디렉터리를 덮지 않는다.
+    `--g998` 이면 `_g998`, 확률 모드면 `_stoch`, 유지 표본 모드면 `_hold<K>` 를 더 붙인다. 기본 조건(결정 모드,
+    5000스텝)의 이름은 그대로라 새 조건으로 돌려도 예전 결과 디렉터리를 덮지 않는다.
     """
     name = Path(args.model).stem if args.model else (args.policy or "report")
     ver = str((getattr(cfg, "v2", None) or {}).get("version") or "2.0")
@@ -581,8 +621,11 @@ def default_name(args, cfg=None) -> str:
         name = f"{name}_v{ver.replace('.', '_')}"
     if getattr(args, "g998", False):
         name += "_g998"
-    if (getattr(args, "act_mode", None) or "deterministic") == "stochastic":
+    mode = getattr(args, "act_mode", None) or "deterministic"
+    if mode == "stochastic":
         name += "_stoch"
+    elif mode == "hold":
+        name += f"_{mode_tag(mode, hold_k_arg(args))}"
     return name
 
 
@@ -610,7 +653,8 @@ def calib_cache_key(ctx: Ctx) -> tuple[Path, dict]:
     """보정 캐시의 (파일, 메타). 메타가 같아야 캐시를 쓴다.
 
     결정 모드는 예전과 같은 파일·메타다(기존 캐시를 그대로 쓴다). 확률 모드는 파일 이름과 메타에 모드를 넣어
-    같은 `--name` 으로 돌려도 결정 모드 캐시를 읽거나 덮지 않는다(스펙에도 "mode" 가 들어 있다).
+    같은 `--name` 으로 돌려도 결정 모드 캐시를 읽거나 덮지 않는다(스펙에도 "mode" 가 들어 있다). 유지 표본 모드는
+    파일 이름에 K 까지 넣는다(`calib_hold24.npz`, 메타·스펙에도 hold_k) — K 가 다르면 서로 읽거나 덮지 않는다.
     """
     spec = ctx.need_spec()
     meta = {"spec": spec, "seeds": ctx.calib_seeds, "steps": ctx.calib_steps,
@@ -619,7 +663,9 @@ def calib_cache_key(ctx: Ctx) -> tuple[Path, dict]:
     fname = "calib.npz"
     if ctx.act_mode != "deterministic":
         meta["act_mode"] = ctx.act_mode
-        fname = f"calib_{ctx.act_mode}.npz"
+        fname = f"calib_{mode_tag(ctx.act_mode, ctx.hold_k)}.npz"
+        if ctx.hold_k is not None:
+            meta["hold_k"] = ctx.hold_k
     return CACHE / ctx.name / fname, meta
 
 
@@ -781,6 +827,8 @@ def md_meta(meta: dict, ref: str | None = "C0") -> list[str]:
     head = int(meta.get("head") or 0)
     mode = meta.get("act_mode") or "deterministic"
     mode_s = ("deterministic" if mode == "deterministic" else
+              f"hold K={meta.get('hold_k')} (조향 평균, 보행·경계 열만 개체별 잡음을 K스텝 유지한 표본, 해시·위상 표본기)"
+              if mode == "hold" else
               f"{mode} (학습 분포 표본, 잡음 스트림 [평가 시드, 303, 0])")
     g_line = (f"- G_γ: γ={meta.get('gamma')}, 롤아웃 끝 {meta.get('tail')}스텝(ceil(5/(1-γ)))은 평균에서 뺐다"
               if head == 0 else
@@ -983,6 +1031,7 @@ def reference_rows(ctx: Ctx, name: str, stem: str = "ablate") -> list[dict] | No
             # 0-7 에서 더한 조건. 예전 JSON 은 키가 없으므로 앞 제외 0, 결정 모드로 본다.
             and int(m.get("head") or 0) == ctx.head
             and (m.get("act_mode") or "deterministic") == ctx.act_mode
+            and m.get("hold_k") == ctx.hold_k                  # R1 에서 더한 조건. 예전 JSON 은 None
             and (ctx.spec is None or m.get("spec") == ctx.spec or stem != "ablate"))
     rows = d.get("per_seed", {}).get(name)
     return rows if same and rows else None
@@ -1693,13 +1742,21 @@ def mode_compare(det: list[dict], stoch: list[dict], reps: int = 2000, seed: int
     평가 시드·스텝·앞 제외·설정은 모든 결과가 같아야 한다. G 의 γ·꼬리는 E998 이면 모두 0.998·2500 이지만
     Etrain 이면 팔마다 그 팔의 학습 γ 라 다르다. 그래서 γ·꼬리는 짝(같은 모델의 두 모드)과 팔 안에서 같은지
     보고, 팔끼리 다르면 모든 결과가 자기 학습 γ 로 잰 것(Etrain)인지 본다 — E998 과 Etrain 을 섞지 않는다.
+
+    둘째 목록은 유지 표본 모드(R1, `--act-mode hold`)여도 된다. 그때 Δ = 유지 표본 − 결정이고 모든 결과의 K 가
+    같아야 한다. 둘째 모드는 결과의 "mode2"·"hold_k" 에 남는다(열 키 "stoch" 는 둘째 모드 값이다).
     """
     for d in det:
         if _cond(d["meta"], "act_mode") != "deterministic":
             raise SystemExit(f"{d.get('_dir')}: --det 에 결정 모드가 아닌 결과가 있다")
-    for d in stoch:
-        if _cond(d["meta"], "act_mode") != "stochastic":
-            raise SystemExit(f"{d.get('_dir')}: --stoch 에 확률 모드가 아닌 결과가 있다")
+    mode2 = {_cond(d["meta"], "act_mode") for d in stoch}
+    if not mode2 <= {"stochastic", "hold"} or len(mode2) != 1:
+        raise SystemExit(f"--stoch 에 확률 모드가 아닌 결과가 있다(또는 확률·유지 표본 모드가 섞였다): {sorted(mode2)}")
+    mode2 = mode2.pop()
+    hold_ks = {d["meta"].get("hold_k") for d in stoch}
+    if len(hold_ks) != 1:
+        raise SystemExit(f"--hold 결과마다 K 가 다르다: {sorted(map(str, hold_ks))}")
+    hold_k = hold_ks.pop()
     check_same_eval(det + stoch, keys=("eval_seeds", "eval_steps", "head", "config_digest"))
     if len({float(d["meta"]["gamma"]) for d in det + stoch}) > 1:
         for d in det + stoch:
@@ -1751,9 +1808,12 @@ def mode_compare(det: list[dict], stoch: list[dict], reps: int = 2000, seed: int
     for k in ("gamma", "tail"):                          # Etrain: 팔마다 다르다 → None (팔별 값은 groups 에)
         if len({_cond(d["meta"], k) for d in det + stoch}) > 1:
             cond[k] = None
-    return {"condition": cond,
-            "eval_seeds": m["eval_seeds"], "t_crit": T_CRIT, "df": T - 1, "reps": reps, "boot_seed": seed,
-            "groups": out}
+    res = {"condition": cond,
+           "eval_seeds": m["eval_seeds"], "t_crit": T_CRIT, "df": T - 1, "reps": reps, "boot_seed": seed,
+           "groups": out}
+    if mode2 != "stochastic":                            # 확률 모드 결과는 예전 키 그대로
+        res.update(mode2=mode2, hold_k=hold_k)
+    return res
 
 
 def _ci_s(col: str, ci: dict | None) -> str:
@@ -1828,9 +1888,13 @@ def md_modecmp(d: dict) -> list[str]:
     c = d["condition"]
     g_s = (f"G 는 γ={c['gamma']} · 앞 {c['head']}·끝 {c['tail']}스텝 제외" if c.get("gamma") is not None else
            f"G 는 팔마다 그 팔의 학습 γ(γ_train) · 앞 {c['head']}스텝과 끝 ceil(5/(1−γ))스텝 제외(팔별 값은 각 절 제목)")
-    L = ["# 0-7 결정 ↔ 확률 모드 (계획서 6.1-7, #29, 사전 등록 results/v2/g07/PREREG.md)", "",
+    hold = d.get("mode2") == "hold"
+    m2 = f"유지 표본 K{d.get('hold_k')}" if hold else "확률"
+    title = (f"# 결정 ↔ 유지 표본 모드 K={d.get('hold_k')} (수정 제안서 3.1 (가) R1, 비교 절차는 #29 modecmp 그대로)"
+             if hold else "# 0-7 결정 ↔ 확률 모드 (계획서 6.1-7, #29, 사전 등록 results/v2/g07/PREREG.md)")
+    L = [title, "",
          f"- 평가: 시드 {d['eval_seeds'][0]}~{d['eval_seeds'][-1]} × {c['eval_steps']}스텝, {g_s}",
-         f"- Δ = 확률 − 결정 (같은 모델·같은 평가 시드). t 는 평가 시드마다 학습 시드 평균(자유도 {d['df']}), CI 는 "
+         f"- Δ = {m2} − 결정 (같은 모델·같은 평가 시드). t 는 평가 시드마다 학습 시드 평균(자유도 {d['df']}), CI 는 "
          f"층화 부트스트랩 {d['reps']}회",
          f"- 유의: G_γ 는 |t|>{d['t_crit']} 이고 CI 가 0 을 뺀다. 결과 지표 3개는 Holm p<0.05 이고 CI 가 0 을 뺀다. "
          "나머지는 기술만 한다"]
@@ -1840,8 +1904,9 @@ def md_modecmp(d: dict) -> list[str]:
     for gr in d["groups"]:
         sig = "결론 없음 (학습 시드 1개)" if gr["trigger"] is None else ("**있음**" if gr["trigger"] else "없음")
         ev = (f", G 의 γ {gfmt(gr['g_eval_gamma'])} · 끝 {gr['tail']}스텝" if "g_eval_gamma" in gr else "")
-        L += [f"## γ_train {gfmt(gr['gamma'])} (학습 시드 {gr['train_seeds']}{ev}) — #29 신호: {sig}", "",
-              "| 지표 | 결정 | 확률 | Δ | t | 95% CI | 판정 |", "|---|---|---|---|---|---|---|"]
+        L += [f"## γ_train {gfmt(gr['gamma'])} (학습 시드 {gr['train_seeds']}{ev}) — "
+              f"{'모드 차 신호' if hold else '#29 신호'}: {sig}", "",
+              f"| 지표 | 결정 | {m2} | Δ | t | 95% CI | 판정 |", "|---|---|---|---|---|---|---|"]
         for col, r in gr["cols"].items():
             if "verdict" in r and r["verdict"] is None:
                 v = "결론 없음"
@@ -1885,9 +1950,10 @@ def cmd_modecmp(ctx: Ctx) -> int:
     data["generated"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     data["command"] = "python diagnose_v2.py " + " ".join(sys.argv[1:])
     save(ctx, a.tag or "modecmp", data, md_modecmp(clean(data)))
+    what = f"결정 ↔ 유지 표본 K{data['hold_k']} 차 신호" if data.get("mode2") == "hold" else "#29 신호"
     for gr in data["groups"]:
         sig = "결론 없음" if gr["trigger"] is None else ("있음" if gr["trigger"] else "없음")
-        print(f"  γ {gfmt(gr['gamma'])}: #29 신호 {sig}")
+        print(f"  γ {gfmt(gr['gamma'])}: {what} {sig}")
     return 0
 
 
@@ -1927,7 +1993,10 @@ def build_parser() -> argparse.ArgumentParser:
                         f"--head {G998['head']} 를 한 번에 정한다. 기본 이름에 _g998")
     g.add_argument("--act-mode", choices=list(ACTION_MODES), default="deterministic",
                    help="행동 모드(6.1-7). deterministic = 평균 행동(기본, 언리얼과 같음), stochastic = 학습 "
-                        "분포에서 표본(평가 시드에서 유도한 잡음, 재현됨). 기본 이름에 _stoch")
+                        "분포에서 표본(평가 시드에서 유도한 잡음, 재현됨). 기본 이름에 _stoch. hold = 유지 표본 모드"
+                        "(R1 출시 모드: 조향 평균, 보행·경계 열만 잡음을 --hold-k 스텝 유지). 기본 이름에 _hold<K>")
+    g.add_argument("--hold-k", type=int, default=None,
+                   help="--act-mode hold 의 유지 길이 K(스텝, 양의 정수). hold 에서는 꼭 준다(수정 제안서 R1 은 24)")
     g.add_argument("--calib-seeds", nargs="+", default=None, help="기본 0:20")
     g.add_argument("--calib-steps", type=int, default=CALIB_STEPS)
     g.add_argument("--recalib", action="store_true", help="보정 캐시를 무시하고 다시 잰다")
@@ -1980,9 +2049,10 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--reps", type=int, default=2000, help="부트스트랩 반복 수")
     s.add_argument("--boot-seed", type=int, default=0, help="부트스트랩 난수 시드")
 
-    s = sub.add_parser("modecmp", parents=[common], help="#29 결정 ↔ 확률 모드 비교")
+    s = sub.add_parser("modecmp", parents=[common], help="#29 결정 ↔ 확률 모드 비교 (R1 결정 ↔ 유지 표본 모드)")
     s.add_argument("--det", nargs="+", required=True, help="결정 모드 ablate 디렉터리")
-    s.add_argument("--stoch", nargs="+", required=True, help="같은 모델·같은 평가 조건의 확률 모드 디렉터리")
+    s.add_argument("--stoch", "--hold", dest="stoch", nargs="+", required=True,
+                   help="같은 모델·같은 평가 조건의 확률 모드 디렉터리. 유지 표본 모드(K 하나) 디렉터리도 된다(--hold)")
     s.add_argument("--reps", type=int, default=2000, help="부트스트랩 반복 수")
     s.add_argument("--boot-seed", type=int, default=0, help="부트스트랩 난수 시드")
     return p
@@ -1997,6 +2067,8 @@ def main(argv=None) -> int:
     ctx = Ctx(args)            # 행동 수는 설정에서 읽는다. --enqueue 길이는 constsearch 가 검사한다
     head = f", 앞 {ctx.head}스텝" if ctx.head else ""
     mode = f", {ctx.act_mode}" if ctx.act_mode != "deterministic" else ""
+    if ctx.hold_k is not None:
+        mode += f" K={ctx.hold_k}"
     print(f"[{args.cmd}] {ctx.name} → {ctx.out}  (γ={ctx.gamma}, 꼬리 {ctx.tail}스텝{head}{mode}, "
           f"워커 {args.workers})", flush=True)
     ctx.ex = make_executor(args.workers) if args.cmd not in NO_POOL else None

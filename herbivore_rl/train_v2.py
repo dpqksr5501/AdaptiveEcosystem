@@ -40,6 +40,12 @@ P(경계) = P(N(−0.84, 1) > logit(0.5) = 0) ≈ 20% (계획서 4.7 "vigilance 
 같은 식, 벡터화)이다. 행은 `<out>.probe.jsonl` 에 바로 덧붙이고(탐침 실행기가 2M·5M 조기 중단을 판정한다) 메타 JSON
 `probe_history` 에도 남긴다. 기본 0 은 끔(기존과 같다).
       python train_v2.py --config configs/v2_2r_l.yaml --seed 20 --run-name v2_2r_l_s20 --probe-every 1000000
+
+범주형 보행 CM (10-03 R2 갈림 3, `env_v2/cm.py`): 설정에 `train.cm` 이 있으면 정책을 CMPolicy(조향 가우시안 4 + 보행
+범주 하나)로 만든다(`make_model_cm`). 구조(64-64 tanh)와 튜닝값은 make_model 과 같고 출력층과 분포만 다르다. 범주
+엔트로피 계수는 `train.cm.cat_ent_coef` 다. 시작 분포·행동 기록·탐침은 범주 확률로 잰다(p_stop = P(정지 범주),
+p_vig_* = P(look 범주)).
+      python train_v2.py --config configs/v2_2r_cm.yaml --seed 20 --run-name v2_2r_cm_s20 --probe-every 1000000
 """
 
 from __future__ import annotations
@@ -59,11 +65,12 @@ import numpy as np
 import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
+from env_v2.cm import CMPolicy, N_STEER, cat_index
 from env_v2.config import load_v2_config
 from env_v2.vec_env import MultiWorldVecEnv, sigmoid
 from env_v2.world import (ACT_NAMES_V1, ACT_SPEED, GAIT_RUN, GAIT_STOP, GAIT_WALK, HUNGRY, OBS_ENERGY,
                           OBS_PREDATOR_COUNT, RECENT_THREAT)
-from train import load_tuned, make_model
+from train import PPO_KWARGS, load_tuned, make_model
 
 ROOT = Path(__file__).resolve().parent
 CKPT = ROOT / "ckpt" / "v2"
@@ -145,13 +152,15 @@ def side_probs(t: float, mu, std) -> np.ndarray:
     return 1.0 - ndtr((x - mu) / std)
 
 
-def probe_row(obs: np.ndarray, mu: np.ndarray, std: np.ndarray, act_names, obs_names, world) -> dict:
+def probe_row(obs: np.ndarray, mu: np.ndarray, std: np.ndarray, act_names, obs_names, world,
+              cat_probs: np.ndarray | None = None, categories=None) -> dict:
     """탐침 기록 한 행 (모듈 docstring '학습 가능성 탐침 기록'). 관측 (n, 관측 수), 정책 평균·표준편차 (n, 행동 수).
 
     - p_stop: 평균 P(명령 정지). threat_recency 가 있으면 구간별 값도 낸다:
       p_stop_win·p_stop_calm, *_full(배부름 표본), b3_l_prob = p_stop_win_full − p_stop_calm_full (L 의 B3 확률판)
     - vigilance 가 있으면 p_vig·p_vig_win·p_vig_calm·p_vig_win_full·p_vig_win_hungry (W′ 의 창 안 사용률)
     - n·frac_win·frac_seen: 표본 수와 구간 비율. 분모가 0 이면 None
+    CM(`cat_probs` (n, K)·`categories`)이면 정지 확률은 정지 범주, 경계 확률은 look 범주의 확률이다(마스크 적용 뒤).
     """
     names, onames = list(act_names), list(obs_names)
 
@@ -171,21 +180,32 @@ def probe_row(obs: np.ndarray, mu: np.ndarray, std: np.ndarray, act_names, obs_n
         calm = ~seen & ~win
         row.update(theta=float(theta), frac_win=mean(win.astype(np.float64)),
                    frac_seen=mean(seen.astype(np.float64)))
-    if "speed" in names:
+    if cat_probs is not None:
+        cats = list(categories)
+        p_stop = cat_probs[:, cats.index("stop")]
+        row["p_stop"] = mean(p_stop)
+        row.update({f"p_cat_{c}": mean(cat_probs[:, k]) for k, c in enumerate(cats)})
+    elif "speed" in names:
         i = names.index("speed")
         p_stop = 1.0 - side_probs(world._sp["thresholds"][0], mu[:, i], std[:, i])
         row["p_stop"] = mean(p_stop)
         row["speed_std"] = mean(std[:, i])
+    if cat_probs is not None or "speed" in names:
         if win is not None:
             row.update(p_stop_win=mean(p_stop, win), p_stop_calm=mean(p_stop, calm),
                        p_stop_win_full=mean(p_stop, win & full), p_stop_calm_full=mean(p_stop, calm & full))
             a, b = row["p_stop_win_full"], row["p_stop_calm_full"]
             row["b3_l_prob"] = None if a is None or b is None else a - b
-    if "vigilance" in names:
+    p_vig = None
+    if cat_probs is not None:
+        if "look" in categories:
+            p_vig = cat_probs[:, list(categories).index("look")]
+    elif "vigilance" in names:
         i = names.index("vigilance")
         p_vig = side_probs(world._vg["threshold"], mu[:, i], std[:, i])
-        row["p_vig"] = mean(p_vig)
         row["vig_std"] = mean(std[:, i])
+    if p_vig is not None:
+        row["p_vig"] = mean(p_vig)
         if win is not None:
             row.update(p_vig_win=mean(p_vig, win), p_vig_calm=mean(p_vig, calm),
                        p_vig_win_full=mean(p_vig, win & full), p_vig_win_hungry=mean(p_vig, win & ~full))
@@ -292,6 +312,14 @@ def init_policy_report(model, venv) -> dict:
     rep = {"act_names": names,
            "action_bias": pol.action_net.bias.detach().cpu().numpy().astype(float).tolist(),
            "log_std": pol.log_std.detach().cpu().numpy().astype(float).tolist()}
+    if venv.cm is not None:         # CM: 범주 확률(마스크 적용, 지금 세계들의 관측에서)
+        from env_v2.cm import cm_distribution
+
+        obs = np.concatenate([w.observe() for w in venv.worlds])
+        _, _, probs = cm_distribution(model, obs)
+        rep["cm"] = {"categories": venv.cm["categories"], "cat_prob": probs.mean(0).tolist(),
+                     "init_logits": venv.cm["init_logits"]}
+        return rep
     if "speed" in names or "vigilance" in names:
         obs = np.concatenate([w.observe() for w in venv.worlds])
         with th.no_grad():
@@ -337,6 +365,9 @@ class BehaviorLogCallbackV2(BaseCallback):
     def _on_rollout_end(self) -> None:
         buf = self.model.rollout_buffer
         names = list(self.training_env.act_names)
+        if self.training_env.cm is not None:
+            self._log_cm(buf)
+            return
         raw = buf.actions.reshape(-1, len(names))
         a = sigmoid(np.clip(raw, -3.0, 3.0))
         for i, name in enumerate(names):
@@ -375,6 +406,36 @@ class BehaviorLogCallbackV2(BaseCallback):
             self.r2_history.append(row)
             self._next_r2 += self.r2_every
 
+        self._save_due()
+
+    def _log_cm(self, buf) -> None:
+        """CM: 조향 4열은 지금처럼, 보행은 롤아웃 표본의 범주 비율(gait/<범주>)로 남긴다. 선형 R² 는 조향 4열만."""
+        cats = self.training_env.cm["categories"]
+        raw = buf.actions.reshape(-1, N_STEER + 1)
+        a = sigmoid(np.clip(raw[:, :N_STEER], -3.0, 3.0))
+        for i, name in enumerate(ACT_NAMES):
+            self.logger.record(f"act/{name}_mean", float(a[:, i].mean()))
+            self.logger.record(f"act/{name}_std", float(a[:, i].std()))
+        log_std = self.model.policy.log_std.detach().cpu().numpy()
+        for i, name in enumerate(ACT_NAMES):
+            self.logger.record(f"policy/{name}_log_std", float(log_std[i]))
+        frac = np.bincount(cat_index(raw[:, N_STEER], len(cats)), minlength=len(cats)) / max(len(raw), 1)
+        for k, c in enumerate(cats):
+            self.logger.record(f"gait/{c}", float(frac[k]))
+        self.logger.record("rollout/reward_per_step", float(buf.rewards.mean()))
+        if self.num_timesteps >= self._next_r2:
+            obs = buf.observations.reshape(-1, self.training_env.obs_dim)
+            det, _ = self.model.predict(obs, deterministic=True)
+            r2 = linear_r2(obs.astype(np.float64), sigmoid(np.clip(det[:, :N_STEER], -3.0, 3.0)))
+            row = {"timesteps": int(self.num_timesteps)}
+            for i, name in enumerate(ACT_NAMES):
+                self.logger.record(f"r2/{name}", float(r2[i]))
+                row[name] = float(r2[i])
+            self.r2_history.append(row)
+            self._next_r2 += self.r2_every
+        self._save_due()
+
+    def _save_due(self) -> None:
         while self.save_at and self.num_timesteps >= self.save_at[0]:
             at = self.save_at.pop(0)
             if self.save_prefix is not None:
@@ -409,12 +470,19 @@ class ProbeLogCallbackV2(BaseCallback):
         env = self.training_env
         obs = self.model.rollout_buffer.observations.reshape(-1, env.obs_dim)
         pol = self.model.policy
-        with th.no_grad():
-            d = pol.get_distribution(pol.obs_to_tensor(obs)[0]).distribution
-            mu = d.mean.cpu().numpy().astype(np.float64)
-            std = d.stddev.cpu().numpy().astype(np.float64)
+        probs = None
+        if env.cm is not None:
+            from env_v2.cm import cm_distribution
+
+            mu, std, probs = cm_distribution(self.model, obs)
+        else:
+            with th.no_grad():
+                d = pol.get_distribution(pol.obs_to_tensor(obs)[0]).distribution
+                mu = d.mean.cpu().numpy().astype(np.float64)
+                std = d.stddev.cpu().numpy().astype(np.float64)
         row = {"timesteps": int(self.num_timesteps),
-               **probe_row(obs, mu, std, env.act_names, env.obs_names, env.worlds[0])}
+               **probe_row(obs, mu, std, env.act_names, env.obs_names, env.worlds[0], probs,
+                           env.cm["categories"] if env.cm is not None else None)}
         self.history.append(row)
         for k, v in row.items():
             if k != "timesteps" and isinstance(v, float):
@@ -424,6 +492,25 @@ class ProbeLogCallbackV2(BaseCallback):
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
         while self._next <= self.num_timesteps:
             self._next += self.probe_every
+
+
+def make_model_cm(venv, cm: dict, tensorboard_log: str | None, **overrides):
+    """CM 정책(env_v2/cm.py CMPolicy)으로 PPO 를 만든다. `train.make_model` 과 같은 PPO_KWARGS·튜닝값·구조(64-64 tanh)를
+    쓰고 정책 클래스와 CM 인자만 더한다. 범주 엔트로피 비율 = cat_ent_coef / ent_coef (cm.py 모듈 docstring)."""
+    from stable_baselines3 import PPO
+
+    bad = {"policy_kwargs", "net_arch", "activation_fn"} & set(overrides)
+    if bad:
+        raise ValueError(f"§6.4 탐색 금지 항목이다: {sorted(bad)}")
+    kw = dict(PPO_KWARGS)
+    kw.update(overrides)
+    ent = float(kw["ent_coef"])
+    if ent <= 0.0:
+        raise ValueError("CM 은 ent_coef > 0 이어야 한다(범주 엔트로피 계수를 비율로 넣는다)")
+    kw["policy_kwargs"] = dict(PPO_KWARGS["policy_kwargs"], cm_k=len(cm["categories"]),
+                               cm_init_logits=cm["init_logits"], cm_ent_scale=cm["cat_ent_coef"] / ent,
+                               cm_mask_theta=cm["theta"] if cm["mask_look"] else None)
+    return PPO(CMPolicy, venv, tensorboard_log=tensorboard_log, device="cpu", **kw)
 
 
 def gamma_tag(gamma: float) -> str:
@@ -512,7 +599,12 @@ def main(argv=None) -> int:
     out = Path(args.out) if args.out else CKPT / f"{run}.zip"
     out.parent.mkdir(parents=True, exist_ok=True)
 
-    model = make_model(venv, tensorboard_log=args.tb, n_steps=n_steps, seed=args.seed, **tuned)
+    if venv.cm is None:
+        model = make_model(venv, tensorboard_log=args.tb, n_steps=n_steps, seed=args.seed, **tuned)
+    else:
+        model = make_model_cm(venv, venv.cm, tensorboard_log=args.tb, n_steps=n_steps, seed=args.seed, **tuned)
+        print(f"범주형 보행 CM: 범주 {venv.cm['categories']}, 범주 엔트로피 계수 {venv.cm['cat_ent_coef']}, "
+              f"look 마스크 {'창 밖' if venv.cm['mask_look'] else '없음'}", flush=True)
     # γ 는 GAE·truncation 부트스트랩이 쓰는 롤아웃 버퍼에도 들어가야 한다 (SB3 _setup_model)
     if float(model.gamma) != gamma or float(model.rollout_buffer.gamma) != gamma:
         raise RuntimeError(f"모델 γ {model.gamma} (버퍼 {model.rollout_buffer.gamma}) 가 지정한 γ {gamma} 와 다르다")
@@ -533,6 +625,10 @@ def main(argv=None) -> int:
     elif bias:
         print(f"train.init_action_bias {bias} 는 --init 이라 쓰지 않는다 (옮겨 온 가중치 그대로)")
     init_rep = init_policy_report(model, venv)
+    if "cm" in init_rep:
+        cp = init_rep["cm"]
+        print("시작 분포 CM: " + " · ".join(f"{c} {p:.3f}" for c, p in zip(cp["categories"], cp["cat_prob"]))
+              + " (마스크 적용 뒤 지금 관측 평균)", flush=True)
     if "speed" in init_rep:
         sp, i = init_rep["speed"], ACT_SPEED
         gp = sp["gait_prob"]

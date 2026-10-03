@@ -12,6 +12,8 @@
 - T1  configs/v2_2r_t1.yaml v2.1 + 관측 8(threat_recency), 경계 행동 열 없음 (L 의 대조군)
 - L   configs/v2_2r_l.yaml  T1 + 반사 돌아보기 (1순위)
 - W   configs/v2_2r_w.yaml  v2.2 + 창 경계(L 형 계수), 시작 편향 0 (보조 팔 W′)
+- CM  configs/v2_2r_cm.yaml Categorical(4){정지, 걷기, 뛰기, look} + 창 밖 look 마스크, W′ 세계 (갈림 3, MEMO 9절)
+      python probe_v2.py train --arms CM
 
 학습 중 탐침 기록은 `train_v2.py --probe-every 1000000` 의 `<체크포인트>.probe.jsonl` 이다. 조기 중단(MEMO 3절):
 L 은 b3_l_prob, W 는 p_vig_win 이 2M 또는 5M 기록에서 시드 절반 이상(올림) 0.01 미만이면 그 팔의 남은 학습을 멈춘다.
@@ -57,7 +59,10 @@ ARMS = {
     "L": {"config": "configs/v2_2r_l.yaml", "seeds": [20, 21, 22],
           "use": {"probe": "b3_l_prob", "eval": "b3_l", "min": 0.1}},
     "W": {"config": "configs/v2_2r_w.yaml", "seeds": [20, 21],
-          "use": {"probe": "p_vig_win", "eval": "p_vig_win", "min": 0.05}},
+          "use": {"probe": "p_vig_win", "eval": "p_vig_win", "min": 0.05}, "w_type": True},
+    # 갈림 3 (MEMO 9절): W′ 와 같은 기준. 탐침 p_vig_win = 창 안 P(look)
+    "CM": {"config": "configs/v2_2r_cm.yaml", "seeds": [20, 21, 22],
+           "use": {"probe": "p_vig_win", "eval": "p_vig_win", "min": 0.05}, "w_type": True},
 }
 # E2 최적 상수 C2 (results/v2/e2/V0/c2/constsearch.json best, 6열). T1·L 세계는 앞 5열을 쓴다
 C2_FILE = ROOT / "results" / "v2" / "e2" / "V0" / "c2" / "constsearch.json"
@@ -155,7 +160,10 @@ def cmd_train(args) -> int:
     logs = OUT / "logs"
     logs.mkdir(parents=True, exist_ok=True)
     jobs = {}
+    arms = args.arms or list(ARMS)
     for arm, a in ARMS.items():
+        if arm not in arms:
+            continue
         for s in a["seeds"]:
             name = run_name(arm, s)
             if model_path(arm, s).exists() and not args.force:
@@ -168,14 +176,16 @@ def cmd_train(args) -> int:
             jobs[(arm, s)] = {"proc": subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT),
                               "log": log, "cmd": " ".join(cmd[1:])}
             print(f"시작 {name}: {' '.join(cmd[1:])}", flush=True)
+    # 배치마다 상태 파일을 따로 둔다(동시에 도는 배치가 서로 덮지 않게). judge 는 train_status*.json 을 모두 읽는다
+    sp = OUT / ("train_status.json" if args.arms is None else f"train_status_{'_'.join(arms)}.json")
     status = {"started": datetime.now(timezone.utc).isoformat(timespec="seconds"), "steps": args.steps,
-              "early_stop": {}, "runs": {}}
+              "arms": arms, "early_stop": {}, "runs": {}}
     checked = {arm: set() for arm in ARMS}
     while jobs and any(j["proc"].poll() is None for j in jobs.values()):
         time.sleep(args.poll)
         for arm, a in ARMS.items():
             use = a["use"]
-            if use is None or arm in status["early_stop"]:
+            if use is None or arm in status["early_stop"] or arm not in arms:
                 continue
             seeds = a["seeds"]
             for at in EARLY_AT:
@@ -200,14 +210,14 @@ def cmd_train(args) -> int:
                     break
         for (arm, s), j in jobs.items():
             status["runs"][run_name(arm, s)] = {"returncode": j["proc"].poll(), "cmd": j["cmd"]}
-        save_json(OUT / "train_status.json", status)
+        save_json(sp, status)
     for (arm, s), j in jobs.items():
         j["proc"].wait()
         j["log"].close()
         status["runs"][run_name(arm, s)] = {"returncode": j["proc"].returncode, "cmd": j["cmd"],
                                             "model": rel(model_path(arm, s)) if model_path(arm, s).exists() else None}
     status["finished"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    save_json(OUT / "train_status.json", status)
+    save_json(sp, status)
     bad = [n for n, r in status["runs"].items() if r["returncode"] not in (0, None)
            and not any(n.startswith(f"v2_2r_{arm.lower()}_") for arm in status["early_stop"])]
     print("학습 끝" + (f" — 실패: {bad}" if bad else ""), flush=True)
@@ -248,75 +258,82 @@ def trained_models() -> dict[str, list[tuple[int, Path]]]:
 
 
 def cmd_eval(args) -> int:
+    """평가는 잡(스펙 키)마다 저장하고, 다시 부르면 없는 잡만 돈다. 조건(시드·스텝·γ·K·C2·v2.1 모델)이 다르거나
+    모델 파일이 바뀌면(sha1) 그 잡을 다시 잰다. 그래서 CM 처럼 뒤에 학습한 팔은 그 팔만 더 잰다."""
     from diagnose_v2 import EXPLORE_SEEDS, model_fingerprint
     from env_v2.config import load_v2_config
     from env_v2.rollout import make_executor, run_specs
+    from env_v2.world import OBS_THREAT_RECENCY
 
     seeds = list(EXPLORE_SEEDS)
     steps = args.steps
     cfgs = {arm: load_v2_config(ROOT / a["config"]) for arm, a in ARMS.items()}
     c2 = json.loads(C2_FILE.read_text(encoding="utf-8"))["best"]
     models = trained_models()
-    meta = {"seeds": seeds, "steps": steps, "gamma": GAMMA, "hold_k": HOLD_K,
-            "models": {f"{arm}_s{s}": {"path": rel(p), "sha1": model_fingerprint(p)}
-                       for arm, ms in models.items() for s, p in ms},
-            "v21_models": {p.name: model_fingerprint(p) for p in V21_MODELS}, "c2": c2}
-    p1 = OUT / "eval_p1.json"
+    sha = {f"{arm}_s{s}": model_fingerprint(p) for arm, ms in models.items() for s, p in ms}
+    cond = {"seeds": seeds, "steps": steps, "gamma": GAMMA, "hold_k": HOLD_K, "c2": c2,
+            "v21_models": {p.name: model_fingerprint(p) for p in V21_MODELS}}
+
+    def load(path):
+        if path.exists() and not args.force:
+            d = json.loads(path.read_text(encoding="utf-8"))
+            if d.get("cond") == cond:
+                return d
+        return {"cond": cond, "rows": {}, "sha1": {}, "mean_energy": {}}
+
+    def fresh(d, key, model_key=None):
+        return key in d["rows"] and (model_key is None or d["sha1"].get(key) == sha.get(model_key))
+
+    def run(d, cfg, specs, model_key=None):
+        todo = {k: v for k, v in specs.items() if not fresh(d, k, model_key)}
+        if not todo:
+            return
+        for k, rows in run_specs(cfg, todo, seeds, steps, gamma=GAMMA, executor=ex).items():
+            d["rows"][k] = _rows(rows)
+            if model_key is not None:
+                d["sha1"][k] = sha[model_key]
+            if "|C0|" in k:       # C4-energy 고정값 = 그 모델·모드 C0 롤아웃의 평균 관측 4 (diagnose_v2 C4-j 와 같은 규칙)
+                d["mean_energy"][k] = float(sum(r["_obs_sum"][4] for r in rows) / sum(r["_act_n"] for r in rows))
+
+    p1, p2 = OUT / "eval_p1.json", OUT / "eval_p2.json"
     ex = make_executor(args.workers)
     try:
-        if p1.exists() and not args.force and json.loads(p1.read_text(encoding="utf-8"))["meta"] == meta:
-            d1 = json.loads(p1.read_text(encoding="utf-8"))
-            print(f"{rel(p1)} 를 다시 쓴다 (같은 조건)")
-        else:
-            t0 = time.time()
-            res = {}
-            for arm, ms in models.items():
-                specs = {f"{arm}_s{s}|C0|{m}": _learned(p, m) for s, p in ms for m in MODES}
-                for k, v in run_specs(cfgs[arm], specs, seeds, steps, gamma=GAMMA, executor=ex).items():
-                    res[k] = v
-                print(f"  {arm} C0 두 모드 ({time.time() - t0:.0f}s)", flush=True)
-            base = {"C2": (cfgs["T1"], {"kind": "fixed", "action": list(c2[:5])}),
-                    "C2W": (cfgs["W"], {"kind": "fixed", "action": list(c2[:5]) + [1.0]})}
-            from env_v2.world import OBS_THREAT_RECENCY
-            tr = OBS_THREAT_RECENCY                          # L 세계의 threat_recency 열 (관측 8 의 idx 7)
-            for i, p in enumerate(V21_MODELS):
-                take = {"factory": "probe_v2:obs_take", "dims": list(range(7))}
-                stop = {"factory": "probe_v2:window_stop", "speed_col": 4, "tr_col": tr,
-                        "theta": cfgs["L"].v2["features"]["vigil_window"]["theta"]}
-                base[f"V21_s{i}"] = (cfgs["L"], {"policy": _learned(p, "det"), "wrap": [take]})
-                base[f"OVL_s{i}"] = (cfgs["L"], {"policy": _learned(p, "det"), "wrap": [take, stop]})
-            for k, (cfg, spec) in base.items():
-                res[k] = run_specs(cfg, {k: spec}, seeds, steps, gamma=GAMMA, executor=ex)[k]
-            print(f"  기준선 ({time.time() - t0:.0f}s)", flush=True)
-            # C4-energy 고정값 = 그 모델·모드 C0 롤아웃의 평균 관측 4 (diagnose_v2 C4-j 고정과 같은 규칙)
-            mean_energy = {k: float(sum(r["_obs_sum"][4] for r in rows) / sum(r["_act_n"] for r in rows))
-                           for k, rows in res.items() if "|C0|" in k}
-            d1 = {"meta": meta, "rows": {k: _rows(v) for k, v in res.items()}, "mean_energy": mean_energy}
+        d1 = load(p1)
+        t0 = time.time()
+        for arm, ms in models.items():
+            for s, p in ms:
+                run(d1, cfgs[arm], {f"{arm}_s{s}|C0|{m}": _learned(p, m) for m in MODES}, f"{arm}_s{s}")
             save_json(p1, d1)
+            print(f"  {arm} C0 두 모드 ({time.time() - t0:.0f}s)", flush=True)
+        base = {"C2": (cfgs["T1"], {"kind": "fixed", "action": list(c2[:5])}),
+                "C2W": (cfgs["W"], {"kind": "fixed", "action": list(c2[:5]) + [1.0]})}
+        take = {"factory": "probe_v2:obs_take", "dims": list(range(7))}
+        stop = {"factory": "probe_v2:window_stop", "speed_col": 4, "tr_col": OBS_THREAT_RECENCY,
+                "theta": cfgs["L"].v2["features"]["vigil_window"]["theta"]}
+        for i, p in enumerate(V21_MODELS):
+            base[f"V21_s{i}"] = (cfgs["L"], {"policy": _learned(p, "det"), "wrap": [take]})
+            base[f"OVL_s{i}"] = (cfgs["L"], {"policy": _learned(p, "det"), "wrap": [take, stop]})
+        for k, (cfg, spec) in base.items():
+            run(d1, cfg, {k: spec})
+        save_json(p1, d1)
+        print(f"  기준선 ({time.time() - t0:.0f}s)", flush=True)
+
         modes = choose_modes(d1)
-        p2 = OUT / "eval_p2.json"
-        meta2 = dict(meta, modes={arm: m["mode"] for arm, m in modes.items()})
-        if p2.exists() and not args.force and json.loads(p2.read_text(encoding="utf-8"))["meta"] == meta2:
-            print(f"{rel(p2)} 를 다시 쓴다 (같은 조건)")
-        else:
-            t0 = time.time()
-            res = {}
-            for arm in ("L", "W"):
-                if arm not in models:
-                    continue
-                m = modes[arm]["mode"]
-                specs = {}
-                for s, p in models[arm]:
-                    specs[f"{arm}_s{s}|C1p|{m}"] = {"policy": _learned(p, m),
-                                                    "wrap": [{"kind": "act_permute", "salt": 0}]}
-                    if arm == "W":
-                        e = d1["mean_energy"][f"{arm}_s{s}|C0|{m}"]
-                        specs[f"{arm}_s{s}|C4e|{m}"] = {"policy": _learned(p, m),
-                                                        "wrap": [{"kind": "obs_fix", "dims": [4], "values": [e]}]}
-                for k, v in run_specs(cfgs[arm], specs, seeds, steps, gamma=GAMMA, executor=ex).items():
-                    res[k] = v
-                print(f"  {arm} C1′·C4 ({time.time() - t0:.0f}s)", flush=True)
-            save_json(p2, {"meta": meta2, "rows": {k: _rows(v) for k, v in res.items()}})
+        d2 = load(p2)
+        for arm in [x for x, a in ARMS.items() if a["use"] is not None]:
+            if arm not in models:
+                continue
+            m = modes[arm]["mode"]
+            for s, p in models[arm]:
+                specs = {f"{arm}_s{s}|C1p|{m}": {"policy": _learned(p, m),
+                                                "wrap": [{"kind": "act_permute", "salt": 0}]}}
+                if ARMS[arm].get("w_type"):
+                    e = d1["mean_energy"][f"{arm}_s{s}|C0|{m}"]
+                    specs[f"{arm}_s{s}|C4e|{m}"] = {"policy": _learned(p, m),
+                                                    "wrap": [{"kind": "obs_fix", "dims": [4], "values": [e]}]}
+                run(d2, cfgs[arm], specs, f"{arm}_s{s}")
+            save_json(p2, d2)
+            print(f"  {arm} C1′·C4 ({time.time() - t0:.0f}s)", flush=True)
     finally:
         if ex is not None:
             ex.shutdown()
@@ -375,8 +392,9 @@ def cmd_judge(args) -> int:
     d1 = json.loads((OUT / "eval_p1.json").read_text(encoding="utf-8"))
     p2 = OUT / "eval_p2.json"
     d2 = json.loads(p2.read_text(encoding="utf-8")) if p2.exists() else {"rows": {}}
-    st = json.loads((OUT / "train_status.json").read_text(encoding="utf-8")) if (OUT / "train_status.json").exists() \
-        else {"early_stop": {}}
+    st = {"early_stop": {}}
+    for f in sorted(OUT.glob("train_status*.json")):
+        st["early_stop"].update(json.loads(f.read_text(encoding="utf-8")).get("early_stop", {}))
     modes = choose_modes(d1)
     c2, c2w = base_series(d1, "C2"), base_series(d1, "C2W")
     ovl, v21 = base_series(d1, "OVL"), base_series(d1, "V21")
@@ -416,7 +434,7 @@ def cmd_judge(args) -> int:
             checks["ii_b"] = r["g"] >= float(ovl.mean()) - 0.3
             checks["iii"] = r["starve_rate"] <= 1.5 * c2_starve
             checks["iv"] = r["b1"] >= 0.3
-            if arm == "W":
+            if a.get("w_type"):
                 r["vs_C2W"] = _paired_t(g, c2w)
                 c4 = arm_series(d2, arm, "C4e", m, "p_vig_win")
                 c0v = arm_series(d1, arm, "C0", m, "p_vig_win")
@@ -435,16 +453,22 @@ def cmd_judge(args) -> int:
                "full_split": max(t1a["per_model"].values()) < min(t0a["per_model"].values())}
         sep["flag"] = sep["T1_minus_T0"] <= -0.3 and sep["full_split"]
     res["t1_vs_t0"] = sep
-    L_ok = res["arms"].get("L", {}).get("pass", False)
-    W_ok = res["arms"].get("W", {}).get("pass", False)
-    if L_ok:
+    ok = {arm: res["arms"].get(arm, {}).get("pass", False) for arm in ("L", "W", "CM")}
+    ovl_sig = res["baselines"]["OVL_minus_V21"]
+    if ok["L"]:
         branch = "1: L 통과 → L 로 확인층"
-    elif W_ok:
+    elif ok["W"]:
         branch = "2: L 실패·W′ 통과 → W′ 로 확인층"
     elif sep is not None and sep["flag"]:
         branch = "4: T1 이 T0 보다 0.3 이상 낮고 완전 분리 → 하루 조사 상자, 그다음 대체안"
+    elif not res["arms"].get("CM", {}).get("trained"):
+        branch = "3: L·W′ 실패 → CM 1회"
+    elif ok["CM"]:
+        branch = "3: L·W′ 실패, CM 통과 → CM 으로 확인층"
+    elif ovl_sig["diff"] > 0 and ovl_sig["t"] > T_CRIT:
+        branch = "5 (a): CM 도 실패, OVL − V21 유의 → 규칙 장면(v2.1 + 창 규칙), v2.1 을 시드 30~34 로 확인"
     else:
-        branch = "3: 모두 실패 → CM 1회 (10-06~10-08)"
+        branch = "5 (b): CM 도 실패, OVL − V21 유의하지 않음 → v2.1 확인 후 1단계를 'S1만'으로 닫는다"
     res["branch"] = branch
     res["generated"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
     save_json(OUT / "judge.json", res)
@@ -488,14 +512,16 @@ def render(res: dict) -> str:
     if res.get("t1_vs_t0"):
         s = res["t1_vs_t0"]
         L += ["", f"- T1 − T0 {_f(s['T1_minus_T0'])}, 완전 분리 {s['full_split']} → 갈림 4 신호 {s['flag']}"]
-    for arm in ("L", "W"):
+    for arm in ("L", "W", "CM"):
         r = res["arms"].get(arm, {})
         if r.get("trained") and r.get("use"):
             L.append(f"- {arm} 시드별 탐침 {r['use']['probe_per_seed']}, 모델별 G_γ {r['per_model']}")
-    if res["arms"].get("W", {}).get("c4_energy_p_vig_win"):
-        c = res["arms"]["W"]["c4_energy_p_vig_win"]
-        L.append(f"- W′ C4-energy 고정 − C0 의 창 안 경계 비율 {_f(c['diff'])} (t {_f(c['t'], 2)}), "
-                 f"C0 − C2_W′ {_f(res['arms']['W']['vs_C2W']['diff'])} (t {_f(res['arms']['W']['vs_C2W']['t'], 2)})")
+    for arm in ("W", "CM"):
+        r = res["arms"].get(arm, {})
+        if r.get("c4_energy_p_vig_win"):
+            c = r["c4_energy_p_vig_win"]
+            L.append(f"- {arm} C4-energy 고정 − C0 의 창 안 경계 비율 {_f(c['diff'])} (t {_f(c['t'], 2)}), "
+                     f"C0 − C2_W′ {_f(r['vs_C2W']['diff'])} (t {_f(r['vs_C2W']['t'], 2)})")
     if res["early_stop"]:
         L.append(f"- 조기 중단: {res['early_stop']}")
     return "\n".join(L) + "\n"
@@ -509,6 +535,7 @@ def main(argv=None) -> int:
     t.add_argument("--threads", type=int, default=1)
     t.add_argument("--poll", type=float, default=30.0)
     t.add_argument("--force", action="store_true")
+    t.add_argument("--arms", nargs="+", choices=list(ARMS), default=None, help="학습할 팔 (기본 전부)")
     e = sub.add_parser("eval")
     e.add_argument("--steps", type=int, default=EVAL_STEPS)
     e.add_argument("--workers", type=int, default=16)

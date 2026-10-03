@@ -14,6 +14,8 @@ v1 `env/vec_env.py` 의 HerdVecEnv 는 World 하나를 감쌌다. 학습 중 res
 슬롯 하나 = SB3 환경 하나라는 v1 규약은 그대로다. 정책의 (-3,3) 출력을 [0,1] 로 바꾸는
 sigmoid 도 여기에만 있다 (§1.3). 행동·관측 공간의 차원은 설정에서 읽는다(`World.act_dim`: v1 4, speed 를 켜면 5,
 vigilance 까지 켜면 6. `World.obs_dim`: v1 7, vigilance 를 켜면 8).
+설정에 `train.cm`(v2.2r 범주형 보행, `env_v2/cm.py`)이 있으면 정책 출력은 [조향 원값 4, 범주 번호] 이고 행동 공간은
+`cm_action_space(K)` 다. 세계 행동으로 바꾸는 `cm_to_world` 도 step_async 에서만 부른다.
 """
 
 from __future__ import annotations
@@ -24,6 +26,7 @@ import numpy as np
 from gymnasium.spaces import Box
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
+from .cm import cm_action_space, cm_params, cm_to_world
 from .world import ACT_DIM, OBS_DIM, World
 
 OBS_SPACE = Box(0.0, 1.0, (OBS_DIM,), np.float32)   # v1 관측 7개. 세계의 관측 공간은 obs_space(obs_dim)
@@ -70,13 +73,17 @@ class MultiWorldVecEnv(VecEnv):
         self.act_names = self.worlds[0].act_names
         self.obs_dim = self.worlds[0].obs_dim
         self.obs_names = self.worlds[0].obs_names
+        # v2.2r CM (env_v2/cm.py): 설정 train.cm 이 있으면 정책 출력은 [조향 4, 범주 번호] 이고 step_async 가 세계 행동
+        # (act_dim 열)으로 바꾼다. 없으면 None 이고 지금과 같다(정책 출력 = act_dim 개 원값, sigmoid).
+        self.cm = cm_params(cfg)
         self._age = self._staggered_ages()
         self._fresh = True          # 한 스텝도 안 돈 세계는 reset() 이 다시 뽑지 않는다
         self.num_resets = 0         # 시간 초과로 세계를 새로 뽑은 횟수
         self.seed_history: list[list[int]] = [[w.seed] for w in self.worlds]
         self._actions: np.ndarray | None = None
         self.render_mode = None
-        super().__init__(self.K * self.N, obs_space(self.obs_dim), act_space(self.act_dim))
+        super().__init__(self.K * self.N, obs_space(self.obs_dim),
+                         act_space(self.act_dim) if self.cm is None else cm_action_space(len(self.cm["categories"])))
 
     # --- 세계 관리 ----------------------------------------------------- #
 
@@ -124,6 +131,9 @@ class MultiWorldVecEnv(VecEnv):
         return np.concatenate([w.observe() for w in self.worlds])
 
     def step_async(self, actions: np.ndarray) -> None:
+        if self.cm is not None:                     # [조향 4, 범주] → 세계 행동 (env_v2/cm.py cm_to_world)
+            self._actions = cm_to_world(actions, self.cm, self.act_names)
+            return
         self._actions = sigmoid(np.asarray(actions, dtype=np.float64))   # (-3,3) → [0,1]
 
     def step_wait(self):

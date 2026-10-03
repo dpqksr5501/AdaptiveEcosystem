@@ -1,0 +1,6 @@
+시작 v2_2r_cm_s20: train_v2.py --config configs/v2_2r_cm.yaml --steps 20000000 --seed 20 --run-name v2_2r_cm_s20 --probe-every 1000000 --threads 1
+시작 v2_2r_cm_s21: train_v2.py --config configs/v2_2r_cm.yaml --steps 20000000 --seed 21 --run-name v2_2r_cm_s21 --probe-every 1000000 --threads 1
+시작 v2_2r_cm_s22: train_v2.py --config configs/v2_2r_cm.yaml --steps 20000000 --seed 22 --run-name v2_2r_cm_s22 --probe-every 1000000 --threads 1
+[CM 2M] p_vig_win = s20 0.0047, s21 0.0071, s22 0.0085
+[CM] 조기 중단: 2M 에서 3/3 시드가 0.01 미만
+학습 끝

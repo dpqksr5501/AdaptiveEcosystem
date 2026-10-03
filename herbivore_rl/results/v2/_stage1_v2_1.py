@@ -24,6 +24,12 @@
         --det v2_1_s0 v2_1_s1 v2_1_s2 --stoch v2_1_s0_stoch v2_1_s1_stoch v2_1_s2_stoch
     python results/v2/_stage1_v2_1.py
 
+1-9 확인층(10-03, `results/v2/s1_9/PREREG.md`)은 같은 절차를 새 학습 시드에 쓴다. 모델·진단 이름의 앞부분과 시드만 바꾼다
+(`--prefix v2_1c --seeds 30 31 32 33 34` → `ckpt/v2/v2_1c_s<시드>.zip`, `results/v2/diag_v2_1c_s<시드>/`,
+`runs/v2_diag/v2_1c_s<시드>/calib.npz`, `results/v2/diag_v2_1c/modecmp.json`, 결과 `results/v2/stage1_v2_1c.json`).
+인자 없이 부르면 1-3 그대로다(v2_1, 시드 0~2).
+    python results/v2/_stage1_v2_1.py --prefix v2_1c --seeds 30 31 32 33 34
+
 운영 정의 (2026-10-02, 평가 롤아웃을 돌리기 전에 이 파일에 적었다. 기준값은 계획서 6.2·#13 의 사전 등록값 그대로):
 - 조건: 결정 모드 결과는 모두 config_digest f068496361f9(`configs/v2_1.yaml` = E1-b B1 r2_5_ew0_5 팔), 평가 시드
   10000~10019 × 5000스텝, G 의 γ = 모델 학습 γ 0.9916661555611042, 끝 600스텝 제외, 앞 제외 0 이어야 한다.
@@ -82,9 +88,19 @@ from diagnose_v2 import (  # noqa: E402
 from env_v2.rollout import build_policy  # noqa: E402
 
 RES = ROOT / "results" / "v2"
+PREFIX = "v2_1"
 SEEDS = (0, 1, 2)
-DET = {s: RES / f"diag_v2_1_s{s}" for s in SEEDS}
-STOCH = {s: RES / f"diag_v2_1_s{s}_stoch" for s in SEEDS}
+DET = {s: RES / f"diag_{PREFIX}_s{s}" for s in SEEDS}
+STOCH = {s: RES / f"diag_{PREFIX}_s{s}_stoch" for s in SEEDS}
+
+
+def configure(prefix: str, seeds) -> None:
+    """모델·진단 이름의 앞부분과 학습 시드를 바꾼다(1-9 확인층). 기본값은 1-3 그대로다."""
+    global PREFIX, SEEDS, DET, STOCH
+    PREFIX, SEEDS = str(prefix), tuple(int(x) for x in seeds)
+    DET = {s: RES / f"diag_{PREFIX}_s{s}" for s in SEEDS}
+    STOCH = {s: RES / f"diag_{PREFIX}_s{s}_stoch" for s in SEEDS}
+
 E1B = RES / "e1" / "B1" / "r2_5_ew0_5"
 DIGEST = "f068496361f9"
 GAMMA = 0.9916661555611042
@@ -260,10 +276,10 @@ def gait_split(a: np.ndarray) -> dict:
 
 
 def intervention(seed: int) -> dict:
-    cal = ROOT / "runs" / "v2_diag" / f"v2_1_s{seed}" / "calib.npz"
+    cal = ROOT / "runs" / "v2_diag" / f"{PREFIX}_s{seed}" / "calib.npz"
     with np.load(cal, allow_pickle=False) as z:
         obs = np.asarray(z["obs"], dtype=np.float32)
-    pol = build_policy({"kind": "learned", "model": str((ROOT / "ckpt" / "v2" / f"v2_1_s{seed}.zip").resolve())})
+    pol = build_policy({"kind": "learned", "model": str((ROOT / "ckpt" / "v2" / f"{PREFIX}_s{seed}.zip").resolve())})
 
     def act(o):
         return np.concatenate([np.asarray(pol(o[i:i + 8192]), np.float64) for i in range(0, len(o), 8192)])
@@ -384,7 +400,7 @@ def main() -> int:
         if c in ("g_gamma", "b1", "b2"):
             row["sig"] = bool(t["sig"] and row["ci_excludes_0"])
         mode[c] = row
-    mc = load(RES / "diag_v2_1" / "modecmp.json")
+    mc = load(RES / f"diag_{PREFIX}" / "modecmp.json")
     holm_rows = {c: mc["groups"][0]["cols"][c] for c in ("survival", "starve_rate", "predation_rate")}
     mode_trigger = bool(any(mode[c]["sig"] for c in ("g_gamma", "b1", "b2"))
                         or any(bool(r.get("verdict")) for r in holm_rows.values()))
@@ -407,10 +423,11 @@ def main() -> int:
 
     data = {
         "generated": datetime.now(timezone.utc).isoformat(timespec="seconds"),
-        "script": "python results/v2/_stage1_v2_1.py",
+        "script": "python results/v2/_stage1_v2_1.py" + ("" if PREFIX == "v2_1" else
+                                                           f" --prefix {PREFIX} --seeds {' '.join(map(str, SEEDS))}"),
         "condition": {"config": "configs/v2_1.yaml", "config_digest": DIGEST, "gamma": GAMMA,
                       "eval_seeds": [EVAL_SEEDS[0], EVAL_SEEDS[-1]], "eval_steps": EVAL_STEPS, "tail": TAIL,
-                      "train_seeds": list(SEEDS), "models": {s: f"ckpt/v2/v2_1_s{s}.zip" for s in SEEDS},
+                      "train_seeds": list(SEEDS), "models": {s: f"ckpt/v2/{PREFIX}_s{s}.zip" for s in SEEDS},
                       "model_sha1": {s: load(DET[s] / "ablate.json")["meta"]["model_sha1"] for s in SEEDS},
                       "c2_source": str(E1B.relative_to(ROOT)).replace("\\", "/"),
                       "reps": REPS, "boot_seed": BOOT_SEED, "t_crit": T_CRIT, "size_need": need},
@@ -422,7 +439,7 @@ def main() -> int:
         "g998": g998_out,
         "intervention": curves,
     }
-    out = RES / "stage1_v2_1.json"
+    out = RES / f"stage1_{PREFIX}.json"
     save_json(out, clean(data))
     print(f"저장: {out}")
     summary(data)
@@ -477,4 +494,11 @@ def summary(d: dict) -> None:
 
 
 if __name__ == "__main__":
+    import argparse
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--prefix", default="v2_1")
+    ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
+    a = ap.parse_args()
+    configure(a.prefix, a.seeds)
     sys.exit(main())

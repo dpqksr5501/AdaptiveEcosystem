@@ -12,16 +12,24 @@ v1 에 없는 것:
 - **확률 모드** (계획서 6.1-7, #29). 학습 정책 스펙에 `"mode": "stochastic"` 을 넣으면 평균 행동 대신
   학습 때의 가우시안 분포에서 뽑은 행동을 쓴다 (`StochasticLearned`). 잡음은 평가 시드에서 유도한 전용
   스트림에서 뽑아 재현된다. `mode` 가 없거나 "deterministic" 이면 지금까지와 같은 결정 모드다.
+- **유지 표본 모드** (수정 제안서 3.1 (가) R1 출시 모드, 5절 #3). `"mode": "hold", "hold_k": K` 면 조향 4열은 결정 모드
+  평균 그대로, 보행·경계 열(4~)만 개체별 잡음 u 를 K 스텝 유지해 뽑는다 (`HoldLearned`). u 는 해시·위상 표본기라
+  상태를 저장하지 않고 C++ 로 그대로 옮길 수 있다. 리스폰은 `observe_done` 훅으로 정책에 알린다(아래 롤아웃).
+- **리스폰 훅.** 정책(래퍼 포함)에 `observe_done(done)` 이 있으면 `rollout` 이 `w.step` 뒤마다 그 스텝의 사망(=리스폰)
+  배열로 부른다. 결정·확률 모드 정책에는 없어 지금까지와 같은 값이 나온다.
 - **앞부분 제외.** `head` 를 주면 G_γ 평균에서 롤아웃 앞 `head` 스텝(리셋 과도기)도 뺀다 (6.1-4, 기본 0).
 - **행동·관측 수는 세계를 따른다** (`World.act_dim`: v1 4, speed 를 켜면 5, vigilance 까지 켜면 6.
   `World.obs_dim`: v1 7, vigilance 를 켜면 8). 래퍼·확률 모드는 차원과 무관하다.
   v1 의 4개짜리 정책(Utility)은 speed·vigilance 세계에 쓸 수 없다(World.step 이 모양을 검사한다). random 은 스펙의
   `act_dim` 으로 차원을 정한다(`adapt_spec`). speed 를 켠 세계의 행에는 `World.gait_stats()` 열이,
   vigilance 를 켠 세계의 행에는 `World.vigil_stats()` 열이 붙는다.
+  vigil_window(v2.2r)를 켠 세계의 행에는 `World.window_stats()` 열(WINDOW_COLUMNS)도 붙는다. 범주형 보행 CM 모델
+  (`env_v2/cm.py`)은 `_base_policy` 가 알아보고 CM 평가 정책(결정·유지 표본·확률)으로 돌린다.
 
 정책 스펙 예:
     {"kind": "learned", "model": "ckpt/final.zip"}                 # policies.registry 스펙 그대로
     {"kind": "learned", "model": "ckpt/final.zip", "mode": "stochastic"}   # 확률 모드
+    {"kind": "learned", "model": "ckpt/final.zip", "mode": "hold", "hold_k": 24}   # 유지 표본 모드 (R1)
     {"policy": {"kind": "learned", "model": "..."},
      "wrap": [{"kind": "act_fix", "dims": [1], "values": [.3, .8, .4, .1]}]}
 """
@@ -40,7 +48,7 @@ import numpy as np
 from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
-from .world import ACT_DIM, GAIT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, World
+from .world import ACT_DIM, GAIT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS, World
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -53,6 +61,8 @@ ROW_COLUMNS = STAT_COLUMNS + EXTRA_COLUMNS
 GAIT_COLUMNS = [c for c in GAIT_STAT_COLUMNS if c not in EXTRA_COLUMNS]
 # vigilance(v2.2)를 켠 세계의 행에만 더 붙는 열 (World.vigil_stats)
 VIGIL_COLUMNS = list(VIGIL_STAT_COLUMNS)
+# vigil_window(v2.2r)를 켠 세계의 행에만 더 붙는 열 (World.window_stats)
+WINDOW_COLUMNS = list(WINDOW_STAT_COLUMNS)
 
 
 # --------------------------------------------------------------------- #
@@ -136,11 +146,20 @@ def g_gamma(rew: np.ndarray, done: np.ndarray, gamma: float, tail: int | None = 
 # 대조군·평가 모드의 RNG 스트림 구분값(시드 목록 둘째 칸). 시드가 같아도 쓰임마다 다른 수열을 쓴다.
 # v1 세계는 default_rng(seed) = [seed, 0, ...], 기능은 [seed, 2, id, part] (env_v2/features.py) 라 겹치지 않는다.
 # act_sample 은 확률 모드의 행동 잡음이다 (StochasticLearned). 번호는 바꾸지 않는다.
-_SALT = {"act_permute": 101, "obs_permute": 202, "act_sample": 303}
+# act_hold 는 유지 표본 모드 해시의 첫 입력이다 (HoldLearned). default_rng 스트림이 아니라 SplitMix64 해시라 위 스트림과
+# 생성기부터 다르지만, 번호를 여기에 같이 두어 겹치지 않게 한다.
+_SALT = {"act_permute": 101, "obs_permute": 202, "act_sample": 303, "act_hold": 404}
 
 
 def _perm_rng(kind: str, seed: int, salt: int) -> np.random.Generator:
     return np.random.default_rng([int(seed), _SALT[kind], int(salt)])
+
+
+def forward_done(policy, done) -> None:
+    """`policy` 에 리스폰 훅(`observe_done`)이 있으면 부른다. 없으면 아무것도 하지 않는다."""
+    hook = getattr(policy, "observe_done", None)
+    if hook is not None:
+        hook(done)
 
 
 class ActFix:
@@ -155,6 +174,9 @@ class ActFix:
         if self.dims:
             a[:, self.dims] = self.values[self.dims]
         return a
+
+    def observe_done(self, done):
+        forward_done(self.base, done)
 
 
 class ActPermute:
@@ -171,6 +193,9 @@ class ActPermute:
         a = np.asarray(self.base(obs))
         return a[self.rng.permutation(len(a))]
 
+    def observe_done(self, done):
+        forward_done(self.base, done)
+
 
 class ObsFix:
     """관측 열 `dims` 를 `values` 로 고정한 뒤 정책에 넣는다 (C4-j 고정). 원본 관측은 건드리지 않는다."""
@@ -185,6 +210,9 @@ class ObsFix:
         o = np.array(obs, dtype=np.float32)
         o[:, self.dims] = self.values
         return self.base(o)
+
+    def observe_done(self, done):
+        forward_done(self.base, done)
 
 
 class ObsPermute:
@@ -202,6 +230,9 @@ class ObsPermute:
         p = self.rng.permutation(len(o))
         o[:, self.dims] = o[p][:, self.dims]
         return self.base(o)
+
+    def observe_done(self, done):
+        forward_done(self.base, done)
 
 
 def n_segments(bins) -> int:
@@ -238,11 +269,29 @@ class SegConst:
         a[:, self.dims] = self.table[segment_ids(obs, self.bins)]
         return a
 
+    def observe_done(self, done):
+        forward_done(self.base, done)
+
+
+class _DoneForward:
+    """리스폰 훅이 없는 외부 factory 래퍼를 감싸 훅을 바탕 정책으로 넘긴다. 행동은 래퍼 그대로다."""
+
+    def __init__(self, policy, base):
+        self.policy, self.base = policy, base
+
+    def __call__(self, obs):
+        return self.policy(obs)
+
+    def observe_done(self, done):
+        forward_done(self.base, done)
+
 
 def make_wrapper(w: dict, base, seed: int):
     """래퍼 스펙 하나 → 정책. 내장 kind 가 아니면 `factory` ("모듈:함수") 를 불러 쓴다.
 
     외부 factory 의 모양은 `f(base, spec, seed) -> 정책` 이다. 워커가 그 모듈을 직접 import 한다.
+    factory 정책에 리스폰 훅(`observe_done`)이 없고 바탕 정책에 있으면(유지 표본 모드) 훅을 넘기는 껍질을 씌운다.
+    훅이 있는 factory 정책은 바탕으로 넘기는 일을 스스로 한다.
     """
     kind = w.get("kind")
     if kind == "act_fix":
@@ -257,15 +306,18 @@ def make_wrapper(w: dict, base, seed: int):
         return SegConst(base, w["bins"], w["dims"], w["table"])
     if "factory" in w:
         mod, _, attr = w["factory"].partition(":")
-        return getattr(importlib.import_module(mod), attr)(base, w, seed)
+        pol = getattr(importlib.import_module(mod), attr)(base, w, seed)
+        if getattr(pol, "observe_done", None) is None and getattr(base, "observe_done", None) is not None:
+            pol = _DoneForward(pol, base)
+        return pol
     raise ValueError(f"알 수 없는 래퍼: {w!r}")
 
 
 # --------------------------------------------------------------------- #
-# 행동 모드: 결정(평균 행동) / 확률(학습 분포에서 표본)
+# 행동 모드: 결정(평균 행동) / 확률(학습 분포에서 표본) / 유지 표본(보행·경계 열만 K 스텝 유지 표본)
 # --------------------------------------------------------------------- #
 
-ACTION_MODES = ("deterministic", "stochastic")
+ACTION_MODES = ("deterministic", "stochastic", "hold")
 # 학습 때 SB3 가 환경에 넘기기 전에 자르는 범위 = env_v2.vec_env.ACT_SPACE (C++ 도 clamp(-3,3) → sigmoid)
 ACT_LOW, ACT_HIGH = -3.0, 3.0
 
@@ -311,9 +363,216 @@ class StochasticLearned:
         return 1.0 / (1.0 + np.exp(-raw))
 
 
+# ---- 유지 표본 모드 (수정 제안서 3.1 (가) R1): 해시·위상 표본기 ----
+#
+# 64비트 해시 (C++ 로 그대로 옮긴다. 모든 연산은 uint64, mod 2^64):
+#   Mix64(z) = SplitMix64 마무리: z ^= z >> 30; z *= 0xBF58476D1CE4E5B9; z ^= z >> 27; z *= 0x94D049BB133111EB;
+#              z ^= z >> 31
+#   H(x_1, ..., x_n): h = 0; k = 1..n 마다 h = Mix64((h ^ x_k) + 0x9E3779B97F4A7C15). 정수 입력은 uint64 로 바꾼다
+#              (음수는 2의 보수). H(x) 하나는 SplitMix64(시드 x) 의 첫 출력과 같다(H(0) = 0xE220A8397B1DCDAF).
+#   U(h) = ((h >> 12) + 0.5) · 2^-52 — 위 52비트. 모든 값이 double 로 정확하고 [2^-53, 1 − 2^-53] ⊂ (0, 1) 이다.
+#              (h >> 11)·2^-53 + 2^-54 는 h >> 11 ≥ 2^52 에서 54비트가 필요해 반올림되고, 최댓값은 정확히 1.0 이 된다.
+# C++ 꼴:  uint64 Mix64(uint64 Z) { Z ^= Z >> 30; Z *= 0xBF58476D1CE4E5B9ull; Z ^= Z >> 27; Z *= 0x94D049BB133111EBull;
+#                                   return Z ^ (Z >> 31); }
+#          uint64 H = 0; for (uint64 X : Inputs) H = Mix64((H ^ X) + 0x9E3779B97F4A7C15ull);
+#          double U = ((double)(H >> 12) + 0.5) * 0x1p-52;
+HOLD_GOLDEN = 0x9E3779B97F4A7C15
+_MIX_M1, _MIX_M2 = 0xBF58476D1CE4E5B9, 0x94D049BB133111EB
+# 유지 표본 해시의 첫 입력(스트림 구분값 404, _SALT 참고). 확률 모드 잡음([seed, 303, salt] default_rng)과 섞이지 않는다.
+HOLD_TAG = _SALT["act_hold"]
+# 위상 해시의 '열' 자리 값. 행동 열 번호(4, 5, ...)로 쓰일 수 없는 값이고, 위상 해시는 입력이 하나 적다(블록 없음).
+HOLD_PHASE_TAG = 0xFFFFFFFF
+# 표본 대상 열의 시작. 앞 4열(v1 조향)은 결정 모드 평균 그대로다.
+HOLD_FIRST_COL = ACT_DIM
+
+
+def _u64(x) -> np.ndarray:
+    """정수(배열) → uint64 배열. 음수는 2의 보수(C++ static_cast<uint64>)다."""
+    a = np.asarray(x)
+    if a.dtype.kind not in "iu":
+        raise TypeError(f"해시 입력은 정수여야 한다: {a.dtype}")
+    return a.astype(np.uint64)
+
+
+def mix64(z) -> np.ndarray:
+    """SplitMix64 마무리 함수 (전단사). 곱셈은 mod 2^64 로 넘친다."""
+    z = _u64(z)
+    with np.errstate(over="ignore"):
+        z = z ^ (z >> np.uint64(30))
+        z = z * np.uint64(_MIX_M1)
+        z = z ^ (z >> np.uint64(27))
+        z = z * np.uint64(_MIX_M2)
+        return np.asarray(z ^ (z >> np.uint64(31)), dtype=np.uint64)
+
+
+def hold_chain(h, *xs) -> np.ndarray:
+    """해시 상태 `h` 에 입력 `xs` 를 차례로 더 섞는다. hold_hash(a, b, c) == hold_chain(hold_hash(a, b), c). 배열은 브로드캐스트."""
+    h = _u64(h)
+    with np.errstate(over="ignore"):
+        for x in xs:
+            h = mix64((h ^ _u64(x)) + np.uint64(HOLD_GOLDEN))
+    return h
+
+
+def hold_hash(*xs) -> np.ndarray:
+    """H(x_1, ..., x_n) (위 정의). 입력이 배열이면 브로드캐스트한 uint64 배열이다."""
+    return hold_chain(0, *xs)
+
+
+def hold_uniform(h) -> np.ndarray:
+    """U(h) = ((h >> 12) + 0.5)·2^-52 ∈ [2^-53, 1 − 2^-53] (위 정의). float64."""
+    return ((_u64(h) >> np.uint64(12)).astype(np.float64) + 0.5) * 2.0 ** -52
+
+
+def check_hold_k(k) -> int:
+    """유지 길이 K 는 양의 정수다(bool 은 받지 않는다)."""
+    if isinstance(k, bool) or not isinstance(k, (int, np.integer)) or int(k) < 1:
+        raise ValueError(f"hold_k 는 양의 정수여야 한다. 받은 값: {k!r}")
+    return int(k)
+
+
+def hold_agent_keys(slots, generations) -> np.ndarray:
+    """개체 키 = 슬롯·2^32 + 세대 (uint64). 세대 = 그 슬롯의 리스폰 횟수(0 부터)."""
+    return (_u64(slots) << np.uint64(32)) + _u64(generations)
+
+
+def hold_phase(seed: int, salt: int, keys, k: int) -> np.ndarray:
+    """개체별 위상 φ = H(404, seed, salt, key, 0xFFFFFFFF) mod K (int64)."""
+    return (hold_hash(HOLD_TAG, int(seed), int(salt), keys, HOLD_PHASE_TAG) % np.uint64(check_hold_k(k))).astype(np.int64)
+
+
+def hold_noise(seed: int, salt: int, keys, cols, tick: int, k: int) -> np.ndarray:
+    """(개체, 열) 유지 잡음 u = U(H(404, seed, salt, key, col, block)), block = ⌊(tick + φ)/K⌋. (len(keys), len(cols))."""
+    keys = _u64(keys).reshape(-1)
+    h_key = hold_chain(hold_hash(HOLD_TAG, int(seed), int(salt)), keys)
+    k = check_hold_k(k)
+    phase = (hold_chain(h_key, HOLD_PHASE_TAG) % np.uint64(k)).astype(np.int64)
+    block = (int(tick) + phase) // k
+    cols = np.asarray(cols, dtype=np.int64).reshape(-1)
+    return hold_uniform(hold_chain(h_key[:, None], cols[None, :], block[:, None]))
+
+
+def _phi(z) -> np.ndarray:
+    """표준 정규 누적 Φ(z) = 0.5·erfc(−z/√2) (C++ 0.5 * std::erfc(-Z * M_SQRT1_2) 와 같은 꼴)."""
+    from scipy.special import erfc
+
+    return 0.5 * erfc(-np.asarray(z, dtype=np.float64) * math.sqrt(0.5))
+
+
+def hold_cell_bounds(mu, sigma, thresholds) -> np.ndarray:
+    """칸 경계의 누적 확률 p_j = P(a < t_j) = Φ((logit(t_j) − μ)/σ). (..., len(thresholds)).
+
+    a = sigmoid(clip(μ + σ·Φ⁻¹(u), −3, 3)) 이므로 a ≥ t_j ⇔ u ≥ p_j 다. logit(t_j) ≤ −3 이면 늘 넘으므로 p_j = 0,
+    logit(t_j) > 3 이면 넘지 못하므로 p_j = 1 이다(자르기). t_j 는 sigmoid 뒤 [0,1] 의 문턱(보행 1/3·2/3, 경계 0.5).
+    """
+    mu = np.asarray(mu, dtype=np.float64)[..., None]
+    sigma = np.asarray(sigma, dtype=np.float64)[..., None]
+    t = np.asarray(thresholds, dtype=np.float64)
+    with np.errstate(divide="ignore"):
+        lt = np.log(t) - np.log1p(-t)                      # logit(t), t = 0 → −inf, t = 1 → +inf
+    p = _phi((lt - mu) / sigma)
+    return np.where(lt <= ACT_LOW, 0.0, np.where(lt > ACT_HIGH, 1.0, p))
+
+
+def hold_cells(mu, sigma, u, thresholds, strict: bool = False) -> np.ndarray:
+    """Φ⁻¹ 없이 칸을 고른다: 칸 = Σ_j [u ≥ p_j] (`strict` 면 [u > p_j]). 보행은 [a ≥ t] 라 기본값, 경계는 a > 0.5 라 strict.
+
+    연속값 a 를 문턱으로 나눈 칸과 같다(u = p_j 인 동률은 측도 0). C++ 는 이 꼴로 칸을 정한다 — 누적 확률은 double,
+    `std::erfc` 로 계산한다(`_phi`). 연속값이 필요 없으므로 Φ⁻¹ 를 옮기지 않아도 된다.
+    """
+    p = hold_cell_bounds(mu, sigma, thresholds)
+    u = np.asarray(u, dtype=np.float64)[..., None]
+    return ((u > p) if strict else (u >= p)).sum(-1).astype(np.int64)
+
+
+class HoldLearned:
+    """유지 표본 모드 (수정 제안서 3.1 (가) R1 출시 모드). 조향은 평균, 보행·경계 열만 K 스텝 유지한 잡음으로 뽑는다.
+
+    - 열 0~3 (v1 조향): sigmoid(clip(μ, −3, 3)) — `policies.registry` 결정 모드(model.predict(deterministic=True) →
+      action_space 로 clip → sigmoid, 모두 float32)와 같은 float32 경로라 비트 단위로 같은 값이다.
+    - 열 4~ (speed, vigilance — 이산 결정 열): a = sigmoid(clip(μ + σ·Φ⁻¹(u), −3, 3)), σ = exp(log_std) (float64).
+      학습 분포(StochasticLearned)와 칸 확률이 같고, 다른 것은 잡음 u 를 K 스텝 유지한다는 것뿐이다.
+    - u = U(H(404, seed, salt, key, col, block)), block = ⌊(tick + φ)/K⌋, φ = H(404, seed, salt, key, 0xFFFFFFFF) mod K
+      (H·U 정의는 위 주석). tick = 이 정책을 만든 뒤 부른 횟수(첫 호출 0). φ 는 개체마다 달라 모든 개체가 한꺼번에
+      바뀌지 않는다. 유지하는 것은 칸이 아니라 u 다 — μ 가 바뀌면(위협이 새로 보이면) 칸은 곧바로 바뀔 수 있다.
+      상태를 저장하지 않으므로 C++ 에 새 Fragment 가 필요 없다.
+    - 개체 키·리스폰 규칙: 파이썬은 key = 슬롯·2^32 + 세대(그 슬롯의 리스폰 횟수, 0 부터). `observe_done(done)` 이
+      죽은 슬롯의 세대를 올리므로 리스폰한 개체는 다음 호출부터 새 키(새 φ, 새 u)를 쓴다. C++ 는 key = StableAgentId 다
+      (리스폰하면 새 id). 키 값은 다르지만 해시와 분포는 같다.
+    - seed 는 평가 시드(롤아웃), salt 는 스펙의 "salt"(기본 0). C++ 는 seed 에 세계 시드, tick 에 세계 시작부터 센
+      정책 스텝 번호(첫 정책 스텝 0)를 쓴다. 해시 입력 순서는 (404, seed, salt, key, col, block) 그대로다.
+    - 칸만 필요하면 Φ⁻¹ 없이 `hold_cells` 로 u 와 경계 누적 확률을 비교한다(C++ 꼴).
+    """
+
+    def __init__(self, model, seed: int, hold_k: int, salt: int = 0):
+        self.model = model
+        self.seed, self.salt, self.k = int(seed), int(salt), check_hold_k(hold_k)
+        self.tick = 0
+        self.gen = np.zeros(0, dtype=np.uint64)             # 슬롯별 세대 (호출·훅의 개체 수에 맞춰 늘린다)
+        self._h0 = hold_hash(HOLD_TAG, self.seed, self.salt)
+        self.last_u = None                                   # 마지막 호출의 u (개체, 표본 열). 진단·테스트용
+
+    def _grow(self, n: int) -> None:
+        if n > len(self.gen):
+            self.gen = np.concatenate([self.gen, np.zeros(n - len(self.gen), dtype=np.uint64)])
+
+    def keys(self, n: int) -> np.ndarray:
+        """슬롯 0..n−1 의 지금 키."""
+        self._grow(n)
+        return hold_agent_keys(np.arange(n), self.gen[:n])
+
+    def noise(self, n: int, cols) -> np.ndarray:
+        """지금 tick 의 u (n, len(cols)). `hold_noise` 와 같은 값이다(키까지의 해시 상태를 한 번만 만든다)."""
+        h_key = hold_chain(self._h0, self.keys(n))
+        phase = (hold_chain(h_key, HOLD_PHASE_TAG) % np.uint64(self.k)).astype(np.int64)
+        block = (self.tick + phase) // self.k
+        cols = np.asarray(cols, dtype=np.int64)
+        return hold_uniform(hold_chain(h_key[:, None], cols[None, :], block[:, None]))
+
+    def observe_done(self, done) -> None:
+        """리스폰 훅: 이번 스텝에 죽은(그 자리에 리스폰한) 슬롯의 세대를 올린다."""
+        d = np.asarray(done, dtype=bool).reshape(-1)
+        self._grow(len(d))
+        self.gen[:len(d)][d] += np.uint64(1)
+
+    def _forward32(self, obs) -> tuple[np.ndarray, np.ndarray]:
+        """관측 → (μ, σ) float32 (N, 행동 수). model.predict 와 같은 전방 계산이다(자르기 전 평균)."""
+        import torch as th
+
+        policy = self.model.policy
+        policy.set_training_mode(False)
+        obs_t, _ = policy.obs_to_tensor(np.asarray(obs, dtype=np.float32))
+        with th.no_grad():
+            d = policy.get_distribution(obs_t).distribution
+            return d.mean.cpu().numpy(), d.stddev.cpu().numpy()
+
+    def distribution(self, obs) -> tuple[np.ndarray, np.ndarray]:
+        """관측 → (평균 μ, 표준편차), 둘 다 float64 (N, 행동 수). StochasticLearned.distribution 과 같은 값이다."""
+        mu32, sd32 = self._forward32(obs)
+        return mu32.astype(np.float64), sd32.astype(np.float64)
+
+    def __call__(self, obs):
+        from scipy.special import ndtri
+
+        mu32, sd32 = self._forward32(obs)
+        space = self.model.policy.action_space
+        raw32 = np.clip(mu32, space.low, space.high)                    # predict 의 clip (float32)
+        a = (1.0 / (1.0 + np.exp(-raw32))).astype(np.float64)          # registry 의 sigmoid (float32) → float64
+        n, n_act = a.shape
+        cols = np.arange(HOLD_FIRST_COL, n_act)
+        if len(cols):
+            u = self.noise(n, cols)
+            mu, sd = mu32[:, cols].astype(np.float64), sd32[:, cols].astype(np.float64)
+            raw = np.clip(mu + sd * ndtri(u), ACT_LOW, ACT_HIGH)
+            a[:, cols] = 1.0 / (1.0 + np.exp(-raw))
+            self.last_u = u
+        self.tick += 1
+        return a
+
+
 # 워커 안에서 학습 정책을 잡마다 다시 싣지 않는다. 결정적 추론이라 상태가 없다.
 _BASE_CACHE: dict[str, object] = {}
-# 확률 모드는 RNG 상태가 있어 정책은 잡마다 새로 만들고, 실은 모델만 돌려쓴다.
+# 확률·유지 표본 모드는 상태(RNG·tick·세대)가 있어 정책은 잡마다 새로 만들고, 실은 모델만 돌려쓴다.
 _MODEL_CACHE: dict[str, object] = {}
 
 
@@ -347,13 +606,53 @@ def _random_policy(spec: dict):
     return lambda obs: rng.random((len(obs), d))
 
 
+def hold_k_of(spec: dict) -> int | None:
+    """정책 스펙의 유지 길이 K. 래퍼 스펙이면 바탕 정책의 값이다. 유지 표본 모드가 아니면 None.
+
+    유지 표본 모드는 "hold_k"(양의 정수)가 꼭 있어야 하고, 다른 모드에 "hold_k" 가 있으면 잘못 쓴 것으로 보고 멈춘다.
+    """
+    base = spec.get("policy", spec)
+    k = base.get("hold_k")
+    if action_mode(spec) != "hold":
+        if k is not None:
+            raise ValueError(f"hold_k 는 hold 모드에만 쓴다: {base!r}")
+        return None
+    if k is None:
+        raise ValueError(f"hold 모드는 hold_k(양의 정수, 예: 24)가 필요하다: {base!r}")
+    return check_hold_k(k)
+
+
+_CM_FILES: dict[str, bool] = {}
+
+
+def _is_cm(spec: dict) -> bool:
+    """학습 정책 파일이 CM(env_v2/cm.py CMPolicy)인가. zip 의 data 만 읽고 워커 안에서 캐시한다."""
+    from .cm import is_cm_file
+
+    path = str(spec["model"])
+    if path not in _CM_FILES:
+        _CM_FILES[path] = is_cm_file(path)
+    return _CM_FILES[path]
+
+
 def _base_policy(spec: dict, seed: int = 0):
     from policies.registry import make_policy
 
+    k = hold_k_of(spec)                     # 모드 검사 + 유지 표본 모드의 K (다른 모드에 hold_k 가 있으면 멈춘다)
+    if spec.get("kind") == "learned" and _is_cm(spec):
+        # v2.2r 범주형 보행 CM 모델(env_v2/cm.py): 결정 = 최빈 범주, hold = 유지 잡음의 누적 확률 비교, 확률 = 범주 표본.
+        # 결정 모드도 registry(가우시안 sigmoid)로는 못 돌린다. 상태(tick·세대·RNG)가 있어 잡마다 새로 만든다
+        from .cm import make_cm_policy
+
+        return make_cm_policy(_load_model(spec), seed, action_mode(spec), k, spec.get("salt", 0))
     if action_mode(spec) == "stochastic":
         if spec.get("kind") != "learned":
             raise ValueError(f"확률 모드는 학습 정책에만 있다: {spec!r}")
         return StochasticLearned(_load_model(spec), seed, spec.get("salt", 0))
+    if k is not None:                       # 유지 표본 모드: 상태(tick·세대)가 있어 잡마다 새로 만든다
+        if spec.get("kind") != "learned":
+            raise ValueError(f"유지 표본 모드는 학습 정책에만 있다: {spec!r}")
+        return HoldLearned(_load_model(spec), seed, k, spec.get("salt", 0))
     if spec.get("kind") == "random" and "act_dim" in spec:      # 행동 4개가 아닌 세계의 random (adapt_spec)
         return _random_policy(spec)
     if spec.get("kind") != "learned":       # random 은 RNG 상태가 있어 잡마다 새로 만든다
@@ -367,7 +666,7 @@ def _base_policy(spec: dict, seed: int = 0):
 def build_policy(spec: dict, seed: int = 0):
     """정책 스펙(래퍼 포함) → 관측 (N, 관측 수) → 행동 (N, 행동 수) 함수. 래퍼는 목록 순서대로 바깥에 씌운다.
 
-    `seed` 는 순열 래퍼와 확률 모드 잡음 스트림의 시드다(롤아웃에서는 평가 시드).
+    `seed` 는 순열 래퍼와 확률·유지 표본 모드 잡음의 시드다(롤아웃에서는 평가 시드).
     """
     if "policy" not in spec:
         return _base_policy(spec, seed)
@@ -393,6 +692,8 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     - `_act_sum`, `_act_sq`, `_act_n`: 실제로 적용된 행동의 합·제곱합·개수 (C1 평균 행동용)
     - `_obs_sum`: 관측 합 (C4 평균 관측용)
     - `_obs`, `_act`: `record_every` 스텝마다의 관측과 그 스텝 행동 (반응 곡선·R²용)
+
+    정책(래퍼 포함)에 `observe_done` 이 있으면 `w.step` 뒤마다 그 스텝의 사망 배열로 부른다(유지 표본 모드의 리스폰 키).
     """
     gamma = load_gamma() if gamma is None else float(gamma)
     w = World(cfg, seeds=[seed])
@@ -402,6 +703,7 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     act_sum, act_sq = np.zeros(A), np.zeros(A)
     obs_sum = np.zeros(w.obs_dim)
     obs_s, act_s = [], []
+    done_hook = getattr(policy, "observe_done", None)
     for t in range(steps):
         obs = w.observe()
         a = np.asarray(policy(obs), dtype=np.float64)
@@ -414,6 +716,8 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
             act_s.append(a.copy())
         _, r, d, _ = w.step(a)
         rew[t], done[t] = r, d
+        if done_hook is not None:
+            done_hook(d)
 
     s = w.stats()
     s["seed"] = int(seed)
@@ -427,6 +731,9 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     if w._vg is not None:
         vs = w.vigil_stats()
         s.update((c, vs[c]) for c in VIGIL_COLUMNS)
+    if w._vw is not None:
+        ws = w.window_stats()
+        s.update((c, ws[c]) for c in WINDOW_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:

@@ -118,7 +118,7 @@ WINDOW_HIST_SHAPE = (3, 2, 2, 2)
 WINDOW_STAT_COLUMNS = (
     "win_frac", "p_stop_win", "p_stop_calm", "p_stop_win_full", "p_stop_calm_full", "b3_l",
     "p_stop_win_hungry", "p_stop_calm_hungry",
-    "p_vig_win", "p_vig_win_full", "p_vig_win_hungry", "p_vig_calm",
+    "p_vig_win", "p_vig_win_full", "p_vig_win_hungry", "p_vig_calm_w",
     "look_frac", "look_win_frac",
 )
 
@@ -1492,8 +1492,9 @@ class World:
         - p_stop_win·p_stop_calm: 창 안·평시의 P(실제 정지). *_full·*_hungry 는 결정 때 energy ≥ 0.5 / < 0.5 표본만
         - b3_l = p_stop_win_full − p_stop_calm_full — L 의 새 결정 사용 지표(B3_L). 배고파서 멈춘 경우를 떼려고
           배부른 표본만 쓴다. 상수 정책도 창 안·평시의 상태 분포 차이로 0 이 아닐 수 있다(대조군과 비교한다)
-        - p_vig_win·p_vig_win_full·p_vig_win_hungry·p_vig_calm: 경계(효력이 난 경계) 비율. W′ 의 사용 지표는
-          p_vig_win 이고, window_only 면 p_vig_calm 은 구성상 0 이다. action false 세계는 모두 0 이다
+        - p_vig_win·p_vig_win_full·p_vig_win_hungry·p_vig_calm_w: 경계(효력이 난 경계) 비율. W′ 의 사용 지표는
+          p_vig_win 이고, window_only 면 p_vig_calm_w 는 구성상 0 이다. action false 세계는 모두 0 이다.
+          (평시 열 이름에 _w 를 붙인 것은 vigil_stats 의 p_vig_calm 과 rollout 행에서 겹치지 않게 하려는 것이다)
         - look_frac·look_win_frac: 반사 돌아보기가 돈 개체-스텝 비율(전체 대비, 창 안 대비). look_back 을 끄면 0
         """
         nan = float("nan")
@@ -1520,7 +1521,7 @@ class World:
             b3_l=p_stop_f(1, 1) - p_stop_f(0, 1),
             p_stop_win_hungry=p_stop_f(1, 0), p_stop_calm_hungry=p_stop_f(0, 0),
             p_vig_win=ratio(vf[1].sum(), nf[1].sum()), p_vig_win_full=ratio(vf[1, 1], nf[1, 1]),
-            p_vig_win_hungry=ratio(vf[1, 0], nf[1, 0]), p_vig_calm=ratio(vf[0].sum(), nf[0].sum()),
+            p_vig_win_hungry=ratio(vf[1, 0], nf[1, 0]), p_vig_calm_w=ratio(vf[0].sum(), nf[0].sum()),
             look_frac=ratio(self._win_look, n), look_win_frac=ratio(self._win_look, nf[1].sum()),
         )
         assert tuple(out) == WINDOW_STAT_COLUMNS

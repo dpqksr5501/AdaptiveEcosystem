@@ -189,7 +189,7 @@ def test_w_vigilance_outside_window_has_no_effect(cfgs):
     x = _run(cfgs["w"], act, fix=always)
     _same_run(x, _run(cfgs["w"], act, fix=window_only))
     ws = x[0].window_stats()
-    assert ws["p_vig_calm"] == 0.0 and ws["p_vig_win"] == 1.0 and ws["win_frac"] > 0.0
+    assert ws["p_vig_calm_w"] == 0.0 and ws["p_vig_win"] == 1.0 and ws["win_frac"] > 0.0
 
 
 # --------------------------------------------------------------------- #
@@ -311,7 +311,7 @@ def test_window_stats_match_a_direct_recount(cfgs, key):
     if key == "l":
         assert s["look_frac"] > 0.0
     if key == "w":
-        assert s["p_vig_calm"] == 0.0 and s["p_vig_win"] > 0.0
+        assert s["p_vig_calm_w"] == 0.0 and s["p_vig_win"] > 0.0
 
 
 def test_window_world_is_deterministic_and_uses_no_rng(cfgs):
@@ -321,3 +321,16 @@ def test_window_world_is_deterministic_and_uses_no_rng(cfgs):
     y = _run(cfgs["l"], act)
     _same_run(x, y)
     assert x[0]._feature_rngs == {}
+
+
+def test_rollout_rows_carry_window_stats(cfgs):
+    """rollout 행에 window_stats 열이 붙는다(vigil_window 를 켠 세계만). 값은 같은 롤아웃의 World.window_stats 다."""
+    from env_v2.rollout import WINDOW_COLUMNS, rollout
+
+    def pol(o):
+        return np.full((len(o), 5), 0.2)                        # 늘 정지 명령
+
+    r = rollout(cfgs["l"], pol, 12000, 200, gamma=0.99)
+    assert set(WINDOW_COLUMNS) <= set(r) and r["look_frac"] > 0.0 and r["p_stop_win"] == 1.0
+    r22 = rollout(cfgs["v22"], lambda o: np.full((len(o), 6), 0.2), 12000, 50, gamma=0.99)
+    assert not set(WINDOW_COLUMNS) & set(r22)
