@@ -1,0 +1,1622 @@
+{
+ "meta": {
+  "generated": "2026-10-03T09:50:31+00:00",
+  "command": "results/v2/v2_2r_explore/inv4/h1_identity.py train"
+ },
+ "config": {
+  "train_block": [
+   {
+    "num_worlds": 8,
+    "reset_interval": 4000,
+    "rollout_world_steps": 256
+   },
+   {
+    "num_worlds": 8,
+    "reset_interval": 4000,
+    "rollout_world_steps": 256
+   }
+  ],
+  "train_equal": true,
+  "overrides": [
+   {
+    "rand": {
+     "pred_speed_mult": [
+      0.6,
+      0.95
+     ]
+    }
+   },
+   {
+    "rand": {
+     "pred_speed_mult": [
+      0.6,
+      0.95
+     ]
+    }
+   }
+  ],
+  "overrides_equal": true,
+  "speed_block": [
+   {
+    "enabled": true,
+    "thresholds": [
+     0.3333333333333333,
+     0.6666666666666666
+    ],
+    "gait_speed": [
+     0.0,
+     0.4,
+     1.0
+    ],
+    "gait_eat": [
+     1.0,
+     0.5,
+     0.0
+    ],
+    "c_rest": 0.7142857142857143,
+    "c_move": 1.7857142857142858,
+    "net_energy_reward": true
+   },
+   {
+    "enabled": true,
+    "thresholds": [
+     0.3333333333333333,
+     0.6666666666666666
+    ],
+    "gait_speed": [
+     0.0,
+     0.4,
+     1.0
+    ],
+    "gait_eat": [
+     1.0,
+     0.5,
+     0.0
+    ],
+    "c_rest": 0.7142857142857143,
+    "c_move": 1.7857142857142858,
+    "net_energy_reward": true
+   }
+  ],
+  "speed_equal": true,
+  "features": [
+   [
+    "speed"
+   ],
+   [
+    "speed",
+    "vigil_window",
+    "vigilance"
+   ]
+  ],
+  "t1_only_features": {
+   "vigilance": {
+    "enabled": true,
+    "threshold": 0.5,
+    "decay": 0.95,
+    "eat_mult": 0.0,
+    "fov_deg": 360.0,
+    "threat_flee": 0.0
+   },
+   "vigil_window": {
+    "enabled": true,
+    "action": false,
+    "window_only": false,
+    "look_back": false,
+    "theta": 0.5
+   }
+  },
+  "merged_v1_keys_differ": [],
+  "merged_v1_n_keys": 46,
+  "version": [
+   "2.1",
+   "2.2r_t1"
+  ]
+ },
+ "meta_json": {
+  "20": {
+   "has_seed_history": [
+    false,
+    false
+   ],
+   "fields": {
+    "steps": {
+     "t0": 20000000,
+     "t1": 20000000,
+     "equal": true
+    },
+    "actual_timesteps": {
+     "t0": 20021248,
+     "t1": 20021248,
+     "equal": true
+    },
+    "seed": {
+     "t0": 20,
+     "t1": 20,
+     "equal": true
+    },
+    "gamma": {
+     "t0": 0.9916661555611042,
+     "t1": 0.9916661555611042,
+     "equal": true
+    },
+    "gamma_source": {
+     "t0": "ppo_config",
+     "t1": "ppo_config",
+     "equal": true
+    },
+    "ent_coef": {
+     "t0": 0.0008971496690499397,
+     "t1": 0.0008971496690499397,
+     "equal": true
+    },
+    "ent_coef_source": {
+     "t0": "ppo_config",
+     "t1": "ppo_config",
+     "equal": true
+    },
+    "ppo_config": {
+     "t0": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\configs\\ppo_best.yaml",
+     "t1": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\configs\\ppo_best.yaml",
+     "equal": true
+    },
+    "ppo": {
+     "t0": {
+      "n_steps": 32.0,
+      "batch_size": 4096.0,
+      "n_epochs": 15.0,
+      "gamma": 0.9916661555611042,
+      "gae_lambda": 0.95,
+      "ent_coef": 0.0008971496690499397,
+      "learning_rate": 6.813187996724827e-05,
+      "clip_range": 0.37816696417287243
+     },
+     "t1": {
+      "n_steps": 32.0,
+      "batch_size": 4096.0,
+      "n_epochs": 15.0,
+      "gamma": 0.9916661555611042,
+      "gae_lambda": 0.95,
+      "ent_coef": 0.0008971496690499397,
+      "learning_rate": 6.813187996724827e-05,
+      "clip_range": 0.37816696417287243
+     },
+     "equal": true
+    },
+    "num_worlds": {
+     "t0": 8,
+     "t1": 8,
+     "equal": true
+    },
+    "reset_interval": {
+     "t0": 4000,
+     "t1": 4000,
+     "equal": true
+    },
+    "worlds_seen": {
+     "t0": 47,
+     "t1": 47,
+     "equal": true
+    },
+    "world_resets": {
+     "t0": 39,
+     "t1": 39,
+     "equal": true
+    },
+    "init": {
+     "t0": null,
+     "t1": null,
+     "equal": true
+    },
+    "act_names": {
+     "t0": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "t1": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "equal": true
+    },
+    "obs_names": {
+     "t0": [
+      "food_density",
+      "pred_count",
+      "pred_dist",
+      "kin_count",
+      "energy",
+      "recent_predation",
+      "cover_dist"
+     ],
+     "t1": [
+      "food_density",
+      "pred_count",
+      "pred_dist",
+      "kin_count",
+      "energy",
+      "recent_predation",
+      "cover_dist",
+      "threat_recency"
+     ],
+     "equal": false
+    },
+    "init_action_bias": {
+     "t0": {},
+     "t1": {},
+     "equal": true
+    },
+    "init_action_bias_source": {
+     "t0": {},
+     "t1": {},
+     "equal": true
+    },
+    "probe_every": {
+     "t0": 1000000,
+     "t1": 1000000,
+     "equal": true
+    },
+    "config_digest": {
+     "t0": "f068496361f9",
+     "t1": "6781d0e83f6a",
+     "equal": false
+    },
+    "command": {
+     "t0": "python.exe train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 20 --run-name v2_2r_t0_s20 --probe-every 1000000 --threads 1",
+     "t1": "python.exe train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 20 --run-name v2_2r_t1_s20 --probe-every 1000000 --threads 1",
+     "equal": false
+    }
+   },
+   "init_policy": [
+    {
+     "act_names": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "action_bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "log_std": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "speed": {
+      "mu_mean": 0.0023248420524453195,
+      "mu_absmax": 0.005043837707489729,
+      "std": 1.0,
+      "gait_prob": {
+       "stop": 0.24337985796441025,
+       "walk": 0.511781455799621,
+       "run": 0.24483868623596905
+      }
+     }
+    },
+    {
+     "act_names": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "action_bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "log_std": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "speed": {
+      "mu_mean": -0.0036720681654287546,
+      "mu_absmax": 0.005579652264714241,
+      "std": 1.0,
+      "gait_prob": {
+       "stop": 0.2452622097923616,
+       "walk": 0.5117797858455028,
+       "run": 0.24295800436213655
+      }
+     }
+    }
+   ]
+  },
+  "21": {
+   "has_seed_history": [
+    false,
+    false
+   ],
+   "fields": {
+    "steps": {
+     "t0": 20000000,
+     "t1": 20000000,
+     "equal": true
+    },
+    "actual_timesteps": {
+     "t0": 20021248,
+     "t1": 20021248,
+     "equal": true
+    },
+    "seed": {
+     "t0": 21,
+     "t1": 21,
+     "equal": true
+    },
+    "gamma": {
+     "t0": 0.9916661555611042,
+     "t1": 0.9916661555611042,
+     "equal": true
+    },
+    "gamma_source": {
+     "t0": "ppo_config",
+     "t1": "ppo_config",
+     "equal": true
+    },
+    "ent_coef": {
+     "t0": 0.0008971496690499397,
+     "t1": 0.0008971496690499397,
+     "equal": true
+    },
+    "ent_coef_source": {
+     "t0": "ppo_config",
+     "t1": "ppo_config",
+     "equal": true
+    },
+    "ppo_config": {
+     "t0": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\configs\\ppo_best.yaml",
+     "t1": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\configs\\ppo_best.yaml",
+     "equal": true
+    },
+    "ppo": {
+     "t0": {
+      "n_steps": 32.0,
+      "batch_size": 4096.0,
+      "n_epochs": 15.0,
+      "gamma": 0.9916661555611042,
+      "gae_lambda": 0.95,
+      "ent_coef": 0.0008971496690499397,
+      "learning_rate": 6.813187996724827e-05,
+      "clip_range": 0.37816696417287243
+     },
+     "t1": {
+      "n_steps": 32.0,
+      "batch_size": 4096.0,
+      "n_epochs": 15.0,
+      "gamma": 0.9916661555611042,
+      "gae_lambda": 0.95,
+      "ent_coef": 0.0008971496690499397,
+      "learning_rate": 6.813187996724827e-05,
+      "clip_range": 0.37816696417287243
+     },
+     "equal": true
+    },
+    "num_worlds": {
+     "t0": 8,
+     "t1": 8,
+     "equal": true
+    },
+    "reset_interval": {
+     "t0": 4000,
+     "t1": 4000,
+     "equal": true
+    },
+    "worlds_seen": {
+     "t0": 47,
+     "t1": 47,
+     "equal": true
+    },
+    "world_resets": {
+     "t0": 39,
+     "t1": 39,
+     "equal": true
+    },
+    "init": {
+     "t0": null,
+     "t1": null,
+     "equal": true
+    },
+    "act_names": {
+     "t0": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "t1": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "equal": true
+    },
+    "obs_names": {
+     "t0": [
+      "food_density",
+      "pred_count",
+      "pred_dist",
+      "kin_count",
+      "energy",
+      "recent_predation",
+      "cover_dist"
+     ],
+     "t1": [
+      "food_density",
+      "pred_count",
+      "pred_dist",
+      "kin_count",
+      "energy",
+      "recent_predation",
+      "cover_dist",
+      "threat_recency"
+     ],
+     "equal": false
+    },
+    "init_action_bias": {
+     "t0": {},
+     "t1": {},
+     "equal": true
+    },
+    "init_action_bias_source": {
+     "t0": {},
+     "t1": {},
+     "equal": true
+    },
+    "probe_every": {
+     "t0": 1000000,
+     "t1": 1000000,
+     "equal": true
+    },
+    "config_digest": {
+     "t0": "f068496361f9",
+     "t1": "6781d0e83f6a",
+     "equal": false
+    },
+    "command": {
+     "t0": "python.exe train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 21 --run-name v2_2r_t0_s21 --probe-every 1000000 --threads 1",
+     "t1": "python.exe train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 21 --run-name v2_2r_t1_s21 --probe-every 1000000 --threads 1",
+     "equal": false
+    }
+   },
+   "init_policy": [
+    {
+     "act_names": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "action_bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "log_std": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "speed": {
+      "mu_mean": 0.0020883896799333,
+      "mu_absmax": 0.0046973624266684055,
+      "std": 1.0,
+      "gait_prob": {
+       "stop": 0.24345415926718034,
+       "walk": 0.5117812263641908,
+       "run": 0.2447646143686286
+      }
+     }
+    },
+    {
+     "act_names": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "action_bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "log_std": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "speed": {
+      "mu_mean": -0.0013609783984804835,
+      "mu_absmax": 0.003159694606438279,
+      "std": 1.0,
+      "gait_prob": {
+       "stop": 0.24453582286834458,
+       "walk": 0.511782362686563,
+       "run": 0.24368181444509251
+      }
+     }
+    }
+   ]
+  },
+  "22": {
+   "has_seed_history": [
+    false,
+    false
+   ],
+   "fields": {
+    "steps": {
+     "t0": 20000000,
+     "t1": 20000000,
+     "equal": true
+    },
+    "actual_timesteps": {
+     "t0": 20021248,
+     "t1": 20021248,
+     "equal": true
+    },
+    "seed": {
+     "t0": 22,
+     "t1": 22,
+     "equal": true
+    },
+    "gamma": {
+     "t0": 0.9916661555611042,
+     "t1": 0.9916661555611042,
+     "equal": true
+    },
+    "gamma_source": {
+     "t0": "ppo_config",
+     "t1": "ppo_config",
+     "equal": true
+    },
+    "ent_coef": {
+     "t0": 0.0008971496690499397,
+     "t1": 0.0008971496690499397,
+     "equal": true
+    },
+    "ent_coef_source": {
+     "t0": "ppo_config",
+     "t1": "ppo_config",
+     "equal": true
+    },
+    "ppo_config": {
+     "t0": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\configs\\ppo_best.yaml",
+     "t1": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\configs\\ppo_best.yaml",
+     "equal": true
+    },
+    "ppo": {
+     "t0": {
+      "n_steps": 32.0,
+      "batch_size": 4096.0,
+      "n_epochs": 15.0,
+      "gamma": 0.9916661555611042,
+      "gae_lambda": 0.95,
+      "ent_coef": 0.0008971496690499397,
+      "learning_rate": 6.813187996724827e-05,
+      "clip_range": 0.37816696417287243
+     },
+     "t1": {
+      "n_steps": 32.0,
+      "batch_size": 4096.0,
+      "n_epochs": 15.0,
+      "gamma": 0.9916661555611042,
+      "gae_lambda": 0.95,
+      "ent_coef": 0.0008971496690499397,
+      "learning_rate": 6.813187996724827e-05,
+      "clip_range": 0.37816696417287243
+     },
+     "equal": true
+    },
+    "num_worlds": {
+     "t0": 8,
+     "t1": 8,
+     "equal": true
+    },
+    "reset_interval": {
+     "t0": 4000,
+     "t1": 4000,
+     "equal": true
+    },
+    "worlds_seen": {
+     "t0": 47,
+     "t1": 47,
+     "equal": true
+    },
+    "world_resets": {
+     "t0": 39,
+     "t1": 39,
+     "equal": true
+    },
+    "init": {
+     "t0": null,
+     "t1": null,
+     "equal": true
+    },
+    "act_names": {
+     "t0": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "t1": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "equal": true
+    },
+    "obs_names": {
+     "t0": [
+      "food_density",
+      "pred_count",
+      "pred_dist",
+      "kin_count",
+      "energy",
+      "recent_predation",
+      "cover_dist"
+     ],
+     "t1": [
+      "food_density",
+      "pred_count",
+      "pred_dist",
+      "kin_count",
+      "energy",
+      "recent_predation",
+      "cover_dist",
+      "threat_recency"
+     ],
+     "equal": false
+    },
+    "init_action_bias": {
+     "t0": {},
+     "t1": {},
+     "equal": true
+    },
+    "init_action_bias_source": {
+     "t0": {},
+     "t1": {},
+     "equal": true
+    },
+    "probe_every": {
+     "t0": 1000000,
+     "t1": 1000000,
+     "equal": true
+    },
+    "config_digest": {
+     "t0": "f068496361f9",
+     "t1": "6781d0e83f6a",
+     "equal": false
+    },
+    "command": {
+     "t0": "python.exe train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 22 --run-name v2_2r_t0_s22 --probe-every 1000000 --threads 1",
+     "t1": "python.exe train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 22 --run-name v2_2r_t1_s22 --probe-every 1000000 --threads 1",
+     "equal": false
+    }
+   },
+   "init_policy": [
+    {
+     "act_names": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "action_bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "log_std": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "speed": {
+      "mu_mean": -0.002641204229377081,
+      "mu_absmax": 0.008009351789951324,
+      "std": 1.0,
+      "gait_prob": {
+       "stop": 0.24493847467969768,
+       "walk": 0.5117803927931851,
+       "run": 0.2432811325271173
+      }
+     }
+    },
+    {
+     "act_names": [
+      "forage",
+      "cohesion",
+      "flee_dist",
+      "cover",
+      "speed"
+     ],
+     "action_bias": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "log_std": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+     ],
+     "speed": {
+      "mu_mean": -0.000702368424711608,
+      "mu_absmax": 0.0028774926904588938,
+      "std": 1.0,
+      "gait_prob": {
+       "stop": 0.24432914621122473,
+       "walk": 0.5117824409243598,
+       "run": 0.2438884128644147
+      }
+     }
+    }
+   ]
+  }
+ },
+ "vec_env_seeds": {
+  "20": {
+   "vec_steps": 19552,
+   "start_seeds": [
+    [
+     892,
+     280,
+     261,
+     461,
+     894,
+     121,
+     249,
+     522
+    ],
+    [
+     892,
+     280,
+     261,
+     461,
+     894,
+     121,
+     249,
+     522
+    ]
+   ],
+   "start_equal": true,
+   "seed_history_equal": true,
+   "seed_history_t0": [
+    [
+     892,
+     986,
+     270,
+     807,
+     89
+    ],
+    [
+     280,
+     662,
+     404,
+     615,
+     647,
+     934
+    ],
+    [
+     261,
+     98,
+     640,
+     52,
+     330,
+     551
+    ],
+    [
+     461,
+     34,
+     550,
+     212,
+     768,
+     906
+    ],
+    [
+     894,
+     71,
+     448,
+     73,
+     4,
+     617
+    ],
+    [
+     121,
+     344,
+     922,
+     555,
+     921,
+     268
+    ],
+    [
+     249,
+     409,
+     694,
+     301,
+     813,
+     467
+    ],
+    [
+     522,
+     241,
+     929,
+     701,
+     878,
+     219
+    ]
+   ],
+   "worlds_seen": [
+    47,
+    47
+   ],
+   "world_resets": [
+    39,
+    39
+   ],
+   "meta_worlds_seen": [
+    47,
+    47
+   ],
+   "meta_world_resets": [
+    39,
+    39
+   ],
+   "final_seeds_equal": true
+  },
+  "21": {
+   "vec_steps": 19552,
+   "start_seeds": [
+    [
+     301,
+     781,
+     386,
+     605,
+     466,
+     709,
+     344,
+     89
+    ],
+    [
+     301,
+     781,
+     386,
+     605,
+     466,
+     709,
+     344,
+     89
+    ]
+   ],
+   "start_equal": true,
+   "seed_history_equal": true,
+   "seed_history_t0": [
+    [
+     301,
+     112,
+     672,
+     698,
+     340
+    ],
+    [
+     781,
+     946,
+     756,
+     373,
+     390,
+     945
+    ],
+    [
+     386,
+     423,
+     197,
+     853,
+     954,
+     440
+    ],
+    [
+     605,
+     242,
+     892,
+     980,
+     463,
+     764
+    ],
+    [
+     466,
+     980,
+     675,
+     209,
+     184,
+     656
+    ],
+    [
+     709,
+     620,
+     917,
+     844,
+     261,
+     61
+    ],
+    [
+     344,
+     630,
+     958,
+     992,
+     221,
+     441
+    ],
+    [
+     89,
+     294,
+     700,
+     506,
+     782,
+     922
+    ]
+   ],
+   "worlds_seen": [
+    47,
+    47
+   ],
+   "world_resets": [
+    39,
+    39
+   ],
+   "meta_worlds_seen": [
+    47,
+    47
+   ],
+   "meta_world_resets": [
+    39,
+    39
+   ],
+   "final_seeds_equal": true
+  },
+  "22": {
+   "vec_steps": 19552,
+   "start_seeds": [
+    [
+     771,
+     366,
+     659,
+     199,
+     944,
+     88,
+     264,
+     653
+    ],
+    [
+     771,
+     366,
+     659,
+     199,
+     944,
+     88,
+     264,
+     653
+    ]
+   ],
+   "start_equal": true,
+   "seed_history_equal": true,
+   "seed_history_t0": [
+    [
+     771,
+     836,
+     50,
+     797,
+     914
+    ],
+    [
+     366,
+     319,
+     517,
+     468,
+     593,
+     246
+    ],
+    [
+     659,
+     851,
+     607,
+     216,
+     369,
+     66
+    ],
+    [
+     199,
+     328,
+     164,
+     326,
+     587,
+     386
+    ],
+    [
+     944,
+     987,
+     555,
+     329,
+     103,
+     187
+    ],
+    [
+     88,
+     147,
+     269,
+     910,
+     640,
+     400
+    ],
+    [
+     264,
+     459,
+     51,
+     477,
+     420,
+     389
+    ],
+    [
+     653,
+     16,
+     52,
+     344,
+     354,
+     224
+    ]
+   ],
+   "worlds_seen": [
+    47,
+    47
+   ],
+   "world_resets": [
+    39,
+    39
+   ],
+   "meta_worlds_seen": [
+    47,
+    47
+   ],
+   "meta_world_resets": [
+    39,
+    39
+   ],
+   "final_seeds_equal": true
+  }
+ },
+ "init_weights": {
+  "20": {
+   "log_std": {
+    "shape": [
+     [
+      5
+     ],
+     [
+      5
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.policy_net.0.weight": {
+    "shape": [
+     [
+      64,
+      7
+     ],
+     [
+      64,
+      8
+     ]
+    ],
+    "equal": false,
+    "first_cols_equal": false
+   },
+   "mlp_extractor.policy_net.0.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.policy_net.2.weight": {
+    "shape": [
+     [
+      64,
+      64
+     ],
+     [
+      64,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 1.01435387134552
+   },
+   "mlp_extractor.policy_net.2.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.value_net.0.weight": {
+    "shape": [
+     [
+      64,
+      7
+     ],
+     [
+      64,
+      8
+     ]
+    ],
+    "equal": false,
+    "first_cols_equal": false
+   },
+   "mlp_extractor.value_net.0.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.value_net.2.weight": {
+    "shape": [
+     [
+      64,
+      64
+     ],
+     [
+      64,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.9177417755126953
+   },
+   "mlp_extractor.value_net.2.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "action_net.weight": {
+    "shape": [
+     [
+      5,
+      64
+     ],
+     [
+      5,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.0057813061866909266
+   },
+   "action_net.bias": {
+    "shape": [
+     [
+      5
+     ],
+     [
+      5
+     ]
+    ],
+    "equal": true
+   },
+   "value_net.weight": {
+    "shape": [
+     [
+      1,
+      64
+     ],
+     [
+      1,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.46361929178237915
+   },
+   "value_net.bias": {
+    "shape": [
+     [
+      1
+     ],
+     [
+      1
+     ]
+    ],
+    "equal": true
+   }
+  },
+  "21": {
+   "log_std": {
+    "shape": [
+     [
+      5
+     ],
+     [
+      5
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.policy_net.0.weight": {
+    "shape": [
+     [
+      64,
+      7
+     ],
+     [
+      64,
+      8
+     ]
+    ],
+    "equal": false,
+    "first_cols_equal": false
+   },
+   "mlp_extractor.policy_net.0.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.policy_net.2.weight": {
+    "shape": [
+     [
+      64,
+      64
+     ],
+     [
+      64,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.941198468208313
+   },
+   "mlp_extractor.policy_net.2.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.value_net.0.weight": {
+    "shape": [
+     [
+      64,
+      7
+     ],
+     [
+      64,
+      8
+     ]
+    ],
+    "equal": false,
+    "first_cols_equal": false
+   },
+   "mlp_extractor.value_net.0.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.value_net.2.weight": {
+    "shape": [
+     [
+      64,
+      64
+     ],
+     [
+      64,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.9169924259185791
+   },
+   "mlp_extractor.value_net.2.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "action_net.weight": {
+    "shape": [
+     [
+      5,
+      64
+     ],
+     [
+      5,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.00595612870529294
+   },
+   "action_net.bias": {
+    "shape": [
+     [
+      5
+     ],
+     [
+      5
+     ]
+    ],
+    "equal": true
+   },
+   "value_net.weight": {
+    "shape": [
+     [
+      1,
+      64
+     ],
+     [
+      1,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.34527645260095596
+   },
+   "value_net.bias": {
+    "shape": [
+     [
+      1
+     ],
+     [
+      1
+     ]
+    ],
+    "equal": true
+   }
+  },
+  "22": {
+   "log_std": {
+    "shape": [
+     [
+      5
+     ],
+     [
+      5
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.policy_net.0.weight": {
+    "shape": [
+     [
+      64,
+      7
+     ],
+     [
+      64,
+      8
+     ]
+    ],
+    "equal": false,
+    "first_cols_equal": false
+   },
+   "mlp_extractor.policy_net.0.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.policy_net.2.weight": {
+    "shape": [
+     [
+      64,
+      64
+     ],
+     [
+      64,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.9297007322311401
+   },
+   "mlp_extractor.policy_net.2.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.value_net.0.weight": {
+    "shape": [
+     [
+      64,
+      7
+     ],
+     [
+      64,
+      8
+     ]
+    ],
+    "equal": false,
+    "first_cols_equal": false
+   },
+   "mlp_extractor.value_net.0.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "mlp_extractor.value_net.2.weight": {
+    "shape": [
+     [
+      64,
+      64
+     ],
+     [
+      64,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.9677003026008606
+   },
+   "mlp_extractor.value_net.2.bias": {
+    "shape": [
+     [
+      64
+     ],
+     [
+      64
+     ]
+    ],
+    "equal": true
+   },
+   "action_net.weight": {
+    "shape": [
+     [
+      5,
+      64
+     ],
+     [
+      5,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.005059436429291964
+   },
+   "action_net.bias": {
+    "shape": [
+     [
+      5
+     ],
+     [
+      5
+     ]
+    ],
+    "equal": true
+   },
+   "value_net.weight": {
+    "shape": [
+     [
+      1,
+      64
+     ],
+     [
+      1,
+      64
+     ]
+    ],
+    "equal": false,
+    "max_abs_diff": 0.5505013465881348
+   },
+   "value_net.bias": {
+    "shape": [
+     [
+      1
+     ],
+     [
+      1
+     ]
+    ],
+    "equal": true
+   }
+  }
+ }
+}
