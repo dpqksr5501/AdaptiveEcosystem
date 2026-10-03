@@ -1,0 +1,11 @@
+{
+ "n_jobs": 320,
+ "max_abs_diff": {
+  "g_gamma": 0.0,
+  "starve_rate": 0.0,
+  "predation_rate": 0.0,
+  "stop_frac_cmd": 0.0,
+  "b1": 0.0,
+  "b8": 0.0
+ }
+}

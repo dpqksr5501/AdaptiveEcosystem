@@ -1,0 +1,132 @@
+
+=== T=1M  p_fw(all) 0.659 (max 12/13), thr1 max 10/10 p_fw 0.286
+  cum:act/forage_std                 best 12/13 loo 12 auc 0.08 rho -0.50 high +0.2078 border->good
+  cum:policy/forage_log_std          best 12/13 loo 12 auc 0.08 rho -0.38 high +0.0039 border->good
+  win:policy/forage_log_std          best 12/13 loo 10 auc 0.06 rho -0.44 high +0.0029 border->good
+  cum:world/in_cover_frac            best 12/13 loo 10 auc 0.89 rho +0.31 low +0.3662 border->good
+  cum:act/flee_dist_mean             best 12/13 loo 10 auc 0.86 rho +0.31 low +0.4766 border->good
+  win:act/forage_std                 best 12/13 loo  9 auc 0.06 rho -0.58 high +0.2078 border->good
+  [thr1] win:policy/forage_log_std      best 10/10 loo 10 auc 0.00
+  [thr1] cum:policy/forage_log_std      best 10/10 loo 10 auc 0.00
+  [thr1] cum:act/forage_std             best  9/10 loo  9 auc 0.12
+
+=== T=2M  p_fw(all) 0.768 (max 12/13), thr1 max 9/10 p_fw 0.990
+  cum:policy/forage_log_std          best 12/13 loo 10 auc 0.06 rho -0.42 high -0.0035 border->good
+  win:policy/forage_log_std          best 12/13 loo 10 auc 0.08 rho -0.41 high -0.0152 border->bad
+  cum:act/flee_dist_mean             best 12/13 loo 10 auc 0.92 rho +0.42 low +0.4753 border->good
+  win:r2/forage                      best 11/13 loo 10 auc 0.83 rho +0.46 low +0.9879 border->good
+  win:policy/cover_log_std           best 11/13 loo 10 auc 0.81 rho +0.26 low -0.0104 border->good
+  cum:act/forage_std                 best 11/13 loo  9 auc 0.17 rho -0.43 high +0.2042 border->bad
+  [thr1] cum:policy/forage_log_std      best  9/10 loo  9 auc 0.08
+  [thr1] win:r2/forage                  best  9/10 loo  9 auc 0.92
+  [thr1] cum:world/in_cover_frac        best  9/10 loo  8 auc 0.83
+
+=== T=3M  p_fw(all) 1.000 (max 11/13), thr1 max 9/10 p_fw 0.967
+  win:policy/flee_dist_log_std       best 11/13 loo 11 auc 0.83 rho +0.28 low -0.0361 border->good
+  cum:world/in_cover_frac            best 11/13 loo 11 auc 0.81 rho +0.21 low +0.3161 border->good
+  cum:gait/walk                      best 11/13 loo 11 auc 0.22 rho -0.37 high +0.4314 border->good
+  win:r2/flee_dist                   best 11/13 loo 11 auc 0.33 rho -0.21 high +0.9959 border->good
+  win:act/speed_std                  best 11/13 loo 10 auc 0.22 rho -0.36 high +0.1852 border->bad
+  win:world/in_cover_frac            best 11/13 loo 10 auc 0.78 rho +0.15 low +0.2941 border->good
+  [thr1] cum:gait/walk                  best  9/10 loo  9 auc 0.17
+  [thr1] cum:world/in_cover_frac        best  9/10 loo  9 auc 0.83
+  [thr1] win:act/speed_std              best  9/10 loo  8 auc 0.17
+
+=== T=4M  p_fw(all) 1.000 (max 11/13), thr1 max 9/10 p_fw 0.962
+  win:policy/speed_log_std           best 11/13 loo 11 auc 0.83 rho +0.42 low -0.1302 border->good
+  cum:act/forage_std                 best 11/13 loo 11 auc 0.19 rho -0.36 high +0.1999 border->bad
+  cum:world/in_cover_frac            best 11/13 loo 11 auc 0.78 rho +0.16 low +0.3122 border->good
+  win:train/policy_gradient_loss     best 11/13 loo 11 auc 0.28 rho -0.36 high -0.0013 border->bad
+  cum:policy/forage_log_std          best 11/13 loo 10 auc 0.19 rho -0.33 high -0.0206 border->bad
+  win:train/clip_fraction            best 11/13 loo 10 auc 0.72 rho +0.30 low +0.0058 border->bad
+  [thr1] win:policy/speed_log_std       best  9/10 loo  9 auc 0.88
+  [thr1] win:probe/speed_std            best  9/10 loo  9 auc 0.88
+  [thr1] win:train/policy_gradient_loss best  9/10 loo  9 auc 0.17
+
+=== T=5M  p_fw(all) 0.808 (max 12/13), thr1 max 9/10 p_fw 0.995
+  win:r2/flee_dist                   best 12/13 loo 12 auc 0.22 rho -0.38 high +0.9926 border->bad
+  win:policy/flee_dist_log_std       best 11/13 loo 11 auc 0.81 rho +0.24 low -0.0839 border->good
+  cum:world/in_cover_frac            best 11/13 loo 11 auc 0.78 rho +0.16 low +0.3057 border->good
+  cum:world/kill_ema                 best 11/13 loo 10 auc 0.22 rho -0.31 high +0.0263 border->good
+  win:train/policy_gradient_loss     best 11/13 loo  9 auc 0.08 rho -0.19 high -0.0013 border->good
+  cum:act/forage_std                 best 11/13 loo  9 auc 0.19 rho -0.41 high +0.1972 border->bad
+  [thr1] cum:policy/flee_dist_log_std   best  9/10 loo  9 auc 0.83
+  [thr1] win:r2/flee_dist               best  9/10 loo  9 auc 0.21
+  [thr1] cum:world/in_cover_frac        best  9/10 loo  9 auc 0.83
+
+=== T=6M  p_fw(all) 1.000 (max 11/13), thr1 max 9/10 p_fw 0.976
+  cum:world/in_cover_frac            best 11/13 loo 10 auc 0.78 rho +0.14 low +0.3000 border->good
+  cum:r2/speed                       best 11/13 loo 10 auc 0.25 rho -0.34 high +0.9919 border->bad
+  cum:r2/flee_dist                   best 11/13 loo  9 auc 0.28 rho -0.29 high +0.9915 border->good
+  win:act/forage_std                 best 11/13 loo  9 auc 0.39 rho -0.09 high +0.1957 border->good
+  win:policy/flee_dist_log_std       best 11/13 loo  8 auc 0.78 rho +0.25 low -0.1026 border->good
+  win:world/kill_ema                 best 11/13 loo  8 auc 0.78 rho +0.21 low +0.0230 border->good
+  [thr1] cum:policy/flee_dist_log_std   best  9/10 loo  9 auc 0.83
+  [thr1] win:probe/p_stop               best  9/10 loo  9 auc 0.75
+  [thr1] cum:world/in_cover_frac        best  9/10 loo  9 auc 0.83
+
+=== T=7M  p_fw(all) 1.000 (max 11/13), thr1 max 9/10 p_fw 0.971
+  win:train/approx_kl                best 11/13 loo 10 auc 0.67 rho +0.17 low +0.0103 border->bad
+  win:gait/run                       best 11/13 loo 10 auc 0.36 rho -0.18 high +0.0858 border->good
+  cum:world/in_cover_frac            best 11/13 loo  9 auc 0.78 rho +0.13 low +0.2973 border->good
+  cum:r2/speed                       best 11/13 loo  9 auc 0.25 rho -0.37 high +0.9920 border->good
+  cum:act/forage_std                 best 11/13 loo  9 auc 0.28 rho -0.32 high +0.1985 border->bad
+  win:policy/forage_log_std          best 11/13 loo  8 auc 0.25 rho -0.26 high -0.0346 border->bad
+  [thr1] cum:policy/flee_dist_log_std   best  9/10 loo  9 auc 0.88
+  [thr1] cum:world/in_cover_frac        best  9/10 loo  9 auc 0.83
+  [thr1] cum:act/speed_std              best  8/10 loo  8 auc 0.25
+
+=== T=8M  p_fw(all) 1.000 (max 11/13), thr1 max 9/10 p_fw 0.971
+  cum:act/forage_std                 best 11/13 loo 11 auc 0.25 rho -0.32 high +0.1984 border->bad
+  cum:r2/flee_dist                   best 11/13 loo 10 auc 0.28 rho -0.31 high +0.9916 border->good
+  win:r2/flee_dist                   best 11/13 loo 10 auc 0.31 rho -0.24 high +0.9956 border->good
+  win:policy/forage_log_std          best 11/13 loo 10 auc 0.33 rho -0.16 high -0.0350 border->bad
+  win:gait/run                       best 11/13 loo 10 auc 0.36 rho -0.20 high +0.0929 border->good
+  cum:r2/speed                       best 11/13 loo  9 auc 0.19 rho -0.40 high +0.9918 border->good
+  [thr1] cum:world/in_cover_frac        best  9/10 loo  8 auc 0.83
+  [thr1] cum:policy/flee_dist_log_std   best  9/10 loo  7 auc 0.88
+  [thr1] cum:act/forage_std             best  8/10 loo  8 auc 0.29
+
+=== T=10M  p_fw(all) 0.793 (max 12/13), thr1 max 9/10 p_fw 0.981
+  win:rollout/reward_per_step        best 12/13 loo 11 auc 0.92 rho +0.54 low +0.0002 border->good
+  win:world/mean_energy              best 12/13 loo 11 auc 0.89 rho +0.60 low +0.5592 border->good
+  win:train/loss                     best 12/13 loo 10 auc 0.89 rho +0.60 low +1.5088 border->good
+  win:train/value_loss               best 12/13 loo 10 auc 0.86 rho +0.55 low +3.0210 border->good
+  win:world/in_cover_frac            best 12/13 loo 10 auc 0.25 rho -0.20 high +0.3589 border->good
+  cum:policy/forage_log_std          best 11/13 loo 11 auc 0.19 rho -0.36 high -0.0284 border->bad
+  [thr1] win:train/value_loss           best  9/10 loo  9 auc 0.83
+  [thr1] win:r2/flee_dist               best  9/10 loo  8 auc 0.21
+  [thr1] win:rollout/reward_per_step    best  9/10 loo  8 auc 0.92
+
+=== T=12M  p_fw(all) 0.783 (max 12/13), thr1 max 10/10 p_fw 0.343
+  win:r2/flee_dist                   best 12/13 loo 12 auc 0.06 rho -0.42 high +0.9706 border->good
+  win:act/forage_mean                best 12/13 loo 12 auc 0.92 rho +0.53 low +0.5525 border->good
+  win:world/in_cover_frac            best 12/13 loo 12 auc 0.22 rho -0.22 high +0.3876 border->good
+  win:act/forage_std                 best 12/13 loo 11 auc 0.14 rho -0.37 high +0.1813 border->bad
+  win:act/flee_dist_std              best 12/13 loo 10 auc 0.08 rho -0.51 high +0.1751 border->bad
+  win:world/mean_energy              best 11/13 loo 11 auc 0.83 rho +0.15 low +0.5038 border->good
+  [thr1] win:r2/flee_dist               best 10/10 loo 10 auc 0.00
+  [thr1] win:act/flee_dist_std          best 10/10 loo  8 auc 0.00
+  [thr1] win:act/forage_mean            best  9/10 loo  9 auc 0.88
+
+=== T=15M  p_fw(all) 0.776 (max 12/13), thr1 max 9/10 p_fw 0.971
+  win:act/forage_mean                best 12/13 loo 12 auc 0.94 rho +0.61 low +0.5081 border->good
+  win:policy/forage_log_std          best 12/13 loo 12 auc 0.08 rho -0.43 high -0.1433 border->bad
+  win:world/in_cover_frac            best 12/13 loo 12 auc 0.11 rho -0.45 high +0.3924 border->good
+  cum:r2/flee_dist                   best 12/13 loo 12 auc 0.14 rho -0.31 high +0.9877 border->good
+  cum:world/in_cover_frac            best 12/13 loo 11 auc 0.22 rho -0.48 high +0.3370 border->good
+  cum:policy/forage_log_std          best 12/13 loo 10 auc 0.14 rho -0.38 high -0.0667 border->bad
+  [thr1] win:act/forage_mean            best  9/10 loo  9 auc 0.92
+  [thr1] cum:r2/flee_dist               best  9/10 loo  9 auc 0.12
+  [thr1] win:world/in_cover_frac        best  9/10 loo  9 auc 0.17
+
+=== T=20M  p_fw(all) 0.134 (max 13/13), thr1 max 10/10 p_fw 0.329
+  win:act/forage_mean                best 13/13 loo 13 auc 1.00 rho +0.66 low +0.4364 border->good
+  win:rollout/reward_per_step        best 13/13 loo 13 auc 1.00 rho +0.74 low -0.0008 border->good
+  win:world/kill_ema                 best 13/13 loo 12 auc 0.00 rho -0.58 high +0.0263 border->good
+  win:world/mean_energy              best 13/13 loo 12 auc 1.00 rho +0.78 low +0.5521 border->good
+  win:world/in_cover_frac            best 12/13 loo 12 auc 0.08 rho -0.73 high +0.3543 border->good
+  cum:world/in_cover_frac            best 12/13 loo 12 auc 0.22 rho -0.51 high +0.3495 border->good
+  [thr1] win:act/forage_mean            best 10/10 loo 10 auc 1.00
+  [thr1] win:rollout/reward_per_step    best 10/10 loo 10 auc 1.00
+  [thr1] win:world/kill_ema             best 10/10 loo  9 auc 0.00
