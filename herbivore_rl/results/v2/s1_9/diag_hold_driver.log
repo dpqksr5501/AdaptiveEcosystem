@@ -1,0 +1,25 @@
+v2_1c_s30_hold24
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30_hold24 --workers 8 --act-mode hold --hold-k 24
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30_hold24 --workers 8 --act-mode hold --hold-k 24 --obs 2 4
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30_hold24 --workers 8 --act-mode hold --hold-k 24 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30_hold24 --workers 8 --act-mode hold --hold-k 24 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+v2_1c_s31_hold24
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31_hold24 --workers 8 --act-mode hold --hold-k 24
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31_hold24 --workers 8 --act-mode hold --hold-k 24 --obs 2 4
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31_hold24 --workers 8 --act-mode hold --hold-k 24 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31_hold24 --workers 8 --act-mode hold --hold-k 24 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+v2_1c_s32_hold24
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32_hold24 --workers 8 --act-mode hold --hold-k 24
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32_hold24 --workers 8 --act-mode hold --hold-k 24 --obs 2 4
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32_hold24 --workers 8 --act-mode hold --hold-k 24 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32_hold24 --workers 8 --act-mode hold --hold-k 24 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+v2_1c_s33_hold24
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33_hold24 --workers 8 --act-mode hold --hold-k 24
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33_hold24 --workers 8 --act-mode hold --hold-k 24 --obs 2 4
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33_hold24 --workers 8 --act-mode hold --hold-k 24 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33_hold24 --workers 8 --act-mode hold --hold-k 24 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+v2_1c_s34_hold24
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34_hold24 --workers 8 --act-mode hold --hold-k 24
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34_hold24 --workers 8 --act-mode hold --hold-k 24 --obs 2 4
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34_hold24 --workers 8 --act-mode hold --hold-k 24 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34_hold24 --workers 8 --act-mode hold --hold-k 24 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035

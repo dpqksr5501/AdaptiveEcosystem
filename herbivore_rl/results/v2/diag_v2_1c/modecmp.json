@@ -1,0 +1,296 @@
+{
+ "condition": {
+  "gamma": 0.9916661555611042,
+  "eval_steps": 5000,
+  "head": 0,
+  "tail": 600
+ },
+ "eval_seeds": [
+  10000,
+  10001,
+  10002,
+  10003,
+  10004,
+  10005,
+  10006,
+  10007,
+  10008,
+  10009,
+  10010,
+  10011,
+  10012,
+  10013,
+  10014,
+  10015,
+  10016,
+  10017,
+  10018,
+  10019
+ ],
+ "t_crit": 2.093,
+ "df": 19,
+ "reps": 2000,
+ "boot_seed": 0,
+ "groups": [
+  {
+   "gamma": 0.9916661555611042,
+   "R": 5,
+   "train_seeds": [
+    30,
+    31,
+    32,
+    33,
+    34
+   ],
+   "g_eval_gamma": 0.9916661555611042,
+   "tail": 600,
+   "dirs_det": [
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s30",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s31",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s32",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s33",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s34"
+   ],
+   "dirs_stoch": [
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s30_stoch",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s31_stoch",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s32_stoch",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s33_stoch",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_1c_s34_stoch"
+   ],
+   "cols": {
+    "g_gamma": {
+     "det": 0.35927321762647213,
+     "stoch": 0.31977262308723997,
+     "diff": -0.039500594539232145,
+     "sd": 0.2914533509033197,
+     "t": -0.6061073874609827,
+     "sig": false,
+     "p": 0.5516166504559641,
+     "ci": {
+      "point": -0.03950059453923223,
+      "lo": -0.12069539645241155,
+      "hi": 0.03695515562529649,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": false,
+     "verdict": false
+    },
+    "mean_return": {
+     "det": 20.489525186413122,
+     "stoch": 16.11790708889463,
+     "diff": -4.371618097518494,
+     "sd": 11.858654522681949,
+     "t": -1.6486246764373897,
+     "sig": false,
+     "p": 0.11566141769908062,
+     "ci": {
+      "point": -4.371618097518495,
+      "lo": -7.965660552711522,
+      "hi": -1.0637616494898448,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "survival": {
+     "det": 389.4153271976653,
+     "stoch": 393.3990882245978,
+     "diff": 3.983761026932396,
+     "sd": 25.10120796644901,
+     "t": 0.7097634882147379,
+     "sig": false,
+     "p": 0.4864709671182359,
+     "ci": {
+      "point": 3.983761026932382,
+      "lo": -2.3234852613065415,
+      "hi": 10.2319048953599,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": false,
+     "p_holm": 0.9427982304017104,
+     "verdict": false
+    },
+    "repro": {
+     "det": 11.14609375,
+     "stoch": 10.88109375,
+     "diff": -0.2649999999999994,
+     "sd": 0.5046910389724384,
+     "t": -2.3482010508603586,
+     "sig": true,
+     "p": 0.029842305966143387,
+     "ci": {
+      "point": -0.265,
+      "lo": -0.4784453125,
+      "hi": -0.06097656250000021,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "predation_rate": {
+     "det": 0.00207109375,
+     "stoch": 0.002125796875,
+     "diff": 5.470312500000003e-05,
+     "sd": 5.968749784720317e-05,
+     "t": 4.0986776291008455,
+     "sig": true,
+     "p": 0.0006115902740894239,
+     "ci": {
+      "point": 5.4703124999999996e-05,
+      "lo": 3.8026953125e-05,
+      "hi": 7.028164062499999e-05,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true,
+     "p_holm": 0.0018347708222682716,
+     "verdict": true
+    },
+    "starve_rate": {
+     "det": 0.000814703125,
+     "stoch": 0.0007946249999999999,
+     "diff": -2.0078125000000015e-05,
+     "sd": 0.0001221896189999999,
+     "t": -0.7348587012246603,
+     "sig": false,
+     "p": 0.4713991152008552,
+     "ci": {
+      "point": -2.0078125000000002e-05,
+      "lo": -5.097148437499999e-05,
+      "hi": 1.2360937499999986e-05,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": false,
+     "p_holm": 0.9427982304017104,
+     "verdict": false
+    },
+    "cohesion_mean": {
+     "det": 0.8980661189490705,
+     "stoch": 0.8887766708995082,
+     "diff": -0.00928944804956242,
+     "sd": 0.0018008818761011873,
+     "t": -23.06851725027554,
+     "sig": true,
+     "p": 2.343047605531803e-15,
+     "ci": {
+      "point": -0.009289448049562441,
+      "lo": -0.010259231625452463,
+      "hi": -0.008286256664690649,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "flee_dist_mean": {
+     "det": 0.386721507942234,
+     "stoch": 0.39264850940594004,
+     "diff": 0.005927001463705989,
+     "sd": 0.0024506738464783982,
+     "t": 10.815946148551813,
+     "sig": true,
+     "p": 1.4663362843632564e-09,
+     "ci": {
+      "point": 0.0059270014637059845,
+      "lo": 0.003560030565947109,
+      "hi": 0.008154005969083743,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "flee_dist_std": {
+     "det": 0.06844977393351534,
+     "stoch": 0.15882071130399633,
+     "diff": 0.090370937370481,
+     "sd": 0.003466592964763375,
+     "t": 116.5845319625317,
+     "sig": true,
+     "p": 1.3593898547713267e-28,
+     "ci": {
+      "point": 0.09037093737048102,
+      "lo": 0.08546479966950736,
+      "hi": 0.09526297912581726,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "cover_frac": {
+     "det": 0.3429847656249999,
+     "stoch": 0.35093834374999994,
+     "diff": 0.007953578124999998,
+     "sd": 0.015376489948223793,
+     "t": 2.313238120239491,
+     "sig": true,
+     "p": 0.032069752445852764,
+     "ci": {
+      "point": 0.007953578124999996,
+      "lo": 0.001843696093749997,
+      "hi": 0.014361421874999992,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "react_pred": {
+     "det": 0.04534071717440325,
+     "stoch": 0.03889284821717361,
+     "diff": -0.00644786895722964,
+     "sd": 0.001394968359346245,
+     "t": -20.671254945356797,
+     "sig": true,
+     "p": 1.7461429144509322e-14,
+     "ci": {
+      "point": -0.00644786895722964,
+      "lo": -0.007325605013647839,
+      "hi": -0.0055864927910984,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "react_hunger": {
+     "det": 0.02853176636024287,
+     "stoch": 0.022874141058904396,
+     "diff": -0.005657625301338476,
+     "sd": 0.0027982977588438284,
+     "t": -9.041807452429584,
+     "sig": true,
+     "p": 2.598313854887739e-08,
+     "ci": {
+      "point": -0.005657625301338476,
+      "lo": -0.008134467811589871,
+      "hi": -0.0032854194653810977,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "starve_share": {
+     "det": 0.28645726560681983,
+     "stoch": 0.2740801156969199,
+     "diff": -0.012377149909899906,
+     "sd": 0.02925727290350499,
+     "t": -1.891915808935563,
+     "sig": false,
+     "p": 0.07384390158220233,
+     "ci": {
+      "point": -0.012377149909899915,
+      "lo": -0.02050250528749518,
+      "hi": -0.004352194413363404,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    }
+   },
+   "trigger": true
+  }
+ ],
+ "generated": "2026-10-03T11:28:08+00:00",
+ "command": "python diagnose_v2.py modecmp --config configs/v2_1.yaml --out results/v2/diag_v2_1c --tag modecmp --det v2_1c_s30 v2_1c_s31 v2_1c_s32 v2_1c_s33 v2_1c_s34 --stoch v2_1c_s30_stoch v2_1c_s31_stoch v2_1c_s32_stoch v2_1c_s33_stoch v2_1c_s34_stoch"
+}

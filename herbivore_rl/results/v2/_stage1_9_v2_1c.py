@@ -156,7 +156,7 @@ def cmd_report(a) -> int:
     judge = json.loads((RES / "v2_2r_explore" / "judge.json").read_text(encoding="utf-8"))
     L = ["# 1-9 확인층 — v2.1 5시드 확인 (대체안, 판정)", "",
          f"- 생성 {datetime.now(timezone.utc).isoformat(timespec='seconds')}. 사전 등록 `s1_9/PREREG.md`, 수치 원본 "
-         f"`stage1_{PREFIX}.json`(1-3 운영 정의)·`s1_9/rule_scene.json`.",
+         f"`stage1_{PREFIX}_hold24.json`(1-3 운영 정의, 판정 모드 K24)·`s1_9/rule_scene.json`.",
          f"- 판정 모드: {judge['modes'].get('T0', {}).get('mode', '?')} (탐색 판정 T0, R1). 갈림: {judge['branch']}", ""]
     L += ["## 판정표", "", "| 주장 | 크기 | 쓸모 | 입력 의존 | 성립 |", "|---|---|---|---|---|"]
     # 쓸모는 10-03 결정 (1) '결과 지표 필수'(PREREG 3절 정정): 집계의 outcome_path 만 쓴다. B2 는 기술용이다
