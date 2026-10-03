@@ -1,0 +1,1113 @@
+{
+ "generated": "2026-10-03T03:39:38+00:00",
+ "script": "python results/v2/_stage1_6b_compare.py compare",
+ "prereg": "results/v2/s1_6b/PREREG.md",
+ "smoke": false,
+ "condition": {
+  "config": "configs/v2_2.yaml",
+  "config_digest": "efc8f775f1e1",
+  "gamma": 0.9916661555611042,
+  "eval_seeds": [
+   10000,
+   10019
+  ],
+  "n_eval_seeds": 20,
+  "eval_steps": 5000,
+  "tail": 600,
+  "train_seeds": [
+   0,
+   1,
+   2
+  ],
+  "reps": 2000,
+  "boot_seed": 0,
+  "collapse_step": 5000000,
+  "collapse_frac": 0.01
+ },
+ "arms": {
+  "a": {
+   "arm": "a",
+   "prefix": "v2_2a",
+   "what": "ent_coef 3e-3 (경계 시작 편향 −0.84, 설정 그대로)",
+   "ent_coef": 0.003,
+   "init_action_bias": {
+    "vigilance": -0.84
+   },
+   "train_args": [
+    "--ent-coef",
+    "3e-3"
+   ],
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "runs": [
+    "v2_2a_s0",
+    "v2_2a_s1",
+    "v2_2a_s2"
+   ],
+   "per_seed": {
+    "0": {
+     "det": {
+      "g_gamma": -1.2188171311109801,
+      "b1": 0.04828877715946041,
+      "b2": 0.00873306603064034,
+      "b3_truth": 0.0,
+      "b3_narrow": 0.0,
+      "starve_rate": 0.00109984375,
+      "predation_rate": 0.002348515625,
+      "survival": 298.6867087488057,
+      "repro": 5.784375,
+      "vig_frac": 0.0,
+      "p_vig_recent_truth": 0.0,
+      "p_vig_calm_truth": 0.0,
+      "stop_frac_cmd": 0.9472390624999999,
+      "walk_frac_cmd": 0.05180015624999999,
+      "run_frac_cmd": 0.00096078125,
+      "p_stop_hungry": 0.9504091739050248,
+      "p_stop_full": 0.9416761078743845,
+      "b8": 0.12452052549801511,
+      "b8_cmd": 0.12451464662090032,
+      "b8_vig": 0.0
+     },
+     "stoch": {
+      "g_gamma": 0.9453930364747108,
+      "b1": 0.2433248288424028,
+      "b2": 0.038300104977800876,
+      "b3_truth": 0.0004239147508379616,
+      "b3_narrow": 0.001365324854281251,
+      "starve_rate": 0.0005737499999999999,
+      "predation_rate": 0.00229828125,
+      "survival": 398.9442810530426,
+      "repro": 12.831640625,
+      "vig_frac": 0.0043667968750000005,
+      "p_vig_recent_truth": 0.0007984950692018101,
+      "p_vig_calm_truth": 0.00037458031836384837,
+      "stop_frac_cmd": 0.617968515625,
+      "walk_frac_cmd": 0.32771765625,
+      "run_frac_cmd": 0.054313828125000005,
+      "p_stop_hungry": 0.6373139179536548,
+      "p_stop_full": 0.5990138129758539,
+      "b8": 3.6762356777312086,
+      "b8_cmd": 3.6799023502782697,
+      "b8_vig": 0.060577579843794103
+     },
+     "tb": {
+      "vig_frac_5m": 0.004974365234375,
+      "vig_frac_5m_step": 5013504,
+      "vig_frac": {
+       "1M": 0.008453369140625,
+       "5M": 0.004974365234375,
+       "10M": 0.002227783203125
+      },
+      "vig_frac_last": 0.00390625,
+      "last_step": 20021248,
+      "first_below_5pct": 589824,
+      "first_below_1pct": 1015808,
+      "vig_frac_max_after_5m": 0.01776123046875,
+      "speed_std": {
+       "init": 0.20934082567691803,
+       "at_5m": 0.1870473176240921,
+       "last": 0.18842658400535583,
+       "min": 0.1505737006664276,
+       "min_ratio": 0.7192753739244944
+      },
+      "vigilance_std": {
+       "init": 0.19003774225711823,
+       "at_5m": 0.08552730828523636,
+       "last": 0.08015292137861252,
+       "min": 0.041544072329998016,
+       "min_ratio": 0.2186095868987409
+      },
+      "vigilance_log_std": {
+       "at_5m": -0.1810207962989807,
+       "last": -0.21499568223953247
+      },
+      "speed_log_std": {
+       "at_5m": -0.029880592599511147,
+       "last": -0.004407207015901804
+      },
+      "vigilance_act_mean": {
+       "at_5m": 0.11242596805095673,
+       "last": 0.10508531332015991
+      },
+      "speed_std_below_10pct": false,
+      "dir": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\v2\\v2_2a_s0_1",
+      "model_sha1": "56fe9d72937e"
+     },
+     "collapse": {
+      "vig_frac_5m_below_1pct": true,
+      "det_vig_frac_zero": true,
+      "signal": true
+     }
+    },
+    "1": {
+     "det": {
+      "g_gamma": -0.25216478592202973,
+      "b1": 0.6461237825810688,
+      "b2": 0.47547679283968025,
+      "b3_truth": 0.0,
+      "b3_narrow": 0.0,
+      "starve_rate": 0.0009594531249999998,
+      "predation_rate": 0.002128046875,
+      "survival": 332.0564691924129,
+      "repro": 9.01171875,
+      "vig_frac": 0.0,
+      "p_vig_recent_truth": 0.0,
+      "p_vig_calm_truth": 0.0,
+      "stop_frac_cmd": 0.664573828125,
+      "walk_frac_cmd": 0.316612578125,
+      "run_frac_cmd": 0.01881359375,
+      "p_stop_hungry": 0.8606164781173959,
+      "p_stop_full": 0.38513968527771547,
+      "b8": 0.29856687515334096,
+      "b8_cmd": 0.2985451031883454,
+      "b8_vig": 0.0
+     },
+     "stoch": {
+      "g_gamma": 1.0742489410248268,
+      "b1": 0.4903963749009418,
+      "b2": 0.1192113852056346,
+      "b3_truth": 3.3161497931263946e-05,
+      "b3_narrow": 0.00022722369888935552,
+      "starve_rate": 0.00057921875,
+      "predation_rate": 0.0021979687500000003,
+      "survival": 421.6443189246961,
+      "repro": 13.209765625,
+      "vig_frac": 0.001574921875,
+      "p_vig_recent_truth": 0.0001529687404364678,
+      "p_vig_calm_truth": 0.00011980724250520388,
+      "stop_frac_cmd": 0.467916015625,
+      "walk_frac_cmd": 0.45923140625,
+      "run_frac_cmd": 0.07285257812500001,
+      "p_stop_hungry": 0.5321276051915567,
+      "p_stop_full": 0.4129162199859221,
+      "b8": 3.945612078102836,
+      "b8_cmd": 3.9467697122700947,
+      "b8_vig": 0.022779344687733405
+     },
+     "tb": {
+      "vig_frac_5m": 3.0517578125e-05,
+      "vig_frac_5m_step": 5013504,
+      "vig_frac": {
+       "1M": 0.005218505859375,
+       "5M": 3.0517578125e-05,
+       "10M": 0.00018310546875
+      },
+      "vig_frac_last": 0.00146484375,
+      "last_step": 20021248,
+      "first_below_5pct": 425984,
+      "first_below_1pct": 851968,
+      "vig_frac_max_after_5m": 0.002838134765625,
+      "speed_std": {
+       "init": 0.20792298018932343,
+       "at_5m": 0.1772053837776184,
+       "last": 0.1780070960521698,
+       "min": 0.15015532076358795,
+       "min_ratio": 0.7221679904109908
+      },
+      "vigilance_std": {
+       "init": 0.18972140550613403,
+       "at_5m": 0.01890498772263527,
+       "last": 0.05412248522043228,
+       "min": 0.013962297700345516,
+       "min_ratio": 0.0735936868225135
+      },
+      "vigilance_log_std": {
+       "at_5m": -0.11757314205169678,
+       "last": -0.03865659981966019
+      },
+      "speed_log_std": {
+       "at_5m": -0.11563520133495331,
+       "last": -0.2513972818851471
+      },
+      "vigilance_act_mean": {
+       "at_5m": 0.05205891653895378,
+       "last": 0.06946805119514465
+      },
+      "speed_std_below_10pct": false,
+      "dir": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\v2\\v2_2a_s1_1",
+      "model_sha1": "af6f381f82d5"
+     },
+     "collapse": {
+      "vig_frac_5m_below_1pct": true,
+      "det_vig_frac_zero": true,
+      "signal": true
+     }
+    },
+    "2": {
+     "det": {
+      "g_gamma": 1.739248675668359,
+      "b1": 0.1547317789808878,
+      "b2": 0.16177664100247482,
+      "b3_truth": 0.0,
+      "b3_narrow": 0.0,
+      "starve_rate": 0.000375859375,
+      "predation_rate": 0.002240390625,
+      "survival": 431.6158955951781,
+      "repro": 15.86484375,
+      "vig_frac": 0.0,
+      "p_vig_recent_truth": 0.0,
+      "p_vig_calm_truth": 0.0,
+      "stop_frac_cmd": 0.048646953124999996,
+      "walk_frac_cmd": 0.934275078125,
+      "run_frac_cmd": 0.017077968750000002,
+      "p_stop_hungry": 0.16188332418767898,
+      "p_stop_full": 0.00010668318520416252,
+      "b8": 0.21679620449846312,
+      "b8_cmd": 0.21667681091331348,
+      "b8_vig": 0.0
+     },
+     "stoch": {
+      "g_gamma": 1.484972681377065,
+      "b1": 0.3100333803151436,
+      "b2": 0.05756533722898473,
+      "b3_truth": 8.03237917153507e-05,
+      "b3_narrow": 4.8666572650547435e-05,
+      "starve_rate": 0.00043875000000000007,
+      "predation_rate": 0.00229390625,
+      "survival": 436.0549163469357,
+      "repro": 14.887890625,
+      "vig_frac": 0.0023096093749999996,
+      "p_vig_recent_truth": 0.000998311947722152,
+      "p_vig_calm_truth": 0.0009179881560068013,
+      "stop_frac_cmd": 0.323789921875,
+      "walk_frac_cmd": 0.5983109375,
+      "run_frac_cmd": 0.077899140625,
+      "p_stop_hungry": 0.35874642395022305,
+      "p_stop_full": 0.30118108672123833,
+      "b8": 3.8262586175224333,
+      "b8_cmd": 3.8244763193178257,
+      "b8_vig": 0.033816813606238505
+     },
+     "tb": {
+      "vig_frac_5m": 0.000244140625,
+      "vig_frac_5m_step": 5013504,
+      "vig_frac": {
+       "1M": 0.011138916015625,
+       "5M": 0.000244140625,
+       "10M": 0.0006103515625
+      },
+      "vig_frac_last": 0.001708984375,
+      "last_step": 20021248,
+      "first_below_5pct": 425984,
+      "first_below_1pct": 884736,
+      "vig_frac_max_after_5m": 0.008575439453125,
+      "speed_std": {
+       "init": 0.20795919001102448,
+       "at_5m": 0.17834988236427307,
+       "last": 0.15749381482601166,
+       "min": 0.15317252278327942,
+       "min_ratio": 0.7365508721935267
+      },
+      "vigilance_std": {
+       "init": 0.18882694840431213,
+       "at_5m": 0.043133676052093506,
+       "last": 0.0634065717458725,
+       "min": 0.03137675300240517,
+       "min_ratio": 0.1661667112006807
+      },
+      "vigilance_log_std": {
+       "at_5m": -0.09560788422822952,
+       "last": -0.03822214901447296
+      },
+      "speed_log_std": {
+       "at_5m": -0.1084480881690979,
+       "last": -0.3911367654800415
+      },
+      "vigilance_act_mean": {
+       "at_5m": 0.06740233302116394,
+       "last": 0.08198799192905426
+      },
+      "speed_std_below_10pct": false,
+      "dir": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\v2\\v2_2a_s2_1",
+      "model_sha1": "c27df7dd5243"
+     },
+     "collapse": {
+      "vig_frac_5m_below_1pct": true,
+      "det_vig_frac_zero": true,
+      "signal": true
+     }
+    }
+   },
+   "collapse": true,
+   "collapse_seeds": [
+    0,
+    1,
+    2
+   ],
+   "learning_failure": true,
+   "learning_failure_delta": {
+    "delta_seg_minus_c0": {
+     "point": 1.7445787787044054,
+     "lo": 1.225616962399914,
+     "hi": 2.252570829771971,
+     "runs": 3,
+     "strata": 20
+    },
+    "delta_mean": 1.8627218659284317,
+    "t_seedmean": {
+     "diff": 1.8627218659284317,
+     "sd": 0.8294577947595266,
+     "t": 10.043121522774463,
+     "sig": true,
+     "n": 20
+    },
+    "per_seed": {
+     "0": {
+      "mean": 1.9521441188068813,
+      "ref_mean": -1.2188171311109801,
+      "diff": 3.170961249917861,
+      "sd": 1.1559973611640098,
+      "t": 12.267302931720204,
+      "sig": true,
+      "n": 20
+     },
+     "1": {
+      "mean": 1.9521441188068813,
+      "ref_mean": -0.25216478592202973,
+      "diff": 2.204308904728911,
+      "sd": 1.1863970922534006,
+      "t": 8.309164927267336,
+      "sig": true,
+      "n": 20
+     },
+     "2": {
+      "mean": 1.9521441188068813,
+      "ref_mean": 1.739248675668359,
+      "diff": 0.21289544313852193,
+      "sd": 0.3413958352799577,
+      "t": 2.788837084478773,
+      "sig": true,
+      "n": 20
+     }
+    }
+   },
+   "g_gamma_iqm": {
+    "point": -0.17167372029710315,
+    "lo": -0.5073765784468994,
+    "hi": 0.2147059524618952,
+    "runs": 3,
+    "strata": 20
+   },
+   "starve_rate_iqm": {
+    "point": 0.0008558333333333332,
+    "lo": 0.0007365950520833334,
+    "hi": 0.0009421966145833333,
+    "runs": 3,
+    "strata": 20
+   },
+   "sizes": {
+    "det": {
+     "B1": {
+      "col": "b1",
+      "crit": 0.3,
+      "per_seed": {
+       "0": 0.04828877715946041,
+       "1": 0.6461237825810688,
+       "2": 0.1547317789808878
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": true,
+       "2": false
+      },
+      "n_pass": 1,
+      "n_seeds": 3
+     },
+     "B2": {
+      "col": "b2",
+      "crit": 0.1,
+      "per_seed": {
+       "0": 0.00873306603064034,
+       "1": 0.47547679283968025,
+       "2": 0.16177664100247482
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": true,
+       "2": true
+      },
+      "n_pass": 2,
+      "n_seeds": 3
+     },
+     "B3": {
+      "col": "b3_truth",
+      "crit": 0.2,
+      "per_seed": {
+       "0": 0.0,
+       "1": 0.0,
+       "2": 0.0
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": false,
+       "2": false
+      },
+      "n_pass": 0,
+      "n_seeds": 3
+     }
+    },
+    "stoch": {
+     "B1": {
+      "col": "b1",
+      "crit": 0.3,
+      "per_seed": {
+       "0": 0.2433248288424028,
+       "1": 0.4903963749009418,
+       "2": 0.3100333803151436
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": true,
+       "2": true
+      },
+      "n_pass": 2,
+      "n_seeds": 3
+     },
+     "B2": {
+      "col": "b2",
+      "crit": 0.1,
+      "per_seed": {
+       "0": 0.038300104977800876,
+       "1": 0.1192113852056346,
+       "2": 0.05756533722898473
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": true,
+       "2": false
+      },
+      "n_pass": 1,
+      "n_seeds": 3
+     },
+     "B3": {
+      "col": "b3_truth",
+      "crit": 0.2,
+      "per_seed": {
+       "0": 0.0004239147508379616,
+       "1": 3.3161497931263946e-05,
+       "2": 8.03237917153507e-05
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": false,
+       "2": false
+      },
+      "n_pass": 0,
+      "n_seeds": 3
+     }
+    }
+   },
+   "n_pass": {
+    "B1": 1,
+    "B2": 2,
+    "B3": 0
+   },
+   "record": {
+    "c2_minus_c0_g_gamma": {
+     "point": 1.3018551077252458,
+     "lo": 0.7734421105191194,
+     "hi": 1.8224817737673746,
+     "runs": 3,
+     "strata": 20
+    },
+    "predation_rate_iqm": {
+     "point": 0.0022235937500000003,
+     "lo": 0.0021811966145833337,
+     "hi": 0.0022692252604166667,
+     "runs": 3,
+     "strata": 20
+    },
+    "stoch_g_gamma_iqm": {
+     "point": 1.1467717606897943,
+     "lo": 1.0255566681098123,
+     "hi": 1.2810512399953478,
+     "runs": 3,
+     "strata": 20
+    },
+    "stoch_starve_rate_iqm": {
+     "point": 0.00043187499999999997,
+     "lo": 0.00039932031250000004,
+     "hi": 0.0004622942708333332,
+     "runs": 3,
+     "strata": 20
+    },
+    "stoch_minus_det_g_gamma": 1.0787826334137507
+   }
+  },
+  "b": {
+   "arm": "b",
+   "prefix": "v2_2b",
+   "what": "경계 시작 편향 0 (ent_coef 튜닝값 그대로)",
+   "ent_coef": 0.0008971496690499397,
+   "init_action_bias": {
+    "vigilance": 0.0
+   },
+   "train_args": [
+    "--init-bias",
+    "vigilance=0"
+   ],
+   "seeds": [
+    0,
+    1,
+    2
+   ],
+   "runs": [
+    "v2_2b_s0",
+    "v2_2b_s1",
+    "v2_2b_s2"
+   ],
+   "per_seed": {
+    "0": {
+     "det": {
+      "g_gamma": -1.1608543129339934,
+      "b1": 0.0,
+      "b2": 0.07982686693793661,
+      "b3_truth": 0.0,
+      "b3_narrow": 0.0,
+      "starve_rate": 0.00107625,
+      "predation_rate": 0.002369296875,
+      "survival": 301.31368101905275,
+      "repro": 6.133203125,
+      "vig_frac": 0.0,
+      "p_vig_recent_truth": 0.0,
+      "p_vig_calm_truth": 0.0,
+      "stop_frac_cmd": 0.8612636718749999,
+      "walk_frac_cmd": 0.138736328125,
+      "run_frac_cmd": 0.0,
+      "p_stop_hungry": 0.8887798166373388,
+      "p_stop_full": 0.8089529496994021,
+      "b8": 0.1116527304848042,
+      "b8_cmd": 0.11165507671397115,
+      "b8_vig": 0.0
+     },
+     "stoch": {
+      "g_gamma": 0.0656975163773123,
+      "b1": 0.04725845614827165,
+      "b2": 0.08881330638140505,
+      "b3_truth": -0.00024956850583581966,
+      "b3_narrow": -0.00033014602521499786,
+      "starve_rate": 0.0007696093750000001,
+      "predation_rate": 0.0023584375000000003,
+      "survival": 361.9120627543156,
+      "repro": 10.30390625,
+      "vig_frac": 0.00020281250000000003,
+      "p_vig_recent_truth": 0.00015159434860444808,
+      "p_vig_calm_truth": 0.0004011628544402678,
+      "stop_frac_cmd": 0.55534265625,
+      "walk_frac_cmd": 0.439215546875,
+      "run_frac_cmd": 0.005441796875,
+      "p_stop_hungry": 0.5972807743374002,
+      "p_stop_full": 0.5084674679559951,
+      "b8": 3.3002417202518624,
+      "b8_cmd": 3.3051977855251247,
+      "b8_vig": 0.0030362623774724865
+     },
+     "tb": {
+      "vig_frac_5m": 0.003631591796875,
+      "vig_frac_5m_step": 5013504,
+      "vig_frac": {
+       "1M": 0.008056640625,
+       "5M": 0.003631591796875,
+       "10M": 3.0517578125e-05
+      },
+      "vig_frac_last": 0.0001220703125,
+      "last_step": 20021248,
+      "first_below_5pct": 655360,
+      "first_below_1pct": 1015808,
+      "vig_frac_max_after_5m": 0.00701904296875,
+      "speed_std": {
+       "init": 0.2093409150838852,
+       "at_5m": 0.17722158133983612,
+       "last": 0.11366008967161179,
+       "min": 0.10994842648506165,
+       "min_ratio": 0.5252123142817261
+      },
+      "vigilance_std": {
+       "init": 0.20890961587429047,
+       "at_5m": 0.07957328110933304,
+       "last": 0.060373950749635696,
+       "min": 0.02509338967502117,
+       "min_ratio": 0.12011601079253767
+      },
+      "vigilance_log_std": {
+       "at_5m": -0.20509423315525055,
+       "last": -0.5856380462646484
+      },
+      "speed_log_std": {
+       "at_5m": -0.23793324828147888,
+       "last": -0.701256275177002
+      },
+      "vigilance_act_mean": {
+       "at_5m": 0.10188640654087067,
+       "last": 0.09148737043142319
+      },
+      "speed_std_below_10pct": false,
+      "dir": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\v2\\v2_2b_s0_1",
+      "model_sha1": "dca49a3d3549"
+     },
+     "collapse": {
+      "vig_frac_5m_below_1pct": true,
+      "det_vig_frac_zero": true,
+      "signal": true
+     }
+    },
+    "1": {
+     "det": {
+      "g_gamma": 0.40020457164314927,
+      "b1": 0.008516040089938559,
+      "b2": 0.5689959836261749,
+      "b3_truth": 0.0,
+      "b3_narrow": 0.0,
+      "starve_rate": 0.0007975781249999999,
+      "predation_rate": 0.00222,
+      "survival": 360.3262482818599,
+      "repro": 11.8984375,
+      "vig_frac": 0.0,
+      "p_vig_recent_truth": 0.0,
+      "p_vig_calm_truth": 0.0,
+      "stop_frac_cmd": 0.35784164062500007,
+      "walk_frac_cmd": 0.64146640625,
+      "run_frac_cmd": 0.0006919531250000001,
+      "p_stop_hungry": 0.6470266042584631,
+      "p_stop_full": 0.0780306206322883,
+      "b8": 0.04573812969678358,
+      "b8_cmd": 0.04537877504817289,
+      "b8_vig": 0.0
+     },
+     "stoch": {
+      "g_gamma": 0.909858101654385,
+      "b1": 0.1327987894305157,
+      "b2": 0.09280052721901752,
+      "b3_truth": -8.1948148238631e-06,
+      "b3_narrow": -5.57416005726348e-06,
+      "starve_rate": 0.00056515625,
+      "predation_rate": 0.0022972656250000003,
+      "survival": 414.00805463723725,
+      "repro": 12.999609375,
+      "vig_frac": 6.7265625e-05,
+      "p_vig_recent_truth": 0.0,
+      "p_vig_calm_truth": 8.1948148238631e-06,
+      "stop_frac_cmd": 0.38979343749999995,
+      "walk_frac_cmd": 0.59362625,
+      "run_frac_cmd": 0.0165803125,
+      "p_stop_hungry": 0.4402195215195651,
+      "p_stop_full": 0.34741899430054757,
+      "b8": 3.4057192797951585,
+      "b8_cmd": 3.4131382993240136,
+      "b8_vig": 0.0009757482709199048
+     },
+     "tb": {
+      "vig_frac_5m": 0.0006103515625,
+      "vig_frac_5m_step": 5013504,
+      "vig_frac": {
+       "1M": 0.03277587890625,
+       "5M": 0.0006103515625,
+       "10M": 0.00103759765625
+      },
+      "vig_frac_last": 0.0,
+      "last_step": 20021248,
+      "first_below_5pct": 819200,
+      "first_below_1pct": 1507328,
+      "vig_frac_max_after_5m": 0.01220703125,
+      "speed_std": {
+       "init": 0.20792284607887268,
+       "at_5m": 0.1607092171907425,
+       "last": 0.11665076017379761,
+       "min": 0.1152104064822197,
+       "min_ratio": 0.5541017192430898
+      },
+      "vigilance_std": {
+       "init": 0.20851165056228638,
+       "at_5m": 0.04897695034742355,
+       "last": 0.04268944635987282,
+       "min": 0.03512959182262421,
+       "min_ratio": 0.168477836743853
+      },
+      "vigilance_log_std": {
+       "at_5m": -0.23011475801467896,
+       "last": -0.5885860919952393
+      },
+      "speed_log_std": {
+       "at_5m": -0.2150348573923111,
+       "last": -0.7282177209854126
+      },
+      "vigilance_act_mean": {
+       "at_5m": 0.07056011259555817,
+       "last": 0.08220425248146057
+      },
+      "speed_std_below_10pct": false,
+      "dir": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\v2\\v2_2b_s1_1",
+      "model_sha1": "0e3a05022555"
+     },
+     "collapse": {
+      "vig_frac_5m_below_1pct": true,
+      "det_vig_frac_zero": true,
+      "signal": true
+     }
+    },
+    "2": {
+     "det": {
+      "g_gamma": 1.3669136793750707,
+      "b1": 0.0,
+      "b2": 0.2102208697188047,
+      "b3_truth": 0.0,
+      "b3_narrow": 0.0,
+      "starve_rate": 0.00046882812499999995,
+      "predation_rate": 0.00236359375,
+      "survival": 408.7341106854357,
+      "repro": 15.334765625,
+      "vig_frac": 7.8125e-07,
+      "p_vig_recent_truth": 0.0,
+      "p_vig_calm_truth": 0.0,
+      "stop_frac_cmd": 0.07127757812499999,
+      "walk_frac_cmd": 0.9287224218750001,
+      "run_frac_cmd": 0.0,
+      "p_stop_hungry": 0.2102208697188047,
+      "p_stop_full": 0.0,
+      "b8": 0.011897346563791548,
+      "b8_cmd": 0.011483254240999616,
+      "b8_vig": 9.418682682646725e-06
+     },
+     "stoch": {
+      "g_gamma": 1.1918270676833118,
+      "b1": 0.09528736037583477,
+      "b2": 0.04762893890002086,
+      "b3_truth": 1.3552176291554999e-06,
+      "b3_narrow": -4.2990569571083393e-07,
+      "starve_rate": 0.0004928125,
+      "predation_rate": 0.0023535156249999993,
+      "survival": 414.28571314948215,
+      "repro": 14.221484375,
+      "vig_frac": 0.00090609375,
+      "p_vig_recent_truth": 2.6456426265939996e-06,
+      "p_vig_calm_truth": 1.2904249974385e-06,
+      "stop_frac_cmd": 0.37634234375,
+      "walk_frac_cmd": 0.6020717968750001,
+      "run_frac_cmd": 0.021585859375,
+      "p_stop_hungry": 0.4042673093214332,
+      "p_stop_full": 0.35663837042141233,
+      "b8": 3.585994913292656,
+      "b8_cmd": 3.589237259836126,
+      "b8_vig": 0.012317909057289193
+     },
+     "tb": {
+      "vig_frac_5m": 0.012542724609375,
+      "vig_frac_5m_step": 5013504,
+      "vig_frac": {
+       "1M": 0.021209716796875,
+       "5M": 0.012542724609375,
+       "10M": 0.00042724609375
+      },
+      "vig_frac_last": 0.001068115234375,
+      "last_step": 20021248,
+      "first_below_5pct": 688128,
+      "first_below_1pct": 2588672,
+      "vig_frac_max_after_5m": 0.017974853515625,
+      "speed_std": {
+       "init": 0.20795796811580658,
+       "at_5m": 0.18577496707439423,
+       "last": 0.13247916102409363,
+       "min": 0.12732799351215363,
+       "min_ratio": 0.6122775417830966
+      },
+      "vigilance_std": {
+       "init": 0.20821969211101532,
+       "at_5m": 0.10497051477432251,
+       "last": 0.06897801905870438,
+       "min": 0.029652347788214684,
+       "min_ratio": 0.14240895031390743
+      },
+      "vigilance_log_std": {
+       "at_5m": -0.29680904746055603,
+       "last": -0.8293964862823486
+      },
+      "speed_log_std": {
+       "at_5m": -0.14481963217258453,
+       "last": -0.5836187601089478
+      },
+      "vigilance_act_mean": {
+       "at_5m": 0.13899335265159607,
+       "last": 0.13765451312065125
+      },
+      "speed_std_below_10pct": false,
+      "dir": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\v2\\v2_2b_s2_1",
+      "model_sha1": "26ed778bb1ac"
+     },
+     "collapse": {
+      "vig_frac_5m_below_1pct": false,
+      "det_vig_frac_zero": false,
+      "signal": false
+     }
+    }
+   },
+   "collapse": true,
+   "collapse_seeds": [
+    0,
+    1
+   ],
+   "learning_failure": true,
+   "learning_failure_delta": {
+    "delta_seg_minus_c0": {
+     "point": 1.5593638605820617,
+     "lo": 1.2136624262264037,
+     "hi": 1.9396095137332212,
+     "runs": 3,
+     "strata": 20
+    },
+    "delta_mean": 1.7500561394454721,
+    "t_seedmean": {
+     "diff": 1.7500561394454723,
+     "sd": 0.6418994310684155,
+     "t": 12.192702790614694,
+     "sig": true,
+     "n": 20
+    },
+    "per_seed": {
+     "0": {
+      "mean": 1.9521441188068813,
+      "ref_mean": -1.1608543129339934,
+      "diff": 3.1129984317408743,
+      "sd": 1.0976136474771923,
+      "t": 12.683654441108756,
+      "sig": true,
+      "n": 20
+     },
+     "1": {
+      "mean": 1.9521441188068813,
+      "ref_mean": 0.40020457164314927,
+      "diff": 1.551939547163732,
+      "sd": 0.8090406374820156,
+      "t": 8.578660115835001,
+      "sig": true,
+      "n": 20
+     },
+     "2": {
+      "mean": 1.9521441188068813,
+      "ref_mean": 1.3669136793750707,
+      "diff": 0.5852304394318105,
+      "sd": 0.5271830284091453,
+      "t": 4.964556803053945,
+      "sig": true,
+      "n": 20
+     }
+    }
+   },
+   "g_gamma_iqm": {
+    "point": -0.010137202104877814,
+    "lo": -0.3676530278120402,
+    "hi": 0.4147288135613239,
+    "runs": 3,
+    "strata": 20
+   },
+   "starve_rate_iqm": {
+    "point": 0.0007709375,
+    "lo": 0.0006646328125,
+    "hi": 0.0008613854166666664,
+    "runs": 3,
+    "strata": 20
+   },
+   "sizes": {
+    "det": {
+     "B1": {
+      "col": "b1",
+      "crit": 0.3,
+      "per_seed": {
+       "0": 0.0,
+       "1": 0.008516040089938559,
+       "2": 0.0
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": false,
+       "2": false
+      },
+      "n_pass": 0,
+      "n_seeds": 3
+     },
+     "B2": {
+      "col": "b2",
+      "crit": 0.1,
+      "per_seed": {
+       "0": 0.07982686693793661,
+       "1": 0.5689959836261749,
+       "2": 0.2102208697188047
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": true,
+       "2": true
+      },
+      "n_pass": 2,
+      "n_seeds": 3
+     },
+     "B3": {
+      "col": "b3_truth",
+      "crit": 0.2,
+      "per_seed": {
+       "0": 0.0,
+       "1": 0.0,
+       "2": 0.0
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": false,
+       "2": false
+      },
+      "n_pass": 0,
+      "n_seeds": 3
+     }
+    },
+    "stoch": {
+     "B1": {
+      "col": "b1",
+      "crit": 0.3,
+      "per_seed": {
+       "0": 0.04725845614827165,
+       "1": 0.1327987894305157,
+       "2": 0.09528736037583477
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": false,
+       "2": false
+      },
+      "n_pass": 0,
+      "n_seeds": 3
+     },
+     "B2": {
+      "col": "b2",
+      "crit": 0.1,
+      "per_seed": {
+       "0": 0.08881330638140505,
+       "1": 0.09280052721901752,
+       "2": 0.04762893890002086
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": false,
+       "2": false
+      },
+      "n_pass": 0,
+      "n_seeds": 3
+     },
+     "B3": {
+      "col": "b3_truth",
+      "crit": 0.2,
+      "per_seed": {
+       "0": -0.00024956850583581966,
+       "1": -8.1948148238631e-06,
+       "2": 1.3552176291554999e-06
+      },
+      "pass_per_seed": {
+       "0": false,
+       "1": false,
+       "2": false
+      },
+      "n_pass": 0,
+      "n_seeds": 3
+     }
+    }
+   },
+   "n_pass": {
+    "B1": 0,
+    "B2": 2,
+    "B3": 0
+   },
+   "record": {
+    "c2_minus_c0_g_gamma": {
+     "point": 1.0555262476956822,
+     "lo": 0.7179766591913652,
+     "hi": 1.4522860734993974,
+     "runs": 3,
+     "strata": 20
+    },
+    "predation_rate_iqm": {
+     "point": 0.0023273437500000004,
+     "lo": 0.002292807291666667,
+     "hi": 0.0023644296875000004,
+     "runs": 3,
+     "strata": 20
+    },
+    "stoch_g_gamma_iqm": {
+     "point": 0.6497239591675611,
+     "lo": 0.446613965910992,
+     "hi": 0.8570679465154274,
+     "runs": 3,
+     "strata": 20
+    },
+    "stoch_starve_rate_iqm": {
+     "point": 0.0005119791666666668,
+     "lo": 0.0004571809895833334,
+     "hi": 0.0005664075520833334,
+     "runs": 3,
+     "strata": 20
+    },
+    "stoch_minus_det_g_gamma": 0.5203729158769275
+   }
+  }
+ },
+ "g_gamma_iqm_diff_a_minus_b": {
+  "point": -0.16153651819222534,
+  "lo": -0.7421920525285525,
+  "hi": 0.3808318274774517,
+  "runs": [
+   3,
+   3
+  ],
+  "strata": 20,
+  "reps": 2000,
+  "boot_seed": 0
+ },
+ "reproduction": {
+  "a": {
+   "0": {
+    "C2 (E2 V0/c2)": true,
+    "C2-seg-E2 (E2 V0/d0_95 a_allow)": true
+   },
+   "1": {
+    "C2 (E2 V0/c2)": true,
+    "C2-seg-E2 (E2 V0/d0_95 a_allow)": true
+   },
+   "2": {
+    "C2 (E2 V0/c2)": true,
+    "C2-seg-E2 (E2 V0/d0_95 a_allow)": true
+   }
+  },
+  "b": {
+   "0": {
+    "C2 (E2 V0/c2)": true,
+    "C2-seg-E2 (E2 V0/d0_95 a_allow)": true
+   },
+   "1": {
+    "C2 (E2 V0/c2)": true,
+    "C2-seg-E2 (E2 V0/d0_95 a_allow)": true
+   },
+   "2": {
+    "C2 (E2 V0/c2)": true,
+    "C2-seg-E2 (E2 V0/d0_95 a_allow)": true
+   }
+  }
+ },
+ "selection": {
+  "arm": null,
+  "prefix": null,
+  "train_args": null,
+  "judge_seeds": null,
+  "stop": true,
+  "candidates_after_1": [],
+  "candidates_after_2": [],
+  "b1_b3_pass_count": {
+   "a": 1,
+   "b": 0
+  },
+  "decided_by": null,
+  "trace": [
+   "(1) 학습 실패가 아닌 팔: 없음",
+   "(2) 그중 붕괴가 없는 팔: 없음",
+   "(3) 후보가 없다 → 판정 재실행을 하지 않고 멈춘다(다음은 사람: 5.0 (b)~(d) 또는 범위 축소)"
+  ]
+ }
+}

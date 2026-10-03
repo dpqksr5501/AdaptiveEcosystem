@@ -13,6 +13,16 @@ Holm 보정, B4 v1 기준선, B6·B7 롤아웃을 더했다.
 진단 명령 전문과 순서는 PREREG 10절이다. `--res`·`--cache`·`--ckpt`·`--out`·`--smoke` 는 도구 시험(scratchpad)용이다:
 `--smoke` 는 평가 시드·스텝을 결과 meta 에서 읽고 E1-b·E2 재현 검사를 건너뛴다(판정에 쓰지 않는다).
 
+실행 이름 접두사·학습 시드·출력 폴더 (10-03, 1-6 판정 재실행 `results/v2/s1_6b/PREREG.md` 5절): `--prefix P`(기본 v2_2)는
+학습 시드 s 의 실행 이름을 `P_s<s>` 로 정한다 — 모델 `ckpt/v2/P_s<s>.zip`, 진단 `diag_P_s<s>`·`diag_P_s<s>_stoch`,
+묶음 `diag_P/modecmp.json`, 보정 캐시 `runs/v2_diag/P_s<s>`. `--seeds`(judge, 기본 0 1 2 3 4)·`--seed`(b67)가 학습
+시드다. `--sdir D`(기본 s1_6)는 B6·B7 결과 `<res>/D/b67_P_s<s>.json` 과 판정표 `<res>/D/stage1_6_P.json` 의 폴더다.
+B3 정의 시험·B4 v1 기준선은 학습 전에 고정한 것이라 늘 `<res>/s1_6/` 의 것을 쓴다. 기본값이면 예전과 같은 파일을
+읽고 같은 판정표를 낸다(10-03 확인: 기본 인자로 다시 낸 judge 출력이 `s1_6/stage1_6_v2_2.json` 과 generated·script
+칸만 다르다). 예 (1-6 판정 재실행, 팔 a):
+    python results/v2/_stage1_6_v2_2.py b67 --prefix v2_2a --sdir s1_6b --seed 5 --workers 3
+    python results/v2/_stage1_6_v2_2.py judge --prefix v2_2a --sdir s1_6b --seeds 5 6 7 8 9
+
 운영 정의 요약 (자세한 것은 PREREG 3~6절):
 - 조건: 결정 모드 결과는 모두 config_digest efc8f775f1e1(`configs/v2_2.yaml` = Gate E2 V0_d0_95), 평가 시드
   10000~10019 × 5000스텝, γ 0.9916661555611042, 끝 600스텝 제외, 앞 제외 0. 확률 모드는 같은 조건에 stochastic.
@@ -47,6 +57,7 @@ import argparse  # noqa: E402
 import json  # noqa: E402
 import math  # noqa: E402
 import os  # noqa: E402
+import re  # noqa: E402
 import warnings  # noqa: E402
 from concurrent.futures import ProcessPoolExecutor  # noqa: E402
 from datetime import datetime, timezone  # noqa: E402
@@ -171,6 +182,16 @@ def vigilance_block() -> dict:
 
 def pool(workers: int) -> ProcessPoolExecutor:
     return ProcessPoolExecutor(max_workers=max(1, workers), initializer=_init_worker)
+
+
+def run_of(a, seed: int) -> str:
+    """학습 시드 하나의 실행 이름 (`--prefix` + `_s<시드>`). 기본 v2_2_s<시드> 는 1-6 이름 그대로다."""
+    return f"{a.prefix}_s{int(seed)}"
+
+
+def sdir_of(a) -> Path:
+    """B6·B7 결과와 판정표를 두는 폴더 `<res>/<--sdir>` (기본 s1_6)."""
+    return Path(a.res) / a.sdir
 
 
 def parse_seeds(tokens) -> list[int]:
@@ -442,10 +463,12 @@ def _b67_job(args):
 
 
 def cmd_b67(a) -> int:
-    res = Path(a.res)
-    model = Path(a.ckpt) / f"v2_2_s{a.seed}.zip"
+    model =Path(a.ckpt) / f"{run_of(a, a.seed)}.zip"
     if not model.exists():
         raise SystemExit(f"{model} 가 없다")
+    dest = sdir_of(a) / f"b67_{run_of(a, a.seed)}.json"
+    if dest.exists() and not a.overwrite:
+        raise SystemExit(f"{dest} 가 이미 있다 — 덮지 않는다(--overwrite 로만)")
     cfg = load_v2_config(CONFIG)
     if config_digest(cfg) != DIGEST and not a.smoke:
         raise SystemExit(f"configs/v2_2.yaml 의 config_digest {config_digest(cfg)} ≠ {DIGEST}")
@@ -457,7 +480,6 @@ def cmd_b67(a) -> int:
     with pool(a.workers) as ex:
         out = list(ex.map(_b67_job, jobs))
     rows = {name: sorted([r for n, r in out if n == name], key=lambda r: r["seed"]) for name in specs}
-    dest = res / "s1_6" / f"b67_v2_2_s{a.seed}.json"
     save_json(dest, {"meta": {"generated": now(), "command": "python results/v2/_stage1_6_v2_2.py " + " ".join(sys.argv[1:]),
                               "config_digest": config_digest(cfg), "eval_seeds": seeds, "eval_steps": steps,
                               "gamma": GAMMA, "tail": TAIL, "model_sha1": model_fingerprint(model),
@@ -548,7 +570,7 @@ def collect(a, cond_holder: list) -> tuple[dict, dict, dict, dict]:
     """학습 시드별 {대조군: 행 목록}(결정 모드), 확률 모드 C0, 재현 검사, G_0.998 참고."""
     res = Path(a.res)
     seeds = list(a.seeds)
-    first = load(res / f"diag_v2_2_s{seeds[0]}" / "ablate.json")
+    first = load(res / f"diag_{run_of(a, seeds[0])}" / "ablate.json")
     cond = Cond(a.smoke, first["meta"])
     cond_holder.append(cond)
     S = cond.eval_seeds
@@ -561,16 +583,21 @@ def collect(a, cond_holder: list) -> tuple[dict, dict, dict, dict]:
         check_const(e2seg, "E2 A-허용 C2-seg", E2_SEG["table"], E2_SEG["bins"], E2_SEG["dims"], E2_C2)
         check_const(e1seg, "E1-b C2-seg", E1B_SEG["table"], E1B_SEG["bins"], E1B_SEG["dims"], E2_C2[:5])
     for s in seeds:
-        dd = res / f"diag_v2_2_s{s}"
+        dd = res / f"diag_{run_of(a, s)}"
         abl, per, c2 = load(dd / "ablate.json"), load(dd / "permute.json"), load(dd / "constsearch.json")
         sg1, sg2 = load(dd / "c2seg_e1b.json"), load(dd / "c2seg_e2.json")
         files = ((abl, "ablate"), (per, "permute"), (c2, "constsearch"), (sg1, "c2seg_e1b"), (sg2, "c2seg_e2"))
         for d, w in files:
             cond.check(d, f"s{s} {w}")
         sha = {d["meta"].get("model_sha1") for d, _ in files}
-        model = Path(a.ckpt) / f"v2_2_s{s}.zip"
+        model = Path(a.ckpt) / f"{run_of(a, s)}.zip"
         if len(sha) != 1 or None in sha or (model.exists() and model_fingerprint(model) not in sha):
             raise SystemExit(f"s{s}: 모델 sha1 이 결과마다 다르거나 체크포인트와 다르다 {sha}")
+        tmeta = model.with_suffix(".json")             # 학습 메타. config_digest 는 10-03 이후 학습에만 있다
+        if tmeta.exists():
+            td = load(tmeta).get("config_digest")
+            if td is not None and td != cond.digest:
+                raise SystemExit(f"s{s}: 학습 메타 config_digest {td} ≠ 평가 {cond.digest}")
         check_const(c2, f"s{s} C2", E2_C2)
         check_const(sg1, f"s{s} C2-seg E1-b", E1B_SEG["table"], E1B_SEG["bins"], E1B_SEG["dims"], E2_C2)
         check_const(sg2, f"s{s} C2-seg E2", E2_SEG["table"], E2_SEG["bins"], E2_SEG["dims"], E2_C2)
@@ -593,7 +620,7 @@ def collect(a, cond_holder: list) -> tuple[dict, dict, dict, dict]:
             if rows_of(d, "C2", S) != rows["C2"]:
                 raise SystemExit(f"s{s}: {w} 의 C2 가 constsearch 의 C2 와 다르다")
         # B6·B7 롤아웃 → C0·C1′ 행에 붙인다 (같은 궤적인지 G_γ·결과 지표로 확인)
-        b67 = load(res / "s1_6" / f"b67_v2_2_s{s}.json")
+        b67 = load(sdir_of(a) / f"b67_{run_of(a, s)}.json")
         bm = b67["meta"]
         if (bm["config_digest"] != cond.digest or bm["eval_seeds"] != S or bm["eval_steps"] != cond.eval_steps
                 or abs(bm["gamma"] - GAMMA) > 1e-12 or bm["tail"] != cond.tail or bm["model_sha1"] not in sha):
@@ -616,7 +643,7 @@ def collect(a, cond_holder: list) -> tuple[dict, dict, dict, dict]:
                 # E1-b 는 v2.1 세계(경계 열 없음)라 E1-b 행의 열만 맞춘다
                 "C2-seg-E1b (E1-b B1 r2_5_ew0_5)": same_rows(rows["C2-seg-E1b"], rows_of(e1seg, "C2-seg", S)),
             }
-        st = load(res / f"diag_v2_2_s{s}_stoch" / "ablate.json")
+        st = load(res / f"diag_{run_of(a, s)}_stoch" / "ablate.json")
         cond.check(st, f"s{s} stoch", mode="stochastic")
         if st["meta"].get("model_sha1") not in sha:
             raise SystemExit(f"s{s}: 확률 모드 결과의 모델이 다르다")
@@ -699,13 +726,13 @@ def act_split(a: np.ndarray, t_walk: float, t_run: float, v_thr: float) -> dict:
 
 
 def intervention(a, seed: int) -> dict:
-    cal = Path(a.cache) / f"v2_2_s{seed}" / "calib.npz"
+    cal = Path(a.cache) / run_of(a, seed) / "calib.npz"
     with np.load(cal, allow_pickle=False) as z:
         obs = np.asarray(z["obs"], dtype=np.float32)
     cfg = load_v2_config(CONFIG)
     t_walk, t_run = (float(x) for x in cfg.v2["features"]["speed"]["thresholds"])
     v_thr = float(cfg.v2["features"]["vigilance"]["threshold"])
-    pol = build_policy({"kind": "learned", "model": str((Path(a.ckpt) / f"v2_2_s{seed}.zip").resolve())})
+    pol = build_policy({"kind": "learned", "model": str((Path(a.ckpt) / f"{run_of(a, seed)}.zip").resolve())})
 
     def act(o):
         return np.concatenate([np.asarray(pol(o[i:i + 8192]), np.float64) for i in range(0, len(o), 8192)])
@@ -863,7 +890,7 @@ def cmd_judge(a) -> int:
         if c in ("g_gamma", "b1", "b2", "b3_truth"):
             row["sig"] = bool(t["sig"] and row["ci_excludes_0"])
         mode[c] = row
-    mc = load(res / "diag_v2_2" / "modecmp.json")
+    mc = load(res / f"diag_{a.prefix}" / "modecmp.json")
     holm_rows = {c: mc["groups"][0]["cols"][c] for c in ("survival", "starve_rate", "predation_rate")}
     trigger = bool(any(mode[c]["sig"] for c in ("g_gamma", "b1", "b2", "b3_truth"))
                    or any(bool(r.get("verdict")) for r in holm_rows.values()))
@@ -894,12 +921,12 @@ def cmd_judge(a) -> int:
 
     data = {
         "generated": now(), "script": "python results/v2/_stage1_6_v2_2.py " + " ".join(sys.argv[1:]),
-        "prereg": "results/v2/s1_6/PREREG.md", "smoke": bool(a.smoke),
+        "prereg": f"results/v2/{a.sdir}/PREREG.md", "smoke": bool(a.smoke),
         "condition": {"config": "configs/v2_2.yaml", "config_digest": cond.digest, "gamma": GAMMA,
                       "eval_seeds": [cond.eval_seeds[0], cond.eval_seeds[-1]], "n_eval_seeds": len(cond.eval_seeds),
                       "eval_steps": cond.eval_steps, "tail": cond.tail, "train_seeds": seeds,
-                      "models": {s: f"ckpt/v2/v2_2_s{s}.zip" for s in seeds},
-                      "model_sha1": {s: load(res / f"diag_v2_2_s{s}" / "ablate.json")["meta"]["model_sha1"]
+                      "models": {s: f"ckpt/v2/{run_of(a, s)}.zip" for s in seeds},
+                      "model_sha1": {s: load(res / f"diag_{run_of(a, s)}" / "ablate.json")["meta"]["model_sha1"]
                                      for s in seeds},
                       "reps": REPS, "boot_seed": BOOT_SEED, "t_crit": T_CRIT, "size_need": need},
         "reproduction": repro if not a.smoke else "생략(smoke)",
@@ -910,7 +937,7 @@ def cmd_judge(a) -> int:
         "mode": {"cols": mode, "holm_outcomes": holm_rows, "trigger": trigger, "stoch_size": stoch_size},
         "g998": g998_out, "intervention": curves, "video": video, "stage1": stage1,
     }
-    out = Path(a.out) if a.out else res / "s1_6" / "stage1_6_v2_2.json"
+    out = Path(a.out) if a.out else sdir_of(a) / f"stage1_6_{a.prefix}.json"
     if out.exists() and not a.overwrite:
         raise SystemExit(f"{out} 가 이미 있다 — 덮지 않는다(--overwrite 로만)")
     save_json(out, clean(data))
@@ -974,13 +1001,17 @@ def main(argv=None) -> int:
     p.add_argument("--res", default=str(REF), help="진단 결과·s1_6 의 뿌리 (기본 results/v2)")
     p.add_argument("--cache", default=str(ROOT / "runs" / "v2_diag"), help="보정 표본 캐시 뿌리")
     p.add_argument("--ckpt", default=str(ROOT / "ckpt" / "v2"), help="체크포인트 디렉터리")
+    p.add_argument("--prefix", default="v2_2",
+                   help="실행 이름 접두사: 학습 시드 s 의 모델·진단 이름이 <prefix>_s<s> (기본 v2_2 = 1-6)")
+    p.add_argument("--sdir", default="s1_6",
+                   help="b67 결과와 판정표 폴더 <res>/<sdir> (기본 s1_6. 1-6 판정 재실행은 s1_6b)")
     p.add_argument("--seeds", type=int, nargs="+", default=list(SEEDS), help="학습 시드 (judge)")
     p.add_argument("--seed", type=int, default=None, help="학습 시드 하나 (b67)")
     p.add_argument("--eval-seeds", nargs="+", default=None, help="b4base·b67 (기본 10000:10020)")
     p.add_argument("--eval-steps", type=int, default=None, help="b4base·b67 (기본 5000)")
     p.add_argument("--workers", type=int, default=10)
-    p.add_argument("--out", default=None, help="judge 출력 JSON (기본 <res>/s1_6/stage1_6_v2_2.json)")
-    p.add_argument("--overwrite", action="store_true", help="judge 출력이 있으면 덮는다")
+    p.add_argument("--out", default=None, help="judge 출력 JSON (기본 <res>/<sdir>/stage1_6_<prefix>.json)")
+    p.add_argument("--overwrite", action="store_true", help="judge·b67 출력이 있으면 덮는다")
     p.add_argument("--smoke", action="store_true", help="도구 시험: 조건을 결과 meta 에서 읽고 재현 검사를 건너뛴다")
     a = p.parse_args(argv)
     try:
@@ -990,6 +1021,10 @@ def main(argv=None) -> int:
     os.environ.setdefault("KMP_DUPLICATE_LIB_OK", "TRUE")
     if a.cmd == "b67" and a.seed is None:
         raise SystemExit("b67 은 --seed <학습 시드> 가 필요하다")
+    if not re.fullmatch(r"[A-Za-z0-9_.-]+", a.prefix) or not re.fullmatch(r"[A-Za-z0-9_.-]+", a.sdir):
+        raise SystemExit(f"--prefix {a.prefix!r}·--sdir {a.sdir!r} 는 경로 구분자 없는 이름이어야 한다")
+    if len(set(a.seeds)) != len(a.seeds):
+        raise SystemExit(f"--seeds 에 같은 시드가 두 번 있다 {a.seeds}")
     return {"b3defs": cmd_b3defs, "b4base": cmd_b4base, "b67": cmd_b67, "judge": cmd_judge}[a.cmd](a)
 
 

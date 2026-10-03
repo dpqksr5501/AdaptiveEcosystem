@@ -21,6 +21,17 @@ PPO 구조(O-64-64-A, tanh)와 기본 하이퍼파라미터는 v1 의 `train.PPO
 설정 `train.init_action_bias: {행동 이름: 값}` 이 있으면 무작위 초기화 직후 그 행동의 편향만 바꾼다(`--init` 이면
 쓰지 않는다). 없으면 기존과 같다. v2.2(`configs/v2_2.yaml`)는 vigilance −0.84 다: log_std 0 에서
 P(경계) = P(N(−0.84, 1) > logit(0.5) = 0) ≈ 20% (계획서 4.7 "vigilance −0.84, 경계 확률 약 20%").
+
+학습 설정만 바꾸는 명령줄 옵션 (10-03 결정, 1-6 학습 실패 대응 비교 `results/v2/s1_6b/PREREG.md`). 세계 설정 파일과
+그 config_digest 는 그대로 두고 학습 쪽 값만 덮는다. 둘 다 주지 않으면 기존과 같다.
+- `--ent-coef X`: 엔트로피 계수만 덮는다(`--gamma` 와 같은 방식). 메타 JSON `ent_coef`·`ent_coef_source`.
+      python train_v2.py --config configs/v2_2.yaml --seed 0 --run-name v2_2a_s0 --ent-coef 3e-3
+- `--init-bias 이름=값 ...`: 설정 `train.init_action_bias` 위에 행동별 시작 편향을 덮는다(적지 않은 행동은 설정 값).
+  메타 JSON `init_action_bias`(실제로 넣은 값)·`init_action_bias_source`(행동마다 config|cli).
+      python train_v2.py --config configs/v2_2.yaml --seed 0 --run-name v2_2b_s0 --init-bias vigilance=0
+  두 옵션은 기본 이름(`v2_2_s0_20m` 등)의 체크포인트를 덮지 않도록 `--run-name` 이나 `--out` 과 함께 써야 한다.
+  `--init` 과 `--init-bias` 는 함께 쓸 수 없다(옮겨 온 가중치에는 편향을 넣지 않는다).
+메타 JSON 에는 설정의 `config_digest`(diagnose_v2.config_digest 와 같은 값)도 남긴다.
 """
 
 from __future__ import annotations
@@ -126,6 +137,62 @@ def init_action_bias(cfg, act_names) -> dict[str, float]:
             raise SystemExit(f"train.init_action_bias.{k} 는 유한한 숫자여야 한다. 받은 값: {v!r}")
         out[str(k)] = float(v)
     return out
+
+
+def parse_init_bias(tokens) -> dict[str, float]:
+    """`--init-bias 이름=값 ...` → {이름: 값}. 형식(이름=유한한 숫자, 이름 중복 없음)만 본다. 행동 이름이 이 세계에
+    있는지는 `resolve_init_bias` 가 본다. 없거나 비면 빈 dict(기존과 같다)."""
+    out: dict[str, float] = {}
+    for tok in tokens or []:
+        name, sep, val = str(tok).partition("=")
+        name = name.strip()
+        if not sep or not name:
+            raise SystemExit(f"--init-bias 는 이름=값 꼴이다 (예: vigilance=0). 받은 값: {tok!r}")
+        try:
+            v = float(val)
+        except ValueError:
+            raise SystemExit(f"--init-bias {name} 의 값은 숫자여야 한다. 받은 값: {val!r}") from None
+        if not math.isfinite(v):
+            raise SystemExit(f"--init-bias {name} 의 값은 유한한 숫자여야 한다. 받은 값: {val!r}")
+        if name in out:
+            raise SystemExit(f"--init-bias 에 '{name}' 이 두 번 있다")
+        out[name] = v
+    return out
+
+
+def resolve_init_bias(cfg, act_names, cli: dict[str, float] | None) -> tuple[dict[str, float], dict[str, str]]:
+    """설정 `train.init_action_bias` 위에 명령줄 `--init-bias` 를 덮는다. (넣을 편향, 행동마다 출처 config|cli).
+
+    명령줄의 모르는 행동 이름(이 세계에 없는 행동, 오타)은 멈춘다. `cli` 가 비면 `init_action_bias(cfg, …)` 그대로다.
+    """
+    bias = init_action_bias(cfg, act_names)
+    source = {k: "config" for k in bias}
+    for k, v in (cli or {}).items():
+        if k not in act_names:
+            raise SystemExit(f"--init-bias 의 '{k}' 는 이 설정의 행동 {list(act_names)} 이 아니다")
+        bias[k] = float(v)
+        source[k] = "cli"
+    return bias, source
+
+
+def resolve_ent_coef(tuned: dict, ent_coef: float | None) -> tuple[dict, float, str]:
+    """튜닝값에 `--ent-coef` 를 덮는다. (새 튜닝값, 쓸 ent_coef, 출처). 다른 키는 건드리지 않는다.
+
+    출처는 "cli"(--ent-coef), "ppo_config"(--ppo-config 의 params.ent_coef), "PPO_KWARGS"(튜닝 파일이 없을 때
+    v1 기본값) 중 하나다(`resolve_gamma` 와 같은 규칙).
+    """
+    from train import PPO_KWARGS
+
+    out = dict(tuned)
+    if ent_coef is not None:
+        e = float(ent_coef)
+        if not (math.isfinite(e) and e >= 0.0):
+            raise SystemExit(f"--ent-coef {ent_coef} 는 0 이상의 유한한 숫자여야 한다")
+        out["ent_coef"] = e
+        return out, e, "cli"
+    if "ent_coef" in out:
+        return out, float(out["ent_coef"]), "ppo_config"
+    return out, float(PPO_KWARGS["ent_coef"]), "PPO_KWARGS"
 
 
 def apply_action_bias(model, act_names, bias: dict[str, float]) -> None:
@@ -289,6 +356,12 @@ def main(argv=None) -> int:
     p.add_argument("--gamma", type=float, default=None,
                    help="할인율 γ 만 덮는다(0-7 γ 비교). 기본은 --ppo-config 의 params.gamma. "
                         "다른 하이퍼파라미터는 그대로다")
+    p.add_argument("--ent-coef", type=float, default=None,
+                   help="엔트로피 계수만 덮는다(1-6 학습 실패 대응 비교). 기본은 --ppo-config 의 params.ent_coef. "
+                        "다른 하이퍼파라미터는 그대로다. --run-name 이나 --out 과 함께 쓴다")
+    p.add_argument("--init-bias", nargs="+", default=None, metavar="이름=값",
+                   help="마지막 층 시작 편향을 행동별로 덮는다(예: vigilance=0). 적지 않은 행동은 설정 "
+                        "train.init_action_bias 그대로. --run-name 이나 --out 과 함께 쓰고, --init 과는 못 쓴다")
     p.add_argument("--init", default=None, help="가중치를 옮겨 올 체크포인트. 기본은 무작위 초기화")
     p.add_argument("--num-worlds", type=int, default=None)
     p.add_argument("--reset-interval", type=int, default=None)
@@ -296,9 +369,16 @@ def main(argv=None) -> int:
     p.add_argument("--threads", type=int, default=4, help="torch 스레드 수 (병렬 실행 시 줄인다)")
     p.add_argument("--tb", default=str(ROOT / "runs" / "v2"))
     args = p.parse_args(argv)
+    cli_bias = parse_init_bias(args.init_bias)
+    if (args.ent_coef is not None or cli_bias) and not (args.run_name or args.out):
+        raise SystemExit("--ent-coef·--init-bias 는 --run-name 이나 --out 과 함께 쓴다 (기본 이름의 체크포인트를 덮지 않게)")
+    if cli_bias and args.init:
+        raise SystemExit("--init-bias 는 --init 과 함께 쓸 수 없다 (옮겨 온 가중치에는 편향을 넣지 않는다)")
 
     torch.set_num_threads(args.threads)
     cfg = load_v2_config(args.config)
+    from diagnose_v2 import config_digest       # 진단 결과 meta 와 같은 식(설정 dict 의 sha1 앞 12자리)
+    digest = config_digest(cfg)
     venv = MultiWorldVecEnv(cfg, num_worlds=args.num_worlds, reset_interval=args.reset_interval,
                             meta_seed=args.seed)
     rollout_world_steps = int(cfg.v2["train"].get("rollout_world_steps", 256))
@@ -307,6 +387,9 @@ def main(argv=None) -> int:
     tuned, gamma, gamma_source = resolve_gamma(load_tuned(args.ppo_config), args.gamma)
     if gamma_source == "cli":
         print(f"γ = {gamma} (--gamma, 다른 튜닝값은 그대로)")
+    tuned, ent_coef, ent_coef_source = resolve_ent_coef(tuned, args.ent_coef)
+    if ent_coef_source == "cli":
+        print(f"ent_coef = {ent_coef} (--ent-coef, 다른 튜닝값은 그대로)")
     run = args.run_name or default_run_name(cfg, args.seed, args.steps, args.gamma)
     out = Path(args.out) if args.out else CKPT / f"{run}.zip"
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -315,6 +398,8 @@ def main(argv=None) -> int:
     # γ 는 GAE·truncation 부트스트랩이 쓰는 롤아웃 버퍼에도 들어가야 한다 (SB3 _setup_model)
     if float(model.gamma) != gamma or float(model.rollout_buffer.gamma) != gamma:
         raise RuntimeError(f"모델 γ {model.gamma} (버퍼 {model.rollout_buffer.gamma}) 가 지정한 γ {gamma} 와 다르다")
+    if float(model.ent_coef) != ent_coef:
+        raise RuntimeError(f"모델 ent_coef {model.ent_coef} 가 지정한 값 {ent_coef} 와 다르다")
     if args.init:
         from stable_baselines3 import PPO
         donor = PPO.load(args.init, device="cpu")
@@ -322,10 +407,11 @@ def main(argv=None) -> int:
         print(f"가중치 이식: {args.init}")
     else:
         print("무작위 초기화로 시작 (계획서 4.7)")
-    bias = init_action_bias(cfg, venv.act_names)
+    bias, bias_source = resolve_init_bias(cfg, venv.act_names, cli_bias)
     if bias and not args.init:
         apply_action_bias(model, venv.act_names, bias)
-        print("마지막 층 편향 (train.init_action_bias): " + ", ".join(f"{k} {v:+g}" for k, v in bias.items()))
+        print("마지막 층 편향 (train.init_action_bias" + (" + --init-bias" if cli_bias else "") + "): "
+              + ", ".join(f"{k} {v:+g} ({bias_source[k]})" for k, v in bias.items()))
     elif bias:
         print(f"train.init_action_bias {bias} 는 --init 이라 쓰지 않는다 (옮겨 온 가중치 그대로)")
     init_rep = init_policy_report(model, venv)
@@ -337,9 +423,10 @@ def main(argv=None) -> int:
               "(계획서 4.7: 편향 0, 걷기 약 51%)", flush=True)
     if "vigilance" in init_rep:
         vp, i = init_rep["vigilance"], venv.act_names.index("vigilance")
+        ref = ("--init-bias 로 덮음" if bias_source.get("vigilance") == "cli"
+               else "계획서 4.7: 편향 −0.84, 경계 약 20%")
         print(f"시작 분포 vigilance: 편향 {init_rep['action_bias'][i]:+.4f}, log_std {init_rep['log_std'][i]:+.3f}, "
-              f"평균 μ {vp['mu_mean']:+.4f} → 경계 {vp['vig_prob']:.3f} (계획서 4.7: 편향 −0.84, 경계 약 20%)",
-              flush=True)
+              f"평균 μ {vp['mu_mean']:+.4f} → 경계 {vp['vig_prob']:.3f} ({ref})", flush=True)
 
     print(f"{args.steps:,} 스텝 — 세계 {venv.K}개 × {venv.N}슬롯 = num_envs {venv.num_envs}, "
           f"세계당 n_steps {n_steps} (배치 {n_steps * venv.num_envs:,}), 리셋 {venv.T}스텝마다, "
@@ -365,6 +452,11 @@ def main(argv=None) -> int:
         # 실제 학습 γ(모델에 들어간 값). 출처: cli(--gamma) / ppo_config / PPO_KWARGS
         "gamma": float(model.gamma),
         "gamma_source": gamma_source,
+        # 실제 엔트로피 계수(모델에 들어간 값). 출처: cli(--ent-coef) / ppo_config / PPO_KWARGS
+        "ent_coef": float(model.ent_coef),
+        "ent_coef_source": ent_coef_source,
+        # 설정 전체(v1 기본 + v2 파일)의 지문. diagnose_v2 결과 meta 의 config_digest 와 같은 값이다
+        "config_digest": digest,
         "ppo_config": args.ppo_config,
         "ppo": {k: (float(v) if isinstance(v, (int, float)) else str(v)) for k, v in {
             "n_steps": n_steps, "batch_size": model.batch_size, "n_epochs": model.n_epochs,
@@ -380,11 +472,13 @@ def main(argv=None) -> int:
         # 학습 전 정책의 시작 분포(마지막 층 편향·log_std, speed 명령 보행 확률). 계획서 4.7 초기화 확인용
         "act_names": list(venv.act_names),
         "obs_names": list(venv.obs_names),
-        # train.init_action_bias 로 바꾼 편향(--init 이면 쓰지 않아 빈 dict)
+        # train.init_action_bias(+ --init-bias)로 바꾼 편향(--init 이면 쓰지 않아 빈 dict)과 행동마다 출처 config|cli
         "init_action_bias": bias if not args.init else {},
+        "init_action_bias_source": bias_source if not args.init else {},
         "init_policy": init_rep,
     }
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
+    print(f"config_digest {meta['config_digest']}, ent_coef {meta['ent_coef']} ({ent_coef_source})")
     print(f"학습한 세계 수: {meta['worlds_seen']} (시간 초과 리셋 {venv.num_resets}회)")
     return 0
 
