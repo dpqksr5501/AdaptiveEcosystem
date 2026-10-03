@@ -362,9 +362,19 @@ def base_series(d: dict, prefix: str, key: str = "g_gamma"):
     return np.mean([_col(d["rows"][k], key) for k in ks], axis=0)
 
 
-def choose_modes(d1: dict) -> dict:
-    """팔마다 출시 모드 (R1, 수정 제안서 3.1 (가) 3): 팔 평균 G_γ 가 유의하게 높은 모드. 유의하지 않으면 크기 통과
-    (새 결정 사용 지표 ≥ 기준, B1 ≥ 0.3) 수가 많은 모드, 같으면 결정."""
+MODE_TIE_RULES = ("passes", "det")
+
+
+def choose_modes(d1: dict, tie: str = "passes") -> dict:
+    """팔마다 출시 모드 (R1, 수정 제안서 3.1 (가) 3): 팔 평균 G_γ 가 유의하게 높은 모드. 유의하지 않을 때는 `tie` 로 정한다.
+
+    - tie="passes" (v2.2r 탐색 메모 5절, 학습 전 규칙 — 이 배치의 판정은 이것으로 재현한다): 크기 통과(새 결정 사용
+      지표 ≥ 기준, B1 ≥ 0.3) 수가 많은 모드, 같으면 결정.
+    - tie="det" (10-03 결정 S1-c, 다음 버전부터): 결정 모드. 크기 통과 수 단계를 뺀다(3모델 K24 ↔ 6모델 결정으로
+      뒤집힌 T0 사례, `results/v2/stage1_close.md` 8절). 크기 통과 수는 기록만 한다.
+    """
+    if tie not in MODE_TIE_RULES:
+        raise ValueError(f"tie 는 {MODE_TIE_RULES} 중 하나다: {tie!r}")
     out = {}
     for arm, a in ARMS.items():
         g = {m: arm_series(d1, arm, "C0", m) for m in MODES}
@@ -379,10 +389,10 @@ def choose_modes(d1: dict) -> dict:
             passes[m] = n
         if t["sig"]:
             mode, why = ("hold" if t["diff"] > 0 else "det"), "G_γ 유의"
-        elif passes["hold"] != passes["det"]:
+        elif tie == "passes" and passes["hold"] != passes["det"]:
             mode, why = max(passes, key=passes.get), "크기 통과 수"
         else:
-            mode, why = "det", "같음 → 결정"
+            mode, why = "det", ("같음 → 결정" if tie == "passes" else "유의하지 않음 → 결정 (S1-c)")
         out[arm] = {"mode": mode, "why": why, "hold_minus_det": t, "passes": passes,
                     "g": {m: float(g[m].mean()) for m in MODES}}
     return out
