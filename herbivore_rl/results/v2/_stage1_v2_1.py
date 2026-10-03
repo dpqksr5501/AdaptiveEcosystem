@@ -29,6 +29,11 @@
 `runs/v2_diag/v2_1c_s<시드>/calib.npz`, `results/v2/diag_v2_1c/modecmp.json`, 결과 `results/v2/stage1_v2_1c.json`).
 인자 없이 부르면 1-3 그대로다(v2_1, 시드 0~2).
     python results/v2/_stage1_v2_1.py --prefix v2_1c --seeds 30 31 32 33 34
+판정 모드(R1)가 K24 유지 표본이면 `--judge-mode hold` 를 준다. 그러면 판정 행(C0·대조군·C2·C2-seg·C4)을
+`results/v2/diag_<prefix>_s<시드>_hold24/`(진단을 `--act-mode hold --hold-k 24` 로 돈 결과)에서 읽고, 결정·확률 모드
+C0 는 '다른 모드' 한 줄 보고(`other_modes`: G_γ·B1·B2, 판정 모드와의 짝 t)로만 쓴다. 기존 '행동 모드'(확률 − 결정,
+#29) 절은 결정 디렉터리 그대로 기술용으로 남는다. G_0.998·개입 곡선도 결정 모드 그대로(참고)다.
+    python results/v2/_stage1_v2_1.py --prefix v2_1c --seeds 30 31 32 33 34 --judge-mode hold
 
 운영 정의 (2026-10-02, 평가 롤아웃을 돌리기 전에 이 파일에 적었다. 기준값은 계획서 6.2·#13 의 사전 등록값 그대로):
 - 조건: 결정 모드 결과는 모두 config_digest f068496361f9(`configs/v2_1.yaml` = E1-b B1 r2_5_ew0_5 팔), 평가 시드
@@ -92,14 +97,20 @@ PREFIX = "v2_1"
 SEEDS = (0, 1, 2)
 DET = {s: RES / f"diag_{PREFIX}_s{s}" for s in SEEDS}
 STOCH = {s: RES / f"diag_{PREFIX}_s{s}_stoch" for s in SEEDS}
+JUDGE_MODE, HOLD_K = "deterministic", None
+JUDGE = DET                            # 판정 행을 읽는 디렉터리 (결정 모드면 DET 그대로)
 
 
-def configure(prefix: str, seeds) -> None:
-    """모델·진단 이름의 앞부분과 학습 시드를 바꾼다(1-9 확인층). 기본값은 1-3 그대로다."""
-    global PREFIX, SEEDS, DET, STOCH
+def configure(prefix: str, seeds, judge_mode: str = "deterministic") -> None:
+    """모델·진단 이름의 앞부분, 학습 시드, 판정 모드를 바꾼다(1-9 확인층). 기본값은 1-3 그대로다."""
+    global PREFIX, SEEDS, DET, STOCH, JUDGE_MODE, HOLD_K, JUDGE
     PREFIX, SEEDS = str(prefix), tuple(int(x) for x in seeds)
     DET = {s: RES / f"diag_{PREFIX}_s{s}" for s in SEEDS}
     STOCH = {s: RES / f"diag_{PREFIX}_s{s}_stoch" for s in SEEDS}
+    if judge_mode not in ("deterministic", "hold"):
+        raise SystemExit(f"--judge-mode 는 deterministic 또는 hold 다: {judge_mode}")
+    JUDGE_MODE, HOLD_K = judge_mode, (24 if judge_mode == "hold" else None)
+    JUDGE = DET if judge_mode == "deterministic" else {s: RES / f"diag_{PREFIX}_s{s}_hold24" for s in SEEDS}
 
 E1B = RES / "e1" / "B1" / "r2_5_ew0_5"
 DIGEST = "f068496361f9"
@@ -147,6 +158,8 @@ def check_meta(d: dict, where: str, *, mode="deterministic", gamma=GAMMA, steps=
         raise SystemExit(f"{where}: γ {m['gamma']} ≠ {gamma}")
     if int(m.get("head") or 0) != head or (m.get("act_mode") or "deterministic") != mode:
         raise SystemExit(f"{where}: head/act_mode 가 다르다 ({m.get('head')}, {m.get('act_mode')})")
+    if m.get("hold_k") != (HOLD_K if mode == "hold" else None):
+        raise SystemExit(f"{where}: hold_k {m.get('hold_k')} 가 판정 조건과 다르다")
 
 
 def with_derived(row: dict) -> dict:
@@ -181,12 +194,12 @@ def collect() -> tuple[dict, dict, dict]:
     check_meta(e1_c2, "E1-b C2")
     check_meta(e1_seg, "E1-b C2-seg")
     for s in SEEDS:
-        abl = load(DET[s] / "ablate.json")
-        per = load(DET[s] / "permute.json")
-        c2 = load(DET[s] / "constsearch.json")
-        seg = load(DET[s] / "constsearch_seg.json")
+        abl = load(JUDGE[s] / "ablate.json")
+        per = load(JUDGE[s] / "permute.json")
+        c2 = load(JUDGE[s] / "constsearch.json")
+        seg = load(JUDGE[s] / "constsearch_seg.json")
         for d, w in ((abl, "ablate"), (per, "permute"), (c2, "constsearch"), (seg, "constsearch_seg")):
-            check_meta(d, f"s{s} {w}")
+            check_meta(d, f"s{s} {w}", mode=JUDGE_MODE)
         sha = {model_sha(x) for x in (abl, per, c2, seg)}
         if len(sha) != 1 or None in sha:
             raise SystemExit(f"s{s}: 모델 sha1 이 결과마다 다르다 {sha}")
@@ -215,6 +228,12 @@ def collect() -> tuple[dict, dict, dict]:
         if model_sha(st) != model_sha(abl):
             raise SystemExit(f"s{s}: 확률 모드 결과의 모델이 다르다")
         stoch[s] = {name: rows_of(st, name) for name in st["per_seed"]}
+        if JUDGE_MODE != "deterministic":      # 결정 모드 C0 (다른 모드 한 줄 보고, '행동 모드' 절의 기준)
+            dabl = load(DET[s] / "ablate.json")
+            check_meta(dabl, f"s{s} det")
+            if model_sha(dabl) != model_sha(abl):
+                raise SystemExit(f"s{s}: 결정 모드 결과의 모델이 다르다")
+            stoch[s]["_det_C0"] = rows_of(dabl, "C0")
     return det, stoch, repro
 
 
@@ -392,7 +411,8 @@ def main() -> int:
     mode = {}
     for c in ["g_gamma", "b1", "b2", "b8", "b8_cmd", "survival", "starve_rate", "predation_rate", "repro",
               "run_frac_cmd", "stop_frac_cmd", "walk_frac_cmd", "b1_d025", "b1_d050", "b1_d100"]:
-        Dm, Sm = matrix(det, "C0", c), matrix(stoch, "C0", c)
+        Dm = matrix(det, "C0", c) if JUDGE_MODE == "deterministic" else matrix(stoch, "_det_C0", c)
+        Sm = matrix(stoch, "C0", c)
         t = paired_nan(col_means(Sm), col_means(Dm))
         ci = stratified_bootstrap_ci(Sm - Dm, stat=fmean, reps=REPS, seed=BOOT_SEED)
         row = {"det": fmean(Dm), "stoch": fmean(Sm), **t, "ci": ci, "ci_excludes_0": excludes_zero(ci),
@@ -405,6 +425,14 @@ def main() -> int:
     mode_trigger = bool(any(mode[c]["sig"] for c in ("g_gamma", "b1", "b2"))
                         or any(bool(r.get("verdict")) for r in holm_rows.values()))
     stoch_size = {x: {s: mode[x]["per_seed_stoch"][s] for s in SEEDS} for x in ("b1", "b2")}
+
+    # 다른 모드 한 줄 보고 (R1: 판정 모드가 아닌 모드는 G_γ·B1·B2 만, 판정 모드와의 짝 t = 다른 모드 − 판정 모드)
+    other_modes = {}
+    if JUDGE_MODE != "deterministic":
+        for label, key in (("deterministic", "_det_C0"), ("stochastic", "C0")):
+            other_modes[label] = {c: {"judged": fmean(matrix(det, "C0", c)), "other": fmean(matrix(stoch, key, c)),
+                                      **paired_nan(col_means(matrix(stoch, key, c)), col_means(matrix(det, "C0", c)))}
+                                  for c in ("g_gamma", "b1", "b2")}
 
     # 참고: G_0.998
     g998 = {}
@@ -428,6 +456,7 @@ def main() -> int:
         "condition": {"config": "configs/v2_1.yaml", "config_digest": DIGEST, "gamma": GAMMA,
                       "eval_seeds": [EVAL_SEEDS[0], EVAL_SEEDS[-1]], "eval_steps": EVAL_STEPS, "tail": TAIL,
                       "train_seeds": list(SEEDS), "models": {s: f"ckpt/v2/{PREFIX}_s{s}.zip" for s in SEEDS},
+                      "judge_mode": JUDGE_MODE, "hold_k": HOLD_K,
                       "model_sha1": {s: load(DET[s] / "ablate.json")["meta"]["model_sha1"] for s in SEEDS},
                       "c2_source": str(E1B.relative_to(ROOT)).replace("\\", "/"),
                       "reps": REPS, "boot_seed": BOOT_SEED, "t_crit": T_CRIT, "size_need": need},
@@ -436,10 +465,11 @@ def main() -> int:
         "size": size, "usefulness": usefulness, "dependence": dependence, "claims": claims,
         "b8": b8, "learning_failure": learn_fail,
         "mode": {"cols": mode, "holm_outcomes": holm_rows, "trigger": mode_trigger, "stoch_size": stoch_size},
+        "other_modes": other_modes,
         "g998": g998_out,
         "intervention": curves,
     }
-    out = RES / f"stage1_{PREFIX}.json"
+    out = RES / (f"stage1_{PREFIX}.json" if JUDGE_MODE == "deterministic" else f"stage1_{PREFIX}_hold24.json")
     save_json(out, clean(data))
     print(f"저장: {out}")
     summary(data)
@@ -499,6 +529,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--prefix", default="v2_1")
     ap.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2])
+    ap.add_argument("--judge-mode", choices=("deterministic", "hold"), default="deterministic")
     a = ap.parse_args()
-    configure(a.prefix, a.seeds)
+    configure(a.prefix, a.seeds, a.judge_mode)
     sys.exit(main())

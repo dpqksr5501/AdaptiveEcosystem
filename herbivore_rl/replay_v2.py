@@ -116,7 +116,7 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator  # noqa: E402
 
 from env_v2.config import load_v2_config  # noqa: E402
 from env_v2.features import features_of  # noqa: E402
-from env_v2.rollout import adapt_spec, build_policy  # noqa: E402
+from env_v2.rollout import adapt_spec, build_policy, forward_done  # noqa: E402
 from env_v2.steering import steer  # noqa: E402
 from env_v2.world import ACT_DIM, World  # noqa: E402
 
@@ -532,6 +532,7 @@ def collect(world: World, policy, steps: int, stride: int, fade_frames: int = 6)
             if getattr(world, "gait", None) is None:     # gait 훅이 없을 때만 조향식을 다시 계산
                 v_pre = steer(world._g, np.asarray(a, dtype=np.float64), world.cfg)
         _, _, done, _ = world.step(a)
+        forward_done(policy, done)          # 유지 표본(hold) 정책의 리스폰 훅 — rollout 과 같은 개체 키
         if snap is not None:
             snap.update(_applied(world, v_pre))
             frames.append(snap)
