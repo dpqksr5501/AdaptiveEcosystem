@@ -59,6 +59,13 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
   설명줄에 vigilance 계수(문턱·threat_recency 감쇠·섭식·시야각) 한 줄을 더 적는다. 행동 6개: `fixed:a,b,c,d,s,v`.
       python replay_v2.py --config configs/v2_2.yaml --compare learned:ckpt/v2/v2_2_s0.zip \
           perm:learned:ckpt/v2/v2_2_s0.zip --labels "C0" "C1′" --steps 1800 --out results/v2/replay_v2_2_compare.mp4
+- 반사 돌아보기 (v2.2r L·규칙 장면, `World.looked`): 창 안에서 멈춰 위협 쪽을 돌아본 개체는 하늘색 테두리와 시선선으로
+  그린다. 경계와 달리 시야는 기본 부채꼴 그대로다(돌아본 방향을 향한다). 하단 하늘색 선은 돌아보기 비율이다.
+  규칙 장면(v2.1 + 창 규칙)은 L 세계(`configs/v2_2r_l.yaml`)에서 v2.1 모델에 관측 7열만 넣고 창 안이면 정지시킨다:
+      python replay_v2.py --config configs/v2_2r_l.yaml --compare \
+          '{"policy":{"kind":"learned","model":"ckpt/v2/v2_1_s0.zip"},"wrap":[{"factory":"probe_v2:obs_take","dims":[0,1,2,3,4,5,6]}]}' \
+          '{"policy":{"kind":"learned","model":"ckpt/v2/v2_1_s0.zip"},"wrap":[{"factory":"probe_v2:obs_take","dims":[0,1,2,3,4,5,6]},{"factory":"probe_v2:window_stop","speed_col":4,"tr_col":7,"theta":0.5}]}' \
+          --labels "v2.1 학습 정책" "v2.1 + 창 규칙(규칙 장면)" --steps 1800 --out results/v2/replay_s2_rule.mp4
 - 모든 초식에 짧은 heading 화살표. 리스폰 직후 몇 프레임은 흐리게 그린다(순간이동 착시 방지).
 - 하단 시계열: 보행 비율(정지/걷기/뛰기), 경계 비율, 지역 기억, 포획 누적. 게임 시각 mm:ss.
 - `--compare` 는 같은 시드·같은 카메라로 정책 여러 개를 나란히 그린다. 칸들은 x축과
@@ -81,6 +88,7 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
 | `vel` | (N,2) | v2.1 (구현) | 스텝 뒤 | 이번 스텝 속도. `gait` 가 없을 때 |v|/herb_speed 로 판정 |
 | `vigilant` | (N,) bool | v2.2 (구현) | 스텝 뒤 | 흰 테두리, 짧은 시선선, 360° 시야 원, 경계 비율 |
 | `gaze` | (N,2) | v2.2 (구현) | 스텝 뒤 | 시선 방향(스텝 뒤 heading, 경계 개체는 ThreatDir 쪽). 없으면 heading |
+| `looked` | (N,) bool | v2.2r (구현) | 스텝 뒤 | 반사 돌아보기: 하늘색 테두리, 짧은 시선선, 돌아보기 비율 (시야는 기본 부채꼴) |
 | `region_id`, `region_mem` | (gw,gw) int, (R,) | v2.3 | 스텝 전 | 지역 배경 반투명 빨강, m_A·m_B 시계열 |
 | `boldness` | (N,) | v2.4 | 스텝 전 | 대담함 최대·최소 개체 2마리 궤적 |
 
@@ -140,6 +148,7 @@ TIMID_COLOR = "#6fd3ff"
 MEM_RGB = (1.0, 0.25, 0.25)
 MEM_LINE_COLORS = ("#ff6b6b", "#c58bff", "#6fd3ff", "#ffd34d")
 VIG_LINE_COLOR = "white"
+LOOK_COLOR = "#5fd7ff"   # 반사 돌아보기(v2.2r) 테두리·시선선·하단 비율
 HERB_FOV_FACE = (1.0, 1.0, 1.0, 0.06)
 HERB_FOV_EDGE = (1.0, 1.0, 1.0, 0.40)
 PRED_FOV_FACE = (1.0, 0.2, 0.2, 0.09)
@@ -511,11 +520,13 @@ def _snapshot(world: World, tracker: RespawnTracker, t: int) -> dict:
 
 
 def _applied(world: World, v_pre: np.ndarray | None) -> dict:
-    """스텝 뒤에 읽는 값: 이번 스텝에 적용된 보행·경계·시선. 같은 스텝이라 서로 어긋나지 않는다."""
+    """스텝 뒤에 읽는 값: 이번 스텝에 적용된 보행·경계·시선. 같은 스텝이라 서로 어긋나지 않는다.
+    경계 행동 열이 없는 세계(v2.2r T1·L, vigil_window.action false)는 경계 훅을 None 으로 둔다(경계 범례·비율을 그리지 않는다)."""
     return dict(
         gait=applied_gait(world, v_pre),
-        vig=_hook(world, "vigilant"),
+        vig=None if (getattr(world, "_vw", None) or {}).get("action", True) is False else _hook(world, "vigilant"),
         gaze=_hook(world, "gaze"),
+        look=_hook(world, "looked"),
     )
 
 
@@ -546,6 +557,7 @@ def series(frames: list) -> dict:
     vig = np.array(
         [np.nan if f["vig"] is None else float(np.mean(f["vig"])) for f in frames]
     )
+    look = np.array([np.nan if f.get("look") is None else float(np.mean(f["look"])) for f in frames])
     mems = [f["mem"] for f in frames]
     mem = None if mems[0] is None else np.stack([np.ravel(m) for m in mems])
     food = None
@@ -556,6 +568,7 @@ def series(frames: list) -> dict:
         t=np.array([f["t"] for f in frames]),
         gait=gait,
         vig=vig,
+        look=look,
         mem=mem,
         food=food,
         caught=np.array([f["caught"] for f in frames]),
@@ -637,6 +650,12 @@ def _vig_mask(f: dict) -> np.ndarray:
     """프레임의 경계 여부 (N,) bool. 훅이 없으면 모두 False."""
     vig = f["vig"]
     return np.zeros(len(f["pos"]), dtype=bool) if vig is None else np.asarray(vig, dtype=bool)
+
+
+def _look_mask(f: dict) -> np.ndarray:
+    """프레임의 반사 돌아보기 여부 (N,) bool (v2.2r `World.looked`). 훅이 없으면 모두 False."""
+    look = f.get("look")
+    return np.zeros(len(f["pos"]), dtype=bool) if look is None else np.asarray(look, dtype=bool)
 
 
 class _Panel:
@@ -762,6 +781,8 @@ class _Panel:
         ax.stackplot(x, s["gait"].T, colors=GAIT_COLORS, alpha=0.85, linewidth=0)
         if np.isfinite(s["vig"]).any():
             ax.plot(x, s["vig"], color=VIG_LINE_COLOR, lw=1.3)
+        if np.isfinite(s["look"]).any():
+            ax.plot(x, s["look"], color=LOOK_COLOR, lw=1.3)
         if s["mem"] is not None:
             for r in range(s["mem"].shape[1]):
                 ax.plot(x, s["mem"][:, r], color=MEM_LINE_COLORS[r % len(MEM_LINE_COLORS)],
@@ -842,12 +863,14 @@ class _Panel:
         face = GAIT_RGBA[f["gait"]]
         face[:, 3] = alpha
         vig = _vig_mask(f)
-        edge =np.where(vig[:, None], (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 1.0))
+        look = _look_mask(f) & ~vig
+        edge = np.where(vig[:, None], (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 1.0))
+        edge = np.where(look[:, None], to_rgba(LOOK_COLOR), edge)
         edge[:, 3] *= alpha
         self.herb.set_offsets(pos)
         self.herb.set_facecolor(face)
         self.herb.set_edgecolor(edge)
-        self.herb.set_linewidths(np.where(vig, 1.4, 0.35))
+        self.herb.set_linewidths(np.where(vig | look, 1.4, 0.35))
 
         arrow = np.ones((len(pos), 4))
         arrow[:, 3] = 0.65 * alpha
@@ -856,8 +879,10 @@ class _Panel:
         self.arrows.set_color(arrow)
 
         gdir = f["head"] if f["gaze"] is None else f["gaze"]
-        segs = np.stack([pos[vig], pos[vig] + gdir[vig] * GAZE_LEN], 1) if vig.any() else []
+        seen = vig | look
+        segs = np.stack([pos[seen], pos[seen] + gdir[seen] * GAZE_LEN], 1) if seen.any() else []
         self.gaze.set_segments(segs)
+        self.gaze.set_color([LOOK_COLOR if lk else "white" for lk in look[seen]] if seen.any() else "white")
 
         if f["bold"] is not None:
             b = np.asarray(f["bold"])
@@ -878,6 +903,8 @@ class _Panel:
         sec = f["t"] * self.step_sec
         run_frac = float(np.mean(f["gait"] == GAIT_RUN))
         vig_s = "" if f["vig"] is None else f"vig {float(np.mean(vig)) * 100:3.0f}%  "
+        if f.get("look") is not None:
+            vig_s += f"look {float(np.mean(look)) * 100:3.0f}%  "
         self.status.set_text(
             f"{fmt_clock(sec)}  step {f['t']:5d}  run {run_frac*100:3.0f}%  {vig_s}"
             f"caught {f['caught']:4d}  starved {f['starved']:3d}"
@@ -922,11 +949,14 @@ def _legend_handles(runs: list, fov_herbs: int = 0, fov_preds: int = 0) -> list:
          for n, c in zip(GAIT_NAMES, GAIT_COLORS)]
     h.append(Line2D([], [], label="리스폰 직후(흐림)", markerfacecolor=(1.0, 0.58, 0.0, DIM_ALPHA),
                     **dot))
-    has = {k: any(r.frames[0].get(k) is not None for r in runs) for k in ("vig", "bold", "food_v")}
+    has = {k: any(r.frames[0].get(k) is not None for r in runs) for k in ("vig", "bold", "food_v", "look")}
     if has["vig"]:
         h.append(Line2D([], [], label="경계(흰 테두리)", marker="o", ls="none", markersize=7,
                         markerfacecolor=GAIT_COLORS[0], markeredgecolor="white",
                         markeredgewidth=1.5))
+    if has["look"]:
+        h.append(Line2D([], [], label="멈춰 위협 쪽 돌아보기(하늘색)", marker="o", ls="none", markersize=7,
+                        markerfacecolor=GAIT_COLORS[0], markeredgecolor=LOOK_COLOR, markeredgewidth=1.5))
     h.append(Line2D([], [], label="근접 포식자", marker="X", ls="none", markersize=9,
                     markerfacecolor="#ff2d2d", markeredgecolor="white"))
     h.append(Line2D([], [], label="원거리 포식자", marker="x", ls="none", markersize=8,
@@ -948,6 +978,8 @@ def _legend_handles(runs: list, fov_herbs: int = 0, fov_preds: int = 0) -> list:
     h.append(Line2D([], [], color="#ff3b30", lw=1.6, label="포획 누적(하단)"))
     if has["vig"]:
         h.append(Line2D([], [], color=VIG_LINE_COLOR, lw=1.4, label="경계 비율(하단)"))
+    if has["look"]:
+        h.append(Line2D([], [], color=LOOK_COLOR, lw=1.4, label="돌아보기 비율(하단)"))
     if has["bold"]:
         h.append(Line2D([], [], color=BOLD_COLOR, lw=1.6, label="대담 최대"))
         h.append(Line2D([], [], color=TIMID_COLOR, lw=1.6, label="대담 최소"))
@@ -1013,12 +1045,21 @@ def speed_line(runs: list) -> str | None:
 
 def vigil_line(runs: list) -> str | None:
     """v2.2 설명줄: 이 영상에 쓴 vigilance 계수(yaml). vigilance 를 끈 설정이면 None (그림이 v2.1 과 같다)."""
-    vg = getattr(runs[0].world, "_vg", None)
+    w = runs[0].world
+    vg = getattr(w, "_vg", None)
     if vg is None:
         return None
     hl = vg["half_life"]
     hl_s = "∞" if not np.isfinite(hl) else f"{hl:.1f}"
     tf = vg.get("threat_flee", 0.0)
+    vw = getattr(w, "_vw", None)
+    if vw is not None:              # v2.2r: 창(·창 경계·반사 돌아보기) 계수
+        win = f"창 = 포식자 안 보임 & threat_recency > {vw['theta']:g} (감쇠 {vg['decay']:g}, 반감기 {hl_s}스텝)"
+        if not vw["action"]:
+            return win + (" | 반사: 정지 중이고 창 안이면 위협 쪽 돌아보기(섭식·시야 정지 그대로)" if vw["look_back"]
+                          else " | 경계 행동 없음")
+        return (win + f" | 창 경계(창 안에서만): 문턱 > {vg['threshold']:g} · 속력 0 · 섭식 {vg['eat_mult']:g} · "
+                f"시야 {vg['fov_deg']:g}° · 위협 쪽 보기")
     return (f"vigilance 문턱 > {vg['threshold']:g} | 경계: 속력 0 · 섭식 {vg['eat_mult']:g} · 정지 대사 · "
             f"시야 {vg['fov_deg']:g}°(반경 see_r) · 위협 쪽 보기 | threat_recency 감쇠 {vg['decay']:g}"
             f"(반감기 {hl_s}스텝)" + (f" | #18 위협 반대 조향 ×{tf:g}" if tf > 0.0 else ""))
