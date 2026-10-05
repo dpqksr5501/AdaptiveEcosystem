@@ -1,0 +1,366 @@
+{
+ "started": "2026-10-05T18:06:24+00:00",
+ "runs": {
+  "s1a_b_s50": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 50 --world-seed 50 --run-name s1a_b_s50 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s50": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 50 --world-seed 50 --run-name s1a_w_s50 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s51": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 51 --world-seed 51 --run-name s1a_b_s51 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s51": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 51 --world-seed 51 --run-name s1a_w_s51 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s52": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 52 --world-seed 52 --run-name s1a_b_s52 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s52": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 52 --world-seed 52 --run-name s1a_w_s52 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s53": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 53 --world-seed 53 --run-name s1a_b_s53 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s53": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 53 --world-seed 53 --run-name s1a_w_s53 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s54": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 54 --world-seed 54 --run-name s1a_b_s54 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s54": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 54 --world-seed 54 --run-name s1a_w_s54 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s55": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 55 --world-seed 55 --run-name s1a_b_s55 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s55": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 55 --world-seed 55 --run-name s1a_w_s55 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s56": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 56 --world-seed 56 --run-name s1a_b_s56 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s56": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 56 --world-seed 56 --run-name s1a_w_s56 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s57": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 57 --world-seed 57 --run-name s1a_b_s57 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s57": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 57 --world-seed 57 --run-name s1a_w_s57 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s58": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 58 --world-seed 58 --run-name s1a_b_s58 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s58": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 58 --world-seed 58 --run-name s1a_w_s58 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s59": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 59 --world-seed 59 --run-name s1a_b_s59 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s59": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 59 --world-seed 59 --run-name s1a_w_s59 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s60": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 60 --world-seed 60 --run-name s1a_b_s60 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s60": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 60 --world-seed 60 --run-name s1a_w_s60 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s61": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 61 --world-seed 61 --run-name s1a_b_s61 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s61": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 61 --world-seed 61 --run-name s1a_w_s61 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s62": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 62 --world-seed 62 --run-name s1a_b_s62 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s62": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 62 --world-seed 62 --run-name s1a_w_s62 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s63": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 63 --world-seed 63 --run-name s1a_b_s63 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s63": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 63 --world-seed 63 --run-name s1a_w_s63 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s64": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 64 --world-seed 64 --run-name s1a_b_s64 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s64": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 64 --world-seed 64 --run-name s1a_w_s64 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s65": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 65 --world-seed 65 --run-name s1a_b_s65 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s65": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 65 --world-seed 65 --run-name s1a_w_s65 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s66": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 66 --world-seed 66 --run-name s1a_b_s66 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s66": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 66 --world-seed 66 --run-name s1a_w_s66 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s67": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 67 --world-seed 67 --run-name s1a_b_s67 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s67": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 67 --world-seed 67 --run-name s1a_w_s67 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s68": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 68 --world-seed 68 --run-name s1a_b_s68 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s68": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 68 --world-seed 68 --run-name s1a_w_s68 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s69": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 69 --world-seed 69 --run-name s1a_b_s69 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s69": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 69 --world-seed 69 --run-name s1a_w_s69 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s70": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 70 --world-seed 70 --run-name s1a_b_s70 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s70": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 70 --world-seed 70 --run-name s1a_w_s70 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s71": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 71 --world-seed 71 --run-name s1a_b_s71 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s71": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 71 --world-seed 71 --run-name s1a_w_s71 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s72": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 72 --world-seed 72 --run-name s1a_b_s72 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s72": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 72 --world-seed 72 --run-name s1a_w_s72 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_b_s73": {
+   "arm": "B",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 73 --world-seed 73 --run-name s1a_b_s73 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_w_s73": {
+   "arm": "W",
+   "cmd": "train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 73 --world-seed 73 --run-name s1a_w_s73 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s80": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 80 --world-seed 24 --run-name s1a_hw_s80 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s81": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 81 --world-seed 24 --run-name s1a_hw_s81 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s82": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 82 --world-seed 24 --run-name s1a_hw_s82 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s83": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 83 --world-seed 30 --run-name s1a_hw_s83 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s84": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 84 --world-seed 30 --run-name s1a_hw_s84 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s85": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 85 --world-seed 30 --run-name s1a_hw_s85 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s86": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 86 --world-seed 31 --run-name s1a_hw_s86 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s87": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 87 --world-seed 31 --run-name s1a_hw_s87 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s88": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 88 --world-seed 31 --run-name s1a_hw_s88 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s89": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 89 --world-seed 33 --run-name s1a_hw_s89 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s90": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 90 --world-seed 33 --run-name s1a_hw_s90 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_hw_s91": {
+   "arm": "HW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 91 --world-seed 33 --run-name s1a_hw_s91 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s92": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 92 --world-seed 32 --run-name s1a_gw_s92 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s93": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 93 --world-seed 32 --run-name s1a_gw_s93 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s94": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 94 --world-seed 32 --run-name s1a_gw_s94 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s95": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 95 --world-seed 20 --run-name s1a_gw_s95 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s96": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 96 --world-seed 20 --run-name s1a_gw_s96 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s97": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 97 --world-seed 20 --run-name s1a_gw_s97 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s98": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 98 --world-seed 22 --run-name s1a_gw_s98 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s99": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 99 --world-seed 22 --run-name s1a_gw_s99 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s100": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 100 --world-seed 22 --run-name s1a_gw_s100 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s101": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 101 --world-seed 25 --run-name s1a_gw_s101 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s102": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 102 --world-seed 25 --run-name s1a_gw_s102 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "s1a_gw_s103": {
+   "arm": "GW",
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 103 --world-seed 25 --run-name s1a_gw_s103 --save-at 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  }
+ },
+ "finished": "2026-10-05T20:11:25+00:00"
+}
