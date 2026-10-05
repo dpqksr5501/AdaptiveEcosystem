@@ -36,3 +36,10 @@
 - 이 폴더: a1/(원자료 raw/ 는 97MB 라 커밋하지 않음, 같은 명령으로 약 50분이면 다시 만든다), a2/, a3_*.py·json, *_report.md, design_draft.md, verification.md.
 - 세계 표본 재계산(10-04): `world_mix.py` (학습 시드별 시간 가중 food_regen_mult·M·pred_speed_mult·cover_frac).
 - 관련: `../stage1_close.md` 8절(나쁨 정의·안건), 계획서 10절 10-03 (4)·10-04 (1).
+
+## 5. 10-06 진행 (이어서 할 때 여기부터 본다)
+- 사용자 지시(10-06): '계속 굶거나 이상하면 계획을 고쳐서라도 학습을 완료시켜라. 막히면 묻지 말고 해 보라.'
+- 구현·사전 등록 끝(커밋 22e0b2f·63a121e·5f989a9): `world_params`, 균형 추출, `--world-seed`, `--lr-schedule`, `train.world_pool_min`, `configs/v2_1_bal.yaml`, `results/v2/s1a/PREREG.md`(변경 기록에 2차 팔), 실행기 `results/v2/_s1a_run.py`.
+- 1차(72개) 학습: B·W 48개 끝, HW·GW 24개 학습 중. **B 2/24, W 4/24 나쁨 → 균형 추출은 효과 없음(P1 미리보기 p 0.91).** 세계 뽑기 운은 주원인이 아니다.
+- 2차(48개, G = γ 0.995, L = 학습률 선형 감쇠)는 1차 학습이 끝나면 자동 시작(`results/v2/s1a/train_driver_r2.log`).
+- 남은 순서: 1차 끝 → `python results/v2/_s1a_run.py eval` → `judge`(P2 유의면 `configs/v2_1_floor.yaml` 만들고 `train --round 2 --with-f`) → 2차 끝 → eval → judge(레시피 결정) → `select`(출시 모델) → 보고서 `results/v2/s1a/report.md` · 계획서 10절 · 로그.
