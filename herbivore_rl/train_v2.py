@@ -268,6 +268,27 @@ def resolve_init_bias(cfg, act_names, cli: dict[str, float] | None) -> tuple[dic
     return bias, source
 
 
+class LinearLR:
+    """학습률 선형 감쇠 lr(진행 남은 비율 p) = lr0 · p (S1-a 2차 대응 L, 10-06). 피클할 수 있게 함수 대신 클래스다."""
+
+    def __init__(self, lr0: float):
+        self.lr0 = float(lr0)
+
+    def __call__(self, progress_remaining: float) -> float:
+        return self.lr0 * float(progress_remaining)
+
+    def __repr__(self) -> str:
+        return f"LinearLR({self.lr0!r})"
+
+
+def apply_lr_schedule(tuned: dict, schedule: str) -> tuple[dict, str]:
+    """`--lr-schedule`: constant 면 튜닝값 그대로(지금과 같다), linear 면 튜닝 학습률에서 0 까지 선형 감쇠."""
+    if schedule == "constant":
+        return tuned, "constant"
+    lr0 = float(tuned.get("learning_rate", PPO_KWARGS["learning_rate"]))
+    return dict(tuned, learning_rate=LinearLR(lr0)), f"linear({lr0!r}→0)"
+
+
 def resolve_ent_coef(tuned: dict, ent_coef: float | None) -> tuple[dict, float, str]:
     """튜닝값에 `--ent-coef` 를 덮는다. (새 튜닝값, 쓸 ent_coef, 출처). 다른 키는 건드리지 않는다.
 
@@ -552,6 +573,8 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="V2 PPO 학습 (다중 세계)")
     p.add_argument("--steps", type=int, default=20_000_000)
     p.add_argument("--seed", type=int, default=0, help="PPO 시드이자 세계 선택 시드(meta_seed)")
+    p.add_argument("--lr-schedule", choices=("constant", "linear"), default="constant",
+                   help="학습률 일정. constant(기본, 지금과 같다) 또는 linear(튜닝값에서 0 까지 선형 감쇠, S1-a 2차 대응 L)")
     p.add_argument("--world-seed", type=int, default=None,
                    help="세계 선택 시드(meta_seed)만 따로 준다(S1-a 원인 확인). 기본은 --seed 그대로 — 주지 않으면 지금과 같다")
     p.add_argument("--run-name", default=None, help="기본 v<설정 version>_s<seed>_<M>m (예: v2_0b_s0_20m)")
@@ -596,6 +619,9 @@ def main(argv=None) -> int:
     if gamma_source == "cli":
         print(f"γ = {gamma} (--gamma, 다른 튜닝값은 그대로)")
     tuned, ent_coef, ent_coef_source = resolve_ent_coef(tuned, args.ent_coef)
+    tuned, lr_schedule = apply_lr_schedule(tuned, args.lr_schedule)
+    if lr_schedule != "constant":
+        print(f"학습률 {lr_schedule} (--lr-schedule, 다른 튜닝값은 그대로)")
     if ent_coef_source == "cli":
         print(f"ent_coef = {ent_coef} (--ent-coef, 다른 튜닝값은 그대로)")
     run = args.run_name or default_run_name(cfg, args.seed, args.steps, args.gamma)
@@ -684,6 +710,7 @@ def main(argv=None) -> int:
             "n_steps": n_steps, "batch_size": model.batch_size, "n_epochs": model.n_epochs,
             "gamma": model.gamma, "gae_lambda": model.gae_lambda, "ent_coef": model.ent_coef,
             "learning_rate": tuned.get("learning_rate", "default"), "clip_range": tuned.get("clip_range", "default"),
+            "lr_schedule": lr_schedule,
         }.items()},
         "v2": cfg.v2,
         "num_worlds": venv.K, "reset_interval": venv.T,

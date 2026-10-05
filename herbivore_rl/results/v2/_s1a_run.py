@@ -5,6 +5,8 @@
     python results/v2/_s1a_run.py eval                       # 평가 시드 10000~10019 × 5000스텝, 결정 모드(판정)
     python results/v2/_s1a_run.py judge                      # P1·P2, 레시피, 2차 → s1a/judge.json·judge.md
     python results/v2/_s1a_run.py select                     # 고른 레시피 팔의 출시 모델(탐색 시드, 두 모드)
+    python results/v2/_s1a_run.py train --round 2            # 2차 대응 팔 G(γ 0.995)·L(학습률 선형 감쇠) (PREREG 변경 기록)
+    python results/v2/_s1a_run.py train --round 2 --with-f   # P2 가 유의할 때만: F(학습 세계 하한) 팔도
 
 팔·시드·판정 규칙은 PREREG 그대로다. 모든 팔을 configs/v2_1.yaml 세계에서 잰다. 나쁨(1차) = G_γ(결정, 평가 시드 평균) ≤ 0.482.
 """
@@ -38,6 +40,24 @@ HW_WORLDS = {24: (80, 81, 82), 30: (83, 84, 85), 31: (86, 87, 88), 33: (89, 90, 
 GW_WORLDS = {32: (92, 93, 94), 20: (95, 96, 97), 22: (98, 99, 100), 25: (101, 102, 103)}
 
 
+def jobs2(with_f: bool = False) -> list[dict]:
+    """2차 대응 팔 (PREREG 변경 기록 2026-10-06): G = γ 0.995, L = 학습률 선형 감쇠, (조건부) F = 학습 세계 하한."""
+    out = []
+    for s in range(50, 74):
+        out.append({"arm": "G", "name": f"s1a_g_s{s}", "config": "configs/v2_1.yaml", "seed": s, "world_seed": s,
+                    "extra": ["--gamma", "0.995"]})
+        out.append({"arm": "L", "name": f"s1a_l_s{s}", "config": "configs/v2_1.yaml", "seed": s, "world_seed": s,
+                    "extra": ["--lr-schedule", "linear"]})
+        if with_f:
+            out.append({"arm": "F", "name": f"s1a_f_s{s}", "config": "configs/v2_1_floor.yaml", "seed": s, "world_seed": s,
+                        "extra": []})
+    return out
+
+
+def all_jobs() -> list[dict]:
+    return jobs() + jobs2(with_f=(ROOT / "configs" / "v2_1_floor.yaml").exists())
+
+
 def jobs() -> list[dict]:
     out = []
     for s in range(50, 74):
@@ -64,19 +84,21 @@ def save_json(path: Path, obj) -> None:
 def cmd_train(a) -> int:
     logs = OUT / "logs"
     logs.mkdir(parents=True, exist_ok=True)
-    todo = [j for j in jobs() if not (CKPT / f"{j['name']}.zip").exists()]
+    pool = jobs() if a.round == 1 else jobs2(with_f=a.with_f)
+    todo = [j for j in pool if not (CKPT / f"{j['name']}.zip").exists()]
     # B·W 를 같은 시드끼리 먼저, 그다음 HW·GW (같은 시간대에 비교 팔이 함께 돌게)
     todo.sort(key=lambda j: (j["arm"] in ("HW", "GW"), j["seed"], j["arm"]))
     print(f"학습할 것 {len(todo)}개 (동시 {a.concurrency})", flush=True)
     running: list[tuple[dict, subprocess.Popen, object]] = []
-    status = {"started": datetime.now(timezone.utc).isoformat(timespec="seconds"), "runs": {}}
+    status = {"started": datetime.now(timezone.utc).isoformat(timespec="seconds"), "round": a.round, "runs": {}}
+    status_path = OUT / ("train_status.json" if a.round == 1 else "train_status_r2.json")
     t0 = time.time()
     while todo or running:
         while todo and len(running) < a.concurrency:
             j = todo.pop(0)
             cmd = [sys.executable, "train_v2.py", "--config", j["config"], "--steps", "20000000", "--seed", str(j["seed"]),
                    "--world-seed", str(j["world_seed"]), "--run-name", j["name"], "--save-at", "10000000",
-                   "--probe-every", "1000000", "--threads", "1"]
+                   "--probe-every", "1000000", "--threads", "1", *j.get("extra", [])]
             log = open(logs / f"train_{j['name']}.log", "w", encoding="utf-8")
             running.append((j, subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT), log))
             status["runs"][j["name"]] = {"arm": j["arm"], "cmd": " ".join(cmd[1:]), "returncode": None}
@@ -93,9 +115,9 @@ def cmd_train(a) -> int:
             print(f"[{(time.time() - t0) / 60:5.1f}분] 끝 {j['name']} (rc {rc}) — {done}/{len(status['runs'])}, 남은 {len(todo)}",
                   flush=True)
         running = still
-        save_json(OUT / "train_status.json", status)
+        save_json(status_path, status)
     status["finished"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    save_json(OUT / "train_status.json", status)
+    save_json(status_path, status)
     bad = [n for n, r in status["runs"].items() if r["returncode"] != 0]
     print("학습 끝" + (f" — 실패: {bad}" if bad else ""), flush=True)
     return 1 if bad else 0
@@ -128,7 +150,7 @@ def cmd_eval(a) -> int:
     path = OUT / "eval.json"
     d = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {"rows": {}, "sha1": {}}
     todo = []
-    for j in jobs():
+    for j in all_jobs():
         z = CKPT / f"{j['name']}.zip"
         if not z.exists():
             continue
@@ -217,7 +239,7 @@ def cmd_judge(a) -> int:
 
     d = json.loads((OUT / "eval.json").read_text(encoding="utf-8"))
     models = {}
-    for j in jobs():
+    for j in all_jobs():
         rows = d["rows"].get(j["name"])
         if not rows:
             continue
@@ -227,8 +249,10 @@ def cmd_judge(a) -> int:
                              "bad": bool(g <= BAD_G), "bad2": bool(g <= BAD_G and st >= 2 * C2_STARVE),
                              "world_fr": world_mix(j["world_seed"], j["config"])}
     arms = {}
-    for arm in ("B", "W", "HW", "GW"):
+    for arm in ("B", "W", "HW", "GW", "G", "L", "F"):
         ms = [m for m in models.values() if m["arm"] == arm]
+        if not ms:
+            continue
         k = sum(m["bad"] for m in ms)
         arms[arm] = {"n": len(ms), "bad": k, "bad2": sum(m["bad2"] for m in ms), "rate": k / len(ms) if ms else None,
                      "cp95": _cp(k, len(ms)) if ms else None,
@@ -247,15 +271,35 @@ def cmd_judge(a) -> int:
     res["P2"] = {"test": "Fisher 단측, 나쁨 HW > GW", "p": fisher("HW", "GW"), "p_bad2": fisher("HW", "GW", "bad2")}
     res["P2"]["sig"] = res["P2"]["p"] < 0.05
     gb = [m["g"] for m in models.values() if m["arm"] == "B" and not m["bad"]]
-    gw = [m["g"] for m in models.values() if m["arm"] == "W" and not m["bad"]]
-    harm = None
-    if len(gb) >= 2 and len(gw) >= 2:
-        u = mannwhitneyu(gw, gb, alternative="two-sided")
-        harm = {"W_not_bad_median": float(np.median(gw)), "B_not_bad_median": float(np.median(gb)), "p": float(u.pvalue),
-                "W_lower_sig": bool(u.pvalue < 0.05 and np.median(gw) < np.median(gb))}
-    res["harm_check"] = harm
-    use_w = arms["W"]["bad"] <= arms["B"]["bad"] and not (harm and harm["W_lower_sig"])
-    res["recipe"] = "W" if use_w else "B"
+
+    def harm_of(arm):
+        gx = [m["g"] for m in models.values() if m["arm"] == arm and not m["bad"]]
+        if len(gb) < 2 or len(gx) < 2:
+            return None
+        u = mannwhitneyu(gx, gb, alternative="two-sided")
+        return {"not_bad_median": float(np.median(gx)), "B_not_bad_median": float(np.median(gb)), "p": float(u.pvalue),
+                "lower_sig": bool(u.pvalue < 0.05 and np.median(gx) < np.median(gb))}
+
+    res["harm_check"] = {arm: harm_of(arm) for arm in ("W", "G", "L", "F") if arm in arms}
+    harm = res["harm_check"].get("W")
+    # 1차 레시피 규칙(PREREG 4절): W 대 B
+    use_w = arms["W"]["bad"] <= arms["B"]["bad"] and not (harm and harm["lower_sig"])
+    res["recipe_round1"] = "W" if use_w else "B"
+    # 2차(변경 기록): P3·P4(·P5) Holm, 레시피 = 나쁨 수 최소(해 점검 통과), 같으면 나쁘지 않은 G 중앙값 높은 팔
+    r2 = [x for x in ("G", "L", "F") if x in arms]
+    if r2:
+        ps = {x: fisher("B", x) for x in r2}
+        order = sorted(ps, key=ps.get)
+        holm, m = {}, len(order)
+        for i, x in enumerate(order):
+            holm[x] = bool(all(ps[y] < 0.05 / (m - k) for k, y in enumerate(order[:i + 1])))
+        res["round2"] = {x: {"p": ps[x], "holm_sig": holm[x]} for x in r2}
+    ok_arms = [x for x in arms if x in ("B", "W", "G", "L", "F")
+               and not (x != "B" and res["harm_check"].get(x) and res["harm_check"][x]["lower_sig"])]
+    def nb_med(x):
+        g = [m["g"] for m in models.values() if m["arm"] == x and not m["bad"]]
+        return float(np.median(g)) if g else -1e9
+    res["recipe"] = min(ok_arms, key=lambda x: (arms[x]["bad"], -nb_med(x))) if r2 else res["recipe_round1"]
     res["claim"] = ("균형 추출이 굶는 갈래를 줄인다(P1 유의)" if res["P1"]["sig"]
                     else "줄인다는 근거가 없다(P1 유의하지 않음, 방향만 기술)")
     chosen = arms[res["recipe"]]
@@ -273,9 +317,9 @@ def cmd_judge(a) -> int:
 
 def render(res) -> str:
     A = res["arms"]
-    L = ["# S1-a 판정 (PREREG 그대로)", "", f"- 생성 {res['generated']}. 나쁨(1차) = G_γ(결정, 평가 시드) ≤ {res['bad_threshold_g']:.3f}.",
+    L = ["# S1-a 판정 (PREREG 그대로, 2차 팔은 변경 기록 규칙)", "", f"- 생성 {res['generated']}. 나쁨(1차) = G_γ(결정, 평가 시드) ≤ {res['bad_threshold_g']:.3f}.",
          "", "| 팔 | 모델 | 나쁨 (1차) | 나쁨 (2차) | 실패율 [CP95] | G_γ 중앙값 [사분위] |", "|---|---|---|---|---|---|"]
-    for arm in ("B", "W", "HW", "GW"):
+    for arm in [x for x in ("B", "W", "HW", "GW", "G", "L", "F") if x in A]:
         x = A[arm]
         if not x["n"]:
             L.append(f"| {arm} | 0 | — | — | — | — |")
@@ -286,7 +330,9 @@ def render(res) -> str:
           f" (2차 정의 p {res['P1']['p_bad2']:.4f})",
           f"- **P2 (원인)** {res['P2']['test']}: p {res['P2']['p']:.4f} → {'유의' if res['P2']['sig'] else '유의하지 않음'}"
           f" (2차 정의 p {res['P2']['p_bad2']:.4f})",
-          f"- 해 점검(나쁘지 않은 모델 G_γ, W 대 B): {res['harm_check']}",
+          f"- 해 점검(나쁘지 않은 모델 G_γ, 각 팔 대 B): {res['harm_check']}",
+          f"- 2차 팔 (P3·P4·P5, Holm): {res.get('round2')}",
+          f"- 1차 레시피 규칙(W 대 B): {res['recipe_round1']}",
           f"- **주장**: {res['claim']}",
           f"- **레시피**: {res['recipe']} · 2차 대응 필요: {res['second_round_needed']}",
           f"- 학습 세계 먹이 재생 평균(기술): 나쁨 {res['world_fr']['bad']}, 나쁨 아님 {res['world_fr']['not_bad']}"]
@@ -351,6 +397,8 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser()
     sub = p.add_subparsers(dest="cmd", required=True)
     t = sub.add_parser("train")
+    t.add_argument("--round", type=int, choices=(1, 2), default=1)
+    t.add_argument("--with-f", action="store_true", help="2차에 F(학습 세계 하한) 팔도 (P2 가 유의할 때만)")
     t.add_argument("--concurrency", type=int, default=16)
     t.add_argument("--poll", type=float, default=30.0)
     e = sub.add_parser("eval")

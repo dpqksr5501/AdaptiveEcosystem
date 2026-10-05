@@ -176,3 +176,21 @@ def test_world_pool_min_filters_training_pool_only(cfgs):
     for bad in ({"food": 1.0}, {"food_regen_mult": "1"}, {}):
         with pytest.raises(ValueError):
             world_pool_min_params(bad)
+
+
+def test_lr_schedule_linear_decays_and_default_is_constant(tmp_path):
+    """--lr-schedule linear 는 튜닝 학습률에서 0 까지 선형으로 줄고(저장·불러오기 뒤에도), 기본은 constant 로 메타에 남는다."""
+    from stable_baselines3 import PPO
+
+    from train_v2 import LinearLR, apply_lr_schedule
+
+    t, tag = apply_lr_schedule({"learning_rate": 1e-4}, "linear")
+    assert isinstance(t["learning_rate"], LinearLR) and t["learning_rate"](0.25) == pytest.approx(2.5e-5)
+    assert apply_lr_schedule({"learning_rate": 1e-4}, "constant") == ({"learning_rate": 1e-4}, "constant")
+    a = _tiny(tmp_path, ["--lr-schedule", "linear"])
+    m = PPO.load(a, device="cpu")
+    lr0 = m.lr_schedule(1.0)
+    assert m.lr_schedule(0.5) == pytest.approx(lr0 / 2) and lr0 > 0
+    assert json.loads(a.with_suffix(".json").read_text(encoding="utf-8"))["ppo"]["lr_schedule"].startswith("linear(")
+    b = _tiny(tmp_path / "c", []) if (tmp_path / "c").mkdir() is None else None
+    assert json.loads(b.with_suffix(".json").read_text(encoding="utf-8"))["ppo"]["lr_schedule"] == "constant"
