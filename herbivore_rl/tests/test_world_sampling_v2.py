@@ -159,3 +159,20 @@ def test_world_seed_default_is_bit_identical(tmp_path):
     ma = json.loads(a.with_suffix(".json").read_text(encoding="utf-8"))
     mc = json.loads(c.with_suffix(".json").read_text(encoding="utf-8"))
     assert ma["world_seed"] == 3 and ma["seed"] == 3 and mc["world_seed"] == 4 and mc["seed"] == 3
+
+
+def test_world_pool_min_filters_training_pool_only(cfgs):
+    """train.world_pool_min 은 학습 풀에서 하한 아래 세계만 뺀다. 없으면 풀이 그대로다."""
+    from env_v2.vec_env import world_pool_min_params
+
+    base = cfgs[0]
+    t = dict(base.v2["train"])
+    t["world_pool_min"] = {"food_regen_mult": 1.0}
+    v = MultiWorldVecEnv(base.replace(v2=dict(base.v2, train=t)), num_worlds=4, meta_seed=5)
+    fr = np.array([world_params(base, int(s))["food_regen_mult"] for s in v.pool])
+    assert fr.min() >= 1.0 and 600 < len(v.pool) < 720          # U[0.5, 2.0] 에서 1.0 이상은 약 2/3
+    assert all(world_params(base, s)["food_regen_mult"] >= 1.0 for s in v.current_seeds())
+    assert len(MultiWorldVecEnv(base, num_worlds=4, meta_seed=5).pool) == 1000
+    for bad in ({"food": 1.0}, {"food_regen_mult": "1"}, {}):
+        with pytest.raises(ValueError):
+            world_pool_min_params(bad)

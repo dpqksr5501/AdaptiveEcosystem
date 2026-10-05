@@ -23,10 +23,13 @@ vigilance 까지 켜면 6. `World.obs_dim`: v1 7, vigilance 를 켜면 8).
 키)만 본다. 동시에 도는 세계와 겹치지 않는 규칙·세계 수·교체 주기는 그대로다. 블록이 없으면 지금과 같다(메타 난수 소비도 같다).
     train:
       world_sampling: {mode: balanced, candidates: 8, keys: [food_regen_mult, predator_count]}
+학습 세계 하한(S1-a 사전 등록 4절 2차 대응 1, 쓸 때만): `train.world_pool_min: {food_regen_mult: 1.0}` 이면 학습 풀에서
+그 값보다 작은 세계를 뺀다(`world_params` 기준). 평가 세계 분포는 그대로다. 블록이 없으면 지금과 같다.
 """
 
 from __future__ import annotations
 
+import math
 from typing import Any, Sequence
 
 import numpy as np
@@ -52,6 +55,22 @@ def act_space(act_dim: int) -> Box:
 
 def sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-x))
+
+
+def world_pool_min_params(raw) -> dict | None:
+    """`train.world_pool_min` 블록({world_params 키: 하한})을 검사한다. 없으면 None."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or not raw:
+        raise ValueError(f"train.world_pool_min 은 {{키: 하한}} 이다. 받은 값: {raw!r}")
+    out = {}
+    for k, v in raw.items():
+        if k not in WORLD_PARAM_KEYS:
+            raise ValueError(f"train.world_pool_min 의 키는 {list(WORLD_PARAM_KEYS)} 중 하나다. 받은 값: {k!r}")
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+            raise ValueError(f"train.world_pool_min.{k} 는 유한한 숫자다. 받은 값: {v!r}")
+        out[k] = float(v)
+    return out
 
 
 def world_sampling_params(raw) -> dict | None:
@@ -87,6 +106,13 @@ class MultiWorldVecEnv(VecEnv):
             lo, hi = cfg.train_seeds
             seeds = range(lo, hi)
         self.pool = np.asarray(list(seeds), dtype=np.int64)
+        pmin = world_pool_min_params(train.get("world_pool_min"))
+        if pmin:
+            keep = [s for s in self.pool.tolist()
+                    if all(world_params(cfg, int(s))[k] >= v for k, v in pmin.items())]
+            if len(keep) < 2 * (int(num_worlds if num_worlds is not None else train.get("num_worlds", 8))):
+                raise ValueError(f"train.world_pool_min {pmin} 로 남는 학습 세계가 {len(keep)}개뿐이다")
+            self.pool = np.asarray(keep, dtype=np.int64)
         self._meta = np.random.default_rng(meta_seed)
         self._ws = world_sampling_params(train.get("world_sampling"))
         if self._ws is not None:
