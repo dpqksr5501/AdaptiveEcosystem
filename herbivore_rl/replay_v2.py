@@ -66,6 +66,19 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
           '{"policy":{"kind":"learned","model":"ckpt/v2/v2_1_s0.zip"},"wrap":[{"factory":"probe_v2:obs_take","dims":[0,1,2,3,4,5,6]}]}' \
           '{"policy":{"kind":"learned","model":"ckpt/v2/v2_1_s0.zip"},"wrap":[{"factory":"probe_v2:obs_take","dims":[0,1,2,3,4,5,6]},{"factory":"probe_v2:window_stop","speed_col":4,"tr_col":7,"theta":0.5}]}' \
           --labels "v2.1 학습 정책" "v2.1 + 창 규칙(규칙 장면)" --steps 1800 --out results/v2/replay_s2_rule.mp4
+  1단계 S1·S2 영상(`results/v2/s1_9/VIDEO_MODEL.md`, 두 클립을 이어 `replay_stage1_s1_s2.mp4` 한 편으로 만든다):
+      python replay_v2.py --config configs/v2_1.yaml --compare \
+          '{"kind":"learned","model":"ckpt/v2/v2_1c_s34.zip","mode":"hold","hold_k":24}' \
+          '{"policy":{"kind":"learned","model":"ckpt/v2/v2_1c_s34.zip","mode":"hold","hold_k":24},"wrap":[{"kind":"act_permute","salt":0}]}' \
+          --labels "S1 v2.1 학습 정책 (s34, K24)" "S0 대조: C1′ 행동 순열" --seed 10000 --steps 1800 --stride 2 \
+          --png 900 --caption "S1: 포식자가 가까우면 뛴다(주황) · 확인층 5모델 중 규칙으로 고른 s34(K24), 5모델 중 3개는 굶는 갈래 · B1 부분(3/5), 학습 실패 감지" \
+          --out results/v2/replay_stage1_s1.mp4
+      python replay_v2.py --config configs/v2_2r_l.yaml --compare \
+          '{"policy":{"kind":"learned","model":"ckpt/v2/v2_1c_s34.zip","mode":"hold","hold_k":24},"wrap":[{"factory":"probe_v2:obs_take","dims":[0,1,2,3,4,5,6]}]}' \
+          '{"policy":{"kind":"learned","model":"ckpt/v2/v2_1c_s34.zip","mode":"hold","hold_k":24},"wrap":[{"factory":"probe_v2:obs_take","dims":[0,1,2,3,4,5,6]},{"factory":"probe_v2:window_stop","speed_col":4,"tr_col":7,"theta":0.5}]}' \
+          --labels "v2.1 학습 정책 (우연히 창 안에서 멈출 때만 돌아봄)" "S2 규칙 장면: v2.1 + 창 규칙" --seed 10000 --steps 1800 \
+          --stride 2 --png 900 --caption "S2 는 학습이 아니라 규칙이다: 포식자를 놓친 뒤 약 13스텝(창) 안이면 멈춰 위협 쪽을 돌아본다 · 같은 모델 s34(K24), 같은 시드" \
+          --out results/v2/replay_stage1_s2.mp4
 - 모든 초식에 짧은 heading 화살표. 리스폰 직후 몇 프레임은 흐리게 그린다(순간이동 착시 방지).
 - 하단 시계열: 보행 비율(정지/걷기/뛰기), 경계 비율, 지역 기억, 포획 누적. 게임 시각 mm:ss.
 - `--compare` 는 같은 시드·같은 카메라로 정책 여러 개를 나란히 그린다. 칸들은 x축과

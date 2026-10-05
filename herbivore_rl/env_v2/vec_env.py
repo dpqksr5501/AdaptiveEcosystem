@@ -16,6 +16,13 @@ sigmoid 도 여기에만 있다 (§1.3). 행동·관측 공간의 차원은 설�
 vigilance 까지 켜면 6. `World.obs_dim`: v1 7, vigilance 를 켜면 8).
 설정에 `train.cm`(v2.2r 범주형 보행, `env_v2/cm.py`)이 있으면 정책 출력은 [조향 원값 4, 범주 번호] 이고 행동 공간은
 `cm_action_space(K)` 다. 세계 행동으로 바꾸는 `cm_to_world` 도 step_async 에서만 부른다.
+
+학습 세계 균형 추출(S1-a, 10-04 사용자 결정, `results/v2/s1a/PREREG.md`): 설정에 `train.world_sampling` 이 있으면 새 세계를
+고를 때 후보 `candidates` 개를 메타 난수로 뽑고, '지금까지 고른 세계들(초기 세계 포함, 세계마다 같은 무게)의 표준화 평균'이
+풀 평균(0)에 가장 가까워지는 후보를 고른다. 표준화는 풀 전체의 평균·표준편차로 하고 `keys`(`env_v2.world.world_params` 의
+키)만 본다. 동시에 도는 세계와 겹치지 않는 규칙·세계 수·교체 주기는 그대로다. 블록이 없으면 지금과 같다(메타 난수 소비도 같다).
+    train:
+      world_sampling: {mode: balanced, candidates: 8, keys: [food_regen_mult, predator_count]}
 """
 
 from __future__ import annotations
@@ -27,7 +34,7 @@ from gymnasium.spaces import Box
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
 from .cm import cm_action_space, cm_params, cm_to_world
-from .world import ACT_DIM, OBS_DIM, World
+from .world import ACT_DIM, OBS_DIM, WORLD_PARAM_KEYS, World, world_params
 
 OBS_SPACE = Box(0.0, 1.0, (OBS_DIM,), np.float32)   # v1 관측 7개. 세계의 관측 공간은 obs_space(obs_dim)
 ACT_SPACE = Box(-3.0, 3.0, (ACT_DIM,), np.float32)    # v1 행동 4개. 세계의 행동 공간은 act_space(act_dim)
@@ -47,6 +54,24 @@ def sigmoid(x: np.ndarray) -> np.ndarray:
     return 1.0 / (1.0 + np.exp(-x))
 
 
+def world_sampling_params(raw) -> dict | None:
+    """`train.world_sampling` 블록을 검사한다. 없으면 None (지금과 같은 균등 추출). 기본값은 없다."""
+    if raw is None:
+        return None
+    need = {"mode", "candidates", "keys"}
+    if not isinstance(raw, dict) or set(raw) != need:
+        raise ValueError(f"train.world_sampling 은 키 {sorted(need)} 를 모두, 그것만 적는다. 받은 값: {raw!r}")
+    if raw["mode"] != "balanced":
+        raise ValueError(f"train.world_sampling.mode 는 balanced 만 있다. 받은 값: {raw['mode']!r}")
+    c = raw["candidates"]
+    if isinstance(c, bool) or not isinstance(c, int) or c < 1:
+        raise ValueError(f"train.world_sampling.candidates 는 1 이상의 정수다. 받은 값: {c!r}")
+    keys = list(raw["keys"])
+    if not keys or any(k not in WORLD_PARAM_KEYS for k in keys) or len(set(keys)) != len(keys):
+        raise ValueError(f"train.world_sampling.keys 는 {list(WORLD_PARAM_KEYS)} 중 겹치지 않는 하나 이상이다. 받은 값: {keys}")
+    return {"mode": "balanced", "candidates": int(c), "keys": keys}
+
+
 class MultiWorldVecEnv(VecEnv):
     metadata = {"render_modes": []}
 
@@ -63,6 +88,16 @@ class MultiWorldVecEnv(VecEnv):
             seeds = range(lo, hi)
         self.pool = np.asarray(list(seeds), dtype=np.int64)
         self._meta = np.random.default_rng(meta_seed)
+        self._ws = world_sampling_params(train.get("world_sampling"))
+        if self._ws is not None:
+            keys = self._ws["keys"]
+            feats = np.array([[world_params(cfg, int(s))[k] for k in keys] for s in self.pool], dtype=np.float64)
+            mu, sd = feats.mean(0), feats.std(0)
+            sd = np.where(sd > 0, sd, 1.0)
+            self._ws_z = dict(zip(self.pool.tolist(), (feats - mu) / sd))
+            self._ws_sum = np.zeros(len(keys))
+            self._ws_n = 0
+            self.ws_picked: list[int] = []      # 고른 순서 (진단·테스트용)
 
         self.worlds: list[World] = []
         for _ in range(self.K):
@@ -91,7 +126,20 @@ class MultiWorldVecEnv(VecEnv):
         return np.array([(k * self.T) // self.K for k in range(self.K)], dtype=np.int64)
 
     def _pick_seed(self, exclude) -> int:
-        """동시에 도는 세계와 겹치지 않는 시드. 풀이 세계 수보다 작으면 겹침을 허용한다."""
+        """동시에 도는 세계와 겹치지 않는 시드. 풀이 세계 수보다 작으면 겹침을 허용한다.
+        `train.world_sampling` 이 있으면 균형 추출(모듈 docstring): 후보를 이 규칙으로 여러 개 뽑아 하나를 고른다."""
+        if self._ws is None:
+            return self._pick_plain(exclude)
+        cands = [self._pick_plain(exclude) for _ in range(self._ws["candidates"])]
+        n = self._ws_n + 1
+        cost = [float(np.sum(((self._ws_sum + self._ws_z[c]) / n) ** 2)) for c in cands]
+        best = cands[int(np.argmin(cost))]         # 같으면 먼저 뽑은 후보
+        self._ws_sum = self._ws_sum + self._ws_z[best]
+        self._ws_n = n
+        self.ws_picked.append(best)
+        return best
+
+    def _pick_plain(self, exclude) -> int:
         exclude = set(int(e) for e in exclude)
         if len(self.pool) <= len(exclude):
             return int(self._meta.choice(self.pool))

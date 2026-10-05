@@ -552,6 +552,8 @@ def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="V2 PPO 학습 (다중 세계)")
     p.add_argument("--steps", type=int, default=20_000_000)
     p.add_argument("--seed", type=int, default=0, help="PPO 시드이자 세계 선택 시드(meta_seed)")
+    p.add_argument("--world-seed", type=int, default=None,
+                   help="세계 선택 시드(meta_seed)만 따로 준다(S1-a 원인 확인). 기본은 --seed 그대로 — 주지 않으면 지금과 같다")
     p.add_argument("--run-name", default=None, help="기본 v<설정 version>_s<seed>_<M>m (예: v2_0b_s0_20m)")
     p.add_argument("--out", default=None, help="기본 ckpt/v2/<run-name>.zip")
     p.add_argument("--config", default=None, help="기본 configs/v2.yaml")
@@ -584,8 +586,9 @@ def main(argv=None) -> int:
     cfg = load_v2_config(args.config)
     from diagnose_v2 import config_digest       # 진단 결과 meta 와 같은 식(설정 dict 의 sha1 앞 12자리)
     digest = config_digest(cfg)
+    world_seed = args.seed if args.world_seed is None else args.world_seed
     venv = MultiWorldVecEnv(cfg, num_worlds=args.num_worlds, reset_interval=args.reset_interval,
-                            meta_seed=args.seed)
+                            meta_seed=world_seed)
     rollout_world_steps = int(cfg.v2["train"].get("rollout_world_steps", 256))
     n_steps = max(1, rollout_world_steps // venv.K)
 
@@ -665,6 +668,8 @@ def main(argv=None) -> int:
         "steps": args.steps,
         "actual_timesteps": int(model.num_timesteps),
         "seed": args.seed,
+        # 세계 선택 시드(VecEnv meta_seed). --world-seed 를 주지 않으면 seed 와 같다
+        "world_seed": world_seed,
         "elapsed_min": round(elapsed / 60, 2),
         # 실제 학습 γ(모델에 들어간 값). 출처: cli(--gamma) / ppo_config / PPO_KWARGS
         "gamma": float(model.gamma),

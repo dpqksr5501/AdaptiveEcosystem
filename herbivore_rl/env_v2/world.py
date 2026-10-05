@@ -123,6 +123,27 @@ WINDOW_STAT_COLUMNS = (
 )
 
 
+WORLD_PARAM_KEYS = ("world_size", "predator_count", "pred_speed_mult", "ranged_frac", "cover_frac", "food_regen_mult")
+
+
+def world_params(cfg, seed: int) -> dict:
+    """세계 시드 하나가 정하는 무작위화 매개변수(`World.reset` 이 같은 순서로 뽑는 값)를 세계를 만들지 않고 낸다.
+
+    reset 의 v1 스트림 `default_rng(seed)` 앞 여섯 번 뽑기와 같다: 크기, 포식자 수 M, 포식자 속도 배수, 원거리형 비율,
+    은신처 비율 목표, 먹이 재생 배수. 학습 세계 균형 추출(`env_v2/vec_env.py`, S1-a 10-04 결정)과 진단이 쓴다.
+    reset 의 뽑는 순서를 바꾸면 이 함수도 같이 바꿔야 한다(`tests/test_world_sampling_v2.py` 가 맞는지 본다).
+    """
+    rd = cfg.rand
+    r = np.random.default_rng(int(seed))
+    size = float(r.uniform(*rd["world_size"]))
+    m = int(r.integers(rd["predator_count"][0], rd["predator_count"][1] + 1))
+    psm = float(r.uniform(*rd["pred_speed_mult"]))
+    rf = float(r.uniform(*rd["ranged_frac"]))
+    cf = float(r.uniform(*rd["cover_frac"]))
+    fr = float(r.uniform(*rd["food_regen_mult"]))
+    return dict(zip(WORLD_PARAM_KEYS, (size, m, psm, rf, cf, fr)))
+
+
 def action_names(cfg) -> tuple[str, ...]:
     """설정(또는 `Features`)의 세계가 받는 행동 이름. 순서 = 행동 열 번호 (계획서 4.3).
 
