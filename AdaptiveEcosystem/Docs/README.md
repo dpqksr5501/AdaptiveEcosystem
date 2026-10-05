@@ -21,6 +21,7 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 - 🗺️ [RL_V2_PLAN.md](RL_Policy/RL_V2_PLAN.md) : 초식 RL v2 계획서 (초안) — 생생한 움직임, 환경과의 상호작용(먹이 고갈·낮밤·지역 이동·날씨), 시간에 따라 달라지는 행동
 - 📒 [RL_V2_LOG.md](RL_Policy/RL_V2_LOG.md) : 초식 RL v2 진행 기록 — 계획서에서 떼어 낸 날짜순 진행·커밋 기록(10-03 결정 R7)
 - 🏁 [herbivore_rl/results/v2/stage1_close.md](../../herbivore_rl/results/v2/stage1_close.md) : V2 1단계 마감 문서(10-03 작성, 실험 끝. 영상과 1단계 닫기는 10-10) — v2.1 → v2.2 → v2.2r → 대체안 (a)의 판정표, B1 '부분(3/5)'·규칙 장면, 새 안건 S1-a~S1-c
+- 🧪 [herbivore_rl/results/v2/s1a/report.md](../../herbivore_rl/results/v2/s1a/report.md) : S1-a 학습 신뢰도 보고(10-06) — '굶는 갈래' 대응 실험 120모델, 학습 γ 0.995 레시피(0/24), v2.1 출시 모델 s1a_g_s58
 - 🧭 [RL_V2_REVISION_PROPOSAL.md](RL_Policy/RL_V2_REVISION_PROPOSAL.md) : V2 계획 수정 제안서(10-03, R1~R10 채택·R11~R19 안건) — 실패 회고, 배포 모드·경계 재설계·게이트 역할·범위·일정 수정안
 - 🔁 [RL_SEASON_RETRAIN_PLAN.md](RL_Policy/RL_SEASON_RETRAIN_PLAN.md) : 시즌 재학습 계획서(초안, 시연용) — 게임 상황 요약으로 시뮬레이터에서 이어 학습하고 검증을 통과한 가중치만 언리얼에 넣는 사이드트랙
 - 📤 [SEASON_SNAPSHOT_SPEC.md](RL_Policy/SEASON_SNAPSHOT_SPEC.md) : 시즌 내보내기 명세(초안) — 게임 서버가 시즌마다 시뮬레이터로 넘길 요약값, 서버 쪽 구현 체크리스트
