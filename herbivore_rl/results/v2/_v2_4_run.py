@@ -418,7 +418,104 @@ def judge_probe(a) -> dict:
     return res
 
 
+def _boot_ci(per_model: np.ndarray, reps=2000, seed=0):
+    """모델 × 시드 배열의 평균에 대한 층화 부트스트랩 95% CI (모델·시드 재표집)."""
+    rng = np.random.default_rng(seed)
+    m, s = per_model.shape
+    b = [per_model[rng.integers(0, m, m)][:, rng.integers(0, s, s)].mean() for _ in range(reps)]
+    return [float(np.percentile(b, 2.5)), float(np.percentile(b, 97.5))]
+
+
+def judge_confirm(a) -> dict:
+    """짧은 확인 판정 (confirm/PREREG.md). 1차 N1·N5′(C1′ 대비) — 3시드 중 2시드 이상 크기 기준."""
+    st = state()
+    d = load_json(OUT / "confirm" / "rows.json")
+    arm = load_json(OUT / "confirm" / "arm_rows.json")
+    names = models("confirm")
+    mode = st["mode"]
+    tab = model_table(d, names, mode)
+    res = dict(stage="confirm", models=names, gamma_sel=st.get("gamma_sel"), mode=mode, primary={}, report={})
+    n1 = {n: float(np.nanmean(_series(tab[n]["C0"], "n1"))) for n in names}
+    n5 = {n: float(np.nanmean(n5p_rel(tab[n]))) for n in names}
+    res["primary"]["N1"] = dict(per_model=n1, n_pass=sum(v >= 0.15 for v in n1.values()), need=2, crit=0.15)
+    res["primary"]["N1"]["pass_"] = res["primary"]["N1"]["n_pass"] >= 2
+    res["primary"]["N5p"] = dict(per_model=n5, n_pass=sum(v >= 0.1 for v in n5.values()), need=2, crit=0.1)
+    res["primary"]["N5p"]["pass_"] = res["primary"]["N5p"]["n_pass"] >= 2
+    rp = res["report"]
+    rp["input_dep"] = {n: dict(n1_c4phase=float(np.nanmean(_series(tab[n]["C4phase"], "n1"))),
+                               n5p_rel_c4energy=float(np.nanmean(_series(tab[n]["C4en"], "n5p")
+                                                                  - _series(tab[n]["C1p"], "n5p"))))
+                       for n in names}
+    g0 = np.array([_series(tab[n]["C0"], "g_gamma") for n in names])
+    c0 = g0.mean(0)
+    for k in ("C2", "C2seg", "FIX", "OVL"):
+        if k in arm["rows"]:
+            ck = _series(arm["rows"][k], "g_gamma")
+            rp[f"vs_{k}"] = dict(**_paired(c0, ck, T_CRIT_20), ci95=_boot_ci(g0 - ck[None, :]))
+    rp["vs_C1p"] = _paired(c0, arm_series(tab, "C1p", "g_gamma"), T_CRIT_20)
+    if "C2seg" in arm["rows"]:
+        v = rp["vs_C2seg"]
+        rp["learning_failure"] = bool(v["diff"] < 0 and v["t"] < -T_CRIT_20 and v["ci95"][1] < 0)
+    c2g = float(np.mean(_series(arm["rows"]["C2"], "g_gamma"))) if "C2" in arm["rows"] else float("nan")
+    per = {n: dict(g=float(np.nanmean(_series(tab[n]["C0"], "g_gamma"))),
+                   starve=float(np.nanmean(_series(tab[n]["C0"], "starve_rate"))),
+                   pred=float(np.nanmean(_series(tab[n]["C0"], "pred_rate"))),
+                   b1_day=float(np.nanmean(_series(tab[n]["C0"], "b1_day"))),
+                   survival=float(np.nanmean(_series(tab[n]["C0"], "survival")))) for n in names}
+    rp["per_model"] = per
+    rp["c2_g"] = c2g
+    rp["bad"] = [n for n in names if per[n]["g"] <= c2g - 1.0]
+    return res
+
+
+def select_release() -> dict:
+    """MEMO 5절 출시 규칙: 후보 = 최종 레시피 모델(탐침 + 짧은 확인), 탐색 시드·고른 모드."""
+    st = state()
+    mode = st["mode"]
+    d = load_json(OUT / "probe" / "rows.json")
+    arm = load_json(OUT / "probe" / "arm_rows.json")
+    pool = (models("resp") if st.get("resp_used") else models("probe")) + models("confirm")
+    tab = model_table(d, pool, mode)
+    missing = [n for n in pool if n not in tab]
+    if missing:
+        raise SystemExit(f"탐색 시드 평가가 없는 후보: {missing} — eval --stage confirm_explore 를 먼저 돌린다")
+    c2 = arm["rows"]["C2"]
+    cap = 1.5 * float(np.mean(_series(c2, "starve_rate")))
+    c2g = float(np.mean(_series(c2, "g_gamma")))
+    cand = []
+    for n in pool:
+        t = tab[n]
+        cand.append(dict(name=n, g=float(np.nanmean(_series(t["C0"], "g_gamma"))),
+                         starve=float(np.nanmean(_series(t["C0"], "starve_rate"))),
+                         n1=float(np.nanmean(_series(t["C0"], "n1"))), n5p_rel=float(np.nanmean(n5p_rel(t))),
+                         b1_day=float(np.nanmean(_series(t["C0"], "b1_day"))), seed=int(n.rsplit("_s", 1)[1])))
+    rules = [("starve", lambda c: c["starve"] <= cap), ("n1", lambda c: c["n1"] >= 0.15),
+             ("n5p", lambda c: c["n5p_rel"] >= 0.1), ("b1", lambda c: c["b1_day"] >= 0.3)]
+    pick, dropped = None, []
+    drop_order = ("b1", "n5p", "n1")              # MEMO 5절: B1 → N5′ → N1 순서로 조건을 뺀다
+    for k in range(len(drop_order) + 1):
+        gone = drop_order[:k]
+        ok = [c for c in cand if all(f(c) for r, f in rules if r not in gone)]
+        if ok:
+            pick = max(ok, key=lambda c: (c["g"], -c["seed"]))
+            dropped = list(gone)
+            break
+    flag = None
+    if pick is None:
+        ok = [c for c in cand if c["g"] > c2g - 1.0]
+        pick = max(ok, key=lambda c: (c["g"], -c["seed"])) if ok else None
+        flag = "자격 없음"
+    return dict(mode=mode, starve_cap=cap, c2_g=c2g, candidates=cand, pick=pick, dropped=dropped, flag=flag)
+
+
 def cmd_judge(a) -> int:
+    if a.stage == "confirm":
+        res = judge_confirm(a)
+        res["release"] = select_release()
+        res["created"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
+        save_json(OUT / "confirm" / "judge.json", res)
+        print(json.dumps({k: res[k] for k in ("primary", "release")}, ensure_ascii=False, indent=1, default=str))
+        return 0
     if a.stage == "probe":
         res = judge_probe(a)
         res["created"] = datetime.now(timezone.utc).isoformat(timespec="seconds")

@@ -106,7 +106,8 @@ def test_v2_4_config_is_v2_1_plus_daynight():
         {k: v for k, v in r1["train"].items() if k != "reset_interval"}
     assert r1["train"]["reset_interval"] == 4000 and r4["train"]["reset_interval"] == 5000
     dn = r4["features"]["daynight"]
-    assert dn == dict(enabled=True, periods=[600, 900, 1800], twilight=0.05, detect_night=0.5, eat_night=0.5,
+    # eat_night 은 10-06 환경 확인 N (a2) 실패로 0(#21 가지치기, results/v2/v2_4/gate_n)
+    assert dn == dict(enabled=True, periods=[600, 900, 1800], twilight=0.05, detect_night=0.5, eat_night=0.0,
                       rest_night=0.35, fixed_day_frac=0.2, transition_norm=900, start_induce=0.0)
     on = dict(r4)
     on["features"] = dict(r4["features"], daynight=dict(dn, fixed_day_frac=0.0))
@@ -241,8 +242,9 @@ def test_night_shrinks_predator_detection_only(cfg4):
 
 
 def test_night_eat_and_rest_multipliers(cfg4):
-    """섭식 × (1 − 0.5·d) 는 모든 보행에, 휴식 대사 × (1 − 0.35·d) 는 정지 개체에만. d = 0 이면 v2.1 값 그대로."""
-    w = World(cfg4, seeds=[10000])
+    """섭식 × (1 − 0.5·d) 는 모든 보행에, 휴식 대사 × (1 − 0.35·d) 는 정지 개체에만. d = 0 이면 v2.1 값 그대로.
+    (판정 설정은 eat_night 0 이라 제안값 0.5 로 켜서 본다)"""
+    w = World(_dn(cfg4, eat_night=0.5), seeds=[10000])
     w.gait = np.array([GAIT_STOP, GAIT_WALK, GAIT_RUN] * 42 + [GAIT_STOP, GAIT_STOP], dtype=np.int8)
     _set_dark(w, 0.0)
     drain0, eat0 = w._drain_eat()

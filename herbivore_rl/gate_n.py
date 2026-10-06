@@ -94,6 +94,8 @@ def cmd_run(a) -> int:
     (out / "rounds").mkdir(parents=True, exist_ok=True)
     W = worlds(a.set)
     specs = policy_specs()
+    if a.policies:
+        specs = {k: v for k, v in specs.items() if k in a.policies}
     seeds = [int(s) for s in a.seeds] if a.seeds else SEEDS
     scarce = {}
     for s in seeds:
@@ -160,7 +162,11 @@ def judge(res) -> dict:
         ok = m_on <= cap or (m_ref > cap and m_on - m_ref <= SAFETY_REL)
         it[f"safety_{pn}"] = dict(on=m_on, ref=m_ref, cap=cap, pass_=bool(ok),
                                   rule=f"아사 비중 평균 ≤ {cap} (기준 세계가 이미 넘으면 on − ref ≤ {SAFETY_REL})")
-    for pn in POLICIES:
+    if res["meta"]["round"] == "final":
+        out["verdict"] = dict(safety=bool(it["safety_CSEG"]["pass_"] and it["safety_FIX"]["pass_"]), a1=None, a2=None,
+                              a3=None, prune=[], note="final 회차는 가지치기한 설정의 안전 항목만 본다(PREREG 2절)")
+        return out
+    for pn in [p for p in POLICIES if p in res["rows"]["on"]]:
         d = _col(res, "on", pn, "pred_rate_night", judged) - _col(res, "on", pn, "pred_rate_day", judged)
         it[f"a1_{pn}"] = dict(**_paired(d), rule="밤 − 낮 피식률 > 0, 짝 t > 임계(양측 0.05)")
         it[f"a1_{pn}"]["pass_"] = bool(it[f"a1_{pn}"]["mean"] > 0 and it[f"a1_{pn}"]["t"] > it[f"a1_{pn}"]["crit"])
@@ -207,6 +213,10 @@ def cmd_report(a) -> int:
         j = judge(res)
         allj[res["meta"]["round"]] = dict(meta=res["meta"], scarce=res["scarce"], judge=j)
         v, it = j["verdict"], j["items"]
+        if v.get("a1") is None:
+            L.append(f"| {res['meta']['round']} | {', '.join(res['meta']['sets']) or '—'} | {_fmt(v['safety'])} | — | — | — "
+                     f"| (안전 항목만) |")
+            continue
         L.append(f"| {res['meta']['round']} | {', '.join(res['meta']['sets']) or '—'} | {_fmt(v['safety'])} | "
                  f"{_fmt(v['a1'])} (t {_fmt(it['a1_C2F']['t'], 3)}) | {_fmt(v['a2'])} ({_fmt(it['a2_C2']['ratio'], 3)}) | "
                  f"{_fmt(v['a3'])} (t {_fmt(it.get('a3_CSTOP', {}).get('t'), 3)}) | {', '.join(v['prune']) or '없음'} |")
@@ -236,6 +246,7 @@ def main(argv=None) -> int:
     r.add_argument("--steps", type=int, default=STEPS)
     r.add_argument("--workers", type=int, default=16)
     r.add_argument("--skip-rest0", action="store_true")
+    r.add_argument("--policies", nargs="*", default=None, help="정책 일부만 (final 회차는 안전 항목 CSEG·FIX)")
     r.add_argument("--note", default=None)
     r.set_defaults(fn=cmd_run)
     p = sub.add_parser("report")
