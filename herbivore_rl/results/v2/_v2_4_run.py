@@ -95,6 +95,10 @@ def jobs(stage: str) -> list[dict]:
     if g is None:
         raise SystemExit("state.json 에 gamma_sel 이 없다 — g27 판정 뒤에 돌린다")
     if stage == "resp":
+        if PREFIX == "v2_4s":   # v2.4s 대응: v2.1 출시 모델 가중치로 시작(s/PREREG.md 2절, s/widen_init.py)
+            return [{"stage": "resp", "g": g, "seed": s, "name": f"{PREFIX}r_g{g}_s{s}", "config": TRAIN_CFG,
+                     "save_at": ["2000000", "5000000", "10000000"],
+                     "extra": ["--init", "ckpt/v2/v2_4s_init_from_s1a_g_s58.zip"]} for s in (20, 21, 22)]
         return [{"stage": "resp", "g": g, "seed": s, "name": f"{PREFIX}r_g{g}_s{s}", "config": final_config("resp"),
                  "save_at": ["2000000", "5000000", "10000000"]} for s in (20, 21, 22)]
     if stage == "confirm":
@@ -127,7 +131,7 @@ def cmd_train(a) -> int:
             j = todo.pop(0)
             cmd = [sys.executable, "train_v2.py", "--config", j["config"], "--steps", "20000000", "--seed", str(j["seed"]),
                    "--gamma", repr(GAMMAS[j["g"]]), "--run-name", j["name"], "--save-at", *j["save_at"],
-                   "--probe-every", "1000000", "--threads", "1"]
+                   "--probe-every", "1000000", "--threads", "1", *j.get("extra", [])]
             log = open(logs / f"train_{j['name']}.log", "w", encoding="utf-8")
             running.append((j, subprocess.Popen(cmd, cwd=ROOT, stdout=log, stderr=subprocess.STDOUT), log))
             status["runs"][j["name"]] = {"stage": j["stage"], "cmd": " ".join(cmd[1:]), "returncode": None}
