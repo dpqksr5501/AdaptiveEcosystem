@@ -80,7 +80,7 @@ from env_v2.rollout import (
     run_specs,
     tail_steps,
 )
-from env_v2.rollout import GAIT_COLUMNS, VIGIL_COLUMNS, adapt_spec
+from env_v2.rollout import DAYNIGHT_COLUMNS, GAIT_COLUMNS, VIGIL_COLUMNS, adapt_spec
 from env_v2.world import (ACT_DIM, ACT_NAMES_V1, OBS_NAMES_V1, OBS_RECENT_PREDATION, action_names,
                           obs_names as world_obs_names)
 from evaluate import T_CRIT, welch_paired
@@ -277,10 +277,18 @@ def quantile_grid(x: np.ndarray, qs=None) -> list[float]:
     return [float(v) for v in np.unique(np.quantile(np.asarray(x, dtype=np.float64), qs))]
 
 
-def react_conditions(obs: np.ndarray) -> dict[str, np.ndarray]:
-    """smart_check.py 의 상황 구분 그대로. 실제 표본을 조건으로 나눈다."""
+def react_conditions(obs: np.ndarray, names=None) -> dict[str, np.ndarray]:
+    """smart_check.py 의 상황 구분 그대로. 실제 표본을 조건으로 나눈다.
+
+    `names` 는 세계의 관측 이름이다. threat_recency 구간은 그 이름의 열이 있을 때만 낸다(v2.4 는 idx 7 이 visibility
+    라 번호로 찾으면 틀린다). 없으면 예전처럼 관측이 8개 이상일 때 idx 7 을 threat_recency 로 본다.
+    """
     o = obs
     q5 = o[:, 5]
+    if names is not None:
+        tr = list(names).index("threat_recency") if "threat_recency" in names else None
+    else:
+        tr = 7 if o.shape[1] > 7 else None
     return {
         "포식자 보임 (dist<1)": o[:, 2] < 1.0,
         "포식자 안 보임": o[:, 2] >= 1.0,
@@ -297,14 +305,14 @@ def react_conditions(obs: np.ndarray) -> dict[str, np.ndarray]:
         "동료 많음 (kin>0.5)": o[:, 3] > 0.5,
         "동료 적음 (kin<0.1)": o[:, 3] < 0.1,
         # v2.2 (관측 8개): 결정 때 구간 (World.vigil_stats 와 같은 문턱 0.5)
-        **({"최근 위협·안 보임 (threat>0.5, dist=1)": (o[:, 7] > 0.5) & (o[:, 2] >= 1.0),
-            "위협 없음 (threat≤0.5)": o[:, 7] <= 0.5} if o.shape[1] > 7 else {}),
+        **({"최근 위협·안 보임 (threat>0.5, dist=1)": (o[:, tr] > 0.5) & (o[:, 2] >= 1.0),
+            "위협 없음 (threat≤0.5)": o[:, tr] <= 0.5} if tr is not None else {}),
     }
 
 
-def react_table(obs: np.ndarray, acts: dict[str, np.ndarray], min_n: int = 50) -> dict:
+def react_table(obs: np.ndarray, acts: dict[str, np.ndarray], min_n: int = 50, names=None) -> dict:
     out = {}
-    for name, m in react_conditions(obs).items():
+    for name, m in react_conditions(obs, names).items():
         if m.sum() < min_n:
             continue
         out[name] = {"n": int(m.sum()), **{k: np.asarray(a)[m].mean(0).tolist() for k, a in acts.items()}}
@@ -705,8 +713,8 @@ def get_calib(ctx: Ctx) -> dict:
 
 def summarize(rows: list[dict]) -> dict:
     """시드 평균. speed 세계의 행이면 보행 지표 열(GAIT_COLUMNS), vigilance 세계의 행이면 경계 지표 열
-    (VIGIL_COLUMNS)도 평균한다(v2.0 행은 예전과 같은 열)."""
-    extra = [c for c in GAIT_COLUMNS + VIGIL_COLUMNS if c in rows[0]] if rows else []
+    (VIGIL_COLUMNS), daynight 세계의 행이면 위상 지표 열(DAYNIGHT_COLUMNS)도 평균한다(v2.0 행은 예전과 같은 열)."""
+    extra = [c for c in GAIT_COLUMNS + VIGIL_COLUMNS + DAYNIGHT_COLUMNS if c in rows[0]] if rows else []
     return {c: nanmean([r.get(c) for r in rows]) for c in ROW_COLUMNS + extra}
 
 
@@ -1293,7 +1301,7 @@ def cmd_curves(ctx: Ctx) -> int:
     acts = {"C0": act, **reference_actions(base, obs, ctx.act_dim)}
     data = {
         "meta": ctx.meta(samples=int(len(obs)), calib_seeds=ctx.calib_seeds, calib_steps=ctx.calib_steps),
-        "react": react_table(obs, acts),
+        "react": react_table(obs, acts, names=ctx.obs_names),
         "conditional": {ctx.obs_names[j]: conditional_curve(obs[:, j], act) for j in range(ctx.obs_dim)},
         "intervention": {ctx.obs_names[j]: intervention_curve(pol, obs, j, quantile_grid(obs[:, j]))
                          for j in range(ctx.obs_dim)},

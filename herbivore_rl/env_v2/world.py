@@ -25,6 +25,10 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
   안 보임 & threat_recency > theta. action false 면 경계 행동 열을 빼고(관측 8 은 그대로, T1·L), window_only 면 경계가
   창 안에서만 효력이 있고(W′), look_back 이면 '정지 중이고 창 안이면 heading ← ThreatDir' 반사를 둔다(L). 난수를
   쓰지 않는다. 정의는 `_window_params`·`_look_back`, 통계는 `window_stats`. 끄면 v2.2 그대로다.
+- daynight (v2.4, 계획서 4.9.2·4.2·#21): 세계마다 하루 길이 T 와 시작 위상 o 를 reset 때 자기 스트림에서 뽑고, 어둠 d
+  (낮 0, 밤 1, 전환 앞뒤 박명은 선형)가 초식의 포식자 탐지 반경·섭식·정지 비경계 개체의 휴식 대사를 줄인다. 관측
+  visibility·to_transition 두 칸이 붙는다. 동족 시야·관측 2 의 분모·포식자는 그대로다. speed 를 함께 켜야 한다.
+  정의는 `_daynight_params`·`_daynight_update`, 통계는 `daynight_stats`. 낮 고정 세계(d = 0)는 v2.1 동역학 그대로다.
 
 행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
 `World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
@@ -122,6 +126,30 @@ WINDOW_STAT_COLUMNS = (
     "look_frac", "look_win_frac",
 )
 
+# daynight_stats 위상 구간 (계획서 6.1-6, 2-5 행): 낮 d ≤ 0.2, 박명 0.2 < d < 0.8, 밤 d ≥ 0.8. d 는 박명 폭 정수 스텝의
+# 유리수라 문턱 비교에 DN_TOL 여유를 둔다(관측 visibility 로 구간을 나누는 도구는 `daynight_seg_edges`).
+DN_EDGES = (0.2, 0.8)
+DN_TOL = 1e-9
+# start_induce 의 유도 에너지 범위(max_energy 비율). 배고픔 문턱 HUNGRY(0.5) 아래다
+INDUCE_ENERGY = (0.2, 0.5)
+# 개체-스텝 히스토그램 [위상 3, 배부름 2, 결정 때 은신처 안 2, 실제 보행 3, 경계 2, 먹이 셀 2]. 먹이 셀 = 이번 스텝의
+# 섭식 위치(이동 뒤) 셀의 기준 용량 cap0 > 0 (N5′ '먹이 셀', 10-06 사전 등록)
+DN_HIST_SHAPE = (3, 2, 2, 3, 2, 2)
+# B1·B2 위상 구간판 [경계 2, 위상 3, 명령 보행 3, 포식자 거리 구간 4, 배부름 2] (gait_stats 와 같은 정의, 위상 축만 더함)
+DN_B_SHAPE = (2, 3, 3, 1 + len(B1_EDGES) + 1, 2)
+# daynight_stats() 열 순서. env_v2/rollout.py 가 daynight 를 켠 세계의 행에 붙인다.
+DAYNIGHT_STAT_COLUMNS = (
+    "dn_period", "dn_offset", "dn_day_fixed", "dn_induced", "dark_mean", "frac_day", "frac_twi", "frac_night",
+    "pred_rate_day", "pred_rate_twi", "pred_rate_night",
+    "starve_rate_day", "starve_rate_twi", "starve_rate_night",
+    "intake_day", "intake_twi", "intake_night", "intake_ratio_nd", "drain_day", "drain_night",
+    "p_rest_cover_day", "p_rest_cover_night", "n1",
+    "p_eat_night_hungry", "p_eat_night_full", "n5p", "p_eat_day_hungry", "p_eat_day_full",
+    "p_stop_day", "p_stop_night", "p_run_day", "p_run_night", "p_cover_day", "p_cover_night",
+    "p_stop_night_hungry", "p_stop_night_full",
+    "b1_day", "b1_night", "b2_day", "b2_night", "n2",
+)
+
 
 WORLD_PARAM_KEYS = ("world_size", "predator_count", "pred_speed_mult", "ranged_frac", "cover_frac", "food_regen_mult")
 
@@ -168,17 +196,22 @@ def action_dim(cfg) -> int:
 def obs_names(cfg) -> tuple[str, ...]:
     """설정(또는 `Features`)의 세계가 내는 관측 이름. 순서 = 관측 열 번호 (계획서 4.2).
 
-    v1 7개(이름은 diagnose_v2.OBS_NAMES 와 같다) 뒤에 켠 기능의 관측이 붙는다: threat_recency(v2.2, idx 7).
+    v1 7개(이름은 diagnose_v2.OBS_NAMES 와 같다) 뒤에 켠 기능의 관측이 붙는다: threat_recency(v2.2),
+    visibility·to_transition(v2.4). 앞 기능을 끄면 뒤 칸이 당겨진다 — v2.1 위의 v2.4 는 visibility 가 idx 7,
+    to_transition 이 idx 8 이다(계획서 4.2 의 9·10 은 v2.2·v2.3 을 모두 했을 때 번호이고, idx 7~10 은 V2a 에서 확정한다).
+    도구는 칸을 번호가 아니라 이름으로 찾는다.
     """
     f = cfg if isinstance(cfg, Features) else features_of(cfg)
     names = OBS_NAMES_V1
     if f.enabled("vigilance"):
         names = names + ("threat_recency",)
+    if f.enabled("daynight"):
+        names = names + ("visibility", "to_transition")
     return names
 
 
 def obs_dim(cfg) -> int:
-    """설정의 세계가 내는 관측 수. v1·v2.0·v2.0b·v2.1 7, vigilance 를 켜면 8."""
+    """설정의 세계가 내는 관측 수. v1·v2.0·v2.0b·v2.1 7, vigilance 를 켜면 8, v2.1 + daynight 9."""
     return len(obs_names(cfg))
 
 
@@ -325,6 +358,100 @@ def _food_v_params(p: dict) -> dict:
     return dict(alpha=alpha, floor=floor, half_lives=half_lives, init_frac=(lo, hi))
 
 
+def _daynight_params(p: dict, f: Features) -> dict:
+    """daynight 계수(yaml 블록, 키는 `features.PARAM_KEYS`)의 값 범위를 검사한다. 기본값은 없다.
+
+    - periods: 하루 길이 T(스텝) 목록, 하나 이상의 양의 짝수 정수(낮·밤이 T/2 씩, 계획서 4.9.2 {600, 900, 1800})
+    - twilight ∈ (0, 0.25]: 전환 앞뒤 박명 폭(T 비율). twilight·T 는 정수 스텝이어야 한다(구간 문턱이 비트 단위로 같게)
+    - detect_night·eat_night·rest_night ∈ [0, 1]: 어둠 d 에서 (1 − x·d) 를 곱한다. 0 이면 그 효과가 없다
+    - fixed_day_frac ∈ [0, 1]: reset 마다 이 확률로 낮 고정 세계(d = 0, 관측은 중립값 1·1)
+    - transition_norm ≥ max(periods)/2: to_transition = 남은 스텝 / transition_norm (계약 900, 계획서 4.2)
+    - start_induce ∈ [0, 1]: 시작 상태 유도 비율(0 = 끔). `_daynight_reset`·`_respawn` docstring
+    speed 를 함께 켜야 한다(휴식 대사는 보행 상태의 정지 대사에 곱하고, 통계가 보행을 센다).
+    """
+    if not f.enabled("speed"):
+        raise ValueError("features.daynight 는 speed 를 함께 켜야 한다(v2.4 는 v2.1 위의 버전이다)")
+    per = p["periods"]
+    if not isinstance(per, (list, tuple)) or not per:
+        raise ValueError(f"features.daynight.periods 는 하루 길이(스텝) 목록이어야 한다. 받은 값: {per!r}")
+    periods = []
+    for x in per:
+        if isinstance(x, bool) or not isinstance(x, (int, np.integer)) or x <= 0 or x % 2:
+            raise ValueError(f"features.daynight.periods 는 양의 짝수 정수여야 한다. 받은 값: {list(per)}")
+        periods.append(int(x))
+    tw = _num("daynight", "twilight", p["twilight"])
+    if not 0.0 < tw <= 0.25:
+        raise ValueError(f"features.daynight.twilight 는 (0, 0.25] 의 T 비율이어야 한다. 받은 값: {tw}")
+    tw_steps = []
+    for T in periods:
+        k = tw * T
+        if abs(k - round(k)) > 1e-9 or round(k) < 1:
+            raise ValueError(f"features.daynight.twilight·T 는 1 이상의 정수 스텝이어야 한다. T={T}: {k}")
+        tw_steps.append(int(round(k)))
+    mult = {}
+    for key in ("detect_night", "eat_night", "rest_night", "fixed_day_frac", "start_induce"):
+        x = _num("daynight", key, p[key])
+        if not 0.0 <= x <= 1.0:
+            raise ValueError(f"features.daynight.{key} 는 [0, 1] 이어야 한다. 받은 값: {x}")
+        mult[key] = x
+    norm = _num("daynight", "transition_norm", p["transition_norm"])
+    if norm < max(periods) / 2:
+        raise ValueError(f"features.daynight.transition_norm 은 가장 긴 상 길이 {max(periods) // 2} 이상이어야 한다. "
+                         f"받은 값: {norm}")
+    return dict(periods=tuple(periods), tw_steps=tuple(tw_steps), transition_norm=norm, **mult)
+
+
+def daynight_phase(t: int, period: int, offset: int, tw_steps: int) -> tuple[float, int]:
+    """스텝 t 의 (어둠 d, 다음 전환까지 남은 스텝 r) (계획서 4.9.2). 낮 고정 세계는 부르지 않는다(d = 0).
+
+    s = (t + o) mod T, 낮 = s < T/2. e = s mod (T/2) 는 지난 전환 뒤 스텝, r = T/2 − e ∈ [1, T/2] 는 다음 전환까지.
+    k = min(e, r), τ = 박명 폭(정수 스텝). 낮이면 d = clip(0.5 − k/(2τ), 0, 1), 밤이면 clip(0.5 + k/(2τ), 0, 1) —
+    전환 순간 0.5, 전환 앞뒤 τ 스텝(계 0.1·T)에 걸쳐 0 과 1 을 선형으로 잇는다.
+    C++ 꼴: e = Now − PhaseStart, r = PhaseEnd − Now (스텝), bNight = Phase == Night.
+    """
+    h = period // 2
+    s = (int(t) + int(offset)) % period
+    e = s % h
+    r = h - e
+    k = min(e, r)
+    x = k / (2.0 * tw_steps)
+    d = min(0.5 + x, 1.0) if s >= h else max(0.5 - x, 0.0)
+    return d, r
+
+
+def daynight_draws(dn: dict, seed: int, n_agents: int) -> dict:
+    """세계 시드 하나가 정하는 낮밤 값(`World._daynight_reset` 이 같은 순서로 뽑는 값)을 세계를 만들지 않고 낸다.
+
+    daynight 스트림 part 0 에서 정확히 3개: u0 → 낮 고정(u0 < fixed_day_frac), u1 → T = periods[⌊u1·n⌋],
+    u2 → o = ⌊u2·T⌋. start_induce > 0 이면 part 2 에서 u → 유도(u < start_induce, 낮 고정이 아닐 때만)와 개체
+    에너지 n_agents 개(U[0.2, 0.5], 늘 뽑는다). 유도면 o = T/2 − ⌈0.1·T⌉ (해 지기 0.1·T 스텝 전에 시작한다).
+    """
+    g = feature_stream(int(seed), "daynight", 0)
+    u0, u1, u2 = g.random(3)
+    per = dn["periods"]
+    i = min(int(u1 * len(per)), len(per) - 1)
+    T = per[i]
+    out = dict(day_fixed=bool(u0 < dn["fixed_day_frac"]), period=T, offset=min(int(u2 * T), T - 1),
+               tw_steps=dn["tw_steps"][i], induced=False, energy=None)
+    if dn["start_induce"] > 0.0:
+        g2 = feature_stream(int(seed), "daynight", 2)
+        ui = float(g2.random())
+        energy = g2.uniform(INDUCE_ENERGY[0], INDUCE_ENERGY[1], n_agents)
+        if ui < dn["start_induce"] and not out["day_fixed"]:
+            out.update(induced=True, energy=energy, offset=T // 2 - int(math.ceil(0.1 * T)))
+    return out
+
+
+def daynight_seg_edges(detect_night: float, tol: float = 1e-5) -> tuple[float, float]:
+    """관측 visibility(float32)로 위상 구간을 나누는 문턱 (밤 | 박명 | 낮). `np.digitize(vis, edges)` 가 0 밤, 1 박명,
+    2 낮을 낸다: 밤 = vis ≤ 1 − 0.8·detect_night, 낮 = vis ≥ 1 − 0.2·detect_night (d 구간과 같다). d 의 이웃 값 사이
+    간격(≥ detect_night/(2τ))보다 훨씬 작은 tol 로 float32 반올림을 흡수한다. detect_night = 0 이면 나눌 수 없다.
+    """
+    if detect_night <= 0.0:
+        raise ValueError("detect_night = 0 이면 visibility 가 늘 1 이라 위상 구간을 관측으로 나눌 수 없다")
+    return (1.0 - DN_EDGES[1] * detect_night + tol, 1.0 - DN_EDGES[0] * detect_night - tol)
+
+
 class World:
     """N=128 슬롯 고정, 죽으면 그 슬롯에 리스폰 (§4.3).
 
@@ -348,12 +475,17 @@ class World:
                     if self.features.enabled("vigilance") else None)
         self._vw = (_window_params(self.features.params("vigil_window"), self.features)
                     if self.features.enabled("vigil_window") else None)
+        self._dn = (_daynight_params(self.features.params("daynight"), self.features)
+                    if self.features.enabled("daynight") else None)
         self.act_names: tuple[str, ...] = action_names(self.features)
         self.act_dim = len(self.act_names)
         self.obs_names: tuple[str, ...] = obs_names(self.features)
         self.obs_dim = len(self.obs_names)
         # 경계 행동 열. vigilance 를 끈 세계와 v2.2r action false 세계는 None 이다(경계가 일어나지 않는다)
         self._act_vig = self.act_names.index("vigilance") if "vigilance" in self.act_names else None
+        # v2.4 관측 열 (이름으로 찾는다). daynight 를 끈 세계는 None 이다
+        self._obs_vis = self.obs_names.index("visibility") if self._dn is not None else None
+        self._obs_tt = self.obs_names.index("to_transition") if self._dn is not None else None
         self.reset()
 
     # ------------------------------------------------------------------ #
@@ -404,6 +536,8 @@ class World:
             # v2.2r 스텝 뒤 훅 (replay_v2): 이번 스텝의 결정 때 창, 반사 돌아보기가 heading 을 바꾼 개체
             self.window = np.zeros(self.N, dtype=bool)
             self.looked = np.zeros(self.N, dtype=bool)
+        if self._dn is not None:
+            self._daynight_reset()
         self._reset_stats()
         self._g = self._geometry()
         if self._vg is not None:
@@ -515,6 +649,39 @@ class World:
         # 기록 (food_stats·food_cells): reset 뒤 셀별 누적 섭취, 마지막으로 뜯긴 스텝(self.t, 없으면 −1)
         self._fv_eaten = np.zeros_like(self.food_cap)
         self._fv_last_eat = np.full(self.food_cap.shape, -1, dtype=np.int64)
+
+    def _daynight_reset(self) -> None:
+        """v2.4 세계 생성 (계획서 4.9.2·4.7). v1 세계(`_build_world`, t = 0)를 다 만든 뒤 부른다.
+
+        daynight 스트림에서만 뽑는다(`daynight_draws`): part 0 에서 정확히 3개(낮 고정, T, o — 낮 고정 세계도 같은
+        수를 뽑는다), start_induce > 0 이면 part 2 에서 1 + N 개. 유도된 세계는 해 지기 0.1·T 스텝 전에 시작하고
+        초식 에너지가 U[0.2, 0.5]·max_energy 다. 그 뒤 t = 0 의 어둠·관측 값을 정한다(`_daynight_update`).
+        """
+        dn = self._dn
+        dr = daynight_draws(dn, self.seed, self.N)
+        self.dn_period, self.dn_offset = dr["period"], dr["offset"]
+        self.dn_tw, self.day_fixed, self.dn_induced = dr["tw_steps"], dr["day_fixed"], dr["induced"]
+        if dr["induced"]:
+            self.energy = dr["energy"] * self.cfg.max_energy
+        self._daynight_update()
+
+    def _daynight_update(self) -> None:
+        """지금 t 의 어둠 d·실효 탐지 반경·관측 두 칸 (계획서 4.9.2, 4.2). reset 과 `step` 의 t 증가 뒤에 부른다.
+
+        여기서 정한 값을 그 뒤 관측(8)과 다음 스텝의 동역학(섭식·휴식 대사)이 함께 쓴다 — 결정 때 값이다.
+        visibility = 1 − detect_night·d (날씨 w 는 v2.6, 지금 1), to_transition = min(r / transition_norm, 1).
+        낮 고정 세계는 d = 0, 반경 see_r, 관측 1·1 (중립값, 계획서 4.2)이다.
+        """
+        dn = self._dn
+        if self.day_fixed:
+            d, tt = 0.0, 1.0
+        else:
+            d, r = daynight_phase(self.t, self.dn_period, self.dn_offset, self.dn_tw)
+            tt = min(r / dn["transition_norm"], 1.0)
+        self.dark = d
+        self._vis = 1.0 - dn["detect_night"] * d
+        self._to_tr = tt
+        self._see_pred = self.cfg.see_r * self._vis
 
     # ------------------------------------------------------------------ #
     # 기하 (관측과 조향이 공유한다)
@@ -630,7 +797,10 @@ class World:
             ey = self.pred_pos[:, 1][None, :] - P[:, 1:2]
             pd = np.sqrt(ex * ex + ey * ey)
             pinv = 1.0 / np.maximum(pd, EPS)
-            pvis = (pd <= cfg.see_r) & ((ex * hx + ey * hy) * pinv >= fov_cos)
+            # v2.4: 초식의 포식자 탐지 반경만 see_r·(1 − detect_night·d) 로 준다(계획서 4.9.2 (a)). 동족 시야(위)·관측 2 의
+            # 분모·조향 도주 문턱(steering.py)은 see_r 그대로다. d = 0 이면 see_r·1.0 이라 v2.1 과 비트 단위로 같다
+            see_p = cfg.see_r if self._dn is None else self._see_pred
+            pvis = (pd <= see_p) & ((ex * hx + ey * hy) * pinv >= fov_cos)
             pred_count = pvis.sum(1)
             masked = np.where(pvis, pd, np.inf)
             j = masked.argmin(1)
@@ -705,6 +875,9 @@ class World:
         o[:, OBS_COVER_DISTANCE] = g["cover_dist"][sl]
         if self._vg is not None:
             o[:, OBS_THREAT_RECENCY] = self.threat[sl]
+        if self._dn is not None:        # v2.4 전역 값 두 칸 (계획서 4.2 visibility·to_transition, 이미 [0,1])
+            o[:, self._obs_vis] = self._vis
+            o[:, self._obs_tt] = self._to_tr
         return o
 
     def _observe_subset(self, idx: np.ndarray) -> np.ndarray:
@@ -806,10 +979,10 @@ class World:
         caught = self._step_predators()
 
         # 3) 섭식 · 대사 (§3.4 "에너지 획득 +1.0 × 획득량")
-        if self._sp is None and vg is None:
+        if self._sp is None and vg is None and self._dn is None:
             e_drained = self.energy - cfg.energy_drain
             gain = self._eat(e_drained)
-        else:                       # v2.1·v2.2: 대사와 섭식 배수가 이번 스텝의 실제 보행·경계를 따른다
+        else:                       # v2.1·v2.2·v2.4: 대사와 섭식 배수가 이번 스텝의 실제 보행·경계·어둠을 따른다
             drain, eat = self._drain_eat()
             e_drained = self.energy - drain
             gain = self._eat(e_drained, eat)
@@ -859,6 +1032,11 @@ class World:
         if vg is not None:            # 결정 때 상태(기하·threat_recency·시야·에너지)로 경계 지표를 센다
             flee = self._vigil_accumulate(a, e_prev, ema0, moving)
             self._wide = self.vigilant.copy()       # 8a) 이번 스텝에 경계한 개체의 다음 관측은 경계 시야다
+        if self._dn is not None:
+            # v2.4: 결정 때 어둠(이번 스텝 동역학의 d)으로 위상 지표를 센 뒤, 새 t 의 어둠·탐지 반경·관측 값을 정한다.
+            # 아래 8) 의 기하·관측과 다음 스텝의 섭식·휴식 대사가 이 값을 쓴다
+            self._daynight_accumulate(e_prev, caught, starved, e_new - e_drained, drain)
+            self._daynight_update()
 
         # 8) 관측 — 스텝당 observe() 한 번 (§4.5)
         g = self._geometry()
@@ -898,6 +1076,16 @@ class World:
             eat = np.ones(self.N)
         if self._vg is not None:
             eat = np.where(self.vigilant, self._vg["eat_mult"], eat)
+        if self._dn is not None:
+            # v2.4 (계획서 4.9.2 (b)(c)): 결정 때 어둠 d 로 섭식 × (1 − eat_night·d), 정지·비경계 개체의 대사 ×
+            # (1 − rest_night·d). 정지에는 방향이 없어 멈춘 개체(stall)도 든다. d = 0 이면 × 1.0 이라 v2.1 과 같다.
+            # C++ 꼴: Want *= GaitEat[G] * (1 − EatNight·D); Drain = EnergyDrain * DrainMult[G] * (bRest ? 1 − RestNight·D : 1)
+            dn, d = self._dn, self.dark
+            eat = eat * (1.0 - dn["eat_night"] * d)
+            rest = self.gait == GAIT_STOP
+            if self._vg is not None:
+                rest = rest & ~self.vigilant
+            drain = np.where(rest, drain * (1.0 - dn["rest_night"] * d), drain)
         return drain, eat
 
     def _vigil_step(self, v: np.ndarray, a_vig: np.ndarray, win: np.ndarray | None = None) -> np.ndarray:
@@ -1171,6 +1359,15 @@ class World:
             self._wide[dead] = False
             self._near[dead] = False            # 통계 전용 기준 상태도 새 개체로 (`_perceive`)
             self._tr_truth[dead] = 0.0
+        if self._dn is not None and self._dn["start_induce"] > 0.0:
+            # v2.4 시작 상태 유도(탐침 대응, 0 이면 없음): daynight 스트림 part 3 에서 리스폰 개체마다 2개(u, 에너지)를
+            # 늘 뽑고(소비가 결과와 무관하다) u < start_induce 면 에너지를 U[0.2, 0.5]·max_energy 로 둔다. 낮 고정 세계는
+            # reset 유도처럼 바꾸지 않는다(낮 고정 세계 = v2.1 동역학). v1 스트림 호출(위)은 그대로다
+            g = self.feature_rng("daynight", 3)
+            u = g.random(k)
+            e = g.uniform(INDUCE_ENERGY[0], INDUCE_ENERGY[1], k) * self.cfg.max_energy
+            if not self.day_fixed:
+                self.energy[dead] = np.where(u < self._dn["start_induce"], e, self.energy[dead])
 
     # ------------------------------------------------------------------ #
     # 통계 (§7.2)
@@ -1220,6 +1417,13 @@ class World:
         if self._vw is not None:     # v2.2r 창 지표 (window_stats). 개체-스텝 수다
             self._win_hist = np.zeros(WINDOW_HIST_SHAPE, dtype=np.int64)   # [구간 3, 배부름 2, 실제 정지 2, 경계 2]
             self._win_look = 0                         # 반사 돌아보기가 돈 개체-스텝
+        if self._dn is not None:     # v2.4 위상 지표 (daynight_stats). 위상 구간은 결정 때 어둠 d 다
+            self._dn_hist = np.zeros(DN_HIST_SHAPE, dtype=np.int64)
+            self._dn_b = np.zeros(DN_B_SHAPE, dtype=np.int64)
+            self._dn_dead = np.zeros((2, 3), dtype=np.int64)    # [피식, 아사] × 위상
+            self._dn_energy = np.zeros((2, 3))                  # [먹이 에너지, 대사] × 위상
+            self._dn_dark = 0.0                                 # 스텝별 d 합
+            self._dn_steps = 0
 
     def _accumulate(self, a, rew, repro, caught, starved, done) -> None:
         self._rew_total += float(rew.sum())
@@ -1546,6 +1750,115 @@ class World:
             look_frac=ratio(self._win_look, n), look_win_frac=ratio(self._win_look, nf[1].sum()),
         )
         assert tuple(out) == WINDOW_STAT_COLUMNS
+        return out
+
+    def _daynight_accumulate(self, e_prev, caught, starved, intake, drain) -> None:
+        """v2.4 위상 지표를 센다. `step` 이 다른 누적 뒤, `_daynight_update`·관측(8) 전에 부른다.
+
+        위상 구간은 이번 스텝 동역학이 쓴 결정 때 어둠 `self.dark` 다. 배부름·은신처 안·포식자 거리는 결정 때 상태
+        (`e_prev`, 스텝 전 기하 `self._g`), 보행은 이번 스텝의 실제 보행(B1·B2 는 gait_stats 처럼 명령 보행), 먹이 셀은
+        이번 스텝의 섭식 위치(이동 뒤 `self.pos`) 셀의 cap0 > 0 이다. 사망·섭취·대사는 이번 스텝 값이다.
+        """
+        cfg, g = self.cfg, self._g
+        d = self.dark
+        ph = 0 if d <= DN_EDGES[0] + DN_TOL else (2 if d >= DN_EDGES[1] - DN_TOL else 1)
+        full = e_prev >= HUNGRY * cfg.max_energy
+        vig = self.vigilant if self._vg is not None else np.zeros(self.N, dtype=bool)
+        ix, iy = self._cell_index(self.pos)
+        food_cell = self.food_cap[iy, ix] > 0.0
+        code = ((((ph * 2 + full) * 2 + g["in_cover"]) * 3 + self.gait) * 2 + vig) * 2 + food_cell
+        self._dn_hist += np.bincount(code, minlength=self._dn_hist.size).reshape(DN_HIST_SHAPE)
+        dd = g["d_pred_min"] / cfg.see_r
+        b = (dd < np.inf) * (1 + (dd >= B1_EDGES[0]) + (dd >= B1_EDGES[1]))
+        code = (((vig * 3 + ph) * 3 + self.gait_cmd) * 4 + b) * 2 + full
+        self._dn_b += np.bincount(code, minlength=self._dn_b.size).reshape(DN_B_SHAPE)
+        self._dn_dead[0, ph] += int(np.count_nonzero(caught))
+        self._dn_dead[1, ph] += int(np.count_nonzero(starved))
+        self._dn_energy[0, ph] += float(intake.sum())
+        self._dn_energy[1, ph] += float(drain.sum())
+        self._dn_dark += d
+        self._dn_steps += 1
+
+    def daynight_stats(self) -> dict:
+        """v2.4 위상 지표 — reset 뒤 누적 (계획서 6.2 N1·N5′·N2, 2-5 행 Gate N). 열 순서는 `DAYNIGHT_STAT_COLUMNS`.
+
+        위상 = 결정 때 어둠 d 의 구간(낮 d ≤ 0.2, 박명, 밤 d ≥ 0.8). 비율은 개체-스텝 기준이고 분모가 0 이면 nan 이다
+        (낮 고정 세계는 밤 열이 nan 이다).
+        - dn_period·dn_offset·dn_day_fixed·dn_induced: 이 세계의 T, 시작 위상, 낮 고정 여부, 시작 상태 유도 여부
+        - dark_mean: 스텝 평균 d. frac_day·frac_twi·frac_night: 위상 구간 개체-스텝 비율
+        - pred_rate_*·starve_rate_*: 위상 구간의 피식·아사 / 개체-스텝 (Gate N (a1)·(a3))
+        - intake_*·drain_*: 개체-스텝당 먹이 에너지·대사. intake_ratio_nd = intake_night / intake_day (Gate N (a2))
+        - p_rest_cover_*: P(결정 때 은신처 안 & 실제 정지 & 비경계). n1 = 밤 − 낮 (N1, 1차). 실제 보행이라 방향이 없어
+          멈춘 개체(stall)도 든다 — 상수 정책에서도 정확히 0 은 아니다(C2 최대 +0.002, 10-06 검토)
+        - p_eat_*_{hungry,full}: P(먹이 셀 & 실제 정지·걷기 & 비경계 | 위상, 결정 때 energy < 0.5 / ≥ 0.5).
+          n5p = p_eat_night_hungry − p_eat_night_full (N5′ 원값). 상태 분포 효과로 상수 정책에서도 크게 음수라(배고픈 개체는
+          먹이 밖에 있다) 1차 정의는 C1′(행동 순열) 대비 차다(results/v2/v2_4/PREREG.md 0절)
+        - p_stop_*·p_run_*·p_cover_*: 실제 정지·뛰기·결정 때 은신처 안 비율. p_stop_night_{hungry,full}: 밤의 배고픔별 정지
+        - b1_*·b2_*: gait_stats 의 B1·B2 를 위상 구간 안에서 잰 값(명령 보행, 경계 개체는 뛰지 않음·정지에서 뺀다)
+        - n2: P(경계 | 밤, 안 보임) − P(경계 | 낮, 안 보임) (2차). vigilance 를 끈 세계는 nan
+        """
+        nan = float("nan")
+        H = self._dn_hist                                       # [위상, 배부름, 은신처, 보행, 경계, 먹이 셀]
+
+        def ratio(x, y):
+            return float(x) / float(y) if y else nan
+
+        n_ph = H.reshape(3, -1).sum(1)
+        n_all = int(n_ph.sum())
+        rest_cover = H[:, :, 1, GAIT_STOP, 0, :].sum((1, 2))
+        eat = H[:, :, :, :2, 0, 1].sum((2, 3))                  # [위상, 배부름] 먹이 셀 & 정지·걷기 & 비경계
+        n_pf = H.sum((2, 3, 4, 5))                               # [위상, 배부름]
+        gait_ph = H.sum((1, 2, 4, 5))                            # [위상, 보행]
+        cover_ph = H[:, :, 1].sum((1, 2, 3, 4))
+        stop_pf = H[:, :, :, GAIT_STOP].sum((2, 3, 4))           # [위상, 배부름]
+
+        B = self._dn_b                                          # [경계, 위상, 명령, 거리 구간, 배부름]
+        Ball = B.sum(0)
+        B0 = B[0]
+
+        def b1(ph):
+            near = Ball[ph, :, 1:3].sum((1, 2))                 # [명령] 보임 & d < 0.5
+            un = Ball[ph, :, 0].sum(1)
+            near_run = B0[ph, GAIT_RUN, 1:3].sum()
+            un_run = B0[ph, GAIT_RUN, 0].sum()
+            return ratio(near_run, near.sum()) - ratio(un_run, un.sum())
+
+        def b2(ph):
+            st = B0[ph, GAIT_STOP].sum(0)                        # [배부름] 경계 아닌 명령 정지
+            nn = Ball[ph].sum((0, 1))
+            return ratio(st[0], nn[0]) - ratio(st[1], nn[1])
+
+        if self._vg is not None:
+            unseen = Ball.sum(1)[:, 0].sum(1)                   # [위상] 안 보임 개체-스텝
+            vig_un = B[1].sum(1)[:, 0].sum(1)
+            n2 = ratio(vig_un[2], unseen[2]) - ratio(vig_un[0], unseen[0])
+        else:
+            n2 = nan
+        e_day, e_twi, e_night = (self._dn_energy[0, k] for k in range(3))
+        out = dict(
+            dn_period=float(self.dn_period), dn_offset=float(self.dn_offset),
+            dn_day_fixed=float(self.day_fixed), dn_induced=float(self.dn_induced),
+            dark_mean=ratio(self._dn_dark, self._dn_steps),
+            frac_day=ratio(n_ph[0], n_all), frac_twi=ratio(n_ph[1], n_all), frac_night=ratio(n_ph[2], n_all),
+            pred_rate_day=ratio(self._dn_dead[0, 0], n_ph[0]), pred_rate_twi=ratio(self._dn_dead[0, 1], n_ph[1]),
+            pred_rate_night=ratio(self._dn_dead[0, 2], n_ph[2]),
+            starve_rate_day=ratio(self._dn_dead[1, 0], n_ph[0]), starve_rate_twi=ratio(self._dn_dead[1, 1], n_ph[1]),
+            starve_rate_night=ratio(self._dn_dead[1, 2], n_ph[2]),
+            intake_day=ratio(e_day, n_ph[0]), intake_twi=ratio(e_twi, n_ph[1]), intake_night=ratio(e_night, n_ph[2]),
+            intake_ratio_nd=ratio(ratio(e_night, n_ph[2]), ratio(e_day, n_ph[0])) if n_ph[0] and n_ph[2] else nan,
+            drain_day=ratio(self._dn_energy[1, 0], n_ph[0]), drain_night=ratio(self._dn_energy[1, 2], n_ph[2]),
+            p_rest_cover_day=ratio(rest_cover[0], n_ph[0]), p_rest_cover_night=ratio(rest_cover[2], n_ph[2]),
+            n1=ratio(rest_cover[2], n_ph[2]) - ratio(rest_cover[0], n_ph[0]),
+            p_eat_night_hungry=ratio(eat[2, 0], n_pf[2, 0]), p_eat_night_full=ratio(eat[2, 1], n_pf[2, 1]),
+            n5p=ratio(eat[2, 0], n_pf[2, 0]) - ratio(eat[2, 1], n_pf[2, 1]),
+            p_eat_day_hungry=ratio(eat[0, 0], n_pf[0, 0]), p_eat_day_full=ratio(eat[0, 1], n_pf[0, 1]),
+            p_stop_day=ratio(gait_ph[0, GAIT_STOP], n_ph[0]), p_stop_night=ratio(gait_ph[2, GAIT_STOP], n_ph[2]),
+            p_run_day=ratio(gait_ph[0, GAIT_RUN], n_ph[0]), p_run_night=ratio(gait_ph[2, GAIT_RUN], n_ph[2]),
+            p_cover_day=ratio(cover_ph[0], n_ph[0]), p_cover_night=ratio(cover_ph[2], n_ph[2]),
+            p_stop_night_hungry=ratio(stop_pf[2, 0], n_pf[2, 0]), p_stop_night_full=ratio(stop_pf[2, 1], n_pf[2, 1]),
+            b1_day=b1(0), b1_night=b1(2), b2_day=b2(0), b2_night=b2(2), n2=n2,
+        )
+        assert tuple(out) == DAYNIGHT_STAT_COLUMNS
         return out
 
     def stats(self) -> dict:

@@ -19,11 +19,12 @@ v1 에 없는 것:
   배열로 부른다. 결정·확률 모드 정책에는 없어 지금까지와 같은 값이 나온다.
 - **앞부분 제외.** `head` 를 주면 G_γ 평균에서 롤아웃 앞 `head` 스텝(리셋 과도기)도 뺀다 (6.1-4, 기본 0).
 - **행동·관측 수는 세계를 따른다** (`World.act_dim`: v1 4, speed 를 켜면 5, vigilance 까지 켜면 6.
-  `World.obs_dim`: v1 7, vigilance 를 켜면 8). 래퍼·확률 모드는 차원과 무관하다.
+  `World.obs_dim`: v1 7, vigilance 를 켜면 8, v2.1 + daynight 9). 래퍼·확률 모드는 차원과 무관하다.
   v1 의 4개짜리 정책(Utility)은 speed·vigilance 세계에 쓸 수 없다(World.step 이 모양을 검사한다). random 은 스펙의
   `act_dim` 으로 차원을 정한다(`adapt_spec`). speed 를 켠 세계의 행에는 `World.gait_stats()` 열이,
   vigilance 를 켠 세계의 행에는 `World.vigil_stats()` 열이 붙는다.
-  vigil_window(v2.2r)를 켠 세계의 행에는 `World.window_stats()` 열(WINDOW_COLUMNS)도 붙는다. 범주형 보행 CM 모델
+  vigil_window(v2.2r)를 켠 세계의 행에는 `World.window_stats()` 열(WINDOW_COLUMNS)도, daynight(v2.4)를 켠 세계의 행에는
+  `World.daynight_stats()` 열(DAYNIGHT_COLUMNS)도 붙는다. 범주형 보행 CM 모델
   (`env_v2/cm.py`)은 `_base_policy` 가 알아보고 CM 평가 정책(결정·유지 표본·확률)으로 돌린다.
 
 정책 스펙 예:
@@ -48,7 +49,7 @@ import numpy as np
 from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
-from .world import ACT_DIM, GAIT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS, World
+from .world import ACT_DIM, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS, World
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -63,6 +64,8 @@ GAIT_COLUMNS = [c for c in GAIT_STAT_COLUMNS if c not in EXTRA_COLUMNS]
 VIGIL_COLUMNS = list(VIGIL_STAT_COLUMNS)
 # vigil_window(v2.2r)를 켠 세계의 행에만 더 붙는 열 (World.window_stats)
 WINDOW_COLUMNS = list(WINDOW_STAT_COLUMNS)
+# daynight(v2.4)를 켠 세계의 행에만 더 붙는 열 (World.daynight_stats)
+DAYNIGHT_COLUMNS = list(DAYNIGHT_STAT_COLUMNS)
 
 
 # --------------------------------------------------------------------- #
@@ -734,6 +737,9 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     if w._vw is not None:
         ws = w.window_stats()
         s.update((c, ws[c]) for c in WINDOW_COLUMNS)
+    if w._dn is not None:
+        ds = w.daynight_stats()
+        s.update((c, ds[c]) for c in DAYNIGHT_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:

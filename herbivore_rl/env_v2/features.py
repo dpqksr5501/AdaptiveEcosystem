@@ -74,7 +74,7 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
-IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window"})
+IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -99,6 +99,14 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # 기능을 끄면(블록이 없으면) v2.2 그대로다 — vigilance 계수 키를 늘리지 않아 configs/v2_2.yaml 의 config_digest
     # (efc8f775f1e1)와 기록된 결과가 그대로 남는다(규칙 5 대신 새 기능 번호, 규칙 4)
     "vigil_window": frozenset({"action", "window_only", "look_back", "theta"}),
+    # v2.4 (env_v2/world.py `_daynight_params`, 계획서 4.9.2·4.2·#21): speed 를 함께 켜야 한다. periods = 하루 길이 T
+    # 목록(스텝, 짝수, reset 마다 하나), twilight = 전환 앞뒤 박명 폭(T 비율, 계획서 0.05), detect_night·eat_night·
+    # rest_night = 어둠 d 에서 포식자 탐지 반경·섭식·정지 비경계 개체의 휴식 대사에 곱하는 (1 − x·d) 의 x(0 = 그 밤 효과
+    # 끔, #21 이 Gate N 에서 실패한 항을 0 으로 뺀다), fixed_day_frac = 낮 고정 세계 비율(#27 기능 꺼진 세계, 1.0 이면
+    # 모든 세계가 낮 = v2.1 동역학), transition_norm = 관측 to_transition 의 분모(계약 상수 900), start_induce = 시작
+    # 상태 유도 비율(탐침 실패 때의 대응 1회, 0 = 끔: reset 의 해 질 녘 시작·낮은 에너지와 리스폰의 낮은 에너지)
+    "daynight": frozenset({"periods", "twilight", "detect_night", "eat_night", "rest_night", "fixed_day_frac",
+                           "transition_norm", "start_induce"}),
 })
 
 

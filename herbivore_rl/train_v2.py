@@ -69,7 +69,7 @@ from env_v2.cm import CMPolicy, N_STEER, cat_index
 from env_v2.config import load_v2_config
 from env_v2.vec_env import MultiWorldVecEnv, sigmoid
 from env_v2.world import (ACT_NAMES_V1, ACT_SPEED, GAIT_RUN, GAIT_STOP, GAIT_WALK, HUNGRY, OBS_ENERGY,
-                          OBS_PREDATOR_COUNT, RECENT_THREAT)
+                          OBS_PREDATOR_COUNT, RECENT_THREAT, daynight_seg_edges)
 from train import PPO_KWARGS, load_tuned, make_model
 
 ROOT = Path(__file__).resolve().parent
@@ -160,6 +160,10 @@ def probe_row(obs: np.ndarray, mu: np.ndarray, std: np.ndarray, act_names, obs_n
       p_stop_win·p_stop_calm, *_full(배부름 표본), b3_l_prob = p_stop_win_full − p_stop_calm_full (L 의 B3 확률판)
     - vigilance 가 있으면 p_vig·p_vig_win·p_vig_calm·p_vig_win_full·p_vig_win_hungry (W′ 의 창 안 사용률)
     - n·frac_win·frac_seen: 표본 수와 구간 비율. 분모가 0 이면 None
+    - visibility(v2.4)가 있으면 위상 구간(관측 visibility 로 나눈 낮·밤, `daynight_seg_edges`)별 p_stop_day·p_stop_night,
+      *_full·*_hungry, phase_use = p_stop_night − p_stop_day (기술용, 조기 중단에 쓰지 않는다), frac_day·frac_night.
+      낮 고정 세계(관측 1·1 — 낮밤이 도는 세계에서는 to_transition < 1 이거나 박명이다)는 낮에서 뺀다. 날씨 w 가 들어오는
+      v2.6 에서는 visibility 로 구간을 나눌 수 없어 d 기준으로 바꿔야 한다
     CM(`cat_probs` (n, K)·`categories`)이면 정지 확률은 정지 범주, 경계 확률은 look 범주의 확률이다(마스크 적용 뒤).
     """
     names, onames = list(act_names), list(obs_names)
@@ -190,6 +194,18 @@ def probe_row(obs: np.ndarray, mu: np.ndarray, std: np.ndarray, act_names, obs_n
         p_stop = 1.0 - side_probs(world._sp["thresholds"][0], mu[:, i], std[:, i])
         row["p_stop"] = mean(p_stop)
         row["speed_std"] = mean(std[:, i])
+    dn = getattr(world, "_dn", None)
+    if "speed" in names and "visibility" in onames and dn is not None and dn["detect_night"] > 0.0:
+        vis, tt = obs[:, onames.index("visibility")], obs[:, onames.index("to_transition")]
+        ph = np.digitize(vis, daynight_seg_edges(dn["detect_night"]))
+        fixed = (vis == 1.0) & (tt == 1.0)          # 낮 고정 세계(중립값 1·1)는 위상 구간에서 뺀다
+        night, day = ph == 0, (ph == 2) & ~fixed
+        row.update(frac_day=mean(day.astype(np.float64)), frac_night=mean(night.astype(np.float64)),
+                   p_stop_day=mean(p_stop, day), p_stop_night=mean(p_stop, night),
+                   p_stop_day_full=mean(p_stop, day & full), p_stop_night_full=mean(p_stop, night & full),
+                   p_stop_day_hungry=mean(p_stop, day & ~full), p_stop_night_hungry=mean(p_stop, night & ~full))
+        a, b = row["p_stop_night"], row["p_stop_day"]
+        row["phase_use"] = None if a is None or b is None else a - b
     if cat_probs is not None or "speed" in names:
         if win is not None:
             row.update(p_stop_win=mean(p_stop, win), p_stop_calm=mean(p_stop, calm),

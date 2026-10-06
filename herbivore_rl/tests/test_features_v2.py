@@ -187,27 +187,28 @@ def test_multiworld_worlds_have_their_own_streams(cfg2):
 
 @pytest.mark.parametrize("seed", [0, 636])
 def test_toggling_one_feature_keeps_other_streams(cfg2, monkeypatch, seed):
-    """food_v 를 켜고 끄고, 켠 쪽이 food_v 스트림을 마구 써도 daynight·weather 난수열은 같다.
+    """food_v 를 켜고 끄고, 켠 쪽이 food_v 스트림을 마구 써도 migration·weather 난수열은 같다.
 
     스트림 기반(번호·part·캐시)이 서로 격리되는지 본다. food_v 는 실제 구현(v2.0b 계수)으로 켜고,
-    daynight·weather 는 계수 없는 가짜 기능으로 켠다. 세계(pos, stats)는 비교하지 않는다 — 켠 쪽 세계가
+    migration·weather 는 계수 없는 가짜 기능으로 켠다(daynight 는 v2.4 에서 구현해 계수가 필요하므로 아직 구현하지 않은
+    기능으로 바꿨다). 세계(pos, stats)는 비교하지 않는다 — 켠 쪽 세계가
     바뀌는 게 정상이다. 기능 코드가 남의 스트림을 쓰지 않는지는
     test_implemented_features_use_only_their_own_streams 가 본다."""
-    monkeypatch.setattr(F, "IMPLEMENTED", F.IMPLEMENTED | {"food_v", "daynight", "weather"})
+    monkeypatch.setattr(F, "IMPLEMENTED", F.IMPLEMENTED | {"food_v", "migration", "weather"})
     on = WorldV2(_with_features(cfg2, {"food_v": dict(_yaml_block("food_v"), enabled=True),
-                                       "daynight": {"enabled": True},
+                                       "migration": {"enabled": True},
                                        "weather": {"enabled": True}}), seeds=[seed])
-    off = WorldV2(_with_features(cfg2, {"daynight": {"enabled": True},
+    off = WorldV2(_with_features(cfg2, {"migration": {"enabled": True},
                                         "weather": {"enabled": True}}), seeds=[seed])
-    assert on.features.active == ("food_v", "daynight", "weather")
-    assert off.features.active == ("daynight", "weather")
+    assert on.features.active == ("food_v", "migration", "weather")
+    assert off.features.active == ("migration", "weather")
 
     act = np.full((on.N, ACT_DIM), 0.5)
     got_on, got_off = [], []
     for t in range(40):
         on.feature_rng("food_v").random(37 + t)          # 켠 쪽만 food_v 난수를 쓴다
         on.feature_rng("food_v", part=1).normal(size=5)
-        for name in ("daynight", "weather"):
+        for name in ("migration", "weather"):
             for part in (0, 1):
                 got_on.append(on.feature_rng(name, part).random(3))
                 got_off.append(off.feature_rng(name, part).random(3))
@@ -219,7 +220,8 @@ def test_toggling_one_feature_keeps_other_streams(cfg2, monkeypatch, seed):
 
 # 다른 기능 위에 얹는 기능의 선행 기능. 혼자 켜면 World 가 거부하므로 선행 기능과 함께 켠다(번호 순).
 # vigil_window(v2.2r)는 vigilance 의 threat_recency·ThreatDir 와 speed 의 정지를 쓴다(env_v2/world.py `_window_params`).
-PREREQS = {"vigil_window": ("speed", "vigilance")}
+# daynight(v2.4)는 speed 의 보행(정지 대사·통계)을 쓴다(`_daynight_params`).
+PREREQS = {"vigil_window": ("speed", "vigilance"), "daynight": ("speed",)}
 
 
 def _implemented_cases():
