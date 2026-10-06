@@ -1,0 +1,7 @@
+{
+ "n_cells": 8,
+ "n_pos": 8,
+ "n_sig_neg": 0,
+ "pass_": true,
+ "config": "configs/v2_4s_on.yaml"
+}
