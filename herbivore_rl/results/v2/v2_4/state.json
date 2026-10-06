@@ -3,5 +3,8 @@
  "mode": "det",
  "probe_pass": false,
  "resp_mode": "det",
- "resp_pass": false
+ "resp_pass": false,
+ "confirm_config": "configs/v2_4.yaml",
+ "resp_used": false,
+ "record_only": true
 }

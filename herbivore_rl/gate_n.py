@@ -215,7 +215,7 @@ def cmd_report(a) -> int:
         j = judge(res)
         allj[res["meta"]["round"]] = dict(meta=res["meta"], scarce=res["scarce"], judge=j)
         v, it = j["verdict"], j["items"]
-        if v.get("a1") is None:
+        if "note" in v:                       # final 회차(안전 항목만)
             L.append(f"| {res['meta']['round']} | {', '.join(res['meta']['sets']) or '—'} | {_fmt(v['safety'])} | — | — | — "
                      f"| (안전 항목만) |")
             continue
