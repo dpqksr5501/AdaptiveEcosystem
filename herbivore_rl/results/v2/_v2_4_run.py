@@ -78,6 +78,10 @@ def jobs(stage: str) -> list[dict]:
     if stage == "confirm":
         return [{"stage": "confirm", "g": g, "seed": s, "name": f"v2_4c_g{g}_s{s}", "config": final_config("confirm"),
                  "save_at": ["5000000", "10000000"]} for s in (40, 41, 42)]
+    if stage == "diag":
+        return [{"stage": "diag", "g": g, "seed": s, "name": f"v2_4d_rest0_s{s}",
+                 "config": "results/v2/v2_4/diag/v2_4_rest0.yaml", "save_at": ["5000000", "10000000"]}
+                for s in (20, 21, 22)]
     raise SystemExit(f"모르는 단계 {stage}")
 
 
@@ -262,12 +266,12 @@ def cmd_eval(a) -> int:
                     todo.append((f"{n}|{sha}|{mode}|{c}", spec))
         run_conds(cfg, todo, EXPLORE_SEEDS, 5000, OUT / "probe" / "rows.json", a.workers)
         arm_level(cfg, EXPLORE_SEEDS, OUT / "probe" / "arm_rows.json", a.workers)
-    elif a.stage in ("resp", "confirm_explore"):
-        stage = "resp" if a.stage == "resp" else "confirm"
+    elif a.stage in ("resp", "confirm_explore", "diag"):
+        stage = {"resp": "resp", "diag": "diag"}.get(a.stage, "confirm")
         todo = []
         for n in models(stage):
             sha = _sha(n)[:12]
-            mode_list = list(MODES) if stage == "resp" else [st["mode"]]
+            mode_list = list(MODES) if stage == "resp" else [st["mode"]]           # diag 는 고른 모드만
             for mode in mode_list:
                 for c, spec in cond_specs(n, mode, cfg).items():
                     todo.append((f"{n}|{sha}|{mode}|{c}", spec))
@@ -534,7 +538,7 @@ def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     sub = ap.add_subparsers(dest="cmd", required=True)
     t = sub.add_parser("train")
-    t.add_argument("--stage", choices=["probe", "resp", "confirm"], required=True)
+    t.add_argument("--stage", choices=["probe", "resp", "confirm", "diag"], required=True)
     t.add_argument("--concurrency", type=int, default=6)
     t.add_argument("--poll", type=float, default=30.0)
     t.set_defaults(fn=cmd_train)
@@ -542,7 +546,7 @@ def main(argv=None) -> int:
     g.add_argument("--workers", type=int, default=16)
     g.set_defaults(fn=cmd_g27)
     e = sub.add_parser("eval")
-    e.add_argument("--stage", choices=["probe", "resp", "confirm", "confirm_explore"], required=True)
+    e.add_argument("--stage", choices=["probe", "resp", "confirm", "confirm_explore", "diag"], required=True)
     e.add_argument("--workers", type=int, default=16)
     e.set_defaults(fn=cmd_eval)
     r = sub.add_parser("garm")
