@@ -179,10 +179,12 @@ def judge(res) -> dict:
             p = _paired(d3)
             it[f"a3_{pn}"] = dict(**p, rule="아사율(on) − 아사율(휴식 할인 끔) < 0, 짝 t < −임계",
                                   pass_=bool(p["mean"] < 0 and p["t"] < -p["crit"]))
+    def _ok(k):
+        return bool(it[k]["pass_"]) if k in it else None       # 그 회차에서 돌리지 않은 정책의 항목은 None
+
     v = dict(safety=bool(it["safety_CSEG"]["pass_"] and it["safety_FIX"]["pass_"]),
-             a1=bool(it["a1_C2F"]["pass_"]), a2=bool(it["a2_C2"]["pass_"]),
-             a3=bool(it.get("a3_CSTOP", {}).get("pass_", False)))
-    v["prune"] = [k for k, ok in (("eat_night", v["a2"]), ("rest_night", v["a3"])) if not ok]
+             a1=_ok("a1_C2F"), a2=_ok("a2_C2"), a3=_ok("a3_CSTOP"))
+    v["prune"] = [k for k, ok in (("eat_night", v["a2"]), ("rest_night", v["a3"])) if ok is False]
     out["verdict"] = v
     return out
 
@@ -218,7 +220,8 @@ def cmd_report(a) -> int:
                      f"| (안전 항목만) |")
             continue
         L.append(f"| {res['meta']['round']} | {', '.join(res['meta']['sets']) or '—'} | {_fmt(v['safety'])} | "
-                 f"{_fmt(v['a1'])} (t {_fmt(it['a1_C2F']['t'], 3)}) | {_fmt(v['a2'])} ({_fmt(it['a2_C2']['ratio'], 3)}) | "
+                 f"{_fmt(v['a1'])} (t {_fmt(it.get('a1_C2F', {}).get('t'), 3)}) | {_fmt(v['a2'])} "
+                 f"({_fmt(it.get('a2_C2', {}).get('ratio'), 3)}) | "
                  f"{_fmt(v['a3'])} (t {_fmt(it.get('a3_CSTOP', {}).get('t'), 3)}) | {', '.join(v['prune']) or '없음'} |")
     for name, rec in allj.items():
         j, m = rec["judge"], rec["meta"]

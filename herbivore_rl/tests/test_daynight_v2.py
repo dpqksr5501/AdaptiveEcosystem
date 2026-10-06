@@ -108,7 +108,7 @@ def test_v2_4_config_is_v2_1_plus_daynight():
     dn = r4["features"]["daynight"]
     # eat_night 은 10-06 환경 확인 N (a2) 실패로 0(#21 가지치기, results/v2/v2_4/gate_n)
     assert dn == dict(enabled=True, periods=[600, 900, 1800], twilight=0.05, detect_night=0.5, eat_night=0.0,
-                      rest_night=0.35, fixed_day_frac=0.2, transition_norm=900, start_induce=0.0)
+                      rest_night=0.35, fixed_day_frac=0.2, transition_norm=900, start_induce=0.0, rest_cover_only=False)
     on = dict(r4)
     on["features"] = dict(r4["features"], daynight=dict(dn, fixed_day_frac=0.0))
     assert ron == on
@@ -511,3 +511,29 @@ def test_react_conditions_use_names_not_index():
     names8 = OBS9[:7] + ("threat_recency",)
     assert any("threat" in k for k in react_conditions(obs8, names8))
     assert any("threat" in k for k in react_conditions(obs8))           # 이름 없이 부르면 예전과 같다
+
+
+def test_rest_cover_only_discounts_only_stoppers_in_cover(cfg4):
+    """v2.4b rest_cover_only: 휴식 할인은 결정 때 은신처 안에서 멈춘 개체만 받는다. 끄면(v2.4) 모든 정지 개체가 받는다.
+    v2_4b.yaml 은 v2_4.yaml 에서 이 키와 version 만 다르다."""
+    w = World(_dn(cfg4, rest_cover_only=True), seeds=[10000])
+    w.gait = np.full(w.N, GAIT_STOP, dtype=np.int8)
+    _set_dark(w, 1.0)
+    w._g = w._geometry()
+    drain, _ = w._drain_eat()
+    inc = w._g["in_cover"]
+    assert inc.any() and (~inc).any()
+    base = w.cfg.energy_drain * w._sp["drain_mult"][GAIT_STOP]
+    np.testing.assert_array_equal(drain[inc], base * (1.0 - 0.35))
+    np.testing.assert_array_equal(drain[~inc], np.full((~inc).sum(), base))
+    w0 = World(cfg4, seeds=[10000])
+    w0.gait = np.full(w0.N, GAIT_STOP, dtype=np.int8)
+    _set_dark(w0, 1.0)
+    d0, _ = w0._drain_eat()
+    np.testing.assert_array_equal(d0, np.full(w0.N, base * (1.0 - 0.35)))
+    r4 = yaml.safe_load(V2_4.read_text(encoding="utf-8"))
+    r4b = yaml.safe_load((ROOT / "configs" / "v2_4b.yaml").read_text(encoding="utf-8"))
+    assert r4b["features"]["daynight"] == dict(r4["features"]["daynight"], rest_cover_only=True)
+    assert {k: v for k, v in r4b.items() if k not in ("features", "version")} ==         {k: v for k, v in r4.items() if k not in ("features", "version")}
+    with pytest.raises(ValueError, match="rest_cover_only"):
+        World(_dn(cfg4, rest_cover_only=1), seeds=[0])

@@ -1,5 +1,7 @@
 {
  "gamma_sel": "995",
  "mode": "det",
- "probe_pass": false
+ "probe_pass": false,
+ "resp_mode": "det",
+ "resp_pass": false
 }

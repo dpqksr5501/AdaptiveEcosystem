@@ -104,9 +104,11 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # rest_night = 어둠 d 에서 포식자 탐지 반경·섭식·정지 비경계 개체의 휴식 대사에 곱하는 (1 − x·d) 의 x(0 = 그 밤 효과
     # 끔, #21 이 Gate N 에서 실패한 항을 0 으로 뺀다), fixed_day_frac = 낮 고정 세계 비율(#27 기능 꺼진 세계, 1.0 이면
     # 모든 세계가 낮 = v2.1 동역학), transition_norm = 관측 to_transition 의 분모(계약 상수 900), start_induce = 시작
-    # 상태 유도 비율(탐침 실패 때의 대응 1회, 0 = 끔: reset 의 해 질 녘 시작·낮은 에너지와 리스폰의 낮은 에너지)
+    # 상태 유도 비율(탐침 실패 때의 대응 1회, 0 = 끔: reset 의 해 질 녘 시작·낮은 에너지와 리스폰의 낮은 에너지).
+    # rest_cover_only(10-06 v2.4b, results/v2/v2_4/MEMO.md 변경 기록): true 면 휴식 할인을 은신처 안(결정 때)에서 멈춘 개체만
+    # 받는다. false = v2.4 그대로(규칙 5 의 끔 값)
     "daynight": frozenset({"periods", "twilight", "detect_night", "eat_night", "rest_night", "fixed_day_frac",
-                           "transition_norm", "start_induce"}),
+                           "transition_norm", "start_induce", "rest_cover_only"}),
 })
 
 

@@ -82,6 +82,8 @@ features:
     transition_norm: 900
     # 시작 상태 유도(탐침 대응 1회용, results/v2/v2_4/MEMO.md). 0 = 끔
     start_induce: 0.0
+    # 휴식 할인을 은신처 안에서 멈춘 개체만 받나(v2.4b, 10-06 추가 — false = v2.4 그대로, features.py 규칙 5)
+    rest_cover_only: false
 
 train:
   # configs/v2_1.yaml 과 같고 reset_interval 만 5000 이다(계획서 4.7: v2.4부터 5000 = 주기 1800 의 약 2.8배).

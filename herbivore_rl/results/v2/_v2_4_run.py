@@ -33,6 +33,20 @@ sys.path.insert(0, str(ROOT))
 import numpy as np  # noqa: E402
 
 OUT = ROOT / "results" / "v2" / "v2_4"
+C2DIR = OUT / "c2"              # v2.4 판정 세계에서 찾은 C2·C2-seg 상수(변형 세계에서도 이 상수를 그 세계로 잰다)
+# 변형(--variant): base = v2.4, b = v2.4b(휴식 할인 은신처 안만, MEMO 변경 기록 10-06 19:00). 출력·상태·이름이 따로다
+PREFIX, TRAIN_CFG, ON_CFG = "v2_4", "configs/v2_4.yaml", "configs/v2_4_on.yaml"
+
+
+def set_variant(v: str) -> None:
+    global OUT, PREFIX, TRAIN_CFG, ON_CFG
+    if v == "b":
+        OUT = ROOT / "results" / "v2" / "v2_4" / "b"
+        PREFIX, TRAIN_CFG, ON_CFG = "v2_4b", "configs/v2_4b.yaml", "configs/v2_4b_on.yaml"
+        st = load_json(OUT / "state.json", {})
+        if "gamma_sel" not in st:          # #27 은 v2.4 에서 정했다(γ 0.995)
+            st["gamma_sel"] = "995"
+            save_json(OUT / "state.json", st)
 CKPT = ROOT / "ckpt" / "v2"
 GAMMA = 0.9916661555611042
 EXPLORE_SEEDS = list(range(12000, 12040))
@@ -62,21 +76,22 @@ def final_config(stage: str) -> str:
     st = state()
     if stage == "resp":
         return "configs/v2_4_ind.yaml"
-    return st.get("confirm_config", "configs/v2_4.yaml") if stage == "confirm" else "configs/v2_4.yaml"
+    return st.get("confirm_config", TRAIN_CFG) if stage == "confirm" else TRAIN_CFG
 
 
 def jobs(stage: str) -> list[dict]:
     if stage == "probe":
-        return [{"stage": "probe", "g": g, "seed": s, "name": f"v2_4p_g{g}_s{s}", "config": "configs/v2_4.yaml",
-                 "save_at": ["2000000", "5000000", "10000000"]} for s in (20, 21, 22) for g in GAMMAS]
+        gs = list(GAMMAS) if PREFIX == "v2_4" else [state().get("gamma_sel", "995")]
+        return [{"stage": "probe", "g": g, "seed": s, "name": f"{PREFIX}p_g{g}_s{s}", "config": TRAIN_CFG,
+                 "save_at": ["2000000", "5000000", "10000000"]} for s in (20, 21, 22) for g in gs]
     g = state().get("gamma_sel")
     if g is None:
         raise SystemExit("state.json 에 gamma_sel 이 없다 — g27 판정 뒤에 돌린다")
     if stage == "resp":
-        return [{"stage": "resp", "g": g, "seed": s, "name": f"v2_4r_g{g}_s{s}", "config": final_config("resp"),
+        return [{"stage": "resp", "g": g, "seed": s, "name": f"{PREFIX}r_g{g}_s{s}", "config": final_config("resp"),
                  "save_at": ["2000000", "5000000", "10000000"]} for s in (20, 21, 22)]
     if stage == "confirm":
-        return [{"stage": "confirm", "g": g, "seed": s, "name": f"v2_4c_g{g}_s{s}", "config": final_config("confirm"),
+        return [{"stage": "confirm", "g": g, "seed": s, "name": f"{PREFIX}c_g{g}_s{s}", "config": final_config("confirm"),
                  "save_at": ["5000000", "10000000"]} for s in (40, 41, 42)]
     if stage == "diag":
         return [{"stage": "diag", "g": g, "seed": s, "name": f"v2_4d_rest0_s{s}",
@@ -186,7 +201,7 @@ def run_conds(cfg, todo: list[tuple[str, dict]], seeds, steps, path: Path, worke
 def on_cfg():
     from env_v2.config import load_v2_config
 
-    return load_v2_config(ROOT / state().get("on_config", "configs/v2_4_on.yaml"))
+    return load_v2_config(ROOT / state().get("on_config", ON_CFG))
 
 
 def models(stage: str) -> list[str]:
@@ -194,7 +209,7 @@ def models(stage: str) -> list[str]:
     if stage == "probe":
         g = st.get("gamma_sel")
         gs = [g] if g else list(GAMMAS)
-        return [f"v2_4p_g{g}_s{s}" for g in gs for s in (20, 21, 22) if (CKPT / f"v2_4p_g{g}_s{s}.zip").exists()]
+        return [f"{PREFIX}p_g{g}_s{s}" for g in gs for s in (20, 21, 22) if (CKPT / f"{PREFIX}p_g{g}_s{s}.zip").exists()]
     return [j["name"] for j in jobs(stage) if (CKPT / f"{j['name']}.zip").exists()]
 
 
@@ -293,10 +308,10 @@ def arm_level(cfg, seeds, path: Path, workers: int) -> None:
     import daynight_v2 as dnv
 
     todo = []
-    c2 = load_json(OUT / "c2" / "constsearch.json")
+    c2 = load_json(C2DIR / "constsearch.json")
     if c2:
         todo.append(("C2", {"kind": "fixed", "action": c2["best"]}))
-    seg = load_json(OUT / "c2" / "constsearch_seg.json")
+    seg = load_json(C2DIR / "constsearch_seg.json")
     if seg:
         todo.append(("C2seg", {"policy": {"kind": "fixed", "action": seg["base_action"]},
                                "wrap": [{"kind": "seg_const", "bins": seg["bins"], "dims": seg["dims"],
@@ -345,7 +360,7 @@ def model_table(d: dict, names, mode) -> dict:
     return out
 
 
-KEYS = ("g_gamma", "starve_rate", "pred_rate", "n1", "n5p", "b1_day", "b1_night", "b2_day", "survival", "repro",
+KEYS = ("g_gamma", "starve_rate", "predation_rate", "n1", "n5p", "b1_day", "b1_night", "b2_day", "survival", "repro",
         "p_rest_cover_night", "p_rest_cover_day", "p_eat_night_hungry", "p_eat_night_full", "p_stop_night", "p_stop_day")
 
 
@@ -366,17 +381,18 @@ def choose_mode(d, names) -> dict:
     return dict(mode=mode, hold_minus_det=t)
 
 
-def judge_probe(a) -> dict:
+def judge_probe(a, stage: str = "probe") -> dict:
+    """탐침 판정(MEMO 3절). stage = probe(탐침 팔), resp(대응 팔, 같은 규칙), diag(진단 팔, 기술 — 결정 모드만 잰다)."""
     from scipy.stats import mannwhitneyu
 
     st = state()
     d = load_json(OUT / "probe" / "rows.json")
     arm = load_json(OUT / "probe" / "arm_rows.json")
-    names = models("probe")
-    mc = choose_mode(d, names)
+    names = models(stage)
+    mc = choose_mode(d, names) if stage != "diag" else dict(mode="det", hold_minus_det=None)
     mode = mc["mode"]
     tab = model_table(d, names, mode)
-    res = dict(stage="probe", models=names, gamma_sel=st.get("gamma_sel"), mode=mc, checks={}, report={})
+    res = dict(stage=stage, models=names, gamma_sel=st.get("gamma_sel"), mode=mc, checks={}, report={})
     ck, rp = res["checks"], res["report"]
     c0 = {k: arm_series(tab, "C0", k) for k in KEYS}
     c4 = {k: arm_series(tab, "C4phase", k) for k in KEYS}
@@ -404,7 +420,7 @@ def judge_probe(a) -> dict:
     ck["iv"] = dict(pass_=bool(mw.pvalue >= 0.05), p=float(mw.pvalue), b1_probe=b1_probe,
                     b1_ref_median=float(np.median(b1_ref)), n_ge_03=int(sum(x >= 0.3 for x in b1_probe)))
     res["pass"] = bool(all(c["pass_"] for c in ck.values()))
-    for k in ("n1", "n5p", "g_gamma", "starve_rate", "pred_rate", "b1_day", "b1_night", "b2_day", "survival"):
+    for k in ("n1", "n5p", "g_gamma", "starve_rate", "predation_rate", "b1_day", "b1_night", "b2_day", "survival"):
         rp[k] = dict(C0=float(np.nanmean(c0[k])), C4phase=float(np.nanmean(c4[k])),
                      C1p=float(np.nanmean(arm_series(tab, "C1p", k))))
     rp["n5p_rel"] = float(np.nanmean(n5r))
@@ -416,7 +432,7 @@ def judge_probe(a) -> dict:
     for k in ("C2", "C2seg", "FIX", "OVL"):
         if k in arm["rows"]:
             rp[f"arm_{k}"] = {kk: float(np.nanmean(_series(arm["rows"][k], kk))) for kk in ("g_gamma", "n1", "n5p",
-                                                                                         "starve_rate", "pred_rate")}
+                                                                                         "starve_rate", "predation_rate")}
     en = arm_series(tab, "C4en", "n5p") - arm_series(tab, "C1p", "n5p")
     rp["c4_energy_night_n5p_rel"] = float(np.nanmean(en))
     return res
@@ -463,7 +479,7 @@ def judge_confirm(a) -> dict:
     c2g = float(np.mean(_series(arm["rows"]["C2"], "g_gamma"))) if "C2" in arm["rows"] else float("nan")
     per = {n: dict(g=float(np.nanmean(_series(tab[n]["C0"], "g_gamma"))),
                    starve=float(np.nanmean(_series(tab[n]["C0"], "starve_rate"))),
-                   pred=float(np.nanmean(_series(tab[n]["C0"], "pred_rate"))),
+                   pred=float(np.nanmean(_series(tab[n]["C0"], "predation_rate"))),
                    b1_day=float(np.nanmean(_series(tab[n]["C0"], "b1_day"))),
                    survival=float(np.nanmean(_series(tab[n]["C0"], "survival")))) for n in names}
     rp["per_model"] = per
@@ -520,13 +536,17 @@ def cmd_judge(a) -> int:
         save_json(OUT / "confirm" / "judge.json", res)
         print(json.dumps({k: res[k] for k in ("primary", "release")}, ensure_ascii=False, indent=1, default=str))
         return 0
-    if a.stage == "probe":
-        res = judge_probe(a)
+    if a.stage in ("probe", "resp", "diag"):
+        res = judge_probe(a, a.stage)
         res["created"] = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        save_json(OUT / "probe" / "judge.json", res)
+        save_json(OUT / "probe" / ("judge.json" if a.stage == "probe" else f"judge_{a.stage}.json"), res)
         st = state()
-        st["mode"] = res["mode"]["mode"]
-        st["probe_pass"] = res["pass"]
+        if a.stage == "probe":
+            st["mode"] = res["mode"]["mode"]
+            st["probe_pass"] = res["pass"]
+        elif a.stage == "resp":
+            st["resp_mode"] = res["mode"]["mode"]
+            st["resp_pass"] = res["pass"]
         save_json(OUT / "state.json", st)
         print(json.dumps({k: res[k] for k in ("pass", "mode", "checks")}, ensure_ascii=False, indent=1, default=str))
     else:
@@ -553,9 +573,11 @@ def main(argv=None) -> int:
     r.add_argument("--workers", type=int, default=16)
     r.set_defaults(fn=cmd_garm)
     j = sub.add_parser("judge")
-    j.add_argument("--stage", choices=["probe", "confirm"], required=True)
+    j.add_argument("--stage", choices=["probe", "resp", "diag", "confirm"], required=True)
     j.set_defaults(fn=cmd_judge)
+    ap.add_argument("--variant", choices=["base", "b"], default="base")
     a = ap.parse_args(argv)
+    set_variant(a.variant)
     return a.fn(a)
 
 

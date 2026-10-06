@@ -367,6 +367,7 @@ def _daynight_params(p: dict, f: Features) -> dict:
     - fixed_day_frac ∈ [0, 1]: reset 마다 이 확률로 낮 고정 세계(d = 0, 관측은 중립값 1·1)
     - transition_norm ≥ max(periods)/2: to_transition = 남은 스텝 / transition_norm (계약 900, 계획서 4.2)
     - start_induce ∈ [0, 1]: 시작 상태 유도 비율(0 = 끔). `_daynight_reset`·`_respawn` docstring
+    - rest_cover_only (bool): true 면 휴식 할인을 결정 때 은신처 안에서 멈춘 개체만 받는다(v2.4b). false = v2.4
     speed 를 함께 켜야 한다(휴식 대사는 보행 상태의 정지 대사에 곱하고, 통계가 보행을 센다).
     """
     if not f.enabled("speed"):
@@ -394,11 +395,14 @@ def _daynight_params(p: dict, f: Features) -> dict:
         if not 0.0 <= x <= 1.0:
             raise ValueError(f"features.daynight.{key} 는 [0, 1] 이어야 한다. 받은 값: {x}")
         mult[key] = x
+    rco = p["rest_cover_only"]
+    if not isinstance(rco, bool):
+        raise ValueError(f"features.daynight.rest_cover_only 는 true/false 여야 한다. 받은 값: {rco!r}")
     norm = _num("daynight", "transition_norm", p["transition_norm"])
     if norm < max(periods) / 2:
         raise ValueError(f"features.daynight.transition_norm 은 가장 긴 상 길이 {max(periods) // 2} 이상이어야 한다. "
                          f"받은 값: {norm}")
-    return dict(periods=tuple(periods), tw_steps=tuple(tw_steps), transition_norm=norm, **mult)
+    return dict(periods=tuple(periods), tw_steps=tuple(tw_steps), transition_norm=norm, rest_cover_only=rco, **mult)
 
 
 def daynight_phase(t: int, period: int, offset: int, tw_steps: int) -> tuple[float, int]:
@@ -1085,6 +1089,8 @@ class World:
             rest = self.gait == GAIT_STOP
             if self._vg is not None:
                 rest = rest & ~self.vigilant
+            if dn["rest_cover_only"]:       # v2.4b: 은신처 안에서 멈춘 개체만(정지 개체는 움직이지 않아 결정 때 위치 그대로)
+                rest = rest & self._g["in_cover"]
             drain = np.where(rest, drain * (1.0 - dn["rest_night"] * d), drain)
         return drain, eat
 
