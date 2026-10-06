@@ -1,5 +1,10 @@
 {
  "gamma_sel": "995",
  "mode": "det",
- "probe_pass": false
+ "probe_pass": false,
+ "resp_mode": "hold",
+ "resp_pass": false,
+ "confirm_config": "configs/v2_4s.yaml",
+ "resp_used": false,
+ "record_only": true
 }
