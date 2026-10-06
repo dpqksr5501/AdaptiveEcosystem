@@ -1,0 +1,13 @@
+SR1 2차: 후보 6개, K2-B 2개 (학습 5,000,000, 평가 시드 20 × 5000스텝, 사전 등록 값 아님)
+  새로   v20_a_m3k0p1_s0_5000k        시즌 a   → runs\season\sr1_5m\train\v20_a_m3k0p1_s0_5000k.zip
+  새로   v20_a_m3k0p1_s1_5000k        시즌 a   → runs\season\sr1_5m\train\v20_a_m3k0p1_s1_5000k.zip
+  새로   v20_b_m3k0p1_s0_5000k        시즌 b   → runs\season\sr1_5m\train\v20_b_m3k0p1_s0_5000k.zip
+  새로   v20_b_m3k0p1_s1_5000k        시즌 b   → runs\season\sr1_5m\train\v20_b_m3k0p1_s1_5000k.zip
+  새로   v20_c_m3k0p1_s0_5000k        시즌 c   → runs\season\sr1_5m\train\v20_c_m3k0p1_s0_5000k.zip
+  새로   v20_c_m3k0p1_s1_5000k        시즌 c   → runs\season\sr1_5m\train\v20_c_m3k0p1_s1_5000k.zip
+  새로   v20_k2b_m3k0p1_s0_5000k      K2-B   → runs\season\sr1_5m\train\v20_k2b_m3k0p1_s0_5000k.zip
+  새로   v20_k2b_m3k0p1_s1_5000k      K2-B   → runs\season\sr1_5m\train\v20_k2b_m3k0p1_s1_5000k.zip
+평가 잡(캐시 밖): 840 (G 360, Ge 300, B 180), 보류 재확인 최대 300
+계산 추정(10-02 유휴 단가): 학습 8회 ÷ 3 동시 → 8분, 평가 840잡 ÷ 8워커 → 17분, 합 24분 (+ 보류 재확인 최대 6분)
+코어: 학습 3 × 3 스레드, 평가 8 워커 (차례로 돈다)
+[학습] 8개, 3개씩, 스레드 3
