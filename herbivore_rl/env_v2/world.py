@@ -29,6 +29,10 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
   (낮 0, 밤 1, 전환 앞뒤 박명은 선형)가 초식의 포식자 탐지 반경·섭식·정지 비경계 개체의 휴식 대사를 줄인다. 관측
   visibility·to_transition 두 칸이 붙는다. 동족 시야·관측 2 의 분모·포식자는 그대로다. speed 를 함께 켜야 한다.
   정의는 `_daynight_params`·`_daynight_update`, 통계는 `daynight_stats`. 낮 고정 세계(d = 0)는 v2.1 동역학 그대로다.
+- pred_sleep (v2.4s, 10-07 사용자 결정 A안): daynight 위에 얹는다. 세계마다 야행성 비율 q 를 뽑고 포식자마다 확률 q 로
+  야행성을 정한다(자기 스트림). 주행성 포식자는 어둠 d ≥ sleep_dark 면 잔다 — 멈추고 사냥하지 않고 초식 시야에 보이지
+  않는다(굴에 있다). 깨어 있는 주행성 포식자는 twilight_slow 면 속력이 (1 − d) 배다. 야행성은 v2.4 그대로 움직인다.
+  정의는 `_pred_sleep_params`·`_daynight_update`, 통계는 `pred_sleep_stats`.
 
 행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
 `World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
@@ -130,6 +134,8 @@ WINDOW_STAT_COLUMNS = (
 # 유리수라 문턱 비교에 DN_TOL 여유를 둔다(관측 visibility 로 구간을 나누는 도구는 `daynight_seg_edges`).
 DN_EDGES = (0.2, 0.8)
 DN_TOL = 1e-9
+# pred_sleep_stats() 열 순서 (v2.4s). env_v2/rollout.py 가 pred_sleep 을 켠 세계의 행에 붙인다.
+PSLEEP_STAT_COLUMNS = ("pred_noct_frac", "pred_noct_n", "pred_asleep_mean")
 # start_induce 의 유도 에너지 범위(max_energy 비율). 배고픔 문턱 HUNGRY(0.5) 아래다
 INDUCE_ENERGY = (0.2, 0.5)
 # 개체-스텝 히스토그램 [위상 3, 배부름 2, 결정 때 은신처 안 2, 실제 보행 3, 경계 2, 먹이 셀 2]. 먹이 셀 = 이번 스텝의
@@ -405,6 +411,31 @@ def _daynight_params(p: dict, f: Features) -> dict:
     return dict(periods=tuple(periods), tw_steps=tuple(tw_steps), transition_norm=norm, rest_cover_only=rco, **mult)
 
 
+def _pred_sleep_params(p: dict, f: Features) -> dict:
+    """pred_sleep 계수(yaml 블록, 키는 `features.PARAM_KEYS`)를 검사한다. 기본값은 없다.
+
+    - nocturnal_frac = [하, 상], 0 ≤ 하 ≤ 상 ≤ 1: reset 마다 야행성 비율 q ~ U[하, 상]
+    - sleep_dark ∈ (0, 1]: 주행성 포식자가 자는 어둠 문턱(d ≥ sleep_dark)
+    - twilight_slow (bool): 깨어 있는 주행성 포식자 속력 × (1 − d)
+    daynight 를 함께 켜야 한다(어둠 d 가 거기 있다).
+    """
+    if not f.enabled("daynight"):
+        raise ValueError("features.pred_sleep 은 daynight 를 함께 켜야 한다(어둠 d 가 daynight 에 있다)")
+    fr = p["nocturnal_frac"]
+    if not isinstance(fr, (list, tuple)) or len(fr) != 2:
+        raise ValueError(f"features.pred_sleep.nocturnal_frac 는 [하, 상] 두 값이어야 한다. 받은 값: {fr!r}")
+    lo, hi = (_num("pred_sleep", "nocturnal_frac", x) for x in fr)
+    if not 0.0 <= lo <= hi <= 1.0:
+        raise ValueError(f"features.pred_sleep.nocturnal_frac 는 0 ≤ 하 ≤ 상 ≤ 1 이어야 한다. 받은 값: {[lo, hi]}")
+    sd = _num("pred_sleep", "sleep_dark", p["sleep_dark"])
+    if not 0.0 < sd <= 1.0:
+        raise ValueError(f"features.pred_sleep.sleep_dark 는 (0, 1] 이어야 한다. 받은 값: {sd}")
+    ts = p["twilight_slow"]
+    if not isinstance(ts, bool):
+        raise ValueError(f"features.pred_sleep.twilight_slow 는 true/false 여야 한다. 받은 값: {ts!r}")
+    return dict(nocturnal_frac=(lo, hi), sleep_dark=sd, twilight_slow=ts)
+
+
 def daynight_phase(t: int, period: int, offset: int, tw_steps: int) -> tuple[float, int]:
     """스텝 t 의 (어둠 d, 다음 전환까지 남은 스텝 r) (계획서 4.9.2). 낮 고정 세계는 부르지 않는다(d = 0).
 
@@ -481,6 +512,8 @@ class World:
                     if self.features.enabled("vigil_window") else None)
         self._dn = (_daynight_params(self.features.params("daynight"), self.features)
                     if self.features.enabled("daynight") else None)
+        self._ps = (_pred_sleep_params(self.features.params("pred_sleep"), self.features)
+                    if self.features.enabled("pred_sleep") else None)
         self.act_names: tuple[str, ...] = action_names(self.features)
         self.act_dim = len(self.act_names)
         self.obs_names: tuple[str, ...] = obs_names(self.features)
@@ -540,6 +573,8 @@ class World:
             # v2.2r 스텝 뒤 훅 (replay_v2): 이번 스텝의 결정 때 창, 반사 돌아보기가 heading 을 바꾼 개체
             self.window = np.zeros(self.N, dtype=bool)
             self.looked = np.zeros(self.N, dtype=bool)
+        if self._ps is not None:
+            self._pred_sleep_reset()
         if self._dn is not None:
             self._daynight_reset()
         self._reset_stats()
@@ -669,6 +704,19 @@ class World:
             self.energy = dr["energy"] * self.cfg.max_energy
         self._daynight_update()
 
+    def _pred_sleep_reset(self) -> None:
+        """v2.4s 세계 생성. pred_sleep 스트림 part 0 에서 1 + M 개: q ~ U[nocturnal_frac], 포식자마다 u < q 면 야행성.
+        포식자 배치(`_build_world`)를 만든 뒤, 어둠을 정하는 `_daynight_reset` 전에 부른다."""
+        g = self.feature_rng("pred_sleep", 0)
+        lo, hi = self._ps["nocturnal_frac"]
+        q = float(g.uniform(lo, hi))
+        u = g.random(self.M)
+        self.pred_noct_frac = q
+        self.pred_nocturnal = u < q
+        self.pred_asleep = np.zeros(self.M, dtype=bool)
+        self._pred_speed_mult = np.ones(self.M)
+        self._ps_asleep_sum, self._ps_steps = 0.0, 0
+
     def _daynight_update(self) -> None:
         """지금 t 의 어둠 d·실효 탐지 반경·관측 두 칸 (계획서 4.9.2, 4.2). reset 과 `step` 의 t 증가 뒤에 부른다.
 
@@ -686,6 +734,12 @@ class World:
         self._vis = 1.0 - dn["detect_night"] * d
         self._to_tr = tt
         self._see_pred = self.cfg.see_r * self._vis
+        if self._ps is not None:        # v2.4s: 주행성 포식자의 잠·박명 감속 (결정 때 어둠, 다음 스텝 포식자 이동에 쓴다)
+            ps = self._ps
+            diurnal = ~self.pred_nocturnal
+            self.pred_asleep = diurnal & (d >= ps["sleep_dark"])
+            slow = (1.0 - d) if ps["twilight_slow"] else 1.0
+            self._pred_speed_mult = np.where(self.pred_asleep, 0.0, np.where(diurnal, slow, 1.0))
 
     # ------------------------------------------------------------------ #
     # 기하 (관측과 조향이 공유한다)
@@ -805,6 +859,8 @@ class World:
             # 분모·조향 도주 문턱(steering.py)은 see_r 그대로다. d = 0 이면 see_r·1.0 이라 v2.1 과 비트 단위로 같다
             see_p = cfg.see_r if self._dn is None else self._see_pred
             pvis = (pd <= see_p) & ((ex * hx + ey * hy) * pinv >= fov_cos)
+            if self._ps is not None:    # v2.4s: 자는 포식자는 굴에 있어 보이지 않는다(관측 1·2·도주 조향에서 빠진다)
+                pvis &= ~self.pred_asleep[None, :]
             pred_count = pvis.sum(1)
             masked = np.where(pvis, pd, np.inf)
             j = masked.argmin(1)
@@ -1227,6 +1283,8 @@ class World:
         perceived = dist * hide
         self.pred_cd = np.maximum(self.pred_cd - 1, 0)
         hunting = self.pred_cd == 0
+        if self._ps is not None:        # v2.4s: 자는 포식자는 사냥하지 않는다(쿨다운은 그대로 준다)
+            hunting = hunting & ~self.pred_asleep
         vis = (
             (perceived <= cfg.pred_view_r)
             & (
@@ -1251,7 +1309,13 @@ class World:
         )
         chase = np.stack([dx[ar, j], dy[ar, j]], 1) * inv[ar, j][:, None]
         move = np.where(has_target[:, None], chase, wander)
-        self.pred_pos = self.pred_pos + move * self.pred_speed[:, None]
+        if self._ps is None:
+            self.pred_pos = self.pred_pos + move * self.pred_speed[:, None]
+        else:                           # v2.4s: 자는 포식자는 멈추고 방향을 유지한다. 깨어 있는 주행성은 박명 감속
+            move = np.where(self.pred_asleep[:, None], self.pred_head, move)
+            self.pred_pos = self.pred_pos + move * (self.pred_speed * self._pred_speed_mult)[:, None]
+            self._ps_asleep_sum += float(self.pred_asleep.mean()) if self.M else 0.0
+            self._ps_steps += 1
         # 벽에서 반사 (§4.2 토러스 끄기)
         for axis in (0, 1):
             out_of = (self.pred_pos[:, axis] < 0.0) | (self.pred_pos[:, axis] > self.size)
@@ -1865,6 +1929,14 @@ class World:
             b1_day=b1(0), b1_night=b1(2), b2_day=b2(0), b2_night=b2(2), n2=n2,
         )
         assert tuple(out) == DAYNIGHT_STAT_COLUMNS
+        return out
+
+    def pred_sleep_stats(self) -> dict:
+        """v2.4s 포식자 잠 통계 — reset 뒤 누적. 열 순서는 `PSLEEP_STAT_COLUMNS`.
+        pred_noct_frac: 이 세계의 야행성 비율 q, pred_noct_n: 야행성 포식자 수, pred_asleep_mean: 스텝 평균 자는 포식자 비율."""
+        out = dict(pred_noct_frac=float(self.pred_noct_frac), pred_noct_n=float(self.pred_nocturnal.sum()),
+                   pred_asleep_mean=self._ps_asleep_sum / self._ps_steps if self._ps_steps else float("nan"))
+        assert tuple(out) == PSLEEP_STAT_COLUMNS
         return out
 
     def stats(self) -> dict:

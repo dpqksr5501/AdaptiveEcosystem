@@ -32,10 +32,13 @@ CELLS = {"T600_slow": ([600], [0.6, 0.7]), "T600_fast": ([600], [0.85, 0.95]),
          "T1800_slow": ([1800], [0.6, 0.7]), "T1800_fast": ([1800], [0.85, 0.95])}
 
 
-def _cfg(periods, psm):
+CONFIG = "configs/v2_4_on.yaml"     # --config 로 바꾼다(v2.4s 는 configs/v2_4s_on.yaml)
+
+
+def _cfg(periods, psm, config=None):
     from env_v2.config import load_v2_config
 
-    cfg = load_v2_config(ROOT / "configs" / "v2_4_on.yaml")
+    cfg = load_v2_config(ROOT / (config or CONFIG))
     f = {k: dict(v) for k, v in cfg.v2["features"].items()}
     f["daynight"]["periods"] = list(periods)
     cfg = cfg.replace(v2=dict(cfg.v2, features=f))
@@ -49,9 +52,9 @@ def _job(args):
 
     import daynight_v2 as dnv
 
-    cell, base_name, variant, seed = args
+    cell, base_name, variant, seed, config = args
     periods, psm = CELLS[cell]
-    cfg = _cfg(periods, psm)
+    cfg = _cfg(periods, psm, config)
     base = {"kind": "fixed", "action": C2} if base_name == "C2" else \
         dnv.take7({"kind": "learned", "model": str(ROOT / "ckpt" / "v2" / "s1a_g_s58.zip")})
     spec = dnv.add_wrap(base, dnv.rule_wrap(cfg, fed_only=(variant == "B"), slots=FOCAL))
@@ -84,8 +87,10 @@ def _job(args):
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--workers", type=int, default=14)
+    ap.add_argument("--config", default=CONFIG)
+    ap.add_argument("--out", default=None, help="결과 디렉터리(기본 이 파일 옆)")
     a = ap.parse_args(argv)
-    jobs = [(c, b, v, s) for c in CELLS for b in ("C2", "FIX") for v in ("A", "B") for s in SEEDS]
+    jobs = [(c, b, v, s, a.config) for c in CELLS for b in ("C2", "FIX") for v in ("A", "B") for s in SEEDS]
     res = {}
     with ProcessPoolExecutor(a.workers) as ex:
         for cell, b, v, s, out in ex.map(_job, jobs):
@@ -97,7 +102,8 @@ def main(argv=None) -> int:
             d = np.array([per[s][k] for s in SEEDS])
             sd = float(d.std(ddof=1))
             summ[key][k] = dict(mean=float(d.mean()), t=float(d.mean() / (sd / math.sqrt(len(d)))) if sd > 0 else None)
-    here = HERE.parent
+    here = Path(a.out) if a.out else HERE.parent
+    here.mkdir(parents=True, exist_ok=True)
     (here / "invasion.json").write_text(json.dumps(dict(summary=summ, per_seed=res), indent=1), encoding="utf-8")
     L = ["# v2.4 소수 침입 시험 (진단, 판정 아님)", "",
          "침입 16칸이 밤 규칙(A 모든 에너지, B 배부를 때만)을 쓰고 112칸은 바탕 정책. 값 = 침입 − 거주, 개체-스텝당, 탐색 시드 40."
@@ -108,6 +114,15 @@ def main(argv=None) -> int:
         s = summ[key]
         f = lambda x: f"{x['mean']:+.5f} ({x['t']:+.2f})" if x["t"] is not None else f"{x['mean']:+.5f}"
         L.append(f"| {c} | {b} | {v} | {f(s['rew'])} | {f(s['pred'])} | {f(s['starve'])} |")
+    # (a4) v2.4s 환경 관문(results/v2/v2_4/s/PREREG.md 2절): 변형 B(배부를 때만 밤 은신처 수면)의 보상 Δ 가 8칸(4 × 바탕 2) 중
+    # 5칸 이상에서 양수이고 유의하게 음수(t < −2.023)인 칸이 없으면 통과. 변형 A 는 보고만 한다.
+    bk = [k for k in summ if k.endswith("|B")]
+    pos = sum(summ[k]["rew"]["mean"] > 0 for k in bk)
+    neg = sum((summ[k]["rew"]["t"] or 0) < -2.023 for k in bk)
+    a4 = dict(n_cells=len(bk), n_pos=int(pos), n_sig_neg=int(neg), pass_=bool(pos >= 5 and neg == 0), config=a.config)
+    (here / "a4.json").write_text(json.dumps(a4, indent=1), encoding="utf-8")
+    L += ["", f"(a4) 변형 B 보상 Δ > 0: {pos}/{len(bk)}칸, 유의하게 음수 {neg}칸 → {'통과' if a4['pass_'] else '실패'}"
+          f" (기준: 5칸 이상 양수, 유의 음수 0칸, 설정 {a.config})"]
     (here / "invasion.md").write_text("\n".join(L) + "\n", encoding="utf-8")
     print("\n".join(L))
     return 0

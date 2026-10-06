@@ -36,13 +36,20 @@ OUT = ROOT / "results" / "v2" / "v2_4"
 C2DIR = OUT / "c2"              # v2.4 판정 세계에서 찾은 C2·C2-seg 상수(변형 세계에서도 이 상수를 그 세계로 잰다)
 # 변형(--variant): base = v2.4, b = v2.4b(휴식 할인 은신처 안만, MEMO 변경 기록 10-06 19:00). 출력·상태·이름이 따로다
 PREFIX, TRAIN_CFG, ON_CFG = "v2_4", "configs/v2_4.yaml", "configs/v2_4_on.yaml"
+CONFIRM_SEEDS = (40, 41, 42)
 
 
 def set_variant(v: str) -> None:
-    global OUT, PREFIX, TRAIN_CFG, ON_CFG
-    if v == "b":
-        OUT = ROOT / "results" / "v2" / "v2_4" / "b"
-        PREFIX, TRAIN_CFG, ON_CFG = "v2_4b", "configs/v2_4b.yaml", "configs/v2_4b_on.yaml"
+    global OUT, PREFIX, TRAIN_CFG, ON_CFG, C2DIR, CONFIRM_SEEDS
+    if v == "s":        # v2.4s 포식자 밤잠(10-07 사용자 결정 A안, results/v2/v2_4/s/PREREG.md). C2 는 v2.4s 세계에서 새로 찾는다
+        OUT = ROOT / "results" / "v2" / "v2_4" / "s"
+        PREFIX, TRAIN_CFG, ON_CFG = "v2_4s", "configs/v2_4s.yaml", "configs/v2_4s_on.yaml"
+        C2DIR = OUT / "c2"
+        CONFIRM_SEEDS = (43, 44, 45)
+    if v in ("b", "s"):
+        if v == "b":
+            OUT = ROOT / "results" / "v2" / "v2_4" / "b"
+            PREFIX, TRAIN_CFG, ON_CFG = "v2_4b", "configs/v2_4b.yaml", "configs/v2_4b_on.yaml"
         st = load_json(OUT / "state.json", {})
         if "gamma_sel" not in st:          # #27 은 v2.4 에서 정했다(γ 0.995)
             st["gamma_sel"] = "995"
@@ -92,7 +99,7 @@ def jobs(stage: str) -> list[dict]:
                  "save_at": ["2000000", "5000000", "10000000"]} for s in (20, 21, 22)]
     if stage == "confirm":
         return [{"stage": "confirm", "g": g, "seed": s, "name": f"{PREFIX}c_g{g}_s{s}", "config": final_config("confirm"),
-                 "save_at": ["5000000", "10000000"]} for s in (40, 41, 42)]
+                 "save_at": ["5000000", "10000000"]} for s in CONFIRM_SEEDS]
     if stage == "diag":
         return [{"stage": "diag", "g": g, "seed": s, "name": f"v2_4d_rest0_s{s}",
                  "config": "results/v2/v2_4/diag/v2_4_rest0.yaml", "save_at": ["5000000", "10000000"]}
@@ -575,7 +582,7 @@ def main(argv=None) -> int:
     j = sub.add_parser("judge")
     j.add_argument("--stage", choices=["probe", "resp", "diag", "confirm"], required=True)
     j.set_defaults(fn=cmd_judge)
-    ap.add_argument("--variant", choices=["base", "b"], default="base")
+    ap.add_argument("--variant", choices=["base", "b", "s"], default="base")
     a = ap.parse_args(argv)
     set_variant(a.variant)
     return a.fn(a)

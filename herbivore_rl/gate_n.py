@@ -81,8 +81,8 @@ def apply_sets(cfg, sets):
     return cfg.replace(v2=dict(cfg.v2, features=f))
 
 
-def worlds(sets) -> dict:
-    on = apply_sets(load_v2_config(ON), sets)
+def worlds(sets, on_path=None) -> dict:
+    on = apply_sets(load_v2_config(ROOT / on_path if on_path else ON), sets)
     f = {k: dict(v) for k, v in on.v2["features"].items()}
     f["daynight"]["rest_night"] = 0.0
     rest0 = on.replace(v2=dict(on.v2, features=f))
@@ -92,7 +92,7 @@ def worlds(sets) -> dict:
 def cmd_run(a) -> int:
     out = Path(a.out)
     (out / "rounds").mkdir(parents=True, exist_ok=True)
-    W = worlds(a.set)
+    W = worlds(a.set, a.on_config)
     specs = policy_specs()
     if a.policies:
         specs = {k: v for k, v in specs.items() if k in a.policies}
@@ -118,6 +118,7 @@ def cmd_run(a) -> int:
                 seeds=seeds, steps=a.steps, gamma=GAMMA, elapsed_s=round(time.time() - t0, 1),
                 digests={k: config_digest(v) for k, v in W.items()},
                 daynight={k: v for k, v in W["on"].v2["features"]["daynight"].items()},
+                on_config=a.on_config or str(ON.relative_to(ROOT)), a1_dir=a.a1_dir,
                 fix_model=str(FIX_MODEL.relative_to(ROOT)), fix_sha1=model_fingerprint(FIX_MODEL),
                 note=a.note or "")
     res = dict(meta=meta, scarce={str(k): v for k, v in scarce.items()}, rows=rows)
@@ -166,9 +167,13 @@ def judge(res) -> dict:
         out["verdict"] = dict(safety=bool(it["safety_CSEG"]["pass_"] and it["safety_FIX"]["pass_"]), a1=None, a2=None,
                               a3=None, prune=[], note="final 회차는 가지치기한 설정의 안전 항목만 본다(PREREG 2절)")
         return out
+    lt = res["meta"].get("a1_dir") == "night_lt_day"      # v2.4s: 포식자가 밤에 자므로 '밤이 낮보다 안전'이 기준
     for pn in [p for p in POLICIES if p in res["rows"]["on"]]:
         d = _col(res, "on", pn, "pred_rate_night", judged) - _col(res, "on", pn, "pred_rate_day", judged)
-        it[f"a1_{pn}"] = dict(**_paired(d), rule="밤 − 낮 피식률 > 0, 짝 t > 임계(양측 0.05)")
+        if lt:
+            d = -d
+        it[f"a1_{pn}"] = dict(**_paired(d), rule=("낮 − 밤 피식률 > 0(밤이 안전), 짝 t > 임계" if lt
+                                                  else "밤 − 낮 피식률 > 0, 짝 t > 임계(양측 0.05)"))
         it[f"a1_{pn}"]["pass_"] = bool(it[f"a1_{pn}"]["mean"] > 0 and it[f"a1_{pn}"]["t"] > it[f"a1_{pn}"]["crit"])
         fn, fd = _col(res, "on", pn, "frac_night", judged), _col(res, "on", pn, "frac_day", judged)
         inn, ind = _col(res, "on", pn, "intake_night", judged), _col(res, "on", pn, "intake_day", judged)
@@ -250,6 +255,9 @@ def main(argv=None) -> int:
     r.add_argument("--workers", type=int, default=16)
     r.add_argument("--skip-rest0", action="store_true")
     r.add_argument("--policies", nargs="*", default=None, help="정책 일부만 (final 회차는 안전 항목 CSEG·FIX)")
+    r.add_argument("--on-config", default=None, help="판정 세계 설정(기본 configs/v2_4_on.yaml). v2.4s 는 configs/v2_4s_on.yaml")
+    r.add_argument("--a1-dir", choices=["night_gt_day", "night_lt_day"], default="night_gt_day",
+                   help="(a1) 방향. v2.4s(포식자 밤잠)는 night_lt_day")
     r.add_argument("--note", default=None)
     r.set_defaults(fn=cmd_run)
     p = sub.add_parser("report")

@@ -49,7 +49,8 @@ import numpy as np
 from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
-from .world import ACT_DIM, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS, World
+from .world import (ACT_DIM, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, PSLEEP_STAT_COLUMNS, VIGIL_STAT_COLUMNS,
+                    WINDOW_STAT_COLUMNS, World)
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -66,6 +67,8 @@ VIGIL_COLUMNS = list(VIGIL_STAT_COLUMNS)
 WINDOW_COLUMNS = list(WINDOW_STAT_COLUMNS)
 # daynight(v2.4)를 켠 세계의 행에만 더 붙는 열 (World.daynight_stats)
 DAYNIGHT_COLUMNS = list(DAYNIGHT_STAT_COLUMNS)
+# pred_sleep(v2.4s)를 켠 세계의 행에만 더 붙는 열 (World.pred_sleep_stats)
+PSLEEP_COLUMNS = list(PSLEEP_STAT_COLUMNS)
 
 
 # --------------------------------------------------------------------- #
@@ -740,6 +743,9 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     if w._dn is not None:
         ds = w.daynight_stats()
         s.update((c, ds[c]) for c in DAYNIGHT_COLUMNS)
+    if w._ps is not None:
+        ps = w.pred_sleep_stats()
+        s.update((c, ps[c]) for c in PSLEEP_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:

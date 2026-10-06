@@ -76,7 +76,7 @@ def test_feature_ids_are_pinned():
     assert dict(F.FEATURE_IDS) == {
         "food_v": 1, "speed": 2, "vigilance": 3, "regions": 4, "daynight": 5, "region_env": 6,
         "migration": 7, "weather": 8, "boldness": 9, "water": 10, "boundary": 11, "obstacles": 12,
-        "vigil_window": 13,
+        "vigil_window": 13, "pred_sleep": 14,
     }
     ids = list(F.FEATURE_IDS.values())
     assert len(set(ids)) == len(ids) and min(ids) >= 1    # 0 은 SeedSequence 끝 0 무시와 겹친다
@@ -221,7 +221,7 @@ def test_toggling_one_feature_keeps_other_streams(cfg2, monkeypatch, seed):
 # 다른 기능 위에 얹는 기능의 선행 기능. 혼자 켜면 World 가 거부하므로 선행 기능과 함께 켠다(번호 순).
 # vigil_window(v2.2r)는 vigilance 의 threat_recency·ThreatDir 와 speed 의 정지를 쓴다(env_v2/world.py `_window_params`).
 # daynight(v2.4)는 speed 의 보행(정지 대사·통계)을 쓴다(`_daynight_params`).
-PREREQS = {"vigil_window": ("speed", "vigilance"), "daynight": ("speed",)}
+PREREQS = {"vigil_window": ("speed", "vigilance"), "daynight": ("speed",), "pred_sleep": ("speed", "daynight")}
 
 
 def _implemented_cases():

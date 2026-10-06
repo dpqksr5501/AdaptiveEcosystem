@@ -71,10 +71,11 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "boundary": 11,     # R1 (i) 언리얼 경계 반발 파리티
     "obstacles": 12,    # R1 (ii) 원형 장애물 반발
     "vigil_window": 13,  # v2.2r 경계 재설계(10-03 R2): 경계 행동 열 유무, 창 안 한정 경계(W′), 반사 돌아보기(L)
+    "pred_sleep": 14,    # v2.4s 포식자 밤잠(10-07 사용자 결정 A안): 대부분 밤에 자고 세계마다 일부만 야행성
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
-IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight"})
+IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight", "pred_sleep"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -109,6 +110,11 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # 받는다. false = v2.4 그대로(규칙 5 의 끔 값)
     "daynight": frozenset({"periods", "twilight", "detect_night", "eat_night", "rest_night", "fixed_day_frac",
                            "transition_norm", "start_induce", "rest_cover_only"}),
+    # v2.4s (env_v2/world.py `_pred_sleep_params`, 10-07 사용자 결정 A안 "밤에는 포식자도 자야 맞다"): daynight 를 함께
+    # 켜야 한다. nocturnal_frac = 야행성 비율 q 의 범위 [하, 상](reset 마다 하나, 포식자마다 확률 q 로 야행성), sleep_dark =
+    # 이 어둠 이상이면 주행성 포식자가 잔다(멈춤, 사냥 안 함, 초식 시야에 안 보임 — 굴에 있다), twilight_slow = 깨어 있는
+    # 주행성 포식자의 속력에 (1 − d) 를 곱하나(박명에 느려진다)
+    "pred_sleep": frozenset({"nocturnal_frac", "sleep_dark", "twilight_slow"}),
 })
 
 

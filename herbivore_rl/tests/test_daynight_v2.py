@@ -537,3 +537,135 @@ def test_rest_cover_only_discounts_only_stoppers_in_cover(cfg4):
     assert {k: v for k, v in r4b.items() if k not in ("features", "version")} ==         {k: v for k, v in r4.items() if k not in ("features", "version")}
     with pytest.raises(ValueError, match="rest_cover_only"):
         World(_dn(cfg4, rest_cover_only=1), seeds=[0])
+
+
+
+# --------------------------------------------------------------------- #
+# v2.4s 포식자 밤잠 (pred_sleep, 10-07 사용자 결정 A안)
+# --------------------------------------------------------------------- #
+
+V2_4S = ROOT / "configs" / "v2_4s.yaml"
+V2_4S_ON = ROOT / "configs" / "v2_4s_on.yaml"
+
+
+def _ps(cfg, **kw):
+    f = {k: dict(v) for k, v in cfg.v2["features"].items()}
+    f["pred_sleep"] = dict(f["pred_sleep"], **kw)
+    return cfg.replace(v2=dict(cfg.v2, features=f))
+
+
+def test_v2_4s_config_is_v2_4b_plus_sleep_and_night_eating():
+    """v2_4s = v2_4b + eat_night 0.9 + pred_sleep 블록(version 2.4s). _on 은 낮 고정 비율만 0."""
+    rb = yaml.safe_load((ROOT / "configs" / "v2_4b.yaml").read_text(encoding="utf-8"))
+    rs = yaml.safe_load(V2_4S.read_text(encoding="utf-8"))
+    rso = yaml.safe_load(V2_4S_ON.read_text(encoding="utf-8"))
+    assert rs["version"] == "2.4s" and rs["overrides"] == rb["overrides"] and rs["train"] == rb["train"]
+    assert rs["features"]["speed"] == rb["features"]["speed"]
+    assert rs["features"]["daynight"] == dict(rb["features"]["daynight"], eat_night=0.9)
+    assert rs["features"]["pred_sleep"] == dict(enabled=True, nocturnal_frac=[0.0, 0.25], sleep_dark=0.5,
+                                                 twilight_slow=True)
+    assert rso["features"]["daynight"] == dict(rs["features"]["daynight"], fixed_day_frac=0.0)
+    assert {k: v for k, v in rso.items() if k != "features"} == {k: v for k, v in rs.items() if k != "features"}
+    w = World(load_v2_config(V2_4S_ON), seeds=[0])
+    assert w.features.active == ("speed", "daynight", "pred_sleep") and w.obs_dim == 9 and w.act_dim == 5
+
+
+def test_pred_sleep_requires_daynight_and_checks_params():
+    cfg = load_v2_config(V2_4S_ON)
+    f = {k: dict(v) for k, v in cfg.v2["features"].items()}
+    f["daynight"]["enabled"] = False
+    with pytest.raises(ValueError, match="daynight"):
+        World(cfg.replace(v2=dict(cfg.v2, features=f)), seeds=[0])
+    for kw, m in ((dict(nocturnal_frac=[0.3, 0.1]), "nocturnal_frac"), (dict(sleep_dark=0.0), "sleep_dark"),
+                  (dict(twilight_slow=1), "twilight_slow")):
+        with pytest.raises(ValueError, match=m):
+            World(_ps(cfg, **kw), seeds=[0])
+
+
+def test_sleeping_predators_do_not_move_hunt_or_get_seen():
+    """d = 1 이면 주행성 포식자는 자고(제자리, 방향 유지), 사냥하지 않고, 초식 관측 1·2 에서 빠진다. 야행성은 그대로."""
+    cfg = _ps(load_v2_config(V2_4S_ON), nocturnal_frac=[0.0, 0.0])
+    w = World(cfg, seeds=[10000])
+    p0 = np.array([w.size / 2, w.size / 2])
+    w.pos[:] = p0 + np.array([-40.0, -40.0])
+    w.head[:] = [1.0, 0.0]
+    w.pos[0] = p0
+    _set_dark(w, 1.0)
+    w.pred_nocturnal = np.zeros(1, dtype=bool)     # 포식자 하나로 바꾸기 전에 잠 상태 배열도 1칸으로 둔다
+    w.pred_asleep = np.ones(1, dtype=bool)
+    w._pred_speed_mult = np.zeros(1)
+    _set_predators(w, [p0 + [3.0, 0.0]])
+    w.pred_speed[:] = 0.5
+    w.pred_cd[:] = 0
+    w._g = w._geometry()
+    o = w._obs_from(w._g)
+    assert o[0, 1] == 0.0 and o[0, 2] == 1.0
+    pos0, head0 = w.pred_pos.copy(), w.pred_head.copy()
+    caught = w._step_predators()
+    assert not caught.any()
+    np.testing.assert_array_equal(w.pred_pos, pos0)
+    np.testing.assert_array_equal(w.pred_head, head0)
+    w.pred_asleep = np.zeros(1, dtype=bool)        # 깨어 있으면(야행성) 보이고 잡는다
+    w._pred_speed_mult = np.ones(1)
+    w._g = w._geometry()
+    assert w._obs_from(w._g)[0, 1] > 0
+
+
+def test_pred_sleep_rule_and_stream():
+    """주행성은 d ≥ 0.5 에서 잔다. 깨어 있는 주행성 속력 배수 (1 − d), 야행성 1. 야행성 결정은 자기 스트림 part 0 에서
+    1 + M 개를 뽑고 v1 스트림은 그대로다."""
+    from env_v2.features import feature_stream
+
+    cfg = load_v2_config(V2_4S_ON)
+    w = World(cfg, seeds=[12000])
+    g = feature_stream(12000, "pred_sleep", 0)
+    q = g.uniform(0.0, 0.25)
+    u = g.random(w.M)
+    assert w.pred_noct_frac == q and np.array_equal(w.pred_nocturnal, u < q)
+    w1 = World(load_v2_config(V2_1), seeds=[12000])
+    assert w.rng.bit_generator.state == w1.rng.bit_generator.state
+    for d in (0.0, 0.3, 0.5, 0.8):
+        _set_dark(w, d)
+        w.day_fixed = False
+        w.dn_period, w.dn_offset = 600, 0
+        w.dark = d
+        dn, ps = w._dn, w._ps
+        diurnal = ~w.pred_nocturnal
+        asleep = diurnal & (d >= ps["sleep_dark"])
+        mult = np.where(asleep, 0.0, np.where(diurnal, 1.0 - d, 1.0))
+        # _daynight_update 의 같은 식을 직접 부른다
+        w.pred_asleep = diurnal & (d >= ps["sleep_dark"])
+        exp = np.where(w.pred_asleep, 0.0, np.where(diurnal, 1.0 - d, 1.0))
+        np.testing.assert_array_equal(asleep, w.pred_asleep)
+        np.testing.assert_array_equal(mult, exp)
+
+
+@pytest.mark.parametrize("seed", [0, 10000])
+def test_pred_sleep_off_or_day_fixed_matches_daynight_world(seed):
+    """pred_sleep 을 끈 v2_4s = v2.4 동역학(같은 daynight 계수), 낮 고정 세계는 잠도 감속도 없어 pred_sleep 을 끈 세계와
+    비트 동일하다."""
+    cfg = load_v2_config(V2_4S_ON)
+    off = _ps(cfg, enabled=False)
+    for a_cfg, b_cfg in ((off, None), (_dn(cfg, fixed_day_frac=1.0), _dn(off, fixed_day_frac=1.0))):
+        if b_cfg is None:
+            continue
+        wa, wb = World(a_cfg, seeds=[seed]), World(b_cfg, seeds=[seed])
+        for _ in range(300):
+            oa, ob = wa.observe(), wb.observe()
+            np.testing.assert_array_equal(oa, ob)
+            act = _rule5(oa)
+            ra, rb = wa.step(act), wb.step(act)
+            for x, y in zip(ra, rb):
+                np.testing.assert_array_equal(x, y)
+        np.testing.assert_array_equal(wa.pred_pos, wb.pred_pos)
+    w = World(off, seeds=[seed])
+    assert w._ps is None and "pred_sleep" not in w.features.active
+
+
+def test_pred_sleep_rollout_columns_and_night_predation_drop():
+    """판정 세계에서 밤 피식률이 낮보다 낮고(대부분 잔다), 행에 pred_sleep 열이 붙는다."""
+    cfg = load_v2_config(V2_4S_ON)
+    pol = ro.build_policy({"kind": "fixed", "action": [0.97099, 0.78494, 1.0, 0.03359, 0.49137]})
+    r = ro.rollout(cfg, pol, 12001, 3000)
+    assert set(ro.PSLEEP_COLUMNS) <= set(r) and r["pred_asleep_mean"] > 0.2
+    assert r["pred_rate_night"] < r["pred_rate_day"]
