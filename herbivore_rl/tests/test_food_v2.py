@@ -428,3 +428,88 @@ def test_world_with_food_v_pickles_and_deepcopies(cfg_b):
         np.testing.assert_array_equal(c.food_cells()["eaten"], w.food_cells()["eaten"])
         assert c.stats() == w.stats()
         assert c.food_stats() == w.food_stats()
+
+
+# --------------------------------------------------------------------- #
+# speed + food_v 함께 (configs/v2_1_0b.yaml — Gate F R10 고정 정책 확인 전용, 학습 금지)
+# --------------------------------------------------------------------- #
+
+V2_1 = ROOT / "configs" / "v2_1.yaml"
+V2_1_0B = ROOT / "configs" / "v2_1_0b.yaml"
+SPEED = 4                                   # 행동 열 4 = speed (v2.1)
+
+
+def test_v2_1_0b_config_is_v2_1_plus_food_v(cfg_b):
+    """v2_1_0b.yaml = v2_1.yaml + v2_0b.yaml 의 food_v 블록. speed·train·v1 키(덮은 포식자 속도 범위 포함)는 v2.1 과
+    같고, food_v 는 키가 같고 α·h 만 R10 R1 후보 값(α 0.03, h 693)이다."""
+    c21, c = load_v2_config(V2_1), load_v2_config(V2_1_0B)
+    assert c.v2["version"] == "2.1_0b"
+    assert c.v2["features"]["speed"] == c21.v2["features"]["speed"] and c.v2["train"] == c21.v2["train"]
+    d21, d = c21.to_dict(), c.to_dict()
+    assert {k for k in d21.keys() | d.keys() if d21.get(k) != d.get(k)} == {"v2"}
+    fv, fb = c.v2["features"]["food_v"], cfg_b.v2["features"]["food_v"]
+    same = set(fb) - {"alpha", "recovery_half_lives"}
+    assert set(fv) == set(fb) and {k: fv[k] for k in same} == {k: fb[k] for k in same}
+    assert fv["alpha"] == 0.03 and fv["floor"] == 0.1 and fv["recovery_half_lives"] == [693]
+    w = World(c, seeds=[0])
+    assert w.features.active == ("food_v", "speed") and w.act_dim == 5 and w.obs_dim == 7
+    assert w.food_v_half_life == 693
+
+
+@pytest.mark.parametrize("seed", [20001, 636])
+def test_speed_and_food_v_coexist(seed):
+    """speed 와 food_v 를 함께 켠 첫 설정. 보행 섭식 배수가 섭취량(taken)을 정하고 food_v 훼손·재생·회복이 그
+    taken 을 쓴다. 수백 스텝 동안 매 스텝 0 ≤ F ≤ V ≤ cap0, V ≥ floor·cap0 이고 나눗셈 경고가 없다.
+    실제 보행이 모두 뛰기인 스텝(섭식 배수 0)은 어느 셀도 뜯기지 않아 V 가 휴식 회복만 하고, 모두 서면 다시 먹는다.
+    (명령이 뛰기여도 갈 방향이 없는 개체는 정지로 쳐서 먹으므로 실제 보행 `w.gait` 로 고른다)"""
+    w = World(load_v2_config(V2_1_0B), seeds=[seed])
+    rng = np.random.default_rng(seed)
+    _invariants(w)
+    with np.errstate(divide="raise", invalid="raise"):
+        for _ in range(400):
+            w.step(rng.random((w.N, 5)))
+            _invariants(w)
+        g = w.gait_stats()
+        assert min(g["stop_frac"], g["walk_frac"], g["run_frac"]) > 0.1      # 세 보행이 모두 나왔다
+        assert w.food_stats()["v_ratio"] < 1.0 and w.food_cells()["eaten"].sum() > 0.0
+        run = rng.random((w.N, 5))
+        run[:, SPEED] = 1.0
+        all_run = 0
+        for _ in range(50):
+            e0, v0 = w._fv_eaten.copy(), w.food_v.copy()
+            w.step(run)
+            _invariants(w)
+            if (w.gait == 2).all():
+                all_run += 1
+                assert not w._fv_taken.any()                                  # 뛰는 개체는 먹지 않는다
+                np.testing.assert_array_equal(w._fv_eaten, e0)
+                assert (w.food_v >= v0).all()                                 # 훼손 없이 휴식 회복만
+        assert all_run >= 10                                                  # 그런 스텝이 실제로 있었다
+        stop = run.copy()
+        stop[:, SPEED] = 0.0
+        e0 = w._fv_eaten.sum()
+        for _ in range(50):
+            w.step(stop)
+            _invariants(w)
+        assert (w.gait == 0).all() and w._fv_eaten.sum() > e0
+
+
+def test_v2_1_0b_with_off_values_is_v2_1_bitwise():
+    """α 0 이고 V 초기값이 cap0 면 V ≡ cap0 라 v2_1_0b 세계는 v2.1 세계와 비트 단위로 같다(food_v 가 speed 경로를
+    바꾸지 않는다. v2.0 쪽은 test_no_damage_and_full_init_is_v2_0)."""
+    c = load_v2_config(V2_1_0B)
+    blk = dict(c.v2["features"]["food_v"], alpha=0.0, init_frac=[1.0, 1.0])
+    on = World(c.replace(v2=dict(c.v2, features=dict(c.v2["features"], food_v=blk))), seeds=[636])
+    ref = World(load_v2_config(V2_1), seeds=[636])
+    rng = np.random.default_rng(1)
+    for _ in range(300):
+        np.testing.assert_array_equal(on.observe(), ref.observe())
+        act = rng.random((on.N, 5))
+        on.step(act)
+        ref.step(act)
+    np.testing.assert_array_equal(on.food, ref.food)
+    np.testing.assert_array_equal(on.pos, ref.pos)
+    np.testing.assert_array_equal(on.food_v, on.food_cap)
+    assert on.stats() == ref.stats()
+    assert on.gait_stats() == pytest.approx(ref.gait_stats(), nan_ok=True)
+    assert on.food_cells()["eaten"].sum() > 0          # 먹기는 했다 — 훼손 경로를 실제로 탔다
