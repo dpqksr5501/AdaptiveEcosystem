@@ -1,0 +1,21 @@
+{
+ "runs": {
+  "v2_4sc_g995_s43": {
+   "stage": "confirm",
+   "cmd": "train_v2.py --config configs/v2_4s.yaml --steps 20000000 --seed 43 --gamma 0.995 --run-name v2_4sc_g995_s43 --save-at 5000000 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "v2_4sc_g995_s44": {
+   "stage": "confirm",
+   "cmd": "train_v2.py --config configs/v2_4s.yaml --steps 20000000 --seed 44 --gamma 0.995 --run-name v2_4sc_g995_s44 --save-at 5000000 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  },
+  "v2_4sc_g995_s45": {
+   "stage": "confirm",
+   "cmd": "train_v2.py --config configs/v2_4s.yaml --steps 20000000 --seed 45 --gamma 0.995 --run-name v2_4sc_g995_s45 --save-at 5000000 10000000 --probe-every 1000000 --threads 1",
+   "returncode": 0
+  }
+ },
+ "started": "2026-10-06T19:26:36+00:00",
+ "finished": "2026-10-06T19:45:06+00:00"
+}
