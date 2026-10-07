@@ -1,0 +1,1814 @@
+{
+ "lead": 25,
+ "k": 150,
+ "half": 16.0,
+ "fps": 15,
+ "sub": 2,
+ "notes": [
+  "갈라진 순간(+0초)에 이미 잠금 중인 먹기 아닌 행동은 RL 이 갈라지기 전에 고른 것이라 세 칸에 똑같이 나온다. screen_stats.inherited_on_screen_until_sec 까지 화면에 남는다.",
+  "갈라진 뒤에는 위치·위협·이웃도 달라진다(screen_stats.pos_gap_focus). 뒤로 갈수록 차이는 '두뇌의 선택'과 '달라진 상황'이 섞인 것이다. 사건 직후 2초의 같은 개체 불일치는 screen_stats.disagree_first_2s_after_event.",
+  "자막 숫자(caption_numbers)는 기록된 프레임에서 코드로 센 값이고 captions.json 과 같다."
+ ],
+ "scenes": [
+  {
+   "n": 1,
+   "tag": "최대 차이",
+   "seed": 10100,
+   "t0": 1198,
+   "t_e": 1223,
+   "kind": "cover",
+   "threat": 0,
+   "n_focus": 4,
+   "center": [
+    36.29202999469733,
+    16.0
+   ],
+   "half": 16.0,
+   "moments": [
+    0,
+    25,
+    33,
+    150
+   ],
+   "determinism": {
+    "rl_two_copies_identical": true,
+    "fsm_two_copies_identical": true,
+    "rbase_two_copies_identical": true,
+    "rl_branch_equals_original_run": true,
+    "fsm_branch_differs_from_rl": true,
+    "rbase_branch_differs_from_rl": true
+   },
+   "caption": "차이가 가장 큰 장면(1498개 순간 중 1위). +3.3초에 위협이 은신처 안 개체들 8 안으로 들어옴(RL 갈래 기준). 갈라진 순간 화면 안 18마리.\n사건 뒤 화면 안 먹기 아닌 점(적을 때~많을 때, 주황 도망·파랑 숨기·흰색 얼기): RL 숨기 0~8·얼기 0~2·도망 0~2 | FSM 숨기 9~20·얼기 0~2 | R_base 도망 0~7\n갈라진 순간 보이는 숨기 1(파랑)·얼기 4(흰색 !)은 세 칸 모두 같다 — RL이 갈라지기 전에 고른 행동이라 RL만의 것이 아니다(길게는 +1.3초까지 세 칸에 남는다).\n갈라진 뒤엔 위치도 달라져(끝에 같은 개체의 RL–FSM 거리 평균 3.8칸) 뒤쪽 차이가 모두 두뇌의 선택 탓은 아니다. 사건 뒤 2초간 같은 개체의 행동이 다른 비율: RL–FSM 50%, RL–R_base 93%.\n20초 동안 이 화면 안에서 잡힌 수: RL 6 · FSM 8 · R_base 16 (한 장면의 잡힌 수는 우연이 크다. 1498개 순간 평균은 셋이 거의 같다).",
+   "caption_in_video": true,
+   "caption_numbers": {
+    "on_screen_at_split": 18,
+    "at_split_counts": {
+     "먹기": 13,
+     "도망": 0,
+     "숨기": 1,
+     "얼기": 4
+    },
+    "after_event_range": {
+     "rl": {
+      "먹기": [
+       12,
+       31
+      ],
+      "도망": [
+       0,
+       2
+      ],
+      "숨기": [
+       0,
+       8
+      ],
+      "얼기": [
+       0,
+       2
+      ]
+     },
+     "fsm": {
+      "먹기": [
+       1,
+       17
+      ],
+      "도망": [
+       0,
+       0
+      ],
+      "숨기": [
+       9,
+       20
+      ],
+      "얼기": [
+       0,
+       2
+      ]
+     },
+     "rbase": {
+      "먹기": [
+       7,
+       19
+      ],
+      "도망": [
+       0,
+       7
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       0
+      ]
+     }
+    },
+    "inherited_on_screen_until_sec": {
+     "rl": 1.3,
+     "fsm": 1.3,
+     "rbase": 1.3
+    },
+    "pos_gap_rl_fsm_end": 3.82,
+    "disagree_first_2s_after_event": {
+     "rl_fsm": 0.5,
+     "rl_rbase": 0.9333
+    },
+    "caught_in_window": {
+     "rl": 6,
+     "fsm": 8,
+     "rbase": 16
+    }
+   },
+   "screen_stats": {
+    "rule": "확대 창(±16) 안, 스텝 k 의 프레임(보간 없음) — 패널 왼쪽 위 숫자와 같다. '사건 뒤' = 사건 다음 스텝 ~ 끝",
+    "on_screen_at_split": 18,
+    "at_split_counts": {
+     "먹기": 13,
+     "도망": 0,
+     "숨기": 1,
+     "얼기": 4
+    },
+    "after_event_range": {
+     "rl": {
+      "먹기": [
+       12,
+       31
+      ],
+      "도망": [
+       0,
+       2
+      ],
+      "숨기": [
+       0,
+       8
+      ],
+      "얼기": [
+       0,
+       2
+      ]
+     },
+     "fsm": {
+      "먹기": [
+       1,
+       17
+      ],
+      "도망": [
+       0,
+       0
+      ],
+      "숨기": [
+       9,
+       20
+      ],
+      "얼기": [
+       0,
+       2
+      ]
+     },
+     "rbase": {
+      "먹기": [
+       7,
+       19
+      ],
+      "도망": [
+       0,
+       7
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       0
+      ]
+     }
+    },
+    "after_event_mean": {
+     "rl": {
+      "먹기": 19.2,
+      "도망": 0.26,
+      "숨기": 2.39,
+      "얼기": 0.41
+     },
+     "fsm": {
+      "먹기": 6.52,
+      "도망": 0.0,
+      "숨기": 14.71,
+      "얼기": 0.3
+     },
+     "rbase": {
+      "먹기": 12.8,
+      "도망": 1.96,
+      "숨기": 0.0,
+      "얼기": 0.0
+     }
+    },
+    "moment_counts": {
+     "rl": [
+      {
+       "sec": 0.0,
+       "먹기": 13,
+       "도망": 0,
+       "숨기": 1,
+       "얼기": 4
+      },
+      {
+       "sec": 3.3,
+       "먹기": 16,
+       "도망": 0,
+       "숨기": 2,
+       "얼기": 0
+      },
+      {
+       "sec": 4.4,
+       "먹기": 14,
+       "도망": 0,
+       "숨기": 2,
+       "얼기": 1
+      },
+      {
+       "sec": 20.0,
+       "먹기": 31,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      }
+     ],
+     "fsm": [
+      {
+       "sec": 0.0,
+       "먹기": 13,
+       "도망": 0,
+       "숨기": 1,
+       "얼기": 4
+      },
+      {
+       "sec": 3.3,
+       "먹기": 4,
+       "도망": 0,
+       "숨기": 13,
+       "얼기": 0
+      },
+      {
+       "sec": 4.4,
+       "먹기": 5,
+       "도망": 0,
+       "숨기": 14,
+       "얼기": 0
+      },
+      {
+       "sec": 20.0,
+       "먹기": 3,
+       "도망": 0,
+       "숨기": 20,
+       "얼기": 1
+      }
+     ],
+     "rbase": [
+      {
+       "sec": 0.0,
+       "먹기": 13,
+       "도망": 0,
+       "숨기": 1,
+       "얼기": 4
+      },
+      {
+       "sec": 3.3,
+       "먹기": 15,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 4.4,
+       "먹기": 18,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 20.0,
+       "먹기": 13,
+       "도망": 1,
+       "숨기": 0,
+       "얼기": 0
+      }
+     ]
+    },
+    "caught_in_window": {
+     "rl": 6,
+     "fsm": 8,
+     "rbase": 16
+    },
+    "inherited_on_screen_until_sec": {
+     "rl": 1.3,
+     "fsm": 1.3,
+     "rbase": 1.3
+    },
+    "inherited_on_screen_at_event": {
+     "rl": 0,
+     "fsm": 0,
+     "rbase": 0
+    },
+    "disagree_first_2s_after_event": {
+     "rl_fsm": 0.5,
+     "rl_rbase": 0.9333
+    },
+    "disagree_whole_branch": {
+     "rl_fsm": 0.5808,
+     "rl_rbase": 0.6959
+    },
+    "pos_gap_focus": {
+     "rl_fsm": {
+      "event": 2.54,
+      "end": 3.82
+     },
+     "rl_rbase": {
+      "event": 3.38,
+      "end": null
+     }
+    }
+   },
+   "search_metrics": {
+    "d_rl_fsm": 0.5816326530612245,
+    "d_rl_rbase": 0.6914285714285714,
+    "d_fsm_rbase": 0.7317073170731707,
+    "hist": {
+     "rl": [
+      0.5162,
+      0.0208,
+      0.3819,
+      0.081
+     ],
+     "fsm": [
+      0.1169,
+      0.0,
+      0.8398,
+      0.0433
+     ],
+     "rbase": [
+      0.6857,
+      0.2171,
+      0.0,
+      0.0971
+     ]
+    },
+    "nongraze": {
+     "rl": 0.4838,
+     "fsm": 0.8831,
+     "rbase": 0.3143
+    },
+    "caught_focus": {
+     "rl": 2,
+     "fsm": 1,
+     "rbase": 4
+    },
+    "caught_all": {
+     "rl": 91,
+     "fsm": 72,
+     "rbase": 87
+    },
+    "pos_div_rl_fsm": 3.8180169500947594,
+    "score": 0.6365306122448979
+   },
+   "search_metrics_note": "탐색 단계 값(candidates.json). 갈라지기 전에 RL 이 고른 잠금(물려받은 스텝)이 세 갈래 비율에 함께 들어 있다 — 예: R_base 는 얼기를 고르지 않지만 장면 1 의 R_base 얼기 비율은 물려받은 것이다. 각 정책이 직접 고른 비율은 branch_summary.share_own",
+   "branch_summary": {
+    "rl": {
+     "share_all": {
+      "먹기": 0.516,
+      "도망": 0.021,
+      "숨기": 0.382,
+      "얼기": 0.081
+     },
+     "share_own": {
+      "먹기": 0.537,
+      "도망": 0.022,
+      "숨기": 0.398,
+      "얼기": 0.043
+     },
+     "inherited_nongraze_share_of_all": 0.039,
+     "share_event": {
+      "먹기": 0.379,
+      "도망": 0.035,
+      "숨기": 0.525,
+      "얼기": 0.061
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 2,
+     "caught_in_window": 6
+    },
+    "fsm": {
+     "share_all": {
+      "먹기": 0.117,
+      "도망": 0.0,
+      "숨기": 0.84,
+      "얼기": 0.043
+     },
+     "share_own": {
+      "먹기": 0.122,
+      "도망": 0.0,
+      "숨기": 0.878,
+      "얼기": 0.0
+     },
+     "inherited_nongraze_share_of_all": 0.043,
+     "share_event": {
+      "먹기": 0.187,
+      "도망": 0.0,
+      "숨기": 0.813,
+      "얼기": 0.0
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 1,
+     "caught_in_window": 8,
+     "first_diff_from_rl_sec": 0.13
+    },
+    "rbase": {
+     "share_all": {
+      "먹기": 0.686,
+      "도망": 0.217,
+      "숨기": 0.0,
+      "얼기": 0.097
+     },
+     "share_own": {
+      "먹기": 0.759,
+      "도망": 0.241,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "inherited_nongraze_share_of_all": 0.097,
+     "share_event": {
+      "먹기": 0.817,
+      "도망": 0.183,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 4,
+     "caught_in_window": 16,
+     "first_diff_from_rl_sec": 0.13
+    }
+   },
+   "png": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene1_seed10100_t1198.png",
+   "mp4": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene1_seed10100_t1198.mp4",
+   "video": {
+    "path": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene1_seed10100_t1198.mp4",
+    "mb": 7.056774,
+    "frames": 352,
+    "secs": 23.46,
+    "render_sec": 101.6
+   }
+  },
+  {
+   "n": 2,
+   "tag": "RL 이 먹기 말고 다른 행동을 하는 장면",
+   "seed": 10107,
+   "t0": 2143,
+   "t_e": 2168,
+   "kind": "chase",
+   "threat": 2,
+   "n_focus": 5,
+   "center": [
+    20.83635231049902,
+    16.0
+   ],
+   "half": 16.0,
+   "moments": [
+    0,
+    25,
+    34,
+    150
+   ],
+   "determinism": {
+    "rl_two_copies_identical": true,
+    "fsm_two_copies_identical": true,
+    "rbase_two_copies_identical": true,
+    "rl_branch_equals_original_run": true,
+    "fsm_branch_differs_from_rl": true,
+    "rbase_branch_differs_from_rl": true
+   },
+   "caption": "RL이 먹기 말고 다른 행동을 많이 하는 장면(그런 순간 중 장면 1과 다른 시드에서 차이 1위). +3.3초에 추격형 포식자가 무리 6 안으로 들어옴(RL 갈래 기준). 갈라진 순간 화면 안 12마리.\n사건 뒤 화면 안 먹기 아닌 점(적을 때~많을 때, 주황 도망·파랑 숨기·흰색 얼기): RL 얼기 0~5·도망 0~3·숨기 0~5 | FSM 숨기 3~5·얼기 0~4 | R_base 도망 0~5\n갈라진 순간 보이는 도망 2(주황)·숨기 2(파랑)·얼기 1(흰색 !)은 세 칸 모두 같다 — RL이 갈라지기 전에 고른 행동이라 RL만의 것이 아니다(길게는 +1.5초까지 세 칸에 남는다).\n갈라진 뒤엔 위치도 달라져(끝에 같은 개체의 RL–FSM 거리 평균 15.9칸) 뒤쪽 차이가 모두 두뇌의 선택 탓은 아니다. 사건 뒤 2초간 같은 개체의 행동이 다른 비율: RL–FSM 57%, RL–R_base 65%.\n20초 동안 이 화면 안에서 잡힌 수: RL 10 · FSM 10 · R_base 12 (한 장면의 잡힌 수는 우연이 크다. 1498개 순간 평균은 셋이 거의 같다).",
+   "caption_in_video": true,
+   "caption_numbers": {
+    "on_screen_at_split": 12,
+    "at_split_counts": {
+     "먹기": 7,
+     "도망": 2,
+     "숨기": 2,
+     "얼기": 1
+    },
+    "after_event_range": {
+     "rl": {
+      "먹기": [
+       1,
+       8
+      ],
+      "도망": [
+       0,
+       3
+      ],
+      "숨기": [
+       0,
+       5
+      ],
+      "얼기": [
+       0,
+       5
+      ]
+     },
+     "fsm": {
+      "먹기": [
+       0,
+       4
+      ],
+      "도망": [
+       0,
+       0
+      ],
+      "숨기": [
+       3,
+       5
+      ],
+      "얼기": [
+       0,
+       4
+      ]
+     },
+     "rbase": {
+      "먹기": [
+       2,
+       9
+      ],
+      "도망": [
+       0,
+       5
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       0
+      ]
+     }
+    },
+    "inherited_on_screen_until_sec": {
+     "rl": 1.5,
+     "fsm": 1.5,
+     "rbase": 1.5
+    },
+    "pos_gap_rl_fsm_end": 15.87,
+    "disagree_first_2s_after_event": {
+     "rl_fsm": 0.5686,
+     "rl_rbase": 0.65
+    },
+    "caught_in_window": {
+     "rl": 10,
+     "fsm": 10,
+     "rbase": 12
+    }
+   },
+   "screen_stats": {
+    "rule": "확대 창(±16) 안, 스텝 k 의 프레임(보간 없음) — 패널 왼쪽 위 숫자와 같다. '사건 뒤' = 사건 다음 스텝 ~ 끝",
+    "on_screen_at_split": 12,
+    "at_split_counts": {
+     "먹기": 7,
+     "도망": 2,
+     "숨기": 2,
+     "얼기": 1
+    },
+    "after_event_range": {
+     "rl": {
+      "먹기": [
+       1,
+       8
+      ],
+      "도망": [
+       0,
+       3
+      ],
+      "숨기": [
+       0,
+       5
+      ],
+      "얼기": [
+       0,
+       5
+      ]
+     },
+     "fsm": {
+      "먹기": [
+       0,
+       4
+      ],
+      "도망": [
+       0,
+       0
+      ],
+      "숨기": [
+       3,
+       5
+      ],
+      "얼기": [
+       0,
+       4
+      ]
+     },
+     "rbase": {
+      "먹기": [
+       2,
+       9
+      ],
+      "도망": [
+       0,
+       5
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       0
+      ]
+     }
+    },
+    "after_event_mean": {
+     "rl": {
+      "먹기": 4.91,
+      "도망": 0.87,
+      "숨기": 0.83,
+      "얼기": 1.48
+     },
+     "fsm": {
+      "먹기": 1.42,
+      "도망": 0.0,
+      "숨기": 3.94,
+      "얼기": 0.58
+     },
+     "rbase": {
+      "먹기": 5.77,
+      "도망": 1.14,
+      "숨기": 0.0,
+      "얼기": 0.0
+     }
+    },
+    "moment_counts": {
+     "rl": [
+      {
+       "sec": 0.0,
+       "먹기": 7,
+       "도망": 2,
+       "숨기": 2,
+       "얼기": 1
+      },
+      {
+       "sec": 3.3,
+       "먹기": 5,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 5
+      },
+      {
+       "sec": 4.5,
+       "먹기": 5,
+       "도망": 3,
+       "숨기": 0,
+       "얼기": 1
+      },
+      {
+       "sec": 20.0,
+       "먹기": 6,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 1
+      }
+     ],
+     "fsm": [
+      {
+       "sec": 0.0,
+       "먹기": 7,
+       "도망": 2,
+       "숨기": 2,
+       "얼기": 1
+      },
+      {
+       "sec": 3.3,
+       "먹기": 4,
+       "도망": 0,
+       "숨기": 4,
+       "얼기": 2
+      },
+      {
+       "sec": 4.5,
+       "먹기": 1,
+       "도망": 0,
+       "숨기": 4,
+       "얼기": 4
+      },
+      {
+       "sec": 20.0,
+       "먹기": 1,
+       "도망": 0,
+       "숨기": 4,
+       "얼기": 0
+      }
+     ],
+     "rbase": [
+      {
+       "sec": 0.0,
+       "먹기": 7,
+       "도망": 2,
+       "숨기": 2,
+       "얼기": 1
+      },
+      {
+       "sec": 3.3,
+       "먹기": 8,
+       "도망": 3,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 4.5,
+       "먹기": 8,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 20.0,
+       "먹기": 3,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      }
+     ]
+    },
+    "caught_in_window": {
+     "rl": 10,
+     "fsm": 10,
+     "rbase": 12
+    },
+    "inherited_on_screen_until_sec": {
+     "rl": 1.5,
+     "fsm": 1.5,
+     "rbase": 1.5
+    },
+    "inherited_on_screen_at_event": {
+     "rl": 0,
+     "fsm": 0,
+     "rbase": 0
+    },
+    "disagree_first_2s_after_event": {
+     "rl_fsm": 0.5686,
+     "rl_rbase": 0.65
+    },
+    "disagree_whole_branch": {
+     "rl_fsm": 0.7311,
+     "rl_rbase": 0.4604
+    },
+    "pos_gap_focus": {
+     "rl_fsm": {
+      "event": 1.77,
+      "end": 15.87
+     },
+     "rl_rbase": {
+      "event": 1.14,
+      "end": 9.16
+     }
+    }
+   },
+   "search_metrics": {
+    "d_rl_fsm": 0.7281553398058253,
+    "d_rl_rbase": 0.46096654275092935,
+    "d_fsm_rbase": 0.6951672862453532,
+    "hist": {
+     "rl": [
+      0.5342,
+      0.1519,
+      0.0,
+      0.3139
+     ],
+     "fsm": [
+      0.2956,
+      0.0063,
+      0.4403,
+      0.2579
+     ],
+     "rbase": [
+      0.7138,
+      0.2602,
+      0.0,
+      0.026
+     ]
+    },
+    "nongraze": {
+     "rl": 0.4658,
+     "fsm": 0.7044,
+     "rbase": 0.2862
+    },
+    "caught_focus": {
+     "rl": 4,
+     "fsm": 4,
+     "rbase": 4
+    },
+    "caught_all": {
+     "rl": 50,
+     "fsm": 39,
+     "rbase": 42
+    },
+    "pos_div_rl_fsm": 15.868043950765674,
+    "score": 0.5945609412783773
+   },
+   "search_metrics_note": "탐색 단계 값(candidates.json). 갈라지기 전에 RL 이 고른 잠금(물려받은 스텝)이 세 갈래 비율에 함께 들어 있다 — 예: R_base 는 얼기를 고르지 않지만 장면 1 의 R_base 얼기 비율은 물려받은 것이다. 각 정책이 직접 고른 비율은 branch_summary.share_own",
+   "branch_summary": {
+    "rl": {
+     "share_all": {
+      "먹기": 0.534,
+      "도망": 0.152,
+      "숨기": 0.0,
+      "얼기": 0.314
+     },
+     "share_own": {
+      "먹기": 0.545,
+      "도망": 0.151,
+      "숨기": 0.0,
+      "얼기": 0.304
+     },
+     "inherited_nongraze_share_of_all": 0.023,
+     "share_event": {
+      "먹기": 0.366,
+      "도망": 0.218,
+      "숨기": 0.0,
+      "얼기": 0.416
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 4,
+     "caught_in_window": 10
+    },
+    "fsm": {
+     "share_all": {
+      "먹기": 0.296,
+      "도망": 0.006,
+      "숨기": 0.44,
+      "얼기": 0.258
+     },
+     "share_own": {
+      "먹기": 0.302,
+      "도망": 0.0,
+      "숨기": 0.455,
+      "얼기": 0.244
+     },
+     "inherited_nongraze_share_of_all": 0.028,
+     "share_event": {
+      "먹기": 0.19,
+      "도망": 0.0,
+      "숨기": 0.399,
+      "얼기": 0.411
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 4,
+     "caught_in_window": 10,
+     "first_diff_from_rl_sec": 0.4
+    },
+    "rbase": {
+     "share_all": {
+      "먹기": 0.714,
+      "도망": 0.26,
+      "숨기": 0.0,
+      "얼기": 0.026
+     },
+     "share_own": {
+      "먹기": 0.737,
+      "도망": 0.263,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "inherited_nongraze_share_of_all": 0.033,
+     "share_event": {
+      "먹기": 0.53,
+      "도망": 0.47,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 4,
+     "caught_in_window": 12,
+     "first_diff_from_rl_sec": 0.8
+    }
+   },
+   "png": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene2_seed10107_t2143.png",
+   "mp4": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene2_seed10107_t2143.mp4",
+   "video": {
+    "path": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene2_seed10107_t2143.mp4",
+    "mb": 4.733375,
+    "frames": 352,
+    "secs": 23.46,
+    "render_sec": 103.1
+   }
+  },
+  {
+   "n": 3,
+   "tag": "포획 결과가 다른 장면",
+   "seed": 10109,
+   "t0": 1624,
+   "t_e": 1649,
+   "kind": "pounce",
+   "threat": 4,
+   "n_focus": 38,
+   "center": [
+    16.0,
+    42.13821248773117
+   ],
+   "half": 16.0,
+   "moments": [
+    0,
+    25,
+    43,
+    150
+   ],
+   "determinism": {
+    "rl_two_copies_identical": true,
+    "fsm_two_copies_identical": true,
+    "rbase_two_copies_identical": true,
+    "rl_branch_equals_original_run": true,
+    "fsm_branch_differs_from_rl": true,
+    "rbase_branch_differs_from_rl": true
+   },
+   "caption": "잡힌 수가 가장 크게 갈린 장면(1498개 순간 중 1위). +3.3초에 잠행형 포식자가 돌진을 시작(RL 갈래 기준). 갈라진 순간 화면 안 55마리.\n사건 뒤 화면 안 먹기 아닌 점(적을 때~많을 때, 주황 도망·파랑 숨기·흰색 얼기): RL 얼기 0~14·도망 0~7·숨기 0~2 | FSM 숨기 3~13·얼기 0~19 | R_base 도망 0~16\n갈라진 순간 보이는 도망 3(주황)·얼기 8(흰색 !)은 세 칸 모두 같다 — RL이 갈라지기 전에 고른 행동이라 RL만의 것이 아니다(길게는 +0.9초까지 세 칸에 남는다).\n갈라진 뒤엔 위치도 달라져(끝에 같은 개체의 RL–FSM 거리 평균 4.5칸) 뒤쪽 차이가 모두 두뇌의 선택 탓은 아니다. 사건 뒤 2초간 같은 개체의 행동이 다른 비율: RL–FSM 35%, RL–R_base 44%.\n20초 동안 이 화면 안에서 잡힌 수: RL 45 · FSM 20 · R_base 31 (한 장면의 잡힌 수는 우연이 크다. 1498개 순간 평균은 셋이 거의 같다).",
+   "caption_in_video": true,
+   "caption_numbers": {
+    "on_screen_at_split": 55,
+    "at_split_counts": {
+     "먹기": 44,
+     "도망": 3,
+     "숨기": 0,
+     "얼기": 8
+    },
+    "after_event_range": {
+     "rl": {
+      "먹기": [
+       17,
+       44
+      ],
+      "도망": [
+       0,
+       7
+      ],
+      "숨기": [
+       0,
+       2
+      ],
+      "얼기": [
+       0,
+       14
+      ]
+     },
+     "fsm": {
+      "먹기": [
+       27,
+       52
+      ],
+      "도망": [
+       0,
+       0
+      ],
+      "숨기": [
+       3,
+       13
+      ],
+      "얼기": [
+       0,
+       19
+      ]
+     },
+     "rbase": {
+      "먹기": [
+       25,
+       44
+      ],
+      "도망": [
+       0,
+       16
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       0
+      ]
+     }
+    },
+    "inherited_on_screen_until_sec": {
+     "rl": 0.9,
+     "fsm": 0.9,
+     "rbase": 0.9
+    },
+    "pos_gap_rl_fsm_end": 4.47,
+    "disagree_first_2s_after_event": {
+     "rl_fsm": 0.3502,
+     "rl_rbase": 0.4408
+    },
+    "caught_in_window": {
+     "rl": 45,
+     "fsm": 20,
+     "rbase": 31
+    }
+   },
+   "screen_stats": {
+    "rule": "확대 창(±16) 안, 스텝 k 의 프레임(보간 없음) — 패널 왼쪽 위 숫자와 같다. '사건 뒤' = 사건 다음 스텝 ~ 끝",
+    "on_screen_at_split": 55,
+    "at_split_counts": {
+     "먹기": 44,
+     "도망": 3,
+     "숨기": 0,
+     "얼기": 8
+    },
+    "after_event_range": {
+     "rl": {
+      "먹기": [
+       17,
+       44
+      ],
+      "도망": [
+       0,
+       7
+      ],
+      "숨기": [
+       0,
+       2
+      ],
+      "얼기": [
+       0,
+       14
+      ]
+     },
+     "fsm": {
+      "먹기": [
+       27,
+       52
+      ],
+      "도망": [
+       0,
+       0
+      ],
+      "숨기": [
+       3,
+       13
+      ],
+      "얼기": [
+       0,
+       19
+      ]
+     },
+     "rbase": {
+      "먹기": [
+       25,
+       44
+      ],
+      "도망": [
+       0,
+       16
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       0
+      ]
+     }
+    },
+    "after_event_mean": {
+     "rl": {
+      "먹기": 29.0,
+      "도망": 1.89,
+      "숨기": 0.18,
+      "얼기": 5.82
+     },
+     "fsm": {
+      "먹기": 39.68,
+      "도망": 0.0,
+      "숨기": 7.68,
+      "얼기": 4.74
+     },
+     "rbase": {
+      "먹기": 37.25,
+      "도망": 5.26,
+      "숨기": 0.0,
+      "얼기": 0.0
+     }
+    },
+    "moment_counts": {
+     "rl": [
+      {
+       "sec": 0.0,
+       "먹기": 44,
+       "도망": 3,
+       "숨기": 0,
+       "얼기": 8
+      },
+      {
+       "sec": 3.3,
+       "먹기": 43,
+       "도망": 0,
+       "숨기": 1,
+       "얼기": 6
+      },
+      {
+       "sec": 5.7,
+       "먹기": 35,
+       "도망": 2,
+       "숨기": 0,
+       "얼기": 11
+      },
+      {
+       "sec": 20.0,
+       "먹기": 17,
+       "도망": 1,
+       "숨기": 0,
+       "얼기": 6
+      }
+     ],
+     "fsm": [
+      {
+       "sec": 0.0,
+       "먹기": 44,
+       "도망": 3,
+       "숨기": 0,
+       "얼기": 8
+      },
+      {
+       "sec": 3.3,
+       "먹기": 48,
+       "도망": 0,
+       "숨기": 5,
+       "얼기": 2
+      },
+      {
+       "sec": 5.7,
+       "먹기": 31,
+       "도망": 0,
+       "숨기": 7,
+       "얼기": 13
+      },
+      {
+       "sec": 20.0,
+       "먹기": 48,
+       "도망": 0,
+       "숨기": 8,
+       "얼기": 0
+      }
+     ],
+     "rbase": [
+      {
+       "sec": 0.0,
+       "먹기": 44,
+       "도망": 3,
+       "숨기": 0,
+       "얼기": 8
+      },
+      {
+       "sec": 3.3,
+       "먹기": 44,
+       "도망": 7,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 5.7,
+       "먹기": 36,
+       "도망": 13,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 20.0,
+       "먹기": 28,
+       "도망": 12,
+       "숨기": 0,
+       "얼기": 0
+      }
+     ]
+    },
+    "caught_in_window": {
+     "rl": 45,
+     "fsm": 20,
+     "rbase": 31
+    },
+    "inherited_on_screen_until_sec": {
+     "rl": 0.9,
+     "fsm": 0.9,
+     "rbase": 0.9
+    },
+    "inherited_on_screen_at_event": {
+     "rl": 0,
+     "fsm": 0,
+     "rbase": 0
+    },
+    "disagree_first_2s_after_event": {
+     "rl_fsm": 0.3502,
+     "rl_rbase": 0.4408
+    },
+    "disagree_whole_branch": {
+     "rl_fsm": 0.2919,
+     "rl_rbase": 0.292
+    },
+    "pos_gap_focus": {
+     "rl_fsm": {
+      "event": 1.55,
+      "end": 4.47
+     },
+     "rl_rbase": {
+      "event": 2.01,
+      "end": 3.3
+     }
+    }
+   },
+   "search_metrics": {
+    "d_rl_fsm": 0.2934604009201446,
+    "d_rl_rbase": 0.2938041305796136,
+    "d_fsm_rbase": 0.24055829228243022,
+    "hist": {
+     "rl": [
+      0.7538,
+      0.06,
+      0.0,
+      0.1863
+     ],
+     "fsm": [
+      0.8144,
+      0.0021,
+      0.0489,
+      0.1346
+     ],
+     "rbase": [
+      0.8807,
+      0.1113,
+      0.0,
+      0.008
+     ]
+    },
+    "nongraze": {
+     "rl": 0.2462,
+     "fsm": 0.1856,
+     "rbase": 0.1193
+    },
+    "caught_focus": {
+     "rl": 26,
+     "fsm": 12,
+     "rbase": 14
+    },
+    "caught_all": {
+     "rl": 86,
+     "fsm": 84,
+     "rbase": 91
+    },
+    "pos_div_rl_fsm": 4.470606265352463,
+    "score": 0.2936322657498791
+   },
+   "search_metrics_note": "탐색 단계 값(candidates.json). 갈라지기 전에 RL 이 고른 잠금(물려받은 스텝)이 세 갈래 비율에 함께 들어 있다 — 예: R_base 는 얼기를 고르지 않지만 장면 1 의 R_base 얼기 비율은 물려받은 것이다. 각 정책이 직접 고른 비율은 branch_summary.share_own",
+   "branch_summary": {
+    "rl": {
+     "share_all": {
+      "먹기": 0.754,
+      "도망": 0.06,
+      "숨기": 0.0,
+      "얼기": 0.186
+     },
+     "share_own": {
+      "먹기": 0.761,
+      "도망": 0.058,
+      "숨기": 0.0,
+      "얼기": 0.18
+     },
+     "inherited_nongraze_share_of_all": 0.013,
+     "share_event": {
+      "먹기": 0.699,
+      "도망": 0.08,
+      "숨기": 0.0,
+      "얼기": 0.221
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 26,
+     "caught_in_window": 45
+    },
+    "fsm": {
+     "share_all": {
+      "먹기": 0.814,
+      "도망": 0.002,
+      "숨기": 0.049,
+      "얼기": 0.135
+     },
+     "share_own": {
+      "먹기": 0.821,
+      "도망": 0.0,
+      "숨기": 0.05,
+      "얼기": 0.129
+     },
+     "inherited_nongraze_share_of_all": 0.01,
+     "share_event": {
+      "먹기": 0.734,
+      "도망": 0.0,
+      "숨기": 0.041,
+      "얼기": 0.225
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 12,
+     "caught_in_window": 20,
+     "first_diff_from_rl_sec": 0.13
+    },
+    "rbase": {
+     "share_all": {
+      "먹기": 0.881,
+      "도망": 0.111,
+      "숨기": 0.0,
+      "얼기": 0.008
+     },
+     "share_own": {
+      "먹기": 0.889,
+      "도망": 0.111,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "inherited_nongraze_share_of_all": 0.01,
+     "share_event": {
+      "먹기": 0.85,
+      "도망": 0.15,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "first_nongraze_sec": 0.13,
+     "caught_focus": 14,
+     "caught_in_window": 31,
+     "first_diff_from_rl_sec": 0.13
+    }
+   },
+   "png": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene3_seed10109_t1624.png",
+   "mp4": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene3_seed10109_t1624.mp4",
+   "video": {
+    "path": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene3_seed10109_t1624.mp4",
+    "mb": 8.471025,
+    "frames": 352,
+    "secs": 23.46,
+    "render_sec": 103.1
+   }
+  },
+  {
+   "n": 4,
+   "tag": "보통 장면(점수 중앙값)",
+   "seed": 10111,
+   "t0": 782,
+   "t_e": 807,
+   "kind": "chase",
+   "threat": 0,
+   "n_focus": 24,
+   "center": [
+    63.11077307727301,
+    41.23126256933845
+   ],
+   "half": 16.0,
+   "moments": [
+    0,
+    25,
+    116,
+    150
+   ],
+   "determinism": {
+    "rl_two_copies_identical": true,
+    "fsm_two_copies_identical": true,
+    "rbase_two_copies_identical": true,
+    "rl_branch_equals_original_run": true,
+    "fsm_branch_differs_from_rl": true,
+    "rbase_branch_differs_from_rl": true
+   },
+   "caption": "'보통' 장면(차이 점수가 1498개 순간의 한가운데에 가장 가까움). +3.3초에 추격형 포식자가 무리 6 안으로 들어옴(RL 갈래 기준). 갈라진 순간 화면 안 37마리.\n사건 뒤 화면 안 먹기 아닌 점(적을 때~많을 때, 주황 도망·파랑 숨기·흰색 얼기): RL 얼기 0~9·도망 0~3 | FSM 숨기 1~10·얼기 0~8 | R_base 도망 0~10\n갈라진 순간에는 화면 안이 모두 먹기다(세 칸 같음). 그 뒤의 먹기 아닌 행동은 각 칸 정책이 고른 것이다.\n갈라진 뒤엔 위치도 달라져(끝에 같은 개체의 RL–FSM 거리 평균 7.6칸) 뒤쪽 차이가 모두 두뇌의 선택 탓은 아니다. 사건 뒤 2초간 같은 개체의 행동이 다른 비율: RL–FSM 24%, RL–R_base 25%.\n20초 동안 이 화면 안에서 잡힌 수: RL 8 · FSM 8 · R_base 14 (한 장면의 잡힌 수는 우연이 크다. 1498개 순간 평균은 셋이 거의 같다).",
+   "caption_in_video": true,
+   "caption_numbers": {
+    "on_screen_at_split": 37,
+    "at_split_counts": {
+     "먹기": 37,
+     "도망": 0,
+     "숨기": 0,
+     "얼기": 0
+    },
+    "after_event_range": {
+     "rl": {
+      "먹기": [
+       28,
+       42
+      ],
+      "도망": [
+       0,
+       3
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       9
+      ]
+     },
+     "fsm": {
+      "먹기": [
+       22,
+       34
+      ],
+      "도망": [
+       0,
+       0
+      ],
+      "숨기": [
+       1,
+       10
+      ],
+      "얼기": [
+       0,
+       8
+      ]
+     },
+     "rbase": {
+      "먹기": [
+       21,
+       37
+      ],
+      "도망": [
+       0,
+       10
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       0
+      ]
+     }
+    },
+    "inherited_on_screen_until_sec": {
+     "rl": 0.0,
+     "fsm": 0.0,
+     "rbase": 0.0
+    },
+    "pos_gap_rl_fsm_end": 7.61,
+    "disagree_first_2s_after_event": {
+     "rl_fsm": 0.2434,
+     "rl_rbase": 0.2493
+    },
+    "caught_in_window": {
+     "rl": 8,
+     "fsm": 8,
+     "rbase": 14
+    }
+   },
+   "screen_stats": {
+    "rule": "확대 창(±16) 안, 스텝 k 의 프레임(보간 없음) — 패널 왼쪽 위 숫자와 같다. '사건 뒤' = 사건 다음 스텝 ~ 끝",
+    "on_screen_at_split": 37,
+    "at_split_counts": {
+     "먹기": 37,
+     "도망": 0,
+     "숨기": 0,
+     "얼기": 0
+    },
+    "after_event_range": {
+     "rl": {
+      "먹기": [
+       28,
+       42
+      ],
+      "도망": [
+       0,
+       3
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       9
+      ]
+     },
+     "fsm": {
+      "먹기": [
+       22,
+       34
+      ],
+      "도망": [
+       0,
+       0
+      ],
+      "숨기": [
+       1,
+       10
+      ],
+      "얼기": [
+       0,
+       8
+      ]
+     },
+     "rbase": {
+      "먹기": [
+       21,
+       37
+      ],
+      "도망": [
+       0,
+       10
+      ],
+      "숨기": [
+       0,
+       0
+      ],
+      "얼기": [
+       0,
+       0
+      ]
+     }
+    },
+    "after_event_mean": {
+     "rl": {
+      "먹기": 34.35,
+      "도망": 0.78,
+      "숨기": 0.0,
+      "얼기": 2.86
+     },
+     "fsm": {
+      "먹기": 26.1,
+      "도망": 0.0,
+      "숨기": 5.57,
+      "얼기": 2.98
+     },
+     "rbase": {
+      "먹기": 28.94,
+      "도망": 3.18,
+      "숨기": 0.0,
+      "얼기": 0.0
+     }
+    },
+    "moment_counts": {
+     "rl": [
+      {
+       "sec": 0.0,
+       "먹기": 37,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 3.3,
+       "먹기": 38,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 15.5,
+       "먹기": 33,
+       "도망": 1,
+       "숨기": 0,
+       "얼기": 3
+      },
+      {
+       "sec": 20.0,
+       "먹기": 38,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 4
+      }
+     ],
+     "fsm": [
+      {
+       "sec": 0.0,
+       "먹기": 37,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 3.3,
+       "먹기": 38,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 15.5,
+       "먹기": 25,
+       "도망": 0,
+       "숨기": 8,
+       "얼기": 2
+      },
+      {
+       "sec": 20.0,
+       "먹기": 25,
+       "도망": 0,
+       "숨기": 8,
+       "얼기": 1
+      }
+     ],
+     "rbase": [
+      {
+       "sec": 0.0,
+       "먹기": 37,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 3.3,
+       "먹기": 38,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 15.5,
+       "먹기": 28,
+       "도망": 2,
+       "숨기": 0,
+       "얼기": 0
+      },
+      {
+       "sec": 20.0,
+       "먹기": 31,
+       "도망": 0,
+       "숨기": 0,
+       "얼기": 0
+      }
+     ]
+    },
+    "caught_in_window": {
+     "rl": 8,
+     "fsm": 8,
+     "rbase": 14
+    },
+    "inherited_on_screen_until_sec": {
+     "rl": 0.0,
+     "fsm": 0.0,
+     "rbase": 0.0
+    },
+    "inherited_on_screen_at_event": {
+     "rl": 0,
+     "fsm": 0,
+     "rbase": 0
+    },
+    "disagree_first_2s_after_event": {
+     "rl_fsm": 0.2434,
+     "rl_rbase": 0.2493
+    },
+    "disagree_whole_branch": {
+     "rl_fsm": 0.2367,
+     "rl_rbase": 0.1744
+    },
+    "pos_gap_focus": {
+     "rl_fsm": {
+      "event": 0.0,
+      "end": 7.61
+     },
+     "rl_rbase": {
+      "event": 0.0,
+      "end": 4.99
+     }
+    }
+   },
+   "search_metrics": {
+    "d_rl_fsm": 0.23836985774702038,
+    "d_rl_rbase": 0.17536454336147353,
+    "d_fsm_rbase": 0.21605960264900662,
+    "hist": {
+     "rl": [
+      0.8966,
+      0.0245,
+      0.0,
+      0.079
+     ],
+     "fsm": [
+      0.7939,
+      0.0,
+      0.111,
+      0.0951
+     ],
+     "rbase": [
+      0.8947,
+      0.1053,
+      0.0,
+      0.0
+     ]
+    },
+    "nongraze": {
+     "rl": 0.1034,
+     "fsm": 0.2061,
+     "rbase": 0.1053
+    },
+    "caught_focus": {
+     "rl": 5,
+     "fsm": 7,
+     "rbase": 11
+    },
+    "caught_all": {
+     "rl": 23,
+     "fsm": 25,
+     "rbase": 31
+    },
+    "pos_div_rl_fsm": 7.614806703312392,
+    "score": 0.20686720055424695
+   },
+   "search_metrics_note": "탐색 단계 값(candidates.json). 갈라지기 전에 RL 이 고른 잠금(물려받은 스텝)이 세 갈래 비율에 함께 들어 있다 — 예: R_base 는 얼기를 고르지 않지만 장면 1 의 R_base 얼기 비율은 물려받은 것이다. 각 정책이 직접 고른 비율은 branch_summary.share_own",
+   "branch_summary": {
+    "rl": {
+     "share_all": {
+      "먹기": 0.897,
+      "도망": 0.024,
+      "숨기": 0.0,
+      "얼기": 0.079
+     },
+     "share_own": {
+      "먹기": 0.897,
+      "도망": 0.024,
+      "숨기": 0.0,
+      "얼기": 0.079
+     },
+     "inherited_nongraze_share_of_all": 0.0,
+     "share_event": {
+      "먹기": 0.889,
+      "도망": 0.026,
+      "숨기": 0.0,
+      "얼기": 0.085
+     },
+     "first_nongraze_sec": 3.6,
+     "caught_focus": 5,
+     "caught_in_window": 8
+    },
+    "fsm": {
+     "share_all": {
+      "먹기": 0.794,
+      "도망": 0.0,
+      "숨기": 0.111,
+      "얼기": 0.095
+     },
+     "share_own": {
+      "먹기": 0.794,
+      "도망": 0.0,
+      "숨기": 0.111,
+      "얼기": 0.095
+     },
+     "inherited_nongraze_share_of_all": 0.0,
+     "share_event": {
+      "먹기": 0.749,
+      "도망": 0.0,
+      "숨기": 0.086,
+      "얼기": 0.165
+     },
+     "first_nongraze_sec": 3.47,
+     "caught_focus": 7,
+     "caught_in_window": 8,
+     "first_diff_from_rl_sec": 3.47
+    },
+    "rbase": {
+     "share_all": {
+      "먹기": 0.895,
+      "도망": 0.105,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "share_own": {
+      "먹기": 0.895,
+      "도망": 0.105,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "inherited_nongraze_share_of_all": 0.0,
+     "share_event": {
+      "먹기": 0.872,
+      "도망": 0.128,
+      "숨기": 0.0,
+      "얼기": 0.0
+     },
+     "first_nongraze_sec": 3.47,
+     "caught_focus": 11,
+     "caught_in_window": 14,
+     "first_diff_from_rl_sec": 3.47
+    }
+   },
+   "png": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene4_seed10111_t782.png",
+   "mp4": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene4_seed10111_t782.mp4",
+   "video": {
+    "path": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r1b\\visual\\scenes\\scene4_seed10111_t782.mp4",
+    "mb": 8.52319,
+    "frames": 352,
+    "secs": 23.46,
+    "render_sec": 101.1
+   }
+  }
+ ]
+}
