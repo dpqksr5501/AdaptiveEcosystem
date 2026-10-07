@@ -88,6 +88,12 @@ U_TARGET = {"esc": (FLEE, HIDE, FREEZE), "hide": (HIDE,), "freeze": (FREEZE,), "
 # 0.364·깜빡임 0.647, FSM U_FREEZE 0.203·깜빡임 0.537, FSM 얼기 사용 2.0%). U 문턱 = 그 니치를 정한 손 규칙 값의 절반(ESC 는
 # R_base, HIDE·FREEZE 는 FSM), 깜빡임 = 손 규칙의 큰 값보다 크지 않게, 사용 = 0.5%. 입력 의존(C4)은 보고만
 U_MIN = {"esc": 0.18, "hide": 0.5, "freeze": 0.10, "sleep": 0.5}
+# 지표 정의 묶음. r1 = R1 사전 등록(위), r1b = R1b 새 시드 확인 시험(results/v3/r1b/PREREG.md 2·3절): U_HIDE′ 제자리 웅크림
+# (은신처 안 & 거리 < 6 대 은신처 안 & 거리 ≥ 8 & 접근 < 0.7), U_FREEZE′ 빠른 위협 앞 얼기(접근 ≥ 0.9 & 은신처 > 5 대 접근 < 0.7 &
+# 거리 ≥ 8). U_ESC·U_SLEEP 은 같다
+U_DEFS = ("r1", "r1b")
+U_MIN_BY = {"r1": U_MIN, "r1b": {"esc": 0.18, "hide": 0.2, "freeze": 0.10, "sleep": 0.5}}
+R1B_COND = dict(hide_near=6.0, hide_far=8.0, hide_slow=0.7, fz_fast=0.9, fz_cover=5.0, fz_slow=0.7, fz_far=8.0)
 USE_MIN, FLICKER_MAX, C4_DROP_MIN, STARVE_RATIO_MAX = 0.005, 0.65, 0.5, 1.5
 FULL_E, HUNGRY_E = 0.7, 0.35                # 위험 할당 에너지 구간 (명세 5절)
 C1P_TAG = 606                               # C1′ 해시 스트림 구분값(rollout._SALT 101~404·지연 505 와 겹치지 않는다)
@@ -106,19 +112,29 @@ def active_u(allowed) -> tuple[str, ...]:
     return tuple(u for u in U_NAMES if u == "esc" or u in allowed)
 
 
-def u_terms(f: dict, variant: str = "near") -> dict:
-    """규칙 입력(`repertoire_rules.features_of_obs`) → {U 이름: (첫 항 조건, 둘째 항 조건)} (모듈 docstring '지표')."""
+def u_terms(f: dict, variant: str = "near", udef: str = "r1") -> dict:
+    """규칙 입력(`repertoire_rules.features_of_obs`) → {U 이름: (첫 항 조건, 둘째 항 조건)} (모듈 docstring '지표').
+    `udef` = r1(R1 사전 등록) 또는 r1b(R1b 확인 시험의 U_HIDE′·U_FREEZE′, U_DEFS 주석)."""
     if variant not in FREEZE_VARIANTS:
         raise ValueError(f"freeze 판은 {FREEZE_VARIANTS} 중 하나다. 받은 값: {variant!r}")
+    if udef not in U_DEFS:
+        raise ValueError(f"지표 정의는 {U_DEFS} 중 하나다. 받은 값: {udef!r}")
     c = U_COND
     seen, dist, app = f["seen"], f["dist"], f["approach"]
     none = ~seen
     near = seen & ((dist < c["fz_near"]) | (app >= c["fz_fast"]))
     far = seen & (dist >= c["fz_far"]) & (app < c["fz_slow"])
-    return {"esc": (seen & (app >= c["esc_approach"]) & (dist < c["esc_dist"]), none),
-            "hide": (seen & (f["cover_d"] <= c["hide_cover"]), none & f["day"]),
-            "freeze": (near, far) if variant == "near" else (far, near),
-            "sleep": (f["night"] & (f["energy"] >= c["sleep_energy"]), f["day"])}
+    out = {"esc": (seen & (app >= c["esc_approach"]) & (dist < c["esc_dist"]), none),
+           "hide": (seen & (f["cover_d"] <= c["hide_cover"]), none & f["day"]),
+           "freeze": (near, far) if variant == "near" else (far, near),
+           "sleep": (f["night"] & (f["energy"] >= c["sleep_energy"]), f["day"])}
+    if udef == "r1b":
+        b = R1B_COND
+        inc = seen & f["in_cover"]
+        out["hide"] = (inc & (dist < b["hide_near"]), inc & (dist >= b["hide_far"]) & (app < b["hide_slow"]))
+        out["freeze"] = (seen & (app >= b["fz_fast"]) & (f["cover_d"] > b["fz_cover"]),
+                         seen & (app < b["fz_slow"]) & (dist >= b["fz_far"]))
+    return out
 
 
 def u_value(cnt) -> float | None:
@@ -254,7 +270,7 @@ def _job(args):
 
     import repertoire_rules as rr
 
-    name, pspec, seed, steps, config, gamma, tail, variant = args
+    name, pspec, seed, steps, config, gamma, tail, variant, udef = args
     cfg = load_v2_config(HERE / config)
     rep = rep_params(cfg)
     geo = rr._geom(cfg)
@@ -278,7 +294,7 @@ def _job(args):
             wake = pk["wake_decide"][dec]
             chosen = np.where(wake & (req == SLEEP), w._rs.wake_target[dec].astype(np.int64), req)
             f = rr.features_of_obs(obs[dec], geo)
-            for u, (ca, cb) in u_terms(f, variant).items():
+            for u, (ca, cb) in u_terms(f, variant, udef).items():
                 hit = np.isin(chosen, U_TARGET[u])
                 u_cnt[u] += (np.count_nonzero(ca), np.count_nonzero(ca & hit), np.count_nonzero(cb),
                              np.count_nonzero(cb & hit))
@@ -359,7 +375,7 @@ def drop(u, u_c4):
     return (u - u_c4) / u
 
 
-def gate(res: dict, allowed, variant: str) -> dict:
+def gate(res: dict, allowed, variant: str, udef: str = "r1") -> dict:
     """PREREG 4절 판정 (모듈 docstring). 조건마다 값·문턱·통과, 그리고 pass(모두 통과)."""
     P = res["pooled"]
     rl, fsm = P["rl"], P["fsm"]
@@ -374,7 +390,8 @@ def gate(res: dict, allowed, variant: str) -> dict:
     us = {}
     for u in active_u(allowed):
         v = rl["u"][u]
-        us[u] = dict(value=v, min=U_MIN[u], pass_=bool(v is not None and v >= U_MIN[u]))
+        lo = U_MIN_BY[udef][u]
+        us[u] = dict(value=v, min=lo, pass_=bool(v is not None and v >= lo))
     out["u"] = dict(items=us, pass_=all(x["pass_"] for x in us.values()))
     use = {b: dict(value=rl["use"][b], pass_=bool(rl["use"][b] is not None and rl["use"][b] >= USE_MIN))
            for b in allowed}
@@ -404,7 +421,7 @@ def config_digest(cfg) -> str:
 
 
 def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CONFIG, variant: str = "near",
-          workers: int = 1, policies=None, tail: int = TAIL, gamma: float = GAMMA) -> dict:
+          workers: int = 1, policies=None, tail: int = TAIL, gamma: float = GAMMA, udef: str = "r1") -> dict:
     """모델 하나를 판정해 `<out>/<name>.json`·`<name>.md` 를 쓴다. 반환은 JSON 과 같은 dict."""
     from env_v2.config import load_v2_config
     from env_v2.rep_policy import rep_params
@@ -416,6 +433,8 @@ def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CON
     allowed = rep["allowed"]
     if variant not in FREEZE_VARIANTS:
         raise ValueError(f"--freeze-variant 는 {FREEZE_VARIANTS} 중 하나다")
+    if udef not in U_DEFS:
+        raise ValueError(f"--u-def 는 {U_DEFS} 중 하나다")
     names = list(policies) if policies else (["rl", "fsm", "rbase"] + [f"c_{b}" for b in allowed]
                                              + ["c1p", "c4_app", "c4_phase"])
     for must in ("rl", "fsm"):
@@ -424,7 +443,7 @@ def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CON
     seeds = [int(s) for s in seeds]
     t0 = time.time()
     phase1 = [p for p in names if p != "c1p"]
-    jobs = [(p, policy_spec(p, model, cfg, allowed, variant), s, steps, config, gamma, tail, variant)
+    jobs = [(p, policy_spec(p, model, cfg, allowed, variant), s, steps, config, gamma, tail, variant, udef)
             for p in phase1 for s in seeds]
     rows: dict[str, list[dict]] = {}
     for r in _map(jobs, workers):
@@ -432,8 +451,8 @@ def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CON
     pooled_ = {p: pooled(rows[p], allowed) for p in rows}
     if "c1p" in names:
         freq = pooled_["rl"]["choice_freq"]
-        jobs = [("c1p", policy_spec("c1p", model, cfg, allowed, variant, freq), s, steps, config, gamma, tail, variant)
-                for s in seeds]
+        jobs = [("c1p", policy_spec("c1p", model, cfg, allowed, variant, freq), s, steps, config, gamma, tail, variant,
+                 udef) for s in seeds]
         rows["c1p"] = _map(jobs, workers)
         pooled_["c1p"] = pooled(rows["c1p"], allowed)
     for p in rows:
@@ -442,9 +461,9 @@ def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CON
     res = dict(pooled=pooled_, perf=paired_t(g("rl"), g("fsm")))
     res["c4_drop"] = {c: {u: drop(pooled_["rl"]["u"][u], pooled_[c]["u"][u]) for u in U_NAMES}
                       for c in ("c4_app", "c4_phase") if c in pooled_}
-    res["gate"] = gate(res, allowed, variant)
+    res["gate"] = gate(res, allowed, variant, udef)
     res["meta"] = dict(name=name, model=str(model), config=config, digest=config_digest(cfg), seeds=seeds,
-                       steps=int(steps), gamma=gamma, tail=int(tail), freeze_variant=variant, allowed=list(allowed),
+                       steps=int(steps), gamma=gamma, tail=int(tail), freeze_variant=variant, u_def=udef, allowed=list(allowed),
                        policies=[p for p in POLICY_ORDER if p in rows], theta=THETA, approach=APPROACH,
                        elapsed_s=round(time.time() - t0, 1))
     res["per_seed"] = {p: [{k: v for k, v in r.items() if k not in ("entries",)} for r in rows[p]] for p in rows}
@@ -473,7 +492,7 @@ def report_md(res: dict) -> str:
     L = [f"# v3 R1 판정 — {m['name']}" + (" (smoke·부분 실행, 판정 아님)" if small else ""), "",
          f"**결론: {'통과' if G['pass_'] else '실패'}** (PREREG 4절 다섯 조건 모두 만족해야 통과)", "",
          f"- 모델 `{m['model']}`, 판정 세계 `{m['config']}`(digest {m['digest']}), 목록 {', '.join(m['allowed'])}, "
-         f"FREEZE 판 {m['freeze_variant']}", f"- 평가 시드 {m['seeds'][0]}~{m['seeds'][-1]} ({len(m['seeds'])}개) × "
+         f"FREEZE 판 {m['freeze_variant']}, 지표 정의 {m.get('u_def', 'r1')}", f"- 평가 시드 {m['seeds'][0]}~{m['seeds'][-1]} ({len(m['seeds'])}개) × "
          f"{m['steps']}스텝, 정책은 모두 argmax·결정적, G_γ γ {m['gamma']} tail {m['tail']}", "",
          "## 판정 (PREREG 4절)", "", "| 조건 | 값 | 문턱 | 결과 |", "|---|---|---|---|"]
     p = G["perf"]
@@ -483,14 +502,14 @@ def report_md(res: dict) -> str:
     for u, v in G["u"]["items"].items():
         L.append(f"| 2. 맞는 때: U_{u.upper()} | {_f(v['value'])} | ≥ {v['min']} | {_ok(v['pass_'])} |")
     for b, v in G["use"]["items"].items():
-        L.append(f"| 3. 쓰임: {b} 사용 비중 | {_f(v['value'], '.2%') if v['value'] is not None else '—'} | ≥ 2% | "
+        L.append(f"| 3. 쓰임: {b} 사용 비중 | {_f(v['value'], '.2%') if v['value'] is not None else '—'} | ≥ {USE_MIN:.1%} | "
                  f"{_ok(v['pass_'])} |")
     L.append(f"| 3. 쓰임: 깜빡임(3초 안 A-B-A) | {_f(G['use']['flicker'], '.2%') if G['use']['flicker'] is not None else '—'}"
-             f" | ≤ 10% | {_ok(G['use']['flicker_pass'])} |")
+             f" | ≤ {FLICKER_MAX:.0%} | {_ok(G['use']['flicker_pass'])} |")
     if G["dep"]["items"]:
         for k, v in G["dep"]["items"].items():
             label = "위상 중립 고정 → U_SLEEP 하락률" if k == "sleep_phase" else "접근 0.5 고정 → U_FREEZE 하락률"
-            L.append(f"| 4. 입력 의존: {label} | {_f(v['value'])} | ≥ {v['min']} | {_ok(v['pass_'])} |")
+            L.append(f"| 4. 입력 의존(보고만): {label} | {_f(v['value'])} | ≥ {v['min']} | {_ok(v['pass_'])} |")
     else:
         L.append("| 4. 입력 의존 | (해당 행동 없음) | — | 통과 |")
     s = G["starve"]
@@ -559,6 +578,8 @@ def prereg_problems(a, seeds) -> list[str]:
         bad.append("--policies (PREREG 는 정책 모두)")
     if a.freeze_variant != "near":
         bad.append("--freeze-variant (R0 에서 통과한 판은 near)")
+    if getattr(a, "u_def", "r1") != "r1":
+        bad.append("--u-def (R1 사전 등록 폴더는 r1)")
     return bad
 
 
@@ -575,6 +596,8 @@ def main(argv=None) -> int:
     r.add_argument("--freeze-variant", choices=FREEZE_VARIANTS, default="near",
                    help="FREEZE 가 목록에 있을 때 쓸 판(U_FREEZE 정의·FSM 얼기 규칙·입력 의존 조건). 기본 near")
     r.add_argument("--policies", nargs="+", default=None, choices=POLICY_ORDER)
+    r.add_argument("--u-def", choices=U_DEFS, default="r1",
+                   help="지표 정의 묶음: r1(R1 사전 등록, 기본) 또는 r1b(R1b 확인 시험, results/v3/r1b/PREREG.md)")
     r.add_argument("--workers", type=int, default=14)
     r.add_argument("--out", default=str(PREREG_OUT))
     s = sub.add_parser("summarize", help="판정 결과 여러 개를 judge.md 로 모은다")
@@ -591,7 +614,7 @@ def main(argv=None) -> int:
         if bad:
             ap.error(f"사전 등록 폴더 {PREREG_OUT} 에는 PREREG 조건만 쓴다(결과를 덮지 않게). 다른 조건: " + ", ".join(bad)
                      + ". smoke·부분 실행·보정 시드는 --out 에 다른 폴더를 준다")
-    judge(a.model, a.name, seeds, a.steps, out, a.config, a.freeze_variant, a.workers, a.policies, a.tail)
+    judge(a.model, a.name, seeds, a.steps, out, a.config, a.freeze_variant, a.workers, a.policies, a.tail, udef=a.u_def)
     print((out / f"{a.name}.md").read_text(encoding="utf-8"))
     return 0
 

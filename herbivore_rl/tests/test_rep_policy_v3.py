@@ -771,3 +771,26 @@ def test_mask_version_saved_and_checked(tmp_path, cfg, cfg_on):
     with pytest.raises(ValueError, match="마스크 판"):
         ro.RepLearned(loaded).bind_world(World(cfg_on, seeds=[0]))
 
+
+
+def test_u_terms_r1b():
+    """R1b 지표(results/v3/r1b/PREREG.md 2절): U_HIDE′ = 은신처 안 & 거리 < 6 대 은신처 안 & 거리 ≥ 8 & 접근 < 0.7,
+    U_FREEZE′ = 접근 ≥ 0.9 & 은신처 > 5 대 접근 < 0.7 & 거리 ≥ 8. U_ESC·U_SLEEP 은 r1 과 같다."""
+    ev = _eval_module()
+    inf = np.inf
+    f = dict(seen=np.array([1, 1, 1, 1, 1, 0], bool), dist=np.array([3.0, 9.0, 9.0, 3.0, 9.0, inf]),
+             approach=np.array([0.5, 0.5, 0.95, 0.95, 0.5, 0.5]), cover_d=np.array([0.0, 0.0, 6.0, 6.0, 6.0, 0.0]),
+             in_cover=np.array([1, 1, 0, 0, 0, 1], bool), energy=np.full(6, 0.6),
+             night=np.zeros(6, bool), day=np.ones(6, bool))
+    t = ev.u_terms(f, "near", "r1b")
+    np.testing.assert_array_equal(t["hide"][0], [1, 0, 0, 0, 0, 0])
+    np.testing.assert_array_equal(t["hide"][1], [0, 1, 0, 0, 0, 0])
+    np.testing.assert_array_equal(t["freeze"][0], [0, 0, 1, 1, 0, 0])
+    np.testing.assert_array_equal(t["freeze"][1], [0, 1, 0, 0, 1, 0])
+    t1 = ev.u_terms(f, "near")
+    for k in ("esc", "sleep"):
+        np.testing.assert_array_equal(t[k][0], t1[k][0])
+        np.testing.assert_array_equal(t[k][1], t1[k][1])
+    assert ev.U_MIN_BY["r1b"] == {"esc": 0.18, "hide": 0.2, "freeze": 0.10, "sleep": 0.5}
+    with pytest.raises(ValueError):
+        ev.u_terms(f, "near", "r2")

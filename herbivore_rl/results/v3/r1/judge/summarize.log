@@ -1,0 +1,2 @@
+usage: eval_v3.py summarize [-h] --names NAMES [NAMES ...] [--out OUT]
+eval_v3.py summarize: error: the following arguments are required: --names
