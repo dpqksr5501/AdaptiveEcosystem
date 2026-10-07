@@ -20,3 +20,4 @@ __pycache__/
 results/v2/*.mp4
 results/v2/*.gif
 results/v2/*.log
+results/v3/**/*.mp4

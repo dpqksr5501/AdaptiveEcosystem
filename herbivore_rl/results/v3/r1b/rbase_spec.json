@@ -1,0 +1,1 @@
+{"policy": {"kind": "fixed", "action": [0.0]}, "wrap": [{"factory": "repertoire_rules:base_rule", "theta": 4.0, "approach": 0.9, "cols": {"pred_count": 1, "pred_dist": 2, "energy": 4, "cover_dist": 6, "visibility": 7, "pred_approach": 9}, "see_r": 20.0, "cover_norm": 20.0, "night_edge": 0.6000099999999999, "day_edge": 0.8999900000000001}]}
