@@ -5,8 +5,12 @@
 
 마스크 m (5칸, 0/1) = 허용 ∧ 가능 ∧ 결정 (`action_mask`). 셋 다 결정 때 계산하고 세계 상태를 바꾸지 않는다.
   - 허용: 설정 `train.repertoire.allowed` 의 행동만
-  - 가능 (`feasible_mask`, 관측으로만 계산하므로 C++ 과 파리티): FLEE·FREEZE 는 관측 pred_count > 0 이거나 threat_recency > 0,
-    HIDE 는 관측 cover_dist < HIDE_COVER_OBS(0.75), GRAZE·SLEEP 은 늘. 관측 칸은 이름(`World.obs_names`)으로 찾는다
+  - 가능 (`feasible_mask`, 관측으로만 계산하므로 C++ 과 파리티): '위협을 안다' = 관측 pred_count > 0 이거나 threat_recency ≥
+    THREAT_RECENCY_OBS(0.2 — 감쇠 0.95 에서 마지막으로 본 뒤 약 31스텝 ≈ 4초 안). FLEE·FREEZE 는 위협을 알 때, HIDE 는 위협을 알고
+    관측 cover_dist < HIDE_COVER_OBS(0.75)일 때, GRAZE·SLEEP 은 늘. 관측 칸은 이름(`World.obs_names`)으로 찾는다.
+    (10-07 첫 학습 조기 중단 뒤 수정, results/v3/r1/PREREG.md 변경 기록: 처음 정의 'threat_recency > 0' 은 곱 감쇠라 본 뒤
+    약 2000스텝 동안 0 이 되지 않아 결정 시점의 53% 에서 위협이 안 보이는데도 FLEE·FREEZE 가, 79% 에서 HIDE 가 열려 있었고,
+    평시의 기울기가 도망 확률을 끌어내려 2M 에 붕괴했다 — 초안이 마스크로 막으려던 v2.2식 붕괴 그대로)
   - 결정 (`World.rep_peek`): 다음 스텝의 `arbitrate` 가 요청을 읽는 개체만 고를 수 있다. 읽지 않는 개체는 지금 행동 한 칸만
     1 이다(log π = 0 이라 actor 기울기가 없고 critic 만 배운다). 기상 결정에서는 SLEEP 을 막는다(기상 결정의 SLEEP 요청은
     wake_target 으로 바뀌어 다른 칸과 같은 뜻이 된다)
@@ -54,6 +58,9 @@ from .repertoire import BEHAVIOR_NAMES, FLEE, FREEZE, HIDE, N_BEHAVIORS, SLEEP
 # 가능 조건의 문턱 (명세 2절 '가능' — 관측 계약 값이고 학습 계수가 아니다. C++ 마스크도 같은 값을 쓴다):
 # HIDE 는 은신처 거리 관측(가장자리까지 / obs_cover_norm, [0, 1])이 이 값보다 작을 때만 고를 수 있다
 HIDE_COVER_OBS = 0.75
+# '위협을 안다'의 기억 문턱: threat_recency(본 순간 1, 스텝마다 × recency_decay) 가 이 값 이상이면 방금 본 위협을 아직 안다.
+# 감쇠 0.95 에서 0.95^31 ≈ 0.204 — 마지막으로 본 뒤 약 31스텝(4초). 관측 계약 값이다(C++ 마스크도 같은 값)
+THREAT_RECENCY_OBS = 0.2
 # 막힌 칸의 로짓. softmax 의 exp(−1e9 − ·) 는 float32 에서 정확히 0 이고, 유한한 값이라 0·log 0 이 nan 이 되지 않는다
 MASK_LOGIT = -1e9
 REP_KEYS = frozenset({"allowed", "epsilon", "init_probs", "ent_coef_base", "f_dec"})
@@ -129,11 +136,11 @@ def feasible_mask(obs, obs_names) -> np.ndarray:
     if missing:
         raise ValueError(f"가능 조건은 관측 {missing} 가 필요하다(features.repertoire.obs_extra: true 세계)")
     o = np.asarray(obs)
-    threat = (o[:, names.index("pred_count")] > 0.0) | (o[:, names.index("threat_recency")] > 0.0)
+    threat = (o[:, names.index("pred_count")] > 0.0) | (o[:, names.index("threat_recency")] >= THREAT_RECENCY_OBS)
     f = np.ones((len(o), N_BEHAVIORS), dtype=bool)
     f[:, FLEE] = threat
     f[:, FREEZE] = threat
-    f[:, HIDE] = o[:, names.index("cover_dist")] < HIDE_COVER_OBS
+    f[:, HIDE] = threat & (o[:, names.index("cover_dist")] < HIDE_COVER_OBS)
     return f
 
 

@@ -220,13 +220,16 @@ def _obs_rows(cfg, rows):
 
 def test_feasible_mask(cfg):
     o, names = _obs_rows(cfg, [dict(), dict(pc=1), dict(recency=0.3), dict(cover=0.74), dict(cover=0.75),
-                               dict(cover=0.0)])
+                               dict(cover=0.0), dict(recency=0.19), dict(recency=rp.THREAT_RECENCY_OBS),
+                               dict(pc=1, cover=0.74), dict(recency=0.3, cover=0.0), dict(recency=0.1, cover=0.0)])
     f = rp.feasible_mask(o, names)
     np.testing.assert_array_equal(f[:, G], True)
     np.testing.assert_array_equal(f[:, S], True)
-    np.testing.assert_array_equal(f[:, F], [False, True, True, False, False, False])
+    # 위협을 안다 = 보임 또는 threat_recency ≥ 0.2 (곱 감쇠의 꼬리 0 < r < 0.2 는 모른다)
+    np.testing.assert_array_equal(f[:, F], [False, True, True, False, False, False, False, True, True, True, False])
     np.testing.assert_array_equal(f[:, Z], f[:, F])
-    np.testing.assert_array_equal(f[:, H], [False, False, False, True, False, True])
+    # HIDE 는 위협을 알고 은신처가 가까울 때만
+    np.testing.assert_array_equal(f[:, H], [False, False, False, False, False, False, False, False, True, True, False])
     with pytest.raises(ValueError, match="threat_recency"):
         rp.feasible_mask(o[:, :9], names[:9])
 
@@ -651,7 +654,7 @@ def test_eval_u_terms_and_fsm_priority(cfg_on):
     final = ro.build_policy(ev.fsm_spec(cfg_on, ("graze", "flee", "hide", "freeze"), "near"), 0)(o2)
     assert final[:, 0].astype(int).tolist() == [H, Z, G, G, H]              # R1 목록: HIDE > FREEZE(가까운 위협) > R_base
     c = ev.ConstRequest(H, names)(o2)[:, 0].astype(int).tolist()
-    assert c == [H, G, G, H, H]                                            # 은신처가 멀면(관측 ≥ 0.75) GRAZE
+    assert c == [H, G, G, G, H]                     # 은신처가 멀거나(관측 ≥ 0.75) 위협을 모르면(행 3) GRAZE
 
 
 def test_eval_c1prime_is_masked_and_deterministic(cfg_on, params):
