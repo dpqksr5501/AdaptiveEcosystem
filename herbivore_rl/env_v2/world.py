@@ -41,7 +41,8 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
   상태(애니메이션 계약)는 스텝 뒤 훅 `World.behavior`·`beh_phase`·`beh_steps`·`beh_seq` 다. 난수를 쓰지 않는다(사건 결정
   지연은 세계 시드·슬롯·세대의 해시다). 추가 관측 9칸은 `rep_obs_extra` 가 늘 계산하고 obs_extra 가 true 일 때만 관측에
   붙는다. 통계는 `repertoire_stats`(슬롯별 전환·깜빡임 수는 `rep_slot_counts`). daynight_stats 의 휴식·먹기 열은 이 세계에서
-  행동 기준이다(휴식 = 은신처 안 SLEEP, 먹기 = 먹이 셀의 GRAZE).
+  행동 기준이다(휴식 = 은신처 안 SLEEP, 먹기 = 먹이 셀의 GRAZE). v3 R1 은 결정 미리 보기 `rep_peek`(다음 스텝의 arbitrate 가
+  요청을 읽는 개체, 순수 함수 — 학습·판정 마스크용, `env_v2/rep_policy.py`)를 더한다. 동역학은 바뀌지 않는다.
 - threats (v3 R0, 명세 3절 M3·플레이어형 위협): daynight 위에 얹는다. reset 마다 잠행형 비율 p_stalk 를 뽑아 포식자마다
   잠행-돌진형을 정하고(잠행형은 근접형이다), 세계의 player_frac 에 플레이어형 위협 하나를 포식자 칸 끝에 더한다(밤에 자지
   않고 배회·잠행·돌진·휴식 모드를 바꾼다. 초식에게는 포식자와 같은 관측 칸으로 보인다). 자기 스트림 part 0(잠행형)·1(플레이어
@@ -1532,6 +1533,39 @@ class World:
         self.gait, self.gait_cmd, self.vel = g, cmd, v
         return v
 
+    def _rep_decision_obs(self) -> dict:
+        """`repertoire.arbitrate` 의 결정 때 입력 (repertoire docstring A '결정 때 관측(이전 스텝 끝 기하)'): 지금 기하
+        `self._g`(리스폰 관측 포함)의 포식자 수·가장 가까운 거리·접근 속력·사건 비교 시야 값·은신처와 지금 에너지(max_energy
+        비율)·어둠. `_rep_step`(실제 결정)과 `rep_peek`(미리 보기)가 같은 이 함수를 써서 두 입력이 늘 같다."""
+        g = self._g
+        return dict(pred_count=g["pred_count"], d_pred_min=g["d_pred_min"], pred_approach=g["pred_approach"],
+                    pred_count_ev=g["pred_count_ev"], d_pred_min_ev=g["d_pred_min_ev"],
+                    pred_approach_ev=g["pred_approach_ev"],
+                    energy=np.clip(self.energy / self.cfg.max_energy, 0.0, 1.0), dark=self.dark,
+                    in_cover=g["in_cover"], cover_k=g["cover_k"])
+
+    def rep_peek(self) -> dict:
+        """다음 `step` 의 `arbitrate` 가 요청을 읽는지 미리 본다 (R1 명세 `Docs/RL_Policy/RL_V3_R1_SPEC.md` 2절 '결정').
+        순수 함수다 — 행동 상태(RepState)를 복사해 같은 결정 때 입력(`_rep_decision_obs`)으로 `arbitrate` 를 돌려 보고 버린다.
+        세계 상태와 난수를 건드리지 않으므로 부르든 부르지 않든 궤적이 비트 단위로 같다(tests/test_rep_policy_v3.py).
+
+        반환 (모두 (N,) 사본):
+          - reads: 요청을 읽는 개체 = 결정 시점((lock_left ≤ 0 또는 사건 fire) & 기상 중 아님 & 이번 스텝에 깨지 않음) 또는
+            기상 결정(이번 스텝에 깨고 wake_ev 가 있음). `arbitrate` 반환의 decide 와 같은 값이다
+          - wake_decide: 기상 결정인 개체(기상 결정의 SLEEP 요청은 wake_target 으로 바뀌므로 마스크가 SLEEP 을 막는다)
+          - behavior: 지금 행동(int64, 결정 전 — 관측 obs_extra 의 행동 one-hot 과 같은 값)
+        `decide` 는 요청 값과 무관하므로(잠금·사건·기상만 본다) 미리 보기의 요청은 지금 행동으로 둔다.
+        """
+        if self._rp is None:
+            raise ValueError("rep_peek 은 repertoire 를 켠 세계에만 있다")
+        rs = self._rs
+        cp = object.__new__(rep.RepState)
+        cp.__dict__.update({k: np.array(v, copy=True) for k, v in vars(rs).items()})
+        woke = rs.waking & (rs.wake_left <= 0)          # arbitrate d. 의 woke 는 a~c 가 바꾸지 않는 칸만 본다
+        res = rep.arbitrate(cp, self._rp, rs.behavior.astype(np.int64), self._rep_decision_obs())
+        reads = np.asarray(res["decide"], dtype=bool).copy()
+        return dict(reads=reads, wake_decide=reads & woke, behavior=rs.behavior.astype(np.int64))
+
     def _rep_step(self, a: np.ndarray) -> tuple[np.ndarray, dict]:
         """v3 행동 실행기 한 스텝 (`step` 0r·1r, 순서는 env_v2/repertoire.py docstring A·B). 반환: (적용 속도, 제어 결과).
 
@@ -1551,12 +1585,7 @@ class World:
                              f"연속 정책 출력은 이 세계에 쓸 수 없다). 받은 범위: [{req.min()}, {req.max()}]"
                              + (f", 정수가 아닌 값 예: {bad[:3].tolist()}" if len(bad) else ""))
         prev = rs.behavior.copy()
-        obs = dict(pred_count=g["pred_count"], d_pred_min=g["d_pred_min"], pred_approach=g["pred_approach"],
-                   pred_count_ev=g["pred_count_ev"], d_pred_min_ev=g["d_pred_min_ev"],
-                   pred_approach_ev=g["pred_approach_ev"],
-                   energy=np.clip(self.energy / cfg.max_energy, 0.0, 1.0), dark=self.dark, in_cover=g["in_cover"],
-                   cover_k=g["cover_k"])
-        res = rep.arbitrate(rs, rp, req.astype(np.int64), obs)
+        res = rep.arbitrate(rs, rp, req.astype(np.int64), self._rep_decision_obs())
         ix, iy = self._cell_index(self.pos)
         to_target = np.zeros((self.N, 2))
         m = (rs.behavior == rep.HIDE) & ~rs.arrived & (rs.hide_target >= 0)

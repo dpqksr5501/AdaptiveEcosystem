@@ -25,6 +25,18 @@ vigilance 까지 켜면 6. `World.obs_dim`: v1 7, vigilance 를 켜면 8).
       world_sampling: {mode: balanced, candidates: 8, keys: [food_regen_mult, predator_count]}
 학습 세계 하한(S1-a 사전 등록 4절 2차 대응 1, 쓸 때만): `train.world_pool_min: {food_regen_mult: 1.0}` 이면 학습 풀에서
 그 값보다 작은 세계를 뺀다(`world_params` 기준). 평가 세계 분포는 그대로다. 블록이 없으면 지금과 같다.
+
+v3 R1 이산 행동 경로 (명세 `Docs/RL_Policy/RL_V3_R1_SPEC.md` 2·4절, `env_v2/rep_policy.py`): repertoire 세계이고 설정에
+`train.repertoire` 블록이 있을 때만 쓴다(블록이 없는 repertoire 세계는 지금처럼 거부한다).
+  - 행동 공간 Discrete(5)(계약 순서의 행동 번호), 관측 공간 Box(0, 1, (obs_dim + 5,)) = [세계 관측 | 마스크 m]
+  - reset·step 뒤마다 세계별로 `World.rep_peek()`(순수)과 지금 관측으로 m = 허용 ∧ 가능 ∧ 결정을 만들어 붙인다
+  - step_async 는 행동 번호를 세계의 'behavior' 열(float)로 바꾸고, 마스크 밖 행동이면 멈춘다(학습 분포 π′ 는 막힌 칸이
+    정확히 0 이라 생기지 않는다 — 생기면 버그다)
+  - 끊긴 슬롯의 terminal_observation 에도 그 세계 마지막 상태(교체 전)의 마스크를 붙인다. 사망 슬롯은 리스폰 뒤 상태의
+    마스크라 그 개체의 것이 아니지만 SB3 는 사망의 terminal_observation 을 쓰지 않는다(부트스트랩은 끊긴 슬롯만)
+  - 학습 기록용 누적 수(`rep_counts`): 개체-스텝, 결정(요청을 읽은) 수, 피식·아사 수, 실행 행동별 수. `last_reads` = 방금
+    스텝에서 요청을 읽은 개체(SB3 롤아웃 버퍼 순서와 같은 (num_envs,) bool)
+세계 뽑기·엇갈린 교체·사망 우선 규칙은 연속 경로와 같다.
 """
 
 from __future__ import annotations
@@ -33,11 +45,12 @@ import math
 from typing import Any, Sequence
 
 import numpy as np
-from gymnasium.spaces import Box
+from gymnasium.spaces import Box, Discrete
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
 from .cm import cm_action_space, cm_params, cm_to_world
 from .features import features_of
+from .repertoire import N_BEHAVIORS
 from .world import ACT_DIM, OBS_DIM, WORLD_PARAM_KEYS, World, world_params
 
 OBS_SPACE = Box(0.0, 1.0, (OBS_DIM,), np.float32)   # v1 관측 7개. 세계의 관측 공간은 obs_space(obs_dim)
@@ -99,11 +112,17 @@ class MultiWorldVecEnv(VecEnv):
                  seeds=None, meta_seed: int = 0):
         train = (getattr(cfg, "v2", None) or {}).get("train", {})
         self.cfg = cfg
+        # v3 R1 이산 행동 경로(모듈 docstring): repertoire 세계 + train.repertoire 블록일 때만. 없으면 None (지금과 같다)
+        self.rep = None
         if features_of(cfg).enabled("repertoire"):
-            # v3 R0: 행동이 이산 행동 번호 한 열이다. 연속 (-3, 3) → sigmoid 경로의 (0, 1) 값은 정수가 아니라 세계가 거부한다
-            # (내림하면 늘 GRAZE 라 아무것도 배우지 않는다). 여기서 먼저 막는다. 이산 행동 학습 경로(범주 분포·잠금 마스크)는 R1 에서
-            # 만든다
-            raise ValueError("repertoire 세계(v3)의 학습 경로는 아직 없다(R1). 이 VecEnv 는 연속 행동 세계만 받는다")
+            from .rep_policy import rep_params
+
+            self.rep = rep_params(cfg)
+            if self.rep is None:
+                # 행동이 이산 행동 번호 한 열이다. 연속 (-3, 3) → sigmoid 경로의 (0, 1) 값은 정수가 아니라 세계가 거부한다
+                # (내림하면 늘 GRAZE 라 아무것도 배우지 않는다). 이산 행동 학습 경로(R1)는 train.repertoire 블록이 켠다
+                raise ValueError("repertoire 세계(v3)는 train.repertoire 블록(R1 이산 행동 경로, env_v2/rep_policy.py)이 "
+                                 "있어야 학습한다. 블록이 없으면 이 VecEnv 는 연속 행동 세계만 받는다")
         self.K = int(num_worlds if num_worlds is not None else train.get("num_worlds", 8))
         self.T = int(reset_interval if reset_interval is not None else train.get("reset_interval", 4000))
         if self.K < 1 or self.T < 1:
@@ -149,6 +168,19 @@ class MultiWorldVecEnv(VecEnv):
         self.seed_history: list[list[int]] = [[w.seed] for w in self.worlds]
         self._actions: np.ndarray | None = None
         self.render_mode = None
+        if self.rep is not None:
+            # v3 R1 이산 경로: 정책 입력 = [세계 관측 | 마스크 5], 행동 = 행동 번호 Discrete(5)
+            self.policy_obs_dim = self.obs_dim + N_BEHAVIORS
+            self._mask = np.zeros((self.K * self.N, N_BEHAVIORS), dtype=bool)   # 지금 관측의 마스크 (다음 스텝용)
+            self._reads = np.zeros(self.K * self.N, dtype=bool)                 # 지금 관측에서 요청을 읽는 개체
+            self.last_reads = np.zeros(self.K * self.N, dtype=bool)             # 방금 스텝에서 요청을 읽은 개체
+            self.rep_counts = dict(agent_steps=0, decide=0, caught=0, starved=0,
+                                   beh=np.zeros(N_BEHAVIORS, dtype=np.int64))
+            for k in range(self.K):
+                self._set_mask(k, self.worlds[k].observe())
+            super().__init__(self.K * self.N, obs_space(self.policy_obs_dim), Discrete(N_BEHAVIORS))
+            return
+        self.policy_obs_dim = self.obs_dim
         super().__init__(self.K * self.N, obs_space(self.obs_dim),
                          act_space(self.act_dim) if self.cm is None else cm_action_space(len(self.cm["categories"])))
 
@@ -208,15 +240,98 @@ class MultiWorldVecEnv(VecEnv):
                 self._renew(k)
         self._fresh = True
         self._age = self._staggered_ages()
+        if self.rep is not None:
+            return np.concatenate([self._with_mask(k, w.observe()) for k, w in enumerate(self.worlds)])
         return np.concatenate([w.observe() for w in self.worlds])
 
+    # --- v3 R1 이산 경로 (모듈 docstring) ------------------------------- #
+
+    def _set_mask(self, k: int, obs: np.ndarray) -> None:
+        """세계 k 의 지금 관측·미리 보기로 마스크(다음 스텝용)와 '요청을 읽는' 개체를 정한다. 세계를 바꾸지 않는다."""
+        from .rep_policy import action_mask
+
+        w, sl = self.worlds[k], slice(k * self.N, (k + 1) * self.N)
+        pk = w.rep_peek()
+        self._mask[sl] = action_mask(pk, obs, self.rep, obs_names=w.obs_names)
+        self._reads[sl] = pk["reads"]
+
+    def _with_mask(self, k: int, obs: np.ndarray) -> np.ndarray:
+        """세계 k 의 마스크를 새로 정하고 정책 입력 [관측 | 마스크] 을 낸다."""
+        self._set_mask(k, obs)
+        return np.concatenate([obs, self._mask[k * self.N:(k + 1) * self.N].astype(np.float32)], axis=1)
+
+    def current_masks(self) -> np.ndarray:
+        """지금 관측의 마스크 (num_envs, 5) bool 사본 (다음 스텝에 쓴다)."""
+        if self.rep is None:
+            raise ValueError("current_masks 는 이산 경로(train.repertoire)에만 있다")
+        return self._mask.copy()
+
+    def _rep_actions(self, actions) -> np.ndarray:
+        """행동 번호 (num_envs,) → 세계 행동 (num_envs, 1) float. 정수 0..4 이고 지금 마스크 안이어야 한다."""
+        a = np.asarray(actions).reshape(-1)
+        if a.shape != (self.num_envs,):
+            raise ValueError(f"행동은 ({self.num_envs},) 행동 번호다. 받은 모양: {np.asarray(actions).shape}")
+        af = a.astype(np.float64)
+        if not np.all(np.isfinite(af)) or not np.all(af == np.floor(af)) or af.min() < 0 or af.max() >= N_BEHAVIORS:
+            raise ValueError(f"행동은 0..{N_BEHAVIORS - 1} 의 정수 행동 번호다. 받은 범위: [{af.min()}, {af.max()}]")
+        ai = af.astype(np.int64)
+        bad = ~self._mask[np.arange(self.num_envs), ai]
+        if bad.any():
+            i = np.flatnonzero(bad)[:5]
+            raise ValueError(f"마스크 밖 행동이다(슬롯 {i.tolist()}, 행동 {ai[i].tolist()}). 학습 분포는 막힌 칸이 0 이다")
+        return af[:, None]
+
     def step_async(self, actions: np.ndarray) -> None:
+        if self.rep is not None:                    # v3 R1: 행동 번호 → 'behavior' 열 (마스크 검사)
+            self._actions = self._rep_actions(actions)
+            return
         if self.cm is not None:                     # [조향 4, 범주] → 세계 행동 (env_v2/cm.py cm_to_world)
             self._actions = cm_to_world(actions, self.cm, self.act_names)
             return
         self._actions = sigmoid(np.asarray(actions, dtype=np.float64))   # (-3,3) → [0,1]
 
+    def _step_wait_rep(self):
+        """이산 경로의 step_wait (모듈 docstring). 세계·교체 규칙은 연속 경로와 같고 관측 뒤에 마스크를 붙인다."""
+        N, D = self.N, self.policy_obs_dim
+        obs_all = np.empty((self.num_envs, D), dtype=np.float32)
+        rew_all = np.empty(self.num_envs, dtype=np.float64)
+        done_all = np.zeros(self.num_envs, dtype=bool)
+        infos: list[dict[str, Any]] = [{} for _ in range(self.num_envs)]
+        self._fresh = False
+        self.last_reads = self._reads.copy()
+        cnt = self.rep_counts
+        cnt["agent_steps"] += self.num_envs
+        cnt["decide"] += int(np.count_nonzero(self.last_reads))
+
+        for k, w in enumerate(self.worlds):
+            sl = slice(k * N, (k + 1) * N)
+            c0, s0 = w._pred_deaths, w._starve_deaths
+            obs, rew, done, term = w.step(self._actions[sl])
+            cnt["caught"] += int(w._pred_deaths - c0)
+            cnt["starved"] += int(w._starve_deaths - s0)
+            cnt["beh"] += np.bincount(w.behavior.astype(np.int64), minlength=N_BEHAVIORS)
+            self._age[k] += 1
+            base = k * N
+            pobs = self._with_mask(k, obs)               # 이 세계 마지막 상태의 마스크(교체 전)
+            m_final = self._mask[sl].astype(np.float32)
+            for i in np.flatnonzero(done):           # 사망: 끝, 부트스트랩 없음
+                infos[base + i]["terminal_observation"] = np.concatenate([term[i], m_final[i]])
+            if self._age[k] >= self.T:
+                # 시간 초과: 산 슬롯은 truncated 로 끊고 세계를 새로 뽑는다. 사망이 우선한다.
+                for i in np.flatnonzero(~done):
+                    infos[base + i]["terminal_observation"] = np.concatenate([term[i], m_final[i]])
+                    infos[base + i]["TimeLimit.truncated"] = True
+                done = np.ones(N, dtype=bool)
+                pobs = self._with_mask(k, self._renew(k))
+                self.num_resets += 1
+            obs_all[sl] = pobs
+            rew_all[sl] = rew
+            done_all[sl] = done
+        return obs_all, rew_all, done_all, infos
+
     def step_wait(self):
+        if self.rep is not None:
+            return self._step_wait_rep()
         N = self.N
         obs_all = np.empty((self.num_envs, self.obs_dim), dtype=np.float32)
         rew_all = np.empty(self.num_envs, dtype=np.float64)
