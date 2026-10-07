@@ -24,8 +24,9 @@ v1 에 없는 것:
   `act_dim` 으로 차원을 정한다(`adapt_spec`). speed 를 켠 세계의 행에는 `World.gait_stats()` 열이,
   vigilance 를 켠 세계의 행에는 `World.vigil_stats()` 열이 붙는다.
   vigil_window(v2.2r)를 켠 세계의 행에는 `World.window_stats()` 열(WINDOW_COLUMNS)도, daynight(v2.4)를 켠 세계의 행에는
-  `World.daynight_stats()` 열(DAYNIGHT_COLUMNS)도 붙는다. 범주형 보행 CM 모델
-  (`env_v2/cm.py`)은 `_base_policy` 가 알아보고 CM 평가 정책(결정·유지 표본·확률)으로 돌린다.
+  `World.daynight_stats()` 열(DAYNIGHT_COLUMNS)도 붙는다. repertoire(v3)·threats(v3)를 켠 세계의 행에는 `World.repertoire_stats()`
+  열(REPERTOIRE_COLUMNS)·`World.threats_stats()` 열(THREAT_COLUMNS)이 붙는다(repertoire 세계는 행동이 'behavior' 한 열이다).
+  범주형 보행 CM 모델 (`env_v2/cm.py`)은 `_base_policy` 가 알아보고 CM 평가 정책(결정·유지 표본·확률)으로 돌린다.
 
 정책 스펙 예:
     {"kind": "learned", "model": "ckpt/final.zip"}                 # policies.registry 스펙 그대로
@@ -49,8 +50,8 @@ import numpy as np
 from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
-from .world import (ACT_DIM, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, PSLEEP_STAT_COLUMNS, VIGIL_STAT_COLUMNS,
-                    WINDOW_STAT_COLUMNS, World)
+from .world import (ACT_DIM, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, PSLEEP_STAT_COLUMNS, REP_STAT_COLUMNS,
+                    THREAT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS, World)
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -69,6 +70,10 @@ WINDOW_COLUMNS = list(WINDOW_STAT_COLUMNS)
 DAYNIGHT_COLUMNS = list(DAYNIGHT_STAT_COLUMNS)
 # pred_sleep(v2.4s)를 켠 세계의 행에만 더 붙는 열 (World.pred_sleep_stats)
 PSLEEP_COLUMNS = list(PSLEEP_STAT_COLUMNS)
+# repertoire(v3 R0)를 켠 세계의 행에만 더 붙는 열 (World.repertoire_stats)
+REPERTOIRE_COLUMNS = list(REP_STAT_COLUMNS)
+# threats(v3 R0)를 켠 세계의 행에만 더 붙는 열 (World.threats_stats)
+THREAT_COLUMNS = list(THREAT_STAT_COLUMNS)
 
 
 # --------------------------------------------------------------------- #
@@ -592,23 +597,33 @@ def _load_model(spec: dict):
     return _MODEL_CACHE[key]
 
 
-def adapt_spec(spec: dict, act_dim: int) -> dict:
+def adapt_spec(spec: dict, act_dim: int, act_names=()) -> dict:
     """정책 스펙을 행동 `act_dim` 개 세계에 맞춘다. random 바탕 정책에만 `act_dim` 을 적는다(래퍼 안쪽 포함).
 
     v1 행동 수(4)면 스펙을 그대로 돌려준다 — 예전 스펙·캐시 키가 바뀌지 않는다. fixed 는 action 길이가,
     learned 는 모델 출력이 차원을 정하므로 건드리지 않는다. Utility(4개)는 speed 세계에서 World.step 이 거부한다.
+    `act_names` 가 repertoire(v3) 세계의 ('behavior',) 면 random 에 "choices"(행동 수 5)를 적어 정수 행동 번호를 고르게
+    뽑는다 — 세계가 정수가 아닌 행동을 거부하기 때문이다(연속 [0, 1) 을 내림하면 늘 GRAZE 가 된다).
     """
     if "policy" in spec:
-        return {**spec, "policy": adapt_spec(spec["policy"], act_dim)}
+        return {**spec, "policy": adapt_spec(spec["policy"], act_dim, act_names)}
+    if spec.get("kind") == "random" and tuple(act_names) == ("behavior",):
+        from .repertoire import N_BEHAVIORS
+
+        return {**spec, "act_dim": int(act_dim), "choices": N_BEHAVIORS}
     if spec.get("kind") == "random" and int(act_dim) != ACT_DIM:
         return {**spec, "act_dim": int(act_dim)}
     return spec
 
 
 def _random_policy(spec: dict):
-    """균등 랜덤 [0,1]^act_dim (C6). act_dim 4 는 policies.registry 의 random 과 같은 수열이다."""
+    """균등 랜덤 [0,1]^act_dim (C6). act_dim 4 는 policies.registry 의 random 과 같은 수열이다.
+    "choices" k 가 있으면 정수 0..k−1 을 고르게 뽑아 float 로 낸다(repertoire 세계의 행동 번호, `adapt_spec`)."""
     rng = np.random.default_rng(spec.get("seed", 0))
     d = int(spec["act_dim"])
+    if "choices" in spec:
+        k = int(spec["choices"])
+        return lambda obs: rng.integers(0, k, (len(obs), d)).astype(np.float64)
     return lambda obs: rng.random((len(obs), d))
 
 
@@ -746,6 +761,12 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     if w._ps is not None:
         ps = w.pred_sleep_stats()
         s.update((c, ps[c]) for c in PSLEEP_COLUMNS)
+    if w._rp is not None:
+        rs = w.repertoire_stats()
+        s.update((c, rs[c]) for c in REPERTOIRE_COLUMNS)
+    if w._th is not None:
+        ts = w.threats_stats()
+        s.update((c, ts[c]) for c in THREAT_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:

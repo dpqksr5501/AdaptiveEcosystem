@@ -61,7 +61,7 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "food_v": 1,        # v2.0b 먹이 2층: 식생 용량 V 의 훼손과 느린 회복
     "speed": 2,         # v2.1 보행 3단(정지·걷기·뛰기), 대사·섭식 연동
     "vigilance": 3,     # v2.2 경계, threat_recency, 위협 방향
-    "regions": 4,       # v2.3 A/B 지역, 소속, 지역 포식자, 지역 기억, 플레이어형 위협
+    "regions": 4,       # v2.3 A/B 지역, 소속, 지역 포식자, 지역 기억 (플레이어형 위협은 v3 threats(16)가 맡는다)
     "daynight": 5,      # v2.4 낮밤 위상, 밤 탐지·섭식·휴식 배수
     "region_env": 6,    # v2.5a 지역 환경: 리스폰 위치 규칙, 지역 재생비, 지역 사이 틈
     "migration": 7,     # v2.5b 이주 조향 항, 지역 먹이·안전 관측, 고갈 안전망
@@ -72,10 +72,13 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "obstacles": 12,    # R1 (ii) 원형 장애물 반발
     "vigil_window": 13,  # v2.2r 경계 재설계(10-03 R2): 경계 행동 열 유무, 창 안 한정 경계(W′), 반사 돌아보기(L)
     "pred_sleep": 14,    # v2.4s 포식자 밤잠(10-07 사용자 결정 A안): 대부분 밤에 자고 세계마다 일부만 야행성
+    "repertoire": 15,    # v3 R0 행동 레퍼토리(10-07 사용자 결정 (4)): 행동 실행기·잠금·사건·개체 행동 상태, 장치 M1·M2·M4·M5·M6
+    "threats": 16,       # v3 R0 위협 유형(10-07 사용자 결정 (4)): 잠행-돌진 포식자(M3)와 플레이어형 위협
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
-IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight", "pred_sleep"})
+IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight", "pred_sleep",
+                                         "repertoire", "threats"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -115,6 +118,31 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # 이 어둠 이상이면 주행성 포식자가 잔다(멈춤, 사냥 안 함, 초식 시야에 안 보임 — 굴에 있다), twilight_slow = 깨어 있는
     # 주행성 포식자의 속력에 (1 − d) 를 곱하나(박명에 느려진다)
     "pred_sleep": frozenset({"nocturnal_frac", "sleep_dark", "twilight_slow"}),
+    # v3 R0 (env_v2/repertoire.py `parse_params`, 명세 RL_V3_R0_SPEC.md 2·3절): speed·daynight 를 함께 켜야 하고 vigilance 와는
+    # 함께 켤 수 없다(행동 열이 'behavior' 하나가 된다). 잠금(스텝) lock_graze·lock_flee·lock_freeze, lock_hide = 은신처 도착 뒤
+    # 최소 유지, hide_travel_max = 도착까지의 최대 잠금, sleep_enter·sleep_hold·sleep_wake = 잠 진입·최소 수면·기상(M4),
+    # startle_steps = GRAZE → FLEE 놀람 정지(M2), c_still = 정지 탐지 배수(M1, FREEZE·도착 HIDE·SLEEP), cover_mult_crouch·
+    # cover_mult_graze·cover_mult_sleep·cover_mult_other = 은신처 안의 웅크린 HIDE·GRAZE·SLEEP·그 밖 행동의 은신 배수(M6,
+    # 표적 선택·포획 판정 모두), graze_head_down = GRAZE 의 자기 포식자 탐지 반경 배수(M5),
+    # sleep_sight = SLEEP 의 자기 탐지 반경 배수, sleep_rest = SLEEP·은신처 안 휴식 할인 x(대사 × (1 − x·d)), graze_eat_min =
+    # GRAZE 가 멈춰 먹는 셀 먹이 문턱, graze_forage·graze_cohesion = GRAZE·FLEE 조향 가중치, event_near·event_approach·
+    # event_energy·event_dark = 사건 E2·E4·E5 문턱, decision_jitter = 사건 결정 지연 최대 J(스텝), recency_decay =
+    # threat_recency 감쇠, steps_norm = 관측 '행동 경과' 분모, obs_extra = 추가 관측 9칸을 관측에 넣나(R0 는 false)
+    "repertoire": frozenset({"lock_graze", "lock_flee", "lock_freeze", "lock_hide", "hide_travel_max", "sleep_enter",
+                             "sleep_hold", "sleep_wake", "startle_steps", "c_still", "cover_mult_crouch",
+                             "cover_mult_graze", "cover_mult_sleep", "cover_mult_other", "graze_head_down",
+                             "sleep_sight", "sleep_rest", "graze_eat_min", "graze_forage", "graze_cohesion", "event_near", "event_approach", "event_energy",
+                             "event_dark", "decision_jitter", "recency_decay", "steps_norm", "obs_extra"}),
+    # v3 R0 (env_v2/world.py `_threats_params`, 명세 3절 M3·플레이어형 위협): daynight 를 함께 켜야 한다. stalk_frac = 잠행형
+    # 비율 p_stalk 의 범위 [하, 상](reset 마다 하나), stalk_dist = 돌진을 시작하는 체감 거리, stalk_speed·pounce_speed·
+    # exhaust_speed = 잠행·돌진·탈진 속력(× herb_speed), pounce_steps·exhaust_steps = 돌진 최대·탈진 스텝, player_frac = 플레이어가
+    # 있는 세계 비율, player_speeds = [배회, 잠행, 돌진] 속력(× herb_speed), player_mode_steps = 배회·잠행 모드 길이 범위 [하, 상],
+    # player_stalk_p = 모드를 새로 고를 때 잠행일 확률, player_charge_dist = 잠행 중 돌진을 시작하는 체감 거리,
+    # player_charge_steps·player_rest_steps = 돌진 최대·휴식 스텝, player_catch_r·player_cooldown = 포획 거리·포획 뒤 쿨다운
+    "threats": frozenset({"stalk_frac", "stalk_dist", "stalk_speed", "pounce_speed", "pounce_steps", "exhaust_speed",
+                          "exhaust_steps", "player_frac", "player_speeds", "player_mode_steps", "player_stalk_p",
+                          "player_charge_dist", "player_charge_steps", "player_rest_steps", "player_catch_r",
+                          "player_cooldown"}),
 })
 
 

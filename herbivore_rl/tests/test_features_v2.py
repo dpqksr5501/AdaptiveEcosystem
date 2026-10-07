@@ -36,8 +36,9 @@ def blank_registry(monkeypatch):
     monkeypatch.setattr(F, "PARAM_KEYS", MappingProxyType({}))
 
 
-# 버전 설정. 파일 이름 순이 버전 순이다(v2.yaml = v2.0 이 '.' < '_' 로 맨 앞, 그다음 v2_0b.yaml ...).
-V2_CONFIGS = sorted((ROOT / "configs").glob("v2*.yaml"))
+# 버전 설정. 파일 이름 순이 버전 순이다(v2.yaml = v2.0 이 '.' < '_' 로 맨 앞, 그다음 v2_0b.yaml ...). v3 R0 설정(v3_r0*.yaml)이
+# 그 뒤에 온다(repertoire·threats 를 처음 켜는 버전 설정).
+V2_CONFIGS = sorted((ROOT / "configs").glob("v2*.yaml")) + sorted((ROOT / "configs").glob("v3*.yaml"))
 
 
 def _yaml_block(name):
@@ -76,7 +77,7 @@ def test_feature_ids_are_pinned():
     assert dict(F.FEATURE_IDS) == {
         "food_v": 1, "speed": 2, "vigilance": 3, "regions": 4, "daynight": 5, "region_env": 6,
         "migration": 7, "weather": 8, "boldness": 9, "water": 10, "boundary": 11, "obstacles": 12,
-        "vigil_window": 13, "pred_sleep": 14,
+        "vigil_window": 13, "pred_sleep": 14, "repertoire": 15, "threats": 16,
     }
     ids = list(F.FEATURE_IDS.values())
     assert len(set(ids)) == len(ids) and min(ids) >= 1    # 0 은 SeedSequence 끝 0 무시와 겹친다
@@ -221,7 +222,10 @@ def test_toggling_one_feature_keeps_other_streams(cfg2, monkeypatch, seed):
 # 다른 기능 위에 얹는 기능의 선행 기능. 혼자 켜면 World 가 거부하므로 선행 기능과 함께 켠다(번호 순).
 # vigil_window(v2.2r)는 vigilance 의 threat_recency·ThreatDir 와 speed 의 정지를 쓴다(env_v2/world.py `_window_params`).
 # daynight(v2.4)는 speed 의 보행(정지 대사·통계)을 쓴다(`_daynight_params`).
-PREREQS = {"vigil_window": ("speed", "vigilance"), "daynight": ("speed",), "pred_sleep": ("speed", "daynight")}
+# repertoire(v3 R0)는 speed 의 보행표와 daynight 의 어둠을, threats(v3 R0)는 daynight 를 쓴다(`repertoire.parse_params`·
+# `_threats_params`).
+PREREQS = {"vigil_window": ("speed", "vigilance"), "daynight": ("speed",), "pred_sleep": ("speed", "daynight"),
+           "repertoire": ("speed", "daynight"), "threats": ("speed", "daynight")}
 
 
 def _implemented_cases():
@@ -240,8 +244,9 @@ def test_implemented_features_use_only_their_own_streams(cfg2, active):
         blocks[name] = dict(_yaml_block(name), enabled=True)
     w = WorldV2(_with_features(cfg2, blocks), seeds=[636])
     assert w.features.active == active
-    # 행동 수는 세계를 따른다(speed 를 켜면 5개). 4개면 make_policy random(seed 1) 과 같은 수열이다
-    p = build_policy(adapt_spec({"kind": "random", "seed": 1}, w.act_dim))
+    # 행동 수는 세계를 따른다(speed 를 켜면 5개). 4개면 make_policy random(seed 1) 과 같은 수열이다.
+    # repertoire 세계는 정수 행동 번호를 뽑는다(행동 이름을 주면 adapt_spec 이 알아본다)
+    p = build_policy(adapt_spec({"kind": "random", "seed": 1}, w.act_dim, w.act_names))
     for _ in range(300):
         w.step(p(w.observe()))
     assert {name for name, _ in w._feature_rngs} <= set(active)

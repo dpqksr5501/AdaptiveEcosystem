@@ -37,6 +37,7 @@ from gymnasium.spaces import Box
 from stable_baselines3.common.vec_env.base_vec_env import VecEnv
 
 from .cm import cm_action_space, cm_params, cm_to_world
+from .features import features_of
 from .world import ACT_DIM, OBS_DIM, WORLD_PARAM_KEYS, World, world_params
 
 OBS_SPACE = Box(0.0, 1.0, (OBS_DIM,), np.float32)   # v1 관측 7개. 세계의 관측 공간은 obs_space(obs_dim)
@@ -98,6 +99,11 @@ class MultiWorldVecEnv(VecEnv):
                  seeds=None, meta_seed: int = 0):
         train = (getattr(cfg, "v2", None) or {}).get("train", {})
         self.cfg = cfg
+        if features_of(cfg).enabled("repertoire"):
+            # v3 R0: 행동이 이산 행동 번호 한 열이다. 연속 (-3, 3) → sigmoid 경로의 (0, 1) 값은 정수가 아니라 세계가 거부한다
+            # (내림하면 늘 GRAZE 라 아무것도 배우지 않는다). 여기서 먼저 막는다. 이산 행동 학습 경로(범주 분포·잠금 마스크)는 R1 에서
+            # 만든다
+            raise ValueError("repertoire 세계(v3)의 학습 경로는 아직 없다(R1). 이 VecEnv 는 연속 행동 세계만 받는다")
         self.K = int(num_worlds if num_worlds is not None else train.get("num_worlds", 8))
         self.T = int(reset_interval if reset_interval is not None else train.get("reset_interval", 4000))
         if self.K < 1 or self.T < 1:

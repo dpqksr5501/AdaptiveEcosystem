@@ -33,6 +33,20 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
   야행성을 정한다(자기 스트림). 주행성 포식자는 어둠 d ≥ sleep_dark 면 잔다 — 멈추고 사냥하지 않고 초식 시야에 보이지
   않는다(굴에 있다). 깨어 있는 주행성 포식자는 twilight_slow 면 속력이 (1 − d) 배다. 야행성은 v2.4 그대로 움직인다.
   정의는 `_pred_sleep_params`·`_daynight_update`, 통계는 `pred_sleep_stats`.
+- repertoire (v3 R0, 명세 `Docs/RL_Policy/RL_V3_R0_SPEC.md` 2·3절): speed·daynight 위에 얹는다(vigilance 와는 함께 켜지 않는다).
+  행동이 한 열 'behavior'(정수 행동 번호. 정수가 아니면 거부)가 되고, v1 조향·보행 대신 행동 실행기(`env_v2/repertoire.py`:
+  잠금·사건·결정 지연, 행동별 제어기)가 속도·보행·섭식·지각을 정한다. 장치: M1 정지 탐지(FREEZE·도착 HIDE·SLEEP 의 표적 선택
+  체감 거리 × c_still), M2 놀람 정지, M4 잠 진입·기상, M5 GRAZE 고개 숙임(자기 탐지 반경), M6 행동별 은신 배수(은신처 안의
+  웅크린 HIDE·GRAZE·SLEEP·그 밖, 계수 넷), SLEEP 시야 배수, SLEEP 전용 은신처 휴식 할인(daynight.rest_night 대신). 개체 행동
+  상태(애니메이션 계약)는 스텝 뒤 훅 `World.behavior`·`beh_phase`·`beh_steps`·`beh_seq` 다. 난수를 쓰지 않는다(사건 결정
+  지연은 세계 시드·슬롯·세대의 해시다). 추가 관측 9칸은 `rep_obs_extra` 가 늘 계산하고 obs_extra 가 true 일 때만 관측에
+  붙는다. 통계는 `repertoire_stats`(슬롯별 전환·깜빡임 수는 `rep_slot_counts`). daynight_stats 의 휴식·먹기 열은 이 세계에서
+  행동 기준이다(휴식 = 은신처 안 SLEEP, 먹기 = 먹이 셀의 GRAZE).
+- threats (v3 R0, 명세 3절 M3·플레이어형 위협): daynight 위에 얹는다. reset 마다 잠행형 비율 p_stalk 를 뽑아 포식자마다
+  잠행-돌진형을 정하고(잠행형은 근접형이다), 세계의 player_frac 에 플레이어형 위협 하나를 포식자 칸 끝에 더한다(밤에 자지
+  않고 배회·잠행·돌진·휴식 모드를 바꾼다. 초식에게는 포식자와 같은 관측 칸으로 보인다). 자기 스트림 part 0(잠행형)·1(플레이어
+  배치)·2(플레이어 모드)·3(플레이어 배회 선회)만 쓴다. 통계는 `threats_stats`.
+  repertoire·threats 중 하나라도 켜면 포식자 스텝은 `_step_predators_v3` 다(v1 스트림 호출은 v2.4s 와 같은 모양).
 
 행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
 `World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
@@ -45,6 +59,7 @@ import math
 
 import numpy as np
 
+from . import repertoire as rep
 from .features import Features, _check_name, _check_part, feature_stream, features_of
 from .steering import EPS, clamp_magnitude, normalize, steer
 
@@ -157,6 +172,27 @@ DAYNIGHT_STAT_COLUMNS = (
 )
 
 
+# repertoire_stats 의 깜빡임 창: 행동 A → B → A 가 이 초 안에 되돌아오면 깜빡임(초안 지표 '3초 안 A-B-A'). 통계 정의다
+FLICKER_SECONDS = 3.0
+# repertoire_stats() 열 순서 (v3 R0). env_v2/rollout.py 가 repertoire 를 켠 세계의 행에 붙인다. 행동 이름은 repertoire.BEHAVIOR_NAMES
+_BN = rep.BEHAVIOR_NAMES
+REP_STAT_COLUMNS = (
+    tuple(f"use_{b}" for b in _BN) + tuple(f"use_day_{b}" for b in _BN) + tuple(f"use_night_{b}" for b in _BN)
+    + tuple(f"use_seen_{b}" for b in _BN) + tuple(f"use_unseen_{b}" for b in _BN)
+    + tuple(f"pred_rate_{b}" for b in _BN) + tuple(f"starve_rate_{b}" for b in _BN)
+    + ("seen_frac", "switch_per_sec", "flicker_rate", "decide_frac")
+)
+# 포식자 유형 번호 (threats). 원거리형은 유형이 아니라 pred_ranged 다(추격형 중 원거리)
+PT_CHASER, PT_STALKER, PT_PLAYER = 0, 1, 2
+# 잠행형 상태: 배회·잠행(표적 체감 거리 > stalk_dist), 돌진, 탈진
+ST_ROAM, ST_POUNCE, ST_EXHAUST = 0, 1, 2
+# 플레이어 모드: 배회, 잠행 접근, 돌진, 휴식
+PM_WANDER, PM_STALK, PM_CHARGE, PM_REST = 0, 1, 2, 3
+# threats_stats() 열 순서 (v3 R0). 포획률은 개체-스텝당. catch_rate_chaser 는 근접 추격형, ranged 는 원거리 추격형
+THREAT_STAT_COLUMNS = ("p_stalk", "stalker_n", "player_present", "catch_rate_chaser", "catch_rate_ranged",
+                       "catch_rate_stalker", "catch_rate_player", "pounce_n", "pounce_hit", "player_charge_n")
+
+
 WORLD_PARAM_KEYS = ("world_size", "predator_count", "pred_speed_mult", "ranged_frac", "cover_frac", "food_regen_mult")
 
 
@@ -184,8 +220,11 @@ def action_names(cfg) -> tuple[str, ...]:
     v1 4개 뒤에 켠 기능의 행동이 버전 순으로 붙는다: speed(v2.1), vigilance(v2.2). 앞 기능을 끄면 뒤 칸이
     당겨진다(speed 없이 vigilance 만 켜면 vigilance 가 열 4). 한번 정한 순서는 바꾸지 않는다.
     vigil_window(v2.2r)를 켜고 action 이 false 면 vigilance 열이 없다(관측 threat_recency 는 그대로).
+    repertoire(v3)를 켜면 행동은 한 열 'behavior'(정수 행동 번호를 float 로. env_v2/repertoire.py)뿐이다.
     """
     f = cfg if isinstance(cfg, Features) else features_of(cfg)
+    if f.enabled("repertoire"):
+        return ("behavior",)
     names = ACT_NAMES_V1
     if f.enabled("speed"):
         names = names + ("speed",)
@@ -206,6 +245,7 @@ def obs_names(cfg) -> tuple[str, ...]:
     visibility·to_transition(v2.4). 앞 기능을 끄면 뒤 칸이 당겨진다 — v2.1 위의 v2.4 는 visibility 가 idx 7,
     to_transition 이 idx 8 이다(계획서 4.2 의 9·10 은 v2.2·v2.3 을 모두 했을 때 번호이고, idx 7~10 은 V2a 에서 확정한다).
     도구는 칸을 번호가 아니라 이름으로 찾는다.
+    repertoire(v3)의 obs_extra 가 true 면 뒤에 9칸(`repertoire.OBS_EXTRA_NAMES`)이 붙는다(R0 설정은 false).
     """
     f = cfg if isinstance(cfg, Features) else features_of(cfg)
     names = OBS_NAMES_V1
@@ -213,6 +253,8 @@ def obs_names(cfg) -> tuple[str, ...]:
         names = names + ("threat_recency",)
     if f.enabled("daynight"):
         names = names + ("visibility", "to_transition")
+    if f.enabled("repertoire") and f.params("repertoire").get("obs_extra") is True:
+        names = names + rep.OBS_EXTRA_NAMES
     return names
 
 
@@ -436,6 +478,67 @@ def _pred_sleep_params(p: dict, f: Features) -> dict:
     return dict(nocturnal_frac=(lo, hi), sleep_dark=sd, twilight_slow=ts)
 
 
+def _threats_params(p: dict, f: Features) -> dict:
+    """threats 계수(yaml 블록, 키는 `features.PARAM_KEYS`)를 검사한다. 기본값은 없다 (v3 R0, 명세 3절 M3·플레이어형 위협).
+
+    - stalk_frac = [하, 상], 0 ≤ 하 ≤ 상 ≤ 1: reset 마다 p_stalk ~ U[하, 상], 포식자마다 확률 p_stalk 로 잠행-돌진형
+    - stalk_dist > 0: 잠행형이 돌진을 시작하는 표적 체감 거리(M1·은신 배수가 든 거리)
+    - stalk_speed·pounce_speed·exhaust_speed ≥ 0 (× herb_speed), pounce_steps ≥ 1, exhaust_steps ≥ 0 (정수 스텝)
+    - player_frac ∈ [0, 1]: 플레이어형 위협이 있는 세계 비율
+    - player_speeds = [배회, 잠행, 돌진] ≥ 0 (× herb_speed), player_mode_steps = [하, 상] 정수 1 ≤ 하 ≤ 상
+    - player_stalk_p ∈ [0, 1], player_charge_dist > 0, player_charge_steps ≥ 1, player_rest_steps ≥ 0 (정수)
+    - player_catch_r > 0, player_cooldown ≥ 0 (정수 스텝)
+    daynight 를 함께 켜야 한다(v3 는 v2.4s 위의 버전이고, 플레이어는 낮밤과 무관하게 움직이는 위협이다).
+    """
+    if not f.enabled("daynight"):
+        raise ValueError("features.threats 는 daynight 를 함께 켜야 한다(v3 는 v2.4s 위의 버전이다)")
+
+    def integer(key, x, lo):
+        if isinstance(x, bool) or not isinstance(x, (int, np.integer)) or x < lo:
+            raise ValueError(f"features.threats.{key} 는 {lo} 이상의 정수(스텝)여야 한다. 받은 값: {x!r}")
+        return int(x)
+
+    def pair(key, n):
+        x = p[key]
+        if not isinstance(x, (list, tuple)) or len(x) != n:
+            raise ValueError(f"features.threats.{key} 는 값 {n}개 목록이어야 한다. 받은 값: {x!r}")
+        return x
+
+    lo, hi = (_num("threats", "stalk_frac", x) for x in pair("stalk_frac", 2))
+    if not 0.0 <= lo <= hi <= 1.0:
+        raise ValueError(f"features.threats.stalk_frac 는 0 ≤ 하 ≤ 상 ≤ 1 이어야 한다. 받은 값: {[lo, hi]}")
+    out = dict(stalk_frac=(lo, hi))
+    for key in ("stalk_speed", "pounce_speed", "exhaust_speed"):
+        x = _num("threats", key, p[key])
+        if x < 0.0:
+            raise ValueError(f"features.threats.{key} 는 0 이상이어야 한다. 받은 값: {x}")
+        out[key] = x
+    for key in ("stalk_dist", "player_charge_dist", "player_catch_r"):
+        x = _num("threats", key, p[key])
+        if x <= 0.0:
+            raise ValueError(f"features.threats.{key} 는 양수여야 한다. 받은 값: {x}")
+        out[key] = x
+    for key in ("player_frac", "player_stalk_p"):
+        x = _num("threats", key, p[key])
+        if not 0.0 <= x <= 1.0:
+            raise ValueError(f"features.threats.{key} 는 [0, 1] 이어야 한다. 받은 값: {x}")
+        out[key] = x
+    out["pounce_steps"] = integer("pounce_steps", p["pounce_steps"], 1)
+    out["exhaust_steps"] = integer("exhaust_steps", p["exhaust_steps"], 0)
+    out["player_charge_steps"] = integer("player_charge_steps", p["player_charge_steps"], 1)
+    out["player_rest_steps"] = integer("player_rest_steps", p["player_rest_steps"], 0)
+    out["player_cooldown"] = integer("player_cooldown", p["player_cooldown"], 0)
+    sp = tuple(_num("threats", "player_speeds", x) for x in pair("player_speeds", 3))
+    if min(sp) < 0.0:
+        raise ValueError(f"features.threats.player_speeds 는 0 이상이어야 한다. 받은 값: {list(sp)}")
+    out["player_speeds"] = sp
+    ms = tuple(integer("player_mode_steps", x, 1) for x in pair("player_mode_steps", 2))
+    if ms[0] > ms[1]:
+        raise ValueError(f"features.threats.player_mode_steps 는 [하, 상], 하 ≤ 상 이어야 한다. 받은 값: {list(ms)}")
+    out["player_mode_steps"] = ms
+    return out
+
+
 def daynight_phase(t: int, period: int, offset: int, tw_steps: int) -> tuple[float, int]:
     """스텝 t 의 (어둠 d, 다음 전환까지 남은 스텝 r) (계획서 4.9.2). 낮 고정 세계는 부르지 않는다(d = 0).
 
@@ -514,6 +617,13 @@ class World:
                     if self.features.enabled("daynight") else None)
         self._ps = (_pred_sleep_params(self.features.params("pred_sleep"), self.features)
                     if self.features.enabled("pred_sleep") else None)
+        # v3 R0: 행동 레퍼토리(repertoire), 위협 유형(threats). 둘 중 하나라도 켜면 포식자 스텝은 _step_predators_v3 다
+        self._rp = (rep.parse_params(self.features.params("repertoire"), self.features)
+                    if self.features.enabled("repertoire") else None)
+        self._th = (_threats_params(self.features.params("threats"), self.features)
+                    if self.features.enabled("threats") else None)
+        self._v3p = self._rp is not None or self._th is not None
+        self._rs = None
         self.act_names: tuple[str, ...] = action_names(self.features)
         self.act_dim = len(self.act_names)
         self.obs_names: tuple[str, ...] = obs_names(self.features)
@@ -523,6 +633,9 @@ class World:
         # v2.4 관측 열 (이름으로 찾는다). daynight 를 끈 세계는 None 이다
         self._obs_vis = self.obs_names.index("visibility") if self._dn is not None else None
         self._obs_tt = self.obs_names.index("to_transition") if self._dn is not None else None
+        # v3 추가 관측 9칸의 첫 열 (obs_extra false 면 None)
+        self._obs_rep = (self.obs_names.index(rep.OBS_EXTRA_NAMES[0])
+                         if self._rp is not None and self._rp["obs_extra"] else None)
         self.reset()
 
     # ------------------------------------------------------------------ #
@@ -573,14 +686,27 @@ class World:
             # v2.2r 스텝 뒤 훅 (replay_v2): 이번 스텝의 결정 때 창, 반사 돌아보기가 heading 을 바꾼 개체
             self.window = np.zeros(self.N, dtype=bool)
             self.looked = np.zeros(self.N, dtype=bool)
+        # v1 포식자 수(threats 의 플레이어 칸을 빼고). threats 를 끈 세계는 늘 self.M 과 같다
+        self.M_base = self.M
+        if self._v3p:
+            # v3 포식자 스텝: v1 원거리형 배치(잠행형이 덮기 전, v1 스트림 호출 모양을 정한다)
+            self._pred_ranged_v1 = self.pred_ranged.copy()
         if self._ps is not None:
             self._pred_sleep_reset()
+        if self._th is not None:
+            self._threats_reset()           # 포식자 밤잠 배치(M 개) 뒤, 어둠을 정하기 전에 잠행형·플레이어를 정한다
+        if self._v3p:
+            self.pred_vel = np.zeros((self.M, 2))   # 포식자의 지난 스텝 이동(관측 pred_approach)
         if self._dn is not None:
             self._daynight_reset()
+        if self._rp is not None:
+            self._repertoire_reset()
         self._reset_stats()
         self._g = self._geometry()
         if self._vg is not None:
             self._perceive(self._g)
+        if self._rp is not None:
+            rep.perceive(self._rs, self._rp, self._g)
         self._obs = self._obs_from(self._g)
         return self._obs
 
@@ -716,6 +842,89 @@ class World:
         self.pred_asleep = np.zeros(self.M, dtype=bool)
         self._pred_speed_mult = np.ones(self.M)
         self._ps_asleep_sum, self._ps_steps = 0.0, 0
+
+    def _threats_reset(self) -> None:
+        """v3 R0 위협 유형 (명세 3절 M3·플레이어형 위협). 포식자 배치·밤잠 배치 뒤, `_daynight_reset` 전에 부른다.
+
+        threats 스트림에서만 뽑는다:
+          part 0 에서 1 + M 개: p_stalk ~ U[stalk_frac], 포식자마다 u < p_stalk 면 잠행-돌진형. 잠행형은 근접형이다 —
+                  v1 이 뽑은 원거리형 배치를 덮고(v1 뽑기는 그대로, features.py 규칙 2) 속력·포획 거리를 근접형으로 둔다
+          part 1 에서 4 개(늘): u < player_frac 면 플레이어가 있다, 위치 (x, y)·size, heading 각 2π·u
+          part 2: 플레이어 모드를 새로 고를 때마다 2 개(`_player_new_mode`), part 3: 배회 선회(스텝마다 1 개)
+        플레이어는 포식자 칸 끝(색인 M_base)에 붙는다. 밤잠 배열에는 야행성으로 넣어 잠도 박명 감속도 받지 않는다(밤에 자지 않는다).
+        """
+        cfg, th, Mb = self.cfg, self._th, self.M_base
+        g0 = self.feature_rng("threats", 0)
+        self.threat_p_stalk = float(g0.uniform(th["stalk_frac"][0], th["stalk_frac"][1]))
+        stalker = g0.random(Mb) < self.threat_p_stalk
+        self.pred_type = np.where(stalker, PT_STALKER, PT_CHASER).astype(np.int8)
+        self.pred_ranged = self.pred_ranged & ~stalker
+        base = cfg.herb_speed * self.pred_speed_mult
+        self.pred_speed = np.where(self.pred_ranged, base * cfg.pred_ranged_speed_mult, base)
+        self.pred_catch_r = np.where(self.pred_ranged, cfg.pred_ranged_catch_r, cfg.pred_melee_catch_r)
+        u = self.feature_rng("threats", 1).random(4)
+        self.player_present = bool(u[0] < th["player_frac"])
+        if self.player_present:
+            ang = 2.0 * np.pi * u[3]
+            self.pred_pos = np.vstack([self.pred_pos, [u[1] * self.size, u[2] * self.size]])
+            self.pred_head = np.vstack([self.pred_head, [math.cos(ang), math.sin(ang)]])
+            self.pred_ranged = np.append(self.pred_ranged, False)
+            self._pred_ranged_v1 = np.append(self._pred_ranged_v1, False)
+            self.pred_speed = np.append(self.pred_speed, 0.0)       # 플레이어 속력은 모드가 정한다
+            self.pred_catch_r = np.append(self.pred_catch_r, th["player_catch_r"])
+            self.pred_cd = np.append(self.pred_cd, 0).astype(np.int32)
+            self.pred_type = np.append(self.pred_type, PT_PLAYER).astype(np.int8)
+            if self._ps is not None:
+                self.pred_nocturnal = np.append(self.pred_nocturnal, True)
+                self.pred_asleep = np.append(self.pred_asleep, False)
+                self._pred_speed_mult = np.append(self._pred_speed_mult, 1.0)
+            self.M = Mb + 1
+        self.pred_is_player = self.pred_type == PT_PLAYER
+        self.stalk_state = np.zeros(self.M, dtype=np.int8)
+        self.stalk_left = np.zeros(self.M, dtype=np.int64)
+        self.player_mode = np.zeros(self.M, dtype=np.int8)
+        self.player_left = np.zeros(self.M, dtype=np.int64)
+        if self.player_present:
+            self._player_new_mode(Mb)
+
+    def _player_new_mode(self, i: int) -> None:
+        """플레이어 모드를 새로 고른다(part 2 에서 2 개): u0 < player_stalk_p 면 잠행 접근, 아니면 배회. 길이 =
+        하 + ⌊u1·(상 − 하 + 1)⌋ 스텝(상에서 자른다)."""
+        th = self._th
+        u = self.feature_rng("threats", 2).random(2)
+        lo, hi = th["player_mode_steps"]
+        self.player_mode[i] = PM_STALK if u[0] < th["player_stalk_p"] else PM_WANDER
+        self.player_left[i] = min(lo + int(u[1] * (hi - lo + 1)), hi)
+
+    def _repertoire_reset(self) -> None:
+        """v3 R0 행동 상태 (env_v2/repertoire.py). 어둠을 정한 뒤(`_daynight_reset`) 부른다. 모든 개체가 GRAZE 진입이다."""
+        rp, N = self._rp, self.N
+        self._rep_gen = np.zeros(N, dtype=np.int64)               # 슬롯별 세대(리스폰 횟수) — 사건 결정 지연의 개체 키
+        self._rs = rep.RepState(N, rp, self.energy / self.cfg.max_energy, self.dark, self.seed)
+        self._rep_see = np.full(N, rp["graze_head_down"])         # 자기 포식자 탐지 반경 배수 (다음 관측)
+        self._rep_see_last = self._rep_see.copy()                 # 직전 관측의 배수 (사건 비교 시야, `_geometry`)
+        self._rep_still = np.zeros(N, dtype=bool)                 # M1 정지 (이번 스텝)
+        self._rep_cover = np.ones(N)                              # 은신처 안일 때의 은신 배수 (이번 스텝)
+        self._rep_eat = np.zeros(N)                               # 섭식·대사 배수 (이번 스텝, 제어기)
+        self._rep_drain = np.ones(N)
+        self._rep_a4 = np.zeros((N, ACT_DIM))                     # v1 stats() 의 행동 열 자리(레퍼토리 세계는 0)
+        self._rep_export()
+
+    def _rep_export(self) -> None:
+        """스텝 뒤 훅 (애니메이션 계약, 언리얼이 받는 넷): 이번 스텝에 실행한 행동·위상·경과·seq 의 사본. 리스폰은 바꾸지
+        않는다(죽은 슬롯의 마지막 프레임이 그 개체의 값이다, replay_v2 규약). 새 개체의 상태는 다음 스텝 값부터다."""
+        rs = self._rs
+        self.behavior = rs.behavior.copy()
+        self.beh_phase = rs.phase.copy()
+        self.beh_steps = rs.steps_in.copy()
+        self.beh_seq = rs.seq.copy()
+
+    def rep_obs_extra(self) -> np.ndarray:
+        """v3 추가 관측 9칸 (N, 9) float32 — 지금 관측(스텝 끝 기하)과 같은 때의 값. obs_extra 가 false 여도 계산한다
+        (R1 학습·손 규칙용). 순서는 `repertoire.OBS_EXTRA_NAMES`."""
+        if self._rp is None:
+            raise ValueError("rep_obs_extra 는 repertoire 를 켠 세계에만 있다")
+        return rep.obs_extra(self._rs, self._rp, self._g)
 
     def _daynight_update(self) -> None:
         """지금 t 의 어둠 d·실효 탐지 반경·관측 두 칸 (계획서 4.9.2, 4.2). reset 과 `step` 의 t 증가 뒤에 부른다.
@@ -858,6 +1067,8 @@ class World:
             # v2.4: 초식의 포식자 탐지 반경만 see_r·(1 − detect_night·d) 로 준다(계획서 4.9.2 (a)). 동족 시야(위)·관측 2 의
             # 분모·조향 도주 문턱(steering.py)은 see_r 그대로다. d = 0 이면 see_r·1.0 이라 v2.1 과 비트 단위로 같다
             see_p = cfg.see_r if self._dn is None else self._see_pred
+            if self._rp is not None:    # v3: 개체 행동별 자기 탐지 반경(GRAZE 고개 숙임 M5, SLEEP 시야)
+                see_p = see_p * self._rep_see[idx][:, None]
             pvis = (pd <= see_p) & ((ex * hx + ey * hy) * pinv >= fov_cos)
             if self._ps is not None:    # v2.4s: 자는 포식자는 굴에 있어 보이지 않는다(관측 1·2·도주 조향에서 빠진다)
                 pvis &= ~self.pred_asleep[None, :]
@@ -907,6 +1118,36 @@ class World:
             cover_dist=cover_dist,
             in_cover=in_cover,
         )
+        if self._rp is not None:
+            # v3 (repertoire 관측·사건 입력): 가장 가까운 보이는 위협의 접근 속력 c = clip(v_pred·û / herb_speed, −1, 1)
+            # (û = 위협에서 이 개체 쪽 단위벡터, v_pred = 그 위협의 지난 스텝 이동)를 (c + 1)/2 로, 없으면 0.5.
+            # kin_alarm = 보이는 동족 중 FLEE 비율(없으면 0). cover_k = 가장 가까운 은신처 색인(가장자리 거리, 동점이면 낮은
+            # 색인, 은신처가 없으면 −1).
+            # *_ev = 사건 비교 시야(이번 관측과 직전 관측의 행동 시야 배수 중 작은 쪽)로 센 포식자 수·가장 가까운 거리·접근 속력.
+            # 사건 E1·E2 만 쓴다 — 자기 행동이 바뀌어 시야가 넓어진 것만으로 생긴 위협은 사건이 아니다(repertoire docstring A.b)
+            if self.M > 0:
+                pv = self.pred_vel[j]
+                c = -(pv[:, 0] * ex[ar, j] + pv[:, 1] * ey[ar, j]) * pinv[ar, j] / cfg.herb_speed
+                vals["pred_approach"] = np.where(seen[:, 0], (np.clip(c, -1.0, 1.0) + 1.0) * 0.5, 0.5)
+                lo = np.minimum(self._rep_see[idx], self._rep_see_last[idx])
+                base_r = cfg.see_r if self._dn is None else self._see_pred
+                pvis_e = pvis & (pd <= base_r * lo[:, None])
+                masked_e = np.where(pvis_e, pd, np.inf)
+                je = masked_e.argmin(1)
+                seen_e = np.isfinite(masked_e[ar, je])
+                pve = self.pred_vel[je]
+                ce = -(pve[:, 0] * ex[ar, je] + pve[:, 1] * ey[ar, je]) * pinv[ar, je] / cfg.herb_speed
+                vals["pred_count_ev"] = pvis_e.sum(1)
+                vals["d_pred_min_ev"] = masked_e[ar, je]
+                vals["pred_approach_ev"] = np.where(seen_e, (np.clip(ce, -1.0, 1.0) + 1.0) * 0.5, 0.5)
+            else:
+                vals["pred_approach"] = np.full(n, 0.5)
+                vals["pred_count_ev"] = np.zeros(n, dtype=np.int64)
+                vals["d_pred_min_ev"] = np.full(n, np.inf)
+                vals["pred_approach_ev"] = np.full(n, 0.5)
+            flee = (self._rs.behavior == rep.FLEE).astype(np.float64)
+            vals["kin_alarm"] = np.where(kin_count > 0, (kin_f @ flee) / np.maximum(kin_count, 1.0), 0.0)
+            vals["cover_k"] = k if len(self.cov_r) else np.full(n, -1, dtype=np.int64)
         if out is None:
             return vals
         for key, v in vals.items():
@@ -938,6 +1179,8 @@ class World:
         if self._dn is not None:        # v2.4 전역 값 두 칸 (계획서 4.2 visibility·to_transition, 이미 [0,1])
             o[:, self._obs_vis] = self._vis
             o[:, self._obs_tt] = self._to_tr
+        if self._obs_rep is not None:   # v3 추가 관측 9칸 (obs_extra true 일 때만)
+            o[:, self._obs_rep:self._obs_rep + len(rep.OBS_EXTRA_NAMES)] = rep.obs_extra(self._rs, self._rp, g, idx)
         return o
 
     def _observe_subset(self, idx: np.ndarray) -> np.ndarray:
@@ -945,6 +1188,8 @@ class World:
         self._geometry(idx, out=self._g)
         if self._vg is not None:
             self._perceive(self._g, idx)
+        if self._rp is not None:
+            rep.perceive(self._rs, self._rp, self._g, idx)
         return self._obs_from(self._g, idx)
 
     def _perceive(self, g: dict, idx: np.ndarray | None = None) -> None:
@@ -1002,41 +1247,49 @@ class World:
 
     def step(self, a: np.ndarray):
         """`a`: (N, act_dim) in [0,1] (§1.3). act_dim 은 v1 4, speed 를 켜면 5, vigilance 까지 켜면 6.
+        repertoire(v3)를 켜면 act_dim 1 이고 값은 정수 행동 번호(0..4)다(정수가 아니면 ValueError).
         반환: obs, reward, done, terminal_obs.
 
-        speed(v2.1)를 켠 세계의 스텝 순서는 `_gait_step`, vigilance(v2.2)는 `_vigil_step` docstring 에 적었다.
-        끈 세계는 v1 과 같은 줄을 탄다.
+        speed(v2.1)를 켠 세계의 스텝 순서는 `_gait_step`, vigilance(v2.2)는 `_vigil_step`, repertoire(v3)는
+        env_v2/repertoire.py 모듈 docstring 과 `_rep_step` 에 적었다. 끈 세계는 v1 과 같은 줄을 탄다.
         """
         cfg = self.cfg
         a = np.asarray(a, dtype=np.float64)
         self._check_action(a)
         rew = np.full(self.N, cfg.rew_alive)
-        vg, vw = self._vg, self._vw
+        vg, vw, rp = self._vg, self._vw, self._rp
         if vg is not None:
             ema0 = min(self.pred_ema, 1.0)              # 결정 때 관측 5 (vigil_stats B5′ 용, 6) 에서 바뀐다)
         if vw is not None:              # v2.2r 0) 결정 때 창: 결정 관측의 포식자 수 0 & threat_recency > theta
             self.window = (self._g["pred_count"] == 0) & (self.threat > vw["theta"])
 
-        # 1) 초식 이동 — §3.3 조향 수식. 벽 경계(§4.2), 토러스 없음.
-        #    v2.2 threat_flee > 0 (#18 변형, Gate E2b 보고 팔)만 위협 반대 항을 정규화 전에 더한다. 0 이면 None 이라
-        #    steer 가 v1 줄 그대로다.
-        v = steer(self._g, a, cfg,
-                  self._threat_flee_term() if vg is not None and vg["threat_flee"] > 0.0 else None)
-        if self._sp is not None:
-            v = self._gait_step(v, a[:, ACT_SPEED])     # v2.1: 보행 상태가 크기만 바꾼다. 방향은 v1 조향 그대로
-        if self._act_vig is not None:       # v2.2: 경계면 속력 0 (speed 보다 우선). v2.2r W′ 는 창 안에서만
-            v = self._vigil_step(v, a[:, self._act_vig],
-                                 self.window if vw is not None and vw["window_only"] else None)
+        if rp is not None:
+            # v3 0r·1r) 행동 실행기: 결정 시점에만 요청을 받고(잠금·사건·지연), 행동별 제어기가 속도·보행을 정한다
+            v, rep_out = self._rep_step(a)
+        else:
+            # 1) 초식 이동 — §3.3 조향 수식. 벽 경계(§4.2), 토러스 없음.
+            #    v2.2 threat_flee > 0 (#18 변형, Gate E2b 보고 팔)만 위협 반대 항을 정규화 전에 더한다. 0 이면 None 이라
+            #    steer 가 v1 줄 그대로다.
+            v = steer(self._g, a, cfg,
+                      self._threat_flee_term() if vg is not None and vg["threat_flee"] > 0.0 else None)
+            if self._sp is not None:
+                v = self._gait_step(v, a[:, ACT_SPEED])     # v2.1: 보행 상태가 크기만 바꾼다. 방향은 v1 조향 그대로
+            if self._act_vig is not None:       # v2.2: 경계면 속력 0 (speed 보다 우선). v2.2r W′ 는 창 안에서만
+                v = self._vigil_step(v, a[:, self._act_vig],
+                                     self.window if vw is not None and vw["window_only"] else None)
         self.pos = np.clip(self.pos + v, 0.0, self.size)
         moving = np.linalg.norm(v, axis=1) > EPS
         self.head = np.where(moving[:, None], normalize(v), self.head)
+        if rp is not None:                  # v3: FREEZE 는 위협 쪽을 본다(모르면 그대로)
+            face = (rep_out["face"] != 0.0).any(1)
+            self.head[face] = rep_out["face"][face]
         if vg is not None:                  # v2.2 1e): 경계한 개체는 위협 쪽을 본다(ThreatDir, 본 적 없으면 유지)
             self._face_threat()
         if vw is not None and vw["look_back"]:   # v2.2r 1f): 정지 중이고 창 안이면 위협 쪽을 본다(L 반사)
             self._look_back()
 
-        # 2) 포식자 이동 + 포획 판정
-        caught = self._step_predators()
+        # 2) 포식자 이동 + 포획 판정 (v3 는 정지 탐지·상태별 은신 배수·잠행형·플레이어)
+        caught = self._step_predators_v3() if self._v3p else self._step_predators()
 
         # 3) 섭식 · 대사 (§3.4 "에너지 획득 +1.0 × 획득량")
         if self._sp is None and vg is None and self._dn is None:
@@ -1084,7 +1337,11 @@ class World:
             self._food_v_step()        # v2.0b: 훼손 → 재생(목표·상한 V) → 휴식 회복
 
         self.t += 1
-        self._accumulate(a, rew, repro, caught, starved, done)
+        self._accumulate(a if rp is None else self._rep_a4, rew, repro, caught, starved, done)
+        if rp is not None:            # v3: 결정 때 상태(어둠·위협 보임)와 이번 스텝 행동으로 레퍼토리 지표를 센 뒤 시간을 넘긴다
+            self._rep_accumulate(rep_out, caught, starved)
+            self._rep_export()
+            rep.tick(self._rs)
         if self._sp is not None:      # 스텝 전 기하(self._g)·결정 때 에너지로 보행 지표를 센다
             self._gait_accumulate(e_prev, e_new - e_drained, drain)
         if vw is not None:            # 결정 때 창·배부름으로 창 지표(B3_L·W′ 사용률)를 센다
@@ -1105,6 +1362,8 @@ class World:
             if vg["fov_deg"] >= 360.0:              # 8c) 360° 경계 시야로 새로 찾은 포식자 쪽을 본다 (4.4 경계 행)
                 self._face_threat()
             self._b4_accumulate(flee, g, done)
+        if rp is not None:
+            rep.perceive(self._rs, rp, g)           # v3: 마지막 위협 방향·threat_recency
         obs = self._obs_from(g)
         self._g, self._obs = g, obs
         terminal_obs = obs.copy()
@@ -1128,6 +1387,12 @@ class World:
           정지(`_vigil_step`)라 speed 세계에서는 정지 대사 c_rest(= drain_mult[정지]), speed 를 끈 세계에서는 v1 대사다
         """
         cfg = self.cfg
+        if self._rp is not None:
+            # v3 (명세 2절 표): 대사·섭식 배수는 행동 제어기(`repertoire.control`)가 정한다 — 대사 = 보행 대사, SLEEP 이고
+            # 은신처 안이면 × (1 − sleep_rest·d)(휴식 할인은 SLEEP 전용이라 daynight.rest_night 는 쓰지 않는다), 섭식 =
+            # GRAZE 정지 1·걷기 0.5, 그 밖 0. 섭식에는 밤 배수 (1 − eat_night·d) 를 곱한다.
+            # C++ 꼴: Drain = EnergyDrain * DrainMult(B, G, bInCover, D); Want *= EatMult(B, G) * (1 − EatNight·D)
+            return cfg.energy_drain * self._rep_drain, self._rep_eat * (1.0 - self._dn["eat_night"] * self.dark)
         if self._sp is not None:
             drain = cfg.energy_drain * self._sp["drain_mult"][self.gait]
             eat = self._sp["eat"][self.gait]
@@ -1267,6 +1532,50 @@ class World:
         self.gait, self.gait_cmd, self.vel = g, cmd, v
         return v
 
+    def _rep_step(self, a: np.ndarray) -> tuple[np.ndarray, dict]:
+        """v3 행동 실행기 한 스텝 (`step` 0r·1r, 순서는 env_v2/repertoire.py docstring A·B). 반환: (적용 속도, 제어 결과).
+
+        요청 = a[:, 0] 이고 0..4 의 정수 행동 번호여야 한다. 정수가 아니면 멈춘다 — 연속 정책(random [0, 1)·학습 정책의
+        sigmoid (0, 1))을 내림하면 조용히 늘 GRAZE 가 되기 때문이다(random 은 `env_v2/rollout.adapt_spec` 이 정수 행동을 뽑는다).
+        결정 때 입력은 이전 스텝 끝 기하 `self._g`(포식자 수·가장 가까운 거리·접근 속력·사건 비교 시야 값·은신처)와 결정 때
+        에너지·어둠이다. GRAZE 의 '먹이 충분'은 결정 때 위치 셀의 먹이(섭식 전) ≥ graze_eat_min 이다. HIDE 는 고른 은신처의
+        중심 쪽으로 간다(가장자리까지의 가장 가까운 점과 같은 방향).
+        스텝 뒤 훅: `self.gait`(실제 보행, gait_cmd 도 같은 값 — 명령 보행이 없다), `self.vel`(적용 속도).
+        """
+        rp, rs, g, cfg = self._rp, self._rs, self._g, self.cfg
+        req = a[:, 0]
+        if (not np.all(np.isfinite(req)) or req.min() < 0 or req.max() >= rep.N_BEHAVIORS
+                or not np.all(req == np.floor(req))):
+            bad = req[~np.isfinite(req) | (req != np.floor(req))]
+            raise ValueError(f"행동 'behavior' 는 0..{rep.N_BEHAVIORS - 1} 의 정수 행동 번호여야 한다(내림하지 않는다 — "
+                             f"연속 정책 출력은 이 세계에 쓸 수 없다). 받은 범위: [{req.min()}, {req.max()}]"
+                             + (f", 정수가 아닌 값 예: {bad[:3].tolist()}" if len(bad) else ""))
+        prev = rs.behavior.copy()
+        obs = dict(pred_count=g["pred_count"], d_pred_min=g["d_pred_min"], pred_approach=g["pred_approach"],
+                   pred_count_ev=g["pred_count_ev"], d_pred_min_ev=g["d_pred_min_ev"],
+                   pred_approach_ev=g["pred_approach_ev"],
+                   energy=np.clip(self.energy / cfg.max_energy, 0.0, 1.0), dark=self.dark, in_cover=g["in_cover"],
+                   cover_k=g["cover_k"])
+        res = rep.arbitrate(rs, rp, req.astype(np.int64), obs)
+        ix, iy = self._cell_index(self.pos)
+        to_target = np.zeros((self.N, 2))
+        m = (rs.behavior == rep.HIDE) & ~rs.arrived & (rs.hide_target >= 0)
+        if m.any():
+            to_target[m] = normalize(self.cov_c[rs.hide_target[m]] - self.pos[m])
+        inp = dict(food_grad=g["food_grad"], to_centroid=g["to_centroid"], separation=g["separation"],
+                   away_from_pred=g["away_from_pred"], to_target=to_target, pred_count=g["pred_count"],
+                   food_ok=self.food[iy, ix] >= rp["graze_eat_min"], in_cover=g["in_cover"], dark=self.dark)
+        out = rep.control(rs, rp, inp, cfg, self._sp)
+        self.gait, self.gait_cmd, self.vel = out["gait"], out["gait"].copy(), out["vel"]
+        self._rep_eat, self._rep_drain = out["eat"], out["drain"]
+        self._rep_see_last = self._rep_see                  # 결정 관측(self._g)을 만든 배수 → 다음 관측의 '직전' 배수
+        self._rep_see, self._rep_still = out["see"], out["still"]
+        # M6 행동별 은신 배수(은신처 안일 때): 웅크린 HIDE, GRAZE, SLEEP, 그 밖 (repertoire.cover_mult)
+        self._rep_cover = rep.cover_mult(rp, rs.behavior, out["crouch"])
+        out.update(res)
+        out["prev"] = prev
+        return out["vel"], out
+
     def _step_predators(self) -> np.ndarray:
         """포식자 2종 (§4.2). 은신처 안 초식은 거리가 `cover_hide_mult` 배로 보인다."""
         cfg = self.cfg
@@ -1335,6 +1644,186 @@ class World:
         caught[k[got]] = True
         self.pred_cd[got] = int(cfg.pred_eat_cd)
         return caught
+
+    def _step_predators_v3(self) -> np.ndarray:
+        """v3 포식자·위협 스텝 (repertoire·threats 중 하나라도 켠 세계, 명세 3절). `_step_predators` 와 같은 순서다:
+        체감 거리 → 쿨다운 → 표적(시야 안 최근접 체감 거리) → 이동 → 벽 반사 → 포획(이동 전 거리, v1 그대로).
+
+        - 체감 거리 (repertoire): 표적 선택 = 실거리 × max(은신 배수, still 이면 c_still)(M1·M6), 포획 = 실거리 × 은신 배수.
+          은신 배수 = 은신처 안이면 행동별 값(웅크린 HIDE cover_mult_crouch, GRAZE cover_mult_graze, SLEEP cover_mult_sleep,
+          그 밖 cover_mult_other — `repertoire.cover_mult`), 밖이면 1.
+          repertoire 를 끈 세계는 v1 그대로 은신처 안 cover_hide_mult 를 둘 다에 쓴다.
+        - 잠행형 (threats, M3): 배회 중 표적이 있고 체감 거리 > stalk_dist 면 stalk_speed 로 잠행, ≤ stalk_dist 면 돌진을
+          시작한다(pounce_speed 로 pounce_steps 번 이동, 표적이 안 보이면 곧장). 돌진 이동을 다 쓴 다음 스텝이 마지막 포획
+          판정이고(느리게 곧장), 놓치면 exhaust_steps 동안 탈진(exhaust_speed 로 배회, 사냥 안 함). 잡으면 배회로 돌아간다.
+          자는 잠행형은 처음 상태로 돌아간다. 밤잠·박명 감속은 추격형과 같다.
+        - 플레이어 (threats): 맵 전체를 본다(시야 반경·각 없음, 체감 거리는 같다 — 사람 플레이어는 화면의 모든 개체를 본다.
+          그래서 정지·웅크림은 플레이어의 표적 순위만 바꾸고 표적에서 벗어나게 하지는 못한다. 명세의 '가장 가까운 무리'는
+          '체감 거리가 가장 가까운 개체'로 둔다. 결정 기록은 results/v3/r0/PREREG.md 변경 기록). 배회(player_speeds[0], 선회는
+          자기 스트림 part 3) · 잠행(player_speeds[1], 가장 가까운 개체 쪽, 체감 거리 ≤ player_charge_dist 면 돌진 시작) · 돌진
+          (player_speeds[2] 로 player_charge_steps 번, 마지막 판정 뒤 휴식) · 휴식(멈춤, 사냥 안 함, player_rest_steps).
+          배회·잠행 모드 길이가 끝나거나 휴식이 끝나면 모드를 새로 고른다(`_player_new_mode`). 포획 뒤 쿨다운 player_cooldown.
+          밤에 자지 않는다.
+        - v1 스트림: 배회 선회 M_base 개, v1 원거리형 배치에 원거리형이 있으면 원거리 판정 (M_base, N) 개 — v2.4s 와 같은 모양
+          (플레이어 몫은 threats 스트림, 잠행형이 덮은 원거리형의 판정은 쓰지 않는다).
+        스텝 뒤 훅: `self.pred_vel`(이번 스텝 실제 이동, 관측 pred_approach).
+        """
+        cfg, th, rp = self.cfg, self._th, self._rp
+        M, Mb, N = self.M, self.M_base, self.N
+        if M == 0:
+            return np.zeros(N, dtype=bool)
+        ar = np.arange(M)
+        old = self.pred_pos.copy()
+        dx = self.pos[:, 0][None, :] - self.pred_pos[:, 0:1]      # (M,N)
+        dy = self.pos[:, 1][None, :] - self.pred_pos[:, 1:2]
+        dist = np.sqrt(dx * dx + dy * dy)
+        inv = 1.0 / np.maximum(dist, EPS)
+        in_cov = self._in_cover(self.pos)
+        if rp is not None:
+            cov = np.where(in_cov, self._rep_cover, 1.0)
+            det = np.maximum(cov, np.where(self._rep_still, rp["c_still"], 1.0))
+        else:
+            cov = det = np.where(in_cov, cfg.cover_hide_mult, 1.0)
+        perceived = dist * det[None, :]
+        catch_d = dist * cov[None, :]
+        self.pred_cd = np.maximum(self.pred_cd - 1, 0)
+        hunting = self.pred_cd == 0
+        if self._ps is not None:
+            hunting = hunting & ~self.pred_asleep
+        ts = None
+        if th is not None:
+            stalker = self.pred_type == PT_STALKER
+            if self._ps is not None:
+                zz = stalker & self.pred_asleep
+                self.stalk_state[zz] = ST_ROAM
+                self.stalk_left[zz] = 0
+            exh0 = stalker & (self.stalk_state == ST_EXHAUST)
+            rest0 = self.pred_is_player & (self.player_mode == PM_REST)
+            hunting = hunting & ~exh0 & ~rest0
+        vis = (perceived <= cfg.pred_view_r) & (
+            (dx * self.pred_head[:, 0:1] + dy * self.pred_head[:, 1:2]) * inv >= cfg.pred_fov_cos)
+        if th is not None and M > Mb:
+            vis[self.pred_is_player] = True
+        vis &= hunting[:, None]
+        masked = np.where(vis, perceived, np.inf)
+        j = masked.argmin(1)
+        d_t = masked[ar, j]
+        has_target = np.isfinite(d_t)
+        turn = self.rng.uniform(-cfg.pred_wander_turn, cfg.pred_wander_turn, Mb)
+        if M > Mb:
+            turn = np.concatenate([turn, self.feature_rng("threats", 3).uniform(
+                -cfg.pred_wander_turn, cfg.pred_wander_turn, M - Mb)])
+        c, s = np.cos(turn), np.sin(turn)
+        wander = np.stack([self.pred_head[:, 0] * c - self.pred_head[:, 1] * s,
+                           self.pred_head[:, 0] * s + self.pred_head[:, 1] * c], 1)
+        chase = np.stack([dx[ar, j], dy[ar, j]], 1) * inv[ar, j][:, None]
+        move = np.where(has_target[:, None], chase, wander)
+        speed = self.pred_speed.copy()
+        if th is not None:
+            move, speed, ts = self._threat_motion(move, speed, wander, has_target, d_t, exh0, rest0)
+        if self._ps is not None:
+            move = np.where(self.pred_asleep[:, None], self.pred_head, move)
+            speed = speed * self._pred_speed_mult
+            self._ps_asleep_sum += float(self.pred_asleep[:Mb].mean()) if Mb else 0.0
+            self._ps_steps += 1
+        self.pred_pos = self.pred_pos + move * speed[:, None]
+        for axis in (0, 1):
+            out_of = (self.pred_pos[:, axis] < 0.0) | (self.pred_pos[:, axis] > self.size)
+            move[out_of, axis] *= -1.0
+        self.pred_pos = np.clip(self.pred_pos, 0.0, self.size)
+        self.pred_head = normalize(move)
+        self.pred_vel = self.pred_pos - old
+
+        hit = (catch_d <= self.pred_catch_r[:, None]) & hunting[:, None]
+        if self._pred_ranged_v1[:Mb].any():
+            roll = self.rng.random((Mb, N)) < cfg.pred_ranged_catch_p
+            if M > Mb:
+                roll = np.vstack([roll, np.ones((M - Mb, N), dtype=bool)])
+            hit &= np.where(self.pred_ranged[:, None], roll, True)
+        hit_d = np.where(hit, catch_d, np.inf)
+        k = hit_d.argmin(1)
+        got = np.isfinite(hit_d[ar, k])
+        caught = np.zeros(N, dtype=bool)
+        caught[k[got]] = True
+        if th is None:
+            self.pred_cd[got] = int(cfg.pred_eat_cd)
+        else:
+            self.pred_cd[got] = np.where(self.pred_is_player[got], th["player_cooldown"], int(cfg.pred_eat_cd))
+            self._threat_after(got, ts)
+        return caught
+
+    def _threat_motion(self, move, speed, wander, has_target, d_t, exh0, rest0):
+        """잠행형·플레이어의 이번 스텝 이동 방향·속력과 상태 시작(돌진·플레이어 돌진). `_step_predators_v3` docstring."""
+        th, hs = self._th, self.cfg.herb_speed
+        stalker = self.pred_type == PT_STALKER
+        st, left = self.stalk_state, self.stalk_left
+        roam = stalker & (st == ST_ROAM)
+        start = roam & has_target & (d_t <= th["stalk_dist"])
+        st[start] = ST_POUNCE
+        left[start] = th["pounce_steps"]
+        self._th_pounce[0] += int(np.count_nonzero(start))
+        stalking = roam & has_target & ~start
+        pounce = stalker & (st == ST_POUNCE)
+        final = pounce & (left <= 0)
+        dash = pounce & ~final
+        speed = np.where(stalking, th["stalk_speed"] * hs, speed)
+        speed = np.where(dash, th["pounce_speed"] * hs, speed)
+        speed = np.where(exh0 | final, th["exhaust_speed"] * hs, speed)
+        move = np.where(((dash & ~has_target) | final)[:, None], self.pred_head, move)
+        ps = th["player_speeds"]
+        for i in np.flatnonzero(self.pred_is_player):
+            if self.player_mode[i] == PM_STALK and has_target[i] and d_t[i] <= th["player_charge_dist"]:
+                self.player_mode[i] = PM_CHARGE
+                self.player_left[i] = th["player_charge_steps"]
+                self._th_charge += 1
+            mode = self.player_mode[i]
+            if mode == PM_WANDER:
+                speed[i], move[i] = ps[0] * hs, wander[i]
+            elif mode == PM_STALK:
+                speed[i] = ps[1] * hs                   # 표적 쪽(없으면 배회)
+            elif mode == PM_CHARGE and self.player_left[i] > 0:
+                speed[i] = ps[2] * hs
+                if not has_target[i]:
+                    move[i] = self.pred_head[i]
+            else:                                       # 휴식, 또는 돌진 뒤 마지막 판정 스텝
+                speed[i], move[i] = 0.0, self.pred_head[i]
+        return move, speed, dict(final=final, dash=dash, exh0=exh0, rest0=rest0)
+
+    def _threat_after(self, got: np.ndarray, ts: dict) -> None:
+        """포획 뒤 잠행형·플레이어 상태 갱신과 유형별 포획 수 (`_step_predators_v3` docstring)."""
+        th = self._th
+        stalker = self.pred_type == PT_STALKER
+        st, left = self.stalk_state, self.stalk_left
+        hitp = stalker & (st == ST_POUNCE) & got
+        self._th_pounce[1] += int(np.count_nonzero(hitp))
+        st[hitp] = ST_ROAM
+        left[hitp] = 0
+        fin = ts["final"] & ~got
+        st[fin] = ST_EXHAUST if th["exhaust_steps"] > 0 else ST_ROAM
+        left[fin] = th["exhaust_steps"]
+        cont = ts["dash"] & ~got
+        left[cont] -= 1
+        e = ts["exh0"]
+        left[e] -= 1
+        back = e & (left <= 0)
+        st[back] = ST_ROAM
+        left[back] = 0
+        kind = np.where(self.pred_is_player, 3, np.where(stalker, 2, np.where(self.pred_ranged, 1, 0)))
+        self._th_catch += np.bincount(kind[got], minlength=4)
+        for i in np.flatnonzero(self.pred_is_player):
+            mode = self.player_mode[i]
+            if mode == PM_CHARGE:
+                if got[i] or self.player_left[i] <= 0:
+                    self.player_mode[i] = PM_REST
+                    self.player_left[i] = th["player_rest_steps"]
+                    if th["player_rest_steps"] <= 0:
+                        self._player_new_mode(i)
+                else:
+                    self.player_left[i] -= 1
+            else:                                       # 배회·잠행·휴식: 남은 길이를 줄이고 끝나면 새 모드
+                self.player_left[i] -= 1
+                if self.player_left[i] <= 0:
+                    self._player_new_mode(i)
 
     def _eat(self, e_drained: np.ndarray, mult: np.ndarray | None = None) -> np.ndarray:
         """셀당 총 수요를 잔량에 비례 배분한다. 개체별 루프 없음 (§1.1).
@@ -1438,6 +1927,17 @@ class World:
             e = g.uniform(INDUCE_ENERGY[0], INDUCE_ENERGY[1], k) * self.cfg.max_energy
             if not self.day_fixed:
                 self.energy[dead] = np.where(u < self._dn["start_induce"], e, self.energy[dead])
+        if self._rp is not None:
+            # v3: 새 개체는 GRAZE 진입 상태(잠금 lock_graze), 사건 기준값은 리스폰 때 값(에너지·어둠), 세대 + 1 로 사건 결정
+            # 지연을 새로 받는다(C++ AgentKey 가 리스폰마다 새 값인 것과 같다). 난수를 쓰지 않는다.
+            # 스텝 뒤 훅(behavior 등)은 바꾸지 않는다(`_rep_export`). 깜빡임 통계는 이전 개체와 잇지 않는다
+            self._rep_gen[dead] += 1
+            self._rs.reset_slots(dead, self._rp, self.energy[dead] / self.cfg.max_energy, self.dark, self.seed,
+                                 self._rep_gen[dead])
+            self._rep_see[dead] = self._rp["graze_head_down"]
+            self._rep_see_last[dead] = self._rp["graze_head_down"]
+            self._rep_before[dead] = -1
+            self._rep_last_sw[dead] = -(10 ** 9)
 
     # ------------------------------------------------------------------ #
     # 통계 (§7.2)
@@ -1451,7 +1951,8 @@ class World:
         self._life_sum = 0
         self._life_count = 0
         self._life_cur = np.zeros(self.N, dtype=np.int64)
-        self._act_sum = np.zeros(self.act_dim)
+        # repertoire 세계의 v1 행동 열 합은 0 자리(행동이 'behavior' 한 열이라 v1 stats 의 조향 열이 없다)
+        self._act_sum = np.zeros(ACT_DIM if self._rp is not None else self.act_dim)
         self._flee_sq = 0.0
         self._cover_steps = 0
         self._agent_steps = 0
@@ -1494,6 +1995,21 @@ class World:
             self._dn_energy = np.zeros((2, 3))                  # [먹이 에너지, 대사] × 위상
             self._dn_dark = 0.0                                 # 스텝별 d 합
             self._dn_steps = 0
+            if self._rp is not None:     # v3: 휴식·먹기 열의 행동 기준 판 [위상 3, 배부름 2, 결정 때 은신처 안 2, 먹이 셀 2, 행동]
+                self._dn_rep = np.zeros((3, 2, 2, 2, rep.N_BEHAVIORS), dtype=np.int64)
+        if self._rp is not None:     # v3 레퍼토리 지표 (repertoire_stats). 개체-스텝 수다
+            self._rep_hist = np.zeros((3, 2, rep.N_BEHAVIORS), dtype=np.int64)   # [위상(낮·박명·밤), 위협 보임, 행동]
+            self._rep_dead = np.zeros((2, rep.N_BEHAVIORS), dtype=np.int64)      # [피식, 아사] × 죽은 스텝의 행동
+            self._rep_switch, self._rep_decide, self._rep_flicker = 0, 0, 0
+            self._rep_before = np.full(self.N, -1, dtype=np.int64)              # 마지막 전환 전 행동(없으면 −1)
+            self._rep_last_sw = np.full(self.N, -(10 ** 9), dtype=np.int64)     # 마지막 전환 스텝
+            self._rep_flicker_w = int(FLICKER_SECONDS * 60.0 / float(self.cfg.policy_interval))
+            self._rep_sw_slot = np.zeros(self.N, dtype=np.int64)                # 슬롯별 전환·깜빡임 수 (rep_slot_counts)
+            self._rep_flick_slot = np.zeros(self.N, dtype=np.int64)
+        if self._th is not None:     # v3 위협 지표 (threats_stats)
+            self._th_catch = np.zeros(4, dtype=np.int64)    # 포획 수 [근접 추격, 원거리 추격, 잠행, 플레이어]
+            self._th_pounce = np.zeros(2, dtype=np.int64)   # [돌진 시작, 돌진 포획]
+            self._th_charge = 0                             # 플레이어 돌진 시작
 
     def _accumulate(self, a, rew, repro, caught, starved, done) -> None:
         self._rew_total += float(rew.sum())
@@ -1838,6 +2354,9 @@ class World:
         food_cell = self.food_cap[iy, ix] > 0.0
         code = ((((ph * 2 + full) * 2 + g["in_cover"]) * 3 + self.gait) * 2 + vig) * 2 + food_cell
         self._dn_hist += np.bincount(code, minlength=self._dn_hist.size).reshape(DN_HIST_SHAPE)
+        if self._rp is not None:        # v3: 휴식·먹기 열의 행동 기준 판 (daynight_stats)
+            code = (((ph * 2 + full) * 2 + g["in_cover"]) * 2 + food_cell) * rep.N_BEHAVIORS + self._rs.behavior
+            self._dn_rep += np.bincount(code, minlength=self._dn_rep.size).reshape(self._dn_rep.shape)
         dd = g["d_pred_min"] / cfg.see_r
         b = (dd < np.inf) * (1 + (dd >= B1_EDGES[0]) + (dd >= B1_EDGES[1]))
         code = (((vig * 3 + ph) * 3 + self.gait_cmd) * 4 + b) * 2 + full
@@ -1866,6 +2385,9 @@ class World:
         - p_stop_*·p_run_*·p_cover_*: 실제 정지·뛰기·결정 때 은신처 안 비율. p_stop_night_{hungry,full}: 밤의 배고픔별 정지
         - b1_*·b2_*: gait_stats 의 B1·B2 를 위상 구간 안에서 잰 값(명령 보행, 경계 개체는 뛰지 않음·정지에서 뺀다)
         - n2: P(경계 | 밤, 안 보임) − P(경계 | 낮, 안 보임) (2차). vigilance 를 끈 세계는 nan
+        repertoire(v3)를 켠 세계는 보행이 행동을 뜻하지 않으므로(FREEZE·HIDE·SLEEP 도 정지, 은신처 안 GRAZE 정지는 먹기다)
+        휴식·먹기 열을 행동 기준으로 센다: p_rest_cover_*·n1 = P(결정 때 은신처 안 & SLEEP), p_eat_*·n5p = P(먹이 셀 & GRAZE).
+        나머지 열(정지·뛰기·은신처 비율, B1·B2)은 실제 보행 그대로다.
         """
         nan = float("nan")
         H = self._dn_hist                                       # [위상, 배부름, 은신처, 보행, 경계, 먹이 셀]
@@ -1875,8 +2397,12 @@ class World:
 
         n_ph = H.reshape(3, -1).sum(1)
         n_all = int(n_ph.sum())
-        rest_cover = H[:, :, 1, GAIT_STOP, 0, :].sum((1, 2))
-        eat = H[:, :, :, :2, 0, 1].sum((2, 3))                  # [위상, 배부름] 먹이 셀 & 정지·걷기 & 비경계
+        if self._rp is None:
+            rest_cover = H[:, :, 1, GAIT_STOP, 0, :].sum((1, 2))
+            eat = H[:, :, :, :2, 0, 1].sum((2, 3))              # [위상, 배부름] 먹이 셀 & 정지·걷기 & 비경계
+        else:                                                   # [위상, 배부름, 은신처, 먹이 셀, 행동]
+            rest_cover = self._dn_rep[:, :, 1, :, rep.SLEEP].sum((1, 2))
+            eat = self._dn_rep[:, :, :, 1, rep.GRAZE].sum(2)
         n_pf = H.sum((2, 3, 4, 5))                               # [위상, 배부름]
         gait_ph = H.sum((1, 2, 4, 5))                            # [위상, 보행]
         cover_ph = H[:, :, 1].sum((1, 2, 3, 4))
@@ -1934,9 +2460,96 @@ class World:
     def pred_sleep_stats(self) -> dict:
         """v2.4s 포식자 잠 통계 — reset 뒤 누적. 열 순서는 `PSLEEP_STAT_COLUMNS`.
         pred_noct_frac: 이 세계의 야행성 비율 q, pred_noct_n: 야행성 포식자 수, pred_asleep_mean: 스텝 평균 자는 포식자 비율."""
-        out = dict(pred_noct_frac=float(self.pred_noct_frac), pred_noct_n=float(self.pred_nocturnal.sum()),
+        # v1 포식자만 센다(threats 의 플레이어 칸은 밤잠 배열에 야행성으로 들어 있다. 끈 세계는 M_base = M)
+        out = dict(pred_noct_frac=float(self.pred_noct_frac),
+                   pred_noct_n=float(self.pred_nocturnal[:self.M_base].sum()),
                    pred_asleep_mean=self._ps_asleep_sum / self._ps_steps if self._ps_steps else float("nan"))
         assert tuple(out) == PSLEEP_STAT_COLUMNS
+        return out
+
+    def _rep_accumulate(self, out: dict, caught: np.ndarray, starved: np.ndarray) -> None:
+        """v3 레퍼토리 지표를 센다. `step` 이 `_accumulate` 바로 뒤, 시간을 넘기기(tick)·어둠 갱신·관측 전에 부른다.
+
+        위상 구간은 결정 때 어둠(daynight_stats 와 같은 DN_EDGES), 위협 보임은 결정 관측의 포식자 수 > 0, 행동은 이번 스텝에
+        실행한 행동이다. 깜빡임 = 행동이 A → B 로 바뀐 뒤 FLICKER_SECONDS(3초 = 22스텝) 안에 B → A 로 되돌아온 전환.
+        """
+        d = self.dark
+        ph = 0 if d <= DN_EDGES[0] + DN_TOL else (2 if d >= DN_EDGES[1] - DN_TOL else 1)
+        b = self._rs.behavior.astype(np.int64)
+        seen = (self._g["pred_count"] > 0).astype(np.int64)
+        K = rep.N_BEHAVIORS
+        self._rep_hist[ph] += np.bincount(seen * K + b, minlength=2 * K).reshape(2, K)
+        self._rep_dead[0] += np.bincount(b[caught], minlength=K)
+        self._rep_dead[1] += np.bincount(b[starved], minlength=K)
+        sw = out["switch"]
+        self._rep_decide += int(np.count_nonzero(out["decide"]))
+        if sw.any():
+            i = np.flatnonzero(sw)
+            self._rep_switch += len(i)
+            t = self.t
+            flick = (b[i] == self._rep_before[i]) & (t - self._rep_last_sw[i] <= self._rep_flicker_w)
+            self._rep_flicker += int(np.count_nonzero(flick))
+            self._rep_sw_slot[i] += 1
+            self._rep_flick_slot[i[flick]] += 1
+            self._rep_before[i] = out["prev"][i]
+            self._rep_last_sw[i] = t
+
+    def rep_slot_counts(self) -> dict:
+        """슬롯별 행동 전환 수·깜빡임 수 (N,) int64 사본 — reset 뒤 누적, 같은 슬롯의 개체들을 합친다(repertoire_stats 의
+        switch·flicker 와 같은 정의라 합이 같다). 침입 시험이 침입·거주로 나눠 쓴다."""
+        if self._rp is None:
+            raise ValueError("rep_slot_counts 는 repertoire 를 켠 세계에만 있다")
+        return dict(switch=self._rep_sw_slot.copy(), flicker=self._rep_flick_slot.copy())
+
+    def repertoire_stats(self) -> dict:
+        """v3 레퍼토리 통계 — reset 뒤 누적. 열 순서는 `REP_STAT_COLUMNS`. 비율은 개체-스텝 기준, 분모가 0 이면 nan.
+
+        - use_<행동>: 행동 사용 비율. use_day_·use_night_: 낮(d ≤ 0.2)·밤(d ≥ 0.8) 구간 안의 비율,
+          use_seen_·use_unseen_: 결정 때 위협이 보인·안 보인 개체-스텝 안의 비율
+        - pred_rate_<행동>·starve_rate_<행동>: 그 행동 중에 죽은 수(피식·아사) / 그 행동의 개체-스텝
+        - seen_frac: 결정 때 위협이 보인 비율, switch_per_sec: 개체당 초당 행동 전환 수, flicker_rate: 전환 중 3초 안 A-B-A
+          되돌림 비율, decide_frac: 결정 시점(잠금 끝 또는 사건 결정)인 개체-스텝 비율
+        """
+        if self._rp is None:
+            raise ValueError("repertoire_stats 는 repertoire 를 켠 세계에만 있다")
+        H = self._rep_hist                                      # [위상, 보임, 행동]
+        n = int(H.sum())
+
+        def ratio(x, y):
+            return float(x) / float(y) if y else float("nan")
+
+        tot, day, night = H.sum((0, 1)), H[0].sum(0), H[2].sum(0)
+        seen, unseen = H[:, 1].sum(0), H[:, 0].sum(0)
+        out = {}
+        for pre, arr in (("use_", tot), ("use_day_", day), ("use_night_", night), ("use_seen_", seen),
+                         ("use_unseen_", unseen)):
+            for k, name in enumerate(rep.BEHAVIOR_NAMES):
+                out[pre + name] = ratio(arr[k], arr.sum())
+        for pre, row in (("pred_rate_", 0), ("starve_rate_", 1)):
+            for k, name in enumerate(rep.BEHAVIOR_NAMES):
+                out[pre + name] = ratio(self._rep_dead[row, k], tot[k])
+        per_sec = 60.0 / float(self.cfg.policy_interval)
+        out.update(seen_frac=ratio(seen.sum(), n), switch_per_sec=ratio(self._rep_switch, n) * per_sec,
+                   flicker_rate=ratio(self._rep_flicker, self._rep_switch), decide_frac=ratio(self._rep_decide, n))
+        assert tuple(out) == REP_STAT_COLUMNS
+        return out
+
+    def threats_stats(self) -> dict:
+        """v3 위협 통계 — reset 뒤 누적. 열 순서는 `THREAT_STAT_COLUMNS`.
+        p_stalk: 이 세계의 잠행형 비율(뽑은 값), stalker_n: 잠행형 수, player_present: 플레이어 유무(0/1),
+        catch_rate_*: 유형별 포획 수 / 개체-스텝(근접 추격·원거리 추격·잠행·플레이어), pounce_n: 돌진 시작 수,
+        pounce_hit: 돌진 중 포획 / 돌진 시작(없으면 nan), player_charge_n: 플레이어 돌진 시작 수."""
+        if self._th is None:
+            raise ValueError("threats_stats 는 threats 를 켠 세계에만 있다")
+        n = max(self.t * self.N, 1)
+        c, p = self._th_catch, self._th_pounce
+        out = dict(p_stalk=float(self.threat_p_stalk), stalker_n=float(np.count_nonzero(self.pred_type == PT_STALKER)),
+                   player_present=float(self.player_present),
+                   catch_rate_chaser=c[0] / n, catch_rate_ranged=c[1] / n, catch_rate_stalker=c[2] / n,
+                   catch_rate_player=c[3] / n, pounce_n=float(p[0]),
+                   pounce_hit=float(p[1]) / float(p[0]) if p[0] else float("nan"),
+                   player_charge_n=float(self._th_charge))
+        assert tuple(out) == THREAT_STAT_COLUMNS
         return out
 
     def stats(self) -> dict:
@@ -1953,6 +2566,14 @@ class World:
                 return float("nan")
             return float(np.abs(sum_a / n_a - sum_b / n_b).mean())
 
+        if self._rp is not None:
+            # repertoire(v3) 세계는 v1 조향 행동 열이 없어 cohesion_mean·flee_dist_mean·flee_dist_std·react_pred·react_hunger 가
+            # nan 이다(0 이 실측처럼 보이지 않게. 행동 분포는 repertoire_stats). 열 순서는 v1 과 같다
+            nan = float("nan")
+            return dict(mean_return=self._rew_total / n, survival=lives / max(n_lives, 1),
+                        repro=self._repro_total / n, predation_rate=self._pred_deaths / (steps * n),
+                        cohesion_mean=nan, flee_dist_mean=nan, flee_dist_std=nan,
+                        cover_frac=self._cover_steps / agent_steps, react_pred=nan, react_hunger=nan)
         return dict(
             mean_return=self._rew_total / n,
             survival=lives / max(n_lives, 1),

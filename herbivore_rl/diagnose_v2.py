@@ -609,7 +609,7 @@ def base_spec(args, names=None) -> dict | None:
                              "(Utility v2 는 아직 없다, 계획서 4.8)")
         return {"kind": "utility"}
     if args.policy == "random":
-        return adapt_spec({"kind": "random", "seed": 0}, len(names))
+        return adapt_spec({"kind": "random", "seed": 0}, len(names), names)
     if args.policy == "fixed":
         if not args.action or len(args.action) != len(names):
             raise SystemExit(f"--policy fixed 는 --action 값 {len(names)}개가 필요하다 ({names})")

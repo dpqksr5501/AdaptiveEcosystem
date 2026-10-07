@@ -79,6 +79,11 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
           --labels "v2.1 학습 정책 (우연히 창 안에서 멈출 때만 돌아봄)" "S2 규칙 장면: v2.1 + 창 규칙" --seed 10000 --steps 1800 \
           --stride 2 --png 900 --caption "S2 는 학습이 아니라 규칙이다: 포식자를 놓친 뒤 약 13스텝(창) 안이면 멈춰 위협 쪽을 돌아본다 · 같은 모델 s34(K24), 같은 시드" \
           --out results/v2/replay_stage1_s2.mp4
+- 행동 레퍼토리 (v3 R0, repertoire): 점 색이 보행 대신 행동(`World.behavior`: 먹기 초록, 도주 주황, 숨기 파랑, 얼기 흰색,
+  잠 보라)이고 얼기 '!'·잠 'z' 글리프를 붙인다. 하단은 행동 비율을 쌓는다. 설명줄에 잠금·장치 값 한 줄을 더 적는다. threats 를
+  켠 세계는 잠행-돌진 포식자를 주황 X, 플레이어형 위협을 하늘색 별로 그린다. 정책 `behavior:<행동>` 은 모든 개체가 늘 그 행동을
+  요청한다(인자 예: --config configs/v3_r0_on.yaml --compare behavior:graze behavior:freeze --steps 600).
+  repertoire·threats 를 끈 설정은 이 표시가 하나도 없고 그림이 앞 버전과 같다.
 - 모든 초식에 짧은 heading 화살표. 리스폰 직후 몇 프레임은 흐리게 그린다(순간이동 착시 방지).
 - 하단 시계열: 보행 비율(정지/걷기/뛰기), 경계 비율, 지역 기억, 포획 누적. 게임 시각 mm:ss.
 - `--compare` 는 같은 시드·같은 카메라로 정책 여러 개를 나란히 그린다. 칸들은 x축과
@@ -104,6 +109,8 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
 | `looked` | (N,) bool | v2.2r (구현) | 스텝 뒤 | 반사 돌아보기: 하늘색 테두리, 짧은 시선선, 돌아보기 비율 (시야는 기본 부채꼴) |
 | `region_id`, `region_mem` | (gw,gw) int, (R,) | v2.3 | 스텝 전 | 지역 배경 반투명 빨강, m_A·m_B 시계열 |
 | `boldness` | (N,) | v2.4 | 스텝 전 | 대담함 최대·최소 개체 2마리 궤적 |
+| `behavior`, `beh_phase` | (N,) int | v3 repertoire (구현) | 스텝 뒤 | 점 색 = 행동(먹기·도주·숨기·얼기·잠), 얼기 '!'·잠 'z' 글리프, 하단 행동 비율. repertoire 를 켠 세계만 읽는다 |
+| `pred_type` | (M,) int | v3 threats (구현) | 스텝 전 | 잠행-돌진 포식자 주황 X, 플레이어 하늘색 별. threats 를 켠 세계만 읽는다 |
 
 `gait`·`vel` 이 모두 없으면(v1·v2.0) 같은 관측으로 조향식을 다시 계산해 속력을 얻는다.
 "스텝 뒤" 값은 이번 스텝 행동이 적용된 상태다. 보행·경계·시선을 같은 스텝에서 읽어 서로
@@ -186,6 +193,13 @@ TRAMPLE_CAP = 0.2            # cap0 가 이보다 작은 패치 가장자리는 
 HALF_COLORS = ("#f0a35e", "#6fb8ff")      # 맵 왼쪽·오른쪽 절반 (라벨, 하단 V/cap0·F/cap0)
 HALF_NAMES = ("왼쪽", "오른쪽")
 CONTROL_COLOR = "#bbbbbb"    # 부재 시험 대조(교란 없는 같은 시드)의 왼쪽 V/cap0
+# v3 행동 레퍼토리(repertoire 훅): 행동 번호 순(0 GRAZE, 1 FLEE, 2 HIDE, 3 FREEZE, 4 SLEEP) 이름·점 색, 글리프(! 얼기, z 잠)
+BEH_NAMES = ("먹기", "도주", "숨기", "얼기", "잠")
+BEH_COLORS = ("#4cd964", "#ff9500", "#5f7cff", "#ffffff", "#c58bff")
+BEH_RGBA = np.array([to_rgba(c) for c in BEH_COLORS])
+BEH_GLYPHS = {3: "$!$", 4: "$z$"}
+STALKER_COLOR = "#ffb020"    # threats 잠행-돌진형 포식자
+PLAYER_COLOR = "#00e5ff"     # threats 플레이어형 위협
 
 
 def _use_korean_font() -> None:
@@ -425,6 +439,7 @@ def parse_spec(text: str) -> dict:
 
     `learned:<zip>`, `fixed:a,b,c,d[,s[,v]]`, `utility`, `utility:default`, `random:<seed>`,
     `perm:<바탕 스펙>` (C1′ 행동 순열, 예: `perm:learned:ckpt/final.zip`),
+    `behavior:<행동>` (v3 repertoire 세계: 모든 개체가 늘 그 행동을 요청한다. 이름 graze·flee·hide·freeze·sleep 또는 번호 0~4),
     또는 JSON 딕셔너리 문자열 (래퍼 꼴 `{"policy": ..., "wrap": [...]}` 포함).
     fixed 는 v1 행동 4개 이상을 받는다. 세계의 행동 수와 맞는지는 `fit_spec` 이 설정을 읽은 뒤 본다.
     """
@@ -448,13 +463,19 @@ def parse_spec(text: str) -> dict:
         return {"kind": "utility", "params": "default"} if arg == "default" else {"kind": "utility"}
     if kind == "random":
         return {"kind": "random", "seed": int(arg) if arg else 0}
+    if kind == "behavior":
+        names = ("graze", "flee", "hide", "freeze", "sleep")       # env_v2.repertoire.BEHAVIOR_NAMES 순서
+        a = arg.strip().lower()
+        if a not in names and a not in {str(i) for i in range(len(names))}:
+            raise ValueError(f"behavior 는 {', '.join(names)} 또는 0~4 다: {text!r}")
+        return {"kind": "fixed", "action": [float(names.index(a) if a in names else int(a))]}
     raise ValueError(f"알 수 없는 정책 스펙: {text!r}")
 
 
 def fit_spec(spec: dict, act_dim: int, act_names=()) -> dict:
     """스펙을 행동 `act_dim` 개 세계에 맞춘다(`env_v2.rollout.adapt_spec`: random 의 행동 수). fixed 길이가 다르거나
     Utility(행동 4개)를 행동 수가 다른 세계에 쓰면 ValueError 다. 래퍼 안쪽 바탕 정책도 본다."""
-    spec = adapt_spec(spec, act_dim)
+    spec = adapt_spec(spec, act_dim, act_names)
     base = spec
     while "policy" in base:
         base = base["policy"]
@@ -512,9 +533,11 @@ def _hook(world, name: str):
 
 
 def _snapshot(world: World, tracker: RespawnTracker, t: int) -> dict:
-    """스텝 전 상태 중 그릴 것만 복사한다."""
+    """스텝 전 상태 중 그릴 것만 복사한다. v3 threats 세계만 포식자 유형(`pred_type`)을 더 읽는다."""
     food_v = _hook(world, "food_v")
+    extra = {} if getattr(world, "_th", None) is None else dict(pred_type=world.pred_type.copy())
     return dict(
+        **extra,
         t=t,
         pos=world.pos.copy(),
         head=world.head.copy(),
@@ -534,13 +557,17 @@ def _snapshot(world: World, tracker: RespawnTracker, t: int) -> dict:
 
 def _applied(world: World, v_pre: np.ndarray | None) -> dict:
     """스텝 뒤에 읽는 값: 이번 스텝에 적용된 보행·경계·시선. 같은 스텝이라 서로 어긋나지 않는다.
-    경계 행동 열이 없는 세계(v2.2r T1·L, vigil_window.action false)는 경계 훅을 None 으로 둔다(경계 범례·비율을 그리지 않는다)."""
-    return dict(
+    경계 행동 열이 없는 세계(v2.2r T1·L, vigil_window.action false)는 경계 훅을 None 으로 둔다(경계 범례·비율을 그리지 않는다).
+    v3 repertoire 를 켠 세계만 행동 훅(`World.behavior`·`beh_phase`)을 더 읽는다(끈 세계의 프레임은 예전과 같다)."""
+    out = dict(
         gait=applied_gait(world, v_pre),
         vig=None if (getattr(world, "_vw", None) or {}).get("action", True) is False else _hook(world, "vigilant"),
         gaze=_hook(world, "gaze"),
         look=_hook(world, "looked"),
     )
+    if getattr(world, "_rp", None) is not None:
+        out.update(beh=_hook(world, "behavior"), beh_phase=_hook(world, "beh_phase"))
+    return out
 
 
 def collect(world: World, policy, steps: int, stride: int, fade_frames: int = 6) -> list:
@@ -577,7 +604,14 @@ def series(frames: list) -> dict:
     if frames[0].get("fstats") is not None:
         arr = np.array([_food_row(f["fstats"]) for f in frames], dtype=np.float64)
         food = {key: arr[:, j] for j, key in enumerate(FOOD_KEYS)}
+    if frames[0].get("beh") is not None:      # v3: 행동 비율 (F,5)
+        beh = np.stack([np.bincount(np.asarray(f["beh"], dtype=np.int64), minlength=len(BEH_NAMES))[:len(BEH_NAMES)]
+                        / max(len(f["beh"]), 1) for f in frames])
+        extra = dict(beh=beh)
+    else:
+        extra = {}
     return dict(
+        **extra,
         t=np.array([f["t"] for f in frames]),
         gait=gait,
         vig=vig,
@@ -767,6 +801,18 @@ class _Panel:
                                 edgecolors="white", linewidths=0.8, zorder=5)
         self.ranged = ax.scatter([], [], marker="x", c="#ff7a7a", s=100, linewidths=2.2, zorder=5)
         self.ranged_mask = w.pred_ranged.copy()
+        # v3 threats: 잠행형은 주황 X, 플레이어는 하늘색 별. 행동 레퍼토리: 얼기 '!'·잠 'z' 글리프
+        self.ptype = f0.get("pred_type")
+        self.stalker = self.player = None
+        if self.ptype is not None:
+            self.stalker = ax.scatter([], [], marker="X", c=STALKER_COLOR, s=150, edgecolors="white", linewidths=0.8,
+                                      zorder=5)
+            self.player = ax.scatter([], [], marker="*", c=PLAYER_COLOR, s=320, edgecolors="black", linewidths=0.8,
+                                     zorder=5.5)
+        self.glyphs = {}
+        if f0.get("beh") is not None:
+            for b, mk in BEH_GLYPHS.items():
+                self.glyphs[b] = ax.scatter([], [], marker=mk, c=BEH_COLORS[b], s=60, zorder=4.5)
         self.status = ax.text(
             0.01, 0.99, "", transform=ax.transAxes, ha="left", va="top", color="white",
             fontsize=9, family="monospace", zorder=6,
@@ -791,7 +837,10 @@ class _Panel:
         x = s["t"] * self.step_sec
         ax = self.ser_ax = fig.add_axes(rect)
         ax.set_facecolor("#1a1a1a")
-        ax.stackplot(x, s["gait"].T, colors=GAIT_COLORS, alpha=0.85, linewidth=0)
+        if "beh" in s:                  # v3: 행동 비율을 보행 대신 쌓는다
+            ax.stackplot(x, s["beh"].T, colors=BEH_COLORS, alpha=0.85, linewidth=0)
+        else:
+            ax.stackplot(x, s["gait"].T, colors=GAIT_COLORS, alpha=0.85, linewidth=0)
         if np.isfinite(s["vig"]).any():
             ax.plot(x, s["vig"], color=VIG_LINE_COLOR, lw=1.3)
         if np.isfinite(s["look"]).any():
@@ -873,8 +922,11 @@ class _Panel:
         if self.mem_im is not None and f["mem"] is not None:
             self.mem_im.set_data(self._mem_rgba(f["mem"]))
 
-        face = GAIT_RGBA[f["gait"]]
+        face = GAIT_RGBA[f["gait"]] if f.get("beh") is None else BEH_RGBA[np.asarray(f["beh"], dtype=np.int64)]
         face[:, 3] = alpha
+        for b, sc in self.glyphs.items():   # v3: 얼기·잠 글리프를 점 옆에
+            m = np.asarray(f["beh"]) == b
+            sc.set_offsets(pos[m] + np.array([1.1, 1.1]) if m.any() else np.empty((0, 2)))
         vig = _vig_mask(f)
         look = _look_mask(f) & ~vig
         edge = np.where(vig[:, None], (1.0, 1.0, 1.0, 1.0), (0.0, 0.0, 0.0, 1.0))
@@ -904,8 +956,14 @@ class _Panel:
                 line.set_data(tr[:, 0], tr[:, 1])
 
         m = ~self.ranged_mask
+        if self.ptype is not None:          # v3 threats: 잠행형·플레이어를 따로 그린다(나머지는 앞 버전 그대로)
+            pt = np.asarray(f["pred_type"])
+            st, pl = pt == 1, pt == 2
+            self.stalker.set_offsets(f["pred"][st] if st.any() else np.empty((0, 2)))
+            self.player.set_offsets(f["pred"][pl] if pl.any() else np.empty((0, 2)))
+            m = m & ~st & ~pl
         self.melee.set_offsets(f["pred"][m] if m.any() else np.empty((0, 2)))
-        self.ranged.set_offsets(f["pred"][~m] if (~m).any() else np.empty((0, 2)))
+        self.ranged.set_offsets(f["pred"][self.ranged_mask] if self.ranged_mask.any() else np.empty((0, 2)))
         for k, wd in enumerate(self.wedges):
             ang = float(np.degrees(np.arctan2(f["pred_head"][k, 1], f["pred_head"][k, 0])))
             wd.set_center(tuple(f["pred"][k]))
@@ -918,6 +976,9 @@ class _Panel:
         vig_s = "" if f["vig"] is None else f"vig {float(np.mean(vig)) * 100:3.0f}%  "
         if f.get("look") is not None:
             vig_s += f"look {float(np.mean(look)) * 100:3.0f}%  "
+        if f.get("beh") is not None:        # v3: 행동 비율 (G F H Z S = 먹기·도주·숨기·얼기·잠)
+            bf = np.bincount(np.asarray(f["beh"], dtype=np.int64), minlength=5)[:5] / max(len(f["beh"]), 1)
+            vig_s += "G{:.0f} F{:.0f} H{:.0f} Z{:.0f} S{:.0f}%  ".format(*(bf * 100))
         self.status.set_text(
             f"{fmt_clock(sec)}  step {f['t']:5d}  run {run_frac*100:3.0f}%  {vig_s}"
             f"caught {f['caught']:4d}  starved {f['starved']:3d}"
@@ -958,8 +1019,11 @@ def _n_regions(runs: list) -> int:
 def _legend_handles(runs: list, fov_herbs: int = 0, fov_preds: int = 0) -> list:
     """범례: 보행 3색, 리스폰, 포식자, 은신처, 시야, 하단 선, 훅이 있으면 경계·궤적·지역별 기억·먹이 상태."""
     dot = dict(marker="o", ls="none", markersize=7, markeredgecolor="black")
-    h = [Line2D([], [], color=c, label=n, markerfacecolor=c, **dot)
-         for n, c in zip(GAIT_NAMES, GAIT_COLORS)]
+    if any(r.frames[0].get("beh") is not None for r in runs):     # v3: 점 색 = 행동
+        h = [Line2D([], [], color=c, label=n, markerfacecolor=c, **dot) for n, c in zip(BEH_NAMES, BEH_COLORS)]
+    else:
+        h = [Line2D([], [], color=c, label=n, markerfacecolor=c, **dot)
+             for n, c in zip(GAIT_NAMES, GAIT_COLORS)]
     h.append(Line2D([], [], label="리스폰 직후(흐림)", markerfacecolor=(1.0, 0.58, 0.0, DIM_ALPHA),
                     **dot))
     has = {k: any(r.frames[0].get(k) is not None for r in runs) for k in ("vig", "bold", "food_v", "look")}
@@ -974,6 +1038,11 @@ def _legend_handles(runs: list, fov_herbs: int = 0, fov_preds: int = 0) -> list:
                     markerfacecolor="#ff2d2d", markeredgecolor="white"))
     h.append(Line2D([], [], label="원거리 포식자", marker="x", ls="none", markersize=8,
                     color="#ff7a7a", markeredgewidth=2))
+    if any(r.frames[0].get("pred_type") is not None for r in runs):     # v3 threats
+        h.append(Line2D([], [], label="잠행-돌진 포식자", marker="X", ls="none", markersize=9,
+                        markerfacecolor=STALKER_COLOR, markeredgecolor="white"))
+        h.append(Line2D([], [], label="플레이어(위협)", marker="*", ls="none", markersize=12,
+                        markerfacecolor=PLAYER_COLOR, markeredgecolor="black"))
     h.append(Line2D([], [], label="은신처", marker="o", ls="none", markersize=9,
                     markerfacecolor="black", markeredgecolor="#5566aa"))
     if has["food_v"]:
@@ -1093,6 +1162,17 @@ def food_line(runs: list) -> str | None:
     )
 
 
+def rep_line(runs: list) -> str | None:
+    """v3 설명줄: 행동 레퍼토리 장치 값(yaml). repertoire 를 끈 설정이면 None (그림이 앞 버전과 같다)."""
+    rp = getattr(runs[0].world, "_rp", None)
+    if rp is None:
+        return None
+    return (f"점 색 = World.behavior (! 얼기, z 잠) | 잠금 먹기 {rp['lock_graze']}·도주 {rp['lock_flee']}·얼기 "
+            f"{rp['lock_freeze']}·숨기 도착+{rp['lock_hide']}·잠 {rp['sleep_enter']}+{rp['sleep_hold']}+{rp['sleep_wake']} | "
+            f"정지 탐지 ×{rp['c_still']:g} · 웅크림 은신 ×{rp['cover_mult_crouch']:g} · 먹기 고개 숙임 시야 "
+            f"×{rp['graze_head_down']:g} · 놀람 {rp['startle_steps']}스텝")
+
+
 LINE_IN = 8.5 * 1.4 / 72     # 설명줄 한 줄 높이(인치): 글자 8.5pt × 줄 간격 1.4
 LEGEND_ROW_IN = 0.21         # 범례 한 줄 높이(인치, 대략)
 
@@ -1127,7 +1207,7 @@ def build_figure(runs: list, fps: int = 30, dpi: int = 100, fov_preds: int = 2,
     )
     sep = " | " if len(runs) > 1 else "\n"
     info = world_line + sep + time_line
-    extra = [x for x in (speed_line(runs), vigil_line(runs), food_line(runs)) if x is not None]
+    extra = [x for x in (speed_line(runs), vigil_line(runs), food_line(runs), rep_line(runs)) if x is not None]
     for line in extra:
         info += "\n" + line
     # 설명줄(아래) → 자막 → 범례 순으로 쌓는다. 늘어난 만큼 아래 여백을 키운다.
