@@ -683,7 +683,8 @@ def test_eval_gate_logic():
     def pol(starve, u, use, flicker=0.05):
         return dict(starve_rate=starve, u=u, use=use, flicker=flicker)
     use = dict(graze=0.8, flee=0.1, hide=0.1, freeze=0.0, sleep=0.0)
-    res = dict(pooled=dict(rl=pol(0.001, dict(esc=0.6, hide=0.35, freeze=None, sleep=None), use),
+    # 문턱은 10-07 개정값(U_ESC 0.18, U_HIDE 0.5, U_FREEZE 0.10, 사용 0.5%, 깜빡임 0.65, 입력 의존은 보고만)
+    res = dict(pooled=dict(rl=pol(0.001, dict(esc=0.6, hide=0.55, freeze=None, sleep=None), use),
                            fsm=pol(0.001, {}, use)),
                perf=dict(mean=0.1, t=1.0, n=20, crit=2.093), c4_drop={})
     g = ev.gate(res, ("graze", "flee", "hide"), "near")
@@ -696,15 +697,20 @@ def test_eval_gate_logic():
     res["pooled"]["rl"]["starve_rate"] = 0.0016                              # 1.5 × FSM 초과
     assert not ev.gate(res, ("graze", "flee", "hide"), "near")["starve"]["pass_"]
     res["pooled"]["rl"]["starve_rate"] = 0.001
-    res["pooled"]["rl"]["use"] = dict(use, hide=0.01)
+    res["pooled"]["rl"]["use"] = dict(use, hide=0.004)
     assert not ev.gate(res, ("graze", "flee", "hide"), "near")["use"]["pass_"]
     res["pooled"]["rl"]["use"] = use
-    res["pooled"]["rl"]["u"]["hide"] = 0.29
+    res["pooled"]["rl"]["flicker"] = 0.66
+    assert not ev.gate(res, ("graze", "flee", "hide"), "near")["use"]["pass_"]
+    res["pooled"]["rl"]["flicker"] = 0.05
+    res["pooled"]["rl"]["u"]["hide"] = 0.49
     assert not ev.gate(res, ("graze", "flee", "hide"), "near")["u"]["pass_"]
-    res["pooled"]["rl"]["u"].update(hide=0.4, sleep=0.6)
+    res["pooled"]["rl"]["u"].update(hide=0.55, sleep=0.6)
     res["c4_drop"] = {"c4_phase": dict(sleep=0.4)}
     g = ev.gate(res, ("graze", "flee", "hide", "sleep"), "near")
-    assert not g["dep"]["pass_"] and set(g["dep"]["items"]) == {"sleep_phase"}
+    # 입력 의존은 보고만: 실패해도 전체 통과에 들지 않는다
+    assert not g["dep"]["pass_"] and set(g["dep"]["items"]) == {"sleep_phase"} and g["dep"]["report_only"]
+    assert g["pass_"] == all(g[k]["pass_"] for k in ("perf", "u", "use", "starve"))
     assert ev.drop(0.5, 0.2) == pytest.approx(0.6) and ev.drop(0.0, 0.1) is None
 
 

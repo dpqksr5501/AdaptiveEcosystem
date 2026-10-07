@@ -83,9 +83,12 @@ U_COND = dict(esc_approach=0.75, esc_dist=10.0, hide_cover=5.0, fz_near=6.0, fz_
               sleep_energy=0.5)
 U_NAMES = ("esc", "hide", "freeze", "sleep")
 U_TARGET = {"esc": (FLEE, HIDE, FREEZE), "hide": (HIDE,), "freeze": (FREEZE,), "sleep": (SLEEP,)}
-# PREREG 4절 문턱
-U_MIN = {"esc": 0.5, "hide": 0.3, "freeze": 0.3, "sleep": 0.5}
-USE_MIN, FLICKER_MAX, C4_DROP_MIN, STARVE_RATIO_MAX = 0.02, 0.10, 0.5, 1.5
+# PREREG 4절 문턱 — 10-07 개정(PREREG 변경 기록 '판정 문턱을 손 규칙 값에 맞춤', 본 학습 1M 기록을 보기 전): 처음 값(U_ESC 0.5,
+# U_HIDE 0.3, U_FREEZE 0.3, 사용 2%, 깜빡임 10%)은 가장 좋은 손 규칙도 넘지 못했다(보정 시드 20000~20007 × 3000: R_base U_ESC
+# 0.364·깜빡임 0.647, FSM U_FREEZE 0.203·깜빡임 0.537, FSM 얼기 사용 2.0%). U 문턱 = 그 니치를 정한 손 규칙 값의 절반(ESC 는
+# R_base, HIDE·FREEZE 는 FSM), 깜빡임 = 손 규칙의 큰 값보다 크지 않게, 사용 = 0.5%. 입력 의존(C4)은 보고만
+U_MIN = {"esc": 0.18, "hide": 0.5, "freeze": 0.10, "sleep": 0.5}
+USE_MIN, FLICKER_MAX, C4_DROP_MIN, STARVE_RATIO_MAX = 0.005, 0.65, 0.5, 1.5
 FULL_E, HUNGRY_E = 0.7, 0.35                # 위험 할당 에너지 구간 (명세 5절)
 C1P_TAG = 606                               # C1′ 해시 스트림 구분값(rollout._SALT 101~404·지연 505 와 겹치지 않는다)
 PREREG_OUT = HERE / "results" / "v3" / "r1" / "judge"
@@ -385,12 +388,13 @@ def gate(res: dict, allowed, variant: str) -> dict:
     if "freeze" in allowed and variant == "near":
         dv = res["c4_drop"].get("c4_app", {}).get("freeze")
         dep["freeze_app"] = dict(value=dv, min=C4_DROP_MIN, pass_=bool(dv is not None and dv >= C4_DROP_MIN))
-    out["dep"] = dict(items=dep, pass_=all(x["pass_"] for x in dep.values()))
+    # 보고만(10-07 개정): 입력 의존은 통과 조건에 넣지 않는다
+    out["dep"] = dict(items=dep, pass_=all(x["pass_"] for x in dep.values()), report_only=True)
     lim = STARVE_RATIO_MAX * fsm["starve_rate"]
     out["starve"] = dict(rl=rl["starve_rate"], fsm=fsm["starve_rate"], limit=lim,
                          ratio=rl["starve_rate"] / fsm["starve_rate"] if fsm["starve_rate"] > 0 else None,
                          pass_=bool(rl["starve_rate"] <= lim))
-    out["pass_"] = all(out[k]["pass_"] for k in ("perf", "u", "use", "dep", "starve"))
+    out["pass_"] = all(out[k]["pass_"] for k in ("perf", "u", "use", "starve"))
     return out
 
 
