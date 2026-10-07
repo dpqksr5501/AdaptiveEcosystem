@@ -110,6 +110,7 @@ v1 `replay.py` 를 참고했지만 그 파일은 건드리지 않는다.
 | `region_id`, `region_mem` | (gw,gw) int, (R,) | v2.3 | 스텝 전 | 지역 배경 반투명 빨강, m_A·m_B 시계열 |
 | `boldness` | (N,) | v2.4 | 스텝 전 | 대담함 최대·최소 개체 2마리 궤적 |
 | `behavior`, `beh_phase` | (N,) int | v3 repertoire (구현) | 스텝 뒤 | 점 색 = 행동(먹기·도주·숨기·얼기·잠), 얼기 '!'·잠 'z' 글리프, 하단 행동 비율. repertoire 를 켠 세계만 읽는다 |
+| `beh_steps`, `beh_seq` | (N,) int | v3 R1 (구현) | 스텝 뒤 | 그리지 않고 프레임에만 남긴다(언리얼 애니메이션 상태 넷 = behavior·phase·steps_in·seq, R1 명세 6절) |
 | `pred_type` | (M,) int | v3 threats (구현) | 스텝 전 | 잠행-돌진 포식자 주황 X, 플레이어 하늘색 별. threats 를 켠 세계만 읽는다 |
 
 `gait`·`vel` 이 모두 없으면(v1·v2.0) 같은 관측으로 조향식을 다시 계산해 속력을 얻는다.
@@ -144,7 +145,7 @@ from matplotlib.ticker import FuncFormatter, MultipleLocator  # noqa: E402
 
 from env_v2.config import load_v2_config  # noqa: E402
 from env_v2.features import features_of  # noqa: E402
-from env_v2.rollout import adapt_spec, build_policy, forward_done  # noqa: E402
+from env_v2.rollout import adapt_spec, build_policy, forward_bind, forward_done  # noqa: E402
 from env_v2.steering import steer  # noqa: E402
 from env_v2.world import ACT_DIM, World  # noqa: E402
 
@@ -558,7 +559,8 @@ def _snapshot(world: World, tracker: RespawnTracker, t: int) -> dict:
 def _applied(world: World, v_pre: np.ndarray | None) -> dict:
     """스텝 뒤에 읽는 값: 이번 스텝에 적용된 보행·경계·시선. 같은 스텝이라 서로 어긋나지 않는다.
     경계 행동 열이 없는 세계(v2.2r T1·L, vigil_window.action false)는 경계 훅을 None 으로 둔다(경계 범례·비율을 그리지 않는다).
-    v3 repertoire 를 켠 세계만 행동 훅(`World.behavior`·`beh_phase`)을 더 읽는다(끈 세계의 프레임은 예전과 같다)."""
+    v3 repertoire 를 켠 세계만 행동 훅(`World.behavior`·`beh_phase`)을 더 읽는다(끈 세계의 프레임은 예전과 같다).
+    v3 R1 명세 6절: 애니메이션 상태 넷을 모두 남기도록 `beh_steps`·`beh_seq` 도 프레임에 둔다(그리지는 않는다)."""
     out = dict(
         gait=applied_gait(world, v_pre),
         vig=None if (getattr(world, "_vw", None) or {}).get("action", True) is False else _hook(world, "vigilant"),
@@ -566,7 +568,8 @@ def _applied(world: World, v_pre: np.ndarray | None) -> dict:
         look=_hook(world, "looked"),
     )
     if getattr(world, "_rp", None) is not None:
-        out.update(beh=_hook(world, "behavior"), beh_phase=_hook(world, "beh_phase"))
+        out.update(beh=_hook(world, "behavior"), beh_phase=_hook(world, "beh_phase"),
+                   beh_steps=_hook(world, "beh_steps"), beh_seq=_hook(world, "beh_seq"))
     return out
 
 
@@ -648,8 +651,12 @@ def run_policy(cfg, spec: dict, seed: int, steps: int, stride: int, label: str |
     if overgraze is not None:
         overgraze_left(world, overgraze)
         if control:
-            ctl = food_series(World(cfg, seeds=[seed]), build_policy(spec, seed), steps, stride)
-    frames = collect(world, build_policy(spec, seed), steps, stride, fade_frames)
+            w_ctl, p_ctl = World(cfg, seeds=[seed]), build_policy(spec, seed)
+            forward_bind(p_ctl, w_ctl)          # 세계 연결 훅(v3 R1 rep_learned) — rollout 과 같다
+            ctl = food_series(w_ctl, p_ctl, steps, stride)
+    pol = build_policy(spec, seed)
+    forward_bind(pol, world)
+    frames = collect(world, pol, steps, stride, fade_frames)
     return Run(label or spec_label(spec), world, frames, world.stats(), overgraze, ctl)
 
 

@@ -17,6 +17,13 @@ v1 에 없는 것:
   상태를 저장하지 않고 C++ 로 그대로 옮길 수 있다. 리스폰은 `observe_done` 훅으로 정책에 알린다(아래 롤아웃).
 - **리스폰 훅.** 정책(래퍼 포함)에 `observe_done(done)` 이 있으면 `rollout` 이 `w.step` 뒤마다 그 스텝의 사망(=리스폰)
   배열로 부른다. 결정·확률 모드 정책에는 없어 지금까지와 같은 값이 나온다.
+- **세계 연결 훅.** 정책(래퍼 포함)에 `bind_world(w)` 가 있으면 `rollout` 이 World 를 만든 직후 한 번 부른다(`forward_bind`).
+  래퍼는 `observe_done` 처럼 바탕 정책으로 넘긴다. v3 R1 학습 정책(`rep_learned`)이 이 훅으로 세계를 받아 마스크(결정 미리
+  보기 `World.rep_peek` + 지금 관측의 가능 조건)를 만든다. 훅이 없는 정책은 지금까지와 같다.
+- **v3 R1 학습 정책** (`{"kind": "rep_learned", "path": "ckpt/v3/....zip"}`, 명세 RL_V3_R1_SPEC.md 2·3절): RepertoirePolicy
+  모델(env_v2/rep_policy.py)을 싣고 매 스텝 마스크 로짓의 argmax(동점이면 낮은 번호)로 행동 번호를 낸다. 마스크는 연결한
+  세계의 참 상태(지금 관측·미리 보기)로 만들고, 망에는 받은 관측을 넣는다 — C4 의 `obs_fix` 래퍼는 망 입력만 바꾼다.
+  모델의 허용 행동(`rep_allowed`)·관측 이름(`rep_obs_names`)이 세계와 맞는지 연결 때 본다.
 - **앞부분 제외.** `head` 를 주면 G_γ 평균에서 롤아웃 앞 `head` 스텝(리셋 과도기)도 뺀다 (6.1-4, 기본 0).
 - **행동·관측 수는 세계를 따른다** (`World.act_dim`: v1 4, speed 를 켜면 5, vigilance 까지 켜면 6.
   `World.obs_dim`: v1 7, vigilance 를 켜면 8, v2.1 + daynight 9). 래퍼·확률 모드는 차원과 무관하다.
@@ -173,7 +180,24 @@ def forward_done(policy, done) -> None:
         hook(done)
 
 
-class ActFix:
+def forward_bind(policy, world) -> None:
+    """`policy` 에 세계 연결 훅(`bind_world`)이 있으면 부른다. 없으면 아무것도 하지 않는다."""
+    hook = getattr(policy, "bind_world", None)
+    if hook is not None:
+        hook(world)
+
+
+class _Hooks:
+    """내장 래퍼의 훅 넘기기: 리스폰 훅·세계 연결 훅을 바탕 정책(`self.base`)으로 넘긴다."""
+
+    def observe_done(self, done):
+        forward_done(self.base, done)
+
+    def bind_world(self, world):
+        forward_bind(self.base, world)
+
+
+class ActFix(_Hooks):
     """행동 차원 `dims` 를 상수로 고정한다. `values` 는 행동 전체 길이(세계의 act_dim) 벡터다 (C3-k)."""
 
     def __init__(self, base, dims, values):
@@ -186,11 +210,8 @@ class ActFix:
             a[:, self.dims] = self.values[self.dims]
         return a
 
-    def observe_done(self, done):
-        forward_done(self.base, done)
 
-
-class ActPermute:
+class ActPermute(_Hooks):
     """같은 스텝에서 개체끼리 행동 벡터를 통째로 섞는다 (C1′).
 
     스텝마다 행동 분포(합·빈도)는 그대로고 개체와 행동의 대응만 끊긴다. RNG 는 시드로 정해진다.
@@ -204,11 +225,8 @@ class ActPermute:
         a = np.asarray(self.base(obs))
         return a[self.rng.permutation(len(a))]
 
-    def observe_done(self, done):
-        forward_done(self.base, done)
 
-
-class ObsFix:
+class ObsFix(_Hooks):
     """관측 열 `dims` 를 `values` 로 고정한 뒤 정책에 넣는다 (C4-j 고정). 원본 관측은 건드리지 않는다."""
 
     def __init__(self, base, dims, values):
@@ -222,11 +240,8 @@ class ObsFix:
         o[:, self.dims] = self.values
         return self.base(o)
 
-    def observe_done(self, done):
-        forward_done(self.base, done)
 
-
-class ObsPermute:
+class ObsPermute(_Hooks):
     """관측 열 `dims` 를 개체끼리 섞은 뒤 정책에 넣는다 (C4-j 순열). 여러 열이면 같은 순열로 함께 섞는다.
 
     모든 개체가 같은 값을 갖는 열(관측 5, 전역 피식 EMA)은 섞어도 바뀌지 않는다.
@@ -241,9 +256,6 @@ class ObsPermute:
         p = self.rng.permutation(len(o))
         o[:, self.dims] = o[p][:, self.dims]
         return self.base(o)
-
-    def observe_done(self, done):
-        forward_done(self.base, done)
 
 
 def n_segments(bins) -> int:
@@ -264,7 +276,7 @@ def segment_ids(obs: np.ndarray, bins) -> np.ndarray:
     return ids
 
 
-class SegConst:
+class SegConst(_Hooks):
     """구간별 상수 (C2-seg). 구간마다 `dims` 행동만 `table[구간]` 값을 쓰고 나머지는 바탕 정책 값을 쓴다.
 
     바탕 정책을 C2 상수(`{"kind": "fixed"}`)로 두면 계획서 5.0 의 C2-seg 가 된다.
@@ -280,12 +292,20 @@ class SegConst:
         a[:, self.dims] = self.table[segment_ids(obs, self.bins)]
         return a
 
-    def observe_done(self, done):
-        forward_done(self.base, done)
+
+class _DoneForward(_Hooks):
+    """리스폰 훅이 없는 외부 factory 래퍼를 감싸 훅(리스폰·세계 연결)을 바탕 정책으로 넘긴다. 행동은 래퍼 그대로다."""
+
+    def __init__(self, policy, base):
+        self.policy, self.base = policy, base
+
+    def __call__(self, obs):
+        return self.policy(obs)
 
 
-class _DoneForward:
-    """리스폰 훅이 없는 외부 factory 래퍼를 감싸 훅을 바탕 정책으로 넘긴다. 행동은 래퍼 그대로다."""
+class _BindForward:
+    """세계 연결 훅이 없는 외부 factory 래퍼를 감싸 `bind_world` 만 바탕 정책으로 넘긴다. 행동·리스폰 훅은 래퍼 그대로다
+    (래퍼에 리스폰 훅이 없으면 바탕으로 넘긴다)."""
 
     def __init__(self, policy, base):
         self.policy, self.base = policy, base
@@ -294,7 +314,26 @@ class _DoneForward:
         return self.policy(obs)
 
     def observe_done(self, done):
-        forward_done(self.base, done)
+        hook = getattr(self.policy, "observe_done", None)
+        if hook is not None:
+            hook(done)
+        else:
+            forward_done(self.base, done)
+
+    def bind_world(self, world):
+        forward_bind(self.base, world)
+
+
+def _binds(policy) -> bool:
+    """정책 사슬에 세계를 실제로 받는 정책(훅을 넘기기만 하는 내장 래퍼·껍질이 아닌 것, 예: rep_learned)이 있는가. 없으면
+    factory 래퍼에 세계 연결 껍질을 씌우지 않는다 — 기존 스펙의 정책 객체 구조가 그대로다."""
+    p = policy
+    for _ in range(256):
+        if isinstance(p, (_Hooks, _BindForward)):
+            p = p.base
+            continue
+        return getattr(p, "bind_world", None) is not None
+    return False
 
 
 def make_wrapper(w: dict, base, seed: int):
@@ -302,7 +341,7 @@ def make_wrapper(w: dict, base, seed: int):
 
     외부 factory 의 모양은 `f(base, spec, seed) -> 정책` 이다. 워커가 그 모듈을 직접 import 한다.
     factory 정책에 리스폰 훅(`observe_done`)이 없고 바탕 정책에 있으면(유지 표본 모드) 훅을 넘기는 껍질을 씌운다.
-    훅이 있는 factory 정책은 바탕으로 넘기는 일을 스스로 한다.
+    세계 연결 훅(`bind_world`)도 같다(바탕이 v3 R1 학습 정책일 때). 훅이 있는 factory 정책은 바탕으로 넘기는 일을 스스로 한다.
     """
     kind = w.get("kind")
     if kind == "act_fix":
@@ -320,6 +359,8 @@ def make_wrapper(w: dict, base, seed: int):
         pol = getattr(importlib.import_module(mod), attr)(base, w, seed)
         if getattr(pol, "observe_done", None) is None and getattr(base, "observe_done", None) is not None:
             pol = _DoneForward(pol, base)
+        if getattr(pol, "bind_world", None) is None and _binds(base):
+            pol = _BindForward(pol, base)
         return pol
     raise ValueError(f"알 수 없는 래퍼: {w!r}")
 
@@ -656,9 +697,58 @@ def _is_cm(spec: dict) -> bool:
     return _CM_FILES[path]
 
 
+class RepLearned:
+    """v3 R1 학습 정책(RepertoirePolicy 모델, `env_v2/rep_policy.py`)의 배포·판정 모드: 마스크 로짓의 argmax(동점이면 낮은
+    번호, 모드 0). 출력은 (N, 1) 행동 번호(float)다.
+
+    `bind_world(w)` 로 받은 세계의 참 상태로 매 호출 마스크를 만든다: m = 허용(모델의 rep_allowed) ∧ 가능(지금 세계 관측
+    `w.observe()`) ∧ 결정(`w.rep_peek()`). 망에는 호출에 받은 관측을 넣는다 — C4 `obs_fix` 같은 바깥 래퍼가 고친 관측은 망
+    입력만 바꾸고 마스크는 바꾸지 않는다. 연결 전에 부르면 멈춘다.
+    """
+
+    def __init__(self, model):
+        from .rep_policy import is_rep_model
+
+        if not is_rep_model(model):
+            raise ValueError("rep_learned 는 RepertoirePolicy(env_v2/rep_policy.py) 모델만 받는다")
+        self.model = model
+        pol = model.policy
+        self.params = {"allowed_mask": pol.rep_allowed_mask}
+        self.world = None
+
+    def bind_world(self, world) -> None:
+        pol = self.model.policy
+        if getattr(world, "_rp", None) is None:
+            raise ValueError("rep_learned 는 repertoire 세계(v3)에서만 쓴다")
+        if tuple(world.obs_names) != tuple(pol.rep_obs_names):
+            raise ValueError(f"모델의 관측 {list(pol.rep_obs_names)} 이 세계의 관측 {list(world.obs_names)} 과 다르다")
+        self.world = world
+
+    def mask(self) -> np.ndarray:
+        """연결한 세계의 지금 마스크 (N, 5) bool."""
+        from .rep_policy import action_mask
+
+        if self.world is None:
+            raise ValueError("rep_learned 정책은 bind_world(w) 로 세계를 받은 뒤에 쓴다(rollout 이 부른다)")
+        return action_mask(self.world, self.world.observe(), self.params)
+
+    def __call__(self, obs):
+        from .rep_policy import policy_obs, rep_argmax
+
+        m = self.mask()
+        a = rep_argmax(self.model.policy, policy_obs(obs, m))
+        self.last_mask = m
+        return a.astype(np.float64)[:, None]
+
+
 def _base_policy(spec: dict, seed: int = 0):
     from policies.registry import make_policy
 
+    if spec.get("kind") == "rep_learned":
+        # v3 R1 학습 정책: argmax 만 있다(모드·유지 길이를 받지 않는다). 세계 연결 상태가 있어 잡마다 새로 만들고 모델만 돌려쓴다
+        if spec.get("mode", "deterministic") != "deterministic" or "hold_k" in spec:
+            raise ValueError(f"rep_learned 는 argmax(결정 모드)만 쓴다: {spec!r}")
+        return RepLearned(_load_model({"model": spec["path"], **({"device": spec["device"]} if "device" in spec else {})}))
     k = hold_k_of(spec)                     # 모드 검사 + 유지 표본 모드의 K (다른 모드에 hold_k 가 있으면 멈춘다)
     if spec.get("kind") == "learned" and _is_cm(spec):
         # v2.2r 범주형 보행 CM 모델(env_v2/cm.py): 결정 = 최빈 범주, hold = 유지 잡음의 누적 확률 비교, 확률 = 범주 표본.
@@ -715,9 +805,11 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     - `_obs`, `_act`: `record_every` 스텝마다의 관측과 그 스텝 행동 (반응 곡선·R²용)
 
     정책(래퍼 포함)에 `observe_done` 이 있으면 `w.step` 뒤마다 그 스텝의 사망 배열로 부른다(유지 표본 모드의 리스폰 키).
+    `bind_world` 가 있으면 World 를 만든 직후 한 번 부른다(v3 R1 `rep_learned` 의 마스크).
     """
     gamma = load_gamma() if gamma is None else float(gamma)
     w = World(cfg, seeds=[seed])
+    forward_bind(policy, w)                 # 세계 연결 훅(v3 R1 rep_learned). 훅이 없는 정책은 아무 일도 없다
     N, A = w.N, w.act_dim
     rew = np.empty((steps, N), dtype=np.float64)
     done = np.empty((steps, N), dtype=bool)
