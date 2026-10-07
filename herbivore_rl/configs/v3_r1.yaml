@@ -187,9 +187,11 @@ train:
     epsilon: 0.05
     # 시작 확률(로짓 편향 = log(p/Σp), 계약 순서 GRAZE·FLEE·HIDE·FREEZE·SLEEP). 마스크가 막은 칸은 나머지로 다시 맞춘다
     init_probs: [0.4, 0.15, 0.15, 0.15, 0.15]
-    # 엔트로피 기준값 = v2.4s 학습 ent_coef(configs/ppo_best.yaml params.ent_coef, v2_4sp_g995_s20 메타 JSON 의 ent_coef 와 같다)
-    ent_coef_base: 0.0008971496690499397
-    # 결정 비율 f_dec (범주 엔트로피 계수 = ent_coef_base ÷ f_dec ≈ 0.003509). 2026-10-07 학습 전에 잰 값이다:
+    # 엔트로피 기준값. 처음 값은 v2.4s 학습 ent_coef 0.0008971496690499397(범주 계수 0.003509)이었고, 첫 학습 2M 조기 중단 뒤
+    # 대응(results/v3/r1/PREREG.md 변경 기록 10-07 '대응: 모방 초기화')으로 범주 계수 0.01(v2.2r CM 과 같은 값, 비교 팔 B)이
+    # 되게 0.01 × f_dec = 0.00255643 으로 바꿨다
+    ent_coef_base: 0.00255643
+    # 결정 비율 f_dec (범주 엔트로피 계수 = ent_coef_base ÷ f_dec = 0.01). 2026-10-07 첫 학습 전에 잰 값이다:
     # python train_v3.py measure-fdec --config configs/v3_r1.yaml (시작 정책, 보정 시드 20000~20002 × 3000스텝, 목록
     # graze·flee·hide·freeze) → 0.255643 (시드별 0.1659·0.1882·0.4128, 결정 시점 중 마스크가 두 칸 이상인 비율 0.501).
     # 판정 세계(_on)는 학습하지 않지만 같은 블록을 둔다(판정 도구가 목록을 읽는다)

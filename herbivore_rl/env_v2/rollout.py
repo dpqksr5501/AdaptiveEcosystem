@@ -722,6 +722,11 @@ class RepLearned:
             raise ValueError("rep_learned 는 repertoire 세계(v3)에서만 쓴다")
         if tuple(world.obs_names) != tuple(pol.rep_obs_names):
             raise ValueError(f"모델의 관측 {list(pol.rep_obs_names)} 이 세계의 관측 {list(world.obs_names)} 과 다르다")
+        from .rep_policy import MASK_VERSION
+
+        if int(getattr(pol, "rep_mask_version", 1)) != MASK_VERSION:
+            raise ValueError(f"모델의 마스크 판 {getattr(pol, 'rep_mask_version', 1)} 이 지금 코드의 판 {MASK_VERSION} 과 다르다"
+                             "(env_v2/rep_policy.py MASK_VERSION) — 다른 마스크로 판정하지 않는다")
         self.world = world
 
     def mask(self) -> np.ndarray:

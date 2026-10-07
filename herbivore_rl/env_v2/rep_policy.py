@@ -61,6 +61,10 @@ HIDE_COVER_OBS = 0.75
 # '위협을 안다'의 기억 문턱: threat_recency(본 순간 1, 스텝마다 × recency_decay) 가 이 값 이상이면 방금 본 위협을 아직 안다.
 # 감쇠 0.95 에서 0.95^31 ≈ 0.204 — 마지막으로 본 뒤 약 31스텝(4초). 관측 계약 값이다(C++ 마스크도 같은 값)
 THREAT_RECENCY_OBS = 0.2
+# 마스크 계약 판. 가능 조건(위 두 문턱과 '숨기도 위협을 알 때만')을 바꾸면 올린다. 정책이 판을 저장하고(`rep_mask_version`),
+# 판정 롤아웃(`env_v2/rollout.py` RepLearned.bind_world)이 지금 코드의 판과 다르면 멈춘다 — 다른 마스크로 조용히 판정하지 않게.
+# 1 = 첫 학습(threat_recency > 0, 숨기는 은신처만), 2 = 10-07 수정(threat_recency ≥ 0.2, 숨기도 위협을 알 때만)
+MASK_VERSION = 2
 # 막힌 칸의 로짓. softmax 의 exp(−1e9 − ·) 는 float32 에서 정확히 0 이고, 유한한 값이라 0·log 0 이 nan 이 되지 않는다
 MASK_LOGIT = -1e9
 REP_KEYS = frozenset({"allowed", "epsilon", "init_probs", "ent_coef_base", "f_dec"})
@@ -286,7 +290,7 @@ class RepertoirePolicy(ActorCriticPolicy):
     """
 
     def __init__(self, observation_space, action_space, lr_schedule, *args, rep_allowed, rep_epsilon: float,
-                 rep_ent_scale: float, rep_init_logits, rep_obs_names, **kw):
+                 rep_ent_scale: float, rep_init_logits, rep_obs_names, rep_mask_version: int = 1, **kw):
         if not isinstance(action_space, spaces.Discrete) or int(action_space.n) != N_BEHAVIORS:
             raise ValueError(f"RepertoirePolicy 의 행동 공간은 Discrete({N_BEHAVIORS}) 다. 받은 값: {action_space}")
         obs_dim = int(observation_space.shape[0]) - N_BEHAVIORS
@@ -298,6 +302,8 @@ class RepertoirePolicy(ActorCriticPolicy):
         self.rep_epsilon, self.rep_ent_scale = float(rep_epsilon), float(rep_ent_scale)
         self.rep_init_logits = [float(x) for x in rep_init_logits]
         self.rep_obs_names = tuple(rep_obs_names)
+        # 판이 없는 저장 파일(첫 학습)은 1 이다
+        self.rep_mask_version = int(rep_mask_version)
         self.rep_obs_dim = obs_dim
         if len(self.rep_init_logits) != N_BEHAVIORS:
             raise ValueError(f"rep_init_logits 는 {N_BEHAVIORS}개다. 받은 값: {rep_init_logits!r}")
@@ -309,7 +315,8 @@ class RepertoirePolicy(ActorCriticPolicy):
     def _get_constructor_parameters(self) -> dict:
         d = super()._get_constructor_parameters()
         d.update(rep_allowed=list(self.rep_allowed), rep_epsilon=self.rep_epsilon, rep_ent_scale=self.rep_ent_scale,
-                 rep_init_logits=self.rep_init_logits, rep_obs_names=list(self.rep_obs_names))
+                 rep_init_logits=self.rep_init_logits, rep_obs_names=list(self.rep_obs_names),
+                 rep_mask_version=self.rep_mask_version)
         return d
 
     def _build(self, lr_schedule) -> None:

@@ -88,7 +88,8 @@ def test_r1_configs_are_r0_plus_three_changes(r1, r0):
     assert t == b["train"] and a["overrides"] == b["overrides"]
     assert blk["allowed"] == ["graze", "flee", "hide", "freeze"] and blk["epsilon"] == 0.05      # R0 결과(SLEEP 제외)
     assert blk["init_probs"] == [0.4, 0.15, 0.15, 0.15, 0.15]
-    assert blk["ent_coef_base"] == 0.0008971496690499397                     # v2.4s 학습 ent_coef (ppo_best.yaml)
+    # 범주 엔트로피 계수 0.01 = ent_coef_base ÷ f_dec (PREREG 변경 기록 10-07 '대응: 모방 초기화', 처음 값은 v2.4s ent_coef)
+    assert blk["ent_coef_base"] == 0.00255643 and abs(blk["ent_coef_base"] / blk["f_dec"] - 0.01) < 1e-9
     assert 0.0 < blk["f_dec"] <= 1.0
     w = World(load_v2_config(r1), seeds=[0])
     assert w.obs_dim == 18 and w.act_names == ("behavior",)
@@ -713,7 +714,7 @@ def test_eval_smoke_and_prereg_guard(trained, tmp_path):
     res = ev.judge(str(out), "smoke", [10000, 10001], 300, tmp_path, tail=100, workers=1)
     assert (tmp_path / "smoke.json").exists() and (tmp_path / "smoke.md").exists()
     P = res["pooled"]
-    assert set(P) == {"rl", "fsm", "c_graze", "c_flee", "c_hide", "c_freeze", "c1p", "c4_app", "c4_phase"}
+    assert set(P) == {"rl", "fsm", "rbase", "c_graze", "c_flee", "c_hide", "c_freeze", "c1p", "c4_app", "c4_phase"}
     for name, v in P.items():
         assert math.isfinite(v["g_gamma"]), name
         assert v["use"]["sleep"] == 0.0, name
@@ -741,3 +742,26 @@ def test_replay_frames_carry_animation_state(cfg_on, model_path, tmp_path):
     w2 = World(load_v2_config(V2_4S), seeds=[0])
     w2.step(np.tile([0.97099, 0.78494, 0.21823, 0.03359, 0.49137], (w2.N, 1)))
     assert "beh_steps" not in R._applied(w2, None)
+
+
+def test_mask_version_saved_and_checked(tmp_path, cfg, cfg_on):
+    """마스크 계약 판: 새 모델은 MASK_VERSION 을 저장하고, 판이 다른 모델은 판정 롤아웃 연결에서 멈춘다."""
+    from stable_baselines3 import PPO
+
+    import env_v2.rollout as ro
+    from env_v2.world import World
+    from train_v3 import make_model_rep
+
+    venv = MultiWorldVecEnv(cfg, num_worlds=1, meta_seed=0)
+    model = make_model_rep(venv, rp.rep_params(cfg), None, seed=0, n_steps=8)
+    assert model.policy.rep_mask_version == rp.MASK_VERSION == 2
+    path = tmp_path / "m.zip"
+    model.save(path)
+    loaded = PPO.load(path, device="cpu")
+    assert loaded.policy.rep_mask_version == rp.MASK_VERSION
+    pol = ro.RepLearned(loaded)
+    pol.bind_world(World(cfg_on, seeds=[0]))                 # 같은 판이면 연결된다
+    loaded.policy.rep_mask_version = 1                       # 첫 학습(판 없는 저장 파일)
+    with pytest.raises(ValueError, match="마스크 판"):
+        ro.RepLearned(loaded).bind_world(World(cfg_on, seeds=[0]))
+

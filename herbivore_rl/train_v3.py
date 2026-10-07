@@ -47,7 +47,7 @@ import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
 from env_v2.config import load_v2_config
-from env_v2.rep_policy import (RepertoirePolicy, action_mask, policy_obs, rep_distribution, rep_params,
+from env_v2.rep_policy import (MASK_VERSION, RepertoirePolicy, action_mask, policy_obs, rep_distribution, rep_params,
                                sample_masked)
 from env_v2.repertoire import BEHAVIOR_NAMES, FLEE, FREEZE, HIDE, N_BEHAVIORS, SLEEP
 from env_v2.vec_env import MultiWorldVecEnv
@@ -81,7 +81,7 @@ def make_model_rep(venv: MultiWorldVecEnv, rep: dict, tensorboard_log: str | Non
         raise ValueError("ent_coef > 0 이어야 한다(범주 엔트로피 계수를 배율로 넣는다)")
     kw["policy_kwargs"] = dict(PPO_KWARGS["policy_kwargs"], rep_allowed=list(rep["allowed"]), rep_epsilon=rep["epsilon"],
                                rep_ent_scale=rep["cat_ent_coef"] / ent, rep_init_logits=rep["init_logits"],
-                               rep_obs_names=list(venv.obs_names))
+                               rep_obs_names=list(venv.obs_names), rep_mask_version=MASK_VERSION)
     return PPO(RepertoirePolicy, venv, tensorboard_log=tensorboard_log, device="cpu", **kw)
 
 
@@ -276,6 +276,8 @@ def main(argv=None) -> int:
     p.add_argument("--freeze-variant", choices=("near", "orig"), default="near",
                    help="학습 기록의 FREEZE 니치 조건 판(eval_v3.u_terms). FREEZE 가 목록에 없으면 쓰이지 않는다")
     p.add_argument("--tb", default=str(ROOT / "runs" / "v3"))
+    p.add_argument("--warmstart", default=None,
+                   help="모방 초기화 가중치(warmstart_v3.py fit 의 .pt). 주면 PPO 시작 정책·가치망을 이것으로 바꾼다")
     args = p.parse_args(argv)
 
     torch.set_num_threads(args.threads)
@@ -302,6 +304,12 @@ def main(argv=None) -> int:
     model = make_model_rep(venv, rep, tensorboard_log=args.tb, n_steps=n_steps, seed=args.seed, **tuned)
     if float(model.gamma) != gamma or float(model.rollout_buffer.gamma) != gamma:
         raise RuntimeError(f"모델 γ {model.gamma} (버퍼 {model.rollout_buffer.gamma}) 가 지정한 γ {gamma} 와 다르다")
+    if args.warmstart:
+        # 모방 초기화(results/v3/r1/PREREG.md 변경 기록 10-07 '대응: 모방 초기화'): 정책·가치망 가중치만 바꾼다. 구조·분포 인자
+        # (ε, 엔트로피 배율, 허용 목록)는 이 설정의 값 그대로다 — 가중치 파일에는 state_dict 만 있다
+        state = torch.load(args.warmstart, map_location="cpu")["policy"]
+        model.policy.load_state_dict(state, strict=True)
+        print(f"모방 초기화 가중치: {args.warmstart}", flush=True)
     ent_scale = float(model.policy.rep_ent_scale)
     cat_ent = float(model.ent_coef) * ent_scale
     if not math.isclose(cat_ent, rep["cat_ent_coef"], rel_tol=1e-12):
@@ -343,7 +351,7 @@ def main(argv=None) -> int:
         "v2": cfg.v2, "num_worlds": venv.K, "reset_interval": venv.T,
         "worlds_seen": sum(len(h) for h in venv.seed_history), "world_resets": venv.num_resets,
         "obs_names": list(venv.obs_names), "behavior_names": list(BEHAVIOR_NAMES), "freeze_variant": args.freeze_variant,
-        "init_policy": init_rep, "checkpoints": cb.saved, "log_history": cb.history,
+        "init_policy": init_rep, "checkpoints": cb.saved, "log_history": cb.history, "warmstart": args.warmstart,
     }
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"config_digest {digest}, 체크포인트 {len(cb.saved)}개, 학습한 세계 수 {meta['worlds_seen']}")

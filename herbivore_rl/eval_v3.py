@@ -89,7 +89,7 @@ USE_MIN, FLICKER_MAX, C4_DROP_MIN, STARVE_RATIO_MAX = 0.02, 0.10, 0.5, 1.5
 FULL_E, HUNGRY_E = 0.7, 0.35                # 위험 할당 에너지 구간 (명세 5절)
 C1P_TAG = 606                               # C1′ 해시 스트림 구분값(rollout._SALT 101~404·지연 505 와 겹치지 않는다)
 PREREG_OUT = HERE / "results" / "v3" / "r1" / "judge"
-POLICY_ORDER = ("rl", "fsm", "c_graze", "c_flee", "c_hide", "c_freeze", "c_sleep", "c1p", "c4_app", "c4_phase")
+POLICY_ORDER = ("rl", "fsm", "rbase", "c_graze", "c_flee", "c_hide", "c_freeze", "c_sleep", "c1p", "c4_app", "c4_phase")
 
 
 # --------------------------------------------------------------------- #
@@ -202,6 +202,9 @@ def policy_spec(name: str, model: str, cfg, allowed, variant: str, freq=None) ->
         return {"build": rl}
     if name == "fsm":
         return {"build": fsm_spec(cfg, allowed, variant)}
+    if name == "rbase":
+        # 보고만(PREREG 변경 기록 10-07 '대응: 모방 초기화'): R_base(θ 4, a 0.9) = 먹다가 가까우면 도망. FSM 은 도망을 쓰지 않는다
+        return {"build": fsm_spec(cfg, ("graze", "flee"), variant)}
     if name.startswith("c_"):
         b = name[2:]
         if b not in allowed:
@@ -409,7 +412,8 @@ def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CON
     allowed = rep["allowed"]
     if variant not in FREEZE_VARIANTS:
         raise ValueError(f"--freeze-variant 는 {FREEZE_VARIANTS} 중 하나다")
-    names = list(policies) if policies else (["rl", "fsm"] + [f"c_{b}" for b in allowed] + ["c1p", "c4_app", "c4_phase"])
+    names = list(policies) if policies else (["rl", "fsm", "rbase"] + [f"c_{b}" for b in allowed]
+                                             + ["c1p", "c4_app", "c4_phase"])
     for must in ("rl", "fsm"):
         if must not in names:
             raise ValueError(f"판정에는 정책 {must} 가 꼭 있어야 한다")
