@@ -46,4 +46,5 @@ protected:
 
 private:
 	FMassEntityQuery EntityQuery;
+	double NextActionAuditLogTime = 0.0;
 };

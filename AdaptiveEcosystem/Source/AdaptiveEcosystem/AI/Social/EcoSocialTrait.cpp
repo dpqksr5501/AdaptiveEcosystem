@@ -21,6 +21,8 @@ void UEcoSocialTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildContex
 	BuildContext.RequireFragment<FEcoPolicyOutputFragment>();
 	BuildContext.AddFragment<FEcoHerdMemberFragment>();
 	BuildContext.AddFragment<FEcoAlarmStateFragment>();
+	BuildContext.AddFragment<FEcoSensoryStateFragment>();
+	BuildContext.AddFragment_GetRef<FEcoSensoryProfileFragment>() = SensoryProfile;
 	BuildContext.AddFragment<FEcoShelterIntentFragment>();
 	BuildContext.AddFragment<FEcoSocialBehaviorFragment>();
 	BuildContext.AddFragment<FEcoSocialMovementRequestFragment>();

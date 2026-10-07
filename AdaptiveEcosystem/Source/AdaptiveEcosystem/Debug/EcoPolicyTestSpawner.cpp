@@ -10,6 +10,7 @@
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
 #include "MassMovementFragments.h"
+#include "Ecology/EcologySimulationSubsystem.h"
 
 AEcoPolicyTestSpawner::AEcoPolicyTestSpawner()
 {
@@ -76,6 +77,7 @@ namespace
 void AEcoPolicyTestSpawner::BeginPlay()
 {
 	Super::BeginPlay();
+	if (!GetWorld() || GetWorld()->GetNetMode() == NM_Client) { return; }
 	SpawnEntities();
 }
 
@@ -119,7 +121,7 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 	}
 
 	// §9.4/§9.5 쿼리가 요구하는 프래그먼트·태그의 합집합.
-	const TArray<const UScriptStruct*> HerbComposition = {
+	TArray<const UScriptStruct*> HerbComposition = {
 		FTransformFragment::StaticStruct(),
 		FMassVelocityFragment::StaticStruct(),
 		FEcoSteeringGeometryFragment::StaticStruct(),
@@ -132,12 +134,19 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 		FMassCustomMovementTag::StaticStruct(),
 	};
 	// FEcoPredatorStateFragment 가 없으면 UEcoPredationProcessor 가 이 포식자를 못 본다.
-	const TArray<const UScriptStruct*> PredComposition = {
+	TArray<const UScriptStruct*> PredComposition = {
 		FTransformFragment::StaticStruct(),
 		FMassVelocityFragment::StaticStruct(),
 		FEcoPredatorStateFragment::StaticStruct(),
 		FEcoPredatorTag::StaticStruct(),
 	};
+	UEcologySimulationSubsystem* IdentityOwner = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
+	if (bAssignStableAgentIds)
+	{
+		if (!IdentityOwner || !IdentityOwner->IsAuthoritativeWorld()) { return; }
+		HerbComposition.Add(FEcoIdentityFragment::StaticStruct());
+		PredComposition.Add(FEcoIdentityFragment::StaticStruct());
+	}
 
 	const FMassArchetypeHandle HerbArch = EM->CreateArchetype(HerbComposition);
 	const FMassArchetypeHandle PredArch = EM->CreateArchetype(PredComposition);
@@ -167,6 +176,21 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 
 	Spawn(HerbArch, HerbivoreCount, SpawnRadius, Herbivores);
 	Spawn(PredArch, PredatorCount, SpawnRadius * 0.7f, Predators);
+	if (bAssignStableAgentIds)
+	{
+		for (const auto E : Herbivores)
+		{
+			auto& Identity = EM->GetFragmentDataChecked<FEcoIdentityFragment>(E);
+			Identity.StableAgentId = IdentityOwner->AllocateStableAgentId();
+			Identity.SpeciesId = TEXT("Herbivore");
+		}
+		for (const auto E : Predators)
+		{
+			auto& Identity = EM->GetFragmentDataChecked<FEcoIdentityFragment>(E);
+			Identity.StableAgentId = IdentityOwner->AllocateStableAgentId();
+			Identity.SpeciesId = TEXT("Wolf");
+		}
+	}
 
 	// §9.2 "스폰 시 0~PolicyInterval 랜덤" — 정책 부하를 틱마다 고르게 흩는다.
 	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
@@ -233,6 +257,7 @@ void AEcoPolicyTestSpawner::RespawnCaught()
 			FVector(FMath::Cos(A), FMath::Sin(A), 0.0f) * 10.0f;
 		Vitals.HP = Vitals.MaxHP;
 		Vitals.Energy = Vitals.MaxEnergy * EcoBehaviorConfig::InitEnergyFrac;
+		OnTestEntityReset(E);
 	}
 }
 

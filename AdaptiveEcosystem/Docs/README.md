@@ -54,6 +54,8 @@ PPO + Mass 생태계와 Steam 멀티플레이를 단계별로 완성하기 위�
 ### 9. Social Behavior & Shelter (사회적 행동 및 은신처 런타임)
 동적 무리(Herd), 위험 전파(Alarm), 은신처(Shelter) 예약 및 PPO 행동 변조를 다룹니다.
 - 📌 [조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md](조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md) : **현재 소셜 런타임 구현 및 에디터 검증 현황 (Source of Truth)**
+- 🔊 [조연우/SOCIAL_SENSORY_RUNTIME.md](조연우/SOCIAL_SENSORY_RUNTIME.md) : 시각·청각·위협 기억, 읽기 전용 인지 계약·보정 중복 진단, SA/서버 소음 분리, 담당별 연결 체크리스트 및 Social 17개 자동화 검증
+- 🐺 [조연우/CREATURE_BP_DEMO_AND_REPRESENTATION.md](조연우/CREATURE_BP_DEMO_AND_REPRESENTATION.md) : 늑대·초식동물 표현 BP와 Standalone 이동 시연, 모델/AnimBP 교체, 실제 BP 바인딩과 담당별 production 연결 범위
 - 🔗 [조연우/SOCIAL_THREAT_ALARM_INTEGRATION.md](조연우/SOCIAL_THREAT_ALARM_INTEGRATION.md) : 실제 포식자/플레이어 위협 → Herd Alarm 구현, 입력 종료 계약, 자동화 검증과 JYU 설정
 - 🔗 [조연우/SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md](조연우/SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md) : Social Request/Feedback 인계, Moving/Occupied·예약 유지/정리, 이동 담당자 연결 지점과 검증 범위
 - 📘 [조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md](조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md) : 사회적 행동 및 은신처 시스템 아키텍처 명세서

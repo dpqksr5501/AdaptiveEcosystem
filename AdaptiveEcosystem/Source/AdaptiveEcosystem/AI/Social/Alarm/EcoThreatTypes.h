@@ -27,4 +27,5 @@ struct FEcoHerdAlarmInput
 {
 	FVector Position = FVector::ZeroVector;
 	float Strength = 0.0f;
+	double EvidenceWorldTime = -1.0;
 };

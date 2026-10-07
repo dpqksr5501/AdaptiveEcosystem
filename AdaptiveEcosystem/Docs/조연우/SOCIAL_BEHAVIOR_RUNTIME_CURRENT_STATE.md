@@ -4,12 +4,12 @@
 > **Repository:** `dpqksr5501/AdaptiveEcosystem`  
 > **Target Module:** `AdaptiveEcosystem` (Source/AdaptiveEcosystem/AI/Social/)  
 > **Current Base:** `main` — `295ac2f` (2026-09-30 Source audit)
-> **Working Branch:** `codex/social-shelter-handoff` — `9461ae7` 기반, Social 이동 인계·예약 생명주기 추가
+> **Working Branch:** `codex/social-shelter-handoff` — HEAD `7f44d5e` (`9461ae7` 기반); 감각·인지 확장은 작업 트리 변경
 > **Current Phase:** Production Integration
 > **Historical MVP Branch:** `feat/social-shelter-mvp` (main에 병합됨)
-> **Last Updated:** 2026-10-01
+> **Last Updated:** 2026-10-05
 > **Status:** Dynamic Herd MVP (Editor Verified) / Alarm Communication MVP (Editor Verified) / Shelter MVP (Editor Verified: 차폐 판정 및 예약 표시)
-> **이번 검증 범위:** 직접 UBT 빌드 성공 및 Social 자동화 **9/9 통과** (Threat 4 + Lifecycle 5). [이동 인계·예약 생명주기 기록](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md)을 따른다. 이전 사용자 PIE의 캐릭터 접근→Alert 확인은 [실제 위협 연동 기록](SOCIAL_THREAT_ALARM_INTEGRATION.md)에 보존한다. 실제 이동 소비자·Moving/Occupied PIE·멀티플레이는 연결/검증 대기다.
+> **최신 작업 트리 검증 — 2026-10-05:** 감각·인지 인계 계약 및 보정 진단 추가 후 직접 UBT 성공 및 Social 자동화 **17/17 통과** (Senses 7 + ActionAudit 1 + Threat 4 + Lifecycle 5). [감각·인지 구현 및 검증](SOCIAL_SENSORY_RUNTIME.md)을 따른다. 2026-10-02의 14/14와 기존 9/9 기록은 각 구현 문서에 보존한다. 이전 사용자 PIE의 캐릭터 접근→Alert 확인은 [실제 위협 연동 기록](SOCIAL_THREAT_ALARM_INTEGRATION.md)에 보존한다. 새 감각 JYU PIE/오디오, PPO 인지 입력 소비·실제 이동 소비자·Moving/Occupied PIE·멀티플레이는 연결/검증 대기다.
 
 ---
 
@@ -29,6 +29,9 @@
 
 | 구분 | 현재 범위 |
 | :--- | :--- |
+| Implemented — 2026-10-02 작업 트리 | 시각·청각·개인 위협 기억·출처/신뢰도/불확실도, 별도 무리 정보, 서버 소음 이벤트/Emitter·선택적 SA 재생, 개체 프로필·환경 multiplier, Debug 표시. 직접 UBT와 14/14 자동화 통과. 후각 제외, PPO 인지 입력 소비·production/JYU/오디오 검증 대기. [상세 계약](SOCIAL_SENSORY_RUNTIME.md) |
+| Implemented — 2026-10-05 작업 트리 | 읽기 시각 감쇠·개인/무리 단서 분리 API, 원 입력/수신 시각·persistent Herd 검증, PPO Raw/Effective 보정 진단. 직접 UBT 및 Social 17/17 통과. 기존 V1 행동 수식과 이동 writer 유지. 검증 기록 및 타 담당 연결은 [인지 계약 §7–9](SOCIAL_SENSORY_RUNTIME.md#7-인지-정보-인계-계약--2026-10-05-구현) 참조 |
+| 표현/시연 별도 작업 — 2026-10-05 | 사용자 요청에 따라 임시 늑대/초식동물 BP·공통 표현 Actor·전용 평면 맵 추가. 기존 PPO/테스트 포식자 이동을 시각화하며 Social 목적지 소비나 production Entity 통합과 구분한다. [BP 실행·인계 문서](CREATURE_BP_DEMO_AND_REPRESENTATION.md) |
 | Completed | Herd 가입/이탈·집계, Alarm 주입/전파·감쇠·Social Response, authored Shelter 선택·LOS/차폐·슬롯 예약. 기존 Herd/Alarm PIE 기록과 Shelter 차폐/예약 표시 기록 보존 |
 | Implemented — 작업 브랜치 | 실제 Mass 포식자/Actor 위협 컴포넌트 → 시야/LOS 감지 → Herd Alarm. 입력 갱신/종료 및 움직이는 위협 위치 수정. [연동 계약 및 검증](SOCIAL_THREAT_ALARM_INTEGRATION.md) |
 | Implemented — 작업 브랜치 | Request/Feedback 인계 계약, 예약 세대 번호, Reserved→Moving→Occupied 전이·lease 유지, 실패/진행 정체/위협 요구 종료·죽음/삭제/이주 예약 정리. [구현·검증 범위](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md) |

@@ -8,6 +8,8 @@
 #include "AI/Policy/EcoPolicyContracts.h"
 #include "AI/Social/EcoSocialTypes.h"
 #include "AI/Social/EcoSocialMovementTypes.h"
+#include "AI/Social/Senses/EcoSensoryTypes.h"
+#include "AI/Social/EcoSocialActionAudit.h"
 #include "EcoSocialFragments.generated.h"
 
 // -----------------------------------------------------------------------------
@@ -164,6 +166,9 @@ struct FEcoSocialBehaviorFragment : public FMassFragment
 {
 	GENERATED_BODY()
 
+	/** Raw/Effective comparison at response time; not a second policy output or final command. */
+	FEcoSocialActionAudit ActionAudit;
+
 	/** Effective steering actions after social alarm and herd modulation */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Social")
 	FEcoPolicyActionV1 ModulatedAction;
@@ -189,6 +194,9 @@ USTRUCT()
 struct FEcoSocialSpeciesSharedFragment : public FMassSharedFragment
 {
 	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere, Category="Ecology|Social|Senses")
+	FEcoSensorySettings Senses;
 
 	UPROPERTY(EditAnywhere, Category = "Ecology|Social|Shelter")
 	FEcoShelterLifecycleSettings Shelter;

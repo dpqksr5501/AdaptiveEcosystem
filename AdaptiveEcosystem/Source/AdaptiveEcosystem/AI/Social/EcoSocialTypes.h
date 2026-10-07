@@ -69,6 +69,10 @@ struct FEcoHerdRuntimeData
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Herd")
 	FVector LastThreatPosition = FVector::ZeroVector;
 
+	/** Time of selected direct/manual alarm input. Decay and reception do not refresh it. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Herd")
+	double LastThreatEvidenceTime = -1.0;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Herd")
 	double LastAggregateTime = 0.0;
 

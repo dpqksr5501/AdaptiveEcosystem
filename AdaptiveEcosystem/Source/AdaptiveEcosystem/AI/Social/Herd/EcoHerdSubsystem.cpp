@@ -75,6 +75,7 @@ int32 UEcoHerdSubsystem::AllocateHerd(int32 SpeciesRuntimeIndex, const FVector& 
 	NewHerd.Representative.Reset();
 	NewHerd.AlarmStrength = 0.0f;
 	NewHerd.LastThreatPosition = FVector::ZeroVector;
+	NewHerd.LastThreatEvidenceTime = -1.0;
 	NewHerd.LastAggregateTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 	NewHerd.LastTopologyUpdateTime = NewHerd.LastAggregateTime;
 
@@ -94,6 +95,7 @@ void UEcoHerdSubsystem::ReleaseHerd(int32 RuntimeIndex)
 		ObservedAlarms[RuntimeIndex] = {};
 		ActiveHerds[RuntimeIndex].AlarmStrength = 0.0f;
 		ActiveHerds[RuntimeIndex].LastThreatPosition = FVector::ZeroVector;
+		ActiveHerds[RuntimeIndex].LastThreatEvidenceTime = -1.0;
 		HerdSpeciesIndices[RuntimeIndex] = INDEX_NONE_ECO;
 		FreeSlots.Add(RuntimeIndex);
 	}
@@ -175,6 +177,7 @@ void UEcoHerdSubsystem::EmitHerdAlarm(int32 HerdRuntimeIndex, const FVector& Thr
 		{
 			Input.Strength = ClampedStrength;
 			Input.Position = ThreatLocation;
+			Input.EvidenceWorldTime = GetWorld()->GetTimeSeconds();
 		}
 		ResolveAlarm(HerdRuntimeIndex);
 	}
@@ -247,6 +250,7 @@ void UEcoHerdSubsystem::ResolveAlarm(int32 RuntimeIndex)
 		? ObservedAlarms[RuntimeIndex] : InjectedAlarms[RuntimeIndex];
 	ActiveHerds[RuntimeIndex].AlarmStrength = Input.Strength;
 	ActiveHerds[RuntimeIndex].LastThreatPosition = Input.Strength > 0.0f ? Input.Position : FVector::ZeroVector;
+	ActiveHerds[RuntimeIndex].LastThreatEvidenceTime = Input.Strength > 0.0f ? Input.EvidenceWorldTime : -1.0;
 }
 
 void UEcoHerdSubsystem::ApplyObservedHerdThreats(TConstArrayView<FEcoObservedHerdThreat> Threats)
@@ -264,6 +268,7 @@ void UEcoHerdSubsystem::ApplyObservedHerdThreats(TConstArrayView<FEcoObservedHer
 		{
 			ObservedAlarms[Index].Position = Threat.Position;
 			ObservedAlarms[Index].Strength = FMath::Clamp(Threat.Strength, 0.0f, 1.0f);
+			ObservedAlarms[Index].EvidenceWorldTime = GetWorld()->GetTimeSeconds();
 		}
 	}
 	for (int32 Index = 0; Index < ActiveHerds.Num(); ++Index)

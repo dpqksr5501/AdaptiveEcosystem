@@ -23,6 +23,11 @@ Verified Herd / Alarm / Shelter MVP를 production PPO / Steering / Lifecycle 경
 5. 은신 요구 종료 / Death / Despawn / Migration reservation cleanup 구현·자동화 검증. production 확인 대기.
 6. 전체 end-to-end·Server/Client 검증.
 
+2026-10-05 Social 작업 트리는 [읽기 전용 인지 계약과 행동 보정 진단](SOCIAL_SENSORY_RUNTIME.md#7-인지-정보-인계-계약--2026-10-05-구현)을 제공한다.
+PPO/이동 담당자가 연결할 데이터 의미와 완료 기준은 같은 문서 §9를 따른다.
+현재 가장 우선한 개인 위협 단서 하나를 predator_count로 대입하거나, shared/heard 보고를 Sight로 해석하지 않는다.
+V1 보정/강제 은신 요구는 유지한다. V2에서의 결정권 변경은 공동 계약이며 Social 작업에서 임의 변경하지 않는다.
+
 **Do NOT start until production integration is complete:** Merge/Split 고도화, cross-herd multi-hop gossip, ORCA/RVO2, 자동 Cover 생성, 복잡한 Leader AI, Group Shelter 최적화, 새로운 PPO Observation/Action.
 
 ### 통합 전 계약 확인

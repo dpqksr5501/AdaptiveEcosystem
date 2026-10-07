@@ -62,6 +62,11 @@ Threat Detection은 `Server | Standalone`을 명시하며 GameThread에서 0.2�
 
 미래 이동 소비자는 [Lifecycle Source](../../Source/AdaptiveEcosystem/AI/Social/Shelter/EcoShelterLifecycleProcessor.cpp) 이후 실행하고 결과는 다음 Lifecycle 패스에 소비된다. Feedback 반환을 이유로 Lifecycle을 동일 소비자 이후에도 배치하는 순환 의존성을 만들지 않는다. production EntityConfig, 에디터 override 및 Listen Server/Client 검증은 별도 확인한다. 근거와 기존 PIE 범위는 [CURRENT_STATE](../조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)를 참조한다.
 
+2026-10-05 Social 작업 트리는 [읽기 전용 인지 API와 보정 진단](../조연우/SOCIAL_SENSORY_RUNTIME.md#7-인지-정보-인계-계약--2026-10-05-구현)을 추가했다.
+Alarm/Response는 Server/Standalone 실행 및 Client guard를 명시하고, Response는 진단 throttle을 위해 GameThread 실행을 명시한다.
+새 인지 Processor/Policy 순서 변경은 없다. 현재 Policy에는 Alarm 이후 prerequisite가 없으며 새 API의 소비도 없다.
+미래 관측 소비자는 Detection/Alarm 이후 읽되, 실제 Mass 그룹 의존성을 확인해 순환 없이 연결한다.
+
 ---
 
 ## 2. 멀티스레드 병렬 안전성 수칙 (Strict Concurrency Rules)

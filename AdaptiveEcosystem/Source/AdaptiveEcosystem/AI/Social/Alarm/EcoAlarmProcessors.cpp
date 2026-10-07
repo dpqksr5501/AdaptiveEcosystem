@@ -12,6 +12,11 @@
 #include "MassCommonTypes.h"
 #include "MassExecutionContext.h"
 #include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
+
+DEFINE_LOG_CATEGORY_STATIC(LogEcoSocialActionAudit, Log, All);
+static TAutoConsoleVariable<int32> CVarEcoSocialActionAudit(TEXT("eco.Social.ActionAudit"), 0,
+	TEXT("Log Raw/Effective Social action comparisons every 5 game seconds (server/standalone)."));
 
 // -----------------------------------------------------------------------------
 // UEcoAlarmPropagationProcessor
@@ -22,6 +27,7 @@ UEcoAlarmPropagationProcessor::UEcoAlarmPropagationProcessor()
 {
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
+	ExecutionFlags = int32(EProcessorExecutionFlags::Server | EProcessorExecutionFlags::Standalone);
 	ExecutionOrder.ExecuteAfter.Add(UEcoHerdAggregateProcessor::StaticClass()->GetFName());
 	ExecutionOrder.ExecuteAfter.Add(UEcoThreatDetectionProcessor::StaticClass()->GetFName());
 	bAutoRegisterWithProcessingPhases = true;
@@ -34,6 +40,7 @@ void UEcoAlarmPropagationProcessor::ConfigureQueries(const TSharedRef<FMassEntit
 	EntityQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FEcoSensoryStateFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
 	EntityQuery.AddSharedRequirement<FEcoSocialSpeciesSharedFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	EntityQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
@@ -44,7 +51,7 @@ void UEcoAlarmPropagationProcessor::ConfigureQueries(const TSharedRef<FMassEntit
 void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
 	UWorld* World = Context.GetWorld();
-	if (!World)
+	if (!World || World->GetNetMode() == NM_Client)
 	{
 		return;
 	}
@@ -59,19 +66,22 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 	}
 
 	const UEcoHerdSubsystem* ConstHerdSubsystem = HerdSubsystem;
+	const double Now = World->GetTimeSeconds();
 
 	// Step 2: Per-agent alarm propagation, distance attenuation, and state transition
-	EntityQuery.ForEachEntityChunk(Context, [ConstHerdSubsystem, DeltaTime](FMassExecutionContext& ChunkContext)
+	EntityQuery.ForEachEntityChunk(Context, [ConstHerdSubsystem, DeltaTime, Now](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
 		TConstArrayView<FEcoHerdMemberFragment> MemberList = ChunkContext.GetFragmentView<FEcoHerdMemberFragment>();
 		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 		TArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetMutableFragmentView<FEcoAlarmStateFragment>();
+		auto Senses = ChunkContext.GetMutableFragmentView<FEcoSensoryStateFragment>();
 		const FEcoSocialSpeciesSharedFragment& SocialConfig = ChunkContext.GetSharedFragment<FEcoSocialSpeciesSharedFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
 			FEcoAlarmStateFragment& Alarm = AlarmList[i];
+			if (!Senses.IsEmpty()) { Senses[i].ClearSharedInformation(); }
 			const FVector AgentLocation = TransformList[i].GetTransform().GetLocation();
 			const int32 HerdIndex = MemberList[i].HerdRuntimeIndex;
 
@@ -91,6 +101,11 @@ void UEcoAlarmPropagationProcessor::Execute(FMassEntityManager& EntityManager, F
 					const float DistToThreat = FVector::Dist(AgentLocation, HerdData.LastThreatPosition);
 					const float DistanceAttenuation = FMath::Exp(-SocialConfig.AlarmDistanceDecay * DistToThreat);
 					const float ReceivedStrength = HerdData.AlarmStrength * DistanceAttenuation;
+					if (!Senses.IsEmpty())
+					{
+						Senses[i].ReceiveSharedInformation(HerdData.LastThreatPosition, ReceivedStrength,
+							HerdData.PersistentHerdId, HerdData.LastThreatEvidenceTime, Now);
+					}
 
 					Alarm.AlarmStrength = FMath::Clamp(FMath::Max(ReceivedStrength, Alarm.AlarmStrength), 0.0f, 1.0f);
 					// Keep memory strength, but always track the currently selected live threat.
@@ -133,13 +148,16 @@ UEcoSocialResponseProcessor::UEcoSocialResponseProcessor()
 {
 	ExecutionOrder.ExecuteInGroup = UE::Mass::ProcessorGroupNames::Behavior;
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
+	ExecutionFlags = int32(EProcessorExecutionFlags::Server | EProcessorExecutionFlags::Standalone);
 	ExecutionOrder.ExecuteAfter.Add(UEcoAlarmPropagationProcessor::StaticClass()->GetFName());
 	ExecutionOrder.ExecuteAfter.Add(UEcoPolicyProcessor::StaticClass()->GetFName());
 	bAutoRegisterWithProcessingPhases = true;
+	bRequiresGameThreadExecution = true; // Diagnostic throttle and World time are serialized.
 }
 
 void UEcoSocialResponseProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	EntityQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly);
@@ -152,12 +170,22 @@ void UEcoSocialResponseProcessor::ConfigureQueries(const TSharedRef<FMassEntityM
 
 void UEcoSocialResponseProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
-	EntityQuery.ForEachEntityChunk(Context, [](FMassExecutionContext& ChunkContext)
+	UWorld* World = Context.GetWorld();
+	if (!World || World->GetNetMode() == NM_Client) { return; }
+	const double Now = World->GetTimeSeconds();
+	const bool bLog = CVarEcoSocialActionAudit.GetValueOnGameThread() > 0;
+	if (!bLog) { NextActionAuditLogTime = 0.0; }
+	const bool bWriteSummary = bLog && Now >= NextActionAuditLogTime;
+	int32 Matched = 0, Adjusted = 0, Invalid = 0;
+	FString Sample;
+	bool bSampleAdjusted = false;
+	EntityQuery.ForEachEntityChunk(Context, [&](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
 		TConstArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetFragmentView<FEcoAlarmStateFragment>();
 		TConstArrayView<FEcoPolicyOutputFragment> PolicyOutputList = ChunkContext.GetFragmentView<FEcoPolicyOutputFragment>();
 		TArrayView<FEcoSocialBehaviorFragment> SocialBehaviorList = ChunkContext.GetMutableFragmentView<FEcoSocialBehaviorFragment>();
+		const auto Ids = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
@@ -206,6 +234,29 @@ void UEcoSocialResponseProcessor::Execute(FMassEntityManager& EntityManager, FMa
 
 			SocialBehavior.ModulatedAction = Modulated;
 			SocialBehavior.SocialCohesionMultiplier = CohesionMultiplier;
+			SocialBehavior.ActionAudit.Record(RawAction, Modulated, Alarm.State, Now);
+			if (bWriteSummary)
+			{
+				++Matched;
+				const auto& Audit = SocialBehavior.ActionAudit;
+				Invalid += Audit.bValid ? 0 : 1;
+				const bool bChanged = Audit.bValid && Audit.MaxAbsoluteDelta > KINDA_SMALL_NUMBER;
+				Adjusted += bChanged ? 1 : 0;
+				if (Sample.IsEmpty() || (bChanged && !bSampleAdjusted))
+				{
+					bSampleAdjusted = bChanged;
+					Sample = FString::Printf(TEXT("Agent=%lld State=%d Changed=%d Raw=[%.3f %.3f %.3f %.3f] Effective=[%.3f %.3f %.3f %.3f] MaxDelta=%.3f"),
+						Ids.IsEmpty() ? int64(0) : Ids[i].StableAgentId, int32(Alarm.State), int32(bChanged),
+						RawAction.Forage, RawAction.Cohesion, RawAction.FleeDist, RawAction.Cover,
+						Modulated.Forage, Modulated.Cohesion, Modulated.FleeDist, Modulated.Cover, Audit.MaxAbsoluteDelta);
+				}
+			}
 		}
 	});
+	if (bWriteSummary)
+	{
+		UE_LOG(LogEcoSocialActionAudit, Log, TEXT("[SocialAction] World=%s Time=%.2f Matched=%d Adjusted=%d Invalid=%d %s"),
+			*GetNameSafe(World), Now, Matched, Adjusted, Invalid, *Sample);
+		NextActionAuditLogTime = Now + 5.0;
+	}
 }

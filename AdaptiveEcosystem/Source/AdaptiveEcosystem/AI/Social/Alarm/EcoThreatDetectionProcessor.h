@@ -4,6 +4,7 @@
 #include "MassProcessor.h"
 #include "MassEntityQuery.h"
 #include "AI/Social/Alarm/EcoThreatTypes.h"
+#include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "EcoThreatDetectionProcessor.generated.h"
 
 /** Reads existing Mass predator grid and opt-in actor sources; writes only Social herd input. */
@@ -22,4 +23,5 @@ private:
 	TArray<int32> CandidateIndices;
 	TArray<FEcoActorThreatSnapshot> ActorThreats;
 	TArray<FEcoObservedHerdThreat> BestThreats;
+	TArray<FEcoNoiseEvent> NoiseEvents;
 };

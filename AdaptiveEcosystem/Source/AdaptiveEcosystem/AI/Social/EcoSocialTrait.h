@@ -20,5 +20,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Social")
 	FEcoSocialSpeciesSharedFragment SocialConfig;
 
+	UPROPERTY(EditAnywhere, Category="Social|Senses")
+	FEcoSensoryProfileFragment SensoryProfile;
+
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };
