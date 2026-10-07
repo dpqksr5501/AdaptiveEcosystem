@@ -78,3 +78,8 @@
   - 그 행동의 시작 확률을 0.3으로
 
 ## 변경 기록
+
+### 2026-10-07 — 행동 목록 확정 (학습 전)
+- R0 결론(`results/v3/r0/report.md`)에 따라 `allowed = [graze, flee, hide, freeze]`. SLEEP 은 빠지므로(마스크로 막힘) 4절 2의 U_SLEEP 과 4절 4의 SLEEP 입력 의존은 보지 않는다.
+- FREEZE 는 '가까운 위협 앞' 판이다: U_FREEZE = P(FREEZE | 보임 & (거리 < 6 또는 접근 ≥ 0.9)) − P(FREEZE | 보임 & 거리 ≥ 8 & 접근 < 0.7), 4절 4의 pred_approach 고정 입력 의존 검사를 한다. FSM 의 얼기 규칙도 이 판(우선순위 HIDE > FREEZE > R_base).
+- 세계 값: R0 첫 회차 값(c_still 1.8, 고개 숙임 ×0.6) + 웅크림 은신 4.0.

@@ -1,0 +1,28 @@
+{
+ "rew": {
+  "complete": true,
+  "niche_pos": 8,
+  "niche_sig_neg": 0,
+  "out_sig_neg": 8,
+  "cross_sig_neg": 5,
+  "c1": true,
+  "c2": true,
+  "c3": true,
+  "pass_": true,
+  "cross_use_focal": 0.05797311197916667,
+  "verdict": "pass"
+ },
+ "rew_did": {
+  "complete": true,
+  "niche_pos": 8,
+  "niche_sig_neg": 0,
+  "out_sig_neg": 8,
+  "cross_sig_neg": 1,
+  "c1": true,
+  "c2": true,
+  "c3": false,
+  "pass_": false,
+  "cross_use_focal": 0.05797311197916667,
+  "verdict": "fail"
+ }
+}

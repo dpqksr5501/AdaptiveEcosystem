@@ -1,0 +1,119 @@
+{
+ "meta": {
+  "config": "configs/v3_r0_on.yaml",
+  "seeds": [
+   12040,
+   12041,
+   12042,
+   12043,
+   12044,
+   12045,
+   12046,
+   12047,
+   12048,
+   12049,
+   12050,
+   12051,
+   12052,
+   12053,
+   12054,
+   12055,
+   12056,
+   12057,
+   12058,
+   12059,
+   12060,
+   12061,
+   12062,
+   12063,
+   12064,
+   12065,
+   12066,
+   12067,
+   12068,
+   12069,
+   12070,
+   12071,
+   12072,
+   12073,
+   12074,
+   12075,
+   12076,
+   12077,
+   12078,
+   12079
+  ],
+  "steps": 3000,
+  "theta": 4.0,
+  "approach": 0.9,
+  "cells": [
+   "ps0.3_pl_T600",
+   "ps0.3_pl_T1800",
+   "ps0.3_np_T600",
+   "ps0.3_np_T1800",
+   "ps0.7_pl_T600",
+   "ps0.7_pl_T1800",
+   "ps0.7_np_T600",
+   "ps0.7_np_T1800"
+  ],
+  "behaviors": [
+   "freeze"
+  ],
+  "t_crit": 2.023,
+  "event_k": 60,
+  "low_use": 0.05,
+  "elapsed_s": 646.1,
+  "digest": {
+   "ps0.3_pl_T600": "aaa22c973039",
+   "ps0.3_pl_T1800": "956b94f45321",
+   "ps0.3_np_T600": "6a1d6c22854c",
+   "ps0.3_np_T1800": "8aa690b0d71e",
+   "ps0.7_pl_T600": "ca8e1eb6d4c7",
+   "ps0.7_pl_T1800": "355ac4a19344",
+   "ps0.7_np_T600": "218ba05b5b27",
+   "ps0.7_np_T1800": "6d036b670821"
+  }
+ },
+ "gate": {
+  "freeze": {
+   "complete": true,
+   "niche_pos": 0,
+   "niche_sig_neg": 5,
+   "out_sig_neg": 8,
+   "cross_sig_neg": 0,
+   "c1": false,
+   "c2": true,
+   "c3": false,
+   "pass_": false,
+   "cross_use_focal": 0.04078893229166666,
+   "verdict": "fail"
+  },
+  "hide": {
+   "complete": false
+  },
+  "sleep": {
+   "complete": false
+  }
+ },
+ "gate_did_report_only": {
+  "freeze": {
+   "complete": true,
+   "niche_pos": 1,
+   "niche_sig_neg": 1,
+   "out_sig_neg": 8,
+   "cross_sig_neg": 0,
+   "c1": false,
+   "c2": true,
+   "c3": false,
+   "pass_": false,
+   "cross_use_focal": 0.04078893229166666,
+   "verdict": "fail"
+  },
+  "hide": {
+   "complete": false
+  },
+  "sleep": {
+   "complete": false
+  }
+ }
+}
