@@ -4,6 +4,7 @@
 #include "AI/Policy/EcoBehaviorFragments.h"
 #include "AI/Policy/EcoBehaviorConfig.h"
 #include "AI/Policy/EcoNeighborhoodSubsystem.h"
+#include "AI/Social/Senses/EcoPredatorPerception.h"
 #include "Mass/EntityFragments.h"
 #include "MassMovementFragments.h"
 #include "MassExecutionContext.h"
@@ -28,13 +29,15 @@ void UEcoCreaturePredatorProcessor::ConfigureQueries(const TSharedRef<FMassEntit
     Query.AddRequirement<FEcoPredatorStateFragment>(EMassFragmentAccess::ReadOnly);
     Query.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly);
     Query.AddRequirement<FEcoTravelFragment>(EMassFragmentAccess::ReadOnly);
+    Query.AddRequirement<FEcoPreySenseFragment>(EMassFragmentAccess::ReadOnly);
+    Query.AddRequirement<FEcoSensoryProfileFragment>(EMassFragmentAccess::ReadOnly);
+    Query.AddSharedRequirement<FEcoPredatorSensesSharedFragment>(EMassFragmentAccess::ReadOnly);
 }
 void UEcoCreaturePredatorProcessor::Execute(FMassEntityManager& EM, FMassExecutionContext& Context)
 {
     UWorld* World = GetWorld();
-    auto* Grid = World ? World->GetSubsystem<UEcoNeighborhoodSubsystem>() : nullptr;
     const float Delta = Context.GetDeltaTimeSeconds();
-    if (!Grid || !Grid->IsBuilt() || !FMath::IsFinite(Delta) || Delta <= 0) return;
+    if (!World || !FMath::IsFinite(Delta) || Delta <= 0) return;
     const double Now = World->GetTimeSeconds();
     Query.ForEachEntityChunk(Context, [&](FMassExecutionContext& C)
     {
@@ -43,24 +46,22 @@ void UEcoCreaturePredatorProcessor::Execute(FMassEntityManager& EM, FMassExecuti
         const auto Ids = C.GetFragmentView<FEcoIdentityFragment>(); const auto Regions = C.GetFragmentView<FEcoRegionFragment>();
         const auto States = C.GetFragmentView<FEcoPredatorStateFragment>(); const auto Vitals = C.GetFragmentView<FEcoVitalsFragment>();
         const auto Travel = C.GetFragmentView<FEcoTravelFragment>();
-        TArray<int32> Nearby;
+        const auto Senses = C.GetFragmentView<FEcoPreySenseFragment>();
+        const auto Profiles = C.GetFragmentView<FEcoSensoryProfileFragment>();
+        const auto& SensorySettings = C.GetSharedFragment<FEcoPredatorSensesSharedFragment>().Settings;
         for (int32 I = 0; I < C.GetNumEntities(); ++I)
         {
             auto& T = Transforms[I].GetMutableTransform(); auto& Life = Lives[I]; Life.bPursuing = false;
             if (Vitals[I].HP <= 0 || States[I].EatCooldown > 0) { Velocities[I].Value = FVector::ZeroVector; continue; }
             const FVector Position = T.GetLocation(), Heading = T.GetRotation().GetForwardVector();
-            FVector Direction = Heading; float Best = MAX_flt;
-            Grid->QueryRadius(Position, EcoBehaviorConfig::PredViewRadiusCm, Nearby);
-            for (int32 Index : Nearby)
+            FVector Direction = Heading, PursuitPosition;
+            if (EcoPredatorSenses::ReadPursuit(Senses[I], SensorySettings, Profiles[I], Now, PursuitPosition))
             {
-                const auto& Other = Grid->GetEntries()[Index];
-                if (Other.bPredator || !EM.IsEntityValid(Other.Entity)) continue;
-                const auto* V = EM.GetFragmentDataPtr<FEcoVitalsFragment>(Other.Entity); if (!V || V->HP <= 0) continue;
-                const FVector D = Other.Location - Position;
-                const float Distance = D.Size2D() * (Other.bInCover ? EcoBehaviorConfig::CoverHideMult : 1.f);
-                if (Distance >= Best || Distance > EcoBehaviorConfig::PredViewRadiusCm || FVector::DotProduct(D.GetSafeNormal2D(), Heading)
-                    < FMath::Cos(FMath::DegreesToRadians(EcoBehaviorConfig::PredFovDeg * 0.5f))) continue;
-                Best = Distance; Direction = D.GetSafeNormal2D(); Life.bPursuing = true;
+                // Knowledge only: never replace a remembered/heard position with the live grid transform.
+                const FVector D = PursuitPosition - Position;
+                const float StopRadius = Senses[I].Cue.Source == EEcoSenseSource::Sight ? 1.f
+                    : FMath::Clamp(Senses[I].Cue.UncertaintyRadius, 100.f, 300.f);
+                if (D.Size2D() > StopRadius) { Direction = D.GetSafeNormal2D(); Life.bPursuing = true; }
             }
             if (!Life.bPursuing && Now >= Life.NextWanderTime)
             {

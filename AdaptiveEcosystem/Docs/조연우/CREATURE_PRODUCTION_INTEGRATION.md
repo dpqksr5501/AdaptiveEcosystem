@@ -4,6 +4,10 @@
 
 ## 바로 실행
 
+늑대 Sight/Hearing/Memory, 접촉 Notify 40개, 실제 Grass/Dry 지형 및 최신 검증은 [감각·Notify 고도화](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md)를 참고한다.
+
+레벨 담당자가 올린 World Partition 맵의 실제 배치는 [팀 레벨 런타임 배치](ECOSYSTEM_LEVEL_RUNTIME_PLACEMENT.md)를 참고한다. `/Game/Map/LV_Ecosystem_IntegrationTest`는 3지역·19마리·수풀 은신처를 사용하며, 아래 평면 테스트 맵과 별도 시나리오다.
+
 1. UE 5.8에서 `/Game/Creatures/Integrated/L_EcoCreatureIntegration`을 연다.
 2. Play 또는 Standalone을 실행한다. 초기 구성은 Forest_A 사슴 8 + 늑대 1, Forest_B 사슴 4 + 늑대 1이다.
 3. Play 설정에서 Players=2, Play As Client 및 전용 서버 실행을 선택하면 같은 맵·EntityConfig로 복제를 확인할 수 있다. Single Process PIE는 이번 CLI 검증과 별개이며 아래 실제 별도 프로세스 테스트를 우선 근거로 삼는다.

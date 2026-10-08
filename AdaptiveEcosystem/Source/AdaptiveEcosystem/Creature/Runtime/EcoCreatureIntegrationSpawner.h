@@ -12,6 +12,8 @@
 
 class UMassEntityConfigAsset;
 class AEcologyRegion;
+class UWorldPartitionStreamingSourceComponent;
+class UEcoFootstepAudioSet;
 
 USTRUCT(BlueprintType)
 struct FEcoCreatureSpawnGroup
@@ -20,6 +22,12 @@ struct FEcoCreatureSpawnGroup
 	UPROPERTY(EditAnywhere) FName RegionId = TEXT("Forest_A");
 	UPROPERTY(EditAnywhere, meta=(ClampMin="0")) int32 Herbivores = 8;
 	UPROPERTY(EditAnywhere, meta=(ClampMin="0")) int32 Wolves = 1;
+	/** World-space authored candidates. Empty arrays retain the original demo arrangement. */
+	UPROPERTY(EditAnywhere) TArray<FVector> HerbivoreSpawnPoints;
+	UPROPERTY(EditAnywhere) TArray<FVector> WolfSpawnPoints;
+	/** Spatial distribution hint only; regional FoodAmount remains the authority. */
+	UPROPERTY(EditAnywhere) bool bUseFoodPatchPosition = false;
+	UPROPERTY(EditAnywhere) FVector FoodPatchPosition = FVector::ZeroVector;
 	UPROPERTY(EditAnywhere) FEcoSpawnScheduleSettings Schedule;
 };
 
@@ -39,12 +47,17 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|Config") TObjectPtr<UMassEntityConfigAsset> WolfConfig;
 	UPROPERTY(EditAnywhere, Category="Creature|Visual") TSubclassOf<AEcoCreatureRepresentationActor> HerbivoreActorClass;
 	UPROPERTY(EditAnywhere, Category="Creature|Visual") TSubclassOf<AEcoCreatureRepresentationActor> WolfActorClass;
+	/** Shared presentation/noise tuning; cadence remains per logical agent and per local visual. */
+	UPROPERTY(EditAnywhere, Category="Creature|Audio") TObjectPtr<UEcoFootstepAudioSet> FootstepAudioSet;
 	UPROPERTY(EditAnywhere, Category="Creature|Population") TArray<FEcoCreatureSpawnGroup> Groups;
 	UPROPERTY(EditAnywhere, Category="Creature|Population", meta=(ClampMin="1",ClampMax="512")) int32 GlobalPopulationLimit = 128;
 	UPROPERTY(EditAnywhere, Category="Creature|Time", meta=(ClampMin="1")) double DaySeconds = 60;
 	UPROPERTY(EditAnywhere, Category="Creature|Time", meta=(ClampMin="1")) double NightSeconds = 60;
 	UPROPERTY(EditAnywhere, Category="Creature|Migration") FEcoMigrationSettings Migration;
 	UPROPERTY(EditAnywhere, Category="Creature|Population") bool bEnableWaves = false;
+	UPROPERTY(EditAnywhere, Category="Creature|Streaming") bool bUseHabitatStreaming = false;
+	UPROPERTY(EditAnywhere, Category="Creature|Streaming", meta=(ClampMin="3000", Units="cm")) float HabitatStreamingRadius = 10000.0f;
+	UPROPERTY(VisibleAnywhere, Category="Creature|Streaming") TObjectPtr<UWorldPartitionStreamingSourceComponent> HabitatStreamingSource;
 	UPROPERTY(EditAnywhere, Category="Creature|Vitals", meta=(ClampMin="0")) float EnergyDrainPerSecond = 1.0f;
 	UPROPERTY(EditAnywhere, Category="Creature|Vitals", meta=(ClampMin="0")) float EnergyPerFood = 5.0f;
 	UFUNCTION(BlueprintPure, Category="Creature") int32 GetVisualCount() const { return Visuals.Num(); }
@@ -60,6 +73,8 @@ private:
 	bool RegisterTemplates();
 	bool StartAuthority();
 	int32 Spawn(FName RegionId, int32 Count, bool bPredator);
+	bool BuildSpawnPositions(const FEcoCreatureSpawnGroup& Group, int32 Count, bool bPredator, TArray<FVector>& Out) const;
+	void UpdateHabitatStreaming();
 	void Reconcile(float DeltaSeconds);
 	void SyncVisuals(float DeltaSeconds);
 	void PublishSummary();
@@ -72,12 +87,19 @@ private:
 	struct FBinding { TWeakObjectPtr<AEcoCreatureRepresentationActor> Actor; int64 Sequence = 0; };
 	TMap<int64, FBinding> Visuals;
 	bool bReady = false;
+	bool bWaitingForHabitat = false;
+	double NextStreamingUpdate = 0;
 	double LastResourceTime = 0;
 	double NextLog = 0;
 	int64 Step = 0;
 	double TestExitAfter = 0;
 	double TestCaptureAt = 0;
 	double StartedAt = 0;
+#if WITH_DEV_AUTOMATION_TESTS
+	void UpdateTestObserver();
+	bool bTestObserverCycle = false;
+	int32 LastTestObserverPhase = INDEX_NONE;
+#endif
 };
 
 UCLASS()

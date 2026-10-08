@@ -1,5 +1,7 @@
 # Social 이동 인계와 Shelter 예약 생명주기
 
+> **2026-10-08 통합 갱신:** `/Game/Map/LV_Ecosystem_IntegrationTest`의 opt-in Creature는 기존 단일 Movement writer가 Request를 소비하고 Feedback을 반환한다. 실제 Moving→Occupied와 사망 시 슬롯 반환, Client 표현 및 재접속을 검증했다. 아래의 “연결 대기”와 JYU 기록은 2026-10-01 당시 범위다. 현재 실행·검증은 [Creature 통합](CREATURE_PRODUCTION_INTEGRATION.md), [감각·Notify 고도화](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md)를 따른다. 기존 JYU/M3 전체 전환 완료를 의미하지 않는다.
+
 > 작업 브랜치: `codex/social-shelter-handoff`<br>
 > 기준 커밋: `9461ae7` — 실제 위협 연동 및 문서 감사<br>
 > 담당: 조연우 / Social Runtime · 최종 갱신 2026-10-01

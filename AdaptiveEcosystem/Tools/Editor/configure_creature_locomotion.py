@@ -17,9 +17,14 @@ def load(path):
 def configure(kind, blueprint):
     folder, prefix = ("/Game/AnimalVarietyPack/Wolf/Animations", "ANIM_Wolf") if kind == "Wolf" else (
         "/Game/AnimalVarietyPack/DeerStagAndDoe/Animations", "ANIM_DeerStag")
-    clips = [load(folder + "/" + prefix + "_" + suffix)
-             for suffix in ("IdleBreathe", "Walk", "WalkTurnL", "WalkTurnR", "Run")]
-    run_turns = [load(folder + "/" + prefix + "_" + suffix) for suffix in ("RunTurnL", "RunTurnR")] if kind == "Wolf" else [None, None]
+    suffixes = ("Walk", "WalkTurnL", "WalkTurnR", "Run") + (("RunTurnL", "RunTurnR") if kind == "Wolf" else ())
+    owned = [unreal.load_asset(ROOT + "/FootContacts/ANIM_Eco" + kind + "_" + suffix) for suffix in suffixes]
+    if any(owned) and not all(owned):
+        raise RuntimeError("Incomplete contact animation set; rerun configure_creature_contacts.py: " + kind)
+    use_notifies = all(owned)
+    moving = owned if use_notifies else [load(folder + "/" + prefix + "_" + suffix) for suffix in suffixes]
+    clips = [load(folder + "/" + prefix + "_IdleBreathe"), *moving[:4]]
+    run_turns = moving[4:] if kind == "Wolf" else [None, None]
     name = "BS_Eco" + kind + "_Turning"
     blend = unreal.load_asset(ROOT + "/" + name)
     if not blend:
@@ -35,6 +40,8 @@ def configure(kind, blueprint):
     if not unreal.EcoCreatureBlendSpaceLibrary.configure_representation(
         blueprint, blend, unreal.Rotator(pitch=0, yaw=-90, roll=0), unreal.Vector(0, 1, 0)):
         raise RuntimeError("BP defaults did not survive compilation: " + kind)
+    if not unreal.EcoCreatureBlendSpaceLibrary.configure_footstep_notifies(blueprint, use_notifies):
+        raise RuntimeError("BP contact mode did not survive compilation: " + kind)
     if not unreal.EditorAssetLibrary.save_loaded_asset(blueprint, only_if_is_dirty=False):
         raise RuntimeError("Could not save animal BP: " + kind)
     unreal.log("CREATURE_LOCOMOTION_OK " + kind + " " + blend.get_path_name() + " meshYaw=-90 forward=+Y")

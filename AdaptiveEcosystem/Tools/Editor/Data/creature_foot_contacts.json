@@ -1,0 +1,386 @@
+{
+  "Wolf": {
+    "Walk": {
+      "source": "/Game/AnimalVarietyPack/Wolf/Animations/ANIM_Wolf_Walk.ANIM_Wolf_Walk",
+      "length": 1.0,
+      "markers": [
+        {
+          "bone": "Wolf_-L-Foot",
+          "time": 0.075,
+          "sample_height": 7.673,
+          "min_height": 6.384,
+          "max_height": 15.516,
+          "threshold": 7.7538
+        },
+        {
+          "bone": "Wolf_-L-Finger0",
+          "time": 0.475,
+          "sample_height": 4.7452,
+          "min_height": 3.32,
+          "max_height": 15.3403,
+          "threshold": 5.123044999999999
+        },
+        {
+          "bone": "Wolf_-R-Foot",
+          "time": 0.591667,
+          "sample_height": 7.1533,
+          "min_height": 6.093,
+          "max_height": 13.672,
+          "threshold": 7.22985
+        },
+        {
+          "bone": "Wolf_-R-Finger0",
+          "time": 0.983333,
+          "sample_height": 4.0019,
+          "min_height": 2.3464,
+          "max_height": 15.6815,
+          "threshold": 4.346665
+        }
+      ]
+    },
+    "WalkTurnL": {
+      "source": "/Game/AnimalVarietyPack/Wolf/Animations/ANIM_Wolf_WalkTurnL.ANIM_Wolf_WalkTurnL",
+      "length": 1.0,
+      "markers": [
+        {
+          "bone": "Wolf_-L-Foot",
+          "time": 0.075,
+          "sample_height": 7.6475,
+          "min_height": 6.3763,
+          "max_height": 15.5161,
+          "threshold": 7.747269999999999
+        },
+        {
+          "bone": "Wolf_-L-Finger0",
+          "time": 0.491667,
+          "sample_height": 4.7933,
+          "min_height": 3.2965,
+          "max_height": 15.4252,
+          "threshold": 5.115805
+        },
+        {
+          "bone": "Wolf_-R-Foot",
+          "time": 0.591667,
+          "sample_height": 7.162,
+          "min_height": 6.0681,
+          "max_height": 13.6719,
+          "threshold": 7.208670000000001
+        },
+        {
+          "bone": "Wolf_-R-Finger0",
+          "time": 0.975,
+          "sample_height": 4.521,
+          "min_height": 2.6836,
+          "max_height": 15.5687,
+          "threshold": 4.616365
+        }
+      ]
+    },
+    "WalkTurnR": {
+      "source": "/Game/AnimalVarietyPack/Wolf/Animations/ANIM_Wolf_WalkTurnR.ANIM_Wolf_WalkTurnR",
+      "length": 1.0,
+      "markers": [
+        {
+          "bone": "Wolf_-L-Foot",
+          "time": 0.075,
+          "sample_height": 7.673,
+          "min_height": 6.3842,
+          "max_height": 15.5161,
+          "threshold": 7.753985
+        },
+        {
+          "bone": "Wolf_-R-Finger0",
+          "time": 0.1,
+          "sample_height": 4.0361,
+          "min_height": 2.1102,
+          "max_height": 15.6721,
+          "threshold": 4.1444849999999995
+        },
+        {
+          "bone": "Wolf_-L-Finger0",
+          "time": 0.466667,
+          "sample_height": 5.0147,
+          "min_height": 3.3207,
+          "max_height": 14.6665,
+          "threshold": 5.02257
+        },
+        {
+          "bone": "Wolf_-R-Foot",
+          "time": 0.608333,
+          "sample_height": 6.9788,
+          "min_height": 5.8603,
+          "max_height": 13.6717,
+          "threshold": 7.03201
+        }
+      ]
+    },
+    "Run": {
+      "source": "/Game/AnimalVarietyPack/Wolf/Animations/ANIM_Wolf_Run.ANIM_Wolf_Run",
+      "length": 0.5333333611488342,
+      "markers": [
+        {
+          "bone": "Wolf_-L-Foot",
+          "time": 0.017778,
+          "sample_height": 8.8961,
+          "min_height": 4.1467,
+          "max_height": 35.9735,
+          "threshold": 8.92072
+        },
+        {
+          "bone": "Wolf_-R-Foot",
+          "time": 0.115556,
+          "sample_height": 7.5035,
+          "min_height": 1.0356,
+          "max_height": 45.9118,
+          "threshold": 7.76703
+        },
+        {
+          "bone": "Wolf_-R-Finger0",
+          "time": 0.471111,
+          "sample_height": 8.4225,
+          "min_height": 3.2911,
+          "max_height": 39.4726,
+          "threshold": 8.718325
+        },
+        {
+          "bone": "Wolf_-L-Finger0",
+          "time": 0.506667,
+          "sample_height": 7.2479,
+          "min_height": 2.3852,
+          "max_height": 37.827,
+          "threshold": 7.7014700000000005
+        }
+      ]
+    },
+    "RunTurnL": {
+      "source": "/Game/AnimalVarietyPack/Wolf/Animations/ANIM_Wolf_RunTurnL.ANIM_Wolf_RunTurnL",
+      "length": 0.5333333611488342,
+      "markers": [
+        {
+          "bone": "Wolf_-L-Foot",
+          "time": 0.017778,
+          "sample_height": 8.8922,
+          "min_height": 4.1477,
+          "max_height": 35.9706,
+          "threshold": 8.921135
+        },
+        {
+          "bone": "Wolf_-R-Foot",
+          "time": 0.12,
+          "sample_height": 7.0041,
+          "min_height": 0.5042,
+          "max_height": 45.9044,
+          "threshold": 7.31423
+        },
+        {
+          "bone": "Wolf_-R-Finger0",
+          "time": 0.471111,
+          "sample_height": 8.4214,
+          "min_height": 3.1136,
+          "max_height": 39.4762,
+          "threshold": 8.56799
+        },
+        {
+          "bone": "Wolf_-L-Finger0",
+          "time": 0.506667,
+          "sample_height": 7.3504,
+          "min_height": 2.4885,
+          "max_height": 36.9608,
+          "threshold": 7.659344999999999
+        }
+      ]
+    },
+    "RunTurnR": {
+      "source": "/Game/AnimalVarietyPack/Wolf/Animations/ANIM_Wolf_RunTurnR.ANIM_Wolf_RunTurnR",
+      "length": 0.5333333611488342,
+      "markers": [
+        {
+          "bone": "Wolf_-L-Foot",
+          "time": 0.001,
+          "sample_height": 9.9343,
+          "min_height": 5.8142,
+          "max_height": 36.0607,
+          "threshold": 10.351174999999998
+        },
+        {
+          "bone": "Wolf_-R-Foot",
+          "time": 0.093333,
+          "sample_height": 11.1783,
+          "min_height": 5.0885,
+          "max_height": 46.0818,
+          "threshold": 11.237495
+        },
+        {
+          "bone": "Wolf_-R-Finger0",
+          "time": 0.471111,
+          "sample_height": 9.4399,
+          "min_height": 4.5763,
+          "max_height": 39.6648,
+          "threshold": 9.839575
+        },
+        {
+          "bone": "Wolf_-L-Finger0",
+          "time": 0.511111,
+          "sample_height": 6.4134,
+          "min_height": 2.4419,
+          "max_height": 35.0994,
+          "threshold": 7.340525000000001
+        }
+      ]
+    }
+  },
+  "Deer": {
+    "Walk": {
+      "source": "/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_Walk.ANIM_DeerStag_Walk",
+      "length": 1.0,
+      "markers": [
+        {
+          "bone": "STAG_-L-Foot",
+          "time": 0.091667,
+          "sample_height": 11.5206,
+          "min_height": 9.8075,
+          "max_height": 22.6005,
+          "threshold": 11.72645
+        },
+        {
+          "bone": "STAG_-L-Finger0",
+          "time": 0.458333,
+          "sample_height": 8.9821,
+          "min_height": 7.8252,
+          "max_height": 16.2615,
+          "threshold": 9.090645
+        },
+        {
+          "bone": "STAG_-R-Foot",
+          "time": 0.591667,
+          "sample_height": 11.3934,
+          "min_height": 9.4202,
+          "max_height": 22.6494,
+          "threshold": 11.40458
+        },
+        {
+          "bone": "STAG_-R-Finger0",
+          "time": 0.966667,
+          "sample_height": 9.0879,
+          "min_height": 7.5863,
+          "max_height": 18.1802,
+          "threshold": 9.175384999999999
+        }
+      ]
+    },
+    "WalkTurnL": {
+      "source": "/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_WalkTurnL.ANIM_DeerStag_WalkTurnL",
+      "length": 1.0,
+      "markers": [
+        {
+          "bone": "STAG_-L-Foot",
+          "time": 0.091667,
+          "sample_height": 11.4681,
+          "min_height": 9.8239,
+          "max_height": 22.5998,
+          "threshold": 11.740285
+        },
+        {
+          "bone": "STAG_-L-Finger0",
+          "time": 0.45,
+          "sample_height": 9.05,
+          "min_height": 7.823,
+          "max_height": 17.5977,
+          "threshold": 9.289205
+        },
+        {
+          "bone": "STAG_-R-Foot",
+          "time": 0.608333,
+          "sample_height": 11.2168,
+          "min_height": 9.4344,
+          "max_height": 22.6493,
+          "threshold": 11.416635
+        },
+        {
+          "bone": "STAG_-R-Finger0",
+          "time": 0.95,
+          "sample_height": 8.9295,
+          "min_height": 7.4876,
+          "max_height": 18.6928,
+          "threshold": 9.168379999999999
+        }
+      ]
+    },
+    "WalkTurnR": {
+      "source": "/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_WalkTurnR.ANIM_DeerStag_WalkTurnR",
+      "length": 1.0,
+      "markers": [
+        {
+          "bone": "STAG_-L-Foot",
+          "time": 0.091667,
+          "sample_height": 11.5384,
+          "min_height": 9.8231,
+          "max_height": 22.6005,
+          "threshold": 11.73971
+        },
+        {
+          "bone": "STAG_-L-Finger0",
+          "time": 0.45,
+          "sample_height": 9.1861,
+          "min_height": 7.828,
+          "max_height": 17.7689,
+          "threshold": 9.319135
+        },
+        {
+          "bone": "STAG_-R-Foot",
+          "time": 0.616667,
+          "sample_height": 11.2695,
+          "min_height": 9.374,
+          "max_height": 22.6494,
+          "threshold": 11.365310000000001
+        },
+        {
+          "bone": "STAG_-R-Finger0",
+          "time": 0.925,
+          "sample_height": 8.9719,
+          "min_height": 7.5514,
+          "max_height": 18.6226,
+          "threshold": 9.21208
+        }
+      ]
+    },
+    "Run": {
+      "source": "/Game/AnimalVarietyPack/DeerStagAndDoe/Animations/ANIM_DeerStag_Run.ANIM_DeerStag_Run",
+      "length": 0.800000011920929,
+      "markers": [
+        {
+          "bone": "STAG_-L-Finger0",
+          "time": 0.526667,
+          "sample_height": 20.4268,
+          "min_height": 6.6891,
+          "max_height": 101.4793,
+          "threshold": 20.907629999999997
+        },
+        {
+          "bone": "STAG_-R-Finger0",
+          "time": 0.546667,
+          "sample_height": 20.2887,
+          "min_height": 6.3985,
+          "max_height": 100.4612,
+          "threshold": 20.507905
+        },
+        {
+          "bone": "STAG_-L-Foot",
+          "time": 0.7,
+          "sample_height": 21.9172,
+          "min_height": 8.1874,
+          "max_height": 101.1639,
+          "threshold": 22.133875
+        },
+        {
+          "bone": "STAG_-R-Foot",
+          "time": 0.733333,
+          "sample_height": 21.7221,
+          "min_height": 8.6799,
+          "max_height": 100.2446,
+          "threshold": 22.414605
+        }
+      ]
+    }
+  }
+}

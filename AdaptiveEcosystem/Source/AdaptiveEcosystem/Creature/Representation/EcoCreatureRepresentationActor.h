@@ -11,6 +11,7 @@ class UTextRenderComponent;
 class USkeletalMesh;
 class UBlendSpace;
 class UAnimSequence;
+class UEcoFootstepAudioComponent;
 
 /** Passive Mass representation. No controller, movement component, physics, or logical state writer. */
 UCLASS(Blueprintable)
@@ -24,6 +25,8 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<USkeletalMeshComponent> CreatureMesh;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<UStaticMeshComponent> PlaceholderBody;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<UTextRenderComponent> IdentityLabel;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Audio") TObjectPtr<UEcoFootstepAudioComponent> Footsteps;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Audio") bool bUseFootstepNotifies = false;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual") FName VisualSpeciesId = TEXT("Herbivore");
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<USkeletalMesh> VisualMesh;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<UBlendSpace> LocomotionBlendSpace;

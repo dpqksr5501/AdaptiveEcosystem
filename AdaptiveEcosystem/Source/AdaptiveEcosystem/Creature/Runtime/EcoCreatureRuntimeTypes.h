@@ -2,11 +2,20 @@
 
 #include "CoreMinimal.h"
 #include "MassEntityTypes.h"
+#include "Creature/Audio/EcoFootstepCadence.h"
 #include "EcoCreatureRuntimeTypes.generated.h"
 
 /** Opt-in networked creature path. Never attached to the M3 Box or legacy demo. */
 USTRUCT()
 struct FEcoIntegratedCreatureTag : public FMassTag { GENERATED_BODY() };
+
+/** Authority-only step history. Audio playback has an independent local cadence. */
+USTRUCT()
+struct FEcoCreatureFootstepFragment : public FMassFragment
+{
+    GENERATED_BODY()
+    FEcoFootstepCadence Cadence;
+};
 
 /** Read-only presentation payload on clients; no client vitals or policy simulation. */
 USTRUCT()

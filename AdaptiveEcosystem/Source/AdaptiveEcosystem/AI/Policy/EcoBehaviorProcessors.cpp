@@ -13,6 +13,7 @@
 #include "Mass/EcoMassFragments.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "AI/Social/Senses/EcoPredatorPerception.h"
 #include "World/EcoWorldClockSubsystem.h"
 
 namespace
@@ -395,6 +396,7 @@ void UEcoPredationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManage
 
 	PredatorQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	PredatorQuery.AddRequirement<FEcoPredatorStateFragment>(EMassFragmentAccess::ReadWrite);
+    PredatorQuery.AddRequirement<FEcoPreySenseFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	PredatorQuery.AddTagRequirement<FEcoPredatorTag>(EMassFragmentPresence::All);
 }
 
@@ -438,7 +440,7 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 	const TArray<FEcoNeighborEntry>& Entries = Grid->GetEntries();
 
 	PredatorQuery.ForEachEntityChunk(Context,
-		[&EntityManager, Predation, Grid, &Entries, Dt, CatchRadius, HideMult, EatCooldown]
+		[&EntityManager, Predation, Grid, World, &Entries, Dt, CatchRadius, HideMult, EatCooldown]
 		(FMassExecutionContext& Ctx)
 	{
 		const TConstArrayView<FTransformFragment> Transforms =
@@ -446,6 +448,7 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 		const TArrayView<FEcoPredatorStateFragment> States =
 			Ctx.GetMutableFragmentView<FEcoPredatorStateFragment>();
 		TArray<int32> Nearby;
+        const auto PreySenses = Ctx.GetFragmentView<FEcoPreySenseFragment>();
 
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
@@ -471,6 +474,17 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 				}
 				const float Perceived =
 					FVector::Dist2D(E.Location, P) * (E.bInCover ? HideMult : 1.0f);
+                // Opt-in Creature wolves require fresh direct sight, plus current LOS at contact.
+                // Legacy/Python-parity predator archetypes have no PreySense and keep their V1 rule.
+                if (!PreySenses.IsEmpty())
+                {
+                    const auto& Sense = PreySenses[i];
+                    if (Sense.Target != E.Entity || Sense.Cue.LastDirectSense != EEcoSenseSource::Sight
+                        || Sense.Cue.Confidence <= 0 || World->GetTimeSeconds() < Sense.Cue.LastObservedTime
+                        || World->GetTimeSeconds() - Sense.Cue.LastObservedTime > .25) continue;
+                    FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoCreatureCaptureLOS), true);
+                    if (World->LineTraceSingleByChannel(Hit, P + FVector(0,0,80), E.Location + FVector(0,0,80), ECC_Visibility, Params)) continue;
+                }
 				if (Perceived > CatchRadius || Perceived >= BestPerceived)
 				{
 					continue;

@@ -337,4 +337,23 @@ bool FEcoSocialActionAuditTest::RunTest(const FString& Parameters)
 	return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoCreatureFootstepHearingTest, "AdaptiveEcosystem.Social.Senses.LogicalFootstepsWithoutVisualActors",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoCreatureFootstepHearingTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoSensoryTests; FFixture F;
+	TestTrue(TEXT("Ambient herbivore footsteps accepted"), F.Noise.ReportCreatureFootstep(FVector(-200, 0, 0), 1, 2000, 0, 123, TEXT("Herbivore")) > 0);
+	F.Scan(); TestTrue(TEXT("Friendly footstep is not a predator alarm"), F.State().Source == EEcoSenseSource::None);
+	F.Noise.ReportCreatureFootstep(FVector(-200, 0, 0), 1, 2000, 1, 456, TEXT("Wolf"));
+	F.Scan(); TestTrue(TEXT("Own stable agent noise excluded without an Actor"), F.State().Source == EEcoSenseSource::None);
+	F.Noise.ReportCreatureFootstep(FVector(-200, 0, 0), 1, 2000, 0.8f, 789, TEXT("Wolf"));
+	F.Scan(); F.Alarm();
+	TestTrue(TEXT("Wolf behind FOV is heard with no audio or visual Actor"), F.State().Source == EEcoSenseSource::Hearing
+		&& F.State().LastKnownPosition.Equals(FVector(-200, 0, 0)) && F.State().UncertaintyRadius > 0);
+	TestTrue(TEXT("Fresh hearing feeds persistent herd alarm"), F.Herd().AlarmStrength > 0);
+	TArray<FEcoNoiseEvent> Events; F.Noise.GatherRecent(Events);
+	TestTrue(TEXT("Logical source metadata preserved"), Events.Last().SourceAgentId == 789 && Events.Last().SourceSpeciesId == TEXT("Wolf"));
+	return true;
+}
+
 #endif

@@ -1,5 +1,7 @@
 # Social Behavior & Shelter Runtime — AI Coding Agent Implementation Guide
 
+> **2026-10-08 현재 구현:** 별도 opt-in Creature 경로는 PPO→Social Request→단일 Movement→Feedback, 은신처 Moving/Occupied·해제 및 기존 Mass Client 표현을 실제 테스트 레벨에 연결했다. 늑대 감각·발 접촉 Notify·Grass/Dry 표면도 적용했고 전체 자동화 43/43 및 PIE·서버/재접속 검증을 마쳤다. 아래 TASK 4 우선순위는 기존 JYU/M3 기준 이력이며, 현재 범위와 담당자 후속 연결은 [CURRENT_STATE](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md), [최신 구현·검증](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md)을 우선한다.
+
 > **Project:** AdaptiveEcosystem  
 > **Repository:** `dpqksr5501/AdaptiveEcosystem`  
 > **Engine:** Unreal Engine 5.8  

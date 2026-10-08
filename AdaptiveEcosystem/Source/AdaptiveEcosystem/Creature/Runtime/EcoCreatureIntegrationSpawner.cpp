@@ -1,4 +1,7 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
+#include "Creature/Audio/EcoFootstepAudioSet.h"
+#include "Creature/Audio/EcoFootstepAudioComponent.h"
+#include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Creature/Runtime/EcoCreatureNetworkTrait.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
@@ -29,6 +32,8 @@
 #include "HAL/PlatformMisc.h"
 #include "GameFramework/PlayerController.h"
 #include "GameFramework/Pawn.h"
+#include "Creature/Runtime/EcoCreatureMovement.h"
+#include "Components/WorldPartitionStreamingSourceComponent.h"
 
 AEcoCreatureIntegrationGameMode::AEcoCreatureIntegrationGameMode() { GameStateClass = AEcoGameState::StaticClass(); }
 void AEcoCreatureIntegrationGameMode::InitGameState()
@@ -45,6 +50,8 @@ AEcoCreatureIntegrationSpawner::AEcoCreatureIntegrationSpawner()
 	Groups.AddDefaulted();
 	HerbivoreActorClass = AEcoHerbivoreRepresentation::StaticClass();
 	WolfActorClass = AEcoWolfRepresentation::StaticClass();
+	HabitatStreamingSource = CreateDefaultSubobject<UWorldPartitionStreamingSourceComponent>(TEXT("HabitatStreamingSource"));
+	HabitatStreamingSource->DisableStreamingSource();
 }
 
 void AEcoCreatureIntegrationSpawner::PostInitializeComponents()
@@ -76,11 +83,75 @@ void AEcoCreatureIntegrationSpawner::BeginPlay()
 #if WITH_DEV_AUTOMATION_TESTS
 	FParse::Value(FCommandLine::Get(), TEXT("EcoIntegrationExitAfter="), TestExitAfter);
 	FParse::Value(FCommandLine::Get(), TEXT("EcoIntegrationCaptureAt="), TestCaptureAt);
+	bTestObserverCycle = TestExitAfter > 0 && FParse::Param(FCommandLine::Get(), TEXT("EcoIntegrationObserverCycle"));
 #endif
 	for (TActorIterator<AEcologyRegion> It(GetWorld()); It; ++It) Regions.Add(*It);
 	Regions.Sort([](const AEcologyRegion& A, const AEcologyRegion& B) { return A.RegionId.LexicalLess(B.RegionId); });
 	if (!RegisterTemplates()) { UE_LOG(LogTemp, Error, TEXT("[Eco Integration] Missing creature configs/bubble registration.")); return; }
-	bReady = GetNetMode() == NM_Client || StartAuthority();
+	if (GetNetMode() == NM_Client) { HabitatStreamingSource->DisableStreamingSource(); bReady = true; return; }
+	if (bUseHabitatStreaming)
+	{
+		if (!FMath::IsFinite(HabitatStreamingRadius) || HabitatStreamingRadius < 3000.0f)
+		{ FailRuntime(TEXT("Invalid habitat streaming radius")); return; }
+		UpdateHabitatStreaming();
+		HabitatStreamingSource->EnableStreamingSource();
+		bWaitingForHabitat = true;
+		UE_LOG(LogTemp, Log, TEXT("[Eco Integration] Waiting for authored habitat collision streaming."));
+	}
+	else if (!(bReady = StartAuthority())) FailRuntime(TEXT("Authority initialization"));
+}
+
+void AEcoCreatureIntegrationSpawner::UpdateHabitatStreaming()
+{
+	if (GetNetMode() == NM_Client || !bUseHabitatStreaming) return;
+	HabitatStreamingSource->Shapes.Reset();
+	auto AddPoint = [&](const FVector& Point)
+	{
+		if (Point.ContainsNaN()) return;
+		FStreamingSourceShape& Shape = HabitatStreamingSource->Shapes.AddDefaulted_GetRef();
+		Shape.bUseGridLoadingRange = false;
+		Shape.Radius = HabitatStreamingRadius;
+		Shape.Location = GetActorTransform().InverseTransformPosition(Point);
+	};
+	// Keep authored arrivals available for migration, plus current logical positions.
+	for (const AEcologyRegion* Region : Regions) AddPoint(Region->GetActorTransform().TransformPosition(Region->ArrivalOffset));
+	if (Owned.IsEmpty())
+	{
+		for (const auto& Group : Groups)
+		{
+			for (const FVector& Point : Group.HerbivoreSpawnPoints) AddPoint(Point);
+			for (const FVector& Point : Group.WolfSpawnPoints) AddPoint(Point);
+		}
+	}
+	else if (auto* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>())
+	{
+		const auto& EM = Spawner->GetEntityManagerChecked();
+		for (const auto E : Owned) if (EM.IsEntityValid(E)) AddPoint(EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation());
+	}
+}
+
+bool AEcoCreatureIntegrationSpawner::BuildSpawnPositions(const FEcoCreatureSpawnGroup& Group, int32 Count, bool bPredator, TArray<FVector>& Out) const
+{
+	Out.Reset();
+	const auto Found = Regions.FindByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; });
+	if (!Found || Count < 0) return false;
+	const auto& Authored = bPredator ? Group.WolfSpawnPoints : Group.HerbivoreSpawnPoints;
+	if (!Authored.IsEmpty() && Authored.Num() < Count) return false;
+	for (int32 I = 0; I < Count; ++I)
+	{
+		const double Angle = (I + (bPredator ? 2 : 0)) * 2.399963;
+		const FVector Hint = Authored.IsEmpty() ? (*Found)->GetActorLocation()
+			+ FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0) * (bPredator ? 1600 : 600) : Authored[I];
+		FVector Ground;
+		if (!EcoCreatureMovement::ProjectSpawnPoint(*GetWorld(), Hint, Ground) || !(*Found)->ContainsPosition(Ground))
+		{
+			UE_LOG(LogTemp, Error, TEXT("[Eco Integration] Invalid spawn ground Region=%s Predator=%d Candidate=%d Hint=%s"),
+				*Group.RegionId.ToString(), bPredator, I, *Hint.ToCompactString());
+			return false;
+		}
+		Out.Add(Ground);
+	}
+	return true;
 }
 
 bool AEcoCreatureIntegrationSpawner::StartAuthority()
@@ -102,8 +173,17 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 		if (Group.RegionId.IsNone() || GroupIds.Contains(Group.RegionId) || Group.Herbivores < 0 || Group.Wolves < 0 || !Group.Schedule.IsValid()) return false;
 		GroupIds.Add(Group.RegionId); Total += int64(Group.Herbivores) + Group.Wolves;
 		if (!Regions.ContainsByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; })) return false;
+		if (Group.bUseFoodPatchPosition && (Group.FoodPatchPosition.ContainsNaN()
+			|| !(*Regions.FindByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; }))->ContainsPosition(Group.FoodPatchPosition))) return false;
 	}
 	if (Total > GlobalPopulationLimit || !HerbivoreActorClass || !WolfActorClass) return false;
+	// Validate every habitat before starting clock/resources or creating any Entity.
+	for (const auto& Group : Groups)
+	{
+		TArray<FVector> Positions;
+		if (!BuildSpawnPositions(Group, Group.Herbivores, false, Positions)
+			|| !BuildSpawnPositions(Group, Group.Wolves, true, Positions)) return false;
+	}
 	if (!Ecology->ConfigurePopulationLimit(GlobalPopulationLimit)) return false;
 	for (AEcologyRegion* Region : Regions)
 	{
@@ -138,15 +218,9 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 	auto* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>();
 	const auto Found = Regions.FindByPredicate([&](const AEcologyRegion* R) { return R->RegionId == RegionId; });
 	if (!Ecology || !Spawner || !Found) return 0;
-	AEcologyRegion* Region = *Found;
 	TArray<FVector> Positions;
-	for (int32 I = 0; I < Count; ++I)
-	{
-		const double A = (I + (bPredator ? 2 : 0)) * 2.399963;
-		const FVector P = Region->GetActorLocation() + FVector(FMath::Cos(A), FMath::Sin(A), 0) * (bPredator ? 1600 : 600);
-		if (!Region->ContainsPosition(P)) { UE_LOG(LogTemp, Error, TEXT("[Eco Integration] Spawn outside authored region.")); return 0; }
-		Positions.Add(P);
-	}
+	const auto* Group = Groups.FindByPredicate([&](const FEcoCreatureSpawnGroup& G) { return G.RegionId == RegionId; });
+	if (!Group || !BuildSpawnPositions(*Group, Count, bPredator, Positions)) return 0;
 	auto& EM = Spawner->GetEntityManagerChecked();
 	TArray<FMassEntityHandle> Entities;
 	const auto& Template = (bPredator ? WolfConfig : HerbivoreConfig)->GetOrCreateEntityTemplate(*GetWorld());
@@ -163,6 +237,8 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 		const FVector Position = Positions[I];
 		EM.GetFragmentDataChecked<FTransformFragment>(Entities[I]).GetMutableTransform() = FTransform(FRotator(0, FMath::RadiansToDegrees(A), 0), Position);
 		Owned.Add(Entities[I]);
+		UE_LOG(LogTemp, Log, TEXT("[Eco Integration][Spawn] Id=%lld Region=%s Species=%s Ground=%s"),
+			Id.StableAgentId, *RegionId.ToString(), *Species.ToString(), *Position.ToCompactString());
 	}
 	Creation.Reset();
 	return Entities.Num();
@@ -180,7 +256,8 @@ float AEcoCreatureIntegrationSpawner::GetFoodDensity(const FVector& Position, fl
 	const auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
 	FRegionEcologyState State;
 	if (!Region || !Ecology || !Ecology->GetRegionState(Region->RegionId, State) || State.FoodCapacity <= 0) return 0;
-	const FVector Patch = Region->GetActorLocation() + FVector(1000, 1000, 0);
+	const auto* Group = Groups.FindByPredicate([&](const FEcoCreatureSpawnGroup& G) { return G.RegionId == Region->RegionId; });
+	const FVector Patch = Group && Group->bUseFoodPatchPosition ? Group->FoodPatchPosition : Region->GetActorLocation() + FVector(1000, 1000, 0);
 	return FMath::Clamp(State.FoodAmount / State.FoodCapacity, 0.f, 1.f)
 		* (0.3f + 0.7f * FMath::Exp(-FVector::DistSquared2D(Position, Patch) / FMath::Square(2500.f)));
 }
@@ -307,6 +384,23 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 		Present.Flags = (V.HP > 0 ? 1 : 0) | (Predator && Predator->EatCooldown > 0 ? 2 : 0) | (Life.bPursuing ? 4 : 0) | 8;
 		Present.Health = uint8(FMath::Clamp(V.HP / FMath::Max(V.MaxHP, 1.f), 0.f, 1.f) * 255);
 		Present.Energy = uint8(FMath::Clamp(V.Energy / FMath::Max(V.MaxEnergy, 1.f), 0.f, 1.f) * 255);
+		// Observe the single movement writer's completed result. Never move the agent here.
+		auto& Cadence = EM.GetFragmentDataChecked<FEcoCreatureFootstepFragment>(E).Cadence;
+		if (FootstepAudioSet && FootstepAudioSet->IsValidConfiguration())
+		{
+			const FVector Position = EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation();
+			const float Speed = Present.Velocity.Size2D();
+			if (Cadence.Advance(Position, Speed, V.HP > 0, Delta, FootstepAudioSet->GetStride(Speed), FootstepAudioSet->MinimumSpeed))
+				if (auto* Noise = GetWorld()->GetSubsystem<UEcoNoiseSubsystem>())
+				{
+					const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
+					const float Loudness = FMath::Lerp(0.45f, 1.f, FMath::Clamp((Speed - 250.f) / 650.f, 0.f, 1.f));
+					Noise->ReportCreatureFootstep(Position, Loudness, FootstepAudioSet->NoiseRange,
+						Identity.SpeciesId == TEXT("Wolf") ? FootstepAudioSet->PredatorThreat : 0.f,
+						Identity.StableAgentId, Identity.SpeciesId);
+				}
+		}
+		else Cadence.Reset();
 	}
 }
 
@@ -342,11 +436,12 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 	if (GetNetMode() == NM_DedicatedServer) return;
 	auto* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>(); if (!Spawner) return;
 	auto& EM = Spawner->GetEntityManagerChecked();
-	struct FInput { int64 Id; FName Species; FVector Position; FEcoCreaturePresentationFragment Visual; };
+	struct FInput { int64 Id; FName Species; FName Region; FVector Position; FEcoCreaturePresentationFragment Visual; };
 	TArray<FInput> Inputs;
 	FMassEntityQuery Query(EM.AsShared());
 	Query.AddTagRequirement<FEcoIntegratedCreatureTag>(EMassFragmentPresence::All);
 	Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
+	Query.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoCreaturePresentationFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
@@ -358,8 +453,9 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		{ UE_LOG(LogTemp, Error, TEXT("[Eco Integration] Client proxy contains authoritative fragments.")); bReady = false; return; }
 		const auto Ids = Chunk.GetFragmentView<FEcoIdentityFragment>(); const auto Positions = Chunk.GetFragmentView<FTransformFragment>();
 		const auto Views = Chunk.GetFragmentView<FEcoCreaturePresentationFragment>();
+		const auto Membership = Chunk.GetFragmentView<FEcoRegionFragment>();
 		for (int32 I = 0; I < Chunk.GetNumEntities(); ++I) if (Ids[I].StableAgentId > 0)
-			Inputs.Add({Ids[I].StableAgentId, Ids[I].SpeciesId, Positions[I].GetTransform().GetLocation(), Views[I]});
+			Inputs.Add({Ids[I].StableAgentId, Ids[I].SpeciesId, Membership[I].CurrentRegionId, Positions[I].GetTransform().GetLocation(), Views[I]});
 	});
 	TSet<int64> Seen;
 	for (const auto& Input : Inputs)
@@ -375,12 +471,14 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 			Binding.Actor = Actor; Binding.Sequence = 0;
 		}
 		FEcoCreatureVisualState State; State.StableAgentId = Input.Id; State.SpeciesId = Input.Species;
+		State.RegionId = Input.Region;
 		State.Sequence = ++Binding.Sequence; State.WorldTime = GetWorld()->GetTimeSeconds(); State.Position = Input.Position;
 		if (GetNetMode() == NM_Client && Binding.Sequence > 1 && FVector::DistSquared(Binding.Actor->GetActorLocation(), State.Position) < FMath::Square(2500.f))
 			State.Position = FMath::VInterpTo(Binding.Actor->GetActorLocation(), State.Position, Delta, 12.f);
 		State.Velocity = Input.Visual.Velocity; State.bAlive = (Input.Visual.Flags & 1) != 0;
 		State.bEating = (Input.Visual.Flags & 2) != 0; State.bPursuingPrey = (Input.Visual.Flags & 4) != 0;
 		State.bHasVitals = (Input.Visual.Flags & 8) != 0; State.NormalizedHealth = Input.Visual.Health / 255.f; State.NormalizedEnergy = Input.Visual.Energy / 255.f;
+		Binding.Actor->Footsteps->AudioSet = FootstepAudioSet;
 		Binding.Actor->ConsumeVisualState(State, Delta);
 	}
 	for (auto It = Visuals.CreateIterator(); It; ++It) if (!Seen.Contains(It.Key()))
@@ -405,9 +503,22 @@ void AEcoCreatureIntegrationSpawner::Tick(float Delta)
 		}
 	}
 #endif
+	if (bWaitingForHabitat)
+	{
+		if (GetWorld()->GetTimeSeconds() - StartedAt > 30.0)
+		{ bWaitingForHabitat = false; FailRuntime(TEXT("Habitat streaming timeout")); return; }
+		if (GetWorld()->GetTimeSeconds() - StartedAt < 0.25 || !HabitatStreamingSource->IsStreamingCompleted()) return;
+		bWaitingForHabitat = false;
+		if (!(bReady = StartAuthority())) { FailRuntime(TEXT("Authority initialization after habitat streaming")); return; }
+	}
 	if (!bReady || !FMath::IsFinite(Delta) || Delta <= 0) return;
+	if (bUseHabitatStreaming && GetNetMode() != NM_Client && GetWorld()->GetTimeSeconds() >= NextStreamingUpdate)
+	{ NextStreamingUpdate = GetWorld()->GetTimeSeconds() + 1.0; UpdateHabitatStreaming(); }
 	if (GetNetMode() != NM_Client) Reconcile(Delta);
 	SyncVisuals(Delta);
+#if WITH_DEV_AUTOMATION_TESTS
+	if (bTestObserverCycle) UpdateTestObserver();
+#endif
 	if (GetWorld()->GetTimeSeconds() >= NextLog)
 	{
 		NextLog = GetWorld()->GetTimeSeconds() + 5;
@@ -435,6 +546,54 @@ void AEcoCreatureIntegrationSpawner::OnWorldPostActorTick(UWorld* World, ELevelT
 	if (World == GetWorld() && TickType != LEVELTICK_ViewportsOnly) Tick(Delta);
 }
 
+#if WITH_DEV_AUTOMATION_TESTS
+void AEcoCreatureIntegrationSpawner::UpdateTestObserver()
+{
+	// Explicit timed development fixture. Moves only the observer Pawn so the
+	// existing server viewer/Bubble and client landscape streaming are exercised.
+	// Never changes creatures, vitals, policy, resources or replication payloads.
+	const auto* GameState = GetWorld()->GetGameState();
+	const double Time = GameState ? GameState->GetServerWorldTimeSeconds() : GetWorld()->GetTimeSeconds();
+	const int32 Phase = int32(Time / 12.0) % 3;
+	const FName Region = Phase == 0 ? TEXT("Forest") : Phase == 1 ? TEXT("Barren") : TEXT("Highland");
+	FVector Point(34000, Phase == 0 ? 45000 : Phase == 1 ? 0 : -49500, Phase == 0 ? -1600 : Phase == 1 ? 1700 : 2640);
+	int64 Best = MAX_int64;
+	if (GetNetMode() == NM_Client)
+	{
+		for (const auto& Pair : Visuals) if (const auto* Actor = Pair.Value.Actor.Get())
+			if (Actor->VisualState.bAlive && Actor->VisualSpeciesId == TEXT("Wolf") && Actor->VisualState.RegionId == Region && Pair.Key < Best)
+			{ Best = Pair.Key; Point = Actor->GetActorLocation(); }
+	}
+	else if (auto* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>())
+	{
+		auto& EM = Spawner->GetEntityManagerChecked();
+		for (const auto E : Owned) if (EM.IsEntityValid(E))
+		{
+			const auto* Id = EM.GetFragmentDataPtr<FEcoIdentityFragment>(E);
+			const auto* Membership = EM.GetFragmentDataPtr<FEcoRegionFragment>(E);
+			const auto* Vital = EM.GetFragmentDataPtr<FEcoVitalsFragment>(E);
+			const auto* Transform = EM.GetFragmentDataPtr<FTransformFragment>(E);
+			if (Id && Membership && Vital && Transform && Vital->HP > 0 && Id->SpeciesId == TEXT("Wolf")
+				&& Membership->CurrentRegionId == Region && Id->StableAgentId < Best)
+			{ Best = Id->StableAgentId; Point = Transform->GetTransform().GetLocation(); }
+		}
+	}
+	for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It) if (auto* Player = It->Get())
+		if (APawn* Pawn = Player->GetPawn())
+		{
+			const FVector View = Point + FVector(400, 250, 650);
+			Pawn->SetActorLocation(View, false, nullptr, ETeleportType::TeleportPhysics);
+			Player->SetControlRotation((Point - View).Rotation());
+		}
+	if (Phase != LastTestObserverPhase)
+	{
+		LastTestObserverPhase = Phase;
+		UE_LOG(LogTemp, Log, TEXT("[Eco Integration][Observer] Mode=%d Region=%s Target=%lld Time=%.2f"),
+			int32(GetNetMode()), *Region.ToString(), Best == MAX_int64 ? 0 : Best, Time);
+	}
+}
+#endif
+
 void AEcoCreatureIntegrationSpawner::FailRuntime(const TCHAR* Reason)
 {
 	 bReady = false;
@@ -446,6 +605,8 @@ void AEcoCreatureIntegrationSpawner::EndPlay(const EEndPlayReason::Type Reason)
 {
 	FWorldDelegates::OnWorldPostActorTick.Remove(PostTickHandle);
 	bReady = false;
+	bWaitingForHabitat = false;
+	HabitatStreamingSource->DisableStreamingSource();
 	for (auto& Pair : Visuals) if (auto* Actor = Pair.Value.Actor.Get()) { Actor->ClearBinding(); Actor->Destroy(); }
 	Visuals.Reset();
 	if (GetWorld() && GetNetMode() != NM_Client)

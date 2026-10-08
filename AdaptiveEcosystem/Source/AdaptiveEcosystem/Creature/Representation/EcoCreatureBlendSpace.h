@@ -24,4 +24,6 @@ public:
     /** Compile-safe native CDO edit: update the Blueprint default cache before saving. */
     UFUNCTION(BlueprintCallable, Category="Creature|Editor")
     static bool ConfigureRepresentation(UBlueprint* Blueprint, UBlendSpace* BlendSpace, FRotator MeshRotation, FVector MeshForwardAxis);
+    UFUNCTION(BlueprintCallable, Category="Creature|Editor")
+    static bool ConfigureFootstepNotifies(UBlueprint* Blueprint, bool bEnabled);
 };

@@ -7,6 +7,24 @@
 #include "Kismet2/KismetEditorUtilities.h"
 #endif
 
+bool UEcoCreatureBlendSpaceLibrary::ConfigureFootstepNotifies(UBlueprint* Blueprint, bool bEnabled)
+{
+#if WITH_EDITOR
+    if (!Blueprint || !Blueprint->GeneratedClass) return false;
+    auto* Defaults = Cast<AEcoCreatureRepresentationActor>(Blueprint->GeneratedClass->GetDefaultObject());
+    if (!Defaults || !Defaults->LocomotionBlendSpace) return false;
+    Blueprint->Modify(); Defaults->Modify(); Defaults->bUseFootstepNotifies = bEnabled;
+    Defaults->LocomotionBlendSpace->Modify();
+    Defaults->LocomotionBlendSpace->NotifyTriggerMode = ENotifyTriggerMode::HighestWeightedAnimation;
+    Defaults->LocomotionBlendSpace->MarkPackageDirty();
+    FBlueprintEditorUtils::MarkBlueprintAsModified(Blueprint); FKismetEditorUtilities::CompileBlueprint(Blueprint);
+    Defaults = Cast<AEcoCreatureRepresentationActor>(Blueprint->GeneratedClass->GetDefaultObject());
+    return Defaults && Defaults->bUseFootstepNotifies == bEnabled;
+#else
+    return false;
+#endif
+}
+
 bool UEcoCreatureBlendSpaceLibrary::ConfigureLocomotion(UBlendSpace1D* BlendSpace, UAnimSequence* Idle, UAnimSequence* Walk, UAnimSequence* Run, float WalkSpeed, float RunSpeed)
 {
 #if WITH_EDITOR

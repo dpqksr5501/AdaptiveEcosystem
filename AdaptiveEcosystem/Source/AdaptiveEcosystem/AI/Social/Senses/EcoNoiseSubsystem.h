@@ -8,6 +8,8 @@
 struct FEcoNoiseEvent
 {
 	int64 Id = 0;
+	int64 SourceAgentId = 0; // 0 for Actor-based emissions.
+	FName SourceSpeciesId;
 	double EmittedAt = 0;
 	FVector Position = FVector::ZeroVector;
 	float Loudness = 0;
@@ -29,6 +31,9 @@ public:
 	int64 ReportNoise(FVector Position, float Loudness, float MaxRange, float ThreatStrength,
 		AActor* Instigator, FName Tag);
 	void GatherRecent(TArray<FEcoNoiseEvent>& Out);
+	/** Logical Mass source: no representation Actor is required, including on dedicated servers. */
+	int64 ReportCreatureFootstep(FVector Position, float Loudness, float MaxRange, float ThreatStrength,
+		int64 StableAgentId, FName SpeciesId);
 	static constexpr int32 MaxEvents = 128;
 	static constexpr double EventLifetime = 0.6;
 private:

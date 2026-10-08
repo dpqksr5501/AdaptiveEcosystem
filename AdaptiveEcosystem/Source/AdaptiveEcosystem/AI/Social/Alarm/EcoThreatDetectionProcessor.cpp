@@ -22,6 +22,12 @@
 
 static TAutoConsoleVariable<int32> CVarEcoSensesDebug(TEXT("eco.Senses.Debug"), 0,
 	TEXT("Draw personal sight/hearing/memory knowledge (server/standalone only)."));
+static TAutoConsoleVariable<int32> CVarEcoDrawFOV(TEXT("eco.Senses.DrawFOV"), 0,
+	TEXT("Draw the effective horizontal vision sector (green, authority only)."));
+static TAutoConsoleVariable<int32> CVarEcoDrawHearing(TEXT("eco.Senses.DrawHearing"), 0,
+	TEXT("Draw the effective listener hearing range (cyan, authority only)."));
+static TAutoConsoleVariable<int32> CVarEcoSenseDrawLimit(TEXT("eco.Senses.DrawLimit"), 16,
+	TEXT("Maximum observers drawing range overlays per sensory scan."));
 
 UEcoThreatDetectionProcessor::UEcoThreatDetectionProcessor() : EntityQuery(*this)
 {
@@ -44,6 +50,7 @@ void UEcoThreatDetectionProcessor::ConfigureQueries(const TSharedRef<FMassEntity
 	EntityQuery.AddRequirement<FEcoSensoryStateFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
 	EntityQuery.AddRequirement<FEcoSensoryProfileFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	EntityQuery.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	// Predator entities are outside the observer archetype. Declare indirect access so
 	// the dependency solver accounts for their Vitals / representation writers as well.
 	EntityQuery.AddIndirectFragmentRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly);
@@ -69,6 +76,9 @@ void UEcoThreatDetectionProcessor::Execute(FMassEntityManager& EntityManager, FM
 	TRACE_CPUPROFILER_EVENT_SCOPE(EcoSensoryScan);
 	const double Now = World->GetTimeSeconds();
 	const bool bDraw = CVarEcoSensesDebug.GetValueOnGameThread() != 0 && World->GetNetMode() != NM_DedicatedServer;
+	const bool bDrawFOV = CVarEcoDrawFOV.GetValueOnGameThread() && World->GetNetMode() != NM_DedicatedServer;
+	const bool bDrawHearing = CVarEcoDrawHearing.GetValueOnGameThread() && World->GetNetMode() != NM_DedicatedServer;
+	int32 DrawnObservers = 0;
 	if (UEcoNoiseSubsystem* Noise = World->GetSubsystem<UEcoNoiseSubsystem>()) { Noise->GatherRecent(NoiseEvents); }
 	else { NoiseEvents.Reset(); }
 	const UEcologyWorldSubsystem* Regions = World->GetSubsystem<UEcologyWorldSubsystem>();
@@ -89,6 +99,7 @@ void UEcoThreatDetectionProcessor::Execute(FMassEntityManager& EntityManager, FM
 		auto Senses = Chunk.GetMutableFragmentView<FEcoSensoryStateFragment>();
 		const auto Profiles = Chunk.GetFragmentView<FEcoSensoryProfileFragment>();
 		const auto Membership = Chunk.GetFragmentView<FEcoRegionFragment>();
+		const auto Identities = Chunk.GetFragmentView<FEcoIdentityFragment>();
 		const auto& Social = Chunk.GetSharedFragment<FEcoSocialSpeciesSharedFragment>();
 		const auto& Species = Chunk.GetSharedFragment<FEcoSpeciesSharedFragment>();
 		if (!FMath::IsFinite(Species.ViewDistance) || Species.ViewDistance <= 0.0f
@@ -187,6 +198,28 @@ void UEcoThreatDetectionProcessor::Execute(FMassEntityManager& EntityManager, FM
 			float HeardConfidence = 0;
 			const float HearingRange = FMath::Clamp(Social.Senses.HearingRange * Profile.HearingMultiplier
 				* FMath::Lerp(1.0f, Social.Senses.RainHearingMultiplier, Rain), 0.0f, 10000.0f);
+			if ((bDrawFOV || bDrawHearing) && DrawnObservers++ < FMath::Clamp(CVarEcoSenseDrawLimit.GetValueOnGameThread(), 0, 128))
+			{
+				const FVector Eye = Location + EyeOffset;
+				if (bDrawFOV)
+				{
+					const float Half = FMath::DegreesToRadians(FMath::Clamp(Species.FOV, 0.f, 360.f) * 0.5f);
+					const float Yaw = FMath::Atan2(Heading.Y, Heading.X);
+					FVector Previous;
+					for (int32 Segment = 0; Segment <= 32; ++Segment)
+					{
+						const float Angle = Yaw - Half + 2.f * Half * Segment / 32.f;
+						const FVector Point = Eye + FVector(FMath::Cos(Angle), FMath::Sin(Angle), 0) * Radius;
+						// Foreground overlay keeps the XY sector visible across uneven terrain.
+						// This range guide is not a claim that LOS succeeds through obstacles.
+						if (Segment > 0) DrawDebugLine(World, Previous, Point, FColor::Green, false, 0.21f, 1, 2.f);
+						if (Segment == 0 || Segment == 32) DrawDebugLine(World, Eye, Point, FColor::Green, false, 0.21f, 1, 2.f);
+						Previous = Point;
+					}
+					DrawDebugDirectionalArrow(World, Eye, Eye + Heading * FMath::Min(Radius, 300.f), 40.f, FColor::Green, false, 0.21f, 1, 2.f);
+				}
+				if (bDrawHearing) DrawDebugSphere(World, Eye, HearingRange, 24, FColor::Cyan, false, 0.21f, 1, 1.f);
+			}
 			// New templates have a per-agent watermark. Legacy templates remain sight-only.
 			if (Sense)
 			{
@@ -195,6 +228,7 @@ void UEcoThreatDetectionProcessor::Execute(FMassEntityManager& EntityManager, FM
 				{
 					Sense->LastProcessedNoiseId = FMath::Max(Sense->LastProcessedNoiseId, Noise.Id);
 					if (Noise.Id <= PreviousNoiseId || Noise.ThreatStrength <= 0
+						|| (!Identities.IsEmpty() && Noise.SourceAgentId > 0 && Noise.SourceAgentId == Identities[I].StableAgentId)
 						|| (ObserverActor && Noise.Instigator.Get() == ObserverActor)) { continue; }
 					const float Range = FMath::Min(HearingRange, Noise.MaxRange);
 					const float Distance = FVector::Dist(Location, Noise.Position);

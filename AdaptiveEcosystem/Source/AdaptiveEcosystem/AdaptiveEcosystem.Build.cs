@@ -36,7 +36,7 @@ public class AdaptiveEcosystem : ModuleRules
 
 		SetupIrisSupport(Target);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { });
+		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem", "PhysicsCore" });
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add("UnrealEd");

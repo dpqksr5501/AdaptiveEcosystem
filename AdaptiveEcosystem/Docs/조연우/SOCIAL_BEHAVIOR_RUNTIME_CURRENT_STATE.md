@@ -1,5 +1,7 @@
 # Social Behavior & Shelter Runtime — Current State & Implementation Status
 
+> **최신 2026-10-08 실제 팀 레벨/감각 고도화 (`edba605` 이후 작업 트리):** main의 3지역 레벨에 owned 런타임을 연결하고 실제 Grass/Dry 발소리·SA·시야 디버그를 적용했다. 늑대의 별도 먹잇감 감각과 단일 이동 인계, 접촉 Notify 40개·Physical Material 우선 선택을 추가했다. 최종 직접 UBT 및 전체 자동화 **43/43** 성공. 아래 오래된 Pending 표는 당시 이력이며 최신 범위·검증·학습/네트워크 인계는 [감각·Notify 고도화](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md), [실제 레벨 배치](ECOSYSTEM_LEVEL_RUNTIME_PLACEMENT.md)를 우선한다.
+
 > **2026-10-08 추가 통합 기록 (`47faebc` 이후 작업 트리):** 실제 사슴·늑대 BP/BS와 별도 opt-in EntityConfig/레벨에서 기존 PPO→Social Request→단일 이동→Feedback 및 기존 Mass Bubble Client 표현을 연결했다. 직접 UBT 성공, 전체 자동화 33/33, 실제 별도 서버 80초/Client 40초 정상 종료·Moving→Occupied 확인. 아래의 2026-09-30/10-05 표와 JYU 기록은 당시 범위로 보존한다. 최신 실행법·책임 경계·날씨/지형 등 미연결 범위는 [동물 production 통합 기록](CREATURE_PRODUCTION_INTEGRATION.md)을 먼저 읽는다.
 
 > **Project:** AdaptiveEcosystem (Unreal Engine 5.8)  
@@ -27,7 +29,21 @@
 - **`Not yet integrated`**: 기능별 구현은 있지만 production 경로의 입력/소비자/생명주기 연결이 없음
 - **`Requires verification`**: Source만으로 에셋 구성이나 실제 PIE 동작을 확정할 수 없음
 
-### 1.1 Completed / Integration Pending
+### 1.0 현재 opt-in Creature 통합 — 2026-10-08
+
+| 범위 | 현재 상태/근거 |
+|---|---|
+| PPO → Social → 기존 단일 Movement → Feedback | 실제 팀 3지역 레벨에서 연결. BP/2D BS 방향 정렬 유지 |
+| 사슴 위협 감각/무리 경보/은신처 | 논리 발소리 Hearing 포함. 실제 Moving→Occupied, 죽음 시 슬롯 반환 확인 |
+| 늑대 개인 먹잇감 감각 | Sight/Hearing/Memory 및 마지막 감지 위치 인계. 최근 직접 Sight/LOS 없는 opt-in 포식 방지 |
+| 발 접촉/표면/공간 오디오 | owned 클립 10개·Notify 40개. Grass/Dry Physical Material 우선, SA/SC 연결 및 실제 PIE 출력 검증 |
+| Client 표현/재접속 | 동일 Dedicated에 두 번 접속·지역 순회·Notify 재생/초기화 확인. 서버 Visuals/Audio=0, Client LogicalOwned/Step=0 |
+| 검증 | 직접 UBT 성공, 전체 자동화 43/43, 실제 PIE 및 별도 서버/Client 정상 종료. [최신 상세 기록](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md) |
+| 아직 다른 작업과 합의/연결 필요 | Python 학습 시나리오 감각/포식 parity, 지역 날씨·물/식생 공급자, production 플레이어 이동·장시간 네트워크 검증 |
+
+기존 JYU/M3 전체의 전환·새 PPO 관측을 완료했다는 뜻은 아니다. 아래 표는 2026-10-05까지의 역사 기록으로 보존하며 최신 opt-in 상태와 구분한다.
+
+### 1.1 Completed / Integration Pending — 2026-10-05까지의 이력
 
 | 구분 | 현재 범위 |
 | :--- | :--- |

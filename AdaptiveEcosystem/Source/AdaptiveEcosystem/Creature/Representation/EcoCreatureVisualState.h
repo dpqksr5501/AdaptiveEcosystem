@@ -13,6 +13,7 @@ struct FEcoCreatureVisualState
 	GENERATED_BODY()
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") int64 StableAgentId = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") FName SpeciesId = NAME_None;
+	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") FName RegionId = NAME_None;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") int64 Sequence = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") double WorldTime = 0.0;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") FVector Position = FVector::ZeroVector;

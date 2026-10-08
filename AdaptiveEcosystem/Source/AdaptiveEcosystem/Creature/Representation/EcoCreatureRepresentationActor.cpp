@@ -10,6 +10,7 @@
 #include "Animation/AnimSingleNodeInstance.h"
 #include "HAL/IConsoleManager.h"
 #include "DrawDebugHelpers.h"
+#include "Creature/Audio/EcoFootstepAudioComponent.h"
 
 static TAutoConsoleVariable<int32> CVarEcoDrawFacing(TEXT("eco.Creature.DrawFacing"), 0,
 	TEXT("Draw actual velocity (green) and calibrated mesh forward (cyan). Visual-only."));
@@ -30,6 +31,7 @@ AEcoCreatureRepresentationActor::AEcoCreatureRepresentationActor()
 	bReplicates = false; // The eventual production transport remains the existing Mass network path.
 	SetReplicateMovement(false);
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("VisualRoot")));
+	Footsteps = CreateDefaultSubobject<UEcoFootstepAudioComponent>(TEXT("Footsteps"));
 	CreatureMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CreatureMesh"));
 	CreatureMesh->SetupAttachment(RootComponent);
 	CreatureMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
@@ -63,6 +65,7 @@ void AEcoCreatureRepresentationActor::BeginPlay()
 
 void AEcoCreatureRepresentationActor::RefreshAppearance()
 {
+    Footsteps->bUseAnimationNotifies = bUseFootstepNotifies;
 	if (VisualMesh) { CreatureMesh->SetSkeletalMesh(VisualMesh); }
 	CreatureMesh->SetRelativeRotation(MeshRotation);
 	UpdateAnimation();
@@ -80,6 +83,7 @@ bool AEcoCreatureRepresentationActor::BindIdentity(int64 AgentId, FName SpeciesI
 	VisualState.StableAgentId = AgentId;
 	VisualState.SpeciesId = SpeciesId;
 	bBound = true;
+	Footsteps->ResetCadence();
 	SetActorHiddenInGame(false);
 	RefreshAppearance();
 	return true;
@@ -88,6 +92,7 @@ bool AEcoCreatureRepresentationActor::BindIdentity(int64 AgentId, FName SpeciesI
 void AEcoCreatureRepresentationActor::ClearBinding()
 {
 	bBound = false;
+	Footsteps->ResetCadence();
 	VisualState = {};
 	VisualTurnAmount = DirectionDegrees = 0.0f;
 	LastFacingAuditTime = -1.0;
@@ -157,6 +162,7 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 			FMath::Abs(FMath::FindDeltaAngleDegrees(GetVisualForwardDirection().Rotation().Yaw, State.Velocity.Rotation().Yaw)), VisualTurnAmount);
 	}
 	OnVisualStateUpdated();
+	Footsteps->Consume(State, DeltaSeconds, bSnap);
 	return true;
 }
 
