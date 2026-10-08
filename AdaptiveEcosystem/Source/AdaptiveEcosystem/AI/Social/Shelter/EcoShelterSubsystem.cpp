@@ -70,6 +70,7 @@ int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVect
 	NewShelter.Capacity = FMath::Max(1, Capacity);
 
 	const float SafeRadius = FMath::Max(50.0f, Radius);
+	NewShelter.Radius = SafeRadius;
 
 	// Allocate discrete reservation slots distributed evenly in a circle around shelter center
 	for (int32 SlotIdx = 0; SlotIdx < NewShelter.Capacity; ++SlotIdx)

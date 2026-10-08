@@ -1,5 +1,7 @@
 # Social Behavior & Shelter Runtime — Current State & Implementation Status
 
+> **2026-10-08 추가 통합 기록 (`47faebc` 이후 작업 트리):** 실제 사슴·늑대 BP/BS와 별도 opt-in EntityConfig/레벨에서 기존 PPO→Social Request→단일 이동→Feedback 및 기존 Mass Bubble Client 표현을 연결했다. 직접 UBT 성공, 전체 자동화 33/33, 실제 별도 서버 80초/Client 40초 정상 종료·Moving→Occupied 확인. 아래의 2026-09-30/10-05 표와 JYU 기록은 당시 범위로 보존한다. 최신 실행법·책임 경계·날씨/지형 등 미연결 범위는 [동물 production 통합 기록](CREATURE_PRODUCTION_INTEGRATION.md)을 먼저 읽는다.
+
 > **Project:** AdaptiveEcosystem (Unreal Engine 5.8)  
 > **Repository:** `dpqksr5501/AdaptiveEcosystem`  
 > **Target Module:** `AdaptiveEcosystem` (Source/AdaptiveEcosystem/AI/Social/)  

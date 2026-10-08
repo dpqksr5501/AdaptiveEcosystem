@@ -8,6 +8,9 @@
 class USkeletalMeshComponent;
 class UStaticMeshComponent;
 class UTextRenderComponent;
+class USkeletalMesh;
+class UBlendSpace;
+class UAnimSequence;
 
 /** Passive Mass representation. No controller, movement component, physics, or logical state writer. */
 UCLASS(Blueprintable)
@@ -22,6 +25,12 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<UStaticMeshComponent> PlaceholderBody;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<UTextRenderComponent> IdentityLabel;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual") FName VisualSpeciesId = TEXT("Herbivore");
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<USkeletalMesh> VisualMesh;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<UBlendSpace> LocomotionBlendSpace;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<UAnimSequence> DeathAnimation;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") FRotator MeshRotation = FRotator::ZeroRotator;
+	/** Native single-node Blend Space playback; can later be replaced by a skeleton-specific AnimBP. */
+	void UpdateAnimation();
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0", Units="cm/s")) float IdleSpeed = 5.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="1", Units="cm/s")) float RunSpeed = 400.0f;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0")) float TurnInterpolationSpeed = 8.0f;

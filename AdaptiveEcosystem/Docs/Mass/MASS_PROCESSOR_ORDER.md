@@ -1,5 +1,7 @@
 # MASS PROCESSOR EXECUTION ORDER & THREAD SAFETY
 
+> **2026-10-08 opt-in 동물 통합:** 별도 Integrated Entity 경로는 기존 PPO→Social Lifecycle→Steering/포식자 이동을 사용하고, 자원·인구·구조 변경·표현 조정은 모든 Mass phase가 끝난 `OnWorldPostActorTick`에서 직렬 처리한다. Actor의 PostPhysics tick에서는 관찰자 잠금이 남을 수 있어 삭제하지 않는다. 그 프레임 경계의 동기 batch destruction은 삭제 전 replication observer를 실행한다. 아래 command buffer 수칙은 실행 중 Processor/Entity loop의 구조 변경에 적용한다. M3 Box 가드와 이동 경로는 유지한다. [실행·검증·인계](../조연우/CREATURE_PRODUCTION_INTEGRATION.md) 참조.
+
 > 기준 엔진: **Unreal Engine 5.8**  
 > 모듈: `AdaptiveEcosystem`  
 > 참조 C++ 헤더: `AdaptiveEcosystem/Source/AdaptiveEcosystem/Mass/EcoMassFragments.h`

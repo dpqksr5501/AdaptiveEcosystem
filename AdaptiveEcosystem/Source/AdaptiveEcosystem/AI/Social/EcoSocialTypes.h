@@ -117,6 +117,9 @@ USTRUCT(BlueprintType)
 struct FEcoShelterPoint
 {
 	GENERATED_BODY()
+	/** Authored physical refuge extent, shared by observation and slot layout. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
+	float Radius = 50.f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
 	int32 RuntimeIndex = INDEX_NONE_ECO;

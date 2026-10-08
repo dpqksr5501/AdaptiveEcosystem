@@ -5,6 +5,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/TextRenderComponent.h"
 #include "UObject/ConstructorHelpers.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/AnimSequence.h"
+#include "Animation/AnimSingleNodeInstance.h"
 
 bool FEcoCreatureVisualState::IsValid() const
 {
@@ -53,6 +56,9 @@ void AEcoCreatureRepresentationActor::BeginPlay()
 
 void AEcoCreatureRepresentationActor::RefreshAppearance()
 {
+	if (VisualMesh) { CreatureMesh->SetSkeletalMesh(VisualMesh); }
+	CreatureMesh->SetRelativeRotation(MeshRotation);
+	UpdateAnimation();
 	PlaceholderBody->SetVisibility(CreatureMesh->GetSkeletalMeshAsset() == nullptr);
 	IdentityLabel->SetText(FText::FromString(bBound ? FString::Printf(TEXT("%s #%lld"), *VisualSpeciesId.ToString(), VisualState.StableAgentId)
 		: VisualSpeciesId.ToString() + TEXT(" (unbound)")));
@@ -106,8 +112,24 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 		: State.bEating && Speed <= FMath::Max(0.0f, IdleSpeed) ? EEcoCreatureVisualMotion::Eating
 		: Speed <= FMath::Max(0.0f, IdleSpeed) ? EEcoCreatureVisualMotion::Idle
 		: Speed >= FMath::Max(IdleSpeed + 1.0f, RunSpeed) ? EEcoCreatureVisualMotion::Run : EEcoCreatureVisualMotion::Walk;
+	UpdateAnimation();
 	OnVisualStateUpdated();
 	return true;
+}
+
+void AEcoCreatureRepresentationActor::UpdateAnimation()
+{
+	if (!LocomotionBlendSpace || !CreatureMesh->GetSkeletalMeshAsset()) return;
+	UAnimationAsset* Desired = VisualMotion == EEcoCreatureVisualMotion::Dead && DeathAnimation
+		? static_cast<UAnimationAsset*>(DeathAnimation.Get()) : static_cast<UAnimationAsset*>(LocomotionBlendSpace.Get());
+	if (!CreatureMesh->GetSingleNodeInstance() || CreatureMesh->GetSingleNodeInstance()->GetCurrentAsset() != Desired)
+	{
+		CreatureMesh->SetAnimationMode(EAnimationMode::AnimationSingleNode);
+		CreatureMesh->PlayAnimation(Desired, Desired == LocomotionBlendSpace);
+		if (auto* Node = CreatureMesh->GetSingleNodeInstance()) Node->SetRootMotionMode(ERootMotionMode::IgnoreRootMotion);
+	}
+	if (auto* Node = CreatureMesh->GetSingleNodeInstance())
+		Node->SetBlendSpacePosition(FVector(VisualState.bAlive ? VisualState.Velocity.Size2D() : 0, 0, 0));
 }
 
 AEcoWolfRepresentation::AEcoWolfRepresentation()

@@ -39,6 +39,8 @@ public:
 
 	/** 개체가 이 위치에서 먹이를 소비한다. 반환값은 실제로 먹은 양. */
 	virtual float ConsumeFood(const FVector& Location, float Amount) = 0;
+	/** Negative means legacy spatial EMA; integrated providers return authoritative regional history. */
+	virtual float GetRecentPredation(const FVector& Location) const { return -1.f; }
 };
 
 UINTERFACE(MinimalAPI, BlueprintType)
