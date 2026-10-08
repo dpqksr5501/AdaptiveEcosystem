@@ -14,6 +14,7 @@
   - `AdaptiveEcosystem/Docs/Architecture/PPO_MASS_ECOSYSTEM_ARCHITECTURE.md`: 동적 생태계 최신 아키텍처 정의서
   - `AdaptiveEcosystem/Docs/RL_Policy/POLICY_CONTRACT_V1.md`: PPO 관측/행동 사양 및 정규화 계약서
   - `AdaptiveEcosystem/Docs/Mass/MASS_PROCESSOR_ORDER.md`: Mass Processor 실행 순서 및 스레드 안전성
+  - `AdaptiveEcosystem/Docs/조연우/README.md`: 조연우 역할·최신 진행상황·다른 채팅의 작업 재개를 위한 시작 문서
   - `AdaptiveEcosystem/Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md`: Social의 현재 main 구현·검증 범위와 Production Integration 우선순위
   - `AdaptiveEcosystem/Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_ARCHITECTURE.md`: Herd / Alarm / Shelter 책임 경계
   - `AdaptiveEcosystem/Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md`: 현재 TASK 4 통합 작업과 과거 MVP 구현 가이드
