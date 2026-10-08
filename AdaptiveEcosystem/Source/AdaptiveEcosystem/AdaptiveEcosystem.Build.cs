@@ -37,6 +37,10 @@ public class AdaptiveEcosystem : ModuleRules
 		SetupIrisSupport(Target);
 
 		PrivateDependencyModuleNames.AddRange(new string[] { });
+		if (Target.bBuildEditor)
+		{
+			PrivateDependencyModuleNames.Add("UnrealEd");
+		}
 
 		PublicIncludePaths.AddRange(new string[] {
 			"AdaptiveEcosystem",

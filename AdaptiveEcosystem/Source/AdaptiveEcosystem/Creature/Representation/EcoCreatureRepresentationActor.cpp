@@ -8,6 +8,13 @@
 #include "Animation/BlendSpace.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimSingleNodeInstance.h"
+#include "HAL/IConsoleManager.h"
+#include "DrawDebugHelpers.h"
+
+static TAutoConsoleVariable<int32> CVarEcoDrawFacing(TEXT("eco.Creature.DrawFacing"), 0,
+	TEXT("Draw actual velocity (green) and calibrated mesh forward (cyan). Visual-only."));
+static TAutoConsoleVariable<int32> CVarEcoFacingAudit(TEXT("eco.Creature.FacingAudit"), 0,
+	TEXT("Log moving representation facing error once per second, including client proxies."));
 
 bool FEcoCreatureVisualState::IsValid() const
 {
@@ -68,6 +75,8 @@ bool AEcoCreatureRepresentationActor::BindIdentity(int64 AgentId, FName SpeciesI
 {
 	if (AgentId <= 0 || SpeciesId != VisualSpeciesId || bBound) { return false; }
 	VisualState = {};
+	VisualTurnAmount = DirectionDegrees = 0.0f;
+	LastFacingAuditTime = -1.0;
 	VisualState.StableAgentId = AgentId;
 	VisualState.SpeciesId = SpeciesId;
 	bBound = true;
@@ -80,6 +89,8 @@ void AEcoCreatureRepresentationActor::ClearBinding()
 {
 	bBound = false;
 	VisualState = {};
+	VisualTurnAmount = DirectionDegrees = 0.0f;
+	LastFacingAuditTime = -1.0;
 	VisualMotion = EEcoCreatureVisualMotion::Idle;
 	SetActorHiddenInGame(true);
 	RefreshAppearance();
@@ -88,6 +99,11 @@ void AEcoCreatureRepresentationActor::ClearBinding()
 FVector AEcoCreatureRepresentationActor::GetVelocity() const
 {
 	return bBound && VisualState.bAlive ? VisualState.Velocity : FVector::ZeroVector;
+}
+
+FVector AEcoCreatureRepresentationActor::GetVisualForwardDirection() const
+{
+	return CreatureMesh->GetComponentTransform().TransformVectorNoScale(MeshForwardAxis).GetSafeNormal2D();
 }
 
 bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisualState& State, float DeltaSeconds)
@@ -99,11 +115,25 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 		|| FVector::DistSquared(GetActorLocation(), State.Position) > FMath::Square(FMath::Max(1.0f, TeleportDistance));
 	const float Speed = State.bAlive ? State.Velocity.Size2D() : 0.0f;
 	FRotator Facing = GetActorRotation();
+	const float PreviousYaw = Facing.Yaw;
+	DirectionDegrees = 0.0f;
 	if (Speed > FMath::Max(0.0f, IdleSpeed))
 	{
 		const FRotator Desired(0, State.Velocity.Rotation().Yaw, 0);
 		Facing = bSnap ? Desired : FMath::RInterpTo(Facing, Desired, DeltaSeconds, FMath::Max(0.0f, TurnInterpolationSpeed));
+		// Presentation may smooth small turns, but must never slide sideways/backwards
+		// for several frames after a sudden logical turn. No Mass state is changed.
+		const float Lag = FMath::Clamp(FMath::FindDeltaAngleDegrees(Desired.Yaw, Facing.Yaw),
+			-FMath::Clamp(MaxFacingLagDegrees, 0.0f, 45.0f), FMath::Clamp(MaxFacingLagDegrees, 0.0f, 45.0f));
+		Facing = FRotator(0, FRotator::NormalizeAxis(Desired.Yaw + Lag), 0);
+		DirectionDegrees = FMath::FindDeltaAngleDegrees(Facing.Yaw, Desired.Yaw);
 	}
+	const bool bContinuousTurn = !bSnap && State.bAlive && VisualState.bAlive
+		&& Speed > IdleSpeed && VisualState.Velocity.Size2D() > IdleSpeed
+		&& DeltaSeconds > SMALL_NUMBER && DeltaSeconds <= 0.5f;
+	const float TurnTarget = bContinuousTurn ? FMath::Clamp(
+		FMath::FindDeltaAngleDegrees(PreviousYaw, Facing.Yaw) / DeltaSeconds / FMath::Max(1.0f, FullTurnRateDegrees), -1.0f, 1.0f) : 0.0f;
+	VisualTurnAmount = bContinuousTurn ? FMath::FInterpTo(VisualTurnAmount, TurnTarget, DeltaSeconds, 8.0f) : 0.0f;
 	// Moves this passive visual Actor only. Never modifies a Mass fragment or evaluates behavior.
 	SetActorLocationAndRotation(State.Position, Facing, false, nullptr, ETeleportType::TeleportPhysics);
 	VisualState = State;
@@ -113,6 +143,19 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 		: Speed <= FMath::Max(0.0f, IdleSpeed) ? EEcoCreatureVisualMotion::Idle
 		: Speed >= FMath::Max(IdleSpeed + 1.0f, RunSpeed) ? EEcoCreatureVisualMotion::Run : EEcoCreatureVisualMotion::Walk;
 	UpdateAnimation();
+	if (Speed > IdleSpeed && CVarEcoDrawFacing.GetValueOnGameThread())
+	{
+		const FVector P = State.Position + FVector(0, 0, 140);
+		DrawDebugDirectionalArrow(GetWorld(), P, P + State.Velocity.GetSafeNormal2D() * 220, 35, FColor::Green, false, 0, 0, 3);
+		DrawDebugDirectionalArrow(GetWorld(), P + FVector(0, 0, 15), P + FVector(0, 0, 15) + GetVisualForwardDirection() * 220, 35, FColor::Cyan, false, 0, 0, 3);
+	}
+	if (Speed > IdleSpeed && CVarEcoFacingAudit.GetValueOnGameThread() && State.WorldTime - LastFacingAuditTime >= 1.0)
+	{
+		LastFacingAuditTime = State.WorldTime;
+		UE_LOG(LogTemp, Log, TEXT("[Eco Facing] NetMode=%d Id=%lld Species=%s Speed=%.1f Error=%.2f Turn=%.3f"),
+			int32(GetNetMode()), State.StableAgentId, *State.SpeciesId.ToString(), Speed,
+			FMath::Abs(FMath::FindDeltaAngleDegrees(GetVisualForwardDirection().Rotation().Yaw, State.Velocity.Rotation().Yaw)), VisualTurnAmount);
+	}
 	OnVisualStateUpdated();
 	return true;
 }
@@ -129,7 +172,7 @@ void AEcoCreatureRepresentationActor::UpdateAnimation()
 		if (auto* Node = CreatureMesh->GetSingleNodeInstance()) Node->SetRootMotionMode(ERootMotionMode::IgnoreRootMotion);
 	}
 	if (auto* Node = CreatureMesh->GetSingleNodeInstance())
-		Node->SetBlendSpacePosition(FVector(VisualState.bAlive ? VisualState.Velocity.Size2D() : 0, 0, 0));
+		Node->SetBlendSpacePosition(FVector(VisualState.bAlive ? VisualState.Velocity.Size2D() : 0, VisualTurnAmount, 0));
 }
 
 AEcoWolfRepresentation::AEcoWolfRepresentation()

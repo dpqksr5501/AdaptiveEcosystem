@@ -19,12 +19,23 @@
 | 에셋 (`/Game/Creatures/Integrated/`) | 용도 |
 |---|---|
 | `BP_EcoDeer`, `BP_EcoWolf` | 이주한 AnimalVarietyPack 사슴/늑대 Mesh를 가진 passive 표현 Actor |
-| `BS_EcoDeer`, `BS_EcoWolf` | Speed 0/300/900cm/s → IdleBreathe/Walk/Run, 호환 Skeleton·in-place Animation |
+| `BS_EcoDeer_Turning`, `BS_EcoWolf_Turning` | 현재 BP 연결: 2D Speed 0/300/900cm/s × Turn -1/0/+1, 9개 in-place samples |
+| `BS_EcoDeer`, `BS_EcoWolf` | 초기 Speed 1D BS, 기존 참조 호환용으로 보존 |
 | `DA_EcoDeer`, `DA_EcoWolf` | `UEcoCreatureEntityConfig`와 역할별 native Trait; 저장된 GUID로 서버/Client TemplateID 일치 |
 | `BP_EcoCreatureIntegration` | configs, BP classes, 2개 지역 스폰 그룹, 낮/밤 각 30초 설정 |
 | `L_EcoCreatureIntegration` | 바닥, 인접한 두 지역, 수동 Shelter 4개, 조명·관찰용 PlayerStart, 전용 GameMode |
 
-BS는 일반 `UBlendSpace1D` 에셋이다. 표현 Actor가 `AnimSingleNodeInstance`로 실제 수신 속도를 넣어 재생하므로 별도 AnimBP 그래프가 필요하지 않다. 사망 시 각 종의 Death Animation을 재생한다. Eating은 현재 상태 DTO만 전달하고 별도 먹기 Animation은 연결하지 않았다. Root Motion과 Actor AI 이동은 사용하지 않는다. 모델 교체 시 Mesh, BS, Death Animation의 Skeleton 호환성을 함께 확인한다.
+현재 BS는 일반 `UBlendSpace` 2D 에셋이다. 표현 Actor가 `AnimSingleNodeInstance`로 실제 수신 속도와 시각 회전량을 넣어 재생하므로 별도 AnimBP 그래프가 필요하지 않다. 사망 시 각 종의 Death Animation을 재생한다. Eating은 현재 상태 DTO만 전달하고 별도 먹기 Animation은 연결하지 않았다. Root Motion과 Actor AI 이동은 사용하지 않는다. 모델 교체 시 Mesh, BS, Death Animation의 Skeleton 호환성을 함께 확인한다.
+
+### 모델 전방 및 좌우 회전 — 2026-10-08 보완
+
+- 원인: 두 원본 Skeleton의 reference pose에서 Pelvis→Head가 **+Y**다. 기존 Actor는 Velocity의 yaw로 **+X**를 전방으로 잡았지만 MeshRotation=0이어서 몸이 이동 방향과 90도 어긋났다. 원본 Mesh/Animation 수정 없이 두 BP의 `MeshRotation.Yaw=-90`, `MeshForwardAxis=(0,1,0)`으로 보정한다.
+- 이동 방향은 **수신한 실제 Velocity**로 결정한다. Actor 표현 회전만 보간하며 `MaxFacingLagDegrees`(기본 10도, 0이면 즉시 정렬)로 잔여 오차를 제한한다. 갑작스러운 반전에도 수 프레임 동안 옆/뒤로 달리는 표현을 방지한다. Mass Transform/Velocity, PPO Raw/Effective Action 및 복제 payload는 변경하지 않는다.
+- 2D 축은 **Speed × Turn**이다. Turn은 실제 표현 yaw 변화량/초를 `FullTurnRateDegrees`(기본 180도/초)로 정규화한 -1(좌)/+1(우) 입력이다. yaw ±180 래핑, 정지/사망/재바인딩/텔레포트/0 delta/큰 hitch를 처리한다. 정지에서 출발하는 초기 정렬은 회전 클립을 유발하지 않는다. Turn은 8/s로 보간하고 직선 이동에서 0으로 감쇠한다.
+- `DirectionDegrees`는 Actor 전방 대비 Velocity 각도다. Turn과는 다른 값이다. 현재 에셋에는 strafe/backward 클립이 없으므로 Direction -180..180을 좌우 달리기 클립에 억지로 연결하지 않는다. AnimBP 확장 시 native parent의 `SpeedCmPerSecond`, `DirectionDegrees`, `TurnAmount`를 사용할 수 있다.
+- 늑대: Idle/Walk/WalkTurnL·R/Run/RunTurnL·R 사용. 사슴: Idle/Walk/WalkTurnL·R/Run 사용. **사슴 RunTurnL·R 자산이 없어 고속의 세 Turn 슬롯에는 같은 Run을 사용한다.** 몸의 방향은 정상 정렬되지만 달리기 전용 몸 굽힘은 해당 클립 확보 후 교체해야 한다. 원본 `_RM` 클립은 사용하지 않는다.
+- 그림 확인: PIE 콘솔 `eco.Creature.DrawFacing 1` → 초록 화살표는 실제 Velocity, 하늘색 화살표는 보정된 Mesh 전방이다. 움직일 때 두 화살표가 거의 같은 방향이어야 한다. `eco.Creature.FacingAudit 1`은 종/NetMode별 오차를 초당 기록한다. 검증용이며 기본 0이다.
+- 맵/스폰 그룹/GUID를 보존한 수정 도구: [`Tools/Editor/configure_creature_locomotion.py`](../../Tools/Editor/configure_creature_locomotion.py). 에디터 Python 콘솔에서 실행하면 두 동물 BP 기본값과 새 Turning BS만 저장한다. 전체 생성 도구는 새 구성도 적용한다. 원본 anatomy/root pose를 읽는 진단은 [`audit_creature_facing.py`](../../Tools/Editor/audit_creature_facing.py)다.
 
 재생성 도구: [`Tools/Editor/create_creature_integration.py`](../../Tools/Editor/create_creature_integration.py). Editor Python API로 새 디렉터리만 생성/갱신한다. 기존 맵·원본 동물 자산은 수정하지 않는다. 실행하면 이 통합 맵의 그룹/회전/참조는 명시된 기본값으로 다시 저장되므로 사용자 편집을 보존할 때에는 무조건 재실행하지 않는다. Config가 이미 있으면 다시 구성하거나 GUID를 바꾸지 않는다.
 
@@ -95,4 +106,19 @@ UE 5.8 직접 UBT `AdaptiveEcosystemEditor Win64 Development -WaitMutex -NoHotRe
 
 로그 디렉터리: `Saved/Logs/`. 엔진 시작의 UnifiedErrorTest 자체 진단 출력과 프로젝트 테스트의 실패를 구분한다. 전체 자동화의 succeeded/failed와 실제 게임 실행의 assertion/Runtime stopped/종료 로그를 함께 확인했다.
 
-MCP/Computer Use skill을 초기화했지만 이 세션의 native UI RPC(`sky`)는 구성되지 않았다. 마우스 조작 완료라고 기록하지 않는다. 자산 생성·저장은 Unreal Editor Python/native API로 수행했고 실제 엔진 프로세스/자동화/렌더 결과로 검증한다. 이후 팀원의 에디터 수동 편집은 위 에셋과 인계 계약을 따른다.
+초기 통합 작업에서는 native UI RPC(`sky`)가 구성되지 않아 자산 생성·저장을 Unreal Editor Python/native API로 수행했다. 이후 방향 보완 세션에서는 MCP의 `sky` 연결이 정상 작동해 실제 에디터 콘솔에서 anatomy 진단을 실행하고 UI를 조작했다. 초기 검증 기록과 이후 방향 검증은 구분한다.
+
+### 방향/2D BS 보완 최종 검증 — 2026-10-08
+
+BP의 native CDO만 수정·저장하면 Blueprint post-construction 기본값 캐시에 이전 MeshRotation/BS가 남아 실제 생성 인스턴스가 옛 값을 사용할 수 있었다. `UEcoCreatureBlendSpaceLibrary::ConfigureRepresentation`은 editor 전용 `MarkBlueprintAsModified`와 컴파일을 거쳐 캐시를 갱신한다. `UnrealEd` 의존성은 Editor target에만 추가했다. 저장 후 **별도 새 엔진 프로세스에서 생성한 BP 인스턴스**를 검사했으며 CDO 값만 확인한 결과가 아니다.
+
+| 검증 | 최종 결과 |
+|---|---|
+| 직접 UBT | UE 5.8.2 `AdaptiveEcosystemEditor Win64 Development -WaitMutex -NoHotReload -NoUBA` 성공. 마지막 코드 빌드 완료 후 에디터를 다시 시작했다. |
+| 전체 자동화 | **35개 성공, 경고/실패/미실행 0**. `Saved/Automation/CreatureFacingFinal/index.json`. 저장 BP의 실제 anatomy 전방, 8개 이동 방향·180도 반전·±179도 래핑, 정지/사망/텔레포트/0 delta, 좌우 Turn 부호, 2D 9개 samples 및 사슴 Run fallback 포함. 기존 Policy/Social/Network 테스트도 통과. |
+| 별도 서버/Client | `CreatureFacingServer.log`: 70초 제한, Ready=1 Step69, dedicated Visuals=0, 정상 종료. `CreatureFacingClient.log`: 30초 제한, NetMode3 LogicalOwned=0, 정상 종료. 이동 프록시 audit의 사슴 21개 표본 최대 10.00도, 늑대 17개 표본 최대 6.71도. 이는 보정된 Mesh 축 오차이며 모든 애니메이션 프레임의 머리 방향 오차를 의미하지 않는다. |
+| MCP 실제 에디터 | Wolf Turning BS 에디터의 2D grid/9개 samples를 확인했다. 저장된 최종 에셋을 재시작한 에디터에서 PIE 실행·일시정지하고 **애니메이션된 Head−Pelvis 월드 벡터**와 실제 Velocity를 비교했다. 이동 중 사슴 8마리 최대 1.523도, 늑대 2마리 최대 0.740도. 각 Mesh relative yaw -90도 확인. 이 값은 해당 관측 프레임의 결과다. |
+
+로그는 `Saved/Logs/`에 있으며 최종 GUI 기록은 `CreatureFacingPIE.log`로 보존한다. 첫 PIE 진단의 editor-only 존재 검사 오류는 진단 도구에서 해당 호출을 제거한 뒤 재실행하여 해결했다. 모델 방향·시각 회전·애니메이션 입력을 보완한 작업이며 PPO 학습 수치, Social 의도, 실제 이동 writer, 복제 payload를 바꾸지 않았다.
+
+검증 종료 후 MCP UI로 PIE를 정지하고 에디터를 정상 종료했다. `LogExit: Exiting`과 Unreal Editor 프로세스 0개를 확인했다. 컴퓨터는 종료하지 않았다.

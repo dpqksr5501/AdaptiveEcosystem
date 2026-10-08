@@ -15,6 +15,7 @@ public:
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float SpeedCmPerSecond = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float DirectionDegrees = 0.0f;
+	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float TurnAmount = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bAlive = false;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bEating = false;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bPursuingPrey = false;

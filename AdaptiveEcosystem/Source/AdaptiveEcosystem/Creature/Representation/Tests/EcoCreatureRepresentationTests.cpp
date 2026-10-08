@@ -10,6 +10,10 @@
 #include "Mass/EcoMassFragments.h"
 #include "MassMovementFragments.h"
 #include "EngineUtils.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/BlendSpace.h"
+#include "Animation/AnimSequence.h"
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoVisualBindingTest, "AdaptiveEcosystem.Creature.Visual.BindingAndStaleSnapshots",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -124,6 +128,90 @@ bool FEcoCreatureDemoTest::RunTest(const FString& Parameters)
 	// This helper world does not run the engine game loop; exercise the teardown callback explicitly.
 	Demo->EndPlay(EEndPlayReason::Destroyed); Demo->Destroy();
 	TestFalse(TEXT("Spawner EndPlay removes its surviving logical entities"), EM.IsEntityValid(Wolf));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoAnatomicalFacingTest, "AdaptiveEcosystem.Creature.Visual.ImportedAnatomyFacingAndReversals",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoAnatomicalFacingTest::RunTest(const FString&)
+{
+	EcoTest::FScopedTestWorld W;
+	for (const FString Kind : {TEXT("Deer"), TEXT("Wolf")})
+	{
+		UClass* BP = LoadClass<AEcoCreatureRepresentationActor>(nullptr, *(TEXT("/Game/Creatures/Integrated/BP_Eco") + Kind + TEXT(".BP_Eco") + Kind + TEXT("_C")));
+		if (!TestNotNull(TEXT("Saved animal BP"), BP)) return false;
+		auto* Visual = W.World->SpawnActor<AEcoCreatureRepresentationActor>(BP);
+		if (!TestNotNull(TEXT("Imported mesh"), Visual->VisualMesh.Get())) return false;
+		const FReferenceSkeleton& Skeleton = Visual->VisualMesh->GetRefSkeleton();
+		// Derive anatomy independently from authored MeshForwardAxis, so a wrong
+		// asset correction cannot pass by comparing the same setting to itself.
+		const FString BonePrefix = Kind == TEXT("Wolf") ? TEXT("Wolf_-") : TEXT("STAG_-");
+		const int32 Head = Skeleton.FindBoneIndex(FName(*(BonePrefix + TEXT("Head"))));
+		const int32 Pelvis = Skeleton.FindBoneIndex(FName(*(BonePrefix + TEXT("Pelvis"))));
+		if (!TestTrue(TEXT("Anatomical reference bones exist"), Head != INDEX_NONE && Pelvis != INDEX_NONE)) return false;
+		TArray<FTransform> ComponentPose = Skeleton.GetRefBonePose();
+		for (int32 I = 1; I < ComponentPose.Num(); ++I)
+			if (Skeleton.GetParentIndex(I) != INDEX_NONE) ComponentPose[I] = ComponentPose[I] * ComponentPose[Skeleton.GetParentIndex(I)];
+		const FVector AnatomicalForward = (ComponentPose[Head].GetLocation() - ComponentPose[Pelvis].GetLocation()).GetSafeNormal2D();
+		Visual->BindIdentity(50, Visual->VisualSpeciesId);
+		FEcoCreatureVisualState State; State.StableAgentId = 50; State.SpeciesId = Visual->VisualSpeciesId;
+		for (const float Yaw : {0.f, 180.f, 90.f, -90.f, 45.f, -135.f, 179.f, -179.f})
+		{
+			State.Sequence++; State.WorldTime += 0.016; State.Velocity = FRotator(0, Yaw, 0).Vector() * 900;
+			State.Position += State.Velocity * 0.016;
+			TestTrue(TEXT("Directional snapshot accepted"), Visual->ConsumeVisualState(State, 0.016f));
+			const FVector WorldAnatomy = Visual->CreatureMesh->GetComponentTransform().TransformVectorNoScale(AnatomicalForward).GetSafeNormal2D();
+			TestTrue(TEXT("Real head/pelvis face motion within 10 degrees, including reversals and yaw wrap"),
+				FVector::DotProduct(WorldAnatomy, State.Velocity.GetSafeNormal2D()) >= FMath::Cos(FMath::DegreesToRadians(10.1f)));
+			TestTrue(TEXT("Calibrated diagnostic agrees with independent anatomy"), FVector::DotProduct(WorldAnatomy, Visual->GetVisualForwardDirection()) > 0.999);
+		}
+		const FRotator LastFacing = Visual->GetActorRotation();
+		State.Sequence++; State.Velocity = FVector::ZeroVector; Visual->ConsumeVisualState(State, 0.016f);
+		TestTrue(TEXT("Stopping keeps last facing and clears turn input"), Visual->GetActorRotation().Equals(LastFacing) && Visual->VisualTurnAmount == 0);
+		State.Sequence++; State.Velocity = FVector(0, 900, 0); State.bDiscontinuity = true;
+		Visual->ConsumeVisualState(State, 0.016f);
+		TestTrue(TEXT("Discontinuity snaps without a spurious turn animation"), Visual->GetActorRotation().Equals(FRotator(0, 90, 0)) && Visual->VisualTurnAmount == 0);
+		State.Sequence++; State.bDiscontinuity = false; State.Velocity = FVector(-900, 0, 0);
+		Visual->ConsumeVisualState(State, 0);
+		TestTrue(TEXT("Zero delta is finite and clears rate input"), FMath::IsFinite(Visual->DirectionDegrees) && Visual->VisualTurnAmount == 0);
+		State.Sequence++; State.bAlive = false; Visual->ConsumeVisualState(State, 0.016f);
+		TestTrue(TEXT("Death clears locomotion turn input"), Visual->VisualTurnAmount == 0 && Visual->DirectionDegrees == 0 && Visual->GetVelocity().IsZero());
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoTurningInputTest, "AdaptiveEcosystem.Creature.Visual.SignedTurnAndAssetFallback",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoTurningInputTest::RunTest(const FString&)
+{
+	EcoTest::FScopedTestWorld W;
+	auto* Visual = W.World->SpawnActor<AEcoWolfRepresentation>();
+	Visual->MaxFacingLagDegrees = 0;
+	for (const float Yaw : {90.f, -90.f})
+	{
+		Visual->ClearBinding(); Visual->BindIdentity(77, TEXT("Wolf"));
+		FEcoCreatureVisualState S; S.StableAgentId = 77; S.SpeciesId = TEXT("Wolf"); S.Sequence = 1; S.Velocity = FVector(300, 0, 0);
+		Visual->ConsumeVisualState(S, 0.1f);
+		S.Sequence++; S.Velocity = FRotator(0, Yaw, 0).Vector() * 300; Visual->ConsumeVisualState(S, 0.1f);
+		TestTrue(TEXT("UE positive yaw selects right, negative selects left; normalized and bounded"),
+			Visual->VisualTurnAmount * Yaw > 0 && FMath::Abs(Visual->VisualTurnAmount) <= 1);
+		for (int32 I = 0; I < 10; ++I) { S.Sequence++; Visual->ConsumeVisualState(S, 0.1f); }
+		TestTrue(TEXT("Straight motion decays to the central sample"), FMath::Abs(Visual->VisualTurnAmount) < 0.001);
+	}
+	for (const FString Kind : {TEXT("Deer"), TEXT("Wolf")})
+	{
+		const FString Path = TEXT("/Game/Creatures/Integrated/BS_Eco") + Kind + TEXT("_Turning.BS_Eco") + Kind + TEXT("_Turning");
+		auto* BS = LoadObject<UBlendSpace>(nullptr, *Path);
+		if (!TestNotNull(TEXT("Saved turning BS"), BS)) return false;
+		for (const auto& Sample : BS->GetBlendSamples())
+		{
+			if (Sample.SampleValue.X == 300 && Sample.SampleValue.Y != 0)
+				TestTrue(TEXT("Walk turns use actual left/right clips"), Sample.Animation->GetName().EndsWith(Sample.SampleValue.Y < 0 ? TEXT("WalkTurnL") : TEXT("WalkTurnR")));
+			if (Sample.SampleValue.X == 900 && Sample.SampleValue.Y != 0)
+				TestTrue(TEXT("Wolf uses run turn clips; deer explicitly falls back to straight run"),
+					Sample.Animation->GetName().EndsWith(Kind == TEXT("Deer") ? TEXT("_Run") : Sample.SampleValue.Y < 0 ? TEXT("RunTurnL") : TEXT("RunTurnR")));
+		}
+	}
 	return true;
 }
 #endif

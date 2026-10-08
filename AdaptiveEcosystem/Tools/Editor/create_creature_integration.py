@@ -3,7 +3,11 @@ Never called by the game. Existing M3/JYU/demo assets are left intact.
 """
 import json
 import os
+import sys
 import unreal
+
+sys.path.insert(0, os.path.dirname(__file__))
+from configure_creature_locomotion import configure
 
 ROOT = "/Game/Creatures/Integrated"
 TOOLS = unreal.AssetToolsHelpers.get_asset_tools()
@@ -51,8 +55,10 @@ def animal(kind, mesh, folder, prefix, parent):
     cls = bp("BP_Eco" + kind, parent, {
         "visual_mesh": load(mesh), "locomotion_blend_space": blend,
         "death_animation": load(folder + "/" + prefix + "_Death"),
-        "mesh_rotation": unreal.Rotator(0, 0, 0),
+        "mesh_rotation": unreal.Rotator(pitch=0, yaw=-90, roll=0),
+        "mesh_forward_axis": unreal.Vector(0, 1, 0),
     })
+    configure(kind, load(ROOT + "/BP_Eco" + kind))
     name = "DA_Eco" + kind
     config = unreal.load_asset(ROOT + "/" + name)
     if not config:
@@ -139,7 +145,7 @@ def generate():
         raise RuntimeError("Could not save placed coordinator references")
     manifest = {"map": map_path, "deer_bp": deer.get_path_name(), "wolf_bp": wolf.get_path_name(),
         "herbivore_config": deer_config.get_path_name(), "wolf_config": wolf_config.get_path_name(),
-        "blend_spaces": [ROOT + "/BS_EcoDeer", ROOT + "/BS_EcoWolf"], "initial_logical_count": 14}
+        "blend_spaces": [ROOT + "/BS_EcoDeer_Turning", ROOT + "/BS_EcoWolf_Turning"], "initial_logical_count": 14}
     out = os.path.join(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()), "CreatureIntegrationAssets.json")
     with open(out, "w", encoding="utf-8") as stream:
         json.dump(manifest, stream, indent=2)

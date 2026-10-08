@@ -88,12 +88,15 @@ bool FEcoIntegratedAssets::RunTest(const FString&)
     {
         const FString Root = TEXT("/Game/Creatures/Integrated/");
         auto* Config=LoadObject<UEcoCreatureEntityConfig>(nullptr, *(Root+TEXT("DA_Eco")+Kind+TEXT(".DA_Eco")+Kind));
-        auto* BS=LoadObject<UBlendSpace1D>(nullptr,*(Root+TEXT("BS_Eco")+Kind+TEXT(".BS_Eco")+Kind));
+        auto* BS=LoadObject<UBlendSpace>(nullptr,*(Root+TEXT("BS_Eco")+Kind+TEXT("_Turning.BS_Eco")+Kind+TEXT("_Turning")));
         UClass* BP=LoadClass<AEcoCreatureRepresentationActor>(nullptr,*(Root+TEXT("BP_Eco")+Kind+TEXT(".BP_Eco")+Kind+TEXT("_C")));
         if (!TestNotNull(TEXT("Saved config"),Config)||!TestNotNull(TEXT("Saved BS"),BS)||!TestNotNull(TEXT("Saved BP"),BP)) return false;
         auto* Actor=W.World->SpawnActor<AEcoCreatureRepresentationActor>(BP);
         TestTrue(TEXT("BP owns imported mesh and matching BS"), Actor->VisualMesh && Actor->LocomotionBlendSpace==BS && BS->GetSkeleton());
-        TestEqual(TEXT("Idle/Walk/Run samples"),BS->GetBlendSamples().Num(),3);
+        TestEqual(TEXT("Speed x signed-turn sample grid"),BS->GetBlendSamples().Num(),9);
+        TestFalse(TEXT("Active locomotion is a 2D BS"),BS->IsA<UBlendSpace1D>());
+        TestEqual(TEXT("Signed turn minimum"),BS->GetBlendParameter(1).Min,-1.f);
+        TestEqual(TEXT("Signed turn maximum"),BS->GetBlendParameter(1).Max,1.f);
         for (const auto& Sample : BS->GetBlendSamples()) TestTrue(TEXT("In-place compatible samples"), Sample.Animation && Sample.Animation->GetSkeleton()==BS->GetSkeleton() && !Sample.Animation->bEnableRootMotion);
         const auto& Template=Config->GetOrCreateEntityTemplate(*W.World);
         TestTrue(TEXT("Role-aware native template builds"),Template.IsValid());
