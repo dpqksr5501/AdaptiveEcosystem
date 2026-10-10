@@ -26,6 +26,15 @@ struct FReplicatedEcoMassAgent : public FReplicatedAgentBase
 
 	FName GetRegionId() const { return RegionId; }
 	void SetRegionId(const FName InRegionId) { RegionId = InRegionId; }
+	const FVector& GetVelocity() const { return Velocity; }
+	uint8 GetVisualFlags() const { return VisualFlags; }
+	uint8 GetHealth() const { return Health; }
+	uint8 GetEnergy() const { return Energy; }
+	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy)
+	{
+		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy) return false;
+		Velocity = InVelocity; VisualFlags = InFlags; Health = InHealth; Energy = InEnergy; return true;
+	}
 
 	bool SetVisualState(float Health, float Energy, EEcoVisualLifeState State)
 	{
@@ -95,6 +104,10 @@ private:
 	uint32 VisualRevision = 0;
 	UPROPERTY(Transient)
 	uint32 MovementDiscontinuityRevision = 0;
+	UPROPERTY(Transient) FVector_NetQuantize10 Velocity = FVector::ZeroVector;
+	UPROPERTY(Transient) uint8 VisualFlags = 1;
+	UPROPERTY(Transient) uint8 Health = 255;
+	UPROPERTY(Transient) uint8 Energy = 255;
 };
 
 /** Fast-array entry used by one connection-specific client bubble. */

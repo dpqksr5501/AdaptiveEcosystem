@@ -18,6 +18,7 @@ namespace EcoMassMigration
 		const FEcoSurvivalSettings* SurvivalSettings = nullptr,
 		TConstArrayView<FEcoMigrationPressureSnapshot> Pressure = {}, double ConsumptionRate = 0.0,
 		TArray<FEcoMigrationOutcome>* OutArrivals = nullptr);
+		bool bDecisionDue, double FeedInterval, bool bResetResidentVelocity = true);
 }
 
 /** Writes movement intent only. The engine UMassApplyMovementProcessor owns position integration. */

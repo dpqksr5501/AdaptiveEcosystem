@@ -8,6 +8,8 @@
 #include "MassEntityView.h"
 #include "MassExecutionContext.h"
 #include "AdaptiveEcosystem.h"
+#include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "AI/Policy/EcoBehaviorFragments.h"
 
 namespace
 {
@@ -32,6 +34,7 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 	bool bDecisionDue, double FeedInterval, const FEcoOvercrowdingSettings* PressureSettings,
 	const FEcoSurvivalSettings* SurvivalSettings, TConstArrayView<FEcoMigrationPressureSnapshot> Pressure, double ConsumptionRate,
 	TArray<FEcoMigrationOutcome>* OutArrivals)
+	bool bDecisionDue, double FeedInterval, bool bResetResidentVelocity)
 {
 	if (OutArrivals) OutArrivals->Reset();
 	if (!IsInGameThread() || Manager.IsProcessing() || !Settings.IsValid() || Resources.Num() != Spaces.Num()
@@ -73,6 +76,8 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 	Query.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
 	Query.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	Query.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	// Integrated wolves hunt prey; regional vegetation depletion only migrates herbivores.
+	if (!bResetResidentVelocity) Query.AddTagRequirement<FEcoPredatorTag>(EMassFragmentPresence::None);
 	FMassExecutionContext Context = Manager.CreateExecutionContext(0.0f);
 	Query.ForEachEntityChunk(Context, [&](FMassExecutionContext& Chunk)
 	{
@@ -106,6 +111,86 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 			if (Agent.Travel.State == EEcoResidenceState::Traveling
 				&& (!Spaces.IsValidIndex(Agent.Travel.TargetRegionIndex)
 					|| Agent.Travel.TargetRegionId != Spaces[Agent.Travel.TargetRegionIndex].RegionId)) bValid = false;
+					
+			FEcoRegionFragment& Region = Regions[I];
+			FEcoTravelFragment& Travel = Travels[I];
+			const FVector Position = Transforms[I].GetTransform().GetLocation();
+			if (!Spaces.IsValidIndex(Region.CurrentRegionIndex) || Feeds[I].bPending
+				|| Spaces[Region.CurrentRegionIndex].RegionId != Region.CurrentRegionId || Position.ContainsNaN())
+			{
+				UE_LOG(LogAdaptiveEcosystem, Error, TEXT("[Eco Migration] Invalid input: ID=%lld Region=%s Index=%d PendingFeed=%d Position=%s Step=%lld"),
+					Ids[I].StableAgentId, *Region.CurrentRegionId.ToString(), Region.CurrentRegionIndex, Feeds[I].bPending, *Position.ToCompactString(), StepId);
+				bValid = false; continue;
+			}
+			const EEcoResidenceState Before = Travel.State;
+			const int32 OldTarget = Travel.TargetRegionIndex;
+			const FName From = Region.CurrentRegionId;
+			bool bArrived = false;
+			const auto HasFood = [&](int32 Index)
+			{
+				return Resources.IsValidIndex(Index) && Resources[Index].Food > Settings.FoodEpsilon;
+			};
+			if (bDecisionDue)
+			{
+				const bool bKeepTarget = Travel.State == EEcoResidenceState::Traveling && HasFood(Travel.TargetRegionIndex);
+				if (!bKeepTarget)
+				{
+					int32 Target = INDEX_NONE;
+					// A waiting/traveling agent away from its habitat must physically return before feeding.
+					if (HasFood(Region.CurrentRegionIndex)) Target = Region.CurrentRegionIndex;
+					else
+					{
+						double BestDistance = TNumericLimits<double>::Max();
+						for (int32 Neighbor : Spaces[Region.CurrentRegionIndex].AdjacentIndices)
+						{
+							if (!HasFood(Neighbor)) continue;
+							const double Distance = FVector::DistSquared(Position, Spaces[Neighbor].ArrivalPosition);
+							if (Distance < BestDistance) { BestDistance = Distance; Target = Neighbor; }
+						}
+					}
+					if (Target == Region.CurrentRegionIndex && Travel.State == EEcoResidenceState::Resident)
+					{
+						// Already resident; preserve its feeding reservation.
+					}
+					else if (Target != INDEX_NONE)
+					{
+						Travel.State = EEcoResidenceState::Traveling;
+						Travel.TargetRegionIndex = Target;
+						Travel.TargetRegionId = Spaces[Target].RegionId;
+						Travel.TargetPosition = ArrivalFor(Spaces[Target], Ids[I].StableAgentId, Settings.ArrivalSpread);
+						Travel.MoveSpeed = Settings.Speed;
+					}
+					else
+					{
+						Travel = FEcoTravelFragment();
+						Travel.State = EEcoResidenceState::WaitingForFood;
+					}
+				}
+			}
+			// Commit only after engine movement from earlier frames, and only against current completed food.
+			if (Travel.State == EEcoResidenceState::Traveling && HasFood(Travel.TargetRegionIndex)
+				&& FVector::DistSquared(Position, Travel.TargetPosition) <= FMath::Square(Settings.ArrivalRadius)
+				&& Spaces[Travel.TargetRegionIndex].Contains(Position))
+			{
+				Region.CurrentRegionIndex = Travel.TargetRegionIndex;
+				Region.CurrentRegionId = Travel.TargetRegionId;
+				Travel = FEcoTravelFragment();
+				// Use observed arrival time, never a historical catch-up time; no accumulated missed meals.
+				Lives[I].NextFeedTimeSeconds = ActualTime + FeedInterval;
+				bArrived = true;
+			}
+			if (bResetResidentVelocity && Travel.State != EEcoResidenceState::Traveling)
+			{
+				Moves[I].DesiredVelocity = FVector::ZeroVector;
+				Velocities[I].Value = FVector::ZeroVector;
+			}
+			if (Settings.bPrintTransitions && (Before != Travel.State || OldTarget != Travel.TargetRegionIndex || bArrived))
+				UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Migration] Epoch=%d Step=%lld Time=%.3f Observed=%.3f ID=%lld From=%s Region=%s Target=%s State=%s Arrived=%d NextFeed=%.3f"),
+					Time.WorldEpoch, StepId, Time.ServerTimeSeconds, ActualTime, Ids[I].StableAgentId,
+					*From.ToString(), *Region.CurrentRegionId.ToString(), *Travel.TargetRegionId.ToString(),
+					Travel.State == EEcoResidenceState::Resident ? TEXT("Resident") : Travel.State == EEcoResidenceState::Traveling ? TEXT("Traveling") : TEXT("WaitingForFood"),
+					bArrived, Lives[I].NextFeedTimeSeconds);
+					
 		}
 	});
 	if (!bValid) return false;
@@ -277,6 +362,7 @@ void UEcoMigrationSteeringProcessor::ConfigureQueries(const TSharedRef<FMassEnti
 	EntityQuery.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	EntityQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	EntityQuery.AddTagRequirement<FEcoIntegratedCreatureTag>(EMassFragmentPresence::None);
 }
 
 void UEcoMigrationSteeringProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)

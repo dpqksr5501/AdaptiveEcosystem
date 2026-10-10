@@ -54,6 +54,8 @@ private:
 		int64 StableAgentId = 0;
 		int32 SlotIndex = INDEX_NONE_ECO;
 		float Score = 0.0f;
+		int32 ShelterIndex = INDEX_NONE_ECO;
+		double LeaseDuration = 12.0;
 	};
 
 	TArray<FSlotProposal> Proposals;

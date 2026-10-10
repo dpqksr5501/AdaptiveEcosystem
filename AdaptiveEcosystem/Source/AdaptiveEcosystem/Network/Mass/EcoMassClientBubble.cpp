@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Network/Mass/EcoMassClientBubble.h"
+#include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 
 #include "AdaptiveEcosystem.h"
 #include "Mass/EcoMassFragments.h"
@@ -61,6 +62,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadWrite);
 		Query.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadWrite);
 		Query.AddRequirement<FEcoClientPresentationFragment>(EMassFragmentAccess::ReadWrite);
+		Query.AddRequirement<FEcoCreaturePresentationFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
 	};
 
 	auto CacheViews = [this](FMassExecutionContext& Context)
@@ -82,6 +84,11 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		Region.CurrentRegionId = Agent.GetRegionId();
 		EntityView.GetFragmentData<FEcoClientPresentationFragment>().Receive(
 			Agent.MakeRepresentationSnapshot(), GetWorld()->GetRealTimeSeconds());
+		if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
+		{
+			Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
+			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy();
+		}
 	};
 
 	auto SetModifiedData = [this](const FMassEntityView& EntityView, const FReplicatedEcoMassAgent& Agent)
@@ -184,6 +191,11 @@ void FEcoMassClientBubbleHandler::SetModifiedEntityData(const FMassEntityView& E
 
 	FEcoRegionFragment& Region = EntityView.GetFragmentData<FEcoRegionFragment>();
 	Region.CurrentRegionId = Agent.GetRegionId();
+	if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
+	{
+		Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
+		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy();
+	}
 }
 #endif
 

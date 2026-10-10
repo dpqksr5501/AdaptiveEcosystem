@@ -12,6 +12,7 @@
 #include "MassReplicationFragments.h"
 #include "MassReplicationTransformHandlers.h"
 #include "Network/Mass/EcoMassClientBubble.h"
+#include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(EcoMassReplicator)
 
@@ -43,6 +44,7 @@ void UEcoMassReplicator::AddRequirements(FMassEntityQuery& EntityQuery)
 	EntityQuery.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoMovementDiscontinuityFragment>(EMassFragmentAccess::ReadOnly);
+	EntityQuery.AddRequirement<FEcoCreaturePresentationFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	EntityQuery.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
 }
 
@@ -67,12 +69,16 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 	};
 
 	auto CacheViews = [&](FMassExecutionContext& ExecutionContext)
+	TConstArrayView<FEcoCreaturePresentationFragment> VisualFragments;
+
+	auto CacheViews = [&ReplicationSharedFragment, &PositionYawHandler, &IdentityFragments, &RegionFragments, &VisualFragments](FMassExecutionContext& ExecutionContext)
 	{
 		PositionYawHandler.CacheFragmentViews(ExecutionContext);
 		IdentityFragments = ExecutionContext.GetFragmentView<FEcoIdentityFragment>();
 		RegionFragments = ExecutionContext.GetFragmentView<FEcoRegionFragment>();
 		VitalsFragments = ExecutionContext.GetFragmentView<FEcoVitalsFragment>();
 		DiscontinuityFragments = ExecutionContext.GetFragmentView<FEcoMovementDiscontinuityFragment>();
+		VisualFragments = ExecutionContext.GetFragmentView<FEcoCreaturePresentationFragment>();
 		ReplicationSharedFragment = &ExecutionContext.GetMutableSharedFragment<FMassReplicationSharedFragment>();
 		ReplicationParams = &ExecutionContext.GetConstSharedFragment<FMassReplicationParameters>();
 		ReplicatedAgentFragments = ExecutionContext.GetMutableFragmentView<FMassReplicatedAgentFragment>();
@@ -81,6 +87,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 	};
 
 	auto AddEntity = [&](
+	auto AddEntity = [&ReplicationSharedFragment, &PositionYawHandler, &IdentityFragments, &RegionFragments, &VisualFragments](
 		FMassExecutionContext& ExecutionContext,
 		const int32 EntityIndex,
 		FReplicatedEcoMassAgent& ReplicatedAgent,
@@ -96,6 +103,11 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		UpdateVisualState(ReplicatedAgent, EntityIndex, ExecutionContext);
 		ReplicatedAgent.SetMovementDiscontinuityRevision(DiscontinuityFragments[EntityIndex].Revision);
 		ReplicatedAgent.StampSample(ExecutionContext.GetWorld()->GetRealTimeSeconds());
+		if (!VisualFragments.IsEmpty())
+		{
+			const auto& V = VisualFragments[EntityIndex];
+			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy);
+		}
 
 		FEcoMassClientBubbleHandler& Bubble = BubbleInfo.GetSerializer().Bubble;
 		const FMassReplicatedAgentHandle Handle = Bubble.AddAgent(ExecutionContext.GetEntity(EntityIndex), ReplicatedAgent);
@@ -112,6 +124,8 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 
 	auto ModifyEntity = [&](
 		FMassExecutionContext& ExecutionContext,
+	auto ModifyEntity = [&ReplicationSharedFragment, &PositionYawHandler, &IdentityFragments, &RegionFragments, &VisualFragments](
+		FMassExecutionContext&,
 		const int32 EntityIndex,
 		const EMassLOD::Type LOD,
 		const double RealTime,
@@ -136,6 +150,11 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		// Persistent important state is examined every callback, before the movement gate.
 		const bool bVisualChanged = UpdateVisualState(Item.Agent, EntityIndex, ExecutionContext);
 		const bool bReset = Item.Agent.GetMovementDiscontinuityRevision() != DiscontinuityFragments[EntityIndex].Revision;
+		if (!VisualFragments.IsEmpty())
+		{
+			const auto& V = VisualFragments[EntityIndex];
+			if (Item.Agent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy)) Bubble.MarkItemDirty(Item);
+		}
 		const FEcoIdentityFragment& Identity = IdentityFragments[EntityIndex];
 		const FEcoRegionFragment& Region = RegionFragments[EntityIndex];
 		const bool bIdentityChanged = Item.Agent.GetStableAgentId() != Identity.StableAgentId
