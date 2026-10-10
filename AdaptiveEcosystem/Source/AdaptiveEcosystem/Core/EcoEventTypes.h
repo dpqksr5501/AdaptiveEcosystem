@@ -59,6 +59,9 @@ struct FEcoRegionPopulationSnapshot
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Event", meta = (ClampMin = "0"))
 	int32 Population = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration") int32 ResidentCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration") int32 OutboundCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration") int32 IncomingCount = 0;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration")
 	int32 TravelingCount = 0;

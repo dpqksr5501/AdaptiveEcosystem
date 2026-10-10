@@ -39,6 +39,22 @@ struct FEcoMigrationSettings
 	}
 };
 
+UENUM(BlueprintType)
+enum class EEcoMigrationReason : uint8 { None, FoodDepletion, Overcrowding, FoodShortage, ReturnHome };
+
+/** One successful cross-region commit. No Actor/EntityHandle crosses the ecology boundary. */
+struct FEcoMigrationOutcome
+{
+	int32 WorldEpoch = 0;
+	int64 StepId = 0;
+	int64 StableAgentId = 0;
+	FName OriginRegionId;
+	FName DestinationRegionId;
+	EEcoMigrationReason Reason = EEcoMigrationReason::None;
+	double DepartureTime = 0.0;
+	double ArrivalTime = 0.0;
+};
+
 /** World-owned geometry copied at the game-thread boundary. No actor references in Mass. */
 struct FEcoRegionSpatialSnapshot
 {

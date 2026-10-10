@@ -6,6 +6,14 @@
 #include "Core/EcoIds.h"
 #include "EcoRepresentationTypes.generated.h"
 
+/** Persistent visual state, independent of proxy relevance and Actor existence. */
+UENUM(BlueprintType)
+enum class EEcoVisualLifeState : uint8
+{
+	Alive,
+	Dead
+};
+
 /**
  * Read-only logical snapshot consumed by Actor/client representation.
  * Representation may interpolate this data, but must never write it back as
@@ -37,4 +45,14 @@ struct FEcoRepresentationSnapshot
 
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Representation", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float NormalizedEnergy = 1.0f;
+
+	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Representation")
+	EEcoVisualLifeState LifeState = EEcoVisualLifeState::Alive;
+
+	/** Server GetRealTimeSeconds(), not ecology WorldClock or client wall time. */
+	double ServerSampleRealTimeSeconds = 0.0;
+	/** Connection/item-local serial; resets on a fresh Bubble Add. */
+	uint32 SampleSequence = 0;
+	uint32 VisualRevision = 0;
+	uint32 MovementDiscontinuityRevision = 0;
 };

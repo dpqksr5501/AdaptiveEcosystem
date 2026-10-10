@@ -8,6 +8,7 @@
 #include "Core/EcoResourceTypes.h"
 #include "Core/EcoMigrationTypes.h"
 #include "AI/Policy/EcoPolicyContracts.h"
+#include "Core/EcoSurvivalTypes.h"
 #include "EcoMassFragments.generated.h"
 
 // -----------------------------------------------------------------------------
@@ -92,6 +93,34 @@ struct FEcoTravelFragment : public FMassFragment
 	EEcoResidenceState State = EEcoResidenceState::Resident;
 	FVector TargetPosition = FVector::ZeroVector;
 	float MoveSpeed = 0.0f;
+	EEcoMigrationReason Reason = EEcoMigrationReason::None;
+	double DepartureTime = 0.0;
+	double LastArrivalTime = 0.0;
+	double NextDecisionTime = 0.0;
+	int32 LastFailedTargetIndex = INDEX_NONE;
+	double FailedTargetUntil = 0.0;
+};
+
+/** Authority-only sequential survival clock. */
+USTRUCT()
+struct FEcoVitalsRuntimeFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	int32 WorldEpoch = 0;
+	int64 LastStepId = 0;
+	double LastTime = 0.0;
+	double ZeroEnergySeconds = 0.0;
+};
+
+USTRUCT()
+struct FEcoDeathFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	bool bCommitted = false;
+	EEcoDeathCause Cause = EEcoDeathCause::None;
+	double DeathTime = 0.0;
+	/** Real observed ecology time, so catch-up cannot remove before a replication frame. */
+	double RemoveAfter = 0.0;
 };
 
 /**

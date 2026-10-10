@@ -96,6 +96,31 @@ struct FRegionEcologyState
 	/** Authoritative alive logical entity count in this region */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|State")
 	int32 Population = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	int32 ResidentCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	int32 OutboundCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	int32 IncomingCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	int32 ProjectedPopulation = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	int32 EcologicalComfortPopulation = 64;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	float CrowdingRatio = 0.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	float FoodSatisfaction = 1.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	bool bPressureActive = false;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	double PressureSince = -1.0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	int64 StarvationDeaths = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration") int64 MigrationInCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration") int64 MigrationOutCount = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration") int64 OvercrowdingDeparturesCompleted = 0;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Pressure")
+	int64 ExternalDeaths = 0;
 
 	/** Derived diagnostics from the same Mass population query, not per-agent travel ownership. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Ecology|Migration")
