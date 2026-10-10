@@ -53,8 +53,13 @@ void UEcologySimulationSubsystem::Deinitialize()
 	bFeedingResolved = false;
 	ResourceLedger.Reset();
 	PendingManualStarvation.Reset();
+	PendingManualFoodSupply.Reset();
 	CompletedResources.Reset();
 	LastAcceptedFeedTime.Reset();
+	DeathReceipts.Reset();
+	LastDeathReceiptStep = 0;
+	LastMigrationReceiptStep = 0;
+	MigrationReceipts.Reset();
 	Super::Deinitialize();
 }
 
@@ -198,6 +203,10 @@ bool UEcologySimulationSubsystem::UpdatePopulationMetrics(const FEcoRegionPopula
 	if (FRegionEcologyState* Found = RegionalStates.Find(Snapshot.RegionId))
 	{
 		Found->Population = FMath::Max(0, Snapshot.Population);
+		Found->ResidentCount = Snapshot.ResidentCount;
+		Found->OutboundCount = Snapshot.OutboundCount;
+		Found->IncomingCount = Snapshot.IncomingCount;
+		Found->ProjectedPopulation = FMath::Max(0, Snapshot.Population - Snapshot.OutboundCount + Snapshot.IncomingCount);
 		Found->TravelingCount = FMath::Clamp(Snapshot.TravelingCount, 0, Found->Population);
 		Found->WaitingCount = FMath::Clamp(Snapshot.WaitingCount, 0, Found->Population - Found->TravelingCount);
 		Found->AverageEnergy = FMath::Clamp(Snapshot.AverageEnergy, 0.0f, 1.0f);
@@ -307,8 +316,16 @@ bool UEcologySimulationSubsystem::ReserveSpawn(FName RegionId, FEcoSpawnRequest&
 		if (Pair.Value.RegionId == RegionId) RegionalReserved += Pair.Value.Count;
 	}
 	Request.RegionId = RegionId;
-	Request.Count = EcoSpawn::AllowedCount(Request.Count, State->Population, GlobalAlive,
+	const int32 RegionalLoad = Request.bInitial ? State->Population : FMath::Max(State->Population, State->ProjectedPopulation);
+	Request.Count = EcoSpawn::AllowedCount(Request.Count, RegionalLoad, GlobalAlive,
 		RegionalReserved, GlobalReserved, Settings->RegionPopulationLimit, GlobalPopulationLimit, State->FoodAmount, Request.bInitial);
+	if (!Request.bInitial && PressureSettings.bEnabled)
+	{
+		const double Demand = (State->ProjectedPopulation + RegionalReserved + Request.Count) * PerAgentConsumptionRate * PressureSettings.ForecastSeconds;
+		if (State->bPressureActive || State->ProjectedPopulation + RegionalReserved + Request.Count
+			> State->EcologicalComfortPopulation * PressureSettings.EnterCrowdingRatio
+			|| (Demand > 0 && State->FoodAmount / Demand < PressureSettings.EnterFoodSatisfaction)) Request.Count = 0;
+	}
 	Request.RequestId = NextSpawnRequestId++;
 	PendingSpawns.Add(Request.RequestId, Request);
 	return true;
