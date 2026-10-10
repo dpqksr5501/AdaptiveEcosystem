@@ -4,6 +4,8 @@
 
 #include "AdaptiveEcosystem.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassPresentationFragments.h"
+#include "Engine/World.h"
 #include "MassEntityQuery.h"
 #include "MassExecutionContext.h"
 #include "MassSpawnerSubsystem.h"
@@ -58,6 +60,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		TransformHandler.AddRequirementsForSpawnQuery(Query);
 		Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadWrite);
 		Query.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadWrite);
+		Query.AddRequirement<FEcoClientPresentationFragment>(EMassFragmentAccess::ReadWrite);
 	};
 
 	auto CacheViews = [this](FMassExecutionContext& Context)
@@ -67,7 +70,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		RegionFragments = Context.GetMutableFragmentView<FEcoRegionFragment>();
 	};
 
-	auto SetSpawnedData = [this](const FMassEntityView&, const FReplicatedEcoMassAgent& Agent, const int32 EntityIndex)
+	auto SetSpawnedData = [this](const FMassEntityView& EntityView, const FReplicatedEcoMassAgent& Agent, const int32 EntityIndex)
 	{
 		TransformHandler.SetSpawnedEntityData(EntityIndex, Agent.GetReplicatedPositionYawData());
 
@@ -77,6 +80,8 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 
 		FEcoRegionFragment& Region = RegionFragments[EntityIndex];
 		Region.CurrentRegionId = Agent.GetRegionId();
+		EntityView.GetFragmentData<FEcoClientPresentationFragment>().Receive(
+			Agent.MakeRepresentationSnapshot(), GetWorld()->GetRealTimeSeconds());
 	};
 
 	auto SetModifiedData = [this](const FMassEntityView& EntityView, const FReplicatedEcoMassAgent& Agent)
@@ -169,6 +174,8 @@ void FEcoMassClientBubbleHandler::RetryPendingAdds()
 
 void FEcoMassClientBubbleHandler::SetModifiedEntityData(const FMassEntityView& EntityView, const FReplicatedEcoMassAgent& Agent) const
 {
+	if (!EntityView.GetFragmentData<FEcoClientPresentationFragment>().Receive(
+		Agent.MakeRepresentationSnapshot(), GetWorld()->GetRealTimeSeconds())) return;
 	TransformHandler.SetModifiedEntityData(EntityView, Agent.GetReplicatedPositionYawData());
 
 	FEcoIdentityFragment& Identity = EntityView.GetFragmentData<FEcoIdentityFragment>();
@@ -205,6 +212,9 @@ void FEcoMassClientBubbleHandler::Tick(const float DeltaTime)
 
 void FEcoMassClientBubbleHandler::Reset()
 {
+#if UE_REPLICATION_COMPILE_SERVER_CODE
+	ReplicationStats = {};
+#endif
 #if UE_REPLICATION_COMPILE_CLIENT_CODE
 	PendingAddReplicationIDs.Reset();
 	WaitingTemplateIDs.Reset();

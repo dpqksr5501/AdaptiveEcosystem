@@ -4,6 +4,8 @@
 > 모듈: `AdaptiveEcosystem`  
 > 연계 문서: [THIRD_PARTY_NOTICES.md](../../../THIRD_PARTY_NOTICES.md)
 
+> 2026-10-05 현황 보충: 아래 내용은 참조·도입 전략이다. 실제 Python 학습은 `herbivore_rl/env/world.py`의 자체 World를 사용하며 Aquarium wrapper는 현재 구현 경로가 아니다. M4의 공식 문서와 공개 소스 비교는 [M4 참고 조사](../Roadmap/M4/M4_REFERENCE_RESEARCH.md)를 따른다.
+
 ---
 
 ## 1. 외부 라이브러리 및 오픈소스 활용 원칙

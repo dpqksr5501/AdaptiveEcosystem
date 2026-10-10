@@ -6,6 +6,7 @@
 #include "MassClientBubbleHandler.h"
 #include "MassReplicationTransformHandlers.h"
 #include "MassReplicationTypes.h"
+#include "Core/EcoRepresentationTypes.h"
 #include "EcoMassReplicationTypes.generated.h"
 
 /** Minimal transport payload for one relevant ecological Mass agent. */
@@ -26,6 +27,46 @@ struct FReplicatedEcoMassAgent : public FReplicatedAgentBase
 	FName GetRegionId() const { return RegionId; }
 	void SetRegionId(const FName InRegionId) { RegionId = InRegionId; }
 
+	bool SetVisualState(float Health, float Energy, EEcoVisualLifeState State)
+	{
+		const auto Quantize = [](float Value) -> uint8
+		{
+			return static_cast<uint8>(FMath::RoundToInt(FMath::Clamp(FMath::IsFinite(Value) ? Value : 0.0f, 0.0f, 1.0f) * 255.0f));
+		};
+		const uint8 NewHealth = Quantize(Health);
+		const uint8 NewEnergy = Quantize(Energy);
+		if (HealthByte == NewHealth && EnergyByte == NewEnergy && LifeState == State) return false;
+		HealthByte = NewHealth;
+		EnergyByte = NewEnergy;
+		LifeState = State;
+		++VisualRevision;
+		return true;
+	}
+	uint32 GetMovementDiscontinuityRevision() const { return MovementDiscontinuityRevision; }
+	void SetMovementDiscontinuityRevision(uint32 Revision) { MovementDiscontinuityRevision = Revision; }
+	void StampSample(double ServerRealTimeSeconds)
+	{
+		ServerSampleRealTimeSeconds = ServerRealTimeSeconds;
+		++SampleSequence;
+	}
+	FEcoRepresentationSnapshot MakeRepresentationSnapshot() const
+	{
+		FEcoRepresentationSnapshot Result;
+		Result.StableAgentId = StableAgentId;
+		Result.SpeciesId = SpeciesId;
+		Result.RegionId = RegionId;
+		Result.Location = PositionYaw.GetPosition();
+		Result.Rotation = FRotator(0.0f, FMath::RadiansToDegrees(PositionYaw.GetYaw()), 0.0f);
+		Result.NormalizedHealth = HealthByte / 255.0f;
+		Result.NormalizedEnergy = EnergyByte / 255.0f;
+		Result.LifeState = LifeState;
+		Result.ServerSampleRealTimeSeconds = ServerSampleRealTimeSeconds;
+		Result.SampleSequence = SampleSequence;
+		Result.VisualRevision = VisualRevision;
+		Result.MovementDiscontinuityRevision = MovementDiscontinuityRevision;
+		return Result;
+	}
+
 private:
 	UPROPERTY(Transient)
 	FReplicatedAgentPositionYawData PositionYaw;
@@ -39,6 +80,21 @@ private:
 
 	UPROPERTY(Transient)
 	FName RegionId = NAME_None;
+
+	UPROPERTY(Transient)
+	uint8 HealthByte = 255;
+	UPROPERTY(Transient)
+	uint8 EnergyByte = 255;
+	UPROPERTY(Transient)
+	EEcoVisualLifeState LifeState = EEcoVisualLifeState::Alive;
+	UPROPERTY(Transient)
+	double ServerSampleRealTimeSeconds = 0.0;
+	UPROPERTY(Transient)
+	uint32 SampleSequence = 0;
+	UPROPERTY(Transient)
+	uint32 VisualRevision = 0;
+	UPROPERTY(Transient)
+	uint32 MovementDiscontinuityRevision = 0;
 };
 
 /** Fast-array entry used by one connection-specific client bubble. */
@@ -58,4 +114,10 @@ struct FEcoMassFastArrayItem : public FMassFastArrayItemBase
 
 	UPROPERTY()
 	FReplicatedEcoMassAgent Agent;
+
+	// Server-local scheduling diagnostics. Not UPROPERTY: never part of the payload.
+	// Lives with this connection's entry, so removal/re-entry cannot retain old LOD state.
+	EMassLOD::Type LastObservedLOD = EMassLOD::Off;
+	double LastTransformCheckRealTime = 0.0;
+	float ConfiguredUpdateInterval = 0.0f;
 };

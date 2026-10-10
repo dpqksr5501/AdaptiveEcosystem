@@ -11,6 +11,25 @@
 #include "Network/Mass/EcoMassReplicationTypes.h"
 #include "EcoMassClientBubble.generated.h"
 
+#if UE_REPLICATION_COMPILE_SERVER_CODE
+/** Local counters since bubble creation/reset; checks and dirty samples are distinct. */
+struct FEcoMassReplicationLODStats
+{
+	uint64 Gated = 0;
+	uint64 Checks = 0;
+	uint64 DirtySamples = 0;
+	uint64 PriorityChecks = 0;
+	uint64 HighPromotions = 0;
+};
+
+struct FEcoMassReplicationStats
+{
+	uint64 Adds = 0;
+	uint64 Removes = 0;
+	FEcoMassReplicationLODStats LOD[EMassLOD::Off];
+};
+#endif
+
 /** Applies one client's replicated bubble to that client's local proxy entities. */
 class FEcoMassClientBubbleHandler : public TClientBubbleHandlerBase<FEcoMassFastArrayItem>
 {
@@ -22,9 +41,19 @@ public:
 		: TransformHandler(*this)
 	{
 	}
+	int32 GetPendingAddCount() const
+	{
+#if UE_REPLICATION_COMPILE_CLIENT_CODE
+		return PendingAddReplicationIDs.Num();
+#else
+		return 0;
+#endif
+	}
 
 #if UE_REPLICATION_COMPILE_SERVER_CODE
 	FTransformHandler& GetTransformHandlerMutable() { return TransformHandler; }
+	FEcoMassReplicationStats& GetReplicationStatsMutable() { return ReplicationStats; }
+	const FEcoMassReplicationStats& GetReplicationStats() const { return ReplicationStats; }
 #endif
 
 protected:
@@ -53,6 +82,9 @@ private:
 #endif
 
 	FTransformHandler TransformHandler;
+#if UE_REPLICATION_COMPILE_SERVER_CODE
+	FEcoMassReplicationStats ReplicationStats;
+#endif
 };
 
 /** Replicated FastArray owned by exactly one client bubble actor. */
@@ -72,6 +104,8 @@ struct FEcoMassClientBubbleSerializer : public FMassClientBubbleSerializerBase
 	}
 
 	FEcoMassClientBubbleHandler Bubble;
+	/** Read-only diagnostics on either role; no mutation of FastArray bookkeeping. */
+	const TArray<FEcoMassFastArrayItem>& GetAgentItems() const { return Agents; }
 
 private:
 	UPROPERTY(Transient)
