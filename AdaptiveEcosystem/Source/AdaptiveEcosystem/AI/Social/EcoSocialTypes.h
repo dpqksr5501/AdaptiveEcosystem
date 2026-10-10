@@ -69,6 +69,10 @@ struct FEcoHerdRuntimeData
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Herd")
 	FVector LastThreatPosition = FVector::ZeroVector;
 
+	/** Time of selected direct/manual alarm input. Decay and reception do not refresh it. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Herd")
+	double LastThreatEvidenceTime = -1.0;
+
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Herd")
 	double LastAggregateTime = 0.0;
 
@@ -113,6 +117,9 @@ USTRUCT(BlueprintType)
 struct FEcoShelterPoint
 {
 	GENERATED_BODY()
+	/** Authored physical refuge extent, shared by observation and slot layout. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
+	float Radius = 50.f;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
 	int32 RuntimeIndex = INDEX_NONE_ECO;
@@ -150,6 +157,13 @@ struct FEcoShelterSlot
 	/** StableAgentId of the agent currently reserving this slot (0 if unreserved) */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
 	int64 ReservedBy = 0;
+
+	/** World-local lease generation; changes on reacquisition, never on renewal. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
+	int64 ReservationId = 0;
+
+	/** Transient owner for Social-managed leases. Never saved or replicated. */
+	FMassEntityHandle OwnerEntity;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
 	double ReservationExpireTime = 0.0;

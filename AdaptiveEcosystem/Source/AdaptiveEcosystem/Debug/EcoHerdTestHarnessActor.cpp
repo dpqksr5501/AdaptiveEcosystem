@@ -104,7 +104,11 @@ void AEcoHerdTestHarnessActor::SpawnTestHerds()
 	FragmentsAndTags.Add(FEcoHerdMemberFragment::StaticStruct());
 	FragmentsAndTags.Add(FEcoSocialBehaviorFragment::StaticStruct());
 	FragmentsAndTags.Add(FEcoAlarmStateFragment::StaticStruct());
+	FragmentsAndTags.Add(FEcoSensoryStateFragment::StaticStruct());
+	FragmentsAndTags.Add(FEcoSensoryProfileFragment::StaticStruct());
 	FragmentsAndTags.Add(FEcoShelterIntentFragment::StaticStruct());
+	FragmentsAndTags.Add(FEcoSocialMovementRequestFragment::StaticStruct());
+	FragmentsAndTags.Add(FEcoShelterMovementFeedbackFragment::StaticStruct());
 	FragmentsAndTags.Add(FEcoPolicyOutputFragment::StaticStruct());
 	FragmentsAndTags.Add(FEcoAliveTag::StaticStruct());
 

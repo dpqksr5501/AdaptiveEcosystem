@@ -1,7 +1,18 @@
 # Collaborator 개발 분석 및 동적 생태계 통합 계획
 
-> 기준일: 2026-09-28 / 현재 브랜치: `M3` / 분석 기준 커밋: `eed75b2`
+> 원래 분석 기준일: 2026-09-28 / 당시 브랜치: `M3` / 당시 커밋: `eed75b2`
 > 커밋 이력·소스·기존 Architecture/Roadmap 검토 결과이며, 이번 분석에서 빌드·런타임 테스트를 재실행하지 않았다.
+
+## 최신 main 대조 — 2026-09-30 / `295ac2f`
+
+현재 Source 기준은 main이며 아래 원래 커밋 분석은 Historical이다. 당시 미커밋 World/스폰/M3 작업은 main에 병합되었다. [M3 구현 요약](../Roadmap/M3/M3_IMPLEMENTATION_SUMMARY.md)과 [검증 기록](../Roadmap/M3/M3_VALIDATION_REPORT.md)을 현재 경로와 검증 범위의 근거로 읽는다. Energy/정식 사망/전체 폐루프가 완료되었다는 뜻은 아니다.
+
+- **현재 이동 분리:** M3 Bootstrap은 PPO Herbivore/Custom/Spring Movement 및 Simulation LOD 혼용을 거절한다. Herbivore Trait는 CustomMovement Tag로 엔진 ApplyMovement를 제외한다. 현 두 경로에서 이중 위치 적분을 단정하지 않는다. 아래 “Network/Herbivore/Social/Species 결합” 제안은 그대로 Trait를 합치라는 구현 지시가 아니며 단일 writer와 인계 계약을 먼저 정한다.
+- **Social의 CURRENT PRIORITY:** 실제 Player/Predator→Alarm, Raw→ModulatedAction→Steering, Shelter 목적지→Movement, 도착/Occupied·예약 유지, Threat clear/Death/Despawn/Migration 정리, end-to-end 검증. 전체 EntityConfig와 서버 전용 Processor 경계는 검증 필요다.
+- **유지되는 공백:** Dummy Provider, 별도 피식 EMA, Raw Action을 읽는 Steering, 미소비 Shelter TargetPosition, HP=0 이후 정식 생명주기 미통합. 아래 수치 계약 차이와 Population max 문제도 Source에서 확인된다.
+- **기여 구분:** 조연우의 Social/문서와 RL 담당의 학습·조향, wonkii의 Mass/Ecology/Network/Representation 구현을 구분한다. Merge 커밋을 해당 구현의 작성 기여로 간주하지 않는다.
+
+Social 상태의 최신 단일 진입점은 [CURRENT_STATE](../조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)다. 이후 절은 당시 분석·역할 제안을 보존하며 현재 Source보다 우선하지 않는다.
 
 핵심 판단은 **개발 방향은 적절하지만, 기능별 테스트 경로를 하나의 권위 생태계 실행 경로로 연결해야 한다**는 것이다. PPO 학습이나 은신처 예약의 완료가 Food·Energy·사망·이주·Population 전체 폐루프의 완료를 의미하지는 않는다.
 
@@ -51,7 +62,7 @@ flowchart TD
 
 **사용자 프로젝트**가 권위 상태·StableAgentId·스폰·지역 이동·복제의 기반을 맡고, **sinhyeok04 코드**가 개체의 행동 선호와 조향을, **조연우 코드**가 무리 문맥과 안전한 목적지를 제공하는 구성이 적절하다. 논리 상태는 Server Mass와 Ecology가 소유하고 Actor는 표현·상호작용 진입점으로 사용한다.
 
-현재 작업 트리에는 World 시계·스폰 예약·Region 관련 **미커밋 작업**도 있다. 이는 진행 중인 M3 기반으로 고려하되 완료나 실행 검증을 전제하지 않는다.
+당시 작업 트리에는 World 시계·스폰 예약·Region 관련 **미커밋 작업**도 있었다. 현재 main 병합 상태는 위 최신 대조를 따른다. 병합만으로 전체 실행 검증을 전제하지 않는다.
 
 ## 3. Architecture에 대한 평가와 핵심 공백
 
@@ -69,13 +80,13 @@ flowchart TD
 
 별도 수정이 필요한 소스 오류도 있다. `UEcoPredationProcessor`는 개체마다 `ReportPopulation(..., 1)`을 호출하지만 수신 함수는 합산 대신 `max`를 취한다. 현재 호출 경로에서는 지역 Population 분모가 1에 머물러 피식 EMA가 과대 계산될 수 있다. 이는 단순 문서 차이와 구분하여 통합 전에 수정·검증한다.
 
-Social Subsystem은 Client 생성을 막지만 Processor 실행 플래그는 명시하지 않는다. 통합 템플릿에서도 Server/Standalone·Authority/Alive 조건을 명확히 하고, Client 템플릿에는 행동 계산용 Trait를 추가하지 않는다. 신규 순회 코드는 읽기 snapshot과 버퍼 요청을 사용하고 UObject 상태 변경은 루프 밖 조정 단계로 모은다.
+Social Subsystem은 Client 생성을 막고 Processor는 실행 플래그를 직접 설정하지 않는다. 최신 감사에서 로컬 UE 5.8 UMassProcessor의 기본값은 `Server | Standalone`으로 확인되어 기본 자동 실행은 서버 권위다. 통합 템플릿의 Authority/Alive/ClientProxy 조건·Client Trait·에디터 실행 설정은 별도로 확인한다. 신규 병렬 순회 코드는 읽기 snapshot과 버퍼 요청을 사용하고 UObject 상태 변경은 GameThread 조정 단계로 모은다.
 
 ## 4. 권장 개발 순서
 
 | 순서 | 핵심 작업 | 완료 판단 |
 |---|---|---|
-| 1. 통합 계약 정리 | RegionId/Runtime Index·Vitals·시간 기준·관측 수치·피식 집계 통일. Server 템플릿에 Network/Herbivore/Social/Species 구성을 결합 | 같은 논리 개체를 모든 계층이 처리하며 Client는 재계산하지 않음 |
+| 1. 통합 계약 정리 | RegionId/Runtime Index·Vitals·시간 기준·관측 수치·피식 집계 통일. 현재 M3 혼용 가드를 고려해 단일 movement writer와 Server/Client Entity 구성을 먼저 확정 | 같은 논리 개체를 모든 계층이 처리하며 Client는 재계산하지 않음 |
 | 2. 기존 M3 완성 | M3.1 낮밤·스폰 → M3.2 소비·이벤트·공정 배분 → M3.3 고갈·실제 이주를 기존 Box로 검증. 이후 Energy·기아·사망·Utility 연결 | Food·Energy·Alive·Population이 일치하고 같은 StableAgentId가 지역을 이동 |
 | 3. M4·Social 연결 | 실제 위협/사냥을 Server 이벤트로 전달. 알람·보정 행동·예약 목적지를 단일 이동 경로에 연결. 도착·사망·이주 시 슬롯 상태 정리 | 위협→무리 반응→실제 은신 이동이 보이고 사망·지역 요약이 Client에 일치 |
 | 4. M5·M6 통합 검증 | 더미 Provider를 실제 지역 자원/은신처로 교체하고 PPO 활성화. Golden Vector 및 같은 생태 조건의 Utility/PPO 비교 | 행동 결과가 Food·Energy·피식 기록·Population을 바꾸고 다음 관측으로 돌아옴 |

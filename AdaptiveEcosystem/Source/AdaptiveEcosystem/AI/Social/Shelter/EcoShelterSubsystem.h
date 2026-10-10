@@ -38,10 +38,17 @@ public:
 	void UnregisterShelter(int32 ShelterIndex);
 
 	/** Attempts to reserve a specific slot for a designated duration */
-	bool ReserveSlot(int32 SlotIndex, int64 StableAgentId, double ExpireTime);
+	bool ReserveSlot(int32 SlotIndex, int64 StableAgentId, double ExpireTime, FMassEntityHandle OwnerEntity = FMassEntityHandle());
+
+	/** Token-checked lease operations cannot resurrect an expired or replaced reservation. */
+	bool IsReservationValid(int32 SlotIndex, int64 StableAgentId, int64 ReservationId, double CurrentTime) const;
+	bool RenewSlot(int32 SlotIndex, int64 StableAgentId, int64 ReservationId, double ExpireTime);
+
+	/** Lifecycle confirms live tokens once per pass; deleted/ineligible owners release promptly. */
+	void ReleaseUnconfirmedReservations(const TSet<int64>& ConfirmedReservationIds);
 
 	/** Releases a reserved slot if held by the specified agent */
-	void ReleaseSlot(int32 SlotIndex, int64 StableAgentId);
+	void ReleaseSlot(int32 SlotIndex, int64 StableAgentId, int64 ExpectedReservationId = 0);
 
 	/** Releases all slots currently reserved by an agent (e.g. on death) */
 	void ReleaseAgentReservations(int64 StableAgentId);
@@ -86,6 +93,7 @@ public:
 	bool IsValidShelterIndex(int32 ShelterIndex) const;
 
 private:
+	int64 NextReservationId = 1;
 	/** Dense array of registered shelter points */
 	UPROPERTY(Transient)
 	TArray<FEcoShelterPoint> Shelters;

@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "Network/Mass/EcoMassClientBubble.h"
+#include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 
 #include "AdaptiveEcosystem.h"
 #include "Mass/EcoMassFragments.h"
@@ -58,6 +59,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		TransformHandler.AddRequirementsForSpawnQuery(Query);
 		Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadWrite);
 		Query.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadWrite);
+		Query.AddRequirement<FEcoCreaturePresentationFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
 	};
 
 	auto CacheViews = [this](FMassExecutionContext& Context)
@@ -67,7 +69,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		RegionFragments = Context.GetMutableFragmentView<FEcoRegionFragment>();
 	};
 
-	auto SetSpawnedData = [this](const FMassEntityView&, const FReplicatedEcoMassAgent& Agent, const int32 EntityIndex)
+	auto SetSpawnedData = [this](const FMassEntityView& EntityView, const FReplicatedEcoMassAgent& Agent, const int32 EntityIndex)
 	{
 		TransformHandler.SetSpawnedEntityData(EntityIndex, Agent.GetReplicatedPositionYawData());
 
@@ -77,6 +79,11 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 
 		FEcoRegionFragment& Region = RegionFragments[EntityIndex];
 		Region.CurrentRegionId = Agent.GetRegionId();
+		if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
+		{
+			Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
+			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy();
+		}
 	};
 
 	auto SetModifiedData = [this](const FMassEntityView& EntityView, const FReplicatedEcoMassAgent& Agent)
@@ -177,6 +184,11 @@ void FEcoMassClientBubbleHandler::SetModifiedEntityData(const FMassEntityView& E
 
 	FEcoRegionFragment& Region = EntityView.GetFragmentData<FEcoRegionFragment>();
 	Region.CurrentRegionId = Agent.GetRegionId();
+	if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
+	{
+		Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
+		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy();
+	}
 }
 #endif
 

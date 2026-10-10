@@ -5,6 +5,18 @@
 > 적용 엔진: **Unreal Engine 5.8** & **Python 3.10+ (Stable-Baselines3)**  
 > 참조 C++ 헤더: `AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoPolicyContracts.h`
 
+## Current implementation gap — main `295ac2f` / 2026-09-30
+
+이 문서는 의도한 V1 계약이다. **7개 관측 / 4개 행동 / 필드 순서**는 실제 코드와 일치하지만 아래 모든 수치·실행 방식을 현재 production 구현 완료로 읽지 않는다.
+
+- `EcoPolicyConstants::MaxPredatorCap`과 이 문서의 기본값은 5지만 실제 `UEcoPolicyProcessor`는 생성된 `EcoBehaviorConfig::ObsPredCountNorm`(8)을 사용한다.
+- 아래 `EvaluateUtilityBaseline`은 계약 헤더에 존재한다. 실제 Policy Processor의 Utility 경로는 `EcoPolicy::RunUtilityPolicy`와 생성 `UtilityParams.h`의 다른 수식을 사용한다.
+- 아래 Alignment 포함 힘 합성은 목표 설명이다. 현재 `EcoPolicy::Steer`는 XY 방향 합성 후 일정 속력으로 정규화하며 FleeDist를 도주 거리 임계치로 사용한다. 별도 ForceFragment writer가 아니다.
+- 최근 피식은 현재 별도 격자 EMA, Food/Cover는 기본 Dummy Provider다. RegionId/실제 Shelter/권위 자원 연결과 Social handoff는 미통합이다.
+- Golden Vector는 현재 native 추론/조향 수치의 검증 근거이며, 전체 생태계·Social·이주 파리티를 보증하지 않는다. Unreal Automation Test는 실행하여 검증하는 경로이며 일반 Editor 빌드만으로 테스트가 자동 수행되는 것은 아니다.
+
+Source: [Policy Processor](../../Source/AdaptiveEcosystem/AI/Policy/EcoBehaviorProcessors.cpp), [생성 상수](../../Source/AdaptiveEcosystem/AI/Policy/EcoBehaviorConfig.h), [실제 Utility](../../Source/AdaptiveEcosystem/AI/Policy/EcoPolicyInference.cpp), [Steering](../../Source/AdaptiveEcosystem/AI/Policy/EcoSteering.h). 문서 감사에서 기존 가중치/정규화/Utility를 변경하지 않았다. RL 담당과 계약 정합성을 확정한 뒤 Python/C++ 검증 및 필요 시 재평가한다.
+
 ---
 
 ## 1. 신경망 아키텍처 (Network Architecture)

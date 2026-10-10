@@ -13,7 +13,7 @@ namespace EcoMassMigration
 	bool Reconcile(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, double ActualTime,
 		int64 StepId, TConstArrayView<FEcoResourceSnapshot> Resources,
 		TConstArrayView<FEcoRegionSpatialSnapshot> Spaces, const FEcoMigrationSettings& Settings,
-		bool bDecisionDue, double FeedInterval);
+		bool bDecisionDue, double FeedInterval, bool bResetResidentVelocity = true);
 }
 
 /** Writes movement intent only. The engine UMassApplyMovementProcessor owns position integration. */

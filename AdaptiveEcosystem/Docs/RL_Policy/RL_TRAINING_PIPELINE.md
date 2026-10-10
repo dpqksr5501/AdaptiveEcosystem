@@ -1,5 +1,7 @@
 # RL TRAINING & POLICY EXPORT PIPELINE
 
+> **Historical / Target Plan:** 아래 `Tools/RL`·Aquarium·PettingZoo 구조는 초기 설계이며 현재 파일 지도/실행 절차가 아니다. main `295ac2f`(2026-09-30)의 실제 구현은 `herbivore_rl/` 자체 World/VecEnv와 SB3이며, requirements는 Aquarium 미사용을 명시한다. 실제 export는 `herbivore_rl/export_weights.py`, C++ 산출물은 `PolicyWeights.h`, `EcoBehaviorConfig.h`, `UtilityParams.h`, `PolicyGoldenVectors.h`, `SteeringGoldenVectors.h`다. 현재 절차는 [UNREAL_POLICY_INTEGRATION](UNREAL_POLICY_INTEGRATION.md) 및 [Python 프로젝트 요약](../../../herbivore_rl/docs/PROJECT_SUMMARY.md)을 따른다. 아래 보상·adapter·JSON 산출물 예시를 현 Source 완료 사실로 간주하지 않는다.
+
 > 환경: **Python 3.10+**, **PyTorch**, **Stable-Baselines3**, **PettingZoo**  
 > 위치: `Tools/RL/`  
 > 연계 문서: [POLICY_CONTRACT_V1.md](POLICY_CONTRACT_V1.md)

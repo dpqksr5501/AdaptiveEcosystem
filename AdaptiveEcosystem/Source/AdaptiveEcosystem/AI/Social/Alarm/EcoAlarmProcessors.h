@@ -8,8 +8,8 @@
 #include "EcoAlarmProcessors.generated.h"
 
 /**
- * Propagates alarm signals within herds and across spatial proximities.
- * Updates per-agent alarm strength using exponential time/distance decay and manages social state transitions.
+ * Receives the selected herd threat with exponential distance attenuation and linear time decay.
+ * Spatial manual broadcasts are explicit subsystem calls; no cross-herd gossip relay is implemented.
  */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoAlarmPropagationProcessor : public UMassProcessor
@@ -29,7 +29,8 @@ private:
 
 /**
  * Modulates PPO policy output actions (Forage, Cohesion, FleeDist, Cover) according to social alert level.
- * Executes after Policy evaluation and before Steering force blending without altering the PPO contract.
+ * Executes after Policy evaluation without altering the PPO contract.
+ * Downstream steering consumption of ModulatedAction is a separate integration task.
  */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoSocialResponseProcessor : public UMassProcessor
@@ -45,4 +46,5 @@ protected:
 
 private:
 	FMassEntityQuery EntityQuery;
+	double NextActionAuditLogTime = 0.0;
 };

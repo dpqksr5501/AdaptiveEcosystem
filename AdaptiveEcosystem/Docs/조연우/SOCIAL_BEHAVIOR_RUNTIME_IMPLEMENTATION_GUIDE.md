@@ -1,22 +1,56 @@
 # Social Behavior & Shelter Runtime — AI Coding Agent Implementation Guide
 
+> **2026-10-08 현재 구현:** 별도 opt-in Creature 경로는 PPO→Social Request→단일 Movement→Feedback, 은신처 Moving/Occupied·해제 및 기존 Mass Client 표현을 실제 테스트 레벨에 연결했다. 늑대 감각·발 접촉 Notify·Grass/Dry 표면도 적용했고 전체 자동화 43/43 및 PIE·서버/재접속 검증을 마쳤다. 아래 TASK 4 우선순위는 기존 JYU/M3 기준 이력이며, 현재 범위와 담당자 후속 연결은 [CURRENT_STATE](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md), [최신 구현·검증](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md)을 우선한다.
+
 > **Project:** AdaptiveEcosystem  
 > **Repository:** `dpqksr5501/AdaptiveEcosystem`  
 > **Engine:** Unreal Engine 5.8  
-> **Suggested repo path:** `AdaptiveEcosystem/Docs/SocialBehavior/SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md`  
+> **Document path:** `AdaptiveEcosystem/Docs/조연우/SOCIAL_BEHAVIOR_RUNTIME_IMPLEMENTATION_GUIDE.md`<br>
+> **Current Base:** `main` / `295ac2f` / 2026-09-30<br>
+> **Current Phase:** Production Integration — TASK 4<br>
 > **Audience:** Codex, Antigravity, and other AI coding agents
 >
 > 이 문서는 `AGENTS.md`와 기존 Active Architecture 문서를 대체하지 않는다.
-> 구현 전 반드시 `AGENTS.md` → Active Architecture → Policy Contract → Mass Processor Order를 먼저 읽고,
+> 구현 전 반드시 `AGENTS.md` → Active Architecture → Policy Contract → [Social CURRENT_STATE](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md) → Mass Processor Order를 먼저 읽고,
 > 이 문서를 Social Behavior 기능 구현을 위한 추가 지침으로 사용한다.
+
+## CURRENT PRIORITY — TASK 4 Production Integration
+
+Verified Herd / Alarm / Shelter MVP를 production PPO / Steering / Lifecycle 경로와 통합한다. 아래 기존 TASK 0~3과 후보 타입/알고리즘은 **Historical / MVP Completed 범위의 설계 이력**이다. 현재 소스를 처음부터 재구현하라는 지시가 아니다. Editor Verified는 기존 기록이며 이번 감사는 Source/Docs 검토만 수행했다.
+
+1. Real Player / Predator Threat → Alarm: 작업 브랜치에서 구현. production EntityConfig/JYU와 Client 검증은 확인 필요. [연동 계약](SOCIAL_THREAT_ALARM_INTEGRATION.md).
+2. Social EffectiveAction Request 제공 구현. 실제 Steering 소비 대기.
+3. Shelter TargetPosition → Request / Feedback 인계 계약 구현. 이동 writer 연결 대기.
+4. Reserved → Moving / Occupied, 실제 거리 도착 판정과 예약 유지 구현·자동화 검증. 실제 이동 PIE 대기.
+5. 은신 요구 종료 / Death / Despawn / Migration reservation cleanup 구현·자동화 검증. production 확인 대기.
+6. 전체 end-to-end·Server/Client 검증.
+
+2026-10-05 Social 작업 트리는 [읽기 전용 인지 계약과 행동 보정 진단](SOCIAL_SENSORY_RUNTIME.md#7-인지-정보-인계-계약--2026-10-05-구현)을 제공한다.
+PPO/이동 담당자가 연결할 데이터 의미와 완료 기준은 같은 문서 §9를 따른다.
+현재 가장 우선한 개인 위협 단서 하나를 predator_count로 대입하거나, shared/heard 보고를 Sight로 해석하지 않는다.
+V1 보정/강제 은신 요구는 유지한다. V2에서의 결정권 변경은 공동 계약이며 Social 작업에서 임의 변경하지 않는다.
+
+**Do NOT start until production integration is complete:** Merge/Split 고도화, cross-herd multi-hop gossip, ORCA/RVO2, 자동 Cover 생성, 복잡한 Leader AI, Group Shelter 최적화, 새로운 PPO Observation/Action.
+
+### 통합 전 계약 확인
+
+- **Herd != Flock**. Social은 논리적 무리·위험 문맥·행동 보정·예약 목적지를 소유한다. RL은 관측/행동/학습/가중치, Movement는 경로·조향·위치 적분, Ecology/Mass는 자원/Vitals/생명주기, Network는 복제 transport를 소유한다.
+- 현재 `UEcoSteeringProcessor`는 Raw Action을 읽는다. ModulatedAction/TargetPosition 소비자는 없다. 기존 Social→Shelter 순서만으로 Policy→Social→Steering 순서를 보장하지 않는다.
+- M3 Box Bootstrap은 PPO Herbivore/Custom/Spring Movement를 거절한다. Herbivore의 CustomMovement Tag는 엔진 ApplyMovement를 제외한다. Trait 단순 결합 또는 가드 삭제로 통합하지 않는다.
+- `UEcoSocialTrait`는 Social Fragment/Shared를 추가하고 Identity/Transform/Velocity/PolicyOutput을 요구한다. Client 논리 구성은 제외한다. Alive/Authority/Species Shared는 담당 Trait/스폰 구성에서 확인한다. JYU Harness의 고정 Raw Action Entity와 production Entity는 다르다.
+- Herd/Shelter Subsystem은 Client에 생성되지 않는다. Detection 및 Shelter Query/Reservation/Lifecycle은 `Server | Standalone`을 명시한다. Lifecycle은 죽음/ClientProxy/PendingDeath/Traveling Entity의 버퍼·예약을 정리하므로 제외 태그로 쿼리 자체를 필터링하지 않는다. 실제 production EntityConfig·에디터 override와 Listen Server/Client 검증은 별도 확인한다.
+
+### 가장 작은 다음 작업 단위
+
+`codex/social-shelter-handoff`는 `9461ae7`의 실제 위협 연동을 포함하고, [이동 인계·예약 생명주기](SOCIAL_MOVEMENT_HANDOFF_AND_SHELTER_LIFECYCLE.md)를 추가했다. 직접 UBT 성공 및 Social 자동화 9/9 통과. 이동 담당자가 기존 writer 하나에 Request 소비·Feedback 반환을 연결하는 것이 다음 작업이다. 다른 담당 영역의 위치 적분·PPO·Vitals 코드는 이번 Social 작업에 포함하지 않았다. main 감사 당시 Source 근거는 [CURRENT_STATE §1](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md#12-source-derived-audit-findings--main-295ac2f)에 보존한다.
 
 ---
 
-# 0. 핵심 목표
+# 0. 목표 범위와 과거 MVP 설계
 
 이 작업의 목적은 PPO나 MassFlock을 다시 만드는 것이 아니다.
 
-추가할 핵심 시스템:
+아래는 전체 목표 범위다. Herd/Alarm/Shelter 기본 기능은 이미 존재하고, Merge/Split·TTL/hop 가십·고급 회피는 구현 완료를 뜻하지 않는다.
 
 ```text
 1. Dynamic Herd
@@ -137,8 +171,9 @@ FEcoRegionFragment
 FEcoTravelFragment
 - TargetRegionId
 - TargetRegionIndex
-- TravelProgress
-- bIsTraveling
+- State (EEcoResidenceState: Resident / Traveling / WaitingForFood)
+- TargetPosition
+- MoveSpeed
 
 FEcoObservationFragment
 - FEcoPolicyObservationV1
@@ -170,8 +205,11 @@ FEcoSpeciesSharedFragment
 
 ```text
 FEcoAliveTag
-FEcoMigratingTag
+FEcoAuthorityTag
+FEcoClientProxyTag
 ```
+
+`FEcoMigratingTag` 타입은 남아 있지만 현 M3의 이주 상태는 `FEcoTravelFragment::State` 하나이며 별도 migrating tag/bool을 갱신하지 않는다.
 
 ### 절대 중복 생성하지 말 것
 
@@ -309,8 +347,8 @@ Change 5 : Alarm herd integration
 Change 6 : Shelter registry + authored shelter
 Change 7 : Shelter query
 Change 8 : Reservation
-Change 9 : Merge / Split / Regroup
-Change 10: Optional avoidance evaluation
+Change 9 : Production Integration (CURRENT PRIORITY)
+Change 10: Future Merge / Split / Optional avoidance (integration 이후)
 ```
 
 각 단계는 그 자체로 빌드되어야 한다.
@@ -318,6 +356,8 @@ Change 10: Optional avoidance evaluation
 ---
 
 # 3. 권장 Source Directory 구조
+
+Historical 후보 구조다. 현재는 `EcoSocialTypes.h`/`EcoSocialFragments.h`/`EcoSocialTrait.*`와 `Herd/EcoHerdProcessors.*`, `Alarm/EcoAlarmProcessors.*`, `Shelter/EcoShelterProcessors.*`로 구현되어 있다. 아래 후보 파일을 중복 생성하거나 불필요하게 분리하지 않는다.
 
 현재 단일 Runtime module을 유지하면서 다음 구조를 우선 검토한다.
 
@@ -371,6 +411,8 @@ AI/Social/
 ---
 
 # 4. 데이터 소유권 설계
+
+이 절의 축약 코드 예시는 초기 설계다. 정확한 타입/필드/기본값은 현재 `AI/Social/EcoSocialFragments.h`와 `EcoSocialTypes.h`를 읽는다. 구현된 Shelter Intent에는 `TargetPosition`이 있고 Social Behavior에는 `ModulatedAction`이 있다.
 
 ## 4.1 Per-agent 데이터
 
@@ -537,6 +579,8 @@ PersistentHerdId
 ---
 
 # 5. Subsystem과 Mass Worker Thread 경계
+
+현재 Herd/Alarm Propagation/Shelter Processor는 GameThread 필수 실행으로 Subsystem 조회·조정을 직렬화한다. 일부 query callback에서 Subsystem을 호출하는 현재 MVP와 아래 **병렬 worker를 위한 목표 패턴**을 구분한다. Social Response는 Fragment만 사용한다. GameThread 전제·엔티티 처리 경계 없이 worker 병렬화부터 적용하지 않는다.
 
 기존 `MASS_PROCESSOR_ORDER.md` 원칙을 반드시 따른다.
 
@@ -872,8 +916,8 @@ struct FEcoAlarmSignal
 \[
 S_{recv}
 =
-S_0 e^{-lpha d}
-e^{-eta \Delta t}
+S_0 e^{-\alpha d}
+e^{-\beta \Delta t}
 \gamma^h
 \]
 
@@ -915,6 +959,8 @@ Individual
 ---
 
 # 9. Cover / Shelter 구현 사양
+
+Historical MVP 설계와 후보 수식이다. 현재는 authored Anchor, 12cm Visibility sphere/simple → Visibility line/complex → geometry object sphere/simple → line/complex, Quality 25% + Distance 35% + Occlusion 40%, SlotIndex/Score/StableAgentId 예약 중재를 구현했다. 슬롯 예약의 동점 기준에 별도 거리 항은 없다. 상세 실제 동작은 CURRENT_STATE를 따른다.
 
 ## 9.1 이름
 
@@ -1121,7 +1167,7 @@ SelectedShelterPosition
 ShelterIntentStrength
 ```
 
-실제 계약은 현재 MassFlock 담당 코드가 merge된 후 audit한다.
+현재 PPO 자체 조향과 M3 엔진 이동이 모두 main에 있지만 production handoff는 없다. 통합 담당자와 최종 writer/우선순위 계약을 먼저 정한다. MassFlock 패키지 병합을 전제로 기다리거나 기존 조향을 복제하지 않는다.
 
 금지:
 
@@ -1215,7 +1261,7 @@ MassFlock은 다른 팀원 담당 Movement 계층이다.
 
 # 13. Processor Order 통합
 
-현재 Active Mass 순서:
+Target Architecture의 순서 (실제 전체 실행 순서가 아님):
 
 ```text
 Environment / Region
@@ -1467,7 +1513,18 @@ reservation
 release
 ```
 
-## Phase 5 — Recommended
+## Phase 5 — CURRENT PRIORITY: Production Integration
+
+```text
+Real Threat → Alarm
+Raw Action → ModulatedAction → Steering
+Shelter TargetPosition → Movement
+Reserved → Moving / Occupied
+Reservation renewal / Threat clear / Death / Despawn / Migration cleanup
+End-to-end Server / Client validation
+```
+
+## Phase 6 — Deferred after Production Integration
 
 ```text
 Herd Merge / Split
@@ -1478,7 +1535,7 @@ LOS cache
 LOD update rates
 ```
 
-## Phase 6 — Advanced Optional
+## Phase 7 — Advanced Optional / Deferred
 
 ```text
 Automatic cover generation
@@ -1548,7 +1605,7 @@ Advanced fission/fusion herd model
 
 # 21. Compile / Validation
 
-`AGENTS.md` 규칙에 따라 변경 후 UnrealBuildTool 빌드를 수행한다.
+`AGENTS.md` 규칙에 따라 C++/빌드 입력 변경 후 직접 `UnrealBuildTool.exe`로 빌드하고 완료까지 기다린다. UBT/dotnet/Editor/Live Coding/MSBuild/ShaderCompileWorker가 실행 중이면 새 빌드를 시작하거나 실행 중 빌드를 중단하지 않는다. 문서만 변경한 감사는 링크·Source 근거·diff를 확인하며 새 컴파일/PIE 성공으로 기록하지 않는다.
 
 Target:
 
@@ -1564,9 +1621,9 @@ Agent가 로컬 UE 경로를 모르면 임의 경로를 만들지 않는다.
 
 ---
 
-# 22. 첫 작업 — TASK 0 Source Audit
+# 22. Historical / Completed — TASK 0 Source Audit
 
-이 문서를 받은 AI Agent는 바로 Herd 코드를 만들지 않는다.
+초기 MVP 착수 지시의 이력이다. 현재 Agent는 먼저 CURRENT_STATE의 최신 기준을 재확인한 뒤 **TASK 4**로 진행한다. Herd 코드를 다시 만들지 않는다.
 
 먼저:
 
@@ -1613,7 +1670,7 @@ H. UE5.8 built-in Mass avoidance가 현재 프로젝트에서 사용 가능한�
 
 ---
 
-# 23. TASK 1 — Herd MVP
+# 23. Historical / MVP Completed — TASK 1 Herd MVP
 
 Audit 이후:
 
@@ -1652,7 +1709,7 @@ ORCA
 
 ---
 
-# 24. TASK 2 — Alarm MVP
+# 24. Historical / MVP Completed — TASK 2 Alarm MVP
 
 Herd 이후:
 
@@ -1669,7 +1726,7 @@ PPO Contract 변경 금지.
 
 ---
 
-# 25. TASK 3 — Shelter MVP
+# 25. Historical / MVP Completed 범위 — TASK 3 Shelter MVP
 
 Alarm 이후:
 
@@ -1686,7 +1743,7 @@ release
 
 ---
 
-# 26. TASK 4 — Integration
+# 26. CURRENT PRIORITY — TASK 4 Production Integration
 
 최종:
 
@@ -1700,7 +1757,7 @@ Herd / Alarm / Shelter intent
 MassFlock / Movement interface
 ```
 
-MassFlock implementation 자체를 Social ownership으로 이동하지 않는다.
+Steering/Movement implementation 자체를 Social ownership으로 이동하지 않는다. 상단 CURRENT PRIORITY의 여섯 항목과 인계 계약이 현재 작업 범위다. JYU의 차폐·예약 표시 기록을 실제 도착/Occupied 완료로 읽지 않는다.
 
 ---
 
@@ -1829,29 +1886,27 @@ and shelter resolution
 
 # 31. Implementation Audit
 
-> AI Agent가 실제 작업 branch를 검사한 후 갱신한다. 추측으로 채우지 않는다.
+> Source audit: 2026-09-30 / main `295ac2f`. 이번 감사에서 빌드·PIE는 재실행하지 않았다.
 
 ```text
-Audit Date:
-Branch / Commit:
-
-Current Position Fragment:
-Current Velocity Fragment:
-Current Steering Fragment:
-Current Spatial Query:
-Current MassFlock Integration:
-Current Preferred Velocity:
-Current Avoidance:
-Current Processor Groups:
-
-Reusable Existing Types:
-
-Required New Types:
-
-Required Cross-team Interface:
-
-Known Risks:
+Current Position Fragment: FTransformFragment
+Current Velocity Fragment: FMassVelocityFragment
+Current Steering Fragment: FEcoSteeringGeometryFragment (PPO)
+Current Spatial Query: UEcoNeighborhoodSubsystem (PPO 자체 격자), Social은 Herd registry 탐색
+Current MassFlock Integration: 별도 runtime 구현 확인되지 않음; 설계 참조
+Current Preferred Velocity: M3 FMassDesiredMovementFragment; PPO는 직접 계산/적분
+Current Avoidance: 해당 PPO/M3 이동 경로의 NavMesh/장애물 우회 미통합
+Current Processor Groups: Social PrePhysics/Behavior; PPO PrePhysics 자체 prerequisite;
+  Migration PrePhysics ApplyForces 뒤 / Movement 앞
+Reusable Existing Types: Identity/Vitals/Region/Travel/Policy/Social fragments
+Required New Types: 미확정. 기존 계약을 재사용하는 최소 adapter 우선
+Required Cross-team Interface: Authority Entity 구성, Raw/Modulated/Target handoff,
+  단일 movement writer, 도착/실패 및 lifecycle cleanup
+Known Risks: Bootstrap 혼용 가드, Social 권위 실행 조건, Policy/Social 순서,
+  Dummy Provider, 별도 피식 EMA, 예약 TTL와 도착/Occupied 미통합
 ```
+
+production EntityConfig/부모 Trait의 실제 composition과 멀티플레이 실행은 requires verification이다. 일곱 가지 감사 질문의 Source 근거는 [CURRENT_STATE §1](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)에 있다.
 
 ---
 

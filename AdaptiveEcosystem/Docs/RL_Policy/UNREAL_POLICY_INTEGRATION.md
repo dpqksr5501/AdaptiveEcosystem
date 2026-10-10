@@ -2,6 +2,8 @@
 
 `herbivore_policy_spec.md` §9 의 산출물 문서다. §은 전부 그 사양서의 절 번호.
 
+> **검증 범위 주의 (main `295ac2f`, 2026-09-30 Source audit):** 아래 실측·테스트 기록은 기존 PPO 시연 경로의 기록이며 이번 감사에서 재실행하지 않았다. “지역 연동”은 별도 격자 EMA이며 Ecology의 RegionId/PredationHistory·실제 Food/Shelter·Social handoff·M3 이주 전체 연결을 뜻하지 않는다. M3 Feeding은 별도 경로로 존재하지만 Energy 환산/정식 사망은 미통합이다. 환경 장애 기록은 당시 설치본의 기록이며 현재 설치 상태로 단정하지 않는다. 최신 Social 통합 공백은 [CURRENT_STATE](../조연우/SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md)를 참조한다.
+
 > **테스트 방법, 열어 둔 값, 다른 시스템이 연결할 API 는
 > [POLICY_TEST_AND_API_GUIDE.md](POLICY_TEST_AND_API_GUIDE.md) 에 있다.** 이 문서는 구현 세부다.
 
@@ -66,8 +68,10 @@ python export_weights.py
 
 ## 4. 빌드와 검증
 
-```bash
-"C:/Program Files/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat" AdaptiveEcosystemEditor Win64 Development -Project=<절대경로>/AdaptiveEcosystem.uproject
+프로젝트 AGENTS 규칙에 따라 C++/빌드 입력 변경은 직접 UBT를 사용한다. UBT/dotnet/Editor/Live Coding/MSBuild/ShaderCompileWorker가 실행 중이면 새 빌드를 시작하거나 실행 중 빌드를 중단하지 않는다. 아래 경로는 해당 로컬 설치 예시이며 실제 엔진 경로를 확인한다.
+
+```powershell
+& "C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe" AdaptiveEcosystemEditor Win64 Development "-Project=<절대경로>/AdaptiveEcosystem.uproject" -WaitMutex -NoHotReloadFromIDE -NoXGE
 ```
 
 ```bash
