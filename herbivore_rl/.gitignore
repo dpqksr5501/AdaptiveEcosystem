@@ -21,3 +21,5 @@ results/v2/*.mp4
 results/v2/*.gif
 results/v2/*.log
 results/v3/**/*.mp4
+results/v3/r2/visual/cache/
+results/v3/r2/visual/check/
