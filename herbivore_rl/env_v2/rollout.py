@@ -33,6 +33,9 @@ v1 에 없는 것:
   vigil_window(v2.2r)를 켠 세계의 행에는 `World.window_stats()` 열(WINDOW_COLUMNS)도, daynight(v2.4)를 켠 세계의 행에는
   `World.daynight_stats()` 열(DAYNIGHT_COLUMNS)도 붙는다. repertoire(v3)·threats(v3)를 켠 세계의 행에는 `World.repertoire_stats()`
   열(REPERTOIRE_COLUMNS)·`World.threats_stats()` 열(THREAT_COLUMNS)이 붙는다(repertoire 세계는 행동이 'behavior' 한 열이다).
+  stare_down(v3 R2 M7)·alarm(v3 R2 M8)을 켠 세계의 행에는 `World.stare_stats()` 열(STARE_COLUMNS)·`World.alarm_stats()`
+  열(ALARM_COLUMNS)이 붙는다. rep_learned 는 모델의 마스크 판이 세계의 판(관측 이름, `rep_policy.mask_version_of`)과 다르면
+  연결 때 멈춘다(R1 모델(판 2)은 경보 세계(판 3)에서 거부된다).
   범주형 보행 CM 모델 (`env_v2/cm.py`)은 `_base_policy` 가 알아보고 CM 평가 정책(결정·유지 표본·확률)으로 돌린다.
 
 정책 스펙 예:
@@ -57,8 +60,9 @@ import numpy as np
 from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
-from .world import (ACT_DIM, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, PSLEEP_STAT_COLUMNS, REP_STAT_COLUMNS,
-                    THREAT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS, World)
+from .world import (ACT_DIM, ALARM_STAT_COLUMNS, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, PSLEEP_STAT_COLUMNS,
+                    REP_STAT_COLUMNS, STARE_STAT_COLUMNS, THREAT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS,
+                    World)
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -81,6 +85,9 @@ PSLEEP_COLUMNS = list(PSLEEP_STAT_COLUMNS)
 REPERTOIRE_COLUMNS = list(REP_STAT_COLUMNS)
 # threats(v3 R0)를 켠 세계의 행에만 더 붙는 열 (World.threats_stats)
 THREAT_COLUMNS = list(THREAT_STAT_COLUMNS)
+# stare_down(v3 R2 M7)·alarm(v3 R2 M8)을 켠 세계의 행에만 더 붙는 열 (World.stare_stats·World.alarm_stats)
+STARE_COLUMNS = list(STARE_STAT_COLUMNS)
+ALARM_COLUMNS = list(ALARM_STAT_COLUMNS)
 
 
 # --------------------------------------------------------------------- #
@@ -720,13 +727,12 @@ class RepLearned:
         pol = self.model.policy
         if getattr(world, "_rp", None) is None:
             raise ValueError("rep_learned 는 repertoire 세계(v3)에서만 쓴다")
+        from .rep_policy import check_mask_version
+
+        # 마스크 판을 먼저 본다(판 2 모델(R1)을 경보 세계(판 3, 관측 19)에 넣으면 관측 이름보다 이 이유가 먼저다)
+        check_mask_version(getattr(pol, "rep_mask_version", 1), world.obs_names)
         if tuple(world.obs_names) != tuple(pol.rep_obs_names):
             raise ValueError(f"모델의 관측 {list(pol.rep_obs_names)} 이 세계의 관측 {list(world.obs_names)} 과 다르다")
-        from .rep_policy import MASK_VERSION
-
-        if int(getattr(pol, "rep_mask_version", 1)) != MASK_VERSION:
-            raise ValueError(f"모델의 마스크 판 {getattr(pol, 'rep_mask_version', 1)} 이 지금 코드의 판 {MASK_VERSION} 과 다르다"
-                             "(env_v2/rep_policy.py MASK_VERSION) — 다른 마스크로 판정하지 않는다")
         self.world = world
 
     def mask(self) -> np.ndarray:
@@ -864,6 +870,12 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     if w._th is not None:
         ts = w.threats_stats()
         s.update((c, ts[c]) for c in THREAT_COLUMNS)
+    if w._sd is not None:
+        ss = w.stare_stats()
+        s.update((c, ss[c]) for c in STARE_COLUMNS)
+    if w._al is not None:
+        als = w.alarm_stats()
+        s.update((c, als[c]) for c in ALARM_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:

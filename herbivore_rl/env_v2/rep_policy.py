@@ -11,6 +11,10 @@
     (10-07 첫 학습 조기 중단 뒤 수정, results/v3/r1/PREREG.md 변경 기록: 처음 정의 'threat_recency > 0' 은 곱 감쇠라 본 뒤
     약 2000스텝 동안 0 이 되지 않아 결정 시점의 53% 에서 위협이 안 보이는데도 FLEE·FREEZE 가, 79% 에서 HIDE 가 열려 있었고,
     평시의 기울기가 도망 확률을 끌어내려 2M 에 붕괴했다 — 초안이 마스크로 막으려던 v2.2식 붕괴 그대로)
+    마스크 판 3 (v3 R2 M8, 명세 RL_V3_R2_SPEC.md 3-4, 사람 확인 H5·H6 10-12): 관측에 alarm_heard 칸이 있는 세계(기능 alarm)는
+    '위협을 안다'에 alarm_heard ≥ ALARM_MASK_OBS(0.4)를 더한다(홉 0 은 받은 뒤 10스텝, 홉 1 은 6스텝 열리고 홉 2(0.36)는
+    열지 않는다). 판 번호는 관측 이름으로 정한다(`mask_version_of`: alarm_heard 가 있으면 3, 없으면 2). 그래서 판 2 모델(R1)은
+    경보 세계에서 거부되고(`check_mask_version`), 경보가 없는 세계의 마스크는 판 2 그대로다.
   - 결정 (`World.rep_peek`): 다음 스텝의 `arbitrate` 가 요청을 읽는 개체만 고를 수 있다. 읽지 않는 개체는 지금 행동 한 칸만
     1 이다(log π = 0 이라 actor 기울기가 없고 critic 만 배운다). 기상 결정에서는 SLEEP 을 막는다(기상 결정의 SLEEP 요청은
     wake_target 으로 바뀌어 다른 칸과 같은 뜻이 된다)
@@ -53,7 +57,7 @@ from stable_baselines3.common.policies import ActorCriticPolicy
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from torch.distributions import Categorical
 
-from .repertoire import BEHAVIOR_NAMES, FLEE, FREEZE, HIDE, N_BEHAVIORS, SLEEP
+from .repertoire import BEHAVIOR_NAMES, FLEE, FREEZE, HIDE, N_BEHAVIORS, OBS_ALARM_NAME, SLEEP
 
 # 가능 조건의 문턱 (명세 2절 '가능' — 관측 계약 값이고 학습 계수가 아니다. C++ 마스크도 같은 값을 쓴다):
 # HIDE 는 은신처 거리 관측(가장자리까지 / obs_cover_norm, [0, 1])이 이 값보다 작을 때만 고를 수 있다
@@ -63,13 +67,19 @@ HIDE_COVER_OBS = 0.75
 THREAT_RECENCY_OBS = 0.2
 # 마스크 계약 판. 가능 조건(위 두 문턱과 '숨기도 위협을 알 때만')을 바꾸면 올린다. 정책이 판을 저장하고(`rep_mask_version`),
 # 판정 롤아웃(`env_v2/rollout.py` RepLearned.bind_world)이 지금 코드의 판과 다르면 멈춘다 — 다른 마스크로 조용히 판정하지 않게.
-# 1 = 첫 학습(threat_recency > 0, 숨기는 은신처만), 2 = 10-07 수정(threat_recency ≥ 0.2, 숨기도 위협을 알 때만)
+# 1 = 첫 학습(threat_recency > 0, 숨기는 은신처만), 2 = 10-07 수정(threat_recency ≥ 0.2, 숨기도 위협을 알 때만),
+# 3 = v3 R2 M8(관측 alarm_heard 가 있는 세계: '위협을 안다'에 alarm_heard ≥ ALARM_MASK_OBS 를 더함). MASK_VERSION 은 경보 칸이
+# 없는 세계의 판이고, 세계의 판은 관측 이름으로 정한다(`mask_version_of`)
 MASK_VERSION = 2
+MASK_VERSION_ALARM = 3
+# 판 3 의 경보 문턱(사람 확인 H5 10-12). 관측 계약 값이다(C++ 마스크도 같은 값). yaml 의 alarm.event_alarm 과 같은 값으로 둔다
+ALARM_MASK_OBS = 0.4
 # 막힌 칸의 로짓. softmax 의 exp(−1e9 − ·) 는 float32 에서 정확히 0 이고, 유한한 값이라 0·log 0 이 nan 이 되지 않는다
 MASK_LOGIT = -1e9
 REP_KEYS = frozenset({"allowed", "epsilon", "init_probs", "ent_coef_base", "f_dec"})
-# 가능 조건이 읽는 관측 칸 이름
+# 가능 조건이 읽는 관측 칸 이름. 판 3 은 경보 칸(있을 때만)도 읽는다
 _FEAS_COLS = ("pred_count", "threat_recency", "cover_dist")
+REP_ALARM_COL = OBS_ALARM_NAME
 
 
 def _number(key: str, x) -> float:
@@ -133,14 +143,35 @@ def allowed_mask_of(names) -> np.ndarray:
     return np.array([b in names for b in BEHAVIOR_NAMES], dtype=bool)
 
 
+def mask_version_of(obs_names) -> int:
+    """세계(관측 이름)의 마스크 판: 관측에 alarm_heard 가 있으면 3(MASK_VERSION_ALARM), 없으면 2(MASK_VERSION)."""
+    return MASK_VERSION_ALARM if REP_ALARM_COL in tuple(obs_names) else MASK_VERSION
+
+
+def check_mask_version(model_version, obs_names) -> None:
+    """모델이 저장한 마스크 판이 세계(관측 이름)의 판과 다르면 멈춘다 — 다른 마스크로 조용히 판정하지 않게. 판 2 모델(R1)을
+    경보 세계(판 3)에 넣거나 그 반대일 때 여기서 멈춘다."""
+    want = mask_version_of(obs_names)
+    got = int(model_version)
+    if got != want:
+        why = (" 경보 세계(관측 alarm_heard, 판 3)는 경보를 '위협을 안다'에 넣는다 — R1 모델(판 2)은 이 세계를 판정할 수 없다"
+               if want == MASK_VERSION_ALARM else
+               (" 판 3 모델(경보 세계에서 학습)은 경보가 없는 세계를 판정할 수 없다" if got == MASK_VERSION_ALARM else ""))
+        raise ValueError(f"모델의 마스크 판 {got} 이 이 세계의 마스크 판 {want} 과 다르다(env_v2/rep_policy.py "
+                         f"mask_version_of) — 다른 마스크로 판정하지 않는다.{why}")
+
+
 def feasible_mask(obs, obs_names) -> np.ndarray:
-    """관측 (n, obs_dim) → 가능 칸 (n, 5) bool (모듈 docstring '가능'). 관측 칸은 이름으로 찾는다."""
+    """관측 (n, obs_dim) → 가능 칸 (n, 5) bool (모듈 docstring '가능'). 관측 칸은 이름으로 찾는다. 관측에 alarm_heard 가
+    있으면 판 3 이다('위협을 안다'에 alarm_heard ≥ ALARM_MASK_OBS 를 더한다)."""
     names = list(obs_names)
     missing = [c for c in _FEAS_COLS if c not in names]
     if missing:
         raise ValueError(f"가능 조건은 관측 {missing} 가 필요하다(features.repertoire.obs_extra: true 세계)")
     o = np.asarray(obs)
     threat = (o[:, names.index("pred_count")] > 0.0) | (o[:, names.index("threat_recency")] >= THREAT_RECENCY_OBS)
+    if REP_ALARM_COL in names:          # 판 3 (v3 R2 M8)
+        threat = threat | (o[:, names.index(REP_ALARM_COL)] >= ALARM_MASK_OBS)
     f = np.ones((len(o), N_BEHAVIORS), dtype=bool)
     f[:, FLEE] = threat
     f[:, FREEZE] = threat
@@ -285,7 +316,7 @@ class RepertoirePolicy(ActorCriticPolicy):
 
     policy_kwargs 로 `rep_allowed`(허용 행동 이름 — 판정 롤아웃의 `rep_learned` 가 마스크를 다시 만들 때 쓴다), `rep_epsilon`,
     `rep_ent_scale`(= cat_ent_coef / ent_coef), `rep_init_logits`(시작 로짓 편향 5), `rep_obs_names`(학습 세계 관측 이름 —
-    판정 세계와 맞는지 본다)를 받는다. 구조(net_arch·activation_fn)는 train.PPO_KWARGS 그대로다. 마스크는 관측 뒤 5칸에서
+    판정 세계와 맞는지 본다), `rep_mask_version`(학습 세계의 마스크 판 — `mask_version_of(rep_obs_names)`)을 받는다. 구조(net_arch·activation_fn)는 train.PPO_KWARGS 그대로다. 마스크는 관측 뒤 5칸에서
     만들므로 관측을 받는 공개 메서드마다 먼저 계산해 둔다(env_v2/cm.py 와 같은 방식).
     """
 

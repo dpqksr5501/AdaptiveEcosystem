@@ -74,11 +74,13 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "pred_sleep": 14,    # v2.4s 포식자 밤잠(10-07 사용자 결정 A안): 대부분 밤에 자고 세계마다 일부만 야행성
     "repertoire": 15,    # v3 R0 행동 레퍼토리(10-07 사용자 결정 (4)): 행동 실행기·잠금·사건·개체 행동 상태, 장치 M1·M2·M4·M5·M6
     "threats": 16,       # v3 R0 위협 유형(10-07 사용자 결정 (4)): 잠행-돌진 포식자(M3)와 플레이어형 위협
+    "stare_down": 17,    # v3 R2 M7 노려보기 대치(10-08 사용자 결정 (1)): 표적 잠금, 얼어 노려보기 → 대치·물러남·들킴. 난수 없음
+    "alarm": 18,         # v3 R2 M8 동족 경보 전염(10-08 사용자 결정 (1)): 경보 방출·수신·중계, 관측 alarm_heard, 사건 E7. 난수 없음
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
 IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight", "pred_sleep",
-                                         "repertoire", "threats"})
+                                         "repertoire", "threats", "stare_down", "alarm"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -143,6 +145,18 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
                           "exhaust_steps", "player_frac", "player_speeds", "player_mode_steps", "player_stalk_p",
                           "player_charge_dist", "player_charge_steps", "player_rest_steps", "player_catch_r",
                           "player_cooldown"}),
+    # v3 R2 M7 (env_v2/world.py `_stare_params`, 명세 RL_V3_R2_SPEC.md 2절): repertoire·threats 를 함께 켜야 한다.
+    # target_lock = 잠행 위협(잠행형의 잠행 단계·플레이어 잠행 모드)이 표적을 잠그나(false = '지난 스텝 표적' 기록만, 표적
+    # 선택은 그대로), spot_r = 노려보기가 통하는 실거리(0 = 노려보기 블록을 건너뛴다 — 중립), spot_cos = 눈맞춤 각의 cos,
+    # spot_steps = 이어서 노려봐야 하는 스텝, balk_steps·balk_speed = 잠행형 물러남 스텝·속력(× herb_speed),
+    # spotted_steps·spotted_charge_speed = 플레이어 '들킴' 스텝·들킨 돌진 속력 상한(× herb_speed)
+    "stare_down": frozenset({"target_lock", "spot_r", "spot_cos", "spot_steps", "balk_steps", "balk_speed",
+                             "spotted_steps", "spotted_charge_speed"}),
+    # v3 R2 M8 (env_v2/world.py `_alarm_params`, 명세 3절): repertoire 를 함께 켜야 한다. alarm_r = 들리는 실거리,
+    # alarm_steps = 경보가 남는 스텝(ttl), max_hop = 낼 수 있는 가장 큰 홉, hop_gain = 홉마다 곱하는 관측 세기,
+    # relay_window = 원점 뒤 중계할 수 있는 스텝, event_alarm = 사건 E7 세기 문턱, on_catch = 잡힌 개체의 비명.
+    # alarm_r 0 이고 on_catch false 면 블록 전체를 건너뛴다(중립)
+    "alarm": frozenset({"alarm_r", "alarm_steps", "max_hop", "hop_gain", "relay_window", "event_alarm", "on_catch"}),
 })
 
 

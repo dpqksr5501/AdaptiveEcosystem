@@ -47,7 +47,7 @@ import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
 from env_v2.config import load_v2_config
-from env_v2.rep_policy import (MASK_VERSION, RepertoirePolicy, action_mask, policy_obs, rep_distribution, rep_params,
+from env_v2.rep_policy import (RepertoirePolicy, action_mask, mask_version_of, policy_obs, rep_distribution, rep_params,
                                sample_masked)
 from env_v2.repertoire import BEHAVIOR_NAMES, FLEE, FREEZE, HIDE, N_BEHAVIORS, SLEEP
 from env_v2.vec_env import MultiWorldVecEnv
@@ -81,7 +81,8 @@ def make_model_rep(venv: MultiWorldVecEnv, rep: dict, tensorboard_log: str | Non
         raise ValueError("ent_coef > 0 이어야 한다(범주 엔트로피 계수를 배율로 넣는다)")
     kw["policy_kwargs"] = dict(PPO_KWARGS["policy_kwargs"], rep_allowed=list(rep["allowed"]), rep_epsilon=rep["epsilon"],
                                rep_ent_scale=rep["cat_ent_coef"] / ent, rep_init_logits=rep["init_logits"],
-                               rep_obs_names=list(venv.obs_names), rep_mask_version=MASK_VERSION)
+                               rep_obs_names=list(venv.obs_names),
+                               rep_mask_version=mask_version_of(venv.obs_names))   # 경보 세계(v3 R2 M8)는 판 3
     return PPO(RepertoirePolicy, venv, tensorboard_log=tensorboard_log, device="cpu", **kw)
 
 

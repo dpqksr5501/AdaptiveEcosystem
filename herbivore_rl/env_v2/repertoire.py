@@ -18,6 +18,11 @@
   hide_target(HIDE 가 고른 은신처 색인, 없으면 −1), arrived(HIDE 도착), 사건 기준값 prev_pc·prev_near·prev_fast·prev_low·
   prev_dark(결정 여부와 무관하게 스텝마다 그 스텝의 결정 관측 값으로 갱신한다), away(마지막 위협 반대 방향, 단위벡터. 본 적
   없으면 0), recency(threat_recency), jitter(개체별 사건 결정 지연, 개체가 새로 날 때마다 다시 정한다).
+  경보 칸(v3 R2 M8, 기능 alarm 을 켠 세계만 `alarm_state` 가 만든다. C++ 은 FEcoKinAlarmFragment 로 따로 둘 수 있다):
+  al_ttl(남은 경보 스텝, 0 = 없음), al_hop(쥔 경보의 홉, AL_NONE = 없음 — C++ uint8 255), al_pt(경보 점, 위협이 있는 자리),
+  al_t0(원점 홉 0 이 난 스텝), alarm_new(지난 E′ 에서 새·더 센 경보를 받음 — 다음 arbitrate 의 E7), alarm_seq(낸 횟수,
+  mod 256 — 단발 애니메이션), entry_cause(FLEE·FREEZE·HIDE 진입 원인 비트: bit0 봄, bit1 들음, bit2 그 밖. 애니메이션용이고
+  동역학과 무관하다).
 
 한 스텝 순서 (`World.step` 이 부른다. C++ 로 옮길 때 이 순서를 지킨다):
   A) `arbitrate` — 결정 때 관측(이전 스텝 끝 기하)으로
@@ -29,6 +34,9 @@
         직전 기준값과 비교한다 — 자기 행동이 바뀌어 시야가 넓어진 것(GRAZE 고개 숙임 0.6 → FREEZE 1.0, SLEEP 0.3 → 기상 뒤)
         만으로 생긴 위협은 사건이 아니다(넓어진 띠의 위협은 기준값에만 들어간다). 기준값은 실제 관측(지금 시야) 값으로 둔다.
         E1 은 수의 증가라 같은 스텝에 하나가 나가고 하나가 들어오면 사건이 아니다(C++ 도 같게 둔다).
+        E7 (v3 R2 M8, 기능 alarm 을 켠 세계만 — 결정 관측에 alarm_new 가 있을 때): 지난 스텝 끝 E′ 에서 새 경보이거나 더 센
+        경보를 받았고(alarm_new) 지금 행동이 GRAZE·SLEEP 이다. FLEE·FREEZE·HIDE 의 잠금은 열지 않는다(약한 중계가 노려보기를
+        끊지 않게). 지연(c)은 E1~E6 과 같다.
      c. 지연: 대기 사건이 없는 개체에 사건이 나면 ev_wait ← jitter. ev_wait = 0 인 개체가 이번 스텝의 사건 결정(fire)이다.
         나머지 대기는 1 줄인다
      d. 기상 끝: 기상 중(깨는 스텝 포함)에 난 사건은 결정 지연과 무관하게 wake_ev 로 남긴다. 기상 중이고 wake_left ≤ 0 이면
@@ -43,6 +51,11 @@
         (FREEZE·HIDE → FLEE 는 0, SLEEP → FLEE 는 기상이 지연이다), HIDE 면 가장 가까운 은신처(동점이면 낮은 색인, 없으면 −1)를
         고르고 이미 은신처 안이면 곧바로 도착(lock_hide, E6 없음)
      g. 위상
+  A′) (World, 기능 alarm) `alarm_emit` — 경보 방출 목록. 이번 스텝에 행동이 바뀌어(switch, 기상 포함) FLEE·FREEZE·HIDE 로
+     들어간 개체만 낸다: 결정 관측에 위협이 보이면 홉 0(점 = 결정 때 위치 − away_from_pred × d_pred_min = 가장 가까운 보이는
+     위협의 위치, 원점 시각 t0 = t), 안 보이고 경보를 쥐고 있고(ttl > 0) hop < max_hop 이고 t − t0 ≤ relay_window 면
+     hop + 1(점·t0 는 쥔 값). 그 밖은 조용하다. 진입 원인 entry_cause(bit0 봄, bit1 들음 = ttl > 0, bit2 그 밖)를 적고,
+     그다음 alarm_new ← False.
   B) `control` — 행동별 제어기 (G 먹이 기울기, C 무리 중심, Sep 분리, A 위협 반대, T 고른 은신처 쪽, n = 정규화)
      GRAZE  방향 n(graze_forage·G + graze_cohesion·C + sep_weight·Sep). 지금 셀 먹이 ≥ graze_eat_min 이면 정지(머리 숙여
             먹기), 아니면 걷기. 섭식 gait_eat[보행](정지 1.0, 걷기 0.5). 자기 포식자 탐지 반경 × graze_head_down(M5)
@@ -59,9 +72,25 @@
      포식자·위협의 표적 선택 체감 거리 = 실거리 × max(은신 배수, still 이면 c_still), 은신 배수 = 은신처 안이면 행동별 값
      (웅크린 HIDE cover_mult_crouch, GRAZE cover_mult_graze, SLEEP cover_mult_sleep, 그 밖(FLEE·FREEZE·가는 중 HIDE)
      cover_mult_other — 넷 다 yaml 계수), 밖이면 1. 포획 판정 거리 = 실거리 × 은신 배수(c_still 없음).
+     C0 (v3 R2 M7, 기능 stare_down — `World._step_predators_v3` 의 쿨다운·밤잠 초기화 바로 뒤, 표적 선택 전): 잠금·노려보기.
+       잠행 위협(잠행형의 배회·대치 상태, 플레이어의 잠행 모드)의 잠금이 추적 불가(잠행형 실거리 > 14 또는 시야각 밖, 표적이
+       웅크림·SLEEP)이면 지우고 대치는 배회로. 이어서 노려보기 S(잠긴 표적이 FREEZE·실거리 ≤ min(spot_r, 표적의 지금 탐지
+       반경)·표적 heading 과 표적 → 위협 방향의 cos ≥ spot_cos·체감 거리 > 돌진 거리)로 대치(STANDOFF)·물러남(BALK)·들킴을
+       센다. 대치·물러남인 잠행형은 사냥에서 빠진다. 사냥 중인 잠행 위협은 잠긴 표적을 계속 쫓는다(표적 선택을 덮는다).
+       위치는 C 시작 값(초식은 이동 뒤, 포식자는 이동 전), heading 은 이번 스텝 FREEZE 제어기가 정한 값이다.
+     (World, 기능 alarm) 포획 뒤: 잡힌 개체는 홉 0 비명을 방출 목록에 더한다(점 = 잡은 위협의 이동 뒤 위치, 동시 포획이면 낮은
+     번호 위협 = 위협 슬롯 순서). 같은 스텝의 전환 방출을 덮는다 — 개체 키 하나에 방출 항목은 늘 하나다(덮지 않고 하나를 더
+     넣으면 같은 키·같은 위치의 홉 0 이 둘이 되어 사전식 최소로 고를 수 없고, 받는 개체의 점이 버퍼 순서에 따라 갈린다).
   D) `tick` — steps_in + 1, lock_left − 1, startle_left·wake_left − 1(0 에서 멈춤)
   E) (World) 관측. `perceive` 가 away·recency 를 갱신한다(보이면 away ← 가장 가까운 위협 반대, recency ← 1, 아니면
      recency ← recency_decay·recency).
+  E′) (World, 기능 alarm) `alarm_receive` — perceive 뒤, 관측 전, 리스폰 전. 개체마다: ttl ← max(ttl − 1, 0) →
+     스스로 냈으면 자기 방출로 덮고 ttl = alarm_steps → 후보 = 자기 말고 실거리 ≤ alarm_r 인 이번 스텝 방출원(위치는 스텝 끝,
+     리스폰 전), 가장 좋은 후보 = (홉, 거리², AgentKey) 사전식 최소 → 받아들임 = 스스로 냈으면 더 센 경보(hop_best < 자기
+     홉)만, 아니면 ttl(1 뒤) = 0 이거나 hop_best ≤ hop → alarm_new = 받아들임 & 스스로 내지 않음 & (ttl(1 뒤) = 0 또는
+     hop_best < 원래 홉) & hop_gain^hop_best ≥ event_alarm → 받아들였고 스스로 내지 않았고 자기 정보가 없으면(pred_count = 0
+     & recency < OWN_RECENCY) away ← 단위(자기 위치 − 점). 낸 개체는 alarm_seq + 1. 관측 alarm_heard = ttl > 0 이면
+     hop_gain^hop × ttl ÷ alarm_steps(이 순서로 계산한다), 아니면 0. 리스폰은 경보 상태를 모두 0 으로 둔다(새 개체).
 
 파리티 메모 (C++ 이식):
   - 스텝 뒤 훅 `World.beh_steps` 는 tick 전 값(이번 스텝에 실행한 행동의 경과)이고, 관측 obs_extra 의 beh_steps 칸은 tick 뒤
@@ -100,6 +129,20 @@ C++ 꼴 (엔진 무관 헤더 EcoBehaviorArbiter.h·EcoBehaviorControllers.h 의
   DrainMult = GaitDrain[Gait] * (S.Behavior == Sleep && bInCover ? 1 - SleepRest*D : 1);
   bStill = S.Behavior == Freeze || S.Behavior == Sleep || bCrouch;   // 포식자 표적 체감 거리 × max(은신 배수, CStill)
   CoverMult = bCrouch ? CoverCrouch : S.Behavior == Graze ? CoverGraze : S.Behavior == Sleep ? CoverSleep : CoverOther;
+  // EcoKinAlarm.h (v3 R2 M8, 명세 RL_V3_R2_SPEC.md 6절) — A′(Arbiter 뒤, 개체 하나)
+  if (bSwitched && (B==Flee || B==Freeze || B==Hide)) {
+    if (Obs.PredCount > 0) Emit({Key, 0, Pos - Obs.AwayFromPred*Obs.DPredMin, T});
+    else if (Al.Ttl>0 && Al.Hop<MaxHop && T-Al.T0<=RelayWindow) Emit({Key, Al.Hop+1, Al.Pt, Al.T0}); }
+  // 포획: if (OnCatch) EmitOrReplace(VictimKey, {0, Q[CatcherSlot], T});   같은 키의 전환 방출을 덮는다(키 하나에 항목 하나)
+  //   CatcherSlot = 그 개체를 잡은 위협 중 위협 슬롯 번호가 가장 작은 것. 위치는 스텝 끝에 채운다. 냈으면 ++Al.Seq(한 번만)
+  // E′(Perception 뒤, 개체 하나): Ttl0 = Max(Al.Ttl-1, 0); 냈으면 Al = 자기 방출, Al.Ttl = AlarmSteps
+  // Best = argmin_{e != i, |P_e - P_i| <= R} (Hop_e, DistSq, Key_e)
+  // bAccept = Best && (bEmitted ? Best.Hop < Al.Hop : (Ttl0==0 || Best.Hop <= Al.Hop));
+  // if (bAccept) { Al.bNew = !bEmitted && (Ttl0==0 || Best.Hop < Al.Hop) && Gain[Best.Hop] >= EventAlarm;
+  //   Al.Hop=Best.Hop; Al.Pt=Best.Pt; Al.T0=Best.T0; Al.Ttl=AlarmSteps;
+  //   if (!bEmitted && PredCount==0 && Recency<0.2f) S.Away = (P_i - Al.Pt).GetSafeNormal(); }
+  // Obs.AlarmHeard = Al.Ttl>0 ? Gain[Al.Hop]*Al.Ttl/(float)AlarmSteps : 0;
+  // Arbiter 사건: bEvent |= Al.bNew && (S.Behavior==Graze || S.Behavior==Sleep);
 """
 
 from __future__ import annotations
@@ -122,6 +165,16 @@ JITTER_TAG = 505
 # 관측 obs_extra 칸 이름 (순서 = 관측 열 순서)
 OBS_EXTRA_NAMES = ("pred_approach", "kin_alarm", "beh_graze", "beh_flee", "beh_hide", "beh_freeze", "beh_sleep",
                    "beh_steps", "threat_recency")
+# v3 R2 M8 관측 칸 (기능 alarm 을 켜고 obs_extra 가 true 일 때만 obs_extra 9칸 뒤 맨 끝에 붙는다. 18 → 19칸)
+OBS_ALARM_NAME = "alarm_heard"
+# 경보 (v3 R2 M8): al_hop 의 '없음'(C++ uint8 255), 자기 정보 문턱(경보 방향을 받지 않는 threat_recency — rep_policy 의
+# THREAT_RECENCY_OBS 와 같은 0.2, 순환 import 를 피해 여기에 다시 적는다), 진입 원인 비트
+AL_NONE = 255
+OWN_RECENCY = 0.2
+ENTRY_SEEN, ENTRY_HEARD, ENTRY_OTHER = 1, 2, 4
+# 경보원 사전식 최소(홉, 거리², AgentKey)에서 후보가 아닌 칸에 넣는 값
+_KEY_MAX = np.iinfo(np.uint64).max
+_HOP_BIG = 1 << 30
 
 _GOLDEN = 0x9E3779B97F4A7C15
 _M1, _M2 = 0xBF58476D1CE4E5B9, 0x94D049BB133111EB
@@ -245,7 +298,7 @@ class RepState:
     """개체별 행동 상태 (모듈 docstring). 모든 칸이 numpy 배열이라 World 와 함께 pickle·deepcopy 된다.
     `seed` 는 세계 시드(사건 결정 지연 해시, `decision_jitter`). 처음 개체는 모두 세대 0 이다."""
 
-    def __init__(self, n: int, p: dict, energy: np.ndarray, dark: float, seed: int):
+    def __init__(self, n: int, p: dict, energy: np.ndarray, dark: float, seed: int, alarm: bool = False):
         self.behavior = np.full(n, GRAZE, dtype=np.int8)
         self.phase = np.zeros(n, dtype=np.int8)
         self.steps_in = np.zeros(n, dtype=np.int64)
@@ -267,6 +320,13 @@ class RepState:
         self.away = np.zeros((n, 2))
         self.recency = np.zeros(n)
         self.jitter = decision_jitter(seed, np.arange(n), np.zeros(n, dtype=np.int64), p["decision_jitter"])
+        if alarm:
+            alarm_state(self, n)
+
+    @property
+    def has_alarm(self) -> bool:
+        """경보 칸(v3 R2 M8)이 있나. 기능 alarm 을 켠 세계만 `alarm_state` 가 만든다."""
+        return "al_ttl" in self.__dict__
 
     def reset_slots(self, idx: np.ndarray, p: dict, energy: np.ndarray, dark: float, seed: int,
                     generations: np.ndarray) -> None:
@@ -293,6 +353,25 @@ class RepState:
         self.away[idx] = 0.0
         self.recency[idx] = 0.0
         self.jitter[idx] = decision_jitter(seed, idx, generations, p["decision_jitter"])
+        if self.has_alarm:          # 새 개체는 경보를 쥐지 않는다(ttl 0, 홉 없음, 점·t0 0, alarm_new 끔, seq 0)
+            self.al_ttl[idx] = 0
+            self.al_hop[idx] = AL_NONE
+            self.al_pt[idx] = 0.0
+            self.al_t0[idx] = 0
+            self.alarm_new[idx] = False
+            self.alarm_seq[idx] = 0
+            self.entry_cause[idx] = 0
+
+
+def alarm_state(rs: RepState, n: int) -> None:
+    """경보 칸을 만든다 (v3 R2 M8, 모듈 docstring '경보 칸'). 처음에는 아무도 경보를 쥐지 않는다."""
+    rs.al_ttl = np.zeros(n, dtype=np.int64)
+    rs.al_hop = np.full(n, AL_NONE, dtype=np.int64)
+    rs.al_pt = np.zeros((n, 2))
+    rs.al_t0 = np.zeros(n, dtype=np.int64)
+    rs.alarm_new = np.zeros(n, dtype=bool)
+    rs.alarm_seq = np.zeros(n, dtype=np.int64)
+    rs.entry_cause = np.zeros(n, dtype=np.int64)
 
 
 def _enter(rs: RepState, p: dict, m: np.ndarray, new: np.ndarray, in_cover: np.ndarray, cover_k: np.ndarray) -> None:
@@ -321,8 +400,9 @@ def arbitrate(rs: RepState, p: dict, request: np.ndarray, obs: dict) -> dict:
     """한 스텝의 결정 (모듈 docstring A). `obs` 는 결정 때 값: pred_count (N,), d_pred_min (N,, 안 보이면 inf),
     pred_approach (N,), energy (N,, max_energy 비율), dark (스칼라 d), in_cover (N,), cover_k (N,, 가장 가까운 은신처, 없으면 −1).
     선택: pred_count_ev·d_pred_min_ev·pred_approach_ev — 사건 비교 시야(모듈 docstring A.b)로 센 값. 없으면 위 값을 쓴다
-    (시야가 바뀌지 않은 개체는 둘이 같다).
-    반환: 마스크 decide(결정 시점, 사건 결정이 있던 기상 끝 포함), switch(행동이 바뀐 개체), event(사건), fire(사건 결정)."""
+    (시야가 바뀌지 않은 개체는 둘이 같다). alarm_new (N,) bool — 기능 alarm 을 켠 세계만(E7). 없으면 E7 은 없다.
+    반환: 마스크 decide(결정 시점, 사건 결정이 있던 기상 끝 포함), switch(행동이 바뀐 개체), event(사건), fire(사건 결정),
+    e7(이번 스텝의 사건 E7)."""
     req = np.asarray(request, dtype=np.int64)
     pc = np.asarray(obs["pred_count"], dtype=np.int64)
     in_cover, cover_k = obs["in_cover"], obs["cover_k"]
@@ -343,6 +423,11 @@ def arbitrate(rs: RepState, p: dict, request: np.ndarray, obs: dict) -> dict:
     dark = bool(obs["dark"] >= p["event_dark"])
     event = ((pce > rs.prev_pc) | (near_e & ~rs.prev_near) | (fast_e & ~rs.prev_fast)
              | ((rs.behavior == SLEEP) & seen) | (low & ~rs.prev_low) | (rs.prev_dark != dark) | e6)
+    if "alarm_new" in obs:          # E7 (v3 R2 M8): 새·더 센 경보를 먹는 중이거나 자는 중에 받았다
+        e7 = np.asarray(obs["alarm_new"], dtype=bool) & ((rs.behavior == GRAZE) | (rs.behavior == SLEEP))
+        event = event | e7
+    else:
+        e7 = np.zeros(len(pc), dtype=bool)
     rs.prev_pc, rs.prev_near, rs.prev_fast, rs.prev_low = pc.copy(), near, fast, low
     rs.prev_dark = np.full(len(pc), dark, dtype=bool)
     # c. 지연
@@ -367,7 +452,7 @@ def arbitrate(rs: RepState, p: dict, request: np.ndarray, obs: dict) -> dict:
     _enter(rs, p, sw, req, in_cover, cover_k)
     # g. 위상
     rs.phase = phase_of(rs, p)
-    return dict(decide=decide | wake_dec, switch=sw | woke, event=event, fire=fire)
+    return dict(decide=decide | wake_dec, switch=sw | woke, event=event, fire=fire, e7=e7)
 
 
 def phase_of(rs: RepState, p: dict) -> np.ndarray:
@@ -451,3 +536,110 @@ def obs_extra(rs: RepState, p: dict, g: dict, idx=None) -> np.ndarray:
     o[:, 7] = np.minimum(rs.steps_in[sl] / p["steps_norm"], 1.0)
     o[:, 8] = rs.recency[sl]
     return o
+
+
+# --------------------------------------------------------------------- #
+# 동족 경보 (v3 R2 M8, 명세 Docs/RL_Policy/RL_V3_R2_SPEC.md 3절). 기능 alarm 을 켠 세계만 `World` 가 부른다. 난수를 쓰지 않는다
+# --------------------------------------------------------------------- #
+
+
+def alarm_gain(hop_gain: float, max_hop: int) -> np.ndarray:
+    """홉별 관측 세기 hop_gain^h (h = 0..max_hop) (max_hop + 1,) float64. 곱을 차례로 쌓는다(C++ Gain[] 과 같은 꼴)."""
+    g = np.empty(int(max_hop) + 1)
+    x = 1.0
+    for h in range(int(max_hop) + 1):
+        g[h] = x
+        x = x * float(hop_gain)
+    return g
+
+
+def alarm_emit(rs: RepState, ap: dict, switch: np.ndarray, pred_count: np.ndarray, pos: np.ndarray,
+               away: np.ndarray, d_pred_min: np.ndarray, t: int) -> dict:
+    """A′ — 방출 목록 (모듈 docstring A′). `switch` 는 arbitrate 의 switch(기상 포함), `pred_count`·`away`·`d_pred_min` 은
+    결정 관측(이전 스텝 끝 기하), `pos` 는 결정 때 위치, `t` 는 이번 스텝 번호. `ap` 는 world._alarm_params.
+    rs 에서 entry_cause 를 적고 alarm_new 를 끈다(다른 칸은 바꾸지 않는다 — 받기는 E′ `alarm_receive`).
+    반환: emit (N,) bool, hop (N,) int64(내지 않으면 AL_NONE), pt (N, 2), t0 (N,) int64, cry (N,) bool(모두 False — 비명은
+    World 가 포획 뒤에 더한다), into(FLEE·FREEZE·HIDE 진입), seen(결정 관측에 위협이 보임)."""
+    b = rs.behavior
+    sw = np.asarray(switch, dtype=bool)
+    into = sw & ((b == FLEE) | (b == FREEZE) | (b == HIDE))
+    seen = np.asarray(pred_count) > 0
+    heard = rs.al_ttl > 0
+    e0 = into & seen
+    relay = into & ~seen & heard & (rs.al_hop < ap["max_hop"]) & (int(t) - rs.al_t0 <= ap["relay_window"])
+    hop = np.where(e0, 0, np.where(relay, rs.al_hop + 1, AL_NONE)).astype(np.int64)
+    pt = rs.al_pt.copy()
+    if e0.any():
+        pt[e0] = pos[e0] - away[e0] * np.asarray(d_pred_min)[e0][:, None]
+    t0 = np.where(e0, int(t), rs.al_t0).astype(np.int64)
+    cause = (np.where(seen, ENTRY_SEEN, 0) | np.where(heard, ENTRY_HEARD, 0)
+             | np.where(~seen & ~heard, ENTRY_OTHER, 0))
+    rs.entry_cause = np.where(sw, np.where(into, cause, 0), rs.entry_cause).astype(np.int64)
+    rs.alarm_new = np.zeros_like(rs.alarm_new)
+    return dict(emit=e0 | relay, hop=hop, pt=pt, t0=t0, cry=np.zeros(len(b), dtype=bool), into=into, seen=seen)
+
+
+def alarm_receive(rs: RepState, ap: dict, em: dict, pos: np.ndarray, keys: np.ndarray, pred_count: np.ndarray) -> dict:
+    """E′ — 경보 받기 (모듈 docstring E′). `em` 은 이번 스텝의 방출 목록(`alarm_emit` + 비명), `pos` 는 스텝 끝 위치(이동 뒤,
+    리스폰 전), `keys` 는 AgentKey(uint64), `pred_count` 는 perceive 뒤(이번 관측) 보이는 위협 수. rs 를 갱신한다.
+    반환: accept·new·dirset·emitted·onset (N,) bool, best (N,) 가장 좋은 후보의 슬롯(없으면 −1), best_hop (N,), ttl0 (N,),
+    listen (E,) 방출원마다 후보로 들은 개체 수, src (E,) 방출원 슬롯."""
+    n = len(rs.al_ttl)
+    A = int(ap["alarm_steps"])
+    ttl0 = np.maximum(rs.al_ttl - 1, 0)
+    hop_prev = rs.al_hop.copy()
+    emitted = np.asarray(em["emit"], dtype=bool)
+    ei = np.flatnonzero(emitted)
+    ttl, hop, pt, t0 = ttl0.copy(), rs.al_hop.copy(), rs.al_pt.copy(), rs.al_t0.copy()
+    ttl[ei] = A
+    hop[ei] = em["hop"][ei]
+    pt[ei] = em["pt"][ei]
+    t0[ei] = em["t0"][ei]
+    best = np.full(n, -1, dtype=np.int64)
+    best_hop = np.full(n, _HOP_BIG, dtype=np.int64)
+    listen = np.zeros(len(ei), dtype=np.int64)
+    if len(ei):
+        dx = pos[ei, 0][None, :] - pos[:, 0:1]                  # (n, E)
+        dy = pos[ei, 1][None, :] - pos[:, 1:2]
+        d2 = dx * dx + dy * dy
+        cand = np.sqrt(d2) <= ap["alarm_r"]
+        cand[ei, np.arange(len(ei))] = False                     # 자기 방출은 후보가 아니다
+        hop_e = em["hop"][ei]
+        hm = np.where(cand, hop_e[None, :], _HOP_BIG)
+        c2 = cand & (hm == hm.min(1, keepdims=True))
+        dm = np.where(c2, d2, np.inf)
+        c3 = c2 & (dm == dm.min(1, keepdims=True))
+        km = np.where(c3, np.asarray(keys, dtype=np.uint64)[ei][None, :], _KEY_MAX)
+        col = km.argmin(1)
+        has = cand.any(1)
+        best = np.where(has, ei[col], -1)
+        best_hop = np.where(has, hop_e[col], _HOP_BIG)
+        listen = cand.sum(0)
+    has = best >= 0
+    accept = has & np.where(emitted, best_hop < hop, (ttl0 == 0) | (best_hop <= hop))
+    bh = np.where(accept, best_hop, 0)
+    new = (accept & ~emitted & ((ttl0 == 0) | (best_hop < hop_prev))
+           & (ap["gain"][np.minimum(bh, ap["max_hop"])] >= ap["event_alarm"]))
+    bi = np.where(accept, best, 0)
+    hop = np.where(accept, best_hop, hop)
+    ttl = np.where(accept, A, ttl)
+    pt = np.where(accept[:, None], np.asarray(em["pt"])[bi], pt)
+    t0 = np.where(accept, np.asarray(em["t0"])[bi], t0)
+    own = (np.asarray(pred_count) == 0) & (rs.recency < OWN_RECENCY)
+    dirset = accept & ~emitted & own
+    if dirset.any():
+        rs.away[dirset] = normalize(pos[dirset] - pt[dirset])
+    onset = (ttl0 == 0) & (ttl > 0)
+    rs.al_ttl, rs.al_hop, rs.al_pt, rs.al_t0 = ttl.astype(np.int64), hop.astype(np.int64), pt, t0.astype(np.int64)
+    rs.alarm_new = new
+    rs.alarm_seq = np.where(emitted, (rs.alarm_seq + 1) % SEQ_MOD, rs.alarm_seq)
+    return dict(accept=accept, new=new, dirset=dirset, emitted=emitted, onset=onset, best=best, best_hop=best_hop,
+                ttl0=ttl0, listen=listen, src=ei)
+
+
+def alarm_level(rs: RepState, ap: dict, idx=None) -> np.ndarray:
+    """관측 alarm_heard = ttl > 0 이면 hop_gain^hop × ttl ÷ alarm_steps(이 순서), 아니면 0. [0, 1] float64."""
+    sl = slice(None) if idx is None else idx
+    ttl, hop = rs.al_ttl[sl], rs.al_hop[sl]
+    g = ap["gain"][np.minimum(hop, ap["max_hop"])]
+    return np.where(ttl > 0, (g * ttl) / float(ap["alarm_steps"]), 0.0)
