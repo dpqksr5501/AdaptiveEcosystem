@@ -18,6 +18,23 @@
 
 맞춘 정책은 train_v3.py --warmstart <.pt> 가 PPO 시작 가중치로 싣는다. .zip 은 같은 가중치의 SB3 모델이라 eval_v3 로 바로 잴 수
 있다(맞춘 직후의 성능 기록용).
+
+v3 R2 (명세 RL_V3_R2_SPEC.md 10절 6단계 — R1 과 같은 조리법, 목표 0.45·R_base + 0.45·FSM_R2 + 0.1·마스크 균등):
+
+    python warmstart_v3.py collect --config configs/v3_r2.yaml --teacher2 fsm_r2 --out-dir ckpt/v3/ws_r2
+    python warmstart_v3.py fit --config configs/v3_r2.yaml --out-dir ckpt/v3/ws_r2 --name v3_r2_ws --seeds 0 1 2 3 4 5
+
+- `--teacher2` 가 둘째 교사를 고른다: fsm(R1 그대로 — eval_v3.fsm_spec near 판) 또는 fsm_r2(eval_v3.fsm_r2_policy_spec =
+  repertoire_rules.fsm_r2_spec, 켠 장치의 stare·look 줄). 기본은 설정을 보고 정한다: 노려보기·경보를 켠 R2 세계면 fsm_r2, 아니면
+  fsm(R1 재현). `--out-dir` 기본도 R2 세계면 ckpt/v3/ws_r2(R1 의 ckpt/v3/ws 를 덮지 않는다), fit `--name` 기본은 v<version>_ws 다.
+  두 교사 모두 R_base(θ 4, a 0.9)를 쓴다 — 합친 세계 거주 탐색은 a 0.6 을 골랐지만 교사·판정 대조는 (4, 0.9)로 고정한다(판정
+  사전 등록 results/v3/r2/judge/PREREG.md). 교사 세계 시드는 R1 과 같은 규칙(학습 시드 풀에서 고정 난수 808)이다.
+- fsm_r2 교사의 FREEZE 는 어느 줄에서 왔는지 표본마다 적는다(`p_src2`: 0 = FREEZE 아님, 1 = 가까운 위협 얼기(freeze cross),
+  2 = stare 띠, 3 = stare 유지 줄만, 4 = look — 우선순위 가까운 판 > stare > look 그대로). 교사 수(`counts_fsm`, `freeze_src_fsm`,
+  세계를 움직인 교사별 `counts_by_driver`)와 맞춘 뒤 보류 표본의 줄별 평균 π(FREEZE)(`recall_src`)를 보고한다. R1 자료(p_src2
+  없음)는 그대로 읽는다.
+- `--out-dir` 가 교사 자료(`<out-dir>/teacher_mix.npz`, 기본 --data)와 맞춘 가중치(`<out-dir>/<name>_s<시드>.pt·.zip·.json`)의
+  폴더다. 기본은 R1 의 ckpt/v3/ws.
 """
 
 from __future__ import annotations
@@ -41,6 +58,7 @@ from env_v2.vec_env import MultiWorldVecEnv
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "ckpt" / "v3" / "ws"
+OUT_R2 = ROOT / "ckpt" / "v3" / "ws_r2"     # v3 R2 세계(노려보기·경보)의 기본 폴더
 CONFIG = ROOT / "configs" / "v3_r1.yaml"
 COLLECT_TAG = 808          # 교사 세계 고르기 난수 스트림(지연 505·C1′ 606·f_dec 707 과 겹치지 않는다)
 N_WORLDS = 24              # 교사 세계 수
@@ -55,21 +73,90 @@ VALUE_COEF = 0.5
 GAMMA_TRAIN = 0.995        # S1-a 학습 γ
 
 
-def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS) -> dict:
+TEACHERS2 = ("fsm", "fsm_r2")
+# fsm_r2 교사 FREEZE 의 출처(p_src2 값 → 이름, 모듈 docstring 'v3 R2')
+SRC_NAMES = {1: "near", 2: "stare_band", 3: "stare_hold", 4: "look"}
+
+
+class FreezeSource:
+    """FSM_R2 의 FREEZE 가 어느 줄에서 왔는지(SRC_NAMES). 줄마다 손 규칙 마스크(repertoire_rules.XRule.mask, x_wrap 스펙)를 다시
+    재고 FSM_R2 우선순위(가까운 위협 얼기 > stare > look)대로 고른다. stare 띠/유지 줄은 같은 스펙에서 beh_freeze 칸을 뺀 판으로
+    가른다(eval_v3.XTerms 와 같은 방식). 상태가 없다."""
+
+    def __init__(self, cfg):
+        import repertoire_rules as rr
+        from eval_v3 import XTerms
+
+        geo = rr._geom(cfg)
+        self.near = rr.XRule(None, rr.x_wrap(cfg, "freeze", "cross", geo=geo))
+        self.xt = XTerms(cfg)
+
+    def __call__(self, obs, base_req, req2) -> np.ndarray:
+        """관측·R_base 요청·FSM_R2 요청 → (n,) int8 출처(0 = FREEZE 아님)."""
+        from env_v2.repertoire import FREEZE
+
+        x = self.xt(obs)
+        near = self.near.mask(obs, base_req)
+        band, stare = x["stare_band"][0], x["stare"][0]
+        look = x["look"][0] if "look" in x else np.zeros(len(obs), dtype=bool)
+        src = np.select([near, band, stare, look], [1, 2, 3, 4], default=0).astype(np.int8)
+        return np.where(req2 == FREEZE, src, 0).astype(np.int8)
+
+
+def teacher2_spec(cfg, allowed, teacher2: str) -> dict:
+    """둘째 교사의 정책 스펙: fsm(R1 FSM, eval_v3.fsm_spec near 판) 또는 fsm_r2(eval_v3.fsm_r2_policy_spec)."""
+    from eval_v3 import fsm_r2_policy_spec, fsm_spec
+
+    if teacher2 not in TEACHERS2:
+        raise ValueError(f"--teacher2 는 {TEACHERS2} 중 하나다. 받은 값: {teacher2!r}")
+    return fsm_spec(cfg, allowed, "near") if teacher2 == "fsm" else fsm_r2_policy_spec(cfg, allowed)
+
+
+def is_r2_world(cfg) -> bool:
+    """노려보기(stare_down)나 경보(alarm)를 켠 v3 R2 세계인가(eval_v3.has_r2_world). --teacher2·--out-dir·--name 기본값이 쓴다."""
+    from eval_v3 import has_r2_world
+
+    return any(has_r2_world(cfg))
+
+
+def default_teacher2(cfg) -> str:
+    """--teacher2 기본값: R2 세계면 fsm_r2, 아니면 fsm(R1 재현). R2 세계에 R1 FSM 교사(stare·look 줄 없음)를 조용히 쓰지 않게."""
+    return "fsm_r2" if is_r2_world(cfg) else "fsm"
+
+
+def default_out_dir(cfg) -> Path:
+    """--out-dir 기본값: R2 세계면 ckpt/v3/ws_r2, 아니면 R1 의 ckpt/v3/ws (R1 교사 자료·가중치를 덮지 않게)."""
+    return OUT_R2 if is_r2_world(cfg) else OUT
+
+
+def default_name(cfg) -> str:
+    """fit --name 기본값: v<설정 version>_ws (v3_r1 → v3_r1_ws, v3_r2 → v3_r2_ws — train_v3.default_run_name 과 같은 version 조각)."""
+    return f"v{str(cfg.v2.get('version') or '3').replace('.', '_')}_ws"
+
+
+def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS, teacher2: str | None = None) -> dict:
+    """교사 자료 모으기(모듈 docstring). `teacher2` 가 None 이면 `default_teacher2`(R2 세계면 fsm_r2, 아니면 fsm)."""
     import env_v2.rollout as ro
     from env_v2.world import World
     from eval_v3 import fsm_spec
 
+    if teacher2 is None:
+        teacher2 = default_teacher2(cfg)
     rep = rep_params(cfg)
     lo, hi = cfg.train_seeds
     seeds = np.random.default_rng([COLLECT_TAG]).choice(np.arange(lo, hi), size=n_worlds, replace=False).tolist()
     P_obs, P_mask, P_act, P_act2, V_obs, V_ret = [], [], [], [], [], []
+    P_src = []
+    src_of = FreezeSource(cfg) if teacher2 == "fsm_r2" else None
     stats = dict(decisions=0, multi=0, teacher_invalid=0, counts_rbase=[0] * N_BEHAVIORS, counts_fsm=[0] * N_BEHAVIORS,
                  agree=0)
+    if src_of is not None:
+        stats.update(freeze_src_fsm={v: 0 for v in SRC_NAMES.values()}, counts_by_driver={})
+    spec2 = teacher2_spec(cfg, rep["allowed"], teacher2)
     for i, s in enumerate(seeds):
         w = World(cfg, seeds=[int(s)])
         rbase = ro.build_policy(fsm_spec(cfg, ("graze", "flee"), "near"), int(s))
-        fsm = ro.build_policy(fsm_spec(cfg, rep["allowed"], "near"), int(s))
+        fsm = ro.build_policy(spec2, int(s))
         teacher = rbase if i % 2 == 0 else fsm
         N = w.N
         obs_t = np.empty((steps, N, w.obs_dim), dtype=np.float32)
@@ -100,6 +187,15 @@ def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS) -> dict:
                 for b in req2[keep]:
                     stats["counts_fsm"][int(b)] += 1
                 stats["agree"] += int((req[keep] == req2[keep]).sum())
+                if src_of is not None:
+                    src = src_of(obs[keep], req[keep], req2[keep])
+                    P_src.append(src)
+                    for k, v in SRC_NAMES.items():
+                        stats["freeze_src_fsm"][v] += int(np.count_nonzero(src == k))
+                    drv = "rbase" if teacher is rbase else teacher2
+                    cb = stats["counts_by_driver"].setdefault(drv, dict(rbase=[0] * N_BEHAVIORS, fsm=[0] * N_BEHAVIORS))
+                    cb["rbase"] = (np.asarray(cb["rbase"]) + np.bincount(req[keep], minlength=N_BEHAVIORS)).tolist()
+                    cb["fsm"] = (np.asarray(cb["fsm"]) + np.bincount(req2[keep], minlength=N_BEHAVIORS)).tolist()
             obs_t[t], mask_t[t] = obs, m
             _, r, d, _ = w.step(a)
             rew[t], done[t] = r, d
@@ -122,8 +218,12 @@ def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS) -> dict:
     data = dict(p_obs=policy_obs(np.concatenate(P_obs), np.concatenate(P_mask)), p_act=np.concatenate(P_act),
                 p_act2=np.concatenate(P_act2),
                 v_obs=np.concatenate(V_obs), v_ret=np.concatenate(V_ret))
+    if src_of is not None:
+        data["p_src2"] = np.concatenate(P_src)
     stats.update(seeds=seeds, steps=steps, n_policy=int(len(data["p_act"])), n_value=int(len(data["v_ret"])),
                  v_ret_mean=float(data["v_ret"].mean()), v_ret_std=float(data["v_ret"].std()))
+    if src_of is not None:              # R1 자료의 통계 키는 그대로 둔다
+        stats.update(teacher2=teacher2, obs_dim=int(data["p_obs"].shape[1] - N_BEHAVIORS))
     return dict(data=data, stats=stats)
 
 
@@ -136,6 +236,9 @@ def fit(cfg, data: dict, seed: int, epochs: int = EPOCHS, smooth: float = SMOOTH
     th.manual_seed(seed)
     rep = rep_params(cfg)
     venv = MultiWorldVecEnv(cfg, num_worlds=1, meta_seed=seed)
+    if data["p_obs"].shape[1] != venv.obs_dim + N_BEHAVIORS:
+        raise ValueError(f"교사 자료의 정책 입력 {data['p_obs'].shape[1]}칸이 이 설정의 [관측 {venv.obs_dim} | 마스크 "
+                         f"{N_BEHAVIORS}] 와 다르다 — 같은 설정으로 모은 자료를 쓴다(--data)")
     tuned, _, _ = resolve_gamma(load_tuned(ppo_config or str(ROOT / "configs" / "ppo_best.yaml")), S1A_GAMMA)
     tuned, _ = apply_lr_schedule(tuned, "constant")
     rollout_world_steps = int(cfg.v2["train"].get("rollout_world_steps", 256))
@@ -145,6 +248,7 @@ def fit(cfg, data: dict, seed: int, epochs: int = EPOCHS, smooth: float = SMOOTH
     opt = th.optim.Adam(pol.parameters(), lr=LR)
     rng = np.random.default_rng([seed, COLLECT_TAG])
     p_obs, p_act, p_act2, v_obs, v_ret = data["p_obs"], data["p_act"], data["p_act2"], data["v_obs"], data["v_ret"]
+    p_src = data.get("p_src2")
     n_p, n_v = len(p_act), len(v_ret)
     hold_p = rng.random(n_p) < 0.1
     tr_p, te_p = np.flatnonzero(~hold_p), np.flatnonzero(hold_p)
@@ -177,16 +281,18 @@ def fit(cfg, data: dict, seed: int, epochs: int = EPOCHS, smooth: float = SMOOTH
             opt.step()
             ce_sum += float(ce)
             v_sum += float(vl)
-        acc = held_out_report(pol, p_obs[te_p], p_act[te_p], p_act2[te_p])
+        acc = held_out_report(pol, p_obs[te_p], p_act[te_p], p_act2[te_p], None if p_src is None else p_src[te_p])
         hist.append(dict(epoch=ep + 1, ce=ce_sum / steps_per_epoch, v_mse=v_sum / steps_per_epoch, **acc))
         print(f"  [s{seed}] 에폭 {ep + 1}: CE {hist[-1]['ce']:.4f}, 가치 MSE {hist[-1]['v_mse']:.4f}, 보류 정확도 "
-              f"{acc['acc']:.4f}(두 교사 행동의 π 합), 행동별 평균 π {acc['recall']}", flush=True)
+              f"{acc['acc']:.4f}(두 교사 행동의 π 합), 행동별 평균 π {acc['recall']}"
+              + (f", FREEZE 출처별 평균 π(FREEZE)·표본 {acc['recall_src']}" if "recall_src" in acc else ""), flush=True)
     pol.set_training_mode(False)
     return model, dict(seed=seed, history=hist, n_policy=n_p, n_value=n_v, smooth=smooth, epochs=epochs)
 
 
-def held_out_report(pol, obs, act, act2) -> dict:
-    """보류 표본: 행동별 평균 π(그 행동을 교사 하나라도 골랐을 때)와 두 교사 행동의 평균 π 합."""
+def held_out_report(pol, obs, act, act2, src=None) -> dict:
+    """보류 표본: 행동별 평균 π(그 행동을 교사 하나라도 골랐을 때)와 두 교사 행동의 평균 π 합. `src`(fsm_r2 교사의 FREEZE 출처,
+    모듈 docstring 'v3 R2')를 주면 출처별 [평균 π(FREEZE), 표본 수](`recall_src`)도 낸다."""
     with th.no_grad():
         d = pol.get_distribution(th.as_tensor(obs))
         pi = d.probs_masked().cpu().numpy()
@@ -197,7 +303,13 @@ def held_out_report(pol, obs, act, act2) -> dict:
             rec[int(b)] = round(float(pi[sel, b].mean()), 3)
     i = np.arange(len(act))
     both = np.where(act == act2, pi[i, act], pi[i, act] + pi[i, act2])
-    return dict(acc=float(both.mean()), recall=rec)
+    out = dict(acc=float(both.mean()), recall=rec)
+    if src is not None:
+        from env_v2.repertoire import FREEZE
+
+        out["recall_src"] = {v: [round(float(pi[src == k, FREEZE].mean()), 3) if (src == k).any() else None,
+                                 int(np.count_nonzero(src == k))] for k, v in SRC_NAMES.items()}
+    return out
 
 
 def main(argv=None) -> int:
@@ -208,23 +320,36 @@ def main(argv=None) -> int:
     cmd = argv.pop(0)
     ap = argparse.ArgumentParser()
     ap.add_argument("--config", default=str(CONFIG))
-    ap.add_argument("--data", default=str(OUT / "teacher_mix.npz"))
+    ap.add_argument("--out-dir", default=None,
+                    help="교사 자료·맞춘 가중치 폴더(기본: R2 세계면 ckpt/v3/ws_r2, 아니면 R1 의 ckpt/v3/ws)")
+    ap.add_argument("--data", default=None, help="교사 자료 .npz (기본 <out-dir>/teacher_mix.npz)")
     ap.add_argument("--threads", type=int, default=4)
     if cmd == "collect":
         ap.add_argument("--worlds", type=int, default=N_WORLDS)
         ap.add_argument("--steps", type=int, default=STEPS)
+        ap.add_argument("--teacher2", choices=TEACHERS2, default=None,
+                        help="둘째 교사: fsm(R1 FSM) 또는 fsm_r2(v3 R2 FSM_R2). 기본: R2 세계면 fsm_r2, 아니면 fsm(R1 재현)")
     else:
         ap.add_argument("--seeds", type=int, nargs="+", required=True)
         ap.add_argument("--epochs", type=int, default=EPOCHS)
         ap.add_argument("--smooth", type=float, default=SMOOTH)
-        ap.add_argument("--name", default="v3_r1_ws")
+        ap.add_argument("--name", default=None, help="가중치 이름(기본 v<설정 version>_ws: v3_r1_ws, v3_r2_ws)")
     a = ap.parse_args(argv)
     th.set_num_threads(a.threads)
     cfg = load_v2_config(a.config)
-    OUT.mkdir(parents=True, exist_ok=True)
+    out_dir = Path(a.out_dir) if a.out_dir is not None else default_out_dir(cfg)
+    if cmd == "collect" and a.teacher2 is None:
+        a.teacher2 = default_teacher2(cfg)
+    if cmd == "collect" and a.teacher2 == "fsm" and is_r2_world(cfg):
+        print("주의: R2 세계(노려보기·경보)에 R1 FSM 교사(stare·look 줄 없음)를 쓴다 — --teacher2 fsm 을 직접 준 경우만", flush=True)
+    if cmd == "fit" and a.name is None:
+        a.name = default_name(cfg)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    if a.data is None:
+        a.data = str(out_dir / "teacher_mix.npz")
     t0 = time.time()
     if cmd == "collect":
-        res = collect(cfg, a.worlds, a.steps)
+        res = collect(cfg, a.worlds, a.steps, a.teacher2)
         np.savez_compressed(a.data, **res["data"])
         st = dict(res["stats"], config=str(a.config), generated=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                   elapsed_s=round(time.time() - t0, 1))
@@ -235,11 +360,12 @@ def main(argv=None) -> int:
     data = {k: z[k] for k in z.files}
     for s in a.seeds:
         model, rep = fit(cfg, data, s, a.epochs, a.smooth)
-        base = OUT / f"{a.name}_s{s}"
+        base = out_dir / f"{a.name}_s{s}"
         th.save({"policy": model.policy.state_dict()}, base.with_suffix(".pt"))
         model.save(base.with_suffix(".zip"))
         rep.update(config=str(a.config), data=str(a.data), elapsed_s=round(time.time() - t0, 1),
-                   generated=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+                   generated=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+                   mask_version=int(model.policy.rep_mask_version), obs_names=list(model.policy.rep_obs_names))
         base.with_suffix(".json").write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"저장: {base}.pt / .zip", flush=True)
     return 0

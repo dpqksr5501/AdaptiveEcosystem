@@ -4,12 +4,18 @@
     python train_v3.py --config configs/v3_r1.yaml --seed 0 --steps 20000000
     # 학습 전 결정 비율 f_dec 측정(보정 시드 20000~20002 × 3000스텝, 시작 정책) → yaml train.repertoire.f_dec 에 적는다
     python train_v3.py measure-fdec --config configs/v3_r1.yaml
+    # v3 R2 (명세 RL_V3_R2_SPEC.md 10절 6단계): 노려보기·경보 세계(관측 19·마스크 판 3), 모방 초기화(warmstart_v3.py --teacher2 fsm_r2)
+    python train_v3.py --config configs/v3_r2.yaml --seed 0 --steps 20000000 --warmstart ckpt/v3/ws_r2/v3_r2_ws_s0.pt
+    # 조기 중단 π 점검(판정 사전 등록 results/v3/r2/judge/PREREG.md 2절): 체크포인트의 니치 π 를 보정 시드 20000~20002 × 3000 에서
+    python train_v3.py measure-pi --config configs/v3_r2_on.yaml --model ckpt/v3/v3_r2_g995_s0_20m_2m.zip \
+        --out results/v3/r2/early/s0_2m_pi.json
 
 학습 (train_v2.py 의 S1-a 조리법 그대로):
 - 독립 세계 K 개를 묶은 MultiWorldVecEnv 의 이산 행동 경로(`train.repertoire` 블록이 켠다, env_v2/vec_env.py): 행동 Discrete(5),
   관측 [세계 관측 18 | 마스크 5]. 세계 8개·교체 5000·rollout_world_steps 256 은 설정 train 블록, 학습 세계 시드 풀은 v2 와 같다
   (cfg.train_seeds, 세계 선택 시드 = 모델 시드)
-- 정책 RepertoirePolicy(env_v2/rep_policy.py): 18 → 64 → 64 → 로짓 5, 가치망 64·64, tanh. 시작 로짓 편향 log(init_probs),
+- 정책 RepertoirePolicy(env_v2/rep_policy.py): 18 → 64 → 64 → 로짓 5, 가치망 64·64, tanh(v3 R2 경보 세계는 관측 19 → 64 → 64 → 5,
+  마스크 판 3 — 판은 관측 이름으로 정해 모델에 저장한다, `mask_version_of`). 시작 로짓 편향 log(init_probs),
   학습 분포 π′ = (1 − ε)·π + ε·U(m), 엔트로피 계수(범주) = ent_coef_base ÷ f_dec
 - PPO 값: γ 0.995 (S1-a·v2.4s 학습 명령의 --gamma 0.995), 나머지는 --ppo-config(configs/ppo_best.yaml: learning_rate·clip_range·
   n_epochs·ent_coef)와 train.PPO_KWARGS(batch_size 4096·gae_lambda 0.95) — v2.4s 학습(v2_4sp_g995_s20 메타 JSON)과 같다.
@@ -22,7 +28,17 @@
     · pi_<x>_niche·pi_<x>_base: 목록의 행동 x(GRAZE 제외)의 결정 시점 π(x)(ε 제외) 평균 — 니치(PREREG U_x 의 첫 항 조건, FLEE 는
       U_ESC 조건)와 둘째 항 조건. pi_esc_niche·pi_esc_base 는 FLEE ∪ HIDE ∪ FREEZE 확률의 합. 조기 중단(PREREG 6절)의 '니치에서 π
       확률'이 pi_<x>_niche 다. FREEZE 는 --freeze-variant 판(기본 near, R0 에서 통과한 판)의 조건을 쓴다(eval_v3.u_terms)
+    · 지표 정의(--u-def, 기본 auto = 관측에 alarm_heard 가 있는 세계(마스크 판 3, v3 R2)면 r2, 아니면 r1 — R1 학습 기록은 그대로다).
+      r2 는 eval_v3 판정과 같은 정의다: HIDE·FREEZE 니치는 R1b 의 U_HIDE′·U_FREEZE′ 조건이고, FREEZE 가 목록에 있으면 v3 R2 의
+      pi_stare_niche·pi_stare_base·pi_look_niche·pi_look_base(FREEZE 확률, stare·look 니치와 교차 — eval_v3.XTerms, 손 규칙
+      repertoire_rules.NICHES 그대로)와 pi_stare_band_*(유지 줄을 뺀 띠, 보고만), pi_look_open_*(look 니치·교차 중 FREEZE 가 열린
+      표본 — 판정 U_LOOK_OPEN 의 조건), 표본 수 n_<x>_niche·n_<x>_base 를 더한다. R2 조기 중단(명세 10절 6단계: R1 사전 등록 6절에
+      stare·look 니치의 π 를 더한다)은 같은 칸을 `measure-pi` 가 보정 시드에서 잰 값으로 본다(판정 사전 등록 2절, 학습 기록은 함께 적는다)
 - 리스폰 니치 유도는 쓰지 않는다.
+
+니치 π 측정 (`measure-pi`, 조기 중단 점검 — R1 사전 등록 1절 '보정 시드 20000~20002 × 3000스텝, 체크포인트'): 저장한 모델(.zip)을
+설정 세계(보정 시드를 하나씩 `World(cfg, seeds=[s])`)에서 argmax(판정 롤아웃 `rep_learned` 과 같은 궤적, 난수 없음)로 돌리며 결정
+시점 표본의 π(ε 제외, 마스크 적용)를 모아, 학습 기록과 같은 `niche_probs` 칸(시드 합침과 시드별)을 낸다.
 
 f_dec 측정 (`measure-fdec`): 학습과 같은 방식으로 만든 시작 정책(모델 시드 0 의 무작위 가중치 + 시작 로짓 편향)을 학습 설정 세계
 (보정 시드 20000~20002 를 하나씩 `World(cfg, seeds=[s])`)에서 ε 혼합 분포 π′ 의 표본으로 3000스텝 돌리고, 요청을 읽은 개체-스텝
@@ -47,8 +63,8 @@ import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
 from env_v2.config import load_v2_config
-from env_v2.rep_policy import (RepertoirePolicy, action_mask, mask_version_of, policy_obs, rep_distribution, rep_params,
-                               sample_masked)
+from env_v2.rep_policy import (MASK_VERSION_ALARM, RepertoirePolicy, action_mask, mask_version_of, policy_obs,
+                               rep_distribution, rep_params, sample_masked)
 from env_v2.repertoire import BEHAVIOR_NAMES, FLEE, FREEZE, HIDE, N_BEHAVIORS, SLEEP
 from env_v2.vec_env import MultiWorldVecEnv
 from train import PPO_KWARGS, load_tuned
@@ -93,12 +109,20 @@ def default_run_name(cfg, seed: int, steps: int, gamma: float) -> str:
     return f"v{ver}_{gamma_tag(gamma)}_s{seed}_{m:g}m"
 
 
-def niche_probs(pi: np.ndarray, obs: np.ndarray, geo: dict, allowed, variant: str) -> dict:
-    """결정 시점 표본의 π (n,5)(ε 제외)·관측 → 니치별 평균 π (모듈 docstring '학습 기록'). 표본이 없으면 None."""
+def auto_udef(obs_names) -> str:
+    """--u-def auto: 관측에 alarm_heard 가 있는 세계(마스크 판 3, v3 R2)면 r2, 아니면 r1."""
+    return "r2" if mask_version_of(obs_names) == MASK_VERSION_ALARM else "r1"
+
+
+def niche_probs(pi: np.ndarray, obs: np.ndarray, geo: dict, allowed, variant: str, udef: str = "r1",
+                xterms=None, mask=None) -> dict:
+    """결정 시점 표본의 π (n,5)(ε 제외)·관측 → 니치별 평균 π (모듈 docstring '학습 기록'). 표본이 없으면 None.
+    `udef` 는 eval_v3 의 지표 정의 묶음, `xterms` 는 eval_v3.XTerms(v3 R2 stare·look 니치, r2 에서만 준다). `mask`(표본의 (n,5)
+    마스크)를 주면 look_open(look 조건 & FREEZE 열림, eval_v3.look_open_terms) 칸도 낸다."""
     import repertoire_rules as rr
     from eval_v3 import u_terms
 
-    terms = u_terms(rr.features_of_obs(obs, geo), variant)
+    terms = u_terms(rr.features_of_obs(obs, geo), variant, udef)
     out = {}
 
     def mean(x, m):
@@ -111,6 +135,15 @@ def niche_probs(pi: np.ndarray, obs: np.ndarray, geo: dict, allowed, variant: st
     esc = pi[:, [FLEE, HIDE, FREEZE]].sum(1)
     a, b = terms["esc"]
     out["pi_esc_niche"], out["pi_esc_base"] = mean(esc, a), mean(esc, b)
+    if xterms is not None and "freeze" in allowed:     # v3 R2: FREEZE 의 stare·look 니치(와 교차)
+        xt = xterms(obs)
+        if mask is not None and "look" in xt:
+            from eval_v3 import look_open_terms
+
+            xt["look_open"] = look_open_terms(xt["look"], mask)
+        for name, (a, b) in xt.items():
+            out[f"pi_{name}_niche"], out[f"pi_{name}_base"] = mean(pi[:, FREEZE], a), mean(pi[:, FREEZE], b)
+            out[f"n_{name}_niche"], out[f"n_{name}_base"] = int(a.sum()), int(b.sum())
     return out
 
 
@@ -120,13 +153,14 @@ class RepLogCallback(BaseCallback):
     없다(난수를 쓰지 않는다)."""
 
     def __init__(self, every: int, save_prefix: Path | None, log_path: Path | None, geo: dict, allowed,
-                 variant: str = "near"):
+                 variant: str = "near", udef: str = "r1", xterms=None):
         super().__init__()
         self.every = int(every)
         self._next_log = self.every
         self._next_save = self.every
         self.save_prefix, self.log_path = save_prefix, log_path
         self.geo, self.allowed, self.variant = geo, tuple(allowed), variant
+        self.udef, self.xterms = udef, xterms
         self.history: list[dict] = []
         self.saved: list[str] = []
         self._reads: list[np.ndarray] = []
@@ -180,7 +214,8 @@ class RepLogCallback(BaseCallback):
             multi = pobs[:, venv.obs_dim:].sum(1) >= 2
             row.update(ent_dec=float(ent.mean()), ent_dec_multi=float(ent[multi].mean()) if multi.any() else None,
                        n_dec_samples=int(len(pobs)))
-            row.update(niche_probs(pi, pobs[:, :venv.obs_dim], self.geo, self.allowed, self.variant))
+            row.update(niche_probs(pi, pobs[:, :venv.obs_dim], self.geo, self.allowed, self.variant, self.udef,
+                                   self.xterms, pobs[:, venv.obs_dim:] > 0.5))
         return row
 
     def _log(self) -> None:
@@ -247,10 +282,64 @@ def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int
                 steps=int(steps), model_seed=int(model_seed), allowed=list(rep["allowed"]))
 
 
+def measure_pi(cfg, model_path, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, udef: str = "auto",
+               variant: str = "near") -> dict:
+    """저장한 모델의 결정 시점 니치 π(ε 제외)를 보정 시드에서 잰다(모듈 docstring '니치 π 측정'). 세계는 모델의 argmax 로 돌린다
+    (판정 롤아웃과 같은 궤적, 난수 없음). 반환: 시드 합친 `niche_probs` 칸(`pooled`)과 시드별 칸, 결정 표본 수."""
+    from stable_baselines3 import PPO
+
+    import repertoire_rules as rr
+    from env_v2.rep_policy import check_mask_version, rep_argmax
+    from env_v2.world import World
+
+    model = PPO.load(str(model_path), device="cpu")
+    pol = model.policy
+    pol.set_training_mode(False)
+    allowed = tuple(pol.rep_allowed)
+    params = {"allowed_mask": pol.rep_allowed_mask}
+    geo = rr._geom(cfg)
+    xterms = None
+    per, P, O, M = [], [], [], []
+    for s in seeds:
+        w = World(cfg, seeds=[int(s)])
+        check_mask_version(getattr(pol, "rep_mask_version", 1), w.obs_names)
+        if tuple(w.obs_names) != tuple(pol.rep_obs_names):
+            raise ValueError(f"모델의 관측 {list(pol.rep_obs_names)} 이 세계의 관측 {list(w.obs_names)} 과 다르다")
+        if udef == "auto":
+            udef = auto_udef(w.obs_names)
+        if udef == "r2" and xterms is None:
+            from eval_v3 import XTerms
+
+            xterms = XTerms(cfg)
+        ps, os_, ms = [], [], []
+        for _ in range(steps):
+            obs = w.observe()
+            pk = w.rep_peek()
+            m = action_mask(pk, obs, params, obs_names=w.obs_names)
+            pobs = policy_obs(obs, m)
+            dec = np.asarray(pk["reads"], dtype=bool)
+            if dec.any():
+                pi, _, _ = rep_distribution(pol, pobs[dec])
+                ps.append(pi)
+                os_.append(obs[dec])
+                ms.append(m[dec])
+            w.step(rep_argmax(pol, pobs).astype(np.float64)[:, None])
+        ps, os_, ms = np.concatenate(ps), np.concatenate(os_), np.concatenate(ms)
+        per.append(dict(seed=int(s), n_dec=int(len(ps)),
+                        **niche_probs(ps, os_, geo, allowed, variant, udef, xterms, ms)))
+        P.append(ps)
+        O.append(os_)
+        M.append(ms)
+    P, O, M = np.concatenate(P), np.concatenate(O), np.concatenate(M)
+    return dict(model=str(model_path), seeds=[int(s) for s in seeds], steps=int(steps), u_def=udef, freeze_variant=variant,
+                allowed=list(allowed), n_dec=int(len(P)), pooled=niche_probs(P, O, geo, allowed, variant, udef, xterms, M),
+                per_seed=per)
+
+
 def main(argv=None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     cmd = "train"
-    if argv and argv[0] in ("train", "measure-fdec"):
+    if argv and argv[0] in ("train", "measure-fdec", "measure-pi"):
         cmd = argv.pop(0)
     p = argparse.ArgumentParser(description="v3 R1 행동 고르기 PPO 학습 (다중 세계, 이산 행동)")
     p.add_argument("--config", default=str(DEFAULT_CONFIG))
@@ -267,6 +356,29 @@ def main(argv=None) -> int:
         print(f"f_dec = {res['f_dec']:.6f} (보정 시드 {res['seeds']} × {res['steps']}스텝, 목록 {res['allowed']}, "
               f"{time.time() - t0:.0f}초) → yaml train.repertoire.f_dec 에 적는다")
         return 0
+    if cmd == "measure-pi":
+        p.add_argument("--model", required=True, help="저장한 모델 .zip (체크포인트 또는 모방 초기화 직후)")
+        p.add_argument("--seeds", type=int, nargs="+", default=list(FDEC_SEEDS))
+        p.add_argument("--steps", type=int, default=FDEC_STEPS)
+        p.add_argument("--u-def", choices=("auto", "r1", "r1b", "r2"), default="auto")
+        p.add_argument("--freeze-variant", choices=("near", "orig"), default="near")
+        p.add_argument("--out", default=None, help="결과 JSON 경로(없으면 화면에만)")
+        args = p.parse_args(argv)
+        torch.set_num_threads(args.threads)
+        t0 = time.time()
+        res = measure_pi(load_v2_config(args.config), args.model, args.seeds, args.steps, args.u_def, args.freeze_variant)
+        res.update(config=str(args.config), elapsed_s=round(time.time() - t0, 1),
+                   generated=datetime.now(timezone.utc).isoformat(timespec="seconds"))
+        text = json.dumps(res, ensure_ascii=False, indent=1)
+        if args.out:
+            Path(args.out).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.out).write_text(text, encoding="utf-8")
+        pooled = res["pooled"]
+        print(text if not args.out else f"저장: {args.out}")
+        print("니치 π(ε 제외, 보정 시드 합침): " + " · ".join(
+            f"{k[3:-6]} {pooled[k]:.4f}" for k in pooled if k.startswith("pi_") and k.endswith("_niche")
+            and pooled[k] is not None), flush=True)
+        return 0
     p.add_argument("--steps", type=int, default=20_000_000)
     p.add_argument("--seed", type=int, default=0, help="모델(PPO) 시드이자 세계 선택 시드(meta_seed)")
     p.add_argument("--run-name", default=None, help="기본 v<설정 version>_<γ>_s<seed>_<M>m (예: v3_r1_g995_s0_20m)")
@@ -276,6 +388,8 @@ def main(argv=None) -> int:
     p.add_argument("--every", type=int, default=EVERY, help="체크포인트·학습 기록 간격(스텝). 기본 1M")
     p.add_argument("--freeze-variant", choices=("near", "orig"), default="near",
                    help="학습 기록의 FREEZE 니치 조건 판(eval_v3.u_terms). FREEZE 가 목록에 없으면 쓰이지 않는다")
+    p.add_argument("--u-def", choices=("auto", "r1", "r1b", "r2"), default="auto",
+                   help="학습 기록의 니치 정의(eval_v3 지표 묶음). auto = 경보 세계(마스크 판 3)면 r2, 아니면 r1")
     p.add_argument("--tb", default=str(ROOT / "runs" / "v3"))
     p.add_argument("--warmstart", default=None,
                    help="모방 초기화 가중치(warmstart_v3.py fit 의 .pt). 주면 PPO 시작 정책·가치망을 이것으로 바꾼다")
@@ -324,9 +438,17 @@ def main(argv=None) -> int:
               + " · ".join(f"{b} {x:.3f}" for b, x in zip(BEHAVIOR_NAMES, init_rep["pi_dec"])), flush=True)
     print(f"{args.steps:,} 스텝 — 세계 {venv.K}개 × {venv.N}슬롯 = num_envs {venv.num_envs}, 세계당 n_steps {n_steps} "
           f"(배치 {n_steps * venv.num_envs:,}), 교체 {venv.T}스텝마다, γ {gamma} ({gamma_source}), "
-          f"관측 {venv.obs_dim} + 마스크 {N_BEHAVIORS}, 행동 Discrete({N_BEHAVIORS})", flush=True)
+          f"관측 {venv.obs_dim} + 마스크 {N_BEHAVIORS}(마스크 판 {model.policy.rep_mask_version}), 행동 Discrete({N_BEHAVIORS})",
+          flush=True)
+    udef = auto_udef(venv.obs_names) if args.u_def == "auto" else args.u_def
+    xterms = None
+    if udef == "r2":
+        from eval_v3 import XTerms
+
+        xterms = XTerms(cfg)
+    print(f"학습 기록 니치 정의: {udef}" + (f" (+ {', '.join(xterms.rules)} 니치)" if xterms is not None else ""), flush=True)
     cb = RepLogCallback(args.every, out, out.with_suffix(".log.jsonl"), rr._geom(cfg), rep["allowed"],
-                        args.freeze_variant)
+                        args.freeze_variant, udef, xterms)
     t0 = time.time()
     model.learn(total_timesteps=args.steps, callback=cb, tb_log_name=run, reset_num_timesteps=True, progress_bar=False)
     elapsed = time.time() - t0
@@ -352,6 +474,7 @@ def main(argv=None) -> int:
         "v2": cfg.v2, "num_worlds": venv.K, "reset_interval": venv.T,
         "worlds_seen": sum(len(h) for h in venv.seed_history), "world_resets": venv.num_resets,
         "obs_names": list(venv.obs_names), "behavior_names": list(BEHAVIOR_NAMES), "freeze_variant": args.freeze_variant,
+        "u_def": udef, "mask_version": int(model.policy.rep_mask_version),
         "init_policy": init_rep, "checkpoints": cb.saved, "log_history": cb.history, "warmstart": args.warmstart,
     }
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")

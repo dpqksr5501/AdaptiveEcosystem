@@ -793,4 +793,4 @@ def test_u_terms_r1b():
         np.testing.assert_array_equal(t[k][1], t1[k][1])
     assert ev.U_MIN_BY["r1b"] == {"esc": 0.18, "hide": 0.2, "freeze": 0.10, "sleep": 0.5}
     with pytest.raises(ValueError):
-        ev.u_terms(f, "near", "r2")
+        ev.u_terms(f, "near", "r9")                     # 모르는 정의 묶음(r2 는 v3 R2 판정 — tests/test_r2_training.py)
