@@ -1,0 +1,35 @@
+{
+ "path": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r2\\visual\\stare_player_compare.mp4",
+ "mb": 1.519902,
+ "frames": 292,
+ "secs": 9.73,
+ "render_sec": 98.8,
+ "kind": "player",
+ "poster": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r2\\visual\\stare_player_compare_poster.png",
+ "poster_sec": 6.4,
+ "speed": 1.0,
+ "clip_clock_sec": [
+  2.0,
+  9.2
+ ],
+ "hold_start_sec": 1.0,
+ "hold_end_sec": 1.5,
+ "fps": 30,
+ "window": {
+  "center": [
+   40.43985163379263,
+   78.22914760410488
+  ],
+  "half_x": 15.0,
+  "half_y": 13.0
+ },
+ "seed": 31097,
+ "t0_step": 1062,
+ "determinism": {
+  "rbase_two_copies_identical": true,
+  "stare_two_copies_identical": true,
+  "stare_branch_equals_original_run": true,
+  "rbase_branch_differs_from_stare": true
+ },
+ "note": "영상 시각 = 처음 멈춤 + (화면 시계 - 구간 시작). 화면 시계는 갈라진 순간부터의 게임 시간(실시간 1배)."
+}
