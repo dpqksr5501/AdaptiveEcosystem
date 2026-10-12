@@ -43,7 +43,7 @@ BASE_COMMIT = "7bb474a"              # R2 구현 직전 커밋(사람 확인 10-
 R1_MODEL = ROOT / "ckpt" / "v3" / "v3_r1_g995_s3_20m.zip"
 G, F_, H, Z, S = rep.GRAZE, rep.FLEE, rep.HIDE, rep.FREEZE, rep.SLEEP
 STARE_BLOCK = dict(enabled=True, target_lock=True, spot_r=10.0, spot_cos=0.866, spot_steps=6, balk_steps=45, balk_speed=0.6,
-                   spotted_steps=45, spotted_charge_speed=0.9)
+                   spotted_steps=45, spotted_charge_speed=0.4)
 ALARM_BLOCK = dict(enabled=True, alarm_r=8.0, alarm_steps=15, max_hop=2, hop_gain=0.6, relay_window=30, event_alarm=0.4,
                    on_catch=True)
 KEYS = ("pos", "head", "energy", "pred_pos", "pred_head", "food", "vel", "pred_cd", "behavior", "beh_phase", "beh_steps",
@@ -723,8 +723,9 @@ def test_break_pounces_same_step_inside_pounce_range(c7, d0, pounce_now):
     assert w.stare_stats()["standoff_break_n"] == 1.0
 
 
-def test_balk_reflects_at_wall(c7):
-    """물러남 방향이 벽을 넘으면 그 축의 이동과 balk_dir 를 함께 뒤집는다."""
+def test_balk_slides_along_wall(c7):
+    """물러남 방향이 벽을 넘으면 반사하지 않고 벽을 따라 미끄러진다(사람 결정 10-12): 벽에 수직인 성분을 없애고, 남은 성분이
+    없으면 가운데 쪽 벽 방향. 물러나는 동안 표적 쪽으로 되돌아오지 않는다."""
     w, c = _solo(c7, "stalker", 8.0, Z)
     w.pos[0] = [8.1, c[1]]
     w.pred_pos[0] = [0.1, c[1]]
@@ -733,11 +734,15 @@ def test_balk_reflects_at_wall(c7):
     for _ in range(6):
         w.step(_req(w, Z))
     assert w.stalk_state[0] == ST_BALK
-    assert w.balk_dir[0, 0] > 0.0 and 0.0 <= w.pred_pos[0, 0] <= w.size
+    x0 = float(w.pred_pos[0, 0])
+    for _ in range(10):
+        w.step(_req(w, Z))
+        assert w.balk_dir[0, 0] == 0.0 and abs(abs(w.balk_dir[0, 1]) - 1.0) < 1e-9
+        assert 0.0 <= w.pred_pos[0, 0] <= w.size and w.pred_pos[0, 0] <= x0 + 1e-9    # 표적(x = 8.1) 쪽으로 오지 않는다
 
 
 def test_player_spotted_and_capped_charge(c7):
-    """플레이어는 멈추지 않는다: 잠긴 표적이 6스텝 이어 노려보면 들킴(45스텝). 들킴 중 시작한 돌진은 min(1.3, 0.9) × herb_speed 로
+    """플레이어는 멈추지 않는다: 잠긴 표적이 6스텝 이어 노려보면 들킴(45스텝). 들킴 중 시작한 돌진은 min(1.3, spotted_charge_speed 0.4) × herb_speed 로
     전체가 느리고, 돌진이 끝나면 표시를 지운다. 들키지 않은 돌진은 1.3 × herb_speed 그대로다."""
     w, c = _solo(c7, "player", 8.0, Z)
     hs = w.cfg.herb_speed
@@ -749,7 +754,7 @@ def test_player_spotted_and_capped_charge(c7):
     w._rs.lock_left[0] = 0
     w.step(_req(w, G))                                                     # 먹기로 돌아가면 체감 거리 4 ≤ 6 → 돌진
     assert w.player_mode[0] == PM_CHARGE and w.spotted_charge[0]
-    assert np.linalg.norm(w.pred_vel[0]) == pytest.approx(0.9 * hs)
+    assert np.linalg.norm(w.pred_vel[0]) == pytest.approx(STARE_BLOCK["spotted_charge_speed"] * hs)
     for _ in range(40):
         if w.player_mode[0] != PM_CHARGE:
             break
@@ -1186,7 +1191,7 @@ def _standoff_module():
 
 def test_standoff_table_rows():
     """결정적 확인표 T7 의 몇 행(명세 9절): 잠행형 × (b) 먹다가 D0 12 → 잡힘 0·물러남, D0 6 → 첫 스텝 돌진, heading 25° 대치·35°
-    없음, 플레이어 × (f) 얼어서 D0 4.5 → 들킴·들킨 돌진·잡힘 0, 근접 추격형은 대치 없음."""
+    없음, 플레이어 × (f) 얼어서 D0 4.5 → 들킴·들킨 돌진(걷기 상한, 10-12)·얼어 버티면 잡힘, 근접 추격형은 대치 없음."""
     T = _standoff_module()
     r = T.trial(("stalker", "graze", "stare", "free", False, 12000, 12.0))
     assert not r["caught"] and r["balk"] and r["standoff_d"] == pytest.approx(9.84, abs=0.01)
@@ -1196,7 +1201,8 @@ def test_standoff_table_rows():
     r = T.trial(("stalker", "freeze", "head+35", "free", False, 12000, 8.0))
     assert r["standoff"] == 0 and r["caught"] and r["attack_d"] <= 3.34
     r = T.trial(("player", "freeze", "zflee", "locked3", False, 12000, 4.5))
-    assert r["spotted"] and r["spotted_charge"] and not r["caught"]
+    # 사람 결정 10-12: 들킨 돌진 = 걷기 속력(0.4). 접근 관측 (0.4 + 1)/2 = 0.7 < 0.9 라 (f) 규칙은 도망하지 않고 얼어 버티다 잡힌다
+    assert r["spotted"] and r["spotted_charge"] and r["caught"]
     assert T.trial(("chaser095", "freeze", "stare", "free", False, 12000, 8.0))["standoff"] == 0
 
 
@@ -1273,7 +1279,7 @@ def test_invasion_r2_guard_no_aux_and_passed():
 
 def test_standoff_review_rows():
     """T7 추가 행: (h) 대치 2스텝째 결정 시점 — 유지 줄이 있으면 대치가 물러남까지 가고, 옛 X7 정의는 멈춘 대치에서 먹기를 요청해
-    스스로 깬 뒤 잡힌다. (g) 끈적이지 않는 R_base 식 도망은 들킨 돌진에서도 잡힌다(H4 상한의 실제 효과 — 사람 확인 안건).
+    스스로 깬 뒤 잡힌다. (g) 끈적이지 않는 R_base 식 도망은 들킨 돌진(걷기 상한, 사람 결정 10-12)에서 산다.
     포획 판정 때 간격(min_gap_c)을 함께 낸다."""
     T = _standoff_module()
     r = T.trial(("stalker", "freeze", "evt2", "free", False, 12000, 8.0))
@@ -1281,7 +1287,8 @@ def test_standoff_review_rows():
     r = T.trial(("stalker", "freeze", "evt2_old", "free", False, 12000, 8.0))
     assert r["break_t"] is not None and r["caught"] and not r["balk"]
     r = T.trial(("player", "graze", "stare_ns", "free", False, 12000, 8.0))
-    assert r["spotted_charge"] and r["caught"] and r["min_gap_c"] is not None
+    # 사람 결정 10-12 '들키면 6초간 달리기 금지'(상한 0.4): 끈적이지 않는 R_base 식 도망도 들킨 돌진에서 산다(0.9 때는 잡혔다)
+    assert r["spotted_charge"] and not r["caught"]
     ev = T._edge_vals()
     assert T.edges(("stalker", "freeze", "stare", "free", False), 10.0, ev) == ["spot_r"]
     assert "돌진 거리" in T.edges(("stalker", "graze", "stare", "free", False), 6.0, ev)

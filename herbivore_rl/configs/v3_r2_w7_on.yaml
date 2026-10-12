@@ -182,8 +182,9 @@ features:
     balk_speed: 0.6
     # 플레이어 대역의 '들킴' 6 s
     spotted_steps: 45
-    # × herb_speed. 들킨 돌진의 상한(< 뛰기 1.0 < 보통 돌진 1.3)
-    spotted_charge_speed: 0.9
+    # × herb_speed. 들킨 돌진의 상한. 사람 결정 10-12: '들키면 6초간 달리기 금지' = 초식 걷기 속력(gait_speed[1] 0.4)과 같게 둔다.
+    # 처음 값 0.9(< 뛰기 1.0)로는 R_base 식 도망도 거의 다 잡혔다(구현 검토 10-12, standoff.md T7 (g)행)
+    spotted_charge_speed: 0.4
 
 train:
   # configs/v2_1.yaml 과 같고 reset_interval 만 5000 이다(계획서 4.7: v2.4부터 5000 = 주기 1800 의 약 2.8배).

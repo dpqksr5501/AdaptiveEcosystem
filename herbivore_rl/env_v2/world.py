@@ -2082,11 +2082,32 @@ class World:
             self._ps_steps += 1
         self.pred_pos = self.pred_pos + move * speed[:, None]
         balk = (stalker & (self.stalk_state == ST_BALK)) if sd is not None else None
+        wall_b = np.zeros(M, dtype=bool)
         for axis in (0, 1):
             out_of = (self.pred_pos[:, axis] < 0.0) | (self.pred_pos[:, axis] > self.size)
             move[out_of, axis] *= -1.0
-            if balk is not None:        # v3 R2: 물러남 방향도 반사한 축을 뒤집는다
-                self.balk_dir[out_of & balk, axis] *= -1.0
+            if balk is not None:
+                # v3 R2 (사람 결정 10-12): 물러나다 벽에 닿으면 반사하지 않고 벽을 따라 미끄러진다 — 벽에 수직인 성분을 없앤다.
+                # 반사하면 물러남의 절반 가까이가 표적 쪽으로 되돌아와 포식자 시야 안에서 끝났다(구현 검토 10-12)
+                ob = out_of & balk
+                self.balk_dir[ob, axis] = 0.0
+                wall_b |= ob
+        if wall_b.any():
+            # 남은 성분(벽을 따라, 원래 물러남 방향 = 표적에서 멀어지는 쪽)으로 다시 단위화한다. 표적 쪽으로 곧장 벽에 박혀
+            # 남은 성분이 없으면(또는 모서리) 맵 가운데 쪽 벽 방향으로 간다. 난수 없음. C++ 꼴:
+            #   if (bBalk && bHitWall[a]) BalkDir[a] = 0;
+            #   BalkDir = BalkDir.Size() > EPS ? BalkDir.GetSafeNormal() : WallTangentToCenter(Pos);
+            bd = self.balk_dir[wall_b]
+            n = np.sqrt((bd * bd).sum(1))
+            p = self.pred_pos[wall_b]
+            to_c = np.where(p <= 0.5 * self.size, 1.0, -1.0)            # 축마다 가운데 쪽 부호
+            hit_x = (p[:, 0] <= 0.0) | (p[:, 0] >= self.size)
+            hit_y = (p[:, 1] <= 0.0) | (p[:, 1] >= self.size)
+            tang = np.stack([np.where(hit_x, 0.0, to_c[:, 0]), np.where(hit_y, 0.0, to_c[:, 1])], 1)
+            tn = np.sqrt((tang * tang).sum(1))
+            tang = np.where((tn > EPS)[:, None], tang / np.maximum(tn, EPS)[:, None], to_c / np.sqrt(2.0))
+            self.balk_dir[wall_b] = np.where((n > EPS)[:, None], bd / np.maximum(n, EPS)[:, None], tang)
+            move[wall_b] = self.balk_dir[wall_b]
         self.pred_pos = np.clip(self.pred_pos, 0.0, self.size)
         self.pred_head = normalize(move)
         self.pred_vel = self.pred_pos - old
