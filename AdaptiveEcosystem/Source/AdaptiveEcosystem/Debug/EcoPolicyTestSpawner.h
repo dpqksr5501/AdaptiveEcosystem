@@ -84,6 +84,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Test|Debug")
 	bool bDrawPredatorView = true;
 
+	/** Opt-in identity for the visual demo. Does not register regional populations or change PPO behavior. */
+	UPROPERTY(EditAnywhere, Category="Ecology|Test")
+	bool bAssignStableAgentIds = false;
+	TConstArrayView<FMassEntityHandle> GetTestHerbivores() const { return Herbivores; }
+	TConstArrayView<FMassEntityHandle> GetTestPredators() const { return Predators; }
+	int32 GetTestPredatorTarget(int32 Index) const { return PredatorTargets.IsValidIndex(Index) ? PredatorTargets[Index] : INDEX_NONE; }
+
+protected:
+	/** Observer notification only. Test reset is not production death/birth. */
+	virtual void OnTestEntityReset(FMassEntityHandle Entity) {}
+
 private:
 	void SpawnEntities();
 	void RespawnCaught();
