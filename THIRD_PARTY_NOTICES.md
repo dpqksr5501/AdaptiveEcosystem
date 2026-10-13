@@ -1,6 +1,10 @@
 # Third-Party Software Notices and Licenses
 
-This project incorporates components from the following open-source projects.
+This file preserves the project's existing third-party license notices and reference history. A listed notice alone does not establish a current runtime dependency or prove which files were copied.
+
+Source audit scope (2026-09-30, main `295ac2f`): the current PPO path uses project-native neighborhood/steering code and the `herbivore_rl` environment. MassFlock and Aquarium are earlier design references; `herbivore_rl/requirements.txt` explicitly states that marl-aquarium is not used. Stable-Baselines3 is a Python training dependency. Existing license texts and attributions below are preserved; this audit does not revalidate upstream licenses or asset provenance.
+
+Social references (OpenSteer/Reynolds, ARGoS3, CoverGenerator-UE4) are conceptual/design references. RVO2/ORCA is a future candidate. No imported Social runtime source from those projects was identified in this audit. See [current integration scope](AdaptiveEcosystem/Docs/Integration/THIRD_PARTY_INTEGRATION.md).
 
 ---
 

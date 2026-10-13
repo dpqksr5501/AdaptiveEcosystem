@@ -1,6 +1,7 @@
 // Copyright Epic Games, Inc. All Rights Reserved.
 
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
+#include "AI/Social/Shelter/EcoShelterDiagnostics.h"
 #include "Engine/World.h"
 #include "CollisionQueryParams.h"
 #include "Components/PrimitiveComponent.h"
@@ -32,6 +33,7 @@ void UEcoShelterSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	Shelters.Reset();
 	ShelterSlots.Reset();
 	FreeShelterIndices.Reset();
+	NextReservationId = 1;
 }
 
 void UEcoShelterSubsystem::Deinitialize()
@@ -44,6 +46,12 @@ void UEcoShelterSubsystem::Deinitialize()
 
 int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVector& Normal, float Quality, int32 Capacity, float Radius)
 {
+	check(IsInGameThread());
+	if (Location.ContainsNaN() || Normal.ContainsNaN() || !FMath::IsFinite(Quality)
+		|| !FMath::IsFinite(Radius) || Radius < 0.0f || Capacity <= 0 || Capacity > 1024)
+	{
+		return INDEX_NONE_ECO;
+	}
 	int32 ShelterIndex = INDEX_NONE_ECO;
 	if (FreeShelterIndices.Num() > 0)
 	{
@@ -62,6 +70,7 @@ int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVect
 	NewShelter.Capacity = FMath::Max(1, Capacity);
 
 	const float SafeRadius = FMath::Max(50.0f, Radius);
+	NewShelter.Radius = SafeRadius;
 
 	// Allocate discrete reservation slots distributed evenly in a circle around shelter center
 	for (int32 SlotIdx = 0; SlotIdx < NewShelter.Capacity; ++SlotIdx)
@@ -83,6 +92,7 @@ int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVect
 
 void UEcoShelterSubsystem::UnregisterShelter(int32 ShelterIndex)
 {
+	check(IsInGameThread());
 	if (IsValidShelterIndex(ShelterIndex))
 	{
 		Shelters[ShelterIndex].RuntimeIndex = INDEX_NONE_ECO;
@@ -92,9 +102,12 @@ void UEcoShelterSubsystem::UnregisterShelter(int32 ShelterIndex)
 		{
 			if (Slot.ShelterRuntimeIndex == ShelterIndex)
 			{
+				if (Slot.ReservedBy != 0) { EcoShelterDiagnostics::LogLeaseEvent(GetWorld(), TEXT("Release"), Slot, TEXT("ShelterUnregistered")); }
 				Slot.ShelterRuntimeIndex = INDEX_NONE_ECO;
 				Slot.ReservedBy = 0;
 				Slot.ReservationExpireTime = 0.0;
+				Slot.ReservationId = 0;
+				Slot.OwnerEntity.Reset();
 			}
 		}
 
@@ -107,42 +120,58 @@ bool UEcoShelterSubsystem::IsValidShelterIndex(int32 ShelterIndex) const
 	return Shelters.IsValidIndex(ShelterIndex) && Shelters[ShelterIndex].RuntimeIndex != INDEX_NONE_ECO;
 }
 
-bool UEcoShelterSubsystem::ReserveSlot(int32 SlotIndex, int64 StableAgentId, double ExpireTime)
+bool UEcoShelterSubsystem::ReserveSlot(int32 SlotIndex, int64 StableAgentId, double ExpireTime, FMassEntityHandle OwnerEntity)
 {
-	if (!ShelterSlots.IsValidIndex(SlotIndex))
+	check(IsInGameThread());
+	const double CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (!ShelterSlots.IsValidIndex(SlotIndex) || !IsValidShelterIndex(ShelterSlots[SlotIndex].ShelterRuntimeIndex)
+		|| StableAgentId == EcoIds::InvalidAgentId || !FMath::IsFinite(ExpireTime) || ExpireTime <= CurrentTime)
 	{
 		return false;
 	}
 
-	const double CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
 	FEcoShelterSlot& Slot = ShelterSlots[SlotIndex];
 
 	// Slot must be unreserved or previously expired
 	if (Slot.ReservedBy == 0 || Slot.ReservationExpireTime <= CurrentTime || Slot.ReservedBy == StableAgentId)
 	{
+		const bool bActive = Slot.ReservedBy != 0 && Slot.ReservationExpireTime > CurrentTime;
+		if (bActive && Slot.OwnerEntity.IsSet() && Slot.OwnerEntity != OwnerEntity) { return false; }
+		if (!bActive)
+		{
+			check(NextReservationId < MAX_int64);
+			Slot.ReservationId = NextReservationId++;
+			Slot.OwnerEntity = OwnerEntity;
+		}
 		Slot.ReservedBy = StableAgentId;
-		Slot.ReservationExpireTime = ExpireTime;
+		Slot.ReservationExpireTime = bActive ? FMath::Max(Slot.ReservationExpireTime, ExpireTime) : ExpireTime;
+		if (!bActive) { EcoShelterDiagnostics::LogLeaseEvent(GetWorld(), TEXT("Reserve"), Slot, TEXT("Granted")); }
 		return true;
 	}
 
 	return false;
 }
 
-void UEcoShelterSubsystem::ReleaseSlot(int32 SlotIndex, int64 StableAgentId)
+void UEcoShelterSubsystem::ReleaseSlot(int32 SlotIndex, int64 StableAgentId, int64 ExpectedReservationId)
 {
+	check(IsInGameThread());
 	if (ShelterSlots.IsValidIndex(SlotIndex))
 	{
 		FEcoShelterSlot& Slot = ShelterSlots[SlotIndex];
-		if (Slot.ReservedBy == StableAgentId)
+		if (StableAgentId != 0 && Slot.ReservedBy == StableAgentId && (ExpectedReservationId == 0 || Slot.ReservationId == ExpectedReservationId))
 		{
+			EcoShelterDiagnostics::LogLeaseEvent(GetWorld(), TEXT("Release"), Slot, TEXT("ExplicitRelease"));
 			Slot.ReservedBy = 0;
 			Slot.ReservationExpireTime = 0.0;
+			Slot.ReservationId = 0;
+			Slot.OwnerEntity.Reset();
 		}
 	}
 }
 
 void UEcoShelterSubsystem::ReleaseAgentReservations(int64 StableAgentId)
 {
+	check(IsInGameThread());
 	if (StableAgentId == 0)
 	{
 		return;
@@ -152,8 +181,11 @@ void UEcoShelterSubsystem::ReleaseAgentReservations(int64 StableAgentId)
 	{
 		if (Slot.ReservedBy == StableAgentId)
 		{
+			EcoShelterDiagnostics::LogLeaseEvent(GetWorld(), TEXT("Release"), Slot, TEXT("AgentRelease"));
 			Slot.ReservedBy = 0;
 			Slot.ReservationExpireTime = 0.0;
+			Slot.ReservationId = 0;
+			Slot.OwnerEntity.Reset();
 		}
 	}
 }
@@ -162,7 +194,7 @@ bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, c
 	FHitResult* OutHit, bool bLogTrace) const
 {
 	const UWorld* World = GetWorld();
-	if (!World)
+	if (!World || ThreatLocation.ContainsNaN() || TargetLocation.ContainsNaN())
 	{
 		if (OutHit)
 		{
@@ -239,6 +271,10 @@ int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocatio
 {
 	OutSlotIndex = INDEX_NONE_ECO;
 	OutScore = 0.0f;
+	if (AgentLocation.ContainsNaN() || (bHasThreat && ThreatLocation.ContainsNaN()) || !FMath::IsFinite(SearchRadius) || SearchRadius <= 0.0f)
+	{
+		return INDEX_NONE_ECO;
+	}
 	int32 BestShelterIndex = INDEX_NONE_ECO;
 	float BestScore = -1.0f;
 
@@ -313,7 +349,7 @@ int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocatio
 
 bool UEcoShelterSubsystem::GetSlotData(int32 SlotIndex, FEcoShelterSlot& OutSlot) const
 {
-	if (ShelterSlots.IsValidIndex(SlotIndex))
+	if (ShelterSlots.IsValidIndex(SlotIndex) && IsValidShelterIndex(ShelterSlots[SlotIndex].ShelterRuntimeIndex))
 	{
 		OutSlot = ShelterSlots[SlotIndex];
 		return true;
@@ -323,21 +359,63 @@ bool UEcoShelterSubsystem::GetSlotData(int32 SlotIndex, FEcoShelterSlot& OutSlot
 
 void UEcoShelterSubsystem::CleanExpiredReservations(double CurrentTime)
 {
+	check(IsInGameThread());
+	if (!FMath::IsFinite(CurrentTime)) { return; }
 	for (FEcoShelterSlot& Slot : ShelterSlots)
 	{
 		if (Slot.ReservedBy != 0 && Slot.ReservationExpireTime <= CurrentTime)
 		{
+			EcoShelterDiagnostics::LogLeaseEvent(GetWorld(), TEXT("Expire"), Slot, TEXT("LeaseTTL"));
 			Slot.ReservedBy = 0;
 			Slot.ReservationExpireTime = 0.0;
+			Slot.ReservationId = 0;
+			Slot.OwnerEntity.Reset();
 		}
 	}
 }
 
 void UEcoShelterSubsystem::ResetAllReservations()
 {
+	check(IsInGameThread());
 	for (FEcoShelterSlot& Slot : ShelterSlots)
 	{
+		if (Slot.ReservedBy != 0) { EcoShelterDiagnostics::LogLeaseEvent(GetWorld(), TEXT("Release"), Slot, TEXT("ResetAllReservations")); }
 		Slot.ReservedBy = 0;
 		Slot.ReservationExpireTime = 0.0;
+		Slot.ReservationId = 0;
+		Slot.OwnerEntity.Reset();
+	}
+}
+
+bool UEcoShelterSubsystem::IsReservationValid(int32 SlotIndex, int64 StableAgentId, int64 ReservationId, double CurrentTime) const
+{
+	FEcoShelterSlot Slot;
+	return StableAgentId != 0 && ReservationId != 0 && FMath::IsFinite(CurrentTime)
+		&& GetSlotData(SlotIndex, Slot) && Slot.ReservedBy == StableAgentId && Slot.ReservationId == ReservationId
+		&& Slot.ReservationExpireTime > CurrentTime && !Slot.Position.ContainsNaN();
+}
+
+bool UEcoShelterSubsystem::RenewSlot(int32 SlotIndex, int64 StableAgentId, int64 ReservationId, double ExpireTime)
+{
+	check(IsInGameThread());
+	const double CurrentTime = GetWorld() ? GetWorld()->GetTimeSeconds() : 0.0;
+	if (!FMath::IsFinite(ExpireTime) || ExpireTime <= CurrentTime
+		|| !IsReservationValid(SlotIndex, StableAgentId, ReservationId, CurrentTime)) { return false; }
+	ShelterSlots[SlotIndex].ReservationExpireTime = FMath::Max(ShelterSlots[SlotIndex].ReservationExpireTime, ExpireTime);
+	return true;
+}
+
+void UEcoShelterSubsystem::ReleaseUnconfirmedReservations(const TSet<int64>& ConfirmedReservationIds)
+{
+	check(IsInGameThread());
+	for (FEcoShelterSlot& Slot : ShelterSlots)
+	{
+		if (Slot.OwnerEntity.IsSet() && !ConfirmedReservationIds.Contains(Slot.ReservationId))
+		{
+			EcoShelterDiagnostics::LogLeaseEvent(GetWorld(), TEXT("Release"), Slot, TEXT("OwnerMissingOrIneligible"));
+			Slot.ReservedBy = Slot.ReservationId = 0;
+			Slot.ReservationExpireTime = 0.0;
+			Slot.OwnerEntity.Reset();
+		}
 	}
 }

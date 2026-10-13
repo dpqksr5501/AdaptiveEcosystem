@@ -6,7 +6,10 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "Core/EcoIds.h"
 #include "AI/Social/EcoSocialTypes.h"
+#include "AI/Social/Alarm/EcoThreatTypes.h"
 #include "EcoHerdSubsystem.generated.h"
+
+class UEcoThreatSourceComponent;
 
 /**
  * Authoritative World-scoped subsystem managing persistent dynamic herds.
@@ -93,7 +96,17 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Social|Alarm")
 	void ClearHerdAlarms();
 
+	/** Replaces the detected input only; manual alarms remain independently decaying. */
+	void ApplyObservedHerdThreats(TConstArrayView<FEcoObservedHerdThreat> Threats);
+	void RegisterThreatSource(UEcoThreatSourceComponent& Source);
+	void UnregisterThreatSource(UEcoThreatSourceComponent& Source);
+	void GatherActorThreats(TArray<FEcoActorThreatSnapshot>& OutThreats);
+
 private:
+	void ResolveAlarm(int32 RuntimeIndex);
+	TArray<FEcoHerdAlarmInput> InjectedAlarms;
+	TArray<FEcoHerdAlarmInput> ObservedAlarms;
+	TArray<TWeakObjectPtr<UEcoThreatSourceComponent>> ThreatSources;
 	/** Monotonically increasing unique ID for persistent herd tracking */
 	int64 NextPersistentHerdId = 1;
 

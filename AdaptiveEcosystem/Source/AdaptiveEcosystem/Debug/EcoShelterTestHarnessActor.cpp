@@ -410,7 +410,7 @@ void AEcoShelterTestHarnessActor::Tick(float DeltaSeconds)
 			for (int32 i = 0; i < NumEntities; ++i)
 			{
 				const FEcoShelterIntentFragment& Intent = IntentList[i];
-				if (Intent.State == EEcoShelterIntentState::Reserved)
+				if (Intent.State == EEcoShelterIntentState::Reserved || Intent.State == EEcoShelterIntentState::Moving || Intent.State == EEcoShelterIntentState::Occupied)
 				{
 					const FVector AgentPos = TransformList[i].GetTransform().GetLocation();
 					// Green line for safe/occluded shelter, orange line for exposed shelter
@@ -559,6 +559,7 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 	DebugQuery.ForEachEntityChunk(Context, [this, Canvas, CameraPos, MaxDistSq](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
+		const auto IdentityList = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
 		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 		TConstArrayView<FEcoShelterIntentFragment> IntentList = ChunkContext.GetFragmentView<FEcoShelterIntentFragment>();
 		TConstArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetFragmentView<FEcoAlarmStateFragment>();
@@ -594,54 +595,71 @@ void AEcoShelterTestHarnessActor::DrawEntityHUD(UCanvas* Canvas, APlayerControll
 			const FEcoShelterIntentFragment& Intent = IntentList[i];
 			const FEcoAlarmStateFragment& Alarm = AlarmList[i];
 
-			FString ShortText;
-			FLinearColor TextColor = FLinearColor::White;
+			// Alarm and reservation are independent. A reserved agent can still be panicking.
+			const TCHAR* AlarmName = TEXT("Calm");
+			FLinearColor AlarmColor(0.2f, 1.0f, 0.4f);
+			switch (Alarm.State)
+			{
+			case EEcoSocialState::Panic:
+				AlarmName = TEXT("Panic");
+				AlarmColor = FLinearColor(1.0f, 0.2f, 0.2f);
+				break;
+			case EEcoSocialState::Alert:
+				AlarmName = TEXT("Alert");
+				AlarmColor = FLinearColor(1.0f, 0.6f, 0.1f);
+				break;
+			case EEcoSocialState::Regrouping:
+				AlarmName = TEXT("Regroup");
+				AlarmColor = FLinearColor(1.0f, 0.3f, 1.0f);
+				break;
+			case EEcoSocialState::Recovering:
+				AlarmName = TEXT("Recover");
+				AlarmColor = FLinearColor(0.2f, 0.9f, 1.0f);
+				break;
+			default: break;
+			}
 
-			if (Intent.State == EEcoShelterIntentState::Reserved)
+			FString ShelterText;
+			FLinearColor ShelterTextColor = FLinearColor::White;
+
+			if (Intent.State == EEcoShelterIntentState::Reserved || Intent.State == EEcoShelterIntentState::Moving || Intent.State == EEcoShelterIntentState::Occupied)
 			{
 				const bool bSafe = (Intent.CurrentScore >= 0.7f);
-				ShortText = FString::Printf(TEXT("S#%d [%s] %.2f"),
+				const TCHAR* StateName = Intent.State == EEcoShelterIntentState::Occupied ? TEXT("Occupied")
+					: Intent.State == EEcoShelterIntentState::Moving ? TEXT("Moving") : TEXT("Reserved");
+				ShelterText = FString::Printf(TEXT("S#%d [%s/%s] %.2f"),
 					Intent.TargetShelterIndex,
+					StateName,
 					bSafe ? TEXT("Safe") : TEXT("Danger"),
 					Intent.CurrentScore);
-				TextColor = bSafe ? FLinearColor(0.2f, 1.0f, 0.4f) : FLinearColor(1.0f, 0.5f, 0.1f);
+				ShelterTextColor = bSafe ? FLinearColor(0.2f, 1.0f, 0.4f) : FLinearColor(1.0f, 0.5f, 0.1f);
 			}
 			else if (Intent.State == EEcoShelterIntentState::Searching)
 			{
-				ShortText = TEXT("Searching");
-				TextColor = FLinearColor(1.0f, 0.9f, 0.2f);
+				ShelterText = TEXT("Searching");
+				ShelterTextColor = FLinearColor(1.0f, 0.9f, 0.2f);
 			}
-			else
+			else if (Alarm.State == EEcoSocialState::Calm)
 			{
-				switch (Alarm.State)
-				{
-				case EEcoSocialState::Panic:
-					ShortText = TEXT("[Panic]");
-					TextColor = FLinearColor(1.0f, 0.2f, 0.2f);
-					break;
-				case EEcoSocialState::Alert:
-					ShortText = TEXT("[Alert]");
-					TextColor = FLinearColor(1.0f, 0.6f, 0.1f);
-					break;
-				case EEcoSocialState::Regrouping:
-					ShortText = TEXT("[Regroup]");
-					TextColor = FLinearColor(1.0f, 0.3f, 1.0f);
-					break;
-				case EEcoSocialState::Recovering:
-					ShortText = TEXT("[Recover]");
-					TextColor = FLinearColor(0.2f, 0.9f, 1.0f);
-					break;
-				case EEcoSocialState::Calm:
-				default:
-					continue; // Clean viewport: no text for calm idle agents
-				}
+				continue; // Clean viewport: no text for calm idle agents.
 			}
 
-			FCanvasTextItem TextItem(ScreenPos2D, FText::FromString(ShortText), GEngine->GetSmallFont(), TextColor);
-			TextItem.bCentreX = true;
-			TextItem.bCentreY = true;
-			TextItem.EnableShadow(FLinearColor::Black);
-			Canvas->DrawItem(TextItem);
+			const FString AlarmText = FString::Printf(TEXT("A%lld [%s] %.2f"), IdentityList[i].StableAgentId, AlarmName, Alarm.AlarmStrength);
+			auto DrawLabel = [&](const FVector2D& At, const FString& Label, const FLinearColor& Color)
+			{
+				FCanvasTextItem Item(At, FText::FromString(Label), GEngine->GetSmallFont(), Color);
+				Item.bCentreX = true;
+				Item.bCentreY = true;
+				Item.EnableShadow(FLinearColor::Black);
+				Canvas->DrawItem(Item);
+			};
+			DrawLabel(ScreenPos2D, AlarmText, AlarmColor);
+			if (!ShelterText.IsEmpty())
+			{
+				float TextWidth = 0.0f, TextHeight = 0.0f;
+				Canvas->StrLen(GEngine->GetSmallFont(), AlarmText, TextWidth, TextHeight);
+				DrawLabel(ScreenPos2D + FVector2D(0.0f, FMath::Max(14.0f, TextHeight + 2.0f)), ShelterText, ShelterTextColor);
+			}
 		}
 	});
 }

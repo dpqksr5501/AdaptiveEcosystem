@@ -15,6 +15,10 @@
 #include "MassMovementFragments.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
+#include "Creature/Runtime/EcoCreatureMovement.h"
+#include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "AI/Social/Senses/EcoPredatorPerception.h"
+#include "World/EcoWorldClockSubsystem.h"
 
 namespace
 {
@@ -77,12 +81,14 @@ void UEcoNeighborhoodGatherProcessor::ConfigureQueries(
 	HerbivoreQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
 	// 죽은 초식은 색인에 넣지 않는다 — 동료로 세어지거나 포식자의 표적이 되면 안 된다.
 	HerbivoreQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+	HerbivoreQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 
 	// 포식자는 생존 태그를 요구하지 않는다. v1·파이썬 모두 포식자는 죽지 않고,
 	// 생존 태그가 없는 포식자 템플릿(플레이어 등)도 계속 보여야 한다.
 	PredatorQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	PredatorQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadOnly);
 	PredatorQuery.AddTagRequirement<FEcoPredatorTag>(EMassFragmentPresence::All);
+	PredatorQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 }
 
 void UEcoNeighborhoodGatherProcessor::Execute(FMassEntityManager& EntityManager,
@@ -106,6 +112,7 @@ void UEcoNeighborhoodGatherProcessor::Execute(FMassEntityManager& EntityManager,
 
 	auto GatherInto = [Grid, Cover](FMassExecutionContext& Ctx, bool bPredator)
 	{
+		const auto Vitals = Ctx.GetFragmentView<FEcoVitalsFragment>();
 		const TConstArrayView<FTransformFragment> Transforms =
 			Ctx.GetFragmentView<FTransformFragment>();
 		const TConstArrayView<FMassVelocityFragment> Velocities =
@@ -113,6 +120,7 @@ void UEcoNeighborhoodGatherProcessor::Execute(FMassEntityManager& EntityManager,
 
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
+			if (!Vitals.IsEmpty() && Vitals[i].HP <= 0) continue;
 			const FVector Location = Transforms[i].GetTransform().GetLocation();
 			FEcoNeighborEntry Entry;
 			Entry.Entity = Ctx.GetEntity(i);
@@ -357,6 +365,8 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 				static_cast<float>(G.KinCount) / EcoBehaviorConfig::ObsKinCountNorm, 0.f, 1.f);
 			Obs.Energy = FMath::Clamp(
 				Vitals[i].Energy / FMath::Max(Vitals[i].MaxEnergy, KINDA_SMALL_NUMBER), 0.f, 1.f);
+			// 관측 5는 파이썬과 같은 전역 EMA 다(world.py, POLICY_CONTRACT_V1). 통합 생명체의 지역 PredationHistory
+			// (IEcoWorldFoodProvider::GetRecentPredation)는 생태·이주·UI 가 쓰고 정책 입력에는 넣지 않는다 — 학습 분포와 맞춘다.
 			Obs.RecentPredation = RecentPredation;
 			Obs.CoverDistance = Cover
 				? FMath::Clamp(Cover->GetCoverDistance(Self) / EcoBehaviorConfig::ObsCoverNormCm,
@@ -411,11 +421,13 @@ void UEcoPredationProcessor::ConfigureQueries(const TSharedRef<FMassEntityManage
 	// 선언이 있어야 Mass 가 이 프로세서가 Vitals 를 쓴다는 걸 안다.
 	HerbivoreQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	HerbivoreQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadWrite);
+	HerbivoreQuery.AddRequirement<FEcoCreatureLifecycleFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
 	HerbivoreQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
 	HerbivoreQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 
 	PredatorQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	PredatorQuery.AddRequirement<FEcoPredatorStateFragment>(EMassFragmentAccess::ReadWrite);
+    PredatorQuery.AddRequirement<FEcoPreySenseFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	PredatorQuery.AddTagRequirement<FEcoPredatorTag>(EMassFragmentPresence::All);
 }
 
@@ -463,7 +475,7 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 	TSet<FMassEntityHandle> CaughtThisTick;
 
 	PredatorQuery.ForEachEntityChunk(Context,
-		[&EntityManager, Predation, Grid, &Entries, &CaughtThisTick, Dt, CatchRadius, HideMult, EatCooldown]
+		[&EntityManager, Predation, Grid, World, &Entries, &CaughtThisTick, Dt, CatchRadius, HideMult, EatCooldown]
 		(FMassExecutionContext& Ctx)
 	{
 		const TConstArrayView<FTransformFragment> Transforms =
@@ -471,6 +483,7 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 		const TArrayView<FEcoPredatorStateFragment> States =
 			Ctx.GetMutableFragmentView<FEcoPredatorStateFragment>();
 		TArray<int32> Nearby;
+        const auto PreySenses = Ctx.GetFragmentView<FEcoPreySenseFragment>();
 
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
@@ -496,6 +509,17 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 				}
 				const float Perceived =
 					FVector::Dist2D(E.Location, P) * (E.bInCover ? HideMult : 1.0f);
+                // Opt-in Creature wolves require fresh direct sight, plus current LOS at contact.
+                // Legacy/Python-parity predator archetypes have no PreySense and keep their V1 rule.
+                if (!PreySenses.IsEmpty())
+                {
+                    const auto& Sense = PreySenses[i];
+                    if (Sense.Target != E.Entity || Sense.Cue.LastDirectSense != EEcoSenseSource::Sight
+                        || Sense.Cue.Confidence <= 0 || World->GetTimeSeconds() < Sense.Cue.LastObservedTime
+                        || World->GetTimeSeconds() - Sense.Cue.LastObservedTime > .25) continue;
+                    FHitResult Hit; FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoCreatureCaptureLOS), true);
+                    if (World->LineTraceSingleByChannel(Hit, P + FVector(0,0,80), E.Location + FVector(0,0,80), ECC_Visibility, Params)) continue;
+                }
 				if (Perceived > CatchRadius || Perceived >= BestPerceived)
 				{
 					continue;
@@ -526,6 +550,9 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 			{
 				MarkPredationKill(Ctx.Defer(),
 								  EntityManager.GetFragmentDataChecked<FEcoVitalsFragment>(Victim), Victim);
+				// 통합 생명체는 조정자(AEcoCreatureIntegrationSpawner::Reconcile)가 HP 0 을 보고 생명주기를 닫는다.
+				// 그때 피식 사망인지 알 수 있게 표시한다.
+				if (auto* Life = EntityManager.GetFragmentDataPtr<FEcoCreatureLifecycleFragment>(Victim)) Life->bPredated = true;
 				Predation->ReportPredation(Entries[Best].Location);
 				CaughtThisTick.Add(Victim);
 			}
@@ -557,11 +584,19 @@ UEcoSteeringProcessor::UEcoSteeringProcessor()
 									  | EProcessorExecutionFlags::Standalone);
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoPolicyProcessor"));
+	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoShelterLifecycleProcessor"));
+	// 포획은 조향 뒤다(UEcoPredationProcessor 생성자, 파이썬 world.py 와 같은 순서). 여기에 '포획 뒤' 를 더하면
+	// 실행 순서가 순환한다. 잡힌 개체는 HP 0·Alive 없음으로 다음 틱부터 이 쿼리에서 빠진다.
 	bRequiresGameThreadExecution = true;
 }
 
 void UEcoSteeringProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+	EntityQuery.AddRequirement<FEcoSocialMovementRequestFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	EntityQuery.AddRequirement<FEcoShelterMovementFeedbackFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
+	EntityQuery.AddRequirement<FEcoTravelFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	EntityQuery.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	EntityQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	// Transform 은 ReadWrite 다 — 이 프로세서가 속도를 위치에 적분하고 yaw 도 쓴다. 이유는 Execute 참조.
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FEcoSteeringGeometryFragment>(EMassFragmentAccess::ReadOnly);
@@ -584,9 +619,12 @@ void UEcoSteeringProcessor::Execute(FMassEntityManager& EntityManager,
 	const float FleeWeight = EcoBehaviorConfig::FleeWeight;
 	const float HerbSpeed = EcoBehaviorConfig::HerbSpeedCmS;
 	const float DeltaSeconds = Context.GetDeltaTimeSeconds();
+	if (!World || !FMath::IsFinite(DeltaSeconds) || DeltaSeconds <= 0) return;
+	// Lease expiry uses the same World-time domain as the Social lifecycle.
+	const double Now = World->GetTimeSeconds();
 
 	EntityQuery.ForEachEntityChunk(Context,
-		[SeeRadius, SepWeight, FleeWeight, HerbSpeed, WorldExtent, DeltaSeconds]
+		[World, Now, SeeRadius, SepWeight, FleeWeight, HerbSpeed, WorldExtent, DeltaSeconds]
 		(FMassExecutionContext& Ctx)
 	{
 		const TArrayView<FTransformFragment> Transforms =
@@ -597,11 +635,21 @@ void UEcoSteeringProcessor::Execute(FMassEntityManager& EntityManager,
 			Ctx.GetFragmentView<FEcoPolicyOutputFragment>();
 		const TArrayView<FMassVelocityFragment> Velocities =
 			Ctx.GetMutableFragmentView<FMassVelocityFragment>();
+		const auto Requests = Ctx.GetFragmentView<FEcoSocialMovementRequestFragment>();
+		const auto Feedback = Ctx.GetMutableFragmentView<FEcoShelterMovementFeedbackFragment>();
+		const auto Travel = Ctx.GetFragmentView<FEcoTravelFragment>();
+		const auto Regions = Ctx.GetFragmentView<FEcoRegionFragment>();
+		const auto Vitals = Ctx.GetFragmentView<FEcoVitalsFragment>();
+		const bool Integrated = Ctx.DoesArchetypeHaveTag<FEcoIntegratedCreatureTag>();
 
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
 			const FEcoSteeringGeometryFragment& G = Geometries[i];
-			const FEcoPolicyActionV1& P = Outputs[i].Action;
+			if (!Vitals.IsEmpty() && Vitals[i].HP <= 0) { Velocities[i].Value = FVector::ZeroVector; continue; }
+			const auto* Request = Requests.IsEmpty() ? nullptr : &Requests[i];
+			auto* Result = Feedback.IsEmpty() ? nullptr : &Feedback[i];
+			const auto* Residence = Travel.IsEmpty() ? nullptr : &Travel[i];
+			const FEcoPolicyActionV1& P = Request && Request->bValid ? Request->EffectiveAction : Outputs[i].Action;
 
 			// ===== §3.3 — EcoSteering.h 의 Steer(). 파이썬 env/steering.py 와 대응 =====
 			// 수식을 여기 인라인으로 두면 테스트할 수 없어서 함수로 뺐다 (§9.8-2).
@@ -626,7 +674,7 @@ void UEcoSteeringProcessor::Execute(FMassEntityManager& EntityManager,
 			// ===== §3.3 끝. 아래는 언리얼에만 있는 항이다 =====
 
 			// §9.5 경계 반발. 파이썬은 좌표를 clamp 해서 벽을 표현한다.
-			if (WorldExtent > 0.0f)
+			if (!Integrated && WorldExtent > 0.0f)
 			{
 				const FVector Pos = Transforms[i].GetTransform().GetLocation();
 				const float Margin = EcoBehaviorConfig::SeeRadiusCm * 0.25f;
@@ -642,12 +690,7 @@ void UEcoSteeringProcessor::Execute(FMassEntityManager& EntityManager,
 				}
 			}
 
-			Velocities[i].Value = V;
-
 			FTransform& T = Transforms[i].GetMutableTransform();
-			// world.py `head = normalize(v) if moving else head`. 경계 반발까지 반영한 **최종 V** 로
-			// 쓴다 — 지각이 읽는 값과 같아야 한다. V = 0 이면 마지막 yaw 를 유지한다.
-			EcoHeading::WriteYawIfMoving(T, V);
 
 			// §9.5 — 속도를 위치에 적분한다. 파이썬 World.step() 이 `pos += v` 를 하는 자리다.
 			//
@@ -656,15 +699,29 @@ void UEcoSteeringProcessor::Execute(FMassEntityManager& EntityManager,
 			// 요구한다. 둘을 아키타입에 넣으면 이동이 엔진의 가감속 모델을 타게 되는데,
 			// §3.3 은 `normalize(v) * herb_speed` 로 **속력이 항상 일정**하다고 못박고 있어
 			// 파이썬과 궤적이 어긋난다. 여기서 직접 적분하는 편이 계약에 맞는다.
+			// Social 이동 요청(은신처 임대 등)과 이주가 정책 속도를 대신할 수 있다. 둘 다 없으면 V 그대로다.
+			V = EcoCreatureMovement::SelectVelocity(T.GetLocation(), V, HerbSpeed, DeltaSeconds, Now, Residence, Request, Result);
 			FVector NewPos = T.GetLocation() + V * DeltaSeconds;
-			if (WorldExtent > 0.0f)
+			if (Integrated && World && !Regions.IsEmpty())
+			{
+				if (!EcoCreatureMovement::ConstrainStep(*World, Regions[i].CurrentRegionId, Residence && Residence->State == EEcoResidenceState::Traveling, T.GetLocation(), NewPos))
+				{
+					NewPos = T.GetLocation(); V = FVector::ZeroVector;
+					if (Request && Request->bValid && Request->ReservationId > 0 && Result) Result->Report(Request->ReservationId, EEcoShelterMovementStatus::Failed);
+				}
+			}
+			if (!Integrated && WorldExtent > 0.0f)
 			{
 				// 파이썬은 좌표를 월드 경계로 clamp 한다 (§4.1). 위 반발항이 그 전에
 				// 방향을 돌려놓지만, 프레임이 튀면 넘어갈 수 있어 최종 clamp 를 둔다.
 				NewPos.X = FMath::Clamp(NewPos.X, -WorldExtent, WorldExtent);
 				NewPos.Y = FMath::Clamp(NewPos.Y, -WorldExtent, WorldExtent);
 			}
+			// world.py `head = normalize(v) if moving else head`. 경계 반발·Social 선택·이동 제약까지 반영한
+			// **최종 V** 로 쓴다 — 지각이 읽는 값과 같아야 한다. V = 0 이면 마지막 yaw 를 유지한다.
+			EcoHeading::WriteYawIfMoving(T, V);
 			T.SetLocation(NewPos);
+			Velocities[i].Value = V;
 		}
 	});
 }
