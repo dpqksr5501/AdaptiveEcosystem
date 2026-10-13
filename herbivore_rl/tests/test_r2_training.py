@@ -223,7 +223,7 @@ def test_u_terms_r2_and_active_u(c2_on):
     assert ev.u_names("r2", stare=True) == ev.U_NAMES + ("look", "look_open", "stare", "stare_band")
     assert ev.u_names("r1", stare=True) == ev.U_NAMES
     assert ev.R2_REPORT_U == ("look", "look_open", "stare", "stare_band")
-    assert ev.U_MIN_BY["r2"] == {"esc": 0.17, "hide": 0.20, "freeze": 0.10, "sleep": None}
+    assert ev.U_MIN_BY["r2"] == {"esc": 0.18, "hide": 0.20, "freeze": 0.10, "sleep": None}
     assert ev.U_MIN_BY["r1b"] == {"esc": 0.18, "hide": 0.2, "freeze": 0.10, "sleep": 0.5}        # r1b 그대로
     assert ev.R2_ALARM == rr.NICHES["look"]["alarm"] == rp.ALARM_MASK_OBS
     assert ev.REF_FSM == {"r1": "fsm", "r1b": "fsm", "r2": "fsm_r2"}
@@ -351,7 +351,7 @@ def test_eval_r2_smoke_and_guards(trained_r2, tmp_path, c2_on):
     # 판정 U 는 R1b 셋, 경보 반응 U 는 보고만(사람 결정 10-12 밤), 노려보기 U 는 없다(10-13)
     assert set(G_["u"]["items"]) == {"esc", "hide", "freeze"} and G_["dep"]["items"] == {}
     assert set(G_["u"]["report"]) == {"look", "look_open"}
-    assert {u: v["min"] for u, v in G_["u"]["items"].items()} == {"esc": 0.17, "hide": 0.20, "freeze": 0.10}
+    assert {u: v["min"] for u, v in G_["u"]["items"].items()} == {"esc": 0.18, "hide": 0.20, "freeze": 0.10}
     assert G_["perf"]["ref"] == "fsm_r2" and G_["starve"]["fsm"] == P["fsm_r2"]["starve_rate"]
     assert not G_["pending"]
     assert res["meta"]["u_def"] == "r2" and res["meta"]["ref_fsm"] == "fsm_r2" and not res["meta"]["prereg"]
@@ -582,7 +582,7 @@ def test_eval_r2_both_world_reproduction(trained_r2, tmp_path):
 
 def _gate_res(**kw):
     """r2 판정 조건 시험용 결과(gate 가 읽는 칸만). 기본값은 모든 조건의 경계(같으면 통과 쪽)다."""
-    u = dict(esc=0.17, hide=0.20, freeze=0.10, sleep=None, look=-0.5, look_open=-0.5)
+    u = dict(esc=0.18, hide=0.20, freeze=0.10, sleep=None, look=-0.5, look_open=-0.5)
     u.update(kw.pop("u", {}))
     use = dict(graze=0.9, flee=0.005, hide=0.05, freeze=0.045, sleep=0.0)
     use.update(kw.pop("use", {}))
@@ -594,7 +594,7 @@ def _gate_res(**kw):
 
 
 def test_r2_pass_set():
-    """R2 통과 조건(판정 사전 등록 3절): U_ESC ≥ 0.17·U_HIDE′ ≥ 0.20·U_FREEZE′ ≥ 0.10, 네 행동 모두 사용 ≥ 0.5%, 깜빡임 ≤ 0.65,
+    """R2 통과 조건(판정 사전 등록 3절): U_ESC ≥ 0.18·U_HIDE′ ≥ 0.20·U_FREEZE′ ≥ 0.10, 네 행동 모두 사용 ≥ 0.5%, 깜빡임 ≤ 0.65,
     아사 ≤ 1.5 × FSM_R2, RL − FSM_R2 G_γ 짝 t ≥ −2.093. 보고만 U(U_LOOK·U_LOOK_OPEN, 재현 설정의 U_STARE)는 통과에 영향이 없다."""
     ev = _ev()
     allowed = ("graze", "flee", "hide", "freeze")
@@ -609,7 +609,7 @@ def test_r2_pass_set():
     assert set(ev.gate(_gate_res(u=dict(stare=-1.0, stare_band=0.0)), allowed, "near", "r2")["u"]["report"]) == \
         {"look", "look_open", "stare", "stare_band"}
     # 조건 하나씩 깨기
-    fails = {"u": dict(u=dict(esc=0.169)), "u2": dict(u=dict(hide=0.199)), "u3": dict(u=dict(freeze=0.099)),
+    fails = {"u": dict(u=dict(esc=0.179)), "u2": dict(u=dict(hide=0.199)), "u3": dict(u=dict(freeze=0.099)),
              "use": dict(use=dict(flee=0.0049)), "use2": dict(use=dict(hide=0.0)), "flicker": dict(flicker=0.651),
              "starve": dict(starve=1.6e-4), "perf": dict(t=-2.1)}
     key = {"u": "u", "u2": "u", "u3": "u", "use": "use", "use2": "use", "flicker": "use", "starve": "starve", "perf": "perf"}
@@ -618,8 +618,11 @@ def test_r2_pass_set():
         assert not g["pass_"] and not g[key[name]]["pass_"], name
         assert all(g[k]["pass_"] for k in ("perf", "u", "use", "starve") if k != key[name]), name
     assert ev.gate(_gate_res(t=2.2), allowed, "near", "r2")["perf"]["beats_fsm"]
-    # r1b 판정은 그대로(문턱 0.18 — 같은 U_ESC 0.17 이면 r1b 는 실패다)
+    # r1b 판정은 그대로(문턱 0.18 — R2 도 10-13 새 ws_baseline 으로 0.18 이 되어 같다. U_ESC 0.179 면 둘 다 실패다)
     r1b = dict(_gate_res(), c4_drop={})
     r1b["pooled"]["fsm"] = r1b["pooled"].pop("fsm_r2")
     gb = ev.gate(r1b, allowed, "near", "r1b")
-    assert not gb["u"]["items"]["esc"]["pass_"] and gb["u"]["items"]["esc"]["min"] == 0.18
+    assert gb["u"]["items"]["esc"]["pass_"] and gb["u"]["items"]["esc"]["min"] == 0.18
+    r1b_lo = dict(_gate_res(u=dict(esc=0.179)), c4_drop={})
+    r1b_lo["pooled"]["fsm"] = r1b_lo["pooled"].pop("fsm_r2")
+    assert not ev.gate(r1b_lo, allowed, "near", "r1b")["u"]["items"]["esc"]["pass_"]

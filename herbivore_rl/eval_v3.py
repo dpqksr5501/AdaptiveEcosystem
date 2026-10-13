@@ -78,7 +78,7 @@ v3 R2 판정 (`--u-def r2`, 명세 `Docs/RL_Policy/RL_V3_R2_SPEC.md` 10절 7단�
   FREEZE 칸이 참. look 니치는 경보 ≥ 0.4 라 마스크 판 3 에서 늘 열리지만 look 교차(경보 < 0.4, 안 보임)는 threat_recency ≥ 0.2 일
   때만 열려서, 글자 그대로의 U_LOOK 은 경보를 읽지 않고 '열리면 언제나 얼기'만 해도 크게 나온다. 열린 결정만 센 U_LOOK_OPEN 은 그
   몫이 0 이고, 늘 U_LOOK_OPEN ≤ U_LOOK 이다(닫힌 칸은 고를 수 없다).
-  판정 문턱 U_MIN_BY['r2'] = U_ESC 0.17·U_HIDE′ 0.20·U_FREEZE′ 0.10 (판정 사전 등록 3절)
+  판정 문턱 U_MIN_BY['r2'] = U_ESC 0.18·U_HIDE′ 0.20·U_FREEZE′ 0.10 (판정 사전 등록 3절)
 - 보고만 하는 R2 지표 (`R2Acc`, 정책마다):
   · 보이는 지표: 세계의 `alarm_stats`·`threats_stats` 열(재현 설정이면 `stare_stats` 도). 수(…_n, emit_*, cry_n)는 시드를 합쳐
     1000 개체-스텝당, 비율은 시드 평균(값이 있는 시드만). 경보 포화는 alarm_frac·alarm_gap_mean·false_alarm_frac 으로 본다.
@@ -153,10 +153,11 @@ R2_STARE_U = ("stare", "stare_band")          # 노려보기를 켠 설정에서
 U_NAMES_R2 = U_NAMES + ("look", "look_open")
 U_TARGET.update(stare=(FREEZE,), look=(FREEZE,), look_open=(FREEZE,), stare_band=(FREEZE,))
 # r2 문턱(판정 사전 등록 results/v3/r2/judge/PREREG.md 3절, 학습 기록을 보기 전에 정한다 — 명세 10절 7단계, R1 선례):
-# U_ESC 0.17(앞선 ws_baseline 의 R_base 0.346 의 절반, R1·R1b 0.18 과 같은 규칙), U_HIDE′ 0.20·U_FREEZE′ 0.10(R1b 문턱 그대로).
+# U_ESC 0.18(R2 세계 ws_baseline 10-13 의 R_base 0.357 의 절반 0.1785 를 둘째 자리 반올림 — R1 의 0.364 → 0.18 과 같은 규칙,
+# 판정 사전 등록 8절 1), U_HIDE′ 0.20·U_FREEZE′ 0.10(R1b 문턱 그대로).
 # SLEEP 은 목록에 없다(None = 미정 — 목록에 들어오면 판정 폴더 실행을 거부한다). 보고만 하는 U(R2_REPORT_U)는 문턱이 없다
 U_MIN_BY = {"r1": U_MIN, "r1b": {"esc": 0.18, "hide": 0.2, "freeze": 0.10, "sleep": 0.5},
-            "r2": {"esc": 0.17, "hide": 0.20, "freeze": 0.10, "sleep": None}}
+            "r2": {"esc": 0.18, "hide": 0.20, "freeze": 0.10, "sleep": None}}
 R1B_COND = dict(hide_near=6.0, hide_far=8.0, hide_slow=0.7, fz_fast=0.9, fz_cover=5.0, fz_slow=0.7, fz_far=8.0)
 USE_MIN, FLICKER_MAX, C4_DROP_MIN, STARVE_RATIO_MAX = 0.005, 0.65, 0.5, 1.5
 FULL_E, HUNGRY_E = 0.7, 0.35                # 위험 할당 에너지 구간 (명세 5절)
