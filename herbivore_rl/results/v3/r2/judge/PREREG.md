@@ -57,7 +57,7 @@
   - 명령: `python train_v3.py measure-fdec --config configs/v3_r2.yaml`(시작 정책, 보정 시드 20000~20002 × 3000)
   - 결과: **0.573169**(시드별 0.5348·0.3926·0.7922, 마스크 칸이 둘 이상인 결정 0.121). 기록 `train/measure_fdec_alarm.log`.
   - `ent_coef_base` 0.00573169 → 범주 엔트로피 계수 **0.01**. R1 조리법(R1 변경 기록 10-07 '대응: 모방 초기화')과 같은 PPO 손실이다.
-  - 앞선 값 0.588227(`train/measure_fdec.log`)은 두 장치 세계에서 잰 것이라 쓰지 않는다.
+  - 앞선 값 0.588227(`train_both/measure_fdec.log`)은 두 장치 세계에서 잰 것이라 쓰지 않는다.
 
 **모방 초기화** (명세 H10, R1 조리법 그대로, `warmstart_v3.py`)
 - 교사 둘
@@ -315,3 +315,8 @@
 - 6절에 M7 없이 정해지는 플레이어 장면 규칙을 다시 넣었다. 앞선 초안의 들킴 기준은 M7 지표라 뺐었다.
 - 5절의 경보 방출·방향·E7 지표를 보고서 둘째 경보 표에 넣었다. 그전에는 결과 JSON에만 있었다.
 - 7절에 검토가 쓴 시드를 적었다. 8절 1~3에 검토 점검값을 적었다.
+
+### 2026-10-13 — 앞선 두 장치 세계의 산출 옮김 (학습 전, 학습 기록 없음)
+- 8절 6을 제안대로 했다: `ws_baseline/` → `ws_baseline_both/`, `early/` → `early_both/`, `train/`의 교사 기록(`measure_fdec.log`·`ws_collect.log`·`ws_fit_*.log`·`ws_teacher_mix.json`) → `train_both/`. 지운 것은 없다.
+- 옛 보고서 안의 모델 경로(`ckpt/v3/ws_r2/…`)는 고치지 않았다. 지금 그 자료는 `ckpt/v3/ws_r2_both/`에 있다.
+- 이제 `ws_baseline/`·`early/`·`train/`의 교사 기록 자리는 비어 있고, R2 세계에서 다시 낸 것만 들어간다. `train/measure_fdec_alarm.log`는 R2 세계 값이라 그대로 둔다.
