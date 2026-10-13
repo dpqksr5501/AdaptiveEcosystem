@@ -28,6 +28,7 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 
 ### 4. Integration (외부 오픈소스 연동)
 외부 검증된 프레임워크의 참조 적응 및 라이선스 고지를 다룹니다.
+- [Mass 생태계 통합·성능 작업 안내](Integration/README.md): 공통 생명주기, 계측, 공간 검색, 동물 복제·표현, 병렬화·시간 스케줄, Simulation LOD의 6개 우선순위별 실행·검증 계획. 구현 완료 보고와 구분합니다.
 - 🔌 [THIRD_PARTY_INTEGRATION.md](Integration/THIRD_PARTY_INTEGRATION.md) : 실제 사용·설계 참조·future candidate와 과거 적응 계획 구분
 - 📜 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) : 루트 오픈소스 라이선스 고지서
 
