@@ -25,8 +25,16 @@
 #include "GameFramework/Actor.h"
 #include "Mass/EntityHandle.h"
 #include "MassEntityTypes.h"
+#include "AI/Policy/EcoPolicyV3Subsystem.h"
 
 #include "EcoPolicyTestSpawner.generated.h"
+
+// v3 (R1b 행동 고르기 두뇌) 선택 — 계획서 RL_V3_UNREAL_TRAINING_PLAN.md 4-5 e3 의 우리 시험 경로.
+//   콘솔 변수 eco.PolicyVersion (1 = v1 기본, 3 = v3) 또는 PolicyVersionOverride 로 고른다. 실행 중에 바꾸면 매 월드 틱
+//   시작(Mass 처리 밖 안전 지점)에서 지금 개체군을 지우고 다른 판의 개체군을 새로 만든다.
+//   v3 개체군은 V3Settings 의 세계(맵·은신처·먹이 격자·늑대 구성·낮밤)에서 돌고, 사슴·늑대·포획·리스폰을 모두
+//   UEcoPolicyV3StepProcessor 가 결정 스텝마다 한다 — 이 액터는 v3 에서 그리기만 한다(기록 줄은 서브시스템이 남긴다).
+//   bAssignStableAgentIds 를 켠 스포너(정체성 관찰자·Creature 데모)는 v1 개체 계약에 기대므로 늘 v1 이다.
 
 UCLASS(BlueprintType, Blueprintable)
 class ADAPTIVEECOSYSTEM_API AEcoPolicyTestSpawner : public AActor
@@ -87,6 +95,23 @@ public:
 	/** Opt-in identity for the visual demo. Does not register regional populations or change PPO behavior. */
 	UPROPERTY(EditAnywhere, Category="Ecology|Test")
 	bool bAssignStableAgentIds = false;
+
+	/** 정책 판. 0 = 콘솔 변수 eco.PolicyVersion 을 따른다(기본 1). 1 = v1, 3 = v3 (R1b). 그 밖의 값은 1 로 본다. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Test|PolicyV3")
+	int32 PolicyVersionOverride = 0;
+
+	/** v3 세계 설정. 스폰할 때 읽는다 (HerbivoreCount·PredatorCount·SpawnRadius·PredatorSpeedRatio 는 v1 전용이다). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Test|PolicyV3")
+	FEcoPolicyV3Settings V3Settings;
+
+	/** 덮어쓰기·콘솔 변수·정체성 옵션으로 정한 판 (1 또는 3). 시험이 부른다. */
+	static int32 ResolvePolicyVersion(int32 Override, int32 RequestedByConsole, bool bAssignsStableIds);
+
+	/** 지금 돌고 있는 판 (0 = 아직 없음, 1, 3). */
+	int32 GetActivePolicyVersion() const { return ActivePolicyVersion; }
+	TConstArrayView<FMassEntityHandle> GetV3Herbivores() const { return V3Herbivores; }
+	TConstArrayView<FMassEntityHandle> GetV3Threats() const { return V3Threats; }
+
 	TConstArrayView<FMassEntityHandle> GetTestHerbivores() const { return Herbivores; }
 	TConstArrayView<FMassEntityHandle> GetTestPredators() const { return Predators; }
 	int32 GetTestPredatorTarget(int32 Index) const { return PredatorTargets.IsValidIndex(Index) ? PredatorTargets[Index] : INDEX_NONE; }
@@ -120,4 +145,22 @@ private:
 	int32 TotalCatches = 0;
 	float LogAccumulator = 0.0f;
 	bool bSpawned = false;
+
+	// --- v3 ---
+	/** 월드 틱 시작 (Mass 처리 밖). 콘솔 변수가 바뀌었으면 개체군을 바꿔 만든다. */
+	void OnWorldTickStart(UWorld* InWorld, ELevelTick TickType, float DeltaSeconds);
+	/** 지금 판의 개체군을 지우고 Version 의 개체군을 만든다. */
+	void SwitchPolicyVersion(int32 Version);
+	/** v1 개체를 지운다 (EndPlay 와 판 바꾸기). */
+	void DespawnV1();
+	bool SpawnV3();
+	void DespawnV3();
+	void DrawDebugV3() const;
+
+	int32 ActivePolicyVersion = 0;
+	/** 이 스포너가 v3 세션을 열었다 (한 월드에 세션은 하나 — 남의 세션을 닫지 않는다). */
+	bool bOwnsV3Session = false;
+	TArray<FMassEntityHandle> V3Herbivores;
+	TArray<FMassEntityHandle> V3Threats;
+	FDelegateHandle WorldTickStartHandle;
 };
