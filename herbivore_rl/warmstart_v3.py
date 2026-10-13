@@ -25,16 +25,30 @@ v3 R2 (명세 RL_V3_R2_SPEC.md 10절 6단계 — R1 과 같은 조리법, 목표
     python warmstart_v3.py fit --config configs/v3_r2.yaml --out-dir ckpt/v3/ws_r2 --name v3_r2_ws --seeds 0 1 2 3 4 5
 
 - `--teacher2` 가 둘째 교사를 고른다: fsm(R1 그대로 — eval_v3.fsm_spec near 판) 또는 fsm_r2(eval_v3.fsm_r2_policy_spec =
-  repertoire_rules.fsm_r2_spec, 켠 장치의 stare·look 줄). 기본은 설정을 보고 정한다: 노려보기·경보를 켠 R2 세계면 fsm_r2, 아니면
-  fsm(R1 재현). `--out-dir` 기본도 R2 세계면 ckpt/v3/ws_r2(R1 의 ckpt/v3/ws 를 덮지 않는다), fit `--name` 기본은 v<version>_ws 다.
-  두 교사 모두 R_base(θ 4, a 0.9)를 쓴다 — 합친 세계 거주 탐색은 a 0.6 을 골랐지만 교사·판정 대조는 (4, 0.9)로 고정한다(판정
-  사전 등록 results/v3/r2/judge/PREREG.md). 교사 세계 시드는 R1 과 같은 규칙(학습 시드 풀에서 고정 난수 808)이다.
+  repertoire_rules.fsm_r2_spec, 켠 장치의 줄). 기본은 설정을 보고 정한다: 경보(또는 재현 설정의 노려보기)를 켠 R2 세계면 fsm_r2,
+  아니면 fsm(R1 재현). `--out-dir` 기본도 R2 세계면 ckpt/v3/ws_r2(R1 의 ckpt/v3/ws 를 덮지 않는다), fit `--name` 기본은
+  v<version>_ws 다. 두 교사 모두 R_base(θ 4, a 0.9)를 쓴다(사람 결정 10-12 밤 — 교사·판정 대조는 R1 과 같은 (4, 0.9)). 교사 세계
+  시드는 R1 과 같은 규칙(학습 시드 풀에서 고정 난수 808)이다.
+- R2 세계(v3_r1 + 경보, 사람 결정 10-13 — 노려보기는 뺐다)의 FSM_R2 교사 = R_base(4, 0.9) + look + R0 HIDE 니치 + R0 가까운 위협
+  얼기(우선순위 HIDE > 가까운 얼기 > look > R_base, stare 줄 없음). 10-12 에 모은 자료·가중치는 노려보기를 함께 켠 세계에서
+  stare 줄이 든 FSM_R2 로 모은 것이라 R2 학습에 쓰지 않는다 — 10-13 에 ckpt/v3/ws_r2_both 로 옮겼고, 기본 폴더에는 다시 모은다
+  (아래 '출처 확인').
 - fsm_r2 교사의 FREEZE 는 어느 줄에서 왔는지 표본마다 적는다(`p_src2`: 0 = FREEZE 아님, 1 = 가까운 위협 얼기(freeze cross),
-  2 = stare 띠, 3 = stare 유지 줄만, 4 = look — 우선순위 가까운 판 > stare > look 그대로). 교사 수(`counts_fsm`, `freeze_src_fsm`,
-  세계를 움직인 교사별 `counts_by_driver`)와 맞춘 뒤 보류 표본의 줄별 평균 π(FREEZE)(`recall_src`)를 보고한다. R1 자료(p_src2
-  없음)는 그대로 읽는다.
+  2 = stare 띠, 3 = stare 유지 줄만, 4 = look — 우선순위 가까운 판 > stare > look 그대로). R2 세계에는 stare 줄이 없어 2·3 은 늘 0 이다
+  (자료 꼴은 그대로 둔다). 교사 수(`counts_fsm`, `freeze_src_fsm`, 세계를 움직인 교사별 `counts_by_driver`)와 맞춘 뒤 보류 표본의
+  줄별 평균 π(FREEZE)(`recall_src`)를 보고한다. R1 자료(p_src2 없음)는 그대로 읽는다.
 - `--out-dir` 가 교사 자료(`<out-dir>/teacher_mix.npz`, 기본 --data)와 맞춘 가중치(`<out-dir>/<name>_s<시드>.pt·.zip·.json`)의
   폴더다. 기본은 R1 의 ckpt/v3/ws.
+
+출처 확인 (10-13 검토 — 옛 R2 자료를 조용히 다시 쓰지 않게):
+- collect 는 곁 파일 teacher_mix.json 에, fit 은 <name>_s<시드>.json 에 이 설정의 `world_digest`(세계 동역학 + 허용 목록, `world_digest`
+  docstring)와 전체 `config_digest` 를 적는다. fit 은 자료의 world_digest 가 이 설정과 다르면 멈추고, train_v3.py --warmstart 는
+  가중치의 world_digest 가 학습 설정과 다르면 멈춘다(`check_source`).
+- world_digest 가 없는 자료·가중치(10-13 전 판)는 R1 세계면 알리고 쓰고(R1 재현), 경보를 켠 R2 세계면 멈춘다 — 10-13 전의 R2
+  자료·가중치는 모두 두 장치 세계의 것이다(10-13 에 ckpt/v3/ws_r2 → ckpt/v3/ws_r2_both 로 옮겼다). 그 실행의 재현이면
+  fit --allow-legacy(train_v3 는 --allow-legacy-warmstart).
+- collect 는 있는 teacher_mix.npz·.json 을, fit 은 있는 <name>_s<시드>.pt·.zip·.json 을 덮지 않는다(덮으려면 --force). ckpt/ 는
+  저장소 밖(.gitignore)이라 덮으면 되살릴 수 없다.
 """
 
 from __future__ import annotations
@@ -42,6 +56,7 @@ from __future__ import annotations
 import env.torch_init  # noqa: F401  ← torch보다 먼저
 
 import argparse
+import hashlib
 import json
 import math
 import sys
@@ -58,7 +73,7 @@ from env_v2.vec_env import MultiWorldVecEnv
 
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "ckpt" / "v3" / "ws"
-OUT_R2 = ROOT / "ckpt" / "v3" / "ws_r2"     # v3 R2 세계(노려보기·경보)의 기본 폴더
+OUT_R2 = ROOT / "ckpt" / "v3" / "ws_r2"     # v3 R2 세계(v3_r1 + 경보)의 기본 폴더
 CONFIG = ROOT / "configs" / "v3_r1.yaml"
 COLLECT_TAG = 808          # 교사 세계 고르기 난수 스트림(지연 505·C1′ 606·f_dec 707 과 겹치지 않는다)
 N_WORLDS = 24              # 교사 세계 수
@@ -81,7 +96,8 @@ SRC_NAMES = {1: "near", 2: "stare_band", 3: "stare_hold", 4: "look"}
 class FreezeSource:
     """FSM_R2 의 FREEZE 가 어느 줄에서 왔는지(SRC_NAMES). 줄마다 손 규칙 마스크(repertoire_rules.XRule.mask, x_wrap 스펙)를 다시
     재고 FSM_R2 우선순위(가까운 위협 얼기 > stare > look)대로 고른다. stare 띠/유지 줄은 같은 스펙에서 beh_freeze 칸을 뺀 판으로
-    가른다(eval_v3.XTerms 와 같은 방식). 상태가 없다."""
+    가른다(eval_v3.XTerms 와 같은 방식). stare 줄은 FSM_R2 와 같이 노려보기를 켠 재현 설정에서만 본다 — R2 세계에서는 출처가
+    가까운 판·look 뿐이다. 상태가 없다."""
 
     def __init__(self, cfg):
         import repertoire_rules as rr
@@ -97,8 +113,10 @@ class FreezeSource:
 
         x = self.xt(obs)
         near = self.near.mask(obs, base_req)
-        band, stare = x["stare_band"][0], x["stare"][0]
-        look = x["look"][0] if "look" in x else np.zeros(len(obs), dtype=bool)
+        none = np.zeros(len(obs), dtype=bool)
+        band = x["stare_band"][0] if "stare_band" in x else none        # 노려보기 재현 설정에서만(eval_v3.XTerms)
+        stare = x["stare"][0] if "stare" in x else none
+        look = x["look"][0] if "look" in x else none
         src = np.select([near, band, stare, look], [1, 2, 3, 4], default=0).astype(np.int8)
         return np.where(req2 == FREEZE, src, 0).astype(np.int8)
 
@@ -113,14 +131,15 @@ def teacher2_spec(cfg, allowed, teacher2: str) -> dict:
 
 
 def is_r2_world(cfg) -> bool:
-    """노려보기(stare_down)나 경보(alarm)를 켠 v3 R2 세계인가(eval_v3.has_r2_world). --teacher2·--out-dir·--name 기본값이 쓴다."""
+    """경보(alarm)나 노려보기(stare_down, 재현 설정)를 켠 v3 R2 세계인가(eval_v3.has_r2_world). --teacher2·--out-dir·--name 기본값이
+    쓴다. R2 세계(v3_r2 = v3_r1 + 경보)는 참이다."""
     from eval_v3 import has_r2_world
 
     return any(has_r2_world(cfg))
 
 
 def default_teacher2(cfg) -> str:
-    """--teacher2 기본값: R2 세계면 fsm_r2, 아니면 fsm(R1 재현). R2 세계에 R1 FSM 교사(stare·look 줄 없음)를 조용히 쓰지 않게."""
+    """--teacher2 기본값: R2 세계면 fsm_r2, 아니면 fsm(R1 재현). R2 세계에 R1 FSM 교사(look 줄 없음)를 조용히 쓰지 않게."""
     return "fsm_r2" if is_r2_world(cfg) else "fsm"
 
 
@@ -132,6 +151,43 @@ def default_out_dir(cfg) -> Path:
 def default_name(cfg) -> str:
     """fit --name 기본값: v<설정 version>_ws (v3_r1 → v3_r1_ws, v3_r2 → v3_r2_ws — train_v3.default_run_name 과 같은 version 조각)."""
     return f"v{str(cfg.v2.get('version') or '3').replace('.', '_')}_ws"
+
+
+def world_digest(cfg) -> str:
+    """교사 자료·맞춘 가중치의 출처 표시(모듈 docstring '출처 확인'): 설정 dict 에서 version 과 train 블록을 빼고
+    train.repertoire.allowed 만 다시 넣은 dict 의 sha1 앞 12자리(eval_v3.config_digest 와 같은 식). 교사 자료(관측·마스크·교사 요청)와
+    맞춘 가중치의 뜻은 세계 동역학과 허용 목록으로 정해지고, train 블록의 다른 값(ε·f_dec·ent_coef_base·롤아웃 길이)은 PPO 학습만
+    바꾼다 — 그래서 조기 중단 대응(ε 0.05 → 0.1, 판정 사전 등록 results/v3/r2/judge/PREREG.md 2절 '같은 모방 초기화에서 다시
+    학습')도 같은 가중치를 받는다. 학습 세계(v3_r2)와 판정 세계(v3_r2_on)는 낮 고정 비율이 달라 값이 다르다."""
+    d = cfg.to_dict()
+    v2 = dict(d.get("v2") or {})
+    v2.pop("version", None)
+    train = v2.pop("train", None) or {}
+    d = dict(d, v2=v2, allowed=list((train.get("repertoire") or {}).get("allowed") or []))
+    return hashlib.sha1(json.dumps(d, sort_keys=True, default=str).encode()).hexdigest()[:12]
+
+
+def check_source(cfg, sidecar, what: str, allow_legacy: bool = False) -> str | None:
+    """`what`(교사 자료·모방 초기화 가중치)의 출처 확인(모듈 docstring '출처 확인'). 곁 파일 `sidecar`(자료는 teacher_mix.json, 가중치는
+    <name>_s<시드>.json)의 world_digest 가 이 설정의 값과 다르면 멈춘다. world_digest 가 없으면(곁 파일이 없거나 10-13 전 판)
+    R1 세계는 알리고 쓰고, 경보를 켠 R2 세계는 `allow_legacy` 가 아니면 멈춘다. 반환: 곁 파일의 world_digest(옛 판이면 None)."""
+    sidecar = Path(sidecar)
+    want = world_digest(cfg)
+    st = json.loads(sidecar.read_text(encoding="utf-8")) if sidecar.exists() else None
+    got = (st or {}).get("world_digest")
+    if got is None:
+        msg = (f"{what}에 출처 표시(world_digest)가 없다({sidecar}" + ("" if st is not None else " 없음")
+               + ") — 10-13 전 판이다")
+        if is_r2_world(cfg) and not allow_legacy:
+            raise SystemExit(msg + ". 10-13 전의 R2 자료·가중치는 노려보기·경보 두 장치 세계에서 stare 줄이 든 FSM_R2 로 만든 "
+                             "것이라(ckpt/v3/ws_r2_both) 이 세계에 쓰지 않는다. 이 설정으로 다시 만든다(그 실행의 재현이면 "
+                             "fit --allow-legacy, train_v3 --allow-legacy-warmstart)")
+        print("주의: " + msg + " — 그대로 쓴다(" + ("재현용으로 허용함" if is_r2_world(cfg) else "R1 재현") + ")", flush=True)
+        return None
+    if got != want:
+        raise SystemExit(f"{what}는 다른 세계에서 만든 것이다(world_digest {got}, 이 설정 {want}, {sidecar}) — 이 설정으로 다시 "
+                         f"만든다")
+    return got
 
 
 def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS, teacher2: str | None = None) -> dict:
@@ -324,6 +380,8 @@ def main(argv=None) -> int:
                     help="교사 자료·맞춘 가중치 폴더(기본: R2 세계면 ckpt/v3/ws_r2, 아니면 R1 의 ckpt/v3/ws)")
     ap.add_argument("--data", default=None, help="교사 자료 .npz (기본 <out-dir>/teacher_mix.npz)")
     ap.add_argument("--threads", type=int, default=4)
+    ap.add_argument("--force", action="store_true",
+                    help="있는 산출(collect: teacher_mix.npz·.json, fit: <name>_s<시드>.pt·.zip·.json)을 덮는다. 기본은 멈춘다")
     if cmd == "collect":
         ap.add_argument("--worlds", type=int, default=N_WORLDS)
         ap.add_argument("--steps", type=int, default=STEPS)
@@ -334,6 +392,8 @@ def main(argv=None) -> int:
         ap.add_argument("--epochs", type=int, default=EPOCHS)
         ap.add_argument("--smooth", type=float, default=SMOOTH)
         ap.add_argument("--name", default=None, help="가중치 이름(기본 v<설정 version>_ws: v3_r1_ws, v3_r2_ws)")
+        ap.add_argument("--allow-legacy", action="store_true",
+                        help="출처 표시가 없는 10-13 전 자료를 R2 세계에서도 쓴다(두 장치 실행의 재현용, 모듈 docstring '출처 확인')")
     a = ap.parse_args(argv)
     th.set_num_threads(a.threads)
     cfg = load_v2_config(a.config)
@@ -341,29 +401,42 @@ def main(argv=None) -> int:
     if cmd == "collect" and a.teacher2 is None:
         a.teacher2 = default_teacher2(cfg)
     if cmd == "collect" and a.teacher2 == "fsm" and is_r2_world(cfg):
-        print("주의: R2 세계(노려보기·경보)에 R1 FSM 교사(stare·look 줄 없음)를 쓴다 — --teacher2 fsm 을 직접 준 경우만", flush=True)
+        print("주의: R2 세계(경보)에 R1 FSM 교사(look 줄 없음)를 쓴다 — --teacher2 fsm 을 직접 준 경우만", flush=True)
     if cmd == "fit" and a.name is None:
         a.name = default_name(cfg)
-    out_dir.mkdir(parents=True, exist_ok=True)
     if a.data is None:
         a.data = str(out_dir / "teacher_mix.npz")
+    from eval_v3 import config_digest
+
     t0 = time.time()
     if cmd == "collect":
+        old = [p for p in (Path(a.data), Path(a.data).with_suffix(".json")) if p.exists()]
+        if old and not a.force:
+            raise SystemExit(f"이미 있는 교사 자료를 덮지 않는다: {', '.join(map(str, old))} — 옮기거나(앞선 실행 기록) --force")
         res = collect(cfg, a.worlds, a.steps, a.teacher2)
+        Path(a.data).parent.mkdir(parents=True, exist_ok=True)
         np.savez_compressed(a.data, **res["data"])
-        st = dict(res["stats"], config=str(a.config), generated=datetime.now(timezone.utc).isoformat(timespec="seconds"),
-                  elapsed_s=round(time.time() - t0, 1))
+        st = dict(res["stats"], config=str(a.config), world_digest=world_digest(cfg), config_digest=config_digest(cfg),
+                  generated=datetime.now(timezone.utc).isoformat(timespec="seconds"), elapsed_s=round(time.time() - t0, 1))
         Path(a.data).with_suffix(".json").write_text(json.dumps(st, ensure_ascii=False, indent=1), encoding="utf-8")
         print(json.dumps(st, ensure_ascii=False))
         return 0
+    old = [p for s in a.seeds for ext in (".pt", ".zip", ".json") if (p := out_dir / f"{a.name}_s{s}{ext}").exists()]
+    if old and not a.force:
+        raise SystemExit(f"이미 있는 가중치를 덮지 않는다: {', '.join(map(str, old))} — 옮기거나(앞선 실행 기록) --force")
+    if not Path(a.data).exists():
+        raise SystemExit(f"교사 자료 {a.data} 가 없다 — 먼저 같은 설정으로 collect 한다")
+    src = check_source(cfg, Path(a.data).with_suffix(".json"), "교사 자료", a.allow_legacy)
     z = np.load(a.data)
     data = {k: z[k] for k in z.files}
+    out_dir.mkdir(parents=True, exist_ok=True)
     for s in a.seeds:
         model, rep = fit(cfg, data, s, a.epochs, a.smooth)
         base = out_dir / f"{a.name}_s{s}"
         th.save({"policy": model.policy.state_dict()}, base.with_suffix(".pt"))
         model.save(base.with_suffix(".zip"))
-        rep.update(config=str(a.config), data=str(a.data), elapsed_s=round(time.time() - t0, 1),
+        rep.update(config=str(a.config), data=str(a.data), world_digest=world_digest(cfg), config_digest=config_digest(cfg),
+                   data_world_digest=src, elapsed_s=round(time.time() - t0, 1),
                    generated=datetime.now(timezone.utc).isoformat(timespec="seconds"),
                    mask_version=int(model.policy.rep_mask_version), obs_names=list(model.policy.rep_obs_names))
         base.with_suffix(".json").write_text(json.dumps(rep, ensure_ascii=False, indent=1), encoding="utf-8")

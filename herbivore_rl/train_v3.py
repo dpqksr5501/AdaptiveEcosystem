@@ -4,7 +4,9 @@
     python train_v3.py --config configs/v3_r1.yaml --seed 0 --steps 20000000
     # 학습 전 결정 비율 f_dec 측정(보정 시드 20000~20002 × 3000스텝, 시작 정책) → yaml train.repertoire.f_dec 에 적는다
     python train_v3.py measure-fdec --config configs/v3_r1.yaml
-    # v3 R2 (명세 RL_V3_R2_SPEC.md 10절 6단계): 노려보기·경보 세계(관측 19·마스크 판 3), 모방 초기화(warmstart_v3.py --teacher2 fsm_r2)
+    # v3 R2 (명세 RL_V3_R2_SPEC.md 10절 6단계): R2 세계 = v3_r1 + 경보(관측 19·마스크 판 3 — 노려보기는 사람 결정 10-13 으로 뺐다),
+    # 모방 초기화(warmstart_v3.py --teacher2 fsm_r2)
+    # (가중치 곁 파일의 world_digest 가 이 설정과 다르거나, R2 세계에서 출처 표시가 없는 10-13 전 가중치면 시작 전에 멈춘다)
     python train_v3.py --config configs/v3_r2.yaml --seed 0 --steps 20000000 --warmstart ckpt/v3/ws_r2/v3_r2_ws_s0.pt
     # 조기 중단 π 점검(판정 사전 등록 results/v3/r2/judge/PREREG.md 2절): 체크포인트의 니치 π 를 보정 시드 20000~20002 × 3000 에서
     python train_v3.py measure-pi --config configs/v3_r2_on.yaml --model ckpt/v3/v3_r2_g995_s0_20m_2m.zip \
@@ -29,11 +31,14 @@
       U_ESC 조건)와 둘째 항 조건. pi_esc_niche·pi_esc_base 는 FLEE ∪ HIDE ∪ FREEZE 확률의 합. 조기 중단(PREREG 6절)의 '니치에서 π
       확률'이 pi_<x>_niche 다. FREEZE 는 --freeze-variant 판(기본 near, R0 에서 통과한 판)의 조건을 쓴다(eval_v3.u_terms)
     · 지표 정의(--u-def, 기본 auto = 관측에 alarm_heard 가 있는 세계(마스크 판 3, v3 R2)면 r2, 아니면 r1 — R1 학습 기록은 그대로다).
-      r2 는 eval_v3 판정과 같은 정의다: HIDE·FREEZE 니치는 R1b 의 U_HIDE′·U_FREEZE′ 조건이고, FREEZE 가 목록에 있으면 v3 R2 의
-      pi_stare_niche·pi_stare_base·pi_look_niche·pi_look_base(FREEZE 확률, stare·look 니치와 교차 — eval_v3.XTerms, 손 규칙
-      repertoire_rules.NICHES 그대로)와 pi_stare_band_*(유지 줄을 뺀 띠, 보고만), pi_look_open_*(look 니치·교차 중 FREEZE 가 열린
-      표본 — 판정 U_LOOK_OPEN 의 조건), 표본 수 n_<x>_niche·n_<x>_base 를 더한다. R2 조기 중단(명세 10절 6단계: R1 사전 등록 6절에
-      stare·look 니치의 π 를 더한다)은 같은 칸을 `measure-pi` 가 보정 시드에서 잰 값으로 본다(판정 사전 등록 2절, 학습 기록은 함께 적는다)
+      r2 는 eval_v3 판정과 같은 정의다: HIDE·FREEZE 니치는 R1b 의 U_HIDE′·U_FREEZE′ 조건이고, FREEZE 가 목록에 있으면 보고만 하는
+      칸 pi_look_niche·pi_look_base(FREEZE 확률, look 니치와 교차 — eval_v3.XTerms, 손 규칙 repertoire_rules.NICHES 그대로)와
+      pi_look_open_*(look 니치·교차 중 FREEZE 가 열린 표본), 표본 수 n_<x>_niche·n_<x>_base 를 더한다. stare 칸(pi_stare_*,
+      pi_stare_band_*)은 노려보기(stare_down)를 켠 재현 설정에서만 생긴다 — R2 세계에는 없다(사람 결정 10-13).
+      R2 조기 중단(판정 사전 등록 results/v3/r2/judge/PREREG.md 2절)은 R1 사전 등록 6절 꼴 그대로 FLEE·HIDE·FREEZE 니치 π
+      (R2_EARLY_PI = pi_flee_niche·pi_hide_niche·pi_freeze_niche)와 5M 의 U_ESC·U_FREEZE′(eval_v3 run)를 본다. look 칸은 보고만
+      (R2_REPORT_PI, 사람 결정 10-12 밤 — 경보 반응은 판정에서 뺐다). 같은 칸을 `measure-pi` 가 보정 시드에서 잰 값으로 보고,
+      학습 기록은 함께 적기만 한다
 - 리스폰 니치 유도는 쓰지 않는다.
 
 니치 π 측정 (`measure-pi`, 조기 중단 점검 — R1 사전 등록 1절 '보정 시드 20000~20002 × 3000스텝, 체크포인트'): 저장한 모델(.zip)을
@@ -78,6 +83,10 @@ EVERY = 1_000_000                   # 체크포인트·학습 기록 간격 (명
 FDEC_SEEDS = (20000, 20001, 20002)  # f_dec 측정 보정 시드 (명세 3절)
 FDEC_STEPS = 3000
 FDEC_TAG = 707                      # f_dec 측정 표본 잡음 스트림 구분값(rollout._SALT·지연 505·C1′ 606 과 겹치지 않는다)
+# v3 R2 조기 중단(판정 사전 등록 results/v3/r2/judge/PREREG.md 2절)이 보는 니치 π 칸 — R1 사전 등록 6절 꼴(FLEE 는 U_ESC 니치,
+# HIDE·FREEZE 는 R1b 의 U_HIDE′·U_FREEZE′ 니치). 보고만 하는 칸은 경보 반응(look)과 재현 설정의 노려보기(stare)다
+R2_EARLY_PI = ("pi_flee_niche", "pi_hide_niche", "pi_freeze_niche")
+R2_REPORT_PI = ("pi_look_niche", "pi_look_open_niche", "pi_stare_niche", "pi_stare_band_niche")
 
 
 def make_model_rep(venv: MultiWorldVecEnv, rep: dict, tensorboard_log: str | None, **overrides):
@@ -331,9 +340,13 @@ def measure_pi(cfg, model_path, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, udef:
         O.append(os_)
         M.append(ms)
     P, O, M = np.concatenate(P), np.concatenate(O), np.concatenate(M)
-    return dict(model=str(model_path), seeds=[int(s) for s in seeds], steps=int(steps), u_def=udef, freeze_variant=variant,
-                allowed=list(allowed), n_dec=int(len(P)), pooled=niche_probs(P, O, geo, allowed, variant, udef, xterms, M),
-                per_seed=per)
+    pooled = niche_probs(P, O, geo, allowed, variant, udef, xterms, M)
+    out = dict(model=str(model_path), seeds=[int(s) for s in seeds], steps=int(steps), u_def=udef, freeze_variant=variant,
+               allowed=list(allowed), n_dec=int(len(P)), pooled=pooled, per_seed=per)
+    if udef == "r2":                # 조기 중단 칸과 보고만 칸을 따로 적는다(R2_EARLY_PI 주석)
+        out["early_stop_pi"] = {k: pooled.get(k) for k in R2_EARLY_PI}
+        out["report_only_pi"] = {k: pooled[k] for k in R2_REPORT_PI if k in pooled}
+    return out
 
 
 def main(argv=None) -> int:
@@ -378,6 +391,11 @@ def main(argv=None) -> int:
         print("니치 π(ε 제외, 보정 시드 합침): " + " · ".join(
             f"{k[3:-6]} {pooled[k]:.4f}" for k in pooled if k.startswith("pi_") and k.endswith("_niche")
             and pooled[k] is not None), flush=True)
+        if "early_stop_pi" in res:
+            print("R2 조기 중단 칸(판정 사전 등록 2절): " + " · ".join(
+                f"{k[3:-6]} {v:.4f}" if v is not None else f"{k[3:-6]} —" for k, v in res["early_stop_pi"].items())
+                + " / 보고만: " + (" · ".join(f"{k[3:-6]} {v:.4f}" for k, v in res["report_only_pi"].items() if v is not None)
+                                  or "—"), flush=True)
         return 0
     p.add_argument("--steps", type=int, default=20_000_000)
     p.add_argument("--seed", type=int, default=0, help="모델(PPO) 시드이자 세계 선택 시드(meta_seed)")
@@ -392,7 +410,10 @@ def main(argv=None) -> int:
                    help="학습 기록의 니치 정의(eval_v3 지표 묶음). auto = 경보 세계(마스크 판 3)면 r2, 아니면 r1")
     p.add_argument("--tb", default=str(ROOT / "runs" / "v3"))
     p.add_argument("--warmstart", default=None,
-                   help="모방 초기화 가중치(warmstart_v3.py fit 의 .pt). 주면 PPO 시작 정책·가치망을 이것으로 바꾼다")
+                   help="모방 초기화 가중치(warmstart_v3.py fit 의 .pt). 주면 PPO 시작 정책·가치망을 이것으로 바꾼다. 곁 파일 "
+                        "<.pt 이름>.json 의 world_digest 가 이 설정과 다르면 멈춘다(warmstart_v3.check_source)")
+    p.add_argument("--allow-legacy-warmstart", action="store_true",
+                   help="출처 표시(world_digest)가 없는 10-13 전 가중치를 R2 세계에서도 싣는다(두 장치 실행의 재현용)")
     args = p.parse_args(argv)
 
     torch.set_num_threads(args.threads)
@@ -400,6 +421,16 @@ def main(argv=None) -> int:
     rep = rep_params(cfg)
     if rep is None:
         raise SystemExit(f"{args.config} 에 train.repertoire 블록이 없다(이산 행동 학습 설정이 아니다)")
+    ws_digest = None
+    if args.warmstart:
+        # 출처 확인(warmstart_v3 모듈 docstring '출처 확인'): 다른 세계에서 맞춘 가중치나, R2 세계에서 10-13 전(두 장치 세계) 가중치를
+        # 조용히 싣지 않는다. 학습을 만들기 전에 멈춘다
+        from warmstart_v3 import check_source
+
+        if not Path(args.warmstart).exists():
+            raise SystemExit(f"모방 초기화 가중치 {args.warmstart} 가 없다")
+        ws_digest = check_source(cfg, Path(args.warmstart).with_suffix(".json"), "모방 초기화 가중치",
+                                 args.allow_legacy_warmstart)
     from diagnose_v2 import config_digest       # 진단 결과 meta 와 같은 식(설정 dict 의 sha1 앞 12자리)
 
     import repertoire_rules as rr
@@ -476,6 +507,7 @@ def main(argv=None) -> int:
         "obs_names": list(venv.obs_names), "behavior_names": list(BEHAVIOR_NAMES), "freeze_variant": args.freeze_variant,
         "u_def": udef, "mask_version": int(model.policy.rep_mask_version),
         "init_policy": init_rep, "checkpoints": cb.saved, "log_history": cb.history, "warmstart": args.warmstart,
+        "warmstart_world_digest": ws_digest,
     }
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"config_digest {digest}, 체크포인트 {len(cb.saved)}개, 학습한 세계 수 {meta['worlds_seen']}")

@@ -1099,17 +1099,25 @@ def test_stare_and_look_rules(c7, c8):
 
 
 def test_fsm_r2_priority(c8, c7):
-    """FSM_R2 = R_base → look → stare → FREEZE 가까운 판 → HIDE (뒤가 앞을 덮는다, 우선순위는 그 반대). 통과한 장치의 줄만."""
+    """FSM_R2 = R_base → look → (stare) → FREEZE 가까운 판 → HIDE (뒤가 앞을 덮는다, 우선순위는 그 반대). 기본값은 노려보기를 뺀
+    R2 세계의 판(사람 결정 10-13): R_base(4, 0.9) + look + HIDE + 가까운 얼기, 우선순위 HIDE > 가까운 얼기 > look > R_base.
+    stare=True 는 두 장치를 함께 켰던 앞선 실행의 FSM_R2(stare 줄 포함) 재현용이다."""
     spec = rr.fsm_r2_spec(c8)
-    assert [w.get("x") for w in spec["wrap"]] == [None, "look", "stare", "freeze", "hide"]
-    assert [w.get("mode") for w in spec["wrap"][1:]] == ["niche", "niche", "cross", "niche"]
-    assert [w.get("x") for w in rr.fsm_r2_spec(c7, look=False)["wrap"]] == [None, "stare", "freeze", "hide"]
+    assert [w.get("x") for w in spec["wrap"]] == [None, "look", "freeze", "hide"]
+    assert [w.get("mode") for w in spec["wrap"][1:]] == ["niche", "cross", "niche"]
+    assert spec["wrap"][0]["theta"] == 4.0 and spec["wrap"][0]["approach"] == 0.9
+    both = rr.fsm_r2_spec(c8, stare=True)
+    assert [w.get("x") for w in both["wrap"]] == [None, "look", "stare", "freeze", "hide"]
+    assert [w.get("mode") for w in both["wrap"][1:]] == ["niche", "niche", "cross", "niche"]
+    assert [w.get("x") for w in rr.fsm_r2_spec(c7, stare=True, look=False)["wrap"]] == [None, "stare", "freeze", "hide"]
+    assert [w.get("x") for w in rr.fsm_r2_spec(c7, look=False)["wrap"]] == [None, "freeze", "hide"]     # 장치 줄 없음 = R1 FSM
     with pytest.raises(ValueError, match="alarm_heard"):
         rr.fsm_r2_spec(c7)
     rows = [dict(pc=1, dist=8.0, app=0.65, cover=3.0), dict(pc=1, dist=8.0, app=0.65), dict(pc=1, dist=3.0),
             dict(alarm=0.5), dict(pc=1, dist=8.0, app=0.95)]
-    out = ro.build_policy(spec, 0)(_rule_obs(c8, rows))[:, 0].astype(int).tolist()
-    assert out == [H, Z, Z, Z, Z]
+    o = _rule_obs(c8, rows)
+    assert ro.build_policy(spec, 0)(o)[:, 0].astype(int).tolist() == [H, G, Z, Z, Z]     # stare 띠에서 얼지 않는다
+    assert ro.build_policy(both, 0)(o)[:, 0].astype(int).tolist() == [H, Z, Z, Z, Z]
 
 
 # --------------------------------------------------------------------- #
@@ -1175,7 +1183,7 @@ def test_invasion_r2_guards(tmp_path):
         with pytest.raises(SystemExit):
             inv.main(argv)
     with pytest.raises(SystemExit):
-        inv.main(["run", "--world", "wr2"])                                 # 설정이 아직 없다(관문 뒤에 만든다)
+        inv.main(["run", "--world", "wr2"])                                 # wr2 사전 등록 폴더는 --passed 가 꼭 있어야 한다
     kw = dict(grid_theta=[8.0], grid_approach=[0.9], cells=["ps0.3_np_T600"])
     inv.search([31000, 31001], 20, 1, tmp_path, inv.WORLDS["w7"]["config"], **kw)
     with pytest.raises(inv.StaleCache, match="force"):
@@ -1229,8 +1237,9 @@ def test_stare_hold_clause(c7, c8):
     assert w["cols"]["beh_freeze"] == names.index("beh_freeze") and w["hold_lo"] == 0.45
     assert "beh_freeze" not in rr.rule_spec(c7, 4.0, 0.9, x="freeze")["wrap"][1]["cols"]
     assert "beh_freeze" not in rr.rule_spec(c7, 4.0, 0.9)["wrap"][0]["cols"]
-    fs = rr.fsm_r2_spec(c8)
+    fs = rr.fsm_r2_spec(c8, stare=True)                 # stare 줄이 든 FSM_R2(두 장치 재현용)
     assert [("beh_freeze" in w_["cols"]) for w_ in fs["wrap"]] == [False, False, True, False, False]
+    assert not any("beh_freeze" in w_["cols"] for w_ in rr.fsm_r2_spec(c8)["wrap"])       # R2 기본(stare 없음)
     o8 = _rule_obs(c8, rows[:2])
     n8 = list(obs_names(c8))
     o8[:, n8.index("beh_freeze")] = [0.0, 1.0]
@@ -1274,6 +1283,11 @@ def test_invasion_r2_guard_no_aux_and_passed():
     assert any("--no-aux" in b for b in inv.prereg_problems(ns(no_aux=True), inv.SEEDS, "w7"))
     assert any("--no-aux" in b for b in inv.prereg_problems(ns(no_aux=True), inv.SEEDS, "w8"))
     assert any("--passed" in b for b in inv.prereg_problems(ns(passed=["stare"]), inv.SEEDS, "w8"))
+    # wr2(R2 세계 = v3_r1_on + 경보, 사람 결정 10-13): 세계에 켠 장치의 규칙만 받는다 — 노려보기가 없으니 stare 는 거부
+    assert inv.prereg_problems(ns(passed=["look"]), inv.SEEDS, "wr2") == []
+    assert any("['stare']" in b for b in inv.prereg_problems(ns(passed=["stare", "look"]), inv.SEEDS, "wr2"))
+    assert any("--passed" in b for b in inv.prereg_problems(ns(passed=[]), inv.SEEDS, "wr2"))
+    assert inv.PASSED_FEATURE == {"stare": "stare_down", "look": "alarm"}
     assert inv.prereg_problems(ns(cmd="pop", no_aux=True), inv.SEEDS, "w7") == []    # pop 은 보조 규칙을 돌리지 않는다
 
 

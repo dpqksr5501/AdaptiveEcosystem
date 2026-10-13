@@ -1,8 +1,12 @@
-# v3 R2 (판정 세계) — 노려보기 대치(M7, stare_down)와 동족 경보 전염(M8, alarm)을 둘 다 켠 세계 (명세
-# AdaptiveEcosystem/Docs/RL_Policy/RL_V3_R2_SPEC.md, 사전 등록 results/v3/r2/PREREG.md 7절 — 관문 W7 통과·W8 조건부 통과 뒤).
-# configs/v3_r1_on.yaml 과는 version(3.r1 → 3.r2)과 맨 아래 stare_down·alarm 블록만 다르다. 두 블록 값은 관문 세계
-# configs/v3_r2_w7_on.yaml·v3_r2_w8_on.yaml 과 같다. 관측 19칸(alarm_heard), 마스크 판 3. 두 장치를 끄면 v3_r1_on 과 비트 단위로 같다.
-# 합친 세계 확인(회귀·무리 확인)은 results/v3/r2/invasion_r2.py --world wr2 가 이 설정을 읽는다.
+# v3 R2 (판정 세계) — R2 세계 = v3_r1_on + 동족 경보 전염(M8, alarm) (명세 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_R2_SPEC.md,
+# 사전 등록 results/v3/r2/PREREG.md 7절·변경 기록 10-13 (8)). 노려보기 대치(M7, stare_down)는 넣지 않는다 — 사람 결정 10-13:
+# '피식자가 포식자를 노려본다고 포식자가 도망가는 것은 말이 안 된다'. W7 관문은 통과했지만 쓰지 않고, 코드는 기능을 끈 채 남긴다
+# (stare_down 블록이 없으면 그 경로를 지나지 않는다). 함께 정한 플레이어 들킴 감속·벽 따라 물러남도 쓰지 않는다.
+# configs/v3_r1_on.yaml 과는 version(3.r1 → 3.r2)·맨 아래 alarm 블록·train.repertoire 의 f_dec·ent_coef_base(이 세계에서 다시
+# 잰 값, 아래 10-13)만 다르다. 동역학은 관문 세계 configs/v3_r2_w8_on.yaml 과 같다(version·머리 주석·train 블록 값만 다를 수 있다
+# — tests/test_r2_training.py 가 확인한다). 관측 19칸(alarm_heard), 마스크 판 3.
+# alarm 을 끄면 v3_r1_on 과 비트 단위로 같다. 합친 세계 확인(회귀·무리 확인)은 results/v3/r2/invasion_r2.py --world wr2 가 이 설정을
+# 읽는다. 두 장치를 함께 켰던 앞선 확인(10-12 (5)·(6))의 결과는 results/v3/r2/wr2_both/ 에 기록으로 남는다.
 version: "3.r2"
 
 # v1 키 가운데 포식자 속도 범위 하나만 바꾼다 (10-02 사람 결정, Gate E1-b). v1 configs/default.yaml 은 그대로다.
@@ -162,30 +166,6 @@ features:
     player_catch_r: 1.0
     player_cooldown: 30
 
-  # ── v3 R2 M7 노려보기 대치 (명세 RL_V3_R2_SPEC.md 2-4 값 그대로) ───────────────────────────────────────────────────────
-  # 잠행 위협(잠행형의 잠행 단계, 플레이어의 잠행 모드)이 표적을 잠그고, 잠긴 표적이 얼어서 정면으로 spot_steps 이어 노려보면
-  # 잠행형은 멈춰 대치한 뒤 balk_steps 동안 물러나고(사냥 안 함), 플레이어는 멈추지 않고 spotted_steps 동안 '들킴'이 되어 그동안
-  # 시작한 돌진이 spotted_charge_speed × herb_speed 로 느려진다(사람 확인 H4 10-12). 사적 노려보기(잠긴 표적만, H3). 난수 없음
-  stare_down:
-    enabled: true
-    # 잠행 위협의 표적 잠금(M7a). false = '지난 스텝 표적' 기록만 하고 표적 선택은 지금 그대로(절제 비교용)
-    target_lock: true
-    # 노려보기가 통하는 실거리(20 m). 0.0 = 노려보기 블록을 건너뛴다(중립). 표적의 지금 탐지 반경(낮 20, 한밤 10)과 작은 쪽
-    spot_r: 10.0
-    # 눈맞춤 각의 cos(±30°): 표적 heading 과 표적 → 위협 방향
-    spot_cos: 0.866
-    # 이어서 노려봐야 하는 스텝(0.8 s). FREEZE 잠금 12 안에 끝난다. 멈춰 서는 시간은 5스텝, 6스텝째부터 걸어 나간다
-    spot_steps: 6
-    # 물러남 6 s. 그동안 사냥하지 않는다
-    balk_steps: 45
-    # × herb_speed = 0.36단위/스텝, 45스텝에 16.2단위(> 포식자 시야 14)
-    balk_speed: 0.6
-    # 플레이어 대역의 '들킴' 6 s
-    spotted_steps: 45
-    # × herb_speed. 들킨 돌진의 상한. 사람 결정 10-12: '들키면 6초간 달리기 금지' = 초식 걷기 속력(gait_speed[1] 0.4)과 같게 둔다.
-    # 처음 값 0.9(< 뛰기 1.0)로는 R_base 식 도망도 거의 다 잡혔다(구현 검토 10-12, standoff.md T7 (g)행)
-    spotted_charge_speed: 0.4
-
   # ── v3 R2 M8 동족 경보 전염 (명세 RL_V3_R2_SPEC.md 3-5 값 그대로) ──────────────────────────────────────────────────────
   # FLEE·FREEZE·HIDE 로 바뀐 개체가 경보를 낸다(위협이 보이면 홉 0, 경보를 쥐고 있으면 중계 hop + 1, 최대 max_hop). 잡힌 개체는
   # 비명(홉 0)을 낸다. alarm_r 안의 동족이 받아 위협이 있는 자리(점)를 넘겨받는다. 관측 alarm_heard = hop_gain^hop × ttl ÷
@@ -216,24 +196,28 @@ train:
   # 세계당 n_steps = 256 / K. 롤아웃 배치(256 × 128 = 32,768 timestep)를 v1 과 같게 유지한다.
   rollout_world_steps: 256
   # v3 R1 이산 행동 학습 블록 (명세 3절, env_v2/rep_policy.py rep_params — 기본값 없음, 키를 모두 적는다).
-  # 이 블록이 있으면 env_v2/vec_env.py 가 이산 행동 경로(Discrete(5), 관측 [세계 관측 18 | 마스크 5])를 쓴다.
+  # 이 블록이 있으면 env_v2/vec_env.py 가 이산 행동 경로(Discrete(5), 관측 [세계 관측 19 | 마스크 5], 마스크 판 3)를 쓴다.
+  # R2 는 목록·ε·시작 확률·범주 엔트로피 계수 0.01 을 R1 그대로 두고 f_dec·ent_coef_base 만 이 세계에서 다시 잰다(명세 10절 5·6단계).
   repertoire:
     # 고를 수 있는 행동(마스크 '허용'). GRAZE·FLEE 는 늘 넣고, R0 관문을 통과한 행동을 더한다(results/v3/r0/report.md).
     # R0 결과(10-07): HIDE 는 보정 1회차(웅크림 은신 배수 4.0)에서, FREEZE 는 '가까운 위협 앞 얼기' 판(보이는 위협이 6 안이거나
     # 접근 ≥ 0.9 일 때 얼기 = NICHES['freeze'] 의 cross 조건)으로 첫 회차 세계 값(c_still 1.8·graze_head_down 0.6)에서 통과했다.
     # SLEEP 은 보정 두 회차 모두 실패해 뺀다(마스크로 막힌다). 목록을 바꾸면 f_dec 를 다시 잰다
-    # (python train_v3.py measure-fdec --config configs/v3_r1.yaml). 판정 도구 eval_v3.py 의 FREEZE 판 기본값은 near 다
+    # (python train_v3.py measure-fdec --config configs/v3_r2.yaml). 판정 도구 eval_v3.py 의 FREEZE 판 기본값은 near 다
     allowed: [graze, flee, hide, freeze]
     # ε 혼합 π′ = (1 − ε)·π + ε·U(m) (학습 표본·PPO 비율). 배포·판정은 argmax 라 ε 를 쓰지 않는다
     epsilon: 0.05
     # 시작 확률(로짓 편향 = log(p/Σp), 계약 순서 GRAZE·FLEE·HIDE·FREEZE·SLEEP). 마스크가 막은 칸은 나머지로 다시 맞춘다
     init_probs: [0.4, 0.15, 0.15, 0.15, 0.15]
-    # 엔트로피 기준값. 처음 값은 v2.4s 학습 ent_coef 0.0008971496690499397(범주 계수 0.003509)이었고, 첫 학습 2M 조기 중단 뒤
-    # 대응(results/v3/r1/PREREG.md 변경 기록 10-07 '대응: 모방 초기화')으로 범주 계수 0.01(v2.2r CM 과 같은 값, 비교 팔 B)이
-    # 되게 0.01 × f_dec = 0.00255643 으로 바꿨다
-    ent_coef_base: 0.00255643
-    # 결정 비율 f_dec (범주 엔트로피 계수 = ent_coef_base ÷ f_dec = 0.01). 2026-10-07 첫 학습 전에 잰 값이다:
-    # python train_v3.py measure-fdec --config configs/v3_r1.yaml (시작 정책, 보정 시드 20000~20002 × 3000스텝, 목록
-    # graze·flee·hide·freeze) → 0.255643 (시드별 0.1659·0.1882·0.4128, 결정 시점 중 마스크가 두 칸 이상인 비율 0.501).
+    # 엔트로피 기준값 = 0.01 × f_dec — 범주 엔트로피 계수(= ent_coef_base ÷ f_dec)를 R1 조리법의 0.01(results/v3/r1/PREREG.md
+    # 변경 기록 10-07 '대응: 모방 초기화', v2.2r CM·비교 팔 B 와 같은 값) 그대로 둔다. PPO 손실의 계수는 R1 과 같다
+    ent_coef_base: 0.00573169
+    # 결정 비율 f_dec. 2026-10-13 노려보기를 뺀 이 설정(v3_r1 + alarm)에서 다시 잰 값이다(명세 10절 5단계 — 마스크 판 3 과 E7 이
+    # 결정 비율을 바꾼다): python train_v3.py measure-fdec --config configs/v3_r2.yaml (시작 정책 = 모델 시드 0 의 무작위 가중치 +
+    # 시작 로짓 편향, 보정 시드 20000~20002 × 3000스텝, 목록 graze·flee·hide·freeze) → 0.573169 (시드별 0.5348·0.3926·0.7922,
+    # 결정 시점 중 마스크가 두 칸 이상인 비율 0.121). 기록 results/v3/r2/train/measure_fdec_alarm.log.
+    # 앞선 값 0.588227(10-12, 기록 results/v3/r2/train/measure_fdec.log)은 노려보기·경보 두 장치를 함께 켠 세계에서 잰 것이라 쓰지 않는다.
+    # 참고: R1 의 0.255643 은 마스크 판 1(10-07 수정 전)에서 잰 값이다 — 지금 코드(판 2)로 configs/v3_r1.yaml 을 다시 재면 0.736176
+    # 이고, 판 1 마스크를 흉내 내면 0.255643 이 그대로 나온다. R1 학습은 범주 계수 0.01 을 썼으므로 R2 도 계수 0.01 로 맞춘다.
     # 판정 세계(_on)는 학습하지 않지만 같은 블록을 둔다(판정 도구가 목록을 읽는다)
-    f_dec: 0.255643
+    f_dec: 0.573169

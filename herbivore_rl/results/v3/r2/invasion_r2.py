@@ -8,11 +8,13 @@
     # smoke: 다른 시드·짧은 스텝·칸 일부·문턱 고정. 사전 등록 폴더가 아닌 --out 이 꼭 필요하다
     python results/v3/r2/invasion_r2.py run --world w8 --seeds 31000 31001 --steps 200 --theta 4 --approach 0.9 \
         --cells ps0.3_pl_T600 --out <임시 폴더> --workers 2
-    # 2단계 R2 세계(관문 뒤에 configs/v3_r2_on.yaml 을 만든 다음): --passed 에 통과한 장치의 규칙을 준다
-    python results/v3/r2/invasion_r2.py run --world wr2 --passed stare look --workers 14     # 회귀(사전 등록 7절, (1) 기준)
+    # 2단계 R2 세계(configs/v3_r2_on.yaml = v3_r1_on + 경보, 사람 결정 10-13): --passed 에 R2 세계에 넣은 장치의 규칙을 준다
+    python results/v3/r2/invasion_r2.py run --world wr2 --passed look --workers 14     # 회귀(사전 등록 7절, (1) 기준)
 
 세계 (`--world`, 사전 등록 1·7절): w7 = configs/v3_r2_w7_on.yaml(M7 만), w8 = configs/v3_r2_w8_on.yaml(M8 만), wr2 =
-configs/v3_r2_on.yaml(v3_r1_on + 통과한 장치, 관문 뒤에 만든다). 칸 8개·덮기·통계·판정은 R0 와 같다(`invasion_r0.py` docstring).
+configs/v3_r2_on.yaml(R2 세계 = v3_r1_on + M8 — 사람 결정 10-13 으로 M7 노려보기는 W7 을 통과했지만 뺐다, 사전 등록 변경 기록
+10-13 (8). 동역학은 w8 과 같다). 두 장치를 함께 켰던 앞선 wr2 실행(10-12 (5)·(6), --passed stare look)의 결과는 wr2_both/ 에 기록으로
+남는다. 칸 8개·덮기·통계·판정은 R0 와 같다(`invasion_r0.py` docstring).
 - search: 128마리 모두 R_base(θ, a) 격자 탐색, 세계마다 한 번(`<out>/search.json`, 조건이 다른 캐시는 --force 없이 덮지 않는다).
 - run: w7·w8 — 관문 X(w7 stare, w8 look)의 niche·out·cross (판정, 사전 등록 3절) + 보고만 하는 보조 규칙(5절: w7 stare_still·
   stare_far·stare_chase, w8 look_hide·look_flee — `--no-aux` 로 뺀다). 슬롯 0~15 만 X 를 덮는다(침입 16 − 거주 112).
@@ -26,7 +28,8 @@ configs/v3_r2_on.yaml(v3_r1_on + 통과한 장치, 관문 뒤에 만든다). 칸
 - H1 '조건부 통과'(사전 등록 4절, 사람 확인 10-12): gate.json 의 (1)·(2) 통과 & (3) 실패 또는 판정 불능이고, 무리 확인의 유의
   음수 칸 0 & 8칸 평균 > 0 이고, 역침입에서 R_base 가 유의하게 이기는(t > 2.023) 칸 0 이면 조건부 통과. pop 이 gate.json 에 적는다.
 사전 등록 폴더(`results/v3/r2/<world>/`, --out 기본값)에 쓰는 실행은 PREREG 조건(시드 12160~12199, 3000스텝, 칸 8개 모두, 격자,
-세계의 설정, run 은 관문 모드 셋 모두와 보조 규칙 — --no-aux 를 받지 않는다, --passed 는 wr2 만)만 받고, --theta/--approach 를
+세계의 설정, run 은 관문 모드 셋 모두와 보조 규칙 — --no-aux 를 받지 않는다, --passed 는 wr2 만이고 세계에 켠 장치의 규칙만 —
+노려보기가 없는 R2 세계에서는 stare 를 받지 않는다)만 받고, --theta/--approach 를
 주면 탐색 캐시의 값과 같아야 하며, run·pop 은 탐색 캐시의 설정 digest 가 지금 설정과 같아야 한다(설정을 바꾼 뒤 옛 탐색 값으로
 판정하지 않게). 결과는 한 번 쓴다.
 """
@@ -70,6 +73,14 @@ LOW_USE = 0.05
 PREREG_DIR = HERE.parent
 CATCH_COLS = ("catch_rate_chaser", "catch_rate_ranged", "catch_rate_stalker", "catch_rate_player")
 NICHE_NEAR_STARE = 4.0                # G7 니치의 아래 거리(repertoire_rules.NICHES['stare']['near']) — θ 가 이보다 크면 report 에 적는다
+PASSED_FEATURE = {"stare": "stare_down", "look": "alarm"}      # wr2 --passed 의 규칙 → 그 규칙이 기대는 세계 기능
+
+
+def load_yaml_features(path) -> dict:
+    """설정 파일의 features 블록(키 → dict). --passed 검사가 쓴다(설정을 싣지 않고 켠 기능만 본다)."""
+    import yaml
+
+    return (yaml.safe_load(Path(path).read_text(encoding="utf-8")) or {}).get("features") or {}
 
 
 def cell_cfg(cell: str, config: str):
@@ -603,6 +614,14 @@ def prereg_problems(a, seeds, world: str) -> list[str]:
         bad.append("--no-aux (PREREG 5절 보조 규칙은 보고한다)")
     if world != "wr2" and a.passed:
         bad.append("--passed (w7·w8 은 관문 X 하나만 잰다 — --passed 는 wr2 전용)")
+    if world == "wr2" and a.passed:
+        cfgp = a.config or wd["config"]
+        if (ROOT / cfgp).exists():
+            feats = load_yaml_features(ROOT / cfgp)
+            off = [x for x in a.passed if not (feats.get(PASSED_FEATURE[x]) or {}).get("enabled")]
+            if off:
+                bad.append(f"--passed {off} (세계 {cfgp} 에 그 장치가 없다 — R2 세계는 v3_r1_on + 경보, 노려보기는 사람 결정 10-13 으로 "
+                           "뺐다. 두 장치 기록은 wr2_both/)")
     path = Path(a.out) / "search.json"
     cache = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
     if a.theta is not None:
@@ -635,7 +654,7 @@ def main(argv=None) -> int:
     ap.add_argument("--force", action="store_true", help="조건이 다른 탐색 캐시가 있어도 다시 재서 덮는다")
     ap.add_argument("--no-aux", action="store_true", help="보고만 하는 보조 규칙(사전 등록 5절)을 빼고 잰다")
     ap.add_argument("--passed", nargs="*", default=[], choices=("stare", "look"),
-                    help="wr2: 관문을 통과한 장치의 규칙(사전 등록 7절)")
+                    help="wr2: R2 세계에 넣은 장치의 규칙(사전 등록 7절 — 10-13 부터 look 만. stare 는 두 장치 기록 재현용)")
     a = ap.parse_args(argv)
     if (a.theta is None) != (a.approach is None):
         ap.error("--theta 와 --approach 는 함께 준다")
@@ -645,7 +664,7 @@ def main(argv=None) -> int:
     seeds = a.seeds or SEEDS
     config = a.config or WORLDS[a.world]["config"]
     if not (ROOT / config).exists():
-        ap.error(f"설정 {config} 이 없다(wr2 의 configs/v3_r2_on.yaml 은 관문을 통과한 장치로 만든 뒤에 쓴다)")
+        ap.error(f"설정 {config} 이 없다")
     if out.resolve() == prereg_out.resolve():
         bad = prereg_problems(a, seeds, a.world)
         if bad:

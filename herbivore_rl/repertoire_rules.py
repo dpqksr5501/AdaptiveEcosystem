@@ -22,7 +22,8 @@ v3 R2 (명세 RL_V3_R2_SPEC.md 4절, 사전 등록 results/v3/r2/PREREG.md 3절)
 FREEZE 이고, R0 의 니치·니치 밖처럼 바탕 규칙의 요청과 무관하게 조건만 본다(G7·G8 의 니치·교차는 거주 R_base(θ 4, a 0.9)라면
 GRAZE 인 상황이다. 거주 탐색이 θ > 4 를 고르더라도 조건만 본다 — 사전 등록 변경 기록 10-12 (2)). look 은 관측 alarm_heard 가
 있는 설정(기능 alarm)에서만 쓴다 — 그 설정에서만 `_geom` 이 alarm_heard·threat_recency 칸을 더 찾는다(다른 설정의 규칙 스펙은
-그대로다). `fsm_r2_spec` 은 언리얼 규칙 두뇌 대조군 FSM_R2 다.
+그대로다). `fsm_r2_spec` 은 언리얼 규칙 두뇌 대조군 FSM_R2 다 — 기본값은 노려보기를 뺀 R2 세계(10-13 사람 결정)의 판이고(stare 줄
+없음), stare 줄을 넣은 판은 `stare=True` 로 앞선 실행을 재현할 때만 쓴다. stare 규칙(X7)과 보조 규칙은 W7 관문 기록 재현용으로 남긴다.
 stare 니치의 유지 줄(사전 등록 변경 기록 10-12 (2)): 지금 FREEZE(관측 beh_freeze)이고 보이는 위협이 4 < 거리 ≤ 10 & 0.45 ≤
 접근 < 0.67 이면 FREEZE 를 이어 간다. 대치(M7)에 들어간 잠행형은 멈춰 서서 접근 관측이 0.5 가 되는데, 유지 줄이 없으면 FREEZE
 잠금 중 사건(E1~E6)이 연 결정 시점에 규칙이 먹기를 요청해 스스로 대치를 깼다(구현 검토). 물러남(접근 0.2)이나 빠른 위협
@@ -268,13 +269,18 @@ class XRule(_Wrap):
         return a
 
 
-def fsm_r2_spec(cfg, allowed=("graze", "flee", "hide", "freeze"), *, stare: bool = True, look: bool = True,
+def fsm_r2_spec(cfg, allowed=("graze", "flee", "hide", "freeze"), *, stare: bool = False, look: bool = True,
                 theta: float = 4.0, approach: float = 0.9) -> dict:
     """FSM_R2 (언리얼 규칙 두뇌, 대조군 — 명세 RL_V3_R2_SPEC.md 4절): R1 FSM(`eval_v3.fsm_spec` 의 near 판: R_base(θ 4, a 0.9) +
-    목록 행동의 니치 규칙)에 통과한 장치의 줄(stare, look)을 더한다. 우선순위 HIDE(보임 & 은신처 ≤ 5) > FREEZE 가까운 판(보임 &
+    목록 행동의 니치 규칙)에 R2 세계에 넣은 장치의 줄을 더한다. 우선순위 HIDE(보임 & 은신처 ≤ 5) > FREEZE 가까운 판(보임 &
     (거리 < 6 또는 접근 ≥ 0.9), 바탕이 FLEE) > stare > look > SLEEP(목록에 있으면) > R_base. 뒤에 씌운 규칙이 앞 규칙을 덮으므로
-    씌우는 순서는 우선순위의 반대다. stare·look 은 FREEZE 가 목록에 있을 때만 넣는다(통과한 장치의 줄만 — `stare`·`look`
-    인자). look 은 관측 alarm_heard 가 있는 설정에서만 쓸 수 있다."""
+    씌우는 순서는 우선순위의 반대다. stare·look 은 FREEZE 가 목록에 있을 때만 넣는다(`stare`·`look` 인자). look 은 관측
+    alarm_heard 가 있는 설정에서만 쓸 수 있다.
+
+    기본값은 R2 세계(v3_r1 + 경보 M8, 사람 결정 10-13 — 노려보기 M7 은 R2 에서 뺀다, 사전 등록 results/v3/r2/PREREG.md 변경 기록
+    10-13 (8))의 FSM_R2 = R_base(4, 0.9) + look + R0 HIDE 니치 + R0 가까운 위협 얼기, 우선순위 HIDE > FREEZE 가까운 판 > look >
+    R_base 다(stare 줄 없음). `stare=True` 는 두 장치를 함께 켰던 앞선 실행(10-12 의 합친 세계 확인 results/v3/r2/wr2_both, 그때의
+    모방 초기화 교사·ws_baseline)의 FSM_R2(stare 줄 포함)를 재현할 때만 쓴다. 관문 도구 invasion_r2.py 는 두 인자를 늘 직접 준다."""
     geo = _geom(cfg)
     if look and "freeze" in allowed and _ALARM_COLS[0] not in geo["cols"]:
         raise ValueError("FSM_R2 의 look 줄은 관측 alarm_heard 가 필요하다(features.alarm 을 켠 설정). 경보가 없는 세계는 look=False")
