@@ -3,11 +3,21 @@
 #include "CoreMinimal.h"
 #include "MassEntityTypes.h"
 #include "Creature/Audio/EcoFootstepCadence.h"
+#include "Core/EcoSurvivalTypes.h"
 #include "EcoCreatureRuntimeTypes.generated.h"
 
 /** Opt-in networked creature path. Never attached to the M3 Box or legacy demo. */
 USTRUCT()
 struct FEcoIntegratedCreatureTag : public FMassTag { GENERATED_BODY() };
+
+/** Immutable per-agent adapter, authored by the coordinator at spawn. Never replicated. */
+USTRUCT()
+struct FEcoCreatureSurvivalFragment : public FMassFragment
+{
+	GENERATED_BODY()
+	FEcoSurvivalSettings Settings;
+	float EnergyPerPredation = 0.0f;
+};
 
 /** Authority-only step history. Audio playback has an independent local cadence. */
 USTRUCT()
@@ -26,6 +36,7 @@ struct FEcoCreaturePresentationFragment : public FMassFragment
 	uint8 Flags = 1; // alive=1, eating=2, pursuing=4, vitals-known=8
 	uint8 Health = 255;
 	uint8 Energy = 255;
+	uint8 Activity = 0;
 };
 
 USTRUCT()

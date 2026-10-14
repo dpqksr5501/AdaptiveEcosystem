@@ -30,20 +30,19 @@ struct FReplicatedEcoMassAgent : public FReplicatedAgentBase
 	uint8 GetVisualFlags() const { return VisualFlags; }
 	uint8 GetHealth() const { return Health; }
 	uint8 GetEnergy() const { return Energy; }
-	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy)
+	uint8 GetActivity() const { return Activity; }
+	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy, uint8 InActivity = 0)
 	{
-		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy) return false;
-		Velocity = InVelocity; VisualFlags = InFlags; Health = InHealth; Energy = InEnergy; return true;
+		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy && Activity == InActivity) return false;
+		Velocity = InVelocity; VisualFlags = InFlags; Health = InHealth; Energy = InEnergy; Activity = InActivity;
+		++VisualRevision;
+		return true;
 	}
 
-	bool SetVisualState(float Health, float Energy, EEcoVisualLifeState State)
+	bool SetVisualState(float InHealth, float InEnergy, EEcoVisualLifeState State)
 	{
-		const auto Quantize = [](float Value) -> uint8
-		{
-			return static_cast<uint8>(FMath::RoundToInt(FMath::Clamp(FMath::IsFinite(Value) ? Value : 0.0f, 0.0f, 1.0f) * 255.0f));
-		};
-		const uint8 NewHealth = Quantize(Health);
-		const uint8 NewEnergy = Quantize(Energy);
+		const uint8 NewHealth = EcoRepresentation::QuantizeUnit(InHealth);
+		const uint8 NewEnergy = EcoRepresentation::QuantizeUnit(InEnergy);
 		if (HealthByte == NewHealth && EnergyByte == NewEnergy && LifeState == State) return false;
 		HealthByte = NewHealth;
 		EnergyByte = NewEnergy;
@@ -108,6 +107,7 @@ private:
 	UPROPERTY(Transient) uint8 VisualFlags = 1;
 	UPROPERTY(Transient) uint8 Health = 255;
 	UPROPERTY(Transient) uint8 Energy = 255;
+	UPROPERTY(Transient) uint8 Activity = 0;
 };
 
 /** Fast-array entry used by one connection-specific client bubble. */

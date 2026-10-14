@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/EcoActivityTypes.h"
 #include "EcoCreatureVisualState.generated.h"
 
 UENUM(BlueprintType)
@@ -24,6 +25,7 @@ struct FEcoCreatureVisualState
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bAlive = true;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bEating = false;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bPursuingPrey = false;
+	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") EEcoSpeciesActivity Activity = EEcoSpeciesActivity::Hold;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bDiscontinuity = false;
 	bool IsValid() const;
 };

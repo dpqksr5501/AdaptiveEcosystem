@@ -19,5 +19,6 @@ public:
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bAlive = false;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bEating = false;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bPursuingPrey = false;
+	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") EEcoSpeciesActivity Activity = EEcoSpeciesActivity::Hold;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") EEcoCreatureVisualMotion VisualMotion = EEcoCreatureVisualMotion::Idle;
 };

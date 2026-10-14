@@ -87,7 +87,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
 		{
 			Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
-			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy();
+			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity();
 		}
 	};
 
@@ -194,7 +194,7 @@ void FEcoMassClientBubbleHandler::SetModifiedEntityData(const FMassEntityView& E
 	if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
 	{
 		Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
-		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy();
+		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity();
 	}
 }
 #endif
@@ -226,6 +226,8 @@ void FEcoMassClientBubbleHandler::Reset()
 {
 #if UE_REPLICATION_COMPILE_SERVER_CODE
 	ReplicationStats = {};
+	AdmissionFrame = MAX_uint64;
+	AddsThisFrame = 0;
 #endif
 #if UE_REPLICATION_COMPILE_CLIENT_CODE
 	PendingAddReplicationIDs.Reset();

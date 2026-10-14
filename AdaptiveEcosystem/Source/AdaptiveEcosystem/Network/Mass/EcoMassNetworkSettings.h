@@ -4,7 +4,7 @@
 #include "MassReplicationFragments.h"
 #include "EcoMassNetworkSettings.generated.h"
 
-/** Future M4.6 connection-wide budgets. These are not per-template LODMaxCount. */
+/** Runtime connection-wide admission and local Actor budgets, independent of per-template LOD counts. */
 USTRUCT(BlueprintType)
 struct FEcoConnectionBudgetSettings
 {

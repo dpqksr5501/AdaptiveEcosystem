@@ -6,6 +6,14 @@
 #include "Core/EcoIds.h"
 #include "EcoRepresentationTypes.generated.h"
 
+namespace EcoRepresentation
+{
+	inline uint8 QuantizeUnit(float Value)
+	{
+		return static_cast<uint8>(FMath::RoundToInt(FMath::Clamp(FMath::IsFinite(Value) ? Value : 0.f, 0.f, 1.f) * 255.f));
+	}
+}
+
 /** Persistent visual state, independent of proxy relevance and Actor existence. */
 UENUM(BlueprintType)
 enum class EEcoVisualLifeState : uint8

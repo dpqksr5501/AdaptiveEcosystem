@@ -80,7 +80,7 @@ namespace
 			});
 		}));
 
-	FAutoConsoleCommandWithWorldAndArgs Teleport(
+	FAutoConsoleCommandWithWorldAndArgs EcoTeleportCommand(
 		TEXT("eco.M4.Teleport"), TEXT("Manual authority edit: eco.M4.Teleport <StableAgentId> <X cm> <Y cm> <Z cm>. Increments reset revision."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args, UWorld* World)
 		{
@@ -201,8 +201,8 @@ namespace
 				if (!bClient)
 				{
 					const auto& Stats = Serializer.Bubble.GetReplicationStats();
-					UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[M4 LOD] World=%s Bubble=%s Adds=%llu Removes=%llu (cumulative since creation/reset)"),
-						*World->GetName(), *It->GetName(), Stats.Adds, Stats.Removes);
+					UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[M4 LOD] World=%s Bubble=%s Adds=%llu Removes=%llu BudgetDeferredAdds=%llu (cumulative since creation/reset)"),
+						*World->GetName(), *It->GetName(), Stats.Adds, Stats.Removes, Stats.BudgetDeferredAdds);
 					int32 Counts[EMassLOD::Off] = {};
 					for (const auto& Item : Serializer.GetAgentItems())
 						if (Item.LastObservedLOD < EMassLOD::Off) ++Counts[Item.LastObservedLOD];

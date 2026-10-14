@@ -17,5 +17,6 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	TurnAmount = bAlive ? Visual->VisualTurnAmount : 0.0f;
 	bEating = bAlive && Visual->VisualState.bEating;
 	bPursuingPrey = bAlive && Visual->VisualState.bPursuingPrey;
+	Activity = bAlive ? Visual->VisualState.Activity : EEcoSpeciesActivity::Hold;
 	VisualMotion = Visual && Visual->bBound ? Visual->VisualMotion : EEcoCreatureVisualMotion::Idle;
 }

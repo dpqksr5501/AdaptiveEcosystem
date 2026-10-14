@@ -13,6 +13,8 @@
 #include "MassReplicationTransformHandlers.h"
 #include "Network/Mass/EcoMassClientBubble.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Core/EcoRuntimeSettings.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 #include UE_INLINE_GENERATED_CPP_BY_NAME(EcoMassReplicator)
 
@@ -29,10 +31,11 @@ namespace
 		if (TraceMode <= 0 || (!bDirty && TraceMode < 2)) return;
 		const auto Sample = Item.Agent.MakeRepresentationSnapshot();
 		UE_LOG(LogAdaptiveEcosystem, Log,
-			TEXT("[M4 Sample] World=%s Bubble=%s ID=%lld LOD=%d Interval=%.3f CheckTime=%.6f CheckDelta=%.6f Sequence=%u SampleTime=%.6f Dirty=%d Reason=%s"),
+			TEXT("[M4 Sample] World=%s Bubble=%s ID=%lld LOD=%d Interval=%.3f CheckTime=%.6f CheckDelta=%.6f Sequence=%u VisualRevision=%u ResetRevision=%u SampleTime=%.6f Dirty=%d Reason=%s"),
 			*Bubble.GetWorld()->GetName(), *Bubble.GetName(), Sample.StableAgentId,
 			static_cast<int32>(Item.LastObservedLOD), Item.ConfiguredUpdateInterval, CheckTime, CheckDelta,
-			Sample.SampleSequence, Sample.ServerSampleRealTimeSeconds, bDirty, Reason);
+			Sample.SampleSequence, Sample.VisualRevision, Sample.MovementDiscontinuityRevision,
+			Sample.ServerSampleRealTimeSeconds, bDirty, Reason);
 	}
 }
 #endif
@@ -50,6 +53,7 @@ void UEcoMassReplicator::AddRequirements(FMassEntityQuery& EntityQuery)
 
 void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context, FMassReplicationContext& ReplicationContext)
 {
+	TRACE_CPUPROFILER_EVENT_SCOPE(EcoReplication_Connection);
 #if UE_REPLICATION_COMPILE_SERVER_CODE
 	FMassReplicationProcessorPositionYawHandler PositionYawHandler;
 	FMassReplicationSharedFragment* ReplicationSharedFragment = nullptr;
@@ -68,10 +72,9 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 			ExecutionContext.DoesArchetypeHaveTag<FEcoAliveTag>() ? EEcoVisualLifeState::Alive : EEcoVisualLifeState::Dead);
 	};
 
-	auto CacheViews = [&](FMassExecutionContext& ExecutionContext)
 	TConstArrayView<FEcoCreaturePresentationFragment> VisualFragments;
 
-	auto CacheViews = [&ReplicationSharedFragment, &PositionYawHandler, &IdentityFragments, &RegionFragments, &VisualFragments](FMassExecutionContext& ExecutionContext)
+	auto CacheViews = [&](FMassExecutionContext& ExecutionContext)
 	{
 		PositionYawHandler.CacheFragmentViews(ExecutionContext);
 		IdentityFragments = ExecutionContext.GetFragmentView<FEcoIdentityFragment>();
@@ -87,7 +90,6 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 	};
 
 	auto AddEntity = [&](
-	auto AddEntity = [&ReplicationSharedFragment, &PositionYawHandler, &IdentityFragments, &RegionFragments, &VisualFragments](
 		FMassExecutionContext& ExecutionContext,
 		const int32 EntityIndex,
 		FReplicatedEcoMassAgent& ReplicatedAgent,
@@ -95,6 +97,10 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 	{
 		AEcoMassClientBubbleInfo& BubbleInfo =
 			ReplicationSharedFragment->GetTypedClientBubbleInfoChecked<AEcoMassClientBubbleInfo>(ClientHandle);
+		const auto& Budget = GetDefault<UEcoRuntimeSettings>()->ConnectionBudget;
+		if (!BubbleInfo.GetSerializer().Bubble.ReserveAdd(GFrameCounter,
+			BubbleInfo.GetSerializer().GetAgentItems().Num(), Budget.MaxRelevantAgents, Budget.MaxAddsPerUpdate))
+			return FMassReplicatedAgentHandle(); // The engine retries an invalid handle while still relevant.
 
 		PositionYawHandler.AddEntity(EntityIndex, ReplicatedAgent.GetReplicatedPositionYawDataMutable());
 		ReplicatedAgent.SetStableAgentId(IdentityFragments[EntityIndex].StableAgentId);
@@ -106,7 +112,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		if (!VisualFragments.IsEmpty())
 		{
 			const auto& V = VisualFragments[EntityIndex];
-			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy);
+			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy, V.Activity);
 		}
 
 		FEcoMassClientBubbleHandler& Bubble = BubbleInfo.GetSerializer().Bubble;
@@ -124,8 +130,6 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 
 	auto ModifyEntity = [&](
 		FMassExecutionContext& ExecutionContext,
-	auto ModifyEntity = [&ReplicationSharedFragment, &PositionYawHandler, &IdentityFragments, &RegionFragments, &VisualFragments](
-		FMassExecutionContext&,
 		const int32 EntityIndex,
 		const EMassLOD::Type LOD,
 		const double RealTime,
@@ -150,17 +154,15 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		// Persistent important state is examined every callback, before the movement gate.
 		const bool bVisualChanged = UpdateVisualState(Item.Agent, EntityIndex, ExecutionContext);
 		const bool bReset = Item.Agent.GetMovementDiscontinuityRevision() != DiscontinuityFragments[EntityIndex].Revision;
-		if (!VisualFragments.IsEmpty())
-		{
-			const auto& V = VisualFragments[EntityIndex];
-			if (Item.Agent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy)) Bubble.MarkItemDirty(Item);
-		}
+		const FEcoCreaturePresentationFragment* Presentation = VisualFragments.IsEmpty() ? nullptr : &VisualFragments[EntityIndex];
+		const bool bPresentationPriority = Presentation && (Item.Agent.GetVisualFlags() != Presentation->Flags
+			|| Item.Agent.GetHealth() != Presentation->Health || Item.Agent.GetEnergy() != Presentation->Energy || Item.Agent.GetActivity() != Presentation->Activity);
 		const FEcoIdentityFragment& Identity = IdentityFragments[EntityIndex];
 		const FEcoRegionFragment& Region = RegionFragments[EntityIndex];
 		const bool bIdentityChanged = Item.Agent.GetStableAgentId() != Identity.StableAgentId
 			|| Item.Agent.GetSpeciesId() != Identity.SpeciesId
 			|| Item.Agent.GetRegionId() != Region.CurrentRegionId;
-		const bool bPriority = bVisualChanged || bReset || bIdentityChanged;
+		const bool bPriority = bVisualChanged || bPresentationPriority || bReset || bIdentityChanged;
 		const double CheckDelta = RealTime - AgentData.LastUpdateTime;
 		const bool bClockReset = CheckDelta < 0.0;
 		if (!bPriority && !bHighPromotion && !bClockReset && CheckDelta < Item.ConfiguredUpdateInterval)
@@ -174,6 +176,9 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		// Advance even for unchanged transforms, without dirtying a timestamp alone.
 		AgentData.LastUpdateTime = RealTime;
 		Item.LastTransformCheckRealTime = RealTime;
+		// Velocity-only changes follow the connection interval; flags/vitals bypass it.
+		const bool bPresentationChanged = Presentation && Item.Agent.SetPresentation(
+			Presentation->Velocity, Presentation->Flags, Presentation->Health, Presentation->Energy, Presentation->Activity);
 
 		const FReplicatedAgentPositionYawData PreviousTransform = Item.Agent.GetReplicatedPositionYawData();
 		if (bReset)
@@ -187,8 +192,10 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 			PositionYawHandler.ModifyEntity<FEcoMassFastArrayItem>(Handle, EntityIndex, Bubble.GetTransformHandlerMutable());
 		}
 		const auto& CurrentTransform = Item.Agent.GetReplicatedPositionYawData();
-		const bool bChanged = bPriority || PreviousTransform.GetPosition() != CurrentTransform.GetPosition()
+		const bool bMovementChanged = bReset || bIdentityChanged
+			|| PreviousTransform.GetPosition() != CurrentTransform.GetPosition()
 			|| PreviousTransform.GetYaw() != CurrentTransform.GetYaw();
+		const bool bChanged = bPriority || bPresentationChanged || bMovementChanged;
 		if (bIdentityChanged)
 		{
 			Item.Agent.SetStableAgentId(Identity.StableAgentId);
@@ -197,7 +204,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		}
 		if (bChanged)
 		{
-			Item.Agent.StampSample(RealTime);
+			if (bMovementChanged) Item.Agent.StampSample(RealTime);
 			Bubble.MarkItemDirty(Item);
 			++Stats.DirtySamples;
 		}

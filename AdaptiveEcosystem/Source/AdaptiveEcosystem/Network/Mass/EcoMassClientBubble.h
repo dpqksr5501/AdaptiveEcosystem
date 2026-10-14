@@ -26,6 +26,7 @@ struct FEcoMassReplicationStats
 {
 	uint64 Adds = 0;
 	uint64 Removes = 0;
+	uint64 BudgetDeferredAdds = 0;
 	FEcoMassReplicationLODStats LOD[EMassLOD::Off];
 };
 #endif
@@ -54,6 +55,15 @@ public:
 	FTransformHandler& GetTransformHandlerMutable() { return TransformHandler; }
 	FEcoMassReplicationStats& GetReplicationStatsMutable() { return ReplicationStats; }
 	const FEcoMassReplicationStats& GetReplicationStats() const { return ReplicationStats; }
+	/** One shared admission budget for this connection, across all Eco templates. */
+	bool ReserveAdd(uint64 Frame, int32 CurrentCount, int32 MaxRelevant, int32 MaxAdds)
+	{
+		if (AdmissionFrame != Frame) { AdmissionFrame = Frame; AddsThisFrame = 0; }
+		if (CurrentCount >= MaxRelevant || AddsThisFrame >= MaxAdds)
+		{ ++ReplicationStats.BudgetDeferredAdds; return false; }
+		++AddsThisFrame;
+		return true;
+	}
 #endif
 
 protected:
@@ -84,6 +94,8 @@ private:
 	FTransformHandler TransformHandler;
 #if UE_REPLICATION_COMPILE_SERVER_CODE
 	FEcoMassReplicationStats ReplicationStats;
+	uint64 AdmissionFrame = MAX_uint64;
+	int32 AddsThisFrame = 0;
 #endif
 };
 

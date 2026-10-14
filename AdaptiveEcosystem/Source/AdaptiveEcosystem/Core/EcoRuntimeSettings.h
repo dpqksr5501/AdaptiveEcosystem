@@ -21,7 +21,7 @@ public:
 	UPROPERTY(Config, EditAnywhere, Category="Ecology|Survival") FEcoSurvivalSettings Survival;
 	UPROPERTY(Config, EditAnywhere, Category="Ecology|Survival") bool bDrawSurvivalDebug = false;
 	UPROPERTY(Config, EditAnywhere, Category="Ecology|Overcrowding") FEcoOvercrowdingSettings Overcrowding;
-	/** Contract only until M4.6 implements a connection-wide scheduler. Restart PIE after editing. */
+	/** Connection-wide admission/Add and local Actor caps across templates. Restart PIE after editing. */
 	UPROPERTY(Config, EditAnywhere, Category="M4|Connection Budget")
 	FEcoConnectionBudgetSettings ConnectionBudget;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Migration")
