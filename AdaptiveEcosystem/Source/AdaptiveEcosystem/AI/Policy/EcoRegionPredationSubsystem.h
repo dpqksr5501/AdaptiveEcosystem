@@ -55,6 +55,7 @@ public:
 
 	UPROPERTY()
 	float RegionSize = 0.0f;
+	UPROPERTY() FEcoRegionPredationState Global;
 };
 
 UCLASS()
@@ -76,6 +77,9 @@ public:
 
 	/** 갱신 구간 동안 지역 개체 수를 알린다. 분모가 된다. */
 	void ReportPopulation(const FVector& Location, int32 Count);
+	/** Full alive snapshot: sums individuals per cell before applying the interval maximum. */
+	void ReportPopulationSnapshot(TConstArrayView<FVector> Positions);
+	float GetGlobal() const { return FMath::Clamp(Global.Ema, 0.f, 1.f); }
 
 	/** §9.6 PolicyInterval 틱마다 한 번. 프로세서가 호출한다. */
 	void Tick();
@@ -98,4 +102,5 @@ private:
 
 	UPROPERTY()
 	TMap<int64, FEcoRegionPredationState> Regions;
+	FEcoRegionPredationState Global;
 };

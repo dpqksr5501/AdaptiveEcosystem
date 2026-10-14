@@ -151,6 +151,7 @@ UEcoSocialResponseProcessor::UEcoSocialResponseProcessor()
 	ExecutionFlags = int32(EProcessorExecutionFlags::Server | EProcessorExecutionFlags::Standalone);
 	ExecutionOrder.ExecuteAfter.Add(UEcoAlarmPropagationProcessor::StaticClass()->GetFName());
 	ExecutionOrder.ExecuteAfter.Add(UEcoPolicyProcessor::StaticClass()->GetFName());
+	ExecutionOrder.ExecuteAfter.Add(TEXT("MassStateTreeProcessor"));
 	bAutoRegisterWithProcessingPhases = true;
 	bRequiresGameThreadExecution = true; // Diagnostic throttle and World time are serialized.
 }

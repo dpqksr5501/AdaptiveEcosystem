@@ -33,8 +33,7 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 	TConstArrayView<FEcoRegionSpatialSnapshot> Spaces, const FEcoMigrationSettings& Settings,
 	bool bDecisionDue, double FeedInterval, const FEcoOvercrowdingSettings* PressureSettings,
 	const FEcoSurvivalSettings* SurvivalSettings, TConstArrayView<FEcoMigrationPressureSnapshot> Pressure, double ConsumptionRate,
-	TArray<FEcoMigrationOutcome>* OutArrivals)
-	bool bDecisionDue, double FeedInterval, bool bResetResidentVelocity)
+	TArray<FEcoMigrationOutcome>* OutArrivals, bool bResetResidentVelocity)
 {
 	if (OutArrivals) OutArrivals->Reset();
 	if (!IsInGameThread() || Manager.IsProcessing() || !Settings.IsValid() || Resources.Num() != Spaces.Num()
@@ -91,6 +90,7 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 		const auto Runtime = Chunk.GetFragmentView<FEcoVitalsRuntimeFragment>();
 		for (int32 I = 0; I < Chunk.GetNumEntities(); ++I)
 		{
+			if (Time.ServerTimeSeconds < Lives[I].SpawnTimeSeconds) continue;
 			const int32 Index = Regions[I].CurrentRegionIndex;
 			if (!Spaces.IsValidIndex(Index) || Feeds[I].bPending || Ids[I].StableAgentId <= 0
 				|| Spaces[Index].RegionId != Regions[I].CurrentRegionId
@@ -112,88 +112,11 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 				&& (!Spaces.IsValidIndex(Agent.Travel.TargetRegionIndex)
 					|| Agent.Travel.TargetRegionId != Spaces[Agent.Travel.TargetRegionIndex].RegionId)) bValid = false;
 					
-			FEcoRegionFragment& Region = Regions[I];
-			FEcoTravelFragment& Travel = Travels[I];
-			const FVector Position = Transforms[I].GetTransform().GetLocation();
-			if (!Spaces.IsValidIndex(Region.CurrentRegionIndex) || Feeds[I].bPending
-				|| Spaces[Region.CurrentRegionIndex].RegionId != Region.CurrentRegionId || Position.ContainsNaN())
-			{
-				UE_LOG(LogAdaptiveEcosystem, Error, TEXT("[Eco Migration] Invalid input: ID=%lld Region=%s Index=%d PendingFeed=%d Position=%s Step=%lld"),
-					Ids[I].StableAgentId, *Region.CurrentRegionId.ToString(), Region.CurrentRegionIndex, Feeds[I].bPending, *Position.ToCompactString(), StepId);
-				bValid = false; continue;
-			}
-			const EEcoResidenceState Before = Travel.State;
-			const int32 OldTarget = Travel.TargetRegionIndex;
-			const FName From = Region.CurrentRegionId;
-			bool bArrived = false;
-			const auto HasFood = [&](int32 Index)
-			{
-				return Resources.IsValidIndex(Index) && Resources[Index].Food > Settings.FoodEpsilon;
-			};
-			if (bDecisionDue)
-			{
-				const bool bKeepTarget = Travel.State == EEcoResidenceState::Traveling && HasFood(Travel.TargetRegionIndex);
-				if (!bKeepTarget)
-				{
-					int32 Target = INDEX_NONE;
-					// A waiting/traveling agent away from its habitat must physically return before feeding.
-					if (HasFood(Region.CurrentRegionIndex)) Target = Region.CurrentRegionIndex;
-					else
-					{
-						double BestDistance = TNumericLimits<double>::Max();
-						for (int32 Neighbor : Spaces[Region.CurrentRegionIndex].AdjacentIndices)
-						{
-							if (!HasFood(Neighbor)) continue;
-							const double Distance = FVector::DistSquared(Position, Spaces[Neighbor].ArrivalPosition);
-							if (Distance < BestDistance) { BestDistance = Distance; Target = Neighbor; }
-						}
-					}
-					if (Target == Region.CurrentRegionIndex && Travel.State == EEcoResidenceState::Resident)
-					{
-						// Already resident; preserve its feeding reservation.
-					}
-					else if (Target != INDEX_NONE)
-					{
-						Travel.State = EEcoResidenceState::Traveling;
-						Travel.TargetRegionIndex = Target;
-						Travel.TargetRegionId = Spaces[Target].RegionId;
-						Travel.TargetPosition = ArrivalFor(Spaces[Target], Ids[I].StableAgentId, Settings.ArrivalSpread);
-						Travel.MoveSpeed = Settings.Speed;
-					}
-					else
-					{
-						Travel = FEcoTravelFragment();
-						Travel.State = EEcoResidenceState::WaitingForFood;
-					}
-				}
-			}
-			// Commit only after engine movement from earlier frames, and only against current completed food.
-			if (Travel.State == EEcoResidenceState::Traveling && HasFood(Travel.TargetRegionIndex)
-				&& FVector::DistSquared(Position, Travel.TargetPosition) <= FMath::Square(Settings.ArrivalRadius)
-				&& Spaces[Travel.TargetRegionIndex].Contains(Position))
-			{
-				Region.CurrentRegionIndex = Travel.TargetRegionIndex;
-				Region.CurrentRegionId = Travel.TargetRegionId;
-				Travel = FEcoTravelFragment();
-				// Use observed arrival time, never a historical catch-up time; no accumulated missed meals.
-				Lives[I].NextFeedTimeSeconds = ActualTime + FeedInterval;
-				bArrived = true;
-			}
-			if (bResetResidentVelocity && Travel.State != EEcoResidenceState::Traveling)
-			{
-				Moves[I].DesiredVelocity = FVector::ZeroVector;
-				Velocities[I].Value = FVector::ZeroVector;
-			}
-			if (Settings.bPrintTransitions && (Before != Travel.State || OldTarget != Travel.TargetRegionIndex || bArrived))
-				UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Migration] Epoch=%d Step=%lld Time=%.3f Observed=%.3f ID=%lld From=%s Region=%s Target=%s State=%s Arrived=%d NextFeed=%.3f"),
-					Time.WorldEpoch, StepId, Time.ServerTimeSeconds, ActualTime, Ids[I].StableAgentId,
-					*From.ToString(), *Region.CurrentRegionId.ToString(), *Travel.TargetRegionId.ToString(),
-					Travel.State == EEcoResidenceState::Resident ? TEXT("Resident") : Travel.State == EEcoResidenceState::Traveling ? TEXT("Traveling") : TEXT("WaitingForFood"),
-					bArrived, Lives[I].NextFeedTimeSeconds);
-					
 		}
 	});
 	if (!bValid) return false;
+	TArray<int32> ScopedPopulation; ScopedPopulation.Init(0, Spaces.Num());
+	for (const FAgent& A : Agents) ++ScopedPopulation[A.Region.CurrentRegionIndex];
 	const auto HasFood = [&](int32 I) { return Resources.IsValidIndex(I) && Resources[I].Food > Settings.FoodEpsilon; };
 	// Arrival is independent of the slower decision cadence and precedes new departures.
 	for (FAgent& A : Agents)
@@ -235,13 +158,19 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 		}
 	}
 	const bool bPressure = PressureSettings && PressureSettings->bEnabled;
+	// All scoped agents consume regional food. Excluded predators still occupy habitat.
+	// Separate the food forecast from total crowding without granting wolves vegetation meals.
+	TArray<int32> ProjectedConsumers = Projected;
+	if (bPressure)
+		for (int32 I = 0; I < Projected.Num(); ++I)
+			Projected[I] += FMath::Max(0, Pressure[I].Population - ScopedPopulation[I]);
 	const auto Crowding = [&](int32 I, int32 Adjustment)
 	{
 		return bPressure ? static_cast<double>(FMath::Max(0, Projected[I] + Adjustment)) / FMath::Max(1, Pressure[I].ComfortPopulation) : 0.0;
 	};
 	const auto Satisfaction = [&](int32 I, int32 Adjustment)
 	{
-		const double Demand = FMath::Max(0, Projected[I] + Adjustment) * ConsumptionRate * (bPressure ? PressureSettings->ForecastSeconds : 1.0);
+		const double Demand = FMath::Max(0, ProjectedConsumers[I] + Adjustment) * ConsumptionRate * (bPressure ? PressureSettings->ForecastSeconds : 1.0);
 		return Demand > 0 ? FMath::Clamp(Resources[I].Food / Demand, 0.0, 1.0) : 1.0;
 	};
 	const auto Quality = [&](int32 I, int32 Adjustment) { return Satisfaction(I, Adjustment) - 0.5 * Crowding(I, Adjustment); };
@@ -317,7 +246,8 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 		A.Travel.DepartureTime = ActualTime;
 		A.Travel.Reason = bReturn ? EEcoMigrationReason::ReturnHome : bEmpty ? EEcoMigrationReason::FoodDepletion
 			: Crowding(Origin, 0) > PressureSettings->ExitCrowdingRatio ? EEcoMigrationReason::Overcrowding : EEcoMigrationReason::FoodShortage;
-		if (Target != Origin) { --Projected[Origin]; ++Projected[Target]; ++Departures[Origin]; }
+		if (Target != Origin)
+		{ --Projected[Origin]; ++Projected[Target]; --ProjectedConsumers[Origin]; ++ProjectedConsumers[Target]; ++Departures[Origin]; }
 	}
 	// No UObject calls or structural changes during the entity query.
 	for (const FAgent& A : Agents)
@@ -331,7 +261,7 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 		View.GetFragmentData<FEcoRegionFragment>() = A.Region;
 		View.GetFragmentData<FEcoTravelFragment>() = A.Travel;
 		View.GetFragmentData<FEcoLifetimeFragment>() = A.Lifetime;
-		if (A.Travel.State != EEcoResidenceState::Traveling)
+		if (bResetResidentVelocity && A.Travel.State != EEcoResidenceState::Traveling)
 		{
 			View.GetFragmentData<FMassDesiredMovementFragment>().DesiredVelocity = FVector::ZeroVector;
 			View.GetFragmentData<FMassVelocityFragment>().Value = FVector::ZeroVector;

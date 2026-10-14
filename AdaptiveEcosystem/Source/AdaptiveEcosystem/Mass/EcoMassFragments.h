@@ -121,6 +121,8 @@ struct FEcoDeathFragment : public FMassFragment
 	double DeathTime = 0.0;
 	/** Real observed ecology time, so catch-up cannot remove before a replication frame. */
 	double RemoveAfter = 0.0;
+	/** Validated predator identity; zero for unattributed damage. */
+	int64 PredatorStableAgentId = 0;
 };
 
 /**
@@ -164,6 +166,14 @@ struct FEcoPolicyRuntimeFragment : public FMassFragment
 
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|Mass")
 	int32 ModelRevision = 0;
+	/** Seconds of decision debt; only one current-state inference is executed per frame. */
+	double PolicyElapsedSeconds = -1.0;
+	/** Scheduling LOD only; vitals, movement, death and lease time remain full-rate. */
+	float DecisionIntervalMultiplier = 1.0f;
+	int32 InferenceFallbackCount = 0;
+	uint64 CompletedPolicyDecisions = 0;
+	uint64 ParallelPolicyDecisions = 0;
+	double PolicyAliveSeconds = 0.0;
 };
 
 // -----------------------------------------------------------------------------

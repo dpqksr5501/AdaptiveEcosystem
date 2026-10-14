@@ -8,9 +8,12 @@
 #include "MassCommandBuffer.h"
 #include "MassMovementFragments.h"
 #include "AdaptiveEcosystem.h"
+#include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "AI/Social/Shelter/EcoShelterSubsystem.h"
+#include "Engine/World.h"
 
 bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, double ObservedTime,
-	int64 StepId, const FEcoSurvivalSettings& Settings, TArray<FEcoDeathOutcome>& OutDeaths)
+	int64 StepId, const FEcoSurvivalSettings& Settings, TArray<FEcoDeathOutcome>& OutDeaths, bool bIntegratedCreatures)
 {
 	OutDeaths.Reset();
 	if (!IsInGameThread() || Manager.IsProcessing() || !Settings.IsValid() || StepId <= 0 || Time.WorldEpoch <= 0
@@ -22,6 +25,7 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 		FEcoVitalsRuntimeFragment Runtime;
 		FEcoDeathOutcome Death;
 		bool bDead = false;
+		double Retention = 2.0;
 	};
 	TArray<FUpdate> Updates;
 	bool bValid = true;
@@ -34,11 +38,13 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 	Query.AddRequirement<FEcoTravelFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoFeedingFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoLifetimeFragment>(EMassFragmentAccess::ReadOnly);
+	Query.AddRequirement<FEcoCreatureSurvivalFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	Query.AddRequirement<FMassDesiredMovementFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
 	Query.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	Query.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	Query.AddTagRequirement<FEcoIntegratedCreatureTag>(bIntegratedCreatures ? EMassFragmentPresence::All : EMassFragmentPresence::None);
 	FMassExecutionContext Context = Manager.CreateExecutionContext(0.0f);
 	Query.ForEachEntityChunk(Context, [&](FMassExecutionContext& Chunk)
 	{
@@ -50,10 +56,13 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 		const auto Travel = Chunk.GetFragmentView<FEcoTravelFragment>();
 		const auto Feeding = Chunk.GetFragmentView<FEcoFeedingFragment>();
 		const auto Lives = Chunk.GetFragmentView<FEcoLifetimeFragment>();
+		const auto Profiles = Chunk.GetFragmentView<FEcoCreatureSurvivalFragment>();
 		for (int32 I = 0; I < Chunk.GetNumEntities(); ++I)
 		{
 			const auto& V = Vitals[I];
 			const auto& R = Runtime[I];
+			const auto& Profile = Profiles.IsEmpty() ? Settings : Profiles[I].Settings;
+			if (!Profile.IsValid()) { bValid = false; continue; }
 			if (Ids[I].StableAgentId <= 0 || Regions[I].CurrentRegionId.IsNone() || Death[I].bCommitted || Feeding[I].bPending
 				|| R.WorldEpoch != Time.WorldEpoch || R.LastStepId >= StepId || !FMath::IsFinite(R.LastTime)
 				|| !FMath::IsFinite(R.ZeroEnergySeconds) || R.ZeroEnergySeconds < 0
@@ -65,34 +74,35 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 			if (Time.ServerTimeSeconds < R.LastTime) { bValid = false; continue; }
 			FUpdate& U = Updates.AddDefaulted_GetRef();
 			U.Entity = Chunk.GetEntity(I);
+			U.Retention = Profile.DeadRetentionSeconds;
 			U.Vitals = V;
 			U.Runtime = R;
 			U.Runtime.LastStepId = StepId;
 			U.Runtime.LastTime = Time.ServerTimeSeconds;
 			double DeathTime = Time.ServerTimeSeconds;
 			EEcoDeathCause Cause = Death[I].Cause == EEcoDeathCause::None ? EEcoDeathCause::ExternalDamage : Death[I].Cause;
-			if (Settings.bEnabled && V.HP > 0)
+			if (Profile.bEnabled && V.HP > 0)
 			{
 				const double Dt = Time.ServerTimeSeconds - R.LastTime;
-				const double Rate = Settings.BaseMetabolism + (Travel[I].State == EEcoResidenceState::Traveling ? Settings.TravelMetabolism : 0.0);
+				const double Rate = Profile.BaseMetabolism + (Travel[I].State == EEcoResidenceState::Traveling ? Profile.TravelMetabolism : 0.0);
 				const double StartEnergy = FMath::Clamp<double>(V.Energy, 0, V.MaxEnergy);
 				const double ZeroAfter = StartEnergy <= 0 ? 0.0 : Rate > 0 ? StartEnergy / Rate : Dt;
 				const double ZeroDuration = FMath::Max(0.0, Dt - ZeroAfter);
 				const double PreviousZero = StartEnergy > 0 ? 0.0 : R.ZeroEnergySeconds;
 				U.Vitals.Energy = static_cast<float>(FMath::Max(0.0, StartEnergy - Rate * Dt));
 				U.Runtime.ZeroEnergySeconds = U.Vitals.Energy <= 0 ? PreviousZero + ZeroDuration : 0.0;
-				const double DamageSeconds = FMath::Max(0.0, U.Runtime.ZeroEnergySeconds - Settings.StarvationGraceSeconds)
-					- FMath::Max(0.0, PreviousZero - Settings.StarvationGraceSeconds);
-				U.Vitals.HP = static_cast<float>(FMath::Max(0.0, V.HP - Settings.StarvationDamagePerSecond * DamageSeconds));
+				const double DamageSeconds = FMath::Max(0.0, U.Runtime.ZeroEnergySeconds - Profile.StarvationGraceSeconds)
+					- FMath::Max(0.0, PreviousZero - Profile.StarvationGraceSeconds);
+				U.Vitals.HP = static_cast<float>(FMath::Max(0.0, V.HP - Profile.StarvationDamagePerSecond * DamageSeconds));
 				if (U.Vitals.HP <= 0)
 				{
 					Cause = EEcoDeathCause::Starvation;
-					DeathTime = R.LastTime + FMath::Min(Dt, ZeroAfter + FMath::Max(0.0, Settings.StarvationGraceSeconds - PreviousZero)
-						+ V.HP / Settings.StarvationDamagePerSecond);
+					DeathTime = R.LastTime + FMath::Min(Dt, ZeroAfter + FMath::Max(0.0, Profile.StarvationGraceSeconds - PreviousZero)
+						+ V.HP / Profile.StarvationDamagePerSecond);
 				}
 			}
 			U.bDead = U.Vitals.HP <= 0;
-			if (U.bDead) U.Death = {Time.WorldEpoch, StepId, Ids[I].StableAgentId, Regions[I].CurrentRegionId, Ids[I].SpeciesId, Cause, DeathTime};
+			if (U.bDead) U.Death = {Time.WorldEpoch, StepId, Ids[I].StableAgentId, Regions[I].CurrentRegionId, Ids[I].SpeciesId, Cause, DeathTime, Death[I].PredatorStableAgentId};
 		}
 	});
 	if (!bValid) return false;
@@ -107,7 +117,9 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 		Death.bCommitted = true;
 		Death.Cause = U.Death.Cause;
 		Death.DeathTime = U.Death.Time;
-		Death.RemoveAfter = ObservedTime + Settings.DeadRetentionSeconds;
+		Death.RemoveAfter = ObservedTime + U.Retention;
+		if (UWorld* World = Manager.GetWorld())
+			if (auto* Shelter = World->GetSubsystem<UEcoShelterSubsystem>()) Shelter->ReleaseAgentReservations(U.Death.StableAgentId);
 		View.GetFragmentData<FEcoTravelFragment>() = FEcoTravelFragment();
 		View.GetFragmentData<FEcoFeedingFragment>() = FEcoFeedingFragment();
 		View.GetFragmentData<FMassDesiredMovementFragment>().DesiredVelocity = FVector::ZeroVector;
@@ -117,13 +129,13 @@ bool EcoMassSurvival::Advance(FMassEntityManager& Manager, const FEcoServerTimeS
 		OutDeaths.Add(U.Death);
 		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Death] Epoch=%d Step=%lld ID=%lld Region=%s Cause=%s Time=%.3f RemoveAfter=%.3f"),
 			U.Death.WorldEpoch, StepId, U.Death.StableAgentId, *U.Death.RegionId.ToString(),
-			U.Death.Cause == EEcoDeathCause::Starvation ? TEXT("Starvation") : TEXT("ExternalDamage"), U.Death.Time, Death.RemoveAfter);
+			U.Death.Cause == EEcoDeathCause::Starvation ? TEXT("Starvation") : U.Death.Cause == EEcoDeathCause::Predation ? TEXT("Predation") : TEXT("ExternalDamage"), U.Death.Time, Death.RemoveAfter);
 	}
 	if (!OutDeaths.IsEmpty()) Manager.FlushCommands();
 	return true;
 }
 
-bool EcoMassSurvival::RemoveExpired(FMassEntityManager& Manager, double ObservedTime)
+bool EcoMassSurvival::RemoveExpired(FMassEntityManager& Manager, double ObservedTime, bool bIntegratedCreatures)
 {
 	if (!IsInGameThread() || Manager.IsProcessing() || !FMath::IsFinite(ObservedTime)) return false;
 	TArray<FMassEntityHandle> Remove;
@@ -132,6 +144,7 @@ bool EcoMassSurvival::RemoveExpired(FMassEntityManager& Manager, double Observed
 	Query.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
 	Query.AddTagRequirement<FEcoPendingDeathTag>(EMassFragmentPresence::All);
 	Query.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::None);
+	Query.AddTagRequirement<FEcoIntegratedCreatureTag>(bIntegratedCreatures ? EMassFragmentPresence::All : EMassFragmentPresence::None);
 	FMassExecutionContext Context = Manager.CreateExecutionContext(0.0f);
 	Query.ForEachEntityChunk(Context, [&](FMassExecutionContext& Chunk)
 	{

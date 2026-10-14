@@ -26,6 +26,15 @@ public class AdaptiveEcosystem : ModuleRules
 			"MassMovement",
 			"MassSpawner",
 			"MassNavigation",
+			"MassAIBehavior",
+			"MassSignals",
+			"GameplayTags",
+			"PropertyBindingUtils",
+			"WorldConditions",
+			"MassNavMeshNavigation",
+			"MassSmartObjects",
+			"SmartObjectsModule",
+			"NavCorridor",
 			"MassSimulation",
 			"MassLOD",
 			"MassRepresentation",
@@ -40,6 +49,7 @@ public class AdaptiveEcosystem : ModuleRules
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add("UnrealEd");
+			PrivateDependencyModuleNames.AddRange(new string[] { "StateTreeEditorModule", "AssetRegistry" });
 		}
 
 		PublicIncludePaths.AddRange(new string[] {

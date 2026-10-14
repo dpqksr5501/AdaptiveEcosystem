@@ -17,8 +17,16 @@ namespace EcoMassMigration
 		bool bDecisionDue, double FeedInterval, const FEcoOvercrowdingSettings* PressureSettings = nullptr,
 		const FEcoSurvivalSettings* SurvivalSettings = nullptr,
 		TConstArrayView<FEcoMigrationPressureSnapshot> Pressure = {}, double ConsumptionRate = 0.0,
-		TArray<FEcoMigrationOutcome>* OutArrivals = nullptr);
-		bool bDecisionDue, double FeedInterval, bool bResetResidentVelocity = true);
+		TArray<FEcoMigrationOutcome>* OutArrivals = nullptr, bool bResetResidentVelocity = true);
+	/** Compatibility adapter for the Creature coordinator; does not reset its resident movement. */
+	inline bool Reconcile(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, double ActualTime,
+		int64 StepId, TConstArrayView<FEcoResourceSnapshot> Resources,
+		TConstArrayView<FEcoRegionSpatialSnapshot> Spaces, const FEcoMigrationSettings& Settings,
+		bool bDecisionDue, double FeedInterval, bool bResetResidentVelocity)
+	{
+		return Reconcile(Manager, Time, ActualTime, StepId, Resources, Spaces, Settings,
+			bDecisionDue, FeedInterval, nullptr, nullptr, {}, 0.0, nullptr, bResetResidentVelocity);
+	}
 }
 
 /** Writes movement intent only. The engine UMassApplyMovementProcessor owns position integration. */

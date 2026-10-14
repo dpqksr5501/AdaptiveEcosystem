@@ -7,6 +7,7 @@ namespace EcoMassSurvival
 {
 	/** Authority-only, sequential, outside processing. Commits deferred tags before returning. */
 	bool Advance(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, double ObservedTime,
-		int64 StepId, const FEcoSurvivalSettings& Settings, TArray<FEcoDeathOutcome>& OutDeaths);
-	bool RemoveExpired(FMassEntityManager& Manager, double ObservedTime);
+		int64 StepId, const FEcoSurvivalSettings& Settings, TArray<FEcoDeathOutcome>& OutDeaths,
+		bool bIntegratedCreatures = false);
+	bool RemoveExpired(FMassEntityManager& Manager, double ObservedTime, bool bIntegratedCreatures = false);
 }

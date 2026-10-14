@@ -9,6 +9,8 @@
 #include "MassCommonUtils.h"
 #include "MassMovementFragments.h"
 #include "Engine/World.h"
+#include "AI/Behavior/EcoSpeciesAITemplate.h"
+#include "AI/Behavior/EcoSpeciesAIProfile.h"
 
 void UEcoCreatureNetworkTrait::BuildTemplate(FMassEntityTemplateBuildContext& Context, const UWorld& World) const
 {
@@ -19,6 +21,7 @@ void UEcoCreatureNetworkTrait::BuildTemplate(FMassEntityTemplateBuildContext& Co
 	// Custom movement excludes engine ApplyMovement; the PPO/predator writers are disjoint by species.
 	Context.AddTag<FMassCustomMovementTag>();
 	Context.AddFragment<FEcoCreatureLifecycleFragment>();
+	Context.AddFragment<FEcoCreatureSurvivalFragment>();
 	Context.AddFragment<FEcoCreatureFootstepFragment>();
 	FMassEntityManager& Manager = UE::Mass::Utils::GetEntityManagerChecked(World);
 	FEcoSpeciesSharedFragment Species;
@@ -29,15 +32,16 @@ void UEcoCreatureNetworkTrait::BuildTemplate(FMassEntityTemplateBuildContext& Co
 	if (bPredator)
 	{
 		GetDefault<UEcoPredatorTrait>()->BuildTemplate(Context, World);
-        Context.AddFragment<FEcoPreySenseFragment>();
-        Context.AddFragment<FEcoSensoryProfileFragment>();
-        Context.AddSharedFragment(Manager.GetOrCreateSharedFragment(FEcoPredatorSensesSharedFragment()));
+		Context.AddFragment<FEcoPreySenseFragment>();
+		Context.AddFragment<FEcoSensoryProfileFragment>();
+		Context.AddSharedFragment(Manager.GetOrCreateSharedFragment(FEcoPredatorSensesSharedFragment()));
 	}
 	else
 	{
 		GetDefault<UEcoHerbivoreTrait>()->BuildTemplate(Context, World);
 		GetDefault<UEcoSocialTrait>()->BuildTemplate(Context, World);
 	}
+	if (bUseSpeciesAI && SpeciesAIProfile) EcoSpeciesAI::BuildEngineTemplate(Context, World, *SpeciesAIProfile);
 }
 
 #if WITH_EDITOR

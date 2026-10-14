@@ -8,7 +8,7 @@ int64 UEcoRegionPredationSubsystem::RegionKey(const FVector& Location) const
 	const float Size = FMath::Max(RegionSize, 1.0f);
 	const int64 X = static_cast<int64>(FMath::FloorToInt(Location.X / Size));
 	const int64 Y = static_cast<int64>(FMath::FloorToInt(Location.Y / Size));
-	return (X << 32) ^ (Y & 0xFFFFFFFF);
+	return static_cast<int64>((static_cast<uint64>(X) << 32) | (static_cast<uint64>(Y) & 0xFFFFFFFFULL));
 }
 
 float UEcoRegionPredationSubsystem::Get(const FVector& Location) const
@@ -24,6 +24,19 @@ float UEcoRegionPredationSubsystem::Get(const FVector& Location) const
 void UEcoRegionPredationSubsystem::ReportPredation(const FVector& Location)
 {
 	Regions.FindOrAdd(RegionKey(Location)).PendingDeaths += 1;
+	++Global.PendingDeaths;
+}
+
+void UEcoRegionPredationSubsystem::ReportPopulationSnapshot(TConstArrayView<FVector> Positions)
+{
+	TMap<int64, int32> Counts;
+	for (const FVector& P : Positions) ++Counts.FindOrAdd(RegionKey(P));
+	for (const auto& Pair : Counts)
+	{
+		auto& State = Regions.FindOrAdd(Pair.Key);
+		State.Population = FMath::Max(State.Population, Pair.Value);
+	}
+	Global.Population = FMath::Max(Global.Population, Positions.Num());
 }
 
 void UEcoRegionPredationSubsystem::ReportPopulation(const FVector& Location, int32 Count)
@@ -38,6 +51,8 @@ void UEcoRegionPredationSubsystem::Tick()
 	// §3.1 / §9.6: ema = decay*ema + (1-decay)*(사망 수 / 개체 수)*gain
 	const float Decay = EcoBehaviorConfig::PredationEmaDecay;
 	const float Gain = EcoBehaviorConfig::PredationEmaGain;
+	Global.Ema = Decay * Global.Ema + (1.f - Decay) * float(Global.PendingDeaths) / FMath::Max(1, Global.Population) * Gain;
+	Global.PendingDeaths = Global.Population = 0;
 
 	for (auto& Pair : Regions)
 	{
@@ -60,6 +75,7 @@ bool UEcoRegionPredationSubsystem::SaveToSlot(const FString& SlotName, int32 Use
 	}
 	Save->Regions = Regions;
 	Save->RegionSize = RegionSize;
+	Save->Global = Global;
 	return UGameplayStatics::SaveGameToSlot(Save, SlotName, UserIndex);
 }
 
@@ -80,5 +96,6 @@ bool UEcoRegionPredationSubsystem::LoadFromSlot(const FString& SlotName, int32 U
 		return false;
 	}
 	Regions = Save->Regions;
+	Global = Save->Global;
 	return true;
 }

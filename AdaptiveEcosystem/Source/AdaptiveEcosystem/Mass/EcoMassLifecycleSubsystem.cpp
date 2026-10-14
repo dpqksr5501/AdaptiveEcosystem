@@ -442,6 +442,8 @@ void UEcoMassLifecycleSubsystem::PublishCompletedSummary(const FEcoServerTimeSna
 		Row.SummaryRevision = Summary.Revision;
 		Row.FoodAmount = Resource.Food;
 		Row.FoodCapacity = Resource.Capacity;
+		Row.Environment = Region.CompletedEnvironment;
+		Row.EffectiveFoodRegenerationRate = Region.FoodRegenerationRate * Region.EffectiveRegenerationMultiplier;
 		Row.Population = Region.Population;
 		Row.AverageEnergy = Region.AverageEnergy;
 		Row.PredationHistory = Region.PredationHistory;
