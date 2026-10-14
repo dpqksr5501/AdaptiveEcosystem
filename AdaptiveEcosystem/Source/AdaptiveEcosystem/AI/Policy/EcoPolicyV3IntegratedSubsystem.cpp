@@ -54,6 +54,14 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("통합 v3 모드의 세션 시드 (사건 결정 지연 해시·지역 세계 난수·시작 자리). 명령줄 -EcoV3Seed= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarGradualNight(
+		TEXT("eco.IntegratedV3.GradualNight"),
+		1,
+		TEXT("통합 v3 모드의 늑대 밤잠 점진화 (1 = 켬, 기본 — 사람 결정 H1 10-14). 해 진 뒤 늑대마다 다른 지연이 지나고 사냥 중이 아니고 ")
+		TEXT("16 m 안에 사슴이 없으면 2 초 동안 걸음을 늦추다 눕는다. 깜깜하면 새 사냥을 시작하지 않고 쫓던 사냥만 끝낸다. 새벽에는 하나씩 ")
+		TEXT("깨어 걸음을 올린다 (파이썬 configs/v3_real1_night_on.yaml realism_night). 0 = 어둠 0.5 가 되는 순간 곧바로 잔다. Play 전에 바꾼다."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarDebug(
 		TEXT("eco.V3Debug"),
 		0,
@@ -144,11 +152,16 @@ namespace EcoPolicyV3IntegratedImpl
 // 이름·늑대 성질
 // -----------------------------------------------------------------------------
 
-EcoV3Integrated::EWolfState EcoV3Integrated::WolfStateOf(const EcoWorldV3::FThreatAgent& A)
+EcoV3Integrated::EWolfState EcoV3Integrated::WolfStateOf(const EcoWorldV3::FThreatAgent& A, const EcoThreatV3::FThreatConfig& Cfg)
 {
 	if (A.State.bAsleep)
 	{
 		return EWolfState::Sleep;
+	}
+	const bool bNight = Cfg.bRealismNight && !A.Spec.bNocturnal;
+	if (bNight && A.State.bNightSettle)
+	{
+		return EWolfState::Settle;
 	}
 	if (A.Spec.Type == EcoThreatV3::EThreatType::Stalker)
 	{
@@ -169,13 +182,18 @@ EcoV3Integrated::EWolfState EcoV3Integrated::WolfStateOf(const EcoWorldV3::FThre
 	{
 		return A.Spec.Type == EcoThreatV3::EThreatType::Stalker ? EWolfState::Stalk : EWolfState::Chase;
 	}
+	if (bNight && A.State.NightAct < Cfg.NightRampSteps)
+	{
+		return EWolfState::Waking;
+	}
 	return EWolfState::Roam;
 }
 
 const TCHAR* EcoV3Integrated::WolfStateNameKo(EWolfState State)
 {
 	static const TCHAR* Names[static_cast<int32>(EWolfState::Count)] = {TEXT("배회"), TEXT("잠행"), TEXT("돌진"), TEXT("지침"),
-																		  TEXT("추격"), TEXT("식사"), TEXT("잠")};
+																		  TEXT("추격"), TEXT("식사"), TEXT("잠"),  TEXT("눕는 중"),
+																		  TEXT("깨는 중")};
 	const int32 I = static_cast<int32>(State);
 	return (I >= 0 && I < static_cast<int32>(EWolfState::Count)) ? Names[I] : TEXT("?");
 }
@@ -216,6 +234,40 @@ FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const 
 	return Label;
 }
 
+FString EcoV3Integrated::WolfLabel(const EcoWorldV3::FThreatAgent& A, const EcoThreatV3::FThreatConfig& Cfg, double Dark, FColor& OutColor)
+{
+	const EWolfState St = WolfStateOf(A, Cfg);
+	OutColor = St == EWolfState::Pounce								  ? FColor(255, 120, 0)
+			   : St == EWolfState::Sleep							  ? FColor(60, 60, 160)
+			   : St == EWolfState::Settle || St == EWolfState::Waking ? FColor(120, 120, 220)
+			   : St == EWolfState::Stalk || St == EWolfState::Chase	  ? FColor::Red
+			   : St == EWolfState::Roam								  ? FColor(220, 150, 150)
+																	  : FColor(150, 150, 150);
+	FString Label = FString::Printf(TEXT("늑대 %s%s"), WolfStateNameKo(St),
+									A.Spec.Type == EcoThreatV3::EThreatType::Stalker ? TEXT(" (잠행형)") : TEXT(" (추격형)"));
+	if (!Cfg.bRealismNight || A.Spec.bNocturnal || A.State.bAsleep)
+	{
+		return Label;
+	}
+	if ((St == EWolfState::Settle || St == EWolfState::Waking) && Cfg.NightRampSteps > 0)
+	{
+		Label += FString::Printf(TEXT(" 걸음 %d%%"), FMath::RoundToInt32(100.0 * A.State.NightAct / Cfg.NightRampSteps));
+	}
+	if (A.LastNight.bBlockDeer)
+	{
+		Label += TEXT(" · 사슴 곁이라 안 누움");
+	}
+	else if (A.LastNight.bBlockHunt)
+	{
+		Label += TEXT(" · 사냥 중이라 안 누움");
+	}
+	else if (St != EWolfState::Settle && Dark >= Cfg.NightHuntDark && !A.State.bNightHunt && !A.Last.bHunting)
+	{
+		Label += TEXT(" · 깜깜해 새 사냥 안 함");   // 눕는 중은 어차피 사냥하지 않으므로 붙이지 않는다
+	}
+	return Label;
+}
+
 EcoThreatV3::FThreatSpec EcoV3Integrated::WolfSpecForOrdinal(int32 Ordinal, double PredSpeedMult)
 {
 	const EcoThreatV3::FThreatConfig Cfg;
@@ -231,6 +283,7 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.Seed = CVarSeed.GetValueOnGameThread();
 	S.DeerPerRegion = FMath::Clamp(CVarDeerPerRegion.GetValueOnGameThread(), 1, kTrainDeer);
 	S.StageSizeUnits = FMath::Clamp(static_cast<double>(CVarStageSizeM.GetValueOnGameThread()) * 100.0 / EcoRepertoireV3::kUnitCm, 60.0, 110.0);
+	S.bGradualNight = CVarGradualNight.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -363,10 +416,12 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	const int32 Wolves = Settings.WolvesPerRegion;
 	UE_LOG(LogEcoPolicyV3I, Log,
 		   TEXT("[EcoV3I] 통합 모드 켬 — 조정자 %s | 모델 %s (관측 %d, 마스크 판 %d) | 지역 %d, 지역마다 사슴 %d·늑대 %d (잠행 %d·추격 %d, 모두 주행성, 속력 %.2f배) | ")
-			   TEXT("무대 한 변 %.0f m | 시드 %lld | 이주·웨이브·1초 에너지 소모 끔, 낮밤 60+60초 | 시작 자리 지면 검사: %s"),
+			   TEXT("무대 한 변 %.0f m | 시드 %lld | 이주·웨이브·1초 에너지 소모 끔, 낮밤 60+60초 | 늑대 밤잠: %s | 시작 자리 지면 검사: %s"),
 		   *GetNameSafe(Found[0]), UTF8_TO_TCHAR(EcoPolicyV3::kModelName), EcoPolicyV3::kObsDim, EcoPolicyV3::kMaskVersion, Plans.Num(),
 		   Plans.IsEmpty() ? 0 : Plans[0].DeerPoints.Num(), Wolves, (Wolves + 1) / 2, Wolves / 2, Settings.PredSpeedMult,
 		   Settings.StageSizeUnits * EcoRepertoireV3::kUnitCm / 100.0, static_cast<long long>(Settings.Seed),
+		   Settings.bGradualNight ? TEXT("서서히 (eco.IntegratedV3.GradualNight 1 — 16 m 안 사슴·사냥 중이면 안 누움, 깜깜하면 새 사냥 없음, 늑대마다 지연, R1b 측정으로 허용)")
+								  : TEXT("곧바로 (eco.IntegratedV3.GradualNight 0 — 어둠 0.5 에 바로 잠)"),
 		   bStreamingSpawner ? TEXT("서식지 스트리밍이 끝나는 프레임에 조정자 시작 직전 다시") : TEXT("끝 (스트리밍 없음 — 조정자가 BeginPlay 에서 시작)"));
 }
 
@@ -603,6 +658,7 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.RngStream = static_cast<uint64>(FMath::Max(0, RegionRuntimeIndex)) + 1;   // 지역마다 다른 먹이 패치·늑대 선회 (0 은 평면 맵 몫)
 	C.bRespawnDead = false;                                    // 제자리 부활 없음 (계약 12-3: 새 개체 = 새 StableAgentId)
 	C.PredEmaDenominator = FMath::Max(1, PlannedDeer);         // 고정 분모 = 무대 처음 사슴 수 (학습의 고정 128 과 같은 꼴, 열린 질문 7)
+	C.bRealismNight = S.bGradualNight;                         // 늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight, 사람 결정 H1)
 	return C;
 }
 
@@ -1042,6 +1098,8 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	Ctx->RecentEaten.Init(0.0, EcoV3Integrated::kRecentEatSteps);
 	Ctx->RecentEatenPos = 0;
 	Ctx->LastStepFoodEaten = Ctx->Sim.Stats.FoodEaten;
+	Ctx->bPrevDark = Ctx->Sim.Dark >= Ctx->Sim.ThreatCfg.SleepDark;
+	Ctx->bDarkKnown = true;
 	FEcoV3RegionContext* Raw = Ctx.Get();
 	Contexts.Add(MoveTemp(Ctx));
 	return Raw;
@@ -1121,6 +1179,60 @@ void UEcoPolicyV3IntegratedSubsystem::NotifyContextStep(FEcoV3RegionContext& Ctx
 	}
 }
 
+void UEcoPolicyV3IntegratedSubsystem::NotifyNightStep(FEcoV3RegionContext& Ctx, EcoWorldV3::FThreatAgent* const* Threats,
+												   const int64* WolfIds, int32 NumWolves)
+{
+	const EcoThreatV3::FThreatConfig& Cfg = Ctx.Sim.ThreatCfg;
+	if (!Cfg.bRealismNight)
+	{
+		return;
+	}
+	// 해 진·뜬 시각 (이번 스텝 끝 새 t 의 어둠 — 밤잠 업데이트가 쓴 값)
+	const bool bDark = Ctx.Sim.Dark >= Cfg.SleepDark;
+	if (!Ctx.bDarkKnown || bDark != Ctx.bPrevDark)
+	{
+		if (Ctx.bDarkKnown)
+		{
+			(bDark ? Ctx.DarkStartT : Ctx.LightStartT) = Ctx.Sim.T;
+		}
+		Ctx.bPrevDark = bDark;
+		Ctx.bDarkKnown = true;
+	}
+	for (int32 m = 0; m < NumWolves; ++m)
+	{
+		const EcoWorldV3::FThreatAgent& A = *Threats[m];
+		const EcoThreatV3::FNightUpdateResult& N = A.LastNight;
+		if (!(N.bOnset || N.bWake || N.bSettleStart || N.bSettleAbort))
+		{
+			continue;
+		}
+		double MinUnits = -1.0;
+		for (const EcoThreatV3::FPreyView& P : Ctx.Sim.Prey)
+		{
+			if (P.bAlive)
+			{
+				const double D = FMath::Sqrt(FMath::Square(P.X - A.State.PosX) + FMath::Square(P.Y - A.State.PosY));
+				MinUnits = MinUnits < 0.0 ? D : FMath::Min(MinUnits, D);
+			}
+		}
+		const TCHAR* What = N.bOnset ? TEXT("잠듦") : N.bWake ? TEXT("깸") : N.bSettleStart ? TEXT("눕기 시작") : TEXT("다시 일어남");
+		const int64 Since = N.bWake ? Ctx.LightStartT : Ctx.DarkStartT;
+		const FString SinceText = Since >= 0 ? FString::Printf(TEXT("%s %.1f초"), N.bWake ? TEXT("해 뜬 뒤") : TEXT("해 진 뒤"),
+															  static_cast<double>(Ctx.Sim.T - Since) * EcoRepertoireV3::kStepSeconds)
+											 : FString(TEXT("해 진·뜬 시각 모름"));
+		const TCHAR* Why = !N.bSettleAbort ? TEXT("")
+						   : !bDark		   ? TEXT(" (밝아짐)")
+						   : N.bNear	   ? TEXT(" (사슴이 16 m 안에 들어옴)")
+										   : TEXT(" (사냥 시작)");
+		const FString Nearest = MinUnits >= 0.0 ? FString::Printf(TEXT("%.1f m"), MinUnits * EcoRepertoireV3::kUnitCm / 100.0) : FString(TEXT("없음"));
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 늑대 %lld (%s) %s%s: %s, d=%.2f, 가장 가까운 사슴 %s (눕지 않는 거리 %.0f m), 지연 %d 스텝, 걸음 %d/%d"),
+			   *Ctx.RegionId.ToString(), static_cast<long long>(WolfIds ? WolfIds[m] : m),
+			   A.Spec.Type == EcoThreatV3::EThreatType::Stalker ? TEXT("잠행형") : TEXT("추격형"), What, Why, *SinceText, Ctx.Sim.Dark,
+			   *Nearest, Cfg.NightSettleR * EcoRepertoireV3::kUnitCm / 100.0, A.State.NightDelay, A.State.NightAct, Cfg.NightRampSteps);
+	}
+}
+
 void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 {
 	using namespace EcoV3Integrated;
@@ -1151,7 +1263,23 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	FString WolfNow;
 	for (int32 w = 0; w < static_cast<int32>(EWolfState::Count); ++w)
 	{
-		WolfNow += FString::Printf(TEXT(" %s %d"), WolfStateNameKo(static_cast<EWolfState>(w)), Ctx.WolvesNow[w]);
+		if (w < static_cast<int32>(EWolfState::Settle) || Ctx.Sim.ThreatCfg.bRealismNight)
+		{
+			WolfNow += FString::Printf(TEXT(" %s %d"), WolfStateNameKo(static_cast<EWolfState>(w)), Ctx.WolvesNow[w]);
+		}
+	}
+	// 늑대 밤잠 점진화 (켠 세계만): 구간 눕기 시작·다시 일어남·잠듦·깸, 누울 차례인데 사슴·사냥 때문에 못 누운 늑대·업데이트, 어둠 중 깨어 있음
+	FString Night;
+	if (Ctx.Sim.ThreatCfg.bRealismNight)
+	{
+		const int64 DarkN = S.NightDarkUpdates - P.NightDarkUpdates;
+		const int64 DarkAwake = S.NightDarkAwake - P.NightDarkAwake;
+		Night = FString::Printf(
+			TEXT(" | 늑대 밤잠(서서히): 눕기 시작 %lld · 다시 일어남 %lld · 잠듦 %lld · 깸 %lld · 사슴 곁이라 안 누움 %lld · 사냥 중이라 안 누움 %lld (늑대·업데이트) · 어둠 중 깨어 있음 %.0f%%"),
+			static_cast<long long>(S.NightSettleStarts - P.NightSettleStarts), static_cast<long long>(S.NightSettleAborts - P.NightSettleAborts),
+			static_cast<long long>(S.NightOnsets - P.NightOnsets), static_cast<long long>(S.NightWakes - P.NightWakes),
+			static_cast<long long>(S.NightBlockDeer - P.NightBlockDeer), static_cast<long long>(S.NightBlockHunt - P.NightBlockHunt),
+			DarkN > 0 ? 100.0 * static_cast<double>(DarkAwake) / static_cast<double>(DarkN) : 0.0);
 	}
 	const double CpuAvgMs = StepCpuSteps > 0 ? 1000.0 * StepCpuSeconds / static_cast<double>(StepCpuSteps) : 0.0;
 	// 먹기: 구간 먹은 양(먹이 단위), 먹은 사슴 수, 먹기 개체·스텝 중 실제로 먹은 비율(먹이 없는 칸을 걷는 먹기는 못 먹는다), 무대 먹이, 에너지
@@ -1164,11 +1292,11 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		static_cast<long long>(AteSteps), static_cast<long long>(GrazeSteps), 100.0 * Ctx.FoodFraction(), 100.0 * Ctx.MeanEnergy, Ctx.StarvingDeer,
 		static_cast<long long>(S.Reproduced - P.Reproduced));
 	UE_LOG(LogEcoPolicyV3I, Log,
-		   TEXT("[EcoV3I] %s | %.1f초 %s d=%.2f (%s) | 사슴 산 %d/%d | 지금 행동:%s | 구간 사용(개체·스텝):%s | 늑대 %d:%s | ")
+		   TEXT("[EcoV3I] %s | %.1f초 %s d=%.2f (%s) | 사슴 산 %d/%d | 지금 행동:%s | 구간 사용(개체·스텝):%s | 늑대 %d:%s%s | ")
 			   TEXT("포획 %lld (누적 %lld) 굶음 %lld (누적 %lld) | %s | 지형 검사 이동 %lld, 막힘 사슴 %lld 늑대 %lld | 피식EMA %.3f | 마스크 위반 %lld | ")
 			   TEXT("네 행동 모두 씀=%s | 결정 스텝 CPU(모든 지역) 평균 %.2f ms/스텝, 최대 %.1f ms/프레임"),
 		   *Ctx.RegionId.ToString(), Seconds, Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Ctx.Sim.Dark, *TeamPhase, Ctx.AliveDeer,
-		   Ctx.AdoptedDeer, *Now, *Used, Ctx.Wolves, *WolfNow, static_cast<long long>(S.Caught - P.Caught),
+		   Ctx.AdoptedDeer, *Now, *Used, Ctx.Wolves, *WolfNow, *Night, static_cast<long long>(S.Caught - P.Caught),
 		   static_cast<long long>(S.Caught), static_cast<long long>(S.Starved - P.Starved), static_cast<long long>(S.Starved), *Feeding,
 		   static_cast<long long>(Ctx.TerrainChecks - Ctx.LastLogTerrainChecks),
 		   static_cast<long long>(S.BlockedHerbMoves - P.BlockedHerbMoves), static_cast<long long>(S.BlockedThreatMoves - P.BlockedThreatMoves),
@@ -1314,6 +1442,10 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			{
 				Wolves += FString::Printf(TEXT(" %s %d"), WolfStateNameKo(static_cast<EWolfState>(w)), Ctx.WolvesNow[w]);
 			}
+		}
+		if (Ctx.Sim.ThreatCfg.bRealismNight)
+		{
+			Wolves += TEXT(" (밤잠 서서히)");
 		}
 		const FString Line = FString::Printf(TEXT("v3 R1b %s | %s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld"),
 											 *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Ctx.Sim.Dark,

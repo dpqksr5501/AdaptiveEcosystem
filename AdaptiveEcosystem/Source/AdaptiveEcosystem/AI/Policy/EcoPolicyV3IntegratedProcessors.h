@@ -16,6 +16,9 @@
 //    지면 높이를 시계 진행으로 보간하고, 속도 = 이번 스텝 변위 ÷ 스텝 시간 (팀 표현 블렌드스페이스가 서기·걷기·뛰기를 고른다).
 //    죽은 개체는 죽은 자리에 멈추고 속도 0. eco.V3Debug 1 이면 개체 위에 행동·상태 글자를 그린다. 사슴 글자 = 행동 + 에너지 %,
 //    이번 결정 스텝에 먹었으면 '+먹은 몫(에너지 %p)', 에너지 15% 아래면 '굶주림'(빨강), 번식 뒤 약 1.5 초 '번식'.
+//    늑대 글자 = 상태 + 종류. 밤잠 점진화(eco.IntegratedV3.GradualNight 1)면 '눕는 중'·'깨는 중' + 걸음 %, 누울 차례인데 못 누우면
+//    '사슴 곁이라 안 누움'·'사냥 중이라 안 누움', 깜깜해 새 사냥을 안 하면 '깜깜해 새 사냥 안 함' (EcoV3Integrated::WolfLabel).
+//    밤잠 사건(잠듦·깸·눕기 시작·다시 일어남)은 스텝 처리기가 [EcoV3I] 한 줄씩 남긴다 (UEcoPolicyV3IntegratedSubsystem::NotifyNightStep).
 //
 // 위치를 쓰는 주체는 이 개체마다 하나다 (AGENTS.md): 팀 이동 처리기(UEcoSteeringProcessor·UEcoCreaturePredatorProcessor)는 v1 태그를
 // 요구하므로 이 개체를 보지 않고, 엔진 ApplyMovement 는 FMassCustomMovementTag 로 막혀 있다.
@@ -88,6 +91,7 @@ private:
 	TArray<EcoWorldV3::FThreatAgent*> ThreatPtrs;
 	TArray<FEcoIntegratedV3Fragment*> HerbInts;
 	TArray<FEcoIntegratedV3Fragment*> WolfInts;
+	TArray<int64> WolfIds;                  // 이번 Step 늑대 배열의 StableAgentId (밤잠 사건 줄)
 	TArray<int32> NewRows;
 
 	TSet<FName> ReportedMissingRegions;

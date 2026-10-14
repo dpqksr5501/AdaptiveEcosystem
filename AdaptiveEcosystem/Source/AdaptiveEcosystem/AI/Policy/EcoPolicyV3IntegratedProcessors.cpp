@@ -250,6 +250,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		HerbInts.Reset();
 		ThreatPtrs.Reset();
 		WolfInts.Reset();
+		WolfIds.Reset();
 		for (const int32 k : DeerByContext[c])
 		{
 			Views.Add(Deer[k].View);
@@ -259,6 +260,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		{
 			ThreatPtrs.Add(Wolves[k].Agent);
 			WolfInts.Add(Wolves[k].Int);
+			WolfIds.Add(Wolves[k].Id);
 		}
 	};
 
@@ -277,8 +279,10 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			const FVector Loc = Xf.GetLocation();
 			const FVector Fwd = Xf.GetRotation().GetForwardVector();
 			const EcoWorldV3::FVec2 P = Ctx.CmToUnits(Loc);
+			// 종류 = 지역 안 순번 (StableAgentId 순, 짝수 잠행·홀수 추격). 밤잠 점진화의 늑대별 지연 해시 키는 StableAgentId 다
+			// (파이썬은 세계 시드·위협 슬롯. 통합 모드는 지역들이 세션 시드 하나를 같이 쓰므로 순번을 쓰면 지역마다 지연이 똑같아진다)
 			const EcoThreatV3::FThreatSpec Spec = EcoV3Integrated::WolfSpecForOrdinal(Ctx.AdoptedWolves++, Ctx.Sim.Config.PredSpeedMult);
-			EcoWorldV3::AdoptThreat(Ctx.Sim, *W.Agent, Spec, P.X, P.Y, Fwd.X, Fwd.Y);
+			EcoWorldV3::AdoptThreat(Ctx.Sim, *W.Agent, Spec, P.X, P.Y, Fwd.X, Fwd.Y, W.Id);
 			W.Int->bAdopted = true;
 			W.Int->ContextIndex = Ctx.Index;
 			W.Int->GroundZ = Loc.Z;
@@ -399,6 +403,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				Wolves[k].Life->bPursuing = A.Last.bHunting && A.Last.bHasTarget;
 			}
 			TallyEnergy(Ctx, Deer, List);   // 기록 줄이 이 스텝 끝 에너지를 쓴다
+			Sub->NotifyNightStep(Ctx, ThreatPtrs.GetData(), WolfIds.GetData(), ThreatPtrs.Num());   // 늑대 밤잠 사건 줄 (켠 세계만)
 			Sub->NotifyContextStep(Ctx, Report);
 		}
 		Sub->FinishGlobalStep();
@@ -427,7 +432,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		}
 		for (const int32 k : WolvesByContext[c])
 		{
-			++Ctx.WolvesNow[static_cast<int32>(EcoV3Integrated::WolfStateOf(*Wolves[k].Agent))];
+			++Ctx.WolvesNow[static_cast<int32>(EcoV3Integrated::WolfStateOf(*Wolves[k].Agent, Ctx.Sim.ThreatCfg))];
 		}
 		Ctx.AliveDeer = DeerByContext[c].Num();
 		Ctx.Wolves = WolvesByContext[c].Num();
@@ -557,15 +562,9 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 			Vels[i].Value = FVector((S.PosX - Ag.PrevX) * K, (S.PosY - Ag.PrevY) * K, 0.0);
 			if (bDebug)
 			{
-				using EcoV3Integrated::EWolfState;
-				const EWolfState St = EcoV3Integrated::WolfStateOf(Ag);
-				const FColor Color = St == EWolfState::Pounce   ? FColor(255, 120, 0)
-									 : St == EWolfState::Sleep	 ? FColor(60, 60, 160)
-									 : St == EWolfState::Stalk || St == EWolfState::Chase ? FColor::Red
-									 : St == EWolfState::Roam	 ? FColor(220, 150, 150)
-																 : FColor(150, 150, 150);
-				const FString Label = FString::Printf(TEXT("늑대 %s%s"), EcoV3Integrated::WolfStateNameKo(St),
-													  Ag.Spec.Type == EcoThreatV3::EThreatType::Stalker ? TEXT(" (잠행형)") : TEXT(" (추격형)"));
+				// '늑대 눕는 중 (추격형) 걸음 40%', '늑대 깨는 중', 못 누운 까닭 — EcoV3Integrated::WolfLabel
+				FColor Color;
+				const FString Label = EcoV3Integrated::WolfLabel(Ag, Rc->Sim.ThreatCfg, Rc->Sim.Dark, Color);
 				DrawDebugString(World, Loc + FVector(0.0, 0.0, 260.0), Label, nullptr, Color, 0.0f, true, 1.2f);
 			}
 		}

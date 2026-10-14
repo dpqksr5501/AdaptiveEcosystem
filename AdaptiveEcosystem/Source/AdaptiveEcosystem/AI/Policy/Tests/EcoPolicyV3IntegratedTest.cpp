@@ -18,6 +18,8 @@
 //   Integrated.EndToEndMiniWorld       두 지역 × (사슴 16 + 늑대 2), 2000 스텝, 조정자 흉내(사망 → Alive 떼기 → 지우기)
 //   Integrated.FeedingFeedback         먹기 되먹임: 기록(먹은 양)은 셀에서 덜어 낸 양과 같고, 먹기 중 먹은 사슴은 에너지가 오른다. 사슴 글자,
 //                                      최근 10 초 고리 버퍼·구간에 먹은 사슴 수·에너지 평균·굶주림 수가 개체 조각과 맞는다
+//   Integrated.GradualNight            늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight 기본 1 → 설정 → 세계): 늑대 글자(눕는 중·깨는 중·못 누운 까닭),
+//                                      Mass 1000 스텝 — 16 m 안에 사슴이 있거나 사냥 중이면 잠들지 않고, 해 진 뒤 바로 자지 않고, 새벽에 깬다
 
 #include "Misc/AutomationTest.h"
 
@@ -365,8 +367,8 @@ namespace EcoPolicyV3IntegratedTestImpl
 			Mw.W.T = 200;
 			EcoWorldV3::UpdateDayNight(Mw.W);
 			const FWorldConfig& C = Mw.W.Config;
-			EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[0], EcoV3Integrated::WolfSpecForOrdinal(0, C.PredSpeedMult), 12.0, 12.0, 1.0, 0.0);
-			EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[1], EcoV3Integrated::WolfSpecForOrdinal(1, C.PredSpeedMult), 48.0, 48.0, -1.0, 0.0);
+			EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[0], EcoV3Integrated::WolfSpecForOrdinal(0, C.PredSpeedMult), 12.0, 12.0, 1.0, 0.0, 0);
+			EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[1], EcoV3Integrated::WolfSpecForOrdinal(1, C.PredSpeedMult), 48.0, 48.0, -1.0, 0.0, 1);
 			std::vector<std::int32_t> Rows;
 			for (int32 i = 0; i < N; ++i)
 			{
@@ -789,8 +791,8 @@ bool FEcoPolicyV3IntegratedAdoptionTest::RunTest(const FString& Parameters)
 	const EcoThreatV3::FThreatSpec Chaser = EcoV3Integrated::WolfSpecForOrdinal(1, C.PredSpeedMult);
 	for (FMiniWorld* Mw : {&SlotKeys, &StableKeys})
 	{
-		EcoWorldV3::AdoptThreat(Mw->W, Mw->Threats[0], Stalker, 5.0, 5.0, 1.0, 0.0);
-		EcoWorldV3::AdoptThreat(Mw->W, Mw->Threats[1], Chaser, 55.0, 55.0, -1.0, 0.0);
+		EcoWorldV3::AdoptThreat(Mw->W, Mw->Threats[0], Stalker, 5.0, 5.0, 1.0, 0.0, 0);
+		EcoWorldV3::AdoptThreat(Mw->W, Mw->Threats[1], Chaser, 55.0, 55.0, -1.0, 0.0, 1);
 	}
 	std::vector<std::int32_t> Rows;
 	for (int32 i = 0; i < N; ++i)
@@ -1057,8 +1059,12 @@ bool FEcoPolicyV3IntegratedDeathTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("빼지 않으면 동족 목록에 남는다"), KinNo, 3);
 
 	// --- Mass: 한 프레임 3 스텝 — 잡힘·굶음이 스텝 안에서 넘겨지고 다음 스텝에서 빠진다 ---
+	// 이 시험은 사망 넘기기만 본다. 늑대 밤잠 점진화(기본 켬)는 끈다: 켜면 t = 0(d = 0.5)에 입양한 늑대가 자고 있다가 늑대별 지연(0~22
+	// 스텝)만큼 뒤에 깨어 2 초에 걸쳐 걸음을 올리므로 3 스텝 안에 잡지 못한다. 밤잠은 Integrated.GradualNight 시험이 본다
+	FEcoV3IntegratedSettings DeathSettings = TestSettings(35001);
+	DeathSettings.bGradualNight = false;
 	FIntegratedHarness H;
-	if (!H.Setup(*this, TestSettings(35001)))
+	if (!H.Setup(*this, DeathSettings))
 	{
 		return false;
 	}
@@ -2032,6 +2038,170 @@ bool FEcoPolicyV3IntegratedFeedingTest::RunTest(const FString& Parameters)
 		MarkBad += SteppedNow.Contains(E) ? (bMarked != (Body(E).LastIntake > 0.0) ? 1 : 0) : (bMarked ? 1 : 0);
 	}
 	TestTrue(TEXT("(c) 다음 스텝: 구간 먹은 사슴 = 그 스텝에 먹은 사슴 (표시와 먹은 양이 맞는다)"), Ctx->AteDeerInterval == MarkedNow && MarkBad == 0);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedGradualNightTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.GradualNight",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedGradualNightTest::RunTest(const FString& Parameters)
+{
+	using EcoV3Integrated::EWolfState;
+
+	// --- 스위치: eco.IntegratedV3.GradualNight 기본 1 → 설정 → 세계 설정 ---
+	IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.GradualNight"));
+	if (!TestNotNull(TEXT("eco.IntegratedV3.GradualNight 콘솔 변수"), CVar))
+	{
+		return false;
+	}
+	const int32 Saved = CVar->GetInt();
+	TestEqual(TEXT("기본 1 (켬)"), Saved, 1);
+	TestTrue(TEXT("설정 기본값도 켬"), FEcoV3IntegratedSettings().bGradualNight);
+	TestTrue(TEXT("콘솔 1 → 설정 켬"), FEcoV3IntegratedSettings::FromConsole().bGradualNight);
+	CVar->Set(0, ECVF_SetByCode);
+	TestFalse(TEXT("콘솔 0 → 설정 끔"), FEcoV3IntegratedSettings::FromConsole().bGradualNight);
+	CVar->Set(Saved, ECVF_SetByCode);
+	{
+		FEcoV3IntegratedSettings S = TestSettings();
+		const std::vector<EcoObservationV3::FCoverInput> Covers = EcoWorldV3::QuadCovers(S.StageSizeUnits, 6.0);
+		TestTrue(TEXT("켠 설정 → 세계 bRealismNight"), UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, 0, 16, 2, Covers).bRealismNight);
+		S.bGradualNight = false;
+		TestFalse(TEXT("끈 설정 → 세계 bRealismNight 끔"), UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, 0, 16, 2, Covers).bRealismNight);
+	}
+
+	// --- 늑대 글자 ---
+	{
+		EcoThreatV3::FThreatConfig On;
+		On.bRealismNight = true;
+		const EcoThreatV3::FThreatConfig Off;
+		auto Make = [](int32 Ordinal)
+		{
+			FThreatAgent A;
+			A.Spec = EcoV3Integrated::WolfSpecForOrdinal(Ordinal, 0.8);
+			A.State.NightAct = 15;
+			return A;
+		};
+		FColor Color;
+		FThreatAgent A = Make(1);
+		A.State.bNightSettle = true;
+		A.State.NightAct = 6;
+		TestEqual(TEXT("눕는 중 글자"), EcoV3Integrated::WolfLabel(A, On, 1.0, Color), FString(TEXT("늑대 눕는 중 (추격형) 걸음 40%")));
+		TestTrue(TEXT("눕는 중 상태"), EcoV3Integrated::WolfStateOf(A, On) == EWolfState::Settle);
+		A = Make(0);
+		A.State.NightAct = 3;
+		TestEqual(TEXT("깨는 중 글자"), EcoV3Integrated::WolfLabel(A, On, 0.3, Color), FString(TEXT("늑대 깨는 중 (잠행형) 걸음 20%")));
+		A = Make(1);
+		A.LastNight.bBlockDeer = true;
+		TestEqual(TEXT("사슴 곁 글자"), EcoV3Integrated::WolfLabel(A, On, 0.8, Color), FString(TEXT("늑대 배회 (추격형) · 사슴 곁이라 안 누움")));
+		A = Make(1);
+		A.Last.bHasTarget = true;
+		A.Last.bHunting = true;
+		A.State.bNightHunt = true;
+		A.LastNight.bBlockHunt = true;
+		TestEqual(TEXT("사냥 중 글자"), EcoV3Integrated::WolfLabel(A, On, 1.0, Color), FString(TEXT("늑대 추격 (추격형) · 사냥 중이라 안 누움")));
+		A = Make(1);
+		TestEqual(TEXT("깜깜해 새 사냥 안 함 글자"), EcoV3Integrated::WolfLabel(A, On, 1.0, Color),
+				  FString(TEXT("늑대 배회 (추격형) · 깜깜해 새 사냥 안 함")));
+		A.State.bAsleep = true;
+		TestEqual(TEXT("잠 글자"), EcoV3Integrated::WolfLabel(A, On, 1.0, Color), FString(TEXT("늑대 잠 (추격형)")));
+		A = FThreatAgent();
+		A.Spec = EcoV3Integrated::WolfSpecForOrdinal(1, 0.8);   // 끈 판: 밤잠 칸은 기본값(활동도 0)이어도 깨는 중이 아니다
+		TestEqual(TEXT("끈 판 글자는 지금 그대로"), EcoV3Integrated::WolfLabel(A, Off, 1.0, Color), FString(TEXT("늑대 배회 (추격형)")));
+		TestEqual(TEXT("상태 이름 눕는 중·깨는 중"), FString(EcoV3Integrated::WolfStateNameKo(EWolfState::Settle)) + TEXT("/")
+														+ EcoV3Integrated::WolfStateNameKo(EWolfState::Waking),
+				  FString(TEXT("눕는 중/깨는 중")));
+	}
+
+	// --- Mass: 한 지역 사슴 16·늑대 2 를 해 질 녘 → 밤 → 새벽(1000 스텝) ---
+	FIntegratedHarness H;
+	if (!H.Setup(*this, TestSettings(38000)))
+	{
+		return false;
+	}
+	FEcoV3RegionContext* Ctx = H.AddRegion(TEXT("RegionN"), 0, FVector(0.0, 0.0, 0.0), 16, 2);
+	H.SpawnRegion(*Ctx, 16, 2, 1, 0);
+	Ctx->bReportedLowDensity = true;   // 시험에서는 밀도 하한 경고 줄을 내지 않는다
+	TestTrue(TEXT("통합 세계에 밤잠 점진화가 켜진다"), Ctx->Sim.ThreatCfg.bRealismNight);
+	const EcoThreatV3::FThreatConfig& Cfg = Ctx->Sim.ThreatCfg;
+	int32 SettleFrames = 0;
+	int32 WakingFrames = 0;
+	int32 OnsetNear = 0;
+	int32 OnsetHunting = 0;
+	int32 AwakeDark = 0;
+	int32 SleepMoved = 0;
+	TSet<int32> Delays;
+	TArray<double> OnsetSeconds;
+	for (int32 s = 0; s < 1000; ++s)
+	{
+		H.DecisionStep();
+		H.CoordinatorReconcile();
+		for (const FMassEntityHandle& E : H.Wolves)
+		{
+			if (!H.EM->IsEntityValid(E))
+			{
+				continue;
+			}
+			const FThreatAgent& A = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(E).Agent;
+			const EWolfState St = EcoV3Integrated::WolfStateOf(A, Cfg);
+			SettleFrames += St == EWolfState::Settle ? 1 : 0;
+			WakingFrames += St == EWolfState::Waking ? 1 : 0;
+			AwakeDark += (!A.State.bAsleep && Ctx->Sim.Dark >= Cfg.SleepDark) ? 1 : 0;
+			Delays.Add(A.State.NightDelay);
+			if (A.State.bAsleep && !A.LastNight.bOnset)
+			{
+				SleepMoved += H.EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value.Size2D() > 0.0 ? 1 : 0;
+			}
+			if (A.LastNight.bOnset)
+			{
+				double MinD = 1e300;
+				for (const EcoThreatV3::FPreyView& P : Ctx->Sim.Prey)
+				{
+					MinD = FMath::Min(MinD, FMath::Sqrt(FMath::Square(P.X - A.State.PosX) + FMath::Square(P.Y - A.State.PosY)));
+				}
+				OnsetNear += MinD <= Cfg.NightSettleR ? 1 : 0;
+				OnsetHunting += A.State.bNightHunt ? 1 : 0;
+				OnsetSeconds.Add(Ctx->DarkStartT >= 0 ? static_cast<double>(Ctx->Sim.T - Ctx->DarkStartT) * EcoRepertoireV3::kStepSeconds : -1.0);
+			}
+		}
+	}
+	const EcoWorldV3::FWorldStats& Stats = Ctx->Sim.Stats;
+	FString Onsets;
+	for (const double Sec : OnsetSeconds)
+	{
+		Onsets += FString::Printf(TEXT(" %.1f"), Sec);
+	}
+	AddInfo(FString::Printf(TEXT("1000 스텝: 눕기 시작 %lld, 다시 일어남 %lld, 잠듦 %lld (해 진 뒤 초:%s), 깸 %lld, 사슴 곁이라 안 누움 %lld, 사냥 중이라 안 누움 %lld, ")
+								TEXT("눕는 중 프레임 %d, 깨는 중 프레임 %d, 어둠 중 깨어 있음 %d, 지연 %d가지, 산 사슴 %d"),
+							Stats.NightSettleStarts, Stats.NightSettleAborts, Stats.NightOnsets, *Onsets, Stats.NightWakes, Stats.NightBlockDeer,
+							Stats.NightBlockHunt, SettleFrames, WakingFrames, AwakeDark, Delays.Num(), Ctx->AliveDeer));
+	TestTrue(TEXT("늑대가 눕고 잠든다 (해 질 녘)"), Stats.NightSettleStarts > 0 && Stats.NightOnsets > 0);
+	TestTrue(TEXT("새벽에 깬다"), Stats.NightWakes > 0);
+	TestTrue(TEXT("눕는 중·깨는 중 상태가 화면 집계에 잡힌다"), SettleFrames > 0 && WakingFrames > 0);
+	TestEqual(TEXT("잠드는 순간 16 m 안에 사슴이 없다"), OnsetNear, 0);
+	TestEqual(TEXT("사냥 중에는 잠들지 않는다"), OnsetHunting, 0);
+	TestEqual(TEXT("잠든 늑대는 움직이지 않는다 (화면 속도 0)"), SleepMoved, 0);
+	TestTrue(TEXT("해 진 뒤 바로 자지 않는다 (어둠 중 깨어 있는 프레임이 있다)"), AwakeDark > 0);
+	TestTrue(TEXT("늑대마다 다른 지연 (StableAgentId 해시)"), Delays.Num() >= 2);
+	for (const FMassEntityHandle& E : H.Wolves)
+	{
+		if (H.EM->IsEntityValid(E))
+		{
+			const FThreatAgent& A = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(E).Agent;
+			const int64 Id = H.EM->GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId;
+			TestEqual(TEXT("지연 = H(606, 세션 시드, StableAgentId) mod 23"), A.State.NightDelay,
+					  EcoThreatV3::NightDelayOf(Ctx->Sim.Config.Seed, Id, EcoWorldV3::NightMaxDelay(Ctx->Sim)));
+		}
+	}
+	for (const double Sec : OnsetSeconds)
+	{
+		// 눕기 시작 업데이트부터 활동도가 R 번 줄어야 잠든다 — 해 진 첫 업데이트에 바로 눕기 시작해도 R - 1 스텝 뒤다
+		TestTrue(TEXT("잠듦은 해 진 뒤 (눕기 15 스텝 − 1) 이후다"), Sec >= (Cfg.NightRampSteps - 1) * EcoRepertoireV3::kStepSeconds - 1e-9);
+	}
+	TestEqual(TEXT("마스크 위반"), Stats.MaskViolations, static_cast<int64>(0));
 	return true;
 }
 

@@ -21,6 +21,8 @@
 //   C4 섭식·대사            셀마다 수요 합 → 먹은 양 = min(수요, 셀 먹이) → 수요 비율로 나눔 (슬롯 순서 합)
 //   C5 번식 · C6 사망 (잡힘 또는 E <= 0) · C7 피식 EMA (분모 N 고정) · C8 먹이 재생
 //   D  t ← t + 1, Tick       D′ 새 t 의 어둠
+//                           D″ (FWorldConfig::bRealismNight 일 때만) 늑대마다 밤잠 업데이트 EcoThreatV3::NightUpdate (사슴 위치 = C2 의
+//                              이동 뒤 위치, 리스폰 전). 끄면 이 줄이 없다 — 평면 맵·기준 루프·골든은 지금 그대로다
 //   E  관측                 먹이 장(blur·기울기) → 위협·동족·은신처 지각 → Perceive(away·recency) → 관측 18
 //                           이번 스텝에 죽은 개체도 제자리에서 동족으로 센다(파이썬 그대로, 계약 2-3·열린 질문 5)
 //   G  리스폰               죽은 슬롯을 새 세대로 (맵 전체 균등 위치) — 그 행만 E 를 다시 한다
@@ -31,6 +33,8 @@
 //   FWorldConfig::RngStream        세계 난수 갈래 (지역마다 다른 먹이 패치·늑대 선회). 0 = 지금과 같다
 //   FWorldConfig::bRespawnDead     false = 제자리 부활 없음 (죽은 개체 = 사라질 개체, 새 개체 = 새 StableAgentId)
 //   FWorldConfig::PredEmaDenominator  피식 EMA 분모 고정값. 0 = 지금처럼 N
+//   FWorldConfig::bRealismNight    늑대 밤잠 점진화 (파이썬 configs/v3_real1_night_on.yaml realism_night). false = 지금과 같다.
+//                                  켜면 잠은 늑대별 상태(InitThreat·AdoptThreat 의 NightInit, D″ NightUpdate)이고 관측도 그 상태를 읽는다
 //   FStepHooks                     이동 제약 콜백 (지형·장애물). C1 사슴 이동 바로 뒤, C2 위협마다 Step 바로 뒤에 부른다.
 //                                  막히면 그 개체는 이번 스텝 이동 전 자리에 남는다 — 그래서 포획 거리·섭식 셀·관측이 모두 막힌 뒤 위치로 계산된다
 //   AdoptHerb·AdoptThreat          주어진 위치·heading·키·종류로 만든다(세계 난수를 쓰지 않는다)
@@ -123,6 +127,8 @@ namespace EcoWorldV3
 		std::uint64_t RngStream = 0;        // 세계 난수 첫 해시의 셋째 입력. 0 = 지금과 같다. 지역마다 다르게 주면 먹이 패치·선회가 갈린다
 		bool bRespawnDead = true;           // false = 죽은 슬롯을 되살리지 않는다 (G 를 건너뛰고 PrevPos = Pos 로 멈춘다)
 		std::int32_t PredEmaDenominator = 0; // 피식 EMA 분모. 0 이면 이번 스텝 N (평면 맵: 설정 사슴 수 = 학습의 고정 128 과 같은 꼴)
+		// 늑대 밤잠 점진화 (EcoThreatModel.h FThreatConfig::bRealismNight 로 넘긴다). 기본 끔 = R1b 학습 세계 그대로 (평면 맵·기준 루프·골든)
+		bool bRealismNight = false;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -389,6 +395,7 @@ namespace EcoWorldV3
 		EcoThreatV3::FThreatSpec Spec;
 		EcoThreatV3::FThreatState State;
 		EcoThreatV3::FThreatStepResult Last;   // 이번 스텝 결과 (디버그·기록)
+		EcoThreatV3::FNightUpdateResult LastNight;   // 이번 스텝 끝 밤잠 업데이트 결과 (밤잠 점진화를 켰을 때만, 디버그·기록)
 		double PrevX = 0.0;                    // 이번 스텝 이동 전 위치 (화면 보간 전용)
 		double PrevY = 0.0;
 	};
@@ -421,6 +428,15 @@ namespace EcoWorldV3
 		// 섭식 기록 (통합 모드 화면·기록용. 논리에 쓰지 않으므로 평면 맵·기준 루프의 상태는 그대로다)
 		double FoodEaten = 0.0;              // 누적 먹은 먹이 (먹이 단위, C4 에서 셀마다 덜어 낸 양의 셀 순서 합)
 		std::int64_t EatSteps = 0;           // 실제로 먹은 개체·스텝 (먹은 양 > 0)
+		// 늑대 밤잠 점진화 기록 (켰을 때만 센다. world.py realism_stats 의 같은 이름 칸)
+		std::int64_t NightSettleStarts = 0;  // 눕기 시작 (settle_n)
+		std::int64_t NightSettleAborts = 0;  // 눕다가 다시 일어남 (settle_abort_n)
+		std::int64_t NightOnsets = 0;        // 잠듦 (onset_n)
+		std::int64_t NightWakes = 0;         // 깸 (wake_n)
+		std::int64_t NightBlockDeer = 0;     // 누울 차례인데 사슴이 가까워 못 누운 늑대·업데이트 (block_deer_n)
+		std::int64_t NightBlockHunt = 0;     // 누울 차례인데 사냥 중이라 못 누운 늑대·업데이트 (block_hunt_n)
+		std::int64_t NightDarkUpdates = 0;   // 어둠(d ≥ 0.5) 업데이트의 주행성 늑대·업데이트
+		std::int64_t NightDarkAwake = 0;     // 그중 깨어 있음 (눕는 중 포함). 비율 = dark_awake_frac
 	};
 
 	/**
@@ -496,6 +512,7 @@ namespace EcoWorldV3
 		W.RepCfg = EcoRepertoireV3::kR1bConfig;
 		W.ObsCfg = EcoObservationV3::kR1bObsConfig;
 		W.ThreatCfg = EcoThreatV3::FThreatConfig();
+		W.ThreatCfg.bRealismNight = C.bRealismNight;
 		W.Rng.State = EcoRepertoireV3::HashChain3(kWorldRngTag, static_cast<std::uint64_t>(C.Seed), C.RngStream);
 		W.Food.Build(W.Config, W.Rng);
 		W.T = 0;
@@ -542,6 +559,35 @@ namespace EcoWorldV3
 		return EcoThreatV3::MakeChaserSpec(C.PredSpeedMult, bRanged, bNocturnal, W.ThreatCfg);
 	}
 
+	/** 밤잠 점진화의 늑대별 지연 최대 ⌊spread × τ⌋ (낮 고정 세계는 0 — world.py `_rz_night_update` fresh 의 tw = 0). */
+	inline std::int32_t NightMaxDelay(const FWorldState& W)
+	{
+		return W.Config.DayPeriod > 0 ? EcoThreatV3::NightMaxDelay(W.Config.TwilightSteps, W.ThreatCfg) : 0;
+	}
+
+	/**
+	 * 위협의 처음 잠 상태. 밤잠 점진화를 켜면 NightInit (지연 = H(606, 세계 Seed, NightSlot) — 파이썬은 위협 슬롯 번호),
+	 * 끄면 지금 어둠의 IsAsleep 훅 그대로.
+	 */
+	inline void InitThreatSleep(const FWorldState& W, FThreatAgent& A, std::int64_t NightSlot)
+	{
+		if (W.ThreatCfg.bRealismNight)
+		{
+			EcoThreatV3::NightInit(A.Spec, A.State, W.Dark, EcoThreatV3::NightDelayOf(W.Config.Seed, NightSlot, NightMaxDelay(W)),
+								   W.ThreatCfg);
+		}
+		else
+		{
+			A.State.bAsleep = EcoThreatV3::IsAsleep(A.Spec, W.Dark, W.ThreatCfg);
+		}
+	}
+
+	/** 지금 잠 (관측의 '굴에서 자는 위협은 안 보인다'). 켜면 늑대별 상태, 끄면 새 t 의 어둠으로 다시 판정한다. */
+	inline bool ThreatAsleepNow(const FWorldState& W, const FThreatAgent& A)
+	{
+		return EcoThreatV3::IsAsleepNow(A.Spec, A.State, W.Dark, W.ThreatCfg);
+	}
+
 	/** 처음 나는 위협: 맵 균등 위치·무작위 heading·지난 변위 0, 플레이어는 첫 모드를 고른다. */
 	inline void InitThreat(FWorldState& W, std::uint32_t Slot, FThreatAgent& A)
 	{
@@ -554,7 +600,7 @@ namespace EcoWorldV3
 		const double Ang = W.Rng.Uniform(0.0, 2.0 * 3.14159265358979323846);
 		A.State.HeadX = std::cos(Ang);
 		A.State.HeadY = std::sin(Ang);
-		A.State.bAsleep = EcoThreatV3::IsAsleep(A.Spec, W.Dark, W.ThreatCfg);
+		InitThreatSleep(W, A, static_cast<std::int64_t>(Slot));
 		if (A.Spec.Type == EcoThreatV3::EThreatType::Player)
 		{
 			const double U0 = W.Rng.NextU01();
@@ -594,9 +640,12 @@ namespace EcoWorldV3
 		EcoRepertoireV3::InitAgent(*H.Rep, E01 < 0.0 ? 0.0 : (E01 > 1.0 ? 1.0 : E01), W.Dark, W.Config.Seed, AgentKey, W.RepCfg);
 	}
 
-	/** 통합 모드의 새 위협: 주어진 성질(잠행·추격, 야행성, 속력)·위치·heading. 플레이어 대역은 쓰지 않는다(모드 난수가 필요하다). */
+	/**
+	 * 통합 모드의 새 위협: 주어진 성질(잠행·추격, 야행성, 속력)·위치·heading. 플레이어 대역은 쓰지 않는다(모드 난수가 필요하다).
+	 * NightSlot = 밤잠 점진화의 늑대별 지연 해시 키 (파이썬은 위협 슬롯 번호. 통합 모드는 늑대 StableAgentId). 끄면 쓰지 않는다.
+	 */
 	inline void AdoptThreat(FWorldState& W, FThreatAgent& A, const EcoThreatV3::FThreatSpec& Spec, double PosX, double PosY,
-							double HeadX, double HeadY)
+							double HeadX, double HeadY, std::int64_t NightSlot = 0)
 	{
 		const double Size = W.Config.WorldSize;
 		A = FThreatAgent();
@@ -609,7 +658,7 @@ namespace EcoWorldV3
 		const bool bHead = Hx != 0.0 || Hy != 0.0;
 		A.State.HeadX = bHead ? Hx : 1.0;
 		A.State.HeadY = bHead ? Hy : 0.0;
-		A.State.bAsleep = EcoThreatV3::IsAsleep(A.Spec, W.Dark, W.ThreatCfg);
+		InitThreatSleep(W, A, NightSlot);
 		A.PrevX = A.State.PosX;
 		A.PrevY = A.State.PosY;
 	}
@@ -629,7 +678,7 @@ namespace EcoWorldV3
 				In.Y = A.State.PosY;
 				In.VelX = A.State.VelX;
 				In.VelY = A.State.VelY;
-				In.bAsleep = EcoThreatV3::IsAsleep(A.Spec, W.Dark, W.ThreatCfg);   // 새 t 의 어둠으로 다시 판정 (굴에서 자면 안 보인다)
+				In.bAsleep = ThreatAsleepNow(W, A);   // 굴에서 자면 안 보인다 (끄면 새 t 의 어둠으로 다시 판정, 켜면 늑대별 상태)
 			}
 		}
 
@@ -1014,6 +1063,29 @@ namespace EcoWorldV3
 			R3::Tick(*Herbs[i].Rep);
 		}
 		UpdateDayNight(W);
+		// D″. 늑대 밤잠 점진화 (켰을 때만): 새 t 의 어둠과 늑대 이동 뒤·리스폰 전 사슴 위치(W.Prey — C2 에서 모은 이동 뒤 위치, 이번 스텝에
+		//     죽은 사슴도 그 자리에 있다)로 늑대마다 한 업데이트 (world.py `_daynight_update` → `_rz_night_update`, 관측 E 전)
+		if (W.ThreatCfg.bRealismNight)
+		{
+			const bool bDarkNow = W.Dark >= W.ThreatCfg.SleepDark;
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				FThreatAgent& A = *Threats[m];
+				A.LastNight = EcoThreatV3::NightUpdate(A.Spec, A.State, W.Dark, W.Prey.data(), N, W.ThreatCfg);
+				const EcoThreatV3::FNightUpdateResult& Nr = A.LastNight;
+				W.Stats.NightSettleStarts += Nr.bSettleStart ? 1 : 0;
+				W.Stats.NightSettleAborts += Nr.bSettleAbort ? 1 : 0;
+				W.Stats.NightOnsets += Nr.bOnset ? 1 : 0;
+				W.Stats.NightWakes += Nr.bWake ? 1 : 0;
+				W.Stats.NightBlockDeer += Nr.bBlockDeer ? 1 : 0;
+				W.Stats.NightBlockHunt += Nr.bBlockHunt ? 1 : 0;
+				if (bDarkNow && !A.Spec.bNocturnal)
+				{
+					++W.Stats.NightDarkUpdates;
+					W.Stats.NightDarkAwake += A.State.bAsleep ? 0 : 1;
+				}
+			}
+		}
 
 		// E~F. 관측 (죽은 개체도 제자리에서 동족으로 센다)
 		ObserveAll(W, Herbs, N, Threats, M);

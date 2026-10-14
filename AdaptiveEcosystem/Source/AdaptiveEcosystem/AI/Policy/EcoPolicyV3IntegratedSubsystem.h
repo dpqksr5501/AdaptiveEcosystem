@@ -34,6 +34,14 @@
 //      먹기 되먹임: 사슴 글자 = 행동 + 에너지 % (+ 이번 결정 스텝에 먹은 몫, 굶주림, 번식), 지역 집계 둘째 줄 = 무대 먹이 처음 대비 %·
 //      최근 10 초 먹은 양·에너지 평균·굶주림 수. 기록 줄에는 구간 먹은 양·먹은 사슴 수·먹기 중 실제로 먹은 비율·무대 먹이 %·에너지 평균.
 //      먹이는 v3 먹이 격자만 바뀐다 — 팀 지역 FoodAmount 에는 쓰지 않는다 (FEcoV3RegionContext 섭식 칸 설명).
+//   6. 늑대 밤잠 점진화 (사람 결정 H1 10-14, 콘솔 변수 eco.IntegratedV3.GradualNight 기본 1 — Play 전에 바꾼다):
+//      파이썬 configs/v3_real1_night_on.yaml 의 realism_night 를 엔진 무관 위협 모델로 옮긴 것(EcoThreatModel.h bRealismNight)을 켠다.
+//      늑대는 해가 진 뒤 늑대마다 다른 지연(0~22 스텝, H(606, 세션 시드, StableAgentId))이 지나고, 사냥 중이 아니고, 16 m(8 단위) 안에 사슴이 없을 때 2 초 동안 걸음을
+//      늦추다 눕는다. 그동안 사냥이 시작되거나 사슴이 다가오면 다시 일어난다. 깜깜하면(d = 1) 새 사냥을 시작하지 않고 쫓던 사냥만 마저
+//      끝낸다. 새벽에는 하나씩 깨어 2 초에 걸쳐 걸음을 올린다. 해 진 뒤 깨어 있는 늑대의 속력 하한은 0.5 배다.
+//      R1b 두뇌는 그대로다(관측 18·마스크 판 2). 학습 세계 밖 규칙이지만 R1b 측정(results/v3/real1)으로 허용했다(R3 명세 H1).
+//      화면: 늑대 글자 '눕는 중'·'깨는 중' + 걸음 %, 사슴이 가까워·사냥 중이라 못 누우면 그 까닭. 기록: 잠듦·깸·눕기 시작·다시 일어남
+//      한 줄씩(해 진 뒤 초, 가장 가까운 사슴 m), 10 초 줄에 밤잠 집계. 0 으로 두면 지금까지처럼 d ≥ 0.5 가 되는 순간 곧바로 잔다.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -70,7 +78,9 @@ namespace EcoV3Integrated
 		Exhaust,   // 지침 (돌진 실패 뒤)
 		Chase,     // 추격 (추격형이 표적을 봄)
 		Eat,       // 식사 (포획 뒤 쿨다운)
-		Sleep,     // 잠 (주행성, 어둠 0.5 이상)
+		Sleep,     // 잠 (주행성. 밤잠 점진화를 끄면 어둠 0.5 이상, 켜면 늑대별 잠)
+		Settle,    // 눕는 중 (밤잠 점진화: 걸음을 늦추는 2 초)
+		Waking,    // 깨는 중 (밤잠 점진화: 깨어 걸음을 올리는 중, 또는 눕다가 다시 일어나는 중)
 		Count
 	};
 
@@ -84,8 +94,20 @@ namespace EcoV3Integrated
 	/** 번식 표시를 남기는 결정 스텝 수 (약 1.5 초). */
 	inline constexpr int64 kReproMarkSteps = 11;
 
-	ADAPTIVEECOSYSTEM_API EWolfState WolfStateOf(const EcoWorldV3::FThreatAgent& Agent);
+	/**
+	 * 늑대 상태 (화면·기록). Cfg 는 그 지역 세계의 위협 설정 (FWorldState::ThreatCfg) — 밤잠 점진화를 켠 세계만 눕는 중·깨는 중이 나온다.
+	 * 우선순위: 잠 > 눕는 중 > 돌진·지침 > 식사 > 추격·잠행 > 깨는 중 > 배회.
+	 */
+	ADAPTIVEECOSYSTEM_API EWolfState WolfStateOf(const EcoWorldV3::FThreatAgent& Agent,
+												 const EcoThreatV3::FThreatConfig& Cfg = EcoThreatV3::FThreatConfig());
 	ADAPTIVEECOSYSTEM_API const TCHAR* WolfStateNameKo(EWolfState State);
+
+	/**
+	 * 늑대 머리 위 글자 (eco.V3Debug 1): '늑대 눕는 중 (추격형) 걸음 40%'. 밤잠 점진화를 켠 세계에서 깨어 있는 주행성 늑대가 이번 스텝에
+	 * 누울 차례인데 못 누웠으면 ' · 사슴 곁이라 안 누움' / ' · 사냥 중이라 안 누움', 눕는 중이 아닌데 깜깜해 새 사냥을 안 하면 ' · 깜깜해 새 사냥 안 함'.
+	 */
+	ADAPTIVEECOSYSTEM_API FString WolfLabel(const EcoWorldV3::FThreatAgent& Agent, const EcoThreatV3::FThreatConfig& Cfg, double Dark,
+											FColor& OutColor);
 	ADAPTIVEECOSYSTEM_API const TCHAR* BehaviorNameKo(int32 Behavior);
 
 	/**
@@ -115,6 +137,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	int32 WolvesPerRegion = 2;          // 잠행 1 + 추격 1 (학습 보통 위협 2~12, 잠행 비율 30~70%)
 	double StageSizeUnits = 60.0;       // 무대 한 변 (단위, 학습 60~110 = 120~220 m)
 	double PredSpeedMult = 0.8;         // 늑대 속력 = 사슴 뛰기 900 cm/s × 0.8 = 720 cm/s (학습 0.6~0.95)
+	bool bGradualNight = true;          // 늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight 기본 1, 사람 결정 H1 10-14). 거짓 = d ≥ 0.5 에 곧바로 잠
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등
@@ -238,6 +261,12 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 		return StartFood > 0.0 ? Sim.Food.Total() / StartFood : 0.0;
 	}
 
+	// 늑대 밤잠 점진화 기록 (해 진·뜬 시각 — 잠듦·깸 줄의 '해 진 뒤 초'). -1 = 아직 모른다
+	int64 DarkStartT = -1;                    // 마지막으로 어둠(d ≥ 0.5)이 시작된 전역 스텝
+	int64 LightStartT = -1;                   // 마지막으로 밝아진(d < 0.5) 전역 스텝
+	bool bPrevDark = false;                   // 지난 결정 스텝 끝의 어둠 (d ≥ 0.5)
+	bool bDarkKnown = false;                  // bPrevDark 가 정해졌다
+
 	// 기록
 	int64 TerrainChecks = 0;                  // 지형 제약으로 검사한 이동 수 (콜백이 실제로 도는지 보는 기록)
 	int64 LastLogTerrainChecks = 0;
@@ -353,6 +382,12 @@ public:
 
 	/** 처리기가 한 컨텍스트의 결정 스텝 하나를 마칠 때마다 부른다 (포획 표시·기록). */
 	void NotifyContextStep(FEcoV3RegionContext& Ctx, const EcoWorldV3::FStepReport& Report);
+	/**
+	 * 늑대 밤잠 점진화 기록 (처리기가 결정 스텝 하나 뒤, NotifyContextStep 앞에 부른다): 해 진·뜬 시각을 갱신하고 늑대마다 이번 스텝의
+	 * 밤잠 사건(잠듦·깸·눕기 시작·다시 일어남)을 한 줄씩 남긴다. 가장 가까운 사슴은 이번 스텝 이동 뒤 산 사슴(Sim.Prey)이다.
+	 * Threats·WolfIds 는 이번 Step 배열과 같은 순서다. 밤잠 점진화를 끈 세계는 아무것도 하지 않는다.
+	 */
+	void NotifyNightStep(FEcoV3RegionContext& Ctx, EcoWorldV3::FThreatAgent* const* Threats, const int64* WolfIds, int32 NumWolves);
 	/** [EcoV3I] 기록 줄을 지금 남긴다. */
 	void LogContext(FEcoV3RegionContext& Ctx);
 	/** 처리기가 한 프레임에 결정 스텝 Steps 개(모든 지역)를 돈 시간 (기록 줄의 '결정 스텝 CPU'). */
