@@ -70,6 +70,18 @@ USTRUCT(BlueprintType)
 struct FRegionEcologyState
 {
 	GENERATED_BODY()
+	/** Opt-in Ecology response to World rainfall; default preserves constant regeneration. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ecology|Environment Response")
+	bool bRainfallAffectsRegeneration = false;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ecology|Environment Response")
+	float DryRegenerationMultiplier = 0.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ecology|Environment Response")
+	float WetRegenerationMultiplier = 1.5f;
+	/** Captured at the resource step boundary, never fetched on a worker. */
+	FRegionEnvironmentState CompletedEnvironment;
+	float EffectiveRegenerationMultiplier = 1.f;
+	/** Derived resource demand, distinct from total predator+prey population. */
+	int32 ProjectedFoodConsumers = 0;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|State")
 	FName RegionId = NAME_None;

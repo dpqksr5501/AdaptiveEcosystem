@@ -17,7 +17,7 @@ bool UEcologySimulationSubsystem::RefreshPopulationPressure(double Time)
 		auto& S = Pair.Value;
 		if (S.EcologicalComfortPopulation <= 0) return false;
 		S.CrowdingRatio = static_cast<float>(S.ProjectedPopulation) / S.EcologicalComfortPopulation;
-		const double Demand = S.ProjectedPopulation * PerAgentConsumptionRate * PressureSettings.ForecastSeconds;
+		const double Demand = S.ProjectedFoodConsumers * PerAgentConsumptionRate * PressureSettings.ForecastSeconds;
 		S.FoodSatisfaction = Demand > 0 ? static_cast<float>(FMath::Clamp(S.FoodAmount / Demand, 0.0, 1.0)) : 1.0f;
 		if (!PressureSettings.bEnabled || (S.CrowdingRatio <= PressureSettings.ExitCrowdingRatio
 			&& S.FoodSatisfaction >= PressureSettings.ExitFoodSatisfaction))
@@ -91,6 +91,13 @@ bool UEcologySimulationSubsystem::RecordDeaths(TConstArrayView<FEcoDeathOutcome>
 		DeathReceipts.Add(Death.StableAgentId);
 		auto& State = RegionalStates.FindChecked(Death.RegionId);
 		if (Death.Cause == EEcoDeathCause::Starvation) ++State.StarvationDeaths;
+		else if (Death.Cause == EEcoDeathCause::Predation)
+		{
+			FEcoPredationEvent Event;
+			Event.RegionId = Death.RegionId; Event.PreyStableAgentId = Death.StableAgentId;
+			Event.PredatorStableAgentId = Death.PredatorStableAgentId;
+			ApplyPredationEvent(Event);
+		}
 		else ++State.ExternalDeaths;
 		// Receipt watermark is no longer needed once the unique lifetime has ended.
 		LastAcceptedFeedTime.Remove(Death.StableAgentId);

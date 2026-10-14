@@ -4,7 +4,7 @@
 #include "EcoSurvivalTypes.generated.h"
 
 UENUM(BlueprintType)
-enum class EEcoDeathCause : uint8 { None, Starvation, ExternalDamage };
+enum class EEcoDeathCause : uint8 { None, Starvation, ExternalDamage, Predation };
 
 /** Session-immutable Box baseline. Energy units/second, HP units/second, Food -> Energy. */
 USTRUCT(BlueprintType)
@@ -64,6 +64,7 @@ struct FEcoDeathOutcome
 	FName SpeciesId;
 	EEcoDeathCause Cause = EEcoDeathCause::None;
 	double Time = 0.0;
+	int64 PredatorStableAgentId = 0;
 };
 
 /** Ephemeral decision input; count source is always authoritative Mass. */

@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Core/EcoRepresentationTypes.h"
 #include "Core/EcoTimeTypes.h"
+#include "Core/EcoRegionTypes.h"
 #include "EcologyNetworkTypes.generated.h"
 
 /**
@@ -35,6 +36,10 @@ struct FReplicatedRegionSummary
 
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
 	FName RegionId;
+	UPROPERTY(BlueprintReadOnly, Category="Ecology|Network")
+	FRegionEnvironmentState Environment;
+	UPROPERTY(BlueprintReadOnly, Category="Ecology|Network")
+	float EffectiveFoodRegenerationRate = 0.f;
 
 	UPROPERTY(BlueprintReadOnly, Category = "Ecology|Network")
 	int32 WorldEpoch = 0;
@@ -88,6 +93,22 @@ struct FReplicatedRegionSummary
 	float AverageEnergy = 0.0f;
 };
 
+/** Region/species counts from the same completed authority step. */
+USTRUCT(BlueprintType)
+struct FEcoSpeciesPopulationSummary
+{
+	GENERATED_BODY()
+	UPROPERTY(BlueprintReadOnly) FName RegionId;
+	UPROPERTY(BlueprintReadOnly) FName SpeciesId;
+	UPROPERTY(BlueprintReadOnly) int32 Population = 0;
+	UPROPERTY(BlueprintReadOnly) float AverageEnergy = 0.f;
+	/** Cumulative committed outcomes since this world epoch, at the summary's completed step. */
+	UPROPERTY(BlueprintReadOnly) int64 Births = 0;
+	UPROPERTY(BlueprintReadOnly) int64 Deaths = 0;
+	UPROPERTY(BlueprintReadOnly) int64 MigrationIn = 0;
+	UPROPERTY(BlueprintReadOnly) int64 MigrationOut = 0;
+};
+
 /** One replication property prevents mixing separately delivered clock/resource/population revisions. */
 USTRUCT(BlueprintType)
 struct FEcoCompletedWorldSummary
@@ -101,4 +122,6 @@ struct FEcoCompletedWorldSummary
 	int32 Revision = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Ecology|Network")
 	TArray<FReplicatedRegionSummary> Regions;
+	UPROPERTY(BlueprintReadOnly, Category="Ecology|Network")
+	TArray<FEcoSpeciesPopulationSummary> Species;
 };

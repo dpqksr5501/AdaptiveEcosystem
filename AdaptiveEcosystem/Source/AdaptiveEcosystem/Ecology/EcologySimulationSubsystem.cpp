@@ -82,10 +82,9 @@ void UEcologySimulationSubsystem::TickSimulation(float DeltaTime)
 
 		State.FoodCapacity = FMath::Max(0.0f, State.FoodCapacity);
 		State.FoodRegenerationRate = FMath::Max(0.0f, State.FoodRegenerationRate);
-		State.FoodAmount = FMath::Clamp(
-			State.FoodAmount + State.FoodRegenerationRate * DeltaTime,
-			0.0f,
-			State.FoodCapacity);
+		State.FoodAmount = static_cast<float>(FMath::Clamp(
+			double(State.FoodAmount) + double(State.FoodRegenerationRate) * State.EffectiveRegenerationMultiplier * DeltaTime,
+			0.0, double(State.FoodCapacity)));
 
 		// Exponential decay is stable for variable frame/step durations.
 		if (State.PredationHistory > 0.0f)
@@ -109,6 +108,9 @@ bool UEcologySimulationSubsystem::RegisterRegionState(const FRegionEcologyState&
 	{
 		return false;
 	}
+	if (!FMath::IsFinite(InState.DryRegenerationMultiplier) || InState.DryRegenerationMultiplier < 0
+		|| InState.DryRegenerationMultiplier > 4 || !FMath::IsFinite(InState.WetRegenerationMultiplier)
+		|| InState.WetRegenerationMultiplier < 0 || InState.WetRegenerationMultiplier > 4) return false;
 
 	if (RegionalStates.Contains(InState.RegionId))
 	{
@@ -207,6 +209,8 @@ bool UEcologySimulationSubsystem::UpdatePopulationMetrics(const FEcoRegionPopula
 		Found->OutboundCount = Snapshot.OutboundCount;
 		Found->IncomingCount = Snapshot.IncomingCount;
 		Found->ProjectedPopulation = FMath::Max(0, Snapshot.Population - Snapshot.OutboundCount + Snapshot.IncomingCount);
+		Found->ProjectedFoodConsumers = Snapshot.FoodConsumerCount < 0 ? Found->ProjectedPopulation
+			: FMath::Max(0, Snapshot.FoodConsumerCount - Snapshot.FoodConsumerOutbound + Snapshot.FoodConsumerIncoming);
 		Found->TravelingCount = FMath::Clamp(Snapshot.TravelingCount, 0, Found->Population);
 		Found->WaitingCount = FMath::Clamp(Snapshot.WaitingCount, 0, Found->Population - Found->TravelingCount);
 		Found->AverageEnergy = FMath::Clamp(Snapshot.AverageEnergy, 0.0f, 1.0f);
@@ -321,7 +325,7 @@ bool UEcologySimulationSubsystem::ReserveSpawn(FName RegionId, FEcoSpawnRequest&
 		RegionalReserved, GlobalReserved, Settings->RegionPopulationLimit, GlobalPopulationLimit, State->FoodAmount, Request.bInitial);
 	if (!Request.bInitial && PressureSettings.bEnabled)
 	{
-		const double Demand = (State->ProjectedPopulation + RegionalReserved + Request.Count) * PerAgentConsumptionRate * PressureSettings.ForecastSeconds;
+		const double Demand = (State->ProjectedFoodConsumers + RegionalReserved + Request.Count) * PerAgentConsumptionRate * PressureSettings.ForecastSeconds;
 		if (State->bPressureActive || State->ProjectedPopulation + RegionalReserved + Request.Count
 			> State->EcologicalComfortPopulation * PressureSettings.EnterCrowdingRatio
 			|| (Demand > 0 && State->FoodAmount / Demand < PressureSettings.EnterFoodSatisfaction)) Request.Count = 0;

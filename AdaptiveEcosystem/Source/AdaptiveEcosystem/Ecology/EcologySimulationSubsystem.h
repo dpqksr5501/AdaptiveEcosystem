@@ -45,6 +45,8 @@ public:
 	/** Ticks regional food regeneration and decays accumulated predation history */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
 	void TickSimulation(float DeltaTime);
+	/** Explicit authority profile change; takes effect at the next resource boundary. */
+	bool ConfigureRegionRegeneration(FName RegionId, float Rate, bool bRainfall, float DryMultiplier, float WetMultiplier);
 
 	// -------------------------------------------------------------------------
 	// Region Ecology State Management
@@ -132,6 +134,7 @@ public:
 	FOnRegionPredationRecorded OnRegionPredationRecorded;
 
 private:
+	bool CaptureEnvironmentInputs(const FEcoServerTimeSnapshot& Time);
 	bool CanMutateAuthoritativeState(const TCHAR* OperationName) const;
 	static FRegionEcologyState MakeSanitizedRegionState(const FRegionEcologyState& InState);
 
