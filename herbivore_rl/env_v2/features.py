@@ -35,6 +35,10 @@
 5. 이미 있는 기능에 동작을 더할 때는 새 계수 키를 `PARAM_KEYS` 에 더하고, 그 키의 '끔' 값이 앞 버전
    동작이 되게 한다. 앞 버전 설정에는 그 값을 적는다(계수가 빠지면 읽을 때 실패한다). 3 과 5 가 함께
    있어야 "새 기능만 끈 상태 = 직전 버전" 회귀가 지켜진다.
+6. 규칙 5 의 다른 꼴 — 선택 계수 키(`OPTIONAL_KEYS`, 10-14 R3): 앞 버전 설정 파일을 고치지 않고(그 파일의 config digest 와
+   기록된 결과가 그대로 남게) 이미 있는 기능에 동작을 더할 때 쓴다. 등록부에 키와 '끔' 값(= 앞 버전 동작)을 한 번 적고, 켠 블록에
+   그 키가 없으면 끔 값으로 읽는다(`with_optional`). 새 설정은 선택 키도 모두 적는다(R3 설정 configs/v3_r3*.yaml 이 적는다).
+   모르는 키 검사는 선택 키도 안다. 끔 값으로 앞 버전과 비트 동일인지는 그 기능의 시험이 본다(tests/test_r3_world.py).
 
 numpy `SeedSequence` 는 시드 목록 끝의 0 을 무시하고(`[s, 2, 7]` 과 `[s, 2, 7, 0]` 이 같은 스트림),
 2^32 이상의 정수는 uint32 단어 여러 개로 쪼갠다. 그래서 시드와 part 는 [0, 2^32) 로 제한한다. 이 범위에서
@@ -85,13 +89,17 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "realism_shelter": 21,     # (c) 은신처 원 안의 사슴은 행동과 무관하게 잡히지 않는다(안에서 먹어도 된다)
     "realism_night": 22,       # (d) 늑대 밤잠 점진화: 사냥 중·사슴 근처면 눕지 않음, 걸음을 늦추며 눕기, 늑대마다 다른 잠·기상 시각, 기상 가속
     "realism_cover_food": 23,  # (e) 은신처 원과 겹치는 셀의 먹이 용량·재생을 밖의 일부로(빽빽한 덤불 밑은 풀이 적다)
+    # v3 R3 세계(10-14 사람 결정, 명세 Docs/RL_Policy/RL_V3_R3_SPEC.md 14절). 정의·식·현실 근거는 env_v2/world.py 모듈 docstring
+    # 'R3 세계'. 늑대가 은신처 원에 못 들어감(H17)과 은신처 먹이 배수 뽑기(H7)는 기존 블록의 선택 키다(OPTIONAL_KEYS)
+    "realism_chase": 24,       # (f) 추격 고정: 쫓기 시작한 늑대는 그 사슴이 보이는 동안 표적을 바꾸지 않는다(H6). 난수 없음
+    "realism_terrain": 25,     # (h) 지형 구역: 셀마다 보통·눈·거친 땅, 이동 전 셀의 땅이 속력을 줄인다(H18, 사슴은 관측하지 않음 H19)
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
 IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight", "pred_sleep",
                                          "repertoire", "threats", "stare_down", "alarm",
                                          "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
-                                         "realism_cover_food"})
+                                         "realism_cover_food", "realism_chase", "realism_terrain"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -185,9 +193,37 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # 늑대마다 다른 잠·기상 지연의 최대(박명 폭 τ 비율), ramp_steps = 눕기·깨기에 걸리는 스텝(활동도 0 ↔ 1)
     "realism_night": frozenset({"settle_r", "hunt_dark", "night_floor", "spread", "ramp_steps"}),
     # realism_cover_food: cap_frac = 은신처 셀(은신처 원과 겹치는 셀, `World._cover_overlap_cells`) 먹이 용량 배수, regen_frac = 은신처
-    # 셀 재생률 / 밖 재생률(v1 은 0.3)
+    # 셀 재생률 / 밖 재생률(v1 은 0.3). 선택 키 frac_range(아래 OPTIONAL_KEYS)를 쓰면 둘 다 null 로 둔다
     "realism_cover_food": frozenset({"cap_frac", "regen_frac"}),
+    # v3 R3 (env_v2/world.py `_rz_chase_params`·`_rz_terrain_params`, 정의는 모듈 docstring 'R3 세계'). 둘 다 repertoire 를 함께 켜야 한다.
+    # realism_chase: lost_steps = 고정한 표적이 늑대 시야(pred_view_r·pred_fov_deg) 밖에 있어도 놓지 않는 연속 포식자 스텝 수(그동안 마지막으로
+    # 본 자리로 간다, 0 = 시야를 벗어난 스텝에 놓는다), stalk_phase = 잠행형의 잠행 접근·플레이어 잠행 모드에서도 고정하나(false = 돌진·
+    # 플레이어 돌진부터만 — 명세 3-1 (f)), player_too = 플레이어형 위협에도 쓰나
+    "realism_chase": frozenset({"lost_steps", "stalk_phase", "player_too"}),
+    # realism_terrain: snow_frac·rough_frac = 눈·거친 땅 넓이 목표 범위 [하, 상](셀 비율, 세계마다 하나), zero_p = [눈, 거친 땅] 이 아예
+    # 없는 세계의 확률, patch_r = 덩어리 원판 반지름 범위 [하, 상](단위), max_patches = 땅마다 원판 수 상한, mult_herb·mult_pred·
+    # mult_player = [보통, 눈, 거친 땅] 속력 배수(사슴·늑대·플레이어형 위협, 보통은 1)
+    "realism_terrain": frozenset({"snow_frac", "rough_frac", "zero_p", "patch_r", "max_patches", "mult_herb", "mult_pred",
+                                  "mult_player"}),
 })
+
+# 선택 계수 키(모듈 docstring 규칙 6, 10-14 R3): 기능 → {키: 끔 값}. 켠 블록에 없으면 끔 값(= 앞 버전 동작)으로 읽는다. 앞 버전 설정
+# 파일(configs/v3_real1_*.yaml)을 고치지 않으려고 둔다 — 새 설정은 모두 적는다.
+#   realism_shelter.block_predators: 늑대(player_too 면 플레이어형 위협도)가 은신처 원에 들어가지 못하고 원 둘레를 따라 미끄러진다
+#     (H17, env_v2/world.py `_rz_wall_push`). 사슴은 그대로 드나든다. false = 1단계 그대로(늑대가 원을 지나다닌다)
+#   realism_cover_food.frac_range: [하, 상] 이면 세계마다 f ~ U[하, 상] 하나를 자기 스트림 part 0 에서 뽑아 용량·재생 배수에 함께 쓴다
+#     (H7, cap_frac·regen_frac 는 null). null = 1단계 그대로(cap_frac·regen_frac 고정, 난수 없음)
+OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
+    "realism_shelter": MappingProxyType({"block_predators": False}),
+    "realism_cover_food": MappingProxyType({"frac_range": None}),
+})
+
+
+def with_optional(name: str, p: Mapping[str, Any]) -> dict[str, Any]:
+    """기능 `name` 의 계수(`Features.params`)에 빠진 선택 키를 끔 값으로 채운 사본(규칙 6). 선택 키가 없는 기능은 그대로다."""
+    out = {k: copy.deepcopy(v) for k, v in OPTIONAL_KEYS.get(name, {}).items()}
+    out.update(p)
+    return out
 
 
 @dataclass(frozen=True)
@@ -296,11 +332,13 @@ def parse_features(raw: Mapping[str, Any] | None, implemented: frozenset[str] | 
             )
         if name in implemented:
             known = param_keys.get(name, frozenset())
-            unknown = sorted(set(block) - {"enabled"} - set(known))
+            # 선택 키(규칙 6)는 알고 있는 키이지만 빠져도 된다(끔 값으로 읽는다)
+            unknown = sorted(set(block) - {"enabled"} - set(known) - set(OPTIONAL_KEYS.get(name, {})))
             if unknown:
                 raise ValueError(
                     f"features.{name} 에 모르는 키 {unknown} 가 있다(오타?). 쓸 수 있는 키: "
                     f"enabled, {', '.join(sorted(known)) or '(계수 없음)'}"
+                    + (f" (선택 키 {', '.join(sorted(OPTIONAL_KEYS[name]))})" if name in OPTIONAL_KEYS else "")
                 )
             missing = sorted(set(known) - set(block))
             if on and missing:

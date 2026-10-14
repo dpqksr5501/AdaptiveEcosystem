@@ -540,6 +540,8 @@ def visible_stats(w) -> dict:
         out["threats"] = _clean(w.threats_stats())
     if w._rz:                                       # v3 현실성 1단계 세계만(realism_*)
         out["realism"] = _clean(w.realism_stats())
+    if w._r3:                                       # v3 R3 세계 규칙(추격 고정·지형·늑대 은신처 진입 금지·먹이 배수 뽑기)을 켠 세계만
+        out["r3"] = _clean(w.r3_stats())
     return out
 
 

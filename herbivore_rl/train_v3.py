@@ -301,11 +301,14 @@ def measure_pi(cfg, model_path, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, udef:
     from env_v2.rep_policy import check_mask_version, rep_argmax
     from env_v2.world import World
 
+    from env_v2.rep_policy import allowed_mask_of, effective_allowed
+
     model = PPO.load(str(model_path), device="cpu")
     pol = model.policy
     pol.set_training_mode(False)
-    allowed = tuple(pol.rep_allowed)
-    params = {"allowed_mask": pol.rep_allowed_mask}
+    # 허용 = 모델 목록 ∩ 설정 목록(판정 롤아웃 rep_learned 와 같다 — v3 R3 세계에서는 R1b 의 FREEZE 가 막힌다)
+    allowed = effective_allowed(pol.rep_allowed, cfg)
+    params = {"allowed_mask": allowed_mask_of(allowed)}
     geo = rr._geom(cfg)
     xterms = None
     per, P, O, M = [], [], [], []
