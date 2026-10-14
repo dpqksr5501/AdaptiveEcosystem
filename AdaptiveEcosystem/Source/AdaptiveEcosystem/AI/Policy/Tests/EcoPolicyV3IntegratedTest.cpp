@@ -1634,8 +1634,8 @@ bool FEcoPolicyV3IntegratedBlockedHooksTest::RunTest(const FString& Parameters)
 		{
 			const bool bAlive0 = Hooked.Mw.Bodies[Target].DeathCause == EcoWorldV3::kDeathNone;
 			Hooked.StepOnce(&Hooks);
-			const EcoWorldV3::FHerbBody& B0 = Hooked.Mw.Bodies[Target];
-			Moved0 += (B0.Pos.X != Start0.X || B0.Pos.Y != Start0.Y) ? 1 : 0;
+			const EcoWorldV3::FHerbBody& Body0 = Hooked.Mw.Bodies[Target];
+			Moved0 += (Body0.Pos.X != Start0.X || Body0.Pos.Y != Start0.Y) ? 1 : 0;
 			if (bAlive0)
 			{
 				Reads0 += Hooked.Mw.Decisions[Target].bCommittedReads ? 1 : 0;
