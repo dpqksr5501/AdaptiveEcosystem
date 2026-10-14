@@ -68,6 +68,21 @@ namespace EcoPolicyV3IntegratedProcImpl
 		// v3 에너지 E (0~1) × MaxEnergy — 조정자 요약(AverageEnergy)·표현 Energy 가 같은 척도로 읽는다
 		return static_cast<float>(FMath::Clamp(B.Energy, 0.0, 1.0)) * V.MaxEnergy;
 	}
+
+	/** 산 사슴(List = Deer 색인) 에너지 평균·굶주림 수 → 컨텍스트 (먹기 표시·기록). */
+	void TallyEnergy(FEcoV3RegionContext& Ctx, const TArray<FEcoV3DeerRec>& Deer, const TArray<int32>& List)
+	{
+		double Sum = 0.0;
+		int32 Starving = 0;
+		for (const int32 k : List)
+		{
+			const double E = FMath::Clamp(Deer[k].View.Body->Energy, 0.0, 1.0);
+			Sum += E;
+			Starving += E < EcoV3Integrated::kStarvingEnergy ? 1 : 0;
+		}
+		Ctx.MeanEnergy = List.IsEmpty() ? 0.0 : Sum / static_cast<double>(List.Num());
+		Ctx.StarvingDeer = Starving;
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -335,6 +350,23 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 																	ThreatPtrs.Num(), EcoPolicyV3::kBuiltinNet,
 																	Sub->UsesTerrain() ? &Hooks : nullptr);
 
+			// 먹기 기록: 이번 스텝에 먹이 칸에서 실제로 먹은 사슴을 구간마다 한 번 센다 (먹고 같은 스텝에 죽은 사슴도). 번식 표시 시각.
+			// Views·HerbInts 는 이번 Step 배열과 같은 순서다 (아래 죽음 넘기기가 List 를 줄여도 이 둘은 그대로)
+			for (int32 r = 0; r < Views.Num(); ++r)
+			{
+				const EcoWorldV3::FHerbBody& Body = *Views[r].Body;
+				FEcoIntegratedV3Fragment& Int = *HerbInts[r];
+				if (Body.LastIntake > 0.0 && Int.AteLogEpoch != Ctx.LogEpoch)
+				{
+					Int.AteLogEpoch = Ctx.LogEpoch;
+					++Ctx.AteDeerInterval;
+				}
+				if (Body.bReproduced)
+				{
+					Int.ReproducedStep = Ctx.Sim.T;
+				}
+			}
+
 			// 죽음 넘기기: HP 0 (+ 잡힘이면 bPredated). 사망 처리·지역 피식 사건·2 초 뒤 삭제는 팀 조정자가 한다.
 			// 목록에서 빼서 이 프레임의 다음 스텝부터는 움직이거나 먹거나 잡히거나 동족으로 세어지지 않게 한다
 			TArray<int32>& List = DeerByContext[c];
@@ -366,6 +398,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				Wolves[k].PredState->EatCooldown = static_cast<float>(A.State.Cooldown * EcoRepertoireV3::kStepSeconds);
 				Wolves[k].Life->bPursuing = A.Last.bHunting && A.Last.bHasTarget;
 			}
+			TallyEnergy(Ctx, Deer, List);   // 기록 줄이 이 스텝 끝 에너지를 쓴다
 			Sub->NotifyContextStep(Ctx, Report);
 		}
 		Sub->FinishGlobalStep();
@@ -398,6 +431,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		}
 		Ctx.AliveDeer = DeerByContext[c].Num();
 		Ctx.Wolves = WolvesByContext[c].Num();
+		TallyEnergy(Ctx, Deer, DeerByContext[c]);   // 스텝이 없는 프레임(입양만)에도 화면 집계가 맞게
 	}
 }
 
@@ -445,8 +479,9 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 	const double Alpha = FMath::Clamp(static_cast<double>(Sub->GetVisualAlpha()), 0.0, 1.0);
 	const bool bDebug = UEcoPolicyV3IntegratedSubsystem::IsDebugDrawEnabled();
 	const double K = EcoRepertoireV3::kUnitCm / EcoRepertoireV3::kStepSeconds;   // 단위/스텝 → cm/s
+	const int64 NowStep = Sub->GetGlobalStep();
 
-	DeerQuery.ForEachEntityChunk(Context, [Sub, Alpha, bDebug, K, World](FMassExecutionContext& Ctx)
+	DeerQuery.ForEachEntityChunk(Context, [Sub, Alpha, bDebug, K, World, NowStep](FMassExecutionContext& Ctx)
 	{
 		const TArrayView<FTransformFragment> Xfs = Ctx.GetMutableFragmentView<FTransformFragment>();
 		const TArrayView<FMassVelocityFragment> Vels = Ctx.GetMutableFragmentView<FMassVelocityFragment>();
@@ -484,16 +519,11 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 				}
 				else
 				{
-					Label = EcoV3Integrated::BehaviorNameKo(Rep.Behavior);
-					if (Rep.Behavior == EcoRepertoireV3::kHide && Rep.bArrived)
-					{
-						Label += TEXT("(웅크림)");
-					}
-					Color = Rep.Behavior == EcoRepertoireV3::kGraze	 ? FColor(70, 200, 70)
-							: Rep.Behavior == EcoRepertoireV3::kFlee ? FColor(255, 215, 0)
-							: Rep.Behavior == EcoRepertoireV3::kHide ? FColor(60, 150, 255)
-							: Rep.Behavior == EcoRepertoireV3::kFreeze ? FColor(245, 245, 245)
-																	   : FColor(170, 70, 210);
+					// 행동 + 에너지 % (+ 이번 결정 스텝에 먹은 몫, 굶주림, 번식) — EcoV3Integrated::DeerLabel
+					// 팀 시계에 다시 맞추면 전역 스텝이 뒤로 갈 수 있다 — 음수 경과는 표시하지 않는다
+					const int64 SinceRepro = NowStep - Int.ReproducedStep;
+					const bool bRecentRepro = Int.ReproducedStep >= 0 && SinceRepro >= 0 && SinceRepro <= EcoV3Integrated::kReproMarkSteps;
+					Label = EcoV3Integrated::DeerLabel(Rep, B, bRecentRepro, Color);
 				}
 				DrawDebugString(World, Loc + FVector(0.0, 0.0, 230.0), Label, nullptr, Color, 0.0f, true, 1.1f);
 			}

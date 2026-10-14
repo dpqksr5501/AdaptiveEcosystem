@@ -16,6 +16,7 @@
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
 #include "MassEntityConfigAsset.h"
+#include "Misc/App.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
 #include "World/EcoWorldClockSubsystem.h"
@@ -183,6 +184,36 @@ const TCHAR* EcoV3Integrated::BehaviorNameKo(int32 B)
 {
 	static const TCHAR* Names[EcoRepertoireV3::kNumBehaviors] = {TEXT("먹기"), TEXT("도망"), TEXT("숨기"), TEXT("얼기"), TEXT("잠")};
 	return (B >= 0 && B < EcoRepertoireV3::kNumBehaviors) ? Names[B] : TEXT("?");
+}
+
+FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
+								   FColor& OutColor)
+{
+	const double E = FMath::Clamp(Body.Energy, 0.0, 1.0);
+	FString Label = FString::Printf(TEXT("%s%s %d%%"), BehaviorNameKo(Rep.Behavior),
+									Rep.Behavior == EcoRepertoireV3::kHide && Rep.bArrived ? TEXT("(웅크림)") : TEXT(""),
+									FMath::RoundToInt32(100.0 * E));
+	if (Body.LastIntake > 0.0)
+	{
+		// 먹이 단위 × 0.5 = 에너지 (FoodEnergyPerUnit). 한 스텝 많아야 0.06 단위 = 3.0 %p
+		const double GainPct = 100.0 * Body.LastIntake * EcoRepertoireV3::kR1bConfig.FoodEnergyPerUnit;
+		Label += GainPct >= 0.05 ? FString::Printf(TEXT(" +%.1f"), GainPct) : FString(TEXT(" +"));
+	}
+	OutColor = Rep.Behavior == EcoRepertoireV3::kGraze	  ? FColor(70, 200, 70)
+			   : Rep.Behavior == EcoRepertoireV3::kFlee	  ? FColor(255, 215, 0)
+			   : Rep.Behavior == EcoRepertoireV3::kHide	  ? FColor(60, 150, 255)
+			   : Rep.Behavior == EcoRepertoireV3::kFreeze ? FColor(245, 245, 245)
+														  : FColor(170, 70, 210);
+	if (E < kStarvingEnergy)
+	{
+		Label += TEXT(" 굶주림");
+		OutColor = FColor(255, 80, 80);
+	}
+	if (bRecentRepro)
+	{
+		Label += TEXT(" 번식");   // 에너지 0.9 초과 → 0.5 (학습 세계 규칙 — 학습 세계도 새끼는 나오지 않는다, 개체 수 128 고정)
+	}
+	return Label;
 }
 
 EcoThreatV3::FThreatSpec EcoV3Integrated::WolfSpecForOrdinal(int32 Ordinal, double PredSpeedMult)
@@ -1007,6 +1038,10 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	Ctx->Sim.T = GlobalT;
 	EcoWorldV3::UpdateDayNight(Ctx->Sim);
 	Ctx->LastLogT = GlobalT;
+	Ctx->StartFood = Ctx->Sim.Food.Total();   // 처음 먹이 = 셀 용량 합 (재생은 용량을 넘지 않는다)
+	Ctx->RecentEaten.Init(0.0, EcoV3Integrated::kRecentEatSteps);
+	Ctx->RecentEatenPos = 0;
+	Ctx->LastStepFoodEaten = Ctx->Sim.Stats.FoodEaten;
 	FEcoV3RegionContext* Raw = Ctx.Get();
 	Contexts.Add(MoveTemp(Ctx));
 	return Raw;
@@ -1079,6 +1114,7 @@ void UEcoPolicyV3IntegratedSubsystem::NotifyContextStep(FEcoV3RegionContext& Ctx
 	const UWorld* World = GetWorld();
 	const double Now = World ? World->GetTimeSeconds() : 0.0;
 	Ctx.RecentCatches.RemoveAll([Now](const FEcoV3IntegratedCatchMark& M) { return Now - M.Time > 2.0; });
+	Ctx.PushStepEaten();
 	if (LogEverySteps > 0 && Ctx.Sim.T - Ctx.LastLogT >= LogEverySteps)
 	{
 		LogContext(Ctx);
@@ -1118,13 +1154,22 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		WolfNow += FString::Printf(TEXT(" %s %d"), WolfStateNameKo(static_cast<EWolfState>(w)), Ctx.WolvesNow[w]);
 	}
 	const double CpuAvgMs = StepCpuSteps > 0 ? 1000.0 * StepCpuSeconds / static_cast<double>(StepCpuSteps) : 0.0;
+	// 먹기: 구간 먹은 양(먹이 단위), 먹은 사슴 수, 먹기 개체·스텝 중 실제로 먹은 비율(먹이 없는 칸을 걷는 먹기는 못 먹는다), 무대 먹이, 에너지
+	const int64 GrazeSteps = S.BehaviorSteps[EcoRepertoireV3::kGraze] - P.BehaviorSteps[EcoRepertoireV3::kGraze];
+	const int64 AteSteps = S.EatSteps - P.EatSteps;
+	const FString Feeding = FString::Printf(
+		TEXT("먹이: 구간 먹은 양 %.2f (먹이 단위, 셀 하나 최대 1) · 먹은 사슴 %d · 먹기 중 실제로 먹은 비율 %.0f%% (%lld/%lld 개체·스텝) · ")
+			TEXT("무대 먹이 처음의 %.1f%% · 사슴 에너지 평균 %.1f%% · 굶주림(15%% 아래) %d · 번식(에너지 0.5 로) %lld"),
+		S.FoodEaten - P.FoodEaten, Ctx.AteDeerInterval, GrazeSteps > 0 ? 100.0 * static_cast<double>(AteSteps) / static_cast<double>(GrazeSteps) : 0.0,
+		static_cast<long long>(AteSteps), static_cast<long long>(GrazeSteps), 100.0 * Ctx.FoodFraction(), 100.0 * Ctx.MeanEnergy, Ctx.StarvingDeer,
+		static_cast<long long>(S.Reproduced - P.Reproduced));
 	UE_LOG(LogEcoPolicyV3I, Log,
 		   TEXT("[EcoV3I] %s | %.1f초 %s d=%.2f (%s) | 사슴 산 %d/%d | 지금 행동:%s | 구간 사용(개체·스텝):%s | 늑대 %d:%s | ")
-			   TEXT("포획 %lld (누적 %lld) 굶음 %lld (누적 %lld) | 지형 검사 이동 %lld, 막힘 사슴 %lld 늑대 %lld | 피식EMA %.3f | 마스크 위반 %lld | 네 행동 모두 씀=%s | ")
-			   TEXT("결정 스텝 CPU(모든 지역) 평균 %.2f ms/스텝, 최대 %.1f ms/프레임"),
+			   TEXT("포획 %lld (누적 %lld) 굶음 %lld (누적 %lld) | %s | 지형 검사 이동 %lld, 막힘 사슴 %lld 늑대 %lld | 피식EMA %.3f | 마스크 위반 %lld | ")
+			   TEXT("네 행동 모두 씀=%s | 결정 스텝 CPU(모든 지역) 평균 %.2f ms/스텝, 최대 %.1f ms/프레임"),
 		   *Ctx.RegionId.ToString(), Seconds, Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Ctx.Sim.Dark, *TeamPhase, Ctx.AliveDeer,
 		   Ctx.AdoptedDeer, *Now, *Used, Ctx.Wolves, *WolfNow, static_cast<long long>(S.Caught - P.Caught),
-		   static_cast<long long>(S.Caught), static_cast<long long>(S.Starved - P.Starved), static_cast<long long>(S.Starved),
+		   static_cast<long long>(S.Caught), static_cast<long long>(S.Starved - P.Starved), static_cast<long long>(S.Starved), *Feeding,
 		   static_cast<long long>(Ctx.TerrainChecks - Ctx.LastLogTerrainChecks),
 		   static_cast<long long>(S.BlockedHerbMoves - P.BlockedHerbMoves), static_cast<long long>(S.BlockedThreatMoves - P.BlockedThreatMoves),
 		   Ctx.Sim.PredEma, static_cast<long long>(S.MaskViolations), bAllFour ? TEXT("예") : TEXT("아니오"), CpuAvgMs,
@@ -1142,6 +1187,8 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	Ctx.LastLogT = Ctx.Sim.T;
 	Ctx.LastLogStats = S;
 	Ctx.LastLogTerrainChecks = Ctx.TerrainChecks;
+	Ctx.AteDeerInterval = 0;   // 새 구간: 사슴 조각의 AteLogEpoch 가 이 번호와 다르면 아직 이 구간에 먹지 않았다
+	++Ctx.LogEpoch;
 }
 
 bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ) const
@@ -1186,8 +1233,12 @@ void UEcoPolicyV3IntegratedSubsystem::UpdateViewEnvironment()
 		RuntimeSettings->bDrawMigrationDebug = false;   // 기본 객체만 바꾼다. SaveConfig 를 부르지 않는다
 		bMigrationDebugHidden = true;
 	}
-	IConsoleVariable* Limit = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DebugSafeZone.MaxDebugTextStringsPerActor"));
-	const bool bDebug = IsDebugDrawEnabled();
+	// 매 프레임 부르므로 찾기는 한 번만 (엔진이 FindConsoleObject 반복 호출 경고를 남긴다)
+	static IConsoleVariable* const Limit = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DebugSafeZone.MaxDebugTextStringsPerActor"));
+	// 그릴 수 없는 실행(-NullRHI 헤드리스)에서는 한도를 풀지 않는다: HUD 가 그려지지 않아 엔진이 디버그 글자 목록(AHUD::DebugTextList)을
+	// 비우지 않는다. 한도 0 이면 목록이 프레임마다 사슴·늑대 수만큼 늘고 글자를 더할 때마다 목록을 훑어 프레임이 점점 느려진다
+	// (10-14 헤드리스 -EcoV3Debug: 프레임 15 → 914 에 20 fps → 1.7 fps). 한도 128 이면 목록이 128 줄에서 멈춘다. 글자 만들기는 그대로 돈다
+	const bool bDebug = IsDebugDrawEnabled() && FApp::CanEverRender();
 	if (Limit && bDebug && !bTextLimitRaised)
 	{
 		SavedTextLimit = Limit->GetInt();
@@ -1268,10 +1319,15 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 											 *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Ctx.Sim.Dark,
 											 Ctx.AliveDeer, Ctx.AdoptedDeer, *Tally, *Wolves,
 											 static_cast<long long>(Ctx.Sim.Stats.Caught), static_cast<long long>(Ctx.Sim.Stats.Starved));
-		DrawDebugString(World, Center + FVector(0, 0, 600.0), Line, nullptr, FColor::White, 0.0f, true, 1.4f);
+		// 둘째 줄: 먹기 되먹임 (v3 먹이 격자 — 팀 지역 FoodAmount 가 아니다)
+		const FString FoodLine = FString::Printf(TEXT("먹이 %s | 무대 먹이 처음의 %.0f%% | 최근 10초 먹은 양 %.1f | 사슴 에너지 평균 %.0f%% | 굶주림(15%% 아래) %d"),
+												 *Ctx.RegionId.ToString(), 100.0 * Ctx.FoodFraction(), Ctx.RecentEatenSum(),
+												 100.0 * Ctx.MeanEnergy, Ctx.StarvingDeer);
+		DrawDebugString(World, Center + FVector(0, 0, 600.0), Line + TEXT("\n") + FoodLine, nullptr, FColor::White, 0.0f, true, 1.4f);
 		if (bScreen)
 		{
 			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(730000 + Ctx.Index), 1.5f, FColor(180, 230, 180), Line);
+			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(731000 + Ctx.Index), 1.5f, FColor(230, 210, 150), FoodLine);
 		}
 	}
 }

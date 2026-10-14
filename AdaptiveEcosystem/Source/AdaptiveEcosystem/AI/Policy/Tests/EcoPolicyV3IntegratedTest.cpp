@@ -16,6 +16,8 @@
 //   Integrated.TerrainBlocking         Mass + 실제 물리 (기운 바닥·벽·지역): 지면 높이·막힘 수가 맞는 개체에 붙고, 아무도 벽을 넘지 않는다
 //   Integrated.FlatSessionUnaffected   평면 시험 세션과 한 월드: 두 경로의 시계·개체가 섞이지 않는다 (평면 경로는 기준 루프와 비트 단위로 같다)
 //   Integrated.EndToEndMiniWorld       두 지역 × (사슴 16 + 늑대 2), 2000 스텝, 조정자 흉내(사망 → Alive 떼기 → 지우기)
+//   Integrated.FeedingFeedback         먹기 되먹임: 기록(먹은 양)은 셀에서 덜어 낸 양과 같고, 먹기 중 먹은 사슴은 에너지가 오른다. 사슴 글자,
+//                                      최근 10 초 고리 버퍼·구간에 먹은 사슴 수·에너지 평균·굶주림 수가 개체 조각과 맞는다
 
 #include "Misc/AutomationTest.h"
 
@@ -1786,6 +1788,250 @@ bool FEcoPolicyV3IntegratedTerrainTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("지면 높이가 그 개체 자리의 실제 지면과 다른 개체·스텝"), ZBad, 0);
 	TestTrue(TEXT("기운 바닥을 따라 지면 높이가 실제로 바뀌었다"), MaxZChange > 5.0);
 	TestEqual(TEXT("스텝이 계속됐다"), Ctx->Sim.T, static_cast<int64>(Steps));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedFeedingTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.FeedingFeedback",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedFeedingTest::RunTest(const FString& Parameters)
+{
+	namespace R3 = EcoRepertoireV3;
+
+	// --- (a) 엔진 무관: 낮(t = 200), 위협 없음, 먹이 재생 0 — 기록 = 셀에서 덜어 낸 양, 먹은 사슴은 에너지가 오른다 ---
+	{
+		constexpr int32 N = 6;
+		FMiniWorld Mw;
+		Mw.Init(MiniConfig(41000, N), N, 0);
+		Mw.W.T = 200;
+		EcoWorldV3::UpdateDayNight(Mw.W);
+		EcoWorldV3::FFoodGrid& F = Mw.W.Food;
+		for (double& R : F.Regen)
+		{
+			R = 0.0;   // 재생 0: 무대 먹이 감소 = 먹은 양 (그대로 맞춰 볼 수 있게)
+		}
+		int32 Rich = 0;
+		for (int32 k = 0; k < static_cast<int32>(F.Cap.size()); ++k)
+		{
+			Rich = F.Cap[static_cast<size_t>(k)] > F.Cap[static_cast<size_t>(Rich)] ? k : Rich;
+		}
+		const EcoWorldV3::FVec2 RichPos{(static_cast<double>(Rich % F.Gw) + 0.5) * F.Cell, (static_cast<double>(Rich / F.Gw) + 0.5) * F.Cell};
+		std::vector<std::int32_t> Rows;
+		for (int32 i = 0; i < N; ++i)
+		{
+			// 사슴 0 은 가장 풍부한 칸, 나머지는 무대에 흩는다
+			const EcoWorldV3::FVec2 P = i == 0 ? RichPos : EcoWorldV3::FVec2{8.0 + 9.0 * i, 50.0 - 7.0 * i};
+			EcoWorldV3::AdoptHerb(Mw.W, Mw.AllViews[i], P, {1.0, 0.0}, EcoRepertoireV3::MakeAgentKeyFromStableId(700 + i));
+			Rows.push_back(i);
+		}
+		EcoWorldV3::ObserveAndDecideRows(Mw.W, Mw.AllViews.data(), N, nullptr, 0, Rows.data(), N);
+		const double FoodStart = F.Total();
+
+		double MaxBookErr = 0.0;   // |개체 먹은 양 합 − 세계 기록 증가|
+		double MaxGridErr = 0.0;   // |무대 먹이 감소 − 세계 기록 증가| (재생 0)
+		int32 EatCountBad = 0;     // 세계 '먹은 개체·스텝' 증가 ≠ 먹은 양 > 0 인 사슴 수
+		int32 FormulaBad = 0;      // 에너지 ≠ (지난 에너지 − 대사) + 먹은 양 × 0.5 (번식 스텝 제외)
+		int32 NonGrazeAte = 0;     // 먹기 밖 행동으로 먹었다 (섭식 배수 0 이라 늘 0)
+		int32 Rose = 0;            // 먹기 중, 먹은 몫 > 대사 → 에너지가 올랐다
+		int32 NotRose = 0;
+		int32 Repro = 0;
+		int32 Died = 0;
+		double Rich0Gain = 0.0;    // 사슴 0 의 첫 스텝 먹은 몫
+		constexpr int32 Steps = 30;
+		for (int32 s = 0; s < Steps; ++s)
+		{
+			const double Total0 = F.Total();
+			const double Book0 = Mw.W.Stats.FoodEaten;
+			const int64 EatSteps0 = Mw.W.Stats.EatSteps;
+			double E0[N];
+			for (int32 i = 0; i < N; ++i)
+			{
+				E0[i] = Mw.Bodies[i].Energy;
+			}
+			EcoWorldV3::Step(Mw.W, Mw.AllViews.data(), N, nullptr, 0);
+			const double BookDelta = Mw.W.Stats.FoodEaten - Book0;
+			double Sum = 0.0;
+			int32 Ate = 0;
+			for (int32 i = 0; i < N; ++i)
+			{
+				const EcoWorldV3::FHerbBody& Body = Mw.Bodies[i];
+				Sum += Body.LastIntake;
+				Ate += Body.LastIntake > 0.0 ? 1 : 0;
+				Died += Body.DeathCause != EcoWorldV3::kDeathNone ? 1 : 0;
+				const double Drain = R3::DrainAmount(Mw.Controls[i].DrainMult);
+				const bool bGraze = Mw.Decisions[i].ExecutedBehavior == R3::kGraze;
+				NonGrazeAte += (!bGraze && Body.LastIntake > 0.0) ? 1 : 0;
+				if (Body.bReproduced)
+				{
+					++Repro;
+					continue;
+				}
+				FormulaBad += FMath::Abs(Body.Energy - R3::EnergyAfterIntake(E0[i] - Drain, Body.LastIntake)) <= 1e-12 ? 0 : 1;
+				// 먹은 몫이 대사보다 분명히 크다 (에너지 1 에 붙은 사슴은 수요 = 대사라 빠진다)
+				if (bGraze && Body.LastIntake * R3::kR1bConfig.FoodEnergyPerUnit > Drain + 1e-9)
+				{
+					Rose += Body.Energy > E0[i] ? 1 : 0;
+					NotRose += Body.Energy > E0[i] ? 0 : 1;
+				}
+			}
+			if (s == 0)
+			{
+				Rich0Gain = Mw.Bodies[0].LastIntake;
+			}
+			MaxBookErr = FMath::Max(MaxBookErr, FMath::Abs(Sum - BookDelta));
+			MaxGridErr = FMath::Max(MaxGridErr, FMath::Abs((Total0 - F.Total()) - BookDelta));
+			EatCountBad += (Mw.W.Stats.EatSteps - EatSteps0) == Ate ? 0 : 1;
+		}
+		AddInfo(FString::Printf(TEXT("(a) %d 스텝: 먹은 양 %.3f (무대 먹이 %.3f → %.3f), 먹은 개체·스텝 %lld, 먹기 %lld, 에너지 오름 %d, 번식 %d, 사슴 0 첫 스텝 먹은 몫 %.4f"),
+								Steps, Mw.W.Stats.FoodEaten, FoodStart, F.Total(), Mw.W.Stats.EatSteps,
+								Mw.W.Stats.BehaviorSteps[R3::kGraze], Rose, Repro, Rich0Gain));
+		TestEqual(TEXT("(a) 위협 없는 낮 30 스텝에 아무도 죽지 않는다"), Died, 0);
+		TestTrue(TEXT("(a) 개체 먹은 양 합 = 세계 기록 증가 (스텝마다)"), MaxBookErr <= 1e-12);
+		TestTrue(TEXT("(a) 재생 0 이면 무대 먹이 감소 = 세계 기록 증가 (기록은 셀에서 실제로 덜어 낸 양)"), MaxGridErr <= 1e-9);
+		TestEqual(TEXT("(a) '먹은 개체·스텝' 기록 = 먹은 양 > 0 인 사슴 수"), EatCountBad, 0);
+		TestEqual(TEXT("(a) 에너지 = 지난 에너지 − 대사 + 먹은 양 × 0.5 (기록한 먹은 양이 실제로 에너지에 들어간 몫)"), FormulaBad, 0);
+		TestEqual(TEXT("(a) 먹기 밖 행동으로는 먹지 않는다"), NonGrazeAte, 0);
+		TestTrue(TEXT("(a) 가장 풍부한 칸의 사슴은 첫 스텝에 한 스텝 최대(0.06 단위)를 먹는다"), FMath::Abs(Rich0Gain - R3::kR1bConfig.FoodEatRate) <= 1e-12);
+		TestTrue(TEXT("(a) 먹기 중 먹은 몫이 대사보다 크면 에너지가 오른다 (그런 스텝이 있다)"), Rose > 0);
+		TestEqual(TEXT("(a) 먹은 몫이 대사보다 큰데 에너지가 오르지 않은 스텝 (번식 제외)"), NotRose, 0);
+		TestTrue(TEXT("(a) 무대 먹이가 줄었다"), F.Total() < FoodStart);
+	}
+
+	// --- (b) 사슴 글자 ---
+	{
+		using EcoV3Integrated::DeerLabel;
+		R3::FRepState Rep;
+		EcoWorldV3::FHerbBody Body;
+		FColor Color;
+		Rep.Behavior = R3::kGraze;
+		Body.Energy = 0.72;
+		Body.LastIntake = 0.06;
+		TestEqual(TEXT("(b) 먹은 사슴: 행동 + 에너지 % + 먹은 몫(에너지 %p)"), DeerLabel(Rep, Body, false, Color), FString(TEXT("먹기 72% +3.0")));
+		TestTrue(TEXT("(b) 먹기 색은 초록"), Color == FColor(70, 200, 70));
+		Body.LastIntake = 0.0;
+		TestEqual(TEXT("(b) 못 먹은 스텝은 표시가 없다"), DeerLabel(Rep, Body, false, Color), FString(TEXT("먹기 72%")));
+		Body.Energy = 0.10;
+		Body.LastIntake = 0.00005;
+		TestEqual(TEXT("(b) 아주 적게 먹으면 '+' 만, 15% 아래면 굶주림"), DeerLabel(Rep, Body, false, Color), FString(TEXT("먹기 10% + 굶주림")));
+		TestTrue(TEXT("(b) 굶주림은 빨강"), Color == FColor(255, 80, 80));
+		Rep.Behavior = R3::kHide;
+		Rep.bArrived = true;
+		Body.Energy = 0.5;
+		Body.LastIntake = 0.0;
+		TestEqual(TEXT("(b) 웅크린 사슴, 번식 직후"), DeerLabel(Rep, Body, true, Color), FString(TEXT("숨기(웅크림) 50% 번식")));
+		Rep.Behavior = R3::kFlee;
+		Rep.bArrived = false;
+		Body.Energy = 0.15;
+		TestEqual(TEXT("(b) 15% 는 굶주림이 아니다 (아래만)"), DeerLabel(Rep, Body, false, Color), FString(TEXT("도망 15%")));
+	}
+
+	// --- (c) Mass: 고리 버퍼·구간 먹은 사슴·에너지 평균·굶주림이 개체 조각과 맞는다. 먹기 중 먹은 사슴은 에너지가 오른다 ---
+	FIntegratedHarness H;
+	if (!H.Setup(*this, TestSettings(41001)))
+	{
+		return false;
+	}
+	FEcoV3RegionContext* Ctx = H.AddRegion(TEXT("TestF"), 0, FVector::ZeroVector, 16, 2);
+	double CapSum = 0.0;
+	for (const double C : Ctx->Sim.Food.Cap)
+	{
+		CapSum += C;
+	}
+	TestTrue(TEXT("(c) 처음 먹이 = 셀 용량 합, 처음 비율 100%"), Ctx->StartFood > 0.0 && Ctx->StartFood == CapSum && Ctx->FoodFraction() == 1.0);
+	TestEqual(TEXT("(c) 최근 10 초 창 = 결정 스텝 75 개"), Ctx->RecentEaten.Num(), EcoV3Integrated::kRecentEatSteps);
+	H.SpawnRegion(*Ctx, 16, 2, 1, 0);
+	H.Frame(0.001f);   // 입양만
+	TestTrue(TEXT("(c) 입양 프레임의 에너지 평균 = 0.5 (스텝 없이도 집계)"), FMath::Abs(Ctx->MeanEnergy - 0.5) <= 1e-12 && Ctx->StarvingDeer == 0);
+
+	auto Body = [&H](const FMassEntityHandle E) -> const EcoWorldV3::FHerbBody& { return *DeerView(*H.EM, E).Body; };
+	auto IntOf = [&H](const FMassEntityHandle E) -> const FEcoIntegratedV3Fragment& { return H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E); };
+	TArray<double> Book;
+	int32 Rose = 0;
+	int32 NotRose = 0;
+	constexpr int32 Steps = 150;
+	for (int32 s = 0; s < Steps; ++s)
+	{
+		TMap<FMassEntityHandle, double> PrevE;
+		for (const FMassEntityHandle& E : H.Deer)
+		{
+			if (!IntOf(E).bDead)
+			{
+				PrevE.Add(E, Body(E).Energy);
+			}
+		}
+		H.DecisionStep();
+		Book.Add(Ctx->Sim.Stats.FoodEaten);
+		for (const FMassEntityHandle& E : H.Deer)
+		{
+			const double* E0 = PrevE.Find(E);
+			const EcoWorldV3::FHerbBody& Bd = Body(E);
+			if (!E0 || IntOf(E).bDead || Bd.bReproduced)
+			{
+				continue;
+			}
+			const FEcoBehaviorStateFragment& St = H.EM->GetFragmentDataChecked<FEcoBehaviorStateFragment>(E);
+			const double Drain = R3::DrainAmount(H.EM->GetFragmentDataChecked<FEcoControlOutFragment>(E).Control.DrainMult);
+			if (St.Decision.ExecutedBehavior == R3::kGraze && Bd.LastIntake * R3::kR1bConfig.FoodEnergyPerUnit > Drain + 1e-9)
+			{
+				Rose += Bd.Energy > *E0 ? 1 : 0;
+				NotRose += Bd.Energy > *E0 ? 0 : 1;
+			}
+		}
+	}
+	const double Last75 = Book.Last() - Book[Steps - 1 - EcoV3Integrated::kRecentEatSteps];
+	int32 AteMarked = 0;
+	int32 Alive = 0;
+	int32 Starving = 0;
+	double ESum = 0.0;
+	for (const FMassEntityHandle& E : H.Deer)
+	{
+		AteMarked += IntOf(E).AteLogEpoch == Ctx->LogEpoch ? 1 : 0;
+		if (!IntOf(E).bDead)
+		{
+			++Alive;
+			ESum += Body(E).Energy;
+			Starving += Body(E).Energy < EcoV3Integrated::kStarvingEnergy ? 1 : 0;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("(c) %d 스텝: 먹은 양 %.3f (최근 75 스텝 %.3f), 무대 먹이 처음의 %.1f%%, 먹은 사슴 %d, 산 사슴 %d, 에너지 평균 %.3f, 굶주림 %d, 에너지 오름 %d, 포획 %lld"),
+							Steps, Ctx->Sim.Stats.FoodEaten, Ctx->RecentEatenSum(), 100.0 * Ctx->FoodFraction(), Ctx->AteDeerInterval, Alive,
+							Ctx->MeanEnergy, Ctx->StarvingDeer, Rose, Ctx->Sim.Stats.Caught));
+	TestTrue(TEXT("(c) 최근 10 초 먹은 양 = 기록의 마지막 75 스텝 차이"), FMath::Abs(Ctx->RecentEatenSum() - Last75) <= 1e-9);
+	TestTrue(TEXT("(c) 통합 모드에서 실제로 먹는다 (먹은 양 > 0, 무대 먹이 < 100%)"), Ctx->Sim.Stats.FoodEaten > 0.0 && Ctx->FoodFraction() < 1.0 && Ctx->FoodFraction() > 0.0);
+	TestTrue(TEXT("(c) 구간에 먹은 사슴 수 = 이 구간 표시가 붙은 사슴 조각 수 (0 보다 크다)"), Ctx->AteDeerInterval == AteMarked && AteMarked > 0);
+	TestTrue(TEXT("(c) 에너지 평균·굶주림 수 = 산 사슴 조각"),
+			 Alive > 0 && FMath::Abs(Ctx->MeanEnergy - ESum / Alive) <= 1e-12 && Ctx->StarvingDeer == Starving && Ctx->AliveDeer == Alive);
+	TestTrue(TEXT("(c) 먹기 중 먹은 몫이 대사보다 크면 에너지가 오른다 (Mass 경로)"), Rose > 0);
+	TestEqual(TEXT("(c) 먹은 몫이 대사보다 큰데 에너지가 오르지 않은 개체·스텝 (Mass, 번식 제외)"), NotRose, 0);
+
+	// 기록 줄을 남기면 새 구간: 먹은 사슴 수가 0 이 되고, 다음 스텝에 먹은 사슴만 다시 센다
+	Ctx->bReportedLowDensity = true;   // 사슴 16 은 60 단위 무대 밀도 하한 아래 — 시험에서는 경고 줄을 내지 않는다
+	const int32 EpochBefore = Ctx->LogEpoch;
+	H.Sub->LogContext(*Ctx);
+	TestTrue(TEXT("(c) 기록 뒤 구간 번호 + 1, 먹은 사슴 0"), Ctx->LogEpoch == EpochBefore + 1 && Ctx->AteDeerInterval == 0);
+	TSet<FMassEntityHandle> SteppedNow;   // 다음 스텝에 들어갈 사슴 = 지금 산 사슴
+	for (const FMassEntityHandle& E : H.Deer)
+	{
+		if (!IntOf(E).bDead)
+		{
+			SteppedNow.Add(E);
+		}
+	}
+	H.DecisionStep();
+	int32 MarkedNow = 0;
+	int32 MarkBad = 0;
+	for (const FMassEntityHandle& E : H.Deer)
+	{
+		const bool bMarked = IntOf(E).AteLogEpoch == Ctx->LogEpoch;
+		MarkedNow += bMarked ? 1 : 0;
+		// 이 구간은 한 스텝뿐: 스텝에 들어간 사슴은 표시 = 이번 스텝 먹은 양 > 0 (그 스텝에 죽었어도), 그 전에 죽은 사슴은 표시가 없다
+		MarkBad += SteppedNow.Contains(E) ? (bMarked != (Body(E).LastIntake > 0.0) ? 1 : 0) : (bMarked ? 1 : 0);
+	}
+	TestTrue(TEXT("(c) 다음 스텝: 구간 먹은 사슴 = 그 스텝에 먹은 사슴 (표시와 먹은 양이 맞는다)"), Ctx->AteDeerInterval == MarkedNow && MarkBad == 0);
 	return true;
 }
 

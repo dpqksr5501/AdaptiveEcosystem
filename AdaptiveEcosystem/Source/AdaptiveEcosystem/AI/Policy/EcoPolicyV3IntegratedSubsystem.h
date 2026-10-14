@@ -31,6 +31,9 @@
 //      시작한다(낮 시작 = 스텝 0, 60 초 = 450 스텝). 어둠은 t 에서 계산한다(계약 7-6). 어긋남이 4 스텝을 넘으면 다시 맞춘다.
 //   5. 기록 [EcoV3I] (지역마다 10 초) 와 디버그 표시 (콘솔 변수 eco.V3Debug 1). 산 사슴 밀도가 학습 하한(128 / 110² 마리/단위²) 아래로
 //      내려가면 지역마다 경고 한 줄을 남긴다 (부활이 없어서 생기는 근사).
+//      먹기 되먹임: 사슴 글자 = 행동 + 에너지 % (+ 이번 결정 스텝에 먹은 몫, 굶주림, 번식), 지역 집계 둘째 줄 = 무대 먹이 처음 대비 %·
+//      최근 10 초 먹은 양·에너지 평균·굶주림 수. 기록 줄에는 구간 먹은 양·먹은 사슴 수·먹기 중 실제로 먹은 비율·무대 먹이 %·에너지 평균.
+//      먹이는 v3 먹이 격자만 바뀐다 — 팀 지역 FoodAmount 에는 쓰지 않는다 (FEcoV3RegionContext 섭식 칸 설명).
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -71,9 +74,27 @@ namespace EcoV3Integrated
 		Count
 	};
 
+	/**
+	 * 굶주림 표시 선: 에너지 15% 아래. 걷는 먹기(대사 0.002/스텝)로 75 스텝 = 10 초, 서서 먹기로 약 14 초, 뛰면 4 초 안에 굶어 죽는 선이다.
+	 * 표시·기록 전용 (규칙이 아니다).
+	 */
+	inline constexpr double kStarvingEnergy = 0.15;
+	/** '최근 10 초 먹은 양' 창 = 결정 스텝 75 개 (7.5 Hz × 10 초, 시뮬레이션 시간). */
+	inline constexpr int32 kRecentEatSteps = 75;
+	/** 번식 표시를 남기는 결정 스텝 수 (약 1.5 초). */
+	inline constexpr int64 kReproMarkSteps = 11;
+
 	ADAPTIVEECOSYSTEM_API EWolfState WolfStateOf(const EcoWorldV3::FThreatAgent& Agent);
 	ADAPTIVEECOSYSTEM_API const TCHAR* WolfStateNameKo(EWolfState State);
 	ADAPTIVEECOSYSTEM_API const TCHAR* BehaviorNameKo(int32 Behavior);
+
+	/**
+	 * 산 사슴 머리 위 글자와 색 (eco.V3Debug 1). '먹기 72%' = 행동 + 에너지 %. 이번 결정 스텝에 먹이 칸에서 실제로 먹었으면
+	 * ' +3.0' (먹은 몫을 에너지 %p 로, 0.05 미만이면 '+' 만), 에너지 15% 아래면 ' 굶주림'(빨강), bRecentRepro 면 ' 번식'.
+	 * 색은 행동 색 (먹기 초록·도망 노랑·숨기 파랑·얼기 흰색), 굶주림만 빨강.
+	 */
+	ADAPTIVEECOSYSTEM_API FString DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
+											FColor& OutColor);
 
 	/** 지역 늑대 순번(StableAgentId 순) → 성질. 짝수 = 잠행-돌진형, 홀수 = 근접 추격형. 모두 주행성(밤에 잔다), 원거리형 없음. */
 	ADAPTIVEECOSYSTEM_API EcoThreatV3::FThreatSpec WolfSpecForOrdinal(int32 Ordinal, double PredSpeedMult);
@@ -176,6 +197,46 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 BehaviorNow[EcoRepertoireV3::kNumBehaviors] = {};
 	int32 WolvesNow[static_cast<int32>(EcoV3Integrated::EWolfState::Count)] = {};
 	int32 Wolves = 0;
+
+	// 섭식 (먹기 표시·기록). 먹이 단위 = v3 먹이 격자 값 (셀 4 m × 4 m 하나가 많아야 1, 사슴 한 마리는 한 스텝에 많아야 0.06 = 에너지 3%p).
+	// 팀 지역 먹이 장부(FRegionEcologyState::FoodAmount)에는 쓰지 않는다 — 팀 재생률이 0 으로 고정이라(EcologyRegion.cpp
+	// MakeInitialEcologyState) 한쪽으로만 줄어 거짓 고갈로 보인다
+	double StartFood = 0.0;                   // 무대 먹이 처음 합 (= 셀 용량 합, AddContext)
+	double MeanEnergy = 0.0;                  // 산 사슴 에너지 평균 (0~1, 결정 스텝마다·프레임 끝)
+	int32 StarvingDeer = 0;                   // 산 사슴 중 에너지 kStarvingEnergy 아래
+	int32 AteDeerInterval = 0;                // 이번 기록 구간에 한 번이라도 먹은 사슴 (그 뒤 죽은 사슴 포함)
+	int32 LogEpoch = 0;                       // 기록 구간 번호 (LogContext 마다 + 1)
+	TArray<double> RecentEaten;               // 최근 kRecentEatSteps 결정 스텝의 스텝마다 먹은 양 (고리 버퍼)
+	int32 RecentEatenPos = 0;
+	double LastStepFoodEaten = 0.0;           // 지난 결정 스텝 끝의 Sim.Stats.FoodEaten (스텝 차이 계산)
+
+	/** 결정 스텝 하나 끝: 이번 스텝 먹은 양을 고리 버퍼에 넣는다. */
+	void PushStepEaten()
+	{
+		if (RecentEaten.Num() != EcoV3Integrated::kRecentEatSteps)
+		{
+			RecentEaten.Init(0.0, EcoV3Integrated::kRecentEatSteps);
+			RecentEatenPos = 0;
+		}
+		RecentEaten[RecentEatenPos] = Sim.Stats.FoodEaten - LastStepFoodEaten;
+		RecentEatenPos = (RecentEatenPos + 1) % EcoV3Integrated::kRecentEatSteps;
+		LastStepFoodEaten = Sim.Stats.FoodEaten;
+	}
+	/** 최근 10 초(결정 스텝 75 개) 먹은 양 (먹이 단위). */
+	double RecentEatenSum() const
+	{
+		double Sum = 0.0;
+		for (const double V : RecentEaten)
+		{
+			Sum += V;
+		}
+		return Sum;
+	}
+	/** 무대 먹이 지금 합 ÷ 처음 합 (0~1). */
+	double FoodFraction() const
+	{
+		return StartFood > 0.0 ? Sim.Food.Total() / StartFood : 0.0;
+	}
 
 	// 기록
 	int64 TerrainChecks = 0;                  // 지형 제약으로 검사한 이동 수 (콜백이 실제로 도는지 보는 기록)
@@ -340,7 +401,8 @@ private:
 	/**
 	 * 보기 환경 (Play 동안만, 끝나면 되돌린다).
 	 * - 엔진은 한 액터에 디버그 글자를 128개까지만 그린다(r.DebugSafeZone.MaxDebugTextStringsPerActor). 우리 글자는 모두 WorldSettings 에
-	 *   붙으므로 eco.V3Debug 를 켠 동안만 한도를 푼다(0 = 한도 없음).
+	 *   붙으므로 eco.V3Debug 를 켠 동안만 한도를 푼다(0 = 한도 없음). 그릴 수 없는 실행(-NullRHI)에서는 풀지 않는다 — HUD 가 그려지지
+	 *   않아 엔진이 글자 목록을 비우지 않으므로, 한도가 없으면 목록이 끝없이 늘어 프레임이 점점 느려진다.
 	 * - 팀 이주 디버그 글자('ID n Forest Resident')는 v3 모드에서 이주를 꺼 두므로 뜻이 없고 행동 글자를 가린다. v3 모드 동안만
 	 *   UEcoRuntimeSettings 기본 객체의 bDrawMigrationDebug 를 끈다. 설정 파일에는 쓰지 않는다.
 	 */

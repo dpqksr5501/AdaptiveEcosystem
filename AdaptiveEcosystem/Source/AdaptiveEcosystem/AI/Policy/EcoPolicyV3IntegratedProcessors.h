@@ -10,9 +10,12 @@
 //            스텝마다 죽은 개체를 목록에서 뺀다 — 한 프레임에 스텝이 여러 번 돌아도 시체는 움직이거나 먹거나 잡히거나 동족으로 세어지지 않는다.
 //    넘기기  잡힘 → Vitals.HP = 0 + Lifecycle.bPredated, 굶음 → HP = 0 (사망 처리·지역 피식 사건·삭제는 팀 조정자). 에너지 E × MaxEnergy 를
 //            Vitals.Energy 로 거울 복사. 늑대: 포획 뒤 쿨다운 → FEcoPredatorStateFragment::EatCooldown, 표적을 쫓으면 Lifecycle.bPursuing.
+//    먹기    스텝마다 먹이 칸에서 실제로 먹은 사슴을 기록 구간마다 한 번 세고(AteLogEpoch), 산 사슴 에너지 평균·굶주림 수를 컨텍스트에
+//            남긴다 (기록·화면 전용. v3 먹이 격자만 — 팀 지역 FoodAmount 에는 쓰지 않는다).
 // 2. UEcoPolicyV3IntegratedVisualProcessor (스텝 뒤) 매 프레임 Transform·FMassVelocityFragment 를 쓴다: 지난 스텝 → 이번 스텝 위치와
 //    지면 높이를 시계 진행으로 보간하고, 속도 = 이번 스텝 변위 ÷ 스텝 시간 (팀 표현 블렌드스페이스가 서기·걷기·뛰기를 고른다).
-//    죽은 개체는 죽은 자리에 멈추고 속도 0. eco.V3Debug 1 이면 개체 위에 행동·상태 글자를 그린다.
+//    죽은 개체는 죽은 자리에 멈추고 속도 0. eco.V3Debug 1 이면 개체 위에 행동·상태 글자를 그린다. 사슴 글자 = 행동 + 에너지 %,
+//    이번 결정 스텝에 먹었으면 '+먹은 몫(에너지 %p)', 에너지 15% 아래면 '굶주림'(빨강), 번식 뒤 약 1.5 초 '번식'.
 //
 // 위치를 쓰는 주체는 이 개체마다 하나다 (AGENTS.md): 팀 이동 처리기(UEcoSteeringProcessor·UEcoCreaturePredatorProcessor)는 v1 태그를
 // 요구하므로 이 개체를 보지 않고, 엔진 ApplyMovement 는 FMassCustomMovementTag 로 막혀 있다.

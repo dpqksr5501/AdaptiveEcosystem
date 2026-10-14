@@ -67,4 +67,10 @@ struct FEcoIntegratedV3Fragment : public FMassFragment
 	/** 지형·장애물에 막혀 이동 전 자리에 남은 결정 스텝 수 (기록). */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|PolicyV3")
 	int32 BlockedMoves = 0;
+
+	/** 이 사슴이 마지막으로 먹은 [EcoV3I] 기록 구간 번호 (FEcoV3RegionContext::LogEpoch). '구간에 한 번이라도 먹은 사슴' 세기 전용. */
+	int32 AteLogEpoch = INDEX_NONE;
+
+	/** 이 사슴이 마지막으로 번식한 전역 스텝 (번식 = 에너지 0.9 초과 → 0.5, 학습 세계 규칙). 화면 표시 전용, 없으면 -1. */
+	int64 ReproducedStep = -1;
 };

@@ -35,6 +35,8 @@
 //                                  막히면 그 개체는 이번 스텝 이동 전 자리에 남는다 — 그래서 포획 거리·섭식 셀·관측이 모두 막힌 뒤 위치로 계산된다
 //   AdoptHerb·AdoptThreat          주어진 위치·heading·키·종류로 만든다(세계 난수를 쓰지 않는다)
 //   ObserveAndDecideRows           새로 입양한 행만 첫 관측·첫 요청
+//   FHerbBody::LastIntake, FWorldStats::FoodEaten·EatSteps  섭식 기록 (통합 모드의 먹기 표시·기록). 늘 채우지만 어떤 계산에도
+//                                  쓰지 않는다 — 평면 맵·기준 루프의 논리 상태는 비트 단위로 그대로다
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -346,6 +348,7 @@ namespace EcoWorldV3
 		FVec2 DeathPos;
 		bool bReproduced = false;
 		bool bRespawned = false;
+		double LastIntake = 0.0;             // 이번 스텝 C4 에서 먹은 먹이 (먹이 단위 = 셀에서 덜어 낸 몫, 에너지는 × 0.5). 기록·표시 전용 — 다른 계산에 쓰지 않는다
 	};
 
 	/** 스텝 끝 지각 (FEcoPerceptionCacheFragment). 다음 스텝의 결정 관측·제어 입력이다. */
@@ -415,6 +418,9 @@ namespace EcoWorldV3
 		std::int64_t MaskViolations = 0;     // 마스크가 막은 행동이 실행됐다 (늘 0 이어야 한다)
 		std::int64_t BlockedHerbMoves = 0;   // 이동 제약 콜백이 막은 사슴 이동 (통합 모드만. 평면 맵은 늘 0)
 		std::int64_t BlockedThreatMoves = 0; // 이동 제약 콜백이 막은 위협 이동
+		// 섭식 기록 (통합 모드 화면·기록용. 논리에 쓰지 않으므로 평면 맵·기준 루프의 상태는 그대로다)
+		double FoodEaten = 0.0;              // 누적 먹은 먹이 (먹이 단위, C4 에서 셀마다 덜어 낸 양의 셀 순서 합)
+		std::int64_t EatSteps = 0;           // 실제로 먹은 개체·스텝 (먹은 양 > 0)
 	};
 
 	/**
@@ -962,6 +968,7 @@ namespace EcoWorldV3
 			const double Taken = Dm < F.Food[k] ? Dm : F.Food[k];
 			F.Demand[k] = Dm > 0.0 ? Taken / Dm : 0.0;   // 이제 이 칸은 비율이다
 			F.Food[k] -= Taken;
+			W.Stats.FoodEaten += Taken;                   // 기록만 (아래 계산에 쓰지 않는다)
 		}
 		std::int32_t NumCaught = 0;
 		for (std::int32_t i = 0; i < N; ++i)
@@ -969,6 +976,8 @@ namespace EcoWorldV3
 			FHerbBody& B = *Herbs[i].Body;
 			const double Gain = W.Want[static_cast<size_t>(i)] * F.Demand[static_cast<size_t>(W.CellIdx[static_cast<size_t>(i)])];
 			B.Energy = R3::EnergyAfterIntake(W.EDrained[static_cast<size_t>(i)], Gain, RC);
+			B.LastIntake = Gain;                          // 기록만
+			W.Stats.EatSteps += Gain > 0.0 ? 1 : 0;
 
 			// C5. 번식
 			B.bReproduced = R3::ApplyReproduction(B.Energy, B.ReproCd, RC);
