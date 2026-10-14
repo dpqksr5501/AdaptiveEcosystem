@@ -1,5 +1,17 @@
 # Mass 생태계 통합·성능 작업 안내
 
+사슴과 늑대를 각각 독립 개발한 뒤 합치는 구현 상세 기준은 [종별 독립 개발 마스터 계획](SpeciesAI/README.md)을 따른다. 공통 엔진 연결·책임/데이터 계약, 사슴 생활·위협 대응, 늑대 사냥·표적/공격, 대역 시험과 후속 통합을 별도 상세 문서로 정리했다.
+
+Unreal 기본 AI 기술로 사슴·늑대를 구현하고 PPO와 비교하는 별도 opt-in 개발은 [Mass StateTree·PPO 비교 개발 계획](MASS_STATETREE_PPO_COMPARISON_DEVELOPMENT_PLAN_2026-10-14.md)을 따른다. 정책만 바꾸는 엄격 비교와 NavMesh·회피·LOD까지 연결하는 전체 시스템 비교를 구분하며, 책임·데이터 소유권·처리 예산·단계별 완료 조건을 정리했다. 기존 PPO 기본 경로를 교체한 완료 보고가 아니다.
+
+새 레벨을 직접 복사하고 팀 기능을 하나씩 배치할 때는 [새 통합 레벨 수동 설정](M4_NEW_LEVEL_MANUAL_SETUP.md)을 먼저 따른다. 레벨/Actor 자동 배치 없이 A~F를 확인하는 순서와 실제 에셋·Blueprint 인계 노드를 정리했다.
+
+현재 M4 코드 개발 및 단계별 수동 검증은 [구현 진행 기록](M4_IMPLEMENTATION_PROGRESS.md)을 따른다. 사용자 요청으로 자동화 테스트를 생략하며 A~F별 간단한 에디터 설정을 별도 문서에 정리했다. 아래 P1~P6 본문은 초기 계획의 이력이다.
+
+이번 Source의 시간·사건 순서·이동 writer·복제 revision·기본/실험 설정은 [통합 실행 계약](M4_RUNTIME_INTEGRATION_CONTRACT.md)에 정리했다.
+
+에디터에서 바로 확인할 때는 [A~F 빠른 시작](M4_EDITOR_QUICK_START.md)을 사용한다.
+
 작성일: 2026-10-11 / 엔진: UE 5.8 / Source 기준: 로컬 `M4`, `6235742`.
 
 이 문서는 서버의 대규모 논리 생태계와 Client의 제한된 복제·표현을 연결하기 위한 작업 순서다. 각 문서는 **구현 계획**이며 완료 보고나 새 성능 측정 결과가 아니다. 이번 변경은 문서만 작성했고 UBT·자동화·PIE·성능 캡처를 실행하지 않았다.
@@ -57,3 +69,7 @@ P2는 P1 이전의 현 상태도 캡처할 수 있다. P1 통합 후 동일 시�
 - [Epic MassGameplay](https://dev.epicgames.com/documentation/en-us/unreal-engine/overview-of-mass-gameplay-in-unreal-engine): Simulation/Replication/Representation LOD, 표현 전환·풀링의 근거.
 
 공식 기능을 사용할 수 있다는 사실과 프로젝트에 적용·성능 검증됐다는 사실을 구분한다. 기존 [통합 맵 안내](ECOSYSTEM_INTEGRATION_MAP_SETUP.md)와 [외부 프레임워크 통합 문서](THIRD_PARTY_INTEGRATION.md)는 별도 범위를 유지한다.
+
+## SpeciesAI 독립 실행과 PPO 비교 구현
+
+2026-10-14 opt-in StateTree 기반 사슴/늑대 코드는 기존 Creature coordinator에 연결된다. [적용 순서](SpeciesAI/EDITOR_QUICK_START.md), [M1~M5 구현·수동 확인과 빌드 증거](SpeciesAI/IMPLEMENTATION_MILESTONES.md), [파일별 책임·실제 계약](SpeciesAI/SOURCE_RESPONSIBILITIES.md)을 먼저 읽는다. 기본 구현의 Editor 빌드와 에셋 재로드는 확인했으며 PIE/다중 Client/성능 release gate는 별도다. 기존 PPO 상수/학습 가중치를 교체하지 않는다.
