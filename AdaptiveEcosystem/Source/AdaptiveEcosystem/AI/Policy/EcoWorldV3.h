@@ -24,7 +24,17 @@
 //   E  관측                 먹이 장(blur·기울기) → 위협·동족·은신처 지각 → Perceive(away·recency) → 관측 18
 //                           이번 스텝에 죽은 개체도 제자리에서 동족으로 센다(파이썬 그대로, 계약 2-3·열린 질문 5)
 //   G  리스폰               죽은 슬롯을 새 세대로 (맵 전체 균등 위치) — 그 행만 E 를 다시 한다
+//                           (통합 모드 bRespawnDead = false: 부활하지 않고 PrevPos = Pos 로 멈춘다. 다음 스텝부터는 부르는 쪽이 뺀다)
 //   H  다음 요청            Prepare(결정 관측) → 마스크(판 2) → reads 면 망 argmax, 아니면 지금 행동
+//
+// 통합 모드 (팀 통합 레벨, AI/Policy/EcoPolicyV3IntegratedProcessors): 기본값은 모두 평면 시험 맵과 같다(ReferenceParity 그대로).
+//   FWorldConfig::RngStream        세계 난수 갈래 (지역마다 다른 먹이 패치·늑대 선회). 0 = 지금과 같다
+//   FWorldConfig::bRespawnDead     false = 제자리 부활 없음 (죽은 개체 = 사라질 개체, 새 개체 = 새 StableAgentId)
+//   FWorldConfig::PredEmaDenominator  피식 EMA 분모 고정값. 0 = 지금처럼 N
+//   FStepHooks                     이동 제약 콜백 (지형·장애물). C1 사슴 이동 바로 뒤, C2 위협마다 Step 바로 뒤에 부른다.
+//                                  막히면 그 개체는 이번 스텝 이동 전 자리에 남는다 — 그래서 포획 거리·섭식 셀·관측이 모두 막힌 뒤 위치로 계산된다
+//   AdoptHerb·AdoptThreat          주어진 위치·heading·키·종류로 만든다(세계 난수를 쓰지 않는다)
+//   ObserveAndDecideRows           새로 입양한 행만 첫 관측·첫 요청
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -106,6 +116,11 @@ namespace EcoWorldV3
 		double FoodRegenBase = 0.026;
 		double FoodRegenMult = 1.0;         // 학습 U[0.5, 2] 의 한 값
 		double FoodCoverRegenMult = 0.3;
+
+		// 통합 모드 (기본값 = 평면 시험 맵 그대로)
+		std::uint64_t RngStream = 0;        // 세계 난수 첫 해시의 셋째 입력. 0 = 지금과 같다. 지역마다 다르게 주면 먹이 패치·선회가 갈린다
+		bool bRespawnDead = true;           // false = 죽은 슬롯을 되살리지 않는다 (G 를 건너뛰고 PrevPos = Pos 로 멈춘다)
+		std::int32_t PredEmaDenominator = 0; // 피식 EMA 분모. 0 이면 이번 스텝 N (평면 맵: 설정 사슴 수 = 학습의 고정 128 과 같은 꼴)
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -398,6 +413,21 @@ namespace EcoWorldV3
 		std::int64_t Starved = 0;            // 굶어 죽음 (같은 스텝에 잡힌 개체는 빼고)
 		std::int64_t Reproduced = 0;
 		std::int64_t MaskViolations = 0;     // 마스크가 막은 행동이 실행됐다 (늘 0 이어야 한다)
+		std::int64_t BlockedHerbMoves = 0;   // 이동 제약 콜백이 막은 사슴 이동 (통합 모드만. 평면 맵은 늘 0)
+		std::int64_t BlockedThreatMoves = 0; // 이동 제약 콜백이 막은 위협 이동
+	};
+
+	/**
+	 * 이동 제약 콜백 (통합 모드의 지형·장애물). 엔진 무관 — 함수 포인터와 사용자 자료만 받는다. nullptr 이면 지금과 같다.
+	 * Index 는 이번 Step 에 넘긴 배열의 색인이다. From = 이번 스텝 이동 전, To = 맵 벽 처리 뒤 자리 (파이썬 단위).
+	 * 참이면 통과, 거짓이면 막힘 — 그 개체는 이번 스텝 이동 전 자리에 남는다 (학습 세계에는 없는 막힘. 근사로 기록한다).
+	 * 움직이지 않은 개체(From == To)는 부르지 않는다.
+	 */
+	struct FStepHooks
+	{
+		void* User = nullptr;
+		bool (*HerbMove)(void* User, std::int32_t Index, const FVec2& From, const FVec2& To) = nullptr;
+		bool (*ThreatMove)(void* User, std::int32_t Index, double FromX, double FromY, double ToX, double ToY) = nullptr;
 	};
 
 	/** 세계 상태 (Mass 경로는 UEcoPolicyV3Subsystem 이 하나 가진다). */
@@ -460,7 +490,7 @@ namespace EcoWorldV3
 		W.RepCfg = EcoRepertoireV3::kR1bConfig;
 		W.ObsCfg = EcoObservationV3::kR1bObsConfig;
 		W.ThreatCfg = EcoThreatV3::FThreatConfig();
-		W.Rng.State = EcoRepertoireV3::HashChain3(kWorldRngTag, static_cast<std::uint64_t>(C.Seed), 0);
+		W.Rng.State = EcoRepertoireV3::HashChain3(kWorldRngTag, static_cast<std::uint64_t>(C.Seed), C.RngStream);
 		W.Food.Build(W.Config, W.Rng);
 		W.T = 0;
 		W.PredEma = 0.0;
@@ -525,6 +555,55 @@ namespace EcoWorldV3
 			const double U1 = W.Rng.NextU01();
 			EcoThreatV3::PickPlayerMode(A.State, U0, U1, W.ThreatCfg);
 		}
+		A.PrevX = A.State.PosX;
+		A.PrevY = A.State.PosY;
+	}
+
+	// ---- 통합 모드 입양 (세계 난수를 쓰지 않는다 — 팀 조정자가 이미 정한 자리·방향을 받는다) ----
+
+	namespace Detail
+	{
+		inline double Clamp0(double V, double Hi) { return V < 0.0 ? 0.0 : (V > Hi ? Hi : V); }
+	}
+
+	/**
+	 * 통합 모드의 새 초식 (계약 12-3): 주어진 위치(맵 안으로 자름)·heading·개체 키, E 0.5, GRAZE 진입, seq 0.
+	 * AgentKey = MakeAgentKeyFromStableId(StableAgentId), Seed = 세계 설정의 Seed(세션 시드). Slot·Generation 은 0 으로 둔다(쓰지 않는다).
+	 * 첫 관측·첫 요청은 ObserveAndDecideRows 로 만든다.
+	 */
+	inline void AdoptHerb(FWorldState& W, const FHerbView& H, const FVec2& Pos, const FVec2& Head, std::uint64_t AgentKey)
+	{
+		const double Size = W.Config.WorldSize;
+		*H.Body = FHerbBody();
+		H.Body->Pos = {Detail::Clamp0(Pos.X, Size), Detail::Clamp0(Pos.Y, Size)};
+		const FVec2 Hn = EcoRepertoireV3::Normalize(Head);
+		H.Body->Head = EcoRepertoireV3::IsNonZero(Hn) ? Hn : FVec2{1.0, 0.0};
+		H.Body->PrevPos = H.Body->Pos;
+		H.Body->Energy = W.RepCfg.InitEnergy;
+		H.Body->ReproCd = 0;
+		*H.Decision = FHerbDecision();
+		*H.Perception = FHerbPerception();
+		*H.Control = EcoRepertoireV3::FControlOutput();
+		const double E01 = H.Body->Energy / W.RepCfg.MaxEnergy;
+		EcoRepertoireV3::InitAgent(*H.Rep, E01 < 0.0 ? 0.0 : (E01 > 1.0 ? 1.0 : E01), W.Dark, W.Config.Seed, AgentKey, W.RepCfg);
+	}
+
+	/** 통합 모드의 새 위협: 주어진 성질(잠행·추격, 야행성, 속력)·위치·heading. 플레이어 대역은 쓰지 않는다(모드 난수가 필요하다). */
+	inline void AdoptThreat(FWorldState& W, FThreatAgent& A, const EcoThreatV3::FThreatSpec& Spec, double PosX, double PosY,
+							double HeadX, double HeadY)
+	{
+		const double Size = W.Config.WorldSize;
+		A = FThreatAgent();
+		A.Spec = Spec;
+		A.State.PosX = Detail::Clamp0(PosX, Size);
+		A.State.PosY = Detail::Clamp0(PosY, Size);
+		double Hx = HeadX;
+		double Hy = HeadY;
+		EcoThreatV3::Normalize2(Hx, Hy);
+		const bool bHead = Hx != 0.0 || Hy != 0.0;
+		A.State.HeadX = bHead ? Hx : 1.0;
+		A.State.HeadY = bHead ? Hy : 0.0;
+		A.State.bAsleep = EcoThreatV3::IsAsleep(A.Spec, W.Dark, W.ThreatCfg);
 		A.PrevX = A.State.PosX;
 		A.PrevY = A.State.PosY;
 	}
@@ -654,6 +733,35 @@ namespace EcoWorldV3
 		DecideAll(W, Herbs, N, Net);
 	}
 
+	/**
+	 * 몇 행만 첫 관측과 첫 요청 (통합 모드 입양 직후). 동족·위협 목록은 넘긴 전체(Herbs·Threats)로 만든다.
+	 * 다른 행의 지각·요청은 건드리지 않는다 (그 행들은 지난 스텝 H 에서 이미 준비됐다).
+	 */
+	inline void ObserveAndDecideRows(FWorldState& W, const FHerbView* Herbs, std::int32_t N, FThreatAgent* const* Threats,
+									 std::int32_t M, const std::int32_t* Rows, std::int32_t NumRows,
+									 const EcoPolicyV3::FPolicyNetV3& Net = EcoPolicyV3::kBuiltinNet)
+	{
+		W.Food.ComputeFields(W.ObsCfg.SeeR);
+		Detail::BuildThreatInputs(W, Threats, M);
+		Detail::BuildKinInputs(W, Herbs, N);
+		for (std::int32_t r = 0; r < NumRows; ++r)
+		{
+			const std::int32_t i = Rows[r];
+			if (i >= 0 && i < N)
+			{
+				Detail::ObserveHerb(W, Herbs[i], i, N, M);
+			}
+		}
+		for (std::int32_t r = 0; r < NumRows; ++r)
+		{
+			const std::int32_t i = Rows[r];
+			if (i >= 0 && i < N)
+			{
+				DecideHerb(W, Herbs[i], Net);
+			}
+		}
+	}
+
 	// ---- 한 결정 스텝 ----
 
 	struct FStepReport
@@ -701,9 +809,11 @@ namespace EcoWorldV3
 	/**
 	 * 한 결정 스텝 (계약 10-2). Herbs 는 슬롯 순서(색인 = 슬롯), Threats 도 슬롯 순서다.
 	 * 처음 부르기 전에 ObserveAndDecideAll 로 첫 관측·요청을 만들어 둔다.
+	 * 통합 모드는 Herbs·Threats 를 StableAgentId 순으로 넘기고(동점 규칙의 '낮은 색인' = 낮은 StableAgentId),
+	 * 산 개체만 넘긴다 — 이번 스텝에 죽은 개체(DeathCause != None)는 다음 Step 에서 빼야 한다. Hooks 가 nullptr 이면 지금과 같다.
 	 */
 	inline FStepReport Step(FWorldState& W, const FHerbView* Herbs, std::int32_t N, FThreatAgent* const* Threats, std::int32_t M,
-							const EcoPolicyV3::FPolicyNetV3& Net = EcoPolicyV3::kBuiltinNet)
+							const EcoPolicyV3::FPolicyNetV3& Net = EcoPolicyV3::kBuiltinNet, const FStepHooks* Hooks = nullptr)
 	{
 		namespace R3 = EcoRepertoireV3;
 		FStepReport Report;
@@ -762,6 +872,13 @@ namespace EcoWorldV3
 			B.bReproduced = false;
 			B.bRespawned = false;
 			R3::ApplyMove(B.Pos, B.Head, *Herbs[i].Control, W.Config.WorldSize);
+			// 통합 모드: 지형·장애물 제약. 막히면 이동 전 자리 (heading 은 가려던 쪽 그대로)
+			if (Hooks && Hooks->HerbMove && (B.Pos.X != B.PrevPos.X || B.Pos.Y != B.PrevPos.Y)
+				&& !Hooks->HerbMove(Hooks->User, i, B.PrevPos, B.Pos))
+			{
+				B.Pos = B.PrevPos;
+				++W.Stats.BlockedHerbMoves;
+			}
 		}
 
 		// C2. 위협 스텝 (초식 이동 뒤 위치, 위협 이동 전 위치로 포획 거리)
@@ -804,6 +921,19 @@ namespace EcoWorldV3
 			A.PrevX = A.State.PosX;
 			A.PrevY = A.State.PosY;
 			A.Last = EcoThreatV3::Step(A.Spec, A.State, In, W.ThreatCfg);
+			// 통합 모드: 지형·장애물 제약. 포획은 이동 전 위치로 이미 판정했다(위 Step 9). 막히면 이동 전 자리·변위 0·heading 반전
+			// (학습의 벽 반사를 흉내 낸 근사 — 장애물의 법선은 모른다)
+			if (Hooks && Hooks->ThreatMove && (A.State.PosX != A.PrevX || A.State.PosY != A.PrevY)
+				&& !Hooks->ThreatMove(Hooks->User, m, A.PrevX, A.PrevY, A.State.PosX, A.State.PosY))
+			{
+				A.State.PosX = A.PrevX;
+				A.State.PosY = A.PrevY;
+				A.State.VelX = 0.0;
+				A.State.VelY = 0.0;
+				A.State.HeadX = -A.State.HeadX;
+				A.State.HeadY = -A.State.HeadY;
+				++W.Stats.BlockedThreatMoves;
+			}
 			W.CaughtByThreat[static_cast<size_t>(m)] = A.Last.Caught;
 		}
 		W.Catcher.assign(static_cast<size_t>(N), -1);
@@ -863,8 +993,9 @@ namespace EcoWorldV3
 		}
 		Report.Caught = NumCaught;
 
-		// C7. 피식 EMA (분모 N 고정 — 파이썬 128 과 같은 꼴, 열린 질문 7). C8. 먹이 재생
-		W.PredEma = EcoObservationV3::UpdatePredationEma(W.PredEma, NumCaught, N > 0 ? N : 1, W.ObsCfg);
+		// C7. 피식 EMA (분모 N 고정 — 파이썬 128 과 같은 꼴, 열린 질문 7. 통합 모드는 PredEmaDenominator 고정값). C8. 먹이 재생
+		const std::int32_t EmaDen = W.Config.PredEmaDenominator > 0 ? W.Config.PredEmaDenominator : (N > 0 ? N : 1);
+		W.PredEma = EcoObservationV3::UpdatePredationEma(W.PredEma, NumCaught, EmaDen, W.ObsCfg);
 		F.Regrow();
 
 		// D. t ← t + 1, Tick. D′. 새 t 의 어둠
@@ -879,12 +1010,19 @@ namespace EcoWorldV3
 		ObserveAll(W, Herbs, N, Threats, M);
 
 		// G. 리스폰 — 죽은 슬롯을 새 세대로, 그 행만 다시 관측한다
+		//    통합 모드(bRespawnDead = false)는 되살리지 않는다: 시체는 죽은 자리에 멈춘다(PrevPos = Pos, 화면 보간이 튀지 않게).
+		//    다음 스텝부터는 부르는 쪽이 이 개체를 빼므로 움직이지도, 먹지도, 잡히지도, 동족으로 세어지지도 않는다
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			const FHerbView& H = Herbs[i];
 			FHerbBody& B = *H.Body;
 			if (B.DeathCause == kDeathNone)
 			{
+				continue;
+			}
+			if (!W.Config.bRespawnDead)
+			{
+				B.PrevPos = B.Pos;
 				continue;
 			}
 			++B.Generation;
