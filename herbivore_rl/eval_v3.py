@@ -538,6 +538,8 @@ def visible_stats(w) -> dict:
         out["alarm"] = _clean(w.alarm_stats())
     if w._th is not None:
         out["threats"] = _clean(w.threats_stats())
+    if w._rz:                                       # v3 현실성 1단계 세계만(realism_*)
+        out["realism"] = _clean(w.realism_stats())
     return out
 
 

@@ -78,6 +78,7 @@ def test_feature_ids_are_pinned():
         "food_v": 1, "speed": 2, "vigilance": 3, "regions": 4, "daynight": 5, "region_env": 6,
         "migration": 7, "weather": 8, "boldness": 9, "water": 10, "boundary": 11, "obstacles": 12,
         "vigil_window": 13, "pred_sleep": 14, "repertoire": 15, "threats": 16, "stare_down": 17, "alarm": 18,
+        "realism_vision": 19, "realism_hearing": 20, "realism_shelter": 21, "realism_night": 22, "realism_cover_food": 23,
     }
     ids = list(F.FEATURE_IDS.values())
     assert len(set(ids)) == len(ids) and min(ids) >= 1    # 0 은 SeedSequence 끝 0 무시와 겹친다
@@ -225,9 +226,13 @@ def test_toggling_one_feature_keeps_other_streams(cfg2, monkeypatch, seed):
 # repertoire(v3 R0)는 speed 의 보행표와 daynight 의 어둠을, threats(v3 R0)는 daynight 를 쓴다(`repertoire.parse_params`·
 # `_threats_params`).
 # stare_down(v3 R2 M7)은 repertoire·threats 를, alarm(v3 R2 M8)은 repertoire 를 쓴다(`_stare_params`·`_alarm_params`).
+# realism_*(v3 현실성 1단계)는 repertoire 를, realism_night 는 pred_sleep 도 쓴다(`_rz_*_params`).
+_REP = ("speed", "daynight", "repertoire")
 PREREQS = {"vigil_window": ("speed", "vigilance"), "daynight": ("speed",), "pred_sleep": ("speed", "daynight"),
            "repertoire": ("speed", "daynight"), "threats": ("speed", "daynight"),
-           "stare_down": ("speed", "daynight", "repertoire", "threats"), "alarm": ("speed", "daynight", "repertoire")}
+           "stare_down": ("speed", "daynight", "repertoire", "threats"), "alarm": ("speed", "daynight", "repertoire"),
+           "realism_vision": _REP, "realism_hearing": _REP, "realism_shelter": _REP, "realism_cover_food": _REP,
+           "realism_night": _REP + ("pred_sleep",)}
 
 
 def _implemented_cases():

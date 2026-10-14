@@ -1281,6 +1281,9 @@ def export(model_path: Path, config: Path, out: Path, seeds=GOLDEN_SEEDS, steps:
         check_mask_version(int(getattr(model.policy, "rep_mask_version", 1)), names)
         if len(names) != 18 or "alarm_heard" in names:
             raise SystemExit("이 골든은 R1b 세계(관측 18, 경보 없음)만 받는다")
+        from env_v2.features import features_of
+        if any(n.startswith("realism_") for n in features_of(cfg).active):
+            raise SystemExit("이 골든은 R1b 세계만 받는다 — realism_*(v3 현실성 1단계) 규칙은 C++ 에 아직 없다")
         g = build_golden(model, cfg, seeds, steps)
     finally:
         th.set_num_threads(prev_threads)

@@ -58,6 +58,77 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
   관측 alarm_heard 한 칸(obs_extra 뒤 맨 끝)과 사건 E7 이 생긴다. 훅은 `alarm_level`·`alarm_hop`·`alarm_seq`·`alarm_pt`·
   `alarm_emit`·`entry_cause`·`alarm_e7`·`alarm_from`, 통계는 `alarm_stats`. 난수를 쓰지 않는다. alarm_r 0 이고 on_catch false 면 블록을
   건너뛴다(관측 칸은 0, E7 0회).
+- realism_* (v3 현실성 1단계, 10-14 사용자 방향 — 팀 통합 레벨을 R1b 두뇌로 돌려 본 뒤 '쫓아오는 늑대가 뒤에 있어 안 보이니 도망을
+  멈춤', '사냥 중인 늑대가 해가 지자 그 자리에서 잠듦'이 어색하다고 했다. 같은 날 갱신: '숨으면 못 먹게 하기보다 은신처에 먹이가
+  적게'). 규칙 다섯은 따로 켜고 끄며 모두 repertoire 위에 얹는다. 블록이 없거나 enabled: false 면 그 규칙의 코드 경로를 타지 않아
+  지금 세계와 비트 단위로 같다(tests/test_realism_v3.py — 이 단계 직전 커밋 626693c 의 코드와도 비교한다). 난수를 쓰지 않는다(지연은
+  해시). 관측 18칸의 모양·값 범위·마스크 판(2)은 바뀌지 않는다. 계수 검사는 `_rz_*_params`, 통계는 `realism_stats`.
+  늑대 식욕은 어느 규칙도 바꾸지 않는다(포만 없음, 쿨다운 pred_eat_cd 5 그대로 — 사용자 결정 '늑대는 과식하게 둔다').
+  (a) realism_vision — 사슴이 위협(포식자·플레이어)을 보는 시야각 threat_fov_deg(300° = 앞쪽 ±150°, 바로 뒤 60° 사각). 반경은 그대로
+      (see_r × 밤 (1 − detect_night·d) × 행동 배수 GRAZE 0.6·SLEEP 0.3). 동족 시야각은 kin_fov_deg(120 = fov_deg 면 그대로).
+      `_geometry` 의 보임 판정만 바뀐다. 판정 문턱 cos(시야각/2), 360° 면 각도 판정 없음(`_fov_cos`).
+      현실 근거: 사슴은 눈이 머리 옆에 있어 수평 시야가 약 300~310°이고 바로 뒤 50~60°만 사각이다.
+  (b) realism_hearing — 위협 m 의 '지난 스텝' 실제 이동 속력 s_m = |pred_vel_m| / herb_speed 와 그 스텝의 걸음새로 소리 반경을 정한다.
+        s′_m = s_m                     (전력 걸음: 표적을 쫓는 추격형·원거리형, 돌진(POUNCE) 상태의 잠행형, 돌진(CHARGE) 모드의 플레이어 —
+                                        훅 `pred_running`)
+             = min(s_m, s_quiet)       (그 밖 — 배회·잠행·탈진·물러남·휴식·대치. roam_quiet false 면 늘 s′ = s)
+        R_m  = 0                                                                     (s′_m < s_silent)
+             = r_quiet + (r_loud − r_quiet) · clip((s′_m − s_quiet) / (s_loud − s_quiet), 0, 1)   (그 밖)
+      사슴 i 와 깨어 있는 위협 m 의 실거리 ≤ min(R_m, 사슴 i 의 지금 탐지 반경)(cap_to_sight, 아니면 R_m)이고 R_m > 0 이면 방향과
+      무관하게 '감지됨'이다 — 보임과 같은 칸에 들어간다(관측 pred_count·pred_dist·pred_approach, away·threat_recency, 사건 E1·E2).
+      자는 위협(pred_sleep)은 빠진다. 1스텝 = 0.133 s, 1단위 ≈ 2 m. 출시 값(configs/v3_real1_*.yaml): s_silent 0.05, s_quiet 0.3,
+      s_loud 1.0, r_quiet 2(4 m), r_loud 20(40 m = 낮 시야 반경). 예(속력 × herb_speed → R): 서 있음·대치·휴식 0 → 0 | 배회하는
+      늑대(0.6~0.95, 배회 걸음) → 2 | 잠행 0.3·탈진 0.2 → 2 | 표적을 쫓는 추격형 0.6~0.95 → 9.7~18.7 | 원거리형 추격 0.36~0.57 → 3.5~8.9 |
+      밤(속력 × 0.5)의 추격 0.3~0.48 → 2~6.5 | 잠행형 돌진 1.5·플레이어 돌진 1.3 → 20.
+      현실 근거: 전력으로 쫓는 늑대는 발 구르는 소리·덤불 스치는 소리가 커서 사슴의 돌아가는 귀가 사방에서 잡는다. 돌아다니는 늑대는
+      조용한 속보로 걷고 살금살금 다가오는 늑대는 아주 가까이 와야 들리며, 서 있거나 자는 늑대는 걸음 소리가 없다. (이 세계의 추격형은
+      배회와 추격 속력이 같아서 — 단순화 — 속력만으로는 두 걸음새를 가를 수 없다. 그래서 roam_quiet 가 걸음새로 가른다.)
+      cap_to_sight 는 현실 규칙이 아니라 학습 범위 보존 장치다(pred_dist ≤ visibility × 행동 배수라는 학습 때 결합 범위 유지).
+  (c) realism_shelter — 은신처 원 안(포획 판정과 같은 위치 = 이번 스텝 초식 이동 뒤, `_in_cover`)의 사슴은 행동과 무관하게(GRAZE 로
+      먹고 있어도) 잡히지 않는다. untargetable 이면 표적 고르기에서도 빠지고(stare_down 세계에서는 잠금도 추적 불가로 지운다),
+      player_too 면 플레이어형 위협에도 같다. 은신 배수(M6)는 그대로 남지만 안전한 사슴에게는 효과가 없다.
+      현실 근거: 빽빽한 덤불·바위틈 안에는 늑대가 몸을 들이밀어 덮칠 수 없다. 늑대는 닿을 수 없는 먹잇감을 오래 노리지 않고 떠난다.
+  (e) realism_cover_food — 은신처 원과 조금이라도 겹치는 셀(`_cover_overlap_cells`, 훅 `World.cover_food_cell` — v1 의 재생 0.3배
+      셀 `cover_cell`(셀 중심이 원 안)에 원 가장자리에 걸친 셀을 더한 것)의 먹이 용량 cap0 을 cap_frac 배, 재생률을 '밖 재생률'의
+      regen_frac 배로 둔다(v1 cfg.food_cover_regen_mult 0.3 을 대신한다). 겹침으로 정하는 이유: 사슴은 자기 위치의 셀에서 먹고
+      (`_cell_index`) 안전은 위치가 원 안인가(`_in_cover`)라서, 셀 중심으로 정하면 원 가장자리의 안전한 자리가 v1 그대로의 풍부한
+      셀 위에 남는다(10-14 검토: 출시 두뇌 R1b·보정 시드 20000~20004 에서 원 안 섭취의 81% 가 그 가장자리 셀에서 나왔다). 겹침이면
+      '원 안 = 먹이가 적은 셀'이 늘 성립한다. 밖 셀은 v1 그대로라 풍부한 패치가 밖에 남는다(먹이 패치 노이즈는 은신처 배치와 무관하다).
+      `_build_world` 직후, food_v 의 식생 V 초기화 전에 적용한다. 출시 값 둘 다 0.15: 은신처 셀의 용량과 재생 속도가 밖의 15% 이고,
+      먹힌 셀이 다시 차는 양은 밖의 약 2%(0.15 × 0.15)다. '숨으면 못 먹음' 규칙은 넣지 않는다 — 은신처 안 GRAZE 는 먹을 수 있고
+      안전하다(웅크린 HIDE 가 먹지 않는 것은 R0 부터의 행동 정의라 그대로다). 가장자리 셀까지 바꾸므로 '끔과 같은 중립 값'은 없다
+      (끄려면 블록을 끈다).
+      현실 근거: 빽빽한 덤불·숲 그늘 밑은 햇빛이 모자라 풀이 적고 더디게 자라며, 트인 풀밭은 풀이 많지만 몸이 드러난다. 사슴이
+      은신처에 몰리면 곧 바닥나서, 굶지 않으려면 위험을 무릅쓰고 밖으로 나가야 한다.
+  (d) realism_night — pred_sleep 의 '주행성은 d ≥ sleep_dark 가 되는 스텝에 곧바로 잠' 대신 늑대마다 상태를 둔다(`_rz_night_update`).
+      활동도 a_m ∈ {0..R}(R = ramp_steps)는 깨어 있으면 스텝마다 +1(R 에서 멈춤), '눕는 중'이면 −1 이고 0 이 되면 잠든다.
+      눕기 시작: 깨어 있고, d ≥ sleep_dark 인 업데이트가 이어서 δ_m 번을 넘었고, 지난 포식자 스텝에 사냥 중(표적 있음, 잠행형 돌진·대치)
+      이 아니고, 실거리 settle_r 안에 사슴이 없다. 눕는 중에 사냥이 시작되거나 사슴이 settle_r 안에 들어오면 멈추고 다시 일어난다.
+      깜깜하면(결정 때 d ≥ hunt_dark) 깨어 있는 주행성 늑대는 새 사냥을 시작하지 않는다 — 지난 포식자 스텝에 사냥 중이던 늑대만 계속
+      쫓고(표적·포획), 나머지는 표적·포획 판정에서 빠진다(`_step_predators_v3` 의 hunting). 계속 쫓는 늑대는 그 스텝에 보이는 가장
+      가까운 개체를 표적으로 삼으므로 무리 안에서 표적을 바꿔 가며 쫓을 수 있다 — 보이는 표적이 한 스텝이라도 끊기거나 잡으면(쿨다운)
+      그 사냥이 끝난다. 이것이 없으면 사슴이 많은 세계에서 늑대가 표적을 계속 새로 잡아 밤새 깨어 사냥한다(보정 시드 측정: 어둠
+      업데이트의 49% 깨어 있음, 밤 피식 4.2배).
+      깸: d < sleep_dark 가 된 뒤 δ_m 번 기다렸다가 a = 0 에서 깨어 오른다. 지연 δ_m = H(606, 세계 시드, 늑대 슬롯) mod (⌊spread·τ⌋ + 1),
+      τ = 그 세계의 박명 폭(스텝). 속력 배수 = 자면 0, 깨어 있으면 max(1 − d (twilight_slow, 아니면 1), night_floor) × a_m / R.
+      night_floor ≤ 1 − sleep_dark 로 검사하므로 해 질 녘·새벽(d < sleep_dark)의 (1 − d) 감속은 pred_sleep 그대로이고 하한은 해 진 뒤에만
+      걸린다. reset 때 이미 밤이면 주행성은 자고 있다(a = 0).
+      현실 근거: 늑대는 해 질 녘에 사냥을 마저 끝내고 주위가 조용해지면 걸음을 늦추다가 눕는다. 먹잇감이 가까이 있거나 쫓는 중이면
+      눕지 않는다. 눈으로 사냥하는 주행성 사냥꾼은 깜깜해지면 새 사냥을 시작하지 않는다(쫓던 사냥은 마저 끝낸다). 새벽에는 하나씩
+      깨어 몸을 풀며 천천히 움직이기 시작한다.
+  난수(다섯 규칙 공통): 난수를 뽑지 않고 기능 스트림도 만들지 않는다. v1 스트림의 스텝당 호출 모양(배회 선회 M_base 개, v1 배치에
+  원거리형이 있으면 원거리 판정 (M_base, N) 개)도 그대로다(은신처 안 사슴도 원거리 판정 난수는 뽑힌다) — 켠 세계에서 v1·기존 기능
+  스트림 소비가 달라지는 것은 사건(사망·리스폰 `_respawn`, 플레이어 모드 전환 `_player_new_mode`)이 달라진 결과뿐이다.
+- 세로 장애물(나무·바위) 확장 지점 — 이번 단계에는 넣지 않는다(10-14 사용자: '언리얼에도 아직 없다. 나중에 추가 가능하게만').
+  구현은 없고 자리만 정해 둔다. 기능 이름은 이미 예약된 `obstacles`(번호 12, `env_v2/features.py`)이고 켜면 '아직 구현되지 않았다'로
+  읽을 때 실패한다(끈 블록 `obstacles: {enabled: false}` 는 받아들이고 무시한다). 자료는 `World.obstacles` — (K, 3) float64 [x, y, r]
+  원판, 열 이름 `OBSTACLE_COLUMNS`, 지금은 늘 K = 0(`_obstacles_reset`). 넣을 때 바꿀 곳(모두 K = 0 이면 지금과 비트 동일이게):
+    1) 배치: `_obstacles_reset` 에서 자기 스트림 `feature_rng("obstacles", 0)` 만 써서 원판을 뽑는다(`_build_world` 뒤).
+    2) 이동: 사슴 `step` 1) 의 clip 직후, 포식자 `_step_predators_v3` 의 벽 반사 앞 — 원판 안으로 들어가면 축별로 미끄러진다.
+    3) 시선: `_geometry` 의 위협 보임(pvis, 청각은 막지 않는다)과 포식자 표적 보임(vis) — 선분-원판 교차로 가린다.
+    4) 먹이: 원판 아래 셀의 용량 0(`_rz_cover_food_apply` 와 같은 자리, food_v 초기화 전).
+    5) 위치: 초기 배치(`_build_world` 뒤)와 리스폰(`_respawn`)을 원판 밖으로 밀어낸다(v1 난수 호출은 그대로, 규칙 2).
+  언리얼은 레벨의 장애물 액터를 같은 원판 목록으로 내보내 같은 엔진 무관 판정을 쓴다(이번에는 C++ 도 바꾸지 않는다).
 
 행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
 `World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
@@ -234,6 +305,23 @@ WAVE_STEPS = 20
 HEADS_UP_STEPS = 8                  # 1초 = 7.5스텝 → 8스텝 뒤
 HEADS_UP_R16 = 16.0                 # 사전 등록 5절 '홉 0 방출자 16단위 안'(글자 그대로 판)
 DIR_COS = math.cos(math.radians(30.0))
+# realism_stats() 열 순서 (v3 현실성 1단계). env_v2/rollout.py 가 realism_* 중 하나라도 켠 세계의 행에만 붙인다. 켜지 않은 규칙의 열은
+# nan 이다. 통계 정의이고 동역학과 무관하다.
+#   rear_seen_frac: 스텝 끝 관측(리스폰 전) 개체-스텝 중 위협이 눈으로 보이는데 기본 시야각(fov_deg 120)이었다면 하나도 안 보였을 비율
+#   heard_only_frac: 위협이 감지됐는데 눈으로는 하나도 안 보인(들어서만 안) 비율
+#   safe_frac: 포식자 스텝 개체-스텝 중 안전(은신처 원 안) 비율, safe_saved_n: 안전해서 포획 판정에서 빠진 '잡힐 거리' 개체-스텝 수
+#   food_cap_kept: 마지막 reset 세계의 먹이 용량 합 / v1 용량 합(은신처 셀을 줄인 뒤), cover_intake_share: 섭취 중 은신처 원 안(섭식
+#   위치)에서 먹은 몫
+#   dark_awake_frac: 어둠(d ≥ sleep_dark) 업데이트의 주행성 늑대-업데이트 중 깨어 있는(눕는 중 포함) 비율, settle_n: 눕기 시작 수,
+#   settle_abort_n: 눕다가 다시 일어난 수, onset_n: 잠든 수, block_deer_n·block_hunt_n: 누울 차례인데 사슴이 가까워·사냥 중이라 못
+#   누운 늑대-업데이트 수, wake_n: 깬 수
+REALISM_STAT_COLUMNS = ("rear_seen_frac", "heard_only_frac", "safe_frac", "safe_saved_n", "food_cap_kept",
+                        "cover_intake_share", "dark_awake_frac", "settle_n", "settle_abort_n", "onset_n", "block_deer_n",
+                        "block_hunt_n", "wake_n")
+# realism_night 의 늑대별 잠·기상 지연 해시의 첫 입력. repertoire.JITTER_TAG(505)·rollout._SALT(101·202·303·404)와 겹치지 않는다
+NIGHT_TAG = 606
+# 세로 장애물 확장 지점(모듈 docstring '세로 장애물'): World.obstacles 의 열. 이번 단계에는 늘 비어 있다
+OBSTACLE_COLUMNS = ("x", "y", "r")
 
 
 WORLD_PARAM_KEYS = ("world_size", "predator_count", "pred_speed_mult", "ranged_frac", "cover_frac", "food_regen_mult")
@@ -658,6 +746,132 @@ def _alarm_params(p: dict, f: Features) -> dict:
     return out
 
 
+def _fov_cos(deg: float, base_deg: float, base_cos: float) -> float:
+    """시야각(도) → 판정 문턱 cos(시야각/2). 기본 시야각과 같으면 v1 상수(cfg.fov_cos) 그대로, 360 이면 −inf(각도 판정 없음 —
+    cos(180°) = −1 과의 비교는 반올림으로 정반대 방향을 놓칠 수 있다, `_vigil_params` 와 같은 규칙)."""
+    if deg == float(base_deg):
+        return base_cos
+    return -math.inf if deg >= 360.0 else math.cos(math.radians(deg) * 0.5)
+
+
+def _rz_need_repertoire(name: str, f: Features) -> None:
+    if not f.enabled("repertoire"):
+        raise ValueError(f"features.{name} 는 repertoire 를 함께 켜야 한다(v3 현실성 1단계는 행동 레퍼토리 세계 위의 규칙이다)")
+
+
+def _rz_vision_params(p: dict, f: Features, cfg) -> dict:
+    """realism_vision 계수 (모듈 docstring (a)). threat_fov_deg·kin_fov_deg ∈ [fov_deg(v1 120), 360]. 반환에 문턱 cos 를 더한다
+    (기본 시야각이면 cfg.fov_cos 그대로라 그 판정은 비트 단위로 같다). repertoire 를 함께 켜야 한다."""
+    _rz_need_repertoire("realism_vision", f)
+    out = {}
+    for key in ("threat_fov_deg", "kin_fov_deg"):
+        x = _num("realism_vision", key, p[key])
+        if not float(cfg.fov_deg) <= x <= 360.0:
+            raise ValueError(f"features.realism_vision.{key} 는 기본 시야각 {cfg.fov_deg} 이상 360 이하여야 한다(좁히지 않는다). "
+                             f"받은 값: {x}")
+        out[key] = x
+    out["threat_cos"] = _fov_cos(out["threat_fov_deg"], cfg.fov_deg, cfg.fov_cos)
+    out["kin_cos"] = _fov_cos(out["kin_fov_deg"], cfg.fov_deg, cfg.fov_cos)
+    return out
+
+
+def _rz_hearing_params(p: dict, f: Features) -> dict:
+    """realism_hearing 계수 (모듈 docstring (b)). 0 ≤ r_quiet ≤ r_loud, 0 < s_silent ≤ s_quiet < s_loud (× herb_speed),
+    cap_to_sight·roam_quiet (bool). repertoire 를 함께 켜야 한다(위협의 지난 이동 pred_vel 과 사슴 행동별 탐지 반경을 쓴다)."""
+    _rz_need_repertoire("realism_hearing", f)
+    out = {k: _num("realism_hearing", k, p[k]) for k in ("r_quiet", "r_loud", "s_silent", "s_quiet", "s_loud")}
+    if not 0.0 <= out["r_quiet"] <= out["r_loud"]:
+        raise ValueError(f"features.realism_hearing 는 0 ≤ r_quiet ≤ r_loud 여야 한다. 받은 값: {out['r_quiet']}, {out['r_loud']}")
+    if not 0.0 < out["s_silent"] <= out["s_quiet"] < out["s_loud"]:
+        raise ValueError("features.realism_hearing 는 0 < s_silent ≤ s_quiet < s_loud 여야 한다. 받은 값: "
+                         f"{out['s_silent']}, {out['s_quiet']}, {out['s_loud']}")
+    for key in ("cap_to_sight", "roam_quiet"):
+        if not isinstance(p[key], bool):
+            raise ValueError(f"features.realism_hearing.{key} 는 true/false 여야 한다. 받은 값: {p[key]!r}")
+        out[key] = p[key]
+    return out
+
+
+def hearing_radius(zh: dict, s: np.ndarray, running: np.ndarray | None = None) -> np.ndarray:
+    """위협의 지난 스텝 속력 s(× herb_speed)·걸음새(running = 전력 걸음, 훅 `World.pred_running`)의 소리 반경 R
+    (모듈 docstring (b)). roam_quiet 면 전력 걸음이 아닌 위협의 속력을 s_quiet 에서 자른다(running 이 None 이면 모두 전력 걸음).
+    C++ 꼴:
+      float S2 = (bRoamQuiet && !bRunning) ? FMath::Min(S, SQuiet) : S;
+      float T = FMath::Clamp((S2 - SQuiet) / (SLoud - SQuiet), 0, 1);  R = S2 < SSilent ? 0 : RQuiet + (RLoud - RQuiet) * T;"""
+    s = np.asarray(s, dtype=np.float64)
+    if zh["roam_quiet"] and running is not None:
+        s = np.where(np.asarray(running, dtype=bool), s, np.minimum(s, zh["s_quiet"]))
+    t = np.clip((s - zh["s_quiet"]) / (zh["s_loud"] - zh["s_quiet"]), 0.0, 1.0)
+    return np.where(s < zh["s_silent"], 0.0, zh["r_quiet"] + (zh["r_loud"] - zh["r_quiet"]) * t)
+
+
+def _rz_shelter_params(p: dict, f: Features) -> dict:
+    """realism_shelter 계수 (모듈 docstring (c)). untargetable·player_too (bool). repertoire 를 함께 켜야 한다(v3 포식자 스텝의
+    표적·포획 판정에 얹는다)."""
+    _rz_need_repertoire("realism_shelter", f)
+    out = {}
+    for key in ("untargetable", "player_too"):
+        if not isinstance(p[key], bool):
+            raise ValueError(f"features.realism_shelter.{key} 는 true/false 여야 한다. 받은 값: {p[key]!r}")
+        out[key] = p[key]
+    return out
+
+
+def _rz_cover_food_params(p: dict, f: Features) -> dict:
+    """realism_cover_food 계수 (모듈 docstring (e)). cap_frac ∈ [0, 1] = 은신처 셀 용량 배수, regen_frac ∈ [0, 1] = 은신처 셀
+    재생률 / 밖 재생률(v1 은 cfg.food_cover_regen_mult 0.3). repertoire 를 함께 켜야 한다(v3 현실성 단계의 규칙이다)."""
+    _rz_need_repertoire("realism_cover_food", f)
+    out = {}
+    for key in ("cap_frac", "regen_frac"):
+        x = _num("realism_cover_food", key, p[key])
+        if not 0.0 <= x <= 1.0:
+            raise ValueError(f"features.realism_cover_food.{key} 는 [0, 1] 이어야 한다(밖보다 늘리지 않는다). 받은 값: {x}")
+        out[key] = x
+    return out
+
+
+def _rz_night_params(p: dict, f: Features, ps: dict | None) -> dict:
+    """realism_night 계수 (모듈 docstring (d)). settle_r ≥ 0, sleep_dark < hunt_dark ≤ 1, 0 ≤ night_floor ≤ 1 − sleep_dark (해 지는
+    순간의 속력 1 − sleep_dark 보다 크면 해 질 녘·새벽의 (1 − d) 감속까지 덮고, 해 질 때 속력이 다시 오른다), 0 ≤ spread ≤ 1 (박명 폭
+    τ 비율), ramp_steps ≥ 0 정수(0 = 눕기·깨기가 한 업데이트에 끝남). pred_sleep·repertoire 를 함께 켜야 한다(pred_sleep 의 잠을 바꾸는
+    규칙이고, 사냥 중 판정은 v3 포식자 스텝이 남긴다)."""
+    _rz_need_repertoire("realism_night", f)
+    if ps is None:
+        raise ValueError("features.realism_night 는 pred_sleep 을 함께 켜야 한다(주행성 늑대의 밤잠을 바꾸는 규칙이다)")
+    out = {}
+    x = _num("realism_night", "settle_r", p["settle_r"])
+    if x < 0.0:
+        raise ValueError(f"features.realism_night.settle_r 는 0 이상이어야 한다. 받은 값: {x}")
+    out["settle_r"] = x
+    x = _num("realism_night", "hunt_dark", p["hunt_dark"])
+    if not ps["sleep_dark"] < x <= 1.0:
+        raise ValueError(f"features.realism_night.hunt_dark 는 pred_sleep.sleep_dark({ps['sleep_dark']}) 초과 1 이하여야 한다. "
+                         f"받은 값: {x}")
+    out["hunt_dark"] = x
+    for key in ("night_floor", "spread"):
+        x = _num("realism_night", key, p[key])
+        if not 0.0 <= x <= 1.0:
+            raise ValueError(f"features.realism_night.{key} 는 [0, 1] 이어야 한다. 받은 값: {x}")
+        out[key] = x
+    if out["night_floor"] > 1.0 - ps["sleep_dark"]:
+        raise ValueError(f"features.realism_night.night_floor 는 1 − pred_sleep.sleep_dark({1.0 - ps['sleep_dark']}) 이하여야 한다"
+                         f"(해 질 녘·새벽 감속은 pred_sleep 그대로 두고 해 진 뒤에만 하한을 건다). 받은 값: {out['night_floor']}")
+    v = p["ramp_steps"]
+    if isinstance(v, bool) or not isinstance(v, (int, np.integer)) or v < 0:
+        raise ValueError(f"features.realism_night.ramp_steps 는 0 이상의 정수(스텝)여야 한다. 받은 값: {v!r}")
+    out["ramp_steps"] = int(v)
+    return out
+
+
+def night_delays(seed: int, n: int, max_delay: int) -> np.ndarray:
+    """realism_night 의 늑대별 잠·기상 지연 δ_m = H(606, 세계 시드, m) mod (max_delay + 1) ∈ [0, max_delay] (int64, m = 위협 슬롯
+    0..n−1). H 는 repertoire.mix_chain(SplitMix64 사슬, 사건 결정 지연과 같은 식). C++ 꼴: Mix64Chain(0, 606, Seed, Slot) % (D + 1)."""
+    if max_delay <= 0 or n == 0:
+        return np.zeros(n, dtype=np.int64)
+    h = rep.mix_chain(NIGHT_TAG, np.int64(seed), np.arange(n, dtype=np.int64))
+    return (h % np.uint64(max_delay + 1)).astype(np.int64)
+
+
 def daynight_phase(t: int, period: int, offset: int, tw_steps: int) -> tuple[float, int]:
     """스텝 t 의 (어둠 d, 다음 전환까지 남은 스텝 r) (계획서 4.9.2). 낮 고정 세계는 부르지 않는다(d = 0).
 
@@ -747,6 +961,15 @@ class World:
                     if self.features.enabled("stare_down") else None)
         self._al = (_alarm_params(self.features.params("alarm"), self.features)
                     if self.features.enabled("alarm") else None)
+        # v3 현실성 1단계(모듈 docstring realism_*): 시야(a)·청각(b)·은신처 안전(c)·은신처 먹이 부족(e)·늑대 밤잠 점진화(d). 끈 규칙은
+        # None 이고 그 코드 경로를 타지 않는다
+        f = self.features
+        self._zv = (_rz_vision_params(f.params("realism_vision"), f, cfg) if f.enabled("realism_vision") else None)
+        self._zh = (_rz_hearing_params(f.params("realism_hearing"), f) if f.enabled("realism_hearing") else None)
+        self._zs = (_rz_shelter_params(f.params("realism_shelter"), f) if f.enabled("realism_shelter") else None)
+        self._zf = (_rz_cover_food_params(f.params("realism_cover_food"), f) if f.enabled("realism_cover_food") else None)
+        self._zn = (_rz_night_params(f.params("realism_night"), f, self._ps) if f.enabled("realism_night") else None)
+        self._rz = any(x is not None for x in (self._zv, self._zh, self._zs, self._zf, self._zn))
         self._rs = None
         self.act_names: tuple[str, ...] = action_names(self.features)
         self.act_dim = len(self.act_names)
@@ -786,6 +1009,9 @@ class World:
         self.food_regen_mult = float(r.uniform(*rd["food_regen_mult"]))
 
         self._build_world()
+        self._obstacles_reset()             # 세로 장애물 확장 지점(이번 단계에는 늘 빈 목록, 난수 없음)
+        if self._zf is not None:
+            self._rz_cover_food_apply()     # v3 현실성 (e): 은신처 셀 먹이 용량·재생 (food_v 의 V 초기화 전)
         if self._fv is not None:
             self._food_v_reset()
         if self._sp is not None:
@@ -825,6 +1051,11 @@ class World:
             self._stare_reset()             # 위협 수 M(플레이어 칸 포함)이 정해진 뒤
         if self._v3p:
             self.pred_vel = np.zeros((self.M, 2))   # 포식자의 지난 스텝 이동(관측 pred_approach)
+        if self._zh is not None:
+            # v3 현실성 (b) 스텝 뒤 훅: 위협이 지난 스텝에 전력 걸음이었나(추격형의 표적 추격, 잠행형 돌진, 플레이어 돌진). 처음에는 아니다
+            self.pred_running = np.zeros(self.M, dtype=bool)
+        if self._zn is not None:
+            self._rz_night_reset()          # 위협 수 M(플레이어 칸 포함)이 정해진 뒤, 첫 어둠(_daynight_reset) 전에
         if self._dn is not None:
             self._daynight_reset()
         if self._rp is not None:
@@ -921,6 +1152,44 @@ class World:
     def _left_half(self) -> np.ndarray:
         """셀 중심이 맵 왼쪽 절반(x < size/2)인 셀 (gw,gw). v2.3 지역 전까지 지역 대용이다 (계획서 0-6)."""
         return self._cell_x < 0.5 * self.size
+
+    def _obstacles_reset(self) -> None:
+        """세로 장애물(나무·바위) 확장 지점 (모듈 docstring '세로 장애물'). 이번 단계에는 구현하지 않는다(10-14 사용자 결정) —
+        `World.obstacles` 는 늘 (0, 3) [x, y, r] 이고 어떤 판정도 읽지 않는다. 난수를 쓰지 않는다. 기능 `obstacles`(번호 12)를
+        구현할 때 여기서 자기 스트림 part 0 으로 원판을 뽑고, docstring 의 2)~5) 자리에 판정을 넣는다."""
+        self.obstacles = np.zeros((0, len(OBSTACLE_COLUMNS)), dtype=np.float64)
+
+    def _cover_overlap_cells(self) -> np.ndarray:
+        """은신처 원과 조금이라도 겹치는 셀 (gw,gw) bool — v3 현실성 (e) 의 '은신처 셀'. 셀 (iy, ix) 의 닫힌 사각형
+        [ix·c, (ix+1)·c] × [iy·c, (iy+1)·c] (c = food_cell, 반올림 여유 EPS 만큼 넓힘)에서 원 중심에 가장 가까운 점이 원 안이면(거리 식은
+        `_in_cover` 와 같은 √(dx² + dy²) − r ≤ 0) 겹친다. 원 안의 위치는 `_cell_index` 가 고르는 셀이 늘 이 마스크 안이다 — 안전한
+        자리(원 안)가 먹이가 줄지 않은 셀 위에 남지 않는다. v1 의 cover_cell(셀 중심이 원 안)을 포함한다. 난수를 쓰지 않는다.
+        C++ 꼴(셀 하나, 원 k 마다): FVector2D Q(FMath::Clamp(C.X, X0 - EPS, X0 + Cell + EPS), FMath::Clamp(C.Y, Y0 - EPS, Y0 + Cell + EPS));
+          bOverlap |= FVector2D::Distance(Q, C) - R <= 0;"""
+        c = float(self.cfg.food_cell)
+        lo = np.arange(self.gw, dtype=np.float64) * c
+        x0, y0 = np.meshgrid(lo - EPS, lo - EPS)              # (gw,gw), [iy, ix] — _cell_x·_cell_y 와 같은 배치
+        x1, y1 = x0 + (c + 2.0 * EPS), y0 + (c + 2.0 * EPS)
+        out = self.cover_cell.copy()
+        for (cx, cy), r in zip(self.cov_c, self.cov_r):
+            qx = np.clip(cx, x0, x1) - cx
+            qy = np.clip(cy, y0, y1) - cy
+            out |= np.sqrt(qx * qx + qy * qy) - r <= 0.0
+        return out
+
+    def _rz_cover_food_apply(self) -> None:
+        """v3 현실성 (e) 은신처 먹이 부족 (모듈 docstring (e)). `_build_world` 직후, `_food_v_reset` 전에 부른다. 난수를 쓰지 않는다.
+        은신처 셀(훅 cover_food_cell = `_cover_overlap_cells`, 은신처 원과 겹치는 셀)의 용량 cap0 ← cap_frac × cap0, 먹이 F ← min(F, cap0)
+        (= 새 cap0), 재생률 ← food_regen_base × food_regen_mult × regen_frac(v1 의 × food_cover_regen_mult 대신). 밖 셀은 v1 그대로다.
+        통계 food_cap_kept = 새 용량 합 / v1 용량 합(용량이 없는 세계는 1). C++ 꼴(셀 하나):
+          if (bCoverFoodCell) { Cap0 *= CapFrac; Food = FMath::Min(Food, Cap0); Regen = RegenBase * RegenMult * RegenFrac; }"""
+        self.cover_food_cell = self._cover_overlap_cells()
+        cfg, zf, cell = self.cfg, self._zf, self.cover_food_cell
+        v1_sum = float(self.food_cap.sum())
+        self.food_cap = np.where(cell, self.food_cap * zf["cap_frac"], self.food_cap)
+        np.minimum(self.food, self.food_cap, out=self.food)
+        self.regen_field = cfg.food_regen_base * self.food_regen_mult * np.where(cell, zf["regen_frac"], 1.0)
+        self._zf_kept = float(self.food_cap.sum()) / v1_sum if v1_sum > 0.0 else 1.0
 
     def _food_v_reset(self) -> None:
         """v2.0b 세계 생성 (계획서 4.9.1). v1 세계(`_build_world`)를 다 만든 뒤 부른다.
@@ -1109,9 +1378,109 @@ class World:
         if self._ps is not None:        # v2.4s: 주행성 포식자의 잠·박명 감속 (결정 때 어둠, 다음 스텝 포식자 이동에 쓴다)
             ps = self._ps
             diurnal = ~self.pred_nocturnal
+            if self._zn is not None:    # v3 현실성 (d): 잠을 늑대별 상태로(사냥 중·사슴 근처면 안 잠, 늑대마다 다른 잠·기상, 기상 가속)
+                self._rz_night_update(d, diurnal)
+                return
             self.pred_asleep = diurnal & (d >= ps["sleep_dark"])
             slow = (1.0 - d) if ps["twilight_slow"] else 1.0
             self._pred_speed_mult = np.where(self.pred_asleep, 0.0, np.where(diurnal, slow, 1.0))
+
+    def _rz_night_reset(self) -> None:
+        """v3 현실성 (d) 늑대별 밤잠 상태 (크기 M — 플레이어 칸 포함, 플레이어는 야행성으로 들어 있어 쓰지 않는다). 난수를 쓰지 않는다.
+        `_threats_reset` 뒤, `_daynight_reset` 전에 부른다(첫 `_daynight_update` 가 '이미 밤이면 자고 있음'으로 시작 상태를 정하고
+        지연을 그 세계의 박명 폭 τ 로 정한다). 위협 수·낮밤 주기를 바꾸는 하네스는 바꾼 뒤 이것을 다시 부르고 `_daynight_update` 를 부른다.
+          _zn_delay: 잠·기상 지연 δ_m (`night_delays`, 최대 ⌊spread·τ⌋ — 낮 고정 세계는 어둠이 없어 0)
+          _zn_act: 활동도 a_m ∈ [0, R] (R = ramp_steps, 속력 배수 a/R), _zn_settle: 눕는 중,
+          _zn_dark_k: 깨어 있는 채 어둠(d ≥ sleep_dark)인 업데이트 수(이어서), _zn_wait: 기상까지 남은 업데이트(−1 = 기다리지 않음),
+          _zn_hunt: 지난 포식자 스텝에 사냥 중(`_step_predators_v3` 가 쓴다), _zn_fresh: 다음 `_daynight_update` 가 시작 상태를 정한다."""
+        M, zn = self.M, self._zn
+        self._zn_delay = np.zeros(M, dtype=np.int64)
+        self._zn_act = np.full(M, zn["ramp_steps"], dtype=np.int64)
+        self._zn_settle = np.zeros(M, dtype=bool)
+        self._zn_dark_k = np.zeros(M, dtype=np.int64)
+        self._zn_wait = np.full(M, -1, dtype=np.int64)
+        self._zn_hunt = np.zeros(M, dtype=bool)
+        self._zn_fresh = True
+
+    def _rz_night_update(self, d: float, diurnal: np.ndarray) -> None:
+        """v3 현실성 (d) 한 업데이트 (모듈 docstring (d)). `_daynight_update` 가 어둠 d 를 정한 뒤 부른다(reset, 스텝 끝 t + 1 뒤 —
+        포식자 이동 뒤·리스폰 전 위치). 야행성·플레이어는 늘 깨어 있고 속력 배수 1 이다. 순서(C++ 로 옮길 때 지킨다, 주행성 늑대 m 하나,
+        R = RampSteps, bDark = D >= SleepDark, bHunt = 지난 포식자 스텝의 사냥 중 — 표적 있음, 또는 잠행형의 돌진·대치 상태):
+          시작(fresh): bAsleep = bDark; Act = bAsleep ? 0 : R; bSettle = false; DarkK = 0; Wait = -1.
+          자고 있음:  if (bDark) Wait = -1; else { if (Wait < 0) Wait = Delay;
+                        if (Wait == 0) { bAsleep = false; Wait = -1; Act = 0; } else --Wait; }     // 깨면 아래 '깨어 있음'을 탄다
+          깨어 있음(이번 업데이트에 깬 늑대 포함):
+                      DarkK = bDark ? DarkK + 1 : 0;
+                      bNear = 실거리 SettleR 안에 사슴(모든 슬롯, 리스폰 전)       — bDark && (bSettle || DarkK > Delay) 일 때만 잰다
+                      bCalm = bDark && !bHunt && !bNear;
+                      if (bSettle && !bCalm) bSettle = false;                            // 사냥·사슴·새벽이면 다시 일어난다
+                      else if (!bSettle && bCalm && DarkK > Delay) bSettle = true;       // 눕기 시작
+                      if (bSettle) { --Act; if (Act <= 0) { Act = 0; bAsleep = true; bSettle = false; DarkK = 0; } }
+                      else Act = FMath::Min(Act + 1, R);
+          SpeedMult = bAsleep ? 0 : FMath::Max(bTwilightSlow ? 1 - D : 1, NightFloor) * (R > 0 ? (float)Act / R : 1)."""
+        ps, zn = self._ps, self._zn
+        R = zn["ramp_steps"]
+        dark = d >= ps["sleep_dark"]
+        if self._zn_fresh:
+            tw = 0 if self.day_fixed else int(self.dn_tw)
+            self._zn_delay = night_delays(self.seed, self.M, int(math.floor(zn["spread"] * tw)))
+            self.pred_asleep = diurnal & dark
+            self._zn_act[:] = np.where(self.pred_asleep, 0, R)
+            self._zn_settle[:] = False
+            self._zn_dark_k[:] = 0
+            self._zn_wait[:] = -1
+            self._zn_fresh = False
+        else:
+            asleep = self.pred_asleep.copy()
+            act, settle = self._zn_act.copy(), self._zn_settle.copy()
+            # 자고 있음
+            sl = diurnal & asleep
+            woke = np.zeros(self.M, dtype=bool)
+            if dark:
+                self._zn_wait[sl] = -1
+            else:
+                w = np.where(sl & (self._zn_wait < 0), self._zn_delay, self._zn_wait)
+                woke = sl & (w == 0)
+                w = np.where(sl & (w > 0), w - 1, w)
+                w[woke] = -1
+                self._zn_wait = w
+                asleep[woke] = False
+                act[woke] = 0
+                self._zn_wake_n += int(np.count_nonzero(woke))
+            # 깨어 있음
+            awake = diurnal & ~asleep
+            self._zn_dark_k = np.where(awake & dark, self._zn_dark_k + 1, 0)
+            near = np.zeros(self.M, dtype=bool)
+            if dark:
+                cand = awake & (settle | (self._zn_dark_k > self._zn_delay))
+                if cand.any() and self.N:
+                    dx = self.pos[:, 0][None, :] - self.pred_pos[:, 0:1]
+                    dy = self.pos[:, 1][None, :] - self.pred_pos[:, 1:2]
+                    near = cand & (np.sqrt(dx * dx + dy * dy) <= zn["settle_r"]).any(1)
+            calm = dark & ~self._zn_hunt & ~near
+            ready = awake & ~settle & dark & (self._zn_dark_k > self._zn_delay)
+            abort = awake & settle & ~calm
+            start = ready & calm
+            settle = (settle & ~abort) | start
+            down = awake & settle
+            act = np.where(down, act - 1, np.where(awake, np.minimum(act + 1, R), act))
+            onset = down & (act <= 0)
+            act[onset] = 0
+            asleep |= onset
+            settle[onset] = False
+            self._zn_dark_k[onset] = 0
+            self._zn_act, self._zn_settle, self.pred_asleep = act, settle, asleep
+            self._zn_settle_n += int(np.count_nonzero(start))
+            self._zn_abort_n += int(np.count_nonzero(abort))
+            self._zn_onset_n += int(np.count_nonzero(onset))
+            self._zn_block_deer_n += int(np.count_nonzero(ready & ~self._zn_hunt & near))
+            self._zn_block_hunt_n += int(np.count_nonzero(ready & self._zn_hunt))
+            if dark:
+                self._zn_dark_n += int(np.count_nonzero(diurnal))
+                self._zn_dark_awake += int(np.count_nonzero(diurnal & ~asleep))
+        base = max((1.0 - d) if ps["twilight_slow"] else 1.0, zn["night_floor"])
+        level = self._zn_act / R if R > 0 else np.ones(self.M)
+        self._pred_speed_mult = np.where(self.pred_asleep, 0.0, np.where(diurnal, base * level, 1.0))
 
     # ------------------------------------------------------------------ #
     # 기하 (관측과 조향이 공유한다)
@@ -1207,7 +1576,9 @@ class World:
         dy = self.pos[:, 1][None, :] - P[:, 1:2]
         dist = np.sqrt(dx * dx + dy * dy)
         invd = 1.0 / np.maximum(dist, EPS)
-        kin_vis = (dist <= cfg.see_r) & ((dx * hx + dy * hy) * invd >= fov_cos)
+        # v3 현실성 (a): 동족 시야각은 kin_fov_deg(120 이면 cfg.fov_cos 그대로 — 같은 판정), 위협 시야각은 threat_fov_deg (아래 pvis)
+        kin_cos = fov_cos if self._zv is None else self._zv["kin_cos"]
+        kin_vis = (dist <= cfg.see_r) & ((dx * hx + dy * hy) * invd >= kin_cos)
         kin_vis[ar, idx] = False
         kin_f = kin_vis.astype(np.float64)
         kin_count = kin_f.sum(1)
@@ -1222,6 +1593,7 @@ class World:
         separation = clamp_magnitude(-((c @ self.pos) - c.sum(1)[:, None] * P), 1.0)
 
         # --- 포식자 (§3.1 idx1, idx2) ---
+        rz: dict = {}
         if self.M > 0:
             ex = self.pred_pos[:, 0][None, :] - P[:, 0:1]
             ey = self.pred_pos[:, 1][None, :] - P[:, 1:2]
@@ -1232,9 +1604,31 @@ class World:
             see_p = cfg.see_r if self._dn is None else self._see_pred
             if self._rp is not None:    # v3: 개체 행동별 자기 탐지 반경(GRAZE 고개 숙임 M5, SLEEP 시야)
                 see_p = see_p * self._rep_see[idx][:, None]
-            pvis = (pd <= see_p) & ((ex * hx + ey * hy) * pinv >= fov_cos)
+            if self._zv is None:
+                pvis = (pd <= see_p) & ((ex * hx + ey * hy) * pinv >= fov_cos)
+            else:                       # v3 현실성 (a): 위협 시야각 threat_fov_deg (반경은 그대로)
+                pcos = (ex * hx + ey * hy) * pinv
+                pvis = (pd <= see_p) & (pcos >= self._zv["threat_cos"])
+                rear = pvis & ~(pcos >= fov_cos)        # 통계 전용: 기본 시야각 밖에서 본 위협
+            if self._zh is not None:
+                # v3 현실성 (b): 지난 스텝에 움직인 위협의 발소리 — 실거리 ≤ min(R, 이 사슴의 지금 탐지 반경)이면 방향과 무관하게
+                # 감지된다(보임과 같은 칸). R = 0 인 위협(서 있음·대치·휴식)은 들리지 않는다. 걸음새는 지난 포식자 스텝의 훅
+                zh = self._zh
+                r_snd = hearing_radius(zh, np.sqrt((self.pred_vel * self.pred_vel).sum(1)) / cfg.herb_speed,
+                                       self.pred_running)[None, :]
+                lim = np.minimum(r_snd, see_p) if zh["cap_to_sight"] else r_snd
+                sight = pvis
+                pvis = pvis | ((pd <= lim) & (r_snd > 0.0))
             if self._ps is not None:    # v2.4s: 자는 포식자는 굴에 있어 보이지 않는다(관측 1·2·도주 조향에서 빠진다)
                 pvis &= ~self.pred_asleep[None, :]
+            if self._zv is not None or self._zh is not None:
+                # 통계 전용(realism_stats, 관측·동역학에 들어가지 않는다): 눈으로 본 위협(eye)이 넓힌 시야각에만 있었나, 들어서만 알았나
+                eye = pvis if self._zh is None else (
+                    sight & ~self.pred_asleep[None, :] if self._ps is not None else sight)
+                if self._zv is not None:
+                    rz["rz_rear"] = eye.any(1) & ~(eye & ~rear).any(1)
+                if self._zh is not None:
+                    rz["rz_heard"] = pvis.any(1) & ~eye.any(1)
             pred_count = pvis.sum(1)
             masked = np.where(pvis, pd, np.inf)
             j = masked.argmin(1)
@@ -1247,6 +1641,10 @@ class World:
             pred_count = np.zeros(n, dtype=np.int64)
             d_pred_min = np.full(n, np.inf)
             away = np.zeros((n, 2))
+            if self._zv is not None:
+                rz["rz_rear"] = np.zeros(n, dtype=bool)
+            if self._zh is not None:
+                rz["rz_heard"] = np.zeros(n, dtype=bool)
 
         # --- 은신처 (§3.1 idx6) ---
         if len(self.cov_r):
@@ -1314,6 +1712,7 @@ class World:
             if self._al is not None:    # v3 R2 M8 통계 전용(헛경보): 가장 가까운 보이는 위협의 색인, 없으면 −1
                 vals["pred_j"] = (np.where(seen[:, 0], j, -1).astype(np.int64) if self.M > 0
                                   else np.full(n, -1, dtype=np.int64))
+        vals.update(rz)                 # v3 현실성 통계 전용 칸(켠 규칙만)
         if out is None:
             return vals
         for key, v in vals.items():
@@ -1471,6 +1870,10 @@ class World:
             drain, eat = self._drain_eat()
             e_drained = self.energy - drain
             gain = self._eat(e_drained, eat)
+        if self._zf is not None:    # v3 현실성 (e) 통계 전용: 은신처 원 안(섭식 위치)에서 먹은 몫
+            inc = self._in_cover(self.pos)
+            self._zf_in += float(gain[inc].sum())
+            self._zf_all += float(gain.sum())
         e_new = np.minimum(e_drained + gain * cfg.food_energy_per_unit, cfg.max_energy)
         if self._sp is not None and self._sp["net_energy_reward"]:
             # #4 순변화 e_new − e_prev. 번식 리셋(아래 4)과 리스폰(8)은 이 뒤라 들어가지 않는다
@@ -1529,6 +1932,12 @@ class World:
 
         # 8) 관측 — 스텝당 observe() 한 번 (§4.5)
         g = self._geometry()
+        if self._zv is not None or self._zh is not None:   # v3 현실성 통계 전용: 스텝 끝 관측(리스폰 전)의 넓힌 시야·청각 몫
+            self._rz_obs_n += self.N
+            if self._zv is not None:
+                self._rz_rear_n += int(np.count_nonzero(g["rz_rear"]))
+            if self._zh is not None:
+                self._rz_heard_n += int(np.count_nonzero(g["rz_heard"]))
         if vg is not None:
             self._perceive(g)                       # 8b) threat_recency·ThreatDir
             if vg["fov_deg"] >= 360.0:              # 8c) 360° 경계 시야로 새로 찾은 포식자 쪽을 본다 (4.4 경계 행)
@@ -2031,10 +2440,24 @@ class World:
             cov = det = np.where(in_cov, cfg.cover_hide_mult, 1.0)
         perceived = dist * det[None, :]
         catch_d = dist * cov[None, :]
+        safe_m = None
+        if self._zs is not None:
+            # v3 현실성 (c): 은신처 원 안(이번 스텝 초식 이동 뒤 위치 — 포획 판정과 같은 정의)이면 행동과 무관하게 안전. player_too 가
+            # 아니면 플레이어 칸은 지금 그대로다. 안전 (M,N) 은 표적·잠금(_stare_check)·포획 판정이 함께 쓴다
+            safe_m = np.broadcast_to(in_cov[None, :], (M, N))
+            if th is not None and not self._zs["player_too"]:
+                safe_m = safe_m & ~self.pred_is_player[:, None]
+            self._zs_safe_m = safe_m
+            self._zs_safe_n += int(np.count_nonzero(in_cov))
+            self._zs_steps += N
         self.pred_cd = np.maximum(self.pred_cd - 1, 0)
         hunting = self.pred_cd == 0
         if self._ps is not None:
             hunting = hunting & ~self.pred_asleep
+        if self._zn is not None and self.dark >= self._zn["hunt_dark"]:
+            # v3 현실성 (d): 깜깜하면(결정 때 어둠 d ≥ hunt_dark) 주행성 늑대는 새 사냥을 시작하지 않는다 — 지난 포식자 스텝에 사냥
+            # 중이던 늑대만 계속 쫓는다(표적·포획 모두). 야행성·플레이어는 그대로다
+            hunting = hunting & (self.pred_nocturnal | self._zn_hunt)
         ts = None
         if th is not None:
             stalker = self.pred_type == PT_STALKER
@@ -2057,6 +2480,8 @@ class World:
         if th is not None and M > Mb:
             vis[self.pred_is_player] = True
         vis &= hunting[:, None]
+        if safe_m is not None and self._zs["untargetable"]:
+            vis &= ~safe_m              # v3 현실성 (c): 안전한 사슴은 표적이 되지 않는다(위협 m 별 — player_too 가 아니면 플레이어는 그대로)
         masked = np.where(vis, perceived, np.inf)
         j = masked.argmin(1)
         d_t = masked[ar, j]
@@ -2111,6 +2536,16 @@ class World:
         self.pred_pos = np.clip(self.pred_pos, 0.0, self.size)
         self.pred_head = normalize(move)
         self.pred_vel = self.pred_pos - old
+        if self._zh is not None:
+            # v3 현실성 (b) 스텝 뒤 훅 pred_running: 이번 이동이 전력 걸음이었나 — 추격형(근접·원거리)이 표적을 쫓음, 잠행형 돌진 상태
+            # (돌진 이동·마지막 판정 스텝), 플레이어 돌진 모드. 상태는 이동 때 값(포획 뒤 갱신 `_threat_after` 전)이다
+            if th is None:
+                run = has_target.copy()
+            else:
+                run = has_target & (self.pred_type == PT_CHASER)
+                run |= stalker & (self.stalk_state == ST_POUNCE)
+                run |= self.pred_is_player & (self.player_mode == PM_CHARGE)
+            self.pred_running = run
 
         hit = (catch_d <= self.pred_catch_r[:, None]) & hunting[:, None]
         if self._pred_ranged_v1[:Mb].any():
@@ -2118,6 +2553,9 @@ class World:
             if M > Mb:
                 roll = np.vstack([roll, np.ones((M - Mb, N), dtype=bool)])
             hit &= np.where(self.pred_ranged[:, None], roll, True)
+        if safe_m is not None:          # v3 현실성 (c): 은신처 안 사슴은 잡히지 않는다(원거리 판정 난수 소비는 그대로)
+            self._zs_saved_n += int(np.count_nonzero((hit & safe_m).any(0)))
+            hit &= ~safe_m
         hit_d = np.where(hit, catch_d, np.inf)
         k = hit_d.argmin(1)
         got = np.isfinite(hit_d[ar, k])
@@ -2142,6 +2580,12 @@ class World:
             if sd is not None:
                 self._stare_after(got, caught)
             self._threat_after(got, ts)
+        if self._zn is not None:
+            # v3 현실성 (d): 이번 스텝에 사냥 중이었나(표적 있음, 또는 스텝 끝 잠행형 돌진·대치) — 다음 `_daynight_update` 의 눕기 조건
+            act = has_target.copy()
+            if th is not None:
+                act |= stalker & ((self.stalk_state == ST_POUNCE) | (self.stalk_state == ST_STANDOFF))
+            self._zn_hunt = act
         return caught
 
     def _stare_check(self, dx, dy, dist, inv, perceived, hunting) -> None:
@@ -2186,6 +2630,8 @@ class World:
         k = np.where(has, lock, 0)
         # 3. 잠금 확인
         hidden = self._rep_crouch[k] | (rs.behavior[k] == rep.SLEEP)
+        if self._zs is not None and self._zs["untargetable"]:   # v3 현실성 (c): 은신처 안 표적은 추적할 수 없다(잠금을 지운다)
+            hidden = hidden | self._zs_safe_m[ar, k]
         fov = (dx[ar, k] * self.pred_head[:, 0] + dy[ar, k] * self.pred_head[:, 1]) * inv[ar, k] >= cfg.pred_fov_cos
         track = (player | ((dist[ar, k] <= cfg.pred_view_r) & fov)) & ~hidden
         drop = has & ~(creep & track)
@@ -2618,6 +3064,12 @@ class World:
             self._al_heads: list = []                       # (확인 스텝, 개체, 세대) — 1초 안 고개 든 비율
             self._al_heads_n = self._al_heads_up = self._al_heads16_n = self._al_heads16_up = 0
             self._al_seen0 = self._al_false = 0
+        if self._rz:                 # v3 현실성 지표 (realism_stats). 수이고 동역학과 무관하다
+            self._rz_obs_n = self._rz_rear_n = self._rz_heard_n = 0
+            self._zs_safe_n = self._zs_saved_n = self._zs_steps = 0
+            self._zf_in = self._zf_all = 0.0
+            self._zn_dark_n = self._zn_dark_awake = self._zn_settle_n = self._zn_abort_n = self._zn_onset_n = 0
+            self._zn_block_deer_n = self._zn_block_hunt_n = self._zn_wake_n = 0
 
     def _accumulate(self, a, rew, repro, caught, starved, done) -> None:
         self._rew_total += float(rew.sum())
@@ -3213,6 +3665,32 @@ class World:
                    e7_decide_frac=ratio(self._al_e7_dn, self._al_e7_n),
                    heads_up_1s_r16=ratio(self._al_heads16_up, self._al_heads16_n))
         assert tuple(out) == ALARM_STAT_COLUMNS
+        return out
+
+    def realism_stats(self) -> dict:
+        """v3 현실성 1단계 통계 — reset 뒤 누적. 열 순서와 뜻은 `REALISM_STAT_COLUMNS` 주석. 켜지 않은 규칙의 열과 분모가 0 인
+        비율은 nan 이다."""
+        if not self._rz:
+            raise ValueError("realism_stats 는 realism_* 중 하나라도 켠 세계에만 있다")
+        nan = float("nan")
+
+        def ratio(x, y):
+            return float(x) / float(y) if y else nan
+        vision, hear, shel, food, night = (x is not None for x in (self._zv, self._zh, self._zs, self._zf, self._zn))
+        out = dict(rear_seen_frac=ratio(self._rz_rear_n, self._rz_obs_n) if vision else nan,
+                   heard_only_frac=ratio(self._rz_heard_n, self._rz_obs_n) if hear else nan,
+                   safe_frac=ratio(self._zs_safe_n, self._zs_steps) if shel else nan,
+                   safe_saved_n=float(self._zs_saved_n) if shel else nan,
+                   food_cap_kept=float(self._zf_kept) if food else nan,
+                   cover_intake_share=ratio(self._zf_in, self._zf_all) if food else nan,
+                   dark_awake_frac=ratio(self._zn_dark_awake, self._zn_dark_n) if night else nan,
+                   settle_n=float(self._zn_settle_n) if night else nan,
+                   settle_abort_n=float(self._zn_abort_n) if night else nan,
+                   onset_n=float(self._zn_onset_n) if night else nan,
+                   block_deer_n=float(self._zn_block_deer_n) if night else nan,
+                   block_hunt_n=float(self._zn_block_hunt_n) if night else nan,
+                   wake_n=float(self._zn_wake_n) if night else nan)
+        assert tuple(out) == REALISM_STAT_COLUMNS
         return out
 
     def stats(self) -> dict:

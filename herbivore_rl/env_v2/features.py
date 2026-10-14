@@ -69,18 +69,29 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "boldness": 9,      # v2.7 개체 대담함 b, 사망 보상 조건화
     "water": 10,        # v2.8 물웅덩이, 수분, 마시기
     "boundary": 11,     # R1 (i) 언리얼 경계 반발 파리티
-    "obstacles": 12,    # R1 (ii) 원형 장애물 반발
+    "obstacles": 12,    # R1 (ii) 원형 장애물 반발로 예약 → v3 세로 장애물(나무·바위 원판) 확장 지점. 10-14 사용자 결정으로 이번 단계에는
+                        # 넣지 않는다(구현 없음 — 켜면 읽을 때 실패, 끈 블록은 무시). 자리는 env_v2/world.py 모듈 docstring '세로 장애물'·
+                        # World.obstacles(늘 빈 (0, 3) [x, y, r])
     "vigil_window": 13,  # v2.2r 경계 재설계(10-03 R2): 경계 행동 열 유무, 창 안 한정 경계(W′), 반사 돌아보기(L)
     "pred_sleep": 14,    # v2.4s 포식자 밤잠(10-07 사용자 결정 A안): 대부분 밤에 자고 세계마다 일부만 야행성
     "repertoire": 15,    # v3 R0 행동 레퍼토리(10-07 사용자 결정 (4)): 행동 실행기·잠금·사건·개체 행동 상태, 장치 M1·M2·M4·M5·M6
     "threats": 16,       # v3 R0 위협 유형(10-07 사용자 결정 (4)): 잠행-돌진 포식자(M3)와 플레이어형 위협
     "stare_down": 17,    # v3 R2 M7 노려보기 대치(10-08 사용자 결정 (1)): 표적 잠금, 얼어 노려보기 → 대치·물러남·들킴. 난수 없음
     "alarm": 18,         # v3 R2 M8 동족 경보 전염(10-08 사용자 결정 (1)): 경보 방출·수신·중계, 관측 alarm_heard, 사건 E7. 난수 없음
+    # v3 현실성 1단계(10-14 사용자 방향 — 통합 레벨을 본 뒤 "도망 멈춤·갑자기 잠듦이 이상하다", "은신처엔 먹이를 적게"). 규칙 다섯을
+    # 따로 켜고 끈다. 난수 없음(정의·식·현실 근거는 env_v2/world.py 모듈 docstring 'realism_*')
+    "realism_vision": 19,      # (a) 사슴의 위협 시야각(예: 300°, 바로 뒤 사각만 남김). 동족 시야는 따로 적은 키가 바꾸지 않으면 그대로
+    "realism_hearing": 20,     # (b) 위협 발소리: 걸음새·속력에 따른 반경 안이면 방향과 무관하게 '감지됨'(관측 18칸·범위 그대로)
+    "realism_shelter": 21,     # (c) 은신처 원 안의 사슴은 행동과 무관하게 잡히지 않는다(안에서 먹어도 된다)
+    "realism_night": 22,       # (d) 늑대 밤잠 점진화: 사냥 중·사슴 근처면 눕지 않음, 걸음을 늦추며 눕기, 늑대마다 다른 잠·기상 시각, 기상 가속
+    "realism_cover_food": 23,  # (e) 은신처 원과 겹치는 셀의 먹이 용량·재생을 밖의 일부로(빽빽한 덤불 밑은 풀이 적다)
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
 IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight", "pred_sleep",
-                                         "repertoire", "threats", "stare_down", "alarm"})
+                                         "repertoire", "threats", "stare_down", "alarm",
+                                         "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
+                                         "realism_cover_food"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -157,6 +168,25 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # relay_window = 원점 뒤 중계할 수 있는 스텝, event_alarm = 사건 E7 세기 문턱, on_catch = 잡힌 개체의 비명.
     # alarm_r 0 이고 on_catch false 면 블록 전체를 건너뛴다(중립)
     "alarm": frozenset({"alarm_r", "alarm_steps", "max_hop", "hop_gain", "relay_window", "event_alarm", "on_catch"}),
+    # v3 현실성 1단계 (env_v2/world.py `_rz_*_params`, 정의·식·현실 근거는 world.py 모듈 docstring 'realism_*'). 다섯 다 repertoire 를
+    # 함께 켜야 한다(realism_night 는 pred_sleep 도). 블록이 없으면(또는 enabled: false) 그 규칙이 없는 지금 세계와 비트 동일이다.
+    # realism_vision: threat_fov_deg = 위협(포식자·플레이어)을 보는 시야각(도, [fov_deg 120, 360]), kin_fov_deg = 동족 시야각
+    # (fov_deg 120 이면 지금 그대로)
+    "realism_vision": frozenset({"threat_fov_deg", "kin_fov_deg"}),
+    # realism_hearing: 위협의 지난 스텝 속력 s(× herb_speed)에서 소리 반경 R — s < s_silent 면 0, 아니면
+    # r_quiet + (r_loud − r_quiet)·clip((s − s_quiet)/(s_loud − s_quiet), 0, 1). roam_quiet = 전력 걸음(표적 추격·돌진)이 아닌 위협의
+    # s 를 s_quiet 에서 자르나, cap_to_sight = 들리는 반경을 그 사슴의 지금 탐지 반경(밤·행동 배수 포함)으로 자르나(학습 범위 보존
+    # 장치 — 현실 규칙이 아니다)
+    "realism_hearing": frozenset({"r_quiet", "r_loud", "s_silent", "s_quiet", "s_loud", "roam_quiet", "cap_to_sight"}),
+    # realism_shelter: untargetable = 은신처 안 사슴을 표적 고르기·잠금에서도 빼나, player_too = 플레이어형 위협에도 적용하나
+    "realism_shelter": frozenset({"untargetable", "player_too"}),
+    # realism_night: settle_r = 눕지 못하게 하는 사슴까지의 실거리, hunt_dark = 이 어둠 이상이면 주행성 늑대가 새 사냥을 시작하지
+    # 않는다(쫓던 사냥만 계속), night_floor = 해 진 뒤 깨어 있는 주행성 늑대의 속력 배수 하한(≤ 1 − pred_sleep.sleep_dark), spread =
+    # 늑대마다 다른 잠·기상 지연의 최대(박명 폭 τ 비율), ramp_steps = 눕기·깨기에 걸리는 스텝(활동도 0 ↔ 1)
+    "realism_night": frozenset({"settle_r", "hunt_dark", "night_floor", "spread", "ramp_steps"}),
+    # realism_cover_food: cap_frac = 은신처 셀(은신처 원과 겹치는 셀, `World._cover_overlap_cells`) 먹이 용량 배수, regen_frac = 은신처
+    # 셀 재생률 / 밖 재생률(v1 은 0.3)
+    "realism_cover_food": frozenset({"cap_frac", "regen_frac"}),
 })
 
 

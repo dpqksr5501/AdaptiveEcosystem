@@ -181,6 +181,9 @@ def cfg_constants(cfg) -> dict:
         raise SystemExit("위협 골든은 repertoire·threats·pred_sleep·daynight 를 모두 켠 v3 세계에서만 만든다")
     if w._sd is not None or w._al is not None:
         raise SystemExit("위협 골든 세계에 stare_down(M7)·alarm(M8) 이 켜져 있다 — R1b 세계(configs/v3_r1_on.yaml)를 쓴다")
+    if w._rz:
+        raise SystemExit("위협 골든 세계에 realism_*(v3 현실성 1단계) 규칙이 켜져 있다 — C++ 에 아직 없는 규칙이다. "
+                         "R1b 세계(configs/v3_r1_on.yaml)를 쓴다")
     rd = cfg.rand
     return {
         "HerbSpeed": float(cfg.herb_speed), "PredViewR": float(cfg.pred_view_r), "PredFovCos": float(cfg.pred_fov_cos),

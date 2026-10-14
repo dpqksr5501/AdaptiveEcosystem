@@ -34,7 +34,8 @@ v1 에 없는 것:
   `World.daynight_stats()` 열(DAYNIGHT_COLUMNS)도 붙는다. repertoire(v3)·threats(v3)를 켠 세계의 행에는 `World.repertoire_stats()`
   열(REPERTOIRE_COLUMNS)·`World.threats_stats()` 열(THREAT_COLUMNS)이 붙는다(repertoire 세계는 행동이 'behavior' 한 열이다).
   stare_down(v3 R2 M7)·alarm(v3 R2 M8)을 켠 세계의 행에는 `World.stare_stats()` 열(STARE_COLUMNS)·`World.alarm_stats()`
-  열(ALARM_COLUMNS)이 붙는다. rep_learned 는 모델의 마스크 판이 세계의 판(관측 이름, `rep_policy.mask_version_of`)과 다르면
+  열(ALARM_COLUMNS)이 붙는다. realism_*(v3 현실성 1단계) 중 하나라도 켠 세계의 행에는 `World.realism_stats()` 열(REALISM_COLUMNS,
+  켜지 않은 규칙의 열은 nan)이 붙는다. rep_learned 는 모델의 마스크 판이 세계의 판(관측 이름, `rep_policy.mask_version_of`)과 다르면
   연결 때 멈춘다(R1 모델(판 2)은 경보 세계(판 3)에서 거부된다).
   범주형 보행 CM 모델 (`env_v2/cm.py`)은 `_base_policy` 가 알아보고 CM 평가 정책(결정·유지 표본·확률)으로 돌린다.
 
@@ -61,8 +62,8 @@ from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
 from .world import (ACT_DIM, ALARM_STAT_COLUMNS, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, PSLEEP_STAT_COLUMNS,
-                    REP_STAT_COLUMNS, STARE_STAT_COLUMNS, THREAT_STAT_COLUMNS, VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS,
-                    World)
+                    REALISM_STAT_COLUMNS, REP_STAT_COLUMNS, STARE_STAT_COLUMNS, THREAT_STAT_COLUMNS, VIGIL_STAT_COLUMNS,
+                    WINDOW_STAT_COLUMNS, World)
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -88,6 +89,8 @@ THREAT_COLUMNS = list(THREAT_STAT_COLUMNS)
 # stare_down(v3 R2 M7)·alarm(v3 R2 M8)을 켠 세계의 행에만 더 붙는 열 (World.stare_stats·World.alarm_stats)
 STARE_COLUMNS = list(STARE_STAT_COLUMNS)
 ALARM_COLUMNS = list(ALARM_STAT_COLUMNS)
+# realism_*(v3 현실성 1단계) 중 하나라도 켠 세계의 행에만 더 붙는 열 (World.realism_stats, 켜지 않은 규칙의 열은 nan)
+REALISM_COLUMNS = list(REALISM_STAT_COLUMNS)
 
 
 # --------------------------------------------------------------------- #
@@ -876,6 +879,9 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     if w._al is not None:
         als = w.alarm_stats()
         s.update((c, als[c]) for c in ALARM_COLUMNS)
+    if w._rz:
+        zs = w.realism_stats()
+        s.update((c, zs[c]) for c in REALISM_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:
