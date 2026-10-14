@@ -1,0 +1,119 @@
+{
+ "meta": {
+  "config": "results/v3/r0/cal2/v3_r0_on_cal2_freeze.yaml",
+  "seeds": [
+   12000,
+   12001,
+   12002,
+   12003,
+   12004,
+   12005,
+   12006,
+   12007,
+   12008,
+   12009,
+   12010,
+   12011,
+   12012,
+   12013,
+   12014,
+   12015,
+   12016,
+   12017,
+   12018,
+   12019,
+   12020,
+   12021,
+   12022,
+   12023,
+   12024,
+   12025,
+   12026,
+   12027,
+   12028,
+   12029,
+   12030,
+   12031,
+   12032,
+   12033,
+   12034,
+   12035,
+   12036,
+   12037,
+   12038,
+   12039
+  ],
+  "steps": 3000,
+  "theta": 4.0,
+  "approach": 0.9,
+  "cells": [
+   "ps0.3_pl_T600",
+   "ps0.3_pl_T1800",
+   "ps0.3_np_T600",
+   "ps0.3_np_T1800",
+   "ps0.7_pl_T600",
+   "ps0.7_pl_T1800",
+   "ps0.7_np_T600",
+   "ps0.7_np_T1800"
+  ],
+  "behaviors": [
+   "freeze"
+  ],
+  "t_crit": 2.023,
+  "event_k": 60,
+  "low_use": 0.05,
+  "elapsed_s": 642.1,
+  "digest": {
+   "ps0.3_pl_T600": "eff50fe568d9",
+   "ps0.3_pl_T1800": "4b37b424e8ef",
+   "ps0.3_np_T600": "6dc4b0361c7c",
+   "ps0.3_np_T1800": "1574f4b2dd41",
+   "ps0.7_pl_T600": "4dd0e14cf38e",
+   "ps0.7_pl_T1800": "012dab402038",
+   "ps0.7_np_T600": "384cf2de5151",
+   "ps0.7_np_T1800": "cb54e151e49b"
+  }
+ },
+ "gate": {
+  "freeze": {
+   "complete": true,
+   "niche_pos": 1,
+   "niche_sig_neg": 1,
+   "out_sig_neg": 8,
+   "cross_sig_neg": 0,
+   "c1": false,
+   "c2": true,
+   "c3": false,
+   "pass_": false,
+   "cross_use_focal": 0.04147858072916667,
+   "verdict": "fail"
+  },
+  "hide": {
+   "complete": false
+  },
+  "sleep": {
+   "complete": false
+  }
+ },
+ "gate_did_report_only": {
+  "freeze": {
+   "complete": true,
+   "niche_pos": 2,
+   "niche_sig_neg": 0,
+   "out_sig_neg": 8,
+   "cross_sig_neg": 0,
+   "c1": false,
+   "c2": true,
+   "c3": false,
+   "pass_": false,
+   "cross_use_focal": 0.04147858072916667,
+   "verdict": "fail"
+  },
+  "hide": {
+   "complete": false
+  },
+  "sleep": {
+   "complete": false
+  }
+ }
+}

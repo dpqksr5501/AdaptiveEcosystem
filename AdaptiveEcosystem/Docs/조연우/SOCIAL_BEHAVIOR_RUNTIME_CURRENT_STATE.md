@@ -2,6 +2,8 @@
 
 다른 채팅에서 역할·진행상황·다음 연결을 처음 파악할 때는 [조연우 작업 시작 문서](README.md)를 먼저 읽는다.
 
+> **최신 2026-10-15 통합 브랜치 `codex/m4-v3-creature-integration`:** 원준 M4 `67c860c`와 신혁 v3 `8292856`을 병합하고 공통 authority/lifecycle/resource/replication에 owned 표현·플레이어·Inspector를 연결했다. 독립 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`, 직접 UBT 성공, 전체 자동화 119개(118 Success + 예상 warning 1), IK/감각 반응 총 12조건 화면 검증. **v3 R1b는 V1 Social slot handoff를 소비하는 경로가 아니며**, hearing/alarm은 표현 입력이고 migration/wave는 비활성화했다. 최신 계약과 검증 한계는 [M4/v3 통합 기록](JYU_M4_V3_INTEGRATION.md), [IK 검증](JYU_IK_VALIDATION.md)을 우선한다. 아래 Pending/기준 commit 표는 당시 이력이다.
+
 > **최신 2026-10-08 실제 팀 레벨/감각 고도화 (`edba605` 이후 작업 트리):** main의 3지역 레벨에 owned 런타임을 연결하고 실제 Grass/Dry 발소리·SA·시야 디버그를 적용했다. 늑대의 별도 먹잇감 감각과 단일 이동 인계, 접촉 Notify 40개·Physical Material 우선 선택을 추가했다. 최종 직접 UBT 및 전체 자동화 **43/43** 성공. 아래 오래된 Pending 표는 당시 이력이며 최신 범위·검증·학습/네트워크 인계는 [감각·Notify 고도화](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md), [실제 레벨 배치](ECOSYSTEM_LEVEL_RUNTIME_PLACEMENT.md)를 우선한다.
 
 > **2026-10-08 추가 통합 기록 (`47faebc` 이후 작업 트리):** 실제 사슴·늑대 BP/BS와 별도 opt-in EntityConfig/레벨에서 기존 PPO→Social Request→단일 이동→Feedback 및 기존 Mass Bubble Client 표현을 연결했다. 직접 UBT 성공, 전체 자동화 33/33, 실제 별도 서버 80초/Client 40초 정상 종료·Moving→Occupied 확인. 아래의 2026-09-30/10-05 표와 JYU 기록은 당시 범위로 보존한다. 최신 실행법·책임 경계·날씨/지형 등 미연결 범위는 [동물 production 통합 기록](CREATURE_PRODUCTION_INTEGRATION.md)을 먼저 읽는다.

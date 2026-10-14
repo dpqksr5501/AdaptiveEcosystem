@@ -34,6 +34,8 @@ public:
 	/** Logical Mass source: no representation Actor is required, including on dedicated servers. */
 	int64 ReportCreatureFootstep(FVector Position, float Loudness, float MaxRange, float ThreatStrength,
 		int64 StableAgentId, FName SpeciesId);
+	/** Presentation alarm emission; authority position and logical identity only. */
+	int64 ReportCreatureAlarm(FVector Position,int64 StableAgentId,FName SpeciesId);
 	static constexpr int32 MaxEvents = 128;
 	static constexpr double EventLifetime = 0.6;
 private:

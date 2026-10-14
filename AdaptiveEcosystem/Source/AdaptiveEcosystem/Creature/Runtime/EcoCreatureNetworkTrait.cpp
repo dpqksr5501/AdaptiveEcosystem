@@ -21,6 +21,7 @@ void UEcoCreatureNetworkTrait::BuildTemplate(FMassEntityTemplateBuildContext& Co
 	// Custom movement excludes engine ApplyMovement; the PPO/predator writers are disjoint by species.
 	Context.AddTag<FMassCustomMovementTag>();
 	Context.AddFragment<FEcoCreatureLifecycleFragment>();
+	Context.AddFragment<FEcoCreatureCueFragment>();
 	Context.AddFragment<FEcoCreatureSurvivalFragment>();
 	Context.AddFragment<FEcoCreatureFootstepFragment>();
 	FMassEntityManager& Manager = UE::Mass::Utils::GetEntityManagerChecked(World);

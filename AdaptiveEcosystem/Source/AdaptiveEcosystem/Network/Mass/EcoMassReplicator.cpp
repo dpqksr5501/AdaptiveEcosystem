@@ -112,7 +112,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		if (!VisualFragments.IsEmpty())
 		{
 			const auto& V = VisualFragments[EntityIndex];
-			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy, V.Activity);
+			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy, V.Activity, V.FocusYaw);
 		}
 
 		FEcoMassClientBubbleHandler& Bubble = BubbleInfo.GetSerializer().Bubble;
@@ -178,7 +178,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		Item.LastTransformCheckRealTime = RealTime;
 		// Velocity-only changes follow the connection interval; flags/vitals bypass it.
 		const bool bPresentationChanged = Presentation && Item.Agent.SetPresentation(
-			Presentation->Velocity, Presentation->Flags, Presentation->Health, Presentation->Energy, Presentation->Activity);
+			Presentation->Velocity, Presentation->Flags, Presentation->Health, Presentation->Energy, Presentation->Activity, Presentation->FocusYaw);
 
 		const FReplicatedAgentPositionYawData PreviousTransform = Item.Agent.GetReplicatedPositionYawData();
 		if (bReset)

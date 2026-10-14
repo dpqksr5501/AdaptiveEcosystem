@@ -1,0 +1,139 @@
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag a_forbid --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.0
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\a_forbid.json
+      results\v2\e2\V0\d0_975\a_forbid.md
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag a_allow --seg-bins threat_recency:0.5,1 --seg-dims vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+  7/112  best 1.531 [0.25, 0.25, 0.25]  (61s)
+  14/112  best 1.531 [0.25, 0.25, 0.25]  (120s)
+  21/112  best 1.531 [0.25, 0.25, 0.25]  (180s)
+  28/112  best 1.531 [0.25, 0.25, 0.25]  (239s)
+  35/112  best 1.531 [0.25, 0.25, 0.25]  (298s)
+  42/112  best 1.531 [0.25, 0.25, 0.25]  (358s)
+  49/112  best 1.531 [0.25, 0.25, 0.25]  (419s)
+  56/112  best 1.531 [0.25, 0.25, 0.25]  (481s)
+  63/112  best 1.531 [0.25, 0.25, 0.25]  (541s)
+  70/112  best 1.531 [0.25, 0.25, 0.25]  (600s)
+  77/112  best 1.531 [0.25, 0.25, 0.25]  (659s)
+  84/112  best 1.531 [0.25, 0.25, 0.25]  (717s)
+  91/112  best 1.531 [0.25, 0.25, 0.25]  (776s)
+  98/112  best 1.531 [0.25, 0.25, 0.25]  (835s)
+  105/112  best 1.531 [0.25, 0.25, 0.25]  (895s)
+  112/112  best 1.531 [0.25, 0.25, 0.25]  (955s)
+  재측정 {'t0': 0.963, 't14': 0.963, 't16': 0.963, 't17': 0.963, 't18': 0.963} → t0 [0.25, 0.25, 0.25]
+저장: results\v2\e2\V0\d0_975\a_allow.json
+      results\v2\e2\V0\d0_975\a_allow.md
+  C2-seg vs C2: mean_return 73.96(t=—, 유의 아님)  g_gamma 1.482(t=—, 유의 아님)  survival 421.7(t=—, 유의 아님)  repro 15.63(t=—, 유의 아님)  predation_rate 0.00238(t=—, 유의 아님)  starve_rate 0.00043(t=—, 유의 아님)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag b_forbid --seg-bins threat_recency:0.5,1 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.0
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+  7/112  best 1.531 [0.491, 0.491, 0.491]  (62s)
+  14/112  best 1.531 [0.491, 0.491, 0.491]  (123s)
+  21/112  best 1.531 [0.491, 0.491, 0.491]  (182s)
+  28/112  best 1.531 [0.491, 0.491, 0.491]  (241s)
+  35/112  best 1.531 [0.491, 0.491, 0.491]  (301s)
+  42/112  best 1.531 [0.491, 0.491, 0.491]  (361s)
+  49/112  best 1.531 [0.491, 0.491, 0.491]  (420s)
+  56/112  best 1.531 [0.491, 0.491, 0.491]  (480s)
+  63/112  best 1.531 [0.491, 0.491, 0.491]  (540s)
+  70/112  best 1.531 [0.491, 0.491, 0.491]  (600s)
+  77/112  best 1.531 [0.491, 0.491, 0.491]  (660s)
+  84/112  best 1.531 [0.491, 0.491, 0.491]  (719s)
+  91/112  best 1.531 [0.491, 0.491, 0.491]  (779s)
+  98/112  best 1.531 [0.491, 0.491, 0.491]  (838s)
+  105/112  best 1.531 [0.491, 0.491, 0.491]  (899s)
+  112/112  best 1.531 [0.491, 0.491, 0.491]  (958s)
+  재측정 {'t0': 0.963, 't2': 0.963, 't24': 0.963, 't29': 0.963, 't30': 0.963} → t0 [0.491, 0.491, 0.491]
+저장: results\v2\e2\V0\d0_975\b_forbid.json
+      results\v2\e2\V0\d0_975\b_forbid.md
+  C2-seg vs C2: mean_return 73.96(t=—, 유의 아님)  g_gamma 1.482(t=—, 유의 아님)  survival 421.7(t=—, 유의 아님)  repro 15.63(t=—, 유의 아님)  predation_rate 0.00238(t=—, 유의 아님)  starve_rate 0.00043(t=—, 유의 아님)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag b_allow --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --enqueue 0.4913744307309694 0.25 0.4913744307309694 0.25 0.4913744307309694 0.25 --enqueue 0.4913744307309694 0.25 0.4913744307309694 0.25 0.4913744307309694 0.25
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+  7/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (63s)
+  14/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (124s)
+  21/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (184s)
+  28/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (245s)
+  35/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (304s)
+  42/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (363s)
+  49/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (423s)
+  56/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (482s)
+  63/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (542s)
+  70/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (601s)
+  77/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (661s)
+  84/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (721s)
+  91/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (781s)
+  98/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (840s)
+  105/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (899s)
+  112/112  best 1.531 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]  (959s)
+  재측정 {'t0': 0.963, 't1': 0.963, 't14': 0.963, 't18': 0.963, 't23': 0.963} → t0 [0.491, 0.25, 0.491, 0.25, 0.491, 0.25]
+저장: results\v2\e2\V0\d0_975\b_allow.json
+      results\v2\e2\V0\d0_975\b_allow.md
+  C2-seg vs C2: mean_return 73.96(t=—, 유의 아님)  g_gamma 1.482(t=—, 유의 아님)  survival 421.7(t=—, 유의 아님)  repro 15.63(t=—, 유의 아님)  predation_rate 0.00238(t=—, 유의 아님)  starve_rate 0.00043(t=—, 유의 아님)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag e2b_vig --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 0.4913744307309694 1.0 1.0 0.0
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\e2b_vig.json
+      results\v2\e2\V0\d0_975\e2b_vig.md
+  C2-seg vs C2: mean_return -34.56(t=-11.18, 유의)  g_gamma -0.821(t=-12.42, 유의)  survival 371.8(t=-3.44, 유의)  repro 7.88(t=-10.63, 유의)  predation_rate 0.00115(t=-8.46, 유의)  starve_rate 0.00207(t=+8.95, 유의)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag e2b_run --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 1.0 0.0 1.0 0.0
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\e2b_run.json
+      results\v2\e2\V0\d0_975\e2b_run.md
+  C2-seg vs C2: mean_return -128.91(t=-9.24, 유의)  g_gamma -1.795(t=-12.59, 유의)  survival 264.8(t=-8.22, 유의)  repro 7.26(t=-9.48, 유의)  predation_rate 0.00165(t=-7.17, 유의)  starve_rate 0.00326(t=+7.82, 유의)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975_tf1.yaml --workers 6 --out results/v2/e2/V0/d0_975/tf --tag e2b_run18 --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 1.0 0.0 1.0 0.0
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975\tf  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\tf\e2b_run18.json
+      results\v2\e2\V0\d0_975\tf\e2b_run18.md
+  C2-seg vs C2: mean_return -49.66(t=-7.56, 유의)  g_gamma -0.885(t=-8.58, 유의)  survival 383.5(t=-4.53, 유의)  repro 7.55(t=-9.33, 유의)  predation_rate 0.00105(t=-8.82, 유의)  starve_rate 0.00239(t=+6.31, 유의)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag e2b_tab_vig --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --const-action 0.4913744307309694 0.25 0.4913744307309694 1.0 0.4913744307309694 0.25
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\e2b_tab_vig.json
+      results\v2\e2\V0\d0_975\e2b_tab_vig.md
+  C2-seg vs C2: mean_return 82.39(t=+1.31, 유의 아님)  g_gamma 1.761(t=+1.81, 유의 아님)  survival 448.7(t=+2.71, 유의)  repro 15.80(t=+0.43, 유의 아님)  predation_rate 0.00234(t=-0.85, 유의 아님)  starve_rate 0.00034(t=-2.36, 유의)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag e2b_tab_run --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --const-action 0.4913744307309694 0.25 1.0 0.0 0.4913744307309694 0.25
+[constsearch] report_v2_2 → results\v2\e2\V0\d0_975  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\e2b_tab_run.json
+      results\v2\e2\V0\d0_975\e2b_tab_run.md
+  C2-seg vs C2: mean_return 32.13(t=-6.15, 유의)  g_gamma 0.852(t=-4.69, 유의)  survival 404.9(t=-1.59, 유의 아님)  repro 12.95(t=-6.15, 유의)  predation_rate 0.00233(t=-1.06, 유의 아님)  starve_rate 0.00072(t=+3.96, 유의)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag a_forbid --g998 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.0
+[constsearch] report_v2_2_g998 → results\v2\e2\V0\d0_975\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\g998\a_forbid.json
+      results\v2\e2\V0\d0_975\g998\a_forbid.md
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag a_allow --g998 --seg-bins threat_recency:0.5,1 --seg-dims vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --const-action 0.25 0.25 0.25
+[constsearch] report_v2_2_g998 → results\v2\e2\V0\d0_975\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\g998\a_allow.json
+      results\v2\e2\V0\d0_975\g998\a_allow.md
+  C2-seg vs C2: mean_return 152.30(t=—, 유의 아님)  g_gamma 4.855(t=—, 유의 아님)  survival 449.0(t=—, 유의 아님)  repro 31.74(t=—, 유의 아님)  predation_rate 0.00240(t=—, 유의 아님)  starve_rate 0.00042(t=—, 유의 아님)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag b_forbid --g998 --seg-bins threat_recency:0.5,1 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.4913744307309694 0.4913744307309694
+[constsearch] report_v2_2_g998 → results\v2\e2\V0\d0_975\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\g998\b_forbid.json
+      results\v2\e2\V0\d0_975\g998\b_forbid.md
+  C2-seg vs C2: mean_return 152.30(t=—, 유의 아님)  g_gamma 4.855(t=—, 유의 아님)  survival 449.0(t=—, 유의 아님)  repro 31.74(t=—, 유의 아님)  predation_rate 0.00240(t=—, 유의 아님)  starve_rate 0.00042(t=—, 유의 아님)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag b_allow --g998 --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --const-action 0.4913744307309694 0.25 0.4913744307309694 0.25 0.4913744307309694 0.25
+[constsearch] report_v2_2_g998 → results\v2\e2\V0\d0_975\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\g998\b_allow.json
+      results\v2\e2\V0\d0_975\g998\b_allow.md
+  C2-seg vs C2: mean_return 152.30(t=—, 유의 아님)  g_gamma 4.855(t=—, 유의 아님)  survival 449.0(t=—, 유의 아님)  repro 31.74(t=—, 유의 아님)  predation_rate 0.00240(t=—, 유의 아님)  starve_rate 0.00042(t=—, 유의 아님)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag e2b_vig --g998 --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 0.4913744307309694 1.0 1.0 0.0
+[constsearch] report_v2_2_g998 → results\v2\e2\V0\d0_975\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\g998\e2b_vig.json
+      results\v2\e2\V0\d0_975\g998\e2b_vig.md
+  C2-seg vs C2: mean_return -69.16(t=-10.74, 유의)  g_gamma -0.642(t=-8.92, 유의)  survival 395.5(t=-3.05, 유의)  repro 15.81(t=-9.95, 유의)  predation_rate 0.00114(t=-8.82, 유의)  starve_rate 0.00208(t=+8.81, 유의)
+
+$ python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag e2b_run --g998 --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 1.0 0.0 1.0 0.0
+[constsearch] report_v2_2_g998 → results\v2\e2\V0\d0_975\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\e2\V0\d0_975\g998\e2b_run.json
+      results\v2\e2\V0\d0_975\g998\e2b_run.md
+  C2-seg vs C2: mean_return -252.72(t=-9.15, 유의)  g_gamma -1.958(t=-13.47, 유의)  survival 273.1(t=-7.13, 유의)  repro 14.73(t=-9.64, 유의)  predation_rate 0.00164(t=-7.62, 유의)  starve_rate 0.00324(t=+7.67, 유의)

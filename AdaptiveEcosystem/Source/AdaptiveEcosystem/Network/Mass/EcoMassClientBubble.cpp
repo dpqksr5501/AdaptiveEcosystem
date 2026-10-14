@@ -87,7 +87,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
 		{
 			Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
-			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity();
+			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity(); Visual->FocusYaw = Agent.GetFocusYaw();
 		}
 	};
 
@@ -194,7 +194,7 @@ void FEcoMassClientBubbleHandler::SetModifiedEntityData(const FMassEntityView& E
 	if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
 	{
 		Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
-		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity();
+		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity(); Visual->FocusYaw = Agent.GetFocusYaw();
 	}
 }
 #endif

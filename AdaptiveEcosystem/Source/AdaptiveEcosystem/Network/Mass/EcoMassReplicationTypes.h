@@ -31,10 +31,11 @@ struct FReplicatedEcoMassAgent : public FReplicatedAgentBase
 	uint8 GetHealth() const { return Health; }
 	uint8 GetEnergy() const { return Energy; }
 	uint8 GetActivity() const { return Activity; }
-	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy, uint8 InActivity = 0)
+	int16 GetFocusYaw() const { return FocusYaw; }
+	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy, uint8 InActivity = 0, int16 InFocusYaw = 0)
 	{
-		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy && Activity == InActivity) return false;
-		Velocity = InVelocity; VisualFlags = InFlags; Health = InHealth; Energy = InEnergy; Activity = InActivity;
+		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy && Activity == InActivity && FocusYaw == InFocusYaw) return false;
+		Velocity = InVelocity; VisualFlags = InFlags; Health = InHealth; Energy = InEnergy; Activity = InActivity; FocusYaw = InFocusYaw;
 		++VisualRevision;
 		return true;
 	}
@@ -108,6 +109,7 @@ private:
 	UPROPERTY(Transient) uint8 Health = 255;
 	UPROPERTY(Transient) uint8 Energy = 255;
 	UPROPERTY(Transient) uint8 Activity = 0;
+	UPROPERTY(Transient) int16 FocusYaw = 0;
 };
 
 /** Fast-array entry used by one connection-specific client bubble. */

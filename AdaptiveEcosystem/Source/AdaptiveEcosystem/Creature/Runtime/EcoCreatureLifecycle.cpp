@@ -8,6 +8,9 @@
 #include "Creature/Audio/EcoFootstepAudioSet.h"
 #include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
+#include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
+#include "AI/Policy/EcoPolicyV3Fragments.h"
+#include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "Ecology/EcologySimulationSubsystem.h"
 #include "Mass/EcoMassMigration.h"
@@ -70,6 +73,7 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 	if (!EcoMassSurvival::RemoveExpired(EM, Now, true) || !BuildAgentLookup())
 	{ FailRuntime(TEXT("Creature death cleanup")); return; }
 	UpdateSimulationLOD();
+	UpdateSensoryPresentation();
 	UpdatePresentationAndNoise(Delta);
 }
 
@@ -126,6 +130,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 		const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
 		const auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
 		if (V.HP <= 0 || Id.SpeciesId != TEXT("Herbivore")) continue;
+		if (EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E)) continue;
 		const auto& Region = EM.GetFragmentDataChecked<FEcoRegionFragment>(E);
 		const auto& Travel = EM.GetFragmentDataChecked<FEcoTravelFragment>(E);
 		const auto& Lifetime = EM.GetFragmentDataChecked<FEcoLifetimeFragment>(E);
@@ -240,7 +245,25 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 		const bool Pursuing = Life.bPursuing || (Execution && Execution->Activity == EEcoSpeciesActivity::Pursue);
 		Present.Flags = (V.HP > 0 ? 1 : 0) | (Eating ? 2 : 0) | (Pursuing ? 4 : 0) | 8;
 		Present.Activity = Execution ? uint8(Execution->Activity) : uint8(EEcoSpeciesActivity::Hold);
-		Present.Health = EcoRepresentation::QuantizeUnit(V.HP / FMath::Max(V.MaxHP, 1.f));
+        if (const auto* Behavior = EM.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E))
+        {
+            const EEcoSpeciesActivity Activities[] = {EEcoSpeciesActivity::Graze, EEcoSpeciesActivity::Flee,
+                Behavior->Rep.bArrived ? EEcoSpeciesActivity::ShelterHold : EEcoSpeciesActivity::ShelterTravel,
+                EEcoSpeciesActivity::Freeze, EEcoSpeciesActivity::Sleep};
+            Present.Activity = uint8(Behavior->BehaviorId < UE_ARRAY_COUNT(Activities) ? Activities[Behavior->BehaviorId] : EEcoSpeciesActivity::Hold);
+            if (Behavior->BehaviorId == 0) Present.Flags |= 2;
+        }
+        if (const auto* Threat = EM.GetFragmentDataPtr<FEcoThreatStateFragment>(E))
+        {
+            const EEcoSpeciesActivity Activities[] = {EEcoSpeciesActivity::Wander, EEcoSpeciesActivity::Stalk,
+                EEcoSpeciesActivity::Pounce, EEcoSpeciesActivity::Exhaust, EEcoSpeciesActivity::Pursue, EEcoSpeciesActivity::Eat, EEcoSpeciesActivity::Sleep};
+            Present.Activity = uint8(Activities[uint8(EcoV3Integrated::WolfStateOf(Threat->Agent))]);
+        }
+		if (const auto* Cue = EM.GetFragmentDataPtr<FEcoCreatureCueFragment>(E)) {
+            Present.Flags |= uint8(Cue->Memory.Source)<<4;
+            Present.FocusYaw = Cue->FocusYaw;
+        }
+        Present.Health = EcoRepresentation::QuantizeUnit(V.HP / FMath::Max(V.MaxHP, 1.f));
 		Present.Energy = EcoRepresentation::QuantizeUnit(V.Energy / FMath::Max(V.MaxEnergy, 1.f));
 		// Observe the single movement writer's completed result. Never move the agent here.
 		auto& Cadence = EM.GetFragmentDataChecked<FEcoCreatureFootstepFragment>(E).Cadence;

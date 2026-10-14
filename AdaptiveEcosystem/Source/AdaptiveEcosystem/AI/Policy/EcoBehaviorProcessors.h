@@ -18,6 +18,7 @@
 #include "CoreMinimal.h"
 #include "MassEntityQuery.h"
 #include "MassProcessor.h"
+#include "EcoPolicyClock.h"
 
 #include "EcoBehaviorProcessors.generated.h"
 
@@ -76,6 +77,7 @@ protected:
 
 private:
 	FMassEntityQuery EntityQuery;
+	EcoPolicy::FStepClock LegacyClock;
 
 };
 
@@ -111,7 +113,8 @@ private:
 	FMassEntityQuery HerbivoreQuery;
 	/** 포획 판정은 파이썬 §4.2 처럼 포식자 쪽에서 한다. */
 	FMassEntityQuery PredatorQuery;
-	double PredationElapsedSeconds = 0.0;
+	EcoPolicy::FStepClock StepClock;
+	int32 EmaPhase = 0;
 };
 
 /** §9.5 — §3.3 조향 수식. 파이썬 `env/steering.py` 와 한 줄씩 대응한다. */

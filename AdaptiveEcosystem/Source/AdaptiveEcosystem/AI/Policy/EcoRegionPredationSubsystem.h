@@ -50,6 +50,8 @@ class ADAPTIVEECOSYSTEM_API UEcoPredationSaveGame : public USaveGame
 	GENERATED_BODY()
 
 public:
+	UPROPERTY() int32 SchemaVersion = 0;
+	UPROPERTY() float Ema = 0.0f;
 	UPROPERTY()
 	TMap<int64, FEcoRegionPredationState> Regions;
 
@@ -64,9 +66,16 @@ class ADAPTIVEECOSYSTEM_API UEcoRegionPredationSubsystem : public UWorldSubsyste
 	GENERATED_BODY()
 
 public:
+	static constexpr int32 SaveSchemaVersion = 2;
+	float GetRecentPredation() const { return GetGlobal(); }
+	void ReportAlivePopulation(int32 Count) { Global.Population = FMath::Max(Global.Population, FMath::Max(Count, 0)); }
+	float GetRawEma() const { return Global.Ema; }
+	int32 GetPendingDeaths() const { return Global.PendingDeaths; }
+	int32 GetStepPopulation() const { return Global.Population; }
 	/** §3.1 관측 5번. 항상 [0,1]. */
 	UFUNCTION(BlueprintPure, Category = "Ecology|Predation")
-	float Get(const FVector& Location) const;
+	float Get(const FVector& Location) const { return GetRecentPredation(); }
+	float GetRegional(const FVector& Location) const;
 
 	/**
 	 * 개체 하나가 죽었다. 포식자 포획이든 플레이어 사냥이든 여기로 들어온다 (§9.6).

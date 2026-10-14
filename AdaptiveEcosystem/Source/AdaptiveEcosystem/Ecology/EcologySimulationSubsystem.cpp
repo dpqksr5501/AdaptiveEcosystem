@@ -56,6 +56,7 @@ void UEcologySimulationSubsystem::Deinitialize()
 	PendingManualFoodSupply.Reset();
 	CompletedResources.Reset();
 	LastAcceptedFeedTime.Reset();
+	SpatialFood.Reset();
 	DeathReceipts.Reset();
 	LastDeathReceiptStep = 0;
 	LastMigrationReceiptStep = 0;
@@ -83,7 +84,7 @@ void UEcologySimulationSubsystem::TickSimulation(float DeltaTime)
 		State.FoodCapacity = FMath::Max(0.0f, State.FoodCapacity);
 		State.FoodRegenerationRate = FMath::Max(0.0f, State.FoodRegenerationRate);
 		State.FoodAmount = static_cast<float>(FMath::Clamp(
-			double(State.FoodAmount) + double(State.FoodRegenerationRate) * State.EffectiveRegenerationMultiplier * DeltaTime,
+			double(State.FoodAmount) + (SpatialFood.Contains(Pair.Key) ? 0.0 : double(State.FoodRegenerationRate) * State.EffectiveRegenerationMultiplier * DeltaTime),
 			0.0, double(State.FoodCapacity)));
 
 		// Exponential decay is stable for variable frame/step durations.
@@ -159,6 +160,7 @@ int64 UEcologySimulationSubsystem::AllocateStableAgentId()
 
 float UEcologySimulationSubsystem::ApplyFoodConsumption(const FEcoFoodConsumptionRequest& Request)
 {
+	if (SpatialFood.Contains(Request.RegionId)) return 0;
 	if (!CanMutateAuthoritativeState(TEXT("ApplyFoodConsumption"))
 		|| Request.RegionId.IsNone()
 		|| !FMath::IsFinite(Request.RequestedAmount)

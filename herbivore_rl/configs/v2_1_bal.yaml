@@ -1,0 +1,89 @@
+# V2 설정 — S1-a 대응 팔 W: v2.1 + 학습 세계 균형 추출 (10-04 사용자 결정, results/v2/s1a/PREREG.md).
+#
+# 세계(features·overrides)는 configs/v2_1.yaml 과 한 글자도 다르지 않다 — 평가는 v2_1.yaml 로 한다. 바꾸는 것은 학습 때
+# 새 세계를 고르는 방법 하나다(train.world_sampling, env_v2/vec_env.py): 후보 8개 가운데 '지금까지 고른 세계들의 먹이
+# 재생 배수·포식자 수 표준화 평균'이 풀 평균에 가장 가까워지는 세계를 고른다. 이유: 굶는 갈래 4모델이 학습 중 본 세계의
+# 먹이 재생 배수 평균이 1.153~1.227 로 좋은 9모델(1.254~1.414)보다 낮았다(results/v2/s1a_diag/STATUS.md, 결과 뒤 발견).
+#   python train_v2.py --config configs/v2_1_bal.yaml --steps 20000000 --seed 50 --run-name s1a_w_s50
+# 아래는 configs/v2_1.yaml 원문 그대로다(train 블록 끝에 world_sampling 만 더함).
+#
+# V2 설정 — v2.1 보행 3단(정지·걷기·뛰기)과 대사·섭식 연동 (Docs/RL_Policy/RL_V2_PLAN.md 4.3·4.4·4.5, 1-1).
+#
+# v2.0(configs/v2.yaml)에 speed 하나만 켠다. 먹이는 v2.0(= v1) 그대로다. v2.0b(먹이 2층)는 Gate F 실패로 2단계로
+# 미뤘다(계획서 10절 10-02 결정. configs/v2_0b.yaml 은 사용 금지). 관측 7 그대로, 행동 5 (idx 4 = speed).
+# v1 configs/default.yaml 을 먼저 읽고 그 위에 이 파일을 덮는다 (env_v2/config.py):
+#   python train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 0 --run-name v2_1_s0 --save-at 10000000
+# 형식 규칙은 configs/v2.yaml 머리 주석과 같다(계수는 이 파일이 유일한 원본, 지수 표기는 1.0e-3 꼴).
+#
+# 아래 계수는 계획서의 제안값(시작값)에서 출발했고, Gate E1(1-2)·E1-b 에서 섭식 배수와 뛰기 배수를 함께 보정한다.
+# 바꾸면 날짜·이유를 여기와 계획서 4.4 에 적는다. 스텝 안 순서는 env_v2/world.py `_gait_step` docstring.
+# Gate E1(10-02, results/v2/e1/judge.md): FAIL. 팔 6개(걷기 대사 1 고정, 뛰기 배수 R0 {2, 3.625, 6}·R1 {1.5, 2.5, 4.5},
+# e_walk 0.5)가 모두 실패해 계수는 바꾸지 않았다(그때 값은 제안값. E1-b 통과 뒤 c_rest·c_move 가 바뀌었다, 아래).
+# E1-b(10-02 사람 결정, 계획서 10절 10-02·results/v2/e1/PREREG.md 변경 기록): 아래 overrides 로 포식자 속도 범위만 바꿔
+# Gate E1 을 다시 한다(회차 B0~B2, 판정표 results/v2/e1/judge_e1b.md).
+# 이 바꿈으로 config_digest 가 50bd812219b4(E1 R0 제안 팔과 같았음)에서 바뀐다. E1 의 팔 설정·결과는 그대로다.
+# Gate E1-b(10-02, results/v2/e1/judge_e1b.md, report_b.md): PASS. B0(R {2, 3.625, 6})는 세 팔 모두 실패했고, 사전 등록
+# 규칙 4(공통 규칙만 실패 → 배수 변경)로 간 B1(R {1.5, 2.5, 4.5}, e_walk 0.5)에서 R 2.5 팔(r2_5_ew0_5)만 통과해 골랐다
+# (PREREG 3.5·5절). 그래서 아래 c_rest·c_move 를 제안값(0.5, 3.125, R 3.625)에서 R 2.5 값으로 바꿨다. gait_eat 는 그대로다.
+# 바꾼 뒤 이 파일 = results/v2/e1/configs/B1_r2_5_ew0_5.yaml (config_digest f068496361f9).
+
+version: "2.1_bal"
+
+# v1 키 가운데 포식자 속도 범위 하나만 바꾼다 (10-02 사람 결정, Gate E1-b). v1 configs/default.yaml 은 그대로다.
+#   rand.pred_speed_mult (herb_speed 대비, reset 마다 균등): v1 [0.8, 1.2] → [0.6, 0.95].
+#   이유: E1 R0·R1 실패. 사전 등록 밖 소수 침입 시험(results/v2/e1/report.md 8절)에서 ×0.8~1.2 는 뛰기 속력 1.0 이
+#   포식자 범위의 가운데라 뛰어도 절반의 세계에서 포식자보다 빠르지 않았고 뛰기의 개체 이득이 작았다(피식 −10%).
+#   ×0.6~0.95 면 피식 −23%(t −6.04). 그래서 '걷기(0.4) < 근접 포식자 < 뛰기(1.0)' 구조로 둔다.
+#   근접형 속력 = herb_speed × pred_speed_mult = ×0.60~0.95.
+#   원거리형 속력 = herb_speed × pred_speed_mult × pred_ranged_speed_mult(0.6, v1 값 그대로 — 덮지 않는다)
+#     = ×0.36~0.57 (v1 범위에서는 ×0.48~0.72). pred_speed_mult < 2/3 인 세계(균등 분포라 약 19%)에서는 원거리형이
+#     걷기(0.4)보다 느리다. 뛰기(1.0)는 모든 포식자보다 빠르다.
+#   rand 의 다른 하위 키(world_size, predator_count, ranged_frac, cover_frac, food_regen_mult)는 v1 값 그대로다.
+#   overrides 는 묶음 키의 하위 키만 덮는다(env_v2/config.py). 시드마다 같은 uniform 한 번을 뽑으므로 같은 시드의
+#   세계 배치(크기, M, 원거리형, 은신처, 재생, 위치)는 v1·v2.0 과 같고 배수만 0.6 + 0.875·(v1 배수 − 0.8)로 옮겨진다.
+overrides:
+  rand:
+    pred_speed_mult: [0.6, 0.95]
+
+features:
+  speed:
+    enabled: true
+    # 행동 idx 4 (sigmoid 뒤 [0,1]) → 보행 상태: a < 1/3 정지, a < 2/3 걷기, 그 이상 뛰기 (계획서 4.3).
+    # 상태가 없는 고정 문턱이다(최소 유지 시간 K 없음, 10절 #3 — B8 이 0.5 를 넘으면 넣는다).
+    # 1/3·2/3 의 float64 값을 그대로 적는다(repr(1/3), repr(2/3)).
+    thresholds: [0.3333333333333333, 0.6666666666666666]
+    # 상태별 속력 × herb_speed [정지, 걷기, 뛰기] (4.4 표). 정지는 0 이어야 한다(heading 유지).
+    # 뛰기 1.0 = v1 속력. 포식자 속도 범위는 E1-b 결정(10-02)으로 ×0.6~0.95(원거리형 ×0.36~0.57, 위 overrides)다.
+    # 걷기 0.4 는 모든 근접형보다 느리고 뛰기 1.0 은 모든 포식자보다 빠르다. 쫓기면 뛰어야 산다.
+    gait_speed: [0.0, 0.4, 1.0]
+    # 상태별 섭식 배수 [정지, 걷기, 뛰기] (4.4 표). env_v2/world.py `_eat` 의 want(흡수 가능량, 상한 food_eat_rate
+    # 0.06)에 곱한다. 걷기 최대 섭취 0.03/스텝.
+    gait_eat: [1.0, 0.5, 0.0]
+    # 대사 drain = energy_drain × (c_rest + c_move·(v/herb_speed)²) (4.4). 기준은 "평시 에너지 예산을 v1 과 같게":
+    # 걷기 대사 = v1 대사(c_rest + 0.4²·c_move = 1)와 c_rest/c_move = 0.4²(거리당 비용이 가장 낮은 속도
+    # √(c_rest/c_move)·herb_speed = 걷기 속도)에서 c_rest 0.5, c_move 3.125 (제안). 대사 배수는 정지 0.5, 걷기 1,
+    # 뛰기 3.625. Gate E1 은 뛰기 배수 R ∈ {2, 3.6, 6} 을 훑는다 — 걷기 1 을 지키면 c_move = (R − 1)/0.84,
+    # c_rest = 1 − 0.16·c_move.
+    # 10-02 Gate E1-b 통과(B1 r2_5_ew0_5, results/v2/e1/judge_e1b.md·report_b.md)로 R = 2.5 값으로 바꿨다:
+    #   c_rest = (21 − 4·1.5)/21 = 15/21, c_move = 25·1.5/21 = 37.5/21 (gate_e1.metabolism(2.5) 의 float64 값 그대로).
+    #   대사 배수는 정지 0.714, 걷기 1(= v1, 그대로), 뛰기 2.5. 걷기 1 고정은 지키고 c_rest/c_move = 0.4 라
+    #   거리당 비용이 가장 낮은 속도는 √0.4 ≈ 0.63·herb_speed(걷기와 뛰기 사이)이고, 걷기와 뛰기의 거리당 대사가
+    #   같다(1/0.4 = 2.5/1). 뛰기의 비용은 대사가 아니라 섭식 0(gait_eat)에서 온다.
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    # 에너지 보상 (4.5, 10절 #4): true = 순변화 e_new − e_prev (번식·리스폰 리셋 제외. 대사가 즉시 보상에 잡힌다),
+    # false = v1 획득량 e_new − e_drained (먹이로 얻은 에너지만).
+    net_energy_reward: true
+
+train:
+  # configs/v2.yaml 과 같다 (v2.0 과 학습 설정을 맞춰 기능 효과만 비교한다).
+  # 독립 세계 K 개를 한 VecEnv 로 묶는다. 세계를 T_reset 월드 스텝마다 새로 뽑고 T_reset/K 씩 엇갈린다.
+  num_worlds: 8
+  reset_interval: 4000
+  # 세계당 n_steps = 256 / K. 롤아웃 배치(256 × 128 = 32,768 timestep)를 v1 과 같게 유지한다.
+  rollout_world_steps: 256
+  # S1-a 대응(10-04): 학습 세계 균형 추출. 후보 수·키는 PREREG 에서 정했다(제안값, 근거는 STATUS.md 2절)
+  world_sampling:
+    mode: balanced
+    candidates: 8
+    keys: [food_regen_mult, predator_count]

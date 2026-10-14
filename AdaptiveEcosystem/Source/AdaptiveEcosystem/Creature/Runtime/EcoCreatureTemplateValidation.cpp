@@ -19,12 +19,23 @@
 #include "MassSimulationLOD.h"
 #include "MassNavigationProcessors.h"
 #include "NavigationSystem.h"
+#include "AI/Policy/EcoCreatureV3Trait.h"
+#include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
+#include "AI/Policy/EcoPolicyV3Fragments.h"
 
 bool AEcoCreatureIntegrationSpawner::RegisterTemplates()
 {
 	const auto* Network = GetWorld()->GetSubsystem<UEcoMassNetworkSubsystem>();
 	if (!Network || !Network->IsBubbleInfoClassRegistered()) return false;
 	const bool bClient = GetNetMode() == NM_Client;
+	// Register both immutable v3 proxy templates even when this client starts without the server's console switch.
+	// Saved V1 templates remain registered below, so late joins can consume either server backend.
+	if (bClient) for (bool bPredator : {false, true})
+	{
+		auto* Config = UEcoCreatureV3Trait::MakeNetworkConfig(bPredator);
+		AdditionalClientConfigs.AddUnique(Config);
+		if (!Config->GetOrCreateEntityTemplate(*GetWorld()).IsValid()) return false;
+	}
 	for (int32 ConfigRoleIndex = 0; ConfigRoleIndex < 2; ++ConfigRoleIndex)
 	{
 		if (!IsSpeciesEnabled(ConfigRoleIndex == 1)) continue;
@@ -40,6 +51,7 @@ bool AEcoCreatureIntegrationSpawner::RegisterTemplates()
 		const auto& Template = Config->GetOrCreateEntityTemplate(*GetWorld());
 		if (!Template.IsValid()) return false;
 		const auto& Composition = Template.GetCompositionDescriptor();
+		const bool bV3 = Trait->IsA<UEcoCreatureV3Trait>();
 		TArray<FString> Problems;
 		const auto Require = [&Composition, &Problems]<typename T>()
 		{ if (!Composition.Contains<T>()) Problems.Add(TEXT("Missing ") + T::StaticStruct()->GetName()); };
@@ -76,7 +88,16 @@ bool AEcoCreatureIntegrationSpawner::RegisterTemplates()
 			Require.operator()<FEcoLifetimeFragment>(); Require.operator()<FEcoFeedingFragment>();
 			Require.operator()<FEcoCreatureSurvivalFragment>(); Require.operator()<FEcoCreatureLifecycleFragment>();
 			Require.operator()<FEcoCreatureFootstepFragment>(); Require.operator()<FEcoSpeciesSharedFragment>();
-			if (ConfigRoleIndex == 0)
+			if (bV3)
+			{
+				Require.operator()<FEcoIntegratedV3Fragment>();
+				Forbid.operator()<FEcoHerbivoreTag>(); Forbid.operator()<FEcoPredatorTag>();
+				Forbid.operator()<FEcoStateTreeBehaviorTag>(); Forbid.operator()<FEcoGroundedNavigationTag>();
+				if (ConfigRoleIndex == 0)
+				{ Require.operator()<FEcoIntegratedPolicyV3Tag>(); Require.operator()<FEcoHerbivoreBodyV3Fragment>(); Require.operator()<FEcoBehaviorStateFragment>(); }
+				else { Require.operator()<FEcoIntegratedThreatV3Tag>(); Require.operator()<FEcoThreatStateFragment>(); }
+			}
+			else if (ConfigRoleIndex == 0)
 			{
 				Require.operator()<FEcoHerbivoreTag>(); Forbid.operator()<FEcoPredatorTag>();
 				Require.operator()<FEcoSteeringGeometryFragment>(); Require.operator()<FEcoObservationFragment>();

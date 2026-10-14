@@ -115,6 +115,9 @@ public:
 	/** Exactly one batch per step; caller has verified live Entity identity/membership at the Mass boundary. */
 	bool ResolveFeeding(TConstArrayView<FEcoFeedRequest> Requests, TArray<FEcoFeedResult>& Results);
 	bool CompleteResourceStep();
+	/** Exclusive spatial adapter; Ecology verifies conservation and monotonic receipts. */
+	bool RegisterSpatialFood(FName RegionId, double Capacity, double Amount);
+	bool CommitSpatialFood(FName RegionId, int64 Sequence, double Before, double Consumed, double Regenerated, double After);
 	void GetResourceSnapshots(TArray<FEcoResourceSnapshot>& Out) const { Out = CompletedResources; }
 
 	// -------------------------------------------------------------------------
@@ -185,4 +188,6 @@ private:
 	TArray<FEcoResourceSnapshot> CompletedResources;
 	/** Receipt watermark only; feeding schedules remain on Mass entities. */
 	TMap<int64, double> LastAcceptedFeedTime;
+	struct FSpatialFoodState { double Capacity = 0, Amount = 0, Consumed = 0, Regenerated = 0; int64 Sequence = -1; };
+	TMap<FName, FSpatialFoodState> SpatialFood;
 };

@@ -1,0 +1,4691 @@
+{
+ "config": "configs/v3_r0_on.yaml",
+ "seeds": [
+  12000,
+  12001,
+  12002
+ ],
+ "d0": 7.5,
+ "table": {
+  "stalker|graze|free|dist|8.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|graze|free|dist|7.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|graze|free|dist|6.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 21
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 21
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 21
+    }
+   ]
+  },
+  "stalker|graze|free|dist|5.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "stalker|graze|free|dist|4.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    }
+   ]
+  },
+  "stalker|graze|free|dist|3.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    }
+   ]
+  },
+  "stalker|graze|free|approach|0.6": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|graze|free|approach|0.75": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "stalker|graze|free|approach|0.9": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "stalker|graze|free|never|-": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    }
+   ]
+  },
+  "stalker|graze|locked|dist|8.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|graze|locked|dist|7.0": {
+   "caught": 9,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|graze|locked|dist|6.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 16
+    }
+   ]
+  },
+  "stalker|graze|locked|dist|5.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    }
+   ]
+  },
+  "stalker|graze|locked|dist|4.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.18,
+     "attack_d": 5.88,
+     "steps": 16
+    }
+   ]
+  },
+  "stalker|graze|locked|dist|3.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.28,
+     "attack_d": 5.88,
+     "steps": 15
+    }
+   ]
+  },
+  "stalker|graze|locked|approach|0.6": {
+   "caught": 3,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": true,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": true,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|graze|locked|approach|0.75": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    }
+   ]
+  },
+  "stalker|graze|locked|approach|0.9": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 18
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 4.98,
+     "attack_d": 5.88,
+     "steps": 16
+    }
+   ]
+  },
+  "stalker|graze|locked|never|-": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 15
+    }
+   ]
+  },
+  "stalker|freeze|free|dist|8.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|freeze|free|dist|7.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|freeze|free|dist|6.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|freeze|free|dist|5.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    }
+   ]
+  },
+  "stalker|freeze|free|dist|4.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    }
+   ]
+  },
+  "stalker|freeze|free|dist|3.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    }
+   ]
+  },
+  "stalker|freeze|free|approach|0.6": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|freeze|free|approach|0.75": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    }
+   ]
+  },
+  "stalker|freeze|free|approach|0.9": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    }
+   ]
+  },
+  "stalker|freeze|free|never|-": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    }
+   ]
+  },
+  "stalker|freeze|locked|dist|8.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|freeze|locked|dist|7.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|freeze|locked|dist|6.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 24
+    }
+   ]
+  },
+  "stalker|freeze|locked|dist|5.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 26
+    }
+   ]
+  },
+  "stalker|freeze|locked|dist|4.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 32
+    }
+   ]
+  },
+  "stalker|freeze|locked|dist|3.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    }
+   ]
+  },
+  "stalker|freeze|locked|approach|0.6": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.34,
+     "steps": 24
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "stalker|freeze|locked|approach|0.75": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    }
+   ]
+  },
+  "stalker|freeze|locked|approach|0.9": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.28,
+     "attack_d": 3.18,
+     "steps": 32
+    }
+   ]
+  },
+  "stalker|freeze|locked|never|-": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    }
+   ]
+  },
+  "player|graze|free|dist|8.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|graze|free|dist|7.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|graze|free|dist|6.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 29
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 29
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 29
+    }
+   ]
+  },
+  "player|graze|free|dist|5.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 23
+    }
+   ]
+  },
+  "player|graze|free|dist|4.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "player|graze|free|dist|3.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    }
+   ]
+  },
+  "player|graze|free|approach|0.6": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|graze|free|approach|0.75": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    }
+   ]
+  },
+  "player|graze|free|approach|0.9": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    }
+   ]
+  },
+  "player|graze|free|never|-": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    }
+   ]
+  },
+  "player|graze|locked|dist|8.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|graze|locked|dist|7.0": {
+   "caught": 9,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|graze|locked|dist|6.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "player|graze|locked|dist|5.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 11,
+     "flee_d": 4.32,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "player|graze|locked|dist|4.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 12,
+     "flee_d": 3.54,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "player|graze|locked|dist|3.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    },
+    {
+     "caught": true,
+     "flee_t": 13,
+     "flee_d": 2.76,
+     "attack_d": 5.88,
+     "steps": 17
+    }
+   ]
+  },
+  "player|graze|locked|approach|0.6": {
+   "caught": 3,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": true,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": true,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|graze|locked|approach|0.75": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "player|graze|locked|approach|0.9": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 23
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    },
+    {
+     "caught": true,
+     "flee_t": 10,
+     "flee_d": 5.1,
+     "attack_d": 5.88,
+     "steps": 20
+    }
+   ]
+  },
+  "player|graze|locked|never|-": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 5.88,
+     "steps": 16
+    }
+   ]
+  },
+  "player|freeze|free|dist|8.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|freeze|free|dist|7.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|freeze|free|dist|6.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|freeze|free|dist|5.0": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    }
+   ]
+  },
+  "player|freeze|free|dist|4.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    }
+   ]
+  },
+  "player|freeze|free|dist|3.0": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    }
+   ]
+  },
+  "player|freeze|free|approach|0.6": {
+   "caught": 0,
+   "n": 3,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|freeze|free|approach|0.75": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    }
+   ]
+  },
+  "player|freeze|free|approach|0.9": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    }
+   ]
+  },
+  "player|freeze|free|never|-": {
+   "caught": 3,
+   "n": 3,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    }
+   ]
+  },
+  "player|freeze|locked|dist|8.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 0,
+     "flee_d": 7.5,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|freeze|locked|dist|7.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 3,
+     "flee_d": 6.96,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|freeze|locked|dist|6.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 9,
+     "flee_d": 5.88,
+     "attack_d": 5.34,
+     "steps": 32
+    }
+   ]
+  },
+  "player|freeze|locked|dist|5.0": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    },
+    {
+     "caught": false,
+     "flee_t": 14,
+     "flee_d": 4.98,
+     "attack_d": 4.98,
+     "steps": 34
+    }
+   ]
+  },
+  "player|freeze|locked|dist|4.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    },
+    {
+     "caught": true,
+     "flee_t": 20,
+     "flee_d": 3.9,
+     "attack_d": 3.9,
+     "steps": 40
+    }
+   ]
+  },
+  "player|freeze|locked|dist|3.0": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    }
+   ]
+  },
+  "player|freeze|locked|approach|0.6": {
+   "caught": 0,
+   "n": 12,
+   "runs": [
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": 5.34,
+     "steps": 32
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    },
+    {
+     "caught": false,
+     "flee_t": 1,
+     "flee_d": 7.32,
+     "attack_d": null,
+     "steps": 80
+    }
+   ]
+  },
+  "player|freeze|locked|approach|0.75": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    }
+   ]
+  },
+  "player|freeze|locked|approach|0.9": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    },
+    {
+     "caught": true,
+     "flee_t": 25,
+     "flee_d": 2.4,
+     "attack_d": 3.18,
+     "steps": 37
+    }
+   ]
+  },
+  "player|freeze|locked|never|-": {
+   "caught": 12,
+   "n": 12,
+   "runs": [
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    },
+    {
+     "caught": true,
+     "flee_t": null,
+     "flee_d": null,
+     "attack_d": 3.18,
+     "steps": 27
+    }
+   ]
+  }
+ }
+}

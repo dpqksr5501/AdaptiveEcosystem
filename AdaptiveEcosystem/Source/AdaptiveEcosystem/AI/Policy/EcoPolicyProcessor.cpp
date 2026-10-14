@@ -50,6 +50,7 @@ void UEcoPolicyProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>&
 	EntityQuery.AddRequirement<FEcoObservationFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadWrite);
 	EntityQuery.AddRequirement<FEcoPolicyRuntimeFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	EntityQuery.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::All);
 	EntityQuery.AddTagRequirement<FEcoStateTreeBehaviorTag>(EMassFragmentPresence::None);
 	EntityQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
@@ -76,12 +77,13 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 	const bool bGlobalPredation = CVarPredationSource.GetValueOnGameThread() != 0;
 	const double Dt = Context.GetDeltaTimeSeconds();
 	if (!FMath::IsFinite(Dt) || Dt < 0) return;
+	const int32 LegacyTicks = LegacyClock.Advance(float(Dt), EcoBehaviorConfig::StepSeconds, Interval);
 	TRACE_CPUPROFILER_EVENT_SCOPE(EcoPolicy_Inference);
 	TArray<FEcoPolicyBatchItem> Items;
 	TMap<FMassEntityHandle, int32> DueItems;
 
 	EntityQuery.ForEachEntityChunk(Context,
-		[Food, Cover, Predation, Interval, SeeRadius, bGlobalPredation, Dt, &Items, &DueItems](FMassExecutionContext& Ctx)
+		[Food, Cover, Predation, Interval, SeeRadius, bGlobalPredation, Dt, LegacyTicks, &Items, &DueItems](FMassExecutionContext& Ctx)
 	{
 		const TConstArrayView<FTransformFragment> Transforms =
 			Ctx.GetFragmentView<FTransformFragment>();
@@ -98,12 +100,21 @@ void UEcoPolicyProcessor::Execute(FMassEntityManager& EntityManager,
 			if (Vitals[i].HP <= 0) continue;
 			auto& Runtime = Runtimes[i];
 			Runtime.PolicyAliveSeconds += Dt;
-			const double Period = double(Interval) / 60.0 * FMath::Clamp(Runtime.DecisionIntervalMultiplier, 1.f, 8.f);
+			if (Ctx.GetFragmentView<FEcoIdentityFragment>().IsEmpty())
+            {
+                // Legacy flat RL path keeps the exported logical-tick contract.
+                if (Runtime.LastPolicyStep < 0) Runtime.LastPolicyStep = int32(Ctx.GetEntity(i).Index % Interval);
+                if (!EcoPolicy::AdvanceDecisionPhase(Runtime.LastPolicyStep, LegacyTicks, Interval)) continue;
+            }
+            else
+            {
+            const double Period = double(Interval) / 60.0 * FMath::Clamp(Runtime.DecisionIntervalMultiplier, 1.f, 8.f);
 			if (Runtime.PolicyElapsedSeconds < 0) Runtime.PolicyElapsedSeconds = Runtime.LastPolicyStep / 60.0;
 			Runtime.PolicyElapsedSeconds += Dt;
 			if (Runtime.PolicyElapsedSeconds + 1.e-8 < Period) continue;
 			Runtime.PolicyElapsedSeconds -= Period; // preserve decision debt after a hitch
 			Runtime.LastPolicyStep = 0;
+            }
 
 			const FVector Self = Transforms[i].GetTransform().GetLocation();
 			const FEcoSteeringGeometryFragment& G = Geometries[i];

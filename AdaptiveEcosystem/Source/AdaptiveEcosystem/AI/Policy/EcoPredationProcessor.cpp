@@ -13,6 +13,8 @@
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "AI/Social/Senses/EcoPredatorPerception.h"
 #include "MassEntityManager.h"
+#include "MassCommandBuffer.h"
+#include "MassEntityView.h"
 #include "AI/Behavior/EcoSpeciesAIFragments.h"
 
 UEcoPredationProcessor::UEcoPredationProcessor()
@@ -23,7 +25,7 @@ UEcoPredationProcessor::UEcoPredationProcessor()
 									  | EProcessorExecutionFlags::Standalone);
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	// 필요한 건 이번 틱 이웃 색인(게더)뿐이다. 지각 뒤에 두는 건 기존 실행 순서를 유지하려고.
-	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoPerceptionProcessor"));
+	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoSteeringProcessor"));
 	bRequiresGameThreadExecution = true;
 }
 
@@ -91,8 +93,9 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 	const float EatCooldown = EcoBehaviorConfig::PredEatCooldownS;
 	const TArray<FEcoNeighborEntry>& Entries = Grid->GetEntries();
 
+	TSet<FMassEntityHandle> CaughtThisTick;
 	PredatorQuery.ForEachEntityChunk(Context,
-		[&EntityManager, Predation, Grid, World, &Entries, Dt, CatchRadius, HideMult, EatCooldown]
+		[&EntityManager, Predation, Grid, World, &Entries, &CaughtThisTick, Dt, CatchRadius, HideMult, EatCooldown]
 		(FMassExecutionContext& Ctx)
 	{
 		const TConstArrayView<FTransformFragment> Transforms =
@@ -146,7 +149,7 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 				}
 				// 같은 틱에 다른 포식자가 먼저 잡았을 수 있다.
 				const FEcoVitalsFragment* V = EntityManager.GetFragmentDataPtr<FEcoVitalsFragment>(E.Entity);
-				if (!V || V->HP <= 0.0f)
+				if (!V || (V->HP <= 0.0f && !CaughtThisTick.Contains(E.Entity)))
 				{
 					continue;
 				}
@@ -161,7 +164,12 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 			// 잡혔다. 파이썬은 슬롯을 즉시 리스폰하지만(§4.3) 여기서는 HP 를 0으로 두고
 			// 생명주기는 Lifecycle 계층에 맡긴다 — 이 프로세서의 책임은 **판정과 지역 보고**다
 			// (§9.6). 테스트 레벨에서는 AEcoPolicyTestSpawner 가 리스폰을 대신한다.
-			EntityManager.GetFragmentDataChecked<FEcoVitalsFragment>(Entries[Best].Entity).HP = 0.0f;
+			S.EatCooldown = EatCooldown;
+            if (CaughtThisTick.Contains(Entries[Best].Entity)) continue;
+            CaughtThisTick.Add(Entries[Best].Entity);
+            EntityManager.GetFragmentDataChecked<FEcoVitalsFragment>(Entries[Best].Entity).HP = 0.0f;
+            if (!FMassEntityView(EntityManager, Entries[Best].Entity).HasTag<FEcoIntegratedCreatureTag>())
+                EntityManager.Defer().SwapTags<FEcoAliveTag, FEcoPendingDeathTag>(Entries[Best].Entity);
 			if (auto* Life = EntityManager.GetFragmentDataPtr<FEcoCreatureLifecycleFragment>(Entries[Best].Entity)) Life->bPredated = true;
 			if (auto* Death = EntityManager.GetFragmentDataPtr<FEcoDeathFragment>(Entries[Best].Entity))
 			{
@@ -173,9 +181,8 @@ void UEcoPredationProcessor::Execute(FMassEntityManager& EntityManager,
 			S.EatCooldown = EatCooldown;
 		}
 	});
-	PredationElapsedSeconds += FMath::Max(0.f, Dt);
-	const double Period = EcoBehaviorConfig::StepSeconds;
-	for (int32 Pass = 0; Pass < 8 && PredationElapsedSeconds + 1.e-8 >= Period; ++Pass)
-	{ Predation->Tick(); PredationElapsedSeconds -= Period; }
+	const int32 Ticks = StepClock.Advance(Dt, EcoBehaviorConfig::StepSeconds, EcoBehaviorConfig::PolicyInterval);
+    const int32 Steps = EcoPolicy::ConsumeSteps(EmaPhase, Ticks, EcoBehaviorConfig::PolicyInterval);
+    for (int32 Pass = 0; Pass < Steps; ++Pass) Predation->Tick();
 
 }

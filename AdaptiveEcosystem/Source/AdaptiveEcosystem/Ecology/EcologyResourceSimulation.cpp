@@ -21,7 +21,7 @@ bool UEcologySimulationSubsystem::QueueManualStarvation(FName RegionId, const FE
 	if (!CanMutateAuthoritativeState(TEXT("QueueManualStarvation")) || ResourceEpoch <= 0
 		|| RequestedAt.WorldEpoch != ResourceEpoch || !EcoClock::IsValidPhase(RequestedAt.ServerTimeSeconds, RequestedAt.DayCycle)
 		|| RequestedAt.ServerTimeSeconds < ResourceTime || RegionId.IsNone() || !RegionalStates.Contains(RegionId)
-		|| PendingManualStarvation.Contains(RegionId)) return false;
+		|| PendingManualStarvation.Contains(RegionId) || SpatialFood.Contains(RegionId)) return false;
 	PendingManualStarvation.Add(RegionId, RequestedAt.ServerTimeSeconds);
 	return true;
 }
@@ -31,7 +31,7 @@ bool UEcologySimulationSubsystem::QueueManualFoodSupply(FName RegionId, float Am
 	if (!CanMutateAuthoritativeState(TEXT("QueueManualFoodSupply")) || bResourceStepOpen || ResourceEpoch <= 0
 		|| RequestedAt.WorldEpoch != ResourceEpoch || RequestedAt.ServerTimeSeconds < ResourceTime
 		|| !EcoClock::IsValidPhase(RequestedAt.ServerTimeSeconds, RequestedAt.DayCycle)
-		|| !RegionalStates.Contains(RegionId) || PendingManualFoodSupply.Contains(RegionId)
+		|| !RegionalStates.Contains(RegionId) || PendingManualFoodSupply.Contains(RegionId) || SpatialFood.Contains(RegionId)
 		|| !FMath::IsFinite(Amount) || Amount <= 0) return false;
 	PendingManualFoodSupply.Add(RegionId, {RequestedAt.ServerTimeSeconds, Amount});
 	return true;
@@ -151,7 +151,7 @@ bool UEcologySimulationSubsystem::ResolveFeeding(TConstArrayView<FEcoFeedRequest
 		const double* LastDue = LastAcceptedFeedTime.Find(Request.Food.StableAgentId);
 		if (Request.WorldEpoch != ResourceEpoch || Request.StepId != ResourceStepId
 			|| Request.Food.StableAgentId <= PreviousId || !RegionIds.IsValidIndex(Request.RegionIndex)
-			|| RegionIds[Request.RegionIndex] != Request.Food.RegionId || !FMath::IsFinite(Request.DueTime)
+			|| RegionIds[Request.RegionIndex] != Request.Food.RegionId || SpatialFood.Contains(Request.Food.RegionId) || !FMath::IsFinite(Request.DueTime)
 			|| Request.DueTime < 0.0 || Request.DueTime > ResourceTime || (LastDue && Request.DueTime <= *LastDue)
 			|| !FMath::IsFinite(Request.Food.RequestedAmount) || Request.Food.RequestedAmount <= 0.0f)
 		{

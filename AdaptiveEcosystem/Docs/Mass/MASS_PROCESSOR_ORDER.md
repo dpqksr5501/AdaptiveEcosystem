@@ -2,6 +2,8 @@
 
 > **2026-10-08 opt-in 동물 통합:** 별도 Integrated Entity 경로는 기존 PPO→Social Lifecycle→Steering/포식자 이동을 사용하고, 자원·인구·구조 변경·표현 조정은 모든 Mass phase가 끝난 `OnWorldPostActorTick`에서 직렬 처리한다. Actor의 PostPhysics tick에서는 관찰자 잠금이 남을 수 있어 삭제하지 않는다. 그 프레임 경계의 동기 batch destruction은 삭제 전 replication observer를 실행한다. 아래 command buffer 수칙은 실행 중 Processor/Entity loop의 구조 변경에 적용한다. M3 Box 가드와 이동 경로는 유지한다. [실행·검증·인계](../조연우/CREATURE_PRODUCTION_INTEGRATION.md) 참조.
 
+> **2026-10-13 main 합치기 (Branch_Sinhyeok):** 포획(`UEcoPredationProcessor`)은 조향 뒤에 둔다(파이썬 `world.py` 와 같은 순서). main 은 조향을 포획 뒤에 두었고(`ExecuteAfter("EcoPredationProcessor")`) 우리 가지는 포획을 조향 뒤에 두어서, 둘 다 남기면 실행 순서가 순환한다. 합칠 때 조향 쪽 그 한 줄을 뺐다. 잡힌 개체는 HP 0 이 되고 Alive → PendingDeath 로 바뀌어 다음 틱부터 초식 쿼리에서 빠진다. 조향도 HP 0 개체를 건너뛴다. 통합 생명체의 죽음은 지금처럼 조정자(`AEcoCreatureIntegrationSpawner::Reconcile`)가 닫는다(`bPredated` 표시, Alive 떼기, 2초 뒤 삭제). 정책 관측 5(최근 피식)는 파이썬과 같은 전역 EMA 이고, 지역 `PredationHistory` 는 생태·이주·UI 가 쓴다. 자세한 내용: [RL_V3_UNREAL_TRAINING_PLAN.md](../RL_Policy/RL_V3_UNREAL_TRAINING_PLAN.md) 3-5.
+
 > 기준 엔진: **Unreal Engine 5.8**  
 > 모듈: `AdaptiveEcosystem`  
 > 참조 C++ 헤더: `AdaptiveEcosystem/Source/AdaptiveEcosystem/Mass/EcoMassFragments.h`
@@ -51,7 +53,7 @@
 
 | 경로 | 명시적 prerequisite / 처리 | 현재 한계 |
 | :--- | :--- | :--- |
-| PPO PrePhysics | Neighborhood Gather → Perception → Policy → Steering. Predation은 Perception 뒤 | Steering은 Raw Action·기하 캐시를 읽고 Velocity/Transform을 직접 쓴다. ForceFragment→별도 Movement라는 목표 그림과 다름 |
+| PPO PrePhysics | Neighborhood Gather → Perception → Policy → Steering → Predation → (통합 늑대) Creature Predator. Predation은 Perception·Steering 뒤 | Steering은 Raw Action·기하 캐시를 읽고 Velocity/Transform을 직접 쓴다. ForceFragment→별도 Movement라는 목표 그림과 다름 |
 | Social PrePhysics / Behavior | Herd Membership → Aggregate → Threat Detection → Alarm Propagation → Social Response → Shelter Query → Reservation → Lifecycle | Detection은 Neighborhood Gather 이후, Response는 Policy 이후. Lifecycle은 Movement 그룹 이전. Request/Feedback 계약은 있으나 기존 Steering의 소비는 미연결 |
 | M3 PreActorTick / GameThread | 자원/스폰/소비 조정 → Migration Reconcile → 집계·요약 | Mass processing 중이면 실행하지 않음. non-Traveling Velocity/DesiredVelocity 리셋 |
 | M3 PrePhysics | ApplyForces 그룹 → Migration Steering → Movement 그룹 | Migration은 DesiredVelocity를 쓰고 엔진이 적분. 아래 §3의 Box 경로만 의미함 |

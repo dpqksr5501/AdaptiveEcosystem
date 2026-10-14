@@ -43,6 +43,10 @@ public:
 	AEcoCreatureIntegrationSpawner();
 	UPROPERTY(EditAnywhere, Category="Creature|Config") EEcoEnabledSpecies EnabledSpecies = EEcoEnabledSpecies::Both;
 	UPROPERTY(EditAnywhere, Category="Creature|Config") bool bEnableSpeciesAIFixtures = false;
+	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bUseV3Policy = false;
+	UPROPERTY(EditAnywhere, Category="Creature|V3", meta=(ClampMin="1",ClampMax="128")) int32 V3DeerPerRegion = 48;
+	/** Copy-level opt-in: consume only authored shelter anchors. */
+	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bV3UseAuthoredShelters = false;
 	bool IsSpeciesEnabled(bool bPredator) const
 	{ return EnabledSpecies == EEcoEnabledSpecies::Both || (bPredator ? EnabledSpecies == EEcoEnabledSpecies::WolfOnly : EnabledSpecies == EEcoEnabledSpecies::DeerOnly); }
 	virtual void PostInitializeComponents() override;
@@ -95,6 +99,7 @@ public:
 	virtual FVector GetCoverDirection(const FVector& Location) const override;
 	virtual bool IsInCover(const FVector& Location) const override;
 private:
+	friend class UEcoPolicyV3IntegratedSubsystem;
 	bool RegisterTemplates();
 	bool CollectSetupIssues(TArray<FString>& Errors, TArray<FString>& Notes) const;
 	bool StartAuthority();
@@ -106,14 +111,17 @@ private:
 	bool BuildAgentLookup();
 	bool ReconcilePopulation();
 	void UpdatePresentationAndNoise(float DeltaSeconds);
+	void UpdateSensoryPresentation();
 	void UpdateSimulationLOD();
 	void SyncVisuals(float DeltaSeconds);
 	void PublishSummary();
 	void FailRuntime(const TCHAR* Reason);
+	TMap<FName,double> NextPresentationAlarm;
 	void OnWorldPostActorTick(UWorld* World, ELevelTick TickType, float DeltaSeconds);
 	FDelegateHandle PostTickHandle;
 	AEcologyRegion* FindRegion(const FVector& Position) const;
 	UPROPERTY(Transient) TArray<TObjectPtr<AEcologyRegion>> Regions;
+	UPROPERTY(Transient) TArray<TObjectPtr<UMassEntityConfigAsset>> AdditionalClientConfigs;
 	TArray<FMassEntityHandle> Owned;
 	struct FBinding { TWeakObjectPtr<AEcoCreatureRepresentationActor> Actor; int64 Sequence = 0; uint32 MovementRevision = 0; };
 	TMap<int64, FBinding> Visuals;

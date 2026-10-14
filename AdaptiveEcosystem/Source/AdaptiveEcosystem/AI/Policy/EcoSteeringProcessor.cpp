@@ -22,7 +22,6 @@ UEcoSteeringProcessor::UEcoSteeringProcessor()
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
 	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoPolicyProcessor"));
 	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoShelterLifecycleProcessor"));
-	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoPredationProcessor"));
 	bRequiresGameThreadExecution = true;
 }
 

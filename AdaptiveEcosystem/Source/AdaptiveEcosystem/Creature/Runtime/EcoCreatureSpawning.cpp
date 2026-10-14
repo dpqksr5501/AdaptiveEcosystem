@@ -1,4 +1,5 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
+#include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
@@ -155,6 +156,8 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 		Lifetime.SpawnTimeSeconds = Time.ServerTimeSeconds; Lifetime.NextFeedTimeSeconds = Time.ServerTimeSeconds + 1.0;
 		auto& Profile = EM.GetFragmentDataChecked<FEcoCreatureSurvivalFragment>(Entities[I]);
 		Profile.Settings.bEnabled = !bPredator || bEnablePredatorSurvival;
+		// v3 owns action-dependent metabolism; M4 still commits all death receipts and cleanup.
+		if (EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entities[I])) Profile.Settings.bEnabled = false;
 		Profile.Settings.BaseMetabolism = bPredator ? PredatorEnergyDrainPerSecond : EnergyDrainPerSecond;
 		Profile.Settings.TravelMetabolism = 0.0f;
 		Profile.Settings.FoodEnergyGain = EnergyPerFood;

@@ -1,6 +1,7 @@
 #include "EcoRegionPredationSubsystem.h"
 
 #include "EcoBehaviorConfig.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
 int64 UEcoRegionPredationSubsystem::RegionKey(const FVector& Location) const
@@ -11,7 +12,7 @@ int64 UEcoRegionPredationSubsystem::RegionKey(const FVector& Location) const
 	return static_cast<int64>((static_cast<uint64>(X) << 32) | (static_cast<uint64>(Y) & 0xFFFFFFFFULL));
 }
 
-float UEcoRegionPredationSubsystem::Get(const FVector& Location) const
+float UEcoRegionPredationSubsystem::GetRegional(const FVector& Location) const
 {
 	if (const FEcoRegionPredationState* State = Regions.Find(RegionKey(Location)))
 	{
@@ -23,6 +24,7 @@ float UEcoRegionPredationSubsystem::Get(const FVector& Location) const
 
 void UEcoRegionPredationSubsystem::ReportPredation(const FVector& Location)
 {
+	if (GetWorld() && GetWorld()->GetNetMode() == NM_Client) return;
 	Regions.FindOrAdd(RegionKey(Location)).PendingDeaths += 1;
 	++Global.PendingDeaths;
 }
@@ -51,7 +53,7 @@ void UEcoRegionPredationSubsystem::Tick()
 	// §3.1 / §9.6: ema = decay*ema + (1-decay)*(사망 수 / 개체 수)*gain
 	const float Decay = EcoBehaviorConfig::PredationEmaDecay;
 	const float Gain = EcoBehaviorConfig::PredationEmaGain;
-	Global.Ema = Decay * Global.Ema + (1.f - Decay) * float(Global.PendingDeaths) / FMath::Max(1, Global.Population) * Gain;
+	Global.Ema = Decay * Global.Ema + (1.f - Decay) * float(Global.PendingDeaths) / FMath::Max(1, FMath::Max(Global.Population, Global.PendingDeaths)) * Gain;
 	Global.PendingDeaths = Global.Population = 0;
 
 	for (auto& Pair : Regions)
@@ -74,6 +76,8 @@ bool UEcoRegionPredationSubsystem::SaveToSlot(const FString& SlotName, int32 Use
 		return false;
 	}
 	Save->Regions = Regions;
+	Save->SchemaVersion = SaveSchemaVersion;
+	Save->Ema = Global.Ema;
 	Save->RegionSize = RegionSize;
 	Save->Global = Global;
 	return UGameplayStatics::SaveGameToSlot(Save, SlotName, UserIndex);
@@ -87,6 +91,8 @@ bool UEcoRegionPredationSubsystem::LoadFromSlot(const FString& SlotName, int32 U
 	{
 		return false;
 	}
+	if (Save->SchemaVersion != SaveSchemaVersion || !FMath::IsFinite(Save->Ema) || Save->Ema < 0)
+    { UE_LOG(LogTemp, Warning, TEXT("EcoRegionPredation: SchemaVersion or EMA rejected")); return false; }
 	// 지역 크기가 다르면 키가 다른 공간을 가리키므로 불러오지 않는다.
 	if (!FMath::IsNearlyEqual(Save->RegionSize, RegionSize))
 	{
@@ -97,5 +103,7 @@ bool UEcoRegionPredationSubsystem::LoadFromSlot(const FString& SlotName, int32 U
 	}
 	Regions = Save->Regions;
 	Global = Save->Global;
+	Global.Ema = Save->Ema;
+	Global.PendingDeaths = Global.Population = 0;
 	return true;
 }

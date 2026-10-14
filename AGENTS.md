@@ -69,3 +69,10 @@
 2. Social 작업은 CURRENT_STATE의 기준 commit·검증 범위를 확인하고, production Entity 구성과 Server/Standalone 실행 조건을 먼저 대조한다. 설계 문서의 예시 Processor를 구현 완료로 간주하지 않는다.
 3. C++/빌드 입력 변경 후 직접 `UnrealBuildTool.exe`로 `AdaptiveEcosystemEditor Win64 Development` 빌드를 실행하고 완료까지 기다린다. UBT, dotnet, Unreal Editor, Live Coding, MSBuild, ShaderCompileWorker가 실행 중이면 새 빌드를 시작하거나 실행 중 빌드를 중단하지 않는다. dotnet 예외 창은 최초 UBT/compiler 오류와 Windows Application Event Log를 확인한 뒤 판단한다.
 4. 문서만 변경한 경우 링크·Source 근거·diff를 검증하고 새 UBT/PIE 검증을 했다고 기록하지 않는다. 코드 변경이 포함되면 위 빌드 규칙을 적용한다.
+
+
+## 4. 2026-10-15 opt-in M4/v3 통합 경로
+
+`codex/m4-v3-creature-integration`의 별도 `/Game/JYU/Maps/LV_JYU_V3Integration`은 M4 공통 권위·identity/lifecycle/resource/replication을 권신혁 Native v3 **R1b 18관측/5행동·mask2**에 연결한다. 이는 기본 V1 7관측/4출력을 변경하는 경로가 아니다. v3의 단일 Native movement/vitals writer를 유지하고 V1/Custom Movement 혼용 가드를 제거하지 않는다. Client는 수신 표현만 수행하며 런타임 Python 추론은 금지한다. 원본 팀 레벨 대신 복사 맵·owned 에셋에 authoring한다.
+
+실제 계약·검증 범위·known gap은 [JYU M4/v3 통합 기록](AdaptiveEcosystem/Docs/조연우/JYU_M4_V3_INTEGRATION.md)과 [IK 검증](AdaptiveEcosystem/Docs/조연우/JYU_IK_VALIDATION.md)을 따른다. v3 Social ModulatedAction/slot arrival feedback·migration/wave는 연결 완료로 간주하지 않는다. 기존 V1 handoff를 보존한다. 단일 runtime 모듈은 유지하며 AnimGraph authoring만 별도 `AdaptiveEcosystemEditor` Editor 모듈로 분리했다.
