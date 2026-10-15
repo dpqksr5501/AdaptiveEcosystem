@@ -94,13 +94,17 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     # 서서 먹는 시간(10-15 사람 결정)도 threats 블록의 선택 키 eat_in_place 와 v1 키 pred_eat_cd(overrides)다 — 새 번호가 없다
     "realism_chase": 24,       # (f) 추격 고정: 쫓기 시작한 늑대는 그 사슴이 보이는 동안 표적을 바꾸지 않는다(H6). 난수 없음
     "realism_terrain": 25,     # (h) 지형 구역: 셀마다 보통·눈·거친 땅, 이동 전 셀의 땅이 속력을 줄인다(H18, 사슴은 관측하지 않음 H19)
+    # 언리얼 통합 v3 모드 거울(10-15 사용자 '언리얼에서 돌리는 게 파이썬에서 돌리는 것과 얼마나 비슷한지'): 팀 레벨의 지역 무대 하나를
+    # 흉내 내는 세계 규칙 묶음 — 부활 없음(죽은 사슴은 그 자리에 남는다), 피식 EMA 분모, 시작 낮밤 위상, 무대 1/4·3/4 은신처, 늑대 구성
+    # (잠행·추격 번갈아), 무대 시작 배치·방향. 정의·식·C++ 출처는 env_v2/world.py 모듈 docstring '통합 무대'
+    "integrated_stage": 26,
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
 IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight", "pred_sleep",
                                          "repertoire", "threats", "stare_down", "alarm",
                                          "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
-                                         "realism_cover_food", "realism_chase", "realism_terrain"})
+                                         "realism_cover_food", "realism_chase", "realism_terrain", "integrated_stage"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -206,6 +210,20 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     # mult_player = [보통, 눈, 거친 땅] 속력 배수(사슴·늑대·플레이어형 위협, 보통은 1)
     "realism_terrain": frozenset({"snow_frac", "rough_frac", "zero_p", "patch_r", "max_patches", "mult_herb", "mult_pred",
                                   "mult_player"}),
+    # 언리얼 통합 무대 거울 (env_v2/world.py `_ist_params`, 정의는 모듈 docstring '통합 무대'). repertoire·threats 를 함께 켜야 한다. 모든 키가
+    # 끔 값이면(respawn true, 나머지 null) 블록을 켜도 끈 세계와 비트 동일이다(tests/test_unreal_mirror.py).
+    #   respawn = 죽은 슬롯을 되살리나(false = 시체로 남고 다음 스텝부터 관측·표적·먹이·이동·번식에서 빠진다 — C++ bRespawnDead false),
+    #   ema_den = 피식 EMA 분모(null = 슬롯 수 N — C++ PredEmaDenominator = 계획한 사슴 수),
+    #   day_offset = 시작 낮밤 위상 o(null = daynight 스트림이 뽑은 값, 0 = 언리얼 DayOffset 0 — t = 0 이 새벽 전환 d = 0.5),
+    #   cover_layout = 'quad'(무대 1/4·3/4 지점 은신처, C++ 우리 은신처) 또는 null(v1 무작위 원), cover_count·cover_r_frac = quad 의 수·반경 비율
+    #   (반경 = clip(cover_r_frac × 한 변, cover_r_min, cover_r_max)),
+    #   wolf_kinds = 'alternate'(늑대 슬롯 짝수 잠행형·홀수 근접 추격형, 모두 주행성 — C++ WolfSpecForOrdinal) 또는 null(threats 스트림이 뽑은 구성),
+    #   start_layout = 'stage'(C++ PlanStage: 늑대는 무대 모서리 쪽, 사슴은 무대 균등·늑대에게서 멀리) 또는 null(v1 맵 균등), wolf_corner_frac·
+    #   wolf_gap·deer_wolf_gap·deer_margin·deer_spacing = stage 의 계수(단위),
+    #   head_layout = 'golden'(C++ 조정자의 순번 × 2.399963 rad 시작 방향) 또는 null(v1 무작위 각)
+    "integrated_stage": frozenset({"respawn", "ema_den", "day_offset", "cover_layout", "cover_count", "cover_r_frac", "wolf_kinds",
+                                   "start_layout", "wolf_corner_frac", "wolf_gap", "deer_wolf_gap", "deer_margin", "deer_spacing",
+                                   "head_layout"}),
 })
 
 # 선택 계수 키(모듈 docstring 규칙 6, 10-14 R3): 기능 → {키: 끔 값}. 켠 블록에 없으면 끔 값(= 앞 버전 동작)으로 읽는다. 앞 버전 설정

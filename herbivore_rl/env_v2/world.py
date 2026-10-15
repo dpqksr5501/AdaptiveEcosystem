@@ -201,6 +201,50 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
       관측도 0 이다. 쿨다운 동안 추격 고정은 풀린다((f) 1). 난수를 쓰지 않는다(배회 선회 난수는 그대로 뽑고 쓰지 않는다 — v1 스트림 모양 그대로).
       C++ 꼴: if (bEatInPlace && Type != Player && Cooldown > 0) { Move = Head; Speed = 0; }   (상태 기계 뒤, 밤잠 배수 앞)
       현실 근거: 늑대는 잡은 먹잇감을 그 자리에서 뜯어 먹고, 먹는 동안에는 사냥하지 않는다. 굶주린 무리는 다 먹으면 곧 다음 사냥에 나선다.
+- 통합 무대 integrated_stage (26, 10-15 사용자 '언리얼에서 돌리는 게 파이썬에서 돌리는 것과 얼마나 비슷한지 확인'): 언리얼 통합 v3 모드
+  (AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoPolicyV3IntegratedSubsystem.cpp·EcoPolicyV3IntegratedProcessors.cpp, 문서
+  Docs/RL_Policy/RL_V3_UNREAL_TRAINING_PLAN.md 4-5b)의 지역 무대 하나를 파이썬 세계 하나로 흉내 낸다. repertoire·threats 위에 얹는다. 키마다 따로
+  켜고 끄며(끔 값 respawn true, 나머지 null) 모두 끈 블록은 끈 세계와 비트 동일이다. 같은 값만 설정으로 맞추는 것(맵 60, 늑대 2마리·속력 0.8,
+  원거리형·야행성·플레이어 없음, 재생 배수 1, 하루 900스텝, 밤잠 점진화, 먹는 시간 38스텝 제자리, 얼기 막음)은 configs/v3_unreal_mirror.yaml 이
+  맡는다. 이 블록은 설정으로 닫을 수 없는 차이만 다룬다.
+  (k) respawn false — 부활 없음(C++ FWorldConfig::bRespawnDead = false, EcoWorldV3.h Step 의 G 단계). 훅 `World.alive` (N,) bool(끈 세계는
+      None), `death_t`(죽은 스텝 끝 t, 산 개체 −1), `death_cause`(0 산, 1 잡힘, 2 굶음). 스텝 첫머리의 산 슬롯을 L 이라 하면 그 스텝에:
+        이동 v ← 0·FREEZE 돌아보기 없음(¬L — 시체는 죽은 자리에 멈춘다, PrevPos = Pos), 늑대 표적·포획에서 뺌(vis·hit &= L — C++ Prey 는 산
+        사슴 목록), 먹이 수요 0(섭식 배수 × L — 셀 수요 합에 0 을 더하므로 산 개체의 몫이 비트 단위로 같다), 에너지 그대로, 번식 &= L,
+        굶음 = (E ≤ 0) & L & ¬잡힘(C++ Stats.Starved — 잡힌 개체는 포획으로만 센다), 보상 0(¬L), 관측 기하의 동족(kin_vis·분리 가중치)과 밤잠
+        '사슴 근처'(realism_night settle_r) 판정의 열 &= L.
+      스텝 끝 관측(8)은 아직 L 로 잰다 — 이번 스텝에 죽은 개체는 죽은 자리에서 동족으로 세어진다(C++ 관측 E 가 G 앞이다). 그 뒤 alive ← L & ¬done
+      이고 리스폰(`_respawn`)·리스폰 관측을 하지 않는다(v1 리스폰 난수도 뽑지 않는다 — 언리얼은 시체를 2초 뒤 지우고 새 개체를 만들지 않는다).
+      추격 고정(realism_chase)은 표적이 죽으면 리스폰 때처럼 놓는다. 경보(alarm)·노려보기(stare_down)는 죽은 개체를 빼는 규칙을 넣지 않아 함께
+      켜지 못한다(읽을 때 실패). 슬롯 수 N 은 그대로라 배열 모양은 바뀌지 않는다. 죽은 행도 관측·정책·행동 상태(RepState)는 계속 계산되지만
+      세계는 그 요청을 쓰지 않는다. 통계(stats·repertoire_stats 등)의 개체-스텝 분모는 죽은 행도 센다(통계 전용).
+      학습(vec_env)은 빈 슬롯을 PPO 손실에서 뺄 마스크가 없어 이 세계를 받지 않는다(만들 때 실패). 번식으로 태어나는 다음 단계는 빈 슬롯(¬alive)에
+      `_spawn_slots`(리스폰의 '새 개체 만들기' 부분, alive ← true)를 부모 곁 자리로 부르면 된다 — `_ist_bury` docstring.
+  (l) ema_den — 피식 EMA 의 분모(C++ PredEmaDenominator = 무대에 처음 놓은 사슴 수). null 이면 N(지금 그대로, 사슴 수 = 슬롯 수인 거울에서는 같은 값).
+  (m) day_offset — 시작 위상 o 를 이 값(mod T)으로 덮는다(daynight 스트림 뽑기 3개는 그대로, features.py 규칙 2). 0 = 언리얼(DayOffset 0, 팀 시계
+      t = 0): d(0) = 0.5(새벽 전환), 450스텝 낮·450스텝 밤. realism_night 의 시작 상태는 이 위상으로 정한다(d = 0.5 ≥ sleep_dark 라 주행성 늑대는
+      자고 시작한다 — 언리얼 로그의 첫 구간 '깸 2').
+  (n) cover_layout 'quad' — v1 은신처 원(뽑기는 그대로)을 무대 1/4·3/4 지점 원 cover_count 개로 덮는다(EcoPolicyV3IntegratedSubsystem.cpp 우리 은신처
+      자리). 원 k = 0..: 각 45° + 90°·k, 중심에서 0.25·S·√2(시도 12번 뒤 0.75 배), 시도 a 마다 ±15°·⌈a/2⌉ 돌린 자리 가운데 무대 안 여유 R + 1
+      (2 m)과 앞 원과의 간격 2R + 2(4 m)을 지키는 첫 자리. R = clip(cover_r_frac × S, cover_r_min, cover_r_max)(C++ ExtraCoverRadiusUnits, 4~9 단위
+      = 8~18 m). S = 60 이면 (45, 45)·(15, 45)·(15, 15)·(45, 15), R = 6, 넓이 12.6%. 지면 검사가 없어 S 60~110 에서는 늘 첫 시도에 놓인다.
+      은신처 셀(v1 cover_cell, 셀 중심이 원 안 — C++ FFoodGrid CoverCell 과 같은 식)·재생률·cover_frac_actual 을 다시 정한다(`_build_world` 직후,
+      현실성 (e)·food_v 초기화 전). 레벨 은신처는 넣지 않는다(통합 레벨 로그: 세 지역 모두 '레벨 0 + v3 4').
+  (o) wolf_kinds 'alternate' — threats 스트림이 뽑은 구성(뽑기는 그대로)을 늑대 슬롯 짝수 = 잠행-돌진형, 홀수 = 근접 추격형, 모두 근접·주행성으로
+      덮는다(C++ WolfSpecForOrdinal, 순번 = StableAgentId 순 — 로그상 Id 1 무대 (54, 54) 잠행, Id 2 (6, 6) 추격). threat_p_stalk 은 실제 잠행형 비율로
+      바꾼다. 플레이어형 위협 칸은 바꾸지 않는다.
+  (p) start_layout 'stage' — v1 시작 자리(뽑기는 그대로)를 C++ PlanStage 의 꼴로 덮는다(자기 스트림 part 0 만 쓴다). 무대 중심 c = S/2, 여유
+      room = S/2 − deer_margin. 늑대(포식자 슬롯 0..M−1): 모서리 c + (±wolf_corner_frac·S) 를 (+,+)·(−,−)·(+,−)·(−,+) 순서로, 앞 늑대와 wolf_gap
+      (C++ 1.5 × 28 m = 21 단위) 이상 떨어진 것만, 모자라면 c + U[−room, room]² 후보(최대 400번). 사슴(슬롯 0..N−1): c + U[−room, room]² 후보를
+      max(64, 60·N) 번까지 — 모든 늑대에게서 deer_wolf_gap(28 m + 1 m = 14.5 단위) 이상, 앞 사슴과 deer_spacing(1.5 m = 0.75 단위) 이상인 것만.
+      후보마다 x, y 두 난수. 다 못 놓으면 남은 개체는 v1 자리 그대로이고 훅 `stage_complete` 가 거짓이다(C++ bComplete). S = 60 이면 늑대는
+      (54, 54)·(6, 6), 사슴은 [1.5, 58.5]².
+  (q) head_layout 'golden' — 시작 방향을 사슴 슬롯 i 는 각 i·2.399963, 늑대 슬롯 m 은 (m + 2)·2.399963 rad 로 덮는다(C++ AEcoCreatureIntegrationSpawner
+      의 yaw, 지역마다 순번 0 부터). 몇 스텝 안에 heading 이 속도 방향이 되므로 영향은 작다.
+  닫지 못한 차이(설정 머리 주석에도 적는다): 난수열(C++ 자체 해시 난수 — 먹이 격자·배회 선회·시작 자리·결정 지연 키가 다르다, 분포는 같다),
+  밤잠 지연 키(C++ 세션 시드·늑대 StableAgentId, 파이썬 세계 시드·슬롯), 지형 제약 이동(언리얼 FStepHooks — 비교 로그는 막힘 0), 팀 시계 동기·
+  시체 2초 삭제(동역학과 무관), 경계 거리 KeepAway(커밋하지 않은 실험, 비교는 끔).
+  C++ 꼴(부활 없음, 사슴 i 하나): if (!bAlive[i]) { Vel = 0; Want = 0; continue; }  bStarved = !bCaught && E <= 0;  ... 관측 E 뒤 bAlive[i] = !bDead;
 - 세로 장애물(나무·바위) 확장 지점 — 이번 단계에는 넣지 않는다(10-14 사용자: '언리얼에도 아직 없다. 나중에 추가 가능하게만').
   구현은 없고 자리만 정해 둔다. 기능 이름은 이미 예약된 `obstacles`(번호 12, `env_v2/features.py`)이고 켜면 '아직 구현되지 않았다'로
   읽을 때 실패한다(끈 블록 `obstacles: {enabled: false}` 는 받아들이고 무시한다). 자료는 `World.obstacles` — (K, 3) float64 [x, y, r]
@@ -1051,6 +1095,75 @@ def _rz_night_params(p: dict, f: Features, ps: dict | None) -> dict:
     return out
 
 
+# 통합 무대 (q) head_layout 'golden' 의 순번 각(rad, C++ AEcoCreatureIntegrationSpawner 의 2.399963 그대로)과 늑대 순번 밀기
+IST_GOLDEN_ANGLE = 2.399963
+IST_WOLF_HEAD_OFFSET = 2
+# 통합 무대 (p) 늑대 모서리 순서(C++ PlanStage Corners)와 무작위 자리 시도 수, 사슴 시도 수 max(IST_DEER_TRIES_MIN, IST_DEER_TRIES_PER × N)
+IST_CORNERS = ((1.0, 1.0), (-1.0, -1.0), (1.0, -1.0), (-1.0, 1.0))
+IST_WOLF_TRIES = 400
+IST_DEER_TRIES_MIN, IST_DEER_TRIES_PER = 64, 60
+# 통합 무대 (n) quad 은신처: 원마다 시도 수, 반경 줄이는 시도 번호, 돌리는 각(도), 무대 안 여유·원 사이 간격에 더하는 값(단위 — C++ 200·400 cm)
+IST_COVER_TRIES = 24
+IST_COVER_SHRINK_AT = 12
+IST_COVER_TURN_DEG = 15.0
+IST_COVER_MARGIN, IST_COVER_GAP = 1.0, 2.0
+
+
+def _ist_params(p: dict, f: Features) -> dict:
+    """integrated_stage 계수(yaml 블록, 키는 `features.PARAM_KEYS`)를 검사한다. 기본값은 없다 (모듈 docstring '통합 무대').
+
+    - respawn (bool): false 면 부활 없음 (k). alarm·stare_down 과 함께 켤 수 없다(죽은 개체를 빼는 규칙이 없다)
+    - ema_den: null 또는 1 이상의 정수 (l)
+    - day_offset: null 또는 0 이상의 정수(스텝) (m). daynight 를 함께 켜야 한다(repertoire 가 이미 요구한다)
+    - cover_layout: null 또는 'quad' (n). quad 면 cover_count 1 이상의 정수, cover_r_frac 양수(아니면 둘 다 null 이어도 된다)
+    - wolf_kinds: null 또는 'alternate' (o)
+    - start_layout: null 또는 'stage' (p). stage 면 wolf_corner_frac ∈ [0, 0.5], wolf_gap·deer_wolf_gap·deer_margin·deer_spacing ≥ 0 (단위)
+    - head_layout: null 또는 'golden' (q)
+    repertoire·threats 를 함께 켜야 한다(언리얼 통합 v3 모드는 v3 세계이고 늑대 구성이 threats 에 있다).
+    """
+    if not (f.enabled("repertoire") and f.enabled("threats")):
+        raise ValueError("features.integrated_stage 는 repertoire·threats 를 함께 켜야 한다(언리얼 통합 v3 모드는 v3 세계다)")
+
+    def choice(key, allowed):
+        x = p[key]
+        if x is not None and x not in allowed:
+            raise ValueError(f"features.integrated_stage.{key} 는 null 또는 {', '.join(allowed)} 이어야 한다. 받은 값: {x!r}")
+        return x
+
+    def integer(key, lo, nullable=True):
+        x = p[key]
+        if x is None and nullable:
+            return None
+        if isinstance(x, bool) or not isinstance(x, (int, np.integer)) or x < lo:
+            raise ValueError(f"features.integrated_stage.{key} 는 {'null 또는 ' if nullable else ''}{lo} 이상의 정수여야 한다. 받은 값: {x!r}")
+        return int(x)
+
+    def number(key, lo, hi=math.inf, open_lo=False):
+        x = _num("integrated_stage", key, p[key])
+        if (x <= lo if open_lo else x < lo) or x > hi:
+            raise ValueError(f"features.integrated_stage.{key} 는 {'(' if open_lo else '['}{lo}, {hi}] 이어야 한다. 받은 값: {x}")
+        return x
+
+    resp = p["respawn"]
+    if not isinstance(resp, bool):
+        raise ValueError(f"features.integrated_stage.respawn 은 true/false 여야 한다. 받은 값: {resp!r}")
+    if not resp:
+        for name in ("alarm", "stare_down"):
+            if f.enabled(name):
+                raise ValueError(f"features.integrated_stage.respawn false 는 {name} 와 함께 켜지 못한다(죽은 개체를 빼는 규칙을 넣지 않았다)")
+    out = dict(respawn=resp, ema_den=integer("ema_den", 1), day_offset=integer("day_offset", 0),
+               cover_layout=choice("cover_layout", ("quad",)), wolf_kinds=choice("wolf_kinds", ("alternate",)),
+               start_layout=choice("start_layout", ("stage",)), head_layout=choice("head_layout", ("golden",)))
+    if out["cover_layout"] is not None:
+        out["cover_count"] = integer("cover_count", 1, nullable=False)
+        out["cover_r_frac"] = number("cover_r_frac", 0.0, open_lo=True)
+    if out["start_layout"] is not None:
+        out["wolf_corner_frac"] = number("wolf_corner_frac", 0.0, 0.5)
+        for key in ("wolf_gap", "deer_wolf_gap", "deer_margin", "deer_spacing"):
+            out[key] = number(key, 0.0)
+    return out
+
+
 def night_delays(seed: int, n: int, max_delay: int) -> np.ndarray:
     """realism_night 의 늑대별 잠·기상 지연 δ_m = H(606, 세계 시드, m) mod (max_delay + 1) ∈ [0, max_delay] (int64, m = 위협 슬롯
     0..n−1). H 는 repertoire.mix_chain(SplitMix64 사슬, 사건 결정 지연과 같은 식). C++ 꼴: Mix64Chain(0, 606, Seed, Slot) % (D + 1)."""
@@ -1171,6 +1284,10 @@ class World:
         self._zw = bool(self._zs is not None and self._zs["block_predators"])
         self._zf_range = self._zf is not None and self._zf["frac_range"] is not None
         self._r3 = self._zc is not None or self._zt is not None or self._zw or self._zf_range
+        # 언리얼 통합 무대 거울(모듈 docstring '통합 무대'): 부활 없음·EMA 분모·시작 위상·은신처·늑대 구성·시작 배치·방향. 끈 세계는 None 이고
+        # 그 코드 경로를 타지 않는다
+        self._ist = (_ist_params(f.params("integrated_stage"), f) if f.enabled("integrated_stage") else None)
+        self.alive = None
         self._rs = None
         self.act_names: tuple[str, ...] = action_names(self.features)
         self.act_dim = len(self.act_names)
@@ -1210,6 +1327,15 @@ class World:
         self.food_regen_mult = float(r.uniform(*rd["food_regen_mult"]))
 
         self._build_world()
+        ist = self._ist
+        if ist is not None:
+            # 통합 무대 (n)(p)(q): 은신처·시작 자리·시작 방향을 덮는다(v1 뽑기는 그대로, 자기 스트림만). 현실성 (e)·food_v·벽 밀어내기 전
+            self._ist_layout_reset()
+            # (k) 부활 없음의 산 슬롯 훅. 부활 있는 세계는 None 이다
+            self.alive = None if ist["respawn"] else np.ones(self.N, dtype=bool)
+            if self.alive is not None:
+                self.death_t = np.full(self.N, -1, dtype=np.int64)
+                self.death_cause = np.zeros(self.N, dtype=np.int8)
         self._obstacles_reset()             # 세로 장애물 확장 지점(이번 단계에는 늘 빈 목록, 난수 없음)
         if self._zt is not None:
             self._rz_terrain_reset()        # v3 R3 (h): 지형 격자(자기 스트림만, 은신처·먹이와 독립)
@@ -1250,6 +1376,8 @@ class World:
             self._pred_sleep_reset()
         if self._th is not None:
             self._threats_reset()           # 포식자 밤잠 배치(M 개) 뒤, 어둠을 정하기 전에 잠행형·플레이어를 정한다
+            if ist is not None and ist["wolf_kinds"] is not None:
+                self._ist_wolf_kinds()      # 통합 무대 (o): 늑대 구성을 슬롯 번갈아로 덮는다(threats 뽑기는 그대로)
         if self._sd is not None:
             self._stare_reset()             # 위협 수 M(플레이어 칸 포함)이 정해진 뒤
         if self._zw:
@@ -1365,6 +1493,101 @@ class World:
         `World.obstacles` 는 늘 (0, 3) [x, y, r] 이고 어떤 판정도 읽지 않는다. 난수를 쓰지 않는다. 기능 `obstacles`(번호 12)를
         구현할 때 여기서 자기 스트림 part 0 으로 원판을 뽑고, docstring 의 2)~5) 자리에 판정을 넣는다."""
         self.obstacles = np.zeros((0, len(OBSTACLE_COLUMNS)), dtype=np.float64)
+
+    def _ist_layout_reset(self) -> None:
+        """통합 무대 (n) 은신처 quad, (p) 시작 배치 stage, (q) 시작 방향 golden (모듈 docstring '통합 무대'). `_build_world` 바로 뒤에 부른다 —
+        v1 뽑기(은신처 원·위치·각)는 이미 끝났고 그 결과만 덮는다(features.py 규칙 2). 난수는 자기 스트림 part 0(stage 의 후보)만 쓴다.
+        훅: stage_complete(stage 를 다 채웠나, 안 쓰면 None). 포식자 칸은 v1 포식자 M 개(플레이어 칸은 threats 가 뒤에 붙인다)."""
+        ist, cfg = self._ist, self.cfg
+        size = self.size
+        c = 0.5 * size
+        if ist["cover_layout"] == "quad":
+            # C++ 우리 은신처(EcoPolicyV3IntegratedSubsystem.cpp): 원 k 의 시도 a — 각 45° + 90°·k ± 15°·⌈a/2⌉(짝수 +), 거리 0.25·S·√2(12번째
+            # 시도부터 0.75 배). 무대 안 여유 R + 1, 앞 원과 2R + 2 이상이면 놓고 다음 원으로. 지면 검사가 없다
+            R = min(max(ist["cover_r_frac"] * size, float(cfg.cover_r_min)), float(cfg.cover_r_max))
+            centers: list[tuple[float, float]] = []
+            for k in range(ist["cover_count"]):
+                base = 0.25 * math.pi + 0.5 * math.pi * k
+                for a in range(IST_COVER_TRIES):
+                    turn = (1.0 if a % 2 == 0 else -1.0) * ((a + 1) // 2) * math.radians(IST_COVER_TURN_DEG)
+                    rad = 0.25 * size * math.sqrt(2.0) * (1.0 if a < IST_COVER_SHRINK_AT else 0.75)
+                    hx, hy = c + rad * math.cos(base + turn), c + rad * math.sin(base + turn)
+                    half = c - (R + IST_COVER_MARGIN)
+                    if abs(hx - c) > half or abs(hy - c) > half:
+                        continue
+                    if any(math.hypot(px - hx, py - hy) < 2.0 * R + IST_COVER_GAP for px, py in centers):
+                        continue
+                    centers.append((hx, hy))
+                    break
+            self.cov_c = np.asarray(centers, dtype=np.float64).reshape(-1, 2)
+            self.cov_r = np.full(len(centers), R, dtype=np.float64)
+            mask = np.zeros((self.gw, self.gw), dtype=bool)
+            for (px, py), rad in zip(self.cov_c, self.cov_r):
+                mask |= (self._cell_x - px) ** 2 + (self._cell_y - py) ** 2 <= rad * rad   # v1 `_build_world` 과 같은 셀 중심 식
+            self.cover_cell = mask
+            self.cover_frac_actual = float(mask.mean())
+            self.regen_field = cfg.food_regen_base * self.food_regen_mult * np.where(
+                self.cover_cell, cfg.food_cover_regen_mult, 1.0
+            )
+        self.stage_complete = None
+        if ist["start_layout"] == "stage":
+            # C++ PlanStage: 늑대 먼저(모서리, 모자라면 무대 안 후보), 그다음 사슴(무대 균등 후보, 늑대·앞 사슴과 떨어진 것만). 후보마다 x, y
+            g = self.feature_rng("integrated_stage", 0)
+            room = c - ist["deer_margin"]
+            wg2, dw2, sp2 = ist["wolf_gap"] ** 2, ist["deer_wolf_gap"] ** 2, ist["deer_spacing"] ** 2
+            M, N = self.M, self.N
+            wolves = np.zeros((0, 2))
+
+            def far(p, pts, d2):
+                return not len(pts) or bool((((pts - p) ** 2).sum(1) >= d2).all())
+
+            corner = ist["wolf_corner_frac"] * size
+            for sx, sy in IST_CORNERS:
+                if len(wolves) >= M:
+                    break
+                h = np.array([c + sx * corner, c + sy * corner])
+                if far(h, wolves, wg2):
+                    wolves = np.vstack([wolves, h])
+            for _ in range(IST_WOLF_TRIES):
+                if len(wolves) >= M:
+                    break
+                h = c + g.uniform(-room, room, 2)
+                if far(h, wolves, wg2):
+                    wolves = np.vstack([wolves, h])
+            deer = np.zeros((N, 2))
+            n = 0
+            tries = max(IST_DEER_TRIES_MIN, IST_DEER_TRIES_PER * N)
+            for _ in range(tries):
+                if n >= N:
+                    break
+                h = c + g.uniform(-room, room, 2)
+                if far(h, wolves, dw2) and far(h, deer[:n], sp2):
+                    deer[n] = h
+                    n += 1
+            self.pred_pos[:len(wolves)] = wolves          # 다 못 놓은 개체는 v1 자리 그대로(C++ bComplete 거짓)
+            self.pos[:n] = deer[:n]
+            self.stage_complete = bool(len(wolves) == M and n == N)
+        if ist["head_layout"] == "golden":
+            a = np.arange(self.N, dtype=np.float64) * IST_GOLDEN_ANGLE
+            self.head = np.stack([np.cos(a), np.sin(a)], 1)
+            b = (np.arange(self.M, dtype=np.float64) + IST_WOLF_HEAD_OFFSET) * IST_GOLDEN_ANGLE
+            self.pred_head = np.stack([np.cos(b), np.sin(b)], 1)
+
+    def _ist_wolf_kinds(self) -> None:
+        """통합 무대 (o) wolf_kinds 'alternate': `_threats_reset` 바로 뒤에 v1 포식자 칸(0..M_base−1)을 짝수 = 잠행-돌진형, 홀수 = 근접 추격형으로
+        덮는다. 모두 근접(원거리형 없음, 속력 herb_speed × pred_speed_mult, 포획 거리 pred_melee_catch_r)·주행성(pred_sleep 을 켰으면 야행성 없음).
+        threats·pred_sleep 스트림 뽑기는 이미 끝났다(규칙 2). v1 원거리형 배치(_pred_ranged_v1)는 v1 스트림 호출 모양을 정하므로 그대로 둔다.
+        C++ 꼴: Spec = (Ordinal % 2 == 0) ? MakeStalkerSpec(PredSpeedMult, false) : MakeChaserSpec(PredSpeedMult, false, false)."""
+        cfg, Mb = self.cfg, self.M_base
+        stalker = (np.arange(Mb) % 2) == 0
+        self.pred_type[:Mb] = np.where(stalker, PT_STALKER, PT_CHASER)
+        self.pred_ranged[:Mb] = False
+        self.pred_speed[:Mb] = cfg.herb_speed * self.pred_speed_mult
+        self.pred_catch_r[:Mb] = cfg.pred_melee_catch_r
+        self.pred_is_player = self.pred_type == PT_PLAYER
+        self.threat_p_stalk = float(stalker.mean()) if Mb else 0.0
+        if self._ps is not None:
+            self.pred_nocturnal[:Mb] = False
 
     def _cover_overlap_cells(self) -> np.ndarray:
         """은신처 원과 조금이라도 겹치는 셀 (gw,gw) bool — v3 현실성 (e) 의 '은신처 셀'. 셀 (iy, ix) 의 닫힌 사각형
@@ -1654,6 +1877,10 @@ class World:
         self.dn_tw, self.day_fixed, self.dn_induced = dr["tw_steps"], dr["day_fixed"], dr["induced"]
         if dr["induced"]:
             self.energy = dr["energy"] * self.cfg.max_energy
+        if self._ist is not None and self._ist["day_offset"] is not None:
+            # 통합 무대 (m): 팀 시계와 같은 시작 위상(언리얼 DayOffset 0 — t = 0 이 새벽 전환). 뽑기 3개는 위에서 그대로 했다(규칙 2).
+            # 첫 _daynight_update(아래)가 이 위상으로 어둠과 realism_night 의 시작 상태를 정한다
+            self.dn_offset = self._ist["day_offset"] % self.dn_period
         self._daynight_update()
 
     def _pred_sleep_reset(self) -> None:
@@ -1883,7 +2110,11 @@ class World:
                 if cand.any() and self.N:
                     dx = self.pos[:, 0][None, :] - self.pred_pos[:, 0:1]
                     dy = self.pos[:, 1][None, :] - self.pred_pos[:, 1:2]
-                    near = cand & (np.sqrt(dx * dx + dy * dy) <= zn["settle_r"]).any(1)
+                    close = np.sqrt(dx * dx + dy * dy) <= zn["settle_r"]
+                    if self.alive is not None:
+                        # 통합 무대 (k): 시체는 '사슴 근처'가 아니다. 이번 스텝에 죽은 개체는 아직 산 슬롯이다(C++ NightUpdate 의 W.Prey 와 같다)
+                        close[:, ~self.alive] = False
+                    near = cand & close.any(1)
             calm = dark & ~self._zn_hunt & ~near
             ready = awake & ~settle & dark & (self._zn_dark_k > self._zn_delay)
             abort = awake & settle & ~calm
@@ -2007,6 +2238,11 @@ class World:
         kin_cos = fov_cos if self._zv is None else self._zv["kin_cos"]
         kin_vis = (dist <= cfg.see_r) & ((dx * hx + dy * hy) * invd >= kin_cos)
         kin_vis[ar, idx] = False
+        dead_cols = None if self.alive is None else ~self.alive
+        if dead_cols is not None:
+            # 통합 무대 (k): 시체는 동족이 아니다(동족 수·무리 중심·분리·kin_alarm). 스텝 끝 관측에서는 이번 스텝에 죽은 개체가 아직 산 슬롯이라
+            # 죽은 자리에서 동족으로 세어진다(C++ 관측 E 가 리스폰·목록 빼기 앞이다)
+            kin_vis[:, dead_cols] = False
         kin_f = kin_vis.astype(np.float64)
         kin_count = kin_f.sum(1)
         centroid = (kin_f @ self.pos) / np.maximum(kin_count, 1.0)[:, None]
@@ -2016,6 +2252,8 @@ class World:
         # sum_j w_ij * (pos_j - P_i)/d_ij  =  (c @ pos) - rowsum(c) * P,  c = w/d
         wgt = np.clip(1.0 - dist / cfg.sep_radius, 0.0, None)
         wgt[ar, idx] = 0.0
+        if dead_cols is not None:
+            wgt[:, dead_cols] = 0.0
         c = wgt * invd
         separation = clamp_magnitude(-((c @ self.pos) - c.sum(1)[:, None] * P), 1.0)
 
@@ -2252,6 +2490,9 @@ class World:
         self._check_action(a)
         rew = np.full(self.N, cfg.rew_alive)
         vg, vw, rp = self._vg, self._vw, self._rp
+        # 통합 무대 (k) 부활 없음: 이번 스텝 첫머리의 산 슬롯 L. self.alive 는 스텝 끝(관측 뒤)에 새 배열로 바뀐다 — 그때까지 L 과 같다.
+        # 부활 있는 세계는 None 이고 아래 L 분기를 타지 않는다
+        live = self.alive
         if vg is not None:
             ema0 = min(self.pred_ema, 1.0)              # 결정 때 관측 5 (vigil_stats B5′ 용, 6) 에서 바뀐다)
         if vw is not None:              # v2.2r 0) 결정 때 창: 결정 관측의 포식자 수 0 & threat_recency > theta
@@ -2273,6 +2514,10 @@ class World:
             if self._act_vig is not None:       # v2.2: 경계면 속력 0 (speed 보다 우선). v2.2r W′ 는 창 안에서만
                 v = self._vigil_step(v, a[:, self._act_vig],
                                      self.window if vw is not None and vw["window_only"] else None)
+        if live is not None:
+            # 통합 무대 (k): 시체는 움직이지 않는다(죽은 자리에 멈춘다 — C++ 처리기가 목록에서 뺀다). 적용 속도 훅도 0 이다
+            v = np.where(live[:, None], v, 0.0)
+            self.vel = v
         if self._zt is not None:
             # v3 R3 (h): 이동 전 위치 셀의 땅이 속도를 줄인다(모든 행동). 대사·섭식은 보행 상태 그대로다. 적용 속도 훅 vel 도 줄인 값이다
             tc = self._rz_terrain_of(self.pos)
@@ -2284,6 +2529,8 @@ class World:
         self.head = np.where(moving[:, None], normalize(v), self.head)
         if rp is not None:                  # v3: FREEZE 는 위협 쪽을 본다(모르면 그대로)
             face = (rep_out["face"] != 0.0).any(1)
+            if live is not None:
+                face &= live                # 통합 무대 (k): 시체는 돌아보지 않는다
             self.head[face] = rep_out["face"][face]
         if vg is not None:                  # v2.2 1e): 경계한 개체는 위협 쪽을 본다(ThreatDir, 본 적 없으면 유지)
             self._face_threat()
@@ -2303,6 +2550,9 @@ class World:
             gain = self._eat(e_drained)
         else:                       # v2.1·v2.2·v2.4: 대사와 섭식 배수가 이번 스텝의 실제 보행·경계·어둠을 따른다
             drain, eat = self._drain_eat()
+            if live is not None:
+                # 통합 무대 (k): 시체는 먹이를 찾지 않는다 — 셀 수요 합에 0 을 더하므로 산 개체의 몫이 시체가 없는 세계와 같다
+                eat = eat * live
             e_drained = self.energy - drain
             gain = self._eat(e_drained, eat)
         if self._zf is not None:    # v3 현실성 (e) 통계 전용: 은신처 원 안(섭식 위치)에서 먹은 몫
@@ -2310,6 +2560,8 @@ class World:
             self._zf_in += float(gain[inc].sum())
             self._zf_all += float(gain.sum())
         e_new = np.minimum(e_drained + gain * cfg.food_energy_per_unit, cfg.max_energy)
+        if live is not None:
+            e_new = np.where(live, e_new, self.energy)     # 통합 무대 (k): 시체의 에너지는 죽은 때 값에 멈춘다(대사도 없다)
         if self._sp is not None and self._sp["net_energy_reward"]:
             # #4 순변화 e_new − e_prev. 번식 리셋(아래 4)과 리스폰(8)은 이 뒤라 들어가지 않는다
             rew += cfg.rew_energy * (e_new - self.energy)
@@ -2321,6 +2573,10 @@ class World:
         # 4) 번식 — energy > threshold AND repro_cd == 0 (§3.4)
         self.repro_cd = np.maximum(self.repro_cd - 1, 0)
         repro = (self.energy > cfg.repro_threshold) & (self.repro_cd == 0)
+        if live is not None:
+            # 통합 무대 (k): 시체는 번식하지 않는다. 이번 스텝에 잡힌 개체는 아직 L 이라 번식할 수 있다(C++ C5 가 C6 사망 판정 앞이다).
+            # 번식으로 태어나는 다음 단계(아직 없음)는 여기서 repro 개체마다 빈 슬롯(~self.alive)에 `_spawn_slots` 를 부른다 — `_ist_bury`
+            repro &= live
         if repro.any():
             rew += cfg.rew_repro * repro
             self.energy = np.where(repro, cfg.init_energy, self.energy)
@@ -2328,14 +2584,21 @@ class World:
 
         # 5) 사망: 피식 또는 아사
         starved = self.energy <= 0.0
+        if live is not None:
+            # 통합 무대 (k): 굶음 = 산 개체 중 잡히지 않은 E ≤ 0 (C++ Stats.Starved 의 정의. 잡힌 개체는 포획으로만 센다)
+            starved &= live & ~caught
         done = caught | starved
         rew += cfg.rew_death * done
+        if live is not None:
+            rew = np.where(live, rew, 0.0)              # 통합 무대 (k): 시체의 행은 보상이 없다(학습에 쓸 때는 손실에서 뺀다)
 
         # 6) 지역 피식 EMA (§3.1). §9.6과 맞춰 피식 사망만 센다.
+        #    통합 무대 (l) 는 분모를 ema_den 으로 둔다(null 이면 N — 지금 그대로)
         n_pred_deaths = int(caught.sum())
+        ema_den = self.N if self._ist is None or self._ist["ema_den"] is None else self._ist["ema_den"]
         self.pred_ema = (
             cfg.predation_ema_decay * self.pred_ema
-            + (1.0 - cfg.predation_ema_decay) * (n_pred_deaths / self.N) * cfg.predation_ema_gain
+            + (1.0 - cfg.predation_ema_decay) * (n_pred_deaths / ema_den) * cfg.predation_ema_gain
         )
 
         # 7) 먹이 재생 (§4.2). 셀 용량(패치 구조)을 향해 자란다.
@@ -2387,12 +2650,15 @@ class World:
         terminal_obs = obs.copy()
         if done.any():
             dead = np.flatnonzero(done)
-            self._respawn(dead)
-            obs[dead] = self._observe_subset(dead)
-            if self._sp is not None:
-                self._gait_prev[:, dead] = -1     # 새 개체: 보행 전환(B8)을 이전 개체와 잇지 않는다
-            if vg is not None:
-                self._vig_prev[dead] = -1         # 새 개체: 경계 전환(b8_vig)도 잇지 않는다
+            if live is not None:
+                self._ist_bury(dead, caught)      # 통합 무대 (k): 되살리지 않는다(시체로 남긴다, 리스폰 난수·관측 없음)
+            else:
+                self._respawn(dead)
+                obs[dead] = self._observe_subset(dead)
+                if self._sp is not None:
+                    self._gait_prev[:, dead] = -1     # 새 개체: 보행 전환(B8)을 이전 개체와 잇지 않는다
+                if vg is not None:
+                    self._vig_prev[dead] = -1         # 새 개체: 경계 전환(b8_vig)도 잇지 않는다
 
         return obs, rew, done, terminal_obs
 
@@ -2920,6 +3186,8 @@ class World:
         if th is not None and M > Mb:
             vis[self.pred_is_player] = True
         vis &= hunting[:, None]
+        if self.alive is not None:
+            vis[:, ~self.alive] = False     # 통합 무대 (k): 시체는 표적이 아니다(C++ Prey 는 산 사슴 목록 — 지난 스텝에 죽은 개체가 빠진다)
         if safe_m is not None and self._zs["untargetable"]:
             vis &= ~safe_m              # v3 현실성 (c): 안전한 사슴은 표적이 되지 않는다(위협 m 별 — player_too 가 아니면 플레이어는 그대로)
         masked = np.where(vis, perceived, np.inf)
@@ -3064,6 +3332,8 @@ class World:
             if M > Mb:
                 roll = np.vstack([roll, np.ones((M - Mb, N), dtype=bool)])
             hit &= np.where(self.pred_ranged[:, None], roll, True)
+        if self.alive is not None:
+            hit[:, ~self.alive] = False     # 통합 무대 (k): 시체는 잡히지 않는다(원거리 판정 난수 소비는 그대로)
         if safe_m is not None:          # v3 현실성 (c): 은신처 안 사슴은 잡히지 않는다(원거리 판정 난수 소비는 그대로)
             self._zs_saved_n += int(np.count_nonzero((hit & safe_m).any(0)))
             hit &= ~safe_m
@@ -3445,10 +3715,22 @@ class World:
 
     def _respawn(self, dead: np.ndarray) -> None:
         """§4.3 — 죽은 슬롯에 랜덤 위치로 리스폰. 개체군 동역학은 넣지 않는다."""
+        # v1 스트림에서 위치 (k, 2)·각 k 개를 이 순서로 뽑고, 슬롯을 새 개체로 만드는 나머지는 `_spawn_slots` 가 한다(통합 무대 10-15 에 떼어
+        # 냈다 — 줄 순서는 그대로라 같은 세계다)
         r, k = self.rng, len(dead)
-        self.pos[dead] = r.uniform(0.0, self.size, (k, 2))
+        pos = r.uniform(0.0, self.size, (k, 2))
         ang = r.uniform(0.0, 2 * np.pi, k)
-        self.head[dead] = np.stack([np.cos(ang), np.sin(ang)], 1)
+        self._spawn_slots(dead, pos, np.stack([np.cos(ang), np.sin(ang)], 1))
+
+    def _spawn_slots(self, dead: np.ndarray, pos: np.ndarray, head: np.ndarray) -> None:
+        """슬롯 `dead` 를 위치 `pos` (k, 2)·방향 `head` (k, 2)의 새 개체로 만든다: 에너지 init_energy, 번식 쿨다운 0, 켠 기능의 개체 상태 초기화
+        (리스폰과 같은 새 개체 — 행동 상태는 GRAZE 진입·세대 + 1, 잠금·추격 고정 놓기). 난수는 켠 기능이 원래 리스폰 때 뽑던 것만 뽑는다
+        (daynight.start_induce 의 part 3). 통합 무대 (k) 부활 없음 세계면 그 슬롯을 다시 산 슬롯으로 둔다.
+        번식으로 태어나는 다음 단계(아직 없음)는 빈 슬롯(~alive)을 골라 부모 곁 자리로 이것을 부른다 — 위치·방향을 정하는 난수는 그 기능의
+        자기 스트림에서 뽑는다(v1 스트림을 쓰지 않는다, features.py 규칙 1). 부른 뒤 그 행만 다시 관측한다(`_observe_subset`)."""
+        k = len(dead)
+        self.pos[dead] = pos
+        self.head[dead] = head
         self.energy[dead] = self.cfg.init_energy
         self.repro_cd[dead] = 0
         if self._vg is not None:        # v2.2 개체별 상태 초기화 (계획서 4.2·4.4). 난수를 쓰지 않는다
@@ -3498,6 +3780,31 @@ class World:
             self._al_wave_last[dead] = -1
             self._al_onset_t[dead] = -1
             self._al_e7_t[dead] = -(10 ** 9)
+        if self.alive is not None:
+            # 통합 무대 (k): 빈 슬롯을 다시 채우면 산 슬롯이다(새 배열 — 스텝 안의 L 을 바꾸지 않는다)
+            self.alive = self.alive.copy()
+            self.alive[dead] = True
+            self.death_t[dead] = -1
+            self.death_cause[dead] = 0
+
+    def _ist_bury(self, dead: np.ndarray, caught: np.ndarray) -> None:
+        """통합 무대 (k) 부활 없음: 이번 스텝에 죽은 슬롯 `dead` 를 시체로 둔다(`step` 의 관측 뒤, 리스폰 자리). 위치·방향·에너지·행동 상태는
+        죽은 때 값 그대로이고 다음 스텝부터 관측(동족)·표적·포획·먹이·이동·번식·밤잠 근처 판정에서 빠진다(모듈 docstring (k)). 난수를 쓰지 않는다.
+        훅: alive ← 새 배열(L & ¬dead), death_t ← 지금 t(이 스텝이 끝난 뒤의 t), death_cause ← 1 잡힘·2 굶음.
+        추격 고정(realism_chase)은 표적이 죽으면 리스폰 때처럼 놓는다(chase_rel_dead_n 에 센다).
+        번식 출생(다음 단계, 아직 없음): 번식 사건(`step` 4) 의 repro)마다 빈 슬롯(~alive) 하나를 골라 `_spawn_slots(슬롯, 부모 곁 자리, 방향)` 을
+        부르고 그 행을 다시 관측한다. 슬롯이 모자라면(용량 N) 태어나지 않는다. 피식 EMA 분모는 ema_den 으로 고정한다. 학습에 쓰려면 vec_env 가
+        빈 슬롯의 행을 PPO 손실에서 빼는 마스크가 있어야 한다(지금은 vec_env 가 이 세계를 받지 않는다)."""
+        self.alive = self.alive.copy()
+        self.alive[dead] = False
+        self.death_t[dead] = self.t
+        self.death_cause[dead] = np.where(caught[dead], 1, 2).astype(np.int8)
+        if self._zc is not None:
+            hit = np.isin(self.chase_tgt, dead)
+            if hit.any():
+                self.chase_tgt[hit] = -1
+                self.chase_lost[hit] = 0
+                self._zc_rel_dead += int(np.count_nonzero(hit))
 
     # ------------------------------------------------------------------ #
     # 통계 (§7.2)

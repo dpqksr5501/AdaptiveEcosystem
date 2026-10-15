@@ -154,6 +154,10 @@ class MultiWorldVecEnv(VecEnv):
         for _ in range(self.K):
             s = self._pick_seed(exclude=[w.seed for w in self.worlds])
             self.worlds.append(World(cfg, seeds=[s]))
+        if self.worlds[0].alive is not None:
+            # 통합 무대 부활 없음(env_v2/world.py 모듈 docstring '통합 무대' (k)): 시체 슬롯의 행을 PPO 손실에서 뺄 마스크가 아직 없다. 그대로
+            # 학습하면 죽은 행의 관측·보상 0 을 조용히 배운다 — 번식 출생 단계에서 빈 슬롯 마스크와 함께 연다
+            raise ValueError("features.integrated_stage.respawn false 세계는 학습(vec_env)에 쓰지 않는다 — 빈 슬롯 마스크가 아직 없다")
         self.N = self.worlds[0].N
         self.act_dim = self.worlds[0].act_dim
         self.act_names = self.worlds[0].act_names
