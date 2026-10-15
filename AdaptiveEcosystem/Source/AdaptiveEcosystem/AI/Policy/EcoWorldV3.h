@@ -113,7 +113,11 @@ namespace EcoWorldV3
 	//   웅크림 두뇌 요청 대신 HIDE (은신처 안이라 곧바로 도착)
 	//   경계   행동은 두뇌가 정한다. 두뇌가 GRAZE 면 걸으며 먹고(섭식 걷기 배수) 방향 = n(GRAZE 조향 + AlertW·알아챈 늑대들 반대), 고개를 든다(시야 배수 1)
 	//   두 방향 모두 무대 벽 WallMargin 안이면 벽 쪽 성분을 지운다. 도주·웅크림이 풀리면 잠금 0·미뤄 둔 사건 지움(두뇌가 곧바로 고른다)
-	// 값 = configs/v3_wild1_mirror.yaml wild_flight (단위: 1 = 2 m). 골든 WildGoldenVectorsV3.h '도주 장면'
+	// 10-16 고침 (사용자 보고 '늑대가 먹기 시작하면 도망치던 사슴이 멈춘다'·'가장자리에서 늑대가 계속 잡아먹는다', 명세 11절, 파이썬 선택 키
+	// hold_awake·edge_r — 기본 끔·0 = 위 그대로):
+	//   bHoldAwake  지난 도주를 붙잡는 늑대 = 깨어 있는 늑대 전부(사냥·먹기·배부름 — 자는 늑대 말고). 도주 방향도 그 늑대들 반대. 도주 시작은 그대로
+	//   EdgeR > 0   경계·도주 방향(은신처 쪽 도주 말고)을 벽 여유 처리 앞에 WildEdgeSteer 로 굽힌다 — 가장자리 EdgeR 안에서 벽을 따라, 모서리에서 빠져나오게
+	// 값 = configs/v3_wild1_mirror.yaml wild_flight (단위: 1 = 2 m). 골든 WildGoldenVectorsV3.h '도주 장면'·'고친 도주 장면'·'가장자리 굽히기'
 	struct FWildFlightConfig
 	{
 		bool bEnabled = false;              // 끄면 아래 칸을 아무도 읽지 않는다
@@ -127,7 +131,63 @@ namespace EcoWorldV3
 		double ShelterR = 15.0;             // 은신처 가장자리까지 이 안 (30 m)
 		bool bCrouch = true;                // 은신처 안에서 알아채면 웅크림
 		double WallMargin = 1.0;            // 무대 벽 여유 (2 m)
+		bool bHoldAwake = false;            // 10-16 hold_awake (설정 true): 도주는 깨어 있는 늑대 모두가 SafeR 밖일 때까지
+		double EdgeR = 0.0;                 // 10-16 edge_r (설정 5 = 10 m): 가장자리 굽히기 거리. 0 = 끔
 	};
+
+	/**
+	 * 10-16 가장자리 굽히기 (world.py `wf_edge_steer` 와 줄마다 같다). P 위치, D 단위 방향 → 단위 방향. 축마다 가까운 벽까지 E < EdgeR 이면
+	 * 안쪽 부호 N(P ≤ Size − P 면 +1)·가까움 W = 1 − E/EdgeR. 모서리(두 축 W > 0)이고 D 가 벽 쪽이면 벽을 따라 모서리를 빠져나오는 쪽(D 와 내적 큰
+	 * 쪽, 같으면 x)을 2·min(W) 만큼 섞고, x·y 축 차례로 벽 쪽 성분의 W 몫을 벽을 따라가는 성분으로 돌린다(다른 축 부호, 0 이면 무대 가운데 쪽).
+	 */
+	inline EcoRepertoireV3::FVec2 WildEdgeSteer(const EcoRepertoireV3::FVec2& P, const EcoRepertoireV3::FVec2& D, double Size, double EdgeR)
+	{
+		namespace R3 = EcoRepertoireV3;
+		if (!(EdgeR > 0.0))
+		{
+			return D;
+		}
+		const double Pa[2] = {P.X, P.Y};
+		const double Da[2] = {D.X, D.Y};
+		double Na[2] = {0.0, 0.0}, Wa[2] = {0.0, 0.0};
+		for (int a = 0; a < 2; ++a)
+		{
+			const double Hi = Size - Pa[a];
+			const double E = Pa[a] < Hi ? Pa[a] : Hi;
+			if (E < EdgeR)
+			{
+				Na[a] = Pa[a] <= Hi ? 1.0 : -1.0;
+				Wa[a] = 1.0 - E / EdgeR;
+			}
+		}
+		double Sa[2] = {Da[0], Da[1]};
+		if (Wa[0] > 0.0 && Wa[1] > 0.0 && (Da[0] * Na[0] < 0.0 || Da[1] * Na[1] < 0.0))
+		{
+			const double K = 2.0 * (Wa[0] < Wa[1] ? Wa[0] : Wa[1]);
+			if (Da[0] * Na[0] >= Da[1] * Na[1])
+			{
+				Sa[0] += K * Na[0];
+			}
+			else
+			{
+				Sa[1] += K * Na[1];
+			}
+		}
+		for (int a = 0; a < 2; ++a)
+		{
+			const int o = 1 - a;
+			if (!(Sa[a] * Na[a] < 0.0))
+			{
+				continue;
+			}
+			const double B = (-Sa[a] * Na[a]) * Wa[a];
+			const double Sg = Sa[o] > 0.0 ? 1.0 : (Sa[o] < 0.0 ? -1.0 : (Pa[o] <= 0.5 * Size ? 1.0 : -1.0));
+			Sa[a] = Sa[a] + B * Na[a];
+			Sa[o] = Sa[o] + B * Sg;
+		}
+		const R3::FVec2 Out = R3::Normalize(R3::FVec2{Sa[0], Sa[1]});
+		return (Out.X * Out.X + Out.Y * Out.Y > R3::kEps * R3::kEps) ? Out : D;
+	}
 
 	// 덮기 (FHerbDecision::KeepMode·KeepActive). 파이썬 WF_NONE·WF_ALERT·WF_PANIC·WF_SHELTER 와 같은 번호
 	inline constexpr std::int32_t kKeepNone = 0;      // 두뇌가 정한다
@@ -234,6 +294,9 @@ namespace EcoWorldV3
 		std::int32_t NumRanged = 1;         // 원거리형 (추격형의 한 갈래, 학습 0~50%)
 		std::int32_t NumNocturnal = 1;      // 야행성 (보통 위협 슬롯 끝에서부터, 학습 0~25%)
 		bool bPlayerProxy = false;          // 플레이어형 대역 (선택, 계약 7-5)
+		// 은신처 안전·늑대 진입 금지 (10-16, 통합 모드 eco.IntegratedV3.ShelterSafe — 파이썬 realism_shelter R3 값). 켜면 FThreatConfig::bShelterSafe·
+		// bShelterBlock 을 켜고 위협 Step 에 Covers 를 원 목록으로 넘긴다. 기본 끔 = R1b 학습 세계 그대로
+		bool bShelterSafe = false;
 		double PredSpeedMult = 0.8;         // 근접형 속력 배수 (학습 U[0.6, 0.95] 의 한 값)
 
 		// 낮밤 (계약 7-6). DayPeriod <= 0 이면 낮 고정 (d = 0, to_transition = 1)
@@ -657,6 +720,7 @@ namespace EcoWorldV3
 		std::vector<EcoObservationV3::FKinInput> KinIn;
 		std::vector<EcoThreatV3::FPreyView> Prey;
 		std::vector<double> Rolls;
+		std::vector<double> ShelterDiscs;   // 은신처 원 (x, y, r) × K — bShelterSafe 일 때 위협 Step 에 넘긴다 (스텝마다 Covers 에서 다시 채운다)
 		std::vector<std::int32_t> CaughtByThreat;
 		std::vector<std::int32_t> Catcher;
 		std::vector<double> Want;
@@ -702,6 +766,8 @@ namespace EcoWorldV3
 			W.ThreatCfg.PredEatCd = C.PredEatCdOverride;
 		}
 		W.ThreatCfg.bEatInPlace = C.bEatInPlace;
+		W.ThreatCfg.bShelterSafe = C.bShelterSafe;
+		W.ThreatCfg.bShelterBlock = C.bShelterSafe;
 		// 야생 (w1): 하루 단위 계수라 낮 고정 세계에서는 끈다 (파이썬 _wild_reserve_params 가 daynight 없이 켜기를 거부한다)
 		W.Config.WildReserve.bEnabled = C.WildReserve.bEnabled && W.Config.DayPeriod > 0;
 		W.ReserveCap = W.Config.WildReserve.bEnabled
@@ -1155,7 +1221,8 @@ namespace EcoWorldV3
 					const bool bComing = bHunt && (bLocked || bAppr);
 					Nh[m] = bPv && bHunt && Pd[m] <= F.AlertR;
 					Nr[m] = F.bRestAlert && bPv && !bHunt && Pd[m] <= F.AlertR;
-					NearH[m] = bHunt && Pd[m] <= F.SafeR;
+					// 지난 도주를 붙잡는 늑대: 사냥 중 (10-16 bHoldAwake 면 깨어 있는 늑대 전부 — 먹기·배부름 포함, 자는 늑대 말고)
+					NearH[m] = (F.bHoldAwake ? !ThreatAsleepNow(W, A) : bHunt) && Pd[m] <= F.SafeR;
 					bPanicNow = bPanicNow || (Nh[m] && (Pd[m] <= F.FlightR || bComing));
 					bNoticedH = bNoticedH || Nh[m];
 					bAnyNr = bAnyNr || Nr[m];
@@ -1175,6 +1242,7 @@ namespace EcoWorldV3
 					Next = kKeepAlert;
 				}
 				FVec2 Dir;
+				bool bToShelter = false;
 				if (Next == kKeepAlert || Next == kKeepPanic)
 				{
 					// 도주 = 안전 거리 안 사냥 중인 늑대들, 경계 = 알아챈 늑대들의 반대 (거리 역수 가중 합). 0 이면 가장 가까운 그 늑대 반대
@@ -1225,7 +1293,13 @@ namespace EcoWorldV3
 						if (Kb >= 0)
 						{
 							Dir = FVec2{Bvx / Bdc, Bvy / Bdc};
+							bToShelter = true;
 						}
+					}
+					// 10-16 가장자리·모서리 굽히기 (경계·도주, 은신처 쪽 도주 말고)
+					if (F.EdgeR > 0.0 && !bToShelter && Dir.X * Dir.X + Dir.Y * Dir.Y > Eps2)
+					{
+						Dir = WildEdgeSteer(P, Dir, Size, F.EdgeR);
 					}
 					// 무대 벽 여유 안이면 벽 쪽 성분을 지운다 (다 지워지면 그대로)
 					const double Mg = F.WallMargin;
@@ -1462,6 +1536,16 @@ namespace EcoWorldV3
 		}
 		W.Rolls.resize(static_cast<size_t>(N));
 		W.CaughtByThreat.assign(static_cast<size_t>(M), -1);
+		W.ShelterDiscs.clear();
+		if (W.ThreatCfg.bShelterBlock)
+		{
+			for (const EcoObservationV3::FCoverInput& Cv : W.Config.Covers)
+			{
+				W.ShelterDiscs.push_back(Cv.X);
+				W.ShelterDiscs.push_back(Cv.Y);
+				W.ShelterDiscs.push_back(Cv.Radius);
+			}
+		}
 		for (std::int32_t m = 0; m < M; ++m)
 		{
 			FThreatAgent& A = *Threats[m];
@@ -1471,6 +1555,8 @@ namespace EcoWorldV3
 			In.Dark = W.Dark;
 			In.WorldSize = W.Config.WorldSize;
 			In.WanderTurn = W.Rng.Uniform(-W.ThreatCfg.PredWanderTurn, W.ThreatCfg.PredWanderTurn);
+			In.Discs = W.ShelterDiscs.empty() ? nullptr : W.ShelterDiscs.data();
+			In.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
 			if (A.Spec.bRanged)
 			{
 				for (std::int32_t i = 0; i < N; ++i)

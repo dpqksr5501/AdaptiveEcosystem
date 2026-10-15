@@ -41,13 +41,23 @@ from pathlib import Path
 import numpy as np
 
 from env_v2.config import load_v2_config
-from env_v2.world import World, hearing_radius
+from env_v2.world import World, hearing_radius, wf_edge_steer
 
 HERE = Path(__file__).resolve().parent
 WILD = HERE / "configs" / "v3_wild1_mirror.yaml"
 DEFAULT_OUT = HERE.parent / "AdaptiveEcosystem" / "Source" / "AdaptiveEcosystem" / "AI" / "Policy"
 SEED = 32090
 N = 16
+
+
+def load_old():
+    """10-15 야생 설정(10-16 고침 전): realism_shelter 끔, wild_flight 의 새 선택 키(hold_awake·edge_r)를 뺀다(코드 기본값 = 10-15 그대로).
+    10-15 골든 칸(비축·포만·감지·도주 장면)은 이 설정으로 만들어 그대로 둔다(C++ 기본값 시험이 그대로 맞는다)."""
+    cfg = load_v2_config(WILD)
+    f = {k: dict(v) for k, v in cfg.v2["features"].items()}
+    f["realism_shelter"] = dict(f["realism_shelter"], enabled=False)
+    f["wild_flight"] = {k: v for k, v in f["wild_flight"].items() if k not in ("hold_awake", "edge_r")}
+    return cfg.replace(v2=dict(cfg.v2, features=f))
 
 
 def d_lit(x) -> str:
@@ -70,7 +80,7 @@ def c_array(ctype: str, name: str, flat: list, per_line: int, fmt) -> str:
 
 
 def make_world() -> World:
-    w = World(load_v2_config(WILD).replace(N=N), seeds=[SEED])
+    w = World(load_old().replace(N=N), seeds=[SEED])
     w.reset()
     if w._wr is None:
         raise SystemExit("v3_wild1_mirror.yaml 의 wild_reserve 가 꺼졌다")
@@ -144,7 +154,7 @@ def mixed_chain(w: World, steps: int = 600) -> list[tuple[float, float]]:
 
 
 def satiation_chain(steps: int = 500) -> tuple[World, list[list[tuple[int, int, bool, float]]]]:
-    w = World(load_v2_config(WILD).replace(N=N), seeds=[SEED + 1])
+    w = World(load_old().replace(N=N), seeds=[SEED + 1])
     w.reset()
     if w._ws is None:
         raise SystemExit("v3_wild1_mirror.yaml 의 wild_satiation 이 꺼졌다")
@@ -166,7 +176,7 @@ def satiation_chain(steps: int = 500) -> tuple[World, list[list[tuple[int, int, 
 
 
 def perception_scenes(k_scenes: int = 12):
-    w = World(load_v2_config(WILD).replace(N=N), seeds=[SEED + 2])
+    w = World(load_old().replace(N=N), seeds=[SEED + 2])
     w.reset()
     if w._zv is None or w._zh is None:
         raise SystemExit("v3_wild1_mirror.yaml 의 realism_vision·realism_hearing 이 꺼졌다")
@@ -196,7 +206,7 @@ def perception_scenes(k_scenes: int = 12):
 
 
 def _flight_world() -> World:
-    w = World(load_v2_config(WILD).replace(N=N), seeds=[SEED + 3])
+    w = World(load_old().replace(N=N), seeds=[SEED + 3])
     w.reset()
     if w._wf is None or w._ws is None:
         raise SystemExit("v3_wild1_mirror.yaml 의 wild_flight·wild_satiation 이 꺼졌다")
@@ -283,6 +293,103 @@ def flight_scenes(k_random: int = 16):
     return w, scenes, outs
 
 
+def flight_fix_scenes(k_random: int = 16):
+    """10-16 고친 도주 장면: 설정 값(hold_awake true, edge_r 5) 그대로의 세계로 10-15 장면 전부 + 고침 손 장면 + 가장자리 난수 장면."""
+    w = World(load_v2_config(WILD).replace(N=N), seeds=[SEED + 3])
+    w.reset()
+    if not (w._wf["hold_awake"] and w._wf["edge_r"] > 0.0):
+        raise SystemExit("v3_wild1_mirror.yaml 의 wild_flight.hold_awake·edge_r 가 꺼졌다")
+    _, old_scenes, _ = flight_scenes(k_random)
+    M = w.M
+    scenes = []
+
+    def base():
+        return {k: (v.copy() if isinstance(v, np.ndarray) else list(v) if isinstance(v, list) else v) for k, v in old_scenes[0].items()}
+
+    def at(deer_xy, wolf_xy, cd=0, sat=0, prev2=0):
+        sc = base()
+        sc["pos"][2] = deer_xy
+        sc["ppos"][0] = wolf_xy
+        sc["cd"][0], sc["sat"][0] = cd, sat
+        sc["prev"][2] = prev2
+        return sc
+
+    # (a) 지난 도주를 깨어 있는 늑대가 붙잡는다
+    scenes.append(at([30.0, 30.0], [40.0, 30.0], cd=10, prev2=2))      # 먹는 늑대 10 → 계속(그 늑대 반대)
+    scenes.append(at([30.0, 30.0], [40.0, 30.0], sat=100, prev2=2))    # 배부른 늑대 10 → 계속
+    scenes.append(at([30.0, 30.0], [51.0, 30.0], cd=10, prev2=2))      # 21 → 풀림
+    scenes.append(at([30.0, 30.0], [35.0, 30.0], cd=10))               # 먹는 늑대는 도주를 일으키지 않는다(경계)
+    # (b) 가장자리·모서리
+    scenes.append(at([1.5, 30.0], [6.5, 30.0]))                         # 왼쪽 벽 앞, 늑대 안쪽 → 벽을 따라
+    scenes.append(at([1.5, 1.5], [5.0, 6.0]))                           # 모서리, 늑대 대각선 안쪽 → 벽을 따라 빠져나옴
+    scenes.append(at([58.0, 3.0], [53.0, 3.5]))                         # 오른쪽 아래 모서리
+    scenes.append(at([3.0, 57.0], [3.5, 49.0], prev2=2))                # 위쪽 벽·왼쪽 모서리 근처, 지난 도주
+    scenes.append(at([2.0, 30.0], [10.0, 30.0]))                        # 경계(8 — 도주 거리 밖) 방향도 굽힌다
+    scenes.append(at([4.0, 20.0], [4.0, 14.0], cd=10, prev2=2))         # 가장자리를 따라 오는 먹는 늑대, 지난 도주
+    hand = len(scenes)
+    rng = np.random.default_rng(SEED + 7)
+    for _ in range(k_random):
+        ppos = rng.uniform(2.0, 58.0, (M, 2))
+        pos = np.clip(ppos[0] + rng.uniform(-15.0, 15.0, (w.N, 2)), 0.0, 60.0)
+        a = rng.uniform(0.0, 2.0 * np.pi, w.N)
+        sp = rng.uniform(0.0, 0.7, M)
+        b = rng.uniform(0.0, 2.0 * np.pi, M)
+        cov = [(float(x), float(y), float(r)) for x, y, r in zip(rng.uniform(5, 55, 2), rng.uniform(5, 55, 2), rng.uniform(2, 6, 2))]
+        scenes.append(dict(pos=pos, head=np.stack([np.cos(a), np.sin(a)], 1), see=rng.choice([1.0, 0.6, 0.3], w.N), ppos=ppos,
+                           pvel=np.stack([sp * np.cos(b), sp * np.sin(b)], 1), run=rng.random(M) < 0.5,
+                           cd=rng.choice([0, 0, 10], M), sat=rng.choice([0, 0, 100], M),
+                           target=np.where(rng.random(M) < 0.3, rng.integers(0, w.N, M), -1), covers=cov,
+                           prev=rng.choice([0, 1, 2, 2, 3], w.N).astype(np.int8), lock=rng.choice([-1, 0, 5], w.N)))
+    scenes = list(old_scenes) + scenes
+    outs = [_flight_run(w, sc) for sc in scenes]
+    return w, scenes, outs, len(old_scenes) + hand
+
+
+def edge_cases(n: int = 96, size: float = 60.0, edge_r: float = 5.0):
+    """가장자리 굽히기 wf_edge_steer 골든: (x, y, dx, dy) → (ox, oy). 위치는 가장자리·모서리 쪽이 많게."""
+    rng = np.random.default_rng(SEED + 8)
+
+    def near(k):
+        return np.where(rng.random(k) < 0.5, rng.uniform(0.0, 7.0, k), size - rng.uniform(0.0, 7.0, k))
+
+    x = np.where(rng.random(n) < 0.7, near(n), rng.uniform(0.0, size, n))
+    y = np.where(rng.random(n) < 0.7, near(n), rng.uniform(0.0, size, n))
+    a = rng.uniform(0.0, 2.0 * np.pi, n)
+    pos, d = np.stack([x, y], 1), np.stack([np.cos(a), np.sin(a)], 1)
+    d[:4] = [[-1.0, 0.0], [1.0, 0.0], [0.0, -1.0], [0.0, 1.0]]          # 벽에 곧장(따라가는 성분 0 — 무대 가운데 쪽)
+    pos[:4] = [[1.0, 30.0], [59.0, 40.0], [20.0, 0.5], [30.0, 59.5]]
+    out = wf_edge_steer(pos, d, size, edge_r)
+    return [(*pos[i], *d[i], *out[i]) for i in range(n)]
+
+
+def shelter_cases(n: int = 64):
+    """은신처 진입 금지 골든 (world.py `_rz_wall_push`·`_rz_wall_tangent`·`_rz_inside_disc`): 원 = 통합 무대 4개 + 겹친 원 하나.
+    (qx, qy, px, py, vx, vy) → (밀어낸 qx, qy, 밀었나, 접선 x, y, q 원 안)."""
+    w = World(load_v2_config(WILD).replace(N=4), seeds=[SEED + 9])
+    w.cov_c = np.array([[15.0, 15.0], [45.0, 15.0], [15.0, 45.0], [45.0, 45.0], [20.0, 15.0]])
+    w.cov_r = np.array([6.0, 6.0, 6.0, 6.0, 3.0])
+    rng = np.random.default_rng(SEED + 9)
+    rows = []
+    for i in range(n):
+        k = int(rng.integers(0, len(w.cov_r)))
+        ang = rng.uniform(0.0, 2.0 * np.pi)
+        u = np.array([np.cos(ang), np.sin(ang)])
+        p = w.cov_c[k] + (w.cov_r[k] + rng.uniform(0.01, 1.5)) * u
+        if w._rz_inside_disc(p[None, :])[0]:
+            p = w.cov_c[k] + (w.cov_r[k] + 3.2) * u
+        v = rng.uniform(-1.0, 1.0, 2) * rng.uniform(0.2, 1.2)
+        if i % 4 == 0:
+            v = (w.cov_c[k] - p) / np.linalg.norm(w.cov_c[k] - p) * 0.9     # 중심 쪽으로 곧장
+        q = p + v
+        if i == 1:
+            q = w.cov_c[0].copy()                                          # 중심과 겹침 → 이전 위치 쪽
+        qp, pushed = w._rz_wall_push(q[None, :], p[None, :], np.array([True]))
+        t = w._rz_wall_tangent(p[None, :], v[None, :])
+        rows.append((q[0], q[1], p[0], p[1], v[0], v[1], qp[0, 0], qp[0, 1], float(pushed[0]), t[0, 0], t[0, 1],
+                     float(w._rz_inside_disc(q[None, :])[0])))
+    return w, rows
+
+
 def build_header() -> str:
     w = make_world()
     wr = w._wr
@@ -295,6 +402,9 @@ def build_header() -> str:
     zv, zh = pw._zv, pw._zh
     fw, fsc, fout = flight_scenes()
     wf = fw._wf
+    xw, xsc, xout, xhand = flight_fix_scenes()
+    edges = edge_cases()
+    sw, srows = shelter_cases()
     L = [
         "// 자동 생성 — herbivore_rl/export_golden_v3_wild.py (손으로 고치지 않는다). 세계 configs/v3_wild1_mirror.yaml, 시드 32090.",
         "// v3 야생 1단계 골든 (명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md 5절). 검사는 Tests/EcoWildV3Test.cpp (AdaptiveEcosystem.Policy.V3.Wild.*).",
@@ -403,6 +513,32 @@ def build_header() -> str:
                                            float(sc['cd'][m]), float(sc['sat'][m]), float(sc['target'][m]))], 8, d_lit),
         c_array("double", "kFlightCover", [v for sc in fsc for k in range(2) for v in
                                            (sc['covers'][k] if k < len(sc['covers']) else (0.0, 0.0, -1.0))], 6, d_lit),
+        "",
+        "\t// ---- 10-16 고침 (명세 11절): 설정 값 hold_awake·edge_r 의 도주 장면, 가장자리 굽히기, 은신처 진입 금지 ----",
+        f"\tinline constexpr bool kFixHoldAwake = {str(bool(xw._wf['hold_awake'])).lower()};",
+        f"\tinline constexpr double kFixEdgeR = {d_lit(xw._wf['edge_r'])};",
+        "\t// 고친 도주 장면: 위 도주 장면과 같은 칸. 앞 kFlightScenes 개 = 10-15 장면(입력 같음), 그 뒤 고침 손 장면 (kFixHandScenes 까지), 그 뒤 난수 장면",
+        f"\tinline constexpr std::int32_t kFixScenes = {len(xsc)};",
+        f"\tinline constexpr std::int32_t kFixHandScenes = {xhand};",
+        c_array("double", "kFixDeerIn", [v for sc in xsc for i in range(xw.N) for v in
+                                         (sc['pos'][i, 0], sc['pos'][i, 1], sc['head'][i, 0], sc['head'][i, 1], sc['see'][i],
+                                          float(sc['prev'][i]), float(sc['lock'][i]))], 7, d_lit),
+        c_array("double", "kFixDeerOut", [v for o in xout for i in range(xw.N) for v in
+                                          (float(o['mode'][i]), o['dir'][i, 0], o['dir'][i, 1], float(o['lock'][i]))], 4, d_lit),
+        c_array("double", "kFixWolf", [v for sc in xsc for m in range(xw.M) for v in
+                                       (sc['ppos'][m, 0], sc['ppos'][m, 1], sc['pvel'][m, 0], sc['pvel'][m, 1], float(sc['run'][m]),
+                                        float(sc['cd'][m]), float(sc['sat'][m]), float(sc['target'][m]))], 8, d_lit),
+        c_array("double", "kFixCover", [v for sc in xsc for k in range(2) for v in
+                                        (sc['covers'][k] if k < len(sc['covers']) else (0.0, 0.0, -1.0))], 6, d_lit),
+        "\t// 가장자리 굽히기 wf_edge_steer (무대 60, edge_r kFixEdgeR): (x, y, dx, dy, 나온 x, y)",
+        f"\tinline constexpr std::int32_t kEdgeCases = {len(edges)};",
+        c_array("double", "kEdgeCase", [v for r in edges for v in r], 6, d_lit),
+        "\t// 은신처 진입 금지: 원 (x, y, r) × kShelterDiscCount, 경우 (qx, qy, px, py, vx, vy, 밀어낸 x, y, 밀었나, 접선 x, y, q 원 안)",
+        f"\tinline constexpr std::int32_t kShelterDiscCount = {len(sw.cov_r)};",
+        f"\tinline constexpr double kShelterWorldSize = {d_lit(sw.size)};",
+        c_array("double", "kShelterDisc", [v for c, r in zip(sw.cov_c, sw.cov_r) for v in (c[0], c[1], r)], 6, d_lit),
+        f"\tinline constexpr std::int32_t kShelterCases = {len(srows)};",
+        c_array("double", "kShelterCase", [v for r in srows for v in r], 6, d_lit),
         "}",
         "",
     ]

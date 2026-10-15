@@ -200,7 +200,126 @@ namespace EcoThreatV3
 		bool bWildSatiation = false;
 		std::int32_t SatSteps = 450;               // 반올림(sat_days 0.5 × 하루 900 스텝) = 60 초
 		double RestSpeed = 0.3;                    // rest_speed: 배부른 늑대의 배회 속력 배수
+
+		// ---- 은신처 안전·늑대 진입 금지 (사용자 보고 10-16 '은신처 안에서도 잡힌다', 파이썬 R3 realism_shelter (c)·(c′) — world.py 모듈 docstring,
+		//      configs/v3_wild1_mirror.yaml realism_shelter: untargetable·player_too·block_predators 모두 true). 기본 끔 = R1b 학습 세계 그대로.
+		//      켜는 쪽: EcoWorldV3 FWorldConfig::bShelterSafe (통합 모드 eco.IntegratedV3.ShelterSafe) ----
+		// bShelterSafe: 은신처 원 안(FPreyView::bInCover — 이동 뒤 위치, 가장자리 포함) 사슴은 행동과 무관하게 표적이 되지 않고 잡히지 않는다
+		//   (모든 위협 — player_too). bShelterBlock: 위협이 이동 뒤 원 안(|q − c| < r)이면 둘레 밖으로 밀어 둘레를 따라 미끄러지게 한다(Step 8, ShelterPush·
+		//   ShelterTangent, 막다른 곳이면 돌아선다). 원 목록은 FThreatStepInput::Discs. 현실 근거: 빽빽한 덤불 속으로는 늑대가 따라 들어가 덮칠 수 없다
+		bool bShelterSafe = false;
+		bool bShelterBlock = false;
 	};
+
+	// 은신처 진입 금지 상수 (world.py WALL_EPS·WALL_PASSES·WALL_DEAD_FRAC)
+	inline constexpr double kShelterWallEps = 1.0e-6;      // 밀어낸 위치의 반지름 여유 (단위)
+	inline constexpr std::int32_t kShelterPasses = 3;      // 밀어내기 바퀴 수
+	inline constexpr double kShelterDeadFrac = 0.1;        // 가려던 거리의 이 몫도 못 가면 막다른 곳 → 돌아선다
+
+	/** 위치 (X, Y) 가 은신처 원 안인가 (|q − c| < r, 둘레 위는 밖 — world.py `_rz_inside_disc`). Discs = (x, y, r) × Num. */
+	inline bool InsideAnyDisc(double X, double Y, const double* Discs, std::int32_t Num)
+	{
+		for (std::int32_t k = 0; k < Num; ++k)
+		{
+			const double Ex = X - Discs[3 * k];
+			const double Ey = Y - Discs[3 * k + 1];
+			if (std::sqrt(Ex * Ex + Ey * Ey) < Discs[3 * k + 2])
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 밀어내기 (world.py `_rz_wall_push` 한 위협): 이동 뒤 위치 Q 가 원 k 안이면 c_k + (r_k + WallEps)·단위(Q − c_k) (Q 가 중심과 겹치면
+	 * 단위(P − c_k), P = 이동 전 위치)로 옮긴다. 원 순서대로, 옮긴 원이 없을 때까지 최대 kShelterPasses 바퀴. 반환 = 한 번이라도 밀었나.
+	 */
+	inline bool ShelterPush(double& QX, double& QY, double PX, double PY, const double* Discs, std::int32_t Num)
+	{
+		if (Num <= 0 || !InsideAnyDisc(QX, QY, Discs, Num))
+		{
+			return false;
+		}
+		bool bPushed = false;
+		for (std::int32_t Pass = 0; Pass < kShelterPasses; ++Pass)
+		{
+			bool bMoved = false;
+			for (std::int32_t k = 0; k < Num; ++k)
+			{
+				const double Cx = Discs[3 * k];
+				const double Cy = Discs[3 * k + 1];
+				const double R = Discs[3 * k + 2];
+				const double Ex = QX - Cx;
+				const double Ey = QY - Cy;
+				const double D = std::sqrt(Ex * Ex + Ey * Ey);
+				if (!(D < R))
+				{
+					continue;
+				}
+				double Ux, Uy;
+				if (D > kEps)
+				{
+					Ux = Ex / D;
+					Uy = Ey / D;
+				}
+				else
+				{
+					const double Px = PX - Cx;
+					const double Py = PY - Cy;
+					const double Dp = std::sqrt(Px * Px + Py * Py);
+					const double Dm = Dp > kEps ? Dp : kEps;
+					Ux = Px / Dm;
+					Uy = Py / Dm;
+				}
+				const double Rr = R + kShelterWallEps;
+				QX = Cx + Rr * Ux;
+				QY = Cy + Rr * Uy;
+				bPushed = true;
+				bMoved = true;
+			}
+			if (!bMoved)
+			{
+				break;
+			}
+		}
+		return bPushed;
+	}
+
+	/**
+	 * 접선 미끄러짐 (world.py `_rz_wall_tangent` 한 위협): 이전 위치 P 에서 둘레가 가장 가까운 원 k (|P − c_k| − r_k 최소, 같으면 낮은 번호)의
+	 * 바깥 법선 n 에 대해 이동 V 의 안쪽 성분만 뺀 P + V − min(V·n, 0)·n 를 [0, Size] 로 자른다.
+	 */
+	inline void ShelterTangent(double PX, double PY, double VX, double VY, const double* Discs, std::int32_t Num, double Size,
+							   double& OutX, double& OutY)
+	{
+		std::int32_t Kb = 0;
+		double Best = 0.0, Bex = 0.0, Bey = 0.0, Bd = 0.0;
+		for (std::int32_t k = 0; k < Num; ++k)
+		{
+			const double Ex = PX - Discs[3 * k];
+			const double Ey = PY - Discs[3 * k + 1];
+			const double D = std::sqrt(Ex * Ex + Ey * Ey);
+			const double Edge = D - Discs[3 * k + 2];
+			if (k == 0 || Edge < Best)
+			{
+				Kb = k;
+				Best = Edge;
+				Bex = Ex;
+				Bey = Ey;
+				Bd = D;
+			}
+		}
+		(void)Kb;
+		const double Nx = Bd > kEps ? Bex / Bd : 1.0;
+		const double Ny = Bd > kEps ? Bey / Bd : 0.0;
+		const double Dot = VX * Nx + VY * Ny;
+		const double Vn = Dot < 0.0 ? Dot : 0.0;
+		const double X = PX + (VX - Vn * Nx);
+		const double Y = PY + (VY - Vn * Ny);
+		OutX = X < 0.0 ? 0.0 : (X > Size ? Size : X);
+		OutY = Y < 0.0 ? 0.0 : (Y > Size ? Size : Y);
+	}
 
 	// 위협 하나의 바뀌지 않는 성질 (세계 생성 때 정한다 — world.py:907-912, 976-1011)
 	struct FThreatSpec
@@ -267,6 +386,9 @@ namespace EcoThreatV3
 		double WanderTurn = 0.0;    // 배회 선회 (rad, U[-PredWanderTurn, PredWanderTurn]). 표적이 있어도 늘 넣는다
 		double PlayerModeU0 = 0.0;  // 플레이어가 이번 스텝에 새 모드를 고를 때만 읽는다 (U[0, 1) 두 개)
 		double PlayerModeU1 = 0.0;
+		// 은신처 원 (x, y, r) × NumDiscs — Cfg.bShelterBlock 일 때만 읽는다 (통합 모드 = 레벨에서 받은 은신처 + 우리 은신처, FWorldConfig::Covers)
+		const double* Discs = nullptr;
+		std::int32_t NumDiscs = 0;
 	};
 
 	struct FThreatStepResult
@@ -684,7 +806,7 @@ namespace EcoThreatV3
 			for (std::int32_t i = 0; i < In.NumPrey; ++i)
 			{
 				const FPreyView& P = In.Prey[i];
-				if (!P.bAlive)
+				if (!P.bAlive || (Cfg.bShelterSafe && P.bInCover))   // 은신처 안 사슴은 표적이 아니다 (realism_shelter untargetable)
 				{
 					continue;
 				}
@@ -822,6 +944,11 @@ namespace EcoThreatV3
 		// 8. 이동·벽 반사·heading·변위 (world.py:2083-2113)
 		double NX = QX + MX * Speed;
 		double NY = QY + MY * Speed;
+		// 8a. 은신처 진입 금지 (켰을 때만, world.py R3 (c′)): 원 안이면 둘레 밖으로 (벽 반사 전)
+		const bool bBlock = Cfg.bShelterBlock && In.Discs != nullptr && In.NumDiscs > 0;
+		const double SVX = MX * Speed;   // 이번 스텝 이동 (벽 반사 전 방향 — 접선 미끄러짐·막다른 곳에 쓴다)
+		const double SVY = MY * Speed;
+		const bool bPushed = bBlock && ShelterPush(NX, NY, QX, QY, In.Discs, In.NumDiscs);
 		if (NX < 0.0 || NX > In.WorldSize)
 		{
 			MX = -MX;
@@ -834,6 +961,28 @@ namespace EcoThreatV3
 		}
 		NX = NX < 0.0 ? 0.0 : (NX > In.WorldSize ? In.WorldSize : NX);
 		NY = NY < 0.0 ? 0.0 : (NY > In.WorldSize ? In.WorldSize : NY);
+		if (bBlock)
+		{
+			// 밀어내도(또는 clip 뒤에) 원 안이면 이전 위치에서 접선으로만, 그래도 원 안이면 이전 위치. 막다른 곳이면 돌아선다 (world.py 그대로.
+			// 플레이어의 막다른 곳 포기·reset 때 원 안 위협 옮기기는 옮기지 않았다 — 통합 무대는 플레이어가 없고 늑대는 모서리에서 시작한다)
+			const bool bInside = InsideAnyDisc(NX, NY, In.Discs, In.NumDiscs);
+			if (bInside)
+			{
+				double AX = 0.0, AY = 0.0;
+				ShelterTangent(QX, QY, SVX, SVY, In.Discs, In.NumDiscs, In.WorldSize, AX, AY);
+				const bool bOk = !InsideAnyDisc(AX, AY, In.Discs, In.NumDiscs);
+				NX = bOk ? AX : QX;
+				NY = bOk ? AY : QY;
+			}
+			const double Want = std::sqrt(SVX * SVX + SVY * SVY);
+			const double DvX = NX - QX;
+			const double DvY = NY - QY;
+			if ((bPushed || bInside) && Want > kEps && std::sqrt(DvX * DvX + DvY * DvY) < kShelterDeadFrac * Want)
+			{
+				MX = -SVX / Want;
+				MY = -SVY / Want;
+			}
+		}
 		Normalize2(MX, MY);
 		T.HeadX = MX;
 		T.HeadY = MY;
@@ -854,7 +1003,7 @@ namespace EcoThreatV3
 			for (std::int32_t i = 0; i < In.NumPrey; ++i)
 			{
 				const FPreyView& P = In.Prey[i];
-				if (!P.bAlive)
+				if (!P.bAlive || (Cfg.bShelterSafe && P.bInCover))   // 은신처 안 사슴은 잡히지 않는다 (realism_shelter (c))
 				{
 					continue;
 				}

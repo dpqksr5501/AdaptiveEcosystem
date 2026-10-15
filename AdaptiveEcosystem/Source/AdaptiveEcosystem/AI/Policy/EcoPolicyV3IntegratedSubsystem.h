@@ -77,6 +77,11 @@
 //      감지 eco.IntegratedV3.RealismVision (-EcoV3RealismVision=, 위협 시야 300° — 바로 뒤 60° 만 사각)·eco.IntegratedV3.RealismHearing
 //      (-EcoV3RealismHearing=, 늑대 걸음이 빠를수록 멀리 들림 4~40 m, 어슬렁거리는 늑대는 4 m): R3 세계 값 그대로. 보임과 같은 칸이라
 //      두뇌 관측(위협 수·거리·접근)·사건이 함께 바뀐다 (EcoObservationV3.h FHearingConfig·HearingRadius·ThreatFovCos).
+//  11. 10-16 고침 (사용자 보고 '늑대가 먹기 시작하면 도망치던 사슴이 멈춘다'·'가장자리에서 늑대가 계속 잡아먹는다'·'은신처 안에서도 잡힌다',
+//      명세 RL_V3_WILD1_SPEC.md 11절): 도주는 깨어 있는 늑대 모두에게서 SafeDistM 밖까지(먹는·배부른 늑대 곁에서 멈추지 않는다), 가장자리
+//      10 m 안의 경계·도주는 벽을 따라·모서리 밖으로 (WildFlightConfig 의 bHoldAwake·EdgeR — eco.IntegratedV3.WildFlight 에 묶음).
+//      은신처 안전 eco.IntegratedV3.ShelterSafe (-EcoV3ShelterSafe=, 기본 1, EcoThreatModel.h bShelterSafe·bShelterBlock): 은신처 원 안 사슴은
+//      표적·포획에서 빠지고 늑대는 원 둘레를 따라 미끄러진다. 원 = 레벨에서 받은 은신처 + 우리 은신처 (FWorldConfig::Covers).
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -196,6 +201,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bWildSatiation = true;         // 늑대 포만 (eco.IntegratedV3.WildSatiation 기본 1, 야생 w2). 거짓 = 식사가 끝나면 곧바로 사냥
 	bool bRealismVision = true;         // 위협 시야 300° (eco.IntegratedV3.RealismVision 기본 1, R3 realism_vision). 거짓 = 앞쪽 120°
 	bool bRealismHearing = true;        // 늑대 발소리 (eco.IntegratedV3.RealismHearing 기본 1, R3 realism_hearing). 거짓 = 소리 없음
+	bool bShelterSafe = true;           // 은신처 안전·늑대 진입 금지 (eco.IntegratedV3.ShelterSafe 기본 1, 10-16 — R3 realism_shelter). 거짓 = 은신처 안에서도 잡힘
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등
@@ -253,6 +259,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 		K.AlertR = Units(AlertDistM, 30.0);
 		K.FlightR = Units(PanicDistM, 15.0);
 		K.SafeR = FMath::Max(Units(SafeDistM, 40.0), FMath::Max(K.AlertR, K.FlightR));
+		// 10-16 고침 (configs/v3_wild1_mirror.yaml hold_awake true·edge_r 5): 도주는 깨어 있는 늑대 모두에게서 SafeR 밖까지, 가장자리 10 m 안은 벽을 따라
+		K.bHoldAwake = true;
+		K.EdgeR = 5.0;
 		return K;
 	}
 

@@ -47,7 +47,9 @@
 - '고치기 전' = 10-15 설정(이 커밋 앞 `configs/v3_wild1_mirror.yaml`)을 같은 코드로 돌린 것이다. 새 키의 기본값이 10-15 그대로라 같은 결과다(위 240초 표 97.0·3.0·0.0 과 같다).
 - 다시 돌리기(herbivore_rl/ 에서): `python results/v3/mirror/run_mirror.py --diag --out-dir results/v3/wild1/runs --config configs/v3_wild1_mirror.yaml
   --deer 128 --seeds 32000-32089 --name d128_fix_after`(포만 끔은 `--disable wild_satiation`), 표 `python results/v3/wild1/summarize_fix.py <이름들>`.
-- 언리얼 이식(C++)은 아직이다. 이 절의 세 규칙은 아직 파이썬에만 있다.
+- 언리얼 이식(C++): 세 규칙 모두 옮겼다(EcoWorldV3.h `WildEdgeSteer`·`UpdateWildFlight`, EcoThreatModel.h `ShelterPush`·`ShelterTangent`·표적·포획 제외,
+  콘솔 변수 eco.IntegratedV3.ShelterSafe 기본 1, 도주 유지·가장자리는 eco.IntegratedV3.WildFlight 에 묶음). 골든(가장자리 96·은신처 64·고친 도주 장면 54)이
+  파이썬과 오차 0 으로 같고, 기준 루프 900 스텝에서 켜면 은신처 안 잡힘 0·늑대 원 안 0(끄면 7·791)이다(자동 시험 Wild.FixGolden·Wild.ShelterRun).
 
 ## 240초 표 (세계 90개, 128마리 시드 32000~32089, 64마리 33000~33089 — 기준과 같은 시드)
 

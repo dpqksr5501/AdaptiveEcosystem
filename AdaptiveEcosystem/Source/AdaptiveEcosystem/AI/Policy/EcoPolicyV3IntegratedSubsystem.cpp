@@ -122,6 +122,14 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("wild_satiation. 0 = 먹기가 끝나면 곧바로 사냥(지금까지). Play 전에 바꾼다. 명령줄 -EcoV3WildSatiation= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarShelterSafe(
+		TEXT("eco.IntegratedV3.ShelterSafe"),
+		1,
+		TEXT("통합 v3 모드의 은신처 안전·늑대 진입 금지 (1 = 켬, 기본 — 사용자 보고 10-16 '은신처 안에서도 잡힌다'). 은신처 원 안 사슴은 무엇을 하든 ")
+		TEXT("늑대의 표적이 되지 않고 잡히지 않는다. 늑대는 은신처 원 안으로 들어가지 못하고 둘레를 따라 미끄러진다. 값 = 파이썬 configs/v3_wild1_mirror.yaml ")
+		TEXT("realism_shelter (R3 값). 0 = 은신처 안에서도 잡힘(지금까지). Play 전에 바꾼다. 명령줄 -EcoV3ShelterSafe= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarRealismVision(
 		TEXT("eco.IntegratedV3.RealismVision"),
 		1,
@@ -416,6 +424,7 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bWildSatiation = CVarWildSatiation.GetValueOnGameThread() != 0;
 	S.bRealismVision = CVarRealismVision.GetValueOnGameThread() != 0;
 	S.bRealismHearing = CVarRealismHearing.GetValueOnGameThread() != 0;
+	S.bShelterSafe = CVarShelterSafe.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -481,6 +490,11 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3WildSatiation="), SatArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.WildSatiation"), LexToString(SatArg));
+	}
+	int32 ShelterArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ShelterSafe="), ShelterArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ShelterSafe"), LexToString(ShelterArg));
 	}
 	int32 VisionArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3RealismVision="), VisionArg))
@@ -605,8 +619,9 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 도주 반사 거리: %s"),
 		   *(Keep.bEnabled
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.WildFlight 1, 야생 w3) — 사냥 중인 늑대를 알아채면 %.0f m 안 = 먹으며 멀어짐(경계), %.0f m 안이거나 다가옴 = ")
-									   TEXT("안전 거리 %.0f m 밖·은신처까지 뜀(도주, 반대쪽 ±60° 은신처 쪽), 은신처 안이면 웅크림, 먹는·쉬는 늑대는 경계만, 자는 늑대 무시"),
-								   Keep.AlertR * MPerUnit, Keep.FlightR * MPerUnit, Keep.SafeR * MPerUnit)
+									   TEXT("깨어 있는 늑대 모두에게서 %.0f m 밖·은신처까지 뜀(도주, 반대쪽 ±60° 은신처 쪽, 가장자리 %.0f m 안은 벽을 따라·모서리 밖으로), 은신처 안이면 웅크림, ")
+									   TEXT("먹는·쉬는 늑대는 경계만 일으킴, 자는 늑대 무시"),
+								   Keep.AlertR * MPerUnit, Keep.FlightR * MPerUnit, Keep.SafeR * MPerUnit, Keep.EdgeR * MPerUnit)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildFlight 0 — 두뇌 그대로)"))));
 	const EcoWorldV3::FWildReserveConfig Wr;
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 지방 비축: %s"),
@@ -623,6 +638,9 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Ws.SatDays, EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900),
 								   EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900) * EcoRepertoireV3::kStepSeconds, Ws.RestSpeed)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildSatiation 0 — 먹기가 끝나면 곧바로 사냥)"))));
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 은신처: %s"),
+		   Settings.bShelterSafe ? TEXT("안전 (eco.IntegratedV3.ShelterSafe 1, 10-16) — 원 안 사슴은 표적·포획에서 빠지고 늑대는 둘레를 따라 미끄러짐")
+								 : TEXT("끔 (eco.IntegratedV3.ShelterSafe 0 — 은신처 안에서도 잡힘)"));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 감지: 위협 시야 %s | 늑대 발소리 %s"),
 		   Settings.bRealismVision ? TEXT("300° (eco.IntegratedV3.RealismVision 1 — 바로 뒤 60° 만 사각)") : TEXT("120° (eco.IntegratedV3.RealismVision 0 — R1b 그대로)"),
 		   Settings.bRealismHearing ? TEXT("켬 (eco.IntegratedV3.RealismHearing 1 — 쫓아 달리면 최대 40 m, 어슬렁거리면 4 m, 서 있으면 없음)")
@@ -880,6 +898,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	// 감지 (eco.IntegratedV3.RealismVision·RealismHearing, R3 값 그대로 — FRealismVisionConfig·FHearingConfig 기본값)
 	C.RealismVision.bEnabled = S.bRealismVision;
 	C.RealismHearing.bEnabled = S.bRealismHearing;
+	// 은신처 안전·늑대 진입 금지 (eco.IntegratedV3.ShelterSafe, 10-16 — R3 realism_shelter): 원 목록 = Covers (레벨에서 받은 은신처 + 우리 은신처)
+	C.bShelterSafe = S.bShelterSafe;
 	return C;
 }
 

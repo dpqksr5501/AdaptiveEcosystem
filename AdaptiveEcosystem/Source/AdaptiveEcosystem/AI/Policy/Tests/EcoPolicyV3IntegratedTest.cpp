@@ -1302,8 +1302,11 @@ bool FEcoPolicyV3IntegratedEndToEndTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("죽은 개체를 지워도 스텝이 계속된다"), H.Destroyed > 0 && A->Sim.T == Steps && B->Sim.T == Steps && H.Sub->GetGlobalStep() == Steps);
 	TestEqual(TEXT("시체가 움직인 프레임"), CorpseMoved, 0);
 	TestEqual(TEXT("무대 밖 자리"), OutOfStage, 0);
-	TestTrue(TEXT("잠행형 최고 속력 ≤ 돌진 1350 cm/s"), MaxStalkerCmS <= 1350.0 + 1e-3);
-	TestTrue(TEXT("추격형 최고 속력 ≤ 720 cm/s (사슴 뛰기의 0.8배)"), MaxChaserCmS <= 720.0 + 1e-3);
+	// 10-16 은신처 진입 금지(eco.IntegratedV3.ShelterSafe 기본 1): 원 안으로 들어간 늑대를 둘레 밖으로 밀면 그 스텝 변위가 걸음보다 조금 길 수 있다
+	// (파이썬 R3 (c′) 그대로 — 둘레 방향 이동 + 바깥쪽 밀기). 그 몫으로 1% 여유를 둔다 (이 시험 2000 스텝 관측: 1351·721 cm/s)
+	const double PushSlack = FEcoV3IntegratedSettings().bShelterSafe ? 1.01 : 1.0;
+	TestTrue(TEXT("잠행형 최고 속력 ≤ 돌진 1350 cm/s (은신처 밀기 여유 1%)"), MaxStalkerCmS <= 1350.0 * PushSlack + 1e-3);
+	TestTrue(TEXT("추격형 최고 속력 ≤ 720 cm/s (사슴 뛰기의 0.8배, 은신처 밀기 여유 1%)"), MaxChaserCmS <= 720.0 * PushSlack + 1e-3);
 	TestTrue(TEXT("사슴 최고 속력 ≤ 뛰기 900 cm/s"), MaxDeerCmS <= 900.0 + 1e-3);
 	TestTrue(TEXT("밤에는 주행성 늑대가 모두 잔다"), AllAsleepSteps > 0);
 	return true;

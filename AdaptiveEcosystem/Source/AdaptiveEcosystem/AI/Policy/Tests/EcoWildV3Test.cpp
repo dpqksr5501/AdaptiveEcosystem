@@ -15,6 +15,8 @@
 //   Wild.PerceptionGolden R3 감지: 시야 300° cos·발소리 계수, 장면 12개의 소리 반경·사슴 × 늑대 알아챔·보이는 수·가장 가까운 거리
 //   Wild.FlightGolden    (w3) 계수, 도주 장면 28개(test_wild1 반사 장면 12 + 난수 16)의 다음 덮기·방향·풀림 잠금 = 파이썬 _wf_update
 //   Wild.FlightRun       (w3) 끈 세계는 계수와 무관하게 비트 단위로 같고 덮기 0, 켠 세계는 경계·도주가 돌고 경계 중 먹기 = 걷기·섭식 0.5·고개 듦
+//   Wild.FixGolden       10-16 고침: 기본값(끔)·통합 기본값, 가장자리 굽히기 96 경우·은신처 밀기/접선 64 경우·고친 도주 장면 54개 = 파이썬
+//   Wild.ShelterRun      10-16 은신처 안전: 기준 루프 900 스텝, 켜면 은신처 안 잡힘 0·늑대 원 안 0, 끄면 늑대가 원에 들어간다
 //   Wild.SatiationGolden (w2) 계수·하루 → 스텝, 포만 열(막 잡은 늑대 둘: 쿨다운·남은 배부름·쉼 정확히, 속력 = 파이썬 변위), 잡으면 배부름, 늑대 글자
 
 #include "Misc/AutomationTest.h"
@@ -659,6 +661,224 @@ bool FEcoWildV3FlightRunTest::RunTest(const FString& Parameters)
 	AddInfo(FString::Printf(TEXT("켬 600 스텝: 경계 시작 %lld · 도주 시작 %lld · 웅크림 시작 %lld · 끝난 도주 %lld (은신처 %lld) · 경계 중 먹기 %d · 포획 %lld"),
 							So.KeepAlertStarts, So.KeepPanicStarts, So.KeepShelterStarts, So.KeepPanicEnds, So.KeepPanicEndShelter, AlertWalk,
 							So.Caught));
+	return true;
+}
+
+// ---- 10-16 고침 (명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md 11절): 도주 유지(bHoldAwake)·가장자리 굽히기(EdgeR)·은신처 안전·늑대 진입 금지 ----
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoWildV3FixGoldenTest,
+	"AdaptiveEcosystem.Policy.V3.Wild.FixGolden",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoWildV3FixGoldenTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoWorldV3;
+	namespace GW = EcoWorldV3::GoldenWild;
+	const FWildFlightConfig Def;
+	TestFalse(TEXT("고침 키 기본은 10-15 그대로 (hold_awake 거짓, edge_r 0)"), Def.bHoldAwake || Def.EdgeR != 0.0);
+	TestFalse(TEXT("은신처 안전 기본은 끔"), FWorldConfig().bShelterSafe || EcoThreatV3::FThreatConfig().bShelterSafe
+															 || EcoThreatV3::FThreatConfig().bShelterBlock);
+	const EcoWorldV3::FWildFlightConfig Integrated = FEcoV3IntegratedSettings().WildFlightConfig();
+	TestEqual(TEXT("통합 v3 기본 = 설정 hold_awake"), Integrated.bHoldAwake, GW::kFixHoldAwake);
+	TestEqual(TEXT("통합 v3 기본 = 설정 edge_r"), Integrated.EdgeR, GW::kFixEdgeR);
+	TestTrue(TEXT("통합 v3 기본 은신처 안전 켬"), FEcoV3IntegratedSettings().bShelterSafe);
+
+	// 1) 가장자리 굽히기 = 파이썬 wf_edge_steer
+	int32 EdgeBad = 0;
+	double EdgeErr = 0.0;
+	for (int32 c = 0; c < GW::kEdgeCases; ++c)
+	{
+		const double* E = &GW::kEdgeCase[c * 6];
+		const EcoRepertoireV3::FVec2 O = WildEdgeSteer({E[0], E[1]}, {E[2], E[3]}, 60.0, GW::kFixEdgeR);
+		const double Err = FMath::Max(FMath::Abs(O.X - E[4]), FMath::Abs(O.Y - E[5]));
+		EdgeErr = FMath::Max(EdgeErr, Err);
+		if (Err > 1.0e-12 && ++EdgeBad <= 3)
+		{
+			AddError(FString::Printf(TEXT("가장자리 %d: (%.17g, %.17g) 파이썬 (%.17g, %.17g)"), c, O.X, O.Y, E[4], E[5]));
+		}
+	}
+	TestEqual(TEXT("가장자리 굽히기 = 파이썬 (|Δ| ≤ 1e-12)"), EdgeBad, 0);
+
+	// 2) 은신처 진입 금지 = 파이썬 _rz_wall_push·_rz_wall_tangent·_rz_inside_disc
+	int32 ShBad = 0;
+	int32 Pushed = 0;
+	for (int32 c = 0; c < GW::kShelterCases; ++c)
+	{
+		const double* R = &GW::kShelterCase[c * 12];
+		double QX = R[0], QY = R[1];
+		const bool bPushed = EcoThreatV3::ShelterPush(QX, QY, R[2], R[3], GW::kShelterDisc, GW::kShelterDiscCount);
+		double TX = 0.0, TY = 0.0;
+		EcoThreatV3::ShelterTangent(R[2], R[3], R[4], R[5], GW::kShelterDisc, GW::kShelterDiscCount, GW::kShelterWorldSize, TX, TY);
+		const bool bIn = EcoThreatV3::InsideAnyDisc(R[0], R[1], GW::kShelterDisc, GW::kShelterDiscCount);
+		const bool bBad = FMath::Abs(QX - R[6]) > 1.0e-12 || FMath::Abs(QY - R[7]) > 1.0e-12 || bPushed != (R[8] != 0.0)
+						  || FMath::Abs(TX - R[9]) > 1.0e-12 || FMath::Abs(TY - R[10]) > 1.0e-12 || bIn != (R[11] != 0.0);
+		Pushed += bPushed ? 1 : 0;
+		if (bBad && ++ShBad <= 3)
+		{
+			AddError(FString::Printf(TEXT("은신처 %d: 밀기 (%.17g, %.17g) %d 접선 (%.17g, %.17g) 안 %d, 파이썬 (%.17g, %.17g) %d (%.17g, %.17g) %d"), c, QX, QY,
+									 bPushed ? 1 : 0, TX, TY, bIn ? 1 : 0, R[6], R[7], static_cast<int32>(R[8]), R[9], R[10], static_cast<int32>(R[11])));
+		}
+	}
+	TestEqual(TEXT("은신처 밀기·접선·원 안 = 파이썬"), ShBad, 0);
+	TestTrue(TEXT("은신처 경우에 밀린 경우가 있다"), Pushed > 0);
+
+	// 3) 고친 도주 장면 = 파이썬 _wf_update (설정 값 hold_awake·edge_r)
+	FWorldConfig C;
+	C.WorldSize = GW::kFlightWorldSize;
+	C.NumHerbivores = GW::kFlightN;
+	C.NumStalkers = 0;
+	C.NumChasers = GW::kFlightM;
+	C.NumRanged = 0;
+	C.NumNocturnal = 0;
+	C.bRespawnDead = false;
+	C.WildSatiation.bEnabled = true;
+	C.RealismVision.bEnabled = true;
+	C.RealismHearing.bEnabled = true;
+	C.WildFlight.bEnabled = true;
+	C.WildFlight.bHoldAwake = GW::kFixHoldAwake;
+	C.WildFlight.EdgeR = GW::kFixEdgeR;
+	FReferenceWorld Ref;
+	Ref.Init(C);
+	int32 Bad = 0;
+	int32 HandBad = 0;
+	double MaxErr = 0.0;
+	for (int32 k = 0; k < GW::kFixScenes; ++k)
+	{
+		FWorldState& W = Ref.World;
+		W.Config.Covers.clear();
+		for (int32 c = 0; c < 2; ++c)
+		{
+			const double* Cv = &GW::kFixCover[(k * 2 + c) * 3];
+			if (Cv[2] >= 0.0)
+			{
+				W.Config.Covers.push_back({Cv[0], Cv[1], Cv[2]});
+			}
+		}
+		W.Dark = 0.0;
+		for (int32 m = 0; m < GW::kFlightM; ++m)
+		{
+			const double* Wv = &GW::kFixWolf[(k * GW::kFlightM + m) * 8];
+			FThreatAgent& A = Ref.Threats[static_cast<size_t>(m)];
+			A.State.PosX = Wv[0];
+			A.State.PosY = Wv[1];
+			A.State.VelX = Wv[2];
+			A.State.VelY = Wv[3];
+			A.Last.bRunning = Wv[4] != 0.0;
+			A.State.Cooldown = static_cast<int32>(Wv[5]);
+			A.State.SatLeft = static_cast<int32>(Wv[6]);
+			A.Last.Target = static_cast<int32>(Wv[7]);
+			A.Last.bHasTarget = A.Last.Target >= 0;
+			A.State.bAsleep = false;
+		}
+		for (int32 i = 0; i < GW::kFlightN; ++i)
+		{
+			const double* Dv = &GW::kFixDeerIn[(k * GW::kFlightN + i) * 7];
+			FHerbBody& B = Ref.Bodies[static_cast<size_t>(i)];
+			B.Pos = {Dv[0], Dv[1]};
+			B.Head = {Dv[2], Dv[3]};
+			B.DeathCause = kDeathNone;
+			EcoRepertoireV3::FRepState& S = Ref.Reps[static_cast<size_t>(i)];
+			S.SeeMult = Dv[4];
+			S.SeeMultLast = Dv[4];
+			S.LockLeft = static_cast<int32>(Dv[6]);
+			Ref.Decisions[static_cast<size_t>(i)].KeepActive = static_cast<int32>(Dv[5]);
+		}
+		ObserveAll(W, Ref.Views.data(), Ref.NumHerbivores(), Ref.ThreatPtrs.data(), Ref.NumThreats());
+		Detail::UpdateWildFlight(W, Ref.Views.data(), Ref.NumHerbivores(), Ref.ThreatPtrs.data(), Ref.NumThreats());
+		for (int32 i = 0; i < GW::kFlightN; ++i)
+		{
+			const double* O = &GW::kFixDeerOut[(k * GW::kFlightN + i) * 4];
+			const FHerbDecision& D = Ref.Decisions[static_cast<size_t>(i)];
+			const double Err = FMath::Max(FMath::Abs(D.KeepDir.X - O[1]), FMath::Abs(D.KeepDir.Y - O[2]));
+			MaxErr = FMath::Max(MaxErr, Err);
+			const bool bBad = D.KeepMode != static_cast<int32>(O[0]) || Err > 1.0e-12
+							  || Ref.Reps[static_cast<size_t>(i)].LockLeft != static_cast<int32>(O[3]);
+			HandBad += (bBad && k < GW::kFixHandScenes) ? 1 : 0;
+			if (bBad && ++Bad <= 3)
+			{
+				AddError(FString::Printf(TEXT("고친 도주 장면 %d 사슴 %d: 덮기 %d 방향 (%.17g, %.17g), 파이썬 %d (%.17g, %.17g)"), k, i, D.KeepMode,
+										 D.KeepDir.X, D.KeepDir.Y, static_cast<int32>(O[0]), O[1], O[2]));
+			}
+		}
+	}
+	TestEqual(TEXT("고친 도주 장면: 덮기·방향·잠금 = 파이썬"), Bad, 0);
+	TestEqual(TEXT("고친 도주 손 장면 모두 같다"), HandBad, 0);
+	AddInfo(FString::Printf(TEXT("가장자리 %d (최대 오차 %.3e), 은신처 %d (밀림 %d), 고친 도주 장면 %d (방향 최대 오차 %.3e)"), GW::kEdgeCases, EdgeErr,
+							GW::kShelterCases, Pushed, GW::kFixScenes, MaxErr));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoWildV3ShelterRunTest,
+	"AdaptiveEcosystem.Policy.V3.Wild.ShelterRun",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoWildV3ShelterRunTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoWorldV3;
+	// 기준 루프 900 스텝 (사슴 64, 늑대 둘, 은신처 4, 부활 없음, 포만 끔 — 사냥이 잦게): 켜면 은신처 안 잡힘 0·늑대 원 안 0, 끄면 은신처 안 잡힘이 있다
+	auto Run = [](bool bSafe, int32& OutCaught, int32& OutCaughtIn, int32& OutWolfIn)
+	{
+		FWorldConfig C;
+		C.Seed = 20002;
+		C.WorldSize = 60.0;
+		C.NumHerbivores = 64;
+		C.bRespawnDead = false;
+		C.Covers = QuadCovers(60.0, 6.0);
+		C.WildFlight.bEnabled = true;
+		C.WildFlight.bHoldAwake = true;
+		C.WildFlight.EdgeR = 5.0;
+		C.RealismVision.bEnabled = true;
+		C.RealismHearing.bEnabled = true;
+		C.bShelterSafe = bSafe;
+		FReferenceWorld Ref;
+		Ref.Init(C);
+		std::vector<double> Discs;
+		for (const EcoObservationV3::FCoverInput& Cv : C.Covers)
+		{
+			Discs.push_back(Cv.X);
+			Discs.push_back(Cv.Y);
+			Discs.push_back(Cv.Radius);
+		}
+		const int32 K = static_cast<int32>(C.Covers.size());
+		OutCaught = OutCaughtIn = OutWolfIn = 0;
+		std::vector<int32> Was(static_cast<size_t>(Ref.NumHerbivores()), 0);
+		for (int32 t = 0; t < 900; ++t)
+		{
+			Ref.StepOnce();
+			for (int32 i = 0; i < Ref.NumHerbivores(); ++i)
+			{
+				const FHerbBody& B = Ref.Bodies[static_cast<size_t>(i)];
+				if (B.DeathCause == kDeathCaught && Was[static_cast<size_t>(i)] == 0)
+				{
+					Was[static_cast<size_t>(i)] = 1;
+					++OutCaught;
+					bool bIn = false;
+					for (int32 k = 0; k < K; ++k)
+					{
+						const double Dx = B.Pos.X - Discs[3 * k];
+						const double Dy = B.Pos.Y - Discs[3 * k + 1];
+						bIn = bIn || std::sqrt(Dx * Dx + Dy * Dy) <= Discs[3 * k + 2];
+					}
+					OutCaughtIn += bIn ? 1 : 0;
+				}
+			}
+			for (const FThreatAgent& A : Ref.Threats)
+			{
+				OutWolfIn += EcoThreatV3::InsideAnyDisc(A.State.PosX, A.State.PosY, Discs.data(), K) ? 1 : 0;
+			}
+		}
+	};
+	int32 CaughtOff = 0, InOff = 0, WolfOff = 0, CaughtOn = 0, InOn = 0, WolfOn = 0;
+	Run(false, CaughtOff, InOff, WolfOff);
+	Run(true, CaughtOn, InOn, WolfOn);
+	TestEqual(TEXT("켬: 은신처 원 안에서 잡힌 사슴 0"), InOn, 0);
+	TestEqual(TEXT("켬: 은신처 원 안 늑대-스텝 0"), WolfOn, 0);
+	TestTrue(TEXT("켬: 사냥은 그대로 일어난다 (잡힘 > 0)"), CaughtOn > 0);
+	TestTrue(TEXT("끔: 늑대가 은신처 원 안에 들어간다 (규칙이 실제로 막는 것을 확인)"), WolfOff > 0);
+	AddInfo(FString::Printf(TEXT("900 스텝: 끔 잡힘 %d (은신처 안 %d, 늑대 원 안 스텝 %d) · 켬 잡힘 %d (은신처 안 %d, 늑대 원 안 스텝 %d)"), CaughtOff, InOff,
+							WolfOff, CaughtOn, InOn, WolfOn));
 	return true;
 }
 
