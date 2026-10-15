@@ -1665,7 +1665,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   TEXT("[EcoV3I] %s 경계 거리 | %.1f초 | %s | 구간 경계(멀어짐) 시작 %lld · 도망 시작 %lld · 은신처 웅크림 시작 %lld | ")
 				   TEXT("덮기 개체·스텝 경계 %lld 도망 %lld 웅크림 %lld (두뇌 %lld) | 끝난 도망 %lld (은신처에서 %lld), 평균 %.1f초 · 도망 중 죽음 %lld | ")
 				   TEXT("잡힌 사슴 %lld: 경계 중 %lld · 도망 중 %lld · 웅크림 중 %lld · 덮기 밖 %lld | ")
-				   TEXT("식사 중 늑대 15 m 안 사슴 %lld 개체·스텝 (스텝당 %.2f 마리) | 지금 덮기: 경계 %d 도망 %d 웅크림 %d"),
+				   TEXT("식사 중 늑대 15 m 안 사슴 %lld 개체·스텝 (스텝당 %.2f 마리) | 지금 덮기: 경계 %d 도망 %d 웅크림 %d | 은신처 안 잡힘 %lld (누적 %lld)"),
 			   *Ctx.RegionId.ToString(), Seconds, *Rule, static_cast<long long>(S.KeepAlertStarts - P.KeepAlertStarts),
 			   static_cast<long long>(S.KeepPanicStarts - P.KeepPanicStarts), static_cast<long long>(S.KeepShelterStarts - P.KeepShelterStarts),
 			   static_cast<long long>(S.KeepSteps[1] - P.KeepSteps[1]), static_cast<long long>(S.KeepSteps[2] - P.KeepSteps[2]),
@@ -1675,7 +1675,8 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   static_cast<long long>(S.KeepPanicDied - P.KeepPanicDied), static_cast<long long>(Caught), static_cast<long long>(CaughtKeep[1]),
 			   static_cast<long long>(CaughtKeep[2]), static_cast<long long>(CaughtKeep[3]), static_cast<long long>(CaughtOutside),
 			   static_cast<long long>(Near),
-			   Steps > 0 ? static_cast<double>(Near) / static_cast<double>(Steps) : 0.0, Ctx.KeepNow[1], Ctx.KeepNow[2], Ctx.KeepNow[3]);
+			   Steps > 0 ? static_cast<double>(Near) / static_cast<double>(Steps) : 0.0, Ctx.KeepNow[1], Ctx.KeepNow[2], Ctx.KeepNow[3],
+			   static_cast<long long>(S.CaughtInCover - P.CaughtInCover), static_cast<long long>(S.CaughtInCover));
 		Ctx.LastLogNearEatingDeerSteps = Ctx.NearEatingDeerSteps;
 	}
 	// 넷째 줄: 야생 1단계 (사람 결정 10-15 (7)). 켠 규칙만 적는다. 구간 = 지난 기록 줄 뒤. 앞 세 줄의 칸·순서는 그대로다

@@ -668,6 +668,7 @@ namespace EcoWorldV3
 		std::int64_t KeepPanicEndSteps = 0;  // 끝난 도망의 길이 합 (스텝)
 		std::int64_t KeepPanicDied = 0;      // 도망 중 죽음 (잡힘·굶음)
 		std::int64_t CaughtByKeep[kNumKeepModes] = {};   // 잡힌 사슴을 그 스텝의 덮기로 가른 수
+		std::int64_t CaughtInCover = 0;      // 은신처 원 안(이동 뒤 위치, 포획 판정과 같은 정의)에서 잡힌 수 — 10-16 기록만 (ShelterSafe 면 0 이어야 한다)
 		// 야생 (w1) 지방 비축 기록 (켰을 때만 센다. world.py wild_stats 의 같은 이름 칸)
 		double ReserveUsed = 0.0;            // 비축에서 꺼내 쓴 에너지 합 (E 단위, reserve_used)
 		double ReserveRefill = 0.0;          // 비축으로 옮긴 에너지 합 (reserve_refill)
@@ -1661,6 +1662,7 @@ namespace EcoWorldV3
 					++W.Stats.CaughtByKeep[Herbs[i].Decision->KeepActive];   // 기록만 (경계 중·도망 중·웅크림 중·덮기 밖)
 				}
 				W.Stats.WeakCaught += (bReserve && B.bWeak) ? 1 : 0;   // 야생 (w1) 기록만: 약한 채로 잡힘
+				W.Stats.CaughtInCover += W.Prey[static_cast<size_t>(i)].bInCover ? 1 : 0;   // 10-16 기록만: 은신처 안에서 잡힘
 			}
 			else if (B.Energy <= 0.0 && (!bReserve || B.Reserve <= 0.0))   // 야생 (w1): 비축까지 바닥나야 굶어 죽는다
 			{

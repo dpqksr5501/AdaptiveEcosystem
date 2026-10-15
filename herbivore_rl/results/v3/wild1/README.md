@@ -50,6 +50,8 @@
 - 언리얼 이식(C++): 세 규칙 모두 옮겼다(EcoWorldV3.h `WildEdgeSteer`·`UpdateWildFlight`, EcoThreatModel.h `ShelterPush`·`ShelterTangent`·표적·포획 제외,
   콘솔 변수 eco.IntegratedV3.ShelterSafe 기본 1, 도주 유지·가장자리는 eco.IntegratedV3.WildFlight 에 묶음). 골든(가장자리 96·은신처 64·고친 도주 장면 54)이
   파이썬과 오차 0 으로 같고, 기준 루프 900 스텝에서 켜면 은신처 안 잡힘 0·늑대 원 안 0(끄면 7·791)이다(자동 시험 Wild.FixGolden·Wild.ShelterRun).
+- 언리얼 헤드리스(사슴 128, 세션 20000~20002, 240초): 230초 산·잡힘·굶음 97.7·2.3·0.0 대 파이썬 97.8·2.2·0.0(차이 0.1%p), 은신처 안 잡힘 0.
+  `compare_unreal.md` '10-16 고침 뒤 다시 견줌'.
 
 ## 240초 표 (세계 90개, 128마리 시드 32000~32089, 64마리 33000~33089 — 기준과 같은 시드)
 
