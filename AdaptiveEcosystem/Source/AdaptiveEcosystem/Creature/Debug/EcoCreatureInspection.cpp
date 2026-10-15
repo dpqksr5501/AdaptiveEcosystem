@@ -109,6 +109,36 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                             Data->SetBoolField(TEXT("wild_flight_enabled"),Ctx->Sim.Config.WildFlight.bEnabled);
                             Data->SetBoolField(TEXT("realism_vision_enabled"),Ctx->Sim.Config.RealismVision.bEnabled);
                             Data->SetBoolField(TEXT("realism_hearing_enabled"),Ctx->Sim.Config.RealismHearing.bEnabled);
+                            Data->SetNumberField(TEXT("native_vision_radius_cm"),EcoObservationV3::SeePredRadius(Ctx->Sim.Dark,Ctx->Sim.ObsCfg)*P->Rep.SeeMult*EcoRepertoireV3::kUnitCm);
+                            Data->SetNumberField(TEXT("native_vision_angle_deg"),2*FMath::RadiansToDegrees(std::acos(Ctx->Sim.ObsCfg.ThreatFovCos)));
+                            // Last native observation snapshot, including resting/sleeping wolves. This is
+                            // read-only diagnosis, not a new omniscient input to policy or Social alarms.
+                            if(const auto* Body=Manager.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E)) {
+                                const int32 Count=int32(Ctx->Sim.ThreatIn.size()-Ctx->Sim.ExternalThreats.size());
+                                int32 Nearest=INDEX_NONE;double Distance=0;
+                                for(int32 J=0;J<Count;++J) {
+                                    const auto& T=Ctx->Sim.ThreatIn[J];
+                                    const double D=std::hypot(T.X-Body->Body.Pos.X,T.Y-Body->Body.Pos.Y);
+                                    if(Nearest==INDEX_NONE||D<Distance){Nearest=J;Distance=D;}
+                                }
+                                if(Nearest!=INDEX_NONE) {
+                                    const auto& T=Ctx->Sim.ThreatIn[Nearest];
+                                    const auto Seen=EcoObservationV3::PerceiveThreats(Body->Body.Pos,Body->Body.Head,
+                                        EcoObservationV3::SeePredRadius(Ctx->Sim.Dark,Ctx->Sim.ObsCfg),P->Rep.SeeMult,P->Rep.SeeMultLast,&T,1,Ctx->Sim.ObsCfg);
+                                    const bool Hunting=T.bHunting&&!T.bAsleep;
+                                    const TCHAR* Reason=T.bAsleep?TEXT("Asleep"):
+                                        Seen.bNearestSight?(Hunting?TEXT("SeenHunter"):TEXT("SeenRestingWolf")):
+                                        Seen.bNearestHeard?(Hunting?TEXT("HeardHunter"):TEXT("HeardRestingWolf")):TEXT("OutsideSightAndHearing");
+                                    Data->SetNumberField(TEXT("nearest_wolf_snapshot_index"),Nearest);
+                                    Data->SetNumberField(TEXT("nearest_wolf_distance_cm"),Distance*EcoRepertoireV3::kUnitCm);
+                                    Data->SetNumberField(TEXT("nearest_wolf_hearing_radius_cm"),T.HearR*EcoRepertoireV3::kUnitCm);
+                                    Data->SetBoolField(TEXT("nearest_wolf_sight_native"),Seen.bNearestSight);
+                                    Data->SetBoolField(TEXT("nearest_wolf_heard_native"),Seen.bNearestHeard);
+                                    Data->SetBoolField(TEXT("nearest_wolf_hunting"),Hunting);
+                                    Data->SetBoolField(TEXT("nearest_wolf_asleep"),T.bAsleep);
+                                    Data->SetStringField(TEXT("nearest_wolf_reason"),Reason);
+                                }
+                            }
                             if(const auto* Sense=Manager.GetFragmentDataPtr<FEcoPerceptionCacheFragment>(E)) {
                                 const int32 Index=Sense->Perception.Threat.Nearest;
                                 const int32 WolfCount=int32(Ctx->Sim.ThreatIn.size()-Ctx->Sim.ExternalThreats.size());
@@ -119,6 +149,7 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                             if(K>=0&&K<int32(Ctx->Sim.Config.Covers.size())) {
                                 const auto& Cover=Ctx->Sim.Config.Covers[K];
                                 Data->SetStringField(TEXT("target"),Ctx->UnitsToCm(Cover.X,Cover.Y,Link->GroundZ).ToCompactString());
+                                Data->SetNumberField(TEXT("native_cover_radius_cm"),Cover.Radius*EcoRepertoireV3::kUnitCm);
                             }
                         }
 
@@ -127,6 +158,9 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetNumberField(TEXT("cover_raw"),Raw->Action.Cover);
             }
             if(const auto* P=Manager.GetFragmentDataPtr<FEcoPerceptionCacheFragment>(E)){
+                Data->SetBoolField(TEXT("native_in_cover"),P->Perception.Cover.bInCover);
+                if(const auto* State=Manager.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E))
+                    Data->SetBoolField(TEXT("hide_arrived"),State->Rep.bArrived&&State->Rep.Behavior==EcoRepertoireV3::kHide);
                 Data->SetNumberField(TEXT("native_threat_count"),P->Perception.Threat.PredCount);
                 if(P->Perception.Threat.Nearest>=0)
                     Data->SetNumberField(TEXT("native_threat_distance_cm"),P->Perception.Threat.DPredMin*EcoRepertoireV3::kUnitCm);
@@ -154,10 +188,13 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetNumberField(TEXT("wolf_eat_steps"),Wolf->Agent.State.Cooldown);
                 Data->SetNumberField(TEXT("wolf_sated_steps"),Wolf->Agent.State.SatLeft);
             }
-            if(const auto* S=Manager.GetFragmentDataPtr<FEcoSocialMovementRequestFragment>(E); S&&S->bValid){
+            if(const auto* S=Manager.GetFragmentDataPtr<FEcoSocialMovementRequestFragment>(E); S&&S->bValid&&S->Mode!=EEcoSocialMovementMode::None&&S->ReservationId>0){
                 Data->SetStringField(TEXT("target"),S->TargetPosition.ToCompactString());Data->SetNumberField(TEXT("reservation"),double(S->ReservationId));
             }
             if(const auto* S=Manager.GetFragmentDataPtr<FEcoSensoryStateFragment>(E)){
+                // This channel intentionally excludes harmless resting wolves. Keep it distinguishable
+                // from native_threat_sight / nearest_wolf_reason in the inspection output.
+                Data->SetStringField(TEXT("alarm_sense"),UEnum::GetValueAsString(S->Source));
                 Data->SetStringField(TEXT("sense"),UEnum::GetValueAsString(S->Source));Data->SetNumberField(TEXT("confidence"),S->Confidence);
                 Data->SetStringField(TEXT("last_known"),S->LastKnownPosition.ToCompactString());
             }
@@ -188,11 +225,12 @@ void AEcoCreatureInspectorHUD::DrawHUD()
     }
     const bool Preview=Actors.ContainsByPredicate([](const AEcoCreatureRepresentationActor* Actor){return Actor->ActorHasTag(TEXT("JYU.VisualAudit"));});
     if(Preview){
-        DrawRect(FLinearColor(.25f,.1f,.01f,.95f),15,410,620,55);
-        DrawText(TEXT("POSE / IK PREVIEW: comparison deer have NO AI."),FLinearColor::Yellow,25,420,nullptr,.9f);
-        DrawText(TEXT("Play ends after the comparison. Start Play again for ecology."),FLinearColor::White,25,441,nullptr,.8f);
+        const float PreviewY=Selected.IsValid()?480.f:410.f;
+        DrawRect(FLinearColor(.25f,.1f,.01f,.95f),15,PreviewY,620,55);
+        DrawText(TEXT("POSE / IK PREVIEW: comparison deer have NO AI."),FLinearColor::Yellow,25,PreviewY+10,nullptr,.9f);
+        DrawText(TEXT("Play ends after the comparison. Start Play again for ecology."),FLinearColor::White,25,PreviewY+31,nullptr,.8f);
     }
-    DrawRect(FLinearColor(.02f,.025f,.035f,.85f),15,15,570,Selected.IsValid()?370:65);
+    DrawRect(FLinearColor(.02f,.025f,.035f,.85f),15,15,600,Selected.IsValid()?450:65);
     DrawText(TEXT("ECO INSPECTOR | Tab: cycle  Middle mouse: pick  R: record"),FLinearColor::White,25,25,nullptr,.85f);
     if(!Selected.IsValid()){DrawText(TEXT("Select a visible creature. Shift: run  Ctrl: sneak"),FLinearColor(.6f,.8f,1),25,50,nullptr,.85f);return;}
     const auto& S=Selected->VisualState;
@@ -205,9 +243,10 @@ void AEcoCreatureInspectorHUD::DrawHUD()
         if(UEcoCreatureInspectionLibrary::CaptureAgent(this,SelectedId,InspectionJson)) {
             TSharedPtr<FJsonObject> J;auto Reader=TJsonReaderFactory<>::Create(InspectionJson);
             if(FJsonSerializer::Deserialize(Reader,J)&&J.IsValid()) {
-                for(const TCHAR* Key:{TEXT("request"),TEXT("executed"),TEXT("phase"),TEXT("last_intake"),TEXT("confidence"),TEXT("target"),TEXT("last_known"),TEXT("native_threat_count"),TEXT("native_threat_distance_cm"),TEXT("native_kin_alarm"),TEXT("flight_override"),TEXT("social_state"),TEXT("alarm_strength"),TEXT("social_override"),TEXT("shelter_state")}) {
+                for(const TCHAR* Key:{TEXT("request"),TEXT("executed"),TEXT("last_intake"),TEXT("flight_override"),TEXT("native_in_cover"),TEXT("hide_arrived"),TEXT("nearest_wolf_reason"),TEXT("nearest_wolf_distance_cm"),TEXT("nearest_wolf_hearing_radius_cm"),TEXT("native_vision_radius_cm"),TEXT("alarm_sense"),TEXT("social_state"),TEXT("alarm_strength"),TEXT("social_override"),TEXT("shelter_state"),TEXT("target"),TEXT("wolf_hunting"),TEXT("wolf_sated"),TEXT("wolf_asleep"),TEXT("wolf_eat_steps"),TEXT("wolf_sated_steps")}) {
                     const auto V=J->TryGetField(Key);if(!V.IsValid())continue;
-                    InspectionDetail+=FString(Key)+TEXT(": ")+(V->Type==EJson::String?V->AsString():LexToString(V->AsNumber()))+TEXT("\n");
+                    const FString Value=V->Type==EJson::String?V->AsString():V->Type==EJson::Boolean?(V->AsBool()?TEXT("true"):TEXT("false")):LexToString(V->AsNumber());
+                    InspectionDetail+=FString(Key)+TEXT(": ")+Value+TEXT("\n");
                 }
                 if(GetWorld()->GetNetMode()==NM_Client)InspectionDetail=TEXT("Client: presentation only. Policy details are available on authority.");
             }

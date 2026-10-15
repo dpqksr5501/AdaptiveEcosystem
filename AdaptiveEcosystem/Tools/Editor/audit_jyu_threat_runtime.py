@@ -12,6 +12,9 @@ if not world or "LV_JYU_V3Integration" not in world.get_name():
 out = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())) / "ThreatAudit_20261016"
 if "-JYUSocialV3Audit" in unreal.SystemLibrary.get_command_line():
     out = out.parent / "SocialV3_20261016"
+if "-JYUSceneAudit" in unreal.SystemLibrary.get_command_line():
+    out = out.parent / "SceneAudit_20261016"
+    unreal.SystemLibrary.execute_console_command(world, "eco.V3Debug 1")
 out.mkdir(parents=True, exist_ok=True)
 unreal.SystemLibrary.execute_console_command(world, "eco.Senses.NoiseLog 1")
 if "-JYUSocialV3Audit" in unreal.SystemLibrary.get_command_line():
@@ -59,6 +62,10 @@ def finish(result):
         "shelter_state_counts": dict(Counter(d.get("shelter_state", -1) for d in rows)),
         "blind_social_reaction_records": sum(d.get("native_threat_count", 0) == 0 and d.get("social_override", 0) > 0 for d in rows),
         "policy_graze_to_social_flee_records": sum(d.get("request") == 0 and d.get("executed") == 1 and d.get("social_override") == 2 for d in rows),
+        "nearest_wolf_reason_counts": dict(Counter(d.get("nearest_wolf_reason", "NoNativeWolf") for d in rows)),
+        "hide_arrived_in_cover_records": sum(d.get("native_in_cover", False) and d.get("hide_arrived", False) for d in rows),
+        "graze_with_seen_resting_wolf_records": sum(d.get("executed") == 0 and d.get("nearest_wolf_reason") == "SeenRestingWolf" for d in rows),
+        "graze_with_nearest_wolf_unsensed_records": sum(d.get("executed") == 0 and d.get("nearest_wolf_reason") == "OutsideSightAndHearing" for d in rows),
     }
     (out / "ThreatRuntime.json").write_text(json.dumps({"result": result, "summary": summary, "samples": state["samples"]}, indent=2), encoding="utf-8")
     unreal.log("JYU_THREAT_AUDIT_" + result + " " + json.dumps(summary))

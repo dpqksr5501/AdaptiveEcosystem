@@ -96,3 +96,5 @@ UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한
 실제 경로는 Native 직접 감지/Player.Footstep → 별도 Herd observed 채널 → 기존 Alarm/SocialResponse → Shelter Request → Native control hook → 단일 이동/섭식/대사 → 실제 body 위치의 Feedback → 점유/예약 정리다. v3 요청을 Social 선호로 명시적으로 projection하며 V1 PPO 출력이나 v3 Raw Request를 덮어쓰지 않는다. Shared 기억을 직접 관측으로 재발행하지 않고, 이동 소비자도 lease/slot/안전 방향을 확인한다. 기존 V1 경로와 Bootstrap 가드는 유지한다.
 
 직접 UBT 성공, 자동화 140개(139 Success + 1 예상 저장 파일 warning, 실패 0), 복사 맵 일반 PIE 및 Dedicated+Client 2개를 검증했다. 실제 Moving→Occupied와 Client 논리 개체/Native Step 0을 확인했다. migration/wave 활성화·외부 MassFlock 설치·NavMesh 전환·재학습은 이번 작업 범위가 아니다. 사용자 변경 에셋 68개는 원본 바이트를 보존하고 이번 코드 커밋에서 제외했다.
+
+후속 [근접 장면 진단](AdaptiveEcosystem/Docs/조연우/JYU_THREAT_SCENE_DIAGNOSIS_20261016.md)에서 **은신처 안전 계약 미충족**을 확인했다. 명세의 늑대 진입 금지/안전과 달리 현재 Native cover는 탐지·포획 거리 배수이며 물리적 진입 금지/면역이 아니다. 웅크림 중 포획도 사용자 로그에 있다. 보이는 엄폐물도 자동 배치하지 않는다. 숨기=미감지 또는 완전한 안전이라고 설명하지 않는다. 새 읽기 전용 진단은 Native 감지와 Social 위급 경보를 구분하며, 후속 141개 자동화와 일반 PIE를 검증했다. 이 진단이 세계 규칙 불일치를 해결한 것은 아니다.

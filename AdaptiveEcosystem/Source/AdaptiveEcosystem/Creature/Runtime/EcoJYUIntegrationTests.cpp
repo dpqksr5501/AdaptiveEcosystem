@@ -3,6 +3,7 @@
 #include "AI/Policy/Tests/EcoTestWorld.h"
 #include "AI/Policy/EcoCreatureV3Trait.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
+#include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Creature/Representation/EcoCreatureAnimationProfile.h"
@@ -15,6 +16,7 @@
 #include "Creature/Audio/EcoFootstepAudioSet.h"
 #include "Ecology/EcologySimulationSubsystem.h"
 #include "AI/Social/Senses/EcoNoiseSubsystem.h"
+#include "AI/Social/EcoSocialFragments.h"
 #include "Network/Mass/EcoMassReplicationTypes.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityTemplate.h"
@@ -153,6 +155,44 @@ bool FEcoJYUInspectionBackend::RunTest(const FString&) {
     TestFalse(TEXT("Never claims excluded SpeciesAI movement is active"),Data->GetBoolField(TEXT("species_ai_movement")));
     TestEqual(TEXT("Observation includes actual trained dimensions"),Data->GetArrayField(TEXT("observation")).Num(),EcoPolicyV3::kObsDim);
     TestTrue(TEXT("Distinguishes policy evaluation from holding previous action"),Data->GetBoolField(TEXT("committed_policy_read")));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUThreatContext,"AdaptiveEcosystem.Creature.JYU.NativeThreatContextInspection",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoJYUThreatContext::RunTest(const FString&) {
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner=W.World->GetSubsystem<UMassSpawnerSubsystem>();
+    TArray<FMassEntityHandle> Entities;
+    {auto Creation=Spawner->SpawnEntities(UEcoCreatureV3Trait::MakeNetworkConfig(false)->GetOrCreateEntityTemplate(*W.World),1,Entities);}
+    if(!TestEqual(TEXT("Spawn actual native deer"),Entities.Num(),1))return false;
+    auto& M=Spawner->GetEntityManagerChecked();const auto E=Entities[0];
+    M.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId=9012;
+    auto* Sub=W.World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+    Sub->ActivateForTest(FEcoV3IntegratedSettings{},false);
+    EcoWorldV3::FWorldConfig Config;Config.Covers.push_back({20,20,6});
+    auto* Region=Sub->AddContext(TEXT("SightTest"),0,FVector::ZeroVector,Config,1,1);
+    Region->Sim.Dark=0;Region->Sim.ObsCfg.ThreatFovCos=std::cos(FMath::DegreesToRadians(150.));
+    auto& Link=M.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E);Link.bAdopted=true;Link.ContextIndex=Region->Index;
+    auto& Body=M.GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(E).Body;Body.Pos={20,20};Body.Head={1,0};
+    auto& State=M.GetFragmentDataChecked<FEcoBehaviorStateFragment>(E);
+    State.Rep.SeeMult=State.Rep.SeeMultLast=.6;State.Rep.Behavior=EcoRepertoireV3::kHide;State.Rep.HideTarget=0;State.Rep.bArrived=true;
+    M.GetFragmentDataChecked<FEcoPerceptionCacheFragment>(E).Perception.Cover.bInCover=true;
+    auto& Request=M.GetFragmentDataChecked<FEcoSocialMovementRequestFragment>(E);Request.bValid=true;
+    EcoObservationV3::FThreatInput Wolf;Wolf.X=18;Wolf.Y=20;Wolf.HearR=2;Wolf.bHunting=false;
+    Region->Sim.ThreatIn.push_back(Wolf);
+    auto Capture=[&](){FString Json;UEcoCreatureInspectionLibrary::CaptureAgent(W.World,9012,Json);TSharedPtr<FJsonObject> D;FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json),D);return D;};
+    auto D=Capture();if(!TestTrue(TEXT("Valid diagnostic output"),D.IsValid()))return false;
+    TestEqual(TEXT("Slow wolf directly behind is heard within 4m"),D->GetStringField(TEXT("nearest_wolf_reason")),FString(TEXT("HeardRestingWolf")));
+    TestTrue(TEXT("Native sight is separated from hearing"),!D->GetBoolField(TEXT("nearest_wolf_sight_native"))&&D->GetBoolField(TEXT("nearest_wolf_heard_native")));
+    TestFalse(TEXT("Resting wolf is not reported as hunting"),D->GetBoolField(TEXT("nearest_wolf_hunting")));
+    TestTrue(TEXT("Hiding and cover facts remain explicit"),D->GetBoolField(TEXT("native_in_cover"))&&D->GetBoolField(TEXT("hide_arrived")));
+    TestEqual(TEXT("Non-shelter Social request cannot replace the native cover target with zero"),D->GetStringField(TEXT("target")),Region->UnitsToCm(20,20,0).ToCompactString());
+    TestEqual(TEXT("Current vision radius reflects the grazing multiplier"),D->GetNumberField(TEXT("native_vision_radius_cm")),2400.);
+    auto& T=Region->Sim.ThreatIn[0];T.X=22;D=Capture();
+    TestEqual(TEXT("Visible resting wolf is different from an unseen wolf"),D->GetStringField(TEXT("nearest_wolf_reason")),FString(TEXT("SeenRestingWolf")));
+    T.bAsleep=true;D=Capture();TestEqual(TEXT("Sleep exclusion is explicit"),D->GetStringField(TEXT("nearest_wolf_reason")),FString(TEXT("Asleep")));
+    T.bAsleep=false;T.bHunting=true;T.X=17.9;D=Capture();
+    TestEqual(TEXT("Slow wolf in blind sector beyond hearing is actually unsensed"),D->GetStringField(TEXT("nearest_wolf_reason")),FString(TEXT("OutsideSightAndHearing")));
+    T.HearR=20;D=Capture();TestEqual(TEXT("Running wolf behind is detected by sound"),D->GetStringField(TEXT("nearest_wolf_reason")),FString(TEXT("HeardHunter")));
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUSenseProvenance,"AdaptiveEcosystem.Creature.JYU.NativeSightAndHearingProvenance",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
