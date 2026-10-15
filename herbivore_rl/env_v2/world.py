@@ -273,6 +273,14 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
       먹이 0), 알아챔은 사슴의 실제 감지(KeepAway 는 30 m 안이면 방향 무관), 도주 방향이 늑대 반대쪽 은신처를 고른다.
       현실 근거: 사슴은 포식자를 알아채면 먼저 고개를 들고 지켜보며 거리를 벌리고, 일정 거리 안으로 들어오거나 다가오면 달아난다. 사냥하지 않는
       포식자(쉬거나 먹는 늑대)에게는 덜 민감하다.
+      10-16 선택 키(features.OPTIONAL_KEYS, 기본 false·0 = 위 그대로 — 사용자가 언리얼에서 보고 알린 '늑대가 먹기 시작하면 도망치던 사슴이 멈춘다'·
+      '가장자리에서 늑대가 계속 잡아먹는다'):
+        hold_awake: '지난 도주' 를 붙잡는 늑대가 사냥 중인 늑대 대신 깨어 있는 늑대 전부(사냥·먹기·배부름 — 자는 늑대 말고, 실거리 safe_r 안)다.
+          도주 방향도 그 늑대들 반대다. 도주를 일으키는 것은 그대로 사냥 중인 늑대뿐이고, 은신처 원 안이면 도주는 풀린다(위 순서 첫 줄).
+          현실 근거: 사슴은 포식자가 다른 사슴을 잡은 뒤에도 충분히 멀어질 때까지 달리고 멀리서 지켜본다
+        edge_r > 0: 경계·도주 방향(은신처 쪽으로 정한 도주 말고)을 무대 벽 wall_margin 처리 앞에 `wf_edge_steer` 로 굽힌다 — 가장자리 edge_r
+          안에서는 벽 쪽 성분을 벽을 따라가는 성분으로 돌리고(벽에 가까울수록 많이), 모서리(두 벽 모두 edge_r 안)에서 벽 쪽으로 가려 하면 늑대에게서
+          더 멀어지는 쪽 벽을 따라 모서리를 빠져나온다. 현실 근거: 사슴은 달아날 길을 쓰고 막다른 곳으로 뛰어들지 않는다
 - 세로 장애물(나무·바위) 확장 지점 — 이번 단계에는 넣지 않는다(10-14 사용자: '언리얼에도 아직 없다. 나중에 추가 가능하게만').
   구현은 없고 자리만 정해 둔다. 기능 이름은 이미 예약된 `obstacles`(번호 12, `env_v2/features.py`)이고 켜면 '아직 구현되지 않았다'로
   읽을 때 실패한다(끈 블록 `obstacles: {enabled: false}` 는 받아들이고 무시한다). 자료는 `World.obstacles` — (K, 3) float64 [x, y, r]
@@ -1231,15 +1239,58 @@ def _wild_flight_params(p: dict, f: Features) -> dict:
     if not f.enabled("repertoire"):
         raise ValueError("features.wild_flight 는 repertoire 를 함께 켜야 한다(덮기는 행동 실행기 위에서 돈다)")
     n = "wild_flight"
+    p = with_optional(n, p)
     out = dict(alert_r=_wild_num(n, p, "alert_r", 0.0, open_lo=True), flight_r=_wild_num(n, p, "flight_r", 0.0, open_lo=True),
                safe_r=_wild_num(n, p, "safe_r", 0.0, open_lo=True), approach=_wild_num(n, p, "approach", 0.0, 1.0),
                alert_w=_wild_num(n, p, "alert_w", 0.0), rest_alert=_wild_bool(n, p, "rest_alert"),
                shelter_cos=_wild_num(n, p, "shelter_cos", -1.0, 1.0), shelter_r=_wild_num(n, p, "shelter_r", 0.0),
-               crouch=_wild_bool(n, p, "crouch"), wall_margin=_wild_num(n, p, "wall_margin", 0.0))
+               crouch=_wild_bool(n, p, "crouch"), wall_margin=_wild_num(n, p, "wall_margin", 0.0),
+               hold_awake=_wild_bool(n, p, "hold_awake"), edge_r=_wild_num(n, p, "edge_r", 0.0))
     if not out["flight_r"] <= out["alert_r"] <= out["safe_r"]:
         raise ValueError(f"features.wild_flight 는 flight_r ≤ alert_r ≤ safe_r 여야 한다. 받은 값: {out['flight_r']}, "
                          f"{out['alert_r']}, {out['safe_r']}")
     return out
+
+
+def wf_edge_steer(pos: np.ndarray, d: np.ndarray, size: float, edge_r: float) -> np.ndarray:
+    """야생 (w3) 10-16 가장자리 굽히기 (모듈 docstring '야생 1단계' (w3) edge_r). pos (K, 2) 위치, d (K, 2) 단위 방향 → (K, 2) 단위 방향.
+    축 a 마다 가까운 벽까지 거리 e_a = min(p_a, size − p_a) < edge_r 이면 안쪽 부호 n_a(p_a ≤ size − p_a 면 +1, 아니면 −1)와 가까움
+    w_a = 1 − e_a / edge_r, 아니면 n_a = w_a = 0.
+      1) 모서리(w_x > 0, w_y > 0)이고 d 가 한 벽 쪽이라도 향하면(d_a·n_a < 0): 벽을 따라 모서리를 빠져나오는 두 방향 (n_x, 0)·(0, n_y) 가운데
+         d 와 내적이 큰 쪽 t(d_x·n_x ≥ d_y·n_y 면 x 쪽)를 섞는다: s = d + (2·min(w_x, w_y))·t. 아니면 s = d
+      2) x 축, 그다음 y 축(o = 다른 축): s_a·n_a < 0 이면 막힌 몫 b = (−s_a·n_a)·w_a 를 벽 쪽 성분에서 빼고(s_a += b·n_a) 다른 축에 벽을
+         따라 더한다(s_o += b·σ, σ = s_o 의 부호, s_o = 0 이면 무대 가운데 쪽 — p_o ≤ size/2 면 +1, 아니면 −1)
+      3) 단위화(normalize). 0 이면 d 그대로
+    edge_r ≤ 0 이면 d 그대로. 난수 없음.
+    C++ 꼴: for a: E = min(P[a], Size - P[a]); if (E < EdgeR) { N[a] = P[a] <= Size - P[a] ? 1 : -1; W[a] = 1 - E / EdgeR; }
+           S = D; if (W.X > 0 && W.Y > 0 && (D.X*N.X < 0 || D.Y*N.Y < 0)) { if (D.X*N.X >= D.Y*N.Y) S.X += 2*min(W)*N.X; else S.Y += 2*min(W)*N.Y; }
+           for a in (X, Y): if (S[a]*N[a] < 0) { B = (-S[a]*N[a])*W[a]; S[a] += B*N[a]; S[o] += B*Sign(S[o], P[o] <= Size/2); }
+           Out = S.GetSafeNormal(); if (Out.IsZero()) Out = D;"""
+    if edge_r <= 0.0 or len(d) == 0:
+        return d
+    e = np.minimum(pos, size - pos)
+    near = e < edge_r
+    n = np.where(near, np.where(pos <= size - pos, 1.0, -1.0), 0.0)
+    w = np.where(near, 1.0 - e / edge_r, 0.0)
+    s = d.copy()
+    corner = (w[:, 0] > 0.0) & (w[:, 1] > 0.0) & ((d[:, 0] * n[:, 0] < 0.0) | (d[:, 1] * n[:, 1] < 0.0))
+    if corner.any():
+        c = np.flatnonzero(corner)
+        ux = d[c, 0] * n[c, 0] >= d[c, 1] * n[c, 1]
+        k = 2.0 * np.minimum(w[c, 0], w[c, 1])
+        s[c[ux], 0] += k[ux] * n[c[ux], 0]
+        s[c[~ux], 1] += k[~ux] * n[c[~ux], 1]
+    for a in (0, 1):
+        o = 1 - a
+        wall = s[:, a] * n[:, a] < 0.0
+        if not wall.any():
+            continue
+        b = np.where(wall, (-s[:, a] * n[:, a]) * w[:, a], 0.0)
+        sg = np.where(s[:, o] > 0.0, 1.0, np.where(s[:, o] < 0.0, -1.0, np.where(pos[:, o] <= 0.5 * size, 1.0, -1.0)))
+        s[:, a] = np.where(wall, s[:, a] + b * n[:, a], s[:, a])
+        s[:, o] = np.where(wall, s[:, o] + b * sg, s[:, o])
+    out = normalize(s)
+    return np.where(((out * out).sum(1) > EPS * EPS)[:, None], out, d)
 
 
 def wild_days_to_steps(days: float, period: int) -> int:
@@ -4084,6 +4135,10 @@ class World:
             nh = pv & hunt & (pd <= wf["alert_r"])               # 경계 거리 안에서 알아챈 사냥 중인 늑대
             nr = (pv & ~hunt & (pd <= wf["alert_r"])) if wf["rest_alert"] else np.zeros((N, M), dtype=bool)
             near_h = hunt & (pd <= wf["safe_r"])                  # 안전 거리 안의 사냥 중인 늑대(실거리 — 쫓는 늑대는 돌아보며 안다)
+            if wf["hold_awake"]:
+                # 10-16: 지난 도주는 깨어 있는 늑대(사냥·먹기·배부름, 자는 늑대 말고)가 안전 거리 안에 하나라도 있으면 이어진다
+                awake = ~self.pred_asleep if self._ps is not None else np.ones(M, dtype=bool)
+                near_h = awake[None, :] & (pd <= wf["safe_r"])
             panic_now = (nh & ((pd <= wf["flight_r"]) | coming)).any(1)
             noticed_h = nh.any(1)
             nxt = np.where(in_cov, np.where(noticed_h & wf["crouch"], WF_SHELTER, WF_NONE),
@@ -4101,6 +4156,7 @@ class World:
                 iz = np.flatnonzero(zero)
                 dirs[zero] = -np.stack([ex[iz, j], ey[iz, j]], 1) * pinv[iz, j][:, None]
             pan = nxt == WF_PANIC
+            to_sh = np.zeros(N, dtype=bool)                       # 은신처 쪽으로 정한 도주(가장자리 굽히기에서 뺀다)
             if pan.any() and len(self.cov_r):
                 # 늑대 반대쪽(±acos(shelter_cos)) 은신처가 가장자리 shelter_r 안에 있으면 가장 가까운 그 은신처 중심 쪽으로
                 ip = np.flatnonzero(pan)
@@ -4116,6 +4172,12 @@ class World:
                 if has.any():
                     ih, kh = ip[has], k[has]
                     dirs[ih] = np.stack([vx[ar[has], kh], vy[ar[has], kh]], 1) / dc[ar[has], kh][:, None]
+                    to_sh[ih] = True
+            if wf["edge_r"] > 0.0:
+                # 10-16: 가장자리·모서리 굽히기(wf_edge_steer) — 경계·도주(은신처 쪽 도주 말고)
+                eg = ((nxt == WF_ALERT) | pan) & ~to_sh & ((dirs * dirs).sum(1) > EPS * EPS)
+                if eg.any():
+                    dirs[eg] = wf_edge_steer(self.pos[eg], dirs[eg], self.size, wf["edge_r"])
             # 무대 벽 여유 안이면 벽 쪽 성분을 지운다(다 지워지면 그대로) — C++ KeepDirection
             mg, size, p = wf["wall_margin"], self.size, self.pos
             sl = dirs.copy()

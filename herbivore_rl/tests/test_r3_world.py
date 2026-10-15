@@ -147,6 +147,8 @@ def test_registry_and_keys():
     assert dict(F.OPTIONAL_KEYS["threats"]) == {"eat_in_place": False}           # (j) 늑대 먹는 시간, 10-15
     full = _raw(R3_ON)["features"]
     for n, opt in F.OPTIONAL_KEYS.items():
+        if n.startswith("wild_"):
+            continue                    # 야생 1단계 선택 키(10-16)는 R3 설정에 없다 — tests/test_wild1.py 가 본다
         assert set(opt) <= set(full[n]) and not set(opt) & F.PARAM_KEYS[n]
         for old in (REAL["all"], R1_ON, R1):                                     # 지난 설정 파일에는 선택 키가 없다(끔 값으로 읽는다)
             assert not set(opt) & set(_raw(old)["features"].get(n, {}))

@@ -23,7 +23,7 @@ from env.config import ROOT
 from env_v2 import features as F
 from env_v2 import repertoire as rep
 from env_v2.config import load_v2_config
-from env_v2.world import (GAIT_WALK, WF_ALERT, WF_NONE, WF_PANIC, WF_SHELTER, World, wild_days_to_steps)
+from env_v2.world import (GAIT_WALK, WF_ALERT, WF_NONE, WF_PANIC, WF_SHELTER, World, wf_edge_steer, wild_days_to_steps)
 
 CFG = ROOT / "configs"
 MIRROR = CFG / "v3_unreal_mirror.yaml"
@@ -32,6 +32,7 @@ R1_MODEL = ROOT / "ckpt" / "v3" / "v3_r1_g995_s3_20m.zip"
 BASE_COMMIT = "d118c23"              # 야생 1단계 직전 커밋(언리얼 거울) — 비트 동일 기준
 WILD_NAMES = ("wild_reserve", "wild_satiation", "wild_flight")
 EXTRA = ("realism_vision", "realism_hearing")
+SHELTER = ("realism_shelter",)        # 10-16 더함: R3 세계의 은신처 안전·늑대 진입 금지
 
 pytestmark = pytest.mark.filterwarnings("ignore:You have specified a mini-batch size")
 
@@ -70,17 +71,19 @@ def test_registry_and_config():
     assert set(WILD_NAMES) <= F.IMPLEMENTED
     raw_w = yaml.safe_load(WILD.read_text(encoding="utf-8"))
     raw_m = yaml.safe_load(MIRROR.read_text(encoding="utf-8"))
-    # 야생 설정 = 거울 설정 + 다섯 블록(나머지 키는 모두 같다)
+    # 야생 설정 = 거울 설정 + 여섯 블록(나머지 키는 모두 같다)
     fw = dict(raw_w["features"])
-    for k in WILD_NAMES + EXTRA:
+    for k in WILD_NAMES + EXTRA + SHELTER:
         assert fw.pop(k)["enabled"] is True
     assert fw == raw_m["features"]
     assert {k: v for k, v in raw_w.items() if k not in ("features", "version")} == \
         {k: v for k, v in raw_m.items() if k not in ("features", "version")}
     # R3 세계의 시야·청각 값 그대로
     raw_r3 = yaml.safe_load((CFG / "v3_r3.yaml").read_text(encoding="utf-8"))
-    for k in EXTRA:
+    for k in EXTRA + SHELTER:
         assert raw_w["features"][k] == raw_r3["features"][k]
+    # 10-16 고침 값(선택 키)
+    assert raw_w["features"]["wild_flight"]["hold_awake"] is True and raw_w["features"]["wild_flight"]["edge_r"] == 5.0
     w = World(load_v2_config(WILD).replace(N=16), seeds=[32084])
     assert w.features.active[-3:] == WILD_NAMES and set(EXTRA) <= set(w.features.active)
     assert w.obs_dim == 18 and w.alive is not None          # 관측 18칸 그대로, 부활 없음
@@ -137,7 +140,7 @@ def test_flags_off_bit_identical_to_head(tmp_path):
             continue
         j = dict(seed=seed, steps=300, policy=pol, model=str(R1_MODEL))
         old.append(dict(j, config="configs/v3_unreal_mirror.yaml"))
-        new.append(dict(j, config="configs/v3_wild1_mirror.yaml", drop=list(EXTRA), set=off))
+        new.append(dict(j, config="configs/v3_wild1_mirror.yaml", drop=list(EXTRA + SHELTER), set=off))
     procs = []
     for root, js, tag in ((old_root, old, "old"), (ROOT, new, "new")):
         jp, op = tmp_path / f"jobs_{tag}.json", tmp_path / f"out_{tag}.json"
@@ -351,3 +354,123 @@ def test_alert_keeps_grazing_and_panic_enters_flee():
     assert w._rep_eat[0] == pytest.approx(0.5) and w._rep_see[0] == 1.0      # 걸으며 먹고 고개를 든다
     assert w.vel[0] @ np.array([0.0, 1.0]) > 0.99 * 0.24 and np.linalg.norm(w.vel[0]) == pytest.approx(0.24)
     assert w._rs.behavior[1] == rep.FLEE                                    # 두뇌 요청(GRAZE) 대신 도주
+
+
+# --------------------------------------------------------------------- #
+# 10-16 고침: (a) 도주는 깨어 있는 늑대 모두에게서 안전할 때까지, (b) 가장자리·모서리 굽히기, (c) 은신처 안전·늑대 진입 금지
+# --------------------------------------------------------------------- #
+
+
+def _mode_after(w, deer, prev, d, **state):
+    """늑대 0 을 사슴 앞(+x) d 에 두고 지난 덮기 prev 에서 다음 덮기를 정한다."""
+    w.pred_pos[0] = w.pos[deer] + [d, 0.0]
+    for k, v in state.items():
+        getattr(w, k)[0] = v
+    w._g = w._geometry()
+    w.wf_mode[:] = WF_NONE
+    w.wf_mode[deer] = prev
+    w._wf_update(np.zeros(w.N, dtype=bool))
+    return int(w.wf_mode[deer])
+
+
+def test_new_keys_default_to_old_behaviour():
+    cfg = load_v2_config(MIRROR)
+    assert F.with_optional("wild_flight", {})["hold_awake"] is False and F.with_optional("wild_flight", {})["edge_r"] == 0.0
+    raw = yaml.safe_load(WILD.read_text(encoding="utf-8"))["features"]["wild_flight"]
+    old = {k: v for k, v in raw.items() if k not in ("hold_awake", "edge_r")}
+    w = World(_with(load_v2_config(WILD).replace(N=8), wild_flight=dict(old, enabled=True) | {"hold_awake": False, "edge_r": 0.0}),
+              seeds=[32091])
+    assert w._wf["hold_awake"] is False and w._wf["edge_r"] == 0.0
+    with pytest.raises(ValueError):
+        World(_with(load_v2_config(WILD).replace(N=8), wild_flight=dict(edge_r=-1.0)), seeds=[32091])
+    assert cfg is not None
+
+
+def test_hold_awake_keeps_flight_near_eating_or_sated_wolf():
+    w = _reflex_world()
+    w._wf = dict(w._wf, hold_awake=False)
+    # 옛 규칙(10-15): 쫓던 늑대가 먹기 시작하면(쿨다운) 도주가 곧바로 풀린다(경계로)
+    assert _mode_after(w, 2, WF_PANIC, 8.0, pred_cd=10) == WF_ALERT
+    w._wf = dict(w._wf, hold_awake=True)
+    assert _mode_after(w, 2, WF_PANIC, 10.0, pred_cd=10) == WF_PANIC              # 먹는 늑대가 안전 거리 20 안 → 계속
+    np.testing.assert_allclose(w.wf_dir[2], [-1.0, 0.0], atol=1e-12)              # 그 늑대 반대로
+    assert _mode_after(w, 2, WF_PANIC, 10.0, pred_cd=0, pred_sat=100) == WF_PANIC  # 배부른 늑대도
+    assert _mode_after(w, 2, WF_PANIC, 21.0) == WF_NONE          # 21 = 안전 거리 밖(경계 거리 밖이라 아무것도 아님)
+    w.pred_sat[0] = 0
+    assert _mode_after(w, 2, WF_PANIC, 10.0, pred_asleep=True) == WF_NONE          # 자는 늑대는 세지 않는다
+    w.pred_asleep[0] = False
+    # 도주를 일으키는 것은 그대로 사냥 중인 늑대뿐: 먹는 늑대가 5 에 있어도 새 도주는 없다
+    assert _mode_after(w, 2, WF_NONE, 5.0, pred_cd=10) == WF_ALERT
+    # 은신처 안이면 풀린다
+    w.pred_cd[0] = 10
+    w.cov_c = np.array([[30.0, 30.0]])
+    w.cov_r = np.array([3.0])
+    assert _mode_after(w, 2, WF_PANIC, 10.0) == WF_NONE
+
+
+def test_edge_steer_runs_along_walls_and_out_of_corners():
+    d = np.array([[-1.0, 0.0]])
+    np.testing.assert_array_equal(wf_edge_steer(np.array([[1.0, 30.0]]), d, 60.0, 0.0), d)          # 끔
+    np.testing.assert_array_equal(wf_edge_steer(np.array([[30.0, 30.0]]), d, 60.0, 5.0), d)         # 가장자리 밖
+    # 왼쪽 벽 1 단위 앞, 늑대가 안쪽(+x): 막힌 몫 0.8 을 벽을 따라(가운데 쪽 +y) 돌린다
+    out = wf_edge_steer(np.array([[1.0, 30.0]]), d, 60.0, 5.0)
+    np.testing.assert_allclose(out[0], np.array([-0.2, 0.8]) / np.hypot(0.2, 0.8), atol=1e-12)
+    out = wf_edge_steer(np.array([[1.0, 40.0]]), d, 60.0, 5.0)
+    assert out[0, 1] < 0.0                                                                            # 위쪽 절반이면 가운데 쪽 = −y
+    # 벽을 따라 비스듬히: 따라가는 쪽은 그대로, 벽 쪽 성분만 줄인다
+    dd = np.array([[-np.sqrt(0.5), np.sqrt(0.5)]])
+    out = wf_edge_steer(np.array([[0.0, 30.0]]), dd, 60.0, 5.0)
+    np.testing.assert_allclose(out[0], [0.0, 1.0], atol=1e-12)
+    # 모서리(1, 1)에서 모서리 쪽: 늑대에게서 더 멀어지는 쪽(d·t 큰 쪽 = +x) 벽을 따라 빠져나온다
+    out = wf_edge_steer(np.array([[1.0, 1.0]]), np.array([[-0.6, -0.8]]), 60.0, 5.0)
+    s = np.array([-0.6 + 1.6 + 0.64, -0.8 + 0.64])          # 1) +x 로 2·0.8 섞기, 2) y 벽 쪽 막힌 몫 0.8·0.8 을 +x 로
+    np.testing.assert_allclose(out[0], s / np.linalg.norm(s), atol=1e-12)
+    assert out[0, 0] > 0.99
+    out = wf_edge_steer(np.array([[59.0, 59.0]]), np.array([[0.8, 0.6]]), 60.0, 5.0)
+    assert out[0, 1] < -0.99                                                                          # 반대 모서리, y 쪽이 덜 늑대 쪽
+    # 모서리에서 이미 바깥(무대 안쪽)으로 가면 그대로
+    dd = np.array([[0.6, 0.8]])
+    np.testing.assert_array_equal(wf_edge_steer(np.array([[1.0, 1.0]]), dd, 60.0, 5.0), dd)
+    # 세계 안: 왼쪽 벽 앞 사슴의 도주가 벽을 따라 간다(edge_r 5)
+    w = _reflex_world()
+    assert w._wf["edge_r"] == 5.0
+    w.pos[2] = [1.5, 30.0]                     # 벽 여유(wall_margin 1) 밖 — 그 안이면 남은 벽 쪽 성분도 지운다
+    assert _mode_with_wolf(w, 2, 5.0) == WF_PANIC
+    np.testing.assert_allclose(w.wf_dir[2], np.array([-0.3, 0.7]) / np.hypot(0.3, 0.7), atol=1e-12)
+    # 은신처 쪽 도주는 굽히지 않는다(은신처 선호 그대로): 늑대 +x, 은신처 (-x, +y 45°)
+    w.pos[2] = [3.0, 30.0]
+    w.cov_c = np.array([[0.5, 32.5]])
+    w.cov_r = np.array([1.0])
+    assert _mode_with_wolf(w, 2, 5.0) == WF_PANIC
+    np.testing.assert_allclose(w.wf_dir[2], [-np.sqrt(0.5), np.sqrt(0.5)], atol=1e-12)
+
+
+def test_shelter_is_safe_and_wolves_stay_out():
+    w = World(load_v2_config(WILD).replace(N=16), seeds=[32092])
+    assert w._zs["untargetable"] and w._zw and len(w.cov_r) == 4
+    c, r = w.cov_c[0], float(w.cov_r[0])
+    # 장면: 사슴 0 은 은신처 0 안 둘레 근처에서 먹는다, 사냥 중인 늑대 0 이 바로 바깥에서 그 사슴 쪽을 본다
+    w.pred_asleep[:] = False
+    w.pred_cd[:] = 0
+    if w._ws is not None:
+        w.pred_sat[:] = 0
+    w.pos[0] = c + [r - 0.3, 0.0]
+    w.pred_pos[0] = c + [r + 0.4, 0.0]
+    w.pred_head[0] = [-1.0, 0.0]
+    w.pred_pos[1] = [-400.0, -400.0]
+    w._g = w._geometry()
+    w._obs = w._obs_from(w._g)
+    for _ in range(20):
+        w.pos[0] = c + [r - 0.3, 0.0]           # 사슴은 은신처 안 그 자리에 둔다
+        w.step(_graze(w))
+        assert w.alive[0]                        # 은신처 안에서는 잡히지 않는다
+        dc = np.sqrt(((w.pred_pos[:, None, :] - w.cov_c[None, :, :]) ** 2).sum(-1))
+        assert not (dc < w.cov_r[None, :]).any()  # 늑대는 은신처 원 안에 없다
+    # 긴 판(먹기만): 은신처 안에서 잡힌 사슴 0, 은신처 안 늑대 0
+    w = World(load_v2_config(WILD).replace(N=64), seeds=[32093])
+    for _ in range(900):
+        w.step(_graze(w))
+    dead = np.flatnonzero(w.death_cause == 1)
+    assert len(dead) > 0
+    assert not w._in_cover(w.pos[dead]).any()
+    assert w._zw_inside_n == 0

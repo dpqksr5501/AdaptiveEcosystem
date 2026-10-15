@@ -256,10 +256,15 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #   threats.eat_in_place (10-15 사람 결정 '먹는 시간 주기 (약 5초)'): 늑대(플레이어형 위협 말고 모든 포식자)가 사슴을 잡은 뒤 쿨다운
 #     (v1 키 pred_eat_cd)이 남은 동안 그 자리에 서서 먹는다(env_v2/world.py `_step_predators_v3`, 모듈 docstring 'R3 세계' (j)). 먹는 시간
 #     자체는 v1 키 pred_eat_cd 를 overrides 로 덮는다(R3 설정은 38스텝). false = 지금까지 그대로(쿨다운 동안 기본 속력으로 배회)
+#   wild_flight.hold_awake·edge_r (10-16 사용자 '늑대가 먹기 시작하면 도망치던 사슴이 멈춘다'·'가장자리에서 늑대가 계속 잡아먹는다'): hold_awake
+#     true 면 시작한 도주는 깨어 있는 늑대(사냥·먹기·배부름 — 자는 늑대 말고) 모두가 실거리 safe_r 밖이 되거나 은신처 안일 때까지 이어진다
+#     (도주를 일으키는 것은 그대로 사냥 중인 늑대만). edge_r > 0 이면 도주·경계 방향이 무대 가장자리 edge_r 안에서 벽 쪽 성분을 벽을 따라가는
+#     성분으로 돌리고 모서리를 벗어나는 쪽을 고른다(env_v2/world.py `wf_edge_steer`). false·0 = 10-15 그대로
 OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "realism_shelter": MappingProxyType({"block_predators": False}),
     "realism_cover_food": MappingProxyType({"frac_range": None}),
     "threats": MappingProxyType({"eat_in_place": False}),
+    "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0}),
 })
 
 

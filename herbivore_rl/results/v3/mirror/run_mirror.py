@@ -34,6 +34,10 @@ EcoPolicyV3IntegratedProcessors.cpp TallyEnergy)와 같다:
 판(규칙 하나씩 빼 보기)을 돌린다. --diag 를 주면 세계마다 meta['diag'] 에 진단을 더 적는다(동역학과 무관 — 기하에 사슴 × 늑대 보임 행렬을 남기는
 World.keep_pair_vis 만 켠다): 행동별 산 사슴-스텝, 늑대 거리 구간(<5·5~10·10~15·15~30 m)별 깨어 있는 늑대 쌍과 그중 알아챈 쌍, 잡힘마다 그 스텝 행동·
 마지막 5초(38스텝) 안에 도망쳤나·알아챘나, 굶음마다 마지막 5초 안에 도망쳤나, 늑대 수·하루 길이, 켠 규칙의 World.wild_stats().
+10-16 더함(가장자리·은신처 진단, results/v3/wild1/README.md '가장자리·은신처 고침'): 잡힘 가운데 무대 가장자리 5 m(2.5 단위) 띠·모서리(두 벽
+모두 10 m = 5 단위 안)·은신처 원 안에서 잡힌 수, 같은 늑대가 자기 지난 포획 자리 20 m(10 단위) 안에서 다시 잡은 수(잡은 늑대 = 이번 스텝에 쿨다운이
+pred_eat_cd 로 막 찬 늑대 가운데 가장 가까운 늑대), 산 사슴-스텝 가운데 그 띠·모서리에 있던 수(자리 몫 기준), 도주가 풀린 수와 그 가운데
+은신처 밖이고 깨어 있는 늑대가 실거리 wild_flight.safe_r 안에 남아 있던 수(스텝 끝 위치 — 덮기를 정한 기하와 같다).
 """
 
 from __future__ import annotations
@@ -173,6 +177,9 @@ def _row(w, alive_before: int, food0: float) -> dict:
 
 DIAG_BANDS_M = (0.0, 5.0, 10.0, 15.0, 30.0)      # 진단: 늑대 거리 구간(m, 1 단위 = 2 m)
 FLED_STEPS = 38                                   # 진단: '마지막 5초' = 반올림(5 ÷ 8/60)
+EDGE_BAND = 2.5                                   # 진단: 가장자리 띠 5 m (단위)
+CORNER_BAND = 5.0                                 # 진단: 모서리 = 두 벽 모두 10 m 안 (단위)
+REPEAT_R = 10.0                                   # 진단: 같은 늑대 거듭 포획 = 자기 지난 포획 자리 20 m 안 (단위)
 
 
 class _Diag:
@@ -189,6 +196,11 @@ class _Diag:
         self.catch_fled = self.catch_saw = self.catches = 0
         self.starve_fled = self.starves = 0
         self.edges = np.asarray(DIAG_BANDS_M) / 2.0
+        self.catch_edge = self.catch_corner = self.catch_cover = self.catch_repeat = 0
+        self.occ_n = self.occ_edge = self.occ_corner = 0
+        self.wolf_last: dict[int, np.ndarray] = {}
+        self.panic_ends = self.panic_end_awake = 0
+        self.prev_wf = w.wf_mode.copy() if getattr(w, "_wf", None) is not None else None
 
     def after(self, w, live_before):
         from env_v2 import repertoire as rep
@@ -207,9 +219,36 @@ class _Diag:
                 sel = m & (d >= self.edges[b]) & (d < self.edges[b + 1])
                 self.pairs[b] += int(sel.sum())
                 self.seen[b] += int((sel & pv).sum())
+        sz = float(w.size)
+        p = w.pos[live_before]
+        ex_, ey_ = np.minimum(p[:, 0], sz - p[:, 0]), np.minimum(p[:, 1], sz - p[:, 1])
+        self.occ_n += len(p)
+        self.occ_edge += int(np.count_nonzero(np.minimum(ex_, ey_) <= EDGE_BAND))
+        self.occ_corner += int(np.count_nonzero((ex_ <= CORNER_BAND) & (ey_ <= CORNER_BAND)))
+        if self.prev_wf is not None:
+            from env_v2.world import WF_PANIC
+
+            ends = (self.prev_wf == WF_PANIC) & (w.wf_mode != WF_PANIC) & live
+            self.panic_ends += int(np.count_nonzero(ends))
+            if w.M and ends.any():
+                near = ((d <= w._wf["safe_r"]) & awake[None, :]).any(1)
+                self.panic_end_awake += int(np.count_nonzero(ends & near & ~g["in_cover"]))
+            self.prev_wf = w.wf_mode.copy()
         for i in np.flatnonzero(live_before & ~live):
             fled = w.t - self.last_flee[i] <= FLED_STEPS
             if w.death_cause[i] == 1:
+                q = w.pos[i]
+                qe = (min(q[0], sz - q[0]), min(q[1], sz - q[1]))
+                self.catch_edge += int(min(qe) <= EDGE_BAND)
+                self.catch_corner += int(max(qe) <= CORNER_BAND)
+                self.catch_cover += int(w._in_cover(q[None, :])[0]) if len(w.cov_r) else 0
+                if w.M:
+                    cand = np.flatnonzero(w.pred_cd == int(w.cfg.pred_eat_cd))
+                    cand = cand if len(cand) else np.arange(w.M)
+                    m = int(cand[np.argmin(((w.pred_pos[cand] - q) ** 2).sum(1))])
+                    last = self.wolf_last.get(m)
+                    self.catch_repeat += int(last is not None and float(np.sqrt(((last - q) ** 2).sum())) <= REPEAT_R)
+                    self.wolf_last[m] = q.copy()
                 self.catches += 1
                 self.catch_beh[beh[i]] += 1
                 self.catch_fled += int(fled)
@@ -222,6 +261,9 @@ class _Diag:
         out = dict(beh_steps=self.n_beh.tolist(), band_pairs=self.pairs.tolist(), band_seen=self.seen.tolist(),
                    catches=self.catches, catch_beh=self.catch_beh.tolist(), catch_fled=self.catch_fled, catch_saw=self.catch_saw,
                    starves=self.starves, starve_fled=self.starve_fled, wolves=int(w.M_base), period=int(w.dn_period), steps=int(w.t))
+        out.update(catch_edge=self.catch_edge, catch_corner=self.catch_corner, catch_cover=self.catch_cover, catch_repeat=self.catch_repeat,
+                   occ_n=self.occ_n, occ_edge=self.occ_edge, occ_corner=self.occ_corner, panic_ends=self.panic_ends,
+                   panic_end_awake=self.panic_end_awake)
         try:
             out["wild"] = w.wild_stats()
         except ValueError:
