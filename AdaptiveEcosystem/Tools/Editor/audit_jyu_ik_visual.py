@@ -50,6 +50,8 @@ def finish(result):
  unreal.unregister_slate_post_tick_callback(handle)
  (out/"FootMetrics.json").write_text(json.dumps({"result":result,"samples":state["samples"]},indent=2),encoding="utf-8")
  unreal.log("JYU_IK_VISUAL_"+result)
+ unreal.log_warning("Pose comparison finished. These fixtures have no AI. Restart Play for ecology.")
+ unreal.get_editor_subsystem(unreal.LevelEditorSubsystem).editor_request_end_play()
 def tick(dt):
  try:
   elapsed=time.monotonic()-state["start"];index=int(elapsed/3)
@@ -65,7 +67,7 @@ def tick(dt):
    if label in ("HearingWhileGraze","SightWhileGraze") and elapsed%3>=1.6:
     visual.set_editor_property("sense_source",unreal.EcoSenseSource.HEARING if label=="HearingWhileGraze" else unreal.EcoSenseSource.SIGHT)
    if not unreal.EcoCreatureAnimationBuilder.update_visual_audit_actor(actor,profile if i==0 else reference,visual,dt): raise RuntimeError("Fixture presentation rejected")
-   actor.get_editor_property("identity_label").set_text(unreal.Text(("IK ON" if i==0 else "IK OFF")+" | "+label))
+   actor.get_editor_property("identity_label").set_text(unreal.Text(("IK ON" if i==0 else "IK OFF")+" | NO AI | "+label))
   if elapsed>=state["next"]:
    state["next"]=elapsed+.25
    state["samples"].append({"case":label,"elapsed":elapsed,"plate_rotation":str(plates[0].get_actor_rotation()),"on":sample_feet(fixtures[0]),"off":sample_feet(fixtures[1])})

@@ -45,6 +45,14 @@
 // t+1~t+4 는 사냥하지 않고(배회, 기본 속력), t+5 에 다시 잡을 수 있다. 플레이어는 30 → t+30 에 다시 잡는다.
 // 잠든 동안에도 쿨다운은 줄어든다.
 //
+// 늑대 식사 중 제자리 (선택, FThreatConfig::bEatInPlace. 기본 끔 — 끄면 위 그대로이고 지금 골든과 비트 단위로 같다. 사람 결정 10-15 (B)):
+//   켜면 보통 위협(플레이어 대역 아님)이 쿨다운 때문에 사냥하지 않는 스텝(1 을 뺀 뒤 cd > 0)에 움직이지 않는다. 7 의 잠과 같은 꼴로
+//   move = head, 속력 0 이다(상태 기계 뒤, 밤잠·박명 배수 앞 — 6c). 그래서 위치 그대로·변위 0·heading = normalize(head) 다.
+//   포획 판정·난수 소비는 그대로다. 식사 길이는 PredEatCd 가 정한다(통합 모드는 eco.IntegratedV3.WolfEatSeconds 로 38 = 5 초).
+//   잡은 스텝 t 에는 이미 움직였고, t+1 ~ t+cd−1 동안 서 있다가 t+cd 에 다시 사냥한다. 파이썬 R3 세계의 같은 규칙:
+//   features.threats.eat_in_place (world.py `_step_predators_v3` R3 (j)) —
+//     eating = (pred_cd > 0) & ~pred_is_player;  move[eating] = pred_head[eating];  speed[eating] = 0
+//
 // 잠행-돌진형 (world.py:2299-2313, 2353-2368): 표적 체감 거리 ≤ 6 이면 돌진 시작(남은 12). 남은 > 0 이면 돌진(× 1.5,
 // 표적 있으면 표적 쪽, 없으면 head), 남은 ≤ 0 이면 마지막 판정 스텝(× 0.2, head). 돌진 이동 12번 + 마지막 판정 1번이고,
 // 마지막 판정에서 놓치면 탈진 30스텝(× 0.2 배회, 사냥 안 함), 돌진·마지막 판정 중 잡으면 곧바로 ROAM 이다.
@@ -54,6 +62,17 @@
 // 체감 ≤ 6 이면 돌진 시작) · 돌진(× 1.3 으로 20번 이동, 남은 ≤ 0 이면 멈춘 판정 스텝) · 휴식(멈춤, 사냥 안 함, 30스텝).
 // 배회·잠행 모드도 닿으면 잡는다. 돌진 중 잡거나 돌진이 끝나면 휴식. 휴식·배회·잠행 길이가 끝나면 새 모드
 // (u0 < 0.5 면 잠행, 아니면 배회. 길이 = 200 + ⌊u1·201⌋, 400 에서 자른다).
+//
+// 늑대 밤잠 점진화 (선택, FThreatConfig::bRealismNight. 기본 끔 — 끄면 위 1~10 그대로이고 지금 골든과 비트 단위로 같다):
+//   파이썬 configs/v3_real1_night_on.yaml 의 realism_night 블록(world.py 모듈 docstring '(d) realism_night', `_rz_night_update`,
+//   `_step_predators_v3` 의 hunt_dark·_zn_hunt)을 옮긴다. 켜면 잠이 어둠 d 의 순수 함수(IsAsleep)가 아니라 늑대마다 상태가 된다.
+//   - 상태 (FThreatState): 잠(bAsleep), 활동도 NightAct ∈ [0, R](R = NightRampSteps), 눕는 중 bNightSettle, 깨어 있는 채 어둠인
+//     업데이트 수 NightDarkK, 기상까지 남은 업데이트 NightWait(-1 = 기다리지 않음), 늑대별 지연 NightDelay, 지난 스텝 사냥 중 bNightHunt.
+//   - NightInit (세계 생성·입양 때 한 번): 잠 = 주행성 ∧ d ≥ 0.5, 활동도 = 잠이면 0, 아니면 R.
+//   - NightUpdate (스텝 끝 t + 1 의 어둠을 정한 뒤, 늑대 이동 뒤·리스폰 전 사슴 위치로): 아래 NightUpdate 머리 주석의 순서.
+//   - Step 은 잠을 상태에서 읽고, 깜깜하면(d ≥ NightHuntDark) 지난 스텝에 사냥 중이 아니던 주행성 늑대는 사냥하지 않는다(새 사냥 없음 —
+//     쫓던 사냥만 마저 끝낸다). 속력 배수 = 잠이면 0, 깨어 있는 주행성은 max(1 − d, NightFloor) × NightAct / R, 야행성 1.
+//     스텝 끝에 bNightHunt = 표적 있음 ∨ 잠행형 돌진 상태(포획 뒤 갱신 다음 값)를 쓴다.
 // ---------------------------------------------------------------------------------------------------------------
 
 #pragma once
@@ -159,6 +178,28 @@ namespace EcoThreatV3
 		double WorldSizeHi = 110.0;
 		std::int32_t DayPeriods[3] = {600, 900, 1800};   // daynight.periods (스텝)
 		double Twilight = 0.05;                    // daynight.twilight (T 비율, 박명 폭 τ = 0.05·T 스텝)
+
+		// ---- 늑대 밤잠 점진화 (features.realism_night, configs/v3_real1_night_on.yaml). 기본 끔 = R1b 학습 세계 그대로 ----
+		// 켜는 쪽: 언리얼 통합 레벨 v3 모드 (사람 결정 H1 10-14: R1b 두뇌를 그대로 두고 언리얼에 먼저 넣는다 — R1b 측정으로 허용).
+		// 아래 다섯 값은 켤 때 쓰는 값이고 골든 ThreatNightGoldenVectorsV3.h 의 kNightCfg* 가 파이썬 설정에서 읽은 같은 값을 싣는다.
+		bool bRealismNight = false;                // 켜면 잠을 늑대별 상태(NightInit·NightUpdate)로 둔다. 끄면 IsAsleep(d) 그대로
+		double NightSettleR = 8.0;                 // settle_r: 이 실거리 안에 사슴이 있으면 눕지 않는다 (16 m)
+		double NightHuntDark = 1.0;                // hunt_dark: d ≥ 이 값이면 주행성 늑대는 새 사냥을 시작하지 않는다
+		double NightFloor = 0.5;                   // night_floor: 해 진 뒤 깨어 있는 주행성 늑대 속력 배수 하한 (1 − SleepDark 이하)
+		double NightSpread = 0.5;                  // spread: 늑대별 잠·기상 지연 최대 = ⌊spread × 박명 폭 τ⌋ 스텝
+		std::int32_t NightRampSteps = 15;          // ramp_steps: 눕기·깨기에 걸리는 업데이트 수 (활동도 한 업데이트에 1 씩)
+
+		// ---- 늑대 식사 중 제자리 (사람 결정 10-15 (B)). 기본 끔 = R1b 학습 세계 그대로 (쿨다운 동안 배회) ----
+		// 켜는 쪽: 언리얼 통합 레벨 v3 모드 (eco.IntegratedV3.WolfEatSeconds 가 학습 5 스텝보다 길 때, PredEatCd 와 함께 바꾼다)
+		bool bEatInPlace = false;                  // eat_in_place: 켜면 보통 위협이 쿨다운(식사) 동안 서 있는다 (Step 6c, 머리 주석 '늑대 식사 중 제자리')
+
+		// ---- 야생 1단계 (w2) 늑대 포만 (사람 결정 10-15 (7), 파이썬 world.py '야생 1단계' (w2), configs/v3_wild1_mirror.yaml wild_satiation).
+		//      기본 끔 = R1b 학습 세계 그대로. 켜는 쪽: EcoWorldV3 FWorldConfig::WildSatiation (하루 단위 sat_days 를 스텝으로 옮겨 넣는다) ----
+		// 보통 위협이 잡으면 SatLeft ← SatSteps. Step 첫머리 쿨다운을 줄인 뒤 쿨다운 0 이고 SatLeft > 0 이면 이번 스텝은 배부름(bSated):
+		// 사냥하지 않고(표적·포획 없음) SatLeft −1, 속력 × RestSpeed (6c 식사 제자리 뒤, 7 밤잠 배수 앞). 자지 않는 한 사슴에게 그대로 보인다
+		bool bWildSatiation = false;
+		std::int32_t SatSteps = 450;               // 반올림(sat_days 0.5 × 하루 900 스텝) = 60 초
+		double RestSpeed = 0.3;                    // rest_speed: 배부른 늑대의 배회 속력 배수
 	};
 
 	// 위협 하나의 바뀌지 않는 성질 (세계 생성 때 정한다 — world.py:907-912, 976-1011)
@@ -187,8 +228,21 @@ namespace EcoThreatV3
 		std::int32_t PlayerLeft = 0;         // 모드 남은 스텝 (player_left)
 
 		// 스텝 뒤 훅 (이번 스텝 결과. 다음 스텝 입력이 아니다)
-		bool bAsleep = false;       // 이번 스텝에 잤다. 초식 관측의 '자는 위협은 안 보인다'는 관측 때의 d 로 IsAsleep 을 다시 부른다
+		// bAsleep: 밤잠 점진화를 끄면 이번 스텝에 잤다(훅) — 초식 관측의 '자는 위협은 안 보인다'는 관측 때의 d 로 IsAsleep 을 다시 부른다.
+		//          켜면(Cfg.bRealismNight) 늑대별 상태다 — NightInit·NightUpdate 가 쓰고 Step·관측이 읽는다.
+		bool bAsleep = false;
 		std::int32_t Target = -1;   // 이번 스텝 표적 (FPreyView 색인, 없으면 -1). 애니메이션 시선용
+
+		// 밤잠 점진화 상태 (Cfg.bRealismNight 일 때만 쓴다. 끄면 기본값 그대로 두고 아무도 읽지 않는다 — world.py `_rz_night_reset`)
+		std::int32_t NightAct = 0;       // 활동도 a ∈ [0, R] (속력 배수 a / R). NightInit 이 정한다
+		bool bNightSettle = false;       // 눕는 중 (걸음을 늦추는 중)
+		std::int32_t NightDarkK = 0;     // 깨어 있는 채 어둠(d ≥ 0.5)인 업데이트 수 (이어서)
+		std::int32_t NightWait = -1;     // 기상까지 남은 업데이트 (-1 = 기다리지 않음)
+		std::int32_t NightDelay = 0;     // 늑대별 잠·기상 지연 δ (NightDelayOf)
+		bool bNightHunt = false;         // 지난 Step 에 사냥 중이었나 (표적 있음 ∨ 잠행형 돌진 상태). Step 이 쓰고 다음 Step·NightUpdate 가 읽는다
+
+		// 야생 (w2) 늑대 포만 (Cfg.bWildSatiation 일 때만. 끄면 늘 0 — world.py pred_sat)
+		std::int32_t SatLeft = 0;        // 남은 배부름 스텝 (먹기가 끝난 뒤부터 준다)
 	};
 
 	// 위협이 보는 초식 하나 (이번 스텝 이동 뒤 값)
@@ -228,6 +282,9 @@ namespace EcoThreatV3
 		bool bPounceStart = false;           // 잠행형 돌진 시작
 		bool bChargeStart = false;           // 플레이어 돌진 시작
 		bool bNewPlayerMode = false;         // 이번 스텝에 PlayerModeU0/U1 을 써서 새 모드를 골랐다
+		bool bSated = false;                 // 야생 (w2): 이번 스텝 배불러 쉬었다 (world.py 훅 pred_sated)
+		bool bRunning = false;               // 이번 이동이 전력 걸음 (world.py 훅 pred_running — 표적을 쫓는 추격형, 잠행형 돌진, 플레이어 돌진).
+											 // 상태는 이동 때 값(포획 뒤 갱신 10a 전). 발소리 반경(EcoObservationV3::HearingRadius)이 읽는다
 	};
 
 	// ------------------------------------------------------------------------------------------------------------
@@ -387,6 +444,196 @@ namespace EcoThreatV3
 	}
 
 	// ------------------------------------------------------------------------------------------------------------
+	// 늑대 밤잠 점진화 (Cfg.bRealismNight, world.py realism_night)
+	// ------------------------------------------------------------------------------------------------------------
+
+	// 늑대별 지연 해시의 첫 입력 (world.py NIGHT_TAG). 사건 결정 지연 505·세계 난수 태그와 겹치지 않는다
+	inline constexpr std::uint64_t kNightTag = 606;
+
+	// SplitMix64 마무리 (env_v2/repertoire.py `_mix64`, EcoRepertoire.h Mix64 와 같은 식. 이 파일은 다른 v3 헤더에 기대지 않는다)
+	inline std::uint64_t NightMix64(std::uint64_t Z)
+	{
+		Z = (Z ^ (Z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+		Z = (Z ^ (Z >> 27)) * 0x94D049BB133111EBULL;
+		return Z ^ (Z >> 31);
+	}
+
+	// 늑대별 잠·기상 지연 δ = H(606, Seed, Slot) mod (MaxDelay + 1) ∈ [0, MaxDelay] (world.py `night_delays`).
+	// H = repertoire.mix_chain (h = 0, 입력마다 h = Mix64((h ^ x) + 0x9E3779B97F4A7C15)). Seed·Slot 의 음수는 2 의 보수 그대로 (numpy astype uint64)
+	inline std::int32_t NightDelayOf(std::int64_t Seed, std::int64_t Slot, std::int32_t MaxDelay)
+	{
+		if (MaxDelay <= 0)
+		{
+			return 0;
+		}
+		std::uint64_t H = 0;
+		H = NightMix64((H ^ kNightTag) + 0x9E3779B97F4A7C15ULL);
+		H = NightMix64((H ^ static_cast<std::uint64_t>(Seed)) + 0x9E3779B97F4A7C15ULL);
+		H = NightMix64((H ^ static_cast<std::uint64_t>(Slot)) + 0x9E3779B97F4A7C15ULL);
+		return static_cast<std::int32_t>(H % static_cast<std::uint64_t>(static_cast<std::int64_t>(MaxDelay) + 1));
+	}
+
+	// 지연 최대 = ⌊spread × τ⌋ (τ = 박명 폭 스텝. 낮 고정 세계는 τ 를 0 으로 넣는다 — 어둠이 없다)
+	inline std::int32_t NightMaxDelay(std::int32_t TwSteps, const FThreatConfig& Cfg)
+	{
+		return TwSteps > 0 ? static_cast<std::int32_t>(std::floor(Cfg.NightSpread * static_cast<double>(TwSteps))) : 0;
+	}
+
+	// 처음 상태 (world.py `_rz_night_update` 의 fresh): 이미 어두우면(d ≥ 0.5) 주행성은 자고 있다. 야행성·플레이어는 늘 깨어 있다
+	inline void NightInit(const FThreatSpec& Spec, FThreatState& T, double Dark, std::int32_t Delay, const FThreatConfig& Cfg)
+	{
+		T.NightDelay = Delay;
+		T.bAsleep = !Spec.bNocturnal && Dark >= Cfg.SleepDark;
+		T.NightAct = T.bAsleep ? 0 : Cfg.NightRampSteps;
+		T.bNightSettle = false;
+		T.NightDarkK = 0;
+		T.NightWait = -1;
+		T.bNightHunt = false;   // world.py `_rz_night_reset`: 처음에는 사냥 중이 아니다
+	}
+
+	// 지금 잠 (Step·관측이 읽는다): 켜면 늑대별 상태, 끄면 어둠의 순수 함수
+	inline bool IsAsleepNow(const FThreatSpec& Spec, const FThreatState& T, double Dark, const FThreatConfig& Cfg)
+	{
+		return Cfg.bRealismNight ? T.bAsleep : IsAsleep(Spec, Dark, Cfg);
+	}
+
+	// 밤잠 점진화의 속력 배수 (world.py `_rz_night_update` 끝): 잠 0, 깨어 있는 주행성 max(1 − d, NightFloor) × a / R, 야행성 1.
+	// d 는 그 업데이트의 어둠 = 다음 Step 의 In.Dark (둘 사이에 어둠이 바뀌지 않는다). 파이썬과 같은 순서의 double 계산이다
+	inline double NightSpeedMult(const FThreatSpec& Spec, const FThreatState& T, double Dark, const FThreatConfig& Cfg)
+	{
+		if (T.bAsleep)
+		{
+			return 0.0;
+		}
+		if (Spec.bNocturnal)
+		{
+			return 1.0;
+		}
+		const double Slow = Cfg.bTwilightSlow ? 1.0 - Dark : 1.0;
+		const double Base = Slow >= Cfg.NightFloor ? Slow : Cfg.NightFloor;   // 파이썬 max(slow, night_floor)
+		const double Level = Cfg.NightRampSteps > 0
+								 ? static_cast<double>(T.NightAct) / static_cast<double>(Cfg.NightRampSteps)
+								 : 1.0;
+		return Base * Level;
+	}
+
+	// NightUpdate 한 번의 결과 (기록·화면·골든 대조. 상태는 T 에 있다)
+	struct FNightUpdateResult
+	{
+		bool bWake = false;          // 이번 업데이트에 깼다 (활동도 0 에서 오르기 시작)
+		bool bSettleStart = false;   // 눕기 시작
+		bool bSettleAbort = false;   // 눕다가 다시 일어났다 (사냥·사슴·새벽)
+		bool bOnset = false;         // 잠들었다
+		bool bBlockDeer = false;     // 누울 차례인데 settle_r 안에 사슴이 있어 못 누웠다
+		bool bBlockHunt = false;     // 누울 차례인데 사냥 중이라 못 누웠다
+		bool bNearChecked = false;   // 사슴 거리를 쟀다 (눕는 중이거나 누울 차례)
+		bool bNear = false;          // 잰 결과 settle_r 안에 사슴이 있다
+	};
+
+	// 한 업데이트 (world.py `_rz_night_update`, 주행성 늑대 하나). 스텝 끝 t + 1 의 어둠 Dark 와, 늑대 이동 뒤·리스폰 전 사슴 위치로 부른다
+	// (이번 스텝에 죽은 사슴도 그 자리에서 센다 — 파이썬 모든 슬롯). R = NightRampSteps, bDark = Dark ≥ SleepDark, bHunt = T.bNightHunt:
+	//   자고 있음:  bDark 면 Wait = -1. 아니면 Wait < 0 이면 Wait = Delay; Wait == 0 이면 깸(Wait = -1, Act = 0), 아니면 --Wait.
+	//               (깬 늑대는 같은 업데이트에 아래 '깨어 있음'을 탄다 → Act = 1)
+	//   깨어 있음:  DarkK = bDark ? DarkK + 1 : 0.
+	//               bNear = 실거리 ≤ SettleR 인 사슴이 있다 (bDark ∧ (bSettle ∨ DarkK > Delay) 일 때만 잰다)
+	//               bCalm = bDark ∧ ¬bHunt ∧ ¬bNear, bReady = ¬bSettle ∧ bDark ∧ DarkK > Delay
+	//               bSettle ∧ ¬bCalm → 다시 일어남, bReady ∧ bCalm → 눕기 시작
+	//               bSettle 이면 --Act, Act ≤ 0 이면 잠듦(Act 0, bSettle 거짓, DarkK 0). 아니면 Act = min(Act + 1, R)
+	//   자는 늑대·야행성의 DarkK 는 0 이다(파이썬 np.where(awake & dark, DarkK + 1, 0)).
+	inline FNightUpdateResult NightUpdate(const FThreatSpec& Spec, FThreatState& T, double Dark, const FPreyView* Prey,
+										  std::int32_t NumPrey, const FThreatConfig& Cfg)
+	{
+		FNightUpdateResult R;
+		if (Spec.bNocturnal)
+		{
+			T.bAsleep = false;
+			T.NightDarkK = 0;
+			return R;
+		}
+		const std::int32_t Ramp = Cfg.NightRampSteps;
+		const bool bDark = Dark >= Cfg.SleepDark;
+		if (T.bAsleep)
+		{
+			if (bDark)
+			{
+				T.NightWait = -1;
+			}
+			else
+			{
+				if (T.NightWait < 0)
+				{
+					T.NightWait = T.NightDelay;
+				}
+				if (T.NightWait == 0)
+				{
+					T.bAsleep = false;
+					T.NightWait = -1;
+					T.NightAct = 0;
+					R.bWake = true;
+				}
+				else
+				{
+					--T.NightWait;
+				}
+			}
+		}
+		if (T.bAsleep)
+		{
+			T.NightDarkK = 0;
+			return R;
+		}
+		T.NightDarkK = bDark ? T.NightDarkK + 1 : 0;
+		bool bNear = false;
+		if (bDark && (T.bNightSettle || T.NightDarkK > T.NightDelay))
+		{
+			R.bNearChecked = true;
+			for (std::int32_t i = 0; i < NumPrey && !bNear; ++i)
+			{
+				if (!Prey[i].bAlive)
+				{
+					continue;
+				}
+				const double DX = Prey[i].X - T.PosX;
+				const double DY = Prey[i].Y - T.PosY;
+				bNear = std::sqrt(DX * DX + DY * DY) <= Cfg.NightSettleR;
+			}
+			R.bNear = bNear;
+		}
+		const bool bHunt = T.bNightHunt;
+		const bool bCalm = bDark && !bHunt && !bNear;
+		const bool bReady = !T.bNightSettle && bDark && T.NightDarkK > T.NightDelay;
+		if (T.bNightSettle && !bCalm)
+		{
+			T.bNightSettle = false;
+			R.bSettleAbort = true;
+		}
+		else if (bReady && bCalm)
+		{
+			T.bNightSettle = true;
+			R.bSettleStart = true;
+		}
+		R.bBlockDeer = bReady && !bHunt && bNear;
+		R.bBlockHunt = bReady && bHunt;
+		if (T.bNightSettle)
+		{
+			--T.NightAct;
+			if (T.NightAct <= 0)
+			{
+				T.NightAct = 0;
+				T.bAsleep = true;
+				T.bNightSettle = false;
+				T.NightDarkK = 0;
+				R.bOnset = true;
+			}
+		}
+		else
+		{
+			T.NightAct = T.NightAct + 1 < Ramp ? T.NightAct + 1 : Ramp;
+		}
+		return R;
+	}
+
+	// ------------------------------------------------------------------------------------------------------------
 	// 한 결정 스텝 (위협 하나)
 	// ------------------------------------------------------------------------------------------------------------
 
@@ -403,10 +650,21 @@ namespace EcoThreatV3
 		const double HX = T.HeadX;
 		const double HY = T.HeadY;
 
-		// 2. 쿨다운·잠·사냥 (world.py:2034-2037)
+		// 2. 쿨다운·잠·사냥 (world.py:2034-2037). 밤잠 점진화를 켜면 잠은 늑대별 상태이고(지난 NightUpdate), 깜깜하면(d ≥ hunt_dark)
+		//    지난 스텝에 사냥 중이 아니던 주행성 늑대는 새 사냥을 시작하지 않는다 (world.py `_step_predators_v3` 의 hunt_dark 줄)
 		T.Cooldown = T.Cooldown - 1 > 0 ? T.Cooldown - 1 : 0;
-		const bool bAsleep = IsAsleep(Spec, In.Dark, Cfg);
-		bool bHunting = T.Cooldown == 0 && !bAsleep;
+		const bool bAsleep = IsAsleepNow(Spec, T, In.Dark, Cfg);
+		// 야생 (w2) 포만: 먹기(쿨다운)가 끝났고 배부름이 남았으면 이번 스텝은 쉰다 (잠과 무관하게 남은 스텝이 준다 — world.py 그대로)
+		const bool bSated = Cfg.bWildSatiation && T.Cooldown == 0 && T.SatLeft > 0;
+		if (bSated)
+		{
+			--T.SatLeft;
+		}
+		bool bHunting = T.Cooldown == 0 && !bAsleep && !bSated;
+		if (Cfg.bRealismNight && In.Dark >= Cfg.NightHuntDark)
+		{
+			bHunting = bHunting && (Spec.bNocturnal || T.bNightHunt);
+		}
 
 		// 3. 자는 잠행형은 처음 상태로, 탈진·휴식은 사냥하지 않는다 (world.py:2040-2054)
 		if (bStalker && bAsleep)
@@ -539,13 +797,27 @@ namespace EcoThreatV3
 			}
 		}
 
-		// 7. 밤잠·박명 (world.py:2078-2080)
+		// 6c. 식사 중 제자리 (켰을 때만, world.py R3 (j) eat_in_place): 쿨다운 때문에 사냥하지 않는 보통 위협은 잠처럼 move = head,
+		//     속력 0 (상태 기계 뒤, 밤잠 배수 앞 — 파이썬과 같은 자리. 뒤의 배수를 곱해도 0 이다)
+		if (Cfg.bEatInPlace && !bPlayer && T.Cooldown > 0)
+		{
+			MX = HX;
+			MY = HY;
+			Speed = 0.0;
+		}
+		// 6d. 야생 (w2): 배부른 늑대는 느리게 어슬렁거린다 (표적이 없으므로 move 는 배회. 밤잠 배수 앞 — world.py 그대로)
+		if (bSated)
+		{
+			Speed = Speed * Cfg.RestSpeed;
+		}
+
+		// 7. 밤잠·박명 (world.py:2078-2080). 밤잠 점진화를 켜면 배수는 늑대별 활동도를 따른다 (NightSpeedMult)
 		if (bAsleep)
 		{
 			MX = HX;
 			MY = HY;
 		}
-		Speed = Speed * SpeedMult(Spec, In.Dark, Cfg);
+		Speed = Speed * (Cfg.bRealismNight ? NightSpeedMult(Spec, T, In.Dark, Cfg) : SpeedMult(Spec, In.Dark, Cfg));
 
 		// 8. 이동·벽 반사·heading·변위 (world.py:2083-2113)
 		double NX = QX + MX * Speed;
@@ -569,6 +841,10 @@ namespace EcoThreatV3
 		T.VelY = NY - QY;
 		T.PosX = NX;
 		T.PosY = NY;
+
+		// 8b. 전력 걸음 훅 (realism_hearing 의 pred_running, 포획 뒤 상태 갱신 전 값)
+		R.bRunning = (Spec.Type == EThreatType::Chaser && bHasTarget) || (bStalker && T.StalkState == EStalkState::Pounce)
+					 || (bPlayer && T.PlayerMode == EPlayerMode::Charge);
 
 		// 9. 포획 (world.py:2115-2125, 2138-2141). 거리는 위협 이동 전 위치로 잰 1 의 값이다
 		std::int32_t K = -1;
@@ -604,6 +880,10 @@ namespace EcoThreatV3
 		if (bGot)
 		{
 			T.Cooldown = bPlayer ? Cfg.PlayerCooldown : Cfg.PredEatCd;
+			if (Cfg.bWildSatiation && !bPlayer)
+			{
+				T.SatLeft = Cfg.SatSteps;   // 야생 (w2): 먹기가 끝난 뒤 배부름 (플레이어형 위협은 늘 0)
+			}
 		}
 
 		// 10a. 잠행형 상태 갱신 (world.py `_threat_after`:2353-2368)
@@ -665,10 +945,17 @@ namespace EcoThreatV3
 			}
 		}
 
+		// 10c. 밤잠 점진화: 이번 스텝에 사냥 중이었나 (표적 있음, 또는 상태 갱신 뒤 잠행형 돌진) — 다음 NightUpdate·Step 이 읽는다
+		if (Cfg.bRealismNight)
+		{
+			T.bNightHunt = bHasTarget || (bStalker && T.StalkState == EStalkState::Pounce);
+		}
+
 		T.bAsleep = bAsleep;
 		T.Target = J;
 		R.bAsleep = bAsleep;
 		R.bHunting = bHunting;
+		R.bSated = bSated;
 		R.bHasTarget = bHasTarget;
 		R.Target = J;
 		R.TargetPerceived = bHasTarget ? DT : -1.0;

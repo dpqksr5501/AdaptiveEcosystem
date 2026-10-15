@@ -10,6 +10,7 @@
 #include "MassSpawnerSubsystem.h"
 #include "MassEntityManager.h"
 #include "Engine/World.h"
+#include "HAL/IConsoleManager.h"
 
 void AEcoCreatureIntegrationSpawner::UpdateSensoryPresentation()
 {
@@ -43,8 +44,10 @@ void AEcoCreatureIntegrationSpawner::UpdateSensoryPresentation()
                     const auto& Target=Region->Sim.ThreatIn[Index];
                     const FVector P=Region->UnitsToCm(Target.X,Target.Y,Position.Z);
                     FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoPresentationSight),true);
-                    if(!GetWorld()->LineTraceSingleByChannel(Hit,Position+FVector(0,0,80),P+FVector(0,0,80),ECC_Visibility,Params))
+                    if(Perception->Perception.Threat.bNearestSight&&!GetWorld()->LineTraceSingleByChannel(Hit,Position+FVector(0,0,80),P+FVector(0,0,80),ECC_Visibility,Params))
                         Cue->Memory.Observe(EEcoSenseSource::Sight,P,1,0,1,uint64(Index+1),Now);
+                    else if(Perception->Perception.Threat.bNearestHeard&&Cue->Memory.Source!=EEcoSenseSource::Sight)
+                        Cue->Memory.Observe(EEcoSenseSource::Hearing,P,Settings.HearingConfidence,Settings.HearingUncertainty,1,uint64(Index+1),Now);
                 }
             }
 
@@ -60,8 +63,13 @@ void AEcoCreatureIntegrationSpawner::UpdateSensoryPresentation()
                 const bool Relevant=Id.SpeciesId==TEXT("Wolf")?Noise.SourceSpeciesId==TEXT("Herbivore")||Noise.Instigator.IsValid():Noise.ThreatStrength>0;
                 if(!Relevant)continue;
                 const float Range=Noise.MaxRange*Noise.Loudness;
-                if(FVector::DistSquared(Position,Noise.Position)<=FMath::Square(Range))
+                if(FVector::DistSquared(Position,Noise.Position)<=FMath::Square(Range)) {
                     Cue->Memory.Observe(EEcoSenseSource::Hearing,Noise.Position,Settings.HearingConfidence,Settings.HearingUncertainty,FMath::Max(Noise.ThreatStrength,.1f),uint64(Noise.Id),Noise.EmittedAt);
+                    const auto* Debug=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Senses.NoiseLog"));
+                    if(Noise.Tag==TEXT("Herd.Alarm")&&Debug&&Debug->GetInt()!=0)
+                        UE_LOG(LogTemp,Log,TEXT("[Eco AlarmHeard] Listener=%lld Source=%lld Event=%lld DistanceCm=%.0f"),
+                            Id.StableAgentId,Noise.SourceAgentId,Noise.Id,FVector::Distance(Position,Noise.Position));
+                }
             }
         }
         // One authority alarm per region per cooldown. Heard alarms never emit another alarm (no gossip loop).

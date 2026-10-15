@@ -83,3 +83,8 @@
 검증 커밋 `8e2f34f`의 M4/v3/JYU 구현은 기존 `codex/social-shelter-handoff`와 원래 저장소 폴더로 반영했다. 앞으로 원래 `AdaptiveEcosystem/AdaptiveEcosystem.uproject`를 사용한다. 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`과 원본 팀 레벨의 분리는 유지한다. 4절의 브랜치명은 최초 구현 이력이다. 세부 보존·재검증·worktree 정리는 [작업 위치 통합 기록](AdaptiveEcosystem/Docs/조연우/JYU_WORKTREE_RETURN_20261016.md)을 따른다.
 
 UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한이 있는 승인된 실행 환경에서 시작한다. 권한 오류로 시작한 빌드를 임의 중단하거나 중복 실행하지 않는다. 2026-10-16의 중단 허용은 사용자가 특정 실패 실행 1회에만 허용한 예외이며 지속적인 예외가 아니다.
+
+
+## 6. 2026-10-16 v3 감지·야생 규칙 추가 통합
+
+기존 통합본 위에 권신혁 `origin/Branch_Sinhyeok` `3916496`의 후속 16개 커밋을 반영했다. `RL_V3_WILD1_SPEC.md`의 시야·청각·도주·비축·포만 규칙을 사용하지만 R1b 내장 학습 가중치와 V1 계약은 그대로다. `request`(PPO)와 `flight_override`(세계 규칙), `executed`(실제 행동)를 구분한다. MassFlock은 외부 패키지 도입 완료가 아닌 설계 참조이며 실제 이웃·조향은 자체 구현이다. v3의 경보 소음/표현과 Native `kin_alarm`은 Social Persistent Herd→ModulatedAction 연결 완료를 뜻하지 않는다. 정확한 활성 backend·검증·남은 연결은 [위협·backend 감사](AdaptiveEcosystem/Docs/조연우/JYU_THREAT_AND_BACKEND_AUDIT_20261016.md)를 따른다.

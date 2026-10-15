@@ -35,8 +35,10 @@ v1 에 없는 것:
   열(REPERTOIRE_COLUMNS)·`World.threats_stats()` 열(THREAT_COLUMNS)이 붙는다(repertoire 세계는 행동이 'behavior' 한 열이다).
   stare_down(v3 R2 M7)·alarm(v3 R2 M8)을 켠 세계의 행에는 `World.stare_stats()` 열(STARE_COLUMNS)·`World.alarm_stats()`
   열(ALARM_COLUMNS)이 붙는다. realism_*(v3 현실성 1단계) 중 하나라도 켠 세계의 행에는 `World.realism_stats()` 열(REALISM_COLUMNS,
-  켜지 않은 규칙의 열은 nan)이 붙는다. rep_learned 는 모델의 마스크 판이 세계의 판(관측 이름, `rep_policy.mask_version_of`)과 다르면
-  연결 때 멈춘다(R1 모델(판 2)은 경보 세계(판 3)에서 거부된다).
+  켜지 않은 규칙의 열은 nan)이, v3 R3 규칙 중 하나라도 켠 세계의 행에는 `World.r3_stats()` 열(R3_COLUMNS)이 붙는다.
+  rep_learned 는 모델의 마스크 판이 세계의 판(관측 이름, `rep_policy.mask_version_of`)과 다르면 연결 때 멈춘다(R1 모델(판 2)은 경보
+  세계(판 3)에서 거부된다). 허용 행동은 모델의 목록 ∩ 세계 설정의 목록(train.repertoire.allowed)이다 — v3 R3 세계(얼기를 뺀 목록)에서
+  R1b(얼기가 든 목록)를 돌리면 FREEZE 가 마스크로 막힌다(`rep_policy.effective_allowed`). 지금까지의 세계는 두 목록이 같아 그대로다.
   범주형 보행 CM 모델 (`env_v2/cm.py`)은 `_base_policy` 가 알아보고 CM 평가 정책(결정·유지 표본·확률)으로 돌린다.
 
 정책 스펙 예:
@@ -62,8 +64,8 @@ from env.config import ROOT, Config
 from env.rollout import STAT_COLUMNS, _init_worker
 
 from .world import (ACT_DIM, ALARM_STAT_COLUMNS, DAYNIGHT_STAT_COLUMNS, GAIT_STAT_COLUMNS, PSLEEP_STAT_COLUMNS,
-                    REALISM_STAT_COLUMNS, REP_STAT_COLUMNS, STARE_STAT_COLUMNS, THREAT_STAT_COLUMNS, VIGIL_STAT_COLUMNS,
-                    WINDOW_STAT_COLUMNS, World)
+                    R3_STAT_COLUMNS, REALISM_STAT_COLUMNS, REP_STAT_COLUMNS, STARE_STAT_COLUMNS, THREAT_STAT_COLUMNS,
+                    VIGIL_STAT_COLUMNS, WINDOW_STAT_COLUMNS, World)
 
 # 학습 γ 의 출처. 모델마다 γ 가 다르면 --gamma 로 덮는다.
 PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
@@ -91,6 +93,8 @@ STARE_COLUMNS = list(STARE_STAT_COLUMNS)
 ALARM_COLUMNS = list(ALARM_STAT_COLUMNS)
 # realism_*(v3 현실성 1단계) 중 하나라도 켠 세계의 행에만 더 붙는 열 (World.realism_stats, 켜지 않은 규칙의 열은 nan)
 REALISM_COLUMNS = list(REALISM_STAT_COLUMNS)
+# v3 R3 세계 규칙(추격 고정·지형·늑대 은신처 진입 금지·은신처 먹이 배수 뽑기) 중 하나라도 켠 세계의 행에만 더 붙는 열 (World.r3_stats)
+R3_COLUMNS = list(R3_STAT_COLUMNS)
 
 
 # --------------------------------------------------------------------- #
@@ -711,9 +715,9 @@ class RepLearned:
     """v3 R1 학습 정책(RepertoirePolicy 모델, `env_v2/rep_policy.py`)의 배포·판정 모드: 마스크 로짓의 argmax(동점이면 낮은
     번호, 모드 0). 출력은 (N, 1) 행동 번호(float)다.
 
-    `bind_world(w)` 로 받은 세계의 참 상태로 매 호출 마스크를 만든다: m = 허용(모델의 rep_allowed) ∧ 가능(지금 세계 관측
-    `w.observe()`) ∧ 결정(`w.rep_peek()`). 망에는 호출에 받은 관측을 넣는다 — C4 `obs_fix` 같은 바깥 래퍼가 고친 관측은 망
-    입력만 바꾸고 마스크는 바꾸지 않는다. 연결 전에 부르면 멈춘다.
+    `bind_world(w)` 로 받은 세계의 참 상태로 매 호출 마스크를 만든다: m = 허용(모델의 rep_allowed ∩ 세계 설정의 목록,
+    `rep_policy.effective_allowed`) ∧ 가능(지금 세계 관측 `w.observe()`) ∧ 결정(`w.rep_peek()`). 망에는 호출에 받은 관측을 넣는다 —
+    C4 `obs_fix` 같은 바깥 래퍼가 고친 관측은 망 입력만 바꾸고 마스크는 바꾸지 않는다. 연결 전에 부르면 멈춘다.
     """
 
     def __init__(self, model):
@@ -736,6 +740,11 @@ class RepLearned:
         check_mask_version(getattr(pol, "rep_mask_version", 1), world.obs_names)
         if tuple(world.obs_names) != tuple(pol.rep_obs_names):
             raise ValueError(f"모델의 관측 {list(pol.rep_obs_names)} 이 세계의 관측 {list(world.obs_names)} 과 다르다")
+        from .rep_policy import allowed_mask_of, effective_allowed
+
+        # 허용 = 모델 목록 ∩ 세계 목록(v3 R3: 얼기를 뺀 세계에서는 R1b 의 FREEZE 가 막힌다. 두 목록이 같으면 모델 목록 그대로)
+        self.allowed = effective_allowed(pol.rep_allowed, world.cfg)
+        self.params = {"allowed_mask": allowed_mask_of(self.allowed)}
         self.world = world
 
     def mask(self) -> np.ndarray:
@@ -882,6 +891,9 @@ def rollout(cfg: Config, policy, seed: int, steps: int, *, gamma: float | None =
     if w._rz:
         zs = w.realism_stats()
         s.update((c, zs[c]) for c in REALISM_COLUMNS)
+    if w._r3:
+        z3 = w.r3_stats()
+        s.update((c, z3[c]) for c in R3_COLUMNS)
     s["_act_sum"], s["_act_sq"], s["_act_n"] = act_sum, act_sq, steps * N
     s["_obs_sum"] = obs_sum
     if record_every:

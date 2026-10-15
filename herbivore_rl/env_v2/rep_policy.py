@@ -143,6 +143,20 @@ def allowed_mask_of(names) -> np.ndarray:
     return np.array([b in names for b in BEHAVIOR_NAMES], dtype=bool)
 
 
+def effective_allowed(model_allowed, cfg) -> tuple[str, ...]:
+    """판정·측정 롤아웃의 허용 행동 = 모델의 허용 목록(`RepertoirePolicy.rep_allowed`) ∩ 세계 설정의 목록(train.repertoire.allowed —
+    블록이 없으면 모델 목록 그대로), 계약 순서. v3 R3 세계는 사용자 결정(10-14 '사슴 얼기를 없애')으로 얼기를 뺀 목록이라, 얼기가 든
+    목록으로 배운 R1b 모델을 그 세계에서 돌리면 FREEZE 칸이 마스크로 막힌다(로짓 −1e9, 확률 0 — argmax 는 남은 행동 가운데 가장 큰
+    로짓). 두 목록이 같은 세계(지금까지의 모든 설정)는 모델 목록 그대로다. GRAZE·FLEE 가 빠지면 멈춘다."""
+    model_allowed = tuple(model_allowed)
+    rp = rep_params(cfg) if cfg is not None else None
+    world = tuple(BEHAVIOR_NAMES) if rp is None else tuple(rp["allowed"])
+    names = tuple(b for b in BEHAVIOR_NAMES if b in model_allowed and b in world)
+    if "graze" not in names or "flee" not in names:
+        raise ValueError(f"모델 목록 {list(model_allowed)} 과 세계 목록 {list(world)} 의 공통 행동 {list(names)} 에 graze·flee 가 없다")
+    return names
+
+
 def mask_version_of(obs_names) -> int:
     """세계(관측 이름)의 마스크 판: 관측에 alarm_heard 가 있으면 3(MASK_VERSION_ALARM), 없으면 2(MASK_VERSION)."""
     return MASK_VERSION_ALARM if REP_ALARM_COL in tuple(obs_names) else MASK_VERSION

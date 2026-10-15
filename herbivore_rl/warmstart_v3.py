@@ -49,6 +49,18 @@ v3 R2 (명세 RL_V3_R2_SPEC.md 10절 6단계 — R1 과 같은 조리법, 목표
   fit --allow-legacy(train_v3 는 --allow-legacy-warmstart).
 - collect 는 있는 teacher_mix.npz·.json 을, fit 은 있는 <name>_s<시드>.pt·.zip·.json 을 덮지 않는다(덮으려면 --force). ckpt/ 는
   저장소 밖(.gitignore)이라 덮으면 되살릴 수 없다.
+
+v3 R3 (관문 사전 등록 results/v3/r3/PREREG.md 13-2 — R1·R2 와 같은 조리법, 목표 0.45·R_base + 0.45·FSM_R3 + 0.1·마스크 균등):
+
+    python warmstart_v3.py collect --config configs/v3_r3.yaml --teacher2 fsm_r3
+    python warmstart_v3.py fit --config configs/v3_r3.yaml --seeds 0 1 2 3 4 5        # → ckpt/v3/ws_r3/v3_r3_ws_s<s>.pt
+
+- R3 세계(`r3_tools.is_r3_world`)의 기본값: --teacher2 fsm_r3, --out-dir ckpt/v3/ws_r3, --name v3_r3_ws. 두 교사의 문턱은 관문 결과다 —
+  R_base 는 관문 거주 (θ, a*)(R1·R2 의 고정 (4, 0.9) 가 아니다), FSM_R3 는 통과·조건부 통과한 관문의 줄(`repertoire_rules.fsm_r3_spec`,
+  `eval_v3.r3_setup` 이 `results/v3/r3/gate/final.json`·`search.json` 에서 읽는다). 관문 결과가 없으면 collect 는 멈춘다 — 도구 점검은
+  --theta/--approach/--fsm-r3-lines/--r3-cal 를 직접 준다(교사 설정은 teacher_mix.json 의 r3 칸에 남는다).
+- 마스크 균등은 허용 ∧ 가능 칸 위라 FREEZE 에 몫이 가지 않고, 두 교사도 FREEZE 를 내지 않는다(FSM_R3 는 허용 ∧ 가능 밖 요청을 GRAZE 로
+  바꾼다). 그래서 맞춘 정책의 FREEZE 확률은 정확히 0 이다. 출처 확인(world_digest)은 R1·R2 와 같다.
 """
 
 from __future__ import annotations
@@ -74,6 +86,7 @@ from env_v2.vec_env import MultiWorldVecEnv
 ROOT = Path(__file__).resolve().parent
 OUT = ROOT / "ckpt" / "v3" / "ws"
 OUT_R2 = ROOT / "ckpt" / "v3" / "ws_r2"     # v3 R2 세계(v3_r1 + 경보)의 기본 폴더
+OUT_R3 = ROOT / "ckpt" / "v3" / "ws_r3"     # v3 R3 세계(얼기 없음)의 기본 폴더
 CONFIG = ROOT / "configs" / "v3_r1.yaml"
 COLLECT_TAG = 808          # 교사 세계 고르기 난수 스트림(지연 505·C1′ 606·f_dec 707 과 겹치지 않는다)
 N_WORLDS = 24              # 교사 세계 수
@@ -88,7 +101,7 @@ VALUE_COEF = 0.5
 GAMMA_TRAIN = 0.995        # S1-a 학습 γ
 
 
-TEACHERS2 = ("fsm", "fsm_r2")
+TEACHERS2 = ("fsm", "fsm_r2", "fsm_r3")
 # fsm_r2 교사 FREEZE 의 출처(p_src2 값 → 이름, 모듈 docstring 'v3 R2')
 SRC_NAMES = {1: "near", 2: "stare_band", 3: "stare_hold", 4: "look"}
 
@@ -121,13 +134,27 @@ class FreezeSource:
         return np.where(req2 == FREEZE, src, 0).astype(np.int8)
 
 
-def teacher2_spec(cfg, allowed, teacher2: str) -> dict:
-    """둘째 교사의 정책 스펙: fsm(R1 FSM, eval_v3.fsm_spec near 판) 또는 fsm_r2(eval_v3.fsm_r2_policy_spec)."""
+def teacher2_spec(cfg, allowed, teacher2: str, r3: dict | None = None) -> dict:
+    """둘째 교사의 정책 스펙: fsm(R1 FSM, eval_v3.fsm_spec near 판), fsm_r2(eval_v3.fsm_r2_policy_spec) 또는 fsm_r3(FSM_R3 —
+    `r3` 는 eval_v3.r3_setup 의 손 규칙 설정)."""
     from eval_v3 import fsm_r2_policy_spec, fsm_spec
 
     if teacher2 not in TEACHERS2:
         raise ValueError(f"--teacher2 는 {TEACHERS2} 중 하나다. 받은 값: {teacher2!r}")
+    if teacher2 == "fsm_r3":
+        import repertoire_rules as rr
+
+        if r3 is None:
+            raise ValueError("fsm_r3 교사는 손 규칙 설정(eval_v3.r3_setup — 관문 결과)이 필요하다")
+        return rr.fsm_r3_spec(cfg, r3["theta"], r3["approach"], lines=r3["lines"], cal=r3["cal"], sleep=r3["sleep"])
     return fsm_spec(cfg, allowed, "near") if teacher2 == "fsm" else fsm_r2_policy_spec(cfg, allowed)
+
+
+def is_r3(cfg) -> bool:
+    """v3 R3 세계인가(`r3_tools.is_r3_world`). --teacher2·--out-dir 기본값이 쓴다."""
+    import r3_tools as rt
+
+    return rt.is_r3_world(cfg)
 
 
 def is_r2_world(cfg) -> bool:
@@ -139,12 +166,16 @@ def is_r2_world(cfg) -> bool:
 
 
 def default_teacher2(cfg) -> str:
-    """--teacher2 기본값: R2 세계면 fsm_r2, 아니면 fsm(R1 재현). R2 세계에 R1 FSM 교사(look 줄 없음)를 조용히 쓰지 않게."""
+    """--teacher2 기본값: R3 세계면 fsm_r3, R2 세계면 fsm_r2, 아니면 fsm(R1 재현). 다른 회차의 교사를 조용히 쓰지 않게."""
+    if is_r3(cfg):
+        return "fsm_r3"
     return "fsm_r2" if is_r2_world(cfg) else "fsm"
 
 
 def default_out_dir(cfg) -> Path:
-    """--out-dir 기본값: R2 세계면 ckpt/v3/ws_r2, 아니면 R1 의 ckpt/v3/ws (R1 교사 자료·가중치를 덮지 않게)."""
+    """--out-dir 기본값: R3 세계면 ckpt/v3/ws_r3, R2 세계면 ckpt/v3/ws_r2, 아니면 R1 의 ckpt/v3/ws (앞 회차 자료·가중치를 덮지 않게)."""
+    if is_r3(cfg):
+        return OUT_R3
     return OUT_R2 if is_r2_world(cfg) else OUT
 
 
@@ -190,14 +221,26 @@ def check_source(cfg, sidecar, what: str, allow_legacy: bool = False) -> str | N
     return got
 
 
-def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS, teacher2: str | None = None) -> dict:
-    """교사 자료 모으기(모듈 docstring). `teacher2` 가 None 이면 `default_teacher2`(R2 세계면 fsm_r2, 아니면 fsm)."""
+def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS, teacher2: str | None = None, r3: dict | None = None) -> dict:
+    """교사 자료 모으기(모듈 docstring). `teacher2` 가 None 이면 `default_teacher2`(R3 세계면 fsm_r3, R2 세계면 fsm_r2, 아니면 fsm).
+    R3 세계는 `r3`(eval_v3.r3_setup, 주지 않으면 관문 결과)의 거주 (θ, a*)로 R_base 교사를, 그 줄로 FSM_R3 교사를 만든다."""
     import env_v2.rollout as ro
     from env_v2.world import World
     from eval_v3 import fsm_spec
 
     if teacher2 is None:
         teacher2 = default_teacher2(cfg)
+    r3w = is_r3(cfg) or teacher2 == "fsm_r3"
+    if r3w and r3 is None:
+        from eval_v3 import r3_setup
+
+        r3 = r3_setup()
+    if r3w:
+        import repertoire_rules as rr
+
+        rbase_spec = rr.rule_spec(cfg, r3["theta"], r3["approach"])
+    else:
+        rbase_spec = fsm_spec(cfg, ("graze", "flee"), "near")
     rep = rep_params(cfg)
     lo, hi = cfg.train_seeds
     seeds = np.random.default_rng([COLLECT_TAG]).choice(np.arange(lo, hi), size=n_worlds, replace=False).tolist()
@@ -208,10 +251,10 @@ def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS, teacher2: str | N
                  agree=0)
     if src_of is not None:
         stats.update(freeze_src_fsm={v: 0 for v in SRC_NAMES.values()}, counts_by_driver={})
-    spec2 = teacher2_spec(cfg, rep["allowed"], teacher2)
+    spec2 = teacher2_spec(cfg, rep["allowed"], teacher2, r3)
     for i, s in enumerate(seeds):
         w = World(cfg, seeds=[int(s)])
-        rbase = ro.build_policy(fsm_spec(cfg, ("graze", "flee"), "near"), int(s))
+        rbase = ro.build_policy(rbase_spec, int(s))
         fsm = ro.build_policy(spec2, int(s))
         teacher = rbase if i % 2 == 0 else fsm
         N = w.N
@@ -280,6 +323,10 @@ def collect(cfg, n_worlds: int = N_WORLDS, steps: int = STEPS, teacher2: str | N
                  v_ret_mean=float(data["v_ret"].mean()), v_ret_std=float(data["v_ret"].std()))
     if src_of is not None:              # R1 자료의 통계 키는 그대로 둔다
         stats.update(teacher2=teacher2, obs_dim=int(data["p_obs"].shape[1] - N_BEHAVIORS))
+    if r3w:                             # v3 R3: 교사 설정(관문 결과 또는 직접 준 값)과 FREEZE 점검
+        stats.update(teacher2=teacher2, obs_dim=int(data["p_obs"].shape[1] - N_BEHAVIORS), r3=r3,
+                     freeze_teacher=int(stats["counts_rbase"][3] + stats["counts_fsm"][3]),
+                     freeze_mask=int(data["p_obs"][:, -N_BEHAVIORS:][:, 3].sum()))
     return dict(data=data, stats=stats)
 
 
@@ -386,7 +433,13 @@ def main(argv=None) -> int:
         ap.add_argument("--worlds", type=int, default=N_WORLDS)
         ap.add_argument("--steps", type=int, default=STEPS)
         ap.add_argument("--teacher2", choices=TEACHERS2, default=None,
-                        help="둘째 교사: fsm(R1 FSM) 또는 fsm_r2(v3 R2 FSM_R2). 기본: R2 세계면 fsm_r2, 아니면 fsm(R1 재현)")
+                        help="둘째 교사: fsm(R1 FSM), fsm_r2(v3 R2 FSM_R2) 또는 fsm_r3(v3 R3 FSM_R3). 기본: 설정의 회차대로")
+        ap.add_argument("--theta", type=float, default=None, help="R3: R_base·FSM_R3 의 거주 θ (기본: 관문 결과)")
+        ap.add_argument("--approach", type=float, default=None, help="R3: 거주 a* (기본: 관문 결과)")
+        ap.add_argument("--fsm-r3-lines", nargs="*", default=None, choices=("crouch", "leave", "run", "keep", "early"),
+                        help="R3: FSM_R3 의 관문 줄 (기본: 관문 결과)")
+        ap.add_argument("--r3-cal", nargs="*", default=None, choices=("keep", "run", "leave", "early"),
+                        help="R3: 보정 1 을 쓴 니치 (기본: 관문 결과)")
     else:
         ap.add_argument("--seeds", type=int, nargs="+", required=True)
         ap.add_argument("--epochs", type=int, default=EPOCHS)
@@ -413,7 +466,15 @@ def main(argv=None) -> int:
         old = [p for p in (Path(a.data), Path(a.data).with_suffix(".json")) if p.exists()]
         if old and not a.force:
             raise SystemExit(f"이미 있는 교사 자료를 덮지 않는다: {', '.join(map(str, old))} — 옮기거나(앞선 실행 기록) --force")
-        res = collect(cfg, a.worlds, a.steps, a.teacher2)
+        r3 = None
+        if is_r3(cfg) or a.teacher2 == "fsm_r3":
+            from eval_v3 import r3_setup
+
+            r3 = r3_setup(a.theta, a.approach, a.fsm_r3_lines, a.r3_cal)
+            if not r3["gate_complete"] and not r3["explicit"]:
+                raise SystemExit("R3 교사 자료는 관문 결과(results/v3/r3/gate/final.json·search.json)로 만든다 — 관문 전이면 "
+                                 "--theta/--approach/--fsm-r3-lines 를 직접 준다(도구 점검)")
+        res = collect(cfg, a.worlds, a.steps, a.teacher2, r3)
         Path(a.data).parent.mkdir(parents=True, exist_ok=True)
         np.savez_compressed(a.data, **res["data"])
         st = dict(res["stats"], config=str(a.config), world_digest=world_digest(cfg), config_digest=config_digest(cfg),

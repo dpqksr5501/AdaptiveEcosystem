@@ -5,10 +5,9 @@
 //   명령줄                     -EcoIntegratedV3                   (헤드리스·독립형 게임 실행용)
 //   명령줄 값은 콘솔 변수의 시작값(ECVF_SetByCommandline)으로만 들어간다. 그래서 콘솔에서 eco.IntegratedPolicyVersion 1 을 넣으면
 //   명령줄이 있어도 꺼진다(-EcoV3Debug·-EcoV3Seed=·-EcoV3DeerPerRegion= 도 같다).
-//   켜지는 곳은 넷 모드가 단독(NM_Standalone)인 게임 월드뿐이다 — 편집기 Play 는 '선택된 뷰포트' 나 '새 에디터 창(PIE)' + 넷 모드
-//   '오프라인 플레이'. 편집기 Play 메뉴의 '독립형 게임' 은 새 프로세스라 편집기 콘솔 값이 넘어가지 않는다 (추가 실행 인수에
-//   -EcoIntegratedV3 를 넣는다). 듣기 서버·전용 서버에서는 경고만 남긴다 — 우리 설정은 실행 중에 만든 일시 객체라 클라이언트가
-//   같은 템플릿을 찾을 수 없다(클라이언트 표시는 팀 합의 뒤 몫).
+//   통합된 권위 경로는 Standalone / Listen / Dedicated Server 에서 실행한다. Client 는 같은 경로/GUID의 canonical
+//   transient EntityConfig만 등록하고 논리 스텝은 실행하지 않는다. Bubble DTO로 표현만 수신한다.
+//   편집기 콘솔 값은 별도 Standalone 프로세스로 전달되지 않으므로 추가 실행 인수에 -EcoIntegratedV3 를 넣는다.
 //
 // 맡는 것 (서버·단독만, AGENTS.md 2절 2항. 복제 통로가 아니다 — 2절 6항):
 //   1. OnWorldBeginPlay (액터 BeginPlay 앞, UE 5.8 UWorld::BeginPlay): 팀 조정자 AEcoCreatureIntegrationSpawner 의 공개 속성만 바꾼다.
@@ -34,6 +33,49 @@
 //      먹기 되먹임: 사슴 글자 = 행동 + 에너지 % (+ 이번 결정 스텝에 먹은 몫, 굶주림, 번식), 지역 집계 둘째 줄 = 무대 먹이 처음 대비 %·
 //      최근 10 초 먹은 양·에너지 평균·굶주림 수. 기록 줄에는 구간 먹은 양·먹은 사슴 수·먹기 중 실제로 먹은 비율·무대 먹이 %·에너지 평균.
 //      먹이는 v3 먹이 격자만 바뀐다 — 팀 지역 FoodAmount 에는 쓰지 않는다 (FEcoV3RegionContext 섭식 칸 설명).
+//   6. 늑대 밤잠 점진화 (사람 결정 H1 10-14, 콘솔 변수 eco.IntegratedV3.GradualNight 기본 1 — Play 전에 바꾼다):
+//      파이썬 configs/v3_real1_night_on.yaml 의 realism_night 를 엔진 무관 위협 모델로 옮긴 것(EcoThreatModel.h bRealismNight)을 켠다.
+//      늑대는 해가 진 뒤 늑대마다 다른 지연(0~22 스텝, H(606, 세션 시드, StableAgentId))이 지나고, 사냥 중이 아니고, 16 m(8 단위) 안에 사슴이 없을 때 2 초 동안 걸음을
+//      늦추다 눕는다. 그동안 사냥이 시작되거나 사슴이 다가오면 다시 일어난다. 깜깜하면(d = 1) 새 사냥을 시작하지 않고 쫓던 사냥만 마저
+//      끝낸다. 새벽에는 하나씩 깨어 2 초에 걸쳐 걸음을 올린다. 해 진 뒤 깨어 있는 늑대의 속력 하한은 0.5 배다.
+//      R1b 두뇌는 그대로다(관측 18·마스크 판 2). 학습 세계 밖 규칙이지만 R1b 측정(results/v3/real1)으로 허용했다(R3 명세 H1).
+//      화면: 늑대 글자 '눕는 중'·'깨는 중' + 걸음 %, 사슴이 가까워·사냥 중이라 못 누우면 그 까닭. 기록: 잠듦·깸·눕기 시작·다시 일어남
+//      한 줄씩(해 진 뒤 초, 가장 가까운 사슴 m), 10 초 줄에 밤잠 집계. 0 으로 두면 지금까지처럼 d ≥ 0.5 가 되는 순간 곧바로 잔다.
+//   7. 사슴 얼기 막음 (사람 결정 10-15 (A) '지금 바로 없앰', 콘솔 변수 eco.IntegratedV3.NoFreeze 기본 1 — Play 전에 바꾼다):
+//      세계 허용 칸(EcoWorldV3 FWorldConfig::WorldAllowed)의 FREEZE 를 0 으로 둔다. 실제 허용 = R1b 모델 허용 ∧ 세계 칸이라 마스크가
+//      FREEZE 를 늘 막는다(파이썬 rep_policy.effective_allowed 와 같은 꼴 = R1b−F). 가중치는 그대로다 — R1b 가 얼던 자리에서는 R1b 의
+//      다음 선호 행동이 나온다(R3 재학습 전 측정: 대부분 먹기 78%·도망 17%). 화면 'v3 R1b−F', 사슴 집계 '얼기(막힘) 0', 기록 줄에
+//      '얼기 막힘: 실행 n · 얼기 칸이 열린 결정 n' (늘 0 이어야 한다). 0 으로 두면 R1b 그대로 얼기를 쓴다.
+//   8. 늑대 식사 시간 (사람 결정 10-15 (B) '먹는 시간 주기 (약 5초)', 콘솔 변수 eco.IntegratedV3.WolfEatSeconds 기본 5 — Play 전에 바꾼다):
+//      잡은 늑대는 시체 곁에 서서 약 5 초 먹고, 끝나면 곧바로 다시 사냥한다(포만 없음 — 늑대는 과식하게 둔다). 결정 스텝으로
+//      5 ÷ (2/15 초) = 37.5 → 반올림 38 스텝(5.07 초)이고, 위협 설정의 식사 쿨다운(FThreatConfig::PredEatCd, 학습 5)을 38 로 바꾸고
+//      식사 동안 서 있게(bEatInPlace) 한다. 0.67 이하(5 스텝 이하)는 옛 규칙 그대로다(학습 세계와 같다: 5 스텝 = 0.67 초, 그동안 배회).
+//      파이썬 R3 세계의 같은 규칙은 overrides.pred_eat_cd 38 + features.threats.eat_in_place 다(같은 스텝 수·같은 제자리 꼴).
+//      팀 표현은 '먹는 중' 깃발(FEcoPredatorStateFragment::EatCooldown > 0)과 속도 0 이면 '먹는 중' 동작을 보인다 — 기록 줄이
+//      팀 늑대 표현 액터의 동작을 프레임마다 세어 확인한다. 화면: 늑대 글자 '늑대 식사 n초'(남은 초), 지역 집계 '늑대 식사 5초 제자리'.
+//      기록 줄: 구간 포획·식사 중 늑대·스텝(그중 움직임)·돌진(앞 포획 뒤 3 초 안 = 이어 사냥, 식사 끝 뒤 3 초 안)·늑대별 포획 누적.
+//      R1b 학습 세계 밖 규칙이다 — 파이썬 측정(R1b−F, v3_r1_on·v3_real1_night_on, 보정 시드 20000~20019)에서 사망이 줄고 G_γ 가
+//      올라 허용했다(계획서 4-5b).
+//   9. 사슴 도주 반사 거리 (사람 결정 10-15 (7) 야생 1단계 w3, 콘솔 변수 eco.IntegratedV3.WildFlight 기본 1 — Play 전에 바꾼다. 명령줄
+//      -EcoV3WildFlight= 는 시작값, 옛 이름 -EcoV3KeepAway= 도 받는다): 두뇌 위의 세계 규칙 (EcoWorldV3.h '야생 1단계 (w3)', FWildFlightConfig).
+//      10-15 (C) 의 경계 거리 실험 KeepAway(콘솔 변수 eco.IntegratedV3.KeepAway)는 이 규칙으로 바꾸고 지웠다 — 옛 동작은 남기지 않았다.
+//      사냥 중인 늑대(먹는·배부른·자는 늑대 빼고)를 실제로 알아채면(시야·발소리) eco.IntegratedV3.AlertDistM(30 m) 안에서 '경계' — 두뇌가
+//      먹기면 걸으며 먹고 늑대 반대쪽으로 멀어진다. eco.IntegratedV3.PanicDistM(15 m) 안이거나 다가오면 '도주' — 사냥 중인 늑대가 모두
+//      eco.IntegratedV3.SafeDistM(40 m) 밖이 될 때까지 뛰고, 반대쪽 ±60°·30 m 안 은신처가 있으면 그쪽으로. 은신처 안이면 웅크린다.
+//      먹는·쉬는 늑대는 경계만 일으킨다. 기록 셋째 줄 '경계 거리'(이름 그대로): 경계·도주·웅크림 시작, 끝난 도주의 평균 길이, 잡힌 사슴을
+//      덮기로 가른 수, 식사 중 늑대 15 m 안 사슴. 0 으로 두면 지금과 비트 단위로 같다 (세계 칸이 모두 기본값).
+//  10. 야생 1단계 (사람 결정 10-15 (7) '바뀐 규칙을 언리얼에서 보이게', 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md, 값 = 파이썬
+//      configs/v3_wild1_mirror.yaml, 하루 900 스텝). 규칙마다 콘솔 변수 하나(기본 1 — Play 를 누르면 보인다. Play 전에 바꾼다)와 명령줄 시작값:
+//      지방 비축 eco.IntegratedV3.WildReserve (-EcoV3WildReserve=, EcoWorldV3.h FWildReserveConfig): 배가 비어도 비축으로 3일(6분) 버티고
+//      배·비축 모두 0 이어야 굶어 죽는다. 배 10% 밑이면 0.75 배 느리다. 비축으로 사는 사슴의 Vitals 에너지 거울은 아주 작은 양수라 팀 HP 감소가
+//      먼저 죽이지 않는다 (죽음은 v3 DeathCause 한 길). 화면: 사슴 글자 '배고픔 비축 63%'·'비축 바닥'·'약함(느림)', 지역 둘째 줄 비축 평균·
+//      비축으로 사는 사슴. 기록 넷째 줄 '<지역> 야생 |': 꺼내 씀·채움·약한 개체·스텝·약한 채로 잡힘·지금 비축 평균·최소 (앞 세 줄은 그대로).
+//      늑대 포만 eco.IntegratedV3.WildSatiation (-EcoV3WildSatiation=, EcoThreatModel.h FThreatConfig::bWildSatiation): 먹기(5초)가 끝나면
+//      반나절(450 스텝 = 60초) 사냥하지 않고 0.3 배 속력으로 어슬렁거린다. 자지 않는 한 사슴에게 보인다. 화면: 늑대 글자 '늑대 배부름·쉼 42초'.
+//      기록 넷째 줄: 배불러 쉰·먹는 늑대·스텝 비율, 포만을 건 포획.
+//      감지 eco.IntegratedV3.RealismVision (-EcoV3RealismVision=, 위협 시야 300° — 바로 뒤 60° 만 사각)·eco.IntegratedV3.RealismHearing
+//      (-EcoV3RealismHearing=, 늑대 걸음이 빠를수록 멀리 들림 4~40 m, 어슬렁거리는 늑대는 4 m): R3 세계 값 그대로. 보임과 같은 칸이라
+//      두뇌 관측(위협 수·거리·접근)·사건이 함께 바뀐다 (EcoObservationV3.h FHearingConfig·HearingRadius·ThreatFovCos).
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -70,7 +112,9 @@ namespace EcoV3Integrated
 		Exhaust,   // 지침 (돌진 실패 뒤)
 		Chase,     // 추격 (추격형이 표적을 봄)
 		Eat,       // 식사 (포획 뒤 쿨다운)
-		Sleep,     // 잠 (주행성, 어둠 0.5 이상)
+		Sleep,     // 잠 (주행성. 밤잠 점진화를 끄면 어둠 0.5 이상, 켜면 늑대별 잠)
+		Settle,    // 눕는 중 (밤잠 점진화: 걸음을 늦추는 2 초)
+		Waking,    // 깨는 중 (밤잠 점진화: 깨어 걸음을 올리는 중, 또는 눕다가 다시 일어나는 중)
 		Count
 	};
 
@@ -79,22 +123,47 @@ namespace EcoV3Integrated
 	 * 표시·기록 전용 (규칙이 아니다).
 	 */
 	inline constexpr double kStarvingEnergy = 0.15;
+	// 야생 (w1) 화면·기록: 비축이 이 밑이면 '비축 바닥 가까움' (글자 빨강·기록 줄 수)
+	inline constexpr double kLowReserve = 0.25;
 	/** '최근 10 초 먹은 양' 창 = 결정 스텝 75 개 (7.5 Hz × 10 초, 시뮬레이션 시간). */
 	inline constexpr int32 kRecentEatSteps = 75;
 	/** 번식 표시를 남기는 결정 스텝 수 (약 1.5 초). */
 	inline constexpr int64 kReproMarkSteps = 11;
+	/** 이어 사냥 창 = 결정 스텝 22 개 (3 초, R3 재학습 전 측정 results/v3/r3/pre 의 '이어 사냥'과 같은 창). */
+	inline constexpr int64 kChainWindowSteps = 22;
+	/** 기록 '식사 중 늑대 15 m 안 사슴'의 거리 (단위 7.5 = 15 m 고정 — 경계 거리 콘솔 변수와 무관하게 규칙 켬·끔을 견준다). 기록 전용. */
+	inline constexpr double kNearEatingWolfUnits = 7.5;
 
-	ADAPTIVEECOSYSTEM_API EWolfState WolfStateOf(const EcoWorldV3::FThreatAgent& Agent);
+	/**
+	 * 늑대 상태 (화면·기록). Cfg 는 그 지역 세계의 위협 설정 (FWorldState::ThreatCfg) — 밤잠 점진화를 켠 세계만 눕는 중·깨는 중이 나온다.
+	 * 우선순위: 잠 > 눕는 중 > 돌진·지침 > 식사 > 추격·잠행 > 깨는 중 > 배회.
+	 */
+	ADAPTIVEECOSYSTEM_API EWolfState WolfStateOf(const EcoWorldV3::FThreatAgent& Agent,
+												 const EcoThreatV3::FThreatConfig& Cfg = EcoThreatV3::FThreatConfig());
 	ADAPTIVEECOSYSTEM_API const TCHAR* WolfStateNameKo(EWolfState State);
+
+	/**
+	 * 늑대 머리 위 글자 (eco.V3Debug 1): '늑대 눕는 중 (추격형) 걸음 40%'. 밤잠 점진화를 켠 세계에서 깨어 있는 주행성 늑대가 이번 스텝에
+	 * 누울 차례인데 못 누웠으면 ' · 사슴 곁이라 안 누움' / ' · 사냥 중이라 안 누움', 눕는 중이 아닌데 깜깜해 새 사냥을 안 하면 ' · 깜깜해 새 사냥 안 함'.
+	 * 식사 중이면 '늑대 식사 3.2초 (잠행형)' — 남은 식사 = 쿨다운 × 결정 스텝 2/15 초 (0.1 초 단위).
+	 */
+	ADAPTIVEECOSYSTEM_API FString WolfLabel(const EcoWorldV3::FThreatAgent& Agent, const EcoThreatV3::FThreatConfig& Cfg, double Dark,
+											FColor& OutColor);
 	ADAPTIVEECOSYSTEM_API const TCHAR* BehaviorNameKo(int32 Behavior);
 
 	/**
 	 * 산 사슴 머리 위 글자와 색 (eco.V3Debug 1). '먹기 72%' = 행동 + 에너지 %. 이번 결정 스텝에 먹이 칸에서 실제로 먹었으면
 	 * ' +3.0' (먹은 몫을 에너지 %p 로, 0.05 미만이면 '+' 만), 에너지 15% 아래면 ' 굶주림'(빨강), bRecentRepro 면 ' 번식'.
 	 * 색은 행동 색 (먹기 초록·도망 노랑·숨기 파랑·얼기 흰색), 굶주림만 빨강.
+	 * KeepMode = 이번 스텝의 도주 반사 덮기 (FHerbDecision::KeepActive): 행동 이름 대신 '경계(먹으며 멀어짐)'(주황, 두뇌가 먹기일 때만)·
+	 * '도주(안전해질 때까지)'(진한 주황)·'웅크림(은신처·경계)'(파랑). 0 이면 지금 그대로.
+	 * bReserveOn = 지방 비축을 켠 세계 (야생 w1): 에너지 15% 아래면 ' 굶주림' 대신 ' 배고픔 비축 63%'(빨강, 비축으로 버티는 중),
+	 * 비축 0 이면 ' 비축 바닥', 배 10% 밑이면 ' 약함(느림)'. 배는 괜찮은데 비축이 25% 밑이면 ' 비축 20%'. 거짓이면 지금 그대로.
 	 */
 	ADAPTIVEECOSYSTEM_API FString DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
-											FColor& OutColor);
+											FColor& OutColor, int32 KeepMode = EcoWorldV3::kKeepNone, bool bReserveOn = false);
+	/** 도주 반사 덮기 이름 (기록·화면): 두뇌 / 경계(먹으며 멀어짐) / 도주(안전해질 때까지) / 웅크림(은신처·경계). */
+	ADAPTIVEECOSYSTEM_API const TCHAR* KeepModeNameKo(int32 KeepMode);
 
 	/** 지역 늑대 순번(StableAgentId 순) → 성질. 짝수 = 잠행-돌진형, 홀수 = 근접 추격형. 모두 주행성(밤에 잔다), 원거리형 없음. */
 	ADAPTIVEECOSYSTEM_API EcoThreatV3::FThreatSpec WolfSpecForOrdinal(int32 Ordinal, double PredSpeedMult);
@@ -115,6 +184,17 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	int32 WolvesPerRegion = 2;          // 잠행 1 + 추격 1 (학습 보통 위협 2~12, 잠행 비율 30~70%)
 	double StageSizeUnits = 60.0;       // 무대 한 변 (단위, 학습 60~110 = 120~220 m)
 	double PredSpeedMult = 0.8;         // 늑대 속력 = 사슴 뛰기 900 cm/s × 0.8 = 720 cm/s (학습 0.6~0.95)
+	bool bGradualNight = true;          // 늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight 기본 1, 사람 결정 H1 10-14). 거짓 = d ≥ 0.5 에 곧바로 잠
+	bool bNoFreeze = true;              // 사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1, 사람 결정 10-15 (A)). 거짓 = R1b 그대로 얼기를 쓴다
+	double WolfEatSeconds = 5.0;        // 늑대 식사 길이 (초, eco.IntegratedV3.WolfEatSeconds 기본 5, 사람 결정 10-15 (B)). 0.67 이하 = 옛 규칙
+	bool bWildFlight = true;            // 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight 기본 1, 야생 w3 — 경계 거리 KeepAway 를 바꿨다). 거짓 = 두뇌 그대로
+	double AlertDistM = 30.0;           // 경계 거리 alert_r (m, eco.IntegratedV3.AlertDistM) — 사냥 중인 늑대를 이 안에서 알아채면 먹으며 멀어진다
+	double PanicDistM = 15.0;           // 도주 거리 flight_r (m, eco.IntegratedV3.PanicDistM) — 이 안이거나 다가오면 뛰어서 달아난다
+	double SafeDistM = 40.0;            // 안전 거리 safe_r (m, eco.IntegratedV3.SafeDistM) — 사냥 중인 늑대가 모두 이 밖일 때까지 도주
+	bool bWildReserve = true;           // 사슴 지방 비축 (eco.IntegratedV3.WildReserve 기본 1, 사람 결정 10-15 (7) 야생 1단계 w1). 거짓 = E 0 이면 곧바로 굶음
+	bool bWildSatiation = true;         // 늑대 포만 (eco.IntegratedV3.WildSatiation 기본 1, 야생 w2). 거짓 = 식사가 끝나면 곧바로 사냥
+	bool bRealismVision = true;         // 위협 시야 300° (eco.IntegratedV3.RealismVision 기본 1, R3 realism_vision). 거짓 = 앞쪽 120°
+	bool bRealismHearing = true;        // 늑대 발소리 (eco.IntegratedV3.RealismHearing 기본 1, R3 realism_hearing). 거짓 = 소리 없음
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등
@@ -129,6 +209,50 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	double ExtraCoverRadiusUnits(double SizeUnits) const
 	{
 		return FMath::Clamp(ExtraCoverRadiusFrac * SizeUnits, kCoverRadiusLoUnits, kCoverRadiusHiUnits);
+	}
+
+	/** 학습 세계의 식사 쿨다운 (결정 스텝, configs/default.yaml pred_eat_cd 5 = 0.67 초 — 위협 설정 기본값). */
+	static int32 TrainEatSteps() { return EcoThreatV3::FThreatConfig().PredEatCd; }
+
+	/**
+	 * 늑대 식사 길이 (결정 스텝) = 반올림(초 ÷ 2/15 초), 0.5 는 올린다. 학습 5 스텝 아래로 내리지 않고 900 스텝(2 분)에서 자른다.
+	 * 5 초 = 37.5 → 38 스텝 (5.07 초), 0.67 초 = 5.025 → 5 스텝 (옛 규칙), 1 초 = 7.5 → 8 스텝.
+	 */
+	int32 WolfEatSteps() const
+	{
+		if (!FMath::IsFinite(WolfEatSeconds))
+		{
+			return TrainEatSteps();
+		}
+		const int32 Steps = FMath::FloorToInt32(WolfEatSeconds / EcoRepertoireV3::kStepSeconds + 0.5);
+		return FMath::Clamp(Steps, TrainEatSteps(), 900);
+	}
+
+	/** 식사가 학습보다 긴가 (그때만 쿨다운을 바꾸고 식사 동안 세운다). 아니면 옛 규칙 그대로 (5 스텝, 그동안 배회 — 학습 세계·골든과 같다). */
+	bool LongWolfEat() const { return WolfEatSteps() > TrainEatSteps(); }
+
+	/**
+	 * 도주 반사 거리의 세계 칸 (m → 단위 = m × 100 ÷ 200). 끄면 기본값(꺼짐) 그대로라 세계가 읽는 값이 바꾸기 전과 같다.
+	 * 음수·수가 아닌 값은 기본값으로, 0 ~ 200 m 로 자르고, 안전 거리는 경계·도주 거리보다 작지 않게 올린다 (도주가 풀리자마자 다시 걸리지 않게).
+	 * 나머지 계수(접근 0.9·경계 무게 1.5·은신처 ±60°/30 m·웅크림·벽 2 m)는 FWildFlightConfig 기본값 = configs/v3_wild1_mirror.yaml.
+	 */
+	EcoWorldV3::FWildFlightConfig WildFlightConfig() const
+	{
+		EcoWorldV3::FWildFlightConfig K;
+		if (!bWildFlight)
+		{
+			return K;
+		}
+		auto Units = [](double M, double Def)
+		{
+			const double V = FMath::IsFinite(M) && M >= 0.0 ? FMath::Min(M, 200.0) : Def;
+			return V * 100.0 / EcoRepertoireV3::kUnitCm;
+		};
+		K.bEnabled = true;
+		K.AlertR = Units(AlertDistM, 30.0);
+		K.FlightR = Units(PanicDistM, 15.0);
+		K.SafeR = FMath::Max(Units(SafeDistM, 40.0), FMath::Max(K.AlertR, K.FlightR));
+		return K;
 	}
 
 	/** 사슴 Deer 마리가 한 변 SizeUnits 무대에서 학습 밀도 하한(128 / 110² 마리/단위²) 아래인가. */
@@ -173,6 +297,26 @@ struct FEcoV3IntegratedCatchMark
 	double Time = 0.0;
 };
 
+/**
+ * 늑대 식사·이어 사냥·팀 화면 확인 집계 (누적, 사람 결정 10-15 (B)). 기록 줄은 지난 줄과의 차이를 쓴다. 기록·시험 전용 (규칙이 아니다).
+ * '이어 사냥' = 그 늑대가 앞 포획 뒤 3 초 안에 시작한 돌진 (식사가 3 초보다 길면 늘 0). '식사 끝 3 초 안' = 앞 포획 뒤
+ * (식사 스텝 + 22 스텝) 안 — 식사를 마치자마자 곁의 사슴에게 돌진했는가.
+ */
+struct FEcoV3WolfEatTally
+{
+	int64 Catches = 0;              // 늑대 포획 (늑대·스텝. 같은 사슴을 둘이 잡으면 둘 다 센다 — 파이썬 got 과 같다)
+	int64 EatSteps = 0;             // 식사 중(포획 뒤 쿨다운으로 사냥하지 않음) 늑대·스텝
+	int64 EatMoved = 0;             // 그중 움직인 늑대·스텝 (제자리 식사면 0)
+	int64 Pounces = 0;              // 잠행형 돌진 시작
+	int64 ChainPounces = 0;         // 그 늑대가 앞 포획 뒤 3 초(22 스텝) 안에 시작한 돌진
+	int64 PostEatPounces = 0;       // 앞 포획 뒤 (식사 스텝 + 22 스텝) 안에 시작한 돌진
+	int64 RepeatCatches = 0;        // 앞 포획이 있는 늑대의 포획
+	int64 PostEatCatches = 0;       // 그중 앞 포획 뒤 (식사 스텝 + 22 스텝) 안 포획
+	int64 EatFlagFrames = 0;        // 팀 늑대 표현 액터: 식사 깃발(bEating)이 선 늑대·프레임
+	int64 EatMotionFrames = 0;      //   그중 팀 화면 동작이 '먹는 중'(서서 먹기)
+	int64 EatWalkFrames = 0;        //   그중 걷기·뛰기 (깃발이 섰는데 움직인다 — 잡은 스텝의 이동을 보간하는 0.13 초가 여기 든다)
+};
+
 /** 한 지역의 v3 세계 (무대 하나 = 학습 세계 하나). */
 struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 {
@@ -206,6 +350,12 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	double StartFood = 0.0;                   // 무대 먹이 처음 합 (= 셀 용량 합, AddContext)
 	double MeanEnergy = 0.0;                  // 산 사슴 에너지 평균 (0~1, 결정 스텝마다·프레임 끝)
 	int32 StarvingDeer = 0;                   // 산 사슴 중 에너지 kStarvingEnergy 아래
+	// 야생 (w1) 지방 비축 (켠 세계만, 결정 스텝마다·프레임 끝. TallyEnergy)
+	double MeanReserve = 0.0;                 // 산 사슴 비축 평균 (0~1)
+	double MinReserve = 0.0;                  // 산 사슴 비축 최소
+	int32 OnReserveDeer = 0;                  // 산 사슴 중 배가 비어(에너지 0) 비축으로 사는 수
+	int32 LowReserveDeer = 0;                 // 산 사슴 중 비축 kLowReserve 아래
+	int32 WeakDeer = 0;                       // 산 사슴 중 배 WeakE 밑 (느림)
 	int32 AteDeerInterval = 0;                // 이번 기록 구간에 한 번이라도 먹은 사슴 (그 뒤 죽은 사슴 포함)
 	int32 LogEpoch = 0;                       // 기록 구간 번호 (LogContext 마다 + 1)
 	TArray<double> RecentEaten;               // 최근 kRecentEatSteps 결정 스텝의 스텝마다 먹은 양 (고리 버퍼)
@@ -239,6 +389,32 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	{
 		return StartFood > 0.0 ? Sim.Food.Total() / StartFood : 0.0;
 	}
+
+	// 늑대 밤잠 점진화 기록 (해 진·뜬 시각 — 잠듦·깸 줄의 '해 진 뒤 초'). -1 = 아직 모른다
+	int64 DarkStartT = -1;                    // 마지막으로 어둠(d ≥ 0.5)이 시작된 전역 스텝
+	int64 LightStartT = -1;                   // 마지막으로 밝아진(d < 0.5) 전역 스텝
+	bool bPrevDark = false;                   // 지난 결정 스텝 끝의 어둠 (d ≥ 0.5)
+	bool bDarkKnown = false;                  // bPrevDark 가 정해졌다
+
+	// 사슴 얼기 막음·늑대 식사 기록 (사람 결정 10-15 (A)(B), 처리기가 결정 스텝마다 채운다)
+	int64 FreezeMaskOpen = 0;                 // 요청을 읽은 결정 중 마스크에 얼기 칸이 열린 수 (얼기를 막으면 늘 0)
+	int64 LastLogFreezeMaskOpen = 0;
+	FEcoV3WolfEatTally Eat;
+	FEcoV3WolfEatTally LastLogEat;
+	TMap<int64, int32> WolfCatchesById;       // 늑대 StableAgentId → 포획 누적 (기록 줄 '늑대별 포획')
+	TMap<int64, int64> WolfLastCatchStep;     // 늑대 StableAgentId → 마지막으로 잡은 스텝 번호 (이어 사냥 판정)
+
+	// 경계 거리 기록 (사람 결정 10-15 (C), 처리기가 채운다. 규칙 켬·끔 모두 센다)
+	int64 NearEatingDeerSteps = 0;            // 식사 중(쿨다운 > 0)인 깨어 있는 늑대의 15 m 안에 있던 산 사슴 (개체·스텝, 스텝 끝)
+	int64 LastLogNearEatingDeerSteps = 0;
+	int32 KeepNow[EcoWorldV3::kNumKeepModes] = {};   // 프레임 끝 산 사슴의 덮기 (화면 집계)
+
+	/**
+	 * 늑대 하나의 결정 스텝 하나를 센다 (처리기가 Step 뒤에 부른다. StepIndex = 이번 스텝 번호 = Step 뒤 Sim.T − 1).
+	 * 돌진 시작이면 앞 포획 뒤 경과로 이어 사냥·식사 끝 3 초 안을 가르고, 식사 중(잡지 않았고 쿨다운 > 0)이면 움직였는지 보고,
+	 * 잡았으면 포획·늑대별 포획·앞 포획 뒤 경과를 센 뒤 마지막 포획 스텝을 바꾼다.
+	 */
+	void TallyWolfStep(const EcoWorldV3::FThreatAgent& A, int64 WolfId, int64 StepIndex);
 
 	// 기록
 	int64 TerrainChecks = 0;                  // 지형 제약으로 검사한 이동 수 (콜백이 실제로 도는지 보는 기록)
@@ -357,6 +533,12 @@ public:
 
 	/** 처리기가 한 컨텍스트의 결정 스텝 하나를 마칠 때마다 부른다 (포획 표시·기록). */
 	void NotifyContextStep(FEcoV3RegionContext& Ctx, const EcoWorldV3::FStepReport& Report);
+	/**
+	 * 늑대 밤잠 점진화 기록 (처리기가 결정 스텝 하나 뒤, NotifyContextStep 앞에 부른다): 해 진·뜬 시각을 갱신하고 늑대마다 이번 스텝의
+	 * 밤잠 사건(잠듦·깸·눕기 시작·다시 일어남)을 한 줄씩 남긴다. 가장 가까운 사슴은 이번 스텝 이동 뒤 산 사슴(Sim.Prey)이다.
+	 * Threats·WolfIds 는 이번 Step 배열과 같은 순서다. 밤잠 점진화를 끈 세계는 아무것도 하지 않는다.
+	 */
+	void NotifyNightStep(FEcoV3RegionContext& Ctx, EcoWorldV3::FThreatAgent* const* Threats, const int64* WolfIds, int32 NumWolves);
 	/** [EcoV3I] 기록 줄을 지금 남긴다. */
 	void LogContext(FEcoV3RegionContext& Ctx);
 	/** 처리기가 한 프레임에 결정 스텝 Steps 개(모든 지역)를 돈 시간 (기록 줄의 '결정 스텝 CPU'). */
@@ -384,6 +566,8 @@ public:
 	bool ApplyToSpawnerForTest(AEcoCreatureIntegrationSpawner& InSpawner, const FEcoV3IntegratedSettings& InSettings);
 	/** 시험: 시작 직전 지면 검사를 지금 한 번 (실패하면 팀 값으로 되돌리고 끈다). */
 	bool ValidateSpawnPointsForTest() { return ValidateSpawnPointsNow(); }
+	/** 팀 늑대 표현 액터의 동작을 센다 (읽기만. 프레임마다 HandlePreActorTick 이 부르고, 시험도 부른다): 식사 깃발이 선 늑대가 '먹는 중' 동작인가. */
+	void TallyTeamWolfVisuals();
 	const TArray<FEcoV3StagePlan>& GetPlans() const { return Plans; }
 
 protected:

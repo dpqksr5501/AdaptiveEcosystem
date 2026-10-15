@@ -4,6 +4,8 @@
 
 현재 실행 맵은 원본과 독립적으로 복사한 **`/Game/JYU/Maps/LV_JYU_V3Integration`**이다. M4+권신혁 v3 Native brain, 행동 프로필/AnimBP, 실제 플레이어 발소리, 감각 표현·경보, Client 표현, Inspector 기록을 연결했다. [현재 통합 계약·실행·검증](JYU_M4_V3_INTEGRATION.md)과 [사슴 IK 수정·비교 화면](JYU_IK_VALIDATION.md)을 먼저 읽는다. v3의 Social slot handoff·migration·wave는 완료했다고 간주하지 않는다. V1 경로와 원본 팀 레벨은 보존했다.
 
+2026-10-16 추가 감사: 신혁 `3916496`의 감지·야생 도주 규칙을 병합했다. R1b 가중치 유지, MassFlock은 설계 참조이며 실제 구현은 자체 이웃·조향이다. v3의 경보 표현과 Persistent Herd 행동 인계는 구분한다. [위협·backend 감사](JYU_THREAT_AND_BACKEND_AUDIT_20261016.md).
+
 ---
 
 **이하 2026-10-08 기준 기록**

@@ -96,6 +96,33 @@ v3 R2 판정 (`--u-def r2`, 명세 `Docs/RL_Policy/RL_V3_R2_SPEC.md` 10절 7단�
   쓴다.
 - `summarize --u-def r2` 는 --out 기본값이 R2 판정 폴더다(기본 r1 은 R1 폴더). 결과 JSON 의 지표 정의가 --u-def 와 다르면 멈추고,
   닫힌 폴더(done.flag 가 있는 폴더)의 judge.md 는 내용이 바뀌면 덮지 않는다.
+
+v3 R3 판정 (`--u-def r3`, 관문 사전 등록 results/v3/r3/PREREG.md 15절 — 확정은 판정 사전 등록 results/v3/r3/judge/PREREG.md):
+
+    # 모방 초기화 직후 기준값(보정 시드 — 판정 시드가 아니다). --theta 등을 주지 않으면 관문 결과(gate/final.json·search.json)를 쓴다
+    python eval_v3.py run --u-def r3 --model ckpt/v3/ws_r3/v3_r3_ws_s0.zip --name ws_s0 --seeds 20000 ... 20007 --steps 3000         --out results/v3/r3/ws_baseline
+    # 판정 — 판정 시드 10300~10319 × 10000. 판정 사전 등록을 확정(제목에 '초안' 없음)하고 문턱(R3_JUDGE)을 정한 뒤에만 이 폴더에 쓴다
+    python eval_v3.py run --u-def r3 --model ckpt/v3/v3_r3_g995_s0_20m.zip --name s0 --workers 14
+
+- 세계: `configs/v3_r3_on.yaml`(허용 GRAZE·FLEE·HIDE, 마스크 판 2). 정책 기본 rl·fsm_r3·rlf·r1b·rbase·c_graze·c_flee·c_hide·c1p.
+  · fsm_r3: FSM_R3(`repertoire_rules.fsm_r3_spec`) — 성과(P1)·굶음(P2)의 기준 손 규칙. 줄은 관문 결과(9-2 표)대로다.
+  · rlf: R1b s3(R1B_MODEL)을 R3 세계에 얹은 것(허용 = 모델 ∩ 세계라 FREEZE 만 막힌다) — P3 의 기준. r1b: 같은 모델을 허용 목록에 freeze 를
+    더한 사본 세계(세계 동역학은 같다)에서 — 보고만('지금 게임의 사슴'과 견주기).
+  · rbase: 관문 거주 R_base(θ, a). c_*: 늘 그 행동(가능하지 않으면 GRAZE). c1p: C1′.
+- U (결정 시점 표본, 평가 시드 합침, `repertoire_rules.r3_u_terms`): U_ESC(FLEE ∪ HIDE — FREEZE 를 세지 않는다)·U_KEEP·U_RUN·
+  U_LEAVE·U_HIDE′·U_EARLY. 보정 1 을 쓴 니치는 보정 뒤 정의. 판정에 쓰는 것은 U_ESC 와 관문을 완전히 통과한 니치의 U 뿐이고 나머지는
+  보고만(9-2 표, `r3_tools.setup_from_final`). U 표본 하한 200(니치·교차 각각) 아래면 그 U 는 판정 불가(보고만).
+- 포기율 A (15-2, `r3_tools.pursuit_world_class`·`opportunities`): 기회 = 결정 시점 & 지금 FLEE & 쫓는 위협(지난 두 포식자 스텝 가운데
+  하나에서 이 사슴을 표적으로 삼았고 깨어 있는 위협) 실거리 < 10 & 은신처 밖. 포기 = GRAZE(·SLEEP). 시드마다 A = 포기 ÷ 기회, 기회 < 300
+  인 시드는 P3 짝 t 에서 뺀다(남은 시드 < 15 면 판정 불가). 같은 기회에서 R1b−F(shadow rlf)와 원래 R1b(shadow r1b — FREEZE 도 포기)가
+  골랐을 것도 센다(반사실, 상태 없는 argmax — 세계를 바꾸지 않는다).
+- 판정 (15-3, 모두 만족): P1 RL − FSM_R3 G_γ 짝 t ≥ −t_crit, P2 아사 ≤ 1.5 × FSM_R3, P3(G1 통과·조건부 통과 때만) RL − R1b−F 의 A 짝 t ≤
+  −t_crit 그리고 A_RL ≤ (A_R1b−F + A_FSM_R3) ÷ 2(두 값은 ws_baseline 에서 학습 전에 고정, R3_JUDGE['a_ref']), P4 U_ESC ≥ 문턱·완전 통과
+  니치의 U ≥ 0.10(U_HIDE′ 0.20), P5 FLEE ≥ 0.5%·HIDE ≥ 0.5%(G2·G4a 가운데 하나가 통과했을 때만)·깜빡임 ≤ 0.65·FREEZE 사용 0(SLEEP 을
+  열지 않았으면 SLEEP 도 — 아니면 판정을 멈춘다). 문턱이 미정(None)이거나 관문 결과가 없으면 `pending`.
+- 사전 등록 폴더 `results/v3/r3/judge`(--u-def r3 의 --out 기본값)에는 판정 시드 10300~10319 × 10000, v3_r3_on, tail 600, 정책 모두,
+  u-def r3, 관문 결과 완비·명시 덮기 없음, 문턱 확정, judge/PREREG.md 있음(제목에 '초안' 없음)만 쓴다. 그 밖의 폴더는 관문·최종 판정
+  시드를 받지 않는다(r3_tools.seed_problems).
 """
 
 from __future__ import annotations
@@ -144,7 +171,7 @@ U_MIN = {"esc": 0.18, "hide": 0.5, "freeze": 0.10, "sleep": 0.5}
 # 지표 정의 묶음. r1 = R1 사전 등록(위), r1b = R1b 새 시드 확인 시험(results/v3/r1b/PREREG.md 2·3절): U_HIDE′ 제자리 웅크림
 # (은신처 안 & 거리 < 6 대 은신처 안 & 거리 ≥ 8 & 접근 < 0.7), U_FREEZE′ 빠른 위협 앞 얼기(접근 ≥ 0.9 & 은신처 > 5 대 접근 < 0.7 &
 # 거리 ≥ 8). U_ESC·U_SLEEP 은 같다
-U_DEFS = ("r1", "r1b", "r2")
+U_DEFS = ("r1", "r1b", "r2", "r3")
 # r2 = R2 판정(모듈 docstring 'v3 R2 판정'): 판정 U 는 r1b 와 같은 셋(esc·hide·freeze)이다. look·look_open(경보 반응 — 사람 결정
 # 10-12 밤: 경보는 세계에 두고 점수 기준에서는 뺀다)과, 노려보기(stare_down)를 켠 재현 설정에서만 세는 stare·stare_band(노려보기 —
 # 사람 결정 10-13: R2 세계에서 뺀다)는 보고만 한다(R2_REPORT_U). 앞선 초안(10-12)은 stare·look_open 을 판정에 넣었다
@@ -164,8 +191,8 @@ FULL_E, HUNGRY_E = 0.7, 0.35                # 위험 할당 에너지 구간 (�
 C1P_TAG = 606                               # C1′ 해시 스트림 구분값(rollout._SALT 101~404·지연 505 와 겹치지 않는다)
 PREREG_OUT = HERE / "results" / "v3" / "r1" / "judge"
 PREREG_OUT_R1B = HERE / "results" / "v3" / "r1b" / "judge"     # R1b 확인 시험(summarize --u-def r1b 의 기본 폴더)
-POLICY_ORDER = ("rl", "fsm", "fsm_r2", "rbase", "rbase_wr2", "c_graze", "c_flee", "c_hide", "c_freeze", "c_sleep", "c1p",
-                "c4_app", "c4_phase")
+POLICY_ORDER = ("rl", "fsm", "fsm_r2", "fsm_r3", "rlf", "r1b", "rbase", "rbase_wr2", "c_graze", "c_flee", "c_hide", "c_freeze",
+                "c_sleep", "c1p", "c4_app", "c4_phase")
 # v3 R2 판정 (명세 RL_V3_R2_SPEC.md 10절 7단계): 새 평가 시드 10200~10219(지금까지 아무 시험에도 쓰지 않았다) × 10000스텝
 CONFIG_R2 = "configs/v3_r2_on.yaml"
 EVAL_SEEDS_R2 = list(range(10200, 10220))
@@ -173,13 +200,26 @@ PREREG_OUT_R2 = HERE / "results" / "v3" / "r2" / "judge"
 # 명세 대조 FSM_R2·R_base·늘 먹기·C1′ + 보고만: 늘 도망·숨기·얼기(R1 기본 대조 — 마스크만으로 생기는 U 의 크기, 판정 사전 등록 3절).
 # rbase_wr2(두 장치 합친 세계의 탐색값 R_base(4, 0.6))는 노려보기를 뺀 10-13 부터 기본에서 뺐다(THETA_WR2 주석)
 R2_POLICIES = ("rl", "fsm_r2", "rbase", "c_graze", "c_flee", "c_hide", "c_freeze", "c1p")
-REF_FSM = {"r1": "fsm", "r1b": "fsm", "r2": "fsm_r2"}          # 성과(1)·굶음(5)의 기준 손 규칙
+REF_FSM = {"r1": "fsm", "r1b": "fsm", "r2": "fsm_r2"}          # 성과(1)·굶음(5)의 기준 손 규칙 (r3 는 `ref_fsm`)
 R2_KINDS = ("chaser", "ranged", "stalker", "player")           # 위협 종류 번호(세계 threats 통계의 kind 와 같다)
 R2_HOPS = (-1, 0, 1, 2)                                        # 쥔 경보의 홉(−1 = 없음)
 R2_RISK_DIST = 10.0                                            # 에너지별 위험 감수: 보이는 위협이 이 거리 안
 R2_ALARM = 0.4                                                 # 밤 경보 의존의 '강한 경보'(마스크 판 3·look 니치와 같은 값)
 # 보이는 지표에서 1000 개체-스텝당으로 바꾸지 않는 수(세계당 하나 — 잠행형 포식자 수)
 _NOT_PER_STEP = ("stalker_n",)
+# v3 R3 판정 (모듈 docstring 'v3 R3 판정', 관문 사전 등록 results/v3/r3/PREREG.md 15절)
+CONFIG_R3 = "configs/v3_r3_on.yaml"
+EVAL_SEEDS_R3 = list(range(10300, 10320))
+PREREG_OUT_R3 = HERE / "results" / "v3" / "r3" / "judge"
+R1B_MODEL = "ckpt/v3/v3_r1_g995_s3_20m.zip"                   # R1b s3 (rlf·r1b 대조, A 반사실)
+R3_POLICIES = ("rl", "fsm_r3", "rlf", "r1b", "rbase", "c_graze", "c_flee", "c_hide", "c1p")
+REF_FSM_R3 = "fsm_r3"
+# 판정 문턱(판정 사전 등록에서 학습 기록을 보기 전에 정한다 — None = 미정, 판정 폴더 실행을 받지 않는다). u_min_esc: ws_baseline R_base
+# 값의 절반(둘째 자리 반올림, 15-3 P4 — 재학습 전 측정이면 0.23), u_min_niche 0.10·u_min_hide 0.20(15-3), a_ref: ws_baseline 의
+# {'rlf': A_R1b−F, 'fsm_r3': A_FSM_R3}(P3 문턱의 두 값)
+R3_JUDGE = dict(u_min_esc=None, u_min_niche=0.10, u_min_hide=0.20, a_ref=None)
+R3_A_MIN_OPP, R3_A_MIN_SEEDS, R3_A_FSM_SAME = 300, 15, 0.8      # 15-2·15-3 P3
+R3_U_MIN_N = 200                                                # 15-3 U 표본 하한(니치·교차 각각)
 
 
 # --------------------------------------------------------------------- #
@@ -194,9 +234,19 @@ def active_u(allowed, udef: str = "r1") -> tuple[str, ...]:
     return tuple(u for u in U_NAMES if u == "esc" or u in allowed)
 
 
+def ref_fsm(udef: str) -> str:
+    """성과·굶음의 기준 손 규칙 이름(r1·r1b fsm, r2 fsm_r2, r3 fsm_r3)."""
+    return REF_FSM_R3 if udef == "r3" else REF_FSM[udef]
+
+
 def u_names(udef: str = "r1", stare: bool = False) -> tuple[str, ...]:
     """지표 정의 묶음이 세는 U 이름(판정에 쓰지 않는 것 포함). r1·r1b 는 U_NAMES 그대로다. r2 는 look·look_open 을 더하고,
-    `stare`(노려보기 stare_down 을 켠 재현 설정 — `XTerms` 가 stare 를 낼 때)면 stare·stare_band 도 더한다(보고만)."""
+    `stare`(노려보기 stare_down 을 켠 재현 설정 — `XTerms` 가 stare 를 낼 때)면 stare·stare_band 도 더한다(보고만). r3 는 R3 의 여섯
+    (`repertoire_rules.R3_U`)."""
+    if udef == "r3":
+        import repertoire_rules as rr
+
+        return rr.R3_U
     if udef != "r2":
         return U_NAMES
     return U_NAMES_R2 + (R2_STARE_U if stare else ())
@@ -359,8 +409,39 @@ def fsm_spec(cfg, allowed, variant: str) -> dict:
     return spec
 
 
-def policy_spec(name: str, model: str, cfg, allowed, variant: str, freq=None) -> dict:
-    """정책 이름 → 워커에 넘기는 스펙(dict, 피클 가능)."""
+def r3_setup(theta=None, approach=None, lines=None, cal=None, gate_dir=None) -> dict:
+    """R3 판정·측정의 손 규칙 설정(모듈 docstring 'v3 R3 판정'): 거주 (θ, a*)·FSM_R3 줄·보정 1 을 쓴 니치·잠 줄과, 판정에 쓰는 U·P3·HIDE
+    사용 하한(관문 사전 등록 9-2 표). 주지 않은 값은 관문 결과(`r3_tools.gate_setup`)에서, 관문 결과가 없으면 재학습 전 측정 값(θ 4,
+    a 0.9, 줄 모두, 보정 없음)으로 채우고 `gate_complete` 가 거짓이다(그때 판정은 pending). `explicit` 는 하나라도 직접 준 값이 있나."""
+    import r3_tools as rt
+    import repertoire_rules as rr
+
+    g = rt.gate_setup(gate_dir)
+    explicit = any(v is not None for v in (theta, approach, lines, cal))
+    done = bool(g["complete"])
+    th = float(theta) if theta is not None else (g["theta"] if g["theta"] is not None else THETA)
+    ap = float(approach) if approach is not None else (g["approach"] if g["approach"] is not None else APPROACH)
+    ln = tuple(lines) if lines is not None else (tuple(g["lines"]) if done else rr.FSM_R3_LINES)
+    cl = tuple(cal) if cal is not None else (tuple(g["cal"]) if done else ())
+    return dict(theta=th, approach=ap, lines=list(ln), cal=[x for x in ln if x in cl], sleep=bool(g["sleep"]) if done else False,
+                u_judged=list(g["u_judged"]) if done else None, u_report=list(g["u_report"]) if done else None,
+                p3=bool(g["p3"]) if done else None, hide_floor=bool(g["hide_floor"]) if done else None, gate_complete=done,
+                explicit=explicit, source=g["source"])
+
+
+def r3_freeze_world(cfg):
+    """R3 판정 세계에 허용 목록 freeze 를 더한 사본(원래 R1b 보고용 — 세계 동역학은 같다, eval_pre 의 r3_fz 와 같다)."""
+    v2 = dict(cfg.v2)
+    tr = dict(v2["train"])
+    rp_ = dict(tr["repertoire"])
+    rp_["allowed"] = [b for b in BEHAVIOR_NAMES if b in set(rp_["allowed"]) | {"freeze"}]
+    tr["repertoire"] = rp_
+    v2["train"] = tr
+    return cfg.replace(v2=v2)
+
+
+def policy_spec(name: str, model: str, cfg, allowed, variant: str, freq=None, r3: dict | None = None) -> dict:
+    """정책 이름 → 워커에 넘기는 스펙(dict, 피클 가능). `r3` 는 R3 판정 설정(`r3_setup`) — fsm_r3·rbase 가 쓴다."""
     from env_v2.world import obs_names
 
     names = list(obs_names(cfg))
@@ -371,6 +452,20 @@ def policy_spec(name: str, model: str, cfg, allowed, variant: str, freq=None) ->
         return {"build": fsm_spec(cfg, allowed, variant)}
     if name == "fsm_r2":
         return {"build": fsm_r2_policy_spec(cfg, allowed)}
+    if name == "fsm_r3":
+        import repertoire_rules as rr
+
+        if r3 is None:
+            raise ValueError("fsm_r3 는 R3 판정 설정(r3_setup)이 필요하다(--u-def r3)")
+        return {"build": rr.fsm_r3_spec(cfg, r3["theta"], r3["approach"], lines=r3["lines"], cal=r3["cal"], sleep=r3["sleep"])}
+    if name in ("rlf", "r1b"):
+        # R1b s3: rlf 는 R3 세계 그대로(허용 = 모델 ∩ 세계 — FREEZE 만 막힌다), r1b 는 허용 목록에 freeze 를 더한 사본 세계(r3_freeze_world)
+        sp = {"build": {"kind": "rep_learned", "path": str(HERE / R1B_MODEL)}}
+        return dict(sp, world="freeze") if name == "r1b" else sp
+    if name == "rbase" and r3 is not None:
+        import repertoire_rules as rr
+
+        return {"build": rr.rule_spec(cfg, r3["theta"], r3["approach"])}         # 관문 거주 R_base(θ, a*)
     if name == "rbase":
         # 보고만(PREREG 변경 기록 10-07 '대응: 모방 초기화'): R_base(θ 4, a 0.9) = 먹다가 가까우면 도망. FSM 은 도망을 쓰지 않는다
         return {"build": fsm_spec(cfg, ("graze", "flee"), variant)}
@@ -540,6 +635,8 @@ def visible_stats(w) -> dict:
         out["threats"] = _clean(w.threats_stats())
     if w._rz:                                       # v3 현실성 1단계 세계만(realism_*)
         out["realism"] = _clean(w.realism_stats())
+    if w._r3:                                       # v3 R3 세계 규칙(추격 고정·지형·늑대 은신처 진입 금지·먹이 배수 뽑기)을 켠 세계만
+        out["r3"] = _clean(w.r3_stats())
     return out
 
 
@@ -552,17 +649,29 @@ def _job(args):
     """(정책 이름, 정책 스펙, 평가 시드) 하나. 결정 시점 표본으로 U 의 수를 센다. 인자는 피클 가능한 것만 받는다."""
     from env_v2 import rollout as ro
     from env_v2.config import load_v2_config
-    from env_v2.rep_policy import action_mask, rep_params
+    from env_v2.rep_policy import action_mask, policy_obs, rep_argmax, rep_params
     from env_v2.world import World
 
     import repertoire_rules as rr
 
-    name, pspec, seed, steps, config, gamma, tail, variant, udef = args
+    name, pspec, seed, steps, config, gamma, tail, variant, udef = args[:9]
+    r3s = args[9] if len(args) > 9 else None                # v3 R3: 판정 설정(r3_setup)
     cfg = load_v2_config(HERE / config)
+    if pspec.get("world") == "freeze":                      # v3 R3 원래 R1b: 허용 목록에 freeze 를 더한 사본 세계
+        cfg = r3_freeze_world(cfg)
     rep = rep_params(cfg)
-    geo = rr._geom(cfg)
+    r3 = udef == "r3"
+    geo = rr.r3_geo(cfg) if r3 else rr._geom(cfg)
     pol = _make_policy(pspec, cfg, rep, seed)
-    w = World(cfg, seeds=[seed])
+    if r3:
+        import r3_tools as rt
+
+        w = rt.pursuit_world_class()(cfg, seeds=[seed])     # 포기율 A 의 쫓는 위협 추적(기록만 한다)
+        shadow = r3_shadow()
+        a_opp = np.zeros((4, N_BEHAVIORS), dtype=np.int64)  # [땅, 고른 행동]
+        a_cf = {k: np.zeros((N_BEHAVIORS, N_BEHAVIORS), dtype=np.int64) for k in ("rlf", "r1b")}   # [반사실 선택, 고른 행동]
+    else:
+        w = World(cfg, seeds=[seed])
     ro.forward_bind(pol, w)
     xt = XTerms(cfg) if udef == "r2" else None             # v3 R2: U_LOOK(재현 설정이면 U_STARE) 조건(손 규칙 마스크)
     stare = xt is not None and "stare" in xt.rules
@@ -577,6 +686,9 @@ def _job(args):
     for t in range(steps):
         obs = w.observe()
         pk = w.rep_peek()
+        if r3:
+            opp_all = rt.opportunities(w, pk)
+            terr_now = rt.terrain_now(w)
         a = np.asarray(pol(obs), dtype=np.float64)
         dec = pk["reads"]
         if dec.any():
@@ -584,7 +696,23 @@ def _job(args):
             wake = pk["wake_decide"][dec]
             chosen = np.where(wake & (req == SLEEP), w._rs.wake_target[dec].astype(np.int64), req)
             f = rr.features_of_obs(obs[dec], geo)
-            terms = u_terms(f, variant, udef)
+            if r3:
+                for u, (ca, cb) in rr.r3_u_terms(f, r3s["theta"], r3s["approach"], r3s["cal"]).items():
+                    hit = rr.r3_u_hit(u, chosen, f)
+                    u_cnt[u] += (np.count_nonzero(ca), np.count_nonzero(ca & hit), np.count_nonzero(cb),
+                                 np.count_nonzero(cb & hit))
+                opp = opp_all[dec]
+                if opp.any():
+                    np.add.at(a_opp, (terr_now[dec][opp], chosen[opp]), 1)
+                    if shadow is not None:
+                        idx = np.flatnonzero(dec)[opp]
+                        for key, prm in shadow["params"].items():
+                            m_s = action_mask(pk, obs, prm, obs_names=w.obs_names)[idx]
+                            cf = rep_argmax(shadow["policy"], policy_obs(obs[idx], m_s))
+                            np.add.at(a_cf[key], (cf, chosen[opp]), 1)
+                terms = {}
+            else:
+                terms = u_terms(f, variant, udef)
             m_dec = None
             if xt is not None:
                 terms.update(xt(obs[dec]))
@@ -616,7 +744,31 @@ def _job(args):
                u_cnt={u: v.tolist() for u, v in u_cnt.items()}, choice=choice.tolist(), entries=entries)
     if acc is not None:
         out.update(r2=acc.to_dict(), visible=visible_stats(w))
+    if r3:
+        out.update(a3=dict(a_opp=a_opp.tolist(), a_cf={k: v.tolist() for k, v in a_cf.items()}, has_cf=shadow is not None,
+                           freeze_world="freeze" in rep["allowed"]), visible=visible_stats(w))
     return out
+
+
+_R3_SHADOW: dict = {}
+
+
+def r3_shadow() -> dict | None:
+    """포기율 A 반사실(모듈 docstring 'v3 R3 판정'): R1b s3 정책(한 번 싣는다)과 두 허용 칸 — rlf(R3 목록 graze·flee·hide)·r1b(모델 목록,
+    freeze 포함). 모델이 없으면 None(반사실을 세지 않는다)."""
+    path = HERE / R1B_MODEL
+    if not path.exists():
+        return None
+    if "policy" not in _R3_SHADOW:
+        from stable_baselines3 import PPO
+
+        from env_v2.rep_policy import allowed_mask_of
+
+        pol = PPO.load(str(path), device="cpu").policy
+        pol.set_training_mode(False)
+        _R3_SHADOW.update(policy=pol, params={"rlf": {"allowed_mask": allowed_mask_of(("graze", "flee", "hide"))},
+                                              "r1b": {"allowed_mask": pol.rep_allowed_mask}})
+    return _R3_SHADOW
 
 
 def _map(jobs, workers):
@@ -660,6 +812,52 @@ def pooled(rows: list[dict], allowed) -> dict:
         out["r2"] = pooled_r2(rows)
         out["visible"] = pooled_visible(rows, n)
         out["visible"]["non_graze"] = None if out["use"]["graze"] is None else 1.0 - out["use"]["graze"]
+    if "a3" in rows[0]:                                 # v3 R3: 포기율 A 와 세계 통계(threats·r3·realism)
+        out["a3"] = pooled_a3(rows)
+        out["visible"] = pooled_visible(rows, n, groups=("threats", "r3", "realism"))
+    return out
+
+
+R3_TERR = ("normal", "snow", "rough", "none")
+
+
+def pooled_a3(rows: list[dict]) -> dict:
+    """R3 포기율 A (모듈 docstring 'v3 R3 판정'): 시드별 A·기회 수(행 순서), 합친 A, 땅별·고른 행동 몫, 반사실(같은 기회에서 R1b−F·원래
+    R1b 가 골랐을 것)의 A. 원래 R1b 를 허용한 사본 세계(freeze_world)의 행과 r1b 반사실은 FREEZE 도 포기로 센다(15-2)."""
+    import r3_tools as rt
+
+    fz = bool(rows[0]["a3"]["freeze_world"])
+    ab, ab_lf, ab_fz = list(rt.abandon_ids(freeze=fz)), list(rt.abandon_ids()), list(rt.abandon_ids(freeze=True))
+    tot = np.zeros((4, N_BEHAVIORS), dtype=np.int64)
+    cf_tot = {k: np.zeros((N_BEHAVIORS, N_BEHAVIORS), dtype=np.int64) for k in ("rlf", "r1b")}
+    per_a, per_n, cf_seed = [], [], {"rlf": [], "r1b": []}
+    has_cf = all(r["a3"]["has_cf"] for r in rows)
+    for r in rows:
+        a = np.asarray(r["a3"]["a_opp"], dtype=np.int64)
+        n = int(a.sum())
+        tot += a
+        per_n.append(n)
+        per_a.append(float(a[:, ab].sum() / n) if n else None)
+        for k in cf_tot:
+            c = np.asarray(r["a3"]["a_cf"][k], dtype=np.int64)
+            cf_tot[k] += c
+            cab = ab_lf if k == "rlf" else ab_fz
+            cf_seed[k].append(float(c[cab, :].sum() / c.sum()) if has_cf and c.sum() else None)
+    nt = int(tot.sum())
+    out = dict(seeds=[int(r["seed"]) for r in rows], per_seed=per_a, opp=per_n, n_opp=nt, freeze_abandon=fz,
+               pooled=float(tot[:, ab].sum() / nt) if nt else None,
+               seed_mean=float(np.mean([x for x in per_a if x is not None])) if any(x is not None for x in per_a) else None,
+               choice={b: (float(tot[:, k].sum() / nt) if nt else None) for k, b in enumerate(BEHAVIOR_NAMES)},
+               by_terr={R3_TERR[q]: dict(n=int(tot[q].sum()), A=float(tot[q, ab].sum() / tot[q].sum()))
+                        for q in range(4) if tot[q].sum()})
+    if has_cf:
+        out["cf"] = {}
+        for k, c in cf_tot.items():
+            cab = ab_lf if k == "rlf" else ab_fz
+            n = int(c.sum())
+            out["cf"][k] = dict(per_seed=cf_seed[k], pooled=float(c[cab, :].sum() / n) if n else None,
+                                same=float(np.trace(c) / n) if n else None,
+                                choice={b: (float(c[j, :].sum() / n) if n else None) for j, b in enumerate(BEHAVIOR_NAMES)})
     return out
 
 
@@ -703,11 +901,11 @@ def pooled_r2(rows: list[dict]) -> dict:
     return out
 
 
-def pooled_visible(rows: list[dict], n_agent_steps: int) -> dict:
+def pooled_visible(rows: list[dict], n_agent_steps: int, groups=("stare", "alarm", "threats")) -> dict:
     """세계 통계 열의 시드 합침(모듈 docstring '보이는 지표'): 수(…_n·emit_*·cry_n)는 합과 1000 개체-스텝당(`<열>_per1000`),
-    그 밖(비율·평균)은 값이 있는 시드의 평균."""
+    그 밖(비율·평균)은 값이 있는 시드의 평균. `groups` 는 모을 통계 묶음(v3 R3 은 threats·r3·realism)."""
     out = {}
-    for grp in ("stare", "alarm", "threats"):
+    for grp in groups:
         vals = [r["visible"][grp] for r in rows if grp in r.get("visible", {})]
         if not vals:
             continue
@@ -750,9 +948,11 @@ def gate(res: dict, allowed, variant: str, udef: str = "r1") -> dict:
     r2 는 기준 손 규칙이 FSM_R2 이고(성과·굶음), 판정 U 는 r1b 와 같은 셋이며(U_LOOK·U_LOOK_OPEN·재현 설정의 U_STARE 는 `u.report`
     에 보고만), 입력 의존(C4) 항목이 없다. 문턱이 미정(None)인 U 는 통과가 아니고 `pending` 이 참이다."""
     P = res["pooled"]
-    rl, fsm = P["rl"], P[REF_FSM[udef]]
+    rl, fsm = P["rl"], P[ref_fsm(udef)]
     if udef == "r2":
         return _gate_r2(res, allowed, rl, fsm)
+    if udef == "r3":
+        return _gate_r3(res, allowed, rl, fsm)
     out = {}
     pt = res["perf"]
     if pt["t"] is not None:
@@ -823,14 +1023,95 @@ def _gate_r2(res: dict, allowed, rl: dict, fsm: dict) -> dict:
     return out
 
 
+def _gate_r3(res: dict, allowed, rl: dict, fsm: dict) -> dict:
+    """R3 판정(관문 사전 등록 15-3, 모듈 docstring 'v3 R3 판정'). 판정 설정은 res['r3_setup'](`r3_setup`), 문턱은 R3_JUDGE. 항목마다
+    status = judged(판정) · report(보고만) · insufficient(표본 부족 — 보고만) · pending(문턱·관문 결과 미정)."""
+    S, J = res["r3_setup"], R3_JUDGE
+    out = {}
+    pt = res["perf"]
+    if pt["t"] is not None:
+        ok, beat = pt["t"] >= -pt["crit"], pt["t"] > pt["crit"]
+    else:
+        ok, beat = (pt["mean"] >= 0.0), False
+    out["perf"] = dict(t=pt["t"], crit=pt["crit"], mean=pt["mean"], pass_=bool(ok), beats_fsm=bool(beat), ref=REF_FSM_R3)
+    lim = STARVE_RATIO_MAX * fsm["starve_rate"]
+    out["starve"] = dict(rl=rl["starve_rate"], fsm=fsm["starve_rate"], limit=lim,
+                         ratio=rl["starve_rate"] / fsm["starve_rate"] if fsm["starve_rate"] > 0 else None,
+                         pass_=bool(rl["starve_rate"] <= lim), ref=REF_FSM_R3)
+    # P3 포기율 A (G1 이 통과·조건부 통과일 때만 판정 조건)
+    A = res.get("a3", {})
+    p3 = dict(active=S["p3"], status="pending", pass_=True)
+    a_rl, a_lf = A.get("rl"), A.get("rlf")
+    if a_rl is not None and a_lf is not None and a_rl["seeds"] == a_lf["seeds"]:
+        valid = [i for i in range(len(a_rl["seeds"])) if a_rl["opp"][i] >= R3_A_MIN_OPP and a_lf["opp"][i] >= R3_A_MIN_OPP
+                 and a_rl["A"][i] is not None and a_lf["A"][i] is not None]
+        p3.update(n_valid=len(valid), seeds_valid=[a_rl["seeds"][i] for i in valid])
+        if valid:
+            p3.update(t=paired_t([a_rl["A"][i] for i in valid], [a_lf["A"][i] for i in valid]),
+                      a_rl=float(np.mean([a_rl["A"][i] for i in valid])), a_rlf=float(np.mean([a_lf["A"][i] for i in valid])))
+    ref = J["a_ref"]
+    if S["p3"] is False:
+        p3["status"] = "report"
+    elif S["p3"] is None or ref is None:
+        p3["status"] = "pending"
+    elif ref["fsm_r3"] >= R3_A_FSM_SAME * ref["rlf"]:
+        p3.update(status="report", why="A_FSM_R3 ≥ 0.8 × A_R1b−F(교사가 R1b−F 와 다르지 않다 — 15-3 P3)")
+    elif p3.get("n_valid", 0) < R3_A_MIN_SEEDS:
+        p3.update(status="insufficient", why=f"기회 ≥ {R3_A_MIN_OPP} 인 시드가 {p3.get('n_valid', 0)}개 < {R3_A_MIN_SEEDS}")
+    else:
+        lim_a = 0.5 * (ref["rlf"] + ref["fsm_r3"])
+        t = p3["t"]
+        p3.update(status="judged", limit=lim_a, pass_=bool(t["t"] is not None and t["t"] <= -t["crit"] and p3["a_rl"] <= lim_a))
+    out["p3"] = p3
+    # P4 U
+    import repertoire_rules as rr
+
+    us = {}
+    for u in rr.R3_U:
+        v, c = rl["u"].get(u), rl["u_cnt"].get(u, [0, 0, 0, 0])
+        lo = J["u_min_esc"] if u == "esc" else (J["u_min_hide"] if u == "hide" else J["u_min_niche"])
+        judged_u = u == "esc" or (S["u_judged"] is not None and u in S["u_judged"])
+        enough = c[0] >= R3_U_MIN_N and c[2] >= R3_U_MIN_N
+        if not judged_u:
+            st, pas = ("pending" if S["u_judged"] is None else "report"), True
+        elif not enough:
+            st, pas = "insufficient", True
+        elif lo is None:
+            st, pas = "pending", False
+        else:
+            st, pas = "judged", bool(v is not None and v >= lo)
+        us[u] = dict(value=v, min=lo, n_niche=int(c[0]), n_cross=int(c[2]), status=st, pass_=pas)
+    out["u"] = dict(items=us, pass_=all(x["pass_"] for x in us.values()))
+    # P5 쓰임
+    use = {"flee": dict(value=rl["use"]["flee"], status="judged", pass_=bool((rl["use"]["flee"] or 0.0) >= USE_MIN))}
+    hv = rl["use"]["hide"]
+    if S["hide_floor"]:
+        use["hide"] = dict(value=hv, status="judged", pass_=bool((hv or 0.0) >= USE_MIN))
+    else:
+        use["hide"] = dict(value=hv, status="pending" if S["hide_floor"] is None else "report", pass_=True)
+    fl = rl["flicker"]
+    fz, sl = rl["use"]["freeze"] or 0.0, rl["use"]["sleep"] or 0.0
+    halt = bool(fz > 0.0 or (not S["sleep"] and sl > 0.0))
+    out["use"] = dict(items=use, flicker=fl, flicker_pass=bool(fl is None or fl <= FLICKER_MAX), freeze=fz, sleep=sl, halt=halt,
+                      pass_=all(x["pass_"] for x in use.values()) and bool(fl is None or fl <= FLICKER_MAX) and not halt)
+    pending = (not S["gate_complete"] or J["u_min_esc"] is None or p3["status"] == "pending"
+               or any(x["status"] == "pending" for x in us.values()) or use["hide"]["status"] == "pending")
+    out["dep"] = dict(items={}, pass_=True, report_only=True)
+    out["pending"] = bool(pending)
+    out["halt"] = halt
+    out["pass_"] = bool(not pending and not halt and all(out[k]["pass_"] for k in ("perf", "starve", "p3", "u", "use")))
+    return out
+
+
 def config_digest(cfg) -> str:
     """diagnose_v2.config_digest 와 같은 식(설정 dict 의 sha1 앞 12자리)."""
     return hashlib.sha1(json.dumps(cfg.to_dict(), sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
 def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CONFIG, variant: str = "near",
-          workers: int = 1, policies=None, tail: int = TAIL, gamma: float = GAMMA, udef: str = "r1") -> dict:
-    """모델 하나를 판정해 `<out>/<name>.json`·`<name>.md` 를 쓴다. 반환은 JSON 과 같은 dict."""
+          workers: int = 1, policies=None, tail: int = TAIL, gamma: float = GAMMA, udef: str = "r1", r3: dict | None = None) -> dict:
+    """모델 하나를 판정해 `<out>/<name>.json`·`<name>.md` 를 쓴다. 반환은 JSON 과 같은 dict. `r3` 는 R3 판정 설정(`r3_setup`, --u-def r3
+    에서 주지 않으면 관문 결과로 만든다)."""
     from env_v2.config import load_v2_config
     from env_v2.rep_policy import rep_params
 
@@ -847,19 +1128,29 @@ def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CON
         # R2 세계 = v3_r1_on + 경보(사람 결정 10-13 — 노려보기는 뺐다). 노려보기를 함께 켠 설정은 앞선 실행의 재현으로만 받는다
         raise ValueError(f"--u-def r2 는 경보(alarm)를 켠 R2 세계에서만 쓴다({CONFIG_R2}). "
                          f"{config}: {dict(zip(('stare_down', 'alarm'), has_r2_world(cfg)))}")
+    r3s = None
+    if udef == "r3":
+        import r3_tools as rt
+
+        if not rt.is_r3_world(cfg) or "freeze" in allowed:
+            raise ValueError(f"--u-def r3 는 얼기를 뺀 R3 세계에서만 쓴다({CONFIG_R3}). {config}: 목록 {list(allowed)}")
+        r3s = dict(r3) if r3 is not None else r3_setup()
     if policies:
         names = list(policies)
     elif udef == "r2":
         names = list(R2_POLICIES)
+    elif udef == "r3":
+        names = list(R3_POLICIES)
     else:
         names = ["rl", "fsm", "rbase"] + [f"c_{b}" for b in allowed] + ["c1p", "c4_app", "c4_phase"]
-    for must in ("rl", REF_FSM[udef]):
+    for must in ("rl", ref_fsm(udef)):
         if must not in names:
             raise ValueError(f"판정에는 정책 {must} 가 꼭 있어야 한다")
     seeds = [int(s) for s in seeds]
     t0 = time.time()
     phase1 = [p for p in names if p != "c1p"]
-    jobs = [(p, policy_spec(p, model, cfg, allowed, variant), s, steps, config, gamma, tail, variant, udef)
+    extra = (r3s,) if udef == "r3" else ()
+    jobs = [(p, policy_spec(p, model, cfg, allowed, variant, r3=r3s), s, steps, config, gamma, tail, variant, udef) + extra
             for p in phase1 for s in seeds]
     rows: dict[str, list[dict]] = {}
     for r in _map(jobs, workers):
@@ -867,17 +1158,22 @@ def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CON
     pooled_ = {p: pooled(rows[p], allowed) for p in rows}
     if "c1p" in names:
         freq = pooled_["rl"]["choice_freq"]
-        jobs = [("c1p", policy_spec("c1p", model, cfg, allowed, variant, freq), s, steps, config, gamma, tail, variant,
-                 udef) for s in seeds]
+        jobs = [("c1p", policy_spec("c1p", model, cfg, allowed, variant, freq, r3=r3s), s, steps, config, gamma, tail, variant,
+                 udef) + extra for s in seeds]
         rows["c1p"] = _map(jobs, workers)
         pooled_["c1p"] = pooled(rows["c1p"], allowed)
     for p in rows:
         rows[p].sort(key=lambda r: r["seed"])
     g = lambda p: [r["g_gamma"] for r in rows[p]]          # noqa: E731
-    res = dict(pooled=pooled_, perf=paired_t(g("rl"), g(REF_FSM[udef])))
+    res = dict(pooled=pooled_, perf=paired_t(g("rl"), g(ref_fsm(udef))))
     if udef == "r2":                                        # 보고만: RL − R_base (R1 판정의 R_base 보고와 같은 뜻)
         res["perf_rbase"] = paired_t(g("rl"), g("rbase")) if "rbase" in rows else None
         res["perf_rbase_wr2"] = paired_t(g("rl"), g("rbase_wr2")) if "rbase_wr2" in rows else None
+    if udef == "r3":                                        # P3 의 시드별 A(시드 순서) · 보고만 하는 G_γ 대비
+        res["r3_setup"] = r3s
+        res["a3"] = {p: dict(seeds=[int(r["seed"]) for r in rows[p]], A=pooled(rows[p], allowed)["a3"]["per_seed"],
+                             opp=[int(np.asarray(r["a3"]["a_opp"]).sum()) for r in rows[p]]) for p in rows}
+        res["perf_ref"] = {q: paired_t(g("rl"), g(q)) for q in ("rbase", "rlf", "r1b") if q in rows}
     res["c4_drop"] = {c: {u: drop(pooled_["rl"]["u"][u], pooled_[c]["u"][u]) for u in U_NAMES}
                       for c in ("c4_app", "c4_phase") if c in pooled_}
     res["gate"] = gate(res, allowed, variant, udef)
@@ -888,8 +1184,11 @@ def judge(model: str, name: str, seeds, steps: int, out: Path, config: str = CON
     if udef == "r2":
         stare_on, alarm_on = has_r2_world(cfg)
         res["meta"].update(u_min=dict(U_MIN_BY["r2"]), u_report=[u for u in R2_REPORT_U if u in pooled_["rl"]["u"]],
-                           ref_fsm=REF_FSM[udef], theta_wr2=THETA_WR2, approach_wr2=APPROACH_WR2,
+                           ref_fsm=ref_fsm(udef), theta_wr2=THETA_WR2, approach_wr2=APPROACH_WR2,
                            stare_down=stare_on, alarm=alarm_on, prereg=bool(out.resolve() == PREREG_OUT_R2.resolve()))
+    if udef == "r3":
+        res["meta"].update(r3=r3s, u_min=dict(R3_JUDGE), ref_fsm=REF_FSM_R3, theta=r3s["theta"], approach=r3s["approach"],
+                           r1b_model=R1B_MODEL, prereg=bool(out.resolve() == PREREG_OUT_R3.resolve()))
     res["per_seed"] = {p: [{k: v for k, v in r.items() if k not in ("entries",)} for r in rows[p]] for p in rows}
     out.mkdir(parents=True, exist_ok=True)
     (out / f"{name}.json").write_text(json.dumps(res, indent=1, ensure_ascii=False), encoding="utf-8")
@@ -914,6 +1213,8 @@ def report_md(res: dict) -> str:
     m, G, P = res["meta"], res["gate"], res["pooled"]
     if m.get("u_def") == "r2":
         return report_md_r2(res)
+    if m.get("u_def") == "r3":
+        return report_md_r3(res)
     small = len(m["seeds"]) < len(EVAL_SEEDS) or m["steps"] < STEPS
     L = [f"# v3 R1 판정 — {m['name']}" + (" (smoke·부분 실행, 판정 아님)" if small else ""), "",
          f"**결론: {'통과' if G['pass_'] else '실패'}** (PREREG 4절 다섯 조건 모두 만족해야 통과)", "",
@@ -1118,6 +1419,96 @@ def report_md_r2(res: dict) -> str:
     return "\n".join(L) + "\n"
 
 
+_R3_STATUS = {"judged": "", "report": "보고만", "insufficient": "판정 불가(표본 부족)", "pending": "미정"}
+
+
+def _st(item) -> str:
+    """판정 항목의 결과 칸: 판정이면 통과·실패, 아니면 그 상태."""
+    return _ok(item["pass_"]) if item["status"] == "judged" else _R3_STATUS[item["status"]]
+
+
+def report_md_r3(res: dict) -> str:
+    """R3 판정 보고(판정표 먼저, 그다음 정책별 지표·U 표본·포기율 A·반사실·세계 통계)."""
+    import repertoire_rules as rr
+
+    m, G, P = res["meta"], res["gate"], res["pooled"]
+    S = m["r3"]
+    small = list(m["seeds"]) != EVAL_SEEDS_R3 or m["steps"] < STEPS
+    head = "통과" if G["pass_"] else ("멈춤(FREEZE·SLEEP 사용 — 허용 목록 결함)" if G["halt"] else
+                                     ("미정(문턱·관문 결과 미정 — 판정 사전 등록 전)" if G["pending"] else "실패"))
+    L = [f"# v3 R3 판정 — {m['name']}" + (" (보정 시드·부분 실행, 판정 아님)" if small else ""), "",
+         f"**결론: {head}** (관문 사전 등록 15-3 의 P1~P5 모두, 확정은 판정 사전 등록 results/v3/r3/judge/PREREG.md)", "",
+         f"- 모델 `{m['model']}`, 판정 세계 `{m['config']}`(digest {m['digest']}), 목록 {', '.join(m['allowed'])}, 지표 정의 r3",
+         f"- 평가 시드 {m['seeds'][0]}~{m['seeds'][-1]} ({len(m['seeds'])}개) × {m['steps']}스텝, argmax, G_γ γ {m['gamma']} tail {m['tail']}",
+         f"- 손 규칙: R_base(θ {S['theta']:g}, a* {S['approach']:g}), FSM_R3 줄 {S['lines']}, 보정 1 {S['cal'] or '없음'}, 잠 줄 "
+         f"{'있음' if S['sleep'] else '없음'}. 관문 결과 {'있음' if S['gate_complete'] else '없음(재학습 전 측정 값으로 채움)'}"
+         + (" — 일부를 직접 주었다" if S["explicit"] else ""), "",
+         "## 판정", "", "| 조건 | 값 | 문턱 | 결과 |", "|---|---|---|---|"]
+    p = G["perf"]
+    L.append(f"| P1 성과: RL − FSM_R3 G_γ 짝 t | 평균 차 {_f(p['mean'], '+.4f')}, t {_f(p['t'], '+.2f')} | t ≥ −{_f(p['crit'], '.3f')} | "
+             f"{_ok(p['pass_'])}{' — FSM_R3 를 이김' if p['beats_fsm'] else ''} |")
+    s = G["starve"]
+    L.append(f"| P2 굶음: 아사율 RL / FSM_R3 | {_f(s['rl'], '.5f')} / {_f(s['fsm'], '.5f')} (비 {_f(s['ratio'], '.2f')}) | ≤ 1.5 × FSM_R3 | "
+             f"{_ok(s['pass_'])} |")
+    p3 = G["p3"]
+    t3 = p3.get("t") or {}
+    L.append(f"| P3 끝까지 도망: 포기율 A RL − R1b−F (기회 ≥ {R3_A_MIN_OPP} 시드 {p3.get('n_valid', '—')}개) | A_RL "
+             f"{_f(p3.get('a_rl'), '.4f')}, A_R1b−F {_f(p3.get('a_rlf'), '.4f')}, t {_f(t3.get('t'), '+.2f')} | t ≤ −crit & A_RL ≤ "
+             f"{_f(p3.get('limit'), '.4f')} | {_st(p3)}{(' — ' + p3['why']) if p3.get('why') else ''} |")
+    for u, v in G["u"]["items"].items():
+        L.append(f"| P4 맞는 때: U_{u.upper()} (니치 {v['n_niche']} / 교차 {v['n_cross']}) | {_f(v['value'])} | "
+                 f"{'≥ ' + str(v['min']) if v['min'] is not None else '미정'} | {_st(v)} |")
+    for b, v in G["use"]["items"].items():
+        L.append(f"| P5 쓰임: {b} 사용 비중 | {_f(v['value'], '.2%') if v['value'] is not None else '—'} | ≥ {USE_MIN:.1%} | {_st(v)} |")
+    L.append(f"| P5 쓰임: 깜빡임 | {_f(G['use']['flicker'], '.2%') if G['use']['flicker'] is not None else '—'} | ≤ {FLICKER_MAX:.0%} | "
+             f"{_ok(G['use']['flicker_pass'])} |")
+    L.append(f"| P5 허용 목록: FREEZE·SLEEP 사용 | {G['use']['freeze']:.4f} · {G['use']['sleep']:.4f} | 0 | "
+             f"{'멈춤' if G['use']['halt'] else '통과'} |")
+    pr = res.get("perf_ref", {})
+    if pr:
+        L += ["", "보고만: " + ", ".join(f"RL − {q} G_γ {_f(v['mean'], '+.4f')} (t {_f(v['t'], '+.2f')})" for q, v in pr.items()) + "."]
+    names = [n for n in POLICY_ORDER if n in P]
+    us = rr.R3_U
+    L += ["", "## 정책별 지표", "",
+          "사용 비중 = 실행한 행동의 개체-스텝 비율(G 먹기·F 도망·H 숨기·Z 얼기·S 잠). U 는 결정 시점 표본, 평가 시드 합침. U_ESC = FLEE ∪ HIDE, "
+          "U_KEEP·U_EARLY = FLEE ∪ 은신처 밖 HIDE, U_HIDE = U_HIDE′. A = 포기율(기회 = 쫓기며 FLEE 중, 은신처 밖).", "",
+          "| 정책 | G_γ | 피식률 | 아사율 | 사용 G/F/H/Z/S | 깜빡임 | 결정 비율 | " + " | ".join(f"U_{u.upper()}" for u in us)
+          + " | A (기회) |", "|---|---|---|---|---|---|---|" + "---|" * (len(us) + 1)]
+    for n in names:
+        v = P[n]
+        use = "/".join(_f(v["use"][b], ".3f") for b in BEHAVIOR_NAMES)
+        a3 = v.get("a3", {})
+        L.append(f"| {n} | {_f(v['g_gamma'], '.4f')} | {_f(v['pred_rate'], '.5f')} | {_f(v['starve_rate'], '.5f')} | {use} | "
+                 f"{_f(v['flicker'])} | {_f(v['decide_frac'])} | " + " | ".join(_f(v["u"].get(u)) for u in us)
+                 + f" | {_f(a3.get('pooled'), '.4f')} ({a3.get('n_opp', 0)}) |")
+    L += ["", "U 표본 수(니치 / 교차):", "", "| 정책 | " + " | ".join(f"U_{u.upper()}" for u in us) + " |", "|---|" + "---|" * len(us)]
+    for n in names:
+        c = P[n]["u_cnt"]
+        L.append(f"| {n} | " + " | ".join(f"{c[u][0]} / {c[u][2]}" for u in us) + " |")
+    L += ["", "## 포기율 A — 땅별·고른 행동·반사실 (보고만)", "",
+          "반사실 = 같은 기회에서 R1b−F(허용 graze·flee·hide)·원래 R1b(freeze 포함 — FREEZE 도 포기)가 골랐을 것(상태 없는 argmax).", "",
+          "| 정책 | A 보통 · 눈 · 거친 땅 | 고른 행동 G/F/H/Z | R1b−F 였다면 A (같은 선택) | 원래 R1b 였다면 A (같은 선택) |",
+          "|---|---|---|---|---|"]
+    for n in names:
+        a3 = P[n].get("a3", {})
+        bt = a3.get("by_terr", {})
+        ch = a3.get("choice", {})
+        cf = a3.get("cf", {})
+        L.append(f"| {n} | " + " · ".join(_f((bt.get(t) or {}).get("A"), ".3f") for t in R3_TERR[:3]) + " | "
+                 + "/".join(_f(ch.get(b), ".3f") for b in ("graze", "flee", "hide", "freeze")) + " | "
+                 + " | ".join(f"{_f((cf.get(k) or {}).get('pooled'), '.3f')} ({_f((cf.get(k) or {}).get('same'), '.3f')})"
+                              for k in ("rlf", "r1b")) + " |")
+    L += ["", "## 세계 통계 (보고만, 시드 합침)", "", "| 정책 | 근접 추격 | 원거리 | 잠행 | 플레이어 | 추격 고정 쥠 /1000 | 표적 잃음(은신처) /1000 | "
+          "원 안 위협-스텝 | 면역 접촉 |", "|---|---|---|---|---|---|---|---|---|"]
+    for n in names:
+        vis = P[n].get("visible", {})
+        th_, z, rz = vis.get("threats", {}), vis.get("r3", {}), vis.get("realism", {})
+        L.append(f"| {n} | " + " | ".join(_f(th_.get(f"catch_rate_{k}"), ".5f") for k in ("chaser", "ranged", "stalker", "player"))
+                 + f" | {_f(z.get('chase_held_n_per1000'), '.2f')} | {_f(z.get('chase_rel_cover_n_per1000'), '.3f')} | "
+                 f"{_f(z.get('wall_inside_n'), '.0f')} | {_f(rz.get('safe_saved_n'), '.1f')} |")
+    return "\n".join(L) + "\n"
+
+
 def _write_judge_md(out: Path, text: str) -> None:
     """`<out>/judge.md` 를 쓴다. 닫힌 폴더(done.flag 가 있는 판정 폴더 — R1·R1b)의 judge.md 는 내용이 바뀌면 덮지 않고 멈춘다
     (다른 시험의 결과를 실수로 다시 모아 덮지 않게, 모듈 docstring)."""
@@ -1141,6 +1532,8 @@ def summarize(names, out: Path, udef: str | None = None) -> str:
     n_pass = sum(r["gate"]["pass_"] for _, r in rows)
     if rows and all(r["meta"].get("u_def") == "r2" for _, r in rows):
         return _summarize_r2(rows, n_pass, out)
+    if rows and all(r["meta"].get("u_def") == "r3" for _, r in rows):
+        return _summarize_r3(rows, n_pass, out)
     L = ["# v3 R1 판정 모음", "",
          f"**통과 {n_pass} / {len(rows)}** — R1 성공 규칙은 6시드 중 4시드 이상 통과(PREREG 5절)"
          + (f": {'성공' if n_pass >= 4 else '실패'}" if len(rows) == 6 else " (6시드가 모두 모이면 판정)"), "",
@@ -1169,6 +1562,58 @@ def _summarize_r2(rows, n_pass: int, out: Path) -> str:
     text = "\n".join(L) + "\n"
     _write_judge_md(out, text)
     return text
+
+
+def _summarize_r3(rows, n_pass: int, out: Path) -> str:
+    """R3 판정 모음(R3 성공 = 6모델 중 4모델 이상 통과, 관문 사전 등록 15-4)."""
+    L = ["# v3 R3 판정 모음", "",
+         f"**통과 {n_pass} / {len(rows)}** — R3 성공 규칙은 6모델 중 4모델 이상 통과"
+         + (f": {'성공' if n_pass >= 4 else '실패'}" if len(rows) == 6 else " (6모델이 모두 모이면 판정)"), "",
+         "| 모델 | P1 성과 (t) | P2 굶음 | P3 A | P4 U | P5 쓰임 | 미정 | 통과 |", "|---|---|---|---|---|---|---|---|"]
+    for n, r in rows:
+        G = r["gate"]
+        L.append(f"| {n} | {_ok(G['perf']['pass_'])} ({_f(G['perf']['t'], '+.2f')}) | {_ok(G['starve']['pass_'])} | {_st(G['p3'])} | "
+                 f"{_ok(G['u']['pass_'])} | {_ok(G['use']['pass_'])} | {'예' if G['pending'] else '아니오'} | **{_ok(G['pass_'])}** |")
+    L += ["", "출시 모델은 통과 모델 가운데 보정 시드 20000~20019 × 10000 의 G_γ 평균이 가장 높은 것이다(판정 시드로 고르지 않는다)."]
+    text = "\n".join(L) + "\n"
+    _write_judge_md(out, text)
+    return text
+
+
+def prereg_problems_r3(a, seeds) -> list[str]:
+    """R3 판정 사전 등록 폴더(PREREG_OUT_R3)에 쓰는 실행의 조건 검사(모듈 docstring 'v3 R3 판정'). 비면 문제 없음."""
+    import r3_tools as rt
+
+    bad = []
+    if list(seeds) != EVAL_SEEDS_R3:
+        bad.append("--seeds (R3 판정 10300~10319)")
+    if a.steps != STEPS:
+        bad.append(f"--steps (R3 판정 {STEPS})")
+    if a.config != CONFIG_R3:
+        bad.append(f"--config (R3 판정 {CONFIG_R3})")
+    if a.tail != TAIL:
+        bad.append(f"--tail (R3 판정 {TAIL})")
+    if a.policies is not None:
+        bad.append("--policies (R3 판정은 기본 정책 모두: " + " ".join(R3_POLICIES) + ")")
+    if getattr(a, "u_def", "r1") != "r3":
+        bad.append("--u-def (R3 판정 폴더는 r3)")
+    if any(getattr(a, k, None) is not None for k in ("theta", "approach", "fsm_r3_lines", "r3_cal")):
+        bad.append("--theta/--approach/--fsm-r3-lines/--r3-cal (판정은 관문 결과 그대로 — 직접 주지 않는다)")
+    g = rt.gate_setup()
+    if not g["complete"]:
+        bad.append(f"관문 결과가 없다({g['source']}/final.json·search.json — invasion_r3.py report)")
+    if R3_JUDGE["u_min_esc"] is None:
+        bad.append("U_ESC 문턱 미정 (eval_v3.R3_JUDGE['u_min_esc'] — 판정 사전 등록에서 학습 기록을 보기 전에 정한다)")
+    if g["complete"] and g["p3"] and R3_JUDGE["a_ref"] is None:
+        bad.append("P3 의 A 기준값 미정 (eval_v3.R3_JUDGE['a_ref'] — ws_baseline 에서 학습 전에 고정한다)")
+    if not (HERE / R1B_MODEL).exists():
+        bad.append(f"R1b 모델 {R1B_MODEL} 이 없다(P3 기준 R1b−F)")
+    pr = PREREG_OUT_R3 / "PREREG.md"
+    if not pr.exists():
+        bad.append(f"판정 사전 등록 {pr} 이 없다(학습 기록을 보기 전에 고정한다)")
+    elif prereg_draft(pr):
+        bad.append(f"판정 사전 등록 {pr} 이 아직 초안이다(제목의 '초안')")
+    return bad
 
 
 def prereg_draft(path: Path) -> bool:
@@ -1243,31 +1688,56 @@ def main(argv=None) -> int:
     r.add_argument("--policies", nargs="+", default=None, choices=POLICY_ORDER)
     r.add_argument("--u-def", choices=U_DEFS, default="r1",
                    help="지표 정의 묶음: r1(R1 사전 등록, 기본), r1b(R1b 확인 시험, results/v3/r1b/PREREG.md), "
-                        "r2(R2 판정, 명세 RL_V3_R2_SPEC.md 10절 7단계)")
+                        "r2(R2 판정, 명세 RL_V3_R2_SPEC.md 10절 7단계), r3(R3 판정, results/v3/r3/PREREG.md 15절)")
+    r.add_argument("--theta", type=float, default=None, help="r3: 거주 R_base θ (기본: 관문 탐색 결과)")
+    r.add_argument("--approach", type=float, default=None, help="r3: 거주 R_base a* (기본: 관문 탐색 결과)")
+    r.add_argument("--fsm-r3-lines", nargs="*", default=None, choices=("crouch", "leave", "run", "keep", "early"),
+                   help="r3: FSM_R3 의 관문 줄 (기본: 관문 결과)")
+    r.add_argument("--r3-cal", nargs="*", default=None, choices=("keep", "run", "leave", "early"),
+                   help="r3: 보정 1 을 쓴 니치 (기본: 관문 결과)")
     r.add_argument("--workers", type=int, default=14)
     r.add_argument("--out", default=None, help=f"기본 {PREREG_OUT} (--u-def r2 면 {PREREG_OUT_R2})")
     s = sub.add_parser("summarize", help="판정 결과 여러 개를 judge.md 로 모은다")
     s.add_argument("--names", nargs="+", required=True)
     s.add_argument("--u-def", choices=U_DEFS, default="r1",
-                   help="결과의 지표 정의(모든 JSON 이 같아야 한다). --out 기본값도 정한다: r1 → R1 판정 폴더, r1b → R1b, r2 → R2")
+                   help="결과의 지표 정의(모든 JSON 이 같아야 한다). --out 기본값도 정한다: r1 → R1 판정 폴더, r1b → R1b, r2 → R2, r3 → R3")
     s.add_argument("--out", default=None, help=f"기본 --u-def 의 판정 폴더 ({PREREG_OUT} · {PREREG_OUT_R1B} · {PREREG_OUT_R2})")
     a = ap.parse_args(argv)
     if a.cmd == "summarize":
-        out = Path(a.out) if a.out is not None else {"r1": PREREG_OUT, "r1b": PREREG_OUT_R1B, "r2": PREREG_OUT_R2}[a.u_def]
+        out = Path(a.out) if a.out is not None else {"r1": PREREG_OUT, "r1b": PREREG_OUT_R1B, "r2": PREREG_OUT_R2,
+                                                      "r3": PREREG_OUT_R3}[a.u_def]
         print(summarize(a.names, out, a.u_def))
         return 0
-    r2 = a.u_def == "r2"
+    r2, r3 = a.u_def == "r2", a.u_def == "r3"
     if a.config is None:
-        a.config = CONFIG_R2 if r2 else CONFIG
-    out = Path(a.out if a.out is not None else (PREREG_OUT_R2 if r2 else PREREG_OUT))
-    seeds = a.seeds or (EVAL_SEEDS_R2 if r2 else EVAL_SEEDS)
-    for folder, check in ((PREREG_OUT, prereg_problems), (PREREG_OUT_R2, prereg_problems_r2)):
+        a.config = CONFIG_R2 if r2 else (CONFIG_R3 if r3 else CONFIG)
+    out = Path(a.out if a.out is not None else (PREREG_OUT_R2 if r2 else (PREREG_OUT_R3 if r3 else PREREG_OUT)))
+    seeds = a.seeds or (EVAL_SEEDS_R2 if r2 else (EVAL_SEEDS_R3 if r3 else EVAL_SEEDS))
+    if not r3 and any(getattr(a, k) is not None for k in ("theta", "approach", "fsm_r3_lines", "r3_cal")):
+        ap.error("--theta/--approach/--fsm-r3-lines/--r3-cal 은 --u-def r3 에서만 쓴다")
+    if not r3:
+        # R3 관문 판정 15000~15039·최종 판정 10300~10319 는 다른 지표 정의(r1·r1b·r2)로도 돌리지 않는다(관문 사전 등록 2절)
+        import r3_tools as rt
+
+        hit = [int(s) for s in seeds if int(s) in rt.GATE_JUDGE or int(s) in rt.FINAL_JUDGE]
+        if hit:
+            ap.error(f"시드 {hit} 는 R3 관문·최종 판정 시드다(15000~15039·10300~10319) — --u-def r3 의 사전 등록 폴더 실행만 쓴다")
+    for folder, check in ((PREREG_OUT, prereg_problems), (PREREG_OUT_R2, prereg_problems_r2), (PREREG_OUT_R3, prereg_problems_r3)):
         if out.resolve() == folder.resolve():
             bad = check(a, seeds)
             if bad:
                 ap.error(f"사전 등록 폴더 {folder} 에는 PREREG 조건만 쓴다(결과를 덮지 않게). 다른 조건: " + ", ".join(bad)
                          + ". smoke·부분 실행·보정 시드는 --out 에 다른 폴더를 준다")
-    judge(a.model, a.name, seeds, a.steps, out, a.config, a.freeze_variant, a.workers, a.policies, a.tail, udef=a.u_def)
+    r3s = None
+    if r3:
+        import r3_tools as rt
+
+        if out.resolve() != PREREG_OUT_R3.resolve():
+            bad = rt.seed_problems(seeds)
+            if bad:
+                ap.error("R3 판정 폴더 밖 실행은 관문·최종 판정 시드를 쓰지 않는다: " + ", ".join(bad))
+        r3s = r3_setup(a.theta, a.approach, a.fsm_r3_lines, a.r3_cal)
+    judge(a.model, a.name, seeds, a.steps, out, a.config, a.freeze_variant, a.workers, a.policies, a.tail, udef=a.u_def, r3=r3s)
     print((out / f"{a.name}.md").read_text(encoding="utf-8"))
     return 0
 

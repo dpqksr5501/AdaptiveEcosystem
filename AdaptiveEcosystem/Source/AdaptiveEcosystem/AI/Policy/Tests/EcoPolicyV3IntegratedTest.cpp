@@ -18,6 +18,14 @@
 //   Integrated.EndToEndMiniWorld       두 지역 × (사슴 16 + 늑대 2), 2000 스텝, 조정자 흉내(사망 → Alive 떼기 → 지우기)
 //   Integrated.FeedingFeedback         먹기 되먹임: 기록(먹은 양)은 셀에서 덜어 낸 양과 같고, 먹기 중 먹은 사슴은 에너지가 오른다. 사슴 글자,
 //                                      최근 10 초 고리 버퍼·구간에 먹은 사슴 수·에너지 평균·굶주림 수가 개체 조각과 맞는다
+//   Integrated.GradualNight            늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight 기본 1 → 설정 → 세계): 늑대 글자(눕는 중·깨는 중·못 누운 까닭),
+//                                      Mass 1000 스텝 — 16 m 안에 사슴이 있거나 사냥 중이면 잠들지 않고, 해 진 뒤 바로 자지 않고, 새벽에 깬다
+//   Integrated.NoFreeze                사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1 → 설정 → 세계 허용 칸): 켜면 Mass 2000 스텝 동안 FREEZE 실행 0·
+//                                      얼기 칸이 열린 결정 0, R1b 가 얼 자리에서만 다른 행동이고 나머지 결정은 R1b 와 같다. 끄면 R1b 그대로(얼기 씀)
+//   (경계 거리 KeepAway 시험 6 개는 도주 반사 거리로 바꾸며 지웠다 — 규칙 시험은 EcoWildV3Test.cpp Wild.FlightGolden·Wild.FlightOff)
+//   Integrated.WolfEating              늑대 식사 시간 (eco.IntegratedV3.WolfEatSeconds 기본 5 → 38 스텝): 위협 모델 — 식사 37 스텝 제자리, 38 번째에
+//                                      다시 잡음, 끄면 배회, 플레이어·쿨다운 0 은 그대로. Mass — 서 있음·속도 0·'먹는 중' 깃발·글자, 팀 늑대 표현이
+//                                      '먹는 중' 동작 (옛 규칙 0.67 초는 뛰기), 옛 규칙 설정은 바꾸기 전 세계와 비트 단위로 같다
 
 #include "Misc/AutomationTest.h"
 
@@ -39,6 +47,7 @@
 #include "CollisionQueryParams.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "Creature/Runtime/EcoCreatureNetworkTrait.h"
@@ -361,12 +370,16 @@ namespace EcoPolicyV3IntegratedTestImpl
 
 		void Init(int64 Seed, int32 N)
 		{
-			Mw.Init(MiniConfig(Seed, N), N, 2);
+			// 이 세계는 이동 제약 콜백만 본다. 도주 반사 거리(기본 켬)는 끈다: 켜면 막힌 사슴이 막힌 잠행 늑대 곁에 남아 도주 덮기가 이어지므로
+			// 두뇌가 요청을 읽지 않아 (e) '막혀도 판단은 계속된다'가 두뇌를 보지 못한다. 규칙은 Wild.FlightGolden 이 본다
+			FWorldConfig HookCfg = MiniConfig(Seed, N);
+			HookCfg.WildFlight = EcoWorldV3::FWildFlightConfig();
+			Mw.Init(HookCfg, N, 2);
 			Mw.W.T = 200;
 			EcoWorldV3::UpdateDayNight(Mw.W);
 			const FWorldConfig& C = Mw.W.Config;
-			EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[0], EcoV3Integrated::WolfSpecForOrdinal(0, C.PredSpeedMult), 12.0, 12.0, 1.0, 0.0);
-			EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[1], EcoV3Integrated::WolfSpecForOrdinal(1, C.PredSpeedMult), 48.0, 48.0, -1.0, 0.0);
+			EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[0], EcoV3Integrated::WolfSpecForOrdinal(0, C.PredSpeedMult), 12.0, 12.0, 1.0, 0.0, 0);
+			EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[1], EcoV3Integrated::WolfSpecForOrdinal(1, C.PredSpeedMult), 48.0, 48.0, -1.0, 0.0, 1);
 			std::vector<std::int32_t> Rows;
 			for (int32 i = 0; i < N; ++i)
 			{
@@ -789,8 +802,8 @@ bool FEcoPolicyV3IntegratedAdoptionTest::RunTest(const FString& Parameters)
 	const EcoThreatV3::FThreatSpec Chaser = EcoV3Integrated::WolfSpecForOrdinal(1, C.PredSpeedMult);
 	for (FMiniWorld* Mw : {&SlotKeys, &StableKeys})
 	{
-		EcoWorldV3::AdoptThreat(Mw->W, Mw->Threats[0], Stalker, 5.0, 5.0, 1.0, 0.0);
-		EcoWorldV3::AdoptThreat(Mw->W, Mw->Threats[1], Chaser, 55.0, 55.0, -1.0, 0.0);
+		EcoWorldV3::AdoptThreat(Mw->W, Mw->Threats[0], Stalker, 5.0, 5.0, 1.0, 0.0, 0);
+		EcoWorldV3::AdoptThreat(Mw->W, Mw->Threats[1], Chaser, 55.0, 55.0, -1.0, 0.0, 1);
 	}
 	std::vector<std::int32_t> Rows;
 	for (int32 i = 0; i < N; ++i)
@@ -1007,7 +1020,10 @@ bool FEcoPolicyV3IntegratedDeathTest::RunTest(const FString& Parameters)
 	{
 		constexpr int32 N = 3;
 		FMiniWorld Mw;
-		Mw.Init(MiniConfig(35000, N), N, 0);
+		// 첫 스텝 굶음을 쓰는 시험이라 지방 비축(야생 w1, 통합 기본 켬)을 끈다 — 비축 켬의 굶음은 Wild.ReserveWorld 가 본다
+		FWorldConfig C = MiniConfig(35000, N);
+		C.WildReserve.bEnabled = false;
+		Mw.Init(C, N, 0);
 		std::vector<std::int32_t> Rows = {0, 1, 2};
 		EcoWorldV3::AdoptHerb(Mw.W, Mw.AllViews[0], {30.0, 30.0}, {1.0, 0.0}, 1);
 		EcoWorldV3::AdoptHerb(Mw.W, Mw.AllViews[1], {28.0, 30.0}, {1.0, 0.0}, 2);
@@ -1057,8 +1073,13 @@ bool FEcoPolicyV3IntegratedDeathTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("빼지 않으면 동족 목록에 남는다"), KinNo, 3);
 
 	// --- Mass: 한 프레임 3 스텝 — 잡힘·굶음이 스텝 안에서 넘겨지고 다음 스텝에서 빠진다 ---
+	// 이 시험은 사망 넘기기만 본다. 늑대 밤잠 점진화(기본 켬)는 끈다: 켜면 t = 0(d = 0.5)에 입양한 늑대가 자고 있다가 늑대별 지연(0~22
+	// 스텝)만큼 뒤에 깨어 2 초에 걸쳐 걸음을 올리므로 3 스텝 안에 잡지 못한다. 밤잠은 Integrated.GradualNight 시험이 본다
+	FEcoV3IntegratedSettings DeathSettings = TestSettings(35001);
+	DeathSettings.bGradualNight = false;
+	DeathSettings.bWildReserve = false;   // 첫 스텝 굶음을 쓴다 — 지방 비축(통합 기본 켬)을 끈다 (비축 켬의 굶음은 Wild.ReserveWorld)
 	FIntegratedHarness H;
-	if (!H.Setup(*this, TestSettings(35001)))
+	if (!H.Setup(*this, DeathSettings))
 	{
 		return false;
 	}
@@ -1268,10 +1289,13 @@ bool FEcoPolicyV3IntegratedEndToEndTest::RunTest(const FString& Parameters)
 	AddInfo(FString::Printf(TEXT("%d 스텝: 사용 G %lld F %lld H %lld Fz %lld S %lld | 포획 %lld 굶음 %lld | 지운 개체 %d | 최고 속력 잠행 %.0f 추격 %.0f 사슴 %.0f cm/s | 늑대 모두 잔 스텝 %d | 산 사슴 A %d B %d"),
 							Steps, Use[0], Use[1], Use[2], Use[3], Use[4], Caught, Starved, H.Destroyed, MaxStalkerCmS, MaxChaserCmS, MaxDeerCmS,
 							AllAsleepSteps, A->AliveDeer, B->AliveDeer));
-	for (int32 b = 0; b < 4; ++b)
+	for (int32 b = 0; b < 3; ++b)
 	{
 		TestTrue(FString::Printf(TEXT("행동 %s 가 나온다"), EcoV3Integrated::BehaviorNameKo(b)), Use[b] > 0);
 	}
+	// 사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1, 사람 결정 10-15 (A)): 통합 모드에서 FREEZE 는 한 번도 실행되지 않는다.
+	// 얼기를 열면 R1b 가 얼기를 쓴다는 것은 Integrated.NoFreeze 시험이 본다
+	TestEqual(TEXT("FREEZE 는 나오지 않는다 (통합 모드 얼기 막음 기본)"), Use[3], static_cast<int64>(0));
 	TestEqual(TEXT("SLEEP 은 나오지 않는다 (R1b 마스크)"), Use[4], static_cast<int64>(0));
 	TestTrue(TEXT("늑대가 사슴을 잡는다"), Caught > 0);
 	TestEqual(TEXT("마스크 위반"), Violations, static_cast<int64>(0));
@@ -2032,6 +2056,628 @@ bool FEcoPolicyV3IntegratedFeedingTest::RunTest(const FString& Parameters)
 		MarkBad += SteppedNow.Contains(E) ? (bMarked != (Body(E).LastIntake > 0.0) ? 1 : 0) : (bMarked ? 1 : 0);
 	}
 	TestTrue(TEXT("(c) 다음 스텝: 구간 먹은 사슴 = 그 스텝에 먹은 사슴 (표시와 먹은 양이 맞는다)"), Ctx->AteDeerInterval == MarkedNow && MarkBad == 0);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedGradualNightTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.GradualNight",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedGradualNightTest::RunTest(const FString& Parameters)
+{
+	using EcoV3Integrated::EWolfState;
+
+	// --- 스위치: eco.IntegratedV3.GradualNight 기본 1 → 설정 → 세계 설정 ---
+	IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.GradualNight"));
+	if (!TestNotNull(TEXT("eco.IntegratedV3.GradualNight 콘솔 변수"), CVar))
+	{
+		return false;
+	}
+	const int32 Saved = CVar->GetInt();
+	TestEqual(TEXT("기본 1 (켬)"), Saved, 1);
+	TestTrue(TEXT("설정 기본값도 켬"), FEcoV3IntegratedSettings().bGradualNight);
+	TestTrue(TEXT("콘솔 1 → 설정 켬"), FEcoV3IntegratedSettings::FromConsole().bGradualNight);
+	CVar->Set(0, ECVF_SetByCode);
+	TestFalse(TEXT("콘솔 0 → 설정 끔"), FEcoV3IntegratedSettings::FromConsole().bGradualNight);
+	CVar->Set(Saved, ECVF_SetByCode);
+	{
+		FEcoV3IntegratedSettings S = TestSettings();
+		const std::vector<EcoObservationV3::FCoverInput> Covers = EcoWorldV3::QuadCovers(S.StageSizeUnits, 6.0);
+		TestTrue(TEXT("켠 설정 → 세계 bRealismNight"), UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, 0, 16, 2, Covers).bRealismNight);
+		S.bGradualNight = false;
+		TestFalse(TEXT("끈 설정 → 세계 bRealismNight 끔"), UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, 0, 16, 2, Covers).bRealismNight);
+	}
+
+	// --- 늑대 글자 ---
+	{
+		EcoThreatV3::FThreatConfig On;
+		On.bRealismNight = true;
+		const EcoThreatV3::FThreatConfig Off;
+		auto Make = [](int32 Ordinal)
+		{
+			FThreatAgent A;
+			A.Spec = EcoV3Integrated::WolfSpecForOrdinal(Ordinal, 0.8);
+			A.State.NightAct = 15;
+			return A;
+		};
+		FColor Color;
+		FThreatAgent A = Make(1);
+		A.State.bNightSettle = true;
+		A.State.NightAct = 6;
+		TestEqual(TEXT("눕는 중 글자"), EcoV3Integrated::WolfLabel(A, On, 1.0, Color), FString(TEXT("늑대 눕는 중 (추격형) 걸음 40%")));
+		TestTrue(TEXT("눕는 중 상태"), EcoV3Integrated::WolfStateOf(A, On) == EWolfState::Settle);
+		A = Make(0);
+		A.State.NightAct = 3;
+		TestEqual(TEXT("깨는 중 글자"), EcoV3Integrated::WolfLabel(A, On, 0.3, Color), FString(TEXT("늑대 깨는 중 (잠행형) 걸음 20%")));
+		A = Make(1);
+		A.LastNight.bBlockDeer = true;
+		TestEqual(TEXT("사슴 곁 글자"), EcoV3Integrated::WolfLabel(A, On, 0.8, Color), FString(TEXT("늑대 배회 (추격형) · 사슴 곁이라 안 누움")));
+		A = Make(1);
+		A.Last.bHasTarget = true;
+		A.Last.bHunting = true;
+		A.State.bNightHunt = true;
+		A.LastNight.bBlockHunt = true;
+		TestEqual(TEXT("사냥 중 글자"), EcoV3Integrated::WolfLabel(A, On, 1.0, Color), FString(TEXT("늑대 추격 (추격형) · 사냥 중이라 안 누움")));
+		A = Make(1);
+		TestEqual(TEXT("깜깜해 새 사냥 안 함 글자"), EcoV3Integrated::WolfLabel(A, On, 1.0, Color),
+				  FString(TEXT("늑대 배회 (추격형) · 깜깜해 새 사냥 안 함")));
+		A.State.bAsleep = true;
+		TestEqual(TEXT("잠 글자"), EcoV3Integrated::WolfLabel(A, On, 1.0, Color), FString(TEXT("늑대 잠 (추격형)")));
+		A = FThreatAgent();
+		A.Spec = EcoV3Integrated::WolfSpecForOrdinal(1, 0.8);   // 끈 판: 밤잠 칸은 기본값(활동도 0)이어도 깨는 중이 아니다
+		TestEqual(TEXT("끈 판 글자는 지금 그대로"), EcoV3Integrated::WolfLabel(A, Off, 1.0, Color), FString(TEXT("늑대 배회 (추격형)")));
+		TestEqual(TEXT("상태 이름 눕는 중·깨는 중"), FString(EcoV3Integrated::WolfStateNameKo(EWolfState::Settle)) + TEXT("/")
+														+ EcoV3Integrated::WolfStateNameKo(EWolfState::Waking),
+				  FString(TEXT("눕는 중/깨는 중")));
+	}
+
+	// --- Mass: 한 지역 사슴 16·늑대 2 를 해 질 녘 → 밤 → 새벽(1000 스텝) ---
+	FIntegratedHarness H;
+	if (!H.Setup(*this, TestSettings(38000)))
+	{
+		return false;
+	}
+	FEcoV3RegionContext* Ctx = H.AddRegion(TEXT("RegionN"), 0, FVector(0.0, 0.0, 0.0), 16, 2);
+	H.SpawnRegion(*Ctx, 16, 2, 1, 0);
+	Ctx->bReportedLowDensity = true;   // 시험에서는 밀도 하한 경고 줄을 내지 않는다
+	TestTrue(TEXT("통합 세계에 밤잠 점진화가 켜진다"), Ctx->Sim.ThreatCfg.bRealismNight);
+	const EcoThreatV3::FThreatConfig& Cfg = Ctx->Sim.ThreatCfg;
+	int32 SettleFrames = 0;
+	int32 WakingFrames = 0;
+	int32 OnsetNear = 0;
+	int32 OnsetHunting = 0;
+	int32 AwakeDark = 0;
+	int32 SleepMoved = 0;
+	TSet<int32> Delays;
+	TArray<double> OnsetSeconds;
+	for (int32 s = 0; s < 1000; ++s)
+	{
+		H.DecisionStep();
+		H.CoordinatorReconcile();
+		for (const FMassEntityHandle& E : H.Wolves)
+		{
+			if (!H.EM->IsEntityValid(E))
+			{
+				continue;
+			}
+			const FThreatAgent& A = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(E).Agent;
+			const EWolfState St = EcoV3Integrated::WolfStateOf(A, Cfg);
+			SettleFrames += St == EWolfState::Settle ? 1 : 0;
+			WakingFrames += St == EWolfState::Waking ? 1 : 0;
+			AwakeDark += (!A.State.bAsleep && Ctx->Sim.Dark >= Cfg.SleepDark) ? 1 : 0;
+			Delays.Add(A.State.NightDelay);
+			if (A.State.bAsleep && !A.LastNight.bOnset)
+			{
+				SleepMoved += H.EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value.Size2D() > 0.0 ? 1 : 0;
+			}
+			if (A.LastNight.bOnset)
+			{
+				double MinD = 1e300;
+				for (const EcoThreatV3::FPreyView& P : Ctx->Sim.Prey)
+				{
+					MinD = FMath::Min(MinD, FMath::Sqrt(FMath::Square(P.X - A.State.PosX) + FMath::Square(P.Y - A.State.PosY)));
+				}
+				OnsetNear += MinD <= Cfg.NightSettleR ? 1 : 0;
+				OnsetHunting += A.State.bNightHunt ? 1 : 0;
+				OnsetSeconds.Add(Ctx->DarkStartT >= 0 ? static_cast<double>(Ctx->Sim.T - Ctx->DarkStartT) * EcoRepertoireV3::kStepSeconds : -1.0);
+			}
+		}
+	}
+	const EcoWorldV3::FWorldStats& Stats = Ctx->Sim.Stats;
+	FString Onsets;
+	for (const double Sec : OnsetSeconds)
+	{
+		Onsets += FString::Printf(TEXT(" %.1f"), Sec);
+	}
+	AddInfo(FString::Printf(TEXT("1000 스텝: 눕기 시작 %lld, 다시 일어남 %lld, 잠듦 %lld (해 진 뒤 초:%s), 깸 %lld, 사슴 곁이라 안 누움 %lld, 사냥 중이라 안 누움 %lld, ")
+								TEXT("눕는 중 프레임 %d, 깨는 중 프레임 %d, 어둠 중 깨어 있음 %d, 지연 %d가지, 산 사슴 %d"),
+							Stats.NightSettleStarts, Stats.NightSettleAborts, Stats.NightOnsets, *Onsets, Stats.NightWakes, Stats.NightBlockDeer,
+							Stats.NightBlockHunt, SettleFrames, WakingFrames, AwakeDark, Delays.Num(), Ctx->AliveDeer));
+	TestTrue(TEXT("늑대가 눕고 잠든다 (해 질 녘)"), Stats.NightSettleStarts > 0 && Stats.NightOnsets > 0);
+	TestTrue(TEXT("새벽에 깬다"), Stats.NightWakes > 0);
+	TestTrue(TEXT("눕는 중·깨는 중 상태가 화면 집계에 잡힌다"), SettleFrames > 0 && WakingFrames > 0);
+	TestEqual(TEXT("잠드는 순간 16 m 안에 사슴이 없다"), OnsetNear, 0);
+	TestEqual(TEXT("사냥 중에는 잠들지 않는다"), OnsetHunting, 0);
+	TestEqual(TEXT("잠든 늑대는 움직이지 않는다 (화면 속도 0)"), SleepMoved, 0);
+	TestTrue(TEXT("해 진 뒤 바로 자지 않는다 (어둠 중 깨어 있는 프레임이 있다)"), AwakeDark > 0);
+	TestTrue(TEXT("늑대마다 다른 지연 (StableAgentId 해시)"), Delays.Num() >= 2);
+	for (const FMassEntityHandle& E : H.Wolves)
+	{
+		if (H.EM->IsEntityValid(E))
+		{
+			const FThreatAgent& A = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(E).Agent;
+			const int64 Id = H.EM->GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId;
+			TestEqual(TEXT("지연 = H(606, 세션 시드, StableAgentId) mod 23"), A.State.NightDelay,
+					  EcoThreatV3::NightDelayOf(Ctx->Sim.Config.Seed, Id, EcoWorldV3::NightMaxDelay(Ctx->Sim)));
+		}
+	}
+	for (const double Sec : OnsetSeconds)
+	{
+		// 눕기 시작 업데이트부터 활동도가 R 번 줄어야 잠든다 — 해 진 첫 업데이트에 바로 눕기 시작해도 R - 1 스텝 뒤다
+		TestTrue(TEXT("잠듦은 해 진 뒤 (눕기 15 스텝 − 1) 이후다"), Sec >= (Cfg.NightRampSteps - 1) * EcoRepertoireV3::kStepSeconds - 1e-9);
+	}
+	TestEqual(TEXT("마스크 위반"), Stats.MaskViolations, static_cast<int64>(0));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedNoFreezeTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.NoFreeze",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedNoFreezeTest::RunTest(const FString& Parameters)
+{
+	namespace P3 = EcoPolicyV3;
+	constexpr int32 Fz = EcoRepertoireV3::kFreeze;
+	constexpr int32 NB = EcoRepertoireV3::kNumBehaviors;
+
+	// --- 스위치: eco.IntegratedV3.NoFreeze 기본 1 → 설정 → 세계 허용 칸 ---
+	IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.NoFreeze"));
+	if (!TestNotNull(TEXT("eco.IntegratedV3.NoFreeze 콘솔 변수"), CVar))
+	{
+		return false;
+	}
+	const int32 Saved = CVar->GetInt();
+	TestEqual(TEXT("기본 1 (얼기 막음)"), Saved, 1);
+	TestTrue(TEXT("설정 기본값도 막음"), FEcoV3IntegratedSettings().bNoFreeze);
+	TestTrue(TEXT("콘솔 1 → 설정 막음"), FEcoV3IntegratedSettings::FromConsole().bNoFreeze);
+	CVar->Set(0, ECVF_SetByCode);
+	TestFalse(TEXT("콘솔 0 → 설정 열림"), FEcoV3IntegratedSettings::FromConsole().bNoFreeze);
+	CVar->Set(Saved, ECVF_SetByCode);
+	{
+		FEcoV3IntegratedSettings On = TestSettings();
+		FEcoV3IntegratedSettings Off = On;
+		Off.bNoFreeze = false;
+		const std::vector<EcoObservationV3::FCoverInput> Covers = EcoWorldV3::QuadCovers(On.StageSizeUnits, 6.0);
+		const FWorldConfig COn = UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(On, 0, 16, 2, Covers);
+		const FWorldConfig COff = UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(Off, 0, 16, 2, Covers);
+		EcoWorldV3::FWorldState WOn;
+		EcoWorldV3::FWorldState WOff;
+		EcoWorldV3::FWorldState WFlat;
+		EcoWorldV3::InitWorld(WOn, COn);
+		EcoWorldV3::InitWorld(WOff, COff);
+		EcoWorldV3::InitWorld(WFlat, FWorldConfig());
+		const EcoWorldV3::FWorldState Fresh{};   // InitWorld 앞의 기본값도 모델 허용 그대로
+		int32 Bad = 0;
+		for (int32 b = 0; b < NB; ++b)
+		{
+			Bad += COn.WorldAllowed[b] == (b == Fz ? 0 : 1) ? 0 : 1;
+			Bad += COff.WorldAllowed[b] == 1 ? 0 : 1;
+			Bad += WOn.Allowed[b] == (b == Fz ? 0 : P3::kAllowedMask[b]) ? 0 : 1;
+			Bad += WOff.Allowed[b] == P3::kAllowedMask[b] ? 0 : 1;
+			Bad += WFlat.Allowed[b] == P3::kAllowedMask[b] ? 0 : 1;
+			Bad += Fresh.Allowed[b] == P3::kAllowedMask[b] ? 0 : 1;
+		}
+		TestEqual(TEXT("허용 칸: 막으면 모델 ∧ (FREEZE 0), 열면·평면 맵·기본값은 모델 kAllowedMask 그대로"), Bad, 0);
+	}
+
+	// --- Mass: 두 지역 × (사슴 16 + 늑대 2) 2000 스텝, 막음·열림을 같은 시드로. 결정마다 R1b(얼기 열림) 라면 무엇을 골랐을지와 견준다 ---
+	struct FRun
+	{
+		int64 Use[EcoRepertoireV3::kNumBehaviors] = {};
+		int64 Entries[EcoRepertoireV3::kNumBehaviors] = {};
+		int64 MaskOpen = 0;           // 세계 기록: 요청을 읽은 결정 중 얼기 칸이 열린 수
+		int64 Reads = 0;              // 산 사슴의 요청을 읽는 결정
+		int64 CfFreeze = 0;           // R1b(얼기 열림) 라면 FREEZE 를 골랐을 결정
+		int64 ChoseFreeze = 0;        // 실제 요청이 FREEZE
+		int64 RedirectBad = 0;        // 얼 자리: 막으면 'FREEZE 를 뺀 R1b argmax' 가 아닌 요청, 열면 FREEZE 가 아닌 요청
+		int64 OtherDiff = 0;          // R1b 가 FREEZE 밖을 고르는 결정에서 다른 요청 (늘 0)
+		int64 Violations = 0;
+		int64 Caught = 0;
+	};
+	auto Run = [this](bool bNoFreeze, FRun& Out) -> bool
+	{
+		FEcoV3IntegratedSettings S = TestSettings(37000);
+		S.bNoFreeze = bNoFreeze;
+		// 이 시험은 두뇌의 결정 마스크를 R1b 와 견준다. 도주 반사 거리(기본 켬)는 끈다: 켜면 늑대가 가까운 결정(R1b 가 얼 자리가 나오는
+		// 곳)에서 두뇌를 부르지 않으므로 '얼 자리를 지난다'·'열면 얼기를 쓴다'가 우연에 달린다. 규칙은 Wild.FlightGolden 이 본다
+		S.bWildFlight = false;
+		FIntegratedHarness H;
+		if (!H.Setup(*this, S))
+		{
+			return false;
+		}
+		FEcoV3RegionContext* A = H.AddRegion(TEXT("RegionA"), 0, FVector(0.0, 0.0, 0.0), 16, 2);
+		FEcoV3RegionContext* B = H.AddRegion(TEXT("RegionB"), 1, FVector(0.0, 40000.0, 0.0), 16, 2);
+		H.SpawnRegion(*A, 16, 2, 1, 0);
+		H.SpawnRegion(*B, 16, 2, 100, 1);
+		for (int32 s = 0; s < 2000; ++s)
+		{
+			H.DecisionStep();
+			H.CoordinatorReconcile();
+			for (const FMassEntityHandle& E : H.Deer)
+			{
+				if (!H.EM->IsEntityValid(E) || H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead)
+				{
+					continue;
+				}
+				const FHerbView V = DeerView(*H.EM, E);
+				const EcoWorldV3::FHerbDecision& D = *V.Decision;
+				if (!D.bPrepared || !D.Prep.bReads)
+				{
+					continue;
+				}
+				++Out.Reads;
+				uint8 R1bMask[EcoRepertoireV3::kNumBehaviors];
+				P3::ComposeActionMask(P3::kAllowedMask, D.Feasible, true, D.Prep.bWakeDecide, V.Rep->Behavior, R1bMask);
+				const int32 Cf = P3::SelectAction(D.Logits, R1bMask);
+				Out.ChoseFreeze += D.Request == Fz ? 1 : 0;
+				if (Cf == Fz)
+				{
+					++Out.CfFreeze;
+					uint8 NoFz[EcoRepertoireV3::kNumBehaviors];
+					for (int32 b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+					{
+						NoFz[b] = b == Fz ? 0 : R1bMask[b];
+					}
+					Out.RedirectBad += (bNoFreeze ? D.Request != P3::SelectAction(D.Logits, NoFz) : D.Request != Fz) ? 1 : 0;
+				}
+				else
+				{
+					Out.OtherDiff += D.Request != Cf ? 1 : 0;
+				}
+			}
+		}
+		for (const FEcoV3RegionContext* C : {A, B})
+		{
+			for (int32 b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+			{
+				Out.Use[b] += C->Sim.Stats.BehaviorSteps[b];
+				Out.Entries[b] += C->Sim.Stats.Entries[b];
+			}
+			Out.MaskOpen += C->FreezeMaskOpen;
+			Out.Violations += C->Sim.Stats.MaskViolations;
+			Out.Caught += C->Sim.Stats.Caught;
+		}
+		return true;
+	};
+	FRun On;
+	FRun Off;
+	if (!Run(true, On) || !Run(false, Off))
+	{
+		return false;
+	}
+	for (const FRun* R : {&On, &Off})
+	{
+		AddInfo(FString::Printf(TEXT("%s: 사용 G %lld F %lld H %lld Fz %lld | 결정 %lld, R1b 라면 얼기 %lld, 실제 얼기 요청 %lld, 얼기 칸 열린 결정 %lld | 포획 %lld"),
+								R == &On ? TEXT("막음") : TEXT("열림"), R->Use[0], R->Use[1], R->Use[2], R->Use[3], R->Reads, R->CfFreeze,
+								R->ChoseFreeze, R->MaskOpen, R->Caught));
+	}
+	TestEqual(TEXT("막음: FREEZE 실행 0 (개체·스텝)"), On.Use[Fz], static_cast<int64>(0));
+	TestEqual(TEXT("막음: FREEZE 진입 0"), On.Entries[Fz], static_cast<int64>(0));
+	TestEqual(TEXT("막음: FREEZE 요청 0"), On.ChoseFreeze, static_cast<int64>(0));
+	TestEqual(TEXT("막음: 얼기 칸이 열린 결정 0 (세계 기록)"), On.MaskOpen, static_cast<int64>(0));
+	TestTrue(TEXT("막음: R1b 가 얼 자리가 실제로 있었다 (시험이 그 경우를 지난다)"), On.CfFreeze > 0);
+	TestEqual(TEXT("막음: 얼 자리에서는 FREEZE 를 뺀 R1b argmax (R1b 의 다음 선호)"), On.RedirectBad, static_cast<int64>(0));
+	TestEqual(TEXT("막음: 얼 자리가 아닌 결정은 R1b 와 같다 (가중치·다른 칸은 그대로)"), On.OtherDiff, static_cast<int64>(0));
+	TestTrue(TEXT("막음: 먹기·도망·숨기는 나온다"), On.Use[0] > 0 && On.Use[1] > 0 && On.Use[2] > 0);
+	TestEqual(TEXT("막음: 마스크 위반 0"), On.Violations, static_cast<int64>(0));
+	TestTrue(TEXT("열림: R1b 가 얼기를 쓴다 (FREEZE 요청·실행·열린 칸 > 0)"), Off.ChoseFreeze > 0 && Off.Use[Fz] > 0 && Off.MaskOpen > 0);
+	TestEqual(TEXT("열림: 모든 결정이 R1b 와 같다 (바뀐 것 없음)"), Off.OtherDiff + Off.RedirectBad, static_cast<int64>(0));
+	TestEqual(TEXT("열림: 마스크 위반 0"), Off.Violations, static_cast<int64>(0));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedWolfEatingTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.WolfEating",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedWolfEatingTest::RunTest(const FString& Parameters)
+{
+	using EcoV3Integrated::EWolfState;
+	namespace T3 = EcoThreatV3;
+
+	// --- 스위치와 스텝 환산 (결정 스텝 2/15 초, 반올림 0.5 올림, 학습 5 스텝 아래로 내리지 않음) ---
+	IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.WolfEatSeconds"));
+	if (!TestNotNull(TEXT("eco.IntegratedV3.WolfEatSeconds 콘솔 변수"), CVar))
+	{
+		return false;
+	}
+	const float Saved = CVar->GetFloat();
+	TestEqual(TEXT("기본 5 초"), Saved, 5.0f);
+	TestEqual(TEXT("설정 기본 5 초"), FEcoV3IntegratedSettings().WolfEatSeconds, 5.0);
+	TestEqual(TEXT("학습 식사 5 스텝 (pred_eat_cd)"), FEcoV3IntegratedSettings::TrainEatSteps(), 5);
+	auto StepsOf = [](double Sec)
+	{
+		FEcoV3IntegratedSettings S;
+		S.WolfEatSeconds = Sec;
+		return S.WolfEatSteps();
+	};
+	TestEqual(TEXT("5 초 = 37.5 스텝 → 38 (0.5 는 올림, 5.07 초)"), StepsOf(5.0), 38);
+	TestEqual(TEXT("0.67 초 = 5.025 → 5 스텝 (옛 규칙)"), StepsOf(0.67), 5);
+	TestEqual(TEXT("콘솔 float 0.67 도 5 스텝"), StepsOf(static_cast<double>(0.67f)), 5);
+	TestEqual(TEXT("1 초 = 7.5 → 8 스텝"), StepsOf(1.0), 8);
+	TestEqual(TEXT("학습 5 스텝 아래로 내리지 않는다"), StepsOf(0.1), 5);
+	TestEqual(TEXT("2 분(900 스텝)에서 자른다"), StepsOf(1000.0), 900);
+	{
+		FEcoV3IntegratedSettings Old;
+		Old.WolfEatSeconds = 0.67;
+		TestTrue(TEXT("5 초는 긴 식사, 0.67 초는 옛 규칙"), FEcoV3IntegratedSettings().LongWolfEat() && !Old.LongWolfEat());
+	}
+	CVar->Set(1.0f, ECVF_SetByCode);
+	TestEqual(TEXT("콘솔 1 초 → 설정 1 초 → 8 스텝"), FEcoV3IntegratedSettings::FromConsole().WolfEatSteps(), 8);
+	CVar->Set(Saved, ECVF_SetByCode);
+
+	// --- 세계 설정: 5 초 → 쿨다운 38·식사 중 제자리, 옛 규칙(0.67 초)·평면 맵 → 학습 그대로 ---
+	{
+		const std::vector<EcoObservationV3::FCoverInput> Covers = EcoWorldV3::QuadCovers(60.0, 6.0);
+		FEcoV3IntegratedSettings S = TestSettings();
+		const FWorldConfig CNew = UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, 0, 16, 2, Covers);
+		S.WolfEatSeconds = 0.67;
+		S.bNoFreeze = false;
+		const FWorldConfig COld = UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, 0, 16, 2, Covers);
+		EcoWorldV3::FWorldState WNew;
+		EcoWorldV3::FWorldState WOld;
+		EcoWorldV3::FWorldState WFlat;
+		EcoWorldV3::InitWorld(WNew, CNew);
+		EcoWorldV3::InitWorld(WOld, COld);
+		EcoWorldV3::InitWorld(WFlat, FWorldConfig());
+		TestTrue(TEXT("5 초 → 세계 쿨다운 38·식사 중 제자리"),
+				 CNew.PredEatCdOverride == 38 && CNew.bEatInPlace && WNew.ThreatCfg.PredEatCd == 38 && WNew.ThreatCfg.bEatInPlace);
+		// 옛 규칙 + 얼기 열림 = 이번 일 전 통합 세계: 새 칸이 모두 기본값이라 세계가 읽는 값이 바꾸기 전과 같다
+		bool bOldDefaults = COld.PredEatCdOverride == 0 && !COld.bEatInPlace;
+		for (int32 b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+		{
+			bOldDefaults = bOldDefaults && COld.WorldAllowed[b] == 1 && WOld.Allowed[b] == EcoPolicyV3::kAllowedMask[b];
+		}
+		TestTrue(TEXT("옛 규칙·얼기 열림 설정 → 새 세계 칸이 모두 기본값 (쿨다운 5, 배회, 모델 허용 그대로)"),
+				 bOldDefaults && WOld.ThreatCfg.PredEatCd == 5 && !WOld.ThreatCfg.bEatInPlace);
+		TestTrue(TEXT("평면 맵 기본 세계는 학습 그대로 (쿨다운 5, 배회)"), WFlat.ThreatCfg.PredEatCd == 5 && !WFlat.ThreatCfg.bEatInPlace);
+	}
+
+	// --- 위협 모델 (엔진 무관): 추격형 (10, 10) +x, 사슴 0 은 0.5 단위 앞 (잡힘), 사슴 1 은 (11.2, 10) ---
+	struct FEatTrace
+	{
+		TArray<double> X;
+		TArray<double> Vel;
+		TArray<double> Speed;
+		TArray<bool> Hunting;
+		TArray<int32> Caught;
+	};
+	auto RunThreat = [](const T3::FThreatConfig& Cfg, FEatTrace& Out)
+	{
+		const T3::FThreatSpec Spec = T3::MakeChaserSpec(0.8, false, false, Cfg);
+		T3::FThreatState T;
+		T.PosX = 10.0;
+		T.PosY = 10.0;
+		T3::FPreyView Prey[2];
+		Prey[0].X = 10.5;
+		Prey[0].Y = 10.0;
+		Prey[1].X = 11.2;
+		Prey[1].Y = 10.0;
+		T3::FThreatStepInput In;
+		In.Prey = Prey;
+		In.NumPrey = 2;
+		In.Dark = 0.0;
+		In.WorldSize = 60.0;
+		In.WanderTurn = 0.0;
+		for (int32 s = 0; s < 45; ++s)
+		{
+			const T3::FThreatStepResult R = T3::Step(Spec, T, In, Cfg);
+			Out.X.Add(T.PosX);
+			Out.Vel.Add(FMath::Abs(T.VelX) + FMath::Abs(T.VelY));
+			Out.Speed.Add(R.Speed);
+			Out.Hunting.Add(R.bHunting);
+			Out.Caught.Add(R.Caught);
+			if (R.Caught >= 0)
+			{
+				Prey[R.Caught].bAlive = false;
+			}
+		}
+	};
+	T3::FThreatConfig EatCfg;
+	EatCfg.PredEatCd = 38;
+	EatCfg.bEatInPlace = true;
+	T3::FThreatConfig WanderCfg = EatCfg;
+	WanderCfg.bEatInPlace = false;
+	FEatTrace Still;
+	FEatTrace Wander;
+	FEatTrace Train;
+	RunThreat(EatCfg, Still);
+	RunThreat(WanderCfg, Wander);
+	RunThreat(T3::FThreatConfig(), Train);
+	{
+		int32 StillBad = 0;
+		for (int32 s = 1; s <= 37; ++s)
+		{
+			StillBad += (!Still.Hunting[s] && Still.Speed[s] == 0.0 && Still.Vel[s] == 0.0 && Still.X[s] == Still.X[0] && Still.Caught[s] < 0) ? 0 : 1;
+		}
+		int32 WanderMoved = 0;
+		for (int32 s = 1; s <= 37; ++s)
+		{
+			WanderMoved += (!Wander.Hunting[s] && Wander.Vel[s] > 0.0) ? 1 : 0;
+		}
+		AddInfo(FString::Printf(TEXT("위협 모델: 잡은 스텝 0 뒤 자리 %.2f, 다시 잡은 스텝 %d (사슴 %d), 배회 판 37 스텝 뒤 자리 %.2f"), Still.X[0],
+								Still.Caught.IndexOfByPredicate([](int32 C) { return C == 1; }), Still.Caught[38], Wander.X[37]));
+		TestEqual(TEXT("제자리: 스텝 0 에 사슴 0 을 잡는다"), Still.Caught[0], 0);
+		TestEqual(TEXT("제자리: 스텝 1~37 (식사) 은 사냥하지 않고 속력 0·변위 0·자리 그대로"), StillBad, 0);
+		TestTrue(TEXT("제자리: 스텝 38 에 다시 사냥해서 곁의 사슴 1 을 잡는다 (포획 사이 38 스텝 = 5.07 초)"), Still.Hunting[38] && Still.Caught[38] == 1);
+		TestEqual(TEXT("제자리를 끄면 같은 쿨다운 동안 배회한다 (37 스텝 모두 움직임)"), WanderMoved, 37);
+		TestTrue(TEXT("제자리를 끄면 스텝 38 에는 사슴 1 이 시야 밖이다 (배회로 멀어짐)"), Wander.Caught[38] < 0);
+		TestTrue(TEXT("학습 기본 (쿨다운 5, 배회): 스텝 1~4 사냥 안 함·움직임, 스텝 5 에 다시 사냥"),
+				 !Train.Hunting[1] && !Train.Hunting[4] && Train.Vel[1] > 0.0 && Train.Vel[4] > 0.0 && Train.Hunting[5]);
+	}
+	{
+		// 플레이어 대역은 제자리 규칙 밖 (쿨다운 중에도 모드대로 움직인다), 쿨다운 0 이면 제자리 규칙이 아무것도 바꾸지 않는다
+		const T3::FThreatSpec Player = T3::MakePlayerSpec(EatCfg);
+		T3::FThreatState P;
+		P.PosX = 20.0;
+		P.PosY = 20.0;
+		P.Cooldown = 10;
+		P.PlayerMode = T3::EPlayerMode::Wander;
+		P.PlayerLeft = 100;
+		T3::FThreatStepInput In;
+		In.WorldSize = 60.0;
+		const T3::FThreatStepResult RP = T3::Step(Player, P, In, EatCfg);
+		TestTrue(TEXT("플레이어 대역은 쿨다운 중에도 배회한다"), RP.Speed > 0.0 && P.PosX != 20.0);
+		const T3::FThreatSpec Chaser = T3::MakeChaserSpec(0.8, false, false, EatCfg);
+		T3::FThreatState A;
+		A.PosX = 30.0;
+		A.PosY = 30.0;
+		T3::FThreatState B = A;
+		In.WanderTurn = 0.1;
+		T3::Step(Chaser, A, In, EatCfg);
+		T3::Step(Chaser, B, In, T3::FThreatConfig());
+		TestTrue(TEXT("쿨다운 0 이면 제자리 규칙·쿨다운 길이가 아무것도 바꾸지 않는다 (비트 단위)"),
+				 A.PosX == B.PosX && A.PosY == B.PosY && A.HeadX == B.HeadX && A.HeadY == B.HeadY && A.VelX == B.VelX && A.VelY == B.VelY);
+	}
+
+	// --- Mass + 팀 늑대 표현: 늑대 하나 (30, 30) 오른쪽, 사슴 0 은 0.3 단위 앞 (잡힌다), 사슴 1 은 (5, 50) 멀리 ---
+	struct FMassEat
+	{
+		int32 CatchFrame = -1;
+		int32 StillBad = 0;           // 식사 프레임 중 자리가 바뀌었거나 속도가 0 이 아니거나 깃발이 없거나 사냥 중인 것
+		int32 MotionEating = 0;       // 팀 표현 동작 '먹는 중'
+		int32 MotionMoving = 0;       // 팀 표현 동작 걷기·뛰기 (식사 깃발이 선 프레임)
+		int32 FlagFrames = 0;         // 팀 표현 식사 깃발이 선 프레임
+		bool bHuntAgain = false;      // 잡은 프레임 + 식사 스텝 뒤 다시 사냥
+		FString Label;                // 잡은 프레임의 늑대 글자
+		FEcoV3WolfEatTally Tally;
+		int32 EatCd = 0;
+	};
+	auto RunMass = [this](double EatSeconds, FMassEat& Out) -> bool
+	{
+		FEcoV3IntegratedSettings S = TestSettings(35001);
+		S.bGradualNight = false;   // MultiStepDeathExclusion 과 같은 배치: t = 0(d = 0.5)에 입양한 늑대가 둘째 스텝에 잡는다
+		S.WolfEatSeconds = EatSeconds;
+		S.bWildSatiation = false;   // 식사 끝 뒤 곧바로 다시 사냥하는지 보는 시험 — 늑대 포만(야생 w2, 통합 기본 켬)을 끈다 (포만은 Wild.SatiationGolden)
+		FIntegratedHarness H;
+		if (!H.Setup(*this, S))
+		{
+			return false;
+		}
+		UWorld* World = H.Scoped.World;
+		FEcoV3RegionContext* Ctx = H.AddRegion(TEXT("TestE"), 0, FVector::ZeroVector, 2, 1, 4.0);
+		Ctx->bReportedLowDensity = true;
+		Out.EatCd = Ctx->Sim.ThreatCfg.PredEatCd;
+		H.Spawn(true, TEXT("TestE"), 0, {FVector(6000.0, 6000.0, 0.0)}, {10});
+		H.Spawn(false, TEXT("TestE"), 0, {FVector(6060.0, 6000.0, 0.0), FVector(1000.0, 10000.0, 0.0)}, {20, 21});
+		H.EM->GetFragmentDataChecked<FTransformFragment>(H.Wolves[0]).GetMutableTransform().SetRotation(FQuat::Identity);
+		H.Frame(0.001f);   // 입양만
+		AEcoWolfRepresentation* Rep = World->SpawnActor<AEcoWolfRepresentation>();
+		if (!TestNotNull(TEXT("팀 늑대 표현 액터"), Rep) || !TestTrue(TEXT("표현 액터 묶기"), Rep->BindIdentity(10, TEXT("Wolf"))))
+		{
+			return false;
+		}
+		const FMassEntityHandle W = H.Wolves[0];
+		int64 Seq = 0;
+		FVector EatLoc = FVector::ZeroVector;
+		const int32 MaxFrames = 60;
+		for (int32 f = 0; f < MaxFrames; ++f)
+		{
+			H.DecisionStep();
+			const FThreatAgent& A = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(W).Agent;
+			const FVector Loc = H.EM->GetFragmentDataChecked<FTransformFragment>(W).GetTransform().GetLocation();
+			const FVector Vel = H.EM->GetFragmentDataChecked<FMassVelocityFragment>(W).Value;
+			const float EatCooldown = H.EM->GetFragmentDataChecked<FEcoPredatorStateFragment>(W).EatCooldown;
+			const bool bPursuing = H.EM->GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(W).bPursuing;
+			// 팀 조정자와 같은 꼴로 표현 상태를 만든다 (깃발 2 = EatCooldown > 0, 속도 = Mass 속도)
+			FEcoCreatureVisualState State;
+			State.StableAgentId = 10;
+			State.SpeciesId = TEXT("Wolf");
+			State.RegionId = TEXT("TestE");
+			State.Sequence = ++Seq;
+			State.WorldTime = (f + 1) * EcoBehaviorConfig::StepSeconds;
+			State.Position = Loc;
+			State.Velocity = Vel;
+			State.bAlive = true;
+			State.bEating = EatCooldown > 0.0f;
+			State.bPursuingPrey = bPursuing;
+			State.bHasVitals = true;
+			Rep->ConsumeVisualState(State, EcoBehaviorConfig::StepSeconds);
+			H.Sub->TallyTeamWolfVisuals();
+			if (Out.CatchFrame < 0 && A.Last.Caught >= 0)
+			{
+				Out.CatchFrame = f;
+				FColor Color;
+				Out.Label = EcoV3Integrated::WolfLabel(A, Ctx->Sim.ThreatCfg, Ctx->Sim.Dark, Color);
+			}
+			if (Out.CatchFrame < 0)
+			{
+				continue;
+			}
+			const int32 Since = f - Out.CatchFrame;
+			if (State.bEating)
+			{
+				++Out.FlagFrames;
+				Out.MotionEating += Rep->VisualMotion == EEcoCreatureVisualMotion::Eating ? 1 : 0;
+				Out.MotionMoving += (Rep->VisualMotion == EEcoCreatureVisualMotion::Walk || Rep->VisualMotion == EEcoCreatureVisualMotion::Run) ? 1 : 0;
+			}
+			if (Since == 1)
+			{
+				EatLoc = Loc;   // 잡은 스텝의 이동을 보간한 뒤의 자리 (화면은 지난 스텝 → 이번 스텝을 보간한다)
+			}
+			if (Since >= 1 && Since < Out.EatCd)
+			{
+				// 식사 스텝: 서 있다 — 자리 그대로, 속도 0, '먹는 중' 깃발, 사냥·추격 안 함, 상태 '식사'
+				const bool bStillNow = Ctx->Sim.ThreatCfg.bEatInPlace ? (Loc.Equals(EatLoc, 1e-6) && Vel.IsZero()) : true;
+				Out.StillBad += (bStillNow && EatCooldown > 0.0f && !A.Last.bHunting && !bPursuing
+								 && EcoV3Integrated::WolfStateOf(A, Ctx->Sim.ThreatCfg) == EWolfState::Eat)
+									? 0 : 1;
+			}
+			if (Since == Out.EatCd)
+			{
+				Out.bHuntAgain = A.Last.bHunting && EatCooldown == 0.0f;
+				break;
+			}
+		}
+		Out.Tally = Ctx->Eat;
+		return true;
+	};
+	FMassEat New;
+	FMassEat Old;
+	if (!RunMass(5.0, New) || !RunMass(0.67, Old))
+	{
+		return false;
+	}
+	for (const FMassEat* M : {&New, &Old})
+	{
+		AddInfo(FString::Printf(TEXT("%s: 식사 %d 스텝, 잡은 프레임 %d, 글자 '%s', 팀 표현 식사 깃발 %d 프레임 (먹는 중 동작 %d, 걷기·뛰기 %d) | 기록: 포획 %lld, 식사 중 늑대·스텝 %lld (움직임 %lld), 깃발 %lld (먹는 중 %lld, 걷기·뛰기 %lld)"),
+								M == &New ? TEXT("5 초") : TEXT("옛 규칙 0.67 초"), M->EatCd, M->CatchFrame, *M->Label, M->FlagFrames,
+								M->MotionEating, M->MotionMoving, M->Tally.Catches, M->Tally.EatSteps, M->Tally.EatMoved, M->Tally.EatFlagFrames,
+								M->Tally.EatMotionFrames, M->Tally.EatWalkFrames));
+	}
+	TestTrue(TEXT("5 초: 늑대가 사슴을 잡는다"), New.CatchFrame >= 0 && New.EatCd == 38);
+	TestEqual(TEXT("5 초: 잡은 프레임의 글자 (남은 식사 = 38 × 2/15 초)"), New.Label, FString(TEXT("늑대 식사 5.1초 (잠행형)")));
+	TestEqual(TEXT("5 초: 식사 37 스텝 동안 시체 곁에 서 있다 (자리·속도 0·깃발·사냥 안 함·상태 식사)"), New.StillBad, 0);
+	TestTrue(TEXT("5 초: 38 스텝 뒤 곧바로 다시 사냥한다 (포만 없음)"), New.bHuntAgain);
+	TestEqual(TEXT("5 초: 팀 늑대 표현이 식사 37 스텝 모두 '먹는 중' 동작"), New.MotionEating, 37);
+	TestEqual(TEXT("5 초: 깃발이 선 채 움직인 프레임은 잡은 스텝 하나 (그 스텝의 돌진을 보간)"), New.MotionMoving, 1);
+	TestTrue(TEXT("5 초: 서브시스템 화면 집계 = 표현 액터 (깃발 38, 먹는 중 37, 걷기·뛰기 1)"),
+			 New.Tally.EatFlagFrames == 38 && New.Tally.EatMotionFrames == 37 && New.Tally.EatWalkFrames == 1);
+	TestTrue(TEXT("5 초: 기록 — 포획 1, 식사 중 늑대·스텝 37, 그중 움직임 0"), New.Tally.Catches == 1 && New.Tally.EatSteps == 37 && New.Tally.EatMoved == 0);
+	TestTrue(TEXT("옛 규칙: 같은 자리에서 잡는다 (쿨다운 5)"), Old.CatchFrame == New.CatchFrame && Old.EatCd == 5);
+	TestTrue(TEXT("옛 규칙: 5 스텝 뒤 다시 사냥"), Old.bHuntAgain && Old.StillBad == 0);
+	TestEqual(TEXT("옛 규칙: 식사 동안 배회하므로 팀 표현 '먹는 중' 동작은 0 (깃발만 서고 뛴다)"), Old.MotionEating, 0);
+	TestTrue(TEXT("옛 규칙: 기록 — 식사 중 늑대·스텝 4, 모두 움직임"), Old.Tally.EatSteps == 4 && Old.Tally.EatMoved == 4);
 	return true;
 }
 

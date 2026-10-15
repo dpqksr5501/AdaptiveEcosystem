@@ -64,6 +64,31 @@
       추격형·잠행형에게 보이지 않지만 포획 거리 0 이라 잡힌다. 플레이어는 맵 전체를 보므로 그 초식을 표적으로 잡고 move = 0 이 되어
       heading 이 영벡터가 된다(normalize 문턱 1e-9). 실제 롤아웃에서는 나오지 않았다.
   (계약 13-1 D3·D4·D10 은 계약이 이미 코드대로 고쳐 적었다: 표적 없는 잠행형은 기본 속력, 돌진 12 + 마지막 판정 1, 쿨다운 5 = 4스텝 쉼.)
+
+밤잠 점진화 골든 (--night, 사람 결정 H1 10-14 — R1b 두뇌를 그대로 두고 늑대 밤잠 점진화를 언리얼에 먼저 넣는다):
+
+    python export_golden_v3_threat.py --night            # AI/Policy/ThreatNightGoldenVectorsV3.h
+    python export_golden_v3_threat.py --night --out <폴더>
+
+  - 세계: configs/v3_real1_night_on.yaml (v3_r1_on 에 realism_night 블록 하나만 더한 세계). 현실성 규칙 가운데 realism_night 만 받는다 —
+    다른 realism_* 가 켜진 세계는 거부한다(C++ 에 없는 규칙이다). 사슴·시드는 위와 같다(R1b argmax, 보정 시드 20000~20002 × 3000스텝).
+  - C++ 쪽: EcoThreatModel.h FThreatConfig::bRealismNight = true, NightInit·NightUpdate·Step (밤잠 상태를 읽는 판).
+  - 묶음 (헤더 네임스페이스 EcoThreatV3::GoldenNight):
+      스텝 사례    위의 본·끝(무대)·롤아웃 열·문턱 근처와 같은 꼴 + 스텝 전 밤잠 상태(잠·활동도·지난 사냥 중)와 스텝 뒤 사냥 중.
+                  본은 위의 표시(FLAG_NAMES)에 밤잠 표시(NIGHT_STEP_FLAGS)를 더해 고른다. 무대 끝 사례는 밤잠 끝 사례만 싣는다
+                  (깜깜할 때 새 사냥 막힘·쫓던 사냥 계속, 활동도 속력, 하한 속력, 해 질 녘에 깨어 있는 늑대의 포획 등).
+      업데이트 사례 `_rz_night_update` 한 번 (늑대 하나): 어둠 d·늑대 위치·사슴(가까운 순 NIGHT_KEEP 마리, 원래 색인 순서)·업데이트 전
+                  상태(잠·활동도·눕는 중·어둠 경과·기상 대기·지난 사냥 중)·지연 → 업데이트 뒤 상태·사건(깸·눕기 시작·다시 일어남·잠듦·
+                  사슴 때문에·사냥 때문에 못 누움)·속력 배수. 롤아웃 본 + 무대 끝(정확히 settle_r 8, 지연 경계, 마지막 활동도 등) + 문턱 근처.
+                  사건은 world.py 가 밖으로 내지 않으므로 참조 업데이트 값이고, 모든 업데이트에서 참조 상태 = world.py 상태, 사건 합 =
+                  world.py 누적 칸(settle_n 등)의 증가분인지 확인한 값이다.
+      처음 상태    세계 생성(reset) 때 위협마다 지연·잠·활동도 (보정 시드 20000~20019 세계를 만들기만 한다)
+      지연 해시    (세계 시드, 슬롯, 최대 지연) → night_delays
+      생애 열     롤아웃의 한 늑대를 이어진 세계 스텝 동안: Step(스텝 사례) → NightUpdate(업데이트 사례) 를 번갈아, C++ 이 자기 출력
+                  상태를 이어 쓴다(해 질 녘 눕기, 새벽 깸, 눕다 일어남, 사슴 때문에 못 누움, 깜깜한 동안 쫓던 사냥).
+  - 밤잠 문턱 근처 제외: 사슴 거리를 재는 업데이트에서 가장 가까운 사슴 실거리 |d − settle_r| < 1e-4 이면 뺀다(EX_SETTLE).
+    어둠 d 는 박명 폭 정수 스텝의 유리수이고 d = 1 은 min(…, 1) 로 정확히 1 이라 hunt_dark·sleep_dark 비교는 빼지 않는다.
+  - 기본 판(v3_r1_on)의 헤더는 이 기능을 더해도 바이트 단위로 같다(tests/test_threat_golden_v3.py).
 """
 
 from __future__ import annotations
@@ -84,6 +109,8 @@ UE_POLICY_DIR = ROOT.parent / "AdaptiveEcosystem" / "Source" / "AdaptiveEcosyste
 HEADER = "ThreatGoldenVectorsV3.h"
 DEFAULT_MODEL = ROOT / "ckpt" / "v3" / "v3_r1_g995_s3_20m.zip"     # R1b 출시 모델 (모델 시드 3)
 DEFAULT_CONFIG = ROOT / "configs" / "v3_r1_on.yaml"               # R1 판정 세계 (경보 없음)
+NIGHT_HEADER = "ThreatNightGoldenVectorsV3.h"                     # 밤잠 점진화 골든 (--night)
+NIGHT_CONFIG = ROOT / "configs" / "v3_real1_night_on.yaml"        # v3_r1_on + realism_night 블록
 
 GOLDEN_SEEDS = (20000, 20001, 20002)     # 보정 시드 (export_weights_v3 와 같은 세 시드)
 GOLDEN_STEPS = 3000
@@ -161,6 +188,53 @@ OUT_BITS = ("asleep", "hunting", "has_target", "wall", "pounce_start", "charge_s
 INT_COLS = ("cd", "ss", "sl", "pm", "pl")
 NO_ROLL = 2.0                            # 원거리 판정 난수가 없는 칸 (원거리형이 아니다)
 
+# ---- 밤잠 점진화 골든 (--night) ----
+NIGHT_KEEP = 4                           # 업데이트 사례에 싣는 사슴 (가까운 순. '실거리 ≤ settle_r 인 사슴이 있나'는 가장 가까운 것이 정한다)
+NIGHT_PER_FLAG = 8                       # 업데이트·밤잠 스텝 표시마다 이만큼까지
+EX_SETTLE = 1e-4                         # 밤잠 문턱 근처: 잰 업데이트에서 가장 가까운 사슴 |d − settle_r| < 이 값이면 뺀다
+NIGHT_INIT_SEEDS = tuple(range(20000, 20020))   # 처음 상태 행: 보정 시드 세계를 만들기만 한다
+NIGHT_HASH_SEEDS = (20000, 20001, 20002, 20019)
+NIGHT_HASH_MAX = (0, 1, 15, 22, 45)      # 지연 최대 (낮 고정 0, τ 30·45·90 → 15·22·45)
+NIGHT_HASH_SLOTS = 13                    # 슬롯 0..12 (보통 위협 2~12 + 플레이어 1)
+LIFE_MAX = 90                            # 생애 열 하나의 최대 세계 스텝
+# 스텝 사례의 밤잠 표시 (kCaseNightFlags 비트)
+NIGHT_STEP_FLAGS = (
+    "hd_block",           # 0 깜깜함(d ≥ hunt_dark): 깨어 있고 쿨다운 0 인 주행성인데 지난 스텝에 사냥 중이 아니라 사냥하지 않는다
+    "hd_continue",        # 1 깜깜함: 지난 스텝에 사냥 중이던 주행성이 계속 사냥한다
+    "ramp",               # 2 깨어 있는 주행성, 활동도 < R (눕는 중이거나 깨어 오르는 중)
+    "floor",              # 3 깨어 있는 주행성, 1 − d < night_floor (하한 속력)
+    "awake_dark",         # 4 깨어 있는 주행성, d ≥ sleep_dark (옛 규칙이면 잤다)
+    "hunt_set",           # 5 스텝 뒤 사냥 중이 새로 켜졌다
+    "hunt_clear",         # 6 스텝 뒤 사냥 중이 꺼졌다
+    "hunt_keep",          # 7 사냥 중이 이어진다
+)
+NFLAG = {n: 1 << i for i, n in enumerate(NIGHT_STEP_FLAGS)}
+# 업데이트 사례 표시 (kUpdFlags 비트)
+UPD_FLAGS = (
+    "nocturnal",          # 0 야행성 (아무것도 바뀌지 않는다)
+    "asleep_dark",        # 1 자고 있고 어둡다 (기상 대기 -1)
+    "wait",               # 2 자고 있고 밝은데 아직 기다린다
+    "wake",               # 3 깼다
+    "delay_wait",         # 4 깨어 있고 어두운데 지연이 아직 안 지났다
+    "settle_start",       # 5 눕기 시작
+    "settling",           # 6 눕는 중이 이어진다
+    "abort_deer",         # 7 눕다가 사슴 때문에 일어남
+    "abort_hunt",         # 8 눕다가 사냥 때문에 일어남
+    "abort_dawn",         # 9 눕다가 밝아져서 일어남
+    "onset",              # 10 잠들었다
+    "block_deer",         # 11 누울 차례인데 사슴이 가까워 못 누웠다
+    "block_hunt",         # 12 누울 차례인데 사냥 중이라 못 누웠다
+    "ramp_up",            # 13 깨어 오르는 중 (활동도 < R, 이번에 깬 것 제외)
+    "day_full",           # 14 밝고 활동도 R 그대로
+    "far_checked",        # 15 사슴 거리를 쟀고 settle_r 안에 없다
+)
+UFLAG = {n: 1 << i for i, n in enumerate(UPD_FLAGS)}
+# 업데이트 사건 비트 (kUpdEvents) — C++ FNightUpdateResult 칸 순서
+UPD_EVENTS = ("wake", "settle_start", "settle_abort", "onset", "block_deer", "block_hunt", "near_checked", "near")
+# 업데이트 상태 열 (kUpdPreInt: 6칸 = 아래 5칸 + 지난 사냥 중, kUpdPostInt: 5칸)
+UPD_COLS = ("asleep", "act", "settle", "dark_k", "wait")
+KIND_LIFE = 5                            # 업데이트 사례 종류: 생애 열의 업데이트 (스텝 사례 종류 0~4 와 같은 번호 체계)
+
 
 def _w():
     from env_v2 import world as W
@@ -181,9 +255,18 @@ def cfg_constants(cfg) -> dict:
         raise SystemExit("위협 골든은 repertoire·threats·pred_sleep·daynight 를 모두 켠 v3 세계에서만 만든다")
     if w._sd is not None or w._al is not None:
         raise SystemExit("위협 골든 세계에 stare_down(M7)·alarm(M8) 이 켜져 있다 — R1b 세계(configs/v3_r1_on.yaml)를 쓴다")
-    if w._rz:
-        raise SystemExit("위협 골든 세계에 realism_*(v3 현실성 1단계) 규칙이 켜져 있다 — C++ 에 아직 없는 규칙이다. "
-                         "R1b 세계(configs/v3_r1_on.yaml)를 쓴다")
+    # v3 R3 의 추격 고정(realism_chase)·지형(realism_terrain)도 C++ 에 아직 없다(진입 금지·먹이 배수 뽑기는 realism_shelter·
+    # realism_cover_food 의 선택 키라 위 두 블록에서 함께 걸린다)
+    others = [n for n, x in (("realism_vision", w._zv), ("realism_hearing", w._zh), ("realism_shelter", w._zs),
+                             ("realism_cover_food", w._zf), ("realism_chase", w._zc), ("realism_terrain", w._zt))
+              if x is not None]
+    if others:
+        raise SystemExit(f"위협 골든 세계에 realism_*(v3 현실성 1단계) 규칙 {others} 이 켜져 있다 — C++ 에 아직 없는 규칙이다. "
+                         "R1b 세계(configs/v3_r1_on.yaml)나 밤잠 세계(configs/v3_real1_night_on.yaml, realism_night 만)를 쓴다")
+    if th["eat_in_place"]:
+        # v3 R3 (j) 늑대 먹는 시간(10-15): 쿨다운 동안 제자리에 서는 규칙은 C++ FThreatConfig 에 아직 없다(PredEatCd 만 있다)
+        raise SystemExit("위협 골든 세계에 threats.eat_in_place(늑대가 잡은 자리에서 서서 먹음, 10-15)가 켜져 있다 — C++ 에 아직 "
+                         "없는 규칙이다. 켜지 않은 세계를 쓴다")
     rd = cfg.rand
     return {
         "HerbSpeed": float(cfg.herb_speed), "PredViewR": float(cfg.pred_view_r), "PredFovCos": float(cfg.pred_fov_cos),
@@ -211,16 +294,45 @@ def cfg_constants(cfg) -> dict:
     }
 
 
+def night_constants(cfg) -> dict | None:
+    """밤잠 점진화 계수 (world.py `_rz_night_params` 가 검사한 값). 키 = C++ FThreatConfig 칸 이름(켜는 칸 bRealismNight 은 빼고).
+    realism_night 를 끈 세계는 None."""
+    W = _w()
+    w = W.World(cfg, seeds=[STAGE_SEED])
+    zn = w._zn
+    if zn is None:
+        return None
+    return {"NightSettleR": float(zn["settle_r"]), "NightHuntDark": float(zn["hunt_dark"]),
+            "NightFloor": float(zn["night_floor"]), "NightSpread": float(zn["spread"]),
+            "NightRampSteps": int(zn["ramp_steps"])}
+
+
 # --------------------------------------------------------------------- #
 # 참조 스텝 (C++ EcoThreatV3::Step 과 한 줄씩 같다)
 # --------------------------------------------------------------------- #
 
 
-def ref_step(c: dict, spec: dict, st: dict, prey: dict, dark: float, size: float, turn: float, mode_u, roll):
+def night_mult(c: dict, nc: dict, noct: bool, asleep: bool, act: int, dark: float) -> float:
+    """밤잠 점진화 속력 배수 (EcoThreatModel.h NightSpeedMult 의 거울, world.py `_rz_night_update` 끝과 같은 double 계산)."""
+    if asleep:
+        return 0.0
+    if noct:
+        return 1.0
+    slow = (1.0 - dark) if c["bTwilightSlow"] else 1.0
+    base = slow if slow >= nc["NightFloor"] else nc["NightFloor"]
+    R = nc["NightRampSteps"]
+    level = (int(act) / R) if R > 0 else 1.0
+    return base * level
+
+
+def ref_step(c: dict, spec: dict, st: dict, prey: dict, dark: float, size: float, turn: float, mode_u, roll, night=None,
+             nc=None):
     """위협 하나의 결정 스텝 (EcoThreatModel.h Step 의 거울). 반환 (새 상태, 결과, 진단).
 
     spec: type·ranged·noct·base_speed·catch_r, st: pos·head·cd·ss·sl·pm·pl, prey: x·y·beh·arrived·in_cover·alive (배열),
     roll: 초식마다 원거리 판정 난수 (원거리형이 아니면 None). mode_u: 플레이어 새 모드 난수 (u0, u1).
+    night: 밤잠 점진화를 켠 판(C++ Cfg.bRealismNight)의 스텝 전 밤잠 상태 dict(asleep, act, hunt), nc: night_constants. None 이면 끈 판
+    (지금 골든과 같은 계산). 켠 판의 결과에는 스텝 뒤 사냥 중 hunt_post 가 붙는다.
     """
     W = _w()
     from env_v2 import repertoire as rep
@@ -233,8 +345,13 @@ def ref_step(c: dict, spec: dict, st: dict, prey: dict, dark: float, size: float
     out = dict(pounce_start=False, charge_start=False, new_mode=False, wall=False)
 
     cd = max(cd - 1, 0)
-    asleep = (not spec["noct"]) and dark >= c["SleepDark"]
+    if night is None:
+        asleep = (not spec["noct"]) and dark >= c["SleepDark"]
+    else:
+        asleep = bool(night["asleep"])
     hunting = cd == 0 and not asleep
+    if night is not None and dark >= nc["NightHuntDark"]:
+        hunting = hunting and (bool(spec["noct"]) or bool(night["hunt"]))
     if stalker and asleep:
         ss, sl = W.ST_ROAM, 0
     exh0 = stalker and ss == W.ST_EXHAUST
@@ -307,7 +424,10 @@ def ref_step(c: dict, spec: dict, st: dict, prey: dict, dark: float, size: float
             speed, mx, my = 0.0, hx, hy
     if asleep:
         mx, my = hx, hy
-    mult = 0.0 if asleep else ((1.0 - dark if c["bTwilightSlow"] else 1.0) if not spec["noct"] else 1.0)
+    if night is None:
+        mult = 0.0 if asleep else ((1.0 - dark if c["bTwilightSlow"] else 1.0) if not spec["noct"] else 1.0)
+    else:
+        mult = night_mult(c, nc, bool(spec["noct"]), asleep, night["act"], dark)
     speed = speed * mult
 
     nx, ny = qx + mx * speed, qy + my * speed
@@ -368,6 +488,8 @@ def ref_step(c: dict, spec: dict, st: dict, prey: dict, dark: float, size: float
     post = dict(pos=(nx, ny), head=(hx2, hy2), vel=(nx - qx, ny - qy), cd=cd, ss=ss, sl=sl, pm=pm, pl=pl)
     out.update(asleep=asleep, hunting=hunting, has_target=has_target, target=j if has_target else -1,
                d_t=d_t if has_target else -1.0, caught=k if got else -1, speed=speed)
+    if night is not None:
+        out["hunt_post"] = bool(has_target or (stalker and ss == W.ST_POUNCE))
     diag = dict(perceived=perceived, catch_d=catch_d, cosv=cosv, vis=vis, hit=hit, ok_roll=ok_roll, raw=raw,
                 final=final, dash=dash, stalking=stalking, exh0=exh0, rest0=rest0, pm_motion=pm_motion,
                 pl_motion=pl_motion, d_t=d_t)
@@ -431,18 +553,44 @@ class Recorder:
     def __init__(self, w):
         self.w = w
         self.records = []
+        self.nights = []              # 밤잠 점진화를 켠 세계: `_rz_night_update` 한 번 = 하나 (모든 위협)
         self._orig_step = w._step_predators_v3
         self._orig_tm = w._threat_motion
         self._orig_ta = w._threat_after
         w._step_predators_v3 = self._step
         w._threat_motion = self._tm
         w._threat_after = self._ta
+        self._orig_nu = None
+        if w._zn is not None:
+            self._orig_nu = w._rz_night_update
+            w._rz_night_update = self._nu
         self._cap = None
 
     def detach(self) -> None:
         w = self.w
-        for name in ("_step_predators_v3", "_threat_motion", "_threat_after"):
+        for name in ("_step_predators_v3", "_threat_motion", "_threat_after", "_rz_night_update"):
             w.__dict__.pop(name, None)
+
+    _NIGHT_COUNTERS = ("_zn_settle_n", "_zn_abort_n", "_zn_onset_n", "_zn_wake_n", "_zn_block_deer_n", "_zn_block_hunt_n",
+                       "_zn_dark_n", "_zn_dark_awake")
+
+    def _nu(self, d, diurnal):
+        """밤잠 업데이트 하나를 적는다: 업데이트 전 상태·어둠·늑대·사슴 위치 → 원래 함수 → 뒤 상태·속력 배수·누적 칸 증가분."""
+        w = self.w
+        pre = dict(asleep=w.pred_asleep.copy(), act=w._zn_act.copy(), settle=w._zn_settle.copy(),
+                   dark_k=w._zn_dark_k.copy(), wait=w._zn_wait.copy(), delay=w._zn_delay.copy(), hunt=w._zn_hunt.copy(),
+                   fresh=bool(w._zn_fresh))
+        cnt0 = {k: int(getattr(w, k)) for k in self._NIGHT_COUNTERS}
+        rec = dict(ri=len(self.records) - 1, t=int(w.t), dark=float(d), diurnal=np.array(diurnal, dtype=bool, copy=True),
+                   pre=pre, pos=np.array(w.pos, dtype=np.float64, copy=True), pred_pos=w.pred_pos.copy(), seed=int(w.seed),
+                   clock=(int(w.t), int(w.dn_period), int(w.dn_offset), int(w.dn_tw)), day_fixed=bool(w.day_fixed),
+                   M=int(w.M))
+        self._orig_nu(d, diurnal)
+        rec["post"] = dict(asleep=w.pred_asleep.copy(), act=w._zn_act.copy(), settle=w._zn_settle.copy(),
+                           dark_k=w._zn_dark_k.copy(), wait=w._zn_wait.copy(), delay=w._zn_delay.copy(),
+                           smult=np.array(w._pred_speed_mult, dtype=np.float64, copy=True))
+        rec["counts"] = {k: int(getattr(w, k)) - cnt0[k] for k in self._NIGHT_COUNTERS}
+        self.nights.append(rec)
 
     def _tm(self, move, speed, wander, has_target, d_t, exh0, rest0):
         self._cap.update(has_target=np.array(has_target, copy=True), d_t=np.array(d_t, copy=True))
@@ -468,6 +616,8 @@ class Recorder:
             type=w.pred_type.astype(np.int64), ranged=w.pred_ranged.copy(), noct=w.pred_nocturnal.copy(),
             speed=w.pred_speed.astype(np.float64), catch_r=w.pred_catch_r.astype(np.float64),
             mult=float(w.pred_speed_mult), M=int(w.M), Mb=int(w.M_base), seed=int(w.seed))
+        if w._zn is not None:           # 밤잠 점진화: 스텝이 읽는 밤잠 상태 (잠은 위 asleep)
+            pre.update(zn_act=w._zn_act.copy(), zn_hunt=w._zn_hunt.copy())
         log = []
         g1 = w.rng
         g2, g3 = w.feature_rng("threats", 2), w.feature_rng("threats", 3)
@@ -484,6 +634,8 @@ class Recorder:
         post = dict(pred_pos=w.pred_pos.copy(), pred_head=w.pred_head.copy(), pred_vel=w.pred_vel.copy(),
                     cd=w.pred_cd.astype(np.int64), ss=w.stalk_state.astype(np.int64), sl=w.stalk_left.astype(np.int64),
                     pm=w.player_mode.astype(np.int64), pl=w.player_left.astype(np.int64))
+        if w._zn is not None:
+            post["zn_hunt"] = w._zn_hunt.copy()
         M, Mb, N = pre["M"], pre["Mb"], len(pre["pos"])
         rng = dict(turn=None, rolls=None, pturn=np.zeros(0), mode=None)
         for tag, kind, x in log:
@@ -542,9 +694,12 @@ def threat_inputs(rec, m, idx=None) -> dict:
                 alive=np.ones(len(idx), dtype=bool), slot=idx.copy())
     roll = rec["rolls"][m][idx].copy() if m in rec["rolls"] else None
     mode = rec["mode"] if (player and rec["mode"] is not None) else None
+    night = (dict(asleep=bool(p["asleep"][m]), act=int(p["zn_act"][m]), hunt=bool(p["zn_hunt"][m]))
+             if "zn_act" in p else None)
     return dict(spec=spec, st=st, prey=prey, roll=roll, dark=float(p["dark"]), size=float(p["size"]),
                 turn=float(rec["turns"][m]), mode_u=(float(mode[0]), float(mode[1])) if mode is not None else (0.0, 0.0),
-                new_mode=mode is not None, clock=(int(p["t"]), int(p["period"]), int(p["offset"]), int(p["tw"])))
+                new_mode=mode is not None, clock=(int(p["t"]), int(p["period"]), int(p["offset"]), int(p["tw"])),
+                night=night)
 
 
 def env_result(rec, m) -> dict:
@@ -557,6 +712,8 @@ def env_result(rec, m) -> dict:
     out = dict(asleep=bool(p["asleep"][m]), has_target=has_target,
                d_t=float(cap["d_t"][m]) if has_target else -1.0, got=bool(cap["got"][m]),
                speed=float(cap["speed_tm"][m] * p["smult"][m]))
+    if "zn_hunt" in q:
+        out["hunt_post"] = bool(q["zn_hunt"][m])
     return dict(post=post, out=out)
 
 
@@ -584,6 +741,8 @@ def check_ref(inp: dict, env: dict, post: dict, out: dict, where: str) -> None:
         bad.append(f"speed {out['speed']} != {e_out['speed']}")
     if out["new_mode"] != inp["new_mode"]:
         bad.append(f"new_mode {out['new_mode']} != {inp['new_mode']}")
+    if ("hunt_post" in out or "hunt_post" in e_out) and out.get("hunt_post") != e_out.get("hunt_post"):
+        bad.append(f"hunt_post {out.get('hunt_post')} != {e_out.get('hunt_post')}")
     if bad:
         raise SystemExit(f"참조 스텝이 world.py 와 다르다 ({where}): " + "; ".join(bad))
 
@@ -598,8 +757,9 @@ def check_chain(name: str, cases: list) -> None:
 
 
 def run_ref(c, inp):
+    night = inp.get("night")
     return ref_step(c, inp["spec"], inp["st"], inp["prey"], inp["dark"], inp["size"], inp["turn"], inp["mode_u"],
-                    inp["roll"])
+                    inp["roll"], night=night, nc=c if night is not None else None)
 
 
 def near_reasons(c, inp, out, diag) -> int:
@@ -877,7 +1037,29 @@ class Stage:
         w.day_fixed = False
         w.dn_period, w.dn_offset, w.dn_tw = STAGE_PERIOD, STAGE_OFFSET, STAGE_TW
         w.seed = -1
+        if w._zn is not None:
+            # 밤잠 점진화 세계: 늑대별 밤잠 상태를 위협 dict 의 z_* 로 놓는다(없으면 깨어 있음·활동도 R·지연 0). 처음 상태(fresh)는 쓰지 않는다
+            w._rz_night_reset()
+            w._zn_fresh = False
+            R = w._zn["ramp_steps"]
+            w._zn_delay = np.array([t.get("z_delay", 0) for t in th], dtype=np.int64)
+            w._zn_act = np.array([t.get("z_act", R) for t in th], dtype=np.int64)
+            w._zn_settle = np.array([t.get("z_settle", False) for t in th], dtype=bool)
+            w._zn_dark_k = np.array([t.get("z_dark_k", 0) for t in th], dtype=np.int64)
+            w._zn_wait = np.array([t.get("z_wait", -1) for t in th], dtype=np.int64)
+            w._zn_hunt = np.array([t.get("z_hunt", False) for t in th], dtype=bool)
+            w.pred_asleep = np.array([t.get("z_asleep", False) for t in th], dtype=bool)
         self.rec = Recorder(w)
+
+    def night(self, prey: list, t: int):
+        """밤잠 업데이트 하나만 (사슴 위치·시각 t 를 놓고 world.py `_daynight_update` → `_rz_night_update`). 반환: 업데이트 기록."""
+        w = self.w
+        n = len(prey)
+        w.N = n
+        w.pos = np.array([p["pos"] for p in prey], dtype=np.float64).reshape(n, 2)
+        w.t = int(t)
+        w._daynight_update()
+        return self.rec.nights[-1]
 
     def step(self, prey: list, t: int, turns, covers=(), rolls=None, mode=(0.5, 0.5)):
         """초식(dict: pos·beh·arrived)·은신처((cx, cy, r) 목록)·시각 t 를 놓고 위협 스텝 하나. 반환: 기록."""
@@ -1235,8 +1417,11 @@ def count_table(cases, kinds) -> dict:
     return out
 
 
-def write_header(path: Path, g: dict, meta: dict) -> None:
-    """ThreatGoldenVectorsV3.h — 위협 모델 골든 (모듈 docstring)."""
+def write_header(path: Path, g: dict, meta: dict, ns: str = "EcoThreatV3::Golden",
+                 title: str = "v3 위협 모델 골든 (EcoThreatModel.h EcoThreatV3::Step 대조, 계약 G7)",
+                 extra_comment: str = "", extra: str = "") -> None:
+    """ThreatGoldenVectorsV3.h — 위협 모델 골든 (모듈 docstring). 밤잠 골든(--night)은 ns·title 을 바꾸고 머리 주석 extra_comment
+    (줄마다 '//' 로 시작, 끝 줄바꿈 포함)와 네임스페이스 끝 배열 extra 를 더한다. 둘 다 빈 문자열이면 기본 헤더와 바이트 단위로 같다."""
     c, s = g["c"], g["stats"]
     fl = flatten(g)
     A, P, cases = fl["A"], fl["P"], fl["cases"]
@@ -1273,7 +1458,7 @@ def write_header(path: Path, g: dict, meta: dict) -> None:
     cfg_block = "\n".join(cfg_lines)
 
     body = f"""// 자동 생성. 수정 금지.
-// 생성: herbivore_rl/export_golden_v3_threat.py — v3 위협 모델 골든 (EcoThreatModel.h EcoThreatV3::Step 대조, 계약 G7)
+// 생성: herbivore_rl/export_golden_v3_threat.py — {title}
 // world:  {meta["world_config"]}  (config_digest {meta["world_digest"]})
 // deer:   {meta["model"]}  (sha256 {meta["model_sha256"]}) argmax — env_v2/rollout.py RepLearned
 // seeds:  보정 시드 {" ".join(map(str, s["seeds"]))} x {s["steps"]}스텝 (판정 시드는 쓰지 않는다), 위협 스텝 풀 {s["pool"]}개
@@ -1297,11 +1482,11 @@ def write_header(path: Path, g: dict, meta: dict) -> None:
 //
 // 끝 사례 이름 kEdgeNames (무대 세계 — 같은 world.py 함수가 계산했다. 문턱과 정확히 같은 2 진수 거리를 쓴다)
 // 허용: 실수 |C++ - Python| <= kFloatTolerance, 정수·열거·판정은 정확히 같다. 문턱 근처 묶음은 보고만 한다
-#pragma once
+{extra_comment}#pragma once
 
 #include <cstdint>
 
-namespace EcoThreatV3::Golden
+namespace {ns}
 {{
 	inline constexpr double kFloatTolerance = {d_lit(FLOAT_TOL)};
 	inline constexpr double kNoRoll = {d_lit(NO_ROLL)};   // 원거리 판정 난수가 없는 칸 (원거리형이 아니다)
@@ -1375,11 +1560,699 @@ namespace EcoThreatV3::Golden
 {c_array("double", "kOutTargetPerceived", A["d_t"], 6, d_lit, comment="[n] 표적 체감 거리 (없으면 -1)")}
 {c_array("std::int32_t", "kOutCaught", A["caught"], 24, _i, comment="[n] 잡은 초식 (사례 안 색인, -1 없음)")}
 {c_array("double", "kOutSpeed", A["speed"], 6, d_lit, comment="[n] 적용 속력")}
-}}
+{extra}}}
 """
     if chr(0xA7) in body:
         raise SystemExit("헤더에 절 기호가 들어갔다")
     Path(path).write_text(body, encoding="utf-8", newline="\n")
+
+
+# --------------------------------------------------------------------- #
+# 밤잠 점진화 골든 (--night, 모듈 docstring '밤잠 점진화 골든')
+# --------------------------------------------------------------------- #
+
+
+def ref_night_init(c: dict, noct: bool, dark: float, delay: int) -> dict:
+    """처음 상태 (EcoThreatModel.h NightInit 의 거울, world.py `_rz_night_update` fresh)."""
+    asleep = (not noct) and dark >= c["SleepDark"]
+    return dict(asleep=asleep, act=0 if asleep else c["NightRampSteps"], settle=False, dark_k=0, wait=-1, delay=int(delay))
+
+
+def ref_night_update(c: dict, noct: bool, st: dict, d: float, wolf, deer_x, deer_y):
+    """늑대 하나의 밤잠 업데이트 (EcoThreatModel.h NightUpdate 의 거울, world.py `_rz_night_update` 의 한 행).
+
+    st: asleep·act·settle·dark_k·wait·delay·hunt. 반환 (뒤 상태 asleep·act·settle·dark_k·wait, 사건 dict(UPD_EVENTS), 잰 가장 가까운
+    사슴 실거리 — 재지 않았으면 inf)."""
+    R = c["NightRampSteps"]
+    dark = d >= c["SleepDark"]
+    asleep, act, settle = bool(st["asleep"]), int(st["act"]), bool(st["settle"])
+    dark_k, wait, delay, hunt = int(st["dark_k"]), int(st["wait"]), int(st["delay"]), bool(st["hunt"])
+    ev = {k: False for k in UPD_EVENTS}
+    dmin = math.inf
+    if noct:
+        return dict(asleep=False, act=act, settle=settle, dark_k=0, wait=wait), ev, dmin
+    if asleep:
+        if dark:
+            wait = -1
+        else:
+            if wait < 0:
+                wait = delay
+            if wait == 0:
+                asleep, wait, act = False, -1, 0
+                ev["wake"] = True
+            else:
+                wait -= 1
+    if asleep:
+        return dict(asleep=True, act=act, settle=settle, dark_k=0, wait=wait), ev, dmin
+    dark_k = dark_k + 1 if dark else 0
+    near = False
+    checked = dark and (settle or dark_k > delay)
+    if checked:
+        dx = np.asarray(deer_x, dtype=np.float64) - float(wolf[0])
+        dy = np.asarray(deer_y, dtype=np.float64) - float(wolf[1])
+        dist = np.sqrt(dx * dx + dy * dy)
+        near = bool((dist <= c["NightSettleR"]).any())
+        dmin = float(dist.min()) if len(dist) else math.inf
+    calm = dark and not hunt and not near
+    ready = (not settle) and dark and dark_k > delay
+    if settle and not calm:
+        settle = False
+        ev["settle_abort"] = True
+    elif ready and calm:
+        settle = True
+        ev["settle_start"] = True
+    ev["block_deer"] = ready and not hunt and near
+    ev["block_hunt"] = ready and hunt
+    if settle:
+        act -= 1
+        if act <= 0:
+            act, asleep, settle, dark_k = 0, True, False, 0
+            ev["onset"] = True
+    else:
+        act = min(act + 1, R)
+    ev["near_checked"], ev["near"] = checked, near
+    return dict(asleep=asleep, act=act, settle=settle, dark_k=dark_k, wait=wait), ev, dmin
+
+
+def night_update_inputs(nrec: dict, m: int, idx=None) -> dict:
+    """밤잠 업데이트 기록 하나의 늑대 m 입력 (idx = 실을 사슴 색인, None 이면 전체)."""
+    p = nrec["pre"]
+    n = len(nrec["pos"])
+    idx = np.arange(n) if idx is None else np.asarray(idx, dtype=np.int64)
+    st = dict(asleep=bool(p["asleep"][m]), act=int(p["act"][m]), settle=bool(p["settle"][m]), dark_k=int(p["dark_k"][m]),
+              wait=int(p["wait"][m]), delay=int(p["delay"][m]), hunt=bool(p["hunt"][m]))
+    return dict(noct=not bool(nrec["diurnal"][m]), st=st, dark=float(nrec["dark"]),
+                wolf=(float(nrec["pred_pos"][m][0]), float(nrec["pred_pos"][m][1])),
+                deer_x=nrec["pos"][idx, 0].copy(), deer_y=nrec["pos"][idx, 1].copy(), slot=idx.copy(), clock=nrec["clock"])
+
+
+def night_env_result(nrec: dict, m: int) -> dict:
+    q = nrec["post"]
+    return dict(asleep=bool(q["asleep"][m]), act=int(q["act"][m]), settle=bool(q["settle"][m]), dark_k=int(q["dark_k"][m]),
+                wait=int(q["wait"][m]), smult=float(q["smult"][m]))
+
+
+def run_night_ref(c: dict, inp: dict):
+    post, ev, dmin = ref_night_update(c, inp["noct"], inp["st"], inp["dark"], inp["wolf"], inp["deer_x"], inp["deer_y"])
+    smult = night_mult(c, c, inp["noct"], post["asleep"], post["act"], inp["dark"])
+    return post, ev, dmin, smult
+
+
+def check_night_ref(c: dict, inp: dict, env: dict, post: dict, smult: float, where: str) -> None:
+    bad = [f"{k} {post[k]} != {env[k]}" for k in UPD_COLS if post[k] != env[k]]
+    if smult != env["smult"]:
+        bad.append(f"smult {smult!r} != {env['smult']!r}")
+    if bad:
+        raise SystemExit(f"참조 밤잠 업데이트가 world.py 와 다르다 ({where}): " + "; ".join(bad))
+
+
+def upd_flags_of(c: dict, inp: dict, post: dict, ev: dict) -> int:
+    st, d = inp["st"], inp["dark"]
+    dark = d >= c["SleepDark"]
+    R = c["NightRampSteps"]
+    f = 0
+
+    def on(name, cond):
+        nonlocal f
+        if cond:
+            f |= UFLAG[name]
+
+    if inp["noct"]:
+        on("nocturnal", True)
+        return f
+    awake0 = not st["asleep"]
+    on("asleep_dark", st["asleep"] and dark)
+    on("wait", st["asleep"] and not dark and not ev["wake"])
+    on("wake", ev["wake"])
+    on("delay_wait", awake0 and dark and not st["settle"] and post["dark_k"] <= st["delay"] and not ev["onset"])
+    on("settle_start", ev["settle_start"])
+    on("settling", st["settle"] and post["settle"])
+    on("abort_deer", ev["settle_abort"] and ev["near"])
+    on("abort_hunt", ev["settle_abort"] and st["hunt"] and not ev["near"])
+    on("abort_dawn", ev["settle_abort"] and not dark)
+    on("onset", ev["onset"])
+    on("block_deer", ev["block_deer"])
+    on("block_hunt", ev["block_hunt"])
+    on("ramp_up", awake0 and not st["settle"] and st["act"] < R and not ev["settle_start"])
+    on("day_full", awake0 and not dark and st["act"] == R and post["act"] == R)
+    on("far_checked", ev["near_checked"] and not ev["near"])
+    return f
+
+
+def upd_near(c: dict, ev: dict, dmin: float) -> int:
+    """밤잠 문턱 근처 (잰 업데이트에서 가장 가까운 사슴이 settle_r 에서 EX_SETTLE 안)."""
+    return int(ev["near_checked"] and abs(dmin - c["NightSettleR"]) < EX_SETTLE)
+
+
+def trim_deer(inp: dict) -> np.ndarray:
+    """업데이트 사례에 실을 사슴: 늑대에서 실거리가 가까운 순 NIGHT_KEEP 마리 (원래 색인 순서)."""
+    dx = inp["deer_x"] - inp["wolf"][0]
+    dy = inp["deer_y"] - inp["wolf"][1]
+    dist = np.sqrt(dx * dx + dy * dy)
+    order = np.lexsort((np.arange(len(dist)), dist))[:NIGHT_KEEP]
+    return np.array(sorted(int(i) for i in order), dtype=np.int64)
+
+
+def make_upd_case(c: dict, nrec: dict, m: int, kind: int, label: int = -1, trim: bool = True) -> dict:
+    """밤잠 업데이트 기록의 늑대 m → 업데이트 사례 (사슴 줄이기 + 참조 업데이트 재확인)."""
+    full = night_update_inputs(nrec, m)
+    env = night_env_result(nrec, m)
+    post, ev, dmin, smult = run_night_ref(c, full)
+    where = f"seed {nrec['seed']} t {nrec['t']} 늑대 {m}"
+    check_night_ref(c, full, env, post, smult, where + " (전체 사슴)")
+    idx = trim_deer(full) if trim else np.arange(len(full["deer_x"]))
+    inp = night_update_inputs(nrec, m, idx)
+    post2, ev2, dmin2, smult2 = run_night_ref(c, inp)
+    check_night_ref(c, inp, env, post2, smult2, where + f" (줄인 사슴 {len(idx)})")
+    if ev2 != ev or (ev["near_checked"] and dmin2 != dmin):
+        raise SystemExit(f"줄인 사슴에서 밤잠 사건이 다르다 ({where})")
+    return dict(kind=kind, label=label, src=(int(nrec["seed"]), int(nrec["t"]), int(m)), flags=upd_flags_of(c, inp, post2, ev2),
+                near=upd_near(c, ev, dmin), inp=inp, post=post2, ev=ev2, dmin=dmin, smult=env["smult"])
+
+
+def collect_rollout_night(model, cfg, seed: int, steps: int):
+    """밤잠 세계 보정 시드 하나를 R1b argmax 로 돌리며 위협 스텝과 밤잠 업데이트를 모두 기록한다."""
+    from env_v2.rollout import RepLearned
+
+    W = _w()
+    w = W.World(cfg, seeds=[seed])
+    pol = RepLearned(model)
+    pol.bind_world(w)
+    rec = Recorder(w)
+    for _ in range(steps):
+        a = pol(w.observe())
+        w.step(a)
+    rec.detach()
+    if len(rec.nights) != len(rec.records):
+        raise SystemExit("밤잠 업데이트 수가 위협 스텝 수와 다르다 — 스텝마다 하나여야 한다")
+    return rec.records, rec.nights
+
+
+def validate_nights(c: dict, nights: list) -> list:
+    """모든 밤잠 업데이트에서 참조 = world.py (전체 사슴), 참조 사건 합 = world.py 누적 칸 증가분.
+    반환: 풀 항목 [(업데이트 번호, 늑대, 표시, 문턱 근처)]."""
+    upool = []
+    for ni, nrec in enumerate(nights):
+        if nrec["pre"]["fresh"]:
+            raise SystemExit("롤아웃 기록에 처음 상태(fresh) 업데이트가 들어왔다")
+        tot = {k: 0 for k in UPD_EVENTS}
+        dark_n = dark_awake = 0
+        dark = nrec["dark"] >= c["SleepDark"]
+        for m in range(nrec["M"]):
+            inp = night_update_inputs(nrec, m)
+            env = night_env_result(nrec, m)
+            post, ev, dmin, smult = run_night_ref(c, inp)
+            check_night_ref(c, inp, env, post, smult, f"seed {nrec['seed']} t {nrec['t']} 늑대 {m}")
+            for k in UPD_EVENTS:
+                tot[k] += int(ev[k])
+            if dark and not inp["noct"]:
+                dark_n += 1
+                dark_awake += int(not post["asleep"])
+            upool.append((ni, m, upd_flags_of(c, inp, post, ev), upd_near(c, ev, dmin)))
+        want = nrec["counts"]
+        got = {"_zn_settle_n": tot["settle_start"], "_zn_abort_n": tot["settle_abort"], "_zn_onset_n": tot["onset"],
+               "_zn_wake_n": tot["wake"], "_zn_block_deer_n": tot["block_deer"], "_zn_block_hunt_n": tot["block_hunt"],
+               "_zn_dark_n": dark_n, "_zn_dark_awake": dark_awake}
+        if got != want:
+            raise SystemExit(f"seed {nrec['seed']} t {nrec['t']}: 참조 밤잠 사건 합 {got} 이 world.py 누적 증가분 {want} 와 다르다")
+    return upool
+
+
+def night_flags_of(c: dict, inp: dict, out: dict) -> int:
+    """스텝 사례의 밤잠 표시 (NIGHT_STEP_FLAGS)."""
+    W = _w()
+    nt, spec, st, d = inp["night"], inp["spec"], inp["st"], inp["dark"]
+    diurnal = not spec["noct"]
+    awake = not nt["asleep"]
+    stalker, player = spec["type"] == W.PT_STALKER, spec["type"] == W.PT_PLAYER
+    exh0 = stalker and st["ss"] == W.ST_EXHAUST
+    rest0 = player and st["pm"] == W.PM_REST
+    base = max(st["cd"] - 1, 0) == 0 and awake and not exh0 and not rest0
+    hd = d >= c["NightHuntDark"]
+    f = 0
+
+    def on(name, cond):
+        nonlocal f
+        if cond:
+            f |= NFLAG[name]
+
+    on("hd_block", diurnal and hd and base and not nt["hunt"])
+    on("hd_continue", diurnal and hd and base and nt["hunt"])
+    on("ramp", diurnal and awake and nt["act"] < c["NightRampSteps"])
+    on("floor", diurnal and awake and c["bTwilightSlow"] and (1.0 - d) < c["NightFloor"])
+    on("awake_dark", diurnal and awake and d >= c["SleepDark"])
+    on("hunt_set", out["hunt_post"] and not nt["hunt"])
+    on("hunt_clear", nt["hunt"] and not out["hunt_post"])
+    on("hunt_keep", nt["hunt"] and out["hunt_post"])
+    return f
+
+
+def night_step_edge_specs() -> list:
+    """밤잠 스텝 끝 사례 (이름, 위협, 초식, 시각). 위협 기본은 (40, 40) heading +x. 밤잠 상태 z_* 는 스텝 앞 업데이트 전 값이다 —
+    Stage.step 이 같은 world.py `_daynight_update` 를 먼저 부르므로, 끝 사례가 원하는 상태가 그 업데이트 뒤에 남게 놓는다
+    (지연을 크게 두어 눕지 않게 하고, 활동도 R 은 R 로 남는다)."""
+    W = _w()
+    C, S = W.PT_CHASER, W.PT_STALKER
+    night, dusk, day = CLOCK["night"], CLOCK["dusk"], CLOCK["day"]
+    late = STAGE_PERIOD // 2 + STAGE_TW - 1          # d = 0.5 + 44/90 = 0.98889 (아직 hunt_dark 1.0 아래)
+    big = 10_000                                     # 이 지연이면 이번 업데이트에 눕기를 시작하지 않는다
+    e = []
+
+    def add(name, threat, prey, t, turn=0.05):
+        e.append(dict(name=name, threat=threat, prey=prey, t=t, turn=turn))
+
+    # 깜깜함(d = 1.0): 새 사냥 없음 · 쫓던 사냥 계속 · 야행성은 그대로
+    add("hd_new_hunt_blocked", _threat(C, z_delay=big), [_prey(45, 40)], night)
+    add("hd_continue_chase", _threat(C, z_delay=big, z_hunt=True), [_prey(45, 40)], night)
+    add("hd_continue_catch", _threat(C, z_delay=big, z_hunt=True), [_prey(40.5, 40)], night)
+    add("hd_blocked_no_catch", _threat(C, z_delay=big), [_prey(40.5, 40)], night)
+    add("hd_below_new_hunt", _threat(C, z_delay=big), [_prey(45, 40)], late)
+    add("hd_nocturnal", _threat(C, noct=True), [_prey(45, 40)], night)
+    add("hd_stalker_pounce_continue", _threat(S, ss=W.ST_POUNCE, sl=5, z_delay=big, z_hunt=True), [_prey(44, 40)], night)
+    add("hd_stalker_blocked", _threat(S, z_delay=big), [_prey(44, 40)], night)
+    # 속력 배수: 활동도 (깨어 오르는 중), 하한, 해 질 녘에 깨어 있음
+    add("ramp_day_speed", _threat(C, z_act=5), [_prey(20, 40)], day)
+    add("floor_night_speed", _threat(C, z_delay=big), [_prey(20, 40)], night)
+    add("dusk_awake_catch", _threat(C), [_prey(40.5, 40)], dusk)      # 옛 규칙은 d = 0.5 에 잤다. 이제는 사슴이 가까워 깨어 있고 잡는다
+    add("asleep_state_no_catch", _threat(C, z_asleep=True, z_act=0), [_prey(40.5, 40)], night)
+    add("settling_speed", _threat(C, z_settle=True, z_act=10, z_dark_k=3), [_prey(20, 40)], night)
+    return e
+
+
+def night_update_edge_specs() -> list:
+    """밤잠 업데이트 끝 사례 (이름, 늑대, 사슴, 시각). 늑대는 (40, 40). 문턱과 정확히 같은 거리(settle_r 8 — 2 진수로 정확)와 바로 위,
+    지연 경계, 마지막 활동도, 깸 지연 0·마지막 대기."""
+    W = _w()
+    C = W.PT_CHASER
+    night, dawn_after, day = CLOCK["night"], STAGE_PERIOD + 1, CLOCK["day"]   # t 901: d = 0.48889 (밝아짐)
+    R = 15
+    e = []
+
+    def add(name, threat, prey, t):
+        e.append(dict(name=name, threat=threat, prey=prey, t=t))
+
+    far = [_prey(70, 70)]
+    add("settle_r_exact_blocks", _threat(C, z_delay=2, z_dark_k=5), [_prey(48, 40)], night)
+    add("settle_r_above_starts", _threat(C, z_delay=2, z_dark_k=5), [_prey(48 + UP, 40)], night)
+    add("ready_eq_delay_waits", _threat(C, z_delay=6, z_dark_k=5), far, night)    # 뒤 dark_k 6 = 지연 6 → 아직
+    add("ready_gt_delay_starts", _threat(C, z_delay=6, z_dark_k=6), far, night)   # 뒤 dark_k 7 > 6 → 눕기 시작
+    add("onset_last_act", _threat(C, z_settle=True, z_act=1, z_dark_k=9), far, night)
+    add("abort_hunt", _threat(C, z_settle=True, z_act=7, z_dark_k=9, z_hunt=True), far, night)
+    add("abort_deer", _threat(C, z_settle=True, z_act=7, z_dark_k=9), [_prey(45, 40)], night)
+    add("abort_dawn", _threat(C, z_settle=True, z_act=7, z_dark_k=9), far, dawn_after)
+    add("block_hunt", _threat(C, z_delay=0, z_dark_k=3, z_hunt=True), far, night)
+    add("wake_delay0", _threat(C, z_asleep=True, z_act=0, z_delay=0), far, dawn_after)
+    add("wait_first", _threat(C, z_asleep=True, z_act=0, z_delay=5), far, dawn_after)
+    add("wait_last_wakes", _threat(C, z_asleep=True, z_act=0, z_delay=5, z_wait=0), far, dawn_after)
+    add("asleep_dark_resets_wait", _threat(C, z_asleep=True, z_act=0, z_delay=5, z_wait=3), far, night)
+    add("nocturnal_night", _threat(C, noct=True, z_dark_k=4), [_prey(45, 40)], night)
+    add("day_full_stays", _threat(C), far, day)
+    add("ramp_up_day", _threat(C, z_act=R - 3), far, day)
+    return e
+
+
+def run_night_edges(cfg, c):
+    """밤잠 끝 사례: 스텝(무대 Stage.step — 업데이트 하나 뒤 스텝)과 업데이트(Stage.night)."""
+    step_cases = []
+    for li, e in enumerate(night_step_edge_specs()):
+        stg = Stage(cfg, [e["threat"]])
+        rec = stg.step(e["prey"], e["t"], [e["turn"]])
+        stg.rec.detach()
+        case = make_case(c, rec, 0, KIND_EDGE, label=li, trim=False)
+        case["src"] = (-1, li, 0)
+        step_cases.append(case)
+    upd_cases = []
+    for li, e in enumerate(night_update_edge_specs()):
+        stg = Stage(cfg, [e["threat"]])
+        nrec = stg.night(e["prey"], e["t"])
+        stg.rec.detach()
+        case = make_upd_case(c, nrec, 0, KIND_EDGE, label=li, trim=False)
+        case["src"] = (-1, li, 0)
+        upd_cases.append(case)
+    return step_cases, upd_cases
+
+
+def night_init_rows(cfg, seeds=NIGHT_INIT_SEEDS) -> list:
+    """세계 생성 때의 밤잠 처음 상태 (위협마다). 세계를 만들기만 하고 돌리지 않는다."""
+    W = _w()
+    check_seeds(seeds)
+    rows = []
+    for s in seeds:
+        w = W.World(cfg, seeds=[int(s)])
+        tw = 0 if w.day_fixed else int(w.dn_tw)
+        for m in range(w.M):
+            rows.append(dict(seed=int(s), slot=m, tw=tw, noct=bool(w.pred_nocturnal[m]), dark=float(w.dark),
+                             delay=int(w._zn_delay[m]), asleep=bool(w.pred_asleep[m]), act=int(w._zn_act[m]),
+                             settle=bool(w._zn_settle[m]), dark_k=int(w._zn_dark_k[m]), wait=int(w._zn_wait[m])))
+    return rows
+
+
+def night_hash_rows() -> list:
+    W = _w()
+    rows = []
+    for s in NIGHT_HASH_SEEDS:
+        for mx in NIGHT_HASH_MAX:
+            d = W.night_delays(int(s), NIGHT_HASH_SLOTS, int(mx))
+            rows += [dict(seed=int(s), slot=k, max_delay=int(mx), delay=int(d[k])) for k in range(NIGHT_HASH_SLOTS)]
+    return rows
+
+
+def find_life_windows(records: list, nights: list, pool: list, upool: list) -> list:
+    """생애 열 후보: (이름, [(기록 번호, 업데이트 번호)], 위협). 모든 스텝·업데이트가 문턱 근처가 아니고 같은 세계의 이어진 스텝이다."""
+    step_near = {(ri, m): near for ri, m, _k, _f, near in pool}
+    ni_of = {nrec["ri"]: ni for ni, nrec in enumerate(nights)}
+    ev_at = {}
+    for ni, m, uf, unear in upool:
+        ev_at[(nights[ni]["ri"], m)] = (uf, unear)
+    want = {"dusk_onset": 2, "dawn_wake": 2, "settle_abort": 1, "block_deer": 1, "block_hunt": 1, "hd_continue": 1}
+    got = {k: 0 for k in want}
+    out = []
+    used = set()
+
+    def ok(ris, m):
+        if not ris or ris[0] < 0 or ris[-1] >= len(records) or len(ris) > LIFE_MAX:
+            return False
+        seed = records[ris[0]]["pre"]["seed"]
+        for a, b in zip(ris, ris[1:]):
+            if records[b]["pre"]["seed"] != seed or records[b]["pre"]["t"] != records[a]["pre"]["t"] + 1:
+                return False
+        for ri in ris:
+            if ri not in ni_of or step_near.get((ri, m), 1) or ev_at.get((ri, m), (0, 1))[1]:
+                return False
+        return True
+
+    def take(name, a, b, m):
+        ris = list(range(a, b))
+        if got[name] >= want[name] or (ris[0] if ris else -1, m) in used or not ok(ris, m):
+            return
+        out.append((name, [(ri, ni_of[ri]) for ri in ris], m))
+        got[name] += 1
+        used.add((ris[0], m))
+
+    for ni, m, uf, unear in upool:
+        if unear:
+            continue
+        ri = nights[ni]["ri"]
+        delay = int(nights[ni]["pre"]["delay"][m])
+        if uf & UFLAG["onset"]:
+            take("dusk_onset", ri - (delay + 15 + 8), ri + 3, m)
+        if uf & UFLAG["wake"]:
+            take("dawn_wake", ri - (delay + 4), ri + 15 + 4, m)
+        if uf & (UFLAG["abort_deer"] | UFLAG["abort_hunt"] | UFLAG["abort_dawn"]):
+            take("settle_abort", ri - 6, ri + 8, m)
+        if uf & UFLAG["block_deer"]:
+            take("block_deer", ri - 4, ri + 10, m)
+        if uf & UFLAG["block_hunt"]:
+            take("block_hunt", ri - 4, ri + 10, m)
+    for ri, m, key, f, near in pool:
+        rec = records[ri]
+        p = rec["pre"]
+        if (not p["noct"][m] and p["dark"] >= 1.0 and p["zn_hunt"][m] and not p["asleep"][m]
+                and int(p["cd"][m]) <= 1):
+            take("hd_continue", ri - 4, ri + 12, m)
+    return out
+
+
+def build_night_golden(model, cfg, seeds, steps: int) -> dict:
+    """밤잠 골든 모으기 (모듈 docstring '밤잠 점진화 골든')."""
+    check_seeds(seeds)
+    c = cfg_constants(cfg)
+    nc = night_constants(cfg)
+    if nc is None:
+        raise SystemExit("밤잠 골든은 realism_night 를 켠 세계(configs/v3_real1_night_on.yaml)에서만 만든다")
+    c = dict(c, **nc)
+    records, nights = [], []
+    for s in seeds:
+        r, n = collect_rollout_night(model, cfg, int(s), steps)
+        base = len(records)
+        for x in n:
+            x["ri"] += base
+        records += r
+        nights += n
+    pool = validate_records(c, records)
+    upool = validate_nights(c, nights)
+    stats = dict(seeds=[int(s) for s in seeds], steps=int(steps), pool=len(pool), records=len(records), upool=len(upool))
+
+    key_arr = np.array([p[2] for p in pool])
+    flag_arr = np.array([p[3] for p in pool], dtype=np.int64)
+    near_arr = np.array([p[4] for p in pool], dtype=np.int64)
+    nflag_arr = np.zeros(len(pool), dtype=np.int64)
+    for i, (ri, m, _k, _f, _n) in enumerate(pool):
+        inp = threat_inputs(records[ri], m)
+        nflag_arr[i] = night_flags_of(c, inp, env_result(records[ri], m)["out"])
+    stats["pool_by_type"] = {k: int((key_arr == k).sum()) for k in TYPE_KEYS}
+    stats["near_by_reason"] = {r: int(((near_arr >> i) & 1).sum()) for i, r in enumerate(EX_REASONS)}
+    stats["near_by_type"] = {k: int(((near_arr != 0) & (key_arr == k)).sum()) for k in TYPE_KEYS}
+    stats["near_total"] = int((near_arr != 0).sum())
+    stats["pool_flags"] = {k: {f: int(((flag_arr & FLAG[f]) != 0)[key_arr == k].sum()) for f in TYPE_FLAGS[k]}
+                           for k in TYPE_KEYS}
+    stats["pool_night_flags"] = {f: int(((nflag_arr & NFLAG[f]) != 0).sum()) for f in NIGHT_STEP_FLAGS}
+
+    # 본 스텝: 종류 × 표시 PER_FLAG 개 + 종류 × 밤잠 표시 PER_FLAG 개 (문턱 근처 제외)
+    rng = np.random.default_rng(SELECT_SEED)
+    chosen = set()
+    for k in TYPE_KEYS:
+        for f in TYPE_FLAGS[k]:
+            idx = np.flatnonzero((key_arr == k) & ((flag_arr & FLAG[f]) != 0) & (near_arr == 0))
+            if len(idx) > PER_FLAG:
+                idx = np.sort(rng.choice(idx, size=PER_FLAG, replace=False))
+            chosen |= set(int(i) for i in idx)
+        for f in NIGHT_STEP_FLAGS:
+            idx = np.flatnonzero((key_arr == k) & ((nflag_arr & NFLAG[f]) != 0) & (near_arr == 0))
+            if len(idx) > PER_FLAG:
+                idx = np.sort(rng.choice(idx, size=PER_FLAG, replace=False))
+            chosen |= set(int(i) for i in idx)
+    main = [make_case(c, records[pool[i][0]], pool[i][1], KIND_MAIN) for i in sorted(chosen)]
+    near_idx = []
+    for i, r in enumerate(EX_REASONS):
+        idx = np.flatnonzero((near_arr >> i) & 1)
+        if len(idx):
+            near_idx += np.sort(rng.choice(idx, size=min(2, len(idx)), replace=False)).tolist()
+    near_idx = sorted(set(near_idx))[:N_NEAR_GROUP]
+    near = [make_case(c, records[pool[i][0]], pool[i][1], KIND_NEAR) for i in near_idx]
+
+    # 롤아웃 스텝 열 (밤잠 상태는 사례마다 골든 값 — C++ 은 스텝 소유 칸만 이어 쓴다)
+    seqs = []
+    for name, ris, m in find_windows(records, pool):
+        cases = [make_case(c, records[ri], m, KIND_SEQ) for ri in ris]
+        check_chain(name, cases)
+        seqs.append((name, KIND_SEQ, cases))
+    stats["rollout_seqs"] = [name for name, _, _ in seqs]
+
+    # 업데이트 본: 표시마다 NIGHT_PER_FLAG 개 (문턱 근처 제외) + 문턱 근처 (보고만)
+    uflag_arr = np.array([u[2] for u in upool], dtype=np.int64)
+    unear_arr = np.array([u[3] for u in upool], dtype=np.int64)
+    stats["upool_flags"] = {f: int(((uflag_arr & UFLAG[f]) != 0).sum()) for f in UPD_FLAGS}
+    stats["upool_near"] = int(unear_arr.sum())
+    uchosen = set()
+    for f in UPD_FLAGS:
+        idx = np.flatnonzero(((uflag_arr & UFLAG[f]) != 0) & (unear_arr == 0))
+        if len(idx) > NIGHT_PER_FLAG:
+            idx = np.sort(rng.choice(idx, size=NIGHT_PER_FLAG, replace=False))
+        uchosen |= set(int(i) for i in idx)
+    umain = [make_upd_case(c, nights[upool[i][0]], upool[i][1], KIND_MAIN) for i in sorted(uchosen)]
+    uidx = np.flatnonzero(unear_arr != 0)
+    unear = [make_upd_case(c, nights[upool[i][0]], upool[i][1], KIND_NEAR)
+             for i in (np.sort(rng.choice(uidx, size=min(6, len(uidx)), replace=False)) if len(uidx) else [])]
+
+    # 끝 사례 (무대)
+    edges, uedges = run_night_edges(cfg, c)
+    stats["edge_names"] = [e["name"] for e in night_step_edge_specs()]
+    stats["upd_edge_names"] = [e["name"] for e in night_update_edge_specs()]
+
+    # 생애 열: 스텝 사례(KIND_LIFE)와 업데이트 사례(KIND_LIFE)를 번갈아
+    lives = []
+    for name, pairs, m in find_life_windows(records, nights, pool, upool):
+        sc = [make_case(c, records[ri], m, KIND_LIFE) for ri, _ in pairs]
+        uc = [make_upd_case(c, nights[ni], m, KIND_LIFE) for _, ni in pairs]
+        check_chain(name, sc)
+        check_life_chain(name, sc, uc)
+        lives.append((name, sc, uc))
+    stats["life_names"] = [x[0] for x in lives]
+    return dict(c=c, main=main, near=near, edges=edges, seqs=seqs, stats=stats, umain=umain, unear=unear, uedges=uedges,
+                lives=lives, init=night_init_rows(cfg), hash=night_hash_rows())
+
+
+def check_life_chain(name: str, sc: list, uc: list) -> None:
+    """생애 열: 스텝 k 뒤 = 업데이트 k 앞(위치·사냥 중), 업데이트 k 뒤 = 스텝 k+1 앞(잠·활동도)·업데이트 k+1 앞(밤잠 상태)."""
+    for k in range(len(sc)):
+        s, u = sc[k], uc[k]
+        if (s["post"]["pos"] != u["inp"]["wolf"] or s["out"]["hunt_post"] != u["inp"]["st"]["hunt"]
+                or s["inp"]["night"]["asleep"] != u["inp"]["st"]["asleep"] or s["inp"]["night"]["act"] != u["inp"]["st"]["act"]):
+            raise SystemExit(f"생애 열 {name} {k}: 스텝 결과가 같은 세계 스텝의 밤잠 업데이트 입력과 다르다")
+        if k + 1 < len(sc):
+            s2, u2 = sc[k + 1], uc[k + 1]
+            if (u["post"]["asleep"] != s2["inp"]["night"]["asleep"] or u["post"]["act"] != s2["inp"]["night"]["act"]
+                    or any(u["post"][c_] != u2["inp"]["st"][c_] for c_ in UPD_COLS)
+                    or u2["inp"]["st"]["delay"] != u["inp"]["st"]["delay"]):
+                raise SystemExit(f"생애 열 {name} {k}: 밤잠 업데이트 결과가 다음 스텝 입력과 다르다")
+
+
+def flatten_night(g: dict, fl: dict) -> dict:
+    """밤잠 골든 → 헤더 배열 (스텝 사례 밤잠 칸·업데이트 사례·처음 상태·지연 해시·생애 열). 스텝 사례 순서는 flatten(g) 뒤에
+    생애 열 스텝 사례를 이어 붙인다 — kCaseCount 는 그 합이다(flatten 이 g['lives'] 를 모른다)."""
+    cases = fl["cases"]
+    life_steps = []
+    for name, sc, uc in g["lives"]:
+        life_steps += sc
+    N = {k: [] for k in ("pre", "post_hunt", "nflags")}
+    for cs in cases + life_steps:
+        nt = cs["inp"]["night"]
+        N["pre"] += [int(nt["asleep"]), int(nt["act"]), int(nt["hunt"])]
+        N["post_hunt"].append(int(cs["out"]["hunt_post"]))
+        N["nflags"].append(night_flags_of(g["c"], cs["inp"], cs["out"]))
+    ucases = list(g["umain"]) + list(g["uedges"])
+    life_tab = []
+    for name, sc, uc in g["lives"]:
+        life_tab.append((name, len(cases) + sum(len(x[1]) for x in g["lives"][:len(life_tab)]), len(ucases), len(sc)))
+        ucases += uc
+    unear_begin = len(ucases)
+    ucases += list(g["unear"])
+    U = {k: [] for k in ("kind", "src", "label", "flags", "near", "noct", "dark", "clock", "wolf", "pre", "delay", "pbeg",
+                         "pcnt", "post", "ev", "smult", "dmin")}
+    UP = {"pos": [], "slot": []}
+    for u in ucases:
+        inp, post, ev = u["inp"], u["post"], u["ev"]
+        U["kind"].append(u["kind"])
+        U["src"] += list(u["src"])
+        U["label"].append(u["label"])
+        U["flags"].append(u["flags"])
+        U["near"].append(u["near"])
+        U["noct"].append(int(inp["noct"]))
+        U["dark"].append(inp["dark"])
+        U["clock"] += list(inp["clock"])
+        U["wolf"] += list(inp["wolf"])
+        st = inp["st"]
+        U["pre"] += [int(st[k]) for k in UPD_COLS] + [int(st["hunt"])]
+        U["delay"].append(int(st["delay"]))
+        U["pbeg"].append(len(UP["slot"]))
+        U["pcnt"].append(len(inp["deer_x"]))
+        for i in range(len(inp["deer_x"])):
+            UP["pos"] += [float(inp["deer_x"][i]), float(inp["deer_y"][i])]
+            UP["slot"].append(int(inp["slot"][i]))
+        U["post"] += [int(post[k]) for k in UPD_COLS]
+        U["ev"].append(sum(1 << i for i, b in enumerate(UPD_EVENTS) if ev[b]))
+        U["smult"].append(u["smult"])
+        U["dmin"].append(u["dmin"] if math.isfinite(u["dmin"]) else -1.0)
+    return dict(N=N, U=U, UP=UP, ucases=ucases, life_tab=life_tab, unear_begin=unear_begin, life_steps=life_steps)
+
+
+def night_extra(g: dict, fl: dict, nf: dict) -> tuple[str, str]:
+    """밤잠 헤더의 머리 주석 덧붙임과 네임스페이스 끝 배열."""
+    s, c = g["stats"], g["c"]
+    N, U, UP = nf["N"], nf["U"], nf["UP"]
+    ukinds = np.bincount(np.array(U["kind"]), minlength=KIND_LIFE + 1)
+    life_lines = "\n".join(f"//   {i:2d} {name:16s} 스텝 사례 {sb}~{sb + ln - 1}, 업데이트 사례 {ub}~{ub + ln - 1} ({ln}세계 스텝)"
+                           for i, (name, sb, ub, ln) in enumerate(nf["life_tab"]))
+    uf = ", ".join(f"{f} {s['upool_flags'][f]}" for f in UPD_FLAGS)
+    nfl = ", ".join(f"{f} {s['pool_night_flags'][f]}" for f in NIGHT_STEP_FLAGS)
+    n_life = len(nf["life_steps"])
+    comment = (
+        f"//\n"
+        f"// ---- 밤잠 점진화 (EcoThreatModel.h FThreatConfig::bRealismNight = true, NightInit·NightUpdate·Step) ----\n"
+        f"// 스텝 사례: 위 kCaseCount 에 생애 열 스텝 {n_life}개가 이어 붙어 있다(종류 kKindLife). 사례마다 스텝 전 밤잠 상태 kCaseNightPre\n"
+        f"//   (잠·활동도·지난 스텝 사냥 중) — C++ 은 State.bAsleep·NightAct·bNightHunt 에 넣고 Step 뒤 bNightHunt 를 kCaseNightPostHunt 와 비교한다.\n"
+        f"//   롤아웃 스텝 열은 스텝 소유 칸(위치·heading·정수 상태·bNightHunt)만 이어 쓰고 밤잠 업데이트 소유 칸(잠·활동도)은 사례마다 골든 값이다.\n"
+        f"//   밤잠 표시 풀(롤아웃 위협 스텝): {nfl}\n"
+        f"// 업데이트 사례 kUpdCount = {len(nf['ucases'])}: 본 {ukinds[KIND_MAIN]}, 끝 {ukinds[KIND_EDGE]}, 생애 열 {ukinds[KIND_LIFE]}, "
+        f"문턱 근처(보고만) {ukinds[KIND_NEAR]} (업데이트 풀 {s['upool']}, 문턱 근처 {s['upool_near']})\n"
+        f"//   한 사례 = 늑대 하나의 NightUpdate 한 번: 어둠 d·늑대 위치·사슴(가까운 순 {NIGHT_KEEP}마리)·업데이트 전 상태 -> 뒤 상태·사건·속력 배수\n"
+        f"//   업데이트 표시 풀: {uf}\n"
+        f"// 생애 열 kLifeCount = {len(nf['life_tab'])} (Step -> NightUpdate 를 번갈아, 첫 스텝만 골든 상태이고 그 뒤는 C++ 자기 출력):\n"
+        f"{life_lines}\n"
+        f"// 처음 상태 kInitCount = {len(g['init'])} (보정 시드 {NIGHT_INIT_SEEDS[0]}~{NIGHT_INIT_SEEDS[-1]} 세계 생성), "
+        f"지연 해시 kHashCount = {len(g['hash'])}\n"
+        f"// 밤잠 문턱 근처: 잰 업데이트의 가장 가까운 사슴 |d - settle_r| < {EX_SETTLE:g} 는 본·생애 열에서 뺐다\n")
+    I, H = g["init"], g["hash"]
+    upd_flag_names = ", ".join(f'"{x}"' for x in UPD_FLAGS)
+    nstep_names = ", ".join(f'"{x}"' for x in NIGHT_STEP_FLAGS)
+    life_names = ", ".join(f'"{x[0]}"' for x in nf["life_tab"])
+    uedge_names = (","+chr(10)+chr(9)+chr(9)).join(f'"{x}"' for x in s["upd_edge_names"])
+    ev_consts = "\n".join(f"\tinline constexpr std::uint8_t kEv{''.join(p.capitalize() for p in b.split('_'))} = {1 << i};"
+                          for i, b in enumerate(UPD_EVENTS))
+    extra = f"""
+	// ======================== 밤잠 점진화 ========================
+	inline constexpr std::uint8_t kKindLife = {KIND_LIFE};        // 생애 열의 스텝·업데이트 (스텝 사례와 업데이트 사례 모두)
+
+	// 업데이트 사건 비트 (kUpdEvents, C++ FNightUpdateResult 칸)
+{ev_consts}
+
+	// ---- 스텝 사례의 밤잠 칸 (kCaseCount + 생애 열 스텝) ----
+	inline constexpr std::int32_t kNightCaseCount = {len(N["post_hunt"])};
+	inline constexpr std::int32_t kNightStepFlagCount = {len(NIGHT_STEP_FLAGS)};
+	inline constexpr const char* kNightStepFlagNames[kNightStepFlagCount] = {{{nstep_names}}};
+{c_array("std::uint8_t", "kCaseNightPre", N["pre"], 30, _i, comment="[n*3] 스텝 전 잠, 활동도 NightAct, 지난 스텝 사냥 중 bNightHunt")}
+{c_array("std::uint8_t", "kCaseNightPostHunt", N["post_hunt"], 40, _i, comment="[n] 스텝 뒤 bNightHunt")}
+{c_array("std::uint32_t", "kCaseNightFlags", N["nflags"], 20, _i, comment="[n] 밤잠 표시 비트 (kNightStepFlagNames)")}
+
+	// ---- 업데이트 사례 ----
+	inline constexpr std::int32_t kUpdCount = {len(nf["ucases"])};
+	inline constexpr std::int32_t kUpdNearBegin = {nf["unear_begin"]};
+	inline constexpr std::int32_t kUpdFlagCount = {len(UPD_FLAGS)};
+	inline constexpr const char* kUpdFlagNames[kUpdFlagCount] = {{{upd_flag_names}}};
+	inline constexpr std::int32_t kUpdEdgeCount = {len(s["upd_edge_names"])};
+	inline constexpr const char* kUpdEdgeNames[kUpdEdgeCount] = {{
+		{uedge_names}
+	}};
+{c_array("std::uint8_t", "kUpdKind", U["kind"], 40, _i, comment="[u] kKind* (본·끝·문턱 근처·생애 열)")}
+{c_array("std::int32_t", "kUpdSource", U["src"], 12, _i, comment="[u*3] 롤아웃: 시드, 업데이트 때 t, 늑대 색인 / 끝: -1, 이름 번호, 0")}
+{c_array("std::int32_t", "kUpdEdge", U["label"], 24, _i, comment="[u] kUpdEdgeNames 번호 (끝 사례가 아니면 -1)")}
+{c_array("std::uint32_t", "kUpdFlags", U["flags"], 16, _i, comment="[u] 업데이트 표시 비트 (kUpdFlagNames)")}
+{c_array("std::uint8_t", "kUpdNear", U["near"], 40, _i, comment="[u] 밤잠 문턱 근처 (가장 가까운 사슴 |d - settle_r| < EX_SETTLE)")}
+{c_array("std::uint8_t", "kUpdNocturnal", U["noct"], 40, _i)}
+{c_array("double", "kUpdDark", U["dark"], 6, d_lit, comment="[u] 업데이트 때 어둠 d (새 t)")}
+{c_array("std::int32_t", "kUpdClock", U["clock"], 16, _i, comment="[u*4] t, T, o, τ (DayNightDark 확인용)")}
+{c_array("double", "kUpdWolfPos", U["wolf"], 6, d_lit, comment="[u*2] 늑대 위치 (이번 스텝 이동 뒤)")}
+{c_array("std::int32_t", "kUpdPreInt", U["pre"], 18, _i, comment="[u*6] 잠, 활동도, 눕는 중, 어둠 경과, 기상 대기, 지난 스텝 사냥 중")}
+{c_array("std::int32_t", "kUpdDelay", U["delay"], 24, _i, comment="[u] 늑대별 지연 NightDelay")}
+{c_array("std::int32_t", "kUpdPreyBegin", U["pbeg"], 16, _i)}
+{c_array("std::int32_t", "kUpdPreyCount", U["pcnt"], 24, _i)}
+	inline constexpr std::int32_t kUpdPreyTotal = {len(UP["slot"])};
+{c_array("double", "kUpdPreyPos", UP["pos"], 6, d_lit, comment="[p*2] 사슴 위치 (이동 뒤, 리스폰 전)")}
+{c_array("std::int32_t", "kUpdPreySlot", UP["slot"], 16, _i, comment="[p] 원래 사슴 슬롯")}
+{c_array("std::int32_t", "kUpdPostInt", U["post"], 15, _i, comment="[u*5] 뒤 잠, 활동도, 눕는 중, 어둠 경과, 기상 대기")}
+{c_array("std::uint8_t", "kUpdEvents", U["ev"], 40, _i, comment="[u] kEv* 비트")}
+{c_array("double", "kUpdSpeedMult", U["smult"], 6, d_lit, comment="[u] 뒤 속력 배수 (world.py _pred_speed_mult = NightSpeedMult)")}
+{c_array("double", "kUpdNearestDist", U["dmin"], 6, d_lit, comment="[u] 잰 가장 가까운 사슴 실거리 (재지 않았으면 -1, 보고용)")}
+
+	// ---- 생애 열 ----
+	inline constexpr std::int32_t kLifeCount = {len(nf["life_tab"])};
+	inline constexpr const char* kLifeNames[kLifeCount] = {{{life_names}}};
+{c_array("std::int32_t", "kLifeStepBegin", [x[1] for x in nf["life_tab"]], 16, _i, comment="[l] 첫 스텝 사례 번호")}
+{c_array("std::int32_t", "kLifeUpdBegin", [x[2] for x in nf["life_tab"]], 16, _i, comment="[l] 첫 업데이트 사례 번호")}
+{c_array("std::int32_t", "kLifeLength", [x[3] for x in nf["life_tab"]], 16, _i, comment="[l] 세계 스텝 수")}
+
+	// ---- 처음 상태 (세계 생성, NightInit) ----
+	inline constexpr std::int32_t kInitCount = {len(I)};
+{c_array("std::int32_t", "kInitSeed", [r["seed"] for r in I], 12, _i)}
+{c_array("std::int32_t", "kInitSlot", [r["slot"] for r in I], 24, _i)}
+{c_array("std::int32_t", "kInitTw", [r["tw"] for r in I], 24, _i, comment="[i] 박명 폭 τ (낮 고정 세계는 0)")}
+{c_array("std::uint8_t", "kInitNocturnal", [int(r["noct"]) for r in I], 40, _i)}
+{c_array("double", "kInitDark", [r["dark"] for r in I], 6, d_lit, comment="[i] t = 0 의 어둠")}
+{c_array("std::int32_t", "kInitDelay", [r["delay"] for r in I], 24, _i)}
+{c_array("std::int32_t", "kInitPostInt", [v for r in I for v in (int(r["asleep"]), r["act"], int(r["settle"]), r["dark_k"], r["wait"])], 15, _i, comment="[i*5] 잠, 활동도, 눕는 중, 어둠 경과, 기상 대기")}
+
+	// ---- 지연 해시 (NightDelayOf) ----
+	inline constexpr std::int32_t kHashCount = {len(H)};
+{c_array("std::int32_t", "kHashSeed", [r["seed"] for r in H], 12, _i)}
+{c_array("std::int32_t", "kHashSlot", [r["slot"] for r in H], 24, _i)}
+{c_array("std::int32_t", "kHashMaxDelay", [r["max_delay"] for r in H], 24, _i)}
+{c_array("std::int32_t", "kHashDelay", [r["delay"] for r in H], 24, _i)}
+"""
+    return comment, extra
+
+
+def write_night_header(path: Path, g: dict, meta: dict) -> None:
+    """ThreatNightGoldenVectorsV3.h — 밤잠 점진화 골든 (모듈 docstring '밤잠 점진화 골든')."""
+    fl = flatten(g)
+    nf = flatten_night(g, fl)
+    comment, extra = night_extra(g, fl, nf)
+    g2 = dict(g)
+    # flatten 이 만든 스텝 사례 뒤에 생애 열 스텝 사례를 붙여 쓴다: 본 헤더 함수가 g['near'] 를 맨 뒤에 두므로 생애 열을 near 뒤에 붙인다
+    g2["near"] = list(g["near"]) + nf["life_steps"]
+    write_header(path, g2, meta, ns="EcoThreatV3::GoldenNight",
+                 title="v3 위협 모델 밤잠 점진화 골든 (EcoThreatModel.h bRealismNight: NightInit·NightUpdate·Step 대조)",
+                 extra_comment=comment, extra=extra)
 
 
 # --------------------------------------------------------------------- #
@@ -1413,6 +2286,8 @@ def export(model_path: Path, config: Path, out: Path, seeds=GOLDEN_SEEDS, steps:
     try:
         model = load_model(model_path)
         cfg = load_v2_config(config)
+        if night_constants(cfg) is not None:
+            raise SystemExit("realism_night 를 켠 세계는 밤잠 골든(--night, export_night)으로 만든다")
         g = build_golden(model, cfg, seeds, steps)
     finally:
         th.set_num_threads(prev)
@@ -1423,6 +2298,32 @@ def export(model_path: Path, config: Path, out: Path, seeds=GOLDEN_SEEDS, steps:
     return dict(meta=meta, golden=g, stats=g["stats"])
 
 
+def export_night(model_path: Path, config: Path, out: Path, seeds=GOLDEN_SEEDS, steps: int = GOLDEN_STEPS) -> dict:
+    """밤잠 점진화 골든 헤더(ThreatNightGoldenVectorsV3.h)를 `out` 에 쓴다. 반환: 메타·골든·통계."""
+    import torch as th
+
+    from env_v2.config import load_v2_config
+    from export_weights_v3 import load_model
+
+    check_seeds(seeds)
+    model_path, config, out = Path(model_path), Path(config), Path(out)
+    if not model_path.exists():
+        raise SystemExit(f"{model_path} 없음")
+    prev = th.get_num_threads()
+    th.set_num_threads(1)
+    try:
+        model = load_model(model_path)
+        cfg = load_v2_config(config)
+        g = build_night_golden(model, cfg, seeds, steps)
+    finally:
+        th.set_num_threads(prev)
+    meta = dict(model=rel(model_path), model_sha256=hashlib.sha256(model_path.read_bytes()).hexdigest(),
+                world_config=rel(config), world_digest=config_digest(cfg))
+    out.mkdir(parents=True, exist_ok=True)
+    write_night_header(out / NIGHT_HEADER, g, meta)
+    return dict(meta=meta, golden=g, stats=g["stats"])
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(description="v3 위협 모델 골든 내보내기")
     p.add_argument("--model", default=str(DEFAULT_MODEL), help="사슴을 모는 R1b 모델")
@@ -1430,7 +2331,23 @@ def main(argv=None) -> int:
     p.add_argument("--seeds", type=int, nargs="+", default=list(GOLDEN_SEEDS))
     p.add_argument("--steps", type=int, default=GOLDEN_STEPS)
     p.add_argument("--out", default=str(UE_POLICY_DIR), help="헤더를 쓸 폴더 (기본: 언리얼 모듈 AI/Policy)")
+    p.add_argument("--night", action="store_true",
+                   help=f"밤잠 점진화 골든 {NIGHT_HEADER} (세계 기본값 configs/v3_real1_night_on.yaml)")
     args = p.parse_args(argv)
+    if args.night:
+        config = Path(args.config) if args.config != str(DEFAULT_CONFIG) else NIGHT_CONFIG
+        r = export_night(Path(args.model), config, Path(args.out), args.seeds, args.steps)
+        g, s = r["golden"], r["stats"]
+        fl = flatten(g)
+        nf = flatten_night(g, fl)
+        print(f"모델: {r['meta']['model']}  sha256 {r['meta']['model_sha256'][:16]}  세계 {r['meta']['world_config']}")
+        print(f"풀: 위협 스텝 {s['pool']}, 밤잠 업데이트 {s['upool']} (문턱 근처 {s['upool_near']})")
+        print(f"스텝 사례: {len(fl['cases']) + len(nf['life_steps'])} (생애 열 {len(nf['life_steps'])}), 업데이트 사례: {len(nf['ucases'])}")
+        print(f"밤잠 스텝 표시 풀: {s['pool_night_flags']}")
+        print(f"업데이트 표시 풀: {s['upool_flags']}")
+        print(f"생애 열: {s['life_names']}, 롤아웃 열: {s['rollout_seqs']}")
+        print(f"생성: {Path(args.out) / NIGHT_HEADER}")
+        return 0
     r = export(Path(args.model), Path(args.config), Path(args.out), args.seeds, args.steps)
     g, s = r["golden"], r["stats"]
     fl = flatten(g)

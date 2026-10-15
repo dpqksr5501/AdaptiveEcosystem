@@ -67,10 +67,18 @@ namespace EcoPolicyV3IntegratedProcImpl
 		return MoveOne(A, *(*A.WolfInts)[Index], FromX, FromY, ToX, ToY);
 	}
 
+	// 비축으로 사는 사슴의 Vitals 에너지 거울 하한 (0~1 비율). 화면 0% 로 보인다
+	constexpr double kReserveMirrorFloor = 1.0e-3;
+
 	float EnergyMirror(const EcoWorldV3::FHerbBody& B, const FEcoVitalsFragment& V)
 	{
 		// v3 에너지 E (0~1) × MaxEnergy — 조정자 요약(AverageEnergy)·표현 Energy 가 같은 척도로 읽는다
-		return static_cast<float>(FMath::Clamp(B.Energy, 0.0, 1.0)) * V.MaxEnergy;
+		// 야생 (w1) 지방 비축: 배(E)가 0 이어도 비축이 남은 산 사슴은 살아 있다. 팀 사슴 HP 감소(Vitals.Energy ≤ 0 이면 초당 HP −5,
+		// Creature/Runtime/EcoCreatureIntegrationSpawner)가 v3 의 굶음 판정(C6: 배·비축 모두 0)보다 먼저 죽이지 않게 거울 값을 아주 작은 양수로 둔다.
+		// 죽음은 지금처럼 v3 DeathCause → HP 0 한 길로만 넘긴다
+		const double E = FMath::Clamp(B.Energy, 0.0, 1.0);
+		const bool bLivingOnReserve = E <= 0.0 && B.Reserve > 0.0 && B.DeathCause == EcoWorldV3::kDeathNone;
+		return static_cast<float>(bLivingOnReserve ? kReserveMirrorFloor : E) * V.MaxEnergy;
 	}
 
 	/** 산 사슴(List = Deer 색인) 에너지 평균·굶주림 수 → 컨텍스트 (먹기 표시·기록). */
@@ -86,6 +94,54 @@ namespace EcoPolicyV3IntegratedProcImpl
 		}
 		Ctx.MeanEnergy = List.IsEmpty() ? 0.0 : Sum / static_cast<double>(List.Num());
 		Ctx.StarvingDeer = Starving;
+		// 야생 (w1) 지방 비축 (켠 세계만): 비축 평균·최소, 비축으로 사는 사슴(배 0), 비축 바닥 가까움, 약함
+		Ctx.MeanReserve = Ctx.MinReserve = 0.0;
+		Ctx.OnReserveDeer = Ctx.LowReserveDeer = Ctx.WeakDeer = 0;
+		if (Ctx.Sim.Config.WildReserve.bEnabled && !List.IsEmpty())
+		{
+			double RSum = 0.0;
+			double RMin = 1.0;
+			for (const int32 k : List)
+			{
+				const EcoWorldV3::FHerbBody& B = *Deer[k].View.Body;
+				RSum += B.Reserve;
+				RMin = FMath::Min(RMin, B.Reserve);
+				Ctx.OnReserveDeer += B.Energy <= 0.0 ? 1 : 0;
+				Ctx.LowReserveDeer += B.Reserve < EcoV3Integrated::kLowReserve ? 1 : 0;
+				Ctx.WeakDeer += B.bWeak ? 1 : 0;
+			}
+			Ctx.MeanReserve = RSum / static_cast<double>(List.Num());
+			Ctx.MinReserve = RMin;
+		}
+	}
+
+	/**
+	 * 경계 거리 기록 (사람 결정 10-15 (C), 규칙 켬·끔 모두 센다): 이 스텝 끝 산 사슴 중 식사 중(쿨다운 > 0)이고 깨어 있는 늑대의
+	 * 15 m(kNearEatingWolfUnits) 안에 있는 사슴 수 → 컨텍스트 누적 (개체·스텝). 기록 전용.
+	 */
+	void TallyNearEatingWolves(FEcoV3RegionContext& Ctx, const TArray<FEcoV3DeerRec>& Deer, const TArray<int32>& DeerList,
+							   const TArray<FEcoV3WolfRec>& Wolves, const TArray<int32>& WolfList)
+	{
+		const double R2 = EcoV3Integrated::kNearEatingWolfUnits * EcoV3Integrated::kNearEatingWolfUnits;
+		for (const int32 k : DeerList)
+		{
+			const EcoWorldV3::FVec2 P = Deer[k].View.Body->Pos;
+			for (const int32 w : WolfList)
+			{
+				const EcoWorldV3::FThreatAgent& A = *Wolves[w].Agent;
+				if (A.State.Cooldown <= 0 || EcoWorldV3::ThreatAsleepNow(Ctx.Sim, A))
+				{
+					continue;
+				}
+				const double Dx = A.State.PosX - P.X;
+				const double Dy = A.State.PosY - P.Y;
+				if (Dx * Dx + Dy * Dy <= R2)
+				{
+					++Ctx.NearEatingDeerSteps;
+					break;
+				}
+			}
+		}
 	}
 }
 
@@ -258,6 +314,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		HerbInts.Reset();
 		ThreatPtrs.Reset();
 		WolfInts.Reset();
+		WolfIds.Reset();
 		for (const int32 k : DeerByContext[c])
 		{
 			Views.Add(Deer[k].View);StableViewIds.Add(Deer[k].Id);
@@ -267,6 +324,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		{
 			ThreatPtrs.Add(Wolves[k].Agent);
 			WolfInts.Add(Wolves[k].Int);
+			WolfIds.Add(Wolves[k].Id);
 		}
 	};
 
@@ -297,8 +355,10 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			const FVector Loc = Xf.GetLocation();
 			const FVector Fwd = Xf.GetRotation().GetForwardVector();
 			const EcoWorldV3::FVec2 P = Ctx.CmToUnits(Loc);
+			// 종류 = 지역 안 순번 (StableAgentId 순, 짝수 잠행·홀수 추격). 밤잠 점진화의 늑대별 지연 해시 키는 StableAgentId 다
+			// (파이썬은 세계 시드·위협 슬롯. 통합 모드는 지역들이 세션 시드 하나를 같이 쓰므로 순번을 쓰면 지역마다 지연이 똑같아진다)
 			const EcoThreatV3::FThreatSpec Spec = EcoV3Integrated::WolfSpecForOrdinal(Ctx.AdoptedWolves++, Ctx.Sim.Config.PredSpeedMult);
-			EcoWorldV3::AdoptThreat(Ctx.Sim, *W.Agent, Spec, P.X, P.Y, Fwd.X, Fwd.Y);
+			EcoWorldV3::AdoptThreat(Ctx.Sim, *W.Agent, Spec, P.X, P.Y, Fwd.X, Fwd.Y, W.Id);
 			W.Int->bAdopted = true;
 			W.Int->ContextIndex = Ctx.Index;
 			W.Int->GroundZ = Loc.Z;
@@ -378,6 +438,9 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			{
 				const EcoWorldV3::FHerbBody& Body = *Views[r].Body;
 				FEcoIntegratedV3Fragment& Int = *HerbInts[r];
+				// 사슴 얼기 막음 확인: 요청을 읽은 결정의 마스크에 얼기 칸이 열렸는가 (eco.IntegratedV3.NoFreeze 1 이면 늘 0)
+				const EcoWorldV3::FHerbDecision& Dec = *Views[r].Decision;
+				Ctx.FreezeMaskOpen += (Dec.bCommittedReads && Dec.CommittedMask[EcoRepertoireV3::kFreeze] != 0) ? 1 : 0;
 				if (Body.LastIntake > 0.0 && Int.AteLogEpoch != Ctx.LogEpoch)
 				{
 					Int.AteLogEpoch = Ctx.LogEpoch;
@@ -419,7 +482,8 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				}
 				List.RemoveAt(r);
 			}
-			// 늑대 표현 자리표시: 포획 뒤 쿨다운 → '먹는 중', 표적을 쫓으면 '추격 중' (팀 표현 깃발)
+			// 늑대 표현 자리표시: 포획 뒤 쿨다운 → '먹는 중', 표적을 쫓으면 '추격 중' (팀 표현 깃발). 팀 표현은 '먹는 중' 깃발 + 속도 0
+			// (식사 중 제자리, 사람 결정 10-15 (B))이면 '먹는 중' 동작을 보인다. 식사·이어 사냥 기록 (TallyWolfStep)
 			for (const int32 k : WolvesByContext[c])
 			{
 				const EcoWorldV3::FThreatAgent& A = *Wolves[k].Agent;
@@ -432,8 +496,11 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
                     Snapshot.LastSeenPreyKey=StableViewIds[Target];Snapshot.LastSeenPreyTime=Now;
                 }
 
+				Ctx.TallyWolfStep(A, Wolves[k].Id, Ctx.Sim.T - 1);
 			}
+			TallyNearEatingWolves(Ctx, Deer, List, Wolves, WolvesByContext[c]);   // 경계 거리 기록 (규칙 켬·끔 모두)
 			TallyEnergy(Ctx, Deer, List);   // 기록 줄이 이 스텝 끝 에너지를 쓴다
+			Sub->NotifyNightStep(Ctx, ThreatPtrs.GetData(), WolfIds.GetData(), ThreatPtrs.Num());   // 늑대 밤잠 사건 줄 (켠 세계만)
 			Sub->NotifyContextStep(Ctx, Report);
             if (Ctx.bSpatialFoodRegistered)
             {
@@ -457,6 +524,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		FEcoV3RegionContext& Ctx = *Sub->GetContext(c);
 		FMemory::Memzero(Ctx.BehaviorNow, sizeof(Ctx.BehaviorNow));
 		FMemory::Memzero(Ctx.WolvesNow, sizeof(Ctx.WolvesNow));
+		FMemory::Memzero(Ctx.KeepNow, sizeof(Ctx.KeepNow));
 		for (const int32 k : DeerByContext[c])
 		{
 			FEcoV3DeerRec& D = Deer[k];
@@ -467,10 +535,15 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			{
 				++Ctx.BehaviorNow[B];
 			}
+			const int32 Km = D.View.Decision->KeepActive;   // 경계 거리 덮기 (규칙을 끄면 늘 0)
+			if (Km >= 0 && Km < EcoWorldV3::kNumKeepModes)
+			{
+				++Ctx.KeepNow[Km];
+			}
 		}
 		for (const int32 k : WolvesByContext[c])
 		{
-			++Ctx.WolvesNow[static_cast<int32>(EcoV3Integrated::WolfStateOf(*Wolves[k].Agent))];
+			++Ctx.WolvesNow[static_cast<int32>(EcoV3Integrated::WolfStateOf(*Wolves[k].Agent, Ctx.Sim.ThreatCfg))];
 		}
 		Ctx.AliveDeer = DeerByContext[c].Num();
 		Ctx.Wolves = WolvesByContext[c].Num();
@@ -523,8 +596,9 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 	const bool bDebug = UEcoPolicyV3IntegratedSubsystem::IsDebugDrawEnabled();
 	const double K = EcoRepertoireV3::kUnitCm / EcoRepertoireV3::kStepSeconds;   // 단위/스텝 → cm/s
 	const int64 NowStep = Sub->GetGlobalStep();
+	const bool bReserveOn = Sub->GetSettings().bWildReserve;   // 야생 (w1) 지방 비축 글자 (모든 지역이 같은 설정)
 
-	DeerQuery.ForEachEntityChunk(Context, [Sub, Alpha, bDebug, K, World, NowStep](FMassExecutionContext& Ctx)
+	DeerQuery.ForEachEntityChunk(Context, [Sub, Alpha, bDebug, K, World, NowStep, bReserveOn](FMassExecutionContext& Ctx)
 	{
 		const TArrayView<FTransformFragment> Xfs = Ctx.GetMutableFragmentView<FTransformFragment>();
 		const TArrayView<FMassVelocityFragment> Vels = Ctx.GetMutableFragmentView<FMassVelocityFragment>();
@@ -566,7 +640,9 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 					// 팀 시계에 다시 맞추면 전역 스텝이 뒤로 갈 수 있다 — 음수 경과는 표시하지 않는다
 					const int64 SinceRepro = NowStep - Int.ReproducedStep;
 					const bool bRecentRepro = Int.ReproducedStep >= 0 && SinceRepro >= 0 && SinceRepro <= EcoV3Integrated::kReproMarkSteps;
-					Label = EcoV3Integrated::DeerLabel(Rep, B, bRecentRepro, Color);
+					// 도주 반사 덮기 중이면 '경계(먹으며 멀어짐)'·'도주(안전해질 때까지)'·'웅크림(은신처·경계)' (야생 w3)
+					Label = EcoV3Integrated::DeerLabel(Rep, B, bRecentRepro, Color, States[i].Decision.KeepActive,
+													   bReserveOn);
 				}
 				DrawDebugString(World, Loc + FVector(0.0, 0.0, 230.0), Label, nullptr, Color, 0.0f, true, 1.1f);
 			}
@@ -600,15 +676,9 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 			Vels[i].Value = FVector((S.PosX - Ag.PrevX) * K, (S.PosY - Ag.PrevY) * K, 0.0);
 			if (bDebug)
 			{
-				using EcoV3Integrated::EWolfState;
-				const EWolfState St = EcoV3Integrated::WolfStateOf(Ag);
-				const FColor Color = St == EWolfState::Pounce   ? FColor(255, 120, 0)
-									 : St == EWolfState::Sleep	 ? FColor(60, 60, 160)
-									 : St == EWolfState::Stalk || St == EWolfState::Chase ? FColor::Red
-									 : St == EWolfState::Roam	 ? FColor(220, 150, 150)
-																 : FColor(150, 150, 150);
-				const FString Label = FString::Printf(TEXT("늑대 %s%s"), EcoV3Integrated::WolfStateNameKo(St),
-													  Ag.Spec.Type == EcoThreatV3::EThreatType::Stalker ? TEXT(" (잠행형)") : TEXT(" (추격형)"));
+				// '늑대 눕는 중 (추격형) 걸음 40%', '늑대 깨는 중', 못 누운 까닭 — EcoV3Integrated::WolfLabel
+				FColor Color;
+				const FString Label = EcoV3Integrated::WolfLabel(Ag, Rc->Sim.ThreatCfg, Rc->Sim.Dark, Color);
 				DrawDebugString(World, Loc + FVector(0.0, 0.0, 260.0), Label, nullptr, Color, 0.0f, true, 1.2f);
 			}
 		}

@@ -151,6 +151,7 @@ bool UEcoCreatureAnimationBuilder::UpdateVisualAuditActor(AEcoCreatureRepresenta
     UWorld* W=Actor?Actor->GetWorld():nullptr;
     if(!W||W->WorldType!=EWorldType::PIE||W->GetNetMode()!=NM_Standalone||!W->GetPathName().StartsWith(TEXT("/Game/JYU/Maps/"))||!Profile||!Profile->IsValidProfile())return false;
     if(!Actor->bBound&&!Actor->BindIdentity(State.StableAgentId,State.SpeciesId))return false;
+    Actor->Tags.AddUnique(TEXT("JYU.VisualAudit"));
     Actor->AnimationProfile=Profile;State.Sequence=Actor->VisualState.Sequence+1;State.WorldTime=W->GetTimeSeconds();
     State.bHasVitals=true;State.NormalizedHealth=State.NormalizedEnergy=1;
     return Actor->ConsumeVisualState(State,DeltaSeconds);

@@ -33,3 +33,6 @@ UE 5.8.3, D3D11, 복사 맵 PIE에서 동일 BP·동일 클립의 IK ON/OFF를 �
 최종 Build24에서도 같은 10조건을 다시 촬영하고, 먹는 중 새 Hearing/Sight cue를 주는 2조건을 추가해 총 12조건을 확인했다. 각각 포즈 1(먹기) → 2(경계) → 1로 복귀했다. [청각 반응 화면](Evidence/JYU_V3/HearingWhileGraze.png), [시야 반응 화면](Evidence/JYU_V3/SightWhileGraze.png), [시간별 포즈 근거](Evidence/JYU_V3/Sensory_pose_summary.json).
 
 급경사·낭떠러지·빠른 지면 변화·모든 카메라/LOD 조합의 무결함을 보장하는 검사는 아니다. 발목을 지면 노멀로 회전시키는 기능과 접촉 발 잠금은 추가하지 않았다. 보정 제한 밖에서는 원본 포즈를 우선하며, 기존 달리기 클립 자체의 공중 구간은 남는다. D3D12 실행에서 이 PC의 `DXGI_ERROR_DEVICE_HUNG`과 Windows LiveKernelEvent 141이 발생해 D3D11로 검증했다. 프로젝트 기본 렌더링 설정은 변경하지 않았다.
+
+
+2026-10-16 구분 보강: 비교 사슴에는 `NO AI` 라벨과 HUD 안내가 표시되며, 비교 36초 후 PIE가 자동 종료된다. 일반 생태계를 보려면 Play를 다시 시작한다. `run_jyu_ik_visual.py`는 이후 에디터까지 정상 종료하는 자동 검증용 runner다. 늑대 반응을 확인할 때는 IK 도구를 실행하지 않고 [위협 감사](JYU_THREAT_AND_BACKEND_AUDIT_20261016.md)의 일반 Play 경로를 사용한다.

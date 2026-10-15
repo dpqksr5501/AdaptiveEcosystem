@@ -1284,6 +1284,8 @@ def export(model_path: Path, config: Path, out: Path, seeds=GOLDEN_SEEDS, steps:
         from env_v2.features import features_of
         if any(n.startswith("realism_") for n in features_of(cfg).active):
             raise SystemExit("이 골든은 R1b 세계만 받는다 — realism_*(v3 현실성 1단계) 규칙은 C++ 에 아직 없다")
+        if features_of(cfg).params("threats").get("eat_in_place"):
+            raise SystemExit("이 골든은 R1b 세계만 받는다 — threats.eat_in_place(늑대가 잡은 자리에서 서서 먹음, 10-15)는 C++ 에 아직 없다")
         g = build_golden(model, cfg, seeds, steps)
     finally:
         th.set_num_threads(prev_threads)

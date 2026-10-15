@@ -20,6 +20,12 @@
 #include "MassEntityTemplate.h"
 #include "PhysicsEngine/PhysicsSettings.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
+#include "Creature/Debug/EcoCreatureInspection.h"
+#include "MassSpawnerSubsystem.h"
+#include "Mass/EcoMassFragments.h"
+#include "Mass/EntityFragments.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
 #include <limits>
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUSpatialFood,"AdaptiveEcosystem.Creature.JYU.SpatialFoodConservationAndExclusiveWriter",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoJYUSpatialFood::RunTest(const FString&) {
@@ -122,6 +128,46 @@ bool FEcoJYUAlarm::RunTest(const FString&) {
     TestTrue(TEXT("Persistent source and dedicated tag preserved"),Events[0].SourceAgentId==42 && Events[0].Tag==TEXT("Herd.Alarm") && Events[0].ThreatStrength>0);
     W.World->TimeSeconds+=1;N->GatherRecent(Events);
     TestTrue(TEXT("Expired alarms cannot be replayed by a later observer"),Events.IsEmpty());return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUInspectionBackend,"AdaptiveEcosystem.Creature.JYU.NativeThreatAndBackendInspection",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoJYUInspectionBackend::RunTest(const FString&) {
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner=W.World->GetSubsystem<UMassSpawnerSubsystem>();
+    auto* Config=UEcoCreatureV3Trait::MakeNetworkConfig(false);
+    TArray<FMassEntityHandle> Entities;
+    {auto Creation=Spawner->SpawnEntities(Config->GetOrCreateEntityTemplate(*W.World),1,Entities);}
+    if(!TestEqual(TEXT("Spawn actual v3 template"),Entities.Num(),1))return false;
+    auto& Manager=Spawner->GetEntityManagerChecked();const auto Entity=Entities[0];
+    auto& Identity=Manager.GetFragmentDataChecked<FEcoIdentityFragment>(Entity);
+    Identity.StableAgentId=9011;Identity.SpeciesId=TEXT("Herbivore");
+    auto& Perception=Manager.GetFragmentDataChecked<FEcoPerceptionCacheFragment>(Entity).Perception;
+    Perception.Threat.Nearest=0;Perception.Threat.PredCount=1;Perception.Threat.DPredMin=2.5;Perception.Kin.KinAlarm=.5;
+    Manager.GetFragmentDataChecked<FEcoBehaviorStateFragment>(Entity).Decision.bCommittedReads=true;
+    FString Json;if(!TestTrue(TEXT("Inspect actual Mass entity without a visual actor"),UEcoCreatureInspectionLibrary::CaptureAgent(W.World,9011,Json)))return false;
+    TSharedPtr<FJsonObject> Data;
+    if(!TestTrue(TEXT("Valid diagnostic JSON"),FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Json),Data)))return false;
+    TestEqual(TEXT("Reports observed threat count"),Data->GetNumberField(TEXT("native_threat_count")),1.0);
+    TestEqual(TEXT("Native distance explicitly converted to cm"),Data->GetNumberField(TEXT("native_threat_distance_cm")),500.0);
+    TestEqual(TEXT("Native kin alarm is distinguishable from Social alarm"),Data->GetNumberField(TEXT("native_kin_alarm")),.5);
+    TestFalse(TEXT("Never claims excluded Social runtime is active"),Data->GetBoolField(TEXT("social_runtime")));
+    TestFalse(TEXT("Never claims excluded SpeciesAI movement is active"),Data->GetBoolField(TEXT("species_ai_movement")));
+    TestEqual(TEXT("Observation includes actual trained dimensions"),Data->GetArrayField(TEXT("observation")).Num(),EcoPolicyV3::kObsDim);
+    TestTrue(TEXT("Distinguishes policy evaluation from holding previous action"),Data->GetBoolField(TEXT("committed_policy_read")));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUSenseProvenance,"AdaptiveEcosystem.Creature.JYU.NativeSightAndHearingProvenance",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoJYUSenseProvenance::RunTest(const FString&) {
+    EcoObservationV3::FThreatInput Threat;Threat.X=-2;Threat.HearR=5;
+    const auto Heard=EcoObservationV3::PerceiveThreats({0,0},{1,0},20,1,1,&Threat,1);
+    TestEqual(TEXT("Wolf behind deer is detected by hearing"),Heard.PredCount,1);
+    TestTrue(TEXT("Hearing is never mislabeled as direct sight"),Heard.bNearestHeard&&!Heard.bNearestSight);
+    Threat.X=2;
+    const auto Seen=EcoObservationV3::PerceiveThreats({0,0},{1,0},20,1,1,&Threat,1);
+    TestTrue(TEXT("Sight and hearing can both contribute"),Seen.bNearestSight&&Seen.bNearestHeard);
+    Threat.bAsleep=true;
+    const auto Sleeping=EcoObservationV3::PerceiveThreats({0,0},{1,0},20,1,1,&Threat,1);
+    TestTrue(TEXT("No stale sensory provenance on an ignored threat"),Sleeping.Nearest<0&&!Sleeping.bNearestSight&&!Sleeping.bNearestHeard);
+    return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUPlayerGait,"AdaptiveEcosystem.Creature.JYU.PlayerGaitBounds",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoJYUPlayerGait::RunTest(const FString&) {

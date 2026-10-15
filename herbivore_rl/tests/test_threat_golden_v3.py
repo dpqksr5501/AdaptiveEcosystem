@@ -4,6 +4,12 @@
 않는지, (3) 헤더의 모든 사례가 참조 스텝(C++ Step 의 파이썬 거울)과 맞는지, (4) 끝 사례·무대 열이 계약의 뜻(돌진 문턱 6 정확히 같음,
 쿨다운 5 = 4스텝 쉼, 해 질 녘 잠 등)대로 world.py 에서 나왔는지, (5) 위협 종류·상태 전이를 모두 덮는지, (6) 판정 시드를 쓰지 않는지
 본다. g++ 가 있으면 언리얼 모듈의 `EcoThreatModel.h` 를 그대로 컴파일해 골든과 대조한다(`tests/cpp/threat_v3_main.cpp`).
+
+밤잠 점진화 골든(`--night`, configs/v3_real1_night_on.yaml, 사람 결정 H1 10-14)도 같은 꼴로 본다: 다시 만든 헤더가 모듈 헤더와 바이트
+단위로 같은지, 기록 장치(밤잠 업데이트 감싸기 포함)가 궤적을 바꾸지 않는지, 참조 스텝·참조 밤잠 업데이트가 world.py 와 같고 사건 합이
+world.py 누적 칸과 같은지, 끝 사례가 규칙 문장(정확히 settle_r 8 이면 못 누움, 지연 경계, 깜깜하면 새 사냥 없음 등)대로인지, 규칙 갈래를
+모두 덮는지. g++ 하네스는 `tests/cpp/threat_night_v3_main.cpp` (검사 본문은 UE 시험과 같은 AI/Policy/Tests/ThreatNightGoldenCheckV3.h).
+기본 판(v3_r1_on) 헤더는 밤잠 기능을 더한 뒤에도 바이트 단위로 같아야 한다(첫 시험).
 """
 
 import env.torch_init  # noqa: F401  ← torch보다 먼저
@@ -494,3 +500,249 @@ def test_cpp_threat_model_matches_golden_with_gpp(exported, tmp_path):
     for group in ("main", "edge", "seq_step", "stage_step", "chain"):
         m = re.search(rf"^{group}\s+.*max_float_err=([0-9.e+-]+) mismatch=(\d+)", run.stdout, re.M)
         assert m and float(m.group(1)) <= ex.FLOAT_TOL and int(m.group(2)) == 0, group
+
+
+# --------------------------------------------------------------------- #
+# 밤잠 점진화 골든 (--night, 사람 결정 H1 10-14)
+# --------------------------------------------------------------------- #
+
+NIGHT_CPP_MAIN = ROOT / "tests" / "cpp" / "threat_night_v3_main.cpp"
+NIGHT_CHECK_H = ex.UE_POLICY_DIR / "Tests" / "ThreatNightGoldenCheckV3.h"
+NIGHT_UE_TEST = ex.UE_POLICY_DIR / "Tests" / "EcoThreatNightV3Test.cpp"
+
+
+@pytest.fixture(scope="module")
+def exported_night(tmp_path_factory):
+    if not ex.DEFAULT_MODEL.exists():
+        pytest.skip(f"{ex.DEFAULT_MODEL} 없음")
+    out = tmp_path_factory.mktemp("threat_night_v3")
+    r = ex.export_night(ex.DEFAULT_MODEL, ex.NIGHT_CONFIG, out)
+    r["out"] = out
+    return r
+
+
+@pytest.fixture(scope="module")
+def golden_night(exported_night):
+    return parse_header(exported_night["out"] / ex.NIGHT_HEADER)
+
+
+@pytest.fixture(scope="module")
+def night_consts():
+    cfg = load_v2_config(ex.NIGHT_CONFIG)
+    return dict(ex.cfg_constants(cfg), **ex.night_constants(cfg))
+
+
+@needs_model
+def test_night_header_matches_unreal_module_bytes(exported_night):
+    """다시 만든 밤잠 골든 헤더가 언리얼 모듈의 헤더와 바이트 단위로 같다. 다르면 `python export_golden_v3_threat.py --night`."""
+    ue = ex.UE_POLICY_DIR / ex.NIGHT_HEADER
+    assert ue.exists(), f"언리얼 모듈 밤잠 헤더 없음: {ue}"
+    assert (exported_night["out"] / ex.NIGHT_HEADER).read_bytes() == ue.read_bytes(), "밤잠 골든 헤더가 다르다 — 결정적이지 않거나 낡았다"
+
+
+@needs_model
+def test_night_header_writer_is_deterministic(exported_night, tmp_path):
+    for k in (1, 2):
+        d = tmp_path / str(k)
+        d.mkdir()
+        ex.write_night_header(d / ex.NIGHT_HEADER, exported_night["golden"], exported_night["meta"])
+    a, b = (tmp_path / "1" / ex.NIGHT_HEADER).read_bytes(), (tmp_path / "2" / ex.NIGHT_HEADER).read_bytes()
+    assert a == b == (exported_night["out"] / ex.NIGHT_HEADER).read_bytes()
+    txt = a.decode("utf-8")
+    assert "자동 생성. 수정 금지." in txt and "namespace EcoThreatV3::GoldenNight" in txt
+    assert ":/" not in txt and ":\\" not in txt, "절대 경로가 헤더에 들어갔다"
+    assert not re.search(r"\b(inf|nan)\b", re.sub(r"//[^\n]*", "", txt)), "유한하지 않은 값이 헤더에 들어갔다"
+    assert chr(0xA7) not in txt
+
+
+def test_night_constants_match_cpp_defaults(night_consts):
+    """밤잠 계수가 C++ FThreatConfig 기본값 줄과 같고, 켜는 칸 bRealismNight 의 기본은 끔이다(끄면 R1b 학습 세계 그대로)."""
+    txt = MODEL_H.read_text(encoding="utf-8")
+    body = re.search(r"struct FThreatConfig\n\t\{(.*?)\n\t\};", txt, re.S).group(1)
+    assert re.search(r"\bbool bRealismNight = false;", body)
+    for key in ("NightSettleR", "NightHuntDark", "NightFloor", "NightSpread", "NightRampSteps"):
+        m = re.search(rf"\b{key} = ([^;]+);", body)
+        assert m, f"FThreatConfig 에 {key} 가 없다"
+        assert float(m.group(1)) == float(night_consts[key]), key
+    # 밤잠 세계의 나머지 계수는 R1b 세계와 같다 (v3_real1_night_on = v3_r1_on + realism_night 블록)
+    base = ex.cfg_constants(load_v2_config(ex.DEFAULT_CONFIG))
+    assert {k: v for k, v in night_consts.items() if not k.startswith("Night")} == base
+
+
+def test_exporter_accepts_only_the_night_realism_flag(tmp_path):
+    """현실성 규칙 가운데 realism_night 만 받는다. 기본 내보내기(export)는 밤잠 세계를 받지 않는다(--night 로 만든다)."""
+    real_all = ROOT / "configs" / "v3_real1_on.yaml"
+    with pytest.raises(SystemExit, match="realism"):
+        ex.cfg_constants(load_v2_config(real_all))
+    for name in ("v3_real1_vision_on.yaml", "v3_real1_hearing_on.yaml", "v3_real1_shelter_on.yaml"):
+        with pytest.raises(SystemExit, match="realism"):
+            ex.cfg_constants(load_v2_config(ROOT / "configs" / name))
+    ex.cfg_constants(load_v2_config(ex.NIGHT_CONFIG))
+    assert ex.night_constants(load_v2_config(ex.DEFAULT_CONFIG)) is None
+    if ex.DEFAULT_MODEL.exists():
+        with pytest.raises(SystemExit, match="night"):
+            ex.export(ex.DEFAULT_MODEL, ex.NIGHT_CONFIG, tmp_path)
+
+
+def test_night_recorder_does_not_change_trajectory():
+    """밤잠 세계에서도 기록 장치(밤잠 업데이트 감싸기 포함)가 궤적을 바꾸지 않는다."""
+    cfg = load_v2_config(ex.NIGHT_CONFIG)
+    a, b = W.World(cfg, seeds=[20001]), W.World(cfg, seeds=[20001])
+    rec = ex.Recorder(b)
+    for _ in range(500):
+        a.step(_hand_rule(a))
+        b.step(_hand_rule(b))
+    rec.detach()
+    assert len(rec.records) == len(rec.nights) == 500
+    for name in ("pos", "pred_pos", "pred_head", "pred_cd", "stalk_state", "pred_asleep", "_zn_act", "_zn_settle",
+                 "_zn_dark_k", "_zn_wait", "_zn_hunt", "_pred_speed_mult", "food"):
+        np.testing.assert_array_equal(getattr(a, name), getattr(b, name), err_msg=name)
+    sa, sb = a.realism_stats(), b.realism_stats()
+    assert all((x == y) or (math.isnan(x) and math.isnan(y)) for x, y in zip(sa.values(), sb.values()))
+    assert a.rng.random() == b.rng.random()
+
+
+def test_night_reference_matches_world_on_hand_rule_rollout(night_consts):
+    """참조 스텝·참조 밤잠 업데이트가 world.py 와 같다 — 모델 없이 손 규칙 사슴, 하루 넘게(해 질 녘·밤·새벽). 사건 합 = 누적 칸."""
+    cfg = load_v2_config(ex.NIGHT_CONFIG)
+    w = W.World(cfg, seeds=[20002])
+    rec = ex.Recorder(w)
+    for _ in range(1300):
+        w.step(_hand_rule(w))
+    rec.detach()
+    pool = ex.validate_records(night_consts, rec.records)
+    upool = ex.validate_nights(night_consts, rec.nights)
+    assert len(pool) == len(upool) == 1300 * w.M
+    flags = np.array([u[2] for u in upool])
+    assert ((flags & ex.UFLAG["asleep_dark"]) != 0).any() and ((flags & ex.UFLAG["day_full"]) != 0).any()
+
+
+def _upd(g, name) -> dict:
+    i = g["kUpdEdgeNames"].index(name)
+    u = int(np.flatnonzero((g["kUpdEdge"] == i) & (g["kUpdKind"] == ex.KIND_EDGE))[0])
+    post = {c: int(g["kUpdPostInt"][5 * u + k]) for k, c in enumerate(ex.UPD_COLS)}
+    pre = {c: int(g["kUpdPreInt"][6 * u + k]) for k, c in enumerate(ex.UPD_COLS + ("hunt",))}
+    ev = {b: bool(int(g["kUpdEvents"][u]) >> k & 1) for k, b in enumerate(ex.UPD_EVENTS)}
+    return dict(pre=pre, post=post, ev=ev, smult=float(g["kUpdSpeedMult"][u]), dmin=float(g["kUpdNearestDist"][u]))
+
+
+@needs_model
+def test_night_update_edges_follow_rule(golden_night):
+    """밤잠 업데이트 끝 사례 (world.py 가 계산) — 모듈 docstring (d) 의 문장대로다."""
+    g = golden_night
+    U = lambda name: _upd(g, name)        # noqa: E731
+    R = 15
+    e = U("settle_r_exact_blocks")        # 실거리 정확히 8 = settle_r → 가깝다 → 못 눕는다
+    assert e["dmin"] == 8.0 and e["ev"]["near"] and e["ev"]["block_deer"] and not e["post"]["settle"] and e["post"]["act"] == R
+    e = U("settle_r_above_starts")
+    assert not e["ev"]["near"] and e["ev"]["settle_start"] and e["post"]["settle"] and e["post"]["act"] == R - 1
+    e = U("ready_eq_delay_waits")         # 어둠 경과 6 = 지연 6 → 아직
+    assert e["post"]["dark_k"] == 6 and not e["ev"]["near_checked"] and not e["post"]["settle"]
+    e = U("ready_gt_delay_starts")
+    assert e["post"]["dark_k"] == 7 and e["ev"]["settle_start"]
+    e = U("onset_last_act")
+    assert e["ev"]["onset"] and e["post"]["asleep"] and e["post"]["act"] == 0 and e["post"]["dark_k"] == 0 and e["smult"] == 0.0
+    for name in ("abort_hunt", "abort_deer", "abort_dawn"):
+        e = U(name)
+        assert e["ev"]["settle_abort"] and not e["post"]["settle"] and e["post"]["act"] == 8, name
+    assert U("abort_deer")["ev"]["near"] and not U("abort_hunt")["ev"]["near"] and U("abort_dawn")["post"]["dark_k"] == 0
+    e = U("block_hunt")
+    assert e["ev"]["block_hunt"] and not e["ev"]["block_deer"] and not e["post"]["settle"]
+    e = U("wake_delay0")                  # 지연 0: 밝아진 첫 업데이트에 깨고 같은 업데이트에 활동도 1
+    assert e["ev"]["wake"] and not e["post"]["asleep"] and e["post"]["act"] == 1 and e["post"]["wait"] == -1
+    assert e["smult"] == pytest.approx((1.0 - W.daynight_phase(ex.STAGE_PERIOD + 1, 900, 0, 45)[0]) / R)
+    e = U("wait_first")
+    assert not e["ev"]["wake"] and e["post"]["asleep"] and e["post"]["wait"] == 4
+    e = U("wait_last_wakes")
+    assert e["ev"]["wake"] and e["post"]["act"] == 1
+    e = U("asleep_dark_resets_wait")
+    assert e["post"]["asleep"] and e["post"]["wait"] == -1
+    e = U("nocturnal_night")
+    assert {k: v for k, v in e["post"].items()} == {k: (0 if k == "dark_k" else e["pre"][k]) for k in ex.UPD_COLS}
+    assert e["smult"] == 1.0 and not any(e["ev"].values())
+    assert U("day_full_stays")["post"]["act"] == R and U("day_full_stays")["smult"] == 1.0
+    assert U("ramp_up_day")["post"]["act"] == R - 2 and U("ramp_up_day")["smult"] == pytest.approx((R - 2) / R)
+
+
+@needs_model
+def test_night_step_edges_follow_rule(golden_night):
+    """밤잠 스텝 끝 사례 — 깜깜하면 새 사냥 없음·쫓던 사냥 계속, 활동도·하한 속력, 해 질 녘에 깨어 있는 늑대."""
+    g = golden_night
+    E = lambda name: _o(g, _edge(g, name))        # noqa: E731
+    base = 0.6 * ex.STAGE_MULT
+    for name in ("hd_new_hunt_blocked", "hd_blocked_no_catch", "hd_stalker_blocked"):
+        e = E(name)
+        assert not e["hunting"] and not e["has_target"] and e["caught"] == -1 and not e["asleep"], name
+    assert E("hd_continue_chase")["has_target"] and E("hd_continue_catch")["caught"] == 0
+    assert E("hd_below_new_hunt")["has_target"] and E("hd_nocturnal")["has_target"]
+    assert E("hd_stalker_pounce_continue")["has_target"] and E("hd_stalker_pounce_continue")["ss"] == W.ST_POUNCE
+    assert E("ramp_day_speed")["speed"] == pytest.approx(base * 6 / 15)
+    assert E("floor_night_speed")["speed"] == pytest.approx(base * 0.5)
+    e = E("dusk_awake_catch")             # 옛 규칙(d = 0.5 에 곧바로 잠)과 다르다: 사슴이 가까워 깨어 있고 잡는다
+    assert not e["asleep"] and e["caught"] == 0
+    e = E("asleep_state_no_catch")
+    assert e["asleep"] and e["caught"] == -1 and e["speed"] == 0.0
+    assert E("settling_speed")["speed"] == pytest.approx(base * 0.5 * 9 / 15)
+    # 스텝 뒤 사냥 중 = 표적 있음 ∨ 잠행형 돌진
+    assert g["kCaseNightPostHunt"][_edge(g, "hd_continue_chase")] == 1
+    assert g["kCaseNightPostHunt"][_edge(g, "hd_new_hunt_blocked")] == 0
+
+
+@needs_model
+def test_night_golden_covers_rule_paths(golden_night, exported_night):
+    """밤잠 골든이 규칙의 갈래를 덮는다: 업데이트 표시 모두(본·끝·생애 열 어딘가), 밤잠 스텝 표시 모두, 해 질 녘 잠듦·새벽 깸 생애 열."""
+    g = golden_night
+    uflags = g["kUpdFlags"][g["kUpdKind"] != ex.KIND_NEAR]
+    for f in ex.UPD_FLAGS:
+        assert ((uflags & ex.UFLAG[f]) != 0).any(), f"업데이트 표시 '{f}' 사례가 없다"
+    nflags = g["kCaseNightFlags"][g["kCaseKind"] != ex.KIND_NEAR]
+    for f in ex.NIGHT_STEP_FLAGS:
+        assert ((nflags & ex.NFLAG[f]) != 0).any(), f"밤잠 스텝 표시 '{f}' 사례가 없다"
+    names = g["kLifeNames"]
+    for want in ("dusk_onset", "dawn_wake", "settle_abort", "block_deer", "block_hunt", "hd_continue"):
+        assert want in names, want
+    ev = g["kUpdEvents"]
+    for k, name in enumerate(names):
+        b, n = int(g["kLifeUpdBegin"][k]), int(g["kLifeLength"][k])
+        bits = ev[b:b + n]
+        if name == "dusk_onset":
+            assert (bits & (1 << ex.UPD_EVENTS.index("onset"))).any()
+            assert (bits & (1 << ex.UPD_EVENTS.index("settle_start"))).any()
+        if name == "dawn_wake":
+            assert (bits & (1 << ex.UPD_EVENTS.index("wake"))).any()
+    assert (g["kUpdNear"][np.isin(g["kUpdKind"], (ex.KIND_MAIN, ex.KIND_LIFE))] == 0).all()
+    assert g["kCaseCount"] == g["kNightCaseCount"] == len(g["kCaseKind"])
+    roll = np.isin(g["kCaseKind"], (ex.KIND_MAIN, ex.KIND_SEQ, ex.KIND_NEAR, ex.KIND_LIFE))
+    assert set(g["kCaseSource"][0::3][roll].tolist()) <= set(ex.GOLDEN_SEEDS)
+    uroll = np.isin(g["kUpdKind"], (ex.KIND_MAIN, ex.KIND_NEAR, ex.KIND_LIFE))
+    assert set(g["kUpdSource"][0::3][uroll].tolist()) <= set(ex.GOLDEN_SEEDS)
+    assert set(g["kInitSeed"].tolist()) <= set(range(20000, 20020))
+    assert exported_night["stats"]["upool"] == exported_night["stats"]["pool"]
+
+
+def test_night_cpp_files_are_clean():
+    """밤잠 검사 본문은 엔진 무관(표준 헤더 + 위협 모델·골든만), UE 시험이 모듈에 있다. 새 파일에 절 기호가 없다."""
+    inc = re.compile(r'#include\s+[<"]([^>"]+)[>"]')
+    assert set(inc.findall(NIGHT_CHECK_H.read_text(encoding="utf-8"))) == {
+        "cmath", "cstdint", "vector", "../EcoThreatModel.h", "../ThreatNightGoldenVectorsV3.h"}
+    assert NIGHT_UE_TEST.exists() and "AdaptiveEcosystem.Policy.V3.ThreatNight." in NIGHT_UE_TEST.read_text(encoding="utf-8")
+    for p in (NIGHT_CHECK_H, NIGHT_UE_TEST, NIGHT_CPP_MAIN, ex.UE_POLICY_DIR / ex.NIGHT_HEADER):
+        if p.exists():
+            assert chr(0xA7) not in p.read_text(encoding="utf-8"), p.name
+
+
+@needs_gpp
+def test_cpp_night_matches_golden_with_gpp(tmp_path):
+    """언리얼 모듈의 EcoThreatModel.h·밤잠 골든 헤더를 그대로 g++ 로 컴파일해 대조한다(UE 시험과 같은 검사 본문)."""
+    if not (ex.UE_POLICY_DIR / ex.NIGHT_HEADER).exists():
+        pytest.skip("언리얼 모듈 밤잠 헤더 없음")
+    exe = tmp_path / ("threat_night_v3.exe" if sys.platform == "win32" else "threat_night_v3")
+    build = subprocess.run(["g++", "-std=c++17", "-O2", "-Wall", "-Wextra", "-Werror", "-Wshadow", "-I", str(ex.UE_POLICY_DIR),
+                            str(NIGHT_CPP_MAIN), "-o", str(exe)], capture_output=True, text=True)
+    assert build.returncode == 0, f"컴파일 실패:\n{build.stderr}"
+    run = subprocess.run([str(exe)], capture_output=True, text=True, encoding="utf-8")
+    assert run.returncode == 0 and "PASS" in run.stdout, f"파리티 실패:\n{run.stdout}\n{run.stderr}"
+    for group in ("config", "hash", "init", "upd_main", "upd_edge", "upd_life", "step_main", "step_edge", "step_seq",
+                  "step_life", "seq_chain", "life_chain", "off_ignores"):
+        m = re.search(rf"^{group}\s+n=(\d+) max_float_err=([0-9.e+-]+) mismatch=(\d+)", run.stdout, re.M)
+        assert m and int(m.group(1)) > 0 and float(m.group(2)) <= ex.FLOAT_TOL and int(m.group(3)) == 0, group

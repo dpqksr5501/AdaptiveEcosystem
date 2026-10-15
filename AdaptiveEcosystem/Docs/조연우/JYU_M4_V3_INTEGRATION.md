@@ -2,6 +2,8 @@
 
 > **2026-10-16 작업 위치 통합:** 검증 커밋 `8e2f34f`를 기존 `codex/social-shelter-handoff`에 반영했다. 앞으로 원래 저장소 `C:/Users/I/Documents/GitHub/AdaptiveEcosystem`의 `AdaptiveEcosystem/AdaptiveEcosystem.uproject`를 연다. 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`은 그대로 사용한다. 아래 브랜치명은 최초 통합 이력이다. 원래 위치의 빌드·검증 및 worktree 정리는 [작업 위치 통합 기록](JYU_WORKTREE_RETURN_20261016.md)을 따른다.
 
+> **2026-10-16 감지·도주 감사:** 신혁 브랜치 `3916496`의 후속 16개 커밋을 추가 통합했다. R1b 가중치는 유지하고 야생 1단계 세계 규칙을 적용한다. 실제 활성 backend·경보의 연결 범위·새 검증은 [위협·backend 감사](JYU_THREAT_AND_BACKEND_AUDIT_20261016.md)를 따른다. 아래 119개 테스트는 최초 통합 시점 기록이다.
+
 작성일: 2026-10-15. 브랜치 `codex/m4-v3-creature-integration`. 장원준 `wonkii/M4` **67c860c** 위에 권신혁 `origin/Branch_Sinhyeok` **8292856**을 병합하고 충돌 네 파일을 해결했다. 기존 조연우 작업은 main의 PR #11 병합 내용을 유지했다. 사용자의 원래 작업 트리와 레벨 디자이너의 `/Game/Map/LV_Ecosystem_IntegrationTest`는 수정하지 않았다.
 
 ## 실행할 맵과 실제 에셋
