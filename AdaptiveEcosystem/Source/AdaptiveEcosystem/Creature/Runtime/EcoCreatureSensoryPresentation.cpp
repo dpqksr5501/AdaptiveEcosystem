@@ -31,7 +31,14 @@ void AEcoCreatureIntegrationSpawner::UpdateSensoryPresentation()
         const FVector Position=EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation();
         const auto* Social=EM.GetFragmentDataPtr<FEcoSensoryStateFragment>(E);
         const auto* Prey=EM.GetFragmentDataPtr<FEcoPreySenseFragment>(E);
-        if(Social)Cue->Memory=*Social;
+        if(Social) {
+            Cue->Memory=*Social;
+            // Shared reports affect only the passive cue here. They never become a new direct Social observation.
+            if(Social->Source==EEcoSenseSource::None&&Social->SharedPersistentHerdId>0&&Social->SharedAlarmStrength>=Settings.MinimumConfidence
+                &&Social->SharedEvidenceWorldTime>=0&&Now>=Social->SharedEvidenceWorldTime&&Now-Social->SharedEvidenceWorldTime<Settings.SharedInformationMaxAge)
+                Cue->Memory.Observe(EEcoSenseSource::Hearing,Social->SharedThreatPosition,FMath::Min(Settings.HearingConfidence,Social->SharedAlarmStrength),
+                    Settings.HearingUncertainty,Social->SharedAlarmStrength,uint64(Social->SharedPersistentHerdId),Social->SharedEvidenceWorldTime);
+        }
         else if(Prey)Cue->Memory=Prey->Cue;
         else {
             Cue->Memory.Age(Now,Settings,1);

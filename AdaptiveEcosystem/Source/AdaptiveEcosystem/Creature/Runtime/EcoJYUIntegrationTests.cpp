@@ -149,7 +149,7 @@ bool FEcoJYUInspectionBackend::RunTest(const FString&) {
     TestEqual(TEXT("Reports observed threat count"),Data->GetNumberField(TEXT("native_threat_count")),1.0);
     TestEqual(TEXT("Native distance explicitly converted to cm"),Data->GetNumberField(TEXT("native_threat_distance_cm")),500.0);
     TestEqual(TEXT("Native kin alarm is distinguishable from Social alarm"),Data->GetNumberField(TEXT("native_kin_alarm")),.5);
-    TestFalse(TEXT("Never claims excluded Social runtime is active"),Data->GetBoolField(TEXT("social_runtime")));
+    TestTrue(TEXT("Native v3 has the connected Social runtime"),Data->GetBoolField(TEXT("social_runtime")));
     TestFalse(TEXT("Never claims excluded SpeciesAI movement is active"),Data->GetBoolField(TEXT("species_ai_movement")));
     TestEqual(TEXT("Observation includes actual trained dimensions"),Data->GetArrayField(TEXT("observation")).Num(),EcoPolicyV3::kObsDim);
     TestTrue(TEXT("Distinguishes policy evaluation from holding previous action"),Data->GetBoolField(TEXT("committed_policy_read")));

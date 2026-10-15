@@ -3,6 +3,8 @@
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Social/EcoSocialFragments.h"
+#include "AI/Social/EcoPolicyV3SocialBridge.h"
+#include "AI/Social/Herd/EcoHerdSubsystem.h"
 #include "AI/Behavior/EcoSpeciesAIFragments.h"
 #include "AI/Social/Senses/EcoSensoryTypes.h"
 #include "Mass/EcoMassFragments.h"
@@ -58,6 +60,29 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
             Data->SetBoolField(TEXT("social_runtime"),Manager.GetFragmentDataPtr<FEcoSocialBehaviorFragment>(E)!=nullptr);
             Data->SetBoolField(TEXT("species_ai_movement"),Manager.GetFragmentDataPtr<FEcoSpeciesAIMoveFragment>(E)!=nullptr);
             if(const auto* V=Manager.GetFragmentDataPtr<FEcoVitalsFragment>(E)){Data->SetNumberField(TEXT("hp"),V->HP);Data->SetNumberField(TEXT("energy"),V->Energy);}
+            if(const auto* Alarm=Manager.GetFragmentDataPtr<FEcoAlarmStateFragment>(E)) {
+                Data->SetNumberField(TEXT("social_state"),int32(Alarm->State));
+                Data->SetNumberField(TEXT("alarm_strength"),Alarm->AlarmStrength);
+                Data->SetStringField(TEXT("alarm_position"),Alarm->LastThreatPosition.ToCompactString());
+            }
+            if(const auto* Member=Manager.GetFragmentDataPtr<FEcoHerdMemberFragment>(E)) {
+                FEcoHerdRuntimeData Herd;
+                if(const auto* Herds=World->GetSubsystem<UEcoHerdSubsystem>();Herds&&Herds->GetHerdData(Member->HerdRuntimeIndex,Herd))
+                    Data->SetStringField(TEXT("herd_id"),LexToString(Herd.PersistentHerdId));
+            }
+            if(const auto* Social=Manager.GetFragmentDataPtr<FEcoV3SocialBridgeFragment>(E)) {
+                Data->SetNumberField(TEXT("social_override"),int32(Social->Applied));
+                Data->SetNumberField(TEXT("native_behavior_before_social"),Social->NativeBehavior);
+                Data->SetBoolField(TEXT("unsafe_shelter_yielded"),Social->bRejectedUnsafeShelter);
+            }
+            if(const auto* Intent=Manager.GetFragmentDataPtr<FEcoShelterIntentFragment>(E)) {
+                Data->SetNumberField(TEXT("shelter_state"),int32(Intent->State));
+                Data->SetStringField(TEXT("reservation_id"),LexToString(Intent->ReservationId));
+            }
+            if(const auto* Request=Manager.GetFragmentDataPtr<FEcoSocialMovementRequestFragment>(E)) {
+                Data->SetNumberField(TEXT("social_forage"),Request->EffectiveAction.Forage);
+                Data->SetNumberField(TEXT("social_cohesion"),Request->EffectiveAction.Cohesion);
+            }
             if(const auto* P=Manager.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E)){
                 Data->SetStringField(TEXT("brain"),TEXT("PPO_V3_builtin"));
                 Data->SetStringField(TEXT("movement"),TEXT("NativeV3_single_writer"));
@@ -163,11 +188,11 @@ void AEcoCreatureInspectorHUD::DrawHUD()
     }
     const bool Preview=Actors.ContainsByPredicate([](const AEcoCreatureRepresentationActor* Actor){return Actor->ActorHasTag(TEXT("JYU.VisualAudit"));});
     if(Preview){
-        DrawRect(FLinearColor(.25f,.1f,.01f,.95f),15,335,620,55);
-        DrawText(TEXT("POSE / IK PREVIEW: comparison deer have NO AI."),FLinearColor::Yellow,25,345,nullptr,.9f);
-        DrawText(TEXT("Play ends after the comparison. Start Play again for ecology."),FLinearColor::White,25,366,nullptr,.8f);
+        DrawRect(FLinearColor(.25f,.1f,.01f,.95f),15,410,620,55);
+        DrawText(TEXT("POSE / IK PREVIEW: comparison deer have NO AI."),FLinearColor::Yellow,25,420,nullptr,.9f);
+        DrawText(TEXT("Play ends after the comparison. Start Play again for ecology."),FLinearColor::White,25,441,nullptr,.8f);
     }
-    DrawRect(FLinearColor(.02f,.025f,.035f,.85f),15,15,570,Selected.IsValid()?300:65);
+    DrawRect(FLinearColor(.02f,.025f,.035f,.85f),15,15,570,Selected.IsValid()?370:65);
     DrawText(TEXT("ECO INSPECTOR | Tab: cycle  Middle mouse: pick  R: record"),FLinearColor::White,25,25,nullptr,.85f);
     if(!Selected.IsValid()){DrawText(TEXT("Select a visible creature. Shift: run  Ctrl: sneak"),FLinearColor(.6f,.8f,1),25,50,nullptr,.85f);return;}
     const auto& S=Selected->VisualState;
@@ -180,7 +205,7 @@ void AEcoCreatureInspectorHUD::DrawHUD()
         if(UEcoCreatureInspectionLibrary::CaptureAgent(this,SelectedId,InspectionJson)) {
             TSharedPtr<FJsonObject> J;auto Reader=TJsonReaderFactory<>::Create(InspectionJson);
             if(FJsonSerializer::Deserialize(Reader,J)&&J.IsValid()) {
-                for(const TCHAR* Key:{TEXT("request"),TEXT("executed"),TEXT("phase"),TEXT("last_intake"),TEXT("confidence"),TEXT("target"),TEXT("last_known"),TEXT("native_threat_count"),TEXT("native_threat_distance_cm"),TEXT("native_kin_alarm"),TEXT("flight_override")}) {
+                for(const TCHAR* Key:{TEXT("request"),TEXT("executed"),TEXT("phase"),TEXT("last_intake"),TEXT("confidence"),TEXT("target"),TEXT("last_known"),TEXT("native_threat_count"),TEXT("native_threat_distance_cm"),TEXT("native_kin_alarm"),TEXT("flight_override"),TEXT("social_state"),TEXT("alarm_strength"),TEXT("social_override"),TEXT("shelter_state")}) {
                     const auto V=J->TryGetField(Key);if(!V.IsValid())continue;
                     InspectionDetail+=FString(Key)+TEXT(": ")+(V->Type==EJson::String?V->AsString():LexToString(V->AsNumber()))+TEXT("\n");
                 }

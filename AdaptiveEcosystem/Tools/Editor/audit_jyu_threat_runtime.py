@@ -10,8 +10,13 @@ world = editor.get_game_world()
 if not world or "LV_JYU_V3Integration" not in world.get_name():
     raise RuntimeError("Copied JYU PIE only")
 out = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())) / "ThreatAudit_20261016"
+if "-JYUSocialV3Audit" in unreal.SystemLibrary.get_command_line():
+    out = out.parent / "SocialV3_20261016"
 out.mkdir(parents=True, exist_ok=True)
 unreal.SystemLibrary.execute_console_command(world, "eco.Senses.NoiseLog 1")
+if "-JYUSocialV3Audit" in unreal.SystemLibrary.get_command_line():
+    for command in ("eco.Shelter.Log 1", "eco.Social.ActionAudit 1"):
+        unreal.SystemLibrary.execute_console_command(world, command)
 player = unreal.GameplayStatics.get_player_controller(world, 0)
 original_view = player.get_view_target()
 camera = None
@@ -50,6 +55,10 @@ def finish(result):
         "heard_cue_records": sum("Hearing" in d.get("sense", "") for d in rows),
         "learned_policy_read_records": sum(d.get("committed_policy_read", False) for d in rows),
         "preview_fixture_records": sum(sample["preview_fixtures"] for sample in state["samples"]),
+        "social_override_counts": dict(Counter(d.get("social_override", -1) for d in rows)),
+        "shelter_state_counts": dict(Counter(d.get("shelter_state", -1) for d in rows)),
+        "blind_social_reaction_records": sum(d.get("native_threat_count", 0) == 0 and d.get("social_override", 0) > 0 for d in rows),
+        "policy_graze_to_social_flee_records": sum(d.get("request") == 0 and d.get("executed") == 1 and d.get("social_override") == 2 for d in rows),
     }
     (out / "ThreatRuntime.json").write_text(json.dumps({"result": result, "summary": summary, "samples": state["samples"]}, indent=2), encoding="utf-8")
     unreal.log("JYU_THREAT_AUDIT_" + result + " " + json.dumps(summary))

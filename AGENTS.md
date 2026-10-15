@@ -88,3 +88,11 @@ UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한
 ## 6. 2026-10-16 v3 감지·야생 규칙 추가 통합
 
 기존 통합본 위에 권신혁 `origin/Branch_Sinhyeok` `3916496`의 후속 16개 커밋을 반영했다. `RL_V3_WILD1_SPEC.md`의 시야·청각·도주·비축·포만 규칙을 사용하지만 R1b 내장 학습 가중치와 V1 계약은 그대로다. `request`(PPO)와 `flight_override`(세계 규칙), `executed`(실제 행동)를 구분한다. MassFlock은 외부 패키지 도입 완료가 아닌 설계 참조이며 실제 이웃·조향은 자체 구현이다. v3의 경보 소음/표현과 Native `kin_alarm`은 Social Persistent Herd→ModulatedAction 연결 완료를 뜻하지 않는다. 정확한 활성 backend·검증·남은 연결은 [위협·backend 감사](AdaptiveEcosystem/Docs/조연우/JYU_THREAT_AND_BACKEND_AUDIT_20261016.md)를 따른다.
+
+## 7. 2026-10-16 v3 실제 Social 행동·슬롯 인계
+
+권신혁 최신 `b5c7384`(Wild1 검증 자료)와 원준 M4 `67c860c`를 포함한 기존 브랜치에서 v3 Social 연결을 추가했다. 2절 10항·4절·6절의 미연결 설명은 당시 이력이며 현재 범위는 [v3 Social 인계 계약과 검증](AdaptiveEcosystem/Docs/조연우/JYU_V3_SOCIAL_HANDOFF.md)을 따른다.
+
+실제 경로는 Native 직접 감지/Player.Footstep → 별도 Herd observed 채널 → 기존 Alarm/SocialResponse → Shelter Request → Native control hook → 단일 이동/섭식/대사 → 실제 body 위치의 Feedback → 점유/예약 정리다. v3 요청을 Social 선호로 명시적으로 projection하며 V1 PPO 출력이나 v3 Raw Request를 덮어쓰지 않는다. Shared 기억을 직접 관측으로 재발행하지 않고, 이동 소비자도 lease/slot/안전 방향을 확인한다. 기존 V1 경로와 Bootstrap 가드는 유지한다.
+
+직접 UBT 성공, 자동화 140개(139 Success + 1 예상 저장 파일 warning, 실패 0), 복사 맵 일반 PIE 및 Dedicated+Client 2개를 검증했다. 실제 Moving→Occupied와 Client 논리 개체/Native Step 0을 확인했다. migration/wave 활성화·외부 MassFlock 설치·NavMesh 전환·재학습은 이번 작업 범위가 아니다. 사용자 변경 에셋 68개는 원본 바이트를 보존하고 이번 코드 커밋에서 제외했다.

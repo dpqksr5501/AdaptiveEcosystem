@@ -71,7 +71,7 @@ public:
 	 * @return Shelter RuntimeIndex or INDEX_NONE_ECO if none suitable.
 	 */
 	int32 FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation, bool bHasThreat,
-		float SearchRadius, int32& OutSlotIndex, float& OutScore) const;
+		float SearchRadius, int32& OutSlotIndex, float& OutScore, const TFunction<bool(const FVector&)>* SlotFilter = nullptr) const;
 
 	/** Retrieves slot data by index */
 	bool GetSlotData(int32 SlotIndex, FEcoShelterSlot& OutSlot) const;

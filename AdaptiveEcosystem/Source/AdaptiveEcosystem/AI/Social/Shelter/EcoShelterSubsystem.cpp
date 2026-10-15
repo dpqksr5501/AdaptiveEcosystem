@@ -267,7 +267,7 @@ bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, c
 }
 
 int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation,
-	bool bHasThreat, float SearchRadius, int32& OutSlotIndex, float& OutScore) const
+	bool bHasThreat, float SearchRadius, int32& OutSlotIndex, float& OutScore, const TFunction<bool(const FVector&)>* SlotFilter) const
 {
 	OutSlotIndex = INDEX_NONE_ECO;
 	OutScore = 0.0f;
@@ -300,7 +300,8 @@ int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocatio
 		for (int32 SlotIdx = 0; SlotIdx < ShelterSlots.Num(); ++SlotIdx)
 		{
 			const FEcoShelterSlot& Slot = ShelterSlots[SlotIdx];
-			if (Slot.ShelterRuntimeIndex == i && (Slot.ReservedBy == 0 || Slot.ReservationExpireTime <= CurrentTime))
+			if (Slot.ShelterRuntimeIndex == i && (Slot.ReservedBy == 0 || Slot.ReservationExpireTime <= CurrentTime)
+                && (!SlotFilter || (*SlotFilter)(Slot.Position)))
 			{
 				FoundAvailableSlot = SlotIdx;
 				break;

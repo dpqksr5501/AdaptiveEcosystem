@@ -1,5 +1,7 @@
 # 늑대 접근 반응 · 팀원 기능 사용 감사 (2026-10-16)
 
+> **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
+
 현재 실행 위치는 원래 저장소의 `AdaptiveEcosystem/AdaptiveEcosystem.uproject`, 브랜치는 `codex/social-shelter-handoff`, 맵은 `/Game/JYU/Maps/LV_JYU_V3Integration`이다.
 
 ## 확인한 문제와 수정

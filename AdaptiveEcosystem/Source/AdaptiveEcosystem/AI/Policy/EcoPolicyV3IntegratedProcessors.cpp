@@ -18,6 +18,10 @@
 #include "Creature/Player/EcoPlayerEcologyComponent.h"
 #include "GameFramework/Pawn.h"
 #include "EngineUtils.h"
+#include "MassCommonTypes.h"
+#include "AI/Social/EcoPolicyV3SocialBridge.h"
+#include "AI/Social/Shelter/EcoShelterSubsystem.h"
+#include "AI/Social/Shelter/EcoShelterLifecycleProcessor.h"
 
 namespace EcoPolicyV3IntegratedProcImpl
 {
@@ -28,7 +32,27 @@ namespace EcoPolicyV3IntegratedProcImpl
 		FEcoV3RegionContext* Ctx = nullptr;
 		const TArray<FEcoIntegratedV3Fragment*>* HerbInts = nullptr;
 		const TArray<FEcoIntegratedV3Fragment*>* WolfInts = nullptr;
+        const TArray<FEcoV3DeerRec>* Deer = nullptr;
+        const TArray<int32>* Rows = nullptr;
+        UEcoShelterSubsystem* Shelters = nullptr;
+        double Now = 0;
 	};
+
+    void SocialControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H)
+    {
+        const auto& A=*static_cast<const FMoveAdapter*>(User);
+        if(!A.Rows||!A.Rows->IsValidIndex(Index)||!A.Deer)return;
+        const auto& D=(*A.Deer)[(*A.Rows)[Index]];
+        if(!D.SocialRequest||!D.Alarm||!D.SocialAudit)return;
+        const auto& R=*D.SocialRequest;
+        FEcoShelterSlot Slot;
+        const bool Valid=A.Shelters&&A.Shelters->IsReservationValid(R.SlotIndex,D.Id,R.ReservationId,A.Now)
+            &&A.Shelters->GetSlotData(R.SlotIndex,Slot)&&Slot.ShelterRuntimeIndex==R.ShelterIndex&&Slot.Position.Equals(R.TargetPosition,1);
+        EcoV3Social::ApplyControl(R,*D.Alarm,*A.Ctx,*D.Int,*D.SocialAudit,H,Valid,A.Now);
+        if(D.Feedback&&R.bValid&&R.ReservationId>0&&R.Mode!=EEcoSocialMovementMode::None
+            &&D.SocialAudit->AppliedReservation==0)
+            D.Feedback->Report(R.ReservationId,Valid?EEcoShelterMovementStatus::Yielded:EEcoShelterMovementStatus::Failed);
+    }
 
 	/** 이번 Step 배열의 색인 = HerbInts/WolfInts 색인 (BuildViews 가 같은 순서로 채운다). 통과하면 그 개체의 지면 높이를 갱신한다. */
 	bool MoveOne(const FMoveAdapter& A, FEcoIntegratedV3Fragment& F, double FromX, double FromY, double ToX, double ToY)
@@ -156,12 +180,20 @@ UEcoPolicyV3IntegratedStepProcessor::UEcoPolicyV3IntegratedStepProcessor()
 	// 논리 상태는 서버·단독에만 있다 (AGENTS.md 2절 2항)
 	ExecutionFlags = static_cast<int32>(EProcessorExecutionFlags::Server | EProcessorExecutionFlags::Standalone);
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
+    ExecutionOrder.ExecuteInGroup=UE::Mass::ProcessorGroupNames::Movement;
+    ExecutionOrder.ExecuteAfter.Add(UEcoShelterLifecycleProcessor::StaticClass()->GetFName());
+
 	// 지역 세계(서브시스템)를 함께 쓰고, 지형 제약에서 물리 질의를 부른다
 	bRequiresGameThreadExecution = true;
 }
 
 void UEcoPolicyV3IntegratedStepProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+    DeerQuery.AddRequirement<FEcoSocialMovementRequestFragment>(EMassFragmentAccess::ReadOnly,EMassFragmentPresence::Optional);
+    DeerQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly,EMassFragmentPresence::Optional);
+    DeerQuery.AddRequirement<FEcoShelterMovementFeedbackFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
+    DeerQuery.AddRequirement<FEcoV3SocialBridgeFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
+
 	DeerQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	DeerQuery.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
 	DeerQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
@@ -213,6 +245,11 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	DeerQuery.ForEachEntityChunk(Context, [this](FMassExecutionContext& Ctx)
 	{
 		const TConstArrayView<FEcoIdentityFragment> Ids = Ctx.GetFragmentView<FEcoIdentityFragment>();
+        const auto Requests=Ctx.GetFragmentView<FEcoSocialMovementRequestFragment>();
+        const auto Alarms=Ctx.GetFragmentView<FEcoAlarmStateFragment>();
+        auto Feedback=Ctx.GetMutableFragmentView<FEcoShelterMovementFeedbackFragment>();
+        auto SocialAudit=Ctx.GetMutableFragmentView<FEcoV3SocialBridgeFragment>();
+
 		const TConstArrayView<FEcoRegionFragment> Regions = Ctx.GetFragmentView<FEcoRegionFragment>();
 		const TConstArrayView<FTransformFragment> Xfs = Ctx.GetFragmentView<FTransformFragment>();
 		const TArrayView<FEcoVitalsFragment> Vits = Ctx.GetMutableFragmentView<FEcoVitalsFragment>();
@@ -238,7 +275,11 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			R.Life = &Lives[i];
 			R.State = &States[i];
 			R.Int = &Ints[i];
-			R.View.Rep = &States[i].Rep;
+			R.SocialRequest=Requests.IsEmpty()?nullptr:&Requests[i];
+            R.Alarm=Alarms.IsEmpty()?nullptr:&Alarms[i];
+            R.Feedback=Feedback.IsEmpty()?nullptr:&Feedback[i];
+            R.SocialAudit=SocialAudit.IsEmpty()?nullptr:&SocialAudit[i];
+            R.View.Rep = &States[i].Rep;
 			R.View.Decision = &States[i].Decision;
 			R.View.Body = &Bodies[i].Body;
 			R.View.Perception = &Percs[i].Perception;
@@ -422,15 +463,28 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			Adapter.Ctx = &Ctx;
 			Adapter.HerbInts = &HerbInts;
 			Adapter.WolfInts = &WolfInts;
+            Adapter.Deer=&Deer;Adapter.Rows=&DeerByContext[c];
+            Adapter.Shelters=World->GetSubsystem<UEcoShelterSubsystem>();Adapter.Now=Now;
 			EcoWorldV3::FStepHooks Hooks;
 			Hooks.User = &Adapter;
-			Hooks.HerbMove = &HerbMoveHook;
-			Hooks.ThreatMove = &ThreatMoveHook;
+			Hooks.HerbControl=&SocialControlHook;
+            Hooks.HerbMove = Sub->UsesTerrain() ? &HerbMoveHook : nullptr;
+            Hooks.ThreatMove = Sub->UsesTerrain() ? &ThreatMoveHook : nullptr;
 			const double BeforeFood = Ctx.Sim.Food.Total();
 			const double BeforeEaten = Ctx.Sim.Stats.FoodEaten;
 			const EcoWorldV3::FStepReport Report = EcoWorldV3::Step(Ctx.Sim, Views.GetData(), Views.Num(), ThreatPtrs.GetData(),
 																	ThreatPtrs.Num(), EcoPolicyV3::kBuiltinNet,
-																	Sub->UsesTerrain() ? &Hooks : nullptr);
+																	&Hooks);
+
+            // Feedback uses the integrated native body and ground result, never the desired slot or render Actor position.
+            for(int32 R=0;R<DeerByContext[c].Num();++R) {
+                const auto& D=Deer[DeerByContext[c][R]];
+                if(!D.Feedback||!D.SocialAudit||!D.SocialRequest||D.SocialAudit->AppliedReservation<=0||D.View.Body->DeathCause!=EcoWorldV3::kDeathNone)continue;
+                const auto& Request=*D.SocialRequest;
+                const FVector Actual=Ctx.UnitsToCm(D.View.Body->Pos.X,D.View.Body->Pos.Y,D.Int->GroundZ);
+                const bool Arrived=FVector::DistSquared(Actual,Request.TargetPosition)<=FMath::Square(Request.ArrivalRadius);
+                D.Feedback->Report(D.SocialAudit->AppliedReservation,Arrived?EEcoShelterMovementStatus::Arrived:EEcoShelterMovementStatus::Moving);
+            }
 
 			// 먹기 기록: 이번 스텝에 먹이 칸에서 실제로 먹은 사슴을 구간마다 한 번 센다 (먹고 같은 스텝에 죽은 사슴도). 번식 표시 시각.
 			// Views·HerbInts 는 이번 Step 배열과 같은 순서다 (아래 죽음 넘기기가 List 를 줄여도 이 둘은 그대로)
@@ -561,6 +615,7 @@ UEcoPolicyV3IntegratedVisualProcessor::UEcoPolicyV3IntegratedVisualProcessor()
 {
 	ExecutionFlags = static_cast<int32>(EProcessorExecutionFlags::Server | EProcessorExecutionFlags::Standalone);
 	ProcessingPhase = EMassProcessingPhase::PrePhysics;
+	ExecutionOrder.ExecuteInGroup=UE::Mass::ProcessorGroupNames::Movement;
 	ExecutionOrder.ExecuteAfter.Add(TEXT("EcoPolicyV3IntegratedStepProcessor"));
 	bRequiresGameThreadExecution = true;
 }

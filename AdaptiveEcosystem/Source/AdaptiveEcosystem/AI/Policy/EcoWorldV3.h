@@ -627,6 +627,9 @@ namespace EcoWorldV3
 	struct FStepHooks
 	{
 		void* User = nullptr;
+        // Optional integrated Social intent, after native policy/control, before the one movement/vitals integration.
+        // nullptr preserves all Python/C++ golden behavior. Does not write raw Request or observations.
+        void (*HerbControl)(void* User, std::int32_t Index, const FHerbView& Herb) = nullptr;
 		bool (*HerbMove)(void* User, std::int32_t Index, const FVec2& From, const FVec2& To) = nullptr;
 		bool (*ThreatMove)(void* User, std::int32_t Index, double FromX, double FromY, double ToX, double ToY) = nullptr;
 	};
@@ -887,6 +890,8 @@ namespace EcoWorldV3
 				In.Y = A.State.PosY;
 				In.VelX = A.State.VelX;
 				In.VelY = A.State.VelY;
+                In.bHunting = A.State.Cooldown == 0 && (!W.ThreatCfg.bWildSatiation || A.State.SatLeft == 0)
+                    && !(A.Spec.Type == EcoThreatV3::EThreatType::Player && A.State.PlayerMode == EcoThreatV3::EPlayerMode::Rest);
 				In.bAsleep = ThreatAsleepNow(W, A);   // 굴에서 자면 안 보인다 (끄면 새 t 의 어둠으로 다시 판정, 켜면 늑대별 상태)
 				// R3 발소리 (켰을 때만): 지난 스텝 변위 크기 ÷ 사슴 걸음과 그 스텝의 걸음새 (world.py hearing_radius·pred_running)
 				In.HearR = W.Config.RealismHearing.bEnabled
@@ -1414,6 +1419,10 @@ namespace EcoWorldV3
 			{
 				*H.Control = R3::Control(*H.Rep, Detail::MakeControlInput(W, H), RC);
 			}
+            if (Hooks && Hooks->HerbControl) {
+                Hooks->HerbControl(Hooks->User, i, H);
+                H.Decision->ExecutedBehavior = H.Rep->Behavior;
+            }
 			if (bReserve)
 			{
 				// 야생 (w1) 약함: 스텝 첫머리 E 가 WeakE 밑이면(비축으로 사는 몸) 이동 속도 × WeakSpeed (world.py step 1 의 v 줄이기).

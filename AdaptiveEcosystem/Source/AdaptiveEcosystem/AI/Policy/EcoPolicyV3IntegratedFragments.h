@@ -1,15 +1,7 @@
-// 팀 통합 레벨에서 v3 R1b 두뇌로 도는 사슴·늑대의 태그와 조각 ("몸은 팀 것, 머리만 우리 것").
-//
-// 몸(정체성·지역·생체·이동 경로·Lifecycle·발소리·표현·복제 조각)은 팀 조정자 AEcoCreatureIntegrationSpawner 가 만들고 관리한다.
-// 판단과 이동은 우리 처리기(EcoPolicyV3IntegratedProcessors)가 v3 조각(EcoPolicyV3Fragments.h)으로 한다.
-//
-// 평면 시험 맵 경로와 섞이지 않는다:
-//   평면 시험 개체 = FEcoPolicyV3Tag / FEcoThreatV3Tag (UEcoPolicyV3StepProcessor·VisualProcessor 만 본다)
-//   통합 개체     = FEcoIntegratedPolicyV3Tag / FEcoIntegratedThreatV3Tag (통합 처리기만 본다)
-// 팀 처리기와도 섞이지 않는다: 통합 v3 사슴에는 FEcoHerbivoreTag·Social 조각이 없고, 늑대에는 FEcoPredatorTag·FEcoPreySenseFragment 가
-// 없다. 그래서 v1 정책 사슬·Social 8종·팀 늑대 감각/이동/포획 처리기의 쿼리에 걸리지 않는다 (목록은 EcoCreatureV3Trait.h 머리말).
-//
-// AGENTS.md 2절 3항: 개체별 상태는 개체별 Entity Fragment 에 둔다(Shared Fragment 아님). 논리 상태는 서버·단독에만 있다(2절 2항).
+// Integrated native v3 tags and movement-owned binding state.
+// Deer now carry the existing Social fragments plus FEcoV3SocialBridgeFragment.
+// Social supplies Request/Feedback through the native control hook; no second movement writer.
+// V1 HerbivoreTag/legacy steering and flat-test tags remain absent. Client remains presentation-only.
 
 #pragma once
 

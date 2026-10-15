@@ -41,6 +41,13 @@
 #include "../EcoPolicyV3Processors.h"
 #include "../EcoPolicyV3Subsystem.h"
 #include "AI/Social/EcoSocialFragments.h"
+#include "AI/Social/EcoPolicyV3SocialBridge.h"
+#include "AI/Social/Senses/EcoNoiseSubsystem.h"
+#include "AI/Social/Herd/EcoHerdSubsystem.h"
+#include "AI/Social/Alarm/EcoAlarmProcessors.h"
+#include "AI/Social/Shelter/EcoShelterProcessors.h"
+#include "AI/Social/Shelter/EcoShelterLifecycleProcessor.h"
+#include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "AI/Social/Senses/EcoPredatorPerception.h"
 #include "AI/Social/Senses/EcoSensoryTypes.h"
 #include "Algo/Reverse.h"
@@ -632,10 +639,11 @@ bool FEcoPolicyV3IntegratedTemplateTest::RunTest(const FString& Parameters)
 	TestFalse(TEXT("사슴에 v1 초식 태그·v1 정책 조각이 없다"),
 			  D.HasTag<FEcoHerbivoreTag>() || D.HasFragment<FEcoObservationFragment>() || D.HasFragment<FEcoSteeringGeometryFragment>()
 				  || D.HasFragment<FEcoPolicyRuntimeFragment>());
-	TestFalse(TEXT("사슴에 Social 조각이 없다 (무리·경보·감각·은신처 의도·Social 행동·피드백)"),
-			  D.HasFragment<FEcoHerdMemberFragment>() || D.HasFragment<FEcoAlarmStateFragment>() || D.HasFragment<FEcoSensoryStateFragment>()
-				  || D.HasFragment<FEcoShelterIntentFragment>() || D.HasFragment<FEcoSocialBehaviorFragment>()
-				  || D.HasFragment<FEcoShelterMovementFeedbackFragment>() || D.HasSharedFragment<FEcoSocialSpeciesSharedFragment>());
+    TestTrue(TEXT("Deer has complete Social request/feedback composition with the native movement writer"),
+        D.HasFragment<FEcoHerdMemberFragment>() && D.HasFragment<FEcoAlarmStateFragment>() && D.HasFragment<FEcoSensoryStateFragment>()
+        && D.HasFragment<FEcoShelterIntentFragment>() && D.HasFragment<FEcoSocialBehaviorFragment>()
+        && D.HasFragment<FEcoShelterMovementFeedbackFragment>() && D.HasSharedFragment<FEcoSocialSpeciesSharedFragment>());
+
 	TestFalse(TEXT("사슴에 평면 시험 태그·늑대 조각이 없다"),
 			  D.HasTag<FEcoPolicyV3Tag>() || D.HasTag<FEcoThreatV3Tag>() || D.HasFragment<FEcoThreatStateFragment>() || D.HasTag<FEcoPredatorTag>());
 
@@ -2679,6 +2687,170 @@ bool FEcoPolicyV3IntegratedWolfEatingTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("옛 규칙: 식사 동안 배회하므로 팀 표현 '먹는 중' 동작은 0 (깃발만 서고 뛴다)"), Old.MotionEating, 0);
 	TestTrue(TEXT("옛 규칙: 기록 — 식사 중 늑대·스텝 4, 모두 움직임"), Old.Tally.EatSteps == 4 && Old.Tally.EatMoved == 4);
 	return true;
+}
+
+
+namespace EcoV3SocialTests
+{
+    template<typename T> T* Processor(EcoPolicyV3IntegratedTestImpl::FIntegratedHarness& H) {
+        auto* P=NewObject<T>(H.Scoped.World);P->CallInitialize(H.Scoped.World,H.EM->AsShared());return P;
+    }
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3SocialBlindMember,"AdaptiveEcosystem.Policy.V3.Social.BlindMemberReaction",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoV3SocialBlindMember::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    namespace R=EcoRepertoireV3;
+    FIntegratedHarness H;auto Settings=TestSettings();
+    Settings.bWildFlight=false;Settings.bRealismVision=false;Settings.bRealismHearing=false;
+    if(!H.Setup(*this,Settings))return false;
+    auto* Region=H.AddRegion(TEXT("SocialTest"),0,FVector::ZeroVector,2,1);
+    // At t=0 the native dawn twilight can legitimately initialize wolves asleep. This scenario tests an awake hunter.
+    Region->Sim.Config.DayOffset=225;EcoWorldV3::UpdateDayNight(Region->Sim);
+    H.Spawn(true,TEXT("SocialTest"),0,{FVector(5000,5000,0)},{10});
+    H.Spawn(false,TEXT("SocialTest"),0,{FVector(5500,5000,0),FVector(5400,5000,0)},{11,12});
+    H.Frame(0);
+    auto Observer=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[0]);
+    auto Receiver=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[1]);
+    Observer.Body->Head={-1,0};Receiver.Body->Head={1,0};
+    FHerbView Views[]={Observer,Receiver};
+    FThreatAgent* Threats[]={&H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent};
+    // This contract fixture holds a live hunting source stationary so capture cannot end the
+    // startle countdown before we observe movement. Separate native tests cover moving hunters/capture.
+    Threats[0]->Spec.BaseSpeed=0;Region->Sim.ThreatCfg.HerbSpeed=0;
+    EcoWorldV3::ObserveAndDecideAll(Region->Sim,Views,2,Threats,1);
+    TestEqual(TEXT("Direct observer sees the wolf"),Observer.Perception->Threat.PredCount,1);
+    TestTrue(TEXT("Actual native wolf is awake and hunting"),Region->Sim.ThreatIn.size()==1&&!Region->Sim.ThreatIn[0].bAsleep&&Region->Sim.ThreatIn[0].bHunting);
+    TestEqual(TEXT("Blind member has no personally sensed threat"),Receiver.Perception->Threat.PredCount,0);
+    auto* Herds=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>();
+    const int32 Herd=Herds->AllocateHerd(H.EM->GetFragmentDataChecked<FEcoIdentityFragment>(H.Deer[0]).SpeciesRuntimeIndex,FVector(5450,5000,0));
+    for(const auto E:H.Deer)H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(E).HerdRuntimeIndex=Herd;
+    auto* Sense=EcoV3SocialTests::Processor<UEcoPolicyV3SocialSenseProcessor>(H);
+    auto* Prop=EcoV3SocialTests::Processor<UEcoAlarmPropagationProcessor>(H);
+    auto* Response=EcoV3SocialTests::Processor<UEcoSocialResponseProcessor>(H);
+    auto* Lifecycle=EcoV3SocialTests::Processor<UEcoShelterLifecycleProcessor>(H);
+    EcoTest::RunProcessor(*Sense,*H.EM,.016f);
+    const auto& Direct=H.EM->GetFragmentDataChecked<FEcoSensoryStateFragment>(H.Deer[0]);
+    TestTrue(TEXT("Native direct-evidence adapter records the observer sight"),Direct.Source==EEcoSenseSource::Sight);
+    FEcoHerdRuntimeData SourceData;Herds->GetHerdData(Herd,SourceData);
+    AddInfo(FString::Printf(TEXT("Native source: active=%d threats=%d adopted=%d context=%d observerSense=%d herd=%d strength=%.3f"),H.Sub->IsActive(),int32(Region->Sim.ThreatIn.size()),H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Deer[0]).bAdopted,H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Deer[0]).ContextIndex,int32(Direct.Source),Herd,SourceData.AlarmStrength));
+    EcoTest::RunProcessor(*Prop,*H.EM,.016f);
+    const auto& Alarm=H.EM->GetFragmentDataChecked<FEcoAlarmStateFragment>(H.Deer[1]);
+    TestTrue(TEXT("A direct observer's report reaches a blind member as Panic"),Alarm.State==EEcoSocialState::Panic);
+    const auto& Memory=H.EM->GetFragmentDataChecked<FEcoSensoryStateFragment>(H.Deer[1]);
+    TestTrue(TEXT("Shared report never becomes fabricated direct sight"),Memory.Source==EEcoSenseSource::None&&Memory.SharedPersistentHerdId>0);
+    Receiver.Decision->Request=R::kGraze;
+    EcoTest::RunProcessor(*Response,*H.EM,.016f);EcoTest::RunProcessor(*Lifecycle,*H.EM,.016f);
+    H.Scoped.World->TimeSeconds+=R::kStepSeconds;H.DecisionStep();
+    TestEqual(TEXT("The committed PPO request remains Graze"),Receiver.Decision->CommittedRequest,R::kGraze);
+    TestEqual(TEXT("Native movement consumer executes Social Flee"),Receiver.Decision->ExecutedBehavior,R::kFlee);
+    TestEqual(TEXT("Alarm reaction suppresses actual feeding"),Receiver.Body->LastIntake,0.0);
+    const auto Before=Receiver.Body->Pos;
+    for(int32 I=0;I<6;++I){
+        H.Scoped.World->TimeSeconds+=R::kStepSeconds;H.DecisionStep();
+        const auto& Audit=H.EM->GetFragmentDataChecked<FEcoV3SocialBridgeFragment>(H.Deer[1]);
+        AddInfo(FString::Printf(TEXT("Reaction step=%d x=%.3f death=%d behavior=%d startle=%d shared=%d override=%d vx=%.3f"),
+            I,Receiver.Body->Pos.X,Receiver.Body->DeathCause,Receiver.Rep->Behavior,Receiver.Rep->StartleLeft,Audit.SharedStartleLeft,int32(Audit.Applied),Receiver.Control->Velocity.X));
+    }
+    TestTrue(TEXT("Blind member physically moves away through the single native integration"),Receiver.Body->Pos.X>Before.X);
+    TestEqual(TEXT("The movement assertion observes a living member"),Receiver.Body->DeathCause,EcoWorldV3::kDeathNone);
+    Region->Sim.ThreatIn.clear();H.Scoped.World->TimeSeconds+=.21;EcoTest::RunProcessor(*Sense,*H.EM,.016f);
+    FEcoHerdRuntimeData Data;Herds->GetHerdData(Herd,Data);
+    TestEqual(TEXT("Shared memories cannot re-emit an observed alarm after direct evidence clears"),Data.AlarmStrength,0.f);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3SocialSlotArrival,"AdaptiveEcosystem.Policy.V3.Social.SlotMovementAndCleanup",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoV3SocialSlotArrival::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    namespace R=EcoRepertoireV3;
+    FIntegratedHarness H;auto Settings=TestSettings();Settings.bWildFlight=false;
+    if(!H.Setup(*this,Settings))return false;
+    auto* Region=H.AddRegion(TEXT("SocialSlot"),0,FVector::ZeroVector,1,0);
+    Region->Sim.Config.Covers.push_back({27.25,25,1.0});
+    H.Spawn(false,TEXT("SocialSlot"),0,{FVector(5000,5000,0)},{21});H.Frame(0);
+    auto* Shelters=H.Scoped.World->GetSubsystem<UEcoShelterSubsystem>();
+    Shelters->RegisterShelter(FVector(5450,5000,0),FVector::UpVector,1,1,100);
+    auto* Response=EcoV3SocialTests::Processor<UEcoSocialResponseProcessor>(H);
+    auto* Query=EcoV3SocialTests::Processor<UEcoShelterQueryProcessor>(H);
+    auto* Reserve=EcoV3SocialTests::Processor<UEcoShelterReservationProcessor>(H);
+    auto* Lifecycle=EcoV3SocialTests::Processor<UEcoShelterLifecycleProcessor>(H);
+    auto& Alarm=H.EM->GetFragmentDataChecked<FEcoAlarmStateFragment>(H.Deer[0]);
+    Alarm.State=EEcoSocialState::Panic;Alarm.AlarmStrength=1;Alarm.LastThreatPosition=FVector(4000,5000,0);
+    int64 Token=0;bool Moving=false,Occupied=false;
+    for(int32 I=0;I<15;++I){
+        EcoTest::RunProcessor(*Response,*H.EM,.016f);EcoTest::RunProcessor(*Query,*H.EM,.016f);
+        EcoTest::RunProcessor(*Reserve,*H.EM,.016f);EcoTest::RunProcessor(*Lifecycle,*H.EM,.016f);
+        auto& Intent=H.EM->GetFragmentDataChecked<FEcoShelterIntentFragment>(H.Deer[0]);
+        if(Intent.ReservationId>0)Token=Intent.ReservationId;
+        Moving|=Intent.State==EEcoShelterIntentState::Moving;Occupied|=Intent.State==EEcoShelterIntentState::Occupied;
+        H.Scoped.World->TimeSeconds+=R::kStepSeconds;H.DecisionStep();
+    }
+    TestTrue(TEXT("Real request/feedback reaches Moving and Occupied"),Token>0&&Moving&&Occupied);
+    const auto& Request=H.EM->GetFragmentDataChecked<FEcoSocialMovementRequestFragment>(H.Deer[0]);
+    const auto Body=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[0]).Body;
+    const auto Position=H.Sub->GetContext(0)->UnitsToCm(Body->Pos.X,Body->Pos.Y,0);
+    TestTrue(TEXT("Occupied reflects actual body position, not the desired target"),FVector::Distance(Position,Request.TargetPosition)<=Request.ArrivalRadius);
+    TestEqual(TEXT("Holding a slot cannot consume food"),Body->LastIntake,0.0);
+    H.EM->GetFragmentDataChecked<FEcoVitalsFragment>(H.Deer[0]).HP=0;
+    EcoTest::RunProcessor(*Lifecycle,*H.EM,.016f);
+    TestEqual(TEXT("Death clears the request token"),H.EM->GetFragmentDataChecked<FEcoSocialMovementRequestFragment>(H.Deer[0]).ReservationId,int64(0));
+    TestTrue(TEXT("Death releases the actual lease"),!Shelters->IsReservationValid(0,21,Token,H.Scoped.World->GetTimeSeconds()));
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3SocialChannels,"AdaptiveEcosystem.Policy.V3.Social.EvidenceChannelsAndUnsafeTarget",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoV3SocialChannels::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    FIntegratedHarness H;if(!H.Setup(*this,TestSettings()))return false;
+    auto* Region=H.AddRegion(TEXT("SafeTest"),0,FVector::ZeroVector,1,0);
+    H.Spawn(false,TEXT("SafeTest"),0,{FVector(5000,5000,0)},{31});H.Frame(0);
+    Region->Sim.Config.Covers.push_back({20,25,1.0});
+    auto View=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[0]);
+    auto& Link=H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Deer[0]);
+    FEcoV3SocialBridgeFragment Audit;FEcoAlarmStateFragment Alarm;
+    Alarm.State=EEcoSocialState::Panic;Alarm.AlarmStrength=1;Alarm.LastThreatPosition=FVector(3900,5000,0);
+    FEcoSocialMovementRequestFragment Request;Request.bValid=true;Request.EffectiveAction=EcoV3Social::ProjectPolicy(0);
+    Request.Mode=EEcoSocialMovementMode::ShelterTravel;Request.TargetPosition=FVector(4000,5000,0);Request.ArrivalRadius=60;Request.ReservationId=123;Request.ValidUntilWorldTime=10;
+    View.Decision->KeepActive=EcoWorldV3::kKeepPanic;
+    EcoV3Social::ApplyControl(Request,Alarm,*Region,Link,Audit,View,true,0);
+    TestTrue(TEXT("Urgent escape yields a leased slot toward the threat"),Audit.bRejectedUnsafeShelter&&Audit.AppliedReservation==0&&Audit.Applied==EEcoV3SocialControl::Flee);
+    Request.TargetPosition=FVector(6000,5000,0);
+    EcoV3Social::ApplyControl(Request,Alarm,*Region,Link,Audit,View,false,0);
+    TestEqual(TEXT("Invalid lease never drives shelter movement"),Audit.AppliedReservation,int64(0));
+    EcoV3Social::ApplyControl(Request,Alarm,*Region,Link,Audit,View,true,11);
+    TestEqual(TEXT("Expired request never resurrects a lease"),Audit.AppliedReservation,int64(0));
+    auto* Herds=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>();const int32 Herd=Herds->AllocateHerd(-1,FVector::ZeroVector);
+    FEcoHerdRuntimeData Data;Herds->GetHerdData(Herd,Data);
+    FEcoObservedHerdThreat T;T.HerdRuntimeIndex=Herd;T.PersistentHerdId=Data.PersistentHerdId;T.Strength=.7f;
+    Herds->ApplyObservedHerdThreats(MakeArrayView(&T,1));T.Strength=.9f;
+    Herds->ApplyObservedHerdThreats(MakeArrayView(&T,1),true);Herds->ApplyObservedHerdThreats({},true);Herds->GetHerdData(Herd,Data);
+    TestEqual(TEXT("Clearing native evidence preserves the legacy detection channel"),Data.AlarmStrength,.7f);
+    return true;
+}
+
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3PlayerSound,"AdaptiveEcosystem.Policy.V3.Social.PlayerFootstepEvidence",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoV3PlayerSound::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    FIntegratedHarness H;if(!H.Setup(*this,TestSettings()))return false;
+    H.AddRegion(TEXT("SoundTest"),0,FVector::ZeroVector,1,0);
+    H.Spawn(false,TEXT("SoundTest"),0,{FVector(5000,5000,0)},{41});H.Frame(0);
+    auto* Herds=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>();
+    const int32 Herd=Herds->AllocateHerd(H.EM->GetFragmentDataChecked<FEcoIdentityFragment>(H.Deer[0]).SpeciesRuntimeIndex,FVector(5000,5000,0));
+    H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(H.Deer[0]).HerdRuntimeIndex=Herd;
+    auto* Noise=H.Scoped.World->GetSubsystem<UEcoNoiseSubsystem>();
+    auto* Sense=EcoV3SocialTests::Processor<UEcoPolicyV3SocialSenseProcessor>(H);
+    auto& Memory=H.EM->GetFragmentDataChecked<FEcoSensoryStateFragment>(H.Deer[0]);
+    Noise->ReportNoise(FVector(4700,5000,0),1,2000,1,nullptr,TEXT("Player.Footstep"));
+    EcoTest::RunProcessor(*Sense,*H.EM,.016f);
+    TestTrue(TEXT("Authority player footstep becomes direct hearing without invented vision"),Memory.Source==EEcoSenseSource::Hearing&&Memory.LastKnownPosition.Equals(FVector(4700,5000,0)));
+    FEcoHerdRuntimeData Data;Herds->GetHerdData(Herd,Data);
+    TestTrue(TEXT("A new player sound reaches the actual Herd alarm"),Data.AlarmStrength>0);
+    H.Scoped.World->TimeSeconds+=.21;EcoTest::RunProcessor(*Sense,*H.EM,.016f);Herds->GetHerdData(Herd,Data);
+    TestEqual(TEXT("An old still-buffered sound cannot be replayed to refresh the alarm"),Data.AlarmStrength,0.f);
+    Memory.Forget();
+    Noise->ReportNoise(FVector(4700,5000,0),.12f,2000,1,nullptr,TEXT("Player.Footstep"));
+    H.Scoped.World->TimeSeconds+=.21;EcoTest::RunProcessor(*Sense,*H.EM,.016f);
+    TestTrue(TEXT("Sneaking sound at 3m lies outside its 2.4m effective range"),Memory.Source==EEcoSenseSource::None);
+    return true;
 }
 
 #endif // WITH_DEV_AUTOMATION_TESTS

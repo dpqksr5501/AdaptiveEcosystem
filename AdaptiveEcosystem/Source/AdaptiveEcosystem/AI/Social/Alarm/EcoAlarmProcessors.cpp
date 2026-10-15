@@ -6,6 +6,8 @@
 #include "AI/Social/Herd/EcoHerdProcessors.h"
 #include "AI/Social/Alarm/EcoThreatDetectionProcessor.h"
 #include "AI/Policy/EcoBehaviorProcessors.h"
+#include "AI/Policy/EcoPolicyV3Fragments.h"
+#include "AI/Social/EcoPolicyV3SocialBridge.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
@@ -158,6 +160,7 @@ UEcoSocialResponseProcessor::UEcoSocialResponseProcessor()
 
 void UEcoSocialResponseProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+	EntityQuery.AddRequirement<FEcoBehaviorStateFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	EntityQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadOnly);
@@ -187,11 +190,12 @@ void UEcoSocialResponseProcessor::Execute(FMassEntityManager& EntityManager, FMa
 		TConstArrayView<FEcoPolicyOutputFragment> PolicyOutputList = ChunkContext.GetFragmentView<FEcoPolicyOutputFragment>();
 		TArrayView<FEcoSocialBehaviorFragment> SocialBehaviorList = ChunkContext.GetMutableFragmentView<FEcoSocialBehaviorFragment>();
 		const auto Ids = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
+        const auto Native = ChunkContext.GetFragmentView<FEcoBehaviorStateFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
 		{
 			const FEcoAlarmStateFragment& Alarm = AlarmList[i];
-			const FEcoPolicyActionV1& RawAction = PolicyOutputList[i].Action;
+			const FEcoPolicyActionV1 RawAction = Native.IsEmpty() ? PolicyOutputList[i].Action : EcoV3Social::ProjectPolicy(Native[i].Decision.Request);
 			FEcoSocialBehaviorFragment& SocialBehavior = SocialBehaviorList[i];
 
 			// Start from the pure, uncorrupted PPO raw action

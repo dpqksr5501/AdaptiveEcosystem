@@ -141,6 +141,7 @@ namespace EcoObservationV3
 		double VelY = 0.0;
 		bool bAsleep = false;
 		double HearR = 0.0;   // 발소리 반경 (realism_hearing, HearingRadius). 0 = 들리지 않음 (끈 세계는 늘 0)
+		bool bHunting = true; // Social metadata only. Resting/eating wolves never raise a new threat alarm.
 	};
 
 	/** R3 발소리 계수 (파이썬 realism_hearing, configs/v3_r3.yaml·v3_wild1_mirror.yaml 값). 기본 끔. */
