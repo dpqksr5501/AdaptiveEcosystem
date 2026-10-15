@@ -1,5 +1,7 @@
 # M4 공통 런타임 · v3 정책 · JYU 표현 통합
 
+> **2026-10-16 작업 위치 통합:** 검증 커밋 `8e2f34f`를 기존 `codex/social-shelter-handoff`에 반영했다. 앞으로 원래 저장소 `C:/Users/I/Documents/GitHub/AdaptiveEcosystem`의 `AdaptiveEcosystem/AdaptiveEcosystem.uproject`를 연다. 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`은 그대로 사용한다. 아래 브랜치명은 최초 통합 이력이다. 원래 위치의 빌드·검증 및 worktree 정리는 [작업 위치 통합 기록](JYU_WORKTREE_RETURN_20261016.md)을 따른다.
+
 작성일: 2026-10-15. 브랜치 `codex/m4-v3-creature-integration`. 장원준 `wonkii/M4` **67c860c** 위에 권신혁 `origin/Branch_Sinhyeok` **8292856**을 병합하고 충돌 네 파일을 해결했다. 기존 조연우 작업은 main의 PR #11 병합 내용을 유지했다. 사용자의 원래 작업 트리와 레벨 디자이너의 `/Game/Map/LV_Ecosystem_IntegrationTest`는 수정하지 않았다.
 
 ## 실행할 맵과 실제 에셋

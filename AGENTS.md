@@ -76,3 +76,10 @@
 `codex/m4-v3-creature-integration`의 별도 `/Game/JYU/Maps/LV_JYU_V3Integration`은 M4 공통 권위·identity/lifecycle/resource/replication을 권신혁 Native v3 **R1b 18관측/5행동·mask2**에 연결한다. 이는 기본 V1 7관측/4출력을 변경하는 경로가 아니다. v3의 단일 Native movement/vitals writer를 유지하고 V1/Custom Movement 혼용 가드를 제거하지 않는다. Client는 수신 표현만 수행하며 런타임 Python 추론은 금지한다. 원본 팀 레벨 대신 복사 맵·owned 에셋에 authoring한다.
 
 실제 계약·검증 범위·known gap은 [JYU M4/v3 통합 기록](AdaptiveEcosystem/Docs/조연우/JYU_M4_V3_INTEGRATION.md)과 [IK 검증](AdaptiveEcosystem/Docs/조연우/JYU_IK_VALIDATION.md)을 따른다. v3 Social ModulatedAction/slot arrival feedback·migration/wave는 연결 완료로 간주하지 않는다. 기존 V1 handoff를 보존한다. 단일 runtime 모듈은 유지하며 AnimGraph authoring만 별도 `AdaptiveEcosystemEditor` Editor 모듈로 분리했다.
+
+
+## 5. 2026-10-16 작업 위치 통합
+
+검증 커밋 `8e2f34f`의 M4/v3/JYU 구현은 기존 `codex/social-shelter-handoff`와 원래 저장소 폴더로 반영했다. 앞으로 원래 `AdaptiveEcosystem/AdaptiveEcosystem.uproject`를 사용한다. 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`과 원본 팀 레벨의 분리는 유지한다. 4절의 브랜치명은 최초 구현 이력이다. 세부 보존·재검증·worktree 정리는 [작업 위치 통합 기록](AdaptiveEcosystem/Docs/조연우/JYU_WORKTREE_RETURN_20261016.md)을 따른다.
+
+UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한이 있는 승인된 실행 환경에서 시작한다. 권한 오류로 시작한 빌드를 임의 중단하거나 중복 실행하지 않는다. 2026-10-16의 중단 허용은 사용자가 특정 실패 실행 1회에만 허용한 예외이며 지속적인 예외가 아니다.

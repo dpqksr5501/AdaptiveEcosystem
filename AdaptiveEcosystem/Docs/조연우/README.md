@@ -1,6 +1,6 @@
 # 조연우 작업 시작 문서 — 역할·진행상황·다음 연결
 
-갱신일: **2026-10-15**. 현재 통합 브랜치는 `codex/m4-v3-creature-integration`이다. 기존 PR #11은 main에 병합됐고, 아래 2026-10-08 항목은 이전 구현 이력이다.
+갱신일: **2026-10-16**. 현재 작업 브랜치는 `codex/social-shelter-handoff`이며 원래 프로젝트 폴더에서 작업한다. 2026-10-15 통합 worktree의 검증 커밋 `8e2f34f`를 기존 브랜치에 fast-forward로 반영했다. 원래 위치의 직접 UBT·119개 자동화·에디터 12조건·서버/Client 재접속 검증 후 별도 worktree 정리를 완료했다. 앞으로 원래 `AdaptiveEcosystem.uproject`를 연다. [위치 통합 기록](JYU_WORKTREE_RETURN_20261016.md). 기존 PR #11은 main에 병합됐고, 아래 2026-10-08 항목은 이전 구현 이력이다.
 
 현재 실행 맵은 원본과 독립적으로 복사한 **`/Game/JYU/Maps/LV_JYU_V3Integration`**이다. M4+권신혁 v3 Native brain, 행동 프로필/AnimBP, 실제 플레이어 발소리, 감각 표현·경보, Client 표현, Inspector 기록을 연결했다. [현재 통합 계약·실행·검증](JYU_M4_V3_INTEGRATION.md)과 [사슴 IK 수정·비교 화면](JYU_IK_VALIDATION.md)을 먼저 읽는다. v3의 Social slot handoff·migration·wave는 완료했다고 간주하지 않는다. V1 경로와 원본 팀 레벨은 보존했다.
 
