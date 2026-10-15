@@ -4,6 +4,7 @@
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Core/EcoRuntimeSettings.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
+#include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "DrawDebugHelpers.h"
@@ -60,6 +61,21 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("통합 v3 모드의 늑대 밤잠 점진화 (1 = 켬, 기본 — 사람 결정 H1 10-14). 해 진 뒤 늑대마다 다른 지연이 지나고 사냥 중이 아니고 ")
 		TEXT("16 m 안에 사슴이 없으면 2 초 동안 걸음을 늦추다 눕는다. 깜깜하면 새 사냥을 시작하지 않고 쫓던 사냥만 끝낸다. 새벽에는 하나씩 ")
 		TEXT("깨어 걸음을 올린다 (파이썬 configs/v3_real1_night_on.yaml realism_night). 0 = 어둠 0.5 가 되는 순간 곧바로 잔다. Play 전에 바꾼다."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarNoFreeze(
+		TEXT("eco.IntegratedV3.NoFreeze"),
+		1,
+		TEXT("통합 v3 모드의 사슴 얼기 막음 (1 = 막음, 기본 — 사람 결정 10-15 (A)). 마스크가 FREEZE 를 늘 막는다(R1b−F: R1b 가중치 그대로, ")
+		TEXT("얼던 자리에서는 R1b 의 다음 선호 행동). 0 = R1b 그대로 얼기를 쓴다. Play 전에 바꾼다. 명령줄 -EcoV3NoFreeze= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarWolfEatSeconds(
+		TEXT("eco.IntegratedV3.WolfEatSeconds"),
+		5.0f,
+		TEXT("통합 v3 모드의 늑대 식사 길이 (초, 기본 5 — 사람 결정 10-15 (B)). 잡은 늑대는 시체 곁에 서서 이만큼 먹고 곧바로 다시 사냥한다 ")
+		TEXT("(포만 없음). 결정 스텝 = 반올림(초 ÷ 2/15) — 5 초 = 38 스텝(5.07 초). 0.67 이하 = 옛 규칙(학습 세계 5 스텝, 그동안 배회). ")
+		TEXT("Play 전에 바꾼다. 명령줄 -EcoV3WolfEatSeconds= 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarDebug(
@@ -243,7 +259,11 @@ FString EcoV3Integrated::WolfLabel(const EcoWorldV3::FThreatAgent& A, const EcoT
 			   : St == EWolfState::Stalk || St == EWolfState::Chase	  ? FColor::Red
 			   : St == EWolfState::Roam								  ? FColor(220, 150, 150)
 																	  : FColor(150, 150, 150);
-	FString Label = FString::Printf(TEXT("늑대 %s%s"), WolfStateNameKo(St),
+	// 식사 중이면 남은 식사 = 쿨다운 × 2/15 초 ('늑대 식사 3.2초 (잠행형)')
+	const FString EatLeft = St == EWolfState::Eat
+								? FString::Printf(TEXT(" %.1f초"), static_cast<double>(A.State.Cooldown) * EcoRepertoireV3::kStepSeconds)
+								: FString();
+	FString Label = FString::Printf(TEXT("늑대 %s%s%s"), WolfStateNameKo(St), *EatLeft,
 									A.Spec.Type == EcoThreatV3::EThreatType::Stalker ? TEXT(" (잠행형)") : TEXT(" (추격형)"));
 	if (!Cfg.bRealismNight || A.Spec.bNocturnal || A.State.bAsleep)
 	{
@@ -284,6 +304,8 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.DeerPerRegion = FMath::Clamp(CVarDeerPerRegion.GetValueOnGameThread(), 1, kTrainDeer);
 	S.StageSizeUnits = FMath::Clamp(static_cast<double>(CVarStageSizeM.GetValueOnGameThread()) * 100.0 / EcoRepertoireV3::kUnitCm, 60.0, 110.0);
 	S.bGradualNight = CVarGradualNight.GetValueOnGameThread() != 0;
+	S.bNoFreeze = CVarNoFreeze.GetValueOnGameThread() != 0;
+	S.WolfEatSeconds = static_cast<double>(CVarWolfEatSeconds.GetValueOnGameThread());
 	return S;
 }
 
@@ -323,6 +345,16 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3DeerPerRegion="), DeerArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.DeerPerRegion"), LexToString(DeerArg));
+	}
+	int32 NoFreezeArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3NoFreeze="), NoFreezeArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.NoFreeze"), LexToString(NoFreezeArg));
+	}
+	float EatArg = 5.0f;
+	if (FParse::Value(CmdLine, TEXT("EcoV3WolfEatSeconds="), EatArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.WolfEatSeconds"), LexToString(EatArg));
 	}
 }
 
@@ -423,6 +455,15 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		   Settings.bGradualNight ? TEXT("서서히 (eco.IntegratedV3.GradualNight 1 — 16 m 안 사슴·사냥 중이면 안 누움, 깜깜하면 새 사냥 없음, 늑대마다 지연, R1b 측정으로 허용)")
 								  : TEXT("곧바로 (eco.IntegratedV3.GradualNight 0 — 어둠 0.5 에 바로 잠)"),
 		   bStreamingSpawner ? TEXT("서식지 스트리밍이 끝나는 프레임에 조정자 시작 직전 다시") : TEXT("끝 (스트리밍 없음 — 조정자가 BeginPlay 에서 시작)"));
+	const int32 EatSteps = Settings.WolfEatSteps();
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 얼기: %s | 늑대 식사: %s"),
+		   Settings.bNoFreeze ? TEXT("막힘 (eco.IntegratedV3.NoFreeze 1, 사람 결정 10-15 (A) — R1b−F: 가중치 그대로, 마스크가 FREEZE 를 늘 막는다)")
+							  : TEXT("열림 (eco.IntegratedV3.NoFreeze 0 — R1b 그대로 얼기를 쓴다)"),
+		   *(Settings.LongWolfEat()
+				 ? FString::Printf(TEXT("%.2f초 → %d 스텝 (%.2f초), 그동안 시체 곁에 서 있고 끝나면 곧바로 사냥 (eco.IntegratedV3.WolfEatSeconds, 사람 결정 10-15 (B), 포만 없음)"),
+								   Settings.WolfEatSeconds, EatSteps, EatSteps * EcoRepertoireV3::kStepSeconds)
+				 : FString::Printf(TEXT("옛 규칙 %d 스텝 (%.2f초, 그동안 배회 — 학습 세계 그대로. eco.IntegratedV3.WolfEatSeconds %.2f)"), EatSteps,
+								   EatSteps * EcoRepertoireV3::kStepSeconds, Settings.WolfEatSeconds)));
 }
 
 void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
@@ -659,6 +700,14 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.bRespawnDead = false;                                    // 제자리 부활 없음 (계약 12-3: 새 개체 = 새 StableAgentId)
 	C.PredEmaDenominator = FMath::Max(1, PlannedDeer);         // 고정 분모 = 무대 처음 사슴 수 (학습의 고정 128 과 같은 꼴, 열린 질문 7)
 	C.bRealismNight = S.bGradualNight;                         // 늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight, 사람 결정 H1)
+	// 사슴 얼기 막음 (eco.IntegratedV3.NoFreeze, 사람 결정 10-15 (A)): 세계 허용 칸의 FREEZE 를 닫는다 — 실제 허용 = R1b 모델 ∧ 세계
+	C.WorldAllowed[EcoRepertoireV3::kFreeze] = S.bNoFreeze ? 0 : 1;
+	// 늑대 식사 (eco.IntegratedV3.WolfEatSeconds, 사람 결정 10-15 (B)): 학습 5 스텝보다 길 때만 쿨다운을 바꾸고 식사 동안 세운다
+	if (S.LongWolfEat())
+	{
+		C.PredEatCdOverride = S.WolfEatSteps();
+		C.bEatInPlace = true;
+	}
 	return C;
 }
 
@@ -910,6 +959,7 @@ void UEcoPolicyV3IntegratedSubsystem::HandlePreActorTick(UWorld* InWorld, ELevel
 	if (bContextsCreated)
 	{
 		CheckClockDrift();
+		TallyTeamWolfVisuals();
 		if (IsDebugDrawEnabled())
 		{
 			DrawOverlay();
@@ -1233,6 +1283,64 @@ void UEcoPolicyV3IntegratedSubsystem::NotifyNightStep(FEcoV3RegionContext& Ctx, 
 	}
 }
 
+void FEcoV3RegionContext::TallyWolfStep(const EcoWorldV3::FThreatAgent& A, int64 WolfId, int64 StepIndex)
+{
+	using EcoV3Integrated::kChainWindowSteps;
+	const int64* Last = WolfLastCatchStep.Find(WolfId);
+	const int64 Since = Last ? StepIndex - *Last : -1;
+	const int64 EatCd = Sim.ThreatCfg.PredEatCd;
+	if (A.Last.bPounceStart)
+	{
+		++Eat.Pounces;
+		Eat.ChainPounces += (Last && Since <= kChainWindowSteps) ? 1 : 0;
+		Eat.PostEatPounces += (Last && Since <= EatCd + kChainWindowSteps) ? 1 : 0;
+	}
+	if (A.Last.Caught < 0 && A.State.Cooldown > 0)
+	{
+		// 식사 중: 이번 스텝에 쿨다운을 빼고도 남아 사냥하지 않았다 (잡은 스텝은 쿨다운이 0 이었으므로 여기 들지 않는다)
+		++Eat.EatSteps;
+		Eat.EatMoved += (A.State.VelX != 0.0 || A.State.VelY != 0.0) ? 1 : 0;
+	}
+	if (A.Last.Caught >= 0)
+	{
+		++Eat.Catches;
+		++WolfCatchesById.FindOrAdd(WolfId);
+		if (Last)
+		{
+			++Eat.RepeatCatches;
+			Eat.PostEatCatches += Since <= EatCd + kChainWindowSteps ? 1 : 0;
+		}
+		WolfLastCatchStep.Add(WolfId, StepIndex);
+	}
+}
+
+void UEcoPolicyV3IntegratedSubsystem::TallyTeamWolfVisuals()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+	static const FName WolfSpecies(TEXT("Wolf"));
+	// 팀 표현 액터는 읽기만 한다 (팀 조정자가 FEcoCreaturePresentationFragment 깃발 2 = EatCooldown > 0 으로 bEating 을 세운다)
+	for (TActorIterator<AEcoCreatureRepresentationActor> It(World); It; ++It)
+	{
+		const AEcoCreatureRepresentationActor* Rep = *It;
+		if (!Rep || !Rep->bBound || !Rep->VisualState.bAlive || !Rep->VisualState.bEating || Rep->VisualState.SpeciesId != WolfSpecies)
+		{
+			continue;
+		}
+		FEcoV3RegionContext* Ctx = FindContext(Rep->VisualState.RegionId);
+		if (!Ctx)
+		{
+			continue;
+		}
+		++Ctx->Eat.EatFlagFrames;
+		Ctx->Eat.EatMotionFrames += Rep->VisualMotion == EEcoCreatureVisualMotion::Eating ? 1 : 0;
+		Ctx->Eat.EatWalkFrames += (Rep->VisualMotion == EEcoCreatureVisualMotion::Walk || Rep->VisualMotion == EEcoCreatureVisualMotion::Run) ? 1 : 0;
+	}
+}
+
 void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 {
 	using namespace EcoV3Integrated;
@@ -1251,12 +1359,19 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 										Snap.DayCycle.PhaseEndSeconds - Snap.DayCycle.PhaseStartSeconds);
 		}
 	}
-	bool bAllFour = true;
+	// 허용 행동(잠 빼고, 얼기를 막으면 얼기도 빼고)을 모두 썼는가
+	bool bAllUsed = true;
+	FString AllowedNames;
 	FString Now;
 	FString Used;
 	for (int32 b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
 	{
-		bAllFour = bAllFour && (b == EcoRepertoireV3::kSleep || S.BehaviorSteps[b] > 0);
+		const bool bCounted = b != EcoRepertoireV3::kSleep && Ctx.Sim.Allowed[b] != 0;
+		bAllUsed = bAllUsed && (!bCounted || S.BehaviorSteps[b] > 0);
+		if (bCounted)
+		{
+			AllowedNames += AllowedNames.IsEmpty() ? FString(BehaviorNameKo(b)) : FString(TEXT("·")) + BehaviorNameKo(b);
+		}
 		Now += FString::Printf(TEXT(" %s %d"), BehaviorNameKo(b), Ctx.BehaviorNow[b]);
 		Used += FString::Printf(TEXT(" %s %lld"), BehaviorNameKo(b), static_cast<long long>(S.BehaviorSteps[b] - P.BehaviorSteps[b]));
 	}
@@ -1294,14 +1409,48 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	UE_LOG(LogEcoPolicyV3I, Log,
 		   TEXT("[EcoV3I] %s | %.1f초 %s d=%.2f (%s) | 사슴 산 %d/%d | 지금 행동:%s | 구간 사용(개체·스텝):%s | 늑대 %d:%s%s | ")
 			   TEXT("포획 %lld (누적 %lld) 굶음 %lld (누적 %lld) | %s | 지형 검사 이동 %lld, 막힘 사슴 %lld 늑대 %lld | 피식EMA %.3f | 마스크 위반 %lld | ")
-			   TEXT("네 행동 모두 씀=%s | 결정 스텝 CPU(모든 지역) 평균 %.2f ms/스텝, 최대 %.1f ms/프레임"),
+			   TEXT("허용 행동(%s) 모두 씀=%s | 결정 스텝 CPU(모든 지역) 평균 %.2f ms/스텝, 최대 %.1f ms/프레임"),
 		   *Ctx.RegionId.ToString(), Seconds, Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Ctx.Sim.Dark, *TeamPhase, Ctx.AliveDeer,
 		   Ctx.AdoptedDeer, *Now, *Used, Ctx.Wolves, *WolfNow, *Night, static_cast<long long>(S.Caught - P.Caught),
 		   static_cast<long long>(S.Caught), static_cast<long long>(S.Starved - P.Starved), static_cast<long long>(S.Starved), *Feeding,
 		   static_cast<long long>(Ctx.TerrainChecks - Ctx.LastLogTerrainChecks),
 		   static_cast<long long>(S.BlockedHerbMoves - P.BlockedHerbMoves), static_cast<long long>(S.BlockedThreatMoves - P.BlockedThreatMoves),
-		   Ctx.Sim.PredEma, static_cast<long long>(S.MaskViolations), bAllFour ? TEXT("예") : TEXT("아니오"), CpuAvgMs,
+		   Ctx.Sim.PredEma, static_cast<long long>(S.MaskViolations), *AllowedNames, bAllUsed ? TEXT("예") : TEXT("아니오"), CpuAvgMs,
 		   1000.0 * StepCpuMaxFrameSeconds);
+	// 둘째 줄: 사슴 얼기 막음·늑대 식사 (사람 결정 10-15 (A)(B)). 구간 = 지난 기록 줄 뒤
+	{
+		const FEcoV3WolfEatTally& E = Ctx.Eat;
+		const FEcoV3WolfEatTally& L = Ctx.LastLogEat;
+		const int32 Fz = EcoRepertoireV3::kFreeze;
+		const bool bFreezeBlocked = Ctx.Sim.Allowed[Fz] == 0;
+		const int32 EatCd = Ctx.Sim.ThreatCfg.PredEatCd;
+		TArray<int64> Ids;
+		Ctx.WolfCatchesById.GetKeys(Ids);
+		Ids.Sort();
+		FString PerWolf;
+		for (const int64 Id : Ids)
+		{
+			PerWolf += FString::Printf(TEXT(" %lld:%d"), static_cast<long long>(Id), Ctx.WolfCatchesById.FindRef(Id));
+		}
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 얼기·식사 | %.1f초 | 얼기 %s: 구간 실행 %lld (누적 %lld) · 얼기 칸이 열린 결정 구간 %lld (누적 %lld) | ")
+				   TEXT("늑대 식사 %.2f초(%d 스텝) %s: 구간 포획 %lld (누적 %lld) · 식사 중 늑대·스텝 %lld, 그중 움직임 %lld · 돌진 %lld, 그중 이어 사냥(앞 포획 뒤 3초 안) %lld · ")
+				   TEXT("식사 끝 3초 안 %lld · 앞 포획이 있는 포획 %lld, 그중 식사 끝 3초 안 %lld · 팀 화면 식사 깃발 늑대·프레임 %lld (먹는 중 동작 %lld, 걷기·뛰기 %lld) | ")
+				   TEXT("늑대별 포획 누적:%s"),
+			   *Ctx.RegionId.ToString(), Seconds, bFreezeBlocked ? TEXT("막힘") : TEXT("열림"),
+			   static_cast<long long>(S.BehaviorSteps[Fz] - P.BehaviorSteps[Fz]), static_cast<long long>(S.BehaviorSteps[Fz]),
+			   static_cast<long long>(Ctx.FreezeMaskOpen - Ctx.LastLogFreezeMaskOpen), static_cast<long long>(Ctx.FreezeMaskOpen),
+			   EatCd * EcoRepertoireV3::kStepSeconds, EatCd, Ctx.Sim.ThreatCfg.bEatInPlace ? TEXT("제자리") : TEXT("배회 (옛 규칙)"),
+			   static_cast<long long>(E.Catches - L.Catches), static_cast<long long>(E.Catches),
+			   static_cast<long long>(E.EatSteps - L.EatSteps), static_cast<long long>(E.EatMoved - L.EatMoved),
+			   static_cast<long long>(E.Pounces - L.Pounces), static_cast<long long>(E.ChainPounces - L.ChainPounces),
+			   static_cast<long long>(E.PostEatPounces - L.PostEatPounces), static_cast<long long>(E.RepeatCatches - L.RepeatCatches),
+			   static_cast<long long>(E.PostEatCatches - L.PostEatCatches), static_cast<long long>(E.EatFlagFrames - L.EatFlagFrames),
+			   static_cast<long long>(E.EatMotionFrames - L.EatMotionFrames), static_cast<long long>(E.EatWalkFrames - L.EatWalkFrames),
+			   PerWolf.IsEmpty() ? TEXT(" 없음") : *PerWolf);
+		Ctx.LastLogEat = E;
+		Ctx.LastLogFreezeMaskOpen = Ctx.FreezeMaskOpen;
+	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
 	{
@@ -1433,7 +1582,8 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 		FString Tally;
 		for (int32 b = 0; b < EcoRepertoireV3::kSleep; ++b)
 		{
-			Tally += FString::Printf(TEXT(" %s %d"), BehaviorNameKo(b), Ctx.BehaviorNow[b]);
+			// 얼기를 막았으면 '얼기(막힘) 0' — 늘 0 이어야 한다 (사람 결정 10-15 (A))
+			Tally += FString::Printf(TEXT(" %s%s %d"), BehaviorNameKo(b), Ctx.Sim.Allowed[b] == 0 ? TEXT("(막힘)") : TEXT(""), Ctx.BehaviorNow[b]);
 		}
 		FString Wolves;
 		for (int32 w = 0; w < static_cast<int32>(EWolfState::Count); ++w)
@@ -1447,7 +1597,13 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 		{
 			Wolves += TEXT(" (밤잠 서서히)");
 		}
-		const FString Line = FString::Printf(TEXT("v3 R1b %s | %s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld"),
+		// 늑대 식사 규칙: '늑대 식사 5초 제자리' (사람 결정 10-15 (B)), 옛 규칙이면 '늑대 식사 0.7초 배회'
+		const int32 EatCd = Ctx.Sim.ThreatCfg.PredEatCd;
+		Wolves += FString::Printf(TEXT(" | 늑대 식사 %s초 %s"),
+								  *FString::SanitizeFloat(FMath::RoundToDouble(10.0 * EatCd * EcoRepertoireV3::kStepSeconds) / 10.0),
+								  Ctx.Sim.ThreatCfg.bEatInPlace ? TEXT("제자리") : TEXT("배회"));
+		const FString Line = FString::Printf(TEXT("v3 %s %s | %s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld"),
+											 Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"),
 											 *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Ctx.Sim.Dark,
 											 Ctx.AliveDeer, Ctx.AdoptedDeer, *Tally, *Wolves,
 											 static_cast<long long>(Ctx.Sim.Stats.Caught), static_cast<long long>(Ctx.Sim.Stats.Starved));

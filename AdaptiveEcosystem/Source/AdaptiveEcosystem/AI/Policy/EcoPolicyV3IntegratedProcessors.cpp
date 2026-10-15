@@ -360,6 +360,9 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			{
 				const EcoWorldV3::FHerbBody& Body = *Views[r].Body;
 				FEcoIntegratedV3Fragment& Int = *HerbInts[r];
+				// 사슴 얼기 막음 확인: 요청을 읽은 결정의 마스크에 얼기 칸이 열렸는가 (eco.IntegratedV3.NoFreeze 1 이면 늘 0)
+				const EcoWorldV3::FHerbDecision& Dec = *Views[r].Decision;
+				Ctx.FreezeMaskOpen += (Dec.bCommittedReads && Dec.CommittedMask[EcoRepertoireV3::kFreeze] != 0) ? 1 : 0;
 				if (Body.LastIntake > 0.0 && Int.AteLogEpoch != Ctx.LogEpoch)
 				{
 					Int.AteLogEpoch = Ctx.LogEpoch;
@@ -395,12 +398,14 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				}
 				List.RemoveAt(r);
 			}
-			// 늑대 표현 자리표시: 포획 뒤 쿨다운 → '먹는 중', 표적을 쫓으면 '추격 중' (팀 표현 깃발)
+			// 늑대 표현 자리표시: 포획 뒤 쿨다운 → '먹는 중', 표적을 쫓으면 '추격 중' (팀 표현 깃발). 팀 표현은 '먹는 중' 깃발 + 속도 0
+			// (식사 중 제자리, 사람 결정 10-15 (B))이면 '먹는 중' 동작을 보인다. 식사·이어 사냥 기록 (TallyWolfStep)
 			for (const int32 k : WolvesByContext[c])
 			{
 				const EcoWorldV3::FThreatAgent& A = *Wolves[k].Agent;
 				Wolves[k].PredState->EatCooldown = static_cast<float>(A.State.Cooldown * EcoRepertoireV3::kStepSeconds);
 				Wolves[k].Life->bPursuing = A.Last.bHunting && A.Last.bHasTarget;
+				Ctx.TallyWolfStep(A, Wolves[k].Id, Ctx.Sim.T - 1);
 			}
 			TallyEnergy(Ctx, Deer, List);   // 기록 줄이 이 스텝 끝 에너지를 쓴다
 			Sub->NotifyNightStep(Ctx, ThreatPtrs.GetData(), WolfIds.GetData(), ThreatPtrs.Num());   // 늑대 밤잠 사건 줄 (켠 세계만)

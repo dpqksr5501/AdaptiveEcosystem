@@ -27,7 +27,7 @@
 //                           이번 스텝에 죽은 개체도 제자리에서 동족으로 센다(파이썬 그대로, 계약 2-3·열린 질문 5)
 //   G  리스폰               죽은 슬롯을 새 세대로 (맵 전체 균등 위치) — 그 행만 E 를 다시 한다
 //                           (통합 모드 bRespawnDead = false: 부활하지 않고 PrevPos = Pos 로 멈춘다. 다음 스텝부터는 부르는 쪽이 뺀다)
-//   H  다음 요청            Prepare(결정 관측) → 마스크(판 2) → reads 면 망 argmax, 아니면 지금 행동
+//   H  다음 요청            Prepare(결정 관측) → 마스크(판 2, 허용 = FWorldState::Allowed) → reads 면 망 argmax, 아니면 지금 행동
 //
 // 통합 모드 (팀 통합 레벨, AI/Policy/EcoPolicyV3IntegratedProcessors): 기본값은 모두 평면 시험 맵과 같다(ReferenceParity 그대로).
 //   FWorldConfig::RngStream        세계 난수 갈래 (지역마다 다른 먹이 패치·늑대 선회). 0 = 지금과 같다
@@ -35,6 +35,9 @@
 //   FWorldConfig::PredEmaDenominator  피식 EMA 분모 고정값. 0 = 지금처럼 N
 //   FWorldConfig::bRealismNight    늑대 밤잠 점진화 (파이썬 configs/v3_real1_night_on.yaml realism_night). false = 지금과 같다.
 //                                  켜면 잠은 늑대별 상태(InitThreat·AdoptThreat 의 NightInit, D″ NightUpdate)이고 관측도 그 상태를 읽는다
+//   FWorldConfig::PredEatCdOverride·bEatInPlace  늑대 식사 길이(포획 뒤 쿨다운)와 식사 중 제자리 (사람 결정 10-15 (B)). 0·false = 지금과 같다
+//   FWorldConfig::WorldAllowed     세계의 허용 행동 칸. 실제 허용 = 모델 kAllowedMask ∧ 이 칸 (FWorldState::Allowed, H 의 마스크).
+//                                  모두 1 = 지금과 같다. 통합 모드는 FREEZE 를 막는다 (사람 결정 10-15 (A), 파이썬 effective_allowed)
 //   FStepHooks                     이동 제약 콜백 (지형·장애물). C1 사슴 이동 바로 뒤, C2 위협마다 Step 바로 뒤에 부른다.
 //                                  막히면 그 개체는 이번 스텝 이동 전 자리에 남는다 — 그래서 포획 거리·섭식 셀·관측이 모두 막힌 뒤 위치로 계산된다
 //   AdoptHerb·AdoptThreat          주어진 위치·heading·키·종류로 만든다(세계 난수를 쓰지 않는다)
@@ -129,6 +132,15 @@ namespace EcoWorldV3
 		std::int32_t PredEmaDenominator = 0; // 피식 EMA 분모. 0 이면 이번 스텝 N (평면 맵: 설정 사슴 수 = 학습의 고정 128 과 같은 꼴)
 		// 늑대 밤잠 점진화 (EcoThreatModel.h FThreatConfig::bRealismNight 로 넘긴다). 기본 끔 = R1b 학습 세계 그대로 (평면 맵·기준 루프·골든)
 		bool bRealismNight = false;
+		// 늑대 식사 (사람 결정 10-15 (B)). PredEatCdOverride > 0 이면 FThreatConfig::PredEatCd(포획 뒤 쿨다운, 학습 5) 를 이 값으로 바꾸고,
+		// bEatInPlace 이면 식사 동안 서 있는다(FThreatConfig::bEatInPlace). 기본 = R1b 학습 세계 그대로.
+		// 파이썬 R3 세계의 같은 칸: overrides.pred_eat_cd 38 · features.threats.eat_in_place true (configs/v3_r3*.yaml)
+		std::int32_t PredEatCdOverride = 0;
+		bool bEatInPlace = false;
+		// 세계의 허용 행동 칸 (파이썬 train.repertoire.allowed). 실제 허용 = 모델 허용(kAllowedMask) ∧ 이 칸 — 파이썬
+		// rep_policy.effective_allowed 의 '모델 목록 ∩ 세계 목록' 과 같다. 기본 모두 1 = 모델 목록 그대로 (평면 맵·기준 루프·골든).
+		// 통합 모드는 eco.IntegratedV3.NoFreeze 1 이면 FREEZE 칸을 0 으로 둔다 (사람 결정 10-15 (A), R1b−F)
+		std::uint8_t WorldAllowed[EcoRepertoireV3::kNumBehaviors] = {1, 1, 1, 1, 1};
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -459,6 +471,10 @@ namespace EcoWorldV3
 		EcoRepertoireV3::FRepertoireConfig RepCfg;
 		EcoObservationV3::FObservationConfig ObsCfg;
 		EcoThreatV3::FThreatConfig ThreatCfg;
+		// 실제 허용 행동 칸 = 모델 kAllowedMask ∧ Config.WorldAllowed (InitWorld 가 정한다). DecideHerb 의 마스크가 이 칸을 쓴다
+		std::uint8_t Allowed[EcoRepertoireV3::kNumBehaviors] = {EcoPolicyV3::kAllowedMask[0], EcoPolicyV3::kAllowedMask[1],
+																 EcoPolicyV3::kAllowedMask[2], EcoPolicyV3::kAllowedMask[3],
+																 EcoPolicyV3::kAllowedMask[4]};
 		FFoodGrid Food;
 		FRng Rng;
 		std::int64_t T = 0;                  // 전역 스텝 번호 (계약 10-1: 모든 개체가 같은 스텝)
@@ -513,6 +529,15 @@ namespace EcoWorldV3
 		W.ObsCfg = EcoObservationV3::kR1bObsConfig;
 		W.ThreatCfg = EcoThreatV3::FThreatConfig();
 		W.ThreatCfg.bRealismNight = C.bRealismNight;
+		if (C.PredEatCdOverride > 0)
+		{
+			W.ThreatCfg.PredEatCd = C.PredEatCdOverride;
+		}
+		W.ThreatCfg.bEatInPlace = C.bEatInPlace;
+		for (std::int32_t b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+		{
+			W.Allowed[b] = (EcoPolicyV3::kAllowedMask[b] != 0 && C.WorldAllowed[b] != 0) ? 1 : 0;
+		}
 		W.Rng.State = EcoRepertoireV3::HashChain3(kWorldRngTag, static_cast<std::uint64_t>(C.Seed), C.RngStream);
 		W.Food.Build(W.Config, W.Rng);
 		W.T = 0;
@@ -755,7 +780,8 @@ namespace EcoWorldV3
 		D.DecisionObs = EcoObservationV3::ToDecisionObs(P.Threat, P.Cover, E01 < 0.0 ? 0.0 : (E01 > 1.0 ? 1.0 : E01), W.Dark);
 		D.Prep = EcoRepertoireV3::Prepare(S, D.DecisionObs, W.RepCfg);
 		EcoPolicyV3::ComputeFeasibleMask(P.Obs, D.Feasible);
-		EcoPolicyV3::ComposeActionMask(D.Feasible, D.Prep.bReads, D.Prep.bWakeDecide, S.Behavior, D.Mask);
+		// 허용 = 모델 ∧ 세계 (W.Allowed). 세계 칸이 모두 1 이면 kAllowedMask 그대로라 지금까지와 비트 단위로 같다
+		EcoPolicyV3::ComposeActionMask(W.Allowed, D.Feasible, D.Prep.bReads, D.Prep.bWakeDecide, S.Behavior, D.Mask);
 		if (D.Prep.bReads)
 		{
 			D.Request = EcoPolicyV3::RunPolicyV3(Net, P.Obs, D.Mask, D.Logits);

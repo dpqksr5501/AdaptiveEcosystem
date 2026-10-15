@@ -45,6 +45,14 @@
 // t+1~t+4 는 사냥하지 않고(배회, 기본 속력), t+5 에 다시 잡을 수 있다. 플레이어는 30 → t+30 에 다시 잡는다.
 // 잠든 동안에도 쿨다운은 줄어든다.
 //
+// 늑대 식사 중 제자리 (선택, FThreatConfig::bEatInPlace. 기본 끔 — 끄면 위 그대로이고 지금 골든과 비트 단위로 같다. 사람 결정 10-15 (B)):
+//   켜면 보통 위협(플레이어 대역 아님)이 쿨다운 때문에 사냥하지 않는 스텝(1 을 뺀 뒤 cd > 0)에 움직이지 않는다. 7 의 잠과 같은 꼴로
+//   move = head, 속력 0 이다(상태 기계 뒤, 밤잠·박명 배수 앞 — 6c). 그래서 위치 그대로·변위 0·heading = normalize(head) 다.
+//   포획 판정·난수 소비는 그대로다. 식사 길이는 PredEatCd 가 정한다(통합 모드는 eco.IntegratedV3.WolfEatSeconds 로 38 = 5 초).
+//   잡은 스텝 t 에는 이미 움직였고, t+1 ~ t+cd−1 동안 서 있다가 t+cd 에 다시 사냥한다. 파이썬 R3 세계의 같은 규칙:
+//   features.threats.eat_in_place (world.py `_step_predators_v3` R3 (j)) —
+//     eating = (pred_cd > 0) & ~pred_is_player;  move[eating] = pred_head[eating];  speed[eating] = 0
+//
 // 잠행-돌진형 (world.py:2299-2313, 2353-2368): 표적 체감 거리 ≤ 6 이면 돌진 시작(남은 12). 남은 > 0 이면 돌진(× 1.5,
 // 표적 있으면 표적 쪽, 없으면 head), 남은 ≤ 0 이면 마지막 판정 스텝(× 0.2, head). 돌진 이동 12번 + 마지막 판정 1번이고,
 // 마지막 판정에서 놓치면 탈진 30스텝(× 0.2 배회, 사냥 안 함), 돌진·마지막 판정 중 잡으면 곧바로 ROAM 이다.
@@ -180,6 +188,10 @@ namespace EcoThreatV3
 		double NightFloor = 0.5;                   // night_floor: 해 진 뒤 깨어 있는 주행성 늑대 속력 배수 하한 (1 − SleepDark 이하)
 		double NightSpread = 0.5;                  // spread: 늑대별 잠·기상 지연 최대 = ⌊spread × 박명 폭 τ⌋ 스텝
 		std::int32_t NightRampSteps = 15;          // ramp_steps: 눕기·깨기에 걸리는 업데이트 수 (활동도 한 업데이트에 1 씩)
+
+		// ---- 늑대 식사 중 제자리 (사람 결정 10-15 (B)). 기본 끔 = R1b 학습 세계 그대로 (쿨다운 동안 배회) ----
+		// 켜는 쪽: 언리얼 통합 레벨 v3 모드 (eco.IntegratedV3.WolfEatSeconds 가 학습 5 스텝보다 길 때, PredEatCd 와 함께 바꾼다)
+		bool bEatInPlace = false;                  // eat_in_place: 켜면 보통 위협이 쿨다운(식사) 동안 서 있는다 (Step 6c, 머리 주석 '늑대 식사 중 제자리')
 	};
 
 	// 위협 하나의 바뀌지 않는 성질 (세계 생성 때 정한다 — world.py:907-912, 976-1011)
@@ -763,6 +775,15 @@ namespace EcoThreatV3
 				MX = HX;
 				MY = HY;
 			}
+		}
+
+		// 6c. 식사 중 제자리 (켰을 때만, world.py R3 (j) eat_in_place): 쿨다운 때문에 사냥하지 않는 보통 위협은 잠처럼 move = head,
+		//     속력 0 (상태 기계 뒤, 밤잠 배수 앞 — 파이썬과 같은 자리. 뒤의 배수를 곱해도 0 이다)
+		if (Cfg.bEatInPlace && !bPlayer && T.Cooldown > 0)
+		{
+			MX = HX;
+			MY = HY;
+			Speed = 0.0;
 		}
 
 		// 7. 밤잠·박명 (world.py:2078-2080). 밤잠 점진화를 켜면 배수는 늑대별 활동도를 따른다 (NightSpeedMult)
