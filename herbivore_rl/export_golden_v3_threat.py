@@ -263,6 +263,10 @@ def cfg_constants(cfg) -> dict:
     if others:
         raise SystemExit(f"위협 골든 세계에 realism_*(v3 현실성 1단계) 규칙 {others} 이 켜져 있다 — C++ 에 아직 없는 규칙이다. "
                          "R1b 세계(configs/v3_r1_on.yaml)나 밤잠 세계(configs/v3_real1_night_on.yaml, realism_night 만)를 쓴다")
+    if th["eat_in_place"]:
+        # v3 R3 (j) 늑대 먹는 시간(10-15): 쿨다운 동안 제자리에 서는 규칙은 C++ FThreatConfig 에 아직 없다(PredEatCd 만 있다)
+        raise SystemExit("위협 골든 세계에 threats.eat_in_place(늑대가 잡은 자리에서 서서 먹음, 10-15)가 켜져 있다 — C++ 에 아직 "
+                         "없는 규칙이다. 켜지 않은 세계를 쓴다")
     rd = cfg.rand
     return {
         "HerbSpeed": float(cfg.herb_speed), "PredViewR": float(cfg.pred_view_r), "PredFovCos": float(cfg.pred_fov_cos),

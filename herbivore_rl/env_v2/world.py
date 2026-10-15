@@ -63,7 +63,8 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
   적게'). 규칙 다섯은 따로 켜고 끄며 모두 repertoire 위에 얹는다. 블록이 없거나 enabled: false 면 그 규칙의 코드 경로를 타지 않아
   지금 세계와 비트 단위로 같다(tests/test_realism_v3.py — 이 단계 직전 커밋 626693c 의 코드와도 비교한다). 난수를 쓰지 않는다(지연은
   해시). 관측 18칸의 모양·값 범위·마스크 판(2)은 바뀌지 않는다. 계수 검사는 `_rz_*_params`, 통계는 `realism_stats`.
-  늑대 식욕은 어느 규칙도 바꾸지 않는다(포만 없음, 쿨다운 pred_eat_cd 5 그대로 — 사용자 결정 '늑대는 과식하게 둔다').
+  늑대 식욕은 어느 규칙도 바꾸지 않는다(포만 없음, 쿨다운 pred_eat_cd 5 그대로 — 사용자 결정 '늑대는 과식하게 둔다'). 10-15 사람 결정으로
+  R3 설정만 먹는 시간을 38스텝(약 5초, 제자리)으로 늘렸다 — 아래 'R3 세계' (j). 포만은 여전히 없다.
   (a) realism_vision — 사슴이 위협(포식자·플레이어)을 보는 시야각 threat_fov_deg(300° = 앞쪽 ±150°, 바로 뒤 60° 사각). 반경은 그대로
       (see_r × 밤 (1 − detect_night·d) × 행동 배수 GRAZE 0.6·SLEEP 0.3). 동족 시야각은 kin_fov_deg(120 = fov_deg 면 그대로).
       `_geometry` 의 보임 판정만 바뀐다. 판정 문턱 cos(시야각/2), 360° 면 각도 판정 없음(`_fov_cos`).
@@ -190,6 +191,16 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
       자료로 싣는다)
       현실 근거: 사슴은 몸무게에 비해 발굽이 작아 깊은 눈에 빠지고, 늑대는 넓은 발로 덜 빠진다. 돌밭·자갈 비탈은 둘 다 디딜 곳을 골라야
       해 느려진다(근거는 눈보다 약하다).
+  (j) 늑대 먹는 시간 (10-15 사람 결정 '먹는 시간 주기 (약 5초)') — threats 블록의 선택 키 eat_in_place 와 v1 키 pred_eat_cd(overrides).
+      늑대(추격형 근접·원거리, 잠행형 — 플레이어형 위협은 빼고)가 사슴을 잡은 스텝 t 에 쿨다운 cd ← pred_eat_cd = C 다(v1 그대로). 포식자
+      스텝 첫머리에 cd 가 1 줄고 cd > 0 이면 사냥하지 않으므로, t+1 ~ t+C−1 의 C−1 스텝 동안 사냥하지 않고, t+C 스텝부터 다시 쫓고 잡는다.
+      eat_in_place 가 true 면 그 C−1 스텝 동안 그 자리에 서서 먹는다(속력 0, heading 그대로 — 자는 늑대와 같은 꼴, 지형·밤잠 배수 앞).
+      false 면 지금까지처럼 기본 속력으로 배회한다. 먹고 나면 곧바로 다시 사냥한다(포만 없음 — 사용자 결정 '늑대는 과식하게 둔다').
+      R3 설정은 C = 38 이다: 5초 ÷ (1스텝 2/15초) = 37.5 → 반올림(0.5 는 올림) 38스텝 = 5.07초(그중 서서 먹는 37스텝 = 4.93초). 지난 값 C = 5
+      (0.67초)는 언리얼 CVar eco.IntegratedV3.WolfEatSeconds 0.67 과 같다. 서 있는 늑대는 실제 이동이 0 이라 발소리가 없고(청각 (b)), 접근
+      관측도 0 이다. 쿨다운 동안 추격 고정은 풀린다((f) 1). 난수를 쓰지 않는다(배회 선회 난수는 그대로 뽑고 쓰지 않는다 — v1 스트림 모양 그대로).
+      C++ 꼴: if (bEatInPlace && Type != Player && Cooldown > 0) { Move = Head; Speed = 0; }   (상태 기계 뒤, 밤잠 배수 앞)
+      현실 근거: 늑대는 잡은 먹잇감을 그 자리에서 뜯어 먹고, 먹는 동안에는 사냥하지 않는다. 굶주린 무리는 다 먹으면 곧 다음 사냥에 나선다.
 - 세로 장애물(나무·바위) 확장 지점 — 이번 단계에는 넣지 않는다(10-14 사용자: '언리얼에도 아직 없다. 나중에 추가 가능하게만').
   구현은 없고 자리만 정해 둔다. 기능 이름은 이미 예약된 `obstacles`(번호 12, `env_v2/features.py`)이고 켜면 '아직 구현되지 않았다'로
   읽을 때 실패한다(끈 블록 `obstacles: {enabled: false}` 는 받아들이고 무시한다). 자료는 `World.obstacles` — (K, 3) float64 [x, y, r]
@@ -725,10 +736,13 @@ def _threats_params(p: dict, f: Features) -> dict:
     - player_speeds = [배회, 잠행, 돌진] ≥ 0 (× herb_speed), player_mode_steps = [하, 상] 정수 1 ≤ 하 ≤ 상
     - player_stalk_p ∈ [0, 1], player_charge_dist > 0, player_charge_steps ≥ 1, player_rest_steps ≥ 0 (정수)
     - player_catch_r > 0, player_cooldown ≥ 0 (정수 스텝)
+    - 선택 키 eat_in_place (bool, 없으면 false — features.OPTIONAL_KEYS, 10-15): 늑대가 잡은 뒤 쿨다운 동안 제자리에서 먹나(모듈
+      docstring 'R3 세계' (j)). 켜면 v1 키 pred_eat_cd 가 0 이상의 정수여야 한다(World.__init__ 이 검사한다)
     daynight 를 함께 켜야 한다(v3 는 v2.4s 위의 버전이고, 플레이어는 낮밤과 무관하게 움직이는 위협이다).
     """
     if not f.enabled("daynight"):
         raise ValueError("features.threats 는 daynight 를 함께 켜야 한다(v3 는 v2.4s 위의 버전이다)")
+    p = with_optional("threats", p)
 
     def integer(key, x, lo):
         if isinstance(x, bool) or not isinstance(x, (int, np.integer)) or x < lo:
@@ -773,6 +787,9 @@ def _threats_params(p: dict, f: Features) -> dict:
     if ms[0] > ms[1]:
         raise ValueError(f"features.threats.player_mode_steps 는 [하, 상], 하 ≤ 상 이어야 한다. 받은 값: {list(ms)}")
     out["player_mode_steps"] = ms
+    if not isinstance(p["eat_in_place"], bool):
+        raise ValueError(f"features.threats.eat_in_place 는 true/false 여야 한다. 받은 값: {p['eat_in_place']!r}")
+    out["eat_in_place"] = p["eat_in_place"]
     return out
 
 
@@ -1126,6 +1143,12 @@ class World:
                     if self.features.enabled("repertoire") else None)
         self._th = (_threats_params(self.features.params("threats"), self.features)
                     if self.features.enabled("threats") else None)
+        # v3 R3 (j) 늑대 먹는 시간(10-15): 잡은 뒤 쿨다운 pred_eat_cd 동안 늑대가 제자리에서 먹는다. 끈 세계는 False 이고 그 코드 경로를 타지 않는다
+        self._eat_in_place = bool(self._th is not None and self._th["eat_in_place"])
+        if self._eat_in_place:
+            cd = cfg.pred_eat_cd
+            if isinstance(cd, bool) or not isinstance(cd, (int, np.integer)) or cd < 0:
+                raise ValueError(f"threats.eat_in_place 를 켜면 pred_eat_cd 는 0 이상의 정수(스텝)여야 한다. 받은 값: {cd!r}")
         self._v3p = self._rp is not None or self._th is not None
         # v3 R2: 노려보기 대치(stare_down, M7), 동족 경보(alarm, M8). 끈 세계는 None 이고 그 코드 경로를 타지 않는다
         self._sd = (_stare_params(self.features.params("stare_down"), self.features)
@@ -2832,6 +2855,8 @@ class World:
           시작은 잠금을 지움, 들킨 돌진, 대치 속력 0·표적 쪽, 물러남) → 9 밤잠·박명 감속(물러남 속력에도) → 10 이동·벽 반사(balk_dir
           도) → 11 포획(대치·물러남은 잡지 않는다, 잡은 위협의 잠금을 지움, `_stare_after`) → 12 `_threat_after`(물러남·들킴 남은
           스텝, 돌진이 끝나면 들킨 돌진 표시를 지움). 대치가 깨지면 4 에서 배회가 되어 같은 스텝의 6~8 을 그대로 탄다.
+        - v3 R3 (j) 늑대 먹는 시간 (threats.eat_in_place, 10-15): 상태 기계·추격 고정 뒤, 밤잠 배수 앞에서 쿨다운이 남은 늑대(플레이어형
+          위협 제외)의 속력을 0, 방향을 heading 그대로 둔다(모듈 docstring 'R3 세계' (j)).
         스텝 뒤 훅: `self.pred_vel`(이번 스텝 실제 이동, 관측 pred_approach).
         """
         cfg, th, rp, sd = self.cfg, self._th, self._rp, self._sd
@@ -2931,6 +2956,15 @@ class World:
                     self._zt_pounce += np.bincount(tc, minlength=len(TERRAIN_NAMES))
         if zc is not None:              # v3 R3 (f) 4): 상태 전이 뒤 새 고정(돌진을 막 시작한 잠행형은 돌진 표적)
             self._rz_chase_acquire(j, has_target, hunting)
+        if self._eat_in_place:
+            # v3 R3 (j) 늑대 먹는 시간(10-15): 잡은 뒤 쿨다운이 남은 늑대(플레이어형 위협 말고 모든 포식자)는 그 자리에 서서 먹는다 —
+            # 속력 0, heading 그대로(자는 늑대와 같은 꼴). 쿨다운은 이 스텝 첫머리에 이미 1 줄었으므로 cd > 0 이면 이번 스텝은 사냥하지
+            # 않는다(표적·포획 없음). 배회 선회 난수는 위에서 그대로 뽑았다(v1 스트림 모양 그대로). C++ 꼴:
+            #   if (bEatInPlace && Type != Player && Cooldown > 0) { Move = Head; Speed = 0; }
+            eating = (self.pred_cd > 0) & ~self.pred_is_player
+            if eating.any():
+                move = np.where(eating[:, None], self.pred_head, move)
+                speed = np.where(eating, 0.0, speed)
         if self._ps is not None:
             move = np.where(self.pred_asleep[:, None], self.pred_head, move)
             speed = speed * self._pred_speed_mult

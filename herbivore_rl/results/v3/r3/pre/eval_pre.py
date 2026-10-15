@@ -54,6 +54,8 @@ FORBIDDEN = [range(10000, 10020), range(10100, 10120), range(10200, 10220), rang
              range(42000, 42010)]
 ALLOWED = [range(20000, 20020), range(32000, 32100), range(33000, 33100)]
 
+# 10-15 부터 이 설정은 늑대 먹는 시간 38스텝(제자리) 세계다(사람 결정 10-15 (B)). 10-14 기록(pre.json·tables.md)은 5스텝(배회) 세계 값이다.
+# 그 세계는 eat38/eval_eat38.py 의 r3_cd5 칸(pred_eat_cd 5, threats.eat_in_place false)이 비트 그대로 다시 낸다(PREREG.md 변경 기록 10-15 (2))
 R3_ON = "configs/v3_r3_on.yaml"
 VARIANTS = {
     "r3": (R3_ON, None),
@@ -309,6 +311,15 @@ def _phase(d: float) -> int:
 
 
 def job(args):
+    variant, pname, seed, steps = args
+    cfg = load_variant(variant)
+    return job_world(cfg, make_policy(pname, cfg, seed), variant, pname, seed, steps)
+
+
+def job_world(cfg, pol, variant: str, pname: str, seed: int, steps: int) -> dict:
+    """`job` 의 본체: 설정 `cfg`·정책 `pol` 로 한 세계를 돌려 지표를 낸다. R3 관문 도구(results/v3/r3/invasion_r3.py)가 관문 칸
+    설정과 거주 R_base 로 T0·확인표를 잴 때도 이것을 부른다(10-15). `pname` 은 관측 히스토그램(OBS_POLICIES)과 R1b−F 반사실(rlf)을
+    정하고, `variant` 는 결과 행의 이름표다."""
     from env_v2 import rollout as ro
     from env_v2.rep_policy import action_mask, allowed_mask_of, feasible_mask, policy_obs, rep_argmax, rep_params
     from env_v2.repertoire import FLEE, FREEZE, GRAZE, HIDE, N_BEHAVIORS, SLEEP
@@ -317,15 +328,12 @@ def job(args):
     import eval_v3 as ev
     import repertoire_rules as rr
 
-    variant, pname, seed, steps = args
     t0 = time.time()
-    cfg = load_variant(variant)
     rp = rep_params(cfg)
     geo = rr._geom(cfg)
     Spy = _spy_class()
     w = Spy(cfg, seeds=[seed])
     w._spy_init()
-    pol = make_policy(pname, cfg, seed)
     ro.forward_bind(pol, w)
     N, M, T, F = w.N, w.M, steps, w.obs_dim
     names = list(w.obs_names)

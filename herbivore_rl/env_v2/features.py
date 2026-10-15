@@ -90,7 +90,8 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "realism_night": 22,       # (d) 늑대 밤잠 점진화: 사냥 중·사슴 근처면 눕지 않음, 걸음을 늦추며 눕기, 늑대마다 다른 잠·기상 시각, 기상 가속
     "realism_cover_food": 23,  # (e) 은신처 원과 겹치는 셀의 먹이 용량·재생을 밖의 일부로(빽빽한 덤불 밑은 풀이 적다)
     # v3 R3 세계(10-14 사람 결정, 명세 Docs/RL_Policy/RL_V3_R3_SPEC.md 14절). 정의·식·현실 근거는 env_v2/world.py 모듈 docstring
-    # 'R3 세계'. 늑대가 은신처 원에 못 들어감(H17)과 은신처 먹이 배수 뽑기(H7)는 기존 블록의 선택 키다(OPTIONAL_KEYS)
+    # 'R3 세계'. 늑대가 은신처 원에 못 들어감(H17)과 은신처 먹이 배수 뽑기(H7)는 기존 블록의 선택 키다(OPTIONAL_KEYS). 늑대가 잡은 자리에서
+    # 서서 먹는 시간(10-15 사람 결정)도 threats 블록의 선택 키 eat_in_place 와 v1 키 pred_eat_cd(overrides)다 — 새 번호가 없다
     "realism_chase": 24,       # (f) 추격 고정: 쫓기 시작한 늑대는 그 사슴이 보이는 동안 표적을 바꾸지 않는다(H6). 난수 없음
     "realism_terrain": 25,     # (h) 지형 구역: 셀마다 보통·눈·거친 땅, 이동 전 셀의 땅이 속력을 줄인다(H18, 사슴은 관측하지 않음 H19)
 })
@@ -213,9 +214,13 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #     (H17, env_v2/world.py `_rz_wall_push`). 사슴은 그대로 드나든다. false = 1단계 그대로(늑대가 원을 지나다닌다)
 #   realism_cover_food.frac_range: [하, 상] 이면 세계마다 f ~ U[하, 상] 하나를 자기 스트림 part 0 에서 뽑아 용량·재생 배수에 함께 쓴다
 #     (H7, cap_frac·regen_frac 는 null). null = 1단계 그대로(cap_frac·regen_frac 고정, 난수 없음)
+#   threats.eat_in_place (10-15 사람 결정 '먹는 시간 주기 (약 5초)'): 늑대(플레이어형 위협 말고 모든 포식자)가 사슴을 잡은 뒤 쿨다운
+#     (v1 키 pred_eat_cd)이 남은 동안 그 자리에 서서 먹는다(env_v2/world.py `_step_predators_v3`, 모듈 docstring 'R3 세계' (j)). 먹는 시간
+#     자체는 v1 키 pred_eat_cd 를 overrides 로 덮는다(R3 설정은 38스텝). false = 지금까지 그대로(쿨다운 동안 기본 속력으로 배회)
 OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "realism_shelter": MappingProxyType({"block_predators": False}),
     "realism_cover_food": MappingProxyType({"frac_range": None}),
+    "threats": MappingProxyType({"eat_in_place": False}),
 })
 
 

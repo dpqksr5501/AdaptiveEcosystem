@@ -10,6 +10,9 @@ v1 난수 상태·기능 스트림·config digest 가 같다(출시 두뇌 R1b·
 원 안에 없고(reset 포함), 원 둘레를 따라 미끄러질 때 둘레 방향 성분이 남는다, 사슴은 드나든다. 지형 배수는 이동 전 셀의 값이고 밤잠 배수
 다음에 곱하며 정확하다, 넓이 0 인 세계가 정확히 0 이다, 지형은 은신처와 독립이다. 얼기는 마스크·판정 롤아웃·학습 경로 어디서도 실행되지
 않는다(R1b 를 얹어도), f_dec 측정·eval_v3 r1b 판정 경로가 얼기 없는 목록에서 돈다. 시드는 보정 20000~20019·탐색 32000~32099 만 쓴다.
+(j) 늑대 먹는 시간(10-15 사람 결정, threats.eat_in_place 선택 키 + v1 pred_eat_cd): R3 설정은 38스텝(5초의 반올림)이고, 잡은 뒤 37스텝 동안
+늑대는 그 자리에 서서 사냥하지 않고 38스텝째에 다시 잡는다(플레이어형 위협은 그대로). 끔 값이나 pred_eat_cd ≤ 1 이면 끈 세계와 비트 동일이고,
+먹는 시간을 끔 값으로 되돌린 R3 세계는 (j) 직전 커밋 f6e8b6e 의 코드와 비트 동일이다. C++ 골든 도구는 제자리 먹기 세계를 거부한다.
 """
 
 import env.torch_init  # noqa: F401  ← torch보다 먼저
@@ -141,24 +144,31 @@ def test_registry_and_keys():
     # 선택 키(규칙 6): 1단계 설정에는 없고(끔 값으로 읽는다) R3 설정에는 적는다
     assert dict(F.OPTIONAL_KEYS["realism_shelter"]) == {"block_predators": False}
     assert dict(F.OPTIONAL_KEYS["realism_cover_food"]) == {"frac_range": None}
+    assert dict(F.OPTIONAL_KEYS["threats"]) == {"eat_in_place": False}           # (j) 늑대 먹는 시간, 10-15
+    full = _raw(R3_ON)["features"]
     for n, opt in F.OPTIONAL_KEYS.items():
-        assert set(opt) <= set(b[n]) and not set(opt) & F.PARAM_KEYS[n]
-        assert not set(opt) & set(_raw(REAL["all"])["features"][n])
+        assert set(opt) <= set(full[n]) and not set(opt) & F.PARAM_KEYS[n]
+        for old in (REAL["all"], R1_ON, R1):                                     # 지난 설정 파일에는 선택 키가 없다(끔 값으로 읽는다)
+            assert not set(opt) & set(_raw(old)["features"].get(n, {}))
     assert F.with_optional("realism_shelter", {"untargetable": True}) == {"block_predators": False, "untargetable": True}
     with pytest.raises(ValueError, match="선택 키"):
         F.parse_features({"realism_shelter": dict(b["realism_shelter"], block_predator=True)})
 
 
 def test_r3_configs_are_r1_plus_blocks():
-    """v3_r3 = v3_r1 + 현실성 블록 다섯 + 추격 고정·지형 + 장애물 자리 블록 + version + 허용 목록(얼기 뺌)·f_dec·ent_coef_base. 판정 세계
-    v3_r3_on 은 v3_r3 에서 낮 고정 세계 비율만 0 이다. 블록 값은 1단계와 같고 청각 자르기·먹이 배수만 다르다. 관측 18·마스크 판 2."""
+    """v3_r3 = v3_r1 + 현실성 블록 다섯 + 추격 고정·지형 + 장애물 자리 블록 + version + 허용 목록(얼기 뺌)·f_dec·ent_coef_base + 늑대 먹는
+    시간(overrides.pred_eat_cd 38, threats.eat_in_place true — 10-15). 판정 세계 v3_r3_on 은 v3_r3 에서 낮 고정 세계 비율만 0 이다. 블록 값은
+    1단계와 같고 청각 자르기·먹이 배수만 다르다. 관측 18·마스크 판 2."""
     a, b, on = _raw(R3), _raw(R1), _raw(R3_ON)
     assert a["version"] == on["version"] == "3.r3"
-    assert {k: v for k, v in a.items() if k not in ("version", "features", "train")} == \
-        {k: v for k, v in b.items() if k not in ("version", "features", "train")}
+    assert {k: v for k, v in a.items() if k not in ("version", "features", "train", "overrides")} == \
+        {k: v for k, v in b.items() if k not in ("version", "features", "train", "overrides")}
+    assert a["overrides"] == dict(b["overrides"], pred_eat_cd=38)                  # 10-15: 늑대 먹는 시간만 더했다
     extra = set(REALISM5) | set(NEW) | {"obstacles"}
     assert set(a["features"]) - set(b["features"]) == extra
-    assert {k: v for k, v in a["features"].items() if k not in extra} == b["features"]
+    assert a["features"]["threats"] == dict(b["features"]["threats"], eat_in_place=True)
+    assert {k: v for k, v in a["features"].items() if k not in extra | {"threats"}} == \
+        {k: v for k, v in b["features"].items() if k != "threats"}
     assert a["features"]["obstacles"] == {"enabled": False}
     ta, tb = a["train"], b["train"]
     assert {k: v for k, v in ta.items() if k != "repertoire"} == {k: v for k, v in tb.items() if k != "repertoire"}
@@ -195,6 +205,7 @@ def test_r3_configs_are_r1_plus_blocks():
         assert w.obs_names == w1.obs_names and w.obs_dim == 18 and rp.mask_version_of(w.obs_names) == 2
         assert set(w.features.active) - set(w1.features.active) == set(REALISM5) | set(NEW)
         assert w._r3 and w._zw and w._zf_range and w._zc is not None and w._zt is not None
+        assert w._eat_in_place and w.cfg.pred_eat_cd == 38 and not w1._eat_in_place and w1.cfg.pred_eat_cd == 5
         assert rp.rep_params(load_v2_config(path))["allowed"] == ("graze", "flee", "hide")
 
 
@@ -256,6 +267,8 @@ def digest(cfg):
 
 def run(job):
     cfg = load_v2_config(job["config"])
+    if job.get("v1"):
+        cfg = cfg.replace(**job["v1"])
     if job.get("set"):
         f = {k: dict(v) for k, v in cfg.v2["features"].items()}
         for n, kw in job["set"].items():
@@ -299,11 +312,11 @@ open(sys.argv[2], "w", encoding="utf-8").write(json.dumps([run(j) for j in jobs]
 '''
 
 
-def _archive(tmp_path):
-    """R3 세계 직전 코드(BASE_COMMIT)의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None."""
+def _archive(tmp_path, commit=BASE_COMMIT):
+    """커밋 commit(기본: R3 세계 직전 코드 BASE_COMMIT)의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None."""
     paths = [f"herbivore_rl/{p}" for p in ("env", "env_v2", "policies", "configs", "repertoire_rules.py")]
     try:
-        out = subprocess.run(["git", "archive", BASE_COMMIT] + paths, cwd=ROOT.parent, capture_output=True, check=True)
+        out = subprocess.run(["git", "archive", commit] + paths, cwd=ROOT.parent, capture_output=True, check=True)
     except (OSError, subprocess.CalledProcessError):
         return None
     with tarfile.open(fileobj=io.BytesIO(out.stdout)) as tf:
@@ -819,8 +832,10 @@ def test_wall_dead_end_rules():
 class _StuckSpy(World):
     def step(self, a):
         old = self.pred_pos.copy()
+        # (j) 10-15: 잡은 뒤 서서 먹는 늑대(이 스텝 첫머리 감소 뒤에도 쿨다운이 남음)는 일부러 제자리다 — 끼임으로 세지 않는다
+        eating = (self.pred_cd >= 2) if self._eat_in_place else np.zeros(self.M, dtype=bool)
         out = super().step(a)
-        awake = ~self.pred_asleep & ~self.pred_is_player
+        awake = ~self.pred_asleep & ~self.pred_is_player & ~eating
         still = awake & (np.linalg.norm(self.pred_pos - old, axis=1) == 0.0)
         self.run = np.where(still, getattr(self, "run", np.zeros(self.M, dtype=np.int64)) + 1, 0)
         self.max_run = max(getattr(self, "max_run", 0), int(self.run.max()))
@@ -830,7 +845,7 @@ class _StuckSpy(World):
 @pytest.mark.parametrize("seed", [20000, 20001])
 def test_no_long_wall_stuck_runs(seed):
     """보정 시드(원이 맵 가장자리에 걸치거나 서로 겹친 세계): R_base 사슴과 2000 스텝 돌려도 깨어 있는 늑대가 몇 스텝 넘게 제자리에
-    멈추지 않는다. 막다른 곳 제자리 수도 적다."""
+    멈추지 않는다(잡은 뒤 서서 먹는 늑대 — (j) — 는 뺀다). 막다른 곳 제자리 수도 적다."""
     cfg = load_v2_config(R3_ON)
     w = _StuckSpy(cfg, seeds=[seed])
     pol = ro.build_policy(rr.rule_spec(cfg, 4.0, 0.9), 0)
@@ -1252,3 +1267,189 @@ def test_golden_exporters_refuse_r3_world(tmp_path):
 
         with pytest.raises(SystemExit, match="realism"):
             egw.export(R1_MODEL, R3_ON, tmp_path)
+
+
+# --------------------------------------------------------------------- #
+# (j) 늑대 먹는 시간 — threats.eat_in_place (선택 키) + v1 pred_eat_cd (10-15 사람 결정 '먹는 시간 주기 (약 5초)')
+# --------------------------------------------------------------------- #
+
+EAT_BASE_COMMIT = "f6e8b6e"      # (j) 직전 커밋(사람 결정 10-14 반영 문서) — R3 세계를 먹는 시간 끔 값으로 되돌리면 이 코드와 비트 동일
+EAT_SECONDS = 5.0                # 사람 결정 10-15 '먹는 시간 주기 (약 5초)'
+
+
+def _eat_cfg(cd=38, on=True, base=R1_ON, names=(), **over):
+    """base 설정 + R3 블록(names, v3_r3_on 의 값) + 늑대 먹는 시간: pred_eat_cd = cd(v1 키), threats.eat_in_place = on."""
+    over = dict(over, threats=dict(over.get("threats", {}), eat_in_place=on))
+    return _cfg(*names, base=base, **over).replace(pred_eat_cd=cd)
+
+
+def test_eat_time_is_five_seconds():
+    """R3 설정의 먹는 시간 38스텝 = 5초 ÷ 1스텝(policy_interval 8 ÷ 60 = 2/15초) = 37.5 를 반올림(0.5 는 올림)한 값이다. 지난 값 5스텝은
+    0.67초(언리얼 CVar eco.IntegratedV3.WolfEatSeconds 의 옛 값)의 같은 반올림이다. 플레이어형 위협의 쿨다운은 그대로다."""
+    for path in (R3, R3_ON):
+        cfg = load_v2_config(path)
+        step_s = cfg.policy_interval / 60.0
+        assert math.isclose(step_s, 2.0 / 15.0) and EAT_SECONDS / step_s == 37.5
+        assert cfg.pred_eat_cd == math.floor(EAT_SECONDS / step_s + 0.5) == 38
+        assert cfg.v2["features"]["threats"]["eat_in_place"] is True
+        assert cfg.v2["features"]["threats"]["player_cooldown"] == _raw(R1_ON)["features"]["threats"]["player_cooldown"]
+    old = load_v2_config(R1_ON)
+    assert old.pred_eat_cd == math.floor(0.67 / (old.policy_interval / 60.0) + 0.5) == 5
+    for path in (R1_ON, R1, R2_ON, *REAL.values()):                # 지난 설정은 그대로다(키 없음 = 끔)
+        cfg = load_v2_config(path)
+        assert cfg.pred_eat_cd == 5 and not World(cfg, seeds=[32093])._eat_in_place
+
+
+@pytest.mark.parametrize("kw, cd, match", [
+    (dict(eat_in_place=1), 38, "eat_in_place"),
+    (dict(eat_in_place="true"), 38, "eat_in_place"),
+    (dict(eat_in_place=True), 37.5, "pred_eat_cd"),
+    (dict(eat_in_place=True), -1, "pred_eat_cd"),
+    (dict(eat_in_place=True), True, "pred_eat_cd"),
+])
+def test_eat_params_are_checked(kw, cd, match):
+    with pytest.raises(ValueError, match=match):
+        World(_with(load_v2_config(R1_ON), threats=kw).replace(pred_eat_cd=cd), seeds=[32093])
+    with pytest.raises(ValueError, match="선택 키"):
+        F.parse_features({"threats": dict(_raw(R1_ON)["features"]["threats"], eat_inplace=True)})
+
+
+@pytest.mark.parametrize("cd, on", [(5, False), (1, True), (0, True)])
+def test_eat_in_place_neutral_equals_off(cd, on):
+    """끔 값(eat_in_place false)을 적은 세계는 키가 없는 세계와 비트 동일이다. 켜도 pred_eat_cd ≤ 1 이면 서서 먹는 스텝이 없어(잡은 다음
+    스텝에 쿨다운이 0) 끈 세계와 같다."""
+    base = load_v2_config(R1_ON).replace(pred_eat_cd=cd)
+    wa, wb = World(base, seeds=[32094]), World(_with(base, threats=dict(eat_in_place=on)), seeds=[32094])
+    assert not wa._eat_in_place and wb._eat_in_place is on
+    _run_pair(wa, wb, _rand(13), _rand(13), 300)
+
+
+@pytest.mark.parametrize("kind", ["chaser", "stalker"])
+def test_eating_wolf_stands_in_place(kind):
+    """잡은 스텝 t 에 쿨다운 38. t+1 ~ t+37 동안 늑대는 그 자리에 서서(위치·heading 그대로, 실제 이동 0) 사냥하지 않고(코앞의 사슴도
+    잡지 않는다), t+38 에 다시 잡는다(포만 없음). 끄면 같은 동안 기본 속력으로 배회한다. 배회 선회 난수는 켜든 끄든 같은 수만큼 뽑는다."""
+    rng_state = {}
+    for on in (True, False):
+        w, c = _arena(_eat_cfg(on=on), kind=kind, threat=(-0.8, 0.0), seed=32095)
+        assert w._eat_in_place is on
+        caught = w._step_predators_v3()
+        assert caught[0] and w.pred_cd[0] == 38
+        q0, h0 = w.pred_pos.copy(), w.pred_head.copy()
+        for t in range(1, 38):
+            w.pos[0] = w.pred_pos[0] + [0.3, 0.0]          # 사슴을 늘 코앞(포획 거리 안)에 둔다
+            caught = w._step_predators_v3()
+            assert not caught.any() and w.pred_cd[0] == 38 - t
+            if on:
+                np.testing.assert_array_equal(w.pred_pos, q0)
+                np.testing.assert_array_equal(w.pred_head, h0)
+                assert not w.pred_vel.any()
+            else:
+                assert np.linalg.norm(w.pred_vel[0]) == pytest.approx(0.5)
+        rng_state[on] = str(w.rng.bit_generator.state)
+        w.pos[0] = w.pred_pos[0] + [0.3, 0.0]
+        caught = w._step_predators_v3()                     # t+38: 쿨다운 0 — 곧바로 다시 사냥해 잡는다
+        assert caught[0] and w.pred_cd[0] == 38
+    assert rng_state[True] == rng_state[False]
+
+
+def test_player_threat_ignores_eat_in_place():
+    """플레이어형 위협은 eat_in_place 와 무관하다: 잡은 뒤 휴식(player_rest_steps)·쿨다운(player_cooldown 30)이 지금 그대로이고, 켜든 끄든
+    궤적이 같다."""
+    tr = {}
+    for on in (True, False):
+        w, c = _arena(_eat_cfg(on=on), kind="player", threat=(-0.8, 0.0), seed=32096)
+        assert w._step_predators_v3()[0] and w.pred_cd[0] == 30 and w.player_mode[0] == PM_REST
+        tr[on] = [w.pred_pos.copy()]
+        for _ in range(45):
+            w._step_predators_v3()
+            tr[on].append(w.pred_pos.copy())
+    np.testing.assert_array_equal(np.array(tr[True]), np.array(tr[False]))
+
+
+def test_eating_wolf_is_silent_and_releases_lock():
+    """R3 블록 위에서: 먹는 늑대는 실제 이동이 0 이라 소리 반경이 0 이고(청각 (b)), 걸음새가 전력이 아니며, 추격 고정을 놓은 채다((f) 1·5)."""
+    from env_v2.world import hearing_radius
+
+    cfg = _eat_cfg(names=("realism_hearing", "realism_shelter", "realism_chase"), realism_shelter=dict(block_predators=False))
+    w, c = _arena(cfg, threat=(-0.8, 0.0), seed=32097)
+    assert w._step_predators_v3()[0] and w.chase_tgt[0] == -1
+    for _ in range(5):
+        w.pos[0] = w.pred_pos[0] + [3.0, 0.0]              # 늑대 시야 안, 포획 거리 밖
+        w._step_predators_v3()
+        assert w.chase_tgt[0] == -1 and w.pred_target[0] == -1 and not w.pred_running[0] and not w.pred_vel.any()
+        s = np.sqrt((w.pred_vel * w.pred_vel).sum(1)) / w.cfg.herb_speed
+        assert hearing_radius(w._zh, s, w.pred_running)[0] == 0.0
+
+
+def test_eat_rule_in_runs():
+    """R3 판정 세계 롤아웃(탐색 시드, R_base): 쿨다운이 남은 늑대(이 스텝 첫머리 감소 뒤 cd > 0, 플레이어형 위협 제외)는 그 스텝에 움직이지
+    않는다. 같은 늑대의 두 포획 사이는 38스텝 이상이다. 서서 먹는 늑대-스텝과 포획이 실제로 나온다."""
+    eat_n = catch_n = 0
+    for seed in (32098, 32099):
+        cfg = load_v2_config(R3_ON)
+        w = World(cfg, seeds=[seed])
+        pol = ro.build_policy(rr.rule_spec(cfg, 4.0, 0.9), seed)
+        ro.forward_bind(pol, w)
+        last = np.full(w.M, -10 ** 6)
+        wolf = ~w.pred_is_player
+        for t in range(800):
+            cd0 = w.pred_cd.copy()
+            w.step(np.asarray(pol(w.observe()), dtype=np.float64))
+            eating = (cd0 >= 2) & wolf
+            assert not w.pred_vel[eating].any(), t
+            eat_n += int(eating.sum())
+            got = (w.pred_cd == 38) & wolf
+            if got.any():
+                assert (t - last[got] >= 38).all(), t
+                last[got] = t
+                catch_n += int(got.sum())
+    assert eat_n > 0 and catch_n > 0
+
+
+def test_bit_identical_r3_to_pre_eat_code(tmp_path):
+    """R3 설정에서 먹는 시간을 끔 값으로 되돌리면(pred_eat_cd 5, eat_in_place false) (j) 직전 코드(EAT_BASE_COMMIT)의 R3 세계와 궤적·통계
+    (r3_stats 포함)·v1 난수 상태·기능 스트림이 같다(무작위·R_base·출시 두뇌 R1b)."""
+    old_root = _archive(tmp_path, EAT_BASE_COMMIT)
+    if old_root is None:
+        pytest.skip(f"git archive {EAT_BASE_COMMIT} 를 할 수 없다")
+    script = tmp_path / "trace.py"
+    script.write_text(TRACE_SRC % dict(keys=KEYS, stats=STATS + ("r3_stats",)), encoding="utf-8")
+    old = [dict(config="configs/v3_r3_on.yaml", seed=32096, steps=250, policy="rand"),
+           dict(config="configs/v3_r3.yaml", seed=32097, steps=250, policy="rbase")]
+    if R1_MODEL.exists():
+        old.append(dict(config="configs/v3_r3_on.yaml", seed=32098, steps=200, policy="model", model=str(R1_MODEL)))
+    new = [dict(j, v1={"pred_eat_cd": 5}, set={"threats": {"eat_in_place": False}}) for j in old]
+    procs = []
+    for root, jobs, tag in ((old_root, old, "old"), (ROOT, new, "new")):
+        jp, op = tmp_path / f"jobs_{tag}.json", tmp_path / f"out_{tag}.json"
+        jp.write_text(json.dumps(jobs), encoding="utf-8")
+        procs.append((subprocess.Popen([sys.executable, str(script), str(jp), str(op)], cwd=root), op))
+    outs = []
+    for p, op in procs:
+        assert p.wait(timeout=900) == 0
+        outs.append(json.loads(op.read_text(encoding="utf-8")))
+    for j, a, b in zip(new, *outs):
+        first = next((i for i, (x, y) in enumerate(zip(a["hashes"], b["hashes"])) if x != y), None)
+        assert first is None and len(a["hashes"]) == len(b["hashes"]), (j, first)
+        assert "r3_stats" in a["stats"]
+        for k in ("stats", "rng", "obs_names", "streams"):
+            assert a[k] == b[k], (j, k)
+
+
+def test_golden_exporters_refuse_eat_in_place(tmp_path):
+    """C++ 골든 도구는 늑대가 서서 먹는 세계를 받지 않는다(C++ FThreatConfig 에는 PredEatCd 만 있고 제자리 규칙이 아직 없다). 먹는 시간만
+    다른 세계(pred_eat_cd 38, 제자리 끔)는 C++ 에 이미 있는 계수라 받는다."""
+    import export_golden_v3_threat as egt
+
+    with pytest.raises(SystemExit, match="eat_in_place"):
+        egt.cfg_constants(_eat_cfg())
+    assert egt.cfg_constants(_eat_cfg(on=False))["PredEatCd"] == 38
+    if R1_MODEL.exists():
+        import export_golden_v3_world as egw
+
+        raw = _raw(R1_ON)
+        raw["features"]["threats"]["eat_in_place"] = True
+        path = tmp_path / "r1_eat.yaml"
+        path.write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False), encoding="utf-8")
+        with pytest.raises(SystemExit, match="eat_in_place"):
+            egw.export(R1_MODEL, path, tmp_path / "out")
