@@ -57,15 +57,14 @@
 //      기록 줄: 구간 포획·식사 중 늑대·스텝(그중 움직임)·돌진(앞 포획 뒤 3 초 안 = 이어 사냥, 식사 끝 뒤 3 초 안)·늑대별 포획 누적.
 //      R1b 학습 세계 밖 규칙이다 — 파이썬 측정(R1b−F, v3_r1_on·v3_real1_night_on, 보정 시드 20000~20019)에서 사망이 줄고 G_γ 가
 //      올라 허용했다(계획서 4-5b).
-//   9. 사슴 경계 거리 (사람 결정 10-15 (C) '늑대가 주변에 있으면 공격하려 하지 않아도 도망', 콘솔 변수 eco.IntegratedV3.KeepAway 기본 1 —
-//      Play 전에 바꾼다. 명령줄 -EcoV3KeepAway= 는 시작값): 두뇌 위의 행동 실행 규칙 (EcoWorldV3.h '경계 거리 규칙', FKeepAwayConfig).
-//      깨어 있는 늑대가 eco.IntegratedV3.AlertDistM(30 m) 안이면 바라보는 쪽과 무관하게 알아채고 먹기를 멈춰 걸어서(360 cm/s) 멀어진다
-//      ('경계(멀어짐)'). eco.IntegratedV3.PanicDistM(15 m) 안이거나 그 늑대가 이 사슴에게 다가오면(접근 높음·이 사슴을 표적으로 사냥·돌진)
-//      뛰어서 달아나고, 깨어 있는 늑대가 모두 eco.IntegratedV3.SafeDistM(40 m) 밖이고 아무도 쫓지 않을 때까지(또는 은신처 원 안까지)
-//      멈추지 않는다 ('도망(안전해질 때까지)'). 은신처 원 안에서 늑대를 알아채면 웅크린다. HIDE 는 늑대 쪽 ±60° 밖의 은신처를 고른다.
-//      자는 늑대는 무시한다. 그 밖은 두뇌가 지금처럼 정한다 (덮기 동안 두뇌를 부르지 않고, 풀리면 잠금을 0 으로 해 곧바로 다시 고른다).
-//      기록 셋째 줄 '경계 거리': 경계 시작·도망 시작·웅크림 시작, 끝난 도망의 평균 길이(초), 잡힌 사슴을 덮기로 가른 수, 식사 중 늑대
-//      15 m 안 사슴(개체·스텝). 0 으로 두면 지금과 비트 단위로 같다 (세계 칸이 모두 기본값).
+//   9. 사슴 도주 반사 거리 (사람 결정 10-15 (7) 야생 1단계 w3, 콘솔 변수 eco.IntegratedV3.WildFlight 기본 1 — Play 전에 바꾼다. 명령줄
+//      -EcoV3WildFlight= 는 시작값, 옛 이름 -EcoV3KeepAway= 도 받는다): 두뇌 위의 세계 규칙 (EcoWorldV3.h '야생 1단계 (w3)', FWildFlightConfig).
+//      10-15 (C) 의 경계 거리 실험 KeepAway(콘솔 변수 eco.IntegratedV3.KeepAway)는 이 규칙으로 바꾸고 지웠다 — 옛 동작은 남기지 않았다.
+//      사냥 중인 늑대(먹는·배부른·자는 늑대 빼고)를 실제로 알아채면(시야·발소리) eco.IntegratedV3.AlertDistM(30 m) 안에서 '경계' — 두뇌가
+//      먹기면 걸으며 먹고 늑대 반대쪽으로 멀어진다. eco.IntegratedV3.PanicDistM(15 m) 안이거나 다가오면 '도주' — 사냥 중인 늑대가 모두
+//      eco.IntegratedV3.SafeDistM(40 m) 밖이 될 때까지 뛰고, 반대쪽 ±60°·30 m 안 은신처가 있으면 그쪽으로. 은신처 안이면 웅크린다.
+//      먹는·쉬는 늑대는 경계만 일으킨다. 기록 셋째 줄 '경계 거리'(이름 그대로): 경계·도주·웅크림 시작, 끝난 도주의 평균 길이, 잡힌 사슴을
+//      덮기로 가른 수, 식사 중 늑대 15 m 안 사슴. 0 으로 두면 지금과 비트 단위로 같다 (세계 칸이 모두 기본값).
 //  10. 야생 1단계 (사람 결정 10-15 (7) '바뀐 규칙을 언리얼에서 보이게', 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md, 값 = 파이썬
 //      configs/v3_wild1_mirror.yaml, 하루 900 스텝). 규칙마다 콘솔 변수 하나(기본 1 — Play 를 누르면 보인다. Play 전에 바꾼다)와 명령줄 시작값:
 //      지방 비축 eco.IntegratedV3.WildReserve (-EcoV3WildReserve=, EcoWorldV3.h FWildReserveConfig): 배가 비어도 비축으로 3일(6분) 버티고
@@ -157,14 +156,14 @@ namespace EcoV3Integrated
 	 * 산 사슴 머리 위 글자와 색 (eco.V3Debug 1). '먹기 72%' = 행동 + 에너지 %. 이번 결정 스텝에 먹이 칸에서 실제로 먹었으면
 	 * ' +3.0' (먹은 몫을 에너지 %p 로, 0.05 미만이면 '+' 만), 에너지 15% 아래면 ' 굶주림'(빨강), bRecentRepro 면 ' 번식'.
 	 * 색은 행동 색 (먹기 초록·도망 노랑·숨기 파랑·얼기 흰색), 굶주림만 빨강.
-	 * KeepMode = 이번 스텝의 경계 거리 덮기 (FHerbDecision::KeepActive): 행동 이름 대신 '경계(멀어짐)'(주황)·'도망(안전해질 때까지)'(진한 주황)·
-	 * '숨기(은신처·경계)'(파랑). 0 이면 지금 그대로.
+	 * KeepMode = 이번 스텝의 도주 반사 덮기 (FHerbDecision::KeepActive): 행동 이름 대신 '경계(먹으며 멀어짐)'(주황, 두뇌가 먹기일 때만)·
+	 * '도주(안전해질 때까지)'(진한 주황)·'웅크림(은신처·경계)'(파랑). 0 이면 지금 그대로.
 	 * bReserveOn = 지방 비축을 켠 세계 (야생 w1): 에너지 15% 아래면 ' 굶주림' 대신 ' 배고픔 비축 63%'(빨강, 비축으로 버티는 중),
 	 * 비축 0 이면 ' 비축 바닥', 배 10% 밑이면 ' 약함(느림)'. 배는 괜찮은데 비축이 25% 밑이면 ' 비축 20%'. 거짓이면 지금 그대로.
 	 */
 	ADAPTIVEECOSYSTEM_API FString DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
 											FColor& OutColor, int32 KeepMode = EcoWorldV3::kKeepNone, bool bReserveOn = false);
-	/** 경계 거리 덮기 이름 (기록·화면): 두뇌 / 경계(멀어짐) / 도망(안전해질 때까지) / 숨기(은신처·경계). */
+	/** 도주 반사 덮기 이름 (기록·화면): 두뇌 / 경계(먹으며 멀어짐) / 도주(안전해질 때까지) / 웅크림(은신처·경계). */
 	ADAPTIVEECOSYSTEM_API const TCHAR* KeepModeNameKo(int32 KeepMode);
 
 	/** 지역 늑대 순번(StableAgentId 순) → 성질. 짝수 = 잠행-돌진형, 홀수 = 근접 추격형. 모두 주행성(밤에 잔다), 원거리형 없음. */
@@ -189,10 +188,10 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bGradualNight = true;          // 늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight 기본 1, 사람 결정 H1 10-14). 거짓 = d ≥ 0.5 에 곧바로 잠
 	bool bNoFreeze = true;              // 사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1, 사람 결정 10-15 (A)). 거짓 = R1b 그대로 얼기를 쓴다
 	double WolfEatSeconds = 5.0;        // 늑대 식사 길이 (초, eco.IntegratedV3.WolfEatSeconds 기본 5, 사람 결정 10-15 (B)). 0.67 이하 = 옛 규칙
-	bool bKeepAway = true;              // 사슴 경계 거리 (eco.IntegratedV3.KeepAway 기본 1, 사람 결정 10-15 (C)). 거짓 = 지금 그대로
-	double AlertDistM = 30.0;           // 경계 거리 (m, eco.IntegratedV3.AlertDistM) — 깨어 있는 늑대가 이 안이면 걸어서 멀어진다
-	double PanicDistM = 15.0;           // 위험 거리 (m, eco.IntegratedV3.PanicDistM) — 이 안이거나 다가오면 뛰어서 달아난다
-	double SafeDistM = 40.0;            // 안전 거리 (m, eco.IntegratedV3.SafeDistM) — 깨어 있는 늑대가 모두 이 밖일 때까지 도망
+	bool bWildFlight = true;            // 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight 기본 1, 야생 w3 — 경계 거리 KeepAway 를 바꿨다). 거짓 = 두뇌 그대로
+	double AlertDistM = 30.0;           // 경계 거리 alert_r (m, eco.IntegratedV3.AlertDistM) — 사냥 중인 늑대를 이 안에서 알아채면 먹으며 멀어진다
+	double PanicDistM = 15.0;           // 도주 거리 flight_r (m, eco.IntegratedV3.PanicDistM) — 이 안이거나 다가오면 뛰어서 달아난다
+	double SafeDistM = 40.0;            // 안전 거리 safe_r (m, eco.IntegratedV3.SafeDistM) — 사냥 중인 늑대가 모두 이 밖일 때까지 도주
 	bool bWildReserve = true;           // 사슴 지방 비축 (eco.IntegratedV3.WildReserve 기본 1, 사람 결정 10-15 (7) 야생 1단계 w1). 거짓 = E 0 이면 곧바로 굶음
 	bool bWildSatiation = true;         // 늑대 포만 (eco.IntegratedV3.WildSatiation 기본 1, 야생 w2). 거짓 = 식사가 끝나면 곧바로 사냥
 	bool bRealismVision = true;         // 위협 시야 300° (eco.IntegratedV3.RealismVision 기본 1, R3 realism_vision). 거짓 = 앞쪽 120°
@@ -234,13 +233,14 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool LongWolfEat() const { return WolfEatSteps() > TrainEatSteps(); }
 
 	/**
-	 * 경계 거리 규칙의 세계 칸 (m → 단위 = m × 100 ÷ 200). 끄면 기본값(꺼짐) 그대로라 세계가 읽는 값이 바꾸기 전과 같다.
-	 * 음수·수가 아닌 값은 기본값으로, 0 ~ 200 m 로 자르고, 안전 거리는 경계·위험 거리보다 작지 않게 올린다 (도망이 풀리자마자 다시 걸리지 않게).
+	 * 도주 반사 거리의 세계 칸 (m → 단위 = m × 100 ÷ 200). 끄면 기본값(꺼짐) 그대로라 세계가 읽는 값이 바꾸기 전과 같다.
+	 * 음수·수가 아닌 값은 기본값으로, 0 ~ 200 m 로 자르고, 안전 거리는 경계·도주 거리보다 작지 않게 올린다 (도주가 풀리자마자 다시 걸리지 않게).
+	 * 나머지 계수(접근 0.9·경계 무게 1.5·은신처 ±60°/30 m·웅크림·벽 2 m)는 FWildFlightConfig 기본값 = configs/v3_wild1_mirror.yaml.
 	 */
-	EcoWorldV3::FKeepAwayConfig KeepAwayConfig() const
+	EcoWorldV3::FWildFlightConfig WildFlightConfig() const
 	{
-		EcoWorldV3::FKeepAwayConfig K;
-		if (!bKeepAway)
+		EcoWorldV3::FWildFlightConfig K;
+		if (!bWildFlight)
 		{
 			return K;
 		}
@@ -250,9 +250,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 			return V * 100.0 / EcoRepertoireV3::kUnitCm;
 		};
 		K.bEnabled = true;
-		K.AlertDist = Units(AlertDistM, 30.0);
-		K.PanicDist = Units(PanicDistM, 15.0);
-		K.SafeDist = FMath::Max(Units(SafeDistM, 40.0), FMath::Max(K.AlertDist, K.PanicDist));
+		K.AlertR = Units(AlertDistM, 30.0);
+		K.FlightR = Units(PanicDistM, 15.0);
+		K.SafeR = FMath::Max(Units(SafeDistM, 40.0), FMath::Max(K.AlertR, K.FlightR));
 		return K;
 	}
 

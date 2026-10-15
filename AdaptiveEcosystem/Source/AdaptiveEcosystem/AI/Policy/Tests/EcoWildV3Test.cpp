@@ -13,6 +13,8 @@
 //   Wild.ReserveWorld    (w1) 기준 루프: 끄면(기본) 먹이 없는 세계에서 300 스텝 안에 굶음이 생기고, 켜면 아무도 굶지 않고 비축으로 살며 모두 약함(이동 ≤ 뛰기 × 0.75),
 //                        굶어 죽는 사슴은 배·비축 모두 0. 낮 고정 세계는 켜도 꺼진다. 사슴 글자 (eco.V3Debug)
 //   Wild.PerceptionGolden R3 감지: 시야 300° cos·발소리 계수, 장면 12개의 소리 반경·사슴 × 늑대 알아챔·보이는 수·가장 가까운 거리
+//   Wild.FlightGolden    (w3) 계수, 도주 장면 28개(test_wild1 반사 장면 12 + 난수 16)의 다음 덮기·방향·풀림 잠금 = 파이썬 _wf_update
+//   Wild.FlightRun       (w3) 끈 세계는 계수와 무관하게 비트 단위로 같고 덮기 0, 켠 세계는 경계·도주가 돌고 경계 중 먹기 = 걷기·섭식 0.5·고개 듦
 //   Wild.SatiationGolden (w2) 계수·하루 → 스텝, 포만 열(막 잡은 늑대 둘: 쿨다운·남은 배부름·쉼 정확히, 속력 = 파이썬 변위), 잡으면 배부름, 늑대 글자
 
 #include "Misc/AutomationTest.h"
@@ -473,6 +475,190 @@ bool FEcoWildV3PerceptionGoldenTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("사슴마다 보이는 수·가장 가까운 거리 = 파이썬"), RowBad, 0);
 	TestTrue(TEXT("장면에 보이는 쌍과 들어서만 안 쌍이 있다"), Seen > 0 && HeardOnly > 0);
 	AddInfo(FString::Printf(TEXT("지각 장면 %d: 쌍 %d, 알아챔 %d, 그중 들어서만 %d"), GW::kPercScenes, Pairs, Seen, HeardOnly));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoWildV3FlightGoldenTest,
+	"AdaptiveEcosystem.Policy.V3.Wild.FlightGolden",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoWildV3FlightGoldenTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoWorldV3;
+	namespace GW = EcoWorldV3::GoldenWild;
+	const FWildFlightConfig Fc;
+	TestFalse(TEXT("도주 반사 기본은 끔"), Fc.bEnabled || FWorldConfig().WildFlight.bEnabled);
+	TestEqual(TEXT("alert_r"), Fc.AlertR, GW::kFlightAlertR);
+	TestEqual(TEXT("flight_r"), Fc.FlightR, GW::kFlightFlightR);
+	TestEqual(TEXT("safe_r"), Fc.SafeR, GW::kFlightSafeR);
+	TestEqual(TEXT("approach"), Fc.Approach, GW::kFlightApproach);
+	TestEqual(TEXT("alert_w"), Fc.AlertW, GW::kFlightAlertW);
+	TestEqual(TEXT("rest_alert"), Fc.bRestAlert, GW::kFlightRestAlert);
+	TestEqual(TEXT("shelter_cos"), Fc.ShelterCos, GW::kFlightShelterCos);
+	TestEqual(TEXT("shelter_r"), Fc.ShelterR, GW::kFlightShelterR);
+	TestEqual(TEXT("crouch"), Fc.bCrouch, GW::kFlightCrouch);
+	TestEqual(TEXT("wall_margin"), Fc.WallMargin, GW::kFlightWallMargin);
+
+	// 거울 세계와 같은 감지·포만을 켠 기준 루프 (늑대 둘 = 추격형. 종류는 사냥 판정·알아챔에 들지 않는다)
+	FWorldConfig C;
+	C.WorldSize = GW::kFlightWorldSize;
+	C.NumHerbivores = GW::kFlightN;
+	C.NumStalkers = 0;
+	C.NumChasers = GW::kFlightM;
+	C.NumRanged = 0;
+	C.NumNocturnal = 0;
+	C.bRespawnDead = false;
+	C.WildSatiation.bEnabled = true;
+	C.RealismVision.bEnabled = true;
+	C.RealismHearing.bEnabled = true;
+	C.WildFlight.bEnabled = true;
+	FReferenceWorld Ref;
+	Ref.Init(C);
+	int32 ModeBad = 0;
+	int32 DirBad = 0;
+	int32 LockBad = 0;
+	int32 HandBad = 0;
+	double MaxErr = 0.0;
+	int32 Counts[kNumKeepModes] = {};
+	for (int32 k = 0; k < GW::kFlightScenes; ++k)
+	{
+		FWorldState& W = Ref.World;
+		W.Config.Covers.clear();
+		for (int32 c = 0; c < GW::kFlightCovers; ++c)
+		{
+			const double* Cv = &GW::kFlightCover[(k * GW::kFlightCovers + c) * 3];
+			if (Cv[2] >= 0.0)
+			{
+				W.Config.Covers.push_back({Cv[0], Cv[1], Cv[2]});
+			}
+		}
+		W.Dark = 0.0;
+		for (int32 m = 0; m < GW::kFlightM; ++m)
+		{
+			const double* Wv = &GW::kFlightWolf[(k * GW::kFlightM + m) * 8];
+			FThreatAgent& A = Ref.Threats[static_cast<size_t>(m)];
+			A.State.PosX = Wv[0];
+			A.State.PosY = Wv[1];
+			A.State.VelX = Wv[2];
+			A.State.VelY = Wv[3];
+			A.Last.bRunning = Wv[4] != 0.0;
+			A.State.Cooldown = static_cast<int32>(Wv[5]);
+			A.State.SatLeft = static_cast<int32>(Wv[6]);
+			A.Last.Target = static_cast<int32>(Wv[7]);
+			A.Last.bHasTarget = A.Last.Target >= 0;
+			A.State.bAsleep = false;
+		}
+		for (int32 i = 0; i < GW::kFlightN; ++i)
+		{
+			const double* Dv = &GW::kFlightDeerIn[(k * GW::kFlightN + i) * 7];
+			FHerbBody& B = Ref.Bodies[static_cast<size_t>(i)];
+			B.Pos = {Dv[0], Dv[1]};
+			B.Head = {Dv[2], Dv[3]};
+			B.DeathCause = kDeathNone;
+			EcoRepertoireV3::FRepState& S = Ref.Reps[static_cast<size_t>(i)];
+			S.SeeMult = Dv[4];
+			S.SeeMultLast = Dv[4];
+			S.LockLeft = static_cast<int32>(Dv[6]);
+			Ref.Decisions[static_cast<size_t>(i)].KeepActive = static_cast<int32>(Dv[5]);
+		}
+		ObserveAll(W, Ref.Views.data(), Ref.NumHerbivores(), Ref.ThreatPtrs.data(), Ref.NumThreats());
+		Detail::UpdateWildFlight(W, Ref.Views.data(), Ref.NumHerbivores(), Ref.ThreatPtrs.data(), Ref.NumThreats());
+		for (int32 i = 0; i < GW::kFlightN; ++i)
+		{
+			const double* O = &GW::kFlightDeerOut[(k * GW::kFlightN + i) * 4];
+			const FHerbDecision& D = Ref.Decisions[static_cast<size_t>(i)];
+			const int32 Want = static_cast<int32>(O[0]);
+			const double Err = FMath::Max(FMath::Abs(D.KeepDir.X - O[1]), FMath::Abs(D.KeepDir.Y - O[2]));
+			MaxErr = FMath::Max(MaxErr, Err);
+			const bool bBad = D.KeepMode != Want || Err > 1.0e-12 || Ref.Reps[static_cast<size_t>(i)].LockLeft != static_cast<int32>(O[3]);
+			ModeBad += D.KeepMode != Want ? 1 : 0;
+			DirBad += Err > 1.0e-12 ? 1 : 0;
+			LockBad += Ref.Reps[static_cast<size_t>(i)].LockLeft != static_cast<int32>(O[3]) ? 1 : 0;
+			HandBad += (bBad && k < GW::kFlightHandScenes) ? 1 : 0;
+			if (bBad && ModeBad + DirBad + LockBad <= 3)
+			{
+				AddError(FString::Printf(TEXT("도주 장면 %d 사슴 %d: 덮기 %d 방향 (%.17g, %.17g) 잠금 %d, 파이썬 %d (%.17g, %.17g) %d"), k, i, D.KeepMode,
+										 D.KeepDir.X, D.KeepDir.Y, Ref.Reps[static_cast<size_t>(i)].LockLeft, Want, O[1], O[2], static_cast<int32>(O[3])));
+			}
+			++Counts[Want >= 0 && Want < kNumKeepModes ? Want : 0];
+		}
+	}
+	TestEqual(TEXT("도주 장면: 다음 덮기 = 파이썬 _wf_update"), ModeBad, 0);
+	TestEqual(TEXT("도주 장면: 방향 = 파이썬 (|Δ| ≤ 1e-12)"), DirBad, 0);
+	TestEqual(TEXT("도주 장면: 풀리면 잠금 0 = 파이썬"), LockBad, 0);
+	TestEqual(TEXT("tests/test_wild1.py 반사 장면 12 개 모두 같다"), HandBad, 0);
+	TestTrue(TEXT("장면에 덮기 넷이 모두 나온다"), Counts[0] > 0 && Counts[1] > 0 && Counts[2] > 0 && Counts[3] > 0);
+	AddInfo(FString::Printf(TEXT("도주 장면 %d (사슴 %d): 두뇌 %d · 경계 %d · 도주 %d · 웅크림 %d, 방향 최대 오차 %.3e"), GW::kFlightScenes,
+							GW::kFlightScenes * GW::kFlightN, Counts[0], Counts[1], Counts[2], Counts[3], MaxErr));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoWildV3FlightRunTest,
+	"AdaptiveEcosystem.Policy.V3.Wild.FlightRun",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoWildV3FlightRunTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoWorldV3;
+	// 끔: 계수만 다른 끈 세계 둘은 600 스텝 비트 단위로 같고 덮기·기록이 0. 켬: 규칙이 돌고 마스크 위반 0, 경계 중 걷기 섭식 배수
+	auto Make = [](bool bOn, double AlertR)
+	{
+		FWorldConfig C;
+		C.Seed = 20001;
+		C.WorldSize = 60.0;
+		C.NumHerbivores = 32;
+		C.Covers = QuadCovers(60.0, 6.0);
+		C.WildFlight.bEnabled = bOn;
+		C.WildFlight.AlertR = AlertR;
+		C.WildSatiation.bEnabled = bOn;
+		C.RealismVision.bEnabled = bOn;
+		C.RealismHearing.bEnabled = bOn;
+		return C;
+	};
+	FReferenceWorld A, B, On;
+	A.Init(Make(false, 15.0));
+	B.Init(Make(false, 3.0));
+	On.Init(Make(true, 15.0));
+	int32 Diff = 0;
+	int32 KeepSet = 0;
+	int32 AlertWalk = 0;
+	int32 AlertBad = 0;
+	for (int32 t = 0; t < 600; ++t)
+	{
+		A.StepOnce();
+		B.StepOnce();
+		On.StepOnce();
+		for (int32 i = 0; i < A.NumHerbivores(); ++i)
+		{
+			const FHerbBody& Ba = A.Bodies[static_cast<size_t>(i)];
+			const FHerbBody& Bb = B.Bodies[static_cast<size_t>(i)];
+			Diff += (Ba.Pos.X != Bb.Pos.X || Ba.Pos.Y != Bb.Pos.Y || Ba.Energy != Bb.Energy) ? 1 : 0;
+			KeepSet += A.Decisions[static_cast<size_t>(i)].KeepActive != kKeepNone ? 1 : 0;
+			const FHerbDecision& D = On.Decisions[static_cast<size_t>(i)];
+			if (D.KeepActive == kKeepAlert && On.Reps[static_cast<size_t>(i)].Behavior == EcoRepertoireV3::kGraze
+				&& (D.KeepDir.X != 0.0 || D.KeepDir.Y != 0.0))
+			{
+				const EcoRepertoireV3::FControlOutput& O = On.Controls[static_cast<size_t>(i)];
+				++AlertWalk;
+				AlertBad += (O.Gait != EcoRepertoireV3::kGaitWalk || O.EatMult != EcoRepertoireV3::kR1bConfig.GaitEat[EcoRepertoireV3::kGaitWalk]
+							 || O.SeeMult != 1.0) ? 1 : 0;
+			}
+		}
+	}
+	const FWorldStats& Sa = A.World.Stats;
+	const FWorldStats& So = On.World.Stats;
+	TestEqual(TEXT("끈 세계 둘 (계수만 다름)은 600 스텝 비트 단위로 같다"), Diff, 0);
+	TestEqual(TEXT("끄면 덮기 칸이 늘 0"), KeepSet, 0);
+	TestEqual(TEXT("끄면 도주 기록 0"), Sa.KeepAlertStarts + Sa.KeepPanicStarts + Sa.KeepShelterStarts + Sa.KeepPanicEnds, static_cast<int64>(0));
+	TestTrue(TEXT("켜면 규칙이 돈다 (경계·도주 덮기 > 0)"), So.KeepSteps[kKeepAlert] > 0 && So.KeepSteps[kKeepPanic] > 0);
+	TestTrue(TEXT("켬: 경계 중 먹기 사슴이 있다"), AlertWalk > 0);
+	TestEqual(TEXT("켬: 경계 중 먹기 = 걷기·섭식 0.5·고개 듦"), AlertBad, 0);
+	TestEqual(TEXT("켬: 마스크 위반 0"), So.MaskViolations, static_cast<int64>(0));
+	AddInfo(FString::Printf(TEXT("켬 600 스텝: 경계 시작 %lld · 도주 시작 %lld · 웅크림 시작 %lld · 끝난 도주 %lld (은신처 %lld) · 경계 중 먹기 %d · 포획 %lld"),
+							So.KeepAlertStarts, So.KeepPanicStarts, So.KeepShelterStarts, So.KeepPanicEnds, So.KeepPanicEndShelter, AlertWalk,
+							So.Caught));
 	return true;
 }
 

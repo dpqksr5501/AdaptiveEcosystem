@@ -26,6 +26,10 @@
               늑대 둘의 자리·지난 변위(속력 0~0.75 단위/스텝)·전력 걸음 여부, 사슴 16의 자리(늑대 0 둘레 ±30)·heading·행동 시야 배수
               {1, 0.6, 0.3} 를 정하고 낮(d = 0)·깨어 있음에서 `World._geometry` 를 부른다. 늑대마다 소리 반경(`hearing_radius`), 사슴 × 늑대
               알아챔(wf_pvis — 관측과 같은 보임), 사슴마다 보이는 늑대 수·가장 가까운 거리(없으면 −1).
+  도주 장면  (w3) 도주 반사 거리. 거울 세계(감지·포만 켬)에 장면 상태(사슴 자리·heading·시야 배수·지난 덮기·잠금, 늑대 자리·변위·전력 걸음·
+              쿨다운·배부름·표적, 은신처)를 넣고 `World._geometry` → `World._wf_update` 를 부른다. 장면 = tests/test_wild1.py 의 반사 장면
+              (사슴 2 를 (30, 30) 에 두고 늑대 0 을 +5·+8.5·먹는 중·배부름·이 사슴을 쫓음·은신처 안, 지난 도주 뒤 15·21, 반대쪽 은신처) 과
+              벽·접근 장면 12개 + 난수 장면 16개(시드 32093). 사슴마다 다음 덮기·방향·잠금.
 """
 
 from __future__ import annotations
@@ -191,6 +195,94 @@ def perception_scenes(k_scenes: int = 12):
     return w, scenes
 
 
+def _flight_world() -> World:
+    w = World(load_v2_config(WILD).replace(N=N), seeds=[SEED + 3])
+    w.reset()
+    if w._wf is None or w._ws is None:
+        raise SystemExit("v3_wild1_mirror.yaml 의 wild_flight·wild_satiation 이 꺼졌다")
+    return w
+
+
+def _flight_run(w: World, sc: dict) -> dict:
+    w.pos[:] = sc["pos"]
+    w.head[:] = sc["head"]
+    w._rep_see[:] = sc["see"]
+    w.pred_pos[:] = sc["ppos"]
+    w.pred_vel[:] = sc["pvel"]
+    w.pred_running[:] = sc["run"]
+    w.pred_cd[:] = sc["cd"]
+    w.pred_sat[:] = sc["sat"]
+    w.pred_target = np.asarray(sc["target"], dtype=np.int64).copy()
+    w.pred_asleep[:] = False
+    w.cov_c = np.asarray([c[:2] for c in sc["covers"]], dtype=np.float64).reshape(-1, 2)
+    w.cov_r = np.asarray([c[2] for c in sc["covers"]], dtype=np.float64)
+    w.dark = 0.0
+    w._see_pred = w.cfg.see_r
+    w._rs.lock_left[:] = sc["lock"]
+    w._g = w._geometry()
+    w.wf_mode[:] = sc["prev"]
+    w._wf_update(np.zeros(w.N, dtype=bool))
+    return dict(mode=w.wf_mode.copy(), dir=w.wf_dir.copy(), lock=w._rs.lock_left.copy())
+
+
+def flight_scenes(k_random: int = 16):
+    w = _flight_world()
+    M = w.M
+    scenes = []
+
+    def base():
+        pos = np.tile([55.0, 55.0], (w.N, 1)) + np.arange(w.N)[:, None] * np.array([0.0, -0.2])
+        pos[:4] = [[30.0, 10.0], [30.0, 20.0], [30.0, 30.0], [30.0, 40.0]]
+        return dict(pos=pos, head=np.tile([1.0, 0.0], (w.N, 1)), see=np.ones(w.N),
+                    ppos=np.array([[35.0, 30.0], [-500.0, -500.0]])[:M].copy(), pvel=np.zeros((M, 2)),
+                    run=np.zeros(M, dtype=bool), cd=np.zeros(M, dtype=np.int64), sat=np.zeros(M, dtype=np.int64),
+                    target=np.full(M, -1), covers=[(0.0, 0.0, 0.5)], prev=np.zeros(w.N, dtype=np.int8), lock=np.full(w.N, 5))
+
+    def wolf_at(dx, dy=0.0, cd=0, sat=0, target=-1, covers=None, prev2=0):
+        sc = base()
+        sc["ppos"][0] = sc["pos"][2] + np.array([dx, dy])
+        sc["cd"][0], sc["sat"][0], sc["target"][0] = cd, sat, target
+        if covers is not None:
+            sc["covers"] = covers
+        sc["prev"][2] = prev2
+        return sc
+
+    # tests/test_wild1.py 의 반사 장면 (test_reflex_triggers_only_on_hunting_wolves·test_panic_continues_until_safe_and_prefers_shelter)
+    scenes.append(wolf_at(5.0))                                         # 사냥 중, 도주 거리 안 → 도주
+    scenes.append(wolf_at(8.5))                                         # 경계 거리 안·도주 거리 밖 → 경계
+    scenes.append(wolf_at(5.0, cd=10))                                  # 먹는 늑대 → 경계만
+    scenes.append(wolf_at(5.0, sat=100))                                # 배부른 늑대 → 경계만
+    scenes.append(wolf_at(8.5, target=2))                               # 이 사슴을 쫓음 → 도주
+    scenes.append(wolf_at(5.0, covers=[(30.0, 30.0, 3.0)]))             # 은신처 안 → 웅크림
+    scenes.append(wolf_at(-15.0, prev2=2))                              # 지난 도주, 바로 뒤 15 → 계속
+    scenes.append(wolf_at(-21.0, prev2=2))                              # 지난 도주, 21 → 풀림·잠금 0
+    scenes.append(wolf_at(5.0, covers=[(25.0, 35.0, 2.0)]))             # 반대쪽 ±60° 은신처 → 그쪽으로
+    scenes.append(wolf_at(5.0, cd=10, covers=[(30.0, 30.0, 3.0)], prev2=3))   # 웅크림 → 먹는 늑대만: 풀림
+    sc = wolf_at(0.0, 5.0)
+    sc["pos"][2] = [30.0, 59.5]
+    sc["ppos"][0] = [30.0, 54.5]
+    scenes.append(sc)                                                   # 벽 여유 안: 벽 쪽 성분을 지운다
+    sc = wolf_at(3.0, 4.0)
+    sc["ppos"][0] = sc["pos"][2] + np.array([9.0, 12.0])
+    sc["pvel"][0] = [-0.6, -0.8]
+    scenes.append(sc)                                                   # 경계 거리 안 빠르게 다가옴(접근 높음) → 도주
+    rng = np.random.default_rng(SEED + 3)
+    for _ in range(k_random):
+        ppos = rng.uniform(5.0, 55.0, (M, 2))
+        pos = np.clip(ppos[0] + rng.uniform(-25.0, 25.0, (w.N, 2)), 0.0, 60.0)
+        a = rng.uniform(0.0, 2.0 * np.pi, w.N)
+        sp = rng.uniform(0.0, 0.7, M)
+        b = rng.uniform(0.0, 2.0 * np.pi, M)
+        cov = [(float(x), float(y), float(r)) for x, y, r in zip(rng.uniform(5, 55, 2), rng.uniform(5, 55, 2), rng.uniform(2, 6, 2))]
+        scenes.append(dict(pos=pos, head=np.stack([np.cos(a), np.sin(a)], 1), see=rng.choice([1.0, 0.6, 0.3], w.N), ppos=ppos,
+                           pvel=np.stack([sp * np.cos(b), sp * np.sin(b)], 1), run=rng.random(M) < 0.5,
+                           cd=rng.choice([0, 0, 0, 10], M), sat=rng.choice([0, 0, 100], M),
+                           target=np.where(rng.random(M) < 0.3, rng.integers(0, w.N, M), -1), covers=cov,
+                           prev=rng.choice([0, 0, 1, 2, 3], w.N).astype(np.int8), lock=rng.choice([-1, 0, 5], w.N)))
+    outs = [_flight_run(w, sc) for sc in scenes]
+    return w, scenes, outs
+
+
 def build_header() -> str:
     w = make_world()
     wr = w._wr
@@ -201,6 +293,8 @@ def build_header() -> str:
     types = [int(t) for t in ws_w.pred_type]
     pw, scenes = perception_scenes()
     zv, zh = pw._zv, pw._zh
+    fw, fsc, fout = flight_scenes()
+    wf = fw._wf
     L = [
         "// 자동 생성 — herbivore_rl/export_golden_v3_wild.py (손으로 고치지 않는다). 세계 configs/v3_wild1_mirror.yaml, 시드 32090.",
         "// v3 야생 1단계 골든 (명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md 5절). 검사는 Tests/EcoWildV3Test.cpp (AdaptiveEcosystem.Policy.V3.Wild.*).",
@@ -279,6 +373,36 @@ def build_header() -> str:
         c_array("std::int32_t", "kPercVis", [int(v) for sc in scenes for v in sc['pvis'].reshape(-1)], 16, str),
         c_array("std::int32_t", "kPercCount", [int(v) for sc in scenes for v in sc['count']], 16, str),
         c_array("double", "kPercDMin", [v for sc in scenes for v in sc['dmin']], 6, d_lit),
+        "",
+        "\t// (w3) wild_flight 계수 (단위)",
+        f"\tinline constexpr double kFlightAlertR = {d_lit(wf['alert_r'])};",
+        f"\tinline constexpr double kFlightFlightR = {d_lit(wf['flight_r'])};",
+        f"\tinline constexpr double kFlightSafeR = {d_lit(wf['safe_r'])};",
+        f"\tinline constexpr double kFlightApproach = {d_lit(wf['approach'])};",
+        f"\tinline constexpr double kFlightAlertW = {d_lit(wf['alert_w'])};",
+        f"\tinline constexpr bool kFlightRestAlert = {str(bool(wf['rest_alert'])).lower()};",
+        f"\tinline constexpr double kFlightShelterCos = {d_lit(wf['shelter_cos'])};",
+        f"\tinline constexpr double kFlightShelterR = {d_lit(wf['shelter_r'])};",
+        f"\tinline constexpr bool kFlightCrouch = {str(bool(wf['crouch'])).lower()};",
+        f"\tinline constexpr double kFlightWallMargin = {d_lit(wf['wall_margin'])};",
+        f"\tinline constexpr double kFlightWorldSize = {d_lit(fw.size)};",
+        "\t// 도주 장면: 장면마다 사슴 kFlightN 의 입력 (x, y, hx, hy, 시야 배수, 지난 덮기, 잠금)·출력 (다음 덮기, 방향 x, y, 잠금),",
+        "\t// 늑대 kFlightM 의 (x, y, vx, vy, 전력 걸음, 쿨다운, 배부름, 표적), 은신처 kFlightCovers 개 (x, y, r — 없으면 r < 0). 앞 kFlightHandScenes 개는 손 장면",
+        f"\tinline constexpr std::int32_t kFlightScenes = {len(fsc)};",
+        "\tinline constexpr std::int32_t kFlightHandScenes = 12;",
+        f"\tinline constexpr std::int32_t kFlightN = {fw.N};",
+        f"\tinline constexpr std::int32_t kFlightM = {fw.M};",
+        "\tinline constexpr std::int32_t kFlightCovers = 2;",
+        c_array("double", "kFlightDeerIn", [v for sc in fsc for i in range(fw.N) for v in
+                                            (sc['pos'][i, 0], sc['pos'][i, 1], sc['head'][i, 0], sc['head'][i, 1], sc['see'][i],
+                                             float(sc['prev'][i]), float(sc['lock'][i]))], 7, d_lit),
+        c_array("double", "kFlightDeerOut", [v for o in fout for i in range(fw.N) for v in
+                                             (float(o['mode'][i]), o['dir'][i, 0], o['dir'][i, 1], float(o['lock'][i]))], 4, d_lit),
+        c_array("double", "kFlightWolf", [v for sc in fsc for m in range(fw.M) for v in
+                                          (sc['ppos'][m, 0], sc['ppos'][m, 1], sc['pvel'][m, 0], sc['pvel'][m, 1], float(sc['run'][m]),
+                                           float(sc['cd'][m]), float(sc['sat'][m]), float(sc['target'][m]))], 8, d_lit),
+        c_array("double", "kFlightCover", [v for sc in fsc for k in range(2) for v in
+                                           (sc['covers'][k] if k < len(sc['covers']) else (0.0, 0.0, -1.0))], 6, d_lit),
         "}",
         "",
     ]
