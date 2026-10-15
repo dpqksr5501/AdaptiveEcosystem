@@ -98,13 +98,19 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     # 흉내 내는 세계 규칙 묶음 — 부활 없음(죽은 사슴은 그 자리에 남는다), 피식 EMA 분모, 시작 낮밤 위상, 무대 1/4·3/4 은신처, 늑대 구성
     # (잠행·추격 번갈아), 무대 시작 배치·방향. 정의·식·C++ 출처는 env_v2/world.py 모듈 docstring '통합 무대'
     "integrated_stage": 26,
+    # 야생 규칙 1단계(10-15 사용자 '야생 생태계 규칙', 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md). 셋 다 난수 없음. 정의·식·현실 근거는
+    # env_v2/world.py 모듈 docstring '야생 1단계'
+    "wild_reserve": 27,     # (w1) 지방 비축: E 가 0 밑이면 느린 비축 R 에서 꺼내 쓰고 R 이 바닥나야 굶어 죽는다, E 가 바닥이면 약해진다(느림)
+    "wild_satiation": 28,   # (w2) 늑대 포만: 먹고 나면 정한 시간(게임 하루 단위) 동안 쉬며 사냥하지 않는다
+    "wild_flight": 29,      # (w3) 도주 반사 거리: 사냥 중인 늑대가 경계 거리 안이면 먹으며 멀어지고, 도주 거리 안·다가오면 안전할 때까지 뛴다
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
 IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_window", "daynight", "pred_sleep",
                                          "repertoire", "threats", "stare_down", "alarm",
                                          "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
-                                         "realism_cover_food", "realism_chase", "realism_terrain", "integrated_stage"})
+                                         "realism_cover_food", "realism_chase", "realism_terrain", "integrated_stage",
+                                         "wild_reserve", "wild_satiation", "wild_flight"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -224,6 +230,21 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     "integrated_stage": frozenset({"respawn", "ema_den", "day_offset", "cover_layout", "cover_count", "cover_r_frac", "wolf_kinds",
                                    "start_layout", "wolf_corner_frac", "wolf_gap", "deer_wolf_gap", "deer_margin", "deer_spacing",
                                    "head_layout"}),
+    # 야생 1단계 (env_v2/world.py `_wild_*_params`, 정의는 모듈 docstring '야생 1단계'). 셋 다 daynight 를 함께 켜야 한다(시간 계수를 게임 하루
+    # 단위로 적고 하루 길이 dn_period 로 스텝을 낸다). 끄면 지금 세계와 비트 동일이다(tests/test_wild1.py).
+    #   wild_reserve: reserve_days = 가득 찬 비축이 걷기 대사(× energy_drain)만으로 버티는 게임 하루 수(비축 용량 = reserve_days × 하루 스텝 ×
+    #   energy_drain, E 단위), init = 시작·새 개체 비축 R(0~1), refill_e = 이 E 이상일 때만 먹은 몫의 일부를 R 로 옮긴다, refill_frac = 옮기는 몫,
+    #   weak_e = E 가 이것보다 낮으면 약하다(비축으로 사는 몸), weak_speed = 약한 사슴의 이동 속력 배수(1 = 약해지지 않음)
+    "wild_reserve": frozenset({"reserve_days", "init", "refill_e", "refill_frac", "weak_e", "weak_speed"}),
+    #   wild_satiation: sat_days = 먹기(pred_eat_cd)가 끝난 뒤 사냥하지 않고 쉬는 게임 하루 수, rest_speed = 쉬는 동안 배회 속력 배수. threats 또는
+    #   repertoire 를 함께 켜야 한다(v3 포식자 스텝)
+    "wild_satiation": frozenset({"sat_days", "rest_speed"}),
+    #   wild_flight: alert_r·flight_r·safe_r = 경계·도주·안전 거리(단위, 1 단위 = 2 m), approach = '다가옴' 접근 관측 문턱, alert_w = 경계 중 먹으며
+    #   멀어지는 조향 항 무게, rest_alert = 쉬는·먹는 늑대도 경계(멀어지기)만 일으키나, shelter_cos·shelter_r = 도주 때 고르는 은신처(늑대 반대쪽
+    #   ±acos(shelter_cos) 안, 가장자리까지 shelter_r 안), crouch = 은신처 안에서 사냥 중인 늑대를 알아채면 웅크리나, wall_margin = 무대 벽 미끄러짐
+    #   여유(단위). repertoire 를 함께 켜야 한다
+    "wild_flight": frozenset({"alert_r", "flight_r", "safe_r", "approach", "alert_w", "rest_alert", "shelter_cos", "shelter_r",
+                              "crouch", "wall_margin"}),
 })
 
 # 선택 계수 키(모듈 docstring 규칙 6, 10-14 R3): 기능 → {키: 끔 값}. 켠 블록에 없으면 끔 값(= 앞 버전 동작)으로 읽는다. 앞 버전 설정

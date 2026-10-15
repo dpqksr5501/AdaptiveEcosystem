@@ -245,6 +245,34 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
   밤잠 지연 키(C++ 세션 시드·늑대 StableAgentId, 파이썬 세계 시드·슬롯), 지형 제약 이동(언리얼 FStepHooks — 비교 로그는 막힘 0), 팀 시계 동기·
   시체 2초 삭제(동역학과 무관), 경계 거리 KeepAway(커밋하지 않은 실험, 비교는 끔).
   C++ 꼴(부활 없음, 사슴 i 하나): if (!bAlive[i]) { Vel = 0; Want = 0; continue; }  bStarved = !bCaught && E <= 0;  ... 관측 E 뒤 bAlive[i] = !bDead;
+- 야생 1단계(10-15 사용자 '야생 생태계 규칙을 만들어', '늑대 피해서 도망가다 굶어 죽는 게 말이 안 된다'. 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md,
+  설정 configs/v3_wild1_mirror.yaml). 기능 셋, 모두 난수 없음. 시간 계수는 게임 하루 단위로 적고 스텝 = 반올림(일 × dn_period)이다. 관측 18칸은 그대로다.
+  (w1) wild_reserve 지방 비축. 개체마다 R ∈ [0, 1](시작·새 개체 init). 비축 용량 C = reserve_days × dn_period × energy_drain(E 단위 — 걷기 대사만으로
+      reserve_days 일을 버틴다). `step` 3) 에서 e_new 를 정한 뒤(산 개체만): e_new < 0 이면 모자람 −e_new 를 R·C 에서 꺼낸다(다 채우면 e_new = 0).
+      e_new ≥ refill_e 이고 R < 1 이면 이번 스텝 먹은 에너지의 refill_frac 을(남은 빈자리 (1 − R)·C 까지) E 에서 R 로 옮긴다. 굶음 = E ≤ 0 이고
+      R ≤ 0. 약함: 스텝 첫머리 E/max_energy < weak_e 인 개체는 이동 속도 × weak_speed(대사·섭식은 보행 그대로). 번식 규칙(E > 0.9 → 0.5)은 그대로다.
+      현실 근거: 사슴은 배가 비어도 몸의 지방으로 여러 주를 버티고, 지방이 바닥나야 굶어 죽는다. 굶주린 사슴은 느리고 약해 늑대가 더 쉽게 잡는다.
+      C++ 꼴: if (E < 0) { Take = min(-E / C, R); R -= Take; E = (Take * C >= -E) ? 0 : E + Take * C; }
+              else if (E >= RefillE && R < 1) { Mv = min(RefillFrac * Gain, (1 - R) * C); E -= Mv; R += Mv / C; }  bStarved = E <= 0 && R <= 0;
+  (w2) wild_satiation 늑대 포만. 포획 때(플레이어형 위협 말고) pred_sat ← 반올림(sat_days × dn_period). `_step_predators_v3` 첫머리 쿨다운을 줄인
+      뒤 쿨다운 0 이고 pred_sat > 0 이면 이번 스텝은 배부름(훅 pred_sated): 사냥하지 않고(표적·포획 없음) pred_sat −1, 배회 속력 × rest_speed.
+      배부른 늑대는 자지 않는 한 사슴에게 그대로 보인다. 현실 근거: 늑대는 먹이를 잡으면 몇 시간 먹고 그 곁에서 쉬며, 배가 고파져야 다시 사냥한다.
+      C++ 꼴: Cd = max(Cd - 1, 0); bSated = Cd == 0 && Sat > 0; if (bSated) { --Sat; bHunting = false; Speed *= RestSpeed; }  on catch: Sat = SatSteps;
+  (w3) wild_flight 도주 반사 거리(C++ 경계 거리 KeepAway 실험(EcoWorldV3.h FKeepAwayConfig)을 고친 판). 스텝 끝(관측·리스폰 뒤) 기하로 다음 스텝의
+      덮기 wf_mode 를 정한다. '알아챔' = 이 사슴의 위협 보임(시야·청각, 관측과 같은 판정 — 기하 wf_pvis). 사냥 중인 늑대 = 깨어 있고 먹는 중(쿨다운)
+      ·배부름(pred_sat)이 아닌 늑대. 다가옴 = 이 사슴을 표적으로 쫓음 또는 접근 관측 ≥ approach. 순서:
+        은신처 원 안: 사냥 중인 늑대를 alert_r 안에서 알아챔이고 crouch 면 웅크림(HIDE 도착), 아니면 두뇌
+        지난 도주: 사냥 중인 늑대가 실거리 safe_r 안에 있으면 계속 도주(쫓는 늑대는 돌아보며 안다), 아니면 풀림
+        도주: 사냥 중인 늑대를 flight_r 안에서 알아챔, 또는 alert_r 안에서 알아챈 사냥 중인 늑대가 다가옴
+        경계: 사냥 중인 늑대(rest_alert 면 쉬는·먹는 늑대도)를 alert_r 안에서 알아챔
+      실행: 도주는 두뇌 요청 대신 FLEE(뛰기)로 들어가고 방향 = 실거리 safe_r 안 사냥 중인 늑대들 반대(거리 역수 가중 합). 그 방향 ±acos(shelter_cos)
+      안에 가장자리 거리 shelter_r 안의 은신처가 있으면 가장 가까운 그 은신처 중심 쪽. 경계는 행동을 바꾸지 않는다 — 두뇌가 GRAZE 면 걸으며 먹고
+      (섭식 걷기 배수) 방향 = n(GRAZE 조향 + alert_w·알아챈 늑대들 반대), 고개를 든다(자기 탐지 반경 배수 1). 두 방향 모두 무대 벽 wall_margin 안이면
+      벽 쪽 성분을 지운다. 덮기(도주·웅크림)가 풀리면 잠금 0·미뤄 둔 사건 지움(두뇌가 곧바로 고른다).
+      KeepAway 와 다른 점: 사냥 중인 늑대만 도주를 일으킨다(먹는·쉬는·자는 늑대는 경계만이거나 무시), 경계 중에도 먹는다(KeepAway 는 FLEE 걷기 —
+      먹이 0), 알아챔은 사슴의 실제 감지(KeepAway 는 30 m 안이면 방향 무관), 도주 방향이 늑대 반대쪽 은신처를 고른다.
+      현실 근거: 사슴은 포식자를 알아채면 먼저 고개를 들고 지켜보며 거리를 벌리고, 일정 거리 안으로 들어오거나 다가오면 달아난다. 사냥하지 않는
+      포식자(쉬거나 먹는 늑대)에게는 덜 민감하다.
 - 세로 장애물(나무·바위) 확장 지점 — 이번 단계에는 넣지 않는다(10-14 사용자: '언리얼에도 아직 없다. 나중에 추가 가능하게만').
   구현은 없고 자리만 정해 둔다. 기능 이름은 이미 예약된 `obstacles`(번호 12, `env_v2/features.py`)이고 켜면 '아직 구현되지 않았다'로
   읽을 때 실패한다(끈 블록 `obstacles: {enabled: false}` 는 받아들이고 무시한다). 자료는 `World.obstacles` — (K, 3) float64 [x, y, r]
@@ -1096,6 +1124,9 @@ def _rz_night_params(p: dict, f: Features, ps: dict | None) -> dict:
 
 
 # 통합 무대 (q) head_layout 'golden' 의 순번 각(rad, C++ AEcoCreatureIntegrationSpawner 의 2.399963 그대로)과 늑대 순번 밀기
+# 야생 (w3) 도주 반사 덮기 wf_mode (모듈 docstring '야생 1단계'). C++ kKeepNone·kKeepAlert·kKeepPanic·kKeepShelter 와 같은 번호
+WF_NONE, WF_ALERT, WF_PANIC, WF_SHELTER = 0, 1, 2, 3
+WF_MODE_NAMES = ("none", "alert", "panic", "shelter")
 IST_GOLDEN_ANGLE = 2.399963
 IST_WOLF_HEAD_OFFSET = 2
 # 통합 무대 (p) 늑대 모서리 순서(C++ PlanStage Corners)와 무작위 자리 시도 수, 사슴 시도 수 max(IST_DEER_TRIES_MIN, IST_DEER_TRIES_PER × N)
@@ -1162,6 +1193,58 @@ def _ist_params(p: dict, f: Features) -> dict:
         for key in ("wolf_gap", "deer_wolf_gap", "deer_margin", "deer_spacing"):
             out[key] = number(key, 0.0)
     return out
+
+
+def _wild_num(name: str, p: dict, key: str, lo: float, hi: float = math.inf, open_lo: bool = False) -> float:
+    x = _num(name, key, p[key])
+    if (x <= lo if open_lo else x < lo) or x > hi:
+        raise ValueError(f"features.{name}.{key} 는 {'(' if open_lo else '['}{lo}, {hi}] 이어야 한다. 받은 값: {x}")
+    return x
+
+
+def _wild_bool(name: str, p: dict, key: str) -> bool:
+    if not isinstance(p[key], bool):
+        raise ValueError(f"features.{name}.{key} 는 true/false 여야 한다. 받은 값: {p[key]!r}")
+    return p[key]
+
+
+def _wild_reserve_params(p: dict, f: Features) -> dict:
+    """wild_reserve 계수 (모듈 docstring '야생 1단계' (w1)). daynight 를 함께 켜야 한다(reserve_days 를 하루 길이로 스텝에 옮긴다)."""
+    if not f.enabled("daynight"):
+        raise ValueError("features.wild_reserve 는 daynight 를 함께 켜야 한다(비축 계수가 게임 하루 단위다)")
+    n = "wild_reserve"
+    return dict(reserve_days=_wild_num(n, p, "reserve_days", 0.0, open_lo=True), init=_wild_num(n, p, "init", 0.0, 1.0),
+                refill_e=_wild_num(n, p, "refill_e", 0.0, 1.0), refill_frac=_wild_num(n, p, "refill_frac", 0.0, 1.0),
+                weak_e=_wild_num(n, p, "weak_e", 0.0, 1.0), weak_speed=_wild_num(n, p, "weak_speed", 0.0, 1.0))
+
+
+def _wild_satiation_params(p: dict, f: Features) -> dict:
+    """wild_satiation 계수 (모듈 docstring '야생 1단계' (w2)). daynight 와 v3 포식자 스텝(repertoire 또는 threats)을 함께 켜야 한다."""
+    if not f.enabled("daynight") or not (f.enabled("repertoire") or f.enabled("threats")):
+        raise ValueError("features.wild_satiation 은 daynight 와 repertoire 또는 threats 를 함께 켜야 한다(v3 포식자 스텝, 게임 하루 단위)")
+    n = "wild_satiation"
+    return dict(sat_days=_wild_num(n, p, "sat_days", 0.0), rest_speed=_wild_num(n, p, "rest_speed", 0.0, 1.0))
+
+
+def _wild_flight_params(p: dict, f: Features) -> dict:
+    """wild_flight 계수 (모듈 docstring '야생 1단계' (w3)). repertoire 를 함께 켜야 한다. 거리는 0 < flight_r ≤ alert_r ≤ safe_r 여야 한다."""
+    if not f.enabled("repertoire"):
+        raise ValueError("features.wild_flight 는 repertoire 를 함께 켜야 한다(덮기는 행동 실행기 위에서 돈다)")
+    n = "wild_flight"
+    out = dict(alert_r=_wild_num(n, p, "alert_r", 0.0, open_lo=True), flight_r=_wild_num(n, p, "flight_r", 0.0, open_lo=True),
+               safe_r=_wild_num(n, p, "safe_r", 0.0, open_lo=True), approach=_wild_num(n, p, "approach", 0.0, 1.0),
+               alert_w=_wild_num(n, p, "alert_w", 0.0), rest_alert=_wild_bool(n, p, "rest_alert"),
+               shelter_cos=_wild_num(n, p, "shelter_cos", -1.0, 1.0), shelter_r=_wild_num(n, p, "shelter_r", 0.0),
+               crouch=_wild_bool(n, p, "crouch"), wall_margin=_wild_num(n, p, "wall_margin", 0.0))
+    if not out["flight_r"] <= out["alert_r"] <= out["safe_r"]:
+        raise ValueError(f"features.wild_flight 는 flight_r ≤ alert_r ≤ safe_r 여야 한다. 받은 값: {out['flight_r']}, "
+                         f"{out['alert_r']}, {out['safe_r']}")
+    return out
+
+
+def wild_days_to_steps(days: float, period: int) -> int:
+    """게임 하루 단위 계수 → 스텝 = 반올림(일 × 하루 스텝), 0.5 는 올림 (모듈 docstring '야생 1단계')."""
+    return int(math.floor(float(days) * int(period) + 0.5))
 
 
 def night_delays(seed: int, n: int, max_delay: int) -> np.ndarray:
@@ -1287,6 +1370,12 @@ class World:
         # 언리얼 통합 무대 거울(모듈 docstring '통합 무대'): 부활 없음·EMA 분모·시작 위상·은신처·늑대 구성·시작 배치·방향. 끈 세계는 None 이고
         # 그 코드 경로를 타지 않는다
         self._ist = (_ist_params(f.params("integrated_stage"), f) if f.enabled("integrated_stage") else None)
+        # 야생 1단계(모듈 docstring '야생 1단계'): 지방 비축 (w1)·늑대 포만 (w2)·도주 반사 거리 (w3). 끈 규칙은 None 이고 그 코드 경로를 타지 않는다
+        self._wr = (_wild_reserve_params(f.params("wild_reserve"), f) if f.enabled("wild_reserve") else None)
+        self._ws = (_wild_satiation_params(f.params("wild_satiation"), f) if f.enabled("wild_satiation") else None)
+        self._wf = (_wild_flight_params(f.params("wild_flight"), f) if f.enabled("wild_flight") else None)
+        # 통계·진단 전용(설정 아님, 동역학과 무관): 참이면 기하에 사슴 × 위협 보임 행렬 wf_pvis 를 남긴다(실행기 results/v3/wild1 이 켠다)
+        self.keep_pair_vis = False
         self.alive = None
         self._rs = None
         self.act_names: tuple[str, ...] = action_names(self.features)
@@ -1397,6 +1486,8 @@ class World:
             self._repertoire_reset()
         if self._al is not None:
             self._alarm_reset()
+        if self._wr is not None or self._ws is not None or self._wf is not None:
+            self._wild_reset()              # 야생 1단계: 하루 길이(_daynight_reset)·위협 수 M 이 정해진 뒤
         self._reset_stats()
         self._g = self._geometry()
         if self._vg is not None:
@@ -2294,6 +2385,8 @@ class World:
                     rz["rz_rear"] = eye.any(1) & ~(eye & ~rear).any(1)
                 if self._zh is not None:
                     rz["rz_heard"] = pvis.any(1) & ~eye.any(1)
+            if self._wf is not None or self.keep_pair_vis:
+                rz["wf_pvis"] = pvis.copy()     # 야생 (w3) 알아챔(사슴 × 위협, 관측과 같은 보임) — 진단 실행기도 읽는다
             pred_count = pvis.sum(1)
             masked = np.where(pvis, pd, np.inf)
             j = masked.argmin(1)
@@ -2310,6 +2403,8 @@ class World:
                 rz["rz_rear"] = np.zeros(n, dtype=bool)
             if self._zh is not None:
                 rz["rz_heard"] = np.zeros(n, dtype=bool)
+            if self._wf is not None or self.keep_pair_vis:
+                rz["wf_pvis"] = np.zeros((n, 0), dtype=bool)
 
         # --- 은신처 (§3.1 idx6) ---
         if len(self.cov_r):
@@ -2514,6 +2609,12 @@ class World:
             if self._act_vig is not None:       # v2.2: 경계면 속력 0 (speed 보다 우선). v2.2r W′ 는 창 안에서만
                 v = self._vigil_step(v, a[:, self._act_vig],
                                      self.window if vw is not None and vw["window_only"] else None)
+        if self._wr is not None:
+            # 야생 (w1) 약함: 스텝 첫머리 E 가 weak_e 밑이면(비축으로 사는 몸) 이동 속도 × weak_speed. 대사·섭식은 보행 그대로. 적용 속도 훅도 줄인 값
+            self.weak = self.energy < self._wr["weak_e"] * cfg.max_energy
+            if self._wr["weak_speed"] < 1.0 and self.weak.any():
+                v = np.where(self.weak[:, None], v * self._wr["weak_speed"], v)
+                self.vel = v
         if live is not None:
             # 통합 무대 (k): 시체는 움직이지 않는다(죽은 자리에 멈춘다 — C++ 처리기가 목록에서 뺀다). 적용 속도 훅도 0 이다
             v = np.where(live[:, None], v, 0.0)
@@ -2543,6 +2644,8 @@ class World:
             self._zt_catch += np.bincount(self._rz_terrain_of(self.pos[caught]), minlength=len(TERRAIN_NAMES))
         if self._al is not None and self._al["active"] and self._al["on_catch"] and caught.any():
             self._alarm_cry(caught)                     # v3 R2 M8: 잡힌 개체의 비명(홉 0, 점 = 잡은 위협 위치)
+        if self._wr is not None and caught.any():       # 야생 (w1) 통계 전용: 약한 채로 잡힌 수
+            self._wr_weak_caught += int(np.count_nonzero(caught & self.weak))
 
         # 3) 섭식 · 대사 (§3.4 "에너지 획득 +1.0 × 획득량")
         if self._sp is None and vg is None and self._dn is None:
@@ -2562,6 +2665,8 @@ class World:
         e_new = np.minimum(e_drained + gain * cfg.food_energy_per_unit, cfg.max_energy)
         if live is not None:
             e_new = np.where(live, e_new, self.energy)     # 통합 무대 (k): 시체의 에너지는 죽은 때 값에 멈춘다(대사도 없다)
+        if self._wr is not None:
+            e_new = self._wild_reserve_step(e_new, gain * cfg.food_energy_per_unit, live)   # 야생 (w1): 모자람은 비축에서, 남음은 비축으로
         if self._sp is not None and self._sp["net_energy_reward"]:
             # #4 순변화 e_new − e_prev. 번식 리셋(아래 4)과 리스폰(8)은 이 뒤라 들어가지 않는다
             rew += cfg.rew_energy * (e_new - self.energy)
@@ -2584,6 +2689,8 @@ class World:
 
         # 5) 사망: 피식 또는 아사
         starved = self.energy <= 0.0
+        if self._wr is not None:
+            starved &= self.reserve <= 0.0              # 야생 (w1): 비축까지 바닥나야 굶어 죽는다
         if live is not None:
             # 통합 무대 (k): 굶음 = 산 개체 중 잡히지 않은 E ≤ 0 (C++ Stats.Starved 의 정의. 잡힌 개체는 포획으로만 센다)
             starved &= live & ~caught
@@ -2659,6 +2766,8 @@ class World:
                     self._gait_prev[:, dead] = -1     # 새 개체: 보행 전환(B8)을 이전 개체와 잇지 않는다
                 if vg is not None:
                     self._vig_prev[dead] = -1         # 새 개체: 경계 전환(b8_vig)도 잇지 않는다
+        if self._wf is not None:
+            self._wf_update(done)               # 야생 (w3): 스텝 끝 기하(리스폰 관측 포함)로 다음 스텝의 덮기를 정한다
 
         return obs, rew, done, terminal_obs
 
@@ -2871,7 +2980,16 @@ class World:
                              f"연속 정책 출력은 이 세계에 쓸 수 없다). 받은 범위: [{req.min()}, {req.max()}]"
                              + (f", 정수가 아닌 값 예: {bad[:3].tolist()}" if len(bad) else ""))
         prev = rs.behavior.copy()
-        res = rep.arbitrate(rs, rp, req.astype(np.int64), self._rep_decision_obs())
+        req_i = req.astype(np.int64)
+        wf = self._wf
+        if wf is not None:
+            # 야생 (w3) 덮기: 도주 = FLEE, 웅크림 = HIDE 를 두뇌 요청 대신 넣는다(결정 시점이면 arbitrate 가 그대로 들어간다)
+            mode = self.wf_mode
+            req_i = np.where(mode == WF_PANIC, rep.FLEE, np.where(mode == WF_SHELTER, rep.HIDE, req_i))
+        dobs = self._rep_decision_obs()
+        res = rep.arbitrate(rs, rp, req_i, dobs)
+        if wf is not None:
+            self._wf_commit(res, dobs)
         ix, iy = self._cell_index(self.pos)
         to_target = np.zeros((self.N, 2))
         m = (rs.behavior == rep.HIDE) & ~rs.arrived & (rs.hide_target >= 0)
@@ -2880,7 +2998,15 @@ class World:
         inp = dict(food_grad=g["food_grad"], to_centroid=g["to_centroid"], separation=g["separation"],
                    away_from_pred=g["away_from_pred"], to_target=to_target, pred_count=g["pred_count"],
                    food_ok=self.food[iy, ix] >= rp["graze_eat_min"], in_cover=g["in_cover"], dark=self.dark)
+        if wf is not None:
+            # 야생 (w3) 도주: FLEE 제어기의 위협 반대 방향 = 덮기 방향(보인 위협으로 둔다 — C++ KeepControl 과 같은 꼴)
+            pan = (self.wf_mode == WF_PANIC) & (self.wf_dir != 0.0).any(1)
+            if pan.any():
+                inp["away_from_pred"] = np.where(pan[:, None], self.wf_dir, g["away_from_pred"])
+                inp["pred_count"] = np.where(pan, np.maximum(g["pred_count"], 1), g["pred_count"])
         out = rep.control(rs, rp, inp, cfg, self._sp)
+        if wf is not None:
+            self._wf_alert_control(out, inp)
         self.gait, self.gait_cmd, self.vel = out["gait"], out["gait"].copy(), out["vel"]
         self._rep_eat, self._rep_drain = out["eat"], out["drain"]
         self._rep_see_last = self._rep_see                  # 결정 관측(self._g)을 만든 배수 → 다음 관측의 '직전' 배수
@@ -3155,6 +3281,16 @@ class World:
             self._zs_steps += N
         self.pred_cd = np.maximum(self.pred_cd - 1, 0)
         hunting = self.pred_cd == 0
+        sated = None
+        if self._ws is not None:
+            # 야생 (w2) 포만: 먹기(쿨다운)가 끝났고 배부름이 남은 늑대는 이번 스텝 사냥하지 않고 쉰다(남은 스텝 −1). 플레이어형 위협은 pred_sat 이 늘 0
+            sated = (self.pred_cd == 0) & (self.pred_sat > 0)
+            self.pred_sat = np.where(sated, self.pred_sat - 1, self.pred_sat)
+            self.pred_sated = sated
+            hunting = hunting & ~sated
+            self._ws_sated_n += int(np.count_nonzero(sated[:Mb]))
+            self._ws_eat_n += int(np.count_nonzero(self.pred_cd[:Mb] > 0))
+            self._ws_steps_n += Mb
         if self._ps is not None:
             hunting = hunting & ~self.pred_asleep
         if self._zn is not None and self.dark >= self._zn["hunt_dark"]:
@@ -3233,6 +3369,9 @@ class World:
             if eating.any():
                 move = np.where(eating[:, None], self.pred_head, move)
                 speed = np.where(eating, 0.0, speed)
+        if sated is not None and sated.any():
+            # 야생 (w2): 배부른 늑대는 느리게 어슬렁거린다(배회 방향 그대로 — 표적이 없으므로 move 는 배회다). 밤잠 배수 앞. C++ 꼴: Speed *= RestSpeed
+            speed = np.where(sated, speed * self._ws["rest_speed"], speed)
         if self._ps is not None:
             move = np.where(self.pred_asleep[:, None], self.pred_head, move)
             speed = speed * self._pred_speed_mult
@@ -3364,8 +3503,8 @@ class World:
             self._zc_catch_own += int(np.count_nonzero(gl & (self.chase_tgt == k)))
             self.chase_tgt[got] = -1
             self.chase_lost[got] = 0
-        if self._rz or self._r3:
-            # 스텝 뒤 훅(통계·판정 전용, 동역학에 쓰지 않는다): 이번 스텝에 위협 m 이 쫓은 사슴 슬롯(없으면 −1). 추격 고정 세계에서는
+        if self._rz or self._r3 or self._wf is not None:
+            # 스텝 뒤 훅(통계·판정 전용 — 야생 (w3) 은 '이 사슴을 쫓음' 판정에 쓴다): 이번 스텝에 위협 m 이 쫓은 사슴 슬롯(없으면 −1). 추격 고정 세계에서는
             # 고정한 표적(시야 밖이면 마지막 자리로 가는 중인 그 표적)이다. 포획 뒤 놓기와 무관하게 이번 스텝의 값이다
             self.pred_target = np.where(has_target, j, -1).astype(np.int64)
         if th is None:
@@ -3375,6 +3514,11 @@ class World:
             if sd is not None:
                 self._stare_after(got, caught)
             self._threat_after(got, ts)
+        if self._ws is not None and got.any():
+            # 야생 (w2): 잡은 늑대(플레이어형 위협 말고)는 먹기가 끝난 뒤 배부름 sat 스텝을 쉰다
+            gw = got & ~self.pred_is_player if th is not None else got
+            self.pred_sat[gw] = self._ws_sat_steps
+            self._ws_kills_n += int(np.count_nonzero(gw))
         if self._zn is not None:
             # v3 현실성 (d): 이번 스텝에 사냥 중이었나(표적 있음, 또는 스텝 끝 잠행형 돌진·대치) — 다음 `_daynight_update` 의 눕기 조건
             act = has_target.copy()
@@ -3780,6 +3924,11 @@ class World:
             self._al_wave_last[dead] = -1
             self._al_onset_t[dead] = -1
             self._al_e7_t[dead] = -(10 ** 9)
+        if self._wr is not None:
+            self.reserve[dead] = self._wr["init"]      # 야생 (w1): 새 개체는 시작 비축으로
+        if self._wf is not None:
+            self.wf_mode[dead] = WF_NONE               # 야생 (w3): 새 개체는 덮기 없이 시작한다
+            self.wf_dir[dead] = 0.0
         if self.alive is not None:
             # 통합 무대 (k): 빈 슬롯을 다시 채우면 산 슬롯이다(새 배열 — 스텝 안의 L 을 바꾸지 않는다)
             self.alive = self.alive.copy()
@@ -3805,6 +3954,208 @@ class World:
                 self.chase_tgt[hit] = -1
                 self.chase_lost[hit] = 0
                 self._zc_rel_dead += int(np.count_nonzero(hit))
+
+    # ------------------------------------------------------------------ #
+    # 야생 1단계 (모듈 docstring '야생 1단계', 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md)
+    # ------------------------------------------------------------------ #
+
+    def _wild_reset(self) -> None:
+        """야생 1단계 상태·통계 칸 (reset, 하루 길이·위협 수가 정해진 뒤). 난수를 쓰지 않는다. 일 단위 계수를 이 세계의 dn_period 로 옮긴다."""
+        N, M = self.N, self.M
+        if self._wr is not None:
+            self.reserve = np.full(N, self._wr["init"])
+            # 비축 용량(E 단위) = 걷기 대사(× energy_drain)만으로 reserve_days 일을 버티는 에너지
+            self._wr_cap = self._wr["reserve_days"] * self.dn_period * self.cfg.energy_drain
+            self.weak = np.zeros(N, dtype=bool)
+            self._wr_used = 0.0             # 비축에서 꺼내 쓴 에너지 합(E 단위)
+            self._wr_refill = 0.0           # 비축으로 옮긴 에너지 합
+            self._wr_live_n = 0             # 산 개체-스텝
+            self._wr_weak_n = 0             # 그중 약한 개체-스텝(스텝 첫머리 E < weak_e)
+            self._wr_weak_caught = 0        # 약한 채로 잡힌 수
+        if self._ws is not None:
+            self.pred_sat = np.zeros(M, dtype=np.int64)    # 남은 배부름 스텝(먹기가 끝난 뒤부터 준다)
+            self.pred_sated = np.zeros(M, dtype=bool)      # 스텝 뒤 훅: 이번 스텝에 배불러 쉬었나
+            self._ws_sat_steps = wild_days_to_steps(self._ws["sat_days"], self.dn_period)
+            self._ws_sated_n = self._ws_eat_n = self._ws_steps_n = self._ws_kills_n = 0
+        if self._wf is not None:
+            self.wf_mode = np.zeros(N, dtype=np.int8)      # 다음 스텝의 덮기(WF_*)
+            self.wf_dir = np.zeros((N, 2))                 # 경계·도주 방향(단위, 없으면 0)
+            self._wf_mode_n = np.zeros(len(WF_MODE_NAMES), dtype=np.int64)   # 실행한 덮기별 산 개체-스텝
+            self._wf_panic_starts = self._wf_panic_ends = self._wf_panic_end_shelter = 0
+
+    def _wild_reserve_step(self, e_new: np.ndarray, gain_e: np.ndarray, live: np.ndarray | None) -> np.ndarray:
+        """야생 (w1) `step` 3): 대사·섭식 뒤 E(e_new, max_energy 로 자른 값)에 비축을 적용한 E 를 돌려주고 self.reserve 를 바꾼다(산 개체만).
+        gain_e = 이번 스텝 먹은 에너지(먹이 × food_energy_per_unit). 모자람을 다 채우면 E = 0, R 이 모자라면 R = 0 이고 E 는 남은 모자람(< 0)."""
+        wr, cap = self._wr, self._wr_cap
+        act = np.ones(self.N, dtype=bool) if live is None else live
+        R = self.reserve.copy()
+        e_out = e_new.copy()
+        need = act & (e_new < 0.0)
+        if need.any():
+            want = -e_new[need] / cap
+            r0 = R[need]
+            covered = want <= r0
+            e_out[need] = np.where(covered, 0.0, e_new[need] + r0 * cap)
+            R[need] = np.where(covered, r0 - want, 0.0)
+            self._wr_used += float((np.minimum(want, r0) * cap).sum())
+        if wr["refill_frac"] > 0.0:
+            fill = act & (e_out >= wr["refill_e"]) & (R < 1.0) & (gain_e > 0.0)
+            if fill.any():
+                mv = np.minimum(wr["refill_frac"] * gain_e[fill], (1.0 - R[fill]) * cap)
+                e_out[fill] -= mv
+                R[fill] = np.minimum(R[fill] + mv / cap, 1.0)
+                self._wr_refill += float(mv.sum())
+        self.reserve = R
+        self._wr_live_n += int(np.count_nonzero(act))
+        self._wr_weak_n += int(np.count_nonzero(self.weak & act))
+        return e_out
+
+    def _wf_hunting(self) -> np.ndarray:
+        """야생 (w3) 사냥 중인 위협 (M,): 깨어 있고 먹는 중(쿨다운 > 0)이 아니고 배부르지(pred_sat > 0) 않다. 플레이어형 위협은 휴식 모드면 아니다."""
+        h = self.pred_cd == 0
+        if self._ps is not None:
+            h = h & ~self.pred_asleep
+        if self._ws is not None:
+            h = h & (self.pred_sat == 0)
+        if self._th is not None and self.M > self.M_base:
+            h = h & ~(self.pred_is_player & (self.player_mode == PM_REST))
+        return h
+
+    def _wf_commit(self, res: dict, dobs: dict) -> None:
+        """야생 (w3) A — C++ CommitKeepAway 와 같은 꼴: 덮기(도주 FLEE·웅크림 HIDE)가 걸린 산 개체가 arbitrate 뒤에도 그 행동이 아니면(잠금 중·
+        기상 중·HIDE 도착 전) 곧바로 들어간다(진입 잠금·seq·놀람 정지 그대로, HIDE 는 은신처 안이라 곧바로 도착). 미뤄 둔 사건 결정은 버린다."""
+        rs, rp = self._rs, self._rp
+        live = np.ones(self.N, dtype=bool) if self.alive is None else self.alive
+        pan = (self.wf_mode == WF_PANIC) & live
+        shl = (self.wf_mode == WF_SHELTER) & live
+        over = pan | shl
+        if not over.any():
+            return
+        target = np.where(pan, rep.FLEE, rep.HIDE).astype(np.int64)
+        need = over & ((rs.behavior != target) | rs.waking | (shl & ~rs.arrived))
+        if need.any():
+            rep._enter(rs, rp, need, target, dobs["in_cover"], dobs["cover_k"])
+            res["switch"] = res["switch"] | need
+        rs.ev_wait = np.where(over, -1, rs.ev_wait)
+        rs.phase = rep.phase_of(rs, rp)
+
+    def _wf_alert_control(self, out: dict, inp: dict) -> None:
+        """야생 (w3) B 경계: 두뇌 행동이 GRAZE 인 경계 개체는 걸으며 먹고(보행·섭식·대사 = 걷기) GRAZE 조향 + alert_w·덮기 방향으로 멀어진다.
+        고개를 든다(자기 탐지 반경 배수 1). 다른 행동(두뇌의 FLEE·HIDE·SLEEP)은 그대로다."""
+        rs, rp, sp, cfg = self._rs, self._rp, self._sp, self.cfg
+        al = (self.wf_mode == WF_ALERT) & (rs.behavior == rep.GRAZE) & (self.wf_dir != 0.0).any(1)
+        if self.alive is not None:
+            al &= self.alive
+        if not al.any():
+            return
+        d = (rp["graze_forage"] * inp["food_grad"][al] + rp["graze_cohesion"] * inp["to_centroid"][al]
+             + cfg.sep_weight * inp["separation"][al] + self._wf["alert_w"] * self.wf_dir[al])
+        n = normalize(d)
+        n = np.where(((n * n).sum(1) > EPS * EPS)[:, None], n, self.wf_dir[al])
+        out["vel"][al] = n * (cfg.herb_speed * sp["speed"][GAIT_WALK])
+        out["gait"][al] = GAIT_WALK
+        out["eat"][al] = sp["eat"][GAIT_WALK]
+        out["drain"][al] = sp["drain_mult"][GAIT_WALK]
+        out["see"][al] = 1.0
+
+    def _wf_update(self, done: np.ndarray) -> None:
+        """야생 (w3) H: 스텝 끝 기하 self._g(관측과 같은 위치·보임, 리스폰 관측 포함)로 다음 스텝의 덮기 wf_mode·wf_dir 를 정한다(모듈 docstring
+        '야생 1단계' (w3) 순서). 이번 스텝에 실행한 덮기를 센다. 덮기(도주·웅크림)가 풀리면 잠금 0·미뤄 둔 사건 지움(두뇌가 곧바로 고른다)."""
+        wf, rs, g = self._wf, self._rs, self._g
+        N, M = self.N, self.M
+        live = np.ones(N, dtype=bool) if self.alive is None else self.alive
+        prev = self.wf_mode
+        self._wf_mode_n += np.bincount(prev[live | done], minlength=len(WF_MODE_NAMES))
+        nxt = np.zeros(N, dtype=np.int8)
+        dirs = np.zeros((N, 2))
+        in_cov = g["in_cover"]
+        if M > 0:
+            hunt = self._wf_hunting()[None, :]
+            pv = g["wf_pvis"]                                   # 알아챔(시야·청각, 자는 위협은 이미 빠졌다)
+            ex = self.pred_pos[:, 0][None, :] - self.pos[:, 0:1]
+            ey = self.pred_pos[:, 1][None, :] - self.pos[:, 1:2]
+            pd = np.sqrt(ex * ex + ey * ey)
+            pinv = 1.0 / np.maximum(pd, EPS)
+            c = -(self.pred_vel[:, 0][None, :] * ex + self.pred_vel[:, 1][None, :] * ey) * pinv / self.cfg.herb_speed
+            appr = (np.clip(c, -1.0, 1.0) + 1.0) * 0.5 >= wf["approach"]     # 관측 pred_approach 와 같은 식
+            tgt = getattr(self, "pred_target", None)
+            locked = (tgt[None, :] == np.arange(N)[:, None]) if tgt is not None else np.zeros((N, M), dtype=bool)
+            coming = hunt & (locked | appr)
+            nh = pv & hunt & (pd <= wf["alert_r"])               # 경계 거리 안에서 알아챈 사냥 중인 늑대
+            nr = (pv & ~hunt & (pd <= wf["alert_r"])) if wf["rest_alert"] else np.zeros((N, M), dtype=bool)
+            near_h = hunt & (pd <= wf["safe_r"])                  # 안전 거리 안의 사냥 중인 늑대(실거리 — 쫓는 늑대는 돌아보며 안다)
+            panic_now = (nh & ((pd <= wf["flight_r"]) | coming)).any(1)
+            noticed_h = nh.any(1)
+            nxt = np.where(in_cov, np.where(noticed_h & wf["crouch"], WF_SHELTER, WF_NONE),
+                           np.where(((prev == WF_PANIC) & near_h.any(1)) | panic_now, WF_PANIC,
+                                    np.where(noticed_h | nr.any(1), WF_ALERT, WF_NONE))).astype(np.int8)
+            nxt[~live] = WF_NONE
+            # 방향: 도주 = 안전 거리 안 사냥 중인 늑대들, 경계 = 알아챈 늑대들의 반대(거리 역수 가중 합). 0 이면 가장 가까운 그 늑대 반대
+            sel = np.where((nxt == WF_PANIC)[:, None], near_h, nh | nr)
+            wt = sel / np.maximum(pd, 0.5)
+            s = np.stack([-(ex * pinv * wt).sum(1), -(ey * pinv * wt).sum(1)], 1)
+            dirs = normalize(s)
+            zero = ((nxt == WF_ALERT) | (nxt == WF_PANIC)) & ~((dirs * dirs).sum(1) > EPS * EPS)
+            if zero.any():
+                j = np.where(sel[zero], pd[zero], np.inf).argmin(1)
+                iz = np.flatnonzero(zero)
+                dirs[zero] = -np.stack([ex[iz, j], ey[iz, j]], 1) * pinv[iz, j][:, None]
+            pan = nxt == WF_PANIC
+            if pan.any() and len(self.cov_r):
+                # 늑대 반대쪽(±acos(shelter_cos)) 은신처가 가장자리 shelter_r 안에 있으면 가장 가까운 그 은신처 중심 쪽으로
+                ip = np.flatnonzero(pan)
+                vx = self.cov_c[:, 0][None, :] - self.pos[ip, 0:1]
+                vy = self.cov_c[:, 1][None, :] - self.pos[ip, 1:2]
+                dc = np.sqrt(vx * vx + vy * vy)
+                cs = (vx * dirs[ip, 0:1] + vy * dirs[ip, 1:2]) / np.maximum(dc, EPS)
+                em = np.where((dc > EPS) & (dc - self.cov_r[None, :] <= wf["shelter_r"]) & (cs >= wf["shelter_cos"]),
+                              dc - self.cov_r[None, :], np.inf)
+                k = em.argmin(1)
+                ar = np.arange(len(ip))
+                has = np.isfinite(em[ar, k])
+                if has.any():
+                    ih, kh = ip[has], k[has]
+                    dirs[ih] = np.stack([vx[ar[has], kh], vy[ar[has], kh]], 1) / dc[ar[has], kh][:, None]
+            # 무대 벽 여유 안이면 벽 쪽 성분을 지운다(다 지워지면 그대로) — C++ KeepDirection
+            mg, size, p = wf["wall_margin"], self.size, self.pos
+            sl = dirs.copy()
+            sl[:, 0] = np.where(((p[:, 0] <= mg) & (sl[:, 0] < 0.0)) | ((p[:, 0] >= size - mg) & (sl[:, 0] > 0.0)), 0.0, sl[:, 0])
+            sl[:, 1] = np.where(((p[:, 1] <= mg) & (sl[:, 1] < 0.0)) | ((p[:, 1] >= size - mg) & (sl[:, 1] > 0.0)), 0.0, sl[:, 1])
+            sl = normalize(sl)
+            dirs = np.where(((sl * sl).sum(1) > EPS * EPS)[:, None], sl, dirs)
+            dirs[(nxt != WF_ALERT) & (nxt != WF_PANIC)] = 0.0
+        over_prev = (prev == WF_PANIC) | (prev == WF_SHELTER)
+        rel = over_prev & (nxt != WF_PANIC) & (nxt != WF_SHELTER) & live
+        if rel.any():
+            rs.lock_left = np.where(rel & (rs.lock_left >= 0), 0, rs.lock_left)
+            rs.ev_wait = np.where(rel, -1, rs.ev_wait)
+        self._wf_panic_starts += int(np.count_nonzero((nxt == WF_PANIC) & (prev != WF_PANIC)))
+        ends = (prev == WF_PANIC) & (nxt != WF_PANIC) & live
+        self._wf_panic_ends += int(np.count_nonzero(ends))
+        self._wf_panic_end_shelter += int(np.count_nonzero(ends & in_cov))
+        self.wf_mode, self.wf_dir = nxt, dirs
+
+    def wild_stats(self) -> dict:
+        """야생 1단계 통계 (켠 규칙만, 동역학과 무관). 비축: 산 개체 평균·최솟값, 꺼내 쓴·채운 에너지, 약한 개체-스텝 비율·약한 채 잡힌 수.
+        포만: 배부름·먹기 늑대-스텝 비율, 잡은 수, 배부름 스텝. 도주 반사: 실행한 덮기별 산 개체-스텝 비율, 도주 시작·끝·은신처에서 끝."""
+        out: dict = {}
+        if self._wr is not None:
+            live = np.ones(self.N, dtype=bool) if self.alive is None else self.alive
+            r = self.reserve[live]
+            out.update(reserve_mean=float(r.mean()) if len(r) else float("nan"), reserve_min=float(r.min()) if len(r) else float("nan"),
+                       reserve_cap=float(self._wr_cap), reserve_used=self._wr_used, reserve_refill=self._wr_refill,
+                       weak_frac=self._wr_weak_n / max(self._wr_live_n, 1), weak_caught_n=self._wr_weak_caught)
+        if self._ws is not None:
+            n = max(self._ws_steps_n, 1)
+            out.update(sated_frac=self._ws_sated_n / n, eating_frac=self._ws_eat_n / n, wolf_kills_n=self._ws_kills_n,
+                       sat_steps=self._ws_sat_steps)
+        if self._wf is not None:
+            tot = max(int(self._wf_mode_n.sum()), 1)
+            out.update({f"mode_{k}_frac": int(c) / tot for k, c in zip(WF_MODE_NAMES, self._wf_mode_n)})
+            out.update(panic_starts=self._wf_panic_starts, panic_ends=self._wf_panic_ends, panic_end_shelter=self._wf_panic_end_shelter)
+        if not out:
+            raise ValueError("wild_stats 는 야생 1단계 규칙(wild_*)을 하나라도 켠 세계에만 있다")
+        return out
 
     # ------------------------------------------------------------------ #
     # 통계 (§7.2)

@@ -29,6 +29,11 @@ EcoPolicyV3IntegratedProcessors.cpp TallyEnergy)와 같다:
   energy_pct = 100 × 스텝 끝 산 사슴의 에너지(0~1 로 자름) 평균(없으면 0), hungry = 그중 에너지 < 0.15(언리얼 kStarvingEnergy)
   dark       = 스텝 끝 어둠 d, wolves_asleep = 자는 늑대 수(기록 전용)
 출력: results/v3/mirror/runs/<이름>.json(세계마다 메타 + 줄)과 .csv(줄만). 같은 인자면 같은 결과다(벽시계 열 wall_s 만 다르다).
+
+야생 1단계(10-15, results/v3/wild1/README.md): --config 로 다른 거울 설정(configs/v3_wild1_mirror.yaml)을, --disable 로 그 설정의 기능 블록 몇 개를 끈
+판(규칙 하나씩 빼 보기)을 돌린다. --diag 를 주면 세계마다 meta['diag'] 에 진단을 더 적는다(동역학과 무관 — 기하에 사슴 × 늑대 보임 행렬을 남기는
+World.keep_pair_vis 만 켠다): 행동별 산 사슴-스텝, 늑대 거리 구간(<5·5~10·10~15·15~30 m)별 깨어 있는 늑대 쌍과 그중 알아챈 쌍, 잡힘마다 그 스텝 행동·
+마지막 5초(38스텝) 안에 도망쳤나·알아챘나, 굶음마다 마지막 5초 안에 도망쳤나, 늑대 수·하루 길이, 켠 규칙의 World.wild_stats().
 """
 
 from __future__ import annotations
@@ -136,13 +141,21 @@ def eat_steps_of_seconds(sec: float) -> int:
     return int(np.floor(sec / STEP_SECONDS + 0.5))
 
 
-def mirror_cfg(deer: int, eat_steps: int, config: Path = CONFIG):
-    """거울 설정에 사슴 수 N(= 슬롯 수 = 피식 EMA 분모)과 늑대 먹는 시간(pred_eat_cd)을 덮는다."""
+def mirror_cfg(deer: int, eat_steps: int, config: Path = CONFIG, disable=()):
+    """거울 설정에 사슴 수 N(= 슬롯 수 = 피식 EMA 분모)과 늑대 먹는 시간(pred_eat_cd)을 덮는다. disable = 끌 기능 블록 이름들(설정에 켜져 있어야 한다)."""
     from env_v2.config import load_v2_config
 
     if deer < 1 or eat_steps < 1:
         raise ValueError(f"사슴 수와 먹는 시간은 1 이상이어야 한다: {deer}, {eat_steps}")
-    return load_v2_config(config).replace(N=int(deer), pred_eat_cd=int(eat_steps))
+    cfg = load_v2_config(config).replace(N=int(deer), pred_eat_cd=int(eat_steps))
+    if disable:
+        f = {k: dict(v) for k, v in cfg.v2["features"].items()}
+        for name in disable:
+            if not f.get(name, {}).get("enabled"):
+                raise ValueError(f"끌 기능 {name} 이 설정 {config} 에 켜져 있지 않다")
+            f[name]["enabled"] = False
+        cfg = cfg.replace(v2=dict(cfg.v2, features=f))
+    return cfg
 
 
 def config_digest(cfg) -> str:
@@ -156,6 +169,64 @@ def _row(w, alive_before: int, food0: float) -> dict:
                 food_pct=float(100.0 * w.food.sum() / food0) if food0 > 0 else 0.0,
                 energy_pct=float(100.0 * e.mean()) if len(e) else 0.0, hungry=int(np.count_nonzero(e < STARVING)),
                 dark=float(w.dark), wolves_asleep=int(np.count_nonzero(w.pred_asleep)))
+
+
+DIAG_BANDS_M = (0.0, 5.0, 10.0, 15.0, 30.0)      # 진단: 늑대 거리 구간(m, 1 단위 = 2 m)
+FLED_STEPS = 38                                   # 진단: '마지막 5초' = 반올림(5 ÷ 8/60)
+
+
+class _Diag:
+    """--diag 진단 모으개(모듈 docstring '야생 1단계'). 스텝 뒤 상태만 읽는다(동역학과 무관)."""
+
+    def __init__(self, w):
+        nb = len(DIAG_BANDS_M) - 1
+        self.n_beh = np.zeros(5, dtype=np.int64)
+        self.pairs = np.zeros(nb, dtype=np.int64)
+        self.seen = np.zeros(nb, dtype=np.int64)
+        self.last_flee = np.full(w.N, -(10 ** 9), dtype=np.int64)
+        self.last_seen = np.full(w.N, -(10 ** 9), dtype=np.int64)
+        self.catch_beh = np.zeros(5, dtype=np.int64)
+        self.catch_fled = self.catch_saw = self.catches = 0
+        self.starve_fled = self.starves = 0
+        self.edges = np.asarray(DIAG_BANDS_M) / 2.0
+
+    def after(self, w, live_before):
+        from env_v2 import repertoire as rep
+
+        beh = w._rs.behavior
+        self.n_beh += np.bincount(beh[live_before], minlength=5)
+        self.last_flee[live_before & (beh == rep.FLEE)] = w.t
+        g, live = w._g, w.alive
+        if w.M:
+            awake = ~w.pred_asleep
+            d = np.sqrt(((w.pos[:, None, :] - w.pred_pos[None, :, :]) ** 2).sum(-1))
+            pv = g["wf_pvis"]
+            self.last_seen[live_before & (pv & awake[None, :]).any(1)] = w.t
+            m = live[:, None] & awake[None, :]
+            for b in range(len(self.edges) - 1):
+                sel = m & (d >= self.edges[b]) & (d < self.edges[b + 1])
+                self.pairs[b] += int(sel.sum())
+                self.seen[b] += int((sel & pv).sum())
+        for i in np.flatnonzero(live_before & ~live):
+            fled = w.t - self.last_flee[i] <= FLED_STEPS
+            if w.death_cause[i] == 1:
+                self.catches += 1
+                self.catch_beh[beh[i]] += 1
+                self.catch_fled += int(fled)
+                self.catch_saw += int(w.t - self.last_seen[i] <= FLED_STEPS)
+            else:
+                self.starves += 1
+                self.starve_fled += int(fled)
+
+    def result(self, w) -> dict:
+        out = dict(beh_steps=self.n_beh.tolist(), band_pairs=self.pairs.tolist(), band_seen=self.seen.tolist(),
+                   catches=self.catches, catch_beh=self.catch_beh.tolist(), catch_fled=self.catch_fled, catch_saw=self.catch_saw,
+                   starves=self.starves, starve_fled=self.starve_fled, wolves=int(w.M_base), period=int(w.dn_period), steps=int(w.t))
+        try:
+            out["wild"] = w.wild_stats()
+        except ValueError:
+            pass
+        return out
 
 
 def run_world(job: dict) -> dict:
@@ -173,6 +244,12 @@ def run_world(job: dict) -> dict:
     um = job.get("unreal_map")
     if um is not None:
         apply_unreal_map(w, int(um["seed"]), um["region"])          # 짝 비교: 언리얼 지역 무대와 같은 먹이 지도
+    dg = None
+    if job.get("diag"):
+        w.keep_pair_vis = True                  # 진단 전용: 기하에 보임 행렬을 남긴다(관측·동역학은 그대로)
+        w._g = w._geometry()
+        w._obs = w._obs_from(w._g)
+        dg = _Diag(w)
     pol = ro.build_policy({"kind": "rep_learned", "path": str(job["model"])}, seed)
     ro.forward_bind(pol, w)
     food0 = float(w.food.sum())
@@ -186,10 +263,15 @@ def run_world(job: dict) -> dict:
         meta["unreal_map"] = dict(um)
     rows = []
     for _ in range(int(job["steps"])):
-        alive_before = int(w.alive.sum())
+        live_before = w.alive
+        alive_before = int(live_before.sum())
         w.step(np.asarray(pol(w.observe()), dtype=np.float64))
+        if dg is not None:
+            dg.after(w, live_before)
         if w.t % int(job["log_every"]) == 0:
             rows.append(_row(w, alive_before, food0))
+    if dg is not None:
+        meta["diag"] = dg.result(w)
     meta["death_t"] = w.death_t.tolist()
     meta["death_cause"] = w.death_cause.tolist()
     meta["wall_s"] = round(time.perf_counter() - t0, 3)
@@ -197,15 +279,19 @@ def run_world(job: dict) -> dict:
 
 
 def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | None = None, model: Path = MODEL,
-        config: Path = CONFIG, log_every: int = LOG_EVERY, unreal_maps=None, replicates: int = 1) -> dict:
+        config: Path = CONFIG, log_every: int = LOG_EVERY, unreal_maps=None, replicates: int = 1, disable=(),
+        diag: bool = False) -> dict:
     """시드마다 세계 하나를 (워커 풀로) 돌린다. 반환 {meta, worlds}(worlds 는 시드 순서 = 받은 순서).
     unreal_maps(언리얼 세션 시드 목록)를 주면 짝 비교: 지도 (세션 시드, 지역 Barren·Forest·Highland) 마다 replicates 개 세계를 seeds 의 앞에서부터
     차례로 쓴다(지도 i 의 j 번째 = seeds[i·replicates + j], 시드 수 = 세션 수 × 3 × replicates)."""
     from env_v2 import rollout as ro
 
-    cfg = mirror_cfg(deer, eat_steps, config)
+    cfg = mirror_cfg(deer, eat_steps, config, disable)
     seeds = [int(s) for s in seeds]
     jobs = [dict(cfg=cfg.to_dict(), seed=s, steps=int(steps), model=str(model), log_every=int(log_every)) for s in seeds]
+    if diag:
+        for j in jobs:
+            j["diag"] = True
     maps = None
     if unreal_maps is not None:
         maps = [(int(u), r) for u in unreal_maps for r in sorted(UNREAL_REGION_STREAM)]
@@ -226,6 +312,8 @@ def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | 
                 config_digest=config_digest(cfg), model=Path(model).name, deer=int(deer), eat_steps=int(eat_steps),
                 eat_seconds=round(eat_steps * STEP_SECONDS, 3), steps=int(steps), log_every=int(log_every), seeds=seeds,
                 session_size=3, wall_s=round(time.perf_counter() - t0, 2))
+    if disable:
+        meta["disable"] = list(disable)
     if maps is not None:
         meta.update(unreal_maps=[int(u) for u in unreal_maps], replicates=int(replicates))
     return dict(meta=meta, worlds=worlds)
@@ -255,10 +343,16 @@ def main(argv=None) -> None:
     ap.add_argument("--out-dir", type=Path, default=OUT)
     ap.add_argument("--unreal-maps", default=None, help="짝 비교: 언리얼 세션 시드(예: 20000-20002)의 지역 먹이 지도를 쓴다")
     ap.add_argument("--replicates", type=int, default=1, help="짝 비교: 지도마다 파이썬 세계 수")
+    ap.add_argument("--config", type=Path, default=CONFIG, help="거울 설정 (기본 configs/v3_unreal_mirror.yaml)")
+    ap.add_argument("--disable", default="", help="설정에서 끌 기능 블록(쉼표, 예: wild_flight)")
+    ap.add_argument("--diag", action="store_true", help="세계마다 진단(meta['diag'])을 더 적는다")
     a = ap.parse_args(argv)
     seeds = parse_seeds(a.seeds)
     um = parse_unreal_maps(a.unreal_maps) if a.unreal_maps else None
-    res = run(a.deer, a.wolf_eat_steps, seeds, steps=a.steps, workers=a.workers, unreal_maps=um, replicates=a.replicates)
+    disable = tuple(x.strip() for x in a.disable.split(",") if x.strip())
+    config = a.config if a.config.is_absolute() else (ROOT / a.config)
+    res = run(a.deer, a.wolf_eat_steps, seeds, steps=a.steps, workers=a.workers, unreal_maps=um, replicates=a.replicates,
+              config=config, disable=disable, diag=a.diag)
     name = a.name or (f"d{a.deer}_e{a.wolf_eat_steps}_s{seeds[0]}-{seeds[-1]}" if um is None else
                       f"pair_d{a.deer}_e{a.wolf_eat_steps}_u{um[0]}-{um[-1]}_k{a.replicates}_s{seeds[0]}-{seeds[-1]}")
     jp, cp = write(res, name, a.out_dir)
