@@ -121,6 +121,21 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("wild_satiation. 0 = 먹기가 끝나면 곧바로 사냥(지금까지). Play 전에 바꾼다. 명령줄 -EcoV3WildSatiation= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarRealismVision(
+		TEXT("eco.IntegratedV3.RealismVision"),
+		1,
+		TEXT("통합 v3 모드의 사슴 위협 시야 (1 = 300°, 기본 — 사람 결정 10-15 (7) 야생 1단계, R3 realism_vision). 사슴은 옆·뒤의 늑대도 본다(바로 뒤 60° 만 사각). ")
+		TEXT("반경·밤·고개 숙임 배수는 그대로. 0 = 앞쪽 120°(R1b 학습 세계). Play 전에 바꾼다. 명령줄 -EcoV3RealismVision= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarRealismHearing(
+		TEXT("eco.IntegratedV3.RealismHearing"),
+		1,
+		TEXT("통합 v3 모드의 늑대 발소리 (1 = 켬, 기본 — 야생 1단계, R3 realism_hearing). 쫓아 달리는 늑대는 멀리(속력에 따라 최대 40 m), 어슬렁거리는·쉬는 ")
+		TEXT("늑대는 4 m 안에서만, 서 있는 늑대는 들리지 않는다. 들리면 방향과 무관하게 알아챈다. 0 = 소리 없음(R1b 학습 세계). Play 전에 바꾼다. ")
+		TEXT("명령줄 -EcoV3RealismHearing= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarDebug(
 		TEXT("eco.V3Debug"),
 		0,
@@ -396,6 +411,8 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.SafeDistM = static_cast<double>(CVarSafeDistM.GetValueOnGameThread());
 	S.bWildReserve = CVarWildReserve.GetValueOnGameThread() != 0;
 	S.bWildSatiation = CVarWildSatiation.GetValueOnGameThread() != 0;
+	S.bRealismVision = CVarRealismVision.GetValueOnGameThread() != 0;
+	S.bRealismHearing = CVarRealismHearing.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -460,6 +477,16 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3WildSatiation="), SatArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.WildSatiation"), LexToString(SatArg));
+	}
+	int32 VisionArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3RealismVision="), VisionArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.RealismVision"), LexToString(VisionArg));
+	}
+	int32 HearingArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3RealismHearing="), HearingArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.RealismHearing"), LexToString(HearingArg));
 	}
 }
 
@@ -592,6 +619,10 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Ws.SatDays, EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900),
 								   EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900) * EcoRepertoireV3::kStepSeconds, Ws.RestSpeed)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildSatiation 0 — 먹기가 끝나면 곧바로 사냥)"))));
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 감지: 위협 시야 %s | 늑대 발소리 %s"),
+		   Settings.bRealismVision ? TEXT("300° (eco.IntegratedV3.RealismVision 1 — 바로 뒤 60° 만 사각)") : TEXT("120° (eco.IntegratedV3.RealismVision 0 — R1b 그대로)"),
+		   Settings.bRealismHearing ? TEXT("켬 (eco.IntegratedV3.RealismHearing 1 — 쫓아 달리면 최대 40 m, 어슬렁거리면 4 m, 서 있으면 없음)")
+									: TEXT("끔 (eco.IntegratedV3.RealismHearing 0)"));
 }
 
 void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
@@ -842,6 +873,9 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.WildReserve.bEnabled = S.bWildReserve;
 	// 늑대 포만 (eco.IntegratedV3.WildSatiation, 야생 w2): 값 = configs/v3_wild1_mirror.yaml (FWildSatiationConfig 기본값, 하루 900 스텝 → 450 스텝)
 	C.WildSatiation.bEnabled = S.bWildSatiation;
+	// 감지 (eco.IntegratedV3.RealismVision·RealismHearing, R3 값 그대로 — FRealismVisionConfig·FHearingConfig 기본값)
+	C.RealismVision.bEnabled = S.bRealismVision;
+	C.RealismHearing.bEnabled = S.bRealismHearing;
 	return C;
 }
 

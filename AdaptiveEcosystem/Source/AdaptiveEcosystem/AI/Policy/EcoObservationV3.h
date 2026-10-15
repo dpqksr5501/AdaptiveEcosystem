@@ -66,6 +66,9 @@ namespace EcoObservationV3
 		double StepsNorm = 60.0;
 		double PredationEmaDecay = 0.95;
 		double PredationEmaGain = 10.0;
+		// R3 감지 (파이썬 realism_vision·realism_hearing, 사람 결정 10-15 (7) 야생 1단계가 켠다). 기본 = R1b 학습 세계 그대로
+		double ThreatFovCos = 0.5000000000000001;   // 위협 시야 문턱 cos (realism_vision threat_cos. 기본 = FovCos 와 같은 120°)
+		bool bHearCapToSight = false;               // 들리는 반경을 이 사슴의 지금 탐지 반경으로 자르나 (cap_to_sight)
 	};
 
 	inline constexpr FObservationConfig kR1bObsConfig{};
@@ -137,7 +140,43 @@ namespace EcoObservationV3
 		double VelX = 0.0;
 		double VelY = 0.0;
 		bool bAsleep = false;
+		double HearR = 0.0;   // 발소리 반경 (realism_hearing, HearingRadius). 0 = 들리지 않음 (끈 세계는 늘 0)
 	};
+
+	/** R3 발소리 계수 (파이썬 realism_hearing, configs/v3_r3.yaml·v3_wild1_mirror.yaml 값). 기본 끔. */
+	struct FHearingConfig
+	{
+		bool bEnabled = false;
+		double SSilent = 0.05;      // 이 속력(× 사슴 걸음 HerbSpeed) 밑이면 소리 없음
+		double SQuiet = 0.3;        // 이 속력 이하 반경 RQuiet
+		double SLoud = 1.0;         // 이 속력 이상 반경 RLoud (사이는 선형)
+		double RQuiet = 2.0;        // 4 m
+		double RLoud = 20.0;        // 40 m
+		bool bRoamQuiet = true;     // 전력 걸음이 아닌 위협(배회·잠행·쉼)은 속력을 SQuiet 에서 자른다
+		bool bCapToSight = false;   // 들리는 반경을 탐지 반경으로 자르나
+	};
+
+	/**
+	 * 위협의 소리 반경 (world.py hearing_radius). S = 지난 스텝 변위 크기 ÷ HerbSpeed, bRunning = 그 스텝이 전력 걸음
+	 * (표적을 쫓는 추격형·잠행형 돌진·플레이어 돌진 — EcoThreatV3::FThreatStepResult::bRunning).
+	 */
+	inline double HearingRadius(const FHearingConfig& H, double S, bool bRunning)
+	{
+		const double S2 = (H.bRoamQuiet && !bRunning) ? (S < H.SQuiet ? S : H.SQuiet) : S;
+		const double T0 = (S2 - H.SQuiet) / (H.SLoud - H.SQuiet);
+		const double T = T0 < 0.0 ? 0.0 : (T0 > 1.0 ? 1.0 : T0);
+		return S2 < H.SSilent ? 0.0 : H.RQuiet + (H.RLoud - H.RQuiet) * T;
+	}
+
+	/** 시야각(도) → 문턱 cos (world.py _fov_cos): 기본 시야각이면 기본 cos 그대로, 360° 이상이면 각도 판정 없음(−∞ 대신 −2). */
+	inline double FovCosOf(double Deg, double BaseDeg, double BaseCos)
+	{
+		if (Deg == BaseDeg)
+		{
+			return BaseCos;
+		}
+		return Deg >= 360.0 ? -2.0 : std::cos(Deg * (3.141592653589793 / 180.0) * 0.5);
+	}
 
 	struct FThreatPerception
 	{
@@ -183,7 +222,11 @@ namespace EcoObservationV3
 			const double Ey = T.Y - Pos.Y;
 			const double Pd = std::sqrt(Ex * Ex + Ey * Ey);
 			const double Inv = 1.0 / (Pd > EcoRepertoireV3::kEps ? Pd : EcoRepertoireV3::kEps);
-			const bool bVis = Pd <= SeeP && (Ex * Head.X + Ey * Head.Y) * Inv >= Cfg.FovCos && !T.bAsleep;
+			// 보임: 시야(반경 SeeP, 위협 시야각 ThreatFovCos) 또는 발소리(실거리 ≤ HearR, 방향 무관 — realism_hearing). 자는 위협은 빠진다
+			const bool bSight = Pd <= SeeP && (Ex * Head.X + Ey * Head.Y) * Inv >= Cfg.ThreatFovCos;
+			const double HearLim = Cfg.bHearCapToSight ? (T.HearR < SeeP ? T.HearR : SeeP) : T.HearR;
+			const bool bHeard = T.HearR > 0.0 && Pd <= HearLim;
+			const bool bVis = (bSight || bHeard) && !T.bAsleep;
 			if (!bVis)
 			{
 				continue;

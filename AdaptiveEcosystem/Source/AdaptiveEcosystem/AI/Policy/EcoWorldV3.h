@@ -212,6 +212,15 @@ namespace EcoWorldV3
 		return static_cast<std::int32_t>(std::floor(Days * static_cast<double>(Period) + 0.5));
 	}
 
+	// ---- R3 감지 (파이썬 realism_vision (a), 야생 1단계가 값 그대로 켠다 — 명세 3-3). 기본 끔 = R1b 학습 세계 그대로 ----
+	// 사슴이 위협을 보는 시야각만 넓힌다(반경·밤·행동 배수 그대로). 동족 시야각(kin_fov_deg)은 거울 세계도 120° 그대로라 옮기지 않았다
+	struct FRealismVisionConfig
+	{
+		bool bEnabled = false;
+		double ThreatFovDeg = 300.0;        // 앞쪽 ±150°, 바로 뒤 60° 사각
+	};
+	inline constexpr double kBaseFovDeg = 120.0;   // 파이썬 cfg.fov_deg (FObservationConfig::FovCos 의 각)
+
 	// ---- 세계 설정 (파이썬 단위). 기본값 = 평면 시험 맵용 R1b 학습 범위 안의 한 세계 ----
 
 	struct FWorldConfig
@@ -267,6 +276,9 @@ namespace EcoWorldV3
 		FWildReserveConfig WildReserve;
 		// 야생 1단계 (w2) 늑대 포만 (통합 모드 eco.IntegratedV3.WildSatiation). 기본 끔. 낮 고정 세계에서는 InitWorld 가 끈다
 		FWildSatiationConfig WildSatiation;
+		// R3 감지 (통합 모드 eco.IntegratedV3.RealismVision·RealismHearing). 기본 끔. 발소리 계수는 EcoObservationV3::FHearingConfig
+		FRealismVisionConfig RealismVision;
+		EcoObservationV3::FHearingConfig RealismHearing;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -701,6 +713,10 @@ namespace EcoWorldV3
 		W.ThreatCfg.bWildSatiation = W.Config.WildSatiation.bEnabled;
 		W.ThreatCfg.SatSteps = W.Config.WildSatiation.bEnabled ? WildDaysToSteps(C.WildSatiation.SatDays, W.Config.DayPeriod) : 0;
 		W.ThreatCfg.RestSpeed = C.WildSatiation.RestSpeed;
+		// R3 감지: 위협 시야 문턱 cos·발소리 반경 자르기 (끄면 R1b 그대로 — FovCos 와 같은 값)
+		W.ObsCfg.ThreatFovCos = C.RealismVision.bEnabled ? EcoObservationV3::FovCosOf(C.RealismVision.ThreatFovDeg, kBaseFovDeg, W.ObsCfg.FovCos)
+														 : W.ObsCfg.FovCos;
+		W.ObsCfg.bHearCapToSight = C.RealismHearing.bEnabled && C.RealismHearing.bCapToSight;
 		for (std::int32_t b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
 		{
 			W.Allowed[b] = (EcoPolicyV3::kAllowedMask[b] != 0 && C.WorldAllowed[b] != 0) ? 1 : 0;
@@ -873,6 +889,12 @@ namespace EcoWorldV3
 				In.VelX = A.State.VelX;
 				In.VelY = A.State.VelY;
 				In.bAsleep = ThreatAsleepNow(W, A);   // 굴에서 자면 안 보인다 (끄면 새 t 의 어둠으로 다시 판정, 켜면 늑대별 상태)
+				// R3 발소리 (켰을 때만): 지난 스텝 변위 크기 ÷ 사슴 걸음과 그 스텝의 걸음새 (world.py hearing_radius·pred_running)
+				In.HearR = W.Config.RealismHearing.bEnabled
+							   ? EcoObservationV3::HearingRadius(W.Config.RealismHearing,
+																 std::sqrt(A.State.VelX * A.State.VelX + A.State.VelY * A.State.VelY) / W.ObsCfg.HerbSpeed,
+																 A.Last.bRunning)
+							   : 0.0;
 			}
 		}
 

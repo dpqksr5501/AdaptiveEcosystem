@@ -22,6 +22,10 @@
               깨어 있음·밤잠 활동도 가득·속력 배수 1 로 두고, 막 잡은 늑대처럼 쿨다운 = pred_eat_cd(38)·배부름 = sat 스텝(450)에서
               `World._step_predators_v3` 만 500 번 부른다(사슴은 시야 밖이라 표적·포획이 없다). 스텝마다 늑대별 (쿨다운, 남은 배부름,
               배부름 훅, 지난 변위 크기). 변위 크기는 벽에 닿은 스텝만 속력보다 작다.
+  지각 장면  R3 감지 (realism_vision 300°·realism_hearing 발소리, 거울 세계 값 그대로). 장면 12개 — 난수(시드 32092, 이 내보내기 전용)로
+              늑대 둘의 자리·지난 변위(속력 0~0.75 단위/스텝)·전력 걸음 여부, 사슴 16의 자리(늑대 0 둘레 ±30)·heading·행동 시야 배수
+              {1, 0.6, 0.3} 를 정하고 낮(d = 0)·깨어 있음에서 `World._geometry` 를 부른다. 늑대마다 소리 반경(`hearing_radius`), 사슴 × 늑대
+              알아챔(wf_pvis — 관측과 같은 보임), 사슴마다 보이는 늑대 수·가장 가까운 거리(없으면 −1).
 """
 
 from __future__ import annotations
@@ -33,7 +37,7 @@ from pathlib import Path
 import numpy as np
 
 from env_v2.config import load_v2_config
-from env_v2.world import World
+from env_v2.world import World, hearing_radius
 
 HERE = Path(__file__).resolve().parent
 WILD = HERE / "configs" / "v3_wild1_mirror.yaml"
@@ -157,6 +161,36 @@ def satiation_chain(steps: int = 500) -> tuple[World, list[list[tuple[int, int, 
     return w, rows
 
 
+def perception_scenes(k_scenes: int = 12):
+    w = World(load_v2_config(WILD).replace(N=N), seeds=[SEED + 2])
+    w.reset()
+    if w._zv is None or w._zh is None:
+        raise SystemExit("v3_wild1_mirror.yaml 의 realism_vision·realism_hearing 이 꺼졌다")
+    rng = np.random.default_rng(SEED + 2)
+    w.keep_pair_vis = True
+    scenes = []
+    for _ in range(k_scenes):
+        w.pred_pos[:] = rng.uniform(20.0, 40.0, (w.M, 2))
+        w.pos[:] = w.pred_pos[0] + rng.uniform(-30.0, 30.0, (w.N, 2))
+        a = rng.uniform(0.0, 2.0 * np.pi, w.N)
+        w.head[:] = np.stack([np.cos(a), np.sin(a)], 1)
+        sp = rng.uniform(0.0, 0.75, w.M)
+        b = rng.uniform(0.0, 2.0 * np.pi, w.M)
+        w.pred_vel[:] = np.stack([sp * np.cos(b), sp * np.sin(b)], 1)
+        w.pred_running[:] = rng.random(w.M) < 0.5
+        w.pred_asleep[:] = False
+        w._rep_see[:] = rng.choice([1.0, 0.6, 0.3], w.N)
+        w.dark = 0.0
+        w._see_pred = w.cfg.see_r
+        g = w._geometry()
+        hr = hearing_radius(w._zh, np.sqrt((w.pred_vel * w.pred_vel).sum(1)) / w.cfg.herb_speed, w.pred_running)
+        dmin = np.where(np.isfinite(g["d_pred_min"]), g["d_pred_min"], -1.0)
+        scenes.append(dict(pos=w.pos.copy(), head=w.head.copy(), see=w._rep_see.copy(), ppos=w.pred_pos.copy(),
+                           pvel=w.pred_vel.copy(), run=w.pred_running.copy(), hr=hr, pvis=g["wf_pvis"].copy(),
+                           count=g["pred_count"].copy(), dmin=dmin))
+    return w, scenes
+
+
 def build_header() -> str:
     w = make_world()
     wr = w._wr
@@ -165,6 +199,8 @@ def build_header() -> str:
     mixed = mixed_chain(w)
     ws_w, sat = satiation_chain()
     types = [int(t) for t in ws_w.pred_type]
+    pw, scenes = perception_scenes()
+    zv, zh = pw._zv, pw._zh
     L = [
         "// 자동 생성 — herbivore_rl/export_golden_v3_wild.py (손으로 고치지 않는다). 세계 configs/v3_wild1_mirror.yaml, 시드 32090.",
         "// v3 야생 1단계 골든 (명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md 5절). 검사는 Tests/EcoWildV3Test.cpp (AdaptiveEcosystem.Policy.V3.Wild.*).",
@@ -217,6 +253,32 @@ def build_header() -> str:
         f"	inline constexpr std::int32_t kSatChainSteps = {len(sat)};",
         c_array("std::int32_t", "kSatChainInt", [v for r in sat for c in r for v in (c[0], c[1], int(c[2]))], 12, str),
         c_array("double", "kSatChainVel", [c[3] for r in sat for c in r], 6, d_lit),
+        "",
+        "	// R3 감지 realism_vision·realism_hearing (거울 세계 값). 위협 시야 문턱 cos = cos(radians(threat_fov_deg) × 0.5)",
+        f"	inline constexpr double kThreatFovDeg = {d_lit(zv['threat_fov_deg'])};",
+        f"	inline constexpr double kThreatFovCos = {d_lit(zv['threat_cos'])};",
+        f"	inline constexpr double kKinFovDeg = {d_lit(zv['kin_fov_deg'])};",
+        f"	inline constexpr double kHearSSilent = {d_lit(zh['s_silent'])};",
+        f"	inline constexpr double kHearSQuiet = {d_lit(zh['s_quiet'])};",
+        f"	inline constexpr double kHearSLoud = {d_lit(zh['s_loud'])};",
+        f"	inline constexpr double kHearRQuiet = {d_lit(zh['r_quiet'])};",
+        f"	inline constexpr double kHearRLoud = {d_lit(zh['r_loud'])};",
+        f"	inline constexpr bool kHearRoamQuiet = {'true' if zh['roam_quiet'] else 'false'};",
+        f"	inline constexpr bool kHearCapToSight = {'true' if zh['cap_to_sight'] else 'false'};",
+        f"	inline constexpr double kSeeR = {d_lit(pw.cfg.see_r)};",
+        "	// 지각 장면: 장면마다 사슴 kPercN 의 (x, y, hx, hy, 시야 배수), 늑대 kPercM 의 (x, y, vx, vy, 전력 걸음 0/1, 소리 반경),",
+        "	// 사슴 × 늑대 알아챔 0/1 (사슴 행 순서), 사슴마다 (보이는 수, 가장 가까운 거리 — 없으면 −1)",
+        f"	inline constexpr std::int32_t kPercScenes = {len(scenes)};",
+        f"	inline constexpr std::int32_t kPercN = {pw.N};",
+        f"	inline constexpr std::int32_t kPercM = {pw.M};",
+        c_array("double", "kPercDeer", [v for sc in scenes for i in range(pw.N) for v in
+                                        (sc['pos'][i, 0], sc['pos'][i, 1], sc['head'][i, 0], sc['head'][i, 1], sc['see'][i])], 5, d_lit),
+        c_array("double", "kPercWolf", [v for sc in scenes for m in range(pw.M) for v in
+                                        (sc['ppos'][m, 0], sc['ppos'][m, 1], sc['pvel'][m, 0], sc['pvel'][m, 1],
+                                         float(sc['run'][m]), sc['hr'][m])], 6, d_lit),
+        c_array("std::int32_t", "kPercVis", [int(v) for sc in scenes for v in sc['pvis'].reshape(-1)], 16, str),
+        c_array("std::int32_t", "kPercCount", [int(v) for sc in scenes for v in sc['count']], 16, str),
+        c_array("double", "kPercDMin", [v for sc in scenes for v in sc['dmin']], 6, d_lit),
         "}",
         "",
     ]

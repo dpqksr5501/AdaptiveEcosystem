@@ -283,6 +283,8 @@ namespace EcoThreatV3
 		bool bChargeStart = false;           // 플레이어 돌진 시작
 		bool bNewPlayerMode = false;         // 이번 스텝에 PlayerModeU0/U1 을 써서 새 모드를 골랐다
 		bool bSated = false;                 // 야생 (w2): 이번 스텝 배불러 쉬었다 (world.py 훅 pred_sated)
+		bool bRunning = false;               // 이번 이동이 전력 걸음 (world.py 훅 pred_running — 표적을 쫓는 추격형, 잠행형 돌진, 플레이어 돌진).
+											 // 상태는 이동 때 값(포획 뒤 갱신 10a 전). 발소리 반경(EcoObservationV3::HearingRadius)이 읽는다
 	};
 
 	// ------------------------------------------------------------------------------------------------------------
@@ -839,6 +841,10 @@ namespace EcoThreatV3
 		T.VelY = NY - QY;
 		T.PosX = NX;
 		T.PosY = NY;
+
+		// 8b. 전력 걸음 훅 (realism_hearing 의 pred_running, 포획 뒤 상태 갱신 전 값)
+		R.bRunning = (Spec.Type == EThreatType::Chaser && bHasTarget) || (bStalker && T.StalkState == EStalkState::Pounce)
+					 || (bPlayer && T.PlayerMode == EPlayerMode::Charge);
 
 		// 9. 포획 (world.py:2115-2125, 2138-2141). 거리는 위협 이동 전 위치로 잰 1 의 값이다
 		std::int32_t K = -1;

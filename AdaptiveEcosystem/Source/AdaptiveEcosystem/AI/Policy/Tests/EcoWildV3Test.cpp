@@ -12,6 +12,7 @@
 //   Wild.ReserveGolden   (w1) 계수 = 파이썬 블록, 용량 C, 비축 한 번 끝 사례, 굶음 열(죽는 스텝·표본), 섞음 열(스텝마다 E·R)
 //   Wild.ReserveWorld    (w1) 기준 루프: 끄면(기본) 먹이 없는 세계에서 300 스텝 안에 굶음이 생기고, 켜면 아무도 굶지 않고 비축으로 살며 모두 약함(이동 ≤ 뛰기 × 0.75),
 //                        굶어 죽는 사슴은 배·비축 모두 0. 낮 고정 세계는 켜도 꺼진다. 사슴 글자 (eco.V3Debug)
+//   Wild.PerceptionGolden R3 감지: 시야 300° cos·발소리 계수, 장면 12개의 소리 반경·사슴 × 늑대 알아챔·보이는 수·가장 가까운 거리
 //   Wild.SatiationGolden (w2) 계수·하루 → 스텝, 포만 열(막 잡은 늑대 둘: 쿨다운·남은 배부름·쉼 정확히, 속력 = 파이썬 변위), 잡으면 배부름, 늑대 글자
 
 #include "Misc/AutomationTest.h"
@@ -377,6 +378,101 @@ bool FEcoWildV3SatiationGoldenTest::RunTest(const FString& Parameters)
 		FColor Color;
 		TestEqual(TEXT("글자: 배부름·쉼 42초"), EcoV3Integrated::WolfLabel(A, Cfg, 0.0, Color), FString(TEXT("늑대 배부름·쉼 42초 (추격형)")));
 	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoWildV3PerceptionGoldenTest,
+	"AdaptiveEcosystem.Policy.V3.Wild.PerceptionGolden",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoWildV3PerceptionGoldenTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoObservationV3;
+	namespace GW = EcoWorldV3::GoldenWild;
+	// 계수 = 거울 세계, 끈 세계는 R1b 그대로
+	const EcoWorldV3::FRealismVisionConfig Vc;
+	const FHearingConfig Hc;
+	TestFalse(TEXT("시야·발소리 기본은 끔"), Vc.bEnabled || Hc.bEnabled);
+	TestEqual(TEXT("threat_fov_deg"), Vc.ThreatFovDeg, GW::kThreatFovDeg);
+	TestEqual(TEXT("kin_fov_deg 는 기본 120° 그대로 (옮기지 않은 칸)"), EcoWorldV3::kBaseFovDeg, GW::kKinFovDeg);
+	TestEqual(TEXT("s_silent"), Hc.SSilent, GW::kHearSSilent);
+	TestEqual(TEXT("s_quiet"), Hc.SQuiet, GW::kHearSQuiet);
+	TestEqual(TEXT("s_loud"), Hc.SLoud, GW::kHearSLoud);
+	TestEqual(TEXT("r_quiet"), Hc.RQuiet, GW::kHearRQuiet);
+	TestEqual(TEXT("r_loud"), Hc.RLoud, GW::kHearRLoud);
+	TestEqual(TEXT("roam_quiet"), Hc.bRoamQuiet, GW::kHearRoamQuiet);
+	TestEqual(TEXT("cap_to_sight"), Hc.bCapToSight, GW::kHearCapToSight);
+	TestEqual(TEXT("see_r"), kR1bObsConfig.SeeR, GW::kSeeR);
+	const double Cos300 = FovCosOf(Vc.ThreatFovDeg, EcoWorldV3::kBaseFovDeg, kR1bObsConfig.FovCos);
+	TestEqual(TEXT("위협 시야 cos(150°) 비트 단위"), Cos300, GW::kThreatFovCos);
+	TestEqual(TEXT("기본 시야각이면 기본 cos 그대로"), FovCosOf(120.0, 120.0, kR1bObsConfig.FovCos), kR1bObsConfig.FovCos);
+	{
+		EcoWorldV3::FWorldConfig C;
+		EcoWorldV3::FWorldState W;
+		EcoWorldV3::InitWorld(W, C);
+		TestEqual(TEXT("끈 세계: 위협 시야 = 기본 120°"), W.ObsCfg.ThreatFovCos, kR1bObsConfig.FovCos);
+		C.RealismVision.bEnabled = true;
+		EcoWorldV3::InitWorld(W, C);
+		TestEqual(TEXT("켠 세계: 위협 시야 300°"), W.ObsCfg.ThreatFovCos, GW::kThreatFovCos);
+	}
+
+	FObservationConfig Oc = kR1bObsConfig;
+	Oc.ThreatFovCos = Cos300;
+	Oc.bHearCapToSight = Hc.bCapToSight;
+	FHearingConfig H = Hc;
+	H.bEnabled = true;
+	int32 HearBad = 0;
+	int32 PairBad = 0;
+	int32 RowBad = 0;
+	int32 Pairs = 0;
+	int32 Seen = 0;
+	int32 HeardOnly = 0;
+	for (int32 k = 0; k < GW::kPercScenes; ++k)
+	{
+		FThreatInput Th[GW::kPercM];
+		for (int32 m = 0; m < GW::kPercM; ++m)
+		{
+			const double* Wv = &GW::kPercWolf[(k * GW::kPercM + m) * 6];
+			Th[m].X = Wv[0];
+			Th[m].Y = Wv[1];
+			Th[m].VelX = Wv[2];
+			Th[m].VelY = Wv[3];
+			Th[m].HearR = HearingRadius(H, std::sqrt(Wv[2] * Wv[2] + Wv[3] * Wv[3]) / Oc.HerbSpeed, Wv[4] != 0.0);
+			HearBad += FMath::Abs(Th[m].HearR - Wv[5]) > 1.0e-12 ? 1 : 0;
+		}
+		for (int32 i = 0; i < GW::kPercN; ++i)
+		{
+			const double* Dv = &GW::kPercDeer[(k * GW::kPercN + i) * 5];
+			const EcoRepertoireV3::FVec2 Pos{Dv[0], Dv[1]};
+			const EcoRepertoireV3::FVec2 Head{Dv[2], Dv[3]};
+			const double SeePred = SeePredRadius(0.0, Oc);
+			const FThreatPerception All = PerceiveThreats(Pos, Head, SeePred, Dv[4], Dv[4], Th, GW::kPercM, Oc);
+			const int32 Row = k * GW::kPercN + i;
+			const double DMin = GW::kPercDMin[Row];
+			if (All.PredCount != GW::kPercCount[Row] || (DMin >= 0.0 ? FMath::Abs(All.DPredMin - DMin) > 1.0e-12 : All.Nearest >= 0))
+			{
+				++RowBad;
+			}
+			for (int32 m = 0; m < GW::kPercM; ++m)
+			{
+				const FThreatPerception One = PerceiveThreats(Pos, Head, SeePred, Dv[4], Dv[4], &Th[m], 1, Oc);
+				const int32 Want = GW::kPercVis[Row * GW::kPercM + m];
+				PairBad += (One.PredCount == 1 ? 1 : 0) != Want ? 1 : 0;
+				++Pairs;
+				Seen += Want;
+				// 들어서만 안 쌍 (시야각·반경 밖인데 보임) — 발소리 판정이 실제로 쓰였는지 센다
+				FThreatInput Mute = Th[m];
+				Mute.HearR = 0.0;
+				HeardOnly += (Want == 1 && PerceiveThreats(Pos, Head, SeePred, Dv[4], Dv[4], &Mute, 1, Oc).PredCount == 0) ? 1 : 0;
+			}
+		}
+	}
+	TestEqual(TEXT("소리 반경 = 파이썬 hearing_radius"), HearBad, 0);
+	TestEqual(TEXT("사슴 × 늑대 알아챔 = 파이썬 wf_pvis"), PairBad, 0);
+	TestEqual(TEXT("사슴마다 보이는 수·가장 가까운 거리 = 파이썬"), RowBad, 0);
+	TestTrue(TEXT("장면에 보이는 쌍과 들어서만 안 쌍이 있다"), Seen > 0 && HeardOnly > 0);
+	AddInfo(FString::Printf(TEXT("지각 장면 %d: 쌍 %d, 알아챔 %d, 그중 들어서만 %d"), GW::kPercScenes, Pairs, Seen, HeardOnly));
 	return true;
 }
 
