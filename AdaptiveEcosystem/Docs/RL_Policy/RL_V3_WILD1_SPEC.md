@@ -1,7 +1,7 @@
 # v3 야생 규칙 1단계 명세 — 굶어도 버티는 사슴, 배부르면 쉬는 늑대, 일찍 알아채고 일찍 피하는 사슴
 
 - 작성: sinhyeok04 (강화학습·정책), 2026-10-15 (목).
-- 상태: **파이썬 구현과 첫 측정까지 했다(두뇌는 지금 게임 두뇌 R1b-F 그대로, 재학습 없음). 언리얼 C++ 에는 아직 넣지 않았다.**
+- 상태: **파이썬 구현과 첫 측정까지 했다(두뇌는 지금 게임 두뇌 R1b-F 그대로, 재학습 없음). 10-16 언리얼 C++ 에 옮겼다(5절) — 통합 v3 모드 기본 켬, 규칙마다 콘솔 변수로 끈다.**
 - 근거: 사용자 결정 10-15 (아래 1절에 옮겼다). 진단 값은 같은 날 파이썬 거울 세계(사슴 128, 세계 10개)에서 쟀다.
 - 경로 표기: `H/` = `herbivore_rl/`, `D/` = `AdaptiveEcosystem/Docs/`, `S/` = `AdaptiveEcosystem/Source/AdaptiveEcosystem/`.
 - 코드: 정의와 식 `H/env_v2/world.py` 모듈 docstring '야생 1단계', 계수 검사 `_wild_*_params`, 설정 `H/configs/v3_wild1_mirror.yaml`, 시험 `H/tests/test_wild1.py`, 측정 `H/results/v3/wild1/`.
@@ -125,19 +125,22 @@
 
 ---
 
-## 5. 언리얼로 옮기기 (나중, 규칙을 정한 뒤 한 번에)
+## 5. 언리얼로 옮기기 (10-16 옮김)
 
-- C++ 위치: `S/AI/Policy/EcoWorldV3.h`. 파이썬 docstring 의 'C++ 꼴' 줄을 그대로 옮긴다.
-  - 비축: `FWorldConfig::WildReserve`(bEnabled, ReserveDays, Init, RefillE, RefillFrac, WeakE, WeakSpeed). 사슴 몸 상태에 `Reserve` 칸. Step 의 대사·섭식(C3) 뒤, 굶음 판정(C6) 앞. 약함은 이동 적용 속도에 곱한다.
-  - 포만: `FThreatConfig`(`S/AI/Policy/EcoThreatModel.h`)에 SatSteps·RestSpeed, 위협 상태에 `SatLeft`. 쿨다운 줄이기 바로 뒤에서 사냥 가능을 끈다.
-  - 도주 반사: 작업 트리의 `FKeepAwayConfig`·`UpdateKeepAway`·`CommitKeepAway`·`KeepControl` 을 이 명세 3-4절로 고친다. 알아챔은 관측의 보임 판정을 쓰고, '사냥 중'은 위협 상태(쿨다운·SatLeft·잠)로 정한다. 경계는 Commit 을 덮지 않고 제어(GRAZE 걷기·방향·섭식 걷기·시야 1)만 바꾼다. `KeepGait` 은 지운다.
-  - 하루 단위 계수는 `DayPeriod` 로 스텝을 낸다(반올림, 0.5 올림).
-- 골든 시험(`S/AI/Policy/Tests/`): C++ 와 파이썬은 난수열이 달라 궤적 대조는 하지 않는다. 대신 난수 없는 장면으로 대조한다.
-  - 비축 식: 같은 E·R·먹은 양 열(파이썬 `_wild_reserve_step` 출력)을 내보내 같은 값을 낸다. 굶음까지 2950스텝.
-  - 포만 시간: 포획 뒤 37스텝 먹기, 450스텝 배부름, 그다음 사냥.
-  - 도주 반사: `H/tests/test_wild1.py` 의 장면(늑대 거리·상태·은신처 자리)을 골든 JSON 으로 내보내 덮기와 방향이 같은지 본다. `H/export_golden_v3_world.py` 에 장면 내보내기를 더한다.
-  - 끔 시험: 세 규칙을 끄면 지금 골든이 그대로 통과해야 한다.
-- 통합 모드 콘솔 변수 제안: `eco.IntegratedV3.WildReserve`, `eco.IntegratedV3.WolfSatiation`, `eco.IntegratedV3.FlightReflex`(기본 0). KeepAway 콘솔 변수는 도주 반사로 바꾼다.
+- 상태: **옮겼다.** 파이썬 docstring 의 'C++ 꼴'과 함수 한 줄씩을 엔진 무관 헤더에 옮기고, 난수 없는 장면 골든으로 대조했다. 모두 기본 끔(평면 맵·기준 루프·기존 골든 그대로)이고 통합 v3 모드만 켠다. 커밋: 비축 c6f1c7f, 포만 c464229, 감지 496bbec, 도주 반사 857da45.
+- C++ 위치 (`S/AI/Policy/`, 줄은 857da45 기준):
+  - 비축: `EcoWorldV3.h:147` `FWildReserveConfig`·`:175` `WildReserveStep`(= `_wild_reserve_step` 한 행), `FWorldConfig::WildReserve`, 몸 `FHerbBody::Reserve`·`bWeak`. 약함 = B 제어 뒤 속도 × WeakSpeed(`:1417`), 꺼내기·채우기 = C4 `EnergyAfterIntake` 뒤·C5 번식 앞(`:1552`), 굶음 = C6 `E ≤ 0 ∧ R ≤ 0`(`:1579`). 용량 = ReserveDays × DayPeriod × EnergyDrain = 5.4. 낮 고정 세계는 끈다.
+  - 포만: `EcoThreatModel.h:200` `FThreatConfig::bWildSatiation`·SatSteps·RestSpeed, 상태 `SatLeft`, 결과 `bSated`. Step 쿨다운 뒤 배부름 판정(`:658`), 6d 속력 × RestSpeed(`:808`, 밤잠 배수 앞), 보통 위협이 잡으면 SatLeft = SatSteps. 하루 단위는 `EcoWorldV3.h:201` `FWildSatiationConfig`·`WildDaysToSteps`(0.5 올림)로 450 스텝.
+  - 감지: `EcoObservationV3.h:147` `FHearingConfig`·`:163` `HearingRadius`, `FObservationConfig::ThreatFovCos`, `PerceiveThreats` 보임 = (시야 ∨ 발소리) ∧ 깨어 있음(`:228`). 전력 걸음 훅 `EcoThreatModel.h:846` `FThreatStepResult::bRunning`. 세계 칸 `EcoWorldV3.h:216` `FRealismVisionConfig`, `FWorldConfig::RealismHearing`. 동족 시야각(kin_fov_deg)은 거울 세계도 120° 라 옮기지 않았다.
+  - 도주 반사: KeepAway 실험(`FKeepAwayConfig`·`UpdateKeepAway`·`CommitKeepAway`·`KeepControl`·`KeepGait`·`RetargetHide`)을 지우고 `EcoWorldV3.h:117` `FWildFlightConfig`, `:1109` `UpdateWildFlight`(= `_wf_update`), `:1266` `CommitFlight`(= `_wf_commit`, 도주·웅크림만 덮는다), `FlightControlInput`, `:1301` `FlightAlertControl`(= `_wf_alert_control`)로 바꿨다. 덮기 번호 `kKeep*` 는 파이썬 `WF_*` 와 같다. 알아챔은 E 의 관측 보임(`W.ThreatIn`, 시야·발소리·잠)을 위협마다 다시 판정한다.
+  - 통합 모드: `EcoPolicyV3IntegratedSubsystem.cpp` 콘솔 변수 `eco.IntegratedV3.WildReserve`·`WildSatiation`·`RealismVision`·`RealismHearing`·`WildFlight`(모두 기본 1, 명령줄 `-EcoV3<이름>=`). `eco.IntegratedV3.KeepAway` 는 지웠고 명령줄 옛 이름 `-EcoV3KeepAway=` 는 `WildFlight` 로 받는다. 거리 콘솔 변수 `AlertDistM`·`PanicDistM`·`SafeDistM`(30·15·40 m) = alert_r·flight_r·safe_r. 글자·기록은 계획서 `RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b '야생 1단계'.
+- 골든 (`H/export_golden_v3_wild.py` → `S/AI/Policy/WildGoldenVectorsV3.h`, 세계 `v3_wild1_mirror.yaml`, 탐색 시드 32090~32093):
+  - `kReserveCases` 14 사례·`kStarve*` 굶음 열(걷기 대사만, E 0.5·R 가득 → 2951 스텝에 굶음, 명세의 '약 2950')·`kMixedER` 섞음 열 600 스텝 — `Wild.ReserveGolden` 모두 비트 단위 같음. `Wild.ReserveWorld`: 먹이 없는 기준 루프에서 끄면 300 스텝 안에 굶고, 켜면 0, 굶는 사슴은 배·비축 모두 0, 약한 사슴은 뛰기 × 0.75 보다 빠르지 않다.
+  - `kSatChain*` 포만 열(파이썬 `_step_predators_v3` 500 스텝, 늑대 둘: 37 스텝 먹기 → 450 스텝 배부름 → 사냥) — `Wild.SatiationGolden` 쿨다운·남은 배부름·쉼 모두 같음, 속력 997/1000 같음(나머지 3은 파이썬 늑대가 벽에 닿은 스텝).
+  - `kPerc*` 지각 장면 12개(쌍 384, 알아챔 75, 그중 들어서만 15) — `Wild.PerceptionGolden` 소리 반경·알아챔·보이는 수·가장 가까운 거리 모두 같음, cos 150° 비트 단위 같음.
+  - `kFlight*` 도주 장면 28개(`H/tests/test_wild1.py` 반사 장면 12 + 난수 16, 사슴 448) — `Wild.FlightGolden` 다음 덮기·방향(오차 0)·풀림 잠금 모두 같음. `Wild.FlightRun`: 끈 세계는 계수와 무관하게 600 스텝 비트 단위로 같고 덮기 0.
+  - 끔 시험: 기본 끔이라 기존 골든 시험(레퍼토리·위협·밤잠·관측·Mass 파리티)이 그대로 통과한다.
+- 남은 차이(알고 둔 것): 난수열(궤적 대조 없음). 평면 맵의 부활 개체는 그 스텝 덮기 판정을 건너뛴다(파이썬은 새 자리에서 판정 — 통합 모드는 부활이 없다). 팀 레벨 PIE·헤드리스 측정은 아직 하지 않았다.
 
 ---
 
