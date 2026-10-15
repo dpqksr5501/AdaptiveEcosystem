@@ -15,6 +15,8 @@
 //    얼기·식사 (사람 결정 10-15, 기록 전용) 스텝마다 요청을 읽은 결정의 마스크에 얼기 칸이 열렸는지 센다(FreezeMaskOpen — 얼기를 막으면
 //            늘 0). 늑대마다 돌진 시작·식사 중 이동·포획을 센다(FEcoV3RegionContext::TallyWolfStep — 이어 사냥, 늑대별 포획). 식사 중
 //            제자리 자체는 위협 모델(FThreatConfig::bEatInPlace)이 한다 — 처리기는 위치를 따로 고치지 않는다.
+//    경계 거리 (사람 결정 10-15 (C)) 규칙 자체는 세계 스텝(EcoWorldV3::Step 의 FKeepAwayConfig)이 한다. 처리기는 기록만: 스텝마다 식사 중
+//            깨어 있는 늑대의 15 m 안 산 사슴 수(규칙 켬·끔 모두 — 견주기용), 프레임 끝 덮기 수(KeepNow), 사슴 글자의 덮기 이름.
 // 2. UEcoPolicyV3IntegratedVisualProcessor (스텝 뒤) 매 프레임 Transform·FMassVelocityFragment 를 쓴다: 지난 스텝 → 이번 스텝 위치와
 //    지면 높이를 시계 진행으로 보간하고, 속도 = 이번 스텝 변위 ÷ 스텝 시간 (팀 표현 블렌드스페이스가 서기·걷기·뛰기를 고른다).
 //    죽은 개체는 죽은 자리에 멈추고 속도 0. eco.V3Debug 1 이면 개체 위에 행동·상태 글자를 그린다. 사슴 글자 = 행동 + 에너지 %,

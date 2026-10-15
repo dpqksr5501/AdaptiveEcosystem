@@ -22,6 +22,12 @@
 //                                      Mass 1000 스텝 — 16 m 안에 사슴이 있거나 사냥 중이면 잠들지 않고, 해 진 뒤 바로 자지 않고, 새벽에 깬다
 //   Integrated.NoFreeze                사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1 → 설정 → 세계 허용 칸): 켜면 Mass 2000 스텝 동안 FREEZE 실행 0·
 //                                      얼기 칸이 열린 결정 0, R1b 가 얼 자리에서만 다른 행동이고 나머지 결정은 R1b 와 같다. 끄면 R1b 그대로(얼기 씀)
+//   Integrated.KeepAway.*              사슴 경계 거리 (eco.IntegratedV3.KeepAway 기본 1, 사람 결정 10-15 (C)): EatingWolfWalkAway — 식사 중 늑대 20 m
+//                                      → 걸어서(360 cm/s) 30 m 밖까지 멀어지고 풀리면 두뇌가 곧바로 고른다. PanicUntilSafe — 10 m → 뛰어서 40 m 밖까지,
+//                                      쫓는 늑대는 25 m 에서도 도망, Mass 글자·집계·'식사 중 늑대 15 m 안' 기록. ShelterStop — 도망하다 은신처 원에서
+//                                      웅크려 멈춘다. HideAwayFromWolf — 숨기는 늑대 쪽 ±60° 밖 은신처 (다 늑대 쪽이면 가장 가까운 것).
+//                                      SleepingWolfIgnored — 자는 늑대 곁은 규칙을 끈 세계와 비트 단위로 같다. OffIdentical — 콘솔 변수·설정·세계 칸,
+//                                      끄면 거리 칸을 읽지 않고 덮기·기록 0 (600 스텝 비트 단위)
 //   Integrated.WolfEating              늑대 식사 시간 (eco.IntegratedV3.WolfEatSeconds 기본 5 → 38 스텝): 위협 모델 — 식사 37 스텝 제자리, 38 번째에
 //                                      다시 잡음, 끄면 배회, 플레이어·쿨다운 0 은 그대로. Mass — 서 있음·속도 0·'먹는 중' 깃발·글자, 팀 늑대 표현이
 //                                      '먹는 중' 동작 (옛 규칙 0.67 초는 뛰기), 옛 규칙 설정은 바꾸기 전 세계와 비트 단위로 같다
@@ -369,7 +375,11 @@ namespace EcoPolicyV3IntegratedTestImpl
 
 		void Init(int64 Seed, int32 N)
 		{
-			Mw.Init(MiniConfig(Seed, N), N, 2);
+			// 이 세계는 이동 제약 콜백만 본다. 경계 거리 규칙(기본 켬)은 끈다: 켜면 막힌 사슴이 막힌 잠행 늑대의 30 m 안에 120 스텝 내내
+			// 남아 '경계' 덮기가 이어지므로 두뇌가 요청을 읽지 않아 (e) '막혀도 판단은 계속된다'가 두뇌를 보지 못한다. 규칙은 Integrated.KeepAway.* 가 본다
+			FWorldConfig HookCfg = MiniConfig(Seed, N);
+			HookCfg.KeepAway = EcoWorldV3::FKeepAwayConfig();
+			Mw.Init(HookCfg, N, 2);
 			Mw.W.T = 200;
 			EcoWorldV3::UpdateDayNight(Mw.W);
 			const FWorldConfig& C = Mw.W.Config;
@@ -2285,6 +2295,9 @@ bool FEcoPolicyV3IntegratedNoFreezeTest::RunTest(const FString& Parameters)
 	{
 		FEcoV3IntegratedSettings S = TestSettings(37000);
 		S.bNoFreeze = bNoFreeze;
+		// 이 시험은 두뇌의 결정 마스크를 R1b 와 견준다. 경계 거리 규칙(기본 켬)은 끈다: 켜면 늑대가 30 m 안인 결정(R1b 가 얼 자리가 나오는
+		// 곳)에서 두뇌를 부르지 않으므로 '얼 자리를 지난다'·'열면 얼기를 쓴다'가 우연에 달린다. 규칙은 Integrated.KeepAway.* 가 본다
+		S.bKeepAway = false;
 		FIntegratedHarness H;
 		if (!H.Setup(*this, S))
 		{
@@ -2665,6 +2678,641 @@ bool FEcoPolicyV3IntegratedWolfEatingTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("옛 규칙: 5 스텝 뒤 다시 사냥"), Old.bHuntAgain && Old.StillBad == 0);
 	TestEqual(TEXT("옛 규칙: 식사 동안 배회하므로 팀 표현 '먹는 중' 동작은 0 (깃발만 서고 뛴다)"), Old.MotionEating, 0);
 	TestTrue(TEXT("옛 규칙: 기록 — 식사 중 늑대·스텝 4, 모두 움직임"), Old.Tally.EatSteps == 4 && Old.Tally.EatMoved == 4);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 사슴 경계 거리 (사람 결정 10-15 (C), eco.IntegratedV3.KeepAway 기본 1)
+// -----------------------------------------------------------------------------
+
+namespace EcoPolicyV3IntegratedTestImpl
+{
+	/** 경계 거리 시험 세계 설정 (통합 설정 → 세계). 은신처는 주어진 원. */
+	FWorldConfig KeepConfig(bool bKeep, const std::vector<EcoObservationV3::FCoverInput>& Covers, int32 NumDeer = 1, int32 NumWolves = 1)
+	{
+		FEcoV3IntegratedSettings S = TestSettings(42000);
+		S.bKeepAway = bKeep;
+		return UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, 0, NumDeer, NumWolves, Covers);
+	}
+
+	/** 늑대 하나 (무대 단위). Cooldown > 0 이면 식사 중 — 통합 세계는 식사 동안 제자리라 서서 먹는다. */
+	struct FKeepWolf
+	{
+		double X = 30.0;
+		double Y = 30.0;
+		int32 Ordinal = 0;      // 짝수 잠행형, 홀수 추격형
+		int32 Cooldown = 0;
+	};
+
+	/** 사슴 하나 (무대 단위·방향). */
+	struct FKeepDeer
+	{
+		double X = 30.0;
+		double Y = 35.0;
+		double HeadX = 0.0;
+		double HeadY = 1.0;
+	};
+
+	/** 엔진 무관 경계 거리 세계: 정한 자리에 입양하고 첫 관측·요청, 스텝마다 죽은 개체를 뺀다 (통합 처리기처럼). */
+	struct FKeepWorld
+	{
+		FMiniWorld Mw;
+		std::vector<FHerbView> Alive;
+		std::vector<FThreatAgent*> Threats;
+
+		void Init(const FWorldConfig& C, int64 T, const std::vector<FKeepWolf>& Wolves, const std::vector<FKeepDeer>& DeerList)
+		{
+			const int32 N = static_cast<int32>(DeerList.size());
+			const int32 M = static_cast<int32>(Wolves.size());
+			Mw.Init(C, N, M);
+			Mw.W.T = T;
+			EcoWorldV3::UpdateDayNight(Mw.W);
+			Threats.clear();
+			for (int32 m = 0; m < M; ++m)
+			{
+				const FKeepWolf& Wf = Wolves[static_cast<size_t>(m)];
+				EcoWorldV3::AdoptThreat(Mw.W, Mw.Threats[static_cast<size_t>(m)], EcoV3Integrated::WolfSpecForOrdinal(Wf.Ordinal, C.PredSpeedMult),
+										Wf.X, Wf.Y, 1.0, 0.0, 100 + m);
+				Mw.Threats[static_cast<size_t>(m)].State.Cooldown = Wf.Cooldown;
+				Threats.push_back(&Mw.Threats[static_cast<size_t>(m)]);
+			}
+			std::vector<std::int32_t> Rows;
+			for (int32 i = 0; i < N; ++i)
+			{
+				const FKeepDeer& Dr = DeerList[static_cast<size_t>(i)];
+				EcoWorldV3::AdoptHerb(Mw.W, Mw.AllViews[static_cast<size_t>(i)], {Dr.X, Dr.Y}, {Dr.HeadX, Dr.HeadY},
+									  EcoRepertoireV3::MakeAgentKeyFromStableId(500 + i));
+				Rows.push_back(i);
+			}
+			EcoWorldV3::ObserveAndDecideRows(Mw.W, Mw.AllViews.data(), N, Threats.data(), M, Rows.data(), N);
+			Alive = Mw.AllViews;
+		}
+
+		EcoWorldV3::FStepReport StepOnce()
+		{
+			const EcoWorldV3::FStepReport R = EcoWorldV3::Step(Mw.W, Alive.data(), static_cast<std::int32_t>(Alive.size()), Threats.data(),
+															   static_cast<std::int32_t>(Threats.size()));
+			std::vector<FHerbView> Next;
+			for (const FHerbView& V : Alive)
+			{
+				if (V.Body->DeathCause == EcoWorldV3::kDeathNone)
+				{
+					Next.push_back(V);
+				}
+			}
+			Alive = Next;
+			return R;
+		}
+
+		/** 사슴 i 와 늑대 m 의 실거리 (단위). */
+		double Dist(int32 i, int32 m) const
+		{
+			const EcoWorldV3::FVec2 P = Mw.Bodies[static_cast<size_t>(i)].Pos;
+			const EcoThreatV3::FThreatState& S = Mw.Threats[static_cast<size_t>(m)].State;
+			return FMath::Sqrt(FMath::Square(P.X - S.PosX) + FMath::Square(P.Y - S.PosY));
+		}
+
+		double Speed(int32 i) const
+		{
+			const EcoWorldV3::FHerbBody& B = Mw.Bodies[static_cast<size_t>(i)];
+			return FMath::Sqrt(FMath::Square(B.Pos.X - B.PrevPos.X) + FMath::Square(B.Pos.Y - B.PrevPos.Y));
+		}
+	};
+
+	/** 한 경계 거리 시험 실행의 사슴 0 기록 (스텝마다). DistBefore = 이번 스텝 결정에 쓴 기하(지난 스텝 끝)의 거리. */
+	struct FKeepTrace
+	{
+		TArray<int32> Mode;
+		TArray<int32> Behavior;
+		TArray<int32> Gait;
+		TArray<double> Speed;
+		TArray<double> DistBefore;
+		TArray<double> DistAfter;
+		TArray<bool> Reads;
+		TArray<bool> Startled;
+
+		void Record(const FKeepWorld& K, double Before)
+		{
+			const EcoWorldV3::FHerbDecision& D = K.Mw.Decisions[0];
+			Mode.Add(D.KeepActive);
+			Behavior.Add(D.ExecutedBehavior);
+			Gait.Add(K.Mw.Controls[0].Gait);
+			Speed.Add(K.Speed(0));
+			DistBefore.Add(Before);
+			DistAfter.Add(K.Dist(0, 0));
+			Reads.Add(D.bCommittedReads);
+			// GRAZE → FLEE 놀람 정지: FLEE 진입 뒤 StartleSteps(3) 스텝 안의 정지 (스텝 끝 Tick 뒤라 StepsIn = 진입 뒤 지난 스텝 수)
+			Startled.Add(K.Mw.Controls[0].Gait == EcoRepertoireV3::kGaitStop && D.ExecutedBehavior == EcoRepertoireV3::kFlee
+						 && K.Mw.Reps[0].StepsIn <= EcoRepertoireV3::kR1bConfig.StartleSteps);
+		}
+	};
+
+	/**
+	 * Steps 스텝을 돌며 사슴 0 을 기록한다. bStopAfterRelease 면 덮기가 처음 풀린 스텝(두뇌로 돌아온 스텝)까지만 — 그 뒤 두뇌가 고르는 길
+	 * (먹이 쪽으로 걸어 다시 늑대 곁에 가는지)은 이 시험이 보는 것이 아니다.
+	 */
+	FKeepTrace RunKeep(FKeepWorld& K, int32 Steps, bool bStopAfterRelease)
+	{
+		FKeepTrace T;
+		for (int32 s = 0; s < Steps; ++s)
+		{
+			const double Before = K.Dist(0, 0);
+			K.StepOnce();
+			T.Record(K, Before);
+			const int32 L = T.Mode.Num() - 1;
+			if (bStopAfterRelease && L > 0 && T.Mode[L] == EcoWorldV3::kKeepNone && T.Mode[L - 1] != EcoWorldV3::kKeepNone)
+			{
+				break;
+			}
+		}
+		return T;
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedKeepAwayEatingWolfTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.KeepAway.EatingWolfWalkAway",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedKeepAwayEatingWolfTest::RunTest(const FString& Parameters)
+{
+	namespace R3 = EcoRepertoireV3;
+	using namespace EcoWorldV3;
+	// 식사 중(제자리) 잠행 늑대 (30, 30), 사슴은 북쪽 20 m (30, 40) 에서 북쪽을 본다 (늑대는 등 뒤 — 두뇌 시야 밖). 낮 t = 200
+	FKeepWorld K;
+	K.Init(KeepConfig(true, QuadCovers(60.0, 6.0)), 200, {{30.0, 30.0, 0, 100000}}, {{30.0, 40.0, 0.0, 1.0}});
+	const FKeepTrace T = RunKeep(K, 60, true);
+	int32 Alert = 0, Panic = 0, Shelter = 0, RunInAlert = 0, AlertNotFlee = 0, WalkBad = 0, Closer = 0, Walked = 0;
+	int32 FirstFree = -1;
+	for (int32 s = 0; s < T.Mode.Num(); ++s)
+	{
+		Alert += T.Mode[s] == kKeepAlert ? 1 : 0;
+		Panic += T.Mode[s] == kKeepPanic ? 1 : 0;
+		Shelter += T.Mode[s] == kKeepShelter ? 1 : 0;
+		if (T.Mode[s] == kKeepAlert)
+		{
+			AlertNotFlee += T.Behavior[s] == R3::kFlee ? 0 : 1;
+			RunInAlert += T.Gait[s] == R3::kGaitRun ? 1 : 0;
+			if (T.Gait[s] == R3::kGaitWalk)
+			{
+				++Walked;
+				WalkBad += FMath::Abs(T.Speed[s] - 0.24) <= 1e-9 ? 0 : 1;   // 보행표 걷기 = 0.6 × 0.4 단위/스텝 = 360 cm/s
+			}
+			else
+			{
+				WalkBad += T.Startled[s] ? 0 : 1;                           // 걷지 않는 경계 스텝은 놀람 정지(0.4 초)뿐
+			}
+			Closer += T.DistAfter[s] + 1e-12 < T.DistBefore[s] ? 1 : 0;
+		}
+		if (FirstFree < 0 && s > 0 && T.Mode[s] == kKeepNone && T.Mode[s - 1] == kKeepAlert)
+		{
+			FirstFree = s;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("경계 %d 스텝 (걷기 %d), 도망 %d, 풀린 스텝 %d (그때 거리 %.2f m), 끝 거리 %.1f m"), Alert, Walked, Panic, FirstFree,
+							FirstFree >= 0 ? T.DistBefore[FirstFree] * 2.0 : -1.0, T.DistAfter.Last() * 2.0));
+	TestEqual(TEXT("첫 스텝은 두뇌 (입양 때 덮기 없음)"), T.Mode[0], kKeepNone);
+	TestEqual(TEXT("둘째 스텝부터 경계(멀어짐) — 식사 중이라 공격하지 않는 늑대가 20 m 안"), T.Mode[1], kKeepAlert);
+	TestTrue(TEXT("경계가 이어진다 (걸어서 30 m 밖까지 약 3 초)"), Alert >= 20 && Walked >= 15);
+	TestEqual(TEXT("도망·웅크림은 없다 (15 m 밖, 다가오지 않음, 은신처 밖)"), Panic + Shelter, 0);
+	TestEqual(TEXT("경계는 FLEE 행동 칸 (먹기를 멈춘다)"), AlertNotFlee, 0);
+	TestEqual(TEXT("경계는 뛰지 않는다"), RunInAlert, 0);
+	TestEqual(TEXT("경계 걸음 = 360 cm/s, 걷지 않는 스텝은 GRAZE → FLEE 놀람 정지뿐"), WalkBad, 0);
+	TestEqual(TEXT("경계 중 늑대에게 가까워진 스텝"), Closer, 0);
+	TestTrue(TEXT("늑대가 30 m 밖이 되면 풀린다 (풀린 스텝의 결정 기하 > 15 단위)"), FirstFree > 0 && T.DistBefore[FirstFree] > 15.0);
+	TestTrue(TEXT("풀린 스텝에 두뇌가 곧바로 요청을 읽는다 (잠금 0 으로 깨끗하게 연다)"), FirstFree > 0 && T.Reads[FirstFree]);
+	TestTrue(TEXT("기록: 경계 시작 1, 도망 0, 마스크 위반 0"),
+			 K.Mw.W.Stats.KeepAlertStarts == 1 && K.Mw.W.Stats.KeepPanicStarts == 0 && K.Mw.W.Stats.MaskViolations == 0);
+	{
+		FColor Color;
+		EcoRepertoireV3::FRepState Rep;
+		Rep.Behavior = R3::kFlee;
+		EcoWorldV3::FHerbBody Body;
+		Body.Energy = 0.64;
+		TestEqual(TEXT("글자 '경계(멀어짐)'"), EcoV3Integrated::DeerLabel(Rep, Body, false, Color, kKeepAlert), FString(TEXT("경계(멀어짐) 64%")));
+		TestEqual(TEXT("덮기 없으면 지금 글자 그대로"), EcoV3Integrated::DeerLabel(Rep, Body, false, Color), FString(TEXT("도망 64%")));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedKeepAwayPanicTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.KeepAway.PanicUntilSafe",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedKeepAwayPanicTest::RunTest(const FString& Parameters)
+{
+	namespace R3 = EcoRepertoireV3;
+	using namespace EcoWorldV3;
+	// --- 엔진 무관: 식사 중 늑대 (30, 30), 사슴 10 m 북쪽 (30, 35). 은신처는 무대 1/4·3/4 (길에 없다) ---
+	FKeepWorld K;
+	K.Init(KeepConfig(true, QuadCovers(60.0, 6.0)), 200, {{30.0, 30.0, 0, 100000}}, {{30.0, 35.0, 0.0, 1.0}});
+	const FKeepTrace T = RunKeep(K, 50, true);
+	int32 Panic = 0, Alert = 0, RunBad = 0, Held = 0, HeldBeyond15 = 0, UnsafeRelease = 0;
+	int32 FirstFree = -1;
+	for (int32 s = 0; s < T.Mode.Num(); ++s)
+	{
+		Alert += T.Mode[s] == kKeepAlert ? 1 : 0;
+		if (T.Mode[s] == kKeepPanic)
+		{
+			++Panic;
+			if (T.Gait[s] == R3::kGaitRun)
+			{
+				++Held;
+				RunBad += FMath::Abs(T.Speed[s] - 0.6) <= 1e-9 ? 0 : 1;   // 뛰기 = 0.6 단위/스텝 = 900 cm/s
+				HeldBeyond15 += T.DistBefore[s] > 7.5 ? 1 : 0;
+			}
+			else
+			{
+				RunBad += T.Startled[s] ? 0 : 1;
+			}
+			UnsafeRelease += T.DistBefore[s] > 20.0 ? 1 : 0;   // 안전 거리 밖인데 아직 도망 (다음 스텝에 풀려야 한다)
+		}
+		if (FirstFree < 0 && s > 0 && T.Mode[s] == kKeepNone && T.Mode[s - 1] == kKeepPanic)
+		{
+			FirstFree = s;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("도망 %d 스텝 (뛰기 %d, 15 m 밖에서 뛴 스텝 %d), 풀린 스텝 %d (그때 거리 %.2f m), 평균 도망 %.1f초"), Panic, Held,
+							HeldBeyond15, FirstFree, FirstFree >= 0 ? T.DistBefore[FirstFree] * 2.0 : -1.0,
+							K.Mw.W.Stats.KeepPanicEnds > 0 ? K.Mw.W.Stats.KeepPanicEndSteps * R3::kStepSeconds / K.Mw.W.Stats.KeepPanicEnds : 0.0));
+	TestEqual(TEXT("둘째 스텝부터 도망 (10 m = 위험 거리 안)"), T.Mode[1], kKeepPanic);
+	TestEqual(TEXT("도망에서 경계(걷기)로 내려가지 않는다"), Alert, 0);
+	TestEqual(TEXT("도망은 900 cm/s 로 뛴다 (뛰지 않는 스텝은 GRAZE → FLEE 놀람 정지뿐)"), RunBad, 0);
+	TestTrue(TEXT("15 m·30 m 를 지나서도 계속 뛴다 (위험 거리 밖 뛰기 스텝이 많다)"), HeldBeyond15 >= 15);
+	TestTrue(TEXT("40 m 밖(결정 기하 > 20 단위)이 되어야 풀린다"), FirstFree > 0 && T.DistBefore[FirstFree] > 20.0);
+	TestTrue(TEXT("40 m 안에서는 풀리지 않는다 (풀리기 전 스텝의 결정 기하 ≤ 20 단위)"), FirstFree > 1 && T.DistBefore[FirstFree - 1] <= 20.0);
+	TestEqual(TEXT("40 m 밖인데 도망을 이은 스텝"), UnsafeRelease, 0);
+	TestTrue(TEXT("풀린 스텝에 두뇌가 곧바로 요청을 읽는다"), FirstFree > 0 && T.Reads[FirstFree]);
+	TestTrue(TEXT("기록: 도망 시작 1·끝 1 (은신처 아님), 길이 합 = 도망 스텝, 마스크 위반 0"),
+			 K.Mw.W.Stats.KeepPanicStarts == 1 && K.Mw.W.Stats.KeepPanicEnds == 1 && K.Mw.W.Stats.KeepPanicEndShelter == 0
+				 && K.Mw.W.Stats.KeepPanicEndSteps == Panic && K.Mw.W.Stats.MaskViolations == 0);
+
+	// --- 다가오는 늑대: 깨어 있는 추격 늑대가 25 m 에서 이 사슴을 표적으로 쫓으면 15 m 밖이어도 도망 ---
+	{
+		FKeepWorld C;
+		C.Init(KeepConfig(true, QuadCovers(60.0, 6.0)), 200, {{30.0, 18.0, 1, 0}}, {{30.0, 30.5, 0.0, 1.0}});
+		C.Mw.Threats[0].State.HeadX = 0.0;
+		C.Mw.Threats[0].State.HeadY = 1.0;   // 사슴 쪽을 본다 (시야 14 단위 안, 12.5 단위)
+		const double Before = C.Dist(0, 0);
+		C.StepOnce();
+		const FThreatAgent& A = C.Mw.Threats[0];
+		AddInfo(FString::Printf(TEXT("다가옴: 거리 %.1f m → 표적 %d, 사냥 %d, 다음 덮기 %d"), Before * 2.0, A.Last.Target, A.Last.bHasTarget ? 1 : 0,
+								C.Mw.Decisions[0].KeepMode));
+		TestTrue(TEXT("다가옴: 늑대가 이 사슴을 표적으로 사냥 중"), A.Last.bHunting && A.Last.Target == 0);
+		TestTrue(TEXT("다가옴: 15 m 밖(약 25 m)인데 다음 스텝 덮기 = 도망"), C.Dist(0, 0) > 7.5 && C.Mw.Decisions[0].KeepMode == kKeepPanic);
+	}
+
+	// --- Mass (팀 몸): 식사 중 늑대 12 m 곁의 사슴 → 도망 글자·덮기 집계·'식사 중 늑대 15 m 안 사슴' 기록, 기록 줄 ---
+	FEcoV3IntegratedSettings S = TestSettings(42100);
+	S.bGradualNight = false;   // t = 0(d = 0.5)에 입양한 늑대가 첫 스텝 뒤 깨어 있게 (밤잠 점진화는 늑대별 지연으로 늦게 깬다)
+	FIntegratedHarness H;
+	if (!H.Setup(*this, S))
+	{
+		return false;
+	}
+	FEcoV3RegionContext* Ctx = H.AddRegion(TEXT("TestK"), 0, FVector::ZeroVector, 1, 1);
+	Ctx->bReportedLowDensity = true;
+	H.Spawn(true, TEXT("TestK"), 0, {FVector(6000.0, 6000.0, 0.0)}, {10});
+	H.Spawn(false, TEXT("TestK"), 0, {FVector(6000.0, 7200.0, 0.0)}, {20});
+	H.EM->GetFragmentDataChecked<FTransformFragment>(H.Deer[0]).GetMutableTransform().SetRotation(FRotator(0.0, 90.0, 0.0).Quaternion());
+	H.Frame(0.001f);   // 입양만
+	H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent.State.Cooldown = 100000;   // 식사 중 (제자리)
+	int32 PanicFrames = 0;
+	int32 PanicTally = 0;
+	int64 NearAt20 = -1;
+	double MaxDist = 0.0;
+	FString PanicLabel;
+	for (int32 f = 0; f < 40; ++f)
+	{
+		H.DecisionStep();
+		const FHerbView V = DeerView(*H.EM, H.Deer[0]);
+		const FThreatAgent& Wolf = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent;
+		MaxDist = FMath::Max(MaxDist, FMath::Sqrt(FMath::Square(V.Body->Pos.X - Wolf.State.PosX) + FMath::Square(V.Body->Pos.Y - Wolf.State.PosY)));
+		if (V.Decision->KeepActive == kKeepPanic)
+		{
+			++PanicFrames;
+			PanicTally += Ctx->KeepNow[kKeepPanic] == 1 ? 1 : 0;
+			if (PanicLabel.IsEmpty())
+			{
+				FColor Color;
+				PanicLabel = EcoV3Integrated::DeerLabel(*V.Rep, *V.Body, false, Color, V.Decision->KeepActive);
+			}
+		}
+		if (f == 19)
+		{
+			NearAt20 = Ctx->NearEatingDeerSteps;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("Mass: 도망 %d 프레임, 가장 먼 거리 %.1f m, 식사 중 늑대 15 m 안 사슴 %lld 개체·스텝 (20 프레임까지 %lld), 글자 '%s'"), PanicFrames,
+							MaxDist * 2.0, Ctx->NearEatingDeerSteps, NearAt20, *PanicLabel));
+	TestTrue(TEXT("Mass: 세계에 경계 거리 규칙이 켜진다 (기본 1)"), Ctx->Sim.Config.KeepAway.bEnabled);
+	TestTrue(TEXT("Mass: 사슴이 도망한다"), PanicFrames > 10);
+	TestEqual(TEXT("Mass: 도망 프레임마다 지역 집계 '도망' 1"), PanicTally, PanicFrames);
+	TestTrue(TEXT("Mass: 글자 '도망(안전해질 때까지)'"), PanicLabel.StartsWith(TEXT("도망(안전해질 때까지) ")));
+	TestTrue(TEXT("Mass: 40 m 밖까지 달아난다"), MaxDist > 20.0);
+	TestTrue(TEXT("Mass: 처음 몇 스텝은 식사 중 늑대 15 m 안 (기록 > 0), 달아난 뒤로는 늘지 않는다"),
+			 NearAt20 > 0 && NearAt20 < 10 && Ctx->NearEatingDeerSteps == NearAt20);
+	H.Sub->LogContext(*Ctx);   // 기록 줄 (셋째 줄 '경계 거리' 포함)이 돈다
+	TestEqual(TEXT("Mass: 기록 뒤 구간 기준 = 누적"), Ctx->LastLogNearEatingDeerSteps, Ctx->NearEatingDeerSteps);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedKeepAwayShelterTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.KeepAway.ShelterStop",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedKeepAwayShelterTest::RunTest(const FString& Parameters)
+{
+	namespace R3 = EcoRepertoireV3;
+	using namespace EcoWorldV3;
+	// 식사 중 늑대 (30, 30), 사슴 10 m 북쪽 (30, 35), 은신처 원 (30, 42) 반경 4 — 도망 길 위 (가장자리 y = 38)
+	FKeepWorld K;
+	K.Init(KeepConfig(true, {{30.0, 42.0, 4.0}}), 200, {{30.0, 30.0, 0, 100000}}, {{30.0, 35.0, 0.0, 1.0}});
+	const FKeepTrace T = RunKeep(K, 60, false);
+	int32 FirstShelter = -1;
+	for (int32 s = 0; s < T.Mode.Num() && FirstShelter < 0; ++s)
+	{
+		FirstShelter = T.Mode[s] == kKeepShelter ? s : -1;
+	}
+	if (!TestTrue(TEXT("도망하다 은신처에 들어 웅크림이 걸린다"), FirstShelter > 0))
+	{
+		return false;
+	}
+	int32 Moved = 0, NotCrouched = 0, NotShelter = 0;
+	for (int32 s = FirstShelter; s < T.Mode.Num(); ++s)
+	{
+		Moved += T.Speed[s] == 0.0 ? 0 : 1;
+		NotCrouched += T.Behavior[s] == R3::kHide && T.Gait[s] == R3::kGaitStop ? 0 : 1;
+		NotShelter += T.Mode[s] == kKeepShelter ? 0 : 1;
+	}
+	const EcoWorldV3::FHerbBody& B = K.Mw.Bodies[0];
+	AddInfo(FString::Printf(TEXT("웅크림 시작 스텝 %d, 자리 (%.2f, %.2f), 늑대 거리 %.1f m, 도망 %lld 스텝"), FirstShelter, B.Pos.X, B.Pos.Y,
+							T.DistAfter.Last() * 2.0, K.Mw.W.Stats.KeepPanicEndSteps));
+	TestEqual(TEXT("웅크림 앞은 도망"), T.Mode[FirstShelter - 1], kKeepPanic);
+	TestTrue(TEXT("은신처 원 안에서 멈춘다"), EcoWorldV3::Detail::InAnyCover(K.Mw.W, B.Pos));
+	TestEqual(TEXT("은신처에 든 뒤로 움직인 스텝"), Moved, 0);
+	TestEqual(TEXT("은신처에 든 뒤로 HIDE 웅크림(정지)이 아닌 스텝"), NotCrouched, 0);
+	TestEqual(TEXT("늑대가 30 m 안인 동안 웅크림이 이어진다"), NotShelter, 0);
+	TestTrue(TEXT("HIDE 도착 (웅크림 배수 4)"), K.Mw.Reps[0].Behavior == R3::kHide && K.Mw.Reps[0].bArrived && K.Mw.Controls[0].bCrouch);
+	TestTrue(TEXT("기록: 도망 끝 1 = 은신처, 웅크림 시작 1, 마스크 위반 0"),
+			 K.Mw.W.Stats.KeepPanicEnds == 1 && K.Mw.W.Stats.KeepPanicEndShelter == 1 && K.Mw.W.Stats.KeepShelterStarts == 1
+				 && K.Mw.W.Stats.MaskViolations == 0);
+	FColor Color;
+	TestEqual(TEXT("글자 '숨기(은신처·경계)'"), EcoV3Integrated::DeerLabel(K.Mw.Reps[0], B, false, Color, kKeepShelter),
+			  FString::Printf(TEXT("숨기(은신처·경계) %d%%"), FMath::RoundToInt32(100.0 * FMath::Clamp(B.Energy, 0.0, 1.0))));
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedKeepAwayHideTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.KeepAway.HideAwayFromWolf",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedKeepAwayHideTest::RunTest(const FString& Parameters)
+{
+	namespace R3 = EcoRepertoireV3;
+	using namespace EcoWorldV3;
+	// 사슴 (30, 30) 동쪽을 본다, 늑대 (30, 12) 36 m 남쪽 (경계 거리 밖·안전 거리 안, 식사 중이라 서 있다).
+	// 은신처 0 = (30, 22) 반경 4 (늑대 쪽, 가장자리 4), 1 = (30, 42) 반경 4 (반대쪽, 가장자리 8). 두뇌 요청을 HIDE 로 둔다
+	auto RunHide = [](bool bKeep, const std::vector<EcoObservationV3::FCoverInput>& Covers, int32 Steps, int32& OutTarget, int32& OutCoverK,
+					  double& OutY, int64& OutRetarget, bool& bOutArrived, double* OutY20 = nullptr, FString* OutWhy = nullptr)
+	{
+		FKeepWorld K;
+		K.Init(KeepConfig(bKeep, Covers), 200, {{30.0, 12.0, 1, 100000}}, {{30.0, 30.0, 1.0, 0.0}});
+		FHerbDecision& D = K.Mw.Decisions[0];
+		D.Request = R3::kHide;
+		D.Prep.bDecide = true;
+		D.Prep.bReads = true;
+		for (int32 b = 0; b < R3::kNumBehaviors; ++b)
+		{
+			D.Mask[b] = K.Mw.W.Allowed[b];
+		}
+		D.bPrepared = true;
+		OutCoverK = D.DecisionObs.CoverK;
+		K.StepOnce();
+		OutTarget = K.Mw.Reps[0].HideTarget;
+		FString Trace;
+		for (int32 s = 1; s < Steps; ++s)
+		{
+			const int32 BehBefore = K.Mw.Reps[0].Behavior;
+			K.StepOnce();
+			if (OutY20 && s == 19)
+			{
+				*OutY20 = K.Mw.Bodies[0].Pos.Y;
+			}
+			if (K.Mw.Reps[0].Behavior != BehBefore)
+			{
+				Trace += FString::Printf(TEXT(" 스텝 %d: %d→%d (읽음 %d, 사건 0x%02x, 덮기 %d)"), s, BehBefore, K.Mw.Reps[0].Behavior,
+										 K.Mw.Decisions[0].bCommittedReads ? 1 : 0, K.Mw.Decisions[0].Result.EventBits, K.Mw.Decisions[0].KeepActive);
+			}
+		}
+		if (OutWhy)
+		{
+			*OutWhy = Trace;
+		}
+		OutY = K.Mw.Bodies[0].Pos.Y;
+		OutRetarget = K.Mw.W.Stats.KeepHideRetarget;
+		bOutArrived = K.Mw.Reps[0].Behavior == R3::kHide && K.Mw.Reps[0].bArrived;
+	};
+	const std::vector<EcoObservationV3::FCoverInput> Two = {{30.0, 22.0, 4.0}, {30.0, 42.0, 4.0}};
+	int32 OnT = -1, OnK = -1, OffT = -1, OffK = -1;
+	double OnY = 0.0, OffY = 0.0;
+	int64 OnRe = 0, OffRe = 0;
+	bool bOnArr = false, bOffArr = false;
+	double OnY20 = 0.0;
+	FString OnWhy;
+	RunHide(true, Two, 45, OnT, OnK, OnY, OnRe, bOnArr, &OnY20, &OnWhy);
+	RunHide(false, Two, 45, OffT, OffK, OffY, OffRe, bOffArr);
+	AddInfo(FString::Printf(TEXT("켬: 가장 가까운 %d → 고른 은신처 %d, 20 스텝 뒤 y %.2f, 45 스텝 뒤 y %.2f (도착 %d), 행동 바뀜:%s | 끔: 고른 %d, y %.2f (도착 %d)"),
+							OnK, OnT, OnY20, OnY, bOnArr ? 1 : 0, OnWhy.IsEmpty() ? TEXT(" 없음") : *OnWhy, OffT, OffY, bOffArr ? 1 : 0));
+	TestEqual(TEXT("가장 가까운 은신처는 늑대 쪽 0"), OnK, 0);
+	TestEqual(TEXT("켬: 늑대 쪽 ±60° 안 은신처를 빼고 반대쪽 1 을 고른다"), OnT, 1);
+	TestEqual(TEXT("켬: 바꿈 기록 1"), OnRe, static_cast<int64>(1));
+	TestTrue(TEXT("켬: 늑대 반대쪽(북쪽) 은신처로 간다 (20 스텝 뒤 2 단위 넘게 북쪽)"), OnY20 > 32.0);
+	TestTrue(TEXT("켬: 45 스텝 뒤에도 늑대 반대쪽"), OnY > 33.0);
+	TestEqual(TEXT("끔: 지금처럼 가장 가까운(늑대 쪽) 은신처"), OffT, 0);
+	TestEqual(TEXT("끔: 바꿈 기록 0"), OffRe, static_cast<int64>(0));
+
+	// 다른 은신처가 모두 늑대 쪽이면 가장 가까운 것 그대로: (30, 22) 와 (34, 24) 둘 다 남쪽 ±60° 안
+	int32 AllT = -1, AllK = -1;
+	double AllY = 0.0;
+	int64 AllRe = 0;
+	bool bAllArr = false;
+	RunHide(true, {{30.0, 22.0, 4.0}, {34.0, 24.0, 4.0}}, 1, AllT, AllK, AllY, AllRe, bAllArr);
+	TestTrue(TEXT("모두 늑대 쪽이면 가장 가까운 은신처 그대로 (바꿈 0)"), AllK == 1 && AllT == AllK && AllRe == 0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedKeepAwaySleepTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.KeepAway.SleepingWolfIgnored",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedKeepAwaySleepTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoWorldV3;
+	// 한밤 (t = 650, d = 1): 주행성 잠행 늑대 (30, 30) 는 자고 있다. 사슴 둘: 10 m (30, 35), 4 m (32, 31). 규칙 켬·끔을 같은 시작으로 60 스텝
+	const std::vector<FKeepDeer> DeerList = {{30.0, 35.0, 0.0, 1.0}, {32.0, 31.0, 1.0, 0.0}};
+	FKeepWorld On;
+	FKeepWorld Off;
+	On.Init(KeepConfig(true, QuadCovers(60.0, 6.0), 2), 650, {{30.0, 30.0, 0, 0}}, DeerList);
+	Off.Init(KeepConfig(false, QuadCovers(60.0, 6.0), 2), 650, {{30.0, 30.0, 0, 0}}, DeerList);
+	TestTrue(TEXT("한밤 (d = 1), 늑대는 자고 있다"), On.Mw.W.Dark == 1.0 && On.Mw.Threats[0].State.bAsleep);
+	int32 Diff = 0, Kept = 0, Awake = 0;
+	for (int32 s = 0; s < 60; ++s)
+	{
+		On.StepOnce();
+		Off.StepOnce();
+		Awake += On.Mw.Threats[0].State.bAsleep ? 0 : 1;
+		for (int32 i = 0; i < 2; ++i)
+		{
+			const FHerbBody& A = On.Mw.Bodies[static_cast<size_t>(i)];
+			const FHerbBody& B = Off.Mw.Bodies[static_cast<size_t>(i)];
+			const EcoRepertoireV3::FRepState& RA = On.Mw.Reps[static_cast<size_t>(i)];
+			const EcoRepertoireV3::FRepState& RB = Off.Mw.Reps[static_cast<size_t>(i)];
+			Diff += (A.Pos.X == B.Pos.X && A.Pos.Y == B.Pos.Y && A.Head.X == B.Head.X && A.Head.Y == B.Head.Y && A.Energy == B.Energy
+					 && RA.Behavior == RB.Behavior && RA.LockLeft == RB.LockLeft && RA.HideTarget == RB.HideTarget && RA.Seq == RB.Seq)
+						? 0 : 1;
+			Kept += (On.Mw.Decisions[static_cast<size_t>(i)].KeepActive != kKeepNone || On.Mw.Decisions[static_cast<size_t>(i)].KeepMode != kKeepNone) ? 1 : 0;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("60 스텝: 사슴 0 거리 %.1f m, 사슴 1 거리 %.1f m, 행동 %d / %d"), On.Dist(0, 0) * 2.0, On.Dist(1, 0) * 2.0,
+							On.Mw.Reps[0].Behavior, On.Mw.Reps[1].Behavior));
+	TestEqual(TEXT("늑대는 내내 잔다"), Awake, 0);
+	TestEqual(TEXT("자는 늑대는 무시한다 — 덮기 0"), Kept, 0);
+	TestEqual(TEXT("기록 덮기 개체·스텝 0"), On.Mw.W.Stats.KeepSteps[1] + On.Mw.W.Stats.KeepSteps[2] + On.Mw.W.Stats.KeepSteps[3],
+			  static_cast<int64>(0));
+	TestEqual(TEXT("규칙을 끈 세계와 비트 단위로 같다 (자리·방향·에너지·행동·잠금)"), Diff, 0);
+	TestTrue(TEXT("두 세계 난수·결정 수가 같다"), On.Mw.W.Rng.State == Off.Mw.W.Rng.State && On.Mw.W.Stats.Decisions == Off.Mw.W.Stats.Decisions);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedKeepAwayOffTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.KeepAway.OffIdentical",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedKeepAwayOffTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoWorldV3;
+	// --- 콘솔 변수 → 설정 → 세계 칸 ---
+	IConsoleVariable* KeepVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.KeepAway"));
+	IConsoleVariable* AlertVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.AlertDistM"));
+	IConsoleVariable* PanicVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.PanicDistM"));
+	IConsoleVariable* SafeVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.SafeDistM"));
+	if (!TestNotNull(TEXT("eco.IntegratedV3.KeepAway"), KeepVar) || !TestNotNull(TEXT("eco.IntegratedV3.AlertDistM"), AlertVar)
+		|| !TestNotNull(TEXT("eco.IntegratedV3.PanicDistM"), PanicVar) || !TestNotNull(TEXT("eco.IntegratedV3.SafeDistM"), SafeVar))
+	{
+		return false;
+	}
+	const int32 SavedKeep = KeepVar->GetInt();
+	const float SavedAlert = AlertVar->GetFloat();
+	TestEqual(TEXT("기본 1 (켬)"), SavedKeep, 1);
+	TestTrue(TEXT("기본 거리 30·15·40 m"), AlertVar->GetFloat() == 30.0f && PanicVar->GetFloat() == 15.0f && SafeVar->GetFloat() == 40.0f);
+	TestTrue(TEXT("설정 기본값도 켬"), FEcoV3IntegratedSettings().bKeepAway && FEcoV3IntegratedSettings::FromConsole().bKeepAway);
+	KeepVar->Set(0, ECVF_SetByCode);
+	AlertVar->Set(25.0f, ECVF_SetByCode);
+	const FEcoV3IntegratedSettings FromOff = FEcoV3IntegratedSettings::FromConsole();
+	KeepVar->Set(SavedKeep, ECVF_SetByCode);
+	AlertVar->Set(SavedAlert, ECVF_SetByCode);
+	TestTrue(TEXT("콘솔 0 → 설정 끔, 거리도 콘솔에서 읽는다"), !FromOff.bKeepAway && FromOff.AlertDistM == 25.0);
+	{
+		const FKeepAwayConfig Def;
+		const FKeepAwayConfig On = FEcoV3IntegratedSettings().KeepAwayConfig();
+		FEcoV3IntegratedSettings OffS;
+		OffS.bKeepAway = false;
+		OffS.AlertDistM = 99.0;
+		const FKeepAwayConfig Off = OffS.KeepAwayConfig();
+		TestTrue(TEXT("켬: 경계 15 · 위험 7.5 · 안전 20 단위 (30·15·40 m)"), On.bEnabled && On.AlertDist == 15.0 && On.PanicDist == 7.5 && On.SafeDist == 20.0);
+		TestTrue(TEXT("끔: 세계 칸이 모두 기본값 (거리 콘솔 변수를 읽지 않는다)"),
+				 !Off.bEnabled && Off.AlertDist == Def.AlertDist && Off.PanicDist == Def.PanicDist && Off.SafeDist == Def.SafeDist
+					 && Off.ApproachHigh == Def.ApproachHigh && Off.HideAvoidCos == Def.HideAvoidCos && Off.WallMargin == Def.WallMargin);
+		FEcoV3IntegratedSettings Low;
+		Low.SafeDistM = 10.0;
+		Low.PanicDistM = -5.0;
+		const FKeepAwayConfig L = Low.KeepAwayConfig();
+		TestTrue(TEXT("안전 거리는 경계·위험 거리보다 작지 않게, 음수는 기본값"), L.SafeDist == 15.0 && L.PanicDist == 7.5);
+		const std::vector<EcoObservationV3::FCoverInput> Covers = QuadCovers(60.0, 6.0);
+		TestFalse(TEXT("끈 설정 → 세계 규칙 끔"), KeepConfig(false, Covers).KeepAway.bEnabled);
+		TestTrue(TEXT("켠 설정 → 세계 규칙 켬"), KeepConfig(true, Covers).KeepAway.bEnabled);
+		TestFalse(TEXT("평면 맵 기본 세계는 끔"), FWorldConfig().KeepAway.bEnabled);
+	}
+
+	// --- 끄면 지금 그대로: 사슴 16 + 늑대 2 (사냥하는 잠행·추격), 600 스텝 (낮 → 밤). 끈 세계 둘(거리 칸만 다름)은 비트 단위로 같고 덮기 0 ---
+	auto MakeWorld = [](FKeepWorld& K, const FWorldConfig& C)
+	{
+		std::vector<FKeepDeer> DeerList;
+		for (int32 i = 0; i < 16; ++i)
+		{
+			DeerList.push_back(i == 0 ? FKeepDeer{43.0, 48.0, -1.0, 0.0}
+									  : FKeepDeer{18.0 + 4.0 * (i % 5), 22.0 + 5.0 * (i / 5), FMath::Cos(i * 0.9), FMath::Sin(i * 0.9)});
+		}
+		K.Init(C, 200, {{12.0, 12.0, 0, 0}, {48.0, 48.0, 1, 0}}, DeerList);
+	};
+	const FWorldConfig COff = KeepConfig(false, QuadCovers(60.0, 6.0), 16, 2);
+	FWorldConfig COffOdd = COff;
+	COffOdd.KeepAway.AlertDist = 99.0;
+	COffOdd.KeepAway.PanicDist = 50.0;
+	COffOdd.KeepAway.SafeDist = 120.0;
+	COffOdd.KeepAway.HideAvoidCos = -1.0;
+	FKeepWorld A;
+	FKeepWorld B;
+	FKeepWorld On;
+	MakeWorld(A, COff);
+	MakeWorld(B, COffOdd);
+	MakeWorld(On, KeepConfig(true, QuadCovers(60.0, 6.0), 16, 2));
+	int32 Diff = 0, KeepSet = 0, OnDiff = 0, TooFast = 0;
+	for (int32 s = 0; s < 600; ++s)
+	{
+		A.StepOnce();
+		B.StepOnce();
+		On.StepOnce();
+		for (int32 i = 0; i < 16; ++i)
+		{
+			const size_t k = static_cast<size_t>(i);
+			const FHerbBody& Ba = A.Mw.Bodies[k];
+			const FHerbBody& Bb = B.Mw.Bodies[k];
+			const EcoRepertoireV3::FRepState& Ra = A.Mw.Reps[k];
+			const EcoRepertoireV3::FRepState& Rb = B.Mw.Reps[k];
+			const FHerbDecision& Da = A.Mw.Decisions[k];
+			const FHerbDecision& Db = B.Mw.Decisions[k];
+			Diff += (Ba.Pos.X == Bb.Pos.X && Ba.Pos.Y == Bb.Pos.Y && Ba.Head.X == Bb.Head.X && Ba.Head.Y == Bb.Head.Y && Ba.Energy == Bb.Energy
+					 && Ba.DeathCause == Bb.DeathCause && Ra.Behavior == Rb.Behavior && Ra.LockLeft == Rb.LockLeft && Ra.EvWait == Rb.EvWait
+					 && Ra.HideTarget == Rb.HideTarget && Ra.Seq == Rb.Seq && Da.Request == Db.Request && Da.bCommittedReads == Db.bCommittedReads)
+						? 0 : 1;
+			KeepSet += (Da.KeepMode | Da.KeepActive | Db.KeepMode | Db.KeepActive | Da.KeepPanicSteps) != 0 ? 1 : 0;
+			const FHerbBody& Bo = On.Mw.Bodies[k];
+			OnDiff += (Bo.Pos.X != Ba.Pos.X || Bo.Pos.Y != Ba.Pos.Y) ? 1 : 0;
+			TooFast += (Bo.DeathCause == kDeathNone && On.Speed(i) > 0.6 + 1e-9) ? 1 : 0;
+		}
+		for (int32 m = 0; m < 2; ++m)
+		{
+			const EcoThreatV3::FThreatState& Ta = A.Mw.Threats[static_cast<size_t>(m)].State;
+			const EcoThreatV3::FThreatState& Tb = B.Mw.Threats[static_cast<size_t>(m)].State;
+			Diff += (Ta.PosX == Tb.PosX && Ta.PosY == Tb.PosY && Ta.Cooldown == Tb.Cooldown && Ta.bAsleep == Tb.bAsleep) ? 0 : 1;
+		}
+	}
+	const FWorldStats& Sa = A.Mw.W.Stats;
+	const FWorldStats& So = On.Mw.W.Stats;
+	int64 KeepCounters = Sa.KeepAlertStarts + Sa.KeepPanicStarts + Sa.KeepShelterStarts + Sa.KeepPanicEnds + Sa.KeepPanicDied + Sa.KeepHideRetarget;
+	for (int32 k = 0; k < kNumKeepModes; ++k)
+	{
+		KeepCounters += Sa.KeepSteps[k] + Sa.CaughtByKeep[k];
+	}
+	AddInfo(FString::Printf(TEXT("끔: 포획 %lld 굶음 %lld 결정 %lld | 켬: 포획 %lld (경계 중 %lld · 도망 중 %lld · 웅크림 중 %lld) 굶음 %lld, 경계 시작 %lld, 도망 시작 %lld, 웅크림 시작 %lld, 덮기 개체·스텝 %lld/%lld/%lld"),
+							Sa.Caught, Sa.Starved, Sa.Decisions, So.Caught, So.CaughtByKeep[1], So.CaughtByKeep[2], So.CaughtByKeep[3], So.Starved,
+							So.KeepAlertStarts, So.KeepPanicStarts, So.KeepShelterStarts, So.KeepSteps[1], So.KeepSteps[2], So.KeepSteps[3]));
+	TestEqual(TEXT("끈 세계 둘 (거리 칸만 다름)은 600 스텝 비트 단위로 같다 — 끄면 거리 칸을 아무도 읽지 않는다"), Diff, 0);
+	TestTrue(TEXT("끈 세계 둘의 난수·기록이 같다"),
+			 A.Mw.W.Rng.State == B.Mw.W.Rng.State && Sa.Caught == B.Mw.W.Stats.Caught && Sa.Decisions == B.Mw.W.Stats.Decisions
+				 && A.Mw.W.PredEma == B.Mw.W.PredEma);
+	TestEqual(TEXT("끄면 덮기 칸이 늘 0"), KeepSet, 0);
+	TestEqual(TEXT("끄면 경계 거리 기록이 모두 0"), KeepCounters, static_cast<int64>(0));
+	TestTrue(TEXT("켜면 규칙이 실제로 돈다 (경계·도망 덮기 > 0, 자리가 달라진다)"), So.KeepSteps[1] + So.KeepSteps[2] > 0 && OnDiff > 0);
+	TestEqual(TEXT("켬: 마스크 위반 0"), So.MaskViolations, static_cast<int64>(0));
+	TestEqual(TEXT("켬: 사슴 최고 속력 ≤ 뛰기 900 cm/s"), TooFast, 0);
 	return true;
 }
 

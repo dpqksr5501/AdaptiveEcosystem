@@ -83,6 +83,35 @@ namespace EcoPolicyV3IntegratedProcImpl
 		Ctx.MeanEnergy = List.IsEmpty() ? 0.0 : Sum / static_cast<double>(List.Num());
 		Ctx.StarvingDeer = Starving;
 	}
+
+	/**
+	 * 경계 거리 기록 (사람 결정 10-15 (C), 규칙 켬·끔 모두 센다): 이 스텝 끝 산 사슴 중 식사 중(쿨다운 > 0)이고 깨어 있는 늑대의
+	 * 15 m(kNearEatingWolfUnits) 안에 있는 사슴 수 → 컨텍스트 누적 (개체·스텝). 기록 전용.
+	 */
+	void TallyNearEatingWolves(FEcoV3RegionContext& Ctx, const TArray<FEcoV3DeerRec>& Deer, const TArray<int32>& DeerList,
+							   const TArray<FEcoV3WolfRec>& Wolves, const TArray<int32>& WolfList)
+	{
+		const double R2 = EcoV3Integrated::kNearEatingWolfUnits * EcoV3Integrated::kNearEatingWolfUnits;
+		for (const int32 k : DeerList)
+		{
+			const EcoWorldV3::FVec2 P = Deer[k].View.Body->Pos;
+			for (const int32 w : WolfList)
+			{
+				const EcoWorldV3::FThreatAgent& A = *Wolves[w].Agent;
+				if (A.State.Cooldown <= 0 || EcoWorldV3::ThreatAsleepNow(Ctx.Sim, A))
+				{
+					continue;
+				}
+				const double Dx = A.State.PosX - P.X;
+				const double Dy = A.State.PosY - P.Y;
+				if (Dx * Dx + Dy * Dy <= R2)
+				{
+					++Ctx.NearEatingDeerSteps;
+					break;
+				}
+			}
+		}
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -407,6 +436,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				Wolves[k].Life->bPursuing = A.Last.bHunting && A.Last.bHasTarget;
 				Ctx.TallyWolfStep(A, Wolves[k].Id, Ctx.Sim.T - 1);
 			}
+			TallyNearEatingWolves(Ctx, Deer, List, Wolves, WolvesByContext[c]);   // 경계 거리 기록 (규칙 켬·끔 모두)
 			TallyEnergy(Ctx, Deer, List);   // 기록 줄이 이 스텝 끝 에너지를 쓴다
 			Sub->NotifyNightStep(Ctx, ThreatPtrs.GetData(), WolfIds.GetData(), ThreatPtrs.Num());   // 늑대 밤잠 사건 줄 (켠 세계만)
 			Sub->NotifyContextStep(Ctx, Report);
@@ -424,6 +454,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		FEcoV3RegionContext& Ctx = *Sub->GetContext(c);
 		FMemory::Memzero(Ctx.BehaviorNow, sizeof(Ctx.BehaviorNow));
 		FMemory::Memzero(Ctx.WolvesNow, sizeof(Ctx.WolvesNow));
+		FMemory::Memzero(Ctx.KeepNow, sizeof(Ctx.KeepNow));
 		for (const int32 k : DeerByContext[c])
 		{
 			FEcoV3DeerRec& D = Deer[k];
@@ -433,6 +464,11 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			if (B >= 0 && B < EcoRepertoireV3::kNumBehaviors)
 			{
 				++Ctx.BehaviorNow[B];
+			}
+			const int32 Km = D.View.Decision->KeepActive;   // 경계 거리 덮기 (규칙을 끄면 늘 0)
+			if (Km >= 0 && Km < EcoWorldV3::kNumKeepModes)
+			{
+				++Ctx.KeepNow[Km];
 			}
 		}
 		for (const int32 k : WolvesByContext[c])
@@ -533,7 +569,8 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 					// 팀 시계에 다시 맞추면 전역 스텝이 뒤로 갈 수 있다 — 음수 경과는 표시하지 않는다
 					const int64 SinceRepro = NowStep - Int.ReproducedStep;
 					const bool bRecentRepro = Int.ReproducedStep >= 0 && SinceRepro >= 0 && SinceRepro <= EcoV3Integrated::kReproMarkSteps;
-					Label = EcoV3Integrated::DeerLabel(Rep, B, bRecentRepro, Color);
+					// 경계 거리 덮기 중이면 '경계(멀어짐)'·'도망(안전해질 때까지)'·'숨기(은신처·경계)' (사람 결정 10-15 (C))
+					Label = EcoV3Integrated::DeerLabel(Rep, B, bRecentRepro, Color, States[i].Decision.KeepActive);
 				}
 				DrawDebugString(World, Loc + FVector(0.0, 0.0, 230.0), Label, nullptr, Color, 0.0f, true, 1.1f);
 			}

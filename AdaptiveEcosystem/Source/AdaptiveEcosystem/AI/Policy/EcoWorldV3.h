@@ -44,6 +44,8 @@
 //   ObserveAndDecideRows           새로 입양한 행만 첫 관측·첫 요청
 //   FHerbBody::LastIntake, FWorldStats::FoodEaten·EatSteps  섭식 기록 (통합 모드의 먹기 표시·기록). 늘 채우지만 어떤 계산에도
 //                                  쓰지 않는다 — 평면 맵·기준 루프의 논리 상태는 비트 단위로 그대로다
+//   FWorldConfig::KeepAway         사슴 경계 거리 규칙 (사람 결정 10-15 (C), 두뇌 위의 행동 실행 규칙). 기본 끔 = 지금과 같다 —
+//                                  새 줄은 모두 KeepAway.bEnabled 안에 있다. 아래 '경계 거리 규칙' 묶음 머리 주석
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -93,6 +95,46 @@ namespace EcoWorldV3
 		double Uniform(double Lo, double Hi) { return Lo + (Hi - Lo) * NextU01(); }
 	};
 
+	// ---- 사슴 경계 거리 규칙 (통합 모드, 사람 결정 10-15 (C)). 기본 끔 = R1b 학습 세계 그대로 ----
+	//
+	// 실제 사슴은 포식자와 경계 거리를 두고, 다가오면 달아난다. 학습 두뇌는 늑대가 8 단위(16 m) 안이거나 빠르게 다가올 때만 달아나서
+	// 서 있는 늑대(식사 중)를 무해하게 보고 곁에 머물다 잡힌다. 그래서 두뇌 위에 행동 실행 규칙을 하나 둔다 (가중치·관측은 그대로):
+	//   경계  깨어 있는 늑대가 AlertDist(30 m) 안이면 바라보는 쪽과 무관하게 알아챈다(가까이에서는 거의 360° 시야 + 소리. 자는 늑대는 무시).
+	//         먹기를 멈추고 걸어서(보행표 걷기 0.24 단위/스텝 = 360 cm/s) 늑대들 반대쪽으로 멀어진다. 행동 칸 = FLEE (걷기)
+	//   도망  늑대가 PanicDist(15 m) 안이거나, 알아챈 늑대가 이 사슴에게 다가오면(접근 관측 ≥ 0.9 = 사건 E2 와 같은 문턱, 이 사슴을 표적으로
+	//         사냥 중, 돌진 중) 뛰어서(0.6 단위/스텝) 달아나고 안전해질 때까지 멈추지 않는다. 안전 = 깨어 있는 늑대가 모두 SafeDist(40 m)
+	//         밖이고 아무도 이 사슴을 쫓거나 다가오지 않음, 또는 은신처 원 안. 행동 칸 = FLEE (뛰기)
+	//   은신처 은신처 원 안에서 늑대를 알아채면 그 자리에 웅크린다 (HIDE 도착 — 웅크림 배수 4). 늑대가 30 m 밖이 되면 푼다
+	//   숨기  두뇌(또는 규칙)가 HIDE 에 들어가면 늑대 쪽 ±60° 안의 은신처는 빼고 가장 가까운 것을 고른다 (다른 은신처가 없으면 가장 가까운 것)
+	//   그 밖은 두뇌가 지금처럼 정한다. 두뇌가 이미 FLEE·HIDE 중이면 경계(걷기)는 끼어들지 않는다 (뛰던 사슴을 걷게 하지 않는다).
+	//
+	// 실행 (Arbiter 잠금·위상의 뜻을 지킨다):
+	//   H  스텝 끝 기하(관측과 같은 위치·늑대 잠·지난 변위·이번 스텝 표적)로 다음 스텝의 덮기 KeepMode 를 정한다(UpdateKeepAway).
+	//      덮기가 걸린 동안 두뇌(망)는 부르지 않는다. Prepare 는 그대로 돌려 사건 기준값(PrevPc·bPrevNear·bPrevFast·bPrevLow·bPrevDark)과
+	//      HIDE 도착을 지금 기하로 맞춘다 — 풀린 뒤 두뇌의 첫 결정이 낡은 기준값으로 거짓 사건을 내지 않게. 읽음(bReads)은 끈다
+	//   A  덮기가 걸리면 Commit 대신 CommitKeepAway: 행동이 다르면 Enter(진입 잠금·seq·위상·GRAZE→FLEE 놀람 0.4 초를 그대로 쓴다),
+	//      미뤄 둔 사건 결정(EvWait)은 버린다. 마스크 확인은 세계 허용 칸으로 한다(FLEE·HIDE 는 늘 허용)
+	//   B  경계·도망은 FLEE 제어기에 늑대 반대 방향(무대 벽에 닿으면 벽을 따라 미끄러지게)을 넣고, 경계는 걷기로 낮춘다
+	//   풀림 덮기가 풀리는 스텝 끝(H)에 잠금을 0 으로 하고(LockLeft ≤ 0 = 결정 시점) EvWait 를 지운다. 그래서 같은 H 의 Prepare 가 결정을
+	//      열고 두뇌가 지금 관측으로 곧바로 요청을 고른다 (다음 Commit 에 반영)
+	struct FKeepAwayConfig
+	{
+		bool bEnabled = false;              // 끄면 아래 칸을 아무도 읽지 않는다
+		double AlertDist = 15.0;            // 경계 거리 (단위, 30 m)
+		double PanicDist = 7.5;             // 위험 거리 (15 m)
+		double SafeDist = 20.0;             // 안전 거리 (40 m). 도망은 이 밖이 될 때까지 이어진다
+		double ApproachHigh = 0.9;          // '다가옴' 접근 관측 문턱 (FRepertoireConfig::EventApproach 와 같다 — 닫는 속력 720 cm/s)
+		double HideAvoidCos = 0.5;          // 은신처 고르기: 늑대 쪽 ±60° (cos 60°) 안은 뺀다
+		double WallMargin = 1.0;            // 무대 벽에서 이 안이면 벽 쪽 성분을 지워 벽을 따라 미끄러진다 (단위, 2 m)
+	};
+
+	// 덮기 (FHerbDecision::KeepMode·KeepActive)
+	inline constexpr std::int32_t kKeepNone = 0;      // 두뇌가 정한다
+	inline constexpr std::int32_t kKeepAlert = 1;     // 경계(멀어짐): FLEE + 걷기
+	inline constexpr std::int32_t kKeepPanic = 2;     // 도망(안전해질 때까지): FLEE + 뛰기
+	inline constexpr std::int32_t kKeepShelter = 3;   // 은신처 안 웅크림: HIDE 도착
+	inline constexpr std::int32_t kNumKeepModes = 4;
+
 	// ---- 세계 설정 (파이썬 단위). 기본값 = 평면 시험 맵용 R1b 학습 범위 안의 한 세계 ----
 
 	struct FWorldConfig
@@ -141,6 +183,8 @@ namespace EcoWorldV3
 		// rep_policy.effective_allowed 의 '모델 목록 ∩ 세계 목록' 과 같다. 기본 모두 1 = 모델 목록 그대로 (평면 맵·기준 루프·골든).
 		// 통합 모드는 eco.IntegratedV3.NoFreeze 1 이면 FREEZE 칸을 0 으로 둔다 (사람 결정 10-15 (A), R1b−F)
 		std::uint8_t WorldAllowed[EcoRepertoireV3::kNumBehaviors] = {1, 1, 1, 1, 1};
+		// 사슴 경계 거리 규칙 (사람 결정 10-15 (C), 통합 모드 eco.IntegratedV3.KeepAway). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든)
+		FKeepAwayConfig KeepAway;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -398,6 +442,12 @@ namespace EcoWorldV3
 		std::int32_t CommittedRequest = EcoRepertoireV3::kGraze;
 		bool bCommittedReads = false;
 		std::uint8_t CommittedMask[EcoRepertoireV3::kNumBehaviors] = {};
+
+		// 경계 거리 규칙 (FWorldConfig::KeepAway 를 켠 세계만 쓴다. 끄면 늘 기본값)
+		std::int32_t KeepMode = kKeepNone;     // 다음 Commit 에 쓸 덮기 (스텝 끝 H 의 UpdateKeepAway 가 정한다)
+		std::int32_t KeepActive = kKeepNone;   // 이번 스텝에 실행한 덮기 (화면·기록)
+		FVec2 KeepDir;                         // 경계·도망 이동 방향 (늑대 반대 단위벡터, 스텝 끝 기하)
+		std::int32_t KeepPanicSteps = 0;       // 이번 도망이 이어진 스텝 수
 	};
 
 	/** 위협 하나 (FEcoThreatStateFragment). */
@@ -449,6 +499,17 @@ namespace EcoWorldV3
 		std::int64_t NightBlockHunt = 0;     // 누울 차례인데 사냥 중이라 못 누운 늑대·업데이트 (block_hunt_n)
 		std::int64_t NightDarkUpdates = 0;   // 어둠(d ≥ 0.5) 업데이트의 주행성 늑대·업데이트
 		std::int64_t NightDarkAwake = 0;     // 그중 깨어 있음 (눕는 중 포함). 비율 = dark_awake_frac
+		// 경계 거리 규칙 기록 (켰을 때만 센다)
+		std::int64_t KeepSteps[kNumKeepModes] = {};   // 덮기별 개체·스텝 (0 = 두뇌)
+		std::int64_t KeepAlertStarts = 0;    // 경계(멀어짐) 시작
+		std::int64_t KeepPanicStarts = 0;    // 도망 시작
+		std::int64_t KeepShelterStarts = 0;  // 은신처 웅크림 시작
+		std::int64_t KeepPanicEnds = 0;      // 끝난 도망 (안전 거리 밖 또는 은신처)
+		std::int64_t KeepPanicEndShelter = 0; // 그중 은신처에서 끝남
+		std::int64_t KeepPanicEndSteps = 0;  // 끝난 도망의 길이 합 (스텝)
+		std::int64_t KeepPanicDied = 0;      // 도망 중 죽음 (잡힘·굶음)
+		std::int64_t CaughtByKeep[kNumKeepModes] = {};   // 잡힌 사슴을 그 스텝의 덮기로 가른 수
+		std::int64_t KeepHideRetarget = 0;   // HIDE 은신처를 늑대 반대쪽으로 바꾼 수
 	};
 
 	/**
@@ -779,6 +840,23 @@ namespace EcoWorldV3
 		const double E01 = H.Body->Energy / W.RepCfg.MaxEnergy;
 		D.DecisionObs = EcoObservationV3::ToDecisionObs(P.Threat, P.Cover, E01 < 0.0 ? 0.0 : (E01 > 1.0 ? 1.0 : E01), W.Dark);
 		D.Prep = EcoRepertoireV3::Prepare(S, D.DecisionObs, W.RepCfg);
+		if (W.Config.KeepAway.bEnabled && D.KeepMode != kKeepNone)
+		{
+			// 경계 거리 규칙의 덮기: 두뇌(망)를 부르지 않는다. Prepare 는 위에서 돌렸다(사건 기준값·HIDE 도착을 지금 기하로 맞춘다).
+			// 읽음을 꺼서 결정 수·마스크 기록에 들지 않게 하고, 요청 = 덮기 행동 (Commit 대신 CommitKeepAway 가 쓴다)
+			D.Prep.bReads = false;
+			D.Prep.bDecide = false;
+			D.Prep.bWakeDecide = false;
+			D.Request = D.KeepMode == kKeepShelter ? EcoRepertoireV3::kHide : EcoRepertoireV3::kFlee;
+			for (std::int32_t b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+			{
+				D.Feasible[b] = 0;
+				D.Mask[b] = 0;
+				D.Logits[b] = 0.0f;
+			}
+			D.bPrepared = true;
+			return;
+		}
 		EcoPolicyV3::ComputeFeasibleMask(P.Obs, D.Feasible);
 		// 허용 = 모델 ∧ 세계 (W.Allowed). 세계 칸이 모두 1 이면 kAllowedMask 그대로라 지금까지와 비트 단위로 같다
 		EcoPolicyV3::ComposeActionMask(W.Allowed, D.Feasible, D.Prep.bReads, D.Prep.bWakeDecide, S.Behavior, D.Mask);
@@ -885,6 +963,281 @@ namespace EcoWorldV3
 												   W.ObsCfg)
 				.bInCover;
 		}
+
+		// ---- 경계 거리 규칙 (FWorldConfig::KeepAway 를 켠 세계만 부른다) ----
+
+		/** 사슴 하나가 본 늑대들 (스텝 끝 기하. 자는 늑대는 뺀다). */
+		struct FKeepGeom
+		{
+			bool bNoticed = false;     // 깨어 있는 늑대가 경계 거리 안
+			bool bPanic = false;       // 위험 거리 안, 또는 알아챈 늑대가 다가옴(접근 높음·이 사슴을 표적으로 사냥·돌진)
+			bool bSafe = true;         // 깨어 있는 늑대가 모두 안전 거리 밖이고 아무도 다가오지 않는다
+			FVec2 AlertDir;            // 경계 거리 안 늑대들 반대 (거리 역수 가중 합, 정규화 전)
+			FVec2 PanicDir;            // 안전 거리 안·다가오는 늑대들 반대
+			FVec2 NearestAway;         // 가장 가까운 깨어 있는 늑대 반대 (단위)
+			bool bHasNearest = false;
+		};
+
+		inline FKeepGeom KeepGeometry(const FWorldState& W, const FVec2& P, std::int32_t Self, FThreatAgent* const* Threats,
+									  std::int32_t M)
+		{
+			const FKeepAwayConfig& K = W.Config.KeepAway;
+			FKeepGeom G;
+			double Nearest = 0.0;
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				const FThreatAgent& A = *Threats[m];
+				if (ThreatAsleepNow(W, A))
+				{
+					continue;   // 굴에서 자는 늑대는 무시한다 (관측의 '자는 위협은 안 보인다'와 같은 판정)
+				}
+				const double Ex = A.State.PosX - P.X;
+				const double Ey = A.State.PosY - P.Y;
+				const double D = std::sqrt(Ex * Ex + Ey * Ey);
+				const double Inv = 1.0 / (D > EcoRepertoireV3::kEps ? D : EcoRepertoireV3::kEps);
+				const FVec2 Away{-Ex * Inv, -Ey * Inv};
+				// 다가옴: 접근 관측(두뇌의 pred_approach 와 같은 식 — 지난 변위가 이 사슴 쪽으로 닫는 속력), 이 사슴을 표적으로 사냥, 돌진
+				const double Approach = EcoObservationV3::ApproachObs(A.State.VelX, A.State.VelY, Ex, Ey, Inv, W.ObsCfg);
+				const bool bLocked = A.Last.bHunting && A.Last.bHasTarget && A.Last.Target == Self;
+				const bool bDash = (A.Spec.Type == EcoThreatV3::EThreatType::Stalker && A.State.StalkState == EcoThreatV3::EStalkState::Pounce)
+								   || (A.Spec.Type == EcoThreatV3::EThreatType::Player && A.State.PlayerMode == EcoThreatV3::EPlayerMode::Charge);
+				const bool bHigh = Approach >= K.ApproachHigh;
+				const bool bComing = bLocked || bHigh || (bDash && (A.Last.Target == Self || bHigh));
+				const double Wt = 1.0 / (D > 0.5 ? D : 0.5);
+				if (!G.bHasNearest || D < Nearest)
+				{
+					G.bHasNearest = D > EcoRepertoireV3::kEps;
+					G.NearestAway = Away;
+					Nearest = D;
+				}
+				const bool bNoticed = D <= K.AlertDist;
+				if (bNoticed)
+				{
+					G.bNoticed = true;
+					G.AlertDir = EcoRepertoireV3::Add(G.AlertDir, EcoRepertoireV3::Scale(Away, Wt));
+				}
+				if (D <= K.PanicDist || (bNoticed && bComing))
+				{
+					G.bPanic = true;
+				}
+				if (D <= K.SafeDist || bComing)
+				{
+					G.bSafe = false;
+					G.PanicDir = EcoRepertoireV3::Add(G.PanicDir, EcoRepertoireV3::Scale(Away, Wt));
+				}
+			}
+			return G;
+		}
+
+		/** 덮기 방향: 가중 합을 정규화하고(0 이면 가장 가까운 늑대 반대), 무대 벽 여유 안이면 벽 쪽 성분을 지운다 (다 지워지면 그대로). */
+		inline FVec2 KeepDirection(const FWorldState& W, const FVec2& P, const FVec2& Sum, const FKeepGeom& G)
+		{
+			FVec2 Dir = EcoRepertoireV3::Normalize(Sum);
+			if (!EcoRepertoireV3::IsNonZero(Dir) && G.bHasNearest)
+			{
+				Dir = G.NearestAway;
+			}
+			const double Size = W.Config.WorldSize;
+			const double Mg = W.Config.KeepAway.WallMargin;
+			FVec2 Slide = Dir;
+			if ((P.X <= Mg && Slide.X < 0.0) || (P.X >= Size - Mg && Slide.X > 0.0))
+			{
+				Slide.X = 0.0;
+			}
+			if ((P.Y <= Mg && Slide.Y < 0.0) || (P.Y >= Size - Mg && Slide.Y > 0.0))
+			{
+				Slide.Y = 0.0;
+			}
+			Slide = EcoRepertoireV3::Normalize(Slide);
+			return EcoRepertoireV3::IsNonZero(Slide) ? Slide : Dir;
+		}
+
+		/**
+		 * 스텝 끝(H, DecideAll 앞): 사슴마다 다음 스텝의 덮기를 정한다. 지난 덮기 = 이번 스텝에 실행한 KeepActive.
+		 *   은신처 원 안   알아챈 늑대가 있으면 웅크림, 없으면 두뇌 (도망 중이었으면 도망 끝 = 은신처)
+		 *   지난 도망      안전하면 두뇌, 아니면 도망
+		 *   위험           도망
+		 *   알아챔         지난 덮기가 있었거나 두뇌가 FLEE·HIDE 중이 아니면 경계, 아니면 두뇌 (두뇌의 도망·숨기를 걷기로 낮추지 않는다)
+		 * 풀리면(덮기 → 두뇌) 잠금 0·EvWait 지움 — 같은 H 의 Prepare 가 결정을 열어 두뇌가 지금 관측으로 곧바로 고른다.
+		 * 이번 스텝에 죽은 사슴은 덮기를 지운다 (도망 중이었으면 '도망 중 죽음').
+		 */
+		inline void UpdateKeepAway(FWorldState& W, const FHerbView* Herbs, std::int32_t N, FThreatAgent* const* Threats, std::int32_t M)
+		{
+			namespace R3 = EcoRepertoireV3;
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				const FHerbView& H = Herbs[i];
+				FHerbDecision& D = *H.Decision;
+				R3::FRepState& S = *H.Rep;
+				const std::int32_t Prev = D.KeepActive;
+				if (H.Body->DeathCause != kDeathNone)
+				{
+					W.Stats.KeepPanicDied += Prev == kKeepPanic ? 1 : 0;
+					D.KeepMode = kKeepNone;
+					D.KeepPanicSteps = 0;
+					if (H.Body->bRespawned)
+					{
+						D.KeepActive = kKeepNone;   // 새 세대 (평면 맵 부활 — 통합 모드는 부활하지 않는다)
+					}
+					continue;
+				}
+				const FKeepGeom G = KeepGeometry(W, H.Body->Pos, i, Threats, M);
+				const bool bInShelter = H.Perception->Cover.bInCover;
+				std::int32_t Next = kKeepNone;
+				if (bInShelter)
+				{
+					Next = G.bNoticed ? kKeepShelter : kKeepNone;
+				}
+				else if (Prev == kKeepPanic)
+				{
+					Next = G.bSafe ? kKeepNone : kKeepPanic;
+				}
+				else if (G.bPanic)
+				{
+					Next = kKeepPanic;
+				}
+				else if (G.bNoticed)
+				{
+					const bool bBrainAvoiding = S.Behavior == R3::kFlee || S.Behavior == R3::kHide;
+					Next = (Prev != kKeepNone || !bBrainAvoiding) ? kKeepAlert : kKeepNone;
+				}
+				if (Prev == kKeepPanic && Next != kKeepPanic)
+				{
+					++W.Stats.KeepPanicEnds;
+					W.Stats.KeepPanicEndShelter += bInShelter ? 1 : 0;
+					W.Stats.KeepPanicEndSteps += D.KeepPanicSteps;
+					D.KeepPanicSteps = 0;
+				}
+				D.KeepDir = Next == kKeepAlert	 ? KeepDirection(W, H.Body->Pos, G.AlertDir, G)
+							: Next == kKeepPanic ? KeepDirection(W, H.Body->Pos, G.PanicDir, G)
+												 : FVec2{};
+				if (Prev != kKeepNone && Next == kKeepNone)
+				{
+					// 풀림: 두뇌의 다음 결정을 깨끗하게 연다 (잠금이 끝난 것으로, 미뤄 둔 사건 결정 없음)
+					S.LockLeft = S.LockLeft < 0 ? S.LockLeft : 0;
+					S.EvWait = -1;
+				}
+				D.KeepMode = Next;
+			}
+		}
+
+		/**
+		 * A 의 덮기 Commit (Arbiter Commit 대신): 행동이 다르면 Enter 로 들어간다 (진입 잠금·seq·위상, GRAZE → FLEE 놀람 정지 0.4 초,
+		 * HIDE 는 결정 관측의 가장 가까운 은신처·도착 — 웅크림은 은신처 원 안에서만 걸리므로 곧바로 도착). 미뤄 둔 사건 결정은 버린다.
+		 */
+		inline EcoRepertoireV3::FArbiterResult CommitKeepAway(const FWorldState& W, const FHerbView& H)
+		{
+			namespace R3 = EcoRepertoireV3;
+			FHerbDecision& D = *H.Decision;
+			R3::FRepState& S = *H.Rep;
+			const std::int32_t Target = D.KeepMode == kKeepShelter ? R3::kHide : R3::kFlee;
+			R3::FArbiterResult R;
+			R.bEvent = D.Prep.bEvent;
+			R.bFire = D.Prep.bFire;
+			R.EventBits = D.Prep.EventBits;
+			if (S.Behavior != Target || S.bWaking || (Target == R3::kHide && !S.bArrived))
+			{
+				R3::Enter(S, Target, D.DecisionObs, W.RepCfg);
+				R.bSwitch = true;
+			}
+			S.EvWait = -1;
+			S.Phase = R3::PhaseOf(S, W.RepCfg);
+			return R;
+		}
+
+		/**
+		 * HIDE 진입 뒤 은신처 고르기 (도착 전일 때만): 늑대 쪽 = 안전 거리 안의 가장 가까운 깨어 있는 늑대, 없으면 최근에 본 위협 쪽(−Away).
+		 * 그 쪽 ±60° 안(중심 방향과의 cos ≥ HideAvoidCos)의 은신처는 빼고 가장자리 거리가 가장 가까운 것 (동점 낮은 색인).
+		 * 남는 것이 없거나 늑대 쪽을 모르면 Enter 가 고른 가장 가까운 은신처 그대로.
+		 */
+		inline void RetargetHide(FWorldState& W, const FHerbView& H, FThreatAgent* const* Threats, std::int32_t M)
+		{
+			namespace R3 = EcoRepertoireV3;
+			R3::FRepState& S = *H.Rep;
+			const FVec2 P = H.Body->Pos;
+			FVec2 ToWolf;
+			bool bKnown = false;
+			double Best = W.Config.KeepAway.SafeDist;
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				const FThreatAgent& A = *Threats[m];
+				if (ThreatAsleepNow(W, A))
+				{
+					continue;
+				}
+				const FVec2 E{A.State.PosX - P.X, A.State.PosY - P.Y};
+				const double D = std::sqrt(R3::SizeSquared(E));
+				if (D <= Best && D > R3::kEps)
+				{
+					Best = D;
+					ToWolf = R3::Normalize(E);
+					bKnown = true;
+				}
+			}
+			if (!bKnown && S.Recency > 0.0 && R3::IsNonZero(S.Away))
+			{
+				ToWolf = R3::Neg(S.Away);
+				bKnown = true;
+			}
+			if (!bKnown)
+			{
+				return;
+			}
+			std::int32_t Pick = -1;
+			double PickEdge = 0.0;
+			const std::int32_t K = static_cast<std::int32_t>(W.Config.Covers.size());
+			for (std::int32_t k = 0; k < K; ++k)
+			{
+				const EcoObservationV3::FCoverInput& C = W.Config.Covers[static_cast<size_t>(k)];
+				const FVec2 E{C.X - P.X, C.Y - P.Y};
+				const double D = std::sqrt(R3::SizeSquared(E));
+				const FVec2 U = R3::Normalize(E);
+				if (D > R3::kEps && U.X * ToWolf.X + U.Y * ToWolf.Y >= W.Config.KeepAway.HideAvoidCos)
+				{
+					continue;   // 늑대 쪽 ±60° 안
+				}
+				const double Edge = D - C.Radius;
+				if (Pick < 0 || Edge < PickEdge)
+				{
+					Pick = k;
+					PickEdge = Edge;
+				}
+			}
+			if (Pick >= 0 && Pick != S.HideTarget)
+			{
+				S.HideTarget = Pick;
+				++W.Stats.KeepHideRetarget;
+			}
+		}
+
+		/** B 의 덮기 제어: FLEE 제어기에 늑대 반대 방향을 넣는다(보인 위협으로 둔다). 경계는 뛰기를 걷기로 낮춘다 (섭식 0, 대사 = 걷기). */
+		inline void KeepControl(const FHerbView& H, EcoRepertoireV3::FControlInput& In)
+		{
+			const FHerbDecision& D = *H.Decision;
+			if (D.KeepActive != kKeepAlert && D.KeepActive != kKeepPanic)
+			{
+				return;
+			}
+			if (EcoRepertoireV3::IsNonZero(D.KeepDir))
+			{
+				In.AwayFromPred = D.KeepDir;
+				In.PredCount = In.PredCount > 0 ? In.PredCount : 1;
+			}
+		}
+
+		inline void KeepGait(const FWorldState& W, const FHerbView& H)
+		{
+			namespace R3 = EcoRepertoireV3;
+			R3::FControlOutput& O = *H.Control;
+			if (H.Decision->KeepActive != kKeepAlert || O.Gait != R3::kGaitRun)
+			{
+				return;
+			}
+			const R3::FRepertoireConfig& RC = W.RepCfg;
+			O.Gait = R3::kGaitWalk;
+			O.Velocity = R3::Scale(R3::Normalize(O.Velocity), RC.HerbSpeed * RC.GaitSpeed[R3::kGaitWalk]);
+			O.DrainMult = RC.GaitDrain[R3::kGaitWalk];
+		}
 	}
 
 	/**
@@ -900,6 +1253,7 @@ namespace EcoWorldV3
 		FStepReport Report;
 		const R3::FRepertoireConfig& RC = W.RepCfg;
 		W.StepCatches.clear();
+		const bool bKeep = W.Config.KeepAway.bEnabled;   // 경계 거리 규칙 (끄면 아래 bKeep 줄은 모두 건너뛴다 — 지금 그대로)
 
 		// A. Arbiter Commit — 지난 스텝 끝에 Prepare·마스크·망으로 정한 요청
 		for (std::int32_t i = 0; i < N; ++i)
@@ -919,13 +1273,40 @@ namespace EcoWorldV3
 			{
 				D.CommittedMask[b] = D.Mask[b];
 			}
-			D.Result = R3::Commit(S, D.Prep, D.Request, D.DecisionObs, RC);
+			const bool bOverride = bKeep && D.KeepMode != kKeepNone;
+			if (bOverride)
+			{
+				D.Result = Detail::CommitKeepAway(W, H);   // 두뇌 요청 대신 덮기 행동 (Enter 로 진입)
+			}
+			else
+			{
+				D.Result = R3::Commit(S, D.Prep, D.Request, D.DecisionObs, RC);
+				if (bKeep && D.Result.bSwitch && S.Behavior == R3::kHide && !S.bArrived)
+				{
+					Detail::RetargetHide(W, H, Threats, M);   // 늑대 쪽이 아닌 은신처
+				}
+			}
+			if (bKeep)
+			{
+				const std::int32_t PrevActive = D.KeepActive;
+				D.KeepActive = D.KeepMode;
+				if (D.KeepActive != PrevActive)
+				{
+					W.Stats.KeepAlertStarts += D.KeepActive == kKeepAlert ? 1 : 0;
+					W.Stats.KeepPanicStarts += D.KeepActive == kKeepPanic ? 1 : 0;
+					W.Stats.KeepShelterStarts += D.KeepActive == kKeepShelter ? 1 : 0;
+				}
+				D.KeepPanicSteps += D.KeepActive == kKeepPanic ? 1 : 0;
+				++W.Stats.KeepSteps[D.KeepActive];
+			}
 			D.ExecutedBehavior = S.Behavior;
 			D.bPrepared = false;
 
-			// 마스크 확인: 읽은 개체는 마스크 안 행동만, 읽지 않은 개체는 행동이 그대로다 (기상 끝은 SLEEP 전용)
-			const bool bAllowed = D.bCommittedReads ? D.CommittedMask[S.Behavior] != 0
-													: (S.Behavior == D.PrevBehavior || D.Prep.bWoke);
+			// 마스크 확인: 읽은 개체는 마스크 안 행동만, 읽지 않은 개체는 행동이 그대로다 (기상 끝은 SLEEP 전용).
+			// 경계 거리 규칙의 덮기는 세계 허용 칸 안 행동만 (FLEE·HIDE)
+			const bool bAllowed = bOverride				? W.Allowed[S.Behavior] != 0
+								  : D.bCommittedReads ? D.CommittedMask[S.Behavior] != 0
+													  : (S.Behavior == D.PrevBehavior || D.Prep.bWoke);
 			W.Stats.MaskViolations += bAllowed ? 0 : 1;
 			W.Stats.Decisions += D.bCommittedReads ? 1 : 0;
 			if (D.Result.bSwitch)
@@ -938,7 +1319,18 @@ namespace EcoWorldV3
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			const FHerbView& H = Herbs[i];
-			*H.Control = R3::Control(*H.Rep, Detail::MakeControlInput(W, H), RC);
+			if (bKeep)
+			{
+				// 경계·도망: FLEE 제어기에 늑대 반대 방향 (경계는 걷기로)
+				R3::FControlInput In = Detail::MakeControlInput(W, H);
+				Detail::KeepControl(H, In);
+				*H.Control = R3::Control(*H.Rep, In, RC);
+				Detail::KeepGait(W, H);
+			}
+			else
+			{
+				*H.Control = R3::Control(*H.Rep, Detail::MakeControlInput(W, H), RC);
+			}
 			R3::CommitSeeMult(*H.Rep, H.Control->SeeMult);
 			++W.Stats.BehaviorSteps[H.Rep->Behavior];
 		}
@@ -1067,6 +1459,10 @@ namespace EcoWorldV3
 				B.DeathPos = B.Pos;
 				W.StepCatches.push_back(B.Pos);
 				++NumCaught;
+				if (bKeep)
+				{
+					++W.Stats.CaughtByKeep[Herbs[i].Decision->KeepActive];   // 기록만 (경계 중·도망 중·웅크림 중·덮기 밖)
+				}
 			}
 			else if (B.Energy <= 0.0)
 			{
@@ -1157,7 +1553,11 @@ namespace EcoWorldV3
 			}
 		}
 
-		// H. 다음 스텝 요청
+		// H. 다음 스텝 요청. 경계 거리 규칙을 켠 세계는 먼저 스텝 끝 기하로 다음 스텝의 덮기를 정한다 (덮기면 DecideHerb 가 망을 부르지 않는다)
+		if (bKeep)
+		{
+			Detail::UpdateKeepAway(W, Herbs, N, Threats, M);
+		}
 		DecideAll(W, Herbs, N, Net);
 
 		W.Stats.Caught += Report.Caught;

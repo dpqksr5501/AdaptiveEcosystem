@@ -78,6 +78,32 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("Play 전에 바꾼다. 명령줄 -EcoV3WolfEatSeconds= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarKeepAway(
+		TEXT("eco.IntegratedV3.KeepAway"),
+		1,
+		TEXT("통합 v3 모드의 사슴 경계 거리 (1 = 켬, 기본 — 사람 결정 10-15 (C)). 깨어 있는 늑대가 경계 거리(AlertDistM) 안이면 바라보는 쪽과 무관하게 ")
+		TEXT("알아채고 걸어서 멀어지고, 위험 거리(PanicDistM) 안이거나 다가오면 안전 거리(SafeDistM) 밖이 되거나 은신처에 들 때까지 뛰어 달아난다. ")
+		TEXT("자는 늑대는 무시한다. 두뇌 위의 행동 실행 규칙이다 (가중치 그대로). 0 = 지금 그대로. Play 전에 바꾼다. 명령줄 -EcoV3KeepAway= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarAlertDistM(
+		TEXT("eco.IntegratedV3.AlertDistM"),
+		30.0f,
+		TEXT("통합 v3 모드 사슴 경계 거리 (m, 기본 30). 깨어 있는 늑대가 이 안이면 먹기를 멈추고 걸어서(360 cm/s) 멀어진다. Play 전에 바꾼다."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarPanicDistM(
+		TEXT("eco.IntegratedV3.PanicDistM"),
+		15.0f,
+		TEXT("통합 v3 모드 사슴 위험 거리 (m, 기본 15). 늑대가 이 안이면(또는 다가오면) 뛰어서 안전해질 때까지 달아난다. Play 전에 바꾼다."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarSafeDistM(
+		TEXT("eco.IntegratedV3.SafeDistM"),
+		40.0f,
+		TEXT("통합 v3 모드 사슴 안전 거리 (m, 기본 40). 깨어 있는 늑대가 모두 이 밖이고 아무도 쫓지 않으면 도망을 멈춘다 (경계·위험 거리보다 작으면 그 값으로 올린다). Play 전에 바꾼다."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarDebug(
 		TEXT("eco.V3Debug"),
 		0,
@@ -220,13 +246,23 @@ const TCHAR* EcoV3Integrated::BehaviorNameKo(int32 B)
 	return (B >= 0 && B < EcoRepertoireV3::kNumBehaviors) ? Names[B] : TEXT("?");
 }
 
+const TCHAR* EcoV3Integrated::KeepModeNameKo(int32 KeepMode)
+{
+	static const TCHAR* Names[EcoWorldV3::kNumKeepModes] = {TEXT("두뇌"), TEXT("경계(멀어짐)"), TEXT("도망(안전해질 때까지)"),
+															 TEXT("숨기(은신처·경계)")};
+	return (KeepMode >= 0 && KeepMode < EcoWorldV3::kNumKeepModes) ? Names[KeepMode] : TEXT("?");
+}
+
 FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
-								   FColor& OutColor)
+								   FColor& OutColor, int32 KeepMode)
 {
 	const double E = FMath::Clamp(Body.Energy, 0.0, 1.0);
-	FString Label = FString::Printf(TEXT("%s%s %d%%"), BehaviorNameKo(Rep.Behavior),
-									Rep.Behavior == EcoRepertoireV3::kHide && Rep.bArrived ? TEXT("(웅크림)") : TEXT(""),
-									FMath::RoundToInt32(100.0 * E));
+	const bool bKeep = KeepMode > EcoWorldV3::kKeepNone && KeepMode < EcoWorldV3::kNumKeepModes;
+	// 경계 거리 덮기 중이면 행동 이름 대신 덮기 이름 ('경계(멀어짐) 64%', '도망(안전해질 때까지) 58%')
+	FString Label = bKeep ? FString::Printf(TEXT("%s %d%%"), KeepModeNameKo(KeepMode), FMath::RoundToInt32(100.0 * E))
+						  : FString::Printf(TEXT("%s%s %d%%"), BehaviorNameKo(Rep.Behavior),
+											Rep.Behavior == EcoRepertoireV3::kHide && Rep.bArrived ? TEXT("(웅크림)") : TEXT(""),
+											FMath::RoundToInt32(100.0 * E));
 	if (Body.LastIntake > 0.0)
 	{
 		// 먹이 단위 × 0.5 = 에너지 (FoodEnergyPerUnit). 한 스텝 많아야 0.06 단위 = 3.0 %p
@@ -238,6 +274,12 @@ FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const 
 			   : Rep.Behavior == EcoRepertoireV3::kHide	  ? FColor(60, 150, 255)
 			   : Rep.Behavior == EcoRepertoireV3::kFreeze ? FColor(245, 245, 245)
 														  : FColor(170, 70, 210);
+	if (bKeep)
+	{
+		OutColor = KeepMode == EcoWorldV3::kKeepAlert ? FColor(255, 175, 80)
+				   : KeepMode == EcoWorldV3::kKeepPanic ? FColor(255, 110, 20)
+														: FColor(60, 150, 255);
+	}
 	if (E < kStarvingEnergy)
 	{
 		Label += TEXT(" 굶주림");
@@ -306,6 +348,10 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bGradualNight = CVarGradualNight.GetValueOnGameThread() != 0;
 	S.bNoFreeze = CVarNoFreeze.GetValueOnGameThread() != 0;
 	S.WolfEatSeconds = static_cast<double>(CVarWolfEatSeconds.GetValueOnGameThread());
+	S.bKeepAway = CVarKeepAway.GetValueOnGameThread() != 0;
+	S.AlertDistM = static_cast<double>(CVarAlertDistM.GetValueOnGameThread());
+	S.PanicDistM = static_cast<double>(CVarPanicDistM.GetValueOnGameThread());
+	S.SafeDistM = static_cast<double>(CVarSafeDistM.GetValueOnGameThread());
 	return S;
 }
 
@@ -355,6 +401,11 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3WolfEatSeconds="), EatArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.WolfEatSeconds"), LexToString(EatArg));
+	}
+	int32 KeepArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3KeepAway="), KeepArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.KeepAway"), LexToString(KeepArg));
 	}
 }
 
@@ -464,6 +515,14 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Settings.WolfEatSeconds, EatSteps, EatSteps * EcoRepertoireV3::kStepSeconds)
 				 : FString::Printf(TEXT("옛 규칙 %d 스텝 (%.2f초, 그동안 배회 — 학습 세계 그대로. eco.IntegratedV3.WolfEatSeconds %.2f)"), EatSteps,
 								   EatSteps * EcoRepertoireV3::kStepSeconds, Settings.WolfEatSeconds)));
+	const EcoWorldV3::FKeepAwayConfig Keep = Settings.KeepAwayConfig();
+	const double MPerUnit = EcoRepertoireV3::kUnitCm / 100.0;
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 경계 거리: %s"),
+		   *(Keep.bEnabled
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.KeepAway 1, 사람 결정 10-15 (C)) — 깨어 있는 늑대 %.0f m 안 = 걸어서 멀어짐, %.0f m 안이거나 다가옴 = 뛰어서 ")
+									   TEXT("안전 거리 %.0f m 밖·은신처까지 도망, 은신처 안이면 웅크림, 숨기는 늑대 쪽 ±60° 밖 은신처, 자는 늑대 무시"),
+								   Keep.AlertDist * MPerUnit, Keep.PanicDist * MPerUnit, Keep.SafeDist * MPerUnit)
+				 : FString(TEXT("끔 (eco.IntegratedV3.KeepAway 0 — 두뇌 그대로)"))));
 }
 
 void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
@@ -708,6 +767,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 		C.PredEatCdOverride = S.WolfEatSteps();
 		C.bEatInPlace = true;
 	}
+	// 사슴 경계 거리 (eco.IntegratedV3.KeepAway, 사람 결정 10-15 (C)): 끄면 기본값(꺼짐) 그대로
+	C.KeepAway = S.KeepAwayConfig();
 	return C;
 }
 
@@ -1451,6 +1512,41 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		Ctx.LastLogEat = E;
 		Ctx.LastLogFreezeMaskOpen = Ctx.FreezeMaskOpen;
 	}
+	// 셋째 줄: 사슴 경계 거리 (사람 결정 10-15 (C)). 구간 = 지난 기록 줄 뒤. '식사 중 늑대 15 m 안 사슴'은 규칙을 꺼도 센다 (켬·끔 비교)
+	{
+		const EcoWorldV3::FKeepAwayConfig& K = Ctx.Sim.Config.KeepAway;
+		const double MPerUnit = EcoRepertoireV3::kUnitCm / 100.0;
+		const int64 Steps = S.Steps - P.Steps;
+		const int64 Near = Ctx.NearEatingDeerSteps - Ctx.LastLogNearEatingDeerSteps;
+		const int64 Ends = S.KeepPanicEnds - P.KeepPanicEnds;
+		const int64 EndSteps = S.KeepPanicEndSteps - P.KeepPanicEndSteps;
+		const int64 Caught = S.Caught - P.Caught;
+		int64 CaughtKeep[EcoWorldV3::kNumKeepModes] = {};
+		for (int32 k = 1; k < EcoWorldV3::kNumKeepModes; ++k)
+		{
+			CaughtKeep[k] = S.CaughtByKeep[k] - P.CaughtByKeep[k];
+		}
+		const int64 CaughtOutside = Caught - CaughtKeep[1] - CaughtKeep[2] - CaughtKeep[3];
+		const FString Rule = K.bEnabled ? FString::Printf(TEXT("켬 (경계 %.0f m · 위험 %.0f m · 안전 %.0f m)"), K.AlertDist * MPerUnit,
+														  K.PanicDist * MPerUnit, K.SafeDist * MPerUnit)
+										: FString(TEXT("끔 (두뇌 그대로)"));
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 경계 거리 | %.1f초 | %s | 구간 경계(멀어짐) 시작 %lld · 도망 시작 %lld · 은신처 웅크림 시작 %lld | ")
+				   TEXT("덮기 개체·스텝 경계 %lld 도망 %lld 웅크림 %lld (두뇌 %lld) | 끝난 도망 %lld (은신처에서 %lld), 평균 %.1f초 · 도망 중 죽음 %lld | ")
+				   TEXT("잡힌 사슴 %lld: 경계 중 %lld · 도망 중 %lld · 웅크림 중 %lld · 덮기 밖 %lld | 숨기 은신처를 늑대 반대쪽으로 바꿈 %lld | ")
+				   TEXT("식사 중 늑대 15 m 안 사슴 %lld 개체·스텝 (스텝당 %.2f 마리) | 지금 덮기: 경계 %d 도망 %d 웅크림 %d"),
+			   *Ctx.RegionId.ToString(), Seconds, *Rule, static_cast<long long>(S.KeepAlertStarts - P.KeepAlertStarts),
+			   static_cast<long long>(S.KeepPanicStarts - P.KeepPanicStarts), static_cast<long long>(S.KeepShelterStarts - P.KeepShelterStarts),
+			   static_cast<long long>(S.KeepSteps[1] - P.KeepSteps[1]), static_cast<long long>(S.KeepSteps[2] - P.KeepSteps[2]),
+			   static_cast<long long>(S.KeepSteps[3] - P.KeepSteps[3]), static_cast<long long>(S.KeepSteps[0] - P.KeepSteps[0]),
+			   static_cast<long long>(Ends), static_cast<long long>(S.KeepPanicEndShelter - P.KeepPanicEndShelter),
+			   Ends > 0 ? static_cast<double>(EndSteps) * EcoRepertoireV3::kStepSeconds / static_cast<double>(Ends) : 0.0,
+			   static_cast<long long>(S.KeepPanicDied - P.KeepPanicDied), static_cast<long long>(Caught), static_cast<long long>(CaughtKeep[1]),
+			   static_cast<long long>(CaughtKeep[2]), static_cast<long long>(CaughtKeep[3]), static_cast<long long>(CaughtOutside),
+			   static_cast<long long>(S.KeepHideRetarget - P.KeepHideRetarget), static_cast<long long>(Near),
+			   Steps > 0 ? static_cast<double>(Near) / static_cast<double>(Steps) : 0.0, Ctx.KeepNow[1], Ctx.KeepNow[2], Ctx.KeepNow[3]);
+		Ctx.LastLogNearEatingDeerSteps = Ctx.NearEatingDeerSteps;
+	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
 	{
@@ -1602,6 +1698,12 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 		Wolves += FString::Printf(TEXT(" | 늑대 식사 %s초 %s"),
 								  *FString::SanitizeFloat(FMath::RoundToDouble(10.0 * EatCd * EcoRepertoireV3::kStepSeconds) / 10.0),
 								  Ctx.Sim.ThreatCfg.bEatInPlace ? TEXT("제자리") : TEXT("배회"));
+		// 사슴 경계 거리 (사람 결정 10-15 (C)): 지금 덮기 수
+		if (Ctx.Sim.Config.KeepAway.bEnabled)
+		{
+			Tally += FString::Printf(TEXT(" | 경계(멀어짐) %d 도망(안전해질 때까지) %d 숨기(은신처·경계) %d"), Ctx.KeepNow[EcoWorldV3::kKeepAlert],
+									 Ctx.KeepNow[EcoWorldV3::kKeepPanic], Ctx.KeepNow[EcoWorldV3::kKeepShelter]);
+		}
 		const FString Line = FString::Printf(TEXT("v3 %s %s | %s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld"),
 											 Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"),
 											 *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Ctx.Sim.Dark,
