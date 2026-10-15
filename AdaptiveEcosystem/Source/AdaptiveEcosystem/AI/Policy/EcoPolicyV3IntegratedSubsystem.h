@@ -72,6 +72,9 @@
 //      배·비축 모두 0 이어야 굶어 죽는다. 배 10% 밑이면 0.75 배 느리다. 비축으로 사는 사슴의 Vitals 에너지 거울은 아주 작은 양수라 팀 HP 감소가
 //      먼저 죽이지 않는다 (죽음은 v3 DeathCause 한 길). 화면: 사슴 글자 '배고픔 비축 63%'·'비축 바닥'·'약함(느림)', 지역 둘째 줄 비축 평균·
 //      비축으로 사는 사슴. 기록 넷째 줄 '<지역> 야생 |': 꺼내 씀·채움·약한 개체·스텝·약한 채로 잡힘·지금 비축 평균·최소 (앞 세 줄은 그대로).
+//      늑대 포만 eco.IntegratedV3.WildSatiation (-EcoV3WildSatiation=, EcoThreatModel.h FThreatConfig::bWildSatiation): 먹기(5초)가 끝나면
+//      반나절(450 스텝 = 60초) 사냥하지 않고 0.3 배 속력으로 어슬렁거린다. 자지 않는 한 사슴에게 보인다. 화면: 늑대 글자 '늑대 배부름·쉼 42초'.
+//      기록 넷째 줄: 배불러 쉰·먹는 늑대·스텝 비율, 포만을 건 포획.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -188,6 +191,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	double PanicDistM = 15.0;           // 위험 거리 (m, eco.IntegratedV3.PanicDistM) — 이 안이거나 다가오면 뛰어서 달아난다
 	double SafeDistM = 40.0;            // 안전 거리 (m, eco.IntegratedV3.SafeDistM) — 깨어 있는 늑대가 모두 이 밖일 때까지 도망
 	bool bWildReserve = true;           // 사슴 지방 비축 (eco.IntegratedV3.WildReserve 기본 1, 사람 결정 10-15 (7) 야생 1단계 w1). 거짓 = E 0 이면 곧바로 굶음
+	bool bWildSatiation = true;         // 늑대 포만 (eco.IntegratedV3.WildSatiation 기본 1, 야생 w2). 거짓 = 식사가 끝나면 곧바로 사냥
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등

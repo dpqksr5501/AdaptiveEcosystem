@@ -198,6 +198,20 @@ namespace EcoWorldV3
 		return Out;
 	}
 
+	// ---- 야생 1단계 (w2) 늑대 포만 (명세 3-2). 계산은 EcoThreatModel.h FThreatConfig::bWildSatiation (Step) — 여기는 하루 단위 계수다 ----
+	struct FWildSatiationConfig
+	{
+		bool bEnabled = false;              // 끄면 FThreatConfig::bWildSatiation 거짓 (SatLeft 늘 0)
+		double SatDays = 0.5;               // 배부름 게임 하루 수 → 스텝 = 반올림(일 × DayPeriod), 0.5 는 올림 (wild_days_to_steps)
+		double RestSpeed = 0.3;             // 배부른 늑대의 배회 속력 배수
+	};
+
+	/** 게임 하루 단위 계수 → 스텝 (world.py wild_days_to_steps: floor(일 × 하루 + 0.5)). */
+	inline std::int32_t WildDaysToSteps(double Days, std::int32_t Period)
+	{
+		return static_cast<std::int32_t>(std::floor(Days * static_cast<double>(Period) + 0.5));
+	}
+
 	// ---- 세계 설정 (파이썬 단위). 기본값 = 평면 시험 맵용 R1b 학습 범위 안의 한 세계 ----
 
 	struct FWorldConfig
@@ -251,6 +265,8 @@ namespace EcoWorldV3
 		// 야생 1단계 (w1) 지방 비축 (사람 결정 10-15 (7), 통합 모드 eco.IntegratedV3.WildReserve). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든).
 		// 낮 고정 세계(DayPeriod ≤ 0)에서는 InitWorld 가 끈다 (파이썬도 daynight 없이 켤 수 없다)
 		FWildReserveConfig WildReserve;
+		// 야생 1단계 (w2) 늑대 포만 (통합 모드 eco.IntegratedV3.WildSatiation). 기본 끔. 낮 고정 세계에서는 InitWorld 가 끈다
+		FWildSatiationConfig WildSatiation;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -585,6 +601,11 @@ namespace EcoWorldV3
 		std::int64_t ReserveLiveSteps = 0;   // 비축을 적용한 개체·스텝
 		std::int64_t WeakSteps = 0;          // 그중 약한 개체·스텝 (스텝 첫머리 E < WeakE)
 		std::int64_t WeakCaught = 0;         // 약한 채로 잡힌 수
+		// 야생 (w2) 늑대 포만 기록 (켰을 때만, 플레이어형 빼고. world.py wild_stats sated_frac·eating_frac·wolf_kills_n)
+		std::int64_t WolfSteps = 0;          // 늑대·스텝
+		std::int64_t WolfSatedSteps = 0;     // 그중 배불러 쉼
+		std::int64_t WolfEatingSteps = 0;    // 그중 먹는 중 (쿨다운 줄인 뒤 > 0)
+		std::int64_t WolfKills = 0;          // 포만을 건 포획
 	};
 
 	/**
@@ -675,6 +696,11 @@ namespace EcoWorldV3
 		W.Config.WildReserve.bEnabled = C.WildReserve.bEnabled && W.Config.DayPeriod > 0;
 		W.ReserveCap = W.Config.WildReserve.bEnabled
 						   ? WildReserveCapacity(W.Config.WildReserve, W.Config.DayPeriod, W.RepCfg.EnergyDrain) : 0.0;
+		// 야생 (w2) 늑대 포만: 하루 단위 배부름을 이 세계의 하루 스텝으로 (파이썬도 daynight 없이 켤 수 없다)
+		W.Config.WildSatiation.bEnabled = C.WildSatiation.bEnabled && W.Config.DayPeriod > 0;
+		W.ThreatCfg.bWildSatiation = W.Config.WildSatiation.bEnabled;
+		W.ThreatCfg.SatSteps = W.Config.WildSatiation.bEnabled ? WildDaysToSteps(C.WildSatiation.SatDays, W.Config.DayPeriod) : 0;
+		W.ThreatCfg.RestSpeed = C.WildSatiation.RestSpeed;
 		for (std::int32_t b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
 		{
 			W.Allowed[b] = (EcoPolicyV3::kAllowedMask[b] != 0 && C.WorldAllowed[b] != 0) ? 1 : 0;
@@ -1488,7 +1514,16 @@ namespace EcoWorldV3
 			}
 			A.PrevX = A.State.PosX;
 			A.PrevY = A.State.PosY;
+			const std::int32_t PreCd = A.State.Cooldown;
 			A.Last = EcoThreatV3::Step(A.Spec, A.State, In, W.ThreatCfg);
+			if (W.ThreatCfg.bWildSatiation && A.Spec.Type != EcoThreatV3::EThreatType::Player)
+			{
+				// 야생 (w2) 기록만: 늑대·스텝, 배불러 쉼, 먹는 중(쿨다운 줄인 뒤 > 0), 포만을 건 포획
+				++W.Stats.WolfSteps;
+				W.Stats.WolfSatedSteps += A.Last.bSated ? 1 : 0;
+				W.Stats.WolfEatingSteps += PreCd - 1 > 0 ? 1 : 0;
+				W.Stats.WolfKills += A.Last.Caught >= 0 ? 1 : 0;
+			}
 			// 통합 모드: 지형·장애물 제약. 포획은 이동 전 위치로 이미 판정했다(위 Step 9). 막히면 이동 전 자리·변위 0·heading 반전
 			// (학습의 벽 반사를 흉내 낸 근사 — 장애물의 법선은 모른다)
 			if (Hooks && Hooks->ThreatMove && (A.State.PosX != A.PrevX || A.State.PosY != A.PrevY)

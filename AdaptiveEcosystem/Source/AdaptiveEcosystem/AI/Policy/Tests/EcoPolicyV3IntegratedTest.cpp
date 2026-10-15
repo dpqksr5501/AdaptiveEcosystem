@@ -2573,6 +2573,7 @@ bool FEcoPolicyV3IntegratedWolfEatingTest::RunTest(const FString& Parameters)
 		FEcoV3IntegratedSettings S = TestSettings(35001);
 		S.bGradualNight = false;   // MultiStepDeathExclusion 과 같은 배치: t = 0(d = 0.5)에 입양한 늑대가 둘째 스텝에 잡는다
 		S.WolfEatSeconds = EatSeconds;
+		S.bWildSatiation = false;   // 식사 끝 뒤 곧바로 다시 사냥하는지 보는 시험 — 늑대 포만(야생 w2, 통합 기본 켬)을 끈다 (포만은 Wild.SatiationGolden)
 		FIntegratedHarness H;
 		if (!H.Setup(*this, S))
 		{

@@ -18,6 +18,10 @@
               100 스텝마다의 (E, R).
   섞음 열     정해진 먹이 무늬(스텝 t 의 먹은 에너지 = 0.03 if (t // 50) % 3 == 0 else 0, e_new = min(E − drain + 먹은 것, max_energy))로
               E 0.2·R 0.2 에서 600 스텝. 스텝마다 (E, R). C++ 은 같은 식으로 자기 출력을 이어 쓴다.
+  포만 열     (w2) 늑대 포만. 거울 세계를 만든 뒤 사슴을 모두 (1, 1) 로, 늑대 둘(추격형·잠행형)을 무대 가운데 (30, 30) 로 옮기고, 낮(d = 0)·
+              깨어 있음·밤잠 활동도 가득·속력 배수 1 로 두고, 막 잡은 늑대처럼 쿨다운 = pred_eat_cd(38)·배부름 = sat 스텝(450)에서
+              `World._step_predators_v3` 만 500 번 부른다(사슴은 시야 밖이라 표적·포획이 없다). 스텝마다 늑대별 (쿨다운, 남은 배부름,
+              배부름 훅, 지난 변위 크기). 변위 크기는 벽에 닿은 스텝만 속력보다 작다.
 """
 
 from __future__ import annotations
@@ -131,12 +135,36 @@ def mixed_chain(w: World, steps: int = 600) -> list[tuple[float, float]]:
     return out
 
 
+def satiation_chain(steps: int = 500) -> tuple[World, list[list[tuple[int, int, bool, float]]]]:
+    w = World(load_v2_config(WILD).replace(N=N), seeds=[SEED + 1])
+    w.reset()
+    if w._ws is None:
+        raise SystemExit("v3_wild1_mirror.yaml 의 wild_satiation 이 꺼졌다")
+    w.pos[:] = [1.0, 1.0]
+    w.pred_pos[:] = [30.0, 30.0]
+    w.dark = 0.0
+    w.pred_asleep[:] = False
+    if getattr(w, "_zn", None) is not None:
+        w._zn_act[:] = w._zn["ramp_steps"]
+    w._pred_speed_mult = np.ones(w.M)
+    w.pred_cd[:] = int(w.cfg.pred_eat_cd)
+    w.pred_sat[:] = w._ws_sat_steps
+    rows = []
+    for _ in range(steps):
+        w._step_predators_v3()
+        rows.append([(int(w.pred_cd[m]), int(w.pred_sat[m]), bool(w.pred_sated[m]), float(np.hypot(*w.pred_vel[m])))
+                     for m in range(w.M)])
+    return w, rows
+
+
 def build_header() -> str:
     w = make_world()
     wr = w._wr
     cases = reserve_cases(w)
     starve_t, starve = starve_chain(w)
     mixed = mixed_chain(w)
+    ws_w, sat = satiation_chain()
+    types = [int(t) for t in ws_w.pred_type]
     L = [
         "// 자동 생성 — herbivore_rl/export_golden_v3_wild.py (손으로 고치지 않는다). 세계 configs/v3_wild1_mirror.yaml, 시드 32090.",
         "// v3 야생 1단계 골든 (명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md 5절). 검사는 Tests/EcoWildV3Test.cpp (AdaptiveEcosystem.Policy.V3.Wild.*).",
@@ -176,6 +204,19 @@ def build_header() -> str:
         "\tinline constexpr double kMixedGain = 0.03;",
         f"\tinline constexpr std::int32_t kMixedSteps = {len(mixed)};",
         c_array("double", "kMixedER", [v for p in mixed for v in p], 6, d_lit),
+        "",
+        "	// (w2) wild_satiation: sat 스텝 = wild_days_to_steps(sat_days, dn_period), rest_speed, 먹기 쿨다운, 늑대 기본 속력",
+        f"	inline constexpr double kSatDays = {d_lit(ws_w._ws['sat_days'])};",
+        f"	inline constexpr double kRestSpeed = {d_lit(ws_w._ws['rest_speed'])};",
+        f"	inline constexpr std::int32_t kSatSteps = {int(ws_w._ws_sat_steps)};",
+        f"	inline constexpr std::int32_t kPredEatCd = {int(ws_w.cfg.pred_eat_cd)};",
+        f"	inline constexpr double kPredBaseSpeed = {d_lit(ws_w.pred_speed[0])};   // 늑대 기본 속력 (단위/스텝, 0.6 × 0.8)",
+        "	// 포만 열: 늑대 슬롯마다 종류 (0 추격형, 1 잠행형 — world.py PT_CHASER·PT_STALKER), 스텝마다 늑대마다 (쿨다운, 남은 배부름, 배부름 0/1, 변위 크기)",
+        f"	inline constexpr std::int32_t kSatWolves = {len(types)};",
+        c_array("std::int32_t", "kSatWolfType", types, 8, str),
+        f"	inline constexpr std::int32_t kSatChainSteps = {len(sat)};",
+        c_array("std::int32_t", "kSatChainInt", [v for r in sat for c in r for v in (c[0], c[1], int(c[2]))], 12, str),
+        c_array("double", "kSatChainVel", [c[3] for r in sat for c in r], 6, d_lit),
         "}",
         "",
     ]

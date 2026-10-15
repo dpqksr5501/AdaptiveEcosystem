@@ -192,6 +192,14 @@ namespace EcoThreatV3
 		// ---- 늑대 식사 중 제자리 (사람 결정 10-15 (B)). 기본 끔 = R1b 학습 세계 그대로 (쿨다운 동안 배회) ----
 		// 켜는 쪽: 언리얼 통합 레벨 v3 모드 (eco.IntegratedV3.WolfEatSeconds 가 학습 5 스텝보다 길 때, PredEatCd 와 함께 바꾼다)
 		bool bEatInPlace = false;                  // eat_in_place: 켜면 보통 위협이 쿨다운(식사) 동안 서 있는다 (Step 6c, 머리 주석 '늑대 식사 중 제자리')
+
+		// ---- 야생 1단계 (w2) 늑대 포만 (사람 결정 10-15 (7), 파이썬 world.py '야생 1단계' (w2), configs/v3_wild1_mirror.yaml wild_satiation).
+		//      기본 끔 = R1b 학습 세계 그대로. 켜는 쪽: EcoWorldV3 FWorldConfig::WildSatiation (하루 단위 sat_days 를 스텝으로 옮겨 넣는다) ----
+		// 보통 위협이 잡으면 SatLeft ← SatSteps. Step 첫머리 쿨다운을 줄인 뒤 쿨다운 0 이고 SatLeft > 0 이면 이번 스텝은 배부름(bSated):
+		// 사냥하지 않고(표적·포획 없음) SatLeft −1, 속력 × RestSpeed (6c 식사 제자리 뒤, 7 밤잠 배수 앞). 자지 않는 한 사슴에게 그대로 보인다
+		bool bWildSatiation = false;
+		std::int32_t SatSteps = 450;               // 반올림(sat_days 0.5 × 하루 900 스텝) = 60 초
+		double RestSpeed = 0.3;                    // rest_speed: 배부른 늑대의 배회 속력 배수
 	};
 
 	// 위협 하나의 바뀌지 않는 성질 (세계 생성 때 정한다 — world.py:907-912, 976-1011)
@@ -232,6 +240,9 @@ namespace EcoThreatV3
 		std::int32_t NightWait = -1;     // 기상까지 남은 업데이트 (-1 = 기다리지 않음)
 		std::int32_t NightDelay = 0;     // 늑대별 잠·기상 지연 δ (NightDelayOf)
 		bool bNightHunt = false;         // 지난 Step 에 사냥 중이었나 (표적 있음 ∨ 잠행형 돌진 상태). Step 이 쓰고 다음 Step·NightUpdate 가 읽는다
+
+		// 야생 (w2) 늑대 포만 (Cfg.bWildSatiation 일 때만. 끄면 늘 0 — world.py pred_sat)
+		std::int32_t SatLeft = 0;        // 남은 배부름 스텝 (먹기가 끝난 뒤부터 준다)
 	};
 
 	// 위협이 보는 초식 하나 (이번 스텝 이동 뒤 값)
@@ -271,6 +282,7 @@ namespace EcoThreatV3
 		bool bPounceStart = false;           // 잠행형 돌진 시작
 		bool bChargeStart = false;           // 플레이어 돌진 시작
 		bool bNewPlayerMode = false;         // 이번 스텝에 PlayerModeU0/U1 을 써서 새 모드를 골랐다
+		bool bSated = false;                 // 야생 (w2): 이번 스텝 배불러 쉬었다 (world.py 훅 pred_sated)
 	};
 
 	// ------------------------------------------------------------------------------------------------------------
@@ -640,7 +652,13 @@ namespace EcoThreatV3
 		//    지난 스텝에 사냥 중이 아니던 주행성 늑대는 새 사냥을 시작하지 않는다 (world.py `_step_predators_v3` 의 hunt_dark 줄)
 		T.Cooldown = T.Cooldown - 1 > 0 ? T.Cooldown - 1 : 0;
 		const bool bAsleep = IsAsleepNow(Spec, T, In.Dark, Cfg);
-		bool bHunting = T.Cooldown == 0 && !bAsleep;
+		// 야생 (w2) 포만: 먹기(쿨다운)가 끝났고 배부름이 남았으면 이번 스텝은 쉰다 (잠과 무관하게 남은 스텝이 준다 — world.py 그대로)
+		const bool bSated = Cfg.bWildSatiation && T.Cooldown == 0 && T.SatLeft > 0;
+		if (bSated)
+		{
+			--T.SatLeft;
+		}
+		bool bHunting = T.Cooldown == 0 && !bAsleep && !bSated;
 		if (Cfg.bRealismNight && In.Dark >= Cfg.NightHuntDark)
 		{
 			bHunting = bHunting && (Spec.bNocturnal || T.bNightHunt);
@@ -785,6 +803,11 @@ namespace EcoThreatV3
 			MY = HY;
 			Speed = 0.0;
 		}
+		// 6d. 야생 (w2): 배부른 늑대는 느리게 어슬렁거린다 (표적이 없으므로 move 는 배회. 밤잠 배수 앞 — world.py 그대로)
+		if (bSated)
+		{
+			Speed = Speed * Cfg.RestSpeed;
+		}
 
 		// 7. 밤잠·박명 (world.py:2078-2080). 밤잠 점진화를 켜면 배수는 늑대별 활동도를 따른다 (NightSpeedMult)
 		if (bAsleep)
@@ -851,6 +874,10 @@ namespace EcoThreatV3
 		if (bGot)
 		{
 			T.Cooldown = bPlayer ? Cfg.PlayerCooldown : Cfg.PredEatCd;
+			if (Cfg.bWildSatiation && !bPlayer)
+			{
+				T.SatLeft = Cfg.SatSteps;   // 야생 (w2): 먹기가 끝난 뒤 배부름 (플레이어형 위협은 늘 0)
+			}
 		}
 
 		// 10a. 잠행형 상태 갱신 (world.py `_threat_after`:2353-2368)
@@ -922,6 +949,7 @@ namespace EcoThreatV3
 		T.Target = J;
 		R.bAsleep = bAsleep;
 		R.bHunting = bHunting;
+		R.bSated = bSated;
 		R.bHasTarget = bHasTarget;
 		R.Target = J;
 		R.TargetPerceived = bHasTarget ? DT : -1.0;

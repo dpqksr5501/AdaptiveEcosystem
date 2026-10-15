@@ -113,6 +113,14 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("명령줄 -EcoV3WildReserve= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarWildSatiation(
+		TEXT("eco.IntegratedV3.WildSatiation"),
+		1,
+		TEXT("통합 v3 모드의 늑대 포만 (1 = 켬, 기본 — 사람 결정 10-15 (7) 야생 1단계 w2). 사슴을 잡은 늑대는 먹기(WolfEatSeconds)가 끝나면 ")
+		TEXT("반나절(450 스텝 = 60초) 동안 사냥하지 않고 0.3 배 속력으로 어슬렁거린다. 쉬는 늑대도 사슴 눈에 보인다. 값 = 파이썬 configs/v3_wild1_mirror.yaml ")
+		TEXT("wild_satiation. 0 = 먹기가 끝나면 곧바로 사냥(지금까지). Play 전에 바꾼다. 명령줄 -EcoV3WildSatiation= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarDebug(
 		TEXT("eco.V3Debug"),
 		0,
@@ -321,6 +329,13 @@ FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const 
 
 FString EcoV3Integrated::WolfLabel(const EcoWorldV3::FThreatAgent& A, const EcoThreatV3::FThreatConfig& Cfg, double Dark, FColor& OutColor)
 {
+	if (Cfg.bWildSatiation && A.Last.bSated && !A.State.bAsleep)
+	{
+		// 야생 (w2) 늑대 포만: 먹은 뒤 쉬며 어슬렁거림 (사냥하지 않는다). 남은 배부름 = SatLeft × 2/15 초
+		OutColor = FColor(150, 210, 150);
+		return FString::Printf(TEXT("늑대 배부름·쉼 %.0f초%s"), static_cast<double>(A.State.SatLeft) * EcoRepertoireV3::kStepSeconds,
+							   A.Spec.Type == EcoThreatV3::EThreatType::Stalker ? TEXT(" (잠행형)") : TEXT(" (추격형)"));
+	}
 	const EWolfState St = WolfStateOf(A, Cfg);
 	OutColor = St == EWolfState::Pounce								  ? FColor(255, 120, 0)
 			   : St == EWolfState::Sleep							  ? FColor(60, 60, 160)
@@ -380,6 +395,7 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.PanicDistM = static_cast<double>(CVarPanicDistM.GetValueOnGameThread());
 	S.SafeDistM = static_cast<double>(CVarSafeDistM.GetValueOnGameThread());
 	S.bWildReserve = CVarWildReserve.GetValueOnGameThread() != 0;
+	S.bWildSatiation = CVarWildSatiation.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -439,6 +455,11 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3WildReserve="), ReserveArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.WildReserve"), LexToString(ReserveArg));
+	}
+	int32 SatArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3WildSatiation="), SatArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.WildSatiation"), LexToString(SatArg));
 	}
 }
 
@@ -564,6 +585,13 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Wr.ReserveDays, static_cast<int32>(Wr.ReserveDays * 900.0 + 0.5), 100.0 * Wr.RefillE, 100.0 * Wr.RefillFrac,
 								   100.0 * Wr.WeakE, Wr.WeakSpeed)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildReserve 0 — 에너지 0 이면 곧바로 굶음)"))));
+	const EcoWorldV3::FWildSatiationConfig Ws;
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 늑대 포만: %s"),
+		   *(Settings.bWildSatiation
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.WildSatiation 1, 야생 w2) — 먹기가 끝나면 %.1f일(%d 스텝 = %.0f초) 사냥하지 않고 %.1f배 속력으로 어슬렁거림, 사슴 눈에 보임"),
+								   Ws.SatDays, EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900),
+								   EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900) * EcoRepertoireV3::kStepSeconds, Ws.RestSpeed)
+				 : FString(TEXT("끔 (eco.IntegratedV3.WildSatiation 0 — 먹기가 끝나면 곧바로 사냥)"))));
 }
 
 void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
@@ -812,6 +840,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.KeepAway = S.KeepAwayConfig();
 	// 사슴 지방 비축 (eco.IntegratedV3.WildReserve, 사람 결정 10-15 (7) 야생 1단계 w1): 값 = configs/v3_wild1_mirror.yaml (FWildReserveConfig 기본값)
 	C.WildReserve.bEnabled = S.bWildReserve;
+	// 늑대 포만 (eco.IntegratedV3.WildSatiation, 야생 w2): 값 = configs/v3_wild1_mirror.yaml (FWildSatiationConfig 기본값, 하루 900 스텝 → 450 스텝)
+	C.WildSatiation.bEnabled = S.bWildSatiation;
 	return C;
 }
 
@@ -1592,10 +1622,10 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	}
 	// 넷째 줄: 야생 1단계 (사람 결정 10-15 (7)). 켠 규칙만 적는다. 구간 = 지난 기록 줄 뒤. 앞 세 줄의 칸·순서는 그대로다
 	//   (results/v3/mirror/compare_unreal.py 가 첫 줄을 읽는다 — 이 줄은 '<지역> 야생 |' 꼴이라 그 정규식에 걸리지 않는다)
-	if (Ctx.Sim.Config.WildReserve.bEnabled)
+	if (Ctx.Sim.Config.WildReserve.bEnabled || Ctx.Sim.ThreatCfg.bWildSatiation)
 	{
 		const int64 LiveN = S.ReserveLiveSteps - P.ReserveLiveSteps;
-		const FString Reserve = FString::Printf(
+		const FString Reserve = !Ctx.Sim.Config.WildReserve.bEnabled ? FString(TEXT("지방 비축 끔")) : FString::Printf(
 			TEXT("지방 비축: 구간 꺼내 씀 %.3f · 채움 %.3f (에너지 단위, 용량 %.2f) · 약한 개체·스텝 %lld/%lld (%.1f%%) · 약한 채로 잡힘 %lld (누적 %lld) | ")
 				TEXT("지금 비축 평균 %.0f%% 최소 %.0f%% · 배 비어 비축으로 사는 사슴 %d · 비축 %.0f%% 밑 %d · 약함 %d"),
 			S.ReserveUsed - P.ReserveUsed, S.ReserveRefill - P.ReserveRefill, Ctx.Sim.ReserveCap,
@@ -1603,7 +1633,15 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			LiveN > 0 ? 100.0 * static_cast<double>(S.WeakSteps - P.WeakSteps) / static_cast<double>(LiveN) : 0.0,
 			static_cast<long long>(S.WeakCaught - P.WeakCaught), static_cast<long long>(S.WeakCaught), 100.0 * Ctx.MeanReserve,
 			100.0 * Ctx.MinReserve, Ctx.OnReserveDeer, 100.0 * EcoV3Integrated::kLowReserve, Ctx.LowReserveDeer, Ctx.WeakDeer);
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 야생 | %.1f초 | %s"), *Ctx.RegionId.ToString(), Seconds, *Reserve);
+		const int64 WolfN = S.WolfSteps - P.WolfSteps;
+		const FString Sat = !Ctx.Sim.ThreatCfg.bWildSatiation
+								? FString(TEXT("늑대 포만 끔"))
+								: FString::Printf(TEXT("늑대 포만(%d 스텝): 구간 늑대·스텝 %lld 중 배불러 쉼 %.0f%% · 먹는 중 %.0f%% · 포만을 건 포획 %lld (누적 %lld)"),
+												  Ctx.Sim.ThreatCfg.SatSteps, static_cast<long long>(WolfN),
+												  WolfN > 0 ? 100.0 * static_cast<double>(S.WolfSatedSteps - P.WolfSatedSteps) / static_cast<double>(WolfN) : 0.0,
+												  WolfN > 0 ? 100.0 * static_cast<double>(S.WolfEatingSteps - P.WolfEatingSteps) / static_cast<double>(WolfN) : 0.0,
+												  static_cast<long long>(S.WolfKills - P.WolfKills), static_cast<long long>(S.WolfKills));
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 야생 | %.1f초 | %s | %s"), *Ctx.RegionId.ToString(), Seconds, *Reserve, *Sat);
 	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))

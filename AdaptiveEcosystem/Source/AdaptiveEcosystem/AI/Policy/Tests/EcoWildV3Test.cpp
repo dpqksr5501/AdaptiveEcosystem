@@ -12,6 +12,7 @@
 //   Wild.ReserveGolden   (w1) 계수 = 파이썬 블록, 용량 C, 비축 한 번 끝 사례, 굶음 열(죽는 스텝·표본), 섞음 열(스텝마다 E·R)
 //   Wild.ReserveWorld    (w1) 기준 루프: 끄면(기본) 먹이 없는 세계에서 300 스텝 안에 굶음이 생기고, 켜면 아무도 굶지 않고 비축으로 살며 모두 약함(이동 ≤ 뛰기 × 0.75),
 //                        굶어 죽는 사슴은 배·비축 모두 0. 낮 고정 세계는 켜도 꺼진다. 사슴 글자 (eco.V3Debug)
+//   Wild.SatiationGolden (w2) 계수·하루 → 스텝, 포만 열(막 잡은 늑대 둘: 쿨다운·남은 배부름·쉼 정확히, 속력 = 파이썬 변위), 잡으면 배부름, 늑대 글자
 
 #include "Misc/AutomationTest.h"
 
@@ -258,6 +259,123 @@ bool FEcoWildV3ReserveWorldTest::RunTest(const FString& Parameters)
 				  FString(TEXT("먹기 80% 비축 20%")));
 		Body.Energy = 0.05;
 		TestEqual(TEXT("글자: 끈 세계는 지금 그대로"), EcoV3Integrated::DeerLabel(Rep, Body, false, Color), FString(TEXT("먹기 5% 굶주림")));
+	}
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoWildV3SatiationGoldenTest,
+	"AdaptiveEcosystem.Policy.V3.Wild.SatiationGolden",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoWildV3SatiationGoldenTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoThreatV3;
+	namespace GW = EcoWorldV3::GoldenWild;
+	// 계수: 하루 단위 → 스텝, 세계 설정이 위협 설정으로 옮긴다
+	const EcoWorldV3::FWildSatiationConfig Ws;
+	TestFalse(TEXT("포만 기본은 끔"), Ws.bEnabled || FThreatConfig().bWildSatiation);
+	TestEqual(TEXT("sat_days"), Ws.SatDays, GW::kSatDays);
+	TestEqual(TEXT("rest_speed"), Ws.RestSpeed, GW::kRestSpeed);
+	TestEqual(TEXT("sat 스텝 = 반올림(0.5 × 900)"), EcoWorldV3::WildDaysToSteps(Ws.SatDays, GW::kDayPeriod), GW::kSatSteps);
+	{
+		EcoWorldV3::FWorldConfig C;
+		C.WildSatiation.bEnabled = true;
+		EcoWorldV3::FWorldState W;
+		EcoWorldV3::InitWorld(W, C);
+		TestTrue(TEXT("세계 → 위협 설정: 켬"), W.ThreatCfg.bWildSatiation);
+		TestEqual(TEXT("세계 → 위협 설정: 450 스텝"), W.ThreatCfg.SatSteps, GW::kSatSteps);
+		C.DayPeriod = 0;
+		EcoWorldV3::InitWorld(W, C);
+		TestFalse(TEXT("낮 고정 세계는 켜도 꺼진다"), W.ThreatCfg.bWildSatiation);
+	}
+
+	// 포만 열: 막 잡은 늑대 (쿨다운 38·배부름 450), 낮·깨어 있음, 사슴 없음 → 37 스텝 먹기(제자리), 450 스텝 배부름(0.3 배), 그다음 사냥
+	FThreatConfig Cfg;
+	Cfg.PredEatCd = GW::kPredEatCd;
+	Cfg.bEatInPlace = true;
+	Cfg.bWildSatiation = true;
+	Cfg.SatSteps = GW::kSatSteps;
+	Cfg.RestSpeed = GW::kRestSpeed;
+	int32 IntBad = 0;
+	int32 VelBad = 0;
+	int32 VelExact = 0;
+	int32 HuntBad = 0;
+	for (int32 m = 0; m < GW::kSatWolves; ++m)
+	{
+		const FThreatSpec Spec = GW::kSatWolfType[m] == 1 ? MakeStalkerSpec(0.8, false, Cfg) : MakeChaserSpec(0.8, false, false, Cfg);
+		TestEqual(TEXT("늑대 기본 속력"), Spec.BaseSpeed, GW::kPredBaseSpeed);
+		FThreatState T;
+		T.PosX = 30.0;
+		T.PosY = 30.0;
+		T.Cooldown = GW::kPredEatCd;
+		T.SatLeft = GW::kSatSteps;
+		FThreatStepInput In;
+		In.Prey = nullptr;
+		In.NumPrey = 0;
+		In.Dark = 0.0;
+		In.WorldSize = 60.0;
+		for (int32 t = 0; t < GW::kSatChainSteps; ++t)
+		{
+			In.WanderTurn = 0.05 * ((t % 7) - 3);   // 선회는 속력에 영향이 없다 (난수열은 다르다)
+			const FThreatStepResult R = Step(Spec, T, In, Cfg);
+			const std::int32_t* Row = &GW::kSatChainInt[(t * GW::kSatWolves + m) * 3];
+			if (T.Cooldown != Row[0] || T.SatLeft != Row[1] || (R.bSated ? 1 : 0) != Row[2])
+			{
+				if (IntBad == 0)
+				{
+					AddError(FString::Printf(TEXT("포만 열 늑대 %d 스텝 %d: (쿨다운 %d, 배부름 %d, 쉼 %d), 파이썬 (%d, %d, %d)"), m, t, T.Cooldown,
+											 T.SatLeft, R.bSated ? 1 : 0, Row[0], Row[1], Row[2]));
+				}
+				++IntBad;
+			}
+			// 사냥 = 쿨다운 0 ∧ 배부르지 않음 (깨어 있음)
+			HuntBad += R.bHunting != (T.Cooldown == 0 && !R.bSated) ? 1 : 0;
+			// 변위 크기: 벽에 닿은 스텝만 속력보다 작다 (파이썬 위치·선회가 달라 벽 스텝은 다를 수 있다)
+			const double V = GW::kSatChainVel[t * GW::kSatWolves + m];
+			if (FMath::Abs(R.Speed - V) <= 1.0e-9)
+			{
+				++VelExact;
+			}
+			else if (V > R.Speed + 1.0e-9)
+			{
+				++VelBad;
+			}
+		}
+	}
+	TestEqual(TEXT("포만 열: 쿨다운·남은 배부름·쉼이 파이썬과 같다"), IntBad, 0);
+	TestEqual(TEXT("포만 열: 사냥 판정 = 먹기도 쉼도 아님"), HuntBad, 0);
+	TestEqual(TEXT("포만 열: 파이썬 변위가 C++ 속력보다 큰 스텝 없음"), VelBad, 0);
+	const int32 Total = GW::kSatChainSteps * GW::kSatWolves;
+	TestTrue(TEXT("포만 열: 변위 크기 = 속력 (벽 스텝 빼고 거의 모두)"), VelExact * 10 >= Total * 9);
+	AddInfo(FString::Printf(TEXT("포만 열: 늑대 %d × 스텝 %d, 변위 = 속력 %d/%d"), GW::kSatWolves, GW::kSatChainSteps, VelExact, Total));
+
+	// 잡으면 배부름이 걸린다 (플레이어형은 아님)
+	{
+		FThreatState T;
+		T.PosX = 10.0;
+		T.PosY = 10.0;
+		FPreyView P;
+		P.X = 10.3;
+		P.Y = 10.0;
+		FThreatStepInput In;
+		In.Prey = &P;
+		In.NumPrey = 1;
+		In.WorldSize = 60.0;
+		const FThreatSpec Chaser = MakeChaserSpec(0.8, false, false, Cfg);
+		const FThreatStepResult R = Step(Chaser, T, In, Cfg);
+		TestEqual(TEXT("잡음"), R.Caught, 0);
+		TestEqual(TEXT("잡으면 배부름 450"), T.SatLeft, GW::kSatSteps);
+		TestEqual(TEXT("잡으면 먹기 38"), T.Cooldown, GW::kPredEatCd);
+	}
+	// 늑대 글자 (eco.V3Debug)
+	{
+		EcoWorldV3::FThreatAgent A;
+		A.Spec = MakeChaserSpec(0.8, false, false, Cfg);
+		A.State.SatLeft = 315;
+		A.Last.bSated = true;
+		FColor Color;
+		TestEqual(TEXT("글자: 배부름·쉼 42초"), EcoV3Integrated::WolfLabel(A, Cfg, 0.0, Color), FString(TEXT("늑대 배부름·쉼 42초 (추격형)")));
 	}
 	return true;
 }
