@@ -379,7 +379,7 @@ def test_seed_problems_and_draft(tmp_path):
         p.write_text(title + "\n\n본문의 초안은 보지 않는다\n", encoding="utf-8")
         assert rt.prereg_draft(p) is want and ev.prereg_draft(p) is want
     assert rt.prereg_draft(tmp_path / "없음.md")
-    assert rt.prereg_draft(GATE_PY / "PREREG.md")                 # 지금 관문 사전 등록은 초안이다 — 사전 등록 폴더 실행을 받지 않는다
+    assert not rt.prereg_draft(GATE_PY / "PREREG.md")             # 지금 관문 사전 등록은 확정이다(10-15 (6)) — 사전 등록 폴더 실행을 받는다
 
 
 def test_is_r3_world():
