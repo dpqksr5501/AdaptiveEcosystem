@@ -66,6 +66,12 @@
 //      자는 늑대는 무시한다. 그 밖은 두뇌가 지금처럼 정한다 (덮기 동안 두뇌를 부르지 않고, 풀리면 잠금을 0 으로 해 곧바로 다시 고른다).
 //      기록 셋째 줄 '경계 거리': 경계 시작·도망 시작·웅크림 시작, 끝난 도망의 평균 길이(초), 잡힌 사슴을 덮기로 가른 수, 식사 중 늑대
 //      15 m 안 사슴(개체·스텝). 0 으로 두면 지금과 비트 단위로 같다 (세계 칸이 모두 기본값).
+//  10. 야생 1단계 (사람 결정 10-15 (7) '바뀐 규칙을 언리얼에서 보이게', 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md, 값 = 파이썬
+//      configs/v3_wild1_mirror.yaml, 하루 900 스텝). 규칙마다 콘솔 변수 하나(기본 1 — Play 를 누르면 보인다. Play 전에 바꾼다)와 명령줄 시작값:
+//      지방 비축 eco.IntegratedV3.WildReserve (-EcoV3WildReserve=, EcoWorldV3.h FWildReserveConfig): 배가 비어도 비축으로 3일(6분) 버티고
+//      배·비축 모두 0 이어야 굶어 죽는다. 배 10% 밑이면 0.75 배 느리다. 비축으로 사는 사슴의 Vitals 에너지 거울은 아주 작은 양수라 팀 HP 감소가
+//      먼저 죽이지 않는다 (죽음은 v3 DeathCause 한 길). 화면: 사슴 글자 '배고픔 비축 63%'·'비축 바닥'·'약함(느림)', 지역 둘째 줄 비축 평균·
+//      비축으로 사는 사슴. 기록 넷째 줄 '<지역> 야생 |': 꺼내 씀·채움·약한 개체·스텝·약한 채로 잡힘·지금 비축 평균·최소 (앞 세 줄은 그대로).
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -113,6 +119,8 @@ namespace EcoV3Integrated
 	 * 표시·기록 전용 (규칙이 아니다).
 	 */
 	inline constexpr double kStarvingEnergy = 0.15;
+	// 야생 (w1) 화면·기록: 비축이 이 밑이면 '비축 바닥 가까움' (글자 빨강·기록 줄 수)
+	inline constexpr double kLowReserve = 0.25;
 	/** '최근 10 초 먹은 양' 창 = 결정 스텝 75 개 (7.5 Hz × 10 초, 시뮬레이션 시간). */
 	inline constexpr int32 kRecentEatSteps = 75;
 	/** 번식 표시를 남기는 결정 스텝 수 (약 1.5 초). */
@@ -145,9 +153,11 @@ namespace EcoV3Integrated
 	 * 색은 행동 색 (먹기 초록·도망 노랑·숨기 파랑·얼기 흰색), 굶주림만 빨강.
 	 * KeepMode = 이번 스텝의 경계 거리 덮기 (FHerbDecision::KeepActive): 행동 이름 대신 '경계(멀어짐)'(주황)·'도망(안전해질 때까지)'(진한 주황)·
 	 * '숨기(은신처·경계)'(파랑). 0 이면 지금 그대로.
+	 * bReserveOn = 지방 비축을 켠 세계 (야생 w1): 에너지 15% 아래면 ' 굶주림' 대신 ' 배고픔 비축 63%'(빨강, 비축으로 버티는 중),
+	 * 비축 0 이면 ' 비축 바닥', 배 10% 밑이면 ' 약함(느림)'. 배는 괜찮은데 비축이 25% 밑이면 ' 비축 20%'. 거짓이면 지금 그대로.
 	 */
 	ADAPTIVEECOSYSTEM_API FString DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
-											FColor& OutColor, int32 KeepMode = EcoWorldV3::kKeepNone);
+											FColor& OutColor, int32 KeepMode = EcoWorldV3::kKeepNone, bool bReserveOn = false);
 	/** 경계 거리 덮기 이름 (기록·화면): 두뇌 / 경계(멀어짐) / 도망(안전해질 때까지) / 숨기(은신처·경계). */
 	ADAPTIVEECOSYSTEM_API const TCHAR* KeepModeNameKo(int32 KeepMode);
 
@@ -177,6 +187,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	double AlertDistM = 30.0;           // 경계 거리 (m, eco.IntegratedV3.AlertDistM) — 깨어 있는 늑대가 이 안이면 걸어서 멀어진다
 	double PanicDistM = 15.0;           // 위험 거리 (m, eco.IntegratedV3.PanicDistM) — 이 안이거나 다가오면 뛰어서 달아난다
 	double SafeDistM = 40.0;            // 안전 거리 (m, eco.IntegratedV3.SafeDistM) — 깨어 있는 늑대가 모두 이 밖일 때까지 도망
+	bool bWildReserve = true;           // 사슴 지방 비축 (eco.IntegratedV3.WildReserve 기본 1, 사람 결정 10-15 (7) 야생 1단계 w1). 거짓 = E 0 이면 곧바로 굶음
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등
@@ -329,6 +340,12 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	double StartFood = 0.0;                   // 무대 먹이 처음 합 (= 셀 용량 합, AddContext)
 	double MeanEnergy = 0.0;                  // 산 사슴 에너지 평균 (0~1, 결정 스텝마다·프레임 끝)
 	int32 StarvingDeer = 0;                   // 산 사슴 중 에너지 kStarvingEnergy 아래
+	// 야생 (w1) 지방 비축 (켠 세계만, 결정 스텝마다·프레임 끝. TallyEnergy)
+	double MeanReserve = 0.0;                 // 산 사슴 비축 평균 (0~1)
+	double MinReserve = 0.0;                  // 산 사슴 비축 최소
+	int32 OnReserveDeer = 0;                  // 산 사슴 중 배가 비어(에너지 0) 비축으로 사는 수
+	int32 LowReserveDeer = 0;                 // 산 사슴 중 비축 kLowReserve 아래
+	int32 WeakDeer = 0;                       // 산 사슴 중 배 WeakE 밑 (느림)
 	int32 AteDeerInterval = 0;                // 이번 기록 구간에 한 번이라도 먹은 사슴 (그 뒤 죽은 사슴 포함)
 	int32 LogEpoch = 0;                       // 기록 구간 번호 (LogContext 마다 + 1)
 	TArray<double> RecentEaten;               // 최근 kRecentEatSteps 결정 스텝의 스텝마다 먹은 양 (고리 버퍼)

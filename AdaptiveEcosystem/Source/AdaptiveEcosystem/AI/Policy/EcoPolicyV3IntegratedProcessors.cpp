@@ -63,10 +63,18 @@ namespace EcoPolicyV3IntegratedProcImpl
 		return MoveOne(A, *(*A.WolfInts)[Index], FromX, FromY, ToX, ToY);
 	}
 
+	// 비축으로 사는 사슴의 Vitals 에너지 거울 하한 (0~1 비율). 화면 0% 로 보인다
+	constexpr double kReserveMirrorFloor = 1.0e-3;
+
 	float EnergyMirror(const EcoWorldV3::FHerbBody& B, const FEcoVitalsFragment& V)
 	{
 		// v3 에너지 E (0~1) × MaxEnergy — 조정자 요약(AverageEnergy)·표현 Energy 가 같은 척도로 읽는다
-		return static_cast<float>(FMath::Clamp(B.Energy, 0.0, 1.0)) * V.MaxEnergy;
+		// 야생 (w1) 지방 비축: 배(E)가 0 이어도 비축이 남은 산 사슴은 살아 있다. 팀 사슴 HP 감소(Vitals.Energy ≤ 0 이면 초당 HP −5,
+		// Creature/Runtime/EcoCreatureIntegrationSpawner)가 v3 의 굶음 판정(C6: 배·비축 모두 0)보다 먼저 죽이지 않게 거울 값을 아주 작은 양수로 둔다.
+		// 죽음은 지금처럼 v3 DeathCause → HP 0 한 길로만 넘긴다
+		const double E = FMath::Clamp(B.Energy, 0.0, 1.0);
+		const bool bLivingOnReserve = E <= 0.0 && B.Reserve > 0.0 && B.DeathCause == EcoWorldV3::kDeathNone;
+		return static_cast<float>(bLivingOnReserve ? kReserveMirrorFloor : E) * V.MaxEnergy;
 	}
 
 	/** 산 사슴(List = Deer 색인) 에너지 평균·굶주림 수 → 컨텍스트 (먹기 표시·기록). */
@@ -82,6 +90,25 @@ namespace EcoPolicyV3IntegratedProcImpl
 		}
 		Ctx.MeanEnergy = List.IsEmpty() ? 0.0 : Sum / static_cast<double>(List.Num());
 		Ctx.StarvingDeer = Starving;
+		// 야생 (w1) 지방 비축 (켠 세계만): 비축 평균·최소, 비축으로 사는 사슴(배 0), 비축 바닥 가까움, 약함
+		Ctx.MeanReserve = Ctx.MinReserve = 0.0;
+		Ctx.OnReserveDeer = Ctx.LowReserveDeer = Ctx.WeakDeer = 0;
+		if (Ctx.Sim.Config.WildReserve.bEnabled && !List.IsEmpty())
+		{
+			double RSum = 0.0;
+			double RMin = 1.0;
+			for (const int32 k : List)
+			{
+				const EcoWorldV3::FHerbBody& B = *Deer[k].View.Body;
+				RSum += B.Reserve;
+				RMin = FMath::Min(RMin, B.Reserve);
+				Ctx.OnReserveDeer += B.Energy <= 0.0 ? 1 : 0;
+				Ctx.LowReserveDeer += B.Reserve < EcoV3Integrated::kLowReserve ? 1 : 0;
+				Ctx.WeakDeer += B.bWeak ? 1 : 0;
+			}
+			Ctx.MeanReserve = RSum / static_cast<double>(List.Num());
+			Ctx.MinReserve = RMin;
+		}
 	}
 
 	/**
@@ -526,8 +553,9 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 	const bool bDebug = UEcoPolicyV3IntegratedSubsystem::IsDebugDrawEnabled();
 	const double K = EcoRepertoireV3::kUnitCm / EcoRepertoireV3::kStepSeconds;   // 단위/스텝 → cm/s
 	const int64 NowStep = Sub->GetGlobalStep();
+	const bool bReserveOn = Sub->GetSettings().bWildReserve;   // 야생 (w1) 지방 비축 글자 (모든 지역이 같은 설정)
 
-	DeerQuery.ForEachEntityChunk(Context, [Sub, Alpha, bDebug, K, World, NowStep](FMassExecutionContext& Ctx)
+	DeerQuery.ForEachEntityChunk(Context, [Sub, Alpha, bDebug, K, World, NowStep, bReserveOn](FMassExecutionContext& Ctx)
 	{
 		const TArrayView<FTransformFragment> Xfs = Ctx.GetMutableFragmentView<FTransformFragment>();
 		const TArrayView<FMassVelocityFragment> Vels = Ctx.GetMutableFragmentView<FMassVelocityFragment>();
@@ -570,7 +598,8 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 					const int64 SinceRepro = NowStep - Int.ReproducedStep;
 					const bool bRecentRepro = Int.ReproducedStep >= 0 && SinceRepro >= 0 && SinceRepro <= EcoV3Integrated::kReproMarkSteps;
 					// 경계 거리 덮기 중이면 '경계(멀어짐)'·'도망(안전해질 때까지)'·'숨기(은신처·경계)' (사람 결정 10-15 (C))
-					Label = EcoV3Integrated::DeerLabel(Rep, B, bRecentRepro, Color, States[i].Decision.KeepActive);
+					Label = EcoV3Integrated::DeerLabel(Rep, B, bRecentRepro, Color, States[i].Decision.KeepActive,
+													   bReserveOn);
 				}
 				DrawDebugString(World, Loc + FVector(0.0, 0.0, 230.0), Label, nullptr, Color, 0.0f, true, 1.1f);
 			}

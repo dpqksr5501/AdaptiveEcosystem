@@ -1025,7 +1025,10 @@ bool FEcoPolicyV3IntegratedDeathTest::RunTest(const FString& Parameters)
 	{
 		constexpr int32 N = 3;
 		FMiniWorld Mw;
-		Mw.Init(MiniConfig(35000, N), N, 0);
+		// 첫 스텝 굶음을 쓰는 시험이라 지방 비축(야생 w1, 통합 기본 켬)을 끈다 — 비축 켬의 굶음은 Wild.ReserveWorld 가 본다
+		FWorldConfig C = MiniConfig(35000, N);
+		C.WildReserve.bEnabled = false;
+		Mw.Init(C, N, 0);
 		std::vector<std::int32_t> Rows = {0, 1, 2};
 		EcoWorldV3::AdoptHerb(Mw.W, Mw.AllViews[0], {30.0, 30.0}, {1.0, 0.0}, 1);
 		EcoWorldV3::AdoptHerb(Mw.W, Mw.AllViews[1], {28.0, 30.0}, {1.0, 0.0}, 2);
@@ -1079,6 +1082,7 @@ bool FEcoPolicyV3IntegratedDeathTest::RunTest(const FString& Parameters)
 	// 스텝)만큼 뒤에 깨어 2 초에 걸쳐 걸음을 올리므로 3 스텝 안에 잡지 못한다. 밤잠은 Integrated.GradualNight 시험이 본다
 	FEcoV3IntegratedSettings DeathSettings = TestSettings(35001);
 	DeathSettings.bGradualNight = false;
+	DeathSettings.bWildReserve = false;   // 첫 스텝 굶음을 쓴다 — 지방 비축(통합 기본 켬)을 끈다 (비축 켬의 굶음은 Wild.ReserveWorld)
 	FIntegratedHarness H;
 	if (!H.Setup(*this, DeathSettings))
 	{

@@ -46,6 +46,8 @@
 //                                  쓰지 않는다 — 평면 맵·기준 루프의 논리 상태는 비트 단위로 그대로다
 //   FWorldConfig::KeepAway         사슴 경계 거리 규칙 (사람 결정 10-15 (C), 두뇌 위의 행동 실행 규칙). 기본 끔 = 지금과 같다 —
 //                                  새 줄은 모두 KeepAway.bEnabled 안에 있다. 아래 '경계 거리 규칙' 묶음 머리 주석
+//   FWorldConfig::WildReserve      야생 1단계 (w1) 지방 비축 (사람 결정 10-15 (7)). 기본 끔 = 지금과 같다 — 새 줄은 모두 bEnabled 안
+//                                  (B 약함 속도, C4 비축 꺼내기·채우기, C6 굶음 = E ≤ 0 ∧ R ≤ 0). 아래 '야생 1단계 (w1)' 묶음 머리 주석
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -135,6 +137,67 @@ namespace EcoWorldV3
 	inline constexpr std::int32_t kKeepShelter = 3;   // 은신처 안 웅크림: HIDE 도착
 	inline constexpr std::int32_t kNumKeepModes = 4;
 
+	// ---- 야생 1단계 (w1) 지방 비축 (사람 결정 10-15 (7), 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md 3-1, 파이썬 world.py
+	//      '야생 1단계' (w1)·`_wild_reserve_step`). 기본 끔 = R1b 학습 세계 그대로 ----
+	//
+	// 사슴마다 느린 비축 R ∈ [0, 1] (시작·새 개체 Init). 용량 C = ReserveDays × DayPeriod × EnergyDrain (E 단위 — 걷기 대사만으로
+	// ReserveDays 일을 버틴다). C4 의 E 를 정한 뒤(C5 번식 앞): E < 0 이면 모자람을 R·C 에서 꺼낸다(다 채우면 E = 0).
+	// E ≥ RefillE 이고 R < 1 이고 이번 스텝 먹었으면 먹은 에너지의 RefillFrac 을(빈자리 (1 − R)·C 까지) E 에서 R 로 옮긴다.
+	// 굶음 = E ≤ 0 이고 R ≤ 0. 약함: 스텝 첫머리 E < WeakE × MaxEnergy 면 이동 속도 × WeakSpeed (대사·섭식은 보행 그대로).
+	// 값 = configs/v3_wild1_mirror.yaml wild_reserve (골든 WildGoldenVectorsV3.h 가 확인한다)
+	struct FWildReserveConfig
+	{
+		bool bEnabled = false;              // 끄면 아래 칸을 아무도 읽지 않는다 (FHerbBody::Reserve 는 늘 0)
+		double ReserveDays = 3.0;           // 비축이 버티는 게임 하루 수 (900 스텝 하루 → 2700 스텝 = 6분)
+		double Init = 1.0;                  // 시작·새 개체 비축 (가득)
+		double RefillE = 0.7;               // 이 E 이상일 때 먹으면 채운다
+		double RefillFrac = 0.25;           // 먹은 에너지 중 비축으로 가는 몫
+		double WeakE = 0.1;                 // 이 E 밑이면 약함 (× MaxEnergy)
+		double WeakSpeed = 0.75;            // 약한 사슴의 이동 속도 배수
+	};
+
+	/** 비축 용량 C (E 단위). 낮 고정 세계(DayPeriod ≤ 0)는 파이썬처럼 비축을 켤 수 없다 — 0 을 돌려 비축이 늘 바닥이게 한다. */
+	inline double WildReserveCapacity(const FWildReserveConfig& R, std::int32_t DayPeriod, double EnergyDrain)
+	{
+		return DayPeriod > 0 ? R.ReserveDays * static_cast<double>(DayPeriod) * EnergyDrain : 0.0;
+	}
+
+	/** 비축 한 스텝의 기록 (통계). */
+	struct FWildReserveDelta
+	{
+		double Used = 0.0;     // 비축에서 꺼낸 에너지 (E 단위)
+		double Refill = 0.0;   // 비축으로 옮긴 에너지
+	};
+
+	/**
+	 * 비축 한 스텝 (world.py `_wild_reserve_step` 한 행과 줄마다 같다). E = C4 의 새 에너지(max_energy 로 자른 값), GainE = 이번 스텝
+	 * 먹은 에너지(먹이 × FoodEnergyPerUnit). 모자람을 다 채우면 E = 0, R 이 모자라면 R = 0 이고 E 는 남은 모자람(< 0).
+	 */
+	inline FWildReserveDelta WildReserveStep(double& E, double& R, double GainE, double Cap, const FWildReserveConfig& Cfg)
+	{
+		FWildReserveDelta Out;
+		if (E < 0.0 && Cap > 0.0)
+		{
+			const double Want = -E / Cap;
+			const double R0 = R;
+			const bool bCovered = Want <= R0;
+			E = bCovered ? 0.0 : E + R0 * Cap;
+			R = bCovered ? R0 - Want : 0.0;
+			Out.Used = (Want < R0 ? Want : R0) * Cap;
+		}
+		if (Cfg.RefillFrac > 0.0 && E >= Cfg.RefillE && R < 1.0 && GainE > 0.0)
+		{
+			const double A = Cfg.RefillFrac * GainE;
+			const double B = (1.0 - R) * Cap;
+			const double Mv = A < B ? A : B;
+			E -= Mv;
+			const double Rn = R + Mv / Cap;
+			R = Rn < 1.0 ? Rn : 1.0;
+			Out.Refill = Mv;
+		}
+		return Out;
+	}
+
 	// ---- 세계 설정 (파이썬 단위). 기본값 = 평면 시험 맵용 R1b 학습 범위 안의 한 세계 ----
 
 	struct FWorldConfig
@@ -185,6 +248,9 @@ namespace EcoWorldV3
 		std::uint8_t WorldAllowed[EcoRepertoireV3::kNumBehaviors] = {1, 1, 1, 1, 1};
 		// 사슴 경계 거리 규칙 (사람 결정 10-15 (C), 통합 모드 eco.IntegratedV3.KeepAway). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든)
 		FKeepAwayConfig KeepAway;
+		// 야생 1단계 (w1) 지방 비축 (사람 결정 10-15 (7), 통합 모드 eco.IntegratedV3.WildReserve). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든).
+		// 낮 고정 세계(DayPeriod ≤ 0)에서는 InitWorld 가 끈다 (파이썬도 daynight 없이 켤 수 없다)
+		FWildReserveConfig WildReserve;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -411,6 +477,9 @@ namespace EcoWorldV3
 		bool bReproduced = false;
 		bool bRespawned = false;
 		double LastIntake = 0.0;             // 이번 스텝 C4 에서 먹은 먹이 (먹이 단위 = 셀에서 덜어 낸 몫, 에너지는 × 0.5). 기록·표시 전용 — 다른 계산에 쓰지 않는다
+		// 야생 (w1) 지방 비축 (FWorldConfig::WildReserve 를 켠 세계만. 끄면 늘 0·거짓)
+		double Reserve = 0.0;                // 비축 R (0~1, × 용량 FWorldState::ReserveCap = E 단위)
+		bool bWeak = false;                  // 이번 스텝 첫머리 E < WeakE (이동 속도 × WeakSpeed)
 	};
 
 	/** 스텝 끝 지각 (FEcoPerceptionCacheFragment). 다음 스텝의 결정 관측·제어 입력이다. */
@@ -510,6 +579,12 @@ namespace EcoWorldV3
 		std::int64_t KeepPanicDied = 0;      // 도망 중 죽음 (잡힘·굶음)
 		std::int64_t CaughtByKeep[kNumKeepModes] = {};   // 잡힌 사슴을 그 스텝의 덮기로 가른 수
 		std::int64_t KeepHideRetarget = 0;   // HIDE 은신처를 늑대 반대쪽으로 바꾼 수
+		// 야생 (w1) 지방 비축 기록 (켰을 때만 센다. world.py wild_stats 의 같은 이름 칸)
+		double ReserveUsed = 0.0;            // 비축에서 꺼내 쓴 에너지 합 (E 단위, reserve_used)
+		double ReserveRefill = 0.0;          // 비축으로 옮긴 에너지 합 (reserve_refill)
+		std::int64_t ReserveLiveSteps = 0;   // 비축을 적용한 개체·스텝
+		std::int64_t WeakSteps = 0;          // 그중 약한 개체·스텝 (스텝 첫머리 E < WeakE)
+		std::int64_t WeakCaught = 0;         // 약한 채로 잡힌 수
 	};
 
 	/**
@@ -542,6 +617,7 @@ namespace EcoWorldV3
 		double Dark = 0.0;                   // d(t)
 		std::int32_t StepsToTransition = -1; // r (낮 고정이면 -1 → to_transition 1)
 		double PredEma = 0.0;                // 전역 피식 EMA
+		double ReserveCap = 0.0;             // 야생 (w1) 비축 용량 C (E 단위, InitWorld 가 정한다. 끄면 0)
 		FWorldStats Stats;
 		std::vector<FVec2> StepCatches;      // 이번 스텝에 잡힌 자리 (디버그)
 
@@ -595,6 +671,10 @@ namespace EcoWorldV3
 			W.ThreatCfg.PredEatCd = C.PredEatCdOverride;
 		}
 		W.ThreatCfg.bEatInPlace = C.bEatInPlace;
+		// 야생 (w1): 하루 단위 계수라 낮 고정 세계에서는 끈다 (파이썬 _wild_reserve_params 가 daynight 없이 켜기를 거부한다)
+		W.Config.WildReserve.bEnabled = C.WildReserve.bEnabled && W.Config.DayPeriod > 0;
+		W.ReserveCap = W.Config.WildReserve.bEnabled
+						   ? WildReserveCapacity(W.Config.WildReserve, W.Config.DayPeriod, W.RepCfg.EnergyDrain) : 0.0;
 		for (std::int32_t b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
 		{
 			W.Allowed[b] = (EcoPolicyV3::kAllowedMask[b] != 0 && C.WorldAllowed[b] != 0) ? 1 : 0;
@@ -619,6 +699,7 @@ namespace EcoWorldV3
 		H.Body->PrevPos = H.Body->Pos;
 		H.Body->Energy = W.RepCfg.InitEnergy;
 		H.Body->ReproCd = 0;
+		H.Body->Reserve = W.Config.WildReserve.bEnabled ? W.Config.WildReserve.Init : 0.0;   // 야생 (w1): 시작·새 개체 비축
 		*H.Decision = FHerbDecision();
 		*H.Perception = FHerbPerception();
 		*H.Control = EcoRepertoireV3::FControlOutput();
@@ -719,6 +800,7 @@ namespace EcoWorldV3
 		H.Body->PrevPos = H.Body->Pos;
 		H.Body->Energy = W.RepCfg.InitEnergy;
 		H.Body->ReproCd = 0;
+		H.Body->Reserve = W.Config.WildReserve.bEnabled ? W.Config.WildReserve.Init : 0.0;   // 야생 (w1): 시작·새 개체 비축
 		*H.Decision = FHerbDecision();
 		*H.Perception = FHerbPerception();
 		*H.Control = EcoRepertoireV3::FControlOutput();
@@ -1254,6 +1336,7 @@ namespace EcoWorldV3
 		const R3::FRepertoireConfig& RC = W.RepCfg;
 		W.StepCatches.clear();
 		const bool bKeep = W.Config.KeepAway.bEnabled;   // 경계 거리 규칙 (끄면 아래 bKeep 줄은 모두 건너뛴다 — 지금 그대로)
+		const bool bReserve = W.Config.WildReserve.bEnabled;   // 야생 (w1) 지방 비축 (끄면 아래 bReserve 줄은 모두 건너뛴다 — 지금 그대로)
 
 		// A. Arbiter Commit — 지난 스텝 끝에 Prepare·마스크·망으로 정한 요청
 		for (std::int32_t i = 0; i < N; ++i)
@@ -1330,6 +1413,18 @@ namespace EcoWorldV3
 			else
 			{
 				*H.Control = R3::Control(*H.Rep, Detail::MakeControlInput(W, H), RC);
+			}
+			if (bReserve)
+			{
+				// 야생 (w1) 약함: 스텝 첫머리 E 가 WeakE 밑이면(비축으로 사는 몸) 이동 속도 × WeakSpeed (world.py step 1 의 v 줄이기).
+				// 대사·섭식 배수는 보행 그대로다. heading 은 ApplyMove 가 줄인 속도의 방향으로 정한다 (방향은 그대로)
+				FHerbBody& Bd = *H.Body;
+				Bd.bWeak = Bd.Energy < W.Config.WildReserve.WeakE * RC.MaxEnergy;
+				if (Bd.bWeak && W.Config.WildReserve.WeakSpeed < 1.0)
+				{
+					H.Control->Velocity.X *= W.Config.WildReserve.WeakSpeed;
+					H.Control->Velocity.Y *= W.Config.WildReserve.WeakSpeed;
+				}
 			}
 			R3::CommitSeeMult(*H.Rep, H.Control->SeeMult);
 			++W.Stats.BehaviorSteps[H.Rep->Behavior];
@@ -1445,6 +1540,15 @@ namespace EcoWorldV3
 			B.Energy = R3::EnergyAfterIntake(W.EDrained[static_cast<size_t>(i)], Gain, RC);
 			B.LastIntake = Gain;                          // 기록만
 			W.Stats.EatSteps += Gain > 0.0 ? 1 : 0;
+			if (bReserve)
+			{
+				// 야생 (w1): 모자람은 비축에서, 남음은 비축으로 (world.py step 3) 의 _wild_reserve_step — 번식 C5 앞)
+				const FWildReserveDelta Dr = WildReserveStep(B.Energy, B.Reserve, Gain * RC.FoodEnergyPerUnit, W.ReserveCap, W.Config.WildReserve);
+				W.Stats.ReserveUsed += Dr.Used;
+				W.Stats.ReserveRefill += Dr.Refill;
+				++W.Stats.ReserveLiveSteps;
+				W.Stats.WeakSteps += B.bWeak ? 1 : 0;
+			}
 
 			// C5. 번식
 			B.bReproduced = R3::ApplyReproduction(B.Energy, B.ReproCd, RC);
@@ -1463,8 +1567,9 @@ namespace EcoWorldV3
 				{
 					++W.Stats.CaughtByKeep[Herbs[i].Decision->KeepActive];   // 기록만 (경계 중·도망 중·웅크림 중·덮기 밖)
 				}
+				W.Stats.WeakCaught += (bReserve && B.bWeak) ? 1 : 0;   // 야생 (w1) 기록만: 약한 채로 잡힘
 			}
-			else if (B.Energy <= 0.0)
+			else if (B.Energy <= 0.0 && (!bReserve || B.Reserve <= 0.0))   // 야생 (w1): 비축까지 바닥나야 굶어 죽는다
 			{
 				B.DeathCause = kDeathStarved;
 				B.DeathPos = B.Pos;
@@ -1535,6 +1640,7 @@ namespace EcoWorldV3
 			B.PrevPos = B.Pos;
 			B.Energy = RC.InitEnergy;
 			B.ReproCd = 0;
+			B.Reserve = W.Config.WildReserve.bEnabled ? W.Config.WildReserve.Init : 0.0;   // 야생 (w1): 새 개체는 시작 비축으로
 			B.bRespawned = true;
 			const double E01 = B.Energy / RC.MaxEnergy;
 			R3::RespawnAgent(*H.Rep, E01 < 0.0 ? 0.0 : (E01 > 1.0 ? 1.0 : E01), W.Dark, W.Config.Seed,

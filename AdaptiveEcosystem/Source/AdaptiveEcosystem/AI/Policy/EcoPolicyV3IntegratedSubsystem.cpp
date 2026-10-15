@@ -104,6 +104,15 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("통합 v3 모드 사슴 안전 거리 (m, 기본 40). 깨어 있는 늑대가 모두 이 밖이고 아무도 쫓지 않으면 도망을 멈춘다 (경계·위험 거리보다 작으면 그 값으로 올린다). Play 전에 바꾼다."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarWildReserve(
+		TEXT("eco.IntegratedV3.WildReserve"),
+		1,
+		TEXT("통합 v3 모드의 사슴 지방 비축 (1 = 켬, 기본 — 사람 결정 10-15 (7) 야생 1단계 w1). 배가 비어도(에너지 0) 몸의 비축으로 3일(게임 하루 2분 → 6분) ")
+		TEXT("버티고, 비축까지 바닥나야 굶어 죽는다. 배가 70% 이상일 때 먹으면 먹은 몫의 1/4 이 비축으로 간다. 배가 바닥(10% 밑)인 사슴은 0.75 배로 ")
+		TEXT("느리다. 값 = 파이썬 configs/v3_wild1_mirror.yaml wild_reserve. 0 = 에너지 0 이면 곧바로 굶어 죽는다(지금까지). Play 전에 바꾼다. ")
+		TEXT("명령줄 -EcoV3WildReserve= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarDebug(
 		TEXT("eco.V3Debug"),
 		0,
@@ -254,7 +263,7 @@ const TCHAR* EcoV3Integrated::KeepModeNameKo(int32 KeepMode)
 }
 
 FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
-								   FColor& OutColor, int32 KeepMode)
+								   FColor& OutColor, int32 KeepMode, bool bReserveOn)
 {
 	const double E = FMath::Clamp(Body.Energy, 0.0, 1.0);
 	const bool bKeep = KeepMode > EcoWorldV3::kKeepNone && KeepMode < EcoWorldV3::kNumKeepModes;
@@ -280,7 +289,25 @@ FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const 
 				   : KeepMode == EcoWorldV3::kKeepPanic ? FColor(255, 110, 20)
 														: FColor(60, 150, 255);
 	}
-	if (E < kStarvingEnergy)
+	if (bReserveOn)
+	{
+		// 야생 (w1) 지방 비축: 배가 비어도 비축으로 버틴다. 굶음 = 배·비축 모두 0
+		const int32 RPct = FMath::RoundToInt32(100.0 * FMath::Clamp(Body.Reserve, 0.0, 1.0));
+		if (E < kStarvingEnergy)
+		{
+			Label += Body.Reserve > 0.0 ? FString::Printf(TEXT(" 배고픔 비축 %d%%"), RPct) : FString(TEXT(" 배고픔 비축 바닥"));
+			OutColor = FColor(255, 80, 80);
+		}
+		else if (Body.Reserve < kLowReserve)
+		{
+			Label += FString::Printf(TEXT(" 비축 %d%%"), RPct);
+		}
+		if (Body.bWeak)
+		{
+			Label += TEXT(" 약함(느림)");
+		}
+	}
+	else if (E < kStarvingEnergy)
 	{
 		Label += TEXT(" 굶주림");
 		OutColor = FColor(255, 80, 80);
@@ -352,6 +379,7 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.AlertDistM = static_cast<double>(CVarAlertDistM.GetValueOnGameThread());
 	S.PanicDistM = static_cast<double>(CVarPanicDistM.GetValueOnGameThread());
 	S.SafeDistM = static_cast<double>(CVarSafeDistM.GetValueOnGameThread());
+	S.bWildReserve = CVarWildReserve.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -406,6 +434,11 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3KeepAway="), KeepArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.KeepAway"), LexToString(KeepArg));
+	}
+	int32 ReserveArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3WildReserve="), ReserveArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.WildReserve"), LexToString(ReserveArg));
 	}
 }
 
@@ -523,6 +556,14 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 									   TEXT("안전 거리 %.0f m 밖·은신처까지 도망, 은신처 안이면 웅크림, 숨기는 늑대 쪽 ±60° 밖 은신처, 자는 늑대 무시"),
 								   Keep.AlertDist * MPerUnit, Keep.PanicDist * MPerUnit, Keep.SafeDist * MPerUnit)
 				 : FString(TEXT("끔 (eco.IntegratedV3.KeepAway 0 — 두뇌 그대로)"))));
+	const EcoWorldV3::FWildReserveConfig Wr;
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 지방 비축: %s"),
+		   *(Settings.bWildReserve
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.WildReserve 1, 사람 결정 10-15 (7) 야생 w1) — 배가 비어도 비축으로 %.1f일(%d 스텝) 버팀, 굶음 = 배·비축 모두 0, ")
+									   TEXT("배 %.0f%% 이상에서 먹으면 %.0f%% 가 비축으로, 배 %.0f%% 밑이면 %.2f배 느림"),
+								   Wr.ReserveDays, static_cast<int32>(Wr.ReserveDays * 900.0 + 0.5), 100.0 * Wr.RefillE, 100.0 * Wr.RefillFrac,
+								   100.0 * Wr.WeakE, Wr.WeakSpeed)
+				 : FString(TEXT("끔 (eco.IntegratedV3.WildReserve 0 — 에너지 0 이면 곧바로 굶음)"))));
 }
 
 void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
@@ -769,6 +810,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	}
 	// 사슴 경계 거리 (eco.IntegratedV3.KeepAway, 사람 결정 10-15 (C)): 끄면 기본값(꺼짐) 그대로
 	C.KeepAway = S.KeepAwayConfig();
+	// 사슴 지방 비축 (eco.IntegratedV3.WildReserve, 사람 결정 10-15 (7) 야생 1단계 w1): 값 = configs/v3_wild1_mirror.yaml (FWildReserveConfig 기본값)
+	C.WildReserve.bEnabled = S.bWildReserve;
 	return C;
 }
 
@@ -1547,6 +1590,21 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   Steps > 0 ? static_cast<double>(Near) / static_cast<double>(Steps) : 0.0, Ctx.KeepNow[1], Ctx.KeepNow[2], Ctx.KeepNow[3]);
 		Ctx.LastLogNearEatingDeerSteps = Ctx.NearEatingDeerSteps;
 	}
+	// 넷째 줄: 야생 1단계 (사람 결정 10-15 (7)). 켠 규칙만 적는다. 구간 = 지난 기록 줄 뒤. 앞 세 줄의 칸·순서는 그대로다
+	//   (results/v3/mirror/compare_unreal.py 가 첫 줄을 읽는다 — 이 줄은 '<지역> 야생 |' 꼴이라 그 정규식에 걸리지 않는다)
+	if (Ctx.Sim.Config.WildReserve.bEnabled)
+	{
+		const int64 LiveN = S.ReserveLiveSteps - P.ReserveLiveSteps;
+		const FString Reserve = FString::Printf(
+			TEXT("지방 비축: 구간 꺼내 씀 %.3f · 채움 %.3f (에너지 단위, 용량 %.2f) · 약한 개체·스텝 %lld/%lld (%.1f%%) · 약한 채로 잡힘 %lld (누적 %lld) | ")
+				TEXT("지금 비축 평균 %.0f%% 최소 %.0f%% · 배 비어 비축으로 사는 사슴 %d · 비축 %.0f%% 밑 %d · 약함 %d"),
+			S.ReserveUsed - P.ReserveUsed, S.ReserveRefill - P.ReserveRefill, Ctx.Sim.ReserveCap,
+			static_cast<long long>(S.WeakSteps - P.WeakSteps), static_cast<long long>(LiveN),
+			LiveN > 0 ? 100.0 * static_cast<double>(S.WeakSteps - P.WeakSteps) / static_cast<double>(LiveN) : 0.0,
+			static_cast<long long>(S.WeakCaught - P.WeakCaught), static_cast<long long>(S.WeakCaught), 100.0 * Ctx.MeanReserve,
+			100.0 * Ctx.MinReserve, Ctx.OnReserveDeer, 100.0 * EcoV3Integrated::kLowReserve, Ctx.LowReserveDeer, Ctx.WeakDeer);
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 야생 | %.1f초 | %s"), *Ctx.RegionId.ToString(), Seconds, *Reserve);
+	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
 	{
@@ -1710,9 +1768,15 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 											 Ctx.AliveDeer, Ctx.AdoptedDeer, *Tally, *Wolves,
 											 static_cast<long long>(Ctx.Sim.Stats.Caught), static_cast<long long>(Ctx.Sim.Stats.Starved));
 		// 둘째 줄: 먹기 되먹임 (v3 먹이 격자 — 팀 지역 FoodAmount 가 아니다)
-		const FString FoodLine = FString::Printf(TEXT("먹이 %s | 무대 먹이 처음의 %.0f%% | 최근 10초 먹은 양 %.1f | 사슴 에너지 평균 %.0f%% | 굶주림(15%% 아래) %d"),
-												 *Ctx.RegionId.ToString(), 100.0 * Ctx.FoodFraction(), Ctx.RecentEatenSum(),
-												 100.0 * Ctx.MeanEnergy, Ctx.StarvingDeer);
+		FString FoodLine = FString::Printf(TEXT("먹이 %s | 무대 먹이 처음의 %.0f%% | 최근 10초 먹은 양 %.1f | 사슴 에너지 평균 %.0f%% | 굶주림(15%% 아래) %d"),
+										   *Ctx.RegionId.ToString(), 100.0 * Ctx.FoodFraction(), Ctx.RecentEatenSum(),
+										   100.0 * Ctx.MeanEnergy, Ctx.StarvingDeer);
+		// 야생 (w1) 지방 비축 (켠 세계만): 비축 평균·배 비어 비축으로 사는 사슴·비축 바닥 가까움·약함
+		if (Ctx.Sim.Config.WildReserve.bEnabled)
+		{
+			FoodLine += FString::Printf(TEXT(" | 지방 비축 평균 %.0f%% · 비축으로 사는 사슴 %d · 비축 %.0f%% 밑 %d · 약함(느림) %d"), 100.0 * Ctx.MeanReserve,
+										Ctx.OnReserveDeer, 100.0 * EcoV3Integrated::kLowReserve, Ctx.LowReserveDeer, Ctx.WeakDeer);
+		}
 		DrawDebugString(World, Center + FVector(0, 0, 600.0), Line + TEXT("\n") + FoodLine, nullptr, FColor::White, 0.0f, true, 1.4f);
 		if (bScreen)
 		{
