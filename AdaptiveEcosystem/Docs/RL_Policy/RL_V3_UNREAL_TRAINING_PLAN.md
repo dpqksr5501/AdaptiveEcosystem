@@ -650,6 +650,12 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 골든·시험: `herbivore_rl/export_golden_v3_wild.py` → `AI/Policy/WildGoldenVectorsV3.h`. 시험 `Policy.V3.Wild.*` 6개(ReserveGolden·ReserveWorld·SatiationGolden·PerceptionGolden·FlightGolden·FlightRun) 모두 파이썬과 같다(세부는 명세 5절). 첫 스텝 굶음·식사 뒤 곧바로 사냥·두뇌 마스크를 보는 기존 시험 넷은 해당 규칙을 끄고 돈다. 자동화 127 성공 + 기존 경고 1, 실패 0.
   - 아직 하지 않은 것: 팀 레벨 헤드리스·PIE 측정(야생 규칙 켬·끔 비교)은 이번에 돌리지 않았다. 다음에 `-EcoIntegratedV3 -benchmark -fps=60 -seconds=120`, 세션 시드 20000~20019 로 잰다.
 
+- 10-16 도주 고침 따로 끄기 (고치기 전·뒤 영상용): `eco.IntegratedV3.FlightHoldAwake` · `-EcoV3FlightHoldAwake=` (0 = 사냥 중인 늑대만 도주를 붙잡음 — 늑대가 먹기 시작하면 도주가 풀린다), `eco.IntegratedV3.FlightEdgeAvoid` · `-EcoV3FlightEdgeAvoid=` (0 = 가장자리 10 m 안에서 벽을 따라 굽히지 않음). 기본 1 = 지금 동작이다. 둘 다 0 이면 857da45 의 도주와 같다. `WildFlight 1` 일 때만 뜻이 있다.
+- 촬영 (발표 영상, 10-16): `AI/Policy/EcoV3FilmDirector.{h,cpp}`. 명령줄 `-EcoV3Film=<이름>` 이 없으면 만들어지지 않는다. 카메라를 띄워 장면 목록대로 옮기고, 장면이 도는 동안만 프레임마다 PNG 를 남긴다(`<Out>/<이름>/f_00000.png …`, `shots.json`). 시뮬레이션은 읽기만 한다.
+  - 장면: `-EcoV3FilmShots=지역,방식,대상,시작초,길이초[,거리m,높이m,방위°,글자0/1];…`. 방식은 `wide`(무대 비스듬히)·`top`(위에서)·`wolf`(늑대 번호를 고정 거리에서 따라감)·`deer`(그 늑대에게 가장 가까운 사슴)·`shelter`(은신처 원 번호 둘레를 돎)다. 시작초는 시뮬레이션 초(전역 결정 스텝 × 2/15 초)다. 글자 칸은 장면마다 `eco.V3Debug` 를 켜고 끈다.
+  - 시간 창 고르기: `-EcoV3FilmScout=<초>` 는 0.5 초마다 늑대별 상태(포획 누적·가까운 사슴·뛰는 사슴·가장자리·은신처)를 `scout.csv` 로 남긴다.
+  - 실행 예: `UnrealEditor.exe <uproject> /Game/Map/LV_Ecosystem_IntegrationTest -game -EcoIntegratedV3 -EcoV3Seed=20000 -EcoV3Film=pair_on -EcoV3FilmOut=<폴더> "-EcoV3FilmShots=Highland,wolf,1,12,16,,,,1" -benchmark -fps=30 -windowed -ResX=1920 -ResY=1080 -NoSound -nosplash -DisablePlugins=Bridge,Fab`. 고치기 전 영상은 같은 줄에 스위치 하나(예: `-EcoV3FlightHoldAwake=0`)만 더한다. 고정 스텝이라 같은 시드면 같은 자리에서 시작한다. Git Bash 에서는 `MSYS_NO_PATHCONV=1` 을 둔다(`/Game/…` 이 바뀌지 않게).
+
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 
 - **목표**: 행동 상태가 화면에 보이도록 사슴·늑대 클립에 묶는다(3-2 표).

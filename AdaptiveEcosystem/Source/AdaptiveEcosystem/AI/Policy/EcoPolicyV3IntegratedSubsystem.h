@@ -194,6 +194,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bNoFreeze = true;              // 사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1, 사람 결정 10-15 (A)). 거짓 = R1b 그대로 얼기를 쓴다
 	double WolfEatSeconds = 5.0;        // 늑대 식사 길이 (초, eco.IntegratedV3.WolfEatSeconds 기본 5, 사람 결정 10-15 (B)). 0.67 이하 = 옛 규칙
 	bool bWildFlight = true;            // 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight 기본 1, 야생 w3 — 경계 거리 KeepAway 를 바꿨다). 거짓 = 두뇌 그대로
+	bool bFlightHoldAwake = true;       // 도주 붙잡기 (eco.IntegratedV3.FlightHoldAwake 기본 1, 10-16 hold_awake). 거짓 = 사냥 중인 늑대만 도주를 붙잡는다 (857da45)
+	bool bFlightEdgeAvoid = true;       // 가장자리 굽히기 (eco.IntegratedV3.FlightEdgeAvoid 기본 1, 10-16 edge_r 5). 거짓 = 굽히지 않는다 (857da45)
 	double AlertDistM = 30.0;           // 경계 거리 alert_r (m, eco.IntegratedV3.AlertDistM) — 사냥 중인 늑대를 이 안에서 알아채면 먹으며 멀어진다
 	double PanicDistM = 15.0;           // 도주 거리 flight_r (m, eco.IntegratedV3.PanicDistM) — 이 안이거나 다가오면 뛰어서 달아난다
 	double SafeDistM = 40.0;            // 안전 거리 safe_r (m, eco.IntegratedV3.SafeDistM) — 사냥 중인 늑대가 모두 이 밖일 때까지 도주
@@ -260,8 +262,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 		K.FlightR = Units(PanicDistM, 15.0);
 		K.SafeR = FMath::Max(Units(SafeDistM, 40.0), FMath::Max(K.AlertR, K.FlightR));
 		// 10-16 고침 (configs/v3_wild1_mirror.yaml hold_awake true·edge_r 5): 도주는 깨어 있는 늑대 모두에게서 SafeR 밖까지, 가장자리 10 m 안은 벽을 따라
-		K.bHoldAwake = true;
-		K.EdgeR = 5.0;
+		// 두 고침은 따로 끌 수 있다 (eco.IntegratedV3.FlightHoldAwake·FlightEdgeAvoid, 고치기 전·뒤 영상용). 끄면 857da45 와 같다
+		K.bHoldAwake = bFlightHoldAwake;
+		K.EdgeR = bFlightEdgeAvoid ? 5.0 : 0.0;
 		return K;
 	}
 

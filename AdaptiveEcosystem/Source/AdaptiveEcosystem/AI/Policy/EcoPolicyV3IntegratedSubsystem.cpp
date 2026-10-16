@@ -122,6 +122,21 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("wild_satiation. 0 = 먹기가 끝나면 곧바로 사냥(지금까지). Play 전에 바꾼다. 명령줄 -EcoV3WildSatiation= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarFlightHoldAwake(
+		TEXT("eco.IntegratedV3.FlightHoldAwake"),
+		1,
+		TEXT("통합 v3 모드 도주 붙잡기 (1 = 켬, 기본 — 10-16 hold_awake). 시작한 도주는 깨어 있는 늑대(먹기·배부름 포함) 모두가 안전 거리 밖일 때까지 이어진다. ")
+		TEXT("0 = 사냥 중인 늑대만 붙잡는다(857da45, 늑대가 먹기 시작하면 도주가 풀린다). eco.IntegratedV3.WildFlight 1 일 때만 뜻이 있다. Play 전에 바꾼다. ")
+		TEXT("명령줄 -EcoV3FlightHoldAwake= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarFlightEdgeAvoid(
+		TEXT("eco.IntegratedV3.FlightEdgeAvoid"),
+		1,
+		TEXT("통합 v3 모드 가장자리 굽히기 (1 = 켬, 기본 — 10-16 edge_r 5 = 10 m). 무대 가장자리 10 m 안의 경계·도주 방향을 벽을 따라·모서리 밖으로 굽힌다. ")
+		TEXT("0 = 굽히지 않는다(857da45). eco.IntegratedV3.WildFlight 1 일 때만 뜻이 있다. Play 전에 바꾼다. 명령줄 -EcoV3FlightEdgeAvoid= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarShelterSafe(
 		TEXT("eco.IntegratedV3.ShelterSafe"),
 		1,
@@ -425,6 +440,8 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bRealismVision = CVarRealismVision.GetValueOnGameThread() != 0;
 	S.bRealismHearing = CVarRealismHearing.GetValueOnGameThread() != 0;
 	S.bShelterSafe = CVarShelterSafe.GetValueOnGameThread() != 0;
+	S.bFlightHoldAwake = CVarFlightHoldAwake.GetValueOnGameThread() != 0;
+	S.bFlightEdgeAvoid = CVarFlightEdgeAvoid.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -490,6 +507,16 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3WildSatiation="), SatArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.WildSatiation"), LexToString(SatArg));
+	}
+	int32 HoldArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3FlightHoldAwake="), HoldArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.FlightHoldAwake"), LexToString(HoldArg));
+	}
+	int32 EdgeArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3FlightEdgeAvoid="), EdgeArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.FlightEdgeAvoid"), LexToString(EdgeArg));
 	}
 	int32 ShelterArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ShelterSafe="), ShelterArg))
@@ -619,9 +646,13 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 도주 반사 거리: %s"),
 		   *(Keep.bEnabled
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.WildFlight 1, 야생 w3) — 사냥 중인 늑대를 알아채면 %.0f m 안 = 먹으며 멀어짐(경계), %.0f m 안이거나 다가옴 = ")
-									   TEXT("깨어 있는 늑대 모두에게서 %.0f m 밖·은신처까지 뜀(도주, 반대쪽 ±60° 은신처 쪽, 가장자리 %.0f m 안은 벽을 따라·모서리 밖으로), 은신처 안이면 웅크림, ")
+									   TEXT("%s %.0f m 밖·은신처까지 뜀(도주, 반대쪽 ±60° 은신처 쪽, %s), 은신처 안이면 웅크림, ")
 									   TEXT("먹는·쉬는 늑대는 경계만 일으킴, 자는 늑대 무시"),
-								   Keep.AlertR * MPerUnit, Keep.FlightR * MPerUnit, Keep.SafeR * MPerUnit, Keep.EdgeR * MPerUnit)
+								   Keep.AlertR * MPerUnit, Keep.FlightR * MPerUnit,
+								   Keep.bHoldAwake ? TEXT("깨어 있는 늑대 모두에게서") : TEXT("사냥 중인 늑대만 (eco.IntegratedV3.FlightHoldAwake 0)"),
+								   Keep.SafeR * MPerUnit,
+								   *(Keep.EdgeR > 0.0 ? FString::Printf(TEXT("가장자리 %.0f m 안은 벽을 따라·모서리 밖으로"), Keep.EdgeR * MPerUnit)
+													  : FString(TEXT("가장자리 굽히기 끔 (eco.IntegratedV3.FlightEdgeAvoid 0)"))))
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildFlight 0 — 두뇌 그대로)"))));
 	const EcoWorldV3::FWildReserveConfig Wr;
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 지방 비축: %s"),
