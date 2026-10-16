@@ -104,3 +104,9 @@ UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한
 사용자 요청에 따라 새 복사 맵 `/Game/JYU/Maps/LV_JYU_RefugeSafety`에 수풀·바위 Blueprint 은신처 12개를 배치했다. 기존 `LV_JYU_V3Integration`과 사용자 에셋 변경은 보존한다. 통합 v3에서 `eco.IntegratedV3.ProtectedRefuges=1`은 실제 영역의 늑대 swept 이동 차단·내부 사슴 포획 후보 제외·지면 슬롯/실제 도착 검증을 활성화한다. Native 단일 movement writer를 유지한다. 등록 전 외형을 숨기고 지형 준비 후 재시도하며 제거·등록 index 재사용도 처리한다.
 
 이는 Unreal 세계 규칙 확장이며 PPO 가중치나 기본 Python 세계를 변경하지 않았다. Native 기준 설정은 OFF로 유지한다. ON 세계까지 Python 파리티/재학습이 완료됐다고 간주하지 않는다. 실제 계약·검증·에디터 위치는 [보호 은신처 구현 기록](AdaptiveEcosystem/Docs/조연우/JYU_REFUGE_SAFETY_20261016.md)을 따른다. 이전 문서의 “은신처 진입 금지/안전 미구현”은 이 변경 전의 진단이다.
+
+## 9. 개인 발표 자료 저장 위치
+
+사용자 요청에 따라 개인 주간 발표 PPT, 발표 대본, 멘토 검토용 PDF와 제작·렌더·임시 산출물은 **저장소 밖의 바탕화면 `AdaptiveEcosystem_발표자료/`** 아래에 날짜·용도별로 저장한다. 작업 폴더도 그 외부 경로 안에 만든다. 저장소의 `Deliverables/`, `output/`, `tmp/`에는 새 발표 산출물을 생성하거나 추적하지 않는다. 해당 경로는 Git 제외 규칙으로 보호한다.
+
+프로젝트 소스·Unreal 에셋·설계/계약 문서·동작 검증 근거는 기존 저장소 구조를 유지한다. 팀원이 관리하는 기존 `Docs/Roadmap/M3/Presentation` 등 공유 설계 자료는 개인 발표 분리 대상으로 간주하지 않는다. 사용자 개인 발표 파일을 push하거나 공개 이력을 다시 쓰지 않는다.
