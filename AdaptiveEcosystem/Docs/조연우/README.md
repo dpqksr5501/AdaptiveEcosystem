@@ -1,5 +1,7 @@
 # 조연우 작업 시작 문서 — 역할·진행상황·다음 연결
 
+> **최신 보호 은신처 구현:** 새 복사 맵 `/Game/JYU/Maps/LV_JYU_RefugeSafety`에 수풀·바위 12곳과 실제 늑대 진입 차단·내부 피식 보호·지면 슬롯/도착 검증을 연결했다. 기존 맵·사용자 변경은 보존한다. [구현·에디터 확인·검증](JYU_REFUGE_SAFETY_20261016.md)을 먼저 읽는다. PPO 재학습 완료를 의미하지 않는다.
+
 > **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
 
 갱신일: **2026-10-16**. 현재 작업 브랜치는 `codex/social-shelter-handoff`이며 원래 프로젝트 폴더에서 작업한다. 2026-10-15 통합 worktree의 검증 커밋 `8e2f34f`를 기존 브랜치에 fast-forward로 반영했다. 원래 위치의 직접 UBT·119개 자동화·에디터 12조건·서버/Client 재접속 검증 후 별도 worktree 정리를 완료했다. 앞으로 원래 `AdaptiveEcosystem.uproject`를 연다. [위치 통합 기록](JYU_WORKTREE_RETURN_20261016.md). 기존 PR #11은 main에 병합됐고, 아래 2026-10-08 항목은 이전 구현 이력이다.

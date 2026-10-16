@@ -37,6 +37,11 @@ public:
 	/** Effective refuge radius around the anchor point */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Ecology|Shelter", meta = (ClampMin = "50.0"))
 	float Radius = 300.0f;
+	/** Default preserves legacy boundary slots; protected refuges place occupants farther inside. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ecology|Shelter", meta=(ClampMin="0.1",ClampMax="1"))
+	float SlotRadiusFraction = 1.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Ecology|Shelter")
+	bool bProjectSlotsToGround = false;
 
 	/** Assigned runtime index in UEcoShelterSubsystem */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Shelter")

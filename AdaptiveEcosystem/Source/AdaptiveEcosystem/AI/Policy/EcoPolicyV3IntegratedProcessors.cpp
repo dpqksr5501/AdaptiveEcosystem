@@ -385,6 +385,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	for (int32 c = 0; c < NumCtx; ++c)
 	{
 		FEcoV3RegionContext& Ctx = *Sub->GetContext(c);
+		Sub->RefreshRefuges(Ctx);
 		for (const int32 k : WolvesByContext[c])
 		{
 			FEcoV3WolfRec& W = Wolves[k];
@@ -482,7 +483,8 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
                 if(!D.Feedback||!D.SocialAudit||!D.SocialRequest||D.SocialAudit->AppliedReservation<=0||D.View.Body->DeathCause!=EcoWorldV3::kDeathNone)continue;
                 const auto& Request=*D.SocialRequest;
                 const FVector Actual=Ctx.UnitsToCm(D.View.Body->Pos.X,D.View.Body->Pos.Y,D.Int->GroundZ);
-                const bool Arrived=FVector::DistSquared(Actual,Request.TargetPosition)<=FMath::Square(Request.ArrivalRadius);
+                const bool Arrived=FVector::DistSquared(Actual,Request.TargetPosition)<=FMath::Square(Request.ArrivalRadius)
+                    &&(!Ctx.Sim.Config.bProtectedRefuges||EcoRefugeV3::Contains(Ctx.Sim.Config.Covers,D.View.Body->Pos));
                 D.Feedback->Report(D.SocialAudit->AppliedReservation,Arrived?EEcoShelterMovementStatus::Arrived:EEcoShelterMovementStatus::Moving);
             }
 

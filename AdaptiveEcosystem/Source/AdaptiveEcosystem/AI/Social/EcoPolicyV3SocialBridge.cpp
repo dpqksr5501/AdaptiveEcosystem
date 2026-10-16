@@ -70,7 +70,8 @@ bool EcoV3Social::ApplyControl(const FEcoSocialMovementRequestFragment& Request,
     }
     if (bShelter && W.Allowed[R::kHide]) {
         if (S.Behavior != R::kHide) R::Enter(S,R::kHide,H.Decision->DecisionObs,Cfg);
-        const bool bArrived = FVector::DistSquared(Position,Request.TargetPosition) <= FMath::Square(Request.ArrivalRadius);
+        const bool bArrived = FVector::DistSquared(Position,Request.TargetPosition) <= FMath::Square(Request.ArrivalRadius)
+            && (!W.Config.bProtectedRefuges || EcoRefugeV3::Contains(W.Config.Covers,H.Body->Pos));
         S.bArrived = bArrived;
         // HideTarget continues to mean the native cover index; the exact leased slot is separate.
         In.ToTarget = R::Normalize(R::Sub(Target,H.Body->Pos));

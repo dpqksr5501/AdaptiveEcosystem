@@ -1,6 +1,7 @@
 #include "EcoPolicyV3IntegratedSubsystem.h"
 
 #include "AI/Social/Shelter/EcoShelterAnchor.h"
+#include "AI/Social/Shelter/EcoRefugeHabitat.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Core/EcoRuntimeSettings.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
@@ -54,6 +55,8 @@ namespace EcoPolicyV3IntegratedImpl
 		20000,
 		TEXT("통합 v3 모드의 세션 시드 (사건 결정 지연 해시·지역 세계 난수·시작 자리). 명령줄 -EcoV3Seed= 는 시작값."),
 		ECVF_Default);
+	static TAutoConsoleVariable<int32> CVarProtectedRefuges(TEXT("eco.IntegratedV3.ProtectedRefuges"),1,
+		TEXT("Unreal refuge safety: exclude sheltered prey from hunting/capture and keep predators outside. Play before changing. 0 restores the original native-world cover rule."),ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarGradualNight(
 		TEXT("eco.IntegratedV3.GradualNight"),
@@ -416,6 +419,7 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bWildSatiation = CVarWildSatiation.GetValueOnGameThread() != 0;
 	S.bRealismVision = CVarRealismVision.GetValueOnGameThread() != 0;
 	S.bRealismHearing = CVarRealismHearing.GetValueOnGameThread() != 0;
+	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -858,6 +862,7 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.DayOffset = 0;
 	C.TwilightSteps = 45;
 	C.Covers = Covers;
+	C.bProtectedRefuges = S.bProtectedRefuges;
 	C.FoodRegenMult = 1.0;
 	C.RngStream = static_cast<uint64>(FMath::Max(0, RegionRuntimeIndex)) + 1;   // 지역마다 다른 먹이 패치·늑대 선회 (0 은 평면 맵 몫)
 	C.bRespawnDead = false;                                    // 제자리 부활 없음 (계약 12-3: 새 개체 = 새 StableAgentId)
@@ -886,6 +891,41 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 // -----------------------------------------------------------------------------
 // 조정자 공개 속성 바꾸기 (OnWorldBeginPlay — 액터 BeginPlay 앞)
 // -----------------------------------------------------------------------------
+
+void UEcoPolicyV3IntegratedSubsystem::RefreshRefuges(FEcoV3RegionContext& Context)
+{
+    auto& W=Context.Sim;
+    if(!W.Config.bProtectedRefuges||Context.CoverShelterIndices.Num()!=int32(W.Config.Covers.size()))return;
+    const auto* Shelters=GetWorld()->GetSubsystem<UEcoShelterSubsystem>();if(!Shelters)return;
+    bool Changed=false;
+    for(int32 I=0;I<Context.CoverShelterIndices.Num();++I) {
+        const int32 Index=Context.CoverShelterIndices[I];
+        const bool Valid=Shelters->IsValidShelterIndex(Index)&&Context.CoverRegistrations.IsValidIndex(I)
+            &&Shelters->GetShelters()[Index].RegistrationId==Context.CoverRegistrations[I];
+        auto& Cover=W.Config.Covers[I];
+        if(!Valid&&Cover.Radius>0){Cover.Radius=0;Changed=true;}
+    }
+    // Non-spatial refuge actors may register after terrain cells become ready. Append stable
+    // targets, never recycle an old policy cover index for a new shelter registration.
+    for(const auto& Point:Shelters->GetShelters()) {
+        if(!Shelters->IsValidShelterIndex(Point.RuntimeIndex)||Context.CoverRegistrations.Contains(Point.RegistrationId))continue;
+        const auto P=Context.CmToUnits(Point.Position);const double Radius=Point.Radius/EcoRepertoireV3::kUnitCm;
+        if(Radius<FEcoV3IntegratedSettings::kCoverRadiusLoUnits||Radius>FEcoV3IntegratedSettings::kCoverRadiusHiUnits
+            ||P.X<Radius||P.Y<Radius||P.X>W.Config.WorldSize-Radius||P.Y>W.Config.WorldSize-Radius)continue;
+        W.Config.Covers.push_back({P.X,P.Y,Radius});Context.CoverShelterIndices.Add(Point.RuntimeIndex);
+        Context.CoverRegistrations.Add(Point.RegistrationId);Context.CoverGroundZ.Add(Point.Position.Z);Changed=true;
+    }
+    if(Changed) {
+        // Preserve food amounts and capacity. Only the removed refuge's regeneration modifier changes.
+        auto& F=W.Food;
+        for(int Y=0;Y<F.Gw;++Y)for(int X=0;X<F.Gw;++X) {
+            const int K=Y*F.Gw+X;
+            const bool In=EcoRefugeV3::Contains(W.Config.Covers,{(X+.5)*F.Cell,(Y+.5)*F.Cell});
+            F.CoverCell[K]=In?1:0;
+            F.Regen[K]=W.Config.FoodRegenBase*W.Config.FoodRegenMult*(In?W.Config.FoodCoverRegenMult:1.);
+        }
+    }
+}
 
 bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpawner& S)
 {
@@ -1233,7 +1273,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 				Params.bDeferConstruction = true;
 				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 				const FTransform Xf(Ground);
-				if (AEcoShelterAnchor* Anchor = World->SpawnActor<AEcoShelterAnchor>(AEcoShelterAnchor::StaticClass(), Xf, Params))
+				if (AEcoShelterAnchor* Anchor = World->SpawnActor<AEcoShelterAnchor>(AEcoRefugeHabitat::StaticClass(), Xf, Params))
 				{
 					Anchor->Radius = R;
 					Anchor->Capacity = 4;
@@ -1253,6 +1293,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		// 그 작은 원을 HIDE 목표로 골라 몰리고, cover_dist 관측·은신 판정(포획·탐지 배수)도 학습 밖 크기로 계산된다. 팀 Social 등록은 그대로다
 		std::vector<EcoObservationV3::FCoverInput> Covers;
 		TArray<double> CoverZ;
+		TArray<int32> CoverIndices;TArray<int64> Registrations;
 		int32 Team = 0;
 		int32 Skipped = 0;
 		if (Shelters)
@@ -1280,6 +1321,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 				Covers.push_back({(P.Position.X - Origin.X) / EcoRepertoireV3::kUnitCm, (P.Position.Y - Origin.Y) / EcoRepertoireV3::kUnitCm,
 								  static_cast<double>(P.Radius) / EcoRepertoireV3::kUnitCm});
 				CoverZ.Add(P.Position.Z);
+				CoverIndices.Add(P.RuntimeIndex);Registrations.Add(P.RegistrationId);
 			}
 		}
 		const EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers);
@@ -1288,6 +1330,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		Ctx->SkippedTeamCovers = Skipped;
 		Ctx->ExtraCovers = Extra;
 		Ctx->CoverGroundZ = CoverZ;
+		Ctx->CoverShelterIndices=MoveTemp(CoverIndices);Ctx->CoverRegistrations=MoveTemp(Registrations);
 		if (Ecology)
 			Ctx->bSpatialFoodRegistered = Ecology->RegisterSpatialFood(G.RegionId, Ctx->StartFood, Ctx->StartFood);
 		if (!Ctx->bSpatialFoodRegistered)
@@ -1523,6 +1566,11 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	const EcoWorldV3::FWorldStats& S = Ctx.Sim.Stats;
 	const EcoWorldV3::FWorldStats& P = Ctx.LastLogStats;
 	const double Seconds = static_cast<double>(Ctx.Sim.T) * EcoRepertoireV3::kStepSeconds;
+	if(Ctx.Sim.Config.bProtectedRefuges)
+		UE_LOG(LogEcoPolicyV3I,Log,TEXT("[EcoRefuge] NetMode=%d Region=%s Step=%lld ProtectedPreySteps=%lld Deflections=%lld Recoveries=%lld InsidePredatorSteps=%lld CaptureViolations=%lld"),
+			int32(GetWorld()->GetNetMode()),*Ctx.RegionId.ToString(),static_cast<long long>(Ctx.Sim.T),
+			static_cast<long long>(S.RefugeProtectedPreySteps),static_cast<long long>(S.RefugeConstrainedMoves),static_cast<long long>(S.RefugeRecoveries),
+			static_cast<long long>(S.RefugeInsidePredatorSteps),static_cast<long long>(S.RefugeCaptureViolations));
 
 	FString TeamPhase = TEXT("팀 시계 없음");
 	if (const UWorld* World = GetWorld())

@@ -186,6 +186,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	double PredSpeedMult = 0.8;         // 늑대 속력 = 사슴 뛰기 900 cm/s × 0.8 = 720 cm/s (학습 0.6~0.95)
 	bool bGradualNight = true;          // 늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight 기본 1, 사람 결정 H1 10-14). 거짓 = d ≥ 0.5 에 곧바로 잠
 	bool bNoFreeze = true;              // 사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1, 사람 결정 10-15 (A)). 거짓 = R1b 그대로 얼기를 쓴다
+	bool bProtectedRefuges = true;      // Unreal refuge extension; baseline/golden worlds keep it disabled.
 	double WolfEatSeconds = 5.0;        // 늑대 식사 길이 (초, eco.IntegratedV3.WolfEatSeconds 기본 5, 사람 결정 10-15 (B)). 0.67 이하 = 옛 규칙
 	bool bWildFlight = true;            // 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight 기본 1, 야생 w3 — 경계 거리 KeepAway 를 바꿨다). 거짓 = 두뇌 그대로
 	double AlertDistM = 30.0;           // 경계 거리 alert_r (m, eco.IntegratedV3.AlertDistM) — 사냥 중인 늑대를 이 안에서 알아채면 먹으며 멀어진다
@@ -336,6 +337,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 SkippedTeamCovers = 0;              // 무대 안이지만 반경이 학습 범위(4~9 단위) 밖이라 v3 원 목록에서 뺀 레벨 은신처
 	int32 ExtraCovers = 0;                    // 우리가 놓은 은신처
 	TArray<double> CoverGroundZ;              // 은신처 원 중심의 높이 (디버그 그리기)
+	TArray<int32> CoverShelterIndices;
+	TArray<int64> CoverRegistrations;
 	bool bReportedLowDensity = false;         // 학습 밀도 하한 아래 경고를 남겼다
 
 	// 프레임 끝 집계 (처리기가 채운다)
@@ -527,6 +530,8 @@ public:
 	void SyncContextClock(FEcoV3RegionContext& Ctx) const;
 
 	int32 NumContexts() const { return Contexts.Num(); }
+	/** Synchronize static authored refuge removal without reindexing policy cover targets. */
+	void RefreshRefuges(FEcoV3RegionContext& Context);
 	FEcoV3RegionContext* GetContext(int32 Index) { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	const FEcoV3RegionContext* GetContext(int32 Index) const { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	FEcoV3RegionContext* FindContext(FName RegionId);

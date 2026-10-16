@@ -46,6 +46,9 @@
 #include "AI/Social/Herd/EcoHerdSubsystem.h"
 #include "AI/Social/Alarm/EcoAlarmProcessors.h"
 #include "AI/Social/Shelter/EcoShelterProcessors.h"
+#include "AI/Social/Shelter/EcoRefugeHabitat.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "TimerManager.h"
 #include "AI/Social/Shelter/EcoShelterLifecycleProcessor.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "AI/Social/Senses/EcoPredatorPerception.h"
@@ -93,6 +96,7 @@ namespace EcoPolicyV3IntegratedTestImpl
 		S.WolvesPerRegion = 2;
 		S.StageSizeUnits = 60.0;
 		S.LogIntervalSeconds = 1000.0f;   // 시험 중 기록 줄을 줄인다
+		S.bProtectedRefuges = false; // Existing parity fixtures exercise their original cover rule.
 		return S;
 	}
 
@@ -2853,4 +2857,148 @@ bool FEcoV3PlayerSound::RunTest(const FString&) {
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeSegments,"AdaptiveEcosystem.Policy.V3.Refuge.SweptExclusion",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRefugeSegments::RunTest(const FString&) {
+    using EcoRepertoireV3::FVec2;
+    const std::vector<EcoObservationV3::FCoverInput> Covers={{20,20,4},{27,20,4}};
+    const FVec2 Starts[]={{10,20},{20,10},{20,30},{14,20},{10,15}};
+    const FVec2 Ends[]={{35,20},{20,30},{20,10},{28,20},{35,25}};
+    for(int I=0;I<5;++I) {
+        const auto Move=EcoRefugeV3::Constrain(Covers,60,Starts[I],Ends[I],.5);
+        TestTrue(TEXT("Crossing segments are constrained"),Move.bConstrained);
+        TestFalse(TEXT("Predator endpoint remains outside the union"),EcoRefugeV3::Contains(Covers,Move.Position,.5));
+        bool SweptSafe=true;
+        for(int J=0;J<=100;++J) {
+            const double A=J/100.;
+            SweptSafe&=!EcoRefugeV3::Contains(Covers,{Starts[I].X+(Move.Position.X-Starts[I].X)*A,Starts[I].Y+(Move.Position.Y-Starts[I].Y)*A},.5-1.e-6);
+        }
+        TestTrue(TEXT("Interpolated motion cannot tunnel through a refuge"),SweptSafe);
+    }
+    const auto Recovery=EcoRefugeV3::Constrain(Covers,60,{20,20},{20,20},.5);
+    TestTrue(TEXT("An initially enclosed predator recovers outside overlapping refuges"),Recovery.bRecovered&&!EcoRefugeV3::Contains(Covers,Recovery.Position,.5));
+    const auto Free=EcoRefugeV3::Constrain(Covers,60,{2,2},{3,4},.5);
+    TestTrue(TEXT("Unobstructed motion is identical"),!Free.bConstrained&&Free.Position.X==3&&Free.Position.Y==4);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeCapture,"AdaptiveEcosystem.Policy.V3.Refuge.ProtectedCaptureAndMovement",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRefugeCapture::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    FIntegratedHarness H;auto Settings=TestSettings();Settings.bProtectedRefuges=true;Settings.bWildSatiation=false;
+    if(!H.Setup(*this,Settings))return false;
+    auto* Region=H.AddRegion(TEXT("Refuge"),0,FVector::ZeroVector,1,1);
+    Region->Sim.Config.DayOffset=225;EcoWorldV3::UpdateDayNight(Region->Sim);
+    H.Spawn(false,TEXT("Refuge"),0,{FVector(3000,3000,0)},{71});
+    H.Spawn(true,TEXT("Refuge"),0,{FVector(3050,3000,0)},{72});H.Frame(0);
+    bool Excluded=true,Protected=true;
+    for(int I=0;I<120;++I) {
+        H.DecisionStep();
+        const auto Body=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[0]).Body;
+        const auto& Wolf=H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent;
+        Excluded&=!EcoRefugeV3::Contains(Region->Sim.Config.Covers,{Wolf.State.PosX,Wolf.State.PosY},Region->Sim.Config.PredatorRefugeMargin-1.e-6);
+        if(EcoRefugeV3::Contains(Region->Sim.Config.Covers,Body->Pos))Protected&=Body->DeathCause!=EcoWorldV3::kDeathCaught;
+    }
+    TestTrue(TEXT("Actual Mass wolf remains outside protected cover"),Excluded);
+    TestTrue(TEXT("Actual prey inside cover cannot be captured"),Protected);
+    TestTrue(TEXT("Protection and initially enclosed predator recovery were exercised"),Region->Sim.Stats.RefugeProtectedPreySteps>0&&Region->Sim.Stats.RefugeRecoveries>0);
+    // Protection is spatial, not an identity-wide invulnerability flag.
+    auto Deer=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[0]);
+    auto& Wolf=H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent;
+    Deer.Body->Pos=Deer.Body->PrevPos={40,40};Deer.Body->Energy=1;Deer.Body->DeathCause=0;
+    H.EM->GetFragmentDataChecked<FEcoVitalsFragment>(H.Deer[0]).HP=100;
+    H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Deer[0]).bDead=false;
+    EcoRepertoireV3::Enter(*Deer.Rep,EcoRepertoireV3::kGraze,Deer.Decision->DecisionObs,Region->Sim.RepCfg);
+    Deer.Decision->KeepMode=Deer.Decision->KeepActive=0;
+    Wolf.State.PosX=40.05;Wolf.State.PosY=40;Wolf.State.Cooldown=Wolf.State.SatLeft=0;
+    Region->Sim.Config.WildFlight.bEnabled=false;
+    H.DecisionStep();
+    TestEqual(TEXT("Leaving refuge restores real predation"),Deer.Body->DeathCause,EcoWorldV3::kDeathCaught);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeLifecycle,"AdaptiveEcosystem.Policy.V3.Refuge.RemovalAndSlotIdentity",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRefugeLifecycle::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    FIntegratedHarness H;auto Settings=TestSettings();Settings.bProtectedRefuges=true;
+    if(!H.Setup(*this,Settings))return false;
+    auto* Region=H.AddRegion(TEXT("Removed"),0,FVector::ZeroVector,1,0);
+    Region->Sim.Config.Covers={{25,25,4}};
+    auto* Shelters=H.Scoped.World->GetSubsystem<UEcoShelterSubsystem>();
+    const int Index=Shelters->RegisterShelter({5000,5000,0},FVector::UpVector,1,4,800,.55f);
+    Region->CoverShelterIndices={Index};Region->CoverRegistrations={Shelters->GetShelters()[Index].RegistrationId};
+    TestTrue(TEXT("Interior slots have a safe arrival buffer"),FMath::IsNearlyEqual(FVector::Distance(Shelters->GetShelterSlots()[0].Position,{5000,5000,0}),440.,.01));
+    H.Spawn(false,TEXT("Removed"),0,{FVector(5000,5000,0)},{81});H.Frame(0);
+    auto Deer=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[0]);
+    EcoRepertoireV3::Enter(*Deer.Rep,EcoRepertoireV3::kHide,Deer.Decision->DecisionObs,Region->Sim.RepCfg);
+    Deer.Rep->bArrived=true;Deer.Rep->HideTarget=0;
+    const double Food=Region->Sim.Food.Total();
+    Shelters->UnregisterShelter(Index);
+    const int Reused=Shelters->RegisterShelter({8000,8000,0},FVector::UpVector,1,4,800,.55f);
+    TestEqual(TEXT("Compact index was reused for a distinct shelter"),Reused,Index);
+    H.Sub->RefreshRefuges(*Region);
+    TestEqual(TEXT("A reused registration cannot resurrect old cover"),Region->Sim.Config.Covers[0].Radius,0.);
+    TestEqual(TEXT("Geometry removal preserves actual food amounts"),Region->Sim.Food.Total(),Food);
+    H.DecisionStep();
+    TestFalse(TEXT("A lost refuge cannot leave the deer sitting on exposed ground"),Deer.Rep->Behavior==EcoRepertoireV3::kHide&&Deer.Rep->bArrived);
+    EcoRepertoireV3::Enter(*Deer.Rep,EcoRepertoireV3::kHide,Deer.Decision->DecisionObs,Region->Sim.RepCfg);
+    Deer.Rep->HideTarget=0;Deer.Rep->bArrived=false;Deer.Rep->LockLeft=100;
+    H.DecisionStep();
+    TestTrue(TEXT("A removed destination cancels travel even while the policy decision is locked"),Deer.Rep->Behavior!=EcoRepertoireV3::kHide);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeVisuals,"AdaptiveEcosystem.Creature.JYU.RefugeVisualComposition",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRefugeVisuals::RunTest(const FString&) {
+    EcoTest::FScopedTestWorld W;auto* Habitat=W.World->SpawnActor<AEcoRefugeHabitat>();
+    if(!TestNotNull(TEXT("Actual refuge actor"),Habitat))return false;
+    Habitat->RebuildHabitat();
+    TestTrue(TEXT("Visible brush and rocks use actual project meshes"),Habitat->Brush->GetStaticMesh()!=nullptr&&Habitat->Boulders->GetStaticMesh()!=nullptr);
+    TestTrue(TEXT("Refuge has distributed cover instead of an empty marker"),Habitat->Brush->GetInstanceCount()>50&&Habitat->Boulders->GetInstanceCount()>8);
+    TestTrue(TEXT("Occupant slots are inset from the predator boundary"),Habitat->SlotRadiusFraction<.75f);
+    TestTrue(TEXT("Visual foliage does not create a second movement writer or collision trap"),Habitat->Brush->GetCollisionEnabled()==ECollisionEnabled::NoCollision);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeGroundSlots,"AdaptiveEcosystem.Policy.V3.Refuge.GroundProjectedSlots",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRefugeGroundSlots::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    EcoTest::FScopedTestWorld W;
+    auto* Shelters=W.World->GetSubsystem<UEcoShelterSubsystem>();
+    TestEqual(TEXT("No ground cannot create a floating protected refuge"),Shelters->RegisterShelter({5000,5000,0},FVector::UpVector,1,4,800,.55f,true),INDEX_NONE_ECO);
+    if(!TestNotNull(TEXT("Actual sloped collision ground"),SpawnBox(*W.World,{5000,5000,0},{0,0,15},{40,40,.5})))return false;
+    const int Index=Shelters->RegisterShelter({5000,5000,0},FVector::UpVector,1,4,800,.55f,true);
+    if(!TestTrue(TEXT("Projected refuge registers on actual physics ground"),Index>=0))return false;
+    double Low=1.e9,High=-1.e9;
+    for(const auto& Slot:Shelters->GetShelterSlots())if(Slot.ShelterRuntimeIndex==Index){Low=FMath::Min(Low,Slot.Position.Z);High=FMath::Max(High,Slot.Position.Z);}
+    TestTrue(TEXT("Each slot follows the slope instead of inheriting the center height"),High-Low>50);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeLateGround,"AdaptiveEcosystem.Creature.JYU.RefugeLateGroundRegistration",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+namespace EcoPolicyV3IntegratedTestImpl {
+class FWaitForRefugeGround final : public IAutomationLatentCommand {
+    TSharedPtr<EcoTest::FScopedTestWorld> W;
+    TWeakObjectPtr<AEcoRefugeHabitat> Habitat;
+    FAutomationTestBase* Test;
+    int Frames=0;
+public:
+    FWaitForRefugeGround(TSharedPtr<EcoTest::FScopedTestWorld> InWorld,AEcoRefugeHabitat* InHabitat,FAutomationTestBase* InTest)
+        : W(MoveTemp(InWorld)),Habitat(InHabitat),Test(InTest) {}
+    bool Update() override {
+        // TimerManager only advances once per engine frame; pending timers become active
+        // after its first tick. Keep the real world alive across automation frames.
+        W->World->GetTimerManager().Tick(.15f);
+        if(++Frames<8&&Habitat.IsValid()&&!Habitat->bRegistrationReady)return false;
+        Test->TestTrue(TEXT("Registration retries when ground becomes available"),Habitat.IsValid()&&Habitat->bRegistrationReady&&Habitat->ShelterRuntimeIndex>=0);
+        Test->TestTrue(TEXT("Registered cover becomes visible"),Habitat.IsValid()&&Habitat->Brush->IsVisible());
+        return true;
+    }
+};
+}
+bool FEcoRefugeLateGround::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    auto W=MakeShared<EcoTest::FScopedTestWorld>();
+    auto* Habitat=W->World->SpawnActor<AEcoRefugeHabitat>();
+    if(!TestNotNull(TEXT("Refuge before streamed ground is ready"),Habitat))return false;
+    Habitat->DispatchBeginPlay();
+    TestFalse(TEXT("Unregistered refuge cannot show a false safety cue"),Habitat->bRegistrationReady||Habitat->Brush->IsVisible());
+    if(!TestNotNull(TEXT("Late physical ground"),SpawnBox(*W->World,{0,0,-20},FRotator::ZeroRotator,{40,40,.2})))return false;
+    FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FWaitForRefugeGround>(W,Habitat,this));
+    return true;
+}
 #endif // WITH_DEV_AUTOMATION_TESTS

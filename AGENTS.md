@@ -98,3 +98,9 @@ UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한
 직접 UBT 성공, 자동화 140개(139 Success + 1 예상 저장 파일 warning, 실패 0), 복사 맵 일반 PIE 및 Dedicated+Client 2개를 검증했다. 실제 Moving→Occupied와 Client 논리 개체/Native Step 0을 확인했다. migration/wave 활성화·외부 MassFlock 설치·NavMesh 전환·재학습은 이번 작업 범위가 아니다. 사용자 변경 에셋 68개는 원본 바이트를 보존하고 이번 코드 커밋에서 제외했다.
 
 후속 [근접 장면 진단](AdaptiveEcosystem/Docs/조연우/JYU_THREAT_SCENE_DIAGNOSIS_20261016.md)에서 **은신처 안전 계약 미충족**을 확인했다. 명세의 늑대 진입 금지/안전과 달리 현재 Native cover는 탐지·포획 거리 배수이며 물리적 진입 금지/면역이 아니다. 웅크림 중 포획도 사용자 로그에 있다. 보이는 엄폐물도 자동 배치하지 않는다. 숨기=미감지 또는 완전한 안전이라고 설명하지 않는다. 새 읽기 전용 진단은 Native 감지와 Social 위급 경보를 구분하며, 후속 141개 자동화와 일반 PIE를 검증했다. 이 진단이 세계 규칙 불일치를 해결한 것은 아니다.
+
+## 8. 2026-10-16 실제 보호 은신처
+
+사용자 요청에 따라 새 복사 맵 `/Game/JYU/Maps/LV_JYU_RefugeSafety`에 수풀·바위 Blueprint 은신처 12개를 배치했다. 기존 `LV_JYU_V3Integration`과 사용자 에셋 변경은 보존한다. 통합 v3에서 `eco.IntegratedV3.ProtectedRefuges=1`은 실제 영역의 늑대 swept 이동 차단·내부 사슴 포획 후보 제외·지면 슬롯/실제 도착 검증을 활성화한다. Native 단일 movement writer를 유지한다. 등록 전 외형을 숨기고 지형 준비 후 재시도하며 제거·등록 index 재사용도 처리한다.
+
+이는 Unreal 세계 규칙 확장이며 PPO 가중치나 기본 Python 세계를 변경하지 않았다. Native 기준 설정은 OFF로 유지한다. ON 세계까지 Python 파리티/재학습이 완료됐다고 간주하지 않는다. 실제 계약·검증·에디터 위치는 [보호 은신처 구현 기록](AdaptiveEcosystem/Docs/조연우/JYU_REFUGE_SAFETY_20261016.md)을 따른다. 이전 문서의 “은신처 진입 금지/안전 미구현”은 이 변경 전의 진단이다.

@@ -357,6 +357,7 @@ namespace EcoObservationV3
 		FCoverPerception R;
 		for (std::int32_t k = 0; k < NumCovers; ++k)
 		{
+			if(Covers[k].Radius<=0)continue; // Stable-index tombstone of an unregistered refuge.
 			const double Dx = Covers[k].X - Pos.X;
 			const double Dy = Covers[k].Y - Pos.Y;
 			const double E = std::sqrt(Dx * Dx + Dy * Dy) - Covers[k].Radius;

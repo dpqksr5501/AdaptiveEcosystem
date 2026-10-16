@@ -66,6 +66,7 @@
 #include "EcoPolicyV3Inference.h"
 #include "EcoRepertoire.h"
 #include "EcoThreatModel.h"
+#include "EcoRefugeSafetyV3.h"
 
 namespace EcoWorldV3
 {
@@ -243,6 +244,9 @@ namespace EcoWorldV3
 
 		// 은신처 원 (단위)
 		std::vector<EcoObservationV3::FCoverInput> Covers;
+		// Explicit Unreal world-rule extension. Disabled for the existing Python/golden baseline.
+		bool bProtectedRefuges = false;
+		double PredatorRefugeMargin = 0.5; // 100 cm body clearance; never changes policy observations.
 
 		// 먹이 격자 (configs/default.yaml)
 		double FoodCell = 2.0;
@@ -616,6 +620,11 @@ namespace EcoWorldV3
 		std::int64_t WolfSatedSteps = 0;     // 그중 배불러 쉼
 		std::int64_t WolfEatingSteps = 0;    // 그중 먹는 중 (쿨다운 줄인 뒤 > 0)
 		std::int64_t WolfKills = 0;          // 포만을 건 포획
+		std::int64_t RefugeProtectedPreySteps = 0;
+		std::int64_t RefugeConstrainedMoves = 0;
+		std::int64_t RefugeRecoveries = 0;
+		std::int64_t RefugeInsidePredatorSteps = 0;
+		std::int64_t RefugeCaptureViolations = 0;
 	};
 
 	/**
@@ -1215,6 +1224,7 @@ namespace EcoWorldV3
 						for (std::int32_t k = 0; k < K; ++k)
 						{
 							const EcoObservationV3::FCoverInput& Cv = W.Config.Covers[static_cast<size_t>(k)];
+							if(Cv.Radius<=0)continue;
 							const double Vx = Cv.X - P.X;
 							const double Vy = Cv.Y - P.Y;
 							const double Dc = std::sqrt(Vx * Vx + Vy * Vy);
@@ -1407,6 +1417,17 @@ namespace EcoWorldV3
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			const FHerbView& H = Herbs[i];
+			const int HideTarget=H.Rep->HideTarget;
+			const bool LostHideTarget=HideTarget>=0&&(HideTarget>=int(W.Config.Covers.size())||W.Config.Covers[HideTarget].Radius<=0);
+			if(W.Config.bProtectedRefuges&&H.Rep->Behavior==R3::kHide
+				&&((H.Rep->bArrived&&!Detail::InAnyCover(W,H.Body->Pos))||(!H.Rep->bArrived&&LostHideTarget))) {
+				// A removed/moved refuge cannot leave a deer sitting in exposed terrain. Use only
+				// its existing personal threat observation to choose escape versus normal foraging.
+				const int Next=H.Perception->Threat.PredCount>0&&W.Allowed[R3::kFlee]?R3::kFlee:R3::kGraze;
+				R3::Enter(*H.Rep,Next,H.Decision->DecisionObs,RC);
+				H.Decision->KeepActive=H.Decision->KeepMode=kKeepNone;
+				H.Decision->ExecutedBehavior=Next;
+			}
 			if (bKeep)
 			{
 				// 도주: FLEE 제어기에 덮기 방향. 경계: 두뇌가 GRAZE 면 걸으며 먹고 멀어진다 (world.py _rep_step 의 wf 줄)
@@ -1469,7 +1490,8 @@ namespace EcoWorldV3
 			P.Behavior = static_cast<std::uint8_t>(H.Rep->Behavior);
 			P.bHideArrived = H.Rep->bArrived;
 			P.bInCover = Detail::InAnyCover(W, H.Body->Pos);   // 이동 뒤 위치로 다시 판정 (world.py:2026)
-			P.bAlive = true;                                    // 파이썬처럼 늘 산 개체다 (죽은 슬롯은 지난 스텝 끝에 리스폰했다)
+			P.bAlive = !(W.Config.bProtectedRefuges && P.bInCover);
+			W.Stats.RefugeProtectedPreySteps += !P.bAlive ? 1 : 0;
 		}
 		W.Rolls.resize(static_cast<size_t>(N));
 		W.CaughtByThreat.assign(static_cast<size_t>(M), -1);
@@ -1497,8 +1519,25 @@ namespace EcoWorldV3
 			}
 			A.PrevX = A.State.PosX;
 			A.PrevY = A.State.PosY;
+			if(W.Config.bProtectedRefuges) {
+				const auto Recovery=EcoRefugeV3::Constrain(W.Config.Covers,W.Config.WorldSize,{A.PrevX,A.PrevY},{A.PrevX,A.PrevY},W.Config.PredatorRefugeMargin);
+				if(Recovery.bRecovered) {
+					A.State.PosX=A.PrevX=Recovery.Position.X;A.State.PosY=A.PrevY=Recovery.Position.Y;
+					++W.Stats.RefugeRecoveries;
+				}
+			}
 			const std::int32_t PreCd = A.State.Cooldown;
 			A.Last = EcoThreatV3::Step(A.Spec, A.State, In, W.ThreatCfg);
+			if(W.Config.bProtectedRefuges) {
+				const auto Move=EcoRefugeV3::Constrain(W.Config.Covers,W.Config.WorldSize,{A.PrevX,A.PrevY},{A.State.PosX,A.State.PosY},W.Config.PredatorRefugeMargin);
+				if(Move.bConstrained) {
+					A.State.PosX=Move.Position.X;A.State.PosY=Move.Position.Y;
+					A.State.VelX=Move.Position.X-A.PrevX;A.State.VelY=Move.Position.Y-A.PrevY;
+					const auto Head=R3::Normalize({A.State.VelX,A.State.VelY});
+					if(R3::IsNonZero(Head)){A.State.HeadX=Head.X;A.State.HeadY=Head.Y;}
+					++W.Stats.RefugeConstrainedMoves;
+				}
+			}
 			if (W.ThreatCfg.bWildSatiation && A.Spec.Type != EcoThreatV3::EThreatType::Player)
 			{
 				// 야생 (w2) 기록만: 늑대·스텝, 배불러 쉼, 먹는 중(쿨다운 줄인 뒤 > 0), 포만을 건 포획
@@ -1521,9 +1560,12 @@ namespace EcoWorldV3
 				++W.Stats.BlockedThreatMoves;
 			}
 			W.CaughtByThreat[static_cast<size_t>(m)] = A.Last.Caught;
+			if(W.Config.bProtectedRefuges&&EcoRefugeV3::Contains(W.Config.Covers,{A.State.PosX,A.State.PosY},W.Config.PredatorRefugeMargin-1.e-6))++W.Stats.RefugeInsidePredatorSteps;
 		}
 		W.Catcher.assign(static_cast<size_t>(N), -1);
 		EcoThreatV3::ResolveCatches(W.CaughtByThreat.data(), M, W.Catcher.data(), N);
+		if(W.Config.bProtectedRefuges)for(std::int32_t I=0;I<N;++I)
+			if(W.Catcher[I]>=0&&W.Prey[I].bInCover)++W.Stats.RefugeCaptureViolations;
 
 		// C4. 섭식·대사 (이동 뒤 셀, 셀마다 수요 합을 슬롯 순서로 쌓는다 — np.bincount)
 		FFoodGrid& F = W.Food;

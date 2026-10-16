@@ -57,6 +57,20 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetStringField(TEXT("last_known"),Cue->Memory.LastKnownPosition.ToCompactString());
             }
             if(World->GetNetMode()==NM_Client)return;
+            if(const auto* Link=Manager.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E))
+                if(const auto* Sub=World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>())
+                    if(const auto* Ctx=Sub->GetContext(Link->ContextIndex)) {
+                        const auto& W=Ctx->Sim;
+                        Data->SetBoolField(TEXT("refuge_safety_enabled"),W.Config.bProtectedRefuges);
+                        Data->SetNumberField(TEXT("refuge_protected_prey_steps"),double(W.Stats.RefugeProtectedPreySteps));
+                        Data->SetNumberField(TEXT("refuge_constrained_moves"),double(W.Stats.RefugeConstrainedMoves));
+                        Data->SetNumberField(TEXT("refuge_capture_violations"),double(W.Stats.RefugeCaptureViolations));
+                        Data->SetNumberField(TEXT("refuge_inside_predator_steps"),double(W.Stats.RefugeInsidePredatorSteps));
+                        if(const auto* Body=Manager.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E))
+                            Data->SetBoolField(TEXT("refuge_protected_here"),W.Config.bProtectedRefuges&&EcoRefugeV3::Contains(W.Config.Covers,Body->Body.Pos));
+                        if(const auto* Wolf=Manager.GetFragmentDataPtr<FEcoThreatStateFragment>(E))
+                            Data->SetBoolField(TEXT("wolf_inside_refuge"),EcoRefugeV3::Contains(W.Config.Covers,{Wolf->Agent.State.PosX,Wolf->Agent.State.PosY}));
+                    }
             Data->SetBoolField(TEXT("social_runtime"),Manager.GetFragmentDataPtr<FEcoSocialBehaviorFragment>(E)!=nullptr);
             Data->SetBoolField(TEXT("species_ai_movement"),Manager.GetFragmentDataPtr<FEcoSpeciesAIMoveFragment>(E)!=nullptr);
             if(const auto* V=Manager.GetFragmentDataPtr<FEcoVitalsFragment>(E)){Data->SetNumberField(TEXT("hp"),V->HP);Data->SetNumberField(TEXT("energy"),V->Energy);}
@@ -243,7 +257,7 @@ void AEcoCreatureInspectorHUD::DrawHUD()
         if(UEcoCreatureInspectionLibrary::CaptureAgent(this,SelectedId,InspectionJson)) {
             TSharedPtr<FJsonObject> J;auto Reader=TJsonReaderFactory<>::Create(InspectionJson);
             if(FJsonSerializer::Deserialize(Reader,J)&&J.IsValid()) {
-                for(const TCHAR* Key:{TEXT("request"),TEXT("executed"),TEXT("last_intake"),TEXT("flight_override"),TEXT("native_in_cover"),TEXT("hide_arrived"),TEXT("nearest_wolf_reason"),TEXT("nearest_wolf_distance_cm"),TEXT("nearest_wolf_hearing_radius_cm"),TEXT("native_vision_radius_cm"),TEXT("alarm_sense"),TEXT("social_state"),TEXT("alarm_strength"),TEXT("social_override"),TEXT("shelter_state"),TEXT("target"),TEXT("wolf_hunting"),TEXT("wolf_sated"),TEXT("wolf_asleep"),TEXT("wolf_eat_steps"),TEXT("wolf_sated_steps")}) {
+                for(const TCHAR* Key:{TEXT("request"),TEXT("executed"),TEXT("last_intake"),TEXT("flight_override"),TEXT("refuge_protected_here"),TEXT("native_in_cover"),TEXT("hide_arrived"),TEXT("nearest_wolf_reason"),TEXT("nearest_wolf_distance_cm"),TEXT("nearest_wolf_hearing_radius_cm"),TEXT("native_vision_radius_cm"),TEXT("alarm_sense"),TEXT("social_state"),TEXT("alarm_strength"),TEXT("social_override"),TEXT("shelter_state"),TEXT("target"),TEXT("wolf_inside_refuge"),TEXT("wolf_hunting"),TEXT("wolf_sated"),TEXT("wolf_asleep"),TEXT("wolf_eat_steps"),TEXT("wolf_sated_steps")}) {
                     const auto V=J->TryGetField(Key);if(!V.IsValid())continue;
                     const FString Value=V->Type==EJson::String?V->AsString():V->Type==EJson::Boolean?(V->AsBool()?TEXT("true"):TEXT("false")):LexToString(V->AsNumber());
                     InspectionDetail+=FString(Key)+TEXT(": ")+Value+TEXT("\n");

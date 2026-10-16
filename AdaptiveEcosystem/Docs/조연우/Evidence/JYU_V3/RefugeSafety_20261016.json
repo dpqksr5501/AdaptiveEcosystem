@@ -1,0 +1,1248 @@
+{
+  "date": "2026-10-16 KST",
+  "map": "/Game/JYU/Maps/LV_JYU_RefugeSafety",
+  "source_baseline": "89f6d2d",
+  "build": "Build06: direct UBT AdaptiveEcosystemEditor Win64 Development: Succeeded",
+  "provenance": "Automation05 uses final Build06; editor/PIE02 and two successful network joins use Build05. Final changes cancel travel to removed refuges and preserve HUD target display; regression verified in Automation05.",
+  "automation": {
+    "succeeded": 146,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "test_cases": [
+    {
+      "path": "AdaptiveEcosystem.Creature.Audio.ActualDistanceAndDiscontinuities",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Audio.NotifyTravelGate",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Audio.PhysicalSurfaceOverridesRegion",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Audio.SurfaceAndPlaybackSettings",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Demo.PPOAndPredatorBridgeLifecycle",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Integration.ActualMovementAndShelterLifecycle",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Integration.ExpiredMalformedAndHoldRequests",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Integration.SavedAnimalAssetsAndTemplate",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Integration.VisualPayloadDeltas",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.AlarmNoiseIdentityAndExpiry",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.CanonicalV3TemplateAndLifecycle",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.NativeSightAndHearingProvenance",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.NativeThreatAndBackendInspection",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.NativeThreatContextInspection",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.PlayerGaitBounds",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.RefugeLateGroundRegistration",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.RefugeVisualComposition",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.SavedProfilesAndBehaviorGraphs",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.SpatialFoodConservationAndExclusiveWriter",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.JYU.StationarySensoryTransportAndSurfaces",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Level.GroundClearanceAndWaterExclusion",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Visual.BindingAndStaleSnapshots",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Visual.ImportedAnatomyFacingAndReversals",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Visual.MotionAndReadOnlyMass",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Creature.Visual.SignedTurnAndAssetFallback",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.AliveFilter.CorpseLeavesNeighborhood",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.AliveFilter.DeadAgentIsFrozen",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.AliveFilter.NoDoubleCatchSameTick",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.AliveFilter.PredationAfterSteering",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.AliveFilter.RespawnRoundTrip",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Heading.FollowsBoundaryVelocity",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Heading.HeldWhenStopped",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Heading.YawFollowsVelocity",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.CoverHidesDistance",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.EmaDenominatorAliveMaxOverStep",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.EmaFormulaSequence",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.EmaIsGlobal",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.EmaPerCatchMatchesPython",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.EmaStepOwnedByPredationProcessor",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.FromBehind",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.ObservationReadsGlobalEma",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.OnePerTickAndCooldown",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Predation.SaveLoadGlobalEma",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Schedule.DecisionRateFpsIndependent",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Schedule.LargeAndZeroDelta",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Schedule.PredationEmaFpsIndependent",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Schedule.SixtyFpsMatchesLegacy",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Schedule.SpawnPhaseSentinel",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.Schedule.StepClockUnits",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.AdoptionKeys",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.BlockedMoveHooks",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.EndToEndMiniWorld",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.FeedingFeedback",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.FlatSessionUnaffected",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.GradualNight",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.MultiStepDeathExclusion",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.NoFreeze",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.PerRegionContexts",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.SpawnerOverride",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.SpawnPlan",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.SwitchDefaultOff",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.TemplateComposition",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.TerrainBlocking",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Integrated.WolfEating",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Mass.AllFourBehaviors",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Mass.DecisionClock",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Mass.Determinism",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Mass.MaskRespected",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Mass.ReferenceParity",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Mass.StateValid",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Mass.V1Untouched",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Mass.VersionSelect",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Observation.Build",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Observation.DayNight",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Observation.Perception",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Observation.PredationEma",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Refuge.GroundProjectedSlots",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Refuge.ProtectedCaptureAndMovement",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Refuge.RemovalAndSlotIdentity",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Refuge.SweptExclusion",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.ArbiterSequences",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.ClosedLoop",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.Constants",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.Contract",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.Control",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.InitRespawn",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.JitterHash",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.MoveEnergy",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.Perceive",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Repertoire.PrepareCommit",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Social.BlindMemberReaction",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Social.EvidenceChannelsAndUnsafeTarget",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Social.PlayerFootstepEvidence",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Social.SlotMovementAndCleanup",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Threat.AliveFilter",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Threat.Config",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Threat.EdgeCases",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Threat.GoldenStep",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Threat.NearThreshold",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Threat.ResolveCatches",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Threat.Sequences",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Threat.SpecAndDayNight",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ThreatNight.ConfigHashInit",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ThreatNight.OffUnchanged",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ThreatNight.ReferenceWorld",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ThreatNight.Sequences",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ThreatNight.Steps",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ThreatNight.Updates",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Wild.FlightGolden",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Wild.FlightRun",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Wild.PerceptionGolden",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Wild.ReserveGolden",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Wild.ReserveWorld",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Wild.SatiationGolden",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ActionMask",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ActionMaskAlarm",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.ArgmaxTieRule",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.Contract",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.GoldenParity",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.MaskNotNetInput",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.V3.NearTie",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.BehaviorConfigUnits",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.GoldenVectorParity",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.OutputRange",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.PipelineSmoke",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.SteeringParity",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Policy.UtilityBaseline",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.ActionAudit.RawPreservationAndNoCompounding",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Predator.OcclusionAndCaptureGuard",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Predator.SightHearingAndPrivateMemory",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Senses.EnvironmentAndProfile",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Senses.HearingOcclusionAndOnceOnly",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Senses.LogicalFootstepsWithoutVisualActors",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Senses.NoiseLifecycleAndEmitter",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Senses.ReadSnapshotExpiryAndIsolation",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Senses.SharedEvidenceAgeAndHerdReuse",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Senses.SharedInformationIsNotDirectSight",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Senses.SightLossAndReacquisition",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.ShelterLifecycle.CompetitionAndOrder",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.ShelterLifecycle.HandoffAndArrival",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.ShelterLifecycle.LeaseGenerationAndFeedback",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.ShelterLifecycle.OwnerCleanup",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.ShelterLifecycle.ProgressAndRenewal",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Threat.ActorLOSAndLifecycle",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Threat.ChannelAndSlotSafety",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Threat.MassToShelter",
+      "state": "Success"
+    },
+    {
+      "path": "AdaptiveEcosystem.Social.Threat.ProcessorOrder",
+      "state": "Success"
+    }
+  ],
+  "runtime": {
+    "result": "FINISHED",
+    "samples": 80,
+    "deer_records": 3801,
+    "wolf_records": 160,
+    "protected_records": 662,
+    "sitting_protected_records": 210,
+    "occupied_records": 147,
+    "wolf_inside_records": 0,
+    "executed_counts": {
+      "0": 3260,
+      "2": 253,
+      "1": 288
+    },
+    "region_safety_counters": {
+      "Forest": {
+        "refuge_protected_prey_steps": 2503,
+        "refuge_constrained_moves": 22,
+        "refuge_capture_violations": 0,
+        "refuge_inside_predator_steps": 0
+      }
+    },
+    "ready_refuges": 12,
+    "refuges": [
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 37000.000000, y: 4000.000000, z: 1571.868265}>",
+        "brush": 183,
+        "rocks": 20,
+        "registration": 2,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 31000.000000, y: -2000.000000, z: 1518.739867}>",
+        "brush": 192,
+        "rocks": 20,
+        "registration": 3,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 37200.000000, y: 43500.000000, z: -1662.500131}>",
+        "brush": 188,
+        "rocks": 20,
+        "registration": 4,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 37000.000000, y: -46000.000000, z: 2672.646952}>",
+        "brush": 185,
+        "rocks": 20,
+        "registration": 5,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 37200.000000, y: 49500.000000, z: -2009.377420}>",
+        "brush": 188,
+        "rocks": 20,
+        "registration": 6,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 37000.000000, y: -52000.000000, z: 2619.529569}>",
+        "brush": 193,
+        "rocks": 20,
+        "registration": 13,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 31200.000000, y: 49500.000000, z: -1590.635145}>",
+        "brush": 188,
+        "rocks": 20,
+        "registration": 7,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 31000.000000, y: -52000.000000, z: 2553.903139}>",
+        "brush": 184,
+        "rocks": 20,
+        "registration": 12,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 31000.000000, y: 4000.000000, z: 1282.017898}>",
+        "brush": 194,
+        "rocks": 20,
+        "registration": 8,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 31200.000000, y: 43500.000000, z: -1659.380758}>",
+        "brush": 190,
+        "rocks": 20,
+        "registration": 9,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 31000.000000, y: -46000.000000, z: 2604.680741}>",
+        "brush": 187,
+        "rocks": 20,
+        "registration": 10,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x000001FD366D4A60) {x: 37000.000000, y: -2000.000000, z: 1885.153210}>",
+        "brush": 193,
+        "rocks": 20,
+        "registration": 11,
+        "ready": true,
+        "projected_slots": true
+      }
+    ]
+  },
+  "pie_all_region_counters": {
+    "Forest": {
+      "net_mode": 0,
+      "step": 300,
+      "protected_prey_steps": 2494,
+      "deflections": 22,
+      "recoveries": 0,
+      "inside_predator_steps": 0,
+      "capture_violations": 0
+    },
+    "Barren": {
+      "net_mode": 0,
+      "step": 300,
+      "protected_prey_steps": 2704,
+      "deflections": 34,
+      "recoveries": 0,
+      "inside_predator_steps": 0,
+      "capture_violations": 0
+    },
+    "Highland": {
+      "net_mode": 0,
+      "step": 300,
+      "protected_prey_steps": 2536,
+      "deflections": 38,
+      "recoveries": 0,
+      "inside_predator_steps": 0,
+      "capture_violations": 0
+    }
+  },
+  "network": {
+    "processes": [
+      {
+        "Name": "ClientA",
+        "ExitCode": 0
+      },
+      {
+        "Name": "ClientB",
+        "ExitCode": 0
+      },
+      {
+        "Name": "Server",
+        "ExitCode": 0
+      }
+    ],
+    "server_max_logical_owned": 390,
+    "server_max_visuals": 0,
+    "server_counters": {
+      "Forest": {
+        "net_mode": 1,
+        "step": 750,
+        "protected_prey_steps": 14275,
+        "deflections": 13,
+        "recoveries": 0,
+        "inside_predator_steps": 0,
+        "capture_violations": 0
+      },
+      "Barren": {
+        "net_mode": 1,
+        "step": 750,
+        "protected_prey_steps": 7713,
+        "deflections": 65,
+        "recoveries": 0,
+        "inside_predator_steps": 0,
+        "capture_violations": 0
+      },
+      "Highland": {
+        "net_mode": 1,
+        "step": 750,
+        "protected_prey_steps": 8025,
+        "deflections": 22,
+        "recoveries": 0,
+        "inside_predator_steps": 0,
+        "capture_violations": 0
+      }
+    },
+    "clients": {
+      "ClientA": {
+        "refuges": [
+          {
+            "ready": true,
+            "brush": 183,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 192,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 188,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 185,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 188,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 193,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 188,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 184,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 194,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 190,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 187,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 193,
+            "rocks": 20,
+            "visible": true
+          }
+        ],
+        "count": 12,
+        "ready": 12,
+        "visible": 12,
+        "passed": true,
+        "max_visual_actors": 64
+      },
+      "ClientB": {
+        "refuges": [
+          {
+            "ready": true,
+            "brush": 183,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 192,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 188,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 185,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 188,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 193,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 188,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 184,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 194,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 190,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 187,
+            "rocks": 20,
+            "visible": true
+          },
+          {
+            "ready": true,
+            "brush": 193,
+            "rocks": 20,
+            "visible": true
+          }
+        ],
+        "count": 12,
+        "ready": 12,
+        "visible": 12,
+        "passed": true,
+        "max_visual_actors": 47
+      }
+    }
+  },
+  "preservation": {
+    "preexisting_asset_count": 68,
+    "changed_after_work": [],
+    "preexisting_assets": [
+      {
+        "path": "AdaptiveEcosystem/Content/JYU/Audio/SW_JYU_Alarm.uasset",
+        "sha256": "b3c0bfe6b47dfa81292b08566f405a56ec0fa67a74a86ee885e8669d23eaa010"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/JYU/Audio/SW_JYU_Snow.uasset",
+        "sha256": "1f86e3f340f329909e20eecbb01274d520cbe3cd0c4316eaa6954279b75dc09b"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/JYU/Audio/SW_JYU_Water.uasset",
+        "sha256": "103d4b95586a9a69b30f76cba5499d36e7cb89716e70e2655d947ed5d5afba03"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/JYU/Audio/SW_JYU_Wet.uasset",
+        "sha256": "92a996aa94b942ffeac42dff8e18e45318da1bdc35df4b7ef62126c927267702"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/0/32/WSMEZM6ZAN920X6BTO9D6B.uasset",
+        "sha256": "a08f15c2d033ca00f2bf897b882f64da43a45391fc4447d4f9ed90c1583cb5eb"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/0/7W/9EHQA934WMUGHYVR6TFI5L.uasset",
+        "sha256": "fe99647f6b562e322c77aec51d9f033c7f4fefb89b24b4e754bcef4982aa7e77"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/0/BL/FUPADIPUUNCM8K4I7QC881.uasset",
+        "sha256": "1d3c6f5f388c10dd0474f41d7c0aabb2765321e0cce63d780b4927e901e9654c"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/0/EG/EB3A30EAZMEBT11WEAH92M.uasset",
+        "sha256": "843fbdc7619456d0d774f0f98dc349a0b5a153aaba1999044222b2dfdfa0957c"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/0/QQ/9H3IMKCFLU9AFVFKAXN9EH.uasset",
+        "sha256": "4d401557919622da8e225516775169be31ca7ea0538d4dbd068b45cab22e3280"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/0/WN/BGPIQWSDMRU7DXEGKM9KQO.uasset",
+        "sha256": "7ad970fde4d8dc7b0a9514bdcbd5cee6173e2aeeecba8c9a3ada6b843914c3ba"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/1/6E/IP5Y9STULEQH3Y4SQ119SH.uasset",
+        "sha256": "876421112e9b1f9d3b2468585848b2fdd89049ce04b241c03a5c144ba7136bbd"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/1/MY/PACLGR7JNHHNNV8Z3CBCLQ.uasset",
+        "sha256": "8cb7a36e0dc600761ed8fa69ab5ea450e67b2f27b60ae6c24363137cd3093811"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/1/PP/KFM7UVQES68Q0SYNYT73TF.uasset",
+        "sha256": "ea7480d53ec8751ad11ac08854f500c30d18d93d52e53a4eceec88e6f53e1123"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/1/T5/OU917T3LPBPEBFGKY2EDY1.uasset",
+        "sha256": "08182d22aa5cb81b03414ad3f1816de854dd6d1047c1884a721eb7e3b03e3bb7"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/1/XM/USD1G6KPMQF8T3DNXRADX6.uasset",
+        "sha256": "cce66fd20c8a16b87f3725e4b20d7331438617dba5631c060820fb9b2acc5c67"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/1/ZL/KFFE6T0J0M758H2TON10IR.uasset",
+        "sha256": "8601ef6351aaae82f9bc7d34c214c17406ffdb2bd134101662fb067c1cb6afc4"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/2/3H/8L36QRDJTPDIID3XWIFTYA.uasset",
+        "sha256": "72481fa946b97f8bd2ea1a4424b54b2f3ef2493e2852f31dd17068c263227253"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/2/I1/ZLI7ELG06PC249J11OOV02.uasset",
+        "sha256": "2337f160ce40f82f31f66de30dcbb737fb3a5182363a4ec973a74c16aa6f73d2"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/2/OC/2U8L8QMUD6GVOXYT581R71.uasset",
+        "sha256": "83ac757638d6fe128d078d1dc30ca924a5d9a9769091d12dc856d697cee0acdc"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/2/XR/7HBHLS0MEWYMVMWFRWKKC1.uasset",
+        "sha256": "e1656ac29c57f74a3cdb037bd0d35d78b537233881230c19939138f6c0de6b2f"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/3/3S/PYZ7ZDMZDM7TI2FCTZ1FSN.uasset",
+        "sha256": "b9105eb1c40f84f7ad69cd34f09c0e69f17f239e4effae6ce11b5072418e4870"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/3/NA/SX29HF8R02RAMV7Q3AM3B1.uasset",
+        "sha256": "7c7ff83fcd317dadf1b1ece4a8f9153d61049f8b6f21087886d91be63da33528"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/3/XL/HZA0XPVA6TX2V72EI88URW.uasset",
+        "sha256": "55b421c5ef924c200148ea7a8b8a5896fbf63c4cc1066c7dbc8bb2fc75b204dd"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/3/Y7/AQCFBE8T3ZJ1YCQK3EMP14.uasset",
+        "sha256": "278d8769cc98bef2bdffeefa0bc3b470b63ce3c625567f31cba2b0075d476bdb"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/4/6A/ED091KNKV5KO8I2EWMXCTT.uasset",
+        "sha256": "1779eb13c6e9822a2955ec1dc07234e6d25403267417ac19ea6a325478a9d03d"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/4/K2/AJX1H0UNOJFTJKEKC9VF42.uasset",
+        "sha256": "f08bb00a1ebef5da46df0e86b7e23cf9b4e9ead2a6ce60bd044c7b1f127ae676"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/5/00/3GP0864VQSXZOC15S3G06M.uasset",
+        "sha256": "1358350606a2b12153643b818aa6741a957ebdc989f7c7d6d63dafc3e7e611c7"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/5/20/TO59GS26WN459V9VEDFEQJ.uasset",
+        "sha256": "7cc8672ed21275538cef07c51a543994d1e75dceb433790125422a363f4a2ed6"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/5/77/EPJ4UP6W6HTO53QSWST8FQ.uasset",
+        "sha256": "6bb027e9cf379c3789fc755309a44a0f556ef22b2b16f91f63b843f5c467b88d"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/5/PS/62UOHKAK86BD9P3G9QAYDL.uasset",
+        "sha256": "00c852d61adff084507f9a0d3e1b80d21985d2190daa6a4201cfe02e944e653c"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/5/W1/C9LJKTMXPF02AT36CE770U.uasset",
+        "sha256": "001d40b9a976f6b83aa82c2010080405893ba0c31969f9f9692f97fced20cd08"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/5/X9/5YWOWIXWFQ4XGQRU32XQGO.uasset",
+        "sha256": "c38abd1289206b9aebacd5c9c778226f9abd7b04c09b129598f828bb37a746c8"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/6/22/2VAVZJS1ESN7J17992Q2KY.uasset",
+        "sha256": "8960fdb249f09c3122ea0116907d7c04945379459ea78b791886c21f3f5828c7"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/6/Q1/AIO1YIFZX5K242ADZFFUC3.uasset",
+        "sha256": "9e74dedc27cbe8f589a722065ddc09de70cd848f3b56a4dfe45bbd4b35a4c7ac"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/6/RQ/XJ72FBG89M0ZHI54XPWUKS.uasset",
+        "sha256": "58d24d6014e024d8ab6a9c7d5463e93936b1b5d4036f9c15181cab15516e7e7f"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/6/VV/1T1FBJPNEB9IBZO9WUD2UF.uasset",
+        "sha256": "39388bfe8f0dbbb56d8d3259336a2c58e61528a1210772edfe913e3177f803e6"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/7/G7/AE3NG3SPIOH1PYC0U4BAPI.uasset",
+        "sha256": "257bfde79b531391840c574aac8a3687bd4f5ed7edb4f75fe17da05dfa48cec5"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/7/PD/6CILRLM337CXUCHI7FFT9H.uasset",
+        "sha256": "7835723bb8722cc4961578083e91389da182933b3f91347e3f5b8b509a66868c"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/7/PH/OHHBFEIABP6QTBRH7ZP91E.uasset",
+        "sha256": "67464d74712d3f7f1e3a6203782b9c8af38d2abe52096764b2444bffaa420611"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/8/0G/X6CMEKFUYUW0MPSU8HC64R.uasset",
+        "sha256": "f4d3e1da35e0cc254793671d4045bc435c68c6fd13bfc5356988b7287c158cc2"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/8/38/8AGJ07JZLI97T2RLVB9JWR.uasset",
+        "sha256": "ef8f5995c42dc0b6b3b727303ec44e296b1c569f98843ede62ae92283209597d"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/8/OU/5YSOMHRL12BQSC8TPKFCJT.uasset",
+        "sha256": "5a90739e5067da764b908b88c9cbe6d6f14b3f4476052a4448057642d27f67c3"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/8/RR/3OY7JVPJTITEC6LBU3DDXW.uasset",
+        "sha256": "b6a1151fcaac02a7d0392a71b0cb8372c5ae4523e54463f5cfcf13efece5dd36"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/8/TE/MMQG9SL59033365ATP1JN0.uasset",
+        "sha256": "5d8d1a055bd8730d907731eabac0914e8b15fa162c48a55e8195e2ff4215e12f"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/8/YM/3UQL8KIU85G4SKR5U1P9RQ.uasset",
+        "sha256": "b9513d81ae7650a7992693ed345fca0a5abb5f7a8b297e8421f7f082cca96e15"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/9/G3/J1C28SPI7W54AVP7YWZU5P.uasset",
+        "sha256": "95f9b29483dedb5160b9194d279f89b45e618ef71e2f443a759020b0da11258c"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/9/YI/XJC7OA05PLI5V0SLQN75VZ.uasset",
+        "sha256": "9721df610a9e0e0cddf1dc2452a7bebec36f37a2c5acc7d7cb7458d721b3f176"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/A/1T/5FVCRSERRZVU3577QC4Z8W.uasset",
+        "sha256": "e988b8e9ed4fb36b334dc64d17dd68ad7072099dcee001defe78414e4a3db326"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/A/70/9MRV1ZIHS7L5OAUS08898C.uasset",
+        "sha256": "215402fdd8db4b849c1543bfae778d0b6772e6e82d0de5ece51eabc4919f7fc4"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/A/B1/PAHMHKJTY338GJEVS5JT0N.uasset",
+        "sha256": "58afdabaf3205fc945e7e452d4aa6bf4ebb1734f347858d8ca989679d95639f9"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/A/PJ/ANV1O16OQKDVJTR3MQ3ZHD.uasset",
+        "sha256": "847497169bfcbcffd9045cc4fe9f077e23e55c7ef0b985012a98835ae7c8df88"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/B/G5/JM8I6XDE8K4MBRGIBC2T71.uasset",
+        "sha256": "442fcafa9282613a41bad3de5e3b27529458dfbf38046522bb2b2252d4caf54b"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/B/MW/VFW8LKSJEP6WYZ3BCJSWRU.uasset",
+        "sha256": "f3ead0a33ea3efe39c5f5d68041e35419e48fb793c6a51b05d521fbb55ae1ca1"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/C/6R/SXMD1ZG71FJXO16HWTLRE0.uasset",
+        "sha256": "888a52c7571e6ca76947a159e1d8c2166e9e80aab9599dcbf0bb5966e6d1ff2e"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/C/9O/H14A69JFIGAZ5Q6VBJAC5Q.uasset",
+        "sha256": "26b979feb0886c78b3c69f01842abc56fbfdb44b95a3506579129f88e721f55d"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/D/0C/7MNB86RINKX0G5CE647QOB.uasset",
+        "sha256": "609a0e42adcee9f0f94b7fcfb3626600d1ca06c85a8625f7bb2c2ec167429d98"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/D/3N/49HYIQC54IUKKTRHXNZU93.uasset",
+        "sha256": "05f3a93b5042d04d5dca4a3afd661ecae5bd7ee1e3423bec750ae126baa46c40"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/D/6N/V6GWPYKKXFXNIZI6GKSGUL.uasset",
+        "sha256": "96741e3128519f480f181509063980ff296babf025e3a32c4cb889aafdbd0c31"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/D/GO/IR30BORW9296XLT0UU3H9U.uasset",
+        "sha256": "9f8c05fe942c153cfa1f71821a120165ac005888b9cfdca1a6f8f8bc8b54779b"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/D/M7/RAF1HATUH39IUJS6PURNN4.uasset",
+        "sha256": "601af0f1d90ec5c9d0a249c44128d385078e182b2b3b77f6654d4bb003de8db6"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/D/NT/9B8FI3NNXVB9E3N8E7S6TK.uasset",
+        "sha256": "3b2760067fcc778a0744e5628f3d93d0e154da5599db34672ac9deb249a2955d"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/D/RQ/6QREJKGRO2F26C0A0BL6HF.uasset",
+        "sha256": "498eaf082dfe5a33f90084858bd53ee43275a6dc94af126b59e9eba15a41273a"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/E/7R/J06VYG9P1OFUZ2RV9PHOYS.uasset",
+        "sha256": "fbe454571ca84037acea354660b054087d84dbdc0d6961d09702fc8ad3bffa03"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/E/8W/CK4QZHYQTEDV75MFZVLEMW.uasset",
+        "sha256": "7df0e9a68894f999f33998286923c3454667678bb5492291bdb0bf9244e967cb"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/E/LM/1GCDJTNG4QIZVN75ZPNTRL.uasset",
+        "sha256": "bdb0b13a801f295f18cc4c193439df86fb2cd13061dfef3031681e86a8ed1dff"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/E/PL/45ZF1LUGH8CNT2OBRNSNJ8.uasset",
+        "sha256": "908ede0a179d14aa85a50ce281523491da061a270e19ca99bf19a517a5f1f680"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/E/YJ/E1KUDN5U86A7S8IFLU4W38.uasset",
+        "sha256": "341f5985373d846eae4885529e48afcecd2d516bd0032031a6f0b62524c90fc3"
+      },
+      {
+        "path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_V3Integration/F/1F/CVK0AX8LBKRCQLXWDUH9V0.uasset",
+        "sha256": "b111000f6210a2710f38423cdefc35f7ed4322400fe7d8e91cc285b053ea3504"
+      }
+    ]
+  },
+  "limits": [
+    "Unreal extension enabled in integrated runtime; Python mirror/retraining not changed.",
+    "PIE records are repeated observations, not unique creature counts.",
+    "Circular static authored refuges; no NavMesh/ORCA or dynamic radius/transform contract."
+  ]
+}
