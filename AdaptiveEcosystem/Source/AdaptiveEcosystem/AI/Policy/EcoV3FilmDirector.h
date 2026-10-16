@@ -25,7 +25,7 @@ struct FEcoV3RegionContext;
 //             deer   장면 시작 때 늑대 '대상' 에게 가장 가까운 산 사슴을 잡아 따라감
 //             shelter 대상 = 은신처 원 번호 (FWorldConfig::Covers). 둘레를 천천히 돎 (기본 26 m, 높이 14 m)
 //   -EcoV3FilmScout=<초>       촬영 없이 0.5 초마다 늑대별 상태를 scout.csv 로 남기고 그 시뮬레이션 초에 끝낸다 (시간 창 고르기)
-//   -EcoV3FilmUI               HUD·화면 메시지를 숨기지 않는다 (eco.V3Debug 글자는 이것 없이도 그대로 그려진다)
+//   -EcoV3FilmUI               HUD·화면 메시지·팀 개체 이름표를 숨기지 않는다 (eco.V3Debug 글자는 이것 없이도 그대로 그려진다)
 //   -EcoV3FilmNoQuit           마지막 장면 뒤 끝내지 않는다
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoV3FilmDirectorSubsystem : public UTickableWorldSubsystem
@@ -66,6 +66,8 @@ private:
 	bool ComputeView(const FShot& Shot, const FEcoV3RegionContext& Ctx, double ShotTime, FVector& OutLoc, FRotator& OutRot, float& OutFov);
 	void EnsureCamera();
 	void ApplyViewEnvironment();
+	/** 팀 표현 액터 이름표를 보기에서만 숨긴다 (-EcoV3FilmUI 면 그대로). */
+	void HideIdentityLabels();
 	void CaptureFrame();
 	void WriteScoutRows(double SimSeconds);
 	void WriteManifest();

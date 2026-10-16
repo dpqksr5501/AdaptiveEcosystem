@@ -2,6 +2,7 @@
 
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "Components/TextRenderComponent.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "EcoPolicyV3IntegratedSubsystem.h"
 #include "Engine/Engine.h"
@@ -263,6 +264,22 @@ void UEcoV3FilmDirectorSubsystem::ApplyViewEnvironment()
 	}
 }
 
+void UEcoV3FilmDirectorSubsystem::HideIdentityLabels()
+{
+	// 팀 표현 액터의 이름표('Herbivore #8' 글자 컴포넌트)를 화면에서만 숨긴다 — 팀 파일·상태는 그대로, 촬영 판에서만
+	if (bKeepUI)
+	{
+		return;
+	}
+	for (TActorIterator<AEcoCreatureRepresentationActor> It(GetWorld()); It; ++It)
+	{
+		if (UTextRenderComponent* Label = It->IdentityLabel; Label && !Label->bHiddenInGame)
+		{
+			Label->SetHiddenInGame(true);
+		}
+	}
+}
+
 void UEcoV3FilmDirectorSubsystem::CaptureFrame()
 {
 	const FString Path = OutDir / FString::Printf(TEXT("f_%05d.png"), TotalFrames);
@@ -414,6 +431,7 @@ void UEcoV3FilmDirectorSubsystem::Tick(float DeltaTime)
 		return;
 	}
 	EnsureCamera();
+	HideIdentityLabels();
 	if (PreparedShot != ShotIndex)
 	{
 		PreparedShot = ShotIndex;
