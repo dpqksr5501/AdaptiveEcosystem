@@ -15,6 +15,7 @@
 #include "Engine/World.h"
 #include "DrawDebugHelpers.h"
 #include "HAL/IConsoleManager.h"
+#include "ProfilingDebugging/CpuProfilerTrace.h"
 
 static TAutoConsoleVariable<int32> CVarEcoPreyLog(TEXT("eco.Senses.PreyLog"), 0, TEXT("Authority prey observation handoff; not PPO output."));
 
@@ -46,6 +47,7 @@ void UEcoPredatorPerceptionProcessor::ConfigureQueries(const TSharedRef<FMassEnt
 }
 void UEcoPredatorPerceptionProcessor::Execute(FMassEntityManager& EM, FMassExecutionContext& Context)
 {
+    TRACE_CPUPROFILER_EVENT_SCOPE(EcoSenses_PredatorScan);
     UWorld* World = Context.GetWorld();
     if (!World || World->GetNetMode() == NM_Client || !FMath::IsFinite(Context.GetDeltaTimeSeconds()) || Context.GetDeltaTimeSeconds() < 0) return;
     UntilScan -= Context.GetDeltaTimeSeconds(); if (UntilScan > 0) return; UntilScan = .2f;
@@ -113,9 +115,18 @@ void UEcoPredatorPerceptionProcessor::Execute(FMassEntityManager& EM, FMassExecu
             };
             int64 SeenId = 0; const FEcoNeighborEntry* Seen = nullptr; float BestDistance = MAX_flt;
             // Sorting by distance then StableAgentId makes selection independent of TMap iteration.
-            for (const auto& Pair : AlivePrey)
+            TArray<int32> Candidates;
+            if (Grid && Grid->IsBuilt()) Grid->QueryRadius(Position, Radius, Candidates);
+            for (const int32 Candidate : Candidates)
             {
-                const FVector D = Pair.Value->Location - Position;
+                const auto* Entry = &Grid->GetEntries()[Candidate];
+                int64 CandidateId = Entry->StableAgentId;
+                if (CandidateId <= 0) // standalone diagnostic snapshots may omit canonical identity
+                    for (const auto& Pair : AlivePrey) if (Pair.Value == Entry) { CandidateId = Pair.Key; break; }
+                const auto* Found = AlivePrey.Find(CandidateId);
+                if (!Found || *Found != Entry) continue;
+                const auto Pair = TPair<int64, const FEcoNeighborEntry*>(CandidateId, Entry);
+                const FVector D = Entry->Location - Position;
                 const float Distance = D.Size() * (Pair.Value->bInCover ? EcoBehaviorConfig::CoverHideMult : 1.f);
                 if (D.ContainsNaN() || Radius <= 0 || Distance > Radius || Distance > BestDistance
                     || (Distance == BestDistance && SeenId > 0 && Pair.Key >= SeenId)

@@ -66,6 +66,7 @@
 #include "EcoPolicyV3Inference.h"
 #include "EcoRepertoire.h"
 #include "EcoThreatModel.h"
+#include "EcoRefugeSafetyV3.h"
 
 namespace EcoWorldV3
 {
@@ -306,6 +307,12 @@ namespace EcoWorldV3
 
 		// 은신처 원 (단위)
 		std::vector<EcoObservationV3::FCoverInput> Covers;
+		// 실제 은신처 규칙 (조연우 님 a88eac8, 통합 모드 eco.IntegratedV3.ProtectedRefuges). 기본 끔 = 파이썬·골든 세계 그대로.
+		// 10-17 통합: 은신처 안전 규칙은 하나만 적용한다 (RefugeOwnsSafety). bShelterSafe 가 켜져 있으면 안전(표적·포획 제외·늑대 진입 금지)은
+		// 파이썬 realism_shelter 가 맡고, 이 칸은 생명주기만 더한다 — 반경 0 원(지워진 은신처, 번호 유지)은 어디서나 건너뛰고, 목표를 잃은 HIDE 를 풀고,
+		// [EcoRefuge] 기록 칸을 센다. bShelterSafe 가 꺼져 있을 때만 아래 몸 여유·쓸고 지나가기 막기·갇힌 늑대 꺼내기·원 안 사슴 bAlive 거짓이 안전을 맡는다
+		bool bProtectedRefuges = false;
+		double PredatorRefugeMargin = 0.5; // 100 cm body clearance; never changes policy observations. (팀 안전 규칙일 때만 읽는다)
 
 		// 먹이 격자 (configs/default.yaml)
 		double FoodCell = 2.0;
@@ -345,6 +352,12 @@ namespace EcoWorldV3
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
 	};
+
+	/**
+	 * 10-17 통합: 팀 실제 은신처 규칙이 안전(원 안 사슴 표적·포획 제외, 늑대 몸 여유 1 m·쓸고 지나가기 막기·갇힌 늑대 꺼내기)을 맡는가.
+	 * 파이썬 규칙 bShelterSafe 가 켜져 있으면 거짓 — 같은 일을 두 규칙이 한꺼번에 하지 않는다 (밤잠 '가까운 사슴' 판정도 파이썬 그대로 남는다).
+	 */
+	inline bool RefugeOwnsSafety(const FWorldConfig& C) { return C.bProtectedRefuges && !C.bShelterSafe; }
 
 	/** 평면 시험 맵의 기본 은신처: 맵 1/4·3/4 지점 네 곳, 반경 Radius (단위). */
 	inline std::vector<EcoObservationV3::FCoverInput> QuadCovers(double WorldSize, double Radius)
@@ -680,6 +693,11 @@ namespace EcoWorldV3
 		std::int64_t WolfSatedSteps = 0;     // 그중 배불러 쉼
 		std::int64_t WolfEatingSteps = 0;    // 그중 먹는 중 (쿨다운 줄인 뒤 > 0)
 		std::int64_t WolfKills = 0;          // 포만을 건 포획
+		std::int64_t RefugeProtectedPreySteps = 0;
+		std::int64_t RefugeConstrainedMoves = 0;
+		std::int64_t RefugeRecoveries = 0;
+		std::int64_t RefugeInsidePredatorSteps = 0;
+		std::int64_t RefugeCaptureViolations = 0;
 	};
 
 	/**
@@ -691,6 +709,9 @@ namespace EcoWorldV3
 	struct FStepHooks
 	{
 		void* User = nullptr;
+        // Optional integrated Social intent, after native policy/control, before the one movement/vitals integration.
+        // nullptr preserves all Python/C++ golden behavior. Does not write raw Request or observations.
+        void (*HerbControl)(void* User, std::int32_t Index, const FHerbView& Herb) = nullptr;
 		bool (*HerbMove)(void* User, std::int32_t Index, const FVec2& From, const FVec2& To) = nullptr;
 		bool (*ThreatMove)(void* User, std::int32_t Index, double FromX, double FromY, double ToX, double ToY) = nullptr;
 	};
@@ -714,6 +735,7 @@ namespace EcoWorldV3
 		double PredEma = 0.0;                // 전역 피식 EMA
 		double ReserveCap = 0.0;             // 야생 (w1) 비축 용량 C (E 단위, InitWorld 가 정한다. 끄면 0)
 		FWorldStats Stats;
+		std::vector<EcoObservationV3::FThreatInput> ExternalThreats;
 		std::vector<FVec2> StepCatches;      // 이번 스텝에 잡힌 자리 (디버그)
 
 		// 작업 버퍼 (스텝마다 다시 쓴다)
@@ -953,6 +975,8 @@ namespace EcoWorldV3
 				In.Y = A.State.PosY;
 				In.VelX = A.State.VelX;
 				In.VelY = A.State.VelY;
+                In.bHunting = A.State.Cooldown == 0 && (!W.ThreatCfg.bWildSatiation || A.State.SatLeft == 0)
+                    && !(A.Spec.Type == EcoThreatV3::EThreatType::Player && A.State.PlayerMode == EcoThreatV3::EPlayerMode::Rest);
 				In.bAsleep = ThreatAsleepNow(W, A);   // 굴에서 자면 안 보인다 (끄면 새 t 의 어둠으로 다시 판정, 켜면 늑대별 상태)
 				// R3 발소리 (켰을 때만): 지난 스텝 변위 크기 ÷ 사슴 걸음과 그 스텝의 걸음새 (world.py hearing_radius·pred_running)
 				In.HearR = W.Config.RealismHearing.bEnabled
@@ -961,6 +985,7 @@ namespace EcoWorldV3
 																 A.Last.bRunning)
 							   : 0.0;
 			}
+			W.ThreatIn.insert(W.ThreatIn.end(), W.ExternalThreats.begin(), W.ExternalThreats.end());
 		}
 
 		inline void BuildKinInputs(FWorldState& W, const FHerbView* Herbs, std::int32_t N)
@@ -984,7 +1009,7 @@ namespace EcoWorldV3
 			const EcoObservationV3::FObservationConfig& OC = W.ObsCfg;
 
 			P.Threat = EcoObservationV3::PerceiveThreats(B.Pos, B.Head, EcoObservationV3::SeePredRadius(W.Dark, OC), S.SeeMult,
-														 S.SeeMultLast, W.ThreatIn.data(), M, OC);
+														 S.SeeMultLast, W.ThreatIn.data(), static_cast<std::int32_t>(W.ThreatIn.size()), OC);
 			P.Kin = EcoObservationV3::PerceiveKin(Self, B.Pos, B.Head, W.KinIn.data(), N, OC);
 			P.Cover = EcoObservationV3::PerceiveCover(B.Pos, W.Config.Covers.data(),
 													  static_cast<std::int32_t>(W.Config.Covers.size()), OC);
@@ -1277,6 +1302,7 @@ namespace EcoWorldV3
 						for (std::int32_t k = 0; k < K; ++k)
 						{
 							const EcoObservationV3::FCoverInput& Cv = W.Config.Covers[static_cast<size_t>(k)];
+							if(Cv.Radius<=0)continue;
 							const double Vx = Cv.X - P.X;
 							const double Vy = Cv.Y - P.Y;
 							const double Dc = std::sqrt(Vx * Vx + Vy * Vy);
@@ -1475,6 +1501,17 @@ namespace EcoWorldV3
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			const FHerbView& H = Herbs[i];
+			const int HideTarget=H.Rep->HideTarget;
+			const bool LostHideTarget=HideTarget>=0&&(HideTarget>=int(W.Config.Covers.size())||W.Config.Covers[HideTarget].Radius<=0);
+			if(W.Config.bProtectedRefuges&&H.Rep->Behavior==R3::kHide
+				&&((H.Rep->bArrived&&!Detail::InAnyCover(W,H.Body->Pos))||(!H.Rep->bArrived&&LostHideTarget))) {
+				// A removed/moved refuge cannot leave a deer sitting in exposed terrain. Use only
+				// its existing personal threat observation to choose escape versus normal foraging.
+				const int Next=H.Perception->Threat.PredCount>0&&W.Allowed[R3::kFlee]?R3::kFlee:R3::kGraze;
+				R3::Enter(*H.Rep,Next,H.Decision->DecisionObs,RC);
+				H.Decision->KeepActive=H.Decision->KeepMode=kKeepNone;
+				H.Decision->ExecutedBehavior=Next;
+			}
 			if (bKeep)
 			{
 				// 도주: FLEE 제어기에 덮기 방향. 경계: 두뇌가 GRAZE 면 걸으며 먹고 멀어진다 (world.py _rep_step 의 wf 줄)
@@ -1487,6 +1524,10 @@ namespace EcoWorldV3
 			{
 				*H.Control = R3::Control(*H.Rep, Detail::MakeControlInput(W, H), RC);
 			}
+            if (Hooks && Hooks->HerbControl) {
+                Hooks->HerbControl(Hooks->User, i, H);
+                H.Decision->ExecutedBehavior = H.Rep->Behavior;
+            }
 			if (bReserve)
 			{
 				// 야생 (w1) 약함: 스텝 첫머리 E 가 WeakE 밑이면(비축으로 사는 몸) 이동 속도 × WeakSpeed (world.py step 1 의 v 줄이기).
@@ -1533,7 +1574,9 @@ namespace EcoWorldV3
 			P.Behavior = static_cast<std::uint8_t>(H.Rep->Behavior);
 			P.bHideArrived = H.Rep->bArrived;
 			P.bInCover = Detail::InAnyCover(W, H.Body->Pos);   // 이동 뒤 위치로 다시 판정 (world.py:2026)
-			P.bAlive = true;                                    // 파이썬처럼 늘 산 개체다 (죽은 슬롯은 지난 스텝 끝에 리스폰했다)
+			// 파이썬처럼 늘 산 개체다(죽은 슬롯은 지난 스텝 끝에 리스폰했다). 팀 안전 규칙일 때만 원 안 사슴을 후보에서 뺀다 (ShelterSafe 면 위협 모델이 뺀다)
+			P.bAlive = !(RefugeOwnsSafety(W.Config) && P.bInCover);
+			W.Stats.RefugeProtectedPreySteps += (W.Config.bProtectedRefuges && P.bInCover) ? 1 : 0;   // 기록만 (어느 규칙이든 원 안 = 보호)
 		}
 		W.Rolls.resize(static_cast<size_t>(N));
 		W.CaughtByThreat.assign(static_cast<size_t>(M), -1);
@@ -1542,6 +1585,10 @@ namespace EcoWorldV3
 		{
 			for (const EcoObservationV3::FCoverInput& Cv : W.Config.Covers)
 			{
+				if (Cv.Radius <= 0.0)
+				{
+					continue;   // 지워진 은신처 (ProtectedRefuges 생명주기, 번호만 남김) — 파이썬 세계에는 없다
+				}
 				W.ShelterDiscs.push_back(Cv.X);
 				W.ShelterDiscs.push_back(Cv.Y);
 				W.ShelterDiscs.push_back(Cv.Radius);
@@ -1573,8 +1620,27 @@ namespace EcoWorldV3
 			}
 			A.PrevX = A.State.PosX;
 			A.PrevY = A.State.PosY;
+			// 팀 안전 규칙일 때만 (ShelterSafe 면 위협 모델 Step 8a 의 ShelterPush·ShelterTangent 가 늑대를 원 밖에 둔다 — 한꺼번에 적용하지 않는다)
+			const bool bRefugeSafety = RefugeOwnsSafety(W.Config);
+			if(bRefugeSafety) {
+				const auto Recovery=EcoRefugeV3::Constrain(W.Config.Covers,W.Config.WorldSize,{A.PrevX,A.PrevY},{A.PrevX,A.PrevY},W.Config.PredatorRefugeMargin);
+				if(Recovery.bRecovered) {
+					A.State.PosX=A.PrevX=Recovery.Position.X;A.State.PosY=A.PrevY=Recovery.Position.Y;
+					++W.Stats.RefugeRecoveries;
+				}
+			}
 			const std::int32_t PreCd = A.State.Cooldown;
 			A.Last = EcoThreatV3::Step(A.Spec, A.State, In, W.ThreatCfg);
+			if(bRefugeSafety) {
+				const auto Move=EcoRefugeV3::Constrain(W.Config.Covers,W.Config.WorldSize,{A.PrevX,A.PrevY},{A.State.PosX,A.State.PosY},W.Config.PredatorRefugeMargin);
+				if(Move.bConstrained) {
+					A.State.PosX=Move.Position.X;A.State.PosY=Move.Position.Y;
+					A.State.VelX=Move.Position.X-A.PrevX;A.State.VelY=Move.Position.Y-A.PrevY;
+					const auto Head=R3::Normalize({A.State.VelX,A.State.VelY});
+					if(R3::IsNonZero(Head)){A.State.HeadX=Head.X;A.State.HeadY=Head.Y;}
+					++W.Stats.RefugeConstrainedMoves;
+				}
+			}
 			if (W.ThreatCfg.bWildSatiation && A.Spec.Type != EcoThreatV3::EThreatType::Player)
 			{
 				// 야생 (w2) 기록만: 늑대·스텝, 배불러 쉼, 먹는 중(쿨다운 줄인 뒤 > 0), 포만을 건 포획
@@ -1597,9 +1663,15 @@ namespace EcoWorldV3
 				++W.Stats.BlockedThreatMoves;
 			}
 			W.CaughtByThreat[static_cast<size_t>(m)] = A.Last.Caught;
+			// 기록만: 원 안 늑대 (팀 규칙 = 몸 여유 안, ShelterSafe = 파이썬 정의 |q − c| < r)
+			if(bRefugeSafety&&EcoRefugeV3::Contains(W.Config.Covers,{A.State.PosX,A.State.PosY},W.Config.PredatorRefugeMargin-1.e-6))++W.Stats.RefugeInsidePredatorSteps;
+			else if(W.Config.bProtectedRefuges&&W.Config.bShelterSafe&&!W.ShelterDiscs.empty()
+				&&EcoThreatV3::InsideAnyDisc(A.State.PosX,A.State.PosY,W.ShelterDiscs.data(),static_cast<std::int32_t>(W.ShelterDiscs.size()/3)))++W.Stats.RefugeInsidePredatorSteps;
 		}
 		W.Catcher.assign(static_cast<size_t>(N), -1);
 		EcoThreatV3::ResolveCatches(W.CaughtByThreat.data(), M, W.Catcher.data(), N);
+		if(W.Config.bProtectedRefuges)for(std::int32_t I=0;I<N;++I)
+			if(W.Catcher[I]>=0&&W.Prey[I].bInCover)++W.Stats.RefugeCaptureViolations;
 
 		// C4. 섭식·대사 (이동 뒤 셀, 셀마다 수요 합을 슬롯 순서로 쌓는다 — np.bincount)
 		FFoodGrid& F = W.Food;

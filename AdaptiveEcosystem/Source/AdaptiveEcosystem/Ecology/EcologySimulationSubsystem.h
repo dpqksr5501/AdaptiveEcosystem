@@ -10,6 +10,8 @@
 #include "AI/Policy/EcoPolicyContracts.h"
 #include "Ecology/EcoSpawnSchedule.h"
 #include "Core/EcoResourceTypes.h"
+#include "Core/EcoSurvivalTypes.h"
+#include "Core/EcoMigrationTypes.h"
 #include "EcologySimulationSubsystem.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnRegionPredationRecorded, FName, RegionId, float, NewPredationHistory);
@@ -43,6 +45,8 @@ public:
 	/** Ticks regional food regeneration and decays accumulated predation history */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Simulation")
 	void TickSimulation(float DeltaTime);
+	/** Explicit authority profile change; takes effect at the next resource boundary. */
+	bool ConfigureRegionRegeneration(FName RegionId, float Rate, bool bRainfall, float DryMultiplier, float WetMultiplier);
 
 	// -------------------------------------------------------------------------
 	// Region Ecology State Management
@@ -89,6 +93,11 @@ public:
 	void GetRegionIds(TArray<FName>& OutIds) const { OutIds = RegionIds; }
 	bool RegisterSpawnSchedule(FName RegionId, const FEcoSpawnScheduleSettings& Settings);
 	bool ConfigurePopulationLimit(int32 Limit);
+	bool ConfigurePressure(const FEcoOvercrowdingSettings& Settings, double ConsumptionRate);
+	bool RefreshPopulationPressure(double Time);
+	bool RecordDeaths(TConstArrayView<FEcoDeathOutcome> Deaths, int64 NextStep);
+	bool BuildMigrationPressure(TArray<FEcoMigrationPressureSnapshot>& Out) const;
+	bool RecordMigrations(TConstArrayView<FEcoMigrationOutcome> Arrivals);
 	bool RequestInitialSpawn(FName RegionId, int32 Count, const FEcoServerTimeSnapshot& Time, FEcoSpawnRequest& Out);
 	/** Returns a terminal wave even if Count is zero (food/cap rejection). */
 	bool PollSpawnWave(FName RegionId, const FEcoServerTimeSnapshot& Time, FEcoSpawnRequest& Out);
@@ -98,6 +107,7 @@ public:
 	bool StartResourceSimulation(int32 Epoch, const FEcoFoodEventSettings& Day, const FEcoFoodEventSettings& Night, bool bLogChanges);
 	/** Queue an authority-only debug event at the given server time. */
 	bool QueueManualStarvation(FName RegionId, const FEcoServerTimeSnapshot& RequestedAt);
+	bool QueueManualFoodSupply(FName RegionId, float Amount, const FEcoServerTimeSnapshot& RequestedAt);
 	/** Next phase/event/wave deadline, used to split coarse steps without changing chronological order. */
 	double GetNextScheduledTime(const FEcoServerTimeSnapshot& Time, bool bIncludeWaves) const;
 	/** Opens one strictly ordered resource transaction and applies its due environmental loss. */
@@ -105,6 +115,9 @@ public:
 	/** Exactly one batch per step; caller has verified live Entity identity/membership at the Mass boundary. */
 	bool ResolveFeeding(TConstArrayView<FEcoFeedRequest> Requests, TArray<FEcoFeedResult>& Results);
 	bool CompleteResourceStep();
+	/** Exclusive spatial adapter; Ecology verifies conservation and monotonic receipts. */
+	bool RegisterSpatialFood(FName RegionId, double Capacity, double Amount);
+	bool CommitSpatialFood(FName RegionId, int64 Sequence, double Before, double Consumed, double Regenerated, double After);
 	void GetResourceSnapshots(TArray<FEcoResourceSnapshot>& Out) const { Out = CompletedResources; }
 
 	// -------------------------------------------------------------------------
@@ -124,6 +137,7 @@ public:
 	FOnRegionPredationRecorded OnRegionPredationRecorded;
 
 private:
+	bool CaptureEnvironmentInputs(const FEcoServerTimeSnapshot& Time);
 	bool CanMutateAuthoritativeState(const TCHAR* OperationName) const;
 	static FRegionEcologyState MakeSanitizedRegionState(const FRegionEcologyState& InState);
 
@@ -141,11 +155,18 @@ private:
 	TMap<int64, FEcoSpawnRequest> PendingSpawns;
 	int64 NextSpawnRequestId = 1;
 	int32 GlobalPopulationLimit = 128;
+	FEcoOvercrowdingSettings PressureSettings;
+	double PerAgentConsumptionRate = 0.0;
+	int64 LastDeathReceiptStep = 0;
+	TSet<int64> DeathReceipts;
+	int64 LastMigrationReceiptStep = 0;
+	TSet<int64> MigrationReceipts;
 	bool ReserveSpawn(FName RegionId, FEcoSpawnRequest& Request);
 	struct FResourceLedger
 	{
 		double Before = 0.0;
 		double EventLoss = 0.0;
+		double Supplied = 0.0;
 		double Granted = 0.0;
 		int32 Requests = 0;
 		bool bEvent = false;
@@ -162,7 +183,11 @@ private:
 	bool bPrintResourceChanges = true;
 	TArray<FResourceLedger> ResourceLedger;
 	TMap<FName, double> PendingManualStarvation;
+	struct FFoodSupply { double Time = 0.0; float Amount = 0.0f; };
+	TMap<FName, FFoodSupply> PendingManualFoodSupply;
 	TArray<FEcoResourceSnapshot> CompletedResources;
 	/** Receipt watermark only; feeding schedules remain on Mass entities. */
 	TMap<int64, double> LastAcceptedFeedTime;
+	struct FSpatialFoodState { double Capacity = 0, Amount = 0, Consumed = 0, Regenerated = 0; int64 Sequence = -1; };
+	TMap<FName, FSpatialFoodState> SpatialFood;
 };

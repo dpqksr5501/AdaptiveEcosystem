@@ -1,0 +1,172 @@
+{
+  "date_local": "2026-10-16",
+  "timezone": "Asia/Seoul",
+  "base_commit": "22eb1b6",
+  "scope": "Read-only diagnostics and corrected target display; no policy, sensory radius, shelter safety or movement rule changes.",
+  "build": "Saved/SceneAudit_20261016/Build03.log: Succeeded",
+  "automation": {
+    "succeeded": 140,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "diagnostic_test": {
+    "testDisplayName": "NativeThreatContextInspection",
+    "fullTestPath": "AdaptiveEcosystem.Creature.JYU.NativeThreatContextInspection",
+    "tags": [],
+    "state": "Success",
+    "deviceInstance": [
+      "57C6A16A4897EF2A2C24C18ABC480BA3"
+    ],
+    "duration": 0.009188100695610046,
+    "dateTime": "2026.10.15-23.30.04",
+    "entries": [],
+    "warnings": 0,
+    "errors": 0,
+    "artifacts": []
+  },
+  "pie": {
+    "samples": 70,
+    "deer_records": 3273,
+    "detected_records": 709,
+    "flight_override_counts": {
+      "0": 2842,
+      "2": 88,
+      "3": 108,
+      "1": 235
+    },
+    "executed_counts": {
+      "0": 3068,
+      "1": 88,
+      "2": 117
+    },
+    "kin_alarm_records": 183,
+    "heard_cue_records": 128,
+    "learned_policy_read_records": 2864,
+    "preview_fixture_records": 0,
+    "social_override_counts": {
+      "1": 30,
+      "5": 410,
+      "0": 2815,
+      "3": 15,
+      "4": 3
+    },
+    "shelter_state_counts": {
+      "0": 3255,
+      "3": 15,
+      "4": 3
+    },
+    "blind_social_reaction_records": 181,
+    "policy_graze_to_social_flee_records": 0,
+    "nearest_wolf_reason_counts": {
+      "OutsideSightAndHearing": 2745,
+      "HeardHunter": 144,
+      "SeenHunter": 105,
+      "HeardRestingWolf": 8,
+      "SeenRestingWolf": 271
+    },
+    "hide_arrived_in_cover_records": 117,
+    "graze_with_seen_resting_wolf_records": 262,
+    "graze_with_nearest_wolf_unsensed_records": 2739
+  },
+  "examples": {
+    "hiding_while_hunter_seen": {
+      "stable_id": "5",
+      "world_seconds": 8.513650309294462,
+      "executed": 2,
+      "phase": 1,
+      "native_in_cover": true,
+      "hide_arrived": true,
+      "flight_override": 3,
+      "social_override": 5,
+      "nearest_wolf_reason": "SeenHunter",
+      "nearest_wolf_distance_cm": 2659.249152198514,
+      "nearest_wolf_hunting": true,
+      "nearest_wolf_hearing_radius_cm": 2971.428571428574,
+      "native_vision_radius_cm": 4000,
+      "native_vision_angle_deg": 300,
+      "alarm_sense": "EEcoSenseSource::Sight",
+      "animation_pose": 3,
+      "last_intake": 0,
+      "target": "V(X=31200.00, Y=49500.00, Z=-1591.41)"
+    },
+    "hiding_while_resting_wolf_seen": {
+      "stable_id": "16",
+      "world_seconds": 15.96382911130786,
+      "executed": 2,
+      "phase": 1,
+      "native_in_cover": true,
+      "hide_arrived": true,
+      "flight_override": 0,
+      "social_override": 5,
+      "nearest_wolf_reason": "SeenRestingWolf",
+      "nearest_wolf_distance_cm": 715.5168510843557,
+      "nearest_wolf_hunting": false,
+      "nearest_wolf_hearing_radius_cm": 400,
+      "native_vision_radius_cm": 4000,
+      "native_vision_angle_deg": 300,
+      "alarm_sense": "EEcoSenseSource::None",
+      "animation_pose": 3,
+      "last_intake": 0,
+      "target": "V(X=37200.00, Y=49500.00, Z=-1954.15)"
+    },
+    "grazing_with_seen_resting_wolf": {
+      "stable_id": "37",
+      "world_seconds": 6.010994408279657,
+      "executed": 0,
+      "phase": 1,
+      "native_in_cover": false,
+      "hide_arrived": false,
+      "flight_override": 1,
+      "social_override": 5,
+      "nearest_wolf_reason": "SeenRestingWolf",
+      "nearest_wolf_distance_cm": 2028.4708874810572,
+      "nearest_wolf_hunting": false,
+      "nearest_wolf_hearing_radius_cm": 4000,
+      "native_vision_radius_cm": 2400,
+      "native_vision_angle_deg": 300,
+      "alarm_sense": "EEcoSenseSource::Sight",
+      "animation_pose": 0,
+      "last_intake": 0.004551713138591967,
+      "target": null
+    },
+    "nearest_wolf_not_sensed": {
+      "stable_id": "41",
+      "world_seconds": 1.0147145092487335,
+      "executed": 0,
+      "phase": 1,
+      "native_in_cover": false,
+      "hide_arrived": false,
+      "flight_override": 0,
+      "social_override": 1,
+      "nearest_wolf_reason": "OutsideSightAndHearing",
+      "nearest_wolf_distance_cm": 4746.522111385142,
+      "nearest_wolf_hunting": true,
+      "nearest_wolf_hearing_radius_cm": 400,
+      "native_vision_radius_cm": 3155.555555555555,
+      "native_vision_angle_deg": 300,
+      "alarm_sense": "EEcoSenseSource::Memory",
+      "animation_pose": 0,
+      "last_intake": 0,
+      "target": null
+    }
+  },
+  "user_screenshot_2": {
+    "timestamp_local": "2026-10-16 08:14:31",
+    "wolf_label": "Wolf #2",
+    "region": "Forest",
+    "log_windows_utc": [
+      "2026.10.15-23.14.30:527",
+      "2026.10.15-23.14.40:316"
+    ],
+    "sated_wolf_steps_percent": 100,
+    "limit": "Aggregated region log supports non-hunting state; individual deer detection is not recoverable from the screenshot."
+  },
+  "known_gap": {
+    "contract": "RL_V3_WILD1_SPEC says wolves cannot enter shelter and shelter is safe.",
+    "implementation": "Native movement does not exclude cover circles. Cover changes perceived/catch distance rather than granting immunity.",
+    "user_log_crouched_capture_count": 1,
+    "status": "Documented discrepancy; this diagnostic change does not change the trained world rules or implement physical cover."
+  },
+  "user_assets_preserved": 68
+}

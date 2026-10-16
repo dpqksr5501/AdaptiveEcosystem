@@ -157,3 +157,20 @@ W=results/v3/wild1
 python results/v3/mirror/compare_unreal.py --unreal-dir $W/unreal_logs/fix_s20000-20002 --python $W/runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json
 python $W/compare_unreal_wild.py --unreal-dir $W/unreal_logs/fix_s20000-20002 --python $W/runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json
 ```
+
+## 10-17 팀 브랜치 통합 뒤 다시 견줌 (사슴 128, 세션 20000~20002)
+
+- `origin/codex/social-shelter-handoff` 를 합친 뒤(계획서 4-5b '10-17 팀 브랜치 통합') 같은 명령으로 돌렸다. 기본값은 통합 v3 야생 규칙·고침 모두 켬 +
+  팀의 사슴 Social 연결(`eco.IntegratedV3.SocialControl 1`)·은신처 생명주기(`eco.IntegratedV3.ProtectedRefuges 1`)다. 은신처 안전은 파이썬 규칙(`ShelterSafe 1`) 하나다.
+- **Social 연결을 끄면(`-EcoV3SocialControl=0`) 통합 전 기록과 CPU 시간 칸 말고 모두 같다.** 세 세션의 기록 줄 전부를 견줬다. 통합이 v3 세계를 바꾸지 않았다는 뜻이다.
+- 기본값(Social 켬) 230초 산·잡힘·굶음: 언리얼 98.1·1.9·0.0, 파이썬 짝 비교 97.8·2.2·0.0 (z +1.5), 통합 전 언리얼 97.7·2.3·0.0.
+  규칙 수치도 모두 |z| < 2 다. Social 무리 경보 때문에 도주가 늘었다(도주 몫 4.6 → 5.9%, 지역마다 도주 시작 225 → 288, 파이썬 5.5%·270). 늑대 배부름은 38.9 → 31.5%(파이썬 35.6).
+- 은신처 안 잡힘 0. `[EcoRefuge]` 줄의 팀 규칙 밀어내기·꺼내기·원 안 늑대·원 안 포획도 모두 0 이다. 오류·ensure 0.
+- 기록: `unreal_logs/merge1017_s20000-20002/`(기본값), `unreal_logs/merge1017_social0_s20000-20002/`(`-EcoV3SocialControl=0`). 파이썬은 바뀌지 않아 `runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json` 을 그대로 쓴다.
+
+```
+# herbivore_rl/ 에서
+W=results/v3/wild1; P=$W/runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json
+python results/v3/mirror/compare_unreal.py --unreal-dir $W/unreal_logs/merge1017_s20000-20002 --python $P
+python $W/compare_unreal_wild.py --unreal-dir $W/unreal_logs/merge1017_s20000-20002 --python $P
+```

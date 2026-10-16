@@ -37,6 +37,7 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 
 ### 4. Integration (외부 오픈소스 연동)
 외부 검증된 프레임워크의 참조 적응 및 라이선스 고지를 다룹니다.
+- [Mass 생태계 통합·성능 작업 안내](Integration/README.md): 공통 생명주기, 계측, 공간 검색, 동물 복제·표현, 병렬화·시간 스케줄, Simulation LOD의 6개 우선순위별 실행·검증 계획. 구현 완료 보고와 구분합니다.
 - 🔌 [THIRD_PARTY_INTEGRATION.md](Integration/THIRD_PARTY_INTEGRATION.md) : 실제 사용·설계 참조·future candidate와 과거 적응 계획 구분
 - 📜 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) : 루트 오픈소스 라이선스 고지서
 
@@ -51,6 +52,9 @@ Steam Session과 MassEntity 멀티플레이의 권위 및 복제 경계를 다�
 ### 7. Roadmap (MVP Milestones)
 PPO + Mass 생태계와 Steam 멀티플레이를 단계별로 완성하기 위한 MVP 로드맵입니다.
 - 🧭 [Roadmap/README.md](Roadmap/README.md) : 방향성 검증 결과, Milestone 순서 및 MVP 완료 기준
+- 📋 [M4 상세 구현 계획](Roadmap/M4/M4_IMPLEMENTATION_PLAN.md) : 대규모 공간 검색·Replication LOD·보간·표현·상호작용의 단계별 작업과 검증 기준
+- 🔎 [M4 공식 문서·공개 구현 비교](Roadmap/M4/M4_REFERENCE_RESEARCH.md) : 단계별 공식 자료와 공간 검색·복제·군집·생태 학습 프로젝트의 유사점/차이점
+- [M4.2 구현·관련 소스](Roadmap/M4/M4_2_REPLICATION_INTERVAL.md), [수동 테스트](Roadmap/M4/M4_EDITOR_TEST.md), [검증 기록](Roadmap/M4/M4_VALIDATION_REPORT.md) : 연결별 LOD 갱신 간격과 우선 상태 전달
 - 📌 [M3 구현 현황](Roadmap/M3/M3_IMPLEMENTATION_SUMMARY.md) / [검증 기록](Roadmap/M3/M3_VALIDATION_REPORT.md) : Food/스폰/고갈 이주의 실제 구현과 미실행 항목. M3 전체 생명주기 폐루프 완료와 구분
 
 ### 8. 초기 문서 (기반 문서 및 히스토리)

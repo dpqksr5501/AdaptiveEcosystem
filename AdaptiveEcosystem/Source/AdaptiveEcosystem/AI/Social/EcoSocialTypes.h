@@ -117,6 +117,8 @@ USTRUCT(BlueprintType)
 struct FEcoShelterPoint
 {
 	GENERATED_BODY()
+	/** Distinguishes reused compact slots after a shelter unloads. Not a replication identifier. */
+	int64 RegistrationId = 0;
 	/** Authored physical refuge extent, shared by observation and slot layout. */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Ecology|Social|Shelter")
 	float Radius = 50.f;

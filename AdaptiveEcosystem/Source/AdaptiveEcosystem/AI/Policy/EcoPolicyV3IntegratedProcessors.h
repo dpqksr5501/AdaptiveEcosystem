@@ -40,10 +40,15 @@
 
 struct FTransformFragment;
 struct FEcoVitalsFragment;
+struct FEcoDeathFragment;
 struct FEcoCreatureLifecycleFragment;
 struct FEcoBehaviorStateFragment;
 struct FEcoIntegratedV3Fragment;
 struct FEcoPredatorStateFragment;
+struct FEcoSocialMovementRequestFragment;
+struct FEcoShelterMovementFeedbackFragment;
+struct FEcoAlarmStateFragment;
+struct FEcoV3SocialBridgeFragment;
 
 /** 통합 v3 사슴 하나 (처리기 한 번 실행 안에서만 유효한 조각 주소). */
 struct FEcoV3DeerRec
@@ -52,9 +57,14 @@ struct FEcoV3DeerRec
 	FName Region;
 	const FTransformFragment* Transform = nullptr;
 	FEcoVitalsFragment* Vitals = nullptr;
+	FEcoDeathFragment* Death = nullptr;
 	FEcoCreatureLifecycleFragment* Life = nullptr;
 	FEcoBehaviorStateFragment* State = nullptr;
 	FEcoIntegratedV3Fragment* Int = nullptr;
+    const FEcoSocialMovementRequestFragment* SocialRequest = nullptr;
+    const FEcoAlarmStateFragment* Alarm = nullptr;
+    FEcoShelterMovementFeedbackFragment* Feedback = nullptr;
+    FEcoV3SocialBridgeFragment* SocialAudit = nullptr;
 	EcoWorldV3::FHerbView View;
 };
 

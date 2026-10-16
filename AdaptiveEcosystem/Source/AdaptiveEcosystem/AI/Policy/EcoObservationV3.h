@@ -141,6 +141,7 @@ namespace EcoObservationV3
 		double VelY = 0.0;
 		bool bAsleep = false;
 		double HearR = 0.0;   // 발소리 반경 (realism_hearing, HearingRadius). 0 = 들리지 않음 (끈 세계는 늘 0)
+		bool bHunting = true; // Social metadata only. Resting/eating wolves never raise a new threat alarm.
 	};
 
 	/** R3 발소리 계수 (파이썬 realism_hearing, configs/v3_r3.yaml·v3_wild1_mirror.yaml 값). 기본 끔. */
@@ -180,6 +181,9 @@ namespace EcoObservationV3
 
 	struct FThreatPerception
 	{
+		// Presentation metadata only: never appended to the 18 policy observations.
+		bool bNearestSight = false;
+		bool bNearestHeard = false;
 		std::int32_t PredCount = 0;               // 보이는 위협 수 (관측 1, 결정 관측)
 		double DPredMin = EcoRepertoireV3::kNoThreatDist;
 		std::int32_t Nearest = -1;                // 가장 가까운 보이는 위협 (동점 낮은 색인)
@@ -235,6 +239,8 @@ namespace EcoObservationV3
 			if (R.Nearest < 0 || Pd < R.DPredMin)
 			{
 				R.Nearest = m;
+				R.bNearestSight = bSight;
+				R.bNearestHeard = bHeard;
 				R.DPredMin = Pd;
 				BestEx = Ex;
 				BestEy = Ey;
@@ -351,6 +357,7 @@ namespace EcoObservationV3
 		FCoverPerception R;
 		for (std::int32_t k = 0; k < NumCovers; ++k)
 		{
+			if(Covers[k].Radius<=0)continue; // Stable-index tombstone of an unregistered refuge.
 			const double Dx = Covers[k].X - Pos.X;
 			const double Dy = Covers[k].Y - Pos.Y;
 			const double E = std::sqrt(Dx * Dx + Dy * Dy) - Covers[k].Radius;

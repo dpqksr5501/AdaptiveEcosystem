@@ -1,0 +1,41 @@
+{
+  "succeeded": 118,
+  "succeededWithWarnings": 1,
+  "failed": 0,
+  "notRun": 0,
+  "warning_tests": [
+    "AdaptiveEcosystem.Policy.Predation.SaveLoadGlobalEma"
+  ],
+  "player_surface_playback_log_counts": {
+    "Grass": 4,
+    "Dry": 5,
+    "Snow": 6,
+    "Water": 5,
+    "Wet": 6
+  },
+  "engine_submix_recordings": {
+    "JYU_PIE_Master": {
+      "seconds": 7.765333333333333,
+      "rate": 48000,
+      "channels": 2,
+      "peak_pcm16": 3409,
+      "rms_pcm16": 191.60189807025816
+    },
+    "JYU_Surface_Master": {
+      "seconds": 10.005333333333333,
+      "rate": 48000,
+      "channels": 2,
+      "peak_pcm16": 1756,
+      "rms_pcm16": 95.68149618797699
+    }
+  },
+  "warning_reason": "Expected missing save file load, EcoPredEmaTest_None.sav",
+  "build_log": "Build24.log: direct UBT Succeeded",
+  "automation_report": "Automation07/index.json",
+  "engine": "UE 5.8.3",
+  "notes": [
+    "118 Success plus 1 expected missing-save warning; 0 failures",
+    "PIE master submix only; no microphone capture",
+    "D3D11 visual validation; original rendering config unchanged"
+  ]
+}

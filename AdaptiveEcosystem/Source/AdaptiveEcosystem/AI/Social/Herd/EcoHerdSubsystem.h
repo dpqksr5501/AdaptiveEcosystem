@@ -97,7 +97,7 @@ public:
 	void ClearHerdAlarms();
 
 	/** Replaces the detected input only; manual alarms remain independently decaying. */
-	void ApplyObservedHerdThreats(TConstArrayView<FEcoObservedHerdThreat> Threats);
+	void ApplyObservedHerdThreats(TConstArrayView<FEcoObservedHerdThreat> Threats, bool bNativeV3Channel = false);
 	void RegisterThreatSource(UEcoThreatSourceComponent& Source);
 	void UnregisterThreatSource(UEcoThreatSourceComponent& Source);
 	void GatherActorThreats(TArray<FEcoActorThreatSnapshot>& OutThreats);
@@ -106,6 +106,7 @@ private:
 	void ResolveAlarm(int32 RuntimeIndex);
 	TArray<FEcoHerdAlarmInput> InjectedAlarms;
 	TArray<FEcoHerdAlarmInput> ObservedAlarms;
+	TArray<FEcoHerdAlarmInput> NativeV3Alarms; // Independent direct evidence channel; never shared receptions.
 	TArray<TWeakObjectPtr<UEcoThreatSourceComponent>> ThreatSources;
 	/** Monotonically increasing unique ID for persistent herd tracking */
 	int64 NextPersistentHerdId = 1;

@@ -14,7 +14,7 @@
 
 ## 1. Processor 명시적 파이프라인 (Execution Order)
 
-아래 도식은 전체 생태계의 목표 파이프라인이다. 현재 M3.3 Box 관찰 경로의 실제 실행 순서는 다음 절을 따른다. 아직 보류된 Energy/사망/PPO 연결까지 구현되었다는 의미가 아니다.
+아래 도식은 전체 생태계의 목표 파이프라인이다. M3.3 Box의 초기 실행 순서는 3절, 과밀·기아 확장 이후 실제 실행 순서는 4절을 따른다. PPO/Social 단일 이동 통합은 별도 작업이다.
 
 ```text
 [1. Eco.Environment/Region Update]
@@ -85,7 +85,7 @@ MassEntity는 태스크 그래프(TaskGraph) 상에서 여러 워커 스레드�
 3. **구조적 변경(Archetype Mutation)은 Deferred Command Buffer 사용**:
    - 태그 추가/제거(`FEcoAliveTag`, `FEcoMigratingTag`)나 엔티티 파괴는 반드시 `FMassCommandBuffer`를 통하여 일괄 지연 실행합니다.
 
-## 3. M3.3 Box 관찰 경로의 실제 경계
+## 3. M3.3 초기 Box 관찰 경로의 경계 (확장 전)
 
 1. **OnWorldPreActorTick / GameThread, Mass가 processing 중이 아닐 때:** 기존 완료 Transform(이전 프레임 엔진 이동 결과)을 사용할 수 있다. World 시계를 전진하고 최대 0.25초 자원 단계를 Phase/이벤트/스폰/소비/이주 판단/요약 기한에서 분할한다. 프레임당 catch-up은 최대 8단계다.
 2. **각 단계:** 현재 Mass 집계 → 환경/수동 Starvation 이벤트 → 스폰 → Resident의 소비 수집/배분/결과 적용 → `CompleteResourceStep`. Traveling/Waiting은 소비 예약 조회와 요청에서 제외한다.
@@ -97,3 +97,19 @@ MassEntity는 태스크 그래프(TaskGraph) 상에서 여러 워커 스레드�
 Mass의 이주 상태는 `FEcoTravelFragment::State` enum 하나다. `FEcoMigratingTag`/별도 bool을 갱신하지 않고 Entity를 생성·파괴하지 않으므로 이주 pass에는 구조적 변경 및 Deferred flush가 필요 없다. Feeding Apply가 모두 끝난 다음 이주를 수행하고, pending 소비가 남으면 실패하여 중복 적용을 차단한다. 스폰은 기존 CreationContext 해제 이후 완성된 Fragment를 노출한다.
 
 이 경로의 이동 query는 Authority+Alive와 서버 이동 Fragment를 요구하며 ClientProxy를 배제한다. Client `Eco Network Agent` 템플릿은 이 이동 Fragment/CodeDrivenMovement Tag를 추가하지 않는다. 다른 Trait에서 추가하더라도 새 조향 query의 Authority 조건을 충족하지 않는다. M3 Bootstrap은 PPO Herbivore/Custom/Spring Movement 및 Simulation LOD 혼용을 거부하여 중복 위치 작성과 Off simulation LOD의 이동 정지를 방지한다. Visualization/Replication LOD는 기존대로 유지한다.
+
+## 4. 과밀·기아 확장 이후 Box 경계
+
+`UEcoMassLifecycleSubsystem::ProcessEcologyStep`은 다음 순서를 사용한다. 모든 query는 GameThread의 Mass processing 외 경계에서 실행하며 값 snapshot을 수집한다. 이동 적분은 여전히 PrePhysics 엔진 Movement가 한 번만 수행한다.
+
+1. 처리 시각까지 대사·기아 피해 적분. lethal 사망 commit, 이동/Travel/소비 정리, Deferred Alive 제거/PendingDeath 추가를 flush한다. 기아·원인 미확정 외부 피해는 PredationHistory를 올리지 않는다.
+2. 살아있는 StableAgentId 중복·인구 보존 검사. Resident/Outbound/Incoming 및 ProjectedPopulation 집계.
+3. 자원 단계: 환경·수동 음식 손실 → 명시적 수동 FoodSupply → 인구/압력·유입을 고려한 Spawn → Resident 식사 요청/배분 → 실제 GrantedAmount에 따른 Energy 회복 → 자원 완료 snapshot.
+4. 이전 이동 결과로 도착 commit. 완료 이주 기록 후 재집계/압력 refresh. 판단 주기가 도래하면 후보를 값 snapshot으로 수집하고 GameThread에서 시급성·ID 순서로 목적지를 선정한다. 각 선정의 예상 유출/유입을 다음 후보에 반영한 뒤 Travel을 적용한다.
+5. 최종 인구/압력 집계, Dead 잔류 기한 종료 Entity의 deferred 파괴, 기본 1초 주기 GameState 완료 요약.
+
+이주 자체는 구조 변경이 없지만 사망/파괴는 Deferred Command Buffer로 처리한다. Dead 잔류 개체는 Authority Tag 및 전송 Fragment를 유지하고 Alive query에서만 제외한다. Client는 health/energy/life 및 지역 요약을 읽으며 대사/식사/이주/사망을 확정하지 않는다.
+
+대사는 WorldClock 처리 구간을 한 번만 적분하고 미래 시각에 태어난 개체를 catch-up 과거 단계에서 소급 처리하지 않는다. 첫/동일 시각의 0 길이 단계는 대사 시간을 추가하지 않는다. 생태 구간 중 계산된 lethal 시각은 다음 최대 0.25초 단계 경계에서 commit하며, 정확히 식사와 같은 경계의 lethal 사망은 식사보다 우선한다. Dead 제거 기한은 catch-up으로 즉시 사라지지 않도록 실제 관찰 WorldClock 시각부터 설정한다.
+
+[에디터 설정·수동 검증](../Roadmap/M3/OVERCROWDING_STARVATION_EDITOR_TEST.md), [검증 기록](../Roadmap/M3/OVERCROWDING_STARVATION_VALIDATION_REPORT.md)을 참조한다.

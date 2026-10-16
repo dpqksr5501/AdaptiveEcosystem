@@ -1,4 +1,5 @@
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
+#include "Creature/Representation/EcoCreatureAnimationProfile.h"
 #include "Creature/Representation/EcoCreatureAnimInstance.h"
 #include "Components/SceneComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -10,6 +11,9 @@
 #include "Animation/AnimSingleNodeInstance.h"
 #include "HAL/IConsoleManager.h"
 #include "DrawDebugHelpers.h"
+#include "TimerManager.h"
+#include "Kismet/GameplayStatics.h"
+#include "Creature/Audio/EcoFootstepAudioSet.h"
 #include "Creature/Audio/EcoFootstepAudioComponent.h"
 
 static TAutoConsoleVariable<int32> CVarEcoDrawFacing(TEXT("eco.Creature.DrawFacing"), 0,
@@ -20,7 +24,8 @@ static TAutoConsoleVariable<int32> CVarEcoFacingAudit(TEXT("eco.Creature.FacingA
 bool FEcoCreatureVisualState::IsValid() const
 {
 	return StableAgentId > 0 && !SpeciesId.IsNone() && Sequence > 0 && FMath::IsFinite(WorldTime) && WorldTime >= 0.0
-		&& !Position.ContainsNaN() && !Velocity.ContainsNaN()
+		&& !Position.ContainsNaN() && !Velocity.ContainsNaN() && FMath::IsFinite(FocusYawDegrees)
+        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::Exhaust)
 		&& FMath::IsFinite(NormalizedHealth) && NormalizedHealth >= 0.0f && NormalizedHealth <= 1.0f
 		&& FMath::IsFinite(NormalizedEnergy) && NormalizedEnergy >= 0.0f && NormalizedEnergy <= 1.0f;
 }
@@ -86,12 +91,16 @@ bool AEcoCreatureRepresentationActor::BindIdentity(int64 AgentId, FName SpeciesI
 	Footsteps->ResetCadence();
 	SetActorHiddenInGame(false);
 	RefreshAppearance();
+    // A pooled visual must not inherit death/IK state from its previous logical identity.
+    if(auto* Animation=CreatureMesh->GetAnimInstance())Animation->InitializeAnimation();
 	return true;
 }
 
 void AEcoCreatureRepresentationActor::ClearBinding()
 {
 	bBound = false;
+	if(GetWorld())GetWorld()->GetTimerManager().ClearTimer(AlarmTimer);
+	LastAlarmTime=-10;
 	Footsteps->ResetCadence();
 	VisualState = {};
 	VisualTurnAmount = DirectionDegrees = 0.0f;
@@ -133,7 +142,16 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 		Facing = FRotator(0, FRotator::NormalizeAxis(Desired.Yaw + Lag), 0);
 		DirectionDegrees = FMath::FindDeltaAngleDegrees(Facing.Yaw, Desired.Yaw);
 	}
-	const bool bContinuousTurn = !bSnap && State.bAlive && VisualState.bAlive
+	if(Speed<=IdleSpeed && State.SenseSource!=EEcoSenseSource::None)
+        Facing=FRotator(0,FMath::FixedTurn(Facing.Yaw,State.FocusYawDegrees,90.f*DeltaSeconds),0);
+    const bool NewDirectCue=State.SenseSource!=VisualState.SenseSource&&(State.SenseSource==EEcoSenseSource::Sight||State.SenseSource==EEcoSenseSource::Hearing);
+    const bool NewFlee=State.Activity!=VisualState.Activity&&State.Activity==EEcoSpeciesActivity::Flee;
+    if(!bSnap&&VisualSpeciesId==TEXT("Herbivore")&&State.bAlive&&(NewDirectCue||NewFlee)&&State.WorldTime-LastAlarmTime>=3&&GetWorld()->GetNetMode()!=NM_DedicatedServer)
+    {
+        LastAlarmTime=State.WorldTime;
+        GetWorld()->GetTimerManager().SetTimer(AlarmTimer,this,&AEcoCreatureRepresentationActor::PlayAlarmCue,.05f+float(State.StableAgentId%7)*.05f,false);
+    }
+    const bool bContinuousTurn = !bSnap && State.bAlive && VisualState.bAlive
 		&& Speed > IdleSpeed && VisualState.Velocity.Size2D() > IdleSpeed
 		&& DeltaSeconds > SMALL_NUMBER && DeltaSeconds <= 0.5f;
 	const float TurnTarget = bContinuousTurn ? FMath::Clamp(
@@ -168,7 +186,14 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 
 void AEcoCreatureRepresentationActor::UpdateAnimation()
 {
-	if (!LocomotionBlendSpace || !CreatureMesh->GetSkeletalMeshAsset()) return;
+	if (!CreatureMesh->GetSkeletalMeshAsset()) return;
+    if (BehaviorAnimationClass && AnimationProfile && AnimationProfile->IsValidProfile())
+    {
+        if (!CreatureMesh->GetAnimInstance() || !CreatureMesh->GetAnimInstance()->IsA(BehaviorAnimationClass))
+        { CreatureMesh->SetAnimationMode(EAnimationMode::AnimationBlueprint); CreatureMesh->SetAnimInstanceClass(BehaviorAnimationClass); }
+        return;
+    }
+    if (!LocomotionBlendSpace) return;
 	UAnimationAsset* Desired = VisualMotion == EEcoCreatureVisualMotion::Dead && DeathAnimation
 		? static_cast<UAnimationAsset*>(DeathAnimation.Get()) : static_cast<UAnimationAsset*>(LocomotionBlendSpace.Get());
 	if (!CreatureMesh->GetSingleNodeInstance() || CreatureMesh->GetSingleNodeInstance()->GetCurrentAsset() != Desired)
@@ -193,4 +218,11 @@ AEcoHerbivoreRepresentation::AEcoHerbivoreRepresentation()
 	VisualSpeciesId = TEXT("Herbivore");
 	PlaceholderBody->SetRelativeScale3D(FVector(1.4f, 1.0f, 1.3f));
 	IdentityLabel->SetTextRenderColor(FColor(100, 255, 140));
+}
+
+void AEcoCreatureRepresentationActor::PlayAlarmCue()
+{
+    if(!bBound||!VisualState.bAlive||!AnimationProfile||!AnimationProfile->AlarmSound||!GetWorld()||GetWorld()->GetNetMode()==NM_DedicatedServer)return;
+    UGameplayStatics::SpawnSoundAtLocation(this,AnimationProfile->AlarmSound,GetActorLocation(),FRotator::ZeroRotator,.4f,1,0,
+        Footsteps&&Footsteps->AudioSet?Footsteps->AudioSet->Attenuation.Get():nullptr);
 }

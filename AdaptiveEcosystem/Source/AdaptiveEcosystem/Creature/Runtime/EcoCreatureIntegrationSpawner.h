@@ -5,6 +5,8 @@
 #include "GameFramework/GameModeBase.h"
 #include "AI/Policy/EcoWorldProviders.h"
 #include "Core/EcoMigrationTypes.h"
+#include "Core/EcoSurvivalTypes.h"
+#include "AI/Behavior/EcoSpeciesAIProfile.h"
 #include "Ecology/EcoSpawnSchedule.h"
 #include "Mass/EntityHandle.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
@@ -39,6 +41,14 @@ class ADAPTIVEECOSYSTEM_API AEcoCreatureIntegrationSpawner : public AActor,
 	GENERATED_BODY()
 public:
 	AEcoCreatureIntegrationSpawner();
+	UPROPERTY(EditAnywhere, Category="Creature|Config") EEcoEnabledSpecies EnabledSpecies = EEcoEnabledSpecies::Both;
+	UPROPERTY(EditAnywhere, Category="Creature|Config") bool bEnableSpeciesAIFixtures = false;
+	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bUseV3Policy = false;
+	UPROPERTY(EditAnywhere, Category="Creature|V3", meta=(ClampMin="1",ClampMax="128")) int32 V3DeerPerRegion = 48;
+	/** Copy-level opt-in: consume only authored shelter anchors. */
+	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bV3UseAuthoredShelters = false;
+	bool IsSpeciesEnabled(bool bPredator) const
+	{ return EnabledSpecies == EEcoEnabledSpecies::Both || (bPredator ? EnabledSpecies == EEcoEnabledSpecies::WolfOnly : EnabledSpecies == EEcoEnabledSpecies::DeerOnly); }
 	virtual void PostInitializeComponents() override;
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaSeconds) override;
@@ -60,8 +70,27 @@ public:
 	UPROPERTY(VisibleAnywhere, Category="Creature|Streaming") TObjectPtr<UWorldPartitionStreamingSourceComponent> HabitatStreamingSource;
 	UPROPERTY(EditAnywhere, Category="Creature|Vitals", meta=(ClampMin="0")) float EnergyDrainPerSecond = 1.0f;
 	UPROPERTY(EditAnywhere, Category="Creature|Vitals", meta=(ClampMin="0")) float EnergyPerFood = 5.0f;
+	/** Preserve the former Creature defaults; Box has its own baseline settings. */
+	UPROPERTY(EditAnywhere, Category="Creature|Vitals", meta=(ClampMin="0")) double StarvationGraceSeconds = 0.0;
+	UPROPERTY(EditAnywhere, Category="Creature|Vitals", meta=(ClampMin="0.01")) float StarvationDamagePerSecond = 5.0f;
+	/** Opt-in predator metabolism. Disabled by default to preserve the existing demonstration. */
+	UPROPERTY(EditAnywhere, Category="Creature|Predator") bool bEnablePredatorSurvival = false;
+	UPROPERTY(EditAnywhere, Category="Creature|Predator", meta=(ClampMin="0")) float PredatorEnergyDrainPerSecond = 1.0f;
+	UPROPERTY(EditAnywhere, Category="Creature|Predator", meta=(ClampMin="0")) float PredatorEnergyPerCapture = 25.0f;
+	UPROPERTY(EditAnywhere, Category="Creature|Pressure") bool bEnablePopulationPressure = true;
+	UPROPERTY(EditAnywhere, Category="Creature|Pressure") FEcoOvercrowdingSettings PopulationPressure;
+	UPROPERTY(EditAnywhere, Category="Creature|Scheduling", meta=(ClampMin="1",ClampMax="32")) int32 MaxCatchUpSteps = 8;
+	UPROPERTY(EditAnywhere, Category="Creature|Visual", meta=(ClampMin="0",ClampMax="1")) float InterpolationDelaySeconds = 0.1f;
+	UPROPERTY(EditAnywhere, Category="Creature|Visual", meta=(ClampMin="0",ClampMax="200000",Units="cm")) float HostVisualDistance = 20000.0f;
+	/** Experimental policy scheduling only. Off by default until the scale fixture is measured. */
+	UPROPERTY(EditAnywhere, Category="Creature|Simulation LOD") bool bEnableSimulationLOD = false;
+	UPROPERTY(EditAnywhere, Category="Creature|Simulation LOD", meta=(ClampMin="4000",Units="cm")) float FarSimulationDistance = 20000.0f;
+	UPROPERTY(EditAnywhere, Category="Creature|Simulation LOD", meta=(ClampMin="1",ClampMax="8")) float FarPolicyIntervalMultiplier = 4.0f;
 	UFUNCTION(BlueprintPure, Category="Creature") int32 GetVisualCount() const { return Visuals.Num(); }
 	UFUNCTION(BlueprintPure, Category="Creature") bool IsRuntimeReady() const { return bReady; }
+	UFUNCTION(BlueprintCallable, Category="Creature|Diagnostics") void DumpRuntime(bool bDetails = false) const;
+	/** Read-only authoring report. Never creates Entities, edits actors, or saves the level. */
+	UFUNCTION(CallInEditor, BlueprintCallable, Category="Creature|Setup") void ValidateEditorSetup() const;
 	virtual float GetFoodDensity(const FVector& Location, float Radius) const override;
 	virtual FVector GetFoodGradient(const FVector& Location, float Radius) const override;
 	virtual float ConsumeFood(const FVector& Location, float Amount) override;
@@ -70,28 +99,47 @@ public:
 	virtual FVector GetCoverDirection(const FVector& Location) const override;
 	virtual bool IsInCover(const FVector& Location) const override;
 private:
+	friend class UEcoPolicyV3IntegratedSubsystem;
 	bool RegisterTemplates();
+	bool CollectSetupIssues(TArray<FString>& Errors, TArray<FString>& Notes) const;
 	bool StartAuthority();
 	int32 Spawn(FName RegionId, int32 Count, bool bPredator);
 	bool BuildSpawnPositions(const FEcoCreatureSpawnGroup& Group, int32 Count, bool bPredator, TArray<FVector>& Out) const;
 	void UpdateHabitatStreaming();
 	void Reconcile(float DeltaSeconds);
+	bool ProcessResourceStep(const FEcoServerTimeSnapshot& Time, double ObservedTime);
+	bool BuildAgentLookup();
+	bool ReconcilePopulation();
+	void UpdatePresentationAndNoise(float DeltaSeconds);
+	void UpdateSensoryPresentation();
+	void UpdateSimulationLOD();
 	void SyncVisuals(float DeltaSeconds);
 	void PublishSummary();
 	void FailRuntime(const TCHAR* Reason);
+	TMap<FName,double> NextPresentationAlarm;
 	void OnWorldPostActorTick(UWorld* World, ELevelTick TickType, float DeltaSeconds);
 	FDelegateHandle PostTickHandle;
 	AEcologyRegion* FindRegion(const FVector& Position) const;
 	UPROPERTY(Transient) TArray<TObjectPtr<AEcologyRegion>> Regions;
+	UPROPERTY(Transient) TArray<TObjectPtr<UMassEntityConfigAsset>> AdditionalClientConfigs;
 	TArray<FMassEntityHandle> Owned;
-	struct FBinding { TWeakObjectPtr<AEcoCreatureRepresentationActor> Actor; int64 Sequence = 0; };
+	struct FBinding { TWeakObjectPtr<AEcoCreatureRepresentationActor> Actor; int64 Sequence = 0; uint32 MovementRevision = 0; };
 	TMap<int64, FBinding> Visuals;
+	UPROPERTY(Transient) TArray<TObjectPtr<AEcoCreatureRepresentationActor>> VisualPool;
+	TMap<int64, FMassEntityHandle> AgentLookup;
 	bool bReady = false;
 	bool bWaitingForHabitat = false;
 	double NextStreamingUpdate = 0;
 	double LastResourceTime = 0;
 	double NextLog = 0;
 	int64 Step = 0;
+	int32 SummaryRevision = 0;
+	double NextMigrationTime = 0.0;
+	FEcoServerTimeSnapshot CompletedTime;
+	int64 SuccessfulBirths = 0;
+	int64 CommittedDeaths = 0;
+	struct FSpeciesTotals { int64 Births = 0, Deaths = 0, Incoming = 0, Outgoing = 0; };
+	TMap<FName, TMap<FName, FSpeciesTotals>> SpeciesTotals;
 	double TestExitAfter = 0;
 	double TestCaptureAt = 0;
 	double StartedAt = 0;

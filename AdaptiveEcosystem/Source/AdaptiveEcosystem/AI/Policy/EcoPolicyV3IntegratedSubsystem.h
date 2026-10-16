@@ -5,10 +5,9 @@
 //   명령줄                     -EcoIntegratedV3                   (헤드리스·독립형 게임 실행용)
 //   명령줄 값은 콘솔 변수의 시작값(ECVF_SetByCommandline)으로만 들어간다. 그래서 콘솔에서 eco.IntegratedPolicyVersion 1 을 넣으면
 //   명령줄이 있어도 꺼진다(-EcoV3Debug·-EcoV3Seed=·-EcoV3DeerPerRegion= 도 같다).
-//   켜지는 곳은 넷 모드가 단독(NM_Standalone)인 게임 월드뿐이다 — 편집기 Play 는 '선택된 뷰포트' 나 '새 에디터 창(PIE)' + 넷 모드
-//   '오프라인 플레이'. 편집기 Play 메뉴의 '독립형 게임' 은 새 프로세스라 편집기 콘솔 값이 넘어가지 않는다 (추가 실행 인수에
-//   -EcoIntegratedV3 를 넣는다). 듣기 서버·전용 서버에서는 경고만 남긴다 — 우리 설정은 실행 중에 만든 일시 객체라 클라이언트가
-//   같은 템플릿을 찾을 수 없다(클라이언트 표시는 팀 합의 뒤 몫).
+//   통합된 권위 경로는 Standalone / Listen / Dedicated Server 에서 실행한다. Client 는 같은 경로/GUID의 canonical
+//   transient EntityConfig만 등록하고 논리 스텝은 실행하지 않는다. Bubble DTO로 표현만 수신한다.
+//   편집기 콘솔 값은 별도 Standalone 프로세스로 전달되지 않으므로 추가 실행 인수에 -EcoIntegratedV3 를 넣는다.
 //
 // 맡는 것 (서버·단독만, AGENTS.md 2절 2항. 복제 통로가 아니다 — 2절 6항):
 //   1. OnWorldBeginPlay (액터 BeginPlay 앞, UE 5.8 UWorld::BeginPlay): 팀 조정자 AEcoCreatureIntegrationSpawner 의 공개 속성만 바꾼다.
@@ -82,6 +81,13 @@
 //      10 m 안의 경계·도주는 벽을 따라·모서리 밖으로 (WildFlightConfig 의 bHoldAwake·EdgeR — eco.IntegratedV3.WildFlight 에 묶음).
 //      은신처 안전 eco.IntegratedV3.ShelterSafe (-EcoV3ShelterSafe=, 기본 1, EcoThreatModel.h bShelterSafe·bShelterBlock): 은신처 원 안 사슴은
 //      표적·포획에서 빠지고 늑대는 원 둘레를 따라 미끄러진다. 원 = 레벨에서 받은 은신처 + 우리 은신처 (FWorldConfig::Covers).
+//  12. 10-17 팀 브랜치 통합 (origin/codex/social-shelter-handoff, 계획서 4-5b '10-17 팀 브랜치 통합'):
+//      은신처 안전 규칙은 하나만 적용한다. ShelterSafe 1(기본) = 파이썬 realism_shelter. 조연우 님의 실제 은신처 규칙
+//      eco.IntegratedV3.ProtectedRefuges (-EcoV3ProtectedRefuges=, 기본 1)는 그 위에 생명주기만 더한다 — 지워진 은신처는 원 반경 0(번호 유지),
+//      늦게 등록된 무대 안 은신처는 끝에 추가(RefreshRefuges), 목표를 잃은 HIDE 사슴은 도주·먹기로, Social 도착은 몸이 원 안일 때만, [EcoRefuge] 기록.
+//      ShelterSafe 0 일 때만 ProtectedRefuges 가 팀 안전 규칙(늑대 몸 여유 1 m·쓸고 지나가기 막기·갇힌 늑대 꺼내기·원 안 사슴 표적 제외)을 맡는다.
+//      사슴 Social 연결 eco.IntegratedV3.SocialControl (-EcoV3SocialControl=, 기본 1): 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에
+//      사슴 제어를 바꾼다(EcoPolicyV3SocialBridge, FStepHooks::HerbControl). 0 = 훅을 걸지 않는다(파이썬 거울과 견줄 때).
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -192,6 +198,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	double PredSpeedMult = 0.8;         // 늑대 속력 = 사슴 뛰기 900 cm/s × 0.8 = 720 cm/s (학습 0.6~0.95)
 	bool bGradualNight = true;          // 늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight 기본 1, 사람 결정 H1 10-14). 거짓 = d ≥ 0.5 에 곧바로 잠
 	bool bNoFreeze = true;              // 사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1, 사람 결정 10-15 (A)). 거짓 = R1b 그대로 얼기를 쓴다
+	bool bProtectedRefuges = true;      // 실제 은신처 생명주기 (eco.IntegratedV3.ProtectedRefuges 기본 1, 조연우 님 a88eac8). 안전은 bShelterSafe 가 맡고,
+										// bShelterSafe 거짓일 때만 팀 규칙(늑대 몸 여유 1 m·쓸고 지나가기 막기)이 안전을 맡는다 (10-17 통합, 하나만 적용)
+	bool bSocialControl = true;         // 사슴 Social 행동 연결 (eco.IntegratedV3.SocialControl 기본 1, 조연우 님 22eb1b6). 거짓 = HerbControl 훅을 걸지 않는다 (견줌용)
 	double WolfEatSeconds = 5.0;        // 늑대 식사 길이 (초, eco.IntegratedV3.WolfEatSeconds 기본 5, 사람 결정 10-15 (B)). 0.67 이하 = 옛 규칙
 	bool bWildFlight = true;            // 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight 기본 1, 야생 w3 — 경계 거리 KeepAway 를 바꿨다). 거짓 = 두뇌 그대로
 	bool bFlightHoldAwake = true;       // 도주 붙잡기 (eco.IntegratedV3.FlightHoldAwake 기본 1, 10-16 hold_awake). 거짓 = 사냥 중인 늑대만 도주를 붙잡는다 (857da45)
@@ -337,6 +346,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 RegionRuntimeIndex = INDEX_NONE;
 	int32 Index = INDEX_NONE;                 // 컨텍스트 색인 (FEcoIntegratedV3Fragment::ContextIndex)
 	EcoWorldV3::FWorldState Sim;
+	bool bSpatialFoodRegistered = false;
+	int64 ResourceReceiptSequence = 0;
 	FVector OriginCm = FVector::ZeroVector;   // 무대 (0, 0) 의 cm. Z = 무대 중심 지면 (기본 높이)
 	double SizeUnits = 60.0;
 	int32 PlannedDeer = 0;
@@ -347,6 +358,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 SkippedTeamCovers = 0;              // 무대 안이지만 반경이 학습 범위(4~9 단위) 밖이라 v3 원 목록에서 뺀 레벨 은신처
 	int32 ExtraCovers = 0;                    // 우리가 놓은 은신처
 	TArray<double> CoverGroundZ;              // 은신처 원 중심의 높이 (디버그 그리기)
+	TArray<int32> CoverShelterIndices;
+	TArray<int64> CoverRegistrations;
 	bool bReportedLowDensity = false;         // 학습 밀도 하한 아래 경고를 남겼다
 
 	// 프레임 끝 집계 (처리기가 채운다)
@@ -504,6 +517,8 @@ public:
 	virtual void Deinitialize() override;
 
 	bool IsActive() const { return bActive; }
+	/** Quiesce the native writer after a rejected authority resource transaction. */
+	void RejectResourceContract();
 	bool UsesTerrain() const { return bUseTerrain; }
 	const FEcoV3IntegratedSettings& GetSettings() const { return Settings; }
 
@@ -536,6 +551,8 @@ public:
 	void SyncContextClock(FEcoV3RegionContext& Ctx) const;
 
 	int32 NumContexts() const { return Contexts.Num(); }
+	/** Synchronize static authored refuge removal without reindexing policy cover targets. */
+	void RefreshRefuges(FEcoV3RegionContext& Context);
 	FEcoV3RegionContext* GetContext(int32 Index) { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	const FEcoV3RegionContext* GetContext(int32 Index) const { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	FEcoV3RegionContext* FindContext(FName RegionId);

@@ -5,6 +5,7 @@
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
 #include "AI/Social/EcoSocialFragments.h"
+#include "AI/Social/EcoPolicyV3SocialBridge.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
@@ -34,12 +35,15 @@ void UEcoCreatureV3Trait::BuildV3Composition(FMassEntityTemplateBuildContext& Co
 	// 몸: 서버만 (팀 트레잇 본문과 같은 줄)
 	Context.AddTag<FMassCustomMovementTag>();
 	Context.AddFragment<FEcoCreatureLifecycleFragment>();
+	Context.AddFragment<FEcoCreatureCueFragment>();
+	Context.AddFragment<FEcoCreatureSurvivalFragment>();
 	Context.AddFragment<FEcoCreatureFootstepFragment>();
 	FMassEntityManager& Manager = UE::Mass::Utils::GetEntityManagerChecked(World);
 	FEcoSpeciesSharedFragment Species;
 	Species.BaseMoveSpeed = EcoBehaviorConfig::HerbSpeedCmS;
 	Species.ViewDistance = bPredator ? EcoBehaviorConfig::PredViewRadiusCm : EcoBehaviorConfig::SeeRadiusCm;
 	Species.FOV = bPredator ? EcoBehaviorConfig::PredFovDeg : EcoBehaviorConfig::FovDeg;
+	if (!bPredator) Species.CoverSearchRadius = EcoObservationV3::kR1bObsConfig.ObsCoverNorm * EcoRepertoireV3::kUnitCm;
 	Context.AddSharedFragment(Manager.GetOrCreateSharedFragment(Species));
 
 	// 머리: v3 (서버만)
@@ -58,10 +62,21 @@ void UEcoCreatureV3Trait::BuildV3Composition(FMassEntityTemplateBuildContext& Co
 		Context.AddFragment<FEcoControlOutFragment>();
 		Context.AddFragment<FEcoHerbivoreBodyV3Fragment>();
 		Context.AddTag<FEcoIntegratedPolicyV3Tag>();
-		// 자리표시: 조정자 1초 정산이 산 Resident 사슴마다 GetFragmentDataChecked 로 읽는다. 기본값(bValid 거짓·Forage 0)이라
-		// 지역 장부 섭식 요청이 생기지 않는다 — v3 섭식은 무대 먹이 격자가 맡는다(팀 장부 연결은 팀 몫)
+        // Compatibility placeholder stays untouched. Social projects the v3 request separately.
+        // Coordinator feeding explicitly excludes FEcoIntegratedV3Fragment; native spatial food is the sole writer.
 		Context.AddFragment<FEcoPolicyOutputFragment>();
 		Context.AddFragment<FEcoSocialMovementRequestFragment>();
+        Context.AddFragment<FEcoShelterMovementFeedbackFragment>();
+        Context.AddFragment<FEcoHerdMemberFragment>();
+        Context.AddFragment<FEcoAlarmStateFragment>();
+        Context.AddFragment<FEcoSocialBehaviorFragment>();
+        Context.AddFragment<FEcoShelterIntentFragment>();
+        Context.AddFragment<FEcoSensoryStateFragment>();
+        Context.AddFragment<FEcoSensoryProfileFragment>();
+        Context.AddFragment<FEcoV3SocialBridgeFragment>();
+        FEcoSocialSpeciesSharedFragment Social;
+        Social.bDetectThreats = false; // Native direct evidence replaces generic V1 sensing, not the Social runtime.
+        Context.AddSharedFragment(Manager.GetOrCreateSharedFragment(Social));
 	}
 }
 
@@ -75,6 +90,17 @@ UMassEntityConfigAsset* UEcoCreatureV3Trait::MakeConfig(UObject* Outer, bool bPr
 											bPredator ? FName(TEXT("EcoV3WolfConfig")) : FName(TEXT("EcoV3DeerConfig")));
 	UMassEntityConfigAsset* Config = NewObject<UMassEntityConfigAsset>(Outer, Name, RF_Transient);
 	UEcoCreatureV3Trait* Trait = NewObject<UEcoCreatureV3Trait>(Config, NAME_None, RF_Transient);
+	Trait->bPredator = bPredator;
+	Config->GetMutableConfig().AddTrait(*Trait);
+	return Config;
+}
+
+UMassEntityConfigAsset* UEcoCreatureV3Trait::MakeNetworkConfig(bool bPredator)
+{
+	const FName Name(bPredator ? TEXT("EcoIntegratedV3Wolf_v1") : TEXT("EcoIntegratedV3Deer_v1"));
+	if (auto* Existing = FindObject<UMassEntityConfigAsset>(GetTransientPackage(), *Name.ToString())) return Existing;
+	auto* Config = NewObject<UMassEntityConfigAsset>(GetTransientPackage(), Name, RF_Transient);
+	auto* Trait = NewObject<UEcoCreatureV3Trait>(Config, NAME_None, RF_Transient);
 	Trait->bPredator = bPredator;
 	Config->GetMutableConfig().AddTrait(*Trait);
 	return Config;

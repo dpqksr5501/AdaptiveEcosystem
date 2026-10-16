@@ -69,3 +69,44 @@
 2. Social 작업은 CURRENT_STATE의 기준 commit·검증 범위를 확인하고, production Entity 구성과 Server/Standalone 실행 조건을 먼저 대조한다. 설계 문서의 예시 Processor를 구현 완료로 간주하지 않는다.
 3. C++/빌드 입력 변경 후 직접 `UnrealBuildTool.exe`로 `AdaptiveEcosystemEditor Win64 Development` 빌드를 실행하고 완료까지 기다린다. UBT, dotnet, Unreal Editor, Live Coding, MSBuild, ShaderCompileWorker가 실행 중이면 새 빌드를 시작하거나 실행 중 빌드를 중단하지 않는다. dotnet 예외 창은 최초 UBT/compiler 오류와 Windows Application Event Log를 확인한 뒤 판단한다.
 4. 문서만 변경한 경우 링크·Source 근거·diff를 검증하고 새 UBT/PIE 검증을 했다고 기록하지 않는다. 코드 변경이 포함되면 위 빌드 규칙을 적용한다.
+
+
+## 4. 2026-10-15 opt-in M4/v3 통합 경로
+
+`codex/m4-v3-creature-integration`의 별도 `/Game/JYU/Maps/LV_JYU_V3Integration`은 M4 공통 권위·identity/lifecycle/resource/replication을 권신혁 Native v3 **R1b 18관측/5행동·mask2**에 연결한다. 이는 기본 V1 7관측/4출력을 변경하는 경로가 아니다. v3의 단일 Native movement/vitals writer를 유지하고 V1/Custom Movement 혼용 가드를 제거하지 않는다. Client는 수신 표현만 수행하며 런타임 Python 추론은 금지한다. 원본 팀 레벨 대신 복사 맵·owned 에셋에 authoring한다.
+
+실제 계약·검증 범위·known gap은 [JYU M4/v3 통합 기록](AdaptiveEcosystem/Docs/조연우/JYU_M4_V3_INTEGRATION.md)과 [IK 검증](AdaptiveEcosystem/Docs/조연우/JYU_IK_VALIDATION.md)을 따른다. v3 Social ModulatedAction/slot arrival feedback·migration/wave는 연결 완료로 간주하지 않는다. 기존 V1 handoff를 보존한다. 단일 runtime 모듈은 유지하며 AnimGraph authoring만 별도 `AdaptiveEcosystemEditor` Editor 모듈로 분리했다.
+
+
+## 5. 2026-10-16 작업 위치 통합
+
+검증 커밋 `8e2f34f`의 M4/v3/JYU 구현은 기존 `codex/social-shelter-handoff`와 원래 저장소 폴더로 반영했다. 앞으로 원래 `AdaptiveEcosystem/AdaptiveEcosystem.uproject`를 사용한다. 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`과 원본 팀 레벨의 분리는 유지한다. 4절의 브랜치명은 최초 구현 이력이다. 세부 보존·재검증·worktree 정리는 [작업 위치 통합 기록](AdaptiveEcosystem/Docs/조연우/JYU_WORKTREE_RETURN_20261016.md)을 따른다.
+
+UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한이 있는 승인된 실행 환경에서 시작한다. 권한 오류로 시작한 빌드를 임의 중단하거나 중복 실행하지 않는다. 2026-10-16의 중단 허용은 사용자가 특정 실패 실행 1회에만 허용한 예외이며 지속적인 예외가 아니다.
+
+
+## 6. 2026-10-16 v3 감지·야생 규칙 추가 통합
+
+기존 통합본 위에 권신혁 `origin/Branch_Sinhyeok` `3916496`의 후속 16개 커밋을 반영했다. `RL_V3_WILD1_SPEC.md`의 시야·청각·도주·비축·포만 규칙을 사용하지만 R1b 내장 학습 가중치와 V1 계약은 그대로다. `request`(PPO)와 `flight_override`(세계 규칙), `executed`(실제 행동)를 구분한다. MassFlock은 외부 패키지 도입 완료가 아닌 설계 참조이며 실제 이웃·조향은 자체 구현이다. v3의 경보 소음/표현과 Native `kin_alarm`은 Social Persistent Herd→ModulatedAction 연결 완료를 뜻하지 않는다. 정확한 활성 backend·검증·남은 연결은 [위협·backend 감사](AdaptiveEcosystem/Docs/조연우/JYU_THREAT_AND_BACKEND_AUDIT_20261016.md)를 따른다.
+
+## 7. 2026-10-16 v3 실제 Social 행동·슬롯 인계
+
+권신혁 최신 `b5c7384`(Wild1 검증 자료)와 원준 M4 `67c860c`를 포함한 기존 브랜치에서 v3 Social 연결을 추가했다. 2절 10항·4절·6절의 미연결 설명은 당시 이력이며 현재 범위는 [v3 Social 인계 계약과 검증](AdaptiveEcosystem/Docs/조연우/JYU_V3_SOCIAL_HANDOFF.md)을 따른다.
+
+실제 경로는 Native 직접 감지/Player.Footstep → 별도 Herd observed 채널 → 기존 Alarm/SocialResponse → Shelter Request → Native control hook → 단일 이동/섭식/대사 → 실제 body 위치의 Feedback → 점유/예약 정리다. v3 요청을 Social 선호로 명시적으로 projection하며 V1 PPO 출력이나 v3 Raw Request를 덮어쓰지 않는다. Shared 기억을 직접 관측으로 재발행하지 않고, 이동 소비자도 lease/slot/안전 방향을 확인한다. 기존 V1 경로와 Bootstrap 가드는 유지한다.
+
+직접 UBT 성공, 자동화 140개(139 Success + 1 예상 저장 파일 warning, 실패 0), 복사 맵 일반 PIE 및 Dedicated+Client 2개를 검증했다. 실제 Moving→Occupied와 Client 논리 개체/Native Step 0을 확인했다. migration/wave 활성화·외부 MassFlock 설치·NavMesh 전환·재학습은 이번 작업 범위가 아니다. 사용자 변경 에셋 68개는 원본 바이트를 보존하고 이번 코드 커밋에서 제외했다.
+
+후속 [근접 장면 진단](AdaptiveEcosystem/Docs/조연우/JYU_THREAT_SCENE_DIAGNOSIS_20261016.md)에서 **은신처 안전 계약 미충족**을 확인했다. 명세의 늑대 진입 금지/안전과 달리 현재 Native cover는 탐지·포획 거리 배수이며 물리적 진입 금지/면역이 아니다. 웅크림 중 포획도 사용자 로그에 있다. 보이는 엄폐물도 자동 배치하지 않는다. 숨기=미감지 또는 완전한 안전이라고 설명하지 않는다. 새 읽기 전용 진단은 Native 감지와 Social 위급 경보를 구분하며, 후속 141개 자동화와 일반 PIE를 검증했다. 이 진단이 세계 규칙 불일치를 해결한 것은 아니다.
+
+## 8. 2026-10-16 실제 보호 은신처
+
+사용자 요청에 따라 새 복사 맵 `/Game/JYU/Maps/LV_JYU_RefugeSafety`에 수풀·바위 Blueprint 은신처 12개를 배치했다. 기존 `LV_JYU_V3Integration`과 사용자 에셋 변경은 보존한다. 통합 v3에서 `eco.IntegratedV3.ProtectedRefuges=1`은 실제 영역의 늑대 swept 이동 차단·내부 사슴 포획 후보 제외·지면 슬롯/실제 도착 검증을 활성화한다. Native 단일 movement writer를 유지한다. 등록 전 외형을 숨기고 지형 준비 후 재시도하며 제거·등록 index 재사용도 처리한다.
+
+이는 Unreal 세계 규칙 확장이며 PPO 가중치나 기본 Python 세계를 변경하지 않았다. Native 기준 설정은 OFF로 유지한다. ON 세계까지 Python 파리티/재학습이 완료됐다고 간주하지 않는다. 실제 계약·검증·에디터 위치는 [보호 은신처 구현 기록](AdaptiveEcosystem/Docs/조연우/JYU_REFUGE_SAFETY_20261016.md)을 따른다. 이전 문서의 “은신처 진입 금지/안전 미구현”은 이 변경 전의 진단이다.
+
+## 9. 개인 발표 자료 저장 위치
+
+사용자 요청에 따라 개인 주간 발표 PPT, 발표 대본, 멘토 검토용 PDF와 제작·렌더·임시 산출물은 **저장소 밖의 바탕화면 `AdaptiveEcosystem_발표자료/`** 아래에 날짜·용도별로 저장한다. 작업 폴더도 그 외부 경로 안에 만든다. 저장소의 `Deliverables/`, `output/`, `tmp/`에는 새 발표 산출물을 생성하거나 추적하지 않는다. 해당 경로는 Git 제외 규칙으로 보호한다.
+
+프로젝트 소스·Unreal 에셋·설계/계약 문서·동작 검증 근거는 기존 저장소 구조를 유지한다. 팀원이 관리하는 기존 `Docs/Roadmap/M3/Presentation` 등 공유 설계 자료는 개인 발표 분리 대상으로 간주하지 않는다. 사용자 개인 발표 파일을 push하거나 공개 이력을 다시 쓰지 않는다.

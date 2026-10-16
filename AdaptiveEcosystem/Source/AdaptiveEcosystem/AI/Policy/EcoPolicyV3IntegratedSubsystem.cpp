@@ -1,6 +1,7 @@
 #include "EcoPolicyV3IntegratedSubsystem.h"
 
 #include "AI/Social/Shelter/EcoShelterAnchor.h"
+#include "AI/Social/Shelter/EcoRefugeHabitat.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Core/EcoRuntimeSettings.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
@@ -31,7 +32,7 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("eco.IntegratedPolicyVersion"),
 		1,
 		TEXT("팀 통합 레벨(AEcoCreatureIntegrationSpawner)의 두뇌 판. 1 = 팀 그대로 (v1 + Social + 팀 늑대, 기본), ")
-		TEXT("3 = 모든 사슴은 v3 R1b 학습 두뇌, 늑대는 학습 위협 규칙. Play 전에 바꾼다 (넷 모드 단독만 — PIE '오프라인 플레이'). ")
+		TEXT("3 = 모든 사슴은 v3 R1b 학습 두뇌, 늑대는 학습 위협 규칙. Play 전에 바꾼다 (서버·단독 권위, Client는 표현만). ")
 		TEXT("명령줄 -EcoIntegratedV3 는 시작값만 3 으로 둔다 (콘솔에서 1 을 넣으면 꺼진다)."),
 		ECVF_Default);
 
@@ -54,6 +55,18 @@ namespace EcoPolicyV3IntegratedImpl
 		20000,
 		TEXT("통합 v3 모드의 세션 시드 (사건 결정 지연 해시·지역 세계 난수·시작 자리). 명령줄 -EcoV3Seed= 는 시작값."),
 		ECVF_Default);
+	// 10-17 팀 브랜치 통합 (계획서 4-5b): 은신처 안전 규칙은 하나다. ShelterSafe 1(기본)이면 파이썬 realism_shelter 가 안전(표적·포획 제외·늑대 진입 금지)을
+	// 맡고, 이 스위치는 실제 은신처 생명주기(지워진 은신처 비활성·늦게 등록된 은신처 추가·잃은 HIDE 목표 풀기·Social 도착은 원 안일 때만·[EcoRefuge] 기록)만 더한다.
+	// ShelterSafe 0 일 때만 조연우 님 규칙(늑대 몸 여유 1 m·쓸고 지나가기 막기·갇힌 늑대 꺼내기·원 안 사슴 표적 제외)이 안전을 맡는다. 둘이 한꺼번에 적용되지 않는다
+	static TAutoConsoleVariable<int32> CVarProtectedRefuges(TEXT("eco.IntegratedV3.ProtectedRefuges"),1,
+		TEXT("통합 v3 실제 은신처 생명주기 (1 = 켬, 기본 — 조연우 님 a88eac8). 지워진 은신처는 원 목록에서 비활성(번호는 그대로), 늦게 등록된 무대 안 은신처는 끝에 더하고, ")
+		TEXT("목표 은신처를 잃은 HIDE 사슴은 도주·먹기로 돌아가며, Social 도착은 몸이 원 안일 때만 인정한다. 안전 규칙은 eco.IntegratedV3.ShelterSafe 1 이면 파이썬 규칙이고, ")
+		TEXT("ShelterSafe 0 일 때만 이 스위치가 팀 규칙(늑대 몸 여유 1 m·쓸고 지나가기 막기·갇힌 늑대 꺼내기)으로 안전을 맡는다. 0 = 생명주기도 끔. Play 전에 바꾼다. ")
+		TEXT("명령줄 -EcoV3ProtectedRefuges= 는 시작값."),ECVF_Default);
+	static TAutoConsoleVariable<int32> CVarSocialControl(TEXT("eco.IntegratedV3.SocialControl"),1,
+		TEXT("통합 v3 사슴의 Social 행동 연결 (1 = 켬, 기본 — 조연우 님 22eb1b6). 무리 경보(Alert·Panic·Recovering)와 은신처 슬롯 예약이 v3 제어 뒤·이동 전에 ")
+		TEXT("사슴 제어를 바꾼다(EcoWorldV3 FStepHooks::HerbControl). 0 = 연결하지 않는다(Social 처리기는 그대로 돌고 v3 사슴 움직임만 파이썬 세계 그대로 — 견줌용). ")
+		TEXT("Play 전에 바꾼다. 명령줄 -EcoV3SocialControl= 는 시작값."),ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarGradualNight(
 		TEXT("eco.IntegratedV3.GradualNight"),
@@ -442,6 +455,8 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bShelterSafe = CVarShelterSafe.GetValueOnGameThread() != 0;
 	S.bFlightHoldAwake = CVarFlightHoldAwake.GetValueOnGameThread() != 0;
 	S.bFlightEdgeAvoid = CVarFlightEdgeAvoid.GetValueOnGameThread() != 0;
+	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
+	S.bSocialControl = CVarSocialControl.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -523,6 +538,16 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.ShelterSafe"), LexToString(ShelterArg));
 	}
+	int32 RefugeArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ProtectedRefuges="), RefugeArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ProtectedRefuges"), LexToString(RefugeArg));
+	}
+	int32 SocialArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3SocialControl="), SocialArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.SocialControl"), LexToString(SocialArg));
+	}
 	int32 VisionArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3RealismVision="), VisionArg))
 	{
@@ -564,12 +589,13 @@ bool UEcoPolicyV3IntegratedSubsystem::DoesSupportWorldType(const EWorldType::Typ
 void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
-	const bool bRequested = IsRequested();
+	bool bRequested = IsRequested();
 	TArray<AEcoCreatureIntegrationSpawner*> Found;
 	for (TActorIterator<AEcoCreatureIntegrationSpawner> It(&InWorld); It; ++It)
 	{
 		Found.Add(*It);
 	}
+	for (const auto* Coordinator : Found) bRequested |= Coordinator->bUseV3Policy;
 	if (!bRequested)
 	{
 		// 기본: 아무것도 바꾸지 않는다 — 팀 레벨은 지금 그대로 돈다. 왜 팀 두뇌로 도는지 알 수 있게 한 줄만 남긴다
@@ -586,12 +612,9 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 통합 모드가 요청됐지만 이 월드에 통합 조정자(AEcoCreatureIntegrationSpawner)가 없다 — 아무것도 바꾸지 않는다"));
 		return;
 	}
-	if (InWorld.GetNetMode() != NM_Standalone)
+	if (InWorld.GetNetMode() == NM_Client)
 	{
-		UE_LOG(LogEcoPolicyV3I, Warning,
-			   TEXT("[EcoV3I] 통합 v3 모드는 지금 넷 모드 단독(Standalone)만 지원한다 (넷 모드 %d). 팀 그대로 돈다 — PIE 는 넷 모드 '오프라인 플레이'로 띄운다. ")
-				   TEXT("클라이언트 표시는 팀 합의 뒤"),
-			   static_cast<int32>(InWorld.GetNetMode()));
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] Client: presentation only; canonical proxy templates registered by M4."));
 		return;
 	}
 	if (Found.Num() > 1)
@@ -600,6 +623,8 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			   *GetNameSafe(Found[0]));
 	}
 	Settings = FEcoV3IntegratedSettings::FromConsole();
+	if (!IsRequested() && Found[0]->bUseV3Policy) Settings.DeerPerRegion = Found[0]->V3DeerPerRegion;
+	if (Found[0]->bV3UseAuthoredShelters) Settings.ExtraCoverCount = 0;
 	bUseTerrain = true;
 	BeginPlaySeconds = InWorld.GetTimeSeconds();
 	if (!ApplyToSpawner(*Found[0]))
@@ -669,9 +694,15 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Ws.SatDays, EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900),
 								   EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900) * EcoRepertoireV3::kStepSeconds, Ws.RestSpeed)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildSatiation 0 — 먹기가 끝나면 곧바로 사냥)"))));
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 은신처: %s"),
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 은신처: %s | 생명주기 %s"),
 		   Settings.bShelterSafe ? TEXT("안전 (eco.IntegratedV3.ShelterSafe 1, 10-16) — 원 안 사슴은 표적·포획에서 빠지고 늑대는 둘레를 따라 미끄러짐")
-								 : TEXT("끔 (eco.IntegratedV3.ShelterSafe 0 — 은신처 안에서도 잡힘)"));
+		   : Settings.bProtectedRefuges ? TEXT("팀 규칙 안전 (eco.IntegratedV3.ShelterSafe 0·ProtectedRefuges 1 — 늑대 몸 여유 1 m, 쓸고 지나가기 막기, 파이썬과 다름)")
+										: TEXT("끔 (eco.IntegratedV3.ShelterSafe 0 — 은신처 안에서도 잡힘)"),
+		   Settings.bProtectedRefuges ? TEXT("켬 (eco.IntegratedV3.ProtectedRefuges 1 — 지워진 은신처 비활성·늦은 은신처 추가·잃은 HIDE 목표 풀기)")
+									  : TEXT("끔 (eco.IntegratedV3.ProtectedRefuges 0)"));
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
+		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다")
+								   : TEXT("끔 (eco.IntegratedV3.SocialControl 0 — v3 사슴 움직임은 파이썬 세계 그대로, Social 처리기는 기록만)"));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 감지: 위협 시야 %s | 늑대 발소리 %s"),
 		   Settings.bRealismVision ? TEXT("300° (eco.IntegratedV3.RealismVision 1 — 바로 뒤 60° 만 사각)") : TEXT("120° (eco.IntegratedV3.RealismVision 0 — R1b 그대로)"),
 		   Settings.bRealismHearing ? TEXT("켬 (eco.IntegratedV3.RealismHearing 1 — 쫓아 달리면 최대 40 m, 어슬렁거리면 4 m, 서 있으면 없음)")
@@ -907,6 +938,7 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.DayOffset = 0;
 	C.TwilightSteps = 45;
 	C.Covers = Covers;
+	C.bProtectedRefuges = S.bProtectedRefuges;
 	C.FoodRegenMult = 1.0;
 	C.RngStream = static_cast<uint64>(FMath::Max(0, RegionRuntimeIndex)) + 1;   // 지역마다 다른 먹이 패치·늑대 선회 (0 은 평면 맵 몫)
 	C.bRespawnDead = false;                                    // 제자리 부활 없음 (계약 12-3: 새 개체 = 새 StableAgentId)
@@ -937,6 +969,41 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 // -----------------------------------------------------------------------------
 // 조정자 공개 속성 바꾸기 (OnWorldBeginPlay — 액터 BeginPlay 앞)
 // -----------------------------------------------------------------------------
+
+void UEcoPolicyV3IntegratedSubsystem::RefreshRefuges(FEcoV3RegionContext& Context)
+{
+    auto& W=Context.Sim;
+    if(!W.Config.bProtectedRefuges||Context.CoverShelterIndices.Num()!=int32(W.Config.Covers.size()))return;
+    const auto* Shelters=GetWorld()->GetSubsystem<UEcoShelterSubsystem>();if(!Shelters)return;
+    bool Changed=false;
+    for(int32 I=0;I<Context.CoverShelterIndices.Num();++I) {
+        const int32 Index=Context.CoverShelterIndices[I];
+        const bool Valid=Shelters->IsValidShelterIndex(Index)&&Context.CoverRegistrations.IsValidIndex(I)
+            &&Shelters->GetShelters()[Index].RegistrationId==Context.CoverRegistrations[I];
+        auto& Cover=W.Config.Covers[I];
+        if(!Valid&&Cover.Radius>0){Cover.Radius=0;Changed=true;}
+    }
+    // Non-spatial refuge actors may register after terrain cells become ready. Append stable
+    // targets, never recycle an old policy cover index for a new shelter registration.
+    for(const auto& Point:Shelters->GetShelters()) {
+        if(!Shelters->IsValidShelterIndex(Point.RuntimeIndex)||Context.CoverRegistrations.Contains(Point.RegistrationId))continue;
+        const auto P=Context.CmToUnits(Point.Position);const double Radius=Point.Radius/EcoRepertoireV3::kUnitCm;
+        if(Radius<FEcoV3IntegratedSettings::kCoverRadiusLoUnits||Radius>FEcoV3IntegratedSettings::kCoverRadiusHiUnits
+            ||P.X<Radius||P.Y<Radius||P.X>W.Config.WorldSize-Radius||P.Y>W.Config.WorldSize-Radius)continue;
+        W.Config.Covers.push_back({P.X,P.Y,Radius});Context.CoverShelterIndices.Add(Point.RuntimeIndex);
+        Context.CoverRegistrations.Add(Point.RegistrationId);Context.CoverGroundZ.Add(Point.Position.Z);Changed=true;
+    }
+    if(Changed) {
+        // Preserve food amounts and capacity. Only the removed refuge's regeneration modifier changes.
+        auto& F=W.Food;
+        for(int Y=0;Y<F.Gw;++Y)for(int X=0;X<F.Gw;++X) {
+            const int K=Y*F.Gw+X;
+            const bool In=EcoRefugeV3::Contains(W.Config.Covers,{(X+.5)*F.Cell,(Y+.5)*F.Cell});
+            F.CoverCell[K]=In?1:0;
+            F.Regen[K]=W.Config.FoodRegenBase*W.Config.FoodRegenMult*(In?W.Config.FoodCoverRegenMult:1.);
+        }
+    }
+}
 
 bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpawner& S)
 {
@@ -1008,8 +1075,8 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 	}
 
 	// 2. 몸은 팀 것, 머리만 우리 것: 우리 트레잇 하나를 가진 실행 중 설정. 팀 DA 는 바꾸지 않는다
-	UMassEntityConfigAsset* DeerConfig = UEcoCreatureV3Trait::MakeConfig(&S, false);
-	UMassEntityConfigAsset* WolfConfig = UEcoCreatureV3Trait::MakeConfig(&S, true);
+	UMassEntityConfigAsset* DeerConfig = UEcoCreatureV3Trait::MakeNetworkConfig(false);
+	UMassEntityConfigAsset* WolfConfig = UEcoCreatureV3Trait::MakeNetworkConfig(true);
 	if (!DeerConfig || !WolfConfig)
 	{
 		return false;
@@ -1232,7 +1299,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 	{
 		GlobalT = FMath::Max<int64>(0, FMath::RoundToInt64(TeamClock->GetServerTime().ServerTimeSeconds / EcoPolicyV3IntegratedImpl::kStepSeconds));
 	}
-	const UEcologySimulationSubsystem* Ecology = World->GetSubsystem<UEcologySimulationSubsystem>();
+	UEcologySimulationSubsystem* Ecology = World->GetSubsystem<UEcologySimulationSubsystem>();
 	UEcoShelterSubsystem* Shelters = World->GetSubsystem<UEcoShelterSubsystem>();
 
 	for (const FEcoV3StagePlan& Plan : Plans)
@@ -1284,7 +1351,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 				Params.bDeferConstruction = true;
 				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 				const FTransform Xf(Ground);
-				if (AEcoShelterAnchor* Anchor = World->SpawnActor<AEcoShelterAnchor>(AEcoShelterAnchor::StaticClass(), Xf, Params))
+				if (AEcoShelterAnchor* Anchor = World->SpawnActor<AEcoShelterAnchor>(AEcoRefugeHabitat::StaticClass(), Xf, Params))
 				{
 					Anchor->Radius = R;
 					Anchor->Capacity = 4;
@@ -1304,6 +1371,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		// 그 작은 원을 HIDE 목표로 골라 몰리고, cover_dist 관측·은신 판정(포획·탐지 배수)도 학습 밖 크기로 계산된다. 팀 Social 등록은 그대로다
 		std::vector<EcoObservationV3::FCoverInput> Covers;
 		TArray<double> CoverZ;
+		TArray<int32> CoverIndices;TArray<int64> Registrations;
 		int32 Team = 0;
 		int32 Skipped = 0;
 		if (Shelters)
@@ -1331,6 +1399,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 				Covers.push_back({(P.Position.X - Origin.X) / EcoRepertoireV3::kUnitCm, (P.Position.Y - Origin.Y) / EcoRepertoireV3::kUnitCm,
 								  static_cast<double>(P.Radius) / EcoRepertoireV3::kUnitCm});
 				CoverZ.Add(P.Position.Z);
+				CoverIndices.Add(P.RuntimeIndex);Registrations.Add(P.RegistrationId);
 			}
 		}
 		const EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers);
@@ -1339,6 +1408,11 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		Ctx->SkippedTeamCovers = Skipped;
 		Ctx->ExtraCovers = Extra;
 		Ctx->CoverGroundZ = CoverZ;
+		Ctx->CoverShelterIndices=MoveTemp(CoverIndices);Ctx->CoverRegistrations=MoveTemp(Registrations);
+		if (Ecology)
+			Ctx->bSpatialFoodRegistered = Ecology->RegisterSpatialFood(G.RegionId, Ctx->StartFood, Ctx->StartFood);
+		if (!Ctx->bSpatialFoodRegistered)
+		{ UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] Spatial food registration rejected: %s"), *G.RegionId.ToString()); bActive = false; return; }
 		UE_LOG(LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] 지역 무대 %s (지역 번호 %d): 원점 (%.0f, %.0f, %.0f), 한 변 %.0f m | 사슴 %d 늑대 %d | 은신처 %d (레벨 %d + v3 %d, v3 반경 %.0f m, ")
 				   TEXT("학습 범위 밖이라 뺀 레벨 은신처 %d) | t=%lld"),
@@ -1570,6 +1644,11 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	const EcoWorldV3::FWorldStats& S = Ctx.Sim.Stats;
 	const EcoWorldV3::FWorldStats& P = Ctx.LastLogStats;
 	const double Seconds = static_cast<double>(Ctx.Sim.T) * EcoRepertoireV3::kStepSeconds;
+	if(Ctx.Sim.Config.bProtectedRefuges)
+		UE_LOG(LogEcoPolicyV3I,Log,TEXT("[EcoRefuge] NetMode=%d Region=%s Step=%lld ProtectedPreySteps=%lld Deflections=%lld Recoveries=%lld InsidePredatorSteps=%lld CaptureViolations=%lld"),
+			int32(GetWorld()->GetNetMode()),*Ctx.RegionId.ToString(),static_cast<long long>(Ctx.Sim.T),
+			static_cast<long long>(S.RefugeProtectedPreySteps),static_cast<long long>(S.RefugeConstrainedMoves),static_cast<long long>(S.RefugeRecoveries),
+			static_cast<long long>(S.RefugeInsidePredatorSteps),static_cast<long long>(S.RefugeCaptureViolations));
 
 	FString TeamPhase = TEXT("팀 시계 없음");
 	if (const UWorld* World = GetWorld())
@@ -1912,4 +1991,10 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(731000 + Ctx.Index), 1.5f, FColor(230, 210, 150), FoodLine);
 		}
 	}
+}
+
+void UEcoPolicyV3IntegratedSubsystem::RejectResourceContract()
+{
+    Deactivate(TEXT("Resource conservation receipt rejected"));
+    if(auto* Coordinator=Spawner.Get())Coordinator->FailRuntime(TEXT("V3 spatial resource contract rejected"));
 }
