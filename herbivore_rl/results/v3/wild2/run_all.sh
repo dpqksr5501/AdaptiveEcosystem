@@ -49,3 +49,19 @@ $R --deer 128 --unreal-maps 20000-20002 --unreal-obstacles results/v3/wild2/shc/
 python results/v3/wild2/shc/check_discs.py --sessions 20000-20002
 python results/v3/wild2/stuck_check.py --seeds 32000-32089 --steps 1800 --unreal-maps 20000-20002 --replicates 10 --unreal-obstacles results/v3/wild2/shc/obstacle_maps --out results/v3/wild2/runs/stuck_shc_pair.json
 python results/v3/wild2/stuck_check.py --seeds 32000-32029 --steps 7200 --set 'obstacles.fixed=[]' --out results/v3/wild2/runs/stuck_shc_long.json
+# 10-17 무대 나무 확인(results/v3/wild2/trees/README.md 7절): 언리얼 기본(나무 켬) 헤드리스 -EcoV3ObstacleExport=trees/unreal_exports/s<s>.json
+# (20006~20008 은 trees/unreal_exports_s20006-20008/) 의 짝. 나무 없는 기준은 위 pair_d128_shc_… 와 아래 packfood 20006~20008.
+T=configs/v3_wild2_trees_mirror.yaml
+L=results/v3/wild2/trees/tree_layout.json
+python results/v3/wild2/trees/make_tree_layout.py --check
+$R --deer 128 --unreal-maps 20000-20002 --replicates 10 --seeds 32000-32089 --config $T --unreal-obstacles $L --name pair_d128_trees_u20000-20002_k10
+$R --deer 128 --unreal-maps 20006-20008 --replicates 10 --seeds 32000-32089 --config $T --unreal-obstacles $L --name pair_d128_trees_u20006-20008_k10
+$R --deer 128 --unreal-maps 20006-20008 --replicates 10 --seeds 32000-32089 --config $P --name pair_d128_packfood_u20006-20008_k10
+python results/v3/wild2/trees/check_discs.py --sessions 20000-20002
+python results/v3/wild2/trees/check_discs.py --sessions 20006-20008 --exports results/v3/wild2/trees/unreal_exports_s20006-20008 --out results/v3/wild2/trees/disc_check_s20006-20008.json
+python results/v3/wild2/stuck_check.py --config $T --seeds 32000-32089 --steps 1800 --unreal-maps 20000-20002 --replicates 10 --unreal-obstacles $L --out results/v3/wild2/runs/stuck_trees_pair.json
+python results/v3/wild2/stuck_check.py --config $T --seeds 32000-32029 --steps 7200 --out results/v3/wild2/runs/stuck_trees_long.json
+W=results/v3/wild2
+python $W/trees/compare_trees.py --unreal-trees $W/trees/unreal_logs $W/trees/unreal_logs_s20006-20008 --unreal-base $W/shc/unreal_logs $W/unreal_logs/packfood_s20006-20008 \
+    --python-trees $W/runs/pair_d128_trees_u20000-20002_k10.json $W/runs/pair_d128_trees_u20006-20008_k10.json \
+    --python-base $W/runs/pair_d128_shc_u20000-20002_k10.json $W/runs/pair_d128_packfood_u20006-20008_k10.json > $W/trees/compare_trees_pooled.md
