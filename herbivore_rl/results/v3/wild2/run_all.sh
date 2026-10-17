@@ -1,5 +1,5 @@
 #!/bin/sh
-# 야생 2단계 측정 묶음 (1 은신처 먹이 부족 · 2 늑대 무리 · 3 세로 장애물 · 10-17 고침 · 10-17 장애물 돌아가기) (herbivore_rl/ 에서 sh results/v3/wild2/run_all.sh). 결과 results/v3/wild2/runs/ (커밋하지 않는다),
+# 야생 2단계 측정 묶음 (1 은신처 먹이 부족 · 2 늑대 무리 · 3 세로 장애물 · 10-17 고침 · 10-17 장애물 돌아가기 · 10-17 SHC 레벨 거울) (herbivore_rl/ 에서 sh results/v3/wild2/run_all.sh). 결과 results/v3/wild2/runs/ (커밋하지 않는다),
 # 표 results/v3/wild2/summarize.py. wild1 = 1단계 + 10-16 고침 + 10-17 늑대 몸 여유(지금까지의 기준), wild2 = 그 위에 은신처 먹이 부족
 set -e
 R="python results/v3/mirror/run_mirror.py --diag --out-dir results/v3/wild2/runs"
@@ -42,3 +42,10 @@ $R --deer 128 --unreal-maps 20000-20002 --unreal-obstacles results/v3/wild2/obst
 python results/v3/wild2/stuck_check.py --seeds 32000-32029 --steps 7200 --out results/v3/wild2/runs/stuck_obstdet.json
 python results/v3/wild2/stuck_check.py --seeds 32000-32029 --steps 7200 --set obstacles.detour=false --out results/v3/wild2/runs/stuck_obstfood.json
 python results/v3/wild2/stuck_check.py --config $P --seeds 32000-32029 --steps 7200 --out results/v3/wild2/runs/stuck_packfood.json
+# 10-17 팀 SHC 날씨·나무 시험 레벨 거울(results/v3/wild2/shc/README.md): 그 레벨 나무를 통합 레벨 무대에 겹친 원판(무대마다 0 — 나무가 모두 무대 밖).
+# 언리얼 짝은 -EcoV3ObstacleImport=shc/obstacle_maps/s<s>.json -EcoV3ObstacleExport=shc/unreal_exports/export_s<s>.json (원판 대조 check_discs.py 는 그 내보내기를 읽는다)
+python results/v3/wild2/shc/make_shc_obstacle_maps.py --sessions 20000-20002
+$R --deer 128 --unreal-maps 20000-20002 --unreal-obstacles results/v3/wild2/shc/obstacle_maps --replicates 10 --seeds 32000-32089 --config $O --name pair_d128_shc_u20000-20002_k10
+python results/v3/wild2/shc/check_discs.py --sessions 20000-20002
+python results/v3/wild2/stuck_check.py --seeds 32000-32089 --steps 1800 --unreal-maps 20000-20002 --replicates 10 --unreal-obstacles results/v3/wild2/shc/obstacle_maps --out results/v3/wild2/runs/stuck_shc_pair.json
+python results/v3/wild2/stuck_check.py --seeds 32000-32029 --steps 7200 --set 'obstacles.fixed=[]' --out results/v3/wild2/runs/stuck_shc_long.json

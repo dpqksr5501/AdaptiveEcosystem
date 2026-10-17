@@ -4,6 +4,8 @@
     python results/v3/wild2/stuck_check.py --seeds 32000-32029 --steps 7200                      # 지금 장애물 거울(configs/v3_wild2_obstacle_mirror.yaml)
     python results/v3/wild2/stuck_check.py --seeds 32000-32029 --steps 7200 --set obstacles.detour=false   # 돌아가기를 끈 판
     python results/v3/wild2/stuck_check.py --config configs/v3_wild2_pack_mirror.yaml --seeds 32000-32029   # 장애물 없는 판(기준)
+    python results/v3/wild2/stuck_check.py --seeds 32000-32089 --steps 1800 --unreal-maps 20000-20002 --replicates 10 \
+        --unreal-obstacles results/v3/wild2/shc/obstacle_maps                                      # 언리얼 짝 지도·원판 (10-17 SHC 거울)
 
 세계는 거울 실행기(results/v3/mirror/run_mirror.py)와 같다: 사슴 128, 늑대 식사 5초(38스텝), 두뇌 R1b 배포 모드. 시드마다 세계 하나를 돌리며 스텝마다
 이동 뒤 위치를 읽는다. '가려던 이동'은 세계가 원판 미끄러짐(world.py `obstacle_slide`)에 넘기는 이동 길이다 — 그 함수를 감싸 사슴 이동(World.step 이
@@ -139,6 +141,9 @@ def one(job: dict) -> dict:
     wm.World._rz_wall_push = rec_push
     try:
         w = wm.World(Config(job["cfg"]), seeds=[int(job["seed"])])
+        um = job.get("unreal_map")
+        if um is not None:
+            rm.apply_unreal_map(w, int(um["seed"]), um["region"])      # 짝 비교: 언리얼 지역 무대와 같은 먹이 지도(run_mirror.run_world 와 같은 순서)
         pol = ro.build_policy({"kind": "rep_learned", "path": str(rm.MODEL)}, int(job["seed"]))
         ro.forward_bind(pol, w)
         T, M, N = int(job["steps"]), w.M, w.N
@@ -241,7 +246,7 @@ def one(job: dict) -> dict:
     finally:
         wm.obstacle_slide = orig
         wm.World._rz_wall_push = orig_push
-    return dict(seed=int(job["seed"]), discs=int(len(disc)), wolf_events=wr.events, deer_events=dr.events, wall_events=wl.events, win_w=win_w,
+    return dict(seed=int(job["seed"]), unreal_map=job.get("unreal_map"), discs=int(len(disc)), wolf_events=wr.events, deer_events=dr.events, wall_events=wl.events, win_w=win_w,
                 win_d=win_d, stuck_w=st_w, stuck_d=st_d, stuck_wall=st_wl, old_wolf=old_w, old_deer=old_d, detour=det)
 
 
@@ -284,9 +289,33 @@ def main(argv=None) -> None:
     ap.add_argument("--set", action="append", default=[], help="설정 덮기 블록.키=값 (예: obstacles.detour=false)")
     ap.add_argument("--workers", type=int, default=10)
     ap.add_argument("--out", type=Path, default=None)
+    ap.add_argument("--unreal-maps", default=None, help="짝 비교(run_mirror.py 와 같다): 언리얼 세션 시드(예: 20000-20002)의 지역 먹이 지도를 쓴다")
+    ap.add_argument("--replicates", type=int, default=1, help="짝 비교: 지도마다 세계 수 (지도 i 의 j 번째 = seeds[i·replicates + j])")
+    ap.add_argument("--unreal-obstacles", type=Path, default=None, help="짝 비교: 장애물 JSON(파일 또는 s<세션>.json 폴더)의 지역 원판을 fixed 로")
     a = ap.parse_args(argv)
     cfg = build_cfg(a.config if a.config.is_absolute() else ROOT / a.config, parse_set(a.set))
-    jobs = [dict(cfg=cfg, seed=s, steps=a.steps) for s in rm.parse_seeds(a.seeds)]
+    seeds = rm.parse_seeds(a.seeds)
+    jobs = [dict(cfg=cfg, seed=s, steps=a.steps) for s in seeds]
+    if a.unreal_maps:
+        # 10-17 더함(팀 SHC 레벨 거울, results/v3/wild2/shc/README.md): run_mirror.run 과 같은 짝 — 지도 (세션, 지역 Barren·Forest·Highland) 마다
+        # replicates 개 세계, 원판은 그 지도의 fixed(난수 없음)
+        import copy
+        um = rm.parse_unreal_maps(a.unreal_maps)
+        maps = [(int(u), r) for u in um for r in sorted(rm.UNREAL_REGION_STREAM)]
+        k = int(a.replicates)
+        if k < 1 or len(seeds) != len(maps) * k:
+            raise ValueError(f"짝 비교는 시드가 지도 {len(maps)}장 × replicates {k} = {len(maps) * k}개여야 한다. 받은 수 {len(seeds)}")
+        obs = rm.load_unreal_obstacles(a.unreal_obstacles, um) if a.unreal_obstacles is not None else None
+        for i, (u, r) in enumerate(maps):
+            for j in range(k):
+                jb = jobs[i * k + j]
+                jb["unreal_map"] = dict(seed=u, region=r, replicate=j)
+                if obs is not None:
+                    c = copy.deepcopy(jb["cfg"])
+                    c["v2"]["features"]["obstacles"]["fixed"] = obs[(u, r)]
+                    jb["cfg"] = c
+    elif a.unreal_obstacles is not None:
+        raise ValueError("--unreal-obstacles 는 --unreal-maps 와 함께 쓴다")
     if a.workers > 0:
         from concurrent.futures import ProcessPoolExecutor
         with ProcessPoolExecutor(max_workers=a.workers) as ex:
@@ -294,12 +323,20 @@ def main(argv=None) -> None:
     else:
         res = [one(j) for j in jobs]
     s = summarize(res)
-    print(f"{a.config.name} {a.seeds} {a.steps} 스텝 {' '.join(a.set)}")
+    if a.unreal_maps:
+        regs = sorted({r["unreal_map"]["region"] for r in res})
+        s["by_region"] = {g: {k: v for k, v in summarize([r for r in res if r["unreal_map"]["region"] == g]).items() if not k.startswith("worst")}
+                          for g in regs}
+    print(f"{a.config.name} {a.seeds} {a.steps} 스텝 {' '.join(a.set)}"
+          + (f" | 짝 지도 {a.unreal_maps} × {a.replicates}{' · 원판 ' + str(a.unreal_obstacles) if a.unreal_obstacles else ''}" if a.unreal_maps else ""))
     for k, v in s.items():
         print(f"  {k}: {v}")
     if a.out is not None:
         a.out.parent.mkdir(parents=True, exist_ok=True)
-        a.out.write_text(json.dumps(dict(args=dict(config=str(a.config), seeds=a.seeds, steps=a.steps, set=a.set), summary=s, worlds=res),
+        a.out.write_text(json.dumps(dict(args=dict(config=str(a.config), seeds=a.seeds, steps=a.steps, set=a.set, unreal_maps=a.unreal_maps,
+                                                   replicates=a.replicates,
+                                                   unreal_obstacles=None if a.unreal_obstacles is None else str(a.unreal_obstacles)),
+                                         summary=s, worlds=res),
                                     ensure_ascii=False, indent=1), encoding="utf-8")
 
 
