@@ -301,6 +301,28 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
     사슴 등)는 따로 센다. 늑대만 센다(플레이어형 위협 말고). 야외 연구의 '사냥'(무리에 달려들기 시작 → 잡음·포기)과 같은 꼴이다.
     현실 근거: 늑대 사냥은 대부분 실패한다 — 사냥 한 번 성공률은 10~49%(Mech & Peterson 2003, Wolves: Behavior, Ecology, and Conservation 5장),
     옐로스톤 엘크는 혹독한 겨울 26%·포근한 겨울 15%(Mech 외 2001, J. Wildl. Manage. 65:998). 목표 띠 10~30% 로 둔다(어림).
+  2 늑대 무리·협동 사냥 wild_pack (30, 10-17 사용자 '추천대로 끄고 2~4번 진행해' — 1 은신처 먹이 부족은 굶음만 늘려 거울 기본에서 끈다. 설정
+    configs/v3_wild2_pack_mirror.yaml = v3_wild1_mirror.yaml + 늑대 4 + 이 블록). 난수 없음. 늑대 수는 v1 키 rand.predator_count 다(거울 2 → 4, 두뇌 학습
+    범위 2~12 안). 구성은 통합 무대 (o) 그대로다(슬롯 짝수 잠행형·홀수 추격형 — 4 마리면 둘씩). 포식자 스텝에서 표적 고르기·잠행형 상태 전이 뒤,
+    먹기·배부름·밤잠 배수 앞에 정한다(`_pack_step`, 식은 `pack_goals`):
+      앞장 = 늑대(플레이어형 말고)가 표적을 쫓으며 전력 걸음(추격형이 표적을 쫓음, 잠행형 돌진 중 표적 있음). 그 표적이 '쫓기는 사슴'이다.
+      돕는 늑대 = 늑대이고 사냥 중(깨어 있음·먹기·배부름·탈진 아님·깜깜한 밤 새 사냥 규칙 통과)이며 전력 걸음이 아닌 늑대(표적이 없거나,
+        잠행형이 표적에 살금살금 다가가는 중 — 동료의 추격에 합류한다).
+      돕는 늑대마다 실거리 join_r 안의 쫓기는 사슴 가운데 가장 가까운 것(같으면 앞 슬롯 앞장)을 고른다. 없으면 지금 그대로(배회).
+      도주 방향 u = 그 사슴의 이번 스텝 이동(이동 뒤 − 이동 전)의 단위벡터. 서 있으면 앞장 늑대에서 사슴 쪽.
+      목표 자리: 가장자리 거리 e_k = |c_k − p| − r_k 가 0 < e_k ≤ door_r 이고 (c_k − p)·u / |c_k − p| ≥ door_cos 인 은신처 가운데 e_k 가 가장 작은 것
+        (같으면 앞 번호)이 있으면 그 은신처의 문 c_k − (r_k + wolf_margin)·(c_k − p)/|c_k − p| (늑대가 설 수 있는 둘레, 사슴 쪽), 없으면 p + lead·u.
+        무대 [0, S] 로 자른다.
+      움직임: 목표 자리가 wait_r 밖이면 그쪽으로 기본 속력(배회·잠행 접근 대신), 안이면 멈춰(속력 0) 사슴 쪽을 본다(기다림 — 사슴과 겹치면
+        heading 그대로).
+        기다리는 늑대가 사슴을 보면 다음 스텝부터 지금 규칙대로 쫓거나 덮친다(잠행형은 체감 6 단위 안이면 돌진).
+      은신처 진입 금지·몸 여유·밤잠·박명 감속·지형은 그대로 걸린다. 표적·포획·사냥 셈 규칙은 바꾸지 않는다.
+      통계 `pack_stats`(앞장·도움·기다림·문 늑대-스텝, 협동 포획 = 다른 앞장 늑대도 쫓던 사슴을 잡은 수), 훅 pack_help·pack_wait·pack_door·pack_prey.
+      C++ 꼴: EcoThreatModel.h PackPeek(사본으로 Step — 난수 없음) → PackGoals → Step 의 6b′ (In.bPackHelp 면 Move = PackDir, Speed = 기다림 ? 0 :
+        BaseSpeed). 계수 join_r 은 처음 20 에서 60 으로 하나만 골랐다(명세 5절).
+    현실 근거: 늑대 무리의 사냥 성공은 4 마리까지 늘고 그 위에서는 더 늘지 않는다(MacNulty 외 2012, Behav. Ecol. 23:75). 늑대는 먹잇감이 다니는
+      길목에 따로 떨어져 기다린다(Gable 외 2024, Ethol. Ecol. Evol. 36(2) — 비버 매복). '먹잇감 쪽으로 가다 가까우면 다른 늑대에게서 벌어진다'는 두
+      규칙만으로 둘러싸기가 생긴다(Muro 외 2011, Behav. Processes 88:192). 교대 추격(relay)은 넣지 않았다.
 - 세로 장애물(나무·바위) 확장 지점 — 이번 단계에는 넣지 않는다(10-14 사용자: '언리얼에도 아직 없다. 나중에 추가 가능하게만').
   구현은 없고 자리만 정해 둔다. 기능 이름은 이미 예약된 `obstacles`(번호 12, `env_v2/features.py`)이고 켜면 '아직 구현되지 않았다'로
   읽을 때 실패한다(끈 블록 `obstacles: {enabled: false}` 는 받아들이고 무시한다). 자료는 `World.obstacles` — (K, 3) float64 [x, y, r]
@@ -1280,6 +1302,94 @@ def _wild_flight_params(p: dict, f: Features) -> dict:
     return out
 
 
+def _wild_pack_params(p: dict, f: Features) -> dict:
+    """wild_pack 계수 (모듈 docstring '야생 2단계' 2). threats 를 함께 켜야 한다(늑대 유형·잠행형 상태로 앞장·돕는 늑대를 가른다)."""
+    if not f.enabled("threats"):
+        raise ValueError("features.wild_pack 은 threats 를 함께 켜야 한다(늑대 유형·잠행형 상태를 쓴다)")
+    n = "wild_pack"
+    return dict(join_r=_wild_num(n, p, "join_r", 0.0, open_lo=True), lead=_wild_num(n, p, "lead", 0.0),
+                door_r=_wild_num(n, p, "door_r", 0.0), door_cos=_wild_num(n, p, "door_cos", -1.0, 1.0),
+                wait_r=_wild_num(n, p, "wait_r", 0.0))
+
+
+def pack_goals(wq, whead, leader, helper, tgt, p, disp, cov_c, cov_r, margin: float, size: float, wp: dict):
+    """야생 2단계 2 늑대 무리 협동의 목표 (모듈 docstring '야생 2단계' 2). 순수 함수 — 세계(`_pack_step`)와 골든 내보내기가 함께 쓴다.
+    wq·whead (M, 2) 늑대 이동 전 위치·heading, leader·helper (M,) bool, tgt (M,) 늑대의 이번 스텝 표적(앞장만 읽는다), p·disp (N, 2) 사슴 이동 뒤
+    위치·이번 스텝 이동, cov_c (K, 2)·cov_r (K,) 은신처 원(사슴 반지름, 0 이하는 건너뛴다), margin = 늑대 몸 여유(막지 않으면 0), size = 무대 한 변,
+    wp = wild_pack 계수. 반환 (help, wait, door, prey, dir): (M,) bool 셋, (M,) 고른 사슴(없으면 −1), (M, 2) 이동 방향(단위, 기다림이면 사슴 쪽).
+    늑대마다 스칼라 식이라 C++ EcoThreatV3::PackGoals 와 같은 순서로 계산한다(골든 비트 동일).
+    C++ 꼴: for (L 앞장, 슬롯 순) if (|p_t(L) − q| <= JoinR && (Best < 0 || d < BestD)) Best = t(L);
+            U = |v| > Eps ? v/|v| : SafeDir(p − q_L);  Door = argmin_k e_k (0 < e_k <= DoorR, (c_k − p)·U / |c_k − p| >= DoorCos);
+            G = Door ? c − (r + m)·(c − p)/|c − p| : p + Lead·U;  G = Clamp(G, 0, Size);
+            |G − q| <= WaitR ? (Wait, Dir = SafeDir(p − q, Head)) : Dir = (G − q)/|G − q|"""
+    M = len(wq)
+    help_ = np.zeros(M, dtype=bool)
+    wait = np.zeros(M, dtype=bool)
+    door = np.zeros(M, dtype=bool)
+    prey = np.full(M, -1, dtype=np.int64)
+    dirv = np.zeros((M, 2))
+    leaders = [int(x) for x in np.flatnonzero(leader)]
+    if not leaders:
+        return help_, wait, door, prey, dirv
+    jr, lead, dr, dc, wr = (float(wp[k]) for k in ("join_r", "lead", "door_r", "door_cos", "wait_r"))
+    margin, size = float(margin), float(size)
+    K = len(cov_r)
+    for m in np.flatnonzero(helper):
+        m = int(m)
+        qx, qy = float(wq[m, 0]), float(wq[m, 1])
+        best, bd, bl = -1, 0.0, -1
+        for lw in leaders:
+            if lw == m:
+                continue
+            i = int(tgt[lw])
+            dx, dy = float(p[i, 0]) - qx, float(p[i, 1]) - qy
+            d = math.sqrt(dx * dx + dy * dy)
+            if d <= jr and (best < 0 or d < bd):
+                best, bd, bl = i, d, lw
+        if best < 0:
+            continue
+        px, py = float(p[best, 0]), float(p[best, 1])
+        vx, vy = float(disp[best, 0]), float(disp[best, 1])
+        n = math.sqrt(vx * vx + vy * vy)
+        if n > EPS:
+            ux, uy = vx / n, vy / n
+        else:
+            ax, ay = px - float(wq[bl, 0]), py - float(wq[bl, 1])
+            na = math.sqrt(ax * ax + ay * ay)
+            ux, uy = (ax / na, ay / na) if na > EPS else (0.0, 0.0)
+        bk, be, bex, bey, bdk = -1, 0.0, 0.0, 0.0, 0.0
+        for k in range(K):
+            r = float(cov_r[k])
+            if not r > 0.0:
+                continue
+            ex, ey = float(cov_c[k, 0]) - px, float(cov_c[k, 1]) - py
+            dk = math.sqrt(ex * ex + ey * ey)
+            e = dk - r
+            if e > 0.0 and e <= dr and (ex * ux + ey * uy) / dk >= dc and (bk < 0 or e < be):
+                bk, be, bex, bey, bdk = k, e, ex, ey, dk
+        if bk >= 0:
+            rr = float(cov_r[bk]) + margin
+            gx = float(cov_c[bk, 0]) - rr * (bex / bdk)
+            gy = float(cov_c[bk, 1]) - rr * (bey / bdk)
+        else:
+            gx, gy = px + lead * ux, py + lead * uy
+        gx = min(max(gx, 0.0), size)
+        gy = min(max(gy, 0.0), size)
+        hx, hy = gx - qx, gy - qy
+        hn = math.sqrt(hx * hx + hy * hy)
+        if hn <= wr:
+            fx, fy = px - qx, py - qy
+            fn = math.sqrt(fx * fx + fy * fy)
+            dirv[m] = (fx / fn, fy / fn) if fn > EPS else (float(whead[m, 0]), float(whead[m, 1]))
+            wait[m] = True
+        else:
+            dirv[m] = (hx / hn, hy / hn)
+        help_[m] = True
+        door[m] = bk >= 0
+        prey[m] = best
+    return help_, wait, door, prey, dirv
+
+
 def wf_edge_steer(pos: np.ndarray, d: np.ndarray, size: float, edge_r: float) -> np.ndarray:
     """야생 (w3) 10-16 가장자리 굽히기 (모듈 docstring '야생 1단계' (w3) edge_r). pos (K, 2) 위치, d (K, 2) 단위 방향 → (K, 2) 단위 방향.
     축 a 마다 가까운 벽까지 거리 e_a = min(p_a, size − p_a) < edge_r 이면 안쪽 부호 n_a(p_a ≤ size − p_a 면 +1, 아니면 −1)와 가까움
@@ -1478,6 +1588,8 @@ class World:
         self._wr = (_wild_reserve_params(f.params("wild_reserve"), f) if f.enabled("wild_reserve") else None)
         self._ws = (_wild_satiation_params(f.params("wild_satiation"), f) if f.enabled("wild_satiation") else None)
         self._wf = (_wild_flight_params(f.params("wild_flight"), f) if f.enabled("wild_flight") else None)
+        # 야생 2단계 2(모듈 docstring '야생 2단계' 2): 늑대 무리 협동 사냥. 끈 세계는 None 이고 그 코드 경로를 타지 않는다
+        self._wp = (_wild_pack_params(f.params("wild_pack"), f) if f.enabled("wild_pack") else None)
         # 통계·진단 전용(설정 아님, 동역학과 무관): 참이면 기하에 사슴 × 위협 보임 행렬 wf_pvis 를 남긴다(실행기 results/v3/wild1 이 켠다)
         self.keep_pair_vis = False
         self.alive = None
@@ -1592,8 +1704,8 @@ class World:
             self._repertoire_reset()
         if self._al is not None:
             self._alarm_reset()
-        if self._wr is not None or self._ws is not None or self._wf is not None:
-            self._wild_reset()              # 야생 1단계: 하루 길이(_daynight_reset)·위협 수 M 이 정해진 뒤
+        if self._wr is not None or self._ws is not None or self._wf is not None or self._wp is not None:
+            self._wild_reset()              # 야생 1단계·2단계 2: 하루 길이(_daynight_reset)·위협 수 M 이 정해진 뒤
         self._reset_stats()
         self._g = self._geometry()
         if self._vg is not None:
@@ -2738,6 +2850,8 @@ class World:
             v = v * self._zt["mult_herb"][tc][:, None]
             self.vel = v
             self._zt_deer += np.bincount(tc, minlength=len(TERRAIN_NAMES))
+        if self._wp is not None:
+            self._pack_p0 = self.pos.copy()     # 야생 2단계 2: 사슴의 이번 스텝 이동(도주 방향)을 포식자 스텝이 읽는다
         self.pos = np.clip(self.pos + v, 0.0, self.size)
         moving = np.linalg.norm(v, axis=1) > EPS
         self.head = np.where(moving[:, None], normalize(v), self.head)
@@ -3473,6 +3587,8 @@ class World:
                     self._zt_pounce += np.bincount(tc, minlength=len(TERRAIN_NAMES))
         if zc is not None:              # v3 R3 (f) 4): 상태 전이 뒤 새 고정(돌진을 막 시작한 잠행형은 돌진 표적)
             self._rz_chase_acquire(j, has_target, hunting)
+        if self._wp is not None:        # 야생 2단계 2: 돕는 늑대는 배회 대신 쫓기는 사슴이 달아날 곳으로 가서 기다린다(먹기·배부름·밤잠 배수 앞)
+            move, speed = self._pack_step(move, speed, has_target, j, hunting)
         if self._eat_in_place:
             # v3 R3 (j) 늑대 먹는 시간(10-15): 잡은 뒤 쿨다운이 남은 늑대(플레이어형 위협 말고 모든 포식자)는 그 자리에 서서 먹는다 —
             # 속력 0, heading 그대로(자는 늑대와 같은 꼴). 쿨다운은 이 스텝 첫머리에 이미 1 줄었으므로 cd > 0 이면 이번 스텝은 사냥하지
@@ -3604,6 +3720,12 @@ class World:
         kind = np.broadcast_to(self.pred_type, (M,)) if th is not None else np.zeros(M, dtype=np.int8)
         for r_, x in enumerate(hx):
             self._hunt_n[r_] += np.bincount(kind[x], minlength=3)[:3]
+        if self._wp is not None and got.any():
+            # 야생 2단계 2 통계 전용: 늑대 포획 가운데 다른 앞장 늑대도 이번 스텝에 쫓던 사슴을 잡은 수(협동 포획)
+            lt = self._pack_lead_tgt
+            for m_ in np.flatnonzero(got & wolf):
+                self._wp_catch_n += 1
+                self._wp_pack_catch_n += int(bool(((lt == k[m_]) & (ar != m_)).any()))
         if self._al is not None:
             # v3 R2 M8 비명의 점: 잡은 위협(동시 포획이면 낮은 번호 = 위협 슬롯 순서, C++ 도 위협 슬롯 번호로 깬다). 헛경보 통계
             # 전용: 이번 스텝에 표적이 있었거나 돌진 중인 위협
@@ -4105,6 +4227,16 @@ class World:
             self.wf_dir = np.zeros((N, 2))                 # 경계·도주 방향(단위, 없으면 0)
             self._wf_mode_n = np.zeros(len(WF_MODE_NAMES), dtype=np.int64)   # 실행한 덮기별 산 개체-스텝
             self._wf_panic_starts = self._wf_panic_ends = self._wf_panic_end_shelter = 0
+        if self._wp is not None:
+            # 야생 2단계 2 스텝 뒤 훅: 이번 스텝에 도운·기다린·은신처 문으로 간 늑대, 고른 사슴(없으면 −1). 통계 칸
+            self.pack_help = np.zeros(M, dtype=bool)
+            self.pack_wait = np.zeros(M, dtype=bool)
+            self.pack_door = np.zeros(M, dtype=bool)
+            self.pack_prey = np.full(M, -1, dtype=np.int64)
+            self._pack_lead_tgt = np.full(M, -1, dtype=np.int64)    # 이번 스텝 앞장 늑대의 표적(앞장이 아니면 −1) — 협동 포획 셈
+            self._pack_p0 = self.pos.copy()                          # 이번 스텝 사슴 이동 전 위치(`step` 이 이동 직전에 다시 쓴다)
+            self._wp_steps_n = self._wp_lead_n = self._wp_help_n = self._wp_wait_n = self._wp_door_n = 0
+            self._wp_catch_n = self._wp_pack_catch_n = 0
 
     def _wild_reserve_step(self, e_new: np.ndarray, gain_e: np.ndarray, live: np.ndarray | None) -> np.ndarray:
         """야생 (w1) `step` 3): 대사·섭식 뒤 E(e_new, max_energy 로 자른 값)에 비축을 적용한 E 를 돌려주고 self.reserve 를 바꾼다(산 개체만).
@@ -4290,6 +4422,39 @@ class World:
         if not out:
             raise ValueError("wild_stats 는 야생 1단계 규칙(wild_*)을 하나라도 켠 세계에만 있다")
         return out
+
+    def _pack_step(self, move, speed, has_target, j, hunting):
+        """야생 2단계 2 늑대 무리 협동 (모듈 docstring '야생 2단계' 2). `_step_predators_v3` 가 표적 고르기·잠행형 상태 전이 뒤에 부른다.
+        앞장·돕는 늑대를 가르고 `pack_goals` 의 방향으로 돕는 늑대의 move 를 덮는다(속력 = 기다림이면 0, 아니면 기본 속력 pred_speed).
+        난수 없음. 반환 (move, speed)."""
+        stalker = self.pred_type == PT_STALKER
+        wolf = ~self.pred_is_player
+        run_now = (has_target & (self.pred_type == PT_CHASER)) | (stalker & (self.stalk_state == ST_POUNCE))
+        leader = wolf & run_now & has_target
+        helper = wolf & hunting & ~run_now
+        self._pack_lead_tgt = np.where(leader, j, -1).astype(np.int64)
+        hp, wt, dr, prey, dv = pack_goals(self.pred_pos, self.pred_head, leader, helper, j, self.pos, self.pos - self._pack_p0,
+                                          self.cov_c, self.cov_r, self._zw_m, self.size, self._wp)
+        self.pack_help, self.pack_wait, self.pack_door, self.pack_prey = hp, wt, dr, prey
+        self._wp_steps_n += int(np.count_nonzero(wolf))
+        self._wp_lead_n += int(np.count_nonzero(leader))
+        self._wp_help_n += int(np.count_nonzero(hp))
+        self._wp_wait_n += int(np.count_nonzero(wt))
+        self._wp_door_n += int(np.count_nonzero(dr))
+        if hp.any():
+            move = np.where(hp[:, None], dv, move)
+            speed = np.where(hp, np.where(wt, 0.0, self.pred_speed), speed)
+        return move, speed
+
+    def pack_stats(self) -> dict:
+        """야생 2단계 2 늑대 무리 협동 통계 (통계 전용). 늑대-스텝 wolf_steps 가운데 앞장(lead)·도움(help)·기다림(wait)·은신처 문(door) 수와 몫,
+        늑대 포획 catches 와 그 가운데 다른 앞장 늑대도 쫓던 사슴을 잡은 협동 포획 pack_catches. wild_pack 을 켠 세계에만 있다."""
+        if self._wp is None:
+            raise ValueError("pack_stats 는 wild_pack 을 켠 세계에만 있다")
+        n = max(self._wp_steps_n, 1)
+        return dict(wolf_steps=self._wp_steps_n, lead_n=self._wp_lead_n, help_n=self._wp_help_n, wait_n=self._wp_wait_n,
+                    door_n=self._wp_door_n, lead_frac=self._wp_lead_n / n, help_frac=self._wp_help_n / n,
+                    catches=self._wp_catch_n, pack_catches=self._wp_pack_catch_n)
 
     def hunt_stats(self) -> dict:
         """야생 2단계 사냥 성공률 (모듈 docstring '야생 2단계', 통계 전용). 늑대(플레이어형 위협 말고) 모두와 유형별(chaser·stalker):

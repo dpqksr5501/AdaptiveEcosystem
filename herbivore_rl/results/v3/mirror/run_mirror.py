@@ -46,6 +46,9 @@ realism_shelter.block_predators 가 켜져 있어야 한다). 진단에 은신�
 모듈 docstring '야생 2단계', 언리얼 '[EcoV3I] <지역> 사냥·은신처 |' 줄과 같다)와 누적 shelter_steps(스텝 첫머리에 산 사슴 가운데 이동 뒤 위치가 은신처
 원 안인 사슴-스텝)·live_steps(스텝 첫머리 산 사슴-스텝)를 더하고, 세계 메타에 hunt(마지막 hunt_stats)·shelter_steps·live_steps 를 적는다(동역학과 무관).
 짝 비교 지도를 덮을 때 은신처 먹이 부족(realism_cover_food)을 켠 세계는 새 지도의 은신처 셀 용량에도 배수를 다시 건다(C++ FFoodGrid::Build 순서).
+10-17 더함(야생 2단계 2 늑대 무리, configs/v3_wild2_pack_mirror.yaml): wild_pack 을 켠 세계는 메타에 pack(World.pack_stats — 앞장·도움·기다림·은신처 문
+늑대-스텝, 늑대 포획과 협동 포획)을 적고, 10초 줄(JSON 만 — CSV 열은 그대로)에 같은 칸의 누적 pack_*을 더한다(동역학과 무관). 늑대 수는 설정의
+rand.predator_count 다(메타 wolves).
 """
 
 from __future__ import annotations
@@ -187,7 +190,13 @@ def config_digest(cfg) -> str:
 def _row(w, alive_before: int, food0: float, shelter: list[int]) -> dict:
     e = np.clip(w.energy[w.alive] / w.cfg.max_energy, 0.0, 1.0)
     h = w.hunt_stats()
-    return dict(t_s=round(w.t * STEP_SECONDS, 1), step=int(w.t), alive=int(alive_before), alive_end=int(w.alive.sum()),
+    extra = {}
+    if getattr(w, "_wp", None) is not None:
+        # 야생 2단계 2(10-17): 누적 늑대 무리 칸(언리얼 '[EcoV3I] <지역> 늑대 무리 |' 줄과 같은 정의). CSV 열(ROW_KEYS)에는 넣지 않는다
+        ps = w.pack_stats()
+        extra = dict(pack_wolf_steps=ps["wolf_steps"], pack_lead=ps["lead_n"], pack_help=ps["help_n"], pack_wait=ps["wait_n"],
+                     pack_door=ps["door_n"], pack_catches=ps["catches"], pack_coop=ps["pack_catches"])
+    return extra | dict(t_s=round(w.t * STEP_SECONDS, 1), step=int(w.t), alive=int(alive_before), alive_end=int(w.alive.sum()),
                 n=int(w.N), caught=int(w._pred_deaths), starved=int(w._starve_deaths),
                 food_pct=float(100.0 * w.food.sum() / food0) if food0 > 0 else 0.0,
                 energy_pct=float(100.0 * e.mean()) if len(e) else 0.0, hungry=int(np.count_nonzero(e < STARVING)),
@@ -359,6 +368,8 @@ def run_world(job: dict) -> dict:
     # 끝난 사냥이 없으면 rate 가 nan 이다 — 메타에는 None 으로 적는다(같은 인자면 같은 메타를 지키려고: nan != nan)
     meta["hunt"] = {k: (None if isinstance(v, float) and v != v else v) for k, v in w.hunt_stats().items()}
     meta["shelter_steps"], meta["live_steps"] = int(shelter[0]), int(shelter[1])
+    if getattr(w, "_wp", None) is not None:
+        meta["pack"] = w.pack_stats()       # 야생 2단계 2 늑대 무리 협동 통계(동역학과 무관)
     meta["death_t"] = w.death_t.tolist()
     meta["death_cause"] = w.death_cause.tolist()
     meta["wall_s"] = round(time.perf_counter() - t0, 3)

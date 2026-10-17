@@ -103,6 +103,9 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "wild_reserve": 27,     # (w1) 지방 비축: E 가 0 밑이면 느린 비축 R 에서 꺼내 쓰고 R 이 바닥나야 굶어 죽는다, E 가 바닥이면 약해진다(느림)
     "wild_satiation": 28,   # (w2) 늑대 포만: 먹고 나면 정한 시간(게임 하루 단위) 동안 쉬며 사냥하지 않는다
     "wild_flight": 29,      # (w3) 도주 반사 거리: 사냥 중인 늑대가 경계 거리 안이면 먹으며 멀어지고, 도주 거리 안·다가오면 안전할 때까지 뛴다
+    # 야생 규칙 2단계 2(10-17 사용자 '추천대로 끄고 2~4번 진행해', 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md). 난수 없음. 정의·식·현실 근거는
+    # env_v2/world.py 모듈 docstring '야생 2단계' 2
+    "wild_pack": 30,        # 늑대 무리 협동 사냥: 한 늑대가 사슴을 쫓는 동안 쉬던 동료가 그 사슴이 달아날 곳(은신처 문·도주선 앞)에 가서 기다린다
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
@@ -110,7 +113,7 @@ IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_
                                          "repertoire", "threats", "stare_down", "alarm",
                                          "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
                                          "realism_cover_food", "realism_chase", "realism_terrain", "integrated_stage",
-                                         "wild_reserve", "wild_satiation", "wild_flight"})
+                                         "wild_reserve", "wild_satiation", "wild_flight", "wild_pack"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -245,6 +248,10 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     #   여유(단위). repertoire 를 함께 켜야 한다
     "wild_flight": frozenset({"alert_r", "flight_r", "safe_r", "approach", "alert_w", "rest_alert", "shelter_cos", "shelter_r",
                               "crouch", "wall_margin"}),
+    # 야생 2단계 2 (env_v2/world.py `_wild_pack_params`·`pack_goals`, 정의는 모듈 docstring '야생 2단계' 2). threats 를 함께 켜야 한다(늑대 유형·상태).
+    #   wild_pack: join_r = 동료가 쫓는 사슴이 이 실거리(단위) 안이면 돕는다, lead = 은신처가 없을 때 사슴 도주선 앞쪽 거리(단위), door_r·door_cos =
+    #   사슴이 향하는 은신처(가장자리까지 door_r 안, 도주 방향 ±acos(door_cos) 안), wait_r = 목표 자리에 이만큼(단위) 가까우면 멈춰 사슴 쪽을 보고 기다린다
+    "wild_pack": frozenset({"join_r", "lead", "door_r", "door_cos", "wait_r"}),
 })
 
 # 선택 계수 키(모듈 docstring 규칙 6, 10-14 R3): 기능 → {키: 끔 값}. 켠 블록에 없으면 끔 값(= 앞 버전 동작)으로 읽는다. 앞 버전 설정

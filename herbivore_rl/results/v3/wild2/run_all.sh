@@ -11,3 +11,10 @@ for N in wild1 wild2; do
   $R --deer 128 --seeds 32000-32029 --steps 7200 --config $C --name d128_${N}_long
   $R --deer 128 --unreal-maps 20000-20002 --replicates 10 --seeds 32000-32089 --config $C --name pair_d128_${N}_u20000-20002_k10
 done
+# 야생 2단계 2 늑대 무리·협동 사냥 (10-17): pack = 늑대 4 + wild_pack, w4 = 늑대 4 만(wild_pack 끔). 은신처 먹이 부족은 끈다(사용자 결정 10-17)
+P=configs/v3_wild2_pack_mirror.yaml
+$R --deer 128 --seeds 32000-32089 --config $P --name d128_pack
+$R --deer 128 --seeds 32000-32089 --config $P --disable wild_pack --name d128_w4
+$R --deer 128 --seeds 32000-32029 --steps 7200 --config $P --name d128_pack_long
+$R --deer 128 --seeds 32000-32029 --steps 7200 --config $P --disable wild_pack --name d128_w4_long
+$R --deer 128 --unreal-maps 20000-20002 --replicates 10 --seeds 32000-32089 --config $P --name pair_d128_pack_u20000-20002_k10

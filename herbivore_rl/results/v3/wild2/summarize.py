@@ -1,5 +1,7 @@
-"""야생 2단계 1 (은신처 먹이 부족) 파이썬 거울 표 (README.md). herbivore_rl/ 에서
+"""야생 2단계 파이썬 거울 표 (README.md). herbivore_rl/ 에서
     python results/v3/wild2/summarize.py d128_wild1 d128_wild2 d128_wild1_long d128_wild2_long
+    python results/v3/wild2/summarize.py d128_wild1 d128_w4 d128_pack d128_wild1_long d128_w4_long d128_pack_long    # 2 늑대 무리(10-17)
+둘째 표(늑대 무리): 늑대/지역, 늑대-스텝 가운데 앞장·돕기·기다림·은신처 문 몫, 늑대 포획·협동 포획, 지역마다 게임 하루 잡힘.
 runs/<이름>.json 은 run_mirror.py --diag 결과다(세계 메타 hunt·shelter_steps·live_steps, 진단 catch_cover·catch_ring).
 
 칸 (정의는 env_v2/world.py 모듈 docstring '야생 2단계', run_mirror.py 머리 주석):
@@ -87,5 +89,28 @@ def main(names):
               f"{t['ring2']} · {t['ring4']} | {t['e_pct'] / t['worlds']:.0f} · {t['food'] / t['worlds']:.0f} |")
 
 
+def pack_table(names):
+    """야생 2단계 2 늑대 무리 표: 늑대 수, 늑대-스텝 가운데 앞장·돕기·기다림·은신처 문 몫, 늑대 포획과 협동 포획(다른 앞장 늑대도 쫓던 사슴을 잡음),
+    지역(세계)마다 게임 하루 잡힘. wild_pack 을 끈 판은 '—'."""
+    print()
+    print("| 판 | 늑대/지역 | 앞장 % | 돕기 % | 기다림 % | 은신처 문 % | 늑대 포획 | 협동 포획 (몫 %) | 잡힘/지역·일 |")
+    print("|---|---|---|---|---|---|---|---|---|")
+    for nm in names:
+        d = load(nm)
+        W = d["worlds"]
+        days = d["meta"]["steps"] / DAY
+        wolves = sum(w["meta"]["wolves"] for w in W) / len(W)
+        caught = sum(w["rows"][-1]["caught"] for w in W)
+        per_day = caught / len(W) / days
+        if "pack" not in W[0]["meta"]:
+            print(f"| {nm} | {wolves:.0f} | — | — | — | — | — | — | {per_day:.2f} |")
+            continue
+        pk = {k: sum(w["meta"]["pack"][k] for w in W) for k in ("wolf_steps", "lead_n", "help_n", "wait_n", "door_n", "catches", "pack_catches")}
+        n = pk["wolf_steps"]
+        print(f"| {nm} | {wolves:.0f} | {pct(pk['lead_n'], n):.1f} | {pct(pk['help_n'], n):.1f} | {pct(pk['wait_n'], n):.2f} | {pct(pk['door_n'], n):.1f} | "
+              f"{pk['catches']} | {pk['pack_catches']} ({pct(pk['pack_catches'], pk['catches']):.0f}) | {per_day:.2f} |")
+
+
 if __name__ == "__main__":
     main(sys.argv[1:])
+    pack_table(sys.argv[1:])
