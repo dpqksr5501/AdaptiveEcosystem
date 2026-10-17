@@ -2709,6 +2709,8 @@ bool FEcoV3SocialBlindMember::RunTest(const FString&) {
     namespace R=EcoRepertoireV3;
     FIntegratedHarness H;auto Settings=TestSettings();
     Settings.bWildFlight=false;Settings.bRealismVision=false;Settings.bRealismHearing=false;
+    // 10-17 (8): 기본은 Social 연결 끔. 이 시험은 팀 연결 자체를 보므로 켠다 (끈 기본값은 아래 DefaultOffKeepsNativeMovement)
+    Settings.bSocialControl=true;
     if(!H.Setup(*this,Settings))return false;
     auto* Region=H.AddRegion(TEXT("SocialTest"),0,FVector::ZeroVector,2,1);
     // At t=0 the native dawn twilight can legitimately initialize wolves asleep. This scenario tests an awake hunter.
@@ -2765,11 +2767,70 @@ bool FEcoV3SocialBlindMember::RunTest(const FString&) {
     TestEqual(TEXT("Shared memories cannot re-emit an observed alarm after direct evidence clears"),Data.AlarmStrength,0.f);
     return true;
 }
+/**
+ * 10-17 사람 결정 (8): 통합 기본값은 Social 연결 끔이다. 위 BlindMemberReaction 과 같은 장면에서 Social 처리기는 그대로 돌아
+ * 못 본 사슴에게 Panic 을 기록하지만, v3 사슴 움직임은 파이썬 세계 규칙 그대로다(먹기 요청은 먹기로 실행, 연결 기록 None).
+ * 실제 근거: 10-13 결정 — 경보는 소리·고개 들기 같은 연출로만 쓰고 행동 논리에는 넣지 않는다.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3SocialDefaultOff,"AdaptiveEcosystem.Policy.V3.Social.DefaultOffKeepsNativeMovement",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoV3SocialDefaultOff::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    namespace R=EcoRepertoireV3;
+    TestFalse(TEXT("통합 v3 기본값: Social 연결 끔"),FEcoV3IntegratedSettings().bSocialControl);
+    IConsoleVariable* Var=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.SocialControl"));
+    if(!TestNotNull(TEXT("콘솔 변수 eco.IntegratedV3.SocialControl"),Var))return false;
+    const int32 Saved=Var->GetInt();
+    TestEqual(TEXT("콘솔 기본 0 (끔)"),Saved,0);
+    TestFalse(TEXT("콘솔 0 → 설정 끔"),FEcoV3IntegratedSettings::FromConsole().bSocialControl);
+    Var->Set(1,ECVF_SetByCode);
+    TestTrue(TEXT("콘솔 1 → 설정 켬"),FEcoV3IntegratedSettings::FromConsole().bSocialControl);
+    Var->Set(Saved,ECVF_SetByCode);
+    FIntegratedHarness H;auto Settings=TestSettings();
+    Settings.bWildFlight=false;Settings.bRealismVision=false;Settings.bRealismHearing=false;
+    TestFalse(TEXT("시험 설정도 기본값 그대로 끔"),Settings.bSocialControl);
+    if(!H.Setup(*this,Settings))return false;
+    auto* Region=H.AddRegion(TEXT("SocialOff"),0,FVector::ZeroVector,2,1);
+    Region->Sim.Config.DayOffset=225;EcoWorldV3::UpdateDayNight(Region->Sim);
+    H.Spawn(true,TEXT("SocialOff"),0,{FVector(5000,5000,0)},{13});
+    H.Spawn(false,TEXT("SocialOff"),0,{FVector(5500,5000,0),FVector(5400,5000,0)},{14,15});
+    H.Frame(0);
+    auto Observer=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[0]);
+    auto Receiver=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[1]);
+    Observer.Body->Head={-1,0};Receiver.Body->Head={1,0};
+    FHerbView Views[]={Observer,Receiver};
+    FThreatAgent* Threats[]={&H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent};
+    Threats[0]->Spec.BaseSpeed=0;Region->Sim.ThreatCfg.HerbSpeed=0;
+    EcoWorldV3::ObserveAndDecideAll(Region->Sim,Views,2,Threats,1);
+    TestEqual(TEXT("못 본 사슴은 늑대를 직접 느끼지 않는다"),Receiver.Perception->Threat.PredCount,0);
+    auto* Herds=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>();
+    const int32 Herd=Herds->AllocateHerd(H.EM->GetFragmentDataChecked<FEcoIdentityFragment>(H.Deer[0]).SpeciesRuntimeIndex,FVector(5450,5000,0));
+    for(const auto E:H.Deer)H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(E).HerdRuntimeIndex=Herd;
+    auto* Sense=EcoV3SocialTests::Processor<UEcoPolicyV3SocialSenseProcessor>(H);
+    auto* Prop=EcoV3SocialTests::Processor<UEcoAlarmPropagationProcessor>(H);
+    auto* Response=EcoV3SocialTests::Processor<UEcoSocialResponseProcessor>(H);
+    auto* Lifecycle=EcoV3SocialTests::Processor<UEcoShelterLifecycleProcessor>(H);
+    EcoTest::RunProcessor(*Sense,*H.EM,.016f);EcoTest::RunProcessor(*Prop,*H.EM,.016f);
+    TestTrue(TEXT("Social 처리기는 그대로 돌아 못 본 사슴에게 Panic 을 기록한다"),
+             H.EM->GetFragmentDataChecked<FEcoAlarmStateFragment>(H.Deer[1]).State==EEcoSocialState::Panic);
+    Receiver.Decision->Request=R::kGraze;
+    EcoTest::RunProcessor(*Response,*H.EM,.016f);EcoTest::RunProcessor(*Lifecycle,*H.EM,.016f);
+    H.Scoped.World->TimeSeconds+=R::kStepSeconds;H.DecisionStep();
+    TestEqual(TEXT("먹기 요청은 그대로 먹기로 실행된다 (Social 도주 없음)"),Receiver.Decision->ExecutedBehavior,R::kGraze);
+    bool bNeverApplied=true;
+    for(int32 I=0;I<6;++I){
+        H.Scoped.World->TimeSeconds+=R::kStepSeconds;H.DecisionStep();
+        bNeverApplied&=H.EM->GetFragmentDataChecked<FEcoV3SocialBridgeFragment>(H.Deer[1]).Applied==EEcoV3SocialControl::None;
+    }
+    TestTrue(TEXT("연결 기록은 한 번도 Social 제어를 적지 않는다 (훅을 걸지 않음)"),bNeverApplied
+             &&H.EM->GetFragmentDataChecked<FEcoV3SocialBridgeFragment>(H.Deer[1]).Applied==EEcoV3SocialControl::None);
+    return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3SocialSlotArrival,"AdaptiveEcosystem.Policy.V3.Social.SlotMovementAndCleanup",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoV3SocialSlotArrival::RunTest(const FString&) {
     using namespace EcoPolicyV3IntegratedTestImpl;
     namespace R=EcoRepertoireV3;
     FIntegratedHarness H;auto Settings=TestSettings();Settings.bWildFlight=false;
+    Settings.bSocialControl=true; // 10-17 (8): 팀 슬롯 이동 연결 자체를 보므로 켠다 (기본은 끔)
     if(!H.Setup(*this,Settings))return false;
     auto* Region=H.AddRegion(TEXT("SocialSlot"),0,FVector::ZeroVector,1,0);
     Region->Sim.Config.Covers.push_back({27.25,25,1.0});

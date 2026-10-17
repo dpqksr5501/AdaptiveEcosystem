@@ -468,7 +468,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
             Adapter.Shelters=World->GetSubsystem<UEcoShelterSubsystem>();Adapter.Now=Now;
 			EcoWorldV3::FStepHooks Hooks;
 			Hooks.User = &Adapter;
-			// 사슴 Social 행동 연결 (조연우 님 22eb1b6). eco.IntegratedV3.SocialControl 0 이면 걸지 않는다 — 파이썬 거울과 견줄 때 (10-17 통합)
+			// 사슴 Social 행동 연결 (조연우 님 22eb1b6). eco.IntegratedV3.SocialControl 1 일 때만 건다 — 기본 0 (사람 결정 10-17 (8))
 			Hooks.HerbControl = Sub->GetSettings().bSocialControl ? &SocialControlHook : nullptr;
             Hooks.HerbMove = Sub->UsesTerrain() ? &HerbMoveHook : nullptr;
             Hooks.ThreatMove = Sub->UsesTerrain() ? &ThreatMoveHook : nullptr;

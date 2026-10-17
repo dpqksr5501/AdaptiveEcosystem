@@ -63,10 +63,13 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("목표 은신처를 잃은 HIDE 사슴은 도주·먹기로 돌아가며, Social 도착은 몸이 원 안일 때만 인정한다. 안전 규칙은 eco.IntegratedV3.ShelterSafe 1 이면 파이썬 규칙이고, ")
 		TEXT("ShelterSafe 0 일 때만 이 스위치가 팀 규칙(늑대 몸 여유 1 m·쓸고 지나가기 막기·갇힌 늑대 꺼내기)으로 안전을 맡는다. 0 = 생명주기도 끔. Play 전에 바꾼다. ")
 		TEXT("명령줄 -EcoV3ProtectedRefuges= 는 시작값."),ECVF_Default);
-	static TAutoConsoleVariable<int32> CVarSocialControl(TEXT("eco.IntegratedV3.SocialControl"),1,
-		TEXT("통합 v3 사슴의 Social 행동 연결 (1 = 켬, 기본 — 조연우 님 22eb1b6). 무리 경보(Alert·Panic·Recovering)와 은신처 슬롯 예약이 v3 제어 뒤·이동 전에 ")
-		TEXT("사슴 제어를 바꾼다(EcoWorldV3 FStepHooks::HerbControl). 0 = 연결하지 않는다(Social 처리기는 그대로 돌고 v3 사슴 움직임만 파이썬 세계 그대로 — 견줌용). ")
-		TEXT("Play 전에 바꾼다. 명령줄 -EcoV3SocialControl= 는 시작값."),ECVF_Default);
+	// 10-17 사람 결정 (RL_V2_PLAN.md '10-17 (8)'): 기본은 끔. 경보는 소리·고개 들기 같은 연출로만 쓴다는 10-13 결정과 맞추고,
+	// 무리 반응은 뒤에 파이썬 야생 규칙으로 먼저 만든다. 켜면 팀 연결이 경계 먹기·가장자리 굽히기·은신처 보호를 덮어쓴다
+	static TAutoConsoleVariable<int32> CVarSocialControl(TEXT("eco.IntegratedV3.SocialControl"),0,
+		TEXT("통합 v3 사슴의 Social 행동 연결 (0 = 끔, 기본 — 사람 결정 10-17 (8)). 0 이면 Social 처리기(무리 경보·은신처 슬롯 예약)는 돌며 기록만 하고, ")
+		TEXT("v3 사슴 움직임은 파이썬 세계 규칙 그대로다. 1 = 조연우 님 22eb1b6 연결을 건다: 무리 경보(Alert·Panic·Recovering)와 은신처 슬롯이 v3 제어 뒤·이동 전에 ")
+		TEXT("사슴 제어를 바꾼다(EcoWorldV3 FStepHooks::HerbControl) — 먹는 늑대 곁 경계 먹기·가장자리 굽히기가 빠지고, 슬롯 없는 은신처 사슴이 밖으로 뛴다. ")
+		TEXT("팀 장면 확인용. Play 전에 바꾼다. 명령줄 -EcoV3SocialControl= 는 시작값."),ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarGradualNight(
 		TEXT("eco.IntegratedV3.GradualNight"),
@@ -543,7 +546,7 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.ProtectedRefuges"), LexToString(RefugeArg));
 	}
-	int32 SocialArg = 1;
+	int32 SocialArg = 0;
 	if (FParse::Value(CmdLine, TEXT("EcoV3SocialControl="), SocialArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.SocialControl"), LexToString(SocialArg));
@@ -701,8 +704,8 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		   Settings.bProtectedRefuges ? TEXT("켬 (eco.IntegratedV3.ProtectedRefuges 1 — 지워진 은신처 비활성·늦은 은신처 추가·잃은 HIDE 목표 풀기)")
 									  : TEXT("끔 (eco.IntegratedV3.ProtectedRefuges 0)"));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
-		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다")
-								   : TEXT("끔 (eco.IntegratedV3.SocialControl 0 — v3 사슴 움직임은 파이썬 세계 그대로, Social 처리기는 기록만)"));
+		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6 — 기본 아님) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다, 파이썬과 다름")
+								   : TEXT("끔 (eco.IntegratedV3.SocialControl 0, 기본 — 사람 결정 10-17 (8): v3 사슴 움직임은 파이썬 세계 그대로, Social 처리기는 기록만)"));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 감지: 위협 시야 %s | 늑대 발소리 %s"),
 		   Settings.bRealismVision ? TEXT("300° (eco.IntegratedV3.RealismVision 1 — 바로 뒤 60° 만 사각)") : TEXT("120° (eco.IntegratedV3.RealismVision 0 — R1b 그대로)"),
 		   Settings.bRealismHearing ? TEXT("켬 (eco.IntegratedV3.RealismHearing 1 — 쫓아 달리면 최대 40 m, 어슬렁거리면 4 m, 서 있으면 없음)")

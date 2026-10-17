@@ -86,8 +86,9 @@
 //      eco.IntegratedV3.ProtectedRefuges (-EcoV3ProtectedRefuges=, 기본 1)는 그 위에 생명주기만 더한다 — 지워진 은신처는 원 반경 0(번호 유지),
 //      늦게 등록된 무대 안 은신처는 끝에 추가(RefreshRefuges), 목표를 잃은 HIDE 사슴은 도주·먹기로, Social 도착은 몸이 원 안일 때만, [EcoRefuge] 기록.
 //      ShelterSafe 0 일 때만 ProtectedRefuges 가 팀 안전 규칙(늑대 몸 여유 1 m·쓸고 지나가기 막기·갇힌 늑대 꺼내기·원 안 사슴 표적 제외)을 맡는다.
-//      사슴 Social 연결 eco.IntegratedV3.SocialControl (-EcoV3SocialControl=, 기본 1): 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에
-//      사슴 제어를 바꾼다(EcoPolicyV3SocialBridge, FStepHooks::HerbControl). 0 = 훅을 걸지 않는다(파이썬 거울과 견줄 때).
+//      사슴 Social 연결 eco.IntegratedV3.SocialControl (-EcoV3SocialControl=, 기본 0 — 사람 결정 10-17 (8)): 0 이면 훅을 걸지 않는다.
+//      Social 처리기는 돌며 기록만 하고 v3 사슴 움직임은 파이썬 세계 그대로다. 1 이면 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에
+//      사슴 제어를 바꾼다(EcoPolicyV3SocialBridge, FStepHooks::HerbControl — 팀 장면 확인용). 무리 반응은 뒤에 파이썬 야생 규칙으로 만든다.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -200,7 +201,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bNoFreeze = true;              // 사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1, 사람 결정 10-15 (A)). 거짓 = R1b 그대로 얼기를 쓴다
 	bool bProtectedRefuges = true;      // 실제 은신처 생명주기 (eco.IntegratedV3.ProtectedRefuges 기본 1, 조연우 님 a88eac8). 안전은 bShelterSafe 가 맡고,
 										// bShelterSafe 거짓일 때만 팀 규칙(늑대 몸 여유 1 m·쓸고 지나가기 막기)이 안전을 맡는다 (10-17 통합, 하나만 적용)
-	bool bSocialControl = true;         // 사슴 Social 행동 연결 (eco.IntegratedV3.SocialControl 기본 1, 조연우 님 22eb1b6). 거짓 = HerbControl 훅을 걸지 않는다 (견줌용)
+	bool bSocialControl = false;        // 사슴 Social 행동 연결 (eco.IntegratedV3.SocialControl 기본 0, 사람 결정 10-17 (8)). 참 = 조연우 님 22eb1b6 HerbControl 훅을 건다
 	double WolfEatSeconds = 5.0;        // 늑대 식사 길이 (초, eco.IntegratedV3.WolfEatSeconds 기본 5, 사람 결정 10-15 (B)). 0.67 이하 = 옛 규칙
 	bool bWildFlight = true;            // 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight 기본 1, 야생 w3 — 경계 거리 KeepAway 를 바꿨다). 거짓 = 두뇌 그대로
 	bool bFlightHoldAwake = true;       // 도주 붙잡기 (eco.IntegratedV3.FlightHoldAwake 기본 1, 10-16 hold_awake). 거짓 = 사냥 중인 늑대만 도주를 붙잡는다 (857da45)

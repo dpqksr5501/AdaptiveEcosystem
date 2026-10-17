@@ -166,7 +166,9 @@ python $W/compare_unreal_wild.py --unreal-dir $W/unreal_logs/fix_s20000-20002 --
 - 기본값(Social 켬) 230초 산·잡힘·굶음: 언리얼 98.1·1.9·0.0, 파이썬 짝 비교 97.8·2.2·0.0 (z +1.5), 통합 전 언리얼 97.7·2.3·0.0.
   규칙 수치도 모두 |z| < 2 다. Social 무리 경보 때문에 도주가 늘었다(도주 몫 4.6 → 5.9%, 지역마다 도주 시작 225 → 288, 파이썬 5.5%·270). 늑대 배부름은 38.9 → 31.5%(파이썬 35.6).
 - 은신처 안 잡힘 0. `[EcoRefuge]` 줄의 팀 규칙 밀어내기·꺼내기·원 안 늑대·원 안 포획도 모두 0 이다. 오류·ensure 0.
-- 기록: `unreal_logs/merge1017_s20000-20002/`(기본값), `unreal_logs/merge1017_social0_s20000-20002/`(`-EcoV3SocialControl=0`). 파이썬은 바뀌지 않아 `runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json` 을 그대로 쓴다.
+- 기록: `unreal_logs/merge1017_s20000-20002/`(통합 직후 기본값 = Social 켬), `unreal_logs/merge1017_social0_s20000-20002/`(`-EcoV3SocialControl=0`). 파이썬은 바뀌지 않아 `runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json` 을 그대로 쓴다.
+- **10-17 (8) 사람 결정 뒤 기본값은 Social 연결 끔이다**(`RL_V2_PLAN.md` '10-17 (8)'). 스위치 없이 돌린 세션 20000 기록 `unreal_logs/default1017_s20000/` 은
+  `merge1017_social0_s20000-20002/` 의 같은 세션과 명령줄·시작 글 한 줄·CPU 시간 칸 말고 모두 같다. 그래서 이제 기본값 = 파이썬 거울과 견주는 판이다.
 
 ```
 # herbivore_rl/ 에서
