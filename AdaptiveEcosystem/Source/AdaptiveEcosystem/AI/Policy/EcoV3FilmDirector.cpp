@@ -2,21 +2,30 @@
 
 #include "Camera/CameraActor.h"
 #include "Camera/CameraComponent.h"
+#include "CollisionQueryParams.h"
+#include "Components/AudioComponent.h"
 #include "Components/TextRenderComponent.h"
+#include "Components/TimelineComponent.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "EcoPolicyV3IntegratedSubsystem.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/HUD.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "Sound/SoundBase.h"
+#include "UObject/UObjectIterator.h"
 #include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
 #include "HAL/PlatformMisc.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
+#include "UObject/UnrealType.h"
 #include "UnrealClient.h"
 
 DEFINE_LOG_CATEGORY_STATIC(LogEcoV3Film, Log, All);
@@ -28,6 +37,7 @@ namespace EcoV3FilmImpl
 	constexpr double kScoutEvery = 0.5;        // 정찰 기록 간격 (시뮬레이션 초)
 	constexpr int32 kQuitWaitFrames = 30;      // 마지막 캡처 뒤 끝내기까지 기다리는 프레임 (PNG 쓰기)
 	constexpr float kFov = 60.0f;
+	constexpr double kFreePrerollSeconds = 3.0; // 단독 촬영: 멀리 옮길 때 땅 조각이 들어올 시간
 
 	double SimSeconds(const UEcoPolicyV3IntegratedSubsystem& V3)
 	{
@@ -77,6 +87,41 @@ TArray<UEcoV3FilmDirectorSubsystem::FShot> UEcoV3FilmDirectorSubsystem::ParseSho
 	return Out;
 }
 
+TArray<UEcoV3FilmDirectorSubsystem::FFreeShot> UEcoV3FilmDirectorSubsystem::ParseFreeShots(const FString& Text)
+{
+	TArray<FFreeShot> Out;
+	TArray<FString> Items;
+	Text.ParseIntoArray(Items, TEXT(";"), true);
+	for (const FString& Item : Items)
+	{
+		TArray<FString> F;
+		Item.ParseIntoArray(F, TEXT(","), false);
+		for (FString& Field : F)
+		{
+			Field.TrimStartAndEndInline();
+		}
+		const bool bMove = F.Num() >= 11;
+		if (F.Num() < 8 || (F.Num() > 8 && !bMove) || F[0].IsEmpty())
+		{
+			UE_LOG(LogEcoV3Film, Warning, TEXT("[EcoV3Film] 단독 장면 '%s' 를 건너뜀 (이름,x,y,h,방위,숙임,시작초,길이초[,x1,y1,h1])"), *Item);
+			continue;
+		}
+		FFreeShot S;
+		S.Tag = F[0];
+		S.FromM = FVector2D(FCString::Atod(*F[1]), FCString::Atod(*F[2]));
+		S.FromH = FCString::Atod(*F[3]);
+		S.YawDeg = FCString::Atod(*F[4]);
+		S.PitchDeg = FMath::Clamp(FCString::Atod(*F[5]), -89.9, 89.9);
+		S.StartSeconds = FCString::Atod(*F[6]);
+		S.DurationSeconds = FMath::Max(FCString::Atod(*F[7]), 0.1);
+		S.bMove = bMove;
+		S.ToM = bMove ? FVector2D(FCString::Atod(*F[8]), FCString::Atod(*F[9])) : S.FromM;
+		S.ToH = bMove ? FCString::Atod(*F[10]) : S.FromH;
+		Out.Add(S);
+	}
+	return Out;
+}
+
 bool UEcoV3FilmDirectorSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
 	// 명령줄 스위치가 없으면 만들지 않는다 — 보통 게임·에디터·자동화 시험에는 이 감독이 없다
@@ -97,17 +142,34 @@ void UEcoV3FilmDirectorSubsystem::Initialize(FSubsystemCollectionBase& Collectio
 	FString Base = FPaths::ProjectSavedDir() / TEXT("EcoV3Film");
 	FParse::Value(Cmd, TEXT("EcoV3FilmOut="), Base, false);
 	OutDir = FPaths::ConvertRelativePathToFull(Base / Name);
+	bStandalone = FParse::Param(Cmd, TEXT("EcoV3FilmStandalone"));
 	FString ShotText;
 	if (FParse::Value(Cmd, TEXT("EcoV3FilmShots="), ShotText, false))
 	{
-		Shots = ParseShots(ShotText);
+		if (bStandalone)
+		{
+			FreeShots = ParseFreeShots(ShotText);
+		}
+		else
+		{
+			Shots = ParseShots(ShotText);
+		}
 	}
 	FParse::Value(Cmd, TEXT("EcoV3FilmScout="), ScoutUntil);
 	bKeepUI = FParse::Param(Cmd, TEXT("EcoV3FilmUI"));
 	bNoQuit = FParse::Param(Cmd, TEXT("EcoV3FilmNoQuit"));
+	FParse::Value(Cmd, TEXT("EcoV3FilmEvery="), Every);
+	Every = FMath::Max(Every, 1);
+	bMovePawn = bStandalone && FParse::Value(Cmd, TEXT("EcoV3FilmPawn="), PawnAheadM);
+	FString WatchText;
+	if (FParse::Value(Cmd, TEXT("EcoV3FilmWatch="), WatchText, false))
+	{
+		WatchText.ParseIntoArray(WatchNames, TEXT(";"), true);
+	}
 	IFileManager::Get().MakeDirectory(*OutDir, true);
-	UE_LOG(LogEcoV3Film, Log, TEXT("[EcoV3Film] 촬영 '%s' → %s | 장면 %d | 정찰 %s"), *Name, *OutDir, Shots.Num(),
-		   ScoutUntil > 0.0 ? *FString::Printf(TEXT("%.1f초까지"), ScoutUntil) : TEXT("없음"));
+	UE_LOG(LogEcoV3Film, Log, TEXT("[EcoV3Film] 촬영 '%s' → %s | %s 장면 %d | 정찰 %s | %d 프레임마다 | 지켜볼 클래스 %d"), *Name, *OutDir,
+		   bStandalone ? TEXT("단독") : TEXT("통합 v3"), bStandalone ? FreeShots.Num() : Shots.Num(),
+		   ScoutUntil > 0.0 ? *FString::Printf(TEXT("%.1f초까지"), ScoutUntil) : TEXT("없음"), Every, WatchNames.Num());
 	if (ScoutUntil > 0.0)
 	{
 		ScoutLines.Add(TEXT("t,region,alive,caught,starved,dark,panic,alert,shelter,widx,wid,x,y,eat,pursue,motion,catches,nd,run20,edge25,cov,covd,covin"));
@@ -364,6 +426,252 @@ void UEcoV3FilmDirectorSubsystem::WriteManifest()
 		FFileHelper::SaveStringToFile(FString::Join(ScoutLines, TEXT("\n")) + TEXT("\n"), *(OutDir / TEXT("scout.csv")),
 									  FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 	}
+	if (WatchLines.Num() > 0)
+	{
+		FFileHelper::SaveStringToFile(FString::Join(WatchLines, TEXT("\n")) + TEXT("\n"), *(OutDir / TEXT("watch.txt")),
+									  FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	}
+}
+
+double UEcoV3FilmDirectorSubsystem::GroundZ(double XCm, double YCm, double Fallback) const
+{
+	// 땅 = 곧은 선이 맞은 WorldStatic 중 가장 낮은 것 (나무 충돌 껍질 같은 위의 것은 건너뛴다)
+	TArray<FHitResult> Hits;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoV3FilmGround), false);
+	if (Camera)
+	{
+		Params.AddIgnoredActor(Camera);
+	}
+	GetWorld()->LineTraceMultiByObjectType(Hits, FVector(XCm, YCm, 500000.0), FVector(XCm, YCm, -500000.0),
+										   FCollisionObjectQueryParams(ECC_WorldStatic), Params);
+	double Best = TNumericLimits<double>::Max();
+	for (const FHitResult& H : Hits)
+	{
+		Best = FMath::Min(Best, H.ImpactPoint.Z);
+	}
+	return Best < TNumericLimits<double>::Max() ? Best : Fallback;
+}
+
+void UEcoV3FilmDirectorSubsystem::NotePerf(double T)
+{
+	const double Wall = FPlatformTime::Seconds();
+	if (PerfWallStart < 0.0)
+	{
+		PerfWallStart = Wall;
+		PerfSimStart = T;
+		PerfTicks = 0;
+		PerfCaptures = 0;
+		return;
+	}
+	++PerfTicks;
+	if (T - PerfSimStart >= 1.0 - 1e-6 && PerfTicks > 0)
+	{
+		const double Ms = 1000.0 * (Wall - PerfWallStart) / PerfTicks;
+		WatchLines.Add(FString::Printf(TEXT("perf t=%.2f frames=%d wall_ms_per_frame=%.1f (fps %.1f) captures=%d"), T, PerfTicks, Ms,
+									   Ms > 0.0 ? 1000.0 / Ms : 0.0, PerfCaptures));
+		PerfWallStart = Wall;
+		PerfSimStart = T;
+		PerfTicks = 0;
+		PerfCaptures = 0;
+	}
+}
+
+void UEcoV3FilmDirectorSubsystem::WriteWatch(double T)
+{
+	if (WatchNames.IsEmpty())
+	{
+		return;
+	}
+	const FVector Cam = Camera ? Camera->GetActorLocation() : FVector::ZeroVector;
+	FString Line = FString::Printf(TEXT("t=%.2f frame=%d cam=(%.0f,%.0f,%.0f)"), T, TotalFrames - 1, Cam.X, Cam.Y, Cam.Z);
+	const APlayerController* PC = GetWorld()->GetFirstPlayerController();
+	if (const APawn* Pawn = PC ? PC->GetPawn() : nullptr)
+	{
+		const FVector L = Pawn->GetActorLocation();
+		Line += FString::Printf(TEXT(" pawn=(%.0f,%.0f,%.0f)"), L.X, L.Y, L.Z);
+	}
+	else
+	{
+		Line += TEXT(" pawn=none");
+	}
+	// 소리: 이 월드에서 재생 중인 오디오 컴포넌트 모두 (팀 블루프린트 변수에 안 담긴 것도)
+	Line += FString::Printf(TEXT(" audio_device=%d"), GetWorld()->GetAudioDeviceRaw() ? 1 : 0);
+	for (TObjectIterator<UAudioComponent> It; It; ++It)
+	{
+		const UAudioComponent* Au = *It;
+		if (!Au || Au->GetWorld() != GetWorld() || !Au->IsPlaying())
+		{
+			continue;
+		}
+		Line += FString::Printf(TEXT(" playing_sound=%s@%s(%.1fm,vol %.2f)"), Au->Sound ? *Au->Sound->GetName() : TEXT("?"),
+								Au->GetOwner() ? *Au->GetOwner()->GetName() : TEXT("-"), FVector::Dist(Au->GetComponentLocation(), Cam) / 100.0,
+								Au->VolumeMultiplier);
+	}
+	int32 Found = 0;
+	for (TActorIterator<AActor> It(GetWorld()); It; ++It)
+	{
+		AActor* Actor = *It;
+		const FString Cls = Actor ? Actor->GetClass()->GetName() : FString();
+		if (!Actor || !WatchNames.ContainsByPredicate([&Cls](const FString& N) { return Cls.Contains(N); }))
+		{
+			continue;
+		}
+		++Found;
+		Line += FString::Printf(TEXT(" | %s"), *Actor->GetName());
+		// 블루프린트가 선언한 변수만 (C++ 부모 클래스 변수는 건너뛴다)
+		for (TFieldIterator<FProperty> P(Actor->GetClass()); P; ++P)
+		{
+			const UClass* OwnerClass = P->GetOwnerClass();
+			if (!OwnerClass || OwnerClass->HasAnyClassFlags(CLASS_Native))
+			{
+				continue;
+			}
+			const void* V = P->ContainerPtrToValuePtr<void>(Actor);
+			const FString PName = P->GetName();
+			if (const FBoolProperty* B = CastField<FBoolProperty>(*P))
+			{
+				Line += FString::Printf(TEXT(" %s=%d"), *PName, B->GetPropertyValue(V) ? 1 : 0);
+			}
+			else if (const FNumericProperty* N = CastField<FNumericProperty>(*P))
+			{
+				if (N->IsFloatingPoint())
+				{
+					Line += FString::Printf(TEXT(" %s=%.3f"), *PName, N->GetFloatingPointPropertyValue(V));
+				}
+				else if (N->IsInteger() && !N->IsEnum())
+				{
+					Line += FString::Printf(TEXT(" %s=%lld"), *PName, static_cast<long long>(N->GetSignedIntPropertyValue(V)));
+				}
+			}
+			else if (const FStructProperty* S = CastField<FStructProperty>(*P); S && S->Struct == TBaseStructure<FRotator>::Get())
+			{
+				const FRotator* R = static_cast<const FRotator*>(V);
+				Line += FString::Printf(TEXT(" %s=(p%.1f,y%.1f,r%.1f)"), *PName, R->Pitch, R->Yaw, R->Roll);
+			}
+			else if (const FObjectPropertyBase* O = CastField<FObjectPropertyBase>(*P))
+			{
+				const UObject* Obj = O->GetObjectPropertyValue(V);
+				if (!Obj)
+				{
+					Line += FString::Printf(TEXT(" %s=none"), *PName);
+				}
+				else if (const UActorComponent* C = Cast<UActorComponent>(Obj))
+				{
+					Line += FString::Printf(TEXT(" %s=%s[active=%d"), *PName, *C->GetClass()->GetName(), C->IsActive() ? 1 : 0);
+					if (const UAudioComponent* Au = Cast<UAudioComponent>(C))
+					{
+						Line += FString::Printf(TEXT(" playing=%d vol=%.2f"), Au->IsPlaying() ? 1 : 0, Au->VolumeMultiplier);
+					}
+					if (const UTimelineComponent* Tl = Cast<UTimelineComponent>(C))
+					{
+						Line += FString::Printf(TEXT(" playing=%d pos=%.2f/%.2f"), Tl->IsPlaying() ? 1 : 0, Tl->GetPlaybackPosition(), Tl->GetTimelineLength());
+					}
+					if (const USceneComponent* Sc = Cast<USceneComponent>(C))
+					{
+						const FVector L = Sc->GetComponentLocation();
+						const USceneComponent* Parent = Sc->GetAttachParent();
+						Line += FString::Printf(TEXT(" visible=%d at=(%.0f,%.0f,%.0f) cam_d=%.1fm parent=%s"), Sc->IsVisible() ? 1 : 0, L.X, L.Y, L.Z,
+												FVector::Dist(L, Cam) / 100.0,
+												Parent && Parent->GetOwner() ? *Parent->GetOwner()->GetName() : TEXT("-"));
+					}
+					Line += TEXT("]");
+				}
+				else if (const AActor* A = Cast<AActor>(Obj))
+				{
+					const FRotator R = A->GetActorRotation();
+					Line += FString::Printf(TEXT(" %s=%s(p%.1f,y%.1f)"), *PName, *A->GetName(), R.Pitch, R.Yaw);
+				}
+				else
+				{
+					Line += FString::Printf(TEXT(" %s=%s"), *PName, *Obj->GetName());
+				}
+			}
+		}
+	}
+	if (Found == 0)
+	{
+		Line += TEXT(" | 지켜볼 액터 없음");
+	}
+	WatchLines.Add(Line);
+}
+
+void UEcoV3FilmDirectorSubsystem::TickStandalone(double T)
+{
+	using namespace EcoV3FilmImpl;
+	if (!FreeShots.IsValidIndex(ShotIndex))
+	{
+		Finish();
+		return;
+	}
+	const FFreeShot& Shot = FreeShots[ShotIndex];
+	const double ShotTime = T - Shot.StartSeconds;
+	if (ShotTime < -kFreePrerollSeconds)
+	{
+		return;
+	}
+	EnsureCamera();
+	if (!Camera)
+	{
+		return;
+	}
+	const double A = Shot.bMove ? FMath::Clamp(ShotTime / Shot.DurationSeconds, 0.0, 1.0) : 0.0;
+	const FVector2D P = FMath::Lerp(Shot.FromM, Shot.ToM, A) * 100.0;
+	const double H = FMath::Lerp(Shot.FromH, Shot.ToH, A) * 100.0;
+	LastGroundZ = GroundZ(P.X, P.Y, LastGroundZ);
+	Camera->SetActorLocationAndRotation(FVector(P.X, P.Y, LastGroundZ + H), FRotator(Shot.PitchDeg, Shot.YawDeg, 0.0));
+	Camera->GetCameraComponent()->SetFieldOfView(kFov);
+	if (bMovePawn)
+	{
+		// 폰을 카메라 앞(뒤) 땅 위에 둔다 — 3인칭 놀이처럼 폰과 카메라가 같은 곳에 있게 (떨어지지 않게 이동 컴포넌트를 끈다)
+		APlayerController* PC = GetWorld()->GetFirstPlayerController();
+		if (APawn* Pawn = PC ? PC->GetPawn() : nullptr)
+		{
+			if (!bPawnMovementOff)
+			{
+				if (UPawnMovementComponent* Move = Pawn->GetMovementComponent())
+				{
+					Move->StopMovementImmediately();
+					Move->Deactivate();
+				}
+				bPawnMovementOff = true;
+			}
+			const double Yaw = FMath::DegreesToRadians(Shot.YawDeg);
+			const double X = P.X + FMath::Cos(Yaw) * PawnAheadM * 100.0;
+			const double Y = P.Y + FMath::Sin(Yaw) * PawnAheadM * 100.0;
+			const double Z = GroundZ(X, Y, LastGroundZ) + Pawn->GetSimpleCollisionHalfHeight();
+			Pawn->SetActorLocationAndRotation(FVector(X, Y, Z), FRotator(0.0, Shot.YawDeg, 0.0), false, nullptr, ETeleportType::TeleportPhysics);
+		}
+	}
+	if (ShotTime < 0.0)
+	{
+		return;
+	}
+	if (ShotTicks == 0)
+	{
+		ShotFirstSim = T;
+		ShotFirstFrame = TotalFrames;
+		UE_LOG(LogEcoV3Film, Log, TEXT("[EcoV3Film] 단독 장면 %d '%s' 시작 t=%.2f 카메라 (%.0f, %.0f, %.0f) cm"), ShotIndex, *Shot.Tag, T, P.X, P.Y,
+			   LastGroundZ + H);
+	}
+	if (ShotTicks % Every == 0)
+	{
+		CaptureFrame();
+		++PerfCaptures;
+		WriteWatch(T);
+		ShotLastSim = T;
+	}
+	++ShotTicks;
+	if (ShotTicks >= FMath::RoundToInt32(Shot.DurationSeconds * 30.0))
+	{
+		ManifestShots.Add(FString::Printf(
+			TEXT("    {\"tag\": \"%s\", \"from_m\": [%.2f, %.2f, %.2f], \"to_m\": [%.2f, %.2f, %.2f], \"yaw\": %.1f, \"pitch\": %.1f, \"start\": %.3f, ")
+			TEXT("\"duration\": %.3f, \"every\": %d, \"first_frame\": %d, \"frames\": %d, \"t_first\": %.3f, \"t_last\": %.3f}"),
+			*Shot.Tag, Shot.FromM.X, Shot.FromM.Y, Shot.FromH, Shot.ToM.X, Shot.ToM.Y, Shot.ToH, Shot.YawDeg, Shot.PitchDeg, Shot.StartSeconds,
+			Shot.DurationSeconds, Every, ShotFirstFrame, ShotFrames, ShotFirstSim, ShotLastSim));
+		++ShotIndex;
+		ShotFrames = 0;
+		ShotTicks = 0;
+	}
 }
 
 void UEcoV3FilmDirectorSubsystem::Finish()
@@ -389,12 +697,24 @@ void UEcoV3FilmDirectorSubsystem::Tick(float DeltaTime)
 	{
 		return;
 	}
+	if (bStandalone)
+	{
+		// 단독 촬영: 통합 v3 모드를 보지 않고 월드 시간으로 카메라만 옮긴다
+		const double T = GetWorld()->GetTimeSeconds();
+		NotePerf(T);
+		TickStandalone(T);
+		return;
+	}
 	UEcoPolicyV3IntegratedSubsystem* V3 = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
 	if (!V3 || !V3->IsActive() || V3->NumContexts() == 0)
 	{
 		return;
 	}
 	const double Sim = SimSeconds(*V3);
+	if (!WatchNames.IsEmpty())
+	{
+		NotePerf(Sim);
+	}
 
 	if (ScoutUntil > 0.0)
 	{
@@ -455,7 +775,7 @@ void UEcoV3FilmDirectorSubsystem::Tick(float DeltaTime)
 	{
 		return;
 	}
-	if (ShotFrames == 0)
+	if (ShotTicks == 0)
 	{
 		ShotFirstSim = Sim;
 		ShotFirstFrame = TotalFrames;
@@ -463,9 +783,15 @@ void UEcoV3FilmDirectorSubsystem::Tick(float DeltaTime)
 		ShotStartCaught = Ctx->Sim.Stats.Caught;
 		ShotStartStarved = Ctx->Sim.Stats.Starved;
 	}
-	CaptureFrame();
+	if (ShotTicks % Every == 0)
+	{
+		CaptureFrame();
+		++PerfCaptures;
+		WriteWatch(Sim);
+	}
 	ShotLastSim = Sim;
-	if (ShotFrames >= FMath::RoundToInt32(Shot.DurationSeconds * 30.0))
+	++ShotTicks;
+	if (ShotTicks >= FMath::RoundToInt32(Shot.DurationSeconds * 30.0))
 	{
 		ManifestShots.Add(FString::Printf(
 			TEXT("    {\"region\": \"%s\", \"mode\": \"%s\", \"subject\": %d, \"subject_id\": %lld, \"start\": %.3f, \"duration\": %.3f, ")
@@ -476,6 +802,7 @@ void UEcoV3FilmDirectorSubsystem::Tick(float DeltaTime)
 			static_cast<long long>(Ctx->Sim.Stats.Caught), static_cast<long long>(ShotStartStarved), static_cast<long long>(Ctx->Sim.Stats.Starved)));
 		++ShotIndex;
 		ShotFrames = 0;
+		ShotTicks = 0;
 		bLocked = false;
 		LockedId = 0;
 	}

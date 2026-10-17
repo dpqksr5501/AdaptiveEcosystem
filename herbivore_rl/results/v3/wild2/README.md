@@ -504,3 +504,5 @@
   (같은 지도·같은 원판, 반복 10) 견줌·원판 비트 대조·끼임 세기. 원판 0 이라 지금 기본값 판과 양쪽 모두 같은 세계다(`shc/README.md`).
 - `trees/` — 10-17 무대 나무: 팀 Beech_Tree 를 통합 레벨 무대에 실행 중에 놓는 고정 배치 표(숲 24·고지 9·메마른 땅 0, 줄기 원판 0.74~0.89 m)와 그 생성기,
   언리얼 헤드리스·GPU 사진, 파이썬 거울 설정 `configs/v3_wild2_trees_mirror.yaml`·끼임 세기, 확인(원판 대조 `check_discs.py`·짝 비교와 나무 효과 `compare_trees.py`, `trees/README.md` 7절).
+- `weather_check/` — 10-18 팀 지역 날씨 눈으로 확인: SHC 시험 레벨을 촬영 감독 단독 모드(`-EcoV3FilmStandalone`)로 찍은 GPU 사진, 날씨 블루프린트 상태 기록,
+  SunSpeed 실행 중 바꾸기, 우리 통합 레벨 확인. 비·눈은 화면·소리만이고 이펙트가 카메라가 아니라 플레이어 캐릭터를 따라간다(`weather_check/README.md`).

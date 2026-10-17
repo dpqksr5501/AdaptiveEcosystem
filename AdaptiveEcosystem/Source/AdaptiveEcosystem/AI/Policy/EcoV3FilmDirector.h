@@ -27,6 +27,17 @@ struct FEcoV3RegionContext;
 //   -EcoV3FilmScout=<초>       촬영 없이 0.5 초마다 늑대별 상태를 scout.csv 로 남기고 그 시뮬레이션 초에 끝낸다 (시간 창 고르기)
 //   -EcoV3FilmUI               HUD·화면 메시지·팀 개체 이름표를 숨기지 않는다 (eco.V3Debug 글자는 이것 없이도 그대로 그려진다)
 //   -EcoV3FilmNoQuit           마지막 장면 뒤 끝내지 않는다
+//   -EcoV3FilmEvery=<n>        장면 동안 n 프레임마다 한 장만 남긴다 (기본 1 = 매 프레임, 장면 길이는 그대로)
+//   -EcoV3FilmWatch=<글자;…>   클래스 이름에 이 글자가 든 액터를 캡처마다 watch.txt 에 적는다 (읽기만): 블루프린트 변수 중 참·수·회전,
+//        가리키는 컴포넌트(켜짐, 소리 재생·음량, 타임라인 재생·위치, 자리와 카메라까지 거리), 가리키는 액터의 회전. 1 초마다 프레임 벽시계 ms 도 적는다
+//
+// 단독 촬영 (10-18, 팀 날씨 시험 레벨처럼 통합 조정자가 없는 맵) — -EcoV3FilmStandalone 이 있을 때만:
+//   통합 v3 모드 없이 월드 시간(-benchmark -fps=30 이면 프레임 × 1/30 초)으로 돈다. 개체·시뮬레이션·레벨 액터에 손대지 않고 카메라만 옮긴다.
+//   -EcoV3FilmShots=<이름,x,y,h,방위°,숙임°,시작초,길이초[,x1,y1,h1];…>
+//        x·y = 월드 m, h = 그 자리 땅 위 m (땅 = WorldStatic 맞은 것 중 가장 낮은 것), 방위 0° = +X, 숙임 음수 = 내려다봄.
+//        x1·y1·h1 이 있으면 길이초 동안 (x, y, h) 에서 (x1, y1, h1) 로 곧게 옮긴다 (경계 넘기 등)
+//   -EcoV3FilmPawn=<m>         플레이어 폰을 매 프레임 카메라 앞 m (음수 = 뒤) 땅 위에 옮겨 둔다 (폰 이동 컴포넌트는 끈다).
+//        팀 날씨처럼 폰 자리를 따라가는 연출을 카메라 곁에서 보려고 쓴다. 없으면 폰에 손대지 않는다
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoV3FilmDirectorSubsystem : public UTickableWorldSubsystem
 {
@@ -47,8 +58,25 @@ public:
 		int32 Debug = -1;        // 0·1 = 장면 앞(준비 2 초)에 eco.V3Debug 를 이 값으로 (그리기만 바뀐다), -1 = 그대로
 	};
 
+	/** 단독 촬영 장면 하나 (월드 좌표). */
+	struct FFreeShot
+	{
+		FString Tag;
+		FVector2D FromM = FVector2D::ZeroVector;   // 월드 m
+		FVector2D ToM = FVector2D::ZeroVector;
+		double FromH = 2.0;                        // 땅 위 m
+		double ToH = 2.0;
+		double YawDeg = 0.0;
+		double PitchDeg = 0.0;
+		double StartSeconds = 0.0;                 // 월드 시간
+		double DurationSeconds = 1.0;
+		bool bMove = false;
+	};
+
 	/** 명령줄 장면 목록 하나를 읽는다 (시험·도구용). 잘못된 장면은 건너뛴다. */
 	static TArray<FShot> ParseShots(const FString& Text);
+	/** 단독 촬영 장면 목록을 읽는다 (시험·도구용). 잘못된 장면은 건너뛴다. */
+	static TArray<FFreeShot> ParseFreeShots(const FString& Text);
 
 	virtual bool ShouldCreateSubsystem(UObject* Outer) const override;
 	virtual void Initialize(FSubsystemCollectionBase& Collection) override;
@@ -72,13 +100,35 @@ private:
 	void WriteScoutRows(double SimSeconds);
 	void WriteManifest();
 	void Finish();
+	/** 단독 촬영 한 프레임 (월드 시간 T 초). */
+	void TickStandalone(double T);
+	/** (x, y) cm 의 땅 높이 cm. 못 찾으면 Fallback. */
+	double GroundZ(double XCm, double YCm, double Fallback) const;
+	/** -EcoV3FilmWatch 액터 상태 한 줄 (캡처마다). */
+	void WriteWatch(double T);
+	/** 1 초마다 프레임 벽시계 ms 를 적는다. */
+	void NotePerf(double T);
 
 	FString Name;
 	FString OutDir;
 	TArray<FShot> Shots;
+	TArray<FFreeShot> FreeShots;
+	TArray<FString> WatchNames;
 	double ScoutUntil = -1.0;
 	bool bKeepUI = false;
 	bool bNoQuit = false;
+	bool bStandalone = false;
+	bool bMovePawn = false;
+	bool bPawnMovementOff = false;
+	double PawnAheadM = 0.0;
+	int32 Every = 1;
+	int32 ShotTicks = 0;             // 이번 장면이 돈 프레임 (Every 와 상관없이)
+	double LastGroundZ = 0.0;
+	TArray<FString> WatchLines;
+	double PerfWallStart = -1.0;     // 이번 1 초 창 시작 벽시계
+	double PerfSimStart = -1.0;
+	int32 PerfTicks = 0;
+	int32 PerfCaptures = 0;
 
 	UPROPERTY(Transient)
 	TObjectPtr<ACameraActor> Camera;
