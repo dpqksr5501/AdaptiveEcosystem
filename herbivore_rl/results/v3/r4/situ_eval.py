@@ -48,16 +48,30 @@ BAND_U = (7.5, 15.0)                        # 15 m·30 m (단위)
 SITS = ("all", "reflex", "knows", "knows_lt15", "knows_15_30", "knows_ge30", "unaware", "tree_all", "tree_knows", "open_knows", "open_all")
 
 
+_CLS = None
+
+
 def _situ_diag_class():
+    """넓힌 진단 모으개 — 프로세스마다 한 번만 만든다(원래 run_mirror._Diag 위에. 잡마다 새로 만들면 앞 잡의 클래스 위에 겹쳐 쌓여
+    한 스텝을 여러 번 세고 뒤 층이 스텝 뒤 상태로 상황을 가른다 — 10-18 첫 판의 결함)."""
+    global _CLS
+    if _CLS is not None:
+        return _CLS
     import run_mirror as rm
 
-    class SituDiag(rm._Diag):
+    base = getattr(rm, "_Diag_orig", rm._Diag)
+    rm._Diag_orig = base
+
+    class SituDiag(base):
         def __init__(self, w):
             super().__init__(w)
             self.cnt = {k: np.zeros(5, dtype=np.int64) for k in SITS}
             self.ring_t = np.zeros((w.N, WIN10 + 1), dtype=bool)   # 나무 곁 + 앎 결정(지난 76 스텝)
             self.ring_o = np.zeros((w.N, WIN10 + 1), dtype=bool)   # 나무 곁 아님 + 앎 결정(나무 있는 세계만)
-            self.s5 = dict(tree_dec=0, tree_caught10=0, open_dec=0, open_caught10=0)
+            self.ring_ta = np.zeros((w.N, WIN10 + 1), dtype=bool)  # 같은 둘을 반사가 덮은 스텝까지(보고만)
+            self.ring_oa = np.zeros((w.N, WIN10 + 1), dtype=bool)
+            self.s5 = dict(tree_dec=0, tree_caught10=0, open_dec=0, open_caught10=0,
+                           treeall_dec=0, treeall_caught10=0, openall_dec=0, openall_caught10=0)
             self.has_trees = bool(len(w.obstacles))
             self.prev = self._state(w)
 
@@ -99,11 +113,14 @@ def _situ_diag_class():
             if self.has_trees:
                 self.ring_t[:, col] = L & tr & kn
                 self.ring_o[:, col] = L & ~tr & kn
-                self.s5["tree_dec"] += int(np.count_nonzero(self.ring_t[:, col]))
-                self.s5["open_dec"] += int(np.count_nonzero(self.ring_o[:, col]))
-                for i in np.flatnonzero(L & ~w.alive & (w.death_cause == 1)):
-                    self.s5["tree_caught10"] += int(self.ring_t[i].sum())
-                    self.s5["open_caught10"] += int(self.ring_o[i].sum())
+                self.ring_ta[:, col] = A & tr & kn
+                self.ring_oa[:, col] = A & ~tr & kn
+                for kind, ring in (("tree", self.ring_t), ("open", self.ring_o), ("treeall", self.ring_ta), ("openall", self.ring_oa)):
+                    self.s5[f"{kind}_dec"] += int(np.count_nonzero(ring[:, col]))
+                # 잡힘은 이 스텝 앞에 산 모든 사슴에서 센다(반사 중에 잡힌 사슴 포함 — 결정은 그 앞 10초 안의 두뇌 결정)
+                for i in np.flatnonzero(A & ~w.alive & (w.death_cause == 1)):
+                    for kind, ring in (("tree", self.ring_t), ("open", self.ring_o), ("treeall", self.ring_ta), ("openall", self.ring_oa)):
+                        self.s5[f"{kind}_caught10"] += int(ring[i].sum())
             self.prev = self._state(w)
 
         def result(self, w):
@@ -111,6 +128,7 @@ def _situ_diag_class():
             out["situ"] = dict(cnt={k: v.tolist() for k, v in self.cnt.items()}, s5=dict(self.s5), has_trees=self.has_trees)
             return out
 
+    _CLS = SituDiag
     return SituDiag
 
 
@@ -120,6 +138,8 @@ def _one(job: dict) -> dict:
     rm._Diag = _situ_diag_class()           # 이 워커 안에서만: 진단 모으개를 넓힌 것으로 바꾼다(동역학과 무관)
     res = rm.run_world(job)
     m, dg = res["meta"], res["meta"]["diag"]
+    if dg["situ"]["cnt"]["all"] != dg["beh_steps"]:
+        raise RuntimeError(f"상황 진단이 행동 수와 다르다(시드 {m['seed']} {job['region']}): {dg['situ']['cnt']['all']} != {dg['beh_steps']}")
     cause = np.asarray(m["death_cause"])
     return dict(seed=m["seed"], region=job["region"], n=m["n"], caught=int((cause == 1).sum()), starved=int((cause == 2).sum()),
                 alive=int((cause == 0).sum()), shelter_steps=m["shelter_steps"], live_steps=m["live_steps"], beh_steps=dg["beh_steps"],
@@ -222,12 +242,13 @@ def report(r4: dict, base: dict, check_r4: dict | None, check_base: dict | None)
             L.append(f"| {REG_KO[r]} | {LABEL[sit].strip()} | {a['graze']:.3f} | {a['flee']:.3f} | {a['hide']:.3f} | {b['graze']:.3f} | {b['flee']:.3f} | {b['hide']:.3f} |")
     L += ["", "나무 곁 결정 S5(숲·고지, 늑대를 안 두뇌 결정 뒤 10초 안에 잡힌 몫 — 보고만):", "",
           "| 결정 | R4 몫 (결정 수) | R1b-F 몫 (결정 수) | 짝 차이 (시드 단위) | t | 시드 수 |", "|---|---|---|---|---|---|"]
-    for kind, lab in (("tree", "나무 곁 + 늑대를 앎"), ("open", "트인 곳 + 늑대를 앎")):
+    for kind, lab in (("tree", "나무 곁 + 늑대를 앎 (두뇌 결정)"), ("open", "트인 곳 + 늑대를 앎 (두뇌 결정)"),
+                      ("treeall", "나무 곁 + 늑대를 앎 (반사 스텝 포함)"), ("openall", "트인 곳 + 늑대를 앎 (반사 스텝 포함)")):
         a, na = pooled_s5(r4, kind)
         b, nb = pooled_s5(base, kind)
         p = paired_common(s5_per_seed(r4, kind), s5_per_seed(base, kind))
         out["s5"][kind] = dict(r4=a, base=b, n_r4=na, n_base=nb, paired=p)
-        L.append(f"| {lab} | {a:.4f} ({na:,}) | {b:.4f} ({nb:,}) | {p['diff']:+.4f} ± {p['se']:.4f} | {p['t']:+.2f} | {p['n']} |")
+        L.append(f"| {lab} | {a:.5f} ({na:,}) | {b:.5f} ({nb:,}) | {p['diff']:+.5f} ± {p['se']:.5f} | {p['t']:+.2f} | {p['n']} |")
     if check_r4 is not None and check_base is not None:
         out["consistency"] = dict(r4=consistency(r4, check_r4), base=consistency(base, check_base))
         L += ["", f"판정 판과 같은가: R4 {out['consistency']['r4']}, R1b-F {out['consistency']['base']}"]
