@@ -73,6 +73,16 @@
 //   - Step 은 잠을 상태에서 읽고, 깜깜하면(d ≥ NightHuntDark) 지난 스텝에 사냥 중이 아니던 주행성 늑대는 사냥하지 않는다(새 사냥 없음 —
 //     쫓던 사냥만 마저 끝낸다). 속력 배수 = 잠이면 0, 깨어 있는 주행성은 max(1 − d, NightFloor) × NightAct / R, 야행성 1.
 //     스텝 끝에 bNightHunt = 표적 있음 ∨ 잠행형 돌진 상태(포획 뒤 갱신 다음 값)를 쓴다.
+//
+// 늑대 무리 협동 사냥 (선택, FThreatConfig::Pack. 기본 끔 — 끄면 위 그대로이고 지금 골든과 비트 단위로 같다. 야생 2단계 2, 사용자 10-17
+//   '추천대로 끄고 2~4번 진행해', 파이썬 world.py wild_pack·`pack_goals`·`_pack_step`, configs/v3_wild2_pack_mirror.yaml):
+//   위협끼리 서로 읽는 유일한 규칙이다. 그래서 Step 안이 아니라 부르는 쪽(EcoWorldV3 C2)이 모든 늑대가 움직이기 전에 정한다:
+//     PackPeek   늑대마다 상태 사본으로 Step 을 한 번 돌려 이번 스텝의 사냥·표적·전력 걸음을 본다 (난수를 쓰지 않는다 — 선회·굴림은 결과와 무관)
+//                앞장 = 보통 위협 ∧ 전력 걸음 ∧ 표적 있음, 돕는 늑대 = 보통 위협 ∧ 사냥 중 ∧ 전력 걸음 아님 (표적이 없거나 잠행 접근 중)
+//     PackGoals  돕는 늑대마다 JoinR 안의 쫓기는 사슴 가운데 가장 가까운 것 → 도주 방향(사슴의 이번 이동, 서 있으면 앞장 → 사슴) →
+//                향하는 은신처의 문(반지름 + 몸 여유) 또는 도주선 앞 Lead → 무대 안으로 자름 → WaitR 안이면 기다림(사슴 쪽을 본다)
+//     Step 6b′   In.bPackHelp 면 move = PackDir, 속력 = 기다림 ? 0 : 기본 속력 (상태 기계 뒤, 6c 식사·6d 배부름·7 밤잠 배수 앞)
+//   현실 근거: 늑대 무리 사냥 성공은 4 마리까지 는다(MacNulty 외 2012), 늑대는 길목에 떨어져 기다린다(Gable 외 2024)
 // ---------------------------------------------------------------------------------------------------------------
 
 #pragma once
@@ -116,6 +126,18 @@ namespace EcoThreatV3
 
 	// normalize·inv 의 문턱 (env_v2/steering.py EPS)
 	inline constexpr double kEps = 1e-9;
+
+	// 야생 2단계 2 늑대 무리 협동 사냥 계수 (파이썬 features.wild_pack, configs/v3_wild2_pack_mirror.yaml 값). 단위는 파이썬 단위(1 = 2 m).
+	// 기본 끔 = R1b 학습 세계 그대로. 켜는 쪽: EcoWorldV3 FWorldConfig::PackHunt (통합 모드 eco.IntegratedV3.PackHunt 기본 1)
+	struct FPackHuntConfig
+	{
+		bool bEnabled = false;
+		double JoinR = 60.0;     // join_r: 동료가 쫓는 사슴이 이 실거리 안이면 돕는다 (120 m = 무대 한 변. 처음 20 에서 하나만 골랐다 — 명세 RL_V3_WILD2_SPEC 5절)
+		double Lead = 6.0;       // lead: 은신처가 없을 때 사슴 도주선 앞쪽 거리 (12 m = 잠행형 덮치기 거리와 같게, 어림)
+		double DoorR = 15.0;     // door_r: 사슴이 향하는 은신처 = 가장자리까지 이 안 (30 m, 사슴의 도주 은신처 규칙 wild_flight.shelter_r 와 같다)
+		double DoorCos = 0.5;    // door_cos: 도주 방향 ±acos(이 값) 안 (±60°, wild_flight.shelter_cos 와 같다)
+		double WaitR = 1.0;      // wait_r: 목표 자리에 이만큼 가까우면 멈춰 사슴 쪽을 보고 기다린다 (2 m = 근접 포획 거리)
+	};
 
 	// 학습 세계 상수 (configs/default.yaml 위에 configs/v3_r1_on.yaml 을 덮은 값). 기본값이 계약이다 — 바꾸면 학습 밖이다.
 	// 생성 헤더 ThreatGoldenVectorsV3.h 의 kCfg* 가 파이썬 설정에서 읽은 같은 값을 싣고, 시험이 하나씩 정확히 비교한다.
@@ -209,6 +231,9 @@ namespace EcoThreatV3
 		//   ShelterTangent, 막다른 곳이면 돌아선다). 원 목록은 FThreatStepInput::Discs. 현실 근거: 빽빽한 덤불 속으로는 늑대가 따라 들어가 덮칠 수 없다
 		bool bShelterSafe = false;
 		bool bShelterBlock = false;
+
+		// ---- 늑대 무리 협동 사냥 (야생 2단계 2, 머리 주석 '늑대 무리 협동 사냥'). 기본 끔. Step 은 읽지 않는다 — PackGoals 가 읽고 In 으로 넘긴다 ----
+		FPackHuntConfig Pack;
 	};
 
 	// 은신처 진입 금지 상수 (world.py WALL_EPS·WALL_PASSES·WALL_DEAD_FRAC)
@@ -373,6 +398,8 @@ namespace EcoThreatV3
 		bool bHideArrived = false;           // HIDE 도착(RepState arrived). 웅크림 = Behavior == HIDE ∧ 이것
 		bool bInCover = false;               // 이동 뒤 위치가 은신처 원 안 (가장자리 포함, world.py `_in_cover`)
 		bool bAlive = true;                  // 파이썬은 늘 참이다(리스폰). 거짓이면 표적·포획 후보에서 뺀다
+		double MoveX = 0.0;                  // 이번 스텝 사슴 이동 (이동 뒤 − 이동 전). 늑대 무리 협동(PackGoals)의 도주 방향만 읽는다
+		double MoveY = 0.0;
 	};
 
 	struct FThreatStepInput
@@ -390,6 +417,11 @@ namespace EcoThreatV3
 		// r 은 위협이 보는 반지름이다: EcoWorldV3 가 은신처 반지름 + 늑대 몸 여유(FWorldConfig::ShelterWolfMargin, 10-17)로 채운다
 		const double* Discs = nullptr;
 		std::int32_t NumDiscs = 0;
+		// 늑대 무리 협동 (야생 2단계 2): 이 늑대가 이번 스텝 돕는 늑대면 참 (PackGoals 결과 — 부르는 쪽이 채운다). 기본 거짓 = 지금 그대로
+		bool bPackHelp = false;
+		bool bPackWait = false;     // 목표 자리에 닿아 기다림 (속력 0, PackDir = 사슴 쪽)
+		double PackDirX = 0.0;      // 이동 방향 (단위)
+		double PackDirY = 0.0;
 	};
 
 	struct FThreatStepResult
@@ -920,6 +952,16 @@ namespace EcoThreatV3
 			}
 		}
 
+		// 6b′. 늑대 무리 협동 (켰을 때만, world.py `_pack_step`): 돕는 늑대(보통 위협·사냥 중·전력 걸음 아님 — PackPeek·PackGoals 가 정해 In 으로 넘긴다)는
+		//      배회·잠행 접근 대신 PackDir 쪽으로 기본 속력, 기다림이면 속력 0. 상태 기계 뒤, 6c 식사·6d 배부름·7 밤잠 배수 앞 (파이썬과 같은 자리)
+		if (In.bPackHelp && !bPlayer && bHunting
+			&& !((Spec.Type == EThreatType::Chaser && bHasTarget) || (bStalker && T.StalkState == EStalkState::Pounce)))
+		{
+			MX = In.PackDirX;
+			MY = In.PackDirY;
+			Speed = In.bPackWait ? 0.0 : Spec.BaseSpeed;
+		}
+
 		// 6c. 식사 중 제자리 (켰을 때만, world.py R3 (j) eat_in_place): 쿨다운 때문에 사냥하지 않는 보통 위협은 잠처럼 move = head,
 		//     속력 0 (상태 기계 뒤, 밤잠 배수 앞 — 파이썬과 같은 자리. 뒤의 배수를 곱해도 0 이다)
 		if (Cfg.bEatInPlace && !bPlayer && T.Cooldown > 0)
@@ -1112,6 +1154,190 @@ namespace EcoThreatV3
 		R.Caught = K;
 		R.Speed = Speed;
 		return R;
+	}
+
+	// ------------------------------------------------------------------------------------------------------------
+	// 늑대 무리 협동 사냥 (야생 2단계 2 — 머리 주석 '늑대 무리 협동 사냥', world.py `pack_goals`·`_pack_step`)
+	// ------------------------------------------------------------------------------------------------------------
+
+	// 늑대 하나의 이번 스텝 미리 보기 (이동 전)
+	struct FPackWolf
+	{
+		double X = 0.0;             // 이동 전 위치·heading
+		double Y = 0.0;
+		double HeadX = 1.0;
+		double HeadY = 0.0;
+		bool bLeader = false;       // 앞장: 보통 위협 ∧ 전력 걸음 ∧ 표적 있음
+		bool bHelper = false;       // 돕는 늑대 후보: 보통 위협 ∧ 사냥 중 ∧ 전력 걸음 아님
+		std::int32_t Target = -1;   // 이번 스텝 표적 (앞장만 읽는다)
+	};
+
+	// 돕는 늑대 하나의 목표 (world.py `pack_goals` 의 한 행)
+	struct FPackGoal
+	{
+		bool bHelp = false;         // 돕는다 (쫓기는 사슴을 골랐다)
+		bool bWait = false;         // 목표 자리에 닿아 기다린다 (속력 0)
+		bool bDoor = false;         // 목표 = 은신처 문 (아니면 도주선 앞)
+		std::int32_t Prey = -1;     // 고른 쫓기는 사슴 (FPreyView 색인)
+		double DirX = 0.0;          // 이동 방향 (단위. 기다림이면 사슴 쪽)
+		double DirY = 0.0;
+	};
+
+	/**
+	 * 늑대 하나의 이번 스텝 사냥·표적·전력 걸음을 상태 사본으로 미리 본다 (T 는 바꾸지 않는다). In 의 무리 칸·원거리 굴림은 지우고 부른다 —
+	 * 표적·전력 걸음은 선회·굴림과 무관하다. 그래서 난수를 더 뽑지 않고, 본 스텝의 Step 결과와 같은 사냥·표적·전력 걸음이다.
+	 */
+	inline FPackWolf PackPeek(const FThreatSpec& Spec, const FThreatState& T, const FThreatStepInput& In, const FThreatConfig& Cfg)
+	{
+		FPackWolf P;
+		P.X = T.PosX;
+		P.Y = T.PosY;
+		P.HeadX = T.HeadX;
+		P.HeadY = T.HeadY;
+		FThreatState Tmp = T;
+		FThreatStepInput Pi = In;
+		Pi.bPackHelp = false;
+		Pi.bPackWait = false;
+		Pi.RangedRoll = nullptr;
+		const FThreatStepResult R = Step(Spec, Tmp, Pi, Cfg);
+		const bool bWolf = Spec.Type != EThreatType::Player;
+		P.bLeader = bWolf && R.bRunning && R.bHasTarget;
+		P.bHelper = bWolf && R.bHunting && !R.bRunning;
+		P.Target = R.Target;
+		return P;
+	}
+
+	/**
+	 * 돕는 늑대마다 목표 (world.py `pack_goals` 와 같은 순서·같은 식 — 골든 비트 동일). Covers = 은신처 원 (x, y, r) × NumCovers, r 은 사슴 반지름
+	 * (r ≤ 0 은 지워진 은신처라 건너뛴다). WolfMargin = 늑대 몸 여유 (막지 않으면 0). Out[M] 을 모두 다시 쓴다.
+	 *   쫓기는 사슴 = JoinR 안 앞장 표적 가운데 가장 가까운 것 (같으면 앞 슬롯 앞장). 도주 방향 U = 사슴 이동 단위벡터, 서 있으면 앞장 → 사슴.
+	 *   문 = 0 < e_k ≤ DoorR ∧ (c_k − p)·U / |c_k − p| ≥ DoorCos 인 은신처 가운데 e_k = |c_k − p| − r_k 최소 (같으면 앞 번호) → c − (r + m)·(c − p)/|c − p|.
+	 *   없으면 p + Lead·U. 무대 [0, WorldSize] 로 자른다. |G − q| ≤ WaitR 면 기다림(사슴 쪽, 겹치면 heading), 아니면 (G − q)/|G − q|.
+	 */
+	inline void PackGoals(const FPackWolf* Wolves, std::int32_t M, const FPreyView* Prey, std::int32_t NumPrey, const double* Covers,
+						  std::int32_t NumCovers, double WolfMargin, double WorldSize, const FPackHuntConfig& Cfg, FPackGoal* Out)
+	{
+		for (std::int32_t m = 0; m < M; ++m)
+		{
+			Out[m] = FPackGoal();
+		}
+		if (!Cfg.bEnabled)
+		{
+			return;
+		}
+		for (std::int32_t m = 0; m < M; ++m)
+		{
+			const FPackWolf& Me = Wolves[m];
+			if (!Me.bHelper)
+			{
+				continue;
+			}
+			std::int32_t Best = -1;
+			std::int32_t BestL = -1;
+			double BestD = 0.0;
+			for (std::int32_t L = 0; L < M; ++L)
+			{
+				if (L == m || !Wolves[L].bLeader)
+				{
+					continue;
+				}
+				const std::int32_t I = Wolves[L].Target;
+				if (I < 0 || I >= NumPrey)
+				{
+					continue;
+				}
+				const double Dx = Prey[I].X - Me.X;
+				const double Dy = Prey[I].Y - Me.Y;
+				const double D = std::sqrt(Dx * Dx + Dy * Dy);
+				if (D <= Cfg.JoinR && (Best < 0 || D < BestD))
+				{
+					Best = I;
+					BestL = L;
+					BestD = D;
+				}
+			}
+			if (Best < 0)
+			{
+				continue;
+			}
+			const FPreyView& P = Prey[Best];
+			double Ux = 0.0;
+			double Uy = 0.0;
+			const double N = std::sqrt(P.MoveX * P.MoveX + P.MoveY * P.MoveY);
+			if (N > kEps)
+			{
+				Ux = P.MoveX / N;
+				Uy = P.MoveY / N;
+			}
+			else
+			{
+				const double Ax = P.X - Wolves[BestL].X;
+				const double Ay = P.Y - Wolves[BestL].Y;
+				const double Na = std::sqrt(Ax * Ax + Ay * Ay);
+				if (Na > kEps)
+				{
+					Ux = Ax / Na;
+					Uy = Ay / Na;
+				}
+			}
+			std::int32_t Bk = -1;
+			double Be = 0.0, Bex = 0.0, Bey = 0.0, Bdk = 0.0;
+			for (std::int32_t k = 0; k < NumCovers; ++k)
+			{
+				const double R = Covers[3 * k + 2];
+				if (!(R > 0.0))
+				{
+					continue;
+				}
+				const double Ex = Covers[3 * k] - P.X;
+				const double Ey = Covers[3 * k + 1] - P.Y;
+				const double Dk = std::sqrt(Ex * Ex + Ey * Ey);
+				const double E = Dk - R;
+				if (E > 0.0 && E <= Cfg.DoorR && (Ex * Ux + Ey * Uy) / Dk >= Cfg.DoorCos && (Bk < 0 || E < Be))
+				{
+					Bk = k;
+					Be = E;
+					Bex = Ex;
+					Bey = Ey;
+					Bdk = Dk;
+				}
+			}
+			double Gx, Gy;
+			if (Bk >= 0)
+			{
+				const double Rr = Covers[3 * Bk + 2] + WolfMargin;
+				Gx = Covers[3 * Bk] - Rr * (Bex / Bdk);
+				Gy = Covers[3 * Bk + 1] - Rr * (Bey / Bdk);
+			}
+			else
+			{
+				Gx = P.X + Cfg.Lead * Ux;
+				Gy = P.Y + Cfg.Lead * Uy;
+			}
+			Gx = Gx < 0.0 ? 0.0 : (Gx > WorldSize ? WorldSize : Gx);
+			Gy = Gy < 0.0 ? 0.0 : (Gy > WorldSize ? WorldSize : Gy);
+			const double Hx = Gx - Me.X;
+			const double Hy = Gy - Me.Y;
+			const double Hn = std::sqrt(Hx * Hx + Hy * Hy);
+			FPackGoal& G = Out[m];
+			if (Hn <= Cfg.WaitR)
+			{
+				const double Fx = P.X - Me.X;
+				const double Fy = P.Y - Me.Y;
+				const double Fn = std::sqrt(Fx * Fx + Fy * Fy);
+				G.DirX = Fn > kEps ? Fx / Fn : Me.HeadX;
+				G.DirY = Fn > kEps ? Fy / Fn : Me.HeadY;
+				G.bWait = true;
+			}
+			else
+			{
+				G.DirX = Hx / Hn;
+				G.DirY = Hy / Hn;
+			}
+			G.bHelp = true;
+			G.bDoor = Bk >= 0;
+			G.Prey = Best;
+		}
 	}
 
 	// 같은 스텝에 여러 위협이 같은 초식을 잡아도 사망은 한 번이다. 비명 점(M8)의 주인은 가장 낮은 위협 색인이다(world.py:2125-2132).

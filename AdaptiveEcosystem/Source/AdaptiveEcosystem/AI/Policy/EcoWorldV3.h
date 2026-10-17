@@ -52,6 +52,9 @@
 //                                  (FFoodGrid::ApplyShelterFood: 은신처 원과 겹치는 셀의 용량·재생 × CapFrac·RegenFrac)
 //   FWorldStats::Hunt*·ShelterDeerSteps·LiveDeerSteps·CaughtNearCover  야생 2단계 기록 (사냥 성공률·은신처 안 시간·은신처 둘레 잡힘).
 //                                  늘 채우지만 어떤 계산에도 쓰지 않는다 (FThreatAgent::bHuntOn 도 기록 전용)
+//   FWorldConfig::PackHunt         야생 2단계 2 늑대 무리 협동 사냥 (파이썬 wild_pack, 10-17). 기본 끔 = 지금과 같다 — 새 줄은 모두 Pack.bEnabled 안에 있다.
+//                                  C2 에서 모든 늑대가 움직이기 전에 PackPeek(상태 사본으로 Step, 난수 없음) → PackGoals 로 돕는 늑대의 목표를 정하고
+//                                  위협 Step 의 In.bPackHelp 로 넘긴다 (EcoThreatModel.h 머리 주석 '늑대 무리 협동 사냥'). 기록 FWorldStats::Pack*
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -394,6 +397,8 @@ namespace EcoWorldV3
 		EcoObservationV3::FHearingConfig RealismHearing;
 		// 야생 2단계 1 은신처 먹이 부족 (통합 모드 eco.IntegratedV3.ShelterFood). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든)
 		FShelterFoodConfig ShelterFood;
+		// 야생 2단계 2 늑대 무리 협동 사냥 (통합 모드 eco.IntegratedV3.PackHunt). 기본 끔 = 지금 그대로. InitWorld 가 FThreatConfig::Pack 으로 넘긴다
+		EcoThreatV3::FPackHuntConfig PackHunt;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -819,6 +824,14 @@ namespace EcoWorldV3
 		std::int64_t ShelterDeerSteps = 0;   // 위협 Step 에 넘긴 사슴 가운데 이동 뒤 위치가 은신처 원 안인 사슴·스텝 (Prey.bInCover)
 		std::int64_t LiveDeerSteps = 0;      // 위협 Step 에 넘긴 사슴·스텝 (통합 모드 = 스텝 첫머리 산 사슴)
 		std::int64_t CaughtNearCover[2] = {};   // 은신처 원 밖이고 가장 가까운 둘레까지 kCoverRingBands(2 m·4 m) 안에서 잡힌 수
+		// 야생 2단계 2 늑대 무리 협동 기록 (켰을 때만 센다 — 어떤 계산에도 쓰지 않는다. world.py pack_stats 의 같은 정의)
+		std::int64_t PackWolfSteps = 0;      // 늑대(플레이어형 말고)·스텝 (wolf_steps)
+		std::int64_t PackLeadSteps = 0;      // 그중 앞장 — 표적을 쫓으며 전력 걸음 (lead_n)
+		std::int64_t PackHelpSteps = 0;      // 돕기 (help_n)
+		std::int64_t PackWaitSteps = 0;      // 그중 목표 자리에서 기다림 (wait_n)
+		std::int64_t PackDoorSteps = 0;      // 그중 목표 = 은신처 문 (door_n)
+		std::int64_t PackCatches = 0;        // 늑대 포획 (catches)
+		std::int64_t PackCoopCatches = 0;    // 그중 다른 앞장 늑대도 이번 스텝에 쫓던 사슴 (pack_catches)
 		std::int64_t RefugeProtectedPreySteps = 0;
 		std::int64_t RefugeConstrainedMoves = 0;
 		std::int64_t RefugeRecoveries = 0;
@@ -872,6 +885,9 @@ namespace EcoWorldV3
 		std::vector<double> ShelterDiscs;   // 은신처 원 (x, y, r) × K — bShelterSafe 일 때 위협 Step 에 넘긴다 (스텝마다 Covers 에서 다시 채운다)
 		std::vector<std::int32_t> CaughtByThreat;
 		std::vector<std::int32_t> Catcher;
+		std::vector<EcoThreatV3::FPackWolf> PackWolves;   // 야생 2단계 2: 늑대마다 이번 스텝 미리 보기 (Pack.bEnabled 일 때만)
+		std::vector<EcoThreatV3::FPackGoal> PackGoalBuf;  // 돕는 늑대의 목표
+		std::vector<double> PackCovers;                   // 은신처 원 (x, y, 사슴 반지름) — 반경 0 원(지워진 은신처)은 뺀다
 		std::vector<double> Want;
 		std::vector<double> EDrained;
 		std::vector<std::int32_t> CellIdx;
@@ -928,6 +944,8 @@ namespace EcoWorldV3
 		W.ThreatCfg.bWildSatiation = W.Config.WildSatiation.bEnabled;
 		W.ThreatCfg.SatSteps = W.Config.WildSatiation.bEnabled ? WildDaysToSteps(C.WildSatiation.SatDays, W.Config.DayPeriod) : 0;
 		W.ThreatCfg.RestSpeed = C.WildSatiation.RestSpeed;
+		// 야생 2단계 2 늑대 무리 협동 (끄면 PackGoals 가 아무도 바꾸지 않는다)
+		W.ThreatCfg.Pack = C.PackHunt;
 		// R3 감지: 위협 시야 문턱 cos·발소리 반경 자르기 (끄면 R1b 그대로 — FovCos 와 같은 값)
 		W.ObsCfg.ThreatFovCos = C.RealismVision.bEnabled ? EcoObservationV3::FovCosOf(C.RealismVision.ThreatFovDeg, kBaseFovDeg, W.ObsCfg.FovCos)
 														 : W.ObsCfg.FovCos;
@@ -1702,6 +1720,8 @@ namespace EcoWorldV3
 			P.Behavior = static_cast<std::uint8_t>(H.Rep->Behavior);
 			P.bHideArrived = H.Rep->bArrived;
 			P.bInCover = Detail::InAnyCover(W, H.Body->Pos);   // 이동 뒤 위치로 다시 판정 (world.py:2026)
+			P.MoveX = H.Body->Pos.X - H.Body->PrevPos.X;      // 이번 스텝 이동 (막힌 이동은 0). 늑대 무리 협동의 도주 방향만 읽는다
+			P.MoveY = H.Body->Pos.Y - H.Body->PrevPos.Y;
 			// 파이썬처럼 늘 산 개체다(죽은 슬롯은 지난 스텝 끝에 리스폰했다). 팀 안전 규칙일 때만 원 안 사슴을 후보에서 뺀다 (ShelterSafe 면 위협 모델이 뺀다)
 			P.bAlive = !(RefugeOwnsSafety(W.Config) && P.bInCover);
 			W.Stats.RefugeProtectedPreySteps += (W.Config.bProtectedRefuges && P.bInCover) ? 1 : 0;   // 기록만 (어느 규칙이든 원 안 = 보호)
@@ -1722,6 +1742,53 @@ namespace EcoWorldV3
 				W.ShelterDiscs.push_back(Cv.X);
 				W.ShelterDiscs.push_back(Cv.Y);
 				W.ShelterDiscs.push_back(Cv.Radius + W.Config.ShelterWolfMargin);   // 늑대 몸 여유 (c″) — 0 이면 반지름 그대로
+			}
+		}
+		// 야생 2단계 2 늑대 무리 협동 (켰을 때만, world.py `_pack_step`): 어느 늑대도 움직이기 전에 늑대마다 이번 스텝의 사냥·표적·전력 걸음을 미리 보고
+		// (PackPeek — 상태 사본으로 Step, 세계 난수를 뽑지 않는다) 돕는 늑대의 목표를 정한다 (PackGoals). 이동 전 위치만 읽으므로 아래 위협 루프의 처리
+		// 순서와 무관하다 (파이썬은 한꺼번에 계산한다). 팀 안전 규칙(ShelterSafe 0)의 갇힌 늑대 꺼내기는 미리 보기 뒤에 일어난다 — 파이썬에 없는 경우다
+		const bool bPack = W.ThreatCfg.Pack.bEnabled && M > 0;
+		if (bPack)
+		{
+			W.PackWolves.resize(static_cast<size_t>(M));
+			W.PackGoalBuf.resize(static_cast<size_t>(M));
+			W.PackCovers.clear();
+			for (const EcoObservationV3::FCoverInput& Cv : W.Config.Covers)
+			{
+				if (Cv.Radius <= 0.0)
+				{
+					continue;
+				}
+				W.PackCovers.push_back(Cv.X);
+				W.PackCovers.push_back(Cv.Y);
+				W.PackCovers.push_back(Cv.Radius);
+			}
+			EcoThreatV3::FThreatStepInput Pi;
+			Pi.Prey = W.Prey.data();
+			Pi.NumPrey = N;
+			Pi.Dark = W.Dark;
+			Pi.WorldSize = W.Config.WorldSize;
+			Pi.Discs = W.ShelterDiscs.empty() ? nullptr : W.ShelterDiscs.data();
+			Pi.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				W.PackWolves[static_cast<size_t>(m)] = EcoThreatV3::PackPeek(Threats[m]->Spec, Threats[m]->State, Pi, W.ThreatCfg);
+			}
+			EcoThreatV3::PackGoals(W.PackWolves.data(), M, W.Prey.data(), N, W.PackCovers.empty() ? nullptr : W.PackCovers.data(),
+								   static_cast<std::int32_t>(W.PackCovers.size() / 3), W.ThreatCfg.bShelterBlock ? W.Config.ShelterWolfMargin : 0.0,
+								   W.Config.WorldSize, W.ThreatCfg.Pack, W.PackGoalBuf.data());
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				if (Threats[m]->Spec.Type == EcoThreatV3::EThreatType::Player)
+				{
+					continue;
+				}
+				const EcoThreatV3::FPackGoal& G = W.PackGoalBuf[static_cast<size_t>(m)];
+				++W.Stats.PackWolfSteps;
+				W.Stats.PackLeadSteps += W.PackWolves[static_cast<size_t>(m)].bLeader ? 1 : 0;
+				W.Stats.PackHelpSteps += G.bHelp ? 1 : 0;
+				W.Stats.PackWaitSteps += G.bWait ? 1 : 0;
+				W.Stats.PackDoorSteps += G.bDoor ? 1 : 0;
 			}
 		}
 		for (std::int32_t m = 0; m < M; ++m)
@@ -1747,6 +1814,14 @@ namespace EcoWorldV3
 			{
 				In.PlayerModeU0 = W.Rng.NextU01();
 				In.PlayerModeU1 = W.Rng.NextU01();
+			}
+			if (bPack)
+			{
+				const EcoThreatV3::FPackGoal& G = W.PackGoalBuf[static_cast<size_t>(m)];
+				In.bPackHelp = G.bHelp;
+				In.bPackWait = G.bWait;
+				In.PackDirX = G.DirX;
+				In.PackDirY = G.DirY;
 			}
 			A.PrevX = A.State.PosX;
 			A.PrevY = A.State.PosY;
@@ -1810,6 +1885,28 @@ namespace EcoWorldV3
 		}
 		W.Catcher.assign(static_cast<size_t>(N), -1);
 		EcoThreatV3::ResolveCatches(W.CaughtByThreat.data(), M, W.Catcher.data(), N);
+		if (bPack)
+		{
+			// 야생 2단계 2 기록만: 늑대 포획과 그 가운데 다른 앞장 늑대도 이번 스텝에 쫓던 사슴을 잡은 수 (world.py pack_stats catches·pack_catches)
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				const std::int32_t Ci = W.CaughtByThreat[static_cast<size_t>(m)];
+				if (Ci < 0 || Threats[m]->Spec.Type == EcoThreatV3::EThreatType::Player)
+				{
+					continue;
+				}
+				++W.Stats.PackCatches;
+				for (std::int32_t L = 0; L < M; ++L)
+				{
+					const EcoThreatV3::FPackWolf& Pw = W.PackWolves[static_cast<size_t>(L)];
+					if (L != m && Pw.bLeader && Pw.Target == Ci)
+					{
+						++W.Stats.PackCoopCatches;
+						break;
+					}
+				}
+			}
+		}
 		if(W.Config.bProtectedRefuges)for(std::int32_t I=0;I<N;++I)
 			if(W.Catcher[I]>=0&&W.Prey[I].bInCover)++W.Stats.RefugeCaptureViolations;
 

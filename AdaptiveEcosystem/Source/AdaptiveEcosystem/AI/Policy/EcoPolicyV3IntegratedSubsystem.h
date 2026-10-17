@@ -97,6 +97,13 @@
 //      밖의 15% 다(EcoWorldV3.h FShelterFoodConfig·FFoodGrid::ApplyShelterFood). 은신처는 안전하지만 먹이가 적어 배고픈 사슴은 밖으로 나와야 한다.
 //      늦게 등록되거나 지워진 은신처(RefreshRefuges)도 같은 식으로 다시 건다. 10초 기록 다섯째 줄 '[EcoV3I] <지역> 사냥·은신처 |' 는 늘 적는다:
 //      사냥 성공률(늑대가 전력으로 쫓거나 덮친 사냥 가운데 잡음으로 끝난 몫 — world.py hunt_update 와 같은 정의), 은신처 안 사슴 시간, 둘레 밖 잡힘.
+//      사용자 결정 10-17 '추천대로 끄고': 은신처 먹이 부족은 잡힘을 늘리지 못하고 오래 두면 굶음만 늘려 기본을 0 으로 바꿨다(켜면 위 그대로).
+//  14. 10-17 야생 2단계 2 늑대 무리 (명세 RL_V3_WILD2_SPEC.md, 파이썬 configs/v3_wild2_pack_mirror.yaml): 지역마다 늑대 수
+//      eco.IntegratedV3.WolvesPerRegion (-EcoV3Wolves=, 기본 4 — 잠행 2·추격 2, 짝수 순번 = 잠행. 두뇌 학습 범위 2~12 안, 0~12 로 자름)와
+//      협동 사냥 eco.IntegratedV3.PackHunt (-EcoV3PackHunt=, 기본 1 — 파이썬 wild_pack, EcoThreatModel.h '늑대 무리 협동 사냥'): 한 늑대가 사슴을
+//      쫓는 동안 사냥 중이고 전력으로 달리지 않는 동료가 그 사슴이 달아날 곳(향하는 은신처의 문, 없으면 도주선 앞 12 m)으로 가서 기다린다.
+//      은신처 진입 금지·몸 여유·포만·밤잠은 그대로다. 10초 기록 여섯째 줄 '[EcoV3I] <지역> 늑대 무리 |' (켰을 때만): 앞장·돕기·기다림·은신처 문
+//      늑대·스텝, 늑대 포획·협동 포획(다른 앞장 늑대도 쫓던 사슴을 잡음) 누적.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -202,7 +209,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	int64 Seed = 20000;                 // 세션 시드 (지연 해시 Seed·세계 난수·시작 자리 난수)
 	int32 DeerPerRegion = kTrainDeer;   // 학습 N 과 같은 128 — 무대 60~110 단위 어디서나 시작 밀도가 학습 범위 안이고, 피식 EMA 분모도 학습과 같다.
 										// 부활이 없어 줄기만 한다 (60 단위 무대는 사망 90 마리까지 학습 밀도 하한 위)
-	int32 WolvesPerRegion = 2;          // 잠행 1 + 추격 1 (학습 보통 위협 2~12, 잠행 비율 30~70%)
+	int32 WolvesPerRegion = 4;          // 잠행 2 + 추격 2 (eco.IntegratedV3.WolvesPerRegion 기본 4, 10-17 야생 2단계 2 — 학습 보통 위협 2~12, 잠행 비율 30~70%)
 	double StageSizeUnits = 60.0;       // 무대 한 변 (단위, 학습 60~110 = 120~220 m)
 	double PredSpeedMult = 0.8;         // 늑대 속력 = 사슴 뛰기 900 cm/s × 0.8 = 720 cm/s (학습 0.6~0.95)
 	bool bGradualNight = true;          // 늑대 밤잠 점진화 (eco.IntegratedV3.GradualNight 기본 1, 사람 결정 H1 10-14). 거짓 = d ≥ 0.5 에 곧바로 잠
@@ -223,8 +230,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bRealismHearing = true;        // 늑대 발소리 (eco.IntegratedV3.RealismHearing 기본 1, R3 realism_hearing). 거짓 = 소리 없음
 	bool bShelterSafe = true;           // 은신처 안전·늑대 진입 금지 (eco.IntegratedV3.ShelterSafe 기본 1, 10-16 — R3 realism_shelter). 거짓 = 은신처 안에서도 잡힘
 	double WolfBodyMarginM = 1.0;       // 늑대 몸 여유 (m, eco.IntegratedV3.WolfBodyMargin 기본 1, 10-17 — 파이썬 realism_shelter.wolf_margin 0.5). bShelterSafe 일 때만.
-	bool bShelterFood = true;           // 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 1, 10-17 야생 2단계 1 — 파이썬 realism_cover_food 0.15). 거짓 = 은신처 셀 재생만 0.3배
-										// 늑대 중심은 은신처 반지름 + 이 값 밖에서 미끄러진다. 0 = 10-16 그대로 (둘레 위). 팀 규칙 몸 여유와 함께 적용되지 않는다
+	bool bShelterFood = false;          // 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 0 — 사용자 결정 10-17 '추천대로 끄고'. 켜면 파이썬 realism_cover_food 0.15).
+										// 거짓 = 은신처 셀 재생만 0.3배 (R1b 학습 세계)
+	bool bPackHunt = true;              // 늑대 무리 협동 사냥 (eco.IntegratedV3.PackHunt 기본 1, 10-17 야생 2단계 2 — 파이썬 wild_pack, 값 = FPackHuntConfig 기본값)
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등

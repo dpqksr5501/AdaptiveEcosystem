@@ -686,6 +686,13 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 10초 기록 다섯째 줄 `[EcoV3I] <지역> 사냥·은신처 | …` 을 늘 적는다: 사냥 누적 시작·끝·성공·사냥 밖 포획·성공률(추격형·잠행형 따로), 은신처 안 사슴·스텝(구간·누적), 은신처 둘레 밖 2 m·4 m 안 잡힘. 앞 네 줄의 칸은 그대로다.
   - 헤드리스(사슴 128, 세션 20000~20005, 240초): 기록 `herbivore_rl/results/v3/wild2/unreal_logs/`. 파이썬 거울과 같다(은신처 안 시간 5.9 대 5.8%, 잡힘 2.43 대 2.28%, 사냥 성공률 56 대 62%, |z| < 2 — 사냥 시작 하나 z +2.1, 독립 지도에서는 +0.5). 오류·ensure·경고 0.
   - 시험: `Policy.V3.Wild2.ShelterFoodGolden`·`HuntGolden`·`Run`(골든 `Wild2GoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_wild2.py`), `Refuge.MergedDefaultSingleRule` 에 기본 켬 확인. 자동 시험 153 성공 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
+  - 사용자 결정 10-17 '추천대로 끄고'(`RL_V2_PLAN.md` '10-17 (11)'): 기본을 0 으로 바꿨다. 켜려면 `-EcoV3ShelterFood=1`.
+- **10-17 야생 2단계 2 늑대 무리·협동 사냥** (명세 `RL_V3_WILD2_SPEC.md` 5절, 결정 `RL_V2_PLAN.md` '10-17 (11)', 측정 `herbivore_rl/results/v3/wild2/README.md` '2 늑대 무리'):
+  - 새 스위치 `eco.IntegratedV3.WolvesPerRegion` · `-EcoV3Wolves=`(기본 4, 0~12 로 자름 — 잠행 2·추격 2)와 `eco.IntegratedV3.PackHunt` · `-EcoV3PackHunt=`(기본 1). 시작 글 `[EcoV3I] 늑대 무리: …`.
+  - 협동 사냥: 한 늑대가 사슴을 쫓는 동안 사냥 중이고 전력으로 달리지 않는 동료(120 m 안)가 그 사슴이 달아날 곳(향하는 은신처의 문, 없으면 도주선 앞 12 m)으로 가서 2 m 안이면 멈춰 사슴 쪽을 본다. 위협 Step 밖(C2, 어느 늑대도 움직이기 전)에서 `PackPeek`(상태 사본, 난수 없음) → `PackGoals` 로 정해 Step 6b′ 로 넘긴다.
+  - 10초 기록 여섯째 줄 `[EcoV3I] <지역> 늑대 무리 | …`(켰을 때만): 누적 늑대·스텝 가운데 앞장·돕기·기다림·은신처 문, 늑대 포획·협동 포획. 앞 다섯 줄은 그대로다.
+  - 헤드리스(사슴 128, 세션 20000~20005, 240초): 기록 `herbivore_rl/results/v3/wild2/unreal_logs/pack_*`. 잡힘 5.47%(같은 지도 파이썬 5.17%), 사냥 성공률 59.4 대 58.7%, 돕기 6.3 대 6.4%, 모든 칸 |z| < 2(숲만도). 오류·ensure·경고 0.
+  - 시험: `Policy.V3.Pack.Golden`(목표 장면 72·한 스텝 장면 80 비트 단위, 골든 `PackGoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_pack.py`, 검사 본문 `Tests/PackGoldenCheckV3.h` — g++ 하네스도 같은 본문)·`Run`·`IntegratedDefaults`. 기존 통합 시험 장면(`TestSettings`)은 무리를 끈다. 자동 시험 157 = 성공 156 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
 
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 

@@ -172,10 +172,26 @@ namespace EcoPolicyV3IntegratedImpl
 
 	static TAutoConsoleVariable<int32> CVarShelterFood(
 		TEXT("eco.IntegratedV3.ShelterFood"),
+		0,
+		TEXT("통합 v3 모드의 은신처 먹이 부족 (0 = 끔, 기본 — 사용자 결정 10-17 '추천대로 끄고': 잡힘은 그대로이고 오래 두면 굶음만 늘었다). 1 = 은신처 원과 조금이라도 ")
+		TEXT("겹치는 먹이 셀의 용량과 재생 속도가 밖의 15% (10-17 야생 2단계 1, 파이썬 configs/v3_wild2_mirror.yaml realism_cover_food). ")
+		TEXT("0 이면 은신처 셀은 재생만 0.3배(R1b 학습 세계). Play 전에 바꾼다. 명령줄 -EcoV3ShelterFood= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarWolvesPerRegion(
+		TEXT("eco.IntegratedV3.WolvesPerRegion"),
+		4,
+		TEXT("통합 v3 모드의 지역 무대마다 늑대 수 (기본 4 — 10-17 야생 2단계 2 늑대 무리, 잠행 2·추격 2, 짝수 순번 = 잠행-돌진형). 사슴 두뇌 R1b 의 학습 범위 ")
+		TEXT("(보통 위협 2~12) 안이어야 하므로 0~12 로 자른다. 2 = 10-17 전 그대로. Play 전에 바꾼다. 명령줄 -EcoV3Wolves= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarPackHunt(
+		TEXT("eco.IntegratedV3.PackHunt"),
 		1,
-		TEXT("통합 v3 모드의 은신처 먹이 부족 (1 = 켬, 기본 — 10-17 야생 2단계 1, 사용자 결정 '은신처는 안전하지만 먹이가 적다'). 은신처 원과 조금이라도 겹치는 ")
-		TEXT("먹이 셀의 용량과 재생 속도가 밖의 15% 다(파이썬 configs/v3_wild2_mirror.yaml realism_cover_food). 배고픈 사슴은 밖으로 나와야 한다. ")
-		TEXT("0 = 은신처 셀은 재생만 0.3배(R1b 학습 세계). Play 전에 바꾼다. 명령줄 -EcoV3ShelterFood= 는 시작값."),
+		TEXT("통합 v3 모드의 늑대 무리 협동 사냥 (1 = 켬, 기본 — 10-17 야생 2단계 2, 파이썬 configs/v3_wild2_pack_mirror.yaml wild_pack). 한 늑대가 사슴을 쫓는 동안 ")
+		TEXT("사냥 중이고 전력으로 달리지 않는 동료(120 m 안)가 그 사슴이 달아날 곳 — 향하는 은신처의 문(반지름 + 몸 여유), 없으면 도주선 앞 12 m — 으로 가서 ")
+		TEXT("기다린다(2 m 안이면 멈춰 사슴 쪽을 본다). 늑대는 여전히 은신처에 못 들어가고 배부르면 쉰다. 0 = 늑대마다 따로 사냥(10-17 전). Play 전에 바꾼다. ")
+		TEXT("명령줄 -EcoV3PackHunt= 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarRealismVision(
@@ -475,6 +491,8 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bShelterSafe = CVarShelterSafe.GetValueOnGameThread() != 0;
 	S.WolfBodyMarginM = static_cast<double>(CVarWolfBodyMargin.GetValueOnGameThread());
 	S.bShelterFood = CVarShelterFood.GetValueOnGameThread() != 0;
+	S.WolvesPerRegion = FMath::Clamp(CVarWolvesPerRegion.GetValueOnGameThread(), 0, 12);
+	S.bPackHunt = CVarPackHunt.GetValueOnGameThread() != 0;
 	S.bFlightHoldAwake = CVarFlightHoldAwake.GetValueOnGameThread() != 0;
 	S.bFlightEdgeAvoid = CVarFlightEdgeAvoid.GetValueOnGameThread() != 0;
 	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
@@ -565,10 +583,20 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.WolfBodyMargin"), LexToString(MarginArg));
 	}
-	int32 ShelterFoodArg = 1;
+	int32 ShelterFoodArg = 0;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ShelterFood="), ShelterFoodArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.ShelterFood"), LexToString(ShelterFoodArg));
+	}
+	int32 WolvesArg = 4;
+	if (FParse::Value(CmdLine, TEXT("EcoV3Wolves="), WolvesArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.WolvesPerRegion"), LexToString(WolvesArg));
+	}
+	int32 PackArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3PackHunt="), PackArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.PackHunt"), LexToString(PackArg));
 	}
 	int32 RefugeArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ProtectedRefuges="), RefugeArg))
@@ -742,7 +770,15 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 				 ? FString::Printf(TEXT("부족 (eco.IntegratedV3.ShelterFood 1, 10-17 야생 2단계 1) — 은신처 원과 겹치는 셀의 용량 %.0f%%·재생 %.0f%% (밖 대비), ")
 									   TEXT("배고픈 사슴은 밖으로 나와야 함"),
 								   100.0 * Sf.CapFrac, 100.0 * Sf.RegenFrac)
-				 : FString(TEXT("끔 (eco.IntegratedV3.ShelterFood 0 — 은신처 셀은 재생만 0.3배, R1b 학습 세계)"))));
+				 : FString(TEXT("끔 (eco.IntegratedV3.ShelterFood 0, 기본 — 사용자 결정 10-17 '추천대로 끄고'. 은신처 셀은 재생만 0.3배, R1b 학습 세계)"))));
+	const EcoThreatV3::FPackHuntConfig Pk;
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 늑대 무리: 지역마다 %d (eco.IntegratedV3.WolvesPerRegion) | 협동 사냥 %s"), Wolves,
+		   *(Settings.bPackHunt
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.PackHunt 1, 10-17 야생 2단계 2) — 한 늑대가 쫓는 사슴이 %.0f m 안이면 사냥 중인 동료가 그 사슴이 향하는 ")
+									   TEXT("은신처의 문(%.0f m·±%.0f° 안) 또는 도주선 앞 %.0f m 로 가서 %.0f m 안이면 기다림"),
+								   Pk.JoinR * MPerUnit, Pk.DoorR * MPerUnit, FMath::RadiansToDegrees(FMath::Acos(Pk.DoorCos)), Pk.Lead * MPerUnit,
+								   Pk.WaitR * MPerUnit)
+				 : FString(TEXT("끔 (eco.IntegratedV3.PackHunt 0 — 늑대마다 따로 사냥)"))));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
 		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6 — 기본 아님) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다, 파이썬과 다름")
 								   : TEXT("끔 (eco.IntegratedV3.SocialControl 0, 기본 — 사람 결정 10-17 (8): v3 사슴 움직임은 파이썬 세계 그대로, Social 처리기는 기록만)"));
@@ -1011,6 +1047,9 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.ShelterWolfMargin = S.WolfBodyMarginUnits();
 	// 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood, 10-17 야생 2단계 1): 값 = configs/v3_wild2_mirror.yaml realism_cover_food (FShelterFoodConfig 기본값)
 	C.ShelterFood.bEnabled = S.bShelterFood;
+	// 늑대 무리 협동 사냥 (eco.IntegratedV3.PackHunt, 10-17 야생 2단계 2): 값 = configs/v3_wild2_pack_mirror.yaml wild_pack (FPackHuntConfig 기본값).
+	// 늑대 몸 여유·은신처 원은 위 칸을 그대로 쓴다 (문 = 반지름 + ShelterWolfMargin)
+	C.PackHunt.bEnabled = S.bPackHunt;
 	return C;
 }
 
@@ -1888,6 +1927,19 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   S.LiveDeerSteps > 0 ? 100.0 * static_cast<double>(S.ShelterDeerSteps) / static_cast<double>(S.LiveDeerSteps) : 0.0,
 			   static_cast<long long>(S.CaughtNearCover[0]), static_cast<long long>(S.CaughtNearCover[1]),
 			   Ctx.Sim.Config.ShelterFood.bEnabled ? TEXT("부족 켬") : TEXT("부족 끔"));
+	}
+	// 여섯째 줄: 야생 2단계 2 늑대 무리 (10-17, 협동 사냥을 켰을 때만). 누적 늑대·스텝 가운데 앞장·돕기·기다림·은신처 문, 늑대 포획·협동 포획
+	//   (world.py pack_stats·run_mirror.py 10초 줄 pack_* 와 같은 정의. 앞 다섯 줄의 정규식은 '<지역> 늑대 무리 |' 꼴에 걸리지 않는다)
+	if (Ctx.Sim.ThreatCfg.Pack.bEnabled)
+	{
+		const int64 Wn = S.PackWolfSteps;
+		auto Pc = [Wn](int64 X) { return Wn > 0 ? 100.0 * static_cast<double>(X) / static_cast<double>(Wn) : 0.0; };
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 늑대 무리 | %.1f초 | 늑대 %d | 누적 늑대·스텝 %lld: 앞장 %lld (%.1f%%) · 돕기 %lld (%.1f%%) · 기다림 %lld · 은신처 문 %lld | ")
+				   TEXT("늑대 포획 누적 %lld · 협동 포획 %lld (다른 앞장 늑대도 쫓던 사슴)"),
+			   *Ctx.RegionId.ToString(), Seconds, Ctx.Wolves, static_cast<long long>(Wn), static_cast<long long>(S.PackLeadSteps), Pc(S.PackLeadSteps),
+			   static_cast<long long>(S.PackHelpSteps), Pc(S.PackHelpSteps), static_cast<long long>(S.PackWaitSteps),
+			   static_cast<long long>(S.PackDoorSteps), static_cast<long long>(S.PackCatches), static_cast<long long>(S.PackCoopCatches));
 	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
