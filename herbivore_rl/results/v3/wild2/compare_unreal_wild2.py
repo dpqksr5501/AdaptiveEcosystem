@@ -14,6 +14,8 @@
 세계)이 모두 있으면 표에 앞장·돕기·은신처 문 늑대-스텝 몫과 늑대 포획·협동 포획 줄을 더한다.
 10-17 더함(야생 2단계 3 세로 장애물): 언리얼 일곱째 줄 '<지역> 장애물 | ...'(원판이 있을 때만)과 파이썬 10초 줄의 ob_*(run_mirror.py, obstacles 를 켠 세계)이
 모두 있으면 사슴·늑대가 원판에 닿은 몫·물러남·돌아섬 줄을 더한다.
+10-17 더함(장애물 돌아가기): 일곱째 줄 끝 '돌아가기 | ...'(돌아가기를 켰을 때만)과 파이썬 det_*(돌아가기를 켠 세계)이 모두 있으면 사슴·늑대가 돌아간
+스텝 몫과 돕기 그만둠 줄을 더한다.
 --independent: 파이썬이 짝 비교가 아닌 독립 지도 판(run_mirror.py --diag, 메타에 unreal_map 없음)이면 세계를 앞에서부터 언리얼 지역 수(9)씩 묶어 반복으로 보고
 '지도 모두' 표만 낸다(지도가 서로 다르다 — 숲 줄은 없다).
 """
@@ -40,6 +42,10 @@ KEYS = ("n", "alive", "caught", "starved", "starts", "ends", "success", "outside
         "ring4", "cover")
 PACK_KEYS = ("pk_steps", "pk_lead", "pk_help", "pk_wait", "pk_door", "pk_catch", "pk_coop")
 OB_KEYS = ("ob_deer_steps", "ob_deer_hit", "ob_deer_back", "ob_wolf_steps", "ob_wolf_hit", "ob_wolf_back", "ob_wolf_dead")
+# 10-17 돌아가기(obstacles.detour): 일곱째 줄 끝 '돌아가기 | 사슴 바꿈 … · 늑대 바꿈 … · 돕기 그만둠 …'
+DET = re.compile(r'\[EcoV3I\] (\S+) 장애물 \| ([\d.]+)초 \| .*?돌아가기 \| 사슴 바꿈 (\d+) \(시작 (\d+) · 못 찾음 (\d+)\) · '
+                 r'늑대 바꿈 (\d+) \(시작 (\d+) · 못 찾음 (\d+)\) · 돕기 그만둠 (\d+)')
+DET_KEYS = ("det_deer_used", "det_deer_start", "det_deer_fail", "det_wolf_used", "det_wolf_start", "det_wolf_fail", "det_help_drop")
 
 
 def parse_unreal(folder: Path) -> dict[tuple[int, str], dict]:
@@ -50,7 +56,7 @@ def parse_unreal(folder: Path) -> dict[tuple[int, str], dict]:
             continue
         seed = int(m.group(2))
         for line in p.read_text(encoding="utf-8").splitlines():
-            for rx, kind in ((MAIN, "main"), (KEEP, "keep"), (HUNT, "hunt"), (PACK, "pack"), (OBST, "obst")):
+            for rx, kind in ((MAIN, "main"), (KEEP, "keep"), (HUNT, "hunt"), (PACK, "pack"), (OBST, "obst"), (DET, "det")):
                 g = rx.search(line)
                 if not g or float(g.group(2)) != T_CMP:
                     continue
@@ -64,6 +70,8 @@ def parse_unreal(folder: Path) -> dict[tuple[int, str], dict]:
                     d.update(zip(PACK_KEYS, v))
                 elif kind == "obst":
                     d.update(zip(OB_KEYS, v))
+                elif kind == "det":
+                    d.update(zip(DET_KEYS, v))
                 else:
                     d.update(starts=v[0], ends=v[1], success=v[2], outside=v[3], ch_e=v[5], ch_s=v[6], st_e=v[8], st_s=v[9], shelter=v[10],
                              live=v[11], ring2=v[12], ring4=v[13])
@@ -94,7 +102,8 @@ def parse_python(paths, block: int = 0) -> dict[tuple[int, str], list[dict]]:
                 cover=g["catch_cover"], outside_end=h["outside"],
                 **({k: r[c] for k, c in zip(PACK_KEYS, ("pack_wolf_steps", "pack_lead", "pack_help", "pack_wait", "pack_door", "pack_catches",
                                                         "pack_coop"))} if "pack_help" in r else {}),
-                **({k: r[k] for k in OB_KEYS} if "ob_deer_hit" in r else {})))
+                **({k: r[k] for k in OB_KEYS} if "ob_deer_hit" in r else {}),
+                **({k: r[k] for k in DET_KEYS} if "det_deer_used" in r else {})))
     return out
 
 
@@ -108,7 +117,8 @@ def has_pack(maps, u, py, keys=PACK_KEYS) -> bool:
 
 def summary(maps, u, py):
     """지도 묶음 → (언리얼 합, 파이썬 반복별 합 목록). 늑대 무리 칸은 양쪽 모두 있을 때만 더한다."""
-    keys = KEYS + (PACK_KEYS if has_pack(maps, u, py) else ()) + (OB_KEYS if has_pack(maps, u, py, OB_KEYS) else ())
+    keys = (KEYS + (PACK_KEYS if has_pack(maps, u, py) else ()) + (OB_KEYS if has_pack(maps, u, py, OB_KEYS) else ())
+            + (DET_KEYS if has_pack(maps, u, py, DET_KEYS) else ()))
     U = {k: sum(u[m][k] for m in maps) for k in keys}
     reps = min(len(py[m]) for m in maps)
     P = [{k: sum(py[m][j][k] for m in maps) for k in keys} for j in range(reps)]
@@ -152,6 +162,11 @@ OB_METRICS = (
     ("늑대·스텝 가운데 원판에 닿음 %", lambda d: pct(d["ob_wolf_hit"], d["ob_wolf_steps"]), 2),
     ("늑대 돌아섬", lambda d: d["ob_wolf_dead"], 1),
 )
+DET_METRICS = (
+    ("사슴·스텝 가운데 돌아감 %", lambda d: pct(d["det_deer_used"], d["ob_deer_steps"]), 2),
+    ("늑대·스텝 가운데 돌아감 %", lambda d: pct(d["det_wolf_used"], d["ob_wolf_steps"]), 2),
+    ("돕기 그만둠", lambda d: d["det_help_drop"], 1),
+)
 
 
 def table(title, maps, u, py):
@@ -159,7 +174,8 @@ def table(title, maps, u, py):
     print(f"\n### {title} (지도 {len(maps)}장, 파이썬 반복 {len(P)})\n")
     print("| 칸 | 언리얼 | 파이썬 평균 [최소..최대] | z |")
     print("|---|---|---|---|")
-    for name, f, nd in METRICS + (PACK_METRICS if "pk_steps" in U else ()) + (OB_METRICS if "ob_deer_steps" in U else ()):
+    for name, f, nd in (METRICS + (PACK_METRICS if "pk_steps" in U else ()) + (OB_METRICS if "ob_deer_steps" in U else ())
+                        + (DET_METRICS if "det_deer_used" in U else ())):
         uv = f(U)
         mu, sd, lo, hi = stat([f(p) for p in P])
         z = (uv - mu) / sd if sd and sd > 0 and math.isfinite(sd) else float("nan")

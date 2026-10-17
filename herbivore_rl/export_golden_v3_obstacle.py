@@ -8,6 +8,7 @@ Step 의 표적 가림과 이동)·`EcoWorldV3.h` (FObstacleConfig·ObstaclePush
     python export_golden_v3_obstacle.py --out <폴더>
 
 세계·시드: configs/v3_wild2_obstacle_mirror.yaml. 이 내보내기 전용 탐색 시드 32095(원판 배치)·32096(장면 난수)·32097(한 스텝 장면). 판정 시드는 쓰지 않는다.
+이 골든은 미끄러짐만 본다 — 설정의 돌아가기(obstacles.detour, 10-17)는 끄고 세계를 만든다(돌아가기 골든은 export_golden_v3_detour.py).
 
 묶음:
   미끄러짐  `obstacle_slide` 의 (원판 묶음, 이동 전 p, 가려던 q, 맵 자르기 여부) → (새 q, 부딪힘, 물러남). 손 장면(정면·비스듬·겹친 두 원판·가는 원판
@@ -69,16 +70,25 @@ def c_array(ctype: str, name: str, flat: list, per_line: int, fmt) -> str:
     return "\n".join(lines)
 
 
-def mirror_params() -> dict:
+def obst_config(detour: bool = False):
+    """거울 설정. detour = 돌아가기(obstacles.detour)를 켜나 — 이 골든은 끈다(10-17 돌아가기를 넣기 전 헤더와 바이트 단위로 같다)."""
     cfg = load_v2_config(OBST)
-    op = dict(cfg.v2["features"]["obstacles"])
+    f = {k: dict(v) for k, v in cfg.v2["features"].items()}
+    f["obstacles"]["detour"] = bool(detour)
+    return cfg.replace(v2=dict(cfg.v2, features=f))
+
+
+def mirror_params() -> dict:
+    op = dict(obst_config().v2["features"]["obstacles"])
     op.pop("enabled")
+    for k in [k for k in op if k.startswith("detour")]:
+        op.pop(k)
     return op
 
 
 def mirror_layout(op: dict) -> tuple[np.ndarray, float, np.ndarray]:
     """거울 세계(시드 SEED_LAYOUT)의 원판 배치·무대 한 변·은신처 원 (x, y, r)."""
-    w = World(load_v2_config(OBST).replace(N=8), seeds=[SEED_LAYOUT])
+    w = World(obst_config().replace(N=8), seeds=[SEED_LAYOUT])
     if w._ob is None or not len(w.obstacles):
         raise SystemExit("v3_wild2_obstacle_mirror.yaml 은 obstacles 를 켜고 원판이 있어야 한다")
     return w.obstacles.copy(), float(w.size), np.c_[w.cov_c, w.cov_r]
@@ -236,7 +246,7 @@ def run_push(c, d, body):
 
 
 def step_world() -> World:
-    w = World(load_v2_config(OBST).replace(N=N_STEP), seeds=[SEED_STEP])
+    w = World(obst_config().replace(N=N_STEP), seeds=[SEED_STEP])
     if w._ob is None or w._wp is None or w.M != 4 or w.alive is None or not len(w.obstacles):
         raise SystemExit("v3_wild2_obstacle_mirror.yaml 은 원판·늑대 4·wild_pack 켬·부활 없음이어야 한다")
     if w._zc is not None or w._sd is not None or w._zt is not None or w._pred_ranged_v1.any():

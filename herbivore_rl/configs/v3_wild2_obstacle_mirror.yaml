@@ -10,6 +10,8 @@
 # obstacles 를 끄면 v3_wild2_pack_mirror.yaml 과 비트 단위로 같다(tests/test_wild2_obstacle.py). 시드: 탐색 32000~32099·33000~33099 만.
 # 언리얼 통합 기본(늑대 4·협동·몸 여유 1 m·은신처 먹이 부족·세로 장애물 켬)의 거울이 이 설정이다(레벨에 원판이 없으면 v3_wild2_pack_mirror.yaml 과 같다).
 # 10-17 고침: 은신처 먹이 부족 블록을 다시 넣었다(아래 v3_wild2_pack_mirror.yaml 머리 주석). 고침 전 측정(81c6409)은 --disable realism_cover_food.
+# 10-17 장애물 끼임 고침: obstacles 블록에 돌아가기(detour·detour_*)를 켰다 — 원판에 막히면 가장 적게 돈 빈 방향으로 돌아간다(블록 주석). 고침 전 판은
+#   실행기에서 obstacles.detour 를 false 로 덮는다(results/v3/wild2/stuck_check.py --set obstacles.detour=false, 결과 results/v3/wild2/README.md '돌아가기').
 #
 # ── 아래는 v3_wild2_pack_mirror.yaml 의 머리 주석 그대로 ──
 # 야생 2단계 2 거울 세계 — 늑대 무리·협동 사냥 (10-17 사용자 '추천대로 끄고 2~4번 진행해' — 끈 것은 팀 무리 경보 연결뿐, 아래).
@@ -389,6 +391,21 @@ features:
     body_r: 0.15
     block_sight: true
     no_food: true
+    # 돌아가기 (10-17 장애물 끼임 고침, env_v2/world.py `detour_moves`, 모듈 docstring '야생 2단계' 3 의 6)). 끄면(detour false) 미끄러짐만 — 고치기 전 판.
+    # 원판에 닿아 가려던 쪽으로 이번 스텝 이동의 detour_block 몫도 못 가면 막힘이다. 그러면 가려던 방향을 22.5° 씩 양쪽으로 돌려 보며(작은 각부터, 같으면
+    # 시계 반대 먼저) 한 스텝에 detour_free 몫 이상 나아가는 첫 방향으로 간다(늑대는 은신처 막기 원 안·무대 밖 자리도 빈 방향이 아니다). 그 뒤 가려던 쪽
+    # 앞 detour_probe(단위)가 트이거나 detour_steps 스텝이 지날 때까지 같은 쪽으로 돈다(붙은 쪽 먼저 — 줄기를 끼고 돈다). 사슴의 도주는 늑대 반대쪽에
+    # 가장 가까운 빈 방향을 고르므로 늑대에서 멀어지는 쪽을 지킨다. 돕는 늑대는 detour_help_block 스텝 넘게 돌아가거나 그만큼 이어서 기어가거나 막혀
+    # 돌아서면 detour_help_drop 스텝 동안 돕지 않는다(길목 자리를 버리고 다시 고른다 — 돌아선 늑대가 다음 스텝에 다시 줄기로 들어가지 않게).
+    # 현실 근거: 사슴·늑대는 나무 줄기와 바위에 몸을 밀어붙이지 않고 돌아 지나간다 — 숲에서 쫓기는 동물은 줄기 사이 빈 길로 방향을 틀고, 걷는 동물은 앞을
+    # 몇 걸음 보고 길을 고른다(값은 어림: 막힘 몫 0.5·빈 몫 0.8 = 한 스텝 이동의 절반·8 할, 앞 보기 3 m ≈ 사슴 몸길이 두 배, 최대 6 초, 돕기 그만둠 2 초 → 5 초)
+    detour: true
+    detour_block: 0.5
+    detour_free: 0.8
+    detour_probe: 1.5
+    detour_steps: 45
+    detour_help_block: 15
+    detour_help_drop: 38
 
 train:
   # configs/v3_real1_night_on.yaml 과 같고 허용 목록에서 얼기만 뺐다. 이 세계는 학습하지 않는다(부활 없음 — vec_env 가 받지 않는다).

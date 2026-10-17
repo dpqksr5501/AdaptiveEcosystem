@@ -326,7 +326,7 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
       규칙만으로 둘러싸기가 생긴다(Muro 외 2011, Behav. Processes 88:192). 교대 추격(relay)은 넣지 않았다.
   3 세로 장애물 obstacles (12, 10-17 사용자 '추천대로 끄고 2~4번 진행해' — 10-14 에 자리만 둔 기능. 설정 configs/v3_wild2_obstacle_mirror.yaml =
     v3_wild2_pack_mirror.yaml + 이 블록). 자료 World.obstacles (K, 3) [x, y, r](단위, 열 이름 OBSTACLE_COLUMNS). 끄면 늘 (0, 3) 이고 어떤 판정도 읽지
-    않는다(비트 동일). 다섯 자리:
+    않는다(비트 동일). 다섯 자리와 선택 하나(6 돌아가기):
       1) 배치 `_obstacles_reset`(`_build_world`·통합 무대 배치 뒤): fixed 가 있으면 그 원판(난수 없음 — 언리얼 무대에서 읽은 원판으로 도는 짝 비교),
          없으면 `obstacle_layout` — 자기 스트림 part 0 만 써서 나무 줄기 round(tree_per_ha × 무대 ha) 개, 그다음 바위 round(rock_per_ha × 무대 ha) 개.
          하나마다 (x, y) ~ U[0, S]², r ~ U[하, 상] 를 뽑고 중심이 은신처 원 안(|c − c_k| ≤ r_k)이거나 무대 벽에서 r + OB_EDGE_BODIES·body_r 안이면 다시
@@ -346,9 +346,23 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
       5) 위치 `obstacle_push_out`(reset 끝 — 은신처 밖 밀어내기 뒤, `_respawn`): 원판(R) 안의 사슴·늑대를 가장 가까운 후보로 옮긴다. 후보 = 원판마다
          (중심 → 개체 쪽 둘레 R + OB_EPS 점) 하나와 OB_RING 8 방향(축·대각선, 성분 0·±1·±√½) 둘레 점. 무대 안이고 모든 원판 밖이고(늑대는 은신처
          막기를 켰으면 은신처 원(반지름 + 몸 여유) 밖) 인 후보 가운데 가장 가까운 것(같으면 앞). 없으면 그대로 두고 센다. v1 난수 호출은 그대로다.
-    난수: 배치만 자기 스트림 part 0. 이동·시선·먹이·밀어내기는 난수가 없다. 통계 `obstacle_stats`.
-    C++ 꼴: EcoThreatModel.h ObstacleSlide·SightBlocked·InsideAnyObstacle(위협 Step 1·4 표적 보임, 8 이동), EcoObservationV3.h FThreatInput::bOccluded
-      (사슴 보임), EcoWorldV3.h FObstacleConfig·FFoodGrid::ApplyObstacleFood·ObstaclePushOut(C1 사슴 이동, 입양·리스폰). 언리얼은 무대 안 레벨의 충돌하는
+      6) 돌아가기 `detour_moves` (선택 키 detour, 10-17 장애물 끼임 고침 — 끄면 None 이고 위 1)~5) 그대로, 비트 동일). 사슴 `step` 1 의 이동 바로 앞, 포식자
+         `_step_predators_v3` 의 이동 바로 앞(밤잠·땅 배수 뒤)에서 가려던 이동 v 의 방향만 바꾼다(크기 그대로). 개체 상태 det_left·det_side·det_steps:
+         - 이동 시험 = 실제 이동과 같은 식(사슴 clip + 미끄러짐 size, 늑대 미끄러짐). 막힘 = 원판에 닿음 ∧ (가려던 쪽 나아감 < detour_block × |v| ∨ (막는
+           늑대) 미끄러진 끝이 은신처 막기 원 안). 빈 방향 = 그 방향 이동 시험의 나아감 ≥ detour_free × |v| (늑대는 더해서 무대 안 ∧ 은신처 막기 원 밖).
+         - 막히면 가려던 방향을 22.5° 씩(삼각함수 없는 표 DETOUR_ROT) 작은 각부터 +·− 번갈아(같으면 시계 반대 먼저) 돌려 본 첫 빈 방향으로 간다. 붙은 쪽
+           side = 그 쪽, det_left = detour_steps − 1.
+         - 돌아가는 중(det_left > 0)에는 가려던 쪽 앞 보기(max(detour_probe, |v|))가 원판에 안 닿으면 끝이고, 닿으면 붙은 쪽 1..8 단계 → 반대쪽 1..7 단계
+           차례의 첫 빈 방향(줄기를 끼고 돈다). 빈 방향이 없으면 v 그대로(늑대는 지금 돌아서기 규칙이 받는다). 멈춘 개체(|v| ≤ EPS)는 상태 0.
+         - 돕는 늑대(wild_pack)는 detour_help_block 스텝 넘게 돌아가거나, 가려던 거리의 detour_block 몫도 못 간 스텝이 쌓여(pred_det_slow — 기어가면 +1,
+           아니면 −1) detour_help_block 에 닿았거나, 막혀
+           돌아섰으면(pred_ob_dead) detour_help_drop 스텝 동안 돕지 않는다(pack_drop, 무리 목표 고르기에서 뺀다 — 돌아선 늑대는 돌아선 쪽으로 간다).
+         도주하는 사슴은 늑대 반대쪽에 가장 가까운 빈 방향을 고르므로 늑대에서 멀어지는 쪽을 지키며 돌아간다. 리스폰은 상태 0. 통계 obstacle_stats()['detour'].
+         현실 근거: 사슴·늑대는 나무 줄기와 바위에 몸을 밀어붙이지 않고 돌아 지나간다(값은 어림 — configs/v3_wild2_obstacle_mirror.yaml 블록 주석).
+    난수: 배치만 자기 스트림 part 0. 이동·시선·먹이·밀어내기·돌아가기는 난수가 없다. 통계 `obstacle_stats`.
+    C++ 꼴: EcoThreatModel.h ObstacleSlide·SightBlocked·InsideAnyObstacle(위협 Step 1·4 표적 보임, 8 이동), DetourStep(사슴 C1·위협 Step 7′, 돕기 그만둠 Step 8″),
+      EcoObservationV3.h FThreatInput::bOccluded
+      (사슴 보임), EcoWorldV3.h FObstacleConfig(::Detour)·FFoodGrid::ApplyObstacleFood·ObstaclePushOut(C1 사슴 이동, 입양·리스폰). 언리얼은 무대 안 레벨의 충돌하는
       스태틱 메시(폴리지 인스턴스 포함)를 읽기만 해서 원판을 만든다(EcoPolicyV3IntegratedSubsystem ScanStageObstacles, 콘솔 변수 eco.IntegratedV3.Obstacles).
     현실 근거: 늑대에게 잡힌 엘크는 도망이 막히는 곳(강가·길가·깊은 눈)에서 더 많았다(Kauffman 외 2007, Ecol. Lett. 10:690). 숲은 그루가 빽빽해
       (온대 성숙림 1 ha 에 줄기 약 1200 그루, 가슴높이 단면적 34 m² — ESA Ecological Archives E094-195) 사슴·늑대가 줄기를 돌아 달리고 서로를 오래 보지 못한다.
@@ -586,6 +600,19 @@ OB_UNIT_M = 2.0          # 1 단위 = 2 m (무대 ha 계산)
 _OB_S = math.sqrt(0.5)
 # 밀어내기 후보 방향 8 개(축·대각선). 삼각함수 없이 정해 C++ 와 비트 단위로 같다(EcoWorldV3.h kObstacleRing)
 OB_RING = ((1.0, 0.0), (_OB_S, _OB_S), (0.0, 1.0), (-_OB_S, _OB_S), (-1.0, 0.0), (-_OB_S, -_OB_S), (0.0, -1.0), (_OB_S, -_OB_S))
+# 돌아가기(모듈 docstring '야생 2단계' 3 의 6), 10-17): 가려던 방향을 k·22.5°(k = 0..8) 돌리는 (cos, sin). 삼각함수 없이 정해 C++ 와 비트 단위로 같다
+# (EcoThreatModel.h kDetourRot). 후보 15 개 = k 1..7 의 양쪽(sg ±1)과 k 8(180°, sg +1 하나). 후보 번호 j: 0..6 = (j + 1, +1), 7 = (8, +1), 8..14 = (j − 7, −1)
+_DT_C = 0.9238795325112867     # cos 22.5°
+_DT_S = 0.3826834323650898     # sin 22.5°
+DETOUR_ROT = ((1.0, 0.0), (_DT_C, _DT_S), (_OB_S, _OB_S), (_DT_S, _DT_C), (0.0, 1.0), (-_DT_S, _DT_C), (-_OB_S, _OB_S), (-_DT_C, _DT_S), (-1.0, 0.0))
+DETOUR_HALF = 8
+DETOUR_CAND_K = (1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7)
+DETOUR_CAND_SG = (1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, -1)
+DETOUR_CANDS = len(DETOUR_CAND_K)
+# 고르는 차례: 처음(막힘) = 작은 각부터 +·− 번갈아, 돌아가는 중 = 붙은 쪽 1..8 단계 다음 반대쪽 1..7 단계
+DETOUR_ORDER_FRESH = (0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7)
+DETOUR_ORDER_POS = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)
+DETOUR_ORDER_NEG = (8, 9, 10, 11, 12, 13, 14, 7, 0, 1, 2, 3, 4, 5, 6)
 
 
 WORLD_PARAM_KEYS = ("world_size", "predator_count", "pred_speed_mult", "ranged_frac", "cover_frac", "food_regen_mult")
@@ -1363,7 +1390,18 @@ def _obstacles_params(p: dict, f: Features) -> dict:
     out = dict(tree_per_ha=_wild_num(n, p, "tree_per_ha", 0.0), tree_r=rng_pair("tree_r"),
                rock_per_ha=_wild_num(n, p, "rock_per_ha", 0.0), rock_r=rng_pair("rock_r"),
                body_r=_wild_num(n, p, "body_r", 0.0), block_sight=_wild_bool(n, p, "block_sight"), no_food=_wild_bool(n, p, "no_food"),
-               fixed=None)
+               fixed=None, detour=None)
+    if _wild_bool(n, p, "detour"):
+        # 6) 돌아가기 (10-17, 선택 키 — 끄면 None 이고 그 코드 경로를 타지 않는다)
+        def whole(key, lo):
+            v = p[key]
+            if isinstance(v, bool) or not isinstance(v, (int, np.integer)) or v < lo:
+                raise ValueError(f"features.obstacles.{key} 는 {lo} 이상의 정수여야 한다. 받은 값: {v!r}")
+            return int(v)
+
+        out["detour"] = dict(block=_wild_num(n, p, "detour_block", 0.0, 1.0, open_lo=True), free=_wild_num(n, p, "detour_free", 0.0, 1.0, open_lo=True),
+                             probe=_wild_num(n, p, "detour_probe", 0.0), steps=whole("detour_steps", 1), help_block=whole("detour_help_block", 1),
+                             help_drop=whole("detour_help_drop", 0))
     if p["fixed"] is not None:
         a = np.asarray(p["fixed"], dtype=np.float64)
         a = a.reshape(-1, len(OBSTACLE_COLUMNS)) if a.size else np.zeros((0, len(OBSTACLE_COLUMNS)))
@@ -1552,6 +1590,124 @@ def obstacle_push_out(q: np.ndarray, discs: np.ndarray, body_r: float, size: flo
         q[i] = C[int(np.argmin(np.where(ok, dx * dx + dy * dy, np.inf)))]
         moved += 1
     return q, moved, failed
+
+
+def detour_candidates(d: np.ndarray) -> np.ndarray:
+    """돌아가기 후보 방향 (모듈 docstring '야생 2단계' 3 의 6)). d (n, 2) 가려던 단위 방향 → (n, DETOUR_CANDS, 2). 후보 j 는 DETOUR_CAND_K[j]·22.5° 를
+    DETOUR_CAND_SG[j] 쪽(+1 = 시계 반대)으로 돌린 방향: (dx·C − sg·(dy·S), sg·(dx·S) + dy·C), (C, S) = DETOUR_ROT[k](삼각함수 없음 — C++ 와 비트 동일).
+    C++ EcoThreatV3::DetourCandidate."""
+    C = np.array([DETOUR_ROT[k][0] for k in DETOUR_CAND_K])[None, :]
+    S = np.array([DETOUR_ROT[k][1] for k in DETOUR_CAND_K])[None, :]
+    sg = np.array(DETOUR_CAND_SG, dtype=np.float64)[None, :]
+    dx, dy = d[:, 0:1], d[:, 1:2]
+    return np.stack([dx * C - sg * (dy * S), sg * (dx * S) + dy * C], -1)
+
+
+def detour_moves(p: np.ndarray, v: np.ndarray, left: np.ndarray, side: np.ndarray, steps: np.ndarray, discs: np.ndarray, body_r: float,
+                 size: float, deer: bool, dp: dict, walls: np.ndarray | None = None, wall_sel: np.ndarray | None = None):
+    """세로 장애물 돌아가기 한 스텝 (모듈 docstring '야생 2단계' 3 의 6)). p (n, 2) 이동 전 위치(모든 원판 밖), v (n, 2) 가려던 이동, 개체 상태
+    left·side·steps (n,) int(제자리에서 바꾼다), discs·body_r 원판, size 무대 한 변, deer = 사슴(이동을 무대로 자르고 미끄러짐도 자른다 — `step` 1 과 같다)
+    인가 늑대(자르지 않는다 — `_step_predators_v3` 이동과 같다)인가, dp = obstacles 의 detour_* 계수, walls (K, 3) [x, y, r + 몸 여유] = 막는 늑대가 들어가지
+    못하는 은신처 원(늑대만, 없으면 None), wall_sel (n,) bool = 은신처 막기를 받는 늑대. 반환 (새 v, 고른 방향 c, 썼나, 시작했나, 못 찾았나) — (n, 2) 둘
+    (c 는 쓴 개체만 — 새 v = s·c), (n,) bool 셋.
+    개체마다 스칼라 식이라 C++ EcoThreatV3::DetourStep 과 같은 순서다(골든 비트 동일):
+      s = |v|. s ≤ EPS 면 상태 0 (돌아가기 끝), v 그대로.
+      이동 시험 M(u) = 사슴: q0 = clip(p + u, 0, size), q = obstacle_slide(p, q0, …, size) / 늑대: q = obstacle_slide(p, p + u, …). 나아감 g(u, c) = ((q − p)·c) / s.
+      빈 방향 c: g(s·c, c) ≥ free (늑대는 더해서 q 가 무대 [0, size]² 안 ∧ 막는 늑대면 walls 원 밖 — |q − c_k| < R_k 가 아님).
+      돌아가는 중(left > 0): 앞 보기 = obstacle_slide(p, p + max(probe, s)·d, …) 가 원판에 안 닿으면 끝(상태 0)이고 아래 '보통' 으로 간다. 닿으면
+        left − 1, steps + 1, 붙은 쪽(side) 먼저 차례(1..8 단계 그 쪽, 1..7 단계 반대쪽 — 8 단계 = 180° 는 늘 sg +1 후보) 가운데 첫 빈 방향 c 로 v ← s·c,
+        side ← 그 후보의 sg(180° 면 그대로). 빈 방향이 없으면 v 그대로(못 찾음).
+      보통: (q, 부딪힘) = M(v). 부딪힘 ∧ (g(v, d) < block ∨ (막는 늑대면) q 가 walls 원 안 — 원판에 미끄러져 은신처 둘레로 밀려 들어감) 이면 막힘 —
+        차례(1 단계 +·−, 2 단계 +·−, …, 7 단계 +·−, 8 단계)의 첫 빈 방향 c 로 v ← s·c,
+        side ← 그 후보의 sg(180° 면 +1), left ← steps_max − 1, steps ← 1(시작). 없으면 v 그대로(못 찾음, 상태 그대로).
+    난수 없음. C++ 꼴: EcoThreatV3::DetourStep(Px, Py, Vx&, Vy&, State&, Discs, Num, Body, Size, bDeer, Walls, NumWalls, Cfg)."""
+    n = len(p)
+    v = np.array(v, dtype=np.float64, copy=True)
+    dirs = np.zeros((n, 2))
+    used = np.zeros(n, dtype=bool)
+    start = np.zeros(n, dtype=bool)
+    fail = np.zeros(n, dtype=bool)
+    if not n or not len(discs):
+        return v, dirs, used, start, fail
+    s = np.sqrt(v[:, 0] * v[:, 0] + v[:, 1] * v[:, 1])
+    mv = s > EPS
+    still = ~mv
+    left[still] = 0
+    side[still] = 0
+    steps[still] = 0
+    if not mv.any():
+        return v, dirs, used, start, fail
+    ss = np.where(mv, s, 1.0)
+    d = v / ss[:, None]
+
+    def move_test(pp, u):
+        if deer:
+            q0 = np.clip(pp + u, 0.0, size)          # `step` 1 의 이동과 같은 식
+            q, hit, _ = obstacle_slide(pp, q0, discs, body_r, size)
+        else:
+            q, hit, _ = obstacle_slide(pp, pp + u, discs, body_r)
+        return q, hit
+
+    def in_walls(Q, sel):
+        if deer or walls is None or not len(walls):
+            return np.zeros(len(Q), dtype=bool)
+        ex = Q[:, 0:1] - walls[:, 0][None, :]
+        ey = Q[:, 1:2] - walls[:, 1][None, :]
+        inw = (np.sqrt(ex * ex + ey * ey) < walls[:, 2][None, :]).any(1)
+        return inw & sel if sel is not None else inw
+
+    q, hit = move_test(p, v)
+    g = ((q[:, 0] - p[:, 0]) * d[:, 0] + (q[:, 1] - p[:, 1]) * d[:, 1]) / ss
+    blocked = mv & hit & ((g < dp["block"]) | in_walls(q, wall_sel))
+    need = np.flatnonzero(mv & ((left > 0) | blocked))
+    if not len(need):
+        return v, dirs, used, start, fail
+    P, Dn, Sn = p[need], d[need], ss[need]
+    cand = detour_candidates(Dn)                                  # (k, J, 2)
+    J = cand.shape[1]
+    PP = np.repeat(P, J, axis=0)
+    U = (Sn[:, None, None] * cand).reshape(-1, 2)
+    Q, _ = move_test(PP, U)
+    CC = cand.reshape(-1, 2)
+    gc = ((Q[:, 0] - PP[:, 0]) * CC[:, 0] + (Q[:, 1] - PP[:, 1]) * CC[:, 1]) / np.repeat(Sn, J)
+    free = gc >= dp["free"]
+    if not deer:
+        free &= (Q[:, 0] >= 0.0) & (Q[:, 0] <= size) & (Q[:, 1] >= 0.0) & (Q[:, 1] <= size)
+        free &= ~in_walls(Q, None if wall_sel is None else np.repeat(wall_sel[need], J))
+    free = free.reshape(len(need), J)
+    L = np.maximum(dp["probe"], Sn)
+    _, hp_, _ = obstacle_slide(P, P + L[:, None] * Dn, discs, body_r)
+    for r, i in enumerate(need):
+        i = int(i)
+        if left[i] > 0:
+            if not hp_[r]:
+                left[i] = side[i] = steps[i] = 0
+            else:
+                left[i] -= 1
+                steps[i] += 1
+                order = DETOUR_ORDER_POS if side[i] > 0 else DETOUR_ORDER_NEG
+                j = next((j for j in order if free[r, j]), -1)
+                if j < 0:
+                    fail[i] = True
+                else:
+                    dirs[i] = cand[r, j]
+                    v[i] = Sn[r] * cand[r, j]
+                    side[i] = side[i] if DETOUR_CAND_K[j] == DETOUR_HALF else DETOUR_CAND_SG[j]
+                    used[i] = True
+                continue
+        if blocked[i]:
+            j = next((j for j in DETOUR_ORDER_FRESH if free[r, j]), -1)
+            if j < 0:
+                fail[i] = True
+            else:
+                dirs[i] = cand[r, j]
+                v[i] = Sn[r] * cand[r, j]
+                side[i] = 1 if DETOUR_CAND_K[j] == DETOUR_HALF else DETOUR_CAND_SG[j]
+                left[i] = dp["steps"] - 1
+                steps[i] = 1
+                used[i] = True
+                start[i] = True
+    return v, dirs, used, start, fail
 
 
 def pack_goals(wq, whead, leader, helper, tgt, p, disp, cov_c, cov_r, margin: float, size: float, wp: dict):
@@ -1935,6 +2091,8 @@ class World:
             self._rz_chase_reset()          # v3 R3 (f): 위협별 추격 고정 상태(크기 M)
         if self._ob is not None:
             self._ob_place_agents()         # 야생 2단계 3 의 5): 원판 안 사슴·늑대를 밖으로(은신처 밀어내기 뒤, 난수 없음)
+            if self._ob["detour"] is not None:
+                self._det_reset()           # 야생 2단계 3 의 6) 돌아가기 상태(난수 없음)
         if self._v3p:
             self.pred_vel = np.zeros((self.M, 2))   # 포식자의 지난 스텝 이동(관측 pred_approach)
             # 야생 2단계 통계 전용: 늑대마다 사냥이 이어지는 중인가(`hunt_update`). 처음에는 아니다
@@ -2066,6 +2224,25 @@ class World:
         self._ob_deer_steps = self._ob_wolf_steps = 0
         self._ob_eye_pairs = self._ob_eye_blocked = self._ob_tgt_pairs = self._ob_tgt_blocked = 0
         self._ob_push_moved = self._ob_push_failed = 0
+        self._det_deer_used = self._det_deer_start = self._det_deer_fail = 0
+        self._det_wolf_used = self._det_wolf_start = self._det_wolf_fail = self._det_help_drop = 0
+
+    def _det_reset(self) -> None:
+        """야생 2단계 3 의 6) 돌아가기 개체 상태 (reset·리스폰). det_left = 남은 돌아가기 스텝(0 = 아님), det_side = 붙은 쪽(+1 시계 반대·−1 시계·0 없음),
+        det_steps = 이번 돌아가기의 지난 스텝 — 사슴 (N,)·늑대 pred_det_* (M,). pack_drop = 돕지 않는 남은 스텝 (M,), pred_det_slow = 가려던 거리의
+        detour_block 몫도 못 간 늑대 스텝의 쌓인 수 (M, 기어가면 +1·아니면 −1, 무리 협동을 켰을 때만 센다). 스텝 뒤 훅 det_used·pred_det_used
+        (이번 스텝에 방향을 바꿨다)."""
+        N, M = self.N, self.M
+        self.det_left = np.zeros(N, dtype=np.int64)
+        self.det_side = np.zeros(N, dtype=np.int64)
+        self.det_steps = np.zeros(N, dtype=np.int64)
+        self.det_used = np.zeros(N, dtype=bool)
+        self.pred_det_left = np.zeros(M, dtype=np.int64)
+        self.pred_det_side = np.zeros(M, dtype=np.int64)
+        self.pred_det_steps = np.zeros(M, dtype=np.int64)
+        self.pred_det_used = np.zeros(M, dtype=bool)
+        self.pack_drop = np.zeros(M, dtype=np.int64)
+        self.pred_det_slow = np.zeros(M, dtype=np.int64)
 
     def _ob_walls(self) -> np.ndarray | None:
         """늑대 밀어내기 후보가 피할 은신처 막기 원 (K, 3) [x, y, r + wolf_margin] — 은신처 막기(c′)를 켠 세계만, 아니면 None."""
@@ -3176,6 +3353,17 @@ class World:
             self._zt_deer += np.bincount(tc, minlength=len(TERRAIN_NAMES))
         if self._wp is not None:
             self._pack_p0 = self.pos.copy()     # 야생 2단계 2: 사슴의 이번 스텝 이동(도주 방향)을 포식자 스텝이 읽는다
+        if self._ob is not None and self._ob["detour"] is not None and len(self.obstacles):
+            # 야생 2단계 3 의 6) 돌아가기(10-17): 원판에 막히면 가려던 쪽에서 가장 적게 돈 빈 방향으로(이동 전에 같은 이동 시험으로 고른다 — 아래 이동은
+            # 그대로). 속도 크기는 그대로, 적용 속도 훅 vel 도 바꾼 값이다. 시체(통합 무대 k)는 v = 0 이라 상태만 0 이 된다
+            v, _, used, st, fl = detour_moves(self.pos, v, self.det_left, self.det_side, self.det_steps, self.obstacles, self._ob["body_r"],
+                                           self.size, True, self._ob["detour"])
+            self.det_used = used
+            self._det_deer_used += int(np.count_nonzero(used))
+            self._det_deer_start += int(np.count_nonzero(st))
+            self._det_deer_fail += int(np.count_nonzero(fl))
+            if used.any():
+                self.vel = v
         p_before = self.pos
         self.pos = np.clip(self.pos + v, 0.0, self.size)
         if self._ob is not None and len(self.obstacles):
@@ -3951,8 +4139,26 @@ class World:
             if th is not None and M > Mb:
                 tm = np.where(self.pred_is_player, self._zt["mult_player"][tc], tm)
             speed = speed * tm
-        self.pred_pos = self.pred_pos + move * speed[:, None]
         ob_on = self._ob is not None and len(self.obstacles) > 0
+        det = self._ob["detour"] if ob_on else None
+        if det is not None:
+            # 야생 2단계 3 의 6) 돌아가기(10-17): 원판에 막히면 가려던 쪽에서 가장 적게 돈 빈 방향으로(은신처 막기 원 안·무대 밖 자리는 빈 방향이 아니다).
+            # 바꾼 늑대는 move = 그 방향(단위), speed = 가려던 이동 길이 — 이동 move·speed 가 시험한 이동과 같다. heading 도 그 방향이다. C++ Step 7′
+            want_v = move * speed[:, None]
+            walls = self._ob_walls()
+            _, dirs, used, st, fl = detour_moves(self.pred_pos, want_v, self.pred_det_left, self.pred_det_side, self.pred_det_steps,
+                                                 self.obstacles, self._ob["body_r"], self.size, False, det, walls,
+                                                 self._zw_sel if walls is not None else None)
+            if used.any():
+                move = move.copy()
+                speed = np.array(speed, dtype=np.float64, copy=True)
+                move[used] = dirs[used]
+                speed[used] = np.sqrt(want_v[used, 0] * want_v[used, 0] + want_v[used, 1] * want_v[used, 1])
+            self.pred_det_used = used
+            self._det_wolf_used += int(np.count_nonzero(used))
+            self._det_wolf_start += int(np.count_nonzero(st))
+            self._det_wolf_fail += int(np.count_nonzero(fl))
+        self.pred_pos = self.pred_pos + move * speed[:, None]
         if ob_on:
             # 야생 2단계 3 의 2): 원판 앞에서 멈춰 둘레를 따라 미끄러진다(은신처 밀어내기·벽 반사 앞). 원 안 되돌림·막다른 곳은 아래 끝에서
             ob_step = move * speed[:, None]
@@ -4039,6 +4245,19 @@ class World:
             self._ob_wolf_dead += int(np.count_nonzero(dead))
             self._ob_wolf_steps += M
             self.pred_ob_hit, self.pred_ob_back, self.pred_ob_dead = ob_hit, back, dead   # 스텝 뒤 훅(골든·시험 — C++ FThreatStepResult::bObstacle*)
+            if det is not None and self._wp is not None:
+                # 야생 2단계 3 의 6) 돕는 늑대가 detour_help_block 스텝 넘게 돌아가거나, 기어간 스텝(가려던 거리의 detour_block 몫도 못 감 — 은신처 둘레·원판
+                # 곁)이 쌓여 detour_help_block 에 닿았거나, 막혀 돌아섰으면 detour_help_drop 스텝 동안 돕지 않는다(남은 스텝 −1 뒤에 건다 — 그동안 보통 늑대처럼
+                # heading 을 따르고, 돌아선 늑대는 돌아선 쪽으로 간다). 느림 세기 pred_det_slow 는 기어가면 +1, 아니면 −1(0 에서 멈춤 — 사이사이 한 걸음 나아가도
+                # 쌓인다), 그만두면 0 이고 이 블록에서만 바뀐다. C++ Step 8″
+                slow = (want > EPS) & (np.sqrt((dv * dv).sum(1)) < det["block"] * want)
+                self.pred_det_slow = np.where(slow, self.pred_det_slow + 1, np.maximum(self.pred_det_slow - 1, 0))
+                hb = det["help_block"]
+                drop = self.pack_help & ((self.pred_det_steps >= hb) | (self.pred_det_slow >= hb) | dead)
+                self.pack_drop = np.maximum(self.pack_drop - 1, 0)
+                self.pack_drop[drop] = det["help_drop"]
+                self.pred_det_slow[drop] = 0
+                self._det_help_drop += int(np.count_nonzero(drop))
         self.pred_head = normalize(move)
         self.pred_vel = self.pred_pos - old
         # 이번 이동이 전력 걸음이었나 — 추격형(근접·원거리)이 표적을 쫓음, 잠행형 돌진 상태(돌진 이동·마지막 판정 스텝), 플레이어 돌진 모드.
@@ -4473,6 +4692,8 @@ class World:
             self.pos[dead], mv, fl = obstacle_push_out(self.pos[dead], self.obstacles, self._ob["body_r"], self.size)
             self._ob_push_moved += mv
             self._ob_push_failed += fl
+        if self._ob is not None and self._ob["detour"] is not None:
+            self.det_left[dead] = self.det_side[dead] = self.det_steps[dead] = 0    # 6) 새 개체는 돌아가지 않는다
 
     def _spawn_slots(self, dead: np.ndarray, pos: np.ndarray, head: np.ndarray) -> None:
         """슬롯 `dead` 를 위치 `pos` (k, 2)·방향 `head` (k, 2)의 새 개체로 만든다: 에너지 init_energy, 번식 쿨다운 0, 켠 기능의 개체 상태 초기화
@@ -4795,6 +5016,8 @@ class World:
         run_now = (has_target & (self.pred_type == PT_CHASER)) | (stalker & (self.stalk_state == ST_POUNCE))
         leader = wolf & run_now & has_target
         helper = wolf & hunting & ~run_now
+        if self._ob is not None and self._ob["detour"] is not None:
+            helper &= self.pack_drop == 0       # 야생 2단계 3 의 6): 막혀 돕기를 그만둔 늑대는 남은 스텝 동안 돕지 않는다
         self._pack_lead_tgt = np.where(leader, j, -1).astype(np.int64)
         hp, wt, dr, prey, dv = pack_goals(self.pred_pos, self.pred_head, leader, helper, j, self.pos, self.pos - self._pack_p0,
                                           self.cov_c, self.cov_r, self._zw_m, self.size, self._wp)
@@ -4827,7 +5050,11 @@ class World:
                     wolf_steps=self._ob_wolf_steps, wolf_hit=self._ob_wolf_hit, wolf_back=self._ob_wolf_back, wolf_dead=self._ob_wolf_dead,
                     eye_pairs=self._ob_eye_pairs, eye_blocked=self._ob_eye_blocked, eye_blocked_frac=ratio(self._ob_eye_blocked, self._ob_eye_pairs),
                     tgt_pairs=self._ob_tgt_pairs, tgt_blocked=self._ob_tgt_blocked, tgt_blocked_frac=ratio(self._ob_tgt_blocked, self._ob_tgt_pairs),
-                    push_moved=self._ob_push_moved, push_failed=self._ob_push_failed)
+                    push_moved=self._ob_push_moved, push_failed=self._ob_push_failed,
+                    **({} if self._ob["detour"] is None else dict(detour=dict(
+                        deer_used=self._det_deer_used, deer_start=self._det_deer_start, deer_fail=self._det_deer_fail,
+                        wolf_used=self._det_wolf_used, wolf_start=self._det_wolf_start, wolf_fail=self._det_wolf_fail,
+                        help_drop=self._det_help_drop))))
 
     def pack_stats(self) -> dict:
         """야생 2단계 2 늑대 무리 협동 통계 (통계 전용). 늑대-스텝 wolf_steps 가운데 앞장(lead)·도움(help)·기다림(wait)·은신처 문(door) 수와 몫,

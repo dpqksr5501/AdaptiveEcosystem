@@ -49,6 +49,9 @@ realism_shelter.block_predators 가 켜져 있어야 한다). 진단에 은신�
 10-17 더함(야생 2단계 2 늑대 무리, configs/v3_wild2_pack_mirror.yaml): wild_pack 을 켠 세계는 메타에 pack(World.pack_stats — 앞장·도움·기다림·은신처 문
 늑대-스텝, 늑대 포획과 협동 포획)을 적고, 10초 줄(JSON 만 — CSV 열은 그대로)에 같은 칸의 누적 pack_*을 더한다(동역학과 무관). 늑대 수는 설정의
 rand.predator_count 다(메타 wolves).
+10-17 더함(장애물 돌아가기, obstacles.detour): 돌아가기를 켠 세계는 10초 줄(JSON 만)에 누적 det_*(World.obstacle_stats()['detour'] — 방향을 바꾼·시작한·
+빈 방향을 못 찾은 사슴·늑대-스텝, 돕기 그만둠)를 더한다(동역학과 무관). --set 블록.키=값(여러 번)으로 기능 블록 계수를 덮는다(예: obstacles.detour=false —
+돌아가기를 넣기 전 판과 비트 동일, 메타 set).
 10-17 더함(야생 2단계 3 세로 장애물, configs/v3_wild2_obstacle_mirror.yaml): obstacles 를 켠 세계는 메타에 obstacles(World.obstacle_stats — 원판 수·넓이,
 사슴·늑대 미끄러짐·물러남·돌아섬, 눈길 가림 몫)를 적고 10초 줄(JSON 만)에 같은 칸의 누적 ob_* 를 더한다. 짝 비교 지도를 덮을 때 원판 밑 먹이 줄임(ob_food_factor)을 은신처 먹이 부족보다 먼저 다시 건다
 (C++ FFoodGrid::Build 순서). --unreal-obstacles <파일 또는 폴더>(짝 비교에만): 언리얼 장애물 JSON(EcoPolicyV3IntegratedSubsystem ExportObstacles 꼴 —
@@ -180,16 +183,37 @@ def eat_steps_of_seconds(sec: float) -> int:
     return int(np.floor(sec / STEP_SECONDS + 0.5))
 
 
-def mirror_cfg(deer: int, eat_steps: int, config: Path = CONFIG, disable=(), wolf_margin: float | None = None):
+def parse_sets(items) -> tuple:
+    """--set 블록.키=값 목록 → ((블록, 키, 값), …). 값은 JSON(true·false·수·목록), 아니면 문자열."""
+    out = []
+    for it in items or ():
+        k, eq, v = it.partition("=")
+        blk, dot, key = k.partition(".")
+        if not (blk and dot and key and eq):
+            raise ValueError(f"--set 은 블록.키=값 이어야 한다: {it!r}")
+        try:
+            val = json.loads(v)
+        except json.JSONDecodeError:
+            val = v
+        out.append((blk, key, val))
+    return tuple(out)
+
+
+def mirror_cfg(deer: int, eat_steps: int, config: Path = CONFIG, disable=(), wolf_margin: float | None = None, sets=()):
     """거울 설정에 사슴 수 N(= 슬롯 수 = 피식 EMA 분모)과 늑대 먹는 시간(pred_eat_cd)을 덮는다. disable = 끌 기능 블록 이름들(설정에 켜져 있어야 한다).
-    wolf_margin(단위, 10-17)을 주면 realism_shelter.wolf_margin 을 덮는다(설정에 realism_shelter.block_predators 가 켜져 있어야 한다)."""
+    wolf_margin(단위, 10-17)을 주면 realism_shelter.wolf_margin 을 덮는다(설정에 realism_shelter.block_predators 가 켜져 있어야 한다).
+    sets = ((블록, 키, 값), …) 기능 블록 계수 덮기(10-17 장애물 돌아가기 끈 판 obstacles.detour=false 등 — 블록이 설정에 있어야 한다)."""
     from env_v2.config import load_v2_config
 
     if deer < 1 or eat_steps < 1:
         raise ValueError(f"사슴 수와 먹는 시간은 1 이상이어야 한다: {deer}, {eat_steps}")
     cfg = load_v2_config(config).replace(N=int(deer), pred_eat_cd=int(eat_steps))
-    if disable or wolf_margin is not None:
+    if disable or wolf_margin is not None or sets:
         f = {k: dict(v) for k, v in cfg.v2["features"].items()}
+        for blk, key, val in sets:
+            if blk not in f:
+                raise ValueError(f"--set 블록 {blk} 이 설정 {config} 에 없다")
+            f[blk][key] = val
         for name in disable:
             if not f.get(name, {}).get("enabled"):
                 raise ValueError(f"끌 기능 {name} 이 설정 {config} 에 켜져 있지 않다")
@@ -221,6 +245,8 @@ def _row(w, alive_before: int, food0: float, shelter: list[int]) -> dict:
         os_ = w.obstacle_stats()
         extra |= {f"ob_{k}": os_[k] for k in ("deer_steps", "deer_hit", "deer_back", "wolf_steps", "wolf_hit", "wolf_back", "wolf_dead",
                                              "eye_pairs", "eye_blocked", "tgt_pairs", "tgt_blocked")}
+        if "detour" in os_:     # 10-17 돌아가기(obstacles.detour): 언리얼 일곱째 줄 끝 '돌아가기 |' 칸과 같은 정의
+            extra |= {f"det_{k}": v for k, v in os_["detour"].items()}
     return extra | dict(t_s=round(w.t * STEP_SECONDS, 1), step=int(w.t), alive=int(alive_before), alive_end=int(w.alive.sum()),
                 n=int(w.N), caught=int(w._pred_deaths), starved=int(w._starve_deaths),
                 food_pct=float(100.0 * w.food.sum() / food0) if food0 > 0 else 0.0,
@@ -405,13 +431,13 @@ def run_world(job: dict) -> dict:
 
 def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | None = None, model: Path = MODEL,
         config: Path = CONFIG, log_every: int = LOG_EVERY, unreal_maps=None, replicates: int = 1, disable=(),
-        diag: bool = False, wolf_margin: float | None = None, unreal_obstacles: Path | None = None) -> dict:
+        diag: bool = False, wolf_margin: float | None = None, unreal_obstacles: Path | None = None, sets=()) -> dict:
     """시드마다 세계 하나를 (워커 풀로) 돌린다. 반환 {meta, worlds}(worlds 는 시드 순서 = 받은 순서).
     unreal_maps(언리얼 세션 시드 목록)를 주면 짝 비교: 지도 (세션 시드, 지역 Barren·Forest·Highland) 마다 replicates 개 세계를 seeds 의 앞에서부터
     차례로 쓴다(지도 i 의 j 번째 = seeds[i·replicates + j], 시드 수 = 세션 수 × 3 × replicates)."""
     from env_v2 import rollout as ro
 
-    cfg = mirror_cfg(deer, eat_steps, config, disable, wolf_margin)
+    cfg = mirror_cfg(deer, eat_steps, config, disable, wolf_margin, sets)
     seeds = [int(s) for s in seeds]
     jobs = [dict(cfg=cfg.to_dict(), seed=s, steps=int(steps), model=str(model), log_every=int(log_every)) for s in seeds]
     if diag:
@@ -453,6 +479,8 @@ def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | 
         meta["disable"] = list(disable)
     if wolf_margin is not None:
         meta["wolf_margin"] = float(wolf_margin)
+    if sets:
+        meta["set"] = [f"{b}.{k}={json.dumps(v)}" for b, k, v in sets]
     if maps is not None:
         meta.update(unreal_maps=[int(u) for u in unreal_maps], replicates=int(replicates))
     if unreal_obstacles is not None:
@@ -489,13 +517,15 @@ def main(argv=None) -> None:
     ap.add_argument("--diag", action="store_true", help="세계마다 진단(meta['diag'])을 더 적는다")
     ap.add_argument("--wolf-margin", type=float, default=None, help="realism_shelter.wolf_margin 덮기(단위, 1 단위 = 2 m. 10-17 늑대 몸 여유)")
     ap.add_argument("--unreal-obstacles", type=Path, default=None, help="짝 비교: 언리얼 장애물 JSON(파일 또는 s<세션>.json 폴더)의 지역 원판을 쓴다")
+    ap.add_argument("--set", action="append", default=[], help="기능 블록 계수 덮기 블록.키=값 (예: obstacles.detour=false — 10-17 돌아가기 끈 판)")
     a = ap.parse_args(argv)
     seeds = parse_seeds(a.seeds)
     um = parse_unreal_maps(a.unreal_maps) if a.unreal_maps else None
     disable = tuple(x.strip() for x in a.disable.split(",") if x.strip())
     config = a.config if a.config.is_absolute() else (ROOT / a.config)
     res = run(a.deer, a.wolf_eat_steps, seeds, steps=a.steps, workers=a.workers, unreal_maps=um, replicates=a.replicates,
-              config=config, disable=disable, diag=a.diag, wolf_margin=a.wolf_margin, unreal_obstacles=a.unreal_obstacles)
+              config=config, disable=disable, diag=a.diag, wolf_margin=a.wolf_margin, unreal_obstacles=a.unreal_obstacles,
+              sets=parse_sets(a.set))
     name = a.name or (f"d{a.deer}_e{a.wolf_eat_steps}_s{seeds[0]}-{seeds[-1]}" if um is None else
                       f"pair_d{a.deer}_e{a.wolf_eat_steps}_u{um[0]}-{um[-1]}_k{a.replicates}_s{seeds[0]}-{seeds[-1]}")
     jp, cp = write(res, name, a.out_dir)

@@ -72,7 +72,8 @@ def test_obstacle_config_is_pack_plus_obstacles():
     a.pop("version"), b.pop("version")
     assert a == b
     assert set(fb) - set(fa) == {"obstacles"} and all(fa[k] == fb[k] for k in fa)
-    assert fb["obstacles"] == dict(enabled=True, **OP)
+    # 10-17 돌아가기 키(detour·detour_*)는 tests/test_wild2_detour.py 가 본다
+    assert {k: v for k, v in fb["obstacles"].items() if not k.startswith("detour")} == dict(enabled=True, **OP)
     lo, hi = (v * 2.0 for v in OP["tree_r"])                      # m
     basal = math.pi * (lo * lo + lo * hi + hi * hi) / 3.0 * OP["tree_per_ha"]
     assert 33.0 < basal < 35.0                                    # ESA E094-195: 34.1 m²/ha
