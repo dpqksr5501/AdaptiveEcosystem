@@ -88,6 +88,18 @@
      무대 벽(무대 상자 가장자리)에 바짝 붙이지 않으면 사슴이 구석에 덜 낀다.
    - 공식 레벨이 wonkii 님의 `Integration_JwJ` 로 정해지면 wonkii 님께 같은 요청을 한다(추정).
    - 실제 근거(추정): 숲의 나무와 바위는 쫓기는 사슴이 돌아가야 하는 길을 만들고, 늑대가 사슴을 보는 길을 가린다.
+   - 10-17 저녁 PR 확인(`ff8c8f4` '지역별 비·눈 날씨 및 나무 장애물 배치', 우리 쪽 병합 `3e90177`, 읽기만 한 결과 `herbivore_rl/results/v3/wild2/level_shc/README.md`):
+     - 나무(`/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree`) 11 그루는 `LV_SHC_RegionalWeatherTest` 의 숲 지역에 있지만 동물 무대 셋 밖이다(가장 가까운 것이 숲 무대 남쪽 끝에서 14.7 m).
+       이 맵에는 통합 조정자·은신처 앵커가 없어 동물이 나오지 않고 우리 통합 v3 모드도 돌지 않는다.
+     - 요청 1: 나무를 `LV_Ecosystem_IntegrationTest`(또는 공식 레벨)의 동물 무대 안(먹이 자리 `Eco_FoodHint_*` 둘레 120 m 상자)에 놓기. 그러면 우리 코드가 그대로 읽는다.
+     - 요청 2: `Beech_Tree` 의 단순 충돌을 줄기 캡슐(반경 약 0.8 m, 높이 2~3 m)로 바꾸기. 지금은 잎까지 감싼 볼록 껍질 하나(28 × 27 × 25 m)라서,
+       땅 위 60 cm 에서 줄기로부터 8~13 m 떨어진 허공이 막힌다(팀 이동 제약도 같은 충돌을 쓴다). 우리 읽기로는 나무마다 반경 13.8 m 원판이 된다.
+     - 요청 3: 나무를 땅에 붙이기. 11 그루 모두 z = −1310 이라 9 그루는 1.8~4.6 m 묻혔고 2 그루는 0.8 m·3.2 m 떠 있다.
+     - 요청 4: `/Game/Actors/BP_WeatherManager_PlayerFollow` 리디렉터가 없는 애셋(`/Game/SHC/Blueprints/Weather/BP_WeatherManager_PlayerFollow`)을 가리켜
+       `LV_JYU_V3Integration`·`LV_JYU_RefugeSafety`·`Integration_JwJ` 의 날씨 액터가 빠진다. 옛 `/Game/Foliage/FT_GrassC·D` 도 리디렉터 없이 옮겨졌다.
+     - 날씨는 지금 보이고 들리는 것만이다(카메라가 지역 트리거 상자 안이면 비·눈 이펙트와 소리). 지역 강수 값(`FRegionEnvironmentState.Rainfall`)은 0 그대로라 게임 규칙은 안 바뀐다.
+       게임 값으로 잇고 싶으면 이미 있는 `AEcoRegionEnvironmentAdapter::ApplyRainfall` 을 서버에서 부르면 된다(우리 학습 세계의 날씨 규칙은 아직 없다 — 나중에 같이 정한다).
+       `BP_SkyManager` 의 SunSpeed 는 팀 시계와 따로 돌아서, 올리면 보이는 해·달과 동물의 낮밤(통합 v3 모드 60 + 60 초)이 어긋난다. `OnClockUpdated` 로 시계에 맞추기를 권한다.
 2. **공식 레벨에 보호 은신처 놓기** (5절 #6)
    - 조연우 님의 `BP_JYU_ProtectedRefuge` 를 공식 레벨의 동물 무대 안에 놓는다. 지역마다 4곳 이상, 반경 8~12 m, 먹이 자리 둘레 약 150 m 안.
    - 그러면 우리 코드가 그 자리를 읽고 임시 은신처를 만들지 않는다. 자동 생성은 하지 않는다(팀 규칙).
