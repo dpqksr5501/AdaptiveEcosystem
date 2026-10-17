@@ -42,6 +42,10 @@ pred_eat_cd 로 막 찬 늑대 가운데 가장 가까운 늑대), 산 사슴-�
 realism_shelter.block_predators 가 켜져 있어야 한다). 진단에 은신처 둘레 밖 2 m(1 단위)·4 m(2 단위) 띠에서 잡힌 수(사슴이 원 밖이고 가장 가까운
 둘레까지 그 거리 안), 늑대-스텝 가운데 늑대 중심이 원 안(|q − c| < r)·둘레 밖 1 m 안(|q − c| < r + 0.5)에 있던 수, 늑대 중심과 가장 가까운 둘레의
 가장 작은 거리(단위, 원 안이면 음수)를 더 적는다(스텝 끝 위치, 플레이어형 위협 없음 — 거울 세계는 늑대뿐이다).
+10-17 더함(야생 2단계, results/v3/wild2/README.md): 줄마다 누적 사냥 hunt_starts·hunt_ends·hunt_success(World.hunt_stats — 정의는 env_v2/world.py
+모듈 docstring '야생 2단계', 언리얼 '[EcoV3I] <지역> 사냥·은신처 |' 줄과 같다)와 누적 shelter_steps(스텝 첫머리에 산 사슴 가운데 이동 뒤 위치가 은신처
+원 안인 사슴-스텝)·live_steps(스텝 첫머리 산 사슴-스텝)를 더하고, 세계 메타에 hunt(마지막 hunt_stats)·shelter_steps·live_steps 를 적는다(동역학과 무관).
+짝 비교 지도를 덮을 때 은신처 먹이 부족(realism_cover_food)을 켠 세계는 새 지도의 은신처 셀 용량에도 배수를 다시 건다(C++ FFoodGrid::Build 순서).
 """
 
 from __future__ import annotations
@@ -76,7 +80,7 @@ UNREAL_REGION_STREAM = {"Barren": 1, "Forest": 2, "Highland": 3}
 WORLD_RNG_TAG = 0x57335247                        # "W3RG" (EcoWorldV3.h kWorldRngTag)
 GOLDEN64 = 0x9E3779B97F4A7C15                     # SplitMix64 증분 (FRng::NextU64)
 ROW_KEYS = ("t_s", "step", "alive", "alive_end", "n", "caught", "starved", "food_pct", "energy_pct", "hungry", "dark",
-            "wolves_asleep")
+            "wolves_asleep", "hunt_starts", "hunt_ends", "hunt_success", "shelter_steps", "live_steps")
 
 
 def parse_seeds(text: str) -> list[int]:
@@ -139,6 +143,10 @@ def apply_unreal_map(w, session_seed: int, region: str) -> None:
     m = (m - m.min()) / max(m.max() - m.min(), EPS)
     t = float(cfg.food_patch_threshold)
     w.food_cap = np.clip((m - t) / (1.0 - t), 0.0, 1.0)
+    if getattr(w, "_zf", None) is not None:
+        # 야생 2단계(은신처 먹이 부족, realism_cover_food): 새 지도에도 은신처 셀 용량 배수를 다시 건다(C++ FFoodGrid::Build 가 지도를 만든 뒤
+        # 거는 순서와 같다). 재생률은 은신처만 정하므로 reset 때 값 그대로다
+        w.food_cap = np.where(w.cover_food_cell, w.food_cap * w.cover_food_cap, w.food_cap)
     w.food = w.food_cap.copy()
     w._g = w._geometry()
     w._obs = w._obs_from(w._g)
@@ -176,13 +184,16 @@ def config_digest(cfg) -> str:
     return hashlib.sha1(json.dumps(cfg.to_dict(), sort_keys=True, default=str).encode()).hexdigest()[:12]
 
 
-def _row(w, alive_before: int, food0: float) -> dict:
+def _row(w, alive_before: int, food0: float, shelter: list[int]) -> dict:
     e = np.clip(w.energy[w.alive] / w.cfg.max_energy, 0.0, 1.0)
+    h = w.hunt_stats()
     return dict(t_s=round(w.t * STEP_SECONDS, 1), step=int(w.t), alive=int(alive_before), alive_end=int(w.alive.sum()),
                 n=int(w.N), caught=int(w._pred_deaths), starved=int(w._starve_deaths),
                 food_pct=float(100.0 * w.food.sum() / food0) if food0 > 0 else 0.0,
                 energy_pct=float(100.0 * e.mean()) if len(e) else 0.0, hungry=int(np.count_nonzero(e < STARVING)),
-                dark=float(w.dark), wolves_asleep=int(np.count_nonzero(w.pred_asleep)))
+                dark=float(w.dark), wolves_asleep=int(np.count_nonzero(w.pred_asleep)),
+                hunt_starts=h["starts"], hunt_ends=h["ends"], hunt_success=h["success"],
+                shelter_steps=int(shelter[0]), live_steps=int(shelter[1]))
 
 
 DIAG_BANDS_M = (0.0, 5.0, 10.0, 15.0, 30.0)      # 진단: 늑대 거리 구간(m, 1 단위 = 2 m)
@@ -332,16 +343,22 @@ def run_world(job: dict) -> dict:
     if um is not None:
         meta["unreal_map"] = dict(um)
     rows = []
+    shelter = [0, 0]                    # 누적 [은신처 원 안 산 사슴-스텝, 산 사슴-스텝] (스텝 첫머리에 산 사슴의 이동 뒤 위치 — C++ Prey.bInCover 와 같다)
     for _ in range(int(job["steps"])):
         live_before = w.alive
         alive_before = int(live_before.sum())
         w.step(np.asarray(pol(w.observe()), dtype=np.float64))
+        shelter[0] += int(np.count_nonzero(live_before & w._in_cover(w.pos)))
+        shelter[1] += alive_before
         if dg is not None:
             dg.after(w, live_before)
         if w.t % int(job["log_every"]) == 0:
-            rows.append(_row(w, alive_before, food0))
+            rows.append(_row(w, alive_before, food0, shelter))
     if dg is not None:
         meta["diag"] = dg.result(w)
+    # 끝난 사냥이 없으면 rate 가 nan 이다 — 메타에는 None 으로 적는다(같은 인자면 같은 메타를 지키려고: nan != nan)
+    meta["hunt"] = {k: (None if isinstance(v, float) and v != v else v) for k, v in w.hunt_stats().items()}
+    meta["shelter_steps"], meta["live_steps"] = int(shelter[0]), int(shelter[1])
     meta["death_t"] = w.death_t.tolist()
     meta["death_cause"] = w.death_cause.tolist()
     meta["wall_s"] = round(time.perf_counter() - t0, 3)

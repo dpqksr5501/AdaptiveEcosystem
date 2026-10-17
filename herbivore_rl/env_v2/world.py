@@ -290,6 +290,17 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
         edge_r > 0: 경계·도주 방향(은신처 쪽으로 정한 도주 말고)을 무대 벽 wall_margin 처리 앞에 `wf_edge_steer` 로 굽힌다 — 가장자리 edge_r
           안에서는 벽 쪽 성분을 벽을 따라가는 성분으로 돌리고(벽에 가까울수록 많이), 모서리(두 벽 모두 edge_r 안)에서 벽 쪽으로 가려 하면 늑대에게서
           더 멀어지는 쪽 벽을 따라 모서리를 빠져나온다. 현실 근거: 사슴은 달아날 길을 쓰고 막다른 곳으로 뛰어들지 않는다
+- 야생 2단계(10-16 사용자 승인 '추천대로' — 늑대가 거의 못 잡는 세계를 사실감과 사냥 성공을 함께 올려 고친다. 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md,
+  설정 configs/v3_wild2_mirror.yaml = v3_wild1_mirror.yaml + 아래 규칙). 순서: 1 은신처 먹이 부족 → 2 늑대 무리·협동 사냥 → 3 장애물.
+  1 은신처 먹이 부족: 새 규칙이 아니라 위 v3 현실성 (e) realism_cover_food 를 거울 세계에 켠다(cap_frac·regen_frac 0.15). 언리얼 FFoodGrid 가 같은 식이다
+    (EcoWorldV3.h FShelterFoodConfig, 통합 모드 eco.IntegratedV3.ShelterFood).
+  사냥 성공률(통계 전용, 동역학·난수와 무관 — `hunt_update`, `World.hunt_stats`): 사냥 한 번 = 한 늑대가 전력 걸음(추격형이 표적을 쫓음, 잠행형
+    돌진 상태, 플레이어 돌진 — 발소리 훅 pred_running 과 같은 식)으로 이어 달린 스텝들. 전력 걸음을 시작한 스텝이 시작이고, 이 늑대가 잡은 스텝
+    (전력 걸음이 끊긴 첫 스텝에 잡아도 그 사냥의 끝 모습이다)이 성공 끝, 잡지 못하고 전력 걸음이 끊긴 첫 스텝이 실패 끝이다. 추격형은 그 사이에
+    표적이 바뀌어도(가장 가까운 보이는 사슴) 같은 사냥이다. 성공률 = 성공 ÷ 끝난 사냥. 사냥 중이 아닌 늑대가 잡은 수(사냥 밖 포획 — 등 뒤로 닿은
+    사슴 등)는 따로 센다. 늑대만 센다(플레이어형 위협 말고). 야외 연구의 '사냥'(무리에 달려들기 시작 → 잡음·포기)과 같은 꼴이다.
+    현실 근거: 늑대 사냥은 대부분 실패한다 — 사냥 한 번 성공률은 10~49%(Mech & Peterson 2003, Wolves: Behavior, Ecology, and Conservation 5장),
+    옐로스톤 엘크는 혹독한 겨울 26%·포근한 겨울 15%(Mech 외 2001, J. Wildl. Manage. 65:998). 목표 띠 10~30% 로 둔다(어림).
 - 세로 장애물(나무·바위) 확장 지점 — 이번 단계에는 넣지 않는다(10-14 사용자: '언리얼에도 아직 없다. 나중에 추가 가능하게만').
   구현은 없고 자리만 정해 둔다. 기능 이름은 이미 예약된 `obstacles`(번호 12, `env_v2/features.py`)이고 켜면 '아직 구현되지 않았다'로
   읽을 때 실패한다(끈 블록 `obstacles: {enabled: false}` 는 받아들이고 무시한다). 자료는 `World.obstacles` — (K, 3) float64 [x, y, r]
@@ -1310,6 +1321,29 @@ def wf_edge_steer(pos: np.ndarray, d: np.ndarray, size: float, edge_r: float) ->
     return np.where(((out * out).sum(1) > EPS * EPS)[:, None], out, d)
 
 
+# 야생 2단계 사냥 성공률 통계(모듈 docstring '야생 2단계'). hunt_stats 의 칸 순서: 시작·끝·성공·사냥 밖 포획
+HUNT_KEYS = ("starts", "ends", "success", "outside")
+
+
+def hunt_update(on: np.ndarray, running: np.ndarray, caught: np.ndarray):
+    """늑대마다 사냥 한 번 셈 (모듈 docstring '야생 2단계' 사냥 성공률). 통계 전용이고 동역학과 무관하다.
+    on = 지난 스텝 끝에 사냥이 이어지는 중, running = 이번 스텝 전력 걸음(추격형이 표적을 쫓음·잠행형 돌진·플레이어 돌진), caught = 이번 스텝에
+    이 늑대가 잡음. 모두 (M,) bool. 반환 (새 on, 시작, 끝, 성공, 사냥 밖 포획) — 뒤 넷은 (M,) bool.
+      시작 = running ∧ ¬on. 이번 스텝 사냥 중 h = on ∨ running. 성공 = caught ∧ h, 사냥 밖 포획 = caught ∧ ¬h, 실패 = h ∧ ¬caught ∧ ¬running.
+      끝 = 성공 ∨ 실패, 새 on = h ∧ ¬끝.
+    C++ 꼴: const bool bStart = bRun && !bOn; const bool bH = bOn || bRun; bSuccess = bCaught && bH; bOutside = bCaught && !bH;
+            bEnd = bSuccess || (bH && !bCaught && !bRun); bOn = bH && !bEnd;"""
+    on = np.asarray(on, dtype=bool)
+    running = np.asarray(running, dtype=bool)
+    caught = np.asarray(caught, dtype=bool)
+    start = running & ~on
+    h = on | running
+    success = caught & h
+    outside = caught & ~h
+    end = success | (h & ~caught & ~running)
+    return h & ~end, start, end, success, outside
+
+
 def wild_days_to_steps(days: float, period: int) -> int:
     """게임 하루 단위 계수 → 스텝 = 반올림(일 × 하루 스텝), 0.5 는 올림 (모듈 docstring '야생 1단계')."""
     return int(math.floor(float(days) * int(period) + 0.5))
@@ -1545,6 +1579,8 @@ class World:
             self._rz_chase_reset()          # v3 R3 (f): 위협별 추격 고정 상태(크기 M)
         if self._v3p:
             self.pred_vel = np.zeros((self.M, 2))   # 포식자의 지난 스텝 이동(관측 pred_approach)
+            # 야생 2단계 통계 전용: 늑대마다 사냥이 이어지는 중인가(`hunt_update`). 처음에는 아니다
+            self._hunt_on = np.zeros(self.M, dtype=bool)
         if self._zh is not None:
             # v3 현실성 (b) 스텝 뒤 훅: 위협이 지난 스텝에 전력 걸음이었나(추격형의 표적 추격, 잠행형 돌진, 플레이어 돌진). 처음에는 아니다
             self.pred_running = np.zeros(self.M, dtype=bool)
@@ -3531,15 +3567,15 @@ class World:
             self._zw_inside_n += int(np.count_nonzero(self._zw_sel & self._rz_inside_disc(self.pred_pos)))
         self.pred_head = normalize(move)
         self.pred_vel = self.pred_pos - old
+        # 이번 이동이 전력 걸음이었나 — 추격형(근접·원거리)이 표적을 쫓음, 잠행형 돌진 상태(돌진 이동·마지막 판정 스텝), 플레이어 돌진 모드.
+        # 상태는 이동 때 값(포획 뒤 갱신 `_threat_after` 전)이다. v3 현실성 (b) 의 스텝 뒤 훅 pred_running 과 야생 2단계 사냥 성공률 통계가 함께 쓴다
+        if th is None:
+            run = has_target.copy()
+        else:
+            run = has_target & (self.pred_type == PT_CHASER)
+            run |= stalker & (self.stalk_state == ST_POUNCE)
+            run |= self.pred_is_player & (self.player_mode == PM_CHARGE)
         if self._zh is not None:
-            # v3 현실성 (b) 스텝 뒤 훅 pred_running: 이번 이동이 전력 걸음이었나 — 추격형(근접·원거리)이 표적을 쫓음, 잠행형 돌진 상태
-            # (돌진 이동·마지막 판정 스텝), 플레이어 돌진 모드. 상태는 이동 때 값(포획 뒤 갱신 `_threat_after` 전)이다
-            if th is None:
-                run = has_target.copy()
-            else:
-                run = has_target & (self.pred_type == PT_CHASER)
-                run |= stalker & (self.stalk_state == ST_POUNCE)
-                run |= self.pred_is_player & (self.player_mode == PM_CHARGE)
             self.pred_running = run
 
         hit = (catch_d <= self.pred_catch_r[:, None]) & hunting[:, None]
@@ -3558,6 +3594,16 @@ class World:
         got = np.isfinite(hit_d[ar, k])
         caught = np.zeros(N, dtype=bool)
         caught[k[got]] = True
+        # 야생 2단계 통계 전용(동역학과 무관, 난수 없음): 늑대(플레이어형 위협 말고)의 사냥 시작·끝·성공·사냥 밖 포획을 유형별로 센다.
+        # 잡음 = 이 늑대의 포획 판정이 참(같은 사슴을 둘이 잡으면 둘 다 — C++ 위협 Step 결과 Caught ≥ 0 과 같다)
+        # 장면 도구(골든 내보내기·시험)가 위협 칸을 reset 뒤에 바꿔도 통계가 동역학을 막지 않게 모양을 맞춘다(유형 칸이 하나면 모두 그 유형)
+        wolf = ~np.broadcast_to(self.pred_is_player, (M,)) if th is not None else np.ones(M, dtype=bool)
+        if self._hunt_on.shape != (M,):
+            self._hunt_on = np.zeros(M, dtype=bool)
+        self._hunt_on, *hx = hunt_update(self._hunt_on, run & wolf, got & wolf)
+        kind = np.broadcast_to(self.pred_type, (M,)) if th is not None else np.zeros(M, dtype=np.int8)
+        for r_, x in enumerate(hx):
+            self._hunt_n[r_] += np.bincount(kind[x], minlength=3)[:3]
         if self._al is not None:
             # v3 R2 M8 비명의 점: 잡은 위협(동시 포획이면 낮은 번호 = 위협 슬롯 순서, C++ 도 위협 슬롯 번호로 깬다). 헛경보 통계
             # 전용: 이번 스텝에 표적이 있었거나 돌진 중인 위협
@@ -4245,6 +4291,21 @@ class World:
             raise ValueError("wild_stats 는 야생 1단계 규칙(wild_*)을 하나라도 켠 세계에만 있다")
         return out
 
+    def hunt_stats(self) -> dict:
+        """야생 2단계 사냥 성공률 (모듈 docstring '야생 2단계', 통계 전용). 늑대(플레이어형 위협 말고) 모두와 유형별(chaser·stalker):
+        starts·ends·success·outside(사냥 밖 포획) 수와 rate = success / ends(끝난 사냥이 없으면 nan). 아직 이어지는 사냥은 ends 에 없다(ongoing).
+        v3 포식자 스텝(repertoire·threats 중 하나라도 켠 세계)에만 있다."""
+        if not self._v3p:
+            raise ValueError("hunt_stats 는 v3 포식자 스텝(repertoire·threats)을 켠 세계에만 있다")
+        n = self._hunt_n
+        out: dict = {}
+        for tag, cols in (("", slice(0, 2)), ("chaser_", slice(PT_CHASER, PT_CHASER + 1)), ("stalker_", slice(PT_STALKER, PT_STALKER + 1))):
+            v = n[:, cols].sum(1)
+            out.update({f"{tag}{k}": int(x) for k, x in zip(HUNT_KEYS, v)})
+            out[f"{tag}rate"] = float(v[2]) / float(v[1]) if v[1] > 0 else float("nan")
+        out["ongoing"] = int(np.count_nonzero(self._hunt_on))
+        return out
+
     # ------------------------------------------------------------------ #
     # 통계 (§7.2)
     # ------------------------------------------------------------------ #
@@ -4268,6 +4329,8 @@ class World:
         self._n_nopred = 0
         self._f_hungry, self._n_hungry = 0.0, 0
         self._f_full, self._n_full = 0.0, 0
+        # 야생 2단계 사냥 성공률 (hunt_stats): [시작·끝·성공·사냥 밖 포획] × 위협 유형 [추격형·잠행형·플레이어] 늑대 수. v3 포식자 스텝만 센다
+        self._hunt_n = np.zeros((len(HUNT_KEYS), 3), dtype=np.int64)
         if self._sp is not None:     # v2.1 보행 지표 (gait_stats). 모두 개체-스텝 수다
             # 개체-스텝 히스토그램 [경계 2, 실제 보행 3, 명령 보행 3, 포식자 거리 구간 4, 배부름 2]. 거리 구간은
             # [안 보임, d<0.25, 0.25≤d<0.5, d≥0.5] (d = d_pred/see_r), 배부름은 [energy<0.5, ≥0.5] (결정 때).
