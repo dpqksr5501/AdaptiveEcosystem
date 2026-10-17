@@ -30,6 +30,9 @@
               쿨다운·배부름·표적, 은신처)를 넣고 `World._geometry` → `World._wf_update` 를 부른다. 장면 = tests/test_wild1.py 의 반사 장면
               (사슴 2 를 (30, 30) 에 두고 늑대 0 을 +5·+8.5·먹는 중·배부름·이 사슴을 쫓음·은신처 안, 지난 도주 뒤 15·21, 반대쪽 은신처) 과
               벽·접근 장면 12개 + 난수 장면 16개(시드 32093). 사슴마다 다음 덮기·방향·잠금.
+  늑대 몸 여유 (10-17, world.py 모듈 docstring (c″)): 은신처 진입 금지 경우(여유 0 — 10-16 칸 그대로)와 같은 원·같은 뽑기로, 거울 설정의 여유
+              realism_shelter.wolf_margin(0.5 = 1 m)을 둔 세계의 밀어내기·접선·원 판정 64 경우. C++ 은 원 반지름에 여유를 더한 원 목록으로
+              ShelterPush·ShelterTangent·InsideAnyDisc 를 불러 같은 값을 내야 한다(통합 모드가 위협 Step 에 넘기는 원 목록과 같은 꼴).
 """
 
 from __future__ import annotations
@@ -362,10 +365,12 @@ def edge_cases(n: int = 96, size: float = 60.0, edge_r: float = 5.0):
     return [(*pos[i], *d[i], *out[i]) for i in range(n)]
 
 
-def shelter_cases(n: int = 64):
+def shelter_cases(n: int = 64, margin: float = 0.0):
     """은신처 진입 금지 골든 (world.py `_rz_wall_push`·`_rz_wall_tangent`·`_rz_inside_disc`): 원 = 통합 무대 4개 + 겹친 원 하나.
-    (qx, qy, px, py, vx, vy) → (밀어낸 qx, qy, 밀었나, 접선 x, y, q 원 안)."""
+    (qx, qy, px, py, vx, vy) → (밀어낸 qx, qy, 밀었나, 접선 x, y, q 원 안). margin = 늑대 몸 여유(10-17, (c″)). 0 이면 10-16 칸 그대로다
+    (뽑기 순서는 여유와 상관없이 같다 — 이전 위치는 반지름 r + 여유 + 0.01~1.5)."""
     w = World(load_v2_config(WILD).replace(N=4), seeds=[SEED + 9])
+    w._zw_m = float(margin)                     # 설정 값(0.5) 대신 이 경우의 여유. 0 이면 10-16 그대로
     w.cov_c = np.array([[15.0, 15.0], [45.0, 15.0], [15.0, 45.0], [45.0, 45.0], [20.0, 15.0]])
     w.cov_r = np.array([6.0, 6.0, 6.0, 6.0, 3.0])
     rng = np.random.default_rng(SEED + 9)
@@ -374,9 +379,9 @@ def shelter_cases(n: int = 64):
         k = int(rng.integers(0, len(w.cov_r)))
         ang = rng.uniform(0.0, 2.0 * np.pi)
         u = np.array([np.cos(ang), np.sin(ang)])
-        p = w.cov_c[k] + (w.cov_r[k] + rng.uniform(0.01, 1.5)) * u
+        p = w.cov_c[k] + (w.cov_r[k] + margin + rng.uniform(0.01, 1.5)) * u
         if w._rz_inside_disc(p[None, :])[0]:
-            p = w.cov_c[k] + (w.cov_r[k] + 3.2) * u
+            p = w.cov_c[k] + (w.cov_r[k] + margin + 3.2) * u
         v = rng.uniform(-1.0, 1.0, 2) * rng.uniform(0.2, 1.2)
         if i % 4 == 0:
             v = (w.cov_c[k] - p) / np.linalg.norm(w.cov_c[k] - p) * 0.9     # 중심 쪽으로 곧장
@@ -404,7 +409,9 @@ def build_header() -> str:
     wf = fw._wf
     xw, xsc, xout, xhand = flight_fix_scenes()
     edges = edge_cases()
-    sw, srows = shelter_cases()
+    sw, srows = shelter_cases(margin=0.0)
+    margin = float(World(load_v2_config(WILD).replace(N=4), seeds=[SEED])._zw_m)   # 거울 설정 realism_shelter.wolf_margin
+    _, mrows = shelter_cases(margin=margin)
     L = [
         "// 자동 생성 — herbivore_rl/export_golden_v3_wild.py (손으로 고치지 않는다). 세계 configs/v3_wild1_mirror.yaml, 시드 32090.",
         "// v3 야생 1단계 골든 (명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md 5절). 검사는 Tests/EcoWildV3Test.cpp (AdaptiveEcosystem.Policy.V3.Wild.*).",
@@ -539,6 +546,12 @@ def build_header() -> str:
         c_array("double", "kShelterDisc", [v for c, r in zip(sw.cov_c, sw.cov_r) for v in (c[0], c[1], r)], 6, d_lit),
         f"\tinline constexpr std::int32_t kShelterCases = {len(srows)};",
         c_array("double", "kShelterCase", [v for r in srows for v in r], 6, d_lit),
+        "",
+        "\t// ---- 10-17 늑대 몸 여유 (world.py (c″), 거울 설정 realism_shelter.wolf_margin) ----",
+        "\t// 같은 원·같은 칸. C++ 은 반지름 + kShelterWolfMargin 인 원 목록으로 부른다 (통합 모드 FWorldConfig::ShelterWolfMargin 과 같은 꼴)",
+        f"\tinline constexpr double kShelterWolfMargin = {d_lit(margin)};",
+        f"\tinline constexpr std::int32_t kShelterMarginCases = {len(mrows)};",
+        c_array("double", "kShelterMarginCase", [v for r in mrows for v in r], 6, d_lit),
         "}",
         "",
     ]

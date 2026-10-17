@@ -161,6 +161,15 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("realism_shelter (R3 값). 0 = 은신처 안에서도 잡힘(지금까지). Play 전에 바꾼다. 명령줄 -EcoV3ShelterSafe= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<float> CVarWolfBodyMargin(
+		TEXT("eco.IntegratedV3.WolfBodyMargin"),
+		1.0f,
+		TEXT("통합 v3 모드의 늑대 몸 여유 (m, 기본 1 — 10-17, 파이썬 configs/v3_wild1_mirror.yaml realism_shelter.wolf_margin 0.5 단위). 늑대 중심은 ")
+		TEXT("은신처 반지름 + 이 거리 밖에서 둘레를 따라 미끄러진다(늑대 몸이 은신처 바위·덤불 테두리를 파고들지 않는다). 사슴 쪽(원 안 안전·표적 제외)은 ")
+		TEXT("반지름 그대로. eco.IntegratedV3.ShelterSafe 1 일 때만 쓴다(0 이면 팀 규칙이 자기 몸 여유로 안전을 맡는다 — 두 여유가 겹치지 않는다). ")
+		TEXT("0 = 10-16 그대로(둘레 위). 0~5 m. Play 전에 바꾼다. 명령줄 -EcoV3WolfBodyMargin= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarRealismVision(
 		TEXT("eco.IntegratedV3.RealismVision"),
 		1,
@@ -456,6 +465,7 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bRealismVision = CVarRealismVision.GetValueOnGameThread() != 0;
 	S.bRealismHearing = CVarRealismHearing.GetValueOnGameThread() != 0;
 	S.bShelterSafe = CVarShelterSafe.GetValueOnGameThread() != 0;
+	S.WolfBodyMarginM = static_cast<double>(CVarWolfBodyMargin.GetValueOnGameThread());
 	S.bFlightHoldAwake = CVarFlightHoldAwake.GetValueOnGameThread() != 0;
 	S.bFlightEdgeAvoid = CVarFlightEdgeAvoid.GetValueOnGameThread() != 0;
 	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
@@ -540,6 +550,11 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3ShelterSafe="), ShelterArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.ShelterSafe"), LexToString(ShelterArg));
+	}
+	float MarginArg = 1.0f;
+	if (FParse::Value(CmdLine, TEXT("EcoV3WolfBodyMargin="), MarginArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.WolfBodyMargin"), LexToString(MarginArg));
 	}
 	int32 RefugeArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ProtectedRefuges="), RefugeArg))
@@ -698,9 +713,13 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   EcoWorldV3::WildDaysToSteps(Ws.SatDays, 900) * EcoRepertoireV3::kStepSeconds, Ws.RestSpeed)
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildSatiation 0 — 먹기가 끝나면 곧바로 사냥)"))));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 은신처: %s | 생명주기 %s"),
-		   Settings.bShelterSafe ? TEXT("안전 (eco.IntegratedV3.ShelterSafe 1, 10-16) — 원 안 사슴은 표적·포획에서 빠지고 늑대는 둘레를 따라 미끄러짐")
-		   : Settings.bProtectedRefuges ? TEXT("팀 규칙 안전 (eco.IntegratedV3.ShelterSafe 0·ProtectedRefuges 1 — 늑대 몸 여유 1 m, 쓸고 지나가기 막기, 파이썬과 다름)")
-										: TEXT("끔 (eco.IntegratedV3.ShelterSafe 0 — 은신처 안에서도 잡힘)"),
+		   *(Settings.bShelterSafe
+				 ? FString::Printf(TEXT("안전 (eco.IntegratedV3.ShelterSafe 1, 10-16) — 원 안 사슴은 표적·포획에서 빠지고 늑대는 반지름 + 몸 여유 %.2f m 둘레를 ")
+								   TEXT("따라 미끄러짐 (eco.IntegratedV3.WolfBodyMargin, 10-17)"),
+								   Settings.WolfBodyMarginUnits() * EcoRepertoireV3::kUnitCm / 100.0)
+				 : FString(Settings.bProtectedRefuges
+							   ? TEXT("팀 규칙 안전 (eco.IntegratedV3.ShelterSafe 0·ProtectedRefuges 1 — 늑대 몸 여유 1 m, 쓸고 지나가기 막기, 파이썬과 다름)")
+							   : TEXT("끔 (eco.IntegratedV3.ShelterSafe 0 — 은신처 안에서도 잡힘)"))),
 		   Settings.bProtectedRefuges ? TEXT("켬 (eco.IntegratedV3.ProtectedRefuges 1 — 지워진 은신처 비활성·늦은 은신처 추가·잃은 HIDE 목표 풀기)")
 									  : TEXT("끔 (eco.IntegratedV3.ProtectedRefuges 0)"));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
@@ -966,6 +985,9 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.RealismHearing.bEnabled = S.bRealismHearing;
 	// 은신처 안전·늑대 진입 금지 (eco.IntegratedV3.ShelterSafe, 10-16 — R3 realism_shelter): 원 목록 = Covers (레벨에서 받은 은신처 + 우리 은신처)
 	C.bShelterSafe = S.bShelterSafe;
+	// 늑대 몸 여유 (eco.IntegratedV3.WolfBodyMargin 1 m, 10-17 — realism_shelter.wolf_margin 0.5): 위협이 보는 원 반지름 + 이 값. ShelterSafe 0 이면 0
+	// (그때는 팀 규칙이 PredatorRefugeMargin 으로 안전을 맡는다 — 두 여유가 한꺼번에 적용되지 않는다, RefugeOwnsSafety)
+	C.ShelterWolfMargin = S.WolfBodyMarginUnits();
 	return C;
 }
 
@@ -1938,6 +1960,12 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			const FVector P = Ctx.UnitsToCm(C.X, C.Y, Z + 60.0);
 			const float R = static_cast<float>(C.Radius * EcoRepertoireV3::kUnitCm);
 			DrawDebugCircle(World, P, R, 48, CoverColor, false, -1.0f, 0, 10.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+			if (C.Radius > 0.0 && Ctx.Sim.Config.ShelterWolfMargin > 0.0)
+			{
+				// 늑대 몸 여유 둘레 (10-17): 늑대 중심은 이 원 밖에 머문다 (가는 선)
+				const float Rw = static_cast<float>((C.Radius + Ctx.Sim.Config.ShelterWolfMargin) * EcoRepertoireV3::kUnitCm);
+				DrawDebugCircle(World, P, Rw, 48, FColor(60, 60, 90), false, -1.0f, 0, 3.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+			}
 		}
 		for (const FEcoV3IntegratedCatchMark& M : Ctx.RecentCatches)
 		{

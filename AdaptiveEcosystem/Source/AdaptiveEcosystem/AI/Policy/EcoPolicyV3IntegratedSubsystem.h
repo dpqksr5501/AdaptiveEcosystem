@@ -81,6 +81,9 @@
 //      10 m 안의 경계·도주는 벽을 따라·모서리 밖으로 (WildFlightConfig 의 bHoldAwake·EdgeR — eco.IntegratedV3.WildFlight 에 묶음).
 //      은신처 안전 eco.IntegratedV3.ShelterSafe (-EcoV3ShelterSafe=, 기본 1, EcoThreatModel.h bShelterSafe·bShelterBlock): 은신처 원 안 사슴은
 //      표적·포획에서 빠지고 늑대는 원 둘레를 따라 미끄러진다. 원 = 레벨에서 받은 은신처 + 우리 은신처 (FWorldConfig::Covers).
+//      늑대 몸 여유 eco.IntegratedV3.WolfBodyMargin (-EcoV3WolfBodyMargin=, m, 기본 1 — 10-17, 파이썬 realism_shelter.wolf_margin 0.5): 늑대 중심은
+//      은신처 반지름 + 1 m 밖에서 미끄러진다(화면에서 늑대 몸이 둘레 65 cm 안쪽 바위 테두리를 파고들지 않는다). 사슴 쪽은 반지름 그대로.
+//      ShelterSafe 1 일 때만 쓴다(0 이면 팀 규칙이 자기 몸 여유 1 m 로 안전을 맡아 두 여유가 겹치지 않는다).
 //  12. 10-17 팀 브랜치 통합 (origin/codex/social-shelter-handoff, 계획서 4-5b '10-17 팀 브랜치 통합'):
 //      은신처 안전 규칙은 하나만 적용한다. ShelterSafe 1(기본) = 파이썬 realism_shelter. 조연우 님의 실제 은신처 규칙
 //      eco.IntegratedV3.ProtectedRefuges (-EcoV3ProtectedRefuges=, 기본 1)는 그 위에 생명주기만 더한다 — 지워진 은신처는 원 반경 0(번호 유지),
@@ -214,6 +217,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bRealismVision = true;         // 위협 시야 300° (eco.IntegratedV3.RealismVision 기본 1, R3 realism_vision). 거짓 = 앞쪽 120°
 	bool bRealismHearing = true;        // 늑대 발소리 (eco.IntegratedV3.RealismHearing 기본 1, R3 realism_hearing). 거짓 = 소리 없음
 	bool bShelterSafe = true;           // 은신처 안전·늑대 진입 금지 (eco.IntegratedV3.ShelterSafe 기본 1, 10-16 — R3 realism_shelter). 거짓 = 은신처 안에서도 잡힘
+	double WolfBodyMarginM = 1.0;       // 늑대 몸 여유 (m, eco.IntegratedV3.WolfBodyMargin 기본 1, 10-17 — 파이썬 realism_shelter.wolf_margin 0.5). bShelterSafe 일 때만.
+										// 늑대 중심은 은신처 반지름 + 이 값 밖에서 미끄러진다. 0 = 10-16 그대로 (둘레 위). 팀 규칙 몸 여유와 함께 적용되지 않는다
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등
@@ -228,6 +233,20 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	double ExtraCoverRadiusUnits(double SizeUnits) const
 	{
 		return FMath::Clamp(ExtraCoverRadiusFrac * SizeUnits, kCoverRadiusLoUnits, kCoverRadiusHiUnits);
+	}
+
+	/**
+	 * 늑대 몸 여유의 세계 칸 (m → 단위 = m × 100 ÷ 200, 1 m = 0.5 단위 = 파이썬 configs/v3_wild1_mirror.yaml realism_shelter.wolf_margin).
+	 * 은신처 안전(bShelterSafe)을 끄면 0 — 그때는 팀 규칙이 자기 몸 여유(FWorldConfig::PredatorRefugeMargin)로 안전을 맡아 두 여유가 겹치지 않는다.
+	 * 음수·수가 아닌 값은 0, 5 m 에서 자른다.
+	 */
+	double WolfBodyMarginUnits() const
+	{
+		if (!bShelterSafe || !FMath::IsFinite(WolfBodyMarginM) || WolfBodyMarginM <= 0.0)
+		{
+			return 0.0;
+		}
+		return FMath::Min(WolfBodyMarginM, 5.0) * 100.0 / EcoRepertoireV3::kUnitCm;
 	}
 
 	/** 학습 세계의 식사 쿨다운 (결정 스텝, configs/default.yaml pred_eat_cd 5 = 0.67 초 — 위협 설정 기본값). */

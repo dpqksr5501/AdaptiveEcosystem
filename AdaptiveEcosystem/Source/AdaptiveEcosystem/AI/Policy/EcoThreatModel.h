@@ -386,7 +386,8 @@ namespace EcoThreatV3
 		double WanderTurn = 0.0;    // 배회 선회 (rad, U[-PredWanderTurn, PredWanderTurn]). 표적이 있어도 늘 넣는다
 		double PlayerModeU0 = 0.0;  // 플레이어가 이번 스텝에 새 모드를 고를 때만 읽는다 (U[0, 1) 두 개)
 		double PlayerModeU1 = 0.0;
-		// 은신처 원 (x, y, r) × NumDiscs — Cfg.bShelterBlock 일 때만 읽는다 (통합 모드 = 레벨에서 받은 은신처 + 우리 은신처, FWorldConfig::Covers)
+		// 은신처 원 (x, y, r) × NumDiscs — Cfg.bShelterBlock 일 때만 읽는다 (통합 모드 = 레벨에서 받은 은신처 + 우리 은신처, FWorldConfig::Covers).
+		// r 은 위협이 보는 반지름이다: EcoWorldV3 가 은신처 반지름 + 늑대 몸 여유(FWorldConfig::ShelterWolfMargin, 10-17)로 채운다
 		const double* Discs = nullptr;
 		std::int32_t NumDiscs = 0;
 	};

@@ -212,3 +212,20 @@
 
 은신처 먹이 부족(`realism_cover_food`)은 켜지 않았다. 언리얼 먹이 격자를 은신처마다 바꿔야 해서 이번 고침에 싸지 않다.
 언리얼 이식(EcoWorldV3.h·EcoThreatModel.h, 콘솔 변수 eco.IntegratedV3.ShelterSafe)은 이 절을 따른다 — 이식 상태는 README 를 본다.
+
+## 12. 10-17 늑대 몸 여유 (파이썬·언리얼, 변경 기록 2026-10-17)
+
+- 보고: 언리얼 화면에서 늑대가 은신처 바위 테두리를 파고드는 것처럼 보인다. 늑대 중심이 원 둘레 위에서 미끄러지는데, 팀 은신처(`AEcoRefugeHabitat`)는 바위 중심을 둘레 65 cm 안쪽에 둔다. 팀 규칙(`ShelterSafe 0` 일 때만 도는 쪽)은 늑대 몸 여유 1 m 를 썼다.
+- 고침: `realism_shelter.wolf_margin`(선택 키, 단위, 기본 0). 늑대(막는 위협)에게만 원 반지름을 r + wolf_margin 으로 본다. 거울 설정 `configs/v3_wild1_mirror.yaml` 값은 0.5(1 m)다.
+  - 이 반지름을 쓰는 곳: 원 안 판정, 밀어내기, 접선 미끄러짐(가장 가까운 둘레 고르기), reset 때 시작 자리 옮기기, 통계 `wall_inside_n`. 그래서 늑대 중심은 늘 r + 1 m 밖에 있다.
+  - 사슴 쪽은 그대로다. 원 안(|q − c| ≤ r) 사슴은 안전하고 표적에서 빠진다. 도주 은신처 고르기와 먹이도 반지름 r 을 쓴다.
+  - 원 둘레와 r + 1 m 사이의 사슴은 원 밖이다. 그래서 표적·포획 대상 그대로다. 늑대가 포획 거리(2 m) 안이면 잡는다.
+  - 여유 0 은 10-16 과 비트 단위로 같다(`tests/test_wolf_margin.py`, 직전 커밋 `495be23` 과 궤적 대조).
+- 현실 근거: 늑대는 몸길이(머리·몸통) 1 m 남짓인 동물이다(Mech 1974, Mammalian Species 37 참고 — 어림). 빽빽한 덤불·바위 테두리에 몸을 밀어 넣지 못하고, 몸 중심이 테두리에서 반 몸쯤 떨어져 돈다.
+- 측정(파이썬 거울, 사슴 128, 세계 90개 32000~32089, 240초, R1b-F argmax — `results/v3/wild1/README.md` '늑대 몸 여유'):
+  - 잡힘은 표본 흔들림 안에서 그대로다. 2.17 → 2.10%(포만 끔 3.67 → 3.76%, 2σ 약 ±0.3%p).
+  - 둘레 밖 2 m 안에서 잡힌 수는 15 → 10(포만 끔 29 → 19)으로 줄었다. 은신처 안 잡힘은 둘 다 0 이다.
+  - 늑대 중심이 둘레 1 m 안에 있던 늑대-스텝은 6.4% → 0 이다. 늑대 중심과 둘레의 가장 가까운 거리는 0 → 1.00 m 다.
+- 언리얼: `FWorldConfig::ShelterWolfMargin`(EcoWorldV3.h, 기본 0). 위협 Step 에 넘기는 원 목록의 반지름에 더한다. 통합 모드는 콘솔 변수 `eco.IntegratedV3.WolfBodyMargin`(m, 기본 1, `-EcoV3WolfBodyMargin=`)이다. `ShelterSafe 1` 일 때만 쓴다. `ShelterSafe 0` 이면 0 이고, 그때는 팀 규칙이 자기 몸 여유(`PredatorRefugeMargin`)로 안전을 맡는다. 두 여유는 한꺼번에 적용되지 않는다.
+  - 골든: `WildGoldenVectorsV3.h` 의 `kShelterMarginCase` 64 경우. 시험은 `Wild.FixGolden`·`Wild.ShelterRun`·`Refuge.MergedDefaultSingleRule`·`Refuge.ProtectedCaptureAndMovement` 다.
+  - 언리얼에는 reset 때 시작 자리 옮기기가 없다. 원 안에서 시작한 늑대는 첫 이동의 밀어내기가 꺼낸다(10-16 그대로). 통합 무대의 늑대 시작 자리(모서리 쪽)는 은신처에서 12 m 넘게 떨어져 있어 여유와 상관없다.

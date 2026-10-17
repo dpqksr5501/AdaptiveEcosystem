@@ -298,6 +298,10 @@ namespace EcoWorldV3
 		// 은신처 안전·늑대 진입 금지 (10-16, 통합 모드 eco.IntegratedV3.ShelterSafe — 파이썬 realism_shelter R3 값). 켜면 FThreatConfig::bShelterSafe·
 		// bShelterBlock 을 켜고 위협 Step 에 Covers 를 원 목록으로 넘긴다. 기본 끔 = R1b 학습 세계 그대로
 		bool bShelterSafe = false;
+		// 늑대 몸 여유 (10-17, 파이썬 realism_shelter.wolf_margin — world.py 모듈 docstring (c″), 단위, 1 단위 = 2 m). bShelterSafe 일 때 위협 Step 에
+		// 넘기는 원 목록(ShelterDiscs)의 반지름에 더한다 — 늑대 중심은 r + 이 값 밖에서 둘레를 따라 미끄러진다. 사슴 쪽(원 안 안전·표적 제외·도주 은신처·
+		// 먹이·기록 CaughtInCover)은 Covers 반지름 그대로다. 기본 0 = 10-16 그대로 (골든·기준 루프). 통합 모드 eco.IntegratedV3.WolfBodyMargin (1 m)
+		double ShelterWolfMargin = 0.0;
 		double PredSpeedMult = 0.8;         // 근접형 속력 배수 (학습 U[0.6, 0.95] 의 한 값)
 
 		// 낮밤 (계약 7-6). DayPeriod <= 0 이면 낮 고정 (d = 0, to_transition = 1)
@@ -791,6 +795,8 @@ namespace EcoWorldV3
 		W.ThreatCfg.bEatInPlace = C.bEatInPlace;
 		W.ThreatCfg.bShelterSafe = C.bShelterSafe;
 		W.ThreatCfg.bShelterBlock = C.bShelterSafe;
+		// 늑대 몸 여유: 0 이상 유한한 값만 (파이썬 _rz_shelter_params 가 음수·무한을 거부한다). 막지 않으면 뜻이 없어 0
+		W.Config.ShelterWolfMargin = C.bShelterSafe && std::isfinite(C.ShelterWolfMargin) && C.ShelterWolfMargin > 0.0 ? C.ShelterWolfMargin : 0.0;
 		// 야생 (w1): 하루 단위 계수라 낮 고정 세계에서는 끈다 (파이썬 _wild_reserve_params 가 daynight 없이 켜기를 거부한다)
 		W.Config.WildReserve.bEnabled = C.WildReserve.bEnabled && W.Config.DayPeriod > 0;
 		W.ReserveCap = W.Config.WildReserve.bEnabled
@@ -1591,7 +1597,7 @@ namespace EcoWorldV3
 				}
 				W.ShelterDiscs.push_back(Cv.X);
 				W.ShelterDiscs.push_back(Cv.Y);
-				W.ShelterDiscs.push_back(Cv.Radius);
+				W.ShelterDiscs.push_back(Cv.Radius + W.Config.ShelterWolfMargin);   // 늑대 몸 여유 (c″) — 0 이면 반지름 그대로
 			}
 		}
 		for (std::int32_t m = 0; m < M; ++m)
@@ -1663,7 +1669,7 @@ namespace EcoWorldV3
 				++W.Stats.BlockedThreatMoves;
 			}
 			W.CaughtByThreat[static_cast<size_t>(m)] = A.Last.Caught;
-			// 기록만: 원 안 늑대 (팀 규칙 = 몸 여유 안, ShelterSafe = 파이썬 정의 |q − c| < r)
+			// 기록만: 원 안 늑대 (팀 규칙 = 몸 여유 안, ShelterSafe = 파이썬 정의 |q − c| < r + ShelterWolfMargin)
 			if(bRefugeSafety&&EcoRefugeV3::Contains(W.Config.Covers,{A.State.PosX,A.State.PosY},W.Config.PredatorRefugeMargin-1.e-6))++W.Stats.RefugeInsidePredatorSteps;
 			else if(W.Config.bProtectedRefuges&&W.Config.bShelterSafe&&!W.ShelterDiscs.empty()
 				&&EcoThreatV3::InsideAnyDisc(A.State.PosX,A.State.PosY,W.ShelterDiscs.data(),static_cast<std::int32_t>(W.ShelterDiscs.size()/3)))++W.Stats.RefugeInsidePredatorSteps;

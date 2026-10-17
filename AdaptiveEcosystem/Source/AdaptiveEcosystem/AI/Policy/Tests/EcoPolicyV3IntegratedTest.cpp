@@ -2953,6 +2953,8 @@ bool FEcoRefugeCapture::RunTest(const FString&) {
     Settings.bShelterSafe=false;
     if(!H.Setup(*this,Settings))return false;
     auto* Region=H.AddRegion(TEXT("Refuge"),0,FVector::ZeroVector,1,1);
+    // 10-17 늑대 몸 여유: 팀 규칙이 안전을 맡을 때는 우리 몸 여유를 쓰지 않는다 (두 여유가 겹치지 않는다 — 팀 여유 PredatorRefugeMargin 하나만)
+    TestEqual(TEXT("팀 규칙일 때 우리 늑대 몸 여유 0"),Region->Sim.Config.ShelterWolfMargin,0.0);
     Region->Sim.Config.DayOffset=225;EcoWorldV3::UpdateDayNight(Region->Sim);
     H.Spawn(false,TEXT("Refuge"),0,{FVector(3000,3000,0)},{71});
     H.Spawn(true,TEXT("Refuge"),0,{FVector(3050,3000,0)},{72});H.Frame(0);
@@ -3004,15 +3006,20 @@ bool FEcoRefugeMergedSingleRule::RunTest(const FString&)
 	TestTrue(TEXT("세계 설정: 두 칸 모두 켬, 안전은 파이썬 규칙"),
 			 Region->Sim.Config.bShelterSafe && Region->Sim.Config.bProtectedRefuges && !EcoWorldV3::RefugeOwnsSafety(Region->Sim.Config)
 				 && Region->Sim.ThreatCfg.bShelterSafe && Region->Sim.ThreatCfg.bShelterBlock);
+	// 10-17 늑대 몸 여유 (eco.IntegratedV3.WolfBodyMargin 기본 1 m = 0.5 단위, 파이썬 realism_shelter.wolf_margin)
+	const double BodyMargin = Region->Sim.Config.ShelterWolfMargin;
+	TestEqual(TEXT("통합 기본 늑대 몸 여유 0.5 단위 (1 m)"), BodyMargin, 0.5);
 	Region->Sim.Config.DayOffset = 225;   // 낮 — 깨어 있는 늑대
 	EcoWorldV3::UpdateDayNight(Region->Sim);
 	H.Spawn(false, TEXT("RefugeMerged"), 0, {FVector(3000, 3000, 0)}, {171});
 	H.Spawn(true, TEXT("RefugeMerged"), 0, {FVector(3050, 3000, 0)}, {172});
 	H.Frame(0);
 	std::vector<double> Discs;
+	std::vector<double> BodyDiscs;   // 늑대가 보는 원 (반지름 + 몸 여유)
 	for (const EcoObservationV3::FCoverInput& C : Region->Sim.Config.Covers)
 	{
 		Discs.insert(Discs.end(), {C.X, C.Y, C.Radius});
+		BodyDiscs.insert(BodyDiscs.end(), {C.X, C.Y, C.Radius + BodyMargin});
 	}
 	const std::int32_t NumDiscs = static_cast<std::int32_t>(Discs.size() / 3);
 	{
@@ -3020,6 +3027,7 @@ bool FEcoRefugeMergedSingleRule::RunTest(const FString&)
 		TestTrue(TEXT("늑대가 원 안에서 시작한다 (장면 확인)"), EcoThreatV3::InsideAnyDisc(StartWolf.PosX, StartWolf.PosY, Discs.data(), NumDiscs));
 	}
 	bool bOutside = true;
+	bool bOutsideBody = true;
 	bool bProtected = true;
 	int32 InCoverSteps = 0;
 	for (int32 I = 0; I < 120; ++I)
@@ -3028,6 +3036,7 @@ bool FEcoRefugeMergedSingleRule::RunTest(const FString&)
 		const EcoWorldV3::FHerbBody* Body = UEcoPolicyV3Subsystem::MakeHerbView(*H.EM, H.Deer[0]).Body;
 		const EcoThreatV3::FThreatState& Wolf = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent.State;
 		bOutside &= !EcoThreatV3::InsideAnyDisc(Wolf.PosX, Wolf.PosY, Discs.data(), NumDiscs);
+		bOutsideBody &= !EcoThreatV3::InsideAnyDisc(Wolf.PosX, Wolf.PosY, BodyDiscs.data(), NumDiscs);
 		if (EcoRefugeV3::Contains(Region->Sim.Config.Covers, Body->Pos))
 		{
 			++InCoverSteps;
@@ -3036,6 +3045,7 @@ bool FEcoRefugeMergedSingleRule::RunTest(const FString&)
 	}
 	const EcoWorldV3::FWorldStats& St = Region->Sim.Stats;
 	TestTrue(TEXT("늑대는 첫 이동부터 원 밖 (파이썬 |q − c| ≥ r)"), bOutside);
+	TestTrue(TEXT("늑대 중심은 첫 이동부터 반지름 + 몸 여유 밖 (10-17)"), bOutsideBody);
 	TestTrue(TEXT("원 안 사슴은 잡히지 않는다"), bProtected && InCoverSteps > 0);
 	TestTrue(TEXT("생명주기 기록: 원 안 보호 스텝이 세어진다"), St.RefugeProtectedPreySteps > 0);
 	TestEqual(TEXT("팀 규칙 밀어내기는 한 번도 없다 (한꺼번에 적용 안 함)"), St.RefugeConstrainedMoves, static_cast<std::int64_t>(0));
