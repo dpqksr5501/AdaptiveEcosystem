@@ -118,6 +118,13 @@
 //      (레벨 읽기 원판과 합쳐 (x, y, r) 순), 레벨 읽기는 이 액터를 빼서 두 번 세지 않는다. 시작 자리 계획(PlanStage)은 줄기 원판(반지름 + 몸) 안 자리를 버린다.
 //      파이썬 거울 configs/v3_wild2_trees_mirror.yaml 과 tree_layout.json 이 같은 원판이다. eco.IntegratedV3.Obstacles 0 이거나 무대 한 변이 표(120 m)와
 //      다르거나 그 지역 원판을 가져왔으면(ObstacleImport) 놓지 않는다. 시작 줄 '[EcoV3I] <지역> 나무 |', eco.V3Debug 에서 줄기 원판은 초록 원.
+//  17. 10-18 지역 날씨 (사용자 '일단 우리 테스트 레벨에도 날씨 적용되게 해 줘. 그리고 그 날씨와 장애물들을 바탕으로 만들어진 세계를 파이썬에 고대로 옮겨서
+//      학습시킬 거야', 명세 RL_V3_WILD2_SPEC.md 11절, 파이썬 configs/v3_wild3_mirror.yaml wild_weather): eco.IntegratedV3.Weather (-EcoV3Weather=, 기본 1).
+//      팀 설계대로 숲 = 비, 고지 = 눈, 메마른 땅 = 맑음 (세기 1, 지역마다 고정 — EcoWorldV3.h kRegionWeatherDefaults). 지역 덮기 eco.IntegratedV3.WeatherForest·
+//      WeatherHighland·WeatherBarren (-EcoV3WeatherForest=rain:0.5 등, 측정·연출 전용). 비 = 시야 × 0.9·사슴 청각 × 0.5, 눈 = 시야 × 0.7·사슴 이동 × 0.6·
+//      늑대 이동 × 0.85, 관측 visibility × 시야 (EcoWorldV3.h FWeatherConfig — 규칙은 엔진 무관 세계 층이 맡는다). 시작 줄 '[EcoV3I] 지역 날씨:'·
+//      '[EcoV3I] <지역> 날씨 |', 10초 여덟째 줄 '[EcoV3I] <지역> 날씨 |'(지금 날씨·날씨별 스텝·감지 띠·들어서만). 연출 eco.IntegratedV3.WeatherVisuals
+//      (-EcoV3WeatherVisuals=, 기본 1)는 EcoV3WeatherPresenter 가 맡는다 — 레벨·애셋은 그대로, 팀 나이아가라·소리를 실행 중 카메라 곁에 켠다.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -257,6 +264,14 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 										// 레벨에 보이는 물체가 없는 원판이라 화면용이 아니다. 파이썬 거울과 같은 원판으로 견줄 때만 쓴다)
 	bool bStageTrees = true;            // 무대 나무 (eco.IntegratedV3.StageTrees 기본 1, 10-17 — 배치 표 TreeLayoutV3.h 대로 팀 나무를 실행 중에 놓고 줄기 원판을
 										// 세계에 넣는다. 파이썬 configs/v3_wild2_trees_mirror.yaml). bObstacles 일 때만 놓는다. 거짓 = 나무 없음 (10-17 야생 2단계 3 그대로)
+	bool bWeather = true;               // 지역 날씨 (eco.IntegratedV3.Weather 기본 1, 10-18 야생 3단계 — 파이썬 configs/v3_wild3_mirror.yaml wild_weather). 숲 비·고지 눈·
+										// 메마른 땅 맑음 (EcoWorldV3.h kRegionWeatherDefaults = 팀 설계). 거짓 = 날씨 없음 (10-17 그대로 — 비트 단위로 같다)
+	FString WeatherForest;              // 지역 날씨 덮기 (eco.IntegratedV3.WeatherForest·WeatherHighland·WeatherBarren, '날씨[:세기]' — 날씨 = clear·rain·snow
+	FString WeatherHighland;            //   (맑음·비·눈도 받음), 세기 0~1 (비·눈 기본 1). 빈 값 = 팀 설계 기본 (kRegionWeatherDefaults). 측정·연출 전용 —
+	FString WeatherBarren;              //   파이썬 거울과 다르게 하면 짝 비교가 맞지 않는다
+	bool bWeatherVisuals = true;        // 비·눈 연출 (eco.IntegratedV3.WeatherVisuals 기본 1, 10-18 — EcoV3WeatherPresenter: 카메라가 비·눈 지역 안이면 카메라 곁에
+										// 팀 Rain_System·A_Rain_Cue·NS_Blizzard). 그리기만 바뀐다 (규칙·관측 그대로). 그릴 수 없는 실행·전용 서버는 늘 끔
+	double WeatherRainDensity = 1.0;    // 빗줄기 수 배수 (eco.IntegratedV3.WeatherRainDensity 기본 1 = 팀 블루프린트와 같은 User.SpawnRate 500 — 낮에는 옅다. 화면 전용, 0.1~10)
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등
@@ -341,6 +356,18 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 		const double MaxSide = 110.0;
 		return SizeUnits > 0.0 && static_cast<double>(Deer) * MaxSide * MaxSide < static_cast<double>(kTrainDeer) * SizeUnits * SizeUnits;
 	}
+
+	/**
+	 * 날씨 글자 '날씨[:세기]' (구분은 ':'·','·공백 아무거나) → (EcoWorldV3::kWeather*, 세기). 날씨 = clear·rain·snow 또는 맑음·비·눈 (대소문자 무관),
+	 * 세기는 [0, 1] 로 자르고 빠지면 비·눈 1, 맑음은 늘 0. 못 읽으면 거짓 (OutKind·OutIntensity 그대로).
+	 */
+	static bool ParseWeather(const FString& Text, int32& OutKind, double& OutIntensity);
+
+	/**
+	 * 지역 세계의 날씨 설정 (10-18 야생 3단계). bWeather 거짓이면 끔(기본값). 켜면 그 지역의 팀 설계 기본(kRegionWeatherDefaults — 표에 없는 지역은 맑음)에
+	 * 지역 덮기 글자(WeatherForest 등)를 읽어 덮는다. 배수 계수·visibility 는 FWeatherConfig 기본값 = 파이썬 거울 계수.
+	 */
+	EcoWorldV3::FWeatherConfig WeatherFor(FName RegionId) const;
 
 	/** 콘솔 변수 eco.IntegratedV3.* 에서 읽는다 (명령줄 -EcoV3Seed= -EcoV3DeerPerRegion= 은 그 콘솔 변수의 시작값이다). */
 	static FEcoV3IntegratedSettings FromConsole();
@@ -679,10 +706,10 @@ public:
 	/** 레벨 읽기 원판과 나무 원판을 합쳐 (x, 다음 y, 다음 r) 순으로 늘어놓는다 (ScanStageObstacles 와 같은 순서). OutIsTree = 원판마다 나무에서 왔나. */
 	static std::vector<double> MergeDiscs(const std::vector<double>& Level, const std::vector<double>& Trees, TArray<uint8>* OutIsTree = nullptr);
 
-	/** 지역 v3 세계 설정 (무대 한 변·늑대 구성·낮밤 900·통합 모드 칸). Covers 는 무대 단위. */
+	/** 지역 v3 세계 설정 (무대 한 변·늑대 구성·낮밤 900·통합 모드 칸). Covers 는 무대 단위. RegionId = 지역 날씨를 고르는 이름 (S.WeatherFor — 없으면 맑음). */
 	static EcoWorldV3::FWorldConfig MakeRegionWorldConfig(const FEcoV3IntegratedSettings& S, int32 RegionRuntimeIndex,
 														  int32 PlannedDeer, int32 PlannedWolves,
-														  const std::vector<EcoObservationV3::FCoverInput>& Covers);
+														  const std::vector<EcoObservationV3::FCoverInput>& Covers, FName RegionId = NAME_None);
 
 	// ---- 처리기 쪽 ----
 

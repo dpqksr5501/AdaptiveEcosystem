@@ -12,6 +12,7 @@ import env.torch_init  # noqa: F401  ← torch보다 먼저
 
 import importlib.util
 import json
+import shutil
 import subprocess
 import sys
 
@@ -297,3 +298,33 @@ def test_runner_sets_region_weather(tmp_path):
            wd["meta"]["weather"]["kind"]]) for wd in res["worlds"]}
     assert got == {"Barren": ("clear", 0, 30), "Forest": ("rain", 24, 30), "Highland": ("snow", 9, 30)}
     assert all(0.0 <= wd["meta"]["heard_only_frac"] <= 1.0 for wd in res["worlds"])
+
+
+# --------------------------------------------------------------------- #
+# C++ 골든 (export_golden_v3_weather.py → AI/Policy/WeatherGoldenVectorsV3.h, 검사 본문 Tests/WeatherGoldenCheckV3.h)
+# --------------------------------------------------------------------- #
+
+UE_POLICY = ROOT.parent / "AdaptiveEcosystem" / "Source" / "AdaptiveEcosystem" / "AI" / "Policy"
+WEATHER_CPP_MAIN = ROOT / "tests" / "cpp" / "weather_v3_main.cpp"
+
+
+def test_weather_golden_header_is_fresh():
+    """언리얼 모듈의 WeatherGoldenVectorsV3.h 는 지금 코드로 다시 만든 헤더와 바이트 단위로 같다."""
+    path = UE_POLICY / "WeatherGoldenVectorsV3.h"
+    if not path.exists():
+        pytest.skip("언리얼 모듈 날씨 골든 헤더 없음")
+    ex = _module("_export_golden_v3_weather", ROOT / "export_golden_v3_weather.py")
+    assert path.read_bytes() == ex.build_header().encode("utf-8")
+
+
+@pytest.mark.skipif(shutil.which("g++") is None, reason="g++ 없음")
+def test_cpp_weather_matches_golden_with_gpp(tmp_path):
+    """언리얼 모듈의 EcoWorldV3.h·EcoThreatModel.h·날씨 골든 헤더를 그대로 g++ 로 컴파일해 대조한다(UE 시험 Policy.V3.Weather.Golden 과 같은 검사 본문)."""
+    if not (UE_POLICY / "WeatherGoldenVectorsV3.h").exists():
+        pytest.skip("언리얼 모듈 날씨 골든 헤더 없음")
+    exe = tmp_path / ("weather_v3.exe" if sys.platform == "win32" else "weather_v3")
+    build = subprocess.run(["g++", "-std=c++17", "-O2", "-Wall", "-Wextra", "-Werror", "-Wshadow", "-Wno-unused-parameter", "-I", str(UE_POLICY),
+                            str(WEATHER_CPP_MAIN), "-o", str(exe)], capture_output=True, text=True)
+    assert build.returncode == 0, f"컴파일 실패:\n{build.stderr}"
+    run = subprocess.run([str(exe)], capture_output=True, text=True, encoding="utf-8")
+    assert run.returncode == 0 and "PASS" in run.stdout, f"파리티 실패:\n{run.stdout}\n{run.stderr}"

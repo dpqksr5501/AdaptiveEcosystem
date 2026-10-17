@@ -63,6 +63,11 @@
 //   FObstacleConfig::Detour        10-17 장애물 돌아가기 (파이썬 obstacles.detour). 기본 끔 = 미끄러짐만. 켜면 C1 에서 ApplyMove 바로 앞에 사슴마다
 //                                  EcoThreatV3::DetourStep 으로 제어 출력의 속도 방향을 바꾸고(FHerbBody::Detour), C2 에서 위협 Step 에 넘긴다(Step 7′·8″ —
 //                                  EcoThreatModel.h 머리 주석 '장애물 돌아가기'). 통합 모드 eco.IntegratedV3.ObstacleDetour 기본 1. 기록 FWorldStats::Detour*
+//   FWorldConfig::Weather          야생 3단계 지역 날씨 (파이썬 wild_weather, 10-18). 기본 끔 = 지금과 같다 — 새 줄은 모두 Weather.bEnabled 안에 있다.
+//                                  D′ UpdateDayNight 가 날씨·배수를 정하고(WeatherAt·WeatherMults), E 의 탐지 반경(SeePredNow)·발소리·visibility, B 의 사슴 속도,
+//                                  C2 위협 Step 의 시야 반경·속력(FThreatStepInput::WeatherViewMult·WeatherSpeedMult)이 읽는다. 아래 '야생 3단계' 묶음 머리 주석.
+//                                  통합 모드 eco.IntegratedV3.Weather 기본 1 (숲 비·고지 눈·메마른 땅 맑음). 기록 FWorldStats::WeatherSteps
+//   FWorldConfig::bSenseStats      감지 기록 (FWorldStats::Sense* — 산 사슴 × 깨어 있는 늑대 쌍의 거리 띠별 감지, 들어서만 안 사슴). 기록만, 통합 모드가 켠다
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -317,6 +322,126 @@ namespace EcoWorldV3
 	};
 	inline constexpr std::int32_t kObstacleFoodSamples = 4;   // 먹이: 셀 한 변의 표본점 수 (world.py OB_SAMPLES)
 
+	// ---- 야생 3단계 지역 날씨 (파이썬 wild_weather — world.py 모듈 docstring '야생 3단계', configs/v3_wild3_mirror.yaml, 명세 RL_V3_WILD2_SPEC.md 11절) ----
+	// 10-18 사용자 '일단 우리 테스트 레벨에도 날씨 적용되게 해 줘. 그리고 그 날씨와 장애물들을 바탕으로 만들어진 세계를 파이썬에 고대로 옮겨서 학습시킬 거야'.
+	// 세계(지역 무대)마다 날씨 하나 (k ∈ 맑음 0·비 1·눈 2, 세기 I ∈ [0, 1]). 시간표가 있으면 시작 스텝 ≤ T 인 마지막 줄, 없거나 첫 줄 앞이면 고정 날씨 (WeatherAt).
+	// 배수 m(I) = 1 − (1 − m₁)·I (WeatherMults, m₁ = 세기 1 의 값). 어둠과 같은 때(UpdateDayNight — 처음과 스텝 끝 T + 1 뒤)에 정해 결정 때 값으로 쓴다:
+	//   (x1) 사슴 위협 탐지 반경 SeeR × ((1 − DetectNight·d) × 시야)                     SeePredNow — 관측 E·도주 반사 알아챔·사건 시야
+	//   (x2) 사슴 청각: 위협 발소리 반경 × 사슴 청각                                     BuildThreatInputs
+	//   (x3) 늑대 시야: PredViewR × 시야 (표적 고르기 — 플레이어형은 그대로 맵 전체)        FThreatStepInput::WeatherViewMult (무리 미리 보기도)
+	//   (x4) 사슴 이동 속도 × 사슴 이동 (약함 뒤·돌아가기 앞, 모든 행동), 위협 속력 × 위협 이동 (밤잠 배수 뒤·돌아가기 앞)
+	//   (x5) 관측 visibility = (1 − DetectNight·d) × 시야 (bObsVisibility — 계획서 RL_V2_PLAN.md 4.2 표 9·#25 의 w, 칸 18 그대로)
+	// 맑음·세기 0 은 배수가 정확히 1.0 이라 날씨를 끈 세계와 비트 단위로 같다. 기본 끔 = R1b 학습 세계 그대로 (평면 맵·기준 루프·골든).
+	// 값 = configs/v3_wild3_mirror.yaml wild_weather (골든 WeatherGoldenVectorsV3.h 가 확인한다). 통합 모드 eco.IntegratedV3.Weather (기본 1)
+	// 현실 근거 (값과 출처는 명세 11절): 빗소리가 배경 소음을 6 dB 올리면 들리는 거리가 반이 된다(구면 퍼짐, Barber 외 2010 TREE 25:180).
+	//   큰 눈은 시정 400 m 밑(Rasmussen 외 1999 J. Appl. Meteor. 38:1542) → 40 m 앞 대비 약 0.74. 사슴은 발 하중이 커서 눈에 더 빠진다(Telfer & Kelsall 1984)
+	inline constexpr std::int32_t kWeatherClear = 0;
+	inline constexpr std::int32_t kWeatherRain = 1;
+	inline constexpr std::int32_t kWeatherSnow = 2;
+	inline constexpr std::int32_t kNumWeatherKinds = 3;
+
+	/** 날씨 한 줄 (고정 날씨 또는 시간표 한 줄). 시작 스텝은 시간표에서만 읽는다. */
+	struct FWeatherRow
+	{
+		std::int64_t StartStep = 0;         // 이 줄이 시작하는 세계 T (시간표는 늘어나는 순)
+		std::int32_t Kind = kWeatherClear;
+		double Intensity = 0.0;             // 0~1, 맑음은 0
+	};
+
+	struct FWeatherConfig
+	{
+		bool bEnabled = false;              // 끄면 아래 칸을 아무도 읽지 않는다 (FWorldState 의 날씨 칸은 맑음·배수 1 그대로)
+		std::int32_t Kind = kWeatherClear;  // 이 세계(지역)의 고정 날씨 (파이썬 regions[region])
+		double Intensity = 0.0;
+		double RainSight = 0.9;             // 비 시야 (사슴 위협 탐지·늑대 시야) — 큰비 40 m 앞 대비 손실 약 6% + 빗줄기 가림 (어림)
+		double RainHear = 0.5;              // 비 사슴 청각 — 소음 +6 dB 면 들리는 거리 반 (Barber 외 2010)
+		double SnowSight = 0.7;             // 눈 시야 — 큰 눈 시정 400 m 밑 → 40 m 앞 대비 0.74 (Rasmussen 외 1999), 눈보라라 조금 낮춤 (어림)
+		double SnowHear = 1.0;              // 눈 청각 그대로 (갓 내린 눈은 소리를 먹고 언 눈은 뽀득거린다 — R3 지형 소리와 같은 판단)
+		double SnowDeerSpeed = 0.6;         // 눈 사슴 이동 (R3 지형 눈 값 — Telfer & Kelsall 1984)
+		double SnowWolfSpeed = 0.85;        // 눈 위협 이동 (R3 지형 눈 값 — Nelson & Mech 1986)
+		bool bObsVisibility = true;         // 관측 visibility 에 시야 배수를 곱한다
+		std::vector<FWeatherRow> Schedule;  // 시간표 (비면 고정 날씨 — 파이썬 schedule null)
+	};
+
+	/** 지역마다 기본 날씨 (configs/v3_wild3_mirror.yaml wild_weather.regions — 팀 avaroki 님 설계: 숲 상자 = 비, 고지 상자 = 눈, 메마른 땅 = 맑음). 이름 순. */
+	struct FRegionWeatherDefault
+	{
+		const char* Region;
+		std::int32_t Kind;
+		double Intensity;
+	};
+	inline constexpr FRegionWeatherDefault kRegionWeatherDefaults[3] = {
+		{"Barren", kWeatherClear, 0.0},
+		{"Forest", kWeatherRain, 1.0},
+		{"Highland", kWeatherSnow, 1.0},
+	};
+
+	/** 날씨 배수 넷 (시야, 사슴 청각, 사슴 이동, 위협 이동). 맑음은 모두 1. */
+	struct FWeatherMults
+	{
+		double Sight = 1.0;
+		double Hear = 1.0;
+		double DeerSpeed = 1.0;
+		double WolfSpeed = 1.0;
+	};
+
+	/** 세계 T 의 날씨 (world.py weather_at): 시간표가 있으면 시작 스텝 ≤ T 인 마지막 줄, 없거나 첫 줄 앞이면 고정 날씨. */
+	inline FWeatherRow WeatherAt(const FWeatherConfig& C, std::int64_t T)
+	{
+		FWeatherRow Out;
+		Out.Kind = C.Kind;
+		Out.Intensity = C.Intensity;
+		const FWeatherRow* Last = nullptr;
+		for (const FWeatherRow& Row : C.Schedule)
+		{
+			if (Row.StartStep <= T)
+			{
+				Last = &Row;
+			}
+			else
+			{
+				break;
+			}
+		}
+		if (Last)
+		{
+			Out = *Last;
+		}
+		return Out;
+	}
+
+	/** 날씨 배수 (world.py weather_mults — 줄마다 같은 식): m(I) = 1 − (1 − m₁)·I. 비는 이동을 바꾸지 않는다. */
+	inline FWeatherMults WeatherMults(const FWeatherConfig& C, std::int32_t Kind, double Intensity)
+	{
+		auto At = [Intensity](double M1) { return 1.0 - (1.0 - M1) * Intensity; };
+		FWeatherMults M;
+		if (Kind == kWeatherRain)
+		{
+			M.Sight = At(C.RainSight);
+			M.Hear = At(C.RainHear);
+		}
+		else if (Kind == kWeatherSnow)
+		{
+			M.Sight = At(C.SnowSight);
+			M.Hear = At(C.SnowHear);
+			M.DeerSpeed = At(C.SnowDeerSpeed);
+			M.WolfSpeed = At(C.SnowWolfSpeed);
+		}
+		return M;
+	}
+
+	/** 날씨 이름 (기록·화면): 맑음·비·눈. */
+	inline const char* WeatherNameKoUtf8(std::int32_t Kind)
+	{
+		return Kind == kWeatherRain ? "비" : (Kind == kWeatherSnow ? "눈" : "맑음");
+	}
+
+	// ---- 감지 기록 (기록만 — 어떤 계산에도 쓰지 않는다. results/v3/mirror/run_mirror.py --diag band_pairs·band_seen·heard_live 와 같은 정의) ----
+	// 스텝 끝(관측 E 의 위협 목록, 이동 뒤 자리)에 산 사슴 × 깨어 있는 늑대 쌍을 실거리 띠 [0, 5)·[5, 10)·[10, 15)·[15, 30) m 로 가르고, 사슴이 그 늑대를
+	// 감지했나(관측과 같은 판정 — 시야·발소리·눈길 가림, 자는 늑대 빼고)를 센다. 들어서만 = 감지한 늑대가 있는데 눈으로 본 늑대가 없는 산 사슴·스텝
+	inline constexpr std::int32_t kNumSenseBands = 4;
+	inline constexpr double kSenseBandEdges[kNumSenseBands + 1] = {0.0, 2.5, 5.0, 7.5, 15.0};   // 단위 (1 = 2 m)
+
 	// ---- 야생 2단계 사냥 성공률 (world.py hunt_update — 모듈 docstring '야생 2단계'). 기록만, 어떤 계산에도 쓰지 않는다 ----
 	// 사냥 한 번 = 한 늑대가 전력 걸음(FThreatStepResult::bRunning — 추격형이 표적을 쫓음·잠행형 돌진·플레이어 돌진)으로 이어 달린 스텝들.
 	// 시작 = 전력 걸음 ∧ ¬이어지는 중. 성공 = 잡음 ∧ (이어지는 중 ∨ 전력 걸음). 실패 = (이어지는 중 ∨ 전력 걸음) ∧ ¬잡음 ∧ ¬전력 걸음.
@@ -429,6 +554,10 @@ namespace EcoWorldV3
 		EcoThreatV3::FPackHuntConfig PackHunt;
 		// 야생 2단계 3 세로 장애물 (통합 모드 eco.IntegratedV3.Obstacles — 원판은 레벨에서 읽는다). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든)
 		FObstacleConfig Obstacles;
+		// 야생 3단계 지역 날씨 (통합 모드 eco.IntegratedV3.Weather — 지역마다 날씨). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든)
+		FWeatherConfig Weather;
+		// 감지 기록 (FWorldStats::Sense* — 통합 모드가 켠다). 기록만, 끄면 세지 않는다 (평면 맵·기준 루프는 그대로)
+		bool bSenseStats = false;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -1002,6 +1131,13 @@ namespace EcoWorldV3
 		std::int64_t DetourWolfStart = 0;    // (wolf_start)
 		std::int64_t DetourWolfFail = 0;     // (wolf_fail)
 		std::int64_t DetourHelpDrop = 0;     // 돕다가 막혀 돕기를 그만둔 늑대 (help_drop)
+		// 야생 3단계 지역 날씨 기록 (켰을 때만 — world.py weather_stats steps_<날씨>: 그 스텝 이동에 쓴 결정 때 날씨, 스텝마다 하나)
+		std::int64_t WeatherSteps[kNumWeatherKinds] = {};
+		// 감지 기록 (FWorldConfig::bSenseStats 일 때만 — run_mirror.py --diag 와 같은 정의, 머리 주석 '감지 기록')
+		std::int64_t SensePairs[kNumSenseBands] = {};    // 산 사슴 × 깨어 있는 늑대 쌍 (띠마다)
+		std::int64_t SenseSeen[kNumSenseBands] = {};     // 그중 사슴이 감지한 쌍
+		std::int64_t SenseLiveSteps = 0;                 // 산 사슴·스텝 (스텝 끝)
+		std::int64_t SenseHeardOnly = 0;                 // 그중 감지한 늑대가 있는데 눈으로 본 늑대가 없음 (들어서만)
 		std::int64_t RefugeProtectedPreySteps = 0;
 		std::int64_t RefugeConstrainedMoves = 0;
 		std::int64_t RefugeRecoveries = 0;
@@ -1042,6 +1178,10 @@ namespace EcoWorldV3
 		double Dark = 0.0;                   // d(t)
 		std::int32_t StepsToTransition = -1; // r (낮 고정이면 -1 → to_transition 1)
 		double PredEma = 0.0;                // 전역 피식 EMA
+		// 야생 3단계 지역 날씨 (결정 때 값 — UpdateDayNight 가 어둠과 함께 정한다. 끄면 맑음·배수 1 그대로)
+		std::int32_t WeatherKind = kWeatherClear;
+		double WeatherIntensity = 0.0;
+		FWeatherMults Weather;
 		double ReserveCap = 0.0;             // 야생 (w1) 비축 용량 C (E 단위, InitWorld 가 정한다. 끄면 0)
 		FWorldStats Stats;
 		std::vector<EcoObservationV3::FThreatInput> ExternalThreats;
@@ -1080,6 +1220,36 @@ namespace EcoWorldV3
 			W.Dark = 0.0;
 			W.StepsToTransition = -1;
 		}
+		// 야생 3단계 지역 날씨 (켰을 때만): 같은 T 의 날씨와 배수 — 스텝 끝 관측과 다음 스텝의 이동·늑대 시야가 쓴다 (world.py `_daynight_update`)
+		if (W.Config.Weather.bEnabled)
+		{
+			const FWeatherRow Wx = WeatherAt(W.Config.Weather, W.T);
+			W.WeatherKind = Wx.Kind;
+			W.WeatherIntensity = Wx.Intensity;
+			W.Weather = WeatherMults(W.Config.Weather, Wx.Kind, Wx.Intensity);
+		}
+	}
+
+	/**
+	 * 지금 사슴의 위협 탐지 기본 반경 (world.py `_see_pred`). 날씨를 켜면 SeeR × ((1 − DetectNight·d) × 시야) — 파이썬과 같은 곱 순서, 끄면
+	 * SeePredRadius 그대로 (맑음은 시야 1.0 이라 같은 값). 행동 배수는 PerceiveThreats 가 곱한다.
+	 */
+	inline double SeePredNow(const FWorldState& W)
+	{
+		return W.Config.Weather.bEnabled ? W.ObsCfg.SeeR * (EcoObservationV3::Visibility(W.Dark, W.ObsCfg) * W.Weather.Sight)
+										 : EcoObservationV3::SeePredRadius(W.Dark, W.ObsCfg);
+	}
+
+	/** 관측 visibility 에 곱할 날씨 배수 (bObsVisibility 일 때 시야 배수, 아니면 1). */
+	inline double ObsVisibilityMult(const FWorldState& W)
+	{
+		return W.Config.Weather.bEnabled && W.Config.Weather.bObsVisibility ? W.Weather.Sight : 1.0;
+	}
+
+	/** 지금 늑대 시야 반경 (world.py `_wx_view` = pred_view_r × 시야, 단위). 날씨를 끄면 PredViewR. */
+	inline double WolfViewNow(const FWorldState& W)
+	{
+		return W.Config.Weather.bEnabled ? W.ThreatCfg.PredViewR * W.Weather.Sight : W.ThreatCfg.PredViewR;
 	}
 
 	/** 세계 생성 (world.reset 의 세계 부분): 설정·계수·난수·먹이 격자·t = 0 의 어둠. 개체는 InitHerb·InitThreat 가 만든다. */
@@ -1123,6 +1293,20 @@ namespace EcoWorldV3
 		for (std::int32_t b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
 		{
 			W.Allowed[b] = (EcoPolicyV3::kAllowedMask[b] != 0 && C.WorldAllowed[b] != 0) ? 1 : 0;
+		}
+		// 야생 3단계 지역 날씨: 세기 [0, 1]·맑음 0·배수 (0, 1]·시간표 늘어나는 순 (파이썬 _wild_weather_params 가 거부하는 값은 끈다 — 끈 세계는 그대로)
+		{
+			FWeatherConfig& Wx = W.Config.Weather;
+			auto Ok = [](std::int32_t K, double I) { return K >= kWeatherClear && K < kNumWeatherKinds && I >= 0.0 && I <= 1.0 && (K != kWeatherClear || I == 0.0); };
+			auto Mult = [](double M) { return M > 0.0 && M <= 1.0; };
+			bool bOk = Ok(Wx.Kind, Wx.Intensity) && Mult(Wx.RainSight) && Mult(Wx.RainHear) && Mult(Wx.SnowSight) && Mult(Wx.SnowHear)
+					   && Mult(Wx.SnowDeerSpeed) && Mult(Wx.SnowWolfSpeed);
+			for (size_t r = 0; r < Wx.Schedule.size() && bOk; ++r)
+			{
+				bOk = Ok(Wx.Schedule[r].Kind, Wx.Schedule[r].Intensity) && Wx.Schedule[r].StartStep >= 0
+					  && (r == 0 || Wx.Schedule[r].StartStep > Wx.Schedule[r - 1].StartStep);
+			}
+			Wx.bEnabled = Wx.bEnabled && bOk;
 		}
 		W.Rng.State = EcoRepertoireV3::HashChain3(kWorldRngTag, static_cast<std::uint64_t>(C.Seed), C.RngStream);
 		W.Food.Build(W.Config, W.Rng);
@@ -1325,6 +1509,10 @@ namespace EcoWorldV3
 																 std::sqrt(A.State.VelX * A.State.VelX + A.State.VelY * A.State.VelY) / W.ObsCfg.HerbSpeed,
 																 A.Last.bRunning)
 							   : 0.0;
+				if (W.Config.Weather.bEnabled && W.Weather.Hear != 1.0)
+				{
+					In.HearR = In.HearR * W.Weather.Hear;   // 야생 3단계 (x2): 빗소리가 발소리를 덮는다 (world.py r_snd × w_h)
+				}
 			}
 			W.ThreatIn.insert(W.ThreatIn.end(), W.ExternalThreats.begin(), W.ExternalThreats.end());
 		}
@@ -1358,7 +1546,7 @@ namespace EcoWorldV3
 					T.bOccluded = EcoThreatV3::SightBlocked(B.Pos.X, B.Pos.Y, T.X, T.Y, Ob.Discs.data(), Ob.Num());
 				}
 			}
-			P.Threat = EcoObservationV3::PerceiveThreats(B.Pos, B.Head, EcoObservationV3::SeePredRadius(W.Dark, OC), S.SeeMult,
+			P.Threat = EcoObservationV3::PerceiveThreats(B.Pos, B.Head, SeePredNow(W), S.SeeMult,
 														 S.SeeMultLast, W.ThreatIn.data(), static_cast<std::int32_t>(W.ThreatIn.size()), OC);
 			P.Kin = EcoObservationV3::PerceiveKin(Self, B.Pos, B.Head, W.KinIn.data(), N, OC);
 			P.Cover = EcoObservationV3::PerceiveCover(B.Pos, W.Config.Covers.data(),
@@ -1377,6 +1565,7 @@ namespace EcoWorldV3
 			In.bHasCover = !W.Config.Covers.empty();
 			In.CoverEdge = P.Cover.Edge;
 			In.Dark = W.Dark;
+			In.VisMult = ObsVisibilityMult(W);   // 야생 3단계 (x5): visibility = (1 − DetectNight·d) × 시야 (끄면 1 — 지금 그대로)
 			In.StepsToTransition = W.StepsToTransition;
 			In.PredApproach = P.Threat.PredApproach;
 			In.KinAlarm = P.Kin.KinAlarm;
@@ -1553,7 +1742,7 @@ namespace EcoWorldV3
 			namespace R3 = EcoRepertoireV3;
 			const FWildFlightConfig& F = W.Config.WildFlight;
 			const double Eps2 = R3::kEps * R3::kEps;
-			const double SeePred = EcoObservationV3::SeePredRadius(W.Dark, W.ObsCfg);
+			const double SeePred = SeePredNow(W);   // 관측과 같은 반경 (야생 3단계 날씨 시야 포함)
 			const double Size = W.Config.WorldSize;
 			const std::int32_t K = static_cast<std::int32_t>(W.Config.Covers.size());
 			const bool bSightBlock = W.Config.Obstacles.Active() && W.Config.Obstacles.bBlockSight;
@@ -1737,6 +1926,61 @@ namespace EcoWorldV3
 			return R;
 		}
 
+		/**
+		 * 감지 기록 (FWorldConfig::bSenseStats, 기록만 — 머리 주석 '감지 기록'). 스텝 끝(H 뒤): 산 사슴(이번 스텝에 죽지 않음) × 깨어 있는 늑대(W.ThreatIn 의 앞 M 개 —
+		 * 플레이어 폰 같은 바깥 위협은 빼고)의 실거리 띠마다 쌍·감지 쌍, 그리고 들어서만 안 사슴·스텝. 감지 = 관측과 같은 판정(PerceiveThreats 와 같은 식 —
+		 * 반경 SeePredNow × 이번 시야 배수·위협 시야각·이 쌍의 눈길 가림, 발소리 HearR, 자는 늑대 빼고). run_mirror.py --diag band_pairs·band_seen·heard_live 와 같은 정의
+		 */
+		inline void TallySense(FWorldState& W, const FHerbView* Herbs, std::int32_t N, std::int32_t M)
+		{
+			const EcoObservationV3::FObservationConfig& OC = W.ObsCfg;
+			const double SeePred = SeePredNow(W);
+			const FObstacleConfig& Ob = W.Config.Obstacles;
+			const bool bSightBlock = Ob.Active() && Ob.bBlockSight;
+			const std::int32_t Mc = M < static_cast<std::int32_t>(W.ThreatIn.size()) ? M : static_cast<std::int32_t>(W.ThreatIn.size());
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				const FHerbView& H = Herbs[i];
+				if (H.Body->DeathCause != kDeathNone)
+				{
+					continue;
+				}
+				const FVec2 P = H.Body->Pos;
+				const FVec2 Hd = H.Body->Head;
+				const double SeeP = SeePred * H.Rep->SeeMult;
+				bool bAnyVis = false, bAnyEye = false;
+				for (std::int32_t m = 0; m < Mc; ++m)
+				{
+					const EcoObservationV3::FThreatInput& T = W.ThreatIn[static_cast<size_t>(m)];
+					const double Ex = T.X - P.X;
+					const double Ey = T.Y - P.Y;
+					const double Pd = std::sqrt(Ex * Ex + Ey * Ey);
+					const double Inv = 1.0 / (Pd > EcoRepertoireV3::kEps ? Pd : EcoRepertoireV3::kEps);
+					const bool bOcc = bSightBlock && EcoThreatV3::SightBlocked(P.X, P.Y, T.X, T.Y, Ob.Discs.data(), Ob.Num());
+					const bool bSight = !bOcc && Pd <= SeeP && (Ex * Hd.X + Ey * Hd.Y) * Inv >= OC.ThreatFovCos;
+					const double HearLim = OC.bHearCapToSight ? (T.HearR < SeeP ? T.HearR : SeeP) : T.HearR;
+					const bool bHeard = T.HearR > 0.0 && Pd <= HearLim;
+					const bool bVis = (bSight || bHeard) && !T.bAsleep;
+					bAnyVis = bAnyVis || bVis;
+					bAnyEye = bAnyEye || (bSight && !T.bAsleep);
+					if (T.bAsleep)
+					{
+						continue;   // 깨어 있는 늑대만 쌍으로 센다
+					}
+					for (std::int32_t b = 0; b < kNumSenseBands; ++b)
+					{
+						if (Pd >= kSenseBandEdges[b] && Pd < kSenseBandEdges[b + 1])
+						{
+							++W.Stats.SensePairs[b];
+							W.Stats.SenseSeen[b] += bVis ? 1 : 0;
+						}
+					}
+				}
+				++W.Stats.SenseLiveSteps;
+				W.Stats.SenseHeardOnly += (bAnyVis && !bAnyEye) ? 1 : 0;
+			}
+		}
+
 		/** B 의 도주 제어 입력: FLEE 제어기의 위협 반대 = 덮기 방향 (보인 위협으로 둔다 — world.py `_rep_step` 의 wf PANIC 줄). */
 		inline void FlightControlInput(const FHerbView& H, EcoRepertoireV3::FControlInput& In)
 		{
@@ -1793,6 +2037,11 @@ namespace EcoWorldV3
 		W.StepCatches.clear();
 		const bool bKeep = W.Config.WildFlight.bEnabled;   // 도주 반사 거리 (끄면 아래 bKeep 줄은 모두 건너뛴다 — 지금 그대로)
 		const bool bReserve = W.Config.WildReserve.bEnabled;   // 야생 (w1) 지방 비축 (끄면 아래 bReserve 줄은 모두 건너뛴다 — 지금 그대로)
+		const bool bWeather = W.Config.Weather.bEnabled;       // 야생 3단계 지역 날씨 (끄면 아래 bWeather 줄은 모두 건너뛴다 — 지금 그대로)
+		if (bWeather)
+		{
+			++W.Stats.WeatherSteps[W.WeatherKind];   // 기록만: 이 스텝 이동에 쓰는 결정 때 날씨 (world.py weather_stats steps_<날씨>)
+		}
 
 		// A. Arbiter Commit — 지난 스텝 끝에 Prepare·마스크·망으로 정한 요청
 		for (std::int32_t i = 0; i < N; ++i)
@@ -1892,6 +2141,12 @@ namespace EcoWorldV3
 					H.Control->Velocity.X *= W.Config.WildReserve.WeakSpeed;
 					H.Control->Velocity.Y *= W.Config.WildReserve.WeakSpeed;
 				}
+			}
+			if (bWeather && W.Weather.DeerSpeed != 1.0)
+			{
+				// 야생 3단계 (x4): 눈 덮인 지역에서 사슴이 느려진다 (world.py step 1 의 v × w_d — 약함 뒤·돌아가기 앞, 모든 행동). 대사·섭식은 보행 그대로
+				H.Control->Velocity.X *= W.Weather.DeerSpeed;
+				H.Control->Velocity.Y *= W.Weather.DeerSpeed;
 			}
 			R3::CommitSeeMult(*H.Rep, H.Control->SeeMult);
 			++W.Stats.BehaviorSteps[H.Rep->Behavior];
@@ -2009,6 +2264,12 @@ namespace EcoWorldV3
 			Pi.WorldSize = W.Config.WorldSize;
 			Pi.Discs = W.ShelterDiscs.empty() ? nullptr : W.ShelterDiscs.data();
 			Pi.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
+			if (bWeather)
+			{
+				// 야생 3단계: 미리 보기도 날씨 시야·이동으로 (표적·전력 걸음이 실제 Step 과 같게)
+				Pi.WeatherViewMult = W.Weather.Sight;
+				Pi.WeatherSpeedMult = W.Weather.WolfSpeed;
+			}
 			if (bObstacles)
 			{
 				// 야생 2단계 3: 미리 보기도 늑대 눈길 가림을 같이 본다 (표적·전력 걸음이 실제 Step 과 같게)
@@ -2049,6 +2310,12 @@ namespace EcoWorldV3
 			In.WanderTurn = W.Rng.Uniform(-W.ThreatCfg.PredWanderTurn, W.ThreatCfg.PredWanderTurn);
 			In.Discs = W.ShelterDiscs.empty() ? nullptr : W.ShelterDiscs.data();
 			In.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
+			if (bWeather)
+			{
+				// 야생 3단계 (x3)·(x4): 늑대 시야 반경 × 시야, 위협 속력 × 위협 이동 (결정 때 날씨 — world.py `_wx_view`·`_wx_wolf`)
+				In.WeatherViewMult = W.Weather.Sight;
+				In.WeatherSpeedMult = W.Weather.WolfSpeed;
+			}
 			if (bObstacles)
 			{
 				// 야생 2단계 3 세로 장애물: 늑대 눈길 가림·이동 미끄러짐 (EcoThreatModel.h 머리 주석 '세로 장애물'), 6) 돌아가기 (Step 7′·8″)
@@ -2360,6 +2627,10 @@ namespace EcoWorldV3
 			Detail::UpdateWildFlight(W, Herbs, N, Threats, M);
 		}
 		DecideAll(W, Herbs, N, Net);
+		if (W.Config.bSenseStats)
+		{
+			Detail::TallySense(W, Herbs, N, M);   // 기록만 (감지 띠·들어서만 — 어떤 계산에도 쓰지 않는다)
+		}
 
 		W.Stats.Caught += Report.Caught;
 		W.Stats.Starved += Report.Starved;

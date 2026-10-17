@@ -59,6 +59,8 @@ rand.predator_count 다(메타 wolves).
 10-18 더함(야생 3단계 지역 날씨, configs/v3_wild3_mirror.yaml): wild_weather 를 켠 설정의 짝 비교는 지도마다 wild_weather.region 을 그 지도의 지역으로 덮는다(날씨는
 설정의 regions 표). 짝 비교가 아니면 설정의 region 그대로다(--set wild_weather.region=Highland 로 바꾼다). 세계 메타에 weather(World.weather_stats)를, realism_hearing 을
 켠 세계는 heard_only_frac(위협을 들어서만 안 개체-스텝 몫, World.realism_stats)을 더 적는다(동역학과 무관).
+10-18 더함(언리얼 날씨 짝 비교, results/v3/wild3/compare_weather.py): --diag 진단에 heard_live·live_obs(스텝 끝 관측에서 들어서만 안 **산** 사슴·스텝과 산 사슴·스텝 —
+C++ 통합 모드 10초 여덟째 줄 '들어서만 안 사슴·스텝' 과 같은 정의. heard_only_frac 은 죽은 슬롯까지 N 으로 나눈다)를 더한다(동역학과 무관).
 """
 
 from __future__ import annotations
@@ -290,6 +292,7 @@ class _Diag:
         self.catch_ring = [0] * len(RING_BANDS)
         self.wolf_steps = self.wolf_in_r = self.wolf_in_1m = 0
         self.wolf_edge_min = float("inf")
+        self.heard_live = self.live_obs = 0       # 10-18: 들어서만 안 산 사슴·스텝 / 산 사슴·스텝 (스텝 끝 관측 — C++ FWorldStats::SenseHeardOnly·SenseLiveSteps)
 
     def after(self, w, live_before):
         from env_v2 import repertoire as rep
@@ -304,6 +307,11 @@ class _Diag:
             pv = g["wf_pvis"]
             self.last_seen[live_before & (pv & awake[None, :]).any(1)] = w.t
             m = live[:, None] & awake[None, :]
+            if "rz_heard" in g:
+                # 10-18 (야생 3단계 짝 비교): 들어서만 안 몫을 산 사슴으로만 센다(realism_stats heard_only_frac 은 죽은 슬롯까지 N 으로 나눈다).
+                # C++ 통합 모드 10초 여덟째 줄 '들어서만 안 사슴·스텝' 과 같은 정의
+                self.heard_live += int(np.count_nonzero(g["rz_heard"] & live))
+                self.live_obs += int(np.count_nonzero(live))
             for b in range(len(self.edges) - 1):
                 sel = m & (d >= self.edges[b]) & (d < self.edges[b + 1])
                 self.pairs[b] += int(sel.sum())
@@ -364,6 +372,7 @@ class _Diag:
         out.update(catch_edge=self.catch_edge, catch_corner=self.catch_corner, catch_cover=self.catch_cover, catch_repeat=self.catch_repeat,
                    occ_n=self.occ_n, occ_edge=self.occ_edge, occ_corner=self.occ_corner, panic_ends=self.panic_ends,
                    panic_end_awake=self.panic_end_awake)
+        out.update(heard_live=self.heard_live, live_obs=self.live_obs)
         out.update(catch_ring=list(self.catch_ring), wolf_steps=self.wolf_steps, wolf_in_r=self.wolf_in_r, wolf_in_1m=self.wolf_in_1m,
                    wolf_edge_min=None if self.wolf_edge_min == float("inf") else round(self.wolf_edge_min, 6))
         try:

@@ -250,6 +250,48 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("시작 자리는 줄기를 피한다. eco.IntegratedV3.Obstacles 1 이고 무대 한 변 120 m 일 때만. 0 = 나무 없음. Play 전에 바꾼다. 명령줄 -EcoV3StageTrees= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarWeather(
+		TEXT("eco.IntegratedV3.Weather"),
+		1,
+		TEXT("통합 v3 모드의 지역 날씨 (1 = 켬, 기본 — 10-18 야생 3단계, 파이썬 configs/v3_wild3_mirror.yaml wild_weather). 팀 설계대로 숲 = 비, 고지 = 눈, 메마른 땅 = 맑음. ")
+		TEXT("비는 사슴·늑대 시야 × 0.9 (사슴 탐지 40 → 36 m, 늑대 28 → 25.2 m)·사슴 청각 × 0.5, 눈은 시야 × 0.7·사슴 이동 × 0.6·늑대 이동 × 0.85, 관측 visibility × 시야. ")
+		TEXT("비·눈은 eco.IntegratedV3.WeatherVisuals 1 이면 카메라 곁에 보인다. 0 = 날씨 없음(10-17 그대로). Play 전에 바꾼다. 명령줄 -EcoV3Weather= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<FString> CVarWeatherForest(
+		TEXT("eco.IntegratedV3.WeatherForest"),
+		TEXT(""),
+		TEXT("통합 v3 모드 숲(Forest) 날씨 덮기 '날씨[:세기]' (날씨 = clear·rain·snow, 세기 0~1). 빈 값 = 팀 설계 기본(비 1). 측정·연출 전용 — 파이썬 거울과 다르면 짝 비교가 ")
+		TEXT("맞지 않는다. Play 전에 바꾼다. 명령줄 -EcoV3WeatherForest= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<FString> CVarWeatherHighland(
+		TEXT("eco.IntegratedV3.WeatherHighland"),
+		TEXT(""),
+		TEXT("통합 v3 모드 고지(Highland) 날씨 덮기 '날씨[:세기]'. 빈 값 = 팀 설계 기본(눈 1). Play 전에 바꾼다. 명령줄 -EcoV3WeatherHighland= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<FString> CVarWeatherBarren(
+		TEXT("eco.IntegratedV3.WeatherBarren"),
+		TEXT(""),
+		TEXT("통합 v3 모드 메마른 땅(Barren) 날씨 덮기 '날씨[:세기]'. 빈 값 = 팀 설계 기본(맑음). Play 전에 바꾼다. 명령줄 -EcoV3WeatherBarren= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarWeatherVisuals(
+		TEXT("eco.IntegratedV3.WeatherVisuals"),
+		1,
+		TEXT("통합 v3 모드의 비·눈 연출 (1 = 켬, 기본 — 10-18). 카메라(보기 대상)가 비 오는 지역 안이면 카메라 곁에 팀 Rain_System 과 빗소리 A_Rain_Cue 를, 눈 오는 지역 안이면 ")
+		TEXT("NS_Blizzard 를 켜고, 나오면 곧 끈다(빗소리도 멈춤). 레벨·애셋은 그대로. 그리기만 바뀐다(규칙·관측 그대로). 그릴 수 없는 실행·전용 서버는 늘 끔. ")
+		TEXT("eco.IntegratedV3.Weather 0 이면 아무것도 하지 않는다. 0 = 연출 없음. 명령줄 -EcoV3WeatherVisuals= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarWeatherRainDensity(
+		TEXT("eco.IntegratedV3.WeatherRainDensity"),
+		1.0f,
+		TEXT("통합 v3 모드 비 연출의 빗줄기 수 배수 (기본 1 = 팀 블루프린트 BP_SHC_RainRegionalWeather 와 같은 Rain_System User.SpawnRate 500 × 세기). 맑은 낮 하늘에서는 ")
+		TEXT("팀 화면처럼 옅다 — 발표용으로 2~4 를 쓸 수 있다. 화면만 바뀐다(규칙·관측 그대로). 0.1~10 으로 자른다. 명령줄 -EcoV3WeatherRainDensity= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarRealismVision(
 		TEXT("eco.IntegratedV3.RealismVision"),
 		1,
@@ -558,7 +600,102 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.ObstacleExportPath = CVarObstacleExport.GetValueOnGameThread();
 	S.ObstacleImportPath = CVarObstacleImport.GetValueOnGameThread();
 	S.bStageTrees = CVarStageTrees.GetValueOnGameThread() != 0;
+	S.bWeather = CVarWeather.GetValueOnGameThread() != 0;
+	S.WeatherForest = CVarWeatherForest.GetValueOnGameThread();
+	S.WeatherHighland = CVarWeatherHighland.GetValueOnGameThread();
+	S.WeatherBarren = CVarWeatherBarren.GetValueOnGameThread();
+	S.bWeatherVisuals = CVarWeatherVisuals.GetValueOnGameThread() != 0;
+	{
+		const double Density = static_cast<double>(CVarWeatherRainDensity.GetValueOnGameThread());
+		S.WeatherRainDensity = FMath::IsFinite(Density) ? FMath::Clamp(Density, 0.1, 10.0) : 1.0;
+	}
 	return S;
+}
+
+bool FEcoV3IntegratedSettings::ParseWeather(const FString& Text, int32& OutKind, double& OutIntensity)
+{
+	FString Body = Text.TrimStartAndEnd();
+	Body.ReplaceInline(TEXT(","), TEXT(" "));
+	Body.ReplaceInline(TEXT(":"), TEXT(" "));
+	TArray<FString> Parts;
+	Body.ParseIntoArrayWS(Parts);
+	if (Parts.Num() < 1 || Parts.Num() > 2)
+	{
+		return false;
+	}
+	const FString Name = Parts[0].ToLower();
+	int32 Kind = INDEX_NONE;
+	if (Name == TEXT("clear") || Name == TEXT("맑음"))
+	{
+		Kind = EcoWorldV3::kWeatherClear;
+	}
+	else if (Name == TEXT("rain") || Name == TEXT("비"))
+	{
+		Kind = EcoWorldV3::kWeatherRain;
+	}
+	else if (Name == TEXT("snow") || Name == TEXT("눈"))
+	{
+		Kind = EcoWorldV3::kWeatherSnow;
+	}
+	if (Kind == INDEX_NONE)
+	{
+		return false;
+	}
+	double Intensity = Kind == EcoWorldV3::kWeatherClear ? 0.0 : 1.0;
+	if (Parts.Num() == 2)
+	{
+		if (!Parts[1].IsNumeric())
+		{
+			return false;
+		}
+		const double V = FCString::Atod(*Parts[1]);
+		if (!FMath::IsFinite(V))
+		{
+			return false;
+		}
+		Intensity = FMath::Clamp(V, 0.0, 1.0);
+	}
+	OutKind = Kind;
+	OutIntensity = Kind == EcoWorldV3::kWeatherClear ? 0.0 : Intensity;
+	return true;
+}
+
+EcoWorldV3::FWeatherConfig FEcoV3IntegratedSettings::WeatherFor(FName RegionId) const
+{
+	EcoWorldV3::FWeatherConfig W;
+	if (!bWeather)
+	{
+		return W;
+	}
+	W.bEnabled = true;
+	for (const EcoWorldV3::FRegionWeatherDefault& D : EcoWorldV3::kRegionWeatherDefaults)
+	{
+		if (RegionId == FName(UTF8_TO_TCHAR(D.Region)))
+		{
+			W.Kind = D.Kind;
+			W.Intensity = D.Intensity;
+		}
+	}
+	const FString* Override = RegionId == FName(TEXT("Forest"))	   ? &WeatherForest
+							  : RegionId == FName(TEXT("Highland")) ? &WeatherHighland
+							  : RegionId == FName(TEXT("Barren"))   ? &WeatherBarren
+																	: nullptr;
+	if (Override && !Override->IsEmpty())
+	{
+		int32 Kind = W.Kind;
+		double Intensity = W.Intensity;
+		if (ParseWeather(*Override, Kind, Intensity))
+		{
+			W.Kind = Kind;
+			W.Intensity = Intensity;
+		}
+		else
+		{
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] %s 날씨 덮기 '%s' 를 못 읽었다 — 팀 설계 기본을 쓴다 ('날씨[:세기]', 날씨 = clear·rain·snow)"),
+				   *RegionId.ToString(), **Override);
+		}
+	}
+	return W;
 }
 
 // -----------------------------------------------------------------------------
@@ -693,6 +830,33 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3StageTrees="), TreesArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.StageTrees"), LexToString(TreesArg));
+	}
+	int32 WeatherArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3Weather="), WeatherArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.Weather"), LexToString(WeatherArg));
+	}
+	int32 WeatherVisualsArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3WeatherVisuals="), WeatherVisualsArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.WeatherVisuals"), LexToString(WeatherVisualsArg));
+	}
+	float RainDensityArg = 1.0f;
+	if (FParse::Value(CmdLine, TEXT("EcoV3WeatherRainDensity="), RainDensityArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.WeatherRainDensity"), LexToString(RainDensityArg));
+	}
+	// 지역 날씨 덮기: 값 안의 ',' 는 명령줄에서 끊기므로 '날씨:세기' 꼴로 받는다 (FParse::Value 는 쉼표에서 멈추지 않게 한다)
+	const TCHAR* const RegionWeatherArgs[3][2] = {{TEXT("EcoV3WeatherForest="), TEXT("eco.IntegratedV3.WeatherForest")},
+												  {TEXT("EcoV3WeatherHighland="), TEXT("eco.IntegratedV3.WeatherHighland")},
+												  {TEXT("EcoV3WeatherBarren="), TEXT("eco.IntegratedV3.WeatherBarren")}};
+	for (const auto& Pair : RegionWeatherArgs)
+	{
+		FString Value;
+		if (FParse::Value(CmdLine, Pair[0], Value, false) && !Value.IsEmpty())
+		{
+			SetIfUnset(Pair[1], Value);
+		}
 	}
 	int32 VisionArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3RealismVision="), VisionArg))
@@ -897,6 +1061,30 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
 		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6 — 기본 아님) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다, 파이썬과 다름")
 								   : TEXT("끔 (eco.IntegratedV3.SocialControl 0, 기본 — 사람 결정 10-17 (8): v3 사슴 움직임은 파이썬 세계 그대로, Social 처리기는 기록만)"));
+	{
+		// 지역 날씨 (10-18 야생 3단계): 지역마다 날씨·덮기, 배수 계수, 연출
+		const EcoWorldV3::FWeatherConfig Wc;
+		FString Table;
+		for (const EcoWorldV3::FRegionWeatherDefault& D : EcoWorldV3::kRegionWeatherDefaults)
+		{
+			const EcoWorldV3::FWeatherConfig R = Settings.WeatherFor(FName(UTF8_TO_TCHAR(D.Region)));
+			Table += FString::Printf(TEXT("%s%s %s%s"), Table.IsEmpty() ? TEXT("") : TEXT(" · "), UTF8_TO_TCHAR(D.Region), UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(R.Kind)),
+									 R.Kind == EcoWorldV3::kWeatherClear ? TEXT("") : *FString::Printf(TEXT(" %.2f"), R.Intensity));
+			if (R.Kind != D.Kind || R.Intensity != D.Intensity)
+			{
+				Table += TEXT(" (덮음 — 팀 설계·파이썬 거울과 다름)");
+			}
+		}
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 지역 날씨: %s"),
+			   *(Settings.bWeather
+					 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.Weather 1, 10-18 야생 3단계 — 파이썬 configs/v3_wild3_mirror.yaml) — %s | 비 = 시야 × %.2f·사슴 청각 × %.2f, ")
+										   TEXT("눈 = 시야 × %.2f·사슴 청각 × %.2f·사슴 이동 × %.2f·늑대 이동 × %.2f (세기 1, 세기 I 는 1 − (1 − 값)·I) | 관측 visibility × 시야 | 연출 %s"),
+									   *Table, Wc.RainSight, Wc.RainHear, Wc.SnowSight, Wc.SnowHear, Wc.SnowDeerSpeed, Wc.SnowWolfSpeed,
+									   !Settings.bWeatherVisuals ? TEXT("끔 (eco.IntegratedV3.WeatherVisuals 0)")
+									   : !FApp::CanEverRender()  ? TEXT("없음 (그리지 않는 실행)")
+																 : TEXT("켬 (eco.IntegratedV3.WeatherVisuals 1 — 카메라가 비·눈 지역 안이면 카메라 곁에 팀 Rain_System·A_Rain_Cue·NS_Blizzard)"))
+					 : FString(TEXT("끔 (eco.IntegratedV3.Weather 0 — 날씨 없음)"))));
+	}
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 감지: 위협 시야 %s | 늑대 발소리 %s"),
 		   Settings.bRealismVision ? TEXT("300° (eco.IntegratedV3.RealismVision 1 — 바로 뒤 60° 만 사각)") : TEXT("120° (eco.IntegratedV3.RealismVision 0 — R1b 그대로)"),
 		   Settings.bRealismHearing ? TEXT("켬 (eco.IntegratedV3.RealismHearing 1 — 쫓아 달리면 최대 40 m, 어슬렁거리면 4 m, 서 있으면 없음)")
@@ -1131,7 +1319,7 @@ bool UEcoPolicyV3IntegratedSubsystem::PlanStage(FName RegionId, int32 GroupIndex
 
 EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	const FEcoV3IntegratedSettings& S, int32 RegionRuntimeIndex, int32 PlannedDeer, int32 PlannedWolves,
-	const std::vector<EcoObservationV3::FCoverInput>& Covers)
+	const std::vector<EcoObservationV3::FCoverInput>& Covers, FName RegionId)
 {
 	EcoWorldV3::FWorldConfig C;
 	C.WorldSize = FMath::Clamp(S.StageSizeUnits, 60.0, 110.0);
@@ -1185,6 +1373,10 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.Obstacles.bEnabled = S.bObstacles;
 	// 장애물 돌아가기 (eco.IntegratedV3.ObstacleDetour, 10-17 끼임 고침): 값 = configs/v3_wild2_obstacle_mirror.yaml obstacles.detour_* (FDetourConfig 기본값)
 	C.Obstacles.Detour.bEnabled = S.bObstacleDetour;
+	// 지역 날씨 (eco.IntegratedV3.Weather, 10-18 야생 3단계): 그 지역의 팀 설계 날씨 (덮기 글자가 있으면 그것). 계수 = configs/v3_wild3_mirror.yaml (FWeatherConfig 기본값)
+	C.Weather = S.WeatherFor(RegionId);
+	// 감지 기록 (기록만 — 10초 여덟째 줄의 감지 띠·들어서만)
+	C.bSenseStats = true;
 	return C;
 }
 
@@ -1621,6 +1813,24 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportObstacles(const FString& Path) const
 			Covers.Add(MakeShared<FJsonValueArray>(Triple(Cv.X, Cv.Y, Cv.Radius)));
 		}
 		R->SetArrayField(TEXT("covers"), Covers);
+		{
+			// 지역 날씨 (10-18 야생 3단계): 이 무대 세계의 날씨 (파이썬 거울 wild_weather.regions 와 같아야 한다 — results/v3/wild3/compare_weather.py 가 본다)
+			const EcoWorldV3::FWeatherConfig& Wx = Ctx->Sim.Config.Weather;
+			static const TCHAR* const Names[EcoWorldV3::kNumWeatherKinds] = {TEXT("clear"), TEXT("rain"), TEXT("snow")};
+			TSharedRef<FJsonObject> Wj = MakeShared<FJsonObject>();
+			Wj->SetBoolField(TEXT("on"), Wx.bEnabled);
+			Wj->SetStringField(TEXT("kind"), Names[FMath::Clamp(Wx.Kind, 0, EcoWorldV3::kNumWeatherKinds - 1)]);
+			Wj->SetNumberField(TEXT("intensity"), Wx.Intensity);
+			Wj->SetNumberField(TEXT("rain_sight"), Wx.RainSight);
+			Wj->SetNumberField(TEXT("rain_hear"), Wx.RainHear);
+			Wj->SetNumberField(TEXT("snow_sight"), Wx.SnowSight);
+			Wj->SetNumberField(TEXT("snow_hear"), Wx.SnowHear);
+			Wj->SetNumberField(TEXT("snow_deer_speed"), Wx.SnowDeerSpeed);
+			Wj->SetNumberField(TEXT("snow_wolf_speed"), Wx.SnowWolfSpeed);
+			Wj->SetBoolField(TEXT("obs_visibility"), Wx.bObsVisibility);
+			Wj->SetNumberField(TEXT("schedule_rows"), static_cast<double>(Wx.Schedule.size()));
+			R->SetObjectField(TEXT("weather"), Wj);
+		}
 		TSharedRef<FJsonObject> Counts = MakeShared<FJsonObject>();
 		Counts->SetNumberField(TEXT("seen_meshes"), S.SeenMeshes);
 		Counts->SetNumberField(TEXT("no_collision"), S.NoCollision);
@@ -2147,7 +2357,7 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			}
 			ScanStageObstacles(*World, Origin, Plan.SizeUnits, Covers, Exclude, true, Scan);
 		}
-		EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers);
+		EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers, G.RegionId);
 		// 세로 장애물 (eco.IntegratedV3.Obstacles): 레벨에서 읽은 원판 + 무대 나무 줄기 원판 ((x, y, r) 순, 측정 때는 가져온 원판). 원판이 없으면 세계는 지금 그대로다
 		TArray<uint8> IsTree;
 		if (Config.Obstacles.bEnabled)
@@ -2264,6 +2474,25 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 				   TEXT("학습 범위 밖이라 뺀 레벨 은신처 %d) | t=%lld"),
 			   *G.RegionId.ToString(), RegionIndex, Origin.X, Origin.Y, Origin.Z, Half * 2.0 / 100.0, G.Herbivores, G.Wolves,
 			   static_cast<int32>(Covers.size()), Team, Extra, R / 100.0f, Skipped, static_cast<long long>(GlobalT));
+		{
+			// 지역 날씨 시작 줄 (10-18 야생 3단계): 이 무대의 날씨와 배수 (낮 기준 반경 — 밤에는 사슴 탐지가 (1 − 0.5·d) 배로 더 준다)
+			const EcoWorldV3::FWorldState& Sw = Ctx->Sim;
+			const double MPerUnit = EcoRepertoireV3::kUnitCm / 100.0;
+			if (Sw.Config.Weather.bEnabled)
+			{
+				UE_LOG(LogEcoPolicyV3I, Log,
+					   TEXT("[EcoV3I] %s 날씨 | %s %.2f%s — 사슴 위협 탐지 %.1f → %.1f m (낮) · 늑대 시야 %.1f → %.1f m · 사슴 청각 × %.2f · 사슴 이동 × %.2f · 늑대 이동 × %.2f · ")
+						   TEXT("관측 visibility × %.2f (eco.IntegratedV3.Weather 1)"),
+					   *G.RegionId.ToString(), UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Sw.WeatherKind)), Sw.WeatherIntensity,
+					   Sw.Config.Weather.Schedule.empty() ? TEXT(" (고정)") : TEXT(" (시간표)"), Sw.ObsCfg.SeeR * MPerUnit,
+					   Sw.ObsCfg.SeeR * Sw.Weather.Sight * MPerUnit, Sw.ThreatCfg.PredViewR * MPerUnit, EcoWorldV3::WolfViewNow(Sw) * MPerUnit, Sw.Weather.Hear,
+					   Sw.Weather.DeerSpeed, Sw.Weather.WolfSpeed, EcoWorldV3::ObsVisibilityMult(Sw));
+			}
+			else
+			{
+				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 날씨 | 끔 (eco.IntegratedV3.Weather 0)"), *G.RegionId.ToString());
+			}
+		}
 		for (const FString& Why : UEcoPolicyV3Subsystem::CheckTrainingRange(Config))
 		{
 			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 지역 %s 학습 범위 밖: %s"), *G.RegionId.ToString(), *Why);
@@ -2735,6 +2964,32 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 									  static_cast<long long>(S.DetourHelpDrop))
 				   : TEXT(""));
 	}
+	// 여덟째 줄: 야생 3단계 지역 날씨와 감지 (10-18, 감지 기록을 켠 세계 — 통합 모드는 늘. 날씨를 끄면 '날씨 끔'). 지금 날씨·배수·늑대 시야, 날씨별 스텝 누적,
+	//   산 사슴 × 깨어 있는 늑대 쌍의 거리 띠별 감지 누적과 들어서만 안 사슴·스텝 (run_mirror.py --diag band_pairs·band_seen·heard_live 와 같은 정의 — 기록만)
+	if (Ctx.Sim.Config.bSenseStats)
+	{
+		const EcoWorldV3::FWeatherConfig& Wx = Ctx.Sim.Config.Weather;
+		const EcoWorldV3::FWeatherMults& Mu = Ctx.Sim.Weather;
+		auto Pc = [](int64 X, int64 N) { return N > 0 ? 100.0 * static_cast<double>(X) / static_cast<double>(N) : 0.0; };
+		const FString WxNow = Wx.bEnabled
+								  ? FString::Printf(TEXT("%s %.2f (시야 × %.2f · 사슴 청각 × %.2f · 사슴 이동 × %.2f · 늑대 이동 × %.2f, 늑대 시야 %.1f m)"),
+													UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Ctx.Sim.WeatherKind)), Ctx.Sim.WeatherIntensity, Mu.Sight, Mu.Hear,
+													Mu.DeerSpeed, Mu.WolfSpeed, EcoWorldV3::WolfViewNow(Ctx.Sim) * EcoRepertoireV3::kUnitCm / 100.0)
+								  : FString(TEXT("날씨 끔 (eco.IntegratedV3.Weather 0)"));
+		FString Bands;
+		static const TCHAR* const BandNames[EcoWorldV3::kNumSenseBands] = {TEXT("<5"), TEXT("5~10"), TEXT("10~15"), TEXT("15~30")};
+		for (int32 b = 0; b < EcoWorldV3::kNumSenseBands; ++b)
+		{
+			Bands += FString::Printf(TEXT("%s%s m %lld/%lld (%.1f%%)"), b == 0 ? TEXT("") : TEXT(" · "), BandNames[b], static_cast<long long>(S.SenseSeen[b]),
+									 static_cast<long long>(S.SensePairs[b]), Pc(S.SenseSeen[b], S.SensePairs[b]));
+		}
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 날씨 | %.1f초 | %s | 날씨 스텝 누적 맑음 %lld · 비 %lld · 눈 %lld | 감지 누적(산 사슴 × 깨어 있는 늑대 쌍): %s | ")
+				   TEXT("들어서만 안 사슴·스텝 %lld/%lld (%.2f%%)"),
+			   *Ctx.RegionId.ToString(), Seconds, *WxNow, static_cast<long long>(S.WeatherSteps[EcoWorldV3::kWeatherClear]),
+			   static_cast<long long>(S.WeatherSteps[EcoWorldV3::kWeatherRain]), static_cast<long long>(S.WeatherSteps[EcoWorldV3::kWeatherSnow]), *Bands,
+			   static_cast<long long>(S.SenseHeardOnly), static_cast<long long>(S.SenseLiveSteps), Pc(S.SenseHeardOnly, S.SenseLiveSteps));
+	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
 	{
@@ -2914,9 +3169,13 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			Tally += FString::Printf(TEXT(" | 경계(멀어짐) %d 도망(안전해질 때까지) %d 숨기(은신처·경계) %d"), Ctx.KeepNow[EcoWorldV3::kKeepAlert],
 									 Ctx.KeepNow[EcoWorldV3::kKeepPanic], Ctx.KeepNow[EcoWorldV3::kKeepShelter]);
 		}
-		const FString Line = FString::Printf(TEXT("v3 %s %s | %s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld"),
+		// 지역 날씨 (10-18): 첫 줄 낮밤 옆에 '비 1.00' (끄거나 맑으면 '맑음')
+		const FString WxTag = Ctx.Sim.Config.Weather.bEnabled && Ctx.Sim.WeatherKind != EcoWorldV3::kWeatherClear
+								  ? FString::Printf(TEXT(" %s %.2f"), UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Ctx.Sim.WeatherKind)), Ctx.Sim.WeatherIntensity)
+								  : FString(TEXT(" 맑음"));
+		const FString Line = FString::Printf(TEXT("v3 %s %s | %s%s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld"),
 											 Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"),
-											 *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Ctx.Sim.Dark,
+											 *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), *WxTag, Ctx.Sim.Dark,
 											 Ctx.AliveDeer, Ctx.AdoptedDeer, *Tally, *Wolves,
 											 static_cast<long long>(Ctx.Sim.Stats.Caught), static_cast<long long>(Ctx.Sim.Stats.Starved));
 		// 둘째 줄: 먹기 되먹임 (v3 먹이 격자 — 팀 지역 FoodAmount 가 아니다)

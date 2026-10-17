@@ -8,6 +8,7 @@
 #include "Components/TimelineComponent.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "EcoPolicyV3IntegratedSubsystem.h"
+#include "EcoV3WeatherPresenter.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -518,11 +519,11 @@ void UEcoV3FilmDirectorSubsystem::WriteWatch(double T)
 		}
 		++Found;
 		Line += FString::Printf(TEXT(" | %s"), *Actor->GetName());
-		// 블루프린트가 선언한 변수만 (C++ 부모 클래스 변수는 건너뛴다)
+		// 블루프린트가 선언한 변수만 (C++ 부모 클래스 변수는 건너뛴다). 10-18: 우리 연출 액터(EcoV3WeatherFx — C++ 클래스)는 그 클래스의 칸도 적는다
 		for (TFieldIterator<FProperty> P(Actor->GetClass()); P; ++P)
 		{
 			const UClass* OwnerClass = P->GetOwnerClass();
-			if (!OwnerClass || OwnerClass->HasAnyClassFlags(CLASS_Native))
+			if (!OwnerClass || (OwnerClass->HasAnyClassFlags(CLASS_Native) && !OwnerClass->GetName().StartsWith(TEXT("EcoV3WeatherFx"))))
 			{
 				continue;
 			}
@@ -561,6 +562,11 @@ void UEcoV3FilmDirectorSubsystem::WriteWatch(double T)
 					if (const UAudioComponent* Au = Cast<UAudioComponent>(C))
 					{
 						Line += FString::Printf(TEXT(" playing=%d vol=%.2f"), Au->IsPlaying() ? 1 : 0, Au->VolumeMultiplier);
+					}
+					// 10-18: 나이아가라 컴포넌트는 사용자 칸 User.SpawnRate (팀 비 Rain_System 의 세기 칸 — 없으면 −1, 읽기만)
+					if (const double Rate = EcoV3WeatherFx::NiagaraUserFloat(const_cast<UActorComponent*>(C), EcoV3WeatherFx::kSpawnRateName); Rate >= 0.0)
+					{
+						Line += FString::Printf(TEXT(" spawn_rate=%.1f"), Rate);
 					}
 					if (const UTimelineComponent* Tl = Cast<UTimelineComponent>(C))
 					{
@@ -702,6 +708,7 @@ void UEcoV3FilmDirectorSubsystem::Tick(float DeltaTime)
 		// 단독 촬영: 통합 v3 모드를 보지 않고 월드 시간으로 카메라만 옮긴다
 		const double T = GetWorld()->GetTimeSeconds();
 		NotePerf(T);
+		HideIdentityLabels();   // 10-18: 통합 v3 모드와 함께 돌 때 팀 개체 이름표가 보이므로 단독 촬영도 화면에서만 숨긴다 (-EcoV3FilmUI 면 그대로)
 		TickStandalone(T);
 		return;
 	}

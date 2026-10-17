@@ -414,6 +414,7 @@ namespace EcoObservationV3
 		bool bHasCover = false;              // 6  세계에 은신처가 있나
 		double CoverEdge = 0.0;              //    가장 가까운 은신처 가장자리 거리 (FCoverPerception::Edge)
 		double Dark = 0.0;                   // 7  d (낮 고정 세계는 0)
+		double VisMult = 1.0;                //    visibility 날씨 배수 w (야생 3단계 — EcoWorldV3 ObsVisibilityMult). 1 = 지금 그대로
 		std::int32_t StepsToTransition = 1;  // 8  r. 음수면 낮 고정 세계 (to_transition 1)
 		double PredApproach = 0.5;           // 9
 		double KinAlarm = 0.0;               // 10
@@ -441,7 +442,8 @@ namespace EcoObservationV3
 		Out[kObsCoverDist] = In.bHasCover
 								 ? static_cast<float>(Detail::Clip01((In.CoverEdge > 0.0 ? In.CoverEdge : 0.0) / Cfg.ObsCoverNorm))
 								 : 1.0f;
-		Out[kObsVisibility] = static_cast<float>(Visibility(In.Dark, Cfg));
+		// 계획서 RL_V2_PLAN.md 4.2 표 9: visibility = (1 − 0.5·d)·w. 날씨 w = 1 이면 곱해도 같은 값이다 (world.py `_vis` = (1 − x·d) × w_s)
+		Out[kObsVisibility] = static_cast<float>(Visibility(In.Dark, Cfg) * In.VisMult);
 		Out[kObsToTransition] = In.StepsToTransition < 0
 									? 1.0f
 									: static_cast<float>(Detail::Min1(static_cast<double>(In.StepsToTransition) / Cfg.TransitionNorm));

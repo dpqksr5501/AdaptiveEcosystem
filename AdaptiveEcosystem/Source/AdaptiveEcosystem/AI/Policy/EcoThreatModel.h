@@ -101,6 +101,13 @@
 //     8″     돕는 늑대가 HelpBlock 스텝 넘게 돌아가거나 기어간 스텝이 HelpBlock 만큼 쌓이거나 돌아섰으면 HelpDrop 스텝 동안 돕지 않는다 (PackDrop, PackPeek 이 뺀다)
 //   바꾸면 move = 고른 방향(단위), 속력 = |V| — 이동이 시험한 이동과 같다. heading 도 그 방향이다
 //   현실 근거: 사슴·늑대는 나무 줄기와 바위에 몸을 밀어붙이지 않고 돌아 지나간다
+//
+// 지역 날씨 (선택, FThreatStepInput::WeatherViewMult·WeatherSpeedMult. 기본 1 — 곱해도 같은 값이라 지금 골든과 비트 단위로 같다. 야생 3단계, 10-18 사용자
+//   '일단 우리 테스트 레벨에도 날씨 적용되게 해 줘', 파이썬 world.py wild_weather (x3)·(x4), configs/v3_wild3_mirror.yaml. 골든 WeatherGoldenVectorsV3.h):
+//   부르는 쪽(EcoWorldV3 C2 — FWorldConfig::Weather)이 결정 때 날씨의 배수를 넣는다.
+//     1·4 표적 보임  보통 위협의 시야 반경 = PredViewR × WeatherViewMult (비 0.9·눈 0.7). 플레이어 대역은 그대로 맵 전체
+//     7″  속력        7 밤잠·박명 배수 뒤, 7′ 돌아가기 앞에 × WeatherSpeedMult (눈 0.85, 모든 위협)
+//   현실 근거: 큰비·눈보라는 앞을 흐리게 하고(Rasmussen 외 1999), 깊은 눈은 늑대도 느리게 하지만 사슴을 더 느리게 한다(Nelson & Mech 1986)
 // ---------------------------------------------------------------------------------------------------------------
 
 #pragma once
@@ -790,6 +797,10 @@ namespace EcoThreatV3
 		bool bObstacleSight = false;
 		// 장애물 돌아가기 (야생 2단계 3 의 6), 머리 주석 '장애물 돌아가기'): nullptr 이거나 꺼져 있으면 지금 그대로. 원판이 있을 때만 쓴다
 		const FDetourConfig* Detour = nullptr;
+		// 야생 3단계 지역 날씨 (머리 주석 '지역 날씨'): 늑대 시야 반경 = PredViewR × WeatherViewMult (보통 위협의 표적 보임), 속력 × WeatherSpeedMult
+		// (모든 위협, 7 밤잠 배수 뒤·7′ 돌아가기 앞). 1 = 지금 그대로 (곱해도 같은 값)
+		double WeatherViewMult = 1.0;
+		double WeatherSpeedMult = 1.0;
 	};
 
 	struct FThreatStepResult
@@ -1211,6 +1222,7 @@ namespace EcoThreatV3
 		// 1·4. 체감 거리와 표적 (world.py:2022-2033, 2055-2063). 동점이면 낮은 색인 — 엄격한 < 로 앞에서부터 훑는다
 		std::int32_t J = -1;
 		double DT = 0.0;
+		const double ViewR = Cfg.PredViewR * In.WeatherViewMult;   // 야생 3단계 (x3): 비·눈이 늑대 시야 반경을 줄인다 (world.py `_wx_view` = pred_view_r × w_s)
 		if (bHunting)
 		{
 			for (std::int32_t i = 0; i < In.NumPrey; ++i)
@@ -1228,7 +1240,7 @@ namespace EcoThreatV3
 				if (!bVis)
 				{
 					const double Inv = 1.0 / (Dist > kEps ? Dist : kEps);
-					bVis = Perceived <= Cfg.PredViewR && (DX * HX + DY * HY) * Inv >= Cfg.PredFovCos;
+					bVis = Perceived <= ViewR && (DX * HX + DY * HY) * Inv >= Cfg.PredFovCos;
 				}
 				if (bVis && (J < 0 || Perceived < DT))
 				{
@@ -1367,6 +1379,11 @@ namespace EcoThreatV3
 			MY = HY;
 		}
 		Speed = Speed * (Cfg.bRealismNight ? NightSpeedMult(Spec, T, In.Dark, Cfg) : SpeedMult(Spec, In.Dark, Cfg));
+		// 7″. 야생 3단계 (x4): 눈 덮인 지역에서 위협(늑대·플레이어형)도 느려진다 — 밤잠 배수 다음, 돌아가기 앞 (world.py speed × w_w)
+		if (In.WeatherSpeedMult != 1.0)
+		{
+			Speed = Speed * In.WeatherSpeedMult;
+		}
 
 		const bool bObs = In.Obstacles != nullptr && In.NumObstacles > 0;
 		const bool bBlock = Cfg.bShelterBlock && In.Discs != nullptr && In.NumDiscs > 0;
