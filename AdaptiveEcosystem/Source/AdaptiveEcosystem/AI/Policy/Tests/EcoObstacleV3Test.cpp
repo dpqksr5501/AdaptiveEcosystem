@@ -15,7 +15,12 @@
 //                               부딪힘이 있다, 같은 시드 = 같은 비트, 끄면(원판을 넣고 켬 칸만 끔) 원판 없는 세계와 비트 단위로 같다
 //   Obstacle.LevelScan          시험 월드에 메시를 놓고 읽기: 충돌하는 상자 = 원판(가로 반지름·무대 단위), 충돌 없음·작음·낮음·은신처 원 안은 뺀다,
 //                               인스턴스 메시는 인스턴스마다, 읽기 전후로 액터·컴포넌트가 그대로다, JSON 내보내기 → 가져오기가 같은 원판
-//   Obstacle.IntegratedDefaults 통합 기본값: 장애물 켬(eco.IntegratedV3.Obstacles 1), 내보내기·가져오기 경로 없음, 세계 설정 켬 칸 — 원판이 없으면 세계 그대로
+//   Obstacle.IntegratedDefaults 통합 기본값: 장애물 켬(eco.IntegratedV3.Obstacles 1), 내보내기·가져오기 경로 없음, 세계 설정 켬 칸 — 원판이 없으면 세계 그대로,
+//                               돌아가기 켬(eco.IntegratedV3.ObstacleDetour 1, 값 = 거울 설정)
+//   Obstacle.DetourGolden       10-17 돌아가기: 설정(기본 끔·계수·돌리기 표 = 거울 설정), 한 번·궤적·한 스텝 장면(PackPeek → PackGoals → Step 7′·8″) 비트 단위,
+//                               끄면 그대로 (골든 DetourGoldenVectorsV3.h — herbivore_rl/export_golden_v3_detour.py, 검사 본문 DetourGoldenCheckV3.h)
+//   Obstacle.DetourRun          기준 루프 900 스텝 (Obstacle.Run 세계 + 돌아가기): 원판 안·무대 밖 0, 돌아가기를 썼다, 원판에 닿은 채 가려던 거리의 절반도 못 가는
+//                               스텝이 3 초(23 스텝) 넘게 이어진 사슴·늑대 0 (끈 판의 값은 정보로 적는다), 같은 시드 = 같은 비트
 
 #include "Misc/AutomationTest.h"
 
@@ -31,6 +36,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "HAL/FileManager.h"
 #include "Misc/Paths.h"
+#include "DetourGoldenCheckV3.h"
 #include "ObstacleGoldenCheckV3.h"
 
 // 단일 번역 단위 빌드(unity)에서 다른 시험 파일의 이름과 겹치지 않게 이름 있는 네임스페이스에 둔다.
@@ -326,6 +332,158 @@ bool FEcoObstacleV3IntegratedDefaultsTest::RunTest(const FString& Parameters)
 	FEcoV3IntegratedSettings Off = Def;
 	Off.bObstacles = false;
 	TestFalse(TEXT("Obstacles 0 → 세계 장애물 끔"), UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(Off, 0, 128, 4, Covers).Obstacles.bEnabled);
+	// 10-17 장애물 돌아가기
+	namespace GD = EcoWorldV3::GoldenDetour;
+	TestTrue(TEXT("통합 기본: 돌아가기 켬 (eco.IntegratedV3.ObstacleDetour 1)"), Def.bObstacleDetour);
+	TestFalse(TEXT("세계 설정 기본은 돌아가기 끔 (미끄러짐만 — 장애물 골든 그대로)"), EcoWorldV3::FWorldConfig().Obstacles.Detour.bEnabled);
+	const EcoThreatV3::FDetourConfig& Dt = C.Obstacles.Detour;
+	TestTrue(TEXT("세계 설정: 돌아가기 켬, 계수 = 거울 설정 obstacles.detour_*"),
+			 Dt.bEnabled && Dt.BlockFrac == GD::kCfgBlock && Dt.FreeFrac == GD::kCfgFree && Dt.Probe == GD::kCfgProbe && Dt.MaxSteps == GD::kCfgSteps
+				 && Dt.HelpBlock == GD::kCfgHelpBlock && Dt.HelpDrop == GD::kCfgHelpDrop);
+	FEcoV3IntegratedSettings NoDetour = Def;
+	NoDetour.bObstacleDetour = false;
+	TestFalse(TEXT("ObstacleDetour 0 → 세계 돌아가기 끔"), UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(NoDetour, 0, 128, 4, Covers).Obstacles.Detour.bEnabled);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoObstacleV3DetourGoldenTest,
+	"AdaptiveEcosystem.Policy.V3.Obstacle.DetourGolden",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoObstacleV3DetourGoldenTest::RunTest(const FString& Parameters)
+{
+	namespace DC = EcoWorldV3::DetourCheck;
+	namespace G = EcoWorldV3::GoldenDetour;
+	auto Rep = [this](const TCHAR* What, const DC::FReport& R)
+	{
+		AddInfo(FString::Printf(TEXT("%s: 사례 %d, 어긋남 %d (처음 사례 %d 칸 %d), 셈 %d·%d·%d"), What, R.Cases, R.Failures, R.FirstCase, R.FirstField, R.Count0,
+								R.Count1, R.Count2));
+		TestTrue(*FString::Printf(TEXT("%s: 파이썬과 비트 단위로 같다"), What), R.Passed());
+	};
+	Rep(TEXT("설정"), DC::CheckConfig());
+	const DC::FReport Ones = DC::CheckOnes();
+	Rep(TEXT("한 번"), Ones);
+	TestTrue(TEXT("한 번: 썼나·시작·못 찾음 수 = 골든"), Ones.Count0 == G::kOneUsed && Ones.Count1 == G::kOneStarts && Ones.Count2 == G::kOneFails && Ones.Count0 > 0
+														&& Ones.Count2 > 0);
+	const DC::FReport Paths = DC::CheckPaths();
+	Rep(TEXT("궤적"), Paths);
+	TestTrue(TEXT("궤적: 돌아간 스텝 수 = 골든"), Paths.Count0 == G::kPathUsed && Paths.Count0 > 0);
+	const DC::FReport Steps = DC::CheckSteps();
+	Rep(TEXT("한 스텝 장면"), Steps);
+	TestTrue(TEXT("한 스텝 장면: 돌아감·돕기 그만둠·돌아섬 수 = 골든"), Steps.Count0 == G::kStepUsed && Steps.Count1 == G::kStepDrops && Steps.Count2 == G::kStepDeads
+																	&& Steps.Count0 > 0 && Steps.Count1 > 0);
+	Rep(TEXT("끄면 그대로"), DC::CheckOffIgnores());
+	return true;
+}
+
+namespace EcoObstacleV3Test
+{
+	// 원판에 닿은 채(둘레까지 − 몸 < 0.05) 가려던 거리의 절반도 못 간 스텝이 이어진 가장 긴 길이 (사슴·늑대). 23 스텝 = 3 초
+	struct FLongest
+	{
+		int32 Deer = 0;
+		int32 Wolf = 0;
+		int64 Inside = 0;
+		int64 Outside = 0;
+	};
+
+	FLongest DetourRun(bool bDetour, EcoWorldV3::FWorldStats& OutStats)
+	{
+		using namespace EcoWorldV3;
+		FReferenceWorld Ref;
+		FWorldConfig Cfg = RunConfig(true, true);
+		Cfg.Obstacles.Detour.bEnabled = bDetour;
+		Ref.Init(Cfg);
+		FWorldState& W = Ref.World;
+		const FObstacleConfig& O = W.Config.Obstacles;
+		auto Touch = [&O](double X, double Y)
+		{
+			for (int32 k = 0; k < O.Num(); ++k)
+			{
+				const double Dx = X - O.Discs[3 * k];
+				const double Dy = Y - O.Discs[3 * k + 1];
+				if (std::sqrt(Dx * Dx + Dy * Dy) - O.Discs[3 * k + 2] - O.BodyR < 0.05)
+				{
+					return true;
+				}
+			}
+			return false;
+		};
+		FLongest L;
+		std::vector<int32> RunD(Ref.Bodies.size(), 0), RunW(Ref.Threats.size(), 0);
+		for (int32 t = 0; t < 900; ++t)
+		{
+			Step(W, Ref.Views.data(), Ref.NumHerbivores(), Ref.ThreatPtrs.data(), Ref.NumThreats());
+			for (size_t i = 0; i < Ref.Bodies.size(); ++i)
+			{
+				const FHerbBody& B = Ref.Bodies[i];
+				const EcoRepertoireV3::FControlOutput& Ct = *Ref.Views[i].Control;
+				const double Wv = std::sqrt(Ct.Velocity.X * Ct.Velocity.X + Ct.Velocity.Y * Ct.Velocity.Y);
+				const double Gx = B.Pos.X - B.PrevPos.X;
+				const double Gy = B.Pos.Y - B.PrevPos.Y;
+				const bool bStuck = !B.bRespawned && Wv > 1e-9 && std::sqrt(Gx * Gx + Gy * Gy) < 0.5 * Wv && Touch(B.Pos.X, B.Pos.Y);
+				RunD[i] = bStuck ? RunD[i] + 1 : 0;
+				L.Deer = FMath::Max(L.Deer, RunD[i]);
+				L.Inside += EcoThreatV3::InsideAnyObstacle(B.Pos.X, B.Pos.Y, O.Discs.data(), O.Num(), O.BodyR) ? 1 : 0;
+				L.Outside += (B.Pos.X < 0.0 || B.Pos.Y < 0.0 || B.Pos.X > W.Config.WorldSize || B.Pos.Y > W.Config.WorldSize) ? 1 : 0;
+			}
+			for (size_t m = 0; m < Ref.Threats.size(); ++m)
+			{
+				const FThreatAgent& A = Ref.Threats[m];
+				const double Wv = A.Last.Speed;
+				const bool bStuck = Wv > 1e-9 && std::sqrt(A.State.VelX * A.State.VelX + A.State.VelY * A.State.VelY) < 0.5 * Wv
+									&& Touch(A.State.PosX, A.State.PosY);
+				RunW[m] = bStuck ? RunW[m] + 1 : 0;
+				L.Wolf = FMath::Max(L.Wolf, RunW[m]);
+				L.Inside += EcoThreatV3::InsideAnyObstacle(A.State.PosX, A.State.PosY, O.Discs.data(), O.Num(), O.BodyR) ? 1 : 0;
+				L.Outside += (A.State.PosX < 0.0 || A.State.PosY < 0.0 || A.State.PosX > W.Config.WorldSize || A.State.PosY > W.Config.WorldSize) ? 1 : 0;
+			}
+		}
+		OutStats = W.Stats;
+		return L;
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoObstacleV3DetourRunTest,
+	"AdaptiveEcosystem.Policy.V3.Obstacle.DetourRun",
+	EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoObstacleV3DetourRunTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoWorldV3;
+	using namespace EcoObstacleV3Test;
+	FWorldStats On, Off;
+	const FLongest Lon = DetourRun(true, On);
+	const FLongest Loff = DetourRun(false, Off);
+	AddInfo(FString::Printf(TEXT("돌아가기 켬: 원판 곁 막힘 가장 긴 이어짐 사슴 %d · 늑대 %d 스텝 | 사슴 바꿈 %lld (시작 %lld · 못 찾음 %lld) · 늑대 바꿈 %lld (시작 %lld · 못 찾음 %lld) · ")
+								TEXT("돕기 그만둠 %lld · 잡힘 %lld"),
+							Lon.Deer, Lon.Wolf, static_cast<long long>(On.DetourDeerUsed), static_cast<long long>(On.DetourDeerStart),
+							static_cast<long long>(On.DetourDeerFail), static_cast<long long>(On.DetourWolfUsed), static_cast<long long>(On.DetourWolfStart),
+							static_cast<long long>(On.DetourWolfFail), static_cast<long long>(On.DetourHelpDrop), static_cast<long long>(On.Caught)));
+	AddInfo(FString::Printf(TEXT("돌아가기 끔: 가장 긴 이어짐 사슴 %d · 늑대 %d 스텝 · 잡힘 %lld"), Loff.Deer, Loff.Wolf, static_cast<long long>(Off.Caught)));
+	TestEqual(TEXT("켬: 사슴·늑대 중심은 늘 원판(r + 몸) 밖"), Lon.Inside, int64(0));
+	TestEqual(TEXT("켬: 무대 밖에 나가지 않는다"), Lon.Outside, int64(0));
+	TestTrue(TEXT("켬: 사슴·늑대가 돌아갔다"), On.DetourDeerUsed > 0 && On.DetourWolfUsed > 0 && On.DetourDeerStart > 0);
+	TestTrue(TEXT("켬: 원판 곁에서 3 초(23 스텝) 넘게 막힌 사슴·늑대가 없다"), Lon.Deer <= 23 && Lon.Wolf <= 23);
+	TestTrue(TEXT("끔: 돌아가기 기록 0"), Off.DetourDeerUsed == 0 && Off.DetourWolfUsed == 0 && Off.DetourHelpDrop == 0);
+	// 같은 시드 = 같은 비트
+	{
+		FWorldConfig Cfg = RunConfig(true, true);
+		Cfg.Obstacles.Detour.bEnabled = true;
+		FReferenceWorld A, B;
+		A.Init(Cfg);
+		B.Init(Cfg);
+		bool bSame = true;
+		for (int32 t = 0; t < 300 && bSame; ++t)
+		{
+			Step(A.World, A.Views.data(), A.NumHerbivores(), A.ThreatPtrs.data(), A.NumThreats());
+			Step(B.World, B.Views.data(), B.NumHerbivores(), B.ThreatPtrs.data(), B.NumThreats());
+			bSame = SameBodies(A, B);
+		}
+		TestTrue(TEXT("켬: 같은 시드 = 같은 비트"), bSame);
+	}
 	return true;
 }
 

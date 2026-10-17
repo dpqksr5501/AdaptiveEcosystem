@@ -60,6 +60,9 @@
 //                                  밖으로 (ObstaclePushOut). C1: 사슴 이동 ApplyMove 뒤 EcoThreatV3::ObstacleSlide (맵 자르기 포함). C2: 위협 Step 에 원판을 넘긴다
 //                                  (늑대 눈길 가림·이동 미끄러짐 — EcoThreatModel.h 머리 주석 '세로 장애물'). E: 사슴마다 위협까지 눈길을 원판이 가리면
 //                                  FThreatInput::bOccluded (발소리는 그대로). 기록 FWorldStats::Obstacle*
+//   FObstacleConfig::Detour        10-17 장애물 돌아가기 (파이썬 obstacles.detour). 기본 끔 = 미끄러짐만. 켜면 C1 에서 ApplyMove 바로 앞에 사슴마다
+//                                  EcoThreatV3::DetourStep 으로 제어 출력의 속도 방향을 바꾸고(FHerbBody::Detour), C2 에서 위협 Step 에 넘긴다(Step 7′·8″ —
+//                                  EcoThreatModel.h 머리 주석 '장애물 돌아가기'). 통합 모드 eco.IntegratedV3.ObstacleDetour 기본 1. 기록 FWorldStats::Detour*
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -305,6 +308,9 @@ namespace EcoWorldV3
 		bool bBlockSight = true;            // 원판이 눈길을 가린다
 		bool bNoFood = true;                // 원판 밑 먹이 셀 용량을 덮인 몫만큼 줄인다
 		std::vector<double> Discs;          // (x, y, r) × K
+		// 6) 돌아가기 (10-17, 파이썬 obstacles.detour·detour_*): 원판에 막히면 가려던 쪽에서 가장 적게 돈 빈 방향으로 돌아간다 (C1 사슴·C2 위협 Step 7′,
+		//    돕다가 막힌 늑대는 잠시 돕지 않는다 — Step 8″). 기본 끔 = 미끄러짐만. 통합 모드 eco.IntegratedV3.ObstacleDetour 기본 1
+		EcoThreatV3::FDetourConfig Detour;
 
 		std::int32_t Num() const { return static_cast<std::int32_t>(Discs.size() / 3); }
 		bool Active() const { return bEnabled && Num() > 0; }
@@ -848,6 +854,9 @@ namespace EcoWorldV3
 		// 야생 (w1) 지방 비축 (FWorldConfig::WildReserve 를 켠 세계만. 끄면 늘 0·거짓)
 		double Reserve = 0.0;                // 비축 R (0~1, × 용량 FWorldState::ReserveCap = E 단위)
 		bool bWeak = false;                  // 이번 스텝 첫머리 E < WeakE (이동 속도 × WeakSpeed)
+		// 야생 2단계 3 의 6) 장애물 돌아가기 (FObstacleConfig::Detour 를 켰을 때만. 끄면 늘 0 — world.py det_left·det_side·det_steps)
+		EcoThreatV3::FDetourState Detour;
+		bool bDetour = false;                // 이번 스텝 방향을 바꿨다 (기록·시험 — world.py det_used)
 	};
 
 	/** 스텝 끝 지각 (FEcoPerceptionCacheFragment). 다음 스텝의 결정 관측·제어 입력이다. */
@@ -985,6 +994,14 @@ namespace EcoWorldV3
 		std::int64_t ObstacleWolfDead = 0;   // 부딪혀 거의 못 가 돌아선 위협·스텝 (wolf_dead)
 		std::int64_t ObstaclePushMoved = 0;  // 원판 밖으로 옮긴 개체 (처음·입양·리스폰, push_moved)
 		std::int64_t ObstaclePushFailed = 0; // 후보가 없어 못 옮긴 개체 (push_failed)
+		// 장애물 돌아가기 (FObstacleConfig::Detour 를 켰을 때만 — world.py obstacle_stats detour)
+		std::int64_t DetourDeerUsed = 0;     // 방향을 바꾼 사슴·스텝 (deer_used)
+		std::int64_t DetourDeerStart = 0;    // 돌아가기를 시작한 사슴·스텝 (deer_start)
+		std::int64_t DetourDeerFail = 0;     // 막혔는데 빈 방향이 없던 사슴·스텝 (deer_fail)
+		std::int64_t DetourWolfUsed = 0;     // 위협·스텝 (wolf_used)
+		std::int64_t DetourWolfStart = 0;    // (wolf_start)
+		std::int64_t DetourWolfFail = 0;     // (wolf_fail)
+		std::int64_t DetourHelpDrop = 0;     // 돕다가 막혀 돕기를 그만둔 늑대 (help_drop)
 		std::int64_t RefugeProtectedPreySteps = 0;
 		std::int64_t RefugeConstrainedMoves = 0;
 		std::int64_t RefugeRecoveries = 0;
@@ -1891,6 +1908,26 @@ namespace EcoWorldV3
 			B.CaughtBy = -1;
 			B.bReproduced = false;
 			B.bRespawned = false;
+			B.bDetour = false;
+			if (bObstacles && Obs.Detour.bEnabled)
+			{
+				// 야생 2단계 3 의 6) 돌아가기 (world.py step 1 의 detour_moves — 이동 바로 앞, 같은 이동 시험으로 고른다): 막히면 가려던 쪽에서 가장 적게 돈 빈 방향.
+				// 속도 크기는 그대로, 제어 출력의 속도(적용 속도·heading)도 바꾼 값이다
+				EcoRepertoireV3::FControlOutput& Ctl = *Herbs[i].Control;
+				double VX = Ctl.Velocity.X;
+				double VY = Ctl.Velocity.Y;
+				const EcoThreatV3::FDetourResult Dr = EcoThreatV3::DetourStep(B.Pos.X, B.Pos.Y, VX, VY, B.Detour, Obs.Discs.data(), Obs.Num(), Obs.BodyR,
+																			 W.Config.WorldSize, true, nullptr, 0, Obs.Detour);
+				if (Dr.bUsed)
+				{
+					Ctl.Velocity.X = VX;
+					Ctl.Velocity.Y = VY;
+				}
+				B.bDetour = Dr.bUsed;
+				W.Stats.DetourDeerUsed += Dr.bUsed ? 1 : 0;
+				W.Stats.DetourDeerStart += Dr.bStart ? 1 : 0;
+				W.Stats.DetourDeerFail += Dr.bFail ? 1 : 0;
+			}
 			R3::ApplyMove(B.Pos, B.Head, *Herbs[i].Control, W.Config.WorldSize);
 			if (bObstacles)
 			{
@@ -2014,11 +2051,12 @@ namespace EcoWorldV3
 			In.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
 			if (bObstacles)
 			{
-				// 야생 2단계 3 세로 장애물: 늑대 눈길 가림·이동 미끄러짐 (EcoThreatModel.h 머리 주석 '세로 장애물')
+				// 야생 2단계 3 세로 장애물: 늑대 눈길 가림·이동 미끄러짐 (EcoThreatModel.h 머리 주석 '세로 장애물'), 6) 돌아가기 (Step 7′·8″)
 				In.Obstacles = Obs.Discs.data();
 				In.NumObstacles = Obs.Num();
 				In.ObstacleBody = Obs.BodyR;
 				In.bObstacleSight = Obs.bBlockSight;
+				In.Detour = &Obs.Detour;
 			}
 			if (A.Spec.bRanged)
 			{
@@ -2061,6 +2099,10 @@ namespace EcoWorldV3
 				W.Stats.ObstacleWolfHit += A.Last.bObstacleHit ? 1 : 0;
 				W.Stats.ObstacleWolfBack += A.Last.bObstacleBack ? 1 : 0;
 				W.Stats.ObstacleWolfDead += A.Last.bObstacleDead ? 1 : 0;
+				W.Stats.DetourWolfUsed += A.Last.bDetour ? 1 : 0;
+				W.Stats.DetourWolfStart += A.Last.bDetourStart ? 1 : 0;
+				W.Stats.DetourWolfFail += A.Last.bDetourFail ? 1 : 0;
+				W.Stats.DetourHelpDrop += A.Last.bPackDrop ? 1 : 0;
 			}
 			if(bRefugeSafety) {
 				const auto Move=EcoRefugeV3::Constrain(W.Config.Covers,W.Config.WorldSize,{A.PrevX,A.PrevY},{A.State.PosX,A.State.PosY},W.Config.PredatorRefugeMargin);
@@ -2293,6 +2335,7 @@ namespace EcoWorldV3
 			B.Energy = RC.InitEnergy;
 			B.ReproCd = 0;
 			B.Reserve = W.Config.WildReserve.bEnabled ? W.Config.WildReserve.Init : 0.0;   // 야생 (w1): 새 개체는 시작 비축으로
+			B.Detour = EcoThreatV3::FDetourState();   // 야생 2단계 3 의 6): 새 개체는 돌아가지 않는다
 			B.bRespawned = true;
 			const double E01 = B.Energy / RC.MaxEnergy;
 			R3::RespawnAgent(*H.Rep, E01 < 0.0 ? 0.0 : (E01 > 1.0 ? 1.0 : E01), W.Dark, W.Config.Seed,

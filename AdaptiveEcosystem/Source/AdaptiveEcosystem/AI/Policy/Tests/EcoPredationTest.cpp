@@ -32,7 +32,7 @@
 
 namespace EcoPredationTestImpl
 {
-	constexpr float Dt = 1.0f / 60.0f;
+	constexpr float kRigDt = 1.0f / 60.0f;   // 단일 번역 단위 빌드에서 다른 파일의 매개변수 Dt 와 겹치지 않는 이름 (C4459, 10-17)
 
 	/** 게더 → 지각 → 포식 세 프로세서와 엔티티 두 종류를 갖춘 최소 환경. */
 	struct FRig
@@ -104,19 +104,19 @@ namespace EcoPredationTestImpl
 
 		void Tick()
 		{
-			EcoTest::RunProcessor(*Gather, *EM, Dt);
-			EcoTest::RunProcessor(*Perception, *EM, Dt);
-			EcoTest::RunProcessor(*Predation, *EM, Dt);
+			EcoTest::RunProcessor(*Gather, *EM, kRigDt);
+			EcoTest::RunProcessor(*Perception, *EM, kRigDt);
+			EcoTest::RunProcessor(*Predation, *EM, kRigDt);
 			EcoTest::FlushPhase(*EM);
 		}
 
 		/** 실제 프레임 순서 (Gather → Perception → Policy → Predation, 페이즈 끝 반영). */
 		void TickWithPolicy()
 		{
-			EcoTest::RunProcessor(*Gather, *EM, Dt);
-			EcoTest::RunProcessor(*Perception, *EM, Dt);
-			EcoTest::RunProcessor(*Policy, *EM, Dt);
-			EcoTest::RunProcessor(*Predation, *EM, Dt);
+			EcoTest::RunProcessor(*Gather, *EM, kRigDt);
+			EcoTest::RunProcessor(*Perception, *EM, kRigDt);
+			EcoTest::RunProcessor(*Policy, *EM, kRigDt);
+			EcoTest::RunProcessor(*Predation, *EM, kRigDt);
 			EcoTest::FlushPhase(*EM);
 		}
 
@@ -214,7 +214,7 @@ bool FEcoPredationOnePerTickCooldownTest::RunTest(const FString& Parameters)
 	// 식사 쿨다운 = pred_eat_cd × StepSeconds. 부동소수 누적 오차로 ±1틱 흔들릴 수 있어
 	// 경계 양쪽에 2틱씩 여유를 둔다.
 	const int32 CooldownTicks =
-		FMath::RoundToInt(EcoBehaviorConfig::PredEatCooldownS / Dt);
+		FMath::RoundToInt(EcoBehaviorConfig::PredEatCooldownS / kRigDt);
 	for (int32 t = 0; t < CooldownTicks - 2; ++t)
 	{
 		Rig.Tick();

@@ -242,6 +242,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bPackHunt = true;              // 늑대 무리 협동 사냥 (eco.IntegratedV3.PackHunt 기본 1, 10-17 야생 2단계 2 — 파이썬 wild_pack, 값 = FPackHuntConfig 기본값)
 	bool bObstacles = true;             // 세로 장애물 (eco.IntegratedV3.Obstacles 기본 1, 10-17 야생 2단계 3 — 파이썬 obstacles). 레벨의 충돌하는 나무·바위를 원판으로 읽어
 										// 사슴·늑대가 둘레를 따라 미끄러지고 시선이 가린다. 원판이 없는 무대는 아무것도 바뀌지 않는다
+	bool bObstacleDetour = true;        // 장애물 돌아가기 (eco.IntegratedV3.ObstacleDetour 기본 1, 10-17 끼임 고침 — 파이썬 obstacles.detour, 값 = FDetourConfig 기본값).
+										// 막히면 가장 적게 돈 빈 방향으로 돌아간다. bObstacles 이고 원판이 있을 때만 쓴다. 거짓 = 미끄러짐만
 	FString ObstacleExportPath;         // 원판 목록 JSON 내보내기 (eco.IntegratedV3.ObstacleExport, 빈 문자열 = 안 함 — 파이썬 거울 짝 비교용)
 	FString ObstacleImportPath;         // 원판 목록 JSON 가져오기 (eco.IntegratedV3.ObstacleImport, 빈 문자열 = 안 함 — 측정 전용: 레벨 원판 대신 이 원판.
 										// 레벨에 보이는 물체가 없는 원판이라 화면용이 아니다. 파이썬 거울과 같은 원판으로 견줄 때만 쓴다)

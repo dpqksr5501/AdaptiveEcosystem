@@ -215,6 +215,15 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("0 = 끔(10-17 야생 2단계 2 그대로). Play 전에 바꾼다. 명령줄 -EcoV3Obstacles= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarObstacleDetour(
+		TEXT("eco.IntegratedV3.ObstacleDetour"),
+		1,
+		TEXT("통합 v3 모드의 장애물 돌아가기 (1 = 켬, 기본 — 10-17 장애물 끼임 고침, 파이썬 configs/v3_wild2_obstacle_mirror.yaml obstacles.detour). ")
+		TEXT("사슴·늑대가 원판(나무 줄기·바위)에 막히면 가려던 쪽에서 가장 적게 돈 빈 방향으로 돌아가고, 앞 3 m 가 트일 때까지 같은 쪽으로 돈다(최대 6 초). ")
+		TEXT("돕는 늑대는 2 초 넘게 돌아가거나 기어가면 5 초 동안 돕지 않는다. eco.IntegratedV3.Obstacles 1 이고 원판이 있을 때만 쓴다(원판이 없는 무대는 그대로). ")
+		TEXT("0 = 미끄러짐만(10-17 야생 2단계 3 그대로). Play 전에 바꾼다. 명령줄 -EcoV3ObstacleDetour= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<FString> CVarObstacleExport(
 		TEXT("eco.IntegratedV3.ObstacleExport"),
 		TEXT(""),
@@ -534,6 +543,7 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
 	S.bSocialControl = CVarSocialControl.GetValueOnGameThread() != 0;
 	S.bObstacles = CVarObstacles.GetValueOnGameThread() != 0;
+	S.bObstacleDetour = CVarObstacleDetour.GetValueOnGameThread() != 0;
 	S.ObstacleExportPath = CVarObstacleExport.GetValueOnGameThread();
 	S.ObstacleImportPath = CVarObstacleImport.GetValueOnGameThread();
 	return S;
@@ -651,6 +661,11 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3Obstacles="), ObstacleArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.Obstacles"), LexToString(ObstacleArg));
+	}
+	int32 DetourArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ObstacleDetour="), DetourArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ObstacleDetour"), LexToString(DetourArg));
 	}
 	FString ObstacleExportArg;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ObstacleExport="), ObstacleExportArg) && !ObstacleExportArg.IsEmpty())
@@ -833,10 +848,17 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Pk.JoinR * MPerUnit, Pk.DoorR * MPerUnit, FMath::RadiansToDegrees(FMath::Acos(Pk.DoorCos)), Pk.Lead * MPerUnit,
 								   Pk.WaitR * MPerUnit)
 				 : FString(TEXT("끔 (eco.IntegratedV3.PackHunt 0 — 늑대마다 따로 사냥)"))));
+	const EcoThreatV3::FDetourConfig Dt;   // 돌아가기 값 = 기본값 (MakeRegionWorldConfig 는 켬 칸만 바꾼다)
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 세로 장애물: %s"),
 		   *(Settings.bObstacles
 				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.Obstacles 1, 10-17 야생 2단계 3) — 무대 안 레벨의 충돌하는 나무·바위를 원판으로 읽어 사슴·늑대가 둘레를 따라 미끄러지고 ")
-									   TEXT("눈길이 가린다(발소리는 못 가림), 원판 밑 먹이는 덮인 몫만큼 적다. 원판이 없는 무대는 그대로%s"),
+									   TEXT("눈길이 가린다(발소리는 못 가림), 원판 밑 먹이는 덮인 몫만큼 적다. 원판이 없는 무대는 그대로 | 돌아가기 %s%s"),
+								   Settings.bObstacleDetour
+									   ? *FString::Printf(TEXT("켬 (eco.IntegratedV3.ObstacleDetour 1, 10-17 끼임 고침) — 막히면 가장 적게 돈 빈 방향으로, 앞 %.0f m 가 트일 때까지 같은 쪽 (최대 %.0f 초), ")
+															 TEXT("돕는 늑대는 %.0f 초 넘게 막히면 %.0f 초 쉼"),
+														 Dt.Probe * MPerUnit, Dt.MaxSteps * EcoRepertoireV3::kStepSeconds, Dt.HelpBlock * EcoRepertoireV3::kStepSeconds,
+														 Dt.HelpDrop * EcoRepertoireV3::kStepSeconds)
+									   : TEXT("끔 (eco.IntegratedV3.ObstacleDetour 0 — 미끄러짐만)"),
 								   Settings.ObstacleImportPath.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" | 측정 전용 원판 가져오기: %s"), *Settings.ObstacleImportPath))
 				 : FString(TEXT("끔 (eco.IntegratedV3.Obstacles 0 — 읽기만 하고 세계에 넣지 않는다)"))));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
@@ -1112,6 +1134,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.PackHunt.bEnabled = S.bPackHunt;
 	// 세로 장애물 (eco.IntegratedV3.Obstacles, 10-17 야생 2단계 3): 켬 칸만 둔다 — 원판은 무대를 만들 때 레벨에서 읽어 넣는다 (원판이 없으면 세계는 그대로)
 	C.Obstacles.bEnabled = S.bObstacles;
+	// 장애물 돌아가기 (eco.IntegratedV3.ObstacleDetour, 10-17 끼임 고침): 값 = configs/v3_wild2_obstacle_mirror.yaml obstacles.detour_* (FDetourConfig 기본값)
+	C.Obstacles.Detour.bEnabled = S.bObstacleDetour;
 	return C;
 }
 
@@ -2382,13 +2406,19 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		auto Pc = [](int64 X, int64 N) { return N > 0 ? 100.0 * static_cast<double>(X) / static_cast<double>(N) : 0.0; };
 		UE_LOG(LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 장애물 | %.1f초 | 원판 %d (%s, 몸 %.0f cm, 눈길 가림 %s, 먹이 줄임 %s) | 누적 사슴·스텝 %lld: 닿음 %lld (%.2f%%) · 물러남 %lld | ")
-				   TEXT("늑대·스텝 %lld: 닿음 %lld (%.2f%%) · 되돌림 %lld · 돌아섬 %lld | 원판 밖으로 옮김 %lld (못 옮김 %lld)"),
+				   TEXT("늑대·스텝 %lld: 닿음 %lld (%.2f%%) · 되돌림 %lld · 돌아섬 %lld | 원판 밖으로 옮김 %lld (못 옮김 %lld)%s"),
 			   *Ctx.RegionId.ToString(), Seconds, Ob.Num(), Ctx.bObstaclesImported ? TEXT("가져온 원판 — 측정 전용") : TEXT("레벨에서 읽음"),
 			   Ob.BodyR * EcoRepertoireV3::kUnitCm, Ob.bBlockSight ? TEXT("켬") : TEXT("끔"), Ob.bNoFood ? TEXT("켬") : TEXT("끔"),
 			   static_cast<long long>(S.ObstacleDeerSteps), static_cast<long long>(S.ObstacleDeerHit), Pc(S.ObstacleDeerHit, S.ObstacleDeerSteps),
 			   static_cast<long long>(S.ObstacleDeerBack), static_cast<long long>(S.ObstacleWolfSteps), static_cast<long long>(S.ObstacleWolfHit),
 			   Pc(S.ObstacleWolfHit, S.ObstacleWolfSteps), static_cast<long long>(S.ObstacleWolfBack), static_cast<long long>(S.ObstacleWolfDead),
-			   static_cast<long long>(S.ObstaclePushMoved), static_cast<long long>(S.ObstaclePushFailed));
+			   static_cast<long long>(S.ObstaclePushMoved), static_cast<long long>(S.ObstaclePushFailed),
+			   Ob.Detour.bEnabled
+				   ? *FString::Printf(TEXT(" | 돌아가기 | 사슴 바꿈 %lld (시작 %lld · 못 찾음 %lld) · 늑대 바꿈 %lld (시작 %lld · 못 찾음 %lld) · 돕기 그만둠 %lld"),
+									  static_cast<long long>(S.DetourDeerUsed), static_cast<long long>(S.DetourDeerStart), static_cast<long long>(S.DetourDeerFail),
+									  static_cast<long long>(S.DetourWolfUsed), static_cast<long long>(S.DetourWolfStart), static_cast<long long>(S.DetourWolfFail),
+									  static_cast<long long>(S.DetourHelpDrop))
+				   : TEXT(""));
 	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
