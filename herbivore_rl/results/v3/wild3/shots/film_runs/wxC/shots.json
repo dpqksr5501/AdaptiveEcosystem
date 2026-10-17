@@ -1,0 +1,9 @@
+{
+  "name": "wxC",
+  "fps": 30,
+  "frames": 18,
+  "shots": [
+    {"tag": "forest_ground", "from_m": [330.00, 470.00, 1.80], "to_m": [330.00, 470.00, 1.80], "yaw": 0.0, "pitch": 0.0, "start": 3.000, "duration": 3.000, "every": 10, "first_frame": 0, "frames": 9, "t_first": 3.000, "t_last": 5.667},
+    {"tag": "forest_low", "from_m": [342.00, 440.00, 6.00], "to_m": [342.00, 440.00, 6.00], "yaw": 90.0, "pitch": -10.0, "start": 7.000, "duration": 3.000, "every": 10, "first_frame": 9, "frames": 9, "t_first": 7.000, "t_last": 9.667}
+  ]
+}

@@ -721,6 +721,17 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 파이썬 거울: `configs/v3_wild2_trees_mirror.yaml`(장애물 거울 + `obstacles.fixed` 숲 원판), 지역마다는 `run_mirror.py --unreal-maps … --unreal-obstacles results/v3/wild2/trees/tree_layout.json`. 언리얼 내보내기 원판 = 표(비트 단위).
   - 헤드리스(사슴 128, 세션 20000~20002, 240초): 다 놓음(뺀 것 0), 원판 밖으로 옮긴 개체 0, 오류·ensure·경고 0, 메마른 땅 기록 줄은 넣기 전과 같다. 파이썬 끼임(짝 지도 90 세계): 줄기에 낀 사슴·늑대 0. GPU 사진 `herbivore_rl/results/v3/wild2/trees/shots/` — 줄기가 땅에 서 있고 은신처 안에 줄기가 없다(잎은 은신처 가장자리 위로 드리운다).
   - 시험: `Policy.V3.StageTrees.Layout`·`StartPoints`·`Spawn`, 파이썬 `tests/test_wild2_trees.py` 5개. 자동 시험 166 모두 성공(기존 경고 1 포함), 실패 0. 빌드 두 방식 통과.
+- **10-18 지역 날씨 — 규칙과 화면** (사용자 '일단 우리 테스트 레벨에도 날씨 적용되게 해 줘. 그리고 그 날씨와 장애물들을 바탕으로 만들어진 세계를 파이썬에 고대로 옮겨서 학습시킬 거야', 결정 `RL_V2_PLAN.md` '10-18 (15)', 명세 `RL_V3_WILD2_SPEC.md` 11절, 기록 `herbivore_rl/results/v3/wild3/README.md`):
+  - 규칙(파이썬 `wild_weather` 를 C++ 로 옮김, `EcoWorldV3.h` `FWeatherConfig`·`WeatherAt`·`WeatherMults`, `EcoThreatModel.h` `FThreatStepInput::WeatherViewMult`·`WeatherSpeedMult`): 팀 설계대로 숲 = 비, 고지 = 눈, 메마른 땅 = 맑음(세기 1, 지역마다 고정). 비 = 사슴·늑대 시야 × 0.9(사슴 탐지 40 → 36 m, 늑대 28 → 25.2 m)·사슴 청각 × 0.5, 눈 = 시야 × 0.7·사슴 이동 × 0.6·늑대 이동 × 0.85, 관측 visibility × 시야(칸 18 그대로). 맑은 지역은 날씨 없는 세계와 비트 단위로 같다.
+  - 새 스위치(모두 Play 전에, 명령줄은 시작값):
+    - `eco.IntegratedV3.Weather` · `-EcoV3Weather=`(기본 1). 0 = 날씨 없음(10-17 그대로).
+    - `eco.IntegratedV3.WeatherForest`·`WeatherHighland`·`WeatherBarren` · `-EcoV3WeatherForest=rain:0.5` 등(기본 빈 값 = 팀 설계). 글자 `날씨[:세기]`(clear·rain·snow 또는 맑음·비·눈). 측정·연출 전용 — 파이썬 거울과 다르면 짝 비교가 맞지 않는다.
+    - `eco.IntegratedV3.WeatherVisuals` · `-EcoV3WeatherVisuals=`(기본 1): 비·눈 연출(`AI/Policy/EcoV3WeatherPresenter`). 카메라(보기 대상 — 촬영 감독 카메라든 폰이든)가 비 오는 지역 안이면 카메라 곁에 팀 `Rain_System` 과 빗소리 `A_Rain_Cue`, 눈 오는 지역 안이면 `NS_Blizzard` 를 켠다. 들어가면 1.5 초 동안 세지고 나오면 1 초 동안 약해진 뒤 끄고 빗소리를 멈춘다. 눈은 나오는 순간 새 눈송이를 멈춘다(0.7 초 안에 사라짐). 레벨·애셋은 그대로, 그리기만 바뀐다. 그릴 수 없는 실행·전용 서버·클라이언트는 만들지 않는다.
+    - `eco.IntegratedV3.WeatherRainDensity` · `-EcoV3WeatherRainDensity=`(기본 1 = 팀 블루프린트와 같은 빗줄기 `User.SpawnRate` 500, 0.1~10): 맑은 낮에는 팀 화면처럼 비가 옅다 — 발표용으로 2~4.
+  - 시작 글 `[EcoV3I] 지역 날씨: …`·`[EcoV3I] <지역> 날씨 | …`, 10초 여덟째 줄 `[EcoV3I] <지역> 날씨 | t초 | 지금 날씨·배수 | 날씨 스텝 | 감지 누적(산 사슴 × 깨어 있는 늑대 쌍, 거리 띠) | 들어서만 안 사슴·스텝`, 연출 `[EcoV3I] 날씨 연출 | …`(카메라 지역이 바뀔 때). 디버그 표시 첫 줄 낮밤 옆 `비 1.00`. 원판 JSON 내보내기에 지역 `weather`.
+  - 헤드리스(사슴 128, 세션 20000~20002, 240초, 기본값 = 나무 + 날씨) 대 파이썬 `configs/v3_wild3_mirror.yaml` 같은 지도 반복 10: 9장 합 산 94.5 대 94.5%, 잡힘 5.47 대 5.49%, 굶음 0, 모든 칸 |z| ≤ 2.3(메마른 땅 사냥 시작 +2.3 은 날씨와 무관한 옛 차이 — 메마른 땅 기록 줄은 날씨 넣기 전과 같다). 날씨를 끈 판(`-EcoV3Weather=0`)과의 차이도 파이썬과 같은 쪽(고지 잡힘 +0.78 대 +0.86 %p). 오류·ensure·경고 0.
+  - GPU 사진 `herbivore_rl/results/v3/wild3/shots/`(숲 비·고지 눈·메마른 땅 맑음, 경계 넘기 띠, 연출 시간표).
+  - 시험: `Policy.V3.Weather.Golden`(골든 `WeatherGoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_weather.py`, 검사 본문 `Tests/WeatherGoldenCheckV3.h` — g++ 하네스도 같은 본문)·`IntegratedDefaults`·`SenseStats`·`Presenter`. 자동 시험 171 = 성공 170 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
 
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 

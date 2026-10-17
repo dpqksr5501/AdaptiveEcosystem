@@ -138,7 +138,7 @@
 | 4 | `energy` | E ÷ `max_energy`(1) | clip[0, 1] | 비율 | 섭식·대사·번식 리셋 뒤 에너지 | `:1340,1474-1489` |
 | 5 | `recent_predation` | min(`pred_ema`, 1). 전역 하나 | 상한 1 | 같다 | 전역 피식 EMA | `:1341,1497-1501` |
 | 6 | `cover_dist` | max(e, 0) ÷ `obs_cover_norm`(20). e = 가장 가까운 은신처 원 가장자리까지의 거리(중심 거리 − 반지름) | clip[0, 1]. 은신처가 없으면 1 | e_cm ÷ 4000 | 은신처 원 목록 | `:1163-1167,1252-1264,1342` |
-| 7 | `visibility` | 1 − `detect_night`(0.5) · d | 이미 [0.5, 1] | 같다 | 새 t의 어둠 d | `:1092-1108,1346` |
+| 7 | `visibility` | (1 − `detect_night`(0.5) · d) · w. w = 지역 날씨 시야 배수(10-18 야생 3단계 `wild_weather` — 날씨 없는 세계·맑음 w = 1, 비 0.9·눈 0.7, 아래 줄) | 날씨 없으면 [0.5, 1], 날씨 있으면 [0.35, 1] | 같다 (`EcoObservationV3::FObservationInput::VisMult` = w) | 새 t의 어둠 d·날씨 | `:1092-1108,1346` |
 | 8 | `to_transition` | min(r ÷ `transition_norm`(900), 1). r = 다음 낮밤 전환까지 남은 스텝 ∈ [1, T/2] | 상한 1 | 남은 초 × 7.5 ÷ 900 | 새 t | `:661-676,1103-1104,1347` |
 | 9 | `pred_approach` | 가장 가까운 보이는 위협 j에 대해 c = −(v_j · e_j) ÷ \|e_j\| ÷ `herb_speed`(0.6). e_j = 위협 위치 − 내 위치, v_j = 그 위협의 **지난 스텝 실제 변위**(벽 자르기 포함). 관측 = (clip(c, −1, 1) + 1) ÷ 2. 안 보이면 0.5 | [0, 1] | 변위 cm ÷ 120 cm(= 900 cm/s × 0.1333 s) | `pred_vel`, 위치 | `:1291-1294,2113` |
 | 10 | `kin_alarm` | 보이는 동족(칸 3과 같은 집합) 중 지금 행동이 FLEE인 비율. 동족이 없으면 0 | [0, 1] | 같다 | 동족의 지금 행동 | `:1311-1312` |
@@ -148,6 +148,9 @@
 | 18 | `alarm_heard` (19칸만) | ttl > 0이면 `gain[hop]` × ttl ÷ `alarm_steps`(15), 아니면 0. 곱한 뒤 나눈다(이 순서) | [0, 1] | 11-3의 표를 쓴다 | 경보 칸(E′ 뒤) | `H/env_v2/repertoire.py:640-645`, `H/env_v2/world.py:1350-1351` |
 
 - 관측 순서: `H/env_v2/world.py:86`(v1 7칸) + `:298-299`(낮밤 2칸) + `H/env_v2/repertoire.py:166-167`(9칸) + `:169`(경보 1칸).
+- 칸 7 의 날씨 w (10-18, 명세 `RL_V3_WILD2_SPEC.md` 11절): 계획서 `RL_V2_PLAN.md` 4.2 표 9·#25 가 처음부터 '실효 탐지 반경 ÷ see_r = (1 − 0.5·d)·w' 로 둔 자리를 켠 것이다.
+  칸 수·순서·뜻(실효 탐지 반경의 몫)은 그대로다. 파이썬 `wild_weather.obs_visibility`(거울 설정 켬), C++ `FWeatherConfig::bObsVisibility`. 곱 순서는 (1 − 0.5·d) 다음 w (골든
+  `WeatherGoldenVectorsV3.h` 낮밤 묶음). R1b 는 [0.5, 1] 에서 배웠으므로 비·눈의 밤(0.45·0.35)은 처음 보는 값이다 — R4 가 배운다.
 - 리스폰한 행:
   - behavior = GRAZE, steps_in = 0이라 beh_steps = 0이다.
   - recency는 0에서 시작한다. 그래서 리스폰 자리에서 위협이 보이면 1, 아니면 0이다.

@@ -514,11 +514,11 @@ C1 사슴 돌아가기(제어 출력의 속도 방향을 바꿈), 기록 `FWorld
 
 ---
 
-## 11. 지역 날씨 — 야생 3단계 (10-18, 파이썬)
+## 11. 지역 날씨 — 야생 3단계 (10-18, 파이썬 · 언리얼)
 
 - 근거: 사용자 10-18 '일단 우리 테스트 레벨에도 날씨 적용되게 해 줘. 그리고 그 날씨와 장애물들을 바탕으로 만들어진 세계를 파이썬에 고대로 옮겨서 학습시킬 거야.'
   결정 기록 `RL_V2_PLAN.md` 10-18 (15)(R4 계획 D1~D4 를 이 말로 읽은 것).
-- 상태: **파이썬 규칙·거울 설정·시험·지금 두뇌 측정까지 했다. C++·언리얼(우리 시험 레벨에서 비·눈 보이기, 날씨 규칙)은 아직이다(11-7).** 두뇌는 R1b-F 그대로다(재학습 없음).
+- 상태: **파이썬 규칙·거울 설정·시험·지금 두뇌 측정(`555b8d5`), C++ 규칙·골든·우리 시험 레벨 비·눈 연출·언리얼 대 파이썬 짝 비교(11-9)까지 했다.** 두뇌는 R1b-F 그대로다(재학습 없음). 남은 것은 R4 학습 세계(11-7).
 - 코드: 기능 `wild_weather`(번호 31 — 8 `weather` 는 v2.6 설계 '맑음↔비 Markov·먹이 재생 배수'의 자리라 그대로 두었다), 정의와 식 `H/env_v2/world.py` 모듈 docstring
   '야생 3단계'(`_wild_weather_params`·`weather_at`·`weather_mults`·`_daynight_update`·`weather_stats`), 설정 `H/configs/v3_wild3_mirror.yaml`(생성기
   `H/results/v3/wild3/make_wild3_config.py` = 나무 거울 + 이 블록), 시험 `H/tests/test_wild3_weather.py`, 측정 `H/results/v3/wild3/`(README·`summary.md`).
@@ -548,7 +548,7 @@ C1 사슴 돌아가기(제어 출력의 속도 방향을 바꿈), 기록 `FWorld
 - 바꾸지 않는 것: 늑대 무리 돕기의 거리(join_r), 도주 반사의 실거리 문턱(안전 40 m 등), 은신처, 먹이, 늑대 식욕, 사슴 동족 시야, 낮밤 구간·사건 E5(어둠 d 로 정한다 — 비 오는 낮이
   밤으로 잡히지 않게).
 - 맑음이거나 세기 0 이면 배수가 모두 정확히 1.0 이라 그 세계는 날씨가 없는 세계와 비트 단위로 같다(메마른 땅 — 측정에서 확인).
-- C++ 꼴(다음 단계): `Wx = WeatherAt(Region, T); Ws = 1 - (1 - SightAt1[Wx.Kind]) * Wx.I; VisW = (1 - DetectNight * D) * Ws; SeePred = SeeR * VisW;`
+- C++ 꼴(10-18 옮김 — 11-9): `Wx = WeatherAt(Region, T); Ws = 1 - (1 - SightAt1[Wx.Kind]) * Wx.I; VisW = (1 - DetectNight * D) * Ws; SeePred = SeeR * VisW;`
   `ObsVis = bObsVis ? VisW : 1 - DetectNight * D; RSnd *= Wh; PredViewR' = PredViewR * Ws; Vel *= Wd; Speed *= Ww;`
 
 ### 11-3. 값
@@ -621,7 +621,9 @@ C1 사슴 돌아가기(제어 출력의 속도 방향을 바꿈), 기록 `FWorld
    (날씨 없는 나무 판 21 번·5.2 초). 고지 눈 배수 + 숲 원판 24 그루 30 세계 × 16분: 사슴 0 번·늑대 줄기 0 번, 기어감 38 번(돕는 늑대 13)·가장 김 5.7 초
    (날씨 없는 숲 배치 23 번·5.2 초 — 느려진 늑대는 3 초에 1 m 문턱을 덜 넘는다. 막힌 것이 아니다).
 
-### 11-5. 시험 (`H/tests/test_wild3_weather.py`, 11개)
+### 11-5. 시험 (`H/tests/test_wild3_weather.py`, 13개 — 10-18 언리얼 단계에서 C++ 골든 2개를 더함)
+
+- C++ 골든(11-9): 언리얼 모듈의 `WeatherGoldenVectorsV3.h` = 지금 내보내기, g++ 로 C++ 헤더를 컴파일해 골든과 비트 단위로 대조(`tests/cpp/weather_v3_main.cpp`).
 
 - 설정 = 나무 거울 + 이 블록(생성기 최신, 눈 값 = R3 지형 값). 계수 검사(지역 없음·날씨 이름·세기 범위·맑음 세기·시간표 순서·선행 기능·청각 없는 세계의 청각 배수).
 - 식: 배수(세기 0·0.5·1, 맑음), 시간표(첫 줄 앞·줄 사이·표 없는 지역), 시간표 세계의 날씨별 스텝 수.
@@ -638,10 +640,8 @@ C1 사슴 돌아가기(제어 출력의 속도 방향을 바꿈), 기록 `FWorld
 
 ### 11-7. 다음 (아직 안 함)
 
-1. 우리 시험 레벨에서 비·눈 보이기(사용자 첫 요청): 통합 v3 모드가 무대를 만들 때 팀 블루프린트(또는 팀 나이아가라·소리 애셋)를 실행 중에 놓는다
-   (레벨·애셋은 그대로, `weather_check/README.md` 7절 (i)). 이펙트가 플레이어 폰 자리에 생기는 팀 블루프린트의 성질은 그대로 따라온다.
-2. C++: `FWorldConfig` 에 날씨(지역 → 날씨 표·배수), `EcoObservationV3.h` visibility × w_s, 위협 Step 의 시야·속력 배수, 사슴 이동 배수, 골든(파이썬 → C++), 계약
-   `POLICY_CONTRACT_V3.md` 칸 7 에 w 를 적기, 두 방식 빌드·자동 시험, 헤드리스 짝 비교.
+1. ~~우리 시험 레벨에서 비·눈 보이기~~ — 10-18 했다(11-9, 팀 블루프린트 대신 팀 나이아가라·소리 애셋을 카메라 곁에).
+2. ~~C++ 규칙·골든·짝 비교~~ — 10-18 했다(11-9). 계약 `POLICY_CONTRACT_V3.md` 칸 7 에 w 를 적었다.
 3. R4 학습 세계(`configs/v3_r4.yaml`): 이 거울 + 세계마다 지역 하나(숲·고지·메마른 땅 — 그 지역 나무·날씨) + 학습용 부활(늑대에게서 40 m 밖) — `RL_V3_R4_PLAN.md`.
 
 ### 11-8. 출처
@@ -654,3 +654,20 @@ C1 사슴 돌아가기(제어 출력의 속도 방향을 바꿈), 기록 `FWorld
 - Sullender, B. K., Cunningham, C. X., Lundquist, J. D., & Prugh, L. R. (2023). Defining the danger zone: critical snow properties for predator–prey interactions. *Oikos*.
 - 시정과 큰비: 시정 = 대비가 5% 로 줄어드는 거리(기상 광학 거리). The influence of rainfall on the extinction coefficient and the meteorological optical range, *Atmósfera* 39
   (https://www.revistascca.unam.mx/atm/index.php/atm/article/view/53491) — 큰비에서 시정이 수 km 아래로 준다.
+
+### 11-9. 언리얼 (10-18)
+
+- 규칙: `AI/Policy/EcoWorldV3.h` `FWeatherConfig`(기본 끔, 계수 = `configs/v3_wild3_mirror.yaml` `wild_weather`)·`kRegionWeatherDefaults`(Barren 맑음·Forest 비 1·Highland 눈 1)·
+  `WeatherAt`·`WeatherMults`·`UpdateDayNight`(어둠과 같은 때)·`SeePredNow`·`ObsVisibilityMult`·`WolfViewNow`, 발소리 × 사슴 청각, B 사슴 속도 × 사슴 이동(약함 뒤),
+  `EcoThreatModel.h` `FThreatStepInput::WeatherViewMult`(표적 보임 반경)·`WeatherSpeedMult`(7 밤잠 배수 뒤·7′ 돌아가기 앞, 무리 미리 보기도), `EcoObservationV3.h` visibility × w.
+  맑음·세기 0·배수 1 은 곱해도 같은 값이다(끈 세계와 비트 단위로 같다 — 골든 '끄면 그대로', 실제 판 메마른 땅 기록 줄이 날씨 전과 같다).
+- 통합 모드: `eco.IntegratedV3.Weather`(기본 1), 지역 덮기 `eco.IntegratedV3.WeatherForest`·`WeatherHighland`·`WeatherBarren`(`날씨[:세기]`), 연출 `eco.IntegratedV3.WeatherVisuals`(기본 1)·
+  빗줄기 배수 `eco.IntegratedV3.WeatherRainDensity`(기본 1). 계획서 `RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b '10-18 지역 날씨'.
+- 골든 `WeatherGoldenVectorsV3.h`(`H/export_golden_v3_weather.py`, 시드 32098·32099): 설정·배수 43·시간표 45·낮밤 114·지각 18 장면·한 스텝 80 장면 비트 단위, 기준 루프 끄면 그대로 240 스텝,
+  첫 스텝 눈 이동. UE 시험 `Policy.V3.Weather.Golden`·`IntegratedDefaults`·`SenseStats`·`Presenter`, g++ 하네스 `H/tests/cpp/weather_v3_main.cpp`.
+- 짝 비교(사슴 128, 세션 20000~20002, 240초, 파이썬 같은 지도 반복 10 — `H/results/v3/wild3/README.md` 4절): 9장 합 산 94.5 대 94.5%, 잡힘 5.47 대 5.49%, 굶음 0, 지역마다 모든 칸
+  |z| ≤ 2.3. 날씨가 바꾼 것도 같은 쪽(고지 잡힘 +0.78 대 +0.86 %p, 15~30 m 알아챔 숲 −21 대 −19 %p·고지 −33 대 −28 %p). 감지 기록은 새 10초 여덟째 줄과 파이썬 진단
+  `band_pairs`·`band_seen`·`heard_live` 가 같은 정의다.
+- 화면(`AI/Policy/EcoV3WeatherPresenter`): 카메라 지역의 세계 날씨를 읽어 팀 `Rain_System`(User.SpawnRate = 팀 블루프린트 값 500 × 세기 × 페이드)·`A_Rain_Cue`·`NS_Blizzard` 를
+  카메라 곁에 켠다. 들어가면 1.5 초·나오면 1 초 페이드, 눈은 나오는 순간 멈춘다. 사진 `H/results/v3/wild3/shots/`. 맑은 낮에는 팀 화면처럼 비가 옅다(빗줄기 배수로 진하게 할 수 있다).
+  현실 근거: 비·눈은 지역 전체에 오고(팀 설계 — 지역 상자마다 날씨) 보는 사람 둘레에서 보인다.
