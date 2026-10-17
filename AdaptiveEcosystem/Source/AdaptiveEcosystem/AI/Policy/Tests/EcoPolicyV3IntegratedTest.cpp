@@ -3010,12 +3010,18 @@ bool FEcoRefugeMergedSingleRule::RunTest(const FString&)
 	// 10-17 늑대 몸 여유 (eco.IntegratedV3.WolfBodyMargin 기본 1 m = 0.5 단위, 파이썬 realism_shelter.wolf_margin)
 	const double BodyMargin = Region->Sim.Config.ShelterWolfMargin;
 	TestEqual(TEXT("통합 기본 늑대 몸 여유 0.5 단위 (1 m)"), BodyMargin, 0.5);
-	// 10-17 야생 2단계 1 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood): 사용자 결정 10-17 '추천대로 끄고'로 기본 0 — 먹이 격자에 2단계 칸이 없다.
-	// 켠 판의 식(겹치는 셀 용량 × 0.15)은 Policy.V3.Wild2.* 가 본다
+	// 10-17 야생 2단계 1 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 1, 파이썬 realism_cover_food 0.15): 겹치는 셀 용량 = 처음 용량 × 0.15
+	// (10-17 고침: 1b11c78 이 기본을 0 으로 바꿨던 것을 되돌렸다 — 사용자 결정 '은신처는 안전하지만 먹이가 적다')
 	{
 		const EcoWorldV3::FFoodGrid& F = Region->Sim.Food;
-		TestTrue(TEXT("통합 기본 은신처 먹이 부족 끔 (겹치는 셀·처음 용량 칸 없음)"),
-				 !Region->Sim.Config.ShelterFood.bEnabled && F.CoverFoodCell.empty() && F.Cap0.empty());
+		bool bFood = Region->Sim.Config.ShelterFood.bEnabled && F.CoverFoodCell.size() == F.Cap.size() && F.Cap0.size() == F.Cap.size();
+		int32 FoodCells = 0;
+		for (size_t K = 0; bFood && K < F.Cap.size(); ++K)
+		{
+			FoodCells += F.CoverFoodCell[K];
+			bFood = F.Cap[K] == (F.CoverFoodCell[K] ? F.Cap0[K] * Region->Sim.Config.ShelterFood.CapFrac : F.Cap0[K]) && F.Food[K] <= F.Cap[K];
+		}
+		TestTrue(TEXT("통합 기본 은신처 먹이 부족 켬 (겹치는 셀 용량 × 0.15)"), bFood && FoodCells > 0);
 	}
 	Region->Sim.Config.DayOffset = 225;   // 낮 — 깨어 있는 늑대
 	EcoWorldV3::UpdateDayNight(Region->Sim);

@@ -9,7 +9,7 @@
 // 그대로 넣고 같은 은신처 원으로 BuildCoverCells → ApplyShelterFood 를 불러 비트 단위로 같은지 본다(통합 모드 Build 와 같은 순서).
 //
 // 묶음:
-//   Wild2.ShelterFoodGolden  기본값(끔·통합도 끔 — 10-17 '추천대로 끄고'), 거울 세계 30 × 30 의 셀 중심 은신처 셀·겹치는 셀·용량·먹이·재생률 = 파이썬, 겹침 장면 16개(셀 경계에
+//   Wild2.ShelterFoodGolden  기본값(끔·통합 켬), 거울 세계 30 × 30 의 셀 중심 은신처 셀·겹치는 셀·용량·먹이·재생률 = 파이썬, 겹침 장면 16개(셀 경계에
 //                            꼭 닿는 원·모서리 중심 등 손 장면 6 + 난수 10)의 두 마스크 = 파이썬, 반경 0 원(지워진 은신처)은 건너뛰고 용량이 돌아온다
 //   Wild2.HuntGolden         늑대 5 × 400 스텝 열의 스텝마다 (on, 시작, 끝, 성공, 사냥 밖)와 합 = 파이썬 hunt_update
 //   Wild2.Run                기준 루프 1800 스텝 (늑대 잠행 2·추격 2, 포만 켬): 사냥 성공 + 사냥 밖 = 늑대 포획, 시작 − 끝 = 이어지는 사냥, 사슴·스텝 기록,
@@ -85,7 +85,7 @@ bool FEcoWild2V3ShelterFoodGoldenTest::RunTest(const FString& Parameters)
 	const FShelterFoodConfig Def;
 	TestFalse(TEXT("은신처 먹이 부족 기본은 끔 (R1b 학습 세계 그대로)"), Def.bEnabled);
 	TestFalse(TEXT("세계 설정 기본도 끔"), FWorldConfig().ShelterFood.bEnabled);
-	TestFalse(TEXT("통합 기본값도 끔 (eco.IntegratedV3.ShelterFood 0 — 사용자 결정 10-17 '추천대로 끄고')"), FEcoV3IntegratedSettings().bShelterFood);
+	TestTrue(TEXT("통합 기본값은 켬 (eco.IntegratedV3.ShelterFood 1 — 10-17 고침으로 되돌림)"), FEcoV3IntegratedSettings().bShelterFood);
 	TestEqual(TEXT("cap_frac"), Def.CapFrac, G2::kCapFrac);
 	TestEqual(TEXT("regen_frac"), Def.RegenFrac, G2::kRegenFrac);
 	const FWorldConfig Base;

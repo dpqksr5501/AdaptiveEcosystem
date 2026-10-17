@@ -286,7 +286,7 @@ namespace EcoWorldV3
 
 	// ---- 야생 2단계 1 은신처 먹이 부족 (파이썬 realism_cover_food — world.py 모듈 docstring (e), configs/v3_wild2_mirror.yaml, 명세 RL_V3_WILD2_SPEC.md) ----
 	// 켜면 은신처 원과 조금이라도 겹치는 셀(FFoodGrid::CoverFoodCell)의 용량 ← CapFrac × 용량, 먹이 ← min(먹이, 용량), 재생률 ← 기본 × RegenFrac
-	// (FoodCoverRegenMult 대신). 밖 셀은 그대로다. 기본 끔 = R1b 학습 세계 그대로 (평면 맵·기준 루프·골든). 통합 모드 eco.IntegratedV3.ShelterFood (기본 0 — 사용자 결정 10-17 '추천대로 끄고', 켜면 0.15)
+	// (FoodCoverRegenMult 대신). 밖 셀은 그대로다. 기본 끔 = R1b 학습 세계 그대로 (평면 맵·기준 루프·골든). 통합 모드 eco.IntegratedV3.ShelterFood (기본 1 = 0.15 — 10-17 고침으로 되돌림)
 	struct FShelterFoodConfig
 	{
 		bool bEnabled = false;

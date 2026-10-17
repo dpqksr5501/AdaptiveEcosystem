@@ -13,7 +13,8 @@
 //                           = _step_predators_v3 비트 단위), 끄면 그대로(무리 칸을 읽지 않는다)
 //   Pack.Run                기준 루프 1800 스텝 (무대 60, 사슴 64, 늑대 잠행 2·추격 2, 포만·제자리 식사·은신처 안전·몸 여유 0.5): 켜면 앞장·돕기가 있고
 //                           기다림·문 ≤ 돕기, 협동 포획 ≤ 늑대 포획 = 사냥 성공 + 사냥 밖, 늑대 중심은 늘 은신처 원(반지름 + 몸 여유) 밖. 끄면 무리 기록이 0
-//   Pack.IntegratedDefaults 통합 기본값: 지역마다 늑대 4 (잠행 2·추격 2)·협동 사냥 켬·은신처 먹이 부족 끔 (사용자 결정 10-17 '추천대로 끄고'),
+//   Pack.IntegratedDefaults 통합 기본값: 지역마다 늑대 4 (잠행 2·추격 2)·협동 사냥 켬·은신처 먹이 부족 켬 (사용자 결정 '은신처는 안전하지만 먹이가 적다' —
+//                           10-17 고침: 1b11c78 은 사용자 말 '추천대로 끄고'를 잘못 읽어 끔으로 두었다),
 //                           MakeRegionWorldConfig·InitWorld 가 무리 칸을 넘긴다
 
 #include "Misc/AutomationTest.h"
@@ -177,12 +178,12 @@ bool FEcoPackV3IntegratedDefaultsTest::RunTest(const FString& Parameters)
 	const FEcoV3IntegratedSettings Def;
 	TestEqual(TEXT("통합 기본: 지역마다 늑대 4"), Def.WolvesPerRegion, 4);
 	TestTrue(TEXT("통합 기본: 협동 사냥 켬"), Def.bPackHunt);
-	TestFalse(TEXT("통합 기본: 은신처 먹이 부족 끔 (사용자 결정 10-17 '추천대로 끄고')"), Def.bShelterFood);
+	TestTrue(TEXT("통합 기본: 은신처 먹이 부족 켬 (eco.IntegratedV3.ShelterFood 1 — 10-17 고침)"), Def.bShelterFood);
 	TestFalse(TEXT("세계 설정 기본은 무리 끔 (평면 맵·기준 루프·골든 그대로)"), EcoWorldV3::FWorldConfig().PackHunt.bEnabled);
 	const std::vector<EcoObservationV3::FCoverInput> Covers = EcoWorldV3::QuadCovers(Def.StageSizeUnits, 6.0);
 	const EcoWorldV3::FWorldConfig C = UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(Def, 0, 128, Def.WolvesPerRegion, Covers);
 	TestTrue(TEXT("늑대 4 = 잠행 2·추격 2, 원거리·야행성 없음"), C.NumStalkers == 2 && C.NumChasers == 2 && C.NumRanged == 0 && C.NumNocturnal == 0);
-	TestTrue(TEXT("세계 설정: 무리 켬, 먹이 부족 끔, 몸 여유 0.5"), C.PackHunt.bEnabled && !C.ShelterFood.bEnabled && C.ShelterWolfMargin == 0.5);
+	TestTrue(TEXT("세계 설정: 무리 켬, 먹이 부족 켬, 몸 여유 0.5"), C.PackHunt.bEnabled && C.ShelterFood.bEnabled && C.ShelterWolfMargin == 0.5);
 	const EcoThreatV3::FPackHuntConfig Pk;
 	TestTrue(TEXT("세계 설정 무리 계수 = 거울 설정"), C.PackHunt.JoinR == Pk.JoinR && C.PackHunt.Lead == Pk.Lead && C.PackHunt.DoorR == Pk.DoorR
 															 && C.PackHunt.DoorCos == Pk.DoorCos && C.PackHunt.WaitR == Pk.WaitR);

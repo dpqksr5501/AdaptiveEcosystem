@@ -93,11 +93,12 @@
 //      Social 처리기는 돌며 기록만 하고 v3 사슴 움직임은 파이썬 세계 그대로다. 1 이면 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에
 //      사슴 제어를 바꾼다(EcoPolicyV3SocialBridge, FStepHooks::HerbControl — 팀 장면 확인용). 무리 반응은 뒤에 파이썬 야생 규칙으로 만든다.
 //  13. 10-17 야생 2단계 1 (명세 RL_V3_WILD2_SPEC.md, 파이썬 configs/v3_wild2_mirror.yaml): 은신처 먹이 부족 eco.IntegratedV3.ShelterFood
-//      (-EcoV3ShelterFood=, 기본 0 — 아래 사용자 결정. 켜면 파이썬 realism_cover_food cap_frac·regen_frac 0.15): 은신처 원과 조금이라도 겹치는 먹이 셀의 용량과 재생 속도가
+//      (-EcoV3ShelterFood=, 기본 1 — 파이썬 realism_cover_food cap_frac·regen_frac 0.15): 은신처 원과 조금이라도 겹치는 먹이 셀의 용량과 재생 속도가
 //      밖의 15% 다(EcoWorldV3.h FShelterFoodConfig·FFoodGrid::ApplyShelterFood). 은신처는 안전하지만 먹이가 적어 배고픈 사슴은 밖으로 나와야 한다.
 //      늦게 등록되거나 지워진 은신처(RefreshRefuges)도 같은 식으로 다시 건다. 10초 기록 다섯째 줄 '[EcoV3I] <지역> 사냥·은신처 |' 는 늘 적는다:
 //      사냥 성공률(늑대가 전력으로 쫓거나 덮친 사냥 가운데 잡음으로 끝난 몫 — world.py hunt_update 와 같은 정의), 은신처 안 사슴 시간, 둘레 밖 잡힘.
-//      사용자 결정 10-17 '추천대로 끄고': 은신처 먹이 부족은 잡힘을 늘리지 못하고 오래 두면 굶음만 늘려 기본을 0 으로 바꿨다(켜면 위 그대로).
+//      10-17 고침: 1b11c78 은 사용자 말 '추천대로 끄고 2~4번 진행해'(10-17)를 은신처 먹이 부족을 끄라는 뜻으로 잘못 읽어 기본을 0 으로 바꿨다. 그 말은 팀 무리 경보
+//      연결(위 12, SocialControl)을 끄라는 뜻뿐이었고 사용자의 결정은 '은신처는 안전하지만 먹이가 적다'(10-14·10-15)라 기본을 1 로 되돌렸다.
 //  14. 10-17 야생 2단계 2 늑대 무리 (명세 RL_V3_WILD2_SPEC.md, 파이썬 configs/v3_wild2_pack_mirror.yaml): 지역마다 늑대 수
 //      eco.IntegratedV3.WolvesPerRegion (-EcoV3Wolves=, 기본 4 — 잠행 2·추격 2, 짝수 순번 = 잠행. 두뇌 학습 범위 2~12 안, 0~12 로 자름)와
 //      협동 사냥 eco.IntegratedV3.PackHunt (-EcoV3PackHunt=, 기본 1 — 파이썬 wild_pack, EcoThreatModel.h '늑대 무리 협동 사냥'): 한 늑대가 사슴을
@@ -236,7 +237,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bRealismHearing = true;        // 늑대 발소리 (eco.IntegratedV3.RealismHearing 기본 1, R3 realism_hearing). 거짓 = 소리 없음
 	bool bShelterSafe = true;           // 은신처 안전·늑대 진입 금지 (eco.IntegratedV3.ShelterSafe 기본 1, 10-16 — R3 realism_shelter). 거짓 = 은신처 안에서도 잡힘
 	double WolfBodyMarginM = 1.0;       // 늑대 몸 여유 (m, eco.IntegratedV3.WolfBodyMargin 기본 1, 10-17 — 파이썬 realism_shelter.wolf_margin 0.5). bShelterSafe 일 때만.
-	bool bShelterFood = false;          // 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 0 — 사용자 결정 10-17 '추천대로 끄고'. 켜면 파이썬 realism_cover_food 0.15).
+	bool bShelterFood = true;           // 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 1, 10-17 야생 2단계 1 — 파이썬 realism_cover_food 0.15. 10-17 고침으로 기본 1 로 되돌림).
 										// 거짓 = 은신처 셀 재생만 0.3배 (R1b 학습 세계)
 	bool bPackHunt = true;              // 늑대 무리 협동 사냥 (eco.IntegratedV3.PackHunt 기본 1, 10-17 야생 2단계 2 — 파이썬 wild_pack, 값 = FPackHuntConfig 기본값)
 	bool bObstacles = true;             // 세로 장애물 (eco.IntegratedV3.Obstacles 기본 1, 10-17 야생 2단계 3 — 파이썬 obstacles). 레벨의 충돌하는 나무·바위를 원판으로 읽어

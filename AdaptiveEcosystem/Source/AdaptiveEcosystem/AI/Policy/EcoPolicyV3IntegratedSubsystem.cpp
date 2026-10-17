@@ -184,10 +184,10 @@ namespace EcoPolicyV3IntegratedImpl
 
 	static TAutoConsoleVariable<int32> CVarShelterFood(
 		TEXT("eco.IntegratedV3.ShelterFood"),
-		0,
-		TEXT("통합 v3 모드의 은신처 먹이 부족 (0 = 끔, 기본 — 사용자 결정 10-17 '추천대로 끄고': 잡힘은 그대로이고 오래 두면 굶음만 늘었다). 1 = 은신처 원과 조금이라도 ")
-		TEXT("겹치는 먹이 셀의 용량과 재생 속도가 밖의 15% (10-17 야생 2단계 1, 파이썬 configs/v3_wild2_mirror.yaml realism_cover_food). ")
-		TEXT("0 이면 은신처 셀은 재생만 0.3배(R1b 학습 세계). Play 전에 바꾼다. 명령줄 -EcoV3ShelterFood= 는 시작값."),
+		1,
+		TEXT("통합 v3 모드의 은신처 먹이 부족 (1 = 켬, 기본 — 10-17 야생 2단계 1, 사용자 결정 '은신처는 안전하지만 먹이가 적다'). 은신처 원과 조금이라도 겹치는 ")
+		TEXT("먹이 셀의 용량과 재생 속도가 밖의 15% 다(파이썬 configs/v3_wild2_pack_mirror.yaml·v3_wild2_obstacle_mirror.yaml realism_cover_food). 배고픈 사슴은 밖으로 나와야 한다. ")
+		TEXT("0 = 은신처 셀은 재생만 0.3배(R1b 학습 세계). Play 전에 바꾼다. 명령줄 -EcoV3ShelterFood= 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarWolvesPerRegion(
@@ -622,7 +622,7 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.WolfBodyMargin"), LexToString(MarginArg));
 	}
-	int32 ShelterFoodArg = 0;
+	int32 ShelterFoodArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ShelterFood="), ShelterFoodArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.ShelterFood"), LexToString(ShelterFoodArg));
@@ -821,10 +821,10 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	const EcoWorldV3::FShelterFoodConfig Sf;
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 은신처 먹이: %s"),
 		   *(Settings.bShelterFood
-				 ? FString::Printf(TEXT("부족 (eco.IntegratedV3.ShelterFood 1, 10-17 야생 2단계 1) — 은신처 원과 겹치는 셀의 용량 %.0f%%·재생 %.0f%% (밖 대비), ")
+				 ? FString::Printf(TEXT("부족 (eco.IntegratedV3.ShelterFood 1, 기본 — 10-17 야생 2단계 1) — 은신처 원과 겹치는 셀의 용량 %.0f%%·재생 %.0f%% (밖 대비), ")
 									   TEXT("배고픈 사슴은 밖으로 나와야 함"),
 								   100.0 * Sf.CapFrac, 100.0 * Sf.RegenFrac)
-				 : FString(TEXT("끔 (eco.IntegratedV3.ShelterFood 0, 기본 — 사용자 결정 10-17 '추천대로 끄고'. 은신처 셀은 재생만 0.3배, R1b 학습 세계)"))));
+				 : FString(TEXT("끔 (eco.IntegratedV3.ShelterFood 0 — 은신처 셀은 재생만 0.3배, R1b 학습 세계)"))));
 	const EcoThreatV3::FPackHuntConfig Pk;
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 늑대 무리: 지역마다 %d (eco.IntegratedV3.WolvesPerRegion) | 협동 사냥 %s"), Wolves,
 		   *(Settings.bPackHunt
