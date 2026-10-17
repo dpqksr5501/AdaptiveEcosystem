@@ -686,7 +686,8 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 10초 기록 다섯째 줄 `[EcoV3I] <지역> 사냥·은신처 | …` 을 늘 적는다: 사냥 누적 시작·끝·성공·사냥 밖 포획·성공률(추격형·잠행형 따로), 은신처 안 사슴·스텝(구간·누적), 은신처 둘레 밖 2 m·4 m 안 잡힘. 앞 네 줄의 칸은 그대로다.
   - 헤드리스(사슴 128, 세션 20000~20005, 240초): 기록 `herbivore_rl/results/v3/wild2/unreal_logs/`. 파이썬 거울과 같다(은신처 안 시간 5.9 대 5.8%, 잡힘 2.43 대 2.28%, 사냥 성공률 56 대 62%, |z| < 2 — 사냥 시작 하나 z +2.1, 독립 지도에서는 +0.5). 오류·ensure·경고 0.
   - 시험: `Policy.V3.Wild2.ShelterFoodGolden`·`HuntGolden`·`Run`(골든 `Wild2GoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_wild2.py`), `Refuge.MergedDefaultSingleRule` 에 기본 켬 확인. 자동 시험 153 성공 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
-  - 사용자 결정 10-17 '추천대로 끄고'(`RL_V2_PLAN.md` '10-17 (11)'): 기본을 0 으로 바꿨다. 켜려면 `-EcoV3ShelterFood=1`.
+  - ~~사용자 결정 10-17 '추천대로 끄고'(`RL_V2_PLAN.md` '10-17 (11)'): 기본을 0 으로 바꿨다. 켜려면 `-EcoV3ShelterFood=1`.~~ **10-17 고침: 잘못 읽은 결정이었다.**
+    그 말은 팀 무리 경보 연결(`SocialControl`)을 끄라는 뜻뿐이었다. 기본을 다시 1 로 두었다(`RL_V2_PLAN.md` '10-17 (13)'). 끄려면 `-EcoV3ShelterFood=0`.
 - **10-17 야생 2단계 2 늑대 무리·협동 사냥** (명세 `RL_V3_WILD2_SPEC.md` 5절, 결정 `RL_V2_PLAN.md` '10-17 (11)', 측정 `herbivore_rl/results/v3/wild2/README.md` '2 늑대 무리'):
   - 새 스위치 `eco.IntegratedV3.WolvesPerRegion` · `-EcoV3Wolves=`(기본 4, 0~12 로 자름 — 잠행 2·추격 2)와 `eco.IntegratedV3.PackHunt` · `-EcoV3PackHunt=`(기본 1). 시작 글 `[EcoV3I] 늑대 무리: …`.
   - 협동 사냥: 한 늑대가 사슴을 쫓는 동안 사냥 중이고 전력으로 달리지 않는 동료(120 m 안)가 그 사슴이 달아날 곳(향하는 은신처의 문, 없으면 도주선 앞 12 m)으로 가서 2 m 안이면 멈춰 사슴 쪽을 본다. 위협 Step 밖(C2, 어느 늑대도 움직이기 전)에서 `PackPeek`(상태 사본, 난수 없음) → `PackGoals` 로 정해 Step 6b′ 로 넘긴다.
@@ -702,6 +703,11 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 측정 전용 가져오기 `eco.IntegratedV3.ObstacleImport` · `-EcoV3ObstacleImport=<경로>`: 지역 이름이 같은 무대는 레벨 원판 대신 이 원판을 쓴다. 레벨에 보이는 물체가 없는 원판이라 화면용이 아니다(디버그 표시로만 보인다). 파이썬 원판은 `herbivore_rl/results/v3/wild2/make_obstacle_maps.py`.
   - 헤드리스(사슴 128, 240초, 파이썬 원판 가져옴): 세션 20000~20002 같은 지도·같은 원판 9장 |z| ≤ 2.0, 독립 지도 20003~20005 |z| < 2, 숲만 |z| < 2. 사냥 성공률 언리얼 35.9 대 파이썬 40.1%(바꾸기 전 59.4%). 기록 `herbivore_rl/results/v3/wild2/unreal_logs/obst_*`. 오류·ensure·경고 0.
   - 시험: `Policy.V3.Obstacle.Golden`(미끄러짐 566·시선 407·먹이·밀어내기 168·한 스텝 장면 80 비트 단위, 골든 `ObstacleGoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_obstacle.py`, 검사 본문 `Tests/ObstacleGoldenCheckV3.h` — g++ 하네스도 같은 본문)·`Run`·`LevelScan`(시험 월드 상자·인스턴스 메시 읽기, 읽기 전후 그대로, JSON 왕복)·`IntegratedDefaults`. 자동 시험 161 = 성공 160 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
+- **10-17 고침: 은신처 먹이 부족 기본을 다시 1 로** (결정 `RL_V2_PLAN.md` '10-17 (13)', 명세 `RL_V3_WILD2_SPEC.md` 6-6, 측정 `herbivore_rl/results/v3/wild2/README.md` '10-17 고침'):
+  - '10-17 (11)' 은 사용자 말 '추천대로 끄고'를 잘못 읽었다(그 말은 `SocialControl` 을 끄라는 뜻뿐). `eco.IntegratedV3.ShelterFood` · `-EcoV3ShelterFood=` 기본 1, 시작 글 `[EcoV3I] 은신처 먹이: 부족 (… 1, 기본 …)`. 파이썬 거울 `configs/v3_wild2_pack_mirror.yaml`·`v3_wild2_obstacle_mirror.yaml` 에 `realism_cover_food` 를 넣었다.
+  - 헤드리스(사슴 128, 기본값 그대로, 240초): 세션 20000~20002 산 95.1·잡힘 4.95%·은신처 안 8.1%(파이썬 같은 지도 94.8·5.18·7.6), 세션 20006~20008 94.6·5.38·8.4%(94.8·5.23·8.2). 굶음 0. 기록 `herbivore_rl/results/v3/wild2/unreal_logs/packfood_*`. 오류·ensure·경고 0.
+  - 남은 차이: 먹이 부족을 켜면 언리얼 사냥 시작이 약 14% 많다(합친 z 약 +3.5, 끈 판은 차이 없음). 잡힘 수는 같다. 원인은 아직 모른다.
+  - 시험: `Pack.IntegratedDefaults`·`Wild2.ShelterFoodGolden`·`Refuge.MergedDefaultSingleRule` 을 기본 켬으로 고쳤다. 자동 시험 161 = 성공 160 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
 
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 
