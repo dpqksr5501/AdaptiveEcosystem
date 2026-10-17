@@ -142,7 +142,8 @@
 | `weather_fx_timeline.png` | 카메라 지역 날씨와 연출 상태(캡처마다 `film_runs/wxB/watch.txt`) |
 
 - 촬영 감독 기록 `shots/film_runs/<판>/watch.txt`(캡처마다 연출 액터 `EcoV3WeatherFx` 의 켜짐·자리·빗줄기 수·페이드 — 읽기만), 장면마다 수 `shots/summary.json`.
-- 소리: `-benchmark`·`-NoSound` 판이라 들어 보지 못했다. 코드는 비가 0 이 되면 빗소리를 멈춘다(`bRainSoundOn` 끔 — 팀 블루프린트처럼 음량 0 으로 남지 않는다).
+- 소리: 이 절의 판은 `-benchmark`·`-NoSound` 라 소리 장치가 없었다. 코드는 비가 0 이 되면 빗소리를 멈춘다(`bRainSoundOn` 끔 — 팀 블루프린트처럼 음량 0 으로 남지 않는다).
+  10-18 독립 확인(`verify/README.md` 5절, 소리 장치가 있는 판)에서 숲 안에서는 `A_Rain_Cue` 가 재생되고, 나온 뒤 1 초에 비와 함께 멈춰 월드에 재생 중인 빗소리가 없음을 봤다.
 - 남은 것: 비는 맑은 낮 하늘에서 옅다(팀 애셋 그대로 — 하늘·빛은 바꾸지 않는다). 연출은 첫 로컬 플레이어 카메라 하나만 본다(분할 화면·클라이언트 없음).
 
 ## 6. 다음
@@ -185,3 +186,5 @@ python results/v3/wild3/make_weather_shots.py --frames <폴더>   # → shots/
   `unreal_exports/` — 원판·은신처·지역 날씨 JSON(`-EcoV3ObstacleExport=`).
 - `compare_weather.py` — 언리얼 대 파이썬 짝 비교(+ 날씨가 바꾼 것)와 내보내기 확인 → `compare_weather.md`·`.json`, 날씨를 끈 판끼리 `compare_weather_off.md`·`.json`.
 - `make_weather_shots.py` — GPU 촬영 출력에서 `shots/` 사진·띠·시간표를 만든다. `shots/` — 5절.
+- `verify/` — 10-18 독립 확인: 새 언리얼 세션 20003~20008(맡은 판 20004) 대 파이썬(시드 33000~33089), 배수 숫자 대조, 소리 장치가 있는 촬영(정지 넷·나가기 둘),
+  옛 문제 다시 보기(`verify/README.md`). 지도 27장 합 모든 칸 |z| ≤ 1.8.
