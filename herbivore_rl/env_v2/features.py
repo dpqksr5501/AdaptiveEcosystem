@@ -73,9 +73,9 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "boldness": 9,      # v2.7 개체 대담함 b, 사망 보상 조건화
     "water": 10,        # v2.8 물웅덩이, 수분, 마시기
     "boundary": 11,     # R1 (i) 언리얼 경계 반발 파리티
-    "obstacles": 12,    # R1 (ii) 원형 장애물 반발로 예약 → v3 세로 장애물(나무·바위 원판) 확장 지점. 10-14 사용자 결정으로 이번 단계에는
-                        # 넣지 않는다(구현 없음 — 켜면 읽을 때 실패, 끈 블록은 무시). 자리는 env_v2/world.py 모듈 docstring '세로 장애물'·
-                        # World.obstacles(늘 빈 (0, 3) [x, y, r])
+    "obstacles": 12,    # R1 (ii) 원형 장애물 반발로 예약 → v3 세로 장애물(나무·바위 원판). 10-14 에는 자리만 두었고 야생 2단계 3(10-17 사용자
+                        # '추천대로 끄고 2~4번 진행해')에서 넣었다: 사슴·늑대가 원판 둘레를 따라 미끄러지고, 원판이 눈길을 가리고(발소리는 못 가림),
+                        # 원판 밑 먹이가 없다. 정의는 env_v2/world.py 모듈 docstring '야생 2단계' 3, 자료 World.obstacles (K, 3) [x, y, r]
     "vigil_window": 13,  # v2.2r 경계 재설계(10-03 R2): 경계 행동 열 유무, 창 안 한정 경계(W′), 반사 돌아보기(L)
     "pred_sleep": 14,    # v2.4s 포식자 밤잠(10-07 사용자 결정 A안): 대부분 밤에 자고 세계마다 일부만 야행성
     "repertoire": 15,    # v3 R0 행동 레퍼토리(10-07 사용자 결정 (4)): 행동 실행기·잠금·사건·개체 행동 상태, 장치 M1·M2·M4·M5·M6
@@ -113,7 +113,7 @@ IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_
                                          "repertoire", "threats", "stare_down", "alarm",
                                          "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
                                          "realism_cover_food", "realism_chase", "realism_terrain", "integrated_stage",
-                                         "wild_reserve", "wild_satiation", "wild_flight", "wild_pack"})
+                                         "wild_reserve", "wild_satiation", "wild_flight", "wild_pack", "obstacles"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -252,6 +252,11 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     #   wild_pack: join_r = 동료가 쫓는 사슴이 이 실거리(단위) 안이면 돕는다, lead = 은신처가 없을 때 사슴 도주선 앞쪽 거리(단위), door_r·door_cos =
     #   사슴이 향하는 은신처(가장자리까지 door_r 안, 도주 방향 ±acos(door_cos) 안), wait_r = 목표 자리에 이만큼(단위) 가까우면 멈춰 사슴 쪽을 보고 기다린다
     "wild_pack": frozenset({"join_r", "lead", "door_r", "door_cos", "wait_r"}),
+    # 야생 2단계 3 세로 장애물 (env_v2/world.py `_obstacles_params`·`obstacle_layout`·`obstacle_slide`·`sight_blocked`, 정의는 모듈 docstring '야생 2단계' 3).
+    #   obstacles: tree_per_ha·rock_per_ha = 무대 1 ha 마다 나무 줄기·바위 수, tree_r·rock_r = 반지름 [하, 상](단위, 1 단위 = 2 m — 세계마다 자기 스트림
+    #   part 0 에서 U[하, 상]), body_r = 몸 반지름(단위 — 이동은 원판 반지름 + body_r 앞에서 멈춰 미끄러진다), block_sight = 원판이 눈길을 가리나(발소리는
+    #   못 가린다), no_food = 원판 밑 먹이 셀 용량을 원판이 덮은 몫만큼 줄이나. 선택 키 fixed(아래 OPTIONAL_KEYS)
+    "obstacles": frozenset({"tree_per_ha", "tree_r", "rock_per_ha", "rock_r", "body_r", "block_sight", "no_food"}),
 })
 
 # 선택 계수 키(모듈 docstring 규칙 6, 10-14 R3): 기능 → {키: 끔 값}. 켠 블록에 없으면 끔 값(= 앞 버전 동작)으로 읽는다. 앞 버전 설정
@@ -267,6 +272,8 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #     true 면 시작한 도주는 깨어 있는 늑대(사냥·먹기·배부름 — 자는 늑대 말고) 모두가 실거리 safe_r 밖이 되거나 은신처 안일 때까지 이어진다
 #     (도주를 일으키는 것은 그대로 사냥 중인 늑대만). edge_r > 0 이면 도주·경계 방향이 무대 가장자리 edge_r 안에서 벽 쪽 성분을 벽을 따라가는
 #     성분으로 돌리고 모서리를 벗어나는 쪽을 고른다(env_v2/world.py `wf_edge_steer`). false·0 = 10-15 그대로
+#   obstacles.fixed (10-17 야생 2단계 3): [[x, y, r], …](단위) 이면 무작위 배치 대신 이 원판을 쓴다(난수를 뽑지 않는다 — 언리얼 무대에서 읽은 원판으로 거울을
+#     돌리는 짝 비교용, results/v3/mirror/run_mirror.py --unreal-obstacles). null = 자기 스트림 part 0 으로 무작위 배치
 #   realism_shelter.wolf_margin (10-17 늑대 몸 여유): 막는 위협이 은신처 원 둘레가 아니라 반지름 r + wolf_margin(단위, 1 단위 = 2 m) 둘레를
 #     따라 미끄러진다(늑대 중심이 그 안에 들지 않는다). block_predators 를 켰을 때만 0 보다 클 수 있다. 사슴의 안전 판정(원 안 |q − c| ≤ r)은
 #     그대로다. 0 = 10-16 그대로(원 둘레에서 미끄러짐)
@@ -275,6 +282,7 @@ OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "realism_cover_food": MappingProxyType({"frac_range": None}),
     "threats": MappingProxyType({"eat_in_place": False}),
     "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0}),
+    "obstacles": MappingProxyType({"fixed": None}),
 })
 
 

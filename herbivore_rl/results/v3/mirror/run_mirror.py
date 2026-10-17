@@ -49,11 +49,16 @@ realism_shelter.block_predators 가 켜져 있어야 한다). 진단에 은신�
 10-17 더함(야생 2단계 2 늑대 무리, configs/v3_wild2_pack_mirror.yaml): wild_pack 을 켠 세계는 메타에 pack(World.pack_stats — 앞장·도움·기다림·은신처 문
 늑대-스텝, 늑대 포획과 협동 포획)을 적고, 10초 줄(JSON 만 — CSV 열은 그대로)에 같은 칸의 누적 pack_*을 더한다(동역학과 무관). 늑대 수는 설정의
 rand.predator_count 다(메타 wolves).
+10-17 더함(야생 2단계 3 세로 장애물, configs/v3_wild2_obstacle_mirror.yaml): obstacles 를 켠 세계는 메타에 obstacles(World.obstacle_stats — 원판 수·넓이,
+사슴·늑대 미끄러짐·물러남·돌아섬, 눈길 가림 몫)를 적고 10초 줄(JSON 만)에 같은 칸의 누적 ob_* 를 더한다. 짝 비교 지도를 덮을 때 원판 밑 먹이 줄임(ob_food_factor)을 은신처 먹이 부족보다 먼저 다시 건다
+(C++ FFoodGrid::Build 순서). --unreal-obstacles <파일 또는 폴더>(짝 비교에만): 언리얼 장애물 JSON(EcoPolicyV3IntegratedSubsystem ExportObstacles 꼴 —
+지역마다 원판 x, y, r)의 지역 원판을 그 지도 세계의 obstacles.fixed 로 넣는다. 폴더면 세션마다 s<세션 시드>.json 을 읽는다.
 """
 
 from __future__ import annotations
 
 import argparse
+import copy
 import csv
 import hashlib
 import json
@@ -146,6 +151,9 @@ def apply_unreal_map(w, session_seed: int, region: str) -> None:
     m = (m - m.min()) / max(m.max() - m.min(), EPS)
     t = float(cfg.food_patch_threshold)
     w.food_cap = np.clip((m - t) / (1.0 - t), 0.0, 1.0)
+    if getattr(w, "_ob", None) is not None and w._ob["no_food"]:
+        # 야생 2단계 3(세로 장애물): 원판 밑 먹이 줄임을 새 지도에 다시 건다(C++ FFoodGrid::Build 가 은신처 먹이 부족보다 먼저 거는 순서와 같다)
+        w.food_cap = w.food_cap * w.ob_food_factor
     if getattr(w, "_zf", None) is not None:
         # 야생 2단계(은신처 먹이 부족, realism_cover_food): 새 지도에도 은신처 셀 용량 배수를 다시 건다(C++ FFoodGrid::Build 가 지도를 만든 뒤
         # 거는 순서와 같다). 재생률은 은신처만 정하므로 reset 때 값 그대로다
@@ -153,6 +161,18 @@ def apply_unreal_map(w, session_seed: int, region: str) -> None:
     w.food = w.food_cap.copy()
     w._g = w._geometry()
     w._obs = w._obs_from(w._g)
+
+
+def load_unreal_obstacles(path: Path, sessions) -> dict:
+    """언리얼 장애물 JSON(파일 하나 = 모든 세션, 폴더 = 세션마다 s<시드>.json) → {(세션, 지역): [[x, y, r], …]}."""
+    path = Path(path)
+    out = {}
+    for u in sessions:
+        f = path / f"s{int(u)}.json" if path.is_dir() else path
+        d = json.loads(f.read_text(encoding="utf-8"))
+        for r in d["regions"]:
+            out[(int(u), r["region"])] = [[float(v) for v in row] for row in r["discs"]]
+    return out
 
 
 def eat_steps_of_seconds(sec: float) -> int:
@@ -196,6 +216,11 @@ def _row(w, alive_before: int, food0: float, shelter: list[int]) -> dict:
         ps = w.pack_stats()
         extra = dict(pack_wolf_steps=ps["wolf_steps"], pack_lead=ps["lead_n"], pack_help=ps["help_n"], pack_wait=ps["wait_n"],
                      pack_door=ps["door_n"], pack_catches=ps["catches"], pack_coop=ps["pack_catches"])
+    if getattr(w, "_ob", None) is not None:
+        # 야생 2단계 3(10-17): 누적 장애물 칸(언리얼 '[EcoV3I] <지역> 장애물 |' 줄과 같은 정의). CSV 열(ROW_KEYS)에는 넣지 않는다
+        os_ = w.obstacle_stats()
+        extra |= {f"ob_{k}": os_[k] for k in ("deer_steps", "deer_hit", "deer_back", "wolf_steps", "wolf_hit", "wolf_back", "wolf_dead",
+                                             "eye_pairs", "eye_blocked", "tgt_pairs", "tgt_blocked")}
     return extra | dict(t_s=round(w.t * STEP_SECONDS, 1), step=int(w.t), alive=int(alive_before), alive_end=int(w.alive.sum()),
                 n=int(w.N), caught=int(w._pred_deaths), starved=int(w._starve_deaths),
                 food_pct=float(100.0 * w.food.sum() / food0) if food0 > 0 else 0.0,
@@ -370,6 +395,8 @@ def run_world(job: dict) -> dict:
     meta["shelter_steps"], meta["live_steps"] = int(shelter[0]), int(shelter[1])
     if getattr(w, "_wp", None) is not None:
         meta["pack"] = w.pack_stats()       # 야생 2단계 2 늑대 무리 협동 통계(동역학과 무관)
+    if getattr(w, "_ob", None) is not None:
+        meta["obstacles"] = w.obstacle_stats()   # 야생 2단계 3 세로 장애물 통계(동역학과 무관)
     meta["death_t"] = w.death_t.tolist()
     meta["death_cause"] = w.death_cause.tolist()
     meta["wall_s"] = round(time.perf_counter() - t0, 3)
@@ -378,7 +405,7 @@ def run_world(job: dict) -> dict:
 
 def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | None = None, model: Path = MODEL,
         config: Path = CONFIG, log_every: int = LOG_EVERY, unreal_maps=None, replicates: int = 1, disable=(),
-        diag: bool = False, wolf_margin: float | None = None) -> dict:
+        diag: bool = False, wolf_margin: float | None = None, unreal_obstacles: Path | None = None) -> dict:
     """시드마다 세계 하나를 (워커 풀로) 돌린다. 반환 {meta, worlds}(worlds 는 시드 순서 = 받은 순서).
     unreal_maps(언리얼 세션 시드 목록)를 주면 짝 비교: 지도 (세션 시드, 지역 Barren·Forest·Highland) 마다 replicates 개 세계를 seeds 의 앞에서부터
     차례로 쓴다(지도 i 의 j 번째 = seeds[i·replicates + j], 시드 수 = 세션 수 × 3 × replicates)."""
@@ -396,9 +423,21 @@ def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | 
         k = int(replicates)
         if k < 1 or len(seeds) != len(maps) * k:
             raise ValueError(f"짝 비교는 시드가 지도 {len(maps)}장 × replicates {k} = {len(maps) * k}개여야 한다. 받은 수 {len(seeds)}")
+        obs = None
+        if unreal_obstacles is not None:
+            if not cfg.v2["features"].get("obstacles", {}).get("enabled"):
+                raise ValueError(f"--unreal-obstacles 는 obstacles 를 켠 설정에만 쓴다: {config}")
+            obs = load_unreal_obstacles(unreal_obstacles, unreal_maps)
         for i, (u, r) in enumerate(maps):
             for j in range(k):
                 jobs[i * k + j]["unreal_map"] = dict(seed=u, region=r, replicate=j)
+                if obs is not None:
+                    # 그 지도의 언리얼 원판을 fixed 로(무작위 배치 대신 — 난수를 뽑지 않는다)
+                    c = copy.deepcopy(jobs[i * k + j]["cfg"])
+                    c["v2"]["features"]["obstacles"]["fixed"] = obs[(u, r)]
+                    jobs[i * k + j]["cfg"] = c
+    elif unreal_obstacles is not None:
+        raise ValueError("--unreal-obstacles 는 --unreal-maps(짝 비교)와 함께 쓴다")
     t0 = time.perf_counter()
     ex = ro.make_executor(ro.default_workers(len(jobs)) if workers is None else min(int(workers), len(jobs)))
     if ex is None:
@@ -416,6 +455,8 @@ def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | 
         meta["wolf_margin"] = float(wolf_margin)
     if maps is not None:
         meta.update(unreal_maps=[int(u) for u in unreal_maps], replicates=int(replicates))
+    if unreal_obstacles is not None:
+        meta["unreal_obstacles"] = str(unreal_obstacles)
     return dict(meta=meta, worlds=worlds)
 
 
@@ -447,13 +488,14 @@ def main(argv=None) -> None:
     ap.add_argument("--disable", default="", help="설정에서 끌 기능 블록(쉼표, 예: wild_flight)")
     ap.add_argument("--diag", action="store_true", help="세계마다 진단(meta['diag'])을 더 적는다")
     ap.add_argument("--wolf-margin", type=float, default=None, help="realism_shelter.wolf_margin 덮기(단위, 1 단위 = 2 m. 10-17 늑대 몸 여유)")
+    ap.add_argument("--unreal-obstacles", type=Path, default=None, help="짝 비교: 언리얼 장애물 JSON(파일 또는 s<세션>.json 폴더)의 지역 원판을 쓴다")
     a = ap.parse_args(argv)
     seeds = parse_seeds(a.seeds)
     um = parse_unreal_maps(a.unreal_maps) if a.unreal_maps else None
     disable = tuple(x.strip() for x in a.disable.split(",") if x.strip())
     config = a.config if a.config.is_absolute() else (ROOT / a.config)
     res = run(a.deer, a.wolf_eat_steps, seeds, steps=a.steps, workers=a.workers, unreal_maps=um, replicates=a.replicates,
-              config=config, disable=disable, diag=a.diag, wolf_margin=a.wolf_margin)
+              config=config, disable=disable, diag=a.diag, wolf_margin=a.wolf_margin, unreal_obstacles=a.unreal_obstacles)
     name = a.name or (f"d{a.deer}_e{a.wolf_eat_steps}_s{seeds[0]}-{seeds[-1]}" if um is None else
                       f"pair_d{a.deer}_e{a.wolf_eat_steps}_u{um[0]}-{um[-1]}_k{a.replicates}_s{seeds[0]}-{seeds[-1]}")
     jp, cp = write(res, name, a.out_dir)

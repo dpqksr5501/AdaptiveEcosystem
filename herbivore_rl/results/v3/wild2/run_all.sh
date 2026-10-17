@@ -18,3 +18,9 @@ $R --deer 128 --seeds 32000-32089 --config $P --disable wild_pack --name d128_w4
 $R --deer 128 --seeds 32000-32029 --steps 7200 --config $P --name d128_pack_long
 $R --deer 128 --seeds 32000-32029 --steps 7200 --config $P --disable wild_pack --name d128_w4_long
 $R --deer 128 --unreal-maps 20000-20002 --replicates 10 --seeds 32000-32089 --config $P --name pair_d128_pack_u20000-20002_k10
+# 야생 2단계 3 세로 장애물 (10-17): 숲 배치(줄기 1 ha 250·바위 5). 짝 비교는 언리얼과 같은 원판(make_obstacle_maps.py → obstacle_maps/)
+O=configs/v3_wild2_obstacle_mirror.yaml
+python results/v3/wild2/make_obstacle_maps.py --sessions 20000-20002
+$R --deer 128 --seeds 32000-32089 --config $O --name d128_obst
+$R --deer 128 --unreal-maps 20000-20002 --unreal-obstacles results/v3/wild2/obstacle_maps --replicates 10 --seeds 32000-32089 --config $O --name pair_d128_obst_u20000-20002_k10
+$R --deer 128 --seeds 32000-32029 --steps 7200 --config $O --name d128_obst_long

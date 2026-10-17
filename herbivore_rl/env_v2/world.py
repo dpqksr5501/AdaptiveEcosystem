@@ -323,16 +323,34 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
     현실 근거: 늑대 무리의 사냥 성공은 4 마리까지 늘고 그 위에서는 더 늘지 않는다(MacNulty 외 2012, Behav. Ecol. 23:75). 늑대는 먹잇감이 다니는
       길목에 따로 떨어져 기다린다(Gable 외 2024, Ethol. Ecol. Evol. 36(2) — 비버 매복). '먹잇감 쪽으로 가다 가까우면 다른 늑대에게서 벌어진다'는 두
       규칙만으로 둘러싸기가 생긴다(Muro 외 2011, Behav. Processes 88:192). 교대 추격(relay)은 넣지 않았다.
-- 세로 장애물(나무·바위) 확장 지점 — 이번 단계에는 넣지 않는다(10-14 사용자: '언리얼에도 아직 없다. 나중에 추가 가능하게만').
-  구현은 없고 자리만 정해 둔다. 기능 이름은 이미 예약된 `obstacles`(번호 12, `env_v2/features.py`)이고 켜면 '아직 구현되지 않았다'로
-  읽을 때 실패한다(끈 블록 `obstacles: {enabled: false}` 는 받아들이고 무시한다). 자료는 `World.obstacles` — (K, 3) float64 [x, y, r]
-  원판, 열 이름 `OBSTACLE_COLUMNS`, 지금은 늘 K = 0(`_obstacles_reset`). 넣을 때 바꿀 곳(모두 K = 0 이면 지금과 비트 동일이게):
-    1) 배치: `_obstacles_reset` 에서 자기 스트림 `feature_rng("obstacles", 0)` 만 써서 원판을 뽑는다(`_build_world` 뒤).
-    2) 이동: 사슴 `step` 1) 의 clip 직후, 포식자 `_step_predators_v3` 의 벽 반사 앞 — 원판 안으로 들어가면 축별로 미끄러진다.
-    3) 시선: `_geometry` 의 위협 보임(pvis, 청각은 막지 않는다)과 포식자 표적 보임(vis) — 선분-원판 교차로 가린다.
-    4) 먹이: 원판 아래 셀의 용량 0(`_rz_cover_food_apply` 와 같은 자리, food_v 초기화 전).
-    5) 위치: 초기 배치(`_build_world` 뒤)와 리스폰(`_respawn`)을 원판 밖으로 밀어낸다(v1 난수 호출은 그대로, 규칙 2).
-  언리얼은 레벨의 장애물 액터를 같은 원판 목록으로 내보내 같은 엔진 무관 판정을 쓴다(이번에는 C++ 도 바꾸지 않는다).
+  3 세로 장애물 obstacles (12, 10-17 사용자 '추천대로 끄고 2~4번 진행해' — 10-14 에 자리만 둔 기능. 설정 configs/v3_wild2_obstacle_mirror.yaml =
+    v3_wild2_pack_mirror.yaml + 이 블록). 자료 World.obstacles (K, 3) [x, y, r](단위, 열 이름 OBSTACLE_COLUMNS). 끄면 늘 (0, 3) 이고 어떤 판정도 읽지
+    않는다(비트 동일). 다섯 자리:
+      1) 배치 `_obstacles_reset`(`_build_world`·통합 무대 배치 뒤): fixed 가 있으면 그 원판(난수 없음 — 언리얼 무대에서 읽은 원판으로 도는 짝 비교),
+         없으면 `obstacle_layout` — 자기 스트림 part 0 만 써서 나무 줄기 round(tree_per_ha × 무대 ha) 개, 그다음 바위 round(rock_per_ha × 무대 ha) 개.
+         하나마다 (x, y) ~ U[0, S]², r ~ U[하, 상] 를 뽑고 중심이 은신처 원 안(|c − c_k| ≤ r_k)이거나 무대 벽에서 r + OB_EDGE_BODIES·body_r 안이면 다시
+         뽑는다(OB_TRIES 번까지, 다 실패하면 건너뜀). 무대 벽은 실제 땅에 없는 학습 세계의 울타리라, 원판을 벽에 붙여 사슴이 끼는 막다른 구석(벽과 원판
+         사이)을 만들지 않는다(벽 곁에 몸 하나 지나갈 틈). 언리얼 레벨 읽기는 벽에 걸친 원판도 그대로 넣는다(레벨의 나무를 지우면 사슴이 나무를 뚫는다).
+         언리얼도 은신처 원 안에 중심이 있는 메시는 원판으로 넣지 않는다(은신처의 덤불·바위 장식이 은신처 원 자체다).
+      2) 이동 `obstacle_slide`(사슴 `step` 1) 의 clip 뒤, 포식자 `_step_predators_v3` 의 이동 직후·은신처 밀어내기와 벽 반사 앞): 이동 p → q 가
+         원판(반지름 R = r + body_r)에 처음 닿는 자리에서 멈추고(선분-원 교차의 가장 이른 t), 닿은 자리를 둘레 R + OB_EPS 로 옮긴 뒤 남은 이동의 안쪽
+         성분만 뺀다(둘레를 따라 미끄러짐). 미끄러진 이동이 다른 원판에 닿으면 되풀이한다(OB_PASSES 번까지). 시작점이 원판 안이면 그 원판은 건너뛴다.
+         마지막에(늑대는 은신처 밀어내기·벽 반사·자르기 뒤) 위치가 어느 원판(R) 안이면 이동 전 자리로 되돌린다. 늑대는 부딪혀 가려던 거리의
+         WALL_DEAD_FRAC 도 못 가면 돌아선다(heading ← 가려던 이동의 반대, 은신처 막다른 곳과 같은 꼴). heading·적용 속도 훅은 가려던 방향 그대로다.
+      3) 시선 `sight_blocked`(위협 보임 pvis `_geometry`, 포식자 표적 보임 vis `_step_predators_v3`): 두 점을 잇는 선분과 원 중심의 가장 가까운 거리가
+         r 보다 작은 원판이 하나라도 있으면 눈으로 못 본다. 발소리(realism_hearing)는 가리지 않는다. 동족 시야는 가리지 않는다. block_sight false 면 없다.
+         플레이어형 위협은 지금처럼 맵 전체를 본다. realism_chase·stare_down 의 시야는 가리지 않으므로 함께 켜지 않는다(켜면 읽을 때 실패).
+      4) 먹이 `obstacle_food_factor`(`_obstacles_reset`, 은신처 먹이 부족 (e)·food_v 전): 셀마다 4 × 4 표본점((ix + (a + 0.5)/4)·cell, …) 가운데
+         어느 원판(|q − c|² ≤ r²) 안인 몫 f 만큼 용량을 줄인다(cap ← cap × (1 − f), 먹이 ← min(먹이, cap)). no_food false 면 없다. 훅 ob_food_factor.
+      5) 위치 `obstacle_push_out`(reset 끝 — 은신처 밖 밀어내기 뒤, `_respawn`): 원판(R) 안의 사슴·늑대를 가장 가까운 후보로 옮긴다. 후보 = 원판마다
+         (중심 → 개체 쪽 둘레 R + OB_EPS 점) 하나와 OB_RING 8 방향(축·대각선, 성분 0·±1·±√½) 둘레 점. 무대 안이고 모든 원판 밖이고(늑대는 은신처
+         막기를 켰으면 은신처 원(반지름 + 몸 여유) 밖) 인 후보 가운데 가장 가까운 것(같으면 앞). 없으면 그대로 두고 센다. v1 난수 호출은 그대로다.
+    난수: 배치만 자기 스트림 part 0. 이동·시선·먹이·밀어내기는 난수가 없다. 통계 `obstacle_stats`.
+    C++ 꼴: EcoThreatModel.h ObstacleSlide·SightBlocked·InsideAnyObstacle(위협 Step 1·4 표적 보임, 8 이동), EcoObservationV3.h FThreatInput::bOccluded
+      (사슴 보임), EcoWorldV3.h FObstacleConfig·FFoodGrid::ApplyObstacleFood·ObstaclePushOut(C1 사슴 이동, 입양·리스폰). 언리얼은 무대 안 레벨의 충돌하는
+      스태틱 메시(폴리지 인스턴스 포함)를 읽기만 해서 원판을 만든다(EcoPolicyV3IntegratedSubsystem ScanStageObstacles, 콘솔 변수 eco.IntegratedV3.Obstacles).
+    현실 근거: 늑대에게 잡힌 엘크는 도망이 막히는 곳(강가·길가·깊은 눈)에서 더 많았다(Kauffman 외 2007, Ecol. Lett. 10:690). 숲은 그루가 빽빽해
+      (온대 성숙림 1 ha 에 줄기 약 1200 그루, 가슴높이 단면적 34 m² — ESA Ecological Archives E094-195) 사슴·늑대가 줄기를 돌아 달리고 서로를 오래 보지 못한다.
 
 행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
 `World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
@@ -556,8 +574,17 @@ WALL_RING = 32
 WALL_DEAD_FRAC = 0.1
 # realism_night 의 늑대별 잠·기상 지연 해시의 첫 입력. repertoire.JITTER_TAG(505)·rollout._SALT(101·202·303·404)와 겹치지 않는다
 NIGHT_TAG = 606
-# 세로 장애물 확장 지점(모듈 docstring '세로 장애물'): World.obstacles 의 열. 이번 단계에는 늘 비어 있다
+# 야생 2단계 3 세로 장애물(모듈 docstring '야생 2단계' 3): World.obstacles 의 열(끈 세계는 늘 비어 있다)
 OBSTACLE_COLUMNS = ("x", "y", "r")
+OB_PASSES = 3            # 미끄러짐 되풀이 수
+OB_EPS = 1.0e-6          # 닿은 자리를 둘레 밖으로 옮기는 여유(단위)
+OB_TRIES = 20            # 배치: 중심이 은신처 원 안이거나 무대 가장자리에 붙으면 다시 뽑는 수
+OB_EDGE_BODIES = 2.0     # 배치: 원판 중심은 무대 벽에서 r + 이 배수 × body_r 밖 (벽 곁에 몸 하나 지나갈 틈 — 막다른 구석을 만들지 않는다)
+OB_SAMPLES = 4           # 먹이: 셀 한 변의 표본점 수(셀마다 4 × 4)
+OB_UNIT_M = 2.0          # 1 단위 = 2 m (무대 ha 계산)
+_OB_S = math.sqrt(0.5)
+# 밀어내기 후보 방향 8 개(축·대각선). 삼각함수 없이 정해 C++ 와 비트 단위로 같다(EcoWorldV3.h kObstacleRing)
+OB_RING = ((1.0, 0.0), (_OB_S, _OB_S), (0.0, 1.0), (-_OB_S, _OB_S), (-1.0, 0.0), (-_OB_S, -_OB_S), (0.0, -1.0), (_OB_S, -_OB_S))
 
 
 WORLD_PARAM_KEYS = ("world_size", "predator_count", "pred_speed_mult", "ranged_frac", "cover_frac", "food_regen_mult")
@@ -1312,6 +1339,220 @@ def _wild_pack_params(p: dict, f: Features) -> dict:
                 wait_r=_wild_num(n, p, "wait_r", 0.0))
 
 
+def _obstacles_params(p: dict, f: Features) -> dict:
+    """obstacles 계수 (모듈 docstring '야생 2단계' 3). v3 포식자 스텝(repertoire 또는 threats)을 함께 켜야 하고, 시야를 가리지 않는 realism_chase·
+    stare_down 과는 함께 켜지 않는다. fixed(선택 키)는 [[x, y, r], …] — r > 0, 모두 유한한 수."""
+    if not (f.enabled("repertoire") or f.enabled("threats")):
+        raise ValueError("features.obstacles 는 repertoire 또는 threats 를 함께 켜야 한다(v3 포식자 스텝이 늑대 이동·표적 보임을 가린다)")
+    for other in ("realism_chase", "stare_down"):
+        if f.enabled(other):
+            raise ValueError(f"features.obstacles 는 {other} 와 함께 켜지 않는다(그 규칙의 시야 판정은 원판을 모른다)")
+    n = "obstacles"
+    p = with_optional(n, p)
+
+    def rng_pair(key):
+        v = p[key]
+        if not isinstance(v, (list, tuple)) or len(v) != 2:
+            raise ValueError(f"features.obstacles.{key} 는 [하, 상] 이어야 한다. 받은 값: {v!r}")
+        lo, hi = _num(n, key, v[0]), _num(n, key, v[1])
+        if not 0.0 < lo <= hi:
+            raise ValueError(f"features.obstacles.{key} 는 0 < 하 ≤ 상 이어야 한다. 받은 값: {v!r}")
+        return lo, hi
+
+    out = dict(tree_per_ha=_wild_num(n, p, "tree_per_ha", 0.0), tree_r=rng_pair("tree_r"),
+               rock_per_ha=_wild_num(n, p, "rock_per_ha", 0.0), rock_r=rng_pair("rock_r"),
+               body_r=_wild_num(n, p, "body_r", 0.0), block_sight=_wild_bool(n, p, "block_sight"), no_food=_wild_bool(n, p, "no_food"),
+               fixed=None)
+    if p["fixed"] is not None:
+        a = np.asarray(p["fixed"], dtype=np.float64)
+        a = a.reshape(-1, len(OBSTACLE_COLUMNS)) if a.size else np.zeros((0, len(OBSTACLE_COLUMNS)))
+        if not np.isfinite(a).all() or (a[:, 2] <= 0.0).any():
+            raise ValueError("features.obstacles.fixed 는 [[x, y, r], …](유한한 수, r > 0) 이어야 한다")
+        out["fixed"] = a
+    return out
+
+
+def obstacle_layout(g: np.random.Generator, size: float, cov_c: np.ndarray, cov_r: np.ndarray, op: dict) -> np.ndarray:
+    """세로 장애물 무작위 배치 (모듈 docstring '야생 2단계' 3 의 1)). g = 자기 스트림 part 0. 나무 줄기 round(tree_per_ha × ha) 개, 그다음 바위
+    round(rock_per_ha × ha) 개(ha = (S × 2 m)² ÷ 10000). 하나마다 (x, y) ~ U[0, S]², r ~ U[하, 상] 를 뽑고 중심이 은신처 원 안(|c − c_k|² ≤ r_k², 반경
+    0 이하는 건너뜀)이거나 무대 벽에서 e = r + OB_EDGE_BODIES·body_r 안(x < e, x > S − e, y 도 같음)이면 다시 뽑는다(OB_TRIES 번, 다 실패하면 건너뜀).
+    반환 (K, 3) [x, y, r]."""
+    ha = (float(size) * OB_UNIT_M) ** 2 / 10000.0
+    out = []
+    for per_ha, (lo, hi) in ((op["tree_per_ha"], op["tree_r"]), (op["rock_per_ha"], op["rock_r"])):
+        n = int(math.floor(per_ha * ha + 0.5))
+        for _ in range(n):
+            for _t in range(OB_TRIES):
+                c = g.uniform(0.0, size, 2)
+                r = float(g.uniform(lo, hi))
+                e = r + OB_EDGE_BODIES * float(op["body_r"])
+                ok = bool(e <= c[0] <= size - e and e <= c[1] <= size - e)
+                for (cx, cy), cr in zip(cov_c, cov_r):
+                    if not ok:
+                        break
+                    if cr > 0.0 and (c[0] - cx) * (c[0] - cx) + (c[1] - cy) * (c[1] - cy) <= cr * cr:
+                        ok = False
+                        break
+                if ok:
+                    out.append((float(c[0]), float(c[1]), r))
+                    break
+    return np.asarray(out, dtype=np.float64).reshape(-1, len(OBSTACLE_COLUMNS))
+
+
+def obstacle_inside(q: np.ndarray, discs: np.ndarray, body_r: float) -> np.ndarray:
+    """위치 q (n, 2) 가 어느 원판(반지름 r + body_r) 안인가(|q − c| < R, 둘레 위는 밖) (n,) bool. C++ EcoThreatV3::InsideAnyObstacle."""
+    if not len(discs) or not len(q):
+        return np.zeros(len(q), dtype=bool)
+    ex = q[:, 0:1] - discs[:, 0][None, :]
+    ey = q[:, 1:2] - discs[:, 1][None, :]
+    return (np.sqrt(ex * ex + ey * ey) < (discs[:, 2] + body_r)[None, :]).any(1)
+
+
+def obstacle_slide(p: np.ndarray, q: np.ndarray, discs: np.ndarray, body_r: float,
+                   size: float | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """세로 장애물 미끄러짐 (모듈 docstring '야생 2단계' 3 의 2)). p (n, 2) 이동 전(모든 원판 밖), q (n, 2) 가려던 자리 → (새 q, 부딪힘, 물러남) (n,) bool 둘.
+    개체마다 OB_PASSES 번: d = q − p, a = d·d 가 0 이면 멈춘다. 원판 k(R = r + body_r)마다 f = p − c, cc = f·f − R², b = f·d. cc < 0(시작점이 원 안)이나
+    b ≥ 0(멀어짐)이면 건너뛰고, D = b² − a·cc < 0 이면 안 닿는다. t = (−b − √D) / a ≤ 1 인 가장 작은 t(같으면 앞 번호)의 원 k 에 닿는다:
+    h = p + t·d, u = (h − c)/|h − c|(|h − c| ≤ EPS 면 (1, 0)), h ← c + (R + OB_EPS)·u, 남은 이동 m = q − h 의 안쪽 성분 v = min(m·u, 0) 을 빼서
+    q ← h + (m − v·u), p ← h. size 를 주면(사슴) 되풀이마다 q 를 [0, size]² 로 자른다. 끝에 q 가 어느 원판 안이면(무대 자르기·겹친 원판) 마지막으로
+    닿은 자리 p(size 를 주면 [0, size]² 로 자른 p), 그것도 안이면 처음 자리로 물러난다(물러남 — 벽과 원판 사이 구석에 낀 사슴). 스칼라 식이라 C++ EcoThreatV3::ObstacleSlide 와 같은 순서다(골든 비트 동일).
+    C++ 꼴: for pass: … if (Cc < 0 || B >= 0) continue; D = B*B - A*Cc; if (D < 0) continue; T = (-B - sqrt(D)) / A; if (T <= 1 && T < Best) …"""
+    q = np.array(q, dtype=np.float64, copy=True)
+    hit = np.zeros(len(q), dtype=bool)
+    if not len(discs) or not len(q):
+        return q, hit, np.zeros(len(q), dtype=bool)
+    p0 = np.array(p, dtype=np.float64, copy=True)
+    p = p0.copy()
+    cx, cy = discs[:, 0][None, :], discs[:, 1][None, :]
+    R = (discs[:, 2] + body_r)[None, :]
+    act = np.ones(len(q), dtype=bool)
+    ar = np.arange(len(q))
+    for _ in range(OB_PASSES):
+        dx = q[:, 0] - p[:, 0]
+        dy = q[:, 1] - p[:, 1]
+        a = dx * dx + dy * dy
+        act &= a > 0.0
+        if not act.any():
+            break
+        fx = p[:, 0:1] - cx
+        fy = p[:, 1:2] - cy
+        cc = fx * fx + fy * fy - R * R
+        b = fx * dx[:, None] + fy * dy[:, None]
+        disc = b * b - a[:, None] * cc
+        ok = act[:, None] & (cc >= 0.0) & (b < 0.0) & (disc >= 0.0)
+        t = np.full(ok.shape, np.inf)
+        t[ok] = (-b[ok] - np.sqrt(disc[ok])) / np.broadcast_to(a[:, None], ok.shape)[ok]
+        t = np.where(t <= 1.0, t, np.inf)
+        k = t.argmin(1)
+        tk = t[ar, k]
+        go = np.isfinite(tk)
+        act &= go
+        if not go.any():
+            break
+        i = np.flatnonzero(go)
+        kk = k[i]
+        hx = p[i, 0] + tk[i] * dx[i]
+        hy = p[i, 1] + tk[i] * dy[i]
+        ccx, ccy = discs[kk, 0], discs[kk, 1]
+        ex, ey = hx - ccx, hy - ccy
+        e = np.sqrt(ex * ex + ey * ey)
+        far = e > EPS
+        ux = np.where(far, ex / np.where(far, e, 1.0), 1.0)
+        uy = np.where(far, ey / np.where(far, e, 1.0), 0.0)
+        rr = (discs[kk, 2] + body_r) + OB_EPS
+        hx = ccx + rr * ux
+        hy = ccy + rr * uy
+        mx, my = q[i, 0] - hx, q[i, 1] - hy
+        vn = np.minimum(mx * ux + my * uy, 0.0)
+        nx = hx + (mx - vn * ux)
+        ny = hy + (my - vn * uy)
+        if size is not None:
+            nx = np.minimum(np.maximum(nx, 0.0), size)
+            ny = np.minimum(np.maximum(ny, 0.0), size)
+        q[i, 0], q[i, 1] = nx, ny
+        p[i, 0], p[i, 1] = hx, hy
+        hit[i] = True
+    back = hit & obstacle_inside(q, discs, body_r)
+    if back.any():
+        lp = p if size is None else np.minimum(np.maximum(p, 0.0), size)
+        lp_in = obstacle_inside(lp, discs, body_r)
+        q[back] = np.where(lp_in[back][:, None], p0[back], lp[back])
+    return q, hit, back
+
+
+def sight_blocked(a: np.ndarray, b: np.ndarray, discs: np.ndarray) -> np.ndarray:
+    """세로 장애물 시선 (모듈 docstring '야생 2단계' 3 의 3)). a (n, 2)·b (m, 2) → (n, m) bool: a_i 와 b_j 를 잇는 선분이 어느 원판을 지나는가 —
+    d = b − a, dd = d·d, t = clip(((c − a)·d) / dd, 0, 1)(dd = 0 이면 0), 가장 가까운 점과 중심의 거리² (a + t·d − c)² < r². 발소리는 가리지 않는다.
+    C++ 꼴: EcoThreatV3::SightBlocked(Ax, Ay, Bx, By, Discs, Num) — 같은 식, 원판 순서로 하나라도 참이면 참."""
+    out = np.zeros((len(a), len(b)), dtype=bool)
+    if not len(discs) or not len(a) or not len(b):
+        return out
+    ax, ay = a[:, 0][:, None, None], a[:, 1][:, None, None]
+    dx = b[:, 0][None, :, None] - ax
+    dy = b[:, 1][None, :, None] - ay
+    dd = dx * dx + dy * dy
+    cx, cy, r = discs[:, 0][None, None, :], discs[:, 1][None, None, :], discs[:, 2][None, None, :]
+    fx, fy = cx - ax, cy - ay
+    pos = dd > 0.0
+    t = np.where(pos, (fx * dx + fy * dy) / np.where(pos, dd, 1.0), 0.0)
+    t = np.minimum(np.maximum(t, 0.0), 1.0)
+    px = ax + t * dx - cx
+    py = ay + t * dy - cy
+    return (px * px + py * py < r * r).any(2)
+
+
+def obstacle_food_factor(gw: int, cell: float, discs: np.ndarray) -> np.ndarray:
+    """세로 장애물 먹이 (모듈 docstring '야생 2단계' 3 의 4)). 셀 (iy, ix) 마다 표본점 ((ix + (a + 0.5)/OB_SAMPLES)·cell, (iy + (b + 0.5)/OB_SAMPLES)·cell)
+    가운데 어느 원판 안(dx·dx + dy·dy ≤ r·r)인 수 n 으로 1 − n / OB_SAMPLES² (gw, gw). 원판이 없으면 모두 1. C++ FFoodGrid::ApplyObstacleFood."""
+    S = OB_SAMPLES
+    off = (np.arange(S, dtype=np.float64) + 0.5) / S
+    coords = ((np.arange(gw, dtype=np.float64)[:, None] + off[None, :]) * float(cell)).reshape(-1)    # 표본 열 s = ix·S + a
+    covered = np.zeros((gw * S, gw * S), dtype=bool)                                                  # [y 표본, x 표본]
+    for cx, cy, r in discs:
+        dx = coords - cx
+        dy = coords - cy
+        covered |= (dx * dx)[None, :] + (dy * dy)[:, None] <= r * r
+    n = covered.reshape(gw, S, gw, S).sum(axis=(1, 3)).astype(np.float64)
+    return 1.0 - n / float(S * S)
+
+
+def obstacle_push_out(q: np.ndarray, discs: np.ndarray, body_r: float, size: float,
+                      walls: np.ndarray | None = None) -> tuple[np.ndarray, int, int]:
+    """세로 장애물 밀어내기 (모듈 docstring '야생 2단계' 3 의 5)). q (n, 2) 가운데 원판(R = r + body_r) 안인 개체를 가장 가까운 후보로 옮긴다. 후보 =
+    원판마다 (c + (R + OB_EPS)·단위(q − c), q = c 면 (1, 0)) 하나와 c + (R + OB_EPS)·OB_RING[j] 8 개(원판 순서대로). 무대 [0, S]² 안 ∧ 모든 원판 밖 ∧
+    walls(늑대의 은신처 막기 원 (x, y, R′), 없으면 None) 의 |q − c| < R′ 밖인 후보 가운데 거리² 가 가장 작은 것(같으면 앞). 반환 (새 q, 옮긴 수,
+    후보가 없어 그대로 둔 수). C++ EcoWorldV3::ObstaclePushOut."""
+    q = np.array(q, dtype=np.float64, copy=True)
+    moved = failed = 0
+    if not len(discs) or not len(q):
+        return q, moved, failed
+    inside = obstacle_inside(q, discs, body_r)
+    for i in np.flatnonzero(inside):
+        px, py = float(q[i, 0]), float(q[i, 1])
+        cand = []
+        for cx, cy, r in discs:
+            rr = (float(r) + body_r) + OB_EPS
+            vx, vy = px - float(cx), py - float(cy)
+            n = math.sqrt(vx * vx + vy * vy)
+            ux, uy = (vx / n, vy / n) if n > EPS else (1.0, 0.0)
+            cand.append((float(cx) + rr * ux, float(cy) + rr * uy))
+            for rx, ry in OB_RING:
+                cand.append((float(cx) + rr * rx, float(cy) + rr * ry))
+        C = np.asarray(cand, dtype=np.float64)
+        ok = (C >= 0.0).all(1) & (C <= size).all(1) & ~obstacle_inside(C, discs, body_r)
+        if walls is not None and len(walls):
+            ex = C[:, 0:1] - walls[:, 0][None, :]
+            ey = C[:, 1:2] - walls[:, 1][None, :]
+            ok &= ~(np.sqrt(ex * ex + ey * ey) < walls[:, 2][None, :]).any(1)
+        if not ok.any():
+            failed += 1
+            continue
+        dx, dy = C[:, 0] - px, C[:, 1] - py
+        q[i] = C[int(np.argmin(np.where(ok, dx * dx + dy * dy, np.inf)))]
+        moved += 1
+    return q, moved, failed
+
+
 def pack_goals(wq, whead, leader, helper, tgt, p, disp, cov_c, cov_r, margin: float, size: float, wp: dict):
     """야생 2단계 2 늑대 무리 협동의 목표 (모듈 docstring '야생 2단계' 2). 순수 함수 — 세계(`_pack_step`)와 골든 내보내기가 함께 쓴다.
     wq·whead (M, 2) 늑대 이동 전 위치·heading, leader·helper (M,) bool, tgt (M,) 늑대의 이번 스텝 표적(앞장만 읽는다), p·disp (N, 2) 사슴 이동 뒤
@@ -1590,6 +1831,8 @@ class World:
         self._wf = (_wild_flight_params(f.params("wild_flight"), f) if f.enabled("wild_flight") else None)
         # 야생 2단계 2(모듈 docstring '야생 2단계' 2): 늑대 무리 협동 사냥. 끈 세계는 None 이고 그 코드 경로를 타지 않는다
         self._wp = (_wild_pack_params(f.params("wild_pack"), f) if f.enabled("wild_pack") else None)
+        # 야생 2단계 3(모듈 docstring '야생 2단계' 3): 세로 장애물. 끈 세계는 None 이고 그 코드 경로를 타지 않는다(World.obstacles 는 늘 빈 목록)
+        self._ob = (_obstacles_params(f.params("obstacles"), f) if f.enabled("obstacles") else None)
         # 통계·진단 전용(설정 아님, 동역학과 무관): 참이면 기하에 사슴 × 위협 보임 행렬 wf_pvis 를 남긴다(실행기 results/v3/wild1 이 켠다)
         self.keep_pair_vis = False
         self.alive = None
@@ -1641,7 +1884,7 @@ class World:
             if self.alive is not None:
                 self.death_t = np.full(self.N, -1, dtype=np.int64)
                 self.death_cause = np.zeros(self.N, dtype=np.int8)
-        self._obstacles_reset()             # 세로 장애물 확장 지점(이번 단계에는 늘 빈 목록, 난수 없음)
+        self._obstacles_reset()             # 야생 2단계 3: 세로 장애물 원판·먹이(끈 세계는 늘 빈 목록, 난수 없음)
         if self._zt is not None:
             self._rz_terrain_reset()        # v3 R3 (h): 지형 격자(자기 스트림만, 은신처·먹이와 독립)
         if self._zf is not None:
@@ -1689,6 +1932,8 @@ class World:
             self._rz_wall_reset()           # v3 R3 (c′): 은신처 원 안에 놓인 위협을 둘레 밖으로(난수 없음)
         if self._zc is not None:
             self._rz_chase_reset()          # v3 R3 (f): 위협별 추격 고정 상태(크기 M)
+        if self._ob is not None:
+            self._ob_place_agents()         # 야생 2단계 3 의 5): 원판 안 사슴·늑대를 밖으로(은신처 밀어내기 뒤, 난수 없음)
         if self._v3p:
             self.pred_vel = np.zeros((self.M, 2))   # 포식자의 지난 스텝 이동(관측 pred_approach)
             # 야생 2단계 통계 전용: 늑대마다 사냥이 이어지는 중인가(`hunt_update`). 처음에는 아니다
@@ -1798,10 +2043,82 @@ class World:
         return self._cell_x < 0.5 * self.size
 
     def _obstacles_reset(self) -> None:
-        """세로 장애물(나무·바위) 확장 지점 (모듈 docstring '세로 장애물'). 이번 단계에는 구현하지 않는다(10-14 사용자 결정) —
-        `World.obstacles` 는 늘 (0, 3) [x, y, r] 이고 어떤 판정도 읽지 않는다. 난수를 쓰지 않는다. 기능 `obstacles`(번호 12)를
-        구현할 때 여기서 자기 스트림 part 0 으로 원판을 뽑고, docstring 의 2)~5) 자리에 판정을 넣는다."""
-        self.obstacles = np.zeros((0, len(OBSTACLE_COLUMNS)), dtype=np.float64)
+        """야생 2단계 3 세로 장애물 (모듈 docstring '야생 2단계' 3 의 1)·4)). `_build_world`·통합 무대 배치 뒤, 은신처 먹이 부족 (e)·food_v 전에 부른다.
+        끈 세계는 `World.obstacles` 가 늘 (0, 3) 이고 난수를 쓰지 않는다. 켠 세계: fixed 가 있으면 그 원판(난수 없음), 없으면 `obstacle_layout`(자기
+        스트림 part 0). no_food 면 셀 용량 × `obstacle_food_factor`, 먹이 ← min(먹이, 용량). 훅 ob_food_factor (gw, gw)(짝 비교 지도 덮기가 다시 건다)."""
+        ob = self._ob
+        if ob is None:
+            self.obstacles = np.zeros((0, len(OBSTACLE_COLUMNS)), dtype=np.float64)
+            return
+        if ob["fixed"] is not None:
+            self.obstacles = ob["fixed"].copy()
+        else:
+            self.obstacles = obstacle_layout(self.feature_rng("obstacles", 0), self.size, self.cov_c, self.cov_r, ob)
+        if ob["no_food"]:
+            self.ob_food_factor = obstacle_food_factor(self.gw, float(self.cfg.food_cell), self.obstacles)
+            self.food_cap = self.food_cap * self.ob_food_factor
+            np.minimum(self.food, self.food_cap, out=self.food)
+        else:
+            self.ob_food_factor = np.ones((self.gw, self.gw))
+        # 통계 전용(obstacle_stats)
+        self._ob_deer_hit = self._ob_deer_back = self._ob_wolf_hit = self._ob_wolf_back = self._ob_wolf_dead = 0
+        self._ob_deer_steps = self._ob_wolf_steps = 0
+        self._ob_eye_pairs = self._ob_eye_blocked = self._ob_tgt_pairs = self._ob_tgt_blocked = 0
+        self._ob_push_moved = self._ob_push_failed = 0
+
+    def _ob_walls(self) -> np.ndarray | None:
+        """늑대 밀어내기 후보가 피할 은신처 막기 원 (K, 3) [x, y, r + wolf_margin] — 은신처 막기(c′)를 켠 세계만, 아니면 None."""
+        if not self._zw or not len(self.cov_r):
+            return None
+        return np.c_[self.cov_c, self._rz_wall_r()]
+
+    def _ob_place_agents(self) -> None:
+        """야생 2단계 3 의 5) reset: 원판(r + body_r) 안의 사슴·늑대를 `obstacle_push_out` 로 옮긴다(은신처 밖 밀어내기 `_rz_wall_reset` 뒤). 막는 늑대
+        (_zw_sel)는 은신처 막기 원 밖 후보만 쓴다. 난수 없음."""
+        disc, body = self.obstacles, self._ob["body_r"]
+        if not len(disc):
+            return
+        self.pos, m1, f1 = obstacle_push_out(self.pos, disc, body, self.size)
+        walls = self._ob_walls()
+        if self.M:
+            sel = self._zw_sel if walls is not None else np.ones(self.M, dtype=bool)
+            q = self.pred_pos.copy()
+            q[sel], m2, f2 = obstacle_push_out(q[sel], disc, body, self.size, walls)
+            q[~sel], m3, f3 = obstacle_push_out(q[~sel], disc, body, self.size)
+            self.pred_pos = q
+        else:
+            m2 = f2 = m3 = f3 = 0
+        self._ob_push_moved += m1 + m2 + m3
+        self._ob_push_failed += f1 + f2 + f3
+
+    def _ob_seg_blocked(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
+        """선분 a_i → b_i (n, 2) 쌍마다 원판에 가리나 (n,) bool — `sight_blocked` 와 같은 식(대각 성분)."""
+        if not len(a):
+            return np.zeros(0, dtype=bool)
+        disc = self.obstacles
+        ax, ay = a[:, 0][:, None], a[:, 1][:, None]
+        dx = b[:, 0][:, None] - ax
+        dy = b[:, 1][:, None] - ay
+        dd = dx * dx + dy * dy
+        cx, cy, r = disc[:, 0][None, :], disc[:, 1][None, :], disc[:, 2][None, :]
+        fx, fy = cx - ax, cy - ay
+        pos = dd > 0.0
+        t = np.where(pos, (fx * dx + fy * dy) / np.where(pos, dd, 1.0), 0.0)
+        t = np.minimum(np.maximum(t, 0.0), 1.0)
+        px = ax + t * dx - cx
+        py = ay + t * dy - cy
+        return (px * px + py * py < r * r).any(1)
+
+    def _ob_occlude(self, vis: np.ndarray, a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, int, int]:
+        """보임 행렬 vis (n, m)(a_i 가 b_j 를 봄) 가운데 참인 쌍만 원판 시선을 잰다. 반환 (가린 쌍을 지운 vis, 잰 쌍, 가린 쌍)."""
+        ii, jj = np.nonzero(vis)
+        if not len(ii):
+            return vis, 0, 0
+        blk = self._ob_seg_blocked(a[ii], b[jj])
+        if blk.any():
+            vis = vis.copy()
+            vis[ii[blk], jj[blk]] = False
+        return vis, len(ii), int(np.count_nonzero(blk))
 
     def _ist_layout_reset(self) -> None:
         """통합 무대 (n) 은신처 quad, (p) 시작 배치 stage, (q) 시작 방향 golden (모듈 docstring '통합 무대'). `_build_world` 바로 뒤에 부른다 —
@@ -2591,6 +2908,12 @@ class World:
                 pcos = (ex * hx + ey * hy) * pinv
                 pvis = (pd <= see_p) & (pcos >= self._zv["threat_cos"])
                 rear = pvis & ~(pcos >= fov_cos)        # 통계 전용: 기본 시야각 밖에서 본 위협
+            if self._ob is not None and self._ob["block_sight"] and len(self.obstacles):
+                # 야생 2단계 3 의 3): 원판이 눈길을 가린다(발소리는 아래에서 그대로 더한다)
+                pvis, n_pair, n_blk = self._ob_occlude(pvis, P, self.pred_pos)
+                if len(idx) == self.N:          # 통계 전용: 스텝 관측(전체 행)만 센다
+                    self._ob_eye_pairs += n_pair
+                    self._ob_eye_blocked += n_blk
             if self._zh is not None:
                 # v3 현실성 (b): 지난 스텝에 움직인 위협의 발소리 — 실거리 ≤ min(R, 이 사슴의 지금 탐지 반경)이면 방향과 무관하게
                 # 감지된다(보임과 같은 칸). R = 0 인 위협(서 있음·대치·휴식)은 들리지 않는다. 걸음새는 지난 포식자 스텝의 훅
@@ -2852,7 +3175,15 @@ class World:
             self._zt_deer += np.bincount(tc, minlength=len(TERRAIN_NAMES))
         if self._wp is not None:
             self._pack_p0 = self.pos.copy()     # 야생 2단계 2: 사슴의 이번 스텝 이동(도주 방향)을 포식자 스텝이 읽는다
+        p_before = self.pos
         self.pos = np.clip(self.pos + v, 0.0, self.size)
+        if self._ob is not None and len(self.obstacles):
+            # 야생 2단계 3 의 2): 원판 앞에서 멈춰 둘레를 따라 미끄러진다(되풀이마다 무대로 자르고, 끝에 원판 안이면 마지막으로 닿은 자리로 물러남).
+            # heading·적용 속도 훅은 가려던 방향 그대로다
+            self.pos, hit, back = obstacle_slide(p_before, self.pos, self.obstacles, self._ob["body_r"], self.size)
+            self._ob_deer_hit += int(np.count_nonzero(hit))
+            self._ob_deer_back += int(np.count_nonzero(back))
+            self._ob_deer_steps += self.N if live is None else int(np.count_nonzero(live))
         moving = np.linalg.norm(v, axis=1) > EPS
         self.head = np.where(moving[:, None], normalize(v), self.head)
         if rp is not None:                  # v3: FREEZE 는 위협 쪽을 본다(모르면 그대로)
@@ -3546,6 +3877,11 @@ class World:
             self._rz_chase_release(dist, dx, dy, inv, in_cov, hunting)
         vis = (perceived <= cfg.pred_view_r) & (
             (dx * self.pred_head[:, 0:1] + dy * self.pred_head[:, 1:2]) * inv >= cfg.pred_fov_cos)
+        if self._ob is not None and self._ob["block_sight"] and len(self.obstacles):
+            # 야생 2단계 3 의 3): 늑대 눈길도 원판이 가린다(플레이어형 위협은 아래에서 늘 본다)
+            vis, n_pair, n_blk = self._ob_occlude(vis, self.pred_pos, self.pos)
+            self._ob_tgt_pairs += n_pair
+            self._ob_tgt_blocked += n_blk
         if th is not None and M > Mb:
             vis[self.pred_is_player] = True
         vis &= hunting[:, None]
@@ -3615,6 +3951,11 @@ class World:
                 tm = np.where(self.pred_is_player, self._zt["mult_player"][tc], tm)
             speed = speed * tm
         self.pred_pos = self.pred_pos + move * speed[:, None]
+        ob_on = self._ob is not None and len(self.obstacles) > 0
+        if ob_on:
+            # 야생 2단계 3 의 2): 원판 앞에서 멈춰 둘레를 따라 미끄러진다(은신처 밀어내기·벽 반사 앞). 원 안 되돌림·막다른 곳은 아래 끝에서
+            ob_step = move * speed[:, None]
+            self.pred_pos, ob_hit, _ = obstacle_slide(old, self.pred_pos, self.obstacles, self._ob["body_r"])
         if self._zw:                    # v3 R3 (c′): 은신처 원 안으로 들어간 막는 위협을 둘레 밖으로(벽 반사 전)
             step_v = move * speed[:, None]                  # 이번 스텝 이동(접선 미끄러짐 되돌림에 쓴다, 벽 반사 전 방향)
             self.pred_pos, wpushed = self._rz_wall_push(self.pred_pos, old, self._zw_sel)
@@ -3681,6 +4022,22 @@ class World:
                         self.player_left[charge_p] = 0
                         self._zw_giveup_n += int(np.count_nonzero(stalk_p | charge_p))
             self._zw_inside_n += int(np.count_nonzero(self._zw_sel & self._rz_inside_disc(self.pred_pos)))
+        if ob_on:
+            # 야생 2단계 3 의 2) 끝: 은신처 밀어내기·벽 자르기 뒤에도 원판(r + body_r) 안이면 이동 전 자리. 원판에 부딪혀 가려던 거리의 WALL_DEAD_FRAC 도
+            # 못 갔으면 돌아선다(heading ← 가려던 이동의 반대 — 은신처 막다른 곳과 같은 꼴). C++ 꼴:
+            #   if (InsideAnyObstacle(N)) N = Q;  if ((bObHit || bBack) && Want > Eps && |N − Q| < DeadFrac·Want) M = −SV / Want;
+            back = obstacle_inside(self.pred_pos, self.obstacles, self._ob["body_r"])
+            self.pred_pos[back] = old[back]
+            want = np.sqrt((ob_step * ob_step).sum(1))
+            dv = self.pred_pos - old
+            dead = (ob_hit | back) & (want > EPS) & (np.sqrt((dv * dv).sum(1)) < WALL_DEAD_FRAC * want)
+            if dead.any():
+                move[dead] = -ob_step[dead] / want[dead][:, None]
+            self._ob_wolf_hit += int(np.count_nonzero(ob_hit))
+            self._ob_wolf_back += int(np.count_nonzero(back))
+            self._ob_wolf_dead += int(np.count_nonzero(dead))
+            self._ob_wolf_steps += M
+            self.pred_ob_hit, self.pred_ob_back, self.pred_ob_dead = ob_hit, back, dead   # 스텝 뒤 훅(골든·시험 — C++ FThreatStepResult::bObstacle*)
         self.pred_head = normalize(move)
         self.pred_vel = self.pred_pos - old
         # 이번 이동이 전력 걸음이었나 — 추격형(근접·원거리)이 표적을 쫓음, 잠행형 돌진 상태(돌진 이동·마지막 판정 스텝), 플레이어 돌진 모드.
@@ -4110,6 +4467,11 @@ class World:
         pos = r.uniform(0.0, self.size, (k, 2))
         ang = r.uniform(0.0, 2 * np.pi, k)
         self._spawn_slots(dead, pos, np.stack([np.cos(ang), np.sin(ang)], 1))
+        if self._ob is not None and len(self.obstacles):
+            # 야생 2단계 3 의 5): 원판 안에 난 새 개체를 밖으로(v1 난수 호출은 위에서 그대로 했다)
+            self.pos[dead], mv, fl = obstacle_push_out(self.pos[dead], self.obstacles, self._ob["body_r"], self.size)
+            self._ob_push_moved += mv
+            self._ob_push_failed += fl
 
     def _spawn_slots(self, dead: np.ndarray, pos: np.ndarray, head: np.ndarray) -> None:
         """슬롯 `dead` 를 위치 `pos` (k, 2)·방향 `head` (k, 2)의 새 개체로 만든다: 에너지 init_energy, 번식 쿨다운 0, 켠 기능의 개체 상태 초기화
@@ -4445,6 +4807,26 @@ class World:
             move = np.where(hp[:, None], dv, move)
             speed = np.where(hp, np.where(wt, 0.0, self.pred_speed), speed)
         return move, speed
+
+    def obstacle_stats(self) -> dict:
+        """야생 2단계 3 세로 장애물 통계 (통계 전용, 모듈 docstring '야생 2단계' 3). n = 원판 수, area_frac = 원판 넓이 합 ÷ 무대 넓이(겹침은 두 번),
+        deer_hit·deer_back = 원판에 부딪혀 미끄러진·되돌린 사슴-스텝(deer_steps 가운데), wolf_hit·wolf_back·wolf_dead = 늑대-스텝(부딪힘·되돌림·돌아섬),
+        eye_pairs·eye_blocked = 사슴이 시야(반경·각)로 본 위협 쌍과 그중 원판이 가린 쌍(스텝 관측), tgt_pairs·tgt_blocked = 늑대가 시야로 본 사슴 쌍과
+        그중 가린 쌍, push_moved·push_failed = 원판 밖으로 옮긴·못 옮긴 개체(reset·리스폰). 켜지 않은 세계는 ValueError."""
+        if self._ob is None:
+            raise ValueError("obstacle_stats 는 obstacles 를 켠 세계에서만 센다")
+        d = self.obstacles
+
+        def ratio(x, y):
+            return float(x) / float(y) if y else 0.0
+
+        return dict(n=int(len(d)), area_frac=ratio(float(np.pi * (d[:, 2] * d[:, 2]).sum()), self.size * self.size),
+                    r_mean=float(d[:, 2].mean()) if len(d) else 0.0,
+                    deer_steps=self._ob_deer_steps, deer_hit=self._ob_deer_hit, deer_back=self._ob_deer_back,
+                    wolf_steps=self._ob_wolf_steps, wolf_hit=self._ob_wolf_hit, wolf_back=self._ob_wolf_back, wolf_dead=self._ob_wolf_dead,
+                    eye_pairs=self._ob_eye_pairs, eye_blocked=self._ob_eye_blocked, eye_blocked_frac=ratio(self._ob_eye_blocked, self._ob_eye_pairs),
+                    tgt_pairs=self._ob_tgt_pairs, tgt_blocked=self._ob_tgt_blocked, tgt_blocked_frac=ratio(self._ob_tgt_blocked, self._ob_tgt_pairs),
+                    push_moved=self._ob_push_moved, push_failed=self._ob_push_failed)
 
     def pack_stats(self) -> dict:
         """야생 2단계 2 늑대 무리 협동 통계 (통계 전용). 늑대-스텝 wolf_steps 가운데 앞장(lead)·도움(help)·기다림(wait)·은신처 문(door) 수와 몫,
