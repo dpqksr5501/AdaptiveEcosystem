@@ -1,0 +1,10 @@
+[  261.6s] on 끝
+[  501.3s] ref 끝
+{
+ "safety": true,
+ "a1": null,
+ "a2": null,
+ "a3": null,
+ "prune": [],
+ "note": "final 회차는 가지치기한 설정의 안전 항목만 본다(PREREG 2절)"
+}

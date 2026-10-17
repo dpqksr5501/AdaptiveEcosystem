@@ -91,7 +91,10 @@ struct FEcoBehaviorConfigSharedFragment : public FMassConstSharedFragment
 	UPROPERTY(EditAnywhere, Category = "Ecology|Behavior")
 	float GridUnitCm = EcoBehaviorConfig::GridUnitCm;
 
-	/** §9.4 이 틱 수마다 한 번만 정책을 돌린다. 파이썬 1 스텝에 해당한다. */
+	/**
+	 * §9.4 파이썬 1 스텝 = 이 논리 틱 수(1 논리 틱 = 1/60초). 참고용 값이다 — 프로세서와 트레잇은
+	 * 생성 상수 EcoBehaviorConfig::PolicyInterval / StepSeconds 를 쓰고, 주기는 시간으로 센다.
+	 */
 	UPROPERTY(EditAnywhere, Category = "Ecology|Behavior", meta = (ClampMin = "1"))
 	int32 PolicyInterval = EcoBehaviorConfig::PolicyInterval;
 

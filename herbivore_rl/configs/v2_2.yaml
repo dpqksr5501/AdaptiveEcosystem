@@ -1,0 +1,73 @@
+# V2 설정 — v2.2 경계(vigilance)·threat_recency·위협 방향(ThreatDir) (Docs/RL_Policy/RL_V2_PLAN.md 4.2·4.3·4.4·4.7, 1-4).
+#
+# v2.1(configs/v2_1.yaml)에 vigilance 하나만 켠다. v2.1 의 모든 계수(포식자 속도 overrides, speed 블록, train 블록)를
+# 그대로 옮겼다 — vigilance 를 끄면 v2.1 과 같은 세계다(tests/test_vigilance_v2.py). 관측 8 (idx 7 = threat_recency),
+# 행동 6 (idx 4 = speed, idx 5 = vigilance).
+# v1 configs/default.yaml 을 먼저 읽고 그 위에 이 파일을 덮는다 (env_v2/config.py):
+#   python train_v2.py --config configs/v2_2.yaml --steps 20000000 --seed 0 --run-name v2_2_s0 --save-at 10000000
+# 형식 규칙은 configs/v2.yaml 머리 주석과 같다(계수는 이 파일이 유일한 원본, 지수 표기는 1.0e-3 꼴).
+#
+# vigilance 계수의 출처: threshold·eat_mult·fov_deg 는 계획서 4.3·4.4 표와 10절 #5 의 규칙값이다. decay 는 계획서가
+# 'Gate E2 에서 정한다'고만 적어 두어 이 파일이 후보와 시작값을 제안한다(아래). Gate E2(1-5)에서 정한 뒤 날짜·이유를
+# 여기와 계획서 4.2·4.4 에 적는다. 스텝 안 순서와 C++ 꼴은 env_v2/world.py `_vigil_step`·`_perceive` docstring.
+# 10-03 Gate E2 통과(E2a·E2b PASS, 회차 V0): 모든 계수를 제안값 그대로 둔다(decay 0.95, eat_mult 0). 아래 decay 주석.
+
+version: "2.2"
+
+# v2.1 과 같다 (10-02 사람 결정, Gate E1-b. 이유와 계산은 configs/v2_1.yaml 의 같은 자리 주석).
+#   근접형 속력 = herb_speed × [0.6, 0.95], 원거리형 = × [0.36, 0.57]. 걷기(0.4) < 근접형 < 뛰기(1.0).
+overrides:
+  rand:
+    pred_speed_mult: [0.6, 0.95]
+
+features:
+  speed:
+    # v2.1 블록 그대로 (configs/v2_1.yaml, Gate E1-b 통과 계수 r2_5_ew0_5, config_digest f068496361f9).
+    # 설명은 v2_1.yaml 의 같은 자리 주석. 바꾸면 두 파일을 함께 바꾸고 날짜·이유를 적는다.
+    enabled: true
+    thresholds: [0.3333333333333333, 0.6666666666666666]
+    gait_speed: [0.0, 0.4, 1.0]
+    gait_eat: [1.0, 0.5, 0.0]
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+  vigilance:
+    enabled: true
+    # 행동 idx 5 (sigmoid 뒤 [0,1]) 가 이 값을 넘으면 경계다(계획서 4.3 "0.5를 넘으면 경계한다. speed보다 우선한다").
+    # 고정 문턱이라 상태가 없다(최소 유지 시간 K 없음, #3 — b8_vig 가 크면 넣는다).
+    # 경계 중: 속력 0(speed 명령 무시), 실제 보행 = 정지 → 대사는 speed 의 정지 대사 c_rest(위 블록)다. 계획서에
+    # 경계 대사의 다른 규정이 없어 정지 대사로 둔다(4.9.2 v2.4 '망보는 개체는 휴식 할인 없이 대사 그대로'와 같은 뜻).
+    threshold: 0.5
+    # threat_recency (관측 idx 7, 개체별): 포식자가 보이면 1, 안 보이면 스텝마다 × decay, 리스폰 때 0 (계획서 4.2).
+    # 감쇠 상수는 Gate E2 에서 정한다(계획서 4.2·4.4). 계획서에 후보가 없어 다음을 제안한다(제안):
+    #   decay ∈ {0.9, 0.95, 0.975} = 반감기 6.6 / 13.5 / 27.4 스텝 (0.9 / 1.8 / 3.7초, 1스텝 = 0.133초)
+    # 시작값은 가운데 0.95 — v1 관측 5(recent_predation)의 EMA decay(predation_ema_decay 0.95, 반감기 13.5스텝,
+    # 계획서 2.2 T7)와 같은 척도다. 근거: 놓친 포식자가 see_r(20) 거리를 좁히는 데 근접형 ×0.6~0.95 로 35~56스텝이 걸려
+    # 그보다 짧은 '최근' 창이 의미가 있다(추정). 게이트에서 정함.
+    # 10-03 Gate E2(results/v2/e2/PREREG.md·judge_e2.md, 보고서 report.md): E2a PASS (회차 V0, 보정 없음) — 후보 셋 가운데
+    #   0.95 만 판정 갈래 A 를 통과해(구간별 vigilance + 바탕 C2 vs C2, Δ G_γ +0.470, t +3.93, '최근 위협·안 보임'
+    #   구간에서만 경계, 경계 비율 0.161) 선택 규칙(제안값 먼저)으로 0.95 를 골랐다. 값은 그대로다. θ = 0.5 고정
+    #   (env_v2/world.py RECENT_THREAT)이라 놓친 뒤 13스텝까지가 '최근 위협'이다. 0.9 는 t +2.08(기준 2.093 미달),
+    #   0.975 는 경계를 쓰지 않았다. E2b PASS (0.95 에서 경계가 계속 뛰기보다 G_γ +0.959(t +5.53), 피식률 −0.00057(t −9.16)).
+    decay: 0.95
+    # 경계 중 섭식 배수 (want 에 곱한다). 4.4 표 "경계: 섭식 0". 9절 '환경 실패면 섭식 손실을 조정한다'의 손잡이다.
+    eat_mult: 0.0
+    # 경계한 스텝 뒤 관측의 시야각(도). 360 = 모든 방향, 반경은 see_r 그대로 (10절 #5: 360°만 넓히고 반경은 넓히지
+    # 않는다 → 관측 2 의 정규화가 v1 과 같다). 관측 1·2(포식자 수·거리)와 3(동족 수)이 함께 넓어진다(4.2 주의).
+    fov_deg: 360.0
+    # 10절 #18 조향 변형(10-03, 1-5 Gate E2b 보고용): 포식자가 안 보일 때 조향 합에 threat_flee·flee_weight·
+    # threat_recency·(−ThreatDir) 를 더한다(env_v2/world.py `_threat_flee_term`). #18 결정 '넣지 않고 시작한다'에 따라
+    # 0(끔)이다 — 0 이면 1-4 구현과 비트 단위로 같다. Gate E2b 의 '계속 뛰기 + 위협 반대 항' 팔만 1 로 둔 사본을 쓴다.
+    threat_flee: 0.0
+
+train:
+  # v2.1 과 같다 (configs/v2.yaml). 독립 세계 K 개, T_reset 4000, 롤아웃 배치 256 × 128 = 32,768.
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256
+  # 무작위 초기화의 마지막 층(action_net) 편향 (계획서 4.7 초기화). 없으면 SB3 기본값 0 (v2.0·v2.1 과 같다).
+  # vigilance −0.84: log_std 0 에서 P(경계) = P(N(−0.84, 1) > logit(0.5) = 0) = 1 − Φ(0.84) ≈ 0.20.
+  # 편향 0 이면 시작부터 약 50% 가 경계라 '경계 끄기'로 먼저 쏠릴 수 있다(4.7). speed 는 0(걷기 약 51%) 그대로다.
+  # train_v2.py 가 --init 없이 시작할 때만 넣는다(--init 은 가중치를 통째로 옮긴다).
+  init_action_bias:
+    vigilance: -0.84

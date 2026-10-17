@@ -1,0 +1,17 @@
+{
+  "name": "shc",
+  "fps": 30,
+  "frames": 220,
+  "shots": [
+    {"tag": "forest_west", "from_m": [300.00, 420.00, 1.80], "to_m": [300.00, 420.00, 1.80], "yaw": 180.0, "pitch": 2.0, "start": 8.000, "duration": 1.000, "every": 6, "first_frame": 0, "frames": 5, "t_first": 8.000, "t_last": 8.800},
+    {"tag": "forest_tree11", "from_m": [343.00, 418.00, 1.80], "to_m": [343.00, 418.00, 1.80], "yaw": -90.0, "pitch": 4.0, "start": 12.000, "duration": 1.000, "every": 6, "first_frame": 5, "frames": 5, "t_first": 12.000, "t_last": 12.800},
+    {"tag": "forest_high100", "from_m": [342.00, 300.00, 100.00], "to_m": [342.00, 300.00, 100.00], "yaw": 90.0, "pitch": -30.0, "start": 17.000, "duration": 1.000, "every": 6, "first_frame": 10, "frames": 5, "t_first": 17.000, "t_last": 17.800},
+    {"tag": "forest_high200", "from_m": [342.00, 300.00, 200.00], "to_m": [342.00, 300.00, 200.00], "yaw": 90.0, "pitch": -35.0, "start": 22.000, "duration": 2.000, "every": 6, "first_frame": 15, "frames": 10, "t_first": 22.000, "t_last": 23.800},
+    {"tag": "highland_ground", "from_m": [340.00, -470.00, 1.80], "to_m": [340.00, -470.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 30.000, "duration": 1.000, "every": 6, "first_frame": 25, "frames": 5, "t_first": 30.000, "t_last": 30.800},
+    {"tag": "highland_high", "from_m": [340.00, -600.00, 60.00], "to_m": [340.00, -600.00, 60.00], "yaw": 90.0, "pitch": -20.0, "start": 35.000, "duration": 1.000, "every": 6, "first_frame": 30, "frames": 5, "t_first": 35.000, "t_last": 35.800},
+    {"tag": "barren_ground", "from_m": [340.00, 10.00, 1.80], "to_m": [340.00, 10.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 41.000, "duration": 1.000, "every": 6, "first_frame": 35, "frames": 5, "t_first": 41.000, "t_last": 41.800},
+    {"tag": "boundary_in", "from_m": [340.00, 220.00, 1.80], "to_m": [340.00, 280.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 48.000, "duration": 12.000, "every": 6, "first_frame": 40, "frames": 60, "t_first": 48.000, "t_last": 59.800},
+    {"tag": "boundary_out", "from_m": [340.00, 280.00, 1.80], "to_m": [340.00, 220.00, 1.80], "yaw": -90.0, "pitch": 0.0, "start": 64.000, "duration": 12.000, "every": 6, "first_frame": 100, "frames": 60, "t_first": 64.000, "t_last": 75.800},
+    {"tag": "highland_in", "from_m": [340.00, -220.00, 1.80], "to_m": [340.00, -280.00, 1.80], "yaw": -90.0, "pitch": 0.0, "start": 80.000, "duration": 12.000, "every": 6, "first_frame": 160, "frames": 60, "t_first": 80.000, "t_last": 91.800}
+  ]
+}

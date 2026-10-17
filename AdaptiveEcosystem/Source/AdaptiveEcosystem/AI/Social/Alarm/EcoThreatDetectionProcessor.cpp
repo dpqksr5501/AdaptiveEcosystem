@@ -3,6 +3,7 @@
 #include "AI/Social/Herd/EcoHerdProcessors.h"
 #include "AI/Social/Herd/EcoHerdSubsystem.h"
 #include "AI/Policy/EcoBehaviorProcessors.h"
+#include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
 #include "AI/Policy/EcoNeighborhoodSubsystem.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
@@ -42,6 +43,7 @@ UEcoThreatDetectionProcessor::UEcoThreatDetectionProcessor() : EntityQuery(*this
 
 void UEcoThreatDetectionProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+	EntityQuery.AddTagRequirement<FEcoIntegratedPolicyV3Tag>(EMassFragmentPresence::None); // Native sensory contract has its own direct-evidence adapter.
 	EntityQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadOnly);

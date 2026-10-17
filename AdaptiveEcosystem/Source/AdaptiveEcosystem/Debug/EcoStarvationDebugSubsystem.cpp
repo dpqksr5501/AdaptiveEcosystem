@@ -25,6 +25,20 @@ void UEcoStarvationDebugSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Super::OnWorldBeginPlay(InWorld);
 	UEcoDebugCommandSubsystem* Commands = InWorld.GetSubsystem<UEcoDebugCommandSubsystem>();
 	if (!Commands) return;
+	Commands->RegisterCommand(TEXT("Debug.FoodSupply"), TEXT("Debug.FoodSupply <RegionId> <Amount>: queue capped food supply at the server resource boundary."),
+		[](UWorld& World, const TArray<FString>& Args)
+		{
+			float Amount = 0;
+			auto* Ecology = World.GetSubsystem<UEcologySimulationSubsystem>();
+			auto* Clock = World.GetSubsystem<UEcoWorldClockSubsystem>();
+			if (Args.Num() != 2 || !LexTryParseString(Amount, *Args[1]) || !Ecology || !Clock || !Clock->IsClockRunning()
+				|| !Ecology->QueueManualFoodSupply(FName(*Args[0]), Amount, Clock->GetServerTime()))
+			{
+				UE_LOG(LogAdaptiveEcosystem, Warning, TEXT("[Eco Debug] Food supply rejected. Usage: Debug.FoodSupply <RegionId> <positive Amount> (authority only)."));
+				return;
+			}
+			UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Debug] Food supply queued: World=%s Region=%s Amount=%.3f"), *World.GetName(), *Args[0], Amount);
+		});
 
 	const auto QueueStarvation = [](UWorld& World, FName RegionId)
 	{

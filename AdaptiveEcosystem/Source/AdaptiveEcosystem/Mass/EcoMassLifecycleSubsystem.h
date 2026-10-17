@@ -5,6 +5,7 @@
 #include "Core/EcoResourceTypes.h"
 #include "Core/EcoTimeTypes.h"
 #include "Core/EcoMigrationTypes.h"
+#include "Core/EcoSurvivalTypes.h"
 #include "EcoMassLifecycleSubsystem.generated.h"
 
 class AEcoMassNetworkBootstrap;
@@ -33,6 +34,10 @@ private:
 	void PublishCompletedSummary(const FEcoServerTimeSnapshot& Time);
 	FEcoFeedingSettings FeedingSettings;
 	FEcoMigrationSettings MigrationSettings;
+	FEcoSurvivalSettings SurvivalSettings;
+	FEcoOvercrowdingSettings PressureSettings;
+	int64 SuccessfulBirths = 0;
+	int64 CommittedDeaths = 0;
 	double NextMigrationTime = 0.0;
 	double NextSummaryTime = 0.0;
 	int32 SummaryRevision = 0;

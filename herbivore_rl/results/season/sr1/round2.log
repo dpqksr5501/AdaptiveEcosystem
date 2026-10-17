@@ -1,0 +1,66 @@
+SR1 2차: 후보 6개, K2-B 2개 (학습 2,000,000, 평가 시드 20 × 5000스텝)
+  있음   v20_a_m3k0p1_s0              시즌 a   → runs\season\sr1\train\v20_a_m3k0p1_s0.zip
+  새로   v20_a_m3k0p1_s1              시즌 a   → runs\season\sr1\train\v20_a_m3k0p1_s1.zip
+  새로   v20_b_m3k0p1_s0              시즌 b   → runs\season\sr1\train\v20_b_m3k0p1_s0.zip
+  새로   v20_b_m3k0p1_s1              시즌 b   → runs\season\sr1\train\v20_b_m3k0p1_s1.zip
+  새로   v20_c_m3k0p1_s0              시즌 c   → runs\season\sr1\train\v20_c_m3k0p1_s0.zip
+  새로   v20_c_m3k0p1_s1              시즌 c   → runs\season\sr1\train\v20_c_m3k0p1_s1.zip
+  있음   v20_k2b_m3k0p1_s0            K2-B   → runs\season\sr1\train\v20_k2b_m3k0p1_s0.zip
+  새로   v20_k2b_m3k0p1_s1            K2-B   → runs\season\sr1\train\v20_k2b_m3k0p1_s1.zip
+평가 잡(캐시 밖): 620 (G 280, Ge 240, B 100), 보류 재확인 최대 300
+계산 추정(10-02 유휴 단가): 학습 6회 ÷ 3 동시 → 2분, 평가 620잡 ÷ 8워커 → 12분, 합 14분 (+ 보류 재확인 최대 6분)
+코어: 학습 3 × 3 스레드, 평가 8 워커 (차례로 돈다)
+[학습] 6개, 3개씩, 스레드 3
+  v20_a_m3k0p1_s1: 완료 (1.9분)
+  v20_b_m3k0p1_s0: 완료 (1.9분)
+  v20_b_m3k0p1_s1: 완료 (1.9분)
+  v20_c_m3k0p1_s0: 완료 (1.9분)
+  v20_c_m3k0p1_s1: 완료 (1.9분)
+  v20_k2b_m3k0p1_s1: 완료 (1.9분)
+[평가] 판정 묶음, 워커 8
+  [평가] 시즌 a · v20 · G: 스펙 6개 (62초)
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:1351: RuntimeWarning: divide by zero encountered in divide
+  (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:1351: RuntimeWarning: divide by zero encountered in divide
+  (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:1351: RuntimeWarning: divide by zero encountered in divide
+  (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:1351: RuntimeWarning: divide by zero encountered in divide
+  (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:1351: RuntimeWarning: divide by zero encountered in divide
+  (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:1351: RuntimeWarning: divide by zero encountered in divide
+  (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:1351: RuntimeWarning: divide by zero encountered in divide
+  (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:1351: RuntimeWarning: divide by zero encountered in divide
+  (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+  [평가] 시즌 a · v20 · Ge: 스펙 5개 (57초)
+  [평가] 시즌 a · v20 · B: 스펙 3개 (32초)
+  [평가] 시즌 b · v20 · G: 스펙 6개 (160초)
+  [평가] 시즌 b · v20 · Ge: 스펙 5개 (136초)
+  [평가] 시즌 b · v20 · B: 스펙 3개 (57초)
+  [평가] 시즌 c · v20 · G: 스펙 6개 (170초)
+  [평가] 시즌 c · v20 · Ge: 스펙 5개 (132초)
+  [평가] 시즌 c · v20 · B: 스펙 3개 (52초)
+  v20_a_m3k0p1_s0: 기각 ['A1 이득 없음']
+  v20_a_m3k0p1_s1: 기각 ['A1 이득 없음', 'A2 상수화']
+  v20_b_m3k0p1_s0: 기각 ['A1 이득 없음', 'A2 상수화']
+  v20_b_m3k0p1_s1: 기각 ['A1 이득 없음', 'A2 상수화']
+  v20_c_m3k0p1_s0: 기각 ['A1 이득 없음', 'A2 상수화']
+  v20_c_m3k0p1_s1: 기각 ['A1 이득 없음', 'A2 상수화']
+# SR1 2차 요약
+
+- 생성: 2026-10-06T19:27:25+00:00, 평가 시드 10000~10019 × 5000스텝, 학습 2,000,000, γ = 앵커 학습 γ
+
+| 후보 | A1 | A2 | A3 | A4 | A5 | 보류 | Ge 피식률 vs 현재 (t) | vs K2-B (t) | G G_γ 하락 | B react 비 | B 행동 평균 최대 변화 | 사유 |
+|---|---|---|---|---|---|---|---|---|---|---|---|---|
+| v20_a_m3k0p1_s0 | 실패 | 통과 | 통과 | 통과 | 통과 | — | -1.2% (-1.51) | -0.4% (-0.48) | -4.8% | 1.01 | 0.001 | A1 이득 없음 |
+| v20_a_m3k0p1_s1 | 실패 | 실패 | 통과 | 통과 | 통과 | — | -0.3% (-0.31) | +0.8% (+1.29) | +9.9% | 1.00 | 0.003 | A1 이득 없음, A2 상수화 |
+| v20_b_m3k0p1_s0 | 실패 | 실패 | 통과 | 통과 | 통과 | — | -4.1% (-1.89) | -6.0% (-2.75) | +0.1% | 1.02 | 0.004 | A1 이득 없음, A2 상수화 |
+| v20_b_m3k0p1_s1 | 실패 | 실패 | 통과 | 통과 | 통과 | — | -0.3% (-0.09) | +1.1% (+0.37) | -0.1% | 1.01 | 0.001 | A1 이득 없음, A2 상수화 |
+| v20_c_m3k0p1_s0 | 실패 | 실패 | 통과 | 통과 | 통과 | — | +1.5% (+0.76) | +0.6% (+0.33) | +0.9% | 1.02 | 0.002 | A1 이득 없음, A2 상수화 |
+| v20_c_m3k0p1_s1 | 실패 | 실패 | 통과 | 통과 | 통과 | — | -1.9% (-0.83) | +0.4% (+0.24) | +2.1% | 1.00 | 0.002 | A1 이득 없음, A2 상수화 |
+
+- Ge 덮기 확인(아사 0·번식 0): 정상
+- 가장 나은 후보 순서(전부 통과 > 통과 판정 수 > Ge 피식률 t, 2차 확인 대상 고르기): v20_a_m3k0p1_s0, v20_b_m3k0p1_s0, v20_c_m3k0p1_s1

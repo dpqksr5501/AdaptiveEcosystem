@@ -1,0 +1,27 @@
+# Gate E1 R0 팔 r6_ew0_5 — gate_e1.py configs 가 configs/v2_1.yaml 에서 만들었다. 손으로 고치지 않는다.
+# 바꾼 계수(그 밖은 configs/v2_1.yaml 과 같다): 뛰기 대사 배수 R = 6 (걷기 배수 1 고정) →
+#   c_rest = (21 − 4(R − 1))/21 = 0.047619047619047616, c_move = 25(R − 1)/21 = 5.9523809523809526
+#   대사 배수 [정지, 걷기, 뛰기] = [0.0476, 1.0000, 6.0000], 걷기 섭식 배수 e_walk = 0.5
+version: '2.1'
+overrides: {}
+features:
+  speed:
+    enabled: true
+    thresholds:
+    - 0.3333333333333333
+    - 0.6666666666666666
+    gait_speed:
+    - 0.0
+    - 0.4
+    - 1.0
+    gait_eat:
+    - 1.0
+    - 0.5
+    - 0.0
+    c_rest: 0.047619047619047616
+    c_move: 5.9523809523809526
+    net_energy_reward: true
+train:
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256

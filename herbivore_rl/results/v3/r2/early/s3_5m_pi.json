@@ -1,0 +1,110 @@
+{
+ "model": "ckpt/v3/v3_r2_g995_s3_20m_5m.zip",
+ "seeds": [
+  20000,
+  20001,
+  20002
+ ],
+ "steps": 3000,
+ "u_def": "r2",
+ "freeze_variant": "near",
+ "allowed": [
+  "graze",
+  "flee",
+  "hide",
+  "freeze"
+ ],
+ "n_dec": 1010009,
+ "pooled": {
+  "pi_flee_niche": 0.5121728362590474,
+  "pi_flee_base": 0.00018648522579144044,
+  "pi_hide_niche": 0.6011394528238648,
+  "pi_hide_base": 0.013202004950894505,
+  "pi_freeze_niche": 0.2344773003416568,
+  "pi_freeze_base": 0.00022013875345859,
+  "pi_esc_niche": 0.9493065152904356,
+  "pi_esc_base": 0.00027424417262246427,
+  "pi_look_niche": 0.0008081224290111197,
+  "pi_look_base": 7.1757665958947845e-06,
+  "n_look_niche": 91837,
+  "n_look_base": 21846,
+  "pi_look_open_niche": 0.0008081224290111197,
+  "pi_look_open_base": 1.5286377089606772e-05,
+  "n_look_open_niche": 91837,
+  "n_look_open_base": 10255
+ },
+ "per_seed": [
+  {
+   "seed": 20000,
+   "n_dec": 339627,
+   "pi_flee_niche": 0.4406560472147332,
+   "pi_flee_base": 0.00019460305231328037,
+   "pi_hide_niche": 0.6646207408007394,
+   "pi_hide_base": 0.022321433744466875,
+   "pi_freeze_niche": 0.2627200438895458,
+   "pi_freeze_base": 0.0002991410630441948,
+   "pi_esc_niche": 0.9713118476182018,
+   "pi_esc_base": 0.00028391350647628084,
+   "pi_look_niche": 0.001116245032691642,
+   "pi_look_base": 6.497061970806164e-06,
+   "n_look_niche": 21704,
+   "n_look_base": 6102,
+   "pi_look_open_niche": 0.001116245032691642,
+   "pi_look_open_base": 1.3457254631995661e-05,
+   "n_look_open_niche": 21704,
+   "n_look_open_base": 2946
+  },
+  {
+   "seed": 20001,
+   "n_dec": 312336,
+   "pi_flee_niche": 0.5049035866593493,
+   "pi_flee_base": 0.00014858697751175606,
+   "pi_hide_niche": 0.5210891022364391,
+   "pi_hide_base": 0.007770790793016367,
+   "pi_freeze_niche": 0.2394303948728039,
+   "pi_freeze_base": 0.00016142729945853554,
+   "pi_esc_niche": 0.9362577848166841,
+   "pi_esc_base": 0.0002631235440798863,
+   "pi_look_niche": 0.000571290261334907,
+   "pi_look_base": 5.681237592120722e-06,
+   "n_look_niche": 50660,
+   "n_look_base": 12522,
+   "pi_look_open_niche": 0.000571290261334907,
+   "pi_look_open_base": 1.2635960413594258e-05,
+   "n_look_open_niche": 50660,
+   "n_look_open_base": 5630
+  },
+  {
+   "seed": 20002,
+   "n_dec": 358046,
+   "pi_flee_niche": 0.6483564991731258,
+   "pi_flee_base": 0.00021011046013534262,
+   "pi_hide_niche": 0.7177152851682848,
+   "pi_hide_base": 0.011778753513075783,
+   "pi_freeze_niche": 0.19958762158816157,
+   "pi_freeze_base": 0.00018493468036969904,
+   "pi_esc_niche": 0.9551793094793499,
+   "pi_esc_base": 0.0002745098587575655,
+   "pi_look_niche": 0.0010808294913125054,
+   "pi_look_base": 1.426948099923109e-05,
+   "n_look_niche": 19473,
+   "n_look_base": 3222,
+   "pi_look_open_niche": 0.0010808294913125054,
+   "pi_look_open_base": 2.7383125538726965e-05,
+   "n_look_open_niche": 19473,
+   "n_look_open_base": 1679
+  }
+ ],
+ "early_stop_pi": {
+  "pi_flee_niche": 0.5121728362590474,
+  "pi_hide_niche": 0.6011394528238648,
+  "pi_freeze_niche": 0.2344773003416568
+ },
+ "report_only_pi": {
+  "pi_look_niche": 0.0008081224290111197,
+  "pi_look_open_niche": 0.0008081224290111197
+ },
+ "config": "configs/v3_r2_on.yaml",
+ "elapsed_s": 26.2,
+ "generated": "2026-10-13T03:42:08+00:00"
+}

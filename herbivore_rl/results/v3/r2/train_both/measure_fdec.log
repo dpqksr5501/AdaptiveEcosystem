@@ -1,0 +1,35 @@
+{
+ "f_dec": 0.5882274305555556,
+ "per_seed": [
+  {
+   "seed": 20000,
+   "f_dec": 0.5495677083333333,
+   "decide_frac_world": 0.5495677083333333
+  },
+  {
+   "seed": 20001,
+   "f_dec": 0.384140625,
+   "decide_frac_world": 0.384140625
+  },
+  {
+   "seed": 20002,
+   "f_dec": 0.8309739583333333,
+   "decide_frac_world": 0.8309739583333333
+  }
+ ],
+ "multi_frac": 0.11231512990711855,
+ "seeds": [
+  20000,
+  20001,
+  20002
+ ],
+ "steps": 3000,
+ "model_seed": 0,
+ "allowed": [
+  "graze",
+  "flee",
+  "hide",
+  "freeze"
+ ]
+}
+f_dec = 0.588227 (보정 시드 [20000, 20001, 20002] × 3000스텝, 목록 ['graze', 'flee', 'hide', 'freeze'], 47초) → yaml train.repertoire.f_dec 에 적는다

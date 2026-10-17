@@ -3,6 +3,7 @@
 #include "Core/EcoMigrationTypes.h"
 #include "Core/EcoResourceTypes.h"
 #include "Core/EcoTimeTypes.h"
+#include "Core/EcoSurvivalTypes.h"
 #include "MassProcessor.h"
 #include "MassEntityQuery.h"
 #include "EcoMassMigration.generated.h"
@@ -13,7 +14,19 @@ namespace EcoMassMigration
 	bool Reconcile(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, double ActualTime,
 		int64 StepId, TConstArrayView<FEcoResourceSnapshot> Resources,
 		TConstArrayView<FEcoRegionSpatialSnapshot> Spaces, const FEcoMigrationSettings& Settings,
-		bool bDecisionDue, double FeedInterval, bool bResetResidentVelocity = true);
+		bool bDecisionDue, double FeedInterval, const FEcoOvercrowdingSettings* PressureSettings = nullptr,
+		const FEcoSurvivalSettings* SurvivalSettings = nullptr,
+		TConstArrayView<FEcoMigrationPressureSnapshot> Pressure = {}, double ConsumptionRate = 0.0,
+		TArray<FEcoMigrationOutcome>* OutArrivals = nullptr, bool bResetResidentVelocity = true);
+	/** Compatibility adapter for the Creature coordinator; does not reset its resident movement. */
+	inline bool Reconcile(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, double ActualTime,
+		int64 StepId, TConstArrayView<FEcoResourceSnapshot> Resources,
+		TConstArrayView<FEcoRegionSpatialSnapshot> Spaces, const FEcoMigrationSettings& Settings,
+		bool bDecisionDue, double FeedInterval, bool bResetResidentVelocity)
+	{
+		return Reconcile(Manager, Time, ActualTime, StepId, Resources, Spaces, Settings,
+			bDecisionDue, FeedInterval, nullptr, nullptr, {}, 0.0, nullptr, bResetResidentVelocity);
+	}
 }
 
 /** Writes movement intent only. The engine UMassApplyMovementProcessor owns position integration. */
@@ -22,8 +35,10 @@ class ADAPTIVEECOSYSTEM_API UEcoMigrationSteeringProcessor : public UMassProcess
 {
 	GENERATED_BODY()
 public:
+
 	UEcoMigrationSteeringProcessor();
 protected:
+
 	virtual void ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager) override;
 	virtual void Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context) override;
 private:

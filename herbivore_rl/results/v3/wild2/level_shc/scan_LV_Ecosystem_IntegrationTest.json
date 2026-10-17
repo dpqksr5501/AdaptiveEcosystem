@@ -1,0 +1,1475 @@
+{
+ "map": "/Game/Map/LV_Ecosystem_IntegrationTest",
+ "log": [
+  "map /Game/Map/LV_Ecosystem_IntegrationTest loaded=True",
+  "actor descs 161, loaded actors 97"
+ ],
+ "actor_descs": 161,
+ "loaded_actors": 97,
+ "class_counts": {
+  "WorldDataLayers": 1,
+  "PlayerStart": 1,
+  "DirectionalLight": 2,
+  "NavModifierVolume": 2,
+  "VolumetricCloud": 1,
+  "SkyLight": 1,
+  "ExponentialHeightFog": 1,
+  "EcologyRegion": 3,
+  "Landscape": 1,
+  "TargetPoint": 8,
+  "EcoShelterAnchor": 2,
+  "RecastNavMesh": 1,
+  "SkyAtmosphere": 1,
+  "EcoCreatureIntegrationSpawner": 1,
+  "WorldPartitionMiniMap": 1,
+  "NavMeshBoundsVolume": 1,
+  "BP_SkyManager_C": 1,
+  "LandscapeStreamingProxy": 64,
+  "TriggerBox": 3,
+  "InstancedFoliageActor": 1
+ },
+ "actors": [
+  {
+   "class": "WorldDataLayers",
+   "class_path": "/Script/Engine.WorldDataLayers",
+   "label": "WorldDataLayers-1",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "PlayerStart",
+   "class_path": "/Script/Engine.PlayerStart",
+   "label": "PlayerStart",
+   "loc": [
+    34200.0,
+    48500.0,
+    -600.0
+   ],
+   "rot": [
+    -25.0,
+    -90.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34200.0,
+    48411.905,
+    -636.824
+   ],
+   "bounds_extent": [
+    80.0,
+    163.228,
+    137.109
+   ]
+  },
+  {
+   "class": "DirectionalLight",
+   "class_path": "/Script/Engine.DirectionalLight",
+   "label": "MoonLight",
+   "loc": [
+    10.0,
+    10.0,
+    0.0
+   ],
+   "rot": [
+    -30.0,
+    105.0,
+    180.0
+   ],
+   "scale": [
+    2.5,
+    2.5,
+    2.5
+   ],
+   "bounds_origin": [
+    -57.243,
+    260.955,
+    -150.0
+   ],
+   "bounds_extent": [
+    286.31,
+    399.311,
+    323.205
+   ]
+  },
+  {
+   "class": "NavModifierVolume",
+   "class_path": "/Script/NavigationSystem.NavModifierVolume",
+   "label": "NavModifierVolume",
+   "loc": [
+    -53400.0,
+    55620.0,
+    -1760.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    25.0,
+    25.0,
+    150.0
+   ],
+   "bounds_origin": [
+    -53400.0,
+    55620.0,
+    -1760.0
+   ],
+   "bounds_extent": [
+    2500.0,
+    2500.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "VolumetricCloud",
+   "class_path": "/Script/Engine.VolumetricCloud",
+   "label": "VolumetricCloud",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "SkyLight",
+   "class_path": "/Script/Engine.SkyLight",
+   "label": "SkyLight",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "class": "ExponentialHeightFog",
+   "class_path": "/Script/Engine.ExponentialHeightFog",
+   "label": "ExponentialHeightFog",
+   "loc": [
+    -5600.0,
+    -50.0,
+    -6850.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    -5600.0,
+    -50.0,
+    -6850.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "EcologyRegion",
+   "class_path": "/Script/AdaptiveEcosystem.EcologyRegion",
+   "label": "Eco_Region_Highland",
+   "loc": [
+    0.0,
+    -50000.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    -50000.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ],
+   "region_id": "Highland",
+   "environment": {
+    "temperature": -5.0,
+    "humidity": 0.4000000059604645,
+    "rainfall": 0.0,
+    "day_phase": "DAY",
+    "weather_state": "CLEAR"
+   },
+   "rainfall_affects_regeneration": false
+  },
+  {
+   "class": "Landscape",
+   "class_path": "/Script/Landscape.Landscape",
+   "label": "Landscape",
+   "loc": [
+    -100800.0,
+    -100800.0,
+    100.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    100.0,
+    100.0,
+    100.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "DirectionalLight",
+   "class_path": "/Script/Engine.DirectionalLight",
+   "label": "DirectionalLight",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    -30.0,
+    105.0,
+    -180.0
+   ],
+   "scale": [
+    2.5,
+    2.5,
+    2.5
+   ],
+   "bounds_origin": [
+    -67.243,
+    250.955,
+    -150.0
+   ],
+   "bounds_extent": [
+    286.31,
+    399.311,
+    323.205
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "Eco_FoodHint_Highland",
+   "loc": [
+    34000.0,
+    -49000.0,
+    2639.84
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34120.0,
+    -49000.0,
+    2639.84
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "EcoShelterAnchor",
+   "class_path": "/Script/AdaptiveEcosystem.EcoShelterAnchor",
+   "label": "Eco_Shelter_Forest_01",
+   "loc": [
+    33300.0,
+    45100.0,
+    -1603.128
+   ],
+   "rot": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    33300.0,
+    44920.0,
+    -1603.128
+   ],
+   "bounds_extent": [
+    80.0,
+    180.0,
+    80.0
+   ]
+  },
+  {
+   "class": "RecastNavMesh",
+   "class_path": "/Script/NavigationSystem.RecastNavMesh",
+   "label": "RecastNavMesh-Default",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    530.0
+   ],
+   "bounds_extent": [
+    75088.0,
+    75088.0,
+    3020.0
+   ]
+  },
+  {
+   "class": "SkyAtmosphere",
+   "class_path": "/Script/Engine.SkyAtmosphere",
+   "label": "SkyAtmosphere",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    120.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "EcologyRegion",
+   "class_path": "/Script/AdaptiveEcosystem.EcologyRegion",
+   "label": "Eco_Region_Forest",
+   "loc": [
+    0.0,
+    50000.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    50000.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ],
+   "region_id": "Forest",
+   "environment": {
+    "temperature": 20.0,
+    "humidity": 0.699999988079071,
+    "rainfall": 0.0,
+    "day_phase": "DAY",
+    "weather_state": "CLEAR"
+   },
+   "rainfall_affects_regeneration": false
+  },
+  {
+   "class": "EcoCreatureIntegrationSpawner",
+   "class_path": "/Script/AdaptiveEcosystem.EcoCreatureIntegrationSpawner",
+   "label": "Eco_CreatureRuntime",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "vars": {
+    "bUseV3Policy": "False",
+    "V3DeerPerRegion": "48",
+    "bV3UseAuthoredShelters": "False"
+   },
+   "components": [
+    "WorldPartitionStreamingSourceComponent:HabitatStreamingSource"
+   ]
+  },
+  {
+   "class": "WorldPartitionMiniMap",
+   "class_path": "/Script/Engine.WorldPartitionMiniMap",
+   "label": "WorldPartitionMiniMap",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "Eco_FoodHint_Forest",
+   "loc": [
+    34200.0,
+    46500.0,
+    -1631.262
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34320.0,
+    46500.0,
+    -1631.262
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "EcologyRegion",
+   "class_path": "/Script/AdaptiveEcosystem.EcologyRegion",
+   "label": "Eco_Region_Barren",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ],
+   "region_id": "Barren",
+   "environment": {
+    "temperature": 30.0,
+    "humidity": 0.20000000298023224,
+    "rainfall": 0.0,
+    "day_phase": "DAY",
+    "weather_state": "CLEAR"
+   },
+   "rainfall_affects_regeneration": false
+  },
+  {
+   "class": "EcoShelterAnchor",
+   "class_path": "/Script/AdaptiveEcosystem.EcoShelterAnchor",
+   "label": "Eco_Shelter_Forest_02",
+   "loc": [
+    34200.0,
+    44400.0,
+    -1606.262
+   ],
+   "rot": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34200.0,
+    44220.0,
+    -1606.262
+   ],
+   "bounds_extent": [
+    80.0,
+    180.0,
+    80.0
+   ]
+  },
+  {
+   "class": "NavMeshBoundsVolume",
+   "class_path": "/Script/NavigationSystem.NavMeshBoundsVolume",
+   "label": "NavMeshBoundsVolume",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    750.0,
+    750.0,
+    150.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    75000.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "BP_SkyManager_C",
+   "class_path": "/Game/SHC/Blueprints/Sky/BP_SkyManager.BP_SkyManager_C",
+   "label": "BP_SkyManager",
+   "loc": [
+    73100.0,
+    25960.0,
+    -5020.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    73100.0,
+    25960.0,
+    -5020.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "vars": {
+    "SunSpeed": "0.0",
+    "DynamicSun": "True",
+    "SunDefaultRotaion": "<Struct 'Rotator' (0x000001CDA69372A0) {pitch: 315.000000, yaw: 0.000000, roll: 0.000000}>",
+    "SunCurrentRotation": "<Struct 'Rotator' (0x000001CDA69372B8) {pitch: 315.000000, yaw: 0.000000, roll: 0.000000}>"
+   },
+   "components": [
+    "BillboardComponent:Billboard"
+   ]
+  },
+  {
+   "class": "NavModifierVolume",
+   "class_path": "/Script/NavigationSystem.NavModifierVolume",
+   "label": "NavModifierVolume2",
+   "loc": [
+    46010.0,
+    53110.0,
+    -1760.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    25.0,
+    25.0,
+    150.0
+   ],
+   "bounds_origin": [
+    46010.0,
+    53110.0,
+    -1760.0
+   ],
+   "bounds_extent": [
+    2500.0,
+    2500.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "Eco_FoodHint_Barren",
+   "loc": [
+    34000.0,
+    1000.0,
+    1663.263
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34120.0,
+    1000.0,
+    1663.263
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "TriggerBox",
+   "class_path": "/Script/Engine.TriggerBox",
+   "label": "TV_Region_Highland",
+   "loc": [
+    0.0,
+    -50000.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    -50000.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "TriggerBox",
+   "class_path": "/Script/Engine.TriggerBox",
+   "label": "TV_Region_Barren",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Shelter_Forest_01",
+   "loc": [
+    33920.0,
+    44870.0,
+    -1530.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34040.0,
+    44870.0,
+    -1530.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "InstancedFoliageActor",
+   "class_path": "/Script/Foliage.InstancedFoliageActor",
+   "label": "InstancedFoliageActor_1_1_-1",
+   "loc": [
+    38400.0,
+    38400.0,
+    -12800.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "static_meshes": [
+    {
+     "component": "FoliageInstancedStaticMeshComponent_14",
+     "ism": true,
+     "mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC",
+     "collides": false,
+     "collision_enabled": "NO_COLLISION",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "NoCollision",
+     "count": 10,
+     "instances": [
+      {
+       "t": [
+        34198.913,
+        45396.901,
+        -1613.242
+       ],
+       "r": [
+        -0.904,
+        69.025,
+        -1.091
+       ],
+       "s": [
+        14.683,
+        14.683,
+        14.683
+       ],
+       "i": 0
+      },
+      {
+       "t": [
+        34502.384,
+        45066.71,
+        -1615.169
+       ],
+       "r": [
+        1.568,
+        -132.416,
+        0.385
+       ],
+       "s": [
+        11.27,
+        11.27,
+        11.27
+       ],
+       "i": 1
+      },
+      {
+       "t": [
+        34759.234,
+        44703.994,
+        -1615.518
+       ],
+       "r": [
+        0.329,
+        135.528,
+        -1.581
+       ],
+       "s": [
+        17.725,
+        17.725,
+        17.725
+       ],
+       "i": 2
+      },
+      {
+       "t": [
+        34619.046,
+        44526.235,
+        -1609.459
+       ],
+       "r": [
+        -0.613,
+        -34.11,
+        1.489
+       ],
+       "s": [
+        17.24,
+        17.24,
+        17.24
+       ],
+       "i": 3
+      },
+      {
+       "t": [
+        34178.55,
+        44350.502,
+        -1605.704
+       ],
+       "r": [
+        0.035,
+        -47.643,
+        0.634
+       ],
+       "s": [
+        18.659,
+        18.659,
+        18.659
+       ],
+       "i": 4
+      },
+      {
+       "t": [
+        33772.191,
+        44364.197,
+        -1604.632
+       ],
+       "r": [
+        0.771,
+        66.018,
+        0.64
+       ],
+       "s": [
+        17.637,
+        17.637,
+        17.637
+       ],
+       "i": 5
+      },
+      {
+       "t": [
+        33387.807,
+        44755.708,
+        -1605.567
+       ],
+       "r": [
+        -0.081,
+        -100.346,
+        -0.446
+       ],
+       "s": [
+        10.167,
+        10.167,
+        10.167
+       ],
+       "i": 6
+      },
+      {
+       "t": [
+        33471.559,
+        44973.702,
+        -1603.001
+       ],
+       "r": [
+        -0.736,
+        -110.966,
+        -0.679
+       ],
+       "s": [
+        15.483,
+        15.483,
+        15.483
+       ],
+       "i": 7
+      },
+      {
+       "t": [
+        33765.816,
+        45245.432,
+        -1604.94
+       ],
+       "r": [
+        -0.096,
+        83.829,
+        -0.884
+       ],
+       "s": [
+        12.902,
+        12.902,
+        12.902
+       ],
+       "i": 8
+      },
+      {
+       "t": [
+        33885.157,
+        45396.731,
+        -1608.321
+       ],
+       "r": [
+        0.897,
+        -89.92,
+        0.899
+       ],
+       "s": [
+        13.873,
+        13.873,
+        13.873
+       ],
+       "i": 9
+      }
+     ]
+    },
+    {
+     "component": "FoliageInstancedStaticMeshComponent_15",
+     "ism": true,
+     "mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD",
+     "collides": false,
+     "collision_enabled": "NO_COLLISION",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "NoCollision",
+     "count": 10,
+     "instances": [
+      {
+       "t": [
+        34237.716,
+        45401.671,
+        -1614.202
+       ],
+       "r": [
+        0.12,
+        128.049,
+        -1.61
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 0
+      },
+      {
+       "t": [
+        34408.638,
+        45100.804,
+        -1613.507
+       ],
+       "r": [
+        1.121,
+        -100.164,
+        1.163
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 1
+      },
+      {
+       "t": [
+        34676.735,
+        44707.454,
+        -1613.82
+       ],
+       "r": [
+        -0.693,
+        101.939,
+        -1.064
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 2
+      },
+      {
+       "t": [
+        34492.607,
+        44416.145,
+        -1607.884
+       ],
+       "r": [
+        -0.555,
+        74.684,
+        -0.309
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 3
+      },
+      {
+       "t": [
+        34309.584,
+        44320.765,
+        -1605.534
+       ],
+       "r": [
+        -0.76,
+        39.176,
+        -1.193
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 4
+      },
+      {
+       "t": [
+        33834.175,
+        44339.227,
+        -1604.39
+       ],
+       "r": [
+        0.418,
+        110.057,
+        0.152
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 5
+      },
+      {
+       "t": [
+        33370.924,
+        44727.695,
+        -1605.701
+       ],
+       "r": [
+        0.346,
+        40.262,
+        0.293
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 6
+      },
+      {
+       "t": [
+        33436.005,
+        45028.695,
+        -1603.804
+       ],
+       "r": [
+        0.695,
+        11.835,
+        1.063
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 7
+      },
+      {
+       "t": [
+        33738.529,
+        45316.916,
+        -1605.736
+       ],
+       "r": [
+        -0.508,
+        34.492,
+        0.74
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 8
+      },
+      {
+       "t": [
+        33980.411,
+        45451.733,
+        -1609.817
+       ],
+       "r": [
+        -0.592,
+        153.828,
+        -1.205
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 9
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "TriggerBox",
+   "class_path": "/Script/Engine.TriggerBox",
+   "label": "TV_Region_Forest",
+   "loc": [
+    0.0,
+    50000.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    50000.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Water_02",
+   "loc": [
+    41210.0,
+    53350.0,
+    -2040.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    41330.0,
+    53350.0,
+    -2040.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Water_03",
+   "loc": [
+    -53890.0,
+    51120.0,
+    -1890.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    -53770.0,
+    51120.0,
+    -1890.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Water_01",
+   "loc": [
+    49240.0,
+    57240.0,
+    -2040.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    49360.0,
+    57240.0,
+    -2040.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Water_04",
+   "loc": [
+    -57450.0,
+    57010.0,
+    -1890.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    -57330.0,
+    57010.0,
+    -1890.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  }
+ ],
+ "meshes": {
+  "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC": {
+   "path": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC",
+   "render_bounds_extent": [
+    25.592,
+    24.605,
+    21.434
+   ],
+   "note": "충돌 없음 — 꼭짓점 안 읽음"
+  },
+  "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD": {
+   "path": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD",
+   "render_bounds_extent": [
+    21.113,
+    20.014,
+    12.452
+   ],
+   "note": "충돌 없음 — 꼭짓점 안 읽음"
+  }
+ }
+}

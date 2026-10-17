@@ -39,6 +39,17 @@ public:
 	float InitialFoodAmount = 1000.0f;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Initial Resources", meta=(ClampMin="0.0"))
 	float FoodCapacity = 2000.0f;
+	/** Opt-in authored supply; default preserves the no-regeneration validation scenario. */
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Initial Resources", meta=(ClampMin="0.0"))
+	float FoodRegenerationRate = 0.0f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Environment Response")
+	bool bRainfallAffectsRegeneration = false;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Environment Response", meta=(ClampMin="0.0", ClampMax="4.0"))
+	float DryRegenerationMultiplier = 0.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Environment Response", meta=(ClampMin="0.0", ClampMax="4.0"))
+	float WetRegenerationMultiplier = 1.5f;
+	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Initial Resources", meta=(ClampMin="1"))
+	int32 EcologicalComfortPopulation = 64;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Region")
 	TArray<FName> AdjacentRegionIds;
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Ecology|Region", meta=(MakeEditWidget=true))

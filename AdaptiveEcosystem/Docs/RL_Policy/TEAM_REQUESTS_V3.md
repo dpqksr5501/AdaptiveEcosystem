@@ -1,0 +1,136 @@
+# 팀원별 요청 — 통합 레벨 v3 사슴·늑대 (2026-10-17, 팀 브랜치 통합 뒤)
+
+- 쓴 사람: 권신혁(RL·정책). 메시지는 권신혁이 직접 보낸다.
+- 기준: `Branch_Sinhyeok`. 팀 브랜치 `codex/social-shelter-handoff` 를 합친 `7029579`, Social 연결을 기본으로 끈 `422e307`(사람 결정 10-17 (8)) 뒤다.
+- 담당은 `RL_V3_UNREAL_TRAINING_PLAN.md` 5절 표의 '누가' 칸을 따랐다. 확실하지 않은 담당은 '(추정)'으로 적었다.
+- 10-16 판의 요청 가운데 통합으로 끝난 것은 1절에 모았고, 2~5절에는 아직 열린 요청만 남겼다.
+
+## 0. 지금 상태 (한 문단)
+
+팀 통합 레벨(`/Game/Map/LV_Ecosystem_IntegrationTest`)을 명령줄 `-EcoIntegratedV3`(또는 콘솔 `eco.IntegratedPolicyVersion 3`)로 Play 하면, 사슴은 학습 두뇌(R1b)와 야생 규칙으로, 늑대는 우리 늑대 규칙으로 움직인다. 10-17 에 팀 브랜치를 합쳐서 팀의 몸(개체·지형·표현·죽음 처리·복제·먹이 장부)과 우리 머리가 한 브랜치에 있다. 은신처 안전 규칙은 우리 규칙 하나(`eco.IntegratedV3.ShelterSafe 1`)이고, 팀의 실제 은신처 생명주기(`eco.IntegratedV3.ProtectedRefuges 1`)가 그 위에 더해진다. 팀의 무리 경보 행동 연결은 기본 끔이다(`eco.IntegratedV3.SocialControl 0`, 사람 결정 10-17 (8)). Social 처리기는 그대로 돌며 기록하고, 경보 연출(소리·고개 들기 표현)은 이 스위치와 따로 돈다. 언리얼 결과는 파이썬 거울 세계와 표본 흔들림 안으로 같다(`herbivore_rl/results/v3/wild1/compare_unreal.md`). 켜고 끄는 콘솔 변수는 `RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b 에 있다. `eco.IntegratedPolicyVersion 1`(기본)이면 팀 원래 동작 그대로다.
+
+## 1. 통합으로 끝난 것 (요청 닫음)
+
+| 10-16 요청 | 누가 | 어떻게 끝났나 | 남은 것 |
+|---|---|---|---|
+| 행동별 애니메이션 연결 | 조연우 | v3 상태가 팀 표현으로 간다(`8e2f34f`, `Creature/Runtime/EcoCreatureLifecycle.cpp`). 사슴 먹기·도망·숨기(이동·웅크림)·얼기·잠, 늑대 배회·잠행·돌진·지침·추격·식사·잠 | 야생 상태 몇 개와 표 한 곳(2절 6·7) |
+| 눈 물리 재질 분리 | 조연우 | JYU 복사 맵에 Snow·Water·Wet 재질과 발판 5종(`19429e9`, `/Game/JYU/Audio`·`/Game/JYU/Materials`) | 공식 레벨을 정하면 그 레벨에도(5절 3) |
+| 레벨 은신처 | 조연우 | 실제 보호 은신처 액터 `AEcoRefugeHabitat`(`/Game/JYU/Environment/BP_JYU_ProtectedRefuge`, 덤불·바위, 늦은 지면 등록, `a88eac8`). 복사 맵 `LV_JYU_RefugeSafety` 에 지역마다 4곳. 안전 규칙은 우리 규칙 하나로 정리했다 | 공식 레벨의 동물 무대 안에 놓기(4절 2). 지금 팀 통합 레벨은 무대 안 은신처가 0이라 우리 코드가 무대마다 4곳을 임시로 만든다 |
+| 경보 연출 주인 | 조연우 | 서버 `Herd.Alarm` 소리 → 근처 사슴의 Hearing·고개 들기 표현, Client 경보 큐(임시 합성음). 무리 경보 행동 연결(`22eb1b6`)도 왔지만 10-17 (8)로 기본 끔 | 행동 연결을 '신호만'으로 바꾸기(2절 1) |
+| 먹이 장부 연결 | 조연우 (wonkii 님께 요청했던 것) | `RegisterSpatialFood`·`CommitSpatialFood`: 지역 먹이 값 = v3 먹이 격자의 합, 보존식 검사, 그 지역의 다른 먹이 writer 막음. 그래서 v3 지역은 `AEcologyRegion` 재생률과 따로 돈다 | 없음 |
+| 클라이언트 복제 | 조연우 | 서버·Client 공통 v3 설정(`UEcoCreatureV3Trait::MakeNetworkConfig`), 행동·늑대 상태가 표현 DTO 로 간다. Dedicated + Client 두 번 접속 확인 | 없음 |
+| (참고) M4 폐루프·StateTree | wonkii | `54d5d5b` M4 폐루프, 사슴·늑대 StateTree 런타임, JWJ 레벨(`64a8cd0`). v3 개체에는 StateTree 이동이 붙지 않는다(이동 writer 하나) | 없음 |
+
+## 2. 조연우 님 (Creature 런타임·Social)
+
+1. **v3 Social 연결은 경보 신호만 내기** (새, 사람 결정 10-17 (8))
+   - 지금 기본은 끔이다. 켜면 `EcoV3Social::ApplyControl`(`AI/Social/EcoPolicyV3SocialBridge.cpp`)이 v3 사슴 제어를 덮어쓴다.
+     - Panic 도주(93줄 근처): 무리 경보만 들은 사슴이 '지난 위협 자리 반대'로 뛴다. 우리 가장자리 굽히기를 건너뛴다.
+     - Alert(104줄 근처)·Recovering·Regrouping(118줄 근처): 우리 '경계하며 먹기'(먹는 늑대 곁 포함)를 지운다.
+   - 이것은 10-13 사람 결정('경보는 소리·고개 들기 연출로만, 행동 논리에는 넣지 않는다')과 어긋난다. 파이썬 학습 세계에도 없는 규칙이다.
+   - 바라는 것: 연결이 사슴마다 '놀람 신호'만 남긴다. 누가 놀랐나, 얼마나(세기), 어디서(보고된 위협 자리), 언제, 직접 봤나·들었나·전해 들었나.
+     - 지금 `FEcoAlarmStateFragment`(State·AlarmStrength·LastThreatPosition)가 거의 그것이다. 칸의 뜻과 갱신 순서(우리 Step 전에 채워짐)를 계약으로 적어 주면 된다.
+   - 우리 쪽: 무리 반응(놀란 동료를 보고 고개 들기·따라 뛰기)은 우리 야생 규칙으로 파이썬에서 먼저 만든다. 그 규칙이 이 신호만 읽는다.
+   - 실제 근거(추정): 사슴의 경보(꼬리 들기·콧소리·발 구르기)는 먼저 무리를 고개 들고 살피게 만든다. 출처는 규칙 설계 때 찾아 적는다.
+2. **은신처 원 안 사슴은 슬롯 수와 상관없이 그대로 두기** (새)
+   - 포획 보호는 이미 슬롯과 상관없다(팀 문서 `Docs/조연우/JYU_REFUGE_SAFETY_20261016.md`).
+   - 그런데 연결을 켜면, 슬롯(은신처마다 4)을 못 받고 웅크린 사슴이 Panic 도주로 원 밖에 나간다. 지금은 기본 끔이라 일어나지 않는다.
+   - 바라는 것: 원 안 사슴에게는 Social 도주·이동을 걸지 않는다. 슬롯은 자리 배분에만 쓴다.
+   - 실제 근거(추정): 덤불은 자리 수가 아니라 몸을 가려서 지킨다. 숨은 피식자는 들키지 않았으면 움직이지 않고 버틴다.
+3. **`AI/Policy/` 파일을 바꾸기 전에 알려 주기** (새)
+   - 이번 통합에서 `EcoWorldV3.h`·`EcoObservationV3.h`·`EcoPolicyV3Integrated*`·`EcoCreatureV3Trait`·통합 시험이 바뀌었다(`a88eac8`, `22eb1b6`). 모두 스위치 뒤라 파이썬 세계와 결과는 그대로였다.
+   - 그래도 이 파일들은 파이썬 세계와 줄마다 맞춰야 한다(골든 시험). 같은 일을 두 쪽이 따로 만들기도 했다(은신처 안전).
+   - 바라는 것: 바꾸기 전에 한 줄 알림이나 PR 설명. 끼워 넣을 자리(`EcoWorldV3::FStepHooks` 같은 훅)가 필요하면 우리가 만든다.
+4. **은신처 바위 테두리와 늑대 몸 여유** (새)
+   - `AEcoRefugeHabitat::RebuildHabitat` 는 바위 중심을 반경 안쪽 65 cm(R − 65 cm)에 두고 크기 5.5~8배로 놓는다.
+   - 우리는 10-17 에 늑대 몸 여유 1 m 를 넣었다(파이썬 `realism_shelter.wolf_margin` 0.5, 언리얼 `eco.IntegratedV3.WolfBodyMargin` 기본 1 m). 늑대 중심은 원 둘레 밖 1 m 둘레를 따라 미끄러진다(팀 규칙의 100 cm 와 같은 값). 사슴 쪽(원 안 안전)은 원 반지름 그대로다. `ShelterSafe 0` 이면 우리 여유는 0 이고 팀 규칙 여유만 쓴다.
+   - 바라는 것: 바위 바깥 끝이 원 둘레와 그 밖 1 m 사이에 오도록 맞추기. 아니면 바위의 실제 반지름(cm)을 알려 주기.
+     - 바위가 1 m 보다 밖으로 튀어나오면 늑대가 바위에 박혀 보인다. 너무 안쪽이면 늑대가 덤불 앞 허공에서 멈춘 듯 보인다.
+   - 실제 근거(추정): 늑대 몸길이(머리·몸통)는 1 m 남짓이다(Mech 1974, Mammalian Species 37 참고). 몸 중심이 덤불 가장자리에서 반 몸쯤 떨어져 멈춘다.
+5. **플레이어 위협 — 의도 확인** (새)
+   - `BP_JYU_Player` 의 `UEcoPlayerEcologyComponent`(`bThreatEnabled` 기본 참)가 있으면, v3 사슴 두뇌가 플레이어를 늑대 한 마리로 본다(위협 수·거리·다가옴 관측). 도주 반사·발소리 규칙은 플레이어를 보지 않는다.
+   - 우리 쪽에는 이것을 끄는 v3 스위치가 아직 없다.
+   - 확인할 것: 시연에서 플레이어는 사슴에게 사냥꾼(늑대처럼 피함)인가, 관찰자인가.
+     - 사냥꾼이면 5절 #11 추천과 같다. 걷기 360·잠행 270·달리기 900 cm/s 는 학습 범위(돌진 최대 1170) 안이라 괜찮다.
+     - 관찰자이면 컴포넌트의 위협을 끄거나, 우리가 스위치를 만든다.
+6. **늑대 '눕는 중'·'깨는 중' 표시 (버그)** (새)
+   - `Creature/Runtime/EcoCreatureLifecycle.cpp` 260줄 근처 늑대 상태 표는 7칸이다. 그런데 `EcoV3Integrated::WolfStateOf` 는 9가지를 돌려준다(눕는 중 `Settle`·깨는 중 `Waking` 포함).
+   - 밤잠 점진화(기본 켬)에서는 해 질 녘·새벽마다 배열 밖을 읽는다.
+   - 바라는 것: 두 칸을 더하기(예: 눕는 중 → Rest, 깨는 중 → Wander). 이름은 같이 정한다.
+7. **남은 애니메이션 연결** (10-16 요청 1 중 남은 것)
+   - 사슴 경계: 먹으며 걷고 고개를 든다. `FEcoBehaviorStateFragment::Decision.KeepActive == EcoWorldV3::kKeepAlert`(Inspector `flight_override` 1).
+   - 사슴 약함: 비축으로 사는 몸이라 느리게 걷는다. `FEcoHerbivoreBodyV3Fragment::Body.bWeak`.
+   - 늑대 배부름 휴식: `FEcoThreatStateFragment::Agent.State.SatLeft > 0`. 지금은 배회로 보인다(추정 — `WolfStateOf` 에 배부름 칸이 없다).
+
+## 3. wonkii 님 (Ecology·서버·스폰) (추정)
+
+1. **새 개체 낳기(출생) 함수** (5절 #8, wonkii·조연우)
+   - 학습 세계는 '번식으로 태어나기'를 쓰기로 했다(사람 결정 10-15 (6)). 언리얼에는 아직 없어서 통합 v3 모드는 죽은 사슴이 다시 나오지 않는다.
+   - 지금 조정자의 `Spawn(RegionId, Count, bPredator)` 은 비공개이고 무리 시작 자리(`BuildSpawnPositions`)를 쓴다. v3 지역의 웨이브는 꺼져 있다.
+   - 필요한 것: 실행 중에 새 `StableAgentId` 로 사슴 한 마리를 지정한 자리(어미 곁)에 낳는 함수. 개체군 장부의 Births 에 들어가야 한다. 우리 쪽은 그 함수만 부른다.
+   - 누가·언제·몇 마리 낳는지는 우리가 파이썬 야생 규칙에서 정한다.
+   - 실제 근거(추정): 사슴은 한 해 한 번 한두 마리를 낳는다. 게임에서는 시간을 줄여 쓴다.
+2. **PPO 와 StateTree 비교 계획** (확인)
+   - `Docs/Integration/MASS_STATETREE_PPO_COMPARISON_DEVELOPMENT_PLAN_2026-10-14.md` 가 RL 쪽에 모델·관측·정규화 목록과 골든 근거를 바랐다. 6절에 답을 적었다.
+   - 바라는 것: v3 와 견줄 때는 v3 기본값(Social 연결 끔)으로 잰다. 켠 판은 파이썬 세계와 다르다.
+
+## 4. avaroki 님 (World·레벨) (추정)
+
+1. **동물 무대 안에 충돌하는 나무·바위 놓기** (야생 2단계 3, 10-17 갱신)
+   - 우리 쪽은 끝났다: 파이썬 세계와 언리얼 C++ 에 같은 원판 규칙(둘레를 따라 미끄러짐·눈길 가림·원판 밑 먹이 적음)을 넣었고, 무대를 만들 때 레벨을 읽기만 해서
+     원판을 만든다(`eco.IntegratedV3.Obstacles` 기본 1, `RL_V3_WILD2_SPEC.md` 6절). 레벨은 고치지 않는다.
+     10-17 더함: 사슴·늑대가 줄기·바위에 막히면 가장 적게 돈 빈 방향으로 돌아간다(`eco.IntegratedV3.ObstacleDetour` 기본 1, 명세 6-7). 파이썬 숲 배치(줄기 1 ha 250)에서
+     원판에 막혀 3초 넘게 제자리인 사슴·늑대가 없어졌다(돌아가기 전에는 30세계 16분에 사슴 1228번·늑대 105번). 나무를 놓아도 동물이 줄기에 끼지 않는다.
+   - 읽어 보니 지금 `LV_Ecosystem_IntegrationTest` 의 동물 무대 셋에는 충돌하는 나무·바위가 하나도 없다. 숲 무대의 메시 38개는 모두 충돌 없는 풀(`SM_MWAM_GrassC`·`GrassD`)이고,
+     메마른 땅·고지 무대는 메시가 0이다. 바위 무늬는 지형 재질의 풀 유형이라 충돌이 없다. 그래서 지금은 사슴이 지날 나무 자체가 없다.
+   - 요청: 동물 무대(먹이 자리 둘레 약 120 m) 안에 나무·바위를 놓고 충돌을 켜기(쿼리 충돌 + WorldStatic 막음 — 팀 이동 제약 `EcoCreatureMovement::ConstrainStep` 이 막는 조건).
+     숲 무대는 1 ha 에 줄기 약 250(지름 20~60 cm)이 실제 숲과 비슷하다(ESA E094-195, 우리 파이썬 숲 설정). 가늘거나(반지름 25 cm 밑) 낮은(50 cm 밑) 것은 우리 코드가 뺀다.
+     무대 벽(무대 상자 가장자리)에 바짝 붙이지 않으면 사슴이 구석에 덜 낀다.
+   - 공식 레벨이 wonkii 님의 `Integration_JwJ` 로 정해지면 wonkii 님께 같은 요청을 한다(추정).
+   - 실제 근거(추정): 숲의 나무와 바위는 쫓기는 사슴이 돌아가야 하는 길을 만들고, 늑대가 사슴을 보는 길을 가린다.
+   - 10-17 저녁 PR 확인(`ff8c8f4` '지역별 비·눈 날씨 및 나무 장애물 배치', 우리 쪽 병합 `3e90177`, 읽기만 한 결과 `herbivore_rl/results/v3/wild2/level_shc/README.md`):
+     - 나무(`/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree`) 11 그루는 `LV_SHC_RegionalWeatherTest` 의 숲 지역에 있지만 동물 무대 셋 밖이다(가장 가까운 것이 숲 무대 남쪽 끝에서 14.7 m).
+       이 맵에는 통합 조정자·은신처 앵커가 없어 동물이 나오지 않고 우리 통합 v3 모드도 돌지 않는다.
+     - 요청 1: 나무를 `LV_Ecosystem_IntegrationTest`(또는 공식 레벨)의 동물 무대 안(먹이 자리 `Eco_FoodHint_*` 둘레 120 m 상자)에 놓기. 그러면 우리 코드가 그대로 읽는다.
+     - 요청 2: `Beech_Tree` 의 단순 충돌을 줄기 캡슐(반경 약 0.8 m, 높이 2~3 m)로 바꾸기. 지금은 잎까지 감싼 볼록 껍질 하나(28 × 27 × 25 m)라서,
+       땅 위 60 cm 에서 줄기로부터 8~13 m 떨어진 허공이 막힌다(팀 이동 제약도 같은 충돌을 쓴다). 우리 읽기로는 나무마다 반경 13.8 m 원판이 된다.
+     - 요청 3: 나무를 땅에 붙이기. 11 그루 모두 z = −1310 이라 9 그루는 1.8~4.6 m 묻혔고 2 그루는 0.8 m·3.2 m 떠 있다.
+     - 요청 4: `/Game/Actors/BP_WeatherManager_PlayerFollow` 리디렉터가 없는 애셋(`/Game/SHC/Blueprints/Weather/BP_WeatherManager_PlayerFollow`)을 가리켜
+       `LV_JYU_V3Integration`·`LV_JYU_RefugeSafety`·`Integration_JwJ` 의 날씨 액터가 빠진다. 옛 `/Game/Foliage/FT_GrassC·D` 도 리디렉터 없이 옮겨졌다.
+     - 날씨는 지금 보이고 들리는 것만이다(카메라가 지역 트리거 상자 안이면 비·눈 이펙트와 소리). 지역 강수 값(`FRegionEnvironmentState.Rainfall`)은 0 그대로라 게임 규칙은 안 바뀐다.
+       게임 값으로 잇고 싶으면 이미 있는 `AEcoRegionEnvironmentAdapter::ApplyRainfall` 을 서버에서 부르면 된다(우리 학습 세계의 날씨 규칙은 아직 없다 — 나중에 같이 정한다).
+       `BP_SkyManager` 의 SunSpeed 는 팀 시계와 따로 돌아서, 올리면 보이는 해·달과 동물의 낮밤(통합 v3 모드 60 + 60 초)이 어긋난다. `OnClockUpdated` 로 시계에 맞추기를 권한다.
+     - 보낼 글(붙여 넣기용): `FEEDBACK_AVAROKI_1017.md` — 무대 상자 좌표·은신처 자리·나무 수, 날씨 값을 읽을 곳(`GetEnvironmentState`, 눈 칸 더하기, 지역마다 어댑터), 공식 레벨 정하기. 학습 계획은 `RL_V3_R4_PLAN.md`.
+2. **공식 레벨에 보호 은신처 놓기** (5절 #6)
+   - 조연우 님의 `BP_JYU_ProtectedRefuge` 를 공식 레벨의 동물 무대 안에 놓는다. 지역마다 4곳 이상, 반경 8~12 m, 먹이 자리 둘레 약 150 m 안.
+   - 그러면 우리 코드가 그 자리를 읽고 임시 은신처를 만들지 않는다. 자동 생성은 하지 않는다(팀 규칙).
+3. **먹이가 보이게** (선택)
+   - 사슴이 먹는 먹이 덩어리가 화면에 안 보여서, 아무 데서나 먹는 것처럼 보인다.
+   - 풀 밀도나 색을 먹이 격자와 맞출 방법을 같이 정한다. 우리 쪽은 격자 값을 내보낼 수 있다.
+4. **동물 무대 지형 칠하기** (선택, R3 명세)
+   - 무대 안에 눈·거친 땅 덩어리를 칠한다.
+   - 기준: 무대 넓이의 눈 25% 이하, 거친 땅 15% 이하, 덩어리 지름 12~40 m.
+
+## 5. 팀 모두
+
+1. **`AGENTS.md` 정책 표기 갱신** (5절 #15): 지금 문구는 v1 공유 망(7 → 64 → 64 → 4)이다. v3(관측 18 → 64 → 64 → 행동 5, 마스크, 실행기)로 고친다. v3 사슴에는 Social `ModulatedAction` 이 이동을 바꾸지 않는다는 예외도 적는다(10-17 (8)).
+2. **시연 마감·매체** (5절 #16): 아직 미정이다.
+3. **공식 레벨 하나 정하기** (새)
+   - 지금 세 곳에 나뉘어 있다.
+     - `/Game/Map/LV_Ecosystem_IntegrationTest`: 우리 헤드리스 견줌과 발표 영상 판.
+     - `/Game/JYU/Maps/LV_JYU_V3Integration`·`LV_JYU_RefugeSafety`: 조연우 님 표현·은신처·표면·플레이어가 들어간 복사 맵.
+     - `/Game/JWJ/Integration_JwJ`: wonkii 님 레벨.
+   - 시연에 쓸 레벨을 하나 정하면 은신처·장애물·표면 요청을 그 레벨로 모은다. 우리 견줌도 그 레벨로 옮긴다.
+4. **통합 v3 모드 같이 보기**
+   - 0절 방법으로 Play 해서 이상한 장면이 보이면 알려 주면 된다.
+   - 팀 무리 경보 연결을 보고 싶으면 Play 전에 `eco.IntegratedV3.SocialControl 1`(또는 `-EcoV3SocialControl=1`). 그 판은 파이썬 세계와 다르다.
+   - 지금 알려진 것(10-17 저녁): 전에 적은 '늑대가 잘 못 잡는다(230초에 잡힌 몫 약 2%)'는 고쳤다. 늑대 몸 여유 1 m·은신처 먹이 부족·늑대 무리(지역마다 4)·협동 사냥·장애물(돌아가기 포함)을 모두 넣었고,
+     지금 기본값에서 230초에 잡힌 몫은 사슴 128마리 판 약 5% 다(`herbivore_rl/results/v3/wild2/README.md`). 장애물은 레벨에 충돌하는 나무·바위가 없어 아직 쓰이지 않는다(4절 1).
+     언리얼에서 늑대가 사냥을 파이썬보다 조금 더 자주 시작하는 까닭은 아직 모른다(잡힘 수는 같다, `RL_V3_WILD2_SPEC.md` 6-6).
+
+## 6. 팀이 우리에게 바란 것과 답
+
+- 조연우 님(`JYU_REFUGE_SAFETY_20261016.md`): 파이썬 거울에 같은 원형 경계·보호 필터를 넣어 달라.
+  - 답: 파이썬 `realism_shelter` 가 이미 같은 보호를 한다(원 안 사슴 표적·포획 제외, 늑대는 원 밖). 통합 기본값은 이 규칙 하나다. 남은 차이였던 늑대 몸 여유 1 m 는 10-17 에 파이썬에 넣고 골든으로 C++ 와 맞췄다(명세 `RL_V3_WILD1_SPEC.md` 12절).
+- wonkii 님(`MASS_STATETREE_PPO_COMPARISON_DEVELOPMENT_PLAN_2026-10-14.md`): PPO 모델·관측·정규화 목록, 골든 근거, 기준 조건.
+  - 답: 계약서 `POLICY_CONTRACT_V3.md`, 야생 규칙 명세 `RL_V3_WILD1_SPEC.md`, 골든 헤더(`AI/Policy/*GoldenVectorsV3.h`)와 시험(`AI/Policy/Tests/`)에 있다. 기준 조건은 통합 v3 기본값이다.

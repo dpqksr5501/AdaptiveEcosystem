@@ -1,0 +1,205 @@
+{
+ "meta": {
+  "generated": "2026-10-03T09:47:25+00:00",
+  "command": "python diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30_stoch --act-mode stochastic --workers 6",
+  "python": "3.13.5",
+  "name": "v2_1c_s30_stoch",
+  "spec": {
+   "kind": "learned",
+   "model": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v2\\v2_1c_s30.zip",
+   "mode": "stochastic"
+  },
+  "eval_seeds": [
+   10000,
+   10001,
+   10002,
+   10003,
+   10004,
+   10005,
+   10006,
+   10007,
+   10008,
+   10009,
+   10010,
+   10011,
+   10012,
+   10013,
+   10014,
+   10015,
+   10016,
+   10017,
+   10018,
+   10019
+  ],
+  "eval_steps": 5000,
+  "gamma": 0.9916661555611042,
+  "tail": 600,
+  "model_sha1": "434d3cbc597a",
+  "config_version": "2.1",
+  "config_digest": "f068496361f9",
+  "head": 0,
+  "act_mode": "stochastic",
+  "model_gamma": 0.9916661555611042,
+  "act_names": [
+   "forage",
+   "cohesion",
+   "flee_dist",
+   "cover",
+   "speed"
+  ],
+  "obs_names": [
+   "food_density",
+   "pred_count",
+   "pred_dist",
+   "kin_count",
+   "energy",
+   "recent_predation",
+   "cover_dist"
+  ],
+  "calib_seeds": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19
+  ],
+  "calib_steps": 3000
+ },
+ "calib": {
+  "seeds": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19
+  ],
+  "steps": 3000,
+  "record_every": 30,
+  "mean_action": {
+   "forage": 0.13084297875754466,
+   "cohesion": 0.8866528681666692,
+   "flee_dist": 0.4061707998041244,
+   "cover": 0.0518756188462019,
+   "speed": 0.45287641528544975
+  },
+  "std_action": {
+   "forage": 0.09444437736991326,
+   "cohesion": 0.07311772988320878,
+   "flee_dist": 0.15054300461754325,
+   "cover": 0.023494615462917673,
+   "speed": 0.10669689345254066
+  },
+  "obs_mean": {
+   "food_density": 0.056965817871766244,
+   "pred_count": 0.035491780598958335,
+   "pred_dist": 0.9331309407753947,
+   "kin_count": 0.5073087509659148,
+   "energy": 0.5197627213710402,
+   "recent_predation": 0.024426929933028564,
+   "cover_dist": 0.2827764468812114
+  },
+  "obs_quantiles_5_50_95": {
+   "food_density": [
+    0.0008545388525817544,
+    0.032643694430589676,
+    0.18742988258600235
+   ],
+   "pred_count": [
+    0.0,
+    0.0,
+    0.125
+   ],
+   "pred_dist": [
+    0.5519338458776474,
+    1.0,
+    1.0
+   ],
+   "kin_count": [
+    0.05000000074505806,
+    0.44999998807907104,
+    1.0
+   ],
+   "energy": [
+    0.09285714477300644,
+    0.47171786427497864,
+    0.9980005025863647
+   ],
+   "recent_predation": [
+    0.006976588093675675,
+    0.021202722564339638,
+    0.04944654498249132
+   ],
+   "cover_dist": [
+    0.0,
+    0.1901632472872734,
+    0.9812057495117185
+   ]
+  },
+  "samples": 256000
+ },
+ "outcome_mean_on_calib_seeds": {
+  "mean_return": -7.801279022849135,
+  "survival": 325.78388826654435,
+  "repro": 5.91875,
+  "predation_rate": 0.0024597656249999997,
+  "cohesion_mean": 0.8866528681666693,
+  "flee_dist_mean": 0.40617079980412435,
+  "flee_dist_std": 0.1504572921895381,
+  "cover_frac": 0.27494583333333333,
+  "react_pred": 0.030098362616630726,
+  "react_hunger": 0.002645047317362182,
+  "g_gamma": -0.20265637384951804,
+  "starve_rate": 0.0008187499999999998,
+  "starve_share": 0.25279989608525133,
+  "stop_frac": 0.13378802083333333,
+  "walk_frac": 0.8371485677083333,
+  "run_frac": 0.029063411458333334,
+  "stall_frac": 0.0030735677083333335,
+  "stop_frac_cmd": 0.130714453125,
+  "walk_frac_cmd": 0.840201953125,
+  "run_frac_cmd": 0.029083593749999997,
+  "hungry_frac": 0.5645276041666667,
+  "b1": 0.3243086491457673,
+  "p_run_unseen": 0.010946585962121932,
+  "p_run_d025": 0.5866319779499858,
+  "p_run_d050": 0.27214041048008447,
+  "p_run_d100": 0.044684809655132454,
+  "b2": 0.08024182535389227,
+  "p_stop_hungry": 0.16713625676357616,
+  "p_stop_full": 0.08689443140968384,
+  "b8": 1.980560790563811,
+  "b8_cmd": 1.9889643806232207,
+  "intake_per_step": 0.0024454698458062614,
+  "drain_per_step": 0.0020107399367559472
+ }
+}

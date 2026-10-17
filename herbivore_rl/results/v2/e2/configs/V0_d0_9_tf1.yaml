@@ -1,0 +1,39 @@
+# Gate E2 V0 후보 d0_9 #18 변형 — gate_e2.py configs 가 configs/v2_2.yaml 에서 만들었다. 손으로 고치지 않는다.
+# 바꾼 계수(그 밖은 configs/v2_2.yaml 와 같다): vigilance.decay = 0.9 (반감기 6.6스텝, θ 0.5 에서 놓친 뒤 6스텝까지 최근 위협),
+#   vigilance.eat_mult = 0.0 (회차 V0), vigilance.threat_flee = 1.0 (10절 #18 변형 — E2b 보고 팔 전용)
+version: '2.2'
+overrides:
+  rand:
+    pred_speed_mult:
+    - 0.6
+    - 0.95
+features:
+  speed:
+    enabled: true
+    thresholds:
+    - 0.3333333333333333
+    - 0.6666666666666666
+    gait_speed:
+    - 0.0
+    - 0.4
+    - 1.0
+    gait_eat:
+    - 1.0
+    - 0.5
+    - 0.0
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+  vigilance:
+    enabled: true
+    threshold: 0.5
+    decay: 0.9
+    eat_mult: 0.0
+    fov_deg: 360.0
+    threat_flee: 1.0
+train:
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256
+  init_action_bias:
+    vigilance: -0.84

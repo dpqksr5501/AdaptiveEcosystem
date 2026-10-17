@@ -1,0 +1,101 @@
+{
+ "meta": {
+  "generated": "2026-10-03T11:07:03+00:00",
+  "command": "python diagnose_v2.py r2 --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33",
+  "python": "3.13.5",
+  "name": "v2_1c_s33",
+  "spec": {
+   "kind": "learned",
+   "model": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v2\\v2_1c_s33.zip"
+  },
+  "eval_seeds": [
+   10000,
+   10001,
+   10002,
+   10003,
+   10004,
+   10005,
+   10006,
+   10007,
+   10008,
+   10009,
+   10010,
+   10011,
+   10012,
+   10013,
+   10014,
+   10015,
+   10016,
+   10017,
+   10018,
+   10019
+  ],
+  "eval_steps": 5000,
+  "gamma": 0.9916661555611042,
+  "tail": 600,
+  "model_sha1": "2bac5eefc01e",
+  "config_version": "2.1",
+  "config_digest": "f068496361f9",
+  "head": 0,
+  "act_mode": "deterministic",
+  "model_gamma": 0.9916661555611042,
+  "act_names": [
+   "forage",
+   "cohesion",
+   "flee_dist",
+   "cover",
+   "speed"
+  ],
+  "obs_names": [
+   "food_density",
+   "pred_count",
+   "pred_dist",
+   "kin_count",
+   "energy",
+   "recent_predation",
+   "cover_dist"
+  ],
+  "calib_seeds": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19
+  ],
+  "calib_steps": 3000
+ },
+ "samples": 256000,
+ "r2": {
+  "C0": [
+   0.9772859035584258,
+   0.8968109319106653,
+   0.9526261682228292,
+   0.9946632234706136,
+   0.9835115893627787
+  ]
+ },
+ "act_std": {
+  "C0": [
+   0.07001084659684498,
+   0.08344203027612719,
+   0.10261019333651124,
+   0.12025711841704927,
+   0.08037355311619244
+  ]
+ }
+}

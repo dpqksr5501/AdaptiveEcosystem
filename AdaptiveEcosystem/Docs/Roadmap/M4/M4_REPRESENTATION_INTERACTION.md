@@ -1,5 +1,9 @@
 # M4 — Representation & Player Interaction
 
+> 상세 단계: [M4 구현 계획](M4_IMPLEMENTATION_PLAN.md) — 공간 검색, Replication LOD, 보간, Actor 전환, 서버 상호작용과 대규모 검증.
+
+현재 코드 진행: [M4.1 데이터 계약](M4_1_DATA_CONTRACT.md), [M4.2 연결별 갱신 간격](M4_2_REPLICATION_INTERVAL.md). [에디터 수동 테스트](M4_EDITOR_TEST.md)와 [검증 기록](M4_VALIDATION_REPORT.md)에서 실제 확인 범위를 구분한다.
+
 ## 목표
 
 복제된 Mass 개체를 Client에서 효율적으로 표현하고, 플레이어 상호작용이 Server의 생태 상태에 안전하게 반영되도록 연결한다.
@@ -7,6 +11,7 @@
 ## 범위
 
 - 거리와 중요도에 따른 Mass Representation LOD
+- Client별 공간 후보 검색과 Replication LOD 갱신 주기·개수·대역폭 예산
 - Client Transform 보간과 시각 상태 표현
 - 중요한 개체의 Actor Representation 전환
 - StableAgentId를 이용한 Mass와 Actor 대응
@@ -28,3 +33,5 @@ Actor와 Client Mass 프록시는 표현자이며 논리 상태의 주인이 아
 ## 제외 범위
 
 복잡한 전투 시스템, 플레이어별 기억, 길들이기와 개별 평판은 MVP에서 다루지 않는다.
+
+특성별 최종 Spawn은 협업 계약에 맞춰 별도 통합한다. M4는 기존 Box 개체와 임시 표현 에셋으로 진행할 수 있다. 쿼드트리/옥트리의 운영 도입은 기본 MassReplication Grid와의 정확성·총비용 비교 결과에 따라 결정한다.

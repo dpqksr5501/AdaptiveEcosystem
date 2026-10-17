@@ -1,0 +1,32 @@
+# v3 R2 무리 확인·역침입 wr2
+
+설정 configs/v3_r2_on.yaml, 시드 12160~12199 (40개) × 3000스텝, R_base(θ 4, a 0.9), X = ['look']. 무리 = 128마리 개체-스텝당 보상의 (변형 − 모두 R_base) 시드 짝 t, 역침입 = 슬롯 0~15(R_base) − 나머지(R_base + X). 보고만 한다(H1 근거).
+
+변형: pop = 모두 R_base + X − 모두 R_base, rev = 역침입, base_off = 모두 R_base 의 장치 켬 − 끔(v3_r1_on), wr2 의 fsm·graze = 모두 FSM_R2·모두 늘 먹기 − 모두 R_base.
+
+| 변형 | 칸 평균 | 유의 양수 칸 | 유의 음수 칸 | ps0.3_pl_T600 | ps0.3_pl_T1800 | ps0.3_np_T600 | ps0.3_np_T1800 | ps0.7_pl_T600 | ps0.7_pl_T1800 | ps0.7_np_T600 | ps0.7_np_T1800 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| pop | +0.00112 | 4 | 0 | +0.00120 (+2.12) | +0.00159 (+1.98) | +0.00246 (+4.15) | +0.00168 (+2.95) | +0.00027 (+0.41) | -0.00026 (-0.40) | +0.00088 (+1.27) | +0.00117 (+2.09) |
+| rev | -0.00150 | 0 | 5 | -0.00154 (-2.29) | -0.00205 (-3.74) | -0.00212 (-3.61) | -0.00067 (-1.31) | -0.00069 (-0.95) | -0.00132 (-2.18) | -0.00257 (-3.89) | -0.00101 (-1.66) |
+| fsm | -0.00250 | 0 | 8 | -0.00383 (-4.74) | -0.00269 (-3.97) | -0.00211 (-4.07) | -0.00286 (-4.39) | -0.00230 (-3.71) | -0.00203 (-3.31) | -0.00222 (-3.32) | -0.00197 (-3.43) |
+| graze | -0.00349 | 0 | 8 | -0.00485 (-7.42) | -0.00353 (-5.42) | -0.00332 (-4.88) | -0.00301 (-4.16) | -0.00320 (-3.68) | -0.00388 (-5.00) | -0.00312 (-3.52) | -0.00302 (-4.45) |
+| base_off | +0.00016 | 1 | 0 | +0.00072 (+1.69) | -0.00007 (-0.13) | -0.00083 (-1.89) | -0.00032 (-0.94) | +0.00029 (+0.67) | +0.00110 (+2.27) | +0.00024 (+0.49) | +0.00017 (+0.43) |
+
+위협 유형별 포획률(개체-스텝당, 칸·시드 평균)·아사율:
+
+| 변형 | 근접 추격 | 원거리 | 잠행 | 플레이어 | 아사 |
+|---|---|---|---|---|---|
+| base | 0.00055 | 0.00009 | 0.00079 | 0.00002 | 0.00034 |
+| pop | 0.00046 | 0.00007 | 0.00072 | 0.00002 | 0.00033 |
+| rev | 0.00048 | 0.00008 | 0.00073 | 0.00002 | 0.00034 |
+| fsm | 0.00059 | 0.00009 | 0.00073 | 0.00003 | 0.00036 |
+| graze | 0.00068 | 0.00012 | 0.00090 | 0.00003 | 0.00037 |
+| base_off | 0.00056 | 0.00009 | 0.00080 | 0.00002 | 0.00034 |
+
+보이는 지표(사전 등록 5절, 칸·시드 평균, *_per1000 = 1000 개체-스텝당):
+
+- base · alarm: emit_h0 1952, emit_h1 0, emit_h2 0, cry_n 554.6, listen_per_emit 8.896, alarm_frac 0.1791, alarm_unseen_frac 0.6972, e7_n 1744, e7_switch_frac 0.07798, heard_entry_flee 0, heard_entry_hide —, heard_entry_freeze —, alarm_gap_mean 160.1, dir_n 4277, dir_ok_pt 0.9473, dir_ok_copy 0.4388, wave_size_mean 0, heads_up_1s 0.1765, false_alarm_frac 0.2395, e7_decide_frac 0.9995, heads_up_1s_r16 0.1219, emit_h0_per1000 5.083, emit_h1_per1000 0, emit_h2_per1000 0, cry_n_per1000 1.444, e7_n_per1000 4.543, dir_n_per1000 11.14
+- pop · alarm: emit_h0 2391, emit_h1 2501, emit_h2 824.3, cry_n 490.1, listen_per_emit 9.569, alarm_frac 0.2539, alarm_unseen_frac 0.5937, e7_n 2968, e7_switch_frac 0.5292, heard_entry_flee 0, heard_entry_hide —, heard_entry_freeze 1, alarm_gap_mean 134.8, dir_n 3602, dir_ok_pt 0.9129, dir_ok_copy 0.6435, wave_size_mean 1.412, heads_up_1s 0.4084, false_alarm_frac 0.1858, e7_decide_frac 0.9938, heads_up_1s_r16 0.3381, emit_h0_per1000 6.226, emit_h1_per1000 6.513, emit_h2_per1000 2.147, cry_n_per1000 1.276, e7_n_per1000 7.729, dir_n_per1000 9.379
+- rev · alarm: emit_h0 2341, emit_h1 2182, emit_h2 672.9, cry_n 501.3, listen_per_emit 9.376, alarm_frac 0.2467, alarm_unseen_frac 0.6066, e7_n 2912, e7_switch_frac 0.4694, heard_entry_flee 0, heard_entry_hide —, heard_entry_freeze 1, alarm_gap_mean 132.2, dir_n 3880, dir_ok_pt 0.9163, dir_ok_copy 0.6138, wave_size_mean 1.237, heads_up_1s 0.3746, false_alarm_frac 0.1944, e7_decide_frac 0.9943, heads_up_1s_r16 0.3053, emit_h0_per1000 6.097, emit_h1_per1000 5.683, emit_h2_per1000 1.752, cry_n_per1000 1.306, e7_n_per1000 7.584, dir_n_per1000 10.1
+- fsm · alarm: emit_h0 2091, emit_h1 1147, emit_h2 653.2, cry_n 548.9, listen_per_emit 9.554, alarm_frac 0.2595, alarm_unseen_frac 0.4815, e7_n 2505, e7_switch_frac 0.5354, heard_entry_flee —, heard_entry_hide 0, heard_entry_freeze 0.7773, alarm_gap_mean 117.6, dir_n 3793, dir_ok_pt 0.9166, dir_ok_copy 0.6622, wave_size_mean 0.8961, heads_up_1s 0.2165, false_alarm_frac 0.2951, e7_decide_frac 0.995, heads_up_1s_r16 0.1909, emit_h0_per1000 5.446, emit_h1_per1000 2.987, emit_h2_per1000 1.701, cry_n_per1000 1.429, e7_n_per1000 6.522, dir_n_per1000 9.877
+- graze · alarm: emit_h0 666.5, emit_h1 0, emit_h2 0, cry_n 666.5, listen_per_emit 7.435, alarm_frac 0.1066, alarm_unseen_frac 0.6149, e7_n 1570, e7_switch_frac 0, heard_entry_flee —, heard_entry_hide —, heard_entry_freeze —, alarm_gap_mean 163.8, dir_n 1236, dir_ok_pt 0.9642, dir_ok_copy 0.2014, wave_size_mean 0, heads_up_1s 0, false_alarm_frac —, e7_decide_frac 0.9999, heads_up_1s_r16 0, emit_h0_per1000 1.736, emit_h1_per1000 0, emit_h2_per1000 0, cry_n_per1000 1.736, e7_n_per1000 4.088, dir_n_per1000 3.219

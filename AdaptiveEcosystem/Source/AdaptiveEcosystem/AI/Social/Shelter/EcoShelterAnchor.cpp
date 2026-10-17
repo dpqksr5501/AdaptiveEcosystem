@@ -38,7 +38,7 @@ void AEcoShelterAnchor::BeginPlay()
 				GetActorForwardVector(),
 				Quality,
 				Capacity,
-				Radius
+				Radius, SlotRadiusFraction, bProjectSlotsToGround
 			);
 		}
 	}
