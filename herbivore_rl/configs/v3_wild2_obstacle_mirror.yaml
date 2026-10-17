@@ -1,27 +1,32 @@
-# 야생 2단계 3 거울 세계 — 도주를 막는 세로 장애물(나무 줄기·바위) (10-17 사용자 '추천대로 끄고 2~4번 진행해').
+# 야생 2단계 3 거울 세계 — 도주를 막는 세로 장애물(나무 줄기·바위) (10-17 사용자 '추천대로 끄고 2~4번 진행해' — 끈 것은 팀 무리 경보 연결뿐).
 # 명세 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_WILD2_SPEC.md 6절. 정의·식은 env_v2/world.py 모듈 docstring '야생 2단계' 3. 재기 전용 세계이고 학습하지
 # 않는다(부활 없음). 실행기 results/v3/mirror/run_mirror.py --config configs/v3_wild2_obstacle_mirror.yaml. 결과 results/v3/wild2/README.md.
 #
-# = configs/v3_wild2_pack_mirror.yaml(늑대 4 + 협동 사냥, 그 머리 주석은 아래에 그대로 둔다) + obstacles(12) 블록 하나:
+# = configs/v3_wild2_pack_mirror.yaml(늑대 4 + 협동 사냥 + 은신처 먹이 부족, 그 머리 주석은 아래에 그대로 둔다) + obstacles(12) 블록 하나:
 #   무대(120 m = 1.44 ha)에 나무 줄기 360 그루(1 ha 250, 반지름 10~30 cm)와 바위 7 개(1 ha 5, 반지름 0.5~1.5 m)를 놓는다. 은신처 원 안에는 놓지 않는다.
 #   사슴·늑대는 원판(반지름 + 몸 30 cm) 앞에서 멈춰 둘레를 따라 미끄러지고, 원판이 눈길을 가린다(발소리는 못 가린다). 원판 밑 먹이는 덮인 몫만큼 적다.
 #   언리얼 팀 통합 레벨의 무대에는 충돌하는 나무·바위가 없다(10-17 읽기: 숲 무대의 메시 38 개는 모두 충돌 없는 풀) — 그래서 밀도는 언리얼 숲 무대가 아니라
 #   실제 숲 자료로 정했다(아래 블록 주석). 언리얼과 같은 원판으로 견줄 때는 실행기 --unreal-obstacles 가 fixed 로 덮는다.
 # obstacles 를 끄면 v3_wild2_pack_mirror.yaml 과 비트 단위로 같다(tests/test_wild2_obstacle.py). 시드: 탐색 32000~32099·33000~33099 만.
+# 언리얼 통합 기본(늑대 4·협동·몸 여유 1 m·은신처 먹이 부족·세로 장애물 켬)의 거울이 이 설정이다(레벨에 원판이 없으면 v3_wild2_pack_mirror.yaml 과 같다).
+# 10-17 고침: 은신처 먹이 부족 블록을 다시 넣었다(아래 v3_wild2_pack_mirror.yaml 머리 주석). 고침 전 측정(81c6409)은 --disable realism_cover_food.
 #
 # ── 아래는 v3_wild2_pack_mirror.yaml 의 머리 주석 그대로 ──
-# 야생 2단계 2 거울 세계 — 늑대 무리·협동 사냥 (10-17 사용자 '추천대로 끄고 2~4번 진행해').
+# 야생 2단계 2 거울 세계 — 늑대 무리·협동 사냥 (10-17 사용자 '추천대로 끄고 2~4번 진행해' — 끈 것은 팀 무리 경보 연결뿐, 아래).
 # 명세 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_WILD2_SPEC.md. 정의·식은 env_v2/world.py 모듈 docstring '야생 2단계' 2. 재기 전용 세계이고 학습하지
 # 않는다(부활 없음). 실행기 results/v3/mirror/run_mirror.py --config configs/v3_wild2_pack_mirror.yaml. 결과 results/v3/wild2/README.md.
 #
-# = configs/v3_wild1_mirror.yaml(야생 1단계 + 10-16 고침 + 10-17 늑대 몸 여유 1 m, 그 머리 주석은 아래에 그대로 둔다) + 두 가지:
+# = configs/v3_wild2_mirror.yaml(= v3_wild1_mirror.yaml 야생 1단계 + 10-16 고침 + 10-17 늑대 몸 여유 1 m + 1 은신처 먹이 부족, 그 머리 주석은 아래에
+#   그대로 둔다) + 두 가지:
 #   (1) 늑대 수 rand.predator_count 2 → 4 (지역당 4, 언리얼 eco.IntegratedV3.WolvesPerRegion 기본 4). 구성은 integrated_stage.wolf_kinds 'alternate'
 #       그대로(슬롯 짝수 잠행-돌진형·홀수 근접 추격형 → 잠행 2·추격 2). 시작 자리는 무대 네 모서리 쪽(stage). 사슴 두뇌 R1b 의 학습 범위(보통 위협 2~12,
 #       잠행 비율 30~70% — 50%)와 관측 분모(obs_pred_count_norm 8) 안이다.
 #   (2) wild_pack(30): 한 늑대가 사슴을 쫓는 동안 쉬던 동료가 그 사슴이 달아날 곳(향하는 은신처의 문, 없으면 도주선 앞 lead)으로 가서 기다린다.
-# 1단계 은신처 먹이 부족(realism_cover_food, configs/v3_wild2_mirror.yaml)은 켜지 않는다 — 사용자 결정 10-17 '추천대로 끄고'(잡힘은 그대로이고 16분 판
-# 굶음만 13.4 → 17.7% 로 늘었다). v3_wild2_mirror.yaml 은 기록용으로 그대로 둔다.
-# wild_pack 을 끄고 predator_count 를 [2, 2] 로 두면 v3_wild1_mirror.yaml 과 비트 단위로 같다(tests/test_wild2_pack.py). 시드: 탐색 32000~32099·33000~33099 만.
+# 1 은신처 먹이 부족(realism_cover_food 0.15)은 켠다 — 사용자의 서 있는 결정(10-14·10-15) '은신처는 안전하지만 먹이가 적다, 배고픈 사슴은 나와야 한다'.
+#   10-17 고침: 처음 이 설정(40b0c58)은 사용자 말 '추천대로 끄고 2~4번 진행해'(10-17)를 은신처 먹이 부족을 끄라는 뜻으로 잘못 읽어 이 블록을 뺐다.
+#   그 말은 팀 무리 경보 연결(eco.IntegratedV3.SocialControl)을 끄고 2~4 단계를 하라는 뜻뿐이었다. 그래서 다시 넣었다. 뺀 판(고침 전 측정)은
+#   실행기 --disable realism_cover_food 로 다시 만든다.
+# wild_pack 을 끄고 predator_count 를 [2, 2] 로 두면 v3_wild2_mirror.yaml 과 비트 단위로 같다(tests/test_wild2_pack.py). 시드: 탐색 32000~32099·33000~33099 만.
 #
 # ── 아래는 v3_wild1_mirror.yaml 의 머리 주석 그대로 ──
 # (야생 1단계 머리 주석) 야생 규칙 1단계 거울 세계 (10-15 사용자 '야생 생태계 규칙을 만들어', '사슴이 굶어도 좀 버티도록', '늑대 피해서 도망가다 굶어 죽는 게 말이 안 된다').
@@ -336,6 +341,16 @@ features:
     block_predators: true
     # 10-17 선택 키(env_v2/features.py OPTIONAL_KEYS, 기본 0 = 10-16 그대로): 늑대 몸 여유 0.5(1 m). 늑대 중심은 원 반지름 + 1 m 밖에 머문다
     wolf_margin: 0.5
+
+  # ── 야생 2단계 1 (10-17, 명세 RL_V3_WILD2_SPEC.md) ─────────────────────────────────────────────────────────────────────────────────────
+  # 은신처 먹이 부족 = configs/v3_wild2_mirror.yaml 의 블록 그대로(정의·식은 env_v2/world.py 모듈 docstring (e)). 은신처 원과 조금이라도 겹치는 셀의
+  #   용량과 재생률을 밖의 15% 로 둔다. 언리얼 eco.IntegratedV3.ShelterFood(기본 1)가 같은 식이다.
+  #   10-17 고침: 처음 이 설정(40b0c58)에서는 사용자 말을 잘못 읽어 뺐다(머리 주석). 사용자의 결정은 '은신처는 안전하지만 먹이가 적다'(10-14·10-15)다.
+  #   현실 근거: 닫힌 숲 밑 사슴 먹이는 트인 곳의 약 12~14%(Lashley 외 2011). 재생 몫을 같게 둔 것은 어림
+  realism_cover_food:
+    enabled: true
+    cap_frac: 0.15
+    regen_frac: 0.15
 
   # ── 야생 2단계 2 (10-17, 명세 RL_V3_WILD2_SPEC.md) ─────────────────────────────────────────────────────────────────────────────────────
   # 늑대 무리 협동 사냥(정의·식은 env_v2/world.py 모듈 docstring '야생 2단계' 2, 함수 pack_goals). 앞장 = 표적을 쫓으며 전력으로 달리는 늑대,

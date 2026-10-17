@@ -2,7 +2,8 @@
 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md, 정의는 env_v2/world.py 모듈 docstring '야생 2단계' 2).
 
 비트 동일: 끈 세계는 직전 커밋(1675861)의 코드와 궤적·통계·v1 난수 상태·기능 스트림이 같다(야생 1·2단계 거울·R3 설정, R1b 롤아웃 포함).
-새 설정에서 wild_pack 을 끄고 늑대를 2 로 두면 v3_wild1_mirror.yaml 과 같다.
+새 설정에서 wild_pack 을 끄고 늑대를 2 로 두면 v3_wild2_mirror.yaml(1 은신처 먹이 부족 켬)과 같다(10-17 고침 — 처음에는 먹이 부족을 빼고
+v3_wild1_mirror.yaml 과 견줬다).
 규칙 단위 시험: pack_goals 손 장면(은신처 문·도주선 앞·기다림·서 있는 사슴·join_r 밖·같은 거리·맵 가장자리·반경 0 원), 롤아웃에서 돕는 늑대는 사냥 중이고
 전력으로 달리지 않으며(먹기·배부름·잠·돌진 아님) 목표 쪽으로 기본 속력으로 가거나 멈춰 사슴 쪽을 본다, 늑대는 은신처 원(반지름 + 몸 여유)에 들지 않는다,
 통계의 맞춤. 시드는 탐색 32084~32089 만 쓴다.
@@ -30,6 +31,7 @@ from env_v2.world import PT_CHASER, PT_STALKER, ST_POUNCE, World, _wild_pack_par
 
 CFG = ROOT / "configs"
 WILD1 = CFG / "v3_wild1_mirror.yaml"
+WILD2 = CFG / "v3_wild2_mirror.yaml"
 PACK = CFG / "v3_wild2_pack_mirror.yaml"
 R1_MODEL = ROOT / "ckpt" / "v3" / "v3_r1_g995_s3_20m.zip"
 BASE_COMMIT = "1675861"              # 야생 2단계 2 직전 커밋(은신처 먹이 부족 C++) — 비트 동일 기준
@@ -65,17 +67,21 @@ def _graze(w):
 # --------------------------------------------------------------------- #
 
 
-def test_pack_config_is_wild1_plus_pack():
-    """v3_wild2_pack_mirror.yaml = v3_wild1_mirror.yaml + 늑대 4 + wild_pack 블록(version 만 다르다). 은신처 먹이 부족은 끈다(사용자 결정 10-17)."""
-    a = yaml.safe_load(WILD1.read_text(encoding="utf-8"))
+def test_pack_config_is_wild2_plus_pack():
+    """v3_wild2_pack_mirror.yaml = v3_wild2_mirror.yaml(= v3_wild1_mirror.yaml + 은신처 먹이 부족) + 늑대 4 + wild_pack 블록(version 만 다르다).
+    은신처 먹이 부족은 켠다 — 사용자 결정 '은신처는 안전하지만 먹이가 적다'(10-14·10-15). 10-17 고침: 처음에는 사용자 말 '추천대로 끄고'를 잘못 읽어 뺐다."""
+    w1 = yaml.safe_load(WILD1.read_text(encoding="utf-8"))
+    a = yaml.safe_load(WILD2.read_text(encoding="utf-8"))
     b = yaml.safe_load(PACK.read_text(encoding="utf-8"))
-    assert a["version"] == "3.wild1" and b["version"] == "3.wild2pack"
+    assert set(a["features"]) - set(w1["features"]) == {"realism_cover_food"}
+    assert a["version"] == "3.wild2" and b["version"] == "3.wild2pack"
     fa, fb = a.pop("features"), b.pop("features")
     a.pop("version"), b.pop("version")
     assert a["overrides"]["rand"]["predator_count"] == [2, 2] and b["overrides"]["rand"]["predator_count"] == [4, 4]
     b["overrides"]["rand"]["predator_count"] = [2, 2]
     assert a == b
-    assert set(fb) - set(fa) == {"wild_pack"} and "realism_cover_food" not in fb
+    assert set(fb) - set(fa) == {"wild_pack"}
+    assert fb["realism_cover_food"] == dict(enabled=True, cap_frac=0.15, regen_frac=0.15)
     assert all(fa[k] == fb[k] for k in fa)
     assert fb["wild_pack"] == dict(enabled=True, **WP)
 
@@ -91,16 +97,16 @@ def test_pack_world_has_four_wolves_in_training_range():
     np.testing.assert_allclose(w.pred_pos, [[0.9 * s, 0.9 * s], [0.1 * s, 0.1 * s], [0.9 * s, 0.1 * s], [0.1 * s, 0.9 * s]])
 
 
-def test_pack_off_two_wolves_equals_wild1():
-    """wild_pack 을 끄고 늑대를 2 로 둔 새 설정 = 야생 1단계 거울(궤적·통계·사냥 셈)."""
-    c1 = load_v2_config(WILD1).replace(N=32)
+def test_pack_off_two_wolves_equals_wild2():
+    """wild_pack 을 끄고 늑대를 2 로 둔 새 설정 = 야생 2단계 1 거울(은신처 먹이 부족 켬 — 궤적·통계·사냥 셈)."""
+    c1 = load_v2_config(WILD2).replace(N=32)
     c2 = _wolves(_with(load_v2_config(PACK).replace(N=32), wild_pack=dict(enabled=False)), 2)
     w1, w2 = World(c1, seeds=[32085]), World(c2, seeds=[32085])
     for _ in range(300):
         a = _graze(w1)
         for x, y in zip(w1.step(a), w2.step(a)):
             np.testing.assert_array_equal(x, y)
-    for k in ("pos", "energy", "food", "pred_pos", "pred_head", "pred_cd"):
+    for k in ("pos", "energy", "food", "food_cap", "pred_pos", "pred_head", "pred_cd"):
         np.testing.assert_array_equal(getattr(w1, k), getattr(w2, k))
     assert json.dumps(w1.hunt_stats()) == json.dumps(w2.hunt_stats())
     with pytest.raises(ValueError, match="pack_stats"):

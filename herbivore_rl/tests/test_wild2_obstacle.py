@@ -263,12 +263,19 @@ def test_rollout_invariants_and_determinism():
     assert 0 < st["deer_steps"] <= 400 * 48 and st["wolf_steps"] == 400 * ws[0].M
 
 
+def _cover_food(w, cap):
+    """은신처 먹이 부족(realism_cover_food)을 켠 세계는 원판 먹이 몫 뒤에 은신처 셀 용량 × cap_frac 을 건다(world.py `_rz_cover_food_apply`,
+    C++ FFoodGrid::Build 의 ApplyObstacleFood → ApplyShelterFood 와 같은 순서). 10-17 고침으로 이 설정에 은신처 먹이 부족을 다시 넣었다."""
+    return np.where(w.cover_food_cell, cap * w.cover_food_cap, cap) if getattr(w, "_zf", None) is not None else cap
+
+
 def test_food_under_discs_reduced():
-    """원판 밑 셀 용량 = v1 용량 × 먹이 몫(no_food). 끄면 그대로."""
+    """원판 밑 셀 용량 = v1 용량 × 먹이 몫(no_food), 그 뒤 은신처 셀 × cap_frac. 끄면 그대로."""
     c = load_v2_config(OBST).replace(N=8)
     w = World(c, seeds=[32080])
-    w0 = World(_with(c, obstacles=dict(no_food=False)), seeds=[32080])
-    np.testing.assert_array_equal(w.food_cap, w0.food_cap * obstacle_food_factor(w.gw, float(c.food_cell), w.obstacles))
+    w0 = World(_with(c, obstacles=dict(no_food=False), realism_cover_food=dict(enabled=False)), seeds=[32080])
+    assert w._zf is not None and w.cover_food_cell.any() and w.cover_food_cap == 0.15
+    np.testing.assert_array_equal(w.food_cap, _cover_food(w, w0.food_cap * obstacle_food_factor(w.gw, float(c.food_cell), w.obstacles)))
     assert (w0.ob_food_factor == 1.0).all() and (w.ob_food_factor < 1.0).any()
 
 
@@ -285,11 +292,13 @@ def test_obstacle_bit_identical_to_head(tmp_path):
         pytest.skip(f"git archive {BASE_COMMIT} 를 할 수 없다")
     script = tmp_path / "trace.py"
     script.write_text(tum.TRACE_SRC % dict(keys=tum.KEYS, stats=tum.STATS), encoding="utf-8")
+    # 늑대 무리 거울은 두 코드 모두 지금 파일을 읽는다(10-17 고침으로 이 설정에 은신처 먹이 부족을 다시 넣었다 — 설정이 아니라 코드를 견준다.
+    # 1b11c78 코드도 realism_cover_food 를 안다)
     jobs = [dict(config="configs/v3_r3_on.yaml", seed=32080, steps=250, policy="rand"),
             dict(config="configs/v3_wild1_mirror.yaml", seed=32081, steps=400, policy="rand"),
-            dict(config="configs/v3_wild2_pack_mirror.yaml", seed=32082, steps=400, policy="rand")]
+            dict(config=str(PACK), seed=32082, steps=400, policy="rand")]
     if R1_MODEL.exists():
-        jobs.append(dict(config="configs/v3_wild2_pack_mirror.yaml", seed=32083, steps=400, policy="model", model=str(R1_MODEL)))
+        jobs.append(dict(config=str(PACK), seed=32083, steps=400, policy="model", model=str(R1_MODEL)))
     procs = []
     for root, tag in ((old_root, "old"), (ROOT, "new")):
         jp, op = tmp_path / f"jobs_{tag}.json", tmp_path / f"out_{tag}.json"
@@ -340,9 +349,9 @@ def test_obstacle_maps_and_runner(tmp_path):
     c = rm.mirror_cfg(16, 38, OBST)
     w = World(c, seeds=[32080])
     rm.apply_unreal_map(w, 20000, "Forest")
-    w0 = World(_with(c, obstacles=dict(no_food=False)), seeds=[32080])
+    w0 = World(_with(c, obstacles=dict(no_food=False), realism_cover_food=dict(enabled=False)), seeds=[32080])
     rm.apply_unreal_map(w0, 20000, "Forest")
-    np.testing.assert_array_equal(w.food_cap, w0.food_cap * w.ob_food_factor)
+    np.testing.assert_array_equal(w.food_cap, _cover_food(w, w0.food_cap * w.ob_food_factor))
 
 
 # --------------------------------------------------------------------- #
