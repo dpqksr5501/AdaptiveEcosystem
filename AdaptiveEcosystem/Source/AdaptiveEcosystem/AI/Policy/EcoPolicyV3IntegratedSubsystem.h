@@ -104,6 +104,12 @@
 //      쫓는 동안 사냥 중이고 전력으로 달리지 않는 동료가 그 사슴이 달아날 곳(향하는 은신처의 문, 없으면 도주선 앞 12 m)으로 가서 기다린다.
 //      은신처 진입 금지·몸 여유·포만·밤잠은 그대로다. 10초 기록 여섯째 줄 '[EcoV3I] <지역> 늑대 무리 |' (켰을 때만): 앞장·돕기·기다림·은신처 문
 //      늑대·스텝, 늑대 포획·협동 포획(다른 앞장 늑대도 쫓던 사슴을 잡음) 누적.
+//  15. 10-17 야생 2단계 3 세로 장애물 (명세 RL_V3_WILD2_SPEC.md 6절, 파이썬 configs/v3_wild2_obstacle_mirror.yaml obstacles): eco.IntegratedV3.Obstacles
+//      (-EcoV3Obstacles=, 기본 1). 무대를 만들 때 무대 안 레벨의 충돌하는 스태틱 메시(폴리지 인스턴스 포함)를 읽기만 해서 원판으로 만들고(ScanStageObstacles —
+//      액터·컴포넌트를 바꾸지 않는다), 사슴·늑대가 원판 둘레를 따라 미끄러지고 원판이 눈길을 가린다(EcoWorldV3.h FObstacleConfig). 지금 팀 레벨의 무대에는
+//      충돌하는 나무·바위가 없어 원판이 0이다(10-17 읽기). eco.IntegratedV3.ObstacleExport(-EcoV3ObstacleExport=) 는 원판 JSON 을 쓰고,
+//      eco.IntegratedV3.ObstacleImport(-EcoV3ObstacleImport=) 는 측정 전용으로 원판을 가져온다(레벨에 보이는 물체가 없는 원판). 10초 기록 일곱째 줄
+//      '[EcoV3I] <지역> 장애물 |'(원판이 있을 때만).
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -233,6 +239,11 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bShelterFood = false;          // 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 0 — 사용자 결정 10-17 '추천대로 끄고'. 켜면 파이썬 realism_cover_food 0.15).
 										// 거짓 = 은신처 셀 재생만 0.3배 (R1b 학습 세계)
 	bool bPackHunt = true;              // 늑대 무리 협동 사냥 (eco.IntegratedV3.PackHunt 기본 1, 10-17 야생 2단계 2 — 파이썬 wild_pack, 값 = FPackHuntConfig 기본값)
+	bool bObstacles = true;             // 세로 장애물 (eco.IntegratedV3.Obstacles 기본 1, 10-17 야생 2단계 3 — 파이썬 obstacles). 레벨의 충돌하는 나무·바위를 원판으로 읽어
+										// 사슴·늑대가 둘레를 따라 미끄러지고 시선이 가린다. 원판이 없는 무대는 아무것도 바뀌지 않는다
+	FString ObstacleExportPath;         // 원판 목록 JSON 내보내기 (eco.IntegratedV3.ObstacleExport, 빈 문자열 = 안 함 — 파이썬 거울 짝 비교용)
+	FString ObstacleImportPath;         // 원판 목록 JSON 가져오기 (eco.IntegratedV3.ObstacleImport, 빈 문자열 = 안 함 — 측정 전용: 레벨 원판 대신 이 원판.
+										// 레벨에 보이는 물체가 없는 원판이라 화면용이 아니다. 파이썬 거울과 같은 원판으로 견줄 때만 쓴다)
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등
@@ -373,6 +384,39 @@ struct FEcoV3WolfEatTally
 	int64 EatWalkFrames = 0;        //   그중 걷기·뛰기 (깃발이 섰는데 움직인다 — 잡은 스텝의 이동을 보간하는 0.13 초가 여기 든다)
 };
 
+/**
+ * 무대 안 세로 장애물 읽기 결과 (야생 2단계 3, 명세 RL_V3_WILD2_SPEC.md 6절). 레벨을 읽기만 한다 — 액터·컴포넌트를 바꾸지 않는다.
+ * 원판 = 무대 안의 충돌하는 스태틱 메시(인스턴스 하나하나 포함 — 폴리지·HISM)의 충돌 상자 가로 반지름. 팀 이동 제약(EcoCreatureMovement::ConstrainStep)이
+ * 막는 것과 같은 조건(쿼리 충돌 켬 ∧ WorldStatic 채널 막음)만 넣는다. 기록 칸은 [EcoV3I] '<지역> 장애물' 시작 줄에 적는다.
+ */
+struct ADAPTIVEECOSYSTEM_API FEcoV3ObstacleScan
+{
+	static constexpr double kMinRadiusCm = 25.0;   // 이보다 가는 것은 뺀다 (사슴이 비켜 디딘다 — 어림)
+	static constexpr double kMinHeightCm = 50.0;   // 이보다 낮은 것은 뺀다 (뛰어넘거나 디딘다 — 어림)
+	static constexpr int32 kMaxDiscs = 512;        // 무대마다 많아야 (스텝 비용 상한)
+
+	std::vector<double> Discs;      // (x, y, r) × K, 무대 단위 (1 단위 = 200 cm). x·y 순으로 정렬
+	int32 SeenMeshes = 0;           // 무대 안 메시 (컴포넌트 하나·인스턴스 하나를 하나로 센다)
+	int32 NoCollision = 0;          // 충돌 없음 (풀·덤불 장식·HLOD)
+	int32 Tiny = 0;                 // 가로 반지름 kMinRadiusCm 밑
+	int32 Low = 0;                  // 높이 kMinHeightCm 밑
+	int32 InCover = 0;              // 중심이 은신처 원 안 (은신처 안은 원판으로 넣지 않는다 — 덤불·바위 장식이 은신처 원 자체다)
+	int32 RefugeDecor = 0;          // 은신처 액터(AEcoShelterAnchor·AEcoRefugeHabitat)의 장식 메시
+	int32 Capped = 0;               // kMaxDiscs 를 넘어 뺀 수
+	int32 NearEdge = 0;             // 넣은 원판 가운데 무대 벽에서 r + 2 × 몸(30 cm) 안 — 벽과 원판 사이에 사슴이 낄 수 있다 (기록만, 그대로 넣는다.
+									// 파이썬 무작위 배치는 이런 원판을 놓지 않는다 — world.py OB_EDGE_BODIES)
+	TMap<FString, int32> KeptByMesh;          // 원판으로 넣은 메시 이름 → 수
+	TMap<FString, int32> NoCollisionByMesh;   // 충돌이 없어 뺀 메시 이름 → 수
+	int32 GroundCells = 0;          // 지면 검사 2 m 격자 칸 (기록만 — 원판에 넣지 않는다)
+	int32 SteepCells = 0;           // 그중 지면 경사가 팀 이동 한계(법선 Z < 0.65) 밖
+	int32 WaterCells = 0;           // 그중 물(내비 제외 볼륨) 안
+	int32 NoGroundCells = 0;        // 그중 지면을 못 찾음
+
+	int32 Num() const { return static_cast<int32>(Discs.size() / 3); }
+	/** 원판 넓이 합 ÷ 무대 넓이 (겹침은 두 번 센다). */
+	double AreaFrac(double SizeUnits) const;
+};
+
 /** 한 지역의 v3 세계 (무대 하나 = 학습 세계 하나). */
 struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 {
@@ -391,6 +435,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 TeamCovers = 0;                     // v3 원 목록에 넣은 레벨 은신처 (무대 안, 반경이 학습 범위)
 	int32 SkippedTeamCovers = 0;              // 무대 안이지만 반경이 학습 범위(4~9 단위) 밖이라 v3 원 목록에서 뺀 레벨 은신처
 	int32 ExtraCovers = 0;                    // 우리가 놓은 은신처
+	FEcoV3ObstacleScan ObstacleScan;          // 무대 안 세로 장애물 읽기 결과 (야생 2단계 3 — 원판은 Sim.Config.Obstacles 에도 넣는다)
+	bool bObstaclesImported = false;          // 원판을 JSON 에서 가져왔다 (eco.IntegratedV3.ObstacleImport — 측정 전용)
+	TArray<double> ObstacleGroundZ;           // 원판 중심 지면 높이 (디버그 그리기, Sim.Config.Obstacles 순서)
 	TArray<double> CoverGroundZ;              // 은신처 원 중심의 높이 (디버그 그리기)
 	TArray<int32> CoverShelterIndices;
 	TArray<int64> CoverRegistrations;
@@ -567,6 +614,17 @@ public:
 						  const FEcoV3IntegratedSettings& S, int32 NumDeer, int32 NumWolves, bool bRequireGround,
 						  TFunctionRef<bool(const FVector&)> Contains, TFunctionRef<bool(const FVector&, FVector&)> Project,
 						  FEcoV3StagePlan& Out);
+
+	/**
+	 * 무대 안 세로 장애물 읽기 (야생 2단계 3, 레벨을 읽기만 한다). OriginCm = 무대 (0, 0) 의 cm, SizeUnits = 무대 한 변, Covers = 은신처 원(무대 단위 —
+	 * 중심이 원 안인 메시는 빼고), Exclude = 뺄 액터(우리가 놓은 은신처). bProbeGround 면 2 m 격자로 지면 경사·물을 세어 기록한다(원판에는 넣지 않는다).
+	 */
+	static void ScanStageObstacles(UWorld& World, const FVector& OriginCm, double SizeUnits, const std::vector<EcoObservationV3::FCoverInput>& Covers,
+								   const TSet<const AActor*>& Exclude, bool bProbeGround, FEcoV3ObstacleScan& Out);
+	/** 지역마다 세계가 쓰는 원판 목록(레벨에서 읽었거나 가져온 원판)과 읽기 기록을 JSON 으로 쓴다 (파이썬 거울 run_mirror.py --unreal-obstacles 가 읽는다). 성공하면 참. */
+	bool ExportObstacles(const FString& Path) const;
+	/** 원판 JSON(ExportObstacles·results/v3/wild2/make_obstacle_maps.py 꼴)을 읽는다: 지역 이름 → (x, y, r) × K. 반지름 0 이하는 뺀다. 못 읽으면 거짓. */
+	static bool LoadObstacleImport(const FString& Path, TMap<FName, std::vector<double>>& Out);
 
 	/** 지역 v3 세계 설정 (무대 한 변·늑대 구성·낮밤 900·통합 모드 칸). Covers 는 무대 단위. */
 	static EcoWorldV3::FWorldConfig MakeRegionWorldConfig(const FEcoV3IntegratedSettings& S, int32 RegionRuntimeIndex,

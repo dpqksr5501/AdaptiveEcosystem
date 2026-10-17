@@ -55,6 +55,11 @@
 //   FWorldConfig::PackHunt         야생 2단계 2 늑대 무리 협동 사냥 (파이썬 wild_pack, 10-17). 기본 끔 = 지금과 같다 — 새 줄은 모두 Pack.bEnabled 안에 있다.
 //                                  C2 에서 모든 늑대가 움직이기 전에 PackPeek(상태 사본으로 Step, 난수 없음) → PackGoals 로 돕는 늑대의 목표를 정하고
 //                                  위협 Step 의 In.bPackHelp 로 넘긴다 (EcoThreatModel.h 머리 주석 '늑대 무리 협동 사냥'). 기록 FWorldStats::Pack*
+//   FWorldConfig::Obstacles        야생 2단계 3 세로 장애물 (파이썬 obstacles, 10-17). 기본 끔 = 지금과 같다 — 새 줄은 모두 bEnabled ∧ 원판 있음 안에 있다.
+//                                  세계 생성: 원판 밑 먹이 셀 용량 × (1 − 덮인 몫) (FFoodGrid::ApplyObstacleFood, 은신처 먹이 부족 앞). 입양·처음·리스폰: 원판 안이면
+//                                  밖으로 (ObstaclePushOut). C1: 사슴 이동 ApplyMove 뒤 EcoThreatV3::ObstacleSlide (맵 자르기 포함). C2: 위협 Step 에 원판을 넘긴다
+//                                  (늑대 눈길 가림·이동 미끄러짐 — EcoThreatModel.h 머리 주석 '세로 장애물'). E: 사슴마다 위협까지 눈길을 원판이 가리면
+//                                  FThreatInput::bOccluded (발소리는 그대로). 기록 FWorldStats::Obstacle*
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -289,6 +294,23 @@ namespace EcoWorldV3
 		double RegenFrac = 0.15;            // 은신처 셀 재생률 / 밖 재생률 (같은 몫으로 둔 것은 어림)
 	};
 
+	// ---- 야생 2단계 3 세로 장애물 (파이썬 obstacles — world.py 모듈 docstring '야생 2단계' 3, configs/v3_wild2_obstacle_mirror.yaml, 명세 RL_V3_WILD2_SPEC.md 6절) ----
+	// 원판 (x, y, r) × K (나무 줄기·바위, 무대 단위). 사슴·늑대는 반지름 r + BodyR 앞에서 멈춰 둘레를 따라 미끄러지고(EcoThreatV3::ObstacleSlide), 원판이 눈길을
+	// 가리고(bBlockSight — 사슴의 위협 보임·늑대의 표적 보임. 발소리는 못 가림), 원판 밑 먹이 셀은 덮인 몫만큼 용량이 적다(bNoFood). 기본 끔 = R1b 학습 세계 그대로.
+	// 통합 모드: 원판 = 무대 안 레벨의 충돌하는 스태틱 메시(EcoPolicyV3IntegratedSubsystem ScanStageObstacles), eco.IntegratedV3.Obstacles
+	struct FObstacleConfig
+	{
+		bool bEnabled = false;
+		double BodyR = 0.15;                // 몸 반지름 (단위, 30 cm = 팀 이동 제약이 쓸어 보는 구 반지름)
+		bool bBlockSight = true;            // 원판이 눈길을 가린다
+		bool bNoFood = true;                // 원판 밑 먹이 셀 용량을 덮인 몫만큼 줄인다
+		std::vector<double> Discs;          // (x, y, r) × K
+
+		std::int32_t Num() const { return static_cast<std::int32_t>(Discs.size() / 3); }
+		bool Active() const { return bEnabled && Num() > 0; }
+	};
+	inline constexpr std::int32_t kObstacleFoodSamples = 4;   // 먹이: 셀 한 변의 표본점 수 (world.py OB_SAMPLES)
+
 	// ---- 야생 2단계 사냥 성공률 (world.py hunt_update — 모듈 docstring '야생 2단계'). 기록만, 어떤 계산에도 쓰지 않는다 ----
 	// 사냥 한 번 = 한 늑대가 전력 걸음(FThreatStepResult::bRunning — 추격형이 표적을 쫓음·잠행형 돌진·플레이어 돌진)으로 이어 달린 스텝들.
 	// 시작 = 전력 걸음 ∧ ¬이어지는 중. 성공 = 잡음 ∧ (이어지는 중 ∨ 전력 걸음). 실패 = (이어지는 중 ∨ 전력 걸음) ∧ ¬잡음 ∧ ¬전력 걸음.
@@ -399,6 +421,8 @@ namespace EcoWorldV3
 		FShelterFoodConfig ShelterFood;
 		// 야생 2단계 2 늑대 무리 협동 사냥 (통합 모드 eco.IntegratedV3.PackHunt). 기본 끔 = 지금 그대로. InitWorld 가 FThreatConfig::Pack 으로 넘긴다
 		EcoThreatV3::FPackHuntConfig PackHunt;
+		// 야생 2단계 3 세로 장애물 (통합 모드 eco.IntegratedV3.Obstacles — 원판은 레벨에서 읽는다). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든)
+		FObstacleConfig Obstacles;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -416,6 +440,83 @@ namespace EcoWorldV3
 		const double A = 0.25 * WorldSize;
 		const double B = 0.75 * WorldSize;
 		return {{A, A, Radius}, {B, A, Radius}, {A, B, Radius}, {B, B, Radius}};
+	}
+
+	/**
+	 * 세로 장애물 밀어내기 (world.py `obstacle_push_out` 한 개체와 같다 — 골든 비트 동일). P 가 원판(반지름 r + BodyR) 안이면 가장 가까운 후보로 옮긴다.
+	 * 후보 = 원판마다 (c + (R + kObstacleEps)·단위(P − c), 겹치면 (1, 0)) 하나와 c + (R + kObstacleEps)·링 방향 8 개(축·대각선, 성분 0·±1·±√½ — 삼각함수
+	 * 없이), 원판 순서대로. 무대 [0, WorldSize]² 안 ∧ 모든 원판 밖 ∧ (bWolf 이고 은신처 막기를 켰으면) 은신처 원(반지름 + ShelterWolfMargin, 반경 0 원은
+	 * 건너뜀) 밖인 후보 가운데 거리² 가 가장 작은 것(같으면 앞). 반환 0 = 원판 밖이라 그대로, 1 = 옮김, 2 = 후보가 없어 그대로.
+	 */
+	inline std::int32_t ObstaclePushOut(const FWorldConfig& C, FVec2& P, bool bWolf)
+	{
+		const FObstacleConfig& O = C.Obstacles;
+		if (!O.Active())
+		{
+			return 0;
+		}
+		const double* D = O.Discs.data();
+		const std::int32_t K = O.Num();
+		if (!EcoThreatV3::InsideAnyObstacle(P.X, P.Y, D, K, O.BodyR))
+		{
+			return 0;
+		}
+		const double S = std::sqrt(0.5);
+		const double Ring[8][2] = {{1.0, 0.0}, {S, S}, {0.0, 1.0}, {-S, S}, {-1.0, 0.0}, {-S, -S}, {0.0, -1.0}, {S, -S}};
+		const bool bWalls = bWolf && C.bShelterSafe;
+		bool bFound = false;
+		double BestD2 = 0.0;
+		FVec2 Best;
+		auto Try = [&](double X, double Y)
+		{
+			if (X < 0.0 || Y < 0.0 || X > C.WorldSize || Y > C.WorldSize || EcoThreatV3::InsideAnyObstacle(X, Y, D, K, O.BodyR))
+			{
+				return;
+			}
+			if (bWalls)
+			{
+				for (const EcoObservationV3::FCoverInput& Cv : C.Covers)
+				{
+					const double Ex = X - Cv.X;
+					const double Ey = Y - Cv.Y;
+					if (Cv.Radius > 0.0 && std::sqrt(Ex * Ex + Ey * Ey) < Cv.Radius + C.ShelterWolfMargin)
+					{
+						return;
+					}
+				}
+			}
+			const double Dx = X - P.X;
+			const double Dy = Y - P.Y;
+			const double D2 = Dx * Dx + Dy * Dy;
+			if (!bFound || D2 < BestD2)
+			{
+				bFound = true;
+				BestD2 = D2;
+				Best = {X, Y};
+			}
+		};
+		for (std::int32_t k = 0; k < K; ++k)
+		{
+			const double Cx = D[3 * k];
+			const double Cy = D[3 * k + 1];
+			const double Rr = (D[3 * k + 2] + O.BodyR) + EcoThreatV3::kObstacleEps;
+			const double Vx = P.X - Cx;
+			const double Vy = P.Y - Cy;
+			const double N = std::sqrt(Vx * Vx + Vy * Vy);
+			const double Ux = N > EcoRepertoireV3::kEps ? Vx / N : 1.0;
+			const double Uy = N > EcoRepertoireV3::kEps ? Vy / N : 0.0;
+			Try(Cx + Rr * Ux, Cy + Rr * Uy);
+			for (std::int32_t j = 0; j < 8; ++j)
+			{
+				Try(Cx + Rr * Ring[j][0], Cy + Rr * Ring[j][1]);
+			}
+		}
+		if (!bFound)
+		{
+			return 2;
+		}
+		P = Best;
+		return 1;
 	}
 
 	// ---- 먹이 격자 (world._build_world·_food_fields·_eat·재생) ----
@@ -569,6 +670,10 @@ namespace EcoWorldV3
 				const double V = (Mn - Th) / (1.0 - Th);
 				Cap[k] = V < 0.0 ? 0.0 : (V > 1.0 ? 1.0 : V);
 			}
+			if (C.Obstacles.Active() && C.Obstacles.bNoFood)
+			{
+				ApplyObstacleFood(C);   // 야생 2단계 3: world.py `_obstacles_reset` (은신처 먹이 부족 앞 — Cap0 에 들어간다)
+			}
 			Food = Cap;
 
 			BuildCoverCells(C);
@@ -578,6 +683,44 @@ namespace EcoWorldV3
 				ApplyShelterFood(C);   // 야생 2단계 1: world.py `_rz_cover_food_apply` (먹이 장을 만들기 전 — 파이썬도 관측 전에 건다)
 			}
 			ComputeFields(EcoObservationV3::kR1bObsConfig.SeeR);
+		}
+
+		/**
+		 * 야생 2단계 3 세로 장애물 먹이 (world.py `obstacle_food_factor`): 셀 (y, x) 의 표본점 ((x + (a + 0.5)/4)·Cell, (y + (b + 0.5)/4)·Cell) 16 개 가운데
+		 * 어느 원판 안(dx·dx + dy·dy ≤ r·r)인 수 n 으로 Cap ← Cap × (1 − n/16). Food = Cap 앞에 부른다.
+		 */
+		void ApplyObstacleFood(const FWorldConfig& C)
+		{
+			const std::vector<double>& D = C.Obstacles.Discs;
+			const std::int32_t K = C.Obstacles.Num();
+			const std::int32_t S = kObstacleFoodSamples;
+			for (std::int32_t y = 0; y < Gw; ++y)
+			{
+				for (std::int32_t x = 0; x < Gw; ++x)
+				{
+					std::int32_t Count = 0;
+					for (std::int32_t b = 0; b < S; ++b)
+					{
+						const double Py = (static_cast<double>(y) + (static_cast<double>(b) + 0.5) / S) * Cell;
+						for (std::int32_t a = 0; a < S; ++a)
+						{
+							const double Px = (static_cast<double>(x) + (static_cast<double>(a) + 0.5) / S) * Cell;
+							for (std::int32_t k = 0; k < K; ++k)
+							{
+								const double Dx = Px - D[3 * k];
+								const double Dy = Py - D[3 * k + 1];
+								if (Dx * Dx + Dy * Dy <= D[3 * k + 2] * D[3 * k + 2])
+								{
+									++Count;
+									break;
+								}
+							}
+						}
+					}
+					const size_t Ci = static_cast<size_t>(y) * Gw + x;
+					Cap[Ci] = Cap[Ci] * (1.0 - static_cast<double>(Count) / static_cast<double>(S * S));
+				}
+			}
 		}
 
 		/** world._build_world 은신처 셀(셀 중심이 원 안 — (cx − x)² + (cy − y)² ≤ r²)과 v1 재생률(은신처 셀 × FoodCoverRegenMult). Gw·Cell 을 정한 뒤 부른다. */
@@ -832,6 +975,16 @@ namespace EcoWorldV3
 		std::int64_t PackDoorSteps = 0;      // 그중 목표 = 은신처 문 (door_n)
 		std::int64_t PackCatches = 0;        // 늑대 포획 (catches)
 		std::int64_t PackCoopCatches = 0;    // 그중 다른 앞장 늑대도 이번 스텝에 쫓던 사슴 (pack_catches)
+		// 야생 2단계 3 세로 장애물 기록 (원판이 있을 때만 센다 — 어떤 계산에도 쓰지 않는다. world.py obstacle_stats 의 같은 이름 칸)
+		std::int64_t ObstacleDeerSteps = 0;  // 사슴·스텝 (deer_steps)
+		std::int64_t ObstacleDeerHit = 0;    // 원판에 닿아 미끄러진 사슴·스텝 (deer_hit)
+		std::int64_t ObstacleDeerBack = 0;   // 그중 끝에 원판 안이라 물러난 사슴·스텝 (deer_back — 벽과 원판 사이 구석)
+		std::int64_t ObstacleWolfSteps = 0;  // 위협·스텝 (wolf_steps)
+		std::int64_t ObstacleWolfHit = 0;    // 원판에 닿아 미끄러진 위협·스텝 (wolf_hit)
+		std::int64_t ObstacleWolfBack = 0;   // 이동 끝이 원판 안이라 되돌린 위협·스텝 (wolf_back)
+		std::int64_t ObstacleWolfDead = 0;   // 부딪혀 거의 못 가 돌아선 위협·스텝 (wolf_dead)
+		std::int64_t ObstaclePushMoved = 0;  // 원판 밖으로 옮긴 개체 (처음·입양·리스폰, push_moved)
+		std::int64_t ObstaclePushFailed = 0; // 후보가 없어 못 옮긴 개체 (push_failed)
 		std::int64_t RefugeProtectedPreySteps = 0;
 		std::int64_t RefugeConstrainedMoves = 0;
 		std::int64_t RefugeRecoveries = 0;
@@ -961,6 +1114,14 @@ namespace EcoWorldV3
 		UpdateDayNight(W);
 	}
 
+	/** 세로 장애물 밀어내기를 걸고 기록한다 (원판이 없으면 아무것도 안 한다). */
+	inline void PushOutAndCount(FWorldState& W, FVec2& P, bool bWolf)
+	{
+		const std::int32_t Rc = ObstaclePushOut(W.Config, P, bWolf);
+		W.Stats.ObstaclePushMoved += Rc == 1 ? 1 : 0;
+		W.Stats.ObstaclePushFailed += Rc == 2 ? 1 : 0;
+	}
+
 	/** 처음 나는 초식 (reset): 맵 균등 위치·무작위 heading·E 0.5·GRAZE 진입, 개체 키 = (슬롯, 세대 0). */
 	inline void InitHerb(FWorldState& W, std::uint32_t Slot, const FHerbView& H)
 	{
@@ -970,6 +1131,7 @@ namespace EcoWorldV3
 		H.Body->Generation = 0;
 		H.Body->Pos = {W.Rng.Uniform(0.0, Size), W.Rng.Uniform(0.0, Size)};
 		const double A = W.Rng.Uniform(0.0, 2.0 * 3.14159265358979323846);
+		PushOutAndCount(W, H.Body->Pos, false);   // 야생 2단계 3: 원판 안이면 밖으로 (난수 없음)
 		H.Body->Head = {std::cos(A), std::sin(A)};
 		H.Body->PrevPos = H.Body->Pos;
 		H.Body->Energy = W.RepCfg.InitEnergy;
@@ -1040,6 +1202,13 @@ namespace EcoWorldV3
 		A.State.PosX = W.Rng.Uniform(0.0, Size);
 		A.State.PosY = W.Rng.Uniform(0.0, Size);
 		const double Ang = W.Rng.Uniform(0.0, 2.0 * 3.14159265358979323846);
+		if (W.Config.Obstacles.Active())
+		{
+			FVec2 P{A.State.PosX, A.State.PosY};
+			PushOutAndCount(W, P, true);   // 야생 2단계 3: 원판 안이면 밖으로 (난수 없음)
+			A.State.PosX = P.X;
+			A.State.PosY = P.Y;
+		}
 		A.State.HeadX = std::cos(Ang);
 		A.State.HeadY = std::sin(Ang);
 		InitThreatSleep(W, A, static_cast<std::int64_t>(Slot));
@@ -1070,6 +1239,7 @@ namespace EcoWorldV3
 		const double Size = W.Config.WorldSize;
 		*H.Body = FHerbBody();
 		H.Body->Pos = {Detail::Clamp0(Pos.X, Size), Detail::Clamp0(Pos.Y, Size)};
+		PushOutAndCount(W, H.Body->Pos, false);   // 야생 2단계 3: 원판 안이면 밖으로 (팀 시작 자리 검사는 몸 30 cm 만 보므로 원판 여유 안일 수 있다)
 		const FVec2 Hn = EcoRepertoireV3::Normalize(Head);
 		H.Body->Head = EcoRepertoireV3::IsNonZero(Hn) ? Hn : FVec2{1.0, 0.0};
 		H.Body->PrevPos = H.Body->Pos;
@@ -1095,6 +1265,13 @@ namespace EcoWorldV3
 		A.Spec = Spec;
 		A.State.PosX = Detail::Clamp0(PosX, Size);
 		A.State.PosY = Detail::Clamp0(PosY, Size);
+		if (W.Config.Obstacles.Active())
+		{
+			FVec2 P{A.State.PosX, A.State.PosY};
+			PushOutAndCount(W, P, true);   // 야생 2단계 3: 원판 안이면 밖으로
+			A.State.PosX = P.X;
+			A.State.PosY = P.Y;
+		}
 		double Hx = HeadX;
 		double Hy = HeadY;
 		EcoThreatV3::Normalize2(Hx, Hy);
@@ -1124,6 +1301,7 @@ namespace EcoWorldV3
                 In.bHunting = A.State.Cooldown == 0 && (!W.ThreatCfg.bWildSatiation || A.State.SatLeft == 0)
                     && !(A.Spec.Type == EcoThreatV3::EThreatType::Player && A.State.PlayerMode == EcoThreatV3::EPlayerMode::Rest);
 				In.bAsleep = ThreatAsleepNow(W, A);   // 굴에서 자면 안 보인다 (끄면 새 t 의 어둠으로 다시 판정, 켜면 늑대별 상태)
+				In.bOccluded = false;                 // 세로 장애물 가림은 사슴마다 ObserveHerb 가 채운다
 				// R3 발소리 (켰을 때만): 지난 스텝 변위 크기 ÷ 사슴 걸음과 그 스텝의 걸음새 (world.py hearing_radius·pred_running)
 				In.HearR = W.Config.RealismHearing.bEnabled
 							   ? EcoObservationV3::HearingRadius(W.Config.RealismHearing,
@@ -1154,6 +1332,15 @@ namespace EcoWorldV3
 			EcoRepertoireV3::FRepState& S = *H.Rep;
 			const EcoObservationV3::FObservationConfig& OC = W.ObsCfg;
 
+			// 야생 2단계 3 세로 장애물: 이 사슴에서 위협마다 눈길을 원판이 가리는가 (world.py `_geometry` 의 pvis 가림 — 발소리는 그대로)
+			const FObstacleConfig& Ob = W.Config.Obstacles;
+			if (Ob.Active() && Ob.bBlockSight)
+			{
+				for (EcoObservationV3::FThreatInput& T : W.ThreatIn)
+				{
+					T.bOccluded = EcoThreatV3::SightBlocked(B.Pos.X, B.Pos.Y, T.X, T.Y, Ob.Discs.data(), Ob.Num());
+				}
+			}
 			P.Threat = EcoObservationV3::PerceiveThreats(B.Pos, B.Head, EcoObservationV3::SeePredRadius(W.Dark, OC), S.SeeMult,
 														 S.SeeMultLast, W.ThreatIn.data(), static_cast<std::int32_t>(W.ThreatIn.size()), OC);
 			P.Kin = EcoObservationV3::PerceiveKin(Self, B.Pos, B.Head, W.KinIn.data(), N, OC);
@@ -1352,6 +1539,7 @@ namespace EcoWorldV3
 			const double SeePred = EcoObservationV3::SeePredRadius(W.Dark, W.ObsCfg);
 			const double Size = W.Config.WorldSize;
 			const std::int32_t K = static_cast<std::int32_t>(W.Config.Covers.size());
+			const bool bSightBlock = W.Config.Obstacles.Active() && W.Config.Obstacles.bBlockSight;
 			constexpr std::int32_t kMaxM = 64;
 			const std::int32_t Mc = M < kMaxM ? M : kMaxM;
 			for (std::int32_t i = 0; i < N; ++i)
@@ -1382,7 +1570,9 @@ namespace EcoWorldV3
 				{
 					const FThreatAgent& A = *Threats[m];
 					const bool bHunt = FlightHunting(W, A);
-					const EcoObservationV3::FThreatInput& Ti = W.ThreatIn[static_cast<size_t>(m)];
+					EcoObservationV3::FThreatInput Ti = W.ThreatIn[static_cast<size_t>(m)];
+					// 야생 2단계 3: 이 사슴의 눈길 가림 (ObserveHerb 가 마지막 사슴 것으로 남긴 칸을 이 쌍으로 다시 잰다 — world.py wf_pvis = 관측 보임)
+					Ti.bOccluded = bSightBlock && EcoThreatV3::SightBlocked(P.X, P.Y, Ti.X, Ti.Y, W.Config.Obstacles.Discs.data(), W.Config.Obstacles.Num());
 					const bool bPv = EcoObservationV3::PerceiveThreats(P, H.Body->Head, SeePred, S.SeeMult, S.SeeMult, &Ti, 1, W.ObsCfg).PredCount == 1;
 					Ex[m] = A.State.PosX - P.X;
 					Ey[m] = A.State.PosY - P.Y;
@@ -1691,6 +1881,8 @@ namespace EcoWorldV3
 		}
 
 		// C1. 초식 이동 (벽에서 멈춤, heading = 속도 방향, FREEZE 는 위협 쪽)
+		const FObstacleConfig& Obs = W.Config.Obstacles;
+		const bool bObstacles = Obs.Active();   // 야생 2단계 3 세로 장애물 (끄거나 원판이 없으면 아래 bObstacles 줄은 모두 건너뛴다 — 지금 그대로)
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			FHerbBody& B = *Herbs[i].Body;
@@ -1700,6 +1892,16 @@ namespace EcoWorldV3
 			B.bReproduced = false;
 			B.bRespawned = false;
 			R3::ApplyMove(B.Pos, B.Head, *Herbs[i].Control, W.Config.WorldSize);
+			if (bObstacles)
+			{
+				// 야생 2단계 3 세로 장애물 (world.py step 1 의 obstacle_slide — 되풀이마다 맵으로 자름): 원판 앞에서 멈춰 둘레를 따라 미끄러진다.
+				// heading 은 가려던 쪽 그대로 (ApplyMove)
+				const EcoThreatV3::FObstacleSlideResult Sl = EcoThreatV3::ObstacleSlide(
+					B.PrevPos.X, B.PrevPos.Y, B.Pos.X, B.Pos.Y, Obs.Discs.data(), Obs.Num(), Obs.BodyR, W.Config.WorldSize);
+				++W.Stats.ObstacleDeerSteps;
+				W.Stats.ObstacleDeerHit += Sl.bHit ? 1 : 0;
+				W.Stats.ObstacleDeerBack += Sl.bBack ? 1 : 0;
+			}
 			// 통합 모드: 지형·장애물 제약. 막히면 이동 전 자리 (heading 은 가려던 쪽 그대로)
 			if (Hooks && Hooks->HerbMove && (B.Pos.X != B.PrevPos.X || B.Pos.Y != B.PrevPos.Y)
 				&& !Hooks->HerbMove(Hooks->User, i, B.PrevPos, B.Pos))
@@ -1770,6 +1972,14 @@ namespace EcoWorldV3
 			Pi.WorldSize = W.Config.WorldSize;
 			Pi.Discs = W.ShelterDiscs.empty() ? nullptr : W.ShelterDiscs.data();
 			Pi.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
+			if (bObstacles)
+			{
+				// 야생 2단계 3: 미리 보기도 늑대 눈길 가림을 같이 본다 (표적·전력 걸음이 실제 Step 과 같게)
+				Pi.Obstacles = Obs.Discs.data();
+				Pi.NumObstacles = Obs.Num();
+				Pi.ObstacleBody = Obs.BodyR;
+				Pi.bObstacleSight = Obs.bBlockSight;
+			}
 			for (std::int32_t m = 0; m < M; ++m)
 			{
 				W.PackWolves[static_cast<size_t>(m)] = EcoThreatV3::PackPeek(Threats[m]->Spec, Threats[m]->State, Pi, W.ThreatCfg);
@@ -1802,6 +2012,14 @@ namespace EcoWorldV3
 			In.WanderTurn = W.Rng.Uniform(-W.ThreatCfg.PredWanderTurn, W.ThreatCfg.PredWanderTurn);
 			In.Discs = W.ShelterDiscs.empty() ? nullptr : W.ShelterDiscs.data();
 			In.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
+			if (bObstacles)
+			{
+				// 야생 2단계 3 세로 장애물: 늑대 눈길 가림·이동 미끄러짐 (EcoThreatModel.h 머리 주석 '세로 장애물')
+				In.Obstacles = Obs.Discs.data();
+				In.NumObstacles = Obs.Num();
+				In.ObstacleBody = Obs.BodyR;
+				In.bObstacleSight = Obs.bBlockSight;
+			}
 			if (A.Spec.bRanged)
 			{
 				for (std::int32_t i = 0; i < N; ++i)
@@ -1836,6 +2054,14 @@ namespace EcoWorldV3
 			}
 			const std::int32_t PreCd = A.State.Cooldown;
 			A.Last = EcoThreatV3::Step(A.Spec, A.State, In, W.ThreatCfg);
+			if (bObstacles)
+			{
+				// 야생 2단계 3 기록만 (world.py obstacle_stats wolf_*)
+				++W.Stats.ObstacleWolfSteps;
+				W.Stats.ObstacleWolfHit += A.Last.bObstacleHit ? 1 : 0;
+				W.Stats.ObstacleWolfBack += A.Last.bObstacleBack ? 1 : 0;
+				W.Stats.ObstacleWolfDead += A.Last.bObstacleDead ? 1 : 0;
+			}
 			if(bRefugeSafety) {
 				const auto Move=EcoRefugeV3::Constrain(W.Config.Covers,W.Config.WorldSize,{A.PrevX,A.PrevY},{A.State.PosX,A.State.PosY},W.Config.PredatorRefugeMargin);
 				if(Move.bConstrained) {
@@ -2061,6 +2287,7 @@ namespace EcoWorldV3
 			++B.Generation;
 			B.Pos = {W.Rng.Uniform(0.0, W.Config.WorldSize), W.Rng.Uniform(0.0, W.Config.WorldSize)};
 			const double A = W.Rng.Uniform(0.0, 2.0 * 3.14159265358979323846);
+			PushOutAndCount(W, B.Pos, false);   // 야생 2단계 3: 원판 안에 난 새 개체를 밖으로 (난수 없음)
 			B.Head = {std::cos(A), std::sin(A)};
 			B.PrevPos = B.Pos;
 			B.Energy = RC.InitEnergy;

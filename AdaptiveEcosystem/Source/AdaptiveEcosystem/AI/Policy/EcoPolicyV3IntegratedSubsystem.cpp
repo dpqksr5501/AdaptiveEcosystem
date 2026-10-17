@@ -4,8 +4,20 @@
 #include "AI/Social/Shelter/EcoRefugeHabitat.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Core/EcoRuntimeSettings.h"
+#include "Components/InstancedStaticMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
+#include "Dom/JsonObject.h"
+#include "Engine/StaticMesh.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/Volume.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "PhysicsEngine/BodySetup.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "DrawDebugHelpers.h"
@@ -192,6 +204,30 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("사냥 중이고 전력으로 달리지 않는 동료(120 m 안)가 그 사슴이 달아날 곳 — 향하는 은신처의 문(반지름 + 몸 여유), 없으면 도주선 앞 12 m — 으로 가서 ")
 		TEXT("기다린다(2 m 안이면 멈춰 사슴 쪽을 본다). 늑대는 여전히 은신처에 못 들어가고 배부르면 쉰다. 0 = 늑대마다 따로 사냥(10-17 전). Play 전에 바꾼다. ")
 		TEXT("명령줄 -EcoV3PackHunt= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarObstacles(
+		TEXT("eco.IntegratedV3.Obstacles"),
+		1,
+		TEXT("통합 v3 모드의 세로 장애물 (1 = 켬, 기본 — 10-17 야생 2단계 3, 파이썬 configs/v3_wild2_obstacle_mirror.yaml obstacles). 무대 안 레벨의 충돌하는 나무·바위")
+		TEXT("(스태틱 메시·폴리지 인스턴스, 팀 이동 제약과 같은 WorldStatic 막음)를 읽기만 해서 원판으로 만든다. 사슴·늑대는 원판 둘레를 따라 미끄러지고, ")
+		TEXT("원판이 눈길을 가린다(발소리는 가리지 않는다). 원판 밑 먹이 셀은 그만큼 먹이가 적다. 원판이 없는 무대는 아무것도 바뀌지 않는다. ")
+		TEXT("0 = 끔(10-17 야생 2단계 2 그대로). Play 전에 바꾼다. 명령줄 -EcoV3Obstacles= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<FString> CVarObstacleExport(
+		TEXT("eco.IntegratedV3.ObstacleExport"),
+		TEXT(""),
+		TEXT("통합 v3 모드의 장애물 원판 목록 JSON 경로 (빈 값 = 안 씀, 기본). 무대를 만든 뒤 지역마다 원판(무대 단위 x, y, r)을 쓴다 — 파이썬 거울 ")
+		TEXT("results/v3/mirror/run_mirror.py --unreal-obstacles 가 같은 원판으로 돈다. 명령줄 -EcoV3ObstacleExport=<경로> 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<FString> CVarObstacleImport(
+		TEXT("eco.IntegratedV3.ObstacleImport"),
+		TEXT(""),
+		TEXT("통합 v3 모드의 장애물 원판 가져오기 JSON 경로 (빈 값 = 안 씀, 기본). 측정 전용: 지역 이름이 같은 무대는 레벨에서 읽은 원판 대신 이 원판(무대 단위 x, y, r)을 ")
+		TEXT("쓴다 — 레벨에 보이는 물체가 없는 원판이라 화면용이 아니다(eco.V3Debug 로만 보인다). 파이썬 거울이 만든 원판(results/v3/wild2/make_obstacle_maps.py)으로 ")
+		TEXT("같은 원판 짝 비교를 할 때 쓴다. eco.IntegratedV3.Obstacles 1 일 때만. 명령줄 -EcoV3ObstacleImport=<경로> 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarRealismVision(
@@ -497,6 +533,9 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bFlightEdgeAvoid = CVarFlightEdgeAvoid.GetValueOnGameThread() != 0;
 	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
 	S.bSocialControl = CVarSocialControl.GetValueOnGameThread() != 0;
+	S.bObstacles = CVarObstacles.GetValueOnGameThread() != 0;
+	S.ObstacleExportPath = CVarObstacleExport.GetValueOnGameThread();
+	S.ObstacleImportPath = CVarObstacleImport.GetValueOnGameThread();
 	return S;
 }
 
@@ -607,6 +646,21 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3SocialControl="), SocialArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.SocialControl"), LexToString(SocialArg));
+	}
+	int32 ObstacleArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3Obstacles="), ObstacleArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.Obstacles"), LexToString(ObstacleArg));
+	}
+	FString ObstacleExportArg;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ObstacleExport="), ObstacleExportArg) && !ObstacleExportArg.IsEmpty())
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ObstacleExport"), ObstacleExportArg);
+	}
+	FString ObstacleImportArg;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ObstacleImport="), ObstacleImportArg) && !ObstacleImportArg.IsEmpty())
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ObstacleImport"), ObstacleImportArg);
 	}
 	int32 VisionArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3RealismVision="), VisionArg))
@@ -779,6 +833,12 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   Pk.JoinR * MPerUnit, Pk.DoorR * MPerUnit, FMath::RadiansToDegrees(FMath::Acos(Pk.DoorCos)), Pk.Lead * MPerUnit,
 								   Pk.WaitR * MPerUnit)
 				 : FString(TEXT("끔 (eco.IntegratedV3.PackHunt 0 — 늑대마다 따로 사냥)"))));
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 세로 장애물: %s"),
+		   *(Settings.bObstacles
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.Obstacles 1, 10-17 야생 2단계 3) — 무대 안 레벨의 충돌하는 나무·바위를 원판으로 읽어 사슴·늑대가 둘레를 따라 미끄러지고 ")
+									   TEXT("눈길이 가린다(발소리는 못 가림), 원판 밑 먹이는 덮인 몫만큼 적다. 원판이 없는 무대는 그대로%s"),
+								   Settings.ObstacleImportPath.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" | 측정 전용 원판 가져오기: %s"), *Settings.ObstacleImportPath))
+				 : FString(TEXT("끔 (eco.IntegratedV3.Obstacles 0 — 읽기만 하고 세계에 넣지 않는다)"))));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
 		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6 — 기본 아님) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다, 파이썬과 다름")
 								   : TEXT("끔 (eco.IntegratedV3.SocialControl 0, 기본 — 사람 결정 10-17 (8): v3 사슴 움직임은 파이썬 세계 그대로, Social 처리기는 기록만)"));
@@ -1050,7 +1110,280 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	// 늑대 무리 협동 사냥 (eco.IntegratedV3.PackHunt, 10-17 야생 2단계 2): 값 = configs/v3_wild2_pack_mirror.yaml wild_pack (FPackHuntConfig 기본값).
 	// 늑대 몸 여유·은신처 원은 위 칸을 그대로 쓴다 (문 = 반지름 + ShelterWolfMargin)
 	C.PackHunt.bEnabled = S.bPackHunt;
+	// 세로 장애물 (eco.IntegratedV3.Obstacles, 10-17 야생 2단계 3): 켬 칸만 둔다 — 원판은 무대를 만들 때 레벨에서 읽어 넣는다 (원판이 없으면 세계는 그대로)
+	C.Obstacles.bEnabled = S.bObstacles;
 	return C;
+}
+
+// -----------------------------------------------------------------------------
+// 세로 장애물 읽기 (야생 2단계 3 — 레벨을 읽기만 한다)
+// -----------------------------------------------------------------------------
+
+double FEcoV3ObstacleScan::AreaFrac(double SizeUnits) const
+{
+	double A = 0.0;
+	for (size_t k = 0; k + 2 < Discs.size(); k += 3)
+	{
+		A += UE_DOUBLE_PI * Discs[k + 2] * Discs[k + 2];
+	}
+	return SizeUnits > 0.0 ? A / (SizeUnits * SizeUnits) : 0.0;
+}
+
+namespace EcoPolicyV3IntegratedImpl
+{
+	/**
+	 * 메시 하나의 충돌 상자 (단순 충돌이 있으면 그 상자, 없으면 — 복잡한 충돌을 단순으로 쓰는 메시 — 그리기 상자). 메시 공간 상자를 전체 변환(축마다 다른
+	 * 크기 포함)으로 옮긴다 — FKAggregateGeom::CalcAABB(변환) 은 크기의 가장 작은 축 하나만 써서 납작한 바위·긴 줄기가 틀린다.
+	 */
+	FBox ObstacleCollisionBox(const UStaticMesh& Mesh, const FTransform& Xf)
+	{
+		if (const UBodySetup* Body = Mesh.GetBodySetup(); Body && Body->AggGeom.GetElementCount() > 0)
+		{
+			return Body->AggGeom.CalcAABB(FTransform::Identity).TransformBy(Xf);
+		}
+		return Mesh.GetBounds().GetBox().TransformBy(Xf);
+	}
+}
+
+void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FVector& OriginCm, double SizeUnits,
+														 const std::vector<EcoObservationV3::FCoverInput>& Covers,
+														 const TSet<const AActor*>& Exclude, bool bProbeGround, FEcoV3ObstacleScan& Out)
+{
+	using EcoRepertoireV3::kUnitCm;
+	Out = FEcoV3ObstacleScan();
+	const double SizeCm = SizeUnits * kUnitCm;
+	struct FDisc
+	{
+		double X, Y, R;
+	};
+	TArray<FDisc> Kept;
+	for (TActorIterator<AActor> It(&World); It; ++It)
+	{
+		const AActor* A = *It;
+		if (!A || Exclude.Contains(A) || A->IsA<APawn>() || A->IsA<AVolume>() || A->IsA<AEcoCreatureRepresentationActor>())
+		{
+			continue;
+		}
+		const bool bRefuge = A->IsA<AEcoShelterAnchor>();
+		TInlineComponentArray<UStaticMeshComponent*> Comps(A);
+		for (const UStaticMeshComponent* C : Comps)
+		{
+			const UStaticMesh* Mesh = C ? C->GetStaticMesh() : nullptr;
+			if (!Mesh || !C->IsRegistered())
+			{
+				continue;
+			}
+			// 팀 이동 제약(ConstrainStep: WorldStatic 채널로 쓸어 봄)이 막는 것과 같은 조건
+			const bool bCollide = CollisionEnabledHasQuery(C->GetCollisionEnabled()) && C->GetCollisionResponseToChannel(ECC_WorldStatic) == ECR_Block;
+			const UInstancedStaticMeshComponent* Ism = Cast<UInstancedStaticMeshComponent>(C);
+			const int32 Count = Ism ? Ism->GetInstanceCount() : 1;
+			for (int32 i = 0; i < Count; ++i)
+			{
+				FTransform Xf = C->GetComponentTransform();
+				if (Ism && !Ism->GetInstanceTransform(i, Xf, true))
+				{
+					continue;
+				}
+				const FBox Box = EcoPolicyV3IntegratedImpl::ObstacleCollisionBox(*Mesh, Xf);
+				if (!Box.IsValid)
+				{
+					continue;
+				}
+				const FVector Ctr = Box.GetCenter();
+				const double X = Ctr.X - OriginCm.X;
+				const double Y = Ctr.Y - OriginCm.Y;
+				if (X < 0.0 || Y < 0.0 || X > SizeCm || Y > SizeCm)
+				{
+					continue;   // 중심이 무대 밖
+				}
+				++Out.SeenMeshes;
+				if (bRefuge)
+				{
+					++Out.RefugeDecor;
+					continue;
+				}
+				if (!bCollide)
+				{
+					++Out.NoCollision;
+					++Out.NoCollisionByMesh.FindOrAdd(Mesh->GetName());
+					continue;
+				}
+				const FVector Ext = Box.GetExtent();
+				const double Rcm = 0.5 * (Ext.X + Ext.Y);   // 가로 반지름 = 충돌 상자 가로 반폭의 평균 (둥근 줄기·바위에 맞춘 어림)
+				if (Rcm < FEcoV3ObstacleScan::kMinRadiusCm)
+				{
+					++Out.Tiny;
+					continue;
+				}
+				if (2.0 * Ext.Z < FEcoV3ObstacleScan::kMinHeightCm)
+				{
+					++Out.Low;
+					continue;
+				}
+				const double Xu = X / kUnitCm;
+				const double Yu = Y / kUnitCm;
+				bool bInCover = false;
+				for (const EcoObservationV3::FCoverInput& Cv : Covers)
+				{
+					bInCover = bInCover || (Cv.Radius > 0.0 && FMath::Square(Xu - Cv.X) + FMath::Square(Yu - Cv.Y) <= Cv.Radius * Cv.Radius);
+				}
+				if (bInCover)
+				{
+					++Out.InCover;
+					continue;
+				}
+				Kept.Add({Xu, Yu, Rcm / kUnitCm});
+				++Out.KeptByMesh.FindOrAdd(Mesh->GetName());
+				const double Edge = Rcm / kUnitCm + 2.0 * EcoWorldV3::FObstacleConfig().BodyR;
+				Out.NearEdge += (Xu < Edge || Yu < Edge || Xu > SizeUnits - Edge || Yu > SizeUnits - Edge) ? 1 : 0;
+			}
+		}
+	}
+	// 액터 순서와 무관하게 같은 목록 (x, 다음 y, 다음 r 순). 상한을 넘으면 큰 것부터 남긴다
+	if (Kept.Num() > FEcoV3ObstacleScan::kMaxDiscs)
+	{
+		Kept.Sort([](const FDisc& A, const FDisc& B) { return A.R > B.R || (A.R == B.R && (A.X < B.X || (A.X == B.X && A.Y < B.Y))); });
+		Out.Capped = Kept.Num() - FEcoV3ObstacleScan::kMaxDiscs;
+		Kept.SetNum(FEcoV3ObstacleScan::kMaxDiscs);
+	}
+	Kept.Sort([](const FDisc& A, const FDisc& B) { return A.X < B.X || (A.X == B.X && (A.Y < B.Y || (A.Y == B.Y && A.R < B.R))); });
+	Out.Discs.reserve(static_cast<size_t>(Kept.Num()) * 3);
+	for (const FDisc& D : Kept)
+	{
+		Out.Discs.push_back(D.X);
+		Out.Discs.push_back(D.Y);
+		Out.Discs.push_back(D.R);
+	}
+	if (!bProbeGround)
+	{
+		return;
+	}
+	// 기록만: 2 m 격자 지면 검사 (팀 이동 제약의 지면 조건 — 경사 법선 Z < 0.65 와 물 볼륨). 원판에는 넣지 않는다
+	const int32 G = FMath::Max(1, FMath::FloorToInt32(SizeCm / 200.0));
+	for (int32 gy = 0; gy < G; ++gy)
+	{
+		for (int32 gx = 0; gx < G; ++gx)
+		{
+			const FVector Hint(OriginCm.X + (gx + 0.5) * 200.0, OriginCm.Y + (gy + 0.5) * 200.0, OriginCm.Z);
+			FHitResult Hit;
+			FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoV3ObstacleGround), false);
+			++Out.GroundCells;
+			if (!World.LineTraceSingleByChannel(Hit, Hint + FVector(0, 0, 5000), Hint - FVector(0, 0, 20000), ECC_WorldStatic, Params))
+			{
+				++Out.NoGroundCells;
+				continue;
+			}
+			Out.SteepCells += Hit.ImpactNormal.Z < 0.65 ? 1 : 0;
+			Out.WaterCells += EcoCreatureMovement::CrossesExcludedArea(World, Hit.ImpactPoint, Hit.ImpactPoint) ? 1 : 0;
+		}
+	}
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::LoadObstacleImport(const FString& Path, TMap<FName, std::vector<double>>& Out)
+{
+	Out.Reset();
+	FString Text;
+	TSharedPtr<FJsonObject> Root;
+	if (!FFileHelper::LoadFileToString(Text, *Path) || !FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) || !Root.IsValid())
+	{
+		return false;
+	}
+	const TArray<TSharedPtr<FJsonValue>>* Regions = nullptr;
+	if (!Root->TryGetArrayField(TEXT("regions"), Regions))
+	{
+		return false;
+	}
+	for (const TSharedPtr<FJsonValue>& Rv : *Regions)
+	{
+		const TSharedPtr<FJsonObject> R = Rv.IsValid() ? Rv->AsObject() : nullptr;
+		const TArray<TSharedPtr<FJsonValue>>* Discs = nullptr;
+		FString Name;
+		if (!R.IsValid() || !R->TryGetStringField(TEXT("region"), Name) || !R->TryGetArrayField(TEXT("discs"), Discs))
+		{
+			continue;
+		}
+		std::vector<double>& D = Out.FindOrAdd(FName(*Name));
+		for (const TSharedPtr<FJsonValue>& Dv : *Discs)
+		{
+			const TArray<TSharedPtr<FJsonValue>>* T = nullptr;
+			if (Dv.IsValid() && Dv->TryGetArray(T) && T->Num() == 3 && (*T)[2]->AsNumber() > 0.0)
+			{
+				D.push_back((*T)[0]->AsNumber());
+				D.push_back((*T)[1]->AsNumber());
+				D.push_back((*T)[2]->AsNumber());
+			}
+		}
+	}
+	return true;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::ExportObstacles(const FString& Path) const
+{
+	if (Path.IsEmpty())
+	{
+		return false;
+	}
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetNumberField(TEXT("session_seed"), static_cast<double>(Settings.Seed));
+	Root->SetStringField(TEXT("units"), TEXT("stage units, 1 unit = 200 cm, x·y from stage origin"));
+	Root->SetBoolField(TEXT("obstacles_on"), Settings.bObstacles);
+	TArray<TSharedPtr<FJsonValue>> Regions;
+	for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
+	{
+		const FEcoV3ObstacleScan& S = Ctx->ObstacleScan;
+		TSharedRef<FJsonObject> R = MakeShared<FJsonObject>();
+		R->SetStringField(TEXT("region"), Ctx->RegionId.ToString());
+		R->SetNumberField(TEXT("region_index"), Ctx->RegionRuntimeIndex);
+		R->SetNumberField(TEXT("size"), Ctx->SizeUnits);
+		auto Triple = [](double A, double B, double C)
+		{
+			TArray<TSharedPtr<FJsonValue>> V;
+			V.Add(MakeShared<FJsonValueNumber>(A));
+			V.Add(MakeShared<FJsonValueNumber>(B));
+			V.Add(MakeShared<FJsonValueNumber>(C));
+			return V;
+		};
+		R->SetArrayField(TEXT("origin_cm"), Triple(Ctx->OriginCm.X, Ctx->OriginCm.Y, Ctx->OriginCm.Z));
+		// discs = 세계가 쓰는 원판 (레벨에서 읽었거나 가져온 원판). 장애물을 끈 세계는 레벨에서 읽은 원판을 적는다
+		const std::vector<double>& Used = Ctx->Sim.Config.Obstacles.bEnabled ? Ctx->Sim.Config.Obstacles.Discs : S.Discs;
+		TArray<TSharedPtr<FJsonValue>> Discs;
+		for (size_t k = 0; k + 2 < Used.size(); k += 3)
+		{
+			Discs.Add(MakeShared<FJsonValueArray>(Triple(Used[k], Used[k + 1], Used[k + 2])));
+		}
+		R->SetArrayField(TEXT("discs"), Discs);
+		R->SetBoolField(TEXT("imported"), Ctx->bObstaclesImported);
+		R->SetNumberField(TEXT("level_discs"), S.Num());
+		TArray<TSharedPtr<FJsonValue>> Covers;
+		for (const EcoObservationV3::FCoverInput& Cv : Ctx->Sim.Config.Covers)
+		{
+			Covers.Add(MakeShared<FJsonValueArray>(Triple(Cv.X, Cv.Y, Cv.Radius)));
+		}
+		R->SetArrayField(TEXT("covers"), Covers);
+		TSharedRef<FJsonObject> Counts = MakeShared<FJsonObject>();
+		Counts->SetNumberField(TEXT("seen_meshes"), S.SeenMeshes);
+		Counts->SetNumberField(TEXT("no_collision"), S.NoCollision);
+		Counts->SetNumberField(TEXT("tiny"), S.Tiny);
+		Counts->SetNumberField(TEXT("low"), S.Low);
+		Counts->SetNumberField(TEXT("in_cover"), S.InCover);
+		Counts->SetNumberField(TEXT("refuge_decor"), S.RefugeDecor);
+		Counts->SetNumberField(TEXT("capped"), S.Capped);
+		Counts->SetNumberField(TEXT("near_edge"), S.NearEdge);
+		Counts->SetNumberField(TEXT("ground_cells"), S.GroundCells);
+		Counts->SetNumberField(TEXT("steep_cells"), S.SteepCells);
+		Counts->SetNumberField(TEXT("water_cells"), S.WaterCells);
+		Counts->SetNumberField(TEXT("no_ground_cells"), S.NoGroundCells);
+		R->SetObjectField(TEXT("counts"), Counts);
+		Regions.Add(MakeShared<FJsonValueObject>(R));
+	}
+	Root->SetArrayField(TEXT("regions"), Regions);
+	FString Text;
+	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
+	if (!FJsonSerializer::Serialize(Root, Writer))
+	{
+		return false;
+	}
+	return FFileHelper::SaveStringToFile(Text, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 }
 
 // -----------------------------------------------------------------------------
@@ -1391,6 +1724,20 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 	}
 	UEcologySimulationSubsystem* Ecology = World->GetSubsystem<UEcologySimulationSubsystem>();
 	UEcoShelterSubsystem* Shelters = World->GetSubsystem<UEcoShelterSubsystem>();
+	// 장애물 원판 가져오기 (eco.IntegratedV3.ObstacleImport — 측정 전용). 지역 이름 → 원판 (x, y, r) × K
+	TMap<FName, std::vector<double>> ImportedDiscs;
+	if (Settings.bObstacles && !Settings.ObstacleImportPath.IsEmpty())
+	{
+		const FString Path = FPaths::ConvertRelativePathToFull(Settings.ObstacleImportPath);
+		if (LoadObstacleImport(Path, ImportedDiscs))
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 장애물 원판을 가져왔다 (측정 전용, 레벨에 보이는 물체 없음): %s — 지역 %d"), *Path, ImportedDiscs.Num());
+		}
+		else
+		{
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 장애물 원판 JSON 을 읽지 못했다: %s — 레벨에서 읽은 원판을 쓴다"), *Path);
+		}
+	}
 
 	for (const FEcoV3StagePlan& Plan : Plans)
 	{
@@ -1492,8 +1839,81 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 				CoverIndices.Add(P.RuntimeIndex);Registrations.Add(P.RegistrationId);
 			}
 		}
-		const EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers);
+		// 세로 장애물 (야생 2단계 3): 레벨을 읽기만 해서 무대 안의 충돌하는 나무·바위를 원판으로 만든다. 우리가 놓은 은신처 앵커는 뺀다
+		FEcoV3ObstacleScan Scan;
+		{
+			TSet<const AActor*> Exclude;
+			for (const TWeakObjectPtr<AActor>& Cover : SpawnedCovers)
+			{
+				if (const AActor* A = Cover.Get())
+				{
+					Exclude.Add(A);
+				}
+			}
+			ScanStageObstacles(*World, Origin, Plan.SizeUnits, Covers, Exclude, true, Scan);
+		}
+		EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers);
+		// 세로 장애물 (eco.IntegratedV3.Obstacles): 레벨에서 읽은 원판 (측정 때는 가져온 원판). 원판이 없으면 세계는 지금 그대로다
+		const std::vector<double>* Imported = ImportedDiscs.Find(G.RegionId);
+		if (Config.Obstacles.bEnabled)
+		{
+			Config.Obstacles.Discs = Imported ? *Imported : Scan.Discs;
+		}
 		FEcoV3RegionContext* Ctx = AddContext(G.RegionId, RegionIndex, Origin, Config, G.Herbivores, G.Wolves);
+		Ctx->ObstacleScan = MoveTemp(Scan);
+		Ctx->bObstaclesImported = Settings.bObstacles && Imported != nullptr;
+		{
+			// 디버그 그리기 높이: 원판 중심 지면 (읽기만 하는 아래쪽 선 검사, 못 찾으면 무대 원점 높이)
+			const std::vector<double>& Dl = Ctx->Sim.Config.Obstacles.Discs;
+			for (size_t k = 0; k + 2 < Dl.size(); k += 3)
+			{
+				const FVector P = Ctx->UnitsToCm(Dl[k], Dl[k + 1], Origin.Z);
+				FHitResult Hit;
+				FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoV3ObstacleDraw), false);
+				Ctx->ObstacleGroundZ.Add(World->LineTraceSingleByChannel(Hit, P + FVector(0, 0, 5000), P - FVector(0, 0, 20000), ECC_WorldStatic, Params)
+											 ? Hit.ImpactPoint.Z : Origin.Z);
+			}
+		}
+		{
+			const FEcoV3ObstacleScan& Sc = Ctx->ObstacleScan;
+			auto Top = [](const TMap<FString, int32>& Map)
+			{
+				TArray<TPair<FString, int32>> Pairs = Map.Array();
+				Pairs.Sort([](const TPair<FString, int32>& A, const TPair<FString, int32>& B) { return A.Value > B.Value || (A.Value == B.Value && A.Key < B.Key); });
+				FString S;
+				for (int32 k = 0; k < FMath::Min(4, Pairs.Num()); ++k)
+				{
+					S += FString::Printf(TEXT(" %s %d"), *Pairs[k].Key, Pairs[k].Value);
+				}
+				return S.IsEmpty() ? FString(TEXT(" 없음")) : S;
+			};
+			double RMean = 0.0, RMax = 0.0;
+			for (int32 k = 0; k < Sc.Num(); ++k)
+			{
+				RMean += Sc.Discs[3 * k + 2];
+				RMax = FMath::Max(RMax, Sc.Discs[3 * k + 2]);
+			}
+			RMean = Sc.Num() > 0 ? RMean / Sc.Num() : 0.0;
+			const double MPerUnit = EcoRepertoireV3::kUnitCm / 100.0;
+			if (Ctx->bObstaclesImported)
+			{
+				const EcoWorldV3::FObstacleConfig& Ob = Ctx->Sim.Config.Obstacles;
+				double Area = 0.0;
+				for (int32 k = 0; k < Ob.Num(); ++k)
+				{
+					Area += UE_DOUBLE_PI * Ob.Discs[3 * k + 2] * Ob.Discs[3 * k + 2];
+				}
+				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 장애물 | 가져온 원판 %d (넓이 %.2f%%) 으로 돈다 — 측정 전용, 레벨에서 읽은 원판 %d 대신 (eco.IntegratedV3.ObstacleImport)"),
+					   *G.RegionId.ToString(), Ob.Num(), 100.0 * Area / (Plan.SizeUnits * Plan.SizeUnits), Sc.Num());
+			}
+			UE_LOG(LogEcoPolicyV3I, Log,
+				   TEXT("[EcoV3I] %s 장애물 | 원판 %d (반지름 평균 %.2f m·최대 %.2f m, 넓이 %.2f%%) %s | 무대 안 메시 %d: 충돌 없음 %d (많은 것:%s) · 작음(반지름 %.0f cm 밑) %d · ")
+					   TEXT("낮음(%.0f cm 밑) %d · 은신처 원 안 %d · 은신처 장식 %d · 상한 넘침 %d · 무대 벽 곁 원판 %d | 원판 메시:%s | 지면 2 m 격자 %d 칸: 가파름 %d · 물 %d · 지면 없음 %d (기록만)"),
+				   *G.RegionId.ToString(), Sc.Num(), RMean * MPerUnit, RMax * MPerUnit, 100.0 * Sc.AreaFrac(Plan.SizeUnits),
+				   Settings.bObstacles ? TEXT("(eco.IntegratedV3.Obstacles 1 — 세계에 넣음)") : TEXT("(eco.IntegratedV3.Obstacles 0 — 읽기만, 세계에 넣지 않음)"),
+				   Sc.SeenMeshes, Sc.NoCollision, *Top(Sc.NoCollisionByMesh), FEcoV3ObstacleScan::kMinRadiusCm, Sc.Tiny, FEcoV3ObstacleScan::kMinHeightCm,
+				   Sc.Low, Sc.InCover, Sc.RefugeDecor, Sc.Capped, Sc.NearEdge, *Top(Sc.KeptByMesh), Sc.GroundCells, Sc.SteepCells, Sc.WaterCells, Sc.NoGroundCells);
+		}
 		Ctx->TeamCovers = Team;
 		Ctx->SkippedTeamCovers = Skipped;
 		Ctx->ExtraCovers = Extra;
@@ -1511,6 +1931,19 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		for (const FString& Why : UEcoPolicyV3Subsystem::CheckTrainingRange(Config))
 		{
 			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 지역 %s 학습 범위 밖: %s"), *G.RegionId.ToString(), *Why);
+		}
+	}
+	// 장애물 원판 JSON (eco.IntegratedV3.ObstacleExport — 파이썬 거울 짝 비교용). 경로를 주지 않으면 쓰지 않는다
+	if (!Settings.ObstacleExportPath.IsEmpty())
+	{
+		const FString Path = FPaths::ConvertRelativePathToFull(Settings.ObstacleExportPath);
+		if (ExportObstacles(Path))
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 장애물 원판 목록을 썼다: %s (지역 %d)"), *Path, Contexts.Num());
+		}
+		else
+		{
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 장애물 원판 목록을 쓰지 못했다: %s"), *Path);
 		}
 	}
 }
@@ -1941,6 +2374,22 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   static_cast<long long>(S.PackHelpSteps), Pc(S.PackHelpSteps), static_cast<long long>(S.PackWaitSteps),
 			   static_cast<long long>(S.PackDoorSteps), static_cast<long long>(S.PackCatches), static_cast<long long>(S.PackCoopCatches));
 	}
+	// 일곱째 줄: 야생 2단계 3 세로 장애물 (10-17, 원판이 있을 때만 — 무대에 충돌하는 나무·바위가 없으면 적지 않는다). 누적 사슴·늑대 미끄러짐·물러남·돌아섬과
+	//   원판 밖으로 옮긴 개체 (world.py obstacle_stats 와 같은 정의. 앞 여섯 줄의 정규식은 '<지역> 장애물 |' 꼴에 걸리지 않는다)
+	if (Ctx.Sim.Config.Obstacles.Active())
+	{
+		const EcoWorldV3::FObstacleConfig& Ob = Ctx.Sim.Config.Obstacles;
+		auto Pc = [](int64 X, int64 N) { return N > 0 ? 100.0 * static_cast<double>(X) / static_cast<double>(N) : 0.0; };
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 장애물 | %.1f초 | 원판 %d (%s, 몸 %.0f cm, 눈길 가림 %s, 먹이 줄임 %s) | 누적 사슴·스텝 %lld: 닿음 %lld (%.2f%%) · 물러남 %lld | ")
+				   TEXT("늑대·스텝 %lld: 닿음 %lld (%.2f%%) · 되돌림 %lld · 돌아섬 %lld | 원판 밖으로 옮김 %lld (못 옮김 %lld)"),
+			   *Ctx.RegionId.ToString(), Seconds, Ob.Num(), Ctx.bObstaclesImported ? TEXT("가져온 원판 — 측정 전용") : TEXT("레벨에서 읽음"),
+			   Ob.BodyR * EcoRepertoireV3::kUnitCm, Ob.bBlockSight ? TEXT("켬") : TEXT("끔"), Ob.bNoFood ? TEXT("켬") : TEXT("끔"),
+			   static_cast<long long>(S.ObstacleDeerSteps), static_cast<long long>(S.ObstacleDeerHit), Pc(S.ObstacleDeerHit, S.ObstacleDeerSteps),
+			   static_cast<long long>(S.ObstacleDeerBack), static_cast<long long>(S.ObstacleWolfSteps), static_cast<long long>(S.ObstacleWolfHit),
+			   Pc(S.ObstacleWolfHit, S.ObstacleWolfSteps), static_cast<long long>(S.ObstacleWolfBack), static_cast<long long>(S.ObstacleWolfDead),
+			   static_cast<long long>(S.ObstaclePushMoved), static_cast<long long>(S.ObstaclePushFailed));
+	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
 	{
@@ -2069,6 +2518,20 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 				// 늑대 몸 여유 둘레 (10-17): 늑대 중심은 이 원 밖에 머문다 (가는 선)
 				const float Rw = static_cast<float>((C.Radius + Ctx.Sim.Config.ShelterWolfMargin) * EcoRepertoireV3::kUnitCm);
 				DrawDebugCircle(World, P, Rw, 48, FColor(60, 60, 90), false, -1.0f, 0, 3.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+			}
+		}
+		// 야생 2단계 3 세로 장애물 원판 (갈색 = 나무·바위 둘레, 옅은 선 = 몸 여유 둘레 — 사슴·늑대 중심이 들지 않는 원). 가져온 원판(측정 전용)은 주황
+		{
+			const EcoWorldV3::FObstacleConfig& Ob = Ctx.Sim.Config.Obstacles;
+			const FColor ObColor = Ctx.bObstaclesImported ? FColor(230, 140, 40) : FColor(120, 80, 40);
+			for (int32 k = 0; Ob.bEnabled && k < Ob.Num(); ++k)
+			{
+				const double Z = Ctx.ObstacleGroundZ.IsValidIndex(k) ? Ctx.ObstacleGroundZ[k] : Ctx.OriginCm.Z;
+				const FVector P = Ctx.UnitsToCm(Ob.Discs[3 * k], Ob.Discs[3 * k + 1], Z + 40.0);
+				const float R = static_cast<float>(Ob.Discs[3 * k + 2] * EcoRepertoireV3::kUnitCm);
+				DrawDebugCircle(World, P, R, 16, ObColor, false, -1.0f, 0, 6.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+				DrawDebugCircle(World, P, R + static_cast<float>(Ob.BodyR * EcoRepertoireV3::kUnitCm), 16, FColor(90, 70, 50), false, -1.0f, 0, 1.5f,
+								FVector(1, 0, 0), FVector(0, 1, 0), false);
 			}
 		}
 		for (const FEcoV3IntegratedCatchMark& M : Ctx.RecentCatches)

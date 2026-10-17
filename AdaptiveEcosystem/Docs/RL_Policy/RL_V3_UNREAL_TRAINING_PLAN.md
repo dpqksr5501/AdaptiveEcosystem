@@ -693,6 +693,15 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 10초 기록 여섯째 줄 `[EcoV3I] <지역> 늑대 무리 | …`(켰을 때만): 누적 늑대·스텝 가운데 앞장·돕기·기다림·은신처 문, 늑대 포획·협동 포획. 앞 다섯 줄은 그대로다.
   - 헤드리스(사슴 128, 세션 20000~20005, 240초): 기록 `herbivore_rl/results/v3/wild2/unreal_logs/pack_*`. 잡힘 5.47%(같은 지도 파이썬 5.17%), 사냥 성공률 59.4 대 58.7%, 돕기 6.3 대 6.4%, 모든 칸 |z| < 2(숲만도). 오류·ensure·경고 0.
   - 시험: `Policy.V3.Pack.Golden`(목표 장면 72·한 스텝 장면 80 비트 단위, 골든 `PackGoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_pack.py`, 검사 본문 `Tests/PackGoldenCheckV3.h` — g++ 하네스도 같은 본문)·`Run`·`IntegratedDefaults`. 기존 통합 시험 장면(`TestSettings`)은 무리를 끈다. 자동 시험 157 = 성공 156 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
+- **10-17 야생 2단계 3 세로 장애물** (명세 `RL_V3_WILD2_SPEC.md` 6절, 결정 `RL_V2_PLAN.md` '10-17 (12)', 측정 `herbivore_rl/results/v3/wild2/README.md` '3 세로 장애물'):
+  - 새 스위치 `eco.IntegratedV3.Obstacles` · `-EcoV3Obstacles=`(기본 1). 무대를 만들 때 무대 안 레벨의 충돌하는 나무·바위(스태틱 메시·폴리지 인스턴스 — 팀 이동 제약과 같은 WorldStatic 막음)를 **읽기만 해서** 원판으로 만든다(`ScanStageObstacles`). 사슴·늑대는 원판(반지름 + 몸 30 cm) 둘레를 따라 미끄러지고, 원판이 눈길을 가린다(발소리는 못 가림). 원판 밑 먹이는 덮인 몫만큼 적다. 0 = 읽기만 하고 세계에 넣지 않는다.
+  - **지금 팀 통합 레벨의 동물 무대에는 충돌하는 나무·바위가 없다**(숲 무대 메시 38 = 충돌 없는 풀, 메마른 땅·고지 0). 그래서 기본으로 돌려도 아무것도 바뀌지 않는다 — 헤드리스 기록이 바꾸기 전과 시작 줄 넷 말고 같다. 팀에 무대 안 나무·바위를 요청했다(`TEAM_REQUESTS_V3.md` 4절 1).
+  - 시작 글: `[EcoV3I] 세로 장애물: …` 과 지역마다 `[EcoV3I] <지역> 장애물 | 원판 n (반지름·넓이) | 무대 안 메시 n: 충돌 없음 n (많은 것 …) · 작음 · 낮음 · 은신처 원 안 · 은신처 장식 · 상한 넘침 · 무대 벽 곁 원판 | 원판 메시 … | 지면 2 m 격자: 가파름 · 물 · 지면 없음`. 10초 기록 일곱째 줄 `[EcoV3I] <지역> 장애물 | t초 | …`(원판이 있을 때만): 사슴·늑대가 원판에 닿은 수·물러남·되돌림·돌아섬, 원판 밖으로 옮긴 개체. 앞 여섯 줄은 그대로다.
+  - 디버그 표시(`eco.V3Debug 1`): 원판 둘레(갈색, 가져온 원판은 주황)와 몸 여유 둘레(옅은 선).
+  - 원판 JSON 내보내기 `eco.IntegratedV3.ObstacleExport` · `-EcoV3ObstacleExport=<경로>`(지역마다 세계가 쓰는 원판 x, y, r·은신처 원·읽기 기록 — 파이썬 거울 `run_mirror.py --unreal-maps … --unreal-obstacles <JSON 또는 폴더>` 가 같은 원판으로 돈다).
+  - 측정 전용 가져오기 `eco.IntegratedV3.ObstacleImport` · `-EcoV3ObstacleImport=<경로>`: 지역 이름이 같은 무대는 레벨 원판 대신 이 원판을 쓴다. 레벨에 보이는 물체가 없는 원판이라 화면용이 아니다(디버그 표시로만 보인다). 파이썬 원판은 `herbivore_rl/results/v3/wild2/make_obstacle_maps.py`.
+  - 헤드리스(사슴 128, 240초, 파이썬 원판 가져옴): 세션 20000~20002 같은 지도·같은 원판 9장 |z| ≤ 2.0, 독립 지도 20003~20005 |z| < 2, 숲만 |z| < 2. 사냥 성공률 언리얼 35.9 대 파이썬 40.1%(바꾸기 전 59.4%). 기록 `herbivore_rl/results/v3/wild2/unreal_logs/obst_*`. 오류·ensure·경고 0.
+  - 시험: `Policy.V3.Obstacle.Golden`(미끄러짐 566·시선 407·먹이·밀어내기 168·한 스텝 장면 80 비트 단위, 골든 `ObstacleGoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_obstacle.py`, 검사 본문 `Tests/ObstacleGoldenCheckV3.h` — g++ 하네스도 같은 본문)·`Run`·`LevelScan`(시험 월드 상자·인스턴스 메시 읽기, 읽기 전후 그대로, JSON 왕복)·`IntegratedDefaults`. 자동 시험 161 = 성공 160 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
 
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 

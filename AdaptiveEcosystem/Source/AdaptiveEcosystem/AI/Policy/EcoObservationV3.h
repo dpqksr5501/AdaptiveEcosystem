@@ -142,6 +142,9 @@ namespace EcoObservationV3
 		bool bAsleep = false;
 		double HearR = 0.0;   // 발소리 반경 (realism_hearing, HearingRadius). 0 = 들리지 않음 (끈 세계는 늘 0)
 		bool bHunting = true; // Social metadata only. Resting/eating wolves never raise a new threat alarm.
+		// 세로 장애물 (야생 2단계 3, world.py sight_blocked): 이 사슴에서 이 위협까지의 눈길을 원판이 가린다. 참이면 눈으로 못 보고 발소리만 남는다.
+		// EcoWorldV3 가 사슴마다 채운다 (끈 세계는 늘 거짓 — 지금 그대로)
+		bool bOccluded = false;
 	};
 
 	/** R3 발소리 계수 (파이썬 realism_hearing, configs/v3_r3.yaml·v3_wild1_mirror.yaml 값). 기본 끔. */
@@ -226,8 +229,8 @@ namespace EcoObservationV3
 			const double Ey = T.Y - Pos.Y;
 			const double Pd = std::sqrt(Ex * Ex + Ey * Ey);
 			const double Inv = 1.0 / (Pd > EcoRepertoireV3::kEps ? Pd : EcoRepertoireV3::kEps);
-			// 보임: 시야(반경 SeeP, 위협 시야각 ThreatFovCos) 또는 발소리(실거리 ≤ HearR, 방향 무관 — realism_hearing). 자는 위협은 빠진다
-			const bool bSight = Pd <= SeeP && (Ex * Head.X + Ey * Head.Y) * Inv >= Cfg.ThreatFovCos;
+			// 보임: 시야(반경 SeeP, 위협 시야각 ThreatFovCos, 원판에 가리지 않음) 또는 발소리(실거리 ≤ HearR, 방향 무관 — realism_hearing). 자는 위협은 빠진다
+			const bool bSight = !T.bOccluded && Pd <= SeeP && (Ex * Head.X + Ey * Head.Y) * Inv >= Cfg.ThreatFovCos;
 			const double HearLim = Cfg.bHearCapToSight ? (T.HearR < SeeP ? T.HearR : SeeP) : T.HearR;
 			const bool bHeard = T.HearR > 0.0 && Pd <= HearLim;
 			const bool bVis = (bSight || bHeard) && !T.bAsleep;

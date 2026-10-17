@@ -1,14 +1,16 @@
-# v3 야생 규칙 2단계 명세 — 사냥 성공률을 재고, 은신처 먹이 부족, 늑대 무리·협동 사냥
+# v3 야생 규칙 2단계 명세 — 사냥 성공률을 재고, 은신처 먹이 부족, 늑대 무리·협동 사냥, 세로 장애물
 
 - 작성: sinhyeok04 (강화학습·정책), 2026-10-17 (토).
-- 상태: **1 은신처 먹이 부족과 2 늑대 무리·협동 사냥을 파이썬 거울과 언리얼 C++ 에 넣고 쟀다. 1 은 사용자 결정 10-17 '추천대로 끄고'로 거울·언리얼
-  기본에서 끈다(코드·스위치는 남김). 3 장애물은 아직이다.** 두뇌는 게임 두뇌 R1b-F 그대로다(재학습 없음).
+- 상태: **1 은신처 먹이 부족, 2 늑대 무리·협동 사냥, 3 세로 장애물을 파이썬 거울과 언리얼 C++ 에 넣고 쟀다. 1 은 사용자 결정 10-17 '추천대로 끄고'로
+  거울·언리얼 기본에서 끈다(코드·스위치는 남김). 3 은 언리얼 기본 켬이지만 팀 레벨 무대에 충돌하는 나무·바위가 없어 지금은 아무것도 바뀌지 않는다(6-1).**
+  두뇌는 게임 두뇌 R1b-F 그대로다(재학습 없음).
 - 근거: 사용자 승인 10-16 '추천대로'(야생 2단계 순서 1 → 2 → 3), 앞선 사용자 결정 '은신처는 안전하지만 먹이가 적다', 사용자 10-17 '추천대로 끄고 2~4번 진행해'.
 - 경로 표기: `H/` = `herbivore_rl/`, `D/` = `AdaptiveEcosystem/Docs/`, `S/` = `AdaptiveEcosystem/Source/AdaptiveEcosystem/`.
-- 코드: 정의와 식 `H/env_v2/world.py` 모듈 docstring '야생 2단계'·(e), 설정 `H/configs/v3_wild2_mirror.yaml`(1)·`H/configs/v3_wild2_pack_mirror.yaml`(2),
-  시험 `H/tests/test_wild2.py`·`H/tests/test_wild2_pack.py`, 측정 `H/results/v3/wild2/`.
+- 코드: 정의와 식 `H/env_v2/world.py` 모듈 docstring '야생 2단계'·(e), 설정 `H/configs/v3_wild2_mirror.yaml`(1)·`H/configs/v3_wild2_pack_mirror.yaml`(2)·
+  `H/configs/v3_wild2_obstacle_mirror.yaml`(3), 시험 `H/tests/test_wild2.py`·`H/tests/test_wild2_pack.py`·`H/tests/test_wild2_obstacle.py`, 측정 `H/results/v3/wild2/`.
   C++ `S/AI/Policy/EcoWorldV3.h`(`FShelterFoodConfig`·`FFoodGrid::ApplyShelterFood`·`HuntUpdate`·C2 무리 미리 보기), `EcoThreatModel.h`(`FPackHuntConfig`·
-  `PackPeek`·`PackGoals`·Step 6b′), 통합 모드 `EcoPolicyV3IntegratedSubsystem.*`, 시험 `Tests/EcoWild2V3Test.cpp`·`Tests/EcoPackV3Test.cpp`.
+  `PackPeek`·`PackGoals`·Step 6b′·`ObstacleSlide`·`SightBlocked`), `EcoObservationV3.h`(`FThreatInput::bOccluded`), 통합 모드 `EcoPolicyV3IntegratedSubsystem.*`
+  (`ScanStageObstacles`), 시험 `Tests/EcoWild2V3Test.cpp`·`Tests/EcoPackV3Test.cpp`·`Tests/EcoObstacleV3Test.cpp`.
 - 단위: 1스텝 = 0.133초, 길이 1단위 = 2 m, 게임 하루 = 900스텝 = 2분(낮 1분 + 밤 1분).
 - 보상·관측 18칸·행동 마스크는 바꾸지 않는다.
 
@@ -25,6 +27,10 @@
 7. **2 늑대 무리(5절): 지역당 늑대 2 → 4 와 협동 사냥(쉬던 동료가 쫓기는 사슴이 달아날 곳에 가서 기다림)을 넣었다.** 늑대 넷이면 지역마다 잡는 수가
    2.4배다(게임 하루 1.34 → 3.22마리). 협동 규칙은 사냥 시작을 17% 늘리고 성공률을 64 → 56% 로 낮추지만 잡힘은 그대로다(흔들림 안).
    성공률은 여전히 목표 띠(10~30%)보다 높다. 언리얼은 파이썬과 같다(5-5).
+8. **3 세로 장애물(6절): 나무 줄기·바위 원판이 도주길과 시선을 막는다.** 사냥 성공률이 56 → 40% 로 내려가 목표 띠에 가까워졌다(쫓던 사슴이 줄기 뒤로
+   가면 놓친다). 사냥 시작은 47% 늘고 잡힘은 조금 는다(5.03 → 5.49%). 언리얼은 같은 원판으로 파이썬과 같다(6-5).
+9. **팀 통합 레벨의 동물 무대에는 충돌하는 나무·바위가 없다(6-1).** 레벨 읽기 기본 켬(`eco.IntegratedV3.Obstacles`)으로는 지금 아무것도 바뀌지 않는다.
+   밀도는 실제 숲 자료로 정했고, 언리얼 측정은 파이썬 원판을 넣어서 했다(측정 전용). 팀에 무대 안 나무·바위를 요청한다.
 
 ---
 
@@ -223,7 +229,95 @@
 
 ---
 
-## 6. 골든 시험
+## 6. 3 도주를 막는 세로 장애물
+
+### 6-1. 언리얼 레벨에서 읽은 것 (10-17)
+
+- 우리 코드가 무대마다 레벨을 읽기만 했다(`ScanStageObstacles` — 액터·컴포넌트를 바꾸지 않는다). 무대 한 변 120 m, 세 무대 모두.
+- **팀 통합 레벨의 동물 무대에는 충돌하는 나무·바위가 하나도 없다.**
+
+| 무대 | 무대 안 메시 | 충돌 없음 | 원판 | 가파른 땅 (2 m 격자 3600칸) | 물 |
+|---|---|---|---|---|---|
+| 숲(Forest) | 38 | 38 (풀 `SM_MWAM_GrassC` 19·`GrassD` 19) | 0 | 0 | 0 |
+| 메마른 땅(Barren) | 0 | 0 | 0 | 0 | 0 |
+| 고지(Highland) | 0 | 0 | 0 | 0 | 0 |
+
+- 레벨 파일도 같다. 바깥 액터 162개 가운데 스태틱 메시 액터가 없고, 폴리지는 풀 두 가지뿐이다. 바위·풀 무늬는 지형 재질의 풀 유형(`LGT_MWAM_*`)이라 충돌이 없고 서버에는 생기지 않는다. 우리 은신처의 덤불·바위 장식(`AEcoRefugeHabitat`)도 충돌이 없다.
+- 그래서 **기본(`eco.IntegratedV3.Obstacles 1`)으로 돌려도 지금 레벨에서는 아무것도 바뀌지 않는다.** 헤드리스 세션 20000 의 기록 줄이 바꾸기 전(`pack_s20000-20002`)과 새 시작 줄 넷 말고 모두 같다.
+- 그래서 장애물 밀도는 언리얼 숲 무대가 아니라 실제 숲 자료로 정했다(6-3). 언리얼과 같은 원판으로 견줄 때는 파이썬이 만든 원판을 언리얼에 넣었다(6-5, 측정 전용).
+- 팀 요청: 동물 무대 안에 충돌하는 나무·바위를 놓아 달라(`TEAM_REQUESTS_V3.md` 4절 1). 놓으면 우리 코드가 고치지 않고 그대로 읽는다.
+
+### 6-2. 규칙 (`obstacles`, 번호 12 — 10-14 에 자리만 둔 기능)
+
+- 원판 = 나무 줄기·바위 (x, y, r). 파이썬 `World.obstacles`, C++ `FWorldConfig::Obstacles`.
+- 이동: 사슴·늑대는 원판(반지름 r + 몸 30 cm) 앞에서 멈추고 둘레를 따라 미끄러진다(`obstacle_slide`·`ObstacleSlide`).
+  - 이동 선분이 원판에 처음 닿는 자리에서 멈춘다. 빠르게 달려도 가는 줄기를 뚫지 않는다.
+  - 남은 이동에서 안쪽 성분만 뺀다. 다른 원판에 또 닿으면 되풀이한다(3번까지).
+  - 끝에 원판 안이면 마지막으로 닿은 자리로 물러난다(겹친 원판 사이 틈).
+  - 늑대는 부딪혀 가려던 거리의 10% 도 못 가면 돌아선다(은신처 막다른 곳과 같은 꼴).
+  - heading 과 두뇌 관측은 그대로다. 두뇌는 원판을 모른다(재학습 없음).
+- 시선: 두 점을 잇는 선분이 원판(반지름 r)을 지나면 눈으로 못 본다(`sight_blocked`·`SightBlocked`).
+  - 사슴이 늑대를 보는 것(관측·도주 반사)과 늑대가 사슴을 고르는 것에 함께 건다.
+  - 발소리는 가리지 않는다. 동족 시야도 가리지 않는다.
+- 먹이: 원판 밑 먹이 셀은 원판이 덮은 몫만큼 용량이 적다(셀마다 표본점 16개 가운데 원판 안인 몫, `obstacle_food_factor`·`ApplyObstacleFood`).
+- 시작·입양·리스폰: 원판 안에서 나면 가장 가까운 둘레 밖 자리로 옮긴다(`obstacle_push_out`·`ObstaclePushOut`, 늑대는 은신처 막기 원도 피한다).
+- 배치(파이썬 무작위 세계만): 기능 스트림 part 0. 중심이 은신처 원 안이거나 무대 벽에서 r + 2 × 몸 안이면 다시 뽑는다.
+  - 무대 벽은 실제 땅에 없는 울타리다. 원판을 벽에 붙이면 사슴이 벽과 원판 사이 구석에 낀다. 처음 측정에서 사슴 물러남의 97% 가 이 구석이었다. 그래서 벽 곁에 몸 하나 지나갈 틈을 둔다.
+  - 언리얼 레벨 읽기는 벽에 걸친 원판도 그대로 넣는다(레벨의 나무를 지우면 사슴이 나무를 뚫는다). 기록에 '무대 벽 곁 원판' 수를 적는다.
+- 난수: 배치만 자기 스트림. 끄면(`obstacles` 블록 끔·원판 0) 지금 세계와 비트 단위로 같다.
+- `realism_chase`·`stare_down` 과는 함께 켜지 않는다(그 규칙의 시야 판정은 원판을 모른다). 거울 세계에는 둘 다 없다.
+- 현실 근거:
+  - 늑대에게 잡힌 엘크는 도망이 막히는 곳(강가·길가·깊은 눈)에서 더 많았다(Kauffman 외 2007, *Ecol. Lett.* 10:690–700, 옐로스톤 북부 10년 774곳).
+  - 숲은 줄기가 빽빽하다. 사슴과 늑대는 줄기를 돌아 달리고 서로를 오래 보지 못한다(밀도는 아래 6-3).
+
+### 6-3. 계수 (`configs/v3_wild2_obstacle_mirror.yaml` `obstacles` = C++ `FObstacleConfig` 기본값)
+
+| 계수 | 값 | 무대 120 m 에서 | 근거 |
+|---|---|---|---|
+| `tree_per_ha` · `tree_r` | 1 ha 250 · 반지름 0.05~0.15 단위 (10~30 cm) | 줄기 360 | 가슴높이 단면적 합 π × 평균 r² × 250 ≈ 34 m²/ha 로 온대 성숙림 측정값(1 ha 산 줄기 1179, 단면적 34.1 m² — ESA Ecological Archives E094-195)과 맞춘다. 가는 줄기는 뺐다(어림) |
+| `rock_per_ha` · `rock_r` | 1 ha 5 · 반지름 0.25~0.75 단위 (0.5~1.5 m) | 바위 7 | 숲 바닥의 큰 바위(어림) |
+| `body_r` | 0.15 단위 (30 cm) | — | 팀 이동 제약이 쓸어 보는 구의 반지름(`EcoCreatureMovement::ConstrainStep`) |
+| `block_sight` · `no_food` | 켬 · 켬 | 원판 넓이 0.5% | 위 규칙 |
+
+- 계수는 바꾸지 않았다(한 번에 정한 값). 시선이 원판에 가리는 몫: 사슴이 시야 안에 둔 늑대 쌍의 22%, 늑대가 시야 안에 둔 사슴 쌍의 21%.
+
+### 6-4. 언리얼 (C++ 대응)
+
+- `EcoThreatModel.h`: `ObstacleSlide`·`SightBlocked`·`InsideAnyObstacle`. 위협 Step 의 표적 보임(보통 위협만, 이동 전 위치 → 사슴)과 8′ 이동(미끄러짐 → 은신처 밀어내기 → 벽 반사 → 원판 안이면 되돌림 → 막다른 곳 돌아섬). `FThreatStepInput::Obstacles` 가 nullptr 이면 지금 그대로.
+- `EcoObservationV3.h`: `FThreatInput::bOccluded` — 사슴마다 위협까지 눈길이 가리면 눈 보임에서 뺀다(발소리는 그대로).
+- `EcoWorldV3.h`: `FObstacleConfig`(기본 끔), `FFoodGrid::ApplyObstacleFood`(은신처 먹이 부족 앞), `ObstaclePushOut`(처음·입양·리스폰), C1 사슴 이동 뒤 미끄러짐, C2 위협 Step·무리 미리 보기에 원판, E·도주 반사에 눈길 가림. 기록 `FWorldStats::Obstacle*`.
+- 통합 모드(`EcoPolicyV3IntegratedSubsystem`):
+  - 무대를 만들 때 레벨을 읽기만 한다(`ScanStageObstacles`). 무대 안 스태틱 메시 컴포넌트(인스턴스 메시는 인스턴스마다)를 본다. 팀 이동 제약이 막는 것과 같은 조건(쿼리 충돌 켬 ∧ WorldStatic 막음)만 원판으로 넣는다.
+  - 반지름 = 충돌 상자 가로 반폭의 평균(메시 공간 상자를 전체 변환으로 옮김). 반지름 25 cm 밑·높이 50 cm 밑·은신처 원 안 중심·은신처 액터 장식·우리 은신처 앵커는 뺀다. 무대마다 많아야 512.
+  - 시작 글 `[EcoV3I] <지역> 장애물 | 원판 n … | 무대 안 메시 n: 충돌 없음 … | 지면 2 m 격자 …`, 10초 기록 일곱째 줄 `[EcoV3I] <지역> 장애물 | t초 | …`(원판이 있을 때만).
+  - 디버그 표시(`eco.V3Debug 1`): 원판 둘레(갈색, 가져온 원판은 주황)와 몸 여유 둘레(옅은 선).
+  - 콘솔 변수 `eco.IntegratedV3.Obstacles`(기본 1, `-EcoV3Obstacles=`), `eco.IntegratedV3.ObstacleExport`(`-EcoV3ObstacleExport=<경로>` — 지역마다 세계가 쓰는 원판 JSON), `eco.IntegratedV3.ObstacleImport`(`-EcoV3ObstacleImport=<경로>` — 측정 전용, 레벨에 보이는 물체가 없는 원판).
+- 파이썬 짝 비교: `run_mirror.py --unreal-maps … --unreal-obstacles <JSON 또는 폴더>` 가 지역 원판을 그 지도 세계의 `obstacles.fixed` 로 넣는다. 측정용 원판은 `H/results/v3/wild2/make_obstacle_maps.py` 가 만든다(파이썬 숲 배치, 세계 시드 33090~33098).
+
+### 6-5. 측정
+
+자세한 표·명령은 `H/results/v3/wild2/README.md` '3 세로 장애물'. 사슴 128, 무대 120 m, 늑대 4 + 협동 사냥, 두뇌 R1b-F.
+
+| 판 | 산 % | 잡힘 % | 굶음 % | 사냥 성공률 % | 추격형 · 잠행형 % | 사냥/늑대·일 | 은신처 안 % |
+|---|---|---|---|---|---|---|---|
+| 파이썬 바꾸기 전 (90세계 × 240초) | 95.0 | 5.03 | 0 | 55.7 | 50 · 60 | 1.53 | 12.3 |
+| **파이썬 장애물 (90세계 × 240초)** | 94.5 | 5.49 | 0 | 39.8 | 29 · 58 | 2.25 | 11.1 |
+| 파이썬 바꾸기 전 (30세계 × 16분) | 63.4 | 20.16 | 16.46 | 57.0 | 50 · 64 | 1.46 | 11.9 |
+| **파이썬 장애물 (30세계 × 16분)** | 59.8 | 21.54 | 18.67 | 38.7 | 27 · 64 | 2.27 | 10.9 |
+| 파이썬 같은 지도 바꾸기 전 (언리얼 지도 9장 × 10) | 94.8 | 5.17 | 0 | 58.1 | 53 · 63 | 1.48 | 10.6 |
+| **파이썬 같은 지도·같은 원판 장애물** | 94.4 | 5.56 | 0 | 39.2 | 29 · 56 | 2.28 | 9.6 |
+| **언리얼 장애물 (세션 20000~20002, 같은 원판)** | 94.8 | 5.21 | 0 | 35.9 | — | — | 9.7 |
+| **언리얼 장애물 (세션 20003~20005)** | 94.5 | 5.47 | 0 | 33.2 | — | — | 11.1 |
+
+- **사냥 성공률이 56 → 40% 로 내려간다(목표 띠 10~30% 에 가까워졌다).** 쫓던 사슴이 줄기 뒤로 가면 추격형이 놓친다(추격형 성공률 50 → 29%). 잠행형은 거의 그대로다(12 m 안에서 덮친다).
+- 늑대 사냥 시작이 47% 늘었다(하루 1.53 → 2.25번). 놓친 뒤 다른 사슴을 다시 쫓는다.
+- 잡힘은 조금 는다. 240초 판 같은 시드 90쌍에서 세계마다 +0.58마리(표준오차 0.14), 같은 지도·같은 원판 90쌍 +0.49(0.13). 사슴도 줄기에 가려 늑대를 늦게 보기 때문으로 본다.
+- 16분 판: 산 63.4 → 59.8%, 잡힘 +1.8마리(0.5), 굶음 +2.8마리(1.5 — 흔들림 안쪽).
+- 원판에 닿는 몫: 사슴·스텝 2.1%, 늑대·스텝 2.3%. 사슴 물러남(겹친 원판 사이 틈) 0.24%, 늑대 돌아섬 0.9%.
+- 언리얼은 파이썬과 같다. 같은 원판 9장의 모든 칸이 |z| ≤ 2.0 이다(늑대 포획 −2.0, 산 +1.7). 은신처 둘레 2 m 안 잡힘만 7 대 1.7(z +3.7)인데, 독립 지도 세션(20003~20005)에서는 1 대 2.8(z −1.6)이라 표본 흔들림으로 본다. 숲만도 모든 칸 |z| < 2.
+- 오류·ensure·EcoV3I 경고 0. 내보낸 원판 = 가져온 원판(비트 단위).
+
+## 7. 골든 시험
 
 - 내보내기 `H/export_golden_v3_wild2.py` → `S/AI/Policy/Wild2GoldenVectorsV3.h`. 검사 `Tests/EcoWild2V3Test.cpp`.
   - `Policy.V3.Wild2.ShelterFoodGolden`: 기본값(끔, 통합 켬), 거울 세계 30 × 30 의 두 마스크·용량·먹이·재생률 = 파이썬(비트 단위), 겹침 장면 16개(셀 경계에 꼭 닿는 원, 셀 모서리 중심, 대각선으로 모서리에 닿는 원, 맵 가장자리, 겹친 두 원, 큰 원 + 난수 10), 지운 은신처는 처음 용량으로 돌아간다.
@@ -243,19 +337,35 @@
   - 파이썬 `H/tests/test_wild2_pack.py` 14개: 설정 = 1단계 + 늑대 4 + 무리 블록, 끄고 늑대 2 면 1단계와 같음, 계수 검사, `pack_goals` 손 장면, 롤아웃 역할·은신처·통계,
     직전 커밋(1675861)과 궤적 같음, 골든 헤더가 최신, g++ 대조.
 - 결과: 빌드 `-DisableAdaptiveUnity`·기본 두 방식 성공. 자동 시험 157 = 성공 156 + 기존 경고 1(저장 파일 없음), 실패 0.
+- 3 세로 장애물: 내보내기 `H/export_golden_v3_obstacle.py` → `S/AI/Policy/ObstacleGoldenVectorsV3.h`(시드 32095·32096·32097). 검사 본문 `Tests/ObstacleGoldenCheckV3.h` 를
+  UE 시험 `Tests/EcoObstacleV3Test.cpp` 와 g++ 하네스 `H/tests/cpp/obstacle_v3_main.cpp` 가 함께 쓴다.
+  - `Policy.V3.Obstacle.Golden`: 설정(기본 끔·계수 = 거울 설정·상수), 미끄러짐 566(손 16 — 정면·비스듬·겹친 원판·가는 줄기·멀어짐·제자리·벽 구석·원판 안 시작 —
+    + 거울 배치 400 + 빽빽한 무리 150), 시선 407(손 7 — 꼭 r 만큼 떨어진 선분·끝점·길이 0), 먹이 30 × 30 두 배치, 밀어내기 168(손 8 — 늑대의 은신처 막기 원·
+    무대를 다 덮는 원판), 한 스텝 장면 80(사슴 24·늑대 4, 원판 = 그 세계 배치 367, 원판 곁·막다른 곳 돌진 섞음 — `PackPeek` → `PackGoals` → Step 의
+    위치·heading·상태·표적·포획·부딪힘·되돌림·돌아섬), 끄면 그대로. 모두 비트 단위로 같다.
+  - `Policy.V3.Obstacle.Run`: 기준 루프 900 스텝(사슴 64·늑대 4·원판 367): 사슴·늑대 중심은 늘 원판(r + 몸) 밖이고 무대 안, 부딪힘이 있다, 같은 시드 = 같은 비트,
+    끄면(원판을 넣고 켬 칸만 끔)·켜도 원판 0 개면 원판 없는 세계와 비트 단위로 같다.
+  - `Policy.V3.Obstacle.LevelScan`: 시험 월드의 상자·인스턴스 메시를 읽는다 — 충돌하는 상자 1 + 인스턴스 2 = 원판 3(가로 반지름·무대 단위·x 순), 충돌 없음·작음·
+    낮음·은신처 원 안은 뺀다, 읽기 전후 액터·인스턴스 수 그대로, 뺄 액터는 읽지 않는다, JSON 내보내기 → 가져오기가 같은 원판.
+  - `Policy.V3.Obstacle.IntegratedDefaults`: 통합 기본 장애물 켬, 내보내기·가져오기 경로 없음, 세계 설정 켬 칸(원판은 무대를 만들 때 넣는다), 끄면 끔.
+  - 파이썬 `H/tests/test_wild2_obstacle.py` 20개: 설정 = 무리 거울 + 장애물 블록(줄기 단면적 33~35 m²/ha), 배치(367 원판·은신처 밖·시작 밖), 끄면 무리 거울과 같음,
+    계수 검사, fixed = 같은 무작위 배치, 미끄러짐·시선·먹이·밀어내기 손 장면, 발소리는 안 가림, 롤아웃 맞춤, 직전 커밋(1b11c78)과 궤적 같음, 지도·실행기
+    `--unreal-obstacles`, 골든 헤더가 최신, g++ 대조.
+- 결과: 빌드 `-DisableAdaptiveUnity`·기본 두 방식 성공. 자동 시험 161 = 성공 160 + 기존 경고 1(저장 파일 없음), 실패 0.
 
 ---
 
-## 7. 다음 단계 (아직 안 함)
+## 8. 다음 단계 (아직 안 함)
 
-- 3 도주를 막는 장애물: 예약된 기능 `obstacles`(원판) — 이동·시야를 막고 그 밑엔 먹이가 없다. 언리얼은 레벨의 나무·바위 충돌에서 원판 목록을 읽기만 한다.
+- 3 세로 장애물은 팀 레벨에 나무·바위가 생겨야 언리얼에서 보인다(6-1). 그때 무대 안 원판 수·넓이를 다시 재고, 파이썬 밀도를 그 무대에 맞출지 정한다.
+- 사냥 성공률(40%)은 아직 목표 띠(10~30%)보다 높다. 남은 큰 원인은 잠행형(58%, 12 m 안에서만 덮침)이다(어림).
 - 단계마다 같은 표(산·잡힘·굶음, 사냥 성공률, 은신처 안 시간, 은신처 둘레 잡힘)로 잰다.
 - 늑대 넷이면 16분 판에서 굶음이 는다(5-5). 늑대가 많아 사슴이 달아나는 시간이 늘고 먹는 시간이 준다(포식 위험 효과 — Creel & Christianson 2008, *Trends Ecol. Evol.* 23:194–201).
   잡은 사슴을 무리가 함께 먹는 규칙(한 마리를 잡으면 곁의 동료도 배부름)은 넣지 않았다 — 넣으면 잡힘이 다시 준다.
 
 ---
 
-## 8. 출처
+## 9. 출처
 
 - Mech, L. D., & Peterson, R. O. (2003). Wolf-prey relations. In *Wolves: Behavior, Ecology, and Conservation* (Mech & Boitani 엮음), 131–160. University of Chicago Press. https://digitalcommons.unl.edu/usgsnpwrc/321/
 - Mech, L. D., Smith, D. W., Murphy, K. M., & MacNulty, D. R. (2001). Winter severity and wolf predation on a formerly wolf-free elk herd. *Journal of Wildlife Management* 65:998–1003. https://digitalcommons.usu.edu/wild_facpub/1468
@@ -265,11 +375,15 @@
 - Muro, C., Escobedo, R., Spector, L., & Coppinger, R. P. (2011). Wolf-pack (*Canis lupus*) hunting strategies emerge from simple rules in computational simulations. *Behavioural Processes* 88:192–197.
 - Harrington, F. H., & Mech, L. D. (1979). Wolf howling and its role in territory maintenance. *Behaviour* 68:207–249. https://pubs.usgs.gov/publication/5221155
 - Creel, S., & Christianson, D. (2008). Relationships between direct predation and risk effects. *Trends in Ecology & Evolution* 23:194–201.
+- Kauffman, M. J., Varley, N., Smith, D. W., Stahler, D. R., MacNulty, D. R., & Boyce, M. S. (2007). Landscape heterogeneity shapes predation in a newly restored predator–prey system. *Ecology Letters* 10:690–700. https://pubs.usgs.gov/publication/70030919
+- ESA Ecological Archives E094-195-D1 — 온대 성숙림 줄기 자료(1 ha 산 줄기 1179, 가슴높이 단면적 34.1 m²). https://esapubs.org/archive/ecol/E094/195/metadata.php
 
-## 9. 추정으로 둔 것
+## 10. 추정으로 둔 것
 
 - 목표 띠 10~30%: 위 두 출처의 범위를 사슴·눈 없는 낮 무대에 맞춰 어림했다.
 - 은신처 셀 재생 속도 0.15배: 용량과 같은 몫으로 둔 어림이다(출처는 서 있는 먹이 양만 쟀다).
 - 사냥 정의의 '한 늑대의 달리기'는 야외의 '무리 한 번 공격'보다 작은 단위다. 늑대 무리를 넣으면(2단계) 무리 단위 셈을 더할지 정한다.
 - 2 늑대 무리: `join_r` 120 m(동료의 추격을 무대 어디서든 안다), `lead` 12 m(덮치기 거리와 같게), 교대 추격을 넣지 않은 것, 늑대 넷이 무리 하나라는 것
   (팀 레벨의 늑대 수·무리 수와 맞춘 게임 값).
+- 3 세로 장애물: 가는 줄기(가슴높이 지름 20 cm 밑)를 뺀 것, 바위 1 ha 5 개·반지름 0.5~1.5 m, 몸 반지름 30 cm(팀 이동 제약 값), 원판을 무대 벽에서 r + 60 cm 띄운 것,
+  늑대·사슴 반지름 판정을 원판 하나로 둔 것(줄기 위 가지·덤불은 시선을 가리지 않는다), 언리얼 레벨 원판의 가로 반지름 = 충돌 상자 가로 반폭 평균.
