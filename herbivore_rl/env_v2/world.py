@@ -174,6 +174,15 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
              if (bBlocked && |V| > Eps && |Q - P| < WallDeadFrac * |V|) Move = -V / |V|;     // 막다른 곳: 돌아선다
              if (bDead && Type==Player && bHasTarget) { if (Mode==Stalk) Mode = Wander; else if (Mode==Charge) PlayerLeft = 0; }
       현실 근거: 빽빽한 덤불·바위틈에는 늑대도 몸을 밀어 넣지 못해 덤불 가장자리를 따라 돌아간다. 사슴은 몸을 낮춰 파고든다.
+  (c″) realism_shelter.wolf_margin (선택 키, 10-17 늑대 몸 여유, 기본 0) — 막는 위협에게만 원 반지름을 r_k + wolf_margin 으로 본다. 위 (c′)의
+      원 안 판정(`_rz_inside_disc`)·밀어내기(`_rz_wall_push`, 반지름 r_k + wolf_margin + WALL_EPS)·접선 미끄러짐(`_rz_wall_tangent`, 둘레가 가장
+      가까운 원 = |p − c_k| − (r_k + wolf_margin) 최소)·reset 옮기기(`_rz_wall_reset`)·통계 wall_inside_n 이 모두 이 반지름을 쓴다. 그래서 늑대
+      중심은 늘 r_k + wolf_margin 밖에 있다. 사슴 쪽은 그대로다: 은신처 안전·표적 제외 (c)·도주 은신처 고르기·먹이는 원 반지름 r_k 를 쓴다.
+      원 둘레와 r_k + wolf_margin 사이의 사슴은 원 밖이라 표적·포획 대상 그대로다(늑대가 포획 거리 안이면 잡는다). 0 이면 r_k + 0 = r_k 라
+      10-16 과 비트 동일하다. 언리얼: 위협 Step 에 넘기는 원 목록의 반지름에 더한다(EcoWorldV3.h FWorldConfig::ShelterWolfMargin).
+      C++ 꼴: Discs[3k + 2] = Cover[k].Radius + ShelterWolfMargin;   // 위 (c′) 의 R_k 가 이 값이다
+      현실 근거: 늑대는 몸길이 약 1~1.5 m 인 동물이라(어림) 몸 중심이 빽빽한 덤불·바위 테두리에 몸 반쯤 길이보다 가까이 붙지 못한다.
+      덤불을 따라 도는 늑대의 몸은 덤불 밖에 있다.
   (e′) realism_cover_food.frac_range (선택 키) — 세계마다 f = 하 + (상 − 하)·u, u = 자기 스트림 part 0 의 첫 난수 하나. 은신처 셀 용량 배수와
       재생 배수를 둘 다 f 로 둔다(H7). 폭 0 범위면 f = 하(1단계 고정 값과 같다).
       현실 근거: 덤불마다 밑풀 양이 다르다.
@@ -1015,6 +1024,14 @@ def _rz_shelter_params(p: dict, f: Features) -> dict:
         if not isinstance(p[key], bool):
             raise ValueError(f"features.realism_shelter.{key} 는 true/false 여야 한다. 받은 값: {p[key]!r}")
         out[key] = p[key]
+    # (c″) 늑대 몸 여유(선택 키, 10-17): 0 이상 유한한 수. 막는 위협이 없으면(block_predators false) 뜻이 없어 0 만 받는다
+    m = p["wolf_margin"]
+    if isinstance(m, bool) or not isinstance(m, (int, float)) or not math.isfinite(float(m)) or float(m) < 0.0:
+        raise ValueError(f"features.realism_shelter.wolf_margin 은 0 이상 유한한 수(단위)여야 한다. 받은 값: {m!r}")
+    if float(m) > 0.0 and not out["block_predators"]:
+        raise ValueError("features.realism_shelter.wolf_margin 은 block_predators true 일 때만 0 보다 클 수 있다(늑대 몸 여유는 진입 금지의 "
+                         f"반지름이다). 받은 값: {m!r}")
+    out["wolf_margin"] = float(m)
     return out
 
 
@@ -1416,6 +1433,8 @@ class World:
         self._zc = (_rz_chase_params(f.params("realism_chase"), f) if f.enabled("realism_chase") else None)
         self._zt = (_rz_terrain_params(f.params("realism_terrain"), f) if f.enabled("realism_terrain") else None)
         self._zw = bool(self._zs is not None and self._zs["block_predators"])
+        # (c″) 늑대 몸 여유(단위): 막는 위협에게만 원 반지름이 r + 이 값이다. 0 이면 10-16 그대로
+        self._zw_m = float(self._zs["wolf_margin"]) if self._zw else 0.0
         self._zf_range = self._zf is not None and self._zf["frac_range"] is not None
         self._r3 = self._zc is not None or self._zt is not None or self._zw or self._zf_range
         # 언리얼 통합 무대 거울(모듈 docstring '통합 무대'): 부활 없음·EMA 분모·시작 위상·은신처·늑대 구성·시작 배치·방향. 끈 세계는 None 이고
@@ -1813,20 +1832,25 @@ class World:
         ix, iy = self._cell_index(p)
         return self.terrain_cell[iy, ix]
 
+    def _rz_wall_r(self) -> np.ndarray:
+        """막는 위협이 보는 은신처 원 반지름 (K,) = r_k + wolf_margin (모듈 docstring (c″)). 여유 0 이면 r_k + 0 = r_k 그대로(비트 동일)."""
+        return self.cov_r + self._zw_m
+
     def _rz_inside_disc(self, q: np.ndarray) -> np.ndarray:
-        """위치 q (n,2) 가 어느 은신처 원 안인가(|q − c| < r, 둘레 위는 밖) (n,) bool — v3 R3 (c′) 늑대 진입 금지의 판정. 사슴의 안전
-        판정 `_in_cover`(≤ 0)와 달리 둘레를 밖으로 둔다(밀어낸 위치는 r + WALL_EPS 다)."""
+        """위치 q (n,2) 가 막는 위협에게 어느 은신처 원 안인가(|q − c| < r + wolf_margin, 둘레 위는 밖) (n,) bool — v3 R3 (c′)·(c″) 늑대
+        진입 금지의 판정. 사슴의 안전 판정 `_in_cover`(|q − c| − r ≤ 0, 여유 없음)와 달리 둘레를 밖으로 둔다(밀어낸 위치는 r + wolf_margin +
+        WALL_EPS 다)."""
         if not len(self.cov_r) or not len(q):
             return np.zeros(len(q), dtype=bool)
         dx = q[:, 0:1] - self.cov_c[:, 0][None, :]
         dy = q[:, 1:2] - self.cov_c[:, 1][None, :]
-        return (np.sqrt(dx * dx + dy * dy) < self.cov_r[None, :]).any(1)
+        return (np.sqrt(dx * dx + dy * dy) < self._rz_wall_r()[None, :]).any(1)
 
     def _rz_wall_reset(self) -> None:
         """v3 R3 (c′) reset: 막는 위협(_zw_sel — 포식자 전부, realism_shelter.player_too 면 플레이어형 위협도)을 정하고, 은신처 원 안에
         놓인 막는 위협을 가장 가까운 후보로 옮긴다. 후보 = 원마다 (그 원 중심 → 위협 쪽 반지름 방향의 둘레 밖 점) 하나와 WALL_RING
-        방향의 둘레 밖 점(반지름 r + WALL_EPS) 가운데 맵 [0, size]² 안이고 모든 원 밖인 점, 거리가 같으면 앞 후보. 난수를 쓰지 않는다
-        (v1 배치 난수는 그대로, features.py 규칙 2). 옮긴 수는 wall_reset_n. 후보가 없으면(맵이 원으로 덮인 경우) 그대로 두고 센다."""
+        방향의 둘레 밖 점(반지름 r + wolf_margin + WALL_EPS, (c″)) 가운데 맵 [0, size]² 안이고 모든 원 밖인 점, 거리가 같으면 앞 후보. 난수를
+        쓰지 않는다(v1 배치 난수는 그대로, features.py 규칙 2). 옮긴 수는 wall_reset_n. 후보가 없으면(맵이 원으로 덮인 경우) 그대로 두고 센다."""
         player = self.pred_is_player if self._th is not None else np.zeros(self.M, dtype=bool)
         self._zw_sel = ~player | self._zs["player_too"]
         self._zw_reset_moved = 0
@@ -1839,7 +1863,7 @@ class World:
         for m in np.flatnonzero(inside):
             p = self.pred_pos[m]
             cand = []
-            for c, r in zip(self.cov_c, self.cov_r):
+            for c, r in zip(self.cov_c, self._rz_wall_r()):
                 v = p - c
                 n = float(np.sqrt(v @ v))
                 u = v / n if n > EPS else np.array([1.0, 0.0])
@@ -1856,16 +1880,18 @@ class World:
             self._zw_reset_moved += 1
 
     def _rz_wall_push(self, q: np.ndarray, p: np.ndarray, sel: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
-        """v3 R3 (c′) 밀어내기 (모듈 docstring (c′)): 막는 위협(sel)의 이동 뒤 위치 q 가 은신처 원 k 안이면 c_k + (r_k + WALL_EPS)·단위(q − c_k)
-        (q 가 중심과 겹치면 단위(p − c_k), p = 이동 전 위치)로 옮긴다. 원 순서대로, 원 안인 위협이 없을 때까지 최대 WALL_PASSES 바퀴.
+        """v3 R3 (c′) 밀어내기 (모듈 docstring (c′)·(c″)): 막는 위협(sel)의 이동 뒤 위치 q 가 은신처 원 k 안(반지름 R_k = r_k + wolf_margin)이면
+        c_k + (R_k + WALL_EPS)·단위(q − c_k) (q 가 중심과 겹치면 단위(p − c_k), p = 이동 전 위치)로 옮긴다. 원 순서대로, 원 안인 위협이 없을
+        때까지 최대 WALL_PASSES 바퀴.
         반환 (새 q, 밀어낸 위협). 그래도 원 안인 위협은 부르는 쪽이 벽 반사·clip 뒤에 이전 위치로 되돌린다."""
         q = q.copy()
         pushed = np.zeros(len(q), dtype=bool)
         if not len(self.cov_r) or not sel.any() or not (sel & self._rz_inside_disc(q)).any():
             return q, pushed            # 대부분의 스텝: 원 안인 막는 위협이 없다(원마다 도는 아래 판정과 같은 식이라 결과가 같다)
+        radii = self._rz_wall_r()
         for _ in range(WALL_PASSES):
             moved = False
-            for c, r in zip(self.cov_c, self.cov_r):
+            for c, r in zip(self.cov_c, radii):
                 ex, ey = q[:, 0] - c[0], q[:, 1] - c[1]
                 d = np.sqrt(ex * ex + ey * ey)
                 inside = sel & (d < r)
@@ -1886,15 +1912,15 @@ class World:
         return q, pushed
 
     def _rz_wall_tangent(self, p: np.ndarray, v: np.ndarray) -> np.ndarray:
-        """v3 R3 (c′) 되돌림 전 접선 미끄러짐 (모듈 docstring (c′)): 이전 위치 p (n,2)(원 밖)에서 둘레가 가장 가까운 원 k(|p − c_k| − r_k 가
-        가장 작은 것, 같으면 낮은 번호)의 바깥 법선 n = 단위(p − c_k)에 대해 이동 v (n,2)의 안쪽 성분만 뺀다: v′ = v − min(v·n, 0)·n.
+        """v3 R3 (c′) 되돌림 전 접선 미끄러짐 (모듈 docstring (c′)·(c″)): 이전 위치 p (n,2)(원 밖)에서 둘레가 가장 가까운 원 k(|p − c_k| − R_k 가
+        가장 작은 것, R_k = r_k + wolf_margin, 같으면 낮은 번호)의 바깥 법선 n = 단위(p − c_k)에 대해 이동 v (n,2)의 안쪽 성분만 뺀다: v′ = v − min(v·n, 0)·n.
         반환 clip(p + v′, 0, size). p 가 둘레 위면 접선은 원 밖이라 그 원에는 들어가지 않는다(다른 원·맵 가장자리는 부르는 쪽이 본다).
         C++ 꼴: int K = NearestEdge(P); FVector2D N = SafeDir(P - C[K], FVector2D(1, 0));
           FVector2D Vt = V - FMath::Min(V | N, 0.f) * N;  Q = Clamp(P + Vt, 0, Size);"""
         ex = p[:, 0:1] - self.cov_c[:, 0][None, :]
         ey = p[:, 1:2] - self.cov_c[:, 1][None, :]
         d = np.sqrt(ex * ex + ey * ey)
-        k = (d - self.cov_r[None, :]).argmin(1)
+        k = (d - self._rz_wall_r()[None, :]).argmin(1)
         ar = np.arange(len(p))
         dk = d[ar, k]
         far = dk > EPS

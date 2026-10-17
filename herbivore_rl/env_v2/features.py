@@ -260,8 +260,11 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #     true 면 시작한 도주는 깨어 있는 늑대(사냥·먹기·배부름 — 자는 늑대 말고) 모두가 실거리 safe_r 밖이 되거나 은신처 안일 때까지 이어진다
 #     (도주를 일으키는 것은 그대로 사냥 중인 늑대만). edge_r > 0 이면 도주·경계 방향이 무대 가장자리 edge_r 안에서 벽 쪽 성분을 벽을 따라가는
 #     성분으로 돌리고 모서리를 벗어나는 쪽을 고른다(env_v2/world.py `wf_edge_steer`). false·0 = 10-15 그대로
+#   realism_shelter.wolf_margin (10-17 늑대 몸 여유): 막는 위협이 은신처 원 둘레가 아니라 반지름 r + wolf_margin(단위, 1 단위 = 2 m) 둘레를
+#     따라 미끄러진다(늑대 중심이 그 안에 들지 않는다). block_predators 를 켰을 때만 0 보다 클 수 있다. 사슴의 안전 판정(원 안 |q − c| ≤ r)은
+#     그대로다. 0 = 10-16 그대로(원 둘레에서 미끄러짐)
 OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
-    "realism_shelter": MappingProxyType({"block_predators": False}),
+    "realism_shelter": MappingProxyType({"block_predators": False, "wolf_margin": 0.0}),
     "realism_cover_food": MappingProxyType({"frac_range": None}),
     "threats": MappingProxyType({"eat_in_place": False}),
     "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0}),

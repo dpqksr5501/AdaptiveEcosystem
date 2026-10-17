@@ -22,6 +22,11 @@
 #   (3) '은신처 안에서도 잡힌다' → realism_shelter 켬(위). 현실 근거: 빽빽한 덤불 속으로는 늑대가 따라 들어가 덮칠 수 없다
 #   은신처 먹이 부족(realism_cover_food)은 켜지 않았다 — 언리얼 먹이 격자(팀 Ecology 쪽)를 은신처마다 바꿔야 해서 이번 고침에 싸지 않다.
 #   새 키의 코드 기본값(hold_awake false, edge_r 0)은 10-15 그대로라 이 세 가지를 끄면 10-15 결과 그대로다.
+#
+# 변경 기록 10-17(늑대 몸 여유, 명세 RL_V3_WILD1_SPEC.md 12절): 늑대가 은신처 원 둘레 위에서 미끄러지면 언리얼 화면에서 늑대 몸이 둘레 65 cm 안쪽의
+#   바위·덤불 테두리(팀 EcoRefugeHabitat)를 파고드는 것처럼 보인다 → realism_shelter.wolf_margin 0.5(1 m): 늑대 중심은 반지름 r + 1 m 둘레를 따라
+#   미끄러진다. 사슴 쪽(원 안 사슴은 안전·표적 제외, 도주 은신처, 먹이)은 원 반지름 r 그대로다. 코드 기본값 0 = 10-16 그대로.
+#   현실 근거: 늑대는 몸길이 약 1~1.5 m 인 동물이라(어림) 빽빽한 덤불·바위 테두리에 몸을 밀어 넣지 못하고 몸 중심이 테두리에서 몸 반쯤 떨어져 돈다
 
 version: "3.wild1"
 
@@ -302,6 +307,8 @@ features:
     untargetable: true
     player_too: true
     block_predators: true
+    # 10-17 선택 키(env_v2/features.py OPTIONAL_KEYS, 기본 0 = 10-16 그대로): 늑대 몸 여유 0.5(1 m). 늑대 중심은 원 반지름 + 1 m 밖에 머문다
+    wolf_margin: 0.5
 
 train:
   # configs/v3_real1_night_on.yaml 과 같고 허용 목록에서 얼기만 뺐다. 이 세계는 학습하지 않는다(부활 없음 — vec_env 가 받지 않는다).

@@ -142,17 +142,19 @@ def test_registry_and_keys():
     for n in NEW:
         assert F.PARAM_KEYS[n] == frozenset(b[n]) - {"enabled"}, n
     # 선택 키(규칙 6): 1단계 설정에는 없고(끔 값으로 읽는다) R3 설정에는 적는다
-    assert dict(F.OPTIONAL_KEYS["realism_shelter"]) == {"block_predators": False}
+    assert dict(F.OPTIONAL_KEYS["realism_shelter"]) == {"block_predators": False, "wolf_margin": 0.0}   # 늑대 몸 여유 10-17
     assert dict(F.OPTIONAL_KEYS["realism_cover_food"]) == {"frac_range": None}
     assert dict(F.OPTIONAL_KEYS["threats"]) == {"eat_in_place": False}           # (j) 늑대 먹는 시간, 10-15
     full = _raw(R3_ON)["features"]
     for n, opt in F.OPTIONAL_KEYS.items():
         if n.startswith("wild_"):
             continue                    # 야생 1단계 선택 키(10-16)는 R3 설정에 없다 — tests/test_wild1.py 가 본다
+        opt = {k: v for k, v in opt.items() if (n, k) != ("realism_shelter", "wolf_margin")}   # 10-17 늑대 몸 여유도 R3 설정에 없다(test_wild1)
         assert set(opt) <= set(full[n]) and not set(opt) & F.PARAM_KEYS[n]
         for old in (REAL["all"], R1_ON, R1):                                     # 지난 설정 파일에는 선택 키가 없다(끔 값으로 읽는다)
             assert not set(opt) & set(_raw(old)["features"].get(n, {}))
-    assert F.with_optional("realism_shelter", {"untargetable": True}) == {"block_predators": False, "untargetable": True}
+    assert F.with_optional("realism_shelter", {"untargetable": True}) == {"block_predators": False, "wolf_margin": 0.0,
+                                                                           "untargetable": True}
     with pytest.raises(ValueError, match="선택 키"):
         F.parse_features({"realism_shelter": dict(b["realism_shelter"], block_predator=True)})
 

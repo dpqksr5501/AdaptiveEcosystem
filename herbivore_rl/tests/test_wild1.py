@@ -81,7 +81,9 @@ def test_registry_and_config():
     # R3 세계의 시야·청각 값 그대로
     raw_r3 = yaml.safe_load((CFG / "v3_r3.yaml").read_text(encoding="utf-8"))
     for k in EXTRA + SHELTER:
-        assert raw_w["features"][k] == raw_r3["features"][k]
+        mine = {kk: v for kk, v in raw_w["features"][k].items() if kk != "wolf_margin"}   # 10-17 늑대 몸 여유는 R3 설정에 없다
+        assert mine == raw_r3["features"][k]
+    assert raw_w["features"]["realism_shelter"]["wolf_margin"] == 0.5                       # 10-17: 1 m
     # 10-16 고침 값(선택 키)
     assert raw_w["features"]["wild_flight"]["hold_awake"] is True and raw_w["features"]["wild_flight"]["edge_r"] == 5.0
     w = World(load_v2_config(WILD).replace(N=16), seeds=[32084])

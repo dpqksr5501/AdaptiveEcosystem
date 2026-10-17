@@ -38,6 +38,10 @@ World.keep_pair_vis 만 켠다): 행동별 산 사슴-스텝, 늑대 거리 구�
 모두 10 m = 5 단위 안)·은신처 원 안에서 잡힌 수, 같은 늑대가 자기 지난 포획 자리 20 m(10 단위) 안에서 다시 잡은 수(잡은 늑대 = 이번 스텝에 쿨다운이
 pred_eat_cd 로 막 찬 늑대 가운데 가장 가까운 늑대), 산 사슴-스텝 가운데 그 띠·모서리에 있던 수(자리 몫 기준), 도주가 풀린 수와 그 가운데
 은신처 밖이고 깨어 있는 늑대가 실거리 wild_flight.safe_r 안에 남아 있던 수(스텝 끝 위치 — 덮기를 정한 기하와 같다).
+10-17 더함(늑대 몸 여유, results/v3/wild1/README.md '늑대 몸 여유'): --wolf-margin 으로 설정의 realism_shelter.wolf_margin(단위)을 덮는다(설정에
+realism_shelter.block_predators 가 켜져 있어야 한다). 진단에 은신처 둘레 밖 2 m(1 단위)·4 m(2 단위) 띠에서 잡힌 수(사슴이 원 밖이고 가장 가까운
+둘레까지 그 거리 안), 늑대-스텝 가운데 늑대 중심이 원 안(|q − c| < r)·둘레 밖 1 m 안(|q − c| < r + 0.5)에 있던 수, 늑대 중심과 가장 가까운 둘레의
+가장 작은 거리(단위, 원 안이면 음수)를 더 적는다(스텝 끝 위치, 플레이어형 위협 없음 — 거울 세계는 늑대뿐이다).
 """
 
 from __future__ import annotations
@@ -145,19 +149,25 @@ def eat_steps_of_seconds(sec: float) -> int:
     return int(np.floor(sec / STEP_SECONDS + 0.5))
 
 
-def mirror_cfg(deer: int, eat_steps: int, config: Path = CONFIG, disable=()):
-    """거울 설정에 사슴 수 N(= 슬롯 수 = 피식 EMA 분모)과 늑대 먹는 시간(pred_eat_cd)을 덮는다. disable = 끌 기능 블록 이름들(설정에 켜져 있어야 한다)."""
+def mirror_cfg(deer: int, eat_steps: int, config: Path = CONFIG, disable=(), wolf_margin: float | None = None):
+    """거울 설정에 사슴 수 N(= 슬롯 수 = 피식 EMA 분모)과 늑대 먹는 시간(pred_eat_cd)을 덮는다. disable = 끌 기능 블록 이름들(설정에 켜져 있어야 한다).
+    wolf_margin(단위, 10-17)을 주면 realism_shelter.wolf_margin 을 덮는다(설정에 realism_shelter.block_predators 가 켜져 있어야 한다)."""
     from env_v2.config import load_v2_config
 
     if deer < 1 or eat_steps < 1:
         raise ValueError(f"사슴 수와 먹는 시간은 1 이상이어야 한다: {deer}, {eat_steps}")
     cfg = load_v2_config(config).replace(N=int(deer), pred_eat_cd=int(eat_steps))
-    if disable:
+    if disable or wolf_margin is not None:
         f = {k: dict(v) for k, v in cfg.v2["features"].items()}
         for name in disable:
             if not f.get(name, {}).get("enabled"):
                 raise ValueError(f"끌 기능 {name} 이 설정 {config} 에 켜져 있지 않다")
             f[name]["enabled"] = False
+        if wolf_margin is not None:
+            zs = f.get("realism_shelter", {})
+            if not (zs.get("enabled") and zs.get("block_predators")):
+                raise ValueError(f"--wolf-margin 은 realism_shelter.block_predators 를 켠 설정에만 쓴다: {config}")
+            f["realism_shelter"] = dict(zs, wolf_margin=float(wolf_margin))
         cfg = cfg.replace(v2=dict(cfg.v2, features=f))
     return cfg
 
@@ -180,6 +190,8 @@ FLED_STEPS = 38                                   # 진단: '마지막 5초' = �
 EDGE_BAND = 2.5                                   # 진단: 가장자리 띠 5 m (단위)
 CORNER_BAND = 5.0                                 # 진단: 모서리 = 두 벽 모두 10 m 안 (단위)
 REPEAT_R = 10.0                                   # 진단: 같은 늑대 거듭 포획 = 자기 지난 포획 자리 20 m 안 (단위)
+RING_BANDS = (1.0, 2.0)                           # 진단: 은신처 둘레 밖 띠 2 m·4 m (단위)
+BODY_1M = 0.5                                     # 진단: 늑대 몸 여유 1 m (단위) — 설정 값과 상관없이 같은 잣대로 센다
 
 
 class _Diag:
@@ -201,6 +213,9 @@ class _Diag:
         self.wolf_last: dict[int, np.ndarray] = {}
         self.panic_ends = self.panic_end_awake = 0
         self.prev_wf = w.wf_mode.copy() if getattr(w, "_wf", None) is not None else None
+        self.catch_ring = [0] * len(RING_BANDS)
+        self.wolf_steps = self.wolf_in_r = self.wolf_in_1m = 0
+        self.wolf_edge_min = float("inf")
 
     def after(self, w, live_before):
         from env_v2 import repertoire as rep
@@ -234,6 +249,13 @@ class _Diag:
                 near = ((d <= w._wf["safe_r"]) & awake[None, :]).any(1)
                 self.panic_end_awake += int(np.count_nonzero(ends & near & ~g["in_cover"]))
             self.prev_wf = w.wf_mode.copy()
+        if w.M and len(w.cov_r):
+            # 10-17: 늑대 중심과 은신처 둘레 (스텝 끝 위치, 원 반지름 r — 여유와 상관없이 같은 잣대)
+            de = (np.sqrt(((w.pred_pos[:, None, :] - w.cov_c[None, :, :]) ** 2).sum(-1)) - w.cov_r[None, :]).min(1)
+            self.wolf_steps += len(de)
+            self.wolf_in_r += int(np.count_nonzero(de < 0.0))
+            self.wolf_in_1m += int(np.count_nonzero(de < BODY_1M))
+            self.wolf_edge_min = min(self.wolf_edge_min, float(de.min()))
         for i in np.flatnonzero(live_before & ~live):
             fled = w.t - self.last_flee[i] <= FLED_STEPS
             if w.death_cause[i] == 1:
@@ -242,6 +264,10 @@ class _Diag:
                 self.catch_edge += int(min(qe) <= EDGE_BAND)
                 self.catch_corner += int(max(qe) <= CORNER_BAND)
                 self.catch_cover += int(w._in_cover(q[None, :])[0]) if len(w.cov_r) else 0
+                if len(w.cov_r):
+                    dq = float((np.sqrt(((q[None, :] - w.cov_c) ** 2).sum(1)) - w.cov_r).min())
+                    for b, band in enumerate(RING_BANDS):
+                        self.catch_ring[b] += int(0.0 < dq <= band)
                 if w.M:
                     cand = np.flatnonzero(w.pred_cd == int(w.cfg.pred_eat_cd))
                     cand = cand if len(cand) else np.arange(w.M)
@@ -264,6 +290,8 @@ class _Diag:
         out.update(catch_edge=self.catch_edge, catch_corner=self.catch_corner, catch_cover=self.catch_cover, catch_repeat=self.catch_repeat,
                    occ_n=self.occ_n, occ_edge=self.occ_edge, occ_corner=self.occ_corner, panic_ends=self.panic_ends,
                    panic_end_awake=self.panic_end_awake)
+        out.update(catch_ring=list(self.catch_ring), wolf_steps=self.wolf_steps, wolf_in_r=self.wolf_in_r, wolf_in_1m=self.wolf_in_1m,
+                   wolf_edge_min=None if self.wolf_edge_min == float("inf") else round(self.wolf_edge_min, 6))
         try:
             out["wild"] = w.wild_stats()
         except ValueError:
@@ -322,13 +350,13 @@ def run_world(job: dict) -> dict:
 
 def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | None = None, model: Path = MODEL,
         config: Path = CONFIG, log_every: int = LOG_EVERY, unreal_maps=None, replicates: int = 1, disable=(),
-        diag: bool = False) -> dict:
+        diag: bool = False, wolf_margin: float | None = None) -> dict:
     """시드마다 세계 하나를 (워커 풀로) 돌린다. 반환 {meta, worlds}(worlds 는 시드 순서 = 받은 순서).
     unreal_maps(언리얼 세션 시드 목록)를 주면 짝 비교: 지도 (세션 시드, 지역 Barren·Forest·Highland) 마다 replicates 개 세계를 seeds 의 앞에서부터
     차례로 쓴다(지도 i 의 j 번째 = seeds[i·replicates + j], 시드 수 = 세션 수 × 3 × replicates)."""
     from env_v2 import rollout as ro
 
-    cfg = mirror_cfg(deer, eat_steps, config, disable)
+    cfg = mirror_cfg(deer, eat_steps, config, disable, wolf_margin)
     seeds = [int(s) for s in seeds]
     jobs = [dict(cfg=cfg.to_dict(), seed=s, steps=int(steps), model=str(model), log_every=int(log_every)) for s in seeds]
     if diag:
@@ -356,6 +384,8 @@ def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | 
                 session_size=3, wall_s=round(time.perf_counter() - t0, 2))
     if disable:
         meta["disable"] = list(disable)
+    if wolf_margin is not None:
+        meta["wolf_margin"] = float(wolf_margin)
     if maps is not None:
         meta.update(unreal_maps=[int(u) for u in unreal_maps], replicates=int(replicates))
     return dict(meta=meta, worlds=worlds)
@@ -388,13 +418,14 @@ def main(argv=None) -> None:
     ap.add_argument("--config", type=Path, default=CONFIG, help="거울 설정 (기본 configs/v3_unreal_mirror.yaml)")
     ap.add_argument("--disable", default="", help="설정에서 끌 기능 블록(쉼표, 예: wild_flight)")
     ap.add_argument("--diag", action="store_true", help="세계마다 진단(meta['diag'])을 더 적는다")
+    ap.add_argument("--wolf-margin", type=float, default=None, help="realism_shelter.wolf_margin 덮기(단위, 1 단위 = 2 m. 10-17 늑대 몸 여유)")
     a = ap.parse_args(argv)
     seeds = parse_seeds(a.seeds)
     um = parse_unreal_maps(a.unreal_maps) if a.unreal_maps else None
     disable = tuple(x.strip() for x in a.disable.split(",") if x.strip())
     config = a.config if a.config.is_absolute() else (ROOT / a.config)
     res = run(a.deer, a.wolf_eat_steps, seeds, steps=a.steps, workers=a.workers, unreal_maps=um, replicates=a.replicates,
-              config=config, disable=disable, diag=a.diag)
+              config=config, disable=disable, diag=a.diag, wolf_margin=a.wolf_margin)
     name = a.name or (f"d{a.deer}_e{a.wolf_eat_steps}_s{seeds[0]}-{seeds[-1]}" if um is None else
                       f"pair_d{a.deer}_e{a.wolf_eat_steps}_u{um[0]}-{um[-1]}_k{a.replicates}_s{seeds[0]}-{seeds[-1]}")
     jp, cp = write(res, name, a.out_dir)
