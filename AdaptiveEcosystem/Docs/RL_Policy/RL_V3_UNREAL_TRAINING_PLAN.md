@@ -713,6 +713,14 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 헤드리스(사슴 128, 기본값 그대로, 240초): 세션 20000~20002 산 95.1·잡힘 4.95%·은신처 안 8.1%(파이썬 같은 지도 94.8·5.18·7.6), 세션 20006~20008 94.6·5.38·8.4%(94.8·5.23·8.2). 굶음 0. 기록 `herbivore_rl/results/v3/wild2/unreal_logs/packfood_*`. 오류·ensure·경고 0.
   - 남은 차이: 먹이 부족을 켜면 언리얼 사냥 시작이 약 14% 많다(합친 z 약 +3.5, 끈 판은 차이 없음). 잡힘 수는 같다. 원인은 아직 모른다.
   - 시험: `Pack.IntegratedDefaults`·`Wild2.ShelterFoodGolden`·`Refuge.MergedDefaultSingleRule` 을 기본 켬으로 고쳤다. 자동 시험 161 = 성공 160 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
+- **10-17 무대 나무** (사용자 '그럼 그냥 우리 쪽 테스트 레벨에 저 사람이 만든 장애물들 적절히 배치해 봐', 기록 `herbivore_rl/results/v3/wild2/trees/README.md`):
+  - 팀 나무 `/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree` 를 통합 레벨 무대에 놓는다 — 숲 24·고지 9·메마른 땅 0 그루. **레벨·콘텐츠·설정은 바꾸지 않는다.** 통합 v3 모드가 무대를 만들 때 고정 배치 표(`AI/Policy/TreeLayoutV3.h`, 파이썬 `results/v3/wild2/trees/make_tree_layout.py` 가 만든다)대로 `AStaticMeshActor` 를 놓는다(충돌 없음, 그림자 켬, 지면에 붙여 10 cm 묻음).
+  - 줄기 원판(밑동 꼭짓점 반경 40.45 cm × 크기 1.8~2.2 = 0.74~0.89 m)을 세계 원판에 넣어 사슴·늑대가 줄기를 돌아간다(세로 장애물 규칙 그대로). 레벨 읽기는 이 액터를 빼고, 시작 자리 계획은 줄기 원판 안 자리를 버린다.
+  - 규칙: 수 = 실제 성숙림 줄기 단면적 34 m²/ha ÷ 이 나무 밑동(숲), 고지는 그 3/8(어림), 메마른 땅은 0(너도밤나무는 가뭄에 약함·나무 없는 비교 무대). 포아송 원반 퍼뜨리기(숲 줄기 중심 9 m·고지 14.5 m 밖), 은신처 원 + 2 m·무대 벽 4 m·가운데 빈터 22 m·늑대 시작 모서리 3 m 비움.
+  - 새 스위치 `eco.IntegratedV3.StageTrees` · `-EcoV3StageTrees=`(기본 1). `Obstacles 0`·무대 한 변이 120 m 가 아님·그 지역 원판 가져오기(`ObstacleImport`)면 놓지 않는다. 시작 글 `[EcoV3I] 무대 나무: …`·`[EcoV3I] <지역> 나무 | …`, 디버그 표시에서 줄기 원판은 초록.
+  - 파이썬 거울: `configs/v3_wild2_trees_mirror.yaml`(장애물 거울 + `obstacles.fixed` 숲 원판), 지역마다는 `run_mirror.py --unreal-maps … --unreal-obstacles results/v3/wild2/trees/tree_layout.json`. 언리얼 내보내기 원판 = 표(비트 단위).
+  - 헤드리스(사슴 128, 세션 20000~20002, 240초): 다 놓음(뺀 것 0), 원판 밖으로 옮긴 개체 0, 오류·ensure·경고 0, 메마른 땅 기록 줄은 넣기 전과 같다. 파이썬 끼임(짝 지도 90 세계): 줄기에 낀 사슴·늑대 0. GPU 사진 `herbivore_rl/results/v3/wild2/trees/shots/` — 줄기가 땅에 서 있고 은신처 안에 줄기가 없다(잎은 은신처 가장자리 위로 드리운다).
+  - 시험: `Policy.V3.StageTrees.Layout`·`StartPoints`·`Spawn`, 파이썬 `tests/test_wild2_trees.py` 5개. 자동 시험 166 모두 성공(기존 경고 1 포함), 실패 0. 빌드 두 방식 통과.
 
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 

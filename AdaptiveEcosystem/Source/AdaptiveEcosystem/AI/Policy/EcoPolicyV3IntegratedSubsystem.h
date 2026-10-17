@@ -111,6 +111,13 @@
 //      충돌하는 나무·바위가 없어 원판이 0이다(10-17 읽기). eco.IntegratedV3.ObstacleExport(-EcoV3ObstacleExport=) 는 원판 JSON 을 쓰고,
 //      eco.IntegratedV3.ObstacleImport(-EcoV3ObstacleImport=) 는 측정 전용으로 원판을 가져온다(레벨에 보이는 물체가 없는 원판). 10초 기록 일곱째 줄
 //      '[EcoV3I] <지역> 장애물 |'(원판이 있을 때만).
+//  16. 10-17 무대 나무 (사용자 '그럼 그냥 우리 쪽 테스트 레벨에 저 사람이 만든 장애물들 적절히 배치해 봐', herbivore_rl/results/v3/wild2/trees/README.md):
+//      eco.IntegratedV3.StageTrees (-EcoV3StageTrees=, 기본 1). 레벨·콘텐츠는 바꾸지 않는다 — 무대를 만들 때 고정 배치 표(TreeLayoutV3.h, 파이썬
+//      make_tree_layout.py 가 만든다 — 숲 24·고지 9·메마른 땅 0 그루)대로 팀 나무 메시(/Game/SHC/.../Beech_Tree)를 AStaticMeshActor 로 놓는다
+//      (충돌 없음 — 메시 애셋은 그대로, 지면에 붙여 밑동을 10 cm 묻음, 그림자 켬). 줄기 원판(밑동 꼭짓점 반경 40.45 cm × 크기)은 세계 원판에 더하고
+//      (레벨 읽기 원판과 합쳐 (x, y, r) 순), 레벨 읽기는 이 액터를 빼서 두 번 세지 않는다. 시작 자리 계획(PlanStage)은 줄기 원판(반지름 + 몸) 안 자리를 버린다.
+//      파이썬 거울 configs/v3_wild2_trees_mirror.yaml 과 tree_layout.json 이 같은 원판이다. eco.IntegratedV3.Obstacles 0 이거나 무대 한 변이 표(120 m)와
+//      다르거나 그 지역 원판을 가져왔으면(ObstacleImport) 놓지 않는다. 시작 줄 '[EcoV3I] <지역> 나무 |', eco.V3Debug 에서 줄기 원판은 초록 원.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -126,6 +133,7 @@
 
 #include "EcoPolicyClock.h"
 #include "EcoWorldV3.h"
+#include "TreeLayoutV3.h"
 
 #include "EcoPolicyV3IntegratedSubsystem.generated.h"
 
@@ -247,6 +255,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	FString ObstacleExportPath;         // 원판 목록 JSON 내보내기 (eco.IntegratedV3.ObstacleExport, 빈 문자열 = 안 함 — 파이썬 거울 짝 비교용)
 	FString ObstacleImportPath;         // 원판 목록 JSON 가져오기 (eco.IntegratedV3.ObstacleImport, 빈 문자열 = 안 함 — 측정 전용: 레벨 원판 대신 이 원판.
 										// 레벨에 보이는 물체가 없는 원판이라 화면용이 아니다. 파이썬 거울과 같은 원판으로 견줄 때만 쓴다)
+	bool bStageTrees = true;            // 무대 나무 (eco.IntegratedV3.StageTrees 기본 1, 10-17 — 배치 표 TreeLayoutV3.h 대로 팀 나무를 실행 중에 놓고 줄기 원판을
+										// 세계에 넣는다. 파이썬 configs/v3_wild2_trees_mirror.yaml). bObstacles 일 때만 놓는다. 거짓 = 나무 없음 (10-17 야생 2단계 3 그대로)
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)
 	double WolfStartCornerFrac = 0.4;   // 늑대 시작 = 무대 중심에서 (±한 변 × 이 값, ±한 변 × 이 값) 모서리 쪽. 사슴은 무대 전체 균등
@@ -420,6 +430,26 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3ObstacleScan
 	double AreaFrac(double SizeUnits) const;
 };
 
+/**
+ * 무대 나무 놓기 결과 (10-17 사용자 '우리 쪽 테스트 레벨에 저 사람이 만든 장애물들 적절히 배치해 봐', 배치 표 TreeLayoutV3.h). 레벨은 바꾸지 않는다 —
+ * 실행 중 액터만 놓는다(충돌 없음). 원판은 세계 원판(Sim.Config.Obstacles)에 레벨 읽기 원판과 합쳐 넣는다.
+ */
+struct ADAPTIVEECOSYSTEM_API FEcoV3StageTrees
+{
+	std::vector<double> Discs;              // 놓은 나무의 줄기 원판 (x, y, r) × K, 무대 단위, 표 순서 (= (x, y, r) 순)
+	TArray<TWeakObjectPtr<AActor>> Actors;  // 놓은 나무 액터 (Discs 순서)
+	TArray<double> GroundZ;                 // 나무마다 밑동 아래 가장 낮은 지면 (cm, 액터 Z = 이 값 − kSinkCm)
+	int32 Layout = 0;                       // 표의 그루 수 (0 = 이 무대에는 표가 없다)
+	int32 SkippedCover = 0;                 // 은신처 원(반지름 + 2 m) 곁이라 뺀 수 — 은신처가 표가 가정한 자리(무대 1/4·3/4)가 아니거나 레벨 은신처
+	int32 SkippedNoGround = 0;              // 줄기 중심 아래 지면을 못 찾아 뺀 수
+	int32 SkippedNoMesh = 0;                // 메시를 못 읽었거나 액터를 못 놓은 수
+	double MaxReliefCm = 0.0;               // 밑동 아래(중심 + 둘레 6 곳) 지면 높낮이 차 최대 (기울기 기록 — 오르막 쪽은 이만큼 더 묻힌다)
+
+	int32 Num() const { return static_cast<int32>(Discs.size() / 3); }
+	/** 표대로 다 놓았나 (빠진 나무가 있으면 파이썬 거울과 원판이 다르다). */
+	bool Complete() const { return Num() == Layout; }
+};
+
 /** 한 지역의 v3 세계 (무대 하나 = 학습 세계 하나). */
 struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 {
@@ -440,6 +470,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 ExtraCovers = 0;                    // 우리가 놓은 은신처
 	FEcoV3ObstacleScan ObstacleScan;          // 무대 안 세로 장애물 읽기 결과 (야생 2단계 3 — 원판은 Sim.Config.Obstacles 에도 넣는다)
 	bool bObstaclesImported = false;          // 원판을 JSON 에서 가져왔다 (eco.IntegratedV3.ObstacleImport — 측정 전용)
+	FEcoV3StageTrees Trees;                   // 무대 나무 (eco.IntegratedV3.StageTrees, 10-17 — 원판은 Sim.Config.Obstacles 에도 들어 있다)
+	TArray<uint8> ObstacleIsTree;             // 세계 원판마다 무대 나무 줄기인가 (디버그 그리기·기록, Sim.Config.Obstacles 순서. 가져온 원판이면 비어 있다)
 	TArray<double> ObstacleGroundZ;           // 원판 중심 지면 높이 (디버그 그리기, Sim.Config.Obstacles 순서)
 	TArray<double> CoverGroundZ;              // 은신처 원 중심의 높이 (디버그 그리기)
 	TArray<int32> CoverShelterIndices;
@@ -612,6 +644,8 @@ public:
 	 * 한 지역 무대와 시작 자리. Contains = 지역 상자 안인가, Project = 지면 검사(성공하면 지면 점).
 	 * bRequireGround 면 지면 검사를 통과한 점만 쓴다 (못 채우면 false). 아니면 검사에 실패한 점도 힌트로 쓴다(스트리밍 전 계획).
 	 * 시작 자리 난수는 (세션 시드, 그룹 번호) 로 정해진다 — 같은 입력이면 같은 자리.
+	 * 무대 나무 (S.bStageTrees ∧ S.bObstacles, 10-17): 그 지역 표의 줄기 원판(반지름 + 몸 0.15 단위) 안 자리는 버리고 다음 자리를 뽑는다 — 세계 원판 안
+	 * 판정(EcoThreatV3::InsideAnyObstacle)과 같은 식이라 입양 때 원판 밖 밀어내기(ObstaclePushOut)가 할 일이 없다. 표가 없는 지역·크기는 그대로다.
 	 */
 	static bool PlanStage(FName RegionId, int32 GroupIndex, const FVector& DesiredCenterCm, const FVector& RegionCenterCm,
 						  const FEcoV3IntegratedSettings& S, int32 NumDeer, int32 NumWolves, bool bRequireGround,
@@ -628,6 +662,22 @@ public:
 	bool ExportObstacles(const FString& Path) const;
 	/** 원판 JSON(ExportObstacles·results/v3/wild2/make_obstacle_maps.py 꼴)을 읽는다: 지역 이름 → (x, y, r) × K. 반지름 0 이하는 뺀다. 못 읽으면 거짓. */
 	static bool LoadObstacleImport(const FString& Path, TMap<FName, std::vector<double>>& Out);
+
+	// ---- 무대 나무 (10-17, 배치 표 TreeLayoutV3.h — 파이썬 make_tree_layout.py) ----
+
+	/** 그 지역 무대의 나무 표 (지역 이름이 같고 무대 한 변이 표의 한 변과 같을 때만, 아니면 nullptr). 표가 있어도 그루 수가 0 일 수 있다(메마른 땅). */
+	static const EcoTreeLayoutV3::FStageTrees* FindStageTrees(FName RegionId, double SizeUnits);
+	/** 표의 줄기 원판 (x, y, r) × K (무대 단위, 표 순서 = (x, y, r) 순). 표가 없으면 빈 목록. */
+	static std::vector<double> StageTreeDiscs(FName RegionId, double SizeUnits);
+	/**
+	 * 실행 중 나무 놓기 (레벨·메시 애셋은 바꾸지 않는다). 표 나무마다 줄기 중심·둘레 6 곳(줄기 반지름)의 지면을 아래로 선 검사(ECC_WorldStatic,
+	 * 팀 ProjectSpawnPoint 와 같은 길이)해 가장 낮은 지면 − kSinkCm 에 액터 기준점을 둔다. 액터 = AStaticMeshActor(움직임 가능 — 실행 중 메시를 넣으려고,
+	 * 충돌 없음, 그림자 켬, 꼬리표 EcoV3StageTree). Avoid = 피할 원(무대 단위 — 은신처) — 줄기 가장자리가 반지름 + 2 m 안이면 그 나무는 뺀다.
+	 */
+	static void SpawnStageTrees(UWorld& World, FName RegionId, const FVector& OriginCm, double SizeUnits,
+								const std::vector<EcoObservationV3::FCoverInput>& Avoid, FEcoV3StageTrees& Out);
+	/** 레벨 읽기 원판과 나무 원판을 합쳐 (x, 다음 y, 다음 r) 순으로 늘어놓는다 (ScanStageObstacles 와 같은 순서). OutIsTree = 원판마다 나무에서 왔나. */
+	static std::vector<double> MergeDiscs(const std::vector<double>& Level, const std::vector<double>& Trees, TArray<uint8>* OutIsTree = nullptr);
 
 	/** 지역 v3 세계 설정 (무대 한 변·늑대 구성·낮밤 900·통합 모드 칸). Covers 는 무대 단위. */
 	static EcoWorldV3::FWorldConfig MakeRegionWorldConfig(const FEcoV3IntegratedSettings& S, int32 RegionRuntimeIndex,
@@ -722,6 +772,7 @@ private:
 	TArray<FEcoV3StagePlan> Plans;
 	TArray<TUniquePtr<FEcoV3RegionContext>> Contexts;
 	TArray<TWeakObjectPtr<AActor>> SpawnedCovers;
+	TArray<TWeakObjectPtr<AActor>> SpawnedTrees;   // 무대 나무 액터 (eco.IntegratedV3.StageTrees — 레벨 읽기에서 뺀다)
 	TSet<int32> OurShelterIndices;            // 우리가 놓은 앵커의 UEcoShelterSubsystem RuntimeIndex (레벨 은신처와 가른다)
 	FEcoV3IntegratedSettings Settings;
 
