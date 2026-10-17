@@ -1,0 +1,2290 @@
+{
+ "args": {
+  "config": "configs\\v3_wild3_mirror.yaml",
+  "seeds": "33000-33029",
+  "steps": 7200,
+  "set": [],
+  "unreal_maps": "20000-20009",
+  "replicates": 1,
+  "unreal_obstacles": "results\\v3\\wild2\\trees\\tree_layout.json"
+ },
+ "summary": {
+  "worlds": 30,
+  "wolf_stuck": 0,
+  "wolf_stuck_helper": 0,
+  "wolf_stuck_wall": 0,
+  "wolf_stuck_max_s": 0.0,
+  "wolf_wall_stuck": 31,
+  "wolf_wall_stuck_helper": 17,
+  "wolf_wall_stuck_max_s": 6.4,
+  "deer_stuck": 0,
+  "deer_stuck_by_beh": {},
+  "deer_stuck_panic": 0,
+  "deer_stuck_max_s": 0.0,
+  "wolf_stuck_frac": 0.0,
+  "wolf_wall_stuck_frac": 0.00024477455284584686,
+  "deer_stuck_frac": 0.0,
+  "old_wolf_runs": 0,
+  "old_wolf_max_s": 0.0,
+  "old_deer_still": 43,
+  "old_deer_flee": 0,
+  "old_deer_push": 6,
+  "old_deer_max_s": 55.86666666666667,
+  "worst_wolf": [],
+  "worst_wolf_wall": [
+   [
+    48,
+    33025,
+    1,
+    2325,
+    false
+   ],
+   [
+    32,
+    33027,
+    0,
+    2847,
+    true
+   ],
+   [
+    30,
+    33022,
+    0,
+    1425,
+    false
+   ],
+   [
+    28,
+    33012,
+    2,
+    1450,
+    false
+   ],
+   [
+    27,
+    33029,
+    3,
+    5895,
+    false
+   ],
+   [
+    27,
+    33024,
+    0,
+    5460,
+    true
+   ]
+  ],
+  "worst_deer": [],
+  "detour": {
+   "deer_used": 16029,
+   "deer_start": 5629,
+   "deer_fail": 0,
+   "wolf_used": 245,
+   "wolf_start": 177,
+   "wolf_fail": 0,
+   "help_drop": 53
+  },
+  "by_region": {
+   "Barren": {
+    "worlds": 10,
+    "wolf_stuck": 0,
+    "wolf_stuck_helper": 0,
+    "wolf_stuck_wall": 0,
+    "wolf_stuck_max_s": 0.0,
+    "wolf_wall_stuck": 10,
+    "wolf_wall_stuck_helper": 8,
+    "wolf_wall_stuck_max_s": 4.266666666666667,
+    "deer_stuck": 0,
+    "deer_stuck_by_beh": {},
+    "deer_stuck_panic": 0,
+    "deer_stuck_max_s": 0.0,
+    "wolf_stuck_frac": 0.0,
+    "wolf_wall_stuck_frac": 0.0002642318193828719,
+    "deer_stuck_frac": 0.0,
+    "old_wolf_runs": 0,
+    "old_wolf_max_s": 0.0,
+    "old_deer_still": 0,
+    "old_deer_flee": 0,
+    "old_deer_push": 0,
+    "old_deer_max_s": 0.0
+   },
+   "Forest": {
+    "worlds": 10,
+    "wolf_stuck": 0,
+    "wolf_stuck_helper": 0,
+    "wolf_stuck_wall": 0,
+    "wolf_stuck_max_s": 0.0,
+    "wolf_wall_stuck": 9,
+    "wolf_wall_stuck_helper": 4,
+    "wolf_wall_stuck_max_s": 6.4,
+    "deer_stuck": 0,
+    "deer_stuck_by_beh": {},
+    "deer_stuck_panic": 0,
+    "deer_stuck_max_s": 0.0,
+    "wolf_stuck_frac": 0.0,
+    "wolf_wall_stuck_frac": 0.00030338069125004295,
+    "deer_stuck_frac": 0.0,
+    "old_wolf_runs": 0,
+    "old_wolf_max_s": 0.0,
+    "old_deer_still": 25,
+    "old_deer_flee": 0,
+    "old_deer_push": 1,
+    "old_deer_max_s": 50.0,
+    "detour": {
+     "deer_used": 11742,
+     "deer_start": 4504,
+     "deer_fail": 0,
+     "wolf_used": 188,
+     "wolf_start": 136,
+     "wolf_fail": 0,
+     "help_drop": 26
+    }
+   },
+   "Highland": {
+    "worlds": 10,
+    "wolf_stuck": 0,
+    "wolf_stuck_helper": 0,
+    "wolf_stuck_wall": 0,
+    "wolf_stuck_max_s": 0.0,
+    "wolf_wall_stuck": 12,
+    "wolf_wall_stuck_helper": 5,
+    "wolf_wall_stuck_max_s": 3.6,
+    "deer_stuck": 0,
+    "deer_stuck_by_beh": {},
+    "deer_stuck_panic": 0,
+    "deer_stuck_max_s": 0.0,
+    "wolf_stuck_frac": 0.0,
+    "wolf_wall_stuck_frac": 0.00016297360431216085,
+    "deer_stuck_frac": 0.0,
+    "old_wolf_runs": 0,
+    "old_wolf_max_s": 0.0,
+    "old_deer_still": 18,
+    "old_deer_flee": 0,
+    "old_deer_push": 5,
+    "old_deer_max_s": 55.86666666666667,
+    "detour": {
+     "deer_used": 4287,
+     "deer_start": 1125,
+     "deer_fail": 0,
+     "wolf_used": 57,
+     "wolf_start": 41,
+     "wolf_fail": 0,
+     "help_drop": 27
+    }
+   }
+  }
+ },
+ "worlds": [
+  {
+   "seed": 33000,
+   "unreal_map": {
+    "seed": 20000,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 3,
+     "t0": 3177,
+     "steps": 24,
+     "helper": false,
+     "wall": true
+    }
+   ],
+   "win_w": 17861,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 2,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33001,
+   "unreal_map": {
+    "seed": 20000,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 3,
+     "t0": 5016,
+     "steps": 25,
+     "helper": false,
+     "wall": true
+    }
+   ],
+   "win_w": 18832,
+   "win_d": 214826,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 3,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 27,
+     "steps": 77,
+     "net": 1.1274843264490015,
+     "path": 1.2673038433773047,
+     "flee": 0,
+     "t_end": 863
+    },
+    {
+     "id": 36,
+     "steps": 39,
+     "net": 0.46750931470926077,
+     "path": 0.43940327693529974,
+     "flee": 0,
+     "t_end": 1776
+    },
+    {
+     "id": 68,
+     "steps": 198,
+     "net": 0.45858755449906313,
+     "path": 1.3887905898673696,
+     "flee": 0,
+     "t_end": 2487
+    },
+    {
+     "id": 23,
+     "steps": 65,
+     "net": 0.4600417166200775,
+     "path": 0.4592811606694908,
+     "flee": 0,
+     "t_end": 4038
+    },
+    {
+     "id": 75,
+     "steps": 244,
+     "net": 0.23999999999999871,
+     "path": 0.23999999999999966,
+     "flee": 0,
+     "t_end": 4224
+    },
+    {
+     "id": 77,
+     "steps": 110,
+     "net": 0.26678465529084516,
+     "path": 0.6910179622093717,
+     "flee": 0,
+     "t_end": 4681
+    }
+   ],
+   "detour": {
+    "deer_used": 1176,
+    "deer_start": 510,
+    "deer_fail": 0,
+    "wolf_used": 14,
+    "wolf_start": 10,
+    "wolf_fail": 0,
+    "help_drop": 3
+   }
+  },
+  {
+   "seed": 33002,
+   "unreal_map": {
+    "seed": 20000,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 4593,
+     "steps": 24,
+     "helper": false,
+     "wall": true
+    },
+    {
+     "id": 2,
+     "t0": 5841,
+     "steps": 25,
+     "helper": false,
+     "wall": true
+    }
+   ],
+   "win_w": 17542,
+   "win_d": 389548,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 5,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": {
+    "deer_used": 214,
+    "deer_start": 55,
+    "deer_fail": 0,
+    "wolf_used": 4,
+    "wolf_start": 3,
+    "wolf_fail": 0,
+    "help_drop": 4
+   }
+  },
+  {
+   "seed": 33003,
+   "unreal_map": {
+    "seed": 20001,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 4612,
+     "steps": 26,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 15648,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 4,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33004,
+   "unreal_map": {
+    "seed": 20001,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 17911,
+   "win_d": 287291,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 20,
+     "steps": 77,
+     "net": 0.456705431608143,
+     "path": 0.4692384107249957,
+     "flee": 0,
+     "t_end": 376
+    },
+    {
+     "id": 38,
+     "steps": 53,
+     "net": 0.6086588146791426,
+     "path": 0.6294992852485534,
+     "flee": 2,
+     "t_end": 536
+    },
+    {
+     "id": 116,
+     "steps": 379,
+     "net": 0.659606685996373,
+     "path": 0.6901863749172541,
+     "flee": 0,
+     "t_end": 1766
+    },
+    {
+     "id": 94,
+     "steps": 163,
+     "net": 0.8488386429545045,
+     "path": 0.9132227527436898,
+     "flee": 0,
+     "t_end": 2664
+    },
+    {
+     "id": 11,
+     "steps": 88,
+     "net": 0.4359016722847961,
+     "path": 0.3880779930792362,
+     "flee": 0,
+     "t_end": 3324
+    },
+    {
+     "id": 44,
+     "steps": 127,
+     "net": 1.0786961011794702,
+     "path": 2.914712308936916,
+     "flee": 2,
+     "t_end": 3355
+    },
+    {
+     "id": 25,
+     "steps": 47,
+     "net": 1.28530254265949,
+     "path": 1.5362079341616606,
+     "flee": 0,
+     "t_end": 4181
+    },
+    {
+     "id": 61,
+     "steps": 42,
+     "net": 1.1658857124726858,
+     "path": 2.007213965077625,
+     "flee": 0,
+     "t_end": 5218
+    },
+    {
+     "id": 125,
+     "steps": 39,
+     "net": 1.114681437820705,
+     "path": 2.0102824947123077,
+     "flee": 0,
+     "t_end": 5230
+    },
+    {
+     "id": 81,
+     "steps": 71,
+     "net": 0.4378258173258854,
+     "path": 2.9762643675085743,
+     "flee": 0,
+     "t_end": 5343
+    },
+    {
+     "id": 121,
+     "steps": 471,
+     "net": 1.1434513847943917,
+     "path": 1.4021488350541036,
+     "flee": 0,
+     "t_end": 5384
+    },
+    {
+     "id": 9,
+     "steps": 416,
+     "net": 0.6538558123591142,
+     "path": 1.1143121593012486,
+     "flee": 0,
+     "t_end": 7200
+    }
+   ],
+   "detour": {
+    "deer_used": 1244,
+    "deer_start": 545,
+    "deer_fail": 0,
+    "wolf_used": 23,
+    "wolf_start": 16,
+    "wolf_fail": 0,
+    "help_drop": 1
+   }
+  },
+  {
+   "seed": 33005,
+   "unreal_map": {
+    "seed": 20001,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 3,
+     "t0": 3620,
+     "steps": 24,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 17376,
+   "win_d": 216660,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 2,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 8,
+     "steps": 63,
+     "net": 1.2004828972575838,
+     "path": 1.087281964056774,
+     "flee": 2,
+     "t_end": 372
+    },
+    {
+     "id": 102,
+     "steps": 199,
+     "net": 0.8756160002873508,
+     "path": 0.6390702573729475,
+     "flee": 2,
+     "t_end": 659
+    },
+    {
+     "id": 8,
+     "steps": 419,
+     "net": 0.42025181364626746,
+     "path": 0.42591820796287017,
+     "flee": 0,
+     "t_end": 889
+    },
+    {
+     "id": 60,
+     "steps": 244,
+     "net": 0.8994229506407524,
+     "path": 0.8045964958089544,
+     "flee": 2,
+     "t_end": 2496
+    },
+    {
+     "id": 34,
+     "steps": 508,
+     "net": 0.8147933612764429,
+     "path": 0.8520616624580001,
+     "flee": 0,
+     "t_end": 4494
+    },
+    {
+     "id": 15,
+     "steps": 526,
+     "net": 0.542693105531193,
+     "path": 0.5478763383618532,
+     "flee": 0,
+     "t_end": 6269
+    },
+    {
+     "id": 121,
+     "steps": 276,
+     "net": 0.2840532410594915,
+     "path": 0.7069213993031863,
+     "flee": 0,
+     "t_end": 7200
+    }
+   ],
+   "detour": {
+    "deer_used": 141,
+    "deer_start": 54,
+    "deer_fail": 0,
+    "wolf_used": 9,
+    "wolf_start": 5,
+    "wolf_fail": 0,
+    "help_drop": 4
+   }
+  },
+  {
+   "seed": 33006,
+   "unreal_map": {
+    "seed": 20002,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 20146,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33007,
+   "unreal_map": {
+    "seed": 20002,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 17152,
+   "win_d": 424551,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": {
+    "deer_used": 2301,
+    "deer_start": 582,
+    "deer_fail": 0,
+    "wolf_used": 17,
+    "wolf_start": 11,
+    "wolf_fail": 0,
+    "help_drop": 1
+   }
+  },
+  {
+   "seed": 33008,
+   "unreal_map": {
+    "seed": 20002,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 17166,
+   "win_d": 284121,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 51,
+     "steps": 89,
+     "net": 0.26928402334457574,
+     "path": 0.23230088346365002,
+     "flee": 0,
+     "t_end": 1062
+    },
+    {
+     "id": 49,
+     "steps": 102,
+     "net": 0.8155585762988404,
+     "path": 0.847507432254419,
+     "flee": 0,
+     "t_end": 2984
+    },
+    {
+     "id": 91,
+     "steps": 68,
+     "net": 0.14435254427359392,
+     "path": 2.461964199689278,
+     "flee": 0,
+     "t_end": 4338
+    },
+    {
+     "id": 66,
+     "steps": 71,
+     "net": 1.1490882391325559,
+     "path": 1.940495714015184,
+     "flee": 0,
+     "t_end": 7065
+    }
+   ],
+   "detour": {
+    "deer_used": 275,
+    "deer_start": 68,
+    "deer_fail": 0,
+    "wolf_used": 1,
+    "wolf_start": 1,
+    "wolf_fail": 0,
+    "help_drop": 3
+   }
+  },
+  {
+   "seed": 33009,
+   "unreal_map": {
+    "seed": 20003,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 18384,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33010,
+   "unreal_map": {
+    "seed": 20003,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 2,
+     "t0": 3664,
+     "steps": 23,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 16085,
+   "win_d": 383399,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 1,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 75,
+     "steps": 48,
+     "net": 1.070201318196802,
+     "path": 1.2755287257609051,
+     "flee": 0,
+     "t_end": 2604
+    },
+    {
+     "id": 74,
+     "steps": 552,
+     "net": 0.807240486742771,
+     "path": 0.8625590893350294,
+     "flee": 0,
+     "t_end": 3667
+    },
+    {
+     "id": 40,
+     "steps": 40,
+     "net": 0.8925267523988186,
+     "path": 2.485929074920402,
+     "flee": 0,
+     "t_end": 5051
+    },
+    {
+     "id": 22,
+     "steps": 40,
+     "net": 1.1886747063067458,
+     "path": 5.6008436016042635,
+     "flee": 0,
+     "t_end": 5365
+    },
+    {
+     "id": 92,
+     "steps": 40,
+     "net": 1.1912621925898585,
+     "path": 1.725367696116856,
+     "flee": 0,
+     "t_end": 5966
+    },
+    {
+     "id": 30,
+     "steps": 41,
+     "net": 1.1278859822083966,
+     "path": 1.291076358873875,
+     "flee": 0,
+     "t_end": 6851
+    }
+   ],
+   "detour": {
+    "deer_used": 1977,
+    "deer_start": 693,
+    "deer_fail": 0,
+    "wolf_used": 18,
+    "wolf_start": 13,
+    "wolf_fail": 0,
+    "help_drop": 6
+   }
+  },
+  {
+   "seed": 33011,
+   "unreal_map": {
+    "seed": 20003,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 47,
+     "steps": 24,
+     "helper": true,
+     "wall": true
+    },
+    {
+     "id": 0,
+     "t0": 4565,
+     "steps": 23,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 16899,
+   "win_d": 417360,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 3,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 106,
+     "steps": 107,
+     "net": 0.41136512748717424,
+     "path": 0.4119836315487546,
+     "flee": 0,
+     "t_end": 615
+    },
+    {
+     "id": 29,
+     "steps": 47,
+     "net": 1.121703915110605,
+     "path": 4.868049052861409,
+     "flee": 0,
+     "t_end": 1752
+    },
+    {
+     "id": 127,
+     "steps": 254,
+     "net": 0.8087167942865905,
+     "path": 0.8440928312196174,
+     "flee": 0,
+     "t_end": 2578
+    },
+    {
+     "id": 127,
+     "steps": 75,
+     "net": 1.0919116938624687,
+     "path": 1.238986270806012,
+     "flee": 0,
+     "t_end": 2680
+    },
+    {
+     "id": 59,
+     "steps": 58,
+     "net": 1.2362460571638183,
+     "path": 1.687040986808556,
+     "flee": 0,
+     "t_end": 3267
+    },
+    {
+     "id": 26,
+     "steps": 128,
+     "net": 1.1376842415801136,
+     "path": 1.8914038548600804,
+     "flee": 0,
+     "t_end": 3572
+    },
+    {
+     "id": 67,
+     "steps": 405,
+     "net": 1.1143519358416554,
+     "path": 2.5595705026671816,
+     "flee": 0,
+     "t_end": 5365
+    },
+    {
+     "id": 121,
+     "steps": 41,
+     "net": 1.2394364852421722,
+     "path": 1.4970349180333722,
+     "flee": 0,
+     "t_end": 5365
+    },
+    {
+     "id": 110,
+     "steps": 90,
+     "net": 1.0956393021414608,
+     "path": 2.290499332870086,
+     "flee": 0,
+     "t_end": 6115
+    }
+   ],
+   "detour": {
+    "deer_used": 1095,
+    "deer_start": 262,
+    "deer_fail": 0,
+    "wolf_used": 6,
+    "wolf_start": 3,
+    "wolf_fail": 0,
+    "help_drop": 2
+   }
+  },
+  {
+   "seed": 33012,
+   "unreal_map": {
+    "seed": 20004,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 195,
+     "steps": 26,
+     "helper": true,
+     "wall": true
+    },
+    {
+     "id": 2,
+     "t0": 1450,
+     "steps": 28,
+     "helper": false,
+     "wall": true
+    },
+    {
+     "id": 2,
+     "t0": 1827,
+     "steps": 25,
+     "helper": true,
+     "wall": true
+    },
+    {
+     "id": 2,
+     "t0": 4556,
+     "steps": 27,
+     "helper": true,
+     "wall": true
+    },
+    {
+     "id": 2,
+     "t0": 4615,
+     "steps": 24,
+     "helper": true,
+     "wall": true
+    },
+    {
+     "id": 0,
+     "t0": 4633,
+     "steps": 26,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 16471,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 24,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33013,
+   "unreal_map": {
+    "seed": 20004,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 15721,
+   "win_d": 320484,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 78,
+     "steps": 500,
+     "net": 0.7960193638561972,
+     "path": 0.8472682982613045,
+     "flee": 0,
+     "t_end": 6439
+    }
+   ],
+   "detour": {
+    "deer_used": 1051,
+    "deer_start": 345,
+    "deer_fail": 0,
+    "wolf_used": 11,
+    "wolf_start": 9,
+    "wolf_fail": 0,
+    "help_drop": 4
+   }
+  },
+  {
+   "seed": 33014,
+   "unreal_map": {
+    "seed": 20004,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 14987,
+   "win_d": 182764,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 104,
+     "steps": 70,
+     "net": 0.7763980666909308,
+     "path": 0.787069925147313,
+     "flee": 0,
+     "t_end": 422
+    },
+    {
+     "id": 123,
+     "steps": 39,
+     "net": 1.114512703002987,
+     "path": 2.4238036959326394,
+     "flee": 0,
+     "t_end": 761
+    },
+    {
+     "id": 17,
+     "steps": 40,
+     "net": 0.4302075536871987,
+     "path": 1.1989395247010384,
+     "flee": 0,
+     "t_end": 1479
+    },
+    {
+     "id": 117,
+     "steps": 148,
+     "net": 0.2737556592391803,
+     "path": 0.22567691243559057,
+     "flee": 0,
+     "t_end": 1971
+    },
+    {
+     "id": 20,
+     "steps": 52,
+     "net": 1.1815234897356306,
+     "path": 1.4609677843579871,
+     "flee": 0,
+     "t_end": 2606
+    },
+    {
+     "id": 101,
+     "steps": 576,
+     "net": 0.6372513831203188,
+     "path": 0.6570128252734835,
+     "flee": 0,
+     "t_end": 3590
+    },
+    {
+     "id": 59,
+     "steps": 96,
+     "net": 1.1279462708889951,
+     "path": 1.5058214030252854,
+     "flee": 0,
+     "t_end": 4652
+    },
+    {
+     "id": 95,
+     "steps": 195,
+     "net": 0.6493454225401846,
+     "path": 0.6664067939553153,
+     "flee": 0,
+     "t_end": 5745
+    },
+    {
+     "id": 89,
+     "steps": 173,
+     "net": 0.4439627477283452,
+     "path": 2.877868758321113,
+     "flee": 0,
+     "t_end": 6490
+    },
+    {
+     "id": 41,
+     "steps": 484,
+     "net": 1.1124671295614004,
+     "path": 1.5692904996639694,
+     "flee": 0,
+     "t_end": 7189
+    }
+   ],
+   "detour": {
+    "deer_used": 400,
+    "deer_start": 101,
+    "deer_fail": 0,
+    "wolf_used": 9,
+    "wolf_start": 9,
+    "wolf_fail": 0,
+    "help_drop": 3
+   }
+  },
+  {
+   "seed": 33015,
+   "unreal_map": {
+    "seed": 20005,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 17724,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33016,
+   "unreal_map": {
+    "seed": 20005,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 1,
+     "t0": 5842,
+     "steps": 26,
+     "helper": false,
+     "wall": true
+    },
+    {
+     "id": 1,
+     "t0": 6440,
+     "steps": 24,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 15149,
+   "win_d": 366942,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 6,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 2,
+     "steps": 86,
+     "net": 1.0587532929218588,
+     "path": 2.182765262063617,
+     "flee": 0,
+     "t_end": 2678
+    }
+   ],
+   "detour": {
+    "deer_used": 785,
+    "deer_start": 293,
+    "deer_fail": 0,
+    "wolf_used": 20,
+    "wolf_start": 17,
+    "wolf_fail": 0,
+    "help_drop": 2
+   }
+  },
+  {
+   "seed": 33017,
+   "unreal_map": {
+    "seed": 20005,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 2,
+     "t0": 49,
+     "steps": 25,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 16920,
+   "win_d": 216851,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 3,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 73,
+     "steps": 116,
+     "net": 1.2732518524373901,
+     "path": 2.169005152268784,
+     "flee": 0,
+     "t_end": 409
+    },
+    {
+     "id": 46,
+     "steps": 84,
+     "net": 0.11916219728690419,
+     "path": 0.24202037406269808,
+     "flee": 0,
+     "t_end": 448
+    },
+    {
+     "id": 22,
+     "steps": 201,
+     "net": 0.7664324056543311,
+     "path": 0.7889496661529026,
+     "flee": 0,
+     "t_end": 875
+    },
+    {
+     "id": 1,
+     "steps": 462,
+     "net": 0.9740419933857954,
+     "path": 1.0350066808878822,
+     "flee": 0,
+     "t_end": 876
+    },
+    {
+     "id": 103,
+     "steps": 50,
+     "net": 0.21886201877264766,
+     "path": 1.1925629620707103,
+     "flee": 0,
+     "t_end": 1075
+    },
+    {
+     "id": 85,
+     "steps": 90,
+     "net": 0.23992136900631475,
+     "path": 0.6741798612425589,
+     "flee": 0,
+     "t_end": 1277
+    },
+    {
+     "id": 72,
+     "steps": 51,
+     "net": 0.17836934084577807,
+     "path": 0.6896385429633659,
+     "flee": 0,
+     "t_end": 1434
+    },
+    {
+     "id": 83,
+     "steps": 205,
+     "net": 0.6902327920629994,
+     "path": 0.6624956338769565,
+     "flee": 0,
+     "t_end": 3304
+    },
+    {
+     "id": 24,
+     "steps": 113,
+     "net": 0.2867727283445852,
+     "path": 0.28800000000000303,
+     "flee": 0,
+     "t_end": 6549
+    }
+   ],
+   "detour": {
+    "deer_used": 551,
+    "deer_start": 148,
+    "deer_fail": 0,
+    "wolf_used": 6,
+    "wolf_start": 4,
+    "wolf_fail": 0,
+    "help_drop": 4
+   }
+  },
+  {
+   "seed": 33018,
+   "unreal_map": {
+    "seed": 20006,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 19056,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33019,
+   "unreal_map": {
+    "seed": 20006,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 1823,
+     "steps": 26,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 16710,
+   "win_d": 338048,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 4,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 43,
+     "steps": 42,
+     "net": 0.24000000000000138,
+     "path": 0.20375906154395304,
+     "flee": 0,
+     "t_end": 2765
+    },
+    {
+     "id": 22,
+     "steps": 61,
+     "net": 0.3358192130694344,
+     "path": 0.47999999999999865,
+     "flee": 2,
+     "t_end": 4640
+    },
+    {
+     "id": 80,
+     "steps": 110,
+     "net": 0.4415372891122734,
+     "path": 0.6505748191044928,
+     "flee": 0,
+     "t_end": 6655
+    }
+   ],
+   "detour": {
+    "deer_used": 844,
+    "deer_start": 343,
+    "deer_fail": 0,
+    "wolf_used": 23,
+    "wolf_start": 17,
+    "wolf_fail": 0,
+    "help_drop": 3
+   }
+  },
+  {
+   "seed": 33020,
+   "unreal_map": {
+    "seed": 20006,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 2,
+     "t0": 1261,
+     "steps": 24,
+     "helper": false,
+     "wall": true
+    },
+    {
+     "id": 3,
+     "t0": 6618,
+     "steps": 24,
+     "helper": false,
+     "wall": true
+    }
+   ],
+   "win_w": 16515,
+   "win_d": 184001,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 4,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 49,
+     "steps": 308,
+     "net": 1.2058062730587302,
+     "path": 1.46446315828081,
+     "flee": 0,
+     "t_end": 868
+    },
+    {
+     "id": 54,
+     "steps": 132,
+     "net": 0.7822695980154118,
+     "path": 0.813161279281093,
+     "flee": 0,
+     "t_end": 5625
+    },
+    {
+     "id": 83,
+     "steps": 88,
+     "net": 1.1825362207474932,
+     "path": 1.5456450118936635,
+     "flee": 0,
+     "t_end": 6545
+    },
+    {
+     "id": 112,
+     "steps": 334,
+     "net": 0.8916823919061151,
+     "path": 0.9224116300540554,
+     "flee": 0,
+     "t_end": 7164
+    }
+   ],
+   "detour": {
+    "deer_used": 280,
+    "deer_start": 78,
+    "deer_fail": 0,
+    "wolf_used": 3,
+    "wolf_start": 3,
+    "wolf_fail": 0,
+    "help_drop": 2
+   }
+  },
+  {
+   "seed": 33021,
+   "unreal_map": {
+    "seed": 20007,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [],
+   "win_w": 14471,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 0,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33022,
+   "unreal_map": {
+    "seed": 20007,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 1425,
+     "steps": 30,
+     "helper": false,
+     "wall": true
+    },
+    {
+     "id": 1,
+     "t0": 6839,
+     "steps": 25,
+     "helper": false,
+     "wall": true
+    }
+   ],
+   "win_w": 18468,
+   "win_d": 181552,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 11,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 41,
+     "steps": 72,
+     "net": 0.5714177122074178,
+     "path": 0.23248297475981505,
+     "flee": 2,
+     "t_end": 148
+    },
+    {
+     "id": 36,
+     "steps": 194,
+     "net": 0.8825866485856825,
+     "path": 0.9343323288567117,
+     "flee": 0,
+     "t_end": 550
+    },
+    {
+     "id": 27,
+     "steps": 49,
+     "net": 1.1719815619107778,
+     "path": 1.4513366263294374,
+     "flee": 0,
+     "t_end": 675
+    },
+    {
+     "id": 12,
+     "steps": 63,
+     "net": 0.16339946564979613,
+     "path": 0.47497384280055144,
+     "flee": 0,
+     "t_end": 1356
+    },
+    {
+     "id": 111,
+     "steps": 69,
+     "net": 0.9374434472617417,
+     "path": 1.0571102152129184,
+     "flee": 0,
+     "t_end": 1548
+    },
+    {
+     "id": 116,
+     "steps": 375,
+     "net": 0.2349460525992112,
+     "path": 0.6117264116879436,
+     "flee": 2,
+     "t_end": 1675
+    },
+    {
+     "id": 74,
+     "steps": 81,
+     "net": 1.2006214403836926,
+     "path": 1.5082671047062548,
+     "flee": 0,
+     "t_end": 1758
+    },
+    {
+     "id": 62,
+     "steps": 60,
+     "net": 1.2037837487545024,
+     "path": 1.4182033315223197,
+     "flee": 0,
+     "t_end": 2208
+    },
+    {
+     "id": 53,
+     "steps": 66,
+     "net": 0.24000000000000074,
+     "path": 0.405924111455354,
+     "flee": 2,
+     "t_end": 2531
+    },
+    {
+     "id": 53,
+     "steps": 170,
+     "net": 1.045375241704646,
+     "path": 1.1558044498564577,
+     "flee": 0,
+     "t_end": 3978
+    },
+    {
+     "id": 84,
+     "steps": 47,
+     "net": 0.47996582365922574,
+     "path": 0.4800000000000019,
+     "flee": 0,
+     "t_end": 4399
+    },
+    {
+     "id": 55,
+     "steps": 238,
+     "net": 1.1793212815686012,
+     "path": 1.356544406625575,
+     "flee": 0,
+     "t_end": 6236
+    },
+    {
+     "id": 33,
+     "steps": 234,
+     "net": 1.1873521373926301,
+     "path": 2.5962664402315534,
+     "flee": 0,
+     "t_end": 6309
+    },
+    {
+     "id": 113,
+     "steps": 179,
+     "net": 0.5192943050116453,
+     "path": 0.4799999999999998,
+     "flee": 2,
+     "t_end": 6966
+    }
+   ],
+   "detour": {
+    "deer_used": 958,
+    "deer_start": 486,
+    "deer_fail": 0,
+    "wolf_used": 30,
+    "wolf_start": 20,
+    "wolf_fail": 0,
+    "help_drop": 3
+   }
+  },
+  {
+   "seed": 33023,
+   "unreal_map": {
+    "seed": 20007,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 3,
+     "t0": 339,
+     "steps": 23,
+     "helper": false,
+     "wall": true
+    },
+    {
+     "id": 3,
+     "t0": 6746,
+     "steps": 23,
+     "helper": false,
+     "wall": true
+    }
+   ],
+   "win_w": 14426,
+   "win_d": 429465,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 2,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 66,
+     "steps": 46,
+     "net": 0.8854214178128675,
+     "path": 2.4089211573674305,
+     "flee": 0,
+     "t_end": 982
+    },
+    {
+     "id": 44,
+     "steps": 494,
+     "net": 1.1162394120604444,
+     "path": 1.4467490667821814,
+     "flee": 0,
+     "t_end": 1786
+    },
+    {
+     "id": 23,
+     "steps": 52,
+     "net": 1.1179499135175655,
+     "path": 1.9514462839676727,
+     "flee": 0,
+     "t_end": 1916
+    },
+    {
+     "id": 117,
+     "steps": 43,
+     "net": 1.0549954504362298,
+     "path": 1.3205273060384055,
+     "flee": 0,
+     "t_end": 2774
+    },
+    {
+     "id": 32,
+     "steps": 243,
+     "net": 0.8002250716293886,
+     "path": 2.631533470882294,
+     "flee": 0,
+     "t_end": 6312
+    },
+    {
+     "id": 112,
+     "steps": 156,
+     "net": 0.7308623478132684,
+     "path": 2.6298877439302064,
+     "flee": 0,
+     "t_end": 6492
+    },
+    {
+     "id": 21,
+     "steps": 183,
+     "net": 0.4541170001381297,
+     "path": 2.893303582385229,
+     "flee": 0,
+     "t_end": 6705
+    }
+   ],
+   "detour": {
+    "deer_used": 522,
+    "deer_start": 132,
+    "deer_fail": 0,
+    "wolf_used": 4,
+    "wolf_start": 3,
+    "wolf_fail": 0,
+    "help_drop": 0
+   }
+  },
+  {
+   "seed": 33024,
+   "unreal_map": {
+    "seed": 20008,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 5460,
+     "steps": 27,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 15286,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 5,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33025,
+   "unreal_map": {
+    "seed": 20008,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 1,
+     "t0": 2325,
+     "steps": 48,
+     "helper": false,
+     "wall": true
+    }
+   ],
+   "win_w": 18678,
+   "win_d": 214127,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 26,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 10,
+     "steps": 67,
+     "net": 0.9774844423627889,
+     "path": 2.52883349620687,
+     "flee": 0,
+     "t_end": 372
+    },
+    {
+     "id": 10,
+     "steps": 51,
+     "net": 1.089427928967308,
+     "path": 1.3234614250729848,
+     "flee": 0,
+     "t_end": 437
+    },
+    {
+     "id": 122,
+     "steps": 110,
+     "net": 0.21606849848239476,
+     "path": 0.4588210175646308,
+     "flee": 0,
+     "t_end": 1028
+    },
+    {
+     "id": 23,
+     "steps": 141,
+     "net": 1.118166418369622,
+     "path": 1.3523686187903887,
+     "flee": 0,
+     "t_end": 3020
+    },
+    {
+     "id": 107,
+     "steps": 169,
+     "net": 0.5920719161985344,
+     "path": 0.6967668898135182,
+     "flee": 2,
+     "t_end": 3076
+    },
+    {
+     "id": 51,
+     "steps": 459,
+     "net": 1.1170851368981594,
+     "path": 1.7816470853738,
+     "flee": 0,
+     "t_end": 3584
+    },
+    {
+     "id": 17,
+     "steps": 41,
+     "net": 1.1216148776948516,
+     "path": 1.9808495390445178,
+     "flee": 0,
+     "t_end": 4174
+    },
+    {
+     "id": 72,
+     "steps": 199,
+     "net": 0.6296874682661145,
+     "path": 0.6726867200131084,
+     "flee": 0,
+     "t_end": 4250
+    },
+    {
+     "id": 122,
+     "steps": 122,
+     "net": 0.4131494189234918,
+     "path": 0.41325944848589213,
+     "flee": 0,
+     "t_end": 4712
+    },
+    {
+     "id": 87,
+     "steps": 127,
+     "net": 0.4480016364236853,
+     "path": 0.3824332994125069,
+     "flee": 0,
+     "t_end": 5567
+    },
+    {
+     "id": 95,
+     "steps": 60,
+     "net": 0.6525121024784984,
+     "path": 0.6486369400528209,
+     "flee": 0,
+     "t_end": 6039
+    },
+    {
+     "id": 62,
+     "steps": 79,
+     "net": 1.3871462103416126,
+     "path": 2.000171365922455,
+     "flee": 2,
+     "t_end": 6534
+    },
+    {
+     "id": 33,
+     "steps": 99,
+     "net": 1.2437081603976181,
+     "path": 1.1025924525535657,
+     "flee": 2,
+     "t_end": 6584
+    },
+    {
+     "id": 115,
+     "steps": 68,
+     "net": 0.6622204753347919,
+     "path": 0.6665020773699419,
+     "flee": 0,
+     "t_end": 7175
+    }
+   ],
+   "detour": {
+    "deer_used": 717,
+    "deer_start": 344,
+    "deer_fail": 0,
+    "wolf_used": 18,
+    "wolf_start": 13,
+    "wolf_fail": 0,
+    "help_drop": 2
+   }
+  },
+  {
+   "seed": 33026,
+   "unreal_map": {
+    "seed": 20008,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 2748,
+     "steps": 25,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 17456,
+   "win_d": 197535,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 3,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": {
+    "deer_used": 349,
+    "deer_start": 91,
+    "deer_fail": 0,
+    "wolf_used": 5,
+    "wolf_start": 3,
+    "wolf_fail": 0,
+    "help_drop": 3
+   }
+  },
+  {
+   "seed": 33027,
+   "unreal_map": {
+    "seed": 20009,
+    "region": "Barren",
+    "replicate": 0
+   },
+   "discs": 0,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 0,
+     "t0": 2847,
+     "steps": 32,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 15258,
+   "win_d": 0,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 10,
+   "old_wolf": [],
+   "old_deer": [],
+   "detour": null
+  },
+  {
+   "seed": 33028,
+   "unreal_map": {
+    "seed": 20009,
+    "region": "Forest",
+    "replicate": 0
+   },
+   "discs": 24,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 2,
+     "t0": 6392,
+     "steps": 24,
+     "helper": true,
+     "wall": true
+    }
+   ],
+   "win_w": 19992,
+   "win_d": 151221,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 2,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 54,
+     "steps": 184,
+     "net": 0.46095762404112695,
+     "path": 0.42081147829542953,
+     "flee": 0,
+     "t_end": 441
+    },
+    {
+     "id": 64,
+     "steps": 67,
+     "net": 1.05234254362602,
+     "path": 1.1933093093218907,
+     "flee": 0,
+     "t_end": 870
+    },
+    {
+     "id": 64,
+     "steps": 89,
+     "net": 0.325940270561348,
+     "path": 0.9333444341286554,
+     "flee": 2,
+     "t_end": 1049
+    },
+    {
+     "id": 1,
+     "steps": 67,
+     "net": 0.4352701400027212,
+     "path": 0.8055829349489432,
+     "flee": 0,
+     "t_end": 1295
+    },
+    {
+     "id": 47,
+     "steps": 43,
+     "net": 0.47771860233761415,
+     "path": 0.45205883090001,
+     "flee": 0,
+     "t_end": 1302
+    },
+    {
+     "id": 75,
+     "steps": 477,
+     "net": 0.6543892950738112,
+     "path": 0.6606189049958654,
+     "flee": 0,
+     "t_end": 1779
+    },
+    {
+     "id": 48,
+     "steps": 76,
+     "net": 0.6186619847268195,
+     "path": 0.5696869745697057,
+     "flee": 0,
+     "t_end": 2004
+    },
+    {
+     "id": 15,
+     "steps": 90,
+     "net": 0.9757303193365435,
+     "path": 1.1402053581107054,
+     "flee": 0,
+     "t_end": 2029
+    },
+    {
+     "id": 86,
+     "steps": 51,
+     "net": 0.24000000000000093,
+     "path": 0.5999999999999992,
+     "flee": 2,
+     "t_end": 2699
+    },
+    {
+     "id": 28,
+     "steps": 63,
+     "net": 0.2399999999999988,
+     "path": 0.24000000000000005,
+     "flee": 0,
+     "t_end": 3586
+    },
+    {
+     "id": 63,
+     "steps": 144,
+     "net": 0.6411294594504913,
+     "path": 0.6506401660303301,
+     "flee": 0,
+     "t_end": 4488
+    },
+    {
+     "id": 121,
+     "steps": 91,
+     "net": 1.0707057672108646,
+     "path": 1.371751674056391,
+     "flee": 0,
+     "t_end": 4527
+    },
+    {
+     "id": 96,
+     "steps": 71,
+     "net": 1.2172266266546221,
+     "path": 0.8546521408013729,
+     "flee": 2,
+     "t_end": 5054
+    },
+    {
+     "id": 113,
+     "steps": 298,
+     "net": 0.9562935079232465,
+     "path": 0.6782268480796075,
+     "flee": 2,
+     "t_end": 5222
+    },
+    {
+     "id": 36,
+     "steps": 156,
+     "net": 1.1899347740727513,
+     "path": 1.3734159239193604,
+     "flee": 0,
+     "t_end": 6483
+    },
+    {
+     "id": 98,
+     "steps": 54,
+     "net": 0.4305409967201597,
+     "path": 0.18994608685869505,
+     "flee": 2,
+     "t_end": 6839
+    }
+   ],
+   "detour": {
+    "deer_used": 689,
+    "deer_start": 363,
+    "deer_fail": 0,
+    "wolf_used": 14,
+    "wolf_start": 10,
+    "wolf_fail": 0,
+    "help_drop": 1
+   }
+  },
+  {
+   "seed": 33029,
+   "unreal_map": {
+    "seed": 20009,
+    "region": "Highland",
+    "replicate": 0
+   },
+   "discs": 9,
+   "wolf_events": [],
+   "deer_events": [],
+   "wall_events": [
+    {
+     "id": 3,
+     "t0": 5895,
+     "steps": 27,
+     "helper": false,
+     "wall": true
+    }
+   ],
+   "win_w": 16384,
+   "win_d": 206507,
+   "stuck_w": 0,
+   "stuck_d": 0,
+   "stuck_wall": 5,
+   "old_wolf": [],
+   "old_deer": [
+    {
+     "id": 65,
+     "steps": 89,
+     "net": 1.1718027141398,
+     "path": 1.4281459372440783,
+     "flee": 0,
+     "t_end": 562
+    },
+    {
+     "id": 14,
+     "steps": 71,
+     "net": 1.003100262530799,
+     "path": 1.082142972442987,
+     "flee": 0,
+     "t_end": 816
+    },
+    {
+     "id": 12,
+     "steps": 47,
+     "net": 1.1287418292473077,
+     "path": 1.2535204250562093,
+     "flee": 0,
+     "t_end": 2984
+    },
+    {
+     "id": 40,
+     "steps": 69,
+     "net": 0.4153116320889427,
+     "path": 0.3728635579029634,
+     "flee": 0,
+     "t_end": 3054
+    },
+    {
+     "id": 8,
+     "steps": 48,
+     "net": 0.6537855217929953,
+     "path": 0.6314159696912993,
+     "flee": 0,
+     "t_end": 3112
+    },
+    {
+     "id": 5,
+     "steps": 54,
+     "net": 0.3958487554972816,
+     "path": 3.4446206636168872,
+     "flee": 0,
+     "t_end": 3474
+    },
+    {
+     "id": 86,
+     "steps": 69,
+     "net": 0.678562587252662,
+     "path": 0.6902906333777569,
+     "flee": 0,
+     "t_end": 4402
+    },
+    {
+     "id": 1,
+     "steps": 446,
+     "net": 1.2756844821228068,
+     "path": 4.201464581400746,
+     "flee": 0,
+     "t_end": 4432
+    },
+    {
+     "id": 52,
+     "steps": 50,
+     "net": 1.0238783263089595,
+     "path": 2.710808542795196,
+     "flee": 0,
+     "t_end": 4445
+    },
+    {
+     "id": 107,
+     "steps": 115,
+     "net": 0.19650705240955765,
+     "path": 0.24011296971317606,
+     "flee": 0,
+     "t_end": 4856
+    },
+    {
+     "id": 8,
+     "steps": 122,
+     "net": 0.6872482198648943,
+     "path": 0.6767978513139894,
+     "flee": 0,
+     "t_end": 5071
+    },
+    {
+     "id": 123,
+     "steps": 70,
+     "net": 1.1684085543764902,
+     "path": 1.3694019517528082,
+     "flee": 0,
+     "t_end": 5568
+    },
+    {
+     "id": 107,
+     "steps": 71,
+     "net": 0.2790245341087475,
+     "path": 2.5042383854325414,
+     "flee": 0,
+     "t_end": 5783
+    },
+    {
+     "id": 64,
+     "steps": 175,
+     "net": 1.1488287824420886,
+     "path": 1.3213569439416302,
+     "flee": 0,
+     "t_end": 6278
+    }
+   ],
+   "detour": {
+    "deer_used": 460,
+    "deer_start": 136,
+    "deer_fail": 0,
+    "wolf_used": 10,
+    "wolf_start": 7,
+    "wolf_fail": 0,
+    "help_drop": 2
+   }
+  }
+ ]
+}
