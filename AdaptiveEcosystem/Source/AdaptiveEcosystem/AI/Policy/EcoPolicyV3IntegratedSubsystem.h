@@ -92,6 +92,11 @@
 //      사슴 Social 연결 eco.IntegratedV3.SocialControl (-EcoV3SocialControl=, 기본 0 — 사람 결정 10-17 (8)): 0 이면 훅을 걸지 않는다.
 //      Social 처리기는 돌며 기록만 하고 v3 사슴 움직임은 파이썬 세계 그대로다. 1 이면 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에
 //      사슴 제어를 바꾼다(EcoPolicyV3SocialBridge, FStepHooks::HerbControl — 팀 장면 확인용). 무리 반응은 뒤에 파이썬 야생 규칙으로 만든다.
+//  13. 10-17 야생 2단계 1 (명세 RL_V3_WILD2_SPEC.md, 파이썬 configs/v3_wild2_mirror.yaml): 은신처 먹이 부족 eco.IntegratedV3.ShelterFood
+//      (-EcoV3ShelterFood=, 기본 1 — 파이썬 realism_cover_food cap_frac·regen_frac 0.15): 은신처 원과 조금이라도 겹치는 먹이 셀의 용량과 재생 속도가
+//      밖의 15% 다(EcoWorldV3.h FShelterFoodConfig·FFoodGrid::ApplyShelterFood). 은신처는 안전하지만 먹이가 적어 배고픈 사슴은 밖으로 나와야 한다.
+//      늦게 등록되거나 지워진 은신처(RefreshRefuges)도 같은 식으로 다시 건다. 10초 기록 다섯째 줄 '[EcoV3I] <지역> 사냥·은신처 |' 는 늘 적는다:
+//      사냥 성공률(늑대가 전력으로 쫓거나 덮친 사냥 가운데 잡음으로 끝난 몫 — world.py hunt_update 와 같은 정의), 은신처 안 사슴 시간, 둘레 밖 잡힘.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -218,6 +223,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bRealismHearing = true;        // 늑대 발소리 (eco.IntegratedV3.RealismHearing 기본 1, R3 realism_hearing). 거짓 = 소리 없음
 	bool bShelterSafe = true;           // 은신처 안전·늑대 진입 금지 (eco.IntegratedV3.ShelterSafe 기본 1, 10-16 — R3 realism_shelter). 거짓 = 은신처 안에서도 잡힘
 	double WolfBodyMarginM = 1.0;       // 늑대 몸 여유 (m, eco.IntegratedV3.WolfBodyMargin 기본 1, 10-17 — 파이썬 realism_shelter.wolf_margin 0.5). bShelterSafe 일 때만.
+	bool bShelterFood = true;           // 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 1, 10-17 야생 2단계 1 — 파이썬 realism_cover_food 0.15). 거짓 = 은신처 셀 재생만 0.3배
 										// 늑대 중심은 은신처 반지름 + 이 값 밖에서 미끄러진다. 0 = 10-16 그대로 (둘레 위). 팀 규칙 몸 여유와 함께 적용되지 않는다
 	int32 ExtraCoverCount = 4;          // 우리가 놓는 은신처 수 (무대 1/4·3/4 지점)
 	double ExtraCoverRadiusFrac = 0.1;  // 우리 은신처 반경 = 무대 한 변 × 이 값을 4~9 단위로 자름 (ExtraCoverRadiusUnits)

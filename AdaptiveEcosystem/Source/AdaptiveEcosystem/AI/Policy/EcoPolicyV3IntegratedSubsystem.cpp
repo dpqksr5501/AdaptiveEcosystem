@@ -170,6 +170,14 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("0 = 10-16 그대로(둘레 위). 0~5 m. Play 전에 바꾼다. 명령줄 -EcoV3WolfBodyMargin= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarShelterFood(
+		TEXT("eco.IntegratedV3.ShelterFood"),
+		1,
+		TEXT("통합 v3 모드의 은신처 먹이 부족 (1 = 켬, 기본 — 10-17 야생 2단계 1, 사용자 결정 '은신처는 안전하지만 먹이가 적다'). 은신처 원과 조금이라도 겹치는 ")
+		TEXT("먹이 셀의 용량과 재생 속도가 밖의 15% 다(파이썬 configs/v3_wild2_mirror.yaml realism_cover_food). 배고픈 사슴은 밖으로 나와야 한다. ")
+		TEXT("0 = 은신처 셀은 재생만 0.3배(R1b 학습 세계). Play 전에 바꾼다. 명령줄 -EcoV3ShelterFood= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarRealismVision(
 		TEXT("eco.IntegratedV3.RealismVision"),
 		1,
@@ -466,6 +474,7 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bRealismHearing = CVarRealismHearing.GetValueOnGameThread() != 0;
 	S.bShelterSafe = CVarShelterSafe.GetValueOnGameThread() != 0;
 	S.WolfBodyMarginM = static_cast<double>(CVarWolfBodyMargin.GetValueOnGameThread());
+	S.bShelterFood = CVarShelterFood.GetValueOnGameThread() != 0;
 	S.bFlightHoldAwake = CVarFlightHoldAwake.GetValueOnGameThread() != 0;
 	S.bFlightEdgeAvoid = CVarFlightEdgeAvoid.GetValueOnGameThread() != 0;
 	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
@@ -555,6 +564,11 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3WolfBodyMargin="), MarginArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.WolfBodyMargin"), LexToString(MarginArg));
+	}
+	int32 ShelterFoodArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ShelterFood="), ShelterFoodArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ShelterFood"), LexToString(ShelterFoodArg));
 	}
 	int32 RefugeArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ProtectedRefuges="), RefugeArg))
@@ -722,6 +736,13 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 							   : TEXT("끔 (eco.IntegratedV3.ShelterSafe 0 — 은신처 안에서도 잡힘)"))),
 		   Settings.bProtectedRefuges ? TEXT("켬 (eco.IntegratedV3.ProtectedRefuges 1 — 지워진 은신처 비활성·늦은 은신처 추가·잃은 HIDE 목표 풀기)")
 									  : TEXT("끔 (eco.IntegratedV3.ProtectedRefuges 0)"));
+	const EcoWorldV3::FShelterFoodConfig Sf;
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 은신처 먹이: %s"),
+		   *(Settings.bShelterFood
+				 ? FString::Printf(TEXT("부족 (eco.IntegratedV3.ShelterFood 1, 10-17 야생 2단계 1) — 은신처 원과 겹치는 셀의 용량 %.0f%%·재생 %.0f%% (밖 대비), ")
+									   TEXT("배고픈 사슴은 밖으로 나와야 함"),
+								   100.0 * Sf.CapFrac, 100.0 * Sf.RegenFrac)
+				 : FString(TEXT("끔 (eco.IntegratedV3.ShelterFood 0 — 은신처 셀은 재생만 0.3배, R1b 학습 세계)"))));
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
 		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6 — 기본 아님) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다, 파이썬과 다름")
 								   : TEXT("끔 (eco.IntegratedV3.SocialControl 0, 기본 — 사람 결정 10-17 (8): v3 사슴 움직임은 파이썬 세계 그대로, Social 처리기는 기록만)"));
@@ -988,6 +1009,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	// 늑대 몸 여유 (eco.IntegratedV3.WolfBodyMargin 1 m, 10-17 — realism_shelter.wolf_margin 0.5): 위협이 보는 원 반지름 + 이 값. ShelterSafe 0 이면 0
 	// (그때는 팀 규칙이 PredatorRefugeMargin 으로 안전을 맡는다 — 두 여유가 한꺼번에 적용되지 않는다, RefugeOwnsSafety)
 	C.ShelterWolfMargin = S.WolfBodyMarginUnits();
+	// 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood, 10-17 야생 2단계 1): 값 = configs/v3_wild2_mirror.yaml realism_cover_food (FShelterFoodConfig 기본값)
+	C.ShelterFood.bEnabled = S.bShelterFood;
 	return C;
 }
 
@@ -1027,6 +1050,9 @@ void UEcoPolicyV3IntegratedSubsystem::RefreshRefuges(FEcoV3RegionContext& Contex
             F.CoverCell[K]=In?1:0;
             F.Regen[K]=W.Config.FoodRegenBase*W.Config.FoodRegenMult*(In?W.Config.FoodCoverRegenMult:1.);
         }
+        // 10-17 야생 2단계 1 (eco.IntegratedV3.ShelterFood): 은신처 먹이 부족을 바뀐 원 목록으로 다시 건다 — 지워진 은신처의 셀은 처음 용량으로 돌아가고
+        // (먹이는 그대로, 재생으로 다시 찬다) 늦게 더한 은신처의 셀은 용량·재생이 15% 로 준다 (FFoodGrid::ApplyShelterFood)
+        if(W.Config.ShelterFood.bEnabled)F.ApplyShelterFood(W.Config);
     }
 }
 
@@ -1836,6 +1862,32 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 												  WolfN > 0 ? 100.0 * static_cast<double>(S.WolfEatingSteps - P.WolfEatingSteps) / static_cast<double>(WolfN) : 0.0,
 												  static_cast<long long>(S.WolfKills - P.WolfKills), static_cast<long long>(S.WolfKills));
 		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 야생 | %.1f초 | %s | %s"), *Ctx.RegionId.ToString(), Seconds, *Reserve, *Sat);
+	}
+	// 다섯째 줄: 야생 2단계 기록 (10-17, 늘 적는다). 사냥 성공률(world.py hunt_update 와 같은 정의, 누적), 은신처 안 사슴 시간, 은신처 둘레 밖 잡힘.
+	//   (results/v3/mirror/compare_unreal.py·results/v3/wild1/compare_unreal_wild.py 의 정규식은 '<지역> 사냥·은신처 |' 꼴에 걸리지 않는다 — 앞 네 줄 그대로)
+	{
+		auto Sum = [](const int64* Arr) { int64 Tot = 0; for (int32 k = 0; k < EcoWorldV3::kNumHuntKinds; ++k) { Tot += Arr[k]; } return Tot; };
+		const int64 HS = Sum(S.HuntStarts), HE = Sum(S.HuntEnds), HW = Sum(S.HuntSuccess), HO = Sum(S.HuntOutside);
+		const int32 Ch = static_cast<int32>(EcoThreatV3::EThreatType::Chaser);
+		const int32 St = static_cast<int32>(EcoThreatV3::EThreatType::Stalker);
+		auto Rate = [](int64 Num, int64 Den) { return Den > 0 ? 100.0 * static_cast<double>(Num) / static_cast<double>(Den) : 0.0; };
+		const int64 LiveN = S.LiveDeerSteps - P.LiveDeerSteps;
+		const int64 InN = S.ShelterDeerSteps - P.ShelterDeerSteps;
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 사냥·은신처 | %.1f초 | 사냥 누적: 시작 %lld · 끝 %lld · 성공 %lld · 사냥 밖 포획 %lld · 성공률 %.1f%% ")
+				   TEXT("(추격형 시작 %lld 끝 %lld 성공 %lld · 잠행형 시작 %lld 끝 %lld 성공 %lld) · 구간 시작 %lld 끝 %lld 성공 %lld | ")
+				   TEXT("은신처 안 사슴·스텝: 구간 %lld/%lld (%.1f%%) · 누적 %lld/%lld (%.1f%%) | 은신처 둘레 밖 잡힘 누적: 2 m 안 %lld · 4 m 안 %lld | ")
+				   TEXT("은신처 먹이 %s"),
+			   *Ctx.RegionId.ToString(), Seconds, static_cast<long long>(HS), static_cast<long long>(HE), static_cast<long long>(HW),
+			   static_cast<long long>(HO), Rate(HW, HE), static_cast<long long>(S.HuntStarts[Ch]), static_cast<long long>(S.HuntEnds[Ch]),
+			   static_cast<long long>(S.HuntSuccess[Ch]), static_cast<long long>(S.HuntStarts[St]), static_cast<long long>(S.HuntEnds[St]),
+			   static_cast<long long>(S.HuntSuccess[St]), static_cast<long long>(HS - Sum(P.HuntStarts)),
+			   static_cast<long long>(HE - Sum(P.HuntEnds)), static_cast<long long>(HW - Sum(P.HuntSuccess)), static_cast<long long>(InN),
+			   static_cast<long long>(LiveN), LiveN > 0 ? 100.0 * static_cast<double>(InN) / static_cast<double>(LiveN) : 0.0,
+			   static_cast<long long>(S.ShelterDeerSteps), static_cast<long long>(S.LiveDeerSteps),
+			   S.LiveDeerSteps > 0 ? 100.0 * static_cast<double>(S.ShelterDeerSteps) / static_cast<double>(S.LiveDeerSteps) : 0.0,
+			   static_cast<long long>(S.CaughtNearCover[0]), static_cast<long long>(S.CaughtNearCover[1]),
+			   Ctx.Sim.Config.ShelterFood.bEnabled ? TEXT("부족 켬") : TEXT("부족 끔"));
 	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))

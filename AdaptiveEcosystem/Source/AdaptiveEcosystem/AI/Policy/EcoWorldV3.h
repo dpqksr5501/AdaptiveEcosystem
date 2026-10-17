@@ -48,6 +48,10 @@
 //                                  바꿨다). 기본 끔 = 지금과 같다 — 새 줄은 모두 WildFlight.bEnabled 안에 있다. 아래 '야생 1단계 (w3)' 묶음 머리 주석
 //   FWorldConfig::WildReserve      야생 1단계 (w1) 지방 비축 (사람 결정 10-15 (7)). 기본 끔 = 지금과 같다 — 새 줄은 모두 bEnabled 안
 //                                  (B 약함 속도, C4 비축 꺼내기·채우기, C6 굶음 = E ≤ 0 ∧ R ≤ 0). 아래 '야생 1단계 (w1)' 묶음 머리 주석
+//   FWorldConfig::ShelterFood      야생 2단계 1 은신처 먹이 부족 (파이썬 realism_cover_food, 10-17). 기본 끔 = 지금과 같다 — 세계 생성의 먹이 격자만 바꾼다
+//                                  (FFoodGrid::ApplyShelterFood: 은신처 원과 겹치는 셀의 용량·재생 × CapFrac·RegenFrac)
+//   FWorldStats::Hunt*·ShelterDeerSteps·LiveDeerSteps·CaughtNearCover  야생 2단계 기록 (사냥 성공률·은신처 안 시간·은신처 둘레 잡힘).
+//                                  늘 채우지만 어떤 계산에도 쓰지 않는다 (FThreatAgent::bHuntOn 도 기록 전용)
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -272,6 +276,42 @@ namespace EcoWorldV3
 		return static_cast<std::int32_t>(std::floor(Days * static_cast<double>(Period) + 0.5));
 	}
 
+	// ---- 야생 2단계 1 은신처 먹이 부족 (파이썬 realism_cover_food — world.py 모듈 docstring (e), configs/v3_wild2_mirror.yaml, 명세 RL_V3_WILD2_SPEC.md) ----
+	// 켜면 은신처 원과 조금이라도 겹치는 셀(FFoodGrid::CoverFoodCell)의 용량 ← CapFrac × 용량, 먹이 ← min(먹이, 용량), 재생률 ← 기본 × RegenFrac
+	// (FoodCoverRegenMult 대신). 밖 셀은 그대로다. 기본 끔 = R1b 학습 세계 그대로 (평면 맵·기준 루프·골든). 통합 모드 eco.IntegratedV3.ShelterFood (기본 1)
+	struct FShelterFoodConfig
+	{
+		bool bEnabled = false;
+		double CapFrac = 0.15;              // 은신처 셀 용량 배수 (닫힌 숲 밑 사슴 먹이 ≈ 트인 곳의 12~14% — Lashley 외 2011)
+		double RegenFrac = 0.15;            // 은신처 셀 재생률 / 밖 재생률 (같은 몫으로 둔 것은 어림)
+	};
+
+	// ---- 야생 2단계 사냥 성공률 (world.py hunt_update — 모듈 docstring '야생 2단계'). 기록만, 어떤 계산에도 쓰지 않는다 ----
+	// 사냥 한 번 = 한 늑대가 전력 걸음(FThreatStepResult::bRunning — 추격형이 표적을 쫓음·잠행형 돌진·플레이어 돌진)으로 이어 달린 스텝들.
+	// 시작 = 전력 걸음 ∧ ¬이어지는 중. 성공 = 잡음 ∧ (이어지는 중 ∨ 전력 걸음). 실패 = (이어지는 중 ∨ 전력 걸음) ∧ ¬잡음 ∧ ¬전력 걸음.
+	// 사냥 밖 포획 = 잡음 ∧ ¬(이어지는 중 ∨ 전력 걸음). 성공률 = 성공 ÷ 끝(성공 + 실패)
+	struct FHuntStep
+	{
+		bool bStart = false;
+		bool bEnd = false;
+		bool bSuccess = false;
+		bool bOutside = false;
+	};
+
+	inline FHuntStep HuntUpdate(bool& bOn, bool bRunning, bool bCaught)
+	{
+		FHuntStep R;
+		R.bStart = bRunning && !bOn;
+		const bool bH = bOn || bRunning;
+		R.bSuccess = bCaught && bH;
+		R.bOutside = bCaught && !bH;
+		R.bEnd = R.bSuccess || (bH && !bCaught && !bRunning);
+		bOn = bH && !R.bEnd;
+		return R;
+	}
+	inline constexpr std::int32_t kNumHuntKinds = 3;       // 사냥 기록 칸 = EcoThreatV3::EThreatType (추격형 0·잠행형 1·플레이어 2 — 플레이어는 세지 않아 늘 0)
+	inline constexpr double kCoverRingBands[2] = {1.0, 2.0};   // 은신처 둘레 밖 잡힘 띠 (단위 = 2 m·4 m, run_mirror.py RING_BANDS)
+
 	// ---- R3 감지 (파이썬 realism_vision (a), 야생 1단계가 값 그대로 켠다 — 명세 3-3). 기본 끔 = R1b 학습 세계 그대로 ----
 	// 사슴이 위협을 보는 시야각만 넓힌다(반경·밤·행동 배수 그대로). 동족 시야각(kin_fov_deg)은 거울 세계도 120° 그대로라 옮기지 않았다
 	struct FRealismVisionConfig
@@ -352,6 +392,8 @@ namespace EcoWorldV3
 		// R3 감지 (통합 모드 eco.IntegratedV3.RealismVision·RealismHearing). 기본 끔. 발소리 계수는 EcoObservationV3::FHearingConfig
 		FRealismVisionConfig RealismVision;
 		EcoObservationV3::FHearingConfig RealismHearing;
+		// 야생 2단계 1 은신처 먹이 부족 (통합 모드 eco.IntegratedV3.ShelterFood). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든)
+		FShelterFoodConfig ShelterFood;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -452,6 +494,8 @@ namespace EcoWorldV3
 		std::vector<double> Food;             // 지금 먹이
 		std::vector<double> Regen;            // 재생률 (은신처 셀 × 0.3)
 		std::vector<std::uint8_t> CoverCell;  // 셀 중심이 은신처 원 안
+		std::vector<std::uint8_t> CoverFoodCell;  // 은신처 원과 조금이라도 겹치는 셀 (ShelterFood 를 켠 세계만 채운다 — world.py cover_food_cell)
+		std::vector<double> Cap0;             // 은신처 먹이 부족 전 용량 (ShelterFood 를 켠 세계만. 은신처가 바뀌면 이것에서 다시 만든다)
 		std::vector<double> Blur;             // 관측 0 (반경 see_r 상자 평균)
 		std::vector<double> GradX;            // 조향 기울기 (반경 GradBlur 상자 평균의 np.gradient)
 		std::vector<double> GradY;
@@ -522,6 +566,19 @@ namespace EcoWorldV3
 			}
 			Food = Cap;
 
+			BuildCoverCells(C);
+			if (C.ShelterFood.bEnabled)
+			{
+				Cap0 = Cap;
+				ApplyShelterFood(C);   // 야생 2단계 1: world.py `_rz_cover_food_apply` (먹이 장을 만들기 전 — 파이썬도 관측 전에 건다)
+			}
+			ComputeFields(EcoObservationV3::kR1bObsConfig.SeeR);
+		}
+
+		/** world._build_world 은신처 셀(셀 중심이 원 안 — (cx − x)² + (cy − y)² ≤ r²)과 v1 재생률(은신처 셀 × FoodCoverRegenMult). Gw·Cell 을 정한 뒤 부른다. */
+		void BuildCoverCells(const FWorldConfig& C)
+		{
+			const size_t Cells = static_cast<size_t>(Gw) * Gw;
 			CoverCell.assign(Cells, 0);
 			Regen.assign(Cells, 0.0);
 			for (std::int32_t y = 0; y < Gw; ++y)
@@ -542,7 +599,63 @@ namespace EcoWorldV3
 					Regen[k] = C.FoodRegenBase * C.FoodRegenMult * (bIn ? C.FoodCoverRegenMult : 1.0);
 				}
 			}
-			ComputeFields(EcoObservationV3::kR1bObsConfig.SeeR);
+		}
+
+		/**
+		 * world._cover_overlap_cells: 셀 (y, x) 의 닫힌 사각형 [x·c, (x+1)·c] × [y·c, (y+1)·c] 를 kEps 만큼 넓혀 원 중심에 가장 가까운 점이 원 안
+		 * (√(dx² + dy²) − r ≤ 0)이면 겹친다. 반경 0 이하 원(통합 모드에서 지워진 은신처)은 건너뛴다.
+		 * 원 안의 위치가 고르는 셀(CellOf)은 늘 이 마스크 안이다 — 안전한 자리가 먹이가 줄지 않은 셀 위에 남지 않는다.
+		 */
+		bool CellTouchesCover(std::int32_t X, std::int32_t Y, const std::vector<EcoObservationV3::FCoverInput>& Covers) const
+		{
+			const double E = EcoRepertoireV3::kEps;
+			const double X0 = static_cast<double>(X) * Cell - E;
+			const double Y0 = static_cast<double>(Y) * Cell - E;
+			const double X1 = X0 + (Cell + 2.0 * E);
+			const double Y1 = Y0 + (Cell + 2.0 * E);
+			for (const EcoObservationV3::FCoverInput& Cv : Covers)
+			{
+				if (!(Cv.Radius > 0.0))
+				{
+					continue;
+				}
+				const double Qx = (Cv.X < X0 ? X0 : (Cv.X > X1 ? X1 : Cv.X)) - Cv.X;   // np.clip(cx, x0, x1) − cx
+				const double Qy = (Cv.Y < Y0 ? Y0 : (Cv.Y > Y1 ? Y1 : Cv.Y)) - Cv.Y;
+				if (std::sqrt(Qx * Qx + Qy * Qy) - Cv.Radius <= 0.0)
+				{
+					return true;
+				}
+			}
+			return false;
+		}
+
+		/**
+		 * 야생 2단계 1 은신처 먹이 부족 (world._rz_cover_food_apply). Cap0(은신처 먹이 부족 전 용량)에서 다시 만든다. 은신처 셀 = 셀 중심이 원 안(CoverCell)
+		 * ∨ CellTouchesCover. 은신처 셀은 용량 ← Cap0 × CapFrac, 재생률 ← 기본 × RegenFrac. 밖 셀은 용량 ← Cap0, 재생률 ← 기본. 먹이 ← min(먹이, 용량).
+		 * 은신처가 바뀌면(통합 모드 RefreshRefuges) Covers·CoverCell 을 바꾼 뒤 다시 부른다 — 지워진 은신처의 셀은 Cap0 용량으로 돌아가고(먹이는 그대로,
+		 * 재생으로 다시 찬다) 새 은신처의 셀은 줄어든다. 파이썬 세계에는 은신처가 바뀌는 일이 없다.
+		 */
+		void ApplyShelterFood(const FWorldConfig& C)
+		{
+			const size_t Cells = static_cast<size_t>(Gw) * Gw;
+			if (Cap0.size() != Cells)
+			{
+				Cap0 = Cap;
+			}
+			CoverFoodCell.assign(Cells, 0);
+			const double Base = C.FoodRegenBase * C.FoodRegenMult;
+			for (std::int32_t y = 0; y < Gw; ++y)
+			{
+				for (std::int32_t x = 0; x < Gw; ++x)
+				{
+					const size_t k = static_cast<size_t>(y) * Gw + x;
+					const bool bCell = CoverCell[k] != 0 || CellTouchesCover(x, y, C.Covers);
+					CoverFoodCell[k] = bCell ? 1 : 0;
+					Cap[k] = bCell ? Cap0[k] * C.ShelterFood.CapFrac : Cap0[k];
+					Food[k] = Food[k] < Cap[k] ? Food[k] : Cap[k];
+					Regen[k] = Base * (bCell ? C.ShelterFood.RegenFrac : 1.0);
+				}
+			}
 		}
 
 		/** world._food_fields: 관측 0 의 blur(반경 round(see_r ÷ cell) = 10셀)와 조향 기울기(반경 GradBlur 셀). */
@@ -636,6 +749,7 @@ namespace EcoWorldV3
 		EcoThreatV3::FNightUpdateResult LastNight;   // 이번 스텝 끝 밤잠 업데이트 결과 (밤잠 점진화를 켰을 때만, 디버그·기록)
 		double PrevX = 0.0;                    // 이번 스텝 이동 전 위치 (화면 보간 전용)
 		double PrevY = 0.0;
+		bool bHuntOn = false;                  // 야생 2단계 기록만: 지난 스텝 끝에 사냥이 이어지는 중 (HuntUpdate). 어떤 계산에도 쓰지 않는다
 	};
 
 	/** 초식 하나의 상태 보기 (소유하지 않는다). Mass 는 조각 안을, 기준 루프는 배열 칸을 가리킨다. */
@@ -697,6 +811,14 @@ namespace EcoWorldV3
 		std::int64_t WolfSatedSteps = 0;     // 그중 배불러 쉼
 		std::int64_t WolfEatingSteps = 0;    // 그중 먹는 중 (쿨다운 줄인 뒤 > 0)
 		std::int64_t WolfKills = 0;          // 포만을 건 포획
+		// 야생 2단계 기록 (늘 센다 — 어떤 계산에도 쓰지 않는다. world.py hunt_stats·run_mirror.py 의 같은 정의)
+		std::int64_t HuntStarts[kNumHuntKinds] = {};    // 사냥 시작 (위협 유형별: 추격형 0·잠행형 1, 플레이어형은 세지 않는다)
+		std::int64_t HuntEnds[kNumHuntKinds] = {};      // 끝난 사냥 (성공 + 실패)
+		std::int64_t HuntSuccess[kNumHuntKinds] = {};   // 잡음으로 끝난 사냥
+		std::int64_t HuntOutside[kNumHuntKinds] = {};   // 사냥 중이 아닌 늑대의 포획 (등 뒤로 닿은 사슴 등)
+		std::int64_t ShelterDeerSteps = 0;   // 위협 Step 에 넘긴 사슴 가운데 이동 뒤 위치가 은신처 원 안인 사슴·스텝 (Prey.bInCover)
+		std::int64_t LiveDeerSteps = 0;      // 위협 Step 에 넘긴 사슴·스텝 (통합 모드 = 스텝 첫머리 산 사슴)
+		std::int64_t CaughtNearCover[2] = {};   // 은신처 원 밖이고 가장 가까운 둘레까지 kCoverRingBands(2 m·4 m) 안에서 잡힌 수
 		std::int64_t RefugeProtectedPreySteps = 0;
 		std::int64_t RefugeConstrainedMoves = 0;
 		std::int64_t RefugeRecoveries = 0;
@@ -1583,7 +1705,9 @@ namespace EcoWorldV3
 			// 파이썬처럼 늘 산 개체다(죽은 슬롯은 지난 스텝 끝에 리스폰했다). 팀 안전 규칙일 때만 원 안 사슴을 후보에서 뺀다 (ShelterSafe 면 위협 모델이 뺀다)
 			P.bAlive = !(RefugeOwnsSafety(W.Config) && P.bInCover);
 			W.Stats.RefugeProtectedPreySteps += (W.Config.bProtectedRefuges && P.bInCover) ? 1 : 0;   // 기록만 (어느 규칙이든 원 안 = 보호)
+			W.Stats.ShelterDeerSteps += P.bInCover ? 1 : 0;   // 야생 2단계 기록만: 은신처 안 시간
 		}
+		W.Stats.LiveDeerSteps += N;
 		W.Rolls.resize(static_cast<size_t>(N));
 		W.CaughtByThreat.assign(static_cast<size_t>(M), -1);
 		W.ShelterDiscs.clear();
@@ -1669,6 +1793,16 @@ namespace EcoWorldV3
 				++W.Stats.BlockedThreatMoves;
 			}
 			W.CaughtByThreat[static_cast<size_t>(m)] = A.Last.Caught;
+			// 야생 2단계 기록만: 늑대(플레이어형 말고)의 사냥 시작·끝·성공·사냥 밖 포획 (world.py hunt_update — 잡음 = 이 위협의 Step 결과 Caught ≥ 0)
+			if (A.Spec.Type != EcoThreatV3::EThreatType::Player)
+			{
+				const FHuntStep Hs = HuntUpdate(A.bHuntOn, A.Last.bRunning, A.Last.Caught >= 0);
+				const size_t Ty = static_cast<size_t>(A.Spec.Type);
+				W.Stats.HuntStarts[Ty] += Hs.bStart ? 1 : 0;
+				W.Stats.HuntEnds[Ty] += Hs.bEnd ? 1 : 0;
+				W.Stats.HuntSuccess[Ty] += Hs.bSuccess ? 1 : 0;
+				W.Stats.HuntOutside[Ty] += Hs.bOutside ? 1 : 0;
+			}
 			// 기록만: 원 안 늑대 (팀 규칙 = 몸 여유 안, ShelterSafe = 파이썬 정의 |q − c| < r + ShelterWolfMargin)
 			if(bRefugeSafety&&EcoRefugeV3::Contains(W.Config.Covers,{A.State.PosX,A.State.PosY},W.Config.PredatorRefugeMargin-1.e-6))++W.Stats.RefugeInsidePredatorSteps;
 			else if(W.Config.bProtectedRefuges&&W.Config.bShelterSafe&&!W.ShelterDiscs.empty()
@@ -1741,6 +1875,27 @@ namespace EcoWorldV3
 				}
 				W.Stats.WeakCaught += (bReserve && B.bWeak) ? 1 : 0;   // 야생 (w1) 기록만: 약한 채로 잡힘
 				W.Stats.CaughtInCover += W.Prey[static_cast<size_t>(i)].bInCover ? 1 : 0;   // 10-16 기록만: 은신처 안에서 잡힘
+				{
+					// 야생 2단계 기록만: 은신처 둘레 밖 띠에서 잡힘 (가장 가까운 둘레까지 거리 dq = min_k |p − c_k| − r_k, 0 < dq ≤ 띠 — run_mirror.py catch_ring)
+					double Dq = 0.0;
+					bool bAny = false;
+					for (const EcoObservationV3::FCoverInput& Cv : W.Config.Covers)
+					{
+						if (!(Cv.Radius > 0.0))
+						{
+							continue;
+						}
+						const double Dx = B.Pos.X - Cv.X;
+						const double Dy = B.Pos.Y - Cv.Y;
+						const double D = std::sqrt(Dx * Dx + Dy * Dy) - Cv.Radius;
+						Dq = (!bAny || D < Dq) ? D : Dq;
+						bAny = true;
+					}
+					for (std::int32_t b = 0; b < 2; ++b)
+					{
+						W.Stats.CaughtNearCover[b] += (bAny && Dq > 0.0 && Dq <= kCoverRingBands[b]) ? 1 : 0;
+					}
+				}
 			}
 			else if (B.Energy <= 0.0 && (!bReserve || B.Reserve <= 0.0))   // 야생 (w1): 비축까지 바닥나야 굶어 죽는다
 			{

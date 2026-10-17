@@ -3009,6 +3009,18 @@ bool FEcoRefugeMergedSingleRule::RunTest(const FString&)
 	// 10-17 늑대 몸 여유 (eco.IntegratedV3.WolfBodyMargin 기본 1 m = 0.5 단위, 파이썬 realism_shelter.wolf_margin)
 	const double BodyMargin = Region->Sim.Config.ShelterWolfMargin;
 	TestEqual(TEXT("통합 기본 늑대 몸 여유 0.5 단위 (1 m)"), BodyMargin, 0.5);
+	// 10-17 야생 2단계 1 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 1, 파이썬 realism_cover_food 0.15): 겹치는 셀 용량 = 처음 용량 × 0.15
+	{
+		const EcoWorldV3::FFoodGrid& F = Region->Sim.Food;
+		bool bFood = Region->Sim.Config.ShelterFood.bEnabled && F.CoverFoodCell.size() == F.Cap.size() && F.Cap0.size() == F.Cap.size();
+		int32 FoodCells = 0;
+		for (size_t K = 0; bFood && K < F.Cap.size(); ++K)
+		{
+			FoodCells += F.CoverFoodCell[K];
+			bFood = F.Cap[K] == (F.CoverFoodCell[K] ? F.Cap0[K] * Region->Sim.Config.ShelterFood.CapFrac : F.Cap0[K]) && F.Food[K] <= F.Cap[K];
+		}
+		TestTrue(TEXT("통합 기본 은신처 먹이 부족 켬 (겹치는 셀 용량 × 0.15)"), bFood && FoodCells > 0);
+	}
 	Region->Sim.Config.DayOffset = 225;   // 낮 — 깨어 있는 늑대
 	EcoWorldV3::UpdateDayNight(Region->Sim);
 	H.Spawn(false, TEXT("RefugeMerged"), 0, {FVector(3000, 3000, 0)}, {171});

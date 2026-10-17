@@ -680,6 +680,12 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 언리얼: `FWorldConfig::ShelterWolfMargin`(기본 0). 위협 Step 에 넘기는 원 목록 반지름에 더한다. 콘솔 변수 `eco.IntegratedV3.WolfBodyMargin` · `-EcoV3WolfBodyMargin=`(m, 기본 1, 0~5). `ShelterSafe 1` 일 때만 쓴다. `ShelterSafe 0` 이면 0 이고 팀 규칙이 자기 몸 여유로 안전을 맡는다(두 여유가 겹치지 않는다). 디버그 표시(`eco.V3Debug 1`)는 은신처 원 밖에 가는 선으로 몸 여유 둘레를 그린다. 시작 글 '은신처:' 줄에 여유 값을 적는다.
   - 결과(파이썬 거울 128마리 90세계 240초): 잡힘 2.17 → 2.10%(표본 흔들림 안), 둘레 밖 2 m 안 잡힘 15 → 10, 은신처 안 잡힘 0 그대로, 둘레 1 m 안 늑대-스텝 6.4% → 0.
   - 시험: 파이썬 `tests/test_wolf_margin.py` 6개(여유 0 = 직전 커밋 `495be23` 과 궤적 같음 포함). 골든 `WildGoldenVectorsV3.h` `kShelterMarginCase` 64 경우 오차 0(`Policy.V3.Wild.FixGolden`), 기준 루프 900 스텝 둘레 1 m 안 늑대-스텝 0(`Wild.ShelterRun`), 통합 기본값 여유 0.5 단위·늑대 중심이 첫 이동부터 r + 1 m 밖(`Refuge.MergedDefaultSingleRule`), 팀 규칙 판은 우리 여유 0(`Refuge.ProtectedCaptureAndMovement`).
+- **10-17 야생 2단계 1 은신처 먹이 부족 + 사냥 성공률** (명세 `RL_V3_WILD2_SPEC.md`, 결정 `RL_V2_PLAN.md` '10-17 (10)', 측정 `herbivore_rl/results/v3/wild2/README.md`):
+  - 새 스위치 `eco.IntegratedV3.ShelterFood` · `-EcoV3ShelterFood=`(기본 1). 은신처 원과 조금이라도 겹치는 먹이 셀의 용량·재생 속도가 밖의 15% 다(파이썬 `configs/v3_wild2_mirror.yaml` `realism_cover_food`). 0 이면 은신처 셀은 재생만 0.3배(지금까지). 시작 글 `[EcoV3I] 은신처 먹이: …`.
+  - 실제 은신처 생명주기(`RefreshRefuges`)가 은신처를 지우거나 더하면 같은 식을 다시 건다(지운 은신처 셀은 처음 용량으로, 먹이는 그대로). 파이썬에는 없는 경우다.
+  - 10초 기록 다섯째 줄 `[EcoV3I] <지역> 사냥·은신처 | …` 을 늘 적는다: 사냥 누적 시작·끝·성공·사냥 밖 포획·성공률(추격형·잠행형 따로), 은신처 안 사슴·스텝(구간·누적), 은신처 둘레 밖 2 m·4 m 안 잡힘. 앞 네 줄의 칸은 그대로다.
+  - 헤드리스(사슴 128, 세션 20000~20005, 240초): 기록 `herbivore_rl/results/v3/wild2/unreal_logs/`. 파이썬 거울과 같다(은신처 안 시간 5.9 대 5.8%, 잡힘 2.43 대 2.28%, 사냥 성공률 56 대 62%, |z| < 2 — 사냥 시작 하나 z +2.1, 독립 지도에서는 +0.5). 오류·ensure·경고 0.
+  - 시험: `Policy.V3.Wild2.ShelterFoodGolden`·`HuntGolden`·`Run`(골든 `Wild2GoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_wild2.py`), `Refuge.MergedDefaultSingleRule` 에 기본 켬 확인. 자동 시험 153 성공 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
 
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 
