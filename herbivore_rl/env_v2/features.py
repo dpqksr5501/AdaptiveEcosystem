@@ -298,6 +298,10 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #   wild_weather.schedule (10-18 야생 3단계, 시간에 따라 바뀌는 날씨의 자리): {지역: [[시작 스텝, 날씨, 세기], …]}(시작 스텝은 reset 뒤 세계 t, 0 이상이고
 #     늘어나는 정수) 이면 그 지역 세계는 시작 스텝 ≤ t 인 마지막 줄의 날씨를 쓰고, 첫 줄 앞이거나 표에 없는 지역은 regions 의 고정 날씨를 쓴다. 난수 없음.
 #     null = 고정 날씨(지역마다 늘 같다)
+#   integrated_stage.respawn_safe_r·respawn_tries (10-18 R4 학습 보충, 사람 결정 RL_V2_PLAN.md 10-18 (15) D2 — 학습 세계 전용, 판정 세계·언리얼에는 없다):
+#     respawn true 세계에서 respawn_safe_r(단위, 1 단위 = 2 m)가 숫자면 죽은 사슴이 다음 스텝에 무대 안 새 자리에 다시 나는데, 그 자리는 모든 늑대(위협)에게서
+#     respawn_safe_r 이상, 원판(r + 몸) 밖, 은신처 원 밖이다(자기 스트림 part 1 에서 후보 respawn_tries 개, 다 못 맞추면 늑대에게서 가장 먼 후보 — env_v2/world.py
+#     `_ist_safe_spawn`). v1 리스폰 뽑기(자리·각)는 그대로 하고 자리만 덮는다(규칙 2). null = v1 그대로(맵 균등 자리)
 OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "realism_shelter": MappingProxyType({"block_predators": False, "wolf_margin": 0.0}),
     "realism_cover_food": MappingProxyType({"frac_range": None}),
@@ -306,6 +310,7 @@ OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "obstacles": MappingProxyType({"fixed": None, "detour": False, "detour_block": 0.5, "detour_free": 0.8, "detour_probe": 1.5,
                                    "detour_steps": 45, "detour_help_block": 15, "detour_help_drop": 38}),
     "wild_weather": MappingProxyType({"schedule": None}),
+    "integrated_stage": MappingProxyType({"respawn_safe_r": None, "respawn_tries": 64}),
 })
 
 

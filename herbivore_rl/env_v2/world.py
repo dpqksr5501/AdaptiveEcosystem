@@ -250,6 +250,12 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
       (54, 54)·(6, 6), 사슴은 [1.5, 58.5]².
   (q) head_layout 'golden' — 시작 방향을 사슴 슬롯 i 는 각 i·2.399963, 늑대 슬롯 m 은 (m + 2)·2.399963 rad 로 덮는다(C++ AEcoCreatureIntegrationSpawner
       의 yaw, 지역마다 순번 0 부터). 몇 스텝 안에 heading 이 속도 방향이 되므로 영향은 작다.
+  (r) respawn_safe_r (선택 키, 10-18 R4 학습 보충 — 사람 결정 RL_V2_PLAN.md 10-18 (15) D2, 학습 세계 전용. 판정 세계와 언리얼은 부활 없음 (k) 그대로):
+      respawn true 세계에서 숫자면 죽은 사슴이 그 스텝 끝(리스폰 자리)에 무대 안 새 자리에 다시 난다. 자리 = 자기 스트림 part 1 의 후보 respawn_tries 개
+      (무대 여유 deer_margin 안 균등) 가운데 처음으로 모든 위협에게서 respawn_safe_r 이상 ∧ 원판(r + 몸) 밖 ∧ 은신처 원 밖인 것, 없으면 늑대에게서 가장
+      먼 후보(`_ist_safe_spawn`). v1 리스폰 뽑기(자리·각)는 그대로 하고 자리만 덮는다(features.py 규칙 2) — 각·에너지·비축·행동 상태는 v1 리스폰과 같다.
+      R4 값 20 단위(40 m) = 도주 반사의 안전 거리(wild_flight.safe_r 20)를 빌린 값(추정). 현실 근거: 학습 장치이지 게임 규칙이 아니다 — 개체 수를 늘
+      같게 두어 학습 표본을 고르게 하고, 늑대 바로 곁에 새로 나서 곧바로 잡히는 '공짜 죽음'을 배우지 않게 한다. 통계 `respawn_stats`(동역학과 무관).
   닫지 못한 차이(설정 머리 주석에도 적는다): 난수열(C++ 자체 해시 난수 — 먹이 격자·배회 선회·시작 자리·결정 지연 키가 다르다, 분포는 같다),
   밤잠 지연 키(C++ 세션 시드·늑대 StableAgentId, 파이썬 세계 시드·슬롯), 지형 제약 이동(언리얼 FStepHooks — 비교 로그는 막힘 0), 팀 시계 동기·
   시체 2초 삭제(동역학과 무관), 경계 거리 KeepAway(커밋하지 않은 실험, 비교는 끔).
@@ -1291,8 +1297,10 @@ def _ist_params(p: dict, f: Features) -> dict:
     - wolf_kinds: null 또는 'alternate' (o)
     - start_layout: null 또는 'stage' (p). stage 면 wolf_corner_frac ∈ [0, 0.5], wolf_gap·deer_wolf_gap·deer_margin·deer_spacing ≥ 0 (단위)
     - head_layout: null 또는 'golden' (q)
+    - 선택 키 respawn_safe_r: null 또는 양수(단위) (r) — respawn true·start_layout 'stage' 일 때만. respawn_tries: 1 이상의 정수(숫자일 때만 읽는다)
     repertoire·threats 를 함께 켜야 한다(언리얼 통합 v3 모드는 v3 세계이고 늑대 구성이 threats 에 있다).
     """
+    p = with_optional("integrated_stage", p)
     if not (f.enabled("repertoire") and f.enabled("threats")):
         raise ValueError("features.integrated_stage 는 repertoire·threats 를 함께 켜야 한다(언리얼 통합 v3 모드는 v3 세계다)")
 
@@ -1333,6 +1341,15 @@ def _ist_params(p: dict, f: Features) -> dict:
         out["wolf_corner_frac"] = number("wolf_corner_frac", 0.0, 0.5)
         for key in ("wolf_gap", "deer_wolf_gap", "deer_margin", "deer_spacing"):
             out[key] = number(key, 0.0)
+    # (r) 학습 보충(10-18 R4 D2): 늑대에게서 먼 자리 즉시 부활. null 이면 v1 리스폰 그대로(지금까지와 비트 동일)
+    out["respawn_safe_r"] = None
+    if p["respawn_safe_r"] is not None:
+        if not resp:
+            raise ValueError("features.integrated_stage.respawn_safe_r 는 respawn true 세계(학습 보충)에만 쓴다 — 부활 없음 세계에는 다시 날 개체가 없다")
+        if out["start_layout"] != "stage":
+            raise ValueError("features.integrated_stage.respawn_safe_r 는 start_layout 'stage' 와 함께 쓴다(무대 여유 deer_margin 을 쓴다)")
+        out["respawn_safe_r"] = number("respawn_safe_r", 0.0, open_lo=True)
+        out["respawn_tries"] = integer("respawn_tries", 1, nullable=False)
     return out
 
 
@@ -2157,7 +2174,10 @@ class World:
             if self.alive is not None:
                 self.death_t = np.full(self.N, -1, dtype=np.int64)
                 self.death_cause = np.zeros(self.N, dtype=np.int8)
-        self._obstacles_reset()             # 야생 2단계 3: 세로 장애물 원판·먹이(끈 세계는 늘 빈 목록, 난수 없음)
+            # (r) 학습 보충 통계 전용(동역학과 무관): 다시 난 사슴 수, 그중 안전 자리를 못 찾아 가장 먼 후보로 둔 수, 다시 난 자리의 가장 가까운 늑대 거리 합(단위)
+            self._ist_resp_n = self._ist_resp_fb = 0
+            self._ist_resp_dsum = 0.0
+        self._obstacles_reset()            # 야생 2단계 3: 세로 장애물 원판·먹이(끈 세계는 늘 빈 목록, 난수 없음)
         if self._zt is not None:
             self._rz_terrain_reset()        # v3 R3 (h): 지형 격자(자기 스트림만, 은신처·먹이와 독립)
         if self._zf is not None:
@@ -4828,6 +4848,8 @@ class World:
         r, k = self.rng, len(dead)
         pos = r.uniform(0.0, self.size, (k, 2))
         ang = r.uniform(0.0, 2 * np.pi, k)
+        if self._ist is not None and self._ist["respawn_safe_r"] is not None:
+            pos = self._ist_safe_spawn(k)   # 통합 무대 (r) 학습 보충: v1 뽑기는 위에서 그대로 하고 자리만 덮는다(features.py 규칙 2)
         self._spawn_slots(dead, pos, np.stack([np.cos(ang), np.sin(ang)], 1))
         if self._ob is not None and len(self.obstacles):
             # 야생 2단계 3 의 5): 원판 안에 난 새 개체를 밖으로(v1 난수 호출은 위에서 그대로 했다)
@@ -4925,6 +4947,48 @@ class World:
                 self.chase_tgt[hit] = -1
                 self.chase_lost[hit] = 0
                 self._zc_rel_dead += int(np.count_nonzero(hit))
+
+    def _ist_safe_spawn(self, k: int) -> np.ndarray:
+        """통합 무대 (r) 학습 보충 자리 k 개 (k, 2) (모듈 docstring '통합 무대' (r)). 자기 스트림 part 1 에서 다시 날 사슴마다 후보 T = respawn_tries 개
+        (x, y 각 U[c − room, c + room], c = S/2, room = S/2 − deer_margin — start_layout 'stage' 와 같은 무대 여유)를 한꺼번에 뽑고(늘 k × T × 2 개라
+        난수 개수가 결과와 무관하다), 앞에서부터 처음으로 (모든 위협까지 거리 ≥ respawn_safe_r) ∧ 원판(r + body_r) 밖 ∧ 은신처 원 밖인 후보를 쓴다.
+        맞는 후보가 없으면 원판·은신처 밖 후보 가운데 가장 가까운 위협이 가장 먼 것(그런 후보도 없으면 모든 후보 가운데), 같으면 앞 후보를 쓴다.
+        위협 자리는 지금(이 스텝 이동 뒤) 자리이고 자는 늑대도 넣는다(곧 깬다). 같은 스텝에 다시 나는 사슴끼리는 서로 보지 않는다."""
+        ist = self._ist
+        T, safe = int(ist["respawn_tries"]), float(ist["respawn_safe_r"])
+        c = 0.5 * self.size
+        room = c - ist["deer_margin"]
+        g = self.feature_rng("integrated_stage", 1)
+        cand = (c + g.uniform(-room, room, (k, T, 2))).reshape(-1, 2)
+        if self.M:
+            d = np.sqrt(((cand[:, None, :] - self.pred_pos[None, :, :]) ** 2).sum(-1)).min(1)
+        else:
+            d = np.full(len(cand), np.inf)
+        free = np.ones(len(cand), dtype=bool)
+        if self._ob is not None and len(self.obstacles):
+            free &= ~obstacle_inside(cand, self.obstacles, self._ob["body_r"])
+        if len(self.cov_r):
+            free &= ~self._in_cover(cand)
+        d, free, cand = d.reshape(k, T), free.reshape(k, T), cand.reshape(k, T, 2)
+        ok = free & (d >= safe)
+        has = ok.any(1)
+        score = np.where(free.any(1)[:, None], np.where(free, d, -np.inf), d)
+        pick = np.where(has, np.argmax(ok, 1), np.argmax(score, 1))
+        rows = np.arange(k)
+        self._ist_resp_n += k
+        self._ist_resp_fb += int(np.count_nonzero(~has))
+        dp = d[rows, pick]
+        self._ist_resp_dsum += float(dp[np.isfinite(dp)].sum())
+        return cand[rows, pick].copy()
+
+    def respawn_stats(self) -> dict:
+        """통합 무대 (r) 학습 보충 통계(동역학과 무관): respawns = 다시 난 사슴 수, fallback = 그중 안전 자리 후보가 없어 늑대에게서 가장 먼 후보에 둔 수,
+        mean_wolf_d = 다시 난 자리에서 가장 가까운 위협까지 거리 평균(단위, 위협이 없으면 nan). respawn_safe_r 를 켠 세계에만 있다."""
+        if self._ist is None or self._ist["respawn_safe_r"] is None:
+            raise ValueError("respawn_stats 는 integrated_stage.respawn_safe_r 를 켠 세계(학습 보충)에만 있다")
+        n = self._ist_resp_n
+        return dict(respawns=int(n), fallback=int(self._ist_resp_fb),
+                    mean_wolf_d=(self._ist_resp_dsum / n) if n and self.M else float("nan"))
 
     # ------------------------------------------------------------------ #
     # 야생 1단계 (모듈 docstring '야생 1단계', 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md)

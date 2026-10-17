@@ -112,8 +112,10 @@ def _run_pair(wa, wb, pa, pb, steps):
 
 def test_registry_and_config():
     assert F.FEATURE_IDS["integrated_stage"] == 26 and "integrated_stage" in F.IMPLEMENTED
-    assert "integrated_stage" not in F.OPTIONAL_KEYS                 # 새 기능이라 계수는 모두 적는다(선택 키 없음)
+    # 새 기능이라 계수는 모두 적는다. 선택 키는 10-18 R4 학습 보충 둘뿐이다(끔 값 = 지금까지 그대로, 거울 설정에는 없다 — tests/test_r4_train.py)
+    assert dict(F.OPTIONAL_KEYS["integrated_stage"]) == {"respawn_safe_r": None, "respawn_tries": 64}
     block = _raw(MIRROR)["features"]["integrated_stage"]
+    assert not set(F.OPTIONAL_KEYS["integrated_stage"]) & set(block)
     assert F.PARAM_KEYS["integrated_stage"] == frozenset(block) - {"enabled"}
     assert set(OFF) == set(block)
     cfg = load_v2_config(MIRROR)

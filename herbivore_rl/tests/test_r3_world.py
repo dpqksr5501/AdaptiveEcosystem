@@ -147,8 +147,9 @@ def test_registry_and_keys():
     assert dict(F.OPTIONAL_KEYS["threats"]) == {"eat_in_place": False}           # (j) 늑대 먹는 시간, 10-15
     full = _raw(R3_ON)["features"]
     for n, opt in F.OPTIONAL_KEYS.items():
-        if n.startswith("wild_") or n == "obstacles":
-            continue                    # 야생 1단계 선택 키(10-16)·야생 2단계 3 obstacles.fixed(10-17)는 R3 설정에 없다 — tests/test_wild1.py·test_wild2_obstacle.py 가 본다
+        if n.startswith("wild_") or n in ("obstacles", "integrated_stage"):
+            continue                    # 야생 1단계 선택 키(10-16)·야생 2단계 3 obstacles.fixed(10-17)·R4 학습 보충 integrated_stage.respawn_safe_r(10-18)는
+                                        # R3 설정에 없다 — tests/test_wild1.py·test_wild2_obstacle.py·test_r4_train.py 가 본다
         opt = {k: v for k, v in opt.items() if (n, k) != ("realism_shelter", "wolf_margin")}   # 10-17 늑대 몸 여유도 R3 설정에 없다(test_wild1)
         assert set(opt) <= set(full[n]) and not set(opt) & F.PARAM_KEYS[n]
         for old in (REAL["all"], R1_ON, R1):                                     # 지난 설정 파일에는 선택 키가 없다(끔 값으로 읽는다)

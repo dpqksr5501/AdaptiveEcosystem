@@ -146,7 +146,7 @@ def one(job: dict) -> dict:
         um = job.get("unreal_map")
         if um is not None:
             rm.apply_unreal_map(w, int(um["seed"]), um["region"])      # 짝 비교: 언리얼 지역 무대와 같은 먹이 지도(run_mirror.run_world 와 같은 순서)
-        pol = ro.build_policy({"kind": "rep_learned", "path": str(rm.MODEL)}, int(job["seed"]))
+        pol = ro.build_policy({"kind": "rep_learned", "path": str(job.get("model") or rm.MODEL)}, int(job["seed"]))   # 10-18: --model(기본 R1b s3)
         ro.forward_bind(pol, w)
         T, M, N = int(job["steps"]), w.M, w.N
         ob = getattr(w, "_ob", None) is not None and len(w.obstacles) > 0
@@ -294,10 +294,14 @@ def main(argv=None) -> None:
     ap.add_argument("--unreal-maps", default=None, help="짝 비교(run_mirror.py 와 같다): 언리얼 세션 시드(예: 20000-20002)의 지역 먹이 지도를 쓴다")
     ap.add_argument("--replicates", type=int, default=1, help="짝 비교: 지도마다 세계 수 (지도 i 의 j 번째 = seeds[i·replicates + j])")
     ap.add_argument("--unreal-obstacles", type=Path, default=None, help="짝 비교: 장애물 JSON(파일 또는 s<세션>.json 폴더)의 지역 원판을 fixed 로")
+    ap.add_argument("--model", type=Path, default=None, help="두뇌 모델 .zip (기본 R1b s3 — 10-18 R4 판정 끼임 세기는 R4 모델을 준다)")
     a = ap.parse_args(argv)
     cfg = build_cfg(a.config if a.config.is_absolute() else ROOT / a.config, parse_set(a.set))
     seeds = rm.parse_seeds(a.seeds)
     jobs = [dict(cfg=cfg, seed=s, steps=a.steps) for s in seeds]
+    if a.model is not None:
+        for jb in jobs:
+            jb["model"] = str(a.model if a.model.is_absolute() else ROOT / a.model)
     if a.unreal_maps:
         # 10-17 더함(팀 SHC 레벨 거울, results/v3/wild2/shc/README.md): run_mirror.run 과 같은 짝 — 지도 (세션, 지역 Barren·Forest·Highland) 마다
         # replicates 개 세계, 원판은 그 지도의 fixed(난수 없음)

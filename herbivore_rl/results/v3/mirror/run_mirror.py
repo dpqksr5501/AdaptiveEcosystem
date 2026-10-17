@@ -59,6 +59,7 @@ rand.predator_count 다(메타 wolves).
 10-18 더함(야생 3단계 지역 날씨, configs/v3_wild3_mirror.yaml): wild_weather 를 켠 설정의 짝 비교는 지도마다 wild_weather.region 을 그 지도의 지역으로 덮는다(날씨는
 설정의 regions 표). 짝 비교가 아니면 설정의 region 그대로다(--set wild_weather.region=Highland 로 바꾼다). 세계 메타에 weather(World.weather_stats)를, realism_hearing 을
 켠 세계는 heard_only_frac(위협을 들어서만 안 개체-스텝 몫, World.realism_stats)을 더 적는다(동역학과 무관).
+10-18 더함(R4 사전 등록 results/v3/r4/PREREG.md): --model 로 두뇌 모델을 바꾼다(기본 R1b s3 그대로 — 메타 model 에 파일 이름).
 10-18 더함(언리얼 날씨 짝 비교, results/v3/wild3/compare_weather.py): --diag 진단에 heard_live·live_obs(스텝 끝 관측에서 들어서만 안 **산** 사슴·스텝과 산 사슴·스텝 —
 C++ 통합 모드 10초 여덟째 줄 '들어서만 안 사슴·스텝' 과 같은 정의. heard_only_frac 은 죽은 슬롯까지 N 으로 나눈다)를 더한다(동역학과 무관).
 """
@@ -540,6 +541,7 @@ def main(argv=None) -> None:
     ap.add_argument("--wolf-margin", type=float, default=None, help="realism_shelter.wolf_margin 덮기(단위, 1 단위 = 2 m. 10-17 늑대 몸 여유)")
     ap.add_argument("--unreal-obstacles", type=Path, default=None, help="짝 비교: 언리얼 장애물 JSON(파일 또는 s<세션>.json 폴더)의 지역 원판을 쓴다")
     ap.add_argument("--set", action="append", default=[], help="기능 블록 계수 덮기 블록.키=값 (예: obstacles.detour=false — 10-17 돌아가기 끈 판)")
+    ap.add_argument("--model", type=Path, default=MODEL, help="두뇌 모델 .zip (기본 R1b s3 — 10-18 R4 언리얼 확인은 R4 모델을 준다)")
     a = ap.parse_args(argv)
     seeds = parse_seeds(a.seeds)
     um = parse_unreal_maps(a.unreal_maps) if a.unreal_maps else None
@@ -547,7 +549,7 @@ def main(argv=None) -> None:
     config = a.config if a.config.is_absolute() else (ROOT / a.config)
     res = run(a.deer, a.wolf_eat_steps, seeds, steps=a.steps, workers=a.workers, unreal_maps=um, replicates=a.replicates,
               config=config, disable=disable, diag=a.diag, wolf_margin=a.wolf_margin, unreal_obstacles=a.unreal_obstacles,
-              sets=parse_sets(a.set))
+              sets=parse_sets(a.set), model=a.model if a.model.is_absolute() else ROOT / a.model)
     name = a.name or (f"d{a.deer}_e{a.wolf_eat_steps}_s{seeds[0]}-{seeds[-1]}" if um is None else
                       f"pair_d{a.deer}_e{a.wolf_eat_steps}_u{um[0]}-{um[-1]}_k{a.replicates}_s{seeds[0]}-{seeds[-1]}")
     jp, cp = write(res, name, a.out_dir)
