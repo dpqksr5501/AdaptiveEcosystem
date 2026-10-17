@@ -366,6 +366,34 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
       스태틱 메시(폴리지 인스턴스 포함)를 읽기만 해서 원판을 만든다(EcoPolicyV3IntegratedSubsystem ScanStageObstacles, 콘솔 변수 eco.IntegratedV3.Obstacles).
     현실 근거: 늑대에게 잡힌 엘크는 도망이 막히는 곳(강가·길가·깊은 눈)에서 더 많았다(Kauffman 외 2007, Ecol. Lett. 10:690). 숲은 그루가 빽빽해
       (온대 성숙림 1 ha 에 줄기 약 1200 그루, 가슴높이 단면적 34 m² — ESA Ecological Archives E094-195) 사슴·늑대가 줄기를 돌아 달리고 서로를 오래 보지 못한다.
+- 야생 3단계 지역 날씨 wild_weather (31, 10-18 사용자 '우리 테스트 레벨에도 날씨 적용되게 해 줘. 그리고 그 날씨와 장애물들을 바탕으로 만들어진 세계를 파이썬에
+  고대로 옮겨서 학습시킬 거야'. 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md 11절, 설정 configs/v3_wild3_mirror.yaml = v3_wild2_trees_mirror.yaml + 이 블록).
+  팀 날씨 설계(avaroki 님 /Game/SHC/Maps/LV_SHC_RegionalWeatherTest: 숲 상자 = 비 BP_SHC_RainRegionalWeather, 고지 상자 = 눈 BP_SHC_SnowRegionalWeather,
+  메마른 땅 = 맑음 — results/v3/wild2/weather_check/README.md)를 지역마다 고정 날씨로 옮긴다. 팀 블루프린트는 화면·소리만 바꾸고 게임 값은 그대로라(강수 0)
+  효과 규칙은 이 블록이 정한다. 난수 없음. 관측 18칸의 모양·마스크 판 2 는 그대로다.
+  날씨 상태: 세계마다 region(지역 이름) 하나. 그 스텝 세계 t 의 (날씨 k ∈ {맑음 0, 비 1, 눈 2}, 세기 I ∈ [0, 1]) = schedule 이 있으면 그 지역 표에서 시작 스텝 ≤ t
+    인 마지막 줄, 없으면(또는 첫 줄 앞이면) regions[region] (`weather_at`). 어둠과 같은 때에 정한다(`_daynight_update` — reset 과 스텝 끝 t + 1 뒤, 결정 때 값):
+    그 값을 스텝 끝 관측(8)과 다음 스텝의 이동·늑대 시야가 쓴다. 맑음은 세기 0 이다.
+  배수(`weather_mults`, 세기 I 에서 m(I) = 1 − (1 − m₁)·I, m₁ = 세기 1 의 값):
+    w_s 시야   — 비 rain_sight, 눈 snow_sight (사슴·늑대 같게)        w_h 사슴 청각 — 비 rain_hear, 눈 snow_hear
+    w_d 사슴 이동 — 눈 snow_deer_speed                               w_w 위협 이동 — 눈 snow_wolf_speed (비는 이동을 바꾸지 않는다)
+  (x1) 사슴 위협 탐지 반경: see_r × ((1 − detect_night·d) × w_s) × 행동 배수(GRAZE 0.6·SLEEP 0.3). 사건 비교 시야(*_ev)도 같은 반경이다. 동족 시야·관측 2 의
+       분모(see_r)는 그대로다(계획서 RL_V2_PLAN.md 4.2 표 9 — 밤·비가 탐지 반경을 줄여도 분모는 see_r 고정).
+  (x2) 사슴 청각(realism_hearing): 위협 발소리 반경 R_m × w_h. R_m = 0 이면 그대로 0.
+  (x3) 늑대 시야: 표적 고르기(`_step_predators_v3`)·추격 고정 시야(realism_chase)·잠금 추적(stare_down)의 pred_view_r × w_s. 플레이어형 위협은 지금처럼 맵 전체를 본다.
+       늑대 무리 돕기(wild_pack)의 join_r·도주 반사 거리(wild_flight)의 실거리 문턱·은신처는 바꾸지 않는다.
+  (x4) 이동: 사슴 이동 속도 × w_d(약함·땅 배수 뒤, 돌아가기·이동 앞 — 모든 행동), 위협 속력 × w_w(밤잠·땅 배수 뒤, 돌아가기 앞). 대사·섭식은 보행 상태 그대로다
+       (같은 힘으로 덜 간다 — realism_terrain 과 같은 꼴). 소리 반경은 실제 이동으로 정하므로 눈에서 느려진 늑대는 저절로 덜 들린다.
+  (x5) 관측 visibility(obs_visibility true): (1 − detect_night·d) × w_s — 계획서 RL_V2_PLAN.md 4.2 표 9 의 '실효 탐지 반경 / see_r = (1 − 0.5·d)·w'(#25: 칸을
+       처음부터 이렇게 계약해 날씨는 칸의 뜻을 바꾸지 않고 w 만 켠다). false 면 1 − detect_night·d 그대로. 비 오는 낮이 밤으로 잡히지 않게 낮밤 구간·통계·
+       사건 E5 는 어둠 d 로 정한다(그대로). 사슴은 이 칸으로 날씨를 안다 — 날씨 칸은 따로 두지 않는다.
+  맑음(또는 세기 0)이면 배수가 모두 정확히 1.0 이라 그 세계는 이 블록이 없는 세계와 비트 단위로 같다(tests/test_wild3_weather.py).
+  C++ 꼴: Wx = WeatherAt(Region, T); Ws = 1 - (1 - SightAt1[Wx.Kind]) * Wx.I; VisW = (1 - DetectNight * D) * Ws; SeePred = SeeR * VisW;
+          ObsVis = bObsVis ? VisW : 1 - DetectNight * D;  RSnd *= Wh;  PredViewR' = PredViewR * Ws;  Vel *= Wd;  Speed *= Ww;
+  현실 근거(값은 명세 11절 — 출처와 어림): 빗소리가 배경 소음을 올리면 들리는 거리가 준다(구면 퍼짐에서 소음 +6 dB 면 거리 반, Barber 외 2010 TREE 25:180 —
+    자연 소음 속 땅다람쥐는 더 경계한다, Le 외 2019 Anim. Behav. 157:51). 젖은 낙엽은 발소리도 줄인다(어림). 비는 40 m 앞의 빛 대비를 조금 줄이고 빗줄기·젖은
+    잎 흔들림이 움직임을 가린다(어림). 큰 눈은 시정이 400 m 아래로(Rasmussen 외 1999 J. Appl. Meteor. 38:1542) 40 m 앞 대비가 약 3/4 로 준다. 사슴은 발 하중이
+    늑대보다 커서 눈에 더 빠지고(Telfer & Kelsall 1984 Ecology 65:1828), 눈이 깊을수록 늑대가 사슴을 더 잡는다(Nelson & Mech 1986 J. Wildl. Manage. 50:471).
 
 행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
 `World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
@@ -1367,6 +1395,92 @@ def _wild_pack_params(p: dict, f: Features) -> dict:
                 wait_r=_wild_num(n, p, "wait_r", 0.0))
 
 
+WEATHER_NAMES = ("clear", "rain", "snow")
+WX_CLEAR, WX_RAIN, WX_SNOW = 0, 1, 2
+# weather_mults 의 배수 열 순서 (시야, 사슴 청각, 사슴 이동, 위협 이동)
+WEATHER_MULT_KEYS = ("sight", "hear", "deer_speed", "wolf_speed")
+
+
+def _weather_entry(where: str, v) -> tuple[int, float]:
+    """[날씨 이름, 세기] → (날씨 번호, 세기). 세기 ∈ [0, 1], 맑음은 0."""
+    if not isinstance(v, (list, tuple)) or len(v) != 2 or v[0] not in WEATHER_NAMES:
+        raise ValueError(f"features.wild_weather.{where} 는 [날씨({'·'.join(WEATHER_NAMES)}), 세기] 여야 한다. 받은 값: {v!r}")
+    k, i = WEATHER_NAMES.index(v[0]), _num("wild_weather", where, v[1])
+    if not 0.0 <= i <= 1.0 or (k == WX_CLEAR and i != 0.0):
+        raise ValueError(f"features.wild_weather.{where} 의 세기는 [0, 1] 이고 맑음은 0 이다. 받은 값: {v!r}")
+    return k, i
+
+
+def _wild_weather_params(p: dict, f: Features) -> dict:
+    """wild_weather 계수 (모듈 docstring '야생 3단계'). speed·daynight·repertoire 를 함께 켜야 한다(시야는 밤 탐지 반경 see_r·(1 − detect_night·d) 에 곱하고,
+    늑대 시야·이동은 v3 포식자 스텝이다). 청각 배수가 1 보다 작으면 realism_hearing 을 켜야 한다(켰다고 적었는데 아무 일도 안 일어나는 실험을 막는다).
+    반환: region·const (날씨 번호, 세기)·배수 m₁ 표·obs_visibility·schedule (None 또는 (시작 스텝 배열, [(번호, 세기), …]))."""
+    for need in ("speed", "daynight", "repertoire"):
+        if not f.enabled(need):
+            raise ValueError(f"features.wild_weather 는 {need} 를 함께 켜야 한다(시야는 밤 탐지 반경에 곱하고 늑대 시야·이동은 v3 포식자 스텝이다)")
+    n = "wild_weather"
+    p = with_optional(n, p)
+    regions = p["regions"]
+    if not isinstance(regions, dict) or not regions or not all(isinstance(k, str) for k in regions):
+        raise ValueError(f"features.wild_weather.regions 는 {{지역 이름: [날씨, 세기]}} 이어야 한다. 받은 값: {regions!r}")
+    table = {k: _weather_entry(f"regions.{k}", v) for k, v in regions.items()}
+    region = p["region"]
+    if not isinstance(region, str) or region not in table:
+        raise ValueError(f"features.wild_weather.region 은 regions 의 지역 이름이어야 한다({', '.join(table)}). 받은 값: {region!r}")
+    m1 = {key: _wild_num(n, p, key, 0.0, 1.0, open_lo=True) for key in
+          ("rain_sight", "rain_hear", "snow_sight", "snow_hear", "snow_deer_speed", "snow_wolf_speed")}
+    if (m1["rain_hear"] < 1.0 or m1["snow_hear"] < 1.0) and not f.enabled("realism_hearing"):
+        raise ValueError("features.wild_weather 의 청각 배수(rain_hear·snow_hear)가 1 보다 작으면 realism_hearing 을 함께 켜야 한다(사슴 청각이 없는 세계)")
+    sch = p["schedule"]
+    rows = None
+    if sch is not None:
+        if not isinstance(sch, dict) or not all(isinstance(k, str) for k in sch):
+            raise ValueError(f"features.wild_weather.schedule 은 null 또는 {{지역: [[시작 스텝, 날씨, 세기], …]}} 이다. 받은 값: {sch!r}")
+        bad = sorted(set(sch) - set(table))
+        if bad:
+            raise ValueError(f"features.wild_weather.schedule 의 지역 {bad} 가 regions 에 없다")
+        for name, lines in sch.items():         # 모든 지역의 표를 검사하고 이 세계 지역의 표만 쓴다
+            if not isinstance(lines, (list, tuple)) or not lines:
+                raise ValueError(f"features.wild_weather.schedule.{name} 은 [[시작 스텝, 날씨, 세기], …] 이다")
+            starts, ents = [], []
+            for row in lines:
+                if not isinstance(row, (list, tuple)) or len(row) != 3:
+                    raise ValueError(f"features.wild_weather.schedule.{name} 의 줄은 [시작 스텝, 날씨, 세기] 이다. 받은 값: {row!r}")
+                s0 = row[0]
+                if isinstance(s0, bool) or not isinstance(s0, (int, np.integer)) or s0 < 0 or (starts and s0 <= starts[-1]):
+                    raise ValueError(f"features.wild_weather.schedule.{name} 의 시작 스텝은 0 이상이고 늘어나는 정수다. 받은 값: {row!r}")
+                starts.append(int(s0))
+                ents.append(_weather_entry(f"schedule.{name}", list(row[1:])))
+            if name == region:
+                rows = (np.asarray(starts, dtype=np.int64), ents)
+    return dict(region=region, const=table[region], m1=m1, obs_visibility=_wild_bool(n, p, "obs_visibility"), schedule=rows)
+
+
+def weather_at(wx: dict, t: int) -> tuple[int, float]:
+    """세계 t 의 (날씨 번호, 세기) (모듈 docstring '야생 3단계'). 시간표가 있으면 시작 스텝 ≤ t 인 마지막 줄, 없거나 첫 줄 앞이면 고정 날씨."""
+    rows = wx["schedule"]
+    if rows is not None:
+        k = int(np.searchsorted(rows[0], int(t), side="right")) - 1
+        if k >= 0:
+            return rows[1][k]
+    return wx["const"]
+
+
+def weather_mults(wx: dict, kind: int, intensity: float) -> tuple[float, float, float, float]:
+    """(시야 w_s, 사슴 청각 w_h, 사슴 이동 w_d, 위협 이동 w_w) — 세기 I 에서 m(I) = 1 − (1 − m₁)·I (모듈 docstring '야생 3단계').
+    맑음은 (1, 1, 1, 1), 비는 이동 배수 1. C++ 꼴: M = 1 - (1 - M1) * I."""
+    m1 = wx["m1"]
+
+    def at(x):
+        return 1.0 - (1.0 - x) * intensity
+
+    if kind == WX_RAIN:
+        return at(m1["rain_sight"]), at(m1["rain_hear"]), 1.0, 1.0
+    if kind == WX_SNOW:
+        return at(m1["snow_sight"]), at(m1["snow_hear"]), at(m1["snow_deer_speed"]), at(m1["snow_wolf_speed"])
+    return 1.0, 1.0, 1.0, 1.0
+
+
 def _obstacles_params(p: dict, f: Features) -> dict:
     """obstacles 계수 (모듈 docstring '야생 2단계' 3). v3 포식자 스텝(repertoire 또는 threats)을 함께 켜야 하고, 시야를 가리지 않는 realism_chase·
     stare_down 과는 함께 켜지 않는다. fixed(선택 키)는 [[x, y, r], …] — r > 0, 모두 유한한 수."""
@@ -1990,6 +2104,8 @@ class World:
         self._wp = (_wild_pack_params(f.params("wild_pack"), f) if f.enabled("wild_pack") else None)
         # 야생 2단계 3(모듈 docstring '야생 2단계' 3): 세로 장애물. 끈 세계는 None 이고 그 코드 경로를 타지 않는다(World.obstacles 는 늘 빈 목록)
         self._ob = (_obstacles_params(f.params("obstacles"), f) if f.enabled("obstacles") else None)
+        # 야생 3단계(모듈 docstring '야생 3단계'): 지역 날씨. 끈 세계는 None 이고 그 코드 경로를 타지 않는다
+        self._wx = (_wild_weather_params(f.params("wild_weather"), f) if f.enabled("wild_weather") else None)
         # 통계·진단 전용(설정 아님, 동역학과 무관): 참이면 기하에 사슴 × 위협 보임 행렬 wf_pvis 를 남긴다(실행기 results/v3/wild1 이 켠다)
         self.keep_pair_vis = False
         self.alive = None
@@ -2608,7 +2724,7 @@ class World:
         k = np.where(has, lk, 0)
         hold = self._rz_chase_hold(hunting)
         fov = (dx[ar, k] * self.pred_head[:, 0] + dy[ar, k] * self.pred_head[:, 1]) * inv[ar, k] >= self.cfg.pred_fov_cos
-        sight = (dist[ar, k] <= self.cfg.pred_view_r) & fov
+        sight = (dist[ar, k] <= (self.cfg.pred_view_r if self._wx is None else self._wx_view)) & fov   # 야생 3단계 (x3) 날씨 시야
         if self._th is not None:
             sight |= self.pred_is_player                    # 플레이어형 위협은 맵 전체를 본다
         rel_state = has & ~hold
@@ -2839,7 +2955,19 @@ class World:
         self.dark = d
         self._vis = 1.0 - dn["detect_night"] * d
         self._to_tr = tt
-        self._see_pred = self.cfg.see_r * self._vis
+        if self._wx is None:
+            self._see_pred = self.cfg.see_r * self._vis
+        else:
+            # 야생 3단계 지역 날씨: 지금 t 의 날씨와 배수(결정 때 값 — 스텝 끝 관측과 다음 스텝의 이동·늑대 시야가 쓴다). 탐지 반경 = see_r × ((1 − x·d) × w_s),
+            # 관측 visibility 는 obs_visibility 면 (1 − x·d) × w_s(계획서 4.2 표 9 의 w). 맑음은 w_s = 1.0 이라 날씨 없는 세계와 같은 값이다
+            wx = self._wx
+            self.weather_kind, self.weather_intensity = weather_at(wx, self.t)
+            self._wx_sight, self._wx_hear, self._wx_deer, self._wx_wolf = weather_mults(wx, self.weather_kind, self.weather_intensity)
+            self._wx_view = self.cfg.pred_view_r * self._wx_sight
+            vis_w = self._vis * self._wx_sight
+            self._see_pred = self.cfg.see_r * vis_w
+            if wx["obs_visibility"]:
+                self._vis = vis_w
         if self._ps is not None:        # v2.4s: 주행성 포식자의 잠·박명 감속 (결정 때 어둠, 다음 스텝 포식자 이동에 쓴다)
             ps = self._ps
             diurnal = ~self.pred_nocturnal
@@ -3098,6 +3226,8 @@ class World:
                 zh = self._zh
                 r_snd = hearing_radius(zh, np.sqrt((self.pred_vel * self.pred_vel).sum(1)) / cfg.herb_speed,
                                        self.pred_running)[None, :]
+                if self._wx is not None and self._wx_hear != 1.0:
+                    r_snd = r_snd * self._wx_hear       # 야생 3단계 (x2): 빗소리가 발소리를 덮는다
                 lim = np.minimum(r_snd, see_p) if zh["cap_to_sight"] else r_snd
                 sight = pvis
                 pvis = pvis | ((pd <= lim) & (r_snd > 0.0))
@@ -3351,6 +3481,12 @@ class World:
             v = v * self._zt["mult_herb"][tc][:, None]
             self.vel = v
             self._zt_deer += np.bincount(tc, minlength=len(TERRAIN_NAMES))
+        if self._wx is not None:
+            # 야생 3단계 (x4): 눈 덮인 지역에서 사슴이 느려진다(모든 행동, 대사·섭식은 보행 그대로). 적용 속도 훅 vel 도 줄인 값이다. 이 스텝의 날씨를 센다(통계)
+            self._wx_steps[self.weather_kind] += 1
+            if self._wx_deer != 1.0:
+                v = v * self._wx_deer
+                self.vel = v
         if self._wp is not None:
             self._pack_p0 = self.pos.copy()     # 야생 2단계 2: 사슴의 이번 스텝 이동(도주 방향)을 포식자 스텝이 읽는다
         if self._ob is not None and self._ob["detour"] is not None and len(self.obstacles):
@@ -4064,7 +4200,9 @@ class World:
         zc = self._zc
         if zc is not None:              # v3 R3 (f) 1): 고정한 표적 놓기·시야 갱신(사냥 가능을 정한 뒤, 표적 고르기 전)
             self._rz_chase_release(dist, dx, dy, inv, in_cov, hunting)
-        vis = (perceived <= cfg.pred_view_r) & (
+        # 야생 3단계 (x3): 비·눈은 늑대 시야 반경도 줄인다(결정 때 날씨). 끈 세계는 pred_view_r 그대로
+        view_r = cfg.pred_view_r if self._wx is None else self._wx_view
+        vis = (perceived <= view_r) & (
             (dx * self.pred_head[:, 0:1] + dy * self.pred_head[:, 1:2]) * inv >= cfg.pred_fov_cos)
         if self._ob is not None and self._ob["block_sight"] and len(self.obstacles):
             # 야생 2단계 3 의 3): 늑대 눈길도 원판이 가린다(플레이어형 위협은 아래에서 늘 본다)
@@ -4139,6 +4277,9 @@ class World:
             if th is not None and M > Mb:
                 tm = np.where(self.pred_is_player, self._zt["mult_player"][tc], tm)
             speed = speed * tm
+        if self._wx is not None and self._wx_wolf != 1.0:
+            # 야생 3단계 (x4): 눈 덮인 지역에서 위협(늑대·플레이어형)도 느려진다 — 밤잠·땅 배수 다음. C++ 꼴: Speed *= Ww
+            speed = speed * self._wx_wolf
         ob_on = self._ob is not None and len(self.obstacles) > 0
         det = self._ob["detour"] if ob_on else None
         if det is not None:
@@ -4394,7 +4535,8 @@ class World:
         if self._zs is not None and self._zs["untargetable"]:   # v3 현실성 (c): 은신처 안 표적은 추적할 수 없다(잠금을 지운다)
             hidden = hidden | self._zs_safe_m[ar, k]
         fov = (dx[ar, k] * self.pred_head[:, 0] + dy[ar, k] * self.pred_head[:, 1]) * inv[ar, k] >= cfg.pred_fov_cos
-        track = (player | ((dist[ar, k] <= cfg.pred_view_r) & fov)) & ~hidden
+        view_r = cfg.pred_view_r if self._wx is None else self._wx_view     # 야생 3단계 (x3) 날씨 시야
+        track = (player | ((dist[ar, k] <= view_r) & fov)) & ~hidden
         drop = has & ~(creep & track)
         if drop.any():
             lock[drop] = -1
@@ -5081,6 +5223,17 @@ class World:
         out["ongoing"] = int(np.count_nonzero(self._hunt_on))
         return out
 
+    def weather_stats(self) -> dict:
+        """야생 3단계 지역 날씨 (통계 전용, 모듈 docstring '야생 3단계'): 지역, 지금 날씨·세기, 지금 배수 넷(시야·사슴 청각·사슴 이동·위협 이동),
+        늑대 시야 반경(단위), 날씨별 스텝 수 steps_<날씨>(그 스텝 이동에 쓴 결정 때 날씨, reset 뒤 누적). wild_weather 를 켠 세계에만 있다."""
+        if self._wx is None:
+            raise ValueError("weather_stats 는 wild_weather 를 켠 세계에만 있다")
+        out = dict(region=self._wx["region"], kind=WEATHER_NAMES[self.weather_kind], intensity=float(self.weather_intensity),
+                   sight=float(self._wx_sight), hear=float(self._wx_hear), deer_speed=float(self._wx_deer), wolf_speed=float(self._wx_wolf),
+                   wolf_view_r=float(self._wx_view), schedule=self._wx["schedule"] is not None)
+        out.update({f"steps_{nm}": int(x) for nm, x in zip(WEATHER_NAMES, self._wx_steps)})
+        return out
+
     # ------------------------------------------------------------------ #
     # 통계 (§7.2)
     # ------------------------------------------------------------------ #
@@ -5106,6 +5259,8 @@ class World:
         self._f_full, self._n_full = 0.0, 0
         # 야생 2단계 사냥 성공률 (hunt_stats): [시작·끝·성공·사냥 밖 포획] × 위협 유형 [추격형·잠행형·플레이어] 늑대 수. v3 포식자 스텝만 센다
         self._hunt_n = np.zeros((len(HUNT_KEYS), 3), dtype=np.int64)
+        if self._wx is not None:     # 야생 3단계 (weather_stats): 날씨별 스텝 수(그 스텝 이동에 쓴 결정 때 날씨)
+            self._wx_steps = np.zeros(len(WEATHER_NAMES), dtype=np.int64)
         if self._sp is not None:     # v2.1 보행 지표 (gait_stats). 모두 개체-스텝 수다
             # 개체-스텝 히스토그램 [경계 2, 실제 보행 3, 명령 보행 3, 포식자 거리 구간 4, 배부름 2]. 거리 구간은
             # [안 보임, d<0.25, 0.25≤d<0.5, d≥0.5] (d = d_pred/see_r), 배부름은 [energy<0.5, ≥0.5] (결정 때).

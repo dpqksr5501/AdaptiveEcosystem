@@ -6,6 +6,8 @@
     python results/v3/wild2/stuck_check.py --config configs/v3_wild2_pack_mirror.yaml --seeds 32000-32029   # 장애물 없는 판(기준)
     python results/v3/wild2/stuck_check.py --seeds 32000-32089 --steps 1800 --unreal-maps 20000-20002 --replicates 10 \
         --unreal-obstacles results/v3/wild2/shc/obstacle_maps                                      # 언리얼 짝 지도·원판 (10-17 SHC 거울)
+    python results/v3/wild2/stuck_check.py --config configs/v3_wild3_mirror.yaml --seeds 32000-32089 --steps 1800 --unreal-maps 20000-20002 --replicates 10 \
+        --unreal-obstacles results/v3/wild2/trees/tree_layout.json                                 # 10-18 날씨 거울: 지도 지역마다 나무·날씨(run_mirror 와 같다)
 
 세계는 거울 실행기(results/v3/mirror/run_mirror.py)와 같다: 사슴 128, 늑대 식사 5초(38스텝), 두뇌 R1b 배포 모드. 시드마다 세계 하나를 돌리며 스텝마다
 이동 뒤 위치를 읽는다. '가려던 이동'은 세계가 원판 미끄러짐(world.py `obstacle_slide`)에 넘기는 이동 길이다 — 그 함수를 감싸 사슴 이동(World.step 이
@@ -306,13 +308,18 @@ def main(argv=None) -> None:
         if k < 1 or len(seeds) != len(maps) * k:
             raise ValueError(f"짝 비교는 시드가 지도 {len(maps)}장 × replicates {k} = {len(maps) * k}개여야 한다. 받은 수 {len(seeds)}")
         obs = rm.load_unreal_obstacles(a.unreal_obstacles, um) if a.unreal_obstacles is not None else None
+        wx_on = bool(cfg["v2"]["features"].get("wild_weather", {}).get("enabled"))
         for i, (u, r) in enumerate(maps):
             for j in range(k):
                 jb = jobs[i * k + j]
                 jb["unreal_map"] = dict(seed=u, region=r, replicate=j)
-                if obs is not None:
+                if obs is not None or wx_on:
                     c = copy.deepcopy(jb["cfg"])
-                    c["v2"]["features"]["obstacles"]["fixed"] = obs[(u, r)]
+                    if obs is not None:
+                        c["v2"]["features"]["obstacles"]["fixed"] = obs[(u, r)]
+                    if wx_on:
+                        # 10-18 야생 3단계: 그 지도 지역의 날씨(run_mirror.run 과 같다)
+                        c["v2"]["features"]["wild_weather"]["region"] = r
                     jb["cfg"] = c
     elif a.unreal_obstacles is not None:
         raise ValueError("--unreal-obstacles 는 --unreal-maps 와 함께 쓴다")

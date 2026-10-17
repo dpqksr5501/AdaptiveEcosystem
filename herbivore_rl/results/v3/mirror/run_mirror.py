@@ -56,6 +56,9 @@ rand.predator_count 다(메타 wolves).
 사슴·늑대 미끄러짐·물러남·돌아섬, 눈길 가림 몫)를 적고 10초 줄(JSON 만)에 같은 칸의 누적 ob_* 를 더한다. 짝 비교 지도를 덮을 때 원판 밑 먹이 줄임(ob_food_factor)을 은신처 먹이 부족보다 먼저 다시 건다
 (C++ FFoodGrid::Build 순서). --unreal-obstacles <파일 또는 폴더>(짝 비교에만): 언리얼 장애물 JSON(EcoPolicyV3IntegratedSubsystem ExportObstacles 꼴 —
 지역마다 원판 x, y, r)의 지역 원판을 그 지도 세계의 obstacles.fixed 로 넣는다. 폴더면 세션마다 s<세션 시드>.json 을 읽는다.
+10-18 더함(야생 3단계 지역 날씨, configs/v3_wild3_mirror.yaml): wild_weather 를 켠 설정의 짝 비교는 지도마다 wild_weather.region 을 그 지도의 지역으로 덮는다(날씨는
+설정의 regions 표). 짝 비교가 아니면 설정의 region 그대로다(--set wild_weather.region=Highland 로 바꾼다). 세계 메타에 weather(World.weather_stats)를, realism_hearing 을
+켠 세계는 heard_only_frac(위협을 들어서만 안 개체-스텝 몫, World.realism_stats)을 더 적는다(동역학과 무관).
 """
 
 from __future__ import annotations
@@ -423,6 +426,11 @@ def run_world(job: dict) -> dict:
         meta["pack"] = w.pack_stats()       # 야생 2단계 2 늑대 무리 협동 통계(동역학과 무관)
     if getattr(w, "_ob", None) is not None:
         meta["obstacles"] = w.obstacle_stats()   # 야생 2단계 3 세로 장애물 통계(동역학과 무관)
+    if getattr(w, "_wx", None) is not None:
+        meta["weather"] = w.weather_stats()      # 야생 3단계 지역 날씨(지역·날씨·배수·날씨별 스텝, 동역학과 무관)
+    if getattr(w, "_zh", None) is not None:
+        rz = w.realism_stats()                   # 야생 3단계 진단(10-18): 들어서만 안 몫(빗소리가 발소리를 덮는 효과를 본다, 동역학과 무관)
+        meta["heard_only_frac"] = None if rz["heard_only_frac"] != rz["heard_only_frac"] else rz["heard_only_frac"]
     meta["death_t"] = w.death_t.tolist()
     meta["death_cause"] = w.death_cause.tolist()
     meta["wall_s"] = round(time.perf_counter() - t0, 3)
@@ -454,13 +462,18 @@ def run(deer: int, eat_steps: int, seeds, *, steps: int = STEPS, workers: int | 
             if not cfg.v2["features"].get("obstacles", {}).get("enabled"):
                 raise ValueError(f"--unreal-obstacles 는 obstacles 를 켠 설정에만 쓴다: {config}")
             obs = load_unreal_obstacles(unreal_obstacles, unreal_maps)
+        wx_on = bool(cfg.v2["features"].get("wild_weather", {}).get("enabled"))
         for i, (u, r) in enumerate(maps):
             for j in range(k):
                 jobs[i * k + j]["unreal_map"] = dict(seed=u, region=r, replicate=j)
-                if obs is not None:
-                    # 그 지도의 언리얼 원판을 fixed 로(무작위 배치 대신 — 난수를 뽑지 않는다)
+                if obs is not None or wx_on:
                     c = copy.deepcopy(jobs[i * k + j]["cfg"])
-                    c["v2"]["features"]["obstacles"]["fixed"] = obs[(u, r)]
+                    if obs is not None:
+                        # 그 지도의 언리얼 원판을 fixed 로(무작위 배치 대신 — 난수를 뽑지 않는다)
+                        c["v2"]["features"]["obstacles"]["fixed"] = obs[(u, r)]
+                    if wx_on:
+                        # 야생 3단계(10-18): 그 지도 지역의 날씨(설정의 wild_weather.regions 표 — 지역 이름이 없으면 세계를 만들 때 실패)
+                        c["v2"]["features"]["wild_weather"]["region"] = r
                     jobs[i * k + j]["cfg"] = c
     elif unreal_obstacles is not None:
         raise ValueError("--unreal-obstacles 는 --unreal-maps(짝 비교)와 함께 쓴다")

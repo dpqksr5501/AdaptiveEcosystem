@@ -106,6 +106,10 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     # 야생 규칙 2단계 2(10-17 사용자 '추천대로 끄고 2~4번 진행해', 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md). 난수 없음. 정의·식·현실 근거는
     # env_v2/world.py 모듈 docstring '야생 2단계' 2
     "wild_pack": 30,        # 늑대 무리 협동 사냥: 한 늑대가 사슴을 쫓는 동안 쉬던 동료가 그 사슴이 달아날 곳(은신처 문·도주선 앞)에 가서 기다린다
+    # 야생 3단계(10-18 사용자 '우리 테스트 레벨에도 날씨 적용되게 해 줘. 그 날씨와 장애물들을 바탕으로 만들어진 세계를 파이썬에 고대로 옮겨서 학습시킬 거야',
+    # 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md 11절). 난수 없음. 정의·식·현실 근거는 env_v2/world.py 모듈 docstring '야생 3단계'.
+    # 번호 8 weather 는 v2.6 설계(맑음↔비 Markov, 먹이 재생·회복 배수)의 자리라 그대로 두고 새 번호를 받는다(규칙 4)
+    "wild_weather": 31,     # 지역 날씨: 지역마다 맑음·비·눈과 세기(고정 표, 선택 시간표). 비는 시야·청각, 눈은 시야·이동(사슴이 늑대보다 더 느려짐)
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
@@ -113,7 +117,7 @@ IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_
                                          "repertoire", "threats", "stare_down", "alarm",
                                          "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
                                          "realism_cover_food", "realism_chase", "realism_terrain", "integrated_stage",
-                                         "wild_reserve", "wild_satiation", "wild_flight", "wild_pack", "obstacles"})
+                                         "wild_reserve", "wild_satiation", "wild_flight", "wild_pack", "obstacles", "wild_weather"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -257,6 +261,15 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     #   part 0 에서 U[하, 상]), body_r = 몸 반지름(단위 — 이동은 원판 반지름 + body_r 앞에서 멈춰 미끄러진다), block_sight = 원판이 눈길을 가리나(발소리는
     #   못 가린다), no_food = 원판 밑 먹이 셀 용량을 원판이 덮은 몫만큼 줄이나. 선택 키 fixed(아래 OPTIONAL_KEYS)
     "obstacles": frozenset({"tree_per_ha", "tree_r", "rock_per_ha", "rock_r", "body_r", "block_sight", "no_food"}),
+    # 야생 3단계 지역 날씨 (env_v2/world.py `_wild_weather_params`·`weather_mults`, 정의는 모듈 docstring '야생 3단계'). speed·daynight·repertoire 를
+    # 함께 켜야 하고(시야는 밤 탐지 반경에 곱한다, 늑대 시야는 v3 포식자 스텝), 청각 배수가 1 보다 작으면 realism_hearing 도 켜야 한다.
+    #   wild_weather: region = 이 세계가 흉내 내는 지역 이름(regions 의 키 — 짝 비교 실행기가 지도마다 덮는다), regions = 지역 → [날씨, 세기]
+    #   (날씨 clear·rain·snow, 세기 0~1, 맑음은 세기 0), rain_sight·rain_hear·snow_sight·snow_hear = 세기 1 일 때 시야(사슴 위협 탐지 반경과 늑대 시야
+    #   반경)·사슴 청각(위협 발소리 반경) 배수, snow_deer_speed·snow_wolf_speed = 세기 1 일 때 눈의 사슴·늑대(모든 위협) 이동 속력 배수(모두 (0, 1] —
+    #   세기 I 의 배수는 1 − (1 − 값)·I), obs_visibility = 관측 visibility 에 시야 배수를 곱하나(계획서 RL_V2_PLAN.md 4.2 표 9·#25 의 w).
+    #   선택 키 schedule(아래 OPTIONAL_KEYS)
+    "wild_weather": frozenset({"region", "regions", "rain_sight", "rain_hear", "snow_sight", "snow_hear", "snow_deer_speed",
+                               "snow_wolf_speed", "obs_visibility"}),
 })
 
 # 선택 계수 키(모듈 docstring 규칙 6, 10-14 R3): 기능 → {키: 끔 값}. 켠 블록에 없으면 끔 값(= 앞 버전 동작)으로 읽는다. 앞 버전 설정
@@ -282,6 +295,9 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #   realism_shelter.wolf_margin (10-17 늑대 몸 여유): 막는 위협이 은신처 원 둘레가 아니라 반지름 r + wolf_margin(단위, 1 단위 = 2 m) 둘레를
 #     따라 미끄러진다(늑대 중심이 그 안에 들지 않는다). block_predators 를 켰을 때만 0 보다 클 수 있다. 사슴의 안전 판정(원 안 |q − c| ≤ r)은
 #     그대로다. 0 = 10-16 그대로(원 둘레에서 미끄러짐)
+#   wild_weather.schedule (10-18 야생 3단계, 시간에 따라 바뀌는 날씨의 자리): {지역: [[시작 스텝, 날씨, 세기], …]}(시작 스텝은 reset 뒤 세계 t, 0 이상이고
+#     늘어나는 정수) 이면 그 지역 세계는 시작 스텝 ≤ t 인 마지막 줄의 날씨를 쓰고, 첫 줄 앞이거나 표에 없는 지역은 regions 의 고정 날씨를 쓴다. 난수 없음.
+#     null = 고정 날씨(지역마다 늘 같다)
 OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "realism_shelter": MappingProxyType({"block_predators": False, "wolf_margin": 0.0}),
     "realism_cover_food": MappingProxyType({"frac_range": None}),
@@ -289,6 +305,7 @@ OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0}),
     "obstacles": MappingProxyType({"fixed": None, "detour": False, "detour_block": 0.5, "detour_free": 0.8, "detour_probe": 1.5,
                                    "detour_steps": 45, "detour_help_block": 15, "detour_help_drop": 38}),
+    "wild_weather": MappingProxyType({"schedule": None}),
 })
 
 
