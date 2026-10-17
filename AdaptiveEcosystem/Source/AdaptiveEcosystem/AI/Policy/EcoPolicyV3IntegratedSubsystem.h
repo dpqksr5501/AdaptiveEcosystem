@@ -93,7 +93,7 @@
 //      Social 처리기는 돌며 기록만 하고 v3 사슴 움직임은 파이썬 세계 그대로다. 1 이면 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에
 //      사슴 제어를 바꾼다(EcoPolicyV3SocialBridge, FStepHooks::HerbControl — 팀 장면 확인용). 무리 반응은 뒤에 파이썬 야생 규칙으로 만든다.
 //  13. 10-17 야생 2단계 1 (명세 RL_V3_WILD2_SPEC.md, 파이썬 configs/v3_wild2_mirror.yaml): 은신처 먹이 부족 eco.IntegratedV3.ShelterFood
-//      (-EcoV3ShelterFood=, 기본 1 — 파이썬 realism_cover_food cap_frac·regen_frac 0.15): 은신처 원과 조금이라도 겹치는 먹이 셀의 용량과 재생 속도가
+//      (-EcoV3ShelterFood=, 기본 0 — 아래 사용자 결정. 켜면 파이썬 realism_cover_food cap_frac·regen_frac 0.15): 은신처 원과 조금이라도 겹치는 먹이 셀의 용량과 재생 속도가
 //      밖의 15% 다(EcoWorldV3.h FShelterFoodConfig·FFoodGrid::ApplyShelterFood). 은신처는 안전하지만 먹이가 적어 배고픈 사슴은 밖으로 나와야 한다.
 //      늦게 등록되거나 지워진 은신처(RefreshRefuges)도 같은 식으로 다시 건다. 10초 기록 다섯째 줄 '[EcoV3I] <지역> 사냥·은신처 |' 는 늘 적는다:
 //      사냥 성공률(늑대가 전력으로 쫓거나 덮친 사냥 가운데 잡음으로 끝난 몫 — world.py hunt_update 와 같은 정의), 은신처 안 사슴 시간, 둘레 밖 잡힘.

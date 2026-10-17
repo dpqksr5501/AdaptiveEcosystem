@@ -99,7 +99,7 @@
 - `FFoodGrid::Build` 가 먹이 잡음으로 용량을 만든 뒤 `BuildCoverCells`(셀 중심 은신처 셀, 지금 그대로) → `ApplyShelterFood` 를 부른다. 파이썬 `_rz_cover_food_apply` 와 같은 순서·같은 식이다.
   - 겹침 판정 `CellTouchesCover`: 셀 사각형을 1e-9 넓혀 원 중심에 가장 가까운 점이 원 안이면 겹친다(파이썬 `_cover_overlap_cells`).
   - 용량 ← 처음 용량 `Cap0` × 0.15, 먹이 ← min(먹이, 용량), 재생률 ← 기본 × 0.15. 밖 셀은 처음 용량·기본 재생률.
-- 통합 모드: 콘솔 변수 `eco.IntegratedV3.ShelterFood`(기본 1), 명령줄 `-EcoV3ShelterFood=`. 0 이면 은신처 셀은 재생만 0.3배다(지금까지).
+- 통합 모드: 콘솔 변수 `eco.IntegratedV3.ShelterFood`(처음 기본 1, 사용자 결정 10-17 '추천대로 끄고' 뒤 기본 0), 명령줄 `-EcoV3ShelterFood=`. 0 이면 은신처 셀은 재생만 0.3배다(지금까지).
   시작 글에 `[EcoV3I] 은신처 먹이: 부족 …` 줄이 있다.
 - 파이썬에 없는 것(언리얼만): 팀 실제 은신처 생명주기(`RefreshRefuges`)가 은신처를 지우거나(반경 0) 늦게 더하면 같은 식을 다시 건다. 지운 은신처의 셀은 처음 용량으로 돌아가고(먹이는 그대로, 재생으로 다시 찬다), 더한 은신처의 셀은 15% 로 준다. 반경 0 원은 겹침에서 건너뛴다.
 
