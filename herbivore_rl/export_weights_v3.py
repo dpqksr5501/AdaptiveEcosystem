@@ -45,7 +45,11 @@ torch 는 스레드 1 로 돈다(`env.torch_init`, main 안에서도 다시 고�
   JSON 하나(`BRAIN_FORMAT` 판 `BRAIN_FORMAT_VERSION`): 계약(관측 이름·행동 이름·망 모양·마스크 판·문턱 — `contract_dict` 그대로)과 계약 해시,
   허용 칸, 세 층 가중치(float32 리틀 엔디언 바이트를 base64 로 — 십진 반올림이 없다), 그 바이트의 sha256, 모델 zip 경로·sha256,
   학습 세계(모델 옆 학습 기록의 설정·지문 + 사람이 읽을 이름), 자체 확인 골든(관측 + 마스크 → torch 원 로짓 5 + 마스크 argmax).
-  골든은 언리얼과 같은 세계(`BRAIN_GOLDEN_CONFIG`) 한 시드를 모델 자신의 argmax 로 돌려 고른 결정 시점(행동별)과 균등 난수 관측이다.
+  골든은 언리얼과 같은 세계(`BRAIN_GOLDEN_CONFIG`, 관측 21 모델은 `BRAIN_GOLDEN_CONFIG_OBS21`) 한 시드를 모델 자신의 argmax 로 돌려 고른 결정 시점(행동별)과
+  균등 난수 관측이다.
+  계약은 둘(10-19): 관측 18·마스크 판 2(0x7eea0107339be4ce, 내장 R1b 와 같다)와 관측 21·판 2(0xbc4fc2d45c47c5fd — 18 칸 + R5 장애물 관측 세 칸,
+  계약 2-4). 언리얼 로더는 이 둘만 받고, 관측 21 두뇌를 넣으면 통합 모드가 세 칸을 더 만든다. 관측 21 시작 두뇌(R1b-F + 새 열 0)는
+  results/v3/r5/zero_extend.py 가 만든다.
   허용 칸 1·2위 로짓 차가 NEAR_TIE_GAP 보다 작은 사례는 넣지 않는다(float32 순서 차이로 argmax 가 갈릴 수 있다).
   언리얼 로더는 버전·차원·이름·마스크·문턱·모양·NaN·sha256 을 보고, 골든을 C++ 순전파(EcoPolicyV3Inference.h)로 다시 돌려
   로짓이 허용 오차 안이고 행동이 같아야 받는다. 시각·절대 경로를 적지 않아 같은 모델이면 바이트 단위로 같은 파일이 나온다.
@@ -91,6 +95,7 @@ NT_ROLLOUT, NT_BISECT = 0, 1                            # 근접 동점 사례 �
 BRAIN_FORMAT = "eco_v3_brain"
 BRAIN_FORMAT_VERSION = 1
 BRAIN_GOLDEN_CONFIG = ROOT / "configs" / "v3_wild3_mirror.yaml"   # 언리얼 통합 레벨과 같은 세계 (나무 + 지역 날씨, 관측 18)
+BRAIN_GOLDEN_CONFIG_OBS21 = ROOT / "configs" / "v3_wild3_obs_mirror.yaml"   # 같은 세계 + R5 장애물 관측 세 칸 (관측 21, 10-19 — 계약 2-4)
 BRAIN_GOLDEN_SEED = 32099              # 파이썬 탐색 시드 칸(32000~32099)의 끝 — 학습·판정·고르기에 쓰지 않는다
 BRAIN_GOLDEN_STEPS = 600
 BRAIN_PER_ACTION = 6                   # 다중 칸 결정 시점을 고른 행동별로 많아야 이만큼
@@ -837,9 +842,17 @@ def write_brain_file(path: Path, d: dict) -> None:
     Path(path).write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
 
 
-def export_brain_file(model_path: Path, out_file: Path, golden_config: Path = BRAIN_GOLDEN_CONFIG, seed: int = BRAIN_GOLDEN_SEED,
+def brain_golden_config_for(obs_names) -> Path:
+    """모델 관측에 맞는 두뇌 골든 세계: 관측 맨 끝이 R5 장애물 관측 세 칸이면 관측 21 거울(`BRAIN_GOLDEN_CONFIG_OBS21`), 아니면 관측 18 거울."""
+    from env_v2.world import OBSTACLE_OBS_NAMES
+
+    k = len(OBSTACLE_OBS_NAMES)
+    return BRAIN_GOLDEN_CONFIG_OBS21 if tuple(obs_names)[-k:] == tuple(OBSTACLE_OBS_NAMES) else BRAIN_GOLDEN_CONFIG
+
+
+def export_brain_file(model_path: Path, out_file: Path, golden_config: Path | None = None, seed: int = BRAIN_GOLDEN_SEED,
                       steps: int = BRAIN_GOLDEN_STEPS, world_label: str | None = None) -> dict:
-    """두뇌 파일 하나를 쓴다 (헤더는 쓰지 않는다). 반환: 파일 dict."""
+    """두뇌 파일 하나를 쓴다 (헤더는 쓰지 않는다). golden_config 가 None 이면 모델 관측으로 고른다(`brain_golden_config_for`). 반환: 파일 dict."""
     model_path = Path(model_path)
     if not model_path.exists():
         raise SystemExit(f"{model_path} 없음")
@@ -847,6 +860,8 @@ def export_brain_file(model_path: Path, out_file: Path, golden_config: Path = BR
     th.set_num_threads(1)
     try:
         model = load_model(model_path)
+        if golden_config is None:
+            golden_config = brain_golden_config_for(model.policy.rep_obs_names)
         d = brain_dict(model, model_path, Path(golden_config), seed, steps, world_label)
     finally:
         th.set_num_threads(prev_threads)
@@ -907,15 +922,17 @@ def main(argv=None) -> int:
     p.add_argument("--out", default=str(UE_POLICY_DIR), help="헤더를 쓸 폴더 (기본: 언리얼 모듈 AI/Policy)")
     p.add_argument("--brain-file", default=None,
                    help="주면 헤더 대신 실행 중 가중치 로더의 두뇌 파일(JSON) 하나만 쓴다 (모듈 docstring '두뇌 파일')")
-    p.add_argument("--golden-config", default=str(BRAIN_GOLDEN_CONFIG), help="두뇌 파일 골든 세계 (모델 관측과 같아야 한다)")
+    p.add_argument("--golden-config", default=None,
+                   help="두뇌 파일 골든 세계 (모델 관측과 같아야 한다. 기본: 관측 18 모델은 configs/v3_wild3_mirror.yaml, 관측 21(R5 장애물 관측) 모델은 "
+                        "configs/v3_wild3_obs_mirror.yaml)")
     p.add_argument("--golden-seed", type=int, default=BRAIN_GOLDEN_SEED)
     p.add_argument("--golden-steps", type=int, default=BRAIN_GOLDEN_STEPS)
     p.add_argument("--world-label", default=None, help="두뇌 파일 train.world (사람이 읽을 학습 세계 이름, 기본: 학습 설정 파일 이름)")
     args = p.parse_args(argv)
 
     if args.brain_file:
-        d = export_brain_file(Path(args.model), Path(args.brain_file), Path(args.golden_config), args.golden_seed, args.golden_steps,
-                              args.world_label)
+        d = export_brain_file(Path(args.model), Path(args.brain_file), Path(args.golden_config) if args.golden_config else None, args.golden_seed,
+                              args.golden_steps, args.world_label)
         g = d["golden"]
         print(f"두뇌: {d['id']}  관측 {d['obs_dim']}  마스크 판 {d['mask_version']}  허용 {' '.join(d['allowed'])}  계약 {d['contract_hash']}")
         print(f"가중치 sha256 {d['weights_sha256']}  모델 sha256 {d['model']['sha256'][:16]}  학습 {d['train']['config']} ({d['train']['world']})")
