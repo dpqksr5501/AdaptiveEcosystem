@@ -838,6 +838,10 @@ idx 7~10은 V2a에서 확정한다. 그 뒤 칸은 계약에 채택되는 순서
 - 10-19 진행(파이썬 관측 단계): 기능 `obstacle_obs`(32, 기본 꺼짐 — 끄면 직전 코드와 비트 단위로 같다, 켜도 세계는 그대로), 설정 `H/configs/v3_wild3_obs_mirror.yaml`, 분포 확인
   `H/results/v3/r5/obs_check.md`(포화 아님 — 분모 20 m·10 m 그대로, 판정 세계 숲에서 늑대를 알 때 escape_room 평균 0.65·obstacle_near 1 몫 57%·threat_hidden 0.5%,
   덤불 숲 0.42·2%·25%), 골든 `H/export_golden_v3_obstacle_obs.py`(435 사례). 계약 해시 관측 21·판 2 = `0xbc4fc2d45c47c5fd`.
+- 10-19 진행(C++ 단계): 언리얼이 관측 21 두뇌를 돌린다 — 세 칸 C++(`S/AI/Policy/EcoObservationV3.h` `ObstacleObsValues`), 통합 모드가 지금 두뇌의 계약대로 관측을 만들고
+  (내장 R1b-F 는 18 칸 그대로), 로더는 관측 18·21 두 계약만 받는다. 골든 435 사례 비트 단위. R1b-F + 새 열 0 두뇌(`AdaptiveEcosystem/EcoBrains/v3_r1_g995_s3_obs21zero.json`,
+  `H/results/v3/r5/zero_extend.py` — 결정 (b) 의 시작점)로 돌린 헤드리스 세션 20000 이 내장 판과 결정 지문까지 같고, 실제 상태 17,709 줄의 세 칸이 파이썬으로 다시 잰 값과
+  비트 단위로 같다(`H/results/v3/r5/unreal_parity.md`, 계획서 `D/RL_Policy/RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b). 다음: R5 학습 세계·사전 등록(판정 시드 33100~33199).
 
 | # | 질문 | 추천 | 근거 |
 |---|---|---|---|

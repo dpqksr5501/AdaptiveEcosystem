@@ -80,7 +80,7 @@
 - 알려진 값과 C++ 확인(`S/AI/Policy/EcoPolicyV3Inference.h`, 같은 작업):
   - 관측 18·판 2 = `0x7eea0107339be4ce`
   - 관측 19·판 3 = `0xf8c26c7d02542fae`
-  - 관측 21·판 2 = `0xbc4fc2d45c47c5fd` (10-19, 2-4 — 장애물 칸 셋. C++ 단계에서 알려진 값에 더한다)
+  - 관측 21·판 2 = `0xbc4fc2d45c47c5fd` (10-19, 2-4 — 장애물 칸 셋. `kContractHashObs21Mask2`. 내장 모델의 계약이 아니라 실행 중 두뇌 파일의 계약이다 — 로더 `S/AI/Policy/EcoV3Brain.cpp` 의 받는 계약 표)
   - 생성 헤더의 `kContractHash`가 둘 중 하나가 아니면 `static_assert`로 빌드가 멈춘다.
 
 **제안: 세계 계약 해시를 하나 더 둔다**
@@ -185,7 +185,7 @@
 
 - 왜: 10-19 사용자 '일단 두뇌가 나무 같은 장애물을 인지할 수 있게 바꿔'(계획서 `D/RL_Policy/RL_V2_PLAN.md` 10-19 (16)). 관측 18 에는 나무·덤불이 없어서, 세계만 바꿔서는 두뇌가 달라지지 않았다(`H/results/v3/adapt/README.md` 권고, R4 결과 `H/results/v3/r4/README.md`).
 - 그대로인 것: 칸 0~17 의 이름·순서·식·자르기, 마스크 판 2(칸을 이름으로 찾는다 — 21 칸 관측의 가능 칸 = 앞 18 칸의 가능 칸), 행동 5, 망 모양(은닉 64·64, tanh, 로짓 머리, 망이 마스크를 보지 않음), 선택 규칙. 바뀌는 것은 입력 수 18 → 21 하나다(4절의 W0 이 (64, 21)).
-- 관측 18 계약(내장 두뇌 R1b-F)은 그대로 남는다. 통합 모드는 **지금 두뇌의 계약이 요구하는 관측**을 만들고(18 이면 앞 18 칸만), 실행 중 로더는 두 계약(관측 18·판 2, 관측 21·판 2)만 받고 나머지는 거부한다(C++ 단계).
+- 관측 18 계약(내장 두뇌 R1b-F)은 그대로 남는다. 통합 모드는 **지금 두뇌의 계약이 요구하는 관측**을 만들고(18 이면 앞 18 칸만), 실행 중 로더는 두 계약(관측 18·판 2, 관측 21·판 2)만 받고 나머지는 거부한다(10-19 C++ — 아래 'C++').
 - 파이썬: 기능 `obstacle_obs`(번호 32, `H/env_v2/features.py`), 식 `H/env_v2/world.py` `obstacle_obs_values`(모듈 docstring 'R5 장애물 관측'), 설정 `H/configs/v3_wild3_obs_mirror.yaml`(= 날씨 거울 `v3_wild3_mirror.yaml` + 이 블록, 생성기 `H/results/v3/r5/make_obs_config.py`). 기능을 끄면 직전 코드와 비트 단위로 같고, 켜도 세계(이동·시선·먹이·늑대·난수)는 그대로이며 앞 18 칸도 비트 단위로 같다(`H/tests/test_obstacle_obs.py`).
 - 다른 기능 없이도 켤 수 있다. 원판 D = 세계 원판 목록(`World.obstacles` — 언리얼은 무대 원판 = 레벨 나무 줄기 `EcoV3Trunk_*`, 지금 숲 24·고지 9·메마른 땅 0), 몸 반지름 b = `obstacles.body_r`(0.15 = 30 cm, 원판 기능이 꺼지면 0), 무대 [0, S]²(S = 60).
 
@@ -225,8 +225,8 @@ Obs[18] = (float)clip(E / EscapeNorm, 0, 1);  Obs[19] = (float)clip((N > 0 ? N :
 - **접함**(D = 0)은 막는다. 둘레 위(R + 1e−6, 미끄러지는 사슴)에서 원판 쪽이면 E ≈ 0.
 - **가림 경계**: 엄격한 < 라 꼭 r 만큼 떨어진 줄기는 가리지 않는다. T 를 [0, 1] 로 잘라 끝점 뒤 줄기는 끝점까지 거리로 본다. 선분 길이 0 이면 T = 0. `block_sight` 가 거짓이면 0. 가린 위협을 아는 것은 발소리로 들었을 때뿐이다 — 이 칸은 '그 늑대가 지금 나를 못 본다'를 알려 준다.
 - **밤·날씨**: 식에 들어가지 않는다. 다만 '위협을 앎'(칸 1)이 밤·날씨로 바뀌므로 방향 u 와 칸 20 이 따라 바뀐다.
-- **시점**: 2-1 의 4) 기하 — 이동 뒤 위치, 같은 관측의 위협 지각. 리스폰한 행은 리스폰 자리에서 다시 만든다. **죽은 슬롯**(부활 없는 무대)은 파이썬이 계산하지만 쓰지 않는다. C++ 은 산 사슴만 만든다.
-- **정밀도**: 거리는 double, 나누고 자른 뒤 float 로 넣는다(다른 칸과 같다). FMA 축약이 생기면 E 의 마지막 비트가 달라진다(g++ `-march=native` 로 골든 435 사례 가운데 155) — 장애물 미끄러짐 골든과 같은 식 꼴이라 그 골든이 비트 단위로 통과하는 빌드 설정이면 같다. 축약 없는 g++ `-O2` 스칼라 구현은 골든 435 사례 모두 비트 단위로 같았다.
+- **시점**: 2-1 의 4) 기하 — 이동 뒤 위치, 같은 관측의 위협 지각. 리스폰한 행은 리스폰 자리에서 다시 만든다. **죽은 슬롯**(부활 없는 무대)은 파이썬이 계산하지만 쓰지 않는다. C++ 도 그 스텝 관측 목록의 개체(그 스텝에 죽은 사슴 포함)를 모두 계산하고, 죽은 사슴은 다음 스텝부터 목록에서 빠진다.
+- **정밀도**: 거리는 double, 나누고 자른 뒤 float 로 넣는다(다른 칸과 같다). FMA 축약이 생기면 E 의 마지막 비트가 달라진다(g++ `-march=native` 로 골든 435 사례 가운데 155) — 장애물 미끄러짐 골든과 같은 식 꼴이라 그 골든이 비트 단위로 통과하는 빌드 설정이면 같다. 축약 없는 g++ `-O2` 스칼라 구현은 골든 435 사례 모두 비트 단위로 같았다. 언리얼 빌드(MSVC, 적응 unity·`-DisableAdaptiveUnity` 두 방식)도 435 사례 모두 비트 단위로 같다(10-19, 시험 `Policy.V3.ObstacleObs.Golden`).
 
 계수와 계약 해시:
 - `escape_norm` 10 단위(20 m — 뛰는 사슴 약 2 초), `near_norm` 5 단위(10 m). 설정 yaml 이 원본이다(`H/configs/v3_wild3_obs_mirror.yaml`).
@@ -243,7 +243,20 @@ Obs[18] = (float)clip(E / EscapeNorm, 0, 1);  Obs[19] = (float)clip((N > 0 ? N :
   escape_room 의 0 은 모두 무대 벽에 붙어 벽 쪽을 보는 사슴이다(숲 1 시드 확인: 산 사슴-스텝의 17% 가 벽 위, 그중 88% 가 먹기).
 - 입출력 계약 해시(1-4 의 식): **관측 21·판 2 = `0xbc4fc2d45c47c5fd`**. 분모 둘은 입출력 해시에 들어가지 않는다(관측 정규화 상수는 `see_r`·`obs_cover_norm` 처럼 1-4 의 세계 해시 쪽이다). C++ 상수와 yaml 이 같은지는 골든 헤더의 설정 칸(`kEscapeNorm`·`kNearNorm`·`kBodyR`)이 지킨다.
 - 이어 배우기(계획서 10-19 (16) 결정 (b)): R1b-F 가중치에 새 입력 세 열을 0 으로 더하면 W0·x = W0[:, 0:18]·x[0:18] 이라 처음 로짓이 R1b-F 와 같다.
-- 골든 G11: `H/export_golden_v3_obstacle_obs.py` → `ObstacleObsGoldenVectorsV3.h`(네임스페이스 `EcoObservationV3::GoldenObstacleObs`). 파이썬 단계의 사본은 `H/results/v3/r5/golden/`, C++ 단계가 기본 경로 `S/AI/Policy/` 에 같은 바이트로 쓴다.
+- 골든 G11: `H/export_golden_v3_obstacle_obs.py` → `ObstacleObsGoldenVectorsV3.h`(네임스페이스 `EcoObservationV3::GoldenObstacleObs`). 기본 경로 `S/AI/Policy/` 의 헤더와 파이썬 단계의 사본 `H/results/v3/r5/golden/` 은 같은 바이트다(`H/tests/test_obstacle_obs_golden.py`).
+
+C++ (10-19 구현 — 계획서 `D/RL_Policy/RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b '10-19 R5 장애물 관측'):
+- 식: `S/AI/Policy/EcoObservationV3.h` `ObstacleObsValues`(입력 `FObstacleObsInput` — 자리·heading·위협을 앎·away·가장 가까운 위협 자리·원판·몸·무대·block_sight → `FObstacleObs` E·N·가림)와 `WriteObstacleObs`(세 칸 float). 위 식 블록과 줄마다 같다. 상수 `kObsDimObstacle` 21, 칸 `kObsEscapeRoom` 18·`kObsObstacleNear` 19·`kObsThreatHidden` 20, 이름 `kObstacleObsNames`, 분모 `kR5ObstacleObsConfig`(10·5).
+- 세계 층 `S/AI/Policy/EcoWorldV3.h`:
+  - 세 칸은 `FHerbPerception::ObstacleObs[3]`(원시 거리 `Obstacle`)에 따로 둔다. 관측 18 배열 `Obs` 는 길이 그대로다 — 팀 진단(`EcoCreatureInspection`)이 그 길이를 관측 칸 수로 쓴다(팀 파일이라 고치지 않았다. 관측 21 두뇌일 때 그 진단 JSON 에는 세 칸이 없다).
+  - `FWorldState::ObsDim`(18·21, `SetModelObsDim`) — 21 이거나 대조 기록(`bObstacleObsProbe`)이면 관측 E 에서 세 칸을 만든다(`Detail::ObserveObstacleObs`, 입력 `ObstacleObsInputOf` — 위협 자리는 같은 관측의 위협 목록 `ThreatIn[Nearest]`, 원판은 세로 장애물 블록이 켜지고 원판이 있을 때만, 몸은 블록이 켜질 때만, block_sight = 블록 켬 ∧ 눈길 가림). 아니면 0·기본값이다 — 관측 18 두뇌만 쓰는 세계(평면 맵·기준 루프·골든·지금 통합 모드)의 조각 바이트는 그대로다.
+  - `DecideHerb`: 망 칸 수가 18 보다 많으면 망 입력 = `Obs` 18 칸 + `ObstacleObs` 세 칸. 마스크 가능 칸은 앞 18 칸만 본다(판 2). 망이 세계보다 칸이 많으면 `FWorldStats::ObsLayoutMismatch` 를 센다(늘 0 이어야 한다).
+- 로더 `S/AI/Policy/EcoV3Brain.{h,cpp}`: 받는 계약 표(`EcoV3Brain::FindContract` — 관측 18·판 2 = 내장, 관측 21·판 2). 차원·관측 이름·마스크 판·첫 층 모양·골든 관측 길이를 그 계약으로 본다. 그 밖의 해시는 '계약 해시' 로 거부한다. `FEcoV3Brain::ContractHash`·`ObsDim`.
+- 통합 모드: `UEcoPolicyV3IntegratedSubsystem::AddContext`·`SyncBrain` 이 세계 관측 칸 수를 지금 두뇌의 망 칸 수로 둔다 — 바꾸는 결정 스텝 경계에서 그 스텝 끝 관측부터 새 칸 수이고, 그 스텝 끝 결정부터 새 두뇌다. 대조 기록 `eco.IntegratedV3.ObsParityLog N`(명령줄 `-EcoV3ObsParityLog=`, 기본 0 = 끔).
+- 확인 (10-19):
+  - 골든 435 사례 비트 단위(`Policy.V3.ObstacleObs.Golden`). 기준 루프(무대 60·숲 + 덤불 240 원판·사슴 64·늑대 4, 600 스텝): 관측 21 세계 + 내장 망 = 관측 18 세계(궤적·요청·로짓·관측 18 비트 단위), 새 열 0 망 = 내장 망(`Policy.V3.ObstacleObs.World`).
+  - 새 열 0 두뇌 파일(`AdaptiveEcosystem/EcoBrains/v3_r1_g995_s3_obs21zero.json`, `H/results/v3/r5/zero_extend.py`): Mass 두 지역 180 초에서 내장 판과 자리·요청·로짓 비트 단위(`Policy.V3.Integrated.BrainObs21Zero`). 헤드리스(세션 20000, 사슴 128, 241 초): 기록 줄 731 이 두뇌 id·CPU 칸 말고 같고, 결정 지문(사슴·스텝 664,893)이 같다.
+  - 실제 상태 대조(헤드리스 세션 20000·20010, 10 초마다 산 사슴 모두 17,709 줄): 파이썬 `obstacle_obs_values` 로 다시 잰 E·N·가림·세 칸이 모두 비트 단위로 같고, away 는 가장 가까운 위협 자리에서 다시 잰 값과 같으며, 세계 원판은 거울 배치 표(`H/results/v3/wild2/trees/tree_layout.json`)와 같다(`H/results/v3/r5/unreal_parity.md`).
 
 ---
 
@@ -861,7 +874,7 @@ else                                               → GRAZE
 | G8 | FSM_R2 | 관측 19 | 요청 | 정확 | 200 (문턱 위·아래 묶음 따로) |
 | G9 | 해시·낮밤 | (seed, slot, gen), (T, o, t) | jitter·H 값, d·r·visibility·to_transition | 정확 / 1e−9 | 각 50 |
 | G10 | 끝에서 끝 논리 열 | 작은 복제 세계(초식 16, 위협 2~3, 은신처 2) 시작 상태와 스텝마다 난수 | 300스텝 동안 개체별 behavior·phase·seq와 경보 칸·위협 상태 | 논리 칸 정확 | 판 2·3 각 1 |
-| G11 | 장애물 칸 셋 (10-19, 2-4) — `H/export_golden_v3_obstacle_obs.py` | 사슴 자리·heading·위협을 앎·away·가장 가까운 위협 자리, 원판 묶음, 몸 반지름, 무대 한 변, block_sight | E·N(double), 가림, 관측 18~20(float) | 비트 단위 | 손 35 · 장면 256(숲·고지·덤불 숲·줄기 숲) · 롤아웃 144(R1b-F) |
+| G11 | 장애물 칸 셋 (10-19, 2-4) — `H/export_golden_v3_obstacle_obs.py`, C++ 시험 `Policy.V3.ObstacleObs.Golden` | 사슴 자리·heading·위협을 앎·away·가장 가까운 위협 자리, 원판 묶음, 몸 반지름, 무대 한 변, block_sight | E·N(double), 가림, 관측 18~20(float) | 비트 단위 | 손 35 · 장면 256(숲·고지·덤불 숲·줄기 숲) · 롤아웃 144(R1b-F) |
 
 - G1·G2는 다른 작업의 `H/export_weights_v3.py`(커밋 전)가 이미 낸다(보정 시드 20000~20002, 로짓 허용 1e−4). 이 계약은 그 값을 따른다.
 - G3~G10의 세계 시드도 **보정 시드 20000~20007**을 제안한다. 판정 시드(10000~10219)와 탐색·관문 시드와 겹치지 않고, f_dec·기준값 측정이 이미 쓰는 범위라 새 오염이 없다. 쓰기 전에 사전 등록 문서의 시드 목록과 한 번 더 맞춘다.

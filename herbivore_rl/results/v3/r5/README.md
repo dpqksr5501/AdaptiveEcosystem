@@ -20,14 +20,34 @@
 
 - '도망칠 쪽 거리 0' 은 모두 무대 끝에 붙어 그쪽을 보는 사슴이다(산 사슴-스텝의 약 17% 가 무대 끝에 붙어 있다 — 대부분 먹는 중).
 
+## 결론 먼저 (10-19, 언리얼 C++ 단계)
+
+- **언리얼이 관측 21 두뇌를 돌린다.** 두뇌를 관측 21 두뇌로 바꾸면 게임이 세 칸을 더 만들어 넣고, 내장 두뇌(R1b-F, 관측 18)로 돌아오면 18 칸만 만든다. 두뇌 파일 검사는 이 두 계약만 받는다.
+- **같은 식이다.** 골든 435 사례에서 C++ 과 파이썬의 세 칸이 비트 단위로 같다. 게임 안 실제 상태(세션 20000·20010, 10 초마다 산 사슴 모두 — 17,709 줄)를 파이썬으로 다시 재도 모두 비트 단위로 같다.
+- **배관이 결정을 바꾸지 않는다.** R1b-F 에 새 세 칸의 입력 열을 0 으로 붙인 두뇌(`AdaptiveEcosystem/EcoBrains/v3_r1_g995_s3_obs21zero.json`)로 240 초를 돌리면 내장 두뇌 판과 기록 줄이 두뇌 이름 말고 모두 같고,
+  사슴·스텝 664,893 개 결정의 지문(요청·로짓 비트·마스크)도 같다. 이 두뇌가 R5 이어 배우기의 시작점이다.
+- 지금 레벨은 줄기가 적어 '줄기가 늑대를 가림' 이 드물다(17,709 줄 중 7). 숲에서 10 m 안에 줄기가 있는 줄은 약 46%, 메마른 땅은 0 이다.
+
+| 확인 (`unreal_parity.md`) | 결과 |
+|---|---|
+| 세 칸 (E·N·가림·float 비트) 파이썬 재계산 대조, 관측 21 판 두 세션 | 17,709 줄 어긋남 0 |
+| away 를 가장 가까운 늑대 자리에서 다시 잼 | 어긋남 0 |
+| 세계 원판 = 파이썬 거울 배치 표 (숲 24·고지 9·메마른 땅 0) | 같음 |
+| 내장 판 대 새 열 0 판 기록 줄 `[EcoV3I]` (세션 20000) | 731 줄 다른 줄 0 |
+| 내장 + 대조 기록 판 대 새 열 0 판 결정 지문·`[EcoV3Obs]` 줄 | 지문 같음 (664,893), 8,927 줄 다른 줄 0 |
+
 ## 파일
 
 - `make_obs_config.py` → `configs/v3_wild3_obs_mirror.yaml`(언리얼과 같은 세계 + 관측 21, R5 판정 세계 1차)
 - `obs_check.py` → `obs_check.md`·`obs_check.json`(분포 확인 — 지금 두뇌 R1b-F, 시드 32000~32009 × 지역 셋 × 16 분, 세계 셋. 포화 규칙은 파일 머리에 재기 전에 적었다)
-- `golden/ObstacleObsGoldenVectorsV3.h`: 골든 사본(`export_golden_v3_obstacle_obs.py --out results/v3/r5/golden`). C++ 단계가 기본 경로 `AI/Policy/` 에 같은 바이트로 쓴다
+- `golden/ObstacleObsGoldenVectorsV3.h`: 골든 사본(`export_golden_v3_obstacle_obs.py --out results/v3/r5/golden`). 언리얼 모듈 `AI/Policy/ObstacleObsGoldenVectorsV3.h` 와 같은 바이트
+- `zero_extend.py` → `ckpt/v3/v3_r1_g995_s3_obs21zero.zip`(R5 시작점, 저장소 밖)·`AdaptiveEcosystem/EcoBrains/v3_r1_g995_s3_obs21zero.json`(R1b-F + 새 세 열 0 — 언리얼 배관 확인 두뇌)
+- `unreal_parity.py` → `unreal_parity.md`·`unreal_parity.json`(언리얼 대 파이썬 대조와 결정 기록 같음). 기록 `unreal_logs/`(`s20000_base.log` 내장, `s20000_baseprobe.log.gz` 내장 + 대조 기록,
+  `s20000_zero.log.gz`·`s20010_zero.log.gz` 새 열 0 두뇌 + 대조 기록 — 고른 줄 `[EcoV3I]`·`[EcoV3Obs]`·`[EcoV3Brain]`). 다시 만드는 명령은 `unreal_parity.py` 머리 주석
 - 시험: `tests/test_obstacle_obs.py`(끄면 직전 코드와 비트 동일, 켜도 세계 그대로, 손 사례, 세계 관측 = C++ 꼴 스칼라 참조, 리스폰 행, 마스크·계약 해시), `tests/test_obstacle_obs_golden.py`(골든 최신, g++ 스칼라 참조 435 사례 비트 단위)
+- 시험(10-19 C++ 단계): `tests/test_zero_brain_obs21.py`(새 열 0 두뇌 파일·모델 zip), 언리얼 `Policy.V3.ObstacleObs.Golden`·`ObstacleObs.World`·`Brain.LoadObs21`·`Integrated.BrainObs21Zero`
 
 ## 남은 것
 
-- C++: 관측 21 만들기(지금 두뇌의 계약이 요구하는 관측), 로더가 두 계약(18·21)만 받기, 골든 G11 시험, 빌드 두 방식·자동 시험
+- ~~C++: 관측 21 만들기, 로더가 두 계약(18·21)만 받기, 골든 G11 시험, 빌드 두 방식·자동 시험~~ — 10-19 끝 (위 'C++ 단계')
 - R5 학습 세계(절반 언리얼 세계 + 절반 무작위 숲 밀도)와 사전 등록(판정 시드 33100~33199), R1b-F 에서 새 입력 열 0 으로 이어 배우기
