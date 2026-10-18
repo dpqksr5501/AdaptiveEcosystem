@@ -412,12 +412,19 @@ def rep_argmax(policy: RepertoirePolicy, pobs: np.ndarray) -> np.ndarray:
 
 
 def is_rep_file(path) -> bool:
-    """SB3 zip 의 정책 클래스가 RepertoirePolicy 인가. torch 를 싣지 않고 data 만 읽는다."""
+    """SB3 zip 의 정책 클래스가 RepertoirePolicy 인가. torch 를 싣지 않고 data 만 읽는다.
+    설명 칸(__module__ 등)을 뺀 zip(R5 시작 모델 — results/v3/r5/zero_extend.py 가 결정성 때문에 뺀다)은 직렬화 바이트(pickle 의 모듈 이름)로 본다."""
+    import base64
+    import binascii
     import json
     import zipfile
 
     try:
         with zipfile.ZipFile(path) as z:
-            return "env_v2.rep_policy" in json.dumps(json.loads(z.read("data")).get("policy_class"))
-    except (OSError, KeyError, ValueError, zipfile.BadZipFile):
+            pc = json.loads(z.read("data")).get("policy_class")
+        if "env_v2.rep_policy" in json.dumps(pc):
+            return True
+        ser = pc.get(":serialized:") if isinstance(pc, dict) else None
+        return isinstance(ser, str) and b"env_v2.rep_policy" in base64.b64decode(ser)
+    except (OSError, KeyError, ValueError, zipfile.BadZipFile, binascii.Error):
         return False

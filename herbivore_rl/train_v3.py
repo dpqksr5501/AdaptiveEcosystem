@@ -665,6 +665,8 @@ def main(argv=None) -> int:
     if venv.region_history is not None:     # v3 R4 지역 섞기: 세계마다 고른 지역 차례(seed_history 와 같은 순서)
         meta["region_history"] = venv.region_history
         meta["seed_history"] = venv.seed_history
+    if getattr(venv, "forest_history", None) is not None:     # v3 R5 무작위 숲 섞기: 세계마다 꼴('unreal' / 'rand u=… brush=… n=…')
+        meta["forest_history"] = venv.forest_history
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"config_digest {digest}, 체크포인트 {len(cb.saved)}개, 학습한 세계 수 {meta['worlds_seen']}")
     return 0

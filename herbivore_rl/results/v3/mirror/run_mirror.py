@@ -90,7 +90,7 @@ STEPS = 1800                         # 240초 (언리얼 비교 실행과 같다
 LOG_EVERY = 75                       # 10초 (언리얼 LogEverySteps = 반올림(10 ÷ 8/60))
 STEP_SECONDS = 8.0 / 60.0            # 언리얼 kStepSeconds
 STARVING = 0.15                      # 언리얼 kStarvingEnergy
-SEED_RANGES = ((32000, 32099), (33000, 33099))   # 탐색 범위만 (판정 시드는 쓰지 않는다)
+SEED_RANGES = ((32000, 32099), (33000, 33099), (33100, 33199))   # 탐색 범위만 (판정 시드는 쓰지 않는다). 33100~33199 = R5 판정(10-19, results/v3/r5/PREREG.md)
 UNREAL_SEED_RANGE = (20000, 20019)                # 짝 비교의 언리얼 세션 시드(보정 범위 — 같은 지도를 만들 때만)
 # 언리얼 지역 → C++ 세계 난수 갈래 RngStream = 지역 번호 + 1 (EcoPolicyV3IntegratedSubsystem.cpp MakeRegionWorldConfig, 로그의 지역 번호)
 UNREAL_REGION_STREAM = {"Barren": 1, "Forest": 2, "Highland": 3}
