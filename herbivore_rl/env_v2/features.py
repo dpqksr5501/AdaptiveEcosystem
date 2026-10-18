@@ -110,6 +110,10 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     # 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md 11절). 난수 없음. 정의·식·현실 근거는 env_v2/world.py 모듈 docstring '야생 3단계'.
     # 번호 8 weather 는 v2.6 설계(맑음↔비 Markov, 먹이 재생·회복 배수)의 자리라 그대로 두고 새 번호를 받는다(규칙 4)
     "wild_weather": 31,     # 지역 날씨: 지역마다 맑음·비·눈과 세기(고정 표, 선택 시간표). 비는 시야·청각, 눈은 시야·이동(사슴이 늑대보다 더 느려짐)
+    # R5 장애물 관측(10-19 사용자 '일단 두뇌가 나무 같은 장애물을 인지할 수 있게 바꿔', 계획서 RL_V2_PLAN.md 10-19 (16)). 세계 규칙이 아니라 관측 칸 셋이다 —
+    # 켜도 동역학·난수는 그대로이고 관측 맨 끝에 escape_room·obstacle_near·threat_hidden 이 붙는다. 정의·식은 env_v2/world.py 모듈 docstring 'R5 장애물 관측',
+    # 계약 Docs/RL_Policy/POLICY_CONTRACT_V3.md 2-4
+    "obstacle_obs": 32,
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
@@ -117,7 +121,8 @@ IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_
                                          "repertoire", "threats", "stare_down", "alarm",
                                          "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
                                          "realism_cover_food", "realism_chase", "realism_terrain", "integrated_stage",
-                                         "wild_reserve", "wild_satiation", "wild_flight", "wild_pack", "obstacles", "wild_weather"})
+                                         "wild_reserve", "wild_satiation", "wild_flight", "wild_pack", "obstacles", "wild_weather",
+                                         "obstacle_obs"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -270,6 +275,11 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     #   선택 키 schedule(아래 OPTIONAL_KEYS)
     "wild_weather": frozenset({"region", "regions", "rain_sight", "rain_hear", "snow_sight", "snow_hear", "snow_deer_speed",
                                "snow_wolf_speed", "obs_visibility"}),
+    # R5 장애물 관측 (env_v2/world.py `_obstacle_obs_params`·`obstacle_obs_values`, 정의는 모듈 docstring 'R5 장애물 관측'). 다른 기능이 없어도 켤 수 있다
+    # (원판이 없으면 칸이 벽 거리·1·0 이다). 원판·몸 반지름은 obstacles 블록이 정한다.
+    #   obstacle_obs: escape_norm = 관측 escape_room(도망칠 쪽 빈 거리)의 분모(단위, 1 단위 = 2 m), near_norm = 관측 obstacle_near(몸 가장자리에서 가장 가까운
+    #   원판 가장자리까지)의 분모(단위). 둘 다 0 보다 크다. 관측 = clip(거리 ÷ 분모, 0, 1)
+    "obstacle_obs": frozenset({"escape_norm", "near_norm"}),
 })
 
 # 선택 계수 키(모듈 docstring 규칙 6, 10-14 R3): 기능 → {키: 끔 값}. 켠 블록에 없으면 끔 값(= 앞 버전 동작)으로 읽는다. 앞 버전 설정

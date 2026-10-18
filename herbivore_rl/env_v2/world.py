@@ -400,6 +400,29 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
     자연 소음 속 땅다람쥐는 더 경계한다, Le 외 2019 Anim. Behav. 157:51). 젖은 낙엽은 발소리도 줄인다(어림). 비는 40 m 앞의 빛 대비를 조금 줄이고 빗줄기·젖은
     잎 흔들림이 움직임을 가린다(어림). 큰 눈은 시정이 400 m 아래로(Rasmussen 외 1999 J. Appl. Meteor. 38:1542) 40 m 앞 대비가 약 3/4 로 준다. 사슴은 발 하중이
     늑대보다 커서 눈에 더 빠지고(Telfer & Kelsall 1984 Ecology 65:1828), 눈이 깊을수록 늑대가 사슴을 더 잡는다(Nelson & Mech 1986 J. Wildl. Manage. 50:471).
+- R5 장애물 관측 obstacle_obs (32, 10-19 사용자 '일단 두뇌가 나무 같은 장애물을 인지할 수 있게 바꿔', 계획서 Docs/RL_Policy/RL_V2_PLAN.md 10-19 (16), 계약
+  Docs/RL_Policy/POLICY_CONTRACT_V3.md 2-4). 세계 규칙이 아니라 관측 칸 셋이다: 켜도 이동·시선·먹이·난수는 그대로이고(앞 칸 값도 비트 단위로 같다
+  — tests/test_obstacle_obs.py), 관측 맨 끝(R1b 세계면 18 칸 뒤 18·19·20)에 escape_room·obstacle_near·threat_hidden 이 붙는다(`OBSTACLE_OBS_NAMES`).
+  다른 기능 없이도 켤 수 있다. 원판 D = World.obstacles(obstacles 를 끈 세계는 빈 목록), 몸 반지름 b = obstacles.body_r(끈 세계 0), 무대 [0, S]².
+  모두 스텝 끝 기하(`_geometry` — 이동 뒤 위치, 같은 관측의 위협 지각)에서 사슴마다 정한다. 식은 `obstacle_obs_values`(스칼라 C++ 와 같은 순서):
+    방향 u: 위협을 알면(관측 1 의 보임 — 눈 또는 발소리) 가장 가까운 위협의 반대 단위벡터 away_from_pred, 모르거나 그 길이가 1e-9 이하면 heading H.
+       그 벡터 w 의 길이 n = √(wx² + wy²) 이 1e-9 보다 크면 u = w ÷ n, 아니면 (1, 0).
+    (1) escape_room = clip(E ÷ escape_norm, 0, 1). E = 사슴이 u 쪽으로 곧장 갈 때 처음 막히는 거리 = min(벽 거리, 원판 거리):
+       벽: ux > 0 이면 (S − x) ÷ ux, ux < 0 이면 x ÷ (−ux), 0 이면 ∞. y 도 같고 둘 중 작은 값, 0 보다 크지 않으면 0.
+       원판 k(R = r_k + b, 이동이 멈추는 반지름): f = p − c_k, cc = (fx·fx + fy·fy) − R·R, β = fx·ux + fy·uy, Δ = β·β − cc. cc ≥ 0 ∧ β < 0 ∧ Δ ≥ 0 이면
+       t_k = −β − √Δ (아니면 막지 않음 — 원판 안에서 시작하면 그 원판은 건너뛴다. 이동 obstacle_slide 와 같다). 원판 거리 = 가장 작은 t_k.
+       은신처 원은 사슴이 드나들므로 막지 않는다.
+    (2) obstacle_near = clip(max(N, 0) ÷ near_norm, 0, 1). N = min_k (√(fx·fx + fy·fy) − (r_k + b)) = 몸 가장자리에서 가장 가까운 원판 가장자리까지. 원판이
+       없으면 N = ∞ → 1. 벽은 넣지 않는다(벽은 (1) 이 본다).
+    (3) threat_hidden = 1 이면 가장 가까운 위협(관측 1 의 보임 — (1) 의 방향을 정한 그 위협)에서 사슴까지 눈길을 원판이 가린다: a = 위협 자리, q = 사슴 자리,
+       d = q − a, dd = d·d, 원판마다 g = c − a, t = dd > 0 ? (g·d) ÷ dd : 0 을 [0, 1] 로 자르고 h = (a + t·d) − c, h·h < r_k² 인 원판이 하나라도 있으면 가림
+       (늑대가 표적을 고를 때 쓰는 sight_blocked(늑대 → 사슴)와 같은 식, 반지름은 줄기 r_k — 몸 반지름 없음). 위협을 모르거나 obstacles.block_sight 가
+       거짓이거나 원판이 없으면 0. 가린 위협이 보이는 것은 발소리로 알았을 때뿐이다 — 이 칸은 '늑대가 지금 나를 못 본다'를 알려 준다.
+  어디서나 같다: 은신처 안도 같은 식(은신처는 원판이 아니다). 벽에 붙은 사슴이 벽 쪽을 보면 E = 0. 죽은 슬롯(통합 무대 부활 없음)도 계산하지만 쓰지 않는다
+  (C++ 은 산 사슴만 만든다). 리스폰한 행은 리스폰 자리에서 다시 만든다(`_observe_subset`). 정규화는 관측 float32 에 넣기 직전에 한다(float64 → float32).
+  C++ 꼴: EcoObservationV3 의 다음 단계 함수(계약 2-4) — Away = PerceiveThreats(…).AwayFromPred, 같은 식으로 E·N·bHidden 을 만들고 BuildObservation 이 세 칸을 쓴다.
+  계수 escape_norm·near_norm(yaml) — R5 판 10·5 단위(20 m·10 m, results/v3/r5/obs_check.md 분포 확인).
+  현실 근거: 늑대에게 잡힌 엘크는 도망길이 막히는 곳에서 더 많다(Kauffman 외 2007, Ecol. Lett. 10:690). 사슴은 눈으로 앞이 트였는지·가까운 줄기를 안다.
 
 행동·관측 수는 설정에서 읽는다: `action_names(cfg)`·`action_dim(cfg)`·`obs_names(cfg)`·`obs_dim(cfg)`, 세계마다
 `World.act_names`·`World.act_dim`·`World.obs_names`·`World.obs_dim`. v1 4개(7개) 뒤에 켠 기능의 칸이 버전 순으로
@@ -647,6 +670,8 @@ DETOUR_CANDS = len(DETOUR_CAND_K)
 DETOUR_ORDER_FRESH = (0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7)
 DETOUR_ORDER_POS = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14)
 DETOUR_ORDER_NEG = (8, 9, 10, 11, 12, 13, 14, 7, 0, 1, 2, 3, 4, 5, 6)
+# R5 장애물 관측(모듈 docstring 'R5 장애물 관측', 10-19): 관측 맨 끝 세 칸의 이름. 순서가 계약이다(POLICY_CONTRACT_V3.md 2-4)
+OBSTACLE_OBS_NAMES = ("escape_room", "obstacle_near", "threat_hidden")
 
 
 WORLD_PARAM_KEYS = ("world_size", "predator_count", "pred_speed_mult", "ranged_frac", "cover_frac", "food_regen_mult")
@@ -703,6 +728,7 @@ def obs_names(cfg) -> tuple[str, ...]:
     도구는 칸을 번호가 아니라 이름으로 찾는다.
     repertoire(v3)의 obs_extra 가 true 면 뒤에 9칸(`repertoire.OBS_EXTRA_NAMES`)이 붙는다(R0 설정은 false). 그 위에 alarm(v3 R2
     M8)을 켜면 맨 끝에 alarm_heard 한 칸이 붙는다(18 → 19칸, 앞 칸 번호는 그대로).
+    obstacle_obs(R5 장애물 관측, 10-19)를 켜면 그 뒤 맨 끝에 `OBSTACLE_OBS_NAMES` 세 칸이 붙는다(R1b 세계 18 → 21칸, 앞 칸 번호는 그대로).
     """
     f = cfg if isinstance(cfg, Features) else features_of(cfg)
     names = OBS_NAMES_V1
@@ -714,6 +740,8 @@ def obs_names(cfg) -> tuple[str, ...]:
         names = names + rep.OBS_EXTRA_NAMES
         if f.enabled("alarm"):
             names = names + (rep.OBS_ALARM_NAME,)
+    if f.enabled("obstacle_obs"):       # R5 장애물 관측(10-19): 맨 끝에 세 칸(앞 칸 번호는 그대로 — R1b 세계 18 → 21칸)
+        names = names + OBSTACLE_OBS_NAMES
     return names
 
 
@@ -1723,6 +1751,79 @@ def obstacle_push_out(q: np.ndarray, discs: np.ndarray, body_r: float, size: flo
     return q, moved, failed
 
 
+def _obstacle_obs_params(p: dict, f: Features) -> dict:
+    """obstacle_obs 계수 (모듈 docstring 'R5 장애물 관측'). escape_norm·near_norm = 관측 escape_room·obstacle_near 의 분모(단위, 0 보다 크다).
+    다른 기능을 요구하지 않는다(원판이 없으면 칸이 벽 거리·1·0 이다)."""
+    n = "obstacle_obs"
+    return dict(escape_norm=_wild_num(n, p, "escape_norm", 0.0, open_lo=True), near_norm=_wild_num(n, p, "near_norm", 0.0, open_lo=True))
+
+
+def obstacle_obs_values(p: np.ndarray, head: np.ndarray, seen: np.ndarray, away: np.ndarray, threat: np.ndarray, discs: np.ndarray,
+                        body_r: float, size: float, block_sight: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """R5 장애물 관측의 거리 (모듈 docstring 'R5 장애물 관측'). p·head (n, 2) 사슴 자리·heading, seen (n,) 위협을 아나(관측 1 의 보임), away (n, 2) 가장 가까운
+    보이는 위협의 반대 단위벡터(모르면 0), threat (n, 2) 그 위협의 자리(모르면 아무 값 — 읽지 않는다), discs (K, 3) [x, y, r], body_r 몸 반지름, size 무대 한 변 S,
+    block_sight 원판이 눈길을 가리나 → (E 도망칠 쪽 빈 거리 (n,), N 몸 가장자리에서 가장 가까운 원판 가장자리까지 (n,) — 원판이 없으면 inf, 가림 (n,) bool).
+    float64. 관측 칸은 `World._obs_from` 이 E ÷ escape_norm·max(N, 0) ÷ near_norm 을 [0, 1] 로 자르고 가림을 0/1 로 넣는다.
+    C++ 꼴(사슴 하나, 원판 순서대로 — 같은 식·같은 순서라 비트 단위로 같다):
+      W = (bSeen && |Away| > 1e-9) ? Away : Head; Nw = sqrt(Wx*Wx + Wy*Wy); U = Nw > 1e-9 ? (Wx / Nw, Wy / Nw) : (1, 0);
+      Tx = Ux > 0 ? (S - X) / Ux : (Ux < 0 ? X / (-Ux) : Inf); Ty 같음; E = min(Tx, Ty); if (!(E > 0)) E = 0;
+      for k: Fx = X - Cx; Fy = Y - Cy; R = Rk + BodyR; Cc = Fx*Fx + Fy*Fy - R*R; B = Fx*Ux + Fy*Uy; D = B*B - Cc;
+             if (Cc >= 0 && B < 0 && D >= 0) E = min(E, -B - sqrt(D)); N = min(N, sqrt(Fx*Fx + Fy*Fy) - R);
+      bHidden = bSeen && bBlockSight && SightBlocked(Threat → 나)  (world.sight_blocked 와 같은 식)"""
+    n = len(p)
+    px, py = p[:, 0], p[:, 1]
+    ax, ay = away[:, 0], away[:, 1]
+    use_away = seen & (np.sqrt(ax * ax + ay * ay) > EPS)
+    wx = np.where(use_away, ax, head[:, 0])
+    wy = np.where(use_away, ay, head[:, 1])
+    nw = np.sqrt(wx * wx + wy * wy)
+    ok = nw > EPS
+    nd = np.where(ok, nw, 1.0)
+    ux = np.where(ok, wx / nd, 1.0)
+    uy = np.where(ok, wy / nd, 0.0)
+    size = float(size)
+
+    def wall(x, u):
+        num = np.where(u > 0.0, size - x, x)
+        den = np.where(u != 0.0, np.abs(u), 1.0)        # u < 0 이면 −u = |u| (부호만 바뀌어 비트 단위로 같다)
+        return np.where(u != 0.0, num / den, np.inf)
+
+    e = np.minimum(wall(px, ux), wall(py, uy))
+    e = np.where(e > 0.0, e, 0.0)
+    near = np.full(n, np.inf)
+    hidden = np.zeros(n, dtype=bool)
+    if len(discs) and n:
+        cx, cy = discs[:, 0][None, :], discs[:, 1][None, :]
+        R = (discs[:, 2] + float(body_r))[None, :]
+        fx = px[:, None] - cx
+        fy = py[:, None] - cy
+        ff = fx * fx + fy * fy
+        cc = ff - R * R
+        b = fx * ux[:, None] + fy * uy[:, None]
+        dsc = b * b - cc
+        hit = (cc >= 0.0) & (b < 0.0) & (dsc >= 0.0)
+        t = np.where(hit, -b - np.sqrt(np.where(hit, dsc, 0.0)), np.inf)
+        e = np.minimum(e, t.min(1))
+        near = (np.sqrt(ff) - R).min(1)
+        if block_sight and seen.any():
+            i = np.flatnonzero(seen)
+            a = threat[i]
+            q = p[i]
+            sx, sy = a[:, 0][:, None], a[:, 1][:, None]
+            dx = q[:, 0][:, None] - sx
+            dy = q[:, 1][:, None] - sy
+            dd = dx * dx + dy * dy
+            gx, gy = cx - sx, cy - sy
+            pos = dd > 0.0
+            tt = np.where(pos, (gx * dx + gy * dy) / np.where(pos, dd, 1.0), 0.0)
+            tt = np.minimum(np.maximum(tt, 0.0), 1.0)
+            hx = sx + tt * dx - cx
+            hy = sy + tt * dy - cy
+            r = discs[:, 2][None, :]
+            hidden[i] = (hx * hx + hy * hy < r * r).any(1)
+    return e, near, hidden
+
+
 def detour_candidates(d: np.ndarray) -> np.ndarray:
     """돌아가기 후보 방향 (모듈 docstring '야생 2단계' 3 의 6)). d (n, 2) 가려던 단위 방향 → (n, DETOUR_CANDS, 2). 후보 j 는 DETOUR_CAND_K[j]·22.5° 를
     DETOUR_CAND_SG[j] 쪽(+1 = 시계 반대)으로 돌린 방향: (dx·C − sg·(dy·S), sg·(dx·S) + dy·C), (C, S) = DETOUR_ROT[k](삼각함수 없음 — C++ 와 비트 동일).
@@ -2123,6 +2224,8 @@ class World:
         self._ob = (_obstacles_params(f.params("obstacles"), f) if f.enabled("obstacles") else None)
         # 야생 3단계(모듈 docstring '야생 3단계'): 지역 날씨. 끈 세계는 None 이고 그 코드 경로를 타지 않는다
         self._wx = (_wild_weather_params(f.params("wild_weather"), f) if f.enabled("wild_weather") else None)
+        # R5 장애물 관측(모듈 docstring 'R5 장애물 관측'): 관측 맨 끝 세 칸. 끈 세계는 None 이고 그 코드 경로를 타지 않는다(동역학은 켜도 그대로)
+        self._oo = (_obstacle_obs_params(f.params("obstacle_obs"), f) if f.enabled("obstacle_obs") else None)
         # 통계·진단 전용(설정 아님, 동역학과 무관): 참이면 기하에 사슴 × 위협 보임 행렬 wf_pvis 를 남긴다(실행기 results/v3/wild1 이 켠다)
         self.keep_pair_vis = False
         self.alive = None
@@ -2141,6 +2244,8 @@ class World:
                          if self._rp is not None and self._rp["obs_extra"] else None)
         # v3 R2 관측 alarm_heard 열 (alarm 을 켜고 obs_extra 가 true 일 때만)
         self._obs_alarm = (self.obs_names.index(rep.OBS_ALARM_NAME) if rep.OBS_ALARM_NAME in self.obs_names else None)
+        # R5 장애물 관측 세 칸의 첫 열 (obstacle_obs 를 끈 세계는 None)
+        self._obs_oo = self.obs_names.index(OBSTACLE_OBS_NAMES[0]) if self._oo is not None else None
         self.reset()
 
     # ------------------------------------------------------------------ #
@@ -3349,6 +3454,17 @@ class World:
                 vals["pred_j"] = (np.where(seen[:, 0], j, -1).astype(np.int64) if self.M > 0
                                   else np.full(n, -1, dtype=np.int64))
         vals.update(rz)                 # v3 현실성 통계 전용 칸(켠 규칙만)
+        if self._oo is not None:
+            # R5 장애물 관측(모듈 docstring 'R5 장애물 관측'): 도망칠 쪽 빈 거리 E·가장 가까운 원판 가장자리 N·가장 가까운 위협 가림. 위협을 아는 행만
+            # 그 위협 자리를 읽는다(seen 이 거짓이면 threat 행은 쓰지 않는다)
+            seen_v = np.isfinite(d_pred_min)
+            threat_xy = self.pred_pos[j] if self.M > 0 else np.zeros((n, 2))
+            ob = self._ob
+            e_esc, n_near, hid = obstacle_obs_values(P, Hd, seen_v, away, threat_xy, self.obstacles, ob["body_r"] if ob is not None else 0.0,
+                                                     self.size, bool(ob is not None and ob["block_sight"]))
+            vals["ob_escape"] = e_esc
+            vals["ob_near"] = n_near
+            vals["ob_hidden"] = hid
         if out is None:
             return vals
         for key, v in vals.items():
@@ -3384,6 +3500,11 @@ class World:
             o[:, self._obs_rep:self._obs_rep + len(rep.OBS_EXTRA_NAMES)] = rep.obs_extra(self._rs, self._rp, g, idx)
         if self._obs_alarm is not None:  # v3 R2 M8 alarm_heard (E′ 뒤 경보 상태, 리스폰 개체는 0)
             o[:, self._obs_alarm] = rep.alarm_level(self._rs, self._al, idx)
+        if self._obs_oo is not None:    # R5 장애물 관측 세 칸 (모듈 docstring 'R5 장애물 관측' — 나누고 자른 float64 를 float32 로)
+            k, oo = self._obs_oo, self._oo
+            o[:, k] = np.clip(g["ob_escape"][sl] / oo["escape_norm"], 0.0, 1.0)
+            o[:, k + 1] = np.clip(np.maximum(g["ob_near"][sl], 0.0) / oo["near_norm"], 0.0, 1.0)
+            o[:, k + 2] = np.where(g["ob_hidden"][sl], 1.0, 0.0)
         return o
 
     def _observe_subset(self, idx: np.ndarray) -> np.ndarray:

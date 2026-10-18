@@ -81,6 +81,7 @@ def test_feature_ids_are_pinned():
         "realism_vision": 19, "realism_hearing": 20, "realism_shelter": 21, "realism_night": 22, "realism_cover_food": 23,
         "realism_chase": 24, "realism_terrain": 25, "integrated_stage": 26,
         "wild_reserve": 27, "wild_satiation": 28, "wild_flight": 29, "wild_pack": 30, "wild_weather": 31,
+        "obstacle_obs": 32,
     }
     ids = list(F.FEATURE_IDS.values())
     assert len(set(ids)) == len(ids) and min(ids) >= 1    # 0 은 SeedSequence 끝 0 무시와 겹친다
@@ -233,6 +234,7 @@ def test_toggling_one_feature_keeps_other_streams(cfg2, monkeypatch, seed):
 # 야생 1단계(10-15): wild_reserve 는 daynight(하루 길이)를, wild_satiation 은 threats(v3 포식자 스텝)를, wild_flight 는 repertoire 를 쓴다.
 # 야생 2단계 2(10-17): wild_pack 은 threats(늑대 유형·잠행형 상태)를 쓴다. 야생 2단계 3(10-17): obstacles 는 v3 포식자 스텝(repertoire 또는 threats)을 쓴다.
 # 야생 3단계(10-18): wild_weather 는 speed·daynight·repertoire 를, 청각 배수가 1 보다 작은 설정은 realism_hearing 도 쓴다.
+# R5 장애물 관측(10-19): obstacle_obs 는 선행 기능이 없다(관측 칸만 더한다 — 원판이 없으면 벽 거리·1·0).
 _REP = ("speed", "daynight", "repertoire")
 PREREQS = {"vigil_window": ("speed", "vigilance"), "daynight": ("speed",), "pred_sleep": ("speed", "daynight"),
            "repertoire": ("speed", "daynight"), "threats": ("speed", "daynight"),
