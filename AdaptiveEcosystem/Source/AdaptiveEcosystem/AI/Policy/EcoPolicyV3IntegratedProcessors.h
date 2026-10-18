@@ -108,6 +108,7 @@ private:
 	TArray<FEcoIntegratedV3Fragment*> WolfInts;
 	TArray<int64> WolfIds;                  // 이번 Step 늑대 배열의 StableAgentId (밤잠 사건 줄)
 	TArray<int32> NewRows;
+	TArray<uint8> KnowsPre;                 // 이번 Step 배열의 사슴마다 스텝 앞 관측에서 늑대를 아는가 (두뇌 행동 몫 기록)
 
 	TSet<FName> ReportedMissingRegions;
 };

@@ -132,6 +132,12 @@
 //      원판으로 읽고, 표 자리와 1 cm 안이면 표 값을 그대로 쓴다(파이썬 거울 tree_layout.json 과 비트 단위로 같게 — SnapToLayout). 시작 자리 계획은
 //      같은 원판을 피한다(GatherLevelTrunks → LevelTrunkDiscs). 무대를 만들 때 팀 이동 제약이 줄기에서만 막히는지 나무마다 재 본다
 //      (ProbeLevelTrunks — 시작 줄 '[EcoV3I] <지역> 나무 |').
+//  19. 10-18 두뇌 바꾸기 (사용자 '우리가 계획한 가중치 로더 써서 두뇌 바꿔주는 기술을 한번 적용해보자', EcoV3Brain.h): 사슴 두뇌는 이제 저장소
+//      (FEcoV3BrainRegistry — 처음은 내장 R1b, 통합 모드는 얼기를 세계가 막아 R1b-F)의 지금 두뇌다. 콘솔 eco.V3Brain.Load <파일|builtin> 으로 Play 중에
+//      바꾸면 결정 스텝 경계(SyncBrain)에서 바뀐다 — 사슴 몸·행동 상태는 그대로, 허용 칸 = 새 두뇌 ∧ 세계 칸. 시작 두뇌 eco.V3Brain.Startup(-EcoV3Brain=),
+//      예정 바꾸기 eco.V3Brain.SwapAtSeconds·SwapFile(-EcoV3BrainSwapAt= -EcoV3BrainSwapTo=, 측정·시연용), 폴더 감시 eco.V3Brain.WatchFolder(기본 끔).
+//      시작 줄 '[EcoV3I] 두뇌 시작 |', 바꿀 때 '[EcoV3I] 두뇌 바꿈 |', 10 초 아홉째 줄 '[EcoV3I] <지역> 두뇌 |'(두뇌 id, 구간 두뇌 스텝의 행동 몫과
+//      늑대를 알 때의 행동 몫 — FEcoV3BrainTally). 평면 시험 경로(UEcoPolicyV3Subsystem)는 내장 두뇌 그대로다.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -146,6 +152,7 @@
 #include "Templates/UniquePtr.h"
 
 #include "EcoPolicyClock.h"
+#include "EcoV3Brain.h"
 #include "EcoWorldV3.h"
 #include "TreeLayoutV3.h"
 
@@ -511,6 +518,66 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3TrunkProbe
 	int32 CrossByTrunk = 0;    // 가로지르기가 막힌 걸음 가운데 같은 구 쓸기가 그 줄기 막이에 닿은 수 — 줄기 수와 같아야 한다
 };
 
+/**
+ * 사슴 두뇌 행동 몫 (10-18 두뇌 바꾸기 — 기록·화면 전용, 규칙이 아니다). 정의는 R4 보고 도구 herbivore_rl/results/v3/r4/situ_eval.py 와 같다:
+ * 산 사슴의 결정 스텝 하나를 그 스텝에 실제로 한 행동(FHerbDecision::ExecutedBehavior)으로 센다. '두뇌 스텝' = 도주 반사(도주·웅크림 덮기)가 덮지
+ * 않은 스텝, '늑대를 앎' = 그 스텝의 결정 관측(스텝 앞 기하)에서 pred_count > 0 (깨어 있는 늑대를 보거나 들음).
+ */
+struct ADAPTIVEECOSYSTEM_API FEcoV3BrainTally
+{
+	int64 Steps[EcoRepertoireV3::kNumBehaviors] = {};       // 두뇌 스텝 (도주 반사 밖)
+	int64 KnowSteps[EcoRepertoireV3::kNumBehaviors] = {};   // 그중 늑대를 앎
+	int64 Reflex = 0;                                       // 도주 반사가 덮은 스텝
+	int64 ReflexKnow = 0;                                   // 그중 늑대를 앎
+
+	void Add(int32 Behavior, bool bKnows, bool bReflex)
+	{
+		if (Behavior < 0 || Behavior >= EcoRepertoireV3::kNumBehaviors)
+		{
+			return;
+		}
+		if (bReflex)
+		{
+			++Reflex;
+			ReflexKnow += bKnows ? 1 : 0;
+			return;
+		}
+		++Steps[Behavior];
+		KnowSteps[Behavior] += bKnows ? 1 : 0;
+	}
+	int64 Total() const
+	{
+		int64 N = 0;
+		for (const int64 V : Steps)
+		{
+			N += V;
+		}
+		return N;
+	}
+	int64 KnowTotal() const
+	{
+		int64 N = 0;
+		for (const int64 V : KnowSteps)
+		{
+			N += V;
+		}
+		return N;
+	}
+	/** 이 집계 − O (기록 구간). */
+	FEcoV3BrainTally Minus(const FEcoV3BrainTally& O) const
+	{
+		FEcoV3BrainTally D;
+		for (int32 b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+		{
+			D.Steps[b] = Steps[b] - O.Steps[b];
+			D.KnowSteps[b] = KnowSteps[b] - O.KnowSteps[b];
+		}
+		D.Reflex = Reflex - O.Reflex;
+		D.ReflexKnow = ReflexKnow - O.ReflexKnow;
+		return D;
+	}
+};
+
 /** 한 지역의 v3 세계 (무대 하나 = 학습 세계 하나). */
 struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 {
@@ -612,6 +679,11 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int64 NearEatingDeerSteps = 0;            // 식사 중(쿨다운 > 0)인 깨어 있는 늑대의 15 m 안에 있던 산 사슴 (개체·스텝, 스텝 끝)
 	int64 LastLogNearEatingDeerSteps = 0;
 	int32 KeepNow[EcoWorldV3::kNumKeepModes] = {};   // 프레임 끝 산 사슴의 덮기 (화면 집계)
+
+	// 두뇌 행동 몫 (10-18 두뇌 바꾸기, 처리기가 결정 스텝마다 채운다 — FEcoV3BrainTally)
+	FEcoV3BrainTally BrainTally;              // 누적 (Play 시작부터)
+	FEcoV3BrainTally LastLogBrainTally;       // 지난 기록 줄의 누적
+	FEcoV3BrainTally SinceSwapBrainTally;     // 지금 두뇌로 바뀐 뒤 (화면 '늑대를 알 때 숨기')
 
 	/**
 	 * 늑대 하나의 결정 스텝 하나를 센다 (처리기가 Step 뒤에 부른다. StepIndex = 이번 스텝 번호 = Step 뒤 Sim.T − 1).
@@ -827,6 +899,20 @@ public:
 	void NotifyNightStep(FEcoV3RegionContext& Ctx, EcoWorldV3::FThreatAgent* const* Threats, const int64* WolfIds, int32 NumWolves);
 	/** [EcoV3I] 기록 줄을 지금 남긴다. */
 	void LogContext(FEcoV3RegionContext& Ctx);
+	// ---- 두뇌 (10-18 실행 중 가중치 로더 — EcoV3Brain.h) ----
+
+	/**
+	 * 결정 스텝 경계 (처리기가 Execute 머리(bPollWatch 참)와 전역 스텝마다 부른다): 예정 바꾸기(eco.V3Brain.SwapAtSeconds — 전역 스텝 × 2/15 초가 그 시각
+	 * 이상인 첫 경계)·폴더 감시를 보고, 저장소의 대기 두뇌를 지금 두뇌로 바꾸고, 바뀌었으면 모든 지역 세계의 허용 칸을 새 두뇌 ∧ 세계 칸으로 다시 정하고
+	 * '[EcoV3I] 두뇌 바꿈' 한 줄을 남긴다 (처음 한 번은 '[EcoV3I] 두뇌 시작'). 사슴 몸·행동 상태·요청은 건드리지 않는다.
+	 */
+	void SyncBrain(bool bPollWatch);
+	/** 이 월드가 지금 쓰는 두뇌 (SyncBrain 전에는 저장소의 지금 두뇌). */
+	const FEcoV3Brain& GetActiveBrain() const;
+	const EcoPolicyV3::FPolicyNetV3& ActiveNet() const { return GetActiveBrain().Net; }
+	/** 마지막으로 두뇌를 바꾼 전역 스텝 (이 Play 에서 바꾼 적이 없으면 -1). 그 스텝부터의 결정은 새 두뇌다. */
+	int64 GetLastBrainSwapStep() const { return LastBrainSwapStep; }
+
 	/** 처리기가 한 프레임에 결정 스텝 Steps 개(모든 지역)를 돈 시간 (기록 줄의 '결정 스텝 CPU'). */
 	void AddStepCpuSeconds(double Seconds, int32 Steps)
 	{
@@ -917,6 +1003,13 @@ private:
 	double StepCpuSeconds = 0.0;          // 시작부터 결정 스텝(모든 지역) 누적 시간
 	int64 StepCpuSteps = 0;
 	double StepCpuMaxFrameSeconds = 0.0;  // 한 프레임의 결정 스텝 시간 최댓값 (스텝이 몰린 프레임의 끊김)
+
+	// 두뇌 (SyncBrain)
+	FEcoV3BrainPtr ActiveBrain;           // 이 월드가 지금 쓰는 두뇌 (첫 SyncBrain 전에는 비어 있다)
+	uint32 AppliedBrainGen = 0;           // 지역 세계 허용 칸에 반영한 저장소 세대 (0 = 아직)
+	bool bScheduledSwapDone = false;      // 이 Play 의 예정 바꾸기를 했다 (성공·거부 모두 한 번만)
+	int64 LastBrainSwapStep = -1;
+	FString LastBrainSwapFrom;            // 마지막으로 바꾸기 전 두뇌 id (기록 줄 '구간 중 바꿈')
 
 	FDelegateHandle PreTickHandle;
 

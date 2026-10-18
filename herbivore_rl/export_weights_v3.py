@@ -36,6 +36,19 @@ v1 `export_weights.py`(7-64-64-4, sigmoid 출력)는 그대로 둔다. 이 스�
 
 결정성: 헤더에는 시각·절대 경로를 적지 않는다. 같은 모델·설정·코드면 바이트 단위로 같은 헤더가 나온다(tests/test_export_v3.py).
 torch 는 스레드 1 로 돈다(`env.torch_init`, main 안에서도 다시 고정한다).
+
+두뇌 파일 (10-18, 실행 중 가중치 로더 — 언리얼 `AI/Policy/EcoV3Brain.h`, 계획서 RL_SEASON_RETRAIN_PLAN.md 4.4.2):
+
+    # 헤더는 쓰지 않고 두뇌 파일 하나만 쓴다 (빌드 없이 Play 중에 eco.V3Brain.Load 로 바꿔 끼운다)
+    python export_weights_v3.py --model ckpt/v3/v3_r4_g995_s0_20m.zip --brain-file ../AdaptiveEcosystem/EcoBrains/v3_r4_g995_s0_20m.json
+
+  JSON 하나(`BRAIN_FORMAT` 판 `BRAIN_FORMAT_VERSION`): 계약(관측 이름·행동 이름·망 모양·마스크 판·문턱 — `contract_dict` 그대로)과 계약 해시,
+  허용 칸, 세 층 가중치(float32 리틀 엔디언 바이트를 base64 로 — 십진 반올림이 없다), 그 바이트의 sha256, 모델 zip 경로·sha256,
+  학습 세계(모델 옆 학습 기록의 설정·지문 + 사람이 읽을 이름), 자체 확인 골든(관측 + 마스크 → torch 원 로짓 5 + 마스크 argmax).
+  골든은 언리얼과 같은 세계(`BRAIN_GOLDEN_CONFIG`) 한 시드를 모델 자신의 argmax 로 돌려 고른 결정 시점(행동별)과 균등 난수 관측이다.
+  허용 칸 1·2위 로짓 차가 NEAR_TIE_GAP 보다 작은 사례는 넣지 않는다(float32 순서 차이로 argmax 가 갈릴 수 있다).
+  언리얼 로더는 버전·차원·이름·마스크·문턱·모양·NaN·sha256 을 보고, 골든을 C++ 순전파(EcoPolicyV3Inference.h)로 다시 돌려
+  로짓이 허용 오차 안이고 행동이 같아야 받는다. 시각·절대 경로를 적지 않아 같은 모델이면 바이트 단위로 같은 파일이 나온다.
 """
 
 from __future__ import annotations
@@ -73,6 +86,18 @@ SELECT_SEED = 3                          # 표본 고르기 난수 (결정적)
 
 KIND_DECIDE, KIND_NONDEC, KIND_SYNTH = 0, 1, 2          # 본 묶음 사례 종류
 NT_ROLLOUT, NT_BISECT = 0, 1                            # 근접 동점 사례 종류
+
+# 두뇌 파일 (모듈 docstring '두뇌 파일')
+BRAIN_FORMAT = "eco_v3_brain"
+BRAIN_FORMAT_VERSION = 1
+BRAIN_GOLDEN_CONFIG = ROOT / "configs" / "v3_wild3_mirror.yaml"   # 언리얼 통합 레벨과 같은 세계 (나무 + 지역 날씨, 관측 18)
+BRAIN_GOLDEN_SEED = 32099              # 파이썬 탐색 시드 칸(32000~32099)의 끝 — 학습·판정·고르기에 쓰지 않는다
+BRAIN_GOLDEN_STEPS = 600
+BRAIN_PER_ACTION = 6                   # 다중 칸 결정 시점을 고른 행동별로 많아야 이만큼
+BRAIN_N_SINGLE = 2                     # 한 칸 마스크 결정 시점
+BRAIN_N_RANDOM = 6                     # 균등 난수 관측 (마스크 = 모델 허용 칸)
+BRAIN_LAYERS = (("W0", "B0", "mlp_extractor.policy_net.0"), ("W1", "B1", "mlp_extractor.policy_net.2"),
+                ("W2", "B2", "action_net"))
 
 
 # --------------------------------------------------------------------- #
@@ -683,6 +708,153 @@ namespace EcoPolicyV3::Golden
 
 
 # --------------------------------------------------------------------- #
+# 두뇌 파일 (실행 중 가중치 로더)
+# --------------------------------------------------------------------- #
+
+
+def weights_bytes(w: dict) -> bytes:
+    """세 층 가중치를 언리얼 로더와 같은 순서(W0, B0, W1, B1, W2, B2)·float32 리틀 엔디언으로 이은 바이트. sha256 은 이 바이트에 건다."""
+    return b"".join(np.ascontiguousarray(w[k], dtype="<f4").tobytes() for wk, bk, _ in BRAIN_LAYERS for k in (wk, bk))
+
+
+def _f32(x) -> float:
+    """float32 값을 그대로 담은 파이썬 float (json 이 적는 십진을 double 로 읽어 float 로 내리면 같은 float32 다)."""
+    return float(np.float32(x))
+
+
+def brain_golden(model, w: dict, cfg, seed: int = BRAIN_GOLDEN_SEED, steps: int = BRAIN_GOLDEN_STEPS) -> dict:
+    """두뇌 파일 자체 확인 골든: 세계 한 시드를 모델 자신의 argmax 로 돌려 다중 칸 결정 시점(고른 행동별)·한 칸 결정 시점을 고르고,
+    균등 난수 관측(마스크 = 모델 허용 칸)을 더한다. 근접 동점(허용 칸 1·2위 차 < NEAR_TIE_GAP)은 뺀다. 기대값은 torch 원 로짓·배포 argmax."""
+    from env_v2.rep_policy import policy_obs
+    from env_v2.repertoire import BEHAVIOR_NAMES
+
+    pol = model.policy
+    names = tuple(pol.rep_obs_names)
+    p = collect_rollout(model, cfg, seed, steps)
+    if p["obs_names"] != names:
+        raise SystemExit(f"골든 세계 관측 {list(p['obs_names'])} 이 모델 관측 {list(names)} 과 다르다")
+    raw, act = torch_logits(pol, policy_obs(p["obs"], p["mask"]))
+    gap = top_gap(raw, p["mask"])
+    nm = p["mask"].sum(1)
+    multi = p["reads"] & (nm > 1) & (gap >= NEAR_TIE_GAP)
+    single = p["reads"] & (nm == 1)
+    rng = np.random.default_rng(SELECT_SEED)
+    picks, kinds = [], []
+    for a in range(len(BEHAVIOR_NAMES)):
+        idx = _pick(rng, np.flatnonzero(multi & (act == a)), BRAIN_PER_ACTION)
+        picks += idx.tolist()
+        kinds += ["rollout"] * len(idx)
+    idx = _pick(rng, np.flatnonzero(single), BRAIN_N_SINGLE)
+    picks += idx.tolist()
+    kinds += ["single"] * len(idx)
+    obs = [p["obs"][i] for i in picks]
+    mask = [p["mask"][i] for i in picks]
+    src = [(int(p["seed"][i]), int(p["step"][i]), int(p["agent"][i])) for i in picks]
+
+    allowed = np.array([b in tuple(pol.rep_allowed) for b in BEHAVIOR_NAMES], dtype=bool)
+    srng = np.random.default_rng(SELECT_SEED + 1)
+    cand = srng.random((BRAIN_N_RANDOM * 4, len(names)), dtype=np.float32)
+    cmask = np.tile(allowed, (len(cand), 1))
+    c_raw, _ = torch_logits(pol, policy_obs(cand, cmask))
+    keep = np.flatnonzero(top_gap(c_raw, cmask) >= NEAR_TIE_GAP)[:BRAIN_N_RANDOM]
+    for i in keep:
+        obs.append(cand[i])
+        mask.append(cmask[i])
+        kinds.append("random")
+        src.append((-1, -1, int(i)))
+
+    obs = np.stack(obs).astype(np.float32)
+    mask = np.stack(mask).astype(bool)
+    logits, act = torch_logits(pol, policy_obs(obs, mask))
+    if np.any(top_gap(logits, mask) < NEAR_TIE_GAP):
+        raise SystemExit("두뇌 골든에 근접 동점이 남았다")
+    err = float(np.abs(forward_np(obs, w, np.float32) - logits).max())
+    return dict(obs=obs, mask=mask, logits=logits, act=act, kind=kinds, src=src, err_np32=err,
+                pool=dict(multi=int(multi.sum()), single=int(single.sum()), near_tie=int((p["reads"] & (nm > 1) & (gap < NEAR_TIE_GAP)).sum())))
+
+
+def brain_dict(model, model_path: Path, golden_config: Path, seed: int = BRAIN_GOLDEN_SEED, steps: int = BRAIN_GOLDEN_STEPS,
+               world_label: str | None = None) -> dict:
+    """두뇌 파일 내용 (dict, 키 순서 고정). 모듈 docstring '두뇌 파일'."""
+    import base64
+
+    from env_v2.config import load_v2_config
+    from env_v2.rep_policy import ALARM_MASK_OBS, HIDE_COVER_OBS, MASK_LOGIT, THREAT_RECENCY_OBS, check_mask_version
+    from env_v2.repertoire import BEHAVIOR_NAMES
+
+    pol = model.policy
+    names = tuple(pol.rep_obs_names)
+    mver = int(getattr(pol, "rep_mask_version", 1))
+    check_mask_version(mver, names)
+    w = extract(model)
+    cfg = load_v2_config(Path(golden_config))
+    g = brain_golden(model, w, cfg, seed, steps)
+    tm = train_meta(model_path)
+    allowed = tuple(pol.rep_allowed)
+    wsha = hashlib.sha256(weights_bytes(w)).hexdigest()
+    layers = []
+    for wk, bk, tag in BRAIN_LAYERS:
+        out_dim, in_dim = w[wk].shape
+        layers.append({"name": tag, "weight": wk, "bias": bk, "out": int(out_dim), "in": int(in_dim),
+                       "w_f32le_b64": base64.b64encode(np.ascontiguousarray(w[wk], dtype="<f4").tobytes()).decode("ascii"),
+                       "b_f32le_b64": base64.b64encode(np.ascontiguousarray(w[bk], dtype="<f4").tobytes()).decode("ascii")})
+    cases = []
+    for k in range(len(g["obs"])):
+        cases.append({"kind": g["kind"][k], "src": list(g["src"][k]), "obs": [_f32(v) for v in g["obs"][k]],
+                      "mask": [int(b) for b in g["mask"][k]], "logits": [_f32(v) for v in g["logits"][k]], "action": int(g["act"][k])})
+    name = Path(model_path).stem
+    return {
+        "format": BRAIN_FORMAT,
+        "format_version": BRAIN_FORMAT_VERSION,
+        "id": f"{name}@{wsha[:8]}",
+        "contract": contract_dict(names, mver),
+        "contract_hash": f"0x{contract_hash(names, mver):016x}",
+        "obs_dim": len(names),
+        "hidden": HIDDEN,
+        "num_behaviors": len(BEHAVIOR_NAMES),
+        "obs_names": list(names),
+        "behaviors": list(BEHAVIOR_NAMES),
+        "mask_version": mver,
+        "allowed": list(allowed),
+        "allowed_mask": [int(b in allowed) for b in BEHAVIOR_NAMES],
+        "thresholds": {"threat_recency_obs": _f32(THREAT_RECENCY_OBS), "hide_cover_obs": _f32(HIDE_COVER_OBS),
+                       "alarm_mask_obs": _f32(ALARM_MASK_OBS), "mask_logit": _f32(MASK_LOGIT)},
+        "layers": layers,
+        "weights_sha256": wsha,
+        "model": {"name": name, "path": rel(model_path), "sha256": file_sha256(model_path)},
+        "train": {"config": tm["config"], "config_digest": tm["config_digest"],
+                  "world": world_label if world_label else Path(tm["config"]).stem},
+        "golden": {"world_config": rel(golden_config), "world_digest": config_digest(cfg), "seed": int(seed), "steps": int(steps),
+                   "logit_tolerance": _f32(LOGIT_TOL), "near_tie_gap": _f32(NEAR_TIE_GAP), "count": len(cases),
+                   "pool": g["pool"], "err_np32": g["err_np32"], "cases": cases},
+        "exporter": "herbivore_rl/export_weights_v3.py --brain-file",
+    }
+
+
+def write_brain_file(path: Path, d: dict) -> None:
+    """두뇌 파일 쓰기 (UTF-8, LF, 키 순서 그대로 — 같은 모델이면 바이트 단위로 같다)."""
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
+
+
+def export_brain_file(model_path: Path, out_file: Path, golden_config: Path = BRAIN_GOLDEN_CONFIG, seed: int = BRAIN_GOLDEN_SEED,
+                      steps: int = BRAIN_GOLDEN_STEPS, world_label: str | None = None) -> dict:
+    """두뇌 파일 하나를 쓴다 (헤더는 쓰지 않는다). 반환: 파일 dict."""
+    model_path = Path(model_path)
+    if not model_path.exists():
+        raise SystemExit(f"{model_path} 없음")
+    prev_threads = th.get_num_threads()
+    th.set_num_threads(1)
+    try:
+        model = load_model(model_path)
+        d = brain_dict(model, model_path, Path(golden_config), seed, steps, world_label)
+    finally:
+        th.set_num_threads(prev_threads)
+    write_brain_file(Path(out_file), d)
+    return d
+
+
+# --------------------------------------------------------------------- #
 
 
 def export(model_path: Path, config: Path, alarm_config: Path, out: Path, seeds=GOLDEN_SEEDS,
@@ -733,7 +905,23 @@ def main(argv=None) -> int:
     p.add_argument("--seeds", type=int, nargs="+", default=list(GOLDEN_SEEDS))
     p.add_argument("--steps", type=int, default=GOLDEN_STEPS)
     p.add_argument("--out", default=str(UE_POLICY_DIR), help="헤더를 쓸 폴더 (기본: 언리얼 모듈 AI/Policy)")
+    p.add_argument("--brain-file", default=None,
+                   help="주면 헤더 대신 실행 중 가중치 로더의 두뇌 파일(JSON) 하나만 쓴다 (모듈 docstring '두뇌 파일')")
+    p.add_argument("--golden-config", default=str(BRAIN_GOLDEN_CONFIG), help="두뇌 파일 골든 세계 (모델 관측과 같아야 한다)")
+    p.add_argument("--golden-seed", type=int, default=BRAIN_GOLDEN_SEED)
+    p.add_argument("--golden-steps", type=int, default=BRAIN_GOLDEN_STEPS)
+    p.add_argument("--world-label", default=None, help="두뇌 파일 train.world (사람이 읽을 학습 세계 이름, 기본: 학습 설정 파일 이름)")
     args = p.parse_args(argv)
+
+    if args.brain_file:
+        d = export_brain_file(Path(args.model), Path(args.brain_file), Path(args.golden_config), args.golden_seed, args.golden_steps,
+                              args.world_label)
+        g = d["golden"]
+        print(f"두뇌: {d['id']}  관측 {d['obs_dim']}  마스크 판 {d['mask_version']}  허용 {' '.join(d['allowed'])}  계약 {d['contract_hash']}")
+        print(f"가중치 sha256 {d['weights_sha256']}  모델 sha256 {d['model']['sha256'][:16]}  학습 {d['train']['config']} ({d['train']['world']})")
+        print(f"골든 {g['count']} (세계 {g['world_config']} 시드 {g['seed']} × {g['steps']}, NumPy 오차 {g['err_np32']:.3e})")
+        print(f"생성: {args.brain_file}")
+        return 0
 
     r = export(Path(args.model), Path(args.config), Path(args.alarm_config), Path(args.out), args.seeds, args.steps)
     m, s, c = r["meta"], r["stats"], r["counts"]

@@ -1315,6 +1315,19 @@ namespace EcoWorldV3
 		UpdateDayNight(W);
 	}
 
+	/**
+	 * 실제 허용 칸을 모델 허용 칸 ∧ 세계 칸(Config.WorldAllowed)으로 다시 정한다. InitWorld 는 내장 모델 kAllowedMask 로 정하고,
+	 * 실행 중 두뇌 바꾸기(언리얼 EcoV3Brain.h — 통합 모드의 결정 스텝 경계)가 새 두뇌의 허용 칸으로 이 함수를 부른다.
+	 * 내장 kAllowedMask 를 넘기면 InitWorld 와 비트 단위로 같다 (파이썬 rep_policy.effective_allowed 와 같은 꼴).
+	 */
+	inline void SetModelAllowed(FWorldState& W, const std::uint8_t ModelAllowed[EcoRepertoireV3::kNumBehaviors])
+	{
+		for (std::int32_t b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+		{
+			W.Allowed[b] = (ModelAllowed[b] != 0 && W.Config.WorldAllowed[b] != 0) ? 1 : 0;
+		}
+	}
+
 	/** 세로 장애물 밀어내기를 걸고 기록한다 (원판이 없으면 아무것도 안 한다). */
 	inline void PushOutAndCount(FWorldState& W, FVec2& P, bool bWolf)
 	{

@@ -869,6 +869,23 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.RealismHearing"), LexToString(HearingArg));
 	}
+	// 두뇌 바꾸기 (10-18, EcoV3Brain.h — 개발 빌드. 파일 이름·경로는 쉼표에서 끊지 않는다)
+	const TCHAR* const BrainArgs[3][2] = {{TEXT("EcoV3Brain="), TEXT("eco.V3Brain.Startup")},
+										  {TEXT("EcoV3BrainSwapTo="), TEXT("eco.V3Brain.SwapFile")},
+										  {TEXT("EcoV3BrainWatch="), TEXT("eco.V3Brain.WatchFolder")}};
+	for (const auto& Pair : BrainArgs)
+	{
+		FString Value;
+		if (FParse::Value(CmdLine, Pair[0], Value, false) && !Value.IsEmpty())
+		{
+			SetIfUnset(Pair[1], Value);
+		}
+	}
+	float SwapAtArg = -1.0f;
+	if (FParse::Value(CmdLine, TEXT("EcoV3BrainSwapAt="), SwapAtArg))
+	{
+		SetIfUnset(TEXT("eco.V3Brain.SwapAtSeconds"), LexToString(SwapAtArg));
+	}
 }
 
 int32 UEcoPolicyV3IntegratedSubsystem::GetRequestedVersion()
@@ -1094,6 +1111,34 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		   Settings.bRealismVision ? TEXT("300° (eco.IntegratedV3.RealismVision 1 — 바로 뒤 60° 만 사각)") : TEXT("120° (eco.IntegratedV3.RealismVision 0 — R1b 그대로)"),
 		   Settings.bRealismHearing ? TEXT("켬 (eco.IntegratedV3.RealismHearing 1 — 쫓아 달리면 최대 40 m, 어슬렁거리면 4 m, 서 있으면 없음)")
 									: TEXT("끔 (eco.IntegratedV3.RealismHearing 0)"));
+	{
+		// 두뇌 바꾸기 (10-18, EcoV3Brain.h): 시작 두뇌는 줄에 넣어 첫 결정 스텝 경계(SyncBrain)에서 바꾼다 — 입양 첫 결정부터 그 두뇌다
+		FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+		const FString Startup = EcoV3Brain::StartupFile();
+		if (!Startup.IsEmpty())
+		{
+			const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(Startup);
+			if (L.Ok())
+			{
+				Reg.Queue(L.Brain.ToSharedRef(), FString::Printf(TEXT("시작 두뇌 eco.V3Brain.Startup %s"), *Startup));
+			}
+			else
+			{
+				UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 시작 두뇌 eco.V3Brain.Startup '%s' 거부 (%s): %s — %s 로 시작한다"), *Startup,
+					   EcoV3Brain::RejectName(L.Reason), *L.Message, *Reg.GetActive()->Id);
+			}
+		}
+		const float SwapAt = EcoV3Brain::SwapAtSeconds();
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] 사슴 두뇌: 지금 %s%s | 내장 %s | 예정 바꾸기 %s | 폴더 감시 %s | 바꾸기 eco.V3Brain.Load <파일|builtin> (결정 스텝 경계에서, Play 그대로), ")
+				   TEXT("보기 eco.V3Brain.Info·List, 찾는 폴더 %s"),
+			   *Reg.GetActive()->Describe(), Reg.GetPending().IsValid() ? *FString::Printf(TEXT(" → 첫 결정 스텝에 %s"), *Reg.GetPending()->Id) : TEXT(""),
+			   *FEcoV3BrainRegistry::Builtin()->Id,
+			   SwapAt >= 0.0f ? *FString::Printf(TEXT("%.1f초에 %s (eco.V3Brain.SwapAtSeconds·SwapFile — 측정·시연용)"), SwapAt, *EcoV3Brain::SwapFile())
+							  : TEXT("끔"),
+			   EcoV3Brain::WatchFolder().IsEmpty() ? TEXT("끔 (eco.V3Brain.WatchFolder)") : *EcoV3Brain::WatchFolder(),
+			   *FString::Join(FEcoV3BrainRegistry::SearchFolders(), TEXT(" · ")));
+	}
 }
 
 void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
@@ -1114,6 +1159,8 @@ void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
 	TeamValues = FEcoV3SpawnerTeamValues();
 	TeamHerbivoreConfig = nullptr;
 	TeamWolfConfig = nullptr;
+	ActiveBrain.Reset();   // 저장소(프로세스에 하나)의 지금 두뇌는 그대로 — 다음 Play 도 그 두뇌로 시작한다 (eco.V3Brain.Load builtin 으로 되돌린다)
+	AppliedBrainGen = 0;
 	Super::Deinitialize();
 }
 
@@ -2922,6 +2969,8 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	Ctx->PlannedDeer = PlannedDeer;
 	Ctx->PlannedWolves = PlannedWolves;
 	EcoWorldV3::InitWorld(Ctx->Sim, Config);
+	// 허용 칸 = 지금 두뇌 ∧ 세계 칸 (내장 두뇌면 InitWorld 그대로 — 두뇌가 바뀌면 SyncBrain 이 다시 정한다)
+	EcoWorldV3::SetModelAllowed(Ctx->Sim, GetActiveBrain().Allowed);
 	Ctx->Sim.T = GlobalT;
 	EcoWorldV3::UpdateDayNight(Ctx->Sim);
 	Ctx->LastLogT = GlobalT;
@@ -2992,6 +3041,82 @@ float UEcoPolicyV3IntegratedSubsystem::GetVisualAlpha() const
 {
 	const int32 Interval = FMath::Max(EcoBehaviorConfig::PolicyInterval, 1);
 	return FMath::Clamp(static_cast<float>(ClockPhase) / static_cast<float>(Interval), 0.0f, 1.0f);
+}
+
+// -----------------------------------------------------------------------------
+// 두뇌 (10-18 실행 중 가중치 로더 — EcoV3Brain.h)
+// -----------------------------------------------------------------------------
+
+const FEcoV3Brain& UEcoPolicyV3IntegratedSubsystem::GetActiveBrain() const
+{
+	return ActiveBrain.IsValid() ? *ActiveBrain : *FEcoV3BrainRegistry::Get().GetActive();
+}
+
+void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
+{
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	const double Seconds = static_cast<double>(GlobalT) * EcoRepertoireV3::kStepSeconds;
+	// 예정 바꾸기 (측정·시연용): 전역 스텝 × 2/15 초가 그 시각 이상인 첫 경계에서 한 번
+	if (!bScheduledSwapDone)
+	{
+		const float At = EcoV3Brain::SwapAtSeconds();
+		if (At >= 0.0f && Seconds + 1e-9 >= static_cast<double>(At))
+		{
+			bScheduledSwapDone = true;
+			const FString File = EcoV3Brain::SwapFile();
+			const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(File);
+			if (L.Ok())
+			{
+				Reg.Queue(L.Brain.ToSharedRef(), FString::Printf(TEXT("예정 바꾸기 eco.V3Brain.SwapAtSeconds %.1f · SwapFile %s"), At, *File));
+			}
+			else
+			{
+				UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 예정 두뇌 바꾸기 '%s' 거부 (%s): %s — %s 그대로"), *File, EcoV3Brain::RejectName(L.Reason), *L.Message,
+					   *GetActiveBrain().Id);
+			}
+		}
+	}
+	if (bPollWatch)
+	{
+		Reg.PollWatch(FPlatformTime::Seconds());
+	}
+	FString Why;
+	const bool bSwapped = Reg.CommitPending(nullptr, &Why);
+	if (ActiveBrain.IsValid() && AppliedBrainGen == Reg.GetGeneration())
+	{
+		return;
+	}
+	const FEcoV3BrainRef Now = Reg.GetActive();
+	const FEcoV3BrainPtr Before = ActiveBrain;
+	FString AllowedByRegion;
+	for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
+	{
+		EcoWorldV3::SetModelAllowed(Ctx->Sim, Now->Allowed);
+		Ctx->SinceSwapBrainTally = FEcoV3BrainTally();
+		AllowedByRegion += FString::Printf(TEXT("%s%s %s"), AllowedByRegion.IsEmpty() ? TEXT("") : TEXT(" · "), *Ctx->RegionId.ToString(),
+										   *EcoV3Brain::AllowedText(Ctx->Sim.Allowed));
+	}
+	if (AllowedByRegion.IsEmpty())
+	{
+		AllowedByRegion = TEXT("(지역 세계 없음)");
+	}
+	if (!Before.IsValid())
+	{
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 두뇌 시작 | %.1f초 (전역 스텝 %lld) | %s%s | 허용(모델 ∧ 세계): %s"), Seconds, static_cast<long long>(GlobalT),
+			   *Now->Describe(), bSwapped ? *FString::Printf(TEXT(" — 대기 두뇌로 시작 (%s)"), *Why) : TEXT(""), *AllowedByRegion);
+	}
+	else
+	{
+		LastBrainSwapStep = GlobalT;
+		LastBrainSwapFrom = Before->Id;
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] 두뇌 바꿈 | %.1f초 (전역 스텝 %lld) | %s → %s | 까닭: %s | 허용(모델 ∧ 세계): %s | 사슴 몸·행동 상태 그대로 — 이 스텝은 앞 두뇌가 ")
+				   TEXT("정한 요청을 실행하고, 이 스텝 끝 결정부터 새 두뇌 | 학습 %s | 골든 %d 사례 최대 로짓 오차 %.2e"),
+			   Seconds, static_cast<long long>(GlobalT), *Before->Id, *Now->Describe(), bSwapped ? *Why : TEXT("저장소 되돌림"), *AllowedByRegion,
+			   *Now->TrainWorld, Now->GoldenCount, Now->GoldenMaxError);
+	}
+	ActiveBrain = Now;
+	AppliedBrainGen = Reg.GetGeneration();
 }
 
 // -----------------------------------------------------------------------------
@@ -3388,6 +3513,30 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   static_cast<long long>(S.WeatherSteps[EcoWorldV3::kWeatherRain]), static_cast<long long>(S.WeatherSteps[EcoWorldV3::kWeatherSnow]), *Bands,
 			   static_cast<long long>(S.SenseHeardOnly), static_cast<long long>(S.SenseLiveSteps), Pc(S.SenseHeardOnly, S.SenseLiveSteps));
 	}
+	// 아홉째 줄: 사슴 두뇌 (10-18 두뇌 바꾸기, 늘 적는다). 지금 두뇌 id 와 구간 두뇌 스텝(도주 반사 밖)의 행동 몫, 그중 늑대를 알 때의 행동 몫
+	//   (FEcoV3BrainTally — R4 situ_eval.py 와 같은 정의). 앞 여덟 줄의 정규식은 '<지역> 두뇌 |' 꼴에 걸리지 않는다
+	{
+		const FEcoV3BrainTally D = Ctx.BrainTally.Minus(Ctx.LastLogBrainTally);
+		auto Shares = [](const int64* Arr, int64 Tot)
+		{
+			FString Out;
+			for (int32 b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+			{
+				Out += FString::Printf(TEXT("%s%s %lld (%.1f%%)"), b == 0 ? TEXT("") : TEXT(" · "), BehaviorNameKo(b), static_cast<long long>(Arr[b]),
+									   Tot > 0 ? 100.0 * static_cast<double>(Arr[b]) / static_cast<double>(Tot) : 0.0);
+			}
+			return Out;
+		};
+		// 이 구간 안에서 바꿨으면 (스텝 LastLogT 뒤·지금 앞의 경계) 앞 두뇌도 적는다 — 구간 몫이 두 두뇌에 걸친다
+		const bool bMixed = LastBrainSwapStep > Ctx.LastLogT && LastBrainSwapStep < Ctx.Sim.T;
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 두뇌 | %.1f초 | 두뇌 %s%s | 구간 두뇌 스텝(도주 반사 밖) %lld: %s | 그중 늑대를 앎 %lld: %s | 반사 스텝 %lld (늑대를 앎 %lld)"),
+			   *Ctx.RegionId.ToString(), Seconds, *GetActiveBrain().Id,
+			   bMixed ? *FString::Printf(TEXT(" (구간 중 바꿈: 전역 스텝 %lld 에 %s →)"), static_cast<long long>(LastBrainSwapStep), *LastBrainSwapFrom) : TEXT(""),
+			   static_cast<long long>(D.Total()), *Shares(D.Steps, D.Total()), static_cast<long long>(D.KnowTotal()), *Shares(D.KnowSteps, D.KnowTotal()),
+			   static_cast<long long>(D.Reflex), static_cast<long long>(D.ReflexKnow));
+		Ctx.LastLogBrainTally = Ctx.BrainTally;
+	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
 	{
@@ -3571,11 +3720,18 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 		const FString WxTag = Ctx.Sim.Config.Weather.bEnabled && Ctx.Sim.WeatherKind != EcoWorldV3::kWeatherClear
 								  ? FString::Printf(TEXT(" %s %.2f"), UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Ctx.Sim.WeatherKind)), Ctx.Sim.WeatherIntensity)
 								  : FString(TEXT(" 맑음"));
-		const FString Line = FString::Printf(TEXT("v3 %s %s | %s%s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld"),
-											 Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"),
-											 *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), *WxTag, Ctx.Sim.Dark,
+		// 두뇌 (10-18 두뇌 바꾸기): 내장이면 'R1b−F'(얼기 막음)·'R1b', 파일 두뇌면 모델 이름. 바뀐 뒤 늑대를 알 때 숨기 몫 (FEcoV3BrainTally)
+		const FEcoV3Brain& Brain = GetActiveBrain();
+		const FString BrainTag = Brain.bBuiltin ? FString(Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"))
+												: FString::Printf(TEXT("두뇌 %s"), *Brain.ModelName);
+		const FEcoV3BrainTally& Since = Ctx.SinceSwapBrainTally;
+		const int64 KnowN = Since.KnowTotal();
+		const FString Line = FString::Printf(TEXT("v3 %s %s | %s%s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld | 이 두뇌로 늑대를 알 때 숨기 %.1f%% (%lld 스텝)"),
+											 *BrainTag, *Ctx.RegionId.ToString(), Ctx.Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), *WxTag, Ctx.Sim.Dark,
 											 Ctx.AliveDeer, Ctx.AdoptedDeer, *Tally, *Wolves,
-											 static_cast<long long>(Ctx.Sim.Stats.Caught), static_cast<long long>(Ctx.Sim.Stats.Starved));
+											 static_cast<long long>(Ctx.Sim.Stats.Caught), static_cast<long long>(Ctx.Sim.Stats.Starved),
+											 KnowN > 0 ? 100.0 * static_cast<double>(Since.KnowSteps[EcoRepertoireV3::kHide]) / static_cast<double>(KnowN) : 0.0,
+											 static_cast<long long>(KnowN));
 		// 둘째 줄: 먹기 되먹임 (v3 먹이 격자 — 팀 지역 FoodAmount 가 아니다)
 		FString FoodLine = FString::Printf(TEXT("먹이 %s | 무대 먹이 처음의 %.0f%% | 최근 10초 먹은 양 %.1f | 사슴 에너지 평균 %.0f%% | 굶주림(15%% 아래) %d"),
 										   *Ctx.RegionId.ToString(), 100.0 * Ctx.FoodFraction(), Ctx.RecentEatenSum(),
