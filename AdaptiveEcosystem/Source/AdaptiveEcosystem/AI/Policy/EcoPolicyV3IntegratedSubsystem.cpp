@@ -243,11 +243,12 @@ namespace EcoPolicyV3IntegratedImpl
 
 	static TAutoConsoleVariable<int32> CVarStageTrees(
 		TEXT("eco.IntegratedV3.StageTrees"),
-		1,
-		TEXT("통합 v3 모드의 무대 나무 (1 = 켬, 기본 — 10-17 사용자 '우리 쪽 테스트 레벨에 저 사람이 만든 장애물들 적절히 배치해 봐'). 레벨은 바꾸지 않고, 무대를 만들 때 ")
-		TEXT("고정 배치 표(TreeLayoutV3.h — 숲 24·고지 9·메마른 땅 0 그루, 파이썬 make_tree_layout.py)대로 팀 나무(Beech_Tree)를 충돌 없이 놓고 지면에 붙인다. ")
-		TEXT("줄기 원판(반지름 0.73~0.89 m)은 세로 장애물로 세계에 들어가 사슴·늑대가 둘레를 돌고 눈길이 가린다(파이썬 configs/v3_wild2_trees_mirror.yaml 과 같은 원판). ")
-		TEXT("시작 자리는 줄기를 피한다. eco.IntegratedV3.Obstacles 1 이고 무대 한 변 120 m 일 때만. 0 = 나무 없음. Play 전에 바꾼다. 명령줄 -EcoV3StageTrees= 는 시작값."),
+		0,
+		TEXT("통합 v3 모드의 실행 중 무대 나무 (0 = 끔, 기본 — 10-18 사용자 '일단 플레이시 장애물이 생성되게 하지 말고 그냥 우리 통합레벨에 배치를 해'). ")
+		TEXT("나무는 통합 레벨에 놓은 액터다(폴더 EcoV3_Trees, 꼬리표 EcoV3Tree·EcoV3Trunk — 편집기 명령 -run=EcoV3PlaceTrees). 레벨 읽기가 줄기 막이를 원판으로 읽는다. ")
+		TEXT("1 = 예비(10-17 그대로): 레벨 나무가 없는 무대에만 고정 배치 표(TreeLayoutV3.h — 숲 24·고지 9·메마른 땅 0 그루, 파이썬 make_tree_layout.py)대로 ")
+		TEXT("팀 나무(Beech_Tree)를 충돌 없이 놓고 줄기 원판을 세계에 넣는다(파이썬 configs/v3_wild2_trees_mirror.yaml 과 같은 원판). 시작 자리는 줄기를 피한다. ")
+		TEXT("eco.IntegratedV3.Obstacles 1 이고 무대 한 변 120 m 일 때만. Play 전에 바꾼다. 명령줄 -EcoV3StageTrees= 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarWeather(
@@ -1050,13 +1051,17 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		}
 		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 무대 나무: %s"),
 			   *(Settings.bStageTrees && Settings.bObstacles
-					 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.StageTrees 1, 10-17) — 배치 표 %s (지문 %s, 무대 한 변 %.0f m):%s 그루, 팀 메시 %s 를 충돌 없이 놓고 ")
-										   TEXT("줄기 원판(밑동 반경 %.2f cm × 크기 %.1f~%.1f)을 세계에 넣음, 시작 자리는 줄기를 피함 (파이썬 configs/v3_wild2_trees_mirror.yaml)"),
-									   UTF8_TO_TCHAR(EcoTreeLayoutV3::kVersion), UTF8_TO_TCHAR(EcoTreeLayoutV3::kDigest),
+					 ? FString::Printf(TEXT("실행 중 놓기 켬 (eco.IntegratedV3.StageTrees 1, 예비 — 10-17) — 레벨 나무(꼬리표 %s)가 없는 무대에만 배치 표 %s (지문 %s, 무대 한 변 %.0f m):%s 그루, ")
+										   TEXT("팀 메시 %s 를 충돌 없이 놓고 줄기 원판(밑동 반경 %.2f cm × 크기 %.1f~%.1f)을 세계에 넣음, 시작 자리는 줄기를 피함 (파이썬 configs/v3_wild2_trees_mirror.yaml)"),
+									   *LevelTrunkTag().ToString(), UTF8_TO_TCHAR(EcoTreeLayoutV3::kVersion), UTF8_TO_TCHAR(EcoTreeLayoutV3::kDigest),
 									   EcoTreeLayoutV3::kStageSizeUnits * EcoRepertoireV3::kUnitCm / 100.0, *Counts, UTF8_TO_TCHAR(EcoTreeLayoutV3::kMeshPath),
 									   EcoTreeLayoutV3::kTrunkRadiusMeshCm, EcoTreeLayoutV3::kScaleLo, EcoTreeLayoutV3::kScaleHi)
-					 : FString(Settings.bStageTrees ? TEXT("끔 (eco.IntegratedV3.Obstacles 0 — 원판이 없으면 나무를 놓지 않는다)")
-													: TEXT("끔 (eco.IntegratedV3.StageTrees 0)"))));
+					 : Settings.bObstacles
+						   ? FString::Printf(TEXT("실행 중 놓기 끔 (eco.IntegratedV3.StageTrees 0, 기본 — 10-18) — 나무는 통합 레벨 액터다(폴더 %s, 꼬리표 %s·%s). 레벨 읽기가 줄기 막이를 ")
+												 TEXT("원판으로 읽고 배치 표 %s 자리와 %.0f cm 안이면 표 값을 쓴다, 시작 자리는 줄기를 피함"),
+											 LevelTreeFolder(), *LevelTreeTag().ToString(), *LevelTrunkTag().ToString(), UTF8_TO_TCHAR(EcoTreeLayoutV3::kVersion),
+											 kLevelTreeSnapCm)
+						   : FString(TEXT("끔 (eco.IntegratedV3.Obstacles 0 — v3 세계에 원판이 없다. 레벨 나무 줄기 막이는 팀 이동 제약에서는 그대로 막는다)"))));
 	}
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 Social 연결: %s"),
 		   Settings.bSocialControl ? TEXT("켬 (eco.IntegratedV3.SocialControl 1, 22eb1b6 — 기본 아님) — 무리 경보·은신처 슬롯이 v3 제어 뒤·이동 전에 사슴 제어를 바꾼다, 파이썬과 다름")
@@ -1170,20 +1175,10 @@ void UEcoPolicyV3IntegratedSubsystem::RestoreTeamValues(const TCHAR* Why)
 // 계획 (엔진 상태 없이)
 // -----------------------------------------------------------------------------
 
-bool UEcoPolicyV3IntegratedSubsystem::PlanStage(FName RegionId, int32 GroupIndex, const FVector& DesiredCenterCm,
-												const FVector& RegionCenterCm, const FEcoV3IntegratedSettings& S, int32 NumDeer,
-												int32 NumWolves, bool bRequireGround, TFunctionRef<bool(const FVector&)> Contains,
-												TFunctionRef<bool(const FVector&, FVector&)> Project, FEcoV3StagePlan& Out)
+FVector UEcoPolicyV3IntegratedSubsystem::StageCenterCm(const FVector& DesiredCenterCm, const FVector& RegionCenterCm, double SizeUnits,
+													   TFunctionRef<bool(const FVector&)> Contains, bool& bOutInside)
 {
-	Out = FEcoV3StagePlan();
-	Out.RegionId = RegionId;
-	Out.GroupIndex = GroupIndex;
-	Out.WantDeer = NumDeer;
-	Out.WantWolves = NumWolves;
-	Out.SizeUnits = FMath::Clamp(S.StageSizeUnits, 60.0, 110.0);
-	const double Half = 0.5 * Out.SizeUnits * EcoRepertoireV3::kUnitCm;
-
-	// 무대가 지역 상자 안에 들게 한다 (네 모서리). 안 들면 지역 중심 쪽으로 옮긴다
+	const double Half = 0.5 * SizeUnits * EcoRepertoireV3::kUnitCm;
 	auto StageInside = [&Contains, Half](const FVector& C)
 	{
 		for (const double Sx : {-1.0, 1.0})
@@ -1213,14 +1208,43 @@ bool UEcoPolicyV3IntegratedSubsystem::PlanStage(FName RegionId, int32 GroupIndex
 			}
 		}
 	}
+	bOutInside = StageInside(Center);
+	return Center;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::PlanStage(FName RegionId, int32 GroupIndex, const FVector& DesiredCenterCm,
+												const FVector& RegionCenterCm, const FEcoV3IntegratedSettings& S, int32 NumDeer,
+												int32 NumWolves, bool bRequireGround, TFunctionRef<bool(const FVector&)> Contains,
+												TFunctionRef<bool(const FVector&, FVector&)> Project, FEcoV3StagePlan& Out,
+												const TArray<FVector>* LevelTrunksCm)
+{
+	Out = FEcoV3StagePlan();
+	Out.RegionId = RegionId;
+	Out.GroupIndex = GroupIndex;
+	Out.WantDeer = NumDeer;
+	Out.WantWolves = NumWolves;
+	Out.SizeUnits = FMath::Clamp(S.StageSizeUnits, 60.0, 110.0);
+	const double Half = 0.5 * Out.SizeUnits * EcoRepertoireV3::kUnitCm;
+
+	// 무대가 지역 상자 안에 들게 한다 (네 모서리). 안 들면 지역 중심 쪽으로 옮긴다
+	const FVector Center = StageCenterCm(DesiredCenterCm, RegionCenterCm, Out.SizeUnits, Contains, Out.bStageInside);
 	Out.CenterCm = Center;
-	Out.bStageInside = StageInside(Center);
 
 	EcoWorldV3::FRng Rng;
 	Rng.State = EcoRepertoireV3::HashChain3(EcoPolicyV3IntegratedImpl::kPlanRngTag, static_cast<uint64>(S.Seed),
 											static_cast<uint64>(GroupIndex + 1));
-	// 무대 나무 (eco.IntegratedV3.StageTrees, 10-17): 줄기 원판(반지름 + 몸) 안 자리는 버린다 — 세계 원판 안 판정과 같은 식 (표가 없으면 빈 목록 = 그대로)
-	const std::vector<double> Trunks = S.bStageTrees && S.bObstacles ? StageTreeDiscs(RegionId, Out.SizeUnits) : std::vector<double>();
+	// 줄기 원판(반지름 + 몸) 안 자리는 버린다 — 세계 원판 안 판정과 같은 식. 레벨 나무(10-18)가 이 무대에 있으면 그 원판(세계에 넣을 값과 같다),
+	// 없고 실행 중 나무(eco.IntegratedV3.StageTrees, 10-17 — 예비)를 놓으면 표 원판. 둘 다 없으면 빈 목록 = 그대로
+	if (S.bObstacles && LevelTrunksCm)
+	{
+		Out.TrunkDiscs = LevelTrunkDiscs(*LevelTrunksCm, RegionId, Out.OriginCm(), Out.SizeUnits);
+		Out.bLevelTrunks = !Out.TrunkDiscs.empty();
+	}
+	if (!Out.bLevelTrunks && S.bStageTrees && S.bObstacles)
+	{
+		Out.TrunkDiscs = StageTreeDiscs(RegionId, Out.SizeUnits);
+	}
+	const std::vector<double>& Trunks = Out.TrunkDiscs;
 	const double TrunkOx = Center.X - Half;
 	const double TrunkOy = Center.Y - Half;
 	const double TrunkBody = EcoWorldV3::FObstacleConfig().BodyR;
@@ -1408,11 +1432,17 @@ namespace EcoPolicyV3IntegratedImpl
 		}
 		return Mesh.GetBounds().GetBox().TransformBy(Xf);
 	}
+
+	/** 레벨 읽기가 원판으로 보는 컴포넌트 조건 = 팀 이동 제약(ConstrainStep: WorldStatic 채널로 쓸어 봄)이 막는 조건: 쿼리 충돌 켬 ∧ WorldStatic 막음. */
+	bool BlocksTeamMovement(const UPrimitiveComponent& C)
+	{
+		return CollisionEnabledHasQuery(C.GetCollisionEnabled()) && C.GetCollisionResponseToChannel(ECC_WorldStatic) == ECR_Block;
+	}
 }
 
 void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FVector& OriginCm, double SizeUnits,
 														 const std::vector<EcoObservationV3::FCoverInput>& Covers,
-														 const TSet<const AActor*>& Exclude, bool bProbeGround, FEcoV3ObstacleScan& Out)
+														 const TSet<const AActor*>& Exclude, bool bProbeGround, FEcoV3ObstacleScan& Out, FName LayoutRegion)
 {
 	using EcoRepertoireV3::kUnitCm;
 	Out = FEcoV3ObstacleScan();
@@ -1420,8 +1450,10 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 	struct FDisc
 	{
 		double X, Y, R;
+		uint8 bTree;   // 레벨 나무 줄기 막이 (10-18)
 	};
 	TArray<FDisc> Kept;
+	const FName TrunkTag = LevelTrunkTag();
 	for (TActorIterator<AActor> It(&World); It; ++It)
 	{
 		const AActor* A = *It;
@@ -1430,6 +1462,7 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 			continue;
 		}
 		const bool bRefuge = A->IsA<AEcoShelterAnchor>();
+		const bool bTrunk = A->ActorHasTag(TrunkTag);
 		TInlineComponentArray<UStaticMeshComponent*> Comps(A);
 		for (const UStaticMeshComponent* C : Comps)
 		{
@@ -1439,7 +1472,7 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 				continue;
 			}
 			// 팀 이동 제약(ConstrainStep: WorldStatic 채널로 쓸어 봄)이 막는 것과 같은 조건
-			const bool bCollide = CollisionEnabledHasQuery(C->GetCollisionEnabled()) && C->GetCollisionResponseToChannel(ECC_WorldStatic) == ECR_Block;
+			const bool bCollide = EcoPolicyV3IntegratedImpl::BlocksTeamMovement(*C);
 			const UInstancedStaticMeshComponent* Ism = Cast<UInstancedStaticMeshComponent>(C);
 			const int32 Count = Ism ? Ism->GetInstanceCount() : 1;
 			for (int32 i = 0; i < Count; ++i)
@@ -1485,8 +1518,8 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 					++Out.Low;
 					continue;
 				}
-				const double Xu = X / kUnitCm;
-				const double Yu = Y / kUnitCm;
+				double Xu = X / kUnitCm;
+				double Yu = Y / kUnitCm;
 				bool bInCover = false;
 				for (const EcoObservationV3::FCoverInput& Cv : Covers)
 				{
@@ -1497,9 +1530,25 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 					++Out.InCover;
 					continue;
 				}
-				Kept.Add({Xu, Yu, Rcm / kUnitCm});
+				double Ru = Rcm / kUnitCm;
+				if (bTrunk)
+				{
+					// 레벨 나무 (10-18): 배치 표 자리와 1 cm 안이면 표 값 그대로 (파이썬 거울 tree_layout.json 과 비트 단위로 같게)
+					++Out.LevelTrees;
+					double Dev = 0.0;
+					if (!LayoutRegion.IsNone() && SnapToLayout(LayoutRegion, SizeUnits, Xu, Yu, Ru, &Dev))
+					{
+						++Out.LevelTreesSnapped;
+						Out.LevelTreeMaxSnapCm = FMath::Max(Out.LevelTreeMaxSnapCm, Dev);
+					}
+					else if (!LayoutRegion.IsNone())
+					{
+						++Out.LevelTreesUnmatched;
+					}
+				}
+				Kept.Add({Xu, Yu, Ru, static_cast<uint8>(bTrunk ? 1 : 0)});
 				++Out.KeptByMesh.FindOrAdd(Mesh->GetName());
-				const double Edge = Rcm / kUnitCm + 2.0 * EcoWorldV3::FObstacleConfig().BodyR;
+				const double Edge = Ru + 2.0 * EcoWorldV3::FObstacleConfig().BodyR;
 				Out.NearEdge += (Xu < Edge || Yu < Edge || Xu > SizeUnits - Edge || Yu > SizeUnits - Edge) ? 1 : 0;
 			}
 		}
@@ -1513,11 +1562,13 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 	}
 	Kept.Sort([](const FDisc& A, const FDisc& B) { return A.X < B.X || (A.X == B.X && (A.Y < B.Y || (A.Y == B.Y && A.R < B.R))); });
 	Out.Discs.reserve(static_cast<size_t>(Kept.Num()) * 3);
+	Out.IsLevelTree.Reset(Kept.Num());
 	for (const FDisc& D : Kept)
 	{
 		Out.Discs.push_back(D.X);
 		Out.Discs.push_back(D.Y);
 		Out.Discs.push_back(D.R);
+		Out.IsLevelTree.Add(D.bTree);
 	}
 	if (!bProbeGround)
 	{
@@ -1651,37 +1702,14 @@ void UEcoPolicyV3IntegratedSubsystem::SpawnStageTrees(UWorld& World, FName Regio
 			continue;
 		}
 		// 지면: 줄기 중심 + 둘레 6 곳(줄기 반지름, 60° 간격)의 가장 낮은 땅 (기울어진 땅에서도 밑동이 뜨지 않게). 팀 ProjectSpawnPoint 와 같은 선 길이
-		const FVector C(OriginCm.X + T.X * kUnitCm, OriginCm.Y + T.Y * kUnitCm, OriginCm.Z);
 		double MinZ = 0.0;
 		double MaxZ = 0.0;
-		bool bCenter = false;
-		bool bAny = false;
-		for (int32 s = 0; s < 7; ++s)
-		{
-			FVector P = C;
-			if (s > 0)
-			{
-				const double A = static_cast<double>(s - 1) * UE_DOUBLE_PI / 3.0;
-				P.X += T.R * kUnitCm * FMath::Cos(A);
-				P.Y += T.R * kUnitCm * FMath::Sin(A);
-			}
-			FHitResult Hit;
-			FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoV3TreeGround), false);
-			if (World.LineTraceSingleByChannel(Hit, P + FVector(0, 0, 5000), P - FVector(0, 0, 20000), ECC_WorldStatic, Params))
-			{
-				MinZ = bAny ? FMath::Min(MinZ, Hit.ImpactPoint.Z) : Hit.ImpactPoint.Z;
-				MaxZ = bAny ? FMath::Max(MaxZ, Hit.ImpactPoint.Z) : Hit.ImpactPoint.Z;
-				bAny = true;
-				bCenter = bCenter || s == 0;
-			}
-		}
-		if (!bCenter)
+		if (!GroundStageTree(World, OriginCm, T, MinZ, MaxZ))
 		{
 			++Out.SkippedNoGround;
 			continue;
 		}
-		const FVector Pivot(OriginCm.X + T.PivotX * kUnitCm, OriginCm.Y + T.PivotY * kUnitCm, MinZ - EcoTreeLayoutV3::kSinkCm);
-		const FTransform Xf(FRotator(0.0, T.YawDeg, 0.0), Pivot, FVector(T.Scale));
+		const FTransform Xf = LevelTreeTransform(T, OriginCm, MinZ);
 		FActorSpawnParameters Params;
 		if (World.PersistentLevel)
 		{
@@ -1716,7 +1744,283 @@ void UEcoPolicyV3IntegratedSubsystem::SpawnStageTrees(UWorld& World, FName Regio
 	}
 }
 
-std::vector<double> UEcoPolicyV3IntegratedSubsystem::MergeDiscs(const std::vector<double>& Level, const std::vector<double>& Trees, TArray<uint8>* OutIsTree)
+bool UEcoPolicyV3IntegratedSubsystem::GroundStageTree(UWorld& World, const FVector& OriginCm, const EcoTreeLayoutV3::FTree& T, double& OutMinZ,
+													  double& OutMaxZ, const TArray<AActor*>* Ignore)
+{
+	using EcoRepertoireV3::kUnitCm;
+	const FVector C(OriginCm.X + T.X * kUnitCm, OriginCm.Y + T.Y * kUnitCm, OriginCm.Z);
+	bool bCenter = false;
+	bool bAny = false;
+	OutMinZ = 0.0;
+	OutMaxZ = 0.0;
+	for (int32 s = 0; s < 7; ++s)
+	{
+		FVector P = C;
+		if (s > 0)
+		{
+			const double A = static_cast<double>(s - 1) * UE_DOUBLE_PI / 3.0;
+			P.X += T.R * kUnitCm * FMath::Cos(A);
+			P.Y += T.R * kUnitCm * FMath::Sin(A);
+		}
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoV3TreeGround), false);
+		if (Ignore)
+		{
+			Params.AddIgnoredActors(*Ignore);
+		}
+		if (World.LineTraceSingleByChannel(Hit, P + FVector(0, 0, 5000), P - FVector(0, 0, 20000), ECC_WorldStatic, Params))
+		{
+			OutMinZ = bAny ? FMath::Min(OutMinZ, Hit.ImpactPoint.Z) : Hit.ImpactPoint.Z;
+			OutMaxZ = bAny ? FMath::Max(OutMaxZ, Hit.ImpactPoint.Z) : Hit.ImpactPoint.Z;
+			bAny = true;
+			bCenter = bCenter || s == 0;
+		}
+	}
+	return bCenter;
+}
+
+// -----------------------------------------------------------------------------
+// 레벨 나무 (10-18 — 통합 레벨에 놓은 나무 액터·줄기 막이, EcoV3PlaceTreesCommandlet)
+// -----------------------------------------------------------------------------
+
+FName UEcoPolicyV3IntegratedSubsystem::LevelTreeTag()
+{
+	static const FName Name(TEXT("EcoV3Tree"));
+	return Name;
+}
+
+FName UEcoPolicyV3IntegratedSubsystem::LevelTrunkTag()
+{
+	static const FName Name(TEXT("EcoV3Trunk"));
+	return Name;
+}
+
+const TCHAR* UEcoPolicyV3IntegratedSubsystem::LevelTreeFolder()
+{
+	return TEXT("EcoV3_Trees");
+}
+
+const TCHAR* UEcoPolicyV3IntegratedSubsystem::LevelTrunkMeshPath()
+{
+	return TEXT("/Engine/BasicShapes/Cylinder.Cylinder");
+}
+
+FTransform UEcoPolicyV3IntegratedSubsystem::LevelTreeTransform(const EcoTreeLayoutV3::FTree& T, const FVector& OriginCm, double GroundMinZ)
+{
+	using EcoRepertoireV3::kUnitCm;
+	const FVector Pivot(OriginCm.X + T.PivotX * kUnitCm, OriginCm.Y + T.PivotY * kUnitCm, GroundMinZ - EcoTreeLayoutV3::kSinkCm);
+	return FTransform(FRotator(0.0, T.YawDeg, 0.0), Pivot, FVector(T.Scale));
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::LevelTrunkTransform(const EcoTreeLayoutV3::FTree& T, const FVector& OriginCm, double GroundMinZ,
+														  const UStaticMesh& Cylinder, FTransform& Out)
+{
+	using EcoRepertoireV3::kUnitCm;
+	// 레벨 읽기와 같은 상자 (단순 충돌 상자, 없으면 그리기 상자) — 메시 공간
+	const FBox Local = EcoPolicyV3IntegratedImpl::ObstacleCollisionBox(Cylinder, FTransform::Identity);
+	const FVector Ext = Local.GetExtent();
+	if (!Local.IsValid || !(Ext.X > 0.0) || !(Ext.Y > 0.0) || !(Ext.Z > 0.0))
+	{
+		return false;
+	}
+	// 가로: 크기 × 반폭 평균 = R (cm). 세로: 밑면 = 땅 − 30 cm, 윗면 = 땅 + 4 m
+	const double Rcm = T.R * kUnitCm;
+	const double Sxy = Rcm / (0.5 * (Ext.X + Ext.Y));
+	const double Bottom = GroundMinZ - kLevelTrunkSinkCm;
+	const double Top = GroundMinZ + kLevelTrunkTopCm;
+	const double Sz = (Top - Bottom) / (2.0 * Ext.Z);
+	const FVector Ctr = Local.GetCenter();
+	const FVector Loc(OriginCm.X + T.X * kUnitCm - Sxy * Ctr.X, OriginCm.Y + T.Y * kUnitCm - Sxy * Ctr.Y, Bottom - Sz * Local.Min.Z);
+	Out = FTransform(FRotator::ZeroRotator, Loc, FVector(Sxy, Sxy, Sz));
+	return true;
+}
+
+void UEcoPolicyV3IntegratedSubsystem::GatherLevelTrunks(UWorld& World, TArray<FVector>& OutCm)
+{
+	OutCm.Reset();
+	const FName TrunkTag = LevelTrunkTag();
+	for (TActorIterator<AActor> It(&World); It; ++It)
+	{
+		const AActor* A = *It;
+		if (!A || !A->ActorHasTag(TrunkTag))
+		{
+			continue;
+		}
+		TInlineComponentArray<UStaticMeshComponent*> Comps(A);
+		for (const UStaticMeshComponent* C : Comps)
+		{
+			const UStaticMesh* Mesh = C ? C->GetStaticMesh() : nullptr;
+			// 레벨 읽기(ScanStageObstacles)가 원판으로 넣는 조건과 같다: 등록됨·팀 이동 제약이 막음·반지름·높이
+			if (!Mesh || !C->IsRegistered() || !EcoPolicyV3IntegratedImpl::BlocksTeamMovement(*C))
+			{
+				continue;
+			}
+			const FBox Box = EcoPolicyV3IntegratedImpl::ObstacleCollisionBox(*Mesh, C->GetComponentTransform());
+			if (!Box.IsValid)
+			{
+				continue;
+			}
+			const FVector Ext = Box.GetExtent();
+			const double Rcm = 0.5 * (Ext.X + Ext.Y);
+			if (Rcm < FEcoV3ObstacleScan::kMinRadiusCm || 2.0 * Ext.Z < FEcoV3ObstacleScan::kMinHeightCm)
+			{
+				continue;
+			}
+			const FVector Ctr = Box.GetCenter();
+			OutCm.Add(FVector(Ctr.X, Ctr.Y, Rcm));
+		}
+	}
+}
+
+std::vector<double> UEcoPolicyV3IntegratedSubsystem::LevelTrunkDiscs(const TArray<FVector>& TrunksCm, FName RegionId, const FVector& OriginCm,
+																	  double SizeUnits, int32* OutSnapped)
+{
+	using EcoRepertoireV3::kUnitCm;
+	const double SizeCm = SizeUnits * kUnitCm;
+	struct FDisc
+	{
+		double X, Y, R;
+	};
+	TArray<FDisc> Kept;
+	int32 Snapped = 0;
+	for (const FVector& T : TrunksCm)
+	{
+		// 레벨 읽기와 같은 셈 (중심이 무대 밖이면 뺀다, 무대 단위로 나눈 뒤 표와 맞춘다)
+		const double X = T.X - OriginCm.X;
+		const double Y = T.Y - OriginCm.Y;
+		if (X < 0.0 || Y < 0.0 || X > SizeCm || Y > SizeCm)
+		{
+			continue;
+		}
+		double Xu = X / kUnitCm;
+		double Yu = Y / kUnitCm;
+		double Ru = T.Z / kUnitCm;
+		Snapped += SnapToLayout(RegionId, SizeUnits, Xu, Yu, Ru) ? 1 : 0;
+		Kept.Add({Xu, Yu, Ru});
+	}
+	Kept.Sort([](const FDisc& A, const FDisc& B) { return A.X < B.X || (A.X == B.X && (A.Y < B.Y || (A.Y == B.Y && A.R < B.R))); });
+	std::vector<double> Out;
+	Out.reserve(static_cast<size_t>(Kept.Num()) * 3);
+	for (const FDisc& D : Kept)
+	{
+		Out.push_back(D.X);
+		Out.push_back(D.Y);
+		Out.push_back(D.R);
+	}
+	if (OutSnapped)
+	{
+		*OutSnapped = Snapped;
+	}
+	return Out;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::SnapToLayout(FName RegionId, double SizeUnits, double& X, double& Y, double& R, double* OutDevCm)
+{
+	using EcoRepertoireV3::kUnitCm;
+	const EcoTreeLayoutV3::FStageTrees* St = FindStageTrees(RegionId, SizeUnits);
+	if (!St || St->Num <= 0)
+	{
+		return false;
+	}
+	int32 Best = INDEX_NONE;
+	double BestDev = 0.0;
+	for (int32 k = 0; k < St->Num; ++k)
+	{
+		const EcoTreeLayoutV3::FTree& T = St->Trees[k];
+		const double Dev = kUnitCm * FMath::Max3(FMath::Abs(X - T.X), FMath::Abs(Y - T.Y), FMath::Abs(R - T.R));
+		if (Dev <= kLevelTreeSnapCm && (Best == INDEX_NONE || Dev < BestDev))
+		{
+			Best = k;
+			BestDev = Dev;
+		}
+	}
+	if (Best == INDEX_NONE)
+	{
+		return false;
+	}
+	X = St->Trees[Best].X;
+	Y = St->Trees[Best].Y;
+	R = St->Trees[Best].R;
+	if (OutDevCm)
+	{
+		*OutDevCm = BestDev;
+	}
+	return true;
+}
+
+void UEcoPolicyV3IntegratedSubsystem::ProbeLevelTrunks(UWorld& World, FName RegionId, const FVector& OriginCm, double SizeUnits, FEcoV3TrunkProbe& Out)
+{
+	Out = FEcoV3TrunkProbe();
+	TArray<FVector> Trunks;
+	GatherLevelTrunks(World, Trunks);
+	const double SizeCm = SizeUnits * EcoRepertoireV3::kUnitCm;
+	const FName TreeTag = LevelTreeTag();
+	const FName TrunkTag = LevelTrunkTag();
+	// ConstrainStep 이 쓰는 것과 같은 구 쓸기 (옛 높이 + 65 cm, 반경 30 cm, WorldStatic) 로 무엇에 닿았나 본다
+	auto HitOurTree = [&World, &TreeTag, &TrunkTag](const FVector& From, const FVector& To)
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoV3TrunkProbe), false);
+		const FVector Lift(0, 0, 65);
+		if (!World.SweepSingleByChannel(Hit, From + Lift, To + Lift, FQuat::Identity, ECC_WorldStatic, FCollisionShape::MakeSphere(30.f), Params))
+		{
+			return false;
+		}
+		const AActor* A = Hit.GetActor();
+		return A && (A->ActorHasTag(TreeTag) || A->ActorHasTag(TrunkTag));
+	};
+	auto Ground = [&World](const FVector& P, FVector& OutP)
+	{
+		FHitResult Hit;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoV3TrunkProbeGround), false);
+		if (!World.LineTraceSingleByChannel(Hit, P + FVector(0, 0, 5000), P - FVector(0, 0, 20000), ECC_WorldStatic, Params))
+		{
+			return false;
+		}
+		OutP = Hit.ImpactPoint;
+		return true;
+	};
+	for (const FVector& T : Trunks)
+	{
+		if (T.X - OriginCm.X < 0.0 || T.Y - OriginCm.Y < 0.0 || T.X - OriginCm.X > SizeCm || T.Y - OriginCm.Y > SizeCm)
+		{
+			continue;
+		}
+		++Out.Trees;
+		// 가로지르기: 줄기 가장자리 + 몸 + 10 cm 밖 서쪽 → 동쪽 (줄기 중심을 지나는 한 걸음). 높이는 그 자리의 땅
+		const double Rcm = T.Z;
+		const double Off = Rcm + 30.0 + 10.0;
+		FVector From, Far;
+		if (Ground(FVector(T.X - Off, T.Y, OriginCm.Z), From) && Ground(FVector(T.X + Off, T.Y, OriginCm.Z), Far))
+		{
+			FVector To = Far;
+			const bool bBlocked = !EcoCreatureMovement::ConstrainStep(World, RegionId, false, From, To);
+			Out.CrossBlocked += bBlocked ? 1 : 0;
+			Out.CrossByTrunk += bBlocked && HitOurTree(From, Far) ? 1 : 0;
+		}
+		// 잎 아래 둘레: 줄기 가장자리 + 몸 30 cm + 1 m 의 원을 따라 30° 마다 30 cm 걸음 (잎은 반경 6~15 m 라 모두 잎 아래다)
+		const double Ring = Rcm + 30.0 + FEcoV3TrunkProbe::kRingGapCm;
+		for (int32 k = 0; k < FEcoV3TrunkProbe::kRingSteps; ++k)
+		{
+			const double A = static_cast<double>(k) * UE_DOUBLE_TWO_PI / FEcoV3TrunkProbe::kRingSteps;
+			const double Step = 30.0 / Ring;   // 둘레를 따라 30 cm
+			FVector P0, P1;
+			if (!Ground(FVector(T.X + Ring * FMath::Cos(A), T.Y + Ring * FMath::Sin(A), OriginCm.Z), P0)
+				|| !Ground(FVector(T.X + Ring * FMath::Cos(A + Step), T.Y + Ring * FMath::Sin(A + Step), OriginCm.Z), P1))
+			{
+				continue;
+			}
+			++Out.RingSteps;
+			FVector To = P1;
+			const bool bBlocked = !EcoCreatureMovement::ConstrainStep(World, RegionId, false, P0, To);
+			Out.RingBlocked += bBlocked ? 1 : 0;
+			Out.RingBlockedByTree += HitOurTree(P0, P1) ? 1 : 0;
+		}
+	}
+}
+
+std::vector<double> UEcoPolicyV3IntegratedSubsystem::MergeDiscs(const std::vector<double>& Level, const std::vector<double>& Trees, TArray<uint8>* OutIsTree,
+															   const TArray<uint8>* LevelIsTree)
 {
 	struct FDisc
 	{
@@ -1726,7 +2030,8 @@ std::vector<double> UEcoPolicyV3IntegratedSubsystem::MergeDiscs(const std::vecto
 	TArray<FDisc> All;
 	for (size_t k = 0; k + 2 < Level.size(); k += 3)
 	{
-		All.Add({Level[k], Level[k + 1], Level[k + 2], 0});
+		const int32 i = static_cast<int32>(k / 3);
+		All.Add({Level[k], Level[k + 1], Level[k + 2], static_cast<uint8>(LevelIsTree && LevelIsTree->IsValidIndex(i) && (*LevelIsTree)[i] != 0 ? 1 : 0)});
 	}
 	for (size_t k = 0; k + 2 < Trees.size(); k += 3)
 	{
@@ -1806,6 +2111,37 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportObstacles(const FString& Path) const
 			R->SetNumberField(TEXT("tree_skipped_no_ground"), T.SkippedNoGround);
 			R->SetNumberField(TEXT("tree_skipped_no_mesh"), T.SkippedNoMesh);
 			R->SetNumberField(TEXT("tree_max_relief_cm"), T.MaxReliefCm);
+		}
+		{
+			// 레벨 나무 (10-18): 레벨 읽기가 줄기 막이(꼬리표 EcoV3Trunk)에서 읽은 원판 (discs 안에도 들어 있다), 표와 맞춘 수, 시작 자리 원판, 이동 검사
+			TArray<TSharedPtr<FJsonValue>> LevelTreeDiscs;
+			for (int32 k = 0; k < S.Num(); ++k)
+			{
+				if (S.IsLevelTree.IsValidIndex(k) && S.IsLevelTree[k] != 0)
+				{
+					LevelTreeDiscs.Add(MakeShared<FJsonValueArray>(Triple(S.Discs[3 * k], S.Discs[3 * k + 1], S.Discs[3 * k + 2])));
+				}
+			}
+			TArray<TSharedPtr<FJsonValue>> PlanDiscs;
+			for (size_t k = 0; k + 2 < Ctx->PlanTrunkDiscs.size(); k += 3)
+			{
+				PlanDiscs.Add(MakeShared<FJsonValueArray>(Triple(Ctx->PlanTrunkDiscs[k], Ctx->PlanTrunkDiscs[k + 1], Ctx->PlanTrunkDiscs[k + 2])));
+			}
+			R->SetBoolField(TEXT("level_trees_on"), Ctx->bLevelTrees);
+			R->SetArrayField(TEXT("level_tree_discs"), LevelTreeDiscs);
+			R->SetNumberField(TEXT("level_trees_snapped"), S.LevelTreesSnapped);
+			R->SetNumberField(TEXT("level_trees_unmatched"), S.LevelTreesUnmatched);
+			R->SetNumberField(TEXT("level_tree_max_snap_cm"), S.LevelTreeMaxSnapCm);
+			R->SetArrayField(TEXT("plan_trunk_discs"), PlanDiscs);
+			const FEcoV3TrunkProbe& Pr = Ctx->TrunkProbe;
+			TSharedRef<FJsonObject> Pj = MakeShared<FJsonObject>();
+			Pj->SetNumberField(TEXT("trees"), Pr.Trees);
+			Pj->SetNumberField(TEXT("cross_blocked"), Pr.CrossBlocked);
+			Pj->SetNumberField(TEXT("cross_by_trunk"), Pr.CrossByTrunk);
+			Pj->SetNumberField(TEXT("ring_steps"), Pr.RingSteps);
+			Pj->SetNumberField(TEXT("ring_blocked"), Pr.RingBlocked);
+			Pj->SetNumberField(TEXT("ring_blocked_by_tree"), Pr.RingBlockedByTree);
+			R->SetObjectField(TEXT("trunk_probe"), Pj);
 		}
 		TArray<TSharedPtr<FJsonValue>> Covers;
 		for (const EcoObservationV3::FCoverInput& Cv : Ctx->Sim.Config.Covers)
@@ -1920,6 +2256,9 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 	TArray<FEcoCreatureSpawnGroup> NewGroups = S.Groups;
 	TArray<bool> Partial;
 	int64 Total = 0;
+	// 레벨 나무 줄기 막이 (10-18, 늘 불린 액터 — 스트리밍 전에도 있다). 시작 자리가 피한다
+	TArray<FVector> LevelTrunks;
+	GatherLevelTrunks(*World, LevelTrunks);
 	for (int32 g = 0; g < NewGroups.Num(); ++g)
 	{
 		FEcoCreatureSpawnGroup& G = NewGroups[g];
@@ -1938,7 +2277,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 		if (bStreaming)
 		{
 			// 지형이 덜 왔다: 이 계획은 힌트일 뿐이다(조정자가 이 자리로 스트리밍 원천 모양을 잡는다). 조정자 시작 직전 검사가 늘 다시 고른다
-			PlanStage(G.RegionId, g, Desired, Region->GetActorLocation(), Settings, Deer, Wolves, false, Contains, Project, Plan);
+			PlanStage(G.RegionId, g, Desired, Region->GetActorLocation(), Settings, Deer, Wolves, false, Contains, Project, Plan, &LevelTrunks);
 			Plan.bGrounded = false;
 			if (!Plan.bComplete)
 			{
@@ -1950,7 +2289,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 		else
 		{
 			// 스트리밍 없음: 조정자가 같은 UWorld::BeginPlay 안에서 바로 시작하므로 지금 지형이 조정자가 볼 지형이다
-			PlanStage(G.RegionId, g, Desired, Region->GetActorLocation(), Settings, Deer, Wolves, true, Contains, Project, Plan);
+			PlanStage(G.RegionId, g, Desired, Region->GetActorLocation(), Settings, Deer, Wolves, true, Contains, Project, Plan, &LevelTrunks);
 			if (!AcceptGroundedPlan(Plan, bPartial))
 			{
 				UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 지역 %s 무대에서 지면 검사를 통과한 시작 자리가 모자란다 (사슴 %d/%d, 늑대 %d/%d)"),
@@ -2063,6 +2402,8 @@ bool UEcoPolicyV3IntegratedSubsystem::ValidateSpawnPointsNow()
 	TArray<FEcoV3StagePlan> NewPlans;
 	TArray<FEcoCreatureSpawnGroup> NewGroups = S->Groups;
 	TArray<bool> Partial;
+	TArray<FVector> LevelTrunks;   // 레벨 나무 줄기 막이 (10-18)
+	GatherLevelTrunks(*World, LevelTrunks);
 	for (const FEcoV3StagePlan& Old : Plans)
 	{
 		FEcoCreatureSpawnGroup* G = NewGroups.IsValidIndex(Old.GroupIndex) ? &NewGroups[Old.GroupIndex] : nullptr;
@@ -2077,7 +2418,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ValidateSpawnPointsNow()
 		auto Project = [World](const FVector& Hint, FVector& Out) { return ProjectLikeCoordinator(*World, Hint, Out); };
 		FEcoV3StagePlan Grounded;
 		PlanStage(G->RegionId, Old.GroupIndex, Desired, Region->GetActorLocation(), Settings, Old.WantDeer, Old.WantWolves, true, Contains,
-				  Project, Grounded);
+				  Project, Grounded, &LevelTrunks);
 		bool bPartial = false;
 		if (!AcceptGroundedPlan(Grounded, bPartial))
 		{
@@ -2314,8 +2655,12 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		// 피할 원 = v3 은신처 원 + 우리가 놓은 앵커 자리(등록이 늦을 수 있다) + 무대에 걸친 모든 등록 은신처(학습 범위 밖이라 v3 원에서 뺀 레벨 은신처 포함).
 		// 그 지역 원판을 가져왔으면(측정 전용 ObstacleImport) 놓지 않는다 — 가져온 원판이 세계 원판 전부다
 		const std::vector<double>* Imported = Settings.bObstacles ? ImportedDiscs.Find(G.RegionId) : nullptr;
+		// 레벨 나무 (10-18): 이 무대 안에 줄기 막이가 있으면 실행 중 나무는 놓지 않는다 (두 번 놓지 않게 — 시작 자리 계획과 같은 판정)
+		TArray<FVector> LevelTrunks;
+		GatherLevelTrunks(*World, LevelTrunks);
+		const bool bLevelTrees = Settings.bObstacles && !LevelTrunkDiscs(LevelTrunks, G.RegionId, Origin, Plan.SizeUnits).empty();
 		FEcoV3StageTrees Trees;
-		if (Settings.bStageTrees && Settings.bObstacles && !Imported)
+		if (Settings.bStageTrees && Settings.bObstacles && !Imported && !bLevelTrees)
 		{
 			std::vector<EcoObservationV3::FCoverInput> Avoid = Covers;
 			for (const FVector& P : Placed)
@@ -2355,20 +2700,27 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 					Exclude.Add(A);
 				}
 			}
-			ScanStageObstacles(*World, Origin, Plan.SizeUnits, Covers, Exclude, true, Scan);
+			ScanStageObstacles(*World, Origin, Plan.SizeUnits, Covers, Exclude, true, Scan, G.RegionId);
 		}
 		EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers, G.RegionId);
 		// 세로 장애물 (eco.IntegratedV3.Obstacles): 레벨에서 읽은 원판 + 무대 나무 줄기 원판 ((x, y, r) 순, 측정 때는 가져온 원판). 원판이 없으면 세계는 지금 그대로다
 		TArray<uint8> IsTree;
 		if (Config.Obstacles.bEnabled)
 		{
-			Config.Obstacles.Discs = Imported ? *Imported : MergeDiscs(Scan.Discs, Trees.Discs, &IsTree);
+			Config.Obstacles.Discs = Imported ? *Imported : MergeDiscs(Scan.Discs, Trees.Discs, &IsTree, &Scan.IsLevelTree);
 		}
 		FEcoV3RegionContext* Ctx = AddContext(G.RegionId, RegionIndex, Origin, Config, G.Herbivores, G.Wolves);
 		Ctx->ObstacleScan = MoveTemp(Scan);
 		Ctx->bObstaclesImported = Settings.bObstacles && Imported != nullptr;
 		Ctx->Trees = MoveTemp(Trees);
 		Ctx->ObstacleIsTree = MoveTemp(IsTree);
+		Ctx->bLevelTrees = bLevelTrees;
+		Ctx->PlanTrunkDiscs = Plan.bLevelTrunks ? Plan.TrunkDiscs : std::vector<double>();
+		if (bLevelTrees)
+		{
+			// 레벨 나무 이동 검사 (기록만): 팀 이동 제약이 줄기에서만 막고 잎 아래는 막지 않는가
+			ProbeLevelTrunks(*World, G.RegionId, Origin, Plan.SizeUnits, Ctx->TrunkProbe);
+		}
 		{
 			// 디버그 그리기 높이: 원판 중심 지면 (읽기만 하는 아래쪽 선 검사, 못 찾으면 무대 원점 높이)
 			const std::vector<double>& Dl = Ctx->Sim.Config.Obstacles.Discs;
@@ -2429,7 +2781,44 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			{
 				bInTable = bInTable || (G.RegionId == FName(UTF8_TO_TCHAR(St.Region)) && St.Num > 0);
 			}
-			if (T.Layout > 0)
+			if (Ctx->bLevelTrees)
+			{
+				// 레벨 나무 (10-18): 레벨 읽기가 읽은 줄기 원판 · 표와 맞춘 수 · 시작 자리 계획과 같은가 · 이동 검사
+				const FEcoV3ObstacleScan& Sc = Ctx->ObstacleScan;
+				std::vector<double> WorldTrunks;
+				double RLo = 0.0, RHi = 0.0;
+				for (int32 k = 0; k < Sc.Num(); ++k)
+				{
+					if (Sc.IsLevelTree.IsValidIndex(k) && Sc.IsLevelTree[k] != 0)
+					{
+						const double Rm = Sc.Discs[3 * k + 2] * EcoRepertoireV3::kUnitCm / 100.0;
+						RLo = WorldTrunks.empty() ? Rm : FMath::Min(RLo, Rm);
+						RHi = WorldTrunks.empty() ? Rm : FMath::Max(RHi, Rm);
+						WorldTrunks.insert(WorldTrunks.end(), {Sc.Discs[3 * k], Sc.Discs[3 * k + 1], Sc.Discs[3 * k + 2]});
+					}
+				}
+				const EcoTreeLayoutV3::FStageTrees* St = FindStageTrees(G.RegionId, Plan.SizeUnits);
+				const int32 TableNum = St ? St->Num : 0;
+				const bool bPlanSame = Ctx->PlanTrunkDiscs == WorldTrunks;
+				const bool bTableSame = WorldTrunks == StageTreeDiscs(G.RegionId, Plan.SizeUnits);
+				const FEcoV3TrunkProbe& Pr = Ctx->TrunkProbe;
+				UE_LOG(LogEcoPolicyV3I, Log,
+					   TEXT("[EcoV3I] %s 나무 | 레벨 나무 줄기 %d (꼬리표 %s, 반지름 %.2f~%.2f m) — 배치 표 %s %d 그루와 맞춤 %d (읽은 값 ↔ 표 차이 최대 %.2g cm) · 표와 다름 %d | ")
+						   TEXT("세계 원판 %s 표 · 시작 자리가 피한 원판 %d 은 세계 줄기 원판과 %s | 이동 검사(팀 ConstrainStep): 줄기 가로지르기 %d/%d 막힘 (줄기 막이에 닿음 %d) · ")
+						   TEXT("잎 아래 둘레 걸음 %d 가운데 막힘 %d (우리 나무에 닿음 %d) | 실행 중 나무 놓지 않음"),
+					   *G.RegionId.ToString(), Sc.LevelTrees, *LevelTrunkTag().ToString(), RLo, RHi, UTF8_TO_TCHAR(EcoTreeLayoutV3::kVersion), TableNum,
+					   Sc.LevelTreesSnapped, Sc.LevelTreeMaxSnapCm, Sc.LevelTreesUnmatched, bTableSame ? TEXT("=") : TEXT("≠"),
+					   static_cast<int32>(Ctx->PlanTrunkDiscs.size() / 3), bPlanSame ? TEXT("같다") : TEXT("다르다"), Pr.CrossBlocked, Pr.Trees, Pr.CrossByTrunk,
+					   Pr.RingSteps, Pr.RingBlocked, Pr.RingBlockedByTree);
+				if (!bTableSame || !bPlanSame || Pr.CrossByTrunk != Pr.Trees || Pr.RingBlockedByTree > 0)
+				{
+					UE_LOG(LogEcoPolicyV3I, Warning,
+						   TEXT("[EcoV3I] %s 나무: 레벨 나무가 배치 표와 다르다(표 %d · 맞춤 %d · 다름 %d) 또는 시작 자리 원판이 세계 원판과 다르거나 이동 검사가 어긋났다 — ")
+							   TEXT("파이썬 거울(results/v3/wild2/trees/tree_layout.json)과 원판이 다를 수 있다. 나무를 옮겼으면 -run=EcoV3PlaceTrees 로 다시 놓는다"),
+						   *G.RegionId.ToString(), TableNum, Sc.LevelTreesSnapped, Sc.LevelTreesUnmatched);
+				}
+			}
+			else if (T.Layout > 0)
 			{
 				double RLo = 0.0, RHi = 0.0, Area = 0.0;
 				for (int32 k = 0; k < T.Num(); ++k)
@@ -2450,6 +2839,13 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 					UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] %s 나무: 표 %d 그루 가운데 %d 그루만 놓았다 — 파이썬 거울(results/v3/wild2/trees/tree_layout.json)과 원판이 다르다"),
 						   *G.RegionId.ToString(), T.Layout, T.Num());
 				}
+			}
+			else if (bInTable && Settings.bObstacles && !Imported)
+			{
+				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 나무 | 레벨 나무(꼬리표 %s)가 무대에 없다 — %s"), *G.RegionId.ToString(), *LevelTrunkTag().ToString(),
+					   Settings.bStageTrees ? (Plan.SizeUnits == EcoTreeLayoutV3::kStageSizeUnits ? TEXT("실행 중에도 놓지 못했다")
+																							   : TEXT("무대 한 변이 배치 표와 달라 실행 중에도 놓지 않았다"))
+											: TEXT("나무 없는 세계로 돈다 (편집기 명령 -run=EcoV3PlaceTrees 로 놓거나 -EcoV3StageTrees=1 로 실행 중에 놓는다)"));
 			}
 			else if (bInTable && Settings.bStageTrees)
 			{
@@ -2951,7 +3347,9 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   *Ctx.RegionId.ToString(), Seconds, Ob.Num(),
 			   Ctx.bObstaclesImported ? TEXT("가져온 원판 — 측정 전용")
 			   : Ctx.Trees.Num() > 0  ? *FString::Printf(TEXT("무대 나무 %d + 레벨에서 읽음 %d"), Ctx.Trees.Num(), Ctx.ObstacleScan.Num())
-									  : TEXT("레벨에서 읽음"),
+			   : Ctx.ObstacleScan.LevelTrees > 0
+				   ? *FString::Printf(TEXT("레벨 나무 %d + 그 밖 레벨에서 읽음 %d"), Ctx.ObstacleScan.LevelTrees, Ctx.ObstacleScan.Num() - Ctx.ObstacleScan.LevelTrees)
+				   : TEXT("레벨에서 읽음"),
 			   Ob.BodyR * EcoRepertoireV3::kUnitCm, Ob.bBlockSight ? TEXT("켬") : TEXT("끔"), Ob.bNoFood ? TEXT("켬") : TEXT("끔"),
 			   static_cast<long long>(S.ObstacleDeerSteps), static_cast<long long>(S.ObstacleDeerHit), Pc(S.ObstacleDeerHit, S.ObstacleDeerSteps),
 			   static_cast<long long>(S.ObstacleDeerBack), static_cast<long long>(S.ObstacleWolfSteps), static_cast<long long>(S.ObstacleWolfHit),
@@ -3121,7 +3519,7 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			}
 		}
 		// 야생 2단계 3 세로 장애물 원판 (갈색 = 나무·바위 둘레, 옅은 선 = 몸 여유 둘레 — 사슴·늑대 중심이 들지 않는 원). 가져온 원판(측정 전용)은 주황,
-		// 무대 나무 줄기 원판(10-17, eco.IntegratedV3.StageTrees)은 초록
+		// 무대 나무 줄기 원판(10-17 실행 중 나무·10-18 레벨 나무 줄기 막이)은 초록
 		{
 			const EcoWorldV3::FObstacleConfig& Ob = Ctx.Sim.Config.Obstacles;
 			const FColor ObColor = Ctx.bObstaclesImported ? FColor(230, 140, 40) : FColor(120, 80, 40);
