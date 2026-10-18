@@ -990,16 +990,23 @@ def cmd_all(a) -> int:
         rc = fn(ns)
         times[name] = round(time.perf_counter() - t0, 1)
         print(f"== {name}: {times[name]}초 (rc {rc})", flush=True)
-        (d / "loop.json").write_text(json.dumps(dict(steps=times, args=vars(a) | {"snapshot": str(a.snapshot)}), ensure_ascii=False, indent=1, default=str) + "\n",
+        (d / "loop.json").write_text(json.dumps(dict(steps=times, args=vars(a) | {"snapshot": str(a.snapshot) if a.snapshot else None}), ensure_ascii=False, indent=1, default=str) + "\n",
                                      encoding="utf-8", newline="\n")
         return rc
 
     base = dict(run=a.run, workers=a.workers)
-    if step("1_convert", cmd_convert, argparse.Namespace(snapshot=a.snapshot, run=a.run)) != 0:
-        return 2
-    if step("2_check", cmd_check, argparse.Namespace(**base)) != 0:
-        print("재현 확인 실패 — 학습하지 않는다")
-        return 1
+    if a.snapshot is None:
+        # 가정 세계 고리(derive 로 만든 폴더): 스냅숏이 없어 1·2 를 건너뛴다
+        info = load_run(a.run)
+        if "derived_from" not in info["record"]:
+            raise SystemExit("--snapshot 이 없으면 derive 로 만든 고리만 받는다")
+        print(f"가정 세계 고리 {a.run} (변형 {info['record']['variant']['name']}) — 변환·재현 확인 없음", flush=True)
+    else:
+        if step("1_convert", cmd_convert, argparse.Namespace(snapshot=a.snapshot, run=a.run)) != 0:
+            return 2
+        if step("2_check", cmd_check, argparse.Namespace(**base)) != 0:
+            print("재현 확인 실패 — 학습하지 않는다")
+            return 1
     # 3 학습 ‖ 4 지금 두뇌 판정 판 (학습 프로세스 수만큼 워커를 덜 쓴다)
     import threading
 
@@ -1104,7 +1111,7 @@ def main(argv=None) -> int:
     s.add_argument("--run", required=True)
     s.add_argument("--out", default=None)
     s = sub.add_parser("all")
-    s.add_argument("--snapshot", type=Path, required=True)
+    s.add_argument("--snapshot", type=Path, default=None, help="없으면 derive 로 만든 가정 세계 고리 (1·2 건너뜀)")
     s.add_argument("--run", required=True)
     s.add_argument("--steps", type=int, default=DEFAULT_STEPS)
     s.add_argument("--model-seeds", type=int, nargs="+", default=[0, 1])

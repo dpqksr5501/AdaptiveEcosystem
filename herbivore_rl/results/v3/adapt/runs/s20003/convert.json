@@ -30,5 +30,5 @@
  ],
  "template": "configs/v3_wild3_mirror.yaml",
  "f_dec_note": "f_dec·ent_coef_base 는 R4 학습 세계에서 잰 값 그대로 (규칙이 같은 세계 — 규칙이 바뀌면 train_v3.py measure-fdec 로 다시 잰다)",
- "wall_s": 1.72
+ "wall_s": 1.62
 }
