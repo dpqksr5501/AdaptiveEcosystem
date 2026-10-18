@@ -308,6 +308,14 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("명령줄 -EcoV3RealismHearing= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarObsParityLog(
+		TEXT("eco.IntegratedV3.ObsParityLog"),
+		0,
+		TEXT("통합 v3 모드의 R5 장애물 관측 대조 기록 (10-19, 계약 POLICY_CONTRACT_V3.md 2-4). 0 = 끔(기본). N > 0 이면 전역 스텝 N 개마다 지역마다 산 사슴마다 ")
+		TEXT("'[EcoV3Obs]' 한 줄(입력·E·N·가림·관측 세 칸)과 지역마다 처음 한 번 원판 줄을 남기고, 관측 18 두뇌여도 세 칸을 만든다(결정은 그대로 — 망은 18 칸만 읽는다). ")
+		TEXT("파이썬 herbivore_rl/results/v3/r5/unreal_parity.py 가 견준다. 측정 전용. Play 전에 바꾼다. 명령줄 -EcoV3ObsParityLog= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarDebug(
 		TEXT("eco.V3Debug"),
 		0,
@@ -885,6 +893,12 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3BrainSwapAt="), SwapAtArg))
 	{
 		SetIfUnset(TEXT("eco.V3Brain.SwapAtSeconds"), LexToString(SwapAtArg));
+	}
+	// R5 장애물 관측 대조 기록 (10-19)
+	int32 ObsParityArg = 0;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ObsParityLog="), ObsParityArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ObsParityLog"), LexToString(ObsParityArg));
 	}
 	// 환경 스냅숏 (10-18 적응 고리, EcoV3Snapshot.cpp — 경로는 쉼표에서 끊지 않는다)
 	float SnapshotAtArg = -1.0f;
@@ -2982,6 +2996,9 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	EcoWorldV3::InitWorld(Ctx->Sim, Config);
 	// 허용 칸 = 지금 두뇌 ∧ 세계 칸 (내장 두뇌면 InitWorld 그대로 — 두뇌가 바뀌면 SyncBrain 이 다시 정한다)
 	EcoWorldV3::SetModelAllowed(Ctx->Sim, GetActiveBrain().Allowed);
+	// 관측 칸 수 = 지금 두뇌의 계약 (18 또는 21 — R5 장애물 관측, 계약 2-4). 대조 기록을 켜면 18 두뇌여도 세 칸을 만든다 (결정 그대로)
+	EcoWorldV3::SetModelObsDim(Ctx->Sim, GetActiveBrain().Net.ObsDim);
+	Ctx->Sim.bObstacleObsProbe = ObsParityEvery() > 0;
 	Ctx->Sim.T = GlobalT;
 	EcoWorldV3::UpdateDayNight(Ctx->Sim);
 	Ctx->LastLogT = GlobalT;
@@ -3103,6 +3120,8 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 	for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
 	{
 		EcoWorldV3::SetModelAllowed(Ctx->Sim, Now->Allowed);
+		// 관측 칸 수 = 새 두뇌의 계약 (R5 장애물 관측 21 이면 이 스텝 끝 관측부터 세 칸을 더 만들고, 그 결정부터 새 두뇌가 21 칸을 읽는다)
+		EcoWorldV3::SetModelObsDim(Ctx->Sim, Now->Net.ObsDim);
 		Ctx->SinceSwapBrainTally = FEcoV3BrainTally();
 		AllowedByRegion += FString::Printf(TEXT("%s%s %s"), AllowedByRegion.IsEmpty() ? TEXT("") : TEXT(" · "), *Ctx->RegionId.ToString(),
 										   *EcoV3Brain::AllowedText(Ctx->Sim.Allowed));
@@ -3128,6 +3147,85 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 	}
 	ActiveBrain = Now;
 	AppliedBrainGen = Reg.GetGeneration();
+}
+
+// -----------------------------------------------------------------------------
+// R5 장애물 관측 대조 기록 (10-19, 계약 POLICY_CONTRACT_V3.md 2-4 — herbivore_rl/results/v3/r5/unreal_parity.py 가 읽는다)
+// -----------------------------------------------------------------------------
+
+int32 UEcoPolicyV3IntegratedSubsystem::ObsParityEvery()
+{
+	EcoPolicyV3IntegratedImpl::EnsureCommandLineApplied();
+	return FMath::Max(0, EcoPolicyV3IntegratedImpl::CVarObsParityLog.GetValueOnGameThread());
+}
+
+void UEcoPolicyV3IntegratedSubsystem::LogObsParity(FEcoV3RegionContext& Ctx, const EcoWorldV3::FHerbView* Views, const int64* Ids, int32 Num)
+{
+	const int32 Every = ObsParityEvery();
+	if (Every <= 0)
+	{
+		return;
+	}
+	// 결정 지문: 이 스텝의 사슴마다 (id, 읽음, 마스크, 다음 요청, 로짓 비트, 이번 스텝에 실행한 행동) — 두 판(예: 내장 대 관측 21 새 열 0)의 모든 결정이 같은지 본다
+	auto Mix = [&Ctx](const void* Data, int32 Bytes)
+	{
+		const uint8* B = static_cast<const uint8*>(Data);
+		for (int32 i = 0; i < Bytes; ++i)
+		{
+			Ctx.ObsParityDecisionHash = (Ctx.ObsParityDecisionHash ^ B[i]) * 1099511628211ULL;
+		}
+	};
+	for (int32 r = 0; r < Num; ++r)
+	{
+		const EcoWorldV3::FHerbDecision& D = *Views[r].Decision;
+		const uint8 Reads = D.Prep.bReads ? 1 : 0;
+		Mix(&Ids[r], sizeof(int64));
+		Mix(&Reads, 1);
+		Mix(D.Mask, sizeof(D.Mask));
+		Mix(&D.Request, sizeof(D.Request));
+		Mix(D.Logits, sizeof(D.Logits));
+		Mix(&D.ExecutedBehavior, sizeof(D.ExecutedBehavior));
+		++Ctx.ObsParityDecisions;
+	}
+	if (Ctx.Sim.T % Every != 0 || !(Ctx.Sim.ObsDim >= EcoObservationV3::kObsDimObstacle || Ctx.Sim.bObstacleObsProbe))
+	{
+		return;
+	}
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3Obs] %s 결정 | t %lld | 사슴·스텝 %lld | 지문 %016llx"), *Ctx.RegionId.ToString(), static_cast<long long>(Ctx.Sim.T),
+		   static_cast<long long>(Ctx.ObsParityDecisions), static_cast<unsigned long long>(Ctx.ObsParityDecisionHash));
+	// 실수는 %.17g (double 왕복), 관측 칸은 float 비트 16진 — 파이썬이 비트 단위로 견준다
+	auto G17 = [](double V) { return FString::Printf(TEXT("%.17g"), V); };
+	if (!Ctx.bObsParityDiscsLogged)
+	{
+		Ctx.bObsParityDiscsLogged = true;
+		const EcoWorldV3::FObstacleConfig& Ob = Ctx.Sim.Config.Obstacles;
+		const int32 K = Ob.Active() ? Ob.Num() : 0;
+		FString Discs;
+		for (int32 k = 0; k < K; ++k)
+		{
+			Discs += FString::Printf(TEXT(" %s,%s,%s"), *G17(Ob.Discs[3 * k]), *G17(Ob.Discs[3 * k + 1]), *G17(Ob.Discs[3 * k + 2]));
+		}
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3Obs] %s 원판 | 원판 %d | 몸 %s | 무대 %s | 가림 %d | 두뇌 %s 관측 %d | 분모 %s %s |%s"), *Ctx.RegionId.ToString(), K,
+			   *G17(Ob.bEnabled ? Ob.BodyR : 0.0), *G17(Ctx.Sim.Config.WorldSize), Ob.bEnabled && Ob.bBlockSight ? 1 : 0, *GetActiveBrain().Id, Ctx.Sim.ObsDim,
+			   *G17(Ctx.Sim.ObstacleObsCfg.EscapeNorm), *G17(Ctx.Sim.ObstacleObsCfg.NearNorm), *Discs);
+	}
+	for (int32 r = 0; r < Num; ++r)
+	{
+		const EcoWorldV3::FHerbView& V = Views[r];
+		if (V.Body->DeathCause != EcoWorldV3::kDeathNone)
+		{
+			continue;   // 이번 스텝에 죽은 사슴 (계산은 했지만 쓰지 않는다 — 계약 2-4)
+		}
+		const EcoWorldV3::FHerbPerception& P = *V.Perception;
+		const EcoObservationV3::FObstacleObsInput In = EcoWorldV3::Detail::ObstacleObsInputOf(Ctx.Sim, P, *V.Body);
+		uint32 Bits[EcoObservationV3::kNumObstacleObs];
+		FMemory::Memcpy(Bits, P.ObstacleObs, sizeof(Bits));
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3Obs] %s | t %lld | id %lld | p %s %s | h %s %s | seen %d | a %s %s | j %s %s | E %s | N %s | hid %d | o %08x %08x %08x"),
+			   *Ctx.RegionId.ToString(), static_cast<long long>(Ctx.Sim.T), static_cast<long long>(Ids[r]), *G17(In.Pos.X), *G17(In.Pos.Y), *G17(In.Head.X),
+			   *G17(In.Head.Y), In.bSeen ? 1 : 0, *G17(In.Away.X), *G17(In.Away.Y), *G17(In.bSeen ? In.Threat.X : 0.0), *G17(In.bSeen ? In.Threat.Y : 0.0),
+			   *G17(P.Obstacle.Escape), *G17(P.Obstacle.Near), P.Obstacle.bThreatHidden ? 1 : 0, Bits[0], Bits[1], Bits[2]);
+		++Ctx.ObsParityLines;
+	}
 }
 
 // -----------------------------------------------------------------------------

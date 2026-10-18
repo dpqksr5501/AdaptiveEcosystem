@@ -685,6 +685,12 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	FEcoV3BrainTally LastLogBrainTally;       // 지난 기록 줄의 누적
 	FEcoV3BrainTally SinceSwapBrainTally;     // 지금 두뇌로 바뀐 뒤 (화면 '늑대를 알 때 숨기')
 
+	// R5 장애물 관측 대조 기록 (10-19, eco.IntegratedV3.ObsParityLog — LogObsParity)
+	bool bObsParityDiscsLogged = false;       // 이 무대의 원판 줄을 남겼다
+	int64 ObsParityLines = 0;                 // 남긴 사슴 줄 수
+	uint64 ObsParityDecisionHash = 14695981039346656037ULL;   // 결정 지문 (FNV-1a 64 — 스텝마다 사슴마다 id·읽음·마스크·요청·로짓 비트·실행 행동, 시작부터 누적)
+	int64 ObsParityDecisions = 0;             // 그 지문에 넣은 사슴·스텝 수
+
 	/**
 	 * 늑대 하나의 결정 스텝 하나를 센다 (처리기가 Step 뒤에 부른다. StepIndex = 이번 스텝 번호 = Step 뒤 Sim.T − 1).
 	 * 돌진 시작이면 앞 포획 뒤 경과로 이어 사냥·식사 끝 3 초 안을 가르고, 식사 중(잡지 않았고 쿨다운 > 0)이면 움직였는지 보고,
@@ -931,6 +937,18 @@ public:
 	const EcoPolicyV3::FPolicyNetV3& ActiveNet() const { return GetActiveBrain().Net; }
 	/** 마지막으로 두뇌를 바꾼 전역 스텝 (이 Play 에서 바꾼 적이 없으면 -1). 그 스텝부터의 결정은 새 두뇌다. */
 	int64 GetLastBrainSwapStep() const { return LastBrainSwapStep; }
+
+	// ---- R5 장애물 관측 대조 기록 (10-19, 계약 2-4) ----
+
+	/** eco.IntegratedV3.ObsParityLog (전역 스텝 간격, 0 = 끔). 켜면 관측 18 두뇌여도 세계가 장애물 세 칸을 만든다 (EcoWorldV3::FWorldState::bObstacleObsProbe — 결정은 그대로). */
+	static int32 ObsParityEvery();
+	/**
+	 * 처리기가 한 지역의 결정 스텝 하나 뒤에 부른다 (ObsParityEvery 가 0 이면 아무것도 안 한다). 전역 스텝이 그 간격의 배수면 산 사슴마다 '[EcoV3Obs]' 한 줄
+	 * (자리·heading·위협을 앎·away·가장 가까운 위협 자리 → E·N·가림·관측 세 칸 float 비트)과 결정 지문 줄(시작부터 스텝마다 사슴마다 id·읽음·마스크·요청·
+	 * 로짓 비트·실행 행동의 FNV-1a 64 — 두 판의 모든 결정이 같은지 본다)을, 지역마다 처음 한 번 원판 줄을 남긴다. 파이썬
+	 * herbivore_rl/results/v3/r5/unreal_parity.py 가 같은 입력으로 world.obstacle_obs_values 를 다시 돌려 비트 단위로 견준다. Views·Ids 는 이번 Step 배열 순서다.
+	 */
+	void LogObsParity(FEcoV3RegionContext& Ctx, const EcoWorldV3::FHerbView* Views, const int64* Ids, int32 Num);
 
 	/** 처리기가 한 프레임에 결정 스텝 Steps 개(모든 지역)를 돈 시간 (기록 줄의 '결정 스텝 CPU'). */
 	void AddStepCpuSeconds(double Seconds, int32 Steps)

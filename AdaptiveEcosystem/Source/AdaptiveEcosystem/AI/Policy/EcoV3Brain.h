@@ -3,7 +3,7 @@
 //
 // 무엇을 하나:
 //   파이썬(herbivore_rl/export_weights_v3.py --brain-file)이 쓴 두뇌 파일(JSON)을 읽어 검사하고, 통과하면 Play 를 다시 시작하지 않고
-//   통합 v3 모드의 사슴 두뇌(관측 18 → 64 → 64 → 로짓 5, EcoPolicyV3Inference.h 의 같은 순전파)를 바꾼다. 내장 두뇌(PolicyWeightsV3.h,
+//   통합 v3 모드의 사슴 두뇌(관측 18 또는 21 → 64 → 64 → 로짓 5, EcoPolicyV3Inference.h 의 같은 순전파)를 바꾼다. 내장 두뇌(PolicyWeightsV3.h,
 //   R1b s3 — 통합 모드는 얼기를 세계가 막아 R1b-F)는 늘 남아 있고 'builtin' 으로 언제든 돌아간다. 추론은 그대로 C++ 이고 파이썬은 게임 안에서
 //   돌지 않는다 — 바뀌는 것은 가중치의 출처뿐이다 (AGENTS.md 2절 4항).
 //
@@ -15,9 +15,14 @@
 //   개발 빌드 전용: Shipping 에서는 콘솔 명령·변수가 없고 늘 내장 두뇌다 (RL_SEASON_RETRAIN_PLAN.md 9절 #S1 — 팀 합의 안건).
 //
 // 두뇌 파일 검사 (하나라도 어긋나면 거부, 지금 두뇌를 그대로 둔다 — EcoV3Brain::EReject):
-//   형식·판 → 계약 해시 = 빌드의 kContractHash → 차원(관측 18·은닉 64·행동 5) → 관측·행동 이름 순서 → 마스크 판 → 마스크 문턱(float 비트) →
-//   허용 칸(먹기 필수, 이름·칸 일치) → 층 모양 → base64 길이 → NaN·Inf → 가중치 바이트 sha256 → 골든 자체 확인(파일 속 관측 + 마스크를
-//   RunPolicyV3 로 다시 돌려 로짓 |C++ − 파이썬| ≤ 허용 오차(≤ 1e-3), 행동은 같아야 한다, 8 사례 이상).
+//   형식·판 → 계약 해시 = 이 빌드가 관측을 만들 수 있는 계약 둘 중 하나 (EcoV3Brain::FindContract) → 차원(관측 = 그 계약의 칸 수·은닉 64·행동 5) →
+//   관측·행동 이름 순서 → 마스크 판 → 마스크 문턱(float 비트) → 허용 칸(먹기 필수, 이름·칸 일치) → 층 모양 → base64 길이 → NaN·Inf →
+//   가중치 바이트 sha256 → 골든 자체 확인(파일 속 관측 + 마스크를 RunPolicyV3 로 다시 돌려 로짓 |C++ − 파이썬| ≤ 허용 오차(≤ 1e-3), 행동은 같아야 한다, 8 사례 이상).
+// 받는 계약 (10-19 R5 장애물 관측, 계약 POLICY_CONTRACT_V3.md 2-4):
+//   관측 18 · 마스크 판 2  0x7eea0107339be4ce  내장 R1b 와 같은 계약 (빌드의 kContractHash)
+//   관측 21 · 마스크 판 2  0xbc4fc2d45c47c5fd  18 칸 + escape_room·obstacle_near·threat_hidden. 통합 모드가 두뇌를 바꾸면 세계가 세 칸을 더 만든다
+//                                              (EcoWorldV3::SetModelObsDim — 망 입력 = 관측 18 + 세 칸)
+//   그 밖(예: R2 관측 19·판 3)은 '계약 해시' 로 거부한다 — C++ 관측 코드를 함께 바꿔야 한다.
 //
 // 콘솔 (개발 빌드):
 //   eco.V3Brain.Load <파일|builtin>   파일 = 절대 경로, 또는 찾는 폴더(<프로젝트>/EcoBrains, <프로젝트>/Saved/EcoBrains) 안의 이름(.json 빼도 됨)
@@ -73,6 +78,25 @@ namespace EcoV3Brain
 
 	ADAPTIVEECOSYSTEM_API const TCHAR* RejectName(EReject Reason);
 
+	/** 이 빌드가 관측을 만들 수 있는 입출력 계약 하나 (관측 이름 = 관측 18 이름 뒤에 Extra 이름). */
+	struct FContract
+	{
+		uint64 Hash = 0;
+		int32 ObsDim = 0;
+		int32 MaskVersion = 0;
+		int32 NumExtra = 0;                    // 관측 18 뒤 칸 수 (0 또는 3)
+		const char* const* ExtraNames = nullptr;
+		const TCHAR* Label = TEXT("");
+	};
+
+	/** 받는 계약 수 (관측 18 · 판 2, 관측 21 · 판 2). */
+	inline constexpr int32 kNumContracts = 2;
+	ADAPTIVEECOSYSTEM_API const FContract& Contract(int32 Index);
+	/** 계약 해시 → 받는 계약 (없으면 nullptr). */
+	ADAPTIVEECOSYSTEM_API const FContract* FindContract(uint64 Hash);
+	/** 계약의 관측 칸 i 이름 (UTF-8). */
+	ADAPTIVEECOSYSTEM_API const char* ContractObsName(const FContract& C, int32 i);
+
 	/** 망 가중치 바이트(W0, B0, W1, B1, W2, B2 순서, float32 리틀 엔디언)의 sha256 16진 — 파이썬 export_weights_v3.weights_bytes 와 같은 바이트. */
 	ADAPTIVEECOSYSTEM_API FString WeightsSha256(const EcoPolicyV3::FPolicyNetV3& Net);
 
@@ -104,6 +128,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3Brain
 	FString GoldenWorld;     // 골든을 뽑은 세계 설정
 	FString SourceFile;      // 불러온 파일 (내장이면 빈 값)
 	bool bBuiltin = false;
+	uint64 ContractHash = 0; // 입출력 계약 해시 (내장 = kContractHash)
+	int32 ObsDim = 0;        // 관측 칸 수 = Net.ObsDim (18 또는 21)
 	uint8 Allowed[EcoPolicyV3::kNumBehaviors] = {};   // 모델 허용 칸 (실제 허용 = 이 칸 ∧ 세계 칸)
 	int32 GoldenCount = 0;
 	float GoldenTolerance = 0.0f;
@@ -118,7 +144,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3Brain
 	TArray<float> Layer2Bias;
 	EcoPolicyV3::FPolicyNetV3 Net = EcoPolicyV3::kBuiltinNet;
 
-	/** 한 줄 요약: 'v3_r4_g995_s0_20m@f807bea5 (파일 v3_r4_g995_s0_20m.json, 허용 먹기·도망·숨기)'. */
+	/** 한 줄 요약: 'v3_r4_g995_s0_20m@f807bea5 (파일 v3_r4_g995_s0_20m.json, 허용 먹기·도망·숨기)'. 관측 21 두뇌는 '…, 관측 21 장애물)' 을 붙인다. */
 	FString Describe() const;
 };
 

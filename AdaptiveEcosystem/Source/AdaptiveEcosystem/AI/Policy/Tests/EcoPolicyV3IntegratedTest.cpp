@@ -25,6 +25,8 @@
 //   (경계 거리 KeepAway 시험 6 개는 도주 반사 거리로 바꾸며 지웠다 — 규칙 시험은 EcoWildV3Test.cpp Wild.FlightGolden·Wild.FlightOff)
 //   Integrated.BrainSwap               두뇌 바꾸기 (10-18, EcoV3Brain.h): 60 초에 내장 R1b → R4 s0 파일 두뇌를 결정 스텝 경계에서 — 사슴 조각 바이트·개체 그대로,
 //                                      바꾸기 앞은 바꾸지 않은 판과 비트 단위로 같고 경계 스텝은 앞 두뇌의 요청을 실행, 뒤 결정은 모두 R4 로짓, 허용 = R4 ∧ 세계
+//   Integrated.BrainObs21Zero          R5 관측 21 (10-19, 계약 2-4): 처음부터 관측 21 두뇌(R1b-F + 장애물 세 칸 입력 열 0)로 돌린 두 지역(숲 나무 24) 180 초 =
+//                                      내장 판 (자리·요청·로짓 비트 단위), 세계 관측 칸 수 = 두뇌 계약, 세 칸은 관측 21 판에서만 만든다, 어긋남·마스크 위반 0
 //   Integrated.WolfEating              늑대 식사 시간 (eco.IntegratedV3.WolfEatSeconds 기본 5 → 38 스텝): 위협 모델 — 식사 37 스텝 제자리, 38 번째에
 //                                      다시 잡음, 끄면 배회, 플레이어·쿨다운 0 은 그대로. Mass — 서 있음·속도 0·'먹는 중' 깃발·글자, 팀 늑대 표현이
 //                                      '먹는 중' 동작 (옛 규칙 0.67 초는 뛰기), 옛 규칙 설정은 바꾸기 전 세계와 비트 단위로 같다
@@ -3396,6 +3398,163 @@ bool FEcoPolicyV3IntegratedBrainSwapTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("모든 결정의 로짓·요청 = 내장 두뇌 (바꾸지 않은 판)"), Ctl.LogitBad, static_cast<int64>(0));
 	TestEqual(TEXT("마스크 위반 0 (두 판)"), Swap.Violations + Ctl.Violations, static_cast<int64>(0));
 	TestEqual(TEXT("두뇌 집계(두뇌 스텝 + 반사 스텝) = 산 사슴·스텝 (지역마다, 두 판)"), Swap.TallyBad + Ctl.TallyBad, static_cast<int64>(0));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// R5 관측 21 (10-19, 계약 2-4): 처음부터 관측 21 두뇌(R1b-F + 장애물 세 칸 입력 열 0)로 돌린 Mass 통합 판 = 내장 R1b-F 판 (배관 확인)
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedBrainObs21ZeroTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.BrainObs21Zero",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedBrainObs21ZeroTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	namespace P3 = EcoPolicyV3;
+	namespace O3 = EcoObservationV3;
+	constexpr int32 NB = EcoRepertoireV3::kNumBehaviors;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	Reg.ResetForTest();
+	ON_SCOPE_EXIT
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	const FEcoV3BrainLoad Zero = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r1_g995_s3_obs21zero"));
+	if (!TestTrue(FString::Printf(TEXT("관측 21 두뇌 파일 (%s: %s)"), EcoV3Brain::RejectName(Zero.Reason), *Zero.Message), Zero.Ok()))
+	{
+		return false;
+	}
+	constexpr int32 kFrames = 1350;   // 180 초
+	// 두 지역 모두 숲 무대 나무 24 그루 줄기 원판 (TreeLayoutV3.h — 언리얼 통합 레벨과 같은 원판)
+	std::vector<double> Discs;
+	for (const EcoTreeLayoutV3::FTree& T : EcoTreeLayoutV3::kForestTrees)
+	{
+		Discs.insert(Discs.end(), {T.X, T.Y, T.R});
+	}
+	struct FRun
+	{
+		TArray<TArray<double>> Pos;
+		TArray<TArray<int32>> Request;
+		TArray<TArray<uint32>> LogitBits;   // [프레임] 사슴마다 다음 요청 로짓 5 (읽은 결정만, 아니면 0)
+		int32 ObsDim[2] = {};
+		int64 Decisions = 0;
+		int64 LogitBad = 0;                  // 그 두뇌·그 입력(관측 18 + 세 칸)으로 다시 돌린 로짓·요청과 다른 결정
+		int64 SlotsFilled = 0;               // 세 칸을 만든 산 사슴·프레임 (obstacle_near < 1 이거나 escape_room < 1)
+		int64 SlotsNonZero = 0;              // 세 칸 중 하나라도 0 이 아닌 산 사슴·프레임
+		int64 Mismatch = 0;
+		int64 Violations = 0;
+		FString ActiveId;
+	};
+	auto Run = [&](bool bZero, FRun& Out) -> bool
+	{
+		Reg.ResetForTest();
+		FIntegratedHarness H;
+		if (!H.Setup(*this, TestSettings(37200)))
+		{
+			return false;
+		}
+		const FEcoV3IntegratedSettings& S = H.Sub->GetSettings();
+		FEcoV3RegionContext* Ctx[2] = {};
+		for (int32 c = 0; c < 2; ++c)
+		{
+			FWorldConfig C = UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, c, 16, 2, EcoWorldV3::QuadCovers(S.StageSizeUnits, 6.0));
+			C.Obstacles.bEnabled = true;
+			C.Obstacles.Discs = Discs;
+			Ctx[c] = H.Sub->AddContext(c == 0 ? FName(TEXT("RegionA")) : FName(TEXT("RegionB")), c, FVector(0.0, 40000.0 * c, 0.0), C, 16, 2);
+		}
+		H.SpawnRegion(*Ctx[0], 16, 2, 1, 0);
+		H.SpawnRegion(*Ctx[1], 16, 2, 100, 1);
+		if (bZero)
+		{
+			// 시작 두뇌 (eco.V3Brain.Startup 과 같은 길): 줄에 넣으면 첫 처리기 머리의 SyncBrain 이 입양 첫 결정 앞에서 바꾼다
+			Reg.Queue(Zero.Brain.ToSharedRef(), TEXT("시험 Integrated.BrainObs21Zero"));
+		}
+		for (int32 f = 0; f < kFrames; ++f)
+		{
+			H.DecisionStep();
+			H.CoordinatorReconcile();
+			const P3::FPolicyNetV3& Net = H.Sub->ActiveNet();
+			TArray<double>& Pos = Out.Pos.AddDefaulted_GetRef();
+			TArray<int32>& Req = Out.Request.AddDefaulted_GetRef();
+			TArray<uint32>& Bits = Out.LogitBits.AddDefaulted_GetRef();
+			for (const FMassEntityHandle& E : H.Deer)
+			{
+				if (!H.EM->IsEntityValid(E))
+				{
+					Pos.Append({TNumericLimits<double>::Max(), TNumericLimits<double>::Max()});
+					Req.Add(-1);
+					Bits.AddZeroed(NB);
+					continue;
+				}
+				const FHerbView V = DeerView(*H.EM, E);
+				Pos.Append({V.Body->Pos.X, V.Body->Pos.Y});
+				const EcoWorldV3::FHerbDecision& D = *V.Decision;
+				Req.Add(D.bPrepared ? D.Request : -1);
+				const int32 At = Bits.AddZeroed(NB);
+				const bool bDead = H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead;
+				if (!bDead)
+				{
+					const float* Ob = V.Perception->ObstacleObs;
+					Out.SlotsFilled += (Ob[0] < 1.0f || Ob[1] < 1.0f) ? 1 : 0;
+					Out.SlotsNonZero += (Ob[0] != 0.0f || Ob[1] != 0.0f || Ob[2] != 0.0f) ? 1 : 0;
+				}
+				if (bDead || !D.bPrepared || !D.Prep.bReads)
+				{
+					continue;
+				}
+				++Out.Decisions;
+				FMemory::Memcpy(&Bits[At], D.Logits, sizeof(D.Logits));
+				float In[O3::kObsDimObstacle];
+				FMemory::Memcpy(In, V.Perception->Obs, sizeof(V.Perception->Obs));
+				FMemory::Memcpy(In + O3::kObsDim, V.Perception->ObstacleObs, sizeof(V.Perception->ObstacleObs));
+				float L[NB];
+				const int32 Got = P3::RunPolicyV3(Net, In, D.Mask, L);
+				Out.LogitBad += (Got != D.Request || FMemory::Memcmp(L, D.Logits, sizeof(L)) != 0) ? 1 : 0;
+			}
+		}
+		for (int32 c = 0; c < 2; ++c)
+		{
+			Out.ObsDim[c] = Ctx[c]->Sim.ObsDim;
+			Out.Mismatch += Ctx[c]->Sim.Stats.ObsLayoutMismatch;
+			Out.Violations += Ctx[c]->Sim.Stats.MaskViolations;
+		}
+		Out.ActiveId = H.Sub->GetActiveBrain().Id;
+		return true;
+	};
+
+	FRun Base;
+	FRun Z;
+	if (!Run(false, Base) || !Run(true, Z))
+	{
+		return false;
+	}
+	int32 PosDiff = 0;
+	int32 ReqDiff = 0;
+	int32 LogitDiff = 0;
+	for (int32 f = 0; f < kFrames; ++f)
+	{
+		PosDiff += Base.Pos[f] == Z.Pos[f] ? 0 : 1;
+		ReqDiff += Base.Request[f] == Z.Request[f] ? 0 : 1;
+		LogitDiff += Base.LogitBits[f] == Z.LogitBits[f] ? 0 : 1;
+	}
+	AddInfo(FString::Printf(TEXT("내장 %s 대 관측 21 %s · 결정 %lld 대 %lld · 다른 프레임 자리 %d·요청 %d·로짓 %d / %d · 세 칸 만든 산 사슴·프레임 내장 %lld 대 관측 21 %lld (0 아님 %lld)"),
+							*Base.ActiveId, *Z.ActiveId, Base.Decisions, Z.Decisions, PosDiff, ReqDiff, LogitDiff, kFrames, Base.SlotsNonZero, Z.SlotsFilled,
+							Z.SlotsNonZero));
+	TestTrue(TEXT("두 판의 두뇌 (내장 R1b-F 관측 18, 파일 관측 21)"), Base.ActiveId == FEcoV3BrainRegistry::Builtin()->Id && Z.ActiveId == Zero.Brain->Id);
+	TestTrue(TEXT("세계 관측 칸 수 = 두뇌 계약 (내장 18, 관측 21 두뇌 21 — 두 지역)"), Base.ObsDim[0] == O3::kObsDim && Base.ObsDim[1] == O3::kObsDim
+																					   && Z.ObsDim[0] == O3::kObsDimObstacle && Z.ObsDim[1] == O3::kObsDimObstacle);
+	TestEqual(TEXT("내장 판은 세 칸을 만들지 않는다 (0)"), Base.SlotsNonZero, static_cast<int64>(0));
+	TestTrue(TEXT("관측 21 판은 산 사슴마다 세 칸을 만든다 (줄기·벽이 보인다)"), Z.SlotsFilled > 0 && Z.SlotsNonZero > 0);
+	TestTrue(TEXT("두 판 모두 두뇌를 부른 결정이 있다"), Base.Decisions > 100 && Z.Decisions == Base.Decisions);
+	TestEqual(TEXT("관측 21 두뇌(새 열 0) = 내장: 사슴 자리 (비트 단위, 모든 프레임)"), PosDiff, 0);
+	TestEqual(TEXT("관측 21 두뇌(새 열 0) = 내장: 다음 요청 (모든 프레임)"), ReqDiff, 0);
+	TestEqual(TEXT("관측 21 두뇌(새 열 0) = 내장: 결정 로짓 (비트 단위, 모든 프레임)"), LogitDiff, 0);
+	TestEqual(TEXT("모든 결정 로짓·요청 = 그 두뇌로 관측 18 + 세 칸을 다시 돌린 값 (두 판)"), Base.LogitBad + Z.LogitBad, static_cast<int64>(0));
+	TestEqual(TEXT("망 칸 수와 세계 관측 칸 수 어긋남 0 (두 판)"), Base.Mismatch + Z.Mismatch, static_cast<int64>(0));
+	TestEqual(TEXT("마스크 위반 0 (두 판)"), Base.Violations + Z.Violations, static_cast<int64>(0));
 	return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

@@ -11,11 +11,17 @@
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
 
+#include "EcoObservationV3.h"
 #include "EcoSha256.h"
 
 DEFINE_LOG_CATEGORY(LogEcoV3Brain);
 
 static_assert(PLATFORM_LITTLE_ENDIAN, "두뇌 파일 가중치는 float32 리틀 엔디언 바이트다 — 큰 엔디언 플랫폼은 바이트를 뒤집어 읽어야 한다");
+// 관측 21 계약은 내장 관측 18·판 2 계약(R1b) 뒤에 세 칸을 붙인 것이다 — 내장 계약이 바뀌면 이 표를 함께 고친다
+static_assert(EcoPolicyV3::kContractHash == EcoPolicyV3::kContractHashObs18Mask2 && EcoPolicyV3::kObsDim == EcoObservationV3::kObsDim
+				  && EcoPolicyV3::kMaskVersion == 2,
+			  "관측 21 장애물 계약은 내장 관측 18·마스크 판 2 계약 위에 있다");
+static_assert(EcoObservationV3::kObsDimObstacle <= EcoPolicyV3::kMaxObsDim, "관측 21 이 망 입력 상한을 넘는다");
 
 namespace EcoV3BrainImpl
 {
@@ -23,6 +29,13 @@ namespace EcoV3BrainImpl
 	namespace P3 = EcoPolicyV3;
 
 	const TCHAR* const kBehaviorKo[P3::kNumBehaviors] = {TEXT("먹기"), TEXT("도망"), TEXT("숨기"), TEXT("얼기"), TEXT("잠")};
+
+	// 받는 계약 (EcoV3Brain.h 머리 주석 '받는 계약'). 0 = 내장 계약, 1 = R5 장애물 관측 21
+	const FContract kContracts[kNumContracts] = {
+		{P3::kContractHash, P3::kObsDim, P3::kMaskVersion, 0, nullptr, TEXT("관측 18 · 마스크 판 2 (내장 R1b 와 같은 계약)")},
+		{P3::kContractHashObs21Mask2, EcoObservationV3::kObsDimObstacle, 2, EcoObservationV3::kNumObstacleObs, EcoObservationV3::kObstacleObsNames,
+		 TEXT("관측 21 · 마스크 판 2 (R5 장애물 관측 — 18 칸 + escape_room·obstacle_near·threat_hidden)")},
+	};
 
 #if !UE_BUILD_SHIPPING
 	TAutoConsoleVariable<FString> CVarStartup(
@@ -193,6 +206,28 @@ const TCHAR* EcoV3Brain::RejectName(EReject Reason)
 	return TEXT("?");
 }
 
+const EcoV3Brain::FContract& EcoV3Brain::Contract(int32 Index)
+{
+	return EcoV3BrainImpl::kContracts[FMath::Clamp(Index, 0, kNumContracts - 1)];
+}
+
+const EcoV3Brain::FContract* EcoV3Brain::FindContract(uint64 Hash)
+{
+	for (const FContract& C : EcoV3BrainImpl::kContracts)
+	{
+		if (C.Hash == Hash)
+		{
+			return &C;
+		}
+	}
+	return nullptr;
+}
+
+const char* EcoV3Brain::ContractObsName(const FContract& C, int32 i)
+{
+	return i < EcoPolicyV3::kObsDim ? EcoPolicyV3::kObsNames[i] : C.ExtraNames[i - EcoPolicyV3::kObsDim];
+}
+
 FString EcoV3Brain::WeightsSha256(const EcoPolicyV3::FPolicyNetV3& Net)
 {
 	namespace P3 = EcoPolicyV3;
@@ -261,9 +296,9 @@ FString EcoV3Brain::WatchFolder()
 
 FString FEcoV3Brain::Describe() const
 {
-	return FString::Printf(TEXT("%s (%s, 허용 %s)"), *Id,
+	return FString::Printf(TEXT("%s (%s, 허용 %s%s)"), *Id,
 						   bBuiltin ? TEXT("내장 PolicyWeightsV3.h") : *FString::Printf(TEXT("파일 %s"), *FPaths::GetCleanFilename(SourceFile)),
-						   *EcoV3Brain::AllowedText(Allowed));
+						   *EcoV3Brain::AllowedText(Allowed), ObsDim > EcoPolicyV3::kObsDim ? *FString::Printf(TEXT(", 관측 %d 장애물"), ObsDim) : TEXT(""));
 }
 
 // -----------------------------------------------------------------------------
@@ -277,6 +312,8 @@ FEcoV3BrainRef FEcoV3BrainRegistry::Builtin()
 		namespace P3 = EcoPolicyV3;
 		TSharedRef<FEcoV3Brain, ESPMode::ThreadSafe> B = MakeShared<FEcoV3Brain, ESPMode::ThreadSafe>();
 		B->bBuiltin = true;
+		B->ContractHash = P3::kContractHash;
+		B->ObsDim = P3::kObsDim;
 		B->Net = P3::kBuiltinNet;
 		B->ModelName = UTF8_TO_TCHAR(P3::kModelName);
 		B->WeightsSha256 = EcoV3Brain::WeightsSha256(B->Net);
@@ -326,36 +363,39 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 	FString HashText;
 	R.TryGetStringField(TEXT("contract_hash"), HashText);
 	const uint64 Hash = HashText.StartsWith(TEXT("0x")) ? FCString::Strtoui64(*HashText + 2, nullptr, 16) : 0;
-	if (Hash != P3::kContractHash)
+	const FContract* Ct = FindContract(Hash);
+	if (!Ct)
 	{
-		return Fail(EReject::Contract, FString::Printf(TEXT("계약 해시 %s 가 이 빌드의 0x%016llx 와 다르다 (관측·마스크 계약이 다른 모델 — C++ 관측 코드를 함께 바꿔야 한다)"),
-													 *HashText, static_cast<unsigned long long>(P3::kContractHash)));
+		return Fail(EReject::Contract, FString::Printf(TEXT("계약 해시 %s 가 이 빌드가 받는 0x%016llx (관측 18)·0x%016llx (관측 21 장애물) 가 아니다 (관측·마스크 계약이 다른 모델 — C++ 관측 코드를 함께 바꿔야 한다)"),
+													 *HashText, static_cast<unsigned long long>(Contract(0).Hash), static_cast<unsigned long long>(Contract(1).Hash)));
 	}
+	const int32 WantObs = Ct->ObsDim;
 
-	// 차원
+	// 차원 (관측 = 그 계약의 칸 수)
 	int32 ObsDim = 0;
 	int32 Hidden = 0;
 	int32 NumBeh = 0;
 	if (!R.TryGetNumberField(TEXT("obs_dim"), ObsDim) || !R.TryGetNumberField(TEXT("hidden"), Hidden) || !R.TryGetNumberField(TEXT("num_behaviors"), NumBeh)
-		|| ObsDim != P3::kObsDim || Hidden != P3::kHiddenDim || NumBeh != P3::kNumBehaviors)
+		|| ObsDim != WantObs || Hidden != P3::kHiddenDim || NumBeh != P3::kNumBehaviors)
 	{
-		return Fail(EReject::Dims, FString::Printf(TEXT("차원 관측 %d·은닉 %d·행동 %d 이 이 빌드의 %d·%d·%d 과 다르다"), ObsDim, Hidden, NumBeh, P3::kObsDim,
+		return Fail(EReject::Dims, FString::Printf(TEXT("차원 관측 %d·은닉 %d·행동 %d 이 계약(%s)의 %d·%d·%d 과 다르다"), ObsDim, Hidden, NumBeh, Ct->Label, WantObs,
 												 P3::kHiddenDim, P3::kNumBehaviors));
 	}
 
 	// 이름 순서
 	TArray<FString> ObsNames;
 	TArray<FString> BehNames;
-	if (!ReadStringArray(R, TEXT("obs_names"), ObsNames) || !ReadStringArray(R, TEXT("behaviors"), BehNames) || ObsNames.Num() != P3::kObsDim
+	if (!ReadStringArray(R, TEXT("obs_names"), ObsNames) || !ReadStringArray(R, TEXT("behaviors"), BehNames) || ObsNames.Num() != WantObs
 		|| BehNames.Num() != P3::kNumBehaviors)
 	{
 		return Fail(EReject::Names, TEXT("obs_names·behaviors 가 없거나 길이가 다르다"));
 	}
-	for (int32 i = 0; i < P3::kObsDim; ++i)
+	for (int32 i = 0; i < WantObs; ++i)
 	{
-		if (ObsNames[i] != UTF8_TO_TCHAR(P3::kObsNames[i]))
+		const char* Want = ContractObsName(*Ct, i);
+		if (ObsNames[i] != UTF8_TO_TCHAR(Want))
 		{
-			return Fail(EReject::Names, FString::Printf(TEXT("관측 %d 칸 '%s' 이 이 빌드의 '%s' 와 다르다"), i, *ObsNames[i], UTF8_TO_TCHAR(P3::kObsNames[i])));
+			return Fail(EReject::Names, FString::Printf(TEXT("관측 %d 칸 '%s' 이 계약의 '%s' 와 다르다"), i, *ObsNames[i], UTF8_TO_TCHAR(Want)));
 		}
 	}
 	for (int32 b = 0; b < P3::kNumBehaviors; ++b)
@@ -368,9 +408,9 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 
 	// 마스크 판·문턱
 	int32 MaskVersion = 0;
-	if (!R.TryGetNumberField(TEXT("mask_version"), MaskVersion) || MaskVersion != P3::kMaskVersion)
+	if (!R.TryGetNumberField(TEXT("mask_version"), MaskVersion) || MaskVersion != Ct->MaskVersion)
 	{
-		return Fail(EReject::Mask, FString::Printf(TEXT("마스크 판 %d 이 이 빌드의 %d 와 다르다"), MaskVersion, P3::kMaskVersion));
+		return Fail(EReject::Mask, FString::Printf(TEXT("마스크 판 %d 이 계약의 %d 와 다르다"), MaskVersion, Ct->MaskVersion));
 	}
 	const FJsonObject* Th = ObjectField(R, TEXT("thresholds"));
 	double Tr = 0.0;
@@ -387,6 +427,8 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 	}
 
 	TSharedRef<FEcoV3Brain, ESPMode::ThreadSafe> B = MakeShared<FEcoV3Brain, ESPMode::ThreadSafe>();
+	B->ContractHash = Ct->Hash;
+	B->ObsDim = WantObs;
 
 	// 허용 칸: 이름 목록 = 칸 (먹기는 늘 — 마스크가 비지 않게)
 	{
@@ -425,7 +467,7 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 		{
 			return Fail(EReject::Shape, TEXT("층이 셋이 아니다"));
 		}
-		const int32 Want[3][2] = {{P3::kHiddenDim, P3::kObsDim}, {P3::kHiddenDim, P3::kHiddenDim}, {P3::kNumBehaviors, P3::kHiddenDim}};
+		const int32 Want[3][2] = {{P3::kHiddenDim, WantObs}, {P3::kHiddenDim, P3::kHiddenDim}, {P3::kNumBehaviors, P3::kHiddenDim}};
 		TArray<float>* Ws[3] = {&B->Layer0Weight, &B->Layer1Weight, &B->Layer2Weight};
 		TArray<float>* Bs[3] = {&B->Layer0Bias, &B->Layer1Bias, &B->Layer2Bias};
 		for (int32 k = 0; k < 3; ++k)
@@ -455,7 +497,7 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 				}
 			}
 		}
-		B->Net = {P3::kObsDim, B->Layer0Weight.GetData(), B->Layer0Bias.GetData(), B->Layer1Weight.GetData(), B->Layer1Bias.GetData(),
+		B->Net = {WantObs, B->Layer0Weight.GetData(), B->Layer0Bias.GetData(), B->Layer1Weight.GetData(), B->Layer1Bias.GetData(),
 				  B->Layer2Weight.GetData(), B->Layer2Bias.GetData()};
 	}
 
@@ -493,11 +535,11 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 		for (int32 n = 0; n < Cases->Num(); ++n)
 		{
 			const TSharedPtr<FJsonObject> C = (*Cases)[n].IsValid() ? (*Cases)[n]->AsObject() : nullptr;
-			float Obs[P3::kObsDim];
+			float Obs[P3::kMaxObsDim];
 			float Want[P3::kNumBehaviors];
 			int32 MaskInt[P3::kNumBehaviors];
 			int32 Action = -1;
-			if (!C.IsValid() || !ReadFloats(*C, TEXT("obs"), P3::kObsDim, Obs) || !ReadFloats(*C, TEXT("logits"), P3::kNumBehaviors, Want)
+			if (!C.IsValid() || !ReadFloats(*C, TEXT("obs"), WantObs, Obs) || !ReadFloats(*C, TEXT("logits"), P3::kNumBehaviors, Want)
 				|| !ReadInts(*C, TEXT("mask"), P3::kNumBehaviors, MaskInt) || !C->TryGetNumberField(TEXT("action"), Action) || Action < 0
 				|| Action >= P3::kNumBehaviors)
 			{
@@ -804,8 +846,9 @@ namespace EcoV3BrainImpl
 	void PrintBrain(FOutputDevice& Ar, const TCHAR* Label, const FEcoV3Brain& B)
 	{
 		Ar.Logf(TEXT("[EcoV3Brain] %s: %s"), Label, *B.Describe());
-		Ar.Logf(TEXT("[EcoV3Brain]   모델 %s (%s) · zip sha256 %s · 가중치 sha256 %s"), *B.ModelName, B.ModelPath.IsEmpty() ? TEXT("-") : *B.ModelPath,
-				B.ModelSha256.IsEmpty() ? TEXT("-") : *B.ModelSha256.Left(16), *B.WeightsSha256.Left(16));
+		Ar.Logf(TEXT("[EcoV3Brain]   모델 %s (%s) · zip sha256 %s · 가중치 sha256 %s · 계약 0x%016llx (관측 %d)"), *B.ModelName,
+				B.ModelPath.IsEmpty() ? TEXT("-") : *B.ModelPath, B.ModelSha256.IsEmpty() ? TEXT("-") : *B.ModelSha256.Left(16), *B.WeightsSha256.Left(16),
+				static_cast<unsigned long long>(B.ContractHash), B.ObsDim);
 		Ar.Logf(TEXT("[EcoV3Brain]   학습 %s%s%s"), *B.TrainWorld, B.TrainConfig.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" · 설정 %s"), *B.TrainConfig),
 				B.TrainDigest.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *B.TrainDigest));
 		if (!B.bBuiltin)

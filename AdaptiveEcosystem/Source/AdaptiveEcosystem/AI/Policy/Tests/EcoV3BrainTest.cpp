@@ -9,6 +9,8 @@
 //   Brain.LoadValid    저장소의 두뇌 파일 둘(<프로젝트>/EcoBrains — herbivore_rl/export_weights_v3.py --brain-file): 검사 통과, C++ 순전파가 파일 속 파이썬 골든과
 //                      같다(로짓 허용 오차·행동), R1b 파일은 내장 가중치와 비트 단위로 같고 내장 골든(PolicyGoldenVectorsV3.h)에서 내장과 같은 로짓,
 //                      R4 파일은 허용 칸이 먹기·도망·숨기이고 내장 골든에서 다른 결정을 낸다
+//   Brain.LoadObs21    R5 관측 21 두뇌 파일(R1b-F + 장애물 세 칸 입력 열 0 — herbivore_rl/results/v3/r5/zero_extend.py): 검사 통과, 망 21 칸, 첫 층 = 내장 18 열 + 0 열
+//                      (비트 단위), 내장 골든 × 아무 세 칸 = 내장 로짓, 두 계약 말고는 거부·계약과 칸 수·이름·마스크·층·골든이 어긋나면 거부 (11 가지 + R4 에 21 해시)
 //   Brain.RejectBad    깨진 파일 24 가지(JSON·없는 파일·형식·판·계약 해시·차원·이름·마스크 판·문턱·허용 칸·층 모양·base64·NaN·sha256·바꾼 가중치·전치·
 //                      골든 허용 오차·사례 수·행동)를 까닭과 함께 거부하고, 지금 두뇌는 그대로다
 //   Brain.Registry     줄·경계·세대(Queue → CommitPending), 'builtin', 이름 찾기(.json 빼도), 목록, 콘솔 eco.V3Brain.Load·Info·List, 폴더 감시
@@ -18,6 +20,7 @@
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "../EcoObservationV3.h"
 #include "../EcoSha256.h"
 #include "../EcoV3Brain.h"
 #include "../PolicyGoldenVectorsV3.h"
@@ -41,6 +44,7 @@ namespace EcoV3BrainTestImpl
 
 	const TCHAR* const kR1bFile = TEXT("v3_r1_g995_s3_20m");
 	const TCHAR* const kR4File = TEXT("v3_r4_g995_s0_20m");
+	const TCHAR* const kZeroObs21File = TEXT("v3_r1_g995_s3_obs21zero");   // R5 관측 21 = R1b-F + 새 세 열 0 (10-19)
 
 	FString Sha(const char* Text)
 	{
@@ -334,6 +338,159 @@ bool FEcoV3BrainLoadValidTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("R4 모델 zip sha256 64 글자"), R4.Brain->ModelSha256.Len(), 64);
 	TestNotEqual(TEXT("R4 가중치 지문 ≠ 내장"), R4.Brain->WeightsSha256, FEcoV3BrainRegistry::Builtin()->WeightsSha256);
 	// 검사만 했다 — 저장소의 지금 두뇌는 그대로다
+	TestTrue(TEXT("불러오기만으로는 지금 두뇌가 바뀌지 않는다"), &*FEcoV3BrainRegistry::Get().GetActive() == &*FEcoV3BrainRegistry::Builtin());
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// R5 관측 21 (10-19, 계약 2-4): R1b-F + 새 세 열 0 두뇌 파일 (herbivore_rl/results/v3/r5/zero_extend.py) — 두 계약만 받고 어긋나면 거부
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3BrainLoadObs21Test, "AdaptiveEcosystem.Policy.V3.Brain.LoadObs21",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3BrainLoadObs21Test::RunTest(const FString& Parameters)
+{
+	namespace G = EcoPolicyV3::Golden;
+	namespace O3 = EcoObservationV3;
+	const FRegistryGuard Guard;
+	const FEcoV3BrainLoad Z = FEcoV3BrainRegistry::LoadFile(kZeroObs21File);
+	if (!TestTrue(FString::Printf(TEXT("관측 21 두뇌 파일 검사 통과 (%s: %s)"), EcoV3Brain::RejectName(Z.Reason), *Z.Message), Z.Ok()))
+	{
+		return false;
+	}
+	const FEcoV3Brain& B = *Z.Brain;
+	AddInfo(FString::Printf(TEXT("%s | 골든 %d 최대 오차 %.3e | 학습 %s"), *B.Describe(), B.GoldenCount, B.GoldenMaxError, *B.TrainWorld));
+	TestEqual(TEXT("관측 21"), B.ObsDim, O3::kObsDimObstacle);
+	TestEqual(TEXT("망 = 관측 21"), B.Net.ObsDim, O3::kObsDimObstacle);
+	TestEqual(TEXT("계약 해시 = 관측 21·판 2"), B.ContractHash, P3::kContractHashObs21Mask2);
+	TestTrue(TEXT("내장 두뇌 = 관측 18·내장 계약"), FEcoV3BrainRegistry::Builtin()->ObsDim == P3::kObsDim && FEcoV3BrainRegistry::Builtin()->ContractHash == P3::kContractHash);
+	TestTrue(TEXT("설명에 '관측 21 장애물'"), B.Describe().Contains(TEXT("관측 21 장애물")));
+	TestTrue(TEXT("허용 칸 = 내장 (먹기·도망·숨기·얼기 — 통합 모드는 세계가 얼기를 막는다)"), FMemory::Memcmp(B.Allowed, P3::kAllowedMask, sizeof(B.Allowed)) == 0);
+	// 가중치 = 내장 + 새 세 열 0 (비트 단위)
+	{
+		int32 Bad = 0;
+		for (int32 j = 0; j < P3::kHiddenDim; ++j)
+		{
+			for (int32 i = 0; i < O3::kObsDimObstacle; ++i)
+			{
+				const float W = B.Net.W0[j * O3::kObsDimObstacle + i];
+				const float Want = i < P3::kObsDim ? P3::kW0[j * P3::kObsDim + i] : 0.0f;
+				Bad += FMemory::Memcmp(&W, &Want, sizeof(float)) != 0 ? 1 : 0;
+			}
+		}
+		const bool bRest = FMemory::Memcmp(B.Net.B0, P3::kB0, sizeof(P3::kB0)) == 0 && FMemory::Memcmp(B.Net.W1, P3::kW1, sizeof(P3::kW1)) == 0
+						   && FMemory::Memcmp(B.Net.B1, P3::kB1, sizeof(P3::kB1)) == 0 && FMemory::Memcmp(B.Net.W2, P3::kW2, sizeof(P3::kW2)) == 0
+						   && FMemory::Memcmp(B.Net.B2, P3::kB2, sizeof(P3::kB2)) == 0;
+		TestEqual(TEXT("첫 층 = 내장 18 열 + 새 세 열 +0.0 (비트 단위)"), Bad, 0);
+		TestTrue(TEXT("나머지 층 = 내장 (비트 단위)"), bRest);
+		TestNotEqual(TEXT("가중치 지문은 내장과 다르다 (첫 층 모양이 다르다)"), B.WeightsSha256, FEcoV3BrainRegistry::Builtin()->WeightsSha256);
+	}
+	// 내장 골든 관측 18 + 아무 세 칸 → 로짓 = 내장 (비트 단위): 새 칸은 결정을 바꾸지 않는다
+	{
+		int32 Diff = 0;
+		const float Extra[3][O3::kNumObstacleObs] = {{0.0f, 1.0f, 0.0f}, {0.37f, 0.11f, 1.0f}, {1.0f, 0.0f, 1.0f}};
+		for (int32 n = 0; n < G::kCount; ++n)
+		{
+			uint8 Mask[P3::kNumBehaviors];
+			for (int32 b = 0; b < P3::kNumBehaviors; ++b)
+			{
+				Mask[b] = G::kMask[n * P3::kNumBehaviors + b];
+			}
+			float Lb[P3::kNumBehaviors];
+			const int32 Ab = P3::RunPolicyV3(P3::kBuiltinNet, &G::kObs[n * P3::kObsDim], Mask, Lb);
+			for (const auto& E : Extra)
+			{
+				float In[O3::kObsDimObstacle];
+				FMemory::Memcpy(In, &G::kObs[n * P3::kObsDim], sizeof(float) * P3::kObsDim);
+				FMemory::Memcpy(In + P3::kObsDim, E, sizeof(E));
+				float Lz[P3::kNumBehaviors];
+				const int32 Az = P3::RunPolicyV3(B.Net, In, Mask, Lz);
+				Diff += (Az != Ab || FMemory::Memcmp(Lz, Lb, sizeof(Lb)) != 0) ? 1 : 0;
+			}
+		}
+		TestEqual(TEXT("내장 골든 × 세 칸 셋: 관측 21 두뇌 로짓·행동 = 내장 (비트 단위)"), Diff, 0);
+	}
+
+	// 거부: 두 계약 말고는 받지 않는다, 계약과 칸 수·이름·마스크·층 모양·골든이 어긋나면 거부
+	FString Text;
+	if (!ReadBrainText(*this, kZeroObs21File, Text))
+	{
+		return false;
+	}
+	struct FBad
+	{
+		const TCHAR* Name;
+		EReject Want;
+		TFunction<void(const TSharedPtr<FJsonObject>&)> Edit;
+	};
+	const TArray<FBad> Cases = {
+		{TEXT("관측 21 파일에 관측 18 계약 해시"), EReject::Dims, [](const TSharedPtr<FJsonObject>& R) { R->SetStringField(TEXT("contract_hash"), TEXT("0x7eea0107339be4ce")); }},
+		{TEXT("관측 21 계약에 obs_dim 18"), EReject::Dims, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("obs_dim"), 18); }},
+		{TEXT("관측 21 계약에 obs_dim 19"), EReject::Dims, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("obs_dim"), 19); }},
+		{TEXT("알 수 없는 계약 (R2 관측 19·판 3)"), EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { R->SetStringField(TEXT("contract_hash"), TEXT("0xf8c26c7d02542fae")); }},
+		{TEXT("알 수 없는 계약 (한 자리 바꿈)"), EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { R->SetStringField(TEXT("contract_hash"), TEXT("0xbc4fc2d45c47c5fe")); }},
+		{TEXT("장애물 칸 순서 (escape_room ↔ obstacle_near)"), EReject::Names,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 {
+			 TArray<TSharedPtr<FJsonValue>> N = R->GetArrayField(TEXT("obs_names"));
+			 N.Swap(18, 19);
+			 R->SetArrayField(TEXT("obs_names"), N);
+		 }},
+		{TEXT("관측 이름 18 개뿐"), EReject::Names,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 {
+			 TArray<TSharedPtr<FJsonValue>> N = R->GetArrayField(TEXT("obs_names"));
+			 N.SetNum(18);
+			 R->SetArrayField(TEXT("obs_names"), N);
+		 }},
+		{TEXT("관측 21 계약에 마스크 판 3"), EReject::Mask, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("mask_version"), 3); }},
+		{TEXT("첫 층 64×18 (관측 21 계약)"), EReject::Shape, [](const TSharedPtr<FJsonObject>& R) { Layer(R, 0)->SetNumberField(TEXT("in"), 18); }},
+		{TEXT("골든 관측 18 칸"), EReject::Golden,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 {
+			 const TSharedPtr<FJsonObject> C = Case(R, 0);
+			 TArray<TSharedPtr<FJsonValue>> O = C->GetArrayField(TEXT("obs"));
+			 O.SetNum(18);
+			 C->SetArrayField(TEXT("obs"), O);
+		 }},
+		{TEXT("새 열에 값 + sha256 맞춤 (골든이 새 칸을 읽어 잡는다)"), EReject::Golden,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 {
+			 EditWeightsKeepSha(R,
+								[](FLayers& Ly)
+								{
+									for (int32 j = 0; j < P3::kHiddenDim; ++j)
+									{
+										Ly.W[0][j * EcoObservationV3::kObsDimObstacle + EcoObservationV3::kObsEscapeRoom] = (j % 2) ? 2.0f : -2.0f;
+									}
+								});
+		 }},
+	};
+	int32 Wrong = 0;
+	for (const FBad& Bad : Cases)
+	{
+		const TSharedPtr<FJsonObject> Root = ToJson(Text);
+		Bad.Edit(Root);
+		const FEcoV3BrainLoad L = FEcoV3BrainRegistry::Parse(ToText(Root), Bad.Name);
+		const bool bOk = L.Reason == Bad.Want && !L.Brain.IsValid();
+		Wrong += bOk ? 0 : 1;
+		AddInfo(FString::Printf(TEXT("%s → %s: %s"), Bad.Name, EcoV3Brain::RejectName(L.Reason), *L.Message));
+		TestTrue(FString::Printf(TEXT("%s → 거부 '%s' (받은 까닭 '%s')"), Bad.Name, EcoV3Brain::RejectName(Bad.Want), EcoV3Brain::RejectName(L.Reason)), bOk);
+	}
+	TestEqual(TEXT("모든 어긋난 관측 21 파일이 맞는 까닭으로 거부된다"), Wrong, 0);
+	// 관측 18 파일(R4)에 관측 21 계약 해시를 적으면 칸 수가 계약과 달라 거부
+	{
+		FString R4Text;
+		if (ReadBrainText(*this, kR4File, R4Text))
+		{
+			const TSharedPtr<FJsonObject> Root = ToJson(R4Text);
+			Root->SetStringField(TEXT("contract_hash"), TEXT("0xbc4fc2d45c47c5fd"));
+			const FEcoV3BrainLoad L = FEcoV3BrainRegistry::Parse(ToText(Root), TEXT("R4 + 관측 21 해시"));
+			TestEqual(TEXT("관측 18 파일에 관측 21 해시 → 차원"), static_cast<int32>(L.Reason), static_cast<int32>(EReject::Dims));
+		}
+	}
 	TestTrue(TEXT("불러오기만으로는 지금 두뇌가 바뀌지 않는다"), &*FEcoV3BrainRegistry::Get().GetActive() == &*FEcoV3BrainRegistry::Builtin());
 	return true;
 }

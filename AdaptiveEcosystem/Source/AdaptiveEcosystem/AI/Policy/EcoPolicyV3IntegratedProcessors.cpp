@@ -489,6 +489,8 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			const double BeforeEaten = Ctx.Sim.Stats.FoodEaten;
 			const EcoWorldV3::FStepReport Report = EcoWorldV3::Step(Ctx.Sim, Views.GetData(), Views.Num(), ThreatPtrs.GetData(),
 																	ThreatPtrs.Num(), Net, &Hooks);
+			// R5 장애물 관측 대조 기록 (eco.IntegratedV3.ObsParityLog — 기본 끔): 이 스텝 끝 관측의 세 칸과 그 입력 (읽기만)
+			Sub->LogObsParity(Ctx, Views.GetData(), StableViewIds.GetData(), Views.Num());
 
             // Feedback uses the integrated native body and ground result, never the desired slot or render Actor position.
             for(int32 R=0;R<DeerByContext[c].Num();++R) {

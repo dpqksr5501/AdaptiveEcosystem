@@ -68,6 +68,9 @@
 //                                  C2 위협 Step 의 시야 반경·속력(FThreatStepInput::WeatherViewMult·WeatherSpeedMult)이 읽는다. 아래 '야생 3단계' 묶음 머리 주석.
 //                                  통합 모드 eco.IntegratedV3.Weather 기본 1 (숲 비·고지 눈·메마른 땅 맑음). 기록 FWorldStats::WeatherSteps
 //   FWorldConfig::bSenseStats      감지 기록 (FWorldStats::Sense* — 산 사슴 × 깨어 있는 늑대 쌍의 거리 띠별 감지, 들어서만 안 사슴). 기록만, 통합 모드가 켠다
+//   FWorldState::ObsDim            R5 장애물 관측 (10-19, 계약 2-4). 지금 두뇌의 관측 칸 수 18·21 (SetModelObsDim — 통합 모드 두뇌 바꾸기가 정한다). 21 이면 E 에서
+//                                  사슴마다 세 칸(FHerbPerception::ObstacleObs — EcoObservationV3::ObstacleObsValues)을 더 만들고 H 의 망 입력이 18 + 3 칸이다.
+//                                  bObstacleObsProbe 는 관측 18 두뇌여도 세 칸을 만든다(대조 기록 전용). 기본 18·끔 = 지금 그대로 (조각 바이트도 같다)
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -997,6 +1000,10 @@ namespace EcoWorldV3
 		double FoodDensity = 0.0;
 		FVec2 FoodGrad;
 		float Obs[EcoObservationV3::kObsDim] = {};
+		// R5 장애물 관측 세 칸 (관측 21 두뇌일 때 또는 FWorldState::bObstacleObsProbe 일 때만 채운다, 아니면 0 — 계약 2-4). 망 입력 = Obs 18 칸 뒤에 이 세 칸 (DecideHerb).
+		// Obs 는 18 칸 그대로 둔다 (팀 진단 EcoCreatureInspection 이 이 배열 길이를 관측 칸 수로 쓴다)
+		float ObstacleObs[EcoObservationV3::kNumObstacleObs] = {};
+		EcoObservationV3::FObstacleObs Obstacle;   // 그 원시 거리 (기록·시험. 채우지 않으면 기본값)
 	};
 
 	/** 요청과 결정 기록 (FEcoBehaviorStateFragment 안). */
@@ -1143,6 +1150,8 @@ namespace EcoWorldV3
 		std::int64_t RefugeRecoveries = 0;
 		std::int64_t RefugeInsidePredatorSteps = 0;
 		std::int64_t RefugeCaptureViolations = 0;
+		// R5 장애물 관측: 망 관측 칸 수(두뇌)가 세계가 만드는 관측(FWorldState::ObsDim)보다 많았던 결정 (늘 0 이어야 한다 — SetModelObsDim 을 빠뜨렸다)
+		std::int64_t ObsLayoutMismatch = 0;
 	};
 
 	/**
@@ -1183,6 +1192,11 @@ namespace EcoWorldV3
 		double WeatherIntensity = 0.0;
 		FWeatherMults Weather;
 		double ReserveCap = 0.0;             // 야생 (w1) 비축 용량 C (E 단위, InitWorld 가 정한다. 끄면 0)
+		// R5 장애물 관측 (계약 2-4): 지금 두뇌가 받는 관측 칸 수 (18 또는 21 — SetModelObsDim). 21 이면 스텝 끝 관측 E 가 세 칸을 더 만든다.
+		// bObstacleObsProbe = 관측 18 두뇌여도 세 칸을 만든다 (기록·대조 전용 — 망은 18 칸만 읽으므로 결정은 그대로). 기본 18·끔 = 지금 그대로
+		std::int32_t ObsDim = EcoObservationV3::kObsDim;
+		bool bObstacleObsProbe = false;
+		EcoObservationV3::FObstacleObsConfig ObstacleObsCfg = EcoObservationV3::kR5ObstacleObsConfig;
 		FWorldStats Stats;
 		std::vector<EcoObservationV3::FThreatInput> ExternalThreats;
 		std::vector<FVec2> StepCatches;      // 이번 스텝에 잡힌 자리 (디버그)
@@ -1326,6 +1340,16 @@ namespace EcoWorldV3
 		{
 			W.Allowed[b] = (ModelAllowed[b] != 0 && W.Config.WorldAllowed[b] != 0) ? 1 : 0;
 		}
+	}
+
+	/**
+	 * R5 장애물 관측: 지금 두뇌가 받는 관측 칸 수를 정한다 (두뇌의 망 FPolicyNetV3::ObsDim — 18 또는 21, 그 밖은 18). 실행 중 두뇌 바꾸기가 SetModelAllowed 와
+	 * 함께 부른다. 다음 관측(스텝 끝 E·입양 첫 관측)부터 그 칸 수로 만든다 — 바꾸는 경계(결정 스텝 앞)에서 부르면 그 스텝 끝 결정이 새 두뇌·새 관측이다.
+	 * InitWorld 는 18 이다 (내장 R1b — 지금 그대로).
+	 */
+	inline void SetModelObsDim(FWorldState& W, std::int32_t ObsDim)
+	{
+		W.ObsDim = ObsDim == EcoObservationV3::kObsDimObstacle ? EcoObservationV3::kObsDimObstacle : EcoObservationV3::kObsDim;
 	}
 
 	/** 세로 장애물 밀어내기를 걸고 기록한다 (원판이 없으면 아무것도 안 한다). */
@@ -1542,7 +1566,51 @@ namespace EcoWorldV3
 			}
 		}
 
-		/** 개체 하나의 스텝 끝 지각 + Perceive + 관측 18. 입력 목록(ThreatIn·KinIn)과 먹이 장은 미리 만들어 둔다. */
+		/** R5 장애물 관측 입력 (사슴 하나, 스텝 끝 기하). P.Threat 는 이번 관측의 위협 지각, 위협 자리는 W.ThreatIn (같은 관측의 목록). */
+		inline EcoObservationV3::FObstacleObsInput ObstacleObsInputOf(const FWorldState& W, const FHerbPerception& P, const FHerbBody& B)
+		{
+			const FObstacleConfig& Ob = W.Config.Obstacles;
+			EcoObservationV3::FObstacleObsInput Oi;
+			Oi.Pos = B.Pos;
+			Oi.Head = B.Head;
+			const std::int32_t J = P.Threat.Nearest;
+			Oi.bSeen = P.Threat.PredCount > 0 && J >= 0 && J < static_cast<std::int32_t>(W.ThreatIn.size());
+			Oi.Away = P.Threat.AwayFromPred;
+			if (Oi.bSeen)
+			{
+				Oi.Threat = {W.ThreatIn[static_cast<size_t>(J)].X, W.ThreatIn[static_cast<size_t>(J)].Y};
+			}
+			// 원판·몸·가림 = 세로 장애물 블록 (끈 세계는 원판 없음 — 파이썬 World.obstacles 빈 목록, body_r 0)
+			Oi.Discs = Ob.Active() ? Ob.Discs.data() : nullptr;
+			Oi.NumDiscs = Ob.Active() ? Ob.Num() : 0;
+			Oi.BodyR = Ob.bEnabled ? Ob.BodyR : 0.0;
+			Oi.StageSize = W.Config.WorldSize;
+			Oi.bBlockSight = Ob.bEnabled && Ob.bBlockSight;
+			return Oi;
+		}
+
+		/**
+		 * R5 장애물 관측 세 칸 (계약 2-4): 관측 21 두뇌(W.ObsDim 21) 또는 대조 기록(W.bObstacleObsProbe)일 때만 만든다. 아니면 0·기본값으로 둔다 —
+		 * 관측 18 두뇌만 쓰는 세계(평면 맵·기준 루프·골든·지금 통합 모드)의 조각 바이트는 그대로다.
+		 */
+		inline void ObserveObstacleObs(const FWorldState& W, FHerbPerception& P, const FHerbBody& B)
+		{
+			if (W.ObsDim >= EcoObservationV3::kObsDimObstacle || W.bObstacleObsProbe)
+			{
+				P.Obstacle = EcoObservationV3::ObstacleObsValues(ObstacleObsInputOf(W, P, B));
+				EcoObservationV3::WriteObstacleObs(P.Obstacle, P.ObstacleObs, W.ObstacleObsCfg);
+			}
+			else
+			{
+				P.Obstacle = EcoObservationV3::FObstacleObs();
+				for (float& V : P.ObstacleObs)
+				{
+					V = 0.0f;
+				}
+			}
+		}
+
+		/** 개체 하나의 스텝 끝 지각 + Perceive + 관측 18 (+ 관측 21 두뇌면 장애물 세 칸). 입력 목록(ThreatIn·KinIn)과 먹이 장은 미리 만들어 둔다. */
 		inline void ObserveHerb(FWorldState& W, const FHerbView& H, std::int32_t Self, std::int32_t N, std::int32_t M)
 		{
 			FHerbPerception& P = *H.Perception;
@@ -1586,6 +1654,7 @@ namespace EcoWorldV3
 			In.StepsIn = S.StepsIn;
 			In.Recency = S.Recency;
 			EcoObservationV3::BuildObservation(In, P.Obs, OC);
+			ObserveObstacleObs(W, P, B);
 		}
 	}
 
@@ -1634,7 +1703,25 @@ namespace EcoWorldV3
 		EcoPolicyV3::ComposeActionMask(W.Allowed, D.Feasible, D.Prep.bReads, D.Prep.bWakeDecide, S.Behavior, D.Mask);
 		if (D.Prep.bReads)
 		{
-			D.Request = EcoPolicyV3::RunPolicyV3(Net, P.Obs, D.Mask, D.Logits);
+			if (Net.ObsDim > EcoObservationV3::kObsDim)
+			{
+				// R5 관측 21 두뇌 (계약 2-4): 망 입력 = 관측 18 + 장애물 세 칸 (마스크는 앞 18 칸만 본다 — 판 2 그대로)
+				W.Stats.ObsLayoutMismatch += W.ObsDim < Net.ObsDim ? 1 : 0;
+				float NetIn[EcoPolicyV3::kMaxObsDim] = {};   // 망 칸 수 상한 (로더는 21 까지만 받는다)
+				for (std::int32_t i = 0; i < EcoObservationV3::kObsDim; ++i)
+				{
+					NetIn[i] = P.Obs[i];
+				}
+				for (std::int32_t i = 0; i < EcoObservationV3::kNumObstacleObs; ++i)
+				{
+					NetIn[EcoObservationV3::kObsDim + i] = P.ObstacleObs[i];
+				}
+				D.Request = EcoPolicyV3::RunPolicyV3(Net, NetIn, D.Mask, D.Logits);
+			}
+			else
+			{
+				D.Request = EcoPolicyV3::RunPolicyV3(Net, P.Obs, D.Mask, D.Logits);
+			}
 		}
 		else
 		{

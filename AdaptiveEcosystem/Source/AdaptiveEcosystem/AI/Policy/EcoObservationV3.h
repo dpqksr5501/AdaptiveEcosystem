@@ -16,11 +16,17 @@
 //
 // 언제 만드나 (계약 2-1): 스텝 끝 t + 1 → Tick → 새 t 의 어둠 → 기하 → Perceive(away·recency) → 관측 → 리스폰한 개체만 다시.
 // Arbiter 는 float 관측이 아니라 같은 때의 기하(double)를 읽는다 — FThreatPerception 을 FDecisionObs 로 옮긴다(ToDecisionObs).
+//
+// R5 장애물 관측 (10-19 사용자 '일단 두뇌가 나무 같은 장애물을 인지할 수 있게 바꿔', 계약 2-4): 관측 21 두뇌는 18 칸 뒤에 세 칸을 더 받는다
+// (escape_room·obstacle_near·threat_hidden — ObstacleObsValues·WriteObstacleObs). 관측 18 은 그대로이고, 세 칸은 따로 만든다 — 망 입력을 붙이는 것은
+// 세계 층(EcoWorldV3::DecideHerb)의 몫이다. 파이썬 world.py `obstacle_obs_values` 와 같은 식·같은 순서라 같은 double 입력이면 비트 단위로 같다
+// (골든 ObstacleObsGoldenVectorsV3.h, 시험 Policy.V3.ObstacleObs.*).
 
 #pragma once
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 #include "EcoRepertoire.h"
 
@@ -455,5 +461,128 @@ namespace EcoObservationV3
 		}
 		Out[kObsBehSteps] = static_cast<float>(Detail::Min1(static_cast<double>(In.StepsIn) / Cfg.StepsNorm));
 		Out[kObsThreatRecency] = static_cast<float>(In.Recency);
+	}
+
+	// ---- R5 장애물 관측 세 칸 (계약 2-4, world.py 'R5 장애물 관측'·obstacle_obs_values) ----
+	//
+	// 관측 21 계약 = 관측 18 + 맨 끝 세 칸 (마스크 판 2 그대로, 계약 해시 EcoPolicyV3::kContractHashObs21Mask2). 칸 번호 18·19·20.
+	inline constexpr std::int32_t kNumObstacleObs = 3;
+	inline constexpr std::int32_t kObsDimObstacle = kObsDim + kNumObstacleObs;   // 21
+	inline constexpr std::int32_t kMaxObsDim = kObsDimObstacle;                  // 망 입력 버퍼 크기
+	inline constexpr std::int32_t kObsEscapeRoom = 18;
+	inline constexpr std::int32_t kObsObstacleNear = 19;
+	inline constexpr std::int32_t kObsThreatHidden = 20;
+	inline constexpr const char* kObstacleObsNames[kNumObstacleObs] = {"escape_room", "obstacle_near", "threat_hidden"};
+
+	/** 분모 (configs/v3_wild3_obs_mirror.yaml obstacle_obs — R5 판, results/v3/r5/obs_check.md). 계약 해시 밖이라 골든 설정 칸이 지킨다. */
+	struct FObstacleObsConfig
+	{
+		double EscapeNorm = 10.0;   // escape_room 분모 (단위, 20 m)
+		double NearNorm = 5.0;      // obstacle_near 분모 (단위, 10 m)
+	};
+
+	inline constexpr FObstacleObsConfig kR5ObstacleObsConfig{};
+
+	/** 사슴 하나의 입력 (스텝 끝 기하 — 이동 뒤 자리, 같은 관측의 위협 지각). 원판 (x, y, r) × NumDiscs, 무대 [0, StageSize]². */
+	struct FObstacleObsInput
+	{
+		FVec2 Pos;
+		FVec2 Head;
+		bool bSeen = false;             // 위협을 아나 (관측 1 의 보임 — PredCount > 0)
+		FVec2 Away;                     // 가장 가까운 보이는 위협의 반대 단위벡터 (FThreatPerception::AwayFromPred, 모르면 0)
+		FVec2 Threat;                   // 그 위협의 자리 (bSeen 일 때만 읽는다)
+		const double* Discs = nullptr;
+		std::int32_t NumDiscs = 0;
+		double BodyR = 0.0;             // 몸 반지름 (이동이 멈추는 반지름 = r + BodyR)
+		double StageSize = 0.0;
+		bool bBlockSight = false;       // 원판이 눈길을 가리나 (obstacles.block_sight)
+	};
+
+	/** 원시 거리 (double). Near 는 원판이 없으면 +∞. */
+	struct FObstacleObs
+	{
+		double Escape = 0.0;            // E 도망칠 쪽으로 곧장 갈 때 처음 막히는 거리 (벽·원판)
+		double Near = std::numeric_limits<double>::infinity();   // N 몸 가장자리에서 가장 가까운 원판 가장자리까지 (원판 안이면 음수)
+		bool bThreatHidden = false;     // 가장 가까운 보이는 위협 → 나 선분을 줄기(r)가 가린다
+	};
+
+	/**
+	 * world.py `obstacle_obs_values` 의 C++ 꼴 (사슴 하나, 원판 순서대로, double — 줄마다 같은 식):
+	 *   W = (bSeen ∧ |Away| > 1e-9) ? Away : Head; n = |W|; U = n > 1e-9 ? W ÷ n : (1, 0)
+	 *   벽: Tx = Ux > 0 ? (S − x) ÷ Ux : (Ux < 0 ? x ÷ (−Ux) : ∞), Ty 같음, E = min(Tx, Ty), 0 보다 크지 않으면 0
+	 *   원판 k (R = r + BodyR): F = P − c, Cc = F·F − R², B = F·U, Δ = B² − Cc. Cc ≥ 0 ∧ B < 0 ∧ Δ ≥ 0 이면 E = min(E, −B − √Δ)
+	 *                          (원판 안에서 시작하면 건너뛴다·접함은 막는다 — 이동 obstacle_slide 와 같다). N = min(N, |F| − R)
+	 *   가림: bSeen ∧ bBlockSight 이면 위협 a → 나 q 선분 (EcoThreatV3::SightBlocked 와 같은 식, 반지름 r — 몸 없음, 엄격한 <)
+	 */
+	inline FObstacleObs ObstacleObsValues(const FObstacleObsInput& In)
+	{
+		const double Inf = std::numeric_limits<double>::infinity();
+		const double Eps = EcoRepertoireV3::kEps;
+		double Wx = In.Head.X;
+		double Wy = In.Head.Y;
+		if (In.bSeen && std::sqrt(In.Away.X * In.Away.X + In.Away.Y * In.Away.Y) > Eps)
+		{
+			Wx = In.Away.X;
+			Wy = In.Away.Y;
+		}
+		const double Nw = std::sqrt(Wx * Wx + Wy * Wy);
+		const double Ux = Nw > Eps ? Wx / Nw : 1.0;
+		const double Uy = Nw > Eps ? Wy / Nw : 0.0;
+		const double X = In.Pos.X;
+		const double Y = In.Pos.Y;
+		const double S = In.StageSize;
+		const double Tx = Ux > 0.0 ? (S - X) / Ux : (Ux < 0.0 ? X / (-Ux) : Inf);
+		const double Ty = Uy > 0.0 ? (S - Y) / Uy : (Uy < 0.0 ? Y / (-Uy) : Inf);
+		FObstacleObs R;
+		R.Escape = Tx < Ty ? Tx : Ty;
+		if (!(R.Escape > 0.0))
+		{
+			R.Escape = 0.0;
+		}
+		R.Near = Inf;
+		const double* D = In.Discs;
+		for (std::int32_t k = 0; k < In.NumDiscs; ++k)
+		{
+			const double Fx = X - D[3 * k];
+			const double Fy = Y - D[3 * k + 1];
+			const double Rk = D[3 * k + 2] + In.BodyR;
+			const double Cc = Fx * Fx + Fy * Fy - Rk * Rk;
+			const double Bb = Fx * Ux + Fy * Uy;
+			const double Dd = Bb * Bb - Cc;
+			if (Cc >= 0.0 && Bb < 0.0 && Dd >= 0.0)
+			{
+				const double T = -Bb - std::sqrt(Dd);
+				R.Escape = T < R.Escape ? T : R.Escape;
+			}
+			const double Nk = std::sqrt(Fx * Fx + Fy * Fy) - Rk;
+			R.Near = Nk < R.Near ? Nk : R.Near;
+		}
+		if (In.bSeen && In.bBlockSight)
+		{
+			const double Jx = In.Threat.X;
+			const double Jy = In.Threat.Y;
+			const double Dx = X - Jx;
+			const double Dy = Y - Jy;
+			const double DD = Dx * Dx + Dy * Dy;
+			for (std::int32_t k = 0; k < In.NumDiscs && !R.bThreatHidden; ++k)
+			{
+				const double Gx = D[3 * k] - Jx;
+				const double Gy = D[3 * k + 1] - Jy;
+				double T = DD > 0.0 ? (Gx * Dx + Gy * Dy) / DD : 0.0;
+				T = T < 0.0 ? 0.0 : (T > 1.0 ? 1.0 : T);
+				const double Qx = Jx + T * Dx - D[3 * k];
+				const double Qy = Jy + T * Dy - D[3 * k + 1];
+				R.bThreatHidden = Qx * Qx + Qy * Qy < D[3 * k + 2] * D[3 * k + 2];
+			}
+		}
+		return R;
+	}
+
+	/** 관측 세 칸 (float): clip(E ÷ EscapeNorm, 0, 1), clip(max(N, 0) ÷ NearNorm, 0, 1) (원판 없음 = 1), 가림 0/1. world.py `_obs_from` 과 같다. */
+	inline void WriteObstacleObs(const FObstacleObs& V, float Out[kNumObstacleObs], const FObstacleObsConfig& Cfg = kR5ObstacleObsConfig)
+	{
+		Out[0] = static_cast<float>(Detail::Clip01(V.Escape / Cfg.EscapeNorm));
+		Out[1] = static_cast<float>(Detail::Clip01((V.Near > 0.0 ? V.Near : 0.0) / Cfg.NearNorm));
+		Out[2] = V.bThreatHidden ? 1.0f : 0.0f;
 	}
 }

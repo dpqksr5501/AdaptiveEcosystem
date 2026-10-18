@@ -329,6 +329,9 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 		J->SetStringField(TEXT("source_file"), B.SourceFile.IsEmpty() ? FString() : FPaths::GetCleanFilename(B.SourceFile));
 		J->SetArrayField(TEXT("allowed"), IntArray(B.Allowed));
 		J->SetNumberField(TEXT("last_swap_step"), static_cast<double>(LastBrainSwapStep));
+		// 두뇌의 입출력 계약 (10-19 R5: 관측 18 또는 21 — 위 contract_hash 는 빌드 내장 계약)
+		J->SetStringField(TEXT("contract_hash"), FString::Printf(TEXT("0x%016llx"), static_cast<unsigned long long>(B.ContractHash)));
+		J->SetNumberField(TEXT("obs_dim"), B.ObsDim);
 		Root->SetObjectField(TEXT("brain"), J);
 	}
 	Root->SetObjectField(TEXT("settings"), SettingsJson(Settings));
