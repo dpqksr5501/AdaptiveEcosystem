@@ -1,0 +1,23 @@
+{
+ "chosen": "ckpt/v3/adapt/s20003_both/adapt_s20003_both_cand_s1_3m.zip",
+ "rule": "고르기 세계 16분 잡힌 몫 최저 → 굶은 몫 → 시드 번호",
+ "rows": [
+  {
+   "seed": 1,
+   "model": "ckpt/v3/adapt/s20003_both/adapt_s20003_both_cand_s1_3m.zip",
+   "caught": 0.179296875,
+   "starved": 0.29010416666666666,
+   "alive": 0.5305989583333334,
+   "hide": 0.020457792461052504
+  },
+  {
+   "seed": 0,
+   "model": "ckpt/v3/adapt/s20003_both/adapt_s20003_both_cand_s0_3m.zip",
+   "caught": 0.1796875,
+   "starved": 0.269921875,
+   "alive": 0.550390625,
+   "hide": 0.012425477364958025
+  }
+ ],
+ "wall_s": 604.7
+}
