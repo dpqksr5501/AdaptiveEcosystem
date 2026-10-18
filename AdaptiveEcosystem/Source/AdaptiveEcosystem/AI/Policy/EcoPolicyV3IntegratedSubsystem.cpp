@@ -886,6 +886,17 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.V3Brain.SwapAtSeconds"), LexToString(SwapAtArg));
 	}
+	// 환경 스냅숏 (10-18 적응 고리, EcoV3Snapshot.cpp — 경로는 쉼표에서 끊지 않는다)
+	float SnapshotAtArg = -1.0f;
+	if (FParse::Value(CmdLine, TEXT("EcoV3SnapshotAt="), SnapshotAtArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.SnapshotAt"), LexToString(SnapshotAtArg));
+	}
+	FString SnapshotOutArg;
+	if (FParse::Value(CmdLine, TEXT("EcoV3SnapshotOut="), SnapshotOutArg, false) && !SnapshotOutArg.IsEmpty())
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.SnapshotOut"), SnapshotOutArg);
+	}
 }
 
 int32 UEcoPolicyV3IntegratedSubsystem::GetRequestedVersion()

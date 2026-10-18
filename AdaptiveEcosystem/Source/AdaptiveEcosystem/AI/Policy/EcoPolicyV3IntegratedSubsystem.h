@@ -809,6 +809,25 @@ public:
 	/** 원판 JSON(ExportObstacles·results/v3/wild2/make_obstacle_maps.py 꼴)을 읽는다: 지역 이름 → (x, y, r) × K. 반지름 0 이하는 뺀다. 못 읽으면 거짓. */
 	static bool LoadObstacleImport(const FString& Path, TMap<FName, std::vector<double>>& Out);
 
+	// ---- 환경 스냅숏 (10-18 적응 고리, EcoV3Snapshot.cpp — 명세 Docs/RL_Policy/SEASON_SNAPSHOT_SPEC.md 11절) ----
+
+	/**
+	 * 지금 세계 스냅숏 JSON (eco_v3_snapshot 판 1)을 Path 에 쓴다 — 파이썬 herbivore_rl/results/v3/adapt/adapt.py 가 이 파일로 거울 세계를 다시 짓는다.
+	 * 담는 것: 세션 시드·전역 스텝·지금 두뇌·계약 해시·통합 설정 스위치, 지역마다 무대 자리·세계 설정 값·허용 칸·은신처 원·장애물 원판(레벨 나무 포함)·
+	 * 먹이 격자(용량·지금 먹이, 행 우선)·날씨(설정·지금)·사슴·늑대 수와 누적 잡힘·굶음·사냥. 읽기만 한다 (세계를 바꾸지 않는다). Why = 기록용 까닭. 성공하면 참.
+	 */
+	bool ExportSnapshot(const FString& Path, const FString& Why) const;
+	/**
+	 * 스냅숏 경로. Out 이 비면 <프로젝트>/Saved/EcoSnapshots/eco_v3_snapshot_s<세션 시드>_t<전역 스텝>.json, '.json' 으로 끝나면 그 파일
+	 * (상대 경로는 프로젝트 폴더 기준), 아니면 그 폴더 안의 같은 이름.
+	 */
+	FString SnapshotPath(const FString& Out) const;
+	/**
+	 * 예정 스냅숏 (eco.IntegratedV3.SnapshotAt 초 ≥ 0 — 명령줄 -EcoV3SnapshotAt=): 전역 스텝 × 2/15 초가 그 시각 이상인 첫 결정 스텝 경계에서 한 번
+	 * eco.IntegratedV3.SnapshotOut 경로에 쓴다. 처리기가 SyncBrain 곁(스텝 앞)에서 부른다 — 그 시각까지 모든 지역이 같은 수의 스텝을 마친 상태다.
+	 */
+	void MaybeScheduledSnapshot();
+
 	// ---- 무대 나무 (10-17, 배치 표 TreeLayoutV3.h — 파이썬 make_tree_layout.py) ----
 
 	/** 그 지역 무대의 나무 표 (지역 이름이 같고 무대 한 변이 표의 한 변과 같을 때만, 아니면 nullptr). 표가 있어도 그루 수가 0 일 수 있다(메마른 땅). */
@@ -1010,6 +1029,7 @@ private:
 	bool bScheduledSwapDone = false;      // 이 Play 의 예정 바꾸기를 했다 (성공·거부 모두 한 번만)
 	int64 LastBrainSwapStep = -1;
 	FString LastBrainSwapFrom;            // 마지막으로 바꾸기 전 두뇌 id (기록 줄 '구간 중 바꿈')
+	bool bScheduledSnapshotDone = false;  // 이 Play 의 예정 스냅숏을 했다 (성공·실패 모두 한 번만)
 
 	FDelegateHandle PreTickHandle;
 

@@ -1,0 +1,520 @@
+// 통합 v3 모드 환경 스냅숏 (10-18 사용자 '나무나 풀 같은 식생이 점점 변해서 환경이 달라지면 … 가중치 로더 써서 두뇌 바꿔 주는 기술을 한번 적용해 보자').
+//
+// 적응 고리의 첫 칸이다: 언리얼(서버·단독)이 지금 세계를 파일 하나로 쓰고 → 파이썬 herbivore_rl/results/v3/adapt/adapt.py 가 그 파일로 거울 세계를
+// 다시 지어 지금 두뇌를 짧게 이어 배우고 → 미리 적은 자동 관문을 통과한 두뇌만 두뇌 파일(EcoV3Brain.h)로 내보내 eco.V3Brain.Load 로 바꿔 끼운다.
+// 형식은 Docs/RL_Policy/SEASON_SNAPSHOT_SPEC.md 11절 (eco_v3_snapshot 판 1). 세계를 읽기만 한다 — 상태·난수·기록을 바꾸지 않는다.
+//
+// 쓰는 길 (개발 빌드):
+//   콘솔   eco.IntegratedV3.Snapshot [경로]                 지금 바로 (서버·단독, 통합 v3 Play 중)
+//   예정   eco.IntegratedV3.SnapshotAt <초>                 전역 스텝 × 2/15 초가 그 시각 이상인 첫 결정 스텝 경계에서 한 번 (명령줄 -EcoV3SnapshotAt=)
+//          eco.IntegratedV3.SnapshotOut <파일|폴더>         예정·콘솔(경로를 안 주면) 경로 (명령줄 -EcoV3SnapshotOut=). 비면 Saved/EcoSnapshots/
+// 먹이 격자 값은 double 을 17 자리로 적어(엔진 Json 쓰개) 파이썬이 비트 단위로 같은 값을 읽는다.
+
+#include "EcoPolicyV3IntegratedSubsystem.h"
+
+#include "Dom/JsonObject.h"
+#include "Engine/World.h"
+#include "HAL/FileManager.h"
+#include "HAL/IConsoleManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonSerializer.h"
+#include "Serialization/JsonWriter.h"
+
+namespace EcoV3SnapshotImpl
+{
+	static TAutoConsoleVariable<float> CVarSnapshotAt(
+		TEXT("eco.IntegratedV3.SnapshotAt"),
+		-1.0f,
+		TEXT("통합 v3 모드 환경 스냅숏 예정 시각 (초, 음수 = 끔 — 기본). 전역 결정 스텝 × 2/15 초가 이 값 이상인 첫 경계에서 한 번 ")
+		TEXT("eco.IntegratedV3.SnapshotOut 에 쓴다 (적응 고리 — herbivore_rl/results/v3/adapt/). 명령줄 -EcoV3SnapshotAt= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<FString> CVarSnapshotOut(
+		TEXT("eco.IntegratedV3.SnapshotOut"),
+		TEXT(""),
+		TEXT("통합 v3 모드 환경 스냅숏 경로 ('.json' 파일 또는 폴더, 상대 경로는 프로젝트 폴더 기준). 비면 <프로젝트>/Saved/EcoSnapshots/")
+		TEXT("eco_v3_snapshot_s<세션 시드>_t<전역 스텝>.json. 명령줄 -EcoV3SnapshotOut= 는 시작값."),
+		ECVF_Default);
+
+	TArray<TSharedPtr<FJsonValue>> Nums(std::initializer_list<double> Values)
+	{
+		TArray<TSharedPtr<FJsonValue>> Out;
+		for (const double V : Values)
+		{
+			Out.Add(MakeShared<FJsonValueNumber>(V));
+		}
+		return Out;
+	}
+
+	TArray<TSharedPtr<FJsonValue>> NumArray(const std::vector<double>& Values)
+	{
+		TArray<TSharedPtr<FJsonValue>> Out;
+		Out.Reserve(static_cast<int32>(Values.size()));
+		for (const double V : Values)
+		{
+			Out.Add(MakeShared<FJsonValueNumber>(V));
+		}
+		return Out;
+	}
+
+	TArray<TSharedPtr<FJsonValue>> Triples(const std::vector<double>& Flat)
+	{
+		TArray<TSharedPtr<FJsonValue>> Out;
+		for (size_t k = 0; k + 2 < Flat.size(); k += 3)
+		{
+			Out.Add(MakeShared<FJsonValueArray>(Nums({Flat[k], Flat[k + 1], Flat[k + 2]})));
+		}
+		return Out;
+	}
+
+	template <typename T, size_t N>
+	TArray<TSharedPtr<FJsonValue>> IntArray(const T (&Values)[N])
+	{
+		TArray<TSharedPtr<FJsonValue>> Out;
+		for (size_t i = 0; i < N; ++i)
+		{
+			Out.Add(MakeShared<FJsonValueNumber>(static_cast<double>(Values[i])));
+		}
+		return Out;
+	}
+
+	const TCHAR* WeatherName(int32 Kind)
+	{
+		static const TCHAR* const Names[EcoWorldV3::kNumWeatherKinds] = {TEXT("clear"), TEXT("rain"), TEXT("snow")};
+		return Names[FMath::Clamp(Kind, 0, EcoWorldV3::kNumWeatherKinds - 1)];
+	}
+
+	/** 지역 세계 설정 값 (파이썬 거울 설정과 하나씩 견줄 칸 — adapt.py 변환표). */
+	TSharedRef<FJsonObject> WorldConfigJson(const EcoWorldV3::FWorldState& W)
+	{
+		const EcoWorldV3::FWorldConfig& C = W.Config;
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetNumberField(TEXT("world_size"), C.WorldSize);
+		J->SetNumberField(TEXT("seed"), static_cast<double>(C.Seed));
+		J->SetNumberField(TEXT("rng_stream"), static_cast<double>(C.RngStream));
+		J->SetNumberField(TEXT("num_herbivores"), C.NumHerbivores);
+		J->SetNumberField(TEXT("num_stalkers"), C.NumStalkers);
+		J->SetNumberField(TEXT("num_chasers"), C.NumChasers);
+		J->SetNumberField(TEXT("num_ranged"), C.NumRanged);
+		J->SetNumberField(TEXT("num_nocturnal"), C.NumNocturnal);
+		J->SetBoolField(TEXT("player_proxy"), C.bPlayerProxy);
+		J->SetNumberField(TEXT("pred_speed_mult"), C.PredSpeedMult);
+		J->SetNumberField(TEXT("pred_eat_cd"), W.ThreatCfg.PredEatCd);
+		J->SetBoolField(TEXT("eat_in_place"), C.bEatInPlace);
+		J->SetBoolField(TEXT("realism_night"), C.bRealismNight);
+		J->SetBoolField(TEXT("respawn_dead"), C.bRespawnDead);
+		J->SetNumberField(TEXT("pred_ema_denominator"), C.PredEmaDenominator);
+		J->SetNumberField(TEXT("day_period"), C.DayPeriod);
+		J->SetNumberField(TEXT("day_offset"), C.DayOffset);
+		J->SetNumberField(TEXT("twilight_steps"), C.TwilightSteps);
+		J->SetBoolField(TEXT("shelter_safe"), C.bShelterSafe);
+		J->SetNumberField(TEXT("shelter_wolf_margin"), C.ShelterWolfMargin);
+		J->SetBoolField(TEXT("protected_refuges"), C.bProtectedRefuges);
+		J->SetArrayField(TEXT("world_allowed"), IntArray(C.WorldAllowed));
+		{
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetNumberField(TEXT("cell"), C.FoodCell);
+			F->SetNumberField(TEXT("patch_blur"), C.FoodPatchBlur);
+			F->SetNumberField(TEXT("patch_threshold"), C.FoodPatchThreshold);
+			F->SetNumberField(TEXT("grad_blur"), C.FoodGradBlur);
+			F->SetNumberField(TEXT("regen_base"), C.FoodRegenBase);
+			F->SetNumberField(TEXT("regen_mult"), C.FoodRegenMult);
+			F->SetNumberField(TEXT("cover_regen_mult"), C.FoodCoverRegenMult);
+			J->SetObjectField(TEXT("food_rules"), F);
+		}
+		{
+			const EcoWorldV3::FWildFlightConfig& K = C.WildFlight;
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), K.bEnabled);
+			F->SetNumberField(TEXT("alert_r"), K.AlertR);
+			F->SetNumberField(TEXT("flight_r"), K.FlightR);
+			F->SetNumberField(TEXT("safe_r"), K.SafeR);
+			F->SetNumberField(TEXT("approach"), K.Approach);
+			F->SetNumberField(TEXT("alert_w"), K.AlertW);
+			F->SetBoolField(TEXT("rest_alert"), K.bRestAlert);
+			F->SetNumberField(TEXT("shelter_cos"), K.ShelterCos);
+			F->SetNumberField(TEXT("shelter_r"), K.ShelterR);
+			F->SetBoolField(TEXT("crouch"), K.bCrouch);
+			F->SetNumberField(TEXT("wall_margin"), K.WallMargin);
+			F->SetBoolField(TEXT("hold_awake"), K.bHoldAwake);
+			F->SetNumberField(TEXT("edge_r"), K.EdgeR);
+			J->SetObjectField(TEXT("wild_flight"), F);
+		}
+		{
+			const EcoWorldV3::FWildReserveConfig& R = C.WildReserve;
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), R.bEnabled);
+			F->SetNumberField(TEXT("reserve_days"), R.ReserveDays);
+			F->SetNumberField(TEXT("init"), R.Init);
+			F->SetNumberField(TEXT("refill_e"), R.RefillE);
+			F->SetNumberField(TEXT("refill_frac"), R.RefillFrac);
+			F->SetNumberField(TEXT("weak_e"), R.WeakE);
+			F->SetNumberField(TEXT("weak_speed"), R.WeakSpeed);
+			J->SetObjectField(TEXT("wild_reserve"), F);
+		}
+		{
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), C.WildSatiation.bEnabled);
+			F->SetNumberField(TEXT("sat_days"), C.WildSatiation.SatDays);
+			F->SetNumberField(TEXT("rest_speed"), C.WildSatiation.RestSpeed);
+			J->SetObjectField(TEXT("wild_satiation"), F);
+		}
+		{
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), C.RealismVision.bEnabled);
+			F->SetNumberField(TEXT("threat_fov_deg"), C.RealismVision.ThreatFovDeg);
+			J->SetObjectField(TEXT("realism_vision"), F);
+		}
+		{
+			const EcoObservationV3::FHearingConfig& H = C.RealismHearing;
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), H.bEnabled);
+			F->SetNumberField(TEXT("s_silent"), H.SSilent);
+			F->SetNumberField(TEXT("s_quiet"), H.SQuiet);
+			F->SetNumberField(TEXT("s_loud"), H.SLoud);
+			F->SetNumberField(TEXT("r_quiet"), H.RQuiet);
+			F->SetNumberField(TEXT("r_loud"), H.RLoud);
+			F->SetBoolField(TEXT("roam_quiet"), H.bRoamQuiet);
+			F->SetBoolField(TEXT("cap_to_sight"), H.bCapToSight);
+			J->SetObjectField(TEXT("realism_hearing"), F);
+		}
+		{
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), C.ShelterFood.bEnabled);
+			F->SetNumberField(TEXT("cap_frac"), C.ShelterFood.CapFrac);
+			F->SetNumberField(TEXT("regen_frac"), C.ShelterFood.RegenFrac);
+			J->SetObjectField(TEXT("shelter_food"), F);
+		}
+		{
+			const EcoThreatV3::FPackHuntConfig& P = C.PackHunt;
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), P.bEnabled);
+			F->SetNumberField(TEXT("join_r"), P.JoinR);
+			F->SetNumberField(TEXT("lead"), P.Lead);
+			F->SetNumberField(TEXT("door_r"), P.DoorR);
+			F->SetNumberField(TEXT("door_cos"), P.DoorCos);
+			F->SetNumberField(TEXT("wait_r"), P.WaitR);
+			J->SetObjectField(TEXT("pack_hunt"), F);
+		}
+		{
+			const EcoWorldV3::FObstacleConfig& O = C.Obstacles;
+			const EcoThreatV3::FDetourConfig& D = O.Detour;
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), O.bEnabled);
+			F->SetNumberField(TEXT("body_r"), O.BodyR);
+			F->SetBoolField(TEXT("block_sight"), O.bBlockSight);
+			F->SetBoolField(TEXT("no_food"), O.bNoFood);
+			F->SetBoolField(TEXT("detour"), D.bEnabled);
+			F->SetNumberField(TEXT("detour_block"), D.BlockFrac);
+			F->SetNumberField(TEXT("detour_free"), D.FreeFrac);
+			F->SetNumberField(TEXT("detour_probe"), D.Probe);
+			F->SetNumberField(TEXT("detour_steps"), D.MaxSteps);
+			F->SetNumberField(TEXT("detour_help_block"), D.HelpBlock);
+			F->SetNumberField(TEXT("detour_help_drop"), D.HelpDrop);
+			J->SetObjectField(TEXT("obstacle_rules"), F);
+		}
+		{
+			const EcoWorldV3::FWeatherConfig& Wx = C.Weather;
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("enabled"), Wx.bEnabled);
+			F->SetStringField(TEXT("kind"), WeatherName(Wx.Kind));
+			F->SetNumberField(TEXT("intensity"), Wx.Intensity);
+			F->SetNumberField(TEXT("rain_sight"), Wx.RainSight);
+			F->SetNumberField(TEXT("rain_hear"), Wx.RainHear);
+			F->SetNumberField(TEXT("snow_sight"), Wx.SnowSight);
+			F->SetNumberField(TEXT("snow_hear"), Wx.SnowHear);
+			F->SetNumberField(TEXT("snow_deer_speed"), Wx.SnowDeerSpeed);
+			F->SetNumberField(TEXT("snow_wolf_speed"), Wx.SnowWolfSpeed);
+			F->SetBoolField(TEXT("obs_visibility"), Wx.bObsVisibility);
+			F->SetNumberField(TEXT("schedule_rows"), static_cast<double>(Wx.Schedule.size()));
+			J->SetObjectField(TEXT("weather"), F);
+		}
+		return J;
+	}
+
+	/** 통합 설정 스위치 (콘솔 변수에서 읽은 값 — 파이썬 변환이 기능 블록 켬·끔과 견준다). */
+	TSharedRef<FJsonObject> SettingsJson(const FEcoV3IntegratedSettings& S)
+	{
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetNumberField(TEXT("seed"), static_cast<double>(S.Seed));
+		J->SetNumberField(TEXT("deer_per_region"), S.DeerPerRegion);
+		J->SetNumberField(TEXT("wolves_per_region"), S.WolvesPerRegion);
+		J->SetNumberField(TEXT("stage_size_units"), S.StageSizeUnits);
+		J->SetNumberField(TEXT("pred_speed_mult"), S.PredSpeedMult);
+		J->SetBoolField(TEXT("gradual_night"), S.bGradualNight);
+		J->SetBoolField(TEXT("no_freeze"), S.bNoFreeze);
+		J->SetBoolField(TEXT("protected_refuges"), S.bProtectedRefuges);
+		J->SetBoolField(TEXT("social_control"), S.bSocialControl);
+		J->SetNumberField(TEXT("wolf_eat_seconds"), S.WolfEatSeconds);
+		J->SetNumberField(TEXT("wolf_eat_steps"), S.WolfEatSteps());
+		J->SetBoolField(TEXT("wild_flight"), S.bWildFlight);
+		J->SetBoolField(TEXT("flight_hold_awake"), S.bFlightHoldAwake);
+		J->SetBoolField(TEXT("flight_edge_avoid"), S.bFlightEdgeAvoid);
+		J->SetNumberField(TEXT("alert_dist_m"), S.AlertDistM);
+		J->SetNumberField(TEXT("panic_dist_m"), S.PanicDistM);
+		J->SetNumberField(TEXT("safe_dist_m"), S.SafeDistM);
+		J->SetBoolField(TEXT("wild_reserve"), S.bWildReserve);
+		J->SetBoolField(TEXT("wild_satiation"), S.bWildSatiation);
+		J->SetBoolField(TEXT("realism_vision"), S.bRealismVision);
+		J->SetBoolField(TEXT("realism_hearing"), S.bRealismHearing);
+		J->SetBoolField(TEXT("shelter_safe"), S.bShelterSafe);
+		J->SetNumberField(TEXT("wolf_body_margin_m"), S.WolfBodyMarginM);
+		J->SetBoolField(TEXT("shelter_food"), S.bShelterFood);
+		J->SetBoolField(TEXT("pack_hunt"), S.bPackHunt);
+		J->SetBoolField(TEXT("obstacles"), S.bObstacles);
+		J->SetBoolField(TEXT("obstacle_detour"), S.bObstacleDetour);
+		J->SetBoolField(TEXT("obstacle_import"), !S.ObstacleImportPath.IsEmpty());
+		J->SetBoolField(TEXT("stage_trees"), S.bStageTrees);
+		J->SetBoolField(TEXT("weather"), S.bWeather);
+		J->SetStringField(TEXT("weather_forest"), S.WeatherForest);
+		J->SetStringField(TEXT("weather_highland"), S.WeatherHighland);
+		J->SetStringField(TEXT("weather_barren"), S.WeatherBarren);
+		J->SetNumberField(TEXT("extra_cover_count"), S.ExtraCoverCount);
+		J->SetNumberField(TEXT("extra_cover_radius_frac"), S.ExtraCoverRadiusFrac);
+		J->SetNumberField(TEXT("wolf_start_corner_frac"), S.WolfStartCornerFrac);
+		J->SetNumberField(TEXT("wolf_min_start_dist_cm"), S.WolfMinStartDistCm);
+		J->SetNumberField(TEXT("deer_min_spacing_cm"), S.DeerMinSpacingCm);
+		return J;
+	}
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::SnapshotPath(const FString& Out) const
+{
+	const FString Name = FString::Printf(TEXT("eco_v3_snapshot_s%lld_t%lld.json"), static_cast<long long>(Settings.Seed), static_cast<long long>(GlobalT));
+	const FString Trimmed = Out.TrimStartAndEnd();
+	if (Trimmed.IsEmpty())
+	{
+		return FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("EcoSnapshots"), Name));
+	}
+	FString P = FPaths::IsRelative(Trimmed) ? FPaths::Combine(FPaths::ProjectDir(), Trimmed) : Trimmed;
+	if (!P.EndsWith(TEXT(".json"), ESearchCase::IgnoreCase))
+	{
+		P = FPaths::Combine(P, Name);
+	}
+	return FPaths::ConvertRelativePathToFull(P);
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const FString& Why) const
+{
+	using namespace EcoV3SnapshotImpl;
+	if (Path.IsEmpty() || Contexts.Num() == 0)
+	{
+		return false;
+	}
+	const UWorld* World = GetWorld();
+	TSharedRef<FJsonObject> Root = MakeShared<FJsonObject>();
+	Root->SetStringField(TEXT("format"), TEXT("eco_v3_snapshot"));
+	Root->SetNumberField(TEXT("version"), 1);
+	Root->SetStringField(TEXT("units"), TEXT("stage units, 1 unit = 200 cm, x·y from stage origin; 1 step = 2/15 s; food grid row-major (k = iy·gw + ix)"));
+	Root->SetNumberField(TEXT("step_seconds"), EcoRepertoireV3::kStepSeconds);
+	Root->SetStringField(TEXT("map"), World ? UWorld::RemovePIEPrefix(World->GetMapName()) : FString());
+	Root->SetStringField(TEXT("net_mode"), !World ? TEXT("none") : World->GetNetMode() == NM_Standalone ? TEXT("standalone") : TEXT("server"));
+	Root->SetNumberField(TEXT("session_seed"), static_cast<double>(Settings.Seed));
+	Root->SetNumberField(TEXT("global_step"), static_cast<double>(GlobalT));
+	Root->SetNumberField(TEXT("sim_seconds"), static_cast<double>(GlobalT) * EcoRepertoireV3::kStepSeconds);
+	Root->SetStringField(TEXT("why"), Why);
+	Root->SetStringField(TEXT("contract_hash"), FString::Printf(TEXT("0x%016llx"), static_cast<unsigned long long>(EcoPolicyV3::kContractHash)));
+	Root->SetStringField(TEXT("tree_layout"), FString::Printf(TEXT("%s %s"), UTF8_TO_TCHAR(EcoTreeLayoutV3::kVersion), UTF8_TO_TCHAR(EcoTreeLayoutV3::kDigest)));
+	{
+		const FEcoV3Brain& B = GetActiveBrain();
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetStringField(TEXT("id"), B.Id);
+		J->SetStringField(TEXT("model"), B.ModelName);
+		J->SetStringField(TEXT("model_path"), B.ModelPath);
+		J->SetStringField(TEXT("model_sha256"), B.ModelSha256);
+		J->SetStringField(TEXT("weights_sha256"), B.WeightsSha256);
+		J->SetBoolField(TEXT("builtin"), B.bBuiltin);
+		J->SetStringField(TEXT("train_world"), B.TrainWorld);
+		J->SetStringField(TEXT("source_file"), B.SourceFile.IsEmpty() ? FString() : FPaths::GetCleanFilename(B.SourceFile));
+		J->SetArrayField(TEXT("allowed"), IntArray(B.Allowed));
+		J->SetNumberField(TEXT("last_swap_step"), static_cast<double>(LastBrainSwapStep));
+		Root->SetObjectField(TEXT("brain"), J);
+	}
+	Root->SetObjectField(TEXT("settings"), SettingsJson(Settings));
+
+	TArray<TSharedPtr<FJsonValue>> Regions;
+	for (const TUniquePtr<FEcoV3RegionContext>& CtxPtr : Contexts)
+	{
+		const FEcoV3RegionContext& Ctx = *CtxPtr;
+		const EcoWorldV3::FWorldState& W = Ctx.Sim;
+		TSharedRef<FJsonObject> R = MakeShared<FJsonObject>();
+		R->SetStringField(TEXT("region"), Ctx.RegionId.ToString());
+		R->SetNumberField(TEXT("region_index"), Ctx.RegionRuntimeIndex);
+		R->SetNumberField(TEXT("size"), Ctx.SizeUnits);
+		R->SetArrayField(TEXT("origin_cm"), Nums({Ctx.OriginCm.X, Ctx.OriginCm.Y, Ctx.OriginCm.Z}));
+		R->SetNumberField(TEXT("t"), static_cast<double>(W.T));
+		R->SetNumberField(TEXT("dark"), W.Dark);
+		R->SetNumberField(TEXT("steps_to_transition"), W.StepsToTransition);
+		R->SetObjectField(TEXT("world"), WorldConfigJson(W));
+		R->SetArrayField(TEXT("allowed"), IntArray(W.Allowed));
+		{
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetStringField(TEXT("kind"), WeatherName(W.WeatherKind));
+			J->SetNumberField(TEXT("intensity"), W.WeatherIntensity);
+			J->SetNumberField(TEXT("sight"), W.Weather.Sight);
+			J->SetNumberField(TEXT("hear"), W.Weather.Hear);
+			J->SetNumberField(TEXT("deer_speed"), W.Weather.DeerSpeed);
+			J->SetNumberField(TEXT("wolf_speed"), W.Weather.WolfSpeed);
+			R->SetObjectField(TEXT("weather_now"), J);
+		}
+		{
+			std::vector<double> Flat;
+			for (const EcoObservationV3::FCoverInput& Cv : W.Config.Covers)
+			{
+				Flat.push_back(Cv.X);
+				Flat.push_back(Cv.Y);
+				Flat.push_back(Cv.Radius);
+			}
+			R->SetArrayField(TEXT("covers"), Triples(Flat));
+			R->SetNumberField(TEXT("team_covers"), Ctx.TeamCovers);
+			R->SetNumberField(TEXT("skipped_team_covers"), Ctx.SkippedTeamCovers);
+			R->SetNumberField(TEXT("extra_covers"), Ctx.ExtraCovers);
+		}
+		{
+			const FEcoV3ObstacleScan& S = Ctx.ObstacleScan;
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			// discs = 세계가 쓰는 원판 (장애물을 끈 세계는 빈 목록 — 세계가 원판을 읽지 않는다). scan_discs = 레벨에서 읽은 원판 (기록)
+			J->SetArrayField(TEXT("discs"), Triples(W.Config.Obstacles.bEnabled ? W.Config.Obstacles.Discs : std::vector<double>()));
+			J->SetArrayField(TEXT("scan_discs"), Triples(S.Discs));
+			J->SetBoolField(TEXT("imported"), Ctx.bObstaclesImported);
+			J->SetBoolField(TEXT("level_trees_on"), Ctx.bLevelTrees);
+			J->SetNumberField(TEXT("level_trees"), S.LevelTrees);
+			J->SetNumberField(TEXT("level_trees_snapped"), S.LevelTreesSnapped);
+			J->SetNumberField(TEXT("level_trees_unmatched"), S.LevelTreesUnmatched);
+			J->SetNumberField(TEXT("stage_trees"), Ctx.Trees.Num());
+			J->SetNumberField(TEXT("seen_meshes"), S.SeenMeshes);
+			J->SetNumberField(TEXT("near_edge"), S.NearEdge);
+			R->SetObjectField(TEXT("obstacles"), J);
+		}
+		{
+			const EcoWorldV3::FFoodGrid& G = W.Food;
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetNumberField(TEXT("cell"), W.Config.FoodCell);
+			J->SetNumberField(TEXT("gw"), G.Gw);
+			J->SetArrayField(TEXT("cap"), NumArray(G.Cap));
+			J->SetArrayField(TEXT("food"), NumArray(G.Food));
+			double CapTotal = 0.0;
+			for (const double V : G.Cap)
+			{
+				CapTotal += V;
+			}
+			J->SetNumberField(TEXT("cap_total"), CapTotal);
+			J->SetNumberField(TEXT("food_total"), G.Total());
+			J->SetNumberField(TEXT("start_total"), Ctx.StartFood);
+			J->SetNumberField(TEXT("eaten_total"), W.Stats.FoodEaten);
+			R->SetObjectField(TEXT("food"), J);
+		}
+		{
+			const int64 Caught = W.Stats.Caught;
+			const int64 Starved = W.Stats.Starved;
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetNumberField(TEXT("planned"), Ctx.PlannedDeer);
+			J->SetNumberField(TEXT("adopted"), Ctx.AdoptedDeer);
+			J->SetNumberField(TEXT("caught"), static_cast<double>(Caught));
+			J->SetNumberField(TEXT("starved"), static_cast<double>(Starved));
+			// 부활이 없으므로 지금 산 사슴 = 입양 − 잡힘 − 굶음 (프레임 끝 집계 alive_frame 은 같은 프레임 안 앞 스텝 값일 수 있다)
+			J->SetNumberField(TEXT("alive"), static_cast<double>(FMath::Max<int64>(0, Ctx.AdoptedDeer - Caught - Starved)));
+			J->SetNumberField(TEXT("alive_frame"), Ctx.AliveDeer);
+			J->SetNumberField(TEXT("mean_energy"), Ctx.MeanEnergy);
+			J->SetNumberField(TEXT("starving"), Ctx.StarvingDeer);
+			J->SetNumberField(TEXT("caught_in_cover"), static_cast<double>(W.Stats.CaughtInCover));
+			J->SetArrayField(TEXT("behavior_steps"), IntArray(W.Stats.BehaviorSteps));
+			J->SetNumberField(TEXT("live_steps"), static_cast<double>(W.Stats.LiveDeerSteps));
+			J->SetNumberField(TEXT("shelter_steps"), static_cast<double>(W.Stats.ShelterDeerSteps));
+			R->SetObjectField(TEXT("deer"), J);
+		}
+		{
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetNumberField(TEXT("planned"), Ctx.PlannedWolves);
+			J->SetNumberField(TEXT("adopted"), Ctx.AdoptedWolves);
+			J->SetNumberField(TEXT("now"), Ctx.Wolves);
+			J->SetArrayField(TEXT("hunt_starts"), IntArray(W.Stats.HuntStarts));
+			J->SetArrayField(TEXT("hunt_ends"), IntArray(W.Stats.HuntEnds));
+			J->SetArrayField(TEXT("hunt_success"), IntArray(W.Stats.HuntSuccess));
+			J->SetArrayField(TEXT("hunt_outside"), IntArray(W.Stats.HuntOutside));
+			R->SetObjectField(TEXT("wolves"), J);
+		}
+		Regions.Add(MakeShared<FJsonValueObject>(R));
+	}
+	Root->SetArrayField(TEXT("regions"), Regions);
+
+	FString Text;
+	const TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&Text);
+	if (!FJsonSerializer::Serialize(Root, Writer))
+	{
+		return false;
+	}
+	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), /*Tree*/ true);
+	return FFileHelper::SaveStringToFile(Text, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+}
+
+void UEcoPolicyV3IntegratedSubsystem::MaybeScheduledSnapshot()
+{
+	if (bScheduledSnapshotDone || Contexts.Num() == 0)
+	{
+		return;
+	}
+	const float At = EcoV3SnapshotImpl::CVarSnapshotAt.GetValueOnGameThread();
+	const double Seconds = static_cast<double>(GlobalT) * EcoRepertoireV3::kStepSeconds;
+	if (!(At >= 0.0f) || Seconds + 1e-9 < static_cast<double>(At))
+	{
+		return;
+	}
+	bScheduledSnapshotDone = true;
+	const FString Path = SnapshotPath(EcoV3SnapshotImpl::CVarSnapshotOut.GetValueOnGameThread());
+	const FString Why = FString::Printf(TEXT("예정 eco.IntegratedV3.SnapshotAt %.1f"), At);
+	if (ExportSnapshot(Path, Why))
+	{
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s"), Seconds, static_cast<long long>(GlobalT), *Path,
+			   Contexts.Num(), *GetActiveBrain().Id);
+	}
+	else
+	{
+		UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 환경 스냅숏을 쓰지 못했다: %s"), *Path);
+	}
+}
+
+#if !UE_BUILD_SHIPPING
+namespace EcoV3SnapshotImpl
+{
+	void CmdSnapshot(const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
+	{
+		if (!World)
+		{
+			Ar.Log(TEXT("[EcoV3I] 월드가 없다"));
+			return;
+		}
+		if (World->GetNetMode() == NM_Client)
+		{
+			Ar.Log(TEXT("[EcoV3I] 클라이언트는 세계를 돌리지 않는다 (서버·단독만) — 서버 또는 단독 실행의 콘솔에서 쓴다"));
+			return;
+		}
+		UEcoPolicyV3IntegratedSubsystem* Sub = World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+		if (!Sub || !Sub->IsActive() || Sub->NumContexts() == 0)
+		{
+			Ar.Log(TEXT("[EcoV3I] 통합 v3 모드가 돌고 있지 않다 (eco.IntegratedPolicyVersion 3 으로 Play, 지역 세계가 생긴 뒤)"));
+			return;
+		}
+		const FString Out = Args.IsEmpty() ? CVarSnapshotOut.GetValueOnGameThread() : FString::Join(Args, TEXT(" "));
+		const FString Path = Sub->SnapshotPath(Out);
+		const double Seconds = static_cast<double>(Sub->GetGlobalStep()) * EcoRepertoireV3::kStepSeconds;
+		if (Sub->ExportSnapshot(Path, TEXT("콘솔 eco.IntegratedV3.Snapshot")))
+		{
+			Ar.Logf(TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s"), Seconds, static_cast<long long>(Sub->GetGlobalStep()), *Path,
+					Sub->NumContexts(), *Sub->GetActiveBrain().Id);
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 콘솔"), Seconds, static_cast<long long>(Sub->GetGlobalStep()), *Path);
+		}
+		else
+		{
+			Ar.Logf(TEXT("[EcoV3I] 환경 스냅숏을 쓰지 못했다: %s"), *Path);
+		}
+	}
+
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice CmdSnapshotReg(
+		TEXT("eco.IntegratedV3.Snapshot"),
+		TEXT("통합 v3 모드 환경 스냅숏을 지금 쓴다: eco.IntegratedV3.Snapshot [파일.json|폴더] (비면 eco.IntegratedV3.SnapshotOut, 그것도 비면 ")
+			TEXT("Saved/EcoSnapshots/). 파이썬 herbivore_rl/results/v3/adapt/adapt.py 가 이 파일로 거울 세계를 다시 짓는다. 서버·단독만 (EcoV3Snapshot.cpp)."),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateStatic(&CmdSnapshot));
+}
+#endif

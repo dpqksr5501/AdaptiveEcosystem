@@ -449,6 +449,8 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	{
 		// 전역 스텝 경계마다: 예정 바꾸기(eco.V3Brain.SwapAtSeconds)가 한 프레임 안의 정확한 스텝에서 걸리게. 이 스텝의 모든 지역이 같은 두뇌다
 		Sub->SyncBrain(/*bPollWatch*/ false);
+		// 환경 스냅숏 (10-18 적응 고리, EcoV3Snapshot.cpp): 예정 시각이면 이 스텝 앞 상태를 한 번 쓴다 (읽기만 — 세계를 바꾸지 않는다)
+		Sub->MaybeScheduledSnapshot();
 		const EcoPolicyV3::FPolicyNetV3& Net = Sub->ActiveNet();
 		for (int32 c = 0; c < NumCtx; ++c)
 		{

@@ -3,6 +3,7 @@
 - **작성**: sinhyeok04
 - **날짜**: 2026-10-02
 - **상태**: 초안 2판(검토 반영). 합의 전이므로 값과 이름은 바뀔 수 있다.
+- **10-18 덧붙임**: 11절 v3 통합 모드 환경 스냅숏(`eco_v3_snapshot` 판 1). 우리 코드(`P/EcoV3Snapshot.cpp`)가 쓰고, 서버 담당의 일은 없다. 3~10절은 그대로다.
 - **받는 사람**: 서버 담당. wonkii 님으로 추정한다. 근거는 계획:100과 `D/Architecture/COLLABORATOR_ECOSYSTEM_INTEGRATION_PLAN.md:91`이다.
 - **합의할 사람**
   - 조연우 님: 스키마 버전과 명명 규칙, `PredationHistory` 계약, 플레이어 집계 범위
@@ -1274,6 +1275,61 @@ L_test에는 (a)·(b)가 없다. `ProcessEcologyStep`은 `IsPopulationReady()`�
 | Q22 | (파이썬) L_test의 관측 0·4 차이를 판정에서 뺄 것인가, 시뮬레이터에 더미 먹이장·고정 에너지 확장을 넣을 것인가 | 당분간 판정에서 뺀다 | 우리 |
 | Q23 | `TickSimulation`, `ApplyPredationEvent`, `RecordPredationEvent`, `SetEnvironmentState`를 부르는 블루프린트가 Jang_lv 에셋에 있나 | 확인 필요. 있으면 해당 필드의 상태를 바꾼다 | wonkii, World 담당 |
 | Q24 | L_test에서 `AEcoGameState`가 실제로 만들어지나 | PIE에서 확인한다 | 우리 |
+
+---
+
+## 11. v3 통합 모드 환경 스냅숏 (10-18 덧붙임)
+
+- 사용자 말(10-18): '나무나 풀 같은 식생이 점점 변해서 환경이 달라지면 그 정보가 없는 상태로 사슴은 학습이 되어 있잖아? … 우리가 계획한 가중치 로더 써서 두뇌 바꿔 주는 기술을 한번 적용해 보자.'
+- 3~9절의 창 파일(서버 담당이 쓰는 지역 요약)과 따로다. 이 절은 v3 통합 모드(`P/EcoPolicyV3Integrated*`)가 **지금 세계를 그대로** 쓰는 파일이다. 우리 코드만 쓰고 서버 담당의 일은 없다.
+- 쓰임: 파이썬 `H/results/v3/adapt/adapt.py convert`가 이 파일로 거울 세계를 다시 짓는다(계획서 `RL_SEASON_RETRAIN_PLAN.md` 진행 10-18 '적응 고리').
+- 창 파일과 다른 점: 창 집계(평균·분포)가 아니라 한 시각의 상태다. 지역 이름·세계 설정 값·먹이 격자·장애물 원판을 그대로 담아 파이썬이 같은 세계를 만든다.
+
+### 11.1 쓰는 길 (서버·단독, 개발 빌드 — `P/EcoV3Snapshot.cpp`)
+| 길 | 쓰기 | 경로 |
+|---|---|---|
+| 콘솔 | `eco.IntegratedV3.Snapshot [파일.json\|폴더]` — 지금 바로. 클라이언트 콘솔은 거부 | 인자 → `eco.IntegratedV3.SnapshotOut` → 둘 다 비면 `<프로젝트>/Saved/EcoSnapshots/eco_v3_snapshot_s<세션 시드>_t<전역 스텝>.json` |
+| 예정 | `eco.IntegratedV3.SnapshotAt <초>`(음수 = 끔, 기본) — 전역 결정 스텝 × 2/15 초가 그 시각 이상인 첫 스텝 경계에서 한 번 | `eco.IntegratedV3.SnapshotOut` |
+| 명령줄 | `-EcoV3SnapshotAt=<초>`, `-EcoV3SnapshotOut=<파일\|폴더>` (콘솔 변수의 시작값) | 같음 |
+
+- 예정 스냅숏은 처리기의 스텝 경계(두뇌 바꾸기 `SyncBrain` 곁, 스텝 앞)에서 쓴다. 그 시각까지 모든 지역이 같은 수의 스텝을 마친 상태다.
+- 세계를 읽기만 한다(난수·먹이·기록 그대로 — 자동화 시험 `Policy.V3.Snapshot.Export`가 본다). 기록 줄 `[EcoV3I] 환경 스냅숏 | <초> (전역 스텝 n) | <경로> | 지역 k | 두뇌 <id>`.
+- 상대 경로는 프로젝트 폴더 기준이다. 폴더는 없으면 만든다.
+
+### 11.2 파일 (`eco_v3_snapshot` 판 1, JSON 하나, UTF-8)
+| 칸 | 내용 |
+|---|---|
+| `format`·`version`·`units`·`step_seconds` | `eco_v3_snapshot`·1, 단위 설명(1 단위 = 200 cm, 무대 원점 기준 x·y, 1 스텝 = 2/15 초, 먹이 격자 행 우선 k = iy·gw + ix) |
+| `map`·`net_mode`·`session_seed`·`global_step`·`sim_seconds`·`why` | 맵 이름(PIE 머리 뺌), 단독·서버, 세션 시드, 전역 결정 스텝, 시각, 쓴 까닭(콘솔·예정) |
+| `contract_hash`·`tree_layout` | 이 빌드의 v3 계약 해시(`PolicyWeightsV3.h` kContractHash), 나무 배치 표 판·지문 |
+| `brain` | 지금 두뇌: id, 모델 이름·경로·zip sha256, 가중치 sha256, 내장인가, 학습 세계, 불러온 파일 이름, 모델 허용 칸, 마지막으로 바꾼 전역 스텝 |
+| `settings` | 통합 설정 스위치(`FEcoV3IntegratedSettings`): 사슴·늑대 수, 무대 한 변, 늑대 속력, 밤잠 점진화, 얼기 막음, 팀 은신처 생명주기, 팀 Social 연결, 식사 초·스텝, 도주 반사(거리·붙잡기·가장자리), 비축, 포만, 시야 300°, 청각, 은신처 안전·몸 여유, 은신처 먹이 부족, 늑대 무리, 장애물·돌아가기·가져오기, 실행 중 나무, 날씨·지역 날씨 덮기, 우리 은신처 수·반경 몫, 시작 자리 계수 |
+| `regions[]` | 지역마다 아래 |
+| 　`region`·`region_index`·`size`·`origin_cm`·`t`·`dark`·`steps_to_transition` | 이름, 지역 번호, 무대 한 변(단위), 무대 원점(cm), 세계 t, 어둠, 낮밤 바뀜까지 스텝 |
+| 　`world` | 지역 세계 설정 값(`FWorldConfig` — 파이썬 거울과 하나씩 견줄 칸): 무대·시드·난수 갈래, 사슴 수, 늑대 구성(잠행·추격·원거리·야행·플레이어 대역), 늑대 속력·식사 스텝·서서 먹기, 밤잠 점진화, 부활, 피식 EMA 분모, 하루·위상·박명, 은신처 안전·늑대 몸 여유, 세계 허용 칸, 먹이 규칙(셀·패치 블러·문턱·기울기 블러·재생·배수·은신처 재생), 블록 `wild_flight`·`wild_reserve`·`wild_satiation`·`realism_vision`·`realism_hearing`·`shelter_food`·`pack_hunt`·`obstacle_rules`·`weather`(파이썬 기능 블록과 같은 칸 이름) |
+| 　`allowed`·`weather_now` | 실제 허용 칸(두뇌 ∧ 세계), 지금 날씨와 배수(시야·청각·사슴·늑대 이동) |
+| 　`covers`·`team_covers`·`skipped_team_covers`·`extra_covers` | 은신처 원 [x, y, r] (단위), 레벨 은신처·뺀 레벨 은신처·우리 은신처 수 |
+| 　`obstacles` | `discs` = 세계가 쓰는 원판 [x, y, r](레벨 나무 줄기 막이·충돌 메시 — 장애물을 끈 세계는 빈 목록), `scan_discs` = 레벨에서 읽은 원판, 가져왔나, 레벨 나무 수·표와 맞춘 수·안 맞는 수, 실행 중 나무 수, 읽은 메시 수, 벽 곁 원판 수 |
+| 　`food` | 셀 크기, 한 변 `gw`, `cap`(셀 용량 gw² — 원판 밑·은신처 배수까지 건 최종 값 — 풀), `food`(지금 먹이 gw²), 용량 합·지금 합·처음 합·먹은 합. 값은 double 17 자리라 파이썬이 비트 단위로 같은 값을 읽는다 |
+| 　`deer` | 계획·입양 수, 누적 잡힘·굶음, 산 수(= 입양 − 잡힘 − 굶음 — 부활이 없다), 프레임 끝 산 수, 에너지 평균, 굶주림 수, 은신처 안 잡힘, 행동별 사슴·스텝, 산 사슴·스텝, 은신처 안 사슴·스텝 |
+| 　`wolves` | 계획·입양·지금 수, 사냥 시작·끝·성공·사냥 밖 포획(유형별: 추격형·잠행형·플레이어) |
+
+- 담지 않는 것: 개체 하나하나의 자리·상태(파이썬은 새 판을 처음부터 돌린다), 팀 지역 먹이 장부(`FRegionEcologyState::FoodAmount` — v3 격자와 따로다), 화면 값.
+- 크기: 지역 셋, 무대 60 단위(격자 30 × 30)에 약 150 KB.
+
+### 11.3 파이썬 변환 규칙 (`adapt.py convert` — 거부하면 학습하지 않는다)
+| 칸 | 처리 |
+|---|---|
+| 형식·판, 계약 해시, 두뇌 | 다르면 거부. 지금 두뇌의 가중치 sha256 으로 이어 배울 모델 zip을 찾는다(내장이면 R1b s3, 파일 두뇌면 두뇌 파일의 모델 경로). 못 찾거나 sha256 이 다르면 거부 |
+| 무대·사슴·늑대·식사·낮밤·허용 칸 | 파이썬 키로 옮긴다: `overrides.rand.world_size`·`predator_count`·`pred_speed_mult`·`food_regen_mult`, `overrides.pred_eat_cd`, `threats.eat_in_place`, `realism_night.enabled`, `daynight.periods`, `integrated_stage.day_offset`, `train.repertoire.allowed`. 늑대 구성이 파이썬 `wolf_kinds alternate`(짝수 잠행·홀수 추격)와 다르면 거부 |
+| `world` 의 기능 블록 아홉 | 같은 이름의 파이썬 기능 블록 칸으로 옮긴다(켬·끔 포함). 바탕 설정에 그 칸이 없으면 거부 |
+| 지역 날씨·원판 | `wild_weather.regions`(지역 → [날씨, 세기])와 지역마다 `obstacles.fixed` |
+| 먹이 격자 | 판정·학습 세계를 만들 때마다 그 지역의 `cap` 으로 덮는다(실행기 쪽 덮기 — 세계 규칙이 아니다). 먹이 규칙 상수(셀·블러·문턱·재생)가 파이썬 상수와 다르면 거부 |
+| 은신처 원 | 파이썬 세계가 놓는 자리(quad)와 같아야 한다. 다르면 거부(파이썬은 은신처를 정한 자리에만 놓는다) |
+| 그 밖의 스칼라 칸 | 기준 스냅숏(`H/results/v3/adapt/reference_snapshot.json` — 거울 설정이 맞춘 기본 게임 값)과 같아야 한다. 다르면 거부(파이썬에 그 규칙이 없다) |
+| 지역마다 다른 규칙, 날씨 시간표, 팀 Social 연결, 지워진 은신처, 부활 | 거부(아직 옮기지 않는다) |
+
+- 재현 확인(9.3 의 v3 판): 지금 두뇌로 같은 세계를 스냅숏 시각까지 돌려(파이썬 시드 20개 × 지역) 언리얼의 잡힘·굶음·산이 지역마다 |z| ≤ 3 이어야 학습한다(sd 바닥 0.5 마리).
 
 ---
 
