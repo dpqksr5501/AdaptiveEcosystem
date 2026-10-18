@@ -45,9 +45,12 @@
 - `unreal_parity.py` → `unreal_parity.md`·`unreal_parity.json`(언리얼 대 파이썬 대조와 결정 기록 같음). 기록 `unreal_logs/`(`s20000_base.log` 내장, `s20000_baseprobe.log.gz` 내장 + 대조 기록,
   `s20000_zero.log.gz`·`s20010_zero.log.gz` 새 열 0 두뇌 + 대조 기록 — 고른 줄 `[EcoV3I]`·`[EcoV3Obs]`·`[EcoV3Brain]`). 다시 만드는 명령은 `unreal_parity.py` 머리 주석
 - 시험: `tests/test_obstacle_obs.py`(끄면 직전 코드와 비트 동일, 켜도 세계 그대로, 손 사례, 세계 관측 = C++ 꼴 스칼라 참조, 리스폰 행, 마스크·계약 해시), `tests/test_obstacle_obs_golden.py`(골든 최신, g++ 스칼라 참조 435 사례 비트 단위)
+- 학습 단계(10-19): `make_r5_config.py` → `configs/v3_r5_train.yaml`, `r5_eval.py`(판정·점검·고르기·2차), `early_checks.py`, `launch_train.ps1`,
+  `PREREG.md`(사전 등록), `STATUS.md`(진행·명령), `pilot/`·`logs/`(스모크·시험판·기준 판), 시험 `tests/test_r5_train.py`
 - 시험(10-19 C++ 단계): `tests/test_zero_brain_obs21.py`(새 열 0 두뇌 파일·모델 zip), 언리얼 `Policy.V3.ObstacleObs.Golden`·`ObstacleObs.World`·`Brain.LoadObs21`·`Integrated.BrainObs21Zero`
 
 ## 남은 것
 
 - ~~C++: 관측 21 만들기, 로더가 두 계약(18·21)만 받기, 골든 G11 시험, 빌드 두 방식·자동 시험~~ — 10-19 끝 (위 'C++ 단계')
-- R5 학습 세계(절반 언리얼 세계 + 절반 무작위 숲 밀도)와 사전 등록(판정 시드 33100~33199), R1b-F 에서 새 입력 열 0 으로 이어 배우기
+- ~~R5 학습 세계(절반 언리얼 세계 + 절반 무작위 숲 밀도)와 사전 등록(판정 시드 33100~33199)~~ — 10-19 끝(`PREREG.md`, 설정 `configs/v3_r5_train.yaml`)
+- R5 본 학습(모델 시드 0~5 × 20M, 10-19 04:21 시작) → 조기 중단 점검 → 고르기 → 판정. 진행·명령은 `STATUS.md`
