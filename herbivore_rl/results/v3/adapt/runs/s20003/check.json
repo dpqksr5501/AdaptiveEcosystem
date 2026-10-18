@@ -1,0 +1,142 @@
+{
+ "ok": true,
+ "steps": 1800,
+ "seeds": [
+  32050,
+  32069
+ ],
+ "regions": {
+  "Forest": {
+   "caught": {
+    "unreal": 6.0,
+    "python_mean": 7.2,
+    "python_sd": 0.8335087534664908,
+    "python_min": 6.0,
+    "python_max": 8.0,
+    "z": -1.4396969378057567,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": true
+   },
+   "starved": {
+    "unreal": 0.0,
+    "python_mean": 0.0,
+    "python_sd": 0.0,
+    "python_min": 0.0,
+    "python_max": 0.0,
+    "z": 0.0,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": true
+   },
+   "alive": {
+    "unreal": 122.0,
+    "python_mean": 120.8,
+    "python_sd": 0.8335087534664907,
+    "python_min": 120.0,
+    "python_max": 122.0,
+    "z": 1.43969693780576,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": true
+   }
+  },
+  "Barren": {
+   "caught": {
+    "unreal": 8.0,
+    "python_mean": 5.85,
+    "python_sd": 0.5871429486123998,
+    "python_min": 5.0,
+    "python_max": 7.0,
+    "z": 3.6617999161551964,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": false
+   },
+   "starved": {
+    "unreal": 0.0,
+    "python_mean": 0.0,
+    "python_sd": 0.0,
+    "python_min": 0.0,
+    "python_max": 0.0,
+    "z": 0.0,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": true
+   },
+   "alive": {
+    "unreal": 120.0,
+    "python_mean": 122.15,
+    "python_sd": 0.5871429486123998,
+    "python_min": 121.0,
+    "python_max": 123.0,
+    "z": -3.6617999161552053,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": false
+   }
+  },
+  "Highland": {
+   "caught": {
+    "unreal": 8.0,
+    "python_mean": 7.7,
+    "python_sd": 0.8013147091860318,
+    "python_min": 5.0,
+    "python_max": 9.0,
+    "z": 0.37438474117708026,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": true
+   },
+   "starved": {
+    "unreal": 0.0,
+    "python_mean": 0.05,
+    "python_sd": 0.22360679774997896,
+    "python_min": 0.0,
+    "python_max": 1.0,
+    "z": -0.1,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": true
+   },
+   "alive": {
+    "unreal": 120.0,
+    "python_mean": 120.25,
+    "python_sd": 0.8506963092234007,
+    "python_min": 119.0,
+    "python_max": 123.0,
+    "z": -0.29387690682262935,
+    "tol": 3.0,
+    "ok": true,
+    "ok_v0": true
+   }
+  }
+ },
+ "pooled": {
+  "caught": {
+   "unreal": 22.0,
+   "python_mean": 20.75,
+   "python_sd": 1.3717065820970682,
+   "z": 0.9112736034910593,
+   "ok": true
+  },
+  "starved": {
+   "unreal": 0.0,
+   "python_mean": 0.05,
+   "python_sd": 0.22360679774997896,
+   "z": -0.1,
+   "ok": true
+  },
+  "alive": {
+   "unreal": 362.0,
+   "python_mean": 363.2,
+   "python_sd": 1.3992479182911457,
+   "z": -0.8576035628235975,
+   "ok": true
+  }
+ },
+ "rule": "지역 합 잡힘·굶음·산 |z| ≤ 3.0 (sd 바닥 0.5) 그리고 지역마다 |언리얼 − 파이썬 평균| ≤ max(3.0·sd, 3.0 마리) — GATE.md 변경 기록 (1)",
+ "ok_v0": false,
+ "rule_v0": "(첫 초안 — 쓰지 않음) 지역마다 |z| ≤ 3.0 (sd 바닥 0.5)",
+ "wall_s": 43.9
+}
