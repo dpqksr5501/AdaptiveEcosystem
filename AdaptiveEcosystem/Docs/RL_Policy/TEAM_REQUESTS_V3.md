@@ -7,7 +7,7 @@
 
 ## 0. 지금 상태 (한 문단)
 
-팀 통합 레벨(`/Game/Map/LV_Ecosystem_IntegrationTest`)을 명령줄 `-EcoIntegratedV3`(또는 콘솔 `eco.IntegratedPolicyVersion 3`)로 Play 하면, 사슴은 학습 두뇌(R1b)와 야생 규칙으로, 늑대는 우리 늑대 규칙으로 움직인다. 10-17 에 팀 브랜치를 합쳐서 팀의 몸(개체·지형·표현·죽음 처리·복제·먹이 장부)과 우리 머리가 한 브랜치에 있다. 은신처 안전 규칙은 우리 규칙 하나(`eco.IntegratedV3.ShelterSafe 1`)이고, 팀의 실제 은신처 생명주기(`eco.IntegratedV3.ProtectedRefuges 1`)가 그 위에 더해진다. 팀의 무리 경보 행동 연결은 기본 끔이다(`eco.IntegratedV3.SocialControl 0`, 사람 결정 10-17 (8)). Social 처리기는 그대로 돌며 기록하고, 경보 연출(소리·고개 들기 표현)은 이 스위치와 따로 돈다. 언리얼 결과는 파이썬 거울 세계와 표본 흔들림 안으로 같다(`herbivore_rl/results/v3/wild1/compare_unreal.md`). 켜고 끄는 콘솔 변수는 `RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b 에 있다. `eco.IntegratedPolicyVersion 1`(기본)이면 팀 원래 동작 그대로다.
+팀 통합 레벨(`/Game/Map/LV_Ecosystem_IntegrationTest`)을 명령줄 `-EcoIntegratedV3`(또는 콘솔 `eco.IntegratedPolicyVersion 3`)로 Play 하면, 사슴은 학습 두뇌(R1b)와 야생 규칙으로, 늑대는 우리 늑대 규칙으로 움직인다. 10-17 에 팀 브랜치를 합쳐서 팀의 몸(개체·지형·표현·죽음 처리·복제·먹이 장부)과 우리 머리가 한 브랜치에 있다. 은신처 안전 규칙은 우리 규칙 하나(`eco.IntegratedV3.ShelterSafe 1`)이고, 팀의 실제 은신처 생명주기(`eco.IntegratedV3.ProtectedRefuges 1`)가 그 위에 더해진다. 팀의 무리 경보 행동 연결은 기본 끔이다(`eco.IntegratedV3.SocialControl 0`, 사람 결정 10-17 (8)). Social 처리기는 그대로 돌며 기록하고, 경보 연출(소리·고개 들기 표현)은 이 스위치와 따로 돈다. 언리얼 결과는 파이썬 거울 세계와 표본 흔들림 안으로 같다(`herbivore_rl/results/v3/wild1/compare_unreal.md`). 켜고 끄는 콘솔 변수는 `RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b 에 있다. `eco.IntegratedPolicyVersion 1`(기본)이면 팀 원래 동작 그대로다. 10-18 에 통합 레벨에 우리 나무 액터를 더했다(7절).
 
 ## 1. 통합으로 끝난 것 (요청 닫음)
 
@@ -81,6 +81,7 @@
      원판을 만든다(`eco.IntegratedV3.Obstacles` 기본 1, `RL_V3_WILD2_SPEC.md` 6절). 레벨은 고치지 않는다.
      10-17 더함: 사슴·늑대가 줄기·바위에 막히면 가장 적게 돈 빈 방향으로 돌아간다(`eco.IntegratedV3.ObstacleDetour` 기본 1, 명세 6-7). 파이썬 숲 배치(줄기 1 ha 250)에서
      원판에 막혀 3초 넘게 제자리인 사슴·늑대가 없어졌다(돌아가기 전에는 30세계 16분에 사슴 1228번·늑대 105번). 나무를 놓아도 동물이 줄기에 끼지 않는다.
+   - 10-18: 사용자 허락으로 우리가 `LV_Ecosystem_IntegrationTest` 무대 안에 `Beech_Tree` 나무와 줄기 막이를 놓았다(7절). 아래는 그 전의 읽기다.
    - 읽어 보니 지금 `LV_Ecosystem_IntegrationTest` 의 동물 무대 셋에는 충돌하는 나무·바위가 하나도 없다. 숲 무대의 메시 38개는 모두 충돌 없는 풀(`SM_MWAM_GrassC`·`GrassD`)이고,
      메마른 땅·고지 무대는 메시가 0이다. 바위 무늬는 지형 재질의 풀 유형이라 충돌이 없다. 그래서 지금은 사슴이 지날 나무 자체가 없다.
    - 요청: 동물 무대(먹이 자리 둘레 약 120 m) 안에 나무·바위를 놓고 충돌을 켜기(쿼리 충돌 + WorldStatic 막음 — 팀 이동 제약 `EcoCreatureMovement::ConstrainStep` 이 막는 조건).
@@ -134,3 +135,24 @@
   - 답: 파이썬 `realism_shelter` 가 이미 같은 보호를 한다(원 안 사슴 표적·포획 제외, 늑대는 원 밖). 통합 기본값은 이 규칙 하나다. 남은 차이였던 늑대 몸 여유 1 m 는 10-17 에 파이썬에 넣고 골든으로 C++ 와 맞췄다(명세 `RL_V3_WILD1_SPEC.md` 12절).
 - wonkii 님(`MASS_STATETREE_PPO_COMPARISON_DEVELOPMENT_PLAN_2026-10-14.md`): PPO 모델·관측·정규화 목록, 골든 근거, 기준 조건.
   - 답: 계약서 `POLICY_CONTRACT_V3.md`, 야생 규칙 명세 `RL_V3_WILD1_SPEC.md`, 골든 헤더(`AI/Policy/*GoldenVectorsV3.h`)와 시험(`AI/Policy/Tests/`)에 있다. 기준 조건은 통합 v3 기본값이다.
+
+## 7. 알림 (10-18) — 통합 레벨에 우리 나무 액터를 더했다
+
+- 무엇: `/Game/Map/LV_Ecosystem_IntegrationTest` 의 동물 무대에 나무를 놓았다 — 숲 24·고지 9·메마른 땅 0 그루(사용자 허락, 10-18). 10-17 부터 통합 v3 모드가 Play 때 띄우던 나무와 같은 자리다.
+  - 나무마다 액터 둘. 월드 아웃라이너 폴더 `EcoV3_Trees`.
+    - `EcoV3Tree_<지역>_<번호>`: avaroki 님의 `Beech_Tree` 메시. 이 액터만 충돌을 껐다(메시 애셋은 그대로). 메시 충돌이 잎까지 덮는 큰 덩어리라서 그대로 두면 잎 아래 빈 땅이 막힌다(4절 1 요청 2).
+    - `EcoV3Trunk_<지역>_<번호>`: 줄기 굵기(반지름 0.74~0.89 m)의 엔진 원기둥. `BlockAll`, 게임에서는 안 보인다(편집기에서는 줄기 밑동에 회색 원기둥으로 보인다). 나무 액터에 붙어 있다.
+  - 꼬리표: 나무 `EcoV3Tree`, 줄기 막이 `EcoV3Trunk`, 둘 다 `EcoV3TreeId_<지역>_<번호>`. 늘 불림(공간 스트리밍 안 함)이다. 내비 메시에는 영향이 없다.
+  - 팀 액터는 하나도 바꾸거나 옮기지 않았다. 맵 파일(`.umap`)도 그대로다. 새 파일만 생겼다: 외부 액터 66 개(`Content/__ExternalActors__/Map/LV_Ecosystem_IntegrationTest/…`)와 폴더 1 개(`Content/__ExternalObjects__/…`).
+- 바뀌는 것:
+  - 기본 v1 모드에서도 나무가 보인다. 줄기에서는 플레이어와 팀 이동 제약(`EcoCreatureMovement::ConstrainStep`)이 막힌다. 잎은 막지 않는다.
+  - 팀 동물은 길 찾기가 없어서, 줄기 앞에서 그 걸음이 멈출 수 있다.
+  - v3 모드는 줄기 막이를 읽어 줄기 둘레를 돌아간다. 사슴·늑대 결과는 Play 때 띄우던 나무와 같다(헤드리스 세 판 기록 줄이 모두 같다).
+- 옮기기: 편집기에서 나무 액터(`EcoV3Tree_…`)를 옮기면 줄기 막이가 따라간다.
+  - 그러면 우리 기록에 '표와 다름' 경고가 뜬다. 파이썬 학습 세계와 줄기 자리가 달라진다. 옮겼으면 알려 달라(배치 표를 다시 만든다).
+  - 표 자리로 되돌리기: 편집기를 닫고 `UnrealEditor-Cmd.exe <uproject> -run=EcoV3PlaceTrees -unattended -nopause -nosplash`. 우리 꼬리표 액터만 고친다.
+- 지우기:
+  - 아웃라이너에서 폴더 `EcoV3_Trees` 를 골라 지우고 저장한다.
+  - 또는 편집기를 닫고 같은 명령에 `-Remove` 를 붙인다(우리 액터 66 개와 폴더 파일을 지운다).
+  - 지운 뒤에도 v3 모드에서 나무를 보려면 `-EcoV3StageTrees=1` 로 Play 한다(예전처럼 실행 중에 놓는다).
+- 다른 맵(공식 레벨 등)에 같은 나무가 필요하면 `-Map=<맵 경로>` 로 같은 명령을 쓸 수 있다. 다만 그 맵에 통합 조정자와 지역이 있어야 한다. 쓰기 전에 그 맵 주인과 먼저 정한다.

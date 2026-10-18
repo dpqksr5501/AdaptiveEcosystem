@@ -717,7 +717,7 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 팀 나무 `/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree` 를 통합 레벨 무대에 놓는다 — 숲 24·고지 9·메마른 땅 0 그루. **레벨·콘텐츠·설정은 바꾸지 않는다.** 통합 v3 모드가 무대를 만들 때 고정 배치 표(`AI/Policy/TreeLayoutV3.h`, 파이썬 `results/v3/wild2/trees/make_tree_layout.py` 가 만든다)대로 `AStaticMeshActor` 를 놓는다(충돌 없음, 그림자 켬, 지면에 붙여 10 cm 묻음).
   - 줄기 원판(밑동 꼭짓점 반경 40.45 cm × 크기 1.8~2.2 = 0.74~0.89 m)을 세계 원판에 넣어 사슴·늑대가 줄기를 돌아간다(세로 장애물 규칙 그대로). 레벨 읽기는 이 액터를 빼고, 시작 자리 계획은 줄기 원판 안 자리를 버린다.
   - 규칙: 수 = 실제 성숙림 줄기 단면적 34 m²/ha ÷ 이 나무 밑동(숲), 고지는 그 3/8(어림), 메마른 땅은 0(너도밤나무는 가뭄에 약함·나무 없는 비교 무대). 포아송 원반 퍼뜨리기(숲 줄기 중심 9 m·고지 14.5 m 밖), 은신처 원 + 2 m·무대 벽 4 m·가운데 빈터 22 m·늑대 시작 모서리 3 m 비움.
-  - 새 스위치 `eco.IntegratedV3.StageTrees` · `-EcoV3StageTrees=`(기본 1). `Obstacles 0`·무대 한 변이 120 m 가 아님·그 지역 원판 가져오기(`ObstacleImport`)면 놓지 않는다. 시작 글 `[EcoV3I] 무대 나무: …`·`[EcoV3I] <지역> 나무 | …`, 디버그 표시에서 줄기 원판은 초록.
+  - 새 스위치 `eco.IntegratedV3.StageTrees` · `-EcoV3StageTrees=`(기본 1 — 10-18 부터 0, 나무는 레벨 액터다. 아래 '10-18 레벨 나무'). `Obstacles 0`·무대 한 변이 120 m 가 아님·그 지역 원판 가져오기(`ObstacleImport`)면 놓지 않는다. 시작 글 `[EcoV3I] 무대 나무: …`·`[EcoV3I] <지역> 나무 | …`, 디버그 표시에서 줄기 원판은 초록.
   - 파이썬 거울: `configs/v3_wild2_trees_mirror.yaml`(장애물 거울 + `obstacles.fixed` 숲 원판), 지역마다는 `run_mirror.py --unreal-maps … --unreal-obstacles results/v3/wild2/trees/tree_layout.json`. 언리얼 내보내기 원판 = 표(비트 단위).
   - 헤드리스(사슴 128, 세션 20000~20002, 240초): 다 놓음(뺀 것 0), 원판 밖으로 옮긴 개체 0, 오류·ensure·경고 0, 메마른 땅 기록 줄은 넣기 전과 같다. 파이썬 끼임(짝 지도 90 세계): 줄기에 낀 사슴·늑대 0. GPU 사진 `herbivore_rl/results/v3/wild2/trees/shots/` — 줄기가 땅에 서 있고 은신처 안에 줄기가 없다(잎은 은신처 가장자리 위로 드리운다).
   - 시험: `Policy.V3.StageTrees.Layout`·`StartPoints`·`Spawn`, 파이썬 `tests/test_wild2_trees.py` 5개. 자동 시험 166 모두 성공(기존 경고 1 포함), 실패 0. 빌드 두 방식 통과.
@@ -732,6 +732,23 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
   - 헤드리스(사슴 128, 세션 20000~20002, 240초, 기본값 = 나무 + 날씨) 대 파이썬 `configs/v3_wild3_mirror.yaml` 같은 지도 반복 10: 9장 합 산 94.5 대 94.5%, 잡힘 5.47 대 5.49%, 굶음 0, 모든 칸 |z| ≤ 2.3(메마른 땅 사냥 시작 +2.3 은 날씨와 무관한 옛 차이 — 메마른 땅 기록 줄은 날씨 넣기 전과 같다). 날씨를 끈 판(`-EcoV3Weather=0`)과의 차이도 파이썬과 같은 쪽(고지 잡힘 +0.78 대 +0.86 %p). 오류·ensure·경고 0.
   - GPU 사진 `herbivore_rl/results/v3/wild3/shots/`(숲 비·고지 눈·메마른 땅 맑음, 경계 넘기 띠, 연출 시간표).
   - 시험: `Policy.V3.Weather.Golden`(골든 `WeatherGoldenVectorsV3.h`, `herbivore_rl/export_golden_v3_weather.py`, 검사 본문 `Tests/WeatherGoldenCheckV3.h` — g++ 하네스도 같은 본문)·`IntegratedDefaults`·`SenseStats`·`Presenter`. 자동 시험 171 = 성공 170 + 기존 경고 1, 실패 0. 빌드 두 방식 통과.
+- **10-18 레벨 나무 — Play 때 띄우지 않고 통합 레벨에 진짜 액터로** (사용자 '일단 플레이시 장애물이 생성되게 하지 말고 그냥 우리 통합레벨에 배치를 해 테스트하는 레벨에', 레벨 편집 허락 — 우리 액터만 더함, 기록 `herbivore_rl/results/v3/wild2/trees/level/README.md`):
+  - 10-17 무대 나무와 같은 자리·방향·크기(배치 표 `trees-1017a`)의 나무를 `/Game/Map/LV_Ecosystem_IntegrationTest` 에 놓았다 — 숲 24·고지 9·메마른 땅 0. 나무마다 액터 둘(폴더 `EcoV3_Trees`, 늘 불림):
+    - 나무 `EcoV3Tree_<지역>_<번호>`: 팀 메시 `Beech_Tree`, 이 액터만 충돌 없음(메시 애셋은 그대로 — 메시 충돌은 잎까지 덮는 큰 볼록 하나라서), 그림자 켬, 꼬리표 `EcoV3Tree`. 밑동은 줄기 중심·둘레 6 곳의 가장 낮은 땅보다 10 cm 묻었다(실행 중 나무와 같은 식).
+    - 줄기 막이 `EcoV3Trunk_<지역>_<번호>`: 엔진 원기둥, `BlockAll`, 게임에서 숨김·그림자 없음, 꼬리표 `EcoV3Trunk`, 나무 액터에 붙음(나무를 옮기면 따라간다). 반지름 = 줄기 원판 반지름, 땅 − 30 cm ~ + 4 m. 내비 메시에 영향 없음.
+    - 두 액터 모두 꼬리표 `EcoV3TreeId_<지역>_<번호>`. 팀 액터는 하나도 바꾸거나 옮기지 않았다. 맵 파일도 그대로 — 외부 액터 파일 66 개와 폴더 파일 1 개만 새로 생겼다.
+  - 놓는 명령(편집기 전용, 우리 모듈 `AI/Policy/EcoV3PlaceTreesCommandlet`): 편집기를 닫고 `UnrealEditor-Cmd.exe <uproject> -run=EcoV3PlaceTrees -unattended -nopause -nosplash`(`-DryRun` 확인만, `-Remove` 우리 액터 지우기, `-Force` 다시 저장).
+    맵과 액터를 모두 불러 통합 모드와 같은 규칙(`StageCenterCm` — 조정자 그룹의 먹이 자리, 지역 상자 안)으로 무대 원점을 찾고, 같은 지면 검사(`GroundStageTree`)로 놓는다. 다시 돌리면 우리 꼬리표 액터만 고치고, 이미 같으면 저장하지 않는다(두 번째 실행: 그대로 66, 저장 0, 파일 바이트 그대로).
+  - `eco.IntegratedV3.StageTrees` · `-EcoV3StageTrees=` 기본을 0 으로 바꿨다(예비로 남김 — 1 이면 레벨 나무가 없는 무대에만 실행 중에 놓는다. 레벨 나무가 있는 무대에는 켜도 놓지 않는다).
+  - 레벨 읽기(`ScanStageObstacles`)가 줄기 막이를 원판으로 읽는다. 원기둥 충돌 상자 반폭 평균이 줄기 원판 반지름이라 읽은 값이 표와 3e-12 cm 안이고, 표 자리와 1 cm 안이면 표 값을 그대로 쓴다(`SnapToLayout` — 파이썬 거울 `tree_layout.json` 과 비트 단위로 같게, 맞춘 수·다른 수·차이 최대를 기록). 시작 자리 계획은 같은 원판을 피한다(`GatherLevelTrunks` → `LevelTrunkDiscs`).
+  - 시작 줄 `[EcoV3I] <지역> 나무 | 레벨 나무 줄기 n … 배치 표와 맞춤 n … 세계 원판 = 표 · 시작 자리가 피한 원판 n 은 세계 줄기 원판과 같다 | 이동 검사(팀 ConstrainStep): 줄기 가로지르기 n/n 막힘 · 잎 아래 둘레 걸음 n 가운데 막힘 0 | 실행 중 나무 놓지 않음`.
+    나무를 옮겼거나 표와 다르면 경고 한 줄. 원판 내보내기에 `level_trees_on`·`level_tree_discs`·`level_trees_snapped`·`level_trees_unmatched`·`plan_trunk_discs`·`trunk_probe`. 디버그 표시에서 레벨 줄기 원판도 초록.
+  - 확인(헤드리스, 세션 20000~20002, 사슴 128, 240초, 기본값 = 레벨 나무 + 날씨, `level/compare_level.py`): 지도 9장 모두 세계 원판 = 배치 표 = 10-18 실행 중 나무 판(`results/v3/wild3`) 원판(비트 단위), 시작 자리 원판 = 표, 무대 원점·은신처·날씨 같음.
+    기록 줄은 나무를 놓는 길 때문에 바뀌는 줄(설정 '무대 나무:', 시작 '장애물 |'·'나무 |', 명령줄)을 빼면 1662 줄 모두 같다 — 줄기 막이가 v3 사슴·늑대 이동을 한 번도 더 막지 않았다(미끄러짐 뒤 이동 선은 줄기 원판 + 몸 30 cm 밖이라 팀 이동 제약의 30 cm 구가 원기둥에 닿지 않는다).
+    이동 검사: 숲 24/24·고지 9/9 줄기 가로지르기가 줄기 막이에 막히고, 잎 아래 둘레 걸음 288·108 은 하나도 막히지 않는다. EcoV3I 경고·오류 0.
+  - GPU 사진(`level/shots/`, 세션 20000, 날씨 끔 — 10-17 사진과 같은 세계): 숲 위·은신처 곁 낮은 자리(디버그)·고지 낮은 자리가 10-17 실행 중 나무 사진과 거의 같다(화소 평균 차이 0.35~2.1 / 255, 줄기 막이는 보이지 않는다).
+  - 시험: `Policy.V3.StageTrees.LevelActors`(새 — 시험 바닥 위 나무 + 줄기 막이: 자리, 레벨 읽기 원판 = 표, 맞추기 없이도 0.01 cm 안, 잎은 충돌 없음, 시작 자리 계획 = 실행 중 나무 계획, 팀 이동 제약은 줄기만 막음, 나무를 옮기면 '표와 다름')·`Layout`(기본값 끔, 표와 맞추기)·`StartPoints`(실행 중 나무를 켜고 본다). 자동 시험 172 모두 성공(기존 경고 1 포함), 실패 0. 빌드 두 방식 통과.
+  - 팀에 알림: `TEAM_REQUESTS_V3.md` 7절(옮기기·지우기).
 
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 
