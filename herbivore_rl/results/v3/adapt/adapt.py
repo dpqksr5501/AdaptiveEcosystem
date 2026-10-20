@@ -179,15 +179,20 @@ def _set_feature(f: dict, block: str, key: str, val, log: list, src: str) -> Non
     f[block][key] = val
 
 
-def convert(snap: dict, reference: dict | None) -> dict:
-    """스냅숏 → {world: 판정 세계 설정 dict, train: 학습 세계 설정 dict, regions: 지역 자료, record: 변환 기록}. 거부는 Refused."""
+def convert(snap: dict, reference: dict | None, template: Path | None = None, start: Path | None = None, contract: str | None = None,
+            recipe: Path | None = None) -> dict:
+    """스냅숏 → {world: 판정 세계 설정 dict, train: 학습 세계 설정 dict, regions: 지역 자료, record: 변환 기록}. 거부는 Refused.
+    실시간 고리(results/v3/live/live.py)용 선택 인자 — 주지 않으면 지금과 같다: template = 바탕 설정(고리는 관측 21 거울), start = 이어 배울 시작 모델
+    zip(부르는 쪽이 고르고 확인했다 — 주면 find_anchor 를 쓰지 않는다), contract = 시작 모델이 맞춰야 할 계약 해시(없으면 스냅숏 맨 위 contract_hash),
+    recipe = 학습 조리법 설정(train 블록·부활 계수, 없으면 R4)."""
     from env_v2.config import load_v2_config
     from env_v2.world import World
     from env.config import Config
 
     import export_weights_v3 as ex
 
-    raw = yaml.safe_load(TEMPLATE.read_text(encoding="utf-8"))
+    template = Path(template) if template is not None else TEMPLATE
+    raw = yaml.safe_load(template.read_text(encoding="utf-8"))
     changed: list[dict] = []
     checks: list[str] = []
     S = snap["settings"]
@@ -204,15 +209,25 @@ def convert(snap: dict, reference: dict | None) -> dict:
                 raise Refused(f"지역 {r['region']} 의 세계 칸 {k} 가 {regs[0]['region']} 와 다르다 ({v!r} 대 {w0[k]!r}) — 지역마다 다른 규칙은 아직 옮기지 않는다")
 
     # 계약·두뇌
-    anchor, wsha = find_anchor(snap["brain"])
+    if start is None:
+        anchor, wsha = find_anchor(snap["brain"])
+    else:
+        anchor = Path(start)
+        if not anchor.exists():
+            raise Refused(f"시작 모델 {anchor} 가 없다")
+        wsha = model_weights_sha256(anchor)
     from stable_baselines3 import PPO
 
     pol = PPO.load(str(anchor), device="cpu").policy
     chash = f"0x{ex.contract_hash(tuple(pol.rep_obs_names), int(getattr(pol, 'rep_mask_version', 1))):016x}"
-    if chash != snap["contract_hash"]:
-        raise Refused(f"계약 해시가 다르다: 스냅숏 {snap['contract_hash']} 대 시작 모델 {chash} — 관측·행동 계약이 다른 빌드다")
+    want = snap["contract_hash"] if contract is None else str(contract)
+    if chash != want:
+        raise Refused(f"계약 해시가 다르다: {'스냅숏' if contract is None else '바라는 계약'} {want} 대 시작 모델 {chash} — 관측·행동 계약이 다른 빌드다")
     checks.append(f"계약 해시 {chash} = 시작 모델")
-    checks.append(f"지금 두뇌 {snap['brain']['id']} = {anchor.relative_to(ROOT).as_posix()} (가중치 sha256 {wsha[:16]})")
+    if start is None:
+        checks.append(f"지금 두뇌 {snap['brain']['id']} = {_rel(anchor)} (가중치 sha256 {wsha[:16]})")
+    else:
+        checks.append(f"시작 모델 {_rel(anchor)} (가중치 sha256 {wsha[:16]}) — 지금 두뇌 {snap['brain']['id']} 에서 부르는 쪽이 골랐다")
 
     # (가) 대응표 — 무대·사슴·늑대·식사·낮밤·얼기
     ov = raw.setdefault("overrides", {})
@@ -292,7 +307,7 @@ def convert(snap: dict, reference: dict | None) -> dict:
         raise Refused(f"지역마다 사슴 수가 다르다 {sorted(deer)} — 판정 세계 N 은 하나다")
     N = deer.pop()
     raw["version"] = "3.adapt"
-    tmp = HERE.parent / ".convert_tmp.yaml"
+    tmp = HERE.parent / f".convert_tmp_{os.getpid()}.yaml"            # 프로세스마다 따로 (고리 둘이 겹쳐 돌아도)
     tmp.write_text(yaml.safe_dump(raw, allow_unicode=True, sort_keys=False), encoding="utf-8")
     try:
         cfg = load_v2_config(tmp).replace(N=N)
@@ -356,7 +371,7 @@ def convert(snap: dict, reference: dict | None) -> dict:
     checks.append("은신처 원 = 파이썬 세계 (지역마다)")
 
     # 학습 세계 = 판정 세계 + R4 학습 바꿈 (학습 전용 부활, 학습 시드 풀, train 블록 + 지역 섞기)
-    r4 = yaml.safe_load(R4_TRAIN.read_text(encoding="utf-8"))
+    r4 = yaml.safe_load((Path(recipe) if recipe is not None else R4_TRAIN).read_text(encoding="utf-8"))
     train = copy.deepcopy(raw)
     train["version"] = "3.adapt.train"
     train["overrides"]["train_seeds"] = list(TRAIN_SEEDS)
@@ -369,8 +384,8 @@ def convert(snap: dict, reference: dict | None) -> dict:
     train["train"] = tb
     record = dict(snapshot=dict(map=snap.get("map"), session_seed=snap["session_seed"], global_step=snap["global_step"],
                                 sim_seconds=snap["sim_seconds"], why=snap.get("why"), brain=snap["brain"]["id"], tree_layout=snap.get("tree_layout")),
-                  anchor=anchor.relative_to(ROOT).as_posix(), anchor_weights_sha256=wsha, N=N, regions=names,
-                  changed=changed, checks=checks, template=TEMPLATE.relative_to(ROOT).as_posix(),
+                  anchor=_rel(anchor), anchor_weights_sha256=wsha, N=N, regions=names,
+                  changed=changed, checks=checks, template=_rel(template),
                   f_dec_note="f_dec·ent_coef_base 는 R4 학습 세계에서 잰 값 그대로 (규칙이 같은 세계 — 규칙이 바뀌면 train_v3.py measure-fdec 로 다시 잰다)")
     return dict(world=raw, train=train, regions=regions, record=record)
 
@@ -750,19 +765,19 @@ def cmd_convert(a) -> int:
     return 0
 
 
-def cmd_check(a) -> int:
-    info = load_run(a.run)
+def check_eval(info: dict, seeds, workers: int) -> dict:
+    """재현 확인의 셈(cmd_check, 실시간 고리 live.py 가 함께 쓴다): 시작 두뇌로 판정 세계(world.yaml)를 스냅숏 시각까지 시드 × 지역 돌려 언리얼의
+    잡힘·굶음·산 수와 견준다. 규칙은 GATE.md 변경 기록 (1). 스냅숏 시각이 0 이면 ok=None."""
     t0 = time.perf_counter()
     steps = int(info["record"]["snapshot"]["global_step"])
     if steps <= 0:
-        print("스냅숏 시각이 0 — 견줄 결과가 없다(재현 확인 건너뜀, 통과로 두지 않는다)")
         out = dict(ok=None, why="t = 0")
     else:
         model = ROOT / info["record"]["anchor"]
-        jobs = make_jobs(info, model, seed_list(GATE["check_seeds"]), steps, diag=False)
-        res = run_jobs(_world_short, jobs, a.workers)
+        seeds = [int(s) for s in seeds]
+        jobs = make_jobs(info, model, seeds, steps, diag=False)
+        res = run_jobs(_world_short, jobs, workers)
         rows, ok, ok_v0 = {}, True, True
-        seeds = seed_list(GATE["check_seeds"])
         tot_py = {k: np.zeros(len(seeds)) for k in ("caught", "starved", "alive")}
         tot_ue = {k: 0.0 for k in tot_py}
         for name, r in info["regions"].items():
@@ -786,11 +801,19 @@ def cmd_check(a) -> int:
             z = (tot_ue[key] - float(v.mean())) / max(float(v.std(ddof=1)), 0.5)
             pooled[key] = dict(unreal=tot_ue[key], python_mean=float(v.mean()), python_sd=float(v.std(ddof=1)), z=z, ok=bool(abs(z) <= GATE["check_z"]))
             ok &= pooled[key]["ok"]
-        out = dict(ok=ok, steps=steps, seeds=list(GATE["check_seeds"]), regions=rows, pooled=pooled,
+        out = dict(ok=ok, steps=steps, seeds=[seeds[0], seeds[-1]], regions=rows, pooled=pooled,
                    rule=f"지역 합 잡힘·굶음·산 |z| ≤ {GATE['check_z']} (sd 바닥 0.5) 그리고 지역마다 |언리얼 − 파이썬 평균| ≤ max({GATE['check_z']}·sd, "
                         f"{GATE['check_abs']} 마리) — GATE.md 변경 기록 (1)",
                    ok_v0=ok_v0, rule_v0=f"(첫 초안 — 쓰지 않음) 지역마다 |z| ≤ {GATE['check_z']} (sd 바닥 0.5)")
     out["wall_s"] = round(time.perf_counter() - t0, 1)
+    return out
+
+
+def cmd_check(a) -> int:
+    info = load_run(a.run)
+    if int(info["record"]["snapshot"]["global_step"]) <= 0:
+        print("스냅숏 시각이 0 — 견줄 결과가 없다(재현 확인 건너뜀, 통과로 두지 않는다)")
+    out = check_eval(info, seed_list(GATE["check_seeds"]), a.workers)
     (info["dir"] / "check.json").write_text(json.dumps(out, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
     if out.get("regions"):
         for n, row in list(out["regions"].items()) + [("지역 합", out["pooled"])]:
