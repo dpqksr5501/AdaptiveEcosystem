@@ -317,13 +317,16 @@ def brain_sha(snap: dict) -> str:
     return str(snap["brain"].get("weights_sha256", ""))
 
 
-def pair_key_of(digest: str, wsha: str) -> str:
-    return f"{digest}|{str(wsha)[:16]}"
+def pair_key_of(digest: str, wsha: str, play_id: str = "") -> str:
+    base = f"{digest}|{str(wsha)[:16]}"
+    return f"{base}|{play_id}" if play_id else base
 
 
 def pair_key(snap: dict) -> str:
-    """건너뛰기 열쇠 = 환경 지문 + 스냅숏 두뇌 가중치 sha256."""
-    return pair_key_of(env_digest(snap), brain_sha(snap))
+    """건너뛰기 열쇠 = 환경 지문 + 스냅숏 두뇌 가중치 sha256 + Play 번호(play_id, 있으면).
+    Play 번호를 넣는 까닭 (10-21 시연 1차): 언리얼은 다른 Play 의 번호가 적힌 두뇌를 받지 않는다. 새 Play 가 앞 Play 와 같은 환경을 다시 만들면
+    (같은 지문·같은 두뇌) 열쇠가 같아 건너뛰게 되고, 그러면 새 Play 에는 두뇌가 영영 오지 않는다 — 새 Play 의 스냅숏은 새 판이다(앞 Play 의 판은 그만둔다)."""
+    return pair_key_of(env_digest(snap), brain_sha(snap), str(snap.get("play_id") or ""))
 
 
 def env_info(snap: dict) -> dict:
@@ -465,7 +468,7 @@ def finish_attempt(root: Path, res: dict) -> dict:
     if state in TERMINAL and res.get("key"):
         st["processed"].append(dict(key=res["key"], state=state, attempt=res.get("attempt"), snapshot=res.get("snapshot"), time=utc_now()))
         if state == "exported" and res.get("env_digest") and res.get("exported_weights_sha256"):
-            st["processed"].append(dict(key=pair_key_of(res["env_digest"], res["exported_weights_sha256"]), state="adopted",
+            st["processed"].append(dict(key=pair_key_of(res["env_digest"], res["exported_weights_sha256"], str(res.get("play_id") or "")), state="adopted",
                                         attempt=res.get("attempt"), snapshot=res.get("snapshot"), time=utc_now()))
     st["processed"] = st["processed"][-500:]
     if res.get("last_result"):
@@ -1165,6 +1168,7 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         e = env_info(snap)
         env_txt = env_summary(snap)
         res.update(key=pair_key(snap), env_digest=env_digest(snap), brain_weights_sha256=brain_sha(snap), env=env_txt, env_revision=e["revision"],
+                   play_id=str(snap.get("play_id") or ""),
                    brain=snap["brain"].get("id"))
         st.set(state="converting", attempt=int(attempt), snapshot=Path(snap_path).name, env=env_txt, progress=-1.0,
                message=f"변환 중 — 시도 {attempt}, 환경 #{e['revision']}")

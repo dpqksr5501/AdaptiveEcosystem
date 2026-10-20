@@ -92,6 +92,9 @@ def test_env_digest(lv, snap):
     s = copy.deepcopy(snap)
     s["brain"]["weights_sha256"] = "11" * 32
     assert lv.env_digest(s) == d0 and lv.pair_key(s) != k0                # 두뇌만 다르면 열쇠가 다르다
+    s2 = json.loads(json.dumps(snap))
+    s2["play_id"] = "p20261021T062000_0badcafe"
+    assert lv.env_digest(s2) == d0 and lv.pair_key(s2) != k0 and lv.pair_key(s2).endswith("|p20261021T062000_0badcafe")   # 새 Play = 새 판
 
 
 def test_decide_and_dedup(lv):

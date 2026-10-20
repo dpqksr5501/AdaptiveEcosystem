@@ -782,6 +782,14 @@ v3 계약과 C++ 이식은 지금 있는 R1b s3로 먼저 시작한다. R2 보�
     - 실제 상태 관측 대조(새 열 0 판 세션 20000·20010, 10 초마다 산 사슴 모두 — 17,709 줄): 파이썬 `obstacle_obs_values` 로 같은 입력을 다시 잰 E·N·가림·세 칸이 **모두 비트 단위로 같다**. away 도 가장 가까운 늑대 자리에서 다시 잰 값과 같고, 세계 원판은 파이썬 거울 배치 표와 같다(숲 24·고지 9·메마른 땅 0). 지금 레벨은 줄기가 적어 가림이 드물다(줄 17,709 중 7 — 늑대를 안 줄 2,514). 기록 `H/results/v3/r5/unreal_parity.md`·`unreal_logs/`.
     - UBT 두 방식(적응 unity·`-DisableAdaptiveUnity`) 성공, 자동화 `AdaptiveEcosystem` 183 성공(새 4) + 기존 경고 1, 실패 0. 오류·ensure·EcoV3I 경고 0.
   - 남은 것: R5 학습(세계 절반 = 언리얼과 같은 세계, 절반 = 무작위 숲 밀도)과 사전 등록 판정(새 판정 시드 33100~33199). 판정을 통과한 두뇌만 두뇌 파일로 내보내 `eco.V3Brain.Load` 로 넣는다. 팀 합의 #S1 은 그대로 남아 있다.
+- **10-21 실시간 두뇌 교체 — 자동 고리** (사용자 '게임 중 실시간 두뇌 교체를 이어서 하자 … 환경이 변하는 규칙은 레벨(팀) 작업', 사람 결정 `D/RL_Policy/RL_V2_PLAN.md` 10-20 (17)·10-21 (18),
+  약속 `D/RL_Policy/LIVE_ADAPT_SPEC.md`, 기록 `herbivore_rl/results/v3/live/README.md`):
+  - 무엇: 레벨이 Play 중에 바꾼 나무(꼬리표 `EcoV3Trunk`)·날씨(우리 지역 날씨 콘솔 변수, 팀 `FRegionEnvironmentState`)를 통합 v3 모드가 알아채 다음 결정 스텝 경계에서 지역 세계에 넣고
+    (`S/AI/Policy/EcoV3EnvWatch.cpp`, `eco.IntegratedV3.EnvWatch` 기본 1 — 바뀐 것이 없으면 비트 단위로 같다), `eco.IntegratedV3.AutoAdapt 1` 이면 자동 스냅숏 → 파이썬 감시
+    (`H/results/v3/live/live.py watch` — 포만 없는 세계에서 관측 21 두뇌 이어 배우기, 빠른 관문 `LIVE_GATE.md`) → 두뇌 파일 `Saved/EcoAdapt/brains` → 폴더 감시가 Play 를 멈추지 않고
+    교체, 화면 알림·판 번호·`eco.V3Brain.Rollback`. 시험용 대역 `eco.IntegratedV3.Test.AddTrees·RemoveTrees·At`.
+  - 확인: UBT 두 방식 성공, 자동화 194(193 성공 + 기존 경고 1), 파이썬 1483 통과. 시연(세션 20004, Barren 나무 0→20 + 비): 진짜 관문 판은 기각(포만 없는 세계 잡힘 13.96 대 13.68%,
+    t +1.15 — 새 두뇌가 더 낫지 않았다), 시험 내보내기로 149.5 초 교체·480 초 되돌림을 화면으로 보였다. 한 바퀴 약 16 분.
 
 ### 4-6. (f) 애니메이션 묶기 — 11-02 ~ 11-13 (준비는 10-27부터)
 

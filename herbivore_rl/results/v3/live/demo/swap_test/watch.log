@@ -1,0 +1,3 @@
+[live 06:38:04] 감시 시작: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\AdaptiveEcosystem\Saved\EcoAdapt_test\snapshots (워커 12, 학습 300k × 모델 1, 판정 시드 N 35000~35009 × 900 스텝 · G 35000~35004 × 900 스텝, 시험 크기)
+[live 06:39:30] 시도 1 시작: eco_v3_snapshot_s20004_t473_e1.json → a1_20261021T063930_e1 (pid 28832, 기록 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\AdaptiveEcosystem\Saved\EcoAdapt_test\live\rounds\a1_20261021T063930_e1\round.log)
+[live 06:40:56] 시도 1 끝 (rc 0): exported — 시험 내보내기: 판 1 (관문 기각)
