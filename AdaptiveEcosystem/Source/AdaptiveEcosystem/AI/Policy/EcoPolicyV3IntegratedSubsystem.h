@@ -138,12 +138,24 @@
 //      예정 바꾸기 eco.V3Brain.SwapAtSeconds·SwapFile(-EcoV3BrainSwapAt= -EcoV3BrainSwapTo=, 측정·시연용), 폴더 감시 eco.V3Brain.WatchFolder(기본 끔).
 //      시작 줄 '[EcoV3I] 두뇌 시작 |', 바꿀 때 '[EcoV3I] 두뇌 바꿈 |', 10 초 아홉째 줄 '[EcoV3I] <지역> 두뇌 |'(두뇌 id, 구간 두뇌 스텝의 행동 몫과
 //      늑대를 알 때의 행동 몫 — FEcoV3BrainTally). 평면 시험 경로(UEcoPolicyV3Subsystem)는 내장 두뇌 그대로다.
+//  20. 10-21 실시간 두뇌 교체 (사용자 '게임 중 실시간 두뇌 교체', 설계 LIVE_ADAPT_SPEC.md 5.4): 바꾸기·되돌리기·파일 거부 알림을 화면에 띄우고
+//      (eco.V3Brain.Notice 기본 1 — eco.V3Debug 와 따로, 그리는 화면이 있을 때만, 고정 키라 PIE 창마다 겹치지 않는다) 늘 '[EcoV3I] 알림 |' 한 줄을 남긴다.
+//      적응 고리 eco.IntegratedV3.AutoAdapt (-EcoV3AutoAdapt, 기본 0): 켜면 두뇌 감시 폴더 기본 Saved/EcoAdapt/brains·상태 파일 기본 Saved/EcoAdapt/status.json,
+//      Play 시작 때 PrimeWatch (그때 있던 두뇌 파일은 읽지 않는다). AutoAdapt 이거나 감시 폴더가 켜졌으면 화면 맨 위에 상태 줄
+//      '두뇌 판 3 (live_r3…@abcd) · 교체 3번 · 환경 #2 · 적응 고리 | <파이썬 상태>' 를 1 초마다. 되돌리기 eco.V3Brain.Rollback.
+//  21. 10-21 환경 바뀜 감시 (설계 LIVE_ADAPT_SPEC.md 5.1~5.3, EcoV3EnvWatch.cpp — 환경을 바꾸는 규칙은 레벨(팀) 몫, 우리는 읽어 옮기기만):
+//      eco.IntegratedV3.EnvWatch (-EcoV3EnvWatch=, 기본 1)·EnvWatchSeconds (실시간 1 초): Play 중 레벨 나무(꼬리표 EcoV3Trunk 줄기 막이)와 지역 날씨(우리 날씨 콘솔
+//      변수·팀 FRegionEnvironmentState)를 읽어 다음 전역 결정 스텝 경계에서 지역 세계에 넣는다 — 세계 원판 = 그 나무로 Play 를 시작했을 때와 같은 목록, 새 원판 안
+//      사슴·늑대 밀어내기, 먹이 격자 그대로. 넣은 묶음마다 환경 판 + 1, '[EcoV3I] 환경 바뀜 #n |'. 바뀐 것이 없으면 비트 단위로 지금과 같다. 0 = 시작 때 고정.
+//      자동 스냅숏 eco.IntegratedV3.AutoSnapshot (-1 = AutoAdapt 따름)·SnapshotEvery·AutoSnapshotSettle·AutoSnapshotOut (EcoV3Snapshot.cpp, 'env' 블록).
+//      시험용 대역 eco.IntegratedV3.Test.AddTrees·Test.RemoveTrees·Test.At (-EcoV3TestAt= -EcoV3TestCmd=), 보기 eco.IntegratedV3.EnvInfo.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Containers/ArrayView.h"
 #include "Core/EcoMigrationTypes.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Engine/EngineBaseTypes.h"
@@ -232,6 +244,16 @@ namespace EcoV3Integrated
 
 	/** 지역 늑대 순번(StableAgentId 순) → 성질. 짝수 = 잠행-돌진형, 홀수 = 근접 추격형. 모두 주행성(밤에 잔다), 원거리형 없음. */
 	ADAPTIVEECOSYSTEM_API EcoThreatV3::FThreatSpec WolfSpecForOrdinal(int32 Ordinal, double PredSpeedMult);
+
+	/** 화면 알림 종류 (10-21 실시간 두뇌 교체 — UEcoPolicyV3IntegratedSubsystem::PostNotice). 종류마다 고정 키·시간·크기. */
+	enum class ENotice : uint8
+	{
+		Swap,       // 새 두뇌 (~10 초, 크게)
+		Rollback,   // 두뇌 되돌림 (~10 초, 크게 — 바꾸기와 같은 키)
+		Reject,     // 두뇌 파일 거부 (~8 초)
+		Env,        // 환경 바뀜 (~8 초, EcoV3EnvWatch)
+		Snapshot    // 스냅숏 내보냄 (~6 초)
+	};
 }
 
 /** 통합 모드 설정 (콘솔 변수·명령줄에서 읽는다. 시험은 직접 채운다). */
@@ -691,6 +713,17 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	uint64 ObsParityDecisionHash = 14695981039346656037ULL;   // 결정 지문 (FNV-1a 64 — 스텝마다 사슴마다 id·읽음·마스크·요청·로짓 비트·실행 행동, 시작부터 누적)
 	int64 ObsParityDecisions = 0;             // 그 지문에 넣은 사슴·스텝 수
 
+	// 환경 바뀜 감시 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp — AddContext 가 바탕을 적는다)
+	std::vector<double> EnvTrunks;            // 지금 세계 원판에 든 레벨 줄기 원판 (x, y, r) 순 (시작 레벨 읽기와 같은 셈 — 은신처 원 안은 뺀다)
+	int32 EnvLevelTrunks = 0;                 // 무대 안 줄기 막이 수 (은신처 원 안 포함 — 스냅숏 obstacles.level_trunks)
+	std::vector<EcoObservationV3::FCoverInput> EnvScanCovers;   // 시작 레벨 읽기가 쓴 은신처 원 (줄기 원판을 같은 판정으로 거른다)
+	FString EnvWeatherCvarSeen;               // 지역 날씨 콘솔 변수를 마지막으로 본 값 (처음 = Play 시작 값, 설정 WeatherForest 등)
+	bool bEnvTeamKnown = false;               // 팀 지역 환경(FRegionEnvironmentState)을 읽었다
+	uint8 EnvTeamWeather = 0;                 // 그때 날씨 (EEcoWeatherState)
+	float EnvTeamRainfall = 0.0f;             // 그때 비 세기
+	bool bEnvTreesIgnoredLogged = false;      // 장애물 끔·가져온 원판이라 나무 바뀜을 넣지 않는다고 적었다
+	bool bEnvWeatherIgnoredLogged = false;    // 날씨 끔이라 날씨 바뀜을 넣지 않는다고 적었다
+
 	/**
 	 * 늑대 하나의 결정 스텝 하나를 센다 (처리기가 Step 뒤에 부른다. StepIndex = 이번 스텝 번호 = Step 뒤 Sim.T − 1).
 	 * 돌진 시작이면 앞 포획 뒤 경과로 이어 사냥·식사 끝 3 초 안을 가르고, 식사 중(잡지 않았고 쿨다운 > 0)이면 움직였는지 보고,
@@ -714,6 +747,52 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 		return {(P.X - OriginCm.X) / EcoRepertoireV3::kUnitCm, (P.Y - OriginCm.Y) / EcoRepertoireV3::kUnitCm};
 	}
 	double SizeCm() const { return SizeUnits * EcoRepertoireV3::kUnitCm; }
+};
+
+/** 환경 바뀜 한 줄 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp — 스냅숏 env.changes, LIVE_ADAPT_SPEC.md 2절). */
+struct FEcoV3EnvChange
+{
+	int32 Revision = 0;      // 환경 판 (1..)
+	int64 Step = 0;          // 넣은 전역 스텝
+	double Seconds = 0.0;    // 그 시뮬레이션 초
+	FName Region;
+	FString Kind;            // trees · weather
+	FString Detail;          // '나무 0→20 (+20 −0)' · '맑음→비 1.00'
+	FString Source;          // level · test · cvar:<콘솔 변수> · team_env
+};
+
+/** 지역 하나의 대기 환경 변화 (PollEnvironment 가 만들고 ApplyEnvChange 가 결정 스텝 경계에서 넣는다). */
+struct FEcoV3EnvPending
+{
+	bool bTrees = false;
+	std::vector<double> Trunks;   // 새 레벨 줄기 원판 (x, y, r) 순 — 시작 레벨 읽기와 같은 셈 (EnvTrunks 를 바꾼다)
+	int32 InStage = 0;            // 무대 안 줄기 막이 (은신처 원 안 포함)
+	int32 Snapped = 0;            // 넣는 줄기 가운데 배치 표 값으로 바꾼 수
+	double MaxSnapCm = 0.0;       // 그 차이 최대 (cm)
+	FString TreeSource;           // level · test
+	bool bWeather = false;
+	int32 WeatherKind = 0;        // EcoWorldV3::kWeather*
+	double WeatherIntensity = 0.0;
+	FString WeatherSource;        // cvar:<콘솔 변수> · team_env
+};
+
+/** 시험용 예약 명령 (eco.IntegratedV3.Test.At·명령줄 -EcoV3TestAt= -EcoV3TestCmd= — 시연 대본용). */
+struct FEcoV3TestAt
+{
+	double Seconds = 0.0;   // 시뮬레이션 초 (전역 스텝 × 2/15 — 기록 줄의 초)
+	FString Commands;       // ';' 로 나눈 콘솔 명령
+};
+
+/** 시험용으로 놓은 나무 짝 (eco.IntegratedV3.Test.AddTrees — Test.RemoveTrees 가 나중 것부터 지운다). */
+struct FEcoV3TestTree
+{
+	FName Region;
+	FString Id;                       // <지역>_T<번호> (짝 꼬리표 EcoV3TreeId_<Id>)
+	TWeakObjectPtr<AActor> Tree;
+	TWeakObjectPtr<AActor> Trunk;
+	double X = 0.0;                   // 줄기 원판 (무대 단위)
+	double Y = 0.0;
+	double R = 0.0;
 };
 
 /**
@@ -821,8 +900,10 @@ public:
 	 * 지금 세계 스냅숏 JSON (eco_v3_snapshot 판 1)을 Path 에 쓴다 — 파이썬 herbivore_rl/results/v3/adapt/adapt.py 가 이 파일로 거울 세계를 다시 짓는다.
 	 * 담는 것: 세션 시드·전역 스텝·지금 두뇌·계약 해시·통합 설정 스위치, 지역마다 무대 자리·세계 설정 값·허용 칸·은신처 원·장애물 원판(레벨 나무 포함)·
 	 * 먹이 격자(용량·지금 먹이, 행 우선)·날씨(설정·지금)·사슴·늑대 수와 누적 잡힘·굶음·사냥. 읽기만 한다 (세계를 바꾸지 않는다). Why = 기록용 까닭. 성공하면 참.
+	 * 10-21 (LIVE_ADAPT_SPEC.md 2절): 'env' 블록(감시·환경 판·바뀐 스텝·계기 Trigger = env_change·periodic·console·scheduled·바뀜 목록)과 지역마다
+	 * obstacles.level_trunks 를 더한다. 쓰기는 바꿔 끼우기다 — '<경로>.tmp' 에 다 쓴 뒤 옮긴다 (파이썬 감시는 *.tmp 를 보지 않는다).
 	 */
-	bool ExportSnapshot(const FString& Path, const FString& Why) const;
+	bool ExportSnapshot(const FString& Path, const FString& Why, const TCHAR* Trigger = TEXT("console")) const;
 	/**
 	 * 스냅숏 경로. Out 이 비면 <프로젝트>/Saved/EcoSnapshots/eco_v3_snapshot_s<세션 시드>_t<전역 스텝>.json, '.json' 으로 끝나면 그 파일
 	 * (상대 경로는 프로젝트 폴더 기준), 아니면 그 폴더 안의 같은 이름.
@@ -833,6 +914,20 @@ public:
 	 * eco.IntegratedV3.SnapshotOut 경로에 쓴다. 처리기가 SyncBrain 곁(스텝 앞)에서 부른다 — 그 시각까지 모든 지역이 같은 수의 스텝을 마친 상태다.
 	 */
 	void MaybeScheduledSnapshot();
+	/**
+	 * 자동·주기 스냅숏 (10-21 실시간 두뇌 교체, 처리기가 MaybeScheduledSnapshot 곁에서 결정 스텝 경계마다 부른다 — 예정 스냅숏과 따로):
+	 * eco.IntegratedV3.AutoSnapshot (-1 = eco.IntegratedV3.AutoAdapt 를 따름) 이면 마지막 환경 판이 eco.IntegratedV3.AutoSnapshotSettle 시뮬레이션 초 동안
+	 * 그대로일 때 판마다 한 번 (계기 env_change), eco.IntegratedV3.SnapshotEvery 초 > 0 이면 그 주기로 (계기 periodic). 같은 경계면 한 번만 쓴다.
+	 * 경로 = AutoSnapshotPath. 쓰면 '[EcoV3I] 환경 스냅숏 |' 한 줄과 알림 '스냅숏 #n 내보냄 → 파이썬 학습 대기'.
+	 */
+	void MaybeAutoSnapshot();
+	/**
+	 * 자동·주기 스냅숏 경로: eco.IntegratedV3.AutoSnapshotOut 폴더(상대 경로는 프로젝트 폴더 기준, 비면 <프로젝트>/Saved/EcoAdapt/snapshots) 안의
+	 * eco_v3_snapshot_s<세션 시드>_t<전역 스텝>_e<환경 판>.json.
+	 */
+	FString AutoSnapshotPath() const;
+	/** 자동 스냅숏 설정 한 줄 (시작 기록 '[EcoV3I] 환경 감시:' 에 붙인다). */
+	static FString DescribeAutoSnapshot();
 
 	// ---- 무대 나무 (10-17, 배치 표 TreeLayoutV3.h — 파이썬 make_tree_layout.py) ----
 
@@ -937,6 +1032,90 @@ public:
 	const EcoPolicyV3::FPolicyNetV3& ActiveNet() const { return GetActiveBrain().Net; }
 	/** 마지막으로 두뇌를 바꾼 전역 스텝 (이 Play 에서 바꾼 적이 없으면 -1). 그 스텝부터의 결정은 새 두뇌다. */
 	int64 GetLastBrainSwapStep() const { return LastBrainSwapStep; }
+	/** 이 Play 에서 두뇌를 바꾼 횟수 (되돌림 포함, 첫 '두뇌 시작'은 빼고 — 상태 줄 '교체 n번'). */
+	int32 GetBrainSwapsThisPlay() const { return BrainSwapsThisPlay; }
+
+	// ---- 실시간 두뇌 교체 화면 (10-21, LIVE_ADAPT_SPEC.md 5.4) ----
+
+	/** 콘솔 변수 eco.IntegratedV3.AutoAdapt (적응 고리 주 스위치, 명령줄 -EcoV3AutoAdapt 는 시작값. Shipping 은 늘 거짓). */
+	static bool IsAutoAdaptEnabled();
+	/**
+	 * 알림 한 줄: 늘 '[EcoV3I] 알림 | <Text>' 를 기록하고, eco.V3Brain.Notice 이고 그리는 화면이 있으면(GEngine ∧ FApp::CanEverRender, 클라이언트 월드 아님)
+	 * 종류의 고정 키로 화면에 띄운다 (eco.V3Debug 와 따로). 바꾸기·되돌리기는 eco.V3Brain.NoticeShot 이면 1.5 초 뒤 화면을 찍는다.
+	 */
+	void PostNotice(EcoV3Integrated::ENotice Kind, const FString& Text);
+	/** 환경 바뀜 판 (Play 시작부터 적용한 환경 변경 묶음 수, 0 = 그대로 — EcoV3EnvWatch 가 올린다. 상태 줄 '환경 #n'). */
+	int32 GetEnvRevision() const { return EnvRevision; }
+	/** 적응 고리 Play 번호 (eco.IntegratedV3.AutoAdapt 일 때 Play 시작마다 새로 — 스냅숏 play_id, 감시는 다른 Play 의 두뇌를 받지 않는다). 끄면 빈 값. */
+	const FString& GetPlayId() const { return PlayId; }
+
+	// ---- 환경 바뀜 감시 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp — LIVE_ADAPT_SPEC.md 5.1) ----
+
+	/** 콘솔 변수 eco.IntegratedV3.EnvWatch (기본 1, 명령줄 -EcoV3EnvWatch= 는 시작값. Shipping 은 늘 거짓 = Play 시작 때 환경 고정). */
+	static bool IsEnvWatchEnabled();
+	/**
+	 * 환경 읽기 (HandlePreActorTick 이 프레임마다, 시험은 직접): eco.IntegratedV3.EnvWatchSeconds(실시간)마다, 액터가 생기거나 지워진 다음 읽기, 또는 bForce 면
+	 * 레벨 줄기 막이(GatherLevelTrunks — 무대마다 시작 레벨 읽기와 같은 셈)와 날씨 원천(지역 날씨 콘솔 변수 — 바뀐 값만, 팀 FRegionEnvironmentState — 바뀐 값만)을
+	 * 읽어 지역마다 대기 변화를 정한다. 세계는 바꾸지 않는다 (ApplyEnvChange). 감시가 꺼졌거나 지역 세계가 없거나 때가 아니면 거짓.
+	 */
+	bool PollEnvironment(bool bForce);
+	/** 결정 스텝 경계에서 넣을 환경 변화가 있나 (처리기가 보고 ApplyEnvChange 를 부른다). */
+	bool HasPendingEnvChange() const { return bEnvPending; }
+	/**
+	 * 대기 환경 변화를 지역 세계에 넣는다 — 처리기가 전역 결정 스텝 경계(SyncBrain 곁, 스텝 앞)에서 부른다.
+	 * 나무: 세계 원판 = 지금 원판에서 지금 넣은 줄기를 뺀 것(시작 레벨 읽기의 바위 등·실행 중 무대 나무) + 새 줄기, (x, y, r) 순 — 그 나무로 Play 를 시작했을 때
+	 * TryCreateContexts 가 만들었을 목록과 같다 (실행 중 무대 나무는 무대 안 줄기 막이가 없을 때만 — 원판을 빼거나 다시 넣고 액터를 숨기거나 보인다).
+	 * 새 원판 안 산 사슴·늑대는 밖으로 밀고(PushOutAndCount, 화면 보간 앞 자리도), 그 지역 돌아가기 상태를 지우고,
+	 * 거울 칸(ObstacleIsTree·ObstacleGroundZ·ObstacleScan·bLevelTrees)을 다시 짓는다. 먹이 격자는 그대로다 (EcoV3EnvWatch.cpp 머리 주석).
+	 * 날씨: 세계 설정 Weather.Kind·Intensity 를 바꾸고 UpdateDayNight (시간표는 쓰지 않는다).
+	 * 하나라도 넣으면 환경 판 + 1, '[EcoV3I] 환경 바뀜 #n |' 한 줄, 알림. Bodies·Agents = 컨텍스트 색인마다 산 사슴 몸·늑대 (칸이 없으면 밀지 않는다).
+	 */
+	void ApplyEnvChange(TConstArrayView<TArray<EcoWorldV3::FHerbBody*>> Bodies, TConstArrayView<TArray<EcoWorldV3::FThreatAgent*>> Agents);
+	/** Play 시작부터 넣은 환경 바뀜 (오래된 것부터 — 스냅숏 env.changes). */
+	const TArray<FEcoV3EnvChange>& GetEnvChanges() const { return EnvChanges; }
+	/** 마지막·처음 환경 바뀜을 넣은 전역 스텝 (없으면 0). */
+	int64 GetEnvChangedStep() const { return EnvChangedStep; }
+	int64 GetEnvFirstChangedStep() const { return EnvFirstChangedStep; }
+	/** 환경 요약 (eco.IntegratedV3.EnvInfo): 감시·환경 판·마지막 바뀜, 지역마다 줄기 막이·넣은 줄기·세계 원판·날씨·대기 변화. 줄마다 하나. */
+	TArray<FString> EnvInfoLines() const;
+
+	// ---- 시험용 대역 (10-21, LIVE_ADAPT_SPEC.md 5.3 — 레벨 팀이 할 일을 흉내 낼 뿐 세계 규칙이 아니다. 나무 놓기·지우기는 단독 실행만, 예약은 서버·단독) ----
+
+	/**
+	 * 나무 하나 (배치 표 TreeLayoutV3.h 와 같은 관계): 줄기 원판 (X, Y, R = 밑동 꼭짓점 반경 × 크기 ÷ 200), 액터 기준점 = 줄기 중심 − 방위로 돌린
+	 * (메시 기준점 → 밑동 중심) × 크기. 무대 단위.
+	 */
+	static EcoTreeLayoutV3::FTree MakeLevelTree(double X, double Y, double Scale, double YawDeg);
+	/**
+	 * 레벨 나무 놓기 명령(EcoV3PlaceTreesCommandlet)과 같은 짝을 실행 중에 놓는다: 나무 = 팀 Beech_Tree(TreeMesh, 없으면 메시 없이), 충돌 없음, 그림자, 꼬리표
+	 * EcoV3Tree + IdTag / 줄기 막이 = 엔진 원기둥(TrunkMesh), BlockAll, 게임에서 숨김, 꼬리표 EcoV3Trunk + IdTag, 나무에 붙음. 변환 = LevelTreeTransform·
+	 * LevelTrunkTransform (GroundMinZ = 줄기 아래 가장 낮은 땅). 실행 중 액터라 움직임 가능·저장하지 않음(Transient). 놓았으면 참.
+	 */
+	static bool SpawnLevelTreePair(UWorld& World, const EcoTreeLayoutV3::FTree& T, const FVector& OriginCm, double GroundMinZ, UStaticMesh* TreeMesh,
+								   UStaticMesh& TrunkMesh, FName IdTag, AActor*& OutTree, AActor*& OutTrunk);
+	/**
+	 * eco.IntegratedV3.Test.AddTrees <지역> <수> [씨]: 그 무대 안 빈자리에 나무 짝을 Count 개 놓는다 (결정적 — 씨 없으면 세션 시드 + 그 지역에 놓은 수).
+	 * 자리: 벽에서 4 m + 줄기, 은신처 원(반지름 > 0) 둘레에서 2 m + 줄기, 지금 원판·아직 넣지 않은 줄기와 줄기 사이 틈 3 m (배치 표와 같은 값), 지면 선 검사.
+	 * 크기·방위 = 배치 표 범위. 짝 꼬리표 EcoV3TreeId_<지역>_T<번호>. 놓은 수 (OutMessage = 한 줄). 단독 실행만 (짝은 복제하지 않는다 — 서버·클라이언트면 0).
+	 */
+	int32 TestAddTrees(FName RegionId, int32 Count, TOptional<int32> Seed, FString& OutMessage);
+	/**
+	 * eco.IntegratedV3.Test.RemoveTrees <지역> <수>: 시험용으로 놓은 짝을 나중 것부터, 모자라면 그 무대의 레벨 나무 짝(짝 꼬리표 이름 역순)을 지운다. 지운 짝 수.
+	 * 단독 실행만 (레벨 나무 짝은 복제하지 않아 서버에서 지우면 클라이언트에 남는다).
+	 */
+	int32 TestRemoveTrees(FName RegionId, int32 Count, FString& OutMessage);
+	/** eco.IntegratedV3.Test.At <초> <명령>[; <명령>…]: 시뮬레이션 초(전역 스텝 × 2/15)가 Seconds 이상이 되면 한 번 (RunTestSchedule). */
+	void TestAt(double Seconds, const FString& Commands);
+	/**
+	 * 때가 된 예약 명령을 돌린다 (HandlePreActorTick — Mass 처리 밖. 시험은 직접). 명령이 콘솔 변수면 처음 바꾸기 전 값을 적어 두고 Play 가 끝날 때(EndEnvWatch)
+	 * 되돌린다 — 명령줄 예약은 Play 마다 다시 돌므로 다음 Play 도 같은 시작값에서 같은 바뀜을 낸다.
+	 */
+	void RunTestSchedule();
+	const TArray<FEcoV3TestAt>& GetTestSchedule() const { return TestAts; }
+	/** 명령줄 예약 (-EcoV3TestAt=<초> -EcoV3TestCmd="명령1; 명령2", 쌍 여러 개 — 프로세스에 하나, Play 마다 그대로 건다). */
+	static TArray<FEcoV3TestAt>& CommandLineTestAts();
+	/** 명령줄에서 예약 쌍을 읽는다 (ApplyCommandLineToConsole). 하나라도 찾으면 CommandLineTestAts 를 바꾼다. 명령은 따옴표 안 ';'·공백을 그대로 둔다. */
+	static void ParseCommandLineTestAts(const TCHAR* CmdLine);
 
 	// ---- R5 장애물 관측 대조 기록 (10-19, 계약 2-4) ----
 
@@ -996,6 +1175,22 @@ private:
 	void CheckClockDrift();
 	void DrawOverlay();
 	/**
+	 * 실시간 두뇌 교체 화면 (HandlePreActorTick 이 프레임마다, eco.V3Debug 와 따로): 적응 고리 상태 파일 읽기(2 초마다 — 상태가 바뀌면 기록 한 줄),
+	 * 미뤄 둔 화면 찍기, AutoAdapt 이거나 감시 폴더가 켜졌으면 상태 줄을 1 초마다 (실시간).
+	 */
+	void DrawBrainNotices();
+	// 환경 바뀜 감시 (10-21, EcoV3EnvWatch.cpp)
+	/** 지역 세계의 환경 바탕을 적는다 (AddContext): 시작 은신처 원, 지금 레벨 줄기 원판, 날씨 콘솔 변수의 Play 시작 값, 팀 지역 환경. */
+	void InitContextEnv(FEcoV3RegionContext& Ctx);
+	/** Play 시작 (OnWorldBeginPlay — 켜졌을 때): 액터 생김·지움 알림을 걸고 명령줄 예약을 옮기고 시작 줄을 남긴다. */
+	void BeginEnvWatch(UWorld& InWorld);
+	/** Deinitialize: 알림을 풀고 감시 상태를 지운다. */
+	void EndEnvWatch();
+	/** 액터가 생기거나 지워졌다 (월드 알림) — 꼬리표는 뒤에 붙을 수 있으므로 다음 읽기를 당기기만 한다. */
+	void HandleEnvActorChanged(AActor* Actor);
+	/** HandlePreActorTick (지역 세계가 생긴 뒤 프레임마다): 예약 명령, 환경 읽기. */
+	void TickEnvWatch();
+	/**
 	 * 보기 환경 (Play 동안만, 끝나면 되돌린다).
 	 * - 엔진은 한 액터에 디버그 글자를 128개까지만 그린다(r.DebugSafeZone.MaxDebugTextStringsPerActor). 우리 글자는 모두 WorldSettings 에
 	 *   붙으므로 eco.V3Debug 를 켠 동안만 한도를 푼다(0 = 한도 없음). 그릴 수 없는 실행(-NullRHI)에서는 풀지 않는다 — HUD 가 그려지지
@@ -1048,6 +1243,38 @@ private:
 	int64 LastBrainSwapStep = -1;
 	FString LastBrainSwapFrom;            // 마지막으로 바꾸기 전 두뇌 id (기록 줄 '구간 중 바꿈')
 	bool bScheduledSnapshotDone = false;  // 이 Play 의 예정 스냅숏을 했다 (성공·실패 모두 한 번만)
+
+	// 실시간 두뇌 교체 화면 (10-21, DrawBrainNotices·PostNotice)
+	int32 BrainSwapsThisPlay = 0;         // 이 Play 에서 바꾼 횟수 (되돌림 포함)
+	int32 EnvRevision = 0;                // 환경 바뀜 판 (EcoV3EnvWatch 가 올린다)
+	uint32 ShownRejectSerial = 0;         // 알린 마지막 폴더 감시 거부 번호 (FEcoV3WatchReject::Serial)
+	bool bAdaptDefaultsSet = false;       // 이 월드가 저장소의 적응 고리 기본 폴더·상태 파일을 정했다 (Deinitialize 에서 지운다)
+	FString PlayId;                       // 적응 고리 Play 번호 (GetPlayId)
+	double NextNoticeLine = 0.0;          // 상태 줄 다음 갱신 (실시간)
+	double PendingShotAt = -1.0;          // 미뤄 둔 화면 찍기 시각 (실시간, 음수 = 없음)
+	FString PendingShotPath;
+	FString LastLiveStatusKey;            // 기록한 마지막 적응 고리 상태 (상태·시도·판·지난 결과)
+
+	// 환경 바뀜 감시 (10-21, EcoV3EnvWatch.cpp)
+	TArray<FEcoV3EnvPending> PendingEnv;  // 컨텍스트 색인마다 대기 변화
+	bool bEnvPending = false;             // PendingEnv 에 넣을 것이 있다
+	bool bEnvDirty = false;               // 액터가 생기거나 지워졌다 (다음 프레임에 곧바로 읽는다)
+	bool bEnvTestEdit = false;            // 시험용 대역이 나무를 바꿨다 (다음 읽기의 출처 test)
+	double NextEnvPoll = 0.0;             // 다음 정기 읽기 (실시간)
+	double LastEnvPoll = -1.0e9;          // 마지막 읽기 (실시간 — 액터 알림이 잦아도 0.1 초에 한 번만 당긴다)
+	int64 EnvChangedStep = 0;             // 마지막 환경 바뀜을 넣은 전역 스텝 (없으면 0)
+	int64 EnvFirstChangedStep = 0;        // 처음 환경 바뀜을 넣은 전역 스텝 (없으면 0)
+	TArray<FEcoV3EnvChange> EnvChanges;   // 넣은 바뀜 (오래된 것부터)
+	FDelegateHandle EnvSpawnHandle;
+	FDelegateHandle EnvDestroyHandle;
+	TArray<FEcoV3TestAt> TestAts;         // 시험용 예약 명령 (아직 안 돌린 것)
+	TMap<FString, FString> TestAtCvarBefore;   // 예약 명령이 바꾼 콘솔 변수 → 이 Play 에서 처음 바꾸기 전 값 (EndEnvWatch 가 되돌린다)
+	TArray<FEcoV3TestTree> TestTrees;     // 시험용으로 놓은 나무 짝 (놓은 순서)
+	TMap<FName, int32> TestTreeSerial;    // 지역마다 다음 시험용 나무 번호
+	// 자동·주기 스냅숏 (EcoV3Snapshot.cpp MaybeAutoSnapshot)
+	int32 AutoSnapshotRevision = 0;       // 자동 스냅숏을 쓴 마지막 환경 판
+	double PeriodicNextSeconds = -1.0;    // 다음 주기 스냅숏 시뮬레이션 초 (음수 = 아직 정하지 않음)
+	double PeriodicEverySeen = 0.0;       // 그 주기를 정한 eco.IntegratedV3.SnapshotEvery 값
 
 	FDelegateHandle PreTickHandle;
 

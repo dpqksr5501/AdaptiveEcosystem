@@ -447,10 +447,33 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	const double CpuStart = FPlatformTime::Seconds();
 	for (int32 s = 0; s < Steps; ++s)
 	{
+		// 환경 바뀜 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp): 레벨이 바꾼 나무·날씨를 이 경계(스텝 앞)에서 지역 세계에 넣는다 — 새 원판 안 산 사슴·늑대는
+		// 밖으로 민다. 대기 변화가 없으면 아무것도 하지 않는다 (지금까지와 비트 단위로 같다)
+		if (Sub->HasPendingEnvChange())
+		{
+			TArray<TArray<EcoWorldV3::FHerbBody*>> EnvBodies;
+			TArray<TArray<EcoWorldV3::FThreatAgent*>> EnvAgents;
+			EnvBodies.SetNum(NumCtx);
+			EnvAgents.SetNum(NumCtx);
+			for (int32 c = 0; c < NumCtx; ++c)
+			{
+				for (const int32 k : DeerByContext[c])
+				{
+					EnvBodies[c].Add(Deer[k].View.Body);
+				}
+				for (const int32 k : WolvesByContext[c])
+				{
+					EnvAgents[c].Add(Wolves[k].Agent);
+				}
+			}
+			Sub->ApplyEnvChange(EnvBodies, EnvAgents);
+		}
 		// 전역 스텝 경계마다: 예정 바꾸기(eco.V3Brain.SwapAtSeconds)가 한 프레임 안의 정확한 스텝에서 걸리게. 이 스텝의 모든 지역이 같은 두뇌다
 		Sub->SyncBrain(/*bPollWatch*/ false);
 		// 환경 스냅숏 (10-18 적응 고리, EcoV3Snapshot.cpp): 예정 시각이면 이 스텝 앞 상태를 한 번 쓴다 (읽기만 — 세계를 바꾸지 않는다)
 		Sub->MaybeScheduledSnapshot();
+		// 자동·주기 스냅숏 (10-21): 환경 판이 가라앉은 뒤 판마다 한 번, eco.IntegratedV3.SnapshotEvery 주기 (읽기만)
+		Sub->MaybeAutoSnapshot();
 		const EcoPolicyV3::FPolicyNetV3& Net = Sub->ActiveNet();
 		for (int32 c = 0; c < NumCtx; ++c)
 		{

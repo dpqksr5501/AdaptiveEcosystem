@@ -177,6 +177,16 @@ bool FEcoV3SnapshotExportTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("두뇌 id = 지금 두뇌"), Root->GetObjectField(TEXT("brain"))->GetStringField(TEXT("id")), H.Sub->GetActiveBrain().Id);
 	TestEqual(TEXT("두뇌 가중치 sha256"), Root->GetObjectField(TEXT("brain"))->GetStringField(TEXT("weights_sha256")), H.Sub->GetActiveBrain().WeightsSha256);
 	{
+		// 적응 고리 판 (10-21, LIVE_ADAPT_SPEC.md 2절): brain.adapt 는 늘 객체, 'adapt' 블록이 없는 두뇌(내장·손 파일)면 빈 객체
+		const TSharedPtr<FJsonObject>* Adapt = nullptr;
+		const bool bAdaptObject = Root->GetObjectField(TEXT("brain"))->TryGetObjectField(TEXT("adapt"), Adapt) && Adapt && Adapt->IsValid();
+		TestTrue(TEXT("두뇌 adapt 객체"), bAdaptObject);
+		if (bAdaptObject && !H.Sub->GetActiveBrain().bAdapt)
+		{
+			TestEqual(TEXT("adapt 블록이 없는 두뇌 → 빈 객체"), (*Adapt)->Values.Num(), 0);
+		}
+	}
+	{
 		const TSharedPtr<FJsonObject> S = Root->GetObjectField(TEXT("settings"));
 		const FEcoV3IntegratedSettings& Want = H.Sub->GetSettings();
 		TestTrue(TEXT("설정 스위치 (얼기 막음·도주 반사·은신처 안전·장애물·날씨·늑대 수·식사 스텝)"),

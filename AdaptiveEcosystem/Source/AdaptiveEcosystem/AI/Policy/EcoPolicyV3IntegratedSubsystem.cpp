@@ -14,6 +14,7 @@
 #include "Engine/StaticMeshActor.h"
 #include "GameFramework/Pawn.h"
 #include "GameFramework/Volume.h"
+#include "HAL/FileManager.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 #include "PhysicsEngine/BodySetup.h"
@@ -35,6 +36,7 @@
 #include "Misc/App.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "UnrealClient.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "World/EcologyRegion.h"
 
@@ -263,19 +265,21 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("eco.IntegratedV3.WeatherForest"),
 		TEXT(""),
 		TEXT("통합 v3 모드 숲(Forest) 날씨 덮기 '날씨[:세기]' (날씨 = clear·rain·snow, 세기 0~1). 빈 값 = 팀 설계 기본(비 1). 측정·연출 전용 — 파이썬 거울과 다르면 짝 비교가 ")
-		TEXT("맞지 않는다. Play 전에 바꾼다. 명령줄 -EcoV3WeatherForest= 는 시작값."),
+		TEXT("맞지 않는다. Play 전에 바꾼다 (Play 중에 바꾸면 환경 감시 eco.IntegratedV3.EnvWatch 1 이 다음 결정 스텝 경계에서 넣는다 — 10-21). 명령줄 -EcoV3WeatherForest= 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<FString> CVarWeatherHighland(
 		TEXT("eco.IntegratedV3.WeatherHighland"),
 		TEXT(""),
-		TEXT("통합 v3 모드 고지(Highland) 날씨 덮기 '날씨[:세기]'. 빈 값 = 팀 설계 기본(눈 1). Play 전에 바꾼다. 명령줄 -EcoV3WeatherHighland= 는 시작값."),
+		TEXT("통합 v3 모드 고지(Highland) 날씨 덮기 '날씨[:세기]'. 빈 값 = 팀 설계 기본(눈 1). Play 전에 바꾼다 (Play 중에 바꾸면 환경 감시가 다음 결정 스텝 경계에서 넣는다). ")
+		TEXT("명령줄 -EcoV3WeatherHighland= 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<FString> CVarWeatherBarren(
 		TEXT("eco.IntegratedV3.WeatherBarren"),
 		TEXT(""),
-		TEXT("통합 v3 모드 메마른 땅(Barren) 날씨 덮기 '날씨[:세기]'. 빈 값 = 팀 설계 기본(맑음). Play 전에 바꾼다. 명령줄 -EcoV3WeatherBarren= 는 시작값."),
+		TEXT("통합 v3 모드 메마른 땅(Barren) 날씨 덮기 '날씨[:세기]'. 빈 값 = 팀 설계 기본(맑음). Play 전에 바꾼다 (Play 중에 바꾸면 환경 감시가 다음 결정 스텝 경계에서 넣는다). ")
+		TEXT("명령줄 -EcoV3WeatherBarren= 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarWeatherVisuals(
@@ -315,6 +319,18 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("'[EcoV3Obs]' 한 줄(입력·E·N·가림·관측 세 칸)과 지역마다 처음 한 번 원판 줄을 남기고, 관측 18 두뇌여도 세 칸을 만든다(결정은 그대로 — 망은 18 칸만 읽는다). ")
 		TEXT("파이썬 herbivore_rl/results/v3/r5/unreal_parity.py 가 견준다. 측정 전용. Play 전에 바꾼다. 명령줄 -EcoV3ObsParityLog= 는 시작값."),
 		ECVF_Default);
+
+#if !UE_BUILD_SHIPPING
+	// 10-21 실시간 두뇌 교체 (LIVE_ADAPT_SPEC.md 5.2·5.4 — 개발 빌드만. Shipping 은 늘 끔이라 감시 폴더 기본도 없다)
+	static TAutoConsoleVariable<int32> CVarAutoAdapt(
+		TEXT("eco.IntegratedV3.AutoAdapt"),
+		0,
+		TEXT("통합 v3 모드 적응 고리 주 스위치 (0 = 끔, 기본 — 10-21 '게임 중 실시간 두뇌 교체'). 1 이면 두뇌 감시 폴더 기본 = Saved/EcoAdapt/brains (eco.V3Brain.WatchFolder 가 ")
+		TEXT("비었을 때만)·상태 파일 기본 = Saved/EcoAdapt/status.json (eco.V3Brain.StatusFile 이 비었을 때만), Play 시작 때 그 폴더에 있던 두뇌 파일은 읽지 않고 ")
+		TEXT("뒤에 나타난 파일만 바꾼다, 화면 상태 줄. 환경 변화 자동 스냅숏(eco.IntegratedV3.AutoSnapshot -1)도 이 값을 따른다. Play 전에 바꾼다. ")
+		TEXT("명령줄 -EcoV3AutoAdapt (또는 -EcoV3AutoAdapt=0|1) 는 시작값."),
+		ECVF_Default);
+#endif
 
 	static TAutoConsoleVariable<int32> CVarDebug(
 		TEXT("eco.V3Debug"),
@@ -399,6 +415,43 @@ namespace EcoPolicyV3IntegratedImpl
 			bDone = true;
 			UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(FCommandLine::Get());
 		}
+	}
+
+	// 실시간 두뇌 교체 화면 알림 키 (10-21 — 고정 키라 PIE 창이 여럿이어도 한 줄. 지역 화면 줄 730000·731000 + 지역과 겹치지 않는다)
+	constexpr uint64 kNoticeKeyBrain = 732000;      // 새 두뇌·되돌림 (같은 키 — 마지막 것만)
+	constexpr uint64 kNoticeKeyReject = 732001;     // 두뇌 파일 거부
+	constexpr uint64 kNoticeKeyEnv = 732002;        // 환경 바뀜
+	constexpr uint64 kNoticeKeySnapshot = 732003;   // 스냅숏 내보냄
+	constexpr uint64 kNoticeKeyStatus = 732004;     // 상태 줄 (1 초마다)
+	/** 바꾸기·되돌리기 알림을 찍는 지연 (실시간 초 — 알림이 화면에 그려진 뒤). */
+	constexpr double kNoticeShotDelaySeconds = 1.5;
+
+	/**
+	 * 두뇌 알림 글자 (LIVE_ADAPT_SPEC.md 5.4): 되돌림 '두뇌 되돌림 → 판 2 (id)' (내장이면 '두뇌 되돌림 → 내장 두뇌 (판 0)', 판 없는 파일이면 id 만),
+	 * 바꾸기 '새 두뇌 — 판 3 · id · 환경: … · 관문: … · 되돌리기 eco.V3Brain.Rollback' (빈 칸은 뺀다).
+	 */
+	FString BrainNoticeText(const FEcoV3Brain& B, bool bRollback)
+	{
+		const FString Round = B.RoundTag();
+		if (bRollback)
+		{
+			return B.bBuiltin	  ? FString(TEXT("두뇌 되돌림 → 내장 두뇌 (판 0)"))
+				   : Round.IsEmpty() ? FString::Printf(TEXT("두뇌 되돌림 → %s"), *B.Id)
+									 : FString::Printf(TEXT("두뇌 되돌림 → %s (%s)"), *Round, *B.Id);
+		}
+		FString Text = B.bBuiltin	   ? FString::Printf(TEXT("새 두뇌 — 내장 두뇌 (판 0) · %s"), *B.Id)
+					   : Round.IsEmpty() ? FString::Printf(TEXT("새 두뇌 — %s"), *B.Id)
+										 : FString::Printf(TEXT("새 두뇌 — %s · %s"), *Round, *B.Id);
+		if (!B.AdaptEnv.IsEmpty())
+		{
+			Text += FString::Printf(TEXT(" · 환경: %s"), *B.AdaptEnv);
+		}
+		if (!B.AdaptGate.IsEmpty())
+		{
+			Text += FString::Printf(TEXT(" · 관문: %s"), *B.AdaptGate);
+		}
+		Text += TEXT(" · 되돌리기 eco.V3Brain.Rollback");
+		return Text;
 	}
 }
 
@@ -911,6 +964,41 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.SnapshotOut"), SnapshotOutArg);
 	}
+	// 적응 고리 (10-21 실시간 두뇌 교체 — 개발 빌드): -EcoV3AutoAdapt 는 1, -EcoV3AutoAdapt=0|1 은 그 값
+	int32 AutoAdaptArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3AutoAdapt="), AutoAdaptArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.AutoAdapt"), LexToString(AutoAdaptArg));
+	}
+	else if (FParse::Param(CmdLine, TEXT("EcoV3AutoAdapt")))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.AutoAdapt"), TEXT("1"));
+	}
+	// 환경 바뀜 감시·자동 스냅숏 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp·EcoV3Snapshot.cpp — 개발 빌드. 폴더는 쉼표에서 끊지 않는다)
+	int32 EnvWatchArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3EnvWatch="), EnvWatchArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.EnvWatch"), LexToString(EnvWatchArg));
+	}
+	int32 AutoSnapshotArg = -1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3AutoSnapshot="), AutoSnapshotArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.AutoSnapshot"), LexToString(AutoSnapshotArg));
+	}
+	float SnapshotEveryArg = 0.0f;
+	if (FParse::Value(CmdLine, TEXT("EcoV3SnapshotEvery="), SnapshotEveryArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.SnapshotEvery"), LexToString(SnapshotEveryArg));
+	}
+	FString AutoSnapshotOutArg;
+	if (FParse::Value(CmdLine, TEXT("EcoV3AutoSnapshotOut="), AutoSnapshotOutArg, false) && !AutoSnapshotOutArg.IsEmpty())
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.AutoSnapshotOut"), AutoSnapshotOutArg);
+	}
+#if !UE_BUILD_SHIPPING
+	// 시험용 예약 (10-21 — 시연 대본): -EcoV3TestAt=<초> -EcoV3TestCmd="명령1; 명령2" (쌍 여러 개, 명령은 따옴표 안 ';'·공백 그대로)
+	ParseCommandLineTestAts(CmdLine);
+#endif
 }
 
 int32 UEcoPolicyV3IntegratedSubsystem::GetRequestedVersion()
@@ -923,6 +1011,16 @@ bool UEcoPolicyV3IntegratedSubsystem::IsDebugDrawEnabled()
 {
 	EcoPolicyV3IntegratedImpl::EnsureCommandLineApplied();
 	return EcoPolicyV3IntegratedImpl::CVarDebug.GetValueOnGameThread() != 0;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::IsAutoAdaptEnabled()
+{
+#if !UE_BUILD_SHIPPING
+	EcoPolicyV3IntegratedImpl::EnsureCommandLineApplied();
+	return EcoPolicyV3IntegratedImpl::CVarAutoAdapt.GetValueOnGameThread() != 0;
+#else
+	return false;
+#endif
 }
 
 void FEcoV3PreStartTickFunction::ExecuteTick(float DeltaTime, ELevelTick TickType, ENamedThreads::Type CurrentThread,
@@ -1000,6 +1098,8 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		PreStartTick.EndTickGroup = TG_LastDemotable;
 		PreStartTick.RegisterTickFunction(InWorld.PersistentLevel);
 	}
+	// 환경 바뀜 감시 (10-21, EcoV3EnvWatch.cpp): 액터 생김·지움 알림, 명령줄 예약, 시작 줄
+	BeginEnvWatch(InWorld);
 	const int32 Wolves = Settings.WolvesPerRegion;
 	UE_LOG(LogEcoPolicyV3I, Log,
 		   TEXT("[EcoV3I] 통합 모드 켬 — 조정자 %s | 모델 %s (관측 %d, 마스크 판 %d) | 지역 %d, 지역마다 사슴 %d·늑대 %d (잠행 %d·추격 %d, 모두 주행성, 속력 %.2f배) | ")
@@ -1139,6 +1239,20 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	{
 		// 두뇌 바꾸기 (10-18, EcoV3Brain.h): 시작 두뇌는 줄에 넣어 첫 결정 스텝 경계(SyncBrain)에서 바꾼다 — 입양 첫 결정부터 그 두뇌다
 		FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+		// 적응 고리 (10-21 실시간 두뇌 교체): 켜면 감시 폴더·상태 파일 기본을 정하고(콘솔 변수가 비었을 때만 쓰인다), 지금 폴더에 있는 두뇌 파일은
+		// 읽지 않게 감시를 준비한다 — Play 뒤에 나타난 파일만 바꾼다. 끄면 앞 Play 가 남긴 기본을 지운다
+		const bool bAutoAdapt = IsAutoAdaptEnabled();
+		Reg.SetDefaultWatchFolder(bAutoAdapt ? FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("EcoAdapt/brains")) : FString());
+		Reg.SetDefaultStatusFile(bAutoAdapt ? FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("EcoAdapt/status.json")) : FString());
+		bAdaptDefaultsSet = bAutoAdapt;
+		// Play 번호: 이 Play 의 스냅숏에 적고, 파이썬이 두뇌 파일 adapt.play_id 로 돌려준다 — 앞 Play 에서 시작한 판의 두뇌는 받지 않는다
+		PlayId = bAutoAdapt ? FString::Printf(TEXT("p%s_%08x"), *FDateTime::UtcNow().ToString(TEXT("%Y%m%dT%H%M%S")), FGuid::NewGuid().A) : FString();
+		Reg.SetWatchPlayId(PlayId);
+		if (bAutoAdapt)
+		{
+			Reg.PrimeWatch();
+		}
+		ShownRejectSerial = Reg.GetLastWatchReject().Serial;   // 앞 Play 의 거부는 다시 알리지 않는다
 		const FString Startup = EcoV3Brain::StartupFile();
 		if (!Startup.IsEmpty())
 		{
@@ -1153,6 +1267,12 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 					   EcoV3Brain::RejectName(L.Reason), *L.Message, *Reg.GetActive()->Id);
 			}
 		}
+		if (bAutoAdapt && Startup.IsEmpty() && !Reg.GetActive()->bBuiltin)
+		{
+			// 적응 고리 Play 는 늘 내장 두뇌(판 0)에서 시작한다: 레벨은 Play 마다 저장된 처음 상태로 돌아오므로, 앞 Play 의 바뀐 환경에 맞춘 두뇌는 맞지 않는다
+			// (저장소의 지금 두뇌는 프로세스에 하나라 PIE 를 다시 시작해도 남는다). 다른 두뇌로 시작하려면 eco.V3Brain.Startup
+			Reg.Queue(FEcoV3BrainRegistry::Builtin(), TEXT("적응 고리 Play 시작 — 내장 두뇌(판 0)에서 시작"));
+		}
 		const float SwapAt = EcoV3Brain::SwapAtSeconds();
 		UE_LOG(LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] 사슴 두뇌: 지금 %s%s | 내장 %s | 예정 바꾸기 %s | 폴더 감시 %s | 바꾸기 eco.V3Brain.Load <파일|builtin> (결정 스텝 경계에서, Play 그대로), ")
@@ -1161,8 +1281,17 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			   *FEcoV3BrainRegistry::Builtin()->Id,
 			   SwapAt >= 0.0f ? *FString::Printf(TEXT("%.1f초에 %s (eco.V3Brain.SwapAtSeconds·SwapFile — 측정·시연용)"), SwapAt, *EcoV3Brain::SwapFile())
 							  : TEXT("끔"),
-			   EcoV3Brain::WatchFolder().IsEmpty() ? TEXT("끔 (eco.V3Brain.WatchFolder)") : *EcoV3Brain::WatchFolder(),
+			   Reg.EffectiveWatchFolder().IsEmpty() ? TEXT("끔 (eco.V3Brain.WatchFolder)") : *Reg.EffectiveWatchFolder(),
 			   *FString::Join(FEcoV3BrainRegistry::SearchFolders(), TEXT(" · ")));
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 적응 고리: %s | 화면 알림 %s · 화면 찍기 %s"),
+			   bAutoAdapt ? *FString::Printf(TEXT("켬 (eco.IntegratedV3.AutoAdapt 1) — Play 번호 %s · 두뇌 감시 %s (Play 시작 때 있던 파일·다른 Play 의 두뇌는 읽지 않음) · 상태 파일 %s · ")
+										      TEXT("되돌리기 eco.V3Brain.Rollback"),
+										  *PlayId, *Reg.EffectiveWatchFolder(), *Reg.EffectiveStatusFile())
+					   : TEXT("끔 (eco.IntegratedV3.AutoAdapt 0)"),
+			   !EcoV3Brain::NoticeEnabled()		  ? TEXT("끔 (eco.V3Brain.Notice 0)")
+			   : !(GEngine && FApp::CanEverRender()) ? TEXT("없음 (그리지 않는 실행 — 기록 '[EcoV3I] 알림 |' 만)")
+													 : TEXT("켬 (eco.V3Brain.Notice 1)"),
+			   EcoV3Brain::NoticeShot() ? TEXT("켬 (eco.V3Brain.NoticeShot 1 — Saved/EcoAdapt/shots)") : TEXT("끔"));
 	}
 }
 
@@ -1174,6 +1303,7 @@ void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
 		PreTickHandle.Reset();
 	}
 	PreStartTick.UnRegisterTickFunction();
+	EndEnvWatch();   // 환경 바뀜 감시 알림을 푼다 (10-21, EcoV3EnvWatch.cpp)
 	bActive = false;
 	RestoreViewEnvironment();
 	Contexts.Reset();
@@ -1186,6 +1316,16 @@ void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
 	TeamWolfConfig = nullptr;
 	ActiveBrain.Reset();   // 저장소(프로세스에 하나)의 지금 두뇌는 그대로 — 다음 Play 도 그 두뇌로 시작한다 (eco.V3Brain.Load builtin 으로 되돌린다)
 	AppliedBrainGen = 0;
+	if (bAdaptDefaultsSet)
+	{
+		// 적응 고리 기본 감시 폴더·상태 파일·감시 준비 기억은 이 Play 동안만 (되돌리기 쌓개·지금 두뇌는 저장소에 남는다)
+		FEcoV3BrainRegistry::Get().SetDefaultWatchFolder(FString());
+		FEcoV3BrainRegistry::Get().SetDefaultStatusFile(FString());
+		FEcoV3BrainRegistry::Get().ClearWatchPrime();
+		FEcoV3BrainRegistry::Get().SetWatchPlayId(FString());
+		bAdaptDefaultsSet = false;
+	}
+	PendingShotAt = -1.0;
 	Super::Deinitialize();
 }
 
@@ -2556,11 +2696,16 @@ void UEcoPolicyV3IntegratedSubsystem::HandlePreActorTick(UWorld* InWorld, ELevel
 	if (bContextsCreated)
 	{
 		CheckClockDrift();
+		TickEnvWatch();   // 환경 바뀜 감시·시험용 예약 (10-21, EcoV3EnvWatch.cpp — 읽기만, 세계는 결정 스텝 경계에서 바꾼다)
 		TallyTeamWolfVisuals();
 		if (IsDebugDrawEnabled())
 		{
 			DrawOverlay();
 		}
+	}
+	if (bActive)
+	{
+		DrawBrainNotices();   // 실시간 두뇌 교체 상태 줄·화면 찍기 (eco.V3Debug 와 따로)
 	}
 }
 
@@ -3010,6 +3155,7 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	Ctx->bDarkKnown = true;
 	FEcoV3RegionContext* Raw = Ctx.Get();
 	Contexts.Add(MoveTemp(Ctx));
+	InitContextEnv(*Raw);   // 환경 바뀜 감시 바탕 (10-21, EcoV3EnvWatch.cpp — 읽기만, 세계는 그대로)
 	return Raw;
 }
 
@@ -3107,9 +3253,21 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 	if (bPollWatch)
 	{
 		Reg.PollWatch(FPlatformTime::Seconds());
+		// 폴더 감시 거부 알림 (거부마다 한 번 — 저장소가 거부할 때 Serial 을 올린다)
+		const FEcoV3WatchReject& Rej = Reg.GetLastWatchReject();
+		if (Rej.Serial != ShownRejectSerial)
+		{
+			ShownRejectSerial = Rej.Serial;
+			if (!Rej.File.IsEmpty())
+			{
+				PostNotice(EcoV3Integrated::ENotice::Reject,
+						   FString::Printf(TEXT("두뇌 파일 거부 — %s: %s"), *FPaths::GetCleanFilename(Rej.File), EcoV3Brain::RejectName(Rej.Reason)));
+			}
+		}
 	}
 	FString Why;
-	const bool bSwapped = Reg.CommitPending(nullptr, &Why);
+	bool bRollback = false;
+	const bool bSwapped = Reg.CommitPending(nullptr, &Why, &bRollback);
 	if (ActiveBrain.IsValid() && AppliedBrainGen == Reg.GetGeneration())
 	{
 		return;
@@ -3144,6 +3302,12 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 				   TEXT("정한 요청을 실행하고, 이 스텝 끝 결정부터 새 두뇌 | 학습 %s | 골든 %d 사례 최대 로짓 오차 %.2e"),
 			   Seconds, static_cast<long long>(GlobalT), *Before->Id, *Now->Describe(), bSwapped ? *Why : TEXT("저장소 되돌림"), *AllowedByRegion,
 			   *Now->TrainWorld, Now->GoldenCount, Now->GoldenMaxError);
+		// 화면 알림 (10-21 실시간 두뇌 교체): 되돌림이면 '두뇌 되돌림 → 판 n (id)', 아니면 '새 두뇌 — 판 n · id · 환경 · 관문 · 되돌리기 …'.
+		// 다른 월드가 바꾼 것(같은 저장소)도 저장소의 마지막 바꾸기로 가른다
+		++BrainSwapsThisPlay;
+		const bool bWasRollback = bSwapped ? bRollback : Reg.WasLastCommitRollback();
+		PostNotice(bWasRollback ? EcoV3Integrated::ENotice::Rollback : EcoV3Integrated::ENotice::Swap,
+				   EcoPolicyV3IntegratedImpl::BrainNoticeText(*Now, bWasRollback));
 	}
 	ActiveBrain = Now;
 	AppliedBrainGen = Reg.GetGeneration();
@@ -3858,6 +4022,119 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(731000 + Ctx.Index), 1.5f, FColor(230, 210, 150), FoodLine);
 		}
 	}
+}
+
+// -----------------------------------------------------------------------------
+// 실시간 두뇌 교체 화면 (10-21, LIVE_ADAPT_SPEC.md 5.4 — eco.V3Debug 와 따로)
+// -----------------------------------------------------------------------------
+
+void UEcoPolicyV3IntegratedSubsystem::PostNotice(EcoV3Integrated::ENotice Kind, const FString& Text)
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	using EcoV3Integrated::ENotice;
+	// 기록은 늘 (헤드리스 실행의 증거)
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 알림 | %s"), *Text);
+	const UWorld* World = GetWorld();
+	if (!EcoV3Brain::NoticeEnabled() || !GEngine || !FApp::CanEverRender() || (World && World->GetNetMode() == NM_Client))
+	{
+		return;
+	}
+	uint64 Key = kNoticeKeyBrain;
+	float Seconds = 10.0f;
+	FColor Color(120, 255, 140);
+	double Scale = 1.6;
+	switch (Kind)
+	{
+	case ENotice::Swap:
+		break;
+	case ENotice::Rollback:
+		Color = FColor(255, 210, 90);
+		break;
+	case ENotice::Reject:
+		Key = kNoticeKeyReject;
+		Seconds = 8.0f;
+		Color = FColor(255, 110, 90);
+		Scale = 1.3;
+		break;
+	case ENotice::Env:
+		Key = kNoticeKeyEnv;
+		Seconds = 8.0f;
+		Color = FColor(140, 200, 255);
+		Scale = 1.3;
+		break;
+	case ENotice::Snapshot:
+		Key = kNoticeKeySnapshot;
+		Seconds = 6.0f;
+		Color = FColor(200, 200, 255);
+		Scale = 1.2;
+		break;
+	}
+	GEngine->AddOnScreenDebugMessage(Key, Seconds, Color, Text, /*bNewerOnTop*/ true, FVector2D(Scale, Scale));
+	if ((Kind == ENotice::Swap || Kind == ENotice::Rollback) && EcoV3Brain::NoticeShot())
+	{
+		// 시연 증거: 알림이 그려진 뒤 (DrawBrainNotices 가 찍는다)
+		PendingShotAt = FPlatformTime::Seconds() + kNoticeShotDelaySeconds;
+		PendingShotPath = FPaths::ConvertRelativePathToFull(
+			FPaths::ProjectSavedDir() / TEXT("EcoAdapt/shots")
+			/ FString::Printf(TEXT("eco_v3_%s_%s_t%lld.png"), Kind == ENotice::Swap ? TEXT("swap") : TEXT("rollback"),
+							  *FDateTime::Now().ToString(TEXT("%Y%m%d_%H%M%S")), static_cast<long long>(GlobalT)));
+	}
+}
+
+void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	const double Now = FPlatformTime::Seconds();
+	// 적응 고리 상태 파일 (2 초마다 — 그릴 수 없는 실행도 읽는다): 상태·시도·판·지난 결과가 바뀌면 기록 한 줄
+	if (Reg.PollStatus(Now))
+	{
+		const FEcoV3LiveStatus& S = Reg.GetLiveStatus();
+		const FString Key = S.bValid ? FString::Printf(TEXT("%s|%d|%d|%s"), *S.State, S.Attempt, S.Round, *S.LastResult) : FString(TEXT("-"));
+		if (Key != LastLiveStatusKey)
+		{
+			LastLiveStatusKey = Key;
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s%s"), *Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds()),
+				   S.bValid ? *FString::Printf(TEXT(" (상태 %s · 시도 %d · 판 %d%s)"), *S.State, S.Attempt, S.Round,
+											   S.LastResult.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" · 지난 결과 %s"), *S.LastResult))
+							: TEXT(""));
+		}
+	}
+	const bool bCanDraw = EcoV3Brain::NoticeEnabled() && GEngine && FApp::CanEverRender();
+	// 미뤄 둔 화면 찍기 (eco.V3Brain.NoticeShot — 바꾸기·되돌리기 알림 1.5 초 뒤, 게임 화면만)
+	if (PendingShotAt >= 0.0 && Now >= PendingShotAt)
+	{
+		PendingShotAt = -1.0;
+		if (bCanDraw && !PendingShotPath.IsEmpty())
+		{
+			IFileManager::Get().MakeDirectory(*FPaths::GetPath(PendingShotPath), /*Tree*/ true);
+			FScreenshotRequest::RequestScreenshot(PendingShotPath, /*bInShowUI*/ true, /*bAddFilenameSuffix*/ false, /*bHdrScreenshot*/ false, FIntRect(),
+												  /*bInRestrictToGameViewport*/ true);
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 화면 찍기 | %s"), *PendingShotPath);
+		}
+	}
+	// 상태 줄 (1 초마다, AutoAdapt 이거나 감시 폴더가 켜졌을 때만): '두뇌 판 3 (live_r3…@abcd) · 교체 3번 · 환경 #2 · 적응 고리 | <파이썬 상태>'
+	if (!bCanDraw || Now < NextNoticeLine)
+	{
+		return;
+	}
+	NextNoticeLine = Now + 1.0;
+	if (!IsAutoAdaptEnabled() && Reg.EffectiveWatchFolder().IsEmpty())
+	{
+		return;
+	}
+	const FEcoV3Brain& B = GetActiveBrain();
+	const FString Round = B.RoundTag();
+	FString Line = B.bBuiltin	   ? FString::Printf(TEXT("두뇌 판 0 (내장 %s)"), Settings.bNoFreeze ? TEXT("R1b−F") : TEXT("R1b"))
+				   : Round.IsEmpty() ? FString::Printf(TEXT("두뇌 %s"), *B.ShortId())
+									 : FString::Printf(TEXT("두뇌 %s (%s)"), *Round, *B.ShortId());
+	Line += FString::Printf(TEXT(" · 교체 %d번 · 환경 #%d"), BrainSwapsThisPlay, EnvRevision);
+	const FString Live = Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds());
+	if (!Live.IsEmpty())
+	{
+		Line += TEXT(" · ") + Live;
+	}
+	GEngine->AddOnScreenDebugMessage(kNoticeKeyStatus, 1.5f, FColor(200, 220, 255), Line);
 }
 
 void UEcoPolicyV3IntegratedSubsystem::RejectResourceContract()

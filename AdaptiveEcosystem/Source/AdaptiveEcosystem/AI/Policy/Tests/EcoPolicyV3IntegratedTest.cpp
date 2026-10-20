@@ -30,6 +30,8 @@
 //   Integrated.WolfEating              늑대 식사 시간 (eco.IntegratedV3.WolfEatSeconds 기본 5 → 38 스텝): 위협 모델 — 식사 37 스텝 제자리, 38 번째에
 //                                      다시 잡음, 끄면 배회, 플레이어·쿨다운 0 은 그대로. Mass — 서 있음·속도 0·'먹는 중' 깃발·글자, 팀 늑대 표현이
 //                                      '먹는 중' 동작 (옛 규칙 0.67 초는 뛰기), 옛 규칙 설정은 바꾸기 전 세계와 비트 단위로 같다
+//   Integrated.EnvChangeBoundary       환경 바뀜 (10-21, EcoV3EnvWatch.cpp): Play 중 놓은 줄기 막이가 다음 결정 스텝 경계에서 세계 원판이 되고 그 안 사슴을 밀어낸다.
+//                                      바꾸기 앞·다른 지역은 바꾸지 않은 판과 비트 단위로 같고, 먹이 용량 그대로, 감시 끔(EnvWatch 0)이면 끝까지 같다
 
 #include "Misc/AutomationTest.h"
 
@@ -3555,6 +3557,170 @@ bool FEcoPolicyV3IntegratedBrainObs21ZeroTest::RunTest(const FString& Parameters
 	TestEqual(TEXT("모든 결정 로짓·요청 = 그 두뇌로 관측 18 + 세 칸을 다시 돌린 값 (두 판)"), Base.LogitBad + Z.LogitBad, static_cast<int64>(0));
 	TestEqual(TEXT("망 칸 수와 세계 관측 칸 수 어긋남 0 (두 판)"), Base.Mismatch + Z.Mismatch, static_cast<int64>(0));
 	TestEqual(TEXT("마스크 위반 0 (두 판)"), Base.Violations + Z.Violations, static_cast<int64>(0));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 환경 바뀜 경계 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp — LIVE_ADAPT_SPEC.md 5.1): Play 중에 놓은 줄기 막이가 처리기의 다음 결정 스텝 경계에서 세계 원판이 되고
+// 그 안의 산 사슴을 밀어낸다. 바꾸기 앞 프레임·다른 지역은 바꾸지 않은 판과 비트 단위로 같고, 감시를 끄면(eco.IntegratedV3.EnvWatch 0) 줄기 막이가 있어도 끝까지 같다
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedEnvChangeBoundaryTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.EnvChangeBoundary",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedEnvChangeBoundaryTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	using FSub = UEcoPolicyV3IntegratedSubsystem;
+	FEcoV3BrainRegistry::Get().ResetForTest();
+	IConsoleVariable* Watch = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.EnvWatch"));
+	UStaticMesh* TrunkMesh = LoadObject<UStaticMesh>(nullptr, FSub::LevelTrunkMeshPath());
+	if (!TestNotNull(TEXT("eco.IntegratedV3.EnvWatch"), Watch) || !TestNotNull(TEXT("엔진 원기둥"), TrunkMesh))
+	{
+		return false;
+	}
+	const int32 SavedWatch = Watch->GetInt();
+	ON_SCOPE_EXIT
+	{
+		Watch->Set(SavedWatch, ECVF_SetByCode);
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	constexpr int32 kFrames = 300;        // 40 초
+	constexpr int32 kChangeFrame = 120;   // 16 초 — 이 프레임 앞(Mass 처리 밖)에 레벨이 줄기 막이를 놓는다
+	enum class EMode : uint8
+	{
+		Control,    // 바꾸지 않음
+		Change,     // 감시 켬 (기본)
+		WatchOff    // 감시 끔 — 줄기 막이는 놓지만 세계에 넣지 않는다
+	};
+	struct FRun
+	{
+		TArray<TArray<double>> Pos[2];      // [지역][프레임] 사슴마다 (x, y) (지워졌으면 큰 값)
+		int32 Target = INDEX_NONE;          // 줄기를 놓은 지역 A 사슴 (H.Deer 색인)
+		bool bPending = false;
+		int64 StepAtChange = -1;
+		bool bTargetInsideAfter = true;
+		int32 Revision = -1;
+		int64 ChangedStep = -1;
+		std::vector<double> Discs[2];
+		std::vector<double> CapA;
+		int64 PushMoved = 0;
+	};
+	auto Run = [&](EMode Mode, FRun& Out) -> bool
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+		Watch->Set(Mode == EMode::WatchOff ? 0 : 1, ECVF_SetByCode);
+		FIntegratedHarness H;
+		if (!H.Setup(*this, TestSettings(37600)))
+		{
+			return false;
+		}
+		FEcoV3RegionContext* Ctx[2] = {H.AddRegion(TEXT("RegionA"), 0, FVector(0.0, 0.0, 0.0), 16, 2),
+									   H.AddRegion(TEXT("RegionB"), 1, FVector(0.0, 40000.0, 0.0), 16, 2)};
+		int32 First[3] = {0, 0, 0};   // 지역마다 H.Deer 색인 [First[r], First[r + 1])
+		H.SpawnRegion(*Ctx[0], 16, 2, 1, 0);
+		First[1] = H.Deer.Num();
+		H.SpawnRegion(*Ctx[1], 16, 2, 100, 1);
+		First[2] = H.Deer.Num();
+		for (int32 f = 0; f < kFrames; ++f)
+		{
+			if (f == kChangeFrame && Mode != EMode::Control)
+			{
+				// 레벨이 줄기 막이를 놓는다 (시험용 대역과 같은 짝): 지역 A 의 산 사슴 하나가 선 자리 (은신처 원 밖)
+				const FEcoV3RegionContext& A = *Ctx[0];
+				for (int32 i = First[0]; i < First[1] && Out.Target == INDEX_NONE; ++i)
+				{
+					const FMassEntityHandle E = H.Deer[i];
+					if (!H.EM->IsEntityValid(E) || H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead)
+					{
+						continue;
+					}
+					const EcoWorldV3::FVec2 P = DeerView(*H.EM, E).Body->Pos;
+					bool bCover = false;
+					for (const EcoObservationV3::FCoverInput& Cv : A.Sim.Config.Covers)
+					{
+						bCover = bCover || FMath::Square(P.X - Cv.X) + FMath::Square(P.Y - Cv.Y) <= FMath::Square(Cv.Radius + 1.0);
+					}
+					AActor* TreeActor = nullptr;
+					AActor* TrunkActor = nullptr;
+					if (!bCover && FSub::SpawnLevelTreePair(*H.Scoped.World, FSub::MakeLevelTree(P.X, P.Y, 2.0, 0.0), A.OriginCm, 0.0, nullptr, *TrunkMesh,
+															 TEXT("EcoV3TreeId_RegionA_T00"), TreeActor, TrunkActor))
+					{
+						Out.Target = i;
+					}
+				}
+				Out.bPending = H.Sub->PollEnvironment(true) && H.Sub->HasPendingEnvChange();
+				Out.StepAtChange = H.Sub->GetGlobalStep();
+			}
+			H.DecisionStep();
+			H.CoordinatorReconcile();
+			if (f == kChangeFrame && Out.Target != INDEX_NONE && H.EM->IsEntityValid(H.Deer[Out.Target]))
+			{
+				const EcoWorldV3::FVec2 P = DeerView(*H.EM, H.Deer[Out.Target]).Body->Pos;
+				const std::vector<double>& D = Ctx[0]->Sim.Config.Obstacles.Discs;
+				Out.bTargetInsideAfter = EcoThreatV3::InsideAnyObstacle(P.X, P.Y, D.data(), static_cast<std::int32_t>(D.size() / 3), Ctx[0]->Sim.Config.Obstacles.BodyR);
+			}
+			for (int32 r = 0; r < 2; ++r)
+			{
+				TArray<double>& Pos = Out.Pos[r].AddDefaulted_GetRef();
+				for (int32 i = First[r]; i < First[r + 1]; ++i)
+				{
+					const FMassEntityHandle E = H.Deer[i];
+					if (!H.EM->IsEntityValid(E))
+					{
+						Pos.Append({TNumericLimits<double>::Max(), TNumericLimits<double>::Max()});
+						continue;
+					}
+					const EcoWorldV3::FVec2 P = DeerView(*H.EM, E).Body->Pos;
+					Pos.Append({P.X, P.Y});
+				}
+			}
+		}
+		Out.Revision = H.Sub->GetEnvRevision();
+		Out.ChangedStep = H.Sub->GetEnvChangedStep();
+		Out.Discs[0] = Ctx[0]->Sim.Config.Obstacles.Discs;
+		Out.Discs[1] = Ctx[1]->Sim.Config.Obstacles.Discs;
+		Out.CapA = Ctx[0]->Sim.Food.Cap;
+		Out.PushMoved = Ctx[0]->Sim.Stats.ObstaclePushMoved;
+		return true;
+	};
+
+	FRun Control, Change, Off;
+	if (!Run(EMode::Control, Control) || !Run(EMode::Change, Change) || !Run(EMode::WatchOff, Off))
+	{
+		return false;
+	}
+	int32 BeforeDiff = 0;   // 바꾸기 앞 프레임에 지역 A 가 다른 수
+	int32 AfterDiff = 0;    // 바꾼 뒤 지역 A 가 다른 수 (0 보다 커야 한다)
+	int32 OtherDiff = 0;    // 지역 B 가 다른 프레임
+	int32 OffDiff = 0;      // 감시 끔 판이 바꾸지 않은 판과 다른 프레임
+	for (int32 f = 0; f < kFrames; ++f)
+	{
+		const bool bA = Change.Pos[0][f] != Control.Pos[0][f];
+		BeforeDiff += f < kChangeFrame && bA ? 1 : 0;
+		AfterDiff += f >= kChangeFrame && bA ? 1 : 0;
+		OtherDiff += Change.Pos[1][f] != Control.Pos[1][f] ? 1 : 0;
+		OffDiff += (Off.Pos[0][f] != Control.Pos[0][f] || Off.Pos[1][f] != Control.Pos[1][f]) ? 1 : 0;
+	}
+	AddInfo(FString::Printf(TEXT("바꾼 판: 사슴 %d 자리에 줄기 · 대기 %d · 판 %d (스텝 %lld, 놓은 프레임 스텝 %lld) · 원판 A %d B %d · 밀어냄 %lld · 다른 프레임 앞 %d 뒤 %d 지역 B %d | 감시 끔 판 다른 프레임 %d"),
+							Change.Target, Change.bPending ? 1 : 0, Change.Revision, static_cast<long long>(Change.ChangedStep), static_cast<long long>(Change.StepAtChange),
+							static_cast<int32>(Change.Discs[0].size() / 3), static_cast<int32>(Change.Discs[1].size() / 3), Change.PushMoved, BeforeDiff, AfterDiff, OtherDiff,
+							OffDiff));
+	TestTrue(TEXT("줄기를 놓을 산 사슴 (두 판 같은 사슴)"), Change.Target != INDEX_NONE && Change.Target == Off.Target);
+	TestTrue(TEXT("감시 켬: 읽기 → 대기 변화"), Change.bPending);
+	TestEqual(TEXT("환경 판 1"), Change.Revision, 1);
+	TestEqual(TEXT("넣은 스텝 = 놓은 뒤 첫 결정 스텝 경계"), Change.ChangedStep, Change.StepAtChange);
+	TestTrue(TEXT("지역 A 세계 원판 = 놓은 줄기 하나 · 지역 B 원판 없음"), Change.Discs[0].size() == 3 && Change.Discs[1].empty());
+	TestFalse(TEXT("그 사슴은 원판 밖 (경계에서 밀렸다)"), Change.bTargetInsideAfter);
+	TestTrue(TEXT("밀어내기 기록"), Change.PushMoved >= 1 && Control.PushMoved == 0);
+	TestEqual(TEXT("바꾸기 앞 프레임은 바꾸지 않은 판과 비트 단위로 같다"), BeforeDiff, 0);
+	TestTrue(TEXT("바꾼 뒤 지역 A 는 달라진다"), AfterDiff > 0);
+	TestEqual(TEXT("다른 지역(B)은 끝까지 비트 단위로 같다"), OtherDiff, 0);
+	TestTrue(TEXT("먹이 용량 그대로 (환경 바뀜은 먹이 격자를 바꾸지 않는다)"), Change.CapA == Control.CapA);
+	TestTrue(TEXT("감시 끔: 대기·판·원판 없음"), !Off.bPending && Off.Revision == 0 && Off.Discs[0].empty());
+	TestEqual(TEXT("감시 끔: 줄기 막이가 있어도 바꾸지 않은 판과 끝까지 비트 단위로 같다 (옛 동작)"), OffDiff, 0);
 	return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

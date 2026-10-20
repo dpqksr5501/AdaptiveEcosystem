@@ -53,7 +53,22 @@ namespace EcoV3BrainImpl
 	TAutoConsoleVariable<FString> CVarWatch(
 		TEXT("eco.V3Brain.WatchFolder"), TEXT(""),
 		TEXT("두뇌 폴더 감시 (기본 빈 값 = 끔). 통합 v3 Play 중 2 초마다 이 폴더(상대 경로는 프로젝트 기준)의 가장 새 *.json 이 바뀌면 불러와 다음 결정 스텝 ")
-			TEXT("경계에서 바꾼다. 명령줄 -EcoV3BrainWatch= 은 시작값."),
+			TEXT("경계에서 바꾼다. eco.IntegratedV3.AutoAdapt 1 이고 비었으면 Saved/EcoAdapt/brains. 명령줄 -EcoV3BrainWatch= 은 시작값."),
+		ECVF_Default);
+	// 실시간 두뇌 교체 화면 (10-21, LIVE_ADAPT_SPEC.md 5.4 — 통합 서브시스템이 그린다)
+	TAutoConsoleVariable<int32> CVarNotice(
+		TEXT("eco.V3Brain.Notice"), 1,
+		TEXT("두뇌 바꾸기·되돌리기·파일 거부·환경 바뀜·스냅숏 화면 알림과 적응 고리 상태 줄 (1 = 켬, 기본 — eco.V3Debug 와 따로). 그리는 화면이 있는 서버·단독만. ")
+			TEXT("0 = 화면에 안 띄움 (기록 '[EcoV3I] 알림 |' 은 늘 남긴다)."),
+		ECVF_Default);
+	TAutoConsoleVariable<int32> CVarNoticeShot(
+		TEXT("eco.V3Brain.NoticeShot"), 0,
+		TEXT("두뇌 바꾸기·되돌리기 알림 1.5 초 뒤 화면을 찍는다 (0 = 끔, 기본 — 시연 증거, Saved/EcoAdapt/shots/). 그릴 수 없는 실행은 건너뛴다."),
+		ECVF_Default);
+	TAutoConsoleVariable<FString> CVarStatusFile(
+		TEXT("eco.V3Brain.StatusFile"), TEXT(""),
+		TEXT("적응 고리 상태 파일 (파이썬 live.py 가 쓰는 eco_v3_live_status JSON, 상대 경로는 프로젝트 기준). 빈 값 = 끔, eco.IntegratedV3.AutoAdapt 1 이면 ")
+			TEXT("Saved/EcoAdapt/status.json. 2 초마다 읽어 화면 상태 줄 '적응 고리 | …' 에 쓴다."),
 		ECVF_Default);
 #endif
 
@@ -202,6 +217,7 @@ const TCHAR* EcoV3Brain::RejectName(EReject Reason)
 	case EReject::NonFinite: return TEXT("NaN·Inf");
 	case EReject::Digest: return TEXT("sha256");
 	case EReject::Golden: return TEXT("골든 자체 확인");
+	case EReject::Play: return TEXT("다른 Play");
 	}
 	return TEXT("?");
 }
@@ -294,11 +310,151 @@ FString EcoV3Brain::WatchFolder()
 #endif
 }
 
+bool EcoV3Brain::NoticeEnabled()
+{
+#if !UE_BUILD_SHIPPING
+	return EcoV3BrainImpl::CVarNotice.GetValueOnGameThread() != 0;
+#else
+	return false;
+#endif
+}
+
+bool EcoV3Brain::NoticeShot()
+{
+#if !UE_BUILD_SHIPPING
+	return EcoV3BrainImpl::CVarNoticeShot.GetValueOnGameThread() != 0;
+#else
+	return false;
+#endif
+}
+
+FString EcoV3Brain::StatusFile()
+{
+#if !UE_BUILD_SHIPPING
+	return EcoV3BrainImpl::CVarStatusFile.GetValueOnGameThread().TrimStartAndEnd();
+#else
+	return FString();
+#endif
+}
+
+double EcoV3Brain::NowUnixSeconds()
+{
+	return (FDateTime::UtcNow() - FDateTime(1970, 1, 1)).GetTotalSeconds();
+}
+
+bool EcoV3Brain::ParseLiveStatus(const FString& JsonText, FEcoV3LiveStatus& Out, FString* OutError)
+{
+	using namespace EcoV3BrainImpl;
+	TSharedPtr<FJsonObject> Root;
+	if (!FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(JsonText), Root) || !Root.IsValid())
+	{
+		if (OutError)
+		{
+			*OutError = TEXT("JSON 으로 읽지 못했다");
+		}
+		return false;
+	}
+	FString Format;
+	int32 Version = 0;
+	if (!Root->TryGetStringField(TEXT("format"), Format) || Format != kLiveStatusFormat || !Root->TryGetNumberField(TEXT("version"), Version)
+		|| Version != kLiveStatusVersion)
+	{
+		if (OutError)
+		{
+			*OutError = FString::Printf(TEXT("형식 '%s' 판 %d 이 '%s' 판 %d 가 아니다"), *Format, Version, kLiveStatusFormat, kLiveStatusVersion);
+		}
+		return false;
+	}
+	FEcoV3LiveStatus S;
+	S.bValid = true;
+	S.State = StringField(Root.Get(), TEXT("state"));
+	S.Message = StringField(Root.Get(), TEXT("message"));
+	S.LastResult = StringField(Root.Get(), TEXT("last_result"));
+	S.Snapshot = StringField(Root.Get(), TEXT("snapshot"));
+	S.Env = StringField(Root.Get(), TEXT("env"));
+	Root->TryGetNumberField(TEXT("attempt"), S.Attempt);
+	Root->TryGetNumberField(TEXT("round"), S.Round);
+	Root->TryGetNumberField(TEXT("pid"), S.Pid);
+	Root->TryGetNumberField(TEXT("updated_unix"), S.UpdatedUnix);
+	if (!Root->TryGetNumberField(TEXT("progress"), S.Progress) || !FMath::IsFinite(S.Progress))
+	{
+		S.Progress = -1.0;
+	}
+	if (!FMath::IsFinite(S.UpdatedUnix))
+	{
+		S.UpdatedUnix = 0.0;
+	}
+	Out = S;
+	return true;
+}
+
+FString EcoV3Brain::LiveStatusText(const FEcoV3LiveStatus& Status, bool bFileExists, double NowUnix)
+{
+	if (!bFileExists)
+	{
+		return TEXT("적응 고리 | 파이썬 감시 없음");
+	}
+	if (!Status.bValid)
+	{
+		return TEXT("적응 고리 | 상태 파일을 못 읽음");
+	}
+	if (!(Status.UpdatedUnix > 0.0))
+	{
+		return TEXT("적응 고리 | 응답 없음 (시각 없음)");
+	}
+	const double Age = NowUnix - Status.UpdatedUnix;
+	if (Age <= kStatusFreshSeconds)
+	{
+		return FString::Printf(TEXT("적응 고리 | %s"), Status.Message.IsEmpty() ? *Status.State : *Status.Message);
+	}
+	return FString::Printf(TEXT("적응 고리 | 응답 없음 (%lld초 전)"), static_cast<long long>(FMath::FloorToDouble(FMath::Min(Age, 1e12))));
+}
+
 FString FEcoV3Brain::Describe() const
 {
+	FString Extra;
+	if (ObsDim > EcoPolicyV3::kObsDim)
+	{
+		Extra += FString::Printf(TEXT(", 관측 %d 장애물"), ObsDim);
+	}
+	if (AdaptRound > 0)
+	{
+		Extra += FString::Printf(TEXT(", 판 %d"), AdaptRound);
+	}
 	return FString::Printf(TEXT("%s (%s, 허용 %s%s)"), *Id,
 						   bBuiltin ? TEXT("내장 PolicyWeightsV3.h") : *FString::Printf(TEXT("파일 %s"), *FPaths::GetCleanFilename(SourceFile)),
-						   *EcoV3Brain::AllowedText(Allowed), ObsDim > EcoPolicyV3::kObsDim ? *FString::Printf(TEXT(", 관측 %d 장애물"), ObsDim) : TEXT(""));
+						   *EcoV3Brain::AllowedText(Allowed), *Extra);
+}
+
+FString FEcoV3Brain::RoundTag() const
+{
+	if (AdaptRound > 0)
+	{
+		return FString::Printf(TEXT("판 %d"), AdaptRound);
+	}
+	return bBuiltin ? FString(TEXT("판 0")) : FString();
+}
+
+FString FEcoV3Brain::ShortId() const
+{
+	FString Name = ModelName;
+	if (ModelName.Len() > 10)
+	{
+		// 앞 7 자 + '…'. 적응 고리 이름 live_r<판>_<실행> 은 판 번호 끝까지 남긴다 (판 10 넘어도 화면 id 가 서로 갈리게)
+		int32 Keep = 7;
+		constexpr int32 kLivePrefixLen = 6;   // 'live_r'
+		if (ModelName.StartsWith(TEXT("live_r"), ESearchCase::CaseSensitive))
+		{
+			int32 End = kLivePrefixLen;
+			while (End < ModelName.Len() && FChar::IsDigit(ModelName[End]))
+			{
+				++End;
+			}
+			Keep = End > kLivePrefixLen ? End : Keep;
+		}
+		Name = Keep < ModelName.Len() ? ModelName.Left(Keep) + TEXT("…") : ModelName;
+	}
+	return FString::Printf(TEXT("%s@%s"), *Name, *WeightsSha256.Left(4));
 }
 
 // -----------------------------------------------------------------------------
@@ -584,6 +740,23 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 	B->SourceFile = Source;
 	B->Id = FString::Printf(TEXT("%s@%s"), *ModelName, *B->WeightsSha256.Left(8));
 
+	// 적응 고리 'adapt' 블록 (선택 — 없거나 값이 깨졌으면 빈 칸으로 두고 거부하지 않는다. 가중치·골든 검사와 무관)
+	if (const FJsonObject* Adapt = ObjectField(R, TEXT("adapt")))
+	{
+		B->bAdapt = true;
+		double Round = 0.0;
+		double Attempt = 0.0;
+		Adapt->TryGetNumberField(TEXT("round"), Round);
+		Adapt->TryGetNumberField(TEXT("attempt"), Attempt);
+		B->AdaptRound = FMath::IsFinite(Round) ? static_cast<int32>(FMath::Clamp(Round, 0.0, 1e6)) : 0;
+		B->AdaptAttempt = FMath::IsFinite(Attempt) ? static_cast<int32>(FMath::Clamp(Attempt, 0.0, 1e6)) : 0;
+		B->AdaptRun = StringField(Adapt, TEXT("run"));
+		B->AdaptSnapshot = StringField(Adapt, TEXT("snapshot"));
+		B->AdaptEnv = StringField(Adapt, TEXT("env"));
+		B->AdaptGate = StringField(Adapt, TEXT("gate"));
+		B->AdaptPlayId = StringField(Adapt, TEXT("play_id"));
+	}
+
 	FEcoV3BrainLoad L;
 	L.Path = Source;
 	L.Brain = B;
@@ -693,8 +866,38 @@ TArray<FString> FEcoV3BrainRegistry::ListFiles()
 // 저장소
 // -----------------------------------------------------------------------------
 
+namespace EcoV3BrainImpl
+{
+	/** 상대 경로는 프로젝트 폴더 기준 (eco.V3Brain.WatchFolder·StatusFile). */
+	FString ProjectPath(const FString& Path)
+	{
+		return FPaths::IsRelative(Path) ? FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / Path) : Path;
+	}
+
+	/** 폴더 안 가장 새 *.json (시각이 같으면 경로가 큰 쪽). 없으면 빈 값. 파이썬의 *.json.tmp 는 걸리지 않는다. */
+	FString NewestJson(const FString& Dir, FDateTime& OutStamp)
+	{
+		TArray<FString> Names;
+		IFileManager::Get().FindFiles(Names, *(Dir / TEXT("*.json")), true, false);
+		FString Newest;
+		OutStamp = FDateTime::MinValue();
+		for (const FString& N : Names)
+		{
+			const FString P = Dir / N;
+			const FDateTime S = IFileManager::Get().GetTimeStamp(*P);
+			if (S > OutStamp || (S == OutStamp && P > Newest))
+			{
+				Newest = P;
+				OutStamp = S;
+			}
+		}
+		return Newest;
+	}
+}
+
 FEcoV3BrainRegistry::FEcoV3BrainRegistry()
 	: Active(Builtin())
+	, ActiveWhy(TEXT("내장 (처음)"))
 {
 }
 
@@ -706,22 +909,41 @@ FEcoV3BrainRegistry& FEcoV3BrainRegistry::Get()
 
 void FEcoV3BrainRegistry::Queue(const FEcoV3BrainRef& Brain, const FString& Why)
 {
+	QueueImpl(Brain, Why, TOptional<FEcoV3BrainHistoryEntry>());
+}
+
+void FEcoV3BrainRegistry::QueueImpl(const FEcoV3BrainRef& Brain, const FString& Why, TOptional<FEcoV3BrainHistoryEntry> RollbackEntry)
+{
 	check(IsInGameThread());
 	if (Pending.IsValid())
 	{
 		UE_LOG(LogEcoV3Brain, Log, TEXT("[EcoV3Brain] 대기 두뇌 %s 를 버리고 새 대기 두뇌로 바꾼다"), *Pending->Id);
 	}
+	if (!RollbackEntry.IsSet() && !PendingRollback.IsEmpty())
+	{
+		// 대기 되돌림을 다른 두뇌가 덮었다: 꺼낸 칸들을 꺼낸 반대 순서로 쌓개에 돌려놓는다 (경계 전 두 번 되돌렸어도 되돌리기를 부르기 전 쌓개 그대로)
+		for (int32 i = PendingRollback.Num() - 1; i >= 0; --i)
+		{
+			History.Add(MoveTemp(PendingRollback[i]));
+		}
+		PendingRollback.Reset();
+	}
 	Pending = Brain;
 	PendingWhy = Why;
+	if (RollbackEntry.IsSet())
+	{
+		PendingRollback.Add(MoveTemp(RollbackEntry.GetValue()));
+	}
 	UE_LOG(LogEcoV3Brain, Log, TEXT("[EcoV3Brain] 대기: %s — 까닭: %s | 다음 결정 스텝 경계에서 바뀐다 (지금 %s)"), *Brain->Describe(), *Why, *Active->Id);
 }
 
-bool FEcoV3BrainRegistry::CommitPending(FEcoV3BrainPtr* OutFrom, FString* OutWhy)
+bool FEcoV3BrainRegistry::CommitPending(FEcoV3BrainPtr* OutFrom, FString* OutWhy, bool* bOutRollback)
 {
 	if (!Pending.IsValid())
 	{
 		return false;
 	}
+	const bool bRollback = !PendingRollback.IsEmpty();
 	if (OutFrom)
 	{
 		*OutFrom = Active;
@@ -730,48 +952,163 @@ bool FEcoV3BrainRegistry::CommitPending(FEcoV3BrainPtr* OutFrom, FString* OutWhy
 	{
 		*OutWhy = PendingWhy;
 	}
+	if (bOutRollback)
+	{
+		*bOutRollback = bRollback;
+	}
+	// 되돌리기 쌓개: 나가는 두뇌를 쌓는다 (되돌림이면 쌓지 않는다 — 되돌린 두뇌로 다시 돌아가지 않게. 같은 id 로 바꾸면 쌓지 않는다)
+	if (!bRollback && Pending->Id != Active->Id)
+	{
+		History.Add(FEcoV3BrainHistoryEntry{Active, ActiveWhy, PendingWhy});
+		if (History.Num() > EcoV3Brain::kHistoryMax)
+		{
+			History.RemoveAt(0);
+		}
+	}
 	Active = Pending.ToSharedRef();
+	ActiveWhy = PendingWhy;
+	bLastCommitRollback = bRollback;
+	LastCommitWhy = PendingWhy;
 	Pending.Reset();
 	PendingWhy.Empty();
+	PendingRollback.Reset();   // 되돌림이 바뀌었다 — 건너뛴 칸은 버린다 (되돌린 두뇌는 쌓지 않는다)
 	++Generation;
 	++SwapCount;
 	return true;
 }
 
+bool FEcoV3BrainRegistry::Rollback(const FString& Why, FString* OutMessage)
+{
+	check(IsInGameThread());
+	if (History.IsEmpty())
+	{
+		const FString Msg = IsPendingRollback() ? FString::Printf(TEXT("더 앞 두뇌가 없다 — 대기 되돌림 %s 그대로"), *Pending->Id)
+												: FString::Printf(TEXT("되돌릴 앞 두뇌가 없다 (쌓개 빔) — 지금 두뇌 %s 그대로"), *Active->Id);
+		UE_LOG(LogEcoV3Brain, Log, TEXT("[EcoV3Brain] 되돌리기: %s"), *Msg);
+		if (OutMessage)
+		{
+			*OutMessage = Msg;
+		}
+		return false;
+	}
+	if (IsPendingRollback())
+	{
+		// 이미 대기 중인 되돌림: 그 두뇌는 건너뛰고 하나 더 앞으로. 꺼낸 칸은 대기 되돌림 칸들에 남긴다 — 경계에서 바뀌면 버리고(되돌린 두뇌는 쌓지 않는다),
+		// 다른 두뇌가 줄을 덮으면 함께 쌓개에 돌려놓는다
+		UE_LOG(LogEcoV3Brain, Log, TEXT("[EcoV3Brain] 되돌리기: 대기 되돌림 %s 를 건너뛰고 하나 더 앞으로"), *Pending->Id);
+		Pending.Reset();
+		PendingWhy.Empty();
+	}
+	FEcoV3BrainHistoryEntry Entry = History.Pop();
+	const FEcoV3BrainRef Brain = Entry.Brain;
+	const FString FullWhy = FString::Printf(TEXT("되돌림 %s (%s 에서, 처음 까닭: %s)"), *Why, *Active->Id, *Entry.Why);
+	QueueImpl(Brain, FullWhy, MoveTemp(Entry));
+	if (OutMessage)
+	{
+		*OutMessage = FString::Printf(TEXT("되돌림 대기: %s — 다음 결정 스텝 경계에서 바뀐다 (남은 쌓개 %d)"), *Brain->Describe(), History.Num());
+	}
+	return true;
+}
+
+FString FEcoV3BrainRegistry::EffectiveWatchFolder() const
+{
+#if !UE_BUILD_SHIPPING
+	const FString Folder = EcoV3Brain::WatchFolder();
+	return Folder.IsEmpty() ? DefaultWatchFolder : Folder;
+#else
+	return FString();
+#endif
+}
+
+void FEcoV3BrainRegistry::PrimeWatch()
+{
+	PrimedFiles.Reset();
+	const FString Folder = EffectiveWatchFolder();
+	if (Folder.IsEmpty())
+	{
+		return;
+	}
+	const FString Dir = EcoV3BrainImpl::ProjectPath(Folder);
+	// 그때 있던 *.json 을 모두 (경로, 시각) 으로 기억한다 — 더 새 파일이 지워져 오래된 파일이 다시 가장 새 파일이 돼도 읽지 않게
+	TArray<FString> Names;
+	IFileManager::Get().FindFiles(Names, *(Dir / TEXT("*.json")), true, false);
+	for (const FString& N : Names)
+	{
+		const FString P = Dir / N;
+		PrimedFiles.Add(P, IFileManager::Get().GetTimeStamp(*P));
+	}
+	FDateTime Stamp;
+	const FString Newest = EcoV3BrainImpl::NewestJson(Dir, Stamp);
+	WatchedFile = Newest;
+	WatchedStamp = Newest.IsEmpty() ? FDateTime() : Stamp;
+	NextWatchPoll = 0.0;
+	UE_LOG(LogEcoV3Brain, Log, TEXT("[EcoV3Brain] 폴더 감시 준비: %s — %s"), *Dir,
+		   Newest.IsEmpty() ? TEXT("파일 없음")
+							: *FString::Printf(TEXT("지금 있는 파일 %d 개(가장 새 %s)는 읽지 않는다 (Play 뒤에 나타나거나 바뀐 파일만 바꾼다)"), PrimedFiles.Num(),
+											   *FPaths::GetCleanFilename(Newest)));
+}
+
+void FEcoV3BrainRegistry::ClearWatchPrime()
+{
+	PrimedFiles.Reset();
+}
+
 bool FEcoV3BrainRegistry::PollWatch(double NowSeconds)
 {
-	const FString Folder = EcoV3Brain::WatchFolder();
+	const FString Folder = EffectiveWatchFolder();
 	if (Folder.IsEmpty() || NowSeconds < NextWatchPoll)
 	{
 		return false;
 	}
 	NextWatchPoll = NowSeconds + EcoV3Brain::kWatchPollSeconds;
-	const FString Dir = FPaths::IsRelative(Folder) ? FPaths::ConvertRelativePathToFull(FPaths::ProjectDir() / Folder) : Folder;
-	TArray<FString> Names;
-	IFileManager::Get().FindFiles(Names, *(Dir / TEXT("*.json")), true, false);
-	FString Newest;
-	FDateTime NewestStamp = FDateTime::MinValue();
-	for (const FString& N : Names)
-	{
-		const FString P = Dir / N;
-		const FDateTime S = IFileManager::Get().GetTimeStamp(*P);
-		if (S > NewestStamp || (S == NewestStamp && P > Newest))
-		{
-			Newest = P;
-			NewestStamp = S;
-		}
-	}
+	FDateTime NewestStamp;
+	const FString Newest = EcoV3BrainImpl::NewestJson(EcoV3BrainImpl::ProjectPath(Folder), NewestStamp);
 	if (Newest.IsEmpty() || (Newest == WatchedFile && NewestStamp == WatchedStamp))
 	{
 		return false;
 	}
-	WatchedFile = Newest;
-	WatchedStamp = NewestStamp;
+	const FDateTime* const PrimedStamp = PrimedFiles.Find(Newest);
+	if (PrimedStamp && *PrimedStamp == NewestStamp)
+	{
+		// PrimeWatch 때 이미 있던 파일 (더 새 파일이 지워졌거나 시각이 되돌아갔다): 읽지 않는다. 기억해 두고 바뀔 때까지 다시 보지 않는다
+		WatchedFile = Newest;
+		WatchedStamp = NewestStamp;
+		UE_LOG(LogEcoV3Brain, Log, TEXT("[EcoV3Brain] 폴더 감시: %s 는 Play 시작 때부터 있던 파일 — 읽지 않는다 (Play 뒤에 나타나거나 바뀐 파일만 바꾼다)"), *Newest);
+		return false;
+	}
 	const FEcoV3BrainLoad L = LoadFile(Newest);
 	if (!L.Ok())
 	{
+		// 쓰는 중일 수 있는 파일 (파이썬은 .tmp 를 바꿔 끼우지만 손 복사·다른 도구는 반쯤 쓴 파일을 보일 수 있다): 새 파일이 읽기·JSON·풀기에서 깨졌으면
+		// 기억하지 않고 다음 감시에 다시 읽는다. 오래된 파일이거나 다른 까닭이면 거부를 기억한다 (시각이 바뀔 때까지 다시 읽지 않는다)
+		const double AgeSeconds = (FDateTime::UtcNow() - NewestStamp).GetTotalSeconds();
+		const bool bTorn = L.Reason == EcoV3Brain::EReject::File || L.Reason == EcoV3Brain::EReject::Json || L.Reason == EcoV3Brain::EReject::Decode;
+		if (bTorn && FMath::Abs(AgeSeconds) < EcoV3Brain::kWatchYoungSeconds)
+		{
+			UE_LOG(LogEcoV3Brain, Log, TEXT("[EcoV3Brain] 폴더 감시: %s 를 아직 못 읽었다 (%s, %.1f 초 전 파일 — 쓰는 중일 수 있다). 다음 감시에 다시 읽는다"), *Newest,
+				   EcoV3Brain::RejectName(L.Reason), AgeSeconds);
+			return false;
+		}
+		WatchedFile = Newest;
+		WatchedStamp = NewestStamp;
+		LastWatchReject.File = Newest;
+		LastWatchReject.Reason = L.Reason;
+		LastWatchReject.Message = L.Message;
+		++LastWatchReject.Serial;
 		UE_LOG(LogEcoV3Brain, Warning, TEXT("[EcoV3Brain] 폴더 감시: %s 거부 (%s) — %s. 지금 두뇌 %s 그대로 (파일 시각이 바뀌면 다시 읽는다)"), *Newest,
 			   EcoV3Brain::RejectName(L.Reason), *L.Message, *Active->Id);
+		return false;
+	}
+	WatchedFile = Newest;
+	WatchedStamp = NewestStamp;
+	if (!WatchPlayId.IsEmpty() && L.Brain->bAdapt && !L.Brain->AdaptPlayId.IsEmpty() && L.Brain->AdaptPlayId != WatchPlayId)
+	{
+		// 앞 Play 의 스냅숏에서 배운 두뇌 (파이썬 판이 새 Play 시작 뒤에 끝났다): 그 환경은 이 Play 에 없다. 받지 않고, 시각이 바뀔 때까지 다시 보지 않는다
+		LastWatchReject.File = Newest;
+		LastWatchReject.Reason = EcoV3Brain::EReject::Play;
+		LastWatchReject.Message = FString::Printf(TEXT("Play %s 의 스냅숏에서 배운 두뇌 — 지금 Play 는 %s"), *L.Brain->AdaptPlayId, *WatchPlayId);
+		++LastWatchReject.Serial;
+		UE_LOG(LogEcoV3Brain, Log, TEXT("[EcoV3Brain] 폴더 감시: %s 건너뜀 — %s. 지금 두뇌 %s 그대로"), *Newest, *LastWatchReject.Message, *Active->Id);
 		return false;
 	}
 	if (L.Brain->WeightsSha256 == Active->WeightsSha256 && !Pending.IsValid())
@@ -783,15 +1120,86 @@ bool FEcoV3BrainRegistry::PollWatch(double NowSeconds)
 	return true;
 }
 
+FString FEcoV3BrainRegistry::EffectiveStatusFile() const
+{
+#if !UE_BUILD_SHIPPING
+	const FString File = EcoV3Brain::StatusFile();
+	return File.IsEmpty() ? DefaultStatusFile : File;
+#else
+	return FString();
+#endif
+}
+
+bool FEcoV3BrainRegistry::PollStatus(double NowSeconds)
+{
+	const FString File = EffectiveStatusFile();
+	if (File.IsEmpty())
+	{
+		StatusPath.Empty();
+		return false;
+	}
+	const FString Path = EcoV3BrainImpl::ProjectPath(File);
+	if (Path == StatusPath && NowSeconds < NextStatusPoll)
+	{
+		return false;
+	}
+	NextStatusPoll = NowSeconds + EcoV3Brain::kStatusPollSeconds;
+	if (Path != StatusPath)
+	{
+		LiveStatus = FEcoV3LiveStatus();   // 다른 파일 — 앞 파일의 상태를 들고 가지 않는다
+	}
+	StatusPath = Path;
+	bStatusFileExists = FPaths::FileExists(Path);
+	if (!bStatusFileExists)
+	{
+		LiveStatus = FEcoV3LiveStatus();
+		bStatusReadOk = false;
+		return true;
+	}
+	// 깨진 글자면 앞서 읽은 상태 그대로 (updated_unix 가 120 초를 넘으면 '응답 없음'이 된다)
+	FString Text;
+	FEcoV3LiveStatus S;
+	bStatusReadOk = FFileHelper::LoadFileToString(Text, *Path) && EcoV3Brain::ParseLiveStatus(Text, S);
+	if (bStatusReadOk)
+	{
+		S.Path = Path;
+		LiveStatus = S;
+	}
+	return true;
+}
+
+FString FEcoV3BrainRegistry::GetLiveStatusText(double NowUnix) const
+{
+	return StatusPath.IsEmpty() ? FString() : EcoV3Brain::LiveStatusText(LiveStatus, bStatusFileExists, NowUnix);
+}
+
 void FEcoV3BrainRegistry::ResetForTest()
 {
 	Active = Builtin();
+	ActiveWhy = TEXT("내장 (처음)");
 	Pending.Reset();
 	PendingWhy.Empty();
+	PendingRollback.Reset();
+	History.Reset();
+	bLastCommitRollback = false;
+	LastCommitWhy.Empty();
 	++Generation;
 	WatchedFile.Empty();
 	WatchedStamp = FDateTime();
 	NextWatchPoll = 0.0;
+	PrimedFiles.Reset();
+	DefaultWatchFolder.Empty();
+	WatchPlayId.Empty();
+	// 거부 Serial 은 되돌리지 않는다 (서브시스템이 알린 번호와 겹치지 않게)
+	LastWatchReject.File.Empty();
+	LastWatchReject.Reason = EcoV3Brain::EReject::None;
+	LastWatchReject.Message.Empty();
+	DefaultStatusFile.Empty();
+	StatusPath.Empty();
+	NextStatusPoll = 0.0;
+	bStatusFileExists = false;
+	bStatusReadOk = false;
+	LiveStatus = FEcoV3LiveStatus();
 }
 
 // -----------------------------------------------------------------------------
@@ -856,6 +1264,11 @@ namespace EcoV3BrainImpl
 			Ar.Logf(TEXT("[EcoV3Brain]   검사 통과: 골든 %d 사례 (세계 %s) 최대 로짓 오차 %.2e ≤ %.0e · 파일 %s"), B.GoldenCount, *B.GoldenWorld, B.GoldenMaxError,
 					B.GoldenTolerance, *B.SourceFile);
 		}
+		if (B.AdaptRound > 0 || !B.AdaptRun.IsEmpty())
+		{
+			Ar.Logf(TEXT("[EcoV3Brain]   적응 고리: 판 %d · 시도 %d · 실행 %s · 스냅숏 %s · 환경 %s · 관문 %s"), B.AdaptRound, B.AdaptAttempt, *B.AdaptRun, *B.AdaptSnapshot,
+					*B.AdaptEnv, *B.AdaptGate);
+		}
 	}
 
 	void CmdInfo(const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
@@ -864,16 +1277,48 @@ namespace EcoV3BrainImpl
 		PrintBrain(Ar, TEXT("지금 두뇌"), *Reg.GetActive());
 		if (const FEcoV3BrainPtr P = Reg.GetPending())
 		{
-			PrintBrain(Ar, TEXT("대기 두뇌 (다음 결정 스텝 경계에서)"), *P);
+			PrintBrain(Ar, Reg.IsPendingRollback() ? TEXT("대기 두뇌 (되돌림, 다음 결정 스텝 경계에서)") : TEXT("대기 두뇌 (다음 결정 스텝 경계에서)"), *P);
 			Ar.Logf(TEXT("[EcoV3Brain]   까닭: %s"), *Reg.GetPendingWhy());
 		}
 		Ar.Logf(TEXT("[EcoV3Brain] 바꾼 횟수 %d · 세대 %u · 내장 %s · 서버·단독만 (이 월드 %s)"), Reg.GetSwapCount(), Reg.GetGeneration(), *FEcoV3BrainRegistry::Builtin()->Id,
 				!World ? TEXT("없음") : World->GetNetMode() == NM_Client ? TEXT("클라이언트 — 두뇌를 돌리지 않음") : TEXT("서버·단독"));
 		const float At = EcoV3Brain::SwapAtSeconds();
-		Ar.Logf(TEXT("[EcoV3Brain] 시작 두뇌 eco.V3Brain.Startup '%s' · 예정 바꾸기 %s · 폴더 감시 %s"), *EcoV3Brain::StartupFile(),
-				At >= 0.0f ? *FString::Printf(TEXT("%.1f초에 '%s'"), At, *EcoV3Brain::SwapFile()) : TEXT("끔"),
-				EcoV3Brain::WatchFolder().IsEmpty() ? TEXT("끔") : *EcoV3Brain::WatchFolder());
+		const FString Watch = Reg.EffectiveWatchFolder();
+		Ar.Logf(TEXT("[EcoV3Brain] 시작 두뇌 eco.V3Brain.Startup '%s' · 예정 바꾸기 %s · 폴더 감시 %s%s"), *EcoV3Brain::StartupFile(),
+				At >= 0.0f ? *FString::Printf(TEXT("%.1f초에 '%s'"), At, *EcoV3Brain::SwapFile()) : TEXT("끔"), Watch.IsEmpty() ? TEXT("끔") : *Watch,
+				!Watch.IsEmpty() && EcoV3Brain::WatchFolder().IsEmpty() ? TEXT(" (적응 고리 기본)") : TEXT(""));
+		Ar.Logf(TEXT("[EcoV3Brain] 되돌리기 쌓개 %d (eco.V3Brain.History·Rollback) · 지금 두뇌가 된 까닭: %s"), Reg.GetHistory().Num(), *Reg.GetActiveWhy());
+		const FString Status = Reg.EffectiveStatusFile();
+		Ar.Logf(TEXT("[EcoV3Brain] 적응 고리 상태 파일 %s%s"), Status.IsEmpty() ? TEXT("끔") : *Status,
+				Status.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" — %s"), *Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds())));
 		Ar.Logf(TEXT("[EcoV3Brain] 찾는 폴더: %s"), *FString::Join(FEcoV3BrainRegistry::SearchFolders(), TEXT(" · ")));
+	}
+
+	void CmdRollback(const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
+	{
+		if (RefuseClient(World, Ar))
+		{
+			return;
+		}
+		FString Msg;
+		const bool bQueued = FEcoV3BrainRegistry::Get().Rollback(TEXT("콘솔 eco.V3Brain.Rollback"), &Msg);
+		Ar.Logf(TEXT("[EcoV3Brain] %s%s"), *Msg, bQueued ? TEXT(" (통합 v3 Play 중이 아니면 Play 를 시작할 때)") : TEXT(""));
+	}
+
+	void CmdHistory(const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
+	{
+		const FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+		const TArray<FEcoV3BrainHistoryEntry>& H = Reg.GetHistory();
+		Ar.Logf(TEXT("[EcoV3Brain] 지금: %s — 까닭: %s"), *Reg.GetActive()->Describe(), *Reg.GetActiveWhy());
+		if (const FEcoV3BrainPtr P = Reg.GetPending())
+		{
+			Ar.Logf(TEXT("[EcoV3Brain] 대기%s: %s — 까닭: %s"), Reg.IsPendingRollback() ? TEXT(" (되돌림)") : TEXT(""), *P->Describe(), *Reg.GetPendingWhy());
+		}
+		Ar.Logf(TEXT("[EcoV3Brain] 되돌리기 쌓개 %d / %d (새 것부터 — 1 이 다음 eco.V3Brain.Rollback)"), H.Num(), EcoV3Brain::kHistoryMax);
+		for (int32 i = H.Num() - 1, n = 1; i >= 0; --i, ++n)
+		{
+			Ar.Logf(TEXT("[EcoV3Brain]   %d. %s — 들어온 까닭: %s · 바뀐 까닭: %s"), n, *H[i].Brain->Describe(), *H[i].Why, *H[i].ReplacedWhy);
+		}
 	}
 
 	void CmdList(const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
@@ -906,5 +1351,13 @@ namespace EcoV3BrainImpl
 	FAutoConsoleCommandWithWorldArgsAndOutputDevice CmdListReg(
 		TEXT("eco.V3Brain.List"), TEXT("찾는 폴더(<프로젝트>/EcoBrains·Saved/EcoBrains)의 두뇌 파일과 검사 결과 (EcoV3Brain.h)."),
 		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateStatic(&CmdList));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice CmdRollbackReg(
+		TEXT("eco.V3Brain.Rollback"),
+		TEXT("앞 사슴 두뇌로 되돌리기: 되돌리기 쌓개(앞 두뇌 16 개)의 맨 위를 줄에 넣는다 — 다음 결정 스텝 경계에서 바뀐다(Play 그대로). 되돌린 두뇌는 쌓지 않는다 ")
+			TEXT("(두 번 = 둘 앞으로). 서버·단독만 (EcoV3Brain.h)."),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateStatic(&CmdRollback));
+	FAutoConsoleCommandWithWorldArgsAndOutputDevice CmdHistoryReg(
+		TEXT("eco.V3Brain.History"), TEXT("지금 두뇌와 되돌리기 쌓개(새 것부터, 들어온 까닭·바뀐 까닭) (EcoV3Brain.h)."),
+		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateStatic(&CmdHistory));
 }
 #endif

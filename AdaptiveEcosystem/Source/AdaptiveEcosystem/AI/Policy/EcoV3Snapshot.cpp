@@ -8,7 +8,13 @@
 //   콘솔   eco.IntegratedV3.Snapshot [경로]                 지금 바로 (서버·단독, 통합 v3 Play 중)
 //   예정   eco.IntegratedV3.SnapshotAt <초>                 전역 스텝 × 2/15 초가 그 시각 이상인 첫 결정 스텝 경계에서 한 번 (명령줄 -EcoV3SnapshotAt=)
 //          eco.IntegratedV3.SnapshotOut <파일|폴더>         예정·콘솔(경로를 안 주면) 경로 (명령줄 -EcoV3SnapshotOut=). 비면 Saved/EcoSnapshots/
+//   자동   eco.IntegratedV3.AutoSnapshot <-1|0|1>           (10-21 실시간 두뇌 교체) 환경 판이 바뀐 뒤 AutoSnapshotSettle 초(기본 3) 그대로면 판마다 한 번.
+//                                                            -1 = eco.IntegratedV3.AutoAdapt 를 따름 (기본). 명령줄 -EcoV3AutoSnapshot=
+//          eco.IntegratedV3.SnapshotEvery <초>              주기 스냅숏 (0 = 끔, 기본). 명령줄 -EcoV3SnapshotEvery=
+//          eco.IntegratedV3.AutoSnapshotOut <폴더>          자동·주기 폴더 (비면 Saved/EcoAdapt/snapshots — 파이썬 live.py 가 본다). 명령줄 -EcoV3AutoSnapshotOut=
 // 먹이 격자 값은 double 을 17 자리로 적어(엔진 Json 쓰개) 파이썬이 비트 단위로 같은 값을 읽는다.
+// 10-21 (LIVE_ADAPT_SPEC.md 2절): 'env' 블록 (환경 감시·환경 판·바뀐 스텝·계기·바뀜 목록 — EcoV3EnvWatch.cpp)과 지역마다 obstacles.level_trunks 를 더했다 (판 1 그대로,
+// 새 칸은 더하기만). 모든 쓰기(자동·주기·콘솔·예정)는 바꿔 끼우기다 — '<이름>.json.tmp' 에 다 쓴 뒤 '<이름>.json' 으로 옮긴다 (감시하는 쪽은 *.tmp 를 보지 않는다).
 
 #include "EcoPolicyV3IntegratedSubsystem.h"
 
@@ -36,6 +42,96 @@ namespace EcoV3SnapshotImpl
 		TEXT("통합 v3 모드 환경 스냅숏 경로 ('.json' 파일 또는 폴더, 상대 경로는 프로젝트 폴더 기준). 비면 <프로젝트>/Saved/EcoSnapshots/")
 		TEXT("eco_v3_snapshot_s<세션 시드>_t<전역 스텝>.json. 명령줄 -EcoV3SnapshotOut= 는 시작값."),
 		ECVF_Default);
+
+#if !UE_BUILD_SHIPPING
+	// 10-21 실시간 두뇌 교체 (LIVE_ADAPT_SPEC.md 5.2 — 개발 빌드만. Shipping 은 자동·주기 스냅숏이 늘 끔)
+	static TAutoConsoleVariable<int32> CVarAutoSnapshot(
+		TEXT("eco.IntegratedV3.AutoSnapshot"),
+		-1,
+		TEXT("통합 v3 모드 환경 바뀜 자동 스냅숏 (-1 = eco.IntegratedV3.AutoAdapt 를 따름, 기본 / 0 = 끔 / 1 = 켬). 환경 감시(eco.IntegratedV3.EnvWatch)가 넣은 마지막 환경 판이 ")
+		TEXT("eco.IntegratedV3.AutoSnapshotSettle 시뮬레이션 초 동안 그대로이면 판마다 한 번 eco.IntegratedV3.AutoSnapshotOut 에 쓴다 (계기 env_change). 명령줄 -EcoV3AutoSnapshot= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarSnapshotEvery(
+		TEXT("eco.IntegratedV3.SnapshotEvery"),
+		0.0f,
+		TEXT("통합 v3 모드 주기 스냅숏 (시뮬레이션 초, 0 = 끔 — 기본). 켜거나 값을 바꾼 때부터 이 주기로 eco.IntegratedV3.AutoSnapshotOut 에 쓴다 (계기 periodic). ")
+		TEXT("명령줄 -EcoV3SnapshotEvery= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarAutoSnapshotSettle(
+		TEXT("eco.IntegratedV3.AutoSnapshotSettle"),
+		3.0f,
+		TEXT("통합 v3 모드 자동 스냅숏을 쓰기 전 환경 판이 그대로여야 하는 시뮬레이션 초 (기본 3 — 레벨이 나무를 여럿 놓는 동안 판마다 쓰지 않게)."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<FString> CVarAutoSnapshotOut(
+		TEXT("eco.IntegratedV3.AutoSnapshotOut"),
+		TEXT(""),
+		TEXT("통합 v3 모드 자동·주기 스냅숏 폴더 (상대 경로는 프로젝트 폴더 기준, 비면 <프로젝트>/Saved/EcoAdapt/snapshots — 파이썬 live.py 가 본다). ")
+		TEXT("파일 이름 eco_v3_snapshot_s<세션 시드>_t<전역 스텝>_e<환경 판>.json. 명령줄 -EcoV3AutoSnapshotOut= 는 시작값."),
+		ECVF_Default);
+#endif
+
+	/** 자동 스냅숏 켬 (eco.IntegratedV3.AutoSnapshot: -1 = AutoAdapt 따름). Shipping 은 늘 끔. */
+	bool AutoSnapshotOn()
+	{
+#if !UE_BUILD_SHIPPING
+		const int32 V = CVarAutoSnapshot.GetValueOnGameThread();
+		return V < 0 ? UEcoPolicyV3IntegratedSubsystem::IsAutoAdaptEnabled() : V != 0;
+#else
+		return false;
+#endif
+	}
+
+	/** 주기 스냅숏 시뮬레이션 초 (0 = 끔). */
+	double SnapshotEverySeconds()
+	{
+#if !UE_BUILD_SHIPPING
+		const double V = static_cast<double>(CVarSnapshotEvery.GetValueOnGameThread());
+		return FMath::IsFinite(V) && V > 0.0 ? V : 0.0;
+#else
+		return 0.0;
+#endif
+	}
+
+	/** 자동 스냅숏 가라앉음 시뮬레이션 초 (음수·수가 아닌 값은 기본 3). */
+	double AutoSnapshotSettleSeconds()
+	{
+#if !UE_BUILD_SHIPPING
+		const double V = static_cast<double>(CVarAutoSnapshotSettle.GetValueOnGameThread());
+		return FMath::IsFinite(V) && V >= 0.0 ? V : 3.0;
+#else
+		return 3.0;
+#endif
+	}
+
+	FString AutoSnapshotOutFolder()
+	{
+#if !UE_BUILD_SHIPPING
+		return CVarAutoSnapshotOut.GetValueOnGameThread().TrimStartAndEnd();
+#else
+		return FString();
+#endif
+	}
+
+	/**
+	 * 바꿔 끼우기 쓰기: '<경로>.tmp' 에 다 쓴 뒤 '<경로>' 로 옮긴다 (이름 안 *.json 만 보는 파이썬 감시가 반쯤 쓴 파일을 읽지 않게).
+	 * 실패하면 .tmp 를 지우고 거짓.
+	 */
+	bool SaveAtomic(const FString& Text, const FString& Path)
+	{
+		IFileManager& Files = IFileManager::Get();
+		Files.MakeDirectory(*FPaths::GetPath(Path), /*Tree*/ true);
+		const FString Tmp = Path + TEXT(".tmp");
+		if (!FFileHelper::SaveStringToFile(Text, *Tmp, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM)
+			|| !Files.Move(*Path, *Tmp, /*Replace*/ true, /*EvenIfReadOnly*/ true))
+		{
+			Files.Delete(*Tmp, /*RequireExists*/ false, /*EvenReadOnly*/ true, /*Quiet*/ true);
+			return false;
+		}
+		return true;
+	}
 
 	TArray<TSharedPtr<FJsonValue>> Nums(std::initializer_list<double> Values)
 	{
@@ -295,7 +391,7 @@ FString UEcoPolicyV3IntegratedSubsystem::SnapshotPath(const FString& Out) const
 	return FPaths::ConvertRelativePathToFull(P);
 }
 
-bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const FString& Why) const
+bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const FString& Why, const TCHAR* Trigger) const
 {
 	using namespace EcoV3SnapshotImpl;
 	if (Path.IsEmpty() || Contexts.Num() == 0)
@@ -314,6 +410,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 	Root->SetNumberField(TEXT("global_step"), static_cast<double>(GlobalT));
 	Root->SetNumberField(TEXT("sim_seconds"), static_cast<double>(GlobalT) * EcoRepertoireV3::kStepSeconds);
 	Root->SetStringField(TEXT("why"), Why);
+	Root->SetStringField(TEXT("play_id"), PlayId);   // 적응 고리 Play 번호 (끄면 빈 값 — 파이썬이 두뇌 파일 adapt.play_id 로 돌려준다)
 	Root->SetStringField(TEXT("contract_hash"), FString::Printf(TEXT("0x%016llx"), static_cast<unsigned long long>(EcoPolicyV3::kContractHash)));
 	Root->SetStringField(TEXT("tree_layout"), FString::Printf(TEXT("%s %s"), UTF8_TO_TCHAR(EcoTreeLayoutV3::kVersion), UTF8_TO_TCHAR(EcoTreeLayoutV3::kDigest)));
 	{
@@ -332,9 +429,46 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 		// 두뇌의 입출력 계약 (10-19 R5: 관측 18 또는 21 — 위 contract_hash 는 빌드 내장 계약)
 		J->SetStringField(TEXT("contract_hash"), FString::Printf(TEXT("0x%016llx"), static_cast<unsigned long long>(B.ContractHash)));
 		J->SetNumberField(TEXT("obs_dim"), B.ObsDim);
+		// 적응 고리 판 (10-21, LIVE_ADAPT_SPEC.md 2절): 지금 두뇌 파일의 'adapt' 블록 (판·시도·실행·바탕 스냅숏). 블록이 없는 두뇌(내장·손 파일)는 빈 객체
+		{
+			TSharedRef<FJsonObject> A = MakeShared<FJsonObject>();
+			if (B.bAdapt)
+			{
+				A->SetNumberField(TEXT("round"), B.AdaptRound);
+				A->SetNumberField(TEXT("attempt"), B.AdaptAttempt);
+				A->SetStringField(TEXT("run"), B.AdaptRun);
+				A->SetStringField(TEXT("snapshot"), B.AdaptSnapshot);
+			}
+			J->SetObjectField(TEXT("adapt"), A);
+		}
 		Root->SetObjectField(TEXT("brain"), J);
 	}
 	Root->SetObjectField(TEXT("settings"), SettingsJson(Settings));
+	{
+		// 환경 바뀜 (10-21, LIVE_ADAPT_SPEC.md 2절 — EcoV3EnvWatch.cpp): 감시·환경 판(Play 시작부터 넣은 묶음 수, 0 = 그대로)·마지막·처음 바뀐 스텝·이 스냅숏의 계기·
+		// Play 시작부터 넣은 바뀜 (오래된 것부터). 파이썬은 'env' 가 없으면 판 0 으로 읽는다
+		TSharedRef<FJsonObject> E = MakeShared<FJsonObject>();
+		E->SetBoolField(TEXT("watch"), IsEnvWatchEnabled());
+		E->SetNumberField(TEXT("revision"), EnvRevision);
+		E->SetNumberField(TEXT("changed_step"), static_cast<double>(EnvChangedStep));
+		E->SetNumberField(TEXT("first_changed_step"), static_cast<double>(EnvFirstChangedStep));
+		E->SetStringField(TEXT("trigger"), Trigger ? Trigger : TEXT("console"));
+		TArray<TSharedPtr<FJsonValue>> Changes;
+		for (const FEcoV3EnvChange& Ch : EnvChanges)
+		{
+			TSharedRef<FJsonObject> C = MakeShared<FJsonObject>();
+			C->SetNumberField(TEXT("revision"), Ch.Revision);
+			C->SetNumberField(TEXT("step"), static_cast<double>(Ch.Step));
+			C->SetNumberField(TEXT("seconds"), Ch.Seconds);
+			C->SetStringField(TEXT("region"), Ch.Region.ToString());
+			C->SetStringField(TEXT("kind"), Ch.Kind);
+			C->SetStringField(TEXT("detail"), Ch.Detail);
+			C->SetStringField(TEXT("source"), Ch.Source);
+			Changes.Add(MakeShared<FJsonValueObject>(C));
+		}
+		E->SetArrayField(TEXT("changes"), Changes);
+		Root->SetObjectField(TEXT("env"), E);
+	}
 
 	TArray<TSharedPtr<FJsonValue>> Regions;
 	for (const TUniquePtr<FEcoV3RegionContext>& CtxPtr : Contexts)
@@ -385,6 +519,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 			J->SetNumberField(TEXT("level_trees"), S.LevelTrees);
 			J->SetNumberField(TEXT("level_trees_snapped"), S.LevelTreesSnapped);
 			J->SetNumberField(TEXT("level_trees_unmatched"), S.LevelTreesUnmatched);
+			J->SetNumberField(TEXT("level_trunks"), Ctx.EnvLevelTrunks);   // 10-21: 지금 무대 안 줄기 막이 수 (은신처 원 안 포함 — 환경 감시가 읽은 값)
 			J->SetNumberField(TEXT("stage_trees"), Ctx.Trees.Num());
 			J->SetNumberField(TEXT("seen_meshes"), S.SeenMeshes);
 			J->SetNumberField(TEXT("near_edge"), S.NearEdge);
@@ -448,8 +583,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 	{
 		return false;
 	}
-	IFileManager::Get().MakeDirectory(*FPaths::GetPath(Path), /*Tree*/ true);
-	return FFileHelper::SaveStringToFile(Text, *Path, FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
+	return SaveAtomic(Text, Path);   // 10-21: 바꿔 끼우기 (.tmp 에 다 쓴 뒤 옮긴다)
 }
 
 void UEcoPolicyV3IntegratedSubsystem::MaybeScheduledSnapshot()
@@ -467,14 +601,109 @@ void UEcoPolicyV3IntegratedSubsystem::MaybeScheduledSnapshot()
 	bScheduledSnapshotDone = true;
 	const FString Path = SnapshotPath(EcoV3SnapshotImpl::CVarSnapshotOut.GetValueOnGameThread());
 	const FString Why = FString::Printf(TEXT("예정 eco.IntegratedV3.SnapshotAt %.1f"), At);
-	if (ExportSnapshot(Path, Why))
+	if (ExportSnapshot(Path, Why, TEXT("scheduled")))
 	{
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s"), Seconds, static_cast<long long>(GlobalT), *Path,
-			   Contexts.Num(), *GetActiveBrain().Id);
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s | 계기 scheduled · 환경 판 #%d"), Seconds,
+			   static_cast<long long>(GlobalT), *Path, Contexts.Num(), *GetActiveBrain().Id, EnvRevision);
 	}
 	else
 	{
 		UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 환경 스냅숏을 쓰지 못했다: %s"), *Path);
+	}
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::AutoSnapshotPath() const
+{
+	const FString Name = FString::Printf(TEXT("eco_v3_snapshot_s%lld_t%lld_e%d.json"), static_cast<long long>(Settings.Seed), static_cast<long long>(GlobalT),
+										 EnvRevision);
+	FString Dir = EcoV3SnapshotImpl::AutoSnapshotOutFolder();
+	if (Dir.IsEmpty())
+	{
+		Dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("EcoAdapt"), TEXT("snapshots"));
+	}
+	else if (FPaths::IsRelative(Dir))
+	{
+		Dir = FPaths::Combine(FPaths::ProjectDir(), Dir);
+	}
+	return FPaths::ConvertRelativePathToFull(FPaths::Combine(Dir, Name));
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::DescribeAutoSnapshot()
+{
+	using namespace EcoV3SnapshotImpl;
+	const double Every = SnapshotEverySeconds();
+	FString Out = AutoSnapshotOn() ? FString::Printf(TEXT("환경 바뀜 켬 (판이 %.1f초 그대로면 판마다 한 번)"), AutoSnapshotSettleSeconds())
+								   : FString(TEXT("환경 바뀜 끔 (eco.IntegratedV3.AutoSnapshot — -1 이면 AutoAdapt 를 따른다)"));
+	Out += Every > 0.0 ? FString::Printf(TEXT(" · 주기 %.1f초"), Every) : FString(TEXT(" · 주기 끔"));
+	if (AutoSnapshotOn() || Every > 0.0)
+	{
+		const FString Folder = AutoSnapshotOutFolder();
+		Out += FString::Printf(TEXT(" → %s"), Folder.IsEmpty() ? TEXT("Saved/EcoAdapt/snapshots") : *Folder);
+	}
+	return Out;
+}
+
+void UEcoPolicyV3IntegratedSubsystem::MaybeAutoSnapshot()
+{
+	using namespace EcoV3SnapshotImpl;
+	if (Contexts.Num() == 0)
+	{
+		return;
+	}
+	const double Seconds = static_cast<double>(GlobalT) * EcoRepertoireV3::kStepSeconds;
+	// 1. 환경 바뀜: 마지막 환경 판이 가라앉음 초 동안 그대로이면 판마다 한 번 (레벨이 나무를 여럿 놓는 동안 판마다 쓰지 않게)
+	bool bEnvDue = false;
+	if (AutoSnapshotOn() && EnvRevision > AutoSnapshotRevision)
+	{
+		const double Since = static_cast<double>(GlobalT - EnvChangedStep) * EcoRepertoireV3::kStepSeconds;
+		bEnvDue = Since + 1e-9 >= AutoSnapshotSettleSeconds();
+	}
+	// 2. 주기: 켜거나 값을 바꾼 때부터 그 주기로 (늦었으면 지금부터 다시)
+	bool bPeriodicDue = false;
+	const double Every = SnapshotEverySeconds();
+	if (Every <= 0.0)
+	{
+		PeriodicNextSeconds = -1.0;
+		PeriodicEverySeen = 0.0;
+	}
+	else if (Every != PeriodicEverySeen || PeriodicNextSeconds < 0.0)
+	{
+		PeriodicEverySeen = Every;
+		PeriodicNextSeconds = Seconds + Every;
+	}
+	else if (Seconds + 1e-9 >= PeriodicNextSeconds)
+	{
+		bPeriodicDue = true;
+		PeriodicNextSeconds += Every;
+		if (PeriodicNextSeconds <= Seconds)
+		{
+			PeriodicNextSeconds = Seconds + Every;
+		}
+	}
+	if (!bEnvDue && !bPeriodicDue)
+	{
+		return;
+	}
+	if (bEnvDue)
+	{
+		AutoSnapshotRevision = EnvRevision;   // 판마다 한 번 (쓰기에 실패해도 다시 쓰지 않는다 — 다음 판·주기·콘솔로)
+	}
+	// 같은 경계에서 둘 다 되면 한 번만 쓴다 (계기 env_change — 이름이 같다)
+	const TCHAR* Trigger = bEnvDue ? TEXT("env_change") : TEXT("periodic");
+	const FString Path = AutoSnapshotPath();
+	const FString Why = bEnvDue ? FString::Printf(TEXT("환경 바뀜 #%d 뒤 %.1f초 그대로 (eco.IntegratedV3.AutoSnapshot)"), EnvRevision,
+												  static_cast<double>(GlobalT - EnvChangedStep) * EcoRepertoireV3::kStepSeconds)
+								: FString::Printf(TEXT("주기 eco.IntegratedV3.SnapshotEvery %.1f"), Every);
+	if (ExportSnapshot(Path, Why, Trigger))
+	{
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s | 계기 %s · 환경 판 #%d"), Seconds,
+			   static_cast<long long>(GlobalT), *Path, Contexts.Num(), *GetActiveBrain().Id, Trigger, EnvRevision);
+		PostNotice(EcoV3Integrated::ENotice::Snapshot, bEnvDue ? FString::Printf(TEXT("스냅숏 #%d 내보냄 → 파이썬 학습 대기"), EnvRevision)
+															   : FString::Printf(TEXT("스냅숏 #%d 내보냄 (주기 %.0f초) → 파이썬 학습 대기"), EnvRevision, Every));
+	}
+	else
+	{
+		UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 환경 스냅숏을 쓰지 못했다 (계기 %s): %s"), Trigger, *Path);
 	}
 }
 
@@ -502,11 +731,12 @@ namespace EcoV3SnapshotImpl
 		const FString Out = Args.IsEmpty() ? CVarSnapshotOut.GetValueOnGameThread() : FString::Join(Args, TEXT(" "));
 		const FString Path = Sub->SnapshotPath(Out);
 		const double Seconds = static_cast<double>(Sub->GetGlobalStep()) * EcoRepertoireV3::kStepSeconds;
-		if (Sub->ExportSnapshot(Path, TEXT("콘솔 eco.IntegratedV3.Snapshot")))
+		if (Sub->ExportSnapshot(Path, TEXT("콘솔 eco.IntegratedV3.Snapshot"), TEXT("console")))
 		{
-			Ar.Logf(TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s"), Seconds, static_cast<long long>(Sub->GetGlobalStep()), *Path,
-					Sub->NumContexts(), *Sub->GetActiveBrain().Id);
-			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 콘솔"), Seconds, static_cast<long long>(Sub->GetGlobalStep()), *Path);
+			Ar.Logf(TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s | 계기 console · 환경 판 #%d"), Seconds,
+					static_cast<long long>(Sub->GetGlobalStep()), *Path, Sub->NumContexts(), *Sub->GetActiveBrain().Id, Sub->GetEnvRevision());
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 콘솔 | 계기 console · 환경 판 #%d"), Seconds,
+				   static_cast<long long>(Sub->GetGlobalStep()), *Path, Sub->GetEnvRevision());
 		}
 		else
 		{
