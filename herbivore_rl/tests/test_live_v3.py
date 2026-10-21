@@ -814,7 +814,7 @@ def test_seq_final_equals_single_look(lv, prepared, seq_setup, monkeypatch):
 def test_eval_runner_switch(lv, tmp_path, monkeypatch):
     """판정 실행기 갈림: 'python' 은 워커 풀(일이 없으면 빈 목록), 모르는 실행기는 멈춤, 등록한 실행기는 꼬리표·순서를 맞춰 봐야 받는다.
     live.py 옆 <이름>.py 의 run_items·version 은 LIVE evaluator 이름만으로 불러 등록한다(네이티브 판정기를 끼울 자리)."""
-    assert lv.LIVE["evaluator"] == "python" and lv.eval_runner([], 4) == []
+    assert lv.LIVE["evaluator"] == "ceval" and lv.eval_runner([], 4, "python") == []          # 10-21 (5): 기본 실행기 = C++ 평가기
     with pytest.raises(ValueError, match="모르는 판정 실행기"):
         lv.eval_runner([("world", "x:N", {})], 2, "native")
     calls = []
@@ -881,13 +881,16 @@ def test_cache_save_state(lv, prepared, tmp_path, monkeypatch):
     assert "N 새로 잼(저장함) (`live/cache/" in lv.cache_note_md(dict(N=ok))
 
 
-def test_eval_cache(lv, prepared, tmp_path, monkeypatch):
+def test_eval_cache(lv, prepared, tmp_path, monkeypatch, request):
     """지금 두뇌 판정 저장: 없으면 None, 쓰면 같은 꼬리표·순서로 다시 읽음, 열쇠(환경·세계·두뇌·시드·길이·실행기·셈 길 판)가 하나라도 다르면 None,
     깨진·바뀐 파일은 None, 쓰기는 임시 파일 → os.replace (실패해도 반쯤 쓴 파일·임시 파일이 남지 않는다), 오래된 것부터 지움."""
     root = tmp_path / "EcoAdapt"
     seeds = [35000, 35001]
     its = lv.eval_items(prepared, "current", lv.OBS21ZERO, seeds, 20, "N")
     rows = [dict(_row(int(j["seed"]), j["region"]), wall_s=np.float64(1.5), beh_steps=tuple(int(x) for x in (5, 1, 1, 0, 0))) for _, _, j in its]
+    ev0 = lv.LIVE["evaluator"]                                                                  # 저장 열쇠 시험은 파이썬 실행기 판으로 (평가기 빌드와 무관하게 —
+    lv.LIVE["evaluator"] = "python"                                                             # 아래 monkeypatch.undo() 가 되돌리지 않게 따로 둔다)
+    request.addfinalizer(lambda: lv.LIVE.__setitem__("evaluator", ev0))
     key = lv.eval_cache_key(prepared, its, lv.OBS21ZERO, "N")
     assert key["env_digest"] == prepared["record"]["live"]["env_digest"] and key["seeds"] == seeds and key["horizon"] == [20]
     assert key["brain_weights_sha256"] == lv.zip_weights_sha(lv.OBS21ZERO) and key["brain_contract"] == lv.CONTRACT_OBS21 and key["evaluator"] == "python"
@@ -1305,5 +1308,5 @@ def test_constants_match_md(lv):
     assert f"앞서 통과를 켜면 끝 문턱 b₂ = −{b2['bound']:.3f} (n₁ {n}), 중간 b₁ = −{b1['bound']:.3f} (n₁ {k})" in md                  # 5절 P1 줄
     assert f"중간 c₁ = {b1['c1']:.3f}" in md and f"참고 c₂ = {b2['c2']:.3f}" in md and f"−{b2['bound_z']:.3f}" in md
     assert L["seq_futility_t"] == 0.0 and "| 중간 기각 경계 seq_futility_t | 짝 t ≥ 0 (나아지는 쪽도 아님) — 구속력 없음 | 예비 측정 뒤 확정" in md
-    assert L["evaluator"] == "python" and "| 판정 실행기 evaluator | python" in md
+    assert L["evaluator"] == "ceval" and "| 판정 실행기 evaluator | ceval" in md and "### 2026-10-21 (5)" in md
     assert L["cache_current"] is True and "| 지금 두뇌 판정 다시 쓰기 cache_current | 켬" in md
