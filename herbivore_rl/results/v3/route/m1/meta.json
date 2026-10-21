@@ -1,0 +1,24 @@
+{
+ "snapshot": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\live\\pilot\\eco_v3_snapshot_s20004_t475_e1.json",
+ "model": "ckpt/v3/v3_r1_g995_s3_obs21zero.zip",
+ "smoke": false,
+ "workers": 14,
+ "started": "2026-10-21T18:35:59.269734",
+ "times": {
+  "rules": {
+   "wall_s": 1680.0,
+   "worlds": 1440,
+   "sec_per_world_step": 0.009025444444444444
+  },
+  "clump": {
+   "wall_s": 2423.0,
+   "worlds": 720,
+   "sec_per_world_step": 0.02599410339506173
+  },
+  "g": {
+   "wall_s": 478.0,
+   "worlds": 240,
+   "sec_per_world_step": 0.007554828703703704
+  }
+ }
+}
