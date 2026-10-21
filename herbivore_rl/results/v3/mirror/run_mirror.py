@@ -62,6 +62,9 @@ rand.predator_count 다(메타 wolves).
 10-18 더함(R4 사전 등록 results/v3/r4/PREREG.md): --model 로 두뇌 모델을 바꾼다(기본 R1b s3 그대로 — 메타 model 에 파일 이름).
 10-18 더함(언리얼 날씨 짝 비교, results/v3/wild3/compare_weather.py): --diag 진단에 heard_live·live_obs(스텝 끝 관측에서 들어서만 안 **산** 사슴·스텝과 산 사슴·스텝 —
 C++ 통합 모드 10초 여덟째 줄 '들어서만 안 사슴·스텝' 과 같은 정의. heard_only_frac 은 죽은 슬롯까지 N 으로 나눈다)를 더한다(동역학과 무관).
+10-21 더함(실시간 고리 '도망 시간' 기준, results/v3/live/LIVE_GATE.md 변경 기록 (3)): wild_flight 세계면 첫 스텝 전에 World.track_flight 를 켜고 세계 메타에
+flight(World.flight_stats — 도망 수·끝 까닭·길이·쫓긴 시간, 정의는 env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 기록)를 적는다. job 의 flight_at(스텝 목록)을
+주면 그 스텝마다 끊은 기록을 flight_at 에 더 적는다(동역학과 무관 — 켜고 끈 궤적이 비트 단위로 같다, tests/test_flight_v3.py).
 """
 
 from __future__ import annotations
@@ -398,6 +401,10 @@ def run_world(job: dict) -> dict:
     um = job.get("unreal_map")
     if um is not None:
         apply_unreal_map(w, int(um["seed"]), um["region"])          # 짝 비교: 언리얼 지역 무대와 같은 먹이 지도
+    fl_on = getattr(w, "_wf", None) is not None
+    if fl_on:
+        w.track_flight = True                   # 10-21 도망 기록(World.flight_stats — 통계 전용, 동역학과 무관). 첫 스텝 전에 켠다
+    fl_at = {int(h) for h in job.get("flight_at") or ()}
     dg = None
     if job.get("diag"):
         w.keep_pair_vis = True                  # 진단 전용: 기하에 보임 행렬을 남긴다(관측·동역학은 그대로)
@@ -417,6 +424,7 @@ def run_world(job: dict) -> dict:
         meta["unreal_map"] = dict(um)
     rows = []
     shelter = [0, 0]                    # 누적 [은신처 원 안 산 사슴-스텝, 산 사슴-스텝] (스텝 첫머리에 산 사슴의 이동 뒤 위치 — C++ Prey.bInCover 와 같다)
+    flight_at = {}
     for _ in range(int(job["steps"])):
         live_before = w.alive
         alive_before = int(live_before.sum())
@@ -427,8 +435,14 @@ def run_world(job: dict) -> dict:
             dg.after(w, live_before)
         if w.t % int(job["log_every"]) == 0:
             rows.append(_row(w, alive_before, food0, shelter))
+        if fl_on and w.t in fl_at:
+            flight_at[str(w.t)] = w.flight_stats()     # 판정 길이 h 에서 끊은 도망 기록(열린 도망 = 잘림) — 예비 측정이 길이마다 쓴다
     if dg is not None:
         meta["diag"] = dg.result(w)
+    if fl_on:
+        meta["flight"] = w.flight_stats()
+        if fl_at:
+            meta["flight_at"] = flight_at
     # 끝난 사냥이 없으면 rate 가 nan 이다 — 메타에는 None 으로 적는다(같은 인자면 같은 메타를 지키려고: nan != nan)
     meta["hunt"] = {k: (None if isinstance(v, float) and v != v else v) for k, v in w.hunt_stats().items()}
     meta["shelter_steps"], meta["live_steps"] = int(shelter[0]), int(shelter[1])

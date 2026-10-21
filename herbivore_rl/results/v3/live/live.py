@@ -2,12 +2,19 @@
 미리 적은 빠른 관문(results/v3/live/LIVE_GATE.md)을 넘은 두뇌만 언리얼이 지켜보는 폴더에 두뇌 파일로 쓴다 (10-20·10-21 사용자 '게임 중 실시간
 두뇌 교체'). 환경을 바꾸는 규칙은 만들지 않는다 — 레벨이 바꾼 것을 옮길 뿐이다(10-20 '환경이 변하는 규칙은 우리가 만들지 않는다 — 레벨(팀) 작업').
 한 판의 변환·세계 돌리기·끼임 세기·두뇌 파일 확인은 results/v3/adapt/adapt.py 를 그대로 쓴다.
+10-21 (3) 사용자 기준 바꿈: 1차 = '잘 안 잡히는 두뇌'가 아니라 '똑같이 도망을 가도 숲속으로 잘 숨어 늑대 시야에서 벗어나 도망 시간이 짧은 두뇌'
+— 포만 없는 세계에서 스스로 벗어난 도망(은신처에 숨거나·나무 줄기·바위가 늑대 눈길을 가리거나·늑대 시야각·시야 반경 밖으로 빠져 쫓기를 끝냄)의
+쫓긴 시간(도망 시작부터 늑대가 이 사슴을 마지막으로 표적으로 둔 순간까지)이 유의하게 짧다. 잡힘·도망 횟수·달린 시간·잡혀 끝난 도망은 지킴(유의하게
+나빠지지 않음)이다. 도망 = FLEE 를 실행한 스텝 묶음(도주 반사·두뇌가 고른 FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 기록
+(World.flight_stats, 판정 실행기가 켠다). 이 기준의 크기는 예비 측정 뒤 확정한다 — 확정 전(LIVE flight_sizes_confirmed 거짓)에는 실제 폴더에서 판·감시를
+돌리지 않는다.
 
     # herbivore_rl/ 에서 (Anaconda base python, PYTHONUTF8=1)
     python results/v3/live/live.py watch                        # 감시: <프로젝트>/Saved/EcoAdapt/snapshots 를 2초마다 보고, 새 환경이면 한 판
                                                                   #   (켠 뒤에 생긴 스냅숏만 — 있던 것도 보려면 --existing)
     python results/v3/live/live.py round --snapshot <파일>        # 한 판 (앞에서 — 감시 없이)
     python results/v3/live/live.py pilot --snapshot <파일>        # 예비 측정 (시드 34900~34999 만 — 관문 크기를 고르려고, 관문이 아니다)
+    python results/v3/live/live.py pilot --snapshot <파일> --extra-models a=ckpt/v3/x.zip --flight-cost 0 0.005   # 더 견줄 두뇌·도주 비용 후보
     # 시험 크기 (관문 상수가 아님 — --root 로 다른 폴더를 줄 때만 받는다, 실제 brains 폴더에는 쓰지 않는다)
     python results/v3/live/live.py round --snapshot <파일> --root <임시 폴더> --steps 20000 --judge-seeds 35000-35002 --horizon 300 --workers 4
 
@@ -19,8 +26,9 @@
 
 세계 셋 (사람 결정 10-21 '포만 없는 세계 1차 (추천)', 10-20 '학습할 때는 늑대 포만을 끈다 (게임은 그대로)'):
   G 게임 세계  = 스냅숏 세계(늑대 포만은 게임 값 그대로, 부활 없음, 사슴 = 입양 수)                     → 지킴 GG·G4·G5·G6
-  N 포만 없는 세계 = G + features.wild_satiation.enabled false                                           → 1차 P1·지킴 GN·G4
+  N 포만 없는 세계 = G + features.wild_satiation.enabled false                                    → 1차 P1(쫓긴 시간)·지킴 GN·GF·GV·GC·G4
   T 학습 세계  = N + R5 학습 조리법(학습 전용 40 m 밖 부활·학습 시드 32000~32049·지역 섞기, 무작위 숲 없음) + 스냅숏 먹이 지도
+                 (+ LIVE train_flight_cost > 0 이면 FLEE 를 실행한 스텝마다 보상에서 그만큼 뺀다 — wild_flight.flight_cost, 기본 0)
 두뇌는 관측 21 계약(R5 장애물 관측 0xbc4fc2d45c47c5fd)으로 배운다(사람 결정 10-21 '관측 21로 올려 배움'): 스냅숏의 지금 두뇌가 R1b-F(관측 18)면
 R1b-F + 0 열(ckpt/v3/v3_r1_g995_s3_obs21zero.zip — 결정이 비트 단위로 같다)에서, 관측 21 두뇌면 그 두뇌 파일의 모델 zip 에서 시작한다(가중치 sha256 을
 다시 맞춰 본다). 다른 관측 18 파일 두뇌는 거부(refused). 판정의 '지금 두뇌' = 시작 zip.
@@ -89,11 +97,20 @@ LIVE = dict(
     model_seeds=(0,),                       # K = 1
     shelter_x=2.0, use_min=0.01,            # G6: 은신처 안 몫 ≤ 지금의 2배, 먹기·도망·숨기 모두 1% 넘게
     f_dec=None,                             # T 세계 f_dec — None = R5 조리법 값 그대로 (예비 측정 T 값 0.885549 는 기록만: 예비 후보가 R5 값으로 배웠다)
+    # 10-21 (3) 사용자 기준 바꿈 — 1차 = 쫓긴 시간 (LIVE_GATE.md 변경 기록 (3), 크기는 이 기준의 예비 측정 뒤 다시 정한다)
+    flight_own=("cover", "obstacle", "fov", "range"),   # P1: 스스로 벗어난 도망 = 이 끝 까닭 (env_v2/world.py FLIGHT_OWN 과 같다)
+    flight_unsafe=("caught", "starved", "truncated"),   # GC: 잡힘·굶음·잘림으로 끝난 도망 (env_v2/world.py FLIGHT_UNSAFE 와 같다)
+    flight_min_episodes=1,                  # P1 짝: 두 두뇌 모두 스스로 벗어난 도망이 이만큼 있는 시드만 (빠진 시드는 기록)
+    flight_min_effect_s=0.0,                # P1 최소 차이 δ (초): 후보 − 지금 ≤ −δ — 0 = 유의성만, 예비 측정 뒤 정한다
+    train_flight_cost=0.0,                  # T 세계 wild_flight.flight_cost (FLEE 를 실행한 스텝마다 보상에서 뺌) — 0 = 끔, 예비 측정 뒤 정한다
+    flight_sizes_confirmed=False,           # 위 크기·δ·도주 비용과 H·n·S·K 를 이 기준의 예비 측정으로 확정해 LIVE_GATE.md 에 적기 전에는 거짓 —
+                                            #   거짓이면 실제 폴더(Saved/EcoAdapt)에서 판·감시를 돌리지 않는다 (plan_from_args)
 )
+STEP_S = 2.0 / 15.0                         # 1 스텝 = 2/15 초 (게임 결정 간격 — 1800 스텝 = 240 초)
 GATE_SEEDS = (35000, 35199)                 # 관문 시드 (판정·고르기·끼임·재현 확인) — 예비 측정은 쓰지 않는다
 PILOT_SEEDS = (34900, 34999)                # 예비 측정 시드 — 관문은 쓰지 않는다
 PILOT = dict(horizons=(1800, 3600), steps=(1_000_000, 2_000_000), model_seeds=(0, 1), seeds=(34900, 34999), cand_seeds=(34900, 34929),
-             fdec_seeds=(32000, 32001, 32002))
+             fdec_seeds=(32000, 32001, 32002), scale_steps=3000)
 NOSAT = dict(name="nosat", sets={"wild_satiation.enabled": False})           # N = G + 늑대 포만 끔
 POLL_S = 2.0                                # 스냅숏 폴더 보기 간격 (초)
 HEARTBEAT_S = 5.0                           # 상태 파일 다시 쓰기 간격 (언리얼은 120 초 넘게 묵으면 '응답 없음')
@@ -690,15 +707,23 @@ def resolve_start(snap: dict, folders) -> dict:
 # --------------------------------------------------------------------- #
 
 
-def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None = None) -> dict:
+def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None = None, flight_cost: float | None = None) -> dict:
     """스냅숏 → 판 폴더 rd: snapshot.json(그대로)·world.yaml(G)·train.yaml(T)·regions.json·convert.json. N 은 G + NOSAT 변형(판정 때 덮는다).
-    반환 = adapt 의 run 정보 꼴 {record, regions, dir} + start. 거부는 adapt.Refused."""
+    flight_cost (None = LIVE train_flight_cost) > 0 이면 T 에 wild_flight.flight_cost 를 적는다(0 이면 적지 않는다 — train.yaml 이 그대로).
+    반환 = adapt 의 run 정보 꼴 {record, regions, dir} + start. 거부는 adapt.Refused (도주 반사를 끈 세계도 — 관문이 도망 기록을 쓴다)."""
     start = resolve_start(snap, folders)
     ref = json.loads(ad.REFERENCE.read_text(encoding="utf-8")) if ad.REFERENCE.exists() else None
     out = ad.convert(snap, ref, template=TEMPLATE_OBS, start=start["zip"], contract=CONTRACT_OBS21, recipe=R5_TRAIN)
     world, train = out["world"], out["train"]
+    if not bool(world["features"]["wild_flight"]["enabled"]):
+        raise ad.Refused("도주 반사(wild_flight)를 끈 세계다 — 1차 쫓긴 시간·지킴 도망 기록을 잴 수 없다 (LIVE_GATE.md 5-1)")
     sat_g = bool(world["features"]["wild_satiation"]["enabled"])
     train["features"]["wild_satiation"]["enabled"] = False             # T: 학습할 때는 늑대 포만을 끈다 (게임 G 는 그대로)
+    fc = float(LIVE["train_flight_cost"] if flight_cost is None else flight_cost)
+    if fc < 0.0:
+        raise ValueError(f"flight_cost 는 0 이상이어야 한다: {fc}")
+    if fc > 0.0:
+        train["features"]["wild_flight"]["flight_cost"] = fc           # T: FLEE 를 실행한 스텝마다 보상에서 뺀다 (10-21 (3) — 학습 세계 전용)
     train["version"] = "3.live.train"
     rep = train["train"]["repertoire"]
     fd = LIVE["f_dec"] if f_dec is None else f_dec
@@ -717,16 +742,36 @@ def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None 
     ad.write_yaml(rd / "world.yaml", world, head + f"# G 게임 세계 (부활 없음, 늑대 포만 = 게임 값 {'켬' if sat_g else '끔'}) = "
                                                    "configs/v3_wild3_obs_mirror.yaml + convert.json 'changed'. N = 이 세계 + wild_satiation 끔\n")
     ad.write_yaml(rd / "train.yaml", train, head + "# T 학습 세계 = world.yaml + 늑대 포만 끔 + R5 학습 조리법(학습 전용 40 m 밖 부활·학습 시드 "
-                                                   "32000~32049·지역 섞기, 무작위 숲 없음)\n")
+                                                   "32000~32049·지역 섞기, 무작위 숲 없음)"
+                  + (f" + 도주 비용 wild_flight.flight_cost {fc:g}" if fc > 0.0 else "") + "\n")
     (rd / "regions.json").write_text(json.dumps(out["regions"], ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     rec = dict(out["record"])
     rec["f_dec_note"] = fd_src
     rec["live"] = dict(start=path_text(start["zip"]), start_why=start["why"], current_brain=start["brain"], brain_contract=start["brain_contract"],
-                       start_contract=start["start_contract"], satiation_game=sat_g, f_dec=float(rep["f_dec"]),
+                       start_contract=start["start_contract"], satiation_game=sat_g, f_dec=float(rep["f_dec"]), flight_cost=fc,
                        worlds=dict(G="world.yaml (늑대 포만 게임 값)", N="world.yaml + wild_satiation.enabled false", T="train.yaml (늑대 포만 끔)"),
                        env=e, env_summary=env_summary(snap), env_digest=env_digest(snap), brain_weights_sha256=brain_sha(snap))
     (rd / "convert.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
     return dict(record=rec, regions=out["regions"], dir=rd, start=start)
+
+
+def train_variant(rd: Path, flight_cost: float) -> Path:
+    """판 폴더 T 세계(train.yaml)에서 wild_flight.flight_cost 만 바꾼 사본 train_fc<값>.yaml (예비 측정 --flight-cost 후보). 0 이면 그 키를 뺀다."""
+    import yaml
+
+    rd = Path(rd)
+    fc = float(flight_cost)
+    if fc < 0.0:
+        raise ValueError(f"flight_cost 는 0 이상이어야 한다: {fc}")
+    d = yaml.safe_load((rd / "train.yaml").read_text(encoding="utf-8"))
+    wf = d["features"]["wild_flight"]
+    if fc > 0.0:
+        wf["flight_cost"] = fc
+    else:
+        wf.pop("flight_cost", None)
+    p = rd / f"train_fc{fc:g}.yaml"
+    ad.write_yaml(p, d, f"# 실시간 적응 {rd.name} 예비 측정 — train.yaml 에서 wild_flight.flight_cost 만 {fc:g} 로 바꾼 T 세계 (자동 생성, 손으로 고치지 않는다)\n")
+    return p
 
 
 # --------------------------------------------------------------------- #
@@ -735,20 +780,61 @@ def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None 
 
 
 def _world_multi(job: dict) -> dict:
-    """예비 측정 세계 하나: r4_eval._one 과 같은 요약(끝 시각) + 판정 길이마다 잡힘·굶음·산(죽은 스텝 death_t 로 센다)."""
+    """예비 측정 세계 하나: r4_eval._one 과 같은 요약(끝 시각) + 판정 길이마다 잡힘·굶음·산(죽은 스텝 death_t 로 센다)·도망 기록(그 길이에서 끊은 것)."""
     import run_mirror as rm
 
     hs = [int(h) for h in job.pop("horizons")]
     ad._patch_food(job.pop("snap_food"))
+    job["flight_at"] = hs
     res = rm.run_world(job)
     m, dg = res["meta"], res["meta"]["diag"]
     cause, dt = np.asarray(m["death_cause"]), np.asarray(m["death_t"])
     out = dict(seed=m["seed"], region=job["region"], n=m["n"], caught=int((cause == 1).sum()), starved=int((cause == 2).sum()),
                alive=int((cause == 0).sum()), shelter_steps=m["shelter_steps"], live_steps=m["live_steps"], beh_steps=dg["beh_steps"],
                catch_cover=dg["catch_cover"], hunt=m["hunt"], wall_s=m["wall_s"])
+    if "flight" in m:
+        out["flight"] = m["flight"]
     out["at"] = {str(h): dict(caught=int(((cause == 1) & (dt <= h)).sum()), starved=int(((cause == 2) & (dt <= h)).sum()),
                               alive=int(((cause == 0) | (dt > h)).sum())) for h in hs}
+    for h in hs:
+        f = (m.get("flight_at") or {}).get(str(h))
+        if f is not None:
+            out["at"][str(h)]["flight"] = f
     return out
+
+
+def _scale_one(job: dict) -> dict:
+    """도주 비용 기준 크기(예비 측정 'scale'): T 세계(부활 있음, 그 지역 스냅숏 먹이 지도) 하나를 두뇌로 job['steps'] 스텝 돌려 사슴-스텝 보상을 나눠 센다.
+    도주 = 그 스텝에 FLEE 를 실행한 사슴(도주 반사·두뇌 FLEE 모두 — 스텝 뒤 rs.behavior, 리스폰 칸은 죽음 스텝이라 빠진다), 그 가운데 반사 = 실행한 덮기
+    WF_PANIC. 에너지 칸 = 보상 − rew_alive (죽음·번식 스텝은 뺀다 — 보상 ±10 이 섞인다). 동역학은 그대로다."""
+    from env.config import Config
+    from env_v2 import repertoire as rep
+    from env_v2 import rollout as ro
+    from env_v2.world import WF_PANIC, World
+
+    cfg = Config(job["cfg"])
+    w = World(cfg, seeds=[int(job["seed"])])
+    ad.apply_snapshot_food(w, job["snap_food"])
+    pol = ro.build_policy({"kind": "rep_learned", "path": str(job["model"])}, int(job["seed"]))
+    ro.forward_bind(pol, w)
+    acc = dict(steps=0, rew=0.0, deaths=0, repro=0, flee_n=0, flee_e=0.0, other_n=0, other_e=0.0, reflex_n=0)
+    for _ in range(int(job["steps"])):
+        pan0 = w.wf_mode == WF_PANIC
+        _, rew, done, _ = w.step(np.asarray(pol(w.observe()), dtype=np.float64))
+        pan = w._rs.behavior == rep.FLEE
+        rep_ = rew > 0.5 * float(cfg.rew_repro)
+        ok = ~done & ~rep_
+        acc["reflex_n"] += int(np.count_nonzero(ok & pan & pan0))
+        e = rew - float(cfg.rew_alive)
+        acc["steps"] += int(w.N)
+        acc["rew"] += float(rew.sum())
+        acc["deaths"] += int(np.count_nonzero(done))
+        acc["repro"] += int(np.count_nonzero(rep_))
+        acc["flee_n"] += int(np.count_nonzero(ok & pan))
+        acc["flee_e"] += float(e[ok & pan].sum())
+        acc["other_n"] += int(np.count_nonzero(ok & ~pan))
+        acc["other_e"] += float(e[ok & ~pan].sum())
+    return dict(acc, region=job["region"], seed=int(job["seed"]))
 
 
 def _job(item):
@@ -760,6 +846,8 @@ def _job(item):
         return tag, ad._stuck_one(job)
     if kind == "multi":
         return tag, _world_multi(job)
+    if kind == "scale":
+        return tag, _scale_one(job)
     raise ValueError(f"모르는 일 {kind}")
 
 
@@ -854,19 +942,22 @@ def gather(results: list, models: dict, steps: dict) -> dict:
 # --------------------------------------------------------------------- #
 
 
-def launch_training(info: dict, rd: Path, start: Path, rid: str, seeds, steps: int, every: int, ckpt: Path) -> list[dict]:
-    """train_v3.py 를 live.py train-one 으로 띄운다 (스냅숏 먹이 지도 + 진행 파일). 반환 = 프로세스 기록 목록."""
+def launch_training(info: dict, rd: Path, start: Path, rid: str, seeds, steps: int, every: int, ckpt: Path, config: Path | None = None,
+                    tag: str = "") -> list[dict]:
+    """train_v3.py 를 live.py train-one 으로 띄운다 (스냅숏 먹이 지도 + 진행 파일). config = T 세계 설정(기본 판 폴더 train.yaml — 예비 측정의
+    도주 비용 후보는 train_variant 사본), tag = 이름에 붙일 꼬리(같은 시드의 다른 설정 후보를 가른다). 반환 = 프로세스 기록 목록."""
     rec = info["record"]
     (rd / "logs").mkdir(parents=True, exist_ok=True)
+    config = Path(config) if config is not None else rd / "train.yaml"
     procs = []
     for s in seeds:
-        name = f"live_{rid}_cand_s{int(s)}"
+        name = f"live_{rid}_cand{tag}_s{int(s)}"
         out = Path(ckpt) / rid / f"{name}.zip"
         out.parent.mkdir(parents=True, exist_ok=True)
-        prog, log = rd / "logs" / f"progress_s{int(s)}.json", rd / "logs" / f"train_s{int(s)}.log"
+        prog, log = rd / "logs" / f"progress{tag}_s{int(s)}.json", rd / "logs" / f"train{tag}_s{int(s)}.log"
         src = (f"실시간 적응 {rid}: 스냅숏 {rec['snapshot'].get('why') or ''} 전역 스텝 {rec['snapshot']['global_step']}, 지금 두뇌 "
-               f"{rec['snapshot']['brain']} — 포만 없는 학습 세계 T (train.yaml), 시작 {rec['live']['start']}")
-        args = ["--config", str(rd / "train.yaml"), "--seed", str(int(s)), "--steps", str(int(steps)), "--init-from-model", str(start),
+               f"{rec['snapshot']['brain']} — 포만 없는 학습 세계 T ({config.name}), 시작 {rec['live']['start']}")
+        args = ["--config", str(config), "--seed", str(int(s)), "--steps", str(int(steps)), "--init-from-model", str(start),
                 "--init-source", src, "--run-name", name, "--out", str(out), "--tb", str(TB), "--threads", "1",
                 "--ppo-config", str(PPO_CONFIG), "--every", str(int(every))]
         cmd = [sys.executable, str(HERE), "train-one", "--dir", str(rd), "--progress", str(prog), "--"] + args
@@ -951,13 +1042,122 @@ def stop_procs(procs: list) -> None:
 
 
 # --------------------------------------------------------------------- #
-# 관문 (LIVE_GATE.md 5절)
+# 도망 기록 (10-21 (3) 1차 = 쫓긴 시간 — env_v2/world.py World.flight_stats, r4_eval._one 'flight')
+# --------------------------------------------------------------------- #
+
+NAN = float("nan")
+FLIGHT_SUMS = ("started", "live_steps", "flee_steps", "reflex_steps", "shelter_end")     # 시드 합으로 더하는 도망 기록 칸
+
+
+def ratio(x: float, y: float) -> float:
+    return x / y if y else NAN
+
+
+def flight_of(w: dict) -> dict:
+    """세계 요약 하나의 도망 기록 (env_v2/world.py World.flight_stats). 없거나 옛 꼴이면 ValueError — 관문은 도망 기록 없는 판을 받지 않는다."""
+    f = w.get("flight")
+    if not isinstance(f, dict):
+        raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 에 도망 기록 flight 가 없다 — wild_flight 세계를 지금 실행기(run_mirror.run_world)로 돌린다")
+    if not all(k in f for k in FLIGHT_SUMS + ("contact",)):
+        raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 의 도망 기록이 옛 꼴이다(쫓긴 시간·산 사슴-스텝 없음) — 지금 실행기로 다시 돌린다")
+    return f
+
+
+def flight_seed(res: dict) -> dict:
+    """판 {meta, worlds} → 시드마다 도망 합(지역 합): FLIGHT_SUMS 칸, own_n·own_contact = 스스로 벗어난 도망(LIVE flight_own) 수·쫓긴 스텝,
+    unsafe_n = 잡힘·굶음·잘림(LIVE flight_unsafe) 수, n·steps·contact = 끝 까닭별 수·FLEE 스텝·쫓긴 스텝."""
+    out: dict = {}
+    for w in res["worlds"]:
+        f = flight_of(w)
+        a = out.setdefault(int(w["seed"]), dict({k: 0 for k in FLIGHT_SUMS}, own_n=0, own_contact=0, unsafe_n=0, n={}, steps={}, contact={}))
+        for k in FLIGHT_SUMS:
+            a[k] += int(f[k])
+        a["own_n"] += sum(int(f["n"][c]) for c in LIVE["flight_own"])
+        a["own_contact"] += sum(int(f["contact"][c]) for c in LIVE["flight_own"])
+        a["unsafe_n"] += sum(int(f["n"][c]) for c in LIVE["flight_unsafe"])
+        for key in ("n", "steps", "contact"):
+            for c, v in f[key].items():
+                a[key][c] = a[key].get(c, 0) + int(v)
+    return out
+
+
+def flight_pair(cand: dict, cur: dict) -> dict:
+    """1차 P1 의 짝: 시드마다 스스로 벗어난 도망(LIVE flight_own — 은신처·원판·시야각·반경)의 쫓긴 시간 평균(초) = (그 시드 지역 셋의 쫓긴 스텝 합 ÷ 수)
+    × 2/15, 후보 − 지금. 두 두뇌 모두 그런 도망이 flight_min_episodes 이상인 시드만 쓴다 — 빠진 시드는 dropped. 시드 목록이 다르면 멈춘다.
+    쓸 시드가 없으면 n 0·nan."""
+    import r4_eval as re_
+
+    a, b = flight_seed(cand), flight_seed(cur)
+    if sorted(a) != sorted(b):
+        raise ValueError("두 판의 시드가 다르다 — 같은 세계끼리만 견준다")
+    k = int(LIVE["flight_min_episodes"])
+    both = [s for s in sorted(a) if a[s]["own_n"] >= k and b[s]["own_n"] >= k]
+    if both:
+        p = re_.paired({s: a[s]["own_contact"] / a[s]["own_n"] * STEP_S for s in both}, {s: b[s]["own_contact"] / b[s]["own_n"] * STEP_S for s in both})
+    else:
+        p = dict(a=NAN, b=NAN, diff=NAN, se=NAN, t=NAN, n=0)
+    return dict(p, dropped=[s for s in sorted(a) if s not in both], seeds=len(a))
+
+
+def flight_rate(a: dict, key: str) -> float:
+    """시드 합 하나의 지킴 몫: starts = 1000 산 사슴-스텝당 시작한 도망(GF), flee = 산 사슴-스텝 가운데 FLEE 를 실행한 몫(GV — 반사·스스로 고른 것 모두),
+    unsafe = 시작한 도망 가운데 잡힘·굶음·잘림으로 끝난 몫(GC). 분모가 0 이면 0."""
+    if key == "starts":
+        return 1000.0 * a["started"] / a["live_steps"] if a["live_steps"] else 0.0
+    if key == "flee":
+        return a["flee_steps"] / a["live_steps"] if a["live_steps"] else 0.0
+    if key == "unsafe":
+        return a["unsafe_n"] / a["started"] if a["started"] else 0.0
+    raise ValueError(f"모르는 지킴 몫 {key}")
+
+
+def flight_rate_pair(cand: dict, cur: dict, key: str) -> dict:
+    """지킴 GF·GV·GC 의 짝: 시드마다 flight_rate(key), 후보 − 지금."""
+    import r4_eval as re_
+
+    a, b = flight_seed(cand), flight_seed(cur)
+    return re_.paired({s: flight_rate(v, key) for s, v in a.items()}, {s: flight_rate(v, key) for s, v in b.items()})
+
+
+def flight_pooled(res: dict) -> dict:
+    """판 전체 도망 합 (보고 — 시드 평균이 아니라 전체 합의 비율이라 1차 P1 의 시드 평균과 셈이 다르다): 시작한 도망 수·시드당·1000 산 사슴-스텝당,
+    끝 까닭 몫(시작한 도망 가운데)·까닭별 평균 도망 초·쫓긴 초, 스스로 벗어난 도망 수·몫·쫓긴 시간 평균 초(own_contact_s), 잡힘·굶음·잘림 몫·잘림 몫,
+    은신처 원 안에서 끝난 몫(살아 끝난 도망 가운데), 산 사슴-스텝 가운데 실행 FLEE 몫(반사 포함)·반사 몫·스스로 고른 FLEE 몫, 쫓긴 시간 칸."""
+    W = res["worlds"]
+    t = {k: 0 for k in FLIGHT_SUMS}
+    n, st, ct, hist = {}, {}, {}, None
+    for w in W:
+        f = flight_of(w)
+        for k in FLIGHT_SUMS:
+            t[k] += int(f[k])
+        for d, key in ((n, "n"), (st, "steps"), (ct, "contact")):
+            for c, v in f[key].items():
+                d[c] = d.get(c, 0) + int(v)
+        h = np.asarray(f.get("hist") or [], dtype=np.int64)
+        hist = h if hist is None else hist + h
+    S, live = t["started"], t["live_steps"]
+    own, uns = tuple(LIVE["flight_own"]), tuple(LIVE["flight_unsafe"])
+    on, oc, un = sum(n.get(c, 0) for c in own), sum(ct.get(c, 0) for c in own), sum(n.get(c, 0) for c in uns)
+    return dict(started=S, started_per_seed=S / max(len({int(w["seed"]) for w in W}), 1), starts_per_1k=ratio(1000.0 * S, live), live_steps=live,
+                n=n, share={c: ratio(v, S) for c, v in n.items()}, mean_s={c: ratio(st[c] * STEP_S, v) for c, v in n.items()},
+                contact_s={c: ratio(ct[c] * STEP_S, v) for c, v in n.items()}, own_n=on, own_share=ratio(on, S), own_contact_s=ratio(oc * STEP_S, on),
+                unsafe_share=ratio(un, S), truncated_share=ratio(n.get("truncated", 0), S), shelter_end_share=ratio(t["shelter_end"], S - un),
+                flee_share=ratio(t["flee_steps"], live), reflex_share=ratio(t["reflex_steps"], live),
+                self_flee_share=ratio(t["flee_steps"] - t["reflex_steps"], live), hist=[] if hist is None else hist.tolist())
+
+
+# --------------------------------------------------------------------- #
+# 관문 (LIVE_GATE.md 5절 — 10-21 변경 기록 (3) 1차 = 쫓긴 시간)
 # --------------------------------------------------------------------- #
 
 
 def gate_live(ev: dict, stuck: dict | None, check: dict | None) -> dict:
-    """빠른 관문. ev = {'N': {'current', 'candidate'}, 'G': {...}} (판 {meta, worlds}), stuck = {'current', 'candidate'} (끼임 {summary}),
-    check = 재현 확인 결과(ok None = 건너뜀). 문턱 = t_crit(n − 1), n = 짝 시드 수. 통과 = R(했으면)·P1·GN·GG·G4·G5·G6 모두 — A5 는 내보낼 때."""
+    """빠른 관문 (LIVE_GATE.md 5절, 변경 기록 (3) 사용자 10-21 '도망 시간' — 1차 = 쫓긴 시간). ev = {'N': {'current', 'candidate'}, 'G': {...}} (판 {meta, worlds},
+    세계마다 도망 기록 flight), stuck = {'current', 'candidate'} (끼임 {summary}), check = 재현 확인 결과(ok None = 건너뜀).
+    1차 P1 = N 세계 시드마다 스스로 벗어난 도망(은신처·원판·시야각·반경)의 쫓긴 시간 평균 초: 후보 − 지금 < 0 이고 ≤ −δ(LIVE flight_min_effect_s),
+    짝 t ≤ −t_crit(n₁ − 1), n₁ = 두 두뇌 모두 그런 도망이 있는 시드 수.
+    지킴 (문턱 t_crit(n − 1), n = 짝 시드 수) = N: GN(잡힘 — 옛 1차 — ·굶음·산), GF(1000 산 사슴-스텝당 시작한 도망), GV(실행 FLEE 몫),
+    GC(잡힘·굶음·잘림으로 끝난 도망 몫) / G: GG(잡힘·굶음·산·쫓긴 시간) / G4·G5·G6. 통과 = R(했으면)·P1·지킴 모두 — A5 는 내보낼 때."""
     import r4_eval as re_
 
     N, G = ev["N"], ev["G"]
@@ -966,25 +1166,40 @@ def gate_live(ev: dict, stuck: dict | None, check: dict | None) -> dict:
         c["R_check"] = dict(ok=None, skipped=True, why=(check or {}).get("why", "재현 확인 없음"), rule="환경 판 0·두뇌 바꿈 없음일 때만")
     else:
         c["R_check"] = dict(ok=bool(check["ok"]), steps=check.get("steps"), rule="재현 확인 (adapt GATE.md 변경 기록 (1) 규칙)")
-    p = re_.paired(re_.per_seed(N["candidate"], "caught"), re_.per_seed(N["current"], "caught"))
-    n = int(p["n"])
+    pc = re_.paired(re_.per_seed(N["candidate"], "caught"), re_.per_seed(N["current"], "caught"))
+    n = int(pc["n"])
     T = t_crit(n - 1)
     n_g = int(re_.paired(re_.per_seed(G["candidate"], "caught"), re_.per_seed(G["current"], "caught"))["n"])
     TG = t_crit(n_g - 1)                                     # G 세계는 판정 시드 수가 따로다 (LIVE judge_seeds_g)
+    p = flight_pair(N["candidate"], N["current"])
+    n1 = int(p["n"])
+    T1 = t_crit(n1 - 1)                                      # 1차 문턱은 두 두뇌 모두 스스로 벗어난 도망이 있는 시드 수에서
+    dl = float(LIVE["flight_min_effect_s"])
 
     def t_ok(q: dict, cond: bool) -> bool:
         # 시드 하나면 표준오차가 nan 이고 t 가 ±∞ 라 어느 쪽 문턱도 넘는다 — 짝 t 를 셀 수 없으면 어떤 t 기준도 통과로 두지 않는다
         return bool(int(q["n"]) >= 2 and math.isfinite(q["se"]) and cond)
 
-    c["P1_N_caught"] = dict(p, ok=t_ok(p, p["diff"] < 0 and p["t"] <= -T), rule=f"N: 후보 − 지금 < 0 이고 짝 t ≤ −{T:.3f}")
+    c["P1_N_chase"] = dict(p, ok=t_ok(p, p["diff"] < 0 and p["diff"] <= -dl and p["t"] <= -T1),
+                           rule=("N: 스스로 벗어난 도망의 쫓긴 시간 평균 초 후보 − 지금 < 0" + (f" 이고 ≤ −{dl:g}초" if dl > 0 else "")
+                                 + f", 짝 t ≤ −{T1:.3f} (시드 {n1}, 빠진 시드 {len(p['dropped'])})"))
+    c["GN_caught"] = dict(pc, ok=t_ok(pc, pc["t"] < T), rule=f"N: 짝 t < +{T:.3f} (옛 1차 — 유의하게 더 잡히지 않는다)")
     for key, sign in (("starved", 1), ("alive", -1)):
         q = re_.paired(re_.per_seed(N["candidate"], key), re_.per_seed(N["current"], key))
         c[f"GN_{key}"] = dict(q, ok=t_ok(q, q["t"] < T if sign > 0 else q["t"] > -T),
                               rule=f"N: 짝 t {'<' if sign > 0 else '>'} {'+' if sign > 0 else '−'}{T:.3f}")
+    for key, name, why in (("starts", "GF_flight_starts", "1000 산 사슴-스텝당 시작한 도망 — 짧게 자주 도망쳐 평균만 줄이지 않는다"),
+                           ("flee", "GV_flee_time", "산 사슴-스텝 가운데 실행 FLEE 몫(반사·스스로 고른 것) — 더 오래·일찍 달려 쫓김을 피하지 않는다"),
+                           ("unsafe", "GC_flight_unsafe", "시작한 도망 가운데 잡힘·굶음·잘림 몫 — 긴 추격을 잡힘·잘림으로 바꿔 1차 평균에서 빼지 않는다")):
+        q = flight_rate_pair(N["candidate"], N["current"], key)
+        c[name] = dict(q, ok=t_ok(q, q["t"] < T), rule=f"N: 짝 t < +{T:.3f} ({why})")
     for key, sign in (("caught", 1), ("starved", 1), ("alive", -1)):
         q = re_.paired(re_.per_seed(G["candidate"], key), re_.per_seed(G["current"], key))
         c[f"GG_{key}"] = dict(q, ok=t_ok(q, q["t"] < TG if sign > 0 else q["t"] > -TG),
                               rule=f"G: 짝 t {'<' if sign > 0 else '>'} {'+' if sign > 0 else '−'}{TG:.3f}")
+    q = flight_pair(G["candidate"], G["current"])
+    TGc = t_crit(int(q["n"]) - 1)
+    c["GG_chase"] = dict(q, ok=t_ok(q, q["t"] < TGc), rule=f"G: 쫓긴 시간(1차와 같은 셈) 짝 t < +{TGc:.3f} (시드 {q['n']}, 빠진 시드 {len(q['dropped'])})")
     an, ag, bg = re_.pooled(N["candidate"]), re_.pooled(G["candidate"]), re_.pooled(G["current"])
     c["G4_catch_in_shelter"] = dict(N=an["catch_cover"], G=ag["catch_cover"], ok=bool(an["catch_cover"] == 0 and ag["catch_cover"] == 0),
                                     rule="후보 N·G 판정 세계 모두 0")
@@ -996,31 +1211,74 @@ def gate_live(ev: dict, stuck: dict | None, check: dict | None) -> dict:
     use_ok = all(ag["beh"][x] > LIVE["use_min"] for x in ("graze", "flee", "hide"))
     c["G6_no_exploit"] = dict(shelter=ag["shelter"], shelter_current=bg["shelter"], beh=ag["beh"],
                               ok=bool(ag["shelter"] <= LIVE["shelter_x"] * bg["shelter"] and use_ok),
-                              rule="G: 은신처 안 몫 ≤ 지금의 2배, 먹기·도망·숨기 모두 1% 넘게")
-    p1 = c["P1_N_caught"]
-    bad = [k for k, v in c.items() if k.startswith(("GN_", "GG_", "G4", "G5", "G6")) and v["ok"] is not True]
+                              rule="G: 은신처 안 몫 ≤ 지금의 2배, 먹기·도망(실행 FLEE — 반사 포함)·숨기 모두 1% 넘게")
+    p1 = c["P1_N_chase"]
+    drop = len(p1["dropped"])
+    bad = [k for k, v in c.items() if k.startswith(("GN_", "GF_", "GV_", "GC_", "GG_", "G4", "G5", "G6")) and v["ok"] is not True]
     if c["R_check"]["ok"] is False:
         verdict, why, brief = "기각", "재현 확인 실패 — 거울이 지금 게임과 다르다", "재현 확인 실패"
-    elif n < 2 or not math.isfinite(p1["se"]):
+    elif n < 2 or not math.isfinite(pc["se"]):
         verdict, why, brief = "기각", f"판정 시드 {n}개 — 짝 t 를 셀 수 없다 (2개 이상이어야 한다)", f"판정 시드 {n}개 (2개 이상)"
+    elif n1 < 2 or not math.isfinite(p1["se"]):
+        verdict = "기각"
+        why = f"쫓긴 시간을 잴 시드 {n1}개 — 두 두뇌 모두 스스로 벗어난 도망이 있는 시드가 2개 이상이어야 한다 (빠진 시드 {drop})"
+        brief = f"쫓긴 시간 잴 시드 {n1}개 (2개 이상)"
     elif not p1["ok"]:
         verdict = "기각"
-        why = (f"1차 P1 실패: 포만 없는 세계 잡힌 몫 후보 {p1['a']:.4f} 대 지금 {p1['b']:.4f} (짝 t {tfmt(p1['t'])}, 문턱 −{T:.3f}, 시드 {n})")
-        brief = f"1차 t {tfmt(p1['t'], 1)} (문턱 −{T:.2f})"
+        why = (f"1차 P1 실패: 포만 없는 세계 스스로 벗어난 도망의 쫓긴 시간 평균 후보 {p1['a']:.2f}초 대 지금 {p1['b']:.2f}초 (짝 t {tfmt(p1['t'])}, "
+               f"문턱 −{T1:.3f}" + (f", 최소 차이 −{dl:g}초" if dl > 0 else "") + f", 시드 {n1}, 빠진 시드 {drop})")
+        brief = f"1차 쫓긴 시간 {p1['b']:.1f}→{p1['a']:.1f}초 t {tfmt(p1['t'], 1)} (문턱 −{T1:.2f})"
     elif bad:
         verdict, why = "기각", "지킴 기준 실패: " + ", ".join(bad)
         brief = "지킴 " + ", ".join(f"{k} (t {tfmt(c[k]['t'], 1)})" if "t" in c[k] else k for k in bad)
     else:
-        verdict, why = "통과", "1차 P1·지킴 GN·GG·G4·G5·G6 모두 통과" + ("" if c["R_check"]["ok"] else " (재현 확인 없음 — 중간 변화)")
+        verdict, why = "통과", "1차 P1(쫓긴 시간)·지킴 GN·GF·GV·GC·GG·G4·G5·G6 모두 통과" + ("" if c["R_check"]["ok"] else " (재현 확인 없음 — 중간 변화)")
         brief = ""
-    summary = (f"포만 없는 세계 잡힘 {p1['b'] * 100:.1f}→{p1['a'] * 100:.1f}% (t {tfmt(p1['t'], 1)})"
-               + (", 게임 세계 나빠짐 없음" if not bad else ", 게임 세계 지킴 실패"))
+    summary = f"포만 없는 세계 쫓긴 시간 {p1['b']:.1f}→{p1['a']:.1f}초 (t {tfmt(p1['t'], 1)})" + (", 잡힘·도망 나빠짐 없음" if not bad else ", 지킴 실패")
     rep = dict(pooled_N=dict(candidate=an, current=re_.pooled(N["current"])), pooled_G=dict(candidate=ag, current=bg),
-               shelter_G=re_.paired(re_.per_seed(G["candidate"], "shelter"), re_.per_seed(G["current"], "shelter")))
+               shelter_G=re_.paired(re_.per_seed(G["candidate"], "shelter"), re_.per_seed(G["current"], "shelter")),
+               flight={w: dict(candidate=flight_pooled(ev[w]["candidate"]), current=flight_pooled(ev[w]["current"])) for w in ("N", "G")})
     return dict(verdict=verdict, passed=verdict == "통과", why=why, brief=brief, summary=summary, n=n, t_crit=T, n_g=n_g, t_crit_g=TG,
-                criteria=c, report=rep,
+                n_flight=n1, t_crit_flight=T1, dropped_flight=p1["dropped"], criteria=c, report=rep,
                 rules={k: v for k, v in LIVE.items()},
                 live_gate_md_sha256=hashlib.sha256(LIVE_GATE_MD.read_bytes()).hexdigest() if LIVE_GATE_MD.exists() else None)
+
+
+def pct(x: float) -> str:
+    return "—" if x != x else f"{x * 100:.1f}%"
+
+
+def cause_parts(f: dict, causes) -> str:
+    """끝 까닭 묶음 하나: 몫(시작한 도망 가운데)과 까닭마다 수 '몫 (수·수·…)'."""
+    k = sum(f["n"].get(c, 0) for c in causes)
+    return f"{pct(ratio(k, f['started']))} ({'·'.join(str(f['n'].get(c, 0)) for c in causes)})"
+
+
+def flight_groups(f: dict) -> tuple:
+    """끝 까닭 셋 묶음: 스스로 벗어남(LIVE flight_own), 그 밖 살아 끝남(바꿈·그만둠·끝까지 쫓김·안 쫓김), 잡힘·굶음·잘림(LIVE flight_unsafe)."""
+    own, uns = tuple(LIVE["flight_own"]), tuple(LIVE["flight_unsafe"])
+    return own, tuple(c for c in f["n"] if c not in own and c not in uns), uns
+
+
+def fmt_flight(g: dict) -> str:
+    """gate.md 도망 기록 표 (보고 — 전체 합의 비율): 세계·두뇌마다 시작한 도망(1000 산 사슴-스텝당), 스스로 벗어난 도망의 쫓긴 시간(전체 합),
+    끝 까닭 묶음 몫(시작한 도망 가운데), 은신처에서 끝난 몫, 실행 FLEE 몫(반사 포함)·스스로 고른 FLEE 몫. 아래 줄에 1차 P1·GG_chase 의 시드 평균."""
+    rep = g["report"]
+    L = ["", "## 도망 기록 (보고 — 전체 합. 끝 까닭 몫은 시작한 도망 가운데, 정의 env_v2/world.py '야생 1단계' (w3) 도망 기록)", "",
+         "| 세계 | 두뇌 | 시작 (1000 산 사슴-스텝당) | 쫓긴 시간 초 (스스로 벗어남, 전체 합) | 스스로 벗어남 (은신처·원판·시야각·반경) | "
+         "그 밖 살아 끝남 (바꿈·그만둠·끝까지·안 쫓김) | 잡힘·굶음·잘림 | 은신처에서 끝 (살아 끝난 도망 가운데) | 실행 FLEE 몫 (반사 포함) | 스스로 고른 FLEE 몫 |",
+         "|---|---|---|---|---|---|---|---|---|---|"]
+    for w in ("N", "G"):
+        for b, nm in (("current", "지금"), ("candidate", "후보")):
+            f = rep["flight"][w][b]
+            own, oth, uns = flight_groups(f)
+            L.append(f"| {w} | {nm} | {f['started']} ({f['starts_per_1k']:.2f}) | {f['own_contact_s']:.2f} | {cause_parts(f, own)} | {cause_parts(f, oth)} | "
+                     f"{cause_parts(f, uns)} | {pct(f['shelter_end_share'])} | {pct(f['flee_share'])} | {pct(f['self_flee_share'])} |")
+    p1, gg, dr = g["criteria"]["P1_N_chase"], g["criteria"]["GG_chase"], g["dropped_flight"]
+    L += ["", f"- 1차 P1 (시드마다 평균을 낸 뒤 평균 — 위 표의 전체 합과 셈이 다르다): N 지금 {p1['b']:.2f}초 → 후보 {p1['a']:.2f}초, "
+              f"짝 시드 {g['n_flight']} (빠진 시드 {len(dr)}{': ' + ', '.join(map(str, dr)) if dr else ''})",
+          f"- G 쫓긴 시간 (지킴 GG_chase, 같은 셈): 지금 {gg['b']:.2f}초 → 후보 {gg['a']:.2f}초 (짝 t {tfmt(gg['t'])}, 시드 {gg['n']})"]
+    return "\n".join(L)
 
 
 # --------------------------------------------------------------------- #
@@ -1084,7 +1342,7 @@ def default_plan(**kw) -> dict:
     return dict(horizon=LIVE["horizon"], judge=LIVE["judge_seeds"], horizon_g=LIVE["horizon_g"], judge_g=LIVE["judge_seeds_g"],
                 select=LIVE["select_seeds"], stuck=LIVE["stuck_seeds"],
                 check=LIVE["check_seeds"], steps=LIVE["train_steps"], model_seeds=tuple(LIVE["model_seeds"]), workers=default_workers(),
-                skip_check=False, force_export=False, ckpt=CKPT, test=False) | kw
+                flight_cost=float(LIVE["train_flight_cost"]), skip_check=False, force_export=False, ckpt=CKPT, test=False) | kw
 
 
 def plan_from_args(a) -> dict:
@@ -1107,13 +1365,22 @@ def plan_from_args(a) -> dict:
         pl["steps"] = int(a.steps)
     if a.model_seeds:
         pl["model_seeds"] = tuple(int(s) for s in a.model_seeds)
+    if getattr(a, "flight_cost", None) is not None:
+        if float(a.flight_cost) < 0.0:
+            raise SystemExit(f"--flight-cost {a.flight_cost} 는 0 이상이어야 한다")
+        pl["flight_cost"] = float(a.flight_cost)
     pl["skip_check"], pl["force_export"] = bool(a.skip_check), bool(a.force_export)
     base = default_plan()
-    pl["test"] = any(pl[k] != base[k] for k in ("horizon", "judge", "horizon_g", "judge_g", "select", "stuck", "check", "steps", "model_seeds")) \
+    pl["test"] = any(pl[k] != base[k] for k in ("horizon", "judge", "horizon_g", "judge_g", "select", "stuck", "check", "steps", "model_seeds",
+                                                "flight_cost")) \
         or pl["skip_check"] \
         or pl["force_export"]
     if pl["test"] and Path(a.root).resolve() == DEFAULT_ROOT.resolve():
         raise SystemExit("시험 크기·시험 깃발은 --root 로 실제 폴더(Saved/EcoAdapt)가 아닌 곳을 줄 때만 쓴다 — 미리 적은 관문이 아니다")
+    if not LIVE["flight_sizes_confirmed"] and Path(a.root).resolve() == DEFAULT_ROOT.resolve():
+        raise SystemExit("1차 쫓긴 시간 기준의 크기(H·n·S·K·δ·도주 비용)를 아직 예비 측정으로 확정하지 않았다 (LIVE flight_sizes_confirmed 거짓, "
+                         "LIVE_GATE.md 변경 기록 (3)) — 확정해 LIVE_GATE.md 와 LIVE 에 먼저 적기 전에는 실제 폴더에서 판·감시를 돌리지 않는다. "
+                         "시험은 --root 로 다른 폴더를 준다")
     return pl
 
 
@@ -1133,6 +1400,8 @@ def plan_args(pl: dict) -> list[str]:
         out += ["--steps", str(pl["steps"])]
     if pl["model_seeds"] != base["model_seeds"]:
         out += ["--model-seeds"] + [str(s) for s in pl["model_seeds"]]
+    if pl["flight_cost"] != base["flight_cost"]:
+        out += ["--flight-cost", repr(float(pl["flight_cost"]))]
     if pl["skip_check"]:
         out.append("--skip-check")
     if pl["force_export"]:
@@ -1174,7 +1443,7 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
                message=f"변환 중 — 시도 {attempt}, 환경 #{e['revision']}")
         st.start_heartbeat()                                 # 재현 확인·판정처럼 긴 단계에서도 HEARTBEAT_S 마다 다시 쓴다
         try:
-            info = prepare(snap_path, snap, rd, brain_folders(root))
+            info = prepare(snap_path, snap, rd, brain_folders(root), flight_cost=plan["flight_cost"])
         except ad.Refused as ex_:
             res.update(state="refused", why=str(ex_), last_result=f"거부: {short(ex_, 60)}")
             mark("convert", t0)
@@ -1242,7 +1511,7 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         if not okr:
             raise RuntimeError("학습에 성공한 후보가 없다: " + ", ".join(f"s{r['seed']} rc {r['rc']}" for r in rows))
 
-        # 후보 고르기 (K > 1 — N 세계 고르기 시드, 잡힌 몫 최저 → 굶은 몫 → 모델 시드)
+        # 후보 고르기 (K > 1 — N 세계 고르기 시드, 스스로 벗어난 도망의 쫓긴 시간 최저 → 잡힌 몫 → 굶은 몫 → 모델 시드. 10-21 (3) 뒤 1차와 같은 잣대)
         import r4_eval as re_
 
         if len(okr) > 1:
@@ -1258,9 +1527,11 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
             srows = []
             for r in okr:
                 p = re_.pooled(sres[f"s{r['seed']}:N"])
-                srows.append(dict(seed=r["seed"], model=r["model"], caught=p["caught"], starved=p["starved"], alive=p["alive"]))
-            srows.sort(key=lambda x: (x["caught"], x["starved"], x["seed"]))
-            atomic_write_json(rd / "select.json", dict(chosen=srows[0]["model"], rule="N 세계 고르기 시드 잡힌 몫 최저 → 굶은 몫 → 모델 시드", rows=srows))
+                fs = flight_pooled(sres[f"s{r['seed']}:N"])["own_contact_s"]
+                srows.append(dict(seed=r["seed"], model=r["model"], flight_s=fs, caught=p["caught"], starved=p["starved"], alive=p["alive"]))
+            srows.sort(key=lambda x: (x["flight_s"] if x["flight_s"] == x["flight_s"] else math.inf, x["caught"], x["starved"], x["seed"]))
+            atomic_write_json(rd / "select.json", dict(chosen=srows[0]["model"], rule="N 세계 고르기 시드 쫓긴 시간(스스로 벗어난 도망) 최저 → 잡힌 몫 → 굶은 몫 → 모델 시드",
+                                                        rows=srows))
             cand = Path(srows[0]["model"])
             mark("select", t0)
         else:
@@ -1289,10 +1560,12 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
                  profile="시험 크기 (관문 상수 아님 — 판정 아님)" if plan["test"] else "LIVE_GATE.md 관문 상수")
         atomic_write_json(rd / "gate.json", g)
         (rd / "gate.md").write_text(f"# 실시간 관문 {rid}\n\n후보 `{g['candidate']}` 대 지금 두뇌 `{g['current']}` (규칙 LIVE_GATE.md, {g['profile']}, "
-                                    f"N 시드 {g['n']}·문턱 {g['t_crit']:.3f}, G 시드 {g['n_g']}·문턱 {g['t_crit_g']:.3f})\n\n{ad.fmt_gate(g)}\n",
+                                    f"N 시드 {g['n']}·문턱 {g['t_crit']:.3f}, 1차 쫓긴 시간 시드 {g['n_flight']}·문턱 {g['t_crit_flight']:.3f}, "
+                                    f"G 시드 {g['n_g']}·문턱 {g['t_crit_g']:.3f})\n\n{ad.fmt_gate(g)}\n{fmt_flight(g)}\n",
                                     encoding="utf-8", newline="\n")
         mark("gate", t0)
         res.update(verdict=g["verdict"], why=g["why"], gate_summary=g["summary"])
+        print(f"1차 P1 쫓긴 시간: 짝 시드 {g['n_flight']}/{g['n']} (두 두뇌 모두 스스로 벗어난 도망이 없어 빠진 시드 {len(g['dropped_flight'])})", flush=True)
         print(f"관문 {g['verdict']} — {g['why']}", flush=True)
         if not g["passed"] and not plan["force_export"]:
             res.update(state="rejected", last_result=f"기각: {g['brief']}")
@@ -1654,8 +1927,8 @@ def cmd_watch(a) -> int:
     try:
         w = Watcher(Path(a.root), pl, new_only=not a.existing)
         w.log(f"감시 시작: {w.snapdir} (워커 {pl['workers']}, 학습 {fmt_steps(pl['steps'])} × 모델 {len(pl['model_seeds'])}, 판정 시드 "
-              f"N {pl['judge'][0]}~{pl['judge'][1]} × {pl['horizon']} 스텝 · G {pl['judge_g'][0]}~{pl['judge_g'][1]} × {pl['horizon_g']} 스텝"
-              f"{', 시험 크기' if pl['test'] else ''})")
+              f"N {pl['judge'][0]}~{pl['judge'][1]} × {pl['horizon']} 스텝 · G {pl['judge_g'][0]}~{pl['judge_g'][1]} × {pl['horizon_g']} 스텝, 1차 = 쫓긴 시간"
+              + (", 도주 비용 {:g}".format(pl["flight_cost"]) if pl["flight_cost"] > 0 else "") + (", 시험 크기)" if pl["test"] else ")"))
         try:
             while True:
                 try:
@@ -1679,7 +1952,7 @@ def cmd_watch(a) -> int:
 
 
 def at_horizon(res: dict, h: int) -> dict:
-    """예비 측정 판 → 판정 길이 h 의 잡힘·굶음·산으로 바꾼 판 (r4_eval 지표 꼴)."""
+    """예비 측정 판 → 판정 길이 h 의 잡힘·굶음·산·도망 기록(그 길이에서 끊은 것)으로 바꾼 판 (r4_eval 지표 꼴)."""
     return dict(meta=res["meta"], worlds=[dict(w, **w["at"][str(int(h))]) for w in res["worlds"]])
 
 
@@ -1698,9 +1971,58 @@ def pilot_pair(a: dict, b: dict, h: int) -> dict:
     return dict(p, sd=sd, n_needed=need)
 
 
+def pilot_flight_pair(a: dict, b: dict, h: int) -> dict:
+    """a − b 쫓긴 시간 짝 차이 (판정 길이 h, 관문 1차 P1 과 같은 셈 `flight_pair` — 빠진 시드 dropped): 평균·sd(시드마다 차이)·t, 그 sd 로
+    0.25·0.5·1 초를 5%·검정력 80% 로 가를 시드 수, 지킴 GF·GV·GC 와 같은 셈의 짝 차이(starts·flee·unsafe)."""
+    A, B = at_horizon(a, h), at_horizon(b, h)
+    p = flight_pair(A, B)
+    sd = float(p["se"] * math.sqrt(p["n"])) if p["n"] > 1 else NAN
+    need = {f"{d:g}s": (int(math.ceil(((_Z975 + 0.8416) * sd / d) ** 2)) if sd == sd else None) for d in (0.25, 0.5, 1.0)}
+    guards = {}
+    for key in ("starts", "flee", "unsafe"):
+        q = flight_rate_pair(A, B, key)
+        guards[key] = dict(a=q["a"], b=q["b"], diff=q["diff"], t=q["t"], n=q["n"])
+    return dict(p, sd=sd, n_needed=need, **guards)
+
+
+def scale_items(info: dict, model: Path, seeds, steps: int) -> list:
+    """도주 비용 기준 크기 일: T 세계(train.yaml, 지역 섞기의 지역마다 그 지역 설정) × 학습 시드 — 지역 스냅숏 먹이 지도를 덮는다(학습 train-one 과 같다)."""
+    from env_v2.config import load_v2_config
+    from env_v2.vec_env import region_configs, region_mix_params
+
+    cfg = load_v2_config(Path(info["dir"]) / "train.yaml")
+    cfgs = region_configs(cfg, region_mix_params(cfg.v2["train"]["region_mix"], cfg))
+    food = {n: r["cap"] for n, r in info["regions"].items()}
+    return [("scale", f"scale:{r}", dict(cfg=c.to_dict(), seed=int(s), steps=int(steps), model=str(model), region=r, snap_food=food[r]))
+            for r, c in cfgs.items() for s in seeds]
+
+
+def scale_summary(rows: list, train_yaml: Path) -> dict:
+    """도주 비용 기준 크기 (LIVE_GATE.md 변경 기록 (3) — flight_cost 를 고르는 자료): 사슴-스텝 평균 보상(죽음·번식 포함), FLEE 스텝(그 가운데 반사 몫)·그 밖 스텝의
+    평균 에너지 칸(보상 − rew_alive, 죽음·번식 스텝 뺌)과 그 차이, 설정에서 셈한 뛰기 대사 비용 rew_energy × energy_drain × (c_rest + c_move·뛰기²)과
+    걷기·정지 대사 비용."""
+    from env_v2.config import load_v2_config
+
+    cfg = load_v2_config(Path(train_yaml))
+    sp = cfg.v2["features"]["speed"]
+    gs = [float(x) for x in sp["gait_speed"]]
+    mult = [float(sp["c_rest"]) + float(sp["c_move"]) * g * g for g in gs]
+    unit = float(cfg.rew_energy) * float(cfg.energy_drain)
+    t = {k: sum(r.get(k, 0) for r in rows) for k in ("steps", "rew", "deaths", "repro", "flee_n", "flee_e", "other_n", "other_e", "reflex_n")}
+    fe = t["flee_e"] / t["flee_n"] if t["flee_n"] else NAN
+    oe = t["other_e"] / t["other_n"] if t["other_n"] else NAN
+    return dict(worlds=len(rows), deer_steps=t["steps"], reward_per_step=t["rew"] / max(t["steps"], 1), rew_alive=float(cfg.rew_alive),
+                deaths_per_1k=1000.0 * t["deaths"] / max(t["steps"], 1), repro_per_1k=1000.0 * t["repro"] / max(t["steps"], 1),
+                flee_share=t["flee_n"] / max(t["flee_n"] + t["other_n"], 1), reflex_share=t["reflex_n"] / max(t["flee_n"] + t["other_n"], 1),
+                energy_flee=fe, energy_other=oe, energy_gap=oe - fe,
+                metabolic=dict(stop=unit * mult[0], walk=unit * mult[1], run=unit * mult[2]), run_extra_over_stop=unit * (mult[2] - mult[0]))
+
+
 def cmd_pilot(a) -> int:
-    """예비 측정 (명세 6절): 지금 두뇌 대 R5 s3 (N·G, 판정 길이 둘 — 시드마다 짝 차이의 sd), T 세계 measure-fdec, K 모델 × S 후보 대 지금 두뇌,
-    단계별 시간. 시드 34900~34999 만 쓴다 (관문 시드 35000~35199 는 쓰지 않는다). 결과로 LIVE_GATE.md 크기를 고른다 — 판정이 아니다."""
+    """예비 측정 (명세 6절 — LIVE_GATE.md 변경 기록 (3) 뒤 '쫓긴 시간' 기준): 지금 두뇌 대 R5 s3·--extra-models 두뇌(N·G, 판정 길이마다 — 잡힘과
+    쫓긴 시간의 시드마다 짝 차이 sd, 0.25·0.5·1 초를 가를 시드 수, 지킴 GF·GV·GC 차이, 끝 까닭 몫), T 세계 measure-fdec, 도주 비용 기준 크기(scale),
+    --flight-cost 값마다 K 모델 × S 후보 대 지금 두뇌, 단계별 시간. 시드 34900~34999 만 쓴다 (관문 시드 35000~35199 는 쓰지 않는다). 결과로 LIVE_GATE.md
+    크기를 고른다 — 판정이 아니다."""
     import r4_eval as re_
 
     root = Path(a.root)
@@ -1708,6 +2030,18 @@ def cmd_pilot(a) -> int:
     for name, lh in (("--seeds", seeds_lh), ("--cand-seeds", cand_lh)):
         if not inside(lh, PILOT_SEEDS):
             raise SystemExit(f"{name} {lh} 는 예비 측정 시드 {PILOT_SEEDS[0]}~{PILOT_SEEDS[1]} 안이어야 한다 (관문 시드를 쓰지 않는다)")
+    extras: dict = {}
+    for item in a.extra_models or []:
+        tag, sep, path = str(item).partition("=")
+        p = Path(path) if Path(path).is_absolute() else ROOT / path
+        if not sep or not tag or tag in ("current", "r5") or tag in extras or ":" in tag:
+            raise SystemExit(f"--extra-models {item} 는 '이름=모델 zip' 이어야 한다 (이름은 겹치지 않고 current·r5 가 아니다)")
+        if not p.exists():
+            raise SystemExit(f"--extra-models {item}: 모델 {p} 가 없다")
+        extras[tag] = p
+    fcs = sorted({float(x) for x in (a.flight_cost if a.flight_cost else [LIVE["train_flight_cost"]])})
+    if any(x < 0.0 for x in fcs):
+        raise SystemExit(f"--flight-cost {fcs} 는 0 이상이어야 한다")
     hs = sorted({int(h) for h in a.horizons})
     H = hs[-1]
     S_list = sorted({int(s) for s in a.steps})
@@ -1724,15 +2058,22 @@ def cmd_pilot(a) -> int:
     times["convert"] = round(time.perf_counter() - t0, 1)
     start = Path(ad.ROOT / info["record"]["anchor"])
     print(f"예비 측정 {pid}: 스냅숏 {Path(a.snapshot).name}, 시작(지금 두뇌) {info['record']['anchor']}, 시드 {seeds_lh[0]}~{seeds_lh[1]}, "
-          f"판정 길이 {hs}, 후보 {len(K)} × {[fmt_steps(s) for s in S_list]}, 워커 {W}", flush=True)
+          f"판정 길이 {hs}, 후보 {len(K)} × {[fmt_steps(s) for s in S_list]} × 도주 비용 {fcs}, 더 견줄 두뇌 {list(extras)}, 워커 {W}", flush=True)
     procs, fproc, fh = [], None, None
     res: dict = {}
     out_rows: dict = dict(pilot=pid, snapshot=Path(a.snapshot).name, seeds=list(seeds_lh), cand_seeds=list(cand_lh), horizons=hs, steps=S_list,
-                          model_seeds=K, workers=W, times=times)
+                          model_seeds=K, flight_costs=fcs, extra_models={k: path_text(v) for k, v in extras.items()}, workers=W, times=times,
+                          criterion="1차 = 포만 없는 세계 스스로 벗어난 도망의 쫓긴 시간 (LIVE_GATE.md 변경 기록 (3))")
     try:
         t_train = time.perf_counter()
         if "cands" in parts:
-            procs = launch_training(info, pd, start, pid, K, S_list[-1], every, Path(a.ckpt) if a.ckpt else CKPT)
+            for fc in fcs:
+                base = fc == float(LIVE["train_flight_cost"])
+                cfg_p = pd / "train.yaml" if base else train_variant(pd, fc)
+                tag = "" if base and len(fcs) == 1 else f"_fc{fc:g}"
+                for p in launch_training(info, pd, start, pid, K, S_list[-1], every, Path(a.ckpt) if a.ckpt else CKPT, config=cfg_p, tag=tag):
+                    procs.append(dict(p, fc=fc, tag=tag))
+            record_pids(pd, procs)
         if "fdec" in parts:
             (pd / "logs").mkdir(parents=True, exist_ok=True)
             fh = open(pd / "logs" / "measure_fdec.log", "w", encoding="utf-8")
@@ -1741,9 +2082,13 @@ def cmd_pilot(a) -> int:
             fproc = subprocess.Popen(fcmd, cwd=str(ROOT), stdout=fh, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONUTF8="1"), **own_group())
         busy = len(procs) + (1 if fproc is not None else 0)
         seeds = seeds_of(seeds_lh)
-        models = {"current": start, "r5": R5S3}
-        if "brains" in parts:
-            items = [it for tag, m in models.items() for w in ("N", "G") for it in eval_items(info, tag, m, seeds, H, w, "multi", hs)]
+        models = {"current": start, "r5": R5S3} | extras
+        if "brains" in parts or "scale" in parts:
+            items = []
+            if "brains" in parts:
+                items += [it for tag, m in models.items() for w in ("N", "G") for it in eval_items(info, tag, m, seeds, H, w, "multi", hs)]
+            if "scale" in parts:
+                items += scale_items(info, start, PILOT["fdec_seeds"], PILOT["scale_steps"])
             t0 = time.perf_counter()
             nw = max(1, min(W - busy, len(items)))
             done = [0]
@@ -1751,11 +2096,17 @@ def cmd_pilot(a) -> int:
                 out = pool.run(items, on_done=lambda: (done.__setitem__(0, done[0] + 1),
                                                        print(f"  두뇌 판 {done[0]}/{len(items)}", flush=True) if done[0] % 50 == 0 else None))
             times["eval_brains"] = round(time.perf_counter() - t0, 1)
-            res.update(gather(out, models, {}))
-            wall = [w["wall_s"] for _, w in out]
-            times["world_wall_mean_s"] = round(float(np.mean(wall)), 2)
-            times["sec_per_world_step"] = float(np.mean(wall)) / H
-            times["eval_brains_workers"] = nw
+            sc = [r for tag, r in out if tag.startswith("scale:")]
+            out = [(tag, r) for tag, r in out if not tag.startswith("scale:")]
+            if sc:
+                out_rows["scale"] = scale_summary(sc, pd / "train.yaml") | dict(model=path_text(start), seeds=list(PILOT["fdec_seeds"]),
+                                                                                steps=PILOT["scale_steps"])
+            if out:
+                res.update(gather(out, models, {}))
+                wall = [w["wall_s"] for _, w in out]
+                times["world_wall_mean_s"] = round(float(np.mean(wall)), 2)
+                times["sec_per_world_step"] = float(np.mean(wall)) / H
+                times["eval_brains_workers"] = nw
         if fproc is not None:
             fproc.wait()
             fh.close()
@@ -1766,19 +2117,21 @@ def cmd_pilot(a) -> int:
             fproc = None
         if procs:
             rows = wait_training(procs)
+            meta = list(procs)
             procs = []
             times["train_wait"] = round(time.perf_counter() - t_train, 1)                 # 학습 띄움 → 다 끝남 (measure-fdec 기다림 포함)
             times["train_learn"] = round(max([r["learn_s"] or 0.0 for r in rows] + [0.0]), 1)
             rates = [float(r["steps_per_sec"]) for r in rows if r.get("steps_per_sec")]
             times["train_steps_per_sec"] = round(float(np.mean(rates)), 1) if rates else None
             cands = {}
-            for r in rows:
+            for r, pm in zip(rows, meta):
                 if not r["ok"]:
                     continue
                 for S in S_list:
                     z = Path(r["model"]) if S == S_list[-1] else Path(r["model"]).with_name(f"{Path(r['model']).stem}_{S / 1e6:g}m.zip")
                     if z.exists():
-                        cands[f"s{r['seed']}_{fmt_steps(S)}"] = z
+                        cands[f"s{r['seed']}{pm['tag']}_{fmt_steps(S)}"] = z
+            out_rows["candidate_models"] = {k: path_text(v) for k, v in cands.items()}
             cseeds = seeds_of(cand_lh)
             items = [it for tag, m in cands.items() for w in ("N", "G") for it in eval_items(info, tag, m, cseeds, H, w, "multi", hs)]
             have_cur = "current:N" in res and set(cseeds) <= set(res["current:N"]["meta"]["seeds"])
@@ -1791,11 +2144,21 @@ def cmd_pilot(a) -> int:
             cres = gather(out, dict(cands, current=start), {})
             cur_c = {w: (subset(res[f"current:{w}"], cseeds) if have_cur else cres[f"current:{w}"]) for w in ("N", "G")}
             out_rows["candidates"] = {tag: {w: {str(h): pilot_pair(cres[f"{tag}:{w}"], cur_c[w], h) for h in hs} for w in ("N", "G")} for tag in cands}
+            out_rows["candidates_flight"] = {tag: {w: {str(h): pilot_flight_pair(cres[f"{tag}:{w}"], cur_c[w], h) for h in hs} for w in ("N", "G")}
+                                             for tag in cands}
             out_rows["candidate_pooled"] = {tag: {w: re_.pooled(cres[f"{tag}:{w}"]) for w in ("N", "G")} for tag in cands}
-        if "current:N" in res and "r5:N" in res:
-            out_rows["r5_vs_current"] = {w: {str(h): pilot_pair(res[f"r5:{w}"], res[f"current:{w}"], h) for h in hs} for w in ("N", "G")}
+            cp = {tag: {w: cres[f"{tag}:{w}"] for w in ("N", "G")} for tag in cands} | {"current": cur_c}
+            out_rows["candidate_flight_pooled"] = {tag: {w: {str(h): flight_pooled(at_horizon(r, h)) for h in hs} for w, r in by.items()}
+                                                   for tag, by in cp.items()}
+        if "current:N" in res:
+            others = [t for t in models if t != "current" and f"{t}:N" in res]
+            out_rows["vs_current"] = {t: {w: {str(h): dict(caught=pilot_pair(res[f"{t}:{w}"], res[f"current:{w}"], h),
+                                                            flight=pilot_flight_pair(res[f"{t}:{w}"], res[f"current:{w}"], h)) for h in hs}
+                                          for w in ("N", "G")} for t in others}
             out_rows["caught_current"] = {w: {str(h): re_.pooled(at_horizon(res[f"current:{w}"], h))["caught"] for h in hs} for w in ("N", "G")}
             out_rows["pooled"] = {tag: re_.pooled(r) for tag, r in res.items() if not tag.endswith(":stuck")}
+            out_rows["flight_pooled"] = {t: {w: {str(h): flight_pooled(at_horizon(res[f"{t}:{w}"], h)) for h in hs} for w in ("N", "G")}
+                                         for t in models if f"{t}:N" in res}
         out_rows["estimates"] = round_estimates(times, out_rows, W)
     finally:
         stop_procs(procs)
@@ -1832,23 +2195,68 @@ def round_estimates(times: dict, rows: dict, W: int, regions: int = 3) -> list[d
 
 
 def fmt_pilot(r: dict) -> str:
+    def need(p):
+        return " · ".join("—" if v is None else str(v) for v in p["n_needed"].values())
+
+    def causes(f):
+        own, oth, uns = flight_groups(f)
+        return (f"{f['starts_per_1k']:.2f} | {f['own_contact_s']:.2f} | {cause_parts(f, own)} | {cause_parts(f, oth)} | {cause_parts(f, uns)} | "
+                f"{pct(f['shelter_end_share'])} | {pct(f['flee_share'])} | {pct(f['self_flee_share'])}")
+
+    def guards(f):
+        return " · ".join(f"{tfmt(f[k]['diff'], nd)} ({tfmt(f[k]['t'])})" for k, nd in (("starts", 2), ("flee", 4), ("unsafe", 4)))
+
+    head_c = ("| 두뇌 | 세계 | 길이 | 시작 /1000 산 사슴-스텝 | 쫓긴 시간 초 (스스로 벗어남, 전체 합) | 스스로 벗어남 (은신처·원판·시야각·반경) | "
+              "그 밖 살아 끝남 (바꿈·그만둠·끝까지·안 쫓김) | 잡힘·굶음·잘림 | 은신처에서 끝 | 실행 FLEE 몫 (반사 포함) | 스스로 고른 FLEE 몫 |",
+              "|---|---|---|---|---|---|---|---|---|---|---|")
     L = [f"# 실시간 고리 예비 측정 {r['pilot']} (보고만 — 관문 크기를 고르는 자료, 시드 {r['seeds'][0]}~{r['seeds'][1]})", "",
-         f"- 스냅숏 {r['snapshot']}, 워커 {r['workers']}, 시간 {json.dumps(r['times'], ensure_ascii=False)}",
+         f"- 기준: {r.get('criterion', '')}. 끝 까닭 몫은 시작한 도망 가운데, 끝 까닭 표는 전체 합(정의 env_v2/world.py '야생 1단계' (w3) 도망 기록)",
+         f"- 스냅숏 {r['snapshot']}, 워커 {r['workers']}, 더 견줄 두뇌 {r.get('extra_models') or {}}, 도주 비용 후보 {r.get('flight_costs')}",
+         f"- 시간 {json.dumps(r['times'], ensure_ascii=False)}",
          f"- T 세계(늑대 포만 끔, 스냅숏 먹이 지도) f_dec = {r.get('f_dec_T')} (R5 조리법 값 0.858922)", ""]
-    if "r5_vs_current" in r:
-        L += ["## R5 s3 − 지금 두뇌 잡힌 몫 (시드마다 짝 차이)", "", "| 세계 | 길이(스텝) | 지금 | R5 | 차이 | sd | t | 시드 | 0.5%p·1%p·2%p 가를 시드 수 |", "|---|---|---|---|---|---|---|---|---|"]
-        for w, by in r["r5_vs_current"].items():
-            for h, p in by.items():
-                L.append(f"| {w} | {h} | {p['b']:.4f} | {p['a']:.4f} | {tfmt(p['diff'], 4)} | {p['sd']:.4f} | {tfmt(p['t'])} | {p['n']} | "
-                         + " · ".join(str(v) for v in p["n_needed"].values()) + " |")
+    if r.get("vs_current"):
+        L += ["## 두뇌 − 지금 두뇌 (시드마다 짝 차이 — 1차 P1·지킴 GF·GV·GC 와 같은 셈)", "",
+              "| 두뇌 | 세계 | 길이(스텝) | 쫓긴 시간 지금 초 | 두뇌 초 | 차이 | sd | t | 시드 (빠짐) | 0.25·0.5·1 초 가를 시드 수 | "
+              "GF 시작/1000 · GV FLEE 몫 · GC 잡힘·잘림 몫 차이 (t) | 잡힘 차이 (t) | 잡힘 0.5·1·2%p 가를 시드 수 |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+        for t, by in r["vs_current"].items():
+            for w, hh in by.items():
+                for h, x in hh.items():
+                    f, c = x["flight"], x["caught"]
+                    L.append(f"| {t} | {w} | {h} | {f['b']:.2f} | {f['a']:.2f} | {tfmt(f['diff'])} | {f['sd']:.2f} | {tfmt(f['t'])} | {f['n']} "
+                             f"({len(f['dropped'])}) | {need(f)} | {guards(f)} | {tfmt(c['diff'] * 100)} %p ({tfmt(c['t'])}) | {need(c)} |")
+        L.append("")
+    if r.get("flight_pooled"):
+        L += ["## 도망 끝 까닭 (두뇌마다, 두뇌 견줌 시드)", "", *head_c]
+        for t, by in r["flight_pooled"].items():
+            for w, hh in by.items():
+                for h, f in hh.items():
+                    L.append(f"| {t} | {w} | {h} | {causes(f)} |")
         L.append("")
     if r.get("candidates"):
-        L += ["## 후보 − 지금 두뇌 잡힌 몫 (후보 시드)", "", "| 후보 | 세계 | 길이 | 차이 | sd | t | 시드 |", "|---|---|---|---|---|---|---|"]
+        L += ["## 후보 − 지금 두뇌 (후보 시드)", "",
+              "| 후보 | 세계 | 길이 | 쫓긴 시간 차이 초 | sd | t | 시드 (빠짐) | GF · GV · GC 차이 (t) | 잡힘 차이 | sd | t |", "|---|---|---|---|---|---|---|---|---|---|---|"]
         for tag, by in r["candidates"].items():
             for w, hh in by.items():
                 for h, p in hh.items():
-                    L.append(f"| {tag} | {w} | {h} | {tfmt(p['diff'], 4)} | {p['sd']:.4f} | {tfmt(p['t'])} | {p['n']} |")
+                    f = r["candidates_flight"][tag][w][h]
+                    L.append(f"| {tag} | {w} | {h} | {tfmt(f['diff'])} | {f['sd']:.2f} | {tfmt(f['t'])} | {f['n']} ({len(f['dropped'])}) | "
+                             f"{guards(f)} | {tfmt(p['diff'] * 100)} %p | {p['sd'] * 100:.2f} | {tfmt(p['t'])} |")
+        L += ["", "### 후보 도망 끝 까닭 (후보 시드)", "", *head_c]
+        for tag, by in r.get("candidate_flight_pooled", {}).items():
+            for w, hh in by.items():
+                for h, f in hh.items():
+                    L.append(f"| {tag} | {w} | {h} | {causes(f)} |")
         L.append("")
+    if r.get("scale"):
+        s = r["scale"]
+        m = s["metabolic"]
+        L += ["## 도주 비용 기준 크기 (T 세계, 지금 두뇌 — flight_cost 를 고르는 자료)", "",
+              f"- 세계 {s['worlds']}개 × {s['steps']} 스텝 (학습 시드 {s['seeds']}), 사슴-스텝 {s['deer_steps']}: 평균 보상 {s['reward_per_step']:+.5f}/스텝 "
+              f"(살아 있음 {s['rew_alive']:+.3f} 포함, 죽음 {s['deaths_per_1k']:.2f}·번식 {s['repro_per_1k']:.2f} /1000 사슴-스텝), 실행 FLEE 몫 {pct(s['flee_share'])}"
+              f" (그 가운데 반사 {pct(s.get('reflex_share', NAN))})",
+              f"- 에너지 칸(보상 − 살아 있음, 죽음·번식 스텝 뺌): FLEE 스텝 {s['energy_flee']:+.5f}, 그 밖 {s['energy_other']:+.5f}, 차이 {s['energy_gap']:+.5f}",
+              f"- 설정 대사 비용(rew_energy × energy_drain × 대사 배수): 정지 {m['stop']:.5f}, 걷기 {m['walk']:.5f}, 뛰기(도주) {m['run']:.5f} /스텝 — "
+              f"뛰기가 정지보다 {s['run_extra_over_stop']:.5f} 더", ""]
     if r.get("estimates"):
         L += ["## 판 하나 벽시계 어림 (K = 1)", "", "| 시드 n | 길이 H | 학습 S | 지금 판정 초 | 학습 초 | 후보 판정 초 | 합 분 | 문턱 |", "|---|---|---|---|---|---|---|---|"]
         for e in r["estimates"]:
@@ -1936,6 +2344,8 @@ def _size_args(s) -> None:
     g = s.add_argument_group("시험 크기 (관문 상수와 다르면 시험 — --root 가 실제 폴더가 아닐 때만)")
     g.add_argument("--steps", type=int, default=None, help=f"모델마다 학습 스텝 S (관문 {LIVE['train_steps']})")
     g.add_argument("--model-seeds", type=int, nargs="+", default=None, help=f"모델 시드 (관문 {list(LIVE['model_seeds'])})")
+    g.add_argument("--flight-cost", type=float, default=None,
+                   help=f"T 세계 도주 비용 wild_flight.flight_cost (관문 {LIVE['train_flight_cost']} — FLEE 를 실행한 스텝마다 보상에서 뺀다)")
     g.add_argument("--horizon", type=int, default=None, help=f"판정 길이 H 스텝 (관문 {LIVE['horizon']})")
     g.add_argument("--judge-seeds", default=None, help="N 판정 시드 처음-끝 (관문 {0}-{1})".format(*LIVE["judge_seeds"]))
     g.add_argument("--horizon-g", type=int, default=None, help=f"G 판정 길이 스텝 (관문 {LIVE['horizon_g']})")
@@ -1979,7 +2389,10 @@ def main(argv=None) -> int:
     s.add_argument("--horizons", type=int, nargs="+", default=list(PILOT["horizons"]), help="판정 길이들 (스텝 — 1800 = 240 초, 3600 = 480 초)")
     s.add_argument("--steps", type=int, nargs="+", default=list(PILOT["steps"]), help="후보 학습 스텝들")
     s.add_argument("--model-seeds", type=int, nargs="+", default=list(PILOT["model_seeds"]))
-    s.add_argument("--parts", nargs="+", default=["brains", "fdec", "cands"], choices=["brains", "fdec", "cands"])
+    s.add_argument("--extra-models", nargs="+", default=None, metavar="이름=ZIP", help="지금 두뇌·R5 s3 와 함께 견줄 관측 21 두뇌 (herbivore_rl/ 기준 경로)")
+    s.add_argument("--flight-cost", type=float, nargs="+", default=None,
+                   help=f"후보 학습의 T 세계 도주 비용 값들 (기본 [{LIVE['train_flight_cost']}] — 값마다 모델 시드 × 학습)")
+    s.add_argument("--parts", nargs="+", default=["brains", "fdec", "cands", "scale"], choices=["brains", "fdec", "cands", "scale"])
     a = ap.parse_args(argv)
     return {"watch": cmd_watch, "round": cmd_round, "pilot": cmd_pilot}[a.cmd](a)
 

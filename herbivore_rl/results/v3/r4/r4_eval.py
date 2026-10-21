@@ -16,7 +16,8 @@
 지역 덮기는 짝 비교 실행기와 같은 두 칸이다: features.wild_weather.region = 지역, features.obstacles.fixed = 나무 배치 표(results/v3/wild2/trees/tree_layout.json)의
 그 지역 원판. 먹이 지도는 시드의 파이썬 난수 지도다(세 지역이 같은 시드면 같은 먹이 지도에 지역 날씨·나무만 다르다).
 시드는 탐색 32000~32099·판정 33000~33099 만 받는다(run_mirror.parse_seeds).
-출력 runs/<이름>.json: 메타 + 세계마다 요약(시드·지역·잡힘·굶음·산·은신처 안 사슴-스텝·행동별 산 사슴-스텝·은신처 안 잡힘·사냥).
+출력 runs/<이름>.json: 메타 + 세계마다 요약(시드·지역·잡힘·굶음·산·은신처 안 사슴-스텝·행동별 산 사슴-스텝·은신처 안 잡힘·사냥, 10-21 부터 wild_flight
+세계는 도망 기록 flight — env_v2/world.py World.flight_stats).
 """
 
 from __future__ import annotations
@@ -68,11 +69,14 @@ def _one(job: dict) -> dict:
     res = rm.run_world(job)
     m, dg = res["meta"], res["meta"]["diag"]
     cause = np.asarray(m["death_cause"])
-    return dict(seed=m["seed"], region=job["region"], n=m["n"], caught=int((cause == 1).sum()), starved=int((cause == 2).sum()),
-                alive=int((cause == 0).sum()), shelter_steps=m["shelter_steps"], live_steps=m["live_steps"], beh_steps=dg["beh_steps"],
-                catch_cover=dg["catch_cover"], catch_fled=dg["catch_fled"], catches=dg["catches"], starve_fled=dg["starve_fled"],
-                hunt=m["hunt"], weather=m.get("weather"), obstacles_n=int(m["obstacles"]["n"]) if "obstacles" in m and "n" in m["obstacles"] else None,
-                wall_s=m["wall_s"])
+    out = dict(seed=m["seed"], region=job["region"], n=m["n"], caught=int((cause == 1).sum()), starved=int((cause == 2).sum()),
+               alive=int((cause == 0).sum()), shelter_steps=m["shelter_steps"], live_steps=m["live_steps"], beh_steps=dg["beh_steps"],
+               catch_cover=dg["catch_cover"], catch_fled=dg["catch_fled"], catches=dg["catches"], starve_fled=dg["starve_fled"],
+               hunt=m["hunt"], weather=m.get("weather"), obstacles_n=int(m["obstacles"]["n"]) if "obstacles" in m and "n" in m["obstacles"] else None,
+               wall_s=m["wall_s"])
+    if "flight" in m:
+        out["flight"] = m["flight"]         # 10-21 도망 기록(World.flight_stats — wild_flight 세계만)
+    return out
 
 
 def run(model: Path, seeds, steps: int, workers: int, regions=REGIONS) -> dict:

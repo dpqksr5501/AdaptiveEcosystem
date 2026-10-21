@@ -296,6 +296,35 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
         edge_r > 0: 경계·도주 방향(은신처 쪽으로 정한 도주 말고)을 무대 벽 wall_margin 처리 앞에 `wf_edge_steer` 로 굽힌다 — 가장자리 edge_r
           안에서는 벽 쪽 성분을 벽을 따라가는 성분으로 돌리고(벽에 가까울수록 많이), 모서리(두 벽 모두 edge_r 안)에서 벽 쪽으로 가려 하면 늑대에게서
           더 멀어지는 쪽 벽을 따라 모서리를 빠져나온다. 현실 근거: 사슴은 달아날 길을 쓰고 막다른 곳으로 뛰어들지 않는다
+      10-21 선택 키 flight_cost (학습 세계 전용, 기본 0 = 위 그대로): 이번 스텝에 FLEE 를 실행한 사슴(도주 반사 덮기·두뇌가 고른 FLEE 모두 — `_rep_step`
+        뒤 rs.behavior)의 보상에서 flight_cost 를 뺀다(`step` 5)). 판정 세계·언리얼에는 보상이 없어 쓰지 않는다. 현실 근거: 달리는 사슴은 에너지를 더 쓰고,
+        먹지 못하고, 눈에 띈다 — 에너지 보상이 이미 말하는 것(뛰기 대사 2.5 배·섭식 0)을 조금 더 날카롭게 할 뿐이다. 반사만 매기면 두뇌가 반사 전에
+        스스로 달아나는 쪽(같은 뛰기)으로 비용을 피하므로 실행한 FLEE 전부에 매긴다.
+      도망 기록 (10-21 실시간 고리 '도망 시간' 기준 — 통계 전용, 훅 track_flight 를 켠 세계만 센다. 덮기·동역학·난수·관측·보상과 무관, `flight_stats`):
+        도망 한 번 = 한 사슴이 FLEE 를 실행한 스텝(도주 반사 덮기 WF_PANIC 와 두뇌가 고른 FLEE 모두 — `step` 이 `_rep_step` 뒤·리스폰 전에 떠 둔
+        rs.behavior 사본)이 끊김 없이 이어진 묶음. 도망 길이 = 실행한 FLEE 스텝 수(× 2/15 초), 그 가운데 반사 = 실행한 덮기가 WF_PANIC 인 스텝.
+        시작 = 열린 도망이 없는 사슴이 FLEE 를 실행한 첫 스텝(started). 산 사슴-스텝(live_steps) = 스텝 첫머리에 산 사슴 수의 합(켠 뒤부터).
+        표적 = 스텝 끝에 사냥 중인(`_wf_hunting`) 늑대의 그 스텝 pred_target(같은 스텝에 다른 사슴을 잡아 먹기 시작한 늑대의 표적은 없다).
+        쫓김 창 = 첫 FLEE 스텝 바로 앞 스텝부터 끝 스텝까지. 그 창에 이 사슴을 표적으로 둔 늑대가 있었으면 '쫓겼다'.
+        쫓긴 시간(contact) = 도망의 첫 스텝부터 이 사슴이 표적이던 마지막 FLEE 스텝까지의 스텝 수(그 뒤 늑대가 놓쳐도 도주 반사는 늑대가 safe_r 밖이 되거나
+          은신처에 들 때까지 이어진다 — 쫓긴 시간은 그 남은 달리기를 넣지 않는다. 쫓기지 않은 도망은 0).
+        놓침 = 지난 스텝 표적이던 이 사슴을 이번 스텝에 표적으로 두지 않은 늑대(FLEE 를 실행한 스텝만 본다). 놓침 까닭(그 스텝 표적 고르기 때 값, 이 순서로
+          처음 맞는 것): 그 늑대가 표적 고르기 때 또는 스텝 끝에 사냥할 수 없음(먹기·배부름·잠·잠행형 탈진·깜깜한 밤 — 같은 스텝에 다른 사슴을 잡음 포함) →
+          그만둠(stop), 체감 거리가 늑대 시야 반경 밖 → 반경(range), 반경·시야각 안인데 원판(나무 줄기·바위)이 눈길을 가림 → 원판(obstacle), 시야각 밖 →
+          시야각(fov), 은신처 원 안이라 표적에서 빠짐(realism_shelter untargetable) → 은신처(cover), 그 밖(보이는데 더 가까운 사슴으로 바꿈) → 바꿈(switch).
+          같은 스텝에 여럿이면 은신처 > 원판 > 그만둠 > 시야각 > 바꿈 > 반경. 도망의 마지막 놓침 까닭을 쓴다.
+        끝 까닭(서로 겹치지 않는다, FLIGHT_CAUSES — 합 = started):
+          caught·starved: FLEE 를 실행한 스텝에 잡힘·굶음(그 스텝에 닫는다. 죽은 칸에 새 사슴이 다시 나는 학습 세계에서도 새 개체는 새 도망이다)
+          truncated: 판이 끝날 때(`flight_stats` 를 부를 때) 마지막 스텝에 FLEE 를 실행해 아직 열린 도망
+          살아서 끝남(FLEE 를 실행한 마지막 스텝 다음 스텝에 닫는다 — 다음 스텝 행동은 그 스텝 결정에서 정해지므로 끝 스텝 끝 상태를 떠 둔다):
+            unchased: 쫓기지 않음(다가온 늑대가 이 사슴을 표적으로 두지 않은 채 끝남, 두뇌가 늑대 없이 고른 FLEE 포함)
+            held: 끝 스텝에도 표적이고 은신처 원 밖(반사 도주는 늑대 시야 반경이 safe_r 보다 길 때만, 두뇌 FLEE 는 표적인 채 그만둘 때)
+            cover: 끝 스텝에도 표적이지만 스텝 끝 위치가 은신처 원 안, 또는 마지막 놓침 까닭이 은신처
+            obstacle·fov·range·switch·stop: 그 밖 — 마지막 놓침 까닭(까닭 없음은 switch)
+          스스로 벗어남(FLIGHT_OWN) = cover·obstacle·fov·range — 숲(은신처)에 숨거나, 나무 줄기·바위로 늑대 눈길을 끊거나, 늑대 시야각·시야 반경 밖으로
+          빠져 쫓기를 끝낸 도망. switch(늑대가 다른 사슴으로 바꿈)·stop(늑대가 사냥을 그만둠)·held·unchased 는 이 사슴이 벗어난 것이 아니다.
+        보고 칸: 끝 까닭마다 수·도망 스텝 합·쫓긴 스텝 합, 은신처 원 안에서 끝난 살아 끝난 도망 수(shelter_end — 끝 까닭과 겹친다), 스스로 벗어난 도망의 쫓긴
+        시간 칸(hist). reset 은 열린 도망·누적 수를 모두 버린다(다른 통계와 같다).
 - 야생 2단계(10-16 사용자 승인 '추천대로' — 늑대가 거의 못 잡는 세계를 사실감과 사냥 성공을 함께 올려 고친다. 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md,
   설정 configs/v3_wild2_mirror.yaml = v3_wild1_mirror.yaml + 아래 규칙). 순서: 1 은신처 먹이 부족 → 2 늑대 무리·협동 사냥 → 3 장애물.
   1 은신처 먹이 부족: 새 규칙이 아니라 위 v3 현실성 (e) realism_cover_food 를 거울 세계에 켠다(cap_frac·regen_frac 0.15). 언리얼 FFoodGrid 가 같은 식이다
@@ -1302,6 +1331,18 @@ def _rz_night_params(p: dict, f: Features, ps: dict | None) -> dict:
 # 야생 (w3) 도주 반사 덮기 wf_mode (모듈 docstring '야생 1단계'). C++ kKeepNone·kKeepAlert·kKeepPanic·kKeepShelter 와 같은 번호
 WF_NONE, WF_ALERT, WF_PANIC, WF_SHELTER = 0, 1, 2, 3
 WF_MODE_NAMES = ("none", "alert", "panic", "shelter")
+# 야생 (w3) 도망 기록 (10-21, 통계 전용 — 모듈 docstring '야생 1단계' (w3) 도망 기록, `World.flight_stats`). 끝 까닭(서로 겹치지 않는다, 합 = 시작):
+# 살아서 끝난 도망은 늑대와의 접촉이 어떻게 끊겼나로 나눈다 — 앞 넷 = 스스로 벗어남(FLIGHT_OWN, 실시간 고리 1차 재료), 다음 넷 = 그 밖, 끝 셋 = 잡힘·굶음·잘림.
+# 쫓긴 시간 칸 경계(스텝, 1 스텝 = 2/15 초): 약 1·2·5·10·20·40·80 초 — 칸 k = 경계 가운데 c 이하인 수(첫 칸 c < 8)
+FLIGHT_CAUSES = ("cover", "obstacle", "fov", "range", "switch", "stop", "held", "unchased", "caught", "starved", "truncated")
+FLIGHT_OWN = ("cover", "obstacle", "fov", "range")
+FLIGHT_UNSAFE = ("caught", "starved", "truncated")
+FLIGHT_HIST_STEPS = (8, 15, 38, 75, 150, 300, 600)
+# 놓침 까닭(늑대가 지난 스텝 표적이던 사슴을 이번 스텝에 표적으로 두지 않음): 반경 밖·다른 사슴으로 바꿈·시야각 밖·사냥 그만둠·원판이 가림·은신처 안
+# (표적 제외). 뒤 번호가 앞선다(같은 스텝에 여럿이면 큰 쪽)
+FL_DROP_NONE, FL_DROP_RANGE, FL_DROP_SWITCH, FL_DROP_FOV, FL_DROP_STOP, FL_DROP_OBSTACLE, FL_DROP_COVER = 0, 1, 2, 3, 4, 5, 6
+FL_DROP_CAUSE = {FL_DROP_NONE: "switch", FL_DROP_RANGE: "range", FL_DROP_SWITCH: "switch", FL_DROP_FOV: "fov", FL_DROP_STOP: "stop",
+                 FL_DROP_OBSTACLE: "obstacle", FL_DROP_COVER: "cover"}
 IST_GOLDEN_ANGLE = 2.399963
 IST_WOLF_HEAD_OFFSET = 2
 # 통합 무대 (p) 늑대 모서리 순서(C++ PlanStage Corners)와 무작위 자리 시도 수, 사슴 시도 수 max(IST_DEER_TRIES_MIN, IST_DEER_TRIES_PER × N)
@@ -1423,7 +1464,8 @@ def _wild_flight_params(p: dict, f: Features) -> dict:
                alert_w=_wild_num(n, p, "alert_w", 0.0), rest_alert=_wild_bool(n, p, "rest_alert"),
                shelter_cos=_wild_num(n, p, "shelter_cos", -1.0, 1.0), shelter_r=_wild_num(n, p, "shelter_r", 0.0),
                crouch=_wild_bool(n, p, "crouch"), wall_margin=_wild_num(n, p, "wall_margin", 0.0),
-               hold_awake=_wild_bool(n, p, "hold_awake"), edge_r=_wild_num(n, p, "edge_r", 0.0))
+               hold_awake=_wild_bool(n, p, "hold_awake"), edge_r=_wild_num(n, p, "edge_r", 0.0),
+               flight_cost=_wild_num(n, p, "flight_cost", 0.0))
     if not out["flight_r"] <= out["alert_r"] <= out["safe_r"]:
         raise ValueError(f"features.wild_flight 는 flight_r ≤ alert_r ≤ safe_r 여야 한다. 받은 값: {out['flight_r']}, "
                          f"{out['alert_r']}, {out['safe_r']}")
@@ -2228,6 +2270,9 @@ class World:
         self._oo = (_obstacle_obs_params(f.params("obstacle_obs"), f) if f.enabled("obstacle_obs") else None)
         # 통계·진단 전용(설정 아님, 동역학과 무관): 참이면 기하에 사슴 × 위협 보임 행렬 wf_pvis 를 남긴다(실행기 results/v3/wild1 이 켠다)
         self.keep_pair_vis = False
+        # 통계 전용(설정 아님, 동역학과 무관): 참이면 야생 (w3) 도망 기록을 센다(`flight_stats`, 판정 실행기 results/v3/mirror/run_mirror.py 가 켠다).
+        # 켠 뒤 스텝부터 센다 — 첫 스텝 전에 켜면 처음부터다
+        self.track_flight = False
         self.alive = None
         self._rs = None
         self.act_names: tuple[str, ...] = action_names(self.features)
@@ -3585,6 +3630,9 @@ class World:
         # 통합 무대 (k) 부활 없음: 이번 스텝 첫머리의 산 슬롯 L. self.alive 는 스텝 끝(관측 뒤)에 새 배열로 바뀐다 — 그때까지 L 과 같다.
         # 부활 있는 세계는 None 이고 아래 L 분기를 타지 않는다
         live = self.alive
+        # 야생 (w3) 도망 기록(통계 전용): 이번 스텝에 실행하는 덮기 — 학습 세계 리스폰(`_spawn_slots`)이 죽은 칸의 wf_mode 를 지우기 전 값
+        wf_exec = self.wf_mode.copy() if self.track_flight and self._wf is not None else None
+        wf_flee = None
         if vg is not None:
             ema0 = min(self.pred_ema, 1.0)              # 결정 때 관측 5 (vigil_stats B5′ 용, 6) 에서 바뀐다)
         if vw is not None:              # v2.2r 0) 결정 때 창: 결정 관측의 포식자 수 0 & threat_recency > theta
@@ -3593,6 +3641,9 @@ class World:
         if rp is not None:
             # v3 0r·1r) 행동 실행기: 결정 시점에만 요청을 받고(잠금·사건·지연), 행동별 제어기가 속도·보행을 정한다
             v, rep_out = self._rep_step(a)
+            if self._wf is not None and (wf_exec is not None or self._wf["flight_cost"] > 0.0):
+                # 야생 (w3) 이번 스텝에 실행하는 FLEE(도주 반사 덮기·두뇌 FLEE 모두 — 리스폰이 죽은 칸을 지우기 전 사본): 도망 기록·학습 전용 도주 비용
+                wf_flee = self._rs.behavior == rep.FLEE
             if self._al is not None and self._al["active"]:
                 self._alarm_emit_step(rep_out)          # v3 R2 A′: 경보 방출 목록, alarm_new ← False
         else:
@@ -3720,6 +3771,10 @@ class World:
             starved &= live & ~caught
         done = caught | starved
         rew += cfg.rew_death * done
+        if wf_flee is not None and self._wf["flight_cost"] > 0.0:
+            # 야생 (w3) 학습 전용 선택 키 flight_cost (10-21): 이번 스텝에 FLEE 를 실행한 사슴(도주 반사·두뇌 FLEE 모두)의 보상에서 뺀다.
+            # 0 이면 이 줄을 타지 않는다(비트 동일)
+            rew = rew - self._wf["flight_cost"] * wf_flee
         if live is not None:
             rew = np.where(live, rew, 0.0)              # 통합 무대 (k): 시체의 행은 보상이 없다(학습에 쓸 때는 손실에서 뺀다)
 
@@ -3791,7 +3846,7 @@ class World:
                 if vg is not None:
                     self._vig_prev[dead] = -1         # 새 개체: 경계 전환(b8_vig)도 잇지 않는다
         if self._wf is not None:
-            self._wf_update(done)               # 야생 (w3): 스텝 끝 기하(리스폰 관측 포함)로 다음 스텝의 덮기를 정한다
+            self._wf_update(done, caught, wf_exec, wf_flee)    # 야생 (w3): 스텝 끝 기하(리스폰 관측 포함)로 다음 스텝의 덮기를 정한다
 
         return obs, rew, done, terminal_obs
 
@@ -4345,11 +4400,17 @@ class World:
         view_r = cfg.pred_view_r if self._wx is None else self._wx_view
         vis = (perceived <= view_r) & (
             (dx * self.pred_head[:, 0:1] + dy * self.pred_head[:, 1:2]) * inv >= cfg.pred_fov_cos)
+        fl_vis0 = vis.copy() if self.track_flight and self._wf is not None else None
         if self._ob is not None and self._ob["block_sight"] and len(self.obstacles):
             # 야생 2단계 3 의 3): 늑대 눈길도 원판이 가린다(플레이어형 위협은 아래에서 늘 본다)
             vis, n_pair, n_blk = self._ob_occlude(vis, self.pred_pos, self.pos)
             self._ob_tgt_pairs += n_pair
             self._ob_tgt_blocked += n_blk
+        if fl_vis0 is not None:
+            # 야생 (w3) 도망 기록(통계 전용): 이번 표적 고르기의 사냥 가능·시야 반경 안(체감 거리)·반경과 시야각 안·원판이 가린 쌍·은신처 안이라 표적에서 빠지는
+            # 쌍 — 놓침 까닭(`_fl_update`)
+            cov_out = (np.array(safe_m) if safe_m is not None and self._zs["untargetable"] else np.zeros((M, N), dtype=bool))
+            self._fl_pred = (hunting.copy(), perceived <= view_r, fl_vis0, fl_vis0 & ~vis, cov_out)
         if th is not None and M > Mb:
             vis[self.pred_is_player] = True
         vis &= hunting[:, None]
@@ -5138,6 +5199,7 @@ class World:
             self.wf_dir = np.zeros((N, 2))                 # 경계·도주 방향(단위, 없으면 0)
             self._wf_mode_n = np.zeros(len(WF_MODE_NAMES), dtype=np.int64)   # 실행한 덮기별 산 개체-스텝
             self._wf_panic_starts = self._wf_panic_ends = self._wf_panic_end_shelter = 0
+            self._fl_reset()
         if self._wp is not None:
             # 야생 2단계 2 스텝 뒤 훅: 이번 스텝에 도운·기다린·은신처 문으로 간 늑대, 고른 사슴(없으면 −1). 통계 칸
             self.pack_help = np.zeros(M, dtype=bool)
@@ -5224,9 +5286,12 @@ class World:
         out["drain"][al] = sp["drain_mult"][GAIT_WALK]
         out["see"][al] = 1.0
 
-    def _wf_update(self, done: np.ndarray) -> None:
+    def _wf_update(self, done: np.ndarray, caught: np.ndarray | None = None, executed: np.ndarray | None = None,
+                   flee: np.ndarray | None = None) -> None:
         """야생 (w3) H: 스텝 끝 기하 self._g(관측과 같은 위치·보임, 리스폰 관측 포함)로 다음 스텝의 덮기 wf_mode·wf_dir 를 정한다(모듈 docstring
-        '야생 1단계' (w3) 순서). 이번 스텝에 실행한 덮기를 센다. 덮기(도주·웅크림)가 풀리면 잠금 0·미뤄 둔 사건 지움(두뇌가 곧바로 고른다)."""
+        '야생 1단계' (w3) 순서). 이번 스텝에 실행한 덮기를 센다. 덮기(도주·웅크림)가 풀리면 잠금 0·미뤄 둔 사건 지움(두뇌가 곧바로 고른다).
+        도망 기록(track_flight)만 쓰는 인자: caught = 이번 스텝에 잡힌 사슴(None 이면 죽음은 굶음으로 센다), executed = 이번 스텝 첫머리의 덮기
+        (`step` 이 리스폰 전에 떠 둔 사본 — None 이면 지금 wf_mode), flee = 이번 스텝에 FLEE 를 실행한 사슴(같은 사본 — None 이면 실행한 덮기가 도주인 사슴)."""
         wf, rs, g = self._wf, self._rs, self._g
         N, M = self.N, self.M
         live = np.ones(N, dtype=bool) if self.alive is None else self.alive
@@ -5310,6 +5375,9 @@ class World:
         ends = (prev == WF_PANIC) & (nxt != WF_PANIC) & live
         self._wf_panic_ends += int(np.count_nonzero(ends))
         self._wf_panic_end_shelter += int(np.count_nonzero(ends & in_cov))
+        if self.track_flight:
+            ex_mode = prev if executed is None else executed
+            self._fl_update(ex_mode == WF_PANIC if flee is None else flee, ex_mode == WF_PANIC, done, caught, live, in_cov)
         self.wf_mode, self.wf_dir = nxt, dirs
 
     def wild_stats(self) -> dict:
@@ -5333,6 +5401,144 @@ class World:
         if not out:
             raise ValueError("wild_stats 는 야생 1단계 규칙(wild_*)을 하나라도 켠 세계에만 있다")
         return out
+
+    def _fl_reset(self) -> None:
+        """야생 (w3) 도망 기록 칸 (`_wild_reset` — reset 마다 열린 도망·누적 수를 버린다). 난수·동역학과 무관."""
+        N, M = self.N, self.M
+        self._fl_len = np.zeros(N, dtype=np.int64)          # 열린 도망의 실행한 FLEE 스텝 수 (0 = 열린 도망 없음)
+        self._fl_contact = np.zeros(N, dtype=np.int64)      # 열린 도망에서 표적이던 마지막 스텝의 도망 스텝 번호 (쫓긴 시간, 0 = 표적인 스텝 없음)
+        self._fl_reflex = np.zeros(N, dtype=np.int64)       # 열린 도망의 반사(실행한 덮기 WF_PANIC) 스텝 수
+        self._fl_chased = np.zeros(N, dtype=bool)           # 열린 도망의 쫓김 창(첫 FLEE 스텝 바로 앞 스텝부터)에 이 사슴을 표적으로 둔 늑대가 있었나
+        self._fl_why = np.zeros(N, dtype=np.int8)           # 열린 도망의 마지막 놓침 까닭 FL_DROP_*
+        self._fl_end_now = np.zeros(N, dtype=bool)          # 열린 도망의 지난 FLEE 스텝 끝에 표적이었나 (살아 끝난 도망은 다음 스텝에 이 값으로 닫는다)
+        self._fl_end_cov = np.zeros(N, dtype=bool)          # 그 스텝 끝 위치가 은신처 원 안이었나
+        self._fl_tgt = np.full(M, -1, dtype=np.int64)       # 지난 스텝 표적(사냥 중인 늑대의 pred_target — 죽은 사슴 칸은 −1 로 지운다)
+        self._fl_pred = None                                # 이번 포식자 스텝의 (사냥 가능 (M,), 시야 반경 안·반경과 시야각 안·원판이 가림·은신처 표적 제외 (M,N))
+        self._fl_started = self._fl_live = 0                # 시작한 도망 수, 산 사슴-스텝(스텝 첫머리)
+        self._fl_n = np.zeros(len(FLIGHT_CAUSES), dtype=np.int64)        # 끝난 도망 수(까닭별)
+        self._fl_steps = np.zeros(len(FLIGHT_CAUSES), dtype=np.int64)    # 그 도망들의 실행한 FLEE 스텝 합
+        self._fl_cont = np.zeros(len(FLIGHT_CAUSES), dtype=np.int64)     # 그 도망들의 쫓긴 스텝 합
+        self._fl_refl = 0                                   # 끝난 도망의 반사 스텝 합
+        self._fl_shelter_end = 0                            # 살아 끝난 도망 가운데 끝 스텝 끝 위치가 은신처 원 안인 수
+        self._fl_hist = np.zeros(len(FLIGHT_HIST_STEPS) + 1, dtype=np.int64)    # 스스로 벗어난 도망의 쫓긴 시간 칸
+
+    def _fl_close(self, m: np.ndarray, cause: np.ndarray) -> None:
+        """도망 기록: m 의 열린 도망을 끝 까닭 번호 cause (N,) 로 닫고 칸을 비운다."""
+        if not m.any():
+            return
+        L, C = self._fl_len, self._fl_contact
+        k = cause[m]
+        np.add.at(self._fl_n, k, 1)
+        np.add.at(self._fl_steps, k, L[m])
+        np.add.at(self._fl_cont, k, C[m])
+        self._fl_refl += int(self._fl_reflex[m].sum())
+        own = m & np.isin(cause, [FLIGHT_CAUSES.index(c) for c in FLIGHT_OWN])
+        if own.any():
+            np.add.at(self._fl_hist, np.searchsorted(np.asarray(FLIGHT_HIST_STEPS), C[own], side="right"), 1)
+        L[m] = 0
+        C[m] = 0
+        self._fl_reflex[m] = 0
+        self._fl_chased[m] = False
+        self._fl_why[m] = FL_DROP_NONE
+        self._fl_end_now[m] = False
+        self._fl_end_cov[m] = False
+
+    def _fl_update(self, flee: np.ndarray, reflex: np.ndarray, done: np.ndarray, caught: np.ndarray | None, live: np.ndarray,
+                   in_cov: np.ndarray) -> None:
+        """야생 (w3) 도망 기록 한 스텝 (`_wf_update` 끝, track_flight 일 때만 — 통계 전용, 덮기·동역학·난수를 바꾸지 않는다). flee = 이번 스텝에 FLEE 를
+        실행한 사슴, reflex = 그 가운데 실행한 덮기가 도주인 사슴, live = 스텝 끝에 산 사슴(죽은 칸 done 과 합치면 스텝 첫머리에 산 사슴),
+        in_cov = 스텝 끝 은신처 원 안. 정의는 모듈 docstring '야생 1단계' (w3) 도망 기록."""
+        N, M = self.N, self.M
+        ci = FLIGHT_CAUSES.index
+
+        def targeted(t):
+            out = np.zeros(N, dtype=bool)
+            out[t[(t >= 0) & (t < N)]] = True
+            return out
+
+        tgt = getattr(self, "pred_target", None)
+        tgt = np.asarray(tgt, dtype=np.int64) if tgt is not None and np.shape(tgt) == (M,) else np.full(M, -1, dtype=np.int64)
+        hunt_end = self._wf_hunting() if M > 0 else np.zeros(0, dtype=bool)
+        tgt = np.where(hunt_end, tgt, -1)                         # 스텝 끝에 사냥 중인 늑대의 표적만(같은 스텝에 잡아 먹기 시작한 늑대는 놓친 것)
+        tp = self._fl_tgt if self._fl_tgt.shape == (M,) else np.full(M, -1, dtype=np.int64)
+        now = targeted(tgt)
+        L = self._fl_len
+        alive0 = live | done                                      # 스텝 첫머리에 산 사슴
+        self._fl_live += int(np.count_nonzero(alive0))
+        ex = np.asarray(flee, dtype=bool) & alive0
+        # 1) 지난 스텝까지 FLEE 였고 이번 스텝은 아닌 사슴: 살아 끝난 도망 — 끝 스텝 끝에 떠 둔 상태로 닫는다
+        gone = (L > 0) & ~ex
+        if gone.any():
+            cause = np.array([ci(FL_DROP_CAUSE[x]) for x in range(FL_DROP_COVER + 1)])[self._fl_why]
+            en, ec = self._fl_end_now, self._fl_end_cov
+            cause = np.where(en, np.where(ec, ci("cover"), ci("held")), cause)
+            cause = np.where(self._fl_chased, cause, ci("unchased"))
+            self._fl_shelter_end += int(np.count_nonzero(gone & ec))
+            self._fl_close(gone, cause)
+        # 2) 이번 스텝 FLEE
+        new = ex & (L == 0)
+        self._fl_started += int(np.count_nonzero(new))
+        self._fl_chased[new] = targeted(tp)[new]
+        self._fl_why[new] = FL_DROP_NONE
+        # 놓침: 지난 스텝 표적이던 사슴(FLEE 를 실행한)을 이번 스텝에 표적으로 두지 않은 늑대. 까닭은 모듈 docstring 순서, 같은 사슴에 여럿이면 큰 번호.
+        # 표적 고르기 재료가 없으면(장면 도구) 사냥 그만둠만 가리고 나머지는 바꿈으로 센다
+        dm = np.flatnonzero((tp >= 0) & (tp < N) & (tgt != tp))
+        di = tp[dm]
+        keep = ex[di]
+        dm, di = dm[keep], di[keep]
+        if len(dm):
+            fp = self._fl_pred
+            stop = ~hunt_end[dm]
+            if fp is not None and fp[1].shape == (M, N):
+                hunt, rng_, vis0, blk, cov = fp
+                code = np.select([stop | ~hunt[dm], ~rng_[dm, di], blk[dm, di], ~vis0[dm, di], cov[dm, di]],
+                                 [FL_DROP_STOP, FL_DROP_RANGE, FL_DROP_OBSTACLE, FL_DROP_FOV, FL_DROP_COVER], FL_DROP_SWITCH)
+            else:
+                code = np.where(stop, FL_DROP_STOP, FL_DROP_SWITCH)
+            why = np.zeros(N, dtype=np.int8)
+            np.maximum.at(why, di, code.astype(np.int8))
+            self._fl_why = np.where(why > 0, why, self._fl_why)
+        L[ex] += 1
+        self._fl_reflex[ex & np.asarray(reflex, dtype=bool)] += 1
+        hit = ex & now
+        self._fl_contact[hit] = L[hit]
+        self._fl_chased |= hit
+        self._fl_end_now[ex] = now[ex]
+        self._fl_end_cov[ex] = np.asarray(in_cov, dtype=bool)[ex]
+        # 3) FLEE 를 실행한 스텝에 죽음: 그 스텝에 닫는다(학습 세계의 새 개체는 다음 스텝부터 새 도망)
+        dead = ex & done
+        if dead.any():
+            cg = np.zeros(N, dtype=bool) if caught is None else np.asarray(caught, dtype=bool)
+            self._fl_close(dead, np.where(cg, ci("caught"), ci("starved")))
+        nt = tgt.copy()
+        if done.any():
+            nt[(nt >= 0) & (nt < N) & done[np.clip(nt, 0, N - 1)]] = -1     # 죽은(학습 세계는 다시 난) 사슴을 쫓던 기록은 새 개체에 잇지 않는다
+        self._fl_tgt = nt
+        self._fl_pred = None
+
+    def flight_stats(self) -> dict:
+        """야생 (w3) 도망 기록 (통계 전용 — 정의는 모듈 docstring '야생 1단계' (w3) 도망 기록). track_flight 를 켠 wild_flight 세계에만 있다.
+        started = 시작한 도망 수, live_steps = 산 사슴-스텝(스텝 첫머리, 켠 뒤부터), flee_steps·reflex_steps = 실행한 FLEE 사슴-스텝·그 가운데 반사(열린 도망
+        포함), n·steps·contact = 끝 까닭(FLIGHT_CAUSES)별 도망 수·FLEE 스텝 합·쫓긴 스텝 합(지금 열린 도망은 truncated 로 센다 — 세계는 그대로),
+        own_n·own_steps·own_contact = 스스로 벗어난 도망(FLIGHT_OWN) 합, shelter_end = 은신처 원 안에서 살아 끝난 도망 수(끝 까닭과 겹친다),
+        hist = 스스로 벗어난 도망의 쫓긴 시간 칸 수(칸 k = hist_edges(스텝) 가운데 쫓긴 시간 이하인 경계 수). started = n 의 합이다."""
+        if self._wf is None:
+            raise ValueError("flight_stats 는 wild_flight 를 켠 세계에만 있다")
+        if not self.track_flight:
+            raise ValueError("flight_stats 는 track_flight 를 켠 세계에만 있다 (판정 실행기는 첫 스텝 전에 켠다)")
+        n, s, c = self._fl_n.copy(), self._fl_steps.copy(), self._fl_cont.copy()
+        op = self._fl_len > 0
+        k = FLIGHT_CAUSES.index("truncated")
+        n[k] += int(np.count_nonzero(op))
+        s[k] += int(self._fl_len[op].sum())
+        c[k] += int(self._fl_contact[op].sum())
+        own = [FLIGHT_CAUSES.index(x) for x in FLIGHT_OWN]
+        return dict(started=int(self._fl_started), live_steps=int(self._fl_live), flee_steps=int(s.sum()),
+                    reflex_steps=int(self._fl_refl + self._fl_reflex[op].sum()),
+                    n={x: int(v) for x, v in zip(FLIGHT_CAUSES, n)}, steps={x: int(v) for x, v in zip(FLIGHT_CAUSES, s)},
+                    contact={x: int(v) for x, v in zip(FLIGHT_CAUSES, c)},
+                    own_n=int(n[own].sum()), own_steps=int(s[own].sum()), own_contact=int(c[own].sum()), shelter_end=int(self._fl_shelter_end),
+                    hist=self._fl_hist.tolist(), hist_edges=list(FLIGHT_HIST_STEPS))
 
     def _pack_step(self, move, speed, has_target, j, hunting):
         """야생 2단계 2 늑대 무리 협동 (모듈 docstring '야생 2단계' 2). `_step_predators_v3` 가 표적 고르기·잠행형 상태 전이 뒤에 부른다.

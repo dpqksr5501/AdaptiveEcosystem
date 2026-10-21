@@ -3,11 +3,15 @@
 - 환경 지문·건너뛰기: 같은 환경(먹이 남은 양·시각만 다름)은 같은 지문, 원판·날씨·용량·은신처가 바뀌면 다른 지문. 열쇠 = 지문 + 두뇌 가중치.
 - 기록·상태 파일: os.replace 로 바꿔 넣고(잠김이면 다시), 임시 파일을 남기지 않는다. 시도·판 번호, 처리한 열쇠, 깨진 기록.
 - 세계 셋: G(게임) 늑대 포만 켬, N(판정) 끔, T(학습) 끔. 시작 모델: R1b-F(관측 18) → 관측 21 + 0 열, 관측 21 두뇌 파일 → 그 zip, 그 밖은 거부.
-- 관문: 짜 맞춘 판정 판으로 통과·1차 기각·지킴 기각·재현 확인. 두뇌 파일 adapt 블록·이름·다시 읽기. 그만둠: 가짜 판 프로세스 나무를 끝낸다.
+- 관문: 짜 맞춘 판정 판으로 통과·1차 기각·지킴 기각·재현 확인. 10-21 (3) 1차 = 쫓긴 시간(스스로 벗어난 도망): 짧으면 통과, 같거나 길면 기각, 최소 차이 δ,
+  덜 잡혀도 1차는 쫓긴 시간, 더 잡히면 GN_caught, 도망을 잘게 쪼개면 GF, 더 오래 달리면 GV, 잡힘·잘림으로 끝난 도망이 늘면 GC, 게임 세계 쫓긴 시간 GG_chase,
+  스스로 벗어난 도망이 없는 시드는 짝에서 빠짐(기록), 옛 꼴 기록 거부. 도주 반사를 끈 스냅숏 거부, 크기 확정 전 실제 폴더 거부.
+  예비 측정 쫓긴 시간 짝·도주 비용 사본·기준 크기 재기.
+  두뇌 파일 adapt 블록·이름·다시 읽기. 그만둠: 가짜 판 프로세스 나무를 끝낸다.
 - 감시 정리: 두뇌 파일을 쓴 뒤 끝난 판은 내보냄(판 번호·두 열쇠), 오류는 같은 스냅숏으로 ERROR_RETRY 번까지, 폴더마다 잠금 하나, 남은 학습 프로세스 끝내기.
   관문은 시드 하나면 기각. state.json 은 잠깐 잠기면 다시 읽는다. 예비 측정 f_dec 는 스냅숏 먹이 지도(T 세계 그대로).
 - 관문 상수 = LIVE_GATE.md.
-학습·판정 세계를 돌리지 않는다(내보내기 골든 600 스텝 하나만). 시드는 관문 범위 이름만 쓰고 세계를 돌리지 않는다.
+학습·판정 세계를 돌리지 않는다(내보내기 골든 600 스텝, 도주 비용 기준 크기 T 세계 셋 × 20 스텝만). 시드는 관문 범위 이름만 쓰고 세계를 돌리지 않는다.
 """
 
 import env.torch_init  # noqa: F401  ← torch보다 먼저
@@ -252,6 +256,7 @@ def test_worlds_satiation(lv, prepared):
     assert world["features"]["wild_satiation"]["enabled"] is True          # G: 게임 그대로
     assert train["features"]["wild_satiation"]["enabled"] is False         # T: 학습할 때는 끈다
     assert world["features"]["obstacle_obs"]["enabled"] is True            # 관측 21 거울
+    assert "flight_cost" not in train["features"]["wild_flight"]           # 도주 비용 끔(LIVE train_flight_cost 0) = train.yaml 그대로
     assert world["features"]["integrated_stage"]["respawn"] is False and train["features"]["integrated_stage"]["respawn"] is True
     assert train["overrides"]["train_seeds"] == [32000, 32050]
     mix = train["train"]["region_mix"]
@@ -273,14 +278,62 @@ def test_worlds_satiation(lv, prepared):
     assert all("diag" not in j and "log_every" not in j and j["cfg"]["v2"]["features"]["wild_satiation"]["enabled"] for _, _, j in st)
 
 
-def test_plan_guard(lv, tmp_path):
+def test_refuse_without_wild_flight(lv, snap, tmp_path):
+    """도주 반사(wild_flight)를 끈 스냅숏은 학습 전에 거부한다 — 관문 1차·지킴이 도망 기록을 쓴다(학습·판정을 헛돌지 않는다)."""
+    s2 = copy.deepcopy(snap)
+    for r in s2["regions"]:
+        r["world"]["wild_flight"]["enabled"] = False
+    with pytest.raises(lv.ad.Refused, match="도주 반사"):
+        lv.prepare(SNAP, s2, tmp_path / "a_nf", lv.BRAIN_FOLDERS)
+    assert not (tmp_path / "a_nf" / "train.yaml").exists()
+
+
+def test_flight_cost_variant_and_scale(lv, prepared, snap, tmp_path):
+    """도주 비용: prepare(flight_cost) 와 예비 측정 사본 train_fc<값>.yaml 은 T 세계에 wild_flight.flight_cost 만 더한다(0 이면 뺀다). 기준 크기 재기
+    (scale)는 T 세계 지역마다 그 지역 스냅숏 먹이 지도로 돈다."""
+    import yaml
+
+    from env_v2.config import load_v2_config
+    from env_v2.world import World
+
+    rd = prepared["dir"]
+    base = yaml.safe_load((rd / "train.yaml").read_text(encoding="utf-8"))
+    p = lv.train_variant(rd, 0.005)
+    d = yaml.safe_load(p.read_text(encoding="utf-8"))
+    assert p.name == "train_fc0.005.yaml" and d["features"]["wild_flight"]["flight_cost"] == 0.005
+    d["features"]["wild_flight"].pop("flight_cost")
+    assert d == base                                                       # 다른 칸은 그대로
+    assert World(load_v2_config(p).replace(N=8), seeds=[32000])._wf["flight_cost"] == 0.005
+    assert "flight_cost" not in yaml.safe_load(lv.train_variant(rd, 0.0).read_text(encoding="utf-8"))["features"]["wild_flight"]
+    with pytest.raises(ValueError):
+        lv.train_variant(rd, -1.0)
+    rd2 = tmp_path / "a2_fc"
+    info2 = lv.prepare(SNAP, snap, rd2, lv.BRAIN_FOLDERS, flight_cost=0.01)
+    t2 = yaml.safe_load((rd2 / "train.yaml").read_text(encoding="utf-8"))
+    assert t2["features"]["wild_flight"]["flight_cost"] == 0.01 and info2["record"]["live"]["flight_cost"] == 0.01
+    assert (rd2 / "train.yaml").read_text(encoding="utf-8").splitlines()[2].endswith("도주 비용 wild_flight.flight_cost 0.01")
+    items = lv.scale_items(prepared, lv.OBS21ZERO, [32000], 20)
+    assert sorted(j["region"] for _, _, j in items) == sorted(prepared["regions"]) and all(k == "scale" for k, _, _ in items)
+    rows = [lv._job(it)[1] for it in items]
+    s = lv.scale_summary(rows, rd / "train.yaml")
+    assert s["worlds"] == 3 and s["deer_steps"] == sum(r["steps"] for r in rows) > 0
+    assert s["metabolic"]["run"] == pytest.approx(0.002 * 2.5) and s["metabolic"]["walk"] == pytest.approx(0.002)   # 뛰기 대사 2.5 배, 걷기 = v1
+    assert s["run_extra_over_stop"] == pytest.approx(0.002 * (2.5 - 15 / 21))
+
+
+def test_plan_guard(lv, tmp_path, monkeypatch):
     def ns(**kw):
         base = dict(root=str(tmp_path), workers=4, ckpt=None, steps=None, model_seeds=None, horizon=None, judge_seeds=None, select_seeds=None,
-                    stuck_seeds=None, check_seeds=None, skip_check=False, force_export=False, horizon_g=None, judge_seeds_g=None)
+                    stuck_seeds=None, check_seeds=None, skip_check=False, force_export=False, horizon_g=None, judge_seeds_g=None, flight_cost=None)
         return Namespace(**(base | kw))
 
     pl = lv.plan_from_args(ns())
     assert not pl["test"] and pl["judge"] == lv.LIVE["judge_seeds"] and pl["steps"] == lv.LIVE["train_steps"]
+    assert pl["flight_cost"] == lv.LIVE["train_flight_cost"] == 0.0 and "--flight-cost" not in lv.plan_args(pl)
+    pl = lv.plan_from_args(ns(flight_cost=0.005))                           # 도주 비용은 관문 상수와 다르면 시험 크기
+    assert pl["test"] and pl["flight_cost"] == 0.005 and lv.plan_args(pl)[-2:] == ["--flight-cost", "0.005"]
+    with pytest.raises(SystemExit):
+        lv.plan_from_args(ns(flight_cost=-0.1))
     pl = lv.plan_from_args(ns(steps=20000, judge_seeds="35000-35002", horizon=300))
     assert pl["test"] and pl["judge"] == (35000, 35002)
     assert "--steps" in lv.plan_args(pl) and "--judge-seeds" in lv.plan_args(pl)
@@ -289,6 +342,12 @@ def test_plan_guard(lv, tmp_path):
     assert "--judge-seeds-g" in lv.plan_args(pl) and "--horizon-g" in lv.plan_args(pl) and "--judge-seeds" not in lv.plan_args(pl)
     with pytest.raises(SystemExit):
         lv.plan_from_args(ns(root=str(lv.DEFAULT_ROOT), steps=20000))     # 시험 크기는 실제 폴더에서 받지 않는다
+    assert lv.LIVE["flight_sizes_confirmed"] is False                      # 10-21 (3) 쫓긴 시간 기준의 크기는 예비 측정 뒤 확정
+    with pytest.raises(SystemExit, match="예비 측정으로 확정하지 않았다"):
+        lv.plan_from_args(ns(root=str(lv.DEFAULT_ROOT)))                   # 확정 전에는 관문 크기여도 실제 폴더에서 판·감시를 돌리지 않는다
+    monkeypatch.setitem(lv.LIVE, "flight_sizes_confirmed", True)
+    assert not lv.plan_from_args(ns(root=str(lv.DEFAULT_ROOT)))["test"]
+    monkeypatch.setitem(lv.LIVE, "flight_sizes_confirmed", False)
     with pytest.raises(SystemExit):
         lv.plan_from_args(ns(judge_seeds="34900-34902"))                   # 예비 측정 시드는 관문에 쓰지 않는다
     for kw in (dict(judge_seeds="35000"), dict(judge_seeds_g="35000-35000"), dict(select_seeds="35100-35100")):
@@ -302,62 +361,179 @@ def test_plan_guard(lv, tmp_path):
 # --------------------------------------------------------------------- #
 
 
-def _fake(seeds, caught, starved=lambda s, r: 10, shelter=0.06, beh=(0.88, 0.08, 0.04, 0, 0), cover=0, regions=("A", "B")):
+def _flight(chase_s, own, started, step_s, live=100000, flee=0.08, unsafe=2):
+    """세계 하나의 도망 기록(짜 맞춤, World.flight_stats 꼴): 스스로 벗어난 도망 own 개(은신처 ½·원판 ¼·반경 나머지)의 쫓긴 시간 평균 chase_s 초,
+    잡힘 unsafe − 1·잘림 1, 나머지 시작은 바꿈(쫓긴 3 스텝)·안 쫓김 반반(시작 = 까닭 수 합). 산 사슴-스텝 live, 실행 FLEE 몫 flee(반사 = 그 ¾)."""
+    tot = int(round(chase_s / step_s * own))
+    cv, ob = own // 2, own // 4
+    rest = max(started - own - unsafe, 0)
+    sw = rest // 2
+    n = dict(cover=cv, obstacle=ob, fov=0, range=own - cv - ob, switch=sw, stop=0, held=0, unchased=rest - sw, caught=unsafe - 1, starved=0, truncated=1)
+    c_cv, c_ob = tot * cv // max(own, 1), tot * ob // max(own, 1)
+    contact = dict(cover=c_cv, obstacle=c_ob, fov=0, range=tot - c_cv - c_ob, switch=3 * sw, stop=0, held=0, unchased=0, caught=30 * n["caught"], starved=0,
+                   truncated=2)
+    steps = {k: contact[k] + 5 * n[k] for k in n}
+    fs = int(flee * live)
+    return dict(started=sum(n.values()), live_steps=live, flee_steps=fs, reflex_steps=fs * 3 // 4, n=n, steps=steps, contact=contact,
+                own_n=own, own_steps=sum(steps[c] for c in ("cover", "obstacle", "fov", "range")), own_contact=tot, shelter_end=cv,
+                hist=[own, 0, 0, 0, 0, 0, 0, 0], hist_edges=[8, 15, 38, 75, 150, 300, 600])
+
+
+def _fake(seeds, caught, starved=lambda s, r: 10, shelter=0.06, beh=(0.88, 0.08, 0.04, 0, 0), cover=0, regions=("A", "B"),
+          chase=lambda s, r: 6.0, own=lambda s, r: 20, started=lambda s, r: 40, flee=lambda s, r: 0.08, unsafe=lambda s, r: 2):
     W = []
     for s in seeds:
         for r in regions:
             c, st, live = int(caught(s, r)), int(starved(s, r)), 100000
             W.append(dict(seed=s, region=r, n=128, caught=c, starved=st, alive=128 - c - st, shelter_steps=int(shelter * live), live_steps=live,
-                          beh_steps=[int(b * live) for b in beh], catch_cover=cover, hunt=dict(ends=10, success=6)))
+                          beh_steps=[int(b * live) for b in beh], catch_cover=cover, hunt=dict(ends=10, success=6),
+                          flight=_flight(chase(s, r), int(own(s, r)), int(started(s, r)), 2.0 / 15.0, live, flee(s, r), int(unsafe(s, r)))))
     return dict(meta={}, worlds=W)
 
 
-def test_gate_decisions(lv):
+def test_gate_decisions(lv, monkeypatch):
     rng = np.random.default_rng(34900)
     seeds = list(range(35000, 35040))
     base = {(s, r): int(rng.integers(25, 30)) for s in seeds for r in ("A", "B")}
-    cur = _fake(seeds, lambda s, r: base[(s, r)])
-    less = (lambda s, r: base[(s, r)] - (1 if (s + (r == "A")) % 2 else 0))
+    fl = {(s, r): float(rng.uniform(4.0, 8.0)) for s in seeds for r in ("A", "B")}
+    cb = lambda s, r: base[(s, r)]                                                        # noqa: E731
+    cf = lambda s, r: fl[(s, r)]                                                          # noqa: E731
+    shorter = (lambda s, r: fl[(s, r)] - (0.5 if (s + (r == "A")) % 2 else 1.5))         # 쫓긴 시간이 0.5~1.5 초 짧다
+    cur = _fake(seeds, cb, chase=cf)
     stuck0 = dict(summary=dict(deer_stuck=0, wolf_stuck=1, wolf_wall_stuck=3, worlds=15))
     stuck = dict(current=stuck0, candidate=stuck0)
     skip = dict(ok=None, why="중간 변화로 재현 확인 없음 (환경 #1)")
 
-    def ev(n_cand, g_cand):
-        return dict(N=dict(current=cur, candidate=n_cand), G=dict(current=cur, candidate=g_cand))
+    def ev(n_cand, g_cand, n_cur=cur, g_cur=cur):
+        return dict(N=dict(current=n_cur, candidate=n_cand), G=dict(current=g_cur, candidate=g_cand))
 
-    g = lv.gate_live(ev(_fake(seeds, less), cur), stuck, skip)
-    assert g["verdict"] == "통과" and g["passed"] and g["n"] == 40 and g["t_crit"] == pytest.approx(2.0227, abs=5e-4)
-    assert g["criteria"]["R_check"]["skipped"] and g["criteria"]["P1_N_caught"]["ok"]
-    assert g["summary"].startswith("포만 없는 세계 잡힘 ") and "게임 세계 나빠짐 없음" in g["summary"]
-    g = lv.gate_live(ev(cur, cur), stuck, skip)                              # 같은 두뇌 = 덜 잡히지 않음
-    assert g["verdict"] == "기각" and "P1" in g["why"] and g["brief"].startswith("1차 t ") and "(문턱 −2.02)" in g["brief"]
-    g = lv.gate_live(ev(_fake(seeds, less), _fake(seeds, lambda s, r: base[(s, r)], starved=lambda s, r: 14)), stuck, skip)
+    good = _fake(seeds, cb, chase=shorter)
+    g = lv.gate_live(ev(good, cur), stuck, skip)
+    assert g["verdict"] == "통과" and g["passed"] and g["n"] == 40 and g["n_flight"] == 40 and g["t_crit_flight"] == pytest.approx(2.0227, abs=5e-4)
+    p1 = g["criteria"]["P1_N_chase"]
+    assert p1["ok"] and p1["diff"] == pytest.approx(-1.0, abs=0.02) and p1["dropped"] == [] and "P1_N_caught" not in g["criteria"]
+    assert all(g["criteria"][k]["ok"] for k in ("GN_caught", "GF_flight_starts", "GV_flee_time", "GC_flight_unsafe", "GG_chase"))
+    assert g["criteria"]["R_check"]["skipped"]
+    assert g["summary"].startswith("포만 없는 세계 쫓긴 시간 ") and "초 (t −" in g["summary"] and g["summary"].endswith(", 잡힘·도망 나빠짐 없음")
+    rep = g["report"]
+    fN = rep["flight"]["N"]
+    assert set(rep["flight"]) == {"N", "G"} and fN["candidate"]["own_contact_s"] < fN["current"]["own_contact_s"]
+    assert fN["current"]["share"]["cover"] == pytest.approx(10 / 40) and fN["current"]["truncated_share"] == pytest.approx(1 / 40)
+    assert fN["current"]["own_share"] == pytest.approx(20 / 40) and fN["current"]["unsafe_share"] == pytest.approx(2 / 40)
+    assert fN["current"]["starts_per_1k"] == pytest.approx(0.4) and fN["current"]["shelter_end_share"] == pytest.approx(10 / 38)
+    assert fN["candidate"]["flee_share"] == pytest.approx(0.08) and fN["candidate"]["self_flee_share"] == pytest.approx(0.02)
+    assert "flee_share" not in rep and "flight_G" not in rep
+    md = lv.fmt_flight(g)
+    assert "쫓긴 시간 초 (스스로 벗어남, 전체 합)" in md and "1차 P1 (시드마다 평균을 낸 뒤 평균" in md and "짝 시드 40 (빠진 시드 0)" in md
+    assert "실행 FLEE 몫 (반사 포함)" in md and "스스로 고른 FLEE 몫" in md and "G 쫓긴 시간 (지킴 GG_chase" in md
+    # 같은 두뇌 = 쫓긴 시간이 짧아지지 않음 → 1차 기각 (잡힘이 같아도)
+    g = lv.gate_live(ev(cur, cur), stuck, skip)
+    assert g["verdict"] == "기각" and "P1" in g["why"] and g["brief"].startswith("1차 쫓긴 시간 ") and "(문턱 −2.02)" in g["brief"]
+    # 더 긴 쫓긴 시간 → 1차 기각
+    g = lv.gate_live(ev(_fake(seeds, cb, chase=lambda s, r: fl[(s, r)] + 1.0), cur), stuck, skip)
+    assert g["verdict"] == "기각" and not g["criteria"]["P1_N_chase"]["ok"] and g["criteria"]["P1_N_chase"]["t"] > 0
+    # 최소 차이 δ: 평균 1 초 짧아도 δ 1.5 초를 못 넘으면 1차 기각
+    monkeypatch.setitem(lv.LIVE, "flight_min_effect_s", 1.5)
+    g = lv.gate_live(ev(good, cur), stuck, skip)
+    assert g["verdict"] == "기각" and "최소 차이 −1.5초" in g["why"] and "≤ −1.5초" in g["criteria"]["P1_N_chase"]["rule"]
+    monkeypatch.setitem(lv.LIVE, "flight_min_effect_s", 0.5)
+    assert lv.gate_live(ev(good, cur), stuck, skip)["verdict"] == "통과"
+    monkeypatch.setitem(lv.LIVE, "flight_min_effect_s", 0.0)
+    # 쫓긴 시간은 짧지만 더 잡힘 (옛 1차가 이제 지킴) → GN_caught 기각
+    more = lambda s, r: base[(s, r)] + (1 if (s + (r == "A")) % 2 else 2)                # noqa: E731
+    g = lv.gate_live(ev(_fake(seeds, more, chase=shorter), cur), stuck, skip)
+    assert g["verdict"] == "기각" and "GN_caught" in g["why"] and g["criteria"]["P1_N_chase"]["ok"]
+    assert g["brief"].startswith("지킴 GN_caught (t +")
+    # 덜 잡혀도 1차는 쫓긴 시간이다
+    less = lambda s, r: base[(s, r)] - (1 if (s + (r == "A")) % 2 else 0)                # noqa: E731
+    g = lv.gate_live(ev(_fake(seeds, less, chase=cf), cur), stuck, skip)
+    assert g["verdict"] == "기각" and "P1" in g["why"] and g["criteria"]["GN_caught"]["ok"]
+    # 짧게 자주 도망 (1000 산 사슴-스텝당 시작이 유의하게 많다) → GF 기각
+    g = lv.gate_live(ev(_fake(seeds, cb, chase=shorter, started=lambda s, r: 50 + (s % 3)), cur), stuck, skip)
+    assert g["verdict"] == "기각" and "GF_flight_starts" in g["why"] and g["criteria"]["P1_N_chase"]["ok"]
+    # 더 오래·일찍 달림 (실행 FLEE 몫이 유의하게 많다 — 두뇌가 반사 전에 스스로 달아나도 센다) → GV 기각
+    g = lv.gate_live(ev(_fake(seeds, cb, chase=shorter, flee=lambda s, r: 0.10 + 0.01 * (s % 2)), cur), stuck, skip)
+    assert g["verdict"] == "기각" and g["why"] == "지킴 기준 실패: GV_flee_time" and g["criteria"]["P1_N_chase"]["ok"]
+    # 긴 추격이 잡힘·잘림으로 끝나 1차 평균에서 빠짐 (잡힘·굶음·잘림으로 끝난 도망 몫이 유의하게 많다) → GC 기각
+    g = lv.gate_live(ev(_fake(seeds, cb, chase=shorter, unsafe=lambda s, r: 4 + (s % 2)), cur), stuck, skip)
+    assert g["verdict"] == "기각" and "GC_flight_unsafe" in g["why"] and g["criteria"]["P1_N_chase"]["ok"]
+    # 게임 세계 G 에서 쫓긴 시간이 길어짐 → GG_chase 기각
+    g = lv.gate_live(ev(good, _fake(seeds, cb, chase=lambda s, r: fl[(s, r)] + 1.0)), stuck, skip)
+    assert g["verdict"] == "기각" and g["why"] == "지킴 기준 실패: GG_chase"
+    # 스스로 벗어난 도망이 없는 시드는 짝에서 빠진다 (빠진 수를 적는다) — 남은 시드로 판단
+    some = lambda s, r: 0 if s in (35001, 35002, 35003) else 20                           # noqa: E731
+    g = lv.gate_live(ev(_fake(seeds, cb, chase=shorter, own=some), cur), stuck, skip)
+    assert g["n_flight"] == 37 and g["dropped_flight"] == [35001, 35002, 35003] and g["n"] == 40
+    assert g["t_crit_flight"] == pytest.approx(lv.t_crit(36)) and g["criteria"]["P1_N_chase"]["n"] == 37
+    assert "빠진 시드 3" in g["criteria"]["P1_N_chase"]["rule"] and "빠진 시드 3: 35001, 35002, 35003" in lv.fmt_flight(g)
+    # 한 시드만 남으면 짝 t 를 셀 수 없다 — 기각
+    one_left = lambda s, r: 20 if s == 35000 else 0                                       # noqa: E731
+    g = lv.gate_live(ev(_fake(seeds, cb, chase=shorter, own=one_left), cur), stuck, skip)
+    assert g["verdict"] == "기각" and "쫓긴 시간을 잴 시드 1개" in g["why"] and g["brief"] == "쫓긴 시간 잴 시드 1개 (2개 이상)"
+    # 지킴은 그대로
+    g = lv.gate_live(ev(good, _fake(seeds, cb, starved=lambda s, r: 14, chase=cf)), stuck, skip)
     assert g["verdict"] == "기각" and "GG_starved" in g["why"]                 # 게임 세계에서 더 굶는다
-    g = lv.gate_live(ev(_fake(seeds, less, starved=lambda s, r: 14), cur), stuck, skip)
+    g = lv.gate_live(ev(_fake(seeds, cb, starved=lambda s, r: 14, chase=shorter), cur), stuck, skip)
     assert g["verdict"] == "기각" and "GN_starved" in g["why"]
-    g = lv.gate_live(ev(_fake(seeds, less), _fake(seeds, lambda s, r: base[(s, r)], cover=1)), stuck, skip)
+    g = lv.gate_live(ev(good, _fake(seeds, cb, cover=1, chase=cf)), stuck, skip)
     assert "G4_catch_in_shelter" in g["why"]
     stuck_bad = dict(summary=dict(deer_stuck=2, wolf_stuck=1, wolf_wall_stuck=3, worlds=15))
-    g = lv.gate_live(ev(_fake(seeds, less), cur), dict(current=stuck0, candidate=stuck_bad), skip)
+    g = lv.gate_live(ev(good, cur), dict(current=stuck0, candidate=stuck_bad), skip)
     assert "G5_stuck" in g["why"]
-    g = lv.gate_live(ev(_fake(seeds, less), cur), None, skip)
+    g = lv.gate_live(ev(good, cur), None, skip)
     assert g["verdict"] == "기각" and "G5_stuck" in g["why"]                   # 끼임 세기가 없으면 통과가 아니다
-    g = lv.gate_live(ev(_fake(seeds, less), _fake(seeds, lambda s, r: base[(s, r)], shelter=0.2)), stuck, skip)
+    g = lv.gate_live(ev(good, _fake(seeds, cb, shelter=0.2, chase=cf)), stuck, skip)
     assert "G6_no_exploit" in g["why"]
-    g = lv.gate_live(ev(_fake(seeds, less), cur), stuck, dict(ok=False, steps=1800))
+    g = lv.gate_live(ev(good, cur), stuck, dict(ok=False, steps=1800))
     assert g["verdict"] == "기각" and "재현 확인" in g["why"]
-    g = lv.gate_live(ev(_fake(seeds, less), cur), stuck, dict(ok=True, steps=1800))
+    g = lv.gate_live(ev(good, cur), stuck, dict(ok=True, steps=1800))
     assert g["verdict"] == "통과" and g["criteria"]["R_check"]["ok"] is True
     few = seeds[:3]
-    g = lv.gate_live(dict(N=dict(current=_fake(few, lambda s, r: base[(s, r)]), candidate=_fake(few, less)),
-                          G=dict(current=_fake(few, lambda s, r: base[(s, r)]), candidate=_fake(few, lambda s, r: base[(s, r)]))), stuck, skip)
-    assert g["n"] == 3 and g["t_crit"] == pytest.approx(4.303, abs=1e-3)      # 문턱은 시드 수에서
-    one = seeds[:1]                                                           # 시드 하나: t = −∞ 지만 짝 t 를 셀 수 없다 — 기각
-    g = lv.gate_live(dict(N=dict(current=_fake(one, lambda s, r: base[(s, r)]), candidate=_fake(one, lambda s, r: base[(s, r)] - 1)),
-                          G=dict(current=_fake(one, lambda s, r: base[(s, r)]), candidate=_fake(one, lambda s, r: base[(s, r)] - 1))), stuck, skip)
-    assert g["n"] == 1 and g["criteria"]["P1_N_caught"]["t"] == -math.inf
-    assert g["verdict"] == "기각" and not g["passed"] and "판정 시드 1개" in g["why"] and not g["criteria"]["P1_N_caught"]["ok"]
-    assert not any(v["ok"] for k, v in g["criteria"].items() if k.startswith(("GN_", "GG_")))
+    g = lv.gate_live(dict(N=dict(current=_fake(few, cb, chase=cf), candidate=_fake(few, cb, chase=shorter)),
+                          G=dict(current=_fake(few, cb, chase=cf), candidate=_fake(few, cb, chase=cf))), stuck, skip)
+    assert g["n"] == 3 and g["t_crit"] == pytest.approx(4.303, abs=1e-3) and g["t_crit_flight"] == pytest.approx(4.303, abs=1e-3)   # 문턱은 시드 수에서
+    one = seeds[:1]                                                           # 시드 하나: 짝 t 를 셀 수 없다 — 기각
+    g = lv.gate_live(dict(N=dict(current=_fake(one, cb, chase=cf), candidate=_fake(one, cb, chase=shorter)),
+                          G=dict(current=_fake(one, cb, chase=cf), candidate=_fake(one, cb, chase=cf))), stuck, skip)
+    assert g["n"] == 1 and g["criteria"]["P1_N_chase"]["t"] == -math.inf
+    assert g["verdict"] == "기각" and not g["passed"] and "판정 시드 1개" in g["why"] and not g["criteria"]["P1_N_chase"]["ok"]
+    assert not any(v["ok"] for k, v in g["criteria"].items() if k.startswith(("GN_", "GF_", "GV_", "GC_", "GG_")))
+    # 도망 기록이 없는 판(옛 실행기)·옛 꼴 기록(쫓긴 시간 없음)은 받지 않는다
+    bare = _fake(seeds, cb)
+    for w in bare["worlds"]:
+        w.pop("flight")
+    with pytest.raises(ValueError, match="도망 기록"):
+        lv.gate_live(ev(good, cur, n_cur=bare), stuck, skip)
+    old = _fake(seeds, cb)
+    for w in old["worlds"]:
+        w["flight"].pop("contact")
+    with pytest.raises(ValueError, match="옛 꼴"):
+        lv.gate_live(ev(good, cur, n_cur=old), stuck, skip)
+
+
+def test_pilot_flight_pair(lv):
+    """예비 측정의 쫓긴 시간 짝 = 관문 1차와 같은 셈 (판정 길이마다 끊은 기록 at[h].flight), 0.25·0.5·1 초 가를 시드 수, 지킴 GF·GV·GC 차이."""
+    seeds = list(range(34900, 34920))
+    rng = np.random.default_rng(34901)
+    fl = {(s, r): float(rng.uniform(4.0, 8.0)) for s in seeds for r in ("A", "B")}
+
+    def multi(shift):
+        res = _fake(seeds, lambda s, r: 10, chase=lambda s, r: fl[(s, r)] + shift(s, r))
+        for w in res["worlds"]:
+            w["at"] = {"1800": dict(caught=w["caught"], starved=w["starved"], alive=w["alive"], flight=w["flight"])}
+        return res
+
+    a, b = multi(lambda s, r: -0.5 - 0.5 * (s % 2)), multi(lambda s, r: 0.0)
+    p = lv.pilot_flight_pair(a, b, 1800)
+    assert p["n"] == 20 and p["diff"] == pytest.approx(-0.75, abs=0.02) and p["sd"] > 0 and p["t"] < -2
+    assert set(p["n_needed"]) == {"0.25s", "0.5s", "1s"} and p["n_needed"]["0.25s"] >= p["n_needed"]["0.5s"] >= p["n_needed"]["1s"]
+    assert p["starts"]["diff"] == 0.0 and p["flee"]["diff"] == 0.0 and p["unsafe"]["diff"] == 0.0
+    fp = lv.flight_pooled(lv.at_horizon(a, 1800))
+    assert fp["started"] == 40 * 40 and fp["own_n"] == 20 * 40 and fp["started_per_seed"] == pytest.approx(80)
+    text = lv.fmt_pilot(dict(pilot="p_t", seeds=[34900, 34919], snapshot="s.json", workers=2, times={}, flight_costs=[0.0],
+                             vs_current={"r5": {"N": {"1800": dict(flight=p, caught=lv.pilot_pair(a, b, 1800))}}},
+                             flight_pooled={"r5": {"N": {"1800": fp}}}))
+    assert "두뇌 − 지금 두뇌" in text and "도망 끝 까닭" in text and "쫓긴 시간 지금 초" in text and "GF 시작/1000" in text
 
 
 # --------------------------------------------------------------------- #
@@ -367,7 +543,7 @@ def test_gate_decisions(lv):
 
 def test_export_adapt_block(lv, tmp_path):
     brains = tmp_path / "brains"
-    gate = "포만 없는 세계 잡힘 31.2→28.4% (t −2.9), 게임 세계 나빠짐 없음"
+    gate = "포만 없는 세계 쫓긴 시간 6.3→5.1초 (t −2.4), 잡힘·도망 나빠짐 없음"
     x = lv.export_brain(lv.OBS21ZERO, brains, 3, 5, "a5_20261021T153200_e2", "eco_v3_snapshot_s20003_t1800_e2.json", "Barren 나무 0→20", gate,
                         play_id="p20261021T150000_0badcafe")
     assert x["ok"] and x["name"] == "live_r3_a5_20261021T153200_e2"
@@ -656,3 +832,17 @@ def test_constants_match_md(lv):
     assert L["f_dec"] is None and "R5 값 0.858922 그대로" in md
     assert lv.CONTRACT_OBS21 in md and "예비 측정 뒤 크기 확정" in md
     assert lv.TEMPLATE_OBS.exists() and lv.R5_TRAIN.exists() and lv.R5S3.name in md
+    # 10-21 (3) 1차 = 도망 시간(쫓긴 시간): 사용자 말 그대로, 스스로 벗어남·잡힘·굶음·잘림 = 세계의 정의와 같은 끝 까닭, 크기는 예비 측정 뒤 확정
+    from env_v2.world import FLIGHT_CAUSES, FLIGHT_OWN, FLIGHT_UNSAFE
+
+    assert "(3) 사용자 10-21 기준 바꿈 — 1차 = 도망 시간" in md
+    assert "똑같이 도망을 가도 숲속으로 잘 숨어서 늑대 시야에 잘 벗어나기 때문에 도망가는 시간이 더 짧은 사슴이 똑똑한걸로 기준을 잡아봐" in md
+    assert tuple(L["flight_own"]) == FLIGHT_OWN and "스스로 벗어난 도망(cover · obstacle · fov · range)" in md
+    assert tuple(L["flight_unsafe"]) == FLIGHT_UNSAFE and "(caught · starved · truncated)" in md
+    assert L["flight_min_episodes"] == 1 and "스스로 벗어난 도망 1개 이상" in md
+    assert L["flight_min_effect_s"] == 0.0 and "| P1 최소 차이 δ | 0 초 (유의성만) | 예비 측정 뒤 확정" in md
+    assert L["train_flight_cost"] == 0.0 and "| T 세계 도주 비용 flight_cost | 0 (끔) | 예비 측정 뒤 확정" in md
+    assert L["flight_sizes_confirmed"] is False and "| 크기 확정 표시 flight_sizes_confirmed | 거짓 |" in md
+    assert md.count("도망 시간 기준은 예비 측정 뒤 확정") >= 6 and all(k in md for k in ("GF", "GV", "GC", "GG_chase", "GN_caught", "P1_N_chase"))
+    assert all(f"`{c}`" in md for c in FLIGHT_CAUSES)
+    assert lv.STEP_S == pytest.approx(2.0 / 15.0) and "× 2/15 초" in md
