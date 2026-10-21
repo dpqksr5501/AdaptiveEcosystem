@@ -297,6 +297,10 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #     성분으로 돌리고 모서리를 벗어나는 쪽을 고른다(env_v2/world.py `wf_edge_steer`). false·0 = 10-15 그대로
 #   wild_flight.flight_cost (10-21 실시간 고리 '도망 시간' 기준 — 학습 세계 전용, 판정 세계·언리얼에는 없다): 0 이상. 이번 스텝에 FLEE 를 실행한
 #     사슴(도주 반사 덮기·두뇌가 고른 FLEE 모두)의 보상에서 이 값을 뺀다(env_v2/world.py `step` 5)). 0 = 그대로(그 줄을 타지 않는다 — 비트 동일)
+#   wild_flight.route_fixed·quiet_end (10-21 '도망 방향을 두뇌가 고름' 1단계 — 측정 전용, 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 6·7·9절):
+#     route_fixed 가 'run'·'open'·'cover'·'shelter' 면 도주 반사 중 방향을 그 길로 고정한다(가능하지 않으면 RUN — env_v2/world.py `flight_route_geometry`·
+#     `_route_step`). 'run' 은 지금 반사 방향 그대로(비트 동일, 길 기록만 더한다). quiet_end > 0(스텝)이면 붙잡는 늑대를 그만큼 이어 알아채지 못한
+#     도주는 끝난다. null·0 = 그대로(그 줄을 타지 않는다 — 비트 동일). 두뇌가 고르는 길(계약 판 4)은 아직 없다
 #   obstacles.fixed (10-17 야생 2단계 3): [[x, y, r], …](단위) 이면 무작위 배치 대신 이 원판을 쓴다(난수를 뽑지 않는다 — 언리얼 무대에서 읽은 원판으로 거울을
 #     돌리는 짝 비교용, results/v3/mirror/run_mirror.py --unreal-obstacles). null = 자기 스트림 part 0 으로 무작위 배치
 #   obstacles.detour·detour_* (10-17 장애물 돌아가기, env_v2/world.py `detour_moves`, 모듈 docstring '야생 2단계' 3 의 6)): detour true 면 사슴·늑대가 원판에
@@ -318,7 +322,7 @@ OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "realism_shelter": MappingProxyType({"block_predators": False, "wolf_margin": 0.0}),
     "realism_cover_food": MappingProxyType({"frac_range": None}),
     "threats": MappingProxyType({"eat_in_place": False}),
-    "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0}),
+    "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0}),
     "obstacles": MappingProxyType({"fixed": None, "detour": False, "detour_block": 0.5, "detour_free": 0.8, "detour_probe": 1.5,
                                    "detour_steps": 45, "detour_help_block": 15, "detour_help_drop": 38}),
     "wild_weather": MappingProxyType({"schedule": None}),

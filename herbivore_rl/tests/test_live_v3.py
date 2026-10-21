@@ -10,6 +10,10 @@
   두뇌 파일 adapt 블록·이름·다시 읽기. 그만둠: 가짜 판 프로세스 나무를 끝낸다.
 - 감시 정리: 두뇌 파일을 쓴 뒤 끝난 판은 내보냄(판 번호·두 열쇠), 오류는 같은 스냅숏으로 ERROR_RETRY 번까지, 폴더마다 잠금 하나, 남은 학습 프로세스 끝내기.
   관문은 시드 하나면 기각. state.json 은 잠깐 잠기면 다시 읽는다. 예비 측정 f_dec 는 스냅숏 먹이 지도(T 세계 그대로).
+- 10-21 (4) 두 번 보기(중간 판정): 경계 셈(끈 기본 = 옛 문턱, 켰을 때 두 몫 합 = α, 같은 간격 두 번의 알려진 z 값, 실제 자유도 t, scipy 없이도 같음,
+  흉내 내기로 우연 통과 몫 ≤ 2.5%), 중간 기각(나아지지 않음)은 G·끼임·뒤 절반을 돌리지 않음(가짜 실행기), 앞서 통과(켰을 때)도 뒤 절반·G·끼임을 돌려 지킴을
+  전체로 봄(검토 사례: 뒤 절반 은신처 안 잡힘·더 잡힘 → 기각), 끝 판정 = 옛 한 번 보기. 지금 두뇌 판정 저장: 맞음·틀림·열쇠 무효, 임시 파일 → os.replace,
+  저장 실패 기록. 판정 실행기 갈림(결과의 시드·지역 확인).
 - 관문 상수 = LIVE_GATE.md.
 학습·판정 세계를 돌리지 않는다(내보내기 골든 600 스텝, 도주 비용 기준 크기 T 세계 셋 × 20 스텝만). 시드는 관문 범위 이름만 쓰고 세계를 돌리지 않는다.
 """
@@ -537,6 +541,443 @@ def test_pilot_flight_pair(lv):
 
 
 # --------------------------------------------------------------------- #
+# 10-21 (4) 두 번 보기(중간 판정)·지금 두뇌 판정 저장·판정 실행기 갈림
+# --------------------------------------------------------------------- #
+
+
+def test_seq_boundaries(lv, monkeypatch):
+    """경계 셈: Lan–DeMets O'Brien–Fleming 꼴 쓰기, 같은 간격 두 번의 알려진 z 값(2.963·1.969), 쓴 α 합 ≤ α, 실제 자유도 t 문턱, scipy 없이도 같은 값,
+    앞서 통과를 끄면(기본 — 중간에 α 를 쓰지 않으면) 끝 문턱 = 옛 한 번 보기 t_crit. 켜면 끝 문턱 = t_{α − α₁} (합집합 상한 — 두 번 합이 t 분포에서 정확히 α)."""
+    a = lv.LIVE["seq_alpha"]
+    assert a == 0.025 and lv.LIVE["seq_spending"] == "obf" and lv.LIVE["seq_efficacy"] is False
+    assert lv.seq_interim_bound(40, 80)["alpha1"] == 0.0 and lv.seq_final_bound(80, dict(lv.seq_interim_bound(40, 80), n1=40))["bound"] == lv.t_crit(79)
+    monkeypatch.setitem(lv.LIVE, "seq_efficacy", True)
+    assert lv.obf_spend(0.5, a) == pytest.approx(0.0015253, abs=1e-7) and lv.obf_spend(1.0, a) == pytest.approx(a, abs=1e-12) and lv.obf_spend(0.0, a) == 0.0
+    i = lv.seq_interim_bound(40, 80)
+    f = lv.seq_final_bound(80, dict(i, n1=40))
+    c1, c2 = lv.SEQ_OBF_REF[0.5]
+    assert i["c1"] == pytest.approx(c1, abs=5e-4) and f["c2"] == pytest.approx(c2, abs=5e-4) and f["rho"] == pytest.approx(math.sqrt(0.5))
+    assert i["bound"] == pytest.approx(3.1595, abs=1e-3) and f["bound"] == pytest.approx(2.0183, abs=1e-3)      # n₁ 40 · 80 의 t 문턱
+    assert f["bound_z"] == pytest.approx(1.9994, abs=1e-3) and f["bound"] > f["bound_z"] > lv.t_crit(79)   # z 경계를 옮긴 값(참고)보다 엄격
+    from scipy.stats import t as st_t0
+
+    assert float(st_t0.sf(i["bound"], 39)) == pytest.approx(i["alpha1"], abs=1e-12)                       # 중간 몫 = α₁ (t 분포에서 정확)
+    assert float(st_t0.sf(f["bound"], 79)) == pytest.approx(a - i["alpha1"], abs=1e-12) and f["alpha2"] == pytest.approx(a - i["alpha1"])
+    for n_int, n_fin in ((40, 80), (37, 74), (20, 80), (5, 10)):                                           # 두 번 합 = α (합집합 상한)
+        bi = lv.seq_interim_bound(n_int, 80)
+        bf = lv.seq_final_bound(n_fin, dict(bi, n1=n_int))
+        tot = float(st_t0.sf(bi["bound"], n_int - 1) + st_t0.sf(bf["bound"], n_fin - 1))
+        assert tot <= a + 1e-12 and tot == pytest.approx(a, abs=1e-9)
+    for frac in (0.2, 0.3, 0.5, 0.7, 0.9):                                                                  # 쓴 α 합 ≤ α (끝은 나머지를 다 쓴다)
+        a1 = lv.obf_spend(frac, a)
+        cc1 = lv.norm_isf(a1)
+        cc2 = lv.seq_final_z(cc1, math.sqrt(frac), a, a1)
+        tot = a1 + lv.bvn_below_above(cc1, cc2, math.sqrt(frac))
+        assert tot <= a + 1e-9 and tot == pytest.approx(a, abs=1e-7) and a1 < a * frac
+    from scipy.stats import multivariate_normal, norm
+
+    for c1_, c2_, r in ((2.96, 1.97, 0.707), (2.0, 2.5, 0.3), (3.5, 1.5, 0.9)):                          # 이변량 정규 적분 = scipy
+        ref = norm.cdf(c1_) - multivariate_normal.cdf([c1_, c2_], mean=[0, 0], cov=[[1, r], [r, 1]], abseps=1e-10, releps=1e-10)
+        assert lv.bvn_below_above(c1_, c2_, r) == pytest.approx(ref, abs=1e-7)
+    assert lv.bvn_below_above(math.inf, 1.96, 0.5) == pytest.approx(0.025, abs=1e-4)
+    assert lv.bvn_below_above(2.0, 1.0, 1.0) == pytest.approx(norm.sf(1.0) - norm.sf(2.0))              # 상관 1 (빠진 뒤 시드가 없음)
+    # 앞서 통과를 끄거나 중간에 보지 못하면 끝 문턱 = 옛 문턱 (비트 단위)
+    for n in (2, 10, 37, 80, 100):
+        assert lv.seq_final_bound(n, None)["bound"] == lv.t_crit(n - 1)
+        assert lv.seq_final_bound(n, dict(alpha1=0.0, n1=5, c1=math.inf))["bound"] == lv.t_crit(n - 1)
+    monkeypatch.setitem(lv.LIVE, "seq_efficacy", False)
+    assert lv.seq_interim_bound(40, 80)["alpha1"] == 0.0 and lv.seq_interim_bound(40, 80)["bound"] == math.inf
+    monkeypatch.setitem(lv.LIVE, "seq_efficacy", True)
+    assert lv.seq_interim_bound(1, 80)["bound"] == math.inf                                                  # 짝 t 를 셀 수 없으면 보지 않는다
+    # 빠진 시드: 정보 몫·상관을 실제 수에서
+    i37 = lv.seq_interim_bound(37, 80)
+    assert i37["frac"] == pytest.approx(37 / 80) and i37["alpha1"] < i["alpha1"] and i37["bound"] > i["bound"]
+    assert lv.seq_final_bound(74, dict(i37, n1=37))["rho"] == pytest.approx(math.sqrt(37 / 74))
+    # scipy 없이 (정수 자유도 닫힌 식) 같은 값
+    from scipy.stats import t as st_t
+
+    for df in (1, 2, 3, 4, 7, 39, 79, 120):
+        for p in (0.025, 0.0015, 1e-6, 0.4):
+            assert lv.t_isf_math(p, df) == pytest.approx(float(st_t.isf(p, df)), rel=1e-8)
+            assert lv.t_sf_math(-1.3, df) == pytest.approx(float(st_t.sf(-1.3, df)), abs=1e-12)
+    want = (i["bound"], f["bound"], f["bound_z"])
+    monkeypatch.setitem(sys.modules, "scipy.stats", None)                                                  # scipy 를 못 가져온다
+    i2 = lv.seq_interim_bound(40, 80)
+    f2 = lv.seq_final_bound(80, dict(i2, n1=40))
+    assert (i2["bound"], f2["bound"], f2["bound_z"]) == pytest.approx(want, abs=1e-9)
+    # 시점: n 80 → 앞 40, 시드가 적으면 한 번 보기
+    assert lv.seq_sizes(80) == 40 and lv.seq_sizes(10) == 5 and lv.seq_sizes(3) == 2 and lv.seq_sizes(2) is None
+    assert lv.seq_sizes(80, 0.25) == 20
+    monkeypatch.setitem(lv.LIVE, "seq_interim_frac", None)
+    assert lv.seq_sizes(80) is None
+    with pytest.raises(ValueError):
+        lv.seq_sizes(80, 1.0)
+
+
+def test_seq_type1_simulation(lv, monkeypatch):
+    """흉내 내기 (앞서 통과를 켠 때): 나아지지 않은 두뇌(짝 차이 평균 0)가 두 번 보기에서 우연히 통과할 몫 ≤ 2.5% (중간 경계 + 끝 문턱, 중간 기각은
+    구속력 없음 — 빼고 셈). 문턱은 합집합 상한(두 몫의 합 = α 를 t 분포에서 정확히 — test_seq_boundaries)이라 흉내 내기는 그보다 조금 작아야 한다.
+    중간에 쓴 몫 ≈ α₁, 중간 기각은 절반쯤. 끈 기본은 통과 쪽이 옛 한 번 보기와 같다(중간 기각은 통과를 늘리지 않는다)."""
+    monkeypatch.setitem(lv.LIVE, "seq_efficacy", True)
+    n, k = 80, lv.seq_sizes(80)
+    b1 = lv.seq_interim_bound(k, n)
+    b2 = lv.seq_final_bound(n, dict(b1, n1=k))["bound"]
+    b2z = lv.seq_final_bound(n, dict(b1, n1=k))["bound_z"]
+    rng = np.random.default_rng(35123)
+    rej = rej_z = early = fut = tot = off = single = 0
+    for _ in range(4):
+        x = rng.standard_normal((50000, n))
+        t1 = x[:, :k].mean(1) / (x[:, :k].std(1, ddof=1) / math.sqrt(k))
+        t2 = x.mean(1) / (x.std(1, ddof=1) / math.sqrt(n))
+        rej += int(((t1 <= -b1["bound"]) | (t2 <= -b2)).sum())
+        rej_z += int(((t1 <= -b1["bound"]) | (t2 <= -b2z)).sum())
+        early += int((t1 <= -b1["bound"]).sum())
+        fut += int((t1 >= lv.LIVE["seq_futility_t"]).sum())
+        off += int(((t1 < lv.LIVE["seq_futility_t"]) & (t2 <= -lv.t_crit(n - 1))).sum())       # 끈 기본: 중간 기각을 넘긴 것만 끝 문턱(옛 것)으로
+        single += int((t2 <= -lv.t_crit(n - 1)).sum())                                         # 옛 한 번 보기
+        tot += len(x)
+    se = math.sqrt(0.025 * 0.975 / tot)
+    assert rej / tot <= 0.025 and rej < rej_z                                                    # 합집합 상한: 넘지 않는다 (z 를 옮긴 문턱보다 엄격)
+    assert off <= single and single / tot == pytest.approx(0.025, abs=3 * se)                  # 끈 기본은 옛 한 번 보기보다 통과가 늘지 않는다
+    assert early / tot == pytest.approx(b1["alpha1"], abs=4 * math.sqrt(b1["alpha1"] / tot))
+    assert fut / tot == pytest.approx(0.5, abs=0.01)
+
+
+def _row(seed, region, *, caught=27, starved=10, chase=6.0, cover=0, shelter=0.06):
+    return _fake([seed], lambda s, r: caught, starved=lambda s, r: starved, chase=lambda s, r: chase, cover=cover, shelter=shelter,
+                 regions=(region,))["worlds"][0]
+
+
+def _stuck_row(seed, region):
+    return dict(seed=seed, region=region, wolf_events=[], deer_events=[], old_wolf=[], old_deer=[], wall_events=[], stuck_w=0, win_w=10, stuck_wall=0,
+                stuck_d=0, win_d=10)
+
+
+def _fake_runner(scen: dict, log: list):
+    """가짜 판정 실행기: 꼬리표(두뇌:세계)·시드·지역으로 짜 맞춘 결과. scen[(두뇌, 세계)] = 결과 칸 함수(seed, region) → _row 인자."""
+    def run(items, on_done=None):
+        log.append([(t, int(j["seed"])) for _, t, j in items])
+        out = []
+        for _, tag, j in items:
+            brain, world = tag.rsplit(":", 1)
+            s, r = int(j["seed"]), str(j["region"])
+            out.append((tag, _stuck_row(s, r) if world == "stuck" else _row(s, r, **scen.get((brain, world), lambda s_, r_: {})(s, r))))
+            if on_done:
+                on_done()
+        return out
+    return run
+
+
+@pytest.fixture(scope="module")
+def seq_setup(lv, prepared):
+    """작은 판 (N 시드 10 → 앞 5, G 시드 5, 끼임 2 — 세계는 돌리지 않는다)과 지금 두뇌 판(가짜)."""
+    plan = lv.default_plan(judge=(35000, 35009), judge_g=(35000, 35004), stuck=(35000, 35001), horizon=20, horizon_g=30, workers=1)
+    rng = np.random.default_rng(35124)
+    base = {(s, r): float(rng.uniform(4.0, 8.0)) for s in range(35000, 35010) for r in prepared["regions"]}
+    log: list = []
+    run = _fake_runner({("current", "N"): lambda s, r: dict(chase=base[(s, r)]), ("current", "G"): lambda s, r: dict(chase=base[(s, r)])}, log)
+    its = (lv.eval_items(prepared, "current", lv.OBS21ZERO, lv.seeds_of(plan["judge"]), 20, "N")
+           + lv.eval_items(prepared, "current", lv.OBS21ZERO, lv.seeds_of(plan["judge_g"]), 30, "G")
+           + lv.stuck_items(prepared, "current", lv.OBS21ZERO, lv.seeds_of(plan["stuck"]), 30))
+    cur = lv.gather(run(its), {"current": lv.OBS21ZERO}, {"current:N": 20, "current:G": 30})
+    return dict(plan=plan, base=base, cur=cur)
+
+
+def _judge(lv, prepared, seq_setup, scen, tmp_path=None):
+    log: list = []
+    st = lv.Status(tmp_path) if tmp_path is not None else None
+    base = seq_setup["base"]
+    scen = {("candidate", "G"): lambda s, r: dict(chase=base[(s, r)])} | scen
+    jc = lv.judge_candidate(prepared, lv.OBS21ZERO, seq_setup["cur"], seq_setup["plan"], dict(ok=None, why="시험"), st, runner=_fake_runner(scen, log))
+    return jc, log
+
+
+def test_seq_interim_futility(lv, prepared, seq_setup, tmp_path):
+    """중간 판정 기각(나아지지 않음): 앞 절반 짝 t ≥ 0 → 기각, 후보 G·끼임·뒤 절반은 돌리지 않는다. 상태 줄 '중간 판정: 기각(나아지지 않음)'."""
+    base = seq_setup["base"]
+    jc, log = _judge(lv, prepared, seq_setup, {("candidate", "N"): lambda s, r: dict(chase=base[(s, r)] + 0.5 + 0.1 * (s % 3))}, tmp_path)
+    assert len(log) == 1 and {t for t, _ in log[0]} == {"candidate:N"} and sorted({s for _, s in log[0]}) == list(range(35000, 35005))
+    g = jc["gate"]
+    assert jc["stage"] == g["stage"] == "interim_futility" and not jc["complete"] and g["verdict"] == "기각" and not g["passed"]
+    s = g["seq"]
+    assert s["action"] == "futility" and s["n_int"] == 5 and s["n_total"] == 10 and s["t"] > 0 and s["seeds_int"] == [35000, 35004]
+    assert set(g["criteria"]) == {"R_check", "P1_N_chase"} and not g["criteria"]["P1_N_chase"]["ok"] and "G" not in g["report"]["flight"]
+    assert g["brief"].startswith("중간 판정 — 1차 쫓긴 시간 ") and g["brief"].endswith("(나아지지 않음)") and "뒤 절반·게임 세계·끼임은 돌리지 않았다" in g["why"]
+    d = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+    assert d["state"] == "gating" and d["message"].startswith("중간 판정: 기각(나아지지 않음)")
+    g.update(candidate="c.zip", current="k.zip", profile="시험")
+    assert math.isnan(g["t_crit_flight"]) and g["t_futility_flight"] == 0.0                     # 판정을 정한 것은 중간 기각 경계 (통과 문턱 아님)
+    md = lv.gate_md("a1_x", g, "- 지금 두뇌 시험: 저장된 결과 다시 씀")
+    assert "## 중간 판정" in md and "기각(나아지지 않음)" in md and "G 돌리지 않음" in md and "저장된 결과 다시 씀" in md
+    head = md.split("\n")[2]
+    assert "중간 기각 경계 t ≥ 0" in head and "문턱 inf" not in md and "문턱 nan" not in head and "문턱 3." not in head
+    st = lv.Status(tmp_path)
+    lv.final_status(st, dict(state="rejected", stage="interim_futility", stage_note=g["note"], last_result=f"기각: {g['brief']}"), 0)
+    assert json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))["message"].startswith("중간 판정: 기각(나아지지 않음) — 게임 두뇌 그대로")
+    # 같은 두뇌(짝 차이 0 → t 0) 도 나아지지 않음
+    jc, log = _judge(lv, prepared, seq_setup, {("candidate", "N"): lambda s, r: dict(chase=base[(s, r)])})
+    assert jc["stage"] == "interim_futility" and len(log) == 1
+
+
+def test_seq_interim_efficacy_checks_full_guards(lv, prepared, seq_setup, tmp_path, monkeypatch):
+    """앞서 통과(켰을 때 — 기본 끔): 앞 절반 짝 t ≤ −b₁ 이면 1차는 통과로 정하지만, 지킴은 뒤 절반까지 N 전체·G 전체·끼임으로 본다(10-21 검토 —
+    앞 절반만 보면 뒤 절반의 은신처 안 잡힘·더 잡힘을 놓쳐 관문이 느슨해진다). 전체 차이가 줄어드는 쪽이 아니면 1차도 통과가 아니다. 끈 기본은 끝 문턱으로만 본다."""
+    base = seq_setup["base"]
+    much = {("candidate", "N"): lambda s, r: dict(chase=base[(s, r)] - 1.0 - 0.1 * (s % 2))}
+    jc, log = _judge(lv, prepared, seq_setup, much, tmp_path)                         # 끈 기본: 같은 자료, 끝 판정 (옛 한 번 보기 문턱)
+    g = jc["gate"]
+    assert jc["stage"] == "final" and g["passed"] and g["seq"]["alpha1"] == 0.0 and g["t_crit_flight"] == lv.t_crit(g["n_flight"] - 1)
+    assert "interim" not in g["criteria"]["P1_N_chase"] and len(log) == 2
+    monkeypatch.setitem(lv.LIVE, "seq_efficacy", True)
+    jc, log = _judge(lv, prepared, seq_setup, much, tmp_path)
+    g = jc["gate"]
+    assert jc["stage"] == g["stage"] == "interim_efficacy" and jc["complete"] and g["passed"] and g["verdict"] == "통과"
+    assert g["summary"].endswith(" — 1차 중간 판정 (시드 5)") and "1차는 중간 판정 앞서 통과 경계로" in g["why"]
+    assert len(log) == 2 and {t for t, _ in log[0]} == {"candidate:N"} and {t for t, _ in log[1]} == {"candidate:N", "candidate:G", "candidate:stuck"}
+    assert sorted({s for t, s in log[1] if t == "candidate:N"}) == list(range(35005, 35010))      # 뒤 절반도 돌린다
+    s = g["seq"]
+    assert s["action"] == "efficacy" and s["t"] <= -s["bound"] and s["alpha1"] > 0 and s["final"]["bound"] == pytest.approx(g["t_crit_flight"])
+    p1 = g["criteria"]["P1_N_chase"]
+    assert p1["ok"] and p1["ok_final"] and p1["interim"]["bound"] == pytest.approx(s["bound"]) and "중간에 넘음" in p1["rule"]
+    assert g["n"] == 10 and g["n_g"] == 5 and g["t_crit_flight"] > lv.t_crit(g["n_flight"] - 1)                          # 지킴은 N 전체 · G 전체
+    d = json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))
+    assert d["message"].startswith("후보 판정 뒤 절반·게임 세계") and "1차 앞서 통과" in d["message"]
+    g.update(candidate="c.zip", current="k.zip", profile="시험")
+    md = lv.gate_md("a1_x", g)
+    assert "중간 앞서 통과 경계" in md.split("\n")[2] and "지킴은 뒤 절반까지 N 전체" in md
+    st = lv.Status(tmp_path)
+    lv.final_status(st, dict(state="exported", round=1, stage="interim_efficacy"), 1)
+    assert "(1차 중간 판정 앞서 통과)" in json.loads((tmp_path / "status.json").read_text(encoding="utf-8"))["message"]
+
+    def rejected(scen, *want):
+        jc_, log_ = _judge(lv, prepared, seq_setup, scen)
+        g_ = jc_["gate"]
+        assert jc_["stage"] == "interim_efficacy" and jc_["complete"] and len(log_) == 2 and g_["verdict"] == "기각", g_["why"]
+        assert all(w in g_["why"] for w in want), g_["why"]
+        return g_
+
+    # 검토 사례 1: 뒤 절반 시드 35007 에서 은신처 안 잡힘 — 앞 절반만 보면 놓친다 (G4 N 몫은 N 전체)
+    g = rejected(much | {("candidate", "N"): lambda s, r: dict(chase=base[(s, r)] - 1.0 - 0.1 * (s % 2), cover=1 if s == 35007 else 0)},
+                 "G4_catch_in_shelter")
+    assert g["criteria"]["P1_N_chase"]["ok"] and g["criteria"]["G4_catch_in_shelter"]["N"] >= 1
+    # 검토 사례 2: 뒤 절반에서 더 잡힌다 (잡힘 33~34 대 27) — GN_caught·GN_alive 는 N 전체로
+    g = rejected(much | {("candidate", "N"): lambda s, r: dict(chase=base[(s, r)] - 1.0 - 0.1 * (s % 2), caught=27 if s < 35005 else 33 + s % 2)},
+                 "GN_caught", "GN_alive")
+    assert g["criteria"]["GN_caught"]["t"] > lv.t_crit(9)
+    # 게임 세계에서 더 굶는다 (G 지킴)
+    rejected(much | {("candidate", "G"): lambda s, r: dict(chase=base[(s, r)], starved=13 + (s % 2))}, "GG_starved")
+    # 중간에는 넘었지만 뒤 절반이 크게 나빠져 전체 차이가 늘어나는 쪽 → 1차도 통과가 아니다
+    g = rejected({("candidate", "N"): lambda s, r: dict(chase=base[(s, r)] + (-1.0 - 0.1 * (s % 2) if s < 35005 else 1.6 + 0.1 * (s % 2)))}, "1차 P1 실패")
+    p1 = g["criteria"]["P1_N_chase"]
+    assert p1["diff"] > 0 and not p1["ok"] and not p1["ok_final"] and p1["interim"]["t"] <= -p1["interim"]["bound"]
+
+
+def test_seq_final_equals_single_look(lv, prepared, seq_setup, monkeypatch):
+    """앞서 통과를 끄면(중간에 α 를 쓰지 않음) 끝 판정 = 옛 한 번 보기 관문(같은 자료로 gate_live) — 문턱·판정·칸 모두. 중간 판정을 끄면 한 번에 돌려 옛 순서 그대로.
+    켜면 끝 문턱만 조금 엄격하다(그 사이의 t 는 한 번 보기 통과·두 번 보기 기각)."""
+    base = seq_setup["base"]
+    noise = dict(zip(range(35000, 35010), (0.8, -0.9, 0.3, -0.7, 0.2, -0.5, 0.6, -0.8, 0.4, -0.3)))    # 앞 절반 짝 t 약 −1.7 — 중간에 끝나지 않는다
+    mild = {("candidate", "N"): lambda s, r: dict(chase=base[(s, r)] - 0.5 + noise[s])}
+
+    def single(jc):
+        cnd, cur = jc["cand"], seq_setup["cur"]
+        return lv.gate_live({w: dict(current=cur[f"current:{w}"], candidate=cnd[f"candidate:{w}"]) for w in ("N", "G")},
+                            dict(current=cur["current:stuck"], candidate=cnd["candidate:stuck"]), dict(ok=None, why="시험"))
+
+    def same(a, b):
+        assert a["verdict"] == b["verdict"] and a["why"] == b["why"] and a["t_crit_flight"] == b["t_crit_flight"] and a["n_flight"] == b["n_flight"]
+        assert {k: v["ok"] for k, v in a["criteria"].items()} == {k: v["ok"] for k, v in b["criteria"].items()}
+        assert a["criteria"]["P1_N_chase"]["t"] == b["criteria"]["P1_N_chase"]["t"]
+
+    monkeypatch.setitem(lv.LIVE, "seq_efficacy", False)
+    monkeypatch.setitem(lv.LIVE, "seq_futility_t", None)
+    jc, log = _judge(lv, prepared, seq_setup, mild)
+    assert jc["stage"] == "final" and len(log) == 2 and jc["gate"]["seq"]["alpha1"] == 0.0
+    same(jc["gate"], single(jc))
+    assert jc["gate"]["t_crit_flight"] == lv.t_crit(jc["gate"]["n_flight"] - 1)
+    monkeypatch.setitem(lv.LIVE, "seq_futility_t", 0.0)                                  # 중간 기각만 켜도 (나아지는 쪽이면) 끝 문턱은 옛 것
+    jc2, _ = _judge(lv, prepared, seq_setup, mild)
+    assert jc2["stage"] == "final" and jc2["gate"]["seq"]["t"] < 0
+    same(jc2["gate"], single(jc2))
+    monkeypatch.setitem(lv.LIVE, "seq_interim_frac", None)                                # 중간 판정 끔 → 한 번에 (옛 순서)
+    jc3, log3 = _judge(lv, prepared, seq_setup, mild)
+    assert jc3["stage"] == "single" and len(log3) == 1 and {t for t, _ in log3[0]} == {"candidate:N", "candidate:G", "candidate:stuck"}
+    same(jc3["gate"], single(jc3))
+    assert jc3["gate"]["seq"] is None and "한 번 보기" in lv.fmt_seq(jc3["gate"])
+    monkeypatch.setitem(lv.LIVE, "seq_interim_frac", 0.5)
+    monkeypatch.setitem(lv.LIVE, "seq_efficacy", True)                                    # 앞서 통과를 켜면 끝 문턱만 바뀐다 (판정 칸 셈은 같다)
+    jc4, _ = _judge(lv, prepared, seq_setup, mild)
+    assert jc4["stage"] == "final" and jc4["gate"]["seq"]["alpha1"] > 0
+    assert jc4["gate"]["t_crit_flight"] > jc["gate"]["t_crit_flight"] and jc4["gate"]["criteria"]["P1_N_chase"]["t"] == jc["gate"]["criteria"]["P1_N_chase"]["t"]
+
+
+def test_eval_runner_switch(lv, tmp_path, monkeypatch):
+    """판정 실행기 갈림: 'python' 은 워커 풀(일이 없으면 빈 목록), 모르는 실행기는 멈춤, 등록한 실행기는 꼬리표·순서를 맞춰 봐야 받는다.
+    live.py 옆 <이름>.py 의 run_items·version 은 LIVE evaluator 이름만으로 불러 등록한다(네이티브 판정기를 끼울 자리)."""
+    assert lv.LIVE["evaluator"] == "python" and lv.eval_runner([], 4) == []
+    with pytest.raises(ValueError, match="모르는 판정 실행기"):
+        lv.eval_runner([("world", "x:N", {})], 2, "native")
+    calls = []
+    lv.EVALUATORS["fake"] = dict(run=lambda items, w, on_done: calls.append(w) or [(t, dict(seed=j["seed"])) for _, t, j in items], version=lambda: "f1")
+    try:
+        items = [("world", "a:N", dict(seed=1)), ("world", "a:N", dict(seed=2))]
+        assert lv.eval_runner(items, 3, "fake") == [("a:N", dict(seed=1)), ("a:N", dict(seed=2))] and calls == [3]
+        lv.EVALUATORS["fake"]["run"] = lambda items, w, on_done: [("b:N", {})] * len(items)
+        with pytest.raises(ValueError, match="꼬리표·순서"):
+            lv.eval_runner(items, 3, "fake")
+        # 한 묶음은 꼬리표가 같다 — 시드·지역이 일마다 맞아야 받는다 (뒤섞임·다른 지역·겹침·빠진 칸)
+        its = [("world", "cur:N", dict(seed=s_, region=r_)) for s_ in (1, 2) for r_ in ("A", "B")]
+        rows = [dict(seed=j["seed"], region=j["region"]) for _, _, j in its]
+        for name, bad in (("지역 순 정렬", sorted(rows, key=lambda r: (r["region"], r["seed"]))), ("다른 지역", rows[:1] + [dict(rows[1], region="C")] + rows[2:]),
+                          ("겹침", rows[:3] + rows[2:3]), ("시드 없음", rows[:3] + [dict(region="B")]), ("글자 시드", rows[:3] + [dict(seed="x", region="B")])):
+            lv.EVALUATORS["fake"]["run"] = lambda items, w, on_done, bad=bad: [(t, r) for (_, t, _), r in zip(items, bad)]
+            with pytest.raises(ValueError, match="일과 다른 세계"):
+                lv.eval_runner(its, 3, "fake")
+            assert name
+        lv.EVALUATORS["fake"]["run"] = lambda items, w, on_done: [(t, dict(seed=str(j["seed"]), region=j["region"], x=1)) for _, t, j in items]
+        assert [r["x"] for _, r in lv.eval_runner(its, 3, "fake")] == [1] * 4                                # 글자 숫자 시드는 같은 시드
+        assert lv.eval_code_tag("fake") != lv.eval_code_tag("python")
+    finally:
+        lv.EVALUATORS.pop("fake", None)
+        lv._CODE.pop("fake", None)
+    with lv.open_pool(2, "native") as p:
+        assert p is None
+    (tmp_path / "fakeev.py").write_text("\n".join(["def run_items(items, workers, on_done=None):",
+                                                   "    return [(t, dict(seed=j['seed'], w=workers)) for _, t, j in items]",
+                                                   "def version():",
+                                                   "    return 'fakeev-1'", ""]), encoding="utf-8")
+    monkeypatch.setattr(lv, "HERE", tmp_path / "live.py")
+    try:
+        assert lv.eval_runner([("world", "a:G", dict(seed=7))], 5, "fakeev") == [("a:G", dict(seed=7, w=5))] and "fakeev" in lv.EVALUATORS
+        assert lv.eval_code_tag("fakeev") != lv.eval_code_tag("python")
+    finally:
+        lv.EVALUATORS.pop("fakeev", None)
+        lv._CODE.pop("fakeev", None)
+    with pytest.raises(ValueError, match="모르는 판정 실행기"):
+        lv.eval_runner([("world", "x:N", {})], 2, "os")                                             # 옆 파일이 아닌 모듈 이름은 불러오지 않는다
+
+
+def test_cache_save_state(lv, prepared, tmp_path, monkeypatch):
+    """지금 두뇌 판정 저장 기록 (gate.md '지금 두뇌 시험'): 실제로 쓴 것만 '저장함'·파일 이름, 쓰기 실패(os.replace)·결과가 일과 안 맞음은 '저장 실패'와 까닭 —
+    없는 파일 이름을 적지 않는다."""
+    root = tmp_path / "EcoAdapt"
+    its = lv.eval_items(prepared, "current", lv.OBS21ZERO, [35000, 35001], 20, "N")
+    rows = [_row(int(j["seed"]), j["region"]) for _, _, j in its]
+    key = lv.eval_cache_key(prepared, its, lv.OBS21ZERO, "N")
+    ok = lv.cache_save(root, key, its, rows, "시험", "N")
+    assert ok == dict(state="saved", file=lv.cache_path(root, key).name, why=None) and lv.cache_path(root, key).exists()
+    bad = lv.cache_save(root, key, its, rows[:-1], "시험", "N")
+    assert bad["state"] == "save_failed" and bad["file"] is None and "맞지 않음" in bad["why"]
+    lv.cache_path(root, key).unlink()
+    monkeypatch.setattr(lv.time, "sleep", lambda s: None)
+    monkeypatch.setattr(lv.os, "replace", lambda a, b: (_ for _ in ()).throw(PermissionError("잠김")))
+    fail = lv.cache_save(root, key, its, rows, "시험", "N")
+    monkeypatch.undo()
+    assert fail["state"] == "save_failed" and fail["file"] is None and "PermissionError" in fail["why"] and not lv.cache_path(root, key).exists()
+    rows_ = dict(N=dict(state="hit", file="N_a.json"), G=dict(fail), stuck=dict(state="off", file=None))
+    md = lv.cache_note_md(rows_, "지금 두뇌 시험: 일부 저장된 결과 (N)")
+    assert md.startswith("- 지금 두뇌 시험: 일부 저장된 결과 (N) — N 저장된 결과 다시 씀 (`live/cache/N_a.json`)")
+    assert "G 새로 잼(저장 실패) — PermissionError" in md and "끼임 새로 잼(저장 끔)" in md and "저장함" not in md
+    assert "N 새로 잼(저장함) (`live/cache/" in lv.cache_note_md(dict(N=ok))
+
+
+def test_eval_cache(lv, prepared, tmp_path, monkeypatch):
+    """지금 두뇌 판정 저장: 없으면 None, 쓰면 같은 꼬리표·순서로 다시 읽음, 열쇠(환경·세계·두뇌·시드·길이·실행기·셈 길 판)가 하나라도 다르면 None,
+    깨진·바뀐 파일은 None, 쓰기는 임시 파일 → os.replace (실패해도 반쯤 쓴 파일·임시 파일이 남지 않는다), 오래된 것부터 지움."""
+    root = tmp_path / "EcoAdapt"
+    seeds = [35000, 35001]
+    its = lv.eval_items(prepared, "current", lv.OBS21ZERO, seeds, 20, "N")
+    rows = [dict(_row(int(j["seed"]), j["region"]), wall_s=np.float64(1.5), beh_steps=tuple(int(x) for x in (5, 1, 1, 0, 0))) for _, _, j in its]
+    key = lv.eval_cache_key(prepared, its, lv.OBS21ZERO, "N")
+    assert key["env_digest"] == prepared["record"]["live"]["env_digest"] and key["seeds"] == seeds and key["horizon"] == [20]
+    assert key["brain_weights_sha256"] == lv.zip_weights_sha(lv.OBS21ZERO) and key["brain_contract"] == lv.CONTRACT_OBS21 and key["evaluator"] == "python"
+    assert key["brain_allowed"] == ["graze", "flee", "hide", "freeze", "sleep"][: len(key["brain_allowed"])] and len(key["brain_allowed"]) >= 3
+    assert lv.cache_get(root, key, its) is None                                                     # 처음 — 없음
+    p = lv.cache_put(root, key, its, list(reversed(rows)), source="시험")                          # 어느 순서든 시드·지역 순으로
+    assert p == lv.cache_path(root, key) and p.parent == root / "live" / "cache" and not list(root.rglob("*.tmp"))
+    got = lv.cache_get(root, key, its)
+    assert [t for t, _ in got] == ["current:N"] * len(its) and [r for _, r in got] == lv.jsonable(rows)
+    assert isinstance(got[0][1]["wall_s"], float) and got[0][1]["beh_steps"] == [5, 1, 1, 0, 0]
+    cand_its = lv.eval_items(prepared, "candidate", lv.OBS21ZERO, seeds, 20, "N")                  # 꼬리표·두뇌 경로는 열쇠가 아니다 (같은 두뇌 가중치)
+    assert lv.eval_cache_key(prepared, cand_its, lv.OBS21ZERO, "N") == key and [t for t, _ in lv.cache_get(root, key, cand_its)] == ["candidate:N"] * len(its)
+    # 열쇠가 하나라도 다르면 다른 파일 — 새로 잰다
+    info2 = copy.deepcopy(prepared)
+    info2["record"]["live"]["env_digest"] = "0" * 16
+    its_disc = copy.deepcopy(its)
+    its_disc[0][2]["cfg"]["v2"]["features"]["obstacles"]["fixed"].append([1.0, 2.0, 0.4])
+    variants = {"환경": lv.eval_cache_key(info2, its, lv.OBS21ZERO, "N"),
+                "세계": lv.eval_cache_key(prepared, its_disc, lv.OBS21ZERO, "N"),
+                "세계 G": lv.eval_cache_key(prepared, lv.eval_items(prepared, "current", lv.OBS21ZERO, seeds, 20, "G"), lv.OBS21ZERO, "N"),
+                "시드": lv.eval_cache_key(prepared, lv.eval_items(prepared, "current", lv.OBS21ZERO, [35000, 35002], 20, "N"), lv.OBS21ZERO, "N"),
+                "길이": lv.eval_cache_key(prepared, lv.eval_items(prepared, "current", lv.OBS21ZERO, seeds, 21, "N"), lv.OBS21ZERO, "N")}
+    monkeypatch.setitem(lv._SHA, lv._zkey(lv.OBS21ZERO), "ab" * 32)                                # 두뇌 가중치가 다르다
+    variants["두뇌"] = lv.eval_cache_key(prepared, its, lv.OBS21ZERO, "N")
+    monkeypatch.undo()
+    monkeypatch.setitem(lv._ALLOWED, lv._zkey(lv.OBS21ZERO), ["graze", "flee"])                     # 허용 행동이 다르다 (계약 해시 밖)
+    variants["허용 행동"] = lv.eval_cache_key(prepared, its, lv.OBS21ZERO, "N")
+    monkeypatch.undo()
+    lv.EVALUATORS["fake"] = dict(run=None, version=lambda: "f1")
+    try:
+        variants["실행기"] = lv.eval_cache_key(prepared, its, lv.OBS21ZERO, "N", "fake")
+    finally:
+        lv.EVALUATORS.pop("fake", None)
+        lv._CODE.pop("fake", None)
+    old = lv._CODE.pop("python")
+    monkeypatch.setattr(lv, "EVAL_CODE_TAG", "live-eval-test")                                      # 셈 길 판이 다르다
+    variants["셈 길"] = lv.eval_cache_key(prepared, its, lv.OBS21ZERO, "N")
+    monkeypatch.undo()
+    lv._CODE["python"] = old
+    assert lv.eval_cache_key(prepared, its, lv.OBS21ZERO, "N") == key
+    for name, k2 in variants.items():
+        assert k2 != key and lv.cache_path(root, k2) != p and lv.cache_get(root, k2, its) is None, name
+    # 깨진 파일·바뀐 열쇠·다른 일 순서
+    d = json.loads(p.read_text(encoding="utf-8"))
+    p.write_text(json.dumps(dict(d, key=dict(d["key"], seeds=[1]))), encoding="utf-8")
+    assert lv.cache_get(root, key, its) is None
+    p.write_text(json.dumps(d)[:100], encoding="utf-8")
+    assert lv.cache_get(root, key, its) is None
+    p.write_text(json.dumps(dict(d, rows=list(reversed(d["rows"])))), encoding="utf-8")
+    assert lv.cache_get(root, key, its) is None
+    assert lv.cache_put(root, key, its, rows[:-1]) is None                                           # 일과 맞지 않는 결과는 쓰지 않는다
+    # 쓰기: 임시 파일 → os.replace. 잠깐 잠기면 다시, 끝내 안 되면 오류 — 반쯤 쓴 파일·임시 파일이 남지 않는다
+    p.unlink()
+    real, calls = os.replace, [0]
+
+    def flaky(a, b):
+        calls[0] += 1
+        if calls[0] <= 2:
+            raise PermissionError("잠김")
+        return real(a, b)
+
+    monkeypatch.setattr(lv.time, "sleep", lambda s: None)
+    monkeypatch.setattr(lv.os, "replace", flaky)
+    lv.cache_put(root, key, its, rows)
+    assert calls[0] == 3 and lv.cache_get(root, key, its) is not None and not list(root.rglob("*.tmp"))
+    p.unlink()
+
+    def broken(a, b):
+        assert Path(a).name.endswith(".tmp") and Path(a).read_text(encoding="utf-8").endswith("\n")      # 다 쓴 임시 파일을 바꿔 넣으려 한다
+        raise PermissionError("잠김")
+
+    monkeypatch.setattr(lv.os, "replace", broken)
+    with pytest.raises(PermissionError):
+        lv.cache_put(root, key, its, rows)
+    monkeypatch.setattr(lv.os, "replace", real)
+    assert not p.exists() and not list(root.rglob("*.tmp")) and lv.cache_get(root, key, its) is None
+    # 오래된 것부터 지움
+    monkeypatch.setattr(lv, "CACHE_KEEP", 2)
+    for i, k2 in enumerate(list(variants.values())[:3]):
+        q = lv.cache_put(root, k2, its, rows)
+        os.utime(q, (time.time() - 100 + i, time.time() - 100 + i))
+    lv.cache_put(root, key, its, rows)
+    assert len(list((root / "live" / "cache").glob("*.json"))) == 2 and lv.cache_get(root, key, its) is not None
+    want = dict(a=3, b=[0.5], c=[0, 1], d="x/y", e={"1": None})
+    assert lv.jsonable(dict(a=np.int64(3), b=(np.float32(0.5),), c=np.arange(2), d=Path("x/y"), e={1: None})) == want
+    with pytest.raises(TypeError):
+        lv.jsonable(dict(a=object()))
+
+
+# --------------------------------------------------------------------- #
 # 내보내기
 # --------------------------------------------------------------------- #
 
@@ -846,3 +1287,23 @@ def test_constants_match_md(lv):
     assert md.count("도망 시간 기준은 예비 측정 뒤 확정") >= 6 and all(k in md for k in ("GF", "GV", "GC", "GG_chase", "GN_caught", "P1_N_chase"))
     assert all(f"`{c}`" in md for c in FLIGHT_CAUSES)
     assert lv.STEP_S == pytest.approx(2.0 / 15.0) and "× 2/15 초" in md
+    # 10-21 (4) 중간 판정 (두 번 보기)·지금 두뇌 판정 다시 쓰기·판정 실행기 — 시점·기각 경계는 예비 측정 뒤 확정
+    assert "### 2026-10-21 (4) 중간 판정" in md and "### 5-3. 중간 판정 (두 번 보기" in md
+    k = lv.seq_sizes(n)
+    assert L["seq_interim_frac"] == 0.5 and k == 40 and f"| 중간 판정 시점 seq_interim_frac | N 판정 시드 앞 1/2 (n {n} 이면 35000~{35000 + k - 1}, {k}개) | 예비 측정 뒤 확정" in md
+    assert L["seq_alpha"] == 0.025 and "| 1차 한쪽 α seq_alpha | 0.025" in md and L["seq_spending"] == "obf" and "| α 쓰기 함수 seq_spending | obf" in md
+    assert L["seq_efficacy"] is False and lv.seq_final_bound(n, dict(lv.seq_interim_bound(k, n), n1=k))["bound"] == tc     # 끈 기본: 끝 문턱 = 옛 것
+    old = L["seq_efficacy"]
+    L["seq_efficacy"] = True                                                                            # 켰을 때의 값 (문서 표)
+    try:
+        b1 = lv.seq_interim_bound(k, n)
+        b2 = lv.seq_final_bound(n, dict(b1, n1=k))
+    finally:
+        L["seq_efficacy"] = old
+    assert f"| 중간 앞서 통과 seq_efficacy · 경계 b₁ | 끔 (켜면 짝 t ≤ −{b1['bound']:.3f} — n₁ {k}, 쓴 α₁ {b1['alpha1']:.5f} — 1차만 통과로 정하고 지킴은 전체)" in md
+    assert f"| 끝 문턱 b₂ (두 번 보기) | 끈 기본: 짝 t ≤ −{tc:.3f} (옛 한 번 보기 그대로). 앞서 통과를 켜면 −{b2['bound']:.3f} (n₁ {n}, t_{{α − α₁}})" in md
+    assert f"앞서 통과를 켜면 끝 문턱 b₂ = −{b2['bound']:.3f} (n₁ {n}), 중간 b₁ = −{b1['bound']:.3f} (n₁ {k})" in md                  # 5절 P1 줄
+    assert f"중간 c₁ = {b1['c1']:.3f}" in md and f"참고 c₂ = {b2['c2']:.3f}" in md and f"−{b2['bound_z']:.3f}" in md
+    assert L["seq_futility_t"] == 0.0 and "| 중간 기각 경계 seq_futility_t | 짝 t ≥ 0 (나아지는 쪽도 아님) — 구속력 없음 | 예비 측정 뒤 확정" in md
+    assert L["evaluator"] == "python" and "| 판정 실행기 evaluator | python" in md
+    assert L["cache_current"] is True and "| 지금 두뇌 판정 다시 쓰기 cache_current | 켬" in md

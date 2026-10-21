@@ -325,6 +325,20 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
           빠져 쫓기를 끝낸 도망. switch(늑대가 다른 사슴으로 바꿈)·stop(늑대가 사냥을 그만둠)·held·unchased 는 이 사슴이 벗어난 것이 아니다.
         보고 칸: 끝 까닭마다 수·도망 스텝 합·쫓긴 스텝 합, 은신처 원 안에서 끝난 살아 끝난 도망 수(shelter_end — 끝 까닭과 겹친다), 스스로 벗어난 도망의 쫓긴
         시간 칸(hist). reset 은 열린 도망·누적 수를 모두 버린다(다른 통계와 같다).
+      도망길 1단계 (10-21 사용자 '도망 방향을 두뇌가 고름' — 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 3-1·6·7절. 이 단계는 손 규칙 측정 전용이다:
+        두뇌가 고르는 길·관측 24·마스크 판 4 는 아직 없다). 선택 키(features.OPTIONAL_KEYS, 기본 null·0 = 위 그대로, 그 코드 경로를 타지 않는다 — 비트 동일):
+        route_fixed ∈ {run, open, cover, shelter}: 도주 반사 중 방향을 그 길로 고정한다(가능하지 않으면 RUN). 길(ROUTE_NAMES):
+          RUN = 지금 반사 방향 그대로(그래서 'run' 은 끔과 궤적이 같다 — 길 기록만 더한다), OPEN = 측정 전용 a₀ → 가장자리 굽히기 → 벽 여유(은신처 굽히기 없음),
+          COVER = 줄기 그늘을 이어 달리기, SHELTER = 늑대보다 먼저 닿는 은신처 (기하는 `flight_route_geometry` — 계수는 계약 상수 ROUTE_*).
+          a₀ = 반사와 같은 늑대 집합 S(near_h — 실거리 safe_r 안 사냥 중, hold_awake 면 깨어 있는 늑대)의 거리 역수 가중 반대(은신처 굽히기 전 반사 방향).
+          결정(스텝 끝 H, `_route_step`): 시작 ∨ 무효(COVER H* < 1/6, SHELTER μ_k < 0) ∨ (결정 뒤 도주 스텝 age ≥ 15 ∧ 가능 비트(들어갈 때 문턱)가 결정
+          때와 다름). 고르기 = 고정 길이 '들어갈 때' 가능(COVER H* ≥ 1/3, SHELTER 후보 있음)이면 그 길, 아니면 RUN. COVER·OPEN 은 매 스텝 다시 겨누고,
+          SHELTER 는 결정 때 고른 은신처 쪽이다. 도주가 끝나거나 웅크림·죽음·다시 남이면 길 상태를 지운다. 이동 제어기(FLEE·미끄러짐·돌아가기)는 그대로 —
+          덮기 방향 wf_dir 만 바뀐다. 길 기록(`flight_stats` 의 route — 길별 실행 스텝·시작 때 가능·결정·무효·바꿈, 도망의 길별 끝 까닭, 원판이 가려
+          놓친 사건, 쫓기는 스텝 가운데 쫓는 늑대 모두에게 가려진 몫, 끝난 뒤 5 초 안 다시 도망)은 통계 전용이다.
+        quiet_end > 0 (스텝, 끝 규칙): 지난 도주는 붙잡는 늑대(near_h) 가운데 알아챈(wf_pvis — 눈(줄기 가림 포함)·발소리) 늑대가 없던 연속 스텝 Q 가 quiet_end
+          에 닿으면 풀린다(알아채면 Q = 0). 뛰는 늑대의 발소리는 줄기가 막지 않으므로 쫓는 늑대가 있으면 끝나지 않는다. 끝나면 지금 규칙대로 경계·없음이고
+          다시 알아채 도주 조건이면 곧바로 다시 도주한다. 현실 근거: 쫓는 소리가 그치고 포식자가 보이지 않으면 멈춰서 뒤를 본다(Cooper & Blumstein 편 2015).
 - 야생 2단계(10-16 사용자 승인 '추천대로' — 늑대가 거의 못 잡는 세계를 사실감과 사냥 성공을 함께 올려 고친다. 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md,
   설정 configs/v3_wild2_mirror.yaml = v3_wild1_mirror.yaml + 아래 규칙). 순서: 1 은신처 먹이 부족 → 2 늑대 무리·협동 사냥 → 3 장애물.
   1 은신처 먹이 부족: 새 규칙이 아니라 위 v3 현실성 (e) realism_cover_food 를 거울 세계에 켠다(cap_frac·regen_frac 0.15). 언리얼 FFoodGrid 가 같은 식이다
@@ -1343,6 +1357,26 @@ FLIGHT_HIST_STEPS = (8, 15, 38, 75, 150, 300, 600)
 FL_DROP_NONE, FL_DROP_RANGE, FL_DROP_SWITCH, FL_DROP_FOV, FL_DROP_STOP, FL_DROP_OBSTACLE, FL_DROP_COVER = 0, 1, 2, 3, 4, 5, 6
 FL_DROP_CAUSE = {FL_DROP_NONE: "switch", FL_DROP_RANGE: "range", FL_DROP_SWITCH: "switch", FL_DROP_FOV: "fov", FL_DROP_STOP: "stop",
                  FL_DROP_OBSTACLE: "obstacle", FL_DROP_COVER: "cover"}
+# 야생 (w3) 도망길 (10-21 '도망 방향을 두뇌가 고름' 1단계 — 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 6·7절, 모듈 docstring '야생 1단계' (w3)
+# 도망길). 길 번호: RUN 지금 반사·COVER 줄기 그늘·SHELTER 늑대보다 먼저 닿는 은신처·OPEN 측정 전용(은신처 굽히기 없는 트인 쪽). −1 = 도주 아님.
+# 기하 계수는 계약 상수다(설계 4-2 'flight_route' 키와 같은 값 — 세계 설정은 켜고 끄기만). 회전표는 삼각함수를 셈하지 않는 리터럴(C++ 와 같은 값).
+ROUTE_NONE, ROUTE_RUN, ROUTE_COVER, ROUTE_SHELTER, ROUTE_OPEN = -1, 0, 1, 2, 3
+ROUTE_NAMES = ("run", "cover", "shelter", "open")
+ROUTE_LOCK_STEPS = 15                                   # 결정 뒤 이 도주 스텝(2 초) 동안은 무효일 때만 다시 고른다
+ROUTE_COVER_DEG = (0.0, 22.5, -22.5, 45.0, -45.0, 67.5, -67.5)
+ROUTE_COVER_COS = (1.0, 0.9238795325112867, 0.9238795325112867, 0.7071067811865476, 0.7071067811865476, 0.3826834323650898,
+                   0.3826834323650898)
+ROUTE_COVER_SIN = (0.0, 0.3826834323650898, -0.3826834323650898, 0.7071067811865476, -0.7071067811865476, 0.9238795325112867,
+                   -0.9238795325112867)
+ROUTE_COVER_STEP_U, ROUTE_COVER_POINTS = 2.0, 6          # 표본점 x_{j,n} = p + 2n·e_j, n = 1..6 (24 m 앞까지)
+ROUTE_COVER_ENTER, ROUTE_COVER_EXIT = 1.0 / 3.0, 1.0 / 6.0   # 들어갈 때 max H ≥ 1/3, 유지 max H ≥ 1/6
+ROUTE_COVER_W_STRAIGHT, ROUTE_COVER_W_PREV = 0.1, 0.15   # 점수 S_j = H_j + 0.1·cos θ_j + 0.15·[j = 지난 방향]
+ROUTE_SHELTER_MAX_EDGE_U = 20.0                          # 은신처 가장자리까지 0 < e ≤ 20 단위(40 m)
+ROUTE_SHELTER_COS_MIN = 0.0                              # (c − p)·a₀ / |c − p| ≥ 0 — 늑대 쪽으로 가지 않는다
+ROUTE_SHELTER_ENTER_U, ROUTE_SHELTER_EXIT_U = 2.0, 0.0   # 경주 여유 μ = min_m |q_m − 입구| − e: 들어갈 때 ≥ 2 단위(4 m), 유지 ≥ 0
+ROUTE_SHELTER_REACH_U = 10.0                             # 관측 shelter_reach = clip(μ* / 10, 0, 1) (단계 4 관측 23 의 재료)
+ROUTE_FEAS_COVER, ROUTE_FEAS_SHELTER = 1, 2              # 가능 비트 ('들어갈 때' 문턱)
+FLIGHT_REFLEE_STEPS = 38                                 # 도망 기록(길 켬): 살아 끝난 도망 뒤 이 스텝(5 초) 안에 다시 시작한 도망을 센다 (설계 12절 GR)
 IST_GOLDEN_ANGLE = 2.399963
 IST_WOLF_HEAD_OFFSET = 2
 # 통합 무대 (p) 늑대 모서리 순서(C++ PlanStage Corners)와 무작위 자리 시도 수, 사슴 시도 수 max(IST_DEER_TRIES_MIN, IST_DEER_TRIES_PER × N)
@@ -1469,6 +1503,15 @@ def _wild_flight_params(p: dict, f: Features) -> dict:
     if not out["flight_r"] <= out["alert_r"] <= out["safe_r"]:
         raise ValueError(f"features.wild_flight 는 flight_r ≤ alert_r ≤ safe_r 여야 한다. 받은 값: {out['flight_r']}, "
                          f"{out['alert_r']}, {out['safe_r']}")
+    # 10-21 도망길 1단계 (측정 전용 선택 키 — null·0 이면 그 코드 경로를 타지 않는다)
+    rf = p["route_fixed"]
+    if rf is not None and rf not in ROUTE_NAMES:
+        raise ValueError(f"features.wild_flight.route_fixed 는 null 또는 {'·'.join(ROUTE_NAMES)} 이다. 받은 값: {rf!r}")
+    out["route_fixed"] = rf
+    qe = p["quiet_end"]
+    if isinstance(qe, bool) or not isinstance(qe, (int, np.integer)) or qe < 0:
+        raise ValueError(f"features.wild_flight.quiet_end 는 0 이상의 정수(스텝)여야 한다. 받은 값: {qe!r}")
+    out["quiet_end"] = int(qe)
     return out
 
 
@@ -2101,6 +2144,162 @@ def wf_edge_steer(pos: np.ndarray, d: np.ndarray, size: float, edge_r: float) ->
         s[:, o] = np.where(wall, s[:, o] + b * sg, s[:, o])
     out = normalize(s)
     return np.where(((out * out).sum(1) > EPS * EPS)[:, None], out, d)
+
+
+def wf_wall_keep(pos: np.ndarray, d: np.ndarray, size: float, mg: float) -> np.ndarray:
+    """야생 (w3) 무대 벽 여유: 축마다 위치가 벽 여유 mg 안이고 방향이 그 벽 쪽이면 그 성분을 지우고 단위화한다(다 지워지면 d 그대로). `_wf_update` 의
+    벽 여유 줄(C++ KeepDirection)과 같은 식 — 도망길 방향(`flight_route_geometry`)이 쓰는 사본이다(반사 방향 줄은 그대로 둔다)."""
+    sl = d.copy()
+    sl[:, 0] = np.where(((pos[:, 0] <= mg) & (sl[:, 0] < 0.0)) | ((pos[:, 0] >= size - mg) & (sl[:, 0] > 0.0)), 0.0, sl[:, 0])
+    sl[:, 1] = np.where(((pos[:, 1] <= mg) & (sl[:, 1] < 0.0)) | ((pos[:, 1] >= size - mg) & (sl[:, 1] > 0.0)), 0.0, sl[:, 1])
+    sl = normalize(sl)
+    return np.where(((sl * sl).sum(1) > EPS * EPS)[:, None], sl, d)
+
+
+def _route_edge_wall(pos: np.ndarray, d: np.ndarray, size: float, mg: float, edge_r: float) -> np.ndarray:
+    """도망길 후처리: 0 이 아닌 방향만 가장자리 굽히기(edge_r > 0) → 벽 여유 (RUN·COVER·OPEN — `_wf_update` 의 반사 방향과 같은 순서)."""
+    out = d.copy()
+    if edge_r > 0.0:
+        eg = (out * out).sum(1) > EPS * EPS
+        if eg.any():
+            out[eg] = wf_edge_steer(pos[eg], out[eg], size, edge_r)
+    return wf_wall_keep(pos, out, size, mg)
+
+
+def _route_seg_blocked(q: np.ndarray, bx: np.ndarray, by: np.ndarray, discs: np.ndarray) -> np.ndarray:
+    """눈길 a = q_m(늑대 눈, (M, 2)) → b (점 배열 bx·by, 꼴 X)가 어느 원판을 지나나 → (X…, M) bool — `sight_blocked`·C++ EcoThreatV3::SightBlocked(늑대, 점)
+    과 같은 식(원소마다 같은 셈 — 묶어 셈해도 값이 같다)."""
+    M = len(q)
+    if not len(discs) or not M:
+        return np.zeros(np.shape(bx) + (M,), dtype=bool)
+    ax, ay = q[:, 0][:, None], q[:, 1][:, None]                   # (M, 1)
+    dx = bx[..., None, None] - ax                                 # (X…, M, 1)
+    dy = by[..., None, None] - ay
+    dd = dx * dx + dy * dy
+    cx, cy, r = discs[:, 0], discs[:, 1], discs[:, 2]
+    fx, fy = cx - ax, cy - ay                                     # (M, D)
+    pos = dd > 0.0
+    t = np.where(pos, (fx * dx + fy * dy) / np.where(pos, dd, 1.0), 0.0)
+    t = np.minimum(np.maximum(t, 0.0), 1.0)
+    px = ax + t * dx - cx
+    py = ay + t * dy - cy
+    return (px * px + py * py < r * r).any(-1)
+
+
+def flight_route_geometry(p: np.ndarray, a0: np.ndarray, q: np.ndarray, S: np.ndarray, dist: np.ndarray, cov_c: np.ndarray,
+                          cov_r: np.ndarray, discs: np.ndarray, size: float, wall_margin: float, edge_r: float,
+                          prev_dir: np.ndarray | None = None, keep_k: np.ndarray | None = None) -> dict:
+    """야생 (w3) 도망길 기하 (설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 6절, 모듈 docstring '야생 1단계' (w3) 도망길). 난수 없음, 순수 함수.
+    p (K, 2) 도주 중인 사슴, a0 (K, 2) 은신처 굽히기 전 반사 방향(단위 — 반사와 같은 늑대 집합 S 의 거리 역수 가중 반대, 0 이면 가장 가까운 그 늑대 반대),
+    q (M, 2) 위협 위치, S (K, M) 반사와 같은 늑대 집합(near_h), dist (K, M) 실거리, cov_c (C, 2)·cov_r (C,) 은신처, discs (D, 3) 늑대 눈길을 가리는 원판
+    (block_sight 를 끈 세계는 빈 배열 — H = 0), prev_dir (K, 2) 지난 COVER 방향(없으면 0), keep_k (K,) 유지할 은신처(−1 없음). 무게 w_m = 1/max(d_m, 0.5).
+      OPEN: a₀ → 가장자리 굽히기 → 벽 여유.
+      COVER: 후보 e_j = R(θ_j)·a₀(ROUTE_COVER_DEG 순서, 회전표 리터럴) + 여덟째 지난 방향(있고 e_prev·a₀ ≥ 0 일 때). 표본점 x_{j,n} = p + 2n·e_j (n = 1..6).
+        빼기: x_{j,6} 이 벽 여유 밖(mg 미만·size − mg 초과), 경주 여유 min_n [min_{m∈S} |q_m − x_{j,n}| − 2n] < 0(|x_{j,n} − p| = 2n).
+        H_j = acc / (6·Σ_m w_m), acc = n 순서·m 순서로 w_m·[SightBlocked(q_m, x_{j,n})] 을 더한 값. 점수 S_j = H_j + 0.1·cos θ_j + 0.15·[j = 지난 방향]
+        (지난 방향의 cos θ = e_prev·a₀), j* = 남은 후보의 argmax(같으면 앞 번호). H* = 남은 후보의 max H(없으면 0). 방향 = e_{j*} → 가장자리 굽히기 → 벽 여유.
+      SHELTER: 은신처 k 마다 v = c_k − p, e_k = |v| − r_k, 입구 x_k = p + e_k·v/|v|, μ_k = min_{m∈S} |q_m − x_k| − e_k. 후보 = |v| > EPS ∧ 0 < e_k ≤ 20 ∧
+        v·a₀/|v| ≥ 0 ∧ μ_k ≥ 2. k* = argmin e_k(같으면 낮은 번호), μ* = μ_{k*}. 방향 = v/|v| → 벽 여유(가장자리 굽히기 없음). 유지 = μ_{keep_k} ≥ 0.
+    반환 dict: open_dir, cover_h (K, 8) 후보마다 H(뺀 후보 nan), cover_valid (K, 8), cover_j (K,) j*(−1 없음), cover_raw (K, 2) e_{j*}, cover_dir (K, 2),
+    cover_best_h (K,) H*, cover_ok (H* ≥ 1/3), cover_keep (H* ≥ 1/6), shelter_k (K,) k*(−1 없음), shelter_mu (K,) μ*(없으면 0), shelter_ok, shelter_dir,
+    keep_mu (K,) μ_{keep_k}(없으면 −inf), keep_ok (μ ≥ 0), keep_dir."""
+    p = np.asarray(p, dtype=np.float64).reshape(-1, 2)
+    a0 = np.asarray(a0, dtype=np.float64).reshape(-1, 2)
+    q = np.asarray(q, dtype=np.float64).reshape(-1, 2)
+    K, M = len(p), len(q)
+    S = np.asarray(S, dtype=bool).reshape(K, M)
+    dist = np.asarray(dist, dtype=np.float64).reshape(K, M)
+    cov_c = np.asarray(cov_c, dtype=np.float64).reshape(-1, 2)
+    cov_r = np.asarray(cov_r, dtype=np.float64).reshape(-1)
+    discs = np.asarray(discs, dtype=np.float64).reshape(-1, 3)
+    prev_dir = np.zeros((K, 2)) if prev_dir is None else np.asarray(prev_dir, dtype=np.float64).reshape(K, 2)
+    keep_k = np.full(K, -1, dtype=np.int64) if keep_k is None else np.asarray(keep_k, dtype=np.int64).reshape(K)
+    mg = float(wall_margin)
+    ar = np.arange(K)
+    wgt = np.where(S, 1.0 / np.maximum(dist, 0.5), 0.0)
+    wsum = np.zeros(K)
+    for m in range(M):
+        wsum = wsum + wgt[:, m]
+    out: dict = {}
+    out["open_dir"] = _route_edge_wall(p, a0, size, mg, edge_r)
+
+    # --- COVER ---
+    J = len(ROUTE_COVER_DEG) + 1
+    cs, sn = np.asarray(ROUTE_COVER_COS), np.asarray(ROUTE_COVER_SIN)
+    e = np.zeros((K, J, 2))
+    e[:, :J - 1, 0] = cs[None, :] * a0[:, 0:1] - sn[None, :] * a0[:, 1:2]
+    e[:, :J - 1, 1] = sn[None, :] * a0[:, 0:1] + cs[None, :] * a0[:, 1:2]
+    e[:, J - 1] = prev_dir
+    pdot = prev_dir[:, 0] * a0[:, 0] + prev_dir[:, 1] * a0[:, 1]
+    cos_j = np.empty((K, J))
+    cos_j[:, :J - 1] = cs[None, :]
+    cos_j[:, J - 1] = pdot
+    valid = np.ones((K, J), dtype=bool)
+    valid[:, J - 1] = ((prev_dir * prev_dir).sum(1) > EPS * EPS) & (pdot >= 0.0)
+    far = float(ROUTE_COVER_STEP_U * ROUTE_COVER_POINTS)
+    x6, y6 = p[:, 0:1] + far * e[:, :, 0], p[:, 1:2] + far * e[:, :, 1]
+    valid &= ~((x6 < mg) | (x6 > size - mg) | (y6 < mg) | (y6 > size - mg))
+    sn_ = ROUTE_COVER_STEP_U * np.arange(1, ROUTE_COVER_POINTS + 1, dtype=np.float64)            # |x_{j,n} − p| = 2n
+    xs = p[:, 0][:, None, None] + sn_[None, None, :] * e[:, :, 0][:, :, None]                       # (K, J, 6)
+    ys = p[:, 1][:, None, None] + sn_[None, None, :] * e[:, :, 1][:, :, None]
+    ddx = q[:, 0][None, None, None, :] - xs[..., None]                                              # (K, J, 6, M)
+    ddy = q[:, 1][None, None, None, :] - ys[..., None]
+    dq = np.where(S[:, None, None, :], np.sqrt(ddx * ddx + ddy * ddy), np.inf)
+    race = (dq.min(-1, initial=np.inf) - sn_[None, None, :]).min(-1)                                # (K, J)
+    valid &= ~(race < 0.0)
+    acc = np.zeros((K, J))
+    if len(discs) and M:
+        blk = _route_seg_blocked(q, xs, ys, discs) & S[:, None, None, :]                            # (K, J, 6, M)
+        for n in range(ROUTE_COVER_POINTS):                                                          # n 순서·m 순서로 더한다(C++ 와 같은 순서)
+            for m in range(M):
+                acc = acc + np.where(blk[:, :, n, m], wgt[:, m][:, None], 0.0)
+    H = np.where(wsum[:, None] > 0.0, acc / np.where(wsum[:, None] > 0.0, ROUTE_COVER_POINTS * wsum[:, None], 1.0), 0.0)
+    bonus = np.zeros(J)
+    bonus[J - 1] = ROUTE_COVER_W_PREV
+    score = np.where(valid, H + ROUTE_COVER_W_STRAIGHT * cos_j + bonus[None, :], -np.inf)
+    has = valid.any(1)
+    j = np.where(has, score.argmax(1), -1)
+    best = np.where(has, np.where(valid, H, -np.inf).max(1), 0.0)
+    raw = np.where(has[:, None], e[ar, np.maximum(j, 0)], 0.0)
+    out.update(cover_h=np.where(valid, H, np.nan), cover_valid=valid, cover_j=j, cover_raw=raw,
+               cover_dir=np.where(has[:, None], _route_edge_wall(p, raw, size, mg, edge_r), 0.0),
+               cover_best_h=best, cover_ok=best >= ROUTE_COVER_ENTER, cover_keep=best >= ROUTE_COVER_EXIT)
+
+    # --- SHELTER ---
+    C = len(cov_r)
+    sk = np.full(K, -1, dtype=np.int64)
+    smu = np.zeros(K)
+    sdir = np.zeros((K, 2))
+    kmu = np.full(K, -np.inf)
+    kdir = np.zeros((K, 2))
+    if C and K:
+        vx = cov_c[:, 0][None, :] - p[:, 0:1]
+        vy = cov_c[:, 1][None, :] - p[:, 1:2]
+        dc = np.sqrt(vx * vx + vy * vy)
+        ed = dc - cov_r[None, :]
+        dsafe = np.maximum(dc, EPS)
+        ux, uy = vx / dsafe, vy / dsafe
+        exx, exy = p[:, 0:1] + ed * ux, p[:, 1:2] + ed * uy
+        ddx = q[:, 0][None, None, :] - exx[..., None]                                                # (K, C, M)
+        ddy = q[:, 1][None, None, :] - exy[..., None]
+        mu = np.where(S[:, None, :], np.sqrt(ddx * ddx + ddy * ddy), np.inf).min(-1, initial=np.inf) - ed
+        cosk = (vx * a0[:, 0:1] + vy * a0[:, 1:2]) / dsafe
+        cand = ((dc > EPS) & (ed > 0.0) & (ed <= ROUTE_SHELTER_MAX_EDGE_U) & (cosk >= ROUTE_SHELTER_COS_MIN)
+                & (mu >= ROUTE_SHELTER_ENTER_U))
+        hk = cand.any(1)
+        kk = np.where(cand, ed, np.inf).argmin(1)
+        sk = np.where(hk, kk, -1)
+        smu = np.where(hk, mu[ar, kk], 0.0)
+        vdir = np.stack([vx[ar, kk], vy[ar, kk]], 1) / dsafe[ar, kk][:, None]
+        sdir = np.where(hk[:, None], wf_wall_keep(p, vdir, size, mg), 0.0)
+        hold = keep_k >= 0
+        kc = np.clip(keep_k, 0, C - 1)
+        kmu = np.where(hold, mu[ar, kc], -np.inf)
+        kv = np.stack([vx[ar, kc], vy[ar, kc]], 1) / dsafe[ar, kc][:, None]
+        kdir = np.where(hold[:, None], wf_wall_keep(p, kv, size, mg), 0.0)
+    out.update(shelter_k=sk, shelter_mu=smu, shelter_ok=sk >= 0, shelter_dir=sdir, keep_mu=kmu, keep_ok=kmu >= ROUTE_SHELTER_EXIT_U,
+               keep_dir=kdir)
+    return out
 
 
 # 야생 2단계 사냥 성공률 통계(모듈 docstring '야생 2단계'). hunt_stats 의 칸 순서: 시작·끝·성공·사냥 밖 포획
@@ -3632,6 +3831,8 @@ class World:
         live = self.alive
         # 야생 (w3) 도망 기록(통계 전용): 이번 스텝에 실행하는 덮기 — 학습 세계 리스폰(`_spawn_slots`)이 죽은 칸의 wf_mode 를 지우기 전 값
         wf_exec = self.wf_mode.copy() if self.track_flight and self._wf is not None else None
+        # 10-21 도망길(route_fixed 켬 세계만): 이번 스텝에 실행하는 길 — 리스폰이 죽은 칸의 길 상태를 지우기 전 값 (길 기록)
+        rt_exec = self.flight_route.astype(np.int64) if self._wf is not None and self._wf["route_fixed"] is not None else None
         wf_flee = None
         if vg is not None:
             ema0 = min(self.pred_ema, 1.0)              # 결정 때 관측 5 (vigil_stats B5′ 용, 6) 에서 바뀐다)
@@ -3846,7 +4047,7 @@ class World:
                 if vg is not None:
                     self._vig_prev[dead] = -1         # 새 개체: 경계 전환(b8_vig)도 잇지 않는다
         if self._wf is not None:
-            self._wf_update(done, caught, wf_exec, wf_flee)    # 야생 (w3): 스텝 끝 기하(리스폰 관측 포함)로 다음 스텝의 덮기를 정한다
+            self._wf_update(done, caught, wf_exec, wf_flee, rt_exec)    # 야생 (w3): 스텝 끝 기하(리스폰 관측 포함)로 다음 스텝의 덮기를 정한다
 
         return obs, rew, done, terminal_obs
 
@@ -5104,6 +5305,11 @@ class World:
         if self._wf is not None:
             self.wf_mode[dead] = WF_NONE               # 야생 (w3): 새 개체는 덮기 없이 시작한다
             self.wf_dir[dead] = 0.0
+            if self._wf["quiet_end"] > 0:
+                self.wf_quiet[dead] = 0
+            if self._wf["route_fixed"] is not None:
+                self._route_clear(np.asarray(dead))     # 10-21 도망길: 새 개체는 길 상태 없이 시작한다(측정 덮기 route_force 도)
+                self.route_force[dead] = ROUTE_NONE
         if self.alive is not None:
             # 통합 무대 (k): 빈 슬롯을 다시 채우면 산 슬롯이다(새 배열 — 스텝 안의 L 을 바꾸지 않는다)
             self.alive = self.alive.copy()
@@ -5199,6 +5405,12 @@ class World:
             self.wf_dir = np.zeros((N, 2))                 # 경계·도주 방향(단위, 없으면 0)
             self._wf_mode_n = np.zeros(len(WF_MODE_NAMES), dtype=np.int64)   # 실행한 덮기별 산 개체-스텝
             self._wf_panic_starts = self._wf_panic_ends = self._wf_panic_end_shelter = 0
+            if self._wf["quiet_end"] > 0:
+                # 10-21 끝 규칙 quiet_end: 도주 중 붙잡는 늑대를 알아채지 못한 연속 스텝 수, 그 규칙으로 끝난 도주 수
+                self.wf_quiet = np.zeros(N, dtype=np.int64)
+                self._wf_quiet_ends = 0
+            if self._wf["route_fixed"] is not None:
+                self._route_reset()
             self._fl_reset()
         if self._wp is not None:
             # 야생 2단계 2 스텝 뒤 훅: 이번 스텝에 도운·기다린·은신처 문으로 간 늑대, 고른 사슴(없으면 −1). 통계 칸
@@ -5287,11 +5499,12 @@ class World:
         out["see"][al] = 1.0
 
     def _wf_update(self, done: np.ndarray, caught: np.ndarray | None = None, executed: np.ndarray | None = None,
-                   flee: np.ndarray | None = None) -> None:
+                   flee: np.ndarray | None = None, route_executed: np.ndarray | None = None) -> None:
         """야생 (w3) H: 스텝 끝 기하 self._g(관측과 같은 위치·보임, 리스폰 관측 포함)로 다음 스텝의 덮기 wf_mode·wf_dir 를 정한다(모듈 docstring
         '야생 1단계' (w3) 순서). 이번 스텝에 실행한 덮기를 센다. 덮기(도주·웅크림)가 풀리면 잠금 0·미뤄 둔 사건 지움(두뇌가 곧바로 고른다).
         도망 기록(track_flight)만 쓰는 인자: caught = 이번 스텝에 잡힌 사슴(None 이면 죽음은 굶음으로 센다), executed = 이번 스텝 첫머리의 덮기
-        (`step` 이 리스폰 전에 떠 둔 사본 — None 이면 지금 wf_mode), flee = 이번 스텝에 FLEE 를 실행한 사슴(같은 사본 — None 이면 실행한 덮기가 도주인 사슴)."""
+        (`step` 이 리스폰 전에 떠 둔 사본 — None 이면 지금 wf_mode), flee = 이번 스텝에 FLEE 를 실행한 사슴(같은 사본 — None 이면 실행한 덮기가 도주인 사슴).
+        route_executed = 이번 스텝 첫머리의 도망길(10-21 route_fixed 켬 세계만 — 같은 사본, None 이면 지금 길 상태): 길 통계·도망 기록이 쓴다."""
         wf, rs, g = self._wf, self._rs, self._g
         N, M = self.N, self.M
         live = np.ones(N, dtype=bool) if self.alive is None else self.alive
@@ -5319,12 +5532,22 @@ class World:
                 # 10-16: 지난 도주는 깨어 있는 늑대(사냥·먹기·배부름, 자는 늑대 말고)가 안전 거리 안에 하나라도 있으면 이어진다
                 awake = ~self.pred_asleep if self._ps is not None else np.ones(M, dtype=bool)
                 near_h = awake[None, :] & (pd <= wf["safe_r"])
+            hold = near_h.any(1)
+            if wf["quiet_end"] > 0:
+                # 10-21 끝 규칙 quiet_end (설계 7절): 지난 도주는 붙잡는 늑대(near_h) 가운데 알아챈(wf_pvis — 눈·발소리) 늑대가 없던 연속 스텝 Q 가
+                # quiet_end 에 닿으면 풀린다. 알아채면 Q = 0, 도주가 아니면 0
+                qn = np.where(prev == WF_PANIC, np.where((pv & near_h).any(1), 0, self.wf_quiet + 1), 0)
+                quiet = (prev == WF_PANIC) & hold & (qn >= wf["quiet_end"])
+                hold = hold & (qn < wf["quiet_end"])
             panic_now = (nh & ((pd <= wf["flight_r"]) | coming)).any(1)
             noticed_h = nh.any(1)
             nxt = np.where(in_cov, np.where(noticed_h & wf["crouch"], WF_SHELTER, WF_NONE),
-                           np.where(((prev == WF_PANIC) & near_h.any(1)) | panic_now, WF_PANIC,
+                           np.where(((prev == WF_PANIC) & hold) | panic_now, WF_PANIC,
                                     np.where(noticed_h | nr.any(1), WF_ALERT, WF_NONE))).astype(np.int8)
             nxt[~live] = WF_NONE
+            if wf["quiet_end"] > 0:
+                self.wf_quiet = np.where(nxt == WF_PANIC, qn, 0)
+                self._wf_quiet_ends += int(np.count_nonzero(quiet & ~in_cov & (nxt != WF_PANIC) & live))
             # 방향: 도주 = 안전 거리 안 사냥 중인 늑대들, 경계 = 알아챈 늑대들의 반대(거리 역수 가중 합). 0 이면 가장 가까운 그 늑대 반대
             sel = np.where((nxt == WF_PANIC)[:, None], near_h, nh | nr)
             wt = sel / np.maximum(pd, 0.5)
@@ -5335,6 +5558,8 @@ class World:
                 j = np.where(sel[zero], pd[zero], np.inf).argmin(1)
                 iz = np.flatnonzero(zero)
                 dirs[zero] = -np.stack([ex[iz, j], ey[iz, j]], 1) * pinv[iz, j][:, None]
+            if wf["route_fixed"] is not None:
+                a0 = dirs.copy()                                  # 10-21 도망길: 은신처 굽히기 전 도주 방향 a₀
             pan = nxt == WF_PANIC
             to_sh = np.zeros(N, dtype=bool)                       # 은신처 쪽으로 정한 도주(가장자리 굽히기에서 뺀다)
             if pan.any() and len(self.cov_r):
@@ -5366,6 +5591,14 @@ class World:
             sl = normalize(sl)
             dirs = np.where(((sl * sl).sum(1) > EPS * EPS)[:, None], sl, dirs)
             dirs[(nxt != WF_ALERT) & (nxt != WF_PANIC)] = 0.0
+        elif wf["quiet_end"] > 0:
+            self.wf_quiet = np.zeros(N, dtype=np.int64)
+        rt_exec = None
+        if wf["route_fixed"] is not None:
+            # 10-21 도망길 1단계(측정 전용 route_fixed): 도주 중인 사슴의 방향을 고른 길로 바꾼다(RUN 은 위 반사 방향 그대로)
+            # 이번 스텝에 실행한 길(길 통계·도망 기록 — `step` 이 리스폰 전에 떠 둔 사본, None 이면 지금 길 상태)
+            rt_exec = self.flight_route.astype(np.int64) if route_executed is None else np.asarray(route_executed, dtype=np.int64)
+            dirs = self._route_step(prev, nxt, dirs, a0 if M > 0 else None, near_h if M > 0 else None, pd if M > 0 else None, live | done, rt_exec)
         over_prev = (prev == WF_PANIC) | (prev == WF_SHELTER)
         rel = over_prev & (nxt != WF_PANIC) & (nxt != WF_SHELTER) & live
         if rel.any():
@@ -5377,8 +5610,164 @@ class World:
         self._wf_panic_end_shelter += int(np.count_nonzero(ends & in_cov))
         if self.track_flight:
             ex_mode = prev if executed is None else executed
-            self._fl_update(ex_mode == WF_PANIC if flee is None else flee, ex_mode == WF_PANIC, done, caught, live, in_cov)
+            kw = {} if rt_exec is None else dict(route_exec=rt_exec)       # 길 끈 세계는 옛 호출 꼴 그대로(감싸는 기록 도구가 같은 인자를 받는다)
+            self._fl_update(ex_mode == WF_PANIC if flee is None else flee, ex_mode == WF_PANIC, done, caught, live, in_cov, **kw)
         self.wf_mode, self.wf_dir = nxt, dirs
+
+    # ------------------------------------------------------------------ #
+    # 야생 (w3) 도망길 1단계 (10-21, 측정 전용 route_fixed — 모듈 docstring '야생 1단계' (w3) 도망길)
+    # ------------------------------------------------------------------ #
+
+    def _route_reset(self) -> None:
+        """도망길 상태·통계 칸 (`_wild_reset`, wild_flight.route_fixed 를 켠 세계만). 난수 없음."""
+        N, R = self.N, len(ROUTE_NAMES)
+        self.flight_route = np.full(N, ROUTE_NONE, dtype=np.int8)      # 다음 스텝에 쓰는 길(−1 = 도주 아님)
+        self.route_k = np.full(N, -1, dtype=np.int64)                  # SHELTER 를 고를 때 정한 은신처 k*
+        self.route_prev_dir = np.zeros((N, 2))                        # 지난 COVER 방향 e_{j*}(지금 길이 COVER 가 아니면 0)
+        self.route_age = np.zeros(N, dtype=np.int64)                  # 지난 결정 뒤 도주 스텝 수
+        self.route_feas = np.zeros(N, dtype=np.int8)                  # 지난 결정 때 가능 비트(ROUTE_FEAS_*)
+        self.route_force = np.full(N, ROUTE_NONE, dtype=np.int8)      # 측정 전용(오라클): 사슴마다 고정 길 덮기(−1 = route_fixed)
+        # 훅(이번 `_wf_update` 의 값 — 도주 중인 사슴만, 아니면 0·−1): 길을 (다시) 골랐나, 도주가 시작됐나, H*, SHELTER 가능이면 μ*, 길마다 방향·가능·k*
+        self.route_decide = np.zeros(N, dtype=bool)
+        self.route_onset = np.zeros(N, dtype=bool)
+        self.route_cover_h = np.zeros(N)
+        self.route_shelter_mu = np.zeros(N)
+        self.route_cand_dir = np.zeros((N, R, 2))
+        self.route_cand_ok = np.zeros((N, R), dtype=bool)
+        self.route_cand_k = np.full(N, -1, dtype=np.int64)
+        self.route_cover_raw = np.zeros((N, 2))
+        # 통계: 실행한 반사 도주 스텝(길별), 시작·시작 때 가능, 결정·가능 바뀜 다시 고름·길 바꿈·고정 길 불가로 RUN, 무효(그 길별), 결정에서 고른 길
+        self._rt_steps = np.zeros(R, dtype=np.int64)
+        self._rt_onsets = self._rt_onset_cover = self._rt_onset_shelter = self._rt_onset_both = 0
+        self._rt_decisions = self._rt_refeas = self._rt_switches = self._rt_fallback = 0
+        self._rt_invalid = np.zeros(R, dtype=np.int64)
+        self._rt_pick = np.zeros(R, dtype=np.int64)
+
+    def _route_clear(self, idx) -> None:
+        """도망길 상태를 지운다 (도주가 끝남·웅크림·죽음·다시 남)."""
+        self.flight_route[idx] = ROUTE_NONE
+        self.route_k[idx] = -1
+        self.route_prev_dir[idx] = 0.0
+        self.route_age[idx] = 0
+        self.route_feas[idx] = 0
+
+    def _route_step(self, prev: np.ndarray, nxt: np.ndarray, dirs: np.ndarray, a0, near_h, pd, alive0: np.ndarray,
+                    executed: np.ndarray) -> np.ndarray:
+        """`_wf_update` 끝(H): 다음 스텝에 도주인 사슴의 길을 정하고 방향 dirs (N, 2) 를 바꾼 사본을 돌려준다(RUN 행은 dirs 그대로 — 비트 동일).
+        결정 = 시작 ∨ 무효(COVER: H* < 1/6, SHELTER: μ_{k} < 0) ∨ (age ≥ 15 ∧ 가능 비트가 지난 결정 때와 다름). age 는 결정이 아닌 도주 스텝마다 +1
+        (먼저 더하고 본다 — 결정 뒤 15 스텝을 실행하면 다시 고를 수 있다), 결정이면 0. 고르기(측정 전용): 고정 길 route_force(있으면)·route_fixed 가
+        '들어갈 때' 가능하면 그 길, 아니면 RUN. 방향: RUN = 반사 dirs, OPEN·COVER = 기하 방향(매 스텝 다시 겨눔), SHELTER = 결정 때 k* 쪽(유지 중에는 그
+        은신처). 도주가 아니면 길 상태를 지운다. alive0 = 스텝 첫머리에 산 사슴, executed = 이번 스텝에 실행한 길(−1 없음 — 실행한 길 셈)."""
+        N, R, wf = self.N, len(ROUTE_NAMES), self._wf
+        old = self.flight_route.astype(np.int64)
+        exe = alive0 & (executed >= 0)
+        if exe.any():
+            self._rt_steps += np.bincount(executed[exe], minlength=R)
+        pan = nxt == WF_PANIC
+        onset = pan & (prev != WF_PANIC)
+        new_route = np.full(N, ROUTE_NONE, dtype=np.int8)
+        new_k = np.full(N, -1, dtype=np.int64)
+        new_prev = np.zeros((N, 2))
+        new_age = np.zeros(N, dtype=np.int64)
+        new_feas = np.zeros(N, dtype=np.int8)
+        decide = np.zeros(N, dtype=bool)
+        c_dir = np.zeros((N, R, 2))
+        c_ok = np.zeros((N, R), dtype=bool)
+        c_k = np.full(N, -1, dtype=np.int64)
+        c_h = np.zeros(N)
+        c_mu = np.zeros(N)
+        c_raw = np.zeros((N, 2))
+        if pan.any():
+            ip = np.flatnonzero(pan)
+            K = len(ip)
+            on = onset[ip]
+            cur = np.where(on, ROUTE_NONE, old[ip])
+            prevd = np.where((cur == ROUTE_COVER)[:, None], self.route_prev_dir[ip], 0.0)
+            keep = np.where(cur == ROUTE_SHELTER, self.route_k[ip], -1)
+            discs = (self.obstacles if self._ob is not None and self._ob["block_sight"] and len(self.obstacles)
+                     else np.zeros((0, len(OBSTACLE_COLUMNS))))
+            geo = flight_route_geometry(self.pos[ip], a0[ip], self.pred_pos, near_h[ip], pd[ip], self.cov_c, self.cov_r, discs, self.size,
+                                        wf["wall_margin"], wf["edge_r"], prevd, keep)
+            cok, sok = geo["cover_ok"], geo["shelter_ok"]
+            feas = (np.where(cok, ROUTE_FEAS_COVER, 0) + np.where(sok, ROUTE_FEAS_SHELTER, 0)).astype(np.int8)
+            inval = ((cur == ROUTE_COVER) & ~geo["cover_keep"]) | ((cur == ROUTE_SHELTER) & ~geo["keep_ok"])
+            age = np.where(on, 0, self.route_age[ip] + 1)
+            refeas = (cur >= 0) & ~inval & (age >= ROUTE_LOCK_STEPS) & (feas != self.route_feas[ip])
+            dec = on | (cur < 0) | inval | refeas
+            want = np.where(self.route_force[ip] >= 0, self.route_force[ip], ROUTE_NAMES.index(wf["route_fixed"])).astype(np.int64)
+            ok = np.stack([np.ones(K, dtype=bool), cok, sok, np.ones(K, dtype=bool)], 1)
+            ark = np.arange(K)
+            pick = np.where(ok[ark, want], want, ROUTE_RUN)
+            new = np.where(dec, pick, cur)
+            run_dir = dirs[ip].copy()
+            sh_dir = np.where(dec[:, None], geo["shelter_dir"], geo["keep_dir"])
+            chosen = np.where((new == ROUTE_COVER)[:, None], geo["cover_dir"],
+                              np.where((new == ROUTE_SHELTER)[:, None], sh_dir,
+                                       np.where((new == ROUTE_OPEN)[:, None], geo["open_dir"], run_dir)))
+            nr = new != ROUTE_RUN
+            if nr.any():
+                dirs = dirs.copy()
+                dirs[ip[nr]] = chosen[nr]
+            new_route[ip] = new
+            new_k[ip] = np.where(new == ROUTE_SHELTER, np.where(dec, geo["shelter_k"], keep), -1)
+            new_prev[ip] = np.where((new == ROUTE_COVER)[:, None], geo["cover_raw"], 0.0)
+            new_age[ip] = np.where(dec, 0, age)
+            new_feas[ip] = np.where(dec, feas, self.route_feas[ip])
+            decide[ip] = dec
+            c_dir[ip] = np.stack([run_dir, geo["cover_dir"], geo["shelter_dir"], geo["open_dir"]], 1)
+            c_ok[ip] = ok
+            c_k[ip] = geo["shelter_k"]
+            c_h[ip] = geo["cover_best_h"]
+            c_mu[ip] = np.where(sok, geo["shelter_mu"], 0.0)
+            c_raw[ip] = geo["cover_raw"]
+            # 통계
+            self._rt_onsets += int(np.count_nonzero(on))
+            self._rt_onset_cover += int(np.count_nonzero(on & cok))
+            self._rt_onset_shelter += int(np.count_nonzero(on & sok))
+            self._rt_onset_both += int(np.count_nonzero(on & cok & sok))
+            self._rt_decisions += int(np.count_nonzero(dec))
+            self._rt_refeas += int(np.count_nonzero(refeas))
+            self._rt_switches += int(np.count_nonzero(dec & ~on & (cur >= 0) & (new != cur)))
+            self._rt_fallback += int(np.count_nonzero(dec & (pick != want)))
+            if inval.any():
+                self._rt_invalid += np.bincount(cur[inval], minlength=R)
+            if dec.any():
+                self._rt_pick += np.bincount(new[dec], minlength=R)
+        self.flight_route, self.route_k, self.route_prev_dir = new_route, new_k, new_prev
+        self.route_age, self.route_feas, self.route_decide, self.route_onset = new_age, new_feas, decide, onset
+        self.route_cand_dir, self.route_cand_ok, self.route_cand_k = c_dir, c_ok, c_k
+        self.route_cover_h, self.route_shelter_mu, self.route_cover_raw = c_h, c_mu, c_raw
+        return dirs
+
+    def route_redecide(self, i: int, route: int) -> int:
+        """측정 전용(오라클 results/v3/route/oracle.py): 지금(스텝 끝) 다음 스텝 도주인 사슴 i 의 길을 route 로 다시 고른다 — 이번 `_wf_update` 가 남긴
+        후보(route_cand_*)에서 고르고(가능하지 않으면 RUN), 다음 결정도 route 로 한다(route_force). 나이 0, 결정 때 가능 비트는 그대로. 반환 = 고른 길."""
+        if self._wf is None or self._wf["route_fixed"] is None:
+            raise ValueError("route_redecide 는 wild_flight.route_fixed 를 켠 세계에만 있다")
+        i, route = int(i), int(route)
+        if self.wf_mode[i] != WF_PANIC or not 0 <= route < len(ROUTE_NAMES):
+            raise ValueError(f"사슴 {i} 는 다음 스텝 도주가 아니거나 길 {route} 이 없다")
+        self.route_force[i] = route
+        new = route if self.route_cand_ok[i, route] else ROUTE_RUN
+        self.flight_route[i] = new
+        self.route_k[i] = self.route_cand_k[i] if new == ROUTE_SHELTER else -1
+        self.route_prev_dir[i] = self.route_cover_raw[i] if new == ROUTE_COVER else 0.0
+        self.route_age[i] = 0
+        self.wf_dir = self.wf_dir.copy()
+        self.wf_dir[i] = self.route_cand_dir[i, new]
+        return new
+
+    def route_stats(self) -> dict:
+        """도망길 통계 (wild_flight.route_fixed 를 켠 세계만, 동역학과 무관): 고정 길·끝 규칙, 실행한 반사 도주 스텝(길별), 시작한 도주와 시작 때 COVER·
+        SHELTER·둘 다 가능, 결정 수·그 가운데 가능 바뀜으로 다시 고름·길 바꿈·고정 길 불가로 RUN, 무효(그 길별), 결정에서 고른 길."""
+        if self._wf is None or self._wf["route_fixed"] is None:
+            raise ValueError("route_stats 는 wild_flight.route_fixed 를 켠 세계에만 있다")
+        nm = ROUTE_NAMES
+        return dict(fixed=self._wf["route_fixed"], quiet_end=int(self._wf["quiet_end"]), steps={k: int(v) for k, v in zip(nm, self._rt_steps)},
+                    onsets=int(self._rt_onsets), onset_cover=int(self._rt_onset_cover), onset_shelter=int(self._rt_onset_shelter),
+                    onset_both=int(self._rt_onset_both), decisions=int(self._rt_decisions), redecide_feas=int(self._rt_refeas),
+                    switches=int(self._rt_switches), fallback=int(self._rt_fallback), invalid={k: int(v) for k, v in zip(nm, self._rt_invalid)},
+                    picked={k: int(v) for k, v in zip(nm, self._rt_pick)})
 
     def wild_stats(self) -> dict:
         """야생 1단계 통계 (켠 규칙만, 동역학과 무관). 비축: 산 개체 평균·최솟값, 꺼내 쓴·채운 에너지, 약한 개체-스텝 비율·약한 채 잡힌 수.
@@ -5398,6 +5787,8 @@ class World:
             tot = max(int(self._wf_mode_n.sum()), 1)
             out.update({f"mode_{k}_frac": int(c) / tot for k, c in zip(WF_MODE_NAMES, self._wf_mode_n)})
             out.update(panic_starts=self._wf_panic_starts, panic_ends=self._wf_panic_ends, panic_end_shelter=self._wf_panic_end_shelter)
+            if self._wf["quiet_end"] > 0:
+                out["panic_quiet_ends"] = int(self._wf_quiet_ends)     # 10-21 끝 규칙 quiet_end 로 끝난 도주 (켠 세계만)
         if not out:
             raise ValueError("wild_stats 는 야생 1단계 규칙(wild_*)을 하나라도 켠 세계에만 있다")
         return out
@@ -5421,6 +5812,23 @@ class World:
         self._fl_refl = 0                                   # 끝난 도망의 반사 스텝 합
         self._fl_shelter_end = 0                            # 살아 끝난 도망 가운데 끝 스텝 끝 위치가 은신처 원 안인 수
         self._fl_hist = np.zeros(len(FLIGHT_HIST_STEPS) + 1, dtype=np.int64)    # 스스로 벗어난 도망의 쫓긴 시간 칸
+        if self._wf["route_fixed"] is not None:
+            # 10-21 도망길 기록 (길 켬 세계만 — `flight_stats` 의 route). 칸 번호 = 길(ROUTE_NAMES) + 마지막 '길 없음'(반사 스텝이 없는 두뇌 FLEE 도망)
+            R, C = len(ROUTE_NAMES), len(FLIGHT_CAUSES)
+            self._fl_rsteps = np.zeros((N, R), dtype=np.int64)      # 열린 도망의 길별 반사 스텝 수 (가장 많은 길 = 그 도망의 길, 같으면 앞 번호)
+            self._flr_n = np.zeros((R + 1, C), dtype=np.int64)      # 끝난 도망 수(길 × 끝 까닭)
+            self._flr_steps = np.zeros((R + 1, C), dtype=np.int64)  # 그 FLEE 스텝 합
+            self._flr_cont = np.zeros((R + 1, C), dtype=np.int64)   # 그 쫓긴 스텝 합
+            self._flr_drop_obs = np.zeros(R + 1, dtype=np.int64)    # 원판이 늑대 눈길을 가려 놓친 사건(그 스텝에 실행한 길)
+            self._flr_chased = np.zeros(R + 1, dtype=np.int64)      # 쫓기는 FLEE 스텝(지난 스텝 표적, 실행한 길)
+            self._flr_hidden = np.zeros(R + 1, dtype=np.int64)      # 그 가운데 쫓는 늑대 모두의 눈길을 원판이 가린 스텝
+            self._flr_refled = 0                                    # 살아 끝난 도망 뒤 FLIGHT_REFLEE_STEPS 안에 다시 시작한 도망
+            self._fl_last_t = np.full(N, -(10 ** 9), dtype=np.int64)   # 살아 끝난 지난 도망의 마지막 FLEE 스텝 번호
+            # 사슴마다 마지막으로 닫힌 도망 (오라클 results/v3/route/oracle.py 가 읽는다): 닫힌 수·끝 까닭 번호·FLEE 스텝·쫓긴 스텝
+            self._fl_closed = np.zeros(N, dtype=np.int64)
+            self._fl_last_cause = np.full(N, -1, dtype=np.int64)
+            self._fl_last_len = np.zeros(N, dtype=np.int64)
+            self._fl_last_contact = np.zeros(N, dtype=np.int64)
 
     def _fl_close(self, m: np.ndarray, cause: np.ndarray) -> None:
         """도망 기록: m 의 열린 도망을 끝 까닭 번호 cause (N,) 로 닫고 칸을 비운다."""
@@ -5435,6 +5843,18 @@ class World:
         own = m & np.isin(cause, [FLIGHT_CAUSES.index(c) for c in FLIGHT_OWN])
         if own.any():
             np.add.at(self._fl_hist, np.searchsorted(np.asarray(FLIGHT_HIST_STEPS), C[own], side="right"), 1)
+        if self._wf["route_fixed"] is not None:
+            # 10-21 도망길 기록: 그 도망의 길(반사 스텝이 가장 많은 길, 없으면 '길 없음')별 끝 까닭·스텝, 사슴마다 마지막으로 닫힌 도망
+            rs_ = self._fl_rsteps[m]
+            dom = np.where(rs_.sum(1) > 0, rs_.argmax(1), len(ROUTE_NAMES))
+            np.add.at(self._flr_n, (dom, k), 1)
+            np.add.at(self._flr_steps, (dom, k), L[m])
+            np.add.at(self._flr_cont, (dom, k), C[m])
+            self._fl_rsteps[m] = 0
+            self._fl_closed[m] += 1
+            self._fl_last_cause[m] = k
+            self._fl_last_len[m] = L[m]
+            self._fl_last_contact[m] = C[m]
         L[m] = 0
         C[m] = 0
         self._fl_reflex[m] = 0
@@ -5444,12 +5864,19 @@ class World:
         self._fl_end_cov[m] = False
 
     def _fl_update(self, flee: np.ndarray, reflex: np.ndarray, done: np.ndarray, caught: np.ndarray | None, live: np.ndarray,
-                   in_cov: np.ndarray) -> None:
+                   in_cov: np.ndarray, route_exec: np.ndarray | None = None) -> None:
         """야생 (w3) 도망 기록 한 스텝 (`_wf_update` 끝, track_flight 일 때만 — 통계 전용, 덮기·동역학·난수를 바꾸지 않는다). flee = 이번 스텝에 FLEE 를
         실행한 사슴, reflex = 그 가운데 실행한 덮기가 도주인 사슴, live = 스텝 끝에 산 사슴(죽은 칸 done 과 합치면 스텝 첫머리에 산 사슴),
-        in_cov = 스텝 끝 은신처 원 안. 정의는 모듈 docstring '야생 1단계' (w3) 도망 기록."""
+        in_cov = 스텝 끝 은신처 원 안, route_exec = 이번 스텝에 실행한 도망길(길 켬 세계만, −1 = 없음 — 10-21 도망길 기록). 정의는 모듈 docstring
+        '야생 1단계' (w3) 도망 기록."""
         N, M = self.N, self.M
         ci = FLIGHT_CAUSES.index
+        rt = self._wf["route_fixed"] is not None
+        if rt:
+            nb = len(ROUTE_NAMES)
+            re_ = np.full(N, ROUTE_NONE, dtype=np.int64) if route_exec is None else np.asarray(route_exec, dtype=np.int64)
+            re_ = np.where(np.asarray(reflex, dtype=bool), re_, ROUTE_NONE)    # 반사 스텝만 길이 있다(두뇌 FLEE 는 길 없음)
+            ri = np.where(re_ >= 0, re_, nb)                                    # 기록 칸 (마지막 = 길 없음)
 
         def targeted(t):
             out = np.zeros(N, dtype=bool)
@@ -5475,9 +5902,13 @@ class World:
             cause = np.where(self._fl_chased, cause, ci("unchased"))
             self._fl_shelter_end += int(np.count_nonzero(gone & ec))
             self._fl_close(gone, cause)
+            if rt:
+                self._fl_last_t[gone] = self.t - 2                  # 끝난 도망의 마지막 FLEE 스텝 번호 (이번 스텝 = self.t − 1)
         # 2) 이번 스텝 FLEE
         new = ex & (L == 0)
         self._fl_started += int(np.count_nonzero(new))
+        if rt and new.any():
+            self._flr_refled += int(np.count_nonzero(new & ((self.t - 1) - self._fl_last_t <= FLIGHT_REFLEE_STEPS)))
         self._fl_chased[new] = targeted(tp)[new]
         self._fl_why[new] = FL_DROP_NONE
         # 놓침: 지난 스텝 표적이던 사슴(FLEE 를 실행한)을 이번 스텝에 표적으로 두지 않은 늑대. 까닭은 모듈 docstring 순서, 같은 사슴에 여럿이면 큰 번호.
@@ -5498,6 +5929,26 @@ class World:
             why = np.zeros(N, dtype=np.int8)
             np.maximum.at(why, di, code.astype(np.int8))
             self._fl_why = np.where(why > 0, why, self._fl_why)
+            if rt:
+                ob = code == FL_DROP_OBSTACLE
+                if ob.any():
+                    np.add.at(self._flr_drop_obs, ri[di[ob]], 1)
+        if rt and ex.any():
+            # 10-21 도망길 기록: 길별 반사 스텝, 쫓기는 스텝(지난 스텝 표적)과 그 가운데 쫓는 늑대 모두의 눈길을 원판이 가린 스텝(이번 표적 고르기 때)
+            rx = np.flatnonzero(ex & (re_ >= 0))
+            if len(rx):
+                np.add.at(self._fl_rsteps, (rx, re_[rx]), 1)
+            ch = ex & targeted(tp)
+            if ch.any():
+                np.add.at(self._flr_chased, ri[ch], 1)
+                fp = self._fl_pred
+                if fp is not None and fp[3].shape == (M, N):
+                    pm = np.flatnonzero((tp >= 0) & (tp < N))
+                    seen = np.zeros(N, dtype=bool)
+                    seen[tp[pm][~fp[3][pm, tp[pm]]]] = True        # 가리지 않은 쫓는 늑대가 하나라도 있으면 가려진 것이 아니다
+                    hd = ch & ~seen
+                    if hd.any():
+                        np.add.at(self._flr_hidden, ri[hd], 1)
         L[ex] += 1
         self._fl_reflex[ex & np.asarray(reflex, dtype=bool)] += 1
         hit = ex & now
@@ -5510,6 +5961,8 @@ class World:
         if dead.any():
             cg = np.zeros(N, dtype=bool) if caught is None else np.asarray(caught, dtype=bool)
             self._fl_close(dead, np.where(cg, ci("caught"), ci("starved")))
+        if rt and done.any():
+            self._fl_last_t[done] = -(10 ** 9)                      # 죽은(학습 세계는 다시 난) 사슴은 다시 도망 셈을 잇지 않는다
         nt = tgt.copy()
         if done.any():
             nt[(nt >= 0) & (nt < N) & done[np.clip(nt, 0, N - 1)]] = -1     # 죽은(학습 세계는 다시 난) 사슴을 쫓던 기록은 새 개체에 잇지 않는다
@@ -5533,12 +5986,37 @@ class World:
         s[k] += int(self._fl_len[op].sum())
         c[k] += int(self._fl_contact[op].sum())
         own = [FLIGHT_CAUSES.index(x) for x in FLIGHT_OWN]
-        return dict(started=int(self._fl_started), live_steps=int(self._fl_live), flee_steps=int(s.sum()),
-                    reflex_steps=int(self._fl_refl + self._fl_reflex[op].sum()),
-                    n={x: int(v) for x, v in zip(FLIGHT_CAUSES, n)}, steps={x: int(v) for x, v in zip(FLIGHT_CAUSES, s)},
-                    contact={x: int(v) for x, v in zip(FLIGHT_CAUSES, c)},
-                    own_n=int(n[own].sum()), own_steps=int(s[own].sum()), own_contact=int(c[own].sum()), shelter_end=int(self._fl_shelter_end),
-                    hist=self._fl_hist.tolist(), hist_edges=list(FLIGHT_HIST_STEPS))
+        out = dict(started=int(self._fl_started), live_steps=int(self._fl_live), flee_steps=int(s.sum()),
+                   reflex_steps=int(self._fl_refl + self._fl_reflex[op].sum()),
+                   n={x: int(v) for x, v in zip(FLIGHT_CAUSES, n)}, steps={x: int(v) for x, v in zip(FLIGHT_CAUSES, s)},
+                   contact={x: int(v) for x, v in zip(FLIGHT_CAUSES, c)},
+                   own_n=int(n[own].sum()), own_steps=int(s[own].sum()), own_contact=int(c[own].sum()), shelter_end=int(self._fl_shelter_end),
+                   hist=self._fl_hist.tolist(), hist_edges=list(FLIGHT_HIST_STEPS))
+        if self._wf["quiet_end"] > 0:
+            out["quiet_ends"] = int(self._wf_quiet_ends)       # 10-21 끝 규칙 quiet_end 로 끝난 도주 (켠 세계만)
+        if self._wf["route_fixed"] is not None:
+            out["route"] = self._flight_route_block(op)
+        return out
+
+    def _flight_route_block(self, op: np.ndarray) -> dict:
+        """`flight_stats` 의 route (10-21 도망길 기록, 길 켬 세계만): route_stats 칸 + 그 도망의 길(반사 스텝이 가장 많은 길, 없으면 none)별 끝 까닭 수·
+        FLEE 스텝·쫓긴 스텝(열린 도망은 truncated), 원판이 늑대 눈길을 가려 놓친 사건·쫓기는 FLEE 스텝·그 가운데 쫓는 늑대 모두에게 가려진 스텝(실행한
+        길별), 살아 끝난 도망 뒤 refled_steps 안에 다시 시작한 도망 수."""
+        R, k = len(ROUTE_NAMES), FLIGHT_CAUSES.index("truncated")
+        n, s, c = self._flr_n.copy(), self._flr_steps.copy(), self._flr_cont.copy()
+        if op.any():
+            rs_ = self._fl_rsteps[op]
+            dom = np.where(rs_.sum(1) > 0, rs_.argmax(1), R)
+            np.add.at(n, (dom, k), 1)
+            np.add.at(s, (dom, k), self._fl_len[op])
+            np.add.at(c, (dom, k), self._fl_contact[op])
+        names = ROUTE_NAMES + ("none",)
+        by = {nm: dict(n={x: int(v) for x, v in zip(FLIGHT_CAUSES, n[r])}, steps={x: int(v) for x, v in zip(FLIGHT_CAUSES, s[r])},
+                       contact={x: int(v) for x, v in zip(FLIGHT_CAUSES, c[r])}) for r, nm in enumerate(names)}
+        return dict(self.route_stats(), by_route=by, drop_obstacle={nm: int(v) for nm, v in zip(names, self._flr_drop_obs)},
+                    chased_steps={nm: int(v) for nm, v in zip(names, self._flr_chased)},
+                    hidden_steps={nm: int(v) for nm, v in zip(names, self._flr_hidden)},
+                    refled=int(self._flr_refled), refled_steps=FLIGHT_REFLEE_STEPS)
 
     def _pack_step(self, move, speed, has_target, j, hunting):
         """야생 2단계 2 늑대 무리 협동 (모듈 docstring '야생 2단계' 2). `_step_predators_v3` 가 표적 고르기·잠행형 상태 전이 뒤에 부른다.
