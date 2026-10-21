@@ -138,17 +138,19 @@ def test_records_equal_seq_kin_python_judge(ce, prepared, monkeypatch):
 
 def test_world_block_refuses_unported_settings(ce, prepared):
     """평가기가 옮기지 않는 칸이 바탕과 다르면 거부한다 (허용 목록): 도망길 측정(route_fixed — 'run' 도 도망길 기록을 낼 수 없다·quiet_end),
-    늑대·밤 계수, v1 상수. 옮기는 칸(포만 끔 N·wild_flight 계수)과 끔 값을 적은 선택 키는 받는다."""
+    숲 시야(obstacles.foliage — C++ 에 없다), 늑대·밤 계수, v1 상수. 옮기는 칸(포만 끔 N·wild_flight 계수)과 끔 값을 적은 선택 키는 받는다."""
     import adapt as ad
 
     def block(sets):
         job = ad.make_jobs(prepared["info"], prepared["zip"], [34900], 1, True, dict(name="t", sets=sets))[0]
         return ce.world_block(ce.make_world(job))
 
-    for sets in ({"wild_satiation.enabled": False}, {"wild_flight.alert_r": 16.0}, {"wild_flight.route_fixed": None, "wild_flight.quiet_end": 0}):
+    for sets in ({"wild_satiation.enabled": False}, {"wild_flight.alert_r": 16.0}, {"wild_flight.route_fixed": None, "wild_flight.quiet_end": 0},
+                 {"obstacles.foliage": {"enabled": False, "r": 1.5}}):
         block(sets)
     for sets in ({"wild_flight.route_fixed": "open"}, {"wild_flight.route_fixed": "run"}, {"wild_flight.quiet_end": 15},
-                 {"threats.stalk_dist": 7.0}, {"realism_night.settle_r": 9.0}, {"pred_sleep.sleep_dark": 0.4}, {"obstacle_obs.escape_norm": 12.0}):
+                 {"threats.stalk_dist": 7.0}, {"realism_night.settle_r": 9.0}, {"pred_sleep.sleep_dark": 0.4}, {"obstacle_obs.escape_norm": 12.0},
+                 {"obstacles.foliage": {"enabled": True}}):
         with pytest.raises(ValueError):
             block(sets)
     job = ad.make_jobs(prepared["info"], prepared["zip"], [34900], 1, True)[0]

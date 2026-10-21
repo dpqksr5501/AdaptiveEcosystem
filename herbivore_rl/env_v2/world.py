@@ -323,6 +323,8 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
             obstacle·fov·range·switch·stop: 그 밖 — 마지막 놓침 까닭(까닭 없음은 switch)
           스스로 벗어남(FLIGHT_OWN) = cover·obstacle·fov·range — 숲(은신처)에 숨거나, 나무 줄기·바위로 늑대 눈길을 끊거나, 늑대 시야각·시야 반경 밖으로
           빠져 쫓기를 끝낸 도망. switch(늑대가 다른 사슴으로 바꿈)·stop(늑대가 사냥을 그만둠)·held·unchased 는 이 사슴이 벗어난 것이 아니다.
+          숲 시야(야생 2단계 3 의 7))를 켠 세계: 원판 가림 = 줄기 ∨ 잎이라 잎이 가려 놓친 것도 obstacle(스스로 벗어남)이다. 그 가운데 그 스텝 원판 놓침이
+          모두 잎 때문(줄기는 안 가림)인 도망을 lost_foliage(n·steps·contact — obstacle 칸의 일부)로 따로 센다. 끈 세계에는 그 칸이 없다.
         보고 칸: 끝 까닭마다 수·도망 스텝 합·쫓긴 스텝 합, 은신처 원 안에서 끝난 살아 끝난 도망 수(shelter_end — 끝 까닭과 겹친다), 스스로 벗어난 도망의 쫓긴
         시간 칸(hist). reset 은 열린 도망·누적 수를 모두 버린다(다른 통계와 같다).
       도망길 1단계 (10-21 사용자 '도망 방향을 두뇌가 고름' — 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 3-1·6·7절. 이 단계는 손 규칙 측정 전용이다:
@@ -336,8 +338,9 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
           SHELTER 는 결정 때 고른 은신처 쪽이다. 도주가 끝나거나 웅크림·죽음·다시 남이면 길 상태를 지운다. 이동 제어기(FLEE·미끄러짐·돌아가기)는 그대로 —
           덮기 방향 wf_dir 만 바뀐다. 길 기록(`flight_stats` 의 route — 길별 실행 스텝·시작 때 가능·결정·무효·바꿈, 도망의 길별 끝 까닭, 원판이 가려
           놓친 사건, 쫓기는 스텝 가운데 쫓는 늑대 모두에게 가려진 몫, 끝난 뒤 5 초 안 다시 도망)은 통계 전용이다.
-        quiet_end > 0 (스텝, 끝 규칙): 지난 도주는 붙잡는 늑대(near_h) 가운데 알아챈(wf_pvis — 눈(줄기 가림 포함)·발소리) 늑대가 없던 연속 스텝 Q 가 quiet_end
-          에 닿으면 풀린다(알아채면 Q = 0). 뛰는 늑대의 발소리는 줄기가 막지 않으므로 쫓는 늑대가 있으면 끝나지 않는다. 끝나면 지금 규칙대로 경계·없음이고
+        quiet_end > 0 (스텝, 끝 규칙): 지난 도주는 붙잡는 늑대(near_h) 가운데 알아챈(wf_pvis — 눈(줄기 가림 포함, 숲 시야(야생 2단계 3 의 7))를 켠 세계는
+          줄기·잎 가림 포함)·발소리) 늑대가 없던 연속 스텝 Q 가 quiet_end 에 닿으면 풀린다(알아채면 Q = 0). 뛰는 늑대의 발소리는 줄기·잎이 막지 않으므로
+          쫓는 늑대가 있으면 끝나지 않는다. 끝나면 지금 규칙대로 경계·없음이고
           다시 알아채 도주 조건이면 곧바로 다시 도주한다. 현실 근거: 쫓는 소리가 그치고 포식자가 보이지 않으면 멈춰서 뒤를 본다(Cooper & Blumstein 편 2015).
 - 야생 2단계(10-16 사용자 승인 '추천대로' — 늑대가 거의 못 잡는 세계를 사실감과 사냥 성공을 함께 올려 고친다. 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md,
   설정 configs/v3_wild2_mirror.yaml = v3_wild1_mirror.yaml + 아래 규칙). 순서: 1 은신처 먹이 부족 → 2 늑대 무리·협동 사냥 → 3 장애물.
@@ -408,7 +411,23 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
            돌아섰으면(pred_ob_dead) detour_help_drop 스텝 동안 돕지 않는다(pack_drop, 무리 목표 고르기에서 뺀다 — 돌아선 늑대는 돌아선 쪽으로 간다).
          도주하는 사슴은 늑대 반대쪽에 가장 가까운 빈 방향을 고르므로 늑대에서 멀어지는 쪽을 지키며 돌아간다. 리스폰은 상태 0. 통계 obstacle_stats()['detour'].
          현실 근거: 사슴·늑대는 나무 줄기와 바위에 몸을 밀어붙이지 않고 돌아 지나간다(값은 어림 — configs/v3_wild2_obstacle_mirror.yaml 블록 주석).
-    난수: 배치만 자기 스트림 part 0. 이동·시선·먹이·밀어내기·돌아가기는 난수가 없다. 통계 `obstacle_stats`.
+      7) 숲 시야 foliage (선택 키 obstacles.foliage, 10-21 사용자 '숲 안 시야 줄이기 → 다시 잼' — 도망길 측정 m1 에서 줄기만 눈길을 가려 도주 중 가려진
+         몫이 0.4~1.7 % 뿐이었다. 끄면 None 이고 위 1)~6) 그대로, 비트 동일). 나무인 원판(trees 'all' = 나무 원판 모두: 무작위 배치 `obstacle_layout` 은
+         줄기 고리에서 놓은 원판만 — 바위에는 잎이 없다, fixed 는 모두 나무로 본다 — 레벨·덩어리 숲 원판은 줄기다. 바위가 섞인 fixed 는 원판마다 0/1
+         목록으로 고른다)마다 같은 중심에 잎 원(반지름 r_f = foliage.r 단위, 줄기 반지름과 무관 — 잎·낮은 가지·줄기 둘레 하층 덤불)을 둔다. 눈길(두 점을
+         잇는 선분)이 잎 원들 안을 지나는 길이 L(원마다 선분과 원의 교차 구간을 선분 끝으로 자르고 — 끝점이 원 안이면 안쪽 몫만, 둘 다 안이면 선분 전체 —
+         그 구간들의 합집합 길이. 겹친 원은 한 번만 센다: L ≤ 눈길 길이라 block 보다 가까운 개체는 잎 속에서도 늘 보인다 — 빽빽한 덩어리 숲이 '투명
+         망토'가 되지 않는다)가 foliage.block(단위) 이상이면 눈으로 못 본다(`foliage_chord`·`foliage_blocked`).
+         줄기 가림 3)은 그대로이고 둘 중 하나면 가린다. 쓰는 곳은 줄기 가림과 같다(같은 눈길, 양쪽 같게): 사슴이 위협을 보는 pvis(`_geometry` — 도주
+         반사·경계·quiet_end 의 알아챔), 늑대가 표적을 고르는 vis(`_step_predators_v3` — 매 스텝 다시 고르므로 이어 쫓기·놓침도 같은 판정), 관측
+         threat_hidden(`obstacle_obs_values` — '늑대가 지금 나를 못 본다'), 도망길 COVER 그늘 H(`flight_route_geometry`). 발소리·동족 시야는 가리지 않는다.
+         선분 끝을 (x, 같으면 y) 작은 쪽부터 놓고 재므로 a → b 와 b → a 가 비트 단위로 같다. block_sight 를 켜야 한다. C++ 에 없다(측정 전용 — 평가기
+         results/v3/live/ceval.py 가 받지 않는다). 도망 기록: 잎이 가려 놓친 도망은 끝 까닭 obstacle(스스로 벗어남 FLIGHT_OWN)이고, 그 스텝 놓침이 모두 잎
+         때문(줄기 가림 없음)인 것을 flight_stats 의 lost_foliage(켠 세계만)로 따로 센다. 통계 obstacle_stats 의 foliage(잎만 가린 쌍).
+         현실 근거: 숲에서는 잎·낮은 가지·하층 덤불이 옆 시야를 몇 m 로 줄인다(숨김 덮개 — 유제류는 포식자 눈을 피하려 덮개를 고른다, Mysterud & Østbye 1999
+         Wildl. Soc. Bull. 27:385). 쫓기는 사슴은 덤불로 뛰어들어 쫓는 쪽의 눈길을 끊는다. 대가로 숲에서 먹는 사슴도 늑대를 늦게 알아챈다(같은 눈길).
+         r_f 3 단위(6 m)·block 2 단위(4 m)는 어림이다(작은 판 1.5·1.0 도 잰다 — results/v3/route/route_rules.py --world-set).
+    난수: 배치만 자기 스트림 part 0. 이동·시선·먹이·밀어내기·돌아가기·숲 시야는 난수가 없다. 통계 `obstacle_stats`.
     C++ 꼴: EcoThreatModel.h ObstacleSlide·SightBlocked·InsideAnyObstacle(위협 Step 1·4 표적 보임, 8 이동), DetourStep(사슴 C1·위협 Step 7′, 돕기 그만둠 Step 8″),
       EcoObservationV3.h FThreatInput::bOccluded
       (사슴 보임), EcoWorldV3.h FObstacleConfig(::Detour)·FFoodGrid::ApplyObstacleFood·ObstaclePushOut(C1 사슴 이동, 입양·리스폰). 언리얼은 무대 안 레벨의 충돌하는
@@ -461,6 +480,8 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
        d = q − a, dd = d·d, 원판마다 g = c − a, t = dd > 0 ? (g·d) ÷ dd : 0 을 [0, 1] 로 자르고 h = (a + t·d) − c, h·h < r_k² 인 원판이 하나라도 있으면 가림
        (늑대가 표적을 고를 때 쓰는 sight_blocked(늑대 → 사슴)와 같은 식, 반지름은 줄기 r_k — 몸 반지름 없음). 위협을 모르거나 obstacles.block_sight 가
        거짓이거나 원판이 없으면 0. 가린 위협이 보이는 것은 발소리로 알았을 때뿐이다 — 이 칸은 '늑대가 지금 나를 못 본다'를 알려 준다.
+       숲 시야(야생 2단계 3 의 7), obstacles.foliage)를 켠 세계는 가림 = 줄기(위 식) ∨ 잎(`foliage_blocked`, 같은 위협 → 사슴 눈길 — 늑대 표적
+       고르기와 같은 판정)이라 잎만 가려도 1 이다(뜻은 같다: '늑대가 지금 나를 못 본다'). 숲 시야는 C++ 에 없다(측정 전용 — 끈 세계는 위 식 그대로).
   어디서나 같다: 은신처 안도 같은 식(은신처는 원판이 아니다). 벽에 붙은 사슴이 벽 쪽을 보면 E = 0. 죽은 슬롯(통합 무대 부활 없음)도 계산하지만 쓰지 않는다
   (C++ 은 산 사슴만 만든다). 리스폰한 행은 리스폰 자리에서 다시 만든다(`_observe_subset`). 정규화는 관측 float32 에 넣기 직전에 한다(float64 → float32).
   C++ 꼴: EcoObservationV3 의 다음 단계 함수(계약 2-4) — Away = PerceiveThreats(…).AwayFromPred, 같은 식으로 E·N·bHidden 을 만들고 BuildObservation 이 세 칸을 쓴다.
@@ -479,7 +500,7 @@ import math
 import numpy as np
 
 from . import repertoire as rep
-from .features import Features, _check_name, _check_part, feature_stream, features_of, with_optional
+from .features import OPTIONAL_KEYS, Features, _check_name, _check_part, feature_stream, features_of, with_optional
 from .steering import EPS, clamp_magnitude, normalize, steer
 
 # 관측 열 인덱스 (§3.1). 이 순서가 언리얼 FEcoObservationFragment와 일치해야 한다.
@@ -1646,6 +1667,7 @@ def _obstacles_params(p: dict, f: Features) -> dict:
         out["detour"] = dict(block=_wild_num(n, p, "detour_block", 0.0, 1.0, open_lo=True), free=_wild_num(n, p, "detour_free", 0.0, 1.0, open_lo=True),
                              probe=_wild_num(n, p, "detour_probe", 0.0), steps=whole("detour_steps", 1), help_block=whole("detour_help_block", 1),
                              help_drop=whole("detour_help_drop", 0))
+    out["foliage"] = _foliage_params(p["foliage"], out["block_sight"])
     if p["fixed"] is not None:
         a = np.asarray(p["fixed"], dtype=np.float64)
         a = a.reshape(-1, len(OBSTACLE_COLUMNS)) if a.size else np.zeros((0, len(OBSTACLE_COLUMNS)))
@@ -1655,14 +1677,54 @@ def _obstacles_params(p: dict, f: Features) -> dict:
     return out
 
 
-def obstacle_layout(g: np.random.Generator, size: float, cov_c: np.ndarray, cov_r: np.ndarray, op: dict) -> np.ndarray:
+FOLIAGE_KEYS = ("enabled", "r", "block", "trees")
+
+
+def _foliage_params(v, block_sight: bool) -> dict | None:
+    """obstacles.foliage 숲 시야 (모듈 docstring '야생 2단계' 3 의 7)). v = None 이거나 {enabled, r, block, trees}(빠진 칸은 features.OPTIONAL_KEYS 의
+    끔 값 — enabled false·r 3.0·block 2.0·trees 'all'). enabled false 면 None(그 코드 경로를 타지 않는다 — 비트 동일). 켜면 r·block > 0 유한한 수,
+    trees = 'all'(나무 원판 모두 — 무작위 배치는 줄기 고리 원판만·바위 빼고, fixed 는 모두) 또는 원판마다 0/1(bool) 목록(길이는 reset 때 원판 수와
+    견준다), block_sight 를 켜야 한다.
+    반환 dict(r, block, trees = 'all' 또는 (K,) bool)."""
+    if v is None:
+        return None
+    n = "obstacles.foliage"
+    if not isinstance(v, dict):
+        raise ValueError(f"features.{n} 는 {{enabled, r, block, trees}} 블록이어야 한다. 받은 값: {v!r}")
+    bad = sorted(set(v) - set(FOLIAGE_KEYS))
+    if bad:
+        raise ValueError(f"features.{n} 에 모르는 키 {bad} 가 있다(쓸 수 있는 키: {', '.join(FOLIAGE_KEYS)})")
+    q = dict(OPTIONAL_KEYS["obstacles"]["foliage"])
+    q.update(v)
+    if not isinstance(q["enabled"], bool):
+        raise ValueError(f"features.{n}.enabled 는 true/false 여야 한다. 받은 값: {q['enabled']!r}")
+    if not q["enabled"]:
+        return None
+    if not block_sight:
+        raise ValueError(f"features.{n} 는 obstacles.block_sight 를 켜야 한다(잎은 줄기와 같은 눈길을 가린다)")
+    r = _wild_num(n, q, "r", 0.0, open_lo=True)
+    block = _wild_num(n, q, "block", 0.0, open_lo=True)
+    t = q["trees"]
+    if isinstance(t, str):
+        if t != "all":
+            raise ValueError(f"features.{n}.trees 는 'all' 이거나 원판마다 0/1 목록이어야 한다. 받은 값: {t!r}")
+        trees = "all"
+    else:
+        if not isinstance(t, (list, tuple)) or not all(isinstance(x, bool) or (isinstance(x, (int, np.integer)) and x in (0, 1)) for x in t):
+            raise ValueError(f"features.{n}.trees 는 'all' 이거나 원판마다 0/1 목록이어야 한다. 받은 값: {t!r}")
+        trees = np.asarray([bool(x) for x in t], dtype=bool)
+    return dict(r=r, block=block, trees=trees)
+
+
+def obstacle_layout(g: np.random.Generator, size: float, cov_c: np.ndarray, cov_r: np.ndarray, op: dict, kinds: bool = False):
     """세로 장애물 무작위 배치 (모듈 docstring '야생 2단계' 3 의 1)). g = 자기 스트림 part 0. 나무 줄기 round(tree_per_ha × ha) 개, 그다음 바위
     round(rock_per_ha × ha) 개(ha = (S × 2 m)² ÷ 10000). 하나마다 (x, y) ~ U[0, S]², r ~ U[하, 상] 를 뽑고 중심이 은신처 원 안(|c − c_k|² ≤ r_k², 반경
     0 이하는 건너뜀)이거나 무대 벽에서 e = r + OB_EDGE_BODIES·body_r 안(x < e, x > S − e, y 도 같음)이면 다시 뽑는다(OB_TRIES 번, 다 실패하면 건너뜀).
-    반환 (K, 3) [x, y, r]."""
+    반환 (K, 3) [x, y, r]. kinds 면 (원판, 나무인가 (K,) bool — 줄기 고리에서 놓은 원판, 숲 시야 3 의 7) 의 잎 원) — 난수·원판은 같다."""
     ha = (float(size) * OB_UNIT_M) ** 2 / 10000.0
     out = []
-    for per_ha, (lo, hi) in ((op["tree_per_ha"], op["tree_r"]), (op["rock_per_ha"], op["rock_r"])):
+    n_tree = 0
+    for kind, (per_ha, (lo, hi)) in enumerate(((op["tree_per_ha"], op["tree_r"]), (op["rock_per_ha"], op["rock_r"]))):
         n = int(math.floor(per_ha * ha + 0.5))
         for _ in range(n):
             for _t in range(OB_TRIES):
@@ -1678,8 +1740,10 @@ def obstacle_layout(g: np.random.Generator, size: float, cov_c: np.ndarray, cov_
                         break
                 if ok:
                     out.append((float(c[0]), float(c[1]), r))
+                    n_tree += kind == 0
                     break
-    return np.asarray(out, dtype=np.float64).reshape(-1, len(OBSTACLE_COLUMNS))
+    d = np.asarray(out, dtype=np.float64).reshape(-1, len(OBSTACLE_COLUMNS))
+    return (d, np.arange(len(d)) < n_tree) if kinds else d
 
 
 def obstacle_inside(q: np.ndarray, discs: np.ndarray, body_r: float) -> np.ndarray:
@@ -1763,10 +1827,80 @@ def obstacle_slide(p: np.ndarray, q: np.ndarray, discs: np.ndarray, body_r: floa
     return q, hit, back
 
 
-def sight_blocked(a: np.ndarray, b: np.ndarray, discs: np.ndarray) -> np.ndarray:
+def foliage_chord(a: np.ndarray, b: np.ndarray, centers: np.ndarray, r: float) -> np.ndarray:
+    """숲 시야 (모듈 docstring '야생 2단계' 3 의 7)). 선분 a_i → b_i (n, 2) 쌍마다 잎 원들(중심 centers (F, 2), 반지름 r 모두 같음)의 합집합 안을
+    지나는 길이 (n,) — 겹친 원은 한 번만 센다(그래서 길이 ≤ |a − b|, block 보다 짧은 눈길은 늘 보인다).
+    끝 순서: (x, 같으면 y) 작은 끝 p0 → 큰 끝 p1 (a·b 를 바꿔도 비트 단위로 같다). d = p1 − p0, dd = d·d, 원마다 f = p0 − c, β = f·d, γ = f·f − r²,
+    Δ = β² − dd·γ. dd > 0 ∧ Δ > 0 이면 구간 t₀ = max((−β − √Δ)/dd, 0), t₁ = min((−β + √Δ)/dd, 1)(끝점이 원 안이면 안쪽 몫만, 둘 다 안이면 선분 전체),
+    t₁ > t₀ 인 구간만 쓴다. 스치기(Δ ≤ 0)·길이 0 선분은 0. 합치기: 선분마다 구간을 t₀ 순서(같으면 원 순서)로 놓고 e = 0 에서 시작해
+    덮인 t += max(t₁ − max(t₀, e), 0), e ← max(e, t₁). 길이 = 덮인 t·√dd. 넓은 거르기: 선분 상자를 r 만큼 넓힌 상자 밖 중심은 닿을 수 없어
+    건너뛴다(정확한 거르기 — 값은 같다)."""
+    a = np.asarray(a, dtype=np.float64).reshape(-1, 2)
+    b = np.asarray(b, dtype=np.float64).reshape(-1, 2)
+    centers = np.asarray(centers, dtype=np.float64).reshape(-1, 2)
+    n = len(a)
+    if not n or not len(centers):
+        return np.zeros(n)
+    sw = (a[:, 0] > b[:, 0]) | ((a[:, 0] == b[:, 0]) & (a[:, 1] > b[:, 1]))
+    x0, y0 = np.where(sw, b[:, 0], a[:, 0]), np.where(sw, b[:, 1], a[:, 1])
+    x1, y1 = np.where(sw, a[:, 0], b[:, 0]), np.where(sw, a[:, 1], b[:, 1])
+    r = float(r)
+    cx, cy = centers[:, 0][None, :], centers[:, 1][None, :]
+    near = ((cx >= (x0 - r)[:, None]) & (cx <= (x1 + r)[:, None])                     # x0 ≤ x1 (끝 순서)
+            & (cy >= (np.minimum(y0, y1) - r)[:, None]) & (cy <= (np.maximum(y0, y1) + r)[:, None]))
+    ii, kk = np.nonzero(near)
+    if not len(ii):
+        return np.zeros(n)
+    dx, dy = x1[ii] - x0[ii], y1[ii] - y0[ii]
+    dd = dx * dx + dy * dy
+    fx, fy = x0[ii] - centers[kk, 0], y0[ii] - centers[kk, 1]
+    beta = fx * dx + fy * dy
+    gam = fx * fx + fy * fy - r * r
+    dsc = beta * beta - dd * gam
+    ok = (dd > 0.0) & (dsc > 0.0)
+    s = np.sqrt(np.where(ok, dsc, 0.0))
+    den = np.where(ok, dd, 1.0)
+    t0 = np.maximum((-beta - s) / den, 0.0)
+    t1 = np.minimum((-beta + s) / den, 1.0)
+    keep = ok & (t1 > t0)
+    if not keep.any():
+        return np.zeros(n)
+    ii, t0, t1 = ii[keep], t0[keep], t1[keep]
+    o = np.lexsort((t0, ii))                                       # 선분 순서, 그 안에서 t₀ 순서(같으면 원 순서 — 안정 정렬)
+    ii, t0, t1 = ii[o], t0[o], t1[o]
+    rows, first, cnt = np.unique(ii, return_index=True, return_counts=True)
+    R, K = len(rows), int(cnt.max())
+    ri = np.repeat(np.arange(R), cnt)
+    col = np.arange(len(ii)) - first[ri]
+    T0, T1 = np.zeros((R, K)), np.zeros((R, K))
+    T0[ri, col], T1[ri, col] = t0, t1
+    e = np.zeros(R)                                                # 지금까지 덮인 끝 (t₀ ≥ 0 이라 0 에서 시작)
+    cov = np.zeros(R)
+    for k in range(K):                                             # 구간을 차례로 이어 붙인다 (겹친 몫은 한 번만)
+        m = k < cnt
+        cov = cov + np.where(m, np.maximum(T1[:, k] - np.maximum(T0[:, k], e), 0.0), 0.0)
+        e = np.where(m, np.maximum(e, T1[:, k]), e)
+    ddx, ddy = x1[rows] - x0[rows], y1[rows] - y0[rows]
+    out = np.zeros(n)
+    out[rows] = cov * np.sqrt(ddx * ddx + ddy * ddy)
+    return out
+
+
+def foliage_blocked(a: np.ndarray, b: np.ndarray, centers: np.ndarray, r: float, block: float) -> np.ndarray:
+    """숲 시야: 선분 a_i → b_i (n, 2) 쌍마다 잎 원들 안 길이(`foliage_chord` — 겹친 몫은 한 번) ≥ block 이면 가림 (n,) bool."""
+    return foliage_chord(a, b, centers, r) >= float(block)
+
+
+def sight_blocked(a: np.ndarray, b: np.ndarray, discs: np.ndarray, foliage: tuple | None = None) -> np.ndarray:
     """세로 장애물 시선 (모듈 docstring '야생 2단계' 3 의 3)). a (n, 2)·b (m, 2) → (n, m) bool: a_i 와 b_j 를 잇는 선분이 어느 원판을 지나는가 —
     d = b − a, dd = d·d, t = clip(((c − a)·d) / dd, 0, 1)(dd = 0 이면 0), 가장 가까운 점과 중심의 거리² (a + t·d − c)² < r². 발소리는 가리지 않는다.
-    C++ 꼴: EcoThreatV3::SightBlocked(Ax, Ay, Bx, By, Discs, Num) — 같은 식, 원판 순서로 하나라도 참이면 참."""
+    foliage = (잎 원 중심 (F, 2), r_f, block) 이면 숲 시야(3 의 7))도 더한다(줄기 ∨ 잎 — `foliage_blocked`). None 이면 줄기만(지금 그대로).
+    C++ 꼴: EcoThreatV3::SightBlocked(Ax, Ay, Bx, By, Discs, Num) — 같은 식, 원판 순서로 하나라도 참이면 참(숲 시야는 C++ 에 없다)."""
+    if foliage is not None and len(a) and len(b):
+        trunk = sight_blocked(a, b, discs)
+        aa = np.repeat(np.asarray(a, dtype=np.float64).reshape(-1, 2), len(b), axis=0)
+        bb = np.tile(np.asarray(b, dtype=np.float64).reshape(-1, 2), (len(a), 1))
+        return trunk | foliage_blocked(aa, bb, foliage[0], foliage[1], foliage[2]).reshape(len(a), len(b))
     out = np.zeros((len(a), len(b)), dtype=bool)
     if not len(discs) or not len(a) or not len(b):
         return out
@@ -1844,10 +1978,13 @@ def _obstacle_obs_params(p: dict, f: Features) -> dict:
 
 
 def obstacle_obs_values(p: np.ndarray, head: np.ndarray, seen: np.ndarray, away: np.ndarray, threat: np.ndarray, discs: np.ndarray,
-                        body_r: float, size: float, block_sight: bool) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+                        body_r: float, size: float, block_sight: bool,
+                        foliage: tuple | None = None) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     """R5 장애물 관측의 거리 (모듈 docstring 'R5 장애물 관측'). p·head (n, 2) 사슴 자리·heading, seen (n,) 위협을 아나(관측 1 의 보임), away (n, 2) 가장 가까운
     보이는 위협의 반대 단위벡터(모르면 0), threat (n, 2) 그 위협의 자리(모르면 아무 값 — 읽지 않는다), discs (K, 3) [x, y, r], body_r 몸 반지름, size 무대 한 변 S,
     block_sight 원판이 눈길을 가리나 → (E 도망칠 쪽 빈 거리 (n,), N 몸 가장자리에서 가장 가까운 원판 가장자리까지 (n,) — 원판이 없으면 inf, 가림 (n,) bool).
+    foliage = (잎 원 중심, r_f, block) 이면(숲 시야 — 모듈 docstring '야생 2단계' 3 의 7)) 가림에 잎 가림도 더한다(위협 → 사슴 눈길, 늑대 표적 고르기와 같은
+    판정 — '늑대가 지금 나를 못 본다'). None 이면 줄기만(지금 그대로, C++ 와 같다).
     float64. 관측 칸은 `World._obs_from` 이 E ÷ escape_norm·max(N, 0) ÷ near_norm 을 [0, 1] 로 자르고 가림을 0/1 로 넣는다.
     C++ 꼴(사슴 하나, 원판 순서대로 — 같은 식·같은 순서라 비트 단위로 같다):
       W = (bSeen && |Away| > 1e-9) ? Away : Head; Nw = sqrt(Wx*Wx + Wy*Wy); U = Nw > 1e-9 ? (Wx / Nw, Wy / Nw) : (1, 0);
@@ -1906,6 +2043,8 @@ def obstacle_obs_values(p: np.ndarray, head: np.ndarray, seen: np.ndarray, away:
             hy = sy + tt * dy - cy
             r = discs[:, 2][None, :]
             hidden[i] = (hx * hx + hy * hy < r * r).any(1)
+            if foliage is not None:
+                hidden[i] |= foliage_blocked(a, q, foliage[0], foliage[1], foliage[2])
     return e, near, hidden
 
 
@@ -2186,13 +2325,27 @@ def _route_seg_blocked(q: np.ndarray, bx: np.ndarray, by: np.ndarray, discs: np.
     return (px * px + py * py < r * r).any(-1)
 
 
+def _route_seg_foliage(q: np.ndarray, bx: np.ndarray, by: np.ndarray, foliage: tuple) -> np.ndarray:
+    """숲 시야 (모듈 docstring '야생 2단계' 3 의 7)): 눈길 q_m(늑대 눈, (M, 2)) → b (점 배열 bx·by, 꼴 X)의 잎 가림 → (X…, M) bool — `_ob_occlude`·
+    `foliage_blocked` 와 같은 판정(foliage = (잎 원 중심, r_f, block))."""
+    M = len(q)
+    shp = np.shape(bx) + (M,)
+    ax = np.broadcast_to(q[:, 0], shp).ravel()
+    ay = np.broadcast_to(q[:, 1], shp).ravel()
+    px = np.broadcast_to(np.asarray(bx)[..., None], shp).ravel()
+    py = np.broadcast_to(np.asarray(by)[..., None], shp).ravel()
+    return foliage_blocked(np.stack([ax, ay], 1), np.stack([px, py], 1), foliage[0], foliage[1], foliage[2]).reshape(shp)
+
+
 def flight_route_geometry(p: np.ndarray, a0: np.ndarray, q: np.ndarray, S: np.ndarray, dist: np.ndarray, cov_c: np.ndarray,
                           cov_r: np.ndarray, discs: np.ndarray, size: float, wall_margin: float, edge_r: float,
-                          prev_dir: np.ndarray | None = None, keep_k: np.ndarray | None = None) -> dict:
+                          prev_dir: np.ndarray | None = None, keep_k: np.ndarray | None = None, foliage: tuple | None = None) -> dict:
     """야생 (w3) 도망길 기하 (설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 6절, 모듈 docstring '야생 1단계' (w3) 도망길). 난수 없음, 순수 함수.
     p (K, 2) 도주 중인 사슴, a0 (K, 2) 은신처 굽히기 전 반사 방향(단위 — 반사와 같은 늑대 집합 S 의 거리 역수 가중 반대, 0 이면 가장 가까운 그 늑대 반대),
     q (M, 2) 위협 위치, S (K, M) 반사와 같은 늑대 집합(near_h), dist (K, M) 실거리, cov_c (C, 2)·cov_r (C,) 은신처, discs (D, 3) 늑대 눈길을 가리는 원판
     (block_sight 를 끈 세계는 빈 배열 — H = 0), prev_dir (K, 2) 지난 COVER 방향(없으면 0), keep_k (K,) 유지할 은신처(−1 없음). 무게 w_m = 1/max(d_m, 0.5).
+    foliage = (잎 원 중심 (F, 2), r_f, block) 이면 숲 시야(모듈 docstring '야생 2단계' 3 의 7))도 그늘로 센다 — SightBlocked 자리가 줄기 ∨ 잎(늑대 표적
+    고르기와 같은 눈길 판정). None 이면 줄기만(지금 그대로).
       OPEN: a₀ → 가장자리 굽히기 → 벽 여유.
       COVER: 후보 e_j = R(θ_j)·a₀(ROUTE_COVER_DEG 순서, 회전표 리터럴) + 여덟째 지난 방향(있고 e_prev·a₀ ≥ 0 일 때). 표본점 x_{j,n} = p + 2n·e_j (n = 1..6).
         빼기: x_{j,6} 이 벽 여유 밖(mg 미만·size − mg 초과), 경주 여유 min_n [min_{m∈S} |q_m − x_{j,n}| − 2n] < 0(|x_{j,n} − p| = 2n).
@@ -2248,8 +2401,12 @@ def flight_route_geometry(p: np.ndarray, a0: np.ndarray, q: np.ndarray, S: np.nd
     race = (dq.min(-1, initial=np.inf) - sn_[None, None, :]).min(-1)                                # (K, J)
     valid &= ~(race < 0.0)
     acc = np.zeros((K, J))
-    if len(discs) and M:
-        blk = _route_seg_blocked(q, xs, ys, discs) & S[:, None, None, :]                            # (K, J, 6, M)
+    fol = foliage is not None and len(foliage[0]) > 0
+    if (len(discs) or fol) and M:
+        blk = _route_seg_blocked(q, xs, ys, discs)
+        if fol:                                                                                      # 숲 시야: 줄기 ∨ 잎
+            blk = blk | _route_seg_foliage(q, xs, ys, foliage)
+        blk = blk & S[:, None, None, :]                                                              # (K, J, 6, M)
         for n in range(ROUTE_COVER_POINTS):                                                          # n 순서·m 순서로 더한다(C++ 와 같은 순서)
             for m in range(M):
                 acc = acc + np.where(blk[:, :, n, m], wgt[:, m][:, None], 0.0)
@@ -2693,11 +2850,13 @@ class World:
         ob = self._ob
         if ob is None:
             self.obstacles = np.zeros((0, len(OBSTACLE_COLUMNS)), dtype=np.float64)
+            self.obstacle_tree = np.zeros(0, dtype=bool)
             return
         if ob["fixed"] is not None:
             self.obstacles = ob["fixed"].copy()
+            self.obstacle_tree = np.ones(len(self.obstacles), dtype=bool)     # fixed = 레벨·덩어리 숲 줄기 (숲 시야 trees 'all')
         else:
-            self.obstacles = obstacle_layout(self.feature_rng("obstacles", 0), self.size, self.cov_c, self.cov_r, ob)
+            self.obstacles, self.obstacle_tree = obstacle_layout(self.feature_rng("obstacles", 0), self.size, self.cov_c, self.cov_r, ob, kinds=True)
         if ob["no_food"]:
             self.ob_food_factor = obstacle_food_factor(self.gw, float(self.cfg.food_cell), self.obstacles)
             self.food_cap = self.food_cap * self.ob_food_factor
@@ -2709,6 +2868,10 @@ class World:
         self._ob_deer_steps = self._ob_wolf_steps = 0
         self._ob_eye_pairs = self._ob_eye_blocked = self._ob_tgt_pairs = self._ob_tgt_blocked = 0
         self._ob_push_moved = self._ob_push_failed = 0
+        if ob["foliage"] is not None:
+            # 숲 시야(3 의 7)): 나무 표가 원판 수와 맞나, 잎만 가린 쌍(줄기는 안 가림 — 통계 전용)
+            self._fol_centers()
+            self._ob_eye_fol = self._ob_tgt_fol = 0
         self._det_deer_used = self._det_deer_start = self._det_deer_fail = 0
         self._det_wolf_used = self._det_wolf_start = self._det_wolf_fail = self._det_help_drop = 0
 
@@ -2754,6 +2917,27 @@ class World:
         self._ob_push_moved += m1 + m2 + m3
         self._ob_push_failed += f1 + f2 + f3
 
+    def _fol_centers(self) -> np.ndarray:
+        """숲 시야(모듈 docstring '야생 2단계' 3 의 7)) 잎 원 중심 (F, 2) — 나무인 원판의 중심(trees 'all' 이면 obstacle_tree: 무작위 배치는 줄기
+        고리 원판만 — 바위 빼고, fixed 는 모두. 0/1 목록이면 그 표). 매번 지금 원판에서 만든다. 표 길이가 원판 수와 다르면 ValueError."""
+        t = self._ob["foliage"]["trees"]
+        d = self.obstacles
+        if isinstance(t, str):
+            t = self.obstacle_tree
+            if len(t) != len(d):
+                raise ValueError(f"숲 시야: 나무 표(obstacle_tree {len(t)})가 원판 수({len(d)})와 다르다 — 원판을 바꾸면 나무 표도 바꾼다")
+            return d[t, :2].copy()
+        if len(t) != len(d):
+            raise ValueError(f"features.obstacles.foliage.trees 는 원판 수({len(d)})만큼의 0/1 목록이어야 한다. 받은 길이: {len(t)}")
+        return d[t, :2].copy()
+
+    def _fol_args(self) -> tuple | None:
+        """숲 시야를 켠 세계면 (잎 원 중심, r_f, block), 아니면 None — `obstacle_obs_values`·`flight_route_geometry`·`sight_blocked` 의 foliage."""
+        if self._ob is None or self._ob["foliage"] is None:
+            return None
+        fp = self._ob["foliage"]
+        return self._fol_centers(), fp["r"], fp["block"]
+
     def _ob_seg_blocked(self, a: np.ndarray, b: np.ndarray) -> np.ndarray:
         """선분 a_i → b_i (n, 2) 쌍마다 원판에 가리나 (n,) bool — `sight_blocked` 와 같은 식(대각 성분)."""
         if not len(a):
@@ -2772,16 +2956,25 @@ class World:
         py = ay + t * dy - cy
         return (px * px + py * py < r * r).any(1)
 
-    def _ob_occlude(self, vis: np.ndarray, a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, int, int]:
-        """보임 행렬 vis (n, m)(a_i 가 b_j 를 봄) 가운데 참인 쌍만 원판 시선을 잰다. 반환 (가린 쌍을 지운 vis, 잰 쌍, 가린 쌍)."""
+    def _ob_occlude(self, vis: np.ndarray, a: np.ndarray, b: np.ndarray) -> tuple[np.ndarray, int, int, np.ndarray | None]:
+        """보임 행렬 vis (n, m)(a_i 가 b_j 를 봄) 가운데 참인 쌍만 원판 시선을 잰다. 반환 (가린 쌍을 지운 vis, 잰 쌍, 가린 쌍, 잎만 가린 쌍 (n, m) bool
+        — 숲 시야(모듈 docstring '야생 2단계' 3 의 7))를 끈 세계는 None). 숲 시야를 켜면 가림 = 줄기 ∨ 잎(`foliage_blocked`, a_i → b_j 눈길)."""
+        fp = self._ob["foliage"]
         ii, jj = np.nonzero(vis)
         if not len(ii):
-            return vis, 0, 0
+            return vis, 0, 0, (None if fp is None else np.zeros(vis.shape, dtype=bool))
         blk = self._ob_seg_blocked(a[ii], b[jj])
+        fol = None
+        if fp is not None:
+            fb = foliage_blocked(a[ii], b[jj], self._fol_centers(), fp["r"], fp["block"])
+            only = fb & ~blk
+            fol = np.zeros(vis.shape, dtype=bool)
+            fol[ii[only], jj[only]] = True
+            blk = blk | fb
         if blk.any():
             vis = vis.copy()
             vis[ii[blk], jj[blk]] = False
-        return vis, len(ii), int(np.count_nonzero(blk))
+        return vis, len(ii), int(np.count_nonzero(blk)), fol
 
     def _ist_layout_reset(self) -> None:
         """통합 무대 (n) 은신처 quad, (p) 시작 배치 stage, (q) 시작 방향 golden (모듈 docstring '통합 무대'). `_build_world` 바로 뒤에 부른다 —
@@ -3585,10 +3778,12 @@ class World:
                 rear = pvis & ~(pcos >= fov_cos)        # 통계 전용: 기본 시야각 밖에서 본 위협
             if self._ob is not None and self._ob["block_sight"] and len(self.obstacles):
                 # 야생 2단계 3 의 3): 원판이 눈길을 가린다(발소리는 아래에서 그대로 더한다)
-                pvis, n_pair, n_blk = self._ob_occlude(pvis, P, self.pred_pos)
+                pvis, n_pair, n_blk, fol_only = self._ob_occlude(pvis, P, self.pred_pos)
                 if len(idx) == self.N:          # 통계 전용: 스텝 관측(전체 행)만 센다
                     self._ob_eye_pairs += n_pair
                     self._ob_eye_blocked += n_blk
+                    if fol_only is not None:    # 숲 시야(3 의 7)): 잎만 가린 쌍
+                        self._ob_eye_fol += int(np.count_nonzero(fol_only))
             if self._zh is not None:
                 # v3 현실성 (b): 지난 스텝에 움직인 위협의 발소리 — 실거리 ≤ min(R, 이 사슴의 지금 탐지 반경)이면 방향과 무관하게
                 # 감지된다(보임과 같은 칸). R = 0 인 위협(서 있음·대치·휴식)은 들리지 않는다. 걸음새는 지난 포식자 스텝의 훅
@@ -3705,7 +3900,7 @@ class World:
             threat_xy = self.pred_pos[j] if self.M > 0 else np.zeros((n, 2))
             ob = self._ob
             e_esc, n_near, hid = obstacle_obs_values(P, Hd, seen_v, away, threat_xy, self.obstacles, ob["body_r"] if ob is not None else 0.0,
-                                                     self.size, bool(ob is not None and ob["block_sight"]))
+                                                     self.size, bool(ob is not None and ob["block_sight"]), self._fol_args())
             vals["ob_escape"] = e_esc
             vals["ob_near"] = n_near
             vals["ob_hidden"] = hid
@@ -4604,9 +4799,13 @@ class World:
         fl_vis0 = vis.copy() if self.track_flight and self._wf is not None else None
         if self._ob is not None and self._ob["block_sight"] and len(self.obstacles):
             # 야생 2단계 3 의 3): 늑대 눈길도 원판이 가린다(플레이어형 위협은 아래에서 늘 본다)
-            vis, n_pair, n_blk = self._ob_occlude(vis, self.pred_pos, self.pos)
+            vis, n_pair, n_blk, fol_only = self._ob_occlude(vis, self.pred_pos, self.pos)
             self._ob_tgt_pairs += n_pair
             self._ob_tgt_blocked += n_blk
+            if fol_only is not None:    # 숲 시야(3 의 7)): 잎만 가린 쌍 — 통계, 도망 기록의 잎 놓침(lost_foliage)
+                self._ob_tgt_fol += int(np.count_nonzero(fol_only))
+                if self.track_flight and self._wf is not None:
+                    self._fl_pred_fol = fol_only
         if fl_vis0 is not None:
             # 야생 (w3) 도망 기록(통계 전용): 이번 표적 고르기의 사냥 가능·시야 반경 안(체감 거리)·반경과 시야각 안·원판이 가린 쌍·은신처 안이라 표적에서 빠지는
             # 쌍 — 놓침 까닭(`_fl_update`)
@@ -5687,7 +5886,7 @@ class World:
             discs = (self.obstacles if self._ob is not None and self._ob["block_sight"] and len(self.obstacles)
                      else np.zeros((0, len(OBSTACLE_COLUMNS))))
             geo = flight_route_geometry(self.pos[ip], a0[ip], self.pred_pos, near_h[ip], pd[ip], self.cov_c, self.cov_r, discs, self.size,
-                                        wf["wall_margin"], wf["edge_r"], prevd, keep)
+                                        wf["wall_margin"], wf["edge_r"], prevd, keep, self._fol_args())
             cok, sok = geo["cover_ok"], geo["shelter_ok"]
             feas = (np.where(cok, ROUTE_FEAS_COVER, 0) + np.where(sok, ROUTE_FEAS_SHELTER, 0)).astype(np.int8)
             inval = ((cur == ROUTE_COVER) & ~geo["cover_keep"]) | ((cur == ROUTE_SHELTER) & ~geo["keep_ok"])
@@ -5812,6 +6011,11 @@ class World:
         self._fl_refl = 0                                   # 끝난 도망의 반사 스텝 합
         self._fl_shelter_end = 0                            # 살아 끝난 도망 가운데 끝 스텝 끝 위치가 은신처 원 안인 수
         self._fl_hist = np.zeros(len(FLIGHT_HIST_STEPS) + 1, dtype=np.int64)    # 스스로 벗어난 도망의 쫓긴 시간 칸
+        if self._ob is not None and self._ob["foliage"] is not None:
+            # 10-21 숲 시야(모듈 docstring '야생 2단계' 3 의 7)) 켬 세계만: 원판 놓침(obstacle) 가운데 잎 때문인 것(lost_foliage)
+            self._fl_why_fol = np.zeros(N, dtype=bool)      # 열린 도망의 마지막 놓침이 잎 때문인가(그 스텝 원판 놓침이 모두 잎만 가림)
+            self._fl_pred_fol = None                        # 이번 포식자 스텝의 잎만 가린 쌍 (M, N) (`_ob_occlude`)
+            self._fl_fol = np.zeros(3, dtype=np.int64)      # 끝 까닭 obstacle 이고 잎 때문인 도망: 수·FLEE 스텝 합·쫓긴 스텝 합
         if self._wf["route_fixed"] is not None:
             # 10-21 도망길 기록 (길 켬 세계만 — `flight_stats` 의 route). 칸 번호 = 길(ROUTE_NAMES) + 마지막 '길 없음'(반사 스텝이 없는 두뇌 FLEE 도망)
             R, C = len(ROUTE_NAMES), len(FLIGHT_CAUSES)
@@ -5820,6 +6024,8 @@ class World:
             self._flr_steps = np.zeros((R + 1, C), dtype=np.int64)  # 그 FLEE 스텝 합
             self._flr_cont = np.zeros((R + 1, C), dtype=np.int64)   # 그 쫓긴 스텝 합
             self._flr_drop_obs = np.zeros(R + 1, dtype=np.int64)    # 원판이 늑대 눈길을 가려 놓친 사건(그 스텝에 실행한 길)
+            if self._ob is not None and self._ob["foliage"] is not None:
+                self._flr_drop_fol = np.zeros(R + 1, dtype=np.int64)    # 그 가운데 잎만 가린 사건(숲 시야 켬 세계만)
             self._flr_chased = np.zeros(R + 1, dtype=np.int64)      # 쫓기는 FLEE 스텝(지난 스텝 표적, 실행한 길)
             self._flr_hidden = np.zeros(R + 1, dtype=np.int64)      # 그 가운데 쫓는 늑대 모두의 눈길을 원판이 가린 스텝
             self._flr_refled = 0                                    # 살아 끝난 도망 뒤 FLIGHT_REFLEE_STEPS 안에 다시 시작한 도망
@@ -5843,6 +6049,11 @@ class World:
         own = m & np.isin(cause, [FLIGHT_CAUSES.index(c) for c in FLIGHT_OWN])
         if own.any():
             np.add.at(self._fl_hist, np.searchsorted(np.asarray(FLIGHT_HIST_STEPS), C[own], side="right"), 1)
+        if self._ob is not None and self._ob["foliage"] is not None:
+            # 숲 시야: 끝 까닭 obstacle(스스로 벗어남) 가운데 마지막 놓침이 잎 때문인 도망
+            fo = m & (cause == FLIGHT_CAUSES.index("obstacle")) & self._fl_why_fol
+            self._fl_fol += np.array([np.count_nonzero(fo), L[fo].sum(), C[fo].sum()], dtype=np.int64)
+            self._fl_why_fol[m] = False
         if self._wf["route_fixed"] is not None:
             # 10-21 도망길 기록: 그 도망의 길(반사 스텝이 가장 많은 길, 없으면 '길 없음')별 끝 까닭·스텝, 사슴마다 마지막으로 닫힌 도망
             rs_ = self._fl_rsteps[m]
@@ -5911,6 +6122,9 @@ class World:
             self._flr_refled += int(np.count_nonzero(new & ((self.t - 1) - self._fl_last_t <= FLIGHT_REFLEE_STEPS)))
         self._fl_chased[new] = targeted(tp)[new]
         self._fl_why[new] = FL_DROP_NONE
+        fol_on = self._ob is not None and self._ob["foliage"] is not None
+        if fol_on:
+            self._fl_why_fol[new] = False
         # 놓침: 지난 스텝 표적이던 사슴(FLEE 를 실행한)을 이번 스텝에 표적으로 두지 않은 늑대. 까닭은 모듈 docstring 순서, 같은 사슴에 여럿이면 큰 번호.
         # 표적 고르기 재료가 없으면(장면 도구) 사냥 그만둠만 가리고 나머지는 바꿈으로 센다
         dm = np.flatnonzero((tp >= 0) & (tp < N) & (tgt != tp))
@@ -5929,10 +6143,21 @@ class World:
             why = np.zeros(N, dtype=np.int8)
             np.maximum.at(why, di, code.astype(np.int8))
             self._fl_why = np.where(why > 0, why, self._fl_why)
+            if fol_on:
+                # 숲 시야: 원판 놓침(obstacle) 가운데 잎만 가린 쌍(줄기는 안 가림). 한 사슴의 그 스텝 원판 놓침이 모두 잎 때문이면 잎
+                fp_ = self._fl_pred_fol
+                fo = (code == FL_DROP_OBSTACLE) & (fp_[dm, di] if fp_ is not None and fp_.shape == (M, N) else False)
+                tr = np.zeros(N, dtype=bool)
+                tr[di[(code == FL_DROP_OBSTACLE) & ~fo]] = True
+                fl = np.zeros(N, dtype=bool)
+                fl[di[fo]] = True
+                self._fl_why_fol = np.where(why > 0, (why == FL_DROP_OBSTACLE) & fl & ~tr, self._fl_why_fol)
             if rt:
                 ob = code == FL_DROP_OBSTACLE
                 if ob.any():
                     np.add.at(self._flr_drop_obs, ri[di[ob]], 1)
+                if fol_on and fo.any():
+                    np.add.at(self._flr_drop_fol, ri[di[fo]], 1)
         if rt and ex.any():
             # 10-21 도망길 기록: 길별 반사 스텝, 쫓기는 스텝(지난 스텝 표적)과 그 가운데 쫓는 늑대 모두의 눈길을 원판이 가린 스텝(이번 표적 고르기 때)
             rx = np.flatnonzero(ex & (re_ >= 0))
@@ -5968,6 +6193,8 @@ class World:
             nt[(nt >= 0) & (nt < N) & done[np.clip(nt, 0, N - 1)]] = -1     # 죽은(학습 세계는 다시 난) 사슴을 쫓던 기록은 새 개체에 잇지 않는다
         self._fl_tgt = nt
         self._fl_pred = None
+        if fol_on:
+            self._fl_pred_fol = None
 
     def flight_stats(self) -> dict:
         """야생 (w3) 도망 기록 (통계 전용 — 정의는 모듈 docstring '야생 1단계' (w3) 도망 기록). track_flight 를 켠 wild_flight 세계에만 있다.
@@ -5994,6 +6221,9 @@ class World:
                    hist=self._fl_hist.tolist(), hist_edges=list(FLIGHT_HIST_STEPS))
         if self._wf["quiet_end"] > 0:
             out["quiet_ends"] = int(self._wf_quiet_ends)       # 10-21 끝 규칙 quiet_end 로 끝난 도주 (켠 세계만)
+        if self._ob is not None and self._ob["foliage"] is not None:
+            # 10-21 숲 시야 켬 세계만: 끝 까닭 obstacle(n·steps·contact 의 obstacle 칸에 들어 있다) 가운데 마지막 놓침이 잎 때문인 도망
+            out["lost_foliage"] = dict(n=int(self._fl_fol[0]), steps=int(self._fl_fol[1]), contact=int(self._fl_fol[2]))
         if self._wf["route_fixed"] is not None:
             out["route"] = self._flight_route_block(op)
         return out
@@ -6013,10 +6243,13 @@ class World:
         names = ROUTE_NAMES + ("none",)
         by = {nm: dict(n={x: int(v) for x, v in zip(FLIGHT_CAUSES, n[r])}, steps={x: int(v) for x, v in zip(FLIGHT_CAUSES, s[r])},
                        contact={x: int(v) for x, v in zip(FLIGHT_CAUSES, c[r])}) for r, nm in enumerate(names)}
-        return dict(self.route_stats(), by_route=by, drop_obstacle={nm: int(v) for nm, v in zip(names, self._flr_drop_obs)},
-                    chased_steps={nm: int(v) for nm, v in zip(names, self._flr_chased)},
-                    hidden_steps={nm: int(v) for nm, v in zip(names, self._flr_hidden)},
-                    refled=int(self._flr_refled), refled_steps=FLIGHT_REFLEE_STEPS)
+        out = dict(self.route_stats(), by_route=by, drop_obstacle={nm: int(v) for nm, v in zip(names, self._flr_drop_obs)},
+                   chased_steps={nm: int(v) for nm, v in zip(names, self._flr_chased)},
+                   hidden_steps={nm: int(v) for nm, v in zip(names, self._flr_hidden)},
+                   refled=int(self._flr_refled), refled_steps=FLIGHT_REFLEE_STEPS)
+        if self._ob is not None and self._ob["foliage"] is not None:
+            out["drop_foliage"] = {nm: int(v) for nm, v in zip(names, self._flr_drop_fol)}     # 숲 시야 켬 세계만: 원판 놓침 가운데 잎만 가린 사건
+        return out
 
     def _pack_step(self, move, speed, has_target, j, hunting):
         """야생 2단계 2 늑대 무리 협동 (모듈 docstring '야생 2단계' 2). `_step_predators_v3` 가 표적 고르기·잠행형 상태 전이 뒤에 부른다.
@@ -6047,7 +6280,8 @@ class World:
         """야생 2단계 3 세로 장애물 통계 (통계 전용, 모듈 docstring '야생 2단계' 3). n = 원판 수, area_frac = 원판 넓이 합 ÷ 무대 넓이(겹침은 두 번),
         deer_hit·deer_back = 원판에 부딪혀 미끄러진·되돌린 사슴-스텝(deer_steps 가운데), wolf_hit·wolf_back·wolf_dead = 늑대-스텝(부딪힘·되돌림·돌아섬),
         eye_pairs·eye_blocked = 사슴이 시야(반경·각)로 본 위협 쌍과 그중 원판이 가린 쌍(스텝 관측), tgt_pairs·tgt_blocked = 늑대가 시야로 본 사슴 쌍과
-        그중 가린 쌍, push_moved·push_failed = 원판 밖으로 옮긴·못 옮긴 개체(reset·리스폰). 켜지 않은 세계는 ValueError."""
+        그중 가린 쌍, push_moved·push_failed = 원판 밖으로 옮긴·못 옮긴 개체(reset·리스폰). 숲 시야(3 의 7))를 켠 세계는 foliage = r·block·잎 원 수 n·
+        eye_only·tgt_only = 위 가린 쌍 가운데 잎만 가린 쌍(줄기는 안 가림)과 그 몫(잰 쌍 대비) — 끈 세계에는 없다. 켜지 않은 세계는 ValueError."""
         if self._ob is None:
             raise ValueError("obstacle_stats 는 obstacles 를 켠 세계에서만 센다")
         d = self.obstacles
@@ -6062,6 +6296,10 @@ class World:
                     eye_pairs=self._ob_eye_pairs, eye_blocked=self._ob_eye_blocked, eye_blocked_frac=ratio(self._ob_eye_blocked, self._ob_eye_pairs),
                     tgt_pairs=self._ob_tgt_pairs, tgt_blocked=self._ob_tgt_blocked, tgt_blocked_frac=ratio(self._ob_tgt_blocked, self._ob_tgt_pairs),
                     push_moved=self._ob_push_moved, push_failed=self._ob_push_failed,
+                    **({} if self._ob["foliage"] is None else dict(foliage=dict(
+                        r=self._ob["foliage"]["r"], block=self._ob["foliage"]["block"], n=int(len(self._fol_centers())),
+                        eye_only=self._ob_eye_fol, tgt_only=self._ob_tgt_fol,
+                        eye_only_frac=ratio(self._ob_eye_fol, self._ob_eye_pairs), tgt_only_frac=ratio(self._ob_tgt_fol, self._ob_tgt_pairs)))),
                     **({} if self._ob["detour"] is None else dict(detour=dict(
                         deer_used=self._det_deer_used, deer_start=self._det_deer_start, deer_fail=self._det_deer_fail,
                         wolf_used=self._det_wolf_used, wolf_start=self._det_wolf_start, wolf_fail=self._det_wolf_fail,

@@ -308,6 +308,10 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #     돌아가고, 앞 보기 detour_probe(단위)가 트이거나 detour_steps 스텝이 지날 때까지 같은 쪽으로 돈다. 돕는 늑대는 detour_help_block 스텝 넘게
 #     돌아가거나 막혀 돌아서면 detour_help_drop 스텝 동안 돕지 않는다(길목 자리를 버리고 다시 고른다). false = 10-17 3 그대로(미끄러짐만). 숫자 키 기본값은
 #     켰을 때 쓰는 값이다(끄면 읽지 않는다)
+#   obstacles.foliage (10-21 숲 시야, env_v2/world.py `foliage_chord`·`foliage_blocked`, 모듈 docstring '야생 2단계' 3 의 7) — 측정 전용, C++ 에 없다):
+#     {enabled, r, block, trees} 블록(빠진 칸은 이 끔 값). enabled true 면 나무인 원판(trees 'all' = 나무 원판 모두 — 무작위 배치는 줄기만·바위 빼고,
+#     fixed 는 모두. 또는 원판마다 0/1 목록)마다 같은 중심에 반지름 r(단위, 1 단위 = 2 m)의 잎 원을 두고, 눈길이 잎 원들 안을 지나는 길이(겹친 몫은
+#     한 번)가 block(단위) 이상이면 줄기처럼 눈길을 가린다(사슴·늑대 같게, 발소리는 그대로). block_sight 를 켜야 한다. false = 10-21 그대로(줄기만 가림)
 #   realism_shelter.wolf_margin (10-17 늑대 몸 여유): 막는 위협이 은신처 원 둘레가 아니라 반지름 r + wolf_margin(단위, 1 단위 = 2 m) 둘레를
 #     따라 미끄러진다(늑대 중심이 그 안에 들지 않는다). block_predators 를 켰을 때만 0 보다 클 수 있다. 사슴의 안전 판정(원 안 |q − c| ≤ r)은
 #     그대로다. 0 = 10-16 그대로(원 둘레에서 미끄러짐)
@@ -324,7 +328,8 @@ OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "threats": MappingProxyType({"eat_in_place": False}),
     "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0}),
     "obstacles": MappingProxyType({"fixed": None, "detour": False, "detour_block": 0.5, "detour_free": 0.8, "detour_probe": 1.5,
-                                   "detour_steps": 45, "detour_help_block": 15, "detour_help_drop": 38}),
+                                   "detour_steps": 45, "detour_help_block": 15, "detour_help_drop": 38,
+                                   "foliage": {"enabled": False, "r": 3.0, "block": 2.0, "trees": "all"}}),
     "wild_weather": MappingProxyType({"schedule": None}),
     "integrated_stage": MappingProxyType({"respawn_safe_r": None, "respawn_tries": 64}),
 })

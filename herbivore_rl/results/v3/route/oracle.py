@@ -15,7 +15,10 @@ RUN 판(N 세계, wild_flight.route_fixed 'run', 끝 규칙 지금·quiet_end 15
     python results/v3/route/oracle.py run --out <폴더> [--workers 14]        # oracle_raw.json → report
     python results/v3/route/oracle.py run --out <폴더> --smoke                # 시드 3 · 300 스텝 · 워커 ≤ 4 (도구 확인)
     python results/v3/route/oracle.py report --out <폴더>                     # oracle.json·oracle.md (route_rules.py report 가 9-4 판단표에 넣는다)
+    python results/v3/route/oracle.py run --out <폴더> --world-set features.obstacles.foliage.enabled=true   # 세계 덮기 (route_rules.py 와 같은 뜻)
 세계·두뇌·워커는 route_rules.py 와 같다(<out>/world — 스냅숏 변환, 도주 밖 obs21zero argmax, 워커 풀 env_v2.rollout.make_executor).
+세계 덮기 --world-set 키=값(여러 번 — route_rules.apply_world_set): 모든 세계에 같게 건다(RUN 판·길 넷·가짜 RUN 이 모두 그 세계의 복제라 비교 기준 RUN 도
+같은 덮기). oracle_raw.json·oracle.json meta 에 남고, route_rules.py report 는 규칙 측정과 덮기가 다른 오라클을 판단표에 쓰지 않는다.
 """
 
 from __future__ import annotations
@@ -319,7 +322,7 @@ def summarize(raw: dict) -> dict:
 def fmt(s: dict, meta: dict) -> str:
     L = [f"# 도망길 오라클과 '배울 수 있나' (설계 9-3절 — 보고만){' — 연기 시험' if meta.get('smoke') else ''}", "",
          f"- 시드 {meta.get('seeds')}, 흐름 {s['streams']}, 롤아웃 최대 {s['max_steps']} 스텝 (잡힘·굶음·안 끝남 = 이 값), 워커 {meta.get('workers')}, "
-         f"시간 {meta.get('wall_s')} 초, 세계-스텝 {meta.get('world_steps')}",
+         f"시간 {meta.get('wall_s')} 초, 세계-스텝 {meta.get('world_steps')}, 세계 덮기 {rr.world_set_text(meta.get('world_set') or {})}",
          "- 값 = 쫓긴 시간 — 도주 시작부터 늑대가 이 사슴을 마지막으로 표적으로 둔 순간까지의 초 (흐름 평균, 관문 1차 P1·route_rules.py P1 과 같은 잣대 — "
          "9-4 판단은 모두 이 값). 이득 = 가장 짧은 길 − RUN (음수 = 짧아짐). 잡음 뺀 값 = 진짜 이득 − 가짜(모두 RUN, 난수만 다름) 이득",
          "", "## 오라클 이득 (두뇌 길 셋 — RUN·COVER·SHELTER, 괄호 = OPEN 까지 넷)", "",
@@ -371,16 +374,18 @@ def cmd_run(a) -> int:
         fit, test = (seeds[0], seeds[-2]), (seeds[-1], seeds[-1])
     quota = SMOKE["quota"] if a.smoke else int(math.ceil(int(a.per_region) / len(seeds)))
     qes = [int(x) for x in a.quiet_ends.split(",")]
+    wset = rr.parse_world_set(a.world_set)
     jobs = []
     for qe in qes:
         sets = dict(lv.NOSAT["sets"], **{"wild_flight.route_fixed": "run"})
         if qe > 0:
             sets["wild_flight.quiet_end"] = qe
         for j in ad.make_jobs(info, model, seeds, steps, False, dict(name=f"oracle_q{qe}", sets=sets)):
+            rr.apply_world_set(j["cfg"], wset)                  # 세계 덮기 (없으면 그대로)
             j.update(quiet_end=qe, region_index=int(info["regions"][j["region"]]["region_index"]), quota=quota, streams=streams, max_steps=ms)
             jobs.append(j)
     print(f"도망길 오라클 → {out}: 세계 {len(jobs)} (시드 {seeds[0]}~{seeds[-1]} × 지역 {len(info['regions'])} × 끝 규칙 {qes}), 세계마다 시작 {quota}, "
-          f"흐름 {streams}, 롤아웃 최대 {ms} 스텝, 워커 {W}{', 연기 시험' if a.smoke else ''}", flush=True)
+          f"흐름 {streams}, 롤아웃 최대 {ms} 스텝, 워커 {W}, 세계 덮기 {rr.world_set_text(wset)}{', 연기 시험' if a.smoke else ''}", flush=True)
     t0 = time.perf_counter()
     ex = ro.make_executor(min(W, len(jobs)))
     worlds = []
@@ -401,7 +406,7 @@ def cmd_run(a) -> int:
     raw = dict(made=datetime.now().isoformat(), snapshot=str(a.snapshot), model=lv.path_text(model), seeds=[seeds[0], seeds[-1]], fit_seeds=list(fit),
                test_seeds=list(test), quiet_ends=qes, quota=quota, streams=streams, max_steps=ms, main_steps=steps, workers=W,
                smoke=bool(a.smoke), wall_s=round(wall, 1), world_steps=ws, sec_per_world_step=float(sum(w["wall_s"] for w in worlds)) / max(ws, 1),
-               worlds=worlds)
+               world_set=lv.jsonable(wset), world_set_args=list(a.world_set or []), worlds=worlds)
     lv.atomic_write_json(out / "oracle_raw.json", lv.jsonable(raw), indent=None)
     print(f"  {wall:.0f} 초, 세계-스텝 {ws} (세계-스텝당 {raw['sec_per_world_step'] * 1000:.2f} ms) → oracle_raw.json", flush=True)
     return cmd_report(a)
@@ -412,6 +417,7 @@ def cmd_report(a) -> int:
     raw = json.loads((out / "oracle_raw.json").read_text(encoding="utf-8"))
     s = summarize(raw)
     meta = {k: raw[k] for k in ("seeds", "workers", "wall_s", "world_steps", "smoke", "quota", "sec_per_world_step")}
+    meta["world_set"] = raw.get("world_set", {})                  # 세계 덮기 (옛 판은 없음 = 덮기 없음)
     lv.atomic_write_json(out / "oracle.json", lv.jsonable(dict(meta=meta, **s)))
     text = fmt(s, meta)
     (out / "oracle.md").write_text(text + "\n", encoding="utf-8", newline="\n")
@@ -434,6 +440,7 @@ def main(argv=None) -> int:
     r.add_argument("--quiet-ends", default="0,15")
     r.add_argument("--workers", type=int, default=14)
     r.add_argument("--smoke", action="store_true", help=f"시드 {SMOKE['seeds']} · {SMOKE['steps']} 스텝 · 워커 ≤ {SMOKE['workers']} · 세계마다 시작 {SMOKE['quota']}")
+    r.add_argument("--world-set", action="append", default=[], metavar="키=값", help="세계 덮기 (여러 번 — route_rules.py 와 같다)")
     r.set_defaults(fn=cmd_run)
     p = sub.add_parser("report")
     p.add_argument("--out", required=True)

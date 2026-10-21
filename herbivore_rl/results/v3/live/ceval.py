@@ -338,6 +338,9 @@ def unsupported_settings(cfg: dict) -> list:
         if not on_j or "*" in free:
             continue
         pj, pr = with_optional(name, ja), with_optional(name, ra)
+        for d in (pj, pr):              # 숲 시야(obstacles.foliage)는 enabled 가 거짓이면 아래 칸과 상관없이 끈 세계다 — 끔은 끔끼리 같게 본다
+            if isinstance(d.get("foliage"), dict) and not d["foliage"].get("enabled", False):
+                d["foliage"] = None
         for k in sorted(set(pj) | set(pr)):
             if k not in free and pj.get(k, _MISSING) != pr.get(k, _MISSING):
                 out.append(f"features.{name}.{k}: {pj.get(k, '(없음)')!r} (바탕 {pr.get(k, '(없음)')!r})")
@@ -374,6 +377,9 @@ def world_block(w, protected_refuges: bool = False) -> dict:
     if w._wf is not None and (w._wf.get("route_fixed") is not None or int(w._wf.get("quiet_end", 0) or 0) > 0):
         # 10-21 도망길 측정(route_fixed·quiet_end)은 C++ 에 없다 — 'run' 도 세계는 같지만 도망길 기록(flight.route 등)을 낼 수 없다
         raise ValueError(f"wild_flight.route_fixed {w._wf.get('route_fixed')!r}·quiet_end {w._wf.get('quiet_end')!r} 는 C++ 세계에 없다 — 평가기가 받지 않는다")
+    if w._ob is not None and w._ob.get("foliage") is not None:
+        # 10-21 숲 시야(obstacles.foliage — 잎 원이 눈길을 가림)는 측정 전용이고 C++ SightBlocked 는 줄기만 본다
+        raise ValueError("features.obstacles.foliage(숲 시야)는 C++ 세계에 없다 — 평가기가 받지 않는다")
     bad = unsupported_settings(cfg.to_dict())
     if bad:
         raise ValueError(f"평가기가 옮기지 않는 세계 칸이 바탕({REF_CFG.name})과 다르다 — C++ 은 제 상수로 돈다: " + "; ".join(bad[:8])
