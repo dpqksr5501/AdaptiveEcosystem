@@ -24,7 +24,9 @@
 //                                      얼기 칸이 열린 결정 0, R1b 가 얼 자리에서만 다른 행동이고 나머지 결정은 R1b 와 같다. 끄면 R1b 그대로(얼기 씀)
 //   (경계 거리 KeepAway 시험 6 개는 도주 반사 거리로 바꾸며 지웠다 — 규칙 시험은 EcoWildV3Test.cpp Wild.FlightGolden·Wild.FlightOff)
 //   Integrated.BrainSwap               두뇌 바꾸기 (10-18, EcoV3Brain.h): 60 초에 내장 R1b → R4 s0 파일 두뇌를 결정 스텝 경계에서 — 사슴 조각 바이트·개체 그대로,
-//                                      바꾸기 앞은 바꾸지 않은 판과 비트 단위로 같고 경계 스텝은 앞 두뇌의 요청을 실행, 뒤 결정은 모두 R4 로짓, 허용 = R4 ∧ 세계
+//                                      바꾸기 앞은 바꾸지 않은 판과 비트 단위로 같고 경계 스텝은 앞 두뇌의 요청을 실행, 뒤 결정은 모두 R4 로짓, 허용 = R4 ∧ 세계.
+//                                      10-21 도망 기록 연결: 지역 장부에 결정 스텝마다 누적, 바꾼 판만 두뇌 판이 한 번 넘어가고 교체 전 + 지금 판 = 누적,
+//                                      보고의 산 사슴-스텝·FLEE 스텝 = 세계 기록 (EcoV3FlightTally.h — 규칙 시험은 EcoFlightV3Test.cpp)
 //   Integrated.BrainObs21Zero          R5 관측 21 (10-19, 계약 2-4): 처음부터 관측 21 두뇌(R1b-F + 장애물 세 칸 입력 열 0)로 돌린 두 지역(숲 나무 24) 180 초 =
 //                                      내장 판 (자리·요청·로짓 비트 단위), 세계 관측 칸 수 = 두뇌 계약, 세 칸은 관측 21 판에서만 만든다, 어긋남·마스크 위반 0
 //   Integrated.WolfEating              늑대 식사 시간 (eco.IntegratedV3.WolfEatSeconds 기본 5 → 38 스텝): 위협 모델 — 식사 37 스텝 제자리, 38 번째에
@@ -3228,6 +3230,11 @@ bool FEcoPolicyV3IntegratedBrainSwapTest::RunTest(const FString& Parameters)
 		int64 TallyBad = 0;                 // 두뇌 집계 + 반사 ≠ 산 사슴·스텝
 		FEcoV3BrainTally Before;            // 두 지역 합 (바꾸기 앞)
 		FEcoV3BrainTally Total;
+		// 도망 기록 연결 (10-21): 도망 기록을 세는 지역 수, 장부·보고가 어긋난 지역 수, 두 지역 시작 도망 합, 화면 글 (지역 A)
+		int32 FlightRegions = 0;
+		int32 FlightBad = 0;
+		int64 FlightStarted = 0;
+		FString FlightText;
 	};
 	auto Snapshot = [](FIntegratedHarness& H, TArray<uint8>& Out, int32& OutValid)
 	{
@@ -3344,7 +3351,21 @@ bool FEcoPolicyV3IntegratedBrainSwapTest::RunTest(const FString& Parameters)
 		{
 			Out.Violations += C->Sim.Stats.MaskViolations;
 			Out.TallyBad += C->BrainTally.Total() + C->BrainTally.Reflex != C->Sim.Stats.LiveDeerSteps ? 1 : 0;
+			// 도망 기록 연결 (10-21): 장부에 결정 스텝마다 누적 · 교체 전 + 지금 판 = 누적 · 바꾼 판만 한 번 넘어감 · 보고 = 세계 기록 (열린 도망 = 처리기의 FlightOpen)
+			if (C->FlightOn())
+			{
+				const EcoWorldV3::FWorldStats& St = C->Sim.Stats;
+				const EcoWorldV3::FFlightReport Fr = EcoWorldV3::FlightReportOf(St.Flight, C->FlightOpen);
+				const EcoV3Flight::FTally& Tl = C->FlightTally;
+				++Out.FlightRegions;
+				Out.FlightStarted += Fr.Started;
+				Out.FlightBad += (Tl.Pushes != St.Steps || !(Tl.PrevGen.Plus(Tl.CurrentGen()) == EcoV3Flight::FSum::Of(St.Flight))
+								  || Tl.Swaps != (bSwap ? 1 : 0) || Tl.bHasPrev != bSwap || Fr.LiveSteps != St.LiveDeerSteps
+								  || Fr.FleeSteps != St.BehaviorSteps[EcoRepertoireV3::kFlee] || Fr.ReflexSteps > St.KeepSteps[EcoWorldV3::kKeepPanic])
+									 ? 1 : 0;
+			}
 		}
+		Out.FlightText = EcoV3Flight::SummaryText(A->FlightTally.Window()) + TEXT(" · ") + EcoV3Flight::CompareText(A->FlightTally);
 		return true;
 	};
 
@@ -3400,6 +3421,10 @@ bool FEcoPolicyV3IntegratedBrainSwapTest::RunTest(const FString& Parameters)
 	TestEqual(TEXT("모든 결정의 로짓·요청 = 내장 두뇌 (바꾸지 않은 판)"), Ctl.LogitBad, static_cast<int64>(0));
 	TestEqual(TEXT("마스크 위반 0 (두 판)"), Swap.Violations + Ctl.Violations, static_cast<int64>(0));
 	TestEqual(TEXT("두뇌 집계(두뇌 스텝 + 반사 스텝) = 산 사슴·스텝 (지역마다, 두 판)"), Swap.TallyBad + Ctl.TallyBad, static_cast<int64>(0));
+	// 도망 기록 연결 (10-21, 도주 반사 기본 켬 → 통합 세계 도망 기록 켬)
+	TestTrue(TEXT("도망 기록: 두 지역 모두 센다 (두 판)"), Swap.FlightRegions == 2 && Ctl.FlightRegions == 2);
+	TestEqual(TEXT("도망 기록: 장부(스텝마다 누적·두뇌 판)·보고(산 사슴-스텝·FLEE 스텝·반사) = 세계 기록 (지역마다, 두 판)"), Swap.FlightBad + Ctl.FlightBad, 0);
+	AddInfo(FString::Printf(TEXT("도망 기록: 바꾼 판 시작 %lld · 바꾸지 않은 판 %lld | 지역 A (바꾼 판): %s"), Swap.FlightStarted, Ctl.FlightStarted, *Swap.FlightText));
 	return true;
 }
 

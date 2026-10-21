@@ -514,6 +514,11 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 																	ThreatPtrs.Num(), Net, &Hooks);
 			// R5 장애물 관측 대조 기록 (eco.IntegratedV3.ObsParityLog — 기본 끔): 이 스텝 끝 관측의 세 칸과 그 입력 (읽기만)
 			Sub->LogObsParity(Ctx, Views.GetData(), StableViewIds.GetData(), Views.Num());
+			// 야생 (w3) 도망 기록 (10-21, 기록만): 이 스텝 뒤 열린 도망 합 — 10초 기록 줄·스냅숏 보고의 잘림 (이번 스텝에 죽은 사슴의 도망은 Step 이 이미 닫았다)
+			if (Ctx.FlightOn())
+			{
+				Ctx.FlightOpen = EcoWorldV3::FlightOpenOf(Views.GetData(), Views.Num());
+			}
 
             // Feedback uses the integrated native body and ground result, never the desired slot or render Actor position.
             for(int32 R=0;R<DeerByContext[c].Num();++R) {

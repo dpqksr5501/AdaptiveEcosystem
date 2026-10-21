@@ -1613,6 +1613,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.Weather = S.WeatherFor(RegionId);
 	// 감지 기록 (기록만 — 10초 여덟째 줄의 감지 띠·들어서만)
 	C.bSenseStats = true;
+	// 야생 (w3) 도망 기록 (10-21, 기록만 — 도주 반사를 켠 세계만 센다. 화면 eco.V3Debug 셋째 줄·두뇌 상태 줄, 10초 열째 줄 '<지역> 도망 |', 스냅숏 flight)
+	C.bFlightStats = true;
 	return C;
 }
 
@@ -3281,6 +3283,11 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 		// 관측 칸 수 = 새 두뇌의 계약 (R5 장애물 관측 21 이면 이 스텝 끝 관측부터 세 칸을 더 만들고, 그 결정부터 새 두뇌가 21 칸을 읽는다)
 		EcoWorldV3::SetModelObsDim(Ctx->Sim, Now->Net.ObsDim);
 		Ctx->SinceSwapBrainTally = FEcoV3BrainTally();
+		if (Before.IsValid() && Ctx->FlightOn())
+		{
+			// 도망 기록 두뇌 판 (EcoV3FlightTally.h): 지금 판의 합을 '교체 전'으로, 새 판은 0 에서 (결정 스텝 경계 — 열린 도망은 새 판에 든다)
+			Ctx->FlightTally.OnBrainSwap(EcoV3Flight::FSum::Of(Ctx->Sim.Stats.Flight));
+		}
 		AllowedByRegion += FString::Printf(TEXT("%s%s %s"), AllowedByRegion.IsEmpty() ? TEXT("") : TEXT(" · "), *Ctx->RegionId.ToString(),
 										   *EcoV3Brain::AllowedText(Ctx->Sim.Allowed));
 	}
@@ -3402,6 +3409,10 @@ void UEcoPolicyV3IntegratedSubsystem::NotifyContextStep(FEcoV3RegionContext& Ctx
 	const double Now = World ? World->GetTimeSeconds() : 0.0;
 	Ctx.RecentCatches.RemoveAll([Now](const FEcoV3IntegratedCatchMark& M) { return Now - M.Time > 2.0; });
 	Ctx.PushStepEaten();
+	if (Ctx.FlightOn())
+	{
+		Ctx.FlightTally.Push(EcoV3Flight::FSum::Of(Ctx.Sim.Stats.Flight));   // 도망 기록 최근 60 초 창·두뇌 판 (기록만)
+	}
 	if (LogEverySteps > 0 && Ctx.Sim.T - Ctx.LastLogT >= LogEverySteps)
 	{
 		LogContext(Ctx);
@@ -3810,6 +3821,35 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   static_cast<long long>(D.Reflex), static_cast<long long>(D.ReflexKnow));
 		Ctx.LastLogBrainTally = Ctx.BrainTally;
 	}
+	// 열째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — 정의는 EcoWorldV3.h 머리 주석 '도망 기록' = world.py flight_stats, 집계는 EcoV3FlightTally.h).
+	//   구간(지난 기록 줄 뒤)에 끝난 도망의 끝 까닭별 수·평균 길이·스스로 벗어난 도망의 쫓긴 시간(관문 1차 재료), 최근 60 초 창, 누적(열린 도망 = 잘림),
+	//   두뇌 판 비교. 앞 아홉 줄의 정규식은 '<지역> 도망 |' 꼴에 걸리지 않는다
+	if (Ctx.FlightOn())
+	{
+		const EcoV3Flight::FSum Iv = EcoV3Flight::FSum::Of(S.Flight).Minus(EcoV3Flight::FSum::Of(P.Flight));
+		FString Causes;
+		for (int32 c = 0; c < EcoWorldV3::kNumFlightCauses; ++c)
+		{
+			if (c == EcoWorldV3::kFlightTruncated)
+			{
+				continue;   // 잘림은 보고 때만 (끝나지 않은 도망)
+			}
+			Causes += FString::Printf(TEXT("%s%s %lld"), c == 0 ? TEXT("") : c == EcoWorldV3::kNumFlightOwn ? TEXT(" / ") : TEXT(" · "),
+									  UTF8_TO_TCHAR(EcoWorldV3::FlightCauseNameKoUtf8(c)), static_cast<long long>(S.Flight.Num[c] - P.Flight.Num[c]));
+		}
+		const EcoWorldV3::FFlightReport Tot = EcoWorldV3::FlightReportOf(S.Flight, Ctx.FlightOpen);
+		const int64 TotEnded = Tot.Started - Tot.Num[EcoWorldV3::kFlightTruncated];
+		UE_LOG(LogEcoPolicyV3I, Log,
+			   TEXT("[EcoV3I] %s 도망 | %.1f초 | 구간 시작 %lld · 끝 %lld (스스로: %s) · 평균 %.1f초 · 스스로 벗어난 도망 %lld번 쫓긴 %.1f초 | %s | ")
+				   TEXT("누적 시작 %lld · 끝 %lld · 열린 %lld · 스스로 벗어남 %lld (%.1f%%) 쫓긴 %.1f초 · 은신처 원 안에서 끝 %lld · 반사 스텝 %lld/%lld | 두뇌 판 (교체 %d번): %s"),
+			   *Ctx.RegionId.ToString(), Seconds, static_cast<long long>(Iv.Started), static_cast<long long>(Iv.Ended), *Causes, Iv.MeanSeconds(),
+			   static_cast<long long>(Iv.OwnN()), Iv.OwnChaseSeconds(), *EcoV3Flight::SummaryText(Ctx.FlightTally.Window()),
+			   static_cast<long long>(Tot.Started), static_cast<long long>(TotEnded), static_cast<long long>(Tot.Num[EcoWorldV3::kFlightTruncated]),
+			   static_cast<long long>(Tot.OwnN), TotEnded > 0 ? 100.0 * static_cast<double>(Tot.OwnN) / static_cast<double>(TotEnded) : 0.0,
+			   Tot.OwnN > 0 ? static_cast<double>(Tot.OwnContact) * EcoRepertoireV3::kStepSeconds / static_cast<double>(Tot.OwnN) : 0.0,
+			   static_cast<long long>(Tot.ShelterEnd), static_cast<long long>(Tot.ReflexSteps), static_cast<long long>(Tot.FleeSteps),
+			   Ctx.FlightTally.Swaps, *EcoV3Flight::CompareText(Ctx.FlightTally));
+	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
 	{
@@ -4015,11 +4055,22 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			FoodLine += FString::Printf(TEXT(" | 지방 비축 평균 %.0f%% · 비축으로 사는 사슴 %d · 비축 %.0f%% 밑 %d · 약함(느림) %d"), 100.0 * Ctx.MeanReserve,
 										Ctx.OnReserveDeer, 100.0 * EcoV3Integrated::kLowReserve, Ctx.LowReserveDeer, Ctx.WeakDeer);
 		}
-		DrawDebugString(World, Center + FVector(0, 0, 600.0), Line + TEXT("\n") + FoodLine, nullptr, FColor::White, 0.0f, true, 1.4f);
+		// 셋째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — EcoV3FlightTally.h): 최근 60 초 창과 두뇌 판 비교 (쫓긴 = 스스로 벗어난 도망)
+		const FString FlightLine = Ctx.FlightOn() ? FString::Printf(TEXT("도망 %s | %s | %s"), *Ctx.RegionId.ToString(),
+																	 *EcoV3Flight::SummaryText(Ctx.FlightTally.Window()),
+																	 *EcoV3Flight::CompareText(Ctx.FlightTally))
+												  : FString();
+		DrawDebugString(World, Center + FVector(0, 0, 600.0), Line + TEXT("\n") + FoodLine + (FlightLine.IsEmpty() ? FString() : TEXT("\n") + FlightLine),
+						nullptr, FColor::White, 0.0f, true, 1.4f);
 		if (bScreen)
 		{
 			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(730000 + Ctx.Index), 1.5f, FColor(180, 230, 180), Line);
 			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(731000 + Ctx.Index), 1.5f, FColor(230, 210, 150), FoodLine);
+			if (!FlightLine.IsEmpty())
+			{
+				// 키 733000 + 지역 (732000~732004 는 두뇌 알림·상태 줄)
+				GEngine->AddOnScreenDebugMessage(static_cast<uint64>(733000 + Ctx.Index), 1.5f, FColor(255, 190, 140), FlightLine);
+			}
 		}
 	}
 }
@@ -4134,7 +4185,35 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 	{
 		Line += TEXT(" · ") + Live;
 	}
+	// 도망 요약 (10-21 — 모든 지역 합: 최근 60 초 창 · 교체 전 x초 → 지금 y초)
+	const FString FlightText = FlightStatusText();
+	if (!FlightText.IsEmpty())
+	{
+		Line += TEXT(" · ") + FlightText;
+	}
 	GEngine->AddOnScreenDebugMessage(kNoticeKeyStatus, 1.5f, FColor(200, 220, 255), Line);
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::FlightStatusText() const
+{
+	EcoV3Flight::FSum WinSum;
+	EcoV3Flight::FSum PrevSum;
+	EcoV3Flight::FSum CurSum;
+	bool bAny = false;
+	bool bHasPrev = false;
+	for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
+	{
+		if (!Ctx || !Ctx->FlightOn())
+		{
+			continue;
+		}
+		bAny = true;
+		WinSum = WinSum.Plus(Ctx->FlightTally.Window());
+		PrevSum = PrevSum.Plus(Ctx->FlightTally.PrevGen);
+		CurSum = CurSum.Plus(Ctx->FlightTally.CurrentGen());
+		bHasPrev = bHasPrev || Ctx->FlightTally.bHasPrev;
+	}
+	return bAny ? FString::Printf(TEXT("%s · %s"), *EcoV3Flight::SummaryText(WinSum), *EcoV3Flight::CompareText(PrevSum, CurSum, bHasPrev)) : FString();
 }
 
 void UEcoPolicyV3IntegratedSubsystem::RejectResourceContract()

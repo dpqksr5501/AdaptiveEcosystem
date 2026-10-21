@@ -165,6 +165,7 @@
 
 #include "EcoPolicyClock.h"
 #include "EcoV3Brain.h"
+#include "EcoV3FlightTally.h"
 #include "EcoWorldV3.h"
 #include "TreeLayoutV3.h"
 
@@ -707,6 +708,13 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	FEcoV3BrainTally LastLogBrainTally;       // 지난 기록 줄의 누적
 	FEcoV3BrainTally SinceSwapBrainTally;     // 지금 두뇌로 바뀐 뒤 (화면 '늑대를 알 때 숨기')
 
+	// 야생 (w3) 도망 기록 화면·기록 (10-21 — EcoV3FlightTally.h. 세계 칸 Sim.Stats.Flight 는 FWorldConfig::bFlightStats 로 단계 함수가 센다).
+	// 처리기가 결정 스텝마다 채운다 (FlightOpen = Step 뒤 열린 도망 합, FlightTally = NotifyContextStep 이 누적을 넣는다. 두뇌 바뀜은 SyncBrain)
+	EcoWorldV3::FFlightOpen FlightOpen;       // 지금 열린 도망 합 (스냅숏 보고의 잘림)
+	EcoV3Flight::FTally FlightTally;          // 최근 60 초 창·두뇌 판 합
+	/** 도망 기록을 세는 세계인가 (기록 켬 ∧ 도주 반사 켬 — 파이썬도 wild_flight 세계에만 있다). */
+	bool FlightOn() const { return Sim.Config.bFlightStats && Sim.Config.WildFlight.bEnabled; }
+
 	// R5 장애물 관측 대조 기록 (10-19, eco.IntegratedV3.ObsParityLog — LogObsParity)
 	bool bObsParityDiscsLogged = false;       // 이 무대의 원판 줄을 남겼다
 	int64 ObsParityLines = 0;                 // 남긴 사슴 줄 수
@@ -1179,6 +1187,8 @@ private:
 	 * 미뤄 둔 화면 찍기, AutoAdapt 이거나 감시 폴더가 켜졌으면 상태 줄을 1 초마다 (실시간).
 	 */
 	void DrawBrainNotices();
+	/** 상태 줄의 도망 요약 (모든 지역 합: 최근 60 초 창·두뇌 판 비교 — EcoV3FlightTally.h). 도망 기록을 세는 지역이 없으면 빈 글. */
+	FString FlightStatusText() const;
 	// 환경 바뀜 감시 (10-21, EcoV3EnvWatch.cpp)
 	/** 지역 세계의 환경 바탕을 적는다 (AddContext): 시작 은신처 원, 지금 레벨 줄기 원판, 날씨 콘솔 변수의 Play 시작 값, 팀 지역 환경. */
 	void InitContextEnv(FEcoV3RegionContext& Ctx);

@@ -238,6 +238,18 @@ bool FEcoV3SnapshotExportTest::RunTest(const FString& Parameters)
 		TestTrue(*FString::Printf(TEXT("%s 사슴 수 (입양·잡힘·굶음·산 = 입양 − 잡힘 − 굶음)"), *Tag),
 				 static_cast<int32>(Deer->GetNumberField(TEXT("adopted"))) == C.AdoptedDeer && Caught == Wr.Stats.Caught && Starved == Wr.Stats.Starved
 					 && static_cast<int64>(Deer->GetNumberField(TEXT("alive"))) == C.AdoptedDeer - Caught - Starved);
+		// 10-21 도망 기록 (더한 칸 'flight' — 앞 칸은 파이썬 world.py flight_stats 와 같은 이름): 켬·시작 수가 세계 기록과 같고 끝 까닭 11·칸 8·창·두뇌 판이 있다
+		const TSharedPtr<FJsonObject>* Fl = nullptr;
+		if (TestTrue(*FString::Printf(TEXT("%s 도망 기록 칸"), *Tag), R->TryGetObjectField(TEXT("flight"), Fl) && Fl != nullptr && Fl->IsValid()))
+		{
+			const EcoWorldV3::FFlightReport Fr = EcoWorldV3::FlightReportOf(Wr.Stats.Flight, C.FlightOpen);
+			TestTrue(*FString::Printf(TEXT("%s 도망 기록 = 세계 (켬·시작·끝 까닭·칸·창·두뇌 판)"), *Tag),
+					 (*Fl)->GetBoolField(TEXT("on")) == C.FlightOn() && static_cast<int64>((*Fl)->GetNumberField(TEXT("started"))) == Fr.Started
+						 && static_cast<int64>((*Fl)->GetNumberField(TEXT("live_steps"))) == Fr.LiveSteps
+						 && (*Fl)->GetObjectField(TEXT("n"))->Values.Num() == EcoWorldV3::kNumFlightCauses
+						 && (*Fl)->GetArrayField(TEXT("hist")).Num() == EcoWorldV3::kNumFlightHistEdges + 1 && (*Fl)->HasField(TEXT("window"))
+						 && (*Fl)->HasField(TEXT("generation")) && (*Fl)->HasField(TEXT("prev_generation")));
+		}
 	}
 	TestTrue(TEXT("숲은 원판 셋·먹은 셀이 있다 (시험 장면)"), H.Forest->Sim.Config.Obstacles.Num() == 3 && H.Forest->Sim.Food.Total() < H.Forest->StartFood);
 	TestTrue(TEXT("메마른 땅 원판 없음"), H.Barren->Sim.Config.Obstacles.Num() == 0);

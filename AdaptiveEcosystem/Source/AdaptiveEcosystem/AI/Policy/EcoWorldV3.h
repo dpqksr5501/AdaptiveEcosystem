@@ -68,6 +68,9 @@
 //                                  C2 위협 Step 의 시야 반경·속력(FThreatStepInput::WeatherViewMult·WeatherSpeedMult)이 읽는다. 아래 '야생 3단계' 묶음 머리 주석.
 //                                  통합 모드 eco.IntegratedV3.Weather 기본 1 (숲 비·고지 눈·메마른 땅 맑음). 기록 FWorldStats::WeatherSteps
 //   FWorldConfig::bSenseStats      감지 기록 (FWorldStats::Sense* — 산 사슴 × 깨어 있는 늑대 쌍의 거리 띠별 감지, 들어서만 안 사슴). 기록만, 통합 모드가 켠다
+//   FWorldConfig::bFlightStats     야생 (w3) 도망 기록 (10-21, FWorldStats::Flight·FHerbDecision::Flight — world.py track_flight·flight_stats). 기록만, WildFlight 를
+//                                  켠 세계만. C2 의 위협 Step 바로 앞에 지난 표적과의 표적 고르기 쌍을 재고(FlightPairOf), H 의 UpdateWildFlight 앞에 한 스텝을 센다.
+//                                  통합 모드가 켠다. 골든 FlightGoldenVectorsV3.h (herbivore_rl/export_golden_v3_flight.py), 시험 Tests/EcoFlightV3Test.cpp
 //   FWorldState::ObsDim            R5 장애물 관측 (10-19, 계약 2-4). 지금 두뇌의 관측 칸 수 18·21 (SetModelObsDim — 통합 모드 두뇌 바꾸기가 정한다). 21 이면 E 에서
 //                                  사슴마다 세 칸(FHerbPerception::ObstacleObs — EcoObservationV3::ObstacleObsValues)을 더 만들고 H 의 망 입력이 18 + 3 칸이다.
 //                                  bObstacleObsProbe 는 관측 18 두뇌여도 세 칸을 만든다(대조 기록 전용). 기본 18·끔 = 지금 그대로 (조각 바이트도 같다)
@@ -78,6 +81,7 @@
 //   세계 생성: 먹이 잡음 Gw² 개 → 초식 슬롯마다 (x, y, 각) → 위협 슬롯마다 (x, y, 각, 플레이어면 모드 2개)
 //   스텝마다:  위협 슬롯마다 선회 1개, 원거리형이면 초식 수만큼 굴림, 플레이어면 모드 2개 → 죽은 슬롯마다 (x, y, 각)
 //   그래서 같은 시드·같은 설정이면 Mass 경로와 기준 루프가 같은 값을 받는다.
+//   FRng::External (10-21, 기본 nullptr = 위 그대로): 네이티브 평가기(Tools/EcoV3Eval)만 바깥 난수(파이썬 numpy PCG64 이어 받기)로 바꿔 끼운다.
 
 #pragma once
 
@@ -107,9 +111,18 @@ namespace EcoWorldV3
 	struct FRng
 	{
 		std::uint64_t State = 0;
+		// 바깥 난수 (10-21 네이티브 평가기 AdaptiveEcosystem/Tools/EcoV3Eval 전용 — 게임은 쓰지 않는다): 있으면 NextU64 가 SplitMix64 대신 이것을 부른다.
+		// 평가기는 파이썬 거울 세계의 numpy 스트림(PCG64)을 이어 받아 같은 늑대 배회 선회를 뽑는다(거울 세계의 스텝 안 뽑기 = 위협 슬롯 순서의 선회뿐).
+		// nullptr(기본) = 지금 그대로 (State 도 그대로 쓴다)
+		std::uint64_t (*External)(void* User) = nullptr;
+		void* ExternalUser = nullptr;
 
 		std::uint64_t NextU64()
 		{
+			if (External != nullptr)
+			{
+				return External(ExternalUser);
+			}
 			State += 0x9E3779B97F4A7C15ULL;
 			return EcoRepertoireV3::Mix64(State);
 		}
@@ -471,6 +484,359 @@ namespace EcoWorldV3
 	inline constexpr std::int32_t kNumHuntKinds = 3;       // 사냥 기록 칸 = EcoThreatV3::EThreatType (추격형 0·잠행형 1·플레이어 2 — 플레이어는 세지 않아 늘 0)
 	inline constexpr double kCoverRingBands[2] = {1.0, 2.0};   // 은신처 둘레 밖 잡힘 띠 (단위 = 2 m·4 m, run_mirror.py RING_BANDS)
 
+	// ---- 야생 (w3) 도망 기록 (10-21 실시간 고리 관문 1차 '쫓긴 시간' — 기록만, 어떤 계산에도 쓰지 않는다. world.py 모듈 docstring '야생 1단계' (w3)
+	//      도망 기록·`_fl_update`·`_fl_close`·`flight_stats` 와 줄마다 같다. 켜는 쪽: FWorldConfig::bFlightStats, WildFlight 를 켠 세계만) ----
+	// 도망 한 번 = 한 사슴이 FLEE 를 실행한 스텝(도주 반사 덮기·두뇌가 고른 FLEE 모두 — FHerbDecision::ExecutedBehavior)이 끊김 없이 이어진 묶음. 길이 = 실행한
+	// FLEE 스텝 수(× 2/15 초), 반사 = 그 가운데 실행한 덮기(KeepActive)가 도주인 스텝. 표적 = 스텝 끝(H)에 사냥 중인(FlightHunting) 늑대의 그 스텝 표적.
+	// 쫓김 창 = 첫 FLEE 스텝 바로 앞 스텝부터. 쫓긴 시간(contact) = 첫 스텝부터 표적이던 마지막 FLEE 스텝까지 (쫓기지 않은 도망은 0).
+	// 놓침 = 지난 스텝 표적이던 이 사슴을 이번 스텝에 표적으로 두지 않은 늑대 (FLEE 를 실행한 스텝만). 까닭 = 그 늑대의 이번 표적 고르기 때 값으로 이 순서의 첫 것:
+	//   그만둠(표적 고르기 때 또는 스텝 끝에 사냥 못 함) → 반경(체감 거리 > 시야 반경) → 원판(반경·시야각 안인데 눈길을 가림) → 시야각 → 은신처(표적 제외) → 바꿈.
+	//   같은 스텝에 여럿이면 큰 kFlDrop* 번호. 도망의 마지막 놓침 까닭을 쓴다.
+	// 끝 까닭 kFlight* (서로 겹치지 않는다, 합 = 시작): 잡힘·굶음 = FLEE 스텝에 죽음 (그 스텝에 닫는다), 잘림 = 보고(FlightReportOf) 때 열린 도망,
+	//   살아 끝남 (FLEE 다음 스텝에 닫는다) = 안 쫓김 > 끝 스텝에도 표적(은신처 원 안 → 은신처, 밖 → 붙잡힘) > 마지막 놓침 까닭 (없으면 바꿈).
+	//   스스로 벗어남 = 앞 넷 (은신처·원판·시야각·반경 — 실시간 고리 1차 재료).
+	// 파이썬과 다른 꼴 (값은 같다): 지난 표적을 늑대 칸(_fl_tgt) 대신 사슴마다 늑대 비트(FFlightTrack::PrevBy, 비트 m = 이번 Step 위협 배열 색인)로 둔다 — 통합
+	//   모드는 사슴 배열이 스텝마다 줄어든다(죽은 사슴 빼기). 통합 모드에만 있는 경우: 늑대 수가 바뀐 스텝은 놓침 까닭이 어긋날 수 있고, 목록에서 빠진 사슴의 열린
+	//   도망은 세지 않는다. 늑대 kFlightMaxWolves 마리까지 (UpdateWildFlight 와 같다)
+	inline constexpr std::int32_t kNumFlightCauses = 11;
+	inline constexpr std::int32_t kFlightCover = 0;       // 스스로: 은신처 (끝 스텝 원 안, 또는 원 안이라 표적에서 빠짐)
+	inline constexpr std::int32_t kFlightObstacle = 1;    // 스스로: 원판(나무 줄기·바위)이 늑대 눈길을 가림
+	inline constexpr std::int32_t kFlightFov = 2;         // 스스로: 늑대 시야각 밖
+	inline constexpr std::int32_t kFlightRange = 3;       // 스스로: 늑대 시야 반경 밖
+	inline constexpr std::int32_t kFlightSwitch = 4;      // 늑대가 다른 사슴으로 바꿈
+	inline constexpr std::int32_t kFlightStop = 5;        // 늑대가 사냥을 그만둠 (먹기·배부름·잠·탈진)
+	inline constexpr std::int32_t kFlightHeld = 6;        // 끝 스텝에도 표적 (은신처 원 밖)
+	inline constexpr std::int32_t kFlightUnchased = 7;    // 쫓기지 않음
+	inline constexpr std::int32_t kFlightCaught = 8;
+	inline constexpr std::int32_t kFlightStarved = 9;
+	inline constexpr std::int32_t kFlightTruncated = 10;  // 보고 때 열린 도망
+	inline constexpr std::int32_t kNumFlightOwn = 4;      // 앞 넷 = 스스로 벗어남 (FLIGHT_OWN)
+	inline constexpr std::int32_t kNumFlightHistEdges = 7;
+	inline constexpr std::int32_t kFlightHistSteps[kNumFlightHistEdges] = {8, 15, 38, 75, 150, 300, 600};   // 쫓긴 시간 칸 경계 (스텝, 약 1·2·5·10·20·40·80 초)
+	inline constexpr std::int32_t kFlightMaxWolves = 64;
+	// 놓침 까닭 (FL_DROP_*): 뒤 번호가 앞선다
+	inline constexpr std::int32_t kFlDropNone = 0;
+	inline constexpr std::int32_t kFlDropRange = 1;
+	inline constexpr std::int32_t kFlDropSwitch = 2;
+	inline constexpr std::int32_t kFlDropFov = 3;
+	inline constexpr std::int32_t kFlDropStop = 4;
+	inline constexpr std::int32_t kFlDropObstacle = 5;
+	inline constexpr std::int32_t kFlDropCover = 6;
+	inline constexpr std::int32_t kNumFlDrops = 7;
+	inline constexpr std::int32_t kFlDropCause[kNumFlDrops] = {kFlightSwitch, kFlightRange, kFlightSwitch, kFlightFov, kFlightStop, kFlightObstacle, kFlightCover};
+
+	/** 끝 까닭 이름 (파이썬 FLIGHT_CAUSES 와 같은 글자 — 스냅숏·골든). */
+	inline const char* FlightCauseName(std::int32_t Cause)
+	{
+		static const char* const Names[kNumFlightCauses] = {"cover", "obstacle", "fov", "range", "switch", "stop", "held", "unchased", "caught", "starved", "truncated"};
+		return Cause >= 0 && Cause < kNumFlightCauses ? Names[Cause] : "?";
+	}
+
+	/** 끝 까닭 한국어 (화면·기록). 원판 = 나무 줄기·바위. */
+	inline const char* FlightCauseNameKoUtf8(std::int32_t Cause)
+	{
+		static const char* const Names[kNumFlightCauses] = {"은신처", "나무", "시야각 밖", "시야 밖", "다른 사슴으로", "사냥 그만둠", "끝까지 쫓김", "안 쫓김",
+															"잡힘", "굶음", "잘림"};
+		return Cause >= 0 && Cause < kNumFlightCauses ? Names[Cause] : "?";
+	}
+
+	/** 사슴 하나의 열린 도망 (FHerbDecision::Flight — world.py `_fl_*` 칸의 한 행). */
+	struct FFlightTrack
+	{
+		std::int32_t Len = 0;        // 열린 도망의 실행한 FLEE 스텝 수 (0 = 열린 도망 없음)
+		std::int32_t Contact = 0;    // 표적이던 마지막 FLEE 스텝의 도망 스텝 번호 (쫓긴 시간, 0 = 표적인 스텝 없음)
+		std::int32_t Reflex = 0;     // 반사(실행한 덮기가 도주) 스텝 수
+		std::int32_t Why = kFlDropNone;   // 마지막 놓침 까닭
+		bool bChased = false;        // 쫓김 창(첫 FLEE 스텝 바로 앞 스텝부터)에 이 사슴을 표적으로 둔 늑대가 있었나
+		bool bEndNow = false;        // 지난 FLEE 스텝 끝에 표적이었나 (살아 끝난 도망은 다음 스텝에 이 값으로 닫는다)
+		bool bEndCov = false;        // 그 스텝 끝 위치가 은신처 원 안이었나
+		std::uint64_t PrevBy = 0;    // 지난 스텝 끝에 이 사슴을 표적으로 둔 사냥 중인 늑대 (비트 m = 위협 색인 m. 죽은 사슴은 0)
+	};
+
+	/** 누적 도망 기록 (FWorldStats::Flight). 열린 도망은 사슴 쪽(FFlightTrack)에 있다 — 보고는 FlightReportOf. */
+	struct FFlightStats
+	{
+		std::int64_t Started = 0;                        // 시작한 도망 (started)
+		std::int64_t LiveSteps = 0;                      // 산 사슴-스텝 (스텝 첫머리, live_steps)
+		std::int64_t Num[kNumFlightCauses] = {};         // 끝난 도망 수 (까닭별 — 잘림은 보고 때만 더한다)
+		std::int64_t Steps[kNumFlightCauses] = {};       // 그 도망들의 실행한 FLEE 스텝 합
+		std::int64_t Contact[kNumFlightCauses] = {};     // 그 도망들의 쫓긴 스텝 합
+		std::int64_t ReflexSteps = 0;                    // 끝난 도망의 반사 스텝 합
+		std::int64_t ShelterEnd = 0;                     // 살아 끝난 도망 가운데 끝 스텝 끝 위치가 은신처 원 안 (끝 까닭과 겹친다)
+		std::int64_t Hist[kNumFlightHistEdges + 1] = {}; // 스스로 벗어난 도망의 쫓긴 시간 칸 (칸 k = 경계 가운데 쫓긴 시간 이하인 수)
+	};
+
+	/** 한 스텝의 사슴 재료 (world.py `_fl_update` 인자의 한 행). 단계 함수는 산 사슴만 넘기므로 bAlive0 은 늘 참이다 (골든 되풀이만 거짓을 쓴다). */
+	struct FFlightDeerStep
+	{
+		bool bAlive0 = true;         // 스텝 첫머리에 산 사슴 (live | done)
+		bool bFlee = false;          // 이번 스텝에 FLEE 를 실행했다 (리스폰 전 값)
+		bool bReflex = false;        // 이번 스텝에 실행한 덮기가 도주 (리스폰 전 값)
+		bool bDone = false;          // 이번 스텝에 죽음
+		bool bCaught = false;        // 그 가운데 잡힘 (아니면 굶음)
+		bool bInCov = false;         // 스텝 끝 은신처 원 안 (관측 E 의 지각)
+	};
+
+	/** 한 스텝의 늑대 재료: 스텝 끝 표적·사냥, 그리고 지난 스텝 표적과의 표적 고르기 때 쌍 (world.py `_fl_pred` 의 (m, 지난 표적) 칸). */
+	struct FFlightWolfStep
+	{
+		std::int32_t Target = -1;    // 이번 스텝 표적 (pred_target, 없으면 −1)
+		bool bHuntEnd = false;       // 스텝 끝 사냥 중 (_wf_hunting — FlightHunting)
+		bool bHuntSel = true;        // 표적 고르기 때 사냥 가능 (FThreatStepResult::bHunting)
+		bool bPair = false;          // 아래 쌍 칸을 쟀다 (지난 표적이 있는 늑대. 거짓이면 그만둠·바꿈만 가린다 — 파이썬 _fl_pred 없음과 같다)
+		bool bRange = true;          // 체감 거리 ≤ 늑대 시야 반경
+		bool bVis0 = true;           // 반경과 시야각 안 (원판 가림 전)
+		bool bBlocked = false;       // 그 가운데 원판이 눈길을 가림
+		bool bCover = false;         // 은신처 원 안이라 표적에서 빠짐
+	};
+
+	/** 표적 고르기 때 쌍 하나 (EcoThreatV3::Step 의 1·4 와 같은 식 — 그 늑대의 Step 바로 앞 상태·같은 입력으로 부른다). */
+	struct FFlightPair
+	{
+		bool bRange = true;
+		bool bVis0 = true;
+		bool bBlocked = false;
+		bool bCover = false;
+	};
+
+	inline FFlightPair FlightPairOf(const EcoThreatV3::FThreatState& T, const EcoThreatV3::FPreyView& P, const EcoThreatV3::FThreatStepInput& In,
+									const EcoThreatV3::FThreatConfig& Cfg)
+	{
+		FFlightPair R;
+		const double Dx = P.X - T.PosX;
+		const double Dy = P.Y - T.PosY;
+		const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
+		const double Perceived = Dist * EcoThreatV3::PreyDetectMult(P, Cfg);
+		const double Inv = 1.0 / (Dist > EcoThreatV3::kEps ? Dist : EcoThreatV3::kEps);
+		R.bRange = Perceived <= Cfg.PredViewR * In.WeatherViewMult;
+		R.bVis0 = R.bRange && (Dx * T.HeadX + Dy * T.HeadY) * Inv >= Cfg.PredFovCos;
+		// 원판 가림은 반경·시야각 안 쌍만 잰다 (world.py `_ob_occlude` 가 보임 쌍만 잰다 — 플레이어 대역 행도 같은 식)
+		R.bBlocked = R.bVis0 && In.bObstacleSight && In.Obstacles != nullptr && In.NumObstacles > 0
+					 && EcoThreatV3::SightBlocked(T.PosX, T.PosY, P.X, P.Y, In.Obstacles, In.NumObstacles);
+		// 은신처 표적 제외: 파이썬 realism_shelter untargetable (Cfg.bShelterSafe), 팀 실제 은신처 규칙은 원 안 사슴을 bAlive 거짓으로 뺀다
+		R.bCover = P.bInCover && (Cfg.bShelterSafe || !P.bAlive);
+		return R;
+	}
+
+	/** 쫓긴 시간 칸 (np.searchsorted(FLIGHT_HIST_STEPS, c, side='right') — 경계 가운데 c 이하인 수). */
+	inline std::int32_t FlightHistBin(std::int64_t Contact)
+	{
+		std::int32_t K = 0;
+		while (K < kNumFlightHistEdges && kFlightHistSteps[K] <= Contact)
+		{
+			++K;
+		}
+		return K;
+	}
+
+	/** 놓침 까닭 (world.py `_fl_update` 의 np.select — 그만둠 → 반경 → 원판 → 시야각 → 은신처 → 바꿈). */
+	inline std::int32_t FlightDropCode(const FFlightWolfStep& Wf)
+	{
+		if (!Wf.bHuntEnd || !Wf.bHuntSel)
+		{
+			return kFlDropStop;
+		}
+		if (!Wf.bPair)
+		{
+			return kFlDropSwitch;
+		}
+		return !Wf.bRange ? kFlDropRange : Wf.bBlocked ? kFlDropObstacle : !Wf.bVis0 ? kFlDropFov : Wf.bCover ? kFlDropCover : kFlDropSwitch;
+	}
+
+	/** 도망 하나를 끝 까닭 Cause 로 닫고 칸을 비운다 (world.py `_fl_close`). PrevBy 는 그대로다. */
+	inline void FlightClose(FFlightStats& S, FFlightTrack& T, std::int32_t Cause)
+	{
+		++S.Num[Cause];
+		S.Steps[Cause] += T.Len;
+		S.Contact[Cause] += T.Contact;
+		S.ReflexSteps += T.Reflex;
+		if (Cause < kNumFlightOwn)
+		{
+			++S.Hist[FlightHistBin(T.Contact)];
+		}
+		T.Len = 0;
+		T.Contact = 0;
+		T.Reflex = 0;
+		T.bChased = false;
+		T.Why = kFlDropNone;
+		T.bEndNow = false;
+		T.bEndCov = false;
+	}
+
+	/** 지금 쓸 늑대 비트 (색인 < M, kFlightMaxWolves 까지). */
+	inline std::uint64_t FlightWolfMask(std::int32_t M)
+	{
+		return M <= 0 ? 0ULL : (M >= kFlightMaxWolves ? ~0ULL : ((1ULL << M) - 1ULL));
+	}
+
+	/** 늑대 m 의 지난 스텝 표적 (그 비트가 선 사슴 색인, 없으면 −1 — 파이썬 _fl_tgt[m]). */
+	inline std::int32_t FlightPrevTarget(const FFlightTrack* const* Tracks, std::int32_t N, std::int32_t Wolf)
+	{
+		if (Wolf < 0 || Wolf >= kFlightMaxWolves)
+		{
+			return -1;
+		}
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			if ((Tracks[i]->PrevBy >> Wolf) & 1ULL)
+			{
+				return i;
+			}
+		}
+		return -1;
+	}
+
+	/**
+	 * 도망 기록 한 스텝 (world.py `_fl_update` 와 줄마다 같다 — 기록만, 덮기·동역학·난수를 바꾸지 않는다). Tracks·Deer 는 사슴 N, Wolves 는 늑대 M (같은 스텝의
+	 * 배열 순서). 늑대 m 의 쌍 칸은 그 늑대의 지난 표적(FlightPrevTarget)과의 값이어야 한다.
+	 */
+	inline void FlightUpdate(FFlightStats& S, FFlightTrack* const* Tracks, const FFlightDeerStep* Deer, std::int32_t N, const FFlightWolfStep* Wolves,
+							 std::int32_t M)
+	{
+		const std::int32_t Mc = M < kFlightMaxWolves ? M : kFlightMaxWolves;
+		const std::uint64_t Valid = FlightWolfMask(Mc);
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			FFlightTrack& T = *Tracks[i];
+			const FFlightDeerStep& Dd = Deer[i];
+			S.LiveSteps += Dd.bAlive0 ? 1 : 0;
+			const bool bEx = Dd.bFlee && Dd.bAlive0;
+			std::uint64_t Now = 0;   // 스텝 끝에 이 사슴을 표적으로 둔 사냥 중인 늑대
+			for (std::int32_t m = 0; m < Mc; ++m)
+			{
+				Now |= (Wolves[m].bHuntEnd && Wolves[m].Target == i) ? (1ULL << m) : 0ULL;
+			}
+			const std::uint64_t Prev = T.PrevBy & Valid;
+			// 1) 지난 스텝까지 FLEE 였고 이번 스텝은 아님: 살아 끝난 도망 — 끝 스텝 끝에 떠 둔 상태로 닫는다
+			if (T.Len > 0 && !bEx)
+			{
+				std::int32_t Cause = kFlDropCause[T.Why >= 0 && T.Why < kNumFlDrops ? T.Why : kFlDropNone];
+				if (T.bEndNow)
+				{
+					Cause = T.bEndCov ? kFlightCover : kFlightHeld;
+				}
+				if (!T.bChased)
+				{
+					Cause = kFlightUnchased;
+				}
+				S.ShelterEnd += T.bEndCov ? 1 : 0;
+				FlightClose(S, T, Cause);
+			}
+			if (bEx)
+			{
+				// 2) 이번 스텝 FLEE: 새 도망이면 쫓김 창은 지난 스텝 표적부터
+				if (T.Len == 0)
+				{
+					++S.Started;
+					T.bChased = Prev != 0;
+					T.Why = kFlDropNone;
+				}
+				// 놓침: 지난 스텝 표적이던 이 사슴을 이번 스텝 끝에 표적으로 두지 않은 늑대. 같은 스텝 여럿이면 큰 번호
+				std::int32_t Why = kFlDropNone;
+				for (std::uint64_t Dm = Prev & ~Now; Dm != 0; Dm &= Dm - 1ULL)
+				{
+					std::int32_t m = 0;
+					while (((Dm >> m) & 1ULL) == 0ULL)
+					{
+						++m;
+					}
+					const std::int32_t Code = FlightDropCode(Wolves[m]);
+					Why = Code > Why ? Code : Why;
+				}
+				if (Why > kFlDropNone)
+				{
+					T.Why = Why;
+				}
+				++T.Len;
+				T.Reflex += Dd.bReflex ? 1 : 0;
+				if (Now != 0)
+				{
+					T.Contact = T.Len;
+					T.bChased = true;
+				}
+				T.bEndNow = Now != 0;
+				T.bEndCov = Dd.bInCov;
+				// 3) FLEE 를 실행한 스텝에 죽음: 그 스텝에 닫는다 (학습 세계의 새 개체는 다음 스텝부터 새 도망)
+				if (Dd.bDone)
+				{
+					FlightClose(S, T, Dd.bCaught ? kFlightCaught : kFlightStarved);
+				}
+			}
+			// 다음 스텝의 지난 표적. 죽은(평면 맵은 다시 난) 사슴을 쫓던 기록은 잇지 않는다
+			T.PrevBy = Dd.bDone ? 0ULL : Now;
+		}
+	}
+
+	/** 열린 도망 합 (보고의 잘림 — 사슴 쪽 FFlightTrack 에서 모은다). */
+	struct FFlightOpen
+	{
+		std::int64_t Num = 0;
+		std::int64_t Steps = 0;
+		std::int64_t Contact = 0;
+		std::int64_t Reflex = 0;
+
+		void Add(const FFlightTrack& T)
+		{
+			if (T.Len > 0)
+			{
+				++Num;
+				Steps += T.Len;
+				Contact += T.Contact;
+				Reflex += T.Reflex;
+			}
+		}
+	};
+
+	/** 도망 기록 보고 (world.py `flight_stats` 의 dict 와 같은 칸 — 지금 열린 도망은 잘림으로 센다. 세계는 그대로). */
+	struct FFlightReport
+	{
+		std::int64_t Started = 0;
+		std::int64_t LiveSteps = 0;
+		std::int64_t FleeSteps = 0;      // 실행한 FLEE 사슴-스텝 (열린 도망 포함)
+		std::int64_t ReflexSteps = 0;    // 그 가운데 반사 (열린 도망 포함)
+		std::int64_t Num[kNumFlightCauses] = {};
+		std::int64_t Steps[kNumFlightCauses] = {};
+		std::int64_t Contact[kNumFlightCauses] = {};
+		std::int64_t OwnN = 0;
+		std::int64_t OwnSteps = 0;
+		std::int64_t OwnContact = 0;
+		std::int64_t ShelterEnd = 0;
+		std::int64_t Hist[kNumFlightHistEdges + 1] = {};
+	};
+
+	inline FFlightReport FlightReportOf(const FFlightStats& S, const FFlightOpen& Open)
+	{
+		FFlightReport R;
+		R.Started = S.Started;
+		R.LiveSteps = S.LiveSteps;
+		for (std::int32_t c = 0; c < kNumFlightCauses; ++c)
+		{
+			R.Num[c] = S.Num[c];
+			R.Steps[c] = S.Steps[c];
+			R.Contact[c] = S.Contact[c];
+		}
+		R.Num[kFlightTruncated] += Open.Num;
+		R.Steps[kFlightTruncated] += Open.Steps;
+		R.Contact[kFlightTruncated] += Open.Contact;
+		for (std::int32_t c = 0; c < kNumFlightCauses; ++c)
+		{
+			R.FleeSteps += R.Steps[c];
+		}
+		R.ReflexSteps = S.ReflexSteps + Open.Reflex;
+		for (std::int32_t c = 0; c < kNumFlightOwn; ++c)
+		{
+			R.OwnN += R.Num[c];
+			R.OwnSteps += R.Steps[c];
+			R.OwnContact += R.Contact[c];
+		}
+		R.ShelterEnd = S.ShelterEnd;
+		for (std::int32_t k = 0; k <= kNumFlightHistEdges; ++k)
+		{
+			R.Hist[k] = S.Hist[k];
+		}
+		return R;
+	}
+
 	// ---- R3 감지 (파이썬 realism_vision (a), 야생 1단계가 값 그대로 켠다 — 명세 3-3). 기본 끔 = R1b 학습 세계 그대로 ----
 	// 사슴이 위협을 보는 시야각만 넓힌다(반경·밤·행동 배수 그대로). 동족 시야각(kin_fov_deg)은 거울 세계도 120° 그대로라 옮기지 않았다
 	struct FRealismVisionConfig
@@ -561,6 +927,9 @@ namespace EcoWorldV3
 		FWeatherConfig Weather;
 		// 감지 기록 (FWorldStats::Sense* — 통합 모드가 켠다). 기록만, 끄면 세지 않는다 (평면 맵·기준 루프는 그대로)
 		bool bSenseStats = false;
+		// 야생 (w3) 도망 기록 (10-21, FWorldStats::Flight·FHerbDecision::Flight — world.py track_flight, 통합 모드가 켠다). 기록만, WildFlight 를 켠
+		// 세계만 센다. 끄면(기본) 아무것도 세지 않는다 (평면 맵·기준 루프·골든 그대로)
+		bool bFlightStats = false;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -1030,6 +1399,9 @@ namespace EcoWorldV3
 		std::int32_t KeepActive = kKeepNone;   // 이번 스텝에 실행한 덮기 (화면·기록)
 		FVec2 KeepDir;                         // 경계·도주 방향 (단위벡터, 스텝 끝 기하. 없으면 0)
 		std::int32_t KeepPanicSteps = 0;       // 이번 도망이 이어진 스텝 수
+
+		// 야생 (w3) 도망 기록 (FWorldConfig::bFlightStats 일 때만 쓴다 — 기록만. 끄면 늘 기본값)
+		FFlightTrack Flight;
 	};
 
 	/** 위협 하나 (FEcoThreatStateFragment). */
@@ -1152,6 +1524,8 @@ namespace EcoWorldV3
 		std::int64_t RefugeCaptureViolations = 0;
 		// R5 장애물 관측: 망 관측 칸 수(두뇌)가 세계가 만드는 관측(FWorldState::ObsDim)보다 많았던 결정 (늘 0 이어야 한다 — SetModelObsDim 을 빠뜨렸다)
 		std::int64_t ObsLayoutMismatch = 0;
+		// 야생 (w3) 도망 기록 (FWorldConfig::bFlightStats ∧ WildFlight 일 때만 — 머리 주석 '도망 기록'. 보고는 FlightReportOf)
+		FFlightStats Flight;
 	};
 
 	/**
@@ -1215,6 +1589,11 @@ namespace EcoWorldV3
 		std::vector<double> Want;
 		std::vector<double> EDrained;
 		std::vector<std::int32_t> CellIdx;
+		// 도망 기록 (bFlightStats 일 때만): 늑대마다 지난 표적·이번 스텝 재료, 사슴마다 재료·열린 도망
+		std::vector<std::int32_t> FlightPrevTgt;
+		std::vector<FFlightWolfStep> FlightWolves;
+		std::vector<FFlightDeerStep> FlightDeer;
+		std::vector<FFlightTrack*> FlightTracks;
 	};
 
 	// ---- 세계 생성·낮밤 ----
@@ -2120,6 +2499,88 @@ namespace EcoWorldV3
 			O.DrainMult = RC.GaitDrain[R3::kGaitWalk];
 			O.SeeMult = 1.0;
 		}
+
+		// ---- 야생 (w3) 도망 기록 (FWorldConfig::bFlightStats ∧ WildFlight — 기록만. 머리 주석 '도망 기록') ----
+
+		/** C2 앞: 늑대마다 지난 스텝 표적(사슴의 PrevBy 비트 — 이번 Step 배열 색인)을 찾고 이번 스텝 재료 칸을 비운다. */
+		inline void FlightBeginThreats(FWorldState& W, const FHerbView* Herbs, std::int32_t N, std::int32_t M)
+		{
+			W.FlightWolves.assign(static_cast<size_t>(M > 0 ? M : 0), FFlightWolfStep());
+			W.FlightPrevTgt.assign(static_cast<size_t>(M > 0 ? M : 0), -1);
+			const std::uint64_t Valid = FlightWolfMask(M < kFlightMaxWolves ? M : kFlightMaxWolves);
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				for (std::uint64_t B = Herbs[i].Decision->Flight.PrevBy & Valid; B != 0; B &= B - 1ULL)
+				{
+					std::int32_t m = 0;
+					while (((B >> m) & 1ULL) == 0ULL)
+					{
+						++m;
+					}
+					W.FlightPrevTgt[static_cast<size_t>(m)] = i;
+				}
+			}
+		}
+
+		/** C2 위협 Step 바로 앞 (그 늑대의 이동 전 상태·이번 입력 — 표적 고르기와 같은 값): 지난 표적과의 쌍 (world.py `_fl_pred`). */
+		inline void FlightBeforeThreatStep(FWorldState& W, std::int32_t m, const FThreatAgent& A, const EcoThreatV3::FThreatStepInput& In)
+		{
+			const std::int32_t i = W.FlightPrevTgt[static_cast<size_t>(m)];
+			if (i < 0 || i >= In.NumPrey)
+			{
+				return;
+			}
+			const FFlightPair Pr = FlightPairOf(A.State, In.Prey[i], In, W.ThreatCfg);
+			FFlightWolfStep& Wf = W.FlightWolves[static_cast<size_t>(m)];
+			Wf.bPair = true;
+			Wf.bRange = Pr.bRange;
+			Wf.bVis0 = Pr.bVis0;
+			Wf.bBlocked = Pr.bBlocked;
+			Wf.bCover = Pr.bCover;
+		}
+
+		/**
+		 * H (UpdateWildFlight 앞 — 리스폰이 지운 칸의 덮기를 읽기 전에): 이번 스텝의 실행한 FLEE·실행한 덮기·죽음·스텝 끝 은신처, 늑대의 스텝 끝 표적·사냥으로
+		 * 도망 기록 한 스텝 (world.py `_wf_update` 끝의 `_fl_update`). 단계 함수는 산 사슴만 받으므로 모두 스텝 첫머리에 산 사슴이다.
+		 */
+		inline void FlightStepEnd(FWorldState& W, const FHerbView* Herbs, std::int32_t N, FThreatAgent* const* Threats, std::int32_t M)
+		{
+			W.FlightDeer.resize(static_cast<size_t>(N));
+			W.FlightTracks.resize(static_cast<size_t>(N));
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				const FHerbView& H = Herbs[i];
+				const FHerbDecision& D = *H.Decision;
+				FFlightDeerStep& Dd = W.FlightDeer[static_cast<size_t>(i)];
+				Dd.bAlive0 = true;
+				Dd.bFlee = D.ExecutedBehavior == EcoRepertoireV3::kFlee;
+				Dd.bReflex = D.KeepActive == kKeepPanic;
+				Dd.bDone = H.Body->DeathCause != kDeathNone;
+				Dd.bCaught = H.Body->DeathCause == kDeathCaught;
+				Dd.bInCov = H.Perception->Cover.bInCover;
+				W.FlightTracks[static_cast<size_t>(i)] = &H.Decision->Flight;
+			}
+			W.FlightWolves.resize(static_cast<size_t>(M > 0 ? M : 0));
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				const FThreatAgent& A = *Threats[m];
+				FFlightWolfStep& Wf = W.FlightWolves[static_cast<size_t>(m)];
+				Wf.Target = A.Last.bHasTarget ? A.Last.Target : -1;
+				Wf.bHuntEnd = FlightHunting(W, A);
+			}
+			FlightUpdate(W.Stats.Flight, W.FlightTracks.data(), W.FlightDeer.data(), N, W.FlightWolves.data(), M);
+		}
+	}
+
+	/** 지금 열린 도망 합 (도망 기록 보고의 잘림 — FlightReportOf(W.Stats.Flight, FlightOpenOf(...))). */
+	inline FFlightOpen FlightOpenOf(const FHerbView* Herbs, std::int32_t N)
+	{
+		FFlightOpen O;
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			O.Add(Herbs[i].Decision->Flight);
+		}
+		return O;
 	}
 
 	/**
@@ -2138,6 +2599,7 @@ namespace EcoWorldV3
 		const bool bKeep = W.Config.WildFlight.bEnabled;   // 도주 반사 거리 (끄면 아래 bKeep 줄은 모두 건너뛴다 — 지금 그대로)
 		const bool bReserve = W.Config.WildReserve.bEnabled;   // 야생 (w1) 지방 비축 (끄면 아래 bReserve 줄은 모두 건너뛴다 — 지금 그대로)
 		const bool bWeather = W.Config.Weather.bEnabled;       // 야생 3단계 지역 날씨 (끄면 아래 bWeather 줄은 모두 건너뛴다 — 지금 그대로)
+		const bool bFlight = bKeep && W.Config.bFlightStats;   // 야생 (w3) 도망 기록 (기록만 — 끄면 아래 bFlight 줄은 모두 건너뛴다)
 		if (bWeather)
 		{
 			++W.Stats.WeatherSteps[W.WeatherKind];   // 기록만: 이 스텝 이동에 쓰는 결정 때 날씨 (world.py weather_stats steps_<날씨>)
@@ -2322,6 +2784,10 @@ namespace EcoWorldV3
 			W.Stats.ShelterDeerSteps += P.bInCover ? 1 : 0;   // 야생 2단계 기록만: 은신처 안 시간
 		}
 		W.Stats.LiveDeerSteps += N;
+		if (bFlight)
+		{
+			Detail::FlightBeginThreats(W, Herbs, N, M);   // 도망 기록: 늑대마다 지난 표적 (기록만)
+		}
 		W.Rolls.resize(static_cast<size_t>(N));
 		W.CaughtByThreat.assign(static_cast<size_t>(M), -1);
 		W.ShelterDiscs.clear();
@@ -2457,8 +2923,16 @@ namespace EcoWorldV3
 					++W.Stats.RefugeRecoveries;
 				}
 			}
+			if (bFlight)
+			{
+				Detail::FlightBeforeThreatStep(W, m, A, In);   // 도망 기록: 지난 표적과의 표적 고르기 쌍 (이동 전 상태 — 기록만)
+			}
 			const std::int32_t PreCd = A.State.Cooldown;
 			A.Last = EcoThreatV3::Step(A.Spec, A.State, In, W.ThreatCfg);
+			if (bFlight)
+			{
+				W.FlightWolves[static_cast<size_t>(m)].bHuntSel = A.Last.bHunting;
+			}
 			if (bObstacles)
 			{
 				// 야생 2단계 3 기록만 (world.py obstacle_stats wolf_*)
@@ -2722,6 +3196,11 @@ namespace EcoWorldV3
 		}
 
 		// H. 다음 스텝 요청. 도주 반사 거리를 켠 세계는 먼저 스텝 끝 기하로 다음 스텝의 덮기를 정한다 (도주·웅크림이면 DecideHerb 가 망을 부르지 않는다)
+		if (bFlight)
+		{
+			// 도망 기록 (기록만): 이번 스텝에 실행한 덮기를 UpdateWildFlight 가 리스폰 칸에서 지우기 전에 (world.py `step` 이 리스폰 전에 떠 둔 사본과 같다)
+			Detail::FlightStepEnd(W, Herbs, N, Threats, M);
+		}
 		if (bKeep)
 		{
 			Detail::UpdateWildFlight(W, Herbs, N, Threats, M);

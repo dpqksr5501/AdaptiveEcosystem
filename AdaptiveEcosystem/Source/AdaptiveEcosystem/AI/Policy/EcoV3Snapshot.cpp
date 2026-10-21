@@ -175,6 +175,29 @@ namespace EcoV3SnapshotImpl
 		return Out;
 	}
 
+	/** 도망 기록 창·두뇌 판 합 (EcoV3Flight::FSum — 끝난 도망만, 열린 도망 없음. 초 = 결정 스텝 × 2/15). */
+	TSharedRef<FJsonObject> FlightSumJson(const EcoV3Flight::FSum& S)
+	{
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetNumberField(TEXT("started"), static_cast<double>(S.Started));
+		J->SetNumberField(TEXT("ended"), static_cast<double>(S.Ended));
+		J->SetNumberField(TEXT("ended_steps"), static_cast<double>(S.EndedSteps));
+		J->SetNumberField(TEXT("own_n"), static_cast<double>(S.OwnN()));
+		J->SetNumberField(TEXT("own_steps"), static_cast<double>(S.OwnSteps));
+		J->SetNumberField(TEXT("own_contact"), static_cast<double>(S.OwnContact));
+		TSharedRef<FJsonObject> Own = MakeShared<FJsonObject>();
+		for (int32 c = 0; c < EcoWorldV3::kNumFlightOwn; ++c)
+		{
+			Own->SetNumberField(UTF8_TO_TCHAR(EcoWorldV3::FlightCauseName(c)), static_cast<double>(S.Own[c]));
+		}
+		J->SetObjectField(TEXT("own"), Own);
+		J->SetNumberField(TEXT("unsafe"), static_cast<double>(S.Unsafe));
+		J->SetNumberField(TEXT("mean_seconds"), S.MeanSeconds());
+		J->SetNumberField(TEXT("own_chase_seconds"), S.OwnChaseSeconds());
+		J->SetNumberField(TEXT("own_share"), S.OwnShare());
+		return J;
+	}
+
 	const TCHAR* WeatherName(int32 Kind)
 	{
 		static const TCHAR* const Names[EcoWorldV3::kNumWeatherKinds] = {TEXT("clear"), TEXT("rain"), TEXT("snow")};
@@ -572,6 +595,44 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 			J->SetArrayField(TEXT("hunt_success"), IntArray(W.Stats.HuntSuccess));
 			J->SetArrayField(TEXT("hunt_outside"), IntArray(W.Stats.HuntOutside));
 			R->SetObjectField(TEXT("wolves"), J);
+		}
+		{
+			// 야생 (w3) 도망 기록 (10-21, 더한 칸 — 앞 칸은 그대로). 앞 칸 = 파이썬 world.py flight_stats 와 같은 이름·정의 (지금 열린 도망은 truncated).
+			// window = 최근 60 초에 끝난 도망, generation·prev_generation = 지금·바로 앞 두뇌 판 (EcoV3FlightTally.h). 기록을 세지 않는 세계는 on 거짓·모두 0
+			const EcoWorldV3::FFlightReport F = EcoWorldV3::FlightReportOf(W.Stats.Flight, Ctx.FlightOpen);
+			TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+			J->SetBoolField(TEXT("on"), Ctx.FlightOn());
+			J->SetNumberField(TEXT("started"), static_cast<double>(F.Started));
+			J->SetNumberField(TEXT("live_steps"), static_cast<double>(F.LiveSteps));
+			J->SetNumberField(TEXT("flee_steps"), static_cast<double>(F.FleeSteps));
+			J->SetNumberField(TEXT("reflex_steps"), static_cast<double>(F.ReflexSteps));
+			auto ByCause = [](const int64* Values)
+			{
+				TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+				for (int32 c = 0; c < EcoWorldV3::kNumFlightCauses; ++c)
+				{
+					O->SetNumberField(UTF8_TO_TCHAR(EcoWorldV3::FlightCauseName(c)), static_cast<double>(Values[c]));
+				}
+				return O;
+			};
+			J->SetObjectField(TEXT("n"), ByCause(F.Num));
+			J->SetObjectField(TEXT("steps"), ByCause(F.Steps));
+			J->SetObjectField(TEXT("contact"), ByCause(F.Contact));
+			J->SetNumberField(TEXT("own_n"), static_cast<double>(F.OwnN));
+			J->SetNumberField(TEXT("own_steps"), static_cast<double>(F.OwnSteps));
+			J->SetNumberField(TEXT("own_contact"), static_cast<double>(F.OwnContact));
+			J->SetNumberField(TEXT("shelter_end"), static_cast<double>(F.ShelterEnd));
+			J->SetArrayField(TEXT("hist"), IntArray(F.Hist));
+			J->SetArrayField(TEXT("hist_edges"), IntArray(EcoWorldV3::kFlightHistSteps));
+			const EcoV3Flight::FTally& T = Ctx.FlightTally;
+			J->SetNumberField(TEXT("window_steps"), static_cast<double>(T.WindowSteps()));
+			J->SetObjectField(TEXT("window"), FlightSumJson(T.Window()));
+			J->SetObjectField(TEXT("generation"), FlightSumJson(T.CurrentGen()));
+			J->SetObjectField(TEXT("prev_generation"), FlightSumJson(T.PrevGen));
+			J->SetBoolField(TEXT("has_prev_generation"), T.bHasPrev);
+			J->SetNumberField(TEXT("swaps"), T.Swaps);
+			J->SetNumberField(TEXT("min_compare"), EcoV3Flight::kMinCompare);
+			R->SetObjectField(TEXT("flight"), J);
 		}
 		Regions.Add(MakeShared<FJsonValueObject>(R));
 	}
