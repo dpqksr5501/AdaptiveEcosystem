@@ -4,10 +4,11 @@
 - 기준: `Branch_Sinhyeok`. 팀 브랜치 `codex/social-shelter-handoff` 를 합친 `7029579`, Social 연결을 기본으로 끈 `422e307`(사람 결정 10-17 (8)) 뒤다.
 - 담당은 `RL_V3_UNREAL_TRAINING_PLAN.md` 5절 표의 '누가' 칸을 따랐다. 확실하지 않은 담당은 '(추정)'으로 적었다.
 - 10-16 판의 요청 가운데 통합으로 끝난 것은 1절에 모았고, 2~5절에는 아직 열린 요청만 남겼다.
+- 10-22 갱신: wonkii 님 `0e915c7` 로 2절 6 이 끝났다(1절). 10-21 의 Play 중 환경 감시·두뇌 교체 고리와 이어지는 새 요청을 9절에 모았다(날씨 값·나무 놓는 꼴·먹이 조정 API·#S1·숲 시야 화면). 바뀐 곳에 '(10-22)' 를 붙였다.
 
 ## 0. 지금 상태 (한 문단)
 
-팀 통합 레벨(`/Game/Map/LV_Ecosystem_IntegrationTest`)을 명령줄 `-EcoIntegratedV3`(또는 콘솔 `eco.IntegratedPolicyVersion 3`)로 Play 하면, 사슴은 학습 두뇌(R1b)와 야생 규칙으로, 늑대는 우리 늑대 규칙으로 움직인다. 10-17 에 팀 브랜치를 합쳐서 팀의 몸(개체·지형·표현·죽음 처리·복제·먹이 장부)과 우리 머리가 한 브랜치에 있다. 은신처 안전 규칙은 우리 규칙 하나(`eco.IntegratedV3.ShelterSafe 1`)이고, 팀의 실제 은신처 생명주기(`eco.IntegratedV3.ProtectedRefuges 1`)가 그 위에 더해진다. 팀의 무리 경보 행동 연결은 기본 끔이다(`eco.IntegratedV3.SocialControl 0`, 사람 결정 10-17 (8)). Social 처리기는 그대로 돌며 기록하고, 경보 연출(소리·고개 들기 표현)은 이 스위치와 따로 돈다. 언리얼 결과는 파이썬 거울 세계와 표본 흔들림 안으로 같다(`herbivore_rl/results/v3/wild1/compare_unreal.md`). 켜고 끄는 콘솔 변수는 `RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b 에 있다. `eco.IntegratedPolicyVersion 1`(기본)이면 팀 원래 동작 그대로다. 10-18 에 통합 레벨에 우리 나무 액터를 더했다(7절).
+팀 통합 레벨(`/Game/Map/LV_Ecosystem_IntegrationTest`)을 명령줄 `-EcoIntegratedV3`(또는 콘솔 `eco.IntegratedPolicyVersion 3`)로 Play 하면, 사슴은 학습 두뇌(R1b)와 야생 규칙으로, 늑대는 우리 늑대 규칙으로 움직인다. 10-17 에 팀 브랜치를 합쳐서 팀의 몸(개체·지형·표현·죽음 처리·복제·먹이 장부)과 우리 머리가 한 브랜치에 있다. 은신처 안전 규칙은 우리 규칙 하나(`eco.IntegratedV3.ShelterSafe 1`)이고, 팀의 실제 은신처 생명주기(`eco.IntegratedV3.ProtectedRefuges 1`)가 그 위에 더해진다. 팀의 무리 경보 행동 연결은 기본 끔이다(`eco.IntegratedV3.SocialControl 0`, 사람 결정 10-17 (8)). Social 처리기는 그대로 돌며 기록하고, 경보 연출(소리·고개 들기 표현)은 이 스위치와 따로 돈다. 언리얼 결과는 파이썬 거울 세계와 표본 흔들림 안으로 같다(`herbivore_rl/results/v3/wild1/compare_unreal.md`). 켜고 끄는 콘솔 변수는 `RL_V3_UNREAL_TRAINING_PLAN.md` 4-5b 에 있다. `eco.IntegratedPolicyVersion 1`(기본)이면 팀 원래 동작 그대로다. 10-18 에 통합 레벨에 우리 나무 액터를 더했다(7절). (10-22) 10-21 부터 통합 v3 모드(개발 빌드)는 Play 중에 레벨이 바꾼 나무·날씨를 다음 결정 스텝에 사슴 세계에 넣는다(`eco.IntegratedV3.EnvWatch` 기본 1, 바뀐 것이 없으면 결과 그대로, `LIVE_ADAPT_SPEC.md`). 팀 쪽 부탁은 9절.
 
 ## 1. 통합으로 끝난 것 (요청 닫음)
 
@@ -19,6 +20,7 @@
 | 경보 연출 주인 | 조연우 | 서버 `Herd.Alarm` 소리 → 근처 사슴의 Hearing·고개 들기 표현, Client 경보 큐(임시 합성음). 무리 경보 행동 연결(`22eb1b6`)도 왔지만 10-17 (8)로 기본 끔 | 행동 연결을 '신호만'으로 바꾸기(2절 1) |
 | 먹이 장부 연결 | 조연우 (wonkii 님께 요청했던 것) | `RegisterSpatialFood`·`CommitSpatialFood`: 지역 먹이 값 = v3 먹이 격자의 합, 보존식 검사, 그 지역의 다른 먹이 writer 막음. 그래서 v3 지역은 `AEcologyRegion` 재생률과 따로 돈다 | 없음 |
 | 클라이언트 복제 | 조연우 | 서버·Client 공통 v3 설정(`UEcoCreatureV3Trait::MakeNetworkConfig`), 행동·늑대 상태가 표현 DTO 로 간다. Dedicated + Client 두 번 접속 확인 | 없음 |
+| (10-22) 늑대 눕는 중·깨는 중 표시 (2절 6) | wonkii | `0e915c7`(10-21, PR #12 검토 중 발견): `Settle` → Rest, `Waking` → Wander, 상태 수 컴파일 검사, 범위 밖이면 Hold. 그 뒤 `1bb3dc3` 빌드 두 방식·자동화 197(실패 0)이 이 수정을 포함한다 | 없음 |
 | (참고) M4 폐루프·StateTree | wonkii | `54d5d5b` M4 폐루프, 사슴·늑대 StateTree 런타임, JWJ 레벨(`64a8cd0`). v3 개체에는 StateTree 이동이 붙지 않는다(이동 writer 하나) | 없음 |
 
 ## 2. 조연우 님 (Creature 런타임·Social)
@@ -41,6 +43,7 @@
    - 이번 통합에서 `EcoWorldV3.h`·`EcoObservationV3.h`·`EcoPolicyV3Integrated*`·`EcoCreatureV3Trait`·통합 시험이 바뀌었다(`a88eac8`, `22eb1b6`). 모두 스위치 뒤라 파이썬 세계와 결과는 그대로였다.
    - 그래도 이 파일들은 파이썬 세계와 줄마다 맞춰야 한다(골든 시험). 같은 일을 두 쪽이 따로 만들기도 했다(은신처 안전).
    - 바라는 것: 바꾸기 전에 한 줄 알림이나 PR 설명. 끼워 넣을 자리(`EcoWorldV3::FStepHooks` 같은 훅)가 필요하면 우리가 만든다.
+   - (10-22) 이제 엔진 없는 평가기 `Tools/EcoV3Eval` 도 이 헤더를 그대로 컴파일한다(UBT 밖). 헤더가 바뀌면 평가기도 다시 빌드해야 한다. 우리 쪽 바뀜도 알린다: 10-21 `FHerbDecision` 에 도망 기록 `FFlightTrack` 이 들어가 `FEcoBehaviorStateFragment`(v3 사슴마다)가 32 바이트 커졌다.
 4. **은신처 바위 테두리와 늑대 몸 여유** (새)
    - `AEcoRefugeHabitat::RebuildHabitat` 는 바위 중심을 반경 안쪽 65 cm(R − 65 cm)에 두고 크기 5.5~8배로 놓는다.
    - 우리는 10-17 에 늑대 몸 여유 1 m 를 넣었다(파이썬 `realism_shelter.wolf_margin` 0.5, 언리얼 `eco.IntegratedV3.WolfBodyMargin` 기본 1 m). 늑대 중심은 원 둘레 밖 1 m 둘레를 따라 미끄러진다(팀 규칙의 100 cm 와 같은 값). 사슴 쪽(원 안 안전)은 원 반지름 그대로다. `ShelterSafe 0` 이면 우리 여유는 0 이고 팀 규칙 여유만 쓴다.
@@ -53,10 +56,8 @@
    - 확인할 것: 시연에서 플레이어는 사슴에게 사냥꾼(늑대처럼 피함)인가, 관찰자인가.
      - 사냥꾼이면 5절 #11 추천과 같다. 걷기 360·잠행 270·달리기 900 cm/s 는 학습 범위(돌진 최대 1170) 안이라 괜찮다.
      - 관찰자이면 컴포넌트의 위협을 끄거나, 우리가 스위치를 만든다.
-6. **늑대 '눕는 중'·'깨는 중' 표시 (버그)** (새)
-   - `Creature/Runtime/EcoCreatureLifecycle.cpp` 260줄 근처 늑대 상태 표는 7칸이다. 그런데 `EcoV3Integrated::WolfStateOf` 는 9가지를 돌려준다(눕는 중 `Settle`·깨는 중 `Waking` 포함).
-   - 밤잠 점진화(기본 켬)에서는 해 질 녘·새벽마다 배열 밖을 읽는다.
-   - 바라는 것: 두 칸을 더하기(예: 눕는 중 → Rest, 깨는 중 → Wander). 이름은 같이 정한다.
+6. ~~**늑대 '눕는 중'·'깨는 중' 표시 (버그)**~~ — (10-22) 끝남: wonkii 님 `0e915c7` 이 눕는 중 → Rest, 깨는 중 → Wander 로 맞췄다(1절).
+   - (그 전) `EcoCreatureLifecycle.cpp` 의 늑대 상태 표는 7칸인데 `EcoV3Integrated::WolfStateOf` 는 9가지(`Settle`·`Waking` 포함)를 돌려줘 해 질 녘·새벽마다 배열 밖을 읽었다.
 7. **남은 애니메이션 연결** (10-16 요청 1 중 남은 것)
    - 사슴 경계: 먹으며 걷고 고개를 든다. `FEcoBehaviorStateFragment::Decision.KeepActive == EcoWorldV3::kKeepAlert`(Inspector `flight_override` 1).
    - 사슴 약함: 비축으로 사는 몸이라 느리게 걷는다. `FEcoHerbivoreBodyV3Fragment::Body.bWeak`.
@@ -102,6 +103,7 @@
        게임 값으로 잇고 싶으면 이미 있는 `AEcoRegionEnvironmentAdapter::ApplyRainfall` 을 서버에서 부르면 된다(우리 학습 세계의 날씨 규칙은 아직 없다 — 나중에 같이 정한다).
        `BP_SkyManager` 의 SunSpeed 는 팀 시계와 따로 돌아서, 올리면 보이는 해·달과 동물의 낮밤(통합 v3 모드 60 + 60 초)이 어긋난다. `OnClockUpdated` 로 시계에 맞추기를 권한다.
      - 보낼 글(붙여 넣기용): `FEEDBACK_AVAROKI_1017.md` — 무대 상자 좌표·은신처 자리·나무 수, 날씨 값을 읽을 곳(`GetEnvironmentState`, 눈 칸 더하기, 지역마다 어댑터), 공식 레벨 정하기. 학습 계획은 `RL_V3_R4_PLAN.md`.
+   - (10-22) 그 PR 은 10-20 main 에 병합됐다(PR #13, `ff4f287` — 내용은 위에서 읽은 `ff8c8f4` 그대로). 그 뒤 위 요청 1~4 를 다루는 팀 커밋은 없다(`Beech_Tree` 애셋도 그대로). 날씨 값 연결·Play 중 나무는 9절 1·2 로 이어진다.
 2. **공식 레벨에 보호 은신처 놓기** (5절 #6)
    - 조연우 님의 `BP_JYU_ProtectedRefuge` 를 공식 레벨의 동물 무대 안에 놓는다. 지역마다 4곳 이상, 반경 8~12 m, 먹이 자리 둘레 약 150 m 안.
    - 그러면 우리 코드가 그 자리를 읽고 임시 은신처를 만들지 않는다. 자동 생성은 하지 않는다(팀 규칙).
@@ -166,3 +168,47 @@
   - 기본은 내장 두뇌(지금 게임 두뇌 R1b-F)이고 폴더 감시도 끔이다. v1 모드·팀 프로세서·팀 파일·Config 는 그대로다.
   - 서버·단독만 돈다. 클라이언트 콘솔에서 치면 거부한다. 개발 빌드 전용이라 Shipping 에는 명령이 없다.
 - 팀 합의 #S1(5절 안건 17 '개발 빌드 가중치 교체 허용')은 아직 정하지 않았다. 반대가 있으면 알려 달라 — 콘솔 명령을 빼고 재빌드 경로만 쓴다.
+- (10-22) 10-21 에 같은 기능 위에 적응 고리·되돌리기·환경 감시를 더했다. #S1 은 9절 4 에서 함께 묻는다.
+
+## 9. 요청 (10-22) — 레벨이 Play 중에 바꾼 환경을 v3 사슴이 따라가게
+
+- 배경: 10-21 에 환경 감시를 넣었다(`3d9ce24`, `LIVE_ADAPT_SPEC.md` 5.1). 통합 v3 모드(개발 빌드)는 Play 중에 레벨 나무(꼬리표 `EcoV3Trunk` 줄기 막이)와 지역 날씨가 바뀌면
+  다음 결정 스텝에 사슴 세계에 넣는다(`eco.IntegratedV3.EnvWatch` 기본 1, 바뀐 것이 없으면 결과 그대로). 환경을 바꾸는 규칙은 레벨(팀) 몫이고 우리는 읽기만 한다(사람 결정 10-20).
+  아래는 팀 쪽 값을 우리가 읽을 수 있는 꼴로 내 달라는 부탁이다. 시험용 대역(`eco.IntegratedV3.Test.AddTrees` 등)은 흉내일 뿐 세계 규칙이 아니다.
+
+1. **날씨를 팀 지역 값으로 내기** (avaroki, 4절 1 날씨 줄의 이어짐)
+   - 지금 SHC 날씨는 보이고 들리는 것뿐이라 사슴 세계에 닿지 않는다.
+   - 바라는 것: 지역 날씨가 바뀔 때 서버에서 `AEcoRegionEnvironmentAdapter::ApplyRainfall(Rainfall, WeatherState)`(또는 `ApplyWeather`)를 불러 `FRegionEnvironmentState` 를 바꾸기.
+     어댑터 `RegionIds` 는 지역마다. 시험은 팀 콘솔 `eco.Environment.Rain <지역> <0..1>`(개발 빌드).
+   - 우리가 읽는 법: 비·폭풍 → 비(세기 = Rainfall, 0 이면 1), 맑음·가뭄 → 맑음. Play 시작 때 값은 바탕으로만 보고 그 뒤 바뀐 값을 넣는다.
+     시작 날씨는 우리 지역 기본표(숲 비·고지 눈·메마른 땅 맑음, `EcoWorldV3.h` `kRegionWeatherDefaults`)다.
+   - 눈: `EEcoWeatherState` 에 눈이 없다(Clear·Rain·Storm·Drought). 둘 중 하나를 정해 달라.
+     - (가) `Snow`(와 세기 칸 `Snowfall`)를 더한다. 어댑터의 범위 검사(`> Drought`)도 같이 고쳐야 한다. 우리는 Snow → 눈으로 읽는다.
+     - (나) 눈은 팀 값에 넣지 않고 우리 콘솔 변수 `eco.IntegratedV3.WeatherHighland snow:1` 경로만 쓴다. 이 변수는 측정·연출용(개발 빌드)이라, 레벨이 눈을 정하는 길은 없게 된다.
+   - 화면의 비·눈이 이 값을 따르면 화면과 규칙이 맞는다. 바뀌는 때(언제·얼마나)는 레벨이 정한다.
+2. **나무는 줄기 막이 짝으로 놓기** (avaroki, 공식 레벨 주인)
+   - 환경 감시는 꼬리표 `EcoV3Trunk` 줄기 막이만 본다(쿼리 충돌 + WorldStatic 막음, 반지름 25 cm·높이 50 cm 이상). 그냥 `Beech_Tree` 를 Play 중에 놓거나 지우면 사슴 세계는 모른다.
+   - Play 시작 때 있던 `Beech_Tree` 는 시작 읽기가 보지만, 메시 충돌이 잎까지 감싼 한 덩어리라 나무마다 반경 약 13.8 m 원판이 된다(4절 1 요청 2).
+     우리 읽기는 충돌 모양이 아니라 단순 충돌 상자의 가로 반폭 평균으로 반지름을 정하기 때문이다.
+   - 바라는 것 (셋 가운데 하나):
+     - (가) `-run=EcoV3PlaceTrees`(7절)와 같은 꼴: 나무(이 액터만 충돌 끔, 꼬리표 `EcoV3Tree`) + 숨긴 원기둥 줄기 막이(BlockAll, 꼬리표 `EcoV3Trunk`, 나무에 붙임) 짝.
+     - (나) 레벨 나무에 줄기 굵기의 막이를 붙이고 꼬리표 `EcoV3Trunk` 를 단다(나무 메시 충돌은 끔).
+     - (다) `Beech_Tree` 단순 충돌을 줄기 캡슐(반경 약 0.8 m)로 바꾸고 그 나무에 꼬리표 `EcoV3Trunk` 를 단다.
+   - Play 중에 나무가 생기거나 없어지는 규칙(벌목·불·자람 등)을 레벨이 만들면 그 짝을 같이 놓고 지우면 된다. 서버에서 놓으면 클라이언트에도 같은 충돌이 가게 복제한다(우리 시험용 대역은 단독 실행 전용이다).
+3. **먹이 격자를 바꾸는 길** (조연우·wonkii (추정), 먹이 장부 주인)
+   - 지금은 새 나무가 생겨도 v3 먹이 격자는 그대로다. `CommitSpatialFood` 는 스텝 밖 먹이 합 변화와 등록 용량을 넘는 값을 거부하고, `RegisterSpatialFood` 는 지역마다 한 번만 된다.
+     우리가 바꾸면 통합 모드가 꺼진다. 파이썬도 스냅숏 먹이를 그대로 써서 둘은 같다.
+   - 레벨이 숲·풀 변화로 먹이도 바뀌길 바라면: 스텝 사이에 용량·양을 바꾸는 API 가 필요하다(예: `AdjustSpatialFood(RegionId, NewCapacity, NewAmount, Reason)` —
+     먹음·재생과 따로 장부에 '환경 변화'로 남김). 그러면 우리가 새 줄기 밑 먹이를 줄여(시작 때와 같은 원판 밑 먹이 규칙 `FFoodGrid::ApplyObstacleFood`) 그 API 로 알린다.
+   - 바뀌지 않아도 된다면 그대로 두자. 줄기 원판은 먹이 칸(4 m) 하나의 1/6 밑만 덮는다.
+4. **#S1 개발 빌드 두뇌 교체·적응 고리 합의** (팀 모두, 8절 이어짐)
+   - 10-21 에 더한 것도 모두 개발 빌드 전용(`#if !UE_BUILD_SHIPPING`)이고 기본은 꺼져 있다: 적응 고리 `eco.IntegratedV3.AutoAdapt`(기본 0 — 켜면 Play 중에 `Saved/EcoAdapt/` 에
+     스냅숏을 쓰고 파이썬이 낸 두뇌를 받는다), 되돌리기 `eco.V3Brain.Rollback`·`History`. 환경 감시만 기본 켬(바뀐 것이 없으면 결과 그대로)이고, 화면 알림은 교체·환경 바뀜 때만 뜬다.
+   - 정할 것: (가) 시연·개발 빌드에서 가중치 교체와 적응 고리 허용 (나) 콘솔 명령을 빼고 재빌드 경로만. 시연에서 고리를 보이려면 (가) 가 필요하다. 아직 기록된 합의가 없다.
+   - 함께 정할 것: 환경 감시도 지금은 개발 빌드에서만 돈다(Shipping 은 Play 시작 때 환경 고정 — 9절 1·2 의 팀 값도 Shipping 에서는 반영되지 않는다). 시연을 Shipping 으로 하면 감시를 켤지 정한다.
+5. **숲 안 시야 규칙을 쓰게 되면 화면도 맞추기** (avaroki, 조건부)
+   - 10-22 에 파이썬에만 넣은 규칙(기본 끔, `12880eb`): 나무마다 잎·덤불 원(반지름 3 단위 ≈ 6 m)을 두고, 눈길이 그 안을 합쳐 2 단위(≈ 4 m) 이상 지나면 늑대도 사슴도 못 본다.
+     C++ 에는 아직 없다. 채택은 지금 도는 도망 길 측정(이 규칙을 켠 세계) 뒤에 정한다.
+   - 채택하면: 지금 `Beech_Tree` 는 잎이 높이 있어서 땅 높이 눈길을 가리는 것이 화면에 보이지 않는다. 줄기 둘레 반경 약 6 m 에 덤불·낮은 가지(충돌 없음)를 놓아,
+     늑대가 숲속 사슴을 놓치는 장면이 화면에서도 그럴듯하게 해 달라. 크기·모양은 그때 같이 정한다.
+   - 실제 근거(추정): 숲에서는 잎·하층 덤불이 옆 시야를 몇 m 로 줄이고, 쫓기는 유제류는 덮개로 뛰어들어 시선을 끊는다(Mysterud & Østbye 1999 — `env_v2/world.py` 모듈 설명).
