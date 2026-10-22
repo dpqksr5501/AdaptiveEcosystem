@@ -13,6 +13,23 @@
 #include "MassCommonTypes.h"
 #include "Engine/World.h"
 
+FEcoSocialSignalSnapshot EcoV3Social::ReadSignal(const FEcoSensoryStateFragment& Sense,const FEcoAlarmStateFragment& Alarm,
+    int64 CurrentHerdId,double Now,const FEcoSensorySettings& Settings)
+{
+    FEcoSocialSignalSnapshot S;
+    if(!FMath::IsFinite(Now))return S;
+    const auto Read=Sense.MakeReadSnapshot(Now,Settings,FEcoSensoryProfileFragment(),CurrentHerdId);
+    if(Read.bHasPersonalThreat){
+        S.bValid=true;S.bDirect=Read.bFreshDirectEvidence;S.PersonalSource=Read.PersonalSource;
+        S.ReportedPosition=Read.LastKnownPosition;S.Strength=Read.ThreatStrength*Read.Confidence;
+        S.EvidenceTime=Sense.LastObservedTime;S.ReceivedTime=Sense.LastObservedTime;S.SourceKey=Sense.SourceKey;
+    }else if(Read.bHasSharedThreat){
+        S.bValid=true;S.ReportedPosition=Read.SharedReportedPosition;S.Strength=FMath::Min(Read.SharedAlarmStrength,Alarm.AlarmStrength);
+        S.EvidenceTime=Sense.SharedEvidenceWorldTime;S.ReceivedTime=Sense.SharedReceivedWorldTime;S.PersistentHerdId=CurrentHerdId;
+    }
+    S.bValid=S.bValid&&S.Strength>0&&!S.ReportedPosition.ContainsNaN();return S;
+}
+
 FEcoPolicyActionV1 EcoV3Social::ProjectPolicy(int32 Request)
 {
     namespace R = EcoRepertoireV3;
@@ -49,6 +66,9 @@ bool EcoV3Social::ApplyControl(const FEcoSocialMovementRequestFragment& Request,
     if (!FMath::IsFinite(A.Forage) || !FMath::IsFinite(A.Cohesion) || !FMath::IsFinite(A.FleeDist) || !FMath::IsFinite(A.Cover)) return false;
     auto& S = *H.Rep;
     const auto& W = Region.Sim;
+    // Capacity allocates standing positions, not safety. A missing lease must never evict protected prey.
+    if(W.Config.bProtectedRefuges&&EcoRefugeV3::Contains(W.Config.Covers,H.Body->Pos)
+        &&(!bLeaseValid||Request.Mode==EEcoSocialMovementMode::None))return false;
     const auto& Cfg = W.RepCfg;
     auto In = EcoWorldV3::Detail::MakeControlInput(W, H);
     In.ToCentroid = R::Scale(In.ToCentroid, FMath::Clamp(double(A.Cohesion),0.,1.) / Cfg.GrazeCohesion);

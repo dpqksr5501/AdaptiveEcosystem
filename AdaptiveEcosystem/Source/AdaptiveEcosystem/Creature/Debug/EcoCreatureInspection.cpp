@@ -8,6 +8,8 @@
 #include "AI/Behavior/EcoSpeciesAIFragments.h"
 #include "AI/Social/Senses/EcoSensoryTypes.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
+#include "Mass/EcoHerdMigration.h"
 #include "Mass/EntityFragments.h"
 #include "MassEntitySubsystem.h"
 #include "MassEntityQuery.h"
@@ -25,6 +27,18 @@
 #include "HAL/FileManager.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
+
+TArray<int64> UEcoCreatureInspectionLibrary::GetAuthorityAgentIds(UObject* Context){
+    TArray<int64> Ids;UWorld* W=GEngine?GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull):nullptr;
+    if(!W||W->GetNetMode()==NM_Client||!IsInGameThread())return Ids;
+    auto* Mass=W->GetSubsystem<UMassEntitySubsystem>();if(!Mass)return Ids;
+    auto& M=Mass->GetMutableEntityManager();if(M.IsProcessing())return Ids;
+    FMassEntityQuery Q(M.AsShared());Q.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
+    Q.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);Q.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+    auto Exec=M.CreateExecutionContext(0);
+    Q.ForEachEntityChunk(Exec,[&](FMassExecutionContext& C){for(const auto& Id:C.GetFragmentView<FEcoIdentityFragment>())if(Id.StableAgentId>0)Ids.Add(Id.StableAgentId);});
+    Ids.Sort();return Ids;
+}
 
 bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,FString& Json)
 {
@@ -57,6 +71,39 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetStringField(TEXT("last_known"),Cue->Memory.LastKnownPosition.ToCompactString());
             }
             if(World->GetNetMode()==NM_Client)return;
+            if(const auto* Region=Manager.GetFragmentDataPtr<FEcoRegionFragment>(E))Data->SetStringField(TEXT("region"),Region->CurrentRegionId.ToString());
+            if(const auto* Audit=Manager.GetFragmentDataPtr<FEcoV3SocialBridgeFragment>(E)){
+                TArray<TSharedPtr<FJsonValue>> Events;
+                for(const auto& Event:Audit->History){
+                    auto Row=MakeShared<FJsonObject>();Row->SetNumberField(TEXT("time"),Event.Time);
+                    Row->SetStringField(TEXT("reason"),Event.Reason.ToString());Row->SetStringField(TEXT("region"),Event.Region.ToString());
+                    Row->SetNumberField(TEXT("native_step"),double(Event.NativeStep));Events.Add(MakeShared<FJsonValueObject>(Row));
+                }
+                Data->SetArrayField(TEXT("reason_history"),Events);
+                Data->SetStringField(TEXT("decision_reason"),Audit->History.IsEmpty()?TEXT("Pending"):Audit->History.Last().Reason.ToString());
+            }
+            if(const auto* J=Manager.GetFragmentDataPtr<FEcoHerdTravelFragment>(E)){
+                Data->SetNumberField(TEXT("migration_plan"),double(J->PlanId));Data->SetBoolField(TEXT("migration_active"),J->bActive);
+                Data->SetStringField(TEXT("migration_reason"),J->Reason.ToString());Data->SetNumberField(TEXT("migration_waypoint"),J->Waypoint);
+                Data->SetStringField(TEXT("migration_goal"),J->Goal.ToCompactString());
+                if(const auto* M=World->GetSubsystem<UEcoHerdMigrationSubsystem>())if(const auto* P=M->GetPlans().Find(J->PersistentHerdId)){
+                    Data->SetStringField(TEXT("migration_state"),M->StateName(P->State));Data->SetStringField(TEXT("migration_destination"),P->Destination.ToString());
+                    Data->SetNumberField(TEXT("migration_arrived"),P->Arrived);Data->SetNumberField(TEXT("migration_members"),P->Members.Num());
+                }
+            }
+            if(const auto* Sense=Manager.GetFragmentDataPtr<FEcoSensoryStateFragment>(E))if(const auto* Alarm=Manager.GetFragmentDataPtr<FEcoAlarmStateFragment>(E)){
+                int64 HerdId=0;FEcoHerdRuntimeData H;
+                if(const auto* Member=Manager.GetFragmentDataPtr<FEcoHerdMemberFragment>(E))
+                    if(const auto* Herds=World->GetSubsystem<UEcoHerdSubsystem>();Herds&&Herds->GetHerdData(Member->HerdRuntimeIndex,H))HerdId=H.PersistentHerdId;
+                const auto* Shared=Manager.GetSharedFragmentDataPtr<FEcoSocialSpeciesSharedFragment>(E);
+                const auto S=EcoV3Social::ReadSignal(*Sense,*Alarm,HerdId,World->GetTimeSeconds(),Shared?Shared->Senses:FEcoSensorySettings());
+                Data->SetNumberField(TEXT("social_signal_version"),S.Version);Data->SetBoolField(TEXT("social_signal_valid"),S.bValid);
+                Data->SetStringField(TEXT("social_signal_source"),S.bValid?(S.bDirect?TEXT("Direct"):S.PersonalSource==EEcoSenseSource::Memory?TEXT("PersonalMemory"):TEXT("SharedReport")):TEXT("None"));
+                Data->SetStringField(TEXT("social_signal_personal_sense"),UEnum::GetValueAsString(S.PersonalSource));
+                Data->SetStringField(TEXT("social_signal_position"),S.ReportedPosition.ToCompactString());
+                Data->SetNumberField(TEXT("social_signal_strength"),S.Strength);Data->SetNumberField(TEXT("social_signal_evidence_time"),S.EvidenceTime);
+                Data->SetNumberField(TEXT("social_signal_received_time"),S.ReceivedTime);Data->SetStringField(TEXT("social_signal_key"),LexToString(S.SourceKey));
+            }
             if(const auto* Link=Manager.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E))
                 if(const auto* Sub=World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>())
                     if(const auto* Ctx=Sub->GetContext(Link->ContextIndex)) {
@@ -66,8 +113,11 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                         Data->SetNumberField(TEXT("refuge_constrained_moves"),double(W.Stats.RefugeConstrainedMoves));
                         Data->SetNumberField(TEXT("refuge_capture_violations"),double(W.Stats.RefugeCaptureViolations));
                         Data->SetNumberField(TEXT("refuge_inside_predator_steps"),double(W.Stats.RefugeInsidePredatorSteps));
-                        if(const auto* Body=Manager.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E))
+                        if(const auto* Body=Manager.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E)){
                             Data->SetBoolField(TEXT("refuge_protected_here"),W.Config.bProtectedRefuges&&EcoRefugeV3::Contains(W.Config.Covers,Body->Body.Pos));
+                            const auto P=Ctx->UnitsToCm(Body->Body.Pos.X,Body->Body.Pos.Y,Link->GroundZ);
+                            Data->SetArrayField(TEXT("native_world_position"),{MakeShared<FJsonValueNumber>(P.X),MakeShared<FJsonValueNumber>(P.Y),MakeShared<FJsonValueNumber>(P.Z)});
+                        }
                         if(const auto* Wolf=Manager.GetFragmentDataPtr<FEcoThreatStateFragment>(E))
                             Data->SetBoolField(TEXT("wolf_inside_refuge"),EcoRefugeV3::Contains(W.Config.Covers,{Wolf->Agent.State.PosX,Wolf->Agent.State.PosY}));
                     }
@@ -244,7 +294,7 @@ void AEcoCreatureInspectorHUD::DrawHUD()
         DrawText(TEXT("POSE / IK PREVIEW: comparison deer have NO AI."),FLinearColor::Yellow,25,PreviewY+10,nullptr,.9f);
         DrawText(TEXT("Play ends after the comparison. Start Play again for ecology."),FLinearColor::White,25,PreviewY+31,nullptr,.8f);
     }
-    DrawRect(FLinearColor(.02f,.025f,.035f,.85f),15,15,600,Selected.IsValid()?450:65);
+    DrawRect(FLinearColor(.02f,.025f,.035f,.85f),15,15,640,Selected.IsValid()?FMath::Min(620.f,Canvas->SizeY-30.f):65.f);
     DrawText(TEXT("ECO INSPECTOR | Tab: cycle  Middle mouse: pick  R: record"),FLinearColor::White,25,25,nullptr,.85f);
     if(!Selected.IsValid()){DrawText(TEXT("Select a visible creature. Shift: run  Ctrl: sneak"),FLinearColor(.6f,.8f,1),25,50,nullptr,.85f);return;}
     const auto& S=Selected->VisualState;
@@ -257,7 +307,7 @@ void AEcoCreatureInspectorHUD::DrawHUD()
         if(UEcoCreatureInspectionLibrary::CaptureAgent(this,SelectedId,InspectionJson)) {
             TSharedPtr<FJsonObject> J;auto Reader=TJsonReaderFactory<>::Create(InspectionJson);
             if(FJsonSerializer::Deserialize(Reader,J)&&J.IsValid()) {
-                for(const TCHAR* Key:{TEXT("request"),TEXT("executed"),TEXT("last_intake"),TEXT("flight_override"),TEXT("refuge_protected_here"),TEXT("native_in_cover"),TEXT("hide_arrived"),TEXT("nearest_wolf_reason"),TEXT("nearest_wolf_distance_cm"),TEXT("nearest_wolf_hearing_radius_cm"),TEXT("native_vision_radius_cm"),TEXT("alarm_sense"),TEXT("social_state"),TEXT("alarm_strength"),TEXT("social_override"),TEXT("shelter_state"),TEXT("target"),TEXT("wolf_inside_refuge"),TEXT("wolf_hunting"),TEXT("wolf_sated"),TEXT("wolf_asleep"),TEXT("wolf_eat_steps"),TEXT("wolf_sated_steps")}) {
+                for(const TCHAR* Key:{TEXT("decision_reason"),TEXT("migration_state"),TEXT("migration_reason"),TEXT("migration_destination"),TEXT("migration_arrived"),TEXT("social_signal_source"),TEXT("request"),TEXT("executed"),TEXT("last_intake"),TEXT("flight_override"),TEXT("refuge_protected_here"),TEXT("hide_arrived"),TEXT("nearest_wolf_reason"),TEXT("alarm_strength"),TEXT("social_override"),TEXT("shelter_state"),TEXT("wolf_hunting"),TEXT("wolf_sated"),TEXT("wolf_asleep")}) {
                     const auto V=J->TryGetField(Key);if(!V.IsValid())continue;
                     const FString Value=V->Type==EJson::String?V->AsString():V->Type==EJson::Boolean?(V->AsBool()?TEXT("true"):TEXT("false")):LexToString(V->AsNumber());
                     InspectionDetail+=FString(Key)+TEXT(": ")+Value+TEXT("\n");

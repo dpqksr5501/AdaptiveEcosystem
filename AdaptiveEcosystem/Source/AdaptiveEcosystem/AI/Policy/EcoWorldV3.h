@@ -1603,6 +1603,8 @@ namespace EcoWorldV3
         // Optional integrated Social intent, after native policy/control, before the one movement/vitals integration.
         // nullptr preserves all Python/C++ golden behavior. Does not write raw Request or observations.
         void (*HerbControl)(void* User, std::int32_t Index, const FHerbView& Herb) = nullptr;
+        // Opt-in authored inter-region journey. Null retains every bounded golden trajectory.
+        bool (*HerbTravel)(void* User, std::int32_t Index) = nullptr;
 		bool (*HerbMove)(void* User, std::int32_t Index, const FVec2& From, const FVec2& To) = nullptr;
 		bool (*ThreatMove)(void* User, std::int32_t Index, double FromX, double FromY, double ToX, double ToY) = nullptr;
 	};
@@ -2826,7 +2828,8 @@ namespace EcoWorldV3
 			B.bReproduced = false;
 			B.bRespawned = false;
 			B.bDetour = false;
-			if (bObstacles && Obs.Detour.bEnabled)
+			const bool Traveling=Hooks&&Hooks->HerbTravel&&Hooks->HerbTravel(Hooks->User,i);
+			if (bObstacles && Obs.Detour.bEnabled && !Traveling)
 			{
 				// 야생 2단계 3 의 6) 돌아가기 (world.py step 1 의 detour_moves — 이동 바로 앞, 같은 이동 시험으로 고른다): 막히면 가려던 쪽에서 가장 적게 돈 빈 방향.
 				// 속도 크기는 그대로, 제어 출력의 속도(적용 속도·heading)도 바꾼 값이다
@@ -2845,8 +2848,11 @@ namespace EcoWorldV3
 				W.Stats.DetourDeerStart += Dr.bStart ? 1 : 0;
 				W.Stats.DetourDeerFail += Dr.bFail ? 1 : 0;
 			}
-			R3::ApplyMove(B.Pos, B.Head, *Herbs[i].Control, W.Config.WorldSize);
-			if (bObstacles)
+			if(Traveling){
+                const auto V=Herbs[i].Control->Velocity;B.Pos=R3::Add(B.Pos,V);
+                if(R3::IsNonZero(V))B.Head=R3::Normalize(V);
+            }else R3::ApplyMove(B.Pos, B.Head, *Herbs[i].Control, W.Config.WorldSize);
+			if (bObstacles && !Traveling)
 			{
 				// 야생 2단계 3 세로 장애물 (world.py step 1 의 obstacle_slide — 되풀이마다 맵으로 자름): 원판 앞에서 멈춰 둘레를 따라 미끄러진다.
 				// heading 은 가려던 쪽 그대로 (ApplyMove)
@@ -3138,7 +3144,9 @@ namespace EcoWorldV3
 		{
 			const FHerbView& H = Herbs[i];
 			const double Ed = H.Body->Energy - R3::DrainAmount(H.Control->DrainMult, RC);
-			const double Want = R3::EatWant(Ed, R3::EffectiveEatMult(H.Control->EatMult, W.Dark, RC), RC);
+			const bool Outside=Hooks&&Hooks->HerbTravel&&Hooks->HerbTravel(Hooks->User,i)
+                &&(H.Body->Pos.X<0||H.Body->Pos.Y<0||H.Body->Pos.X>W.Config.WorldSize||H.Body->Pos.Y>W.Config.WorldSize);
+			const double Want = Outside?0.0:R3::EatWant(Ed, R3::EffectiveEatMult(H.Control->EatMult, W.Dark, RC), RC);
 			const std::int32_t Cell = F.CellOf(H.Body->Pos);
 			W.EDrained[static_cast<size_t>(i)] = Ed;
 			W.Want[static_cast<size_t>(i)] = Want;

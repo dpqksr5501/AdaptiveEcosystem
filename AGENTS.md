@@ -114,3 +114,9 @@ UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한
 ## 10. 2026-10-22 PR #12 main 후속 통합
 
 `main a74fcac`를 작업 브랜치에 병합했다. 현재 통합 v3의 `eco.IntegratedV3.SocialControl` 기본값은 **0**이며 기존 Social 처리·경보 표현과 Native 행동 개입을 구분한다. 기존 훅의 opt-in 연결은 보존한다. main의 은신처 먹이 규칙으로 늦은 은신처 등록 시 용량·남은 먹이가 변하므로 `AdjustSpatialFoodHabitat` 거래로 권위 장부에 반영하고, 제거 시 용량만 복구하며 먹이를 생성하지 않는다. 기존 자원 보존 검사를 우회하거나 두 번째 이동 writer를 추가하지 않는다. 최신 검증·한계·로컬 병합 상태는 [PR #12 main 통합 기록](AdaptiveEcosystem/Docs/조연우/JYU_PR12_MAIN_INTEGRATION_20261022.md)을 따른다.
+
+## 11. 2026-10-23 신호 계약·무리 이주 통합
+
+PR #14는 사용자 요청으로 Draft다. v3 기본 SocialControl=0 신호 경로를 유지하고 `ReadSignal`의 증거/수신 시각·TTL·Herd 일치 계약을 제공한다. opt-in `UEcoHerdMigrationSubsystem`은 완료된 M4 자원 경계에서 Persistent Herd 공동 계획·기존 Travel·실제 Native context 인계·기존 Migration receipt/인구 집계를 연결한다. Native Step이 유일한 이동·대사 writer다. Client는 기존 Bubble 표현만 받는다.
+
+기존 맵의 이주 옵션은 OFF이며 `/Game/JYU/Maps/LV_JYU_HerdMigration`만 ON이다. 팀 JWJ 대형 레벨의 owned 복사 맵이고 Barren↔Forest 지면 경로를 authoring했다. 원본 팀 레벨은 변경하지 않는다. 기본 가중치·V1 계약·Python ON 세계 파리티/재학습을 변경 완료로 간주하지 않는다. 정확한 실행·검증·한계는 [무리 이주와 신호 계약](AdaptiveEcosystem/Docs/조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다. 개발 가뭄 fixture는 명시적으로 실행한 세션에만 적용하며 자연 발생 생태 균형 검증으로 설명하지 않는다.

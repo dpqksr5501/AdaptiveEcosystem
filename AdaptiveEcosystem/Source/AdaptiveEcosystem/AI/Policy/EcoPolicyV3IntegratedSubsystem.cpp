@@ -3952,7 +3952,7 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	++Ctx.LogEpoch;
 }
 
-bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ) const
+bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling) const
 {
 	OutZ = FromCm.Z;
 	UWorld* World = GetWorld();
@@ -3971,7 +3971,7 @@ bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& F
 	{
 		const double A = static_cast<double>(k) / static_cast<double>(Pieces);
 		FVector Next(FMath::Lerp(FromCm.X, ToCm.X, A), FMath::Lerp(FromCm.Y, ToCm.Y, A), Cur.Z);
-		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, false, Cur, Next))
+		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, bTraveling, Cur, Next))
 		{
 			return false;
 		}

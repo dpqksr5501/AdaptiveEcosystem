@@ -11,6 +11,7 @@
 #include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
+#include "Mass/EcoHerdMigration.h"
 #include "Mass/EntityFragments.h"
 #include "MassExecutionContext.h"
 #include "MassMovementFragments.h"
@@ -38,6 +39,54 @@ namespace EcoPolicyV3IntegratedProcImpl
         double Now = 0;
 	};
 
+    bool Traveling(void* User,int32 Index){
+        const auto& A=*static_cast<const FMoveAdapter*>(User);
+        if(!A.Rows||!A.Rows->IsValidIndex(Index)||!A.Deer)return false;
+        const auto* J=(*A.Deer)[(*A.Rows)[Index]].Journey;return J&&J->bActive;
+    }
+    void JourneyControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H){
+        const auto& A=*static_cast<const FMoveAdapter*>(User);
+        const auto& D=(*A.Deer)[(*A.Rows)[Index]];const auto* J=D.Journey;
+        if(!J||!J->bActive)return;
+        // Native personal danger wins. Shared alarm never creates an untrained flee override.
+        if(H.Decision->KeepActive==EcoWorldV3::kKeepPanic||H.Decision->KeepActive==EcoWorldV3::kKeepShelter)return;
+        namespace R=EcoRepertoireV3;const auto& C=A.Ctx->Sim.RepCfg;
+        if(H.Rep->Behavior!=R::kGraze)R::Enter(*H.Rep,R::kGraze,H.Decision->DecisionObs,C);
+        const FVector P=A.Ctx->UnitsToCm(H.Body->Pos.X,H.Body->Pos.Y,D.Int->GroundZ);
+        const FVector Delta=J->Goal-P;
+        FVector Separation=FVector::ZeroVector;
+        for(const auto& Other:*A.Deer){
+            if(Other.Id==D.Id||!Other.Journey||!Other.Journey->bActive||Other.Journey->PlanId!=J->PlanId||Other.Int->bDead)continue;
+            const auto* Context=A.Sub->GetContext(Other.Int->ContextIndex);if(!Context)continue;
+            const FVector Q=Context->UnitsToCm(Other.View.Body->Pos.X,Other.View.Body->Pos.Y,Other.Int->GroundZ);
+            const FVector Away=P-Q;const double Distance=Away.Size2D();
+            if(Distance>0.1&&Distance<220)Separation+=Away.GetSafeNormal2D()*(1-Distance/220);
+            else if(Distance<=.1)Separation+=FVector(D.Id<Other.Id?-1:1,0,0);
+        }
+        const FVector Dir=(Delta.GetSafeNormal2D()+Separation.GetClampedToMaxSize(1)*.8).GetSafeNormal2D();
+        H.Control->Gait=J->bPause?R::kGaitStop:R::kGaitWalk;
+        const double Speed=C.HerbSpeed*C.GaitSpeed[H.Control->Gait]*J->SpeedScale;
+        H.Control->Velocity={Dir.X*Speed,Dir.Y*Speed};
+        H.Control->DrainMult=C.GaitDrain[H.Control->Gait];H.Control->EatMult=J->bPause?C.GaitEat[R::kGaitStop]:0;
+        H.Control->SeeMult=1;H.Control->bCrouch=false;H.Control->bStill=J->bPause;
+        H.Control->CoverMult=1;
+        // Test bounded alternate headings through the existing terrain writer's constraints.
+        if(A.Sub->UsesTerrain()&&!J->bPause){
+            const FVector Step(Dir.X*Speed*R::kUnitCm,Dir.Y*Speed*R::kUnitCm,0);
+            double Z=P.Z;
+            if(!A.Sub->TraceMove(A.RegionId,P,P+Step,Z,true)){
+                bool Found=false;
+                for(const float Angle:{35.f,-35.f,70.f,-70.f}){
+                    const FVector Alternative=Step.RotateAngleAxis(Angle,FVector::UpVector);
+                    if(A.Sub->TraceMove(A.RegionId,P,P+Alternative,Z,true)){
+                        H.Control->Velocity={Alternative.X/R::kUnitCm,Alternative.Y/R::kUnitCm};Found=true;break;
+                    }
+                }
+                if(!Found)H.Control->Velocity={0,0};
+            }
+        }
+    }
+
     void SocialControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H)
     {
         const auto& A=*static_cast<const FMoveAdapter*>(User);
@@ -52,6 +101,11 @@ namespace EcoPolicyV3IntegratedProcImpl
         if(D.Feedback&&R.bValid&&R.ReservationId>0&&R.Mode!=EEcoSocialMovementMode::None
             &&D.SocialAudit->AppliedReservation==0)
             D.Feedback->Report(R.ReservationId,Valid?EEcoShelterMovementStatus::Yielded:EEcoShelterMovementStatus::Failed);
+    }
+    void IntegratedControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H){
+        const auto& A=*static_cast<const FMoveAdapter*>(User);
+        if(Traveling(User,Index))JourneyControlHook(User,Index,H);
+        else if(A.Sub->GetSettings().bSocialControl)SocialControlHook(User,Index,H);
     }
 
 	/** 이번 Step 배열의 색인 = HerbInts/WolfInts 색인 (BuildViews 가 같은 순서로 채운다). 통과하면 그 개체의 지면 높이를 갱신한다. */
@@ -78,6 +132,11 @@ namespace EcoPolicyV3IntegratedProcImpl
 		{
 			return true;
 		}
+        if(Traveling(User,Index)){
+            auto& F=*(*A.HerbInts)[Index];double Z=F.GroundZ;
+            const bool Ok=A.Sub->TraceMove(A.RegionId,A.Ctx->UnitsToCm(From.X,From.Y,Z),A.Ctx->UnitsToCm(To.X,To.Y,Z),Z,true);
+            if(Ok)F.GroundZ=Z;else ++F.BlockedMoves;return Ok;
+        }
 		return MoveOne(A, *(*A.HerbInts)[Index], From.X, From.Y, To.X, To.Y);
 	}
 
@@ -193,6 +252,7 @@ void UEcoPolicyV3IntegratedStepProcessor::ConfigureQueries(const TSharedRef<FMas
     DeerQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly,EMassFragmentPresence::Optional);
     DeerQuery.AddRequirement<FEcoShelterMovementFeedbackFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
     DeerQuery.AddRequirement<FEcoV3SocialBridgeFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
+    DeerQuery.AddRequirement<FEcoHerdTravelFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
 
 	DeerQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	DeerQuery.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
@@ -251,6 +311,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
         const auto Alarms=Ctx.GetFragmentView<FEcoAlarmStateFragment>();
         auto Feedback=Ctx.GetMutableFragmentView<FEcoShelterMovementFeedbackFragment>();
         auto SocialAudit=Ctx.GetMutableFragmentView<FEcoV3SocialBridgeFragment>();
+        auto Journeys=Ctx.GetMutableFragmentView<FEcoHerdTravelFragment>();
 
 		const TConstArrayView<FEcoRegionFragment> Regions = Ctx.GetFragmentView<FEcoRegionFragment>();
 		const TConstArrayView<FTransformFragment> Xfs = Ctx.GetFragmentView<FTransformFragment>();
@@ -281,6 +342,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
             R.Alarm=Alarms.IsEmpty()?nullptr:&Alarms[i];
             R.Feedback=Feedback.IsEmpty()?nullptr:&Feedback[i];
             R.SocialAudit=SocialAudit.IsEmpty()?nullptr:&SocialAudit[i];
+            R.Journey=Journeys.IsEmpty()?nullptr:&Journeys[i];
             R.View.Rep = &States[i].Rep;
 			R.View.Decision = &States[i].Decision;
 			R.View.Body = &Bodies[i].Body;
@@ -416,6 +478,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			FEcoV3DeerRec& D = Deer[List[r]];
 			if (D.Int->bAdopted)
 			{
+				if(D.Int->bRefreshObservation){NewRows.Add(r);D.Int->bRefreshObservation=false;}
 				continue;
 			}
 			const FTransform& Xf = D.Transform->GetTransform();
@@ -506,7 +569,8 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			EcoWorldV3::FStepHooks Hooks;
 			Hooks.User = &Adapter;
 			// 사슴 Social 행동 연결 (조연우 님 22eb1b6). eco.IntegratedV3.SocialControl 1 일 때만 건다 — 기본 0 (사람 결정 10-17 (8))
-			Hooks.HerbControl = Sub->GetSettings().bSocialControl ? &SocialControlHook : nullptr;
+			Hooks.HerbControl = &IntegratedControlHook;
+            Hooks.HerbTravel = &Traveling;
             Hooks.HerbMove = Sub->UsesTerrain() ? &HerbMoveHook : nullptr;
             Hooks.ThreatMove = Sub->UsesTerrain() ? &ThreatMoveHook : nullptr;
 			const double BeforeFood = Ctx.Sim.Food.Total();

@@ -25,7 +25,7 @@ bool FEcoCreatureVisualState::IsValid() const
 {
 	return StableAgentId > 0 && !SpeciesId.IsNone() && Sequence > 0 && FMath::IsFinite(WorldTime) && WorldTime >= 0.0
 		&& !Position.ContainsNaN() && !Velocity.ContainsNaN() && FMath::IsFinite(FocusYawDegrees)
-        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::Exhaust)
+        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::SatedRest)
 		&& FMath::IsFinite(NormalizedHealth) && NormalizedHealth >= 0.0f && NormalizedHealth <= 1.0f
 		&& FMath::IsFinite(NormalizedEnergy) && NormalizedEnergy >= 0.0f && NormalizedEnergy <= 1.0f;
 }

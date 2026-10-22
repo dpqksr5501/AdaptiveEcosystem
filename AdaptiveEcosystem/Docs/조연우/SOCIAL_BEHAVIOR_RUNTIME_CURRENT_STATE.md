@@ -1,5 +1,7 @@
 # Social Behavior & Shelter Runtime — Current State & Implementation Status
 
+> **2026-10-23 후속:** v3는 기본 signal-only이며, `ReadSignal`이 개인 증거/기억/유효한 Herd report를 구분한다. 별도 opt-in 무리 이주가 공통 Travel·Native 단일 이동·M4 지역/자원/인구·기존 복제에 연결됐다. 최신 Source 근거·새 복사 맵·검증·제한은 [무리 이주와 신호 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다. 아래의 기본 Social 행동 개입/이주 미연결 설명은 해당 날짜의 이력이다. PR #14는 Draft다.
+
 > **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
 
 > **작업 위치 갱신 2026-10-16:** 기존 `codex/social-shelter-handoff`와 원래 프로젝트 폴더로 `8e2f34f` 통합 내용을 반영했다. 복사 JYU 맵을 계속 사용한다. [작업 위치·보존·검증 기록](JYU_WORKTREE_RETURN_20261016.md). 아래 통합 브랜치명은 이력이다.

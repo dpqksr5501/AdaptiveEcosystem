@@ -12,6 +12,8 @@
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "EcoCreatureIntegrationSpawner.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FEcoRuntimeSample, float, DeltaSeconds);
+
 class UMassEntityConfigAsset;
 class AEcologyRegion;
 class UWorldPartitionStreamingSourceComponent;
@@ -41,6 +43,8 @@ class ADAPTIVEECOSYSTEM_API AEcoCreatureIntegrationSpawner : public AActor,
 	GENERATED_BODY()
 public:
 	AEcoCreatureIntegrationSpawner();
+    /** Passive diagnostics at completed runtime boundaries, including headless servers. */
+    UPROPERTY(BlueprintAssignable, Category="Creature|Inspection") FEcoRuntimeSample OnRuntimeSample;
 	UPROPERTY(EditAnywhere, Category="Creature|Config") EEcoEnabledSpecies EnabledSpecies = EEcoEnabledSpecies::Both;
 	UPROPERTY(EditAnywhere, Category="Creature|Config") bool bEnableSpeciesAIFixtures = false;
 	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bUseV3Policy = false;
@@ -64,6 +68,8 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|Time", meta=(ClampMin="1")) double DaySeconds = 60;
 	UPROPERTY(EditAnywhere, Category="Creature|Time", meta=(ClampMin="1")) double NightSeconds = 60;
 	UPROPERTY(EditAnywhere, Category="Creature|Migration") FEcoMigrationSettings Migration;
+    /** Separate opt-in for shared native-v3 herd journeys; legacy per-agent migration remains guarded. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Creature|Migration") bool bEnableHerdJourneys=false;
 	UPROPERTY(EditAnywhere, Category="Creature|Population") bool bEnableWaves = false;
 	UPROPERTY(EditAnywhere, Category="Creature|Streaming") bool bUseHabitatStreaming = false;
 	UPROPERTY(EditAnywhere, Category="Creature|Streaming", meta=(ClampMin="3000", Units="cm")) float HabitatStreamingRadius = 10000.0f;
@@ -132,6 +138,7 @@ private:
 	double NextStreamingUpdate = 0;
 	double LastResourceTime = 0;
 	double NextLog = 0;
+    double NextAuditSample = 0;
 	int64 Step = 0;
 	int32 SummaryRevision = 0;
 	double NextMigrationTime = 0.0;

@@ -75,6 +75,8 @@ Alarm/Response는 Server/Standalone 실행 및 Client guard를 명시하고, Res
 
 ## 2. 멀티스레드 병렬 안전성 수칙 (Strict Concurrency Rules)
 
+2026-10-23 opt-in v3 무리 이주 추가: M4 Spawner의 `OnWorldPostActorTick` → Native 완료 결과/자원 receipt → `CompleteResourceStep` → `UEcoHerdMigrationSubsystem::Reconcile` → 기존 `RecordMigrations`/종별 유입·유출/재집계 → 표현 snapshot 순서다. Mass processing 외 GameThread에서 공동 계획과 실제 지역 진입을 commit한다. 다음 Native Step의 control hook이 목적 방향을 소비하며 **위치·에너지 적분은 기존 Native 단일 writer**다. 기존 V1/M3 이동 순서는 변경하지 않았다. [계약·검증](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md).
+
 MassEntity는 태스크 그래프(TaskGraph) 상에서 여러 워커 스레드에 청크(Chunk) 단위로 병렬 디스패치됩니다. 다음 행위는 엔진 크래시를 유발하므로 엄격히 금지됩니다:
 
 1. **Entity Loop 내부에서 UObject 직접 접근/수정 금지**:

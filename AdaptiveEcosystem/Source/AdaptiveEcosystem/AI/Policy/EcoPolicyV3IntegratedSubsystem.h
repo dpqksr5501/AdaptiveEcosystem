@@ -1154,7 +1154,7 @@ public:
 	 * 지형 제약 이동 검사: FromCm → ToCm 를 30 cm 이하 토막으로 나눠 팀 공개 함수 EcoCreatureMovement::ConstrainStep (지역 안·장애물·
 	 * 지면·물) 을 부른다. 통과하면 OutZ = 끝 지면 높이, 막히면 거짓 (OutZ = FromCm.Z).
 	 */
-	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ) const;
+	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false) const;
 
 	// ---- 시험·조정자 없이 쓰는 길 ----
 

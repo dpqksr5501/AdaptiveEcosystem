@@ -1,5 +1,7 @@
 # 조연우 작업 인계 — 다른 채팅에서 이어가기
 
+> **후속 최신 2026-10-23:** 사용자 요청으로 PR #14는 Draft 유지. Social 신호 계약·추가 애니메이션·Inspector 원인 이력·실제 무리 이주·대형 팀 맵 복사 통합은 [무리 이주와 신호 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 먼저 읽는다. 실행 맵은 `/Game/JYU/Maps/LV_JYU_HerdMigration`이며 기존 맵/원본 팀 레벨은 보존한다. 아래 PR 승인 대기·이주 비활성 설명은 당시 이력이다.
+
 > **후속 최신 상태 — PR #12 병합 반영:** `main`을 `a74fcac`로 최신화하고 현재 작업 브랜치에 로컬 병합했다. Git 충돌은 없었으며, 실제 맵에서 발견한 늦은 은신처 등록의 먹이 자원 장부 불일치를 복구했다. 직접 UBT 성공·자동화 201개(성공 200·예상 warning 1·실패 0)·Social OFF/ON 각각 40초 NullRHI Standalone을 검증했다. main의 `SocialControl` 기본 **0**을 유지한다. [최신 병합·복구·검증과 한계](JYU_PR12_MAIN_INTEGRATION_20261022.md)를 먼저 읽는다. 이번 로컬 병합은 push하지 않았으며 아래 PR #14 승인 상태는 이전 확인 기록이다.
 
 > **최신 상태:** main `ff4f287`을 작업 브랜치에 병합하고 날씨 클래스 호환 복구·빌드·PIE·네트워크 검증을 마쳤다. 구현 기준은 `29c6491`이며 push 완료다. [PR #14 — 동물 행동·경보·애니메이션과 테스트 은신처 통합](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)은 2026-10-22 확인 시 **OPEN·충돌 없음·승인 대기**다. [main 병합 기록](JYU_MAIN_MERGE_20261022.md)과 아래 PR 인계를 먼저 읽는다. 이 문서 이후의 문서 커밋과 실제 PR 상태는 재개 시 다시 확인한다.

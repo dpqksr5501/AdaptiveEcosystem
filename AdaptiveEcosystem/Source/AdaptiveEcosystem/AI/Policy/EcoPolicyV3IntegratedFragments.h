@@ -41,6 +41,8 @@ struct FEcoIntegratedV3Fragment : public FMassFragment
 	/** v3 가 죽음을 정했다 (잡힘·굶음). 그 뒤로 이 개체는 스텝에 들어가지 않고 화면은 죽은 자리에 멈춘다. */
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|PolicyV3")
 	bool bDead = false;
+    /** Region handoff refreshes local observation caches without reinitializing the body or reserve. */
+    bool bRefreshObservation=false;
     /** Immutable last observed native prey, copied for representation only; never used by policy. */
     FVector LastSeenPreyPosition=FVector::ZeroVector;
     int64 LastSeenPreyKey=0;

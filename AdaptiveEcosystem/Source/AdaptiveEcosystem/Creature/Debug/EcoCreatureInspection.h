@@ -10,6 +10,9 @@ class ADAPTIVEECOSYSTEM_API UEcoCreatureInspectionLibrary : public UBlueprintFun
 {
     GENERATED_BODY()
 public:
+    /** Read-only authority inventory for diagnostics; clients always return an empty list. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Inspection",meta=(WorldContext="WorldContext"))
+    static TArray<int64> GetAuthorityAgentIds(UObject* WorldContext);
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection",meta=(WorldContext="WorldContext"))
     static bool CaptureAgent(UObject* WorldContext,int64 AgentId,FString& Json);
 };

@@ -12,8 +12,11 @@
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Social/EcoSocialFragments.h"
+#include "AI/Social/EcoPolicyV3SocialBridge.h"
+#include "AI/Social/Herd/EcoHerdSubsystem.h"
 #include "Ecology/EcologySimulationSubsystem.h"
 #include "Mass/EcoMassMigration.h"
+#include "Mass/EcoHerdMigration.h"
 #include "Mass/EcoMassSurvival.h"
 #include "MassMovementFragments.h"
 #include "World/EcologyWorldSubsystem.h"
@@ -200,9 +203,13 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	TArray<FEcoRegionSpatialSnapshot> Spaces;
 	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionIds, Spaces)) return false;
 	TArray<FEcoMigrationOutcome> Arrivals;
+	if(auto* HerdMigration=GetWorld()->GetSubsystem<UEcoHerdMigrationSubsystem>())
+        if(!HerdMigration->Reconcile(EM,Time,Step,Arrivals))return false;
+    TArray<FEcoMigrationOutcome> LegacyArrivals;
 	if (!EcoMassMigration::Reconcile(EM, Time, ObservedTime, Step, Resources, Spaces, Migration,
-		false, 1.0, nullptr, nullptr, {}, 0.0, &Arrivals, false)
-		|| !Ecology->RecordMigrations(Arrivals) || !ReconcilePopulation()
+		false, 1.0, nullptr, nullptr, {}, 0.0, &LegacyArrivals, false))return false;
+    Arrivals.Append(LegacyArrivals);
+    if (!Ecology->RecordMigrations(Arrivals) || !ReconcilePopulation()
 		|| !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return false;
 	for (const auto& Arrival : Arrivals)
 	{
@@ -252,6 +259,15 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 EEcoSpeciesActivity::Freeze, EEcoSpeciesActivity::Sleep};
             Present.Activity = uint8(Behavior->BehaviorId < UE_ARRAY_COUNT(Activities) ? Activities[Behavior->BehaviorId] : EEcoSpeciesActivity::Hold);
             if (Behavior->BehaviorId == 0) Present.Flags |= 2;
+            if(Behavior->Decision.KeepActive==EcoWorldV3::kKeepAlert&&Behavior->BehaviorId==EcoRepertoireV3::kGraze)
+                Present.Activity=uint8(EEcoSpeciesActivity::AlertGraze);
+            else if(const auto* Body=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E);Body&&Body->Body.bWeak
+                &&Present.Velocity.SizeSquared2D()>1)Present.Activity=uint8(EEcoSpeciesActivity::WeakTravel);
+            if(const auto* J=EM.GetFragmentDataPtr<FEcoHerdTravelFragment>(E);J&&J->bActive
+                &&Behavior->Decision.KeepActive!=EcoWorldV3::kKeepPanic&&Behavior->Decision.KeepActive!=EcoWorldV3::kKeepShelter){
+                Present.Activity=uint8(J->bPause?EEcoSpeciesActivity::Rest:EEcoSpeciesActivity::Travel);
+                if(!J->bPause)Present.Flags&=~uint8(2);
+            }
         }
         if (const auto* Threat = EM.GetFragmentDataPtr<FEcoThreatStateFragment>(E))
         {
@@ -262,6 +278,32 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 "Every v3 wolf state must have a presentation activity.");
             const uint8 StateIndex = static_cast<uint8>(EcoV3Integrated::WolfStateOf(Threat->Agent));
             Present.Activity = uint8(StateIndex < UE_ARRAY_COUNT(Activities) ? Activities[StateIndex] : EEcoSpeciesActivity::Hold);
+            if(Threat->Agent.State.SatLeft>0&&Threat->Agent.State.Cooldown<=0&&!Threat->Agent.State.bAsleep)
+                Present.Activity=uint8(EEcoSpeciesActivity::SatedRest);
+        }
+        if(auto* Audit=EM.GetFragmentDataPtr<FEcoV3SocialBridgeFragment>(E)){
+            FName Reason=TEXT("NativePolicy");
+            const auto* B=EM.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E);
+            const auto* J=EM.GetFragmentDataPtr<FEcoHerdTravelFragment>(E);
+            if(V.HP<=0)Reason=TEXT("Dead");
+            else if(B&&B->Decision.KeepActive==EcoWorldV3::kKeepPanic)Reason=TEXT("NativeThreatEscape");
+            else if(B&&B->Decision.KeepActive==EcoWorldV3::kKeepShelter)Reason=TEXT("NativeRefugeSafety");
+            else if(J&&J->bActive)Reason=J->Reason;
+            else if(Present.Activity==uint8(EEcoSpeciesActivity::AlertGraze))Reason=TEXT("NativeAlertGraze");
+            else if(Present.Activity==uint8(EEcoSpeciesActivity::WeakTravel))Reason=TEXT("LowEnergyReserve");
+            else if(Audit->Applied!=EEcoV3SocialControl::None)Reason=TEXT("LegacySocialOverride");
+            else if(const auto* Sense=EM.GetFragmentDataPtr<FEcoSensoryStateFragment>(E)){
+                const auto* Alarm=EM.GetFragmentDataPtr<FEcoAlarmStateFragment>(E);
+                const auto* Member=EM.GetFragmentDataPtr<FEcoHerdMemberFragment>(E);
+                const auto* Herds=GetWorld()->GetSubsystem<UEcoHerdSubsystem>();FEcoHerdRuntimeData Herd;
+                const int64 HerdId=Member&&Herds&&Herds->GetHerdData(Member->HerdRuntimeIndex,Herd)?Herd.PersistentHerdId:0;
+                const auto* Shared=EM.GetSharedFragmentDataPtr<FEcoSocialSpeciesSharedFragment>(E);
+                const auto Signal=Alarm?EcoV3Social::ReadSignal(*Sense,*Alarm,HerdId,GetWorld()->GetTimeSeconds(),Shared?Shared->Senses:FEcoSensorySettings()):FEcoSocialSignalSnapshot();
+                if(Signal.bValid&&Signal.PersonalSource==EEcoSenseSource::None)Reason=TEXT("SharedAlarmSignalOnly");
+            }
+            const auto* Native=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+            Audit->RecordReason(GetWorld()->GetTimeSeconds(),Reason,EM.GetFragmentDataChecked<FEcoRegionFragment>(E).CurrentRegionId,
+                Native?Native->GetGlobalStep():0);
         }
 		if (const auto* Cue = EM.GetFragmentDataPtr<FEcoCreatureCueFragment>(E)) {
             Present.Flags |= uint8(Cue->Memory.Source)<<4;

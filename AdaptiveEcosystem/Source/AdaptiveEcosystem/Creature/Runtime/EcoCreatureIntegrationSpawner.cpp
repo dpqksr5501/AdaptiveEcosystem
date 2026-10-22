@@ -34,6 +34,7 @@
 #include "GameFramework/Pawn.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
+#include "Mass/EcoHerdMigration.h"
 #include "HAL/IConsoleManager.h"
 
 static TAutoConsoleVariable<int32> EcoIntegrationLogDetails(TEXT("eco.Integration.LogDetails"), 0,
@@ -103,6 +104,14 @@ void AEcoCreatureIntegrationSpawner::UpdateHabitatStreaming()
 		Shape.Location = GetActorTransform().InverseTransformPosition(Point);
 	};
 	// Keep authored arrivals available for migration, plus current logical positions.
+    if(bEnableHerdJourneys)for(TActorIterator<AEcoHerdMigrationRoute> It(GetWorld());It;++It)if(It->bEnabled){
+        for(int32 I=0;I<It->Points.Num();++I){
+            AddPoint(It->Points[I]);if(I==0)continue;
+            const double Distance=FVector::Dist2D(It->Points[I-1],It->Points[I]);
+            const int32 Count=FMath::Clamp(FMath::CeilToInt(Distance/FMath::Max(1000.f,HabitatStreamingRadius*.75f)),1,256);
+            for(int32 K=1;K<Count;++K)AddPoint(FMath::Lerp(It->Points[I-1],It->Points[I],double(K)/Count));
+        }
+    }
 	for (const AEcologyRegion* Region : Regions) AddPoint(Region->GetActorTransform().TransformPosition(Region->ArrivalOffset));
 	if (Owned.IsEmpty())
 	{
@@ -150,6 +159,11 @@ void AEcoCreatureIntegrationSpawner::Tick(float Delta)
 	{ NextStreamingUpdate = GetWorld()->GetTimeSeconds() + 1.0; UpdateHabitatStreaming(); }
 	if (GetNetMode() != NM_Client) Reconcile(Delta);
 	SyncVisuals(Delta);
+    if (OnRuntimeSample.IsBound() && GetWorld()->GetTimeSeconds() >= NextAuditSample)
+    {
+        NextAuditSample = GetWorld()->GetTimeSeconds() + 2.0;
+        OnRuntimeSample.Broadcast(Delta);
+    }
 #if WITH_DEV_AUTOMATION_TESTS
 	if (bTestObserverCycle) UpdateTestObserver();
 #endif

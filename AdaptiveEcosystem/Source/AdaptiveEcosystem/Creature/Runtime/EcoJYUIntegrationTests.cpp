@@ -92,7 +92,14 @@ bool FEcoJYUSavedAssets::RunTest(const FString&) {
             View.Sequence=3;View.Activity=EEcoSpeciesActivity::Sleep;View.SenseSource=EEcoSenseSource::Sight;
             A->ConsumeVisualState(View,.016f);Instance->NativeUpdateAnimation(.3f);
             TestEqual(TEXT("Sensory cue cannot override sleep"),Instance->AnimationIndex,5);
-            View.Sequence=4;View.bAlive=false;A->ConsumeVisualState(View,.016f);Instance->NativeUpdateAnimation(.2f);
+            View.Sequence=4;View.Activity=EEcoSpeciesActivity::AlertGraze;View.Velocity=FVector(200,0,0);
+            A->ConsumeVisualState(View,.016f);Instance->NativeUpdateAnimation(.3f);
+            TestEqual(TEXT("Moving vigilance retains locomotion legs"),Instance->AnimationIndex,0);
+            TestTrue(TEXT("Moving vigilance layers the head pose"),Instance->AlertHeadAlpha>0);
+            View.Sequence=5;View.Activity=EEcoSpeciesActivity::SatedRest;View.Velocity=FVector::ZeroVector;
+            A->ConsumeVisualState(View,.016f);Instance->NativeUpdateAnimation(.3f);
+            TestEqual(TEXT("Sated resting uses the rest pose"),Instance->AnimationIndex,7);
+            View.Sequence=6;View.bAlive=false;A->ConsumeVisualState(View,.016f);Instance->NativeUpdateAnimation(.2f);
             TestEqual(TEXT("Death uses terminal pose"),Instance->AnimationIndex,8);
             A->ClearBinding();A->BindIdentity(501,A->VisualSpeciesId);
             TestEqual(TEXT("Rebinding resets previous death and IK state"),Instance->AnimationIndex,0);
