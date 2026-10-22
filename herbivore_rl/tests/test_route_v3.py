@@ -422,7 +422,8 @@ def test_route_redecide_for_oracle(forest):
 
 def test_optional_keys_and_validation(forest):
     """선택 키 기본값은 끔(null·0), 잘못된 값은 멈춘다."""
-    assert dict(F.OPTIONAL_KEYS["wild_flight"]) == {"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0}
+    assert dict(F.OPTIONAL_KEYS["wild_flight"]) == {"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0,
+                                                    "route": False}      # 10-22 두뇌 길(tests/test_route2_v3.py)
     assert F.with_optional("wild_flight", {})["route_fixed"] is None and F.with_optional("wild_flight", {})["quiet_end"] == 0
     for bad in (dict(route_fixed="forest"), dict(route_fixed=1), dict(quiet_end=-1), dict(quiet_end=1.5), dict(quiet_end=True)):
         with pytest.raises(ValueError, match="route_fixed|quiet_end"):

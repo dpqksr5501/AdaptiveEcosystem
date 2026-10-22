@@ -96,8 +96,8 @@ import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
 from env_v2.config import load_v2_config
-from env_v2.rep_policy import (MASK_VERSION_ALARM, RepertoirePolicy, action_mask, mask_version_of, policy_obs,
-                               rep_distribution, rep_params, sample_masked)
+from env_v2.rep_policy import (MASK_VERSION_ALARM, ROUTE_PANIC_COL, ROUTE_SLOT_SHELTER, RepertoirePolicy, action_mask, mask_version_of,
+                               policy_obs, rep_distribution, rep_params, sample_masked)
 from env_v2.repertoire import BEHAVIOR_NAMES, FLEE, FREEZE, HIDE, N_BEHAVIORS, SLEEP
 from env_v2.vec_env import MultiWorldVecEnv
 from train import PPO_KWARGS, load_tuned
@@ -284,6 +284,12 @@ class RepLogCallback(BaseCallback):
                        n_dec_samples=int(len(pobs)))
             row.update(niche_probs(pi, pobs[:, :venv.obs_dim], self.geo, self.allowed, self.variant, self.udef,
                                    self.xterms, pobs[:, venv.obs_dim:] > 0.5, self.r3))
+            if ROUTE_PANIC_COL in venv.obs_names:
+                # 10-22 두뇌 길(마스크 판 4): 결정 표본 가운데 도주 길 결정, 그 가운데 SHELTER 가 열린(두 칸) 결정의 π(SHELTER) 평균(ε 제외 — 시작 0.119)
+                rt = pobs[:, list(venv.obs_names).index(ROUTE_PANIC_COL)] > 0.5
+                two = rt & (pobs[:, venv.obs_dim + ROUTE_SLOT_SHELTER] > 0.5)
+                row.update(n_route_dec=int(rt.sum()), n_route_choice=int(two.sum()),
+                           pi_shelter_route=float(pi[two, ROUTE_SLOT_SHELTER].mean()) if two.any() else None)
         return row
 
     def _log(self) -> None:
@@ -297,7 +303,9 @@ class RepLogCallback(BaseCallback):
                 f.write(json.dumps(row, ensure_ascii=False) + "\n")
         use = " ".join(f"{c}{row[f'use_{b}']:.3f}" for c, b in zip("GFHZS", BEHAVIOR_NAMES))   # 먹기·도망·숨기·얼기·잠
         print(f"  [{row['timesteps']:,}] 사용 {use} · 결정 {row['decide_frac']:.3f} · 결정 엔트로피 "
-              f"{row.get('ent_dec', float('nan')):.3f} · 아사 {row['starve_rate']:.2e} · 피식 {row['pred_rate']:.2e}",
+              f"{row.get('ent_dec', float('nan')):.3f} · 아사 {row['starve_rate']:.2e} · 피식 {row['pred_rate']:.2e}"
+              + (f" · 길 결정 {row['n_route_dec']} (두 칸 {row['n_route_choice']}, π SHELTER "
+                 + (f"{row['pi_shelter_route']:.3f}" if row["pi_shelter_route"] is not None else "—") + ")" if "n_route_dec" in row else ""),
               flush=True)
 
 
@@ -317,7 +325,8 @@ def init_policy_report(model, venv: MultiWorldVecEnv) -> dict:
 
 def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int = 0) -> dict:
     """시작 정책으로 결정 비율 f_dec 를 잰다(모듈 docstring 'f_dec 측정'). 반환: f_dec(요청을 읽은 개체-스텝 비율), 시드별 값,
-    결정 시점 중 마스크가 두 칸 이상인 비율, World.repertoire_stats decide_frac(같은 값이어야 한다)."""
+    결정 시점 중 마스크가 두 칸 이상인 비율, World.repertoire_stats decide_frac(같은 값이어야 한다 — 마스크 판 4 세계도 덮기 스텝을 빼고 길 결정을
+    더한 같은 셈이다)."""
     from env_v2.vec_env import region_configs, region_mix_params
     from env_v2.world import World
 
@@ -333,6 +342,7 @@ def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int
     cfgs = [(None, cfg)] if rm is None else list(region_configs(cfg, rm).items())
     per = []
     reads_n = multi_n = total = 0
+    route_n = route_two = 0             # 10-22 두뇌 길(마스크 판 4)만: 도주 길 결정, 그 가운데 SHELTER 가 열린 결정
     for s in seeds:
         for region, c in cfgs:
             w = World(c, seeds=[int(s)])
@@ -346,6 +356,9 @@ def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int
                 a = sample_masked(pi_eps, m, rng.random(w.N))
                 r_s += int(pk["reads"].sum())
                 multi_n += int((m[pk["reads"]].sum(1) >= 2).sum())
+                if "route_decide" in pk:
+                    route_n += int(pk["route_decide"].sum())
+                    route_two += int((pk["route_decide"] & m[:, ROUTE_SLOT_SHELTER]).sum())
                 w.step(a.astype(np.float64)[:, None])
             n = steps * w.N
             row = dict(seed=int(s), f_dec=r_s / n, decide_frac_world=w.repertoire_stats()["decide_frac"])
@@ -354,8 +367,11 @@ def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int
             per.append(row)
             reads_n += r_s
             total += n
-    return dict(f_dec=reads_n / total, per_seed=per, multi_frac=multi_n / max(reads_n, 1), seeds=[int(s) for s in seeds],
-                steps=int(steps), model_seed=int(model_seed), allowed=list(rep["allowed"]))
+    out = dict(f_dec=reads_n / total, per_seed=per, multi_frac=multi_n / max(reads_n, 1), seeds=[int(s) for s in seeds],
+               steps=int(steps), model_seed=int(model_seed), allowed=list(rep["allowed"]))
+    if mask_version_of(venv.obs_names) == 4:
+        out.update(route_decisions=route_n, route_choice=route_two, route_dec_frac=route_n / total)
+    return out
 
 
 def measure_pi(cfg, model_path, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, udef: str = "auto",

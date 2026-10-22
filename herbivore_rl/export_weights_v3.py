@@ -50,6 +50,9 @@ torch 는 스레드 1 로 돈다(`env.torch_init`, main 안에서도 다시 고�
   계약은 둘(10-19): 관측 18·마스크 판 2(0x7eea0107339be4ce, 내장 R1b 와 같다)와 관측 21·판 2(0xbc4fc2d45c47c5fd — 18 칸 + R5 장애물 관측 세 칸,
   계약 2-4). 언리얼 로더는 이 둘만 받고, 관측 21 두뇌를 넣으면 통합 모드가 세 칸을 더 만든다. 관측 21 시작 두뇌(R1b-F + 새 열 0)는
   results/v3/r5/zero_extend.py 가 만든다.
+  셋째 계약(10-22, 파이썬만 — C++ 은 다음 단계): 관측 24·마스크 판 4(0xe302dee198197444 — 관측 21 + 두뇌 길 세 칸, 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 16-5).
+  계약 dict 에 키 flight_route 가 판 4 에만 붙는다(옛 둘·판 3 의 dict·해시는 그대로). 골든 세계는 configs/v3_wild3_route_mirror.yaml 이고 도주 길 결정 사례
+  (route·route_edge·route_single)를 더한다. 시작 두뇌(obs21zero + 열 0 + 칸 4 = 칸 1 − 2)는 results/v3/route/route_extend.py 가 만든다.
   허용 칸 1·2위 로짓 차가 NEAR_TIE_GAP 보다 작은 사례는 넣지 않는다(float32 순서 차이로 argmax 가 갈릴 수 있다).
   언리얼 로더는 버전·차원·이름·마스크·문턱·모양·NaN·sha256 을 보고, 골든을 C++ 순전파(EcoPolicyV3Inference.h)로 다시 돌려
   로짓이 허용 오차 안이고 행동이 같아야 받는다. 시각·절대 경로를 적지 않아 같은 모델이면 바이트 단위로 같은 파일이 나온다.
@@ -96,11 +99,15 @@ BRAIN_FORMAT = "eco_v3_brain"
 BRAIN_FORMAT_VERSION = 1
 BRAIN_GOLDEN_CONFIG = ROOT / "configs" / "v3_wild3_mirror.yaml"   # 언리얼 통합 레벨과 같은 세계 (나무 + 지역 날씨, 관측 18)
 BRAIN_GOLDEN_CONFIG_OBS21 = ROOT / "configs" / "v3_wild3_obs_mirror.yaml"   # 같은 세계 + R5 장애물 관측 세 칸 (관측 21, 10-19 — 계약 2-4)
+BRAIN_GOLDEN_CONFIG_ROUTE = ROOT / "configs" / "v3_wild3_route_mirror.yaml"  # 관측 21 거울 + 두뇌 길(관측 24·마스크 판 4, 10-22 — 설계 16절)
 BRAIN_GOLDEN_SEED = 32099              # 파이썬 탐색 시드 칸(32000~32099)의 끝 — 학습·판정·고르기에 쓰지 않는다
 BRAIN_GOLDEN_STEPS = 600
 BRAIN_PER_ACTION = 6                   # 다중 칸 결정 시점을 고른 행동별로 많아야 이만큼
 BRAIN_N_SINGLE = 2                     # 한 칸 마스크 결정 시점
 BRAIN_N_RANDOM = 6                     # 균등 난수 관측 (마스크 = 모델 허용 칸)
+BRAIN_N_ROUTE = 6                      # 마스크 판 4: 도주 길 결정(RUN·SHELTER 두 칸) — 그 가운데 BRAIN_N_ROUTE_EDGE 개는 shelter_reach 가 가장 작은(문턱 근처) 것
+BRAIN_N_ROUTE_EDGE = 2
+BRAIN_N_ROUTE_SINGLE = 2               # 마스크 판 4: SHELTER 가 가능하지 않은 도주 길 결정(RUN 한 칸)
 BRAIN_LAYERS = (("W0", "B0", "mlp_extractor.policy_net.0"), ("W1", "B1", "mlp_extractor.policy_net.2"),
                 ("W2", "B2", "action_net"))
 
@@ -203,7 +210,7 @@ def contract_dict(obs_names, mask_version: int) -> dict:
     from env_v2.rep_policy import ALARM_MASK_OBS, HIDE_COVER_OBS, MASK_LOGIT, MASK_VERSION_ALARM, THREAT_RECENCY_OBS
     from env_v2.repertoire import BEHAVIOR_NAMES
 
-    return {
+    d = {
         "contract": "eco_policy_v3_io",
         "obs_names": list(obs_names),
         "behaviors": list(BEHAVIOR_NAMES),
@@ -212,6 +219,35 @@ def contract_dict(obs_names, mask_version: int) -> dict:
                  "alarm_mask_obs": ALARM_MASK_OBS if int(mask_version) == MASK_VERSION_ALARM else None,
                  "mask_logit": MASK_LOGIT, "bit": "> 0.5"},
         "select": "argmax_masked_lowest_index",
+    }
+    fr = flight_route_contract(mask_version)
+    if fr is not None:
+        # 10-22 두뇌 길(마스크 판 4)만 키를 더한다 — 판 2·3 계약 dict 는 바이트까지 그대로라 옛 해시 셋이 바뀌지 않는다(설계 16-5)
+        d["flight_route"] = fr
+    return d
+
+
+def flight_route_contract(mask_version: int) -> dict | None:
+    """마스크 판 4(두뇌 길 '두 길', 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 16-5)의 계약 키 `flight_route`, 다른 판은 None. 값은 세계·마스크 상수에서
+    읽는다(관측 shelter_reach·shelter_edge 값이 이 계수에 달려 있다). COVER 기하 계수는 넣지 않는다(칸 3 은 늘 막힌 자리)."""
+    from env_v2.rep_policy import MASK_VERSION_ROUTE, ROUTE_SLOT_RESERVED, ROUTE_SLOT_RUN, ROUTE_SLOT_SHELTER
+    from env_v2.world import (ROUTE_LOCK_STEPS, ROUTE_OBS_NAMES, ROUTE_SHELTER_COS_MIN, ROUTE_SHELTER_EDGE_NORM_U, ROUTE_SHELTER_ENTER_U,
+                              ROUTE_SHELTER_EXIT_U, ROUTE_SHELTER_MAX_EDGE_U, ROUTE_SHELTER_REACH_U)
+
+    if int(mask_version) != MASK_VERSION_ROUTE:
+        return None
+    return {
+        "slots": {"run": int(ROUTE_SLOT_RUN), "shelter": int(ROUTE_SLOT_SHELTER), "reserved_masked": [int(ROUTE_SLOT_RESERVED)]},
+        "obs": list(ROUTE_OBS_NAMES),
+        # lock_and_feasible_changed 는 지금 길이 refeas_from(RUN)일 때만 — SHELTER 는 무효(μ_k < exit_margin_u)까지 잇는다(env_v2/world.py `_route_step`)
+        "decide": {"lock_steps": int(ROUTE_LOCK_STEPS), "on": ["onset", "invalid", "lock_and_feasible_changed"], "feasible": ["shelter"],
+                   "refeas_from": ["run"]},
+        "shelter": {"max_edge_u": float(ROUTE_SHELTER_MAX_EDGE_U), "cos_min": float(ROUTE_SHELTER_COS_MIN),
+                    "enter_margin_u": float(ROUTE_SHELTER_ENTER_U), "exit_margin_u": float(ROUTE_SHELTER_EXIT_U),
+                    "reach_norm_u": float(ROUTE_SHELTER_REACH_U), "edge_norm_u": float(ROUTE_SHELTER_EDGE_NORM_U)},
+        # 얼기·잠이 막혀야 하는 목록 = 실제 허용(모델 허용 ∧ 세계 허용 — 파이썬 rep_policy.effective_allowed, C++ FWorldState::Allowed).
+        # 세계 칸(C++ FWorldConfig::WorldAllowed)만 보지 않는다 — 통합 게임 세계는 잠을 허용하지만 모델 목록이 막는다
+        "freeze_sleep_must_be_blocked": "effective_allowed",
     }
 
 
@@ -729,7 +765,9 @@ def _f32(x) -> float:
 
 def brain_golden(model, w: dict, cfg, seed: int = BRAIN_GOLDEN_SEED, steps: int = BRAIN_GOLDEN_STEPS) -> dict:
     """두뇌 파일 자체 확인 골든: 세계 한 시드를 모델 자신의 argmax 로 돌려 다중 칸 결정 시점(고른 행동별)·한 칸 결정 시점을 고르고,
-    균등 난수 관측(마스크 = 모델 허용 칸)을 더한다. 근접 동점(허용 칸 1·2위 차 < NEAR_TIE_GAP)은 뺀다. 기대값은 torch 원 로짓·배포 argmax."""
+    균등 난수 관측(마스크 = 모델 허용 칸)을 더한다. 근접 동점(허용 칸 1·2위 차 < NEAR_TIE_GAP)은 뺀다. 기대값은 torch 원 로짓·배포 argmax.
+    마스크 판 4(두뇌 길) 모델은 도주 길 결정(관측 in_panic 인 결정 시점)을 따로 고른다: SHELTER 가 가능한 두 칸 결정(kind route — 그 가운데 shelter_reach 가
+    가장 작은 문턱 근처 route_edge)과 가능하지 않은 RUN 한 칸 결정(route_single). 그 결정은 행동별·한 칸 묶음에서 뺀다."""
     from env_v2.rep_policy import policy_obs
     from env_v2.repertoire import BEHAVIOR_NAMES
 
@@ -743,6 +781,11 @@ def brain_golden(model, w: dict, cfg, seed: int = BRAIN_GOLDEN_SEED, steps: int 
     nm = p["mask"].sum(1)
     multi = p["reads"] & (nm > 1) & (gap >= NEAR_TIE_GAP)
     single = p["reads"] & (nm == 1)
+    from env_v2.rep_policy import ROUTE_PANIC_COL, ROUTE_REACH_COL
+
+    route = (p["reads"] & (p["obs"][:, list(names).index(ROUTE_PANIC_COL)] > 0.5)) if ROUTE_PANIC_COL in names else np.zeros(len(nm), dtype=bool)
+    multi &= ~route
+    single &= ~route
     rng = np.random.default_rng(SELECT_SEED)
     picks, kinds = [], []
     for a in range(len(BEHAVIOR_NAMES)):
@@ -752,6 +795,16 @@ def brain_golden(model, w: dict, cfg, seed: int = BRAIN_GOLDEN_SEED, steps: int 
     idx = _pick(rng, np.flatnonzero(single), BRAIN_N_SINGLE)
     picks += idx.tolist()
     kinds += ["single"] * len(idx)
+    if route.any():
+        # 마스크 판 4 도주 길 결정: 문턱 근처(shelter_reach 가 가장 작은 두 칸 결정) → 나머지 두 칸 결정 → SHELTER 불가 한 칸 결정
+        reach = p["obs"][:, list(names).index(ROUTE_REACH_COL)]
+        two = np.flatnonzero(route & (nm == 2) & (gap >= NEAR_TIE_GAP))
+        edge = two[np.argsort(reach[two], kind="stable")[:BRAIN_N_ROUTE_EDGE]]
+        rest = _pick(rng, np.setdiff1d(two, edge), BRAIN_N_ROUTE - len(edge))
+        one = _pick(rng, np.flatnonzero(route & (nm == 1)), BRAIN_N_ROUTE_SINGLE)
+        for kind, idx in (("route_edge", edge), ("route", rest), ("route_single", one)):
+            picks += [int(i) for i in idx]
+            kinds += [kind] * len(idx)
     obs = [p["obs"][i] for i in picks]
     mask = [p["mask"][i] for i in picks]
     src = [(int(p["seed"][i]), int(p["step"][i]), int(p["agent"][i])) for i in picks]
@@ -774,8 +827,10 @@ def brain_golden(model, w: dict, cfg, seed: int = BRAIN_GOLDEN_SEED, steps: int 
     if np.any(top_gap(logits, mask) < NEAR_TIE_GAP):
         raise SystemExit("두뇌 골든에 근접 동점이 남았다")
     err = float(np.abs(forward_np(obs, w, np.float32) - logits).max())
-    return dict(obs=obs, mask=mask, logits=logits, act=act, kind=kinds, src=src, err_np32=err,
-                pool=dict(multi=int(multi.sum()), single=int(single.sum()), near_tie=int((p["reads"] & (nm > 1) & (gap < NEAR_TIE_GAP)).sum())))
+    pool = dict(multi=int(multi.sum()), single=int(single.sum()), near_tie=int((p["reads"] & (nm > 1) & (gap < NEAR_TIE_GAP)).sum()))
+    if route.any():         # 마스크 판 4 만 칸을 더한다(옛 두뇌 파일 바이트 그대로)
+        pool.update(route=int((route & (nm == 2)).sum()), route_single=int((route & (nm == 1)).sum()))
+    return dict(obs=obs, mask=mask, logits=logits, act=act, kind=kinds, src=src, err_np32=err, pool=pool)
 
 
 def brain_dict(model, model_path: Path, golden_config: Path, seed: int = BRAIN_GOLDEN_SEED, steps: int = BRAIN_GOLDEN_STEPS,
@@ -843,11 +898,15 @@ def write_brain_file(path: Path, d: dict) -> None:
 
 
 def brain_golden_config_for(obs_names) -> Path:
-    """모델 관측에 맞는 두뇌 골든 세계: 관측 맨 끝이 R5 장애물 관측 세 칸이면 관측 21 거울(`BRAIN_GOLDEN_CONFIG_OBS21`), 아니면 관측 18 거울."""
-    from env_v2.world import OBSTACLE_OBS_NAMES
+    """모델 관측에 맞는 두뇌 골든 세계: 관측 맨 끝이 두뇌 길 세 칸이면 관측 24 거울(`BRAIN_GOLDEN_CONFIG_ROUTE`), R5 장애물 관측 세 칸이면 관측 21 거울
+    (`BRAIN_GOLDEN_CONFIG_OBS21`), 아니면 관측 18 거울."""
+    from env_v2.world import OBSTACLE_OBS_NAMES, ROUTE_OBS_NAMES
 
+    names = tuple(obs_names)
+    if names[-len(ROUTE_OBS_NAMES):] == tuple(ROUTE_OBS_NAMES):
+        return BRAIN_GOLDEN_CONFIG_ROUTE
     k = len(OBSTACLE_OBS_NAMES)
-    return BRAIN_GOLDEN_CONFIG_OBS21 if tuple(obs_names)[-k:] == tuple(OBSTACLE_OBS_NAMES) else BRAIN_GOLDEN_CONFIG
+    return BRAIN_GOLDEN_CONFIG_OBS21 if names[-k:] == tuple(OBSTACLE_OBS_NAMES) else BRAIN_GOLDEN_CONFIG
 
 
 def export_brain_file(model_path: Path, out_file: Path, golden_config: Path | None = None, seed: int = BRAIN_GOLDEN_SEED,

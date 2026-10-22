@@ -744,6 +744,9 @@ class RepLearned:
 
         # 허용 = 모델 목록 ∩ 세계 목록(v3 R3: 얼기를 뺀 세계에서는 R1b 의 FREEZE 가 막힌다. 두 목록이 같으면 모델 목록 그대로)
         self.allowed = effective_allowed(pol.rep_allowed, world.cfg)
+        from .rep_policy import check_route_allowed, mask_version_of
+
+        check_route_allowed(self.allowed, mask_version_of(world.obs_names))     # 10-22 판 4(두뇌 길) 세계는 얼기·잠이 막혀야 한다
         self.params = {"allowed_mask": allowed_mask_of(self.allowed)}
         self.world = world
 

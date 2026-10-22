@@ -322,9 +322,11 @@ def world_block(w, protected_refuges: bool = False) -> dict:
         raise ValueError("날씨 시간표는 평가기가 받지 않는다")
     if w._wf is not None and float(w._wf.get("flight_cost", 0.0)) > 0.0:
         raise ValueError("wild_flight.flight_cost 는 학습 세계 전용이다 (판정 세계에 없어야 한다)")
-    if w._wf is not None and (w._wf.get("route_fixed") is not None or int(w._wf.get("quiet_end", 0) or 0) > 0):
-        # 10-21 도망길 측정(route_fixed·quiet_end)은 C++ 에 없다 — 'run' 도 세계는 같지만 도망길 기록(flight.route 등)을 낼 수 없다
-        raise ValueError(f"wild_flight.route_fixed {w._wf.get('route_fixed')!r}·quiet_end {w._wf.get('quiet_end')!r} 는 C++ 세계에 없다 — 평가기가 받지 않는다")
+    if w._wf is not None and (w._wf.get("route_fixed") is not None or int(w._wf.get("quiet_end", 0) or 0) > 0 or w._wf.get("route")):
+        # 10-21 도망길 측정(route_fixed·quiet_end)·10-22 두뇌 길(route — 관측 24·마스크 판 4)은 C++ 에 없다 — 'run' 도 세계는 같지만 도망길 기록(flight.route 등)을
+        # 낼 수 없다
+        raise ValueError(f"wild_flight.route_fixed {w._wf.get('route_fixed')!r}·quiet_end {w._wf.get('quiet_end')!r}·route {w._wf.get('route')!r} 는 "
+                         "C++ 세계에 없다 — 평가기가 받지 않는다")
     bad = unsupported_settings(cfg.to_dict())
     if bad:
         raise ValueError(f"평가기가 옮기지 않는 세계 칸이 바탕({REF_CFG.name})과 다르다 — C++ 은 제 상수로 돈다: " + "; ".join(bad[:8])

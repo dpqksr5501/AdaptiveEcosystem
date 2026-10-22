@@ -1,0 +1,274 @@
+{
+ "route_model": "ckpt/v3/v3_r1_g995_s3_obs24route0.zip",
+ "src_model": "ckpt/v3/v3_r1_g995_s3_obs21zero.zip",
+ "steps": 1800,
+ "seeds": [
+  32090,
+  32091
+ ],
+ "regions": [
+  "Barren",
+  "Forest",
+  "Highland"
+ ],
+ "all_same": true,
+ "runs": [
+  {
+   "world": "N",
+   "region": "Barren",
+   "seed": 32090,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "f04f014b9224181633c335fe2e5090f206301c8d4ee3e0b1ad686253c82805c5",
+   "started": 457,
+   "reflex_steps": 29122,
+   "route_decisions": 878,
+   "route_choice": 480,
+   "route_single": 398,
+   "picked": {
+    "run": 878,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "N",
+   "region": "Barren",
+   "seed": 32091,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "331f2065d85805ea82fa3fc8803bde29ec16a2e4ad55549a0afd203b9068d024",
+   "started": 458,
+   "reflex_steps": 24580,
+   "route_decisions": 770,
+   "route_choice": 432,
+   "route_single": 338,
+   "picked": {
+    "run": 770,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "N",
+   "region": "Forest",
+   "seed": 32090,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "64c187e36db5b83a00552015adde51d41b1d93bc92c851420fac096a17ea578f",
+   "started": 642,
+   "reflex_steps": 36895,
+   "route_decisions": 1115,
+   "route_choice": 589,
+   "route_single": 526,
+   "picked": {
+    "run": 1115,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "N",
+   "region": "Forest",
+   "seed": 32091,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "d06644cb5c50809b2b114f1748860c6acfb09d844fbfb56a8e2f878077cf0625",
+   "started": 605,
+   "reflex_steps": 35564,
+   "route_decisions": 1122,
+   "route_choice": 625,
+   "route_single": 497,
+   "picked": {
+    "run": 1122,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "N",
+   "region": "Highland",
+   "seed": 32090,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "c3a78c2c79a9c6625ef675ba8b9a277e09628b50c9c25bcb509efb1eb98ef16f",
+   "started": 284,
+   "reflex_steps": 26436,
+   "route_decisions": 577,
+   "route_choice": 287,
+   "route_single": 290,
+   "picked": {
+    "run": 577,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "N",
+   "region": "Highland",
+   "seed": 32091,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "06493691dd71b6fee8b3179992a6f1a11eb40e353c5ab7e09f4fe9198ec54ea9",
+   "started": 356,
+   "reflex_steps": 29119,
+   "route_decisions": 623,
+   "route_choice": 316,
+   "route_single": 307,
+   "picked": {
+    "run": 623,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "G",
+   "region": "Barren",
+   "seed": 32090,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "e6339ac50c11cab16c7e73c27fff3e3c707f538fc92d417c02272c1c14b4e921",
+   "started": 220,
+   "reflex_steps": 14619,
+   "route_decisions": 473,
+   "route_choice": 214,
+   "route_single": 259,
+   "picked": {
+    "run": 473,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "G",
+   "region": "Barren",
+   "seed": 32091,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "432354badb98599d949a52bb3500c50387645ff408900821f98303469d4bfddb",
+   "started": 338,
+   "reflex_steps": 18288,
+   "route_decisions": 544,
+   "route_choice": 291,
+   "route_single": 253,
+   "picked": {
+    "run": 544,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "G",
+   "region": "Forest",
+   "seed": 32090,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "1b302d7662d2166d16dff5f691a35363d74d2f5b7b1b1787fd5376744c898bbe",
+   "started": 476,
+   "reflex_steps": 26447,
+   "route_decisions": 827,
+   "route_choice": 445,
+   "route_single": 382,
+   "picked": {
+    "run": 827,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "G",
+   "region": "Forest",
+   "seed": 32091,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "e6e25a1ff2ef1d78365fe04aefaca625e9580c6e66b1e18bb218da3811caaf9d",
+   "started": 198,
+   "reflex_steps": 11445,
+   "route_decisions": 339,
+   "route_choice": 167,
+   "route_single": 172,
+   "picked": {
+    "run": 339,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "G",
+   "region": "Highland",
+   "seed": 32090,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "263ae1b69d9ce0eea837a2d05becd630c7e37f50c72e93b620305f365b0939f0",
+   "started": 256,
+   "reflex_steps": 12724,
+   "route_decisions": 384,
+   "route_choice": 186,
+   "route_single": 198,
+   "picked": {
+    "run": 384,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  },
+  {
+   "world": "G",
+   "region": "Highland",
+   "seed": 32091,
+   "steps": 1800,
+   "same": true,
+   "first_diff": null,
+   "hash": "21edd2178d2829f8af4ceaf4383ab91b6abc55da08c09d9b03629ba3f9891470",
+   "started": 146,
+   "reflex_steps": 10649,
+   "route_decisions": 256,
+   "route_choice": 128,
+   "route_single": 128,
+   "picked": {
+    "run": 256,
+    "cover": 0,
+    "shelter": 0,
+    "open": 0
+   }
+  }
+ ],
+ "route_decisions": 7908,
+ "route_choice": 4160,
+ "route_single": 3748,
+ "picked_run": 7908,
+ "pi_run": 0.8807970326966964,
+ "pi_shelter": 0.11920291300719747,
+ "pi_shelter_min": 0.11920291185379028,
+ "pi_shelter_max": 0.11920294165611267,
+ "pi_eps_run": 0.8617571633882247,
+ "pi_eps_shelter": 0.13824276741450794,
+ "pi_other_max": 0.0,
+ "expected": {
+  "pi_shelter": 0.11920292202211755,
+  "pi_eps_shelter": 0.13824277592101167
+ },
+ "sha256": "293c3165b1edb11e24d5a616ef58c24196fb164164b7902dcf5622d8e7d3dffc",
+ "src_sha256": "e268476da76ecdfb8db5dcfd17e089a51088e2035bf205464c8185efdb9ea3a1"
+}
