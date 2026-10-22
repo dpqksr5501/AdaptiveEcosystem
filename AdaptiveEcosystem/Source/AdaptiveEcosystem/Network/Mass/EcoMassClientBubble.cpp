@@ -5,6 +5,8 @@
 
 #include "AdaptiveEcosystem.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassPresentationFragments.h"
+#include "Engine/World.h"
 #include "MassEntityQuery.h"
 #include "MassExecutionContext.h"
 #include "MassSpawnerSubsystem.h"
@@ -59,6 +61,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		TransformHandler.AddRequirementsForSpawnQuery(Query);
 		Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadWrite);
 		Query.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadWrite);
+		Query.AddRequirement<FEcoClientPresentationFragment>(EMassFragmentAccess::ReadWrite);
 		Query.AddRequirement<FEcoCreaturePresentationFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
 	};
 
@@ -79,10 +82,12 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 
 		FEcoRegionFragment& Region = RegionFragments[EntityIndex];
 		Region.CurrentRegionId = Agent.GetRegionId();
+		EntityView.GetFragmentData<FEcoClientPresentationFragment>().Receive(
+			Agent.MakeRepresentationSnapshot(), GetWorld()->GetRealTimeSeconds());
 		if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
 		{
 			Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
-			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy();
+			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity(); Visual->FocusYaw = Agent.GetFocusYaw();
 		}
 	};
 
@@ -176,6 +181,8 @@ void FEcoMassClientBubbleHandler::RetryPendingAdds()
 
 void FEcoMassClientBubbleHandler::SetModifiedEntityData(const FMassEntityView& EntityView, const FReplicatedEcoMassAgent& Agent) const
 {
+	if (!EntityView.GetFragmentData<FEcoClientPresentationFragment>().Receive(
+		Agent.MakeRepresentationSnapshot(), GetWorld()->GetRealTimeSeconds())) return;
 	TransformHandler.SetModifiedEntityData(EntityView, Agent.GetReplicatedPositionYawData());
 
 	FEcoIdentityFragment& Identity = EntityView.GetFragmentData<FEcoIdentityFragment>();
@@ -187,7 +194,7 @@ void FEcoMassClientBubbleHandler::SetModifiedEntityData(const FMassEntityView& E
 	if (auto* Visual = EntityView.GetFragmentDataPtr<FEcoCreaturePresentationFragment>())
 	{
 		Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
-		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy();
+		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity(); Visual->FocusYaw = Agent.GetFocusYaw();
 	}
 }
 #endif
@@ -217,6 +224,11 @@ void FEcoMassClientBubbleHandler::Tick(const float DeltaTime)
 
 void FEcoMassClientBubbleHandler::Reset()
 {
+#if UE_REPLICATION_COMPILE_SERVER_CODE
+	ReplicationStats = {};
+	AdmissionFrame = MAX_uint64;
+	AddsThisFrame = 0;
+#endif
 #if UE_REPLICATION_COMPILE_CLIENT_CODE
 	PendingAddReplicationIDs.Reset();
 	WaitingTemplateIDs.Reset();

@@ -1,0 +1,523 @@
+{
+ "meta": {
+  "r1_config": "configs\\v3_r1.yaml",
+  "r4_config": "configs\\v3_r4_train.yaml",
+  "model": "ckpt\\v3\\v3_r1_g995_s3_20m.zip",
+  "r1_seeds": [
+   0,
+   90,
+   180,
+   270,
+   360,
+   450,
+   540,
+   630,
+   720,
+   810,
+   900,
+   990
+  ],
+  "r1_steps": 2000,
+  "r4_seeds": [
+   32000,
+   32001,
+   32002,
+   32003
+  ],
+  "r4_steps": 3000,
+  "r1_samples": 3072000,
+  "r4_samples": {
+   "Barren": 1536000,
+   "Forest": 1536000,
+   "Highland": 1536000
+  }
+ },
+ "slots": [
+  {
+   "slot": 0,
+   "name": "food_density",
+   "r1_min": 0.0,
+   "r1_max": 0.4555118680000305,
+   "r1_q001": 0.0,
+   "r1_q999": 0.3691932328939449,
+   "Barren": {
+    "min": 0.0,
+    "max": 0.2863011658191681,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 0.28226497769355774,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 0.2615372836589813,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 1,
+   "name": "pred_count",
+   "r1_min": 0.0,
+   "r1_max": 0.875,
+   "r1_q001": 0.0,
+   "r1_q999": 0.375,
+   "Barren": {
+    "min": 0.0,
+    "max": 0.5,
+    "out_range": 0.0,
+    "out_q": 0.004143880208333333
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 0.5,
+    "out_range": 0.0,
+    "out_q": 0.0022760416666666667
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 0.5,
+    "out_range": 0.0,
+    "out_q": 6.705729166666667e-05
+   },
+   "outside": false
+  },
+  {
+   "slot": 2,
+   "name": "pred_dist",
+   "r1_min": 1.918624690233628e-07,
+   "r1_max": 1.0,
+   "r1_q001": 0.04894283329695463,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.002593584591522813,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0004029947916666667
+   },
+   "Forest": {
+    "min": 0.005477601662278175,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0004069010416666667
+   },
+   "Highland": {
+    "min": 0.008184739388525486,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.00036002604166666664
+   },
+   "outside": false
+  },
+  {
+   "slot": 3,
+   "name": "kin_count",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 4,
+   "name": "energy",
+   "r1_min": 8.119959460373138e-08,
+   "r1_max": 1.0,
+   "r1_q001": 0.005214284377638251,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.48164518229166664,
+    "out_q": 0.50258203125
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.44012369791666667,
+    "out_q": 0.45914322916666667
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.482251953125,
+    "out_q": 0.4974641927083333
+   },
+   "outside": true
+  },
+  {
+   "slot": 5,
+   "name": "recent_predation",
+   "r1_min": 0.0,
+   "r1_max": 0.08444613218307495,
+   "r1_q001": 0.0,
+   "r1_q999": 0.07783058758840407,
+   "Barren": {
+    "min": 0.0,
+    "max": 0.00906510278582573,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 0.011981374584138393,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 0.009309790097177029,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 6,
+   "name": "cover_dist",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 0.7606601715087891,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 0.7606601715087891,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 0.7606601715087891,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 7,
+   "name": "visibility",
+   "r1_min": 0.5,
+   "r1_max": 1.0,
+   "r1_q001": 0.5,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.5,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.44999998807907104,
+    "max": 0.8999999761581421,
+    "out_range": 0.379,
+    "out_q": 0.379
+   },
+   "Highland": {
+    "min": 0.3499999940395355,
+    "max": 0.699999988079071,
+    "out_range": 0.437,
+    "out_q": 0.437
+   },
+   "outside": true
+  },
+  {
+   "slot": 8,
+   "name": "to_transition",
+   "r1_min": 0.0011111111380159855,
+   "r1_max": 1.0,
+   "r1_q001": 0.0011111111380159855,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0011111111380159855,
+    "max": 0.5,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0011111111380159855,
+    "max": 0.5,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0011111111380159855,
+    "max": 0.5,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 9,
+   "name": "pred_approach",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 10,
+   "name": "kin_alarm",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 0.5,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.041017578125
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.045177734375
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.03733984375
+   },
+   "outside": false
+  },
+  {
+   "slot": 11,
+   "name": "beh_graze",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 12,
+   "name": "beh_flee",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 13,
+   "name": "beh_hide",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 14,
+   "name": "beh_freeze",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 0.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 0.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 0.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 15,
+   "name": "beh_sleep",
+   "r1_min": 0.0,
+   "r1_max": 0.0,
+   "r1_q001": 0.0,
+   "r1_q999": 0.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 0.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 0.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 0.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 16,
+   "name": "beh_steps",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  },
+  {
+   "slot": 17,
+   "name": "threat_recency",
+   "r1_min": 0.0,
+   "r1_max": 1.0,
+   "r1_q001": 0.0,
+   "r1_q999": 1.0,
+   "Barren": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Forest": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "Highland": {
+    "min": 0.0,
+    "max": 1.0,
+    "out_range": 0.0,
+    "out_q": 0.0
+   },
+   "outside": false
+  }
+ ]
+}

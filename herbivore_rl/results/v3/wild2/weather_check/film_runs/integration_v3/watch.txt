@@ -1,0 +1,32 @@
+perf t=1.13 frames=30 wall_ms_per_frame=10.3 (fps 97.0) captures=0
+perf t=2.13 frames=30 wall_ms_per_frame=9.5 (fps 105.4) captures=0
+perf t=3.13 frames=30 wall_ms_per_frame=9.0 (fps 110.9) captures=0
+perf t=4.13 frames=30 wall_ms_per_frame=10.3 (fps 97.4) captures=0
+perf t=5.13 frames=30 wall_ms_per_frame=8.0 (fps 124.3) captures=0
+t=6.00 frame=0 cam=(27412,39712,3769) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=485.2m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=6.13 frames=30 wall_ms_per_frame=26.8 (fps 37.3) captures=1
+t=6.50 frame=1 cam=(27412,39712,3769) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=485.2m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=7.13 frames=30 wall_ms_per_frame=15.2 (fps 65.7) captures=1
+perf t=8.13 frames=30 wall_ms_per_frame=8.6 (fps 116.5) captures=0
+perf t=9.13 frames=30 wall_ms_per_frame=10.3 (fps 97.3) captures=0
+t=10.00 frame=2 cam=(31998,42801,73) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=447.1m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=10.13 frames=30 wall_ms_per_frame=16.4 (fps 61.0) captures=1
+t=10.50 frame=3 cam=(31745,43173,74) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=450.8m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=11.13 frames=30 wall_ms_per_frame=16.1 (fps 62.2) captures=1
+perf t=12.13 frames=30 wall_ms_per_frame=9.2 (fps 108.3) captures=0
+perf t=13.13 frames=30 wall_ms_per_frame=8.9 (fps 112.6) captures=0
+t=14.00 frame=4 cam=(27212,-55788,8040) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=946.5m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=14.13 frames=30 wall_ms_per_frame=14.7 (fps 68.2) captures=1
+t=14.50 frame=5 cam=(27212,-55788,8040) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=946.5m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=15.13 frames=30 wall_ms_per_frame=14.6 (fps 68.7) captures=1
+perf t=16.13 frames=30 wall_ms_per_frame=7.6 (fps 132.3) captures=0
+perf t=17.13 frames=30 wall_ms_per_frame=7.9 (fps 127.1) captures=0
+t=18.00 frame=6 cam=(34808,-48534,4345) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=842.8m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=18.13 frames=30 wall_ms_per_frame=15.2 (fps 65.8) captures=1
+t=18.50 frame=7 cam=(34808,-48534,4345) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=842.8m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=19.13 frames=30 wall_ms_per_frame=15.0 (fps 66.7) captures=1
+perf t=20.13 frames=30 wall_ms_per_frame=8.0 (fps 124.6) captures=0
+perf t=21.13 frames=30 wall_ms_per_frame=6.4 (fps 156.2) captures=0
+t=22.00 frame=8 cam=(27212,-5788,7063) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=570.9m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)
+perf t=22.13 frames=30 wall_ms_per_frame=13.4 (fps 74.8) captures=1
+t=22.50 frame=9 cam=(27212,-5788,7063) pawn=(34200,48500,-600) audio_device=0 | BP_SkyManager_C_UAID_644ED7F0E5F70A0903_1221053096 Billboard=BillboardComponent[active=0 visible=0 at=(73100,25960,-5020) cam_d=570.9m parent=-] DynamicSun=1 WeatherManager=none Sun=DirectionalLight_UAID_644ED7F0E5F70A0903_1193979095(p-45.0,y0.0) SunSpeed=0.000 SunDefaultRotaion=(p315.0,y0.0,r0.0) SunCurrentRotation=(p315.0,y0.0,r0.0) Moon=DirectionalLight_UAID_644ED7F0E5F70A0903_1234814097(p45.0,y180.0)

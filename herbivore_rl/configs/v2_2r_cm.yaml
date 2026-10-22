@@ -1,0 +1,54 @@
+# V2 설정 — v2.2r CM: 범주형 보행 Categorical(4){정지, 걷기, 뛰기, look} + 창 밖 look 마스크 (수정 제안서 3.1 (나) CM 행,
+# 3.3 범주형 초기값, 10-03 R2 갈림 3).
+#
+# 탐색 배치(results/v2/v2_2r_explore/judge.md)에서 L·W′ 가 모두 실패해 미리 정한 갈림 3 으로 CM 을 한 번 시도한다. 갈림의
+# 규칙 "W′ 가 L 보다 기준에 가까웠으면 Categorical(4) + 창 밖 경계 마스크"에 따라(W′ 는 2M 사용률 0.095 로 기준 0.05 를
+# 넘고 5M 에 0.016 이었고, L 은 2M B3_L 평균 −0.149 로 기준 0.1 에서 멀었다) 세계는 W′(configs/v2_2r_w.yaml) 그대로다.
+# 조향 4개는 가우시안 그대로이고, 보행·경계를 범주 하나로 고른다(env_v2/cm.py). look = 경계(창 안에서만 효력, 정지·섭식 1.0·
+# 위협 쪽 돌아보기). 창 밖에서는 look 확률을 0 으로 막는다. 세계·행동 열(6)은 W′ 와 같고 정책 출력만 [조향 4, 범주] 다.
+#   python train_v2.py --config configs/v2_2r_cm.yaml --steps 20000000 --seed 20 --run-name v2_2r_cm_s20 --probe-every 1000000
+# 형식 규칙은 configs/v2.yaml 머리 주석과 같다.
+
+version: "2.2r_cm"
+
+overrides:
+  rand:
+    pred_speed_mult: [0.6, 0.95]
+
+features:
+  speed:
+    # configs/v2_1.yaml·v2_2.yaml 블록 그대로 (Gate E1-b 통과 계수 r2_5_ew0_5)
+    enabled: true
+    thresholds: [0.3333333333333333, 0.6666666666666666]
+    gait_speed: [0.0, 0.4, 1.0]
+    gait_eat: [1.0, 0.5, 0.0]
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+  vigilance:
+    # configs/v2_2r_w.yaml 블록 그대로 (L 형 계수: 섭식 1.0, 시야 120°)
+    enabled: true
+    threshold: 0.5
+    decay: 0.95
+    eat_mult: 1.0
+    fov_deg: 120.0
+    threat_flee: 0.0
+  vigil_window:
+    enabled: true
+    action: true
+    window_only: true
+    look_back: false
+    theta: 0.5
+
+train:
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256
+  cm:
+    categories: [stop, walk, run, look]
+    # 시작 확률 (수정 제안서 3.3, 제안): 정지 0.3·걷기 0.5·뛰기 0.2 에 경계 0.1 을 더하고 합으로 나눠 맞춘다
+    # (env_v2/cm.py cm_params 가 init_probs / 합의 log 를 로짓 편향으로 넣는다). 창 밖에서는 look 이 막혀 0.3·0.5·0.2 다
+    init_probs: [0.3, 0.5, 0.2, 0.1]
+    # 범주 엔트로피 계수 (수정 제안서 3.3, 제안). 조향 가우시안은 PPO ent_coef(튜닝값) 그대로다
+    cat_ent_coef: 0.01
+    mask_look_outside_window: true

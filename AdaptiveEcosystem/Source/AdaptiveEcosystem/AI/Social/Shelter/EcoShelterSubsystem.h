@@ -29,7 +29,7 @@ public:
 	 * @return Compact RuntimeIndex of the registered shelter.
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Social|Shelter")
-	int32 RegisterShelter(const FVector& Location, const FVector& Normal, float Quality, int32 Capacity, float Radius = 200.0f);
+	int32 RegisterShelter(const FVector& Location, const FVector& Normal, float Quality, int32 Capacity, float Radius = 200.0f, float SlotRadiusFraction = 1.0f, bool bProjectSlotsToGround = false);
 
 	/**
 	 * Unregisters an existing shelter and vacates all its slots.
@@ -71,7 +71,7 @@ public:
 	 * @return Shelter RuntimeIndex or INDEX_NONE_ECO if none suitable.
 	 */
 	int32 FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation, bool bHasThreat,
-		float SearchRadius, int32& OutSlotIndex, float& OutScore) const;
+		float SearchRadius, int32& OutSlotIndex, float& OutScore, const TFunction<bool(const FVector&)>* SlotFilter = nullptr) const;
 
 	/** Retrieves slot data by index */
 	bool GetSlotData(int32 SlotIndex, FEcoShelterSlot& OutSlot) const;
@@ -93,6 +93,7 @@ public:
 	bool IsValidShelterIndex(int32 ShelterIndex) const;
 
 private:
+	int64 NextShelterRegistrationId = 1;
 	int64 NextReservationId = 1;
 	/** Dense array of registered shelter points */
 	UPROPERTY(Transient)

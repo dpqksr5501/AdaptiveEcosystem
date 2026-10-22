@@ -1,0 +1,118 @@
+{
+  "date": "2026-10-16",
+  "sinhyeok": "3916496",
+  "wonkii_m4": "67c860c",
+  "model": "unchanged R1b builtin 18-64-64-5 mask2",
+  "runtime": {
+    "samples": 70,
+    "deer_records": 3332,
+    "detected_records": 723,
+    "flight_override_counts": {
+      "0": 2692,
+      "2": 244,
+      "3": 180,
+      "1": 216
+    },
+    "executed_counts": {
+      "0": 2905,
+      "1": 247,
+      "2": 180
+    },
+    "kin_alarm_records": 436,
+    "heard_cue_records": 313,
+    "learned_policy_read_records": 2640,
+    "preview_fixture_records": 0
+  },
+  "native_hearing_only_records": 232,
+  "active_backends": {
+    "brain": "PPO_V3_builtin",
+    "movement": "NativeV3_single_writer",
+    "social_runtime": false,
+    "species_ai_movement": false
+  },
+  "close_wolf_graze_examples": [
+    {
+      "deer": 27,
+      "wolf": 2,
+      "distance_cm": 1348,
+      "wolf_eat_steps": 36
+    },
+    {
+      "deer": 12,
+      "wolf": 1,
+      "distance_cm": 1006,
+      "wolf_eat_steps": 23
+    }
+  ],
+  "interpretation": "record counts, not unique animal counts; native kin_alarm is not Persistent Herd Alarm; resting/eating wolves do not trigger panic",
+  "ik_preview": {
+    "cases": 12,
+    "finished": true,
+    "no_ai_label_and_hud": true,
+    "play_ended_at_seconds": 36
+  },
+  "user_assets_preserved": 68,
+  "network": {
+    "processes": [
+      {
+        "Name": "ClientA",
+        "ExitCode": 0
+      },
+      {
+        "Name": "ClientB",
+        "ExitCode": 0
+      },
+      {
+        "Name": "Server",
+        "ExitCode": 0
+      }
+    ],
+    "server_seconds": 110,
+    "alarm_deliveries": 1452,
+    "unique_alarm_listeners": 328,
+    "duplicate_listener_event": 0,
+    "max_delivery_distance_cm": 2400,
+    "resource_receipt_rejections": 0,
+    "nonzero_mask_violations": 0,
+    "server_visual_counts": [
+      0
+    ],
+    "clients": {
+      "ClientA": {
+        "ready": true,
+        "logical_counts": [
+          0
+        ],
+        "visual_counts": [
+          52,
+          57,
+          63
+        ],
+        "logical_steps": [
+          0
+        ]
+      },
+      "ClientB": {
+        "ready": true,
+        "logical_counts": [
+          0
+        ],
+        "visual_counts": [
+          33,
+          37,
+          39
+        ],
+        "logical_steps": [
+          0
+        ]
+      }
+    }
+  },
+  "automation": {
+    "succeeded": 135,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0,
+    "inProcess": 0
+  }
+}

@@ -1,0 +1,38 @@
+# v3 R2 무리 확인·역침입 wr2
+
+설정 configs/v3_r2_on.yaml, 시드 12160~12199 (40개) × 3000스텝, R_base(θ 4, a 0.6), X = ['stare', 'look']. 무리 = 128마리 개체-스텝당 보상의 (변형 − 모두 R_base) 시드 짝 t, 역침입 = 슬롯 0~15(R_base) − 나머지(R_base + X). 보고만 한다(H1 근거).
+
+변형: pop = 모두 R_base + X − 모두 R_base, rev = 역침입, base_off = 모두 R_base 의 장치 켬 − 끔(v3_r1_on), wr2 의 fsm·graze = 모두 FSM_R2·모두 늘 먹기 − 모두 R_base.
+
+| 변형 | 칸 평균 | 유의 양수 칸 | 유의 음수 칸 | ps0.3_pl_T600 | ps0.3_pl_T1800 | ps0.3_np_T600 | ps0.3_np_T1800 | ps0.7_pl_T600 | ps0.7_pl_T1800 | ps0.7_np_T600 | ps0.7_np_T1800 |
+|---|---|---|---|---|---|---|---|---|---|---|---|
+| pop | +0.00061 | 2 | 1 | -0.00108 (-1.89) | -0.00113 (-2.09) | -0.00104 (-1.27) | -0.00036 (-0.52) | +0.00159 (+1.71) | +0.00152 (+2.01) | +0.00282 (+3.66) | +0.00258 (+3.32) |
+| rev | +0.00019 | 0 | 0 | +0.00028 (+0.44) | +0.00089 (+1.40) | -0.00106 (-1.69) | +0.00106 (+1.99) | +0.00017 (+0.24) | +0.00035 (+0.65) | +0.00016 (+0.23) | -0.00036 (-0.55) |
+| fsm | +0.00017 | 2 | 1 | -0.00112 (-2.01) | -0.00174 (-2.43) | -0.00116 (-1.67) | -0.00032 (-0.50) | +0.00105 (+1.86) | +0.00079 (+1.03) | +0.00235 (+3.81) | +0.00152 (+2.65) |
+| graze | -0.00363 | 0 | 8 | -0.00322 (-5.37) | -0.00381 (-6.38) | -0.00340 (-5.73) | -0.00243 (-4.49) | -0.00362 (-5.55) | -0.00380 (-5.49) | -0.00409 (-5.55) | -0.00470 (-6.68) |
+| base_off | +0.00183 | 7 | 0 | +0.00093 (+2.27) | +0.00132 (+2.39) | +0.00142 (+2.67) | +0.00064 (+1.33) | +0.00322 (+5.07) | +0.00284 (+4.95) | +0.00162 (+2.57) | +0.00269 (+4.96) |
+
+위협 유형별 포획률(개체-스텝당, 칸·시드 평균)·아사율:
+
+| 변형 | 근접 추격 | 원거리 | 잠행 | 플레이어 | 아사 |
+|---|---|---|---|---|---|
+| base | 0.00054 | 0.00007 | 0.00055 | 0.00002 | 0.00038 |
+| pop | 0.00038 | 0.00005 | 0.00024 | 0.00001 | 0.00049 |
+| rev | 0.00041 | 0.00005 | 0.00030 | 0.00002 | 0.00048 |
+| fsm | 0.00059 | 0.00009 | 0.00041 | 0.00003 | 0.00035 |
+| graze | 0.00069 | 0.00012 | 0.00079 | 0.00003 | 0.00036 |
+| base_off | 0.00054 | 0.00007 | 0.00071 | 0.00002 | 0.00038 |
+
+보이는 지표(사전 등록 5절, 칸·시드 평균, *_per1000 = 1000 개체-스텝당):
+
+- base · stare: standoff_n 0, standoff_break_n 0, blink_catch_n 0, balk_n 0, balk_share 0, spotted_n 0, spotted_charge_n 0, spotted_charge_catch_n 0, lock_steps_mean 16.05, stare_frac 0, standoff_break_beh_n 0, spotted_charge_catch_frac —, unspotted_charge_catch_frac 0.9893, standoff_n_per1000 0, standoff_break_n_per1000 0, blink_catch_n_per1000 0, balk_n_per1000 0, spotted_n_per1000 0, spotted_charge_n_per1000 0, spotted_charge_catch_n_per1000 0, standoff_break_beh_n_per1000 0
+- base · alarm: emit_h0 2741, emit_h1 0, emit_h2 0, cry_n 451.3, listen_per_emit 8.765, alarm_frac 0.2268, alarm_unseen_frac 0.7536, e7_n 1786, e7_switch_frac 0.08274, heard_entry_flee 0, heard_entry_hide —, heard_entry_freeze —, alarm_gap_mean 154.3, dir_n 7414, dir_ok_pt 0.9239, dir_ok_copy 0.6031, wave_size_mean 0, heads_up_1s 0.2533, false_alarm_frac 0.2199, e7_decide_frac 0.9996, heads_up_1s_r16 0.1956, emit_h0_per1000 7.137, emit_h1_per1000 0, emit_h2_per1000 0, cry_n_per1000 1.175, e7_n_per1000 4.65, dir_n_per1000 19.31
+- pop · stare: standoff_n 39.72, standoff_break_n 3.184, blink_catch_n 0.5406, balk_n 35.9, balk_share 0.3049, spotted_n 1.019, spotted_charge_n 1, spotted_charge_catch_n 0.1719, lock_steps_mean 16.62, stare_frac 0.0006227, standoff_break_beh_n 1.084, spotted_charge_catch_frac 0.1748, unspotted_charge_catch_frac 0.9918, standoff_n_per1000 0.1034, standoff_break_n_per1000 0.008293, blink_catch_n_per1000 0.001408, balk_n_per1000 0.09348, spotted_n_per1000 0.002653, spotted_charge_n_per1000 0.002604, spotted_charge_catch_n_per1000 0.0004476, standoff_break_beh_n_per1000 0.002824
+- pop · alarm: emit_h0 3645, emit_h1 3075, emit_h2 654.9, cry_n 261.1, listen_per_emit 9.66, alarm_frac 0.2861, alarm_unseen_frac 0.6988, e7_n 2256, e7_switch_frac 0.585, heard_entry_flee 0, heard_entry_hide —, heard_entry_freeze 0.9662, alarm_gap_mean 148.4, dir_n 6224, dir_ok_pt 0.881, dir_ok_copy 0.7382, wave_size_mean 1.031, heads_up_1s 0.6789, false_alarm_frac 0.217, e7_decide_frac 0.9929, heads_up_1s_r16 0.5823, emit_h0_per1000 9.493, emit_h1_per1000 8.009, emit_h2_per1000 1.705, cry_n_per1000 0.6799, e7_n_per1000 5.874, dir_n_per1000 16.21
+- rev · stare: standoff_n 34.11, standoff_break_n 3.575, blink_catch_n 0.4938, balk_n 30.06, balk_share 0.2234, spotted_n 0.7344, spotted_charge_n 0.7312, spotted_charge_catch_n 0.1469, lock_steps_mean 16.77, stare_frac 0.0005194, standoff_break_beh_n 1.025, spotted_charge_catch_frac 0.2117, unspotted_charge_catch_frac 0.9947, standoff_n_per1000 0.08883, standoff_break_n_per1000 0.00931, blink_catch_n_per1000 0.001286, balk_n_per1000 0.07828, spotted_n_per1000 0.001912, spotted_charge_n_per1000 0.001904, spotted_charge_catch_n_per1000 0.0003825, standoff_break_beh_n_per1000 0.002669
+- rev · alarm: emit_h0 3586, emit_h1 2697, emit_h2 540.9, cry_n 296.8, listen_per_emit 9.082, alarm_frac 0.283, alarm_unseen_frac 0.7049, e7_n 2295, e7_switch_frac 0.4958, heard_entry_flee 0, heard_entry_hide —, heard_entry_freeze 0.9649, alarm_gap_mean 146.2, dir_n 6789, dir_ok_pt 0.8892, dir_ok_copy 0.7294, wave_size_mean 0.9067, heads_up_1s 0.6103, false_alarm_frac 0.2179, e7_decide_frac 0.9938, heads_up_1s_r16 0.5155, emit_h0_per1000 9.338, emit_h1_per1000 7.024, emit_h2_per1000 1.409, cry_n_per1000 0.7728, e7_n_per1000 5.976, dir_n_per1000 17.68
+- fsm · stare: standoff_n 27.72, standoff_break_n 2.291, blink_catch_n 0.425, balk_n 24.94, balk_share 0.1514, spotted_n 0.4656, spotted_charge_n 0.5531, spotted_charge_catch_n 0.5188, lock_steps_mean 9.293, stare_frac 0.0004268, standoff_break_beh_n 0.3031, spotted_charge_catch_frac 0.9109, unspotted_charge_catch_frac 0.9958, standoff_n_per1000 0.07219, standoff_break_n_per1000 0.005965, blink_catch_n_per1000 0.001107, balk_n_per1000 0.06496, spotted_n_per1000 0.001213, spotted_charge_n_per1000 0.00144, spotted_charge_catch_n_per1000 0.001351, standoff_break_beh_n_per1000 0.0007894
+- fsm · alarm: emit_h0 1812, emit_h1 1070, emit_h2 667.9, cry_n 426.3, listen_per_emit 10.03, alarm_frac 0.2503, alarm_unseen_frac 0.4766, e7_n 2389, e7_switch_frac 0.5676, heard_entry_flee —, heard_entry_hide 0, heard_entry_freeze 0.7822, alarm_gap_mean 114.4, dir_n 3538, dir_ok_pt 0.9106, dir_ok_copy 0.6783, wave_size_mean 1.035, heads_up_1s 0.2546, false_alarm_frac 0.3248, e7_decide_frac 0.9948, heads_up_1s_r16 0.2271, emit_h0_per1000 4.718, emit_h1_per1000 2.787, emit_h2_per1000 1.739, cry_n_per1000 1.11, e7_n_per1000 6.221, dir_n_per1000 9.213
+- graze · stare: standoff_n 0, standoff_break_n 0, blink_catch_n 0, balk_n 0, balk_share 0, spotted_n 0, spotted_charge_n 0, spotted_charge_catch_n 0, lock_steps_mean 9.26, stare_frac 0, standoff_break_beh_n 0, spotted_charge_catch_frac —, unspotted_charge_catch_frac 1, standoff_n_per1000 0, standoff_break_n_per1000 0, blink_catch_n_per1000 0, balk_n_per1000 0, spotted_n_per1000 0, spotted_charge_n_per1000 0, spotted_charge_catch_n_per1000 0, standoff_break_beh_n_per1000 0
+- graze · alarm: emit_h0 627.2, emit_h1 0, emit_h2 0, cry_n 627.2, listen_per_emit 7.658, alarm_frac 0.1049, alarm_unseen_frac 0.6127, e7_n 1559, e7_switch_frac 0, heard_entry_flee —, heard_entry_hide —, heard_entry_freeze —, alarm_gap_mean 162.3, dir_n 1216, dir_ok_pt 0.9616, dir_ok_copy 0.1972, wave_size_mean 0, heads_up_1s 0, false_alarm_frac —, e7_decide_frac 0.9999, heads_up_1s_r16 0, emit_h0_per1000 1.633, emit_h1_per1000 0, emit_h2_per1000 0, cry_n_per1000 1.633, e7_n_per1000 4.059, dir_n_per1000 3.166
+

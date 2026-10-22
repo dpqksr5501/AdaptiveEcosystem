@@ -1,0 +1,9 @@
+§6.4 튜닝값 적용: learning_rate=6.813187996724827e-05  gamma=0.9916661555611042  ent_coef=0.0008971496690499397  clip_range=0.37816696417287243  n_epochs=15
+학습률 linear(6.813187996724827e-05→0) (--lr-schedule, 다른 튜닝값은 그대로)
+무작위 초기화로 시작 (계획서 4.7)
+시작 분포 speed: 편향 +0.0000, log_std +0.000, 평균 μ -0.0033 → 정지 0.245 · 걷기 0.512 · 뛰기 0.243 (계획서 4.7: 편향 0, 걷기 약 51%)
+20,000,000 스텝 — 세계 8개 × 128슬롯 = num_envs 1024, 세계당 n_steps 32 (배치 32,768), 리셋 4000스텝마다, 관측 7개, 행동 5개 ['forage', 'cohesion', 'flee_dist', 'cover', 'speed']
+  중간 저장 10,000,000 → s1a_l_s58_10m.zip (실제 10,027,008)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v2\s1a_l_s58.zip  (26.8분)
+config_digest f068496361f9, ent_coef 0.0008971496690499397 (ppo_config)
+학습한 세계 수: 47 (시간 초과 리셋 39회)

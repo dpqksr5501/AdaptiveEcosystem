@@ -1,0 +1,17 @@
+{
+ "label": "V0/c2",
+ "config_digest": {
+  "": "efc8f775f1e1"
+ },
+ "smoke": false,
+ "steps": [
+  {
+   "stem": "constsearch",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_95.yaml --workers 18 --out results/v2/e2/V0/c2 --enqueue 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 0.25 --enqueue 0.39 0.99 0.92 0.15 0.5 0.25",
+   "returncode": 0,
+   "elapsed_s": 405.8,
+   "finished": "2026-10-02T16:13:05+00:00"
+  }
+ ],
+ "python": "3.13.5"
+}

@@ -1,0 +1,197 @@
+{
+ "meta": {
+  "bundle": "a",
+  "config": "configs/v3_r3_on.yaml",
+  "seeds": [
+   15000,
+   15001,
+   15002,
+   15003,
+   15004,
+   15005,
+   15006,
+   15007,
+   15008,
+   15009,
+   15010,
+   15011,
+   15012,
+   15013,
+   15014,
+   15015,
+   15016,
+   15017,
+   15018,
+   15019,
+   15020,
+   15021,
+   15022,
+   15023,
+   15024,
+   15025,
+   15026,
+   15027,
+   15028,
+   15029,
+   15030,
+   15031,
+   15032,
+   15033,
+   15034,
+   15035,
+   15036,
+   15037,
+   15038,
+   15039
+  ],
+  "steps": 3000,
+  "theta": 4.0,
+  "approach": 0.9,
+  "cells": [
+   "ps0.3_pl_T600",
+   "ps0.3_pl_T1800",
+   "ps0.3_np_T600",
+   "ps0.3_np_T1800",
+   "ps0.7_pl_T600",
+   "ps0.7_pl_T1800",
+   "ps0.7_np_T600",
+   "ps0.7_np_T1800"
+  ],
+  "gates": [
+   "early"
+  ],
+  "variants": [
+   [
+    "early",
+    "niche"
+   ],
+   [
+    "early",
+    "out"
+   ],
+   [
+    "early",
+    "cross"
+   ]
+  ],
+  "cal": [
+   "early"
+  ],
+  "skipped": {},
+  "t_crit": 2.023,
+  "event_k": 60,
+  "low_cover": 0.05,
+  "min_changed": 400,
+  "layout": {
+   "15000": "696caec658fe",
+   "15001": "0b4bfad4bb12",
+   "15002": "7f1cdc96dff0",
+   "15003": "d66032dc8b25",
+   "15004": "baf75fdafd1a",
+   "15005": "c236e0e88a34",
+   "15006": "e0835f5c9654",
+   "15007": "b00da67f62ba",
+   "15008": "d91329f1898e",
+   "15009": "606af0d4afc7",
+   "15010": "9ea63b952be7",
+   "15011": "a851b5dd4815",
+   "15012": "77a4398b80c6",
+   "15013": "2e4240596fd3",
+   "15014": "4f65a333ba97",
+   "15015": "4ab3ca444460",
+   "15016": "c0129e670dbf",
+   "15017": "d5b757985e81",
+   "15018": "3a65b4c4ef63",
+   "15019": "083a9918bd4a",
+   "15020": "54437435b699",
+   "15021": "d4f875d93147",
+   "15022": "eccf4e0b2535",
+   "15023": "1dd415a40e54",
+   "15024": "8fdc0ae52d66",
+   "15025": "e5be56ecd1b4",
+   "15026": "73843b870710",
+   "15027": "3c3d162c1d74",
+   "15028": "ce6aa8cc88f4",
+   "15029": "d9257bbd8d88",
+   "15030": "e57b70bc1460",
+   "15031": "14d0f47f5af6",
+   "15032": "43a137efcc69",
+   "15033": "c3d71d9172ec",
+   "15034": "4ab229aff506",
+   "15035": "ac59d9c2ad8f",
+   "15036": "091cd6708722",
+   "15037": "0d97f1a615c8",
+   "15038": "fb73a1c98389",
+   "15039": "41be5b756446"
+  },
+  "digest": {
+   "ps0.3_pl_T600": "25af6c2c65ef",
+   "ps0.3_pl_T1800": "64c238037d35",
+   "ps0.3_np_T600": "db89a259ac67",
+   "ps0.3_np_T1800": "17bfe655f62e",
+   "ps0.7_pl_T600": "5dc203987ee5",
+   "ps0.7_pl_T1800": "6c8d88b51aad",
+   "ps0.7_np_T600": "030a3e543126",
+   "ps0.7_np_T1800": "416420599a04"
+  },
+  "prereg_digest": {
+   "config": "fccf955cd1c9",
+   "world": "92e1be9d6d66"
+  },
+  "elapsed_s": 1099.7
+ },
+ "gate": {
+  "early": {
+   "complete": true,
+   "kind": "judged",
+   "niche_pos": 2,
+   "niche_sig_neg": 3,
+   "out_sig_neg": 6,
+   "cross_sig_neg": 8,
+   "c1": false,
+   "c2": true,
+   "c3": true,
+   "floor": {
+    "niche": 8,
+    "out": 8,
+    "cross": 8
+   },
+   "floor_ok": {
+    "niche": true,
+    "out": true,
+    "cross": true
+   },
+   "cross_cov_focal": 0.033845377604166664,
+   "verdict": "fail",
+   "cal_eligible": true,
+   "human": false
+  }
+ },
+ "gate_did_report_only": {
+  "early": {
+   "complete": true,
+   "kind": "judged",
+   "niche_pos": 2,
+   "niche_sig_neg": 0,
+   "out_sig_neg": 3,
+   "cross_sig_neg": 8,
+   "c1": false,
+   "c2": false,
+   "c3": true,
+   "floor": {
+    "niche": 8,
+    "out": 8,
+    "cross": 8
+   },
+   "floor_ok": {
+    "niche": true,
+    "out": true,
+    "cross": true
+   },
+   "cross_cov_focal": 0.033845377604166664,
+   "verdict": "fail",
+   "cal_eligible": false,
+   "human": true
+  }
+ }
+}

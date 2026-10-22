@@ -20,6 +20,15 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 - 🧪 [RL_TRAINING_PIPELINE.md](RL_Policy/RL_TRAINING_PIPELINE.md) : 초기 Aquarium/Tools/RL 파이프라인 설계. 현재 학습 구현은 아래 herbivore_rl 요약과 정책 통합 문서 참고
 - ✅ [POLICY_TEST_AND_API_GUIDE.md](RL_Policy/POLICY_TEST_AND_API_GUIDE.md) : 테스트 레벨에서 확인할 것, 열어 둔 값, 다른 시스템이 연결할 API
 - 🔧 [UNREAL_POLICY_INTEGRATION.md](RL_Policy/UNREAL_POLICY_INTEGRATION.md) : 파이썬 → 언리얼 정책 통합의 빌드·검증·가중치 갱신 절차와 구현 세부
+- 🗺️ [RL_V2_PLAN.md](RL_Policy/RL_V2_PLAN.md) : 초식 RL v2 계획서 (초안) — 생생한 움직임, 환경과의 상호작용(먹이 고갈·낮밤·지역 이동·날씨), 시간에 따라 달라지는 행동
+- 📒 [RL_V2_LOG.md](RL_Policy/RL_V2_LOG.md) : 초식 RL v2 진행 기록 — 계획서에서 떼어 낸 날짜순 진행·커밋 기록(10-03 결정 R7)
+- 🏁 [herbivore_rl/results/v2/stage1_close.md](../../herbivore_rl/results/v2/stage1_close.md) : V2 1단계 마감 문서(10-03 작성, 실험 끝. 영상과 1단계 닫기는 10-10) — v2.1 → v2.2 → v2.2r → 대체안 (a)의 판정표, B1 '부분(3/5)'·규칙 장면, 새 안건 S1-a~S1-c
+- 🧪 [herbivore_rl/results/v2/s1a/report.md](../../herbivore_rl/results/v2/s1a/report.md) : S1-a 학습 신뢰도 보고(10-06) — '굶는 갈래' 대응 실험 120모델, 학습 γ 0.995 레시피(0/24), v2.1 출시 모델 s1a_g_s58
+- 🌙 [herbivore_rl/results/v2/v2_4/report.md](../../herbivore_rl/results/v2/v2_4/report.md) : v2.4 낮밤 보고(10-06, 10-11~10-20 칸 앞당김) — 환경 확인 통과·탐침 실패(밤 은신처 휴식이 개체에게 손해), v2.0b R10 재판정 실패
+- 😴 [herbivore_rl/results/v2/v2_4/s/report.md](../../herbivore_rl/results/v2/v2_4/s/report.md) : v2.4s 보고(10-07, 밤에는 포식자도 잔다) — 4/6 모델이 '밤엔 자고 낮엔 움직임'을 학습, 2/6 굶는 갈래, 출시 후보 v2_4sp_g995_s20
+- 🧭 [RL_V2_REVISION_PROPOSAL.md](RL_Policy/RL_V2_REVISION_PROPOSAL.md) : V2 계획 수정 제안서(10-03, R1~R10 채택·R11~R19 안건) — 실패 회고, 배포 모드·경계 재설계·게이트 역할·범위·일정 수정안
+- 🔁 [RL_SEASON_RETRAIN_PLAN.md](RL_Policy/RL_SEASON_RETRAIN_PLAN.md) : 시즌 재학습 계획서(초안, 시연용) — 게임 상황 요약으로 시뮬레이터에서 이어 학습하고 검증을 통과한 가중치만 언리얼에 넣는 사이드트랙
+- 📤 [SEASON_SNAPSHOT_SPEC.md](RL_Policy/SEASON_SNAPSHOT_SPEC.md) : 시즌 내보내기 명세(초안) — 게임 서버가 시즌마다 시뮬레이터로 넘길 요약값, 서버 쪽 구현 체크리스트
 - 🐍 [herbivore_rl/docs/PROJECT_SUMMARY.md](../../herbivore_rl/docs/PROJECT_SUMMARY.md) : 파이썬 학습 환경·PPO 학습·평가의 전체 과정과 결과
 
 ### 3. Mass Entity (대규모 개체 시뮬레이션)
@@ -28,6 +37,7 @@ AdaptiveEcosystem 프로젝트의 전체 기술 문서 및 사양서 허브입�
 
 ### 4. Integration (외부 오픈소스 연동)
 외부 검증된 프레임워크의 참조 적응 및 라이선스 고지를 다룹니다.
+- [Mass 생태계 통합·성능 작업 안내](Integration/README.md): 공통 생명주기, 계측, 공간 검색, 동물 복제·표현, 병렬화·시간 스케줄, Simulation LOD의 6개 우선순위별 실행·검증 계획. 구현 완료 보고와 구분합니다.
 - 🔌 [THIRD_PARTY_INTEGRATION.md](Integration/THIRD_PARTY_INTEGRATION.md) : 실제 사용·설계 참조·future candidate와 과거 적응 계획 구분
 - 📜 [THIRD_PARTY_NOTICES.md](../../THIRD_PARTY_NOTICES.md) : 루트 오픈소스 라이선스 고지서
 
@@ -42,6 +52,9 @@ Steam Session과 MassEntity 멀티플레이의 권위 및 복제 경계를 다�
 ### 7. Roadmap (MVP Milestones)
 PPO + Mass 생태계와 Steam 멀티플레이를 단계별로 완성하기 위한 MVP 로드맵입니다.
 - 🧭 [Roadmap/README.md](Roadmap/README.md) : 방향성 검증 결과, Milestone 순서 및 MVP 완료 기준
+- 📋 [M4 상세 구현 계획](Roadmap/M4/M4_IMPLEMENTATION_PLAN.md) : 대규모 공간 검색·Replication LOD·보간·표현·상호작용의 단계별 작업과 검증 기준
+- 🔎 [M4 공식 문서·공개 구현 비교](Roadmap/M4/M4_REFERENCE_RESEARCH.md) : 단계별 공식 자료와 공간 검색·복제·군집·생태 학습 프로젝트의 유사점/차이점
+- [M4.2 구현·관련 소스](Roadmap/M4/M4_2_REPLICATION_INTERVAL.md), [수동 테스트](Roadmap/M4/M4_EDITOR_TEST.md), [검증 기록](Roadmap/M4/M4_VALIDATION_REPORT.md) : 연결별 LOD 갱신 간격과 우선 상태 전달
 - 📌 [M3 구현 현황](Roadmap/M3/M3_IMPLEMENTATION_SUMMARY.md) / [검증 기록](Roadmap/M3/M3_VALIDATION_REPORT.md) : Food/스폰/고갈 이주의 실제 구현과 미실행 항목. M3 전체 생명주기 폐루프 완료와 구분
 
 ### 8. 초기 문서 (기반 문서 및 히스토리)

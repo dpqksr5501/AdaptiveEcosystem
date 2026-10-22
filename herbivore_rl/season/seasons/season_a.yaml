@@ -1,0 +1,17 @@
+# 합성 시즌 (a) 포식자가 많고 빠르다 (계획서 RL_SEASON_RETRAIN_PLAN.md 5.4, 10-02 시험과 같다).
+# configs/default.yaml 위에 덮는다(env_v2/config.py). rand 키 6개를 모두 적는다: 바꾸지 않는 키는 기본 범위 그대로다.
+# 허용 키는 overrides.rand 뿐이다(season/common.py load_season). 기능은 모두 끈다(v2.0 = v1 세계).
+version: "2.0-season-a"
+overrides:
+  rand:
+    world_size:      [60.0, 110.0]
+    predator_count:  [10, 12]
+    pred_speed_mult: [1.15, 1.2]
+    ranged_frac:     [0.0, 0.5]
+    cover_frac:      [0.05, 0.30]
+    food_regen_mult: [0.5, 2.0]
+features: {}
+train:
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256

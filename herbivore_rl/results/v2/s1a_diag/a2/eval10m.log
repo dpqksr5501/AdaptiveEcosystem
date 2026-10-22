@@ -1,0 +1,18 @@
+v2_1_s0@10m      G -0.714 starve 0.00110 pS|h 0.971 pS|f 0.620 hungry 0.654 stall 0.0000
+v2_1_s0@20m      G +2.880 starve 0.00029 pS|h 0.183 pS|f 0.000 hungry 0.267 stall 0.0032
+v2_1_s1@10m      G -0.072 starve 0.00106 pS|h 0.929 pS|f 0.173 hungry 0.621 stall 0.0000
+v2_1_s1@20m      G +2.840 starve 0.00025 pS|h 0.081 pS|f 0.000 hungry 0.273 stall 0.0022
+v2_1_s2@10m      G +1.715 starve 0.00062 pS|h 0.694 pS|f 0.000 hungry 0.373 stall 0.0007
+v2_1_s2@20m      G +2.575 starve 0.00037 pS|h 0.151 pS|f 0.000 hungry 0.320 stall 0.0024
+v2_1c_s30@10m    G +1.273 starve 0.00069 pS|h 0.753 pS|f 0.048 hungry 0.437 stall 0.0005
+v2_1c_s30@20m    G +0.648 starve 0.00069 pS|h 0.000 pS|f 0.000 hungry 0.498 stall 0.0021
+v2_1c_s31@10m    G +0.025 starve 0.00108 pS|h 0.815 pS|f 0.005 hungry 0.586 stall 0.0002
+v2_1c_s31@20m    G -0.515 starve 0.00119 pS|h 0.680 pS|f 0.000 hungry 0.619 stall 0.0003
+v2_1c_s32@10m    G +1.946 starve 0.00046 pS|h 0.278 pS|f 0.000 hungry 0.349 stall 0.0018
+v2_1c_s32@20m    G +2.484 starve 0.00030 pS|h 0.149 pS|f 0.000 hungry 0.305 stall 0.0018
+v2_1c_s33@10m    G +0.652 starve 0.00084 pS|h 0.618 pS|f 0.021 hungry 0.514 stall 0.0010
+v2_1c_s33@20m    G +0.034 starve 0.00104 pS|h 0.788 pS|f 0.007 hungry 0.580 stall 0.0011
+v2_1c_s34@10m    G -0.902 starve 0.00126 pS|h 0.975 pS|f 0.309 hungry 0.709 stall 0.0000
+v2_1c_s34@20m    G +2.656 starve 0.00031 pS|h 0.076 pS|f 0.000 hungry 0.294 stall 0.0023
+C2               G +2.351 starve 0.00034 pS|h 0.000 pS|f 0.000 hungry 0.297 stall 0.0040
+189s

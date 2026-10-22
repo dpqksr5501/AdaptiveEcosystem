@@ -122,7 +122,7 @@ python export_weights.py
 | `AI/Policy/EcoBehaviorFragments.h` | §9.2 태그 + 공유 설정 + 기하 캐시 |
 | `AI/Policy/EcoWorldProviders.h/.cpp` | §9.4 월드팀 인터페이스 + 더미 구현 |
 | `AI/Policy/EcoNeighborhoodSubsystem.h/.cpp` | 이웃 조회 (균일 격자) |
-| `AI/Policy/EcoRegionPredationSubsystem.h/.cpp` | §9.6 지역 피식 EMA + SaveGame |
+| `AI/Policy/EcoRegionPredationSubsystem.h/.cpp` | §9.6 전역 피식 EMA(관측 5) + SaveGame |
 | `AI/Policy/EcoBehaviorProcessors.h/.cpp` | §9.4 Policy + §9.5 Steering (+ 게더·지각) |
 | `AI/Policy/PolicyWeights.h` | 자동 생성 (7-64-64-4) |
 | `AI/Policy/UtilityParams.h` | 자동 생성 (§5.2 튜닝 계수) |
@@ -136,9 +136,10 @@ python export_weights.py
 ```
 NeighborhoodGather  (매 틱)  개체 위치 색인
   → Perception      (매 틱)  §3.3 기하 입력
-  → Policy          (8틱마다) 관측 7개 → RunPolicy/RunUtilityPolicy → 행동 4개
-  → Steering        (매 틱)  §3.3 조향 → 속도
-  → (엔진) Mass 이동
+  → Policy          (0.133초마다, 시간 기준) 관측 7개 → RunPolicy/RunUtilityPolicy → 행동 4개
+  → Steering        (매 틱)  §3.3 조향 → 속도, 위치 적분, 바라보는 방향(yaw)
+  → Predation       (매 틱)  포획 판정, 생존 수 보고, 0.133초마다 피식 EMA 스텝
+  (초식 쿼리는 전부 FEcoAliveTag 를 요구한다. 잡히면 Alive → PendingDeath)
 ```
 
 콘솔 변수 `eco.UseLearnedPolicy` 로 학습 정책(1)과 §5.1 Utility 비교군(0)을 바꾼다.
@@ -146,7 +147,7 @@ NeighborhoodGather  (매 틱)  개체 위치 색인
 엔진 자동화 테스트 실행:
 
 ```bash
-"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" <절대경로>/AdaptiveEcosystem.uproject "-ExecCmds=Automation RunTests AdaptiveEcosystem.Policy" "-testexit=Automation Test Queue Empty" -DisablePlugins=Bridge,Fab -unattended -nopause -nosplash -NullRHI -log
+"C:/Program Files/Epic Games/UE_5.8/Engine/Binaries/Win64/UnrealEditor-Cmd.exe" <절대경로>/AdaptiveEcosystem.uproject "-ExecCmds=Automation RunTests AdaptiveEcosystem.Policy" "-testexit=Automation Test Queue Empty" -unattended -nopause -nosplash -NullRHI -log
 ```
 
 빌드·테스트:
@@ -155,10 +156,10 @@ NeighborhoodGather  (매 틱)  개체 위치 색인
 "C:/Program Files/Epic Games/UE_5.8/Engine/Build/BatchFiles/Build.bat" AdaptiveEcosystemEditor Win64 Development -Project=<절대경로>/AdaptiveEcosystem.uproject
 ```
 
-> **이 엔진 설치본 주의.** `Bridge`(Megascans)와 `Fab` 플러그인 바이너리가 없어서
-> 에디터가 시작 직후 종료된다. 자동화 테스트를 돌릴 땐 `-DisablePlugins=Bridge,Fab`
-> 가 필요하다. 그리고 `Content/` 의 에셋 144개가 **UE 5.8보다 새 엔진**에서 저장돼
-> 로드되지 않는다 (`OpenWorld.umap` 포함). 레벨을 띄우려면 이 둘을 먼저 풀어야 한다.
+> **UE 5.8.3 에서 확인했다.** 팀 에셋은 5.8.2·5.8.3 으로 저장돼 있다. 정식 5.8.0 보다
+> 이전 빌드에서는 에디터가 시작 직후 꺼지고(Bridge·Fab 플러그인 로드 실패) `Content/` 에셋이
+> `Custom version is too new` 로 안 열린다. Epic Games Launcher 에서 5.8 을 최신 핫픽스로
+> 업데이트한다.
 
 ## §7 비교 평가 결과
 

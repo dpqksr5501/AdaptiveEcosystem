@@ -1,0 +1,7 @@
+§6.4 튜닝값 적용: learning_rate=6.813187996724827e-05  gamma=0.9916661555611042  ent_coef=0.0008971496690499397  clip_range=0.37816696417287243  n_epochs=15
+시작 가중치(출처: R5 스모크 — 새 열 0 시작 두뇌): ckpt/v3/v3_r1_g995_s3_obs21zero.zip (sha1 de25bcbb5296, 원래 목록 ['graze', 'flee', 'hide', 'freeze'] → 이 설정의 목록 ['graze', 'flee', 'hide'])
+행동 고르기 학습: 목록 ['graze', 'flee', 'hide'], ε 0.05, 시작 확률 [0.4, 0.15, 0.15, 0.15, 0.15], 엔트로피 기준 0.00858922 ÷ f_dec 0.858922 = 0.01 (PPO ent_coef 0.0008971496690499397 × 배율 11.1464)
+300,000 스텝 — 세계 8개 × 128슬롯 = num_envs 1024, 세계당 n_steps 32 (배치 32,768), 교체 5000스텝마다, γ 0.995 (s1a), 관측 21 + 마스크 5(마스크 판 2), 행동 Discrete(5)
+학습 기록 니치 정의: r3 (θ 4, a* 0.9, 보정 1 없음, 관문 결과 있음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r5_smoke_s90.zip  (0.5분, 10,880 스텝/초)
+config_digest a119c35118d8, 체크포인트 0개, 학습한 세계 수 8

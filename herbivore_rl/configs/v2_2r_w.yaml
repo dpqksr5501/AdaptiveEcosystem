@@ -1,0 +1,49 @@
+# V2 설정 — v2.2r 탐색 팔 W′ (보조): v2.2 + 창 경계, L 형 계수 (수정 제안서 3.1 (나)·3.8, 10-03 R2).
+#
+# configs/v2_2.yaml 의 세계에서 경계를 창 안에서만 효력이 있게 하고(window_only), 경계 계수를 L 형으로 바꾼다: 섭식
+# eat_mult 1.0(정지 섭식과 같다), 시야 fov_deg 120(기본 시야와 같다 — 넓히지 않는다). 경계 중 정지·위협 쪽 돌아보기는
+# vigilance 규칙 그대로다. 창 밖에서는 경계 행동이 효력이 없고 speed 가 보행을 정한다(그래서 창 밖 비용이 없다).
+# 관측 8, 행동 6 (idx 5 = vigilance). 시작 편향 0(창 안 약 50%. 창 밖에서는 효력이 없어 비용이 없다).
+# 묻는 것: 별도 차원으로 창 안 경계를 배우나(창 안 경계 확률 ≥ 0.05), 상수 기준선 C2_W′ 를 이기나.
+#   python train_v2.py --config configs/v2_2r_w.yaml --steps 20000000 --seed 20 --run-name v2_2r_w_s20
+# 형식 규칙은 configs/v2.yaml 머리 주석과 같다.
+
+version: "2.2r_w"
+
+overrides:
+  rand:
+    pred_speed_mult: [0.6, 0.95]
+
+features:
+  speed:
+    # configs/v2_1.yaml·v2_2.yaml 블록 그대로 (Gate E1-b 통과 계수 r2_5_ew0_5)
+    enabled: true
+    thresholds: [0.3333333333333333, 0.6666666666666666]
+    gait_speed: [0.0, 0.4, 1.0]
+    gait_eat: [1.0, 0.5, 0.0]
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+  vigilance:
+    enabled: true
+    threshold: 0.5
+    decay: 0.95
+    # L 형 계수 (수정 제안서 3.1 (나) W′ 행): 섭식은 정지와 같은 1.0, 시야는 기본 120° 그대로
+    eat_mult: 1.0
+    fov_deg: 120.0
+    threat_flee: 0.0
+  vigil_window:
+    enabled: true
+    action: true
+    window_only: true
+    look_back: false
+    # 창 문턱 = Gate E2 의 θ (env_v2/world.py RECENT_THREAT, 놓친 뒤 13스텝). E2 C2-seg 구간 s1 과 같은 식이다
+    theta: 0.5
+
+train:
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256
+  # 시작 편향 0 (수정 제안서 3.3): log_std 0 에서 P(경계) = 0.5. 창 밖에서는 효력이 없어 비용이 없다
+  init_action_bias:
+    vigilance: 0.0

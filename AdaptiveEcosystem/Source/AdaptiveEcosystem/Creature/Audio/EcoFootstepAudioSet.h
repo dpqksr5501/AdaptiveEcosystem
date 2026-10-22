@@ -7,6 +7,8 @@ class USoundBase;
 class USoundAttenuation;
 class USoundConcurrency;
 class UPhysicalMaterial;
+UENUM(BlueprintType)
+enum class EEcoFootstepSurface : uint8 { Grass, Dry, Snow, Water, Wet };
 
 /** Shared authored playback/range configuration. Owns no AI state or network transport. */
 UCLASS(BlueprintType)
@@ -16,10 +18,16 @@ class ADAPTIVEECOSYSTEM_API UEcoFootstepAudioSet : public UDataAsset
 public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps") TArray<TObjectPtr<USoundBase>> Grass;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps") TArray<TObjectPtr<USoundBase>> Dry;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps") TArray<TObjectPtr<USoundBase>> Snow;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps") TArray<TObjectPtr<USoundBase>> Water;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps") TArray<TObjectPtr<USoundBase>> Wet;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps") TArray<FName> GrassRegions = {TEXT("Forest"), TEXT("Forest_A"), TEXT("Forest_B")};
     /** Explicit authored materials take precedence. Unknown/streaming surfaces use RegionId. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Surface") TArray<TObjectPtr<UPhysicalMaterial>> GrassMaterials;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Surface") TArray<TObjectPtr<UPhysicalMaterial>> DryMaterials;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Surface") TArray<TObjectPtr<UPhysicalMaterial>> SnowMaterials;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Surface") TArray<TObjectPtr<UPhysicalMaterial>> WaterMaterials;
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Surface") TArray<TObjectPtr<UPhysicalMaterial>> WetMaterials;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps") TObjectPtr<USoundAttenuation> Attenuation;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps") TObjectPtr<USoundConcurrency> Concurrency;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps", meta=(ClampMin="0",ClampMax="1")) float Volume = 0.7f;
@@ -28,6 +36,15 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps", meta=(ClampMin="0",Units="cm/s")) float MinimumSpeed = 40;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI Noise", meta=(ClampMin="1",ClampMax="10000",Units="cm")) float NoiseRange = 2000;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI Noise", meta=(ClampMin="0",ClampMax="1")) float PredatorThreat = 0.8f;
+    EEcoFootstepSurface GetSurface(const UPhysicalMaterial* M,FName RegionId) const
+    {
+        if(M&&SnowMaterials.Contains(M))return EEcoFootstepSurface::Snow;
+        if(M&&WaterMaterials.Contains(M))return EEcoFootstepSurface::Water;
+        if(M&&WetMaterials.Contains(M))return EEcoFootstepSurface::Wet;
+        return IsGrassSurface(M,RegionId)?EEcoFootstepSurface::Grass:EEcoFootstepSurface::Dry;
+    }
+    const TArray<TObjectPtr<USoundBase>>& GetSounds(EEcoFootstepSurface S) const
+    { return S==EEcoFootstepSurface::Snow?Snow:S==EEcoFootstepSurface::Water?Water:S==EEcoFootstepSurface::Wet?Wet:S==EEcoFootstepSurface::Grass?Grass:Dry; }
     bool IsGrass(FName RegionId) const { return GrassRegions.Contains(RegionId); }
     bool IsGrassSurface(const UPhysicalMaterial* Material, FName RegionId) const
     {

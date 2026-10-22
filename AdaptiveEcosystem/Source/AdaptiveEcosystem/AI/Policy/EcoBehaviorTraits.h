@@ -21,7 +21,8 @@
 /**
  * 초식 개체. §9.4 관측 수집과 §9.5 조향의 대상이 된다.
  *
- * 붙는 것: FEcoHerbivoreTag + 관측/행동/주기/기하/생체 프래그먼트 + 공유 설정.
+ * 붙는 것: FEcoHerbivoreTag + FEcoAliveTag(서버/스탠드얼론) + FMassCustomMovementTag
+ * + 관측/행동/주기/기하/생체 프래그먼트 + 공유 설정.
  * 위치·속도(FTransformFragment, FMassVelocityFragment)는 Mass 기본 이동 트레잇이
  * 제공하므로 여기서는 **요구만** 한다 — 중복으로 추가하면 초기화 주체가 흐려진다.
  */

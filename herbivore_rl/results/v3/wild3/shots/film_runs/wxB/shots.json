@@ -1,0 +1,14 @@
+{
+  "name": "wxB",
+  "fps": 30,
+  "frames": 126,
+  "shots": [
+    {"tag": "forest_ground", "from_m": [330.00, 470.00, 1.80], "to_m": [330.00, 470.00, 1.80], "yaw": 0.0, "pitch": 0.0, "start": 3.000, "duration": 4.000, "every": 10, "first_frame": 0, "frames": 12, "t_first": 3.000, "t_last": 6.667},
+    {"tag": "forest_low", "from_m": [342.00, 440.00, 6.00], "to_m": [342.00, 440.00, 6.00], "yaw": 90.0, "pitch": -10.0, "start": 8.000, "duration": 3.000, "every": 10, "first_frame": 12, "frames": 9, "t_first": 8.000, "t_last": 10.667},
+    {"tag": "cross_in", "from_m": [340.00, 200.00, 1.80], "to_m": [340.00, 300.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 12.000, "duration": 10.000, "every": 10, "first_frame": 21, "frames": 30, "t_first": 12.000, "t_last": 21.667},
+    {"tag": "cross_out", "from_m": [340.00, 300.00, 1.80], "to_m": [340.00, 200.00, 1.80], "yaw": -90.0, "pitch": 0.0, "start": 23.000, "duration": 10.000, "every": 10, "first_frame": 51, "frames": 30, "t_first": 23.000, "t_last": 32.667},
+    {"tag": "highland_ground", "from_m": [340.00, -490.00, 1.80], "to_m": [340.00, -490.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 34.000, "duration": 3.000, "every": 10, "first_frame": 81, "frames": 9, "t_first": 34.000, "t_last": 36.667},
+    {"tag": "snow_out", "from_m": [340.00, -300.00, 1.80], "to_m": [340.00, -200.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 38.000, "duration": 10.000, "every": 10, "first_frame": 90, "frames": 30, "t_first": 38.000, "t_last": 47.667},
+    {"tag": "barren_ground", "from_m": [340.00, 10.00, 1.80], "to_m": [340.00, 10.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 49.000, "duration": 2.000, "every": 10, "first_frame": 120, "frames": 6, "t_first": 49.000, "t_last": 50.667}
+  ]
+}

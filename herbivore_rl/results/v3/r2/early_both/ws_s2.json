@@ -1,0 +1,2074 @@
+{
+ "pooled": {
+  "rl": {
+   "g_gamma": 0.4736574668106321,
+   "pred_rate": 0.001736111111111111,
+   "starve_rate": 0.0008090277777777778,
+   "mean_return": 6.188701796861527,
+   "use": {
+    "graze": 0.9007352430555555,
+    "flee": 0.026261284722222222,
+    "hide": 0.029080729166666666,
+    "freeze": 0.04392274305555555,
+    "sleep": 0.0
+   },
+   "flicker": 0.5244760838265877,
+   "switch_n": 25004,
+   "decide_frac": 0.8066788194444444,
+   "choice_freq": [
+    0.9762787664614212,
+    0.005367515554819034,
+    0.009467402135384497,
+    0.008886315848375218,
+    0.0
+   ],
+   "u": {
+    "esc": 0.5286085804948533,
+    "hide": -0.15628516509936696,
+    "freeze": 0.3673366834170854,
+    "sleep": 0.0,
+    "stare": 0.03798670465337132,
+    "look": 0.10185972566273524,
+    "look_open": 0.10185972566273524,
+    "stare_band": 0.0007797270955165692
+   },
+   "u_cnt": {
+    "esc": [
+     8977,
+     4802,
+     872664,
+     5510
+    ],
+    "hide": [
+     1952,
+     982,
+     6614,
+     4361
+    ],
+    "freeze": [
+     3980,
+     1462,
+     23018,
+     0
+    ],
+    "sleep": [
+     207654,
+     0,
+     380298,
+     0
+    ],
+    "stare": [
+     3159,
+     120,
+     18424,
+     0
+    ],
+    "look": [
+     54094,
+     5510,
+     35498,
+     0
+    ],
+    "look_open": [
+     54094,
+     5510,
+     13988,
+     0
+    ],
+    "stare_band": [
+     2565,
+     2,
+     18424,
+     0
+    ]
+   },
+   "risk": {
+    "median_full": 3.710501492023468,
+    "median_hungry": 5.2293860912323,
+    "n_full": 974,
+    "n_hungry": 1609,
+    "diff": -1.5188845992088318
+   },
+   "r2": {
+    "by_kind": {
+     "chaser": {
+      "n": 22536,
+      "freeze": 0.04574902378416756,
+      "flee": 0.08657259495917644,
+      "hide": 0.10108271210507633,
+      "respond": 0.2334043308484203
+     },
+     "ranged": {
+      "n": 4033,
+      "freeze": 0.01537317133647409,
+      "flee": 0.030498388296553436,
+      "hide": 0.18894123481279446,
+      "respond": 0.23481279444582198
+     },
+     "stalker": {
+      "n": 25827,
+      "freeze": 0.04719866806055678,
+      "flee": 0.10903318232857087,
+      "hide": 0.20106864908816355,
+      "respond": 0.3573004994772912
+     },
+     "player": {
+      "n": 4234,
+      "freeze": 0.10297590930562116,
+      "flee": 0.023145961265942372,
+      "hide": 0.1334435521965045,
+      "respond": 0.25956542276806804
+     }
+    },
+    "kind_miss": 0,
+    "by_hop": {
+     "-1": {
+      "n": 735441,
+      "freeze": 0.0,
+      "flee": 0.0,
+      "hide": 0.0,
+      "respond": 0.0
+     },
+     "0": {
+      "n": 108063,
+      "freeze": 0.03566438096295679,
+      "flee": 0.0,
+      "hide": 0.0,
+      "respond": 0.03566438096295679
+     },
+     "1": {
+      "n": 13767,
+      "freeze": 0.12028764436696449,
+      "flee": 0.0,
+      "hide": 0.0,
+      "respond": 0.12028764436696449
+     },
+     "2": {
+      "n": 15393,
+      "freeze": 0.0,
+      "flee": 0.0,
+      "hide": 0.0,
+      "respond": 0.0
+     }
+    },
+    "hop_miss": {
+     "n": 84,
+     "dropped": 0
+    },
+    "night": {
+     "night": {
+      "n_alarm": 20133,
+      "respond_alarm": 0.08568022649381613,
+      "n_respond": 3344,
+      "alarm_share": 0.5158492822966507
+     },
+     "day": {
+      "n_alarm": 70345,
+      "respond_alarm": 0.04291705167389295,
+      "n_respond": 16200,
+      "alarm_share": 0.18635802469135804
+     },
+     "respond_alarm_diff": 0.04276317481992317,
+     "alarm_share_diff": 0.3294912576052927
+    },
+    "cover": {
+     "in_cover": {
+      "n": 411,
+      "hide": 0.27007299270072993,
+      "freeze": 0.0,
+      "flee": 0.0
+     },
+     "open": {
+      "n": 2154,
+      "hide": 0.07149489322191271,
+      "freeze": 0.0009285051067780873,
+      "flee": 0.0
+     }
+    },
+    "energy": {
+     "full": {
+      "n": 11200,
+      "graze": 0.7736607142857143
+     },
+     "hungry": {
+      "n": 12213,
+      "graze": 0.6669123065585851
+     },
+     "graze_diff": -0.10674840772712912
+    },
+    "disagree": {
+     "n": 213515,
+     "fsm_r2": 0.30033487108634055,
+     "rbase": 0.08229398402922511
+    }
+   },
+   "visible": {
+    "stare": {
+     "standoff_n": 34.0,
+     "standoff_n_per1000": 0.02951388888888889,
+     "standoff_break_n": 23.0,
+     "standoff_break_n_per1000": 0.01996527777777778,
+     "blink_catch_n": 10.0,
+     "blink_catch_n_per1000": 0.008680555555555556,
+     "balk_n": 10.0,
+     "balk_n_per1000": 0.008680555555555556,
+     "balk_share": 0.007571476458399982,
+     "spotted_n": 0.0,
+     "spotted_n_per1000": 0.0,
+     "spotted_charge_n": 0.0,
+     "spotted_charge_n_per1000": 0.0,
+     "spotted_charge_catch_n": 0.0,
+     "spotted_charge_catch_n_per1000": 0.0,
+     "lock_steps_mean": 8.54714003964573,
+     "stare_frac": 9.98263888888889e-05,
+     "standoff_break_beh_n": 23.0,
+     "standoff_break_beh_n_per1000": 0.01996527777777778,
+     "spotted_charge_catch_frac": null,
+     "unspotted_charge_catch_frac": 1.0
+    },
+    "alarm": {
+     "emit_h0": 10571.0,
+     "emit_h0_per1000": 9.176215277777779,
+     "emit_h1": 3630.0,
+     "emit_h1_per1000": 3.1510416666666665,
+     "emit_h2": 1630.0,
+     "emit_h2_per1000": 1.4149305555555556,
+     "cry_n": 2000.0,
+     "cry_n_per1000": 1.736111111111111,
+     "listen_per_emit": 10.592409216811284,
+     "alarm_frac": 0.3206597222222222,
+     "alarm_unseen_frac": 0.6263313209483,
+     "e7_n": 9330.0,
+     "e7_n_per1000": 8.098958333333332,
+     "e7_switch_frac": 0.28478955678826046,
+     "heard_entry_flee": 0.0,
+     "heard_entry_hide": 0.0,
+     "heard_entry_freeze": 0.7852187667508056,
+     "alarm_gap_mean": 104.05007369890245,
+     "dir_n": 18417.0,
+     "dir_n_per1000": 15.986979166666664,
+     "dir_ok_pt": 0.91233529428992,
+     "dir_ok_copy": 0.6192895052852032,
+     "wave_size_mean": 0.4717294817863029,
+     "heads_up_1s": 0.27280688341783677,
+     "false_alarm_frac": 0.2616313053563291,
+     "e7_decide_frac": 0.9957011954555117,
+     "heads_up_1s_r16": 0.234802580054457
+    },
+    "threats": {
+     "p_stalk": 0.41593850199724186,
+     "stalker_n": 4.666666666666667,
+     "player_present": 0.3333333333333333,
+     "catch_rate_chaser": 0.0006944444444444445,
+     "catch_rate_ranged": 2.0833333333333333e-05,
+     "catch_rate_stalker": 0.001015625,
+     "catch_rate_player": 1.0416666666666666e-05,
+     "pounce_n": 1177.0,
+     "pounce_n_per1000": 1.0217013888888888,
+     "pounce_hit": 0.9818347087109558,
+     "player_charge_n": 7.0,
+     "player_charge_n_per1000": 0.006076388888888888
+    },
+    "non_graze": 0.09926475694444448
+   }
+  },
+  "fsm_r2": {
+   "g_gamma": 0.7546991540310696,
+   "pred_rate": 0.0013133680555555555,
+   "starve_rate": 0.0008177083333333334,
+   "mean_return": 16.671133042613622,
+   "use": {
+    "graze": 0.8422829861111111,
+    "flee": 0.0,
+    "hide": 0.07313541666666666,
+    "freeze": 0.08458159722222222,
+    "sleep": 0.0
+   },
+   "flicker": 0.7113073561544064,
+   "switch_n": 21968,
+   "decide_frac": 0.8137803819444445,
+   "choice_freq": [
+    0.9094279847462599,
+    0.0,
+    0.061270967225792686,
+    0.02930104802794741,
+    0.0
+   ],
+   "u": {
+    "esc": 0.7802388438923462,
+    "hide": 0.0,
+    "freeze": 0.9667603654251581,
+    "sleep": 0.0,
+    "stare": 0.6753620870428085,
+    "look": 1.0,
+    "look_open": 1.0,
+    "stare_band": 0.31438639814262337
+   },
+   "u_cnt": {
+    "esc": [
+     12709,
+     10088,
+     844682,
+     11428
+    ],
+    "hide": [
+     10340,
+     10340,
+     31848,
+     31848
+    ],
+    "freeze": [
+     4414,
+     4414,
+     42690,
+     1419
+    ],
+    "sleep": [
+     197437,
+     0,
+     392537,
+     0
+    ],
+    "stare": [
+     6359,
+     4472,
+     35636,
+     994
+    ],
+    "look": [
+     11428,
+     11428,
+     36116,
+     0
+    ],
+    "look_open": [
+     11428,
+     11428,
+     9316,
+     0
+    ],
+    "stare_band": [
+     2869,
+     982,
+     35636,
+     994
+    ]
+   },
+   "risk": {
+    "median_full": null,
+    "median_hungry": null,
+    "n_full": 0,
+    "n_hungry": 0,
+    "diff": null
+   },
+   "r2": {
+    "by_kind": {
+     "chaser": {
+      "n": 27348,
+      "freeze": 0.24634342547901125,
+      "flee": 0.0,
+      "hide": 0.46537223928623667,
+      "respond": 0.711715664765248
+     },
+     "ranged": {
+      "n": 5639,
+      "freeze": 0.3222202518176982,
+      "flee": 0.0,
+      "hide": 0.2502216705089555,
+      "respond": 0.5724419223266537
+     },
+     "stalker": {
+      "n": 55049,
+      "freeze": 0.11111918472633472,
+      "flee": 0.0,
+      "hide": 0.7324747043543025,
+      "respond": 0.8435938890806373
+     },
+     "player": {
+      "n": 4757,
+      "freeze": 0.2879966365356317,
+      "flee": 0.0,
+      "hide": 0.6264452385957536,
+      "respond": 0.9144418751313853
+     }
+    },
+    "kind_miss": 0,
+    "by_hop": {
+     "-1": {
+      "n": 762085,
+      "freeze": 0.0,
+      "flee": 0.0,
+      "hide": 0.0,
+      "respond": 0.0
+     },
+     "0": {
+      "n": 47986,
+      "freeze": 0.1561288709206852,
+      "flee": 0.0,
+      "hide": 0.0,
+      "respond": 0.1561288709206852
+     },
+     "1": {
+      "n": 10311,
+      "freeze": 0.3817282513820192,
+      "flee": 0.0,
+      "hide": 0.0,
+      "respond": 0.3817282513820192
+     },
+     "2": {
+      "n": 24300,
+      "freeze": 0.0,
+      "flee": 0.0,
+      "hide": 0.0,
+      "respond": 0.0
+     }
+    },
+    "hop_miss": {
+     "n": 56,
+     "dropped": 0
+    },
+    "night": {
+     "night": {
+      "n_alarm": 14212,
+      "respond_alarm": 0.24810019701660568,
+      "n_respond": 9695,
+      "alarm_share": 0.3636926250644662
+     },
+     "day": {
+      "n_alarm": 25043,
+      "respond_alarm": 0.23507566984786168,
+      "n_respond": 66927,
+      "alarm_share": 0.08796151030226963
+     },
+     "respond_alarm_diff": 0.013024527168743999,
+     "alarm_share_diff": 0.2757311147621966
+    },
+    "cover": {
+     "in_cover": {
+      "n": 1764,
+      "hide": 1.0,
+      "freeze": 0.0,
+      "flee": 0.0
+     },
+     "open": {
+      "n": 1105,
+      "hide": 0.11131221719457013,
+      "freeze": 0.8886877828054298,
+      "flee": 0.0
+     }
+    },
+    "energy": {
+     "full": {
+      "n": 11973,
+      "graze": 0.4050780923745093
+     },
+     "hungry": {
+      "n": 19939,
+      "graze": 0.1779427253122022
+     },
+     "graze_diff": -0.2271353670623071
+    },
+    "disagree": {
+     "n": 183869,
+     "fsm_r2": 0.0,
+     "rbase": 0.46179073144466987
+    }
+   },
+   "visible": {
+    "stare": {
+     "standoff_n": 130.0,
+     "standoff_n_per1000": 0.11284722222222222,
+     "standoff_break_n": 2.0,
+     "standoff_break_n_per1000": 0.0017361111111111112,
+     "blink_catch_n": 1.0,
+     "blink_catch_n_per1000": 0.0008680555555555556,
+     "balk_n": 126.0,
+     "balk_n_per1000": 0.109375,
+     "balk_share": 0.192707336523126,
+     "spotted_n": 2.0,
+     "spotted_n_per1000": 0.0017361111111111112,
+     "spotted_charge_n": 2.0,
+     "spotted_charge_n_per1000": 0.0017361111111111112,
+     "spotted_charge_catch_n": 2.0,
+     "spotted_charge_catch_n_per1000": 0.0017361111111111112,
+     "lock_steps_mean": 9.244868233618234,
+     "stare_frac": 0.0006866319444444445,
+     "standoff_break_beh_n": 0.0,
+     "standoff_break_beh_n_per1000": 0.0,
+     "spotted_charge_catch_frac": 1.0,
+     "unspotted_charge_catch_frac": 1.0
+    },
+    "alarm": {
+     "emit_h0": 5932.0,
+     "emit_h0_per1000": 5.149305555555555,
+     "emit_h1": 4434.0,
+     "emit_h1_per1000": 3.848958333333333,
+     "emit_h2": 2683.0,
+     "emit_h2_per1000": 2.3289930555555554,
+     "cry_n": 1513.0,
+     "cry_n_per1000": 1.3133680555555554,
+     "listen_per_emit": 11.379103268331969,
+     "alarm_frac": 0.28393489583333337,
+     "alarm_unseen_frac": 0.4455486307129763,
+     "e7_n": 8209.0,
+     "e7_n_per1000": 7.125868055555555,
+     "e7_switch_frac": 0.6775773024684705,
+     "heard_entry_flee": null,
+     "heard_entry_hide": 0.0,
+     "heard_entry_freeze": 0.7806130496724885,
+     "alarm_gap_mean": 99.37180092807812,
+     "dir_n": 11871.0,
+     "dir_n_per1000": 10.3046875,
+     "dir_ok_pt": 0.8864094587751649,
+     "dir_ok_copy": 0.7158972783359774,
+     "wave_size_mean": 1.2148020509403066,
+     "heads_up_1s": 0.35812484500455005,
+     "false_alarm_frac": 0.35201649289871245,
+     "e7_decide_frac": 0.9929956909961498,
+     "heads_up_1s_r16": 0.3107660319036971
+    },
+    "threats": {
+     "p_stalk": 0.41593850199724186,
+     "stalker_n": 4.666666666666667,
+     "player_present": 0.3333333333333333,
+     "catch_rate_chaser": 0.0007126736111111111,
+     "catch_rate_ranged": 3.211805555555556e-05,
+     "catch_rate_stalker": 0.0005598958333333334,
+     "catch_rate_player": 1.1284722222222222e-05,
+     "pounce_n": 649.0,
+     "pounce_n_per1000": 0.5633680555555556,
+     "pounce_hit": 0.9611096683641209,
+     "player_charge_n": 7.0,
+     "player_charge_n_per1000": 0.006076388888888888
+    },
+    "non_graze": 0.15771701388888892
+   }
+  }
+ },
+ "perf": {
+  "mean": -0.28104168722043754,
+  "t": -0.749718185690735,
+  "n": 3,
+  "crit": 4.302652729696142
+ },
+ "perf_rbase": null,
+ "perf_rbase_wr2": null,
+ "c4_drop": {},
+ "gate": {
+  "perf": {
+   "t": -0.749718185690735,
+   "crit": 4.302652729696142,
+   "mean": -0.28104168722043754,
+   "pass_": true,
+   "beats_fsm": false,
+   "ref": "fsm_r2"
+  },
+  "u": {
+   "items": {
+    "esc": {
+     "value": 0.5286085804948533,
+     "min": null,
+     "pending": true,
+     "pass_": false
+    },
+    "hide": {
+     "value": -0.15628516509936696,
+     "min": null,
+     "pending": true,
+     "pass_": false
+    },
+    "freeze": {
+     "value": 0.3673366834170854,
+     "min": null,
+     "pending": true,
+     "pass_": false
+    },
+    "stare": {
+     "value": 0.03798670465337132,
+     "min": null,
+     "pending": true,
+     "pass_": false
+    },
+    "look_open": {
+     "value": 0.10185972566273524,
+     "min": null,
+     "pending": true,
+     "pass_": false
+    }
+   },
+   "pass_": false,
+   "pending": true
+  },
+  "use": {
+   "items": {
+    "graze": {
+     "value": 0.9007352430555555,
+     "pass_": true
+    },
+    "flee": {
+     "value": 0.026261284722222222,
+     "pass_": true
+    },
+    "hide": {
+     "value": 0.029080729166666666,
+     "pass_": true
+    },
+    "freeze": {
+     "value": 0.04392274305555555,
+     "pass_": true
+    }
+   },
+   "flicker": 0.5244760838265877,
+   "flicker_pass": true,
+   "pass_": true
+  },
+  "dep": {
+   "items": {},
+   "pass_": true,
+   "report_only": true
+  },
+  "starve": {
+   "rl": 0.0008090277777777778,
+   "fsm": 0.0008177083333333334,
+   "limit": 0.0012265625,
+   "ratio": 0.989384288747346,
+   "pass_": true,
+   "ref": "fsm_r2"
+  },
+  "pending": true,
+  "pass_": false
+ },
+ "meta": {
+  "name": "ws_s2",
+  "model": "ckpt/v3/ws_r2/v3_r2_ws_s2.zip",
+  "config": "configs/v3_r2_on.yaml",
+  "digest": "8bdbd4b9b1f8",
+  "seeds": [
+   20000,
+   20001,
+   20002
+  ],
+  "steps": 3000,
+  "gamma": 0.9916661555611042,
+  "tail": 600,
+  "freeze_variant": "near",
+  "u_def": "r2",
+  "allowed": [
+   "graze",
+   "flee",
+   "hide",
+   "freeze"
+  ],
+  "policies": [
+   "rl",
+   "fsm_r2"
+  ],
+  "theta": 4.0,
+  "approach": 0.9,
+  "elapsed_s": 25.7,
+  "u_min": {
+   "esc": null,
+   "hide": null,
+   "freeze": null,
+   "sleep": null,
+   "stare": null,
+   "look_open": null
+  },
+  "ref_fsm": "fsm_r2",
+  "theta_wr2": 4.0,
+  "approach_wr2": 0.6,
+  "prereg": false
+ },
+ "per_seed": {
+  "rl": [
+   {
+    "name": "rl",
+    "seed": 20000,
+    "g_gamma": 1.83397408148862,
+    "pred_rate": 0.0020885416666666665,
+    "starve_rate": 0.00023177083333333334,
+    "mean_return": 46.36131899475911,
+    "beh": [
+     344815,
+     9636,
+     16717,
+     12832,
+     0
+    ],
+    "switch": 8433,
+    "flicker": 4513,
+    "decide": 310107,
+    "n": 384000,
+    "n_dec": 310107,
+    "u_cnt": {
+     "esc": [
+      2919,
+      1314,
+      284827,
+      1365
+     ],
+     "hide": [
+      896,
+      450,
+      3784,
+      2613
+     ],
+     "freeze": [
+      825,
+      283,
+      11449,
+      0
+     ],
+     "sleep": [
+      86462,
+      0,
+      145512,
+      0
+     ],
+     "stare": [
+      1828,
+      74,
+      8901,
+      0
+     ],
+     "look": [
+      14936,
+      1365,
+      9352,
+      0
+     ],
+     "look_open": [
+      14936,
+      1365,
+      4926,
+      0
+     ],
+     "stare_band": [
+      1516,
+      1,
+      8901,
+      0
+     ]
+    },
+    "choice": [
+     301386,
+     1594,
+     4758,
+     2369,
+     0
+    ],
+    "r2": {
+     "by_kind": [
+      [
+       6599,
+       104,
+       187,
+       712
+      ],
+      [
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       14447,
+       464,
+       1309,
+       3481
+      ],
+      [
+       4234,
+       436,
+       98,
+       565
+      ]
+     ],
+     "kind_miss": 0,
+     "by_hop": [
+      [
+       241197,
+       0,
+       0,
+       0
+      ],
+      [
+       37274,
+       988,
+       0,
+       0
+      ],
+      [
+       3906,
+       377,
+       0,
+       0
+      ],
+      [
+       2450,
+       0,
+       0,
+       0
+      ]
+     ],
+     "hop_miss": [
+      32,
+      0
+     ],
+     "night": [
+      [
+       3033,
+       168,
+       559,
+       168
+      ],
+      [
+       26639,
+       993,
+       6953,
+       993
+      ]
+     ],
+     "cover": [
+      [
+       277,
+       73,
+       0,
+       0
+      ],
+      [
+       1239,
+       99,
+       1,
+       0
+      ]
+     ],
+     "energy": [
+      [
+       8052,
+       6052
+      ],
+      [
+       2014,
+       1451
+      ]
+     ],
+     "disagree": [
+      81991,
+      20699,
+      7280
+     ]
+    },
+    "visible": {
+     "stare": {
+      "standoff_n": 23.0,
+      "standoff_break_n": 14.0,
+      "blink_catch_n": 4.0,
+      "balk_n": 8.0,
+      "balk_share": 0.012598425196850394,
+      "spotted_n": 0.0,
+      "spotted_charge_n": 0.0,
+      "spotted_charge_catch_n": 0.0,
+      "lock_steps_mean": 8.477611940298507,
+      "stare_frac": 0.00022916666666666666,
+      "standoff_break_beh_n": 14.0,
+      "spotted_charge_catch_frac": null,
+      "unspotted_charge_catch_frac": 1.0
+     },
+     "alarm": {
+      "emit_h0": 4037.0,
+      "emit_h1": 976.0,
+      "emit_h2": 375.0,
+      "cry_n": 802.0,
+      "listen_per_emit": 7.96807720861173,
+      "alarm_frac": 0.32350260416666665,
+      "alarm_unseen_frac": 0.5942362648420205,
+      "e7_n": 3120.0,
+      "e7_switch_frac": 0.2685897435897436,
+      "heard_entry_flee": 0.0,
+      "heard_entry_hide": 0.0,
+      "heard_entry_freeze": 0.8151260504201681,
+      "alarm_gap_mean": 99.13763919821827,
+      "dir_n": 4604.0,
+      "dir_ok_pt": 0.8935708079930496,
+      "dir_ok_copy": 0.569721980886186,
+      "wave_size_mean": 0.33564528114936837,
+      "heads_up_1s": 0.21341986498079146,
+      "false_alarm_frac": 0.19938931297709925,
+      "e7_decide_frac": 0.996474358974359,
+      "heads_up_1s_r16": 0.1779463997416855
+     },
+     "threats": {
+      "p_stalk": 0.48261922113349476,
+      "stalker_n": 8.0,
+      "player_present": 1.0,
+      "catch_rate_chaser": 0.00044010416666666666,
+      "catch_rate_ranged": 0.0,
+      "catch_rate_stalker": 0.001625,
+      "catch_rate_player": 3.125e-05,
+      "pounce_n": 627.0,
+      "pounce_hit": 0.9824561403508771,
+      "player_charge_n": 7.0
+     }
+    }
+   },
+   {
+    "name": "rl",
+    "seed": 20001,
+    "g_gamma": -2.7736857778380473,
+    "pred_rate": 0.0022994791666666667,
+    "starve_rate": 0.00171875,
+    "mean_return": -85.9965607075237,
+    "beh": [
+     324525,
+     14880,
+     14804,
+     29791,
+     0
+    ],
+    "switch": 12953,
+    "flicker": 6931,
+    "decide": 268467,
+    "n": 384000,
+    "n_dec": 268467,
+    "u_cnt": {
+     "esc": [
+      4158,
+      2643,
+      246651,
+      3453
+     ],
+     "hide": [
+      914,
+      467,
+      2595,
+      1606
+     ],
+     "freeze": [
+      2100,
+      753,
+      7931,
+      0
+     ],
+     "sleep": [
+      15061,
+      0,
+      107486,
+      0
+     ],
+     "stare": [
+      899,
+      29,
+      6582,
+      0
+     ],
+     "look": [
+      26782,
+      3453,
+      21609,
+      0
+     ],
+     "look_open": [
+      26782,
+      3453,
+      6750,
+      0
+     ],
+     "stare_band": [
+      677,
+      1,
+      6582,
+      0
+     ]
+    },
+    "choice": [
+     257725,
+     2492,
+     3642,
+     4608,
+     0
+    ],
+    "r2": {
+     "by_kind": [
+      [
+       9587,
+       553,
+       1238,
+       1401
+      ],
+      [
+       4033,
+       62,
+       123,
+       762
+      ],
+      [
+       8196,
+       540,
+       1131,
+       1479
+      ],
+      [
+       0,
+       0,
+       0,
+       0
+      ]
+     ],
+     "kind_miss": 0,
+     "by_hop": [
+      [
+       171724,
+       0,
+       0,
+       0
+      ],
+      [
+       55562,
+       2390,
+       0,
+       0
+      ],
+      [
+       8444,
+       1063,
+       0,
+       0
+      ],
+      [
+       10921,
+       0,
+       0,
+       0
+      ]
+     ],
+     "hop_miss": [
+      41,
+      0
+     ],
+     "night": [
+      [
+       17100,
+       1557,
+       2785,
+       1557
+      ],
+      [
+       30382,
+       1390,
+       6809,
+       1390
+      ]
+     ],
+     "cover": [
+      [
+       112,
+       34,
+       0,
+       0
+      ],
+      [
+       565,
+       49,
+       1,
+       0
+      ]
+     ],
+     "energy": [
+      [
+       474,
+       347
+      ],
+      [
+       9100,
+       5886
+      ]
+     ],
+     "disagree": [
+      95848,
+      29959,
+      8456
+     ]
+    },
+    "visible": {
+     "stare": {
+      "standoff_n": 7.0,
+      "standoff_break_n": 6.0,
+      "blink_catch_n": 5.0,
+      "balk_n": 1.0,
+      "balk_share": 0.002364066193853428,
+      "spotted_n": 0.0,
+      "spotted_charge_n": 0.0,
+      "spotted_charge_catch_n": 0.0,
+      "lock_steps_mean": 6.740079365079365,
+      "stare_frac": 4.6875e-05,
+      "standoff_break_beh_n": 6.0,
+      "spotted_charge_catch_frac": null,
+      "unspotted_charge_catch_frac": null
+     },
+     "alarm": {
+      "emit_h0": 4872.0,
+      "emit_h1": 2185.0,
+      "emit_h2": 1039.0,
+      "cry_n": 883.0,
+      "listen_per_emit": 13.576086956521738,
+      "alarm_frac": 0.5031510416666667,
+      "alarm_unseen_frac": 0.6947259458620154,
+      "e7_n": 4891.0,
+      "e7_switch_frac": 0.31057043549376406,
+      "heard_entry_flee": 0.0,
+      "heard_entry_hide": 0.0,
+      "heard_entry_freeze": 0.8764227642276423,
+      "alarm_gap_mean": 67.43380376344086,
+      "dir_n": 11616.0,
+      "dir_ok_pt": 0.8698347107438017,
+      "dir_ok_copy": 0.5589703856749312,
+      "wave_size_mean": 0.6631773399014779,
+      "heads_up_1s": 0.2841710997720117,
+      "false_alarm_frac": 0.32673267326732675,
+      "e7_decide_frac": 0.993661827847066,
+      "heads_up_1s_r16": 0.24356382539813515
+     },
+     "threats": {
+      "p_stalk": 0.38739163127046683,
+      "stalker_n": 3.0,
+      "player_present": 0.0,
+      "catch_rate_chaser": 0.00115625,
+      "catch_rate_ranged": 6.25e-05,
+      "catch_rate_stalker": 0.0010885416666666667,
+      "catch_rate_player": 0.0,
+      "pounce_n": 422.0,
+      "pounce_hit": 0.9786729857819905,
+      "player_charge_n": 0.0
+     }
+    }
+   },
+   {
+    "name": "rl",
+    "seed": 20002,
+    "g_gamma": 2.3606840967813234,
+    "pred_rate": 0.0008203125,
+    "starve_rate": 0.0004765625,
+    "mean_return": 58.20134710334917,
+    "beh": [
+     368307,
+     5737,
+     1980,
+     7976,
+     0
+    ],
+    "switch": 3618,
+    "flicker": 1670,
+    "decide": 350720,
+    "n": 384000,
+    "n_dec": 350720,
+    "u_cnt": {
+     "esc": [
+      1900,
+      845,
+      341186,
+      692
+     ],
+     "hide": [
+      142,
+      65,
+      235,
+      142
+     ],
+     "freeze": [
+      1055,
+      426,
+      3638,
+      0
+     ],
+     "sleep": [
+      106131,
+      0,
+      127300,
+      0
+     ],
+     "stare": [
+      432,
+      17,
+      2941,
+      0
+     ],
+     "look": [
+      12376,
+      692,
+      4537,
+      0
+     ],
+     "look_open": [
+      12376,
+      692,
+      2312,
+      0
+     ],
+     "stare_band": [
+      372,
+      0,
+      2941,
+      0
+     ]
+    },
+    "choice": [
+     348139,
+     902,
+     398,
+     1281,
+     0
+    ],
+    "r2": {
+     "by_kind": [
+      [
+       6350,
+       374,
+       526,
+       165
+      ],
+      [
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       3184,
+       215,
+       376,
+       233
+      ],
+      [
+       0,
+       0,
+       0,
+       0
+      ]
+     ],
+     "kind_miss": 0,
+     "by_hop": [
+      [
+       322520,
+       0,
+       0,
+       0
+      ],
+      [
+       15227,
+       476,
+       0,
+       0
+      ],
+      [
+       1417,
+       216,
+       0,
+       0
+      ],
+      [
+       2022,
+       0,
+       0,
+       0
+      ]
+     ],
+     "hop_miss": [
+      11,
+      0
+     ],
+     "night": [
+      [
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       13324,
+       636,
+       2438,
+       636
+      ]
+     ],
+     "cover": [
+      [
+       22,
+       4,
+       0,
+       0
+      ],
+      [
+       350,
+       6,
+       0,
+       0
+      ]
+     ],
+     "energy": [
+      [
+       2674,
+       2266
+      ],
+      [
+       1099,
+       808
+      ]
+     ],
+     "disagree": [
+      35676,
+      13468,
+      1835
+     ]
+    },
+    "visible": {
+     "stare": {
+      "standoff_n": 4.0,
+      "standoff_break_n": 3.0,
+      "blink_catch_n": 1.0,
+      "balk_n": 1.0,
+      "balk_share": 0.007751937984496124,
+      "spotted_n": 0.0,
+      "spotted_charge_n": 0.0,
+      "spotted_charge_catch_n": 0.0,
+      "lock_steps_mean": 10.423728813559322,
+      "stare_frac": 2.34375e-05,
+      "standoff_break_beh_n": 3.0,
+      "spotted_charge_catch_frac": null,
+      "unspotted_charge_catch_frac": null
+     },
+     "alarm": {
+      "emit_h0": 1662.0,
+      "emit_h1": 469.0,
+      "emit_h2": 216.0,
+      "cry_n": 315.0,
+      "listen_per_emit": 10.233063485300384,
+      "alarm_frac": 0.13532552083333332,
+      "alarm_unseen_frac": 0.590031752140864,
+      "e7_n": 1319.0,
+      "e7_switch_frac": 0.27520849128127367,
+      "heard_entry_flee": 0.0,
+      "heard_entry_hide": 0.0,
+      "heard_entry_freeze": 0.6641074856046065,
+      "alarm_gap_mean": 145.57877813504822,
+      "dir_n": 2197.0,
+      "dir_ok_pt": 0.9736003641329085,
+      "dir_ok_copy": 0.7291761492944925,
+      "wave_size_mean": 0.41636582430806257,
+      "heads_up_1s": 0.3208296855007071,
+      "false_alarm_frac": 0.25877192982456143,
+      "e7_decide_frac": 0.9969673995451099,
+      "heads_up_1s_r16": 0.2828975150235504
+     },
+     "threats": {
+      "p_stalk": 0.37780465358776405,
+      "stalker_n": 3.0,
+      "player_present": 0.0,
+      "catch_rate_chaser": 0.00048697916666666665,
+      "catch_rate_ranged": 0.0,
+      "catch_rate_stalker": 0.0003333333333333333,
+      "catch_rate_player": 0.0,
+      "pounce_n": 128.0,
+      "pounce_hit": 0.984375,
+      "player_charge_n": 0.0
+     }
+    }
+   }
+  ],
+  "fsm_r2": [
+   {
+    "name": "fsm_r2",
+    "seed": 20000,
+    "g_gamma": 2.7651585664132434,
+    "pred_rate": 0.0012239583333333334,
+    "starve_rate": 0.00023177083333333334,
+    "mean_return": 76.42804085353347,
+    "beh": [
+     314003,
+     0,
+     44595,
+     25402,
+     0
+    ],
+    "switch": 6475,
+    "flicker": 4210,
+    "decide": 320782,
+    "n": 384000,
+    "n_dec": 320782,
+    "u_cnt": {
+     "esc": [
+      4555,
+      3709,
+      275210,
+      2394
+     ],
+     "hide": [
+      6042,
+      6042,
+      18524,
+      18524
+     ],
+     "freeze": [
+      508,
+      508,
+      23616,
+      612
+     ],
+     "sleep": [
+      84899,
+      0,
+      155290,
+      0
+     ],
+     "stare": [
+      3267,
+      1949,
+      18956,
+      448
+     ],
+     "look": [
+      2394,
+      2394,
+      7937,
+      0
+     ],
+     "look_open": [
+      2394,
+      2394,
+      2272,
+      0
+     ],
+     "stare_band": [
+      1733,
+      415,
+      18956,
+      448
+     ]
+    },
+    "choice": [
+     280651,
+     0,
+     33212,
+     6919,
+     0
+    ],
+    "r2": {
+     "by_kind": [
+      [
+       7022,
+       801,
+       0,
+       3842
+      ],
+      [
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       33793,
+       2354,
+       0,
+       26390
+      ],
+      [
+       4757,
+       1370,
+       0,
+       2980
+      ]
+     ],
+     "kind_miss": 0,
+     "by_hop": [
+      [
+       254566,
+       0,
+       0,
+       0
+      ],
+      [
+       13825,
+       1724,
+       0,
+       0
+      ],
+      [
+       1849,
+       670,
+       0,
+       0
+      ],
+      [
+       4970,
+       0,
+       0,
+       0
+      ]
+     ],
+     "hop_miss": [
+      21,
+      0
+     ],
+     "night": [
+      [
+       1139,
+       183,
+       1559,
+       183
+      ],
+      [
+       8998,
+       1762,
+       35156,
+       1762
+      ]
+     ],
+     "cover": [
+      [
+       1244,
+       1244,
+       0,
+       0
+      ],
+      [
+       489,
+       74,
+       415,
+       0
+      ]
+     ],
+     "energy": [
+      [
+       8429,
+       3116
+      ],
+      [
+       3844,
+       538
+      ]
+     ],
+     "disagree": [
+      77091,
+      0,
+      40131
+     ]
+    },
+    "visible": {
+     "stare": {
+      "standoff_n": 79.0,
+      "standoff_break_n": 2.0,
+      "blink_catch_n": 1.0,
+      "balk_n": 75.0,
+      "balk_share": 0.1893939393939394,
+      "spotted_n": 2.0,
+      "spotted_charge_n": 2.0,
+      "spotted_charge_catch_n": 2.0,
+      "lock_steps_mean": 7.247596153846154,
+      "stare_frac": 0.0012630208333333332,
+      "standoff_break_beh_n": 0.0,
+      "spotted_charge_catch_frac": 1.0,
+      "unspotted_charge_catch_frac": 1.0
+     },
+     "alarm": {
+      "emit_h0": 2106.0,
+      "emit_h1": 1124.0,
+      "emit_h2": 618.0,
+      "cry_n": 470.0,
+      "listen_per_emit": 8.606288981288982,
+      "alarm_frac": 0.26609635416666666,
+      "alarm_unseen_frac": 0.3910511738972999,
+      "e7_n": 2286.0,
+      "e7_switch_frac": 0.6504811898512686,
+      "heard_entry_flee": null,
+      "heard_entry_hide": 0.0,
+      "heard_entry_freeze": 0.776,
+      "alarm_gap_mean": 97.0973348783314,
+      "dir_n": 2617.0,
+      "dir_ok_pt": 0.8723729461215132,
+      "dir_ok_copy": 0.6935422239205197,
+      "wave_size_mean": 0.8252611585944919,
+      "heads_up_1s": 0.22793424066837353,
+      "false_alarm_frac": 0.36363636363636365,
+      "e7_decide_frac": 0.9960629921259843,
+      "heads_up_1s_r16": 0.18542734102410965
+     },
+     "threats": {
+      "p_stalk": 0.48261922113349476,
+      "stalker_n": 8.0,
+      "player_present": 1.0,
+      "catch_rate_chaser": 0.000390625,
+      "catch_rate_ranged": 0.0,
+      "catch_rate_stalker": 0.0008046875,
+      "catch_rate_player": 3.3854166666666665e-05,
+      "pounce_n": 321.0,
+      "pounce_hit": 0.9501557632398754,
+      "player_charge_n": 7.0
+     }
+    }
+   },
+   {
+    "name": "fsm_r2",
+    "seed": 20001,
+    "g_gamma": -2.4943692351414857,
+    "pred_rate": 0.0020807291666666665,
+    "starve_rate": 0.0016458333333333333,
+    "mean_return": -77.44188558751401,
+    "beh": [
+     290626,
+     0,
+     36828,
+     56546,
+     0
+    ],
+    "switch": 12462,
+    "flicker": 9153,
+    "decide": 264620,
+    "n": 384000,
+    "n_dec": 264620,
+    "u_cnt": {
+     "esc": [
+      6425,
+      5226,
+      225329,
+      7717
+     ],
+     "hide": [
+      3979,
+      3979,
+      12373,
+      12373
+     ],
+     "freeze": [
+      2823,
+      2823,
+      16401,
+      690
+     ],
+     "sleep": [
+      16339,
+      0,
+      104941,
+      0
+     ],
+     "stare": [
+      2655,
+      2109,
+      14381,
+      499
+     ],
+     "look": [
+      7717,
+      7717,
+      24455,
+      0
+     ],
+     "look_open": [
+      7717,
+      7717,
+      6004,
+      0
+     ],
+     "stare_band": [
+      966,
+      420,
+      14381,
+      499
+     ]
+    },
+    "choice": [
+     225464,
+     0,
+     22639,
+     16517,
+     0
+    ],
+    "r2": {
+     "by_kind": [
+      [
+       15214,
+       4069,
+       0,
+       7955
+      ],
+      [
+       5639,
+       1817,
+       0,
+       1411
+      ],
+      [
+       18438,
+       2914,
+       0,
+       13273
+      ],
+      [
+       0,
+       0,
+       0,
+       0
+      ]
+     ],
+     "kind_miss": 0,
+     "by_hop": [
+      [
+       169536,
+       0,
+       0,
+       0
+      ],
+      [
+       31928,
+       4902,
+       0,
+       0
+      ],
+      [
+       7363,
+       2815,
+       0,
+       0
+      ],
+      [
+       16502,
+       0,
+       0,
+       0
+      ]
+     ],
+     "hop_miss": [
+      27,
+      0
+     ],
+     "night": [
+      [
+       13073,
+       3343,
+       8136,
+       3343
+      ],
+      [
+       14277,
+       3136,
+       26870,
+       3136
+      ]
+     ],
+     "cover": [
+      [
+       501,
+       501,
+       0,
+       0
+      ],
+      [
+       465,
+       45,
+       420,
+       0
+      ]
+     ],
+     "energy": [
+      [
+       990,
+       427
+      ],
+      [
+       15135,
+       2720
+      ]
+     ],
+     "disagree": [
+      88410,
+      0,
+      39156
+     ]
+    },
+    "visible": {
+     "stare": {
+      "standoff_n": 29.0,
+      "standoff_break_n": 0.0,
+      "blink_catch_n": 0.0,
+      "balk_n": 29.0,
+      "balk_share": 0.09539473684210527,
+      "spotted_n": 0.0,
+      "spotted_charge_n": 0.0,
+      "spotted_charge_catch_n": 0.0,
+      "lock_steps_mean": 7.1177777777777775,
+      "stare_frac": 0.000453125,
+      "standoff_break_beh_n": 0.0,
+      "spotted_charge_catch_frac": null,
+      "unspotted_charge_catch_frac": null
+     },
+     "alarm": {
+      "emit_h0": 3070.0,
+      "emit_h1": 2626.0,
+      "emit_h2": 1662.0,
+      "cry_n": 799.0,
+      "listen_per_emit": 14.763250883392226,
+      "alarm_frac": 0.49318489583333336,
+      "alarm_unseen_frac": 0.5573203508234635,
+      "e7_n": 4896.0,
+      "e7_switch_frac": 0.5935457516339869,
+      "heard_entry_flee": null,
+      "heard_entry_hide": 0.0,
+      "heard_entry_freeze": 0.8309804679945851,
+      "alarm_gap_mean": 61.20216216216216,
+      "dir_n": 8298.0,
+      "dir_ok_pt": 0.866353338153772,
+      "dir_ok_copy": 0.6225596529284165,
+      "wave_size_mean": 1.3892508143322475,
+      "heads_up_1s": 0.3632138965450933,
+      "false_alarm_frac": 0.38367525098210387,
+      "e7_decide_frac": 0.9887663398692811,
+      "heads_up_1s_r16": 0.31444362739284104
+     },
+     "threats": {
+      "p_stalk": 0.38739163127046683,
+      "stalker_n": 3.0,
+      "player_present": 0.0,
+      "catch_rate_chaser": 0.0012526041666666666,
+      "catch_rate_ranged": 9.635416666666667e-05,
+      "catch_rate_stalker": 0.000734375,
+      "catch_rate_player": 0.0,
+      "pounce_n": 275.0,
+      "pounce_hit": 0.9709090909090909,
+      "player_charge_n": 0.0
+     }
+    }
+   },
+   {
+    "name": "fsm_r2",
+    "seed": 20002,
+    "g_gamma": 1.993308130821451,
+    "pred_rate": 0.0006354166666666666,
+    "starve_rate": 0.0005755208333333334,
+    "mean_return": 51.0272438618214,
+    "beh": [
+     365681,
+     0,
+     2829,
+     15490,
+     0
+    ],
+    "switch": 3031,
+    "flicker": 2263,
+    "decide": 352073,
+    "n": 384000,
+    "n_dec": 352073,
+    "u_cnt": {
+     "esc": [
+      1729,
+      1153,
+      344143,
+      1317
+     ],
+     "hide": [
+      319,
+      319,
+      951,
+      951
+     ],
+     "freeze": [
+      1083,
+      1083,
+      2673,
+      117
+     ],
+     "sleep": [
+      96199,
+      0,
+      132306,
+      0
+     ],
+     "stare": [
+      437,
+      414,
+      2299,
+      47
+     ],
+     "look": [
+      1317,
+      1317,
+      3724,
+      0
+     ],
+     "look_open": [
+      1317,
+      1317,
+      1040,
+      0
+     ],
+     "stare_band": [
+      170,
+      147,
+      2299,
+      47
+     ]
+    },
+    "choice": [
+     346451,
+     0,
+     1589,
+     4033,
+     0
+    ],
+    "r2": {
+     "by_kind": [
+      [
+       5112,
+       1867,
+       0,
+       930
+      ],
+      [
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       2818,
+       849,
+       0,
+       659
+      ],
+      [
+       0,
+       0,
+       0,
+       0
+      ]
+     ],
+     "kind_miss": 0,
+     "by_hop": [
+      [
+       337983,
+       0,
+       0,
+       0
+      ],
+      [
+       2233,
+       866,
+       0,
+       0
+      ],
+      [
+       1099,
+       451,
+       0,
+       0
+      ],
+      [
+       2828,
+       0,
+       0,
+       0
+      ]
+     ],
+     "hop_miss": [
+      8,
+      0
+     ],
+     "night": [
+      [
+       0,
+       0,
+       0,
+       0
+      ],
+      [
+       1768,
+       989,
+       4901,
+       989
+      ]
+     ],
+     "cover": [
+      [
+       19,
+       19,
+       0,
+       0
+      ],
+      [
+       151,
+       4,
+       147,
+       0
+      ]
+     ],
+     "energy": [
+      [
+       2554,
+       1307
+      ],
+      [
+       960,
+       290
+      ]
+     ],
+     "disagree": [
+      18368,
+      0,
+      5622
+     ]
+    },
+    "visible": {
+     "stare": {
+      "standoff_n": 22.0,
+      "standoff_break_n": 0.0,
+      "blink_catch_n": 0.0,
+      "balk_n": 22.0,
+      "balk_share": 0.29333333333333333,
+      "spotted_n": 0.0,
+      "spotted_charge_n": 0.0,
+      "spotted_charge_catch_n": 0.0,
+      "lock_steps_mean": 13.36923076923077,
+      "stare_frac": 0.00034375,
+      "standoff_break_beh_n": 0.0,
+      "spotted_charge_catch_frac": null,
+      "unspotted_charge_catch_frac": null
+     },
+     "alarm": {
+      "emit_h0": 756.0,
+      "emit_h1": 684.0,
+      "emit_h2": 403.0,
+      "cry_n": 244.0,
+      "listen_per_emit": 10.767769940314704,
+      "alarm_frac": 0.0925234375,
+      "alarm_unseen_frac": 0.38827436741816546,
+      "e7_n": 1027.0,
+      "e7_switch_frac": 0.7887049659201558,
+      "heard_entry_flee": null,
+      "heard_entry_hide": 0.0,
+      "heard_entry_freeze": 0.7348586810228802,
+      "alarm_gap_mean": 139.81590574374079,
+      "dir_n": 956.0,
+      "dir_ok_pt": 0.9205020920502092,
+      "dir_ok_copy": 0.8315899581589958,
+      "wave_size_mean": 1.42989417989418,
+      "heads_up_1s": 0.48322639780018334,
+      "false_alarm_frac": 0.3087378640776699,
+      "e7_decide_frac": 0.994157740993184,
+      "heads_up_1s_r16": 0.43242712729414073
+     },
+     "threats": {
+      "p_stalk": 0.37780465358776405,
+      "stalker_n": 3.0,
+      "player_present": 0.0,
+      "catch_rate_chaser": 0.0004947916666666667,
+      "catch_rate_ranged": 0.0,
+      "catch_rate_stalker": 0.000140625,
+      "catch_rate_player": 0.0,
+      "pounce_n": 53.0,
+      "pounce_hit": 0.9622641509433962,
+      "player_charge_n": 0.0
+     }
+    }
+   }
+  ]
+ }
+}

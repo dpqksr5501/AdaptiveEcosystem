@@ -71,3 +71,9 @@ DerivedDataCache/
 
 # Built data for maps
 *_BuiltData.uasset
+
+# Personal presentation outputs live outside this checkout (Desktop presentation folder).
+/Deliverables/
+/output/
+/tmp/
+~$*

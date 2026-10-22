@@ -9,6 +9,7 @@
 #include "MassMovementFragments.h"
 #include "MassExecutionContext.h"
 #include "Engine/World.h"
+#include "AI/Behavior/EcoSpeciesAIFragments.h"
 
 UEcoCreaturePredatorProcessor::UEcoCreaturePredatorProcessor() : Query(*this)
 {
@@ -21,6 +22,7 @@ void UEcoCreaturePredatorProcessor::ConfigureQueries(const TSharedRef<FMassEntit
 {
     Query.AddTagRequirement<FEcoIntegratedCreatureTag>(EMassFragmentPresence::All);
     Query.AddTagRequirement<FEcoPredatorTag>(EMassFragmentPresence::All);
+    Query.AddTagRequirement<FEcoGroundedNavigationTag>(EMassFragmentPresence::None);
     Query.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
     Query.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadWrite);
     Query.AddRequirement<FEcoCreatureLifecycleFragment>(EMassFragmentAccess::ReadWrite);

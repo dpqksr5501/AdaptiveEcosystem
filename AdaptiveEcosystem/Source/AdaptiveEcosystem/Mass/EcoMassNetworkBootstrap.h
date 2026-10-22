@@ -60,6 +60,11 @@ public:
 	TObjectPtr<AEcologyRegion> RegionActor;
 	UPROPERTY(EditAnywhere, Category="Ecology|Mass")
 	FEcoSpawnScheduleSettings SpawnSchedule;
+	/** Soft ecology comfort; independent of the SpawnSchedule hard spawn cap. */
+	UPROPERTY(EditAnywhere, Category="Ecology|Overcrowding", meta=(ClampMin="1"))
+	int32 EcologicalComfortPopulation = 64;
+	UPROPERTY(EditAnywhere, Category="Ecology|Survival", meta=(ClampMin="0.0", ClampMax="1.0"))
+	float InitialEnergyRatio = 1.0f;
 
 	/** Allows the actor to initialize itself without a GameMode callback. */
 	UPROPERTY(EditAnywhere, Category = "Ecology|Mass")

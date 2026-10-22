@@ -1,0 +1,83 @@
+# 갈림 4 조사 검증 기록 (2026-10-03 20:59, 갈림 4 조사(H5)와 코드 회귀 확인의 근거 중 저장소 json 에 없는 두 가지)
+# 행 원자료와 래퍼 스크립트는 검증 세션 임시 폴더에만 있다(저장소 밖). 아래 '#' 없는 줄은 그 요약 출력을 그대로 옮긴 것이다. '#' 줄은 설명이다.
+
+## 1. H5 깨끗한 개입: T1 s20~22, T1 세계, 탐색 시드 12000~12039 x 5000스텝, 두 모드
+# 결과 뒤 추가 시험이다(inv4 MEMO 1절 밖). H5 판정은 MEMO 1절대로 C4-fix(관측 7 = 0) 기준이고, 이 절의 값은 판정에 쓰지 않는다. 원자료는 저장소에 없다.
+# 관측 7 := 1[관측 1 > 0]. 보임 개체는 원래 값 1 그대로, 안 보인 개체의 기억만 0 으로 지운다.
+# 구현 A (래퍼 mask7:obs7_seen, 키 C4seen). n_bad = 보임인데 관측 7 != 1 인 개체 수. 비교 대상 C0 는 eval_p1.json 의 T1_s2x|C0 행.
+# 다음 줄의 'n_bad 합' 은 모든 행의 n_bad 합이다. 뒤의 사전 값 40 은 키별 행 수(탐색 시드 40개)이고 n_bad 가 아니다(집계 스크립트: {키: len(행)}).
+n_bad 합 0 {'T1_s20|C4seen|hold': 40, 'T1_s21|C4seen|hold': 40, 'T1_s22|C4seen|hold': 40, 'T1_s20|C4seen|det': 40, 'T1_s21|C4seen|det': 40, 'T1_s22|C4seen|det': 40}
+hold g_gamma C4seen vs C0: 0.7707 vs 0.7957 diff -0.0250 t -0.79
+    20 0.8860 vs 0.9877 diff -0.1017 t -1.93
+    21 0.6552 vs 0.6265 diff +0.0287 t +0.54
+    22 0.7708 vs 0.7729 diff -0.0021 t -0.03
+hold   C4seen vs C4fix0: 0.7707 vs 0.7431 diff +0.0275 t +0.95
+hold   C4seen vs T0: 0.7707 vs 1.1176 diff -0.3470 t -8.39
+hold predation_rate C4seen vs C0: 0.0025 vs 0.0025 diff +0.0000 t +1.99
+hold starve_rate C4seen vs C0: 0.0005 vs 0.0005 diff -0.0000 t -1.01
+hold repro C4seen vs C0: 12.7442 vs 12.8184 diff -0.0742 t -1.23
+hold p_stop_calm C4seen vs C0: 0.6772 vs 0.6693 diff +0.0078 t +7.15
+hold p_stop_win C4seen vs C0: 0.5194 vs 0.4421 diff +0.0773 t +58.21
+hold stop_frac C4seen vs C0: 0.5636 vs 0.5411 diff +0.0225 t +17.23
+hold p_run_unseen C4seen vs C0: 0.0010 vs 0.0015 diff -0.0006 t -14.09
+det g_gamma C4seen vs C0: -0.9111 vs -0.6114 diff -0.2997 t -9.01
+    20 -0.7323 vs 0.1808 diff -0.9132 t -11.82
+    21 -0.9942 vs -0.9883 diff -0.0058 t -0.18
+    22 -1.0068 vs -1.0266 diff +0.0198 t +0.49
+det   C4seen vs C4fix0: -0.9111 vs -1.1293 diff +0.2182 t +7.00
+det   C4seen vs T0: -0.9111 vs 1.1928 diff -2.1039 t -12.87
+det predation_rate C4seen vs C0: 0.0026 vs 0.0025 diff +0.0001 t +4.92
+det starve_rate C4seen vs C0: 0.0009 vs 0.0009 diff +0.0000 t +4.78
+det repro C4seen vs C0: 7.2766 vs 8.3573 diff -1.0807 t -10.28
+det p_stop_calm C4seen vs C0: 0.9930 vs 0.9743 diff +0.0187 t +11.83
+det p_stop_win C4seen vs C0: 0.9855 vs 0.6205 diff +0.3650 t +61.03
+det stop_frac C4seen vs C0: 0.9077 vs 0.8158 diff +0.0919 t +14.23
+det p_run_unseen C4seen vs C0: 0.0000 vs 0.0000 diff +0.0000 t +nan
+
+# 구현 B (래퍼 vh5wrap:unseen_fix value 0, 키 U0). 구현 A 와 같은 값이어야 한다. Uperm(안 보인 개체끼리 순열)은 돌리지 않았다.
+== U0 hold
+  g_gamma: U0-C0 0.7707 vs 0.7957 diff -0.0250 t -0.79 n 40
+  p_stop_calm: U0-C0 0.6772 vs 0.6693 diff +0.0078 t +7.15 n 40
+  p_stop_win: U0-C0 0.5194 vs 0.4421 diff +0.0773 t +58.21 n 40
+  p_run_unseen: U0-C0 0.0010 vs 0.0015 diff -0.0006 t -14.09 n 40
+  stop_frac: U0-C0 0.5636 vs 0.5411 diff +0.0225 t +17.23 n 40
+  predation_rate: U0-C0 0.0025 vs 0.0025 diff +0.0000 t +1.99 n 40
+  starve_rate: U0-C0 0.0005 vs 0.0005 diff -0.0000 t -1.01 n 40
+  repro: U0-C0 12.7442 vs 12.8184 diff -0.0742 t -1.23 n 40
+  hungry_frac: U0-C0 0.4656 vs 0.4625 diff +0.0031 t +1.45 n 40
+  win_frac: U0-C0 0.1505 vs 0.1517 diff -0.0012 t -1.47 n 40
+  s20 g:  0.8860 vs 0.9877 diff -0.1017 t -1.93 n 40
+  s21 g:  0.6552 vs 0.6265 diff +0.0287 t +0.54 n 40
+  s22 g:  0.7708 vs 0.7729 diff -0.0021 t -0.03 n 40
+  vs T0: 0.7707 vs 1.1176 diff -0.3470 t -8.39 n 40
+  vs C4fix0: 0.7707 vs 0.7431 diff +0.0275 t +0.95 n 40
+== U0 det
+  g_gamma: U0-C0 -0.9111 vs -0.6114 diff -0.2997 t -9.01 n 40
+  p_stop_calm: U0-C0 0.9930 vs 0.9743 diff +0.0187 t +11.83 n 40
+  p_stop_win: U0-C0 0.9855 vs 0.6205 diff +0.3650 t +61.03 n 40
+  p_run_unseen: U0-C0 0.0000 vs 0.0000 diff +0.0000 t +nan n 40
+  stop_frac: U0-C0 0.9077 vs 0.8158 diff +0.0919 t +14.23 n 40
+  predation_rate: U0-C0 0.0026 vs 0.0025 diff +0.0001 t +4.92 n 40
+  starve_rate: U0-C0 0.0009 vs 0.0009 diff +0.0000 t +4.78 n 40
+  repro: U0-C0 7.2766 vs 8.3573 diff -1.0807 t -10.28 n 40
+  hungry_frac: U0-C0 0.6362 vs 0.6073 diff +0.0289 t +8.14 n 40
+  win_frac: U0-C0 0.1033 vs 0.1108 diff -0.0075 t -7.59 n 40
+  s20 g:  -0.7323 vs 0.1808 diff -0.9132 t -11.82 n 40
+  s21 g:  -0.9942 vs -0.9883 diff -0.0058 t -0.18 n 40
+  s22 g:  -1.0068 vs -1.0266 diff +0.0198 t +0.49 n 40
+  vs T0: -0.9111 vs 1.1928 diff -2.1039 t -12.87 n 40
+  vs C4fix0: -0.9111 vs -1.1293 diff +0.2182 t +7.00 n 40
+
+## 2. 코드 회귀: 1d0b845(v2.1 s0~2 결과를 담은 커밋, 10-02 23:21) 코드 대 지금 코드 (결과 뒤 점검)
+# 1d0b845 가 학습 당시 코드와 같다는 것은 추정이다. v2.1 s0~2 학습은 10-02 22:05 KST 에 끝났다(ckpt/v2/v2_1_s*.json generated 13:05Z).
+# 조건: configs/v2_1.yaml, 시드 0, --threads 3, 98,304스텝(config_digest f068496361f9). 세 번째는 지금 코드에 --probe-every 를 켠 것.
+# 명령(각 메타 json 의 command 에서 옮김. 1d0b845 코드는 세션 임시 폴더의 oldcode/herbivore_rl 에서 돌렸다):
+#   old       python.exe train_v2.py --config configs/v2_1.yaml --steps 98304 --seed 0 --gamma 0.9916661555611042 --out <임시>/regr/old.zip --tb <임시>/regr/tb --threads 3
+#   new       python.exe train_v2.py --config configs/v2_1.yaml --steps 98304 --seed 0 --gamma 0.9916661555611042 --out <임시>/regr/new.zip --tb <임시>/regr/tb --threads 3
+#   new_probe python.exe train_v2.py --config configs/v2_1.yaml --steps 98304 --seed 0 --gamma 0.9916661555611042 --out <임시>/regr/new_probe.zip --tb <임시>/regr/tb --threads 3 --probe-every 32768
+# γ 출처: --gamma 인자(메타 gamma_source cli). v2.1 s0~2 학습 명령(ckpt/v2/v2_1_s*.json)과 같은 값이다.
+# 끝 시각(메타 generated, KST): old·new 19:48:36, new_probe 19:49:25.
+# <임시> = C:/Users/Sinhyeok/AppData/Local/Temp/claude/C--kwon-univ-3-1-GameContentsCapstoneDesign-AdaptiveEcosystem/8784a74e-06b3-41b0-8bfb-1f4436208da2/scratchpad (저장소 밖, 세션이 끝나면 지워질 수 있다)
+텐서 13개, 이름 같음 True
+1d0b845 코드 대 지금 코드: 비트 동일 True
+1d0b845 코드 대 지금 코드 + --probe-every: 비트 동일 True

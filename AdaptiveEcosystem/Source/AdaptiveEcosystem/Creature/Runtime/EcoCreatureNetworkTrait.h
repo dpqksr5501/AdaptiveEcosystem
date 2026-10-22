@@ -11,6 +11,8 @@ class ADAPTIVEECOSYSTEM_API UEcoCreatureNetworkTrait : public UEcoMassNetworkTra
 	GENERATED_BODY()
 public:
 	UPROPERTY(EditAnywhere, Category="Creature") bool bPredator = false;
+	UPROPERTY(EditAnywhere, Category="Species AI") bool bUseSpeciesAI = false;
+	UPROPERTY(EditAnywhere, Category="Species AI") TObjectPtr<class UEcoSpeciesAIProfile> SpeciesAIProfile;
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& Context, const UWorld& World) const override;
 };
 

@@ -1,0 +1,10 @@
+[  516.2s] on 끝
+[ 1035.5s] rest0 끝
+[ 1492.2s] ref 끝
+{
+ "safety": true,
+ "a1": null,
+ "a2": null,
+ "a3": true,
+ "prune": []
+}

@@ -1,0 +1,14 @@
+학습 먹이 지도: 스냅숏 (Forest, Barren, Highland)
+§6.4 튜닝값 적용: learning_rate=6.813187996724827e-05  gamma=0.9916661555611042  ent_coef=0.0008971496690499397  clip_range=0.37816696417287243  n_epochs=15
+시작 가중치(출처: 적응 고리 s20003: 스냅숏 지금 두뇌 v3_r1_g995_s3_20m@eca97f2e — 스냅숏 세계(train.yaml)): C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r1_g995_s3_20m.zip (sha1 d6e6434e296c, 원래 목록 ['graze', 'flee', 'hide', 'freeze'] → 이 설정의 목록 ['graze', 'flee', 'hide'])
+행동 고르기 학습: 목록 ['graze', 'flee', 'hide'], ε 0.05, 시작 확률 [0.4, 0.15, 0.15, 0.15, 0.15], 엔트로피 기준 0.00854956 ÷ f_dec 0.854956 = 0.01 (PPO ent_coef 0.0008971496690499397 × 배율 11.1464)
+3,000,000 스텝 — 세계 8개 × 128슬롯 = num_envs 1024, 세계당 n_steps 32 (배치 32,768), 교체 5000스텝마다, γ 0.995 (s1a), 관측 18 + 마스크 5(마스크 판 2), 행동 Discrete(5)
+학습 기록 니치 정의: r3 (θ 4, a* 0.9, 보정 1 없음, 관문 결과 있음)
+  [1,015,808] 사용 G0.851 F0.102 H0.047 Z0.000 S0.000 · 결정 0.896 · 결정 엔트로피 0.032 · 아사 0.00e+00 · 피식 4.33e-05
+  체크포인트 1,000,000 → adapt_s20003_cand_s0_3m_1m.zip (실제 1,015,808)
+  [2,031,616] 사용 G0.883 F0.081 H0.036 Z0.000 S0.000 · 결정 0.926 · 결정 엔트로피 0.008 · 아사 0.00e+00 · 피식 4.04e-05
+  체크포인트 2,000,000 → adapt_s20003_cand_s0_3m_2m.zip (실제 2,031,616)
+  [3,014,656] 사용 G0.879 F0.086 H0.034 Z0.000 S0.000 · 결정 0.927 · 결정 엔트로피 0.013 · 아사 2.14e-05 · 피식 3.36e-05
+  체크포인트 3,000,000 → adapt_s20003_cand_s0_3m_3m.zip (실제 3,014,656)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\adapt\s20003\adapt_s20003_cand_s0_3m.zip  (4.7분, 10,788 스텝/초)
+config_digest 40af054f69d7, 체크포인트 3개, 학습한 세계 수 12

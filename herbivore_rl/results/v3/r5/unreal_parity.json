@@ -1,0 +1,330 @@
+{
+ "parity": [
+  {
+   "name": "s20000_zero",
+   "rows": 8855,
+   "regions": {
+    "Barren": {
+     "rows": 2959,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 0,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_obs21zero@a085b941",
+     "obs_dim": 21,
+     "steps": 24,
+     "known": 599,
+     "hidden": 0,
+     "near_lt1": 0,
+     "near_lt1_known": 0,
+     "escape_zero": 319,
+     "escape_one": 2305,
+     "escape_mean_known": 0.7578137516975403,
+     "near_min": null
+    },
+    "Forest": {
+     "rows": 2956,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 24,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_obs21zero@a085b941",
+     "obs_dim": 21,
+     "steps": 24,
+     "known": 372,
+     "hidden": 0,
+     "near_lt1": 1422,
+     "near_lt1_known": 140,
+     "escape_zero": 466,
+     "escape_one": 1510,
+     "escape_mean_known": 0.6608588099479675,
+     "near_min": 0.00017697664398863555
+    },
+    "Highland": {
+     "rows": 2940,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 9,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_obs21zero@a085b941",
+     "obs_dim": 21,
+     "steps": 24,
+     "known": 196,
+     "hidden": 3,
+     "near_lt1": 599,
+     "near_lt1_known": 43,
+     "escape_zero": 885,
+     "escape_one": 1413,
+     "escape_mean_known": 0.7708037495613098,
+     "near_min": 0.005438005346603103
+    }
+   },
+   "bad": 0,
+   "first_bad": null
+  },
+  {
+   "name": "s20010_zero",
+   "rows": 8854,
+   "regions": {
+    "Barren": {
+     "rows": 2978,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 0,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_obs21zero@a085b941",
+     "obs_dim": 21,
+     "steps": 24,
+     "known": 612,
+     "hidden": 0,
+     "near_lt1": 0,
+     "near_lt1_known": 0,
+     "escape_zero": 484,
+     "escape_one": 1901,
+     "escape_mean_known": 0.7302342057228088,
+     "near_min": null
+    },
+    "Forest": {
+     "rows": 2941,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 24,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_obs21zero@a085b941",
+     "obs_dim": 21,
+     "steps": 24,
+     "known": 519,
+     "hidden": 3,
+     "near_lt1": 1288,
+     "near_lt1_known": 178,
+     "escape_zero": 815,
+     "escape_one": 1450,
+     "escape_mean_known": 0.5444507598876953,
+     "near_min": 0.007255629894972859
+    },
+    "Highland": {
+     "rows": 2935,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 9,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_obs21zero@a085b941",
+     "obs_dim": 21,
+     "steps": 24,
+     "known": 216,
+     "hidden": 1,
+     "near_lt1": 773,
+     "near_lt1_known": 55,
+     "escape_zero": 853,
+     "escape_one": 1478,
+     "escape_mean_known": 0.6268638968467712,
+     "near_min": 0.0003781770933530826
+    }
+   },
+   "bad": 0,
+   "first_bad": null
+  },
+  {
+   "name": "s20000_baseprobe",
+   "rows": 8855,
+   "regions": {
+    "Barren": {
+     "rows": 2959,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 0,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_20m@eca97f2e",
+     "obs_dim": 18,
+     "steps": 24,
+     "known": 599,
+     "hidden": 0,
+     "near_lt1": 0,
+     "near_lt1_known": 0,
+     "escape_zero": 319,
+     "escape_one": 2305,
+     "escape_mean_known": 0.7578137516975403,
+     "near_min": null
+    },
+    "Forest": {
+     "rows": 2956,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 24,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_20m@eca97f2e",
+     "obs_dim": 18,
+     "steps": 24,
+     "known": 372,
+     "hidden": 0,
+     "near_lt1": 1422,
+     "near_lt1_known": 140,
+     "escape_zero": 466,
+     "escape_one": 1510,
+     "escape_mean_known": 0.6608588099479675,
+     "near_min": 0.00017697664398863555
+    },
+    "Highland": {
+     "rows": 2940,
+     "bad": 0,
+     "bad_E": 0,
+     "bad_N": 0,
+     "bad_hidden": 0,
+     "bad_obs": 0,
+     "bad_away": 0,
+     "discs": 9,
+     "discs_equal_layout": true,
+     "body_r": 0.15,
+     "size": 60.0,
+     "block_sight": true,
+     "brain": "v3_r1_g995_s3_20m@eca97f2e",
+     "obs_dim": 18,
+     "steps": 24,
+     "known": 196,
+     "hidden": 3,
+     "near_lt1": 599,
+     "near_lt1_known": 43,
+     "escape_zero": 885,
+     "escape_one": 1413,
+     "escape_mean_known": 0.7708037495613098,
+     "near_min": 0.005438005346603103
+    }
+   },
+   "bad": 0,
+   "first_bad": null
+  }
+ ],
+ "same": [
+  {
+   "a": "s20000_base.log",
+   "b": "s20000_zero.log.gz",
+   "lines": [
+    731,
+    731
+   ],
+   "differ": 0,
+   "first": null,
+   "brain_lines": 72,
+   "obs_rows": [
+    0,
+    8927
+   ],
+   "obs_differ": null,
+   "digest": null
+  },
+  {
+   "a": "s20000_base.log",
+   "b": "s20000_baseprobe.log.gz",
+   "lines": [
+    731,
+    731
+   ],
+   "differ": 0,
+   "first": null,
+   "brain_lines": 72,
+   "obs_rows": [
+    0,
+    8927
+   ],
+   "obs_differ": null,
+   "digest": null
+  },
+  {
+   "a": "s20000_baseprobe.log.gz",
+   "b": "s20000_zero.log.gz",
+   "lines": [
+    731,
+    731
+   ],
+   "differ": 0,
+   "first": null,
+   "brain_lines": 72,
+   "obs_rows": [
+    8927,
+    8927
+   ],
+   "obs_differ": 0,
+   "digest": {
+    "lines": [
+     72,
+     72
+    ],
+    "equal": true,
+    "last": {
+     "Forest": [
+      1800,
+      222014,
+      "2f9a2b965f48087d"
+     ],
+     "Barren": [
+      1800,
+      222069,
+      "05aa7244a94ae4bd"
+     ],
+     "Highland": [
+      1800,
+      220810,
+      "37e1295fad4915a6"
+     ]
+    },
+    "decisions": 664893
+   }
+  }
+ ]
+}

@@ -1,0 +1,46 @@
+# V2 설정 — 환경 층 확인 전용, 학습 금지. v2.1 세계 + v2.0b 먹이 2층 (계획서 0-6 행·10절 R10, Gate F R10 재판정).
+#
+# 쓰임: Gate F R10 의 고정 정책 확인(results/v2/gate_f_r10/PREREG.md) 하나다. 고정된 최신 정책(v2.1 출시 모델
+# s1a_g_s58, 결정 모드)을 이 세계에 넣어 먹이 2층이 생존 경제를 무너뜨리지 않는지((d) 아사 비중 ≤ 0.4) 본다:
+#   python gate_f.py run --out results/v2/gate_f_r10 --round fixed --config configs/v2_1_0b.yaml --alpha 0.03 \
+#     --half-life 693 --floor 0.1 --policies v21 c2v21
+# 이 yaml 로 train_v2.py 학습이나 diagnose_v2.py 진단을 돌리지 않는다. v2.0b 를 학습 분포에 넣을지는 Gate F 와 이 확인을
+# 통과한 뒤 따로 정한다(한 버전에 기능 하나. 이번 창 v2.4 에는 넣지 않는다, PREREG).
+# gate_f.py 는 α·하한·h 를 명령줄로 덮는다(생략한 계수만 아래 값). 아래 값은 R10 R1 후보(α 0.03, 하한 0.1, h 693)다.
+#
+# 세계: overrides·features.speed·train 은 configs/v2_1.yaml 과 한 글자도 다르지 않다(머리 주석·계수 이력은 그 파일).
+# features.food_v 는 configs/v2_0b.yaml 블록에서 alpha 와 recovery_half_lives 만 위 후보 값으로 바꿨다.
+# speed 와 food_v 는 스텝 안에서 겹치지 않는다: 보행 섭식 배수가 _eat 의 섭취량(taken)을 정하고, 훼손·재생·휴식 회복
+# (_food_v_step)은 그 taken 을 그대로 쓴다(env_v2/world.py step 3)·7)). 같은 시드의 세계 배치·food_v 초기값은
+# v2_1.yaml·v2_0b.yaml 과 같다(food_v 는 자기 난수 스트림만 쓴다).
+
+version: "2.1_0b"
+
+# configs/v2_1.yaml 과 같다 (10-02 E1-b 포식자 속도 범위).
+overrides:
+  rand:
+    pred_speed_mult: [0.6, 0.95]
+
+features:
+  # configs/v2_1.yaml 의 speed 블록 그대로 (계수 설명은 그 파일).
+  speed:
+    enabled: true
+    thresholds: [0.3333333333333333, 0.6666666666666666]
+    gait_speed: [0.0, 0.4, 1.0]
+    gait_eat: [1.0, 0.5, 0.0]
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+  # configs/v2_0b.yaml 의 food_v 블록 (식 설명은 그 파일). alpha·recovery_half_lives 만 R10 R1 후보 값이다.
+  food_v:
+    enabled: true
+    alpha: 0.03                                 # R10 R1 후보 (Gate F R1 선택값, 10-02)
+    floor: 0.1                                  # V 하한 = floor·cap0
+    recovery_half_lives: [693]                  # 판정 실행 고정값(4.7). 학습 목록이 아니다
+    init_frac: [0.3, 1.0]
+
+train:
+  # configs/v2_1.yaml 과 같다. 이 설정으로 학습하지 않는다(머리 주석).
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256

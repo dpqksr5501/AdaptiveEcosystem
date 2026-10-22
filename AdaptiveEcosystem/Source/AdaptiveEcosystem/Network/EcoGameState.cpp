@@ -77,7 +77,8 @@ void AEcoGameState::OnRep_AuthorityState()
 
 void AEcoGameState::PublishEcologySummary(const FEcoCompletedWorldSummary& Summary)
 {
-	if (!HasAuthority() || Summary.Time.WorldEpoch != WorldEpoch || Summary.StepId <= EcologySummary.StepId) return;
+	if (!HasAuthority() || Summary.Time.WorldEpoch != WorldEpoch || Summary.StepId < EcologySummary.StepId
+		|| (Summary.StepId == EcologySummary.StepId && Summary.Revision <= EcologySummary.Revision)) return;
 	EcologySummary = Summary;
 	CommitAuthorityChange();
 }

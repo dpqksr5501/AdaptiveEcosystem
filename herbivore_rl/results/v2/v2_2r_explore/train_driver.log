@@ -1,0 +1,17 @@
+시작 v2_2r_t0_s20: train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 20 --run-name v2_2r_t0_s20 --probe-every 1000000 --threads 1
+시작 v2_2r_t0_s21: train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 21 --run-name v2_2r_t0_s21 --probe-every 1000000 --threads 1
+시작 v2_2r_t0_s22: train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 22 --run-name v2_2r_t0_s22 --probe-every 1000000 --threads 1
+시작 v2_2r_t1_s20: train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 20 --run-name v2_2r_t1_s20 --probe-every 1000000 --threads 1
+시작 v2_2r_t1_s21: train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 21 --run-name v2_2r_t1_s21 --probe-every 1000000 --threads 1
+시작 v2_2r_t1_s22: train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 22 --run-name v2_2r_t1_s22 --probe-every 1000000 --threads 1
+시작 v2_2r_l_s20: train_v2.py --config configs/v2_2r_l.yaml --steps 20000000 --seed 20 --run-name v2_2r_l_s20 --probe-every 1000000 --threads 1
+시작 v2_2r_l_s21: train_v2.py --config configs/v2_2r_l.yaml --steps 20000000 --seed 21 --run-name v2_2r_l_s21 --probe-every 1000000 --threads 1
+시작 v2_2r_l_s22: train_v2.py --config configs/v2_2r_l.yaml --steps 20000000 --seed 22 --run-name v2_2r_l_s22 --probe-every 1000000 --threads 1
+시작 v2_2r_w_s20: train_v2.py --config configs/v2_2r_w.yaml --steps 20000000 --seed 20 --run-name v2_2r_w_s20 --probe-every 1000000 --threads 1
+시작 v2_2r_w_s21: train_v2.py --config configs/v2_2r_w.yaml --steps 20000000 --seed 21 --run-name v2_2r_w_s21 --probe-every 1000000 --threads 1
+[L 2M] b3_l_prob = s20 -0.1662, s21 -0.2179, s22 -0.0629
+[L] 조기 중단: 2M 에서 3/3 시드가 0.01 미만
+[W 2M] p_vig_win = s20 0.0773, s21 0.1124
+[W 5M] p_vig_win = s20 0.0066, s21 0.0259
+[W] 조기 중단: 5M 에서 1/2 시드가 0.01 미만
+학습 끝

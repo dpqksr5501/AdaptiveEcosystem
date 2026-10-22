@@ -1,0 +1,31 @@
+# V2 설정 (Docs/RL_Policy/RL_V2_PLAN.md).
+#
+# v1 configs/default.yaml 을 먼저 읽고 그 위에 이 파일을 덮는다 (env_v2/config.py).
+# default.yaml 은 언리얼 EcoBehaviorConfig.h 의 생성 원본이라 V2 키를 섞지 않는다 (계획서 4.8).
+
+version: "2.0"
+
+# v1 키를 바꿔야 할 때만 쓴다. v2.0 은 비워 둔다 — 세계 규칙이 v1 과 같다.
+overrides: {}
+
+# 기능 스위치. 기능마다 블록 하나: `이름: {enabled: true|false, 계수: 값, ...}` (env_v2/features.py).
+#   예) food_v: {enabled: true, alpha: 0.03, floor: 0.1, recovery_half_lives: [693], init_frac: [0.3, 1.0]}
+#       (형식 예시다. 계수 키는 PARAM_KEYS, 실제 값은 configs/v2_0b.yaml. tests/test_features_v2.py 가 이 줄을 읽어 검사한다)
+# - 블록이 없는 기능은 꺼진 것이다. 모두 끄면 World 는 v1 과 같은 결과를 낸다 (tests/test_env_v2.py).
+# - 켠 기능의 계수는 여기에 모두 적는다. 코드에는 기본값이 없다(보정 값이 이 파일과 기록에 남게).
+# - 지수 표기는 소수점과 부호를 넣는다: 1e-3·1.0e3 은 PyYAML 이 문자열로 읽는다 → 1.0e-3, 1.0e+3.
+# - 이름은 등록부 FEATURE_IDS 에 있어야 하고, 아직 구현하지 않은 기능은 켤 수 없다. 모르는 계수 키,
+#   켤 때 빠진 계수, 이 파일의 모르는 최상위 키도 읽을 때 실패한다.
+# - 기능마다 난수 스트림이 따로라 기능 하나를 켜고 꺼도 다른 기능의 난수열은 그대로다.
+features: {}
+
+train:
+  # 독립 세계 K 개를 한 VecEnv 로 묶는다. v1 은 사실상 세계 하나(시드 636)에서만 학습했다.
+  num_worlds: 8
+  # 세계를 이 월드 스텝마다 새로 뽑는다(T_reset). 세계마다 T_reset/K 씩 엇갈려 리셋한다.
+  # 리셋으로 끊긴 슬롯은 TimeLimit.truncated 로 보내 SB3 가 γ·V 를 더하게 한다. 같은 스텝에
+  # 죽은 슬롯은 사망이 우선한다 (계획서 4.7).
+  reset_interval: 4000
+  # 롤아웃 한 번의 월드 스텝 수 × 세계 수. 세계당 n_steps = 256 / K 로 줄여
+  # 롤아웃 배치(256 × 128 = 32,768 timestep)를 v1 과 같게 유지한다.
+  rollout_world_steps: 256

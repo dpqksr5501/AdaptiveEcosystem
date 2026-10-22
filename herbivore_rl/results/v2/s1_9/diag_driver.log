@@ -1,0 +1,47 @@
+v2_1c_s30
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30 --workers 6
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30 --obs 2 4 --workers 6
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30 --workers 6 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30 --workers 6 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30 --workers 6 --out results/v2/diag_v2_1c_s30/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30_stoch --act-mode stochastic --workers 6
+  $ diagnose_v2.py curves --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30
+  $ diagnose_v2.py r2 --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s30.zip --name v2_1c_s30
+v2_1c_s31
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31 --workers 6
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31 --obs 2 4 --workers 6
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31 --workers 6 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31 --workers 6 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31 --workers 6 --out results/v2/diag_v2_1c_s31/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31_stoch --act-mode stochastic --workers 6
+  $ diagnose_v2.py curves --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31
+  $ diagnose_v2.py r2 --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s31.zip --name v2_1c_s31
+v2_1c_s32
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32 --workers 6
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32 --obs 2 4 --workers 6
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32 --workers 6 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32 --workers 6 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32 --workers 6 --out results/v2/diag_v2_1c_s32/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32_stoch --act-mode stochastic --workers 6
+  $ diagnose_v2.py curves --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32
+  $ diagnose_v2.py r2 --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s32.zip --name v2_1c_s32
+v2_1c_s33
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33 --workers 6
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33 --obs 2 4 --workers 6
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33 --workers 6 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33 --workers 6 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33 --workers 6 --out results/v2/diag_v2_1c_s33/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33_stoch --act-mode stochastic --workers 6
+  $ diagnose_v2.py curves --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33
+  $ diagnose_v2.py r2 --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s33.zip --name v2_1c_s33
+v2_1c_s34
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34 --workers 6
+  $ diagnose_v2.py permute --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34 --obs 2 4 --workers 6
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34 --workers 6 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34 --workers 6 --seg-bins 2:0.5 4:0.5 --seg-dims speed --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py constsearch --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34 --workers 6 --out results/v2/diag_v2_1c_s34/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 --const-action 0.31542835092418386 0.3637107709426226 0.5701967704178796 0.43860151346232035
+  $ diagnose_v2.py ablate --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34_stoch --act-mode stochastic --workers 6
+  $ diagnose_v2.py curves --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34
+  $ diagnose_v2.py r2 --config configs/v2_1.yaml --model ckpt/v2/v2_1c_s34.zip --name v2_1c_s34
+  $ diagnose_v2.py report --config configs/v2_1.yaml --dirs v2_1c_s30 v2_1c_s31 v2_1c_s32 v2_1c_s33 v2_1c_s34 --name v2_1c
+  $ diagnose_v2.py modecmp --config configs/v2_1.yaml --out results/v2/diag_v2_1c --tag modecmp --det v2_1c_s30 v2_1c_s31 v2_1c_s32 v2_1c_s33 v2_1c_s34 --stoch v2_1c_s30_stoch v2_1c_s31_stoch v2_1c_s32_stoch v2_1c_s33_stoch v2_1c_s34_stoch

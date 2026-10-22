@@ -6,6 +6,9 @@
 #include "AI/Social/Shelter/EcoShelterDiagnostics.h"
 #include "AI/Social/Alarm/EcoAlarmProcessors.h"
 #include "AI/Social/EcoSocialFragments.h"
+#include "AI/Social/EcoPolicyV3SocialBridge.h"
+#include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
+#include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
@@ -31,6 +34,8 @@ UEcoShelterQueryProcessor::UEcoShelterQueryProcessor()
 
 void UEcoShelterQueryProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
+	EntityQuery.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadOnly,EMassFragmentPresence::Optional);
+    EntityQuery.AddRequirement<FEcoBehaviorStateFragment>(EMassFragmentAccess::ReadOnly,EMassFragmentPresence::Optional);
 	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly);
@@ -64,6 +69,8 @@ void UEcoShelterQueryProcessor::Execute(FMassEntityManager& EntityManager, FMass
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
 		const auto IdentityList = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
+        const auto NativeLinks=ChunkContext.GetFragmentView<FEcoIntegratedV3Fragment>();
+        const auto NativeStates=ChunkContext.GetFragmentView<FEcoBehaviorStateFragment>();
 		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 		TConstArrayView<FEcoAlarmStateFragment> AlarmList = ChunkContext.GetFragmentView<FEcoAlarmStateFragment>();
 		TConstArrayView<FEcoSocialBehaviorFragment> SocialList = ChunkContext.GetFragmentView<FEcoSocialBehaviorFragment>();
@@ -104,13 +111,26 @@ void UEcoShelterQueryProcessor::Execute(FMassEntityManager& EntityManager, FMass
 					int32 TargetSlotIndex = INDEX_NONE_ECO;
 					float CandidateScore = 0.0f;
 
+                    TFunction<bool(const FVector&)> SlotFilter;
+                    if(!NativeLinks.IsEmpty()) {
+                        const auto* Native=World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+                        const auto& Link=NativeLinks[i];
+                        const auto* Region=Native&&Link.bAdopted?Native->GetContext(Link.ContextIndex):nullptr;
+                        const bool Emergency=!NativeStates.IsEmpty()&&NativeStates[i].Decision.KeepActive==EcoWorldV3::kKeepPanic;
+                        const auto Direction=!NativeStates.IsEmpty()?NativeStates[i].Decision.KeepDir:EcoRepertoireV3::FVec2{};
+                        SlotFilter=[Region,Emergency,Direction,AgentLocation](const FVector& P){
+                            return Region&&EcoV3Social::IsShelterTarget(*Region,P)&&(!Emergency
+                                ||FVector::DotProduct((P-AgentLocation).GetSafeNormal2D(),FVector(Direction.X,Direction.Y,0))>=0);
+                        };
+                    }
+
 					const int32 BestShelterIndex = ShelterSubsystem->FindBestAvailableShelter(
 						AgentLocation,
 						Alarm.LastThreatPosition,
 						Alarm.AlarmStrength > 0.05f,
 						SpeciesConfig.CoverSearchRadius,
 						TargetSlotIndex,
-						CandidateScore
+						CandidateScore, SlotFilter ? &SlotFilter : nullptr
 					);
 					if (EcoShelterDiagnostics::GetLevel() >= 2)
 					{

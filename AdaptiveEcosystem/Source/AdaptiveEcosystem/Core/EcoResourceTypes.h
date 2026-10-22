@@ -74,6 +74,7 @@ struct FEcoResourceSnapshot
 	float Capacity = 0.0f;
 	bool bDepleted = false;
 	double EventLoss = 0.0;
+	double SuppliedFood = 0.0;
 	double Consumed = 0.0;
 	double RoundingAdjustment = 0.0;
 };
