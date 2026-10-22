@@ -1,6 +1,6 @@
 # 조연우 작업 인계 — 다른 채팅에서 이어가기
 
-> **같은 날 후속 갱신:** 아래 최초 스냅샷 이후 `origin/main` `ff4f287`을 현재 작업 브랜치에 병합하고, 누락된 날씨 클래스 호환 복구·새 빌드·검증을 수행했다. [main 병합 기록](JYU_MAIN_MERGE_20261022.md)을 먼저 읽고 현재 Git HEAD/PR 상태를 다시 확인한다. 아래 “오늘 fetch/merge/push를 하지 않았다”는 최초 문서 작성 시점의 설명이다.
+> **최신 상태:** main `ff4f287`을 작업 브랜치에 병합하고 날씨 클래스 호환 복구·빌드·PIE·네트워크 검증을 마쳤다. 구현 기준은 `29c6491`이며 push 완료다. [PR #14 — 동물 행동·경보·애니메이션과 테스트 은신처 통합](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)은 2026-10-22 확인 시 **OPEN·충돌 없음·승인 대기**다. [main 병합 기록](JYU_MAIN_MERGE_20261022.md)과 아래 PR 인계를 먼저 읽는다. 이 문서 이후의 문서 커밋과 실제 PR 상태는 재개 시 다시 확인한다.
 
 작성일: **2026-10-22**. 이 문서는 대화 기록 없이 현재 프로젝트를 이어가기 위한 시작점이다. 루트 [AGENTS.md](../../../AGENTS.md)를 먼저 읽고, 아래 계약과 실제 Source를 대조한다. 과거 문서의 Pending이나 목표 설계를 현재 구현으로 해석하지 않는다.
 
@@ -11,15 +11,25 @@
 | 저장소 | `C:/Users/I/Documents/GitHub/AdaptiveEcosystem` |
 | 프로젝트 | `C:/Users/I/Documents/GitHub/AdaptiveEcosystem/AdaptiveEcosystem/AdaptiveEcosystem.uproject` |
 | 엔진 | UE 5.8, 기존 화면 검증 기록은 5.8.3 |
-| 브랜치 / HEAD | `codex/social-shelter-handoff` / `5885333` |
-| 작업 트리 | 이 문서 작업 직전 clean, 로컬 추적 참조 기준 origin과 동일 |
+| 브랜치 / 구현 기준 | `codex/social-shelter-handoff` / `29c6491` (main 병합·호환 복구), 이후 문서 갱신 커밋은 `git log`로 확인 |
+| 작업 트리 | 이번 인계 갱신 직전 clean, 로컬 추적 참조 기준 origin과 동일 |
+| 병합한 main | `ff4f287` — 지역별 비·눈 날씨와 나무 배치 포함 |
+| PR | [#14](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14), 작업 브랜치 → `main`, 확인 당시 승인 대기 |
 | worktree | `git worktree list`에 원래 저장소 한 곳만 있음. 이전 통합 worktree를 열지 않는다 |
 | 최신 기능 확인 맵 | `/Game/JYU/Maps/LV_JYU_RefugeSafety` |
 | 이전 통합 확인 맵 | `/Game/JYU/Maps/LV_JYU_V3Integration` |
 
-오늘은 fetch/merge/push를 하지 않았다. 팀원의 **현재 원격 최신**까지 반영됐다는 뜻은 아니다. 후속 작업에서 최신 브랜치 통합이 필요하면 먼저 작업 트리를 보존하고 fetch 후 실제 차이를 검토한다. 이번 인계 문서 작성은 새 구현이나 재검증이 아니다.
+2026-10-22에 fetch 후 main을 병합·검증하고 `29c6491`까지 push했다. 이는 모든 팀 개인 브랜치의 최신 커밋을 추가 통합했다는 뜻은 아니다. 이후 팀 브랜치 통합이 필요하면 작업 트리를 보존하고 fetch 후 실제 차이를 검토한다. **이번 PR 인계 문서 갱신만으로 빌드·PIE를 추가 실행하지는 않았다.**
 
-주요 이력은 `22eb1b6`(팀 브랜치·v3 Social 연결), `89f6d2d`(근접 반응 진단), `a88eac8`(보호 은신처), `19429e9`(기존 사용자 에셋 저장본 반영), `5885333`(개인 발표 산출물 분리)이다. 사용자 에셋 68개를 처음 코드 커밋에서 제외한 기록은 이후 별도 에셋 커밋 전의 이력이다. 다시 미처리 변경으로 간주하지 않는다.
+### PR #14와 다음 채팅에서 할 일
+
+- 제목: **동물 행동·경보·애니메이션과 테스트 은신처 통합**. 기존 Social·감각·M4/v3·애니메이션/IK·발소리·Client 표현·테스트 은신처와 작업 인계를 main에 반영하는 PR이다. 아직 main으로 병합 완료된 상태는 아니다.
+- main에만 있던 3개 커밋의 에셋 251개는 충돌 없이 반영했다. 끊어진 `BP_WeatherManager_PlayerFollow` 이동 경로는 main 날씨 관리자를 상속하는 얇은 자식 Blueprint로 복구했다. 원본 main 그래프·배치와 JYU 복사 맵을 보존했다.
+- 10월 22일 직접 UBT 성공, 전체 자동화 147개(성공 146·예상 warning 1·실패 0), 날씨 Blueprint 9개 컴파일 및 이전 클래스 경로 로드, 실제 PIE 40초와 화면 확인을 완료했다. Dedicated 110초와 Client 두 차례 접속도 정상 종료했다. 양 Client 논리 개체/Native Step 0, 은신처 ready/visible 12. 서버 세 지역 750 Native steps에서 내부 늑대·내부 포획 위반 0이다. 조건·한계·근거는 [병합 기록](JYU_MAIN_MERGE_20261022.md)에 있다.
+- 확인 당시 GitHub는 `MERGEABLE`, `REVIEW_REQUIRED`, `BLOCKED`였다. 충돌로 막힌 것이 아니라 승인 대기다. main 보호 규칙은 **마지막 push 작성자 외 1명의 승인**을 요구하며 기존 설정을 유지했다.
+- 재개하면 `git status`, `git log`, PR #14의 현재 승인/병합 상태부터 확인한다. 기존 PR을 사용하고 중복 PR을 만들지 않는다. 승인·병합이 끝났다면 실제 main 반영 여부를 확인한 뒤 사용자가 지정한 다음 작업으로 이어간다. 아직 새 후속 기능은 지정되지 않았다.
+
+주요 이력은 `22eb1b6`(팀 브랜치·v3 Social 연결), `89f6d2d`(근접 반응 진단), `a88eac8`(보호 은신처), `19429e9`(기존 사용자 에셋 저장본 반영), `5885333`(개인 발표 산출물 분리), `5cd07e4`(작업 인계), `29c6491`(main 병합·날씨 호환 복구)이다. 사용자 에셋 68개를 처음 코드 커밋에서 제외한 기록은 이후 별도 에셋 커밋 전의 이력이다. 다시 미처리 변경으로 간주하지 않는다.
 
 ## 2. 프로젝트 목표와 조연우 역할
 
@@ -57,7 +67,7 @@ IK 비교 도구의 `IK ON/OFF`, `NO AI` 사슴은 **임시 표현 Actor**이며
 
 ## 5. 마지막 검증과 근거의 범위
 
-다음은 **2026-10-16 구현 당시 기록**이며 10월 22일에 다시 실행한 결과가 아니다.
+아래 목록은 **2026-10-16 구현 당시 개별 조건·기록**이다. 최신 10월 22일 재검증은 위 PR 인계와 [main 병합 기록](JYU_MAIN_MERGE_20261022.md)을 따른다. 서로 다른 실행의 수치와 조건을 합쳐 설명하지 않는다.
 
 - 보호 은신처 최종 직접 UBT Build06 성공. 전체 자동화 **147개: Success 146, 예상 warning 1, 실패 0**. warning은 기존 missing-save fixture다.
 - 일반 PIE 40초에서 은신처 12/12 준비, 보호·점유·웅크림 관찰. 300 Native steps의 세 지역 내부 늑대·내부 포획 위반 0.
@@ -96,4 +106,4 @@ Source 진입점은 `AI/Policy/Eco*V3*`, `AI/Social/EcoPolicyV3SocialBridge.*`, 
 
 새 채팅에 붙일 문장:
 
-> 나는 조연우야. 루트 AGENTS.md와 AdaptiveEcosystem/Docs/조연우/JYU_CHAT_HANDOFF_20261022.md, README.md를 읽고 프로젝트 맥락을 파악해줘. 현재 Git 상태와 Source를 기준으로 기존 Social·M4/v3·IK·테스트 은신처 연결을 보존해줘. 원본 팀 레벨은 건드리지 말고, 개인 발표자료는 바탕화면 외부 폴더에 둬. 이후 작업은 내가 이어서 지정할게.
+> 나는 조연우야. 루트 AGENTS.md와 AdaptiveEcosystem/Docs/조연우/JYU_CHAT_HANDOFF_20261022.md, JYU_MAIN_MERGE_20261022.md를 읽고 PR #14의 현재 상태부터 확인해줘. main 병합·날씨 호환 복구와 기존 Social·M4/v3·IK·테스트 은신처 연결을 보존해줘. 원본 팀 레벨은 건드리지 말고, 개인 발표자료는 바탕화면 외부 폴더에 둬. 이후 작업은 내가 이어서 지정할게.

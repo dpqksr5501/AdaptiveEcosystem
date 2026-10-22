@@ -2,6 +2,13 @@
 
 `codex/social-shelter-handoff`의 `5cd07e4`에 `origin/main` **`ff4f287`**을 병합했다. main에만 있던 3개 커밋의 지역별 비·눈·나무 배치 에셋 251개를 반영했다. Git 충돌은 없었으며, main 기준 251개 경로는 병합 후에도 main과 동일하다. 기존 JYU 맵·ExternalActors·소스·설정은 병합으로 변경하지 않았다.
 
+## 커밋·PR 인계
+
+- 병합 커밋: **`29c6491` — 통합: main 날씨·나무 배치 반영과 기존 동물 기능 호환 복구**. `origin/codex/social-shelter-handoff`에 push했다.
+- [PR #14 — 동물 행동·경보·애니메이션과 테스트 은신처 통합](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14): `codex/social-shelter-handoff` → `main`. 기존 동물 기능 전체와 이번 main 호환 복구를 포함한다. 제목·설명은 한글이다.
+- 2026-10-22 인계 갱신 전 조회 결과 OPEN / MERGEABLE / REVIEW_REQUIRED, mergeStateStatus BLOCKED. **충돌은 없고 승인 대기**다. main 보호 규칙은 마지막 push 작성자 외 **1명 승인**이며 설정을 바꾸지 않았다. main 병합 완료로 기록하지 않는다.
+- 새 채팅은 [작업 인계](JYU_CHAT_HANDOFF_20261022.md)를 읽고 현재 Git 및 PR 상태를 다시 확인한다. 이 절의 추가는 문서 갱신으로, 아래 빌드·게임 검증을 추가 실행한 것은 아니다.
+
 ## 복구가 필요했던 실제 참조
 
 main의 `/Game/Actors/BP_WeatherManager_PlayerFollow`는 이동 후 경로 `/Game/SHC/Blueprints/Weather/BP_WeatherManager_PlayerFollow`로 향하는 redirector다. 하지만 대상 Blueprint가 main 트리에 없어 실제 로드가 실패했다. AssetRegistry에서 다음 참조를 확인했다.
