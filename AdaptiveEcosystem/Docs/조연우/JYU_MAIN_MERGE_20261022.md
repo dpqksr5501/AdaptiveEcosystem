@@ -6,7 +6,7 @@
 
 - 병합 커밋: **`29c6491` — 통합: main 날씨·나무 배치 반영과 기존 동물 기능 호환 복구**. `origin/codex/social-shelter-handoff`에 push했다.
 - [PR #14 — 동물 행동·경보·애니메이션과 테스트 은신처 통합](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14): `codex/social-shelter-handoff` → `main`. 기존 동물 기능 전체와 이번 main 호환 복구를 포함한다. 제목·설명은 한글이다.
-- 2026-10-22 인계 갱신 전 조회 결과 OPEN / MERGEABLE / REVIEW_REQUIRED, mergeStateStatus BLOCKED. **충돌은 없고 승인 대기**다. main 보호 규칙은 마지막 push 작성자 외 **1명 승인**이며 설정을 바꾸지 않았다. main 병합 완료로 기록하지 않는다.
+- PR #14는 OPEN / MERGEABLE / REVIEW_REQUIRED, mergeStateStatus BLOCKED로 **충돌 없이 승인 대기**다. 같은 날 후속 사용자 요청으로 main의 `require_last_push_approval`만 false로 변경했다. 현재는 PR 작성자 외 쓰기 권한 팀원 **1명 승인**이 필요하며, 추가 push 후 무조건 재승인을 요구하지 않는다. 필수 승인 수 1·관리자 보호는 유지했다. 이 변경으로 기존 승인이 있던 PR #12는 APPROVED / CLEAN이 됐다. 두 PR을 실제 병합한 것은 아니다.
 - 새 채팅은 [작업 인계](JYU_CHAT_HANDOFF_20261022.md)를 읽고 현재 Git 및 PR 상태를 다시 확인한다. 이 절의 추가는 문서 갱신으로, 아래 빌드·게임 검증을 추가 실행한 것은 아니다.
 
 ## 복구가 필요했던 실제 참조

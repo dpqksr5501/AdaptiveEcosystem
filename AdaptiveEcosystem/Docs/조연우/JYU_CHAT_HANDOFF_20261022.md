@@ -26,7 +26,8 @@
 - 제목: **동물 행동·경보·애니메이션과 테스트 은신처 통합**. 기존 Social·감각·M4/v3·애니메이션/IK·발소리·Client 표현·테스트 은신처와 작업 인계를 main에 반영하는 PR이다. 아직 main으로 병합 완료된 상태는 아니다.
 - main에만 있던 3개 커밋의 에셋 251개는 충돌 없이 반영했다. 끊어진 `BP_WeatherManager_PlayerFollow` 이동 경로는 main 날씨 관리자를 상속하는 얇은 자식 Blueprint로 복구했다. 원본 main 그래프·배치와 JYU 복사 맵을 보존했다.
 - 10월 22일 직접 UBT 성공, 전체 자동화 147개(성공 146·예상 warning 1·실패 0), 날씨 Blueprint 9개 컴파일 및 이전 클래스 경로 로드, 실제 PIE 40초와 화면 확인을 완료했다. Dedicated 110초와 Client 두 차례 접속도 정상 종료했다. 양 Client 논리 개체/Native Step 0, 은신처 ready/visible 12. 서버 세 지역 750 Native steps에서 내부 늑대·내부 포획 위반 0이다. 조건·한계·근거는 [병합 기록](JYU_MAIN_MERGE_20261022.md)에 있다.
-- 확인 당시 GitHub는 `MERGEABLE`, `REVIEW_REQUIRED`, `BLOCKED`였다. 충돌로 막힌 것이 아니라 승인 대기다. main 보호 규칙은 **마지막 push 작성자 외 1명의 승인**을 요구하며 기존 설정을 유지했다.
+- 현재 main 보호 규칙은 **PR 작성자 외 쓰기 권한이 있는 팀원 1명의 승인**이다. 같은 날 사용자 요청으로 `require_last_push_approval`만 false로 바꿨다. 기존 승인이 있어도 새 push 뒤 다시 승인해야 하던 추가 조건을 해제한 것이다. `required_approving_review_count=1`, `dismiss_stale_reviews=false`, 관리자 보호는 유지한다. 이후 push가 기존 승인을 자동 무효화하지 않으므로 변경된 코드는 계속 리뷰해야 한다.
+- 설정 변경 후 PR #12는 `APPROVED / CLEAN / MERGEABLE`이 됐고, PR #14는 승인 0개라 `REVIEW_REQUIRED / BLOCKED / MERGEABLE`이었다. PR을 실제 병합한 것은 아니다. 승인 버튼 자체의 UI 비활성화 원인을 고쳤다고 주장하지 않으며, 확인한 병합 차단 조건을 해결한 것이다. 변경 전후 로컬 설정 기록은 `Saved/GitHubReviewFix_20261022/`에 있다.
 - 재개하면 `git status`, `git log`, PR #14의 현재 승인/병합 상태부터 확인한다. 기존 PR을 사용하고 중복 PR을 만들지 않는다. 승인·병합이 끝났다면 실제 main 반영 여부를 확인한 뒤 사용자가 지정한 다음 작업으로 이어간다. 아직 새 후속 기능은 지정되지 않았다.
 
 주요 이력은 `22eb1b6`(팀 브랜치·v3 Social 연결), `89f6d2d`(근접 반응 진단), `a88eac8`(보호 은신처), `19429e9`(기존 사용자 에셋 저장본 반영), `5885333`(개인 발표 산출물 분리), `5cd07e4`(작업 인계), `29c6491`(main 병합·날씨 호환 복구)이다. 사용자 에셋 68개를 처음 코드 커밋에서 제외한 기록은 이후 별도 에셋 커밋 전의 이력이다. 다시 미처리 변경으로 간주하지 않는다.

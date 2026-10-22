@@ -1,6 +1,6 @@
 # 조연우 작업 시작 문서 — 역할·진행상황·다음 연결
 
-> **2026-10-22 최신 상태:** main `ff4f287` 병합·날씨 호환 복구·검증을 `29c6491`로 push하고 [PR #14 — 동물 행동·경보·애니메이션과 테스트 은신처 통합](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)을 생성했다. 확인 당시 OPEN·충돌 없음·마지막 push 작성자 외 1명 승인 대기다. [병합·호환 복구·검증](JYU_MAIN_MERGE_20261022.md)을 참고하고 재개 시 실제 PR 상태를 다시 확인한다.
+> **2026-10-22 최신 상태:** main `ff4f287` 병합·날씨 호환 복구·검증을 `29c6491`로 push하고 [PR #14 — 동물 행동·경보·애니메이션과 테스트 은신처 통합](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)을 생성했다. 확인 당시 OPEN·충돌 없음·승인 대기다. 후속 사용자 요청으로 main의 마지막 push 후 재승인 추가 조건을 해제했으며, **PR 작성자 외 쓰기 권한 팀원 1명 승인**은 유지한다. [병합·호환 복구·검증](JYU_MAIN_MERGE_20261022.md)을 참고하고 재개 시 실제 PR 상태를 다시 확인한다.
 
 > **다른 채팅에서 먼저 읽기:** [최신 작업 인계·프로젝트 맥락](JYU_CHAT_HANDOFF_20261022.md). 작업 브랜치는 `codex/social-shelter-handoff`, 구현 기준은 `29c6491`이며 이후 문서 커밋은 `git log`로 확인한다. 보호 은신처 맵은 `/Game/JYU/Maps/LV_JYU_RefugeSafety`다. 아래 날짜별 “Social 미연결”, “IK 미구현”은 당시 상태다. 이번 PR 인계 문서 갱신은 문서 작업이며 추가 빌드·PIE는 실행하지 않았다.
 
