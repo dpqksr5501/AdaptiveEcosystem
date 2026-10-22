@@ -93,6 +93,7 @@ def _traj_hash(cfg, seed, steps, acts_seed=7):
     f = w.flight_stats()
     f.pop("route", None)
     f.pop("quiet_ends", None)
+    f.pop("hide", None)                 # 10-23 숨은 뒤 지켜보기 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
     ws = w.wild_stats()
     ws.pop("panic_quiet_ends", None)
     st = json.dumps(dict(flight=f, wild=ws, hunt=w.hunt_stats(), rng=str(w.rng.bit_generator.state)), sort_keys=True, default=str)

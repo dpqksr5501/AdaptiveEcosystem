@@ -119,6 +119,7 @@ def _traj_hash(cfg, seed, steps, acts_seed=7):
     f = w.flight_stats()
     f.pop("route", None)
     f.pop("quiet_ends", None)
+    f.pop("hide", None)                 # 10-23 숨은 뒤 지켜보기 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
     ws = w.wild_stats()
     ws.pop("panic_quiet_ends", None)
     st = json.dumps(dict(flight=f, wild=ws, hunt=w.hunt_stats(), rng=str(w.rng.bit_generator.state)), sort_keys=True, default=str)
@@ -135,7 +136,9 @@ def _full_hash(cfg, seed, steps, acts_seed=7):
     for _ in range(steps):
         o, r, d, to = w.step(rng.integers(0, 3, (w.N, 1)).astype(np.float64))
         h.update(_H(o, r, d, to, w.pos, w.pred_pos, w.energy, w.wf_mode, w.wf_dir).digest())
-    st = json.dumps(dict(flight=w.flight_stats(), wild=w.wild_stats(), hunt=w.hunt_stats(), rng=str(w.rng.bit_generator.state)),
+    f = w.flight_stats()
+    f.pop("hide", None)                 # 10-23 숨은 뒤 지켜보기 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
+    st = json.dumps(dict(flight=f, wild=w.wild_stats(), hunt=w.hunt_stats(), rng=str(w.rng.bit_generator.state)),
                     sort_keys=True, default=str)
     h.update(st.encode())
     return h.hexdigest()
@@ -251,6 +254,19 @@ def test_route_on_always_run_equals_off(forest, forest_on):
     off, _ = _run(_with(r6, wild_flight=dict(route=False)), 32001, 900, None, acts_seed=5)
     _same_as_off(on, off)
     assert sum(int(x["d"].sum()) for x in on) > 0, "죽음·다시 남이 있는 세계"
+
+
+def test_hide_watch_in_route_world(forest_on):
+    """10-23 숨은 뒤 지켜보기(flight_stats 의 hide — 실시간 관문 1차 숨음 비율·R6 판정 16-9 의 재료)는 두 길 세계(SHELTER 를 고르는 두뇌)에서도 같은 정의로
+    센다: 숨음 + 지켜보는 동안 잡힘·굶음 = cover 끝 도망 수, 쫓긴 도망 = 끝난 도망 − 안 쫓김. 지켜보기 칸만 빼면 늘 RUN 두뇌와의 길 기록 셈 그대로다."""
+    _, w = _run(forest_on, 32086, 900, _route_policy(True))
+    f = w.flight_stats()
+    h = f["hide"]
+    assert f["route"]["picked"]["shelter"] > 0
+    assert h["hidden"] + h["cover_then_caught"] + h["cover_then_starved"] == f["n"]["cover"] > 0
+    assert h["chased"] == sum(f["n"].values()) - f["n"]["unchased"] - f["n"]["truncated"] and h["watch_steps"] == 75
+    by = f["route"]["by_route"]
+    assert sum(v["n"]["cover"] for v in by.values()) == f["n"]["cover"]
 
 
 def test_shelter_choice_changes_world(forest_on):

@@ -102,7 +102,9 @@ def _traj_hash(cfg, seed, steps, acts_seed=7):
     for _ in range(steps):
         o, r, d, to = w.step(rng.integers(0, 3, (w.N, 1)).astype(np.float64))
         h.update(_H(o, r, d, to, w.pos, w.pred_pos, w.energy, w.wf_mode, w.wf_dir, w.pred_target).digest())
-    st = dict(flight=w.flight_stats(), wild=w.wild_stats(), hunt=w.hunt_stats(), ob=w.obstacle_stats(), rng=str(w.rng.bit_generator.state))
+    f = w.flight_stats()
+    f.pop("hide", None)                 # 10-23 숨은 뒤 지켜보기 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
+    st = dict(flight=f, wild=w.wild_stats(), hunt=w.hunt_stats(), ob=w.obstacle_stats(), rng=str(w.rng.bit_generator.state))
     h.update(json.dumps(st, sort_keys=True, default=str).encode())
     return h.hexdigest()
 

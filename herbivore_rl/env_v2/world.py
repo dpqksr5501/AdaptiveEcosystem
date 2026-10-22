@@ -327,6 +327,15 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
           모두 잎 때문(줄기는 안 가림)인 도망을 lost_foliage(n·steps·contact — obstacle 칸의 일부)로 따로 센다. 끈 세계에는 그 칸이 없다.
         보고 칸: 끝 까닭마다 수·도망 스텝 합·쫓긴 스텝 합, 은신처 원 안에서 끝난 살아 끝난 도망 수(shelter_end — 끝 까닭과 겹친다), 스스로 벗어난 도망의 쫓긴
         시간 칸(hist). reset 은 열린 도망·누적 수를 모두 버린다(다른 통계와 같다).
+        숨은 뒤 지켜보기 (10-23 사람 결정 '사슴 하나가 늑대에게 쫓겼을 때 잡히는지 아니면 살아서 은신처에 잘 숨는지 비율로' — 실시간 관문 1차 숨음 비율,
+          results/v3/live/LIVE_GATE.md 변경 기록 (6). 같은 기록 훅 안의 통계 전용 칸 — 덮기·동역학·난수·관측·보상·마스크와 무관, `flight_stats` 의 hide):
+          쫓긴 도망(chased) = 끝난 도망 가운데 끝 까닭이 unchased·truncated(FLIGHT_NOT_CHASED)가 아닌 것(잡힘·굶음 포함).
+          끝 까닭 cover 인 도망은 닫는 스텝(끝 스텝 다음 스텝 — 위 '살아서 끝남')부터 FLIGHT_HIDE_WATCH_STEPS(75 스텝 = 10 초) 동안 그 사슴(슬롯)을 지켜본다:
+          그 안에 잡히면 cover_then_caught, 굶어 죽으면 cover_then_starved(실패 — 따로 센다), 끝까지 살면 숨어 살아남음(hidden). 닫는 스텝에 죽은 것도 그 안이다.
+          판이 끝날 때(`flight_stats` 를 부를 때) 아직 지켜보는 도망은 지켜본 만큼만 본다 — 잡히지 않았으니 hidden 에 넣고 watching 으로도 따로 적는다(세계는 그대로).
+          지켜보는 동안 그 사슴이 다시 도망을 시작해도 지켜보기는 이어진다(새 도망은 따로 기록된다 — 그 도망이 또 cover 로 끝나면 지켜보기가 하나 더 열린다).
+          시계는 기록 훅을 부른 횟수(스텝)다. 학습 세계에서 죽은 칸에 다시 난 개체는 지켜보지 않는다(죽음 스텝에 끝낸다). hidden + cover_then_caught +
+          cover_then_starved = 끝 까닭 cover 수.
       도망길 1단계 (10-21 사용자 '도망 방향을 두뇌가 고름' — 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 3-1·6·7절. 이 단계는 손 규칙 측정 전용이다:
         두뇌가 고르는 길·관측 24·마스크 판 4 는 아직 없다). 선택 키(features.OPTIONAL_KEYS, 기본 null·0 = 위 그대로, 그 코드 경로를 타지 않는다 — 비트 동일):
         route_fixed ∈ {run, open, cover, shelter}: 도주 반사 중 방향을 그 길로 고정한다(가능하지 않으면 RUN). 길(ROUTE_NAMES):
@@ -1389,6 +1398,13 @@ FLIGHT_CAUSES = ("cover", "obstacle", "fov", "range", "switch", "stop", "held", 
 FLIGHT_OWN = ("cover", "obstacle", "fov", "range")
 FLIGHT_UNSAFE = ("caught", "starved", "truncated")
 FLIGHT_HIST_STEPS = (8, 15, 38, 75, 150, 300, 600)
+# 10-23 숨음 비율 (사람 결정 10-23 — results/v3/live/LIVE_GATE.md 변경 기록 (6), 모듈 docstring '야생 1단계' (w3) 도망 기록의 '숨은 뒤 지켜보기').
+# 쫓긴 도망 = 끝난 도망 가운데 끝 까닭이 FLIGHT_NOT_CHASED 가 아닌 것. 끝 까닭 cover 인 도망은 끝난 스텝 뒤 FLIGHT_HIDE_WATCH_STEPS 스텝 동안 그 사슴을
+# 지켜본다 — 10 초 ÷ (1 스텝 = FLIGHT_STEP_S = 2/15 초 ≈ 0.133 초) = 75 스텝
+FLIGHT_STEP_S = 2.0 / 15.0
+FLIGHT_HIDE_WATCH_S = 10.0
+FLIGHT_HIDE_WATCH_STEPS = 75
+FLIGHT_NOT_CHASED = ("unchased", "truncated")
 # 놓침 까닭(늑대가 지난 스텝 표적이던 사슴을 이번 스텝에 표적으로 두지 않음): 반경 밖·다른 사슴으로 바꿈·시야각 밖·사냥 그만둠·원판이 가림·은신처 안
 # (표적 제외). 뒤 번호가 앞선다(같은 스텝에 여럿이면 큰 쪽)
 FL_DROP_NONE, FL_DROP_RANGE, FL_DROP_SWITCH, FL_DROP_FOV, FL_DROP_STOP, FL_DROP_OBSTACLE, FL_DROP_COVER = 0, 1, 2, 3, 4, 5, 6
@@ -6187,6 +6203,14 @@ class World:
         self._fl_refl = 0                                   # 끝난 도망의 반사 스텝 합
         self._fl_shelter_end = 0                            # 살아 끝난 도망 가운데 끝 스텝 끝 위치가 은신처 원 안인 수
         self._fl_hist = np.zeros(len(FLIGHT_HIST_STEPS) + 1, dtype=np.int64)    # 스스로 벗어난 도망의 쫓긴 시간 칸
+        # 10-23 숨은 뒤 지켜보기 (모듈 docstring '야생 1단계' (w3) 도망 기록 — `flight_stats` 의 hide). 시계 = `_fl_update` 를 부른 횟수.
+        # 지켜보는 도망은 사슴 × (마지막으로 보는 스텝 mod FLIGHT_HIDE_WATCH_STEPS) 칸의 수로 둔다 — 한 사슴에 여럿이 겹칠 수 있고(다시 숨음),
+        # 죽음은 그 사슴의 지켜보기를 모두 끝내며, 칸 하나는 마지막 스텝이 같은 지켜보기뿐이다(열린 지켜보기의 마지막 스텝은 지금 ~ 지금 + 74)
+        self._fl_clock = 0
+        self._fl_watch = np.zeros((N, FLIGHT_HIDE_WATCH_STEPS), dtype=np.int64)
+        self._fl_watch_open = 0                             # 지켜보는 도망 수 (= _fl_watch 합)
+        self._fl_hidden = 0                                 # 끝까지 지켜본 숨어 살아남은 도망
+        self._fl_cover_caught = self._fl_cover_starved = 0  # 지켜보는 동안 잡힘·굶음
         if self._ob is not None and self._ob["foliage"] is not None:
             # 10-21 숲 시야(모듈 docstring '야생 2단계' 3 의 7)) 켬 세계만: 원판 놓침(obstacle) 가운데 잎 때문인 것(lost_foliage)
             self._fl_why_fol = np.zeros(N, dtype=bool)      # 열린 도망의 마지막 놓침이 잎 때문인가(그 스텝 원판 놓침이 모두 잎만 가림)
@@ -6288,6 +6312,11 @@ class World:
             cause = np.where(en, np.where(ec, ci("cover"), ci("held")), cause)
             cause = np.where(self._fl_chased, cause, ci("unchased"))
             self._fl_shelter_end += int(np.count_nonzero(gone & ec))
+            cv = gone & (cause == ci("cover"))
+            if cv.any():
+                # 10-23 숨은 뒤 지켜보기: 이번 스텝(끝 스텝 다음)부터 FLIGHT_HIDE_WATCH_STEPS 스텝 — 마지막으로 보는 스텝(지금 + 74)의 칸에 하나 더한다
+                self._fl_watch[cv, (self._fl_clock + FLIGHT_HIDE_WATCH_STEPS - 1) % FLIGHT_HIDE_WATCH_STEPS] += 1
+                self._fl_watch_open += int(np.count_nonzero(cv))
             self._fl_close(gone, cause)
             if rt:
                 self._fl_last_t[gone] = self.t - 2                  # 끝난 도망의 마지막 FLEE 스텝 번호 (이번 스텝 = self.t − 1)
@@ -6364,6 +6393,28 @@ class World:
             self._fl_close(dead, np.where(cg, ci("caught"), ci("starved")))
         if rt and done.any():
             self._fl_last_t[done] = -(10 ** 9)                      # 죽은(학습 세계는 다시 난) 사슴은 다시 도망 셈을 잇지 않는다
+        # 4) 10-23 숨은 뒤 지켜보기: 이번 스텝에 죽은 사슴의 지켜보기를 잡힘·굶음으로 끝내고(학습 세계의 새 개체에 잇지 않는다), 마지막으로 보는 스텝이
+        #    이번 스텝인 지켜보기는 숨어 살아남음으로 끝낸다
+        if self._fl_watch_open:
+            wt = self._fl_watch
+            if done.any():
+                di = np.flatnonzero(done)
+                k = wt[di].sum(1)
+                if k.any():
+                    cg = np.zeros(N, dtype=bool) if caught is None else np.asarray(caught, dtype=bool)
+                    kc = int(k[cg[di]].sum())
+                    ks = int(k.sum()) - kc
+                    self._fl_cover_caught += kc
+                    self._fl_cover_starved += ks
+                    wt[di] = 0
+                    self._fl_watch_open -= kc + ks
+            col = self._fl_clock % FLIGHT_HIDE_WATCH_STEPS
+            e = int(wt[:, col].sum())
+            if e:
+                self._fl_hidden += e
+                wt[:, col] = 0
+                self._fl_watch_open -= e
+        self._fl_clock += 1
         nt = tgt.copy()
         if done.any():
             nt[(nt >= 0) & (nt < N) & done[np.clip(nt, 0, N - 1)]] = -1     # 죽은(학습 세계는 다시 난) 사슴을 쫓던 기록은 새 개체에 잇지 않는다
@@ -6377,7 +6428,11 @@ class World:
         started = 시작한 도망 수, live_steps = 산 사슴-스텝(스텝 첫머리, 켠 뒤부터), flee_steps·reflex_steps = 실행한 FLEE 사슴-스텝·그 가운데 반사(열린 도망
         포함), n·steps·contact = 끝 까닭(FLIGHT_CAUSES)별 도망 수·FLEE 스텝 합·쫓긴 스텝 합(지금 열린 도망은 truncated 로 센다 — 세계는 그대로),
         own_n·own_steps·own_contact = 스스로 벗어난 도망(FLIGHT_OWN) 합, shelter_end = 은신처 원 안에서 살아 끝난 도망 수(끝 까닭과 겹친다),
-        hist = 스스로 벗어난 도망의 쫓긴 시간 칸 수(칸 k = hist_edges(스텝) 가운데 쫓긴 시간 이하인 경계 수). started = n 의 합이다."""
+        hist = 스스로 벗어난 도망의 쫓긴 시간 칸 수(칸 k = hist_edges(스텝) 가운데 쫓긴 시간 이하인 경계 수). started = n 의 합이다.
+        hide (10-23 숨은 뒤 지켜보기 — 모듈 docstring): chased = 쫓긴 도망 수(끝난 도망 가운데 unchased·truncated 가 아닌 것), hidden = 끝 까닭 cover 이고
+        지켜보는 FLIGHT_HIDE_WATCH_STEPS 스텝 안에 죽지 않은 도망(지금 지켜보는 것 포함 — 지켜본 만큼만), watching = 그 가운데 아직 지켜보는 것,
+        cover_then_caught·cover_then_starved = 끝 까닭 cover 이고 지켜보는 동안 잡힘·굶음, watch_steps = 지켜보는 스텝 수.
+        hidden + cover_then_caught + cover_then_starved = n['cover']."""
         if self._wf is None:
             raise ValueError("flight_stats 는 wild_flight 를 켠 세계에만 있다")
         if not self.track_flight:
@@ -6395,6 +6450,12 @@ class World:
                    contact={x: int(v) for x, v in zip(FLIGHT_CAUSES, c)},
                    own_n=int(n[own].sum()), own_steps=int(s[own].sum()), own_contact=int(c[own].sum()), shelter_end=int(self._fl_shelter_end),
                    hist=self._fl_hist.tolist(), hist_edges=list(FLIGHT_HIST_STEPS))
+        # 10-23 숨은 뒤 지켜보기 (쫓긴 도망은 끝난 도망만 — 열린 도망(truncated)은 빠진다)
+        fn = self._fl_n
+        out["hide"] = dict(chased=int(fn.sum() - sum(int(fn[FLIGHT_CAUSES.index(x)]) for x in FLIGHT_NOT_CHASED)),
+                           hidden=int(self._fl_hidden + self._fl_watch_open), watching=int(self._fl_watch_open),
+                           cover_then_caught=int(self._fl_cover_caught), cover_then_starved=int(self._fl_cover_starved),
+                           watch_steps=FLIGHT_HIDE_WATCH_STEPS)
         if self._wf["quiet_end"] > 0:
             out["quiet_ends"] = int(self._wf_quiet_ends)       # 10-21 끝 규칙 quiet_end 로 끝난 도주 (켠 세계만)
         if self._ob is not None and self._ob["foliage"] is not None:

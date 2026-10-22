@@ -15,6 +15,8 @@ live.py 와 같은 꼴 (나중에 live.py 가 바꿔 쓸 수 있게 — 이 파�
   kind 'world'(r4_eval._one 칸)·'multi'(live._world_multi 칸 — 판정 길이마다 at)는 네이티브로, 그 밖('stuck'·'scale')은 파이썬(live._job)으로 돈다.
   model 은 모델 zip(그 가중치의 두뇌 파일을 EcoBrains·Saved/EcoBrains·캐시에서 찾고, 없으면 export_weights_v3 로 캐시에 쓴다) 또는 두뇌 파일 .json.
   live.py 판정 실행기 갈림(live.evaluator): LIVE evaluator 를 'ceval' 로 바꾸면 이 파일의 run_items(items, workers, on_done)·version() 을 쓴다.
+  10-23 (LIVE_GATE.md 변경 기록 (6)): 1차 숨음 비율이 쓰는 숨은 뒤 10 초 지켜보기를 이 평가기가 아직 세지 못해(HIDE_WATCH 거짓) LIVE evaluator 기본값은
+  'python' 이고, live.py 는 'ceval' 판정을 거부한다 — 두 길 C++ 이식 때 넣고 되돌린다.
   version() = 평가기 실행 파일·그 C++ 소스(include 닫힘)·이 파일·바탕 설정·파이썬 판정 셈 길(live.eval_code_tag('python'))의 sha256 — 판정 저장 열쇠.
   실행 파일이 소스(include 닫힘)보다 오래되면 쓰지 않는다(다시 빌드하라고 멈춘다).
   세계 설정은 허용 목록으로 본다: 바탕(REF_CFG — C++ 상수가 맞춘 판정 세계)과 다른 칸은 world 블록·시작 상태로 옮기는 칸(FREE_V1·FREE_FEATURES)이어야
@@ -88,6 +90,11 @@ MULTI_KEYS = ("seed", "region", "n", "caught", "starved", "alive", "shelter_step
 EXE_SRC = PROJECT / "Tools" / "EcoV3Eval" / "EcoV3Eval.cpp"
 INCLUDE_DIRS = (PROJECT / "Tools" / "EcoV3Eval", PROJECT / "Source" / "AdaptiveEcosystem" / "AI" / "Policy")   # build.ps1 의 /I 순서
 VERSION_TAG = "ceval-1"                                                           # 셈 길 판 — 아래 지문 밖에서 결과를 바꾸는 고침이면 올린다
+# 10-23 (results/v3/live/LIVE_GATE.md 변경 기록 (6)): 실시간 관문 1차 숨음 비율·지킴 GH 는 도망 기록의 숨은 뒤 10 초 지켜보기(파이썬 flight.hide —
+# cover_then_caught 등, env_v2/world.py '숨은 뒤 지켜보기')를 쓴다. 이 평가기(EcoWorldV3.h FlightUpdate)는 아직 그 칸을 세지 않아 거짓이다 — live.py 가
+# 판정 실행기로 쓰려 하면 거부한다(live.require_hide_watch). 두 길 C++ 이식 때 C++ 에 넣고 참으로 바꾼다. compare·selftest 는 이 값과 무관하다
+# (compare 는 두 기록에 함께 있는 칸만 견주고, 파이썬에만 있는 hide 는 python_only 로 적는다).
+HIDE_WATCH = False
 
 # 세계 설정 허용 목록 (world_block). REF_CFG = C++ 세계 상수가 맞춘 판정 세계 바탕 (live.TEMPLATE_OBS — 관측 21 거울, v3_wild3_mirror.yaml 과 세계가
 # 비트 단위로 같다). 바탕과 달라도 되는 칸은 평가기가 world 블록·시작 상태(native_job)로 옮기는 칸뿐이다.
