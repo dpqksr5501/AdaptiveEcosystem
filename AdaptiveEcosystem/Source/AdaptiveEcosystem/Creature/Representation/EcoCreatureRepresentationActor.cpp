@@ -18,6 +18,7 @@
 
 static TAutoConsoleVariable<int32> CVarEcoDrawFacing(TEXT("eco.Creature.DrawFacing"), 0,
 	TEXT("Draw actual velocity (green) and calibrated mesh forward (cyan). Visual-only."));
+static TAutoConsoleVariable<int32> CVarEcoIdentityLabels(TEXT("eco.Creature.Labels"),1,TEXT("Show representation identity labels. Visual-only; disable for scene captures."));
 static TAutoConsoleVariable<int32> CVarEcoFacingAudit(TEXT("eco.Creature.FacingAudit"), 0,
 	TEXT("Log moving representation facing error once per second, including client proxies."));
 
@@ -125,6 +126,7 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 	if (!bBound || !State.IsValid() || State.StableAgentId != VisualState.StableAgentId || State.SpeciesId != VisualState.SpeciesId
 		|| State.Sequence <= VisualState.Sequence || State.WorldTime < VisualState.WorldTime
 		|| !FMath::IsFinite(DeltaSeconds) || DeltaSeconds < 0.0f) { return false; }
+    IdentityLabel->SetVisibility(CVarEcoIdentityLabels.GetValueOnGameThread()!=0);
 	const bool bSnap = VisualState.Sequence == 0 || State.bDiscontinuity
 		|| FVector::DistSquared(GetActorLocation(), State.Position) > FMath::Square(FMath::Max(1.0f, TeleportDistance));
 	const float Speed = State.bAlive ? State.Velocity.Size2D() : 0.0f;

@@ -27,6 +27,20 @@
 #include "HAL/FileManager.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
+#include "HAL/IConsoleManager.h"
+
+static TAutoConsoleVariable<int32> CVarInspectorVisible(TEXT("eco.Inspector.Visible"),1,TEXT("Show the creature detail panel. Migration overview has its own M/debug switch."));
+bool UEcoCreatureInspectionLibrary::CaptureMigration(UObject* Context,FString& Json)
+{
+    Json.Reset();auto* W=GEngine?GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull):nullptr;
+    FEcoHerdMigrationDebugSnapshot S;return W&&EcoHerdMigrationDebug::Capture(*W,S)&&EcoHerdMigrationDebug::ToJson(S,Json);
+}
+bool AEcoCreatureInspectorHUD::SelectAgentForInspection(int64 AgentId)
+{
+    for(TActorIterator<AEcoCreatureRepresentationActor> It(GetWorld());It;++It)
+        if(It->bBound&&!It->IsHidden()&&It->VisualState.StableAgentId==AgentId){Selected=*It;SelectedId=AgentId;return true;}
+    return false;
+}
 
 TArray<int64> UEcoCreatureInspectionLibrary::GetAuthorityAgentIds(UObject* Context){
     TArray<int64> Ids;UWorld* W=GEngine?GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull):nullptr;
@@ -287,6 +301,31 @@ void AEcoCreatureInspectorHUD::DrawHUD()
         bRecording=!bRecording;NextRecord=0;
         if(bRecording){RecordPath=FPaths::ProjectSavedDir()/TEXT("JYU")/FString::Printf(TEXT("Inspection_%s.jsonl"),*FDateTime::UtcNow().ToString(TEXT("%Y%m%d_%H%M%S")));IFileManager::Get().MakeDirectory(*FPaths::GetPath(RecordPath),true);}
     }
+    if(PlayerOwner->WasInputKeyJustPressed(EKeys::M))EcoHerdMigrationDebug::Toggle(*GetWorld());
+    const int32 MigrationMode=EcoHerdMigrationDebug::Mode(*GetWorld());
+    if(MigrationMode){
+        if(GetWorld()->GetTimeSeconds()>=NextMigrationCapture){
+            NextMigrationCapture=GetWorld()->GetTimeSeconds()+.25;
+            FEcoHerdMigrationDebugSnapshot Fresh;if(EcoHerdMigrationDebug::Capture(*GetWorld(),Fresh))MigrationSnapshot=MoveTemp(Fresh);
+        }
+        if(SelectedId!=LastMigrationSelectedAgent){
+            LastMigrationSelectedAgent=SelectedId;
+            if(const auto* Member=MigrationSnapshot.Members.FindByPredicate([&](const auto& V){return V.Agent==SelectedId;});Member&&Member->Plan>0)MigrationFocus=Member->Plan;
+        }
+        const auto& Plans=MigrationSnapshot.Plans;
+        int32 Index=Plans.IndexOfByPredicate([&](const auto& V){return V.Id==MigrationFocus;});
+        if(Index==INDEX_NONE&&!Plans.IsEmpty()){
+            Index=Plans.IndexOfByPredicate([](const auto& V){return V.State!=EEcoHerdJourneyState::Settled;});
+            if(Index==INDEX_NONE)Index=0;
+        }
+        if(!Plans.IsEmpty()){
+            if(PlayerOwner->WasInputKeyJustPressed(EKeys::LeftBracket))Index=(Index+Plans.Num()-1)%Plans.Num();
+            if(PlayerOwner->WasInputKeyJustPressed(EKeys::RightBracket))Index=(Index+1)%Plans.Num();
+            MigrationFocus=Plans[Index].Id;
+        }
+        EcoHerdMigrationDebug::Draw(*this,*PlayerOwner,FVector2D(Canvas->SizeX,Canvas->SizeY),MigrationSnapshot,MigrationFocus,MigrationMode);
+    }
+    if(!CVarInspectorVisible.GetValueOnGameThread())return;
     const bool Preview=Actors.ContainsByPredicate([](const AEcoCreatureRepresentationActor* Actor){return Actor->ActorHasTag(TEXT("JYU.VisualAudit"));});
     if(Preview){
         const float PreviewY=Selected.IsValid()?480.f:410.f;

@@ -1,3 +1,4 @@
+#include "Creature/Debug/EcoHerdMigrationDebug.h"
 // 팀 통합 레벨용 v3 연결("몸은 팀 것, 머리만 우리 것")의 자동화 시험 (계획서 RL_V3_UNREAL_TRAINING_PLAN.md 4-5b).
 //
 // 실행:
@@ -3125,6 +3126,13 @@ bool FEcoHerdJourneyNative::RunTest(const FString&){
     FEcoServerTimeSnapshot Time;TArray<FEcoMigrationOutcome> Receipts;
     TestTrue(TEXT("Plan is coordinated outside Mass"),Journeys->Reconcile(*H.EM,Time,1,Receipts));
     TestEqual(TEXT("Exactly one shared plan"),Journeys->GetPlans().Num(),1);
+    FEcoHerdMigrationDebugSnapshot Debug;
+    TestTrue(TEXT("Read-only route snapshot is available on authority"),EcoHerdMigrationDebug::Capture(*H.Scoped.World,Debug));
+    TestEqual(TEXT("Debug snapshot has the authored corridor"),Debug.Routes.Num(),1);
+    TestEqual(TEXT("Debug snapshot shows both native habitats"),Debug.Regions.Num(),2);
+    TestEqual(TEXT("Debug snapshot shows actual members"),Debug.Members.Num(),2);
+    FString DebugJson;TestTrue(TEXT("Debug snapshot serializes for reproducible captures"),EcoHerdMigrationDebug::ToJson(Debug,DebugJson));
+    TestEqual(TEXT("Debug capture cannot create or alter plans"),Journeys->GetPlans().Num(),1);
     for(const auto Entity:H.Deer)TestTrue(TEXT("Both members travel together"),H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(Entity).bActive);
     // Turning off new departures must not clamp or abandon an existing journey.
     Enable->Set(0,ECVF_SetByCode);

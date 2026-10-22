@@ -1,5 +1,7 @@
 # 조연우 작업 시작 문서 — 역할·진행상황·다음 연결
 
+> **2026-10-23 화면 확인 후속:** 새 이주 맵의 오른쪽 지도·월드 경로·현재 목적지·실제 구성원·진행 상태를 읽기 전용으로 표시한다. `M` 토글, `[`/`]` 무리 선택. [이주 디버그 사용·재현·검증](HERD_MIGRATION_DEBUG_20261023.md)을 먼저 읽는다. 개인 PPT/캡처는 저장소 밖 발표자료 폴더에 보관한다.
+
 > **최신 2026-10-23:** PR #14를 **Draft**로 전환하고 PR #12 통합본 위에 v3 신호 읽기 계약·추가 행동 애니메이션·Inspector 원인 이력·Persistent Herd 식량 이주를 연결했다. 팀의 대형 JWJ 레벨을 owned 복사한 `/Game/JYU/Maps/LV_JYU_HerdMigration`을 사용한다. **현재 계약·실행·검증·제한은 [무리 이주와 신호 통합](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 먼저 읽는다.** 아래 “migration 비활성/미연결”과 PR 승인 대기는 이전 기록이다. 기존 맵의 이주는 기본 opt-in OFF이며 기본 v3 SocialControl=0은 유지한다.
 
 > **최신 후속 인계:** PR #12가 병합된 `main a74fcac`를 현재 작업 브랜치에 로컬 병합하고 늦은 은신처 등록의 먹이 자원 장부 연결을 복구했다. main의 Social 행동 개입 기본값은 OFF다. 직접 UBT·자동화 201개(실패 0)·Social OFF/ON Standalone 검증은 [PR #12 main 통합 기록](JYU_PR12_MAIN_INTEGRATION_20261022.md)을 따른다. 원격 push는 이번 작업에 포함하지 않았다. 아래 기존 HEAD·PR 상태·기본 동작 설명은 그 이전 기록이다.

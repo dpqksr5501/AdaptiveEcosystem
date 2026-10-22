@@ -120,3 +120,7 @@ UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한
 PR #14는 사용자 요청으로 Draft다. v3 기본 SocialControl=0 신호 경로를 유지하고 `ReadSignal`의 증거/수신 시각·TTL·Herd 일치 계약을 제공한다. opt-in `UEcoHerdMigrationSubsystem`은 완료된 M4 자원 경계에서 Persistent Herd 공동 계획·기존 Travel·실제 Native context 인계·기존 Migration receipt/인구 집계를 연결한다. Native Step이 유일한 이동·대사 writer다. Client는 기존 Bubble 표현만 받는다.
 
 기존 맵의 이주 옵션은 OFF이며 `/Game/JYU/Maps/LV_JYU_HerdMigration`만 ON이다. 팀 JWJ 대형 레벨의 owned 복사 맵이고 Barren↔Forest 지면 경로를 authoring했다. 원본 팀 레벨은 변경하지 않는다. 기본 가중치·V1 계약·Python ON 세계 파리티/재학습을 변경 완료로 간주하지 않는다. 정확한 실행·검증·한계는 [무리 이주와 신호 계약](AdaptiveEcosystem/Docs/조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다. 개발 가뭄 fixture는 명시적으로 실행한 세션에만 적용하며 자연 발생 생태 균형 검증으로 설명하지 않는다.
+
+## 12. 2026-10-23 이주 경로·목적지 디버그
+
+새 이주 맵은 읽기 전용 HUD 지도·실제 Native 개체 위치·선택 계획의 경로/현재 목적지를 표시한다. `M` 토글, `[`/`]` 계획 선택이며 기존 맵/Client의 논리 권위를 확장하지 않는다. snapshot은 Mass processing 외 GameThread에서 만들고 HUD는 4Hz로 읽는다. `Blocked`는 무진행 진단이며 지형 충돌 확정으로 설명하지 않는다. [표시 계약·재현·검증](AdaptiveEcosystem/Docs/조연우/HERD_MIGRATION_DEBUG_20261023.md)을 따른다. 개인 PPT·캡처와 제작 작업은 9절의 저장소 밖 발표자료 폴더에 두며 Git에 넣지 않는다.
