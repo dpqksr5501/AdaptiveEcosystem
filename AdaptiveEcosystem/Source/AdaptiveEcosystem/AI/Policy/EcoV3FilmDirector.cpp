@@ -346,7 +346,8 @@ void UEcoV3FilmDirectorSubsystem::HideIdentityLabels()
 void UEcoV3FilmDirectorSubsystem::CaptureFrame()
 {
 	const FString Path = OutDir / FString::Printf(TEXT("f_%05d.png"), TotalFrames);
-	FScreenshotRequest::RequestScreenshot(Path, false, false);
+	// -EcoV3FilmUI 면 화면 글(두뇌 교체 알림·상태 줄 등 화면 메시지)도 프레임에 넣는다 (10-22). 아니면 게임 화면만
+	FScreenshotRequest::RequestScreenshot(Path, /*bInShowUI*/ bKeepUI, false);
 	++TotalFrames;
 	++ShotFrames;
 }
