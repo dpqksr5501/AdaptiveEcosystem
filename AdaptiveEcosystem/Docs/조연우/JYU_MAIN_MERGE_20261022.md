@@ -1,5 +1,7 @@
 # main 병합과 날씨 클래스 호환 복구 — 2026-10-22
 
+> **이력 문서 안내 — 2026-10-23:** 아래 HEAD·PR 제목·Draft/push 전 상태·미연결 항목·테스트 결과는 해당 작업 시점의 기록이다. 현재 작업 위치·실제 기본값·후속 기능·검증은 [2026-10-23 최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 우선한다. 기능/디버그는 원격 push했으며 PR #14는 확인 당시 OPEN·Ready for review·미병합이다.
+
 `codex/social-shelter-handoff`의 `5cd07e4`에 `origin/main` **`ff4f287`**을 병합했다. main에만 있던 3개 커밋의 지역별 비·눈·나무 배치 에셋 251개를 반영했다. Git 충돌은 없었으며, main 기준 251개 경로는 병합 후에도 main과 동일하다. 기존 JYU 맵·ExternalActors·소스·설정은 병합으로 변경하지 않았다.
 
 ## 커밋·PR 인계

@@ -1,5 +1,7 @@
 # PR #12 병합 이후 main 통합 — 2026-10-22
 
+> **이력 문서 안내 — 2026-10-23:** 아래 HEAD·PR 제목·Draft/push 전 상태·미연결 항목·테스트 결과는 해당 작업 시점의 기록이다. 현재 작업 위치·실제 기본값·후속 기능·검증은 [2026-10-23 최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 우선한다. 기능/디버그는 원격 push했으며 PR #14는 확인 당시 OPEN·Ready for review·미병합이다.
+
 사용자 요청으로 최신 `origin/main` **`a74fcac`**(PR #12 병합)을 로컬 `main`에 fast-forward하고, `5e270f4`의 `codex/social-shelter-handoff`에 병합했다. Git 충돌은 없었다. PR #12는 GitHub에서 실제 MERGED 상태를 확인했다. 이번 작업은 로컬 병합이며 원격 작업 브랜치 push와 PR #14 병합은 수행하지 않는다.
 
 ## main 기준으로 유지한 변경

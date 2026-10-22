@@ -27,7 +27,7 @@
 - **작은 점:** 현재 살아 있는 Native 사슴의 실제 세계 위치. 흰 점/구와 연결선은 선택한 계획의 구성원과 다음 목표다.
 - **지역의 사각형:** 전체 `AEcologyRegion` 경계가 아니라 Native habitat footprint다. 현재 경로와 연결된 지역만 범위에 포함해 카메라 밖의 이동을 볼 수 있다.
 - **Food/Pop:** 기존 Native `FoodFraction()`과 M4 Ecology의 마지막 완료 개체군 집계를 읽는다. 지도 표시는 자원이나 개체를 만들지 않는다.
-- **Active herds / Finished:** 진행 중/종료된 공동 계획 수. Finished에는 안전하게 복귀한 계획도 포함하므로 Forest 도착 수와 같지 않다.
+- **Active herds / Finished:** 진행 중/종료된 공동 계획 수. Finished에는 복귀와 생존자 도착/사망 정리로 종료한 계획도 포함하므로 Forest 성공 수와 같지 않다.
 - **In target:** 실제 RegionId가 현재 목적지인 살아 있는 계획 구성원 수. **Finished:** 경로 끝 여행을 완료한 수. 목적지 지역 진입과 여행 완료는 서로 다른 시점이다.
 
 `Preparing` 집결, `Traveling` 이동, `Regrouping` 재집결, `Resting` 휴식, `Blocked` 무진행, `Settled` 종료를 구분한다. **Blocked는 일정 시간 진행이 없다는 진단이며 지형 충돌을 확정한 원인은 아니다.** Native 위협 회피·구성원 대기 등도 진행을 늦출 수 있다. 왼쪽 Inspector의 개체별 `decision_reason`을 함께 확인한다.
@@ -46,4 +46,4 @@
 
 검증 근거는 `Saved/HerdVisualization_20261023`의 직접 UBT 로그와 Automation 보고서, [검증 요약](Evidence/JYU_V3/HerdVisualization_20261023.json)을 따른다. 전체 자동화에는 기존 실제 Native 여정 시험의 지도 snapshot/경로/두 지역/실제 구성원/JSON 검증을 추가했다. 개인 발표용 PNG는 위 외부 폴더의 촬영 기록과 함께 보존한다.
 
-검증은 제어된 가뭄에서 실제로 관찰한 기능 동작이다. 일부 무리는 Forest 정착, 일부는 무진행 후 복귀했다. 모든 무리가 항상 성공한다거나 장시간 균형·고지대 경로·Python ON 세계 파리티를 검증했다는 뜻이 아니다. PR #14는 Draft, 원격 push 없음 상태를 유지한다.
+검증은 제어된 가뭄에서 실제로 관찰한 기능 동작이다. 일부 무리는 Forest 정착, 일부는 무진행 후 복귀했다. 모든 무리가 항상 성공한다거나 장시간 균형·고지대 경로·Python ON 세계 파리티를 검증했다는 뜻이 아니다. 2026-10-23 기능·디버그 push 후 PR #14는 OPEN·Ready for review·미병합이다. 최신 재개 정보는 [인수인계](JYU_CHAT_HANDOFF_20261023.md)를 따른다.

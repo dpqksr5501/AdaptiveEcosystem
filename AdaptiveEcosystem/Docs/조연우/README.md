@@ -1,14 +1,20 @@
 # 조연우 작업 시작 문서 — 역할·진행상황·다음 연결
 
-> **2026-10-23 화면 확인 후속:** 새 이주 맵의 오른쪽 지도·월드 경로·현재 목적지·실제 구성원·진행 상태를 읽기 전용으로 표시한다. `M` 토글, `[`/`]` 무리 선택. [이주 디버그 사용·재현·검증](HERD_MIGRATION_DEBUG_20261023.md)을 먼저 읽는다. 개인 PPT/캡처는 저장소 밖 발표자료 폴더에 보관한다.
+갱신일: **2026-10-23**. 먼저 [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 읽는다. 구현 기준 `581ce1d` + `e22dbbd`, 통합 main `a74fcac`, 작업 브랜치 `codex/social-shelter-handoff`다. [PR #14 — 먹이 부족에 따른 무리 이주 기능 추가](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)는 확인 당시 OPEN·Ready for review·미병합이고 기능/디버그 push를 완료했다.
 
-> **최신 2026-10-23:** PR #14를 **Draft**로 전환하고 PR #12 통합본 위에 v3 신호 읽기 계약·추가 행동 애니메이션·Inspector 원인 이력·Persistent Herd 식량 이주를 연결했다. 팀의 대형 JWJ 레벨을 owned 복사한 `/Game/JYU/Maps/LV_JYU_HerdMigration`을 사용한다. **현재 계약·실행·검증·제한은 [무리 이주와 신호 통합](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 먼저 읽는다.** 아래 “migration 비활성/미연결”과 PR 승인 대기는 이전 기록이다. 기존 맵의 이주는 기본 opt-in OFF이며 기본 v3 SocialControl=0은 유지한다.
+| 읽을 문서 | 확인할 내용 |
+|---|---|
+| [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md) | 현재 기본값·위치·연결 범위·기존 검증·후속 작업·발표 자료 위치 |
+| [무리 이주와 신호 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md) | ReadSignal, Persistent Herd, 실제 Native 이동/지역 인계, M4 자원·인구·복제 연결 |
+| [이주 디버그 사용법](HERD_MIGRATION_DEBUG_20261023.md) | 지도·현재 목적지·실제 구성원·조작·가뭄 재현·촬영 |
+| [현재 상태](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md) | 현재 통합과 과거 V1/MVP 기록의 구분 |
+| [문서 감사 기록](JYU_DOCUMENTATION_AUDIT_20261023.md) | 갱신한 문서와 Source 근거·검증 한계 |
 
-> **최신 후속 인계:** PR #12가 병합된 `main a74fcac`를 현재 작업 브랜치에 로컬 병합하고 늦은 은신처 등록의 먹이 자원 장부 연결을 복구했다. main의 Social 행동 개입 기본값은 OFF다. 직접 UBT·자동화 201개(실패 0)·Social OFF/ON Standalone 검증은 [PR #12 main 통합 기록](JYU_PR12_MAIN_INTEGRATION_20261022.md)을 따른다. 원격 push는 이번 작업에 포함하지 않았다. 아래 기존 HEAD·PR 상태·기본 동작 설명은 그 이전 기록이다.
+현재 확인 맵은 `/Game/JYU/Maps/LV_JYU_HerdMigration`이다. 기존 맵의 이주 옵션은 OFF, 새 맵만 ON이다. v3 기본 `SocialControl=0`을 유지하고, 이주 의도는 Native의 유일한 이동 writer가 소비한다. 실제 지역 진입과 경로 끝 정착은 다르며 모든 무리가 성공하지는 않는다. 일반 PIE·Dedicated/Client 결과는 체크인 Evidence를 따른다. 이 문서 갱신에서 새 UBT·PIE를 실행하지 않았다.
 
-> **2026-10-22 최신 상태:** main `ff4f287` 병합·날씨 호환 복구·검증을 `29c6491`로 push하고 [PR #14 — 동물 행동·경보·애니메이션과 테스트 은신처 통합](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)을 생성했다. 확인 당시 OPEN·충돌 없음·승인 대기다. 후속 사용자 요청으로 main의 마지막 push 후 재승인 추가 조건을 해제했으며, **PR 작성자 외 쓰기 권한 팀원 1명 승인**은 유지한다. [병합·호환 복구·검증](JYU_MAIN_MERGE_20261022.md)을 참고하고 재개 시 실제 PR 상태를 다시 확인한다.
+## 이전 통합 이력 — 아래 날짜의 현재/대기는 당시 상태
 
-> **다른 채팅에서 먼저 읽기:** [최신 작업 인계·프로젝트 맥락](JYU_CHAT_HANDOFF_20261022.md). 작업 브랜치는 `codex/social-shelter-handoff`, 구현 기준은 `29c6491`이며 이후 문서 커밋은 `git log`로 확인한다. 보호 은신처 맵은 `/Game/JYU/Maps/LV_JYU_RefugeSafety`다. 아래 날짜별 “Social 미연결”, “IK 미구현”은 당시 상태다. 이번 PR 인계 문서 갱신은 문서 작업이며 추가 빌드·PIE는 실행하지 않았다.
+2026-10-22 main 병합·날씨 호환 검증은 [main 통합 기록](JYU_MAIN_MERGE_20261022.md), 이후 PR #12 `a74fcac` 반영·늦은 은신처 먹이 장부 복구는 [PR #12 통합 기록](JYU_PR12_MAIN_INTEGRATION_20261022.md)에 보존한다. 과거 PR 제목·HEAD·Draft·push 전 상태를 현재 상태로 사용하지 않는다.
 
 > **최신 보호 은신처 구현:** 새 복사 맵 `/Game/JYU/Maps/LV_JYU_RefugeSafety`에 수풀·바위 12곳과 실제 늑대 진입 차단·내부 피식 보호·지면 슬롯/도착 검증을 연결했다. 기존 맵·사용자 변경은 보존한다. [구현·에디터 확인·검증](JYU_REFUGE_SAFETY_20261016.md)을 먼저 읽는다. PPO 재학습 완료를 의미하지 않는다.
 
@@ -22,7 +28,7 @@
 
 ---
 
-**이하 2026-10-08 기준 기록**
+**이하 2026-10-08 기준 상세 기록**
 
 갱신일: **2026-10-08**. 다른 Codex 채팅이나 팀원이 조연우 작업을 이어갈 때 읽는 진입 문서다. 대화 기록 없이 현재 범위와 연결 지점을 파악하는 것이 목적이며, 상세 계약을 대체하지 않는다.
 

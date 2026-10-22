@@ -1,5 +1,21 @@
 # MASS PROCESSOR EXECUTION ORDER & THREAD SAFETY
 
+## 2026-10-23 v3 무리 이주의 완료 경계
+
+아래 V1 Processor 표와 2026-09-30 소비자 미연결 설명은 당시 경로다. 현재 v3 실제 연결은 [이주 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md), [인수인계](../조연우/JYU_CHAT_HANDOFF_20261023.md)를 따른다. Source 기준은 `Creature/Runtime/EcoCreatureLifecycle.cpp`와 `Mass/EcoHerdMigration.*`다.
+
+| 순서/경계 | 책임 |
+|---|---|
+| 기존 Native 결정/이동 스텝 | 개인 세계 규칙과 유효한 이주 의도를 소비하는 유일한 이동·섭식·대사 writer. Raw Request와 실행 결과를 구분 |
+| 권위 `OnWorldPostActorTick` 완료 처리 | Mass processing이 끝난 GameThread에서 생명주기/자원 결과를 조정 |
+| `CompleteResourceStep` 성공 이후 | `UEcoHerdMigrationSubsystem::Reconcile`로 공동 여행/Travel·실제 지역/context 이전 결과를 조정 |
+| 기존 이주 결과 처리 | 기존 `EcoMassMigration::Reconcile` 경로와 공통 `RecordMigrations`·개체군/압력/합계를 연결. 같은 v3 개체에 레거시 개별 이주 중복 금지 |
+| 진단 읽기 | 권위 snapshot을 Mass processing 외 GameThread에서 생성. HUD는 최대 4Hz 읽기, `OnRuntimeSample`은 리스너가 있을 때 2초 간격 로컬 관찰 이벤트 |
+
+Reconcile은 별도 이동 적분/프레임 Tick Subsystem이 아니다. Worker 중 UObject/Entity 구조를 직접 바꾸거나 HUD에서 fragment를 쓰지 않는다. Client는 이주 Subsystem/논리 Entity를 만들지 않으며 기존 표현 transport만 소비한다. V1/Custom Movement 혼용 가드와 기존 thread-safety 수칙은 유지한다.
+
+## 기존 Processor 계약과 날짜별 감사 기록
+
 > **2026-10-08 opt-in 동물 통합:** 별도 Integrated Entity 경로는 기존 PPO→Social Lifecycle→Steering/포식자 이동을 사용하고, 자원·인구·구조 변경·표현 조정은 모든 Mass phase가 끝난 `OnWorldPostActorTick`에서 직렬 처리한다. Actor의 PostPhysics tick에서는 관찰자 잠금이 남을 수 있어 삭제하지 않는다. 그 프레임 경계의 동기 batch destruction은 삭제 전 replication observer를 실행한다. 아래 command buffer 수칙은 실행 중 Processor/Entity loop의 구조 변경에 적용한다. M3 Box 가드와 이동 경로는 유지한다. [실행·검증·인계](../조연우/CREATURE_PRODUCTION_INTEGRATION.md) 참조.
 
 > **2026-10-13 main 합치기 (Branch_Sinhyeok):** 포획(`UEcoPredationProcessor`)은 조향 뒤에 둔다(파이썬 `world.py` 와 같은 순서). main 은 조향을 포획 뒤에 두었고(`ExecuteAfter("EcoPredationProcessor")`) 우리 가지는 포획을 조향 뒤에 두어서, 둘 다 남기면 실행 순서가 순환한다. 합칠 때 조향 쪽 그 한 줄을 뺐다. 잡힌 개체는 HP 0 이 되고 Alive → PendingDeath 로 바뀌어 다음 틱부터 초식 쿼리에서 빠진다. 조향도 HP 0 개체를 건너뛴다. 통합 생명체의 죽음은 지금처럼 조정자(`AEcoCreatureIntegrationSpawner::Reconcile`)가 닫는다(`bPredated` 표시, Alive 떼기, 2초 뒤 삭제). 정책 관측 5(최근 피식)는 파이썬과 같은 전역 EMA 이고, 지역 `PredationHistory` 는 생태·이주·UI 가 쓴다. 자세한 내용: [RL_V3_UNREAL_TRAINING_PLAN.md](../RL_Policy/RL_V3_UNREAL_TRAINING_PLAN.md) 3-5.

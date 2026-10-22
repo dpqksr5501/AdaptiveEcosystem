@@ -1,5 +1,23 @@
 # 팀원별 요청 — 통합 레벨 v3 사슴·늑대 (2026-10-17, 팀 브랜치 통합 뒤)
 
+## 조연우 통합 후속 확인 — 2026-10-23
+
+아래 요청 원문은 권신혁 작성 당시 기록으로 보존한다. 이 절은 조연우 측 통합 Source `581ce1d` + `e22dbbd`의 확인 결과이며 RL 담당의 수락·학습 완료·모든 요청 종료를 뜻하지 않는다. 별도 메시지는 보내지 않았다. [최신 인수인계](../조연우/JYU_CHAT_HANDOFF_20261023.md)와 [통합 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다.
+
+| 원문 요청 | 현재 구현/범위 | 남은 부분 |
+|---|---|---|
+| §2-1 신호 계약 | 버전 1 `ReadSignal`에 직접/기억/shared·강도/위치·증거/수신 시각·Herd/TTL 검증. 기본 SocialControl=0 유지 | legacy ApplyControl은 opt-in 보존. RL Native 무리 반응/관측·Python 학습 연결은 별도 |
+| §2-2 슬롯 없는 보호 개체 | legacy 훅도 보호 원 안 개체를 lease 부족만으로 내보내지 않게 guard | 보호 안전은 슬롯 수와 분리. 기존 안전 규칙 하나만 사용 |
+| §2-3 Policy 헤더 변경 | 기존 Native hook에서 이주 방향/단계 경계와 context 이전을 연결; engine-free EcoV3Eval을 변경 헤더로 재컴파일 | 새 이주 ON 세계의 전체 Python 궤적 파리티/재학습 미검증, 후속 Policy 변경은 공동 계약 필요 |
+| §2-4 바위 외형 | 실제 mesh bounds/pivot으로 ring을 배치해 보이는 끝을 반경+50cm 안에 둠 | 늑대 몸 여유 100cm와 중첩 안전 writer를 만들지 않음 |
+| §2-5 관찰자 | 실제 촬영/검증 도구가 관찰자 위협을 비활성화 | 일반 플레이어의 사냥꾼/관찰자 제품 의도는 별도이며 전역 기본을 바꾸지 않음 |
+| §2-7 남은 표현 | AlertGraze(이동+목 look), WeakTravel(실제 저속), SatedRest(포만 휴식), 수신 enum 검증 연결 | 모든 미래 야생 상태/새 종의 애니메이션 완료는 아님 |
+| §4/5 레벨 | JWJ 대형 레벨 owned 복사 `LV_JYU_HerdMigration`, 실제 은신처 12곳·Barren↔Forest 경로 검증 | 원본 공식 레벨 선정/원본 팀 맵 authoring 요청을 닫은 것은 아님 |
+
+먹이 장부는 PR #12 main 통합의 `AdjustSpatialFoodHabitat` 거래로 늦은 은신처 등록/제거를 반영했다. 제어된 가뭄 fixture도 거래를 사용한다. §9 EnvWatch/날씨·나무·#S1 등 다른 담당의 진행 여부는 각 Source/계약으로 확인하며 이 절에서 일괄 완료 처리하지 않는다.
+
+## 요청 원문과 날짜별 진행 기록
+
 - 쓴 사람: 권신혁(RL·정책). 메시지는 권신혁이 직접 보낸다.
 - 기준: `Branch_Sinhyeok`. 팀 브랜치 `codex/social-shelter-handoff` 를 합친 `7029579`, Social 연결을 기본으로 끈 `422e307`(사람 결정 10-17 (8)) 뒤다.
 - 담당은 `RL_V3_UNREAL_TRAINING_PLAN.md` 5절 표의 '누가' 칸을 따랐다. 확실하지 않은 담당은 '(추정)'으로 적었다.

@@ -117,10 +117,18 @@ UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한
 
 ## 11. 2026-10-23 신호 계약·무리 이주 통합
 
-PR #14는 사용자 요청으로 Draft다. v3 기본 SocialControl=0 신호 경로를 유지하고 `ReadSignal`의 증거/수신 시각·TTL·Herd 일치 계약을 제공한다. opt-in `UEcoHerdMigrationSubsystem`은 완료된 M4 자원 경계에서 Persistent Herd 공동 계획·기존 Travel·실제 Native context 인계·기존 Migration receipt/인구 집계를 연결한다. Native Step이 유일한 이동·대사 writer다. Client는 기존 Bubble 표현만 받는다.
+PR #14는 2026-10-23 사용자 요청으로 기능·디버그를 push하고 Ready for review로 전환했다. 확인 당시 OPEN·미병합이다. v3 기본 SocialControl=0 신호 경로를 유지하고 `ReadSignal`의 증거/수신 시각·TTL·Herd 일치 계약을 제공한다. opt-in `UEcoHerdMigrationSubsystem`은 완료된 M4 자원 경계에서 Persistent Herd 공동 계획·기존 Travel·실제 Native context 인계·기존 Migration receipt/인구 집계를 연결한다. Native Step이 유일한 이동·대사 writer다. Client는 기존 Bubble 표현만 받는다.
 
 기존 맵의 이주 옵션은 OFF이며 `/Game/JYU/Maps/LV_JYU_HerdMigration`만 ON이다. 팀 JWJ 대형 레벨의 owned 복사 맵이고 Barren↔Forest 지면 경로를 authoring했다. 원본 팀 레벨은 변경하지 않는다. 기본 가중치·V1 계약·Python ON 세계 파리티/재학습을 변경 완료로 간주하지 않는다. 정확한 실행·검증·한계는 [무리 이주와 신호 계약](AdaptiveEcosystem/Docs/조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다. 개발 가뭄 fixture는 명시적으로 실행한 세션에만 적용하며 자연 발생 생태 균형 검증으로 설명하지 않는다.
 
 ## 12. 2026-10-23 이주 경로·목적지 디버그
 
 새 이주 맵은 읽기 전용 HUD 지도·실제 Native 개체 위치·선택 계획의 경로/현재 목적지를 표시한다. `M` 토글, `[`/`]` 계획 선택이며 기존 맵/Client의 논리 권위를 확장하지 않는다. snapshot은 Mass processing 외 GameThread에서 만들고 HUD는 4Hz로 읽는다. `Blocked`는 무진행 진단이며 지형 충돌 확정으로 설명하지 않는다. [표시 계약·재현·검증](AdaptiveEcosystem/Docs/조연우/HERD_MIGRATION_DEBUG_20261023.md)을 따른다. 개인 PPT·캡처와 제작 작업은 9절의 저장소 밖 발표자료 폴더에 두며 Git에 넣지 않는다.
+
+## 13. 2026-10-23 최신 재개 기준과 문서 이력
+
+현재 작업 시작점은 [최신 조연우 인수인계](AdaptiveEcosystem/Docs/조연우/JYU_CHAT_HANDOFF_20261023.md)다. 기능 기준 `581ce1d`, 디버그 기준 `e22dbbd`, 통합 main `a74fcac`이며 이후 문서 커밋은 별도 확인한다. 앞 절과 설계 문서의 날짜별 미연결·Pending·Draft·push 전 설명은 당시 이력이다. 현재 기본 `SocialControl=0`, 기존 맵 이주 OFF·새 owned 이주 맵 ON을 유지한다. Native의 단일 이동·대사 writer와 기존 자원/인구/복제 계약을 보존한다.
+
+현재 통합 `ShelterSafe=1`은 Python realism_shelter에 맞춘 Native 안전 규칙, `ProtectedRefuges=1`은 실제 은신처 생명주기다. ShelterSafe=0일 때만 JYU 보호 규칙이 안전을 맡으며 중첩하지 않는다. 8절의 Native 보호 기본 OFF는 하위 `FWorldConfig` 기본값을 의미한다. 기존 안전 기준 세계의 파리티와 새 이주 ON 세계 전체 궤적 파리티/재학습 미완료를 구분한다. V1 7관측/4출력과 opt-in v3 18관측/5행동·mask2를 서로 대체하지 않는다.
+
+사용자의 후속 이동 요청에 따라 최종 개인 PPT `겜캡디_조연우_1023.pptx`는 바탕화면 바로 아래에 있다. 캡처·대본·렌더/제작 작업은 9절의 외부 날짜별 폴더를 유지한다. 개인 파일을 Git에 넣지 않는다. 이번 문서 감사는 Source·링크·diff를 확인하고 새 UBT/PIE를 실행하지 않는다.
