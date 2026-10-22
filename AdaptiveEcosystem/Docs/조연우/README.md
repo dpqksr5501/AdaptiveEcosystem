@@ -1,5 +1,7 @@
 # 조연우 작업 시작 문서 — 역할·진행상황·다음 연결
 
+> **다른 채팅에서 재개할 때 먼저 읽기 (2026-10-22):** [최신 작업 인계·프로젝트 맥락](JYU_CHAT_HANDOFF_20261022.md). 현재 체크아웃은 `codex/social-shelter-handoff`, 확인한 HEAD는 `5885333`이다. 보호 은신처 확인은 `/Game/JYU/Maps/LV_JYU_RefugeSafety`에서 한다. 아래 날짜별 기록의 “Social 미연결”, “IK 미구현”은 당시 상태이며 최신 완료 범위를 대신하지 않는다. 오늘은 문서만 갱신했고 빌드·PIE를 다시 실행하지 않았다.
+
 > **최신 보호 은신처 구현:** 새 복사 맵 `/Game/JYU/Maps/LV_JYU_RefugeSafety`에 수풀·바위 12곳과 실제 늑대 진입 차단·내부 피식 보호·지면 슬롯/도착 검증을 연결했다. 기존 맵·사용자 변경은 보존한다. [구현·에디터 확인·검증](JYU_REFUGE_SAFETY_20261016.md)을 먼저 읽는다. PPO 재학습 완료를 의미하지 않는다.
 
 > **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
