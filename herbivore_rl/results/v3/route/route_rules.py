@@ -15,6 +15,12 @@ RUN 포함 — 같은 덮기)에 건다. 덮기가 있으면 부분마다 '덮�
 규칙 효과 표와 같은 꼴)를 낸다. 덮기는 raw_<부분>.json(진짜 기록)·meta.json(부분 전·부분마다 쓴다)에 남는다. run 은 이미 있는 raw 파일마다 그 덮기와
 견주어 다르면 멈추고(섞지 않는다 — 같은 덮기로 이어 돌리기, 새 폴더, 또는 --force 와 그 부분을 --parts 에), report 는 부분끼리·meta 와 덮기가 다르면 멈춘다.
 
+셈 길 지문 (10-22, code_tag): raw_<부분>.json·meta.json 에 code = 세계(live.eval_code_tag('python') — env_v2/world.py 등 판정 파일 바이트·판정 함수·
+라이브러리 판, 실시간 판정 저장 열쇠와 같은 지문)·측정(이 파일의 측정 함수 원문·상수)을 적는다. run 은 이미 있는 raw 의 지문이 지금과 다르면(옛 판 — 칸
+없음 포함) 덮기처럼 멈추고(이어 돌리기·g 의 규칙 고르기에 옛 셈을 쓰지 않는다 — 새 폴더에서 처음부터, 또는 --force 와 그 부분을 --parts 에), 부분 중간에
+지문이 바뀌면 그 부분을 지문 없이 적고 멈춘다. report 는 부분끼리 지문이 다르면 멈추고, 세계 지문이 다른 오라클은 판단표에 쓰지 않는다. 지문이 없는 옛 폴더
+(10-22 동족 합 차례 고침 전 runs/m1·m2_f15·m2_f30 등)는 보고만 다시 낼 수 있다. 부분은 늘 rules → clump → g 차례로 돈다(g 가 이번에 다시 잰 rules 로 고른다).
+
 부분 (9-1 표):
   rules  N 세계(늑대 포만 끔), 시드 34900~34959 × 지역 셋, 1800 스텝: 길 4(run·open·cover·shelter) × 끝 규칙 2(지금·quiet_end 15) = 8 팔
   clump  같은 세계 + 지역마다 덩어리 숲 2 개(반지름 5 단위 = 10 m, 줄기 30 그루, r 0.4 단위 — 측정 전용, 레벨을 바꾸지 않음): 길 2(run·cover) × 끝 규칙 2 = 4 팔
@@ -29,6 +35,8 @@ P1 = 스스로 벗어난 도망(은신처·원판·시야각·반경)의 쫓긴 
 from __future__ import annotations
 
 import argparse
+import hashlib
+import inspect
 import json
 import math
 import sys
@@ -172,14 +180,44 @@ def world_set_text(sets: dict) -> str:
     return " ".join(f"{k}={json.dumps(v, ensure_ascii=False)}" for k, v in sets.items()) or "없음"
 
 
-def raw_world_set(path: Path) -> dict:
-    """이미 쓴 raw_<부분>.json(·oracle_raw.json)의 세계 덮기 — 그 파일이 잰 세계의 진짜 기록이다(meta.json 은 보고용). 옛 판(칸 없음) = 덮기 없음."""
-    return json.loads(Path(path).read_text(encoding="utf-8")).get("world_set") or {}
-
-
 def same_world_set(x: dict, y: dict) -> bool:
     """JSON 으로 적은 덮기끼리 같은가 (키 순서 무관)."""
     return json.dumps(lv.jsonable(x or {}), sort_keys=True) == json.dumps(lv.jsonable(y or {}), sort_keys=True)
+
+
+# --------------------------------------------------------------------- #
+# 셈 길 지문 (10-22 — 다른 셈 길로 잰 결과를 이어 돌리거나 한 보고에 섞지 않는다)
+# --------------------------------------------------------------------- #
+
+def code_tag(funcs=None, consts=None) -> dict:
+    """셈 길 지문 → dict(world, tool). world = live.eval_code_tag('python')(판정 파일 바이트·판정 함수 원문·라이브러리 판 — 실시간 판정 저장 열쇠와
+    같은 지문. 프로세스 저장을 비우고 매번 새로 잰다 — 측정 중 파일이 바뀐 것을 잡는다), tool = 측정 함수(funcs — 기본 route_items·clump_discs·
+    apply_world_set) 원문·상수(consts — 기본 덩어리 숲·N 세계 설정)의 sha256 앞 16."""
+    lv._CODE.pop("python", None)
+    funcs = (route_items, clump_discs, apply_world_set) if funcs is None else funcs
+    if consts is None:
+        consts = dict(clump=[CLUMP_TAG, CLUMPS, CLUMP_R, CLUMP_TRUNKS, CLUMP_TRUNK_R, CLUMP_GAP, CLUMP_WALL, CLUMP_COVER_GAP, CLUMP_APART, CLUMP_TRIES],
+                      nosat=lv.NOSAT)
+    h = hashlib.sha256()
+    for f in funcs:
+        h.update(inspect.getsource(f).encode() + b"\0")
+    h.update(json.dumps(lv.jsonable(consts), sort_keys=True).encode())
+    return dict(world=lv.eval_code_tag("python"), tool=h.hexdigest()[:16])
+
+
+def same_code(x, y, keys=("world", "tool")) -> bool:
+    """지문끼리 같은가 (keys 칸만). 옛 판(None — 칸 없음)은 None 끼리만 같다 — 지금 지문과는 늘 다르다."""
+    return all((x or {}).get(k) == (y or {}).get(k) for k in keys)
+
+
+def code_text(c) -> str:
+    return f"세계 {c.get('world')} · 측정 {c.get('tool')}" if c else "없음(지문을 적기 전 판)"
+
+
+def raw_head(path: Path) -> dict:
+    """이미 쓴 raw_<부분>.json 의 세계 덮기·셈 길 지문 — 그 파일이 잰 세계의 진짜 기록이다(meta.json 은 보고용). 옛 판(칸 없음) = 덮기 없음·지문 None."""
+    d = json.loads(Path(path).read_text(encoding="utf-8"))
+    return dict(world_set=d.get("world_set") or {}, code=d.get("code"))
 
 
 def route_items(info: dict, model: Path, seeds, steps: int, route: str, qe: int, world: str = "N", clump: bool = False,
@@ -405,10 +443,11 @@ def pick_best(rules: dict | None) -> tuple[str, int]:
 def cmd_run(a) -> int:
     out = Path(a.out)
     out.mkdir(parents=True, exist_ok=True)
-    parts = [p for p in a.parts.split(",") if p]
-    for p in parts:
+    req = [p for p in a.parts.split(",") if p]
+    for p in req:
         if p not in PARTS:
             raise SystemExit(f"--parts {p} 는 {', '.join(PARTS)} 가운데 하나여야 한다")
+    parts = [p for p in PARTS if p in req]               # 늘 rules → clump → g (g 가 이번에 다시 잰 rules 로 고른다)
     W = min(int(a.workers), SMOKE["workers"]) if a.smoke else int(a.workers)
     wset = parse_world_set(a.world_set)
     plain = bool(wset) and not a.no_plain
@@ -420,13 +459,19 @@ def cmd_run(a) -> int:
     meta = json.loads(meta_p.read_text(encoding="utf-8")) if meta_p.exists() else {}
     # 섞지 않기: 이미 있는 부분 결과마다 그 raw 파일에 적힌 덮기와 견준다(meta.json 은 끊긴 실행이면 없거나 옛 값일 수 있다). 다른 덮기의 부분은
     # --force 로 이번에 다시 잴 때만 허용한다(그 밖은 멈춘다 — 다른 부분을 그 결과로 고르거나 한 보고에 섞지 않게)
-    had = {p: raw_world_set(out / f"raw_{p}.json") for p in PARTS if (out / f"raw_{p}.json").exists()}
-    bad = [p for p, ws in had.items() if not same_world_set(ws, wset) and not (a.force and p in parts)]
+    had = {p: raw_head(out / f"raw_{p}.json") for p in PARTS if (out / f"raw_{p}.json").exists()}
+    bad = [p for p, h in had.items() if not same_world_set(h["world_set"], wset) and not (a.force and p in parts)]
     if bad:
-        raise SystemExit(f"{out} 의 결과 " + ", ".join(f"{p}(세계 덮기 {world_set_text(had[p])})" for p in bad) + f" — 지금 덮기 {world_set_text(wset)} "
+        raise SystemExit(f"{out} 의 결과 " + ", ".join(f"{p}(세계 덮기 {world_set_text(had[p]['world_set'])})" for p in bad) + f" — 지금 덮기 {world_set_text(wset)} "
                          "와 섞지 않는다 (같은 --world-set 으로 다시 돌리거나, 새 폴더, 또는 --force 와 그 부분을 --parts 에 넣어 다시)")
+    # 셈 길 지문도 같다: 지금과 다른(옛 판 — 지문 없음 포함) 부분은 이번에 --force 로 다시 잴 때만 둔다 (건너뛴 옛 부분과 새 부분, g 의 규칙 고르기를 섞지 않게)
+    now = code_tag()
+    stale = [p for p, h in had.items() if not same_code(h["code"], now) and not (a.force and p in parts)]
+    if stale:
+        raise SystemExit(f"{out} 의 결과 " + ", ".join(f"{p}(셈 길 {code_text(had[p]['code'])})" for p in stale) + f" — 지금 셈 길 {code_text(now)} 과 "
+                         "섞지 않는다 (세계·측정 코드가 바뀌었다 — 새 폴더에서 처음부터, 또는 --force 와 그 부분을 모두 --parts 에 넣어 다시)")
     meta.update(snapshot=str(a.snapshot), model=lv.path_text(model), smoke=bool(a.smoke), workers=W, started=meta.get("started") or datetime.now().isoformat(),
-                world_set=lv.jsonable(wset), world_set_args=list(a.world_set or []), plain=plain)
+                world_set=lv.jsonable(wset), world_set_args=list(a.world_set or []), plain=plain, code=now)
     lv.atomic_write_json(meta_p, meta)                   # 부분을 돌리기 전에 먼저 쓴다 (끊겨도 덮기가 남는다 — 부분이 끝날 때마다 다시 쓴다)
     for part in parts:
         raw = out / f"raw_{part}.json"
@@ -452,15 +497,21 @@ def cmd_run(a) -> int:
         t0 = time.perf_counter()
         rows = run_items(items, W, part)
         wall = time.perf_counter() - t0
+        end = code_tag()                                 # 부분 중간에 셈 길 파일이 바뀌었으면 어느 셈으로 잰 것인지 모른다 — 지문 없이 적고 멈춘다
         world_wall = [w["wall_s"] for _, w in rows]
-        d = dict(part=part, seeds=seeds, steps=steps, world_set=lv.jsonable(wset),
+        d = dict(part=part, seeds=seeds, steps=steps, world_set=lv.jsonable(wset), code=now if same_code(end, now) else None,
                  arms=[dict(route=r, quiet_end=q, clump=cl, world=wn, plain=pl, name=arm_name(r, q, cl, wn, pl)) for r, q, cl, wn, pl in arms],
                  workers=W, wall_s=round(wall, 1), world_wall_mean_s=float(np.mean(world_wall)), sec_per_world_step=float(np.mean(world_wall)) / steps,
                  worlds=[dict(tag=t, **w) for t, w in rows])
+        if d["code"] is None:
+            d["code_changed"] = dict(start=now, end=end)
         lv.atomic_write_json(raw, lv.jsonable(d), indent=None)
-        meta.setdefault("times", {})[part] = dict(wall_s=d["wall_s"], worlds=len(rows), sec_per_world_step=d["sec_per_world_step"])
+        meta.setdefault("times", {})[part] = dict(wall_s=d["wall_s"], worlds=len(rows), sec_per_world_step=d["sec_per_world_step"], code=d["code"])
         lv.atomic_write_json(meta_p, meta)
         print(f"  {part}: {wall:.0f} 초 (세계 하나 평균 {d['world_wall_mean_s']:.1f} 초) → {raw.name}", flush=True)
+        if d["code"] is None:
+            raise SystemExit(f"{part} 측정 중 셈 길이 바뀌었다 ({code_text(now)} → {code_text(end)}) — {raw.name} 을 지문 없이 적고 멈춘다 "
+                             "(이어 돌릴 수 없다 — 새 폴더에서 처음부터)")
     lv.atomic_write_json(meta_p, meta)
     return cmd_report(a)
 
@@ -471,8 +522,8 @@ def summarize_part(d: dict) -> dict:
     arms = by_arm(rows)
     regions = sorted({w["region"] for _, w in rows})
     res = {k: dict(worlds=v) for k, v in arms.items()}
-    out = dict(part=d["part"], seeds=d["seeds"], steps=d["steps"], regions=regions, world_set=d.get("world_set") or {},
-               plain=any(arm.get("plain") for arm in d["arms"]), pooled={}, compare={})
+    out = dict(part=d["part"], seeds=d["seeds"], steps=d["steps"], regions=regions, world_set=d.get("world_set") or {}, code=d.get("code"),
+               code_changed=d.get("code_changed"), plain=any(arm.get("plain") for arm in d["arms"]), pooled={}, compare={})
     for name, r in res.items():
         out["pooled"][name] = {reg: pooled_arm(r, reg) for reg in regions} | {"all": pooled_arm(r, None)}
     for arm in d["arms"]:
@@ -640,12 +691,24 @@ def cmd_report(a) -> int:
     if "world_set" in meta and not same_world_set(meta["world_set"], wset):
         raise SystemExit(f"{out}/meta.json 의 세계 덮기 {world_set_text(meta['world_set'])} 가 부분 결과의 덮기 {world_set_text(wset)} 와 다르다 "
                          "— 끊긴 실행이면 같은 명령으로 다시 돌린다")
+    # 셈 길 지문도 부분 raw 의 기록이다 — 부분끼리 다르면(옛 판 지문 없음과 새 판 포함) 멈춘다. 지문 없는 옛 폴더끼리는 보고만 다시 낸다(머리에 적는다)
+    codes = {p: s.get("code") for p, s in parts.items()}
+    code = next(iter(codes.values()))
+    if any(not same_code(c, code) for c in codes.values()):
+        raise SystemExit(f"{out} 의 부분끼리 셈 길 지문이 다르다 — " + "; ".join(f"{p}: {code_text(c)}" for p, c in codes.items())
+                         + " (다른 세계·측정 코드로 잰 부분을 한 보고에 섞지 않는다 — 새 폴더에서 처음부터, 또는 --force 로 그 부분을 다시)")
+    changed = [p for p, s in parts.items() if s.get("code_changed")]
     plain = any(s.get("plain") for s in parts.values())
-    o_note = ""
-    if oracle is not None and not same_world_set((oracle.get("meta") or {}).get("world_set", {}), wset):
+    o_notes = []
+    o_meta = (oracle.get("meta") or {}) if oracle is not None else {}
+    if oracle is not None and not same_world_set(o_meta.get("world_set", {}), wset):
         # 오라클과 규칙 측정의 세계 덮기가 다르면 판단표에 쓰지 않는다 (다른 세계)
-        o_note = (f"오라클 세계 덮기 {world_set_text((oracle.get('meta') or {}).get('world_set', {}))} ≠ 규칙 측정 덮기 "
-                  f"{world_set_text(wset)} — 오라클을 판단표에 쓰지 않는다")
+        o_notes.append(f"오라클 세계 덮기 {world_set_text(o_meta.get('world_set', {}))} ≠ 규칙 측정 덮기 {world_set_text(wset)}")
+    if oracle is not None and not same_code(o_meta.get("code"), code, ("world",)):
+        # 세계 셈 길이 다르면(옛 판 지문 없음과 새 판 포함) 같은 세계가 아니다 — 측정 지문(tool)은 도구가 달라 견주지 않는다
+        o_notes.append(f"오라클 세계 셈 길 {(o_meta.get('code') or {}).get('world', '없음(옛 판)')} ≠ 규칙 측정 {(code or {}).get('world', '없음(옛 판)')}")
+    o_note = ("; ".join(o_notes) + " — 오라클을 판단표에 쓰지 않는다") if o_notes else ""
+    if o_notes:
         oracle = None
     dec = decide(parts.get("rules"), parts.get("clump"), oracle)
     lv.atomic_write_json(out / "rules.json", lv.jsonable(dict(meta=meta, parts=parts, decision=dec)))
@@ -653,6 +716,10 @@ def cmd_report(a) -> int:
          f"- 스냅숏 {Path(meta.get('snapshot', '')).name}, 도주 밖 두뇌 {meta.get('model')}, 워커 {meta.get('workers')}, 시간 {json.dumps(meta.get('times', {}), ensure_ascii=False)}",
          f"- 세계 덮기 (--world-set, 모든 팔·비교 기준 RUN 에 같게): {world_set_text(wset)}"
          + (" — 덮기 없음 RUN 팔(plain_…)로 덮기 효과 표를 함께 낸다" if plain else "") + (f". **{o_note}**" if o_note else ""),
+         f"- 셈 길 지문 (부분 raw 기록 — 세계 = 실시간 판정 저장 열쇠와 같은 live.eval_code_tag('python'), 측정 = 이 도구의 측정 함수): {code_text(code) if code or not changed else '없음'}"
+         + (" — **지문을 적기 전 판이다: 부분끼리·오라클과 같은 셈 길인지 확인할 수 없다. 10-22 동족 합 차례 고침(env_v2/world.py `_seq_sum`) 전에 잰 "
+            "폴더는 이어 돌리지 말고 새 폴더에서 처음부터 다시 잰다**" if not code and not changed else "")
+         + (f" — **{', '.join(changed)} 측정 중 셈 길이 바뀌었다 (지문 없이 적음 — 새 폴더에서 처음부터 다시 잰다)**" if changed else ""),
          "- P1 = 스스로 벗어난 도망(은신처·원판·시야각·반경)의 쫓긴 시간 시드 평균 (관문 1차와 같은 셈). 차이 = 팔 − 같은 끝 규칙·같은 배치의 RUN. 몫 차이는 %p",
          f"- 쓸모 있음(9-4): 한 지역 이상에서 P1 차이 ≤ −{USEFUL_S} 초 ∧ 짝 t ≤ −{USEFUL_T}, 또는 COVER 원판 놓침 몫 ≥ +{OBST_PP * 100:.0f}%p ∧ P1 이 줄어듦. 잡힘 t ≥ +{CAUGHT_T} 면 빼기", ""]
     titles = dict(rules="규칙 (N 세계, 지금 배치)", clump="덩어리 숲 가정 (N 세계, 측정 전용)", g="게임 세계 G (RUN 대 가장 좋은 규칙)")

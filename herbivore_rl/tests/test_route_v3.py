@@ -1,7 +1,7 @@
 """야생 (w3) 도망길 1단계 (10-21 사용자 '도망 방향을 두뇌가 고름' — 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 6·7·9-0절, 측정 전용 선택 키
 wild_flight.route_fixed·quiet_end — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망길).
 
-- 끔(키 없음 = route_fixed null·quiet_end 0)은 HEAD(c44d37e, git archive 로 돌린 같은 셈)와 궤적 해시가 같다. 'run' 은 끔과 비트 단위로 같고 길 기록만 더한다.
+- 끔(키 없음 = route_fixed null·quiet_end 0)은 HEAD(c44d37e, git archive 로 돌린 같은 셈 — 10-22 동족 차례 합 두 줄을 넣은 사본)와 궤적 해시가 같다. 'run' 은 끔과 비트 단위로 같고 길 기록만 더한다.
 - 기하(`flight_route_geometry`): COVER 는 늑대 눈길이 줄기에 더 가리는 쪽을 고르고, 늑대가 먼저 닿는 길·벽 여유 밖 길을 뺀다. SHELTER 는 늑대보다 먼저 닿는
   은신처만(뒤쪽·너무 먼 은신처는 빼고, 같으면 낮은 번호). OPEN 은 a₀ 에 가장자리 굽히기·벽 여유만.
 - quiet_end: 붙잡는 늑대를 Q 스텝 이어 알아채지 못하면(눈·발소리 모두) 도주가 끝난다. 쫓는(뛰는) 늑대의 발소리는 줄기가 막지 않아 도주가 이어진다.
@@ -34,10 +34,12 @@ TRAIN = CFG / "v3_r5_train.yaml"                # 학습 세계 (부활 있음)
 
 pytestmark = pytest.mark.filterwarnings("ignore:You have specified a mini-batch size")
 
-# HEAD(c44d37e) 를 git archive 로 풀어 같은 `_traj_hash` 로 잰 값 (도망길 코드를 넣기 전)
+# HEAD(c44d37e) 를 git archive 로 풀어 같은 `_traj_hash` 로 잰 값 (도망길 코드를 넣기 전).
+# 10-22 다시 잼: world.py 가 동족 무리 중심·분리를 C++ 과 같은 j 차례 합으로 더하게 되어(`_seq_sum`) 끝 비트가 달라졌다 — 사본의 그 두 줄만 같은
+# 차례 합으로 바꾼 HEAD(tests/kin_seq.py patch_tree)로 잰 값이고 지금 코드(끔)와 같다. 옛 값(행렬곱 HEAD): obs_Forest_sat0 c7a7b4cd…·train_respawn 6d99c93d…
 HEAD_HASH = {
-    "obs_Forest_sat0": "c7a7b4cd4e48d2a6d3750f79bc4b4ca8528fbc5307566f8229318ae6e7985fde",
-    "train_respawn": "6d99c93d27addfe50528fcaeb7dd25c15ad1fa413d21fb8142bef12db7a2520b",
+    "obs_Forest_sat0": "a1d6cde8248821e73fb379f7196f461f0ec8ba9f0e80a4a0e0b18968a308c343",
+    "train_respawn": "3f6c580f9cc3147dcb93ef5fe7bf050d44daf4b846b9ca860ddcdbf606f77692",
 }
 # HEAD 의 config digest (results/v3/mirror/run_mirror.config_digest — wild_flight 를 켠 설정 전부)
 HEAD_DIGEST = {

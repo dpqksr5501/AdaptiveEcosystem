@@ -92,6 +92,14 @@
 //                    벽 반사·자르기 → 은신처 접선 → 그래도 원판 안이면 이동 전 자리 → 부딪혀 가려던 거리의 kShelterDeadFrac 도 못 가면 돌아선다
 //   현실 근거: 늑대에게 잡힌 엘크는 도망이 막히는 곳(강가·길가·깊은 눈)에서 더 많았다(Kauffman 외 2007, Ecol. Lett. 10:690)
 //
+// 숲 시야 (선택, FThreatStepInput::bFoliage. 기본 거짓 — 거짓이면 위 그대로이고 지금 골든과 비트 단위로 같다. 야생 2단계 3 의 7), 10-21 사용자
+//   '숲 안 시야 줄이기 → 다시 잼', 파이썬 world.py obstacles.foliage·`foliage_chord`·`foliage_blocked`. 골든 FoliageGoldenVectorsV3.h):
+//   나무인 원판(FoliageTrees[k] ≠ 0, nullptr = 모두 — 바위에는 잎이 없다)마다 같은 중심에 잎 원(반지름 FoliageR, 줄기 반지름과 무관)을 둔다.
+//   눈길(선분)이 잎 원들 안을 지나는 길이(겹친 원은 합집합 — 한 번만, FoliageChord)가 FoliageBlock 이상이면 줄기처럼 가린다 (FoliageBlocked).
+//     1·4 표적 보임  bObstacleSight 면 가림 = 줄기 SightBlocked ∨ 잎 FoliageBlocked (InputSightBlocked — 무리 미리 보기 PackPeek 도 같은 Step)
+//   발소리는 가리지 않는다. 부르는 쪽(EcoWorldV3 — FObstacleConfig::Foliage)이 사슴 쪽 세 곳(위협 보임·도주 반사 알아챔·관측 threat_hidden)에도 같은 판정을 쓴다.
+//   현실 근거: 숲에서는 잎·낮은 가지·하층 덤불이 옆 시야를 몇 m 로 줄인다(Mysterud & Østbye 1999 Wildl. Soc. Bull. 27:385)
+//
 // 장애물 돌아가기 (선택, FThreatStepInput::Detour. 기본 nullptr — 없거나 꺼져 있으면 위 그대로이고 장애물 골든과 비트 단위로 같다. 10-17 장애물 끼임 고침,
 //   파이썬 world.py obstacles.detour·`detour_moves`, configs/v3_wild2_obstacle_mirror.yaml. 골든 DetourGoldenVectorsV3.h):
 //   원판이 있을 때만 쓴다. 사슴(EcoWorldV3 C1)과 위협(Step 7′ — 밤잠 배수 뒤·이동 바로 앞)이 같은 DetourStep 을 부른다:
@@ -413,6 +421,139 @@ namespace EcoThreatV3
 			}
 		}
 		return false;
+	}
+
+	// ---- 숲 시야 (야생 2단계 3 의 7) — 머리 주석 '숲 시야', world.py `foliage_chord`·`foliage_blocked`) ----
+	inline constexpr std::int32_t kFoliageSpanCap = 64;   // 눈길 하나의 잎 구간을 한 번에 쌓아 두는 칸 (넘으면 이만큼씩 묶어 차례로 — 같은 값)
+
+	namespace Detail
+	{
+		/**
+		 * 잎 원 하나 (중심 C, 반지름 R) 와 선분 p0 → p1 (p0 = 작은 끝, D = p1 − p0, Dd = D·D) 의 교차 구간 [T0, T1] (world.py `foliage_chord` 의 한 쌍).
+		 * 넓은 거르기: 중심이 선분 상자를 R 만큼 넓힌 상자 [Lx, Hx] × [Ly, Hy] 밖이면 쓰지 않는다 (파이썬과 같은 거르기 — 경계 값까지 같다).
+		 * F = p0 − C, β = F·D, γ = F·F − R², Δ = β² − Dd·γ. Dd > 0 ∧ Δ > 0 이면 T0 = max((−β − √Δ)/Dd, 0), T1 = min((−β + √Δ)/Dd, 1), T1 > T0 일 때만 참.
+		 * max·min 은 numpy maximum·minimum 과 같은 꼴(같으면 앞 값)이다.
+		 */
+		inline bool FoliageSpan(double X0, double Y0, double Dx, double Dy, double Dd, double Lx, double Hx, double Ly, double Hy, double Cx, double Cy,
+								double R, double& T0, double& T1)
+		{
+			if (!(Cx >= Lx && Cx <= Hx && Cy >= Ly && Cy <= Hy))
+			{
+				return false;
+			}
+			const double Fx = X0 - Cx;
+			const double Fy = Y0 - Cy;
+			const double Beta = Fx * Dx + Fy * Dy;
+			const double Gam = Fx * Fx + Fy * Fy - R * R;
+			const double Dsc = Beta * Beta - Dd * Gam;
+			if (!(Dd > 0.0 && Dsc > 0.0))
+			{
+				return false;
+			}
+			const double Sq = std::sqrt(Dsc);
+			const double Ta = (-Beta - Sq) / Dd;
+			const double Tb = (-Beta + Sq) / Dd;
+			T0 = Ta >= 0.0 ? Ta : 0.0;
+			T1 = Tb <= 1.0 ? Tb : 1.0;
+			return T1 > T0;
+		}
+	}
+
+	/**
+	 * 숲 시야 눈길 길이 (world.py `foliage_chord` 한 쌍과 비트 단위로 같다): 선분 A → B 가 잎 원들(원판 Discs (x, y, r) × Num 가운데 나무인 것 — Trees[k] ≠ 0,
+	 * Trees = nullptr 이면 모두 — 의 중심, 반지름 모두 R)의 합집합 안을 지나는 길이. 겹친 원은 한 번만 세서 길이 ≤ |A − B| 이다.
+	 * 끝 순서: (x, 같으면 y) 작은 끝 p0 → 큰 끝 p1 (A·B 를 바꿔도 비트 단위로 같다). 원 순서로 구간(Detail::FoliageSpan)을 모아 T0 순서(같으면 원 순서 —
+	 * np.lexsort 안정 정렬)로 놓고 E = 0 에서 시작해 덮인 t += max(T1 − max(T0, E), 0), E ← max(E, T1). 길이 = 덮인 t × √(D·D). 구간이 없으면 0.
+	 * 구간이 kFoliageSpanCap 을 넘으면 (T0, 원 번호) 순서로 그 칸 수만큼씩 묶어 원판을 다시 훑는다 (같은 순서·같은 식이라 값이 같다 — 비용 = 묶음 수 × 원판 수).
+	 */
+	inline double FoliageChord(double Ax, double Ay, double Bx, double By, const double* Discs, std::int32_t Num, const std::uint8_t* Trees, double R)
+	{
+		if (Discs == nullptr || Num <= 0)
+		{
+			return 0.0;
+		}
+		const bool bSwap = Ax > Bx || (Ax == Bx && Ay > By);
+		const double X0 = bSwap ? Bx : Ax;
+		const double Y0 = bSwap ? By : Ay;
+		const double X1 = bSwap ? Ax : Bx;
+		const double Y1 = bSwap ? Ay : By;
+		const double Dx = X1 - X0;
+		const double Dy = Y1 - Y0;
+		const double Dd = Dx * Dx + Dy * Dy;
+		const double Lx = X0 - R;
+		const double Hx = X1 + R;
+		const double Ly = (Y0 <= Y1 ? Y0 : Y1) - R;
+		const double Hy = (Y0 >= Y1 ? Y0 : Y1) + R;
+		struct FSpan
+		{
+			double T0;
+			double T1;
+		};
+		FSpan Spans[kFoliageSpanCap];
+		std::int32_t Ks[kFoliageSpanCap];
+		double E = 0.0;
+		double Cov = 0.0;
+		bool bAny = false;
+		// 묶음마다 원판을 한 번 훑어 (T0, 원 번호) 순서로 지난 묶음 끝 다음 구간 가운데 앞 kFoliageSpanCap 개만 남긴다 (안정 삽입 — 원 번호는 훑는 차례로
+		// 늘어나서 T0 가 같으면 먼저 넣은 쪽이 앞). 그 차례로 잇고, 칸이 다 찼으면 다음 묶음. 구간 ≤ 칸이면 한 번 훑기(예전 그대로), 넘어도 묶음 수 × 원판 수다
+		double LastT0 = 0.0;
+		std::int32_t LastK = -1;
+		for (;;)
+		{
+			std::int32_t Ns = 0;
+			for (std::int32_t k = 0; k < Num; ++k)
+			{
+				if (Trees != nullptr && Trees[k] == 0)
+				{
+					continue;
+				}
+				double T0 = 0.0, T1 = 0.0;
+				if (!Detail::FoliageSpan(X0, Y0, Dx, Dy, Dd, Lx, Hx, Ly, Hy, Discs[3 * k], Discs[3 * k + 1], R, T0, T1))
+				{
+					continue;
+				}
+				if (LastK >= 0 && !(T0 > LastT0 || (T0 == LastT0 && k > LastK)))
+				{
+					continue;   // 앞 묶음에서 이었다
+				}
+				if (Ns == kFoliageSpanCap && !(T0 < Spans[kFoliageSpanCap - 1].T0))
+				{
+					continue;   // 찼고 맨 뒤보다 앞이 아니다 (T0 같으면 원 번호가 뒤)
+				}
+				std::int32_t p = Ns < kFoliageSpanCap ? Ns : kFoliageSpanCap - 1;   // 찼으면 맨 뒤를 버린다
+				while (p > 0 && Spans[p - 1].T0 > T0)
+				{
+					Spans[p] = Spans[p - 1];
+					Ks[p] = Ks[p - 1];
+					--p;
+				}
+				Spans[p] = FSpan{T0, T1};
+				Ks[p] = k;
+				Ns = Ns < kFoliageSpanCap ? Ns + 1 : Ns;
+			}
+			for (std::int32_t s = 0; s < Ns; ++s)
+			{
+				const double Lo = Spans[s].T0 >= E ? Spans[s].T0 : E;
+				const double G = Spans[s].T1 - Lo;
+				Cov = Cov + (G >= 0.0 ? G : 0.0);
+				E = E >= Spans[s].T1 ? E : Spans[s].T1;
+			}
+			bAny = bAny || Ns > 0;
+			if (Ns < kFoliageSpanCap)
+			{
+				break;
+			}
+			LastT0 = Spans[Ns - 1].T0;
+			LastK = Ks[Ns - 1];
+		}
+		return bAny ? Cov * std::sqrt(Dx * Dx + Dy * Dy) : 0.0;
+	}
+
+	/** 숲 시야 가림 (world.py `foliage_blocked` 한 쌍): FoliageChord ≥ Block. */
+	inline bool FoliageBlocked(double Ax, double Ay, double Bx, double By, const double* Discs, std::int32_t Num, const std::uint8_t* Trees, double R,
+							   double Block)
+	{
+		return FoliageChord(Ax, Ay, Bx, By, Discs, Num, Trees, R) >= Block;
 	}
 
 	struct FObstacleSlideResult
@@ -795,6 +936,12 @@ namespace EcoThreatV3
 		std::int32_t NumObstacles = 0;
 		double ObstacleBody = 0.0;
 		bool bObstacleSight = false;
+		// 숲 시야 (야생 2단계 3 의 7), 머리 주석 '숲 시야'): 참이면 bObstacleSight 의 가림에 잎 가림을 더한다 — Obstacles 가운데 나무인 원판(FoliageTrees[k] ≠ 0,
+		// nullptr = 모두)의 중심에 반지름 FoliageR 잎 원, 눈길이 그 합집합 안을 FoliageBlock 이상 지나면 가림. 거짓(기본) = 지금 그대로
+		bool bFoliage = false;
+		const std::uint8_t* FoliageTrees = nullptr;
+		double FoliageR = 0.0;
+		double FoliageBlock = 0.0;
 		// 장애물 돌아가기 (야생 2단계 3 의 6), 머리 주석 '장애물 돌아가기'): nullptr 이거나 꺼져 있으면 지금 그대로. 원판이 있을 때만 쓴다
 		const FDetourConfig* Detour = nullptr;
 		// 야생 3단계 지역 날씨 (머리 주석 '지역 날씨'): 늑대 시야 반경 = PredViewR × WeatherViewMult (보통 위협의 표적 보임), 속력 × WeatherSpeedMult
@@ -802,6 +949,23 @@ namespace EcoThreatV3
 		double WeatherViewMult = 1.0;
 		double WeatherSpeedMult = 1.0;
 	};
+
+	/** 숲 시야만 (In.bFoliage 일 때 — 줄기와 따로 본다. 도망 기록의 '잎만 가림'). bObstacleSight·원판이 있을 때만. */
+	inline bool InputFoliageBlocked(const FThreatStepInput& In, double Ax, double Ay, double Bx, double By)
+	{
+		return In.bFoliage && In.bObstacleSight && In.Obstacles != nullptr && In.NumObstacles > 0
+			   && FoliageBlocked(Ax, Ay, Bx, By, In.Obstacles, In.NumObstacles, In.FoliageTrees, In.FoliageR, In.FoliageBlock);
+	}
+
+	/** 위협 눈길 가림 (world.py `_ob_occlude` 한 쌍): bObstacleSight 면 줄기 SightBlocked ∨ 숲 시야 InputFoliageBlocked. 원판이 없으면 거짓. */
+	inline bool InputSightBlocked(const FThreatStepInput& In, double Ax, double Ay, double Bx, double By)
+	{
+		if (!In.bObstacleSight || In.Obstacles == nullptr || In.NumObstacles <= 0)
+		{
+			return false;
+		}
+		return SightBlocked(Ax, Ay, Bx, By, In.Obstacles, In.NumObstacles) || InputFoliageBlocked(In, Ax, Ay, Bx, By);
+	}
 
 	struct FThreatStepResult
 	{
@@ -1244,9 +1408,9 @@ namespace EcoThreatV3
 				}
 				if (bVis && (J < 0 || Perceived < DT))
 				{
-					// 세로 장애물: 보통 위협의 눈길이 원판을 지나면 안 보인다 (더 가까운 후보일 때만 재도 결과는 파이썬의 보임 행렬과 같다)
-					if (!bPlayer && In.bObstacleSight && In.Obstacles != nullptr && In.NumObstacles > 0
-						&& SightBlocked(QX, QY, P.X, P.Y, In.Obstacles, In.NumObstacles))
+					// 세로 장애물: 보통 위협의 눈길이 원판을 지나면 안 보인다 (더 가까운 후보일 때만 재도 결과는 파이썬의 보임 행렬과 같다).
+					// 숲 시야(In.bFoliage)면 잎 원 합집합 안 길이가 문턱 이상이어도 안 보인다 (줄기 ∨ 잎)
+					if (!bPlayer && InputSightBlocked(In, QX, QY, P.X, P.Y))
 					{
 						continue;
 					}

@@ -108,7 +108,7 @@ IGNORE_SETTINGS = {"seed", "weather_forest", "weather_highland", "weather_barren
                    "flight_hold_awake", "flight_edge_avoid", "wild_flight", "wild_reserve", "wild_satiation", "realism_vision", "realism_hearing",
                    "shelter_safe", "wolf_body_margin_m", "shelter_food", "pack_hunt", "obstacles", "obstacle_detour", "weather", "no_freeze",
                    "gradual_night", "wolf_eat_seconds", "wolf_eat_steps", "deer_per_region", "wolves_per_region", "stage_size_units", "pred_speed_mult",
-                   "stage_trees", "obstacle_import", "social_control", "protected_refuges"}
+                   "stage_trees", "obstacle_import", "social_control", "protected_refuges", "foliage"}
 IGNORE_WORLD = {"seed", "rng_stream", "world_size", "num_herbivores", "num_stalkers", "num_chasers", "num_ranged", "num_nocturnal", "player_proxy",
                 "pred_speed_mult", "pred_eat_cd", "eat_in_place", "realism_night", "respawn_dead", "day_period", "day_offset", "twilight_steps",
                 "shelter_safe", "shelter_wolf_margin", "protected_refuges", "world_allowed", "food_rules"} | set(FEATURE_MAPS)
@@ -276,6 +276,13 @@ def convert(snap: dict, reference: dict | None, template: Path | None = None, st
     raw["train"]["repertoire"]["allowed"] = allowed
     if S.get("social_control"):
         raise Refused("팀 Social 행동 연결(eco.IntegratedV3.SocialControl 1)을 켠 세계다 — 파이썬에 그 규칙이 없다")
+    # 숲 시야 (eco.IntegratedV3.Foliage, 10-22 C++ — 스냅숏 world.obstacle_rules.foliage·foliage_r·foliage_block, obstacles.foliage_trees). 파이썬
+    # features.obstacles.foliage {enabled, r, block, trees} 대응(지역마다 나무 표·덤불 원판 덧붙이기)을 아직 옮기지 않았다 — 끈 세계로 조용히 바꾸지 않고
+    # 거부한다. 켠 세계 = C++ FObstacleConfig::FoliageConfigured (장애물 ∧ 눈길 가림 ∧ 숲 시야). 옛 스냅숏(칸 없음)은 끈 세계다
+    ob0 = w0["obstacle_rules"]
+    if ob0.get("foliage") and ob0.get("enabled") and ob0.get("block_sight"):
+        raise Refused(f"숲 시야(eco.IntegratedV3.Foliage 1 — 잎 r {ob0.get('foliage_r')}·block {ob0.get('foliage_block')})를 켠 세계다 — "
+                      "adapt 대응(features.obstacles.foliage)을 아직 옮기지 않았다")
     # 은신처 안전·몸 여유
     _set_feature(f, "realism_shelter", "enabled", w0["shelter_safe"], changed, "world.shelter_safe")
     _set_feature(f, "realism_shelter", "wolf_margin", w0["shelter_wolf_margin"], changed, "world.shelter_wolf_margin")

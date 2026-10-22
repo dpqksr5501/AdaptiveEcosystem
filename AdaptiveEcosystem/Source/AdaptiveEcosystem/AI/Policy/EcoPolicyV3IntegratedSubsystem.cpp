@@ -321,6 +321,29 @@ namespace EcoPolicyV3IntegratedImpl
 		ECVF_Default);
 
 #if !UE_BUILD_SHIPPING
+	// 10-22 숲 시야 (파이썬 obstacles.foliage 를 옮김 — 측정·실험 전용이라 개발 빌드만. Shipping 은 늘 끔)
+	static TAutoConsoleVariable<int32> CVarFoliage(
+		TEXT("eco.IntegratedV3.Foliage"),
+		0,
+		TEXT("통합 v3 모드의 숲 시야 (0 = 끔, 기본 — 10-22, 파이썬 features.obstacles.foliage 를 옮김. 개발 빌드 전용). 1 이면 나무 원판(레벨·무대 나무 줄기 — 바위는 빼고)마다 ")
+		TEXT("반지름 eco.IntegratedV3.FoliageR 의 잎 원을 두고, 사슴·늑대 눈길이 잎 원들 안(겹친 몫은 한 번)을 eco.IntegratedV3.FoliageBlock 넘게 지나면 줄기처럼 가린다 — ")
+		TEXT("사슴의 늑대 알아챔·늑대의 표적 고르기·관측 threat_hidden. 발소리는 그대로. R1b 두뇌는 이 세계에서 배우지 않았다(측정용). eco.IntegratedV3.Obstacles 1 일 때만. ")
+		TEXT("Play 전에 바꾼다. 명령줄 -EcoV3Foliage= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarFoliageR(
+		TEXT("eco.IntegratedV3.FoliageR"),
+		6.0f,
+		TEXT("숲 시야 잎 원 반지름 (m, 기본 6 = 파이썬 r 3.0 단위). 0.5~20 m. eco.IntegratedV3.Foliage 1 일 때만. Play 전에 바꾼다. 명령줄 -EcoV3FoliageR= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<float> CVarFoliageBlock(
+		TEXT("eco.IntegratedV3.FoliageBlock"),
+		4.0f,
+		TEXT("숲 시야 문턱 (m, 기본 4 = 파이썬 block 2.0 단위): 눈길이 잎 원들 안을 이만큼 이상 지나면 가린다 — 이보다 가까운 개체는 잎 속에서도 늘 보인다. 0.5~40 m. ")
+		TEXT("eco.IntegratedV3.Foliage 1 일 때만. Play 전에 바꾼다. 명령줄 -EcoV3FoliageBlock= 는 시작값."),
+		ECVF_Default);
+
 	// 10-21 실시간 두뇌 교체 (LIVE_ADAPT_SPEC.md 5.2·5.4 — 개발 빌드만. Shipping 은 늘 끔이라 감시 폴더 기본도 없다)
 	static TAutoConsoleVariable<int32> CVarAutoAdapt(
 		TEXT("eco.IntegratedV3.AutoAdapt"),
@@ -659,6 +682,15 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bSocialControl = CVarSocialControl.GetValueOnGameThread() != 0;
 	S.bObstacles = CVarObstacles.GetValueOnGameThread() != 0;
 	S.bObstacleDetour = CVarObstacleDetour.GetValueOnGameThread() != 0;
+#if !UE_BUILD_SHIPPING
+	S.bFoliage = CVarFoliage.GetValueOnGameThread() != 0;
+	{
+		const double Rm = static_cast<double>(CVarFoliageR.GetValueOnGameThread());
+		const double Bm = static_cast<double>(CVarFoliageBlock.GetValueOnGameThread());
+		S.FoliageRM = FMath::IsFinite(Rm) ? FMath::Clamp(Rm, 0.5, 20.0) : 6.0;
+		S.FoliageBlockM = FMath::IsFinite(Bm) ? FMath::Clamp(Bm, 0.5, 40.0) : 4.0;
+	}
+#endif
 	S.ObstacleExportPath = CVarObstacleExport.GetValueOnGameThread();
 	S.ObstacleImportPath = CVarObstacleImport.GetValueOnGameThread();
 	S.bStageTrees = CVarStageTrees.GetValueOnGameThread() != 0;
@@ -893,6 +925,23 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.StageTrees"), LexToString(TreesArg));
 	}
+#if !UE_BUILD_SHIPPING
+	int32 FoliageArg = 0;
+	if (FParse::Value(CmdLine, TEXT("EcoV3Foliage="), FoliageArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.Foliage"), LexToString(FoliageArg));
+	}
+	float FoliageRArg = 6.0f;
+	if (FParse::Value(CmdLine, TEXT("EcoV3FoliageR="), FoliageRArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.FoliageR"), LexToString(FoliageRArg));
+	}
+	float FoliageBlockArg = 4.0f;
+	if (FParse::Value(CmdLine, TEXT("EcoV3FoliageBlock="), FoliageBlockArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.FoliageBlock"), LexToString(FoliageBlockArg));
+	}
+#endif
 	int32 WeatherArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3Weather="), WeatherArg))
 	{
@@ -1185,6 +1234,12 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 									   : TEXT("끔 (eco.IntegratedV3.ObstacleDetour 0 — 미끄러짐만)"),
 								   Settings.ObstacleImportPath.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" | 측정 전용 원판 가져오기: %s"), *Settings.ObstacleImportPath))
 				 : FString(TEXT("끔 (eco.IntegratedV3.Obstacles 0 — 읽기만 하고 세계에 넣지 않는다)"))));
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 숲 시야: %s"),
+		   *(Settings.bFoliage && Settings.bObstacles
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.Foliage 1, 10-22 — 측정용, R1b 는 배우지 않은 세계) — 나무 원판마다 잎 원 %.1f m, 눈길이 잎 안을 %.1f m 이상 지나면 가림 ")
+									   TEXT("(사슴의 늑대 알아챔·늑대 표적·관측 threat_hidden, 발소리 그대로)"),
+								   Settings.FoliageRM, Settings.FoliageBlockM)
+				 : FString(TEXT("끔 (eco.IntegratedV3.Foliage 0, 기본 — 줄기만 가림)"))));
 	{
 		FString Counts;
 		for (const EcoTreeLayoutV3::FStageTrees& St : EcoTreeLayoutV3::kStages)
@@ -1609,6 +1664,10 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	C.Obstacles.bEnabled = S.bObstacles;
 	// 장애물 돌아가기 (eco.IntegratedV3.ObstacleDetour, 10-17 끼임 고침): 값 = configs/v3_wild2_obstacle_mirror.yaml obstacles.detour_* (FDetourConfig 기본값)
 	C.Obstacles.Detour.bEnabled = S.bObstacleDetour;
+	// 숲 시야 (eco.IntegratedV3.Foliage, 10-22 — 개발 빌드, 기본 끔): 반지름·문턱 m → 단위. 나무 표는 무대를 만들 때 원판과 함께 넣는다 (ObstacleIsTree)
+	C.Obstacles.Foliage.bEnabled = S.bFoliage;
+	C.Obstacles.Foliage.R = S.FoliageRM * 100.0 / EcoRepertoireV3::kUnitCm;
+	C.Obstacles.Foliage.Block = S.FoliageBlockM * 100.0 / EcoRepertoireV3::kUnitCm;
 	// 지역 날씨 (eco.IntegratedV3.Weather, 10-18 야생 3단계): 그 지역의 팀 설계 날씨 (덮기 글자가 있으면 그것). 계수 = configs/v3_wild3_mirror.yaml (FWeatherConfig 기본값)
 	C.Weather = S.WeatherFor(RegionId);
 	// 감지 기록 (기록만 — 10초 여덟째 줄의 감지 띠·들어서만)
@@ -2928,6 +2987,11 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		{
 			Config.Obstacles.Discs = Imported ? *Imported : MergeDiscs(Scan.Discs, Trees.Discs, &IsTree, &Scan.IsLevelTree);
 		}
+		// 숲 시야 나무 표 (10-22): 세계 원판마다 나무 줄기에서 왔나 — 바위 등 다른 충돌 메시에는 잎이 없다. 가져온 원판(측정 전용)은 표가 없어 모두 나무로 본다
+		if (Config.Obstacles.bEnabled && !Imported && IsTree.Num() == Config.Obstacles.Num())
+		{
+			Config.Obstacles.Foliage.Trees.assign(IsTree.GetData(), IsTree.GetData() + IsTree.Num());
+		}
 		FEcoV3RegionContext* Ctx = AddContext(G.RegionId, RegionIndex, Origin, Config, G.Herbivores, G.Wolves);
 		Ctx->ObstacleScan = MoveTemp(Scan);
 		Ctx->bObstaclesImported = Settings.bObstacles && Imported != nullptr;
@@ -3376,9 +3440,18 @@ void UEcoPolicyV3IntegratedSubsystem::LogObsParity(FEcoV3RegionContext& Ctx, con
 		{
 			Discs += FString::Printf(TEXT(" %s,%s,%s"), *G17(Ob.Discs[3 * k]), *G17(Ob.Discs[3 * k + 1]), *G17(Ob.Discs[3 * k + 2]));
 		}
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3Obs] %s 원판 | 원판 %d | 몸 %s | 무대 %s | 가림 %d | 두뇌 %s 관측 %d | 분모 %s %s |%s"), *Ctx.RegionId.ToString(), K,
-			   *G17(Ob.bEnabled ? Ob.BodyR : 0.0), *G17(Ctx.Sim.Config.WorldSize), Ob.bEnabled && Ob.bBlockSight ? 1 : 0, *GetActiveBrain().Id, Ctx.Sim.ObsDim,
-			   *G17(Ctx.Sim.ObstacleObsCfg.EscapeNorm), *G17(Ctx.Sim.ObstacleObsCfg.NearNorm), *Discs);
+		// 숲 시야 (10-22): 관측 가림이 쓰는 값 그대로 (ObstacleObsInputOf — 켬 = FoliageOn, 반지름·문턱 단위, 원판마다 나무 1·아님 0, 원판이 없으면 '-').
+		// unreal_parity.py 가 켠 판이면 잎 원 중심 = 나무 원판으로 다시 잰다
+		FString FolTrees;
+		const uint8* FolTr = Ob.FoliageTrees();
+		for (int32 k = 0; k < K; ++k)
+		{
+			FolTrees += (FolTr == nullptr || (k < static_cast<int32>(Ob.Foliage.Trees.size()) && FolTr[k] != 0)) ? TEXT("1") : TEXT("0");
+		}
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3Obs] %s 원판 | 원판 %d | 몸 %s | 무대 %s | 가림 %d | 두뇌 %s 관측 %d | 분모 %s %s | 잎 %d %s %s %s |%s"),
+			   *Ctx.RegionId.ToString(), K, *G17(Ob.bEnabled ? Ob.BodyR : 0.0), *G17(Ctx.Sim.Config.WorldSize), Ob.bEnabled && Ob.bBlockSight ? 1 : 0,
+			   *GetActiveBrain().Id, Ctx.Sim.ObsDim, *G17(Ctx.Sim.ObstacleObsCfg.EscapeNorm), *G17(Ctx.Sim.ObstacleObsCfg.NearNorm), Ob.FoliageOn() ? 1 : 0,
+			   *G17(Ob.Foliage.R), *G17(Ob.Foliage.Block), FolTrees.IsEmpty() ? TEXT("-") : *FolTrees, *Discs);
 	}
 	for (int32 r = 0; r < Num; ++r)
 	{

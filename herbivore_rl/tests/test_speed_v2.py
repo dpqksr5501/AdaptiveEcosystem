@@ -19,7 +19,7 @@ import yaml
 
 import env_v2.features as F
 from env.config import ROOT, load_config
-from env.world import World as WorldV1
+import kin_seq
 from env_v2 import rollout as ro
 from env_v2.config import load_v2_config
 from env_v2.steering import EPS, normalize, steer
@@ -27,6 +27,10 @@ from env_v2.vec_env import MultiWorldVecEnv
 from env_v2.world import (ACT_DIM, ACT_SPEED, GAIT_RUN, GAIT_STAT_COLUMNS, GAIT_STOP, GAIT_WALK, World,
                           action_dim, action_names)
 from policies.registry import make_policy
+
+# v1 env/world.py 를 동족 무리 중심·분리 j 차례 합으로만 바꾼 사본 (tests/kin_seq.py) — env_v2 가 10-22 부터 C++ 과 같은 그 차례로 더해
+# v1 원본(행렬곱, 한 줄도 바꾸지 않는다)과는 끝 비트가 다르다. '기능을 끄면 v1 과 비트 동일' 은 이 사본과 견준다
+WorldV1 = kin_seq.world_v1()
 
 V2_1 = ROOT / "configs" / "v2_1.yaml"
 NAMES5 = ("forage", "cohesion", "flee_dist", "cover", "speed")

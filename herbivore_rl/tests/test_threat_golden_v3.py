@@ -318,7 +318,7 @@ def test_edge_cases_follow_contract(golden):
     assert E("graze_cover_safe")["d_t"] == pytest.approx(1.125)
     assert E("freeze_vs_graze_target")["target"] == 1
     # 동점 = 낮은 색인
-    for name in ("tie_target", "tie_target_swapped", "player_tie_target"):
+    for name in ("tie_target", "tie_target_swapped", "player_tie_target", "stalker_tie_target"):    # 잠행형 = 10-22 끝 사례
         assert E(name)["target"] == 0, name
     for name in ("tie_catch", "player_tie_catch"):
         assert E(name)["caught"] == 0, name

@@ -3,8 +3,9 @@
 - numpy PCG64 이어 받기가 numpy 와 같은 64 비트 수열을 낸다.
 - 저장소 두뇌 파일이 평가기의 검사(계약·차원·문턱·sha256·골든)를 통과한다.
 - 평가기 설정(파이썬 거울 세계 → 스냅숏 지역 world 블록 꼴)이 스냅숏 world 블록과 같다(시드·난수 갈래·팀 은신처 생명주기·포만(N)·세계 허용 칸 표기 빼고).
-- 같은 시작 상태에서 C++ 세계가 파이썬 세계와 비트 단위로 같다 — 파이썬 동족 무리 중심·분리 행렬곱만 C++ 과 같은 차례 합으로 바꾸면(진단 seq_kin,
-  world.py 는 그대로) 궤적 모든 칸이 같고, 그대로 두면 시작 지각의 끝 비트만 다르다(행렬곱 더하는 순서).
+- 같은 시작 상태에서 C++ 세계가 파이썬 세계(world.py 그대로)와 비트 단위로 같다 — 궤적 모든 칸·기록 칸 전체. 10-22 world.py 가 동족 무리 중심·분리를
+  C++ PerceiveKin 과 같은 j 차례 합으로 더한다(`_seq_sum`). 그 전에는 행렬곱이라 시작 지각의 그 두 칸만 끝 비트가 달랐고, 이 시험은 그 두 칸만 바꾼
+  진단 기하(옛 ceval.seq_kin_geometry)로 같음을 보았다 — 진단은 world.py 와 같아져 지웠다.
 - Pool.run 기록 칸 = 파이썬 판정 기록 칸 (+ native), 'multi' 는 판정 길이마다 at.
 평가기 실행 파일이 없으면 건너뛴다 (빌드: AdaptiveEcosystem/Tools/EcoV3Eval/build.ps1).
 """
@@ -88,34 +89,31 @@ def test_world_block_matches_snapshot(ce, prepared):
             assert wb["weather"]["kind"] == wx["kind"]
 
 
-def test_bit_identical_with_sequential_kin_sums(ce, prepared):
+def test_bit_identical_to_python_world(ce, prepared):
+    """궤적 150 스텝: 첫 비트 차이가 없다. 시작 지각의 동족 무리 중심·분리도 0 차이다 (10-22 전에는 이 두 칸만 1e-15 쯤 달랐다 — 행렬곱 순서)."""
     kind, tag, job = ce.eval_items(prepared["info"], "t", prepared["zip"], [34901], 150, "N")[0]
     row = ce.run_native([ce.native_job(job, 0, trace=150)], BRAIN21, 1)[0]
-    seq = ce.trace_diff(ce.python_trace(job, prepared["zip"], 150, seq_kin=True), row)
-    assert seq["first_bit_difference"] is None, seq["rows"][seq["first_bit_difference"]]
     real = ce.trace_diff(ce.python_trace(job, prepared["zip"], 150), row)
+    assert real["first_bit_difference"] is None, real["rows"][real["first_bit_difference"]]
     r0 = real["rows"][0]
-    # 시작 상태는 그대로 옮긴다: 자리·heading·에너지·관측·늑대 모두 같고, 동족 무리 중심·분리만 끝 비트가 다르다 (MKL 행렬곱 순서)
-    assert (r0["pos"], r0["head"], r0["energy"], r0["obs"], r0["wolf_pos"], r0["away_from_pred"], r0["food_grad"]) == (0.0,) * 7
-    assert 0.0 < max(r0["to_centroid"], r0["separation"]) < 1e-12
+    assert (r0["pos"], r0["head"], r0["energy"], r0["obs"], r0["wolf_pos"], r0["away_from_pred"], r0["food_grad"], r0["to_centroid"],
+            r0["separation"]) == (0.0,) * 9
 
 
-def test_records_equal_seq_kin_python_judge(ce, prepared, monkeypatch):
+def test_records_equal_python_judge(ce, prepared, monkeypatch):
     """Step 안 도망 기록(EcoWorldV3.h FlightBeforeThreatStep·FlightStepEnd — 스텝 끝 은신처·표적·사냥, 실행한 FLEE·반사)과 기록 칸 전체가 파이썬 판정
-    (r4_eval._one·live._world_multi — 동족 차례 합 기하만 바꾼 판)과 같다: N·G 세계 지역 셋 × 300 스텝, 'multi' 판정 길이마다 at 의 도망 기록까지.
+    (r4_eval._one·live._world_multi — world.py 그대로)과 같다: N·G 세계 지역 셋 × 300 스텝, 'multi' 판정 길이마다 at 의 도망 기록까지.
     골든(Flight.Golden)은 파이썬이 적은 재료를 순수 함수에 넣어 보므로 Step 안에서 재료를 뜨는 자리는 이 대조만 본다."""
     import copy
 
     import adapt as ad
     import live
-    from env_v2 import world as wm
 
     items = (ce.eval_items(prepared["info"], "t", prepared["zip"], [34903], 300, "N")
              + ce.eval_items(prepared["info"], "t", prepared["zip"], [34903], 300, "G", "multi", [150, 300]))
-    nat = ce.Pool(2, brain=BRAIN21).run(copy.deepcopy(items))                 # 네이티브 먼저 (파이썬 World 를 바꾸기 전)
+    nat = ce.Pool(2, brain=BRAIN21).run(copy.deepcopy(items))
     import run_mirror as rm
 
-    monkeypatch.setattr(wm.World, "_geometry", ce.seq_kin_geometry(wm.World._geometry))
     monkeypatch.setattr(rm, "apply_unreal_map", rm.apply_unreal_map)          # 판정 함수가 덮는 먹이 지도 훅을 시험 뒤 되돌린다
     tot = dict(started=0, own_n=0, caught=0, shelter_end=0, flee=0)
     for (kind, tag, job), (_, r) in zip(items, nat):
@@ -138,19 +136,26 @@ def test_records_equal_seq_kin_python_judge(ce, prepared, monkeypatch):
 
 def test_world_block_refuses_unported_settings(ce, prepared):
     """평가기가 옮기지 않는 칸이 바탕과 다르면 거부한다 (허용 목록): 도망길 측정(route_fixed — 'run' 도 도망길 기록을 낼 수 없다·quiet_end),
-    숲 시야(obstacles.foliage — C++ 에 없다), 늑대·밤 계수, v1 상수. 옮기는 칸(포만 끔 N·wild_flight 계수)과 끔 값을 적은 선택 키는 받는다."""
+    늑대·밤 계수, v1 상수. 옮기는 칸(포만 끔 N·wild_flight 계수·숲 시야 obstacles.foliage — 10-22 C++ 에 옮김)과 끔 값을 적은 선택 키는 받는다."""
     import adapt as ad
 
+    def job_of(sets):
+        return ad.make_jobs(prepared["info"], prepared["zip"], [34900], 1, True, dict(name="t", sets=sets))[0]
+
     def block(sets):
-        job = ad.make_jobs(prepared["info"], prepared["zip"], [34900], 1, True, dict(name="t", sets=sets))[0]
-        return ce.world_block(ce.make_world(job))
+        return ce.world_block(ce.make_world(job_of(sets)))
 
     for sets in ({"wild_satiation.enabled": False}, {"wild_flight.alert_r": 16.0}, {"wild_flight.route_fixed": None, "wild_flight.quiet_end": 0},
                  {"obstacles.foliage": {"enabled": False, "r": 1.5}}):
-        block(sets)
+        assert block(sets)["obstacle_rules"]["foliage"] is False
+    # 숲 시야: world 블록 obstacle_rules 의 foliage·foliage_r·foliage_block, 일의 foliage_trees (원판마다 0/1 — 스냅숏 원판은 fixed 라 모두 나무)
+    on = block({"obstacles.foliage": {"enabled": True, "r": 2.5, "block": 1.5}})["obstacle_rules"]
+    assert (on["foliage"], on["foliage_r"], on["foliage_block"]) == (True, 2.5, 1.5)
+    nj = ce.native_job(job_of({"obstacles.foliage": {"enabled": True}}), 0)
+    assert len(nj["foliage_trees"]) == len(nj["discs"]) > 0 and set(nj["foliage_trees"]) == {1}
+    assert ce.native_job(job_of({}), 0)["foliage_trees"] == []
     for sets in ({"wild_flight.route_fixed": "open"}, {"wild_flight.route_fixed": "run"}, {"wild_flight.quiet_end": 15},
-                 {"threats.stalk_dist": 7.0}, {"realism_night.settle_r": 9.0}, {"pred_sleep.sleep_dark": 0.4}, {"obstacle_obs.escape_norm": 12.0},
-                 {"obstacles.foliage": {"enabled": True}}):
+                 {"threats.stalk_dist": 7.0}, {"realism_night.settle_r": 9.0}, {"pred_sleep.sleep_dark": 0.4}, {"obstacle_obs.escape_norm": 12.0}):
         with pytest.raises(ValueError):
             block(sets)
     job = ad.make_jobs(prepared["info"], prepared["zip"], [34900], 1, True)[0]
@@ -172,7 +177,7 @@ def test_live_evaluator_hook(ce):
             "EcoRefugeSafetyV3.h", "EcoSha256.h", "PolicyWeightsV3.h", "MiniJson.h", "Pcg64.h"} <= names
 
 
-def test_pool_record_schema(ce, prepared):
+def test_pool_record_schema(ce, prepared, monkeypatch):
     items = (ce.eval_items(prepared["info"], "t", prepared["zip"], [34902], 40, "N", "world")
              + ce.eval_items(prepared["info"], "t", prepared["zip"], [34902], 40, "G", "multi", [20, 40]))
     out = ce.Pool(2, brain=BRAIN21).run(items)
@@ -187,7 +192,9 @@ def test_pool_record_schema(ce, prepared):
             assert set(r["at"]) == {"20", "40"} and r["at"]["40"]["caught"] == r["caught"]
     # 파이썬 판정 기록과 같은 칸 (r4_eval._one 하나만 돌려 견준다 — 40 스텝)
     import adapt as ad
+    import run_mirror as rm
 
+    monkeypatch.setattr(rm, "apply_unreal_map", rm.apply_unreal_map)          # _world_one 이 덮는 먹이 지도 훅을 시험 뒤 되돌린다 (뒤 시험 test_adapt_v3 의 지도 재현)
     kind, tag, job = items[0]
     py = ad._world_one(dict(job))
     assert set(py) | {"native"} == set(out[0][1])

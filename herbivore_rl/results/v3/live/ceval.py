@@ -7,7 +7,7 @@
     python results/v3/live/ceval.py selftest                       # PCG64 이어 받기 = numpy, 저장소 두뇌 파일 검사
     python results/v3/live/ceval.py compare --snapshot results/v3/live/pilot/eco_v3_snapshot_s20004_t475_e1.json \\
         --brain ../AdaptiveEcosystem/EcoBrains/v3_r1_g995_s3_obs21zero.json --seeds 34900-34904 --horizon 1800 --worlds N G --workers 4 \\
-        --trace 1800 --py-seq-kin        # 결과 → AdaptiveEcosystem/Saved/EcoV3Eval/compare/<이름>/compare.json (git 밖)
+        --trace 1800                     # 결과 → AdaptiveEcosystem/Saved/EcoV3Eval/compare/<이름>/compare.json (git 밖)
 
 live.py 와 같은 꼴 (나중에 live.py 가 바꿔 쓸 수 있게 — 이 파일은 live.py 를 고치지 않는다):
     items = ceval.eval_items(info, tag, model, seeds, steps, world, kind, horizons)   # = live.eval_items (adapt.make_jobs 그대로)
@@ -19,6 +19,9 @@ live.py 와 같은 꼴 (나중에 live.py 가 바꿔 쓸 수 있게 — 이 파�
   실행 파일이 소스(include 닫힘)보다 오래되면 쓰지 않는다(다시 빌드하라고 멈춘다).
   세계 설정은 허용 목록으로 본다: 바탕(REF_CFG — C++ 상수가 맞춘 판정 세계)과 다른 칸은 world 블록·시작 상태로 옮기는 칸(FREE_V1·FREE_FEATURES)이어야
   하고, 그 밖 칸이 다르면(예: wild_flight.route_fixed·quiet_end, threats·realism_night 계수) 거부한다 — C++ 이 제 상수로 다른 세계를 돌지 않게.
+  숲 시야(features.obstacles.foliage, 10-21)는 C++ 에 옮겼다(EcoThreatModel.h FoliageChord·FoliageBlocked, EcoWorldV3.h FObstacleConfig::Foliage) — world 블록
+  obstacle_rules 의 foliage·foliage_r·foliage_block 과 일의 foliage_trees(원판마다 나무 0/1)로 넘긴다. 도망길 COVER 그늘의 잎(route_fixed)은 파이썬 전용이라
+  route_fixed 를 거부하는 것은 그대로다. compare --world-set 키=값 (route_rules.py 와 같은 점 경로 덮기)으로 숲 시야 세계를 견준다.
 
 세계 하나 (파이썬 거울 실행기 run_mirror.run_world 와 같은 세계):
   1) 파이썬이 job 의 설정·시드로 World 를 만들고(reset — 시작 자리·방향·늑대 구성·은신처·원판), 스냅숏 먹이 지도를 덮는다(adapt.apply_snapshot_food).
@@ -28,13 +31,19 @@ live.py 와 같은 꼴 (나중에 live.py 가 바꿔 쓸 수 있게 — 이 파�
      뽑는다(거울 세계의 스텝 안 난수는 그것뿐). 통합 모드처럼 산 사슴만 Step 에 넘기고, 언리얼 이동 제약(TraceMove 훅)은 없다(파이썬도 없다).
   기록 칸·뜻은 파이썬 판정 기록과 같다(잡힘·굶음·산·은신처 안·행동별 사슴-스텝·은신처 안 잡힘·사냥·날씨·도망 기록 flight·판정 길이마다 at) + 'native'(속도·두뇌).
 
-파리티 (10-21 compare, 스냅숏 s20004_t475_e1 · R1b-F + 0 열 관측 21 · 시드 34900~34904 × 지역 셋 × 1800 스텝 · N·G):
-  - 파이썬 그대로와는 기록이 정확히 같은 세계가 2/30 뿐이다. 까닭은 하나다: 파이썬 World._geometry 는 동족 무리 중심·분리를 행렬곱(MKL dgemm)으로 더하고
-    C++ PerceiveKin 은 j 차례로 더한다 — 시작 상태가 같아도 스텝 0 의 그 두 칸만 끝 비트(1e-15~1e-14)가 다르고, 혼돈이라 223~769 스텝에 첫 이산 갈림이 난다.
-  - 그 두 칸만 같은 차례 합으로 바꾼 파이썬(--py-seq-kin 진단, world.py 는 그대로)과는 30/30 세계 기록이 정확히 같고, 1800 스텝 궤적 셋(사슴 자리·heading·
-    에너지·비축·관측 21·행동·요청·덮기, 늑대 자리·쿨다운·표적·잠)이 비트 단위로 같다 — 시작 상태 옮기기·PCG64 이어 받기·Step·망(torch 와 argmax 동점 없음)이 같다.
-  - 지표 통계(짝 z, 같은 시작 상태)는 N·G 23 지표 모두 |z| < 2 (compare 출력·compare.json).
-  그래서 compare 는 첫 갈림 스텝(궤적 대조)·차례 합 판과의 정확 일치·지표별 통계 일치(z)를 함께 보고한다.
+파리티 — 10-22 부터 파이썬 거울 세계와 비트 단위로 같다:
+  - 10-21 compare (스냅숏 s20004_t475_e1 · R1b-F + 0 열 관측 21 · 시드 34900~34904 × 지역 셋 × 1800 스텝 · N·G)에서 파이썬 그대로와 기록이 정확히 같은
+    세계는 2/30 뿐이었다. 까닭은 하나였다: 파이썬 World._geometry 가 동족 무리 중심·분리를 행렬곱(MKL dgemm)·np.sum(쌍 합)으로 더하고 C++ PerceiveKin 은
+    j 차례로 더해, 시작 상태가 같아도 스텝 0 의 그 두 칸만 끝 비트(1e-15~1e-14)가 달랐고 혼돈이라 223~769 스텝에 첫 이산 갈림이 났다. 그 두 칸만 같은
+    차례 합으로 바꾼 진단(그때의 --py-seq-kin)과는 30/30 이 같았다(숲 시야 켬 900 스텝 18/18 도).
+  - 10-22 world.py 가 그 두 칸을 C++ 과 같은 j 차례 합(`_seq_sum` — np.cumsum, 세계 스텝 +2.5~3.6 %)으로 더한다. 진단은 world.py 와 같아져 지웠다.
+    같은 compare (진단 없이 world.py 그대로): N 15/15·G 15/15 세계 기록이 정확히 같고, 1800 스텝 궤적 셋(지역 셋 × 시드 34900 — 사슴 자리·heading·에너지·비축·
+    관측 21·행동·요청·덮기·동족 무리 중심·분리, 늑대 자리·쿨다운·표적·잠)에 첫 비트 차이가 없다. 짝 z 는 모든 지표 0 (차이 0). 숲 시야 켬
+    (--world-set features.obstacles.foliage.enabled=true ·r=3.0 ·block=2.0, 같은 시드 × 1800): N 15/15·G 15/15, 궤적 셋 비트 동일 (잎 놓침 lost_foliage
+    네이티브 N 360·G 200). 시작 상태 옮기기·PCG64 이어 받기·Step·망(torch 와 argmax 동점 없음)이 같다.
+  - 학습된 두뇌·가중치는 그대로다(바뀐 것은 동족 두 칸의 끝 비트 셈뿐 — 같은 세계의 통계는 그대로 같은 분포다). 옛 파이썬 판정 기록과는 세계마다 같지
+    않을 수 있다(수백 스텝 뒤 갈림 — 판정 저장 열쇠에 world.py 바이트가 들어가 섞이지 않는다).
+  그래서 compare 는 '기록이 정확히 같은 세계'(파리티 검사)·첫 갈림 스텝(궤적 대조)·지표별 통계 일치(z)를 보고한다.
 """
 
 from __future__ import annotations
@@ -92,7 +101,8 @@ _FREE_EXTRA = {
     "daynight": ("periods", "twilight"),                                          # day_period·twilight_steps (실제 값 dn_period·dn_tw)
     "integrated_stage": ("*",),                                                   # 시작 배치 = 시작 상태, ema_den·day_offset 은 world 블록 (부활은 따로 거부)
     "wild_weather": ("region", "regions"),                                        # 날씨 kind·intensity (시간표는 바탕 그대로 null 이어야)
-    "obstacles": ("fixed", "tree_per_ha", "tree_r", "rock_per_ha", "rock_r"),     # 원판 = 시작 상태 discs
+    "obstacles": ("fixed", "tree_per_ha", "tree_r", "rock_per_ha", "rock_r",      # 원판 = 시작 상태 discs
+                  "foliage"),                                                     # 숲 시야 = obstacle_rules.foliage* + 일의 foliage_trees (10-22 C++ 에 옮김)
     "obstacle_obs": ("enabled",),                                                 # 관측 칸 수는 두뇌 계약이 정한다 (계수는 바탕 그대로)
 }
 FREE_FEATURES = {blk: frozenset(keys) | frozenset(_FREE_EXTRA.get(blk, ())) for blk, keys in ad.FEATURE_MAPS.values()}
@@ -227,76 +237,14 @@ def _brain_for_zip(model: Path) -> Path:
 # --------------------------------------------------------------------- #
 
 
-def _seq_rows(a: np.ndarray, b: np.ndarray) -> np.ndarray:
-    """a (n, N) @ b (N, k) 를 j 차례 합으로 (C++ PerceiveKin 의 SumX·CX 와 같은 순서 — np.cumsum 은 왼쪽부터 차례로 더한다)."""
-    return np.cumsum(a[:, :, None] * b[None, :, :], axis=1)[:, -1, :]
-
-
-def _seq_kin_vectors(w, rows: np.ndarray) -> tuple:
-    """World._geometry 의 동족 무리 중심 방향(to_centroid)·분리(separation)를 같은 식으로, 행렬곱 대신 j 차례 합(C++ PerceiveKin 순서)으로 다시 잰다.
-    vigilance 를 끈 세계만 (경계 시야 _wide 없음)."""
-    from env_v2.steering import EPS, clamp_magnitude, normalize
-
-    if w._vg is not None:
-        raise ValueError("seq_kin 진단은 vigilance 를 끈 세계만 받는다")
-    cfg = w.cfg
-    P, Hd = w.pos[rows], w.head[rows]
-    ar = np.arange(len(rows))
-    dx = w.pos[:, 0][None, :] - P[:, 0:1]
-    dy = w.pos[:, 1][None, :] - P[:, 1:2]
-    dist = np.sqrt(dx * dx + dy * dy)
-    invd = 1.0 / np.maximum(dist, EPS)
-    kin_cos = cfg.fov_cos if w._zv is None else w._zv["kin_cos"]
-    kin_vis = (dist <= cfg.see_r) & ((dx * Hd[:, 0:1] + dy * Hd[:, 1:2]) * invd >= kin_cos)
-    kin_vis[ar, rows] = False
-    dead = None if w.alive is None else ~w.alive
-    if dead is not None:
-        kin_vis[:, dead] = False
-    kin_f = kin_vis.astype(np.float64)
-    kin_count = kin_f.sum(1)
-    centroid = _seq_rows(kin_f, w.pos) / np.maximum(kin_count, 1.0)[:, None]
-    to_centroid = np.where(kin_count[:, None] > 0, normalize(centroid - P), 0.0)
-    wgt = np.clip(1.0 - dist / cfg.sep_radius, 0.0, None)
-    wgt[ar, rows] = 0.0
-    if dead is not None:
-        wgt[:, dead] = 0.0
-    c = wgt * invd
-    separation = clamp_magnitude(-(_seq_rows(c, w.pos) - _seq_rows(c, np.ones((c.shape[1], 1))) * P), 1.0)
-    return to_centroid, separation
-
-
-def seq_kin_geometry(orig):
-    """진단 전용 (compare --py-seq-kin): 원래 World._geometry(orig) 를 부른 뒤 동족 무리 중심·분리 두 칸만 차례 합으로 다시 잰 값으로 덮는 함수.
-    파이썬은 이 둘을 행렬곱(MKL dgemm — 더하는 순서가 C++ 과 다르다)으로 더한다. 두 칸은 조향에만 쓰이고 관측·다른 기하 칸이 읽지 않는다.
-    env_v2/world.py 는 고치지 않고 소스도 읽지 않는다(다른 작업이 파일을 고치는 중이어도 된다)."""
-
-    def _geometry(self, idx=None, out=None):
-        res = orig(self, idx, out)
-        rows = np.arange(self.N) if idx is None else np.asarray(idx)
-        tc, sep = _seq_kin_vectors(self, rows)
-        if out is None:
-            res["to_centroid"], res["separation"] = tc, sep
-        else:
-            res["to_centroid"][rows], res["separation"][rows] = tc, sep
-        return res
-
-    return _geometry
-
-
-def make_world(job: dict, seq_kin: bool = False):
-    """run_mirror.run_world 와 같은 세계 (reset + 스냅숏 먹이 지도 또는 언리얼 지도 덮기). seq_kin = 진단 전용 차례 합 기하(seq_kin_geometry)."""
-    import types
-
+def make_world(job: dict):
+    """run_mirror.run_world 와 같은 세계 (reset + 스냅숏 먹이 지도 또는 언리얼 지도 덮기)."""
     from env.config import Config
     from env_v2.world import World
 
     import run_mirror as rm
 
     w = World(Config(job["cfg"]), seeds=[int(job["seed"])])
-    if seq_kin:
-        w._geometry = types.MethodType(seq_kin_geometry(World._geometry), w)
-        w._g = w._geometry()
-        w._obs = w._obs_from(w._g)
     if w.alive is None:
         raise ValueError("평가기는 부활 없는 판정 세계(integrated_stage.respawn false)만 받는다")
     if job.get("snap_food") is not None:
@@ -377,9 +325,6 @@ def world_block(w, protected_refuges: bool = False) -> dict:
     if w._wf is not None and (w._wf.get("route_fixed") is not None or int(w._wf.get("quiet_end", 0) or 0) > 0):
         # 10-21 도망길 측정(route_fixed·quiet_end)은 C++ 에 없다 — 'run' 도 세계는 같지만 도망길 기록(flight.route 등)을 낼 수 없다
         raise ValueError(f"wild_flight.route_fixed {w._wf.get('route_fixed')!r}·quiet_end {w._wf.get('quiet_end')!r} 는 C++ 세계에 없다 — 평가기가 받지 않는다")
-    if w._ob is not None and w._ob.get("foliage") is not None:
-        # 10-21 숲 시야(obstacles.foliage — 잎 원이 눈길을 가림)는 측정 전용이고 C++ SightBlocked 는 줄기만 본다
-        raise ValueError("features.obstacles.foliage(숲 시야)는 C++ 세계에 없다 — 평가기가 받지 않는다")
     bad = unsupported_settings(cfg.to_dict())
     if bad:
         raise ValueError(f"평가기가 옮기지 않는 세계 칸이 바탕({REF_CFG.name})과 다르다 — C++ 은 제 상수로 돈다: " + "; ".join(bad[:8])
@@ -405,6 +350,12 @@ def world_block(w, protected_refuges: bool = False) -> dict:
         for k in keys:
             blk[k] = bool(f.enabled(pblock)) if k == "enabled" else p[k]
         wb[sblock] = blk
+    # 숲 시야 (10-22, C++ FObstacleConfig::Foliage — 스냅숏 obstacle_rules 와 같은 이름, 끈 세계는 foliage false·켤 때 값). 나무 표는 native_job 의 foliage_trees
+    fo = foliage_of(w)
+    fdef = foliage_defaults()
+    wb["obstacle_rules"]["foliage"] = fo is not None
+    wb["obstacle_rules"]["foliage_r"] = float(fo["r"] if fo is not None else fdef["r"])
+    wb["obstacle_rules"]["foliage_block"] = float(fo["block"] if fo is not None else fdef["block"])
     wx = wb["weather"]
     if w._wx is not None:
         wx["kind"], wx["intensity"] = WEATHER[int(w.weather_kind)], float(w.weather_intensity)
@@ -412,6 +363,29 @@ def world_block(w, protected_refuges: bool = False) -> dict:
         wx["kind"], wx["intensity"] = "clear", 0.0
     wx["schedule_rows"] = 0
     return wb
+
+
+def foliage_defaults() -> dict:
+    """숲 시야 끔 값 (features.OPTIONAL_KEYS obstacles.foliage — r·block 은 켤 때 값)."""
+    from env_v2.features import OPTIONAL_KEYS
+
+    return dict(OPTIONAL_KEYS["obstacles"]["foliage"])
+
+
+def foliage_of(w) -> dict | None:
+    """숲 시야를 켠 세계면 그 블록 (world.py `_foliage_params` 결과 — r·block·trees), 아니면 None."""
+    return None if w._ob is None else w._ob.get("foliage")
+
+
+def foliage_trees(w) -> list:
+    """숲 시야 나무 표 (원판마다 0/1, w.obstacles 순서 — world.py `_fol_centers` 와 같은 표: trees 'all' 이면 obstacle_tree, 아니면 그 목록). 끈 세계는 빈 목록."""
+    fo = foliage_of(w)
+    if fo is None:
+        return []
+    t = w.obstacle_tree if isinstance(fo["trees"], str) else np.asarray(fo["trees"], dtype=bool)
+    if len(t) != len(w.obstacles):
+        raise ValueError(f"숲 시야 나무 표 {len(t)} 가 원판 수 {len(w.obstacles)} 와 다르다")
+    return [int(bool(x)) for x in t]
 
 
 def native_job(job: dict, idx: int, horizons=None, trace: int = 0, protected_refuges: bool = False, rng: str = "pcg64",
@@ -427,7 +401,7 @@ def native_job(job: dict, idx: int, horizons=None, trace: int = 0, protected_ref
     reserve = w.reserve if getattr(w, "_wr", None) is not None else np.zeros(w.N)
     out = dict(id=int(idx), seed=int(job["seed"]), region=str(job.get("region", "")), steps=int(job["steps"]),
                horizons=[int(h) for h in (horizons or [])], trace=int(trace), world=world_block(w, protected_refuges),
-               covers=np.c_[w.cov_c, w.cov_r].tolist(), discs=np.asarray(w.obstacles, dtype=np.float64).tolist(),
+               covers=np.c_[w.cov_c, w.cov_r].tolist(), discs=np.asarray(w.obstacles, dtype=np.float64).tolist(), foliage_trees=foliage_trees(w),
                food=dict(gw=int(w.gw), cell=float(w.cfg.food_cell), cap=w.food_cap.ravel().tolist(), food=w.food.ravel().tolist(),
                          regen=np.broadcast_to(w.regen_field, w.food_cap.shape).ravel().tolist()),
                deer=dict(x=w.pos[:, 0].tolist(), y=w.pos[:, 1].tolist(), hx=w.head[:, 0].tolist(), hy=w.head[:, 1].tolist(),
@@ -556,13 +530,57 @@ class Pool:
         return False
 
 
-def eval_items(info: dict, tag: str, model: Path, seeds, steps: int, world: str, kind: str = "world", horizons=None) -> list:
-    """live.eval_items 와 같다: world 'N' = 포만 없는 세계(G + NOSAT), 'G' = 게임 세계. kind 'multi' 면 판정 길이마다 요약."""
+def eval_items(info: dict, tag: str, model: Path, seeds, steps: int, world: str, kind: str = "world", horizons=None,
+               world_set: dict | None = None) -> list:
+    """live.eval_items 와 같다: world 'N' = 포만 없는 세계(G + NOSAT), 'G' = 게임 세계. kind 'multi' 면 판정 길이마다 요약.
+    world_set = 세계 덮기 {점 경로: 값} (apply_world_set — 예: 숲 시야 features.obstacles.foliage.enabled=true). 파이썬·네이티브가 같은 job['cfg'] 를 쓴다."""
     jobs = ad.make_jobs(info, Path(model), seeds, steps, True, NOSAT if world == "N" else None)
-    if horizons is not None:
-        for j in jobs:
+    for j in jobs:
+        if horizons is not None:
             j["horizons"] = list(horizons)
+        if world_set:
+            apply_world_set(j["cfg"], world_set)
     return [(kind, f"{tag}:{world}", j) for j in jobs]
+
+
+def parse_world_set(items) -> dict:
+    """['키=값', …] → {점 경로: 값} (값은 YAML — true·3.0·null). results/v3/route/route_rules.py 의 --world-set 과 같은 꼴. 같은 키를 두 번 주면 멈춘다."""
+    import yaml
+
+    out: dict = {}
+    for it in items or ():
+        if "=" not in it:
+            raise SystemExit(f"--world-set {it!r} 는 키=값 꼴이어야 한다")
+        k, v = it.split("=", 1)
+        k = k.strip()
+        if not k or any(not x for x in k.split(".")):
+            raise SystemExit(f"--world-set {it!r}: 키가 비었다")
+        if k in out:
+            raise SystemExit(f"--world-set {k} 를 두 번 주었다")
+        out[k] = yaml.safe_load(v)
+    return out
+
+
+def apply_world_set(cfg: dict, sets: dict) -> None:
+    """설정 dict(Config.to_dict 꼴)에 점 경로 덮기 (제자리, route_rules.apply_world_set 과 같은 뜻): features.<…> = cfg['v2']['features'][…], v2.<…> =
+    cfg['v2'][…], 그 밖은 v1 칸. 중간 칸이 없거나 null 이면 빈 블록을 만든다. 중간 칸이 블록이 아니면 멈춘다."""
+    for path, val in sets.items():
+        ks = path.split(".")
+        if ks[0] == "features":
+            node, ks = cfg.setdefault("v2", {}).setdefault("features", {}), ks[1:]
+        elif ks[0] == "v2":
+            node, ks = cfg.setdefault("v2", {}), ks[1:]
+        else:
+            node = cfg
+        if not ks:
+            raise SystemExit(f"--world-set {path}: 칸 이름이 없다")
+        for k in ks[:-1]:
+            if node.get(k) is None:
+                node[k] = {}
+            if not isinstance(node[k], dict):
+                raise SystemExit(f"--world-set {path}: 칸 {k} 가 블록이 아니다 ({node[k]!r})")
+            node = node[k]
+        node[ks[-1]] = val
 
 
 # --------------------------------------------------------------------- #
@@ -638,11 +656,11 @@ def exact_worlds(py: list, nat: list) -> dict:
     return dict(worlds=len(rows), exact=sum(x["same"] for x in rows), python_only=sorted(only), rows=rows)
 
 
-def python_trace(job: dict, model: Path, steps: int, seq_kin: bool = False) -> list:
-    """파이썬 거울 세계를 steps 스텝 돌리며 매 스텝 끝 상태 (평가기 trace 와 같은 칸). 첫 줄 = 시작 상태. seq_kin = 진단 전용 차례 합 기하."""
+def python_trace(job: dict, model: Path, steps: int) -> list:
+    """파이썬 거울 세계를 steps 스텝 돌리며 매 스텝 끝 상태 (평가기 trace 와 같은 칸). 첫 줄 = 시작 상태."""
     from env_v2 import rollout as ro
 
-    w = make_world(job, seq_kin=seq_kin)
+    w = make_world(job)
     if w._wf is not None:
         w.track_flight = True
     pol = ro.build_policy({"kind": "rep_learned", "path": str(model)}, int(job["seed"]))
@@ -717,29 +735,6 @@ def trace_diff(py: list, nat: dict) -> dict:
     return dict(first_divergence=first, first_bit_difference=first_any, steps=len(rows), rows=rows)
 
 
-def _py_job_seq(item):
-    """워커: 파이썬 판정 일 하나를 동족 차례 합 기하로 (진단 — seq_kin_geometry 를 이 워커 프로세스의 World 클래스에 붙인다)."""
-    from env_v2 import world as wm
-
-    if not getattr(wm.World, "_ceval_seq_kin", False):
-        wm.World._geometry = seq_kin_geometry(wm.World._geometry)
-        wm.World._ceval_seq_kin = True
-    import live
-
-    return live._job(item)
-
-
-def run_python_seq(items: list, workers: int) -> list:
-    """진단: 파이썬 판정 일들을 동족 차례 합 기하 워커로 (워커 풀 — 이 프로세스의 World 는 그대로)."""
-    from env_v2 import rollout as ro
-
-    ex = ro.make_executor(min(int(workers), len(items)))
-    if ex is None:
-        raise ValueError("--py-seq-kin 은 워커 2 개 이상으로 돈다 (이 프로세스의 World 를 바꾸지 않으려고)")
-    with ex:
-        return [r for _, r in ex.map(_py_job_seq, items)]
-
-
 def cmd_compare(a) -> int:
     import live
 
@@ -759,10 +754,11 @@ def cmd_compare(a) -> int:
     info = live.prepare(snap_p, snap, out_dir / "prep", live.brain_folders(live.DEFAULT_ROOT))
     lo, hi = (int(x) for x in a.seeds.split("-"))
     seeds = list(range(lo, hi + 1))
+    wset = parse_world_set(a.world_set)
     print(f"대조: 스냅숏 {snap_p.name}, 두뇌 {b['id']} (zip {b['model']['path']}), 시드 {lo}~{hi} × 지역 {list(info['regions'])}, 길이 {a.horizon}, "
-          f"세계 {a.worlds}, 프로세스 {a.workers}", flush=True)
+          f"세계 {a.worlds}, 프로세스 {a.workers}, 세계 덮기 {' '.join(f'{k}={v!r}' for k, v in wset.items()) or '없음'}", flush=True)
     res: dict = dict(snapshot=snap_p.name, brain=b["id"], model=b["model"]["path"], seeds=[lo, hi], horizon=int(a.horizon), workers=int(a.workers),
-                     regions=list(info["regions"]), worlds={})
+                     regions=list(info["regions"]), world_set=wset, worlds={})
     out_json = out_dir / "compare.json"
 
     def save() -> None:
@@ -772,7 +768,7 @@ def cmd_compare(a) -> int:
     # 스냅숏 world 블록과 네이티브 설정 견주기 (지역마다, 시드·난수 갈래·포만(N)·팀 은신처 생명주기 빼고)
     cfg_diff = {}
     for world in a.worlds:
-        items = eval_items(info, "cmp", zip_p, seeds[:1], 1, world)
+        items = eval_items(info, "cmp", zip_p, seeds[:1], 1, world, world_set=wset)
         for kind, tag, job in items:
             wb = world_block(make_world(job), protected_refuges=bool(a.protected_refuges))
             sw = next(r["world"] for r in snap["regions"] if r["region"] == job["region"])
@@ -798,7 +794,7 @@ def cmd_compare(a) -> int:
     for k, dd in cfg_diff.items():
         print(f"  설정 {k}: {'스냅숏 세계와 같음' if not dd else '; '.join(dd)}", flush=True)
     for world in a.worlds:
-        items = eval_items(info, "cmp", zip_p, seeds, int(a.horizon), world)
+        items = eval_items(info, "cmp", zip_p, seeds, int(a.horizon), world, world_set=wset)
         t0 = time.perf_counter()
         with live.Pool(int(a.workers)) as pool:
             py = [r for _, r in pool.run(copy.deepcopy(items))]     # 파이썬 일은 job 을 고친다(snap_food pop)
@@ -809,13 +805,6 @@ def cmd_compare(a) -> int:
         t_nat = time.perf_counter() - t0
         st = stat_compare(py, nat)
         ex = exact_worlds(py, nat)
-        ex_seq = None
-        if a.py_seq_kin:
-            # 진단: 파이썬 세계의 동족 행렬곱만 C++ 과 같은 차례 합으로 바꾼 판 (world.py 는 그대로 — 워커 안에서만 붙인다)
-            t0 = time.perf_counter()
-            pys = run_python_seq(copy.deepcopy(items), int(a.workers))
-            ex_seq = exact_worlds(pys, nat)
-            ex_seq["wall_s"] = round(time.perf_counter() - t0, 1)
         wsteps = len(items) * int(a.horizon)
         py_rate = [int(a.horizon) / r["wall_s"] for r in py if r.get("wall_s")]
         nat_rate = [r["native"]["steps_per_s"] for r in nat]
@@ -824,9 +813,8 @@ def cmd_compare(a) -> int:
                   python_world_steps_per_s_per_proc=float(np.mean(py_rate)) if py_rate else None,
                   native_world_steps_per_s_per_proc=float(np.mean(nat_rate)) if nat_rate else None,
                   python_world_steps_per_s_total=wsteps / t_py, native_world_steps_per_s_total=wsteps / t_nat)
-        res["worlds"][world] = dict(stats=st, exact=ex, exact_seq_kin=ex_seq, speed=sp, python=py, native=nat)
-        print(f"\n세계 {world}: {len(items)} 세계 × {a.horizon} 스텝 — 기록이 정확히 같은 세계 {ex['exact']}/{ex['worlds']}"
-              + (f" (파이썬 동족 차례 합 판과는 {ex_seq['exact']}/{ex_seq['worlds']})" if ex_seq else ""), flush=True)
+        res["worlds"][world] = dict(stats=st, exact=ex, speed=sp, python=py, native=nat)
+        print(f"\n세계 {world}: {len(items)} 세계 × {a.horizon} 스텝 — 기록이 정확히 같은 세계 {ex['exact']}/{ex['worlds']}", flush=True)
         print(f"  속도: 파이썬 {sp['python_world_steps_per_s_per_proc']:.0f} 세계-스텝/초/프로세스 (벽 {t_py:.1f}초), 네이티브 "
               f"{sp['native_world_steps_per_s_per_proc']:.0f} (벽 {t_nat:.1f}초, 준비 {sp['native_prep_s']}초)", flush=True)
         print(f"  {'지표':<20} {'파이썬':>10} {'네이티브':>10} {'짝차이':>9} {'sd':>8} {'z짝':>7} {'z독립':>7} 같음", flush=True)
@@ -837,24 +825,23 @@ def cmd_compare(a) -> int:
     if a.trace > 0:
         tr = {}
         world = a.worlds[0]
-        items = eval_items(info, "cmp", zip_p, seeds[:1], int(a.trace), world)
+        items = eval_items(info, "cmp", zip_p, seeds[:1], int(a.trace), world, world_set=wset)
         for kind, tag, job in items:
             nj = native_job(job, 0, trace=int(a.trace), protected_refuges=bool(a.protected_refuges))
             row = run_native([nj], brain, 1)[0]
-            for seq in ((False, True) if a.py_seq_kin else (False,)):
-                t0 = time.perf_counter()
-                d = trace_diff(python_trace(job, zip_p, int(a.trace), seq_kin=seq), row)
-                name = f"{job['region']}{':seq_kin' if seq else ''}"
-                tr[name] = dict(first_divergence=d["first_divergence"], first_bit_difference=d["first_bit_difference"], rows=d["rows"],
-                                wall_s=round(time.perf_counter() - t0, 1))
-                fd = d["first_divergence"]
-                print(f"\n궤적 {world}:{name} 시드 {job['seed']} {a.trace} 스텝: 첫 비트 차이 스텝 {d['first_bit_difference']}, 첫 갈림 스텝 {fd}", flush=True)
-                for r in d["rows"][: (fd + 3 if fd is not None else 3)][-6:]:
-                    print(f"  t={r['t']:>4} 자리 {r['pos']:.3g} heading {r['head']:.3g} 에너지 {r['energy']:.3g} 관측 {r['obs']:.3g} 행동≠{r['behavior']} "
-                          f"덮기≠{r['keep']} 요청≠{r['request']} 죽음≠{r['cause']} 늑대 {r['wolf_pos']:.3g} cd≠{r['wolf_cd']} 표적≠{r['wolf_target']} "
-                          f"잠≠{r['wolf_asleep']} 무리중심 {r.get('to_centroid', 0):.3g} 분리 {r.get('separation', 0):.3g}", flush=True)
-                res["trace"] = tr
-                save()
+            t0 = time.perf_counter()
+            d = trace_diff(python_trace(job, zip_p, int(a.trace)), row)
+            name = job["region"]
+            tr[name] = dict(first_divergence=d["first_divergence"], first_bit_difference=d["first_bit_difference"], rows=d["rows"],
+                            wall_s=round(time.perf_counter() - t0, 1))
+            fd = d["first_divergence"]
+            print(f"\n궤적 {world}:{name} 시드 {job['seed']} {a.trace} 스텝: 첫 비트 차이 스텝 {d['first_bit_difference']}, 첫 갈림 스텝 {fd}", flush=True)
+            for r in d["rows"][: (fd + 3 if fd is not None else 3)][-6:]:
+                print(f"  t={r['t']:>4} 자리 {r['pos']:.3g} heading {r['head']:.3g} 에너지 {r['energy']:.3g} 관측 {r['obs']:.3g} 행동≠{r['behavior']} "
+                      f"덮기≠{r['keep']} 요청≠{r['request']} 죽음≠{r['cause']} 늑대 {r['wolf_pos']:.3g} cd≠{r['wolf_cd']} 표적≠{r['wolf_target']} "
+                      f"잠≠{r['wolf_asleep']} 무리중심 {r.get('to_centroid', 0):.3g} 분리 {r.get('separation', 0):.3g}", flush=True)
+            res["trace"] = tr
+            save()
     save()
     print(f"\n-> {out_json}", flush=True)
     return 0
@@ -890,8 +877,8 @@ def main(argv=None) -> int:
     c.add_argument("--workers", type=int, default=4)
     c.add_argument("--trace", type=int, default=0, help="첫 세계(시드 처음 × 지역)의 궤적을 이만큼 스텝 대조 (0 = 끔)")
     c.add_argument("--protected-refuges", action="store_true", help="언리얼 팀 은신처 생명주기 칸도 켠다 (기본 끔 = 파이썬 세계 그대로)")
-    c.add_argument("--py-seq-kin", action="store_true",
-                   help="진단: 파이썬 세계의 동족 무리 중심·분리 행렬곱만 C++ 과 같은 차례 합으로 바꾼 판도 돌려 정확히 같은 세계 수를 센다 (world.py 는 그대로)")
+    c.add_argument("--world-set", action="append", default=[], metavar="키=값",
+                   help="세계 덮기 (여러 번, 점 경로 = route_rules.py 와 같다) — 예: features.obstacles.foliage.enabled=true (숲 시야, 10-21)")
     c.add_argument("--out", default=None)
     sub.add_parser("selftest")
     a = ap.parse_args(argv)

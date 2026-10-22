@@ -6,12 +6,16 @@ import numpy as np
 import pytest
 
 from env.config import load_config
-from env.world import World as WorldV1
+import kin_seq
 from env_v2.config import load_v2_config
 from env_v2.features import features_of
 from env_v2.vec_env import MultiWorldVecEnv
 from env_v2.world import World as WorldV2
 from policies.registry import make_policy
+
+# v1 env/world.py 를 동족 무리 중심·분리 j 차례 합으로만 바꾼 사본 (tests/kin_seq.py) — env_v2 가 10-22 부터 C++ 과 같은 그 차례로 더해
+# v1 원본(행렬곱, 한 줄도 바꾸지 않는다)과는 끝 비트가 다르다. '기능을 끄면 v1 과 비트 동일' 은 이 사본과 견준다
+WorldV1 = kin_seq.world_v1()
 
 
 @pytest.fixture
@@ -165,3 +169,49 @@ def test_reset_keeps_fresh_worlds_and_renews_used_ones(cfg2):
     venv.step(np.zeros((venv.num_envs, 4), dtype=np.float32))
     venv.reset()
     assert venv.current_seeds() != built
+
+
+def test_kin_sums_follow_cpp_order():
+    """동족 무리 중심·분리의 j 합이 C++ PerceiveKin(EcoObservationV3.h)과 같은 차례다 (10-22, world.py `_seq_sum`): 산 동족을 j 오름차순으로 0.0 에서
+    하나씩 더하는 스칼라 셈(C++ 꼴 그대로)과 비트 단위로 같다 — 전체 행·일부 행(`_observe_subset` 경로). 행렬곱으로 되돌리면 끝 비트가 달라 깨진다."""
+    from env.config import ROOT
+    from env_v2.steering import EPS, clamp_magnitude, normalize
+
+    w = WorldV2(load_v2_config(ROOT / "configs" / "v3_wild3_obs_mirror.yaml").replace(N=24), seeds=[32084])
+    assert w._vg is None and w.alive is not None
+    rng = np.random.default_rng(3)
+    cfg = w.cfg
+    kin_cos = cfg.fov_cos if w._zv is None else w._zv["kin_cos"]
+    checked = 0
+    for t in range(40):
+        w.step(rng.integers(0, 3, (w.N, 1)).astype(np.float64))
+        for rows in (np.arange(w.N), np.array([1, 5, 17])):
+            g = w._geometry() if len(rows) == w.N else w._geometry(rows, {k: v.copy() for k, v in w._geometry().items()})
+            tc = np.zeros((len(rows), 2))
+            sep = np.zeros((len(rows), 2))
+            for r, i in enumerate(rows):
+                px, py = float(w.pos[i, 0]), float(w.pos[i, 1])
+                hx, hy = float(w.head[i, 0]), float(w.head[i, 1])
+                sx = sy = cx = cy = cs = 0.0
+                n = 0
+                for j in range(w.N):
+                    if j == i or not w.alive[j]:
+                        continue
+                    dx, dy = float(w.pos[j, 0]) - px, float(w.pos[j, 1]) - py
+                    dist = float(np.sqrt(dx * dx + dy * dy))
+                    invd = 1.0 / max(dist, EPS)
+                    if dist <= cfg.see_r and (dx * hx + dy * hy) * invd >= kin_cos:
+                        n += 1
+                        sx += float(w.pos[j, 0])
+                        sy += float(w.pos[j, 1])
+                    c = max(1.0 - dist / cfg.sep_radius, 0.0) * invd
+                    cx += c * float(w.pos[j, 0])
+                    cy += c * float(w.pos[j, 1])
+                    cs += c
+                if n > 0:
+                    tc[r] = normalize(np.array([[sx / n - px, sy / n - py]]))[0]
+                sep[r] = clamp_magnitude(np.array([[-(cx - cs * px), -(cy - cs * py)]]), 1.0)[0]
+            assert np.array_equal(g["to_centroid"][rows].view(np.int64), tc.view(np.int64)), t
+            assert np.array_equal(g["separation"][rows].view(np.int64), sep.view(np.int64)), t
+            checked += int((np.abs(tc).sum(1) > 0).sum())
+    assert checked > 100                                    # 동족이 실제로 보인 행이 있다

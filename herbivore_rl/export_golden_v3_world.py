@@ -873,12 +873,14 @@ def asleep_hidden(inp: dict) -> int:
 
 def pick_snapshot(col: dict) -> dict:
     """후보 중 사건 비교 시야가 실제 시야와 다른 개체(행동 시야 배수가 바뀐 띠의 위협)와 자서 안 보이는 위협이 많고, 위협이
-    보이고 동족 경보가 있는 개체가 많은 스텝 하나."""
-    best, score = None, -1
+    보이고 동족 경보가 있는 개체가 많은 스텝 하나. 10-22: 띠와 자서 안 보이는 위협이 둘 다 있는 스텝을 먼저 고른다(동족 차례 합으로 롤아웃이
+    바뀐 뒤 점수만으로는 세 시드 모두 자는 위협이 없는 스텝을 골라 골든이 그 지각 경우를 잃었다). 그런 스텝이 없으면 점수 그대로."""
+    best, score = None, (False, -1)
     for s in col["snaps"]:
         o = s["out"]
         band = int((np.asarray(o["pred_count"]) != np.asarray(o["pred_count_ev"])).sum())
-        sc = (100 * band + 10 * asleep_hidden(s["inp"]) + int((np.asarray(o["pred_count"]) > 0).sum())
+        hid = asleep_hidden(s["inp"])
+        sc = (band > 0 and hid > 0, 100 * band + 10 * hid + int((np.asarray(o["pred_count"]) > 0).sum())
               + int((np.asarray(o["kin_alarm"]) > 0).sum()))
         if sc > score:
             best, score = s, sc

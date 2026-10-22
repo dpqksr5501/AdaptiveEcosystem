@@ -60,6 +60,12 @@
 //                                  밖으로 (ObstaclePushOut). C1: 사슴 이동 ApplyMove 뒤 EcoThreatV3::ObstacleSlide (맵 자르기 포함). C2: 위협 Step 에 원판을 넘긴다
 //                                  (늑대 눈길 가림·이동 미끄러짐 — EcoThreatModel.h 머리 주석 '세로 장애물'). E: 사슴마다 위협까지 눈길을 원판이 가리면
 //                                  FThreatInput::bOccluded (발소리는 그대로). 기록 FWorldStats::Obstacle*
+//   FObstacleConfig::Foliage       10-21 숲 시야 (파이썬 obstacles.foliage — world.py `foliage_chord`·`foliage_blocked`). 기본 끔 = 줄기 가림만 (비트 단위로 같다).
+//                                  켜면 나무인 원판마다 잎 원(반지름 R)을 두고 눈길이 그 합집합 안을 Block 이상 지나면 줄기처럼 가린다 — 파이썬과 같은 네 곳 가운데
+//                                  셋: E 사슴의 위협 보임(ObserveHerb·UpdateWildFlight·TallySense — Detail::EyeBlocked), C2 늑대 표적 고르기(Step 의
+//                                  FThreatStepInput::bFoliage, 무리 미리 보기 포함), E 관측 threat_hidden(FObstacleObsInput::bFoliage). 넷째 도망길 COVER 그늘은
+//                                  파이썬 전용이다(C++ 에 도망길이 없다). 도망 기록 FFlightStats::LostFoliage (원판 놓침 가운데 잎 때문). 골든 FoliageGoldenVectorsV3.h
+//                                  (herbivore_rl/export_golden_v3_foliage.py), 시험 Policy.V3.Foliage.*. 통합 모드 eco.IntegratedV3.Foliage (기본 0, 개발 빌드)
 //   FObstacleConfig::Detour        10-17 장애물 돌아가기 (파이썬 obstacles.detour). 기본 끔 = 미끄러짐만. 켜면 C1 에서 ApplyMove 바로 앞에 사슴마다
 //                                  EcoThreatV3::DetourStep 으로 제어 출력의 속도 방향을 바꾸고(FHerbBody::Detour), C2 에서 위협 Step 에 넘긴다(Step 7′·8″ —
 //                                  EcoThreatModel.h 머리 주석 '장애물 돌아가기'). 통합 모드 eco.IntegratedV3.ObstacleDetour 기본 1. 기록 FWorldStats::Detour*
@@ -322,6 +328,20 @@ namespace EcoWorldV3
 	// 원판 (x, y, r) × K (나무 줄기·바위, 무대 단위). 사슴·늑대는 반지름 r + BodyR 앞에서 멈춰 둘레를 따라 미끄러지고(EcoThreatV3::ObstacleSlide), 원판이 눈길을
 	// 가리고(bBlockSight — 사슴의 위협 보임·늑대의 표적 보임. 발소리는 못 가림), 원판 밑 먹이 셀은 덮인 몫만큼 용량이 적다(bNoFood). 기본 끔 = R1b 학습 세계 그대로.
 	// 통합 모드: 원판 = 무대 안 레벨의 충돌하는 스태틱 메시(EcoPolicyV3IntegratedSubsystem ScanStageObstacles), eco.IntegratedV3.Obstacles
+
+	// 7) 숲 시야 (10-21 사용자 '숲 안 시야 줄이기 → 다시 잼', 파이썬 obstacles.foliage — world.py 모듈 docstring '야생 2단계' 3 의 7)). 기본 끔 = 줄기만 가림.
+	// 나무인 원판(Trees[k] ≠ 0 — 비었으면 모두 나무: 파이썬 trees 'all' 의 fixed 원판)마다 같은 중심에 잎 원(반지름 R 단위, 줄기 반지름과 무관 — 잎·낮은 가지·
+	// 하층 덤불)을 두고, 눈길이 잎 원들의 합집합 안을 지나는 길이가 Block 단위 이상이면 줄기처럼 가린다(EcoThreatV3::FoliageChord·FoliageBlocked). 발소리·동족
+	// 시야는 그대로. bBlockSight 를 켜야 한다(파이썬도 그래야 받는다). 값 r 3.0 (6 m)·block 2.0 (4 m) = features.OPTIONAL_KEYS 의 켤 때 값(어림).
+	// 통합 모드: eco.IntegratedV3.Foliage·FoliageR·FoliageBlock (개발 빌드), 나무 표 = 세계 원판마다 나무 줄기에서 왔나(FEcoV3RegionContext::ObstacleIsTree)
+	struct FFoliageConfig
+	{
+		bool bEnabled = false;
+		double R = 3.0;                     // 잎 원 반지름 (단위)
+		double Block = 2.0;                 // 가리는 잎 안 길이 문턱 (단위)
+		std::vector<std::uint8_t> Trees;    // 원판마다 나무(1)인가 — Discs 와 같은 순서. 비면 모두 나무
+	};
+
 	struct FObstacleConfig
 	{
 		bool bEnabled = false;
@@ -332,9 +352,21 @@ namespace EcoWorldV3
 		// 6) 돌아가기 (10-17, 파이썬 obstacles.detour·detour_*): 원판에 막히면 가려던 쪽에서 가장 적게 돈 빈 방향으로 돌아간다 (C1 사슴·C2 위협 Step 7′,
 		//    돕다가 막힌 늑대는 잠시 돕지 않는다 — Step 8″). 기본 끔 = 미끄러짐만. 통합 모드 eco.IntegratedV3.ObstacleDetour 기본 1
 		EcoThreatV3::FDetourConfig Detour;
+		// 7) 숲 시야 (10-21, 파이썬 obstacles.foliage {enabled, r, block, trees} — 머리 주석 FObstacleConfig::Foliage). 기본 끔
+		FFoliageConfig Foliage;
 
 		std::int32_t Num() const { return static_cast<std::int32_t>(Discs.size() / 3); }
 		bool Active() const { return bEnabled && Num() > 0; }
+		/** 숲 시야를 켠 세계인가 (파이썬 `_ob["foliage"] is not None` — 원판 수와 무관. 도망 기록의 lost_foliage 칸이 있다). 원판이 눈길을 가려야 한다 */
+		bool FoliageConfigured() const { return bEnabled && bBlockSight && Foliage.bEnabled; }
+		/** 숲 시야를 지금 잰다: 켠 세계 ∧ 원판 있음 ∧ R·Block > 0 ∧ 나무 표가 비었거나(모두 나무) 원판 수와 같다. 아니면 줄기만 (파이썬은 표 길이가 다르면 멈춘다) */
+		bool FoliageOn() const
+		{
+			return FoliageConfigured() && Num() > 0 && Foliage.R > 0.0 && Foliage.Block > 0.0
+				   && (Foliage.Trees.empty() || static_cast<std::int32_t>(Foliage.Trees.size()) == Num());
+		}
+		/** 원판마다 나무인가 (FoliageChord 의 Trees — 비었으면 nullptr = 모두 나무). */
+		const std::uint8_t* FoliageTrees() const { return Foliage.Trees.empty() ? nullptr : Foliage.Trees.data(); }
 	};
 	inline constexpr std::int32_t kObstacleFoodSamples = 4;   // 먹이: 셀 한 변의 표본점 수 (world.py OB_SAMPLES)
 
@@ -498,6 +530,9 @@ namespace EcoWorldV3
 	// 파이썬과 다른 꼴 (값은 같다): 지난 표적을 늑대 칸(_fl_tgt) 대신 사슴마다 늑대 비트(FFlightTrack::PrevBy, 비트 m = 이번 Step 위협 배열 색인)로 둔다 — 통합
 	//   모드는 사슴 배열이 스텝마다 줄어든다(죽은 사슴 빼기). 통합 모드에만 있는 경우: 늑대 수가 바뀐 스텝은 놓침 까닭이 어긋날 수 있고, 목록에서 빠진 사슴의 열린
 	//   도망은 세지 않는다. 늑대 kFlightMaxWolves 마리까지 (UpdateWildFlight 와 같다)
+	// 숲 시야 (FObstacleConfig::Foliage, 10-21): 원판 가림 = 줄기 ∨ 잎이라 잎이 가려 놓친 것도 원판(스스로 벗어남)이다. 그 스텝 원판 놓침이 모두 잎만 가린 쌍
+	//   (FFlightWolfStep::bFolOnly — 줄기는 안 가림)인 도망을 LostFoliage (수·FLEE 스텝·쫓긴 스텝 — 원판 칸의 일부)로 따로 센다 (world.py `_fl_why_fol`·
+	//   flight_stats lost_foliage). 끈 세계는 늘 0 이고 보고에 칸이 없다
 	inline constexpr std::int32_t kNumFlightCauses = 11;
 	inline constexpr std::int32_t kFlightCover = 0;       // 스스로: 은신처 (끝 스텝 원 안, 또는 원 안이라 표적에서 빠짐)
 	inline constexpr std::int32_t kFlightObstacle = 1;    // 스스로: 원판(나무 줄기·바위)이 늑대 눈길을 가림
@@ -550,6 +585,7 @@ namespace EcoWorldV3
 		bool bChased = false;        // 쫓김 창(첫 FLEE 스텝 바로 앞 스텝부터)에 이 사슴을 표적으로 둔 늑대가 있었나
 		bool bEndNow = false;        // 지난 FLEE 스텝 끝에 표적이었나 (살아 끝난 도망은 다음 스텝에 이 값으로 닫는다)
 		bool bEndCov = false;        // 그 스텝 끝 위치가 은신처 원 안이었나
+		bool bWhyFol = false;        // 마지막 놓침이 잎 때문 (숲 시야 켬 세계만 — 그 스텝 원판 놓침이 모두 잎만 가림. world.py _fl_why_fol)
 		std::uint64_t PrevBy = 0;    // 지난 스텝 끝에 이 사슴을 표적으로 둔 사냥 중인 늑대 (비트 m = 위협 색인 m. 죽은 사슴은 0)
 	};
 
@@ -564,6 +600,7 @@ namespace EcoWorldV3
 		std::int64_t ReflexSteps = 0;                    // 끝난 도망의 반사 스텝 합
 		std::int64_t ShelterEnd = 0;                     // 살아 끝난 도망 가운데 끝 스텝 끝 위치가 은신처 원 안 (끝 까닭과 겹친다)
 		std::int64_t Hist[kNumFlightHistEdges + 1] = {}; // 스스로 벗어난 도망의 쫓긴 시간 칸 (칸 k = 경계 가운데 쫓긴 시간 이하인 수)
+		std::int64_t LostFoliage[3] = {};                // 숲 시야: 끝 까닭 원판 가운데 마지막 놓침이 잎 때문인 도망 — 수·FLEE 스텝 합·쫓긴 스텝 합 (lost_foliage)
 	};
 
 	/** 한 스텝의 사슴 재료 (world.py `_fl_update` 인자의 한 행). 단계 함수는 산 사슴만 넘기므로 bAlive0 은 늘 참이다 (골든 되풀이만 거짓을 쓴다). */
@@ -586,8 +623,9 @@ namespace EcoWorldV3
 		bool bPair = false;          // 아래 쌍 칸을 쟀다 (지난 표적이 있는 늑대. 거짓이면 그만둠·바꿈만 가린다 — 파이썬 _fl_pred 없음과 같다)
 		bool bRange = true;          // 체감 거리 ≤ 늑대 시야 반경
 		bool bVis0 = true;           // 반경과 시야각 안 (원판 가림 전)
-		bool bBlocked = false;       // 그 가운데 원판이 눈길을 가림
+		bool bBlocked = false;       // 그 가운데 원판이 눈길을 가림 (숲 시야 켬 세계는 줄기 ∨ 잎)
 		bool bCover = false;         // 은신처 원 안이라 표적에서 빠짐
+		bool bFolOnly = false;       // 숲 시야: 가림이 잎 때문뿐 (줄기는 안 가림 — world.py `_fl_pred_fol`)
 	};
 
 	/** 표적 고르기 때 쌍 하나 (EcoThreatV3::Step 의 1·4 와 같은 식 — 그 늑대의 Step 바로 앞 상태·같은 입력으로 부른다). */
@@ -597,6 +635,7 @@ namespace EcoWorldV3
 		bool bVis0 = true;
 		bool bBlocked = false;
 		bool bCover = false;
+		bool bFolOnly = false;
 	};
 
 	inline FFlightPair FlightPairOf(const EcoThreatV3::FThreatState& T, const EcoThreatV3::FPreyView& P, const EcoThreatV3::FThreatStepInput& In,
@@ -610,9 +649,11 @@ namespace EcoWorldV3
 		const double Inv = 1.0 / (Dist > EcoThreatV3::kEps ? Dist : EcoThreatV3::kEps);
 		R.bRange = Perceived <= Cfg.PredViewR * In.WeatherViewMult;
 		R.bVis0 = R.bRange && (Dx * T.HeadX + Dy * T.HeadY) * Inv >= Cfg.PredFovCos;
-		// 원판 가림은 반경·시야각 안 쌍만 잰다 (world.py `_ob_occlude` 가 보임 쌍만 잰다 — 플레이어 대역 행도 같은 식)
-		R.bBlocked = R.bVis0 && In.bObstacleSight && In.Obstacles != nullptr && In.NumObstacles > 0
-					 && EcoThreatV3::SightBlocked(T.PosX, T.PosY, P.X, P.Y, In.Obstacles, In.NumObstacles);
+		// 원판 가림은 반경·시야각 안 쌍만 잰다 (world.py `_ob_occlude` 가 보임 쌍만 잰다 — 플레이어 대역 행도 같은 식). 숲 시야면 줄기 ∨ 잎, 잎만 가린 쌍을 따로
+		const bool bTrunk = R.bVis0 && In.bObstacleSight && In.Obstacles != nullptr && In.NumObstacles > 0
+							&& EcoThreatV3::SightBlocked(T.PosX, T.PosY, P.X, P.Y, In.Obstacles, In.NumObstacles);
+		R.bFolOnly = R.bVis0 && !bTrunk && EcoThreatV3::InputFoliageBlocked(In, T.PosX, T.PosY, P.X, P.Y);
+		R.bBlocked = bTrunk || R.bFolOnly;
 		// 은신처 표적 제외: 파이썬 realism_shelter untargetable (Cfg.bShelterSafe), 팀 실제 은신처 규칙은 원 안 사슴을 bAlive 거짓으로 뺀다
 		R.bCover = P.bInCover && (Cfg.bShelterSafe || !P.bAlive);
 		return R;
@@ -654,6 +695,14 @@ namespace EcoWorldV3
 		{
 			++S.Hist[FlightHistBin(T.Contact)];
 		}
+		if (Cause == kFlightObstacle && T.bWhyFol)
+		{
+			// 숲 시야: 원판 놓침 가운데 마지막 놓침이 잎 때문인 도망 (world.py `_fl_close` 의 _fl_fol)
+			++S.LostFoliage[0];
+			S.LostFoliage[1] += T.Len;
+			S.LostFoliage[2] += T.Contact;
+		}
+		T.bWhyFol = false;
 		T.Len = 0;
 		T.Contact = 0;
 		T.Reflex = 0;
@@ -730,9 +779,12 @@ namespace EcoWorldV3
 					++S.Started;
 					T.bChased = Prev != 0;
 					T.Why = kFlDropNone;
+					T.bWhyFol = false;
 				}
-				// 놓침: 지난 스텝 표적이던 이 사슴을 이번 스텝 끝에 표적으로 두지 않은 늑대. 같은 스텝 여럿이면 큰 번호
+				// 놓침: 지난 스텝 표적이던 이 사슴을 이번 스텝 끝에 표적으로 두지 않은 늑대. 같은 스텝 여럿이면 큰 번호.
+				// 숲 시야: 원판 놓침 가운데 잎만 가린 늑대(bFo)·줄기도 가린 늑대(bTr) — 그 스텝 원판 놓침이 모두 잎 때문이면 잎 (world.py `_fl_update` 의 fo·tr·fl)
 				std::int32_t Why = kFlDropNone;
+				bool bFo = false, bTr = false;
 				for (std::uint64_t Dm = Prev & ~Now; Dm != 0; Dm &= Dm - 1ULL)
 				{
 					std::int32_t m = 0;
@@ -742,10 +794,16 @@ namespace EcoWorldV3
 					}
 					const std::int32_t Code = FlightDropCode(Wolves[m]);
 					Why = Code > Why ? Code : Why;
+					if (Code == kFlDropObstacle)
+					{
+						bFo = bFo || Wolves[m].bFolOnly;
+						bTr = bTr || !Wolves[m].bFolOnly;
+					}
 				}
 				if (Why > kFlDropNone)
 				{
 					T.Why = Why;
+					T.bWhyFol = Why == kFlDropObstacle && bFo && !bTr;
 				}
 				++T.Len;
 				T.Reflex += Dd.bReflex ? 1 : 0;
@@ -802,6 +860,7 @@ namespace EcoWorldV3
 		std::int64_t OwnContact = 0;
 		std::int64_t ShelterEnd = 0;
 		std::int64_t Hist[kNumFlightHistEdges + 1] = {};
+		std::int64_t LostFoliage[3] = {};   // 숲 시야 (FFlightStats::LostFoliage — 열린 도망은 넣지 않는다, 파이썬 lost_foliage 와 같다)
 	};
 
 	inline FFlightReport FlightReportOf(const FFlightStats& S, const FFlightOpen& Open)
@@ -833,6 +892,10 @@ namespace EcoWorldV3
 		for (std::int32_t k = 0; k <= kNumFlightHistEdges; ++k)
 		{
 			R.Hist[k] = S.Hist[k];
+		}
+		for (std::int32_t k = 0; k < 3; ++k)
+		{
+			R.LostFoliage[k] = S.LostFoliage[k];
 		}
 		return R;
 	}
@@ -1945,6 +2008,33 @@ namespace EcoWorldV3
 			}
 		}
 
+		/**
+		 * 사슴 → 위협 눈길 가림 (world.py `_ob_occlude` 한 쌍 — 부르는 쪽이 Ob.Active() ∧ bBlockSight 를 본다): 줄기 SightBlocked ∨ 숲 시야(FoliageOn 일 때만)
+		 * FoliageBlocked. 숲 시야를 끄면 줄기만 (지금 그대로).
+		 */
+		inline bool EyeBlocked(const FObstacleConfig& Ob, double Ax, double Ay, double Bx, double By)
+		{
+			return EcoThreatV3::SightBlocked(Ax, Ay, Bx, By, Ob.Discs.data(), Ob.Num())
+				   || (Ob.FoliageOn() && EcoThreatV3::FoliageBlocked(Ax, Ay, Bx, By, Ob.Discs.data(), Ob.Num(), Ob.FoliageTrees(), Ob.Foliage.R, Ob.Foliage.Block));
+		}
+
+		/**
+		 * 눈길 가림을 잴 쌍인가: PerceiveThreats 의 bSight 가 가림 말고 보는 두 조건(실거리 ≤ SeeP·시야각)을 여유(1e-9)를 두고 본다. 거짓이면 가림과 상관없이
+		 * bSight 가 거짓이라 가림 칸(bOccluded)은 bSight 에서만 읽히므로 거짓으로 둬도 값이 같다 — 시야 밖 쌍의 잎 계산(EyeBlocked)만 뺀다 (파이썬도 보이는 쌍만 잰다).
+		 */
+		inline bool EyeCandidate(const FVec2& Pos, const FVec2& Head, double SeeP, double X, double Y, const EcoObservationV3::FObservationConfig& OC)
+		{
+			const double Ex = X - Pos.X;
+			const double Ey = Y - Pos.Y;
+			const double Pd = std::sqrt(Ex * Ex + Ey * Ey);
+			if (!(Pd <= SeeP * (1.0 + 1e-9) + 1e-9))
+			{
+				return false;
+			}
+			const double Inv = 1.0 / (Pd > EcoRepertoireV3::kEps ? Pd : EcoRepertoireV3::kEps);
+			return !((Ex * Head.X + Ey * Head.Y) * Inv < OC.ThreatFovCos - 1e-9);
+		}
+
 		/** R5 장애물 관측 입력 (사슴 하나, 스텝 끝 기하). P.Threat 는 이번 관측의 위협 지각, 위협 자리는 W.ThreatIn (같은 관측의 목록). */
 		inline EcoObservationV3::FObstacleObsInput ObstacleObsInputOf(const FWorldState& W, const FHerbPerception& P, const FHerbBody& B)
 		{
@@ -1965,6 +2055,11 @@ namespace EcoWorldV3
 			Oi.BodyR = Ob.bEnabled ? Ob.BodyR : 0.0;
 			Oi.StageSize = W.Config.WorldSize;
 			Oi.bBlockSight = Ob.bEnabled && Ob.bBlockSight;
+			// 숲 시야 (10-21): 가림 = 줄기 ∨ 잎 (world.py obstacle_obs_values 의 foliage — 끄면 줄기만)
+			Oi.bFoliage = Ob.FoliageOn();
+			Oi.FoliageTrees = Ob.FoliageTrees();
+			Oi.FoliageR = Ob.Foliage.R;
+			Oi.FoliageBlock = Ob.Foliage.Block;
 			return Oi;
 		}
 
@@ -1997,13 +2092,15 @@ namespace EcoWorldV3
 			EcoRepertoireV3::FRepState& S = *H.Rep;
 			const EcoObservationV3::FObservationConfig& OC = W.ObsCfg;
 
-			// 야생 2단계 3 세로 장애물: 이 사슴에서 위협마다 눈길을 원판이 가리는가 (world.py `_geometry` 의 pvis 가림 — 발소리는 그대로)
+			// 야생 2단계 3 세로 장애물: 이 사슴에서 위협마다 눈길을 원판이 가리는가 (world.py `_geometry` 의 pvis 가림 — 발소리는 그대로).
+			// 숲 시야를 켜면 줄기 ∨ 잎 (EyeBlocked). 시야 밖 쌍은 재지 않는다 (EyeCandidate — 가림은 bSight 에서만 읽어 값이 같다)
 			const FObstacleConfig& Ob = W.Config.Obstacles;
 			if (Ob.Active() && Ob.bBlockSight)
 			{
+				const double SeeP = SeePredNow(W) * S.SeeMult;   // PerceiveThreats 의 SeeP 와 같은 곱
 				for (EcoObservationV3::FThreatInput& T : W.ThreatIn)
 				{
-					T.bOccluded = EcoThreatV3::SightBlocked(B.Pos.X, B.Pos.Y, T.X, T.Y, Ob.Discs.data(), Ob.Num());
+					T.bOccluded = EyeCandidate(B.Pos, B.Head, SeeP, T.X, T.Y, OC) && EyeBlocked(Ob, B.Pos.X, B.Pos.Y, T.X, T.Y);
 				}
 			}
 			P.Threat = EcoObservationV3::PerceiveThreats(B.Pos, B.Head, SeePredNow(W), S.SeeMult,
@@ -2256,8 +2353,9 @@ namespace EcoWorldV3
 					const FThreatAgent& A = *Threats[m];
 					const bool bHunt = FlightHunting(W, A);
 					EcoObservationV3::FThreatInput Ti = W.ThreatIn[static_cast<size_t>(m)];
-					// 야생 2단계 3: 이 사슴의 눈길 가림 (ObserveHerb 가 마지막 사슴 것으로 남긴 칸을 이 쌍으로 다시 잰다 — world.py wf_pvis = 관측 보임)
-					Ti.bOccluded = bSightBlock && EcoThreatV3::SightBlocked(P.X, P.Y, Ti.X, Ti.Y, W.Config.Obstacles.Discs.data(), W.Config.Obstacles.Num());
+					// 야생 2단계 3: 이 사슴의 눈길 가림 (ObserveHerb 가 마지막 사슴 것으로 남긴 칸을 이 쌍으로 다시 잰다 — world.py wf_pvis = 관측 보임, 숲 시야 포함)
+					Ti.bOccluded = bSightBlock && EyeCandidate(P, H.Body->Head, SeePred * S.SeeMult, Ti.X, Ti.Y, W.ObsCfg)
+								   && EyeBlocked(W.Config.Obstacles, P.X, P.Y, Ti.X, Ti.Y);   // 시야 밖 쌍은 재지 않는다 (값 같음)
 					const bool bPv = EcoObservationV3::PerceiveThreats(P, H.Body->Head, SeePred, S.SeeMult, S.SeeMult, &Ti, 1, W.ObsCfg).PredCount == 1;
 					Ex[m] = A.State.PosX - P.X;
 					Ey[m] = A.State.PosY - P.Y;
@@ -2435,8 +2533,9 @@ namespace EcoWorldV3
 					const double Ey = T.Y - P.Y;
 					const double Pd = std::sqrt(Ex * Ex + Ey * Ey);
 					const double Inv = 1.0 / (Pd > EcoRepertoireV3::kEps ? Pd : EcoRepertoireV3::kEps);
-					const bool bOcc = bSightBlock && EcoThreatV3::SightBlocked(P.X, P.Y, T.X, T.Y, Ob.Discs.data(), Ob.Num());
-					const bool bSight = !bOcc && Pd <= SeeP && (Ex * Hd.X + Ey * Hd.Y) * Inv >= OC.ThreatFovCos;
+					// 숲 시야 포함 (run_mirror --diag 는 wf_pvis 를 읽는다). 가림은 시야 안 쌍만 잰다 (bSight 에서만 읽어 값이 같다)
+					const bool bInView = Pd <= SeeP && (Ex * Hd.X + Ey * Hd.Y) * Inv >= OC.ThreatFovCos;
+					const bool bSight = bInView && !(bSightBlock && EyeBlocked(Ob, P.X, P.Y, T.X, T.Y));
 					const double HearLim = OC.bHearCapToSight ? (T.HearR < SeeP ? T.HearR : SeeP) : T.HearR;
 					const bool bHeard = T.HearR > 0.0 && Pd <= HearLim;
 					const bool bVis = (bSight || bHeard) && !T.bAsleep;
@@ -2537,6 +2636,7 @@ namespace EcoWorldV3
 			Wf.bVis0 = Pr.bVis0;
 			Wf.bBlocked = Pr.bBlocked;
 			Wf.bCover = Pr.bCover;
+			Wf.bFolOnly = Pr.bFolOnly;
 		}
 
 		/**
@@ -2838,11 +2938,15 @@ namespace EcoWorldV3
 			}
 			if (bObstacles)
 			{
-				// 야생 2단계 3: 미리 보기도 늑대 눈길 가림을 같이 본다 (표적·전력 걸음이 실제 Step 과 같게)
+				// 야생 2단계 3: 미리 보기도 늑대 눈길 가림을 같이 본다 (표적·전력 걸음이 실제 Step 과 같게 — 숲 시야 포함)
 				Pi.Obstacles = Obs.Discs.data();
 				Pi.NumObstacles = Obs.Num();
 				Pi.ObstacleBody = Obs.BodyR;
 				Pi.bObstacleSight = Obs.bBlockSight;
+				Pi.bFoliage = Obs.FoliageOn();
+				Pi.FoliageTrees = Obs.FoliageTrees();
+				Pi.FoliageR = Obs.Foliage.R;
+				Pi.FoliageBlock = Obs.Foliage.Block;
 			}
 			for (std::int32_t m = 0; m < M; ++m)
 			{
@@ -2890,6 +2994,11 @@ namespace EcoWorldV3
 				In.ObstacleBody = Obs.BodyR;
 				In.bObstacleSight = Obs.bBlockSight;
 				In.Detour = &Obs.Detour;
+				// 숲 시야 (10-21, 머리 주석 FObstacleConfig::Foliage): 늑대 눈길 가림 = 줄기 ∨ 잎. 끄면 거짓 — 지금 그대로
+				In.bFoliage = Obs.FoliageOn();
+				In.FoliageTrees = Obs.FoliageTrees();
+				In.FoliageR = Obs.Foliage.R;
+				In.FoliageBlock = Obs.Foliage.Block;
 			}
 			if (A.Spec.bRanged)
 			{

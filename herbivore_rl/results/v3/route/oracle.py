@@ -19,6 +19,8 @@ RUN 판(N 세계, wild_flight.route_fixed 'run', 끝 규칙 지금·quiet_end 15
 세계·두뇌·워커는 route_rules.py 와 같다(<out>/world — 스냅숏 변환, 도주 밖 obs21zero argmax, 워커 풀 env_v2.rollout.make_executor).
 세계 덮기 --world-set 키=값(여러 번 — route_rules.apply_world_set): 모든 세계에 같게 건다(RUN 판·길 넷·가짜 RUN 이 모두 그 세계의 복제라 비교 기준 RUN 도
 같은 덮기). oracle_raw.json·oracle.json meta 에 남고, route_rules.py report 는 규칙 측정과 덮기가 다른 오라클을 판단표에 쓰지 않는다.
+셈 길 지문 (10-22 — route_rules.code_tag): oracle_raw.json·oracle.json meta 에 code(세계 = live.eval_code_tag('python'), 측정 = 이 파일의 오라클 함수)를
+적는다. 측정 중 지문이 바뀌면 지문 없이 적는다. route_rules.py report 는 세계 지문이 규칙 측정과 다른(옛 판 지문 없음 포함) 오라클을 판단표에 쓰지 않는다.
 """
 
 from __future__ import annotations
@@ -58,6 +60,11 @@ NO_GAIN_S = -0.5                    # 9-4 첫 줄: 오라클(잡음 뺀 값) −
 REGRET_CUT = 0.3                    # 배울 수 있나: '늘 RUN' 대비 손해를 30 % 넘게 줄인다
 MEASURE = "contact"                 # 판단 잣대: 쫓긴 시간 (route_rules P1·관문 1차와 같다). 보조 = "len" (도망 길이)
 STEP_S = rr.STEP_S
+
+
+def code_tag() -> dict:
+    """오라클 셈 길 지문 (route_rules.code_tag — 세계는 규칙 측정과 같은 지문, 측정 = 오라클 함수 원문·상수)."""
+    return rr.code_tag((_oracle_world, rollout_one, reseed, pick_times, rr.apply_world_set), dict(tag=ORACLE_TAG, nosat=lv.NOSAT))
 
 
 # --------------------------------------------------------------------- #
@@ -322,7 +329,8 @@ def summarize(raw: dict) -> dict:
 def fmt(s: dict, meta: dict) -> str:
     L = [f"# 도망길 오라클과 '배울 수 있나' (설계 9-3절 — 보고만){' — 연기 시험' if meta.get('smoke') else ''}", "",
          f"- 시드 {meta.get('seeds')}, 흐름 {s['streams']}, 롤아웃 최대 {s['max_steps']} 스텝 (잡힘·굶음·안 끝남 = 이 값), 워커 {meta.get('workers')}, "
-         f"시간 {meta.get('wall_s')} 초, 세계-스텝 {meta.get('world_steps')}, 세계 덮기 {rr.world_set_text(meta.get('world_set') or {})}",
+         f"시간 {meta.get('wall_s')} 초, 세계-스텝 {meta.get('world_steps')}, 세계 덮기 {rr.world_set_text(meta.get('world_set') or {})}, "
+         f"셈 길 지문 {rr.code_text(meta.get('code'))}{' (측정 중 바뀜)' if meta.get('code_changed') else ''}",
          "- 값 = 쫓긴 시간 — 도주 시작부터 늑대가 이 사슴을 마지막으로 표적으로 둔 순간까지의 초 (흐름 평균, 관문 1차 P1·route_rules.py P1 과 같은 잣대 — "
          "9-4 판단은 모두 이 값). 이득 = 가장 짧은 길 − RUN (음수 = 짧아짐). 잡음 뺀 값 = 진짜 이득 − 가짜(모두 RUN, 난수만 다름) 이득",
          "", "## 오라클 이득 (두뇌 길 셋 — RUN·COVER·SHELTER, 괄호 = OPEN 까지 넷)", "",
@@ -386,6 +394,7 @@ def cmd_run(a) -> int:
             jobs.append(j)
     print(f"도망길 오라클 → {out}: 세계 {len(jobs)} (시드 {seeds[0]}~{seeds[-1]} × 지역 {len(info['regions'])} × 끝 규칙 {qes}), 세계마다 시작 {quota}, "
           f"흐름 {streams}, 롤아웃 최대 {ms} 스텝, 워커 {W}, 세계 덮기 {rr.world_set_text(wset)}{', 연기 시험' if a.smoke else ''}", flush=True)
+    now = code_tag()
     t0 = time.perf_counter()
     ex = ro.make_executor(min(W, len(jobs)))
     worlds = []
@@ -406,9 +415,14 @@ def cmd_run(a) -> int:
     raw = dict(made=datetime.now().isoformat(), snapshot=str(a.snapshot), model=lv.path_text(model), seeds=[seeds[0], seeds[-1]], fit_seeds=list(fit),
                test_seeds=list(test), quiet_ends=qes, quota=quota, streams=streams, max_steps=ms, main_steps=steps, workers=W,
                smoke=bool(a.smoke), wall_s=round(wall, 1), world_steps=ws, sec_per_world_step=float(sum(w["wall_s"] for w in worlds)) / max(ws, 1),
-               world_set=lv.jsonable(wset), world_set_args=list(a.world_set or []), worlds=worlds)
+               world_set=lv.jsonable(wset), world_set_args=list(a.world_set or []), code=now, worlds=worlds)
+    end = code_tag()                                     # 측정 중 셈 길 파일이 바뀌었으면 어느 셈으로 잰 것인지 모른다 — 지문 없이 적는다
+    if not rr.same_code(end, now):
+        raw.update(code=None, code_changed=dict(start=now, end=end))
     lv.atomic_write_json(out / "oracle_raw.json", lv.jsonable(raw), indent=None)
     print(f"  {wall:.0f} 초, 세계-스텝 {ws} (세계-스텝당 {raw['sec_per_world_step'] * 1000:.2f} ms) → oracle_raw.json", flush=True)
+    if raw["code"] is None:
+        print(f"  ! 측정 중 셈 길이 바뀌었다 ({rr.code_text(now)} → {rr.code_text(end)}) — 지문 없이 적었다 (판단표에 쓰이지 않는다)", flush=True)
     return cmd_report(a)
 
 
@@ -418,6 +432,9 @@ def cmd_report(a) -> int:
     s = summarize(raw)
     meta = {k: raw[k] for k in ("seeds", "workers", "wall_s", "world_steps", "smoke", "quota", "sec_per_world_step")}
     meta["world_set"] = raw.get("world_set", {})                  # 세계 덮기 (옛 판은 없음 = 덮기 없음)
+    meta["code"] = raw.get("code")                                # 셈 길 지문 (옛 판·측정 중 바뀜은 None)
+    if raw.get("code_changed"):
+        meta["code_changed"] = raw["code_changed"]
     lv.atomic_write_json(out / "oracle.json", lv.jsonable(dict(meta=meta, **s)))
     text = fmt(s, meta)
     (out / "oracle.md").write_text(text + "\n", encoding="utf-8", newline="\n")

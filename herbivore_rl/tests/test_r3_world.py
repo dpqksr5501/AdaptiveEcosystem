@@ -318,7 +318,10 @@ open(sys.argv[2], "w", encoding="utf-8").write(json.dumps([run(j) for j in jobs]
 
 
 def _archive(tmp_path, commit=BASE_COMMIT):
-    """커밋 commit(기본: R3 세계 직전 코드 BASE_COMMIT)의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None."""
+    """커밋 commit(기본: R3 세계 직전 코드 BASE_COMMIT)의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None.
+    10-22: 사본의 동족 무리 중심·분리 두 줄만 지금 코드와 같은 j 차례 합으로 바꾼다 (tests/kin_seq.py)."""
+    import kin_seq
+
     paths = [f"herbivore_rl/{p}" for p in ("env", "env_v2", "policies", "configs", "repertoire_rules.py")]
     try:
         out = subprocess.run(["git", "archive", commit] + paths, cwd=ROOT.parent, capture_output=True, check=True)
@@ -326,7 +329,7 @@ def _archive(tmp_path, commit=BASE_COMMIT):
         return None
     with tarfile.open(fileobj=io.BytesIO(out.stdout)) as tf:
         tf.extractall(tmp_path / "base", **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
-    return tmp_path / "base" / "herbivore_rl"
+    return kin_seq.patch_tree(tmp_path / "base" / "herbivore_rl")
 
 
 # 새 블록·선택 키를 모두 끈 값(1단계 세계에 더해도 그 세계 그대로여야 한다)

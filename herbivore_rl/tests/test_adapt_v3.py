@@ -95,6 +95,8 @@ def test_mapped_changes(ad, snap, ref):
     (lambda s: s["regions"][1]["world"].__setitem__("pred_eat_cd", 5), "다르다"),
     (lambda s: s["brain"].__setitem__("weights_sha256", "00" * 32), "모델 zip"),
     (lambda s: [r["world"].__setitem__("num_ranged", 1) for r in s["regions"]], "늑대 구성"),
+    # 10-22 숲 시야 켠 스냅숏 (C++ eco.IntegratedV3.Foliage) — 대응 전이라 끈 세계로 조용히 바꾸지 않고 거부
+    (lambda s: [r["world"]["obstacle_rules"].update(foliage=True, foliage_r=3.0, foliage_block=2.0) for r in s["regions"]], "숲 시야"),
 ])
 def test_refusals(ad, snap, ref, edit, needle):
     s = copy.deepcopy(snap)
@@ -102,6 +104,16 @@ def test_refusals(ad, snap, ref, edit, needle):
     with pytest.raises(ad.Refused) as e:
         ad.convert(s, ref)
     assert needle in str(e.value)
+
+
+def test_foliage_off_snapshot_converts(ad, snap, ref):
+    """숲 시야 칸이 있어도 끈 세계(foliage 거짓, 또는 장애물을 끈 세계)는 지금처럼 옮긴다 — 끈 C++ 세계와 같다."""
+    s = copy.deepcopy(snap)
+    s["settings"]["foliage"] = False
+    for r in s["regions"]:
+        r["world"]["obstacle_rules"].update(foliage=False, foliage_r=3.0, foliage_block=2.0)
+        r["obstacles"]["foliage_trees"] = [1] * len(r["obstacles"]["discs"])
+    assert ad.convert(s, ref)["record"]["changed"] == []
 
 
 def test_format_refused(ad, tmp_path, snap):

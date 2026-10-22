@@ -15,6 +15,10 @@
 // 먹이 격자 값은 double 을 17 자리로 적어(엔진 Json 쓰개) 파이썬이 비트 단위로 같은 값을 읽는다.
 // 10-21 (LIVE_ADAPT_SPEC.md 2절): 'env' 블록 (환경 감시·환경 판·바뀐 스텝·계기·바뀜 목록 — EcoV3EnvWatch.cpp)과 지역마다 obstacles.level_trunks 를 더했다 (판 1 그대로,
 // 새 칸은 더하기만). 모든 쓰기(자동·주기·콘솔·예정)는 바꿔 끼우기다 — '<이름>.json.tmp' 에 다 쓴 뒤 '<이름>.json' 으로 옮긴다 (감시하는 쪽은 *.tmp 를 보지 않는다).
+// 10-22 숲 시야 (eco.IntegratedV3.Foliage, EcoWorldV3.h FObstacleConfig::Foliage — 판 1 그대로, 더하기만): 지역 world.obstacle_rules 에 foliage·foliage_r·foliage_block,
+// 지역 obstacles 에 foliage_trees (discs 순서로 원판마다 나무 0/1), settings 에 foliage (스위치), 켠 세계의 flight 에 lost_foliage {n, steps, contact}.
+// 파이썬 adapt.convert 는 켠 세계(장애물 ∧ 눈길 가림 ∧ foliage)를 거부한다(Refused — 대응을 아직 옮기지 않았다). 옮길 때 대응은 obstacle_rules.foliage →
+// features.obstacles.foliage.enabled, foliage_r → .r, foliage_block → .block, obstacles.foliage_trees → .trees (fixed 원판 순서의 0/1 목록).
 
 #include "EcoPolicyV3IntegratedSubsystem.h"
 
@@ -331,6 +335,10 @@ namespace EcoV3SnapshotImpl
 			F->SetNumberField(TEXT("detour_steps"), D.MaxSteps);
 			F->SetNumberField(TEXT("detour_help_block"), D.HelpBlock);
 			F->SetNumberField(TEXT("detour_help_drop"), D.HelpDrop);
+			// 10-22 숲 시야 (더하기만 — 나무 표는 지역 obstacles.foliage_trees)
+			F->SetBoolField(TEXT("foliage"), O.Foliage.bEnabled);
+			F->SetNumberField(TEXT("foliage_r"), O.Foliage.R);
+			F->SetNumberField(TEXT("foliage_block"), O.Foliage.Block);
 			J->SetObjectField(TEXT("obstacle_rules"), F);
 		}
 		{
@@ -383,6 +391,7 @@ namespace EcoV3SnapshotImpl
 		J->SetBoolField(TEXT("pack_hunt"), S.bPackHunt);
 		J->SetBoolField(TEXT("obstacles"), S.bObstacles);
 		J->SetBoolField(TEXT("obstacle_detour"), S.bObstacleDetour);
+		J->SetBoolField(TEXT("foliage"), S.bFoliage);   // 10-22 숲 시야 스위치 (세계 값은 지역 world.obstacle_rules.foliage*)
 		J->SetBoolField(TEXT("obstacle_import"), !S.ObstacleImportPath.IsEmpty());
 		J->SetBoolField(TEXT("stage_trees"), S.bStageTrees);
 		J->SetBoolField(TEXT("weather"), S.bWeather);
@@ -537,6 +546,20 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 			// discs = 세계가 쓰는 원판 (장애물을 끈 세계는 빈 목록 — 세계가 원판을 읽지 않는다). scan_discs = 레벨에서 읽은 원판 (기록)
 			J->SetArrayField(TEXT("discs"), Triples(W.Config.Obstacles.bEnabled ? W.Config.Obstacles.Discs : std::vector<double>()));
 			J->SetArrayField(TEXT("scan_discs"), Triples(S.Discs));
+			{
+				// 10-22 숲 시야 나무 표 (discs 순서, 원판마다 나무 1·아님 0 — 세계가 쓰는 표. 표가 비면 모든 원판이 나무, 장애물을 끈 세계는 빈 목록)
+				const EcoWorldV3::FObstacleConfig& Ob = W.Config.Obstacles;
+				TArray<TSharedPtr<FJsonValue>> Trees;
+				if (Ob.bEnabled)
+				{
+					for (int32 k = 0; k < Ob.Num(); ++k)
+					{
+						const bool bTree = Ob.Foliage.Trees.empty() || (k < static_cast<int32>(Ob.Foliage.Trees.size()) && Ob.Foliage.Trees[static_cast<size_t>(k)] != 0);
+						Trees.Add(MakeShared<FJsonValueNumber>(bTree ? 1.0 : 0.0));
+					}
+				}
+				J->SetArrayField(TEXT("foliage_trees"), Trees);
+			}
 			J->SetBoolField(TEXT("imported"), Ctx.bObstaclesImported);
 			J->SetBoolField(TEXT("level_trees_on"), Ctx.bLevelTrees);
 			J->SetNumberField(TEXT("level_trees"), S.LevelTrees);
@@ -622,6 +645,15 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 			J->SetNumberField(TEXT("own_steps"), static_cast<double>(F.OwnSteps));
 			J->SetNumberField(TEXT("own_contact"), static_cast<double>(F.OwnContact));
 			J->SetNumberField(TEXT("shelter_end"), static_cast<double>(F.ShelterEnd));
+			if (W.Config.Obstacles.FoliageConfigured())
+			{
+				// 숲 시야 켠 세계만 (10-22, 파이썬 flight_stats 의 lost_foliage — 원판 놓침 가운데 잎 때문, 끈 세계에는 칸이 없다)
+				TSharedRef<FJsonObject> L = MakeShared<FJsonObject>();
+				L->SetNumberField(TEXT("n"), static_cast<double>(F.LostFoliage[0]));
+				L->SetNumberField(TEXT("steps"), static_cast<double>(F.LostFoliage[1]));
+				L->SetNumberField(TEXT("contact"), static_cast<double>(F.LostFoliage[2]));
+				J->SetObjectField(TEXT("lost_foliage"), L);
+			}
 			J->SetArrayField(TEXT("hist"), IntArray(F.Hist));
 			J->SetArrayField(TEXT("hist_edges"), IntArray(EcoWorldV3::kFlightHistSteps));
 			const EcoV3Flight::FTally& T = Ctx.FlightTally;

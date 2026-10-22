@@ -391,7 +391,9 @@ def test_cpp_files_are_engine_independent_and_clean():
     """엔진 무관 헤더는 표준 헤더와 서로만 싣는다(UObject·CoreMinimal 없음). 새 파일에 절 기호를 쓰지 않는다."""
     inc = re.compile(r'#include\s+[<"]([^>"]+)[>"]')
     assert set(inc.findall(REP_H.read_text(encoding="utf-8"))) == {"cmath", "cstdint"}
-    assert set(inc.findall(OBS_H.read_text(encoding="utf-8"))) == {"cmath", "cstdint", "EcoRepertoire.h"}
+    # <limits> = R5 장애물 관측(b3e175b), EcoThreatModel.h = 숲 시야 FoliageBlocked (10-22 — 같은 엔진 무관 헤더, 표준 헤더만 싣는다)
+    assert set(inc.findall(OBS_H.read_text(encoding="utf-8"))) == {"cmath", "cstdint", "limits", "EcoRepertoire.h", "EcoThreatModel.h"}
+    assert set(inc.findall((POLICY_DIR / "EcoThreatModel.h").read_text(encoding="utf-8"))) == {"cmath", "cstdint"}
     assert set(inc.findall(CHECK_H.read_text(encoding="utf-8"))) == {
         "cmath", "cstdint", "../EcoObservationV3.h", "../EcoPolicyV3Inference.h", "../EcoRepertoire.h",
         "../RepertoireGoldenVectorsV3.h"}

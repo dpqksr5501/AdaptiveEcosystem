@@ -1,7 +1,7 @@
 // v3 관측 18 만들기와 개체 지각 기하 — 파이썬 herbivore_rl/env_v2/world.py `_obs_from`·`_geometry`·`daynight_phase` 와
 // repertoire.obs_extra 의 거울 (R1b 두뇌, 관측 18 = v1 7 + 낮밤 2 + 레퍼토리 9. 경보 칸 alarm_heard 는 없다).
 //
-// **이 파일은 의도적으로 언리얼에 의존하지 않는다.** `<cmath>`·`<cstdint>` 와 EcoRepertoire.h 만 쓴다.
+// **이 파일은 의도적으로 언리얼에 의존하지 않는다.** `<cmath>`·`<cstdint>` 와 EcoRepertoire.h·EcoThreatModel.h(숲 시야 FoliageBlocked — 같은 엔진 무관 헤더)만 쓴다.
 //
 // 계약: AdaptiveEcosystem/Docs/RL_Policy/POLICY_CONTRACT_V3.md 2절(관측), 2-3(기하), 7-6(어둠).
 // 단위: 파이썬 단위 (1단위 = 200 cm, 1스텝 = 8/60 s). Mass 층이 cm 를 ÷ 200 해서 넘긴다.
@@ -21,6 +21,8 @@
 // (escape_room·obstacle_near·threat_hidden — ObstacleObsValues·WriteObstacleObs). 관측 18 은 그대로이고, 세 칸은 따로 만든다 — 망 입력을 붙이는 것은
 // 세계 층(EcoWorldV3::DecideHerb)의 몫이다. 파이썬 world.py `obstacle_obs_values` 와 같은 식·같은 순서라 같은 double 입력이면 비트 단위로 같다
 // (골든 ObstacleObsGoldenVectorsV3.h, 시험 Policy.V3.ObstacleObs.*).
+// 숲 시야 (10-21, world.py obstacles.foliage — 기본 끔): FObstacleObsInput::bFoliage 면 threat_hidden 의 가림 = 줄기 ∨ 잎(EcoThreatV3::FoliageBlocked,
+// 위협 → 나 눈길 — 늑대 표적 고르기와 같은 판정). 끄면 위 그대로 (골든 FoliageGoldenVectorsV3.h, 시험 Policy.V3.Foliage.*).
 
 #pragma once
 
@@ -29,6 +31,7 @@
 #include <limits>
 
 #include "EcoRepertoire.h"
+#include "EcoThreatModel.h"
 
 namespace EcoObservationV3
 {
@@ -302,7 +305,8 @@ namespace EcoObservationV3
 	/**
 	 * 동족 지각 (world._geometry 동족·분리 줄). Agents 는 자기(Self)를 포함한 목록이고 Self 는 건너뛴다.
 	 * 보임 = 실거리 <= see_r(20, 밤·행동 배수 없음) ∧ 시야각 120°. 같은 좌표(거리 0)인 동족은 내적 0 이라 보이지 않는다.
-	 * 분리는 파이썬 행렬 꼴 Σc·pos − (Σc)·P 로 더한다(c = max(1 − d/5, 0) ÷ max(d, 1e-9)).
+	 * 분리는 파이썬과 같은 꼴 Σc·pos − (Σc)·P 로 더한다(c = max(1 − d/5, 0) ÷ max(d, 1e-9)). 합(SumX·CX·CSum)은 j 차례 —
+	 * 파이썬 world.py `_seq_sum` 도 10-22 부터 같은 차례라 비트 단위로 같다(그 전 행렬곱은 끝 비트가 달랐다).
 	 */
 	inline FKinPerception PerceiveKin(std::int32_t Self, const FVec2& Pos, const FVec2& Head, const FKinInput* Agents,
 									  std::int32_t NumAgents, const FObservationConfig& Cfg = kR1bObsConfig)
@@ -496,6 +500,12 @@ namespace EcoObservationV3
 		double BodyR = 0.0;             // 몸 반지름 (이동이 멈추는 반지름 = r + BodyR)
 		double StageSize = 0.0;
 		bool bBlockSight = false;       // 원판이 눈길을 가리나 (obstacles.block_sight)
+		// 숲 시야 (10-21, obstacles.foliage): 참이면 가림 = 줄기 ∨ 잎 (원판 가운데 나무인 것 — FoliageTrees[k] ≠ 0, nullptr = 모두 — 의 중심에 반지름 FoliageR,
+		// 눈길이 그 합집합 안을 FoliageBlock 이상 지나면). bBlockSight 일 때만 읽는다. 거짓(기본) = 줄기만
+		bool bFoliage = false;
+		const std::uint8_t* FoliageTrees = nullptr;
+		double FoliageR = 0.0;
+		double FoliageBlock = 0.0;
 	};
 
 	/** 원시 거리 (double). Near 는 원판이 없으면 +∞. */
@@ -513,6 +523,7 @@ namespace EcoObservationV3
 	 *   원판 k (R = r + BodyR): F = P − c, Cc = F·F − R², B = F·U, Δ = B² − Cc. Cc ≥ 0 ∧ B < 0 ∧ Δ ≥ 0 이면 E = min(E, −B − √Δ)
 	 *                          (원판 안에서 시작하면 건너뛴다·접함은 막는다 — 이동 obstacle_slide 와 같다). N = min(N, |F| − R)
 	 *   가림: bSeen ∧ bBlockSight 이면 위협 a → 나 q 선분 (EcoThreatV3::SightBlocked 와 같은 식, 반지름 r — 몸 없음, 엄격한 <)
+	 *         숲 시야(bFoliage)면 줄기가 안 가릴 때 잎도 본다 (EcoThreatV3::FoliageBlocked — world.py `obstacle_obs_values` 의 foliage 줄)
 	 */
 	inline FObstacleObs ObstacleObsValues(const FObstacleObsInput& In)
 	{
@@ -573,6 +584,10 @@ namespace EcoObservationV3
 				const double Qx = Jx + T * Dx - D[3 * k];
 				const double Qy = Jy + T * Dy - D[3 * k + 1];
 				R.bThreatHidden = Qx * Qx + Qy * Qy < D[3 * k + 2] * D[3 * k + 2];
+			}
+			if (!R.bThreatHidden && In.bFoliage && In.NumDiscs > 0)
+			{
+				R.bThreatHidden = EcoThreatV3::FoliageBlocked(Jx, Jy, X, Y, D, In.NumDiscs, In.FoliageTrees, In.FoliageR, In.FoliageBlock);
 			}
 		}
 		return R;

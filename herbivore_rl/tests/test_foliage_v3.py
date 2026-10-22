@@ -7,12 +7,15 @@ results/v3/route/route_rules.py·oracle.py --world-set).
 - 나무 표: trees 'all' 은 나무 원판만(무작위 배치의 바위는 잎이 없다, fixed 는 모두), 0/1 목록이면 그 표.
 - 세계에서 양쪽 같게: 잎 뒤 늑대를 사슴이 못 보고(서 있으면), 늑대도 그 사슴을 표적으로 고르지 못한다. 발소리는 잎이 막지 않고, 그때 관측 threat_hidden
   = 1(늑대가 나를 못 본다). 끄면 보고 표적으로 고른다.
-- 끔(키 없음·enabled false) = HEAD(01e8d90, git archive 로 돌린 같은 셈) 궤적·기록 해시 — 거울 G·N(숲·고지, COVER 길 고정 포함)·학습 세계(부활 있음).
+- 끔(키 없음·enabled false) = HEAD(01e8d90, git archive 로 돌린 같은 셈 — 10-22 동족 차례 합 두 줄을 넣은 사본) 궤적·기록 해시 — 거울 G·N(숲·고지, COVER 길 고정 포함)·학습 세계(부활 있음).
 - 옛 설정의 config digest 그대로 (선택 키는 features.OPTIONAL_KEYS 끔 값).
 - 도망길 COVER 그늘: 잎이 있으면 H 가 늘고(같은 눈길 판정 — `sight_blocked` 와 같은 값), 끄면 그대로.
-- 도망 기록: 잎 놓침은 obstacle(스스로 벗어남) 안의 lost_foliage, 끈 세계에는 칸이 없다. 평가기(ceval)는 숲 시야 세계를 받지 않는다.
+- 도망 기록: 잎 놓침은 obstacle(스스로 벗어남) 안의 lost_foliage, 끈 세계에는 칸이 없다. 평가기(ceval)는 숲 시야 세계를 받는다(10-22 C++ 에 옮김 —
+  FoliageGoldenVectorsV3.h·Policy.V3.Foliage.*, 도망길 COVER 그늘의 잎은 파이썬 전용이라 route_fixed 거부는 그대로).
 - 측정 도구 --world-set: 점 경로 덮기, 덮기 없음 RUN 팔, 덮기 효과 표, '원판 놓침 가운데 잎 때문' 칸(÷ 원판 놓침, 끈 팔 —), 끊긴 측정을 이어 돌릴
   때 raw 파일의 덮기로 섞기를 막음(meta.json 이 없어도), report 의 부분끼리·meta 덮기 검사.
+- 측정 도구 셈 길 지문(10-22 code_tag): 지문이 다른(옛 판 포함) raw 는 이어 돌리지 않고, 부분 중간에 바뀌면 지문 없이 적고 멈추며, report 는 부분끼리
+  다르면 멈추고 세계 지문이 다른 오라클을 판단표에 쓰지 않는다.
 시드는 탐색 32083~32099·학습 32000~32049 만 쓴다.
 """
 
@@ -41,15 +44,18 @@ FOL = dict(enabled=True, r=3.0, block=2.0, trees="all")
 
 pytestmark = pytest.mark.filterwarnings("ignore:You have specified a mini-batch size")
 
-# HEAD(01e8d90) 를 git archive 로 풀어 같은 `_traj_hash` 로 잰 값 (숲 시야 코드를 넣기 전)
+# HEAD(01e8d90) 를 git archive 로 풀어 같은 `_traj_hash` 로 잰 값 (숲 시야 코드를 넣기 전).
+# 10-22 다시 잼: world.py 가 동족 무리 중심·분리를 C++ 과 같은 j 차례 합으로 더하게 되어(`_seq_sum`) 끝 비트가 달라졌다 — 사본의 그 두 줄만 같은
+# 차례 합으로 바꾼 HEAD(tests/kin_seq.py patch_tree)로 잰 값이고 지금 코드(끔)와 같다. 옛 값(행렬곱 HEAD): G_Forest 99daf5ae…·N_Forest 7c36653a…·
+# N_Forest_cover d1d446f4…·G_Highland 7c07576d…·N_Highland 324eeef3…·N_Highland_cover de490a34…·train_respawn b67d202b…
 HEAD_HASH = {
-    "G_Forest": "99daf5aeeeab35b42c96e1d6ad04c8aff173d22658014cbbde7c980652bafcc1",
-    "N_Forest": "7c36653a38a03968477075530ed5fd1505748c97a2a50093061fefcebb8e01f7",
-    "N_Forest_cover": "d1d446f4a6b28f0cc9f6d760b9eceddefa2f3e5ba807654a8a9f1d8ae8402c05",
-    "G_Highland": "7c07576ddaeed7f465bbecfb3e05b5865b0741d8283b140fca23705bce081a50",
-    "N_Highland": "324eeef3f8cbd050f3af9d59c7c979b7e036e8ffd83a0f0941a0456896314902",
-    "N_Highland_cover": "de490a34fb67538ddaf9a676e91afc6ebf5c3c31e8f502d9f1c81d96248aceea",
-    "train_respawn": "b67d202bcc93eca87c6c8e7e1567dc91b08d5000bbdd54a3466dfbfeb095c628",
+    "G_Forest": "f640c25d1b0981e2c249b9a6f3f4ef329ee284ba894ed40c66474d56e4913023",
+    "N_Forest": "cf260c57bcf1e1e4fe629924e8aeb8a4a39befa3f796cec9cb750787f2396399",
+    "N_Forest_cover": "c84ade66094356acffed5d6375d3555124ee65a762398e10b097372d5ca8f823",
+    "G_Highland": "edaa93bd38f0cbec50d07c3e1a1f9b8e200014863531be33f41013db23b91935",
+    "N_Highland": "a9de3b28df21ecea5854124b2252e752d3e40a9fb2fceea1efb09f7cf19fdbf9",
+    "N_Highland_cover": "0603d1a34611498ea2fe4bf230e6df6a452d7683d3c82b0ce04bf8674dde80cb",
+    "train_respawn": "65984ff6834440bbf8d2bd60ca5d38e39ff246034aa3b2d92d14302024ee0ca1",
 }
 # HEAD 의 config digest (results/v3/mirror/run_mirror.config_digest — obstacles 를 켠 설정 전부)
 HEAD_DIGEST = {
@@ -416,8 +422,9 @@ def test_flight_record_lost_foliage(discs):
     assert "lost_foliage" not in f and "drop_foliage" not in f["route"]
 
 
-def test_ceval_refuses_foliage_world():
-    """평가기(C++)에는 숲 시야가 없다: 켠 설정은 허용 목록 검사(unsupported_settings)와 world_block 이 거부하고, enabled false 를 적은 블록은 끈 세계로 본다."""
+def test_ceval_accepts_foliage_world():
+    """평가기(C++)에 숲 시야를 옮겼다 (10-22, EcoThreatModel.h FoliageChord·FoliageBlocked): 켠 설정도 허용 목록 검사(unsupported_settings)를 지나고,
+    enabled false 를 적은 블록은 끈 세계로 본다. 도망길(route_fixed — COVER 그늘의 잎 포함, 파이썬 전용) 거부는 그대로다."""
     live_dir = ROOT / "results" / "v3" / "live"
     if str(live_dir) not in sys.path:
         sys.path.insert(0, str(live_dir))
@@ -425,10 +432,10 @@ def test_ceval_refuses_foliage_world():
     ref = load_v2_config(ce.REF_CFG)
     on = _with(ref, obstacles=dict(foliage=dict(enabled=True))).to_dict()
     off = _with(ref, obstacles=dict(foliage=dict(enabled=False, r=1.0))).to_dict()
-    assert any("foliage" in x for x in ce.unsupported_settings(on))
+    assert not ce.unsupported_settings(on)
     assert not ce.unsupported_settings(off)
     src = (live_dir / "ceval.py").read_text(encoding="utf-8")
-    assert 'w._ob.get("foliage") is not None' in src
+    assert 'w._ob.get("foliage") is not None' not in src and 'route_fixed' in src
 
 
 # --------------------------------------------------------------------- #
@@ -504,8 +511,8 @@ def test_world_set_arms_and_effect_table():
     assert "| 33.3% |" in rows["run_q0"] and "| 66.7% |" in rows["cover_q0"] and "| — |" in rows["plain_run_q0"]
 
 
-def _fake_raw(rr, part, world_set, seeds=(1, 2, 3)):
-    """요약할 수 있는 작은 raw_<부분>.json 내용 (run 팔 둘·cover 팔 하나, 지역 하나)."""
+def _fake_raw(rr, part, world_set, seeds=(1, 2, 3), code=None):
+    """요약할 수 있는 작은 raw_<부분>.json 내용 (run 팔 둘·cover 팔 하나, 지역 하나). code = 셈 길 지문 (None = 옛 판 — 칸 없음)."""
     def flight(c):
         n = {k: 0 for k in FLIGHT_CAUSES}
         n.update(obstacle=3, cover=2, switch=5)
@@ -515,13 +522,19 @@ def _fake_raw(rr, part, world_set, seeds=(1, 2, 3)):
     arms = [("run", 0, False, "N", False), ("cover", 0, False, "N", False)]
     worlds = [dict(tag=f"{rr.arm_name(r, q, c, wn, pl)}:{wn}", seed=s, region="A", n=32, caught=1, starved=0, alive=31, shelter_steps=10,
                    flight=flight(6 + s + (r == "cover")), wall_s=1.0) for s in seeds for r, q, c, wn, pl in arms]
-    return dict(part=part, seeds=list(seeds), steps=100, world_set=world_set, workers=1, wall_s=1.0, world_wall_mean_s=1.0, sec_per_world_step=0.01,
-                arms=[dict(route=r, quiet_end=q, clump=c, world=wn, plain=pl, name=rr.arm_name(r, q, c, wn, pl)) for r, q, c, wn, pl in arms],
-                worlds=worlds)
+    d = dict(part=part, seeds=list(seeds), steps=100, world_set=world_set, workers=1, wall_s=1.0, world_wall_mean_s=1.0, sec_per_world_step=0.01,
+             arms=[dict(route=r, quiet_end=q, clump=c, world=wn, plain=pl, name=rr.arm_name(r, q, c, wn, pl)) for r, q, c, wn, pl in arms],
+             worlds=worlds)
+    if code is not None:
+        d["code"] = code
+    return d
 
 
 class _Ran(Exception):
     pass
+
+
+_NOW = dict(world="w-now", tool="t-now")                                             # 시험용 셈 길 지문
 
 
 def test_world_set_resume_uses_raw_files(tmp_path, monkeypatch):
@@ -530,9 +543,10 @@ def test_world_set_resume_uses_raw_files(tmp_path, monkeypatch):
     rr = _rr()
     W = {"features.obstacles.foliage.enabled": True, "features.obstacles.foliage.r": 3.0}
     args = ["--world-set", "features.obstacles.foliage.enabled=true", "--world-set", "features.obstacles.foliage.r=3.0"]
-    (tmp_path / "raw_rules.json").write_text(json.dumps(_fake_raw(rr, "rules", W)), encoding="utf-8")
+    (tmp_path / "raw_rules.json").write_text(json.dumps(_fake_raw(rr, "rules", W, code=_NOW)), encoding="utf-8")
     monkeypatch.setattr(rr, "prepare_info", lambda out, snap: dict(start=dict(zip="x.zip"), regions={}))
     monkeypatch.setattr(rr, "route_items", lambda *a, **k: [])
+    monkeypatch.setattr(rr, "code_tag", lambda *a, **k: dict(_NOW))                 # 셈 길 지문은 같다 (지문 검사는 아래 시험)
     seen = []
 
     def run_items(items, workers, label):
@@ -580,3 +594,123 @@ def test_world_set_report_checks_parts_and_meta(tmp_path):
     (tmp_path / "raw_clump.json").write_text(json.dumps(old), encoding="utf-8")
     with pytest.raises(SystemExit, match="부분끼리"):
         rr.main(["report", "--out", str(tmp_path)])
+
+
+# --------------------------------------------------------------------- #
+# 측정 도구 셈 길 지문 (10-22 — route_rules.code_tag: 다른 셈 길로 잰 부분을 이어 돌리거나 한 보고에 섞지 않는다)
+# --------------------------------------------------------------------- #
+
+
+def test_route_code_guards_resume(tmp_path, monkeypatch):
+    """이미 있는 raw 의 지문이 지금과 다르면(옛 판 — 칸 없음, 세계·측정 지문 하나라도) 이어 돌리지 않는다 — g 만 돌리면 옛 rules 로 규칙을 고르게 되므로
+    --force 여도 rules 를 다시 재지 않으면 멈춘다(meta.json 도 쓰지 않는다). --force 와 rules 면 다시 잰다(부분은 늘 rules → g 차례). 같은 지문이면 건너뛴다."""
+    rr = _rr()
+    monkeypatch.setattr(rr, "prepare_info", lambda out, snap: dict(start=dict(zip="x.zip"), regions={}))
+    monkeypatch.setattr(rr, "route_items", lambda *a, **k: [])
+    monkeypatch.setattr(rr, "code_tag", lambda *a, **k: dict(_NOW))
+    seen = []
+
+    def run_items(items, workers, label):
+        seen.append(label)
+        raise _Ran(label)
+
+    monkeypatch.setattr(rr, "run_items", run_items)
+    out = ["run", "--out", str(tmp_path), "--workers", "1"]
+    for old in (None, dict(_NOW, world="w-old"), dict(_NOW, tool="t-old")):
+        (tmp_path / "raw_rules.json").write_text(json.dumps(_fake_raw(rr, "rules", {}, code=old)), encoding="utf-8")
+        for extra in ([], ["--force"]):
+            with pytest.raises(SystemExit, match="셈 길"):
+                rr.main(out + ["--parts", "g", "--g-route", "shelter"] + extra)
+        assert seen == [] and not (tmp_path / "meta.json").exists()
+    with pytest.raises(_Ran):
+        rr.main(out + ["--parts", "g,rules", "--force", "--g-route", "shelter"])
+    assert seen == ["rules"] and json.loads((tmp_path / "meta.json").read_text(encoding="utf-8"))["code"] == _NOW
+    (tmp_path / "raw_rules.json").write_text(json.dumps(_fake_raw(rr, "rules", {}, code=_NOW)), encoding="utf-8")
+    with pytest.raises(_Ran):
+        rr.main(out + ["--parts", "rules,g", "--g-route", "shelter"])
+    assert seen == ["rules", "g"]
+
+
+def test_route_code_change_during_part(tmp_path, monkeypatch):
+    """부분 중간에 셈 길이 바뀌면 그 부분을 지문 없이(code None·code_changed) 적고 멈춘다 — 다음 부분을 돌리지 않고, 이어 돌리기도 받지 않으며, 보고 머리에 적는다."""
+    rr = _rr()
+    monkeypatch.setattr(rr, "prepare_info", lambda out, snap: dict(start=dict(zip="x.zip"), regions={}))
+    monkeypatch.setattr(rr, "route_items", lambda *a, **k: [])
+    edit = dict(_NOW, world="w-edit")
+    tags = iter([dict(_NOW), dict(edit)])
+    monkeypatch.setattr(rr, "code_tag", lambda *a, **k: next(tags))
+    fake = _fake_raw(rr, "rules", {})
+    monkeypatch.setattr(rr, "arms_of", lambda part, *a, **k: [("run", 0, False, "N", False), ("cover", 0, False, "N", False)])   # _fake_raw 의 팔
+    monkeypatch.setattr(rr, "run_items", lambda items, workers, label: [(w["tag"], {k: v for k, v in w.items() if k != "tag"}) for w in fake["worlds"]])
+    out = ["run", "--out", str(tmp_path), "--workers", "1"]
+    with pytest.raises(SystemExit, match="바뀌었다"):
+        rr.main(out + ["--parts", "rules,g", "--g-route", "shelter"])
+    raw = json.loads((tmp_path / "raw_rules.json").read_text(encoding="utf-8"))
+    assert raw["code"] is None and raw["code_changed"] == dict(start=_NOW, end=edit) and not (tmp_path / "raw_g.json").exists()
+    assert json.loads((tmp_path / "meta.json").read_text(encoding="utf-8"))["times"]["rules"]["code"] is None
+    monkeypatch.setattr(rr, "code_tag", lambda *a, **k: dict(edit))
+    with pytest.raises(SystemExit, match="셈 길"):
+        rr.main(out + ["--parts", "g", "--g-route", "shelter"])
+    rr.main(["report", "--out", str(tmp_path)])
+    text = (tmp_path / "rules.md").read_text(encoding="utf-8")
+    assert "rules 측정 중 셈 길이 바뀌었다" in text and "지문을 적기 전 판" not in text
+
+
+def test_route_code_report_checks(tmp_path):
+    """report: 부분끼리 셈 길 지문이 다르면(옛 판 지문 없음과 새 판 포함) 멈춘다. 오라클은 세계 지문이 같을 때만 판단표에 쓴다(측정 지문은 도구가 달라
+    견주지 않는다). 지문 없는 옛 폴더는 보고를 다시 내되 머리에 '새 폴더에서 처음부터 다시 잰다'를 적는다."""
+    rr = _rr()
+    (tmp_path / "raw_rules.json").write_text(json.dumps(_fake_raw(rr, "rules", {}, code=_NOW)), encoding="utf-8")
+    (tmp_path / "oracle.json").write_text(json.dumps(dict(meta=dict(world_set={}, code=dict(world="w-now", tool="t-oracle")))), encoding="utf-8")
+    rr.main(["report", "--out", str(tmp_path)])
+    text = (tmp_path / "rules.md").read_text(encoding="utf-8")
+    assert "세계 w-now · 측정 t-now" in text and "오라클을 판단표에 쓰지 않는다" not in text and "지문을 적기 전 판" not in text
+    for o_code in (None, dict(world="w-old", tool="t-oracle")):
+        (tmp_path / "oracle.json").write_text(json.dumps(dict(meta=dict(world_set={}, code=o_code))), encoding="utf-8")
+        rr.main(["report", "--out", str(tmp_path)])
+        text = (tmp_path / "rules.md").read_text(encoding="utf-8")
+        assert "오라클 세계 셈 길" in text and "오라클을 판단표에 쓰지 않는다" in text
+    (tmp_path / "raw_g.json").write_text(json.dumps(_fake_raw(rr, "g", {})), encoding="utf-8")            # 옛 판 g 와 새 판 rules
+    with pytest.raises(SystemExit, match="셈 길 지문이 다르다"):
+        rr.main(["report", "--out", str(tmp_path)])
+    (tmp_path / "raw_rules.json").write_text(json.dumps(_fake_raw(rr, "rules", {})), encoding="utf-8")     # 둘 다 옛 판
+    (tmp_path / "oracle.json").write_text(json.dumps(dict(meta=dict(world_set={}))), encoding="utf-8")
+    rr.main(["report", "--out", str(tmp_path)])
+    text = (tmp_path / "rules.md").read_text(encoding="utf-8")
+    assert "지문을 적기 전 판" in text and "새 폴더에서 처음부터" in text and "오라클을 판단표에 쓰지 않는다" not in text
+
+
+def test_route_code_tag_tracks_files(tmp_path, monkeypatch):
+    """code_tag: 세계 = live.eval_code_tag('python')(실시간 판정 저장 열쇠와 같은 지문 — 매번 새로 재서 측정 중 파일이 바뀌면 다르다), 측정 = 함수 원문·
+    상수. 오라클의 세계 지문은 규칙 측정과 같고 측정 지문은 다르다. 오라클 run 은 지문을 raw·oracle.json 에 적고, 측정 중 바뀌면 지문 없이 적는다."""
+    rr = _rr()
+    import oracle as orc
+
+    lv = rr.lv
+    monkeypatch.setattr(lv, "_CODE", {})
+    now = rr.code_tag()
+    assert now["world"] == lv.eval_code_tag("python") and len(now["tool"]) == 16
+    o = orc.code_tag()
+    assert o["world"] == now["world"] and o["tool"] != now["tool"]
+    assert rr.code_tag(consts=dict(x=1))["tool"] != rr.code_tag(consts=dict(x=2))["tool"]
+    monkeypatch.setattr(lv, "ROOT", tmp_path)
+    monkeypatch.setattr(lv, "EVAL_CODE_FILES", ("w.py",))
+    (tmp_path / "w.py").write_text("a = 1\n", encoding="utf-8")
+    a = rr.code_tag()
+    (tmp_path / "w.py").write_text("a = 2\n", encoding="utf-8")
+    b = rr.code_tag()
+    assert a["world"] != b["world"] and a["tool"] == b["tool"]
+
+    od = tmp_path / "oracle"
+    monkeypatch.setattr(rr, "prepare_info", lambda out, snap: dict(start=dict(zip="x.zip"), regions={}))
+    monkeypatch.setattr(orc.ad, "make_jobs", lambda *a, **k: [])
+    monkeypatch.setattr(orc, "code_tag", lambda: dict(_NOW))
+    orc.main(["run", "--out", str(od), "--workers", "1"])
+    assert json.loads((od / "oracle_raw.json").read_text(encoding="utf-8"))["code"] == _NOW
+    assert json.loads((od / "oracle.json").read_text(encoding="utf-8"))["meta"]["code"] == _NOW
+    tags = iter([dict(_NOW), dict(_NOW, world="w-edit")])
+    monkeypatch.setattr(orc, "code_tag", lambda: next(tags))
+    orc.main(["run", "--out", str(od), "--workers", "1"])
+    raw = json.loads((od / "oracle_raw.json").read_text(encoding="utf-8"))
+    assert raw["code"] is None and raw["code_changed"]["end"]["world"] == "w-edit"
+    assert json.loads((od / "oracle.json").read_text(encoding="utf-8"))["meta"]["code"] is None

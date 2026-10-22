@@ -679,6 +679,8 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 				Discs.insert(Discs.end(), {D.X, D.Y, D.R});
 				Ctx.ObstacleIsTree.Add(D.bFlag);
 			}
+			// 숲 시야 나무 표 (10-22, FObstacleConfig::Foliage.Trees — 원판과 같은 순서로 다시 맞춘다. 무대를 만들 때와 같은 표)
+			W.Config.Obstacles.Foliage.Trees.assign(Ctx.ObstacleIsTree.GetData(), Ctx.ObstacleIsTree.GetData() + Ctx.ObstacleIsTree.Num());
 			// 먹이 격자는 그대로 둔다 — 팀 자원 계약(CommitSpatialFood)이 스텝 밖 먹이·용량 변화를 거부하면 통합 모드가 꺼진다. 줄기는 먹이 셀 하나의 1/6 밑만 덮는다
 			// (EcoV3EnvWatch.cpp 머리 주석). 파이썬 거울은 스냅숏 food.cap 을 그대로 쓴다
 

@@ -1151,6 +1151,8 @@ def edge_specs() -> list:
     add("tie_catch", _threat(C, head=(r2, r2)), [_prey(40.5, 40), _prey(40, 40.5)])
     add("player_tie_target", _threat(P, pm=W.PM_STALK, pl=50), [_prey(32, 40), _prey(40, 48)])     # 맵 전체를 본다: 뒤쪽도
     add("player_tie_catch", _threat(P, pm=W.PM_WANDER, pl=50), [_prey(40, 39.5), _prey(39.5, 40)])
+    # 잠행형 표적 동점 (10-22 — 동족 차례 합으로 롤아웃이 바뀐 뒤 잠행형 풀에 정확한 동점이 없어 끝 사례로 둔다. 체감 거리 3 < 6 → 돌진 시작)
+    add("stalker_tie_target", _threat(S, head=(r2, r2)), [_prey(43, 40), _prey(40, 43)])
     # 잠행형 상태 기계
     add("exhaust_end", _threat(S, ss=W.ST_EXHAUST, sl=1), [_prey(40.5, 40)])
     add("exhaust_mid", _threat(S, ss=W.ST_EXHAUST, sl=30), [_prey(40.5, 40)])

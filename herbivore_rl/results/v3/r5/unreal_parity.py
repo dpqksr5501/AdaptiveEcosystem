@@ -38,7 +38,9 @@ import numpy as np  # noqa: E402
 LAYOUT = ROOT / "results" / "v3" / "wild2" / "trees" / "tree_layout.json"
 EPS = 1e-9
 
-RE_DISC = re.compile(r"\[EcoV3Obs\] (\S+) 원판 \| 원판 (\d+) \| 몸 (\S+) \| 무대 (\S+) \| 가림 (\d) \| 두뇌 (\S+) 관측 (\d+) \| 분모 (\S+) (\S+) \|(.*)$")
+# 숲 시야 칸 '| 잎 켬 r block 나무표 ' (10-22 — 켬 0/1, 반지름·문턱 단위 %.17g, 원판마다 나무 0/1 글자, 원판 없으면 '-')는 그 뒤 기록부터 있다. 옛 기록은 없음 = 끔
+RE_DISC = re.compile(r"\[EcoV3Obs\] (\S+) 원판 \| 원판 (\d+) \| 몸 (\S+) \| 무대 (\S+) \| 가림 (\d) \| 두뇌 (\S+) 관측 (\d+) \| 분모 (\S+) (\S+) "
+                     r"(?:\| 잎 (\d) (\S+) (\S+) (\S+) )?\|(.*)$")
 RE_ROW = re.compile(r"\[EcoV3Obs\] (\S+) \| t (\d+) \| id (\d+) \| p (\S+) (\S+) \| h (\S+) (\S+) \| seen (\d) \| a (\S+) (\S+) \| j (\S+) (\S+) \| "
                     r"E (\S+) \| N (\S+) \| hid (\d) \| o ([0-9a-f]{8}) ([0-9a-f]{8}) ([0-9a-f]{8})")
 RE_DIGEST = re.compile(r"\[EcoV3Obs\] (\S+) 결정 \| t (\d+) \| 사슴·스텝 (\d+) \| 지문 ([0-9a-f]{16})")
@@ -76,12 +78,18 @@ def read_parity(path: Path) -> dict:
         m = RE_DISC.search(line)
         if m:
             reg = m.group(1)
-            d = [tuple(_f(x) for x in tok.split(",")) for tok in m.group(10).split()]
+            d = [tuple(_f(x) for x in tok.split(",")) for tok in m.group(14).split()]
             if len(d) != int(m.group(2)):
                 raise SystemExit(f"{path.name} {reg}: 원판 수 {m.group(2)} 인데 {len(d)} 개를 읽었다")
+            foliage = None
+            if m.group(10) == "1":                    # 숲 시야 켬 — 잎 원 중심 = 나무 원판 (C++ ObstacleObsInputOf 와 같은 표)
+                trees = m.group(13)
+                if len(trees) != len(d) or set(trees) - {"0", "1"}:
+                    raise SystemExit(f"{path.name} {reg}: 숲 시야 나무 표 {trees!r} 가 원판 {len(d)} 개와 맞지 않는다")
+                foliage = dict(trees=np.array([c == "1" for c in trees], dtype=bool), r=_f(m.group(11)), block=_f(m.group(12)))
             discs[reg] = dict(discs=np.array(d, dtype=np.float64).reshape(-1, 3), body_r=_f(m.group(3)), size=_f(m.group(4)),
                               block=m.group(5) == "1", brain=m.group(6), obs_dim=int(m.group(7)), escape_norm=_f(m.group(8)),
-                              near_norm=_f(m.group(9)))
+                              near_norm=_f(m.group(9)), foliage=foliage)
             continue
         m = RE_ROW.search(line)
         if m:
@@ -111,7 +119,9 @@ def check_parity(name: str, log: dict, layout: dict) -> dict:
         A = np.array([r["a"] for r in rows], dtype=np.float64).reshape(-1, 2)
         J = np.array([r["j"] for r in rows], dtype=np.float64).reshape(-1, 2)
         D = meta["discs"]
-        e, nn, hid = obstacle_obs_values(P, H, seen, A, J, D, meta["body_r"], meta["size"], meta["block"])
+        fo = meta.get("foliage")
+        fol = None if fo is None else (D[fo["trees"], :2], fo["r"], fo["block"])   # 숲 시야 켠 판: 가림 = 줄기 ∨ 잎 (world.py foliage 인자)
+        e, nn, hid = obstacle_obs_values(P, H, seen, A, J, D, meta["body_r"], meta["size"], meta["block"], foliage=fol)
         o = np.empty((n, 3), dtype=np.float32)          # world.py `_obs_from` 세 칸 (float64 → float32)
         o[:, 0] = np.clip(e / meta["escape_norm"], 0.0, 1.0)
         o[:, 1] = np.clip(np.maximum(nn, 0.0) / meta["near_norm"], 0.0, 1.0)
@@ -143,7 +153,8 @@ def check_parity(name: str, log: dict, layout: dict) -> dict:
         out["regions"][reg] = dict(
             rows=n, bad=bad, bad_E=int((~okE).sum()), bad_N=int((~okN).sum()), bad_hidden=int((~okH).sum()), bad_obs=int((~okO).sum()),
             bad_away=int((~okA).sum()), discs=int(len(D)), discs_equal_layout=same_layout, body_r=meta["body_r"], size=meta["size"],
-            block_sight=meta["block"], brain=meta["brain"], obs_dim=meta["obs_dim"], steps=len({r["t"] for r in rows}),
+            block_sight=meta["block"], foliage=None if fo is None else dict(r=fo["r"], block=fo["block"], trees=int(fo["trees"].sum())),
+            brain=meta["brain"], obs_dim=meta["obs_dim"], steps=len({r["t"] for r in rows}),
             known=int(known), hidden=int(cH.sum()), near_lt1=int((oo[:, 1] < 1.0).sum()), near_lt1_known=int(((oo[:, 1] < 1.0) & seen).sum()),
             escape_zero=int((oo[:, 0] == 0.0).sum()), escape_one=int((oo[:, 0] == 1.0).sum()),
             escape_mean_known=float(oo[seen, 0].mean()) if known else None,

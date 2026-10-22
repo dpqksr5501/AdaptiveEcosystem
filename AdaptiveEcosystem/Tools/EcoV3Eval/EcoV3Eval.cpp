@@ -10,6 +10,7 @@
 // 일 파일 (herbivore_rl/results/v3/live/ceval.py 가 쓴다 — 형식 eco_v3_eval_jobs 판 1):
 //   brain  두뇌 파일 경로 (export_weights_v3.py --brain-file, 형식 eco_v3_brain 판 1 — 계약 해시·차원·마스크 문턱·sha256·골든 자체 확인)
 //   jobs[] 세계마다: world (스냅숏 지역 world 블록과 같은 이름·뜻 — EcoV3Snapshot.cpp WorldConfigJson), covers·discs (x, y, r),
+//          foliage_trees (선택 — 숲 시야 나무 표, 원판마다 0/1. world.obstacle_rules 의 foliage·foliage_r·foliage_block 과 함께, 10-21),
 //          food (gw·cell·cap·food·regen, 행 우선 k = iy·gw + ix), deer (슬롯 순서 x·y·hx·hy·energy·reserve·repro_cd·slot),
 //          wolves (kind stalker|chaser·x·y·hx·hy·slot·speed), rng (pcg64 = 파이썬 numpy 상태 이어 받기, native = 게임 SplitMix64),
 //          steps·horizons·trace·id·seed·region
@@ -588,6 +589,34 @@ namespace EcoV3Eval
 				O.Discs.push_back(A.at(1).Num());
 				O.Discs.push_back(A.at(2).Num());
 			}
+			// 숲 시야 (10-21, 파이썬 obstacles.foliage — 선택 칸, 없으면 끔): foliage·foliage_r·foliage_block (스냅숏 obstacle_rules 와 같은 이름),
+			// 나무 표 = 일의 foliage_trees (원판마다 0/1, discs 순서 — 파이썬 _fol_centers 의 표. 비면 모두 나무)
+			O.Foliage.bEnabled = O.bEnabled && F.BoolOr("foliage", false);
+			O.Foliage.R = F.NumOr("foliage_r", O.Foliage.R);
+			O.Foliage.Block = F.NumOr("foliage_block", O.Foliage.Block);
+			O.Foliage.Trees.clear();
+			if (const FValue* Ft = Job.Find("foliage_trees"); O.Foliage.bEnabled && Ft != nullptr && Ft->IsArray())
+			{
+				for (const FValue& V : Ft->Arr())
+				{
+					O.Foliage.Trees.push_back(V.Num() != 0.0 ? 1 : 0);
+				}
+			}
+			if (O.Foliage.bEnabled)
+			{
+				if (!O.bBlockSight)
+				{
+					throw std::runtime_error("숲 시야는 block_sight 를 켠 세계만 받는다 (파이썬도 그렇다)");
+				}
+				if (!(O.Foliage.R > 0.0) || !(O.Foliage.Block > 0.0))
+				{
+					throw std::runtime_error("숲 시야 foliage_r·foliage_block 은 0 보다 커야 한다");
+				}
+				if (!O.Foliage.Trees.empty() && static_cast<std::int32_t>(O.Foliage.Trees.size()) != O.Num())
+				{
+					throw std::runtime_error("숲 시야 나무 표(foliage_trees) 길이가 원판 수와 다르다");
+				}
+			}
 		}
 		{
 			const FValue& F = Wb.At("weather");
@@ -776,7 +805,7 @@ namespace EcoV3Eval
 
 	// ---- 기록 ----
 
-	void WriteFlight(FOut& O, const W3::FFlightReport& F)
+	void WriteFlight(FOut& O, const W3::FFlightReport& F, bool bFoliage)
 	{
 		O.BeginObj();
 		O.KInt("started", F.Started);
@@ -801,6 +830,16 @@ namespace EcoV3Eval
 		O.KInt("shelter_end", F.ShelterEnd);
 		O.KIntArr("hist", F.Hist, W3::kNumFlightHistEdges + 1);
 		O.KIntArr("hist_edges", W3::kFlightHistSteps, W3::kNumFlightHistEdges);
+		if (bFoliage)
+		{
+			// 숲 시야 켬 세계만 (파이썬 flight_stats 의 lost_foliage — 끈 세계에는 칸이 없다)
+			O.Key("lost_foliage");
+			O.BeginObj();
+			O.KInt("n", F.LostFoliage[0]);
+			O.KInt("steps", F.LostFoliage[1]);
+			O.KInt("contact", F.LostFoliage[2]);
+			O.EndObj();
+		}
 		O.EndObj();
 	}
 
@@ -1105,7 +1144,7 @@ namespace EcoV3Eval
 			if (E.W.Config.bFlightStats && E.W.Config.WildFlight.bEnabled)
 			{
 				O.Key("flight");
-				WriteFlight(O, FlightNow(E));
+				WriteFlight(O, FlightNow(E), E.W.Config.Obstacles.FoliageConfigured());
 			}
 			if (!Hs.empty())
 			{
@@ -1121,7 +1160,7 @@ namespace EcoV3Eval
 					if (E.W.Config.bFlightStats && E.W.Config.WildFlight.bEnabled)
 					{
 						O.Key("flight");
-						WriteFlight(O, A.Flight);
+						WriteFlight(O, A.Flight, E.W.Config.Obstacles.FoliageConfigured());
 					}
 					O.EndObj();
 				}

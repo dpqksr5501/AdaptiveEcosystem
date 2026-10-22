@@ -421,8 +421,10 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
          줄기 가림 3)은 그대로이고 둘 중 하나면 가린다. 쓰는 곳은 줄기 가림과 같다(같은 눈길, 양쪽 같게): 사슴이 위협을 보는 pvis(`_geometry` — 도주
          반사·경계·quiet_end 의 알아챔), 늑대가 표적을 고르는 vis(`_step_predators_v3` — 매 스텝 다시 고르므로 이어 쫓기·놓침도 같은 판정), 관측
          threat_hidden(`obstacle_obs_values` — '늑대가 지금 나를 못 본다'), 도망길 COVER 그늘 H(`flight_route_geometry`). 발소리·동족 시야는 가리지 않는다.
-         선분 끝을 (x, 같으면 y) 작은 쪽부터 놓고 재므로 a → b 와 b → a 가 비트 단위로 같다. block_sight 를 켜야 한다. C++ 에 없다(측정 전용 — 평가기
-         results/v3/live/ceval.py 가 받지 않는다). 도망 기록: 잎이 가려 놓친 도망은 끝 까닭 obstacle(스스로 벗어남 FLIGHT_OWN)이고, 그 스텝 놓침이 모두 잎
+         선분 끝을 (x, 같으면 y) 작은 쪽부터 놓고 재므로 a → b 와 b → a 가 비트 단위로 같다. block_sight 를 켜야 한다. C++ 에 옮겼다(10-22, 기본 끔 —
+         EcoThreatModel.h FoliageChord·FoliageBlocked, EcoWorldV3.h FObstacleConfig::Foliage, 통합 모드 eco.IntegratedV3.Foliage, 평가기
+         results/v3/live/ceval.py 가 받는다. 도망길 COVER 그늘 H 의 잎만 파이썬 전용, adapt.convert 는 켠 스냅숏을 거부). 도망 기록: 잎이 가려 놓친 도망은
+         끝 까닭 obstacle(스스로 벗어남 FLIGHT_OWN)이고, 그 스텝 놓침이 모두 잎
          때문(줄기 가림 없음)인 것을 flight_stats 의 lost_foliage(켠 세계만)로 따로 센다. 통계 obstacle_stats 의 foliage(잎만 가린 쌍).
          현실 근거: 숲에서는 잎·낮은 가지·하층 덤불이 옆 시야를 몇 m 로 줄인다(숨김 덮개 — 유제류는 포식자 눈을 피하려 덮개를 고른다, Mysterud & Østbye 1999
          Wildl. Soc. Bull. 27:385). 쫓기는 사슴은 덤불로 뛰어들어 쫓는 쪽의 눈길을 끊는다. 대가로 숲에서 먹는 사슴도 늑대를 늦게 알아챈다(같은 눈길).
@@ -481,7 +483,8 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
        (늑대가 표적을 고를 때 쓰는 sight_blocked(늑대 → 사슴)와 같은 식, 반지름은 줄기 r_k — 몸 반지름 없음). 위협을 모르거나 obstacles.block_sight 가
        거짓이거나 원판이 없으면 0. 가린 위협이 보이는 것은 발소리로 알았을 때뿐이다 — 이 칸은 '늑대가 지금 나를 못 본다'를 알려 준다.
        숲 시야(야생 2단계 3 의 7), obstacles.foliage)를 켠 세계는 가림 = 줄기(위 식) ∨ 잎(`foliage_blocked`, 같은 위협 → 사슴 눈길 — 늑대 표적
-       고르기와 같은 판정)이라 잎만 가려도 1 이다(뜻은 같다: '늑대가 지금 나를 못 본다'). 숲 시야는 C++ 에 없다(측정 전용 — 끈 세계는 위 식 그대로).
+       고르기와 같은 판정)이라 잎만 가려도 1 이다(뜻은 같다: '늑대가 지금 나를 못 본다'). C++ 도 같다(EcoObservationV3.h ObstacleObsValues 의
+       bFoliage, 10-22 — 끈 세계는 위 식 그대로).
   어디서나 같다: 은신처 안도 같은 식(은신처는 원판이 아니다). 벽에 붙은 사슴이 벽 쪽을 보면 E = 0. 죽은 슬롯(통합 무대 부활 없음)도 계산하지만 쓰지 않는다
   (C++ 은 산 사슴만 만든다). 리스폰한 행은 리스폰 자리에서 다시 만든다(`_observe_subset`). 정규화는 관측 float32 에 넣기 직전에 한다(float64 → float32).
   C++ 꼴: EcoObservationV3 의 다음 단계 함수(계약 2-4) — Away = PerceiveThreats(…).AwayFromPred, 같은 식으로 E·N·bHidden 을 만들고 BuildObservation 이 세 칸을 쓴다.
@@ -1895,7 +1898,8 @@ def sight_blocked(a: np.ndarray, b: np.ndarray, discs: np.ndarray, foliage: tupl
     """세로 장애물 시선 (모듈 docstring '야생 2단계' 3 의 3)). a (n, 2)·b (m, 2) → (n, m) bool: a_i 와 b_j 를 잇는 선분이 어느 원판을 지나는가 —
     d = b − a, dd = d·d, t = clip(((c − a)·d) / dd, 0, 1)(dd = 0 이면 0), 가장 가까운 점과 중심의 거리² (a + t·d − c)² < r². 발소리는 가리지 않는다.
     foliage = (잎 원 중심 (F, 2), r_f, block) 이면 숲 시야(3 의 7))도 더한다(줄기 ∨ 잎 — `foliage_blocked`). None 이면 줄기만(지금 그대로).
-    C++ 꼴: EcoThreatV3::SightBlocked(Ax, Ay, Bx, By, Discs, Num) — 같은 식, 원판 순서로 하나라도 참이면 참(숲 시야는 C++ 에 없다)."""
+    C++ 꼴: EcoThreatV3::SightBlocked(Ax, Ay, Bx, By, Discs, Num) — 같은 식, 원판 순서로 하나라도 참이면 참(숲 시야는 EcoThreatV3::FoliageBlocked —
+    10-22, 줄기 ∨ 잎은 부르는 쪽 EcoWorldV3 Detail::EyeBlocked·EcoThreatV3::InputSightBlocked)."""
     if foliage is not None and len(a) and len(b):
         trunk = sight_blocked(a, b, discs)
         aa = np.repeat(np.asarray(a, dtype=np.float64).reshape(-1, 2), len(b), axis=0)
@@ -2545,6 +2549,14 @@ def daynight_seg_edges(detect_night: float, tol: float = 1e-5) -> tuple[float, f
     if detect_night <= 0.0:
         raise ValueError("detect_night = 0 이면 visibility 가 늘 1 이라 위상 구간을 관측으로 나눌 수 없다")
     return (1.0 - DN_EDGES[1] * detect_night + tol, 1.0 - DN_EDGES[0] * detect_night - tol)
+
+
+def _seq_sum(a: np.ndarray) -> np.ndarray:
+    """(n, N) → (n,): 행마다 j = 0, 1, … 차례로 더한 합. np.cumsum(= add.accumulate)은 앞 합에 다음 값을 하나씩 더한다.
+    `_geometry` 의 동족 무리 중심·분리 합에 쓴다 — C++ PerceiveKin(EcoObservationV3.h 의 SumX·SumY·CX·CY·CSum, j 차례 += )과 같은 순서라 C++ 세계
+    (평가기 EcoV3Eval·통합 모드)와 비트 단위로 같다 (10-22). 그 전에는 행렬곱(MKL dgemm)·np.sum(쌍 합)으로 더해 끝 비트(1e-15)가 달랐고 혼돈이라
+    수백 스텝 뒤 궤적이 갈렸다. 0 을 더하는 칸(안 보이는 동족·반경 밖·자기·시체)은 합을 바꾸지 않아 C++ 이 건너뛰는 것과 같다."""
+    return np.cumsum(a, axis=1)[:, -1]
 
 
 class World:
@@ -3728,7 +3740,7 @@ class World:
                    np.where(self._wide[idx], self._vg["wide_cos"], cfg.fov_cos)[:, None])
 
         # 쌍별 계산은 전부 (n, ·) 2D로 둔다. (n,N,2) 3D 임시배열을 만들면 스텝의 75%를
-        # 여기서 쓴다 (측정). 합산은 행렬곱으로 내려보낸다.
+        # 여기서 쓴다 (측정). 동족 무리 중심·분리의 j 합은 `_seq_sum`(j 차례 — C++ PerceiveKin 과 같은 순서, 10-22)으로 한다.
 
         # --- 동족: 시야(거리 + 각도) 내, 자기 제외 (§3.1 idx3) ---
         dx = self.pos[:, 0][None, :] - P[:, 0:1]
@@ -3745,18 +3757,19 @@ class World:
             # 죽은 자리에서 동족으로 세어진다(C++ 관측 E 가 리스폰·목록 빼기 앞이다)
             kin_vis[:, dead_cols] = False
         kin_f = kin_vis.astype(np.float64)
-        kin_count = kin_f.sum(1)
-        centroid = (kin_f @ self.pos) / np.maximum(kin_count, 1.0)[:, None]
+        kin_count = kin_f.sum(1)                # 0/1 합이라 순서와 무관하게 정확하다
+        qx, qy = self.pos[:, 0], self.pos[:, 1]
+        centroid = np.stack([_seq_sum(kin_f * qx), _seq_sum(kin_f * qy)], 1) / np.maximum(kin_count, 1.0)[:, None]
         to_centroid = np.where(kin_count[:, None] > 0, normalize(centroid - P), 0.0)
 
         # --- separation: 반경 내 이웃마다 (1 - d/R) * 멀어지는 단위벡터, 합 후 크기 1로 clamp ---
-        # sum_j w_ij * (pos_j - P_i)/d_ij  =  (c @ pos) - rowsum(c) * P,  c = w/d
+        # sum_j w_ij * (pos_j - P_i)/d_ij  =  Σc·pos - (Σc) * P,  c = w/d  (C++ 의 CX·CY − CSum·P 와 같은 꼴·같은 j 차례)
         wgt = np.clip(1.0 - dist / cfg.sep_radius, 0.0, None)
         wgt[ar, idx] = 0.0
         if dead_cols is not None:
             wgt[:, dead_cols] = 0.0
         c = wgt * invd
-        separation = clamp_magnitude(-((c @ self.pos) - c.sum(1)[:, None] * P), 1.0)
+        separation = clamp_magnitude(-(np.stack([_seq_sum(c * qx), _seq_sum(c * qy)], 1) - _seq_sum(c)[:, None] * P), 1.0)
 
         # --- 포식자 (§3.1 idx1, idx2) ---
         rz: dict = {}

@@ -297,6 +297,11 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 										// 사슴·늑대가 둘레를 따라 미끄러지고 시선이 가린다. 원판이 없는 무대는 아무것도 바뀌지 않는다
 	bool bObstacleDetour = true;        // 장애물 돌아가기 (eco.IntegratedV3.ObstacleDetour 기본 1, 10-17 끼임 고침 — 파이썬 obstacles.detour, 값 = FDetourConfig 기본값).
 										// 막히면 가장 적게 돈 빈 방향으로 돌아간다. bObstacles 이고 원판이 있을 때만 쓴다. 거짓 = 미끄러짐만
+	bool bFoliage = false;              // 숲 시야 (eco.IntegratedV3.Foliage 기본 0 — 개발 빌드 전용, 10-22 파이썬 obstacles.foliage 를 옮김). 참 = 나무 원판(ObstacleIsTree)마다
+										// 잎 원(FoliageR)을 두고 눈길이 그 안을 FoliageBlock 넘게 지나면 줄기처럼 가린다 (사슴·늑대 같게, 발소리는 그대로). bObstacles 일 때만.
+										// R1b 는 이 세계에서 배우지 않았다 — 측정·실험용 (EcoWorldV3.h FObstacleConfig::Foliage)
+	double FoliageRM = 6.0;             // 잎 원 반지름 (m, eco.IntegratedV3.FoliageR 기본 6 = 3 단위 — 파이썬 r 3.0)
+	double FoliageBlockM = 4.0;         // 가리는 잎 안 길이 (m, eco.IntegratedV3.FoliageBlock 기본 4 = 2 단위 — 파이썬 block 2.0)
 	FString ObstacleExportPath;         // 원판 목록 JSON 내보내기 (eco.IntegratedV3.ObstacleExport, 빈 문자열 = 안 함 — 파이썬 거울 짝 비교용)
 	FString ObstacleImportPath;         // 원판 목록 JSON 가져오기 (eco.IntegratedV3.ObstacleImport, 빈 문자열 = 안 함 — 측정 전용: 레벨 원판 대신 이 원판.
 										// 레벨에 보이는 물체가 없는 원판이라 화면용이 아니다. 파이썬 거울과 같은 원판으로 견줄 때만 쓴다)

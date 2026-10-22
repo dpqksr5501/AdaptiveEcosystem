@@ -308,7 +308,8 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #     돌아가고, 앞 보기 detour_probe(단위)가 트이거나 detour_steps 스텝이 지날 때까지 같은 쪽으로 돈다. 돕는 늑대는 detour_help_block 스텝 넘게
 #     돌아가거나 막혀 돌아서면 detour_help_drop 스텝 동안 돕지 않는다(길목 자리를 버리고 다시 고른다). false = 10-17 3 그대로(미끄러짐만). 숫자 키 기본값은
 #     켰을 때 쓰는 값이다(끄면 읽지 않는다)
-#   obstacles.foliage (10-21 숲 시야, env_v2/world.py `foliage_chord`·`foliage_blocked`, 모듈 docstring '야생 2단계' 3 의 7) — 측정 전용, C++ 에 없다):
+#   obstacles.foliage (10-21 숲 시야, env_v2/world.py `foliage_chord`·`foliage_blocked`, 모듈 docstring '야생 2단계' 3 의 7) — 측정용. 10-22 C++ 에 옮김
+#     (기본 끔 — 통합 모드 eco.IntegratedV3.Foliage·평가기 ceval 이 받는다. 도망길 COVER 그늘의 잎만 파이썬 전용, adapt.convert 는 켠 스냅숏을 거부)):
 #     {enabled, r, block, trees} 블록(빠진 칸은 이 끔 값). enabled true 면 나무인 원판(trees 'all' = 나무 원판 모두 — 무작위 배치는 줄기만·바위 빼고,
 #     fixed 는 모두. 또는 원판마다 0/1 목록)마다 같은 중심에 반지름 r(단위, 1 단위 = 2 m)의 잎 원을 두고, 눈길이 잎 원들 안을 지나는 길이(겹친 몫은
 #     한 번)가 block(단위) 이상이면 줄기처럼 눈길을 가린다(사슴·늑대 같게, 발소리는 그대로). block_sight 를 켜야 한다. false = 10-21 그대로(줄기만 가림)

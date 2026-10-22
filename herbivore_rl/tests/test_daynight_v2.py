@@ -291,7 +291,7 @@ def test_daynight_off_matches_v2_1_bitwise(cfg4, seed, pol):
 
 def test_daynight_off_reproduces_recorded_v2_1_result(cfg4):
     """1-4 전 코드가 남긴 Gate E1-b 결과 행(results/v2/e1/B1/r2_5_ew0_5/constsearch_seg.json)을 daynight 를 끈 v2_4 설정이
-    비트 단위로 다시 낸다."""
+    비트 단위로 다시 낸다 (10-22 부터 기록 코드에 동족 차례 합 두 줄을 넣은 행 기준 — 아래 주석)."""
     d = json.loads((ROOT / "results/v2/e1/B1/r2_5_ew0_5/constsearch_seg.json").read_text(encoding="utf-8"))
     m = d["meta"]
     assert m["config_digest"] == "f068496361f9"
@@ -301,9 +301,16 @@ def test_daynight_off_reproduces_recorded_v2_1_result(cfg4):
     want = d["per_seed"]["C2-seg"][0]
     r = ro.rollout(_dn(cfg4, enabled=False), ro.build_policy(spec, 10000), 10000, m["eval_steps"], gamma=m["gamma"],
                    tail=m["tail"])
+    import hashlib
+
     from diagnose_v2 import clean
 
-    assert clean(ro.public_row(r)) == want
+    got = clean(ro.public_row(r))
+    # 10-22: world.py 동족 무리 중심·분리를 C++ 과 같은 j 차례 합으로 바꿔 끝 비트가 달라져 5000 스텝 뒤 기록 행과 다르다(옛 mean_return
+    # 171.814 → 150.704). 기록 커밋 1d0b845 사본은 그대로 기록 행을 다시 내고, 같은 두 줄 바꿈(tests/kin_seq.py)을 넣은 사본은 지문 66c95ab7c531f6dc
+    # 행을 낸다 — 지금 코드가 그 행과 같다 (tests/test_vigilance_v2.py 같은 시험과 같은 행)
+    assert got.keys() == want.keys() and got["seed"] == want["seed"]
+    assert hashlib.sha256(json.dumps(got, sort_keys=True).encode()).hexdigest()[:16] == "66c95ab7c531f6dc", got
 
 
 @pytest.mark.parametrize("kw", [dict(fixed_day_frac=1.0),
