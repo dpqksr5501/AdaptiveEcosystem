@@ -142,15 +142,20 @@ def test_registry_and_keys():
     for n in NEW:
         assert F.PARAM_KEYS[n] == frozenset(b[n]) - {"enabled"}, n
     # 선택 키(규칙 6): 1단계 설정에는 없고(끔 값으로 읽는다) R3 설정에는 적는다
-    assert dict(F.OPTIONAL_KEYS["realism_shelter"]) == {"block_predators": False}
+    assert dict(F.OPTIONAL_KEYS["realism_shelter"]) == {"block_predators": False, "wolf_margin": 0.0}   # 늑대 몸 여유 10-17
     assert dict(F.OPTIONAL_KEYS["realism_cover_food"]) == {"frac_range": None}
     assert dict(F.OPTIONAL_KEYS["threats"]) == {"eat_in_place": False}           # (j) 늑대 먹는 시간, 10-15
     full = _raw(R3_ON)["features"]
     for n, opt in F.OPTIONAL_KEYS.items():
+        if n.startswith("wild_") or n in ("obstacles", "integrated_stage"):
+            continue                    # 야생 1단계 선택 키(10-16)·야생 2단계 3 obstacles.fixed(10-17)·R4 학습 보충 integrated_stage.respawn_safe_r(10-18)는
+                                        # R3 설정에 없다 — tests/test_wild1.py·test_wild2_obstacle.py·test_r4_train.py 가 본다
+        opt = {k: v for k, v in opt.items() if (n, k) != ("realism_shelter", "wolf_margin")}   # 10-17 늑대 몸 여유도 R3 설정에 없다(test_wild1)
         assert set(opt) <= set(full[n]) and not set(opt) & F.PARAM_KEYS[n]
         for old in (REAL["all"], R1_ON, R1):                                     # 지난 설정 파일에는 선택 키가 없다(끔 값으로 읽는다)
             assert not set(opt) & set(_raw(old)["features"].get(n, {}))
-    assert F.with_optional("realism_shelter", {"untargetable": True}) == {"block_predators": False, "untargetable": True}
+    assert F.with_optional("realism_shelter", {"untargetable": True}) == {"block_predators": False, "wolf_margin": 0.0,
+                                                                           "untargetable": True}
     with pytest.raises(ValueError, match="선택 키"):
         F.parse_features({"realism_shelter": dict(b["realism_shelter"], block_predator=True)})
 
@@ -313,7 +318,10 @@ open(sys.argv[2], "w", encoding="utf-8").write(json.dumps([run(j) for j in jobs]
 
 
 def _archive(tmp_path, commit=BASE_COMMIT):
-    """커밋 commit(기본: R3 세계 직전 코드 BASE_COMMIT)의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None."""
+    """커밋 commit(기본: R3 세계 직전 코드 BASE_COMMIT)의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None.
+    10-22: 사본의 동족 무리 중심·분리 두 줄만 지금 코드와 같은 j 차례 합으로 바꾼다 (tests/kin_seq.py)."""
+    import kin_seq
+
     paths = [f"herbivore_rl/{p}" for p in ("env", "env_v2", "policies", "configs", "repertoire_rules.py")]
     try:
         out = subprocess.run(["git", "archive", commit] + paths, cwd=ROOT.parent, capture_output=True, check=True)
@@ -321,7 +329,7 @@ def _archive(tmp_path, commit=BASE_COMMIT):
         return None
     with tarfile.open(fileobj=io.BytesIO(out.stdout)) as tf:
         tf.extractall(tmp_path / "base", **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
-    return tmp_path / "base" / "herbivore_rl"
+    return kin_seq.patch_tree(tmp_path / "base" / "herbivore_rl")
 
 
 # 새 블록·선택 키를 모두 끈 값(1단계 세계에 더해도 그 세계 그대로여야 한다)

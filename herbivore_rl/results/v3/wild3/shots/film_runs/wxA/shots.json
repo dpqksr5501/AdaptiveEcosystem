@@ -1,0 +1,13 @@
+{
+  "name": "wxA",
+  "fps": 30,
+  "frames": 36,
+  "shots": [
+    {"region": "Forest", "mode": "wide", "subject": 0, "subject_id": -1, "start": 6.000, "duration": 3.000, "first_frame": 0, "frames": 6, "sim_first": 6.000, "sim_last": 8.967, "alive_start": 128, "alive_end": 127, "caught_start": 0, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Forest", "mode": "shelter", "subject": 0, "subject_id": -1, "start": 10.000, "duration": 3.000, "first_frame": 6, "frames": 6, "sim_first": 10.000, "sim_last": 12.967, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Highland", "mode": "wide", "subject": 0, "subject_id": -1, "start": 14.000, "duration": 3.000, "first_frame": 12, "frames": 6, "sim_first": 14.000, "sim_last": 16.967, "alive_start": 128, "alive_end": 125, "caught_start": 0, "caught_end": 3, "starved_start": 0, "starved_end": 0},
+    {"region": "Highland", "mode": "deer", "subject": 0, "subject_id": 279, "start": 18.000, "duration": 3.000, "first_frame": 18, "frames": 6, "sim_first": 18.000, "sim_last": 20.967, "alive_start": 125, "alive_end": 124, "caught_start": 3, "caught_end": 4, "starved_start": 0, "starved_end": 0},
+    {"region": "Barren", "mode": "wide", "subject": 0, "subject_id": -1, "start": 22.000, "duration": 3.000, "first_frame": 24, "frames": 6, "sim_first": 22.000, "sim_last": 24.967, "alive_start": 128, "alive_end": 127, "caught_start": 0, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Barren", "mode": "deer", "subject": 0, "subject_id": 150, "start": 26.000, "duration": 3.000, "first_frame": 30, "frames": 6, "sim_first": 26.000, "sim_last": 28.967, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0}
+  ]
+}

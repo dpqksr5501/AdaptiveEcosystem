@@ -1,0 +1,326 @@
+{
+ "s0_2m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.21822916666666667,
+   "starved": 0.22552083333333334,
+   "alive": 0.55625,
+   "shelter": 0.06306760806094,
+   "beh": {
+    "graze": 0.8930839260495101,
+    "flee": 0.0813668053329821,
+    "hide": 0.025549268617507812,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.6112311015118791,
+   "hunt_ends": 1389
+  },
+  "base_caught": 0.21796875
+ },
+ "s1_2m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.21744791666666666,
+   "starved": 0.24010416666666667,
+   "alive": 0.5424479166666667,
+   "shelter": 0.061790011900744145,
+   "beh": {
+    "graze": 0.8944938491055173,
+    "flee": 0.08133484235204395,
+    "hide": 0.02417130854243867,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.616897305171158,
+   "hunt_ends": 1373
+  },
+  "base_caught": 0.21796875
+ },
+ "s2_2m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.21796875,
+   "starved": 0.21796875,
+   "alive": 0.5640625,
+   "shelter": 0.06113244858526908,
+   "beh": {
+    "graze": 0.8917643692378903,
+    "flee": 0.08380172784755126,
+    "hide": 0.02443390291455844,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.6242603550295858,
+   "hunt_ends": 1352
+  },
+  "base_caught": 0.21796875
+ },
+ "s3_2m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.215625,
+   "starved": 0.24505208333333334,
+   "alive": 0.5393229166666667,
+   "shelter": 0.06478673142781903,
+   "beh": {
+    "graze": 0.8895713233465036,
+    "flee": 0.08473574383142755,
+    "hide": 0.025692932822068925,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.6210995542347697,
+   "hunt_ends": 1346
+  },
+  "base_caught": 0.21796875
+ },
+ "s4_2m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.221875,
+   "starved": 0.23333333333333334,
+   "alive": 0.5447916666666667,
+   "shelter": 0.06637052616779052,
+   "beh": {
+    "graze": 0.8893709089402793,
+    "flee": 0.08139639906020082,
+    "hide": 0.029232691999519896,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.6135714285714285,
+   "hunt_ends": 1400
+  },
+  "base_caught": 0.21796875
+ },
+ "s5_2m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.2171875,
+   "starved": 0.23411458333333332,
+   "alive": 0.5486979166666667,
+   "shelter": 0.059406651907334275,
+   "beh": {
+    "graze": 0.9001108984084035,
+    "flee": 0.07786577242766361,
+    "hide": 0.022023329163932886,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.5910049191848208,
+   "hunt_ends": 1423
+  },
+  "base_caught": 0.21796875
+ },
+ "s0_5m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.20885416666666667,
+   "starved": 0.2609375,
+   "alive": 0.5302083333333333,
+   "shelter": 0.06832969684758189,
+   "beh": {
+    "graze": 0.8885566364635137,
+    "flee": 0.08320009690881097,
+    "hide": 0.028243266627675335,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.594574780058651,
+   "hunt_ends": 1364
+  },
+  "base_caught": 0.21796875
+ },
+ "s1_5m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.21354166666666666,
+   "starved": 0.23125,
+   "alive": 0.5552083333333333,
+   "shelter": 0.06722550314309457,
+   "beh": {
+    "graze": 0.8903047471702029,
+    "flee": 0.07860861724033288,
+    "hide": 0.03108663558946423,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.6044117647058823,
+   "hunt_ends": 1360
+  },
+  "base_caught": 0.21796875
+ },
+ "s2_5m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.21770833333333334,
+   "starved": 0.25416666666666665,
+   "alive": 0.528125,
+   "shelter": 0.06332426064127011,
+   "beh": {
+    "graze": 0.8905683546233492,
+    "flee": 0.08411846656366677,
+    "hide": 0.0253131788129841,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.617820324005891,
+   "hunt_ends": 1358
+  },
+  "base_caught": 0.21796875
+ },
+ "s3_5m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.21354166666666666,
+   "starved": 0.22473958333333333,
+   "alive": 0.56171875,
+   "shelter": 0.061138580844406695,
+   "beh": {
+    "graze": 0.8952676129367491,
+    "flee": 0.08118521731424354,
+    "hide": 0.02354716974900743,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.5800561797752809,
+   "hunt_ends": 1424
+  },
+  "base_caught": 0.21796875
+ },
+ "s4_5m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.2171875,
+   "starved": 0.22369791666666666,
+   "alive": 0.5591145833333333,
+   "shelter": 0.06639304587588062,
+   "beh": {
+    "graze": 0.8902376468428908,
+    "flee": 0.08090547518497895,
+    "hide": 0.028856877972130317,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.6260223048327137,
+   "hunt_ends": 1345
+  },
+  "base_caught": 0.21796875
+ },
+ "s5_5m": {
+  "stop": false,
+  "rules": {
+   "flee_half": false,
+   "shelter_3x": false,
+   "starve_1_5x": false,
+   "mask_defect": false
+  },
+  "run": {
+   "worlds": 30,
+   "caught": 0.21796875,
+   "starved": 0.22916666666666666,
+   "alive": 0.5528645833333333,
+   "shelter": 0.060827902394036557,
+   "beh": {
+    "graze": 0.8968637120366423,
+    "flee": 0.0800417334994269,
+    "hide": 0.02309455446393077,
+    "freeze": 0.0,
+    "sleep": 0.0
+   },
+   "catch_cover": 0,
+   "hunt_success": 0.6149341142020498,
+   "hunt_ends": 1366
+  },
+  "base_caught": 0.21796875
+ }
+}

@@ -24,7 +24,7 @@ import yaml
 
 import env_v2.features as F
 from env.config import ROOT, load_config
-from env.world import World as WorldV1
+import kin_seq
 from env_v2 import rollout as ro
 from env_v2.config import load_v2_config
 from env_v2.steering import EPS, steer
@@ -32,6 +32,10 @@ from env_v2.vec_env import MultiWorldVecEnv
 from env_v2.world import (ACT_SPEED, GAIT_RUN, GAIT_STOP, GAIT_WALK, OBS_THREAT_RECENCY, RECENT_THREAT,
                           VIGIL_STAT_COLUMNS, World, action_names, obs_dim, obs_names)
 from policies.registry import make_policy
+
+# v1 env/world.py 를 동족 무리 중심·분리 j 차례 합으로만 바꾼 사본 (tests/kin_seq.py) — env_v2 가 10-22 부터 C++ 과 같은 그 차례로 더해
+# v1 원본(행렬곱, 한 줄도 바꾸지 않는다)과는 끝 비트가 다르다. '기능을 끄면 v1 과 비트 동일' 은 이 사본과 견준다
+WorldV1 = kin_seq.world_v1()
 
 V2_1 = ROOT / "configs" / "v2_1.yaml"
 V2_2 = ROOT / "configs" / "v2_2.yaml"
@@ -466,9 +470,19 @@ def test_vigilance_off_matches_v2_1_bitwise(cfg2, seed, pol):
         np.testing.assert_array_equal(getattr(w1, k), getattr(w2, k), err_msg=k)
 
 
+KIN_SEQ_ROW_SHA = "66c95ab7c531f6dc"      # 기록 커밋 1d0b845 + 동족 차례 합 사본의 C2-seg 시드 10000 행 (json sort_keys sha256 앞 16)
+
+
+def _row_sha(row) -> str:
+    import hashlib
+
+    return hashlib.sha256(json.dumps(row, sort_keys=True).encode()).hexdigest()[:16]
+
+
 def test_vigilance_off_reproduces_recorded_v2_1_result(cfg2):
     """1-4 전 코드가 남긴 Gate E1-b 결과(results/v2/e1/B1/r2_5_ew0_5/constsearch_seg.json, C2-seg, 평가 시드 10000 ×
-    5000스텝)를 vigilance 를 끈 v2_2 설정으로 다시 돌리면 행 전체(G_γ·통계·보행 지표)가 비트 단위로 같다."""
+    5000스텝)를 vigilance 를 끈 v2_2 설정으로 다시 돌리면 행 전체(G_γ·통계·보행 지표)가 비트 단위로 같다 (10-22 부터 기록 코드에 동족 차례 합
+    두 줄을 넣은 행 기준 — 아래 주석)."""
     d = json.loads((ROOT / "results/v2/e1/B1/r2_5_ew0_5/constsearch_seg.json").read_text(encoding="utf-8"))
     m = d["meta"]
     assert m["config_digest"] == "f068496361f9" and m["eval_steps"] == 5000 and int(m.get("head") or 0) == 0
@@ -481,7 +495,13 @@ def test_vigilance_off_reproduces_recorded_v2_1_result(cfg2):
                    tail=m["tail"])
     from diagnose_v2 import clean
 
-    assert clean(ro.public_row(r)) == want
+    got = clean(ro.public_row(r))
+    # 10-22: world.py 동족 무리 중심·분리를 C++ 과 같은 j 차례 합으로 바꿔 끝 비트가 달라져 5000 스텝 뒤 기록 행과 다르다(옛 G_γ 3.3443 → 2.7825,
+    # mean_return 171.814 → 150.704). 기록 커밋 1d0b845 사본은 그대로 기록 행을 다시 내고, 그 사본에 같은 두 줄 바꿈(tests/kin_seq.py)을 넣으면
+    # 아래 행(지문 KIN_SEQ_ROW_SHA)을 낸다 — 지금 코드가 그 행과 같다. 칸 이름은 기록 행과 같다
+    assert got.keys() == want.keys() and got["seed"] == want["seed"]
+    assert _row_sha(got) == KIN_SEQ_ROW_SHA, got
+    assert got["mean_return"] == 150.70392699835568 and got["g_gamma"] == 2.7824716331107604
 
 
 @pytest.mark.parametrize("seed", [0, 10000])

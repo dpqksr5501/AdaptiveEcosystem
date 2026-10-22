@@ -238,6 +238,8 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	{
 		return;
 	}
+	// 두뇌 바꾸기 (10-18, EcoV3Brain.h): 결정 스텝 경계 — 콘솔·폴더 감시·시작 두뇌로 대기 중인 두뇌를 여기서 바꾼다 (입양 첫 결정 앞)
+	Sub->SyncBrain(/*bPollWatch*/ true);
 
 	// --- 1. 모으기 (청크 순서는 아키타입·생성 순서에 따라 바뀌므로 StableAgentId 로 정렬한다) ---
 	Deer.Reset();
@@ -386,6 +388,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	{
 		FEcoV3RegionContext& Ctx = *Sub->GetContext(c);
 		Sub->RefreshRefuges(Ctx);
+		if (!Sub->IsActive()) return;
 		for (const int32 k : WolvesByContext[c])
 		{
 			FEcoV3WolfRec& W = Wolves[k];
@@ -431,7 +434,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		{
 			BuildViews(c);
 			EcoWorldV3::ObserveAndDecideRows(Ctx.Sim, Views.GetData(), Views.Num(), ThreatPtrs.GetData(), ThreatPtrs.Num(),
-											 NewRows.GetData(), NewRows.Num());
+											 NewRows.GetData(), NewRows.Num(), Sub->ActiveNet());
 			for (const int32 r : NewRows)
 			{
 				const FEcoV3DeerRec& D = Deer[List[r]];
@@ -445,11 +448,45 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	const double CpuStart = FPlatformTime::Seconds();
 	for (int32 s = 0; s < Steps; ++s)
 	{
+		// 환경 바뀜 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp): 레벨이 바꾼 나무·날씨를 이 경계(스텝 앞)에서 지역 세계에 넣는다 — 새 원판 안 산 사슴·늑대는
+		// 밖으로 민다. 대기 변화가 없으면 아무것도 하지 않는다 (지금까지와 비트 단위로 같다)
+		if (Sub->HasPendingEnvChange())
+		{
+			TArray<TArray<EcoWorldV3::FHerbBody*>> EnvBodies;
+			TArray<TArray<EcoWorldV3::FThreatAgent*>> EnvAgents;
+			EnvBodies.SetNum(NumCtx);
+			EnvAgents.SetNum(NumCtx);
+			for (int32 c = 0; c < NumCtx; ++c)
+			{
+				for (const int32 k : DeerByContext[c])
+				{
+					EnvBodies[c].Add(Deer[k].View.Body);
+				}
+				for (const int32 k : WolvesByContext[c])
+				{
+					EnvAgents[c].Add(Wolves[k].Agent);
+				}
+			}
+			Sub->ApplyEnvChange(EnvBodies, EnvAgents);
+		}
+		// 전역 스텝 경계마다: 예정 바꾸기(eco.V3Brain.SwapAtSeconds)가 한 프레임 안의 정확한 스텝에서 걸리게. 이 스텝의 모든 지역이 같은 두뇌다
+		Sub->SyncBrain(/*bPollWatch*/ false);
+		// 환경 스냅숏 (10-18 적응 고리, EcoV3Snapshot.cpp): 예정 시각이면 이 스텝 앞 상태를 한 번 쓴다 (읽기만 — 세계를 바꾸지 않는다)
+		Sub->MaybeScheduledSnapshot();
+		// 자동·주기 스냅숏 (10-21): 환경 판이 가라앉은 뒤 판마다 한 번, eco.IntegratedV3.SnapshotEvery 주기 (읽기만)
+		Sub->MaybeAutoSnapshot();
+		const EcoPolicyV3::FPolicyNetV3& Net = Sub->ActiveNet();
 		for (int32 c = 0; c < NumCtx; ++c)
 		{
 			FEcoV3RegionContext& Ctx = *Sub->GetContext(c);
 			Sub->SyncContextClock(Ctx);
 			BuildViews(c);
+			// 두뇌 행동 몫 기록: 늑대를 앎 = 이 스텝 결정 관측(스텝 앞 기하)의 pred_count > 0 (FEcoV3BrainTally)
+			KnowsPre.SetNumUninitialized(Views.Num());
+			for (int32 r = 0; r < Views.Num(); ++r)
+			{
+				KnowsPre[r] = Views[r].Perception->Obs[EcoPolicyV3::kObsPredCount] > 0.0f ? 1 : 0;
+			}
 			for (FEcoIntegratedV3Fragment* Int : HerbInts)
 			{
 				Int->PrevGroundZ = Int->GroundZ;
@@ -468,14 +505,21 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
             Adapter.Shelters=World->GetSubsystem<UEcoShelterSubsystem>();Adapter.Now=Now;
 			EcoWorldV3::FStepHooks Hooks;
 			Hooks.User = &Adapter;
-			Hooks.HerbControl=&SocialControlHook;
+			// 사슴 Social 행동 연결 (조연우 님 22eb1b6). eco.IntegratedV3.SocialControl 1 일 때만 건다 — 기본 0 (사람 결정 10-17 (8))
+			Hooks.HerbControl = Sub->GetSettings().bSocialControl ? &SocialControlHook : nullptr;
             Hooks.HerbMove = Sub->UsesTerrain() ? &HerbMoveHook : nullptr;
             Hooks.ThreatMove = Sub->UsesTerrain() ? &ThreatMoveHook : nullptr;
 			const double BeforeFood = Ctx.Sim.Food.Total();
 			const double BeforeEaten = Ctx.Sim.Stats.FoodEaten;
 			const EcoWorldV3::FStepReport Report = EcoWorldV3::Step(Ctx.Sim, Views.GetData(), Views.Num(), ThreatPtrs.GetData(),
-																	ThreatPtrs.Num(), EcoPolicyV3::kBuiltinNet,
-																	&Hooks);
+																	ThreatPtrs.Num(), Net, &Hooks);
+			// R5 장애물 관측 대조 기록 (eco.IntegratedV3.ObsParityLog — 기본 끔): 이 스텝 끝 관측의 세 칸과 그 입력 (읽기만)
+			Sub->LogObsParity(Ctx, Views.GetData(), StableViewIds.GetData(), Views.Num());
+			// 야생 (w3) 도망 기록 (10-21, 기록만): 이 스텝 뒤 열린 도망 합 — 10초 기록 줄·스냅숏 보고의 잘림 (이번 스텝에 죽은 사슴의 도망은 Step 이 이미 닫았다)
+			if (Ctx.FlightOn())
+			{
+				Ctx.FlightOpen = EcoWorldV3::FlightOpenOf(Views.GetData(), Views.Num());
+			}
 
             // Feedback uses the integrated native body and ground result, never the desired slot or render Actor position.
             for(int32 R=0;R<DeerByContext[c].Num();++R) {
@@ -497,6 +541,10 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				// 사슴 얼기 막음 확인: 요청을 읽은 결정의 마스크에 얼기 칸이 열렸는가 (eco.IntegratedV3.NoFreeze 1 이면 늘 0)
 				const EcoWorldV3::FHerbDecision& Dec = *Views[r].Decision;
 				Ctx.FreezeMaskOpen += (Dec.bCommittedReads && Dec.CommittedMask[EcoRepertoireV3::kFreeze] != 0) ? 1 : 0;
+				// 두뇌 행동 몫: 이 스텝에 실제로 한 행동, 도주 반사(도주·웅크림 덮기)는 따로 (R4 situ_eval.py 와 같은 정의)
+				const bool bReflex = Dec.KeepActive == EcoWorldV3::kKeepPanic || Dec.KeepActive == EcoWorldV3::kKeepShelter;
+				Ctx.BrainTally.Add(Dec.ExecutedBehavior, KnowsPre[r] != 0, bReflex);
+				Ctx.SinceSwapBrainTally.Add(Dec.ExecutedBehavior, KnowsPre[r] != 0, bReflex);
 				if (Body.LastIntake > 0.0 && Int.AteLogEpoch != Ctx.LogEpoch)
 				{
 					Int.AteLogEpoch = Ctx.LogEpoch;

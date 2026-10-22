@@ -1,0 +1,458 @@
+# 야생 2단계 3 나무 거울 세계 — 통합 레벨 무대에 놓은 팀 나무 줄기 (10-17 사용자 '그럼 그냥 우리 쪽 테스트 레벨에 저 사람이 만든 장애물들 적절히 배치해 봐').
+# 자동 생성 — results/v3/wild2/trees/make_tree_layout.py (손으로 고치지 않는다. v3_wild2_obstacle_mirror.yaml 을 고치면 다시 만든다). 설명 results/v3/wild2/trees/README.md.
+# = configs/v3_wild2_obstacle_mirror.yaml(아래 그대로) + obstacles.fixed 하나: 무작위 줄기·바위 대신 배치 표 trees-1017a(지문 21218665c114)의
+#   숲 무대 Beech_Tree 24 그루 줄기 원판(반지름 = 밑동 꼭짓점 반경 40.45 cm × 크기 1.8~2.2 = 0.73~0.89 m). fixed 가 있으면 tree_per_ha·rock_per_ha
+#   무작위 배치는 쓰지 않는다(난수를 뽑지 않는다). 언리얼 통합 v3 모드(eco.IntegratedV3.StageTrees 1, 기본)가 같은 표로 나무를 놓고 같은 원판을 세계에 넣는다.
+# 지역마다 다른 표(숲 24·고지 9·메마른 땅 0): 짝 비교 실행기 run_mirror.py --unreal-maps … --unreal-obstacles results/v3/wild2/trees/tree_layout.json
+#   (그 파일은 언리얼 내보내기 꼴 — 지도 (세션, 지역) 마다 그 지역 원판을 fixed 로 덮는다). 이 파일 하나만 쓰면 모든 세계가 숲 무대다.
+#
+# ── 아래는 v3_wild2_obstacle_mirror.yaml 그대로 (version 과 obstacles.fixed 만 다르다) ──
+# 야생 2단계 3 거울 세계 — 도주를 막는 세로 장애물(나무 줄기·바위) (10-17 사용자 '추천대로 끄고 2~4번 진행해' — 끈 것은 팀 무리 경보 연결뿐).
+# 명세 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_WILD2_SPEC.md 6절. 정의·식은 env_v2/world.py 모듈 docstring '야생 2단계' 3. 재기 전용 세계이고 학습하지
+# 않는다(부활 없음). 실행기 results/v3/mirror/run_mirror.py --config configs/v3_wild2_obstacle_mirror.yaml. 결과 results/v3/wild2/README.md.
+#
+# = configs/v3_wild2_pack_mirror.yaml(늑대 4 + 협동 사냥 + 은신처 먹이 부족, 그 머리 주석은 아래에 그대로 둔다) + obstacles(12) 블록 하나:
+#   무대(120 m = 1.44 ha)에 나무 줄기 360 그루(1 ha 250, 반지름 10~30 cm)와 바위 7 개(1 ha 5, 반지름 0.5~1.5 m)를 놓는다. 은신처 원 안에는 놓지 않는다.
+#   사슴·늑대는 원판(반지름 + 몸 30 cm) 앞에서 멈춰 둘레를 따라 미끄러지고, 원판이 눈길을 가린다(발소리는 못 가린다). 원판 밑 먹이는 덮인 몫만큼 적다.
+#   언리얼 팀 통합 레벨의 무대에는 충돌하는 나무·바위가 없다(10-17 읽기: 숲 무대의 메시 38 개는 모두 충돌 없는 풀) — 그래서 밀도는 언리얼 숲 무대가 아니라
+#   실제 숲 자료로 정했다(아래 블록 주석). 언리얼과 같은 원판으로 견줄 때는 실행기 --unreal-obstacles 가 fixed 로 덮는다.
+# obstacles 를 끄면 v3_wild2_pack_mirror.yaml 과 비트 단위로 같다(tests/test_wild2_obstacle.py). 시드: 탐색 32000~32099·33000~33099 만.
+# 언리얼 통합 기본(늑대 4·협동·몸 여유 1 m·은신처 먹이 부족·세로 장애물 켬)의 거울이 이 설정이다(레벨에 원판이 없으면 v3_wild2_pack_mirror.yaml 과 같다).
+# 10-17 고침: 은신처 먹이 부족 블록을 다시 넣었다(아래 v3_wild2_pack_mirror.yaml 머리 주석). 고침 전 측정(81c6409)은 --disable realism_cover_food.
+# 10-17 장애물 끼임 고침: obstacles 블록에 돌아가기(detour·detour_*)를 켰다 — 원판에 막히면 가장 적게 돈 빈 방향으로 돌아간다(블록 주석). 고침 전 판은
+#   실행기에서 obstacles.detour 를 false 로 덮는다(results/v3/wild2/stuck_check.py --set obstacles.detour=false, 결과 results/v3/wild2/README.md '돌아가기').
+#
+# ── 아래는 v3_wild2_pack_mirror.yaml 의 머리 주석 그대로 ──
+# 야생 2단계 2 거울 세계 — 늑대 무리·협동 사냥 (10-17 사용자 '추천대로 끄고 2~4번 진행해' — 끈 것은 팀 무리 경보 연결뿐, 아래).
+# 명세 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_WILD2_SPEC.md. 정의·식은 env_v2/world.py 모듈 docstring '야생 2단계' 2. 재기 전용 세계이고 학습하지
+# 않는다(부활 없음). 실행기 results/v3/mirror/run_mirror.py --config configs/v3_wild2_pack_mirror.yaml. 결과 results/v3/wild2/README.md.
+#
+# = configs/v3_wild2_mirror.yaml(= v3_wild1_mirror.yaml 야생 1단계 + 10-16 고침 + 10-17 늑대 몸 여유 1 m + 1 은신처 먹이 부족, 그 머리 주석은 아래에
+#   그대로 둔다) + 두 가지:
+#   (1) 늑대 수 rand.predator_count 2 → 4 (지역당 4, 언리얼 eco.IntegratedV3.WolvesPerRegion 기본 4). 구성은 integrated_stage.wolf_kinds 'alternate'
+#       그대로(슬롯 짝수 잠행-돌진형·홀수 근접 추격형 → 잠행 2·추격 2). 시작 자리는 무대 네 모서리 쪽(stage). 사슴 두뇌 R1b 의 학습 범위(보통 위협 2~12,
+#       잠행 비율 30~70% — 50%)와 관측 분모(obs_pred_count_norm 8) 안이다.
+#   (2) wild_pack(30): 한 늑대가 사슴을 쫓는 동안 쉬던 동료가 그 사슴이 달아날 곳(향하는 은신처의 문, 없으면 도주선 앞 lead)으로 가서 기다린다.
+# 1 은신처 먹이 부족(realism_cover_food 0.15)은 켠다 — 사용자의 서 있는 결정(10-14·10-15) '은신처는 안전하지만 먹이가 적다, 배고픈 사슴은 나와야 한다'.
+#   10-17 고침: 처음 이 설정(40b0c58)은 사용자 말 '추천대로 끄고 2~4번 진행해'(10-17)를 은신처 먹이 부족을 끄라는 뜻으로 잘못 읽어 이 블록을 뺐다.
+#   그 말은 팀 무리 경보 연결(eco.IntegratedV3.SocialControl)을 끄고 2~4 단계를 하라는 뜻뿐이었다. 그래서 다시 넣었다. 뺀 판(고침 전 측정)은
+#   실행기 --disable realism_cover_food 로 다시 만든다.
+# wild_pack 을 끄고 predator_count 를 [2, 2] 로 두면 v3_wild2_mirror.yaml 과 비트 단위로 같다(tests/test_wild2_pack.py). 시드: 탐색 32000~32099·33000~33099 만.
+#
+# ── 아래는 v3_wild1_mirror.yaml 의 머리 주석 그대로 ──
+# (야생 1단계 머리 주석) 야생 규칙 1단계 거울 세계 (10-15 사용자 '야생 생태계 규칙을 만들어', '사슴이 굶어도 좀 버티도록', '늑대 피해서 도망가다 굶어 죽는 게 말이 안 된다').
+# 명세 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_WILD1_SPEC.md. 정의·식은 env_v2/world.py 모듈 docstring '야생 1단계'. 재기 전용 세계이고 학습하지
+# 않는다(부활 없음 세계는 env_v2/vec_env.py 가 받지 않는다). 실행기 results/v3/mirror/run_mirror.py --config configs/v3_wild1_mirror.yaml.
+#
+# = configs/v3_unreal_mirror.yaml(언리얼 통합 v3 모드 거울 — 머리 주석에 C++ 출처와 닫지 못한 차이) 그대로 + 아래 다섯 블록:
+#   realism_vision·realism_hearing: R3 세계(configs/v3_r3.yaml)의 값 그대로 켠다(위협 시야 300°, 발소리). 사슴이 옆·뒤의 늑대도 알아챈다
+#   wild_reserve(27): 지방 비축 — 배가 비어도(E = 0) 비축으로 3일(게임 하루 900스텝 = 2분 → 2700스텝 = 6분) 버틴다. 비축이 바닥나야 굶어 죽는다.
+#     배가 바닥인 사슴(E < 0.1)은 느리다(0.75배) — 늑대가 약한 사슴을 더 잡는다
+#   wild_satiation(28): 늑대 포만 — 먹고(5초) 나면 반나절(450스텝 = 60초) 쉬며 사냥하지 않는다. 쉬는 늑대도 사슴에게 보인다
+#   wild_flight(29): 도주 반사 거리 — 사냥 중인 늑대를 30 m 안에서 알아채면 먹으며 멀어지고, 15 m 안이거나 다가오면 40 m 밖·은신처까지 뛴다
+#   realism_shelter(10-16 더함): R3 세계(configs/v3_r3_on.yaml)의 값 그대로 켠다 — 은신처 원 안 사슴은 무엇을 하든(먹고 있어도) 잡히지 않고 표적도
+#     되지 않는다. 늑대는 은신처 원 안으로 들어가지 못하고 둘레를 따라 미끄러진다(H17)
+# 여섯 블록을 지우거나 끄면 v3_unreal_mirror.yaml 과 비트 단위로 같다(tests/test_wild1.py). 시드: 탐색 32000~32099·33000~33099 만 쓴다.
+#
+# 변경 기록 10-16(사용자가 언리얼에서 보고 알린 세 가지, results/v3/wild1/README.md '가장자리·은신처 고침', 명세 RL_V3_WILD1_SPEC.md 11절):
+#   (1) '늑대가 먹기 시작하면 도망치던 사슴이 멈춘다' → wild_flight.hold_awake true: 시작한 도주는 깨어 있는 늑대(사냥·먹기·배부름, 자는 늑대 말고)
+#       모두에게서 40 m 밖이 되거나 은신처 안에 들 때까지 이어진다. 도주를 일으키는 것은 그대로 사냥 중인 늑대뿐이다.
+#       현실 근거: 사슴은 포식자가 다른 사슴을 잡은 뒤에도 충분히 멀어질 때까지 달리고, 멀리서 지켜본다
+#   (2) '가장자리에서 늑대가 계속 잡아먹는다' → wild_flight.edge_r 5.0(10 m): 무대 가장자리 10 m 안에서는 도주·경계 방향의 벽 쪽 성분을 벽을 따라가는
+#       성분으로 굽히고, 모서리(두 벽 모두 10 m 안)에서는 늑대에게서 더 멀어지는 쪽 벽을 따라 모서리를 빠져나온다.
+#       현실 근거: 사슴은 달아날 길을 쓰고 막다른 곳으로 뛰어들지 않는다
+#   (3) '은신처 안에서도 잡힌다' → realism_shelter 켬(위). 현실 근거: 빽빽한 덤불 속으로는 늑대가 따라 들어가 덮칠 수 없다
+#   은신처 먹이 부족(realism_cover_food)은 켜지 않았다 — 언리얼 먹이 격자(팀 Ecology 쪽)를 은신처마다 바꿔야 해서 이번 고침에 싸지 않다.
+#   새 키의 코드 기본값(hold_awake false, edge_r 0)은 10-15 그대로라 이 세 가지를 끄면 10-15 결과 그대로다.
+#
+# 변경 기록 10-17(늑대 몸 여유, 명세 RL_V3_WILD1_SPEC.md 12절): 늑대가 은신처 원 둘레 위에서 미끄러지면 언리얼 화면에서 늑대 몸이 둘레 65 cm 안쪽의
+#   바위·덤불 테두리(팀 EcoRefugeHabitat)를 파고드는 것처럼 보인다 → realism_shelter.wolf_margin 0.5(1 m): 늑대 중심은 반지름 r + 1 m 둘레를 따라
+#   미끄러진다. 사슴 쪽(원 안 사슴은 안전·표적 제외, 도주 은신처, 먹이)은 원 반지름 r 그대로다. 코드 기본값 0 = 10-16 그대로.
+#   현실 근거: 늑대는 몸길이 약 1~1.5 m 인 동물이라(어림) 빽빽한 덤불·바위 테두리에 몸을 밀어 넣지 못하고 몸 중심이 테두리에서 몸 반쯤 떨어져 돈다
+
+version: "3.wild2trees"
+
+# v1 키: 포식자 속도 범위(v3_real1_night_on 은 [0.6, 0.95])를 통합 무대 값 0.8 하나로, 맵·늑대 수·원거리형·재생 배수를 고정한다. 폭 0 범위는
+# uniform(a, a) = a 라 v1 스트림 뽑기 수는 그대로다(world_params·vec_env 균형 뽑기와 같은 순서). 은신처 비율 cover_frac 은 뽑기만 하고
+# integrated_stage.cover_layout 이 덮는다. rand 의 나머지 하위 키는 v1 값 그대로다.
+overrides:
+  rand:
+    world_size: [60.0, 60.0]
+    # 야생 2단계 2: 지역당 늑대 4 (잠행 2·추격 2). 학습 범위 2~12 안
+    predator_count: [4, 4]
+    pred_speed_mult: [0.8, 0.8]
+    ranged_frac: [0.0, 0.0]
+    food_regen_mult: [1.0, 1.0]
+  # 늑대 먹는 시간 5초 = 반올림(5 ÷ 2/15) = 38스텝(C++ WolfEatSteps). 실행기 --wolf-eat-steps 가 덮는다(30초 225, 60초 450)
+  pred_eat_cd: 38
+
+features:
+  speed:
+    enabled: true
+    # 행동 idx 4 (sigmoid 뒤 [0,1]) → 보행 상태: a < 1/3 정지, a < 2/3 걷기, 그 이상 뛰기 (계획서 4.3).
+    # 상태가 없는 고정 문턱이다(최소 유지 시간 K 없음, 10절 #3 — B8 이 0.5 를 넘으면 넣는다).
+    # 1/3·2/3 의 float64 값을 그대로 적는다(repr(1/3), repr(2/3)).
+    thresholds: [0.3333333333333333, 0.6666666666666666]
+    # 상태별 속력 × herb_speed [정지, 걷기, 뛰기] (4.4 표). 정지는 0 이어야 한다(heading 유지).
+    # 뛰기 1.0 = v1 속력. 포식자 속도 범위는 E1-b 결정(10-02)으로 ×0.6~0.95(원거리형 ×0.36~0.57, 위 overrides)다.
+    # 걷기 0.4 는 모든 근접형보다 느리고 뛰기 1.0 은 모든 포식자보다 빠르다. 쫓기면 뛰어야 산다.
+    gait_speed: [0.0, 0.4, 1.0]
+    # 상태별 섭식 배수 [정지, 걷기, 뛰기] (4.4 표). env_v2/world.py `_eat` 의 want(흡수 가능량, 상한 food_eat_rate
+    # 0.06)에 곱한다. 걷기 최대 섭취 0.03/스텝.
+    gait_eat: [1.0, 0.5, 0.0]
+    # 대사 drain = energy_drain × (c_rest + c_move·(v/herb_speed)²) (4.4). 기준은 "평시 에너지 예산을 v1 과 같게":
+    # 걷기 대사 = v1 대사(c_rest + 0.4²·c_move = 1)와 c_rest/c_move = 0.4²(거리당 비용이 가장 낮은 속도
+    # √(c_rest/c_move)·herb_speed = 걷기 속도)에서 c_rest 0.5, c_move 3.125 (제안). 대사 배수는 정지 0.5, 걷기 1,
+    # 뛰기 3.625. Gate E1 은 뛰기 배수 R ∈ {2, 3.6, 6} 을 훑는다 — 걷기 1 을 지키면 c_move = (R − 1)/0.84,
+    # c_rest = 1 − 0.16·c_move.
+    # 10-02 Gate E1-b 통과(B1 r2_5_ew0_5, results/v2/e1/judge_e1b.md·report_b.md)로 R = 2.5 값으로 바꿨다:
+    #   c_rest = (21 − 4·1.5)/21 = 15/21, c_move = 25·1.5/21 = 37.5/21 (gate_e1.metabolism(2.5) 의 float64 값 그대로).
+    #   대사 배수는 정지 0.714, 걷기 1(= v1, 그대로), 뛰기 2.5. 걷기 1 고정은 지키고 c_rest/c_move = 0.4 라
+    #   거리당 비용이 가장 낮은 속도는 √0.4 ≈ 0.63·herb_speed(걷기와 뛰기 사이)이고, 걷기와 뛰기의 거리당 대사가
+    #   같다(1/0.4 = 2.5/1). 뛰기의 비용은 대사가 아니라 섭식 0(gait_eat)에서 온다.
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    # 에너지 보상 (4.5, 10절 #4): true = 순변화 e_new − e_prev (번식·리스폰 리셋 제외. 대사가 즉시 보상에 잡힌다),
+    # false = v1 획득량 e_new − e_drained (먹이로 얻은 에너지만).
+    net_energy_reward: true
+
+  daynight:
+    enabled: true
+    # 하루 길이 T(스텝) 목록. reset 마다 하나를 고른다(계획서 4.9.2 {600, 900, 1800} = 80·120·240초, 낮·밤 1:1).
+    # 통합 무대: 900 하나 — 60초 낮 + 60초 밤(C++ DayPeriod 900·TwilightSteps 45 = 0.05 × 900, 팀 시계와 같은 길이)
+    periods: [900]
+    # 전환 앞뒤 박명 폭(T 비율). 전환 순간 d = 0.5, 앞뒤 0.05·T 스텝(30·45·90)에 걸쳐 0 과 1 을 선형으로 잇는다.
+    twilight: 0.05
+    # 밤 효과 (1 − x·d) 의 x (계획서 4.9.2 (a)(b)(c), #21). Gate N (a2)·(a3)가 실패한 항은 0 으로 뺀다(사전 등록).
+    #   detect_night: 초식의 포식자 탐지 반경 see_r·(1 − 0.5·d) (밤 10 < 포식자 시야 14). 동족 시야는 그대로다
+    #   eat_night: 섭식 × (1 − 0.5·d) — 10-06 환경 확인 N(results/v2/v2_4/gate_n, N0 회차)에서 (a2) 밤/낮 섭취비가 0.878
+    #     (C2, 기준 ≤ 0.8)로 실패해 사전 등록(PREREG 2절, #21)대로 0 으로 뺐다(제안값 0.5). 흡수 가능량 제한 때문에 섭취가
+    #     대사 수요를 따라가 밤 섭식 감소가 하루 섭취를 거의 줄이지 못한다(계획서 4.9.2 예측대로)
+    #   rest_night: 정지·비경계 개체의 휴식 대사 × (1 − 0.35·d) — N0 (a3) 통과(늘 정지 상수 CSTOP, t −14.99)
+    #   detect_night 는 N0 (a1) 통과(도주 반경 see_r 상수 C2F, t 5.16)로 계약값 그대로다
+    detect_night: 0.5
+    #   v2.4s(10-07): 포식자가 밤에 자면 밤이 가장 안전한 식사 시간이 되므로, 초식도 밤에 잘 이유로 eat_night 을 0.9 로
+    #     다시 켠다(밤 섭취 상한 ×0.1). 위 10-06 N0 의 0 은 v2.4 판정이다. v2.4s 환경 확인(results/v2/v2_4/s)에서 다시 잰다
+    eat_night: 0.9
+    rest_night: 0.35
+    # 낮 고정 세계 비율. 판정 세계는 0 이다(학습 세계 configs/v2_4.yaml 은 0.2, #27).
+    fixed_day_frac: 0.0
+    # to_transition = 다음 전환까지 남은 스텝 / 900 (계약 상수 — 가장 긴 상 길이, 계획서 4.2)
+    transition_norm: 900
+    # 시작 상태 유도(탐침 대응 1회용, results/v2/v2_4/MEMO.md). 0 = 끔
+    start_induce: 0.0
+    # 휴식 할인을 은신처 안에서 멈춘 개체만 받나(v2.4b, 10-06 추가 — false = v2.4 그대로, features.py 규칙 5)
+    rest_cover_only: true
+
+  pred_sleep:
+    enabled: true
+    # 야행성 비율 q 범위 — reset 마다 q ~ U[하, 상], 포식자마다 확률 q 로 야행성(밤에도 v2.4 그대로 사냥). 나머지는 주행성
+    # 통합 무대: 야행성 없음(C++ NumNocturnal 0 — 늑대는 모두 주행성, 밤에 잔다)
+    nocturnal_frac: [0.0, 0.0]
+    # 주행성 포식자가 자는 어둠 문턱(d ≥ 0.5 = 해 진 뒤): 멈추고 사냥하지 않고 초식 시야에 보이지 않는다(굴)
+    sleep_dark: 0.5
+    # 깨어 있는 주행성 포식자의 속력 × (1 − d) (박명에 느려진다)
+    twilight_slow: true
+
+  # ── v3 R0 (명세 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_R0_SPEC.md, 사전 등록 results/v3/r0/PREREG.md) ──────────────
+  # 아래 두 블록을 끄면(enabled: false) 위 v2.4s 세계와 비트 단위로 같다(tests/test_repertoire_v3.py).
+  repertoire:
+    enabled: true
+    # 잠금(최소 유지, 스텝 = 0.133초, 명세 2절). 잠금이 끝나거나 사건이 생기면 결정 시점이다(행동을 강제하지 않는다)
+    lock_graze: 12
+    lock_flee: 8
+    lock_freeze: 12
+    # HIDE: 도착까지 최대 hide_travel_max 스텝 잠그고, 도착(웅크림)한 뒤 lock_hide 스텝 더 잠근다
+    lock_hide: 12
+    hide_travel_max: 40
+    # SLEEP: 진입 3 → 최소 수면 60 → 기상 3 (기상 중에는 움직이지 못하고 결정도 받지 않는다, M4)
+    sleep_enter: 3
+    sleep_hold: 60
+    sleep_wake: 3
+    # M2 놀람: GRAZE → FLEE 처음 3스텝 속력 0 (FREEZE·HIDE → FLEE 는 0)
+    startle_steps: 3
+    # M1 정지 탐지: FREEZE·도착 HIDE·SLEEP 의 표적 선택 체감 거리 × max(은신 배수, 1.8). GRAZE 정지에는 주지 않는다
+    c_still: 1.8
+    # M6 은신 배수(은신처 안일 때, 행동별): 웅크린(도착) HIDE 2.5, GRAZE 1.5, SLEEP 2.5, 그 밖(FLEE·FREEZE·가는 중 HIDE) 1.
+    # 표적 선택과 포획 판정에 모두 쓴다(c_still 은 표적 선택에만). SLEEP 2.5 는 10-07 결정(results/v3/r0/PREREG.md 변경 기록
+    # (n)): 은신처(굴) 안에서 자는 개체는 웅크린 개체처럼 숨겨진다 — 사용자 설계 '밤엔 굴에서 잔다'. 1 이면 은신처 안 잠이
+    # 밖 잠과 똑같이 들켜 잠자리를 고를 이유가 없다
+    # R1: 웅크림 은신 배수 4.0 은 R0 보정 1회차(results/v3/r0/cal1/hide)에서 HIDE 가 통과한 값이다
+    cover_mult_crouch: 4.0
+    cover_mult_graze: 1.5
+    cover_mult_sleep: 2.5
+    cover_mult_other: 1.0
+    # M5 고개 숙임: GRAZE 중 자기 포식자 탐지 반경 × 0.6. SLEEP 은 × 0.3
+    graze_head_down: 0.6
+    sleep_sight: 0.3
+    # 휴식 할인은 SLEEP 전용: 은신처 안의 SLEEP 대사 × (1 − 0.6·d). daynight.rest_night(0.35)는 이 세계에서 쓰지 않는다
+    sleep_rest: 0.6
+    # GRAZE: 지금 셀 먹이 ≥ 0.06(food_eat_rate)이면 멈춰 먹고 아니면 걷는다. 조향 n(0.83·먹이 기울기 + 0.71·무리 + 1.35·분리),
+    # FLEE 는 n(3·위협 반대 + 0.71·무리 + 1.35·분리)
+    graze_eat_min: 0.06
+    graze_forage: 0.83
+    graze_cohesion: 0.71
+    # 사건 문턱: E2 위협이 8 안으로 들어오거나 접근 관측 ≥ 0.9, E4 에너지 < 0.25, E5 어둠 0.5 통과
+    event_near: 8.0
+    event_approach: 0.9
+    event_energy: 0.25
+    event_dark: 0.5
+    # 사건 결정 지연 0~3스텝(개체 번호 해시, 해질녘에 무리가 한꺼번에 바뀌지 않게)
+    decision_jitter: 3
+    # 추가 관측: threat_recency 감쇠(v2.2 의 0.95), 행동 경과 분모 60. R1 은 관측에 넣는다(관측 9 + 9 = 18칸, 명세 1절)
+    recency_decay: 0.95
+    steps_norm: 60
+    obs_extra: true
+
+  threats:
+    enabled: true
+    # M3 잠행-돌진형: 세계마다 p_stalk ~ U[0.3, 0.7](포식자마다 이 확률로 잠행형, 나머지는 기존 추격형). 표적 체감 거리 > 6 이면
+    # × 0.3 으로 몰래 접근, ≤ 6 이면 × 1.5 로 최대 12스텝 돌진, 놓치면 30스텝 탈진(× 0.2). 속력은 × herb_speed
+    stalk_frac: [0.3, 0.7]
+    stalk_dist: 6.0
+    stalk_speed: 0.3
+    pounce_speed: 1.5
+    pounce_steps: 12
+    exhaust_speed: 0.2
+    exhaust_steps: 30
+    # 플레이어형 위협(사용자 결정 10-07): 세계의 절반에 하나, 밤에 자지 않는다. 모드 [배회 × 0.4, 잠행 접근 × 0.3, 돌진 × 1.3].
+    # 배회·잠행 모드는 200~400스텝마다 새로 고른다(잠행 확률 0.5). 잠행 중 가장 가까운 개체의 체감 거리가 6 이하면 최대 20스텝
+    # 돌진하고 30스텝 쉰다. 포획 거리는 근접형과 같은 1.0, 포획 뒤 쿨다운 30스텝.
+    # (명세에 값이 없는 것 — 모드 길이 범위, 잠행 확률, 돌진 시작 거리, 휴식, 쿨다운 — 은 R0 시작값이다)
+    # 통합 무대: 플레이어형 위협 없음(C++ bPlayerProxy false)
+    player_frac: 0.0
+    player_speeds: [0.4, 0.3, 1.3]
+    player_mode_steps: [200, 400]
+    player_stalk_p: 0.5
+    player_charge_dist: 6.0
+    player_charge_steps: 20
+    player_rest_steps: 30
+    player_catch_r: 1.0
+    player_cooldown: 30
+    # 늑대 먹는 시간(10-15, 선택 키 — env_v2/features.py OPTIONAL_KEYS): 잡은 뒤 쿨다운(위 overrides.pred_eat_cd 38)이 남은 늑대는 그 자리에
+    # 서서 먹는다(속력 0, 방향 그대로 — C++ bEatInPlace). 잠행형 비율 stalk_frac 은 뽑기만 하고 아래 integrated_stage.wolf_kinds 가 덮는다
+    eat_in_place: true
+
+  # ── v3 현실성 1단계 (10-14 사용자 방향, 정의·식은 env_v2/world.py 모듈 docstring 'realism_*') ─────────────────────────────────
+  # 블록을 지우거나 enabled: false 로 두면 그 규칙이 없는 v3_r1_on 세계와 비트 단위로 같다(tests/test_realism_v3.py). 난수 없음.
+  # 늑대 식욕은 어느 규칙도 바꾸지 않는다(포만 없음 — 사용자 결정 '늑대는 과식하게 둔다'). 먹는 시간은 이 설정에서 38스텝이다(위 overrides).
+  # (d) 늑대 밤잠 점진화(주행성만. 야행성·플레이어는 그대로 밤에 자지 않는다).
+  #   눕기: 해 진 뒤(d ≥ pred_sleep.sleep_dark 0.5) 늑대마다 다른 지연(0~spread·τ 스텝)이 지나고, 지난 스텝에 사냥 중(표적 있음·
+  #   잠행형 돌진·대치)이 아니고, 실거리 settle_r 안에 사슴이 없으면 걸음을 늦추기 시작해 ramp_steps 스텝 뒤에 눕는다(잠). 늦추는
+  #   동안 사냥이 시작되거나 사슴이 다가오면 다시 일어난다. 깨어 있는 동안 속력 = max(1 − d, night_floor) × 활동도.
+  #   깜깜하면(d ≥ hunt_dark) 새 사냥을 시작하지 않고 쫓던 사냥만 마저 끝낸다(표적·포획).
+  #   깸: d < 0.5 가 된 뒤 같은 지연이 지나면 깨고 ramp_steps 스텝에 걸쳐 속력이 0 에서 다 오른다. 해 질 녘·새벽(d < 0.5)의 감속
+  #   (1 − d)는 v3_r1_on 그대로다.
+  #   현실 근거: 늑대는 해 질 녘에 사냥을 마저 끝내고 주위가 조용해지면 걸음을 늦추다 눕는다. 먹잇감이 가까이 있거나 쫓는 중이면
+  #   눕지 않는다. 눈으로 사냥하는 주행성 사냥꾼은 깜깜해지면 새 사냥을 시작하지 않는다. 새벽에는 하나씩 깨어 몸을 풀며 천천히
+  #   움직이기 시작한다.
+  realism_night:
+    enabled: true
+    # 이 실거리 안에 사슴이 있으면 눕지 않는다(8단위 ≈ 16 m, repertoire.event_near 와 같다 — 냄새·소리가 닿는 거리)
+    settle_r: 8.0
+    # 완전히 어두워지면(d = 1, 해 진 뒤 τ 스텝) 새 사냥을 시작하지 않는다. 이것이 없으면 사슴이 많은 세계에서 늑대가 표적을 계속 새로
+    # 잡아 밤새 깨어 사냥한다(보정 시드 20000~20019 측정: 어둠 업데이트의 49% 깨어 있음, 밤 피식 4.2배)
+    hunt_dark: 1.0
+    # 해 진 뒤 깨어 있는 늑대의 속력 배수 하한 = 해 지는 순간의 값(1 − 0.5). 어둠 속 사냥은 낮보다 더디다. 1 − sleep_dark 이하여야 한다
+    # (그래야 해 질 녘·새벽의 (1 − d) 감속이 v3_r1_on 그대로다)
+    night_floor: 0.5
+    # 늑대마다 다른 잠·기상 지연의 최대 = floor(0.5 × τ) 스텝(τ = 박명 폭 30·45·90 → 15·22·45). 지연 = 세계 시드·늑대 번호 해시
+    spread: 0.5
+    # 눕기·깨기에 걸리는 스텝: 15스텝(2 s) 동안 활동도가 한 스텝에 1/15 씩 1 ↔ 0 으로 바뀐다
+    ramp_steps: 15
+
+  # ── 언리얼 통합 무대 거울 (10-15, 정의·식·C++ 출처는 env_v2/world.py 모듈 docstring '통합 무대') ─────────────────────────────────────
+  # 설정 키로 맞출 수 없는 차이만 다룬다. 끔 값(respawn true, 나머지 null)이면 이 블록이 없는 세계와 비트 단위로 같다(tests/test_unreal_mirror.py).
+  integrated_stage:
+    enabled: true
+    # (k) 부활 없음: 죽은 사슴은 그 자리에 시체로 남고 다음 스텝부터 관측(동족)·늑대 표적·먹이·이동·번식·밤잠 근처 판정에서 빠진다(C++
+    # bRespawnDead false — 계약 12-3 '새 개체 = 새 StableAgentId'). 학습(vec_env)에는 쓰지 않는다
+    respawn: false
+    # (l) 피식 EMA 분모: null = 슬롯 수 N = 처음 놓은 사슴 수(C++ PredEmaDenominator = PlannedDeer)
+    ema_den: null
+    # (m) 시작 위상: t = 0 이 새벽 전환(d = 0.5)이고 450스텝 낮, 450스텝 밤(C++ DayOffset 0, 팀 시계 t = 0). 주행성 늑대는 자고 시작한다
+    day_offset: 0
+    # (n) 은신처: 무대 1/4·3/4 지점 원 4개, 반경 = clip(0.1 × 한 변, cover_r_min 4, cover_r_max 9) = 6 단위(12 m, 넓이 12.6%) — C++ ExtraCoverCount 4·
+    # ExtraCoverRadiusFrac 0.1. 레벨 은신처는 넣지 않는다(통합 레벨 로그: 세 지역 모두 '레벨 0 + v3 4')
+    cover_layout: quad
+    cover_count: 4
+    cover_r_frac: 0.1
+    # (o) 늑대 구성: 슬롯 0 잠행-돌진형, 슬롯 1 근접 추격형, 모두 주행성(C++ WolfSpecForOrdinal — 순번 짝수 잠행)
+    wolf_kinds: alternate
+    # (p) 시작 배치(C++ PlanStage, 1 단위 = 2 m): 늑대는 무대 중심에서 (±0.4 × 한 변) 모서리 (+,+)·(−,−) = (54, 54)·(6, 6)(WolfStartCornerFrac
+    # 0.4, 늑대끼리 1.5 × 28 m = 21 단위 밖), 사슴은 무대 균등 [1.5, 58.5]²(여유 3 m)·모든 늑대에게서 28 m + 1 m = 14.5 단위 밖(WolfMinStartDistCm
+    # 2800 + 100)·서로 1.5 m = 0.75 단위 밖(DeerMinSpacingCm 150)
+    start_layout: stage
+    wolf_corner_frac: 0.4
+    wolf_gap: 21.0
+    deer_wolf_gap: 14.5
+    deer_margin: 1.5
+    deer_spacing: 0.75
+    # (q) 시작 방향: 사슴 순번 i 는 i × 2.399963 rad, 늑대 순번 m 은 (m + 2) × 2.399963 rad(C++ AEcoCreatureIntegrationSpawner 의 yaw)
+    head_layout: golden
+
+  # ── 야생 1단계 (10-15, 정의·식·현실 근거는 env_v2/world.py 모듈 docstring '야생 1단계', 명세 RL_V3_WILD1_SPEC.md) ─────────────────────────
+  # (a) 위협 시야각: R3 세계 값 그대로. 사슴 눈은 옆에 붙어 거의 온 둘레(약 300°)를 본다. 동족 시야는 그대로 120°
+  realism_vision:
+    enabled: true
+    threat_fov_deg: 300.0
+    kin_fov_deg: 120.0
+  # (b) 위협 발소리: R3 세계 값 그대로. 걸음새 속력 s(× 사슴 걸음 0.6) < 0.05 면 소리 없음, 0.3 이하 반경 2(4 m), 1.0 이상 20(40 m), 사이는 선형.
+  # 표적을 쫓지 않는 늑대는 s 를 0.3 에서 자른다(어슬렁거리는 늑대는 조용하다). 들리는 반경을 탐지 반경으로 자르지 않는다
+  realism_hearing:
+    enabled: true
+    s_silent: 0.05
+    s_quiet: 0.3
+    s_loud: 1.0
+    r_quiet: 2.0
+    r_loud: 20.0
+    roam_quiet: true
+    cap_to_sight: false
+  # (w1) 지방 비축. 용량 = 3일 × 900스텝 × 0.002 = 5.4(E 단위 — 배 한가득 E 1 의 5.4배). 배가 비면(E < 0) 모자람을 비축에서 꺼내고, 비축이 바닥나야
+  # 굶어 죽는다. 배가 70% 이상 찼을 때만 먹은 몫의 1/4 을 비축으로 옮긴다(빈 비축을 다 채우려면 아주 잘 먹어도 약 1일). 시작 비축은 가득.
+  # 배가 바닥(E < 0.1)이면 이동 속도 0.75배(뛰기 0.45 < 추격형 늑대 0.48 — 굶주린 사슴은 늑대에게 따라잡힌다)
+  wild_reserve:
+    enabled: true
+    reserve_days: 3.0
+    init: 1.0
+    refill_e: 0.7
+    refill_frac: 0.25
+    weak_e: 0.1
+    weak_speed: 0.75
+  # (w2) 늑대 포만. 먹기(overrides.pred_eat_cd 38스텝 = 5초)가 끝나면 0.5일(450스텝 = 60초) 사냥하지 않고 0.3배 속력으로 어슬렁거린다
+  wild_satiation:
+    enabled: true
+    sat_days: 0.5
+    rest_speed: 0.3
+  # (w3) 도주 반사 거리(1 단위 = 2 m). 경계 15(30 m), 도주 7.5(15 m), 안전 20(40 m), 다가옴 = 접근 관측 ≥ 0.9 또는 이 사슴을 쫓음.
+  # 경계 중 GRAZE 는 걸으며 먹고 조향에 1.5 × 늑대 반대 항을 더한다. 쉬는·먹는 늑대는 경계만 일으킨다. 도주는 늑대 반대 ±60° 안, 가장자리 15(30 m)
+  # 안의 은신처가 있으면 그쪽으로. 은신처 안에서 사냥 중인 늑대를 알아채면 웅크린다. 무대 벽 1(2 m) 안이면 벽을 따라 미끄러진다.
+# 10-16: 시작한 도주는 깨어 있는 늑대 모두에게서 안전 거리 밖이 되거나 은신처 안일 때까지(hold_awake), 가장자리 5(10 m) 안에서는 벽을 따라·모서리 밖으로(edge_r)
+  wild_flight:
+    enabled: true
+    alert_r: 15.0
+    flight_r: 7.5
+    safe_r: 20.0
+    approach: 0.9
+    alert_w: 1.5
+    rest_alert: true
+    shelter_cos: 0.5
+    shelter_r: 15.0
+    crouch: true
+    wall_margin: 1.0
+    # 10-16 선택 키(env_v2/features.py OPTIONAL_KEYS, 기본 false·0 = 10-15 그대로)
+    hold_awake: true
+    edge_r: 5.0
+  # (c) 은신처 안전 + (c′) 늑대 진입 금지 (10-16 더함, R3 세계 configs/v3_r3_on.yaml 의 값 그대로). 정의·식은 env_v2/world.py 모듈 docstring (c)·(c′).
+  # 통합 무대의 은신처 4개(반경 6 = 12 m) 안 사슴은 행동과 무관하게 안전하고 표적에서 빠진다. 늑대는 원 둘레 밖으로 밀려 둘레를 따라 미끄러진다
+  realism_shelter:
+    enabled: true
+    untargetable: true
+    player_too: true
+    block_predators: true
+    # 10-17 선택 키(env_v2/features.py OPTIONAL_KEYS, 기본 0 = 10-16 그대로): 늑대 몸 여유 0.5(1 m). 늑대 중심은 원 반지름 + 1 m 밖에 머문다
+    wolf_margin: 0.5
+
+  # ── 야생 2단계 1 (10-17, 명세 RL_V3_WILD2_SPEC.md) ─────────────────────────────────────────────────────────────────────────────────────
+  # 은신처 먹이 부족 = configs/v3_wild2_mirror.yaml 의 블록 그대로(정의·식은 env_v2/world.py 모듈 docstring (e)). 은신처 원과 조금이라도 겹치는 셀의
+  #   용량과 재생률을 밖의 15% 로 둔다. 언리얼 eco.IntegratedV3.ShelterFood(기본 1)가 같은 식이다.
+  #   10-17 고침: 처음 이 설정(40b0c58)에서는 사용자 말을 잘못 읽어 뺐다(머리 주석). 사용자의 결정은 '은신처는 안전하지만 먹이가 적다'(10-14·10-15)다.
+  #   현실 근거: 닫힌 숲 밑 사슴 먹이는 트인 곳의 약 12~14%(Lashley 외 2011). 재생 몫을 같게 둔 것은 어림
+  realism_cover_food:
+    enabled: true
+    cap_frac: 0.15
+    regen_frac: 0.15
+
+  # ── 야생 2단계 2 (10-17, 명세 RL_V3_WILD2_SPEC.md) ─────────────────────────────────────────────────────────────────────────────────────
+  # 늑대 무리 협동 사냥(정의·식은 env_v2/world.py 모듈 docstring '야생 2단계' 2, 함수 pack_goals). 앞장 = 표적을 쫓으며 전력으로 달리는 늑대,
+  # 돕는 늑대 = 사냥 중이고 전력으로 달리지 않는 늑대(표적이 없거나 잠행형이 살금살금 다가가는 중. 먹는·배부른·자는·지친 늑대는 돕지 않는다). 돕는 늑대는 join_r 안에서 가장 가까운 쫓기는 사슴을 골라
+  # 그 사슴이 향하는 은신처의 문(늑대가 설 수 있는 둘레 = 반지름 + 몸 여유, 사슴 쪽)이나 도주선 앞 lead 자리로 가고, wait_r 안이면 멈춰 사슴 쪽을 본다.
+  # 사슴이 보이면 다음 스텝부터 보통 규칙대로 쫓거나 덮친다. 늑대는 여전히 은신처에 못 들어가고 몸 여유 1 m 를 지킨다.
+  # 현실 근거: 늑대 무리 사냥 성공은 4 마리까지 는다(MacNulty 외 2012, Behav. Ecol. 23:75). 늑대는 먹잇감이 다닐 길목에 떨어져 기다린다(Gable 외 2024,
+  # Ethol. Ecol. Evol. 36(2)). 단순한 두 규칙만으로 둘러싸기가 생긴다(Muro 외 2011, Behav. Processes 88:192).
+  wild_pack:
+    enabled: true
+    # 60 단위 = 120 m = 무대 한 변. 동료가 쫓는 사슴이 이 안이면 돕는다(무대 어디서든 동료의 추격을 안다).
+    # 고른 계수 하나(명세 RL_V3_WILD2_SPEC.md 5절): 처음 값 20(40 m, 늑대 발소리 거리 realism_hearing r_loud 와 같게)에서는 늑대-스텝의 2.5% 만 돕고
+    # 사냥 성공률이 62.6% 로 목표 띠(10~30%)보다 훨씬 높았다. 40 → 58.4%, 60 → 55.7% (사냥 시작 +13%, 잡힘 그대로 — 탐색 시드 32000~32089).
+    # 현실 근거: 늑대 무리는 서로의 울음을 숲에서 수 km 밖에서도 듣는다(Harrington & Mech 1979, Behaviour 68:207 — 숲 9 km 어림). 120 m 안의 동료 추격은
+    # 보고 듣는다고 본다(어림)
+    join_r: 60.0
+    # 6 단위 = 12 m. 은신처가 없을 때 사슴 도주선 앞쪽 거리. 어림 — 잠행형이 덮치기 시작하는 거리(threats.stalk_dist 6)와 같게 뒀다
+    lead: 6.0
+    # 사슴이 향하는 은신처 = 가장자리까지 15 단위(30 m) 안이고 도주 방향 ±60° 안. 사슴 자신이 도주 은신처를 고르는 규칙(wild_flight shelter_r·shelter_cos)과 같다
+    door_r: 15.0
+    door_cos: 0.5
+    # 1 단위 = 2 m. 목표 자리에 이만큼 가까우면 멈춰 기다린다. 근접 포획 거리(pred_melee_catch_r 1)와 같다
+    wait_r: 1.0
+
+  # 야생 2단계 3 세로 장애물 (env_v2/world.py 모듈 docstring '야생 2단계' 3). 1 단위 = 2 m.
+  obstacles:
+    enabled: true
+    # 나무 줄기: 1 ha 에 250 그루, 반지름 0.05~0.15 단위(10~30 cm, 가슴높이 지름 20~60 cm). 가슴높이 단면적 합 = π × 평균 r² × 250 ≈ 34 m²/ha 로
+    # 온대 성숙림 측정값(1 ha 에 산 줄기 1179, 단면적 34.1 m² — ESA Ecological Archives E094-195)과 맞춘다(가는 줄기는 뺐다 — 어림)
+    tree_per_ha: 250.0
+    tree_r: [0.05, 0.15]
+    # 바위: 1 ha 에 5 개, 반지름 0.25~0.75 단위(0.5~1.5 m). 숲 바닥의 큰 바위 — 어림
+    rock_per_ha: 5.0
+    rock_r: [0.25, 0.75]
+    # 몸 반지름 0.15 단위(30 cm) = 팀 이동 제약이 쓸어 보는 구의 반지름(EcoCreatureMovement::ConstrainStep, 30 cm)
+    body_r: 0.15
+    block_sight: true
+    no_food: true
+    # 돌아가기 (10-17 장애물 끼임 고침, env_v2/world.py `detour_moves`, 모듈 docstring '야생 2단계' 3 의 6)). 끄면(detour false) 미끄러짐만 — 고치기 전 판.
+    # 원판에 닿아 가려던 쪽으로 이번 스텝 이동의 detour_block 몫도 못 가면 막힘이다. 그러면 가려던 방향을 22.5° 씩 양쪽으로 돌려 보며(작은 각부터, 같으면
+    # 시계 반대 먼저) 한 스텝에 detour_free 몫 이상 나아가는 첫 방향으로 간다(늑대는 은신처 막기 원 안·무대 밖 자리도 빈 방향이 아니다). 그 뒤 가려던 쪽
+    # 앞 detour_probe(단위)가 트이거나 detour_steps 스텝이 지날 때까지 같은 쪽으로 돈다(붙은 쪽 먼저 — 줄기를 끼고 돈다). 사슴의 도주는 늑대 반대쪽에
+    # 가장 가까운 빈 방향을 고르므로 늑대에서 멀어지는 쪽을 지킨다. 돕는 늑대는 detour_help_block 스텝 넘게 돌아가거나 그만큼 이어서 기어가거나 막혀
+    # 돌아서면 detour_help_drop 스텝 동안 돕지 않는다(길목 자리를 버리고 다시 고른다 — 돌아선 늑대가 다음 스텝에 다시 줄기로 들어가지 않게).
+    # 현실 근거: 사슴·늑대는 나무 줄기와 바위에 몸을 밀어붙이지 않고 돌아 지나간다 — 숲에서 쫓기는 동물은 줄기 사이 빈 길로 방향을 틀고, 걷는 동물은 앞을
+    # 몇 걸음 보고 길을 고른다(값은 어림: 막힘 몫 0.5·빈 몫 0.8 = 한 스텝 이동의 절반·8 할, 앞 보기 3 m ≈ 사슴 몸길이 두 배, 최대 6 초, 돕기 그만둠 2 초 → 5 초)
+    detour: true
+    detour_block: 0.5
+    detour_free: 0.8
+    detour_probe: 1.5
+    detour_steps: 45
+    detour_help_block: 15
+    detour_help_drop: 38
+    # 나무 배치 표 (자동 생성 — make_tree_layout.py): 숲 무대 줄기 원판 [x, y, r] (단위, (x, y, r) 순 = C++ 원판 순서)
+    fixed:
+      - [4.759, 23.812, 0.37537600000000004]
+      - [8.864, 55.847, 0.3846795]
+      - [13.413, 27.381, 0.36890400000000007]
+      - [17.067, 24.47, 0.44414100000000006]
+      - [20.963, 3.378, 0.38569075]
+      - [22.028, 50.191, 0.424725]
+      - [26.298, 16.319, 0.408545]
+      - [28.715, 51.701, 0.40085950000000004]
+      - [28.887, 43.455, 0.3838705]
+      - [32.278, 14.44, 0.42957900000000004]
+      - [34.871, 46.837, 0.40187075000000005]
+      - [36.444, 17.573, 0.40429775000000007]
+      - [39.479, 50.263, 0.38528625000000005]
+      - [39.821, 5.67, 0.3765895]
+      - [42.271, 56.949, 0.39580325]
+      - [43.557, 25.22, 0.37193775]
+      - [44.633, 35.572, 0.4170395]
+      - [46.359, 2.841, 0.36809500000000006]
+      - [50.043, 54.881, 0.38002775]
+      - [51.752, 30.824, 0.42088225]
+      - [52.191, 23.39, 0.36971300000000007]
+      - [52.47, 3.293, 0.3840727500000001]
+      - [55.069, 42.804, 0.37335350000000006]
+      - [55.345, 19.257, 0.38609525000000006]
+
+train:
+  # configs/v3_real1_night_on.yaml 과 같고 허용 목록에서 얼기만 뺐다. 이 세계는 학습하지 않는다(부활 없음 — vec_env 가 받지 않는다).
+  num_worlds: 8
+  reset_interval: 5000
+  rollout_world_steps: 256
+  repertoire:
+    # 고를 수 있는 행동: 먹기·도망·숨기(C++ WorldAllowed[FREEZE] = 0, 사람 결정 10-15 (A)). R1b 모델 목록(얼기 포함) ∩ 이 목록 = 이 셋이라
+    # 판정 롤아웃(rep_learned)이 FREEZE 를 늘 막는다(R3 설정과 같은 방식)
+    allowed: [graze, flee, hide]
+    # 아래 셋은 학습 전용이다(argmax 판정은 쓰지 않는다). R1 값 그대로 두고 이 목록으로 다시 재지 않았다
+    epsilon: 0.05
+    init_probs: [0.4, 0.15, 0.15, 0.15, 0.15]
+    ent_coef_base: 0.00255643
+    f_dec: 0.255643

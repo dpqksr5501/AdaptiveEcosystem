@@ -52,7 +52,7 @@ namespace EcoPolicyV3
 	inline constexpr std::int32_t kFreeze = 3;
 	inline constexpr std::int32_t kSleep = 4;
 
-	// 관측 칸 수의 상한 (스택 배열 크기). 계약은 18 또는 19 다.
+	// 관측 칸 수의 상한 (스택 배열 크기). 계약은 18·19·21 이다.
 	inline constexpr std::int32_t kMaxObsDim = 32;
 
 	// 알려진 계약 해시 (export_weights_v3.contract_hash). 생성 헤더의 kContractHash 가 이 중 하나가 아니면 빌드가 멈춘다 —
@@ -60,6 +60,9 @@ namespace EcoPolicyV3
 	// 계약을 바꿀 때는 이 값과 관측을 만드는 쪽을 함께 고친다(herbivore_rl/tests/test_export_v3.py 가 파이썬 값과 대조한다).
 	inline constexpr std::uint64_t kContractHashObs18Mask2 = 0x7eea0107339be4ceULL;   // R1b: 관측 18, 마스크 판 2
 	inline constexpr std::uint64_t kContractHashObs19Mask3 = 0xf8c26c7d02542faeULL;   // R2: 관측 19 (+ alarm_heard), 판 3
+	// R5: 관측 21 (18 + escape_room·obstacle_near·threat_hidden), 판 2 (계약 2-4). 내장 모델의 계약이 아니라 실행 중 두뇌 파일(EcoV3Brain.h)이 쓴다 —
+	// 세 칸은 EcoObservationV3::ObstacleObsValues 가 만들고 EcoWorldV3::DecideHerb 가 관측 18 뒤에 붙인다
+	inline constexpr std::uint64_t kContractHashObs21Mask2 = 0xbc4fc2d45c47c5fdULL;
 
 	namespace Detail
 	{
@@ -97,7 +100,7 @@ namespace EcoPolicyV3
 	/** 망 가중치 보기 (소유하지 않는다). 생성 헤더의 내장 모델은 kBuiltinNet 이다. */
 	struct FPolicyNetV3
 	{
-		std::int32_t ObsDim;      // 18 (R1b) 또는 19 (R2)
+		std::int32_t ObsDim;      // 18 (R1b), 19 (R2) 또는 21 (R5 장애물 관측 — 실행 중 두뇌 파일)
 		const float* W0;          // [64 * ObsDim]
 		const float* B0;          // [64]
 		const float* W1;          // [64 * 64]

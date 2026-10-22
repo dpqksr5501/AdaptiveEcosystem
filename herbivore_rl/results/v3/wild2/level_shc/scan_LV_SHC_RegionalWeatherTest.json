@@ -1,0 +1,2547 @@
+{
+ "map": "/Game/SHC/Maps/LV_SHC_RegionalWeatherTest",
+ "log": [
+  "map /Game/SHC/Maps/LV_SHC_RegionalWeatherTest loaded=True",
+  "actor descs 171, loaded actors 107"
+ ],
+ "actor_descs": 171,
+ "loaded_actors": 107,
+ "class_counts": {
+  "WorldDataLayers": 1,
+  "TargetPoint": 8,
+  "BP_SkyManager_C": 1,
+  "DirectionalLight": 2,
+  "EcologyRegion": 3,
+  "Landscape": 1,
+  "NavModifierVolume": 2,
+  "VolumetricCloud": 1,
+  "NavMeshBoundsVolume": 1,
+  "ExponentialHeightFog": 1,
+  "PlayerStart": 1,
+  "RecastNavMesh": 1,
+  "SkyAtmosphere": 1,
+  "WorldPartitionMiniMap": 1,
+  "SkyLight": 1,
+  "TriggerBox": 3,
+  "BP_SHC_SnowRegionalWeather_C": 1,
+  "LandscapeStreamingProxy": 64,
+  "StaticMeshActor": 11,
+  "BP_SHC_RainRegionalWeather_C": 1,
+  "InstancedFoliageActor": 1
+ },
+ "actors": [
+  {
+   "class": "WorldDataLayers",
+   "class_path": "/Script/Engine.WorldDataLayers",
+   "label": "WorldDataLayers-1",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "Eco_FoodHint_Highland",
+   "loc": [
+    34000.0,
+    -49000.0,
+    2639.84
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34120.0,
+    -49000.0,
+    2639.84
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "BP_SkyManager_C",
+   "class_path": "/Game/SHC/Blueprints/Sky/BP_SkyManager.BP_SkyManager_C",
+   "label": "BP_SkyManager",
+   "loc": [
+    73100.0,
+    25960.0,
+    -5020.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    73100.0,
+    25960.0,
+    -5020.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "vars": {
+    "SunSpeed": "0.0",
+    "DynamicSun": "True",
+    "SunDefaultRotaion": "<Struct 'Rotator' (0x0000016E7827E0A0) {pitch: 315.000000, yaw: 0.000000, roll: 0.000000}>",
+    "SunCurrentRotation": "<Struct 'Rotator' (0x0000016E7827E0B8) {pitch: 315.000000, yaw: 0.000000, roll: 0.000000}>"
+   },
+   "components": [
+    "BillboardComponent:Billboard"
+   ]
+  },
+  {
+   "class": "DirectionalLight",
+   "class_path": "/Script/Engine.DirectionalLight",
+   "label": "DirectionalLight",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    -30.0,
+    105.0,
+    -180.0
+   ],
+   "scale": [
+    2.5,
+    2.5,
+    2.5
+   ],
+   "bounds_origin": [
+    -67.243,
+    250.955,
+    -150.0
+   ],
+   "bounds_extent": [
+    286.31,
+    399.311,
+    323.205
+   ]
+  },
+  {
+   "class": "DirectionalLight",
+   "class_path": "/Script/Engine.DirectionalLight",
+   "label": "MoonLight",
+   "loc": [
+    10.0,
+    10.0,
+    0.0
+   ],
+   "rot": [
+    -30.0,
+    105.0,
+    180.0
+   ],
+   "scale": [
+    2.5,
+    2.5,
+    2.5
+   ],
+   "bounds_origin": [
+    -57.243,
+    260.955,
+    -150.0
+   ],
+   "bounds_extent": [
+    286.31,
+    399.311,
+    323.205
+   ]
+  },
+  {
+   "class": "EcologyRegion",
+   "class_path": "/Script/AdaptiveEcosystem.EcologyRegion",
+   "label": "Eco_Region_Barren",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ],
+   "region_id": "Barren",
+   "environment": {
+    "temperature": 30.0,
+    "humidity": 0.20000000298023224,
+    "rainfall": 0.0,
+    "day_phase": "DAY",
+    "weather_state": "CLEAR"
+   },
+   "rainfall_affects_regeneration": false
+  },
+  {
+   "class": "Landscape",
+   "class_path": "/Script/Landscape.Landscape",
+   "label": "Landscape",
+   "loc": [
+    -100800.0,
+    -100800.0,
+    100.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    100.0,
+    100.0,
+    100.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "EcologyRegion",
+   "class_path": "/Script/AdaptiveEcosystem.EcologyRegion",
+   "label": "Eco_Region_Highland",
+   "loc": [
+    0.0,
+    -50000.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    -50000.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ],
+   "region_id": "Highland",
+   "environment": {
+    "temperature": -5.0,
+    "humidity": 0.4000000059604645,
+    "rainfall": 0.0,
+    "day_phase": "DAY",
+    "weather_state": "CLEAR"
+   },
+   "rainfall_affects_regeneration": false
+  },
+  {
+   "class": "NavModifierVolume",
+   "class_path": "/Script/NavigationSystem.NavModifierVolume",
+   "label": "NavModifierVolume",
+   "loc": [
+    -53400.0,
+    55620.0,
+    -1760.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    25.0,
+    25.0,
+    150.0
+   ],
+   "bounds_origin": [
+    -53400.0,
+    55620.0,
+    -1760.0
+   ],
+   "bounds_extent": [
+    2500.0,
+    2500.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "Eco_FoodHint_Barren",
+   "loc": [
+    34000.0,
+    1000.0,
+    1663.263
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34120.0,
+    1000.0,
+    1663.263
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "VolumetricCloud",
+   "class_path": "/Script/Engine.VolumetricCloud",
+   "label": "VolumetricCloud",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "NavMeshBoundsVolume",
+   "class_path": "/Script/NavigationSystem.NavMeshBoundsVolume",
+   "label": "NavMeshBoundsVolume",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    750.0,
+    750.0,
+    150.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    75000.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "ExponentialHeightFog",
+   "class_path": "/Script/Engine.ExponentialHeightFog",
+   "label": "ExponentialHeightFog",
+   "loc": [
+    -5600.0,
+    -50.0,
+    -6850.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    -5600.0,
+    -50.0,
+    -6850.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "PlayerStart",
+   "class_path": "/Script/Engine.PlayerStart",
+   "label": "PlayerStart",
+   "loc": [
+    18200.0,
+    40450.0,
+    -350.0
+   ],
+   "rot": [
+    0.0,
+    -90.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    18200.0,
+    40350.0,
+    -350.0
+   ],
+   "bounds_extent": [
+    80.0,
+    140.0,
+    92.0
+   ]
+  },
+  {
+   "class": "EcologyRegion",
+   "class_path": "/Script/AdaptiveEcosystem.EcologyRegion",
+   "label": "Eco_Region_Forest",
+   "loc": [
+    0.0,
+    50000.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    50000.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ],
+   "region_id": "Forest",
+   "environment": {
+    "temperature": 20.0,
+    "humidity": 0.699999988079071,
+    "rainfall": 0.0,
+    "day_phase": "DAY",
+    "weather_state": "CLEAR"
+   },
+   "rainfall_affects_regeneration": false
+  },
+  {
+   "class": "NavModifierVolume",
+   "class_path": "/Script/NavigationSystem.NavModifierVolume",
+   "label": "NavModifierVolume2",
+   "loc": [
+    46010.0,
+    53110.0,
+    -1760.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    25.0,
+    25.0,
+    150.0
+   ],
+   "bounds_origin": [
+    46010.0,
+    53110.0,
+    -1760.0
+   ],
+   "bounds_extent": [
+    2500.0,
+    2500.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "RecastNavMesh",
+   "class_path": "/Script/NavigationSystem.RecastNavMesh",
+   "label": "RecastNavMesh-Default",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    530.0
+   ],
+   "bounds_extent": [
+    75088.0,
+    75088.0,
+    3020.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "Eco_FoodHint_Forest",
+   "loc": [
+    34200.0,
+    46500.0,
+    -1631.262
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34320.0,
+    46500.0,
+    -1631.262
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "SkyAtmosphere",
+   "class_path": "/Script/Engine.SkyAtmosphere",
+   "label": "SkyAtmosphere",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    120.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "WorldPartitionMiniMap",
+   "class_path": "/Script/Engine.WorldPartitionMiniMap",
+   "label": "WorldPartitionMiniMap",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ]
+  },
+  {
+   "class": "SkyLight",
+   "class_path": "/Script/Engine.SkyLight",
+   "label": "SkyLight",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    1.0,
+    1.0,
+    1.0
+   ]
+  },
+  {
+   "class": "TriggerBox",
+   "class_path": "/Script/Engine.TriggerBox",
+   "label": "TV_Region_Highland",
+   "loc": [
+    0.0,
+    -50000.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    -50000.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "BP_SHC_SnowRegionalWeather_C",
+   "class_path": "/Game/SHC/Blueprints/Weather/BP_SHC_SnowRegionalWeather.BP_SHC_SnowRegionalWeather_C",
+   "label": "BP_SHC_SnowRegionalWeather",
+   "loc": [
+    16800.0,
+    -49560.0,
+    5270.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    16800.0,
+    -49560.0,
+    5270.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "vars": {
+    "RegionBounds": "Actor:TV_Region_Highland",
+    "CameraInsideRegion": "False",
+    "Rain": "False"
+   },
+   "components": [
+    "BillboardComponent:Billboard",
+    "TimelineComponent:RainTimeline"
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree5",
+   "loc": [
+    18650.0,
+    32610.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    18615.884,
+    32684.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        18650.0,
+        32610.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         18615.89,
+         32684.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -982.42,
+        "500,0": -982.19,
+        "-500,0": -982.5,
+        "0,500": -981.64,
+        "0,-500": -981.17
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree2",
+   "loc": [
+    24420.0,
+    47170.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    24385.884,
+    47244.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        24420.0,
+        47170.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         24385.89,
+         47244.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -1385.63,
+        "500,0": -1419.85,
+        "-500,0": -1348.52,
+        "0,500": -1377.03,
+        "0,-500": -1392.27
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree11",
+   "loc": [
+    34360.0,
+    39030.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    34325.884,
+    39104.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        34360.0,
+        39030.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         34325.89,
+         39104.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -1629.15,
+        "500,0": -1627.04,
+        "-500,0": -1629.07,
+        "0,500": -1635.71,
+        "0,-500": -1617.91
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "TriggerBox",
+   "class_path": "/Script/Engine.TriggerBox",
+   "label": "TV_Region_Forest",
+   "loc": [
+    0.0,
+    50000.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    50000.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Shelter_Forest_01",
+   "loc": [
+    33920.0,
+    44870.0,
+    -1530.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    34040.0,
+    44870.0,
+    -1530.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree7",
+   "loc": [
+    -1200.0,
+    36160.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    -1234.116,
+    36234.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        -1200.0,
+        36160.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         -1234.11,
+         36234.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -995.63,
+        "500,0": -996.41,
+        "-500,0": -995.47,
+        "0,500": -992.97,
+        "0,-500": -997.66
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "BP_SHC_RainRegionalWeather_C",
+   "class_path": "/Game/SHC/Blueprints/Weather/BP_SHC_RainRegionalWeather.BP_SHC_RainRegionalWeather_C",
+   "label": "BP_SHC_RainRegionalWeather",
+   "loc": [
+    7780.0,
+    38210.0,
+    6070.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    7780.0,
+    38210.0,
+    6070.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "vars": {
+    "RegionBounds": "Actor:TV_Region_Forest",
+    "CameraInsideRegion": "False",
+    "Rain": "False"
+   },
+   "components": [
+    "BillboardComponent:Billboard",
+    "TimelineComponent:RainTimeline"
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree",
+   "loc": [
+    22070.0,
+    42440.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    22035.884,
+    42514.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        22070.0,
+        42440.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         22035.89,
+         42514.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -1129.62,
+        "500,0": -1164.77,
+        "-500,0": -1096.1,
+        "0,500": -1146.88,
+        "0,-500": -1111.41
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree4",
+   "loc": [
+    12050.0,
+    42440.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    12015.884,
+    42514.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        12050.0,
+        42440.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         12015.89,
+         42514.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -945.16,
+        "500,0": -945.78,
+        "-500,0": -945.39,
+        "0,500": -940.7,
+        "0,-500": -950.86
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree3",
+   "loc": [
+    18860.0,
+    52250.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    18825.884,
+    52324.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        18860.0,
+        52250.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         18825.89,
+         52324.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -916.57,
+        "500,0": -945.16,
+        "-500,0": -891.1,
+        "0,500": -917.35,
+        "0,-500": -915.0
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "InstancedFoliageActor",
+   "class_path": "/Script/Foliage.InstancedFoliageActor",
+   "label": "InstancedFoliageActor_1_1_-1",
+   "loc": [
+    38400.0,
+    38400.0,
+    -12800.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "static_meshes": [
+    {
+     "component": "FoliageInstancedStaticMeshComponent_14",
+     "ism": true,
+     "mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC",
+     "collides": false,
+     "collision_enabled": "NO_COLLISION",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "NoCollision",
+     "count": 10,
+     "instances": [
+      {
+       "t": [
+        34198.913,
+        45396.901,
+        -1613.242
+       ],
+       "r": [
+        -0.904,
+        69.025,
+        -1.091
+       ],
+       "s": [
+        14.683,
+        14.683,
+        14.683
+       ],
+       "i": 0
+      },
+      {
+       "t": [
+        34502.384,
+        45066.71,
+        -1615.169
+       ],
+       "r": [
+        1.568,
+        -132.416,
+        0.385
+       ],
+       "s": [
+        11.27,
+        11.27,
+        11.27
+       ],
+       "i": 1
+      },
+      {
+       "t": [
+        34759.234,
+        44703.994,
+        -1615.518
+       ],
+       "r": [
+        0.329,
+        135.528,
+        -1.581
+       ],
+       "s": [
+        17.725,
+        17.725,
+        17.725
+       ],
+       "i": 2
+      },
+      {
+       "t": [
+        34619.046,
+        44526.235,
+        -1609.459
+       ],
+       "r": [
+        -0.613,
+        -34.11,
+        1.489
+       ],
+       "s": [
+        17.24,
+        17.24,
+        17.24
+       ],
+       "i": 3
+      },
+      {
+       "t": [
+        34178.55,
+        44350.502,
+        -1605.704
+       ],
+       "r": [
+        0.035,
+        -47.643,
+        0.634
+       ],
+       "s": [
+        18.659,
+        18.659,
+        18.659
+       ],
+       "i": 4
+      },
+      {
+       "t": [
+        33772.191,
+        44364.197,
+        -1604.632
+       ],
+       "r": [
+        0.771,
+        66.018,
+        0.64
+       ],
+       "s": [
+        17.637,
+        17.637,
+        17.637
+       ],
+       "i": 5
+      },
+      {
+       "t": [
+        33387.807,
+        44755.708,
+        -1605.567
+       ],
+       "r": [
+        -0.081,
+        -100.346,
+        -0.446
+       ],
+       "s": [
+        10.167,
+        10.167,
+        10.167
+       ],
+       "i": 6
+      },
+      {
+       "t": [
+        33471.559,
+        44973.702,
+        -1603.001
+       ],
+       "r": [
+        -0.736,
+        -110.966,
+        -0.679
+       ],
+       "s": [
+        15.483,
+        15.483,
+        15.483
+       ],
+       "i": 7
+      },
+      {
+       "t": [
+        33765.816,
+        45245.432,
+        -1604.94
+       ],
+       "r": [
+        -0.096,
+        83.829,
+        -0.884
+       ],
+       "s": [
+        12.902,
+        12.902,
+        12.902
+       ],
+       "i": 8
+      },
+      {
+       "t": [
+        33885.157,
+        45396.731,
+        -1608.321
+       ],
+       "r": [
+        0.897,
+        -89.92,
+        0.899
+       ],
+       "s": [
+        13.873,
+        13.873,
+        13.873
+       ],
+       "i": 9
+      }
+     ]
+    },
+    {
+     "component": "FoliageInstancedStaticMeshComponent_15",
+     "ism": true,
+     "mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD",
+     "collides": false,
+     "collision_enabled": "NO_COLLISION",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "NoCollision",
+     "count": 10,
+     "instances": [
+      {
+       "t": [
+        34237.716,
+        45401.671,
+        -1614.202
+       ],
+       "r": [
+        0.12,
+        128.049,
+        -1.61
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 0
+      },
+      {
+       "t": [
+        34408.638,
+        45100.804,
+        -1613.507
+       ],
+       "r": [
+        1.121,
+        -100.164,
+        1.163
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 1
+      },
+      {
+       "t": [
+        34676.735,
+        44707.454,
+        -1613.82
+       ],
+       "r": [
+        -0.693,
+        101.939,
+        -1.064
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 2
+      },
+      {
+       "t": [
+        34492.607,
+        44416.145,
+        -1607.884
+       ],
+       "r": [
+        -0.555,
+        74.684,
+        -0.309
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 3
+      },
+      {
+       "t": [
+        34309.584,
+        44320.765,
+        -1605.534
+       ],
+       "r": [
+        -0.76,
+        39.176,
+        -1.193
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 4
+      },
+      {
+       "t": [
+        33834.175,
+        44339.227,
+        -1604.39
+       ],
+       "r": [
+        0.418,
+        110.057,
+        0.152
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 5
+      },
+      {
+       "t": [
+        33370.924,
+        44727.695,
+        -1605.701
+       ],
+       "r": [
+        0.346,
+        40.262,
+        0.293
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 6
+      },
+      {
+       "t": [
+        33436.005,
+        45028.695,
+        -1603.804
+       ],
+       "r": [
+        0.695,
+        11.835,
+        1.063
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 7
+      },
+      {
+       "t": [
+        33738.529,
+        45316.916,
+        -1605.736
+       ],
+       "r": [
+        -0.508,
+        34.492,
+        0.74
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 8
+      },
+      {
+       "t": [
+        33980.411,
+        45451.733,
+        -1609.817
+       ],
+       "r": [
+        -0.592,
+        153.828,
+        -1.205
+       ],
+       "s": [
+        1.0,
+        1.0,
+        1.0
+       ],
+       "i": 9
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Water_03",
+   "loc": [
+    -53890.0,
+    51120.0,
+    -1890.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    -53770.0,
+    51120.0,
+    -1890.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Water_04",
+   "loc": [
+    -57450.0,
+    57010.0,
+    -1890.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    -57330.0,
+    57010.0,
+    -1890.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Water_02",
+   "loc": [
+    41210.0,
+    53350.0,
+    -2040.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    41330.0,
+    53350.0,
+    -2040.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree10",
+   "loc": [
+    -7840.0,
+    51040.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    -7874.116,
+    51114.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        -7840.0,
+        51040.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         -7874.11,
+         51114.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -889.85,
+        "500,0": -872.81,
+        "-500,0": -910.32,
+        "0,500": -885.32,
+        "0,-500": -894.69
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree8",
+   "loc": [
+    7680.0,
+    32100.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    7645.884,
+    32174.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        7680.0,
+        32100.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         7645.89,
+         32174.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -994.69,
+        "500,0": -992.5,
+        "-500,0": -994.69,
+        "0,500": -999.38,
+        "0,-500": -985.94
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree6",
+   "loc": [
+    6890.0,
+    49400.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    6855.884,
+    49474.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        6890.0,
+        49400.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         6855.89,
+         49474.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -846.1,
+        "500,0": -846.88,
+        "-500,0": -846.1,
+        "0,500": -842.97,
+        "0,-500": -850.7
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "StaticMeshActor",
+   "class_path": "/Script/Engine.StaticMeshActor",
+   "label": "Beech_Tree9",
+   "loc": [
+    12050.0,
+    61580.0,
+    -1310.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "bounds_origin": [
+    12015.884,
+    61654.9,
+    -67.173
+   ],
+   "bounds_extent": [
+    1408.959,
+    1359.665,
+    1242.827
+   ],
+   "static_meshes": [
+    {
+     "component": "StaticMeshComponent0",
+     "ism": false,
+     "mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+     "collides": true,
+     "collision_enabled": "QUERY_AND_PHYSICS",
+     "resp_worldstatic": "ECR_BLOCK",
+     "resp_pawn": "ECR_BLOCK",
+     "profile": "BlockAll",
+     "count": 1,
+     "instances": [
+      {
+       "t": [
+        12050.0,
+        61580.0,
+        -1310.0
+       ],
+       "r": [
+        0.0,
+        0.0,
+        -0.0
+       ],
+       "s": [
+        2.0,
+        2.0,
+        2.0
+       ],
+       "i": -1,
+       "reader_disc": {
+        "center_cm": [
+         12015.89,
+         61654.9,
+         -67.17
+        ],
+        "r_cm": 1384.51,
+        "height_cm": 2486.05
+       },
+       "ground_z": {
+        "0": -846.09,
+        "500,0": -846.09,
+        "-500,0": -846.09,
+        "0,500": -846.09,
+        "0,-500": -846.09
+       }
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "class": "TriggerBox",
+   "class_path": "/Script/Engine.TriggerBox",
+   "label": "TV_Region_Barren",
+   "loc": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "bounds_extent": [
+    75000.0,
+    25000.0,
+    15000.0
+   ]
+  },
+  {
+   "class": "TargetPoint",
+   "class_path": "/Script/Engine.TargetPoint",
+   "label": "TP_Water_01",
+   "loc": [
+    49240.0,
+    57240.0,
+    -2040.0
+   ],
+   "rot": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "scale": [
+    1.0,
+    1.0,
+    1.0
+   ],
+   "bounds_origin": [
+    49360.0,
+    57240.0,
+    -2040.0
+   ],
+   "bounds_extent": [
+    120.0,
+    80.0,
+    80.0
+   ]
+  }
+ ],
+ "meshes": {
+  "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree": {
+   "path": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+   "render_bounds_origin": [
+    -17.058,
+    37.45,
+    621.414
+   ],
+   "render_bounds_extent": [
+    704.479,
+    679.833,
+    621.414
+   ],
+   "collision_trace_flag": "CTF_USE_DEFAULT",
+   "agg_counts": {
+    "sphere_elems": 0,
+    "box_elems": 0,
+    "sphyl_elems": 0,
+    "convex_elems": 1,
+    "tapered_capsule_elems": 0
+   },
+   "simple_collision": {
+    "shape_count": 1,
+    "verts_mesh_cm": [
+     [
+      687.522,
+      310.19,
+      785.896
+     ],
+     [
+      687.522,
+      -305.873,
+      785.896
+     ],
+     [
+      687.522,
+      -305.873,
+      309.779
+     ],
+     [
+      687.522,
+      310.19,
+      309.779
+     ],
+     [
+      -721.637,
+      219.212,
+      401.904
+     ],
+     [
+      -721.637,
+      -209.638,
+      401.904
+     ],
+     [
+      -721.637,
+      -209.638,
+      748.841
+     ],
+     [
+      -721.637,
+      219.212,
+      748.841
+     ],
+     [
+      -223.467,
+      717.383,
+      770.741
+     ],
+     [
+      280.329,
+      717.383,
+      770.741
+     ],
+     [
+      280.329,
+      717.383,
+      437.642
+     ],
+     [
+      -223.467,
+      717.383,
+      437.642
+     ],
+     [
+      -288.793,
+      -642.483,
+      337.215
+     ],
+     [
+      350.912,
+      -642.483,
+      337.215
+     ],
+     [
+      350.912,
+      -642.483,
+      793.171
+     ],
+     [
+      -288.793,
+      -642.483,
+      793.171
+     ],
+     [
+      -227.551,
+      -192.726,
+      1242.927
+     ],
+     [
+      230.49,
+      -192.726,
+      1242.927
+     ],
+     [
+      230.49,
+      245.196,
+      1242.927
+     ],
+     [
+      -227.551,
+      245.196,
+      1242.927
+     ],
+     [
+      -319.633,
+      279.641,
+      -0.1
+     ],
+     [
+      377.642,
+      279.641,
+      -0.1
+     ],
+     [
+      377.642,
+      -305.168,
+      -0.1
+     ],
+     [
+      -319.633,
+      -305.168,
+      -0.1
+     ],
+     [
+      -461.602,
+      479.247,
+      1008.876
+     ],
+     [
+      491.503,
+      506.209,
+      981.915
+     ],
+     [
+      -472.871,
+      -458.405,
+      153.137
+     ],
+     [
+      532.935,
+      -460.46,
+      155.193
+     ],
+     [
+      547.856,
+      449.855,
+      170.114
+     ],
+     [
+      -490.421,
+      450.428,
+      170.687
+     ],
+     [
+      -483.05,
+      -448.226,
+      987.428
+     ],
+     [
+      515.579,
+      -477.816,
+      957.838
+     ]
+    ]
+   },
+   "render_base": {
+    "n_verts": 86302,
+    "z_min": 0.0,
+    "base_verts_mesh_cm": [
+     [
+      16.515,
+      -34.781,
+      0.0
+     ],
+     [
+      -23.93,
+      -34.781,
+      0.0
+     ],
+     [
+      -44.153,
+      0.246,
+      0.0
+     ],
+     [
+      -23.93,
+      35.273,
+      0.0
+     ],
+     [
+      16.515,
+      35.273,
+      0.0
+     ],
+     [
+      36.738,
+      0.246,
+      0.0
+     ]
+    ]
+   }
+  },
+  "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC": {
+   "path": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC",
+   "render_bounds_extent": [
+    25.592,
+    24.605,
+    21.434
+   ],
+   "note": "충돌 없음 — 꼭짓점 안 읽음"
+  },
+  "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD": {
+   "path": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD",
+   "render_bounds_extent": [
+    21.113,
+    20.014,
+    12.452
+   ],
+   "note": "충돌 없음 — 꼭짓점 안 읽음"
+  }
+ }
+}

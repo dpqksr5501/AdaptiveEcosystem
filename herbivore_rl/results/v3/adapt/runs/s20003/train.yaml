@@ -1,0 +1,442 @@
+# 적응 고리 s20003 — 자동 생성 (results/v3/adapt/adapt.py convert, 손으로 고치지 않는다).
+# 스냅숏 eco_v3_snapshot_s20003_240s.json: 지도 LV_Ecosystem_IntegrationTest 세션 20003 전역 스텝 1800, 두뇌 v3_r1_g995_s3_20m@eca97f2e
+# 학습 세계 = world.yaml + R4 학습 바꿈(학습 전용 40 m 밖 부활·학습 시드 32000~32049·train 블록 + 지역 섞기)
+version: 3.adapt.train
+overrides:
+  rand:
+    world_size:
+    - 60.0
+    - 60.0
+    predator_count:
+    - 4
+    - 4
+    pred_speed_mult:
+    - 0.8
+    - 0.8
+    ranged_frac:
+    - 0.0
+    - 0.0
+    food_regen_mult:
+    - 1.0
+    - 1.0
+  pred_eat_cd: 38
+  train_seeds:
+  - 32000
+  - 32050
+features:
+  speed:
+    enabled: true
+    thresholds:
+    - 0.3333333333333333
+    - 0.6666666666666666
+    gait_speed:
+    - 0.0
+    - 0.4
+    - 1.0
+    gait_eat:
+    - 1.0
+    - 0.5
+    - 0.0
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+  daynight:
+    enabled: true
+    periods:
+    - 900
+    twilight: 0.05
+    detect_night: 0.5
+    eat_night: 0.9
+    rest_night: 0.35
+    fixed_day_frac: 0.0
+    transition_norm: 900
+    start_induce: 0.0
+    rest_cover_only: true
+  pred_sleep:
+    enabled: true
+    nocturnal_frac:
+    - 0.0
+    - 0.0
+    sleep_dark: 0.5
+    twilight_slow: true
+  repertoire:
+    enabled: true
+    lock_graze: 12
+    lock_flee: 8
+    lock_freeze: 12
+    lock_hide: 12
+    hide_travel_max: 40
+    sleep_enter: 3
+    sleep_hold: 60
+    sleep_wake: 3
+    startle_steps: 3
+    c_still: 1.8
+    cover_mult_crouch: 4.0
+    cover_mult_graze: 1.5
+    cover_mult_sleep: 2.5
+    cover_mult_other: 1.0
+    graze_head_down: 0.6
+    sleep_sight: 0.3
+    sleep_rest: 0.6
+    graze_eat_min: 0.06
+    graze_forage: 0.83
+    graze_cohesion: 0.71
+    event_near: 8.0
+    event_approach: 0.9
+    event_energy: 0.25
+    event_dark: 0.5
+    decision_jitter: 3
+    recency_decay: 0.95
+    steps_norm: 60
+    obs_extra: true
+  threats:
+    enabled: true
+    stalk_frac:
+    - 0.3
+    - 0.7
+    stalk_dist: 6.0
+    stalk_speed: 0.3
+    pounce_speed: 1.5
+    pounce_steps: 12
+    exhaust_speed: 0.2
+    exhaust_steps: 30
+    player_frac: 0.0
+    player_speeds:
+    - 0.4
+    - 0.3
+    - 1.3
+    player_mode_steps:
+    - 200
+    - 400
+    player_stalk_p: 0.5
+    player_charge_dist: 6.0
+    player_charge_steps: 20
+    player_rest_steps: 30
+    player_catch_r: 1.0
+    player_cooldown: 30
+    eat_in_place: true
+  realism_night:
+    enabled: true
+    settle_r: 8.0
+    hunt_dark: 1.0
+    night_floor: 0.5
+    spread: 0.5
+    ramp_steps: 15
+  integrated_stage:
+    enabled: true
+    respawn: true
+    ema_den: null
+    day_offset: 0
+    cover_layout: quad
+    cover_count: 4
+    cover_r_frac: 0.1
+    wolf_kinds: alternate
+    start_layout: stage
+    wolf_corner_frac: 0.4
+    wolf_gap: 21.0
+    deer_wolf_gap: 14.5
+    deer_margin: 1.5
+    deer_spacing: 0.75
+    head_layout: golden
+    respawn_safe_r: 20.0
+    respawn_tries: 64
+  realism_vision:
+    enabled: true
+    threat_fov_deg: 300.0
+    kin_fov_deg: 120.0
+  realism_hearing:
+    enabled: true
+    s_silent: 0.05
+    s_quiet: 0.3
+    s_loud: 1.0
+    r_quiet: 2.0
+    r_loud: 20.0
+    roam_quiet: true
+    cap_to_sight: false
+  wild_reserve:
+    enabled: true
+    reserve_days: 3.0
+    init: 1.0
+    refill_e: 0.7
+    refill_frac: 0.25
+    weak_e: 0.1
+    weak_speed: 0.75
+  wild_satiation:
+    enabled: true
+    sat_days: 0.5
+    rest_speed: 0.3
+  wild_flight:
+    enabled: true
+    alert_r: 15.0
+    flight_r: 7.5
+    safe_r: 20.0
+    approach: 0.9
+    alert_w: 1.5
+    rest_alert: true
+    shelter_cos: 0.5
+    shelter_r: 15.0
+    crouch: true
+    wall_margin: 1.0
+    hold_awake: true
+    edge_r: 5.0
+  realism_shelter:
+    enabled: true
+    untargetable: true
+    player_too: true
+    block_predators: true
+    wolf_margin: 0.5
+  realism_cover_food:
+    enabled: true
+    cap_frac: 0.15
+    regen_frac: 0.15
+  wild_pack:
+    enabled: true
+    join_r: 60.0
+    lead: 6.0
+    door_r: 15.0
+    door_cos: 0.5
+    wait_r: 1.0
+  obstacles:
+    enabled: true
+    tree_per_ha: 250.0
+    tree_r:
+    - 0.05
+    - 0.15
+    rock_per_ha: 5.0
+    rock_r:
+    - 0.25
+    - 0.75
+    body_r: 0.15
+    block_sight: true
+    no_food: true
+    detour: true
+    detour_block: 0.5
+    detour_free: 0.8
+    detour_probe: 1.5
+    detour_steps: 45
+    detour_help_block: 15
+    detour_help_drop: 38
+    fixed:
+    - - 4.759
+      - 23.812
+      - 0.37537600000000004
+    - - 8.864
+      - 55.847
+      - 0.3846795
+    - - 13.413
+      - 27.381
+      - 0.36890400000000007
+    - - 17.067
+      - 24.47
+      - 0.44414100000000006
+    - - 20.963
+      - 3.378
+      - 0.38569075
+    - - 22.028
+      - 50.191
+      - 0.424725
+    - - 26.298
+      - 16.319
+      - 0.408545
+    - - 28.715
+      - 51.701
+      - 0.40085950000000004
+    - - 28.887
+      - 43.455
+      - 0.3838705
+    - - 32.278
+      - 14.44
+      - 0.42957900000000004
+    - - 34.871
+      - 46.837
+      - 0.40187075000000005
+    - - 36.444
+      - 17.573
+      - 0.40429775000000007
+    - - 39.479
+      - 50.263
+      - 0.38528625000000005
+    - - 39.821
+      - 5.67
+      - 0.3765895
+    - - 42.271
+      - 56.949
+      - 0.39580325
+    - - 43.557
+      - 25.22
+      - 0.37193775
+    - - 44.633
+      - 35.572
+      - 0.4170395
+    - - 46.359
+      - 2.841
+      - 0.36809500000000006
+    - - 50.043
+      - 54.881
+      - 0.38002775
+    - - 51.752
+      - 30.824
+      - 0.42088225
+    - - 52.191
+      - 23.39
+      - 0.36971300000000007
+    - - 52.47
+      - 3.293
+      - 0.3840727500000001
+    - - 55.069
+      - 42.804
+      - 0.37335350000000006
+    - - 55.345
+      - 19.257
+      - 0.38609525000000006
+  wild_weather:
+    enabled: true
+    region: Forest
+    regions:
+      Forest:
+      - rain
+      - 1.0
+      Barren:
+      - clear
+      - 0.0
+      Highland:
+      - snow
+      - 1.0
+    rain_sight: 0.9
+    rain_hear: 0.5
+    snow_sight: 0.7
+    snow_hear: 1.0
+    snow_deer_speed: 0.6
+    snow_wolf_speed: 0.85
+    obs_visibility: true
+    schedule: null
+train:
+  num_worlds: 8
+  reset_interval: 5000
+  rollout_world_steps: 256
+  repertoire:
+    allowed:
+    - graze
+    - flee
+    - hide
+    epsilon: 0.05
+    init_probs:
+    - 0.4
+    - 0.15
+    - 0.15
+    - 0.15
+    - 0.15
+    ent_coef_base: 0.00854956
+    f_dec: 0.854956
+  region_mix:
+    regions:
+    - Forest
+    - Barren
+    - Highland
+    weights:
+    - 1
+    - 1
+    - 1
+    obstacles:
+      Forest:
+      - - 4.759
+        - 23.812
+        - 0.37537600000000004
+      - - 8.864
+        - 55.847
+        - 0.3846795
+      - - 13.413
+        - 27.381
+        - 0.36890400000000007
+      - - 17.067
+        - 24.47
+        - 0.44414100000000006
+      - - 20.963
+        - 3.378
+        - 0.38569075
+      - - 22.028
+        - 50.191
+        - 0.424725
+      - - 26.298
+        - 16.319
+        - 0.408545
+      - - 28.715
+        - 51.701
+        - 0.40085950000000004
+      - - 28.887
+        - 43.455
+        - 0.3838705
+      - - 32.278
+        - 14.44
+        - 0.42957900000000004
+      - - 34.871
+        - 46.837
+        - 0.40187075000000005
+      - - 36.444
+        - 17.573
+        - 0.40429775000000007
+      - - 39.479
+        - 50.263
+        - 0.38528625000000005
+      - - 39.821
+        - 5.67
+        - 0.3765895
+      - - 42.271
+        - 56.949
+        - 0.39580325
+      - - 43.557
+        - 25.22
+        - 0.37193775
+      - - 44.633
+        - 35.572
+        - 0.4170395
+      - - 46.359
+        - 2.841
+        - 0.36809500000000006
+      - - 50.043
+        - 54.881
+        - 0.38002775
+      - - 51.752
+        - 30.824
+        - 0.42088225
+      - - 52.191
+        - 23.39
+        - 0.36971300000000007
+      - - 52.47
+        - 3.293
+        - 0.3840727500000001
+      - - 55.069
+        - 42.804
+        - 0.37335350000000006
+      - - 55.345
+        - 19.257
+        - 0.38609525000000006
+      Barren: []
+      Highland:
+      - - 2.754
+        - 49.221
+        - 0.42290475000000005
+      - - 11.64
+        - 34.359
+        - 0.43989375000000003
+      - - 12.685
+        - 54.349
+        - 0.44130949999999997
+      - - 17.196
+        - 28.826
+        - 0.38811775000000004
+      - - 22.403
+        - 50.732
+        - 0.38933125
+      - - 31.085
+        - 46.259
+        - 0.44070275000000003
+      - - 46.363
+        - 29.253
+        - 0.39378075
+      - - 50.052
+        - 5.754
+        - 0.37396025
+      - - 56.866
+        - 21.405
+        - 0.38326375000000007

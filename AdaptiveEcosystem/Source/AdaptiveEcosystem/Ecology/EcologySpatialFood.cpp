@@ -1,5 +1,20 @@
 #include "Ecology/EcologySimulationSubsystem.h"
 
+bool UEcologySimulationSubsystem::AdjustSpatialFoodHabitat(FName Id, int64 Sequence, double Before, double Removed, double Capacity, double After)
+{
+	auto* Source = SpatialFood.Find(Id);
+	if (!CanMutateAuthoritativeState(TEXT("AdjustSpatialFoodHabitat")) || bResourceStepOpen || !Source || Sequence <= Source->Sequence
+		|| !FMath::IsFinite(Before) || !FMath::IsFinite(Removed) || !FMath::IsFinite(Capacity) || !FMath::IsFinite(After)
+		|| Removed < 0 || Capacity <= 0 || Capacity > MAX_flt || After < 0 || After > Capacity + 1.e-8
+		|| !FMath::IsNearlyEqual(Before, Source->Amount, 1.e-6)
+		|| !FMath::IsNearlyEqual(Before - Removed, After, 1.e-6)) return false;
+	Source->Capacity = Capacity; Source->Amount = After; Source->Sequence = Sequence;
+	Source->HabitatRemoved += Removed;
+	auto& Region = RegionalStates.FindChecked(Id);
+	Region.FoodCapacity = float(Capacity); Region.FoodAmount = float(FMath::Clamp(After, 0.0, Capacity));
+	return true;
+}
+
 bool UEcologySimulationSubsystem::RegisterSpatialFood(FName Id, double Capacity, double Amount)
 {
 	if (!CanMutateAuthoritativeState(TEXT("RegisterSpatialFood")) || bResourceStepOpen || SpatialFood.Contains(Id)

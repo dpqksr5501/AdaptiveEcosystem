@@ -1,0 +1,25 @@
+{
+ "steps": {
+  "1_convert": 1.6,
+  "2_check": 45.0,
+  "4_eval_current": 826.0,
+  "3_train": 286.0,
+  "5_select": 317.3,
+  "6_eval_candidate": 720.8,
+  "7_stuck": 178.5,
+  "8_gate": 0.1,
+  "9_export": 0.0
+ },
+ "args": {
+  "cmd": "all",
+  "snapshot": "results\\v3\\adapt\\unreal\\eco_v3_snapshot_s20003_240s.json",
+  "run": "s20003",
+  "steps": 3000000,
+  "model_seeds": [
+   0,
+   1
+  ],
+  "train_food": "snapshot",
+  "workers": 16
+ }
+}

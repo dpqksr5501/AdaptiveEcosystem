@@ -73,6 +73,49 @@
 //   - Step 은 잠을 상태에서 읽고, 깜깜하면(d ≥ NightHuntDark) 지난 스텝에 사냥 중이 아니던 주행성 늑대는 사냥하지 않는다(새 사냥 없음 —
 //     쫓던 사냥만 마저 끝낸다). 속력 배수 = 잠이면 0, 깨어 있는 주행성은 max(1 − d, NightFloor) × NightAct / R, 야행성 1.
 //     스텝 끝에 bNightHunt = 표적 있음 ∨ 잠행형 돌진 상태(포획 뒤 갱신 다음 값)를 쓴다.
+//
+// 늑대 무리 협동 사냥 (선택, FThreatConfig::Pack. 기본 끔 — 끄면 위 그대로이고 지금 골든과 비트 단위로 같다. 야생 2단계 2, 사용자 10-17
+//   '추천대로 끄고 2~4번 진행해', 파이썬 world.py wild_pack·`pack_goals`·`_pack_step`, configs/v3_wild2_pack_mirror.yaml):
+//   위협끼리 서로 읽는 유일한 규칙이다. 그래서 Step 안이 아니라 부르는 쪽(EcoWorldV3 C2)이 모든 늑대가 움직이기 전에 정한다:
+//     PackPeek   늑대마다 상태 사본으로 Step 을 한 번 돌려 이번 스텝의 사냥·표적·전력 걸음을 본다 (난수를 쓰지 않는다 — 선회·굴림은 결과와 무관)
+//                앞장 = 보통 위협 ∧ 전력 걸음 ∧ 표적 있음, 돕는 늑대 = 보통 위협 ∧ 사냥 중 ∧ 전력 걸음 아님 (표적이 없거나 잠행 접근 중)
+//     PackGoals  돕는 늑대마다 JoinR 안의 쫓기는 사슴 가운데 가장 가까운 것 → 도주 방향(사슴의 이번 이동, 서 있으면 앞장 → 사슴) →
+//                향하는 은신처의 문(반지름 + 몸 여유) 또는 도주선 앞 Lead → 무대 안으로 자름 → WaitR 안이면 기다림(사슴 쪽을 본다)
+//     Step 6b′   In.bPackHelp 면 move = PackDir, 속력 = 기다림 ? 0 : 기본 속력 (상태 기계 뒤, 6c 식사·6d 배부름·7 밤잠 배수 앞)
+//   현실 근거: 늑대 무리 사냥 성공은 4 마리까지 는다(MacNulty 외 2012), 늑대는 길목에 떨어져 기다린다(Gable 외 2024)
+//
+// 세로 장애물 (선택, FThreatStepInput::Obstacles. 기본 nullptr — 없으면 위 그대로이고 지금 골든과 비트 단위로 같다. 야생 2단계 3, 사용자 10-17
+//   '추천대로 끄고 2~4번 진행해', 파이썬 world.py obstacles·`obstacle_slide`·`sight_blocked`·`obstacle_inside`, configs/v3_wild2_obstacle_mirror.yaml):
+//   원판 (x, y, r) × NumObstacles (나무 줄기·바위). 부르는 쪽(EcoWorldV3 C2 — FWorldConfig::Obstacles)이 채운다.
+//     1·4 표적 보임  bObstacleSight 면 보통 위협의 눈길(이동 전 위치 → 사슴)이 원판을 지나면(SightBlocked) 보이지 않는다. 플레이어 대역은 그대로 맵 전체
+//     8   이동       q = 이동 전 + 이동 → ObstacleSlide(반지름 r + ObstacleBody 앞에서 멈춰 둘레를 따라 미끄러짐, 맵 자르기 없음) → 8a 은신처 밀어내기 →
+//                    벽 반사·자르기 → 은신처 접선 → 그래도 원판 안이면 이동 전 자리 → 부딪혀 가려던 거리의 kShelterDeadFrac 도 못 가면 돌아선다
+//   현실 근거: 늑대에게 잡힌 엘크는 도망이 막히는 곳(강가·길가·깊은 눈)에서 더 많았다(Kauffman 외 2007, Ecol. Lett. 10:690)
+//
+// 숲 시야 (선택, FThreatStepInput::bFoliage. 기본 거짓 — 거짓이면 위 그대로이고 지금 골든과 비트 단위로 같다. 야생 2단계 3 의 7), 10-21 사용자
+//   '숲 안 시야 줄이기 → 다시 잼', 파이썬 world.py obstacles.foliage·`foliage_chord`·`foliage_blocked`. 골든 FoliageGoldenVectorsV3.h):
+//   나무인 원판(FoliageTrees[k] ≠ 0, nullptr = 모두 — 바위에는 잎이 없다)마다 같은 중심에 잎 원(반지름 FoliageR, 줄기 반지름과 무관)을 둔다.
+//   눈길(선분)이 잎 원들 안을 지나는 길이(겹친 원은 합집합 — 한 번만, FoliageChord)가 FoliageBlock 이상이면 줄기처럼 가린다 (FoliageBlocked).
+//     1·4 표적 보임  bObstacleSight 면 가림 = 줄기 SightBlocked ∨ 잎 FoliageBlocked (InputSightBlocked — 무리 미리 보기 PackPeek 도 같은 Step)
+//   발소리는 가리지 않는다. 부르는 쪽(EcoWorldV3 — FObstacleConfig::Foliage)이 사슴 쪽 세 곳(위협 보임·도주 반사 알아챔·관측 threat_hidden)에도 같은 판정을 쓴다.
+//   현실 근거: 숲에서는 잎·낮은 가지·하층 덤불이 옆 시야를 몇 m 로 줄인다(Mysterud & Østbye 1999 Wildl. Soc. Bull. 27:385)
+//
+// 장애물 돌아가기 (선택, FThreatStepInput::Detour. 기본 nullptr — 없거나 꺼져 있으면 위 그대로이고 장애물 골든과 비트 단위로 같다. 10-17 장애물 끼임 고침,
+//   파이썬 world.py obstacles.detour·`detour_moves`, configs/v3_wild2_obstacle_mirror.yaml. 골든 DetourGoldenVectorsV3.h):
+//   원판이 있을 때만 쓴다. 사슴(EcoWorldV3 C1)과 위협(Step 7′ — 밤잠 배수 뒤·이동 바로 앞)이 같은 DetourStep 을 부른다:
+//     막힘   이동 시험(실제 이동과 같은 식)이 원판에 닿고 가려던 쪽 나아감 < BlockFrac × |V|, 또는 (위협) 미끄러진 끝이 은신처 막기 원 안
+//     고름   가려던 방향을 22.5° 씩(삼각함수 없는 표 kDetourRot) 작은 각부터 +·− 번갈아 돌려 본 첫 빈 방향 (나아감 ≥ FreeFrac × |V|, 위협은 무대 안 ∧ 막기 원 밖)
+//     이어   앞 보기 max(Probe, |V|) 가 트일 때까지(최대 MaxSteps) 붙은 쪽 먼저 차례로 다시 고른다. 빈 방향이 없으면 V 그대로 (돌아서기 규칙이 받는다)
+//     8″     돕는 늑대가 HelpBlock 스텝 넘게 돌아가거나 기어간 스텝이 HelpBlock 만큼 쌓이거나 돌아섰으면 HelpDrop 스텝 동안 돕지 않는다 (PackDrop, PackPeek 이 뺀다)
+//   바꾸면 move = 고른 방향(단위), 속력 = |V| — 이동이 시험한 이동과 같다. heading 도 그 방향이다
+//   현실 근거: 사슴·늑대는 나무 줄기와 바위에 몸을 밀어붙이지 않고 돌아 지나간다
+//
+// 지역 날씨 (선택, FThreatStepInput::WeatherViewMult·WeatherSpeedMult. 기본 1 — 곱해도 같은 값이라 지금 골든과 비트 단위로 같다. 야생 3단계, 10-18 사용자
+//   '일단 우리 테스트 레벨에도 날씨 적용되게 해 줘', 파이썬 world.py wild_weather (x3)·(x4), configs/v3_wild3_mirror.yaml. 골든 WeatherGoldenVectorsV3.h):
+//   부르는 쪽(EcoWorldV3 C2 — FWorldConfig::Weather)이 결정 때 날씨의 배수를 넣는다.
+//     1·4 표적 보임  보통 위협의 시야 반경 = PredViewR × WeatherViewMult (비 0.9·눈 0.7). 플레이어 대역은 그대로 맵 전체
+//     7″  속력        7 밤잠·박명 배수 뒤, 7′ 돌아가기 앞에 × WeatherSpeedMult (눈 0.85, 모든 위협)
+//   현실 근거: 큰비·눈보라는 앞을 흐리게 하고(Rasmussen 외 1999), 깊은 눈은 늑대도 느리게 하지만 사슴을 더 느리게 한다(Nelson & Mech 1986)
 // ---------------------------------------------------------------------------------------------------------------
 
 #pragma once
@@ -116,6 +159,18 @@ namespace EcoThreatV3
 
 	// normalize·inv 의 문턱 (env_v2/steering.py EPS)
 	inline constexpr double kEps = 1e-9;
+
+	// 야생 2단계 2 늑대 무리 협동 사냥 계수 (파이썬 features.wild_pack, configs/v3_wild2_pack_mirror.yaml 값). 단위는 파이썬 단위(1 = 2 m).
+	// 기본 끔 = R1b 학습 세계 그대로. 켜는 쪽: EcoWorldV3 FWorldConfig::PackHunt (통합 모드 eco.IntegratedV3.PackHunt 기본 1)
+	struct FPackHuntConfig
+	{
+		bool bEnabled = false;
+		double JoinR = 60.0;     // join_r: 동료가 쫓는 사슴이 이 실거리 안이면 돕는다 (120 m = 무대 한 변. 처음 20 에서 하나만 골랐다 — 명세 RL_V3_WILD2_SPEC 5절)
+		double Lead = 6.0;       // lead: 은신처가 없을 때 사슴 도주선 앞쪽 거리 (12 m = 잠행형 덮치기 거리와 같게, 어림)
+		double DoorR = 15.0;     // door_r: 사슴이 향하는 은신처 = 가장자리까지 이 안 (30 m, 사슴의 도주 은신처 규칙 wild_flight.shelter_r 와 같다)
+		double DoorCos = 0.5;    // door_cos: 도주 방향 ±acos(이 값) 안 (±60°, wild_flight.shelter_cos 와 같다)
+		double WaitR = 1.0;      // wait_r: 목표 자리에 이만큼 가까우면 멈춰 사슴 쪽을 보고 기다린다 (2 m = 근접 포획 거리)
+	};
 
 	// 학습 세계 상수 (configs/default.yaml 위에 configs/v3_r1_on.yaml 을 덮은 값). 기본값이 계약이다 — 바꾸면 학습 밖이다.
 	// 생성 헤더 ThreatGoldenVectorsV3.h 의 kCfg* 가 파이썬 설정에서 읽은 같은 값을 싣고, 시험이 하나씩 정확히 비교한다.
@@ -200,7 +255,599 @@ namespace EcoThreatV3
 		bool bWildSatiation = false;
 		std::int32_t SatSteps = 450;               // 반올림(sat_days 0.5 × 하루 900 스텝) = 60 초
 		double RestSpeed = 0.3;                    // rest_speed: 배부른 늑대의 배회 속력 배수
+
+		// ---- 은신처 안전·늑대 진입 금지 (사용자 보고 10-16 '은신처 안에서도 잡힌다', 파이썬 R3 realism_shelter (c)·(c′) — world.py 모듈 docstring,
+		//      configs/v3_wild1_mirror.yaml realism_shelter: untargetable·player_too·block_predators 모두 true). 기본 끔 = R1b 학습 세계 그대로.
+		//      켜는 쪽: EcoWorldV3 FWorldConfig::bShelterSafe (통합 모드 eco.IntegratedV3.ShelterSafe) ----
+		// bShelterSafe: 은신처 원 안(FPreyView::bInCover — 이동 뒤 위치, 가장자리 포함) 사슴은 행동과 무관하게 표적이 되지 않고 잡히지 않는다
+		//   (모든 위협 — player_too). bShelterBlock: 위협이 이동 뒤 원 안(|q − c| < r)이면 둘레 밖으로 밀어 둘레를 따라 미끄러지게 한다(Step 8, ShelterPush·
+		//   ShelterTangent, 막다른 곳이면 돌아선다). 원 목록은 FThreatStepInput::Discs. 현실 근거: 빽빽한 덤불 속으로는 늑대가 따라 들어가 덮칠 수 없다
+		bool bShelterSafe = false;
+		bool bShelterBlock = false;
+
+		// ---- 늑대 무리 협동 사냥 (야생 2단계 2, 머리 주석 '늑대 무리 협동 사냥'). 기본 끔. Step 은 읽지 않는다 — PackGoals 가 읽고 In 으로 넘긴다 ----
+		FPackHuntConfig Pack;
 	};
+
+	// 은신처 진입 금지 상수 (world.py WALL_EPS·WALL_PASSES·WALL_DEAD_FRAC)
+	inline constexpr double kShelterWallEps = 1.0e-6;      // 밀어낸 위치의 반지름 여유 (단위)
+	inline constexpr std::int32_t kShelterPasses = 3;      // 밀어내기 바퀴 수
+	inline constexpr double kShelterDeadFrac = 0.1;        // 가려던 거리의 이 몫도 못 가면 막다른 곳 → 돌아선다
+
+	/** 위치 (X, Y) 가 은신처 원 안인가 (|q − c| < r, 둘레 위는 밖 — world.py `_rz_inside_disc`). Discs = (x, y, r) × Num. */
+	inline bool InsideAnyDisc(double X, double Y, const double* Discs, std::int32_t Num)
+	{
+		for (std::int32_t k = 0; k < Num; ++k)
+		{
+			const double Ex = X - Discs[3 * k];
+			const double Ey = Y - Discs[3 * k + 1];
+			if (std::sqrt(Ex * Ex + Ey * Ey) < Discs[3 * k + 2])
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
+	 * 밀어내기 (world.py `_rz_wall_push` 한 위협): 이동 뒤 위치 Q 가 원 k 안이면 c_k + (r_k + WallEps)·단위(Q − c_k) (Q 가 중심과 겹치면
+	 * 단위(P − c_k), P = 이동 전 위치)로 옮긴다. 원 순서대로, 옮긴 원이 없을 때까지 최대 kShelterPasses 바퀴. 반환 = 한 번이라도 밀었나.
+	 */
+	inline bool ShelterPush(double& QX, double& QY, double PX, double PY, const double* Discs, std::int32_t Num)
+	{
+		if (Num <= 0 || !InsideAnyDisc(QX, QY, Discs, Num))
+		{
+			return false;
+		}
+		bool bPushed = false;
+		for (std::int32_t Pass = 0; Pass < kShelterPasses; ++Pass)
+		{
+			bool bMoved = false;
+			for (std::int32_t k = 0; k < Num; ++k)
+			{
+				const double Cx = Discs[3 * k];
+				const double Cy = Discs[3 * k + 1];
+				const double R = Discs[3 * k + 2];
+				const double Ex = QX - Cx;
+				const double Ey = QY - Cy;
+				const double D = std::sqrt(Ex * Ex + Ey * Ey);
+				if (!(D < R))
+				{
+					continue;
+				}
+				double Ux, Uy;
+				if (D > kEps)
+				{
+					Ux = Ex / D;
+					Uy = Ey / D;
+				}
+				else
+				{
+					const double Px = PX - Cx;
+					const double Py = PY - Cy;
+					const double Dp = std::sqrt(Px * Px + Py * Py);
+					const double Dm = Dp > kEps ? Dp : kEps;
+					Ux = Px / Dm;
+					Uy = Py / Dm;
+				}
+				const double Rr = R + kShelterWallEps;
+				QX = Cx + Rr * Ux;
+				QY = Cy + Rr * Uy;
+				bPushed = true;
+				bMoved = true;
+			}
+			if (!bMoved)
+			{
+				break;
+			}
+		}
+		return bPushed;
+	}
+
+	/**
+	 * 접선 미끄러짐 (world.py `_rz_wall_tangent` 한 위협): 이전 위치 P 에서 둘레가 가장 가까운 원 k (|P − c_k| − r_k 최소, 같으면 낮은 번호)의
+	 * 바깥 법선 n 에 대해 이동 V 의 안쪽 성분만 뺀 P + V − min(V·n, 0)·n 를 [0, Size] 로 자른다.
+	 */
+	inline void ShelterTangent(double PX, double PY, double VX, double VY, const double* Discs, std::int32_t Num, double Size,
+							   double& OutX, double& OutY)
+	{
+		std::int32_t Kb = 0;
+		double Best = 0.0, Bex = 0.0, Bey = 0.0, Bd = 0.0;
+		for (std::int32_t k = 0; k < Num; ++k)
+		{
+			const double Ex = PX - Discs[3 * k];
+			const double Ey = PY - Discs[3 * k + 1];
+			const double D = std::sqrt(Ex * Ex + Ey * Ey);
+			const double Edge = D - Discs[3 * k + 2];
+			if (k == 0 || Edge < Best)
+			{
+				Kb = k;
+				Best = Edge;
+				Bex = Ex;
+				Bey = Ey;
+				Bd = D;
+			}
+		}
+		(void)Kb;
+		const double Nx = Bd > kEps ? Bex / Bd : 1.0;
+		const double Ny = Bd > kEps ? Bey / Bd : 0.0;
+		const double Dot = VX * Nx + VY * Ny;
+		const double Vn = Dot < 0.0 ? Dot : 0.0;
+		const double X = PX + (VX - Vn * Nx);
+		const double Y = PY + (VY - Vn * Ny);
+		OutX = X < 0.0 ? 0.0 : (X > Size ? Size : X);
+		OutY = Y < 0.0 ? 0.0 : (Y > Size ? Size : Y);
+	}
+
+	// ---- 세로 장애물 (야생 2단계 3 — 머리 주석 '세로 장애물', world.py OB_PASSES·OB_EPS) ----
+	inline constexpr std::int32_t kObstaclePasses = 3;     // 미끄러짐 되풀이 수
+	inline constexpr double kObstacleEps = 1.0e-6;         // 닿은 자리를 둘레 밖으로 옮기는 여유 (단위)
+
+	/** 위치 (X, Y) 가 어느 원판(반지름 r + Body) 안인가 (|q − c| < R, 둘레 위는 밖 — world.py `obstacle_inside`). Discs = (x, y, r) × Num. */
+	inline bool InsideAnyObstacle(double X, double Y, const double* Discs, std::int32_t Num, double Body)
+	{
+		for (std::int32_t k = 0; k < Num; ++k)
+		{
+			const double Ex = X - Discs[3 * k];
+			const double Ey = Y - Discs[3 * k + 1];
+			if (std::sqrt(Ex * Ex + Ey * Ey) < Discs[3 * k + 2] + Body)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/** 선분 (Ax, Ay) → (Bx, By) 가 어느 원판을 지나는가 (world.py `sight_blocked` 한 쌍): t = clip(((c − a)·d) / d·d, 0, 1), |a + t·d − c|² < r². */
+	inline bool SightBlocked(double Ax, double Ay, double Bx, double By, const double* Discs, std::int32_t Num)
+	{
+		const double Dx = Bx - Ax;
+		const double Dy = By - Ay;
+		const double Dd = Dx * Dx + Dy * Dy;
+		for (std::int32_t k = 0; k < Num; ++k)
+		{
+			const double Cx = Discs[3 * k];
+			const double Cy = Discs[3 * k + 1];
+			const double R = Discs[3 * k + 2];
+			const double Fx = Cx - Ax;
+			const double Fy = Cy - Ay;
+			double T = Dd > 0.0 ? (Fx * Dx + Fy * Dy) / Dd : 0.0;
+			T = T < 0.0 ? 0.0 : (T > 1.0 ? 1.0 : T);
+			const double Px = Ax + T * Dx - Cx;
+			const double Py = Ay + T * Dy - Cy;
+			if (Px * Px + Py * Py < R * R)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+
+	// ---- 숲 시야 (야생 2단계 3 의 7) — 머리 주석 '숲 시야', world.py `foliage_chord`·`foliage_blocked`) ----
+	inline constexpr std::int32_t kFoliageSpanCap = 64;   // 눈길 하나의 잎 구간을 한 번에 쌓아 두는 칸 (넘으면 이만큼씩 묶어 차례로 — 같은 값)
+
+	namespace Detail
+	{
+		/**
+		 * 잎 원 하나 (중심 C, 반지름 R) 와 선분 p0 → p1 (p0 = 작은 끝, D = p1 − p0, Dd = D·D) 의 교차 구간 [T0, T1] (world.py `foliage_chord` 의 한 쌍).
+		 * 넓은 거르기: 중심이 선분 상자를 R 만큼 넓힌 상자 [Lx, Hx] × [Ly, Hy] 밖이면 쓰지 않는다 (파이썬과 같은 거르기 — 경계 값까지 같다).
+		 * F = p0 − C, β = F·D, γ = F·F − R², Δ = β² − Dd·γ. Dd > 0 ∧ Δ > 0 이면 T0 = max((−β − √Δ)/Dd, 0), T1 = min((−β + √Δ)/Dd, 1), T1 > T0 일 때만 참.
+		 * max·min 은 numpy maximum·minimum 과 같은 꼴(같으면 앞 값)이다.
+		 */
+		inline bool FoliageSpan(double X0, double Y0, double Dx, double Dy, double Dd, double Lx, double Hx, double Ly, double Hy, double Cx, double Cy,
+								double R, double& T0, double& T1)
+		{
+			if (!(Cx >= Lx && Cx <= Hx && Cy >= Ly && Cy <= Hy))
+			{
+				return false;
+			}
+			const double Fx = X0 - Cx;
+			const double Fy = Y0 - Cy;
+			const double Beta = Fx * Dx + Fy * Dy;
+			const double Gam = Fx * Fx + Fy * Fy - R * R;
+			const double Dsc = Beta * Beta - Dd * Gam;
+			if (!(Dd > 0.0 && Dsc > 0.0))
+			{
+				return false;
+			}
+			const double Sq = std::sqrt(Dsc);
+			const double Ta = (-Beta - Sq) / Dd;
+			const double Tb = (-Beta + Sq) / Dd;
+			T0 = Ta >= 0.0 ? Ta : 0.0;
+			T1 = Tb <= 1.0 ? Tb : 1.0;
+			return T1 > T0;
+		}
+	}
+
+	/**
+	 * 숲 시야 눈길 길이 (world.py `foliage_chord` 한 쌍과 비트 단위로 같다): 선분 A → B 가 잎 원들(원판 Discs (x, y, r) × Num 가운데 나무인 것 — Trees[k] ≠ 0,
+	 * Trees = nullptr 이면 모두 — 의 중심, 반지름 모두 R)의 합집합 안을 지나는 길이. 겹친 원은 한 번만 세서 길이 ≤ |A − B| 이다.
+	 * 끝 순서: (x, 같으면 y) 작은 끝 p0 → 큰 끝 p1 (A·B 를 바꿔도 비트 단위로 같다). 원 순서로 구간(Detail::FoliageSpan)을 모아 T0 순서(같으면 원 순서 —
+	 * np.lexsort 안정 정렬)로 놓고 E = 0 에서 시작해 덮인 t += max(T1 − max(T0, E), 0), E ← max(E, T1). 길이 = 덮인 t × √(D·D). 구간이 없으면 0.
+	 * 구간이 kFoliageSpanCap 을 넘으면 (T0, 원 번호) 순서로 그 칸 수만큼씩 묶어 원판을 다시 훑는다 (같은 순서·같은 식이라 값이 같다 — 비용 = 묶음 수 × 원판 수).
+	 */
+	inline double FoliageChord(double Ax, double Ay, double Bx, double By, const double* Discs, std::int32_t Num, const std::uint8_t* Trees, double R)
+	{
+		if (Discs == nullptr || Num <= 0)
+		{
+			return 0.0;
+		}
+		const bool bSwap = Ax > Bx || (Ax == Bx && Ay > By);
+		const double X0 = bSwap ? Bx : Ax;
+		const double Y0 = bSwap ? By : Ay;
+		const double X1 = bSwap ? Ax : Bx;
+		const double Y1 = bSwap ? Ay : By;
+		const double Dx = X1 - X0;
+		const double Dy = Y1 - Y0;
+		const double Dd = Dx * Dx + Dy * Dy;
+		const double Lx = X0 - R;
+		const double Hx = X1 + R;
+		const double Ly = (Y0 <= Y1 ? Y0 : Y1) - R;
+		const double Hy = (Y0 >= Y1 ? Y0 : Y1) + R;
+		struct FSpan
+		{
+			double T0;
+			double T1;
+		};
+		FSpan Spans[kFoliageSpanCap];
+		std::int32_t Ks[kFoliageSpanCap];
+		double E = 0.0;
+		double Cov = 0.0;
+		bool bAny = false;
+		// 묶음마다 원판을 한 번 훑어 (T0, 원 번호) 순서로 지난 묶음 끝 다음 구간 가운데 앞 kFoliageSpanCap 개만 남긴다 (안정 삽입 — 원 번호는 훑는 차례로
+		// 늘어나서 T0 가 같으면 먼저 넣은 쪽이 앞). 그 차례로 잇고, 칸이 다 찼으면 다음 묶음. 구간 ≤ 칸이면 한 번 훑기(예전 그대로), 넘어도 묶음 수 × 원판 수다
+		double LastT0 = 0.0;
+		std::int32_t LastK = -1;
+		for (;;)
+		{
+			std::int32_t Ns = 0;
+			for (std::int32_t k = 0; k < Num; ++k)
+			{
+				if (Trees != nullptr && Trees[k] == 0)
+				{
+					continue;
+				}
+				double T0 = 0.0, T1 = 0.0;
+				if (!Detail::FoliageSpan(X0, Y0, Dx, Dy, Dd, Lx, Hx, Ly, Hy, Discs[3 * k], Discs[3 * k + 1], R, T0, T1))
+				{
+					continue;
+				}
+				if (LastK >= 0 && !(T0 > LastT0 || (T0 == LastT0 && k > LastK)))
+				{
+					continue;   // 앞 묶음에서 이었다
+				}
+				if (Ns == kFoliageSpanCap && !(T0 < Spans[kFoliageSpanCap - 1].T0))
+				{
+					continue;   // 찼고 맨 뒤보다 앞이 아니다 (T0 같으면 원 번호가 뒤)
+				}
+				std::int32_t p = Ns < kFoliageSpanCap ? Ns : kFoliageSpanCap - 1;   // 찼으면 맨 뒤를 버린다
+				while (p > 0 && Spans[p - 1].T0 > T0)
+				{
+					Spans[p] = Spans[p - 1];
+					Ks[p] = Ks[p - 1];
+					--p;
+				}
+				Spans[p] = FSpan{T0, T1};
+				Ks[p] = k;
+				Ns = Ns < kFoliageSpanCap ? Ns + 1 : Ns;
+			}
+			for (std::int32_t s = 0; s < Ns; ++s)
+			{
+				const double Lo = Spans[s].T0 >= E ? Spans[s].T0 : E;
+				const double G = Spans[s].T1 - Lo;
+				Cov = Cov + (G >= 0.0 ? G : 0.0);
+				E = E >= Spans[s].T1 ? E : Spans[s].T1;
+			}
+			bAny = bAny || Ns > 0;
+			if (Ns < kFoliageSpanCap)
+			{
+				break;
+			}
+			LastT0 = Spans[Ns - 1].T0;
+			LastK = Ks[Ns - 1];
+		}
+		return bAny ? Cov * std::sqrt(Dx * Dx + Dy * Dy) : 0.0;
+	}
+
+	/** 숲 시야 가림 (world.py `foliage_blocked` 한 쌍): FoliageChord ≥ Block. */
+	inline bool FoliageBlocked(double Ax, double Ay, double Bx, double By, const double* Discs, std::int32_t Num, const std::uint8_t* Trees, double R,
+							   double Block)
+	{
+		return FoliageChord(Ax, Ay, Bx, By, Discs, Num, Trees, R) >= Block;
+	}
+
+	struct FObstacleSlideResult
+	{
+		bool bHit = false;    // 원판에 닿아 미끄러졌다
+		bool bBack = false;   // 끝에 원판 안이라 마지막으로 닿은 자리(또는 처음 자리)로 물러났다
+	};
+
+	/**
+	 * 미끄러짐 (world.py `obstacle_slide` 한 개체와 줄마다 같다). P 이동 전(모든 원판 밖), Q 가려던 자리 → Q 를 바꾼다. 되풀이마다 d = Q − P, A = d·d 가
+	 * 0 이면 멈춘다. 원판 k (R = r + Body): F = P − c, Cc = F·F − R², B = F·d. Cc < 0·B ≥ 0·D = B² − A·Cc < 0 이면 건너뛰고 T = (−B − √D)/A ≤ 1 인
+	 * 가장 작은 T(같으면 앞 번호)에 닿는다. 닿은 자리 H 를 둘레 R + kObstacleEps 로 옮기고 남은 이동의 안쪽 성분을 뺀다. Size ≥ 0 이면(사슴) 되풀이마다
+	 * Q 를 [0, Size]² 로 자른다. 끝에 원판 안이면 마지막으로 닿은 자리(Size ≥ 0 이면 자른 값), 그것도 안이면 처음 자리.
+	 */
+	inline FObstacleSlideResult ObstacleSlide(double PX, double PY, double& QX, double& QY, const double* Discs, std::int32_t Num, double Body,
+											  double Size)
+	{
+		FObstacleSlideResult R;
+		if (Discs == nullptr || Num <= 0)
+		{
+			return R;
+		}
+		const double P0X = PX;
+		const double P0Y = PY;
+		for (std::int32_t Pass = 0; Pass < kObstaclePasses; ++Pass)
+		{
+			const double Dx = QX - PX;
+			const double Dy = QY - PY;
+			const double A = Dx * Dx + Dy * Dy;
+			if (!(A > 0.0))
+			{
+				break;
+			}
+			std::int32_t Kb = -1;
+			double Best = 0.0;
+			for (std::int32_t k = 0; k < Num; ++k)
+			{
+				const double Fx = PX - Discs[3 * k];
+				const double Fy = PY - Discs[3 * k + 1];
+				const double Rk = Discs[3 * k + 2] + Body;
+				const double Cc = Fx * Fx + Fy * Fy - Rk * Rk;
+				const double B = Fx * Dx + Fy * Dy;
+				if (!(Cc >= 0.0) || !(B < 0.0))
+				{
+					continue;
+				}
+				const double D = B * B - A * Cc;
+				if (!(D >= 0.0))
+				{
+					continue;
+				}
+				const double T = (-B - std::sqrt(D)) / A;
+				if (T <= 1.0 && (Kb < 0 || T < Best))
+				{
+					Kb = k;
+					Best = T;
+				}
+			}
+			if (Kb < 0)
+			{
+				break;
+			}
+			const double Cx = Discs[3 * Kb];
+			const double Cy = Discs[3 * Kb + 1];
+			double Hx = PX + Best * Dx;
+			double Hy = PY + Best * Dy;
+			const double Ex = Hx - Cx;
+			const double Ey = Hy - Cy;
+			const double E = std::sqrt(Ex * Ex + Ey * Ey);
+			const double Ux = E > kEps ? Ex / E : 1.0;
+			const double Uy = E > kEps ? Ey / E : 0.0;
+			const double Rr = (Discs[3 * Kb + 2] + Body) + kObstacleEps;
+			Hx = Cx + Rr * Ux;
+			Hy = Cy + Rr * Uy;
+			const double Mx = QX - Hx;
+			const double My = QY - Hy;
+			const double Dot = Mx * Ux + My * Uy;
+			const double Vn = Dot < 0.0 ? Dot : 0.0;
+			double Nx = Hx + (Mx - Vn * Ux);
+			double Ny = Hy + (My - Vn * Uy);
+			if (Size >= 0.0)
+			{
+				Nx = Nx < 0.0 ? 0.0 : (Nx > Size ? Size : Nx);
+				Ny = Ny < 0.0 ? 0.0 : (Ny > Size ? Size : Ny);
+			}
+			QX = Nx;
+			QY = Ny;
+			PX = Hx;
+			PY = Hy;
+			R.bHit = true;
+		}
+		if (R.bHit && InsideAnyObstacle(QX, QY, Discs, Num, Body))
+		{
+			R.bBack = true;
+			double Lx = PX;
+			double Ly = PY;
+			if (Size >= 0.0)
+			{
+				Lx = Lx < 0.0 ? 0.0 : (Lx > Size ? Size : Lx);
+				Ly = Ly < 0.0 ? 0.0 : (Ly > Size ? Size : Ly);
+			}
+			const bool bLastIn = InsideAnyObstacle(Lx, Ly, Discs, Num, Body);
+			QX = bLastIn ? P0X : Lx;
+			QY = bLastIn ? P0Y : Ly;
+		}
+		return R;
+	}
+
+	// ---- 장애물 돌아가기 (야생 2단계 3 의 6), 10-17 — 머리 주석 '장애물 돌아가기', world.py `detour_moves`·DETOUR_*) ----
+	// 기본 끔 = 지금 그대로 (미끄러짐만). 켜는 쪽: EcoWorldV3 FObstacleConfig::Detour (통합 모드 eco.IntegratedV3.ObstacleDetour 기본 1). 값 = 파이썬
+	// configs/v3_wild2_obstacle_mirror.yaml obstacles.detour_* (단위: 1 = 2 m, 1 스텝 = 8/60 초)
+	struct FDetourConfig
+	{
+		bool bEnabled = false;
+		double BlockFrac = 0.5;          // detour_block: 원판에 닿아 가려던 쪽으로 이 몫도 못 가면 막힘
+		double FreeFrac = 0.8;           // detour_free: 한 스텝에 이 몫 이상 나아가는 방향이 빈 방향
+		double Probe = 1.5;              // detour_probe: 가려던 쪽 앞 보기 길이 (3 m — 트이면 돌아가기 끝)
+		std::int32_t MaxSteps = 45;      // detour_steps: 한 번 돌아가기의 최대 스텝 (6 초)
+		std::int32_t HelpBlock = 15;     // detour_help_block: 돕는 늑대가 이 스텝 넘게 돌아가면 (2 초) 돕기를 그만둔다
+		std::int32_t HelpDrop = 38;      // detour_help_drop: 그만둔 늑대가 돕지 않는 스텝 (5 초)
+	};
+
+	// 개체마다 (사슴 FHerbBody::Detour, 위협 FThreatState::Detour)
+	struct FDetourState
+	{
+		std::int32_t Left = 0;           // 남은 돌아가기 스텝 (0 = 돌아가는 중 아님)
+		std::int32_t Side = 0;           // 붙은 쪽 (+1 시계 반대, −1 시계, 0 없음)
+		std::int32_t Steps = 0;          // 이번 돌아가기의 지난 스텝
+	};
+
+	struct FDetourResult
+	{
+		bool bUsed = false;              // 이번 스텝 방향을 바꿨다 (V = S·Dir)
+		bool bStart = false;             // 이번 스텝 돌아가기를 시작했다
+		bool bFail = false;              // 빈 방향을 못 찾았다 (V 그대로)
+		double DirX = 0.0;               // 고른 방향 (bUsed 일 때만)
+		double DirY = 0.0;
+		double Speed = 0.0;              // |V| (이동 길이 — 바꿔도 같다)
+	};
+
+	// k·22.5° (k = 0..8) 의 (cos, sin). 삼각함수 없이 world.py DETOUR_ROT 와 같은 리터럴 (비트 동일)
+	inline constexpr double kDetourCos1 = 0.9238795325112867;   // cos 22.5°
+	inline constexpr double kDetourSin1 = 0.3826834323650898;   // sin 22.5°
+	inline constexpr double kDetourHalfRoot = 0.7071067811865476;   // √½ (world.py _OB_S)
+	inline constexpr double kDetourRot[9][2] = {
+		{1.0, 0.0}, {kDetourCos1, kDetourSin1}, {kDetourHalfRoot, kDetourHalfRoot}, {kDetourSin1, kDetourCos1}, {0.0, 1.0},
+		{-kDetourSin1, kDetourCos1}, {-kDetourHalfRoot, kDetourHalfRoot}, {-kDetourCos1, kDetourSin1}, {-1.0, 0.0}};
+	inline constexpr std::int32_t kDetourHalf = 8;
+	inline constexpr std::int32_t kDetourCands = 15;
+	// 후보 j: 0..6 = (j + 1 단계, +1), 7 = (8 단계 = 180°, +1), 8..14 = (j − 7 단계, −1)
+	inline constexpr std::int32_t kDetourCandK[kDetourCands] = {1, 2, 3, 4, 5, 6, 7, 8, 1, 2, 3, 4, 5, 6, 7};
+	inline constexpr std::int32_t kDetourCandSg[kDetourCands] = {1, 1, 1, 1, 1, 1, 1, 1, -1, -1, -1, -1, -1, -1, -1};
+	// 고르는 차례: 처음(막힘) = 작은 각부터 +·− 번갈아, 돌아가는 중 = 붙은 쪽 1..8 단계 다음 반대쪽 1..7 단계
+	inline constexpr std::int32_t kDetourOrderFresh[kDetourCands] = {0, 8, 1, 9, 2, 10, 3, 11, 4, 12, 5, 13, 6, 14, 7};
+	inline constexpr std::int32_t kDetourOrderPos[kDetourCands] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14};
+	inline constexpr std::int32_t kDetourOrderNeg[kDetourCands] = {8, 9, 10, 11, 12, 13, 14, 7, 0, 1, 2, 3, 4, 5, 6};
+
+	/** 후보 j 의 방향 (world.py `detour_candidates` 한 칸): (Dx·C − sg·(Dy·S), sg·(Dx·S) + Dy·C). */
+	inline void DetourCandidate(double Dx, double Dy, std::int32_t J, double& Cx, double& Cy)
+	{
+		const double C = kDetourRot[kDetourCandK[J]][0];
+		const double S = kDetourRot[kDetourCandK[J]][1];
+		const double Sg = static_cast<double>(kDetourCandSg[J]);
+		Cx = Dx * C - Sg * (Dy * S);
+		Cy = Sg * (Dx * S) + Dy * C;
+	}
+
+	/**
+	 * 이동 시험 (world.py `detour_moves` 의 move_test): 사슴(bDeer)은 Q = clip(P + U, 0, Size) 뒤 ObstacleSlide(…, Size) — EcoWorldV3 C1 의 ApplyMove·미끄러짐과 같다.
+	 * 위협은 Q = P + U 뒤 ObstacleSlide(…, −1) — Step 8′ 와 같다. 반환 = 원판에 닿았나.
+	 */
+	inline bool DetourMoveTest(double PX, double PY, double UX, double UY, const double* Discs, std::int32_t Num, double Body, double Size,
+							   bool bDeer, double& QX, double& QY)
+	{
+		if (bDeer)
+		{
+			const double X = PX + UX;
+			const double Y = PY + UY;
+			QX = X < 0.0 ? 0.0 : (X > Size ? Size : X);
+			QY = Y < 0.0 ? 0.0 : (Y > Size ? Size : Y);
+			return ObstacleSlide(PX, PY, QX, QY, Discs, Num, Body, Size).bHit;
+		}
+		QX = PX + UX;
+		QY = PY + UY;
+		return ObstacleSlide(PX, PY, QX, QY, Discs, Num, Body, -1.0).bHit;
+	}
+
+	/**
+	 * 돌아가기 한 스텝 (world.py `detour_moves` 한 개체와 줄마다 같다 — 골든 비트 동일). P 이동 전 위치(모든 원판 밖), V 가려던 이동 (바꾼다), St 개체 상태.
+	 * Walls = 위협이 들어가지 못하는 은신처 원 (x, y, r + 몸 여유) × NumWalls (위협만, 없으면 nullptr — 빈 방향이 그 안이면 빈 방향이 아니다).
+	 *   S = |V| ≤ kEps 면 상태 0. 나아감 G(U, C) = ((Q − P)·C) / S. 빈 방향 C: G(S·C, C) ≥ FreeFrac (위협은 더해서 Q 가 무대 안 ∧ Walls 밖).
+	 *   돌아가는 중(Left > 0): 앞 보기 P → P + max(Probe, S)·D 가 원판에 안 닿으면 상태 0 (아래 보통으로). 닿으면 Left − 1, Steps + 1, 붙은 쪽 먼저 차례의 첫 빈 방향.
+	 *   보통: 이동 시험 V 가 닿았고 (G(V, D) < BlockFrac ∨ (위협) 이동 끝이 Walls 안 — 원판에 미끄러져 은신처 둘레로 밀려 들어감) 이면 막힘 —
+	 *         처음 차례의 첫 빈 방향, Left = MaxSteps − 1, Steps = 1.
+	 *   빈 방향이 없으면 V 그대로 (bFail). 고르면 V = S·C, Side = 그 후보의 sg (180° 면 돌아가는 중 그대로·처음 +1).
+	 */
+	inline FDetourResult DetourStep(double PX, double PY, double& VX, double& VY, FDetourState& St, const double* Discs, std::int32_t Num,
+									double Body, double Size, bool bDeer, const double* Walls, std::int32_t NumWalls, const FDetourConfig& Cfg)
+	{
+		FDetourResult R;
+		if (!Cfg.bEnabled || Discs == nullptr || Num <= 0)
+		{
+			return R;
+		}
+		const double S = std::sqrt(VX * VX + VY * VY);
+		R.Speed = S;
+		if (!(S > kEps))
+		{
+			St = FDetourState();
+			return R;
+		}
+		const double Dx = VX / S;
+		const double Dy = VY / S;
+		double QX = 0.0;
+		double QY = 0.0;
+		const bool bHit = DetourMoveTest(PX, PY, VX, VY, Discs, Num, Body, Size, bDeer, QX, QY);
+		const double G = ((QX - PX) * Dx + (QY - PY) * Dy) / S;
+		const bool bWalls = !bDeer && Walls != nullptr && NumWalls > 0;
+		const bool bBlocked = bHit && (G < Cfg.BlockFrac || (bWalls && InsideAnyDisc(QX, QY, Walls, NumWalls)));
+		if (!(St.Left > 0 || bBlocked))
+		{
+			return R;
+		}
+		auto Free = [&](std::int32_t J, double& Cx, double& Cy) -> bool
+		{
+			DetourCandidate(Dx, Dy, J, Cx, Cy);
+			double Ux = S * Cx;
+			double Uy = S * Cy;
+			double Qx = 0.0;
+			double Qy = 0.0;
+			DetourMoveTest(PX, PY, Ux, Uy, Discs, Num, Body, Size, bDeer, Qx, Qy);
+			const double Gc = ((Qx - PX) * Cx + (Qy - PY) * Cy) / S;
+			bool bFree = Gc >= Cfg.FreeFrac;
+			if (!bDeer)
+			{
+				bFree = bFree && Qx >= 0.0 && Qx <= Size && Qy >= 0.0 && Qy <= Size && !(bWalls && InsideAnyDisc(Qx, Qy, Walls, NumWalls));
+			}
+			return bFree;
+		};
+		auto Take = [&](double Cx, double Cy)
+		{
+			R.bUsed = true;
+			R.DirX = Cx;
+			R.DirY = Cy;
+			VX = S * Cx;
+			VY = S * Cy;
+		};
+		if (St.Left > 0)
+		{
+			const double L = Cfg.Probe > S ? Cfg.Probe : S;
+			double PrX = PX + L * Dx;
+			double PrY = PY + L * Dy;
+			if (!ObstacleSlide(PX, PY, PrX, PrY, Discs, Num, Body, -1.0).bHit)
+			{
+				St = FDetourState();
+			}
+			else
+			{
+				St.Left -= 1;
+				St.Steps += 1;
+				const std::int32_t* Order = St.Side > 0 ? kDetourOrderPos : kDetourOrderNeg;
+				for (std::int32_t o = 0; o < kDetourCands; ++o)
+				{
+					double Cx = 0.0, Cy = 0.0;
+					if (Free(Order[o], Cx, Cy))
+					{
+						Take(Cx, Cy);
+						St.Side = kDetourCandK[Order[o]] == kDetourHalf ? St.Side : kDetourCandSg[Order[o]];
+						return R;
+					}
+				}
+				R.bFail = true;
+				return R;
+			}
+		}
+		if (bBlocked)
+		{
+			for (std::int32_t o = 0; o < kDetourCands; ++o)
+			{
+				double Cx = 0.0, Cy = 0.0;
+				if (Free(kDetourOrderFresh[o], Cx, Cy))
+				{
+					Take(Cx, Cy);
+					St.Side = kDetourCandK[kDetourOrderFresh[o]] == kDetourHalf ? 1 : kDetourCandSg[kDetourOrderFresh[o]];
+					St.Left = Cfg.MaxSteps - 1;
+					St.Steps = 1;
+					R.bStart = true;
+					return R;
+				}
+			}
+			R.bFail = true;
+		}
+		return R;
+	}
 
 	// 위협 하나의 바뀌지 않는 성질 (세계 생성 때 정한다 — world.py:907-912, 976-1011)
 	struct FThreatSpec
@@ -243,6 +890,11 @@ namespace EcoThreatV3
 
 		// 야생 (w2) 늑대 포만 (Cfg.bWildSatiation 일 때만. 끄면 늘 0 — world.py pred_sat)
 		std::int32_t SatLeft = 0;        // 남은 배부름 스텝 (먹기가 끝난 뒤부터 준다)
+
+		// 장애물 돌아가기 (In.Detour 를 켰을 때만. 끄면 늘 0 — world.py pred_det_left·pred_det_side·pred_det_steps·pack_drop)
+		FDetourState Detour;
+		std::int32_t PackDrop = 0;       // 돕지 않는 남은 스텝 (막혀 돕기를 그만둔 늑대 — PackPeek 의 돕는 늑대 후보에서 뺀다)
+		std::int32_t DetourSlow = 0;     // 가려던 거리의 BlockFrac 몫도 못 간 스텝의 쌓인 수 (기어가면 +1, 아니면 −1. Step 8″ 만 바꾼다 — world.py pred_det_slow)
 	};
 
 	// 위협이 보는 초식 하나 (이번 스텝 이동 뒤 값)
@@ -254,6 +906,8 @@ namespace EcoThreatV3
 		bool bHideArrived = false;           // HIDE 도착(RepState arrived). 웅크림 = Behavior == HIDE ∧ 이것
 		bool bInCover = false;               // 이동 뒤 위치가 은신처 원 안 (가장자리 포함, world.py `_in_cover`)
 		bool bAlive = true;                  // 파이썬은 늘 참이다(리스폰). 거짓이면 표적·포획 후보에서 뺀다
+		double MoveX = 0.0;                  // 이번 스텝 사슴 이동 (이동 뒤 − 이동 전). 늑대 무리 협동(PackGoals)의 도주 방향만 읽는다
+		double MoveY = 0.0;
 	};
 
 	struct FThreatStepInput
@@ -267,7 +921,51 @@ namespace EcoThreatV3
 		double WanderTurn = 0.0;    // 배회 선회 (rad, U[-PredWanderTurn, PredWanderTurn]). 표적이 있어도 늘 넣는다
 		double PlayerModeU0 = 0.0;  // 플레이어가 이번 스텝에 새 모드를 고를 때만 읽는다 (U[0, 1) 두 개)
 		double PlayerModeU1 = 0.0;
+		// 은신처 원 (x, y, r) × NumDiscs — Cfg.bShelterBlock 일 때만 읽는다 (통합 모드 = 레벨에서 받은 은신처 + 우리 은신처, FWorldConfig::Covers).
+		// r 은 위협이 보는 반지름이다: EcoWorldV3 가 은신처 반지름 + 늑대 몸 여유(FWorldConfig::ShelterWolfMargin, 10-17)로 채운다
+		const double* Discs = nullptr;
+		std::int32_t NumDiscs = 0;
+		// 늑대 무리 협동 (야생 2단계 2): 이 늑대가 이번 스텝 돕는 늑대면 참 (PackGoals 결과 — 부르는 쪽이 채운다). 기본 거짓 = 지금 그대로
+		bool bPackHelp = false;
+		bool bPackWait = false;     // 목표 자리에 닿아 기다림 (속력 0, PackDir = 사슴 쪽)
+		double PackDirX = 0.0;      // 이동 방향 (단위)
+		double PackDirY = 0.0;
+		// 세로 장애물 (야생 2단계 3, 머리 주석 '세로 장애물'): 원판 (x, y, r) × NumObstacles. nullptr 이면 지금 그대로. ObstacleBody = 몸 반지름 (이동은
+		// r + ObstacleBody 앞에서 멈춘다), bObstacleSight = 원판이 보통 위협의 눈길을 가린다
+		const double* Obstacles = nullptr;
+		std::int32_t NumObstacles = 0;
+		double ObstacleBody = 0.0;
+		bool bObstacleSight = false;
+		// 숲 시야 (야생 2단계 3 의 7), 머리 주석 '숲 시야'): 참이면 bObstacleSight 의 가림에 잎 가림을 더한다 — Obstacles 가운데 나무인 원판(FoliageTrees[k] ≠ 0,
+		// nullptr = 모두)의 중심에 반지름 FoliageR 잎 원, 눈길이 그 합집합 안을 FoliageBlock 이상 지나면 가림. 거짓(기본) = 지금 그대로
+		bool bFoliage = false;
+		const std::uint8_t* FoliageTrees = nullptr;
+		double FoliageR = 0.0;
+		double FoliageBlock = 0.0;
+		// 장애물 돌아가기 (야생 2단계 3 의 6), 머리 주석 '장애물 돌아가기'): nullptr 이거나 꺼져 있으면 지금 그대로. 원판이 있을 때만 쓴다
+		const FDetourConfig* Detour = nullptr;
+		// 야생 3단계 지역 날씨 (머리 주석 '지역 날씨'): 늑대 시야 반경 = PredViewR × WeatherViewMult (보통 위협의 표적 보임), 속력 × WeatherSpeedMult
+		// (모든 위협, 7 밤잠 배수 뒤·7′ 돌아가기 앞). 1 = 지금 그대로 (곱해도 같은 값)
+		double WeatherViewMult = 1.0;
+		double WeatherSpeedMult = 1.0;
 	};
+
+	/** 숲 시야만 (In.bFoliage 일 때 — 줄기와 따로 본다. 도망 기록의 '잎만 가림'). bObstacleSight·원판이 있을 때만. */
+	inline bool InputFoliageBlocked(const FThreatStepInput& In, double Ax, double Ay, double Bx, double By)
+	{
+		return In.bFoliage && In.bObstacleSight && In.Obstacles != nullptr && In.NumObstacles > 0
+			   && FoliageBlocked(Ax, Ay, Bx, By, In.Obstacles, In.NumObstacles, In.FoliageTrees, In.FoliageR, In.FoliageBlock);
+	}
+
+	/** 위협 눈길 가림 (world.py `_ob_occlude` 한 쌍): bObstacleSight 면 줄기 SightBlocked ∨ 숲 시야 InputFoliageBlocked. 원판이 없으면 거짓. */
+	inline bool InputSightBlocked(const FThreatStepInput& In, double Ax, double Ay, double Bx, double By)
+	{
+		if (!In.bObstacleSight || In.Obstacles == nullptr || In.NumObstacles <= 0)
+		{
+			return false;
+		}
+		return SightBlocked(Ax, Ay, Bx, By, In.Obstacles, In.NumObstacles) || InputFoliageBlocked(In, Ax, Ay, Bx, By);
+	}
 
 	struct FThreatStepResult
 	{
@@ -285,6 +983,15 @@ namespace EcoThreatV3
 		bool bSated = false;                 // 야생 (w2): 이번 스텝 배불러 쉬었다 (world.py 훅 pred_sated)
 		bool bRunning = false;               // 이번 이동이 전력 걸음 (world.py 훅 pred_running — 표적을 쫓는 추격형, 잠행형 돌진, 플레이어 돌진).
 											 // 상태는 이동 때 값(포획 뒤 갱신 10a 전). 발소리 반경(EcoObservationV3::HearingRadius)이 읽는다
+		// 세로 장애물 기록 (원판을 넘겼을 때만 — 어떤 계산에도 쓰지 않는다. world.py obstacle_stats wolf_hit·wolf_back·wolf_dead)
+		bool bObstacleHit = false;           // 원판에 닿아 미끄러졌다
+		bool bObstacleBack = false;          // 이동 끝이 원판 안이라 이동 전 자리로 되돌렸다
+		bool bObstacleDead = false;          // 부딪혀 거의 못 가 돌아섰다
+		// 장애물 돌아가기 기록 (world.py obstacle_stats detour wolf_used·wolf_start·wolf_fail·help_drop)
+		bool bDetour = false;                // 이번 스텝 방향을 바꿨다
+		bool bDetourStart = false;           // 이번 스텝 돌아가기를 시작했다
+		bool bDetourFail = false;            // 막혔는데 빈 방향을 못 찾았다
+		bool bPackDrop = false;              // 돕다가 막혀 돕기를 그만뒀다 (PackDrop ← HelpDrop)
 	};
 
 	// ------------------------------------------------------------------------------------------------------------
@@ -679,12 +1386,13 @@ namespace EcoThreatV3
 		// 1·4. 체감 거리와 표적 (world.py:2022-2033, 2055-2063). 동점이면 낮은 색인 — 엄격한 < 로 앞에서부터 훑는다
 		std::int32_t J = -1;
 		double DT = 0.0;
+		const double ViewR = Cfg.PredViewR * In.WeatherViewMult;   // 야생 3단계 (x3): 비·눈이 늑대 시야 반경을 줄인다 (world.py `_wx_view` = pred_view_r × w_s)
 		if (bHunting)
 		{
 			for (std::int32_t i = 0; i < In.NumPrey; ++i)
 			{
 				const FPreyView& P = In.Prey[i];
-				if (!P.bAlive)
+				if (!P.bAlive || (Cfg.bShelterSafe && P.bInCover))   // 은신처 안 사슴은 표적이 아니다 (realism_shelter untargetable)
 				{
 					continue;
 				}
@@ -696,10 +1404,16 @@ namespace EcoThreatV3
 				if (!bVis)
 				{
 					const double Inv = 1.0 / (Dist > kEps ? Dist : kEps);
-					bVis = Perceived <= Cfg.PredViewR && (DX * HX + DY * HY) * Inv >= Cfg.PredFovCos;
+					bVis = Perceived <= ViewR && (DX * HX + DY * HY) * Inv >= Cfg.PredFovCos;
 				}
 				if (bVis && (J < 0 || Perceived < DT))
 				{
+					// 세로 장애물: 보통 위협의 눈길이 원판을 지나면 안 보인다 (더 가까운 후보일 때만 재도 결과는 파이썬의 보임 행렬과 같다).
+					// 숲 시야(In.bFoliage)면 잎 원 합집합 안 길이가 문턱 이상이어도 안 보인다 (줄기 ∨ 잎)
+					if (!bPlayer && InputSightBlocked(In, QX, QY, P.X, P.Y))
+					{
+						continue;
+					}
 					J = i;
 					DT = Perceived;
 				}
@@ -797,6 +1511,17 @@ namespace EcoThreatV3
 			}
 		}
 
+		// 6b′. 늑대 무리 협동 (켰을 때만, world.py `_pack_step`): 돕는 늑대(보통 위협·사냥 중·전력 걸음 아님 — PackPeek·PackGoals 가 정해 In 으로 넘긴다)는
+		//      배회·잠행 접근 대신 PackDir 쪽으로 기본 속력, 기다림이면 속력 0. 상태 기계 뒤, 6c 식사·6d 배부름·7 밤잠 배수 앞 (파이썬과 같은 자리)
+		const bool bHelped = In.bPackHelp && !bPlayer && bHunting
+							 && !((Spec.Type == EThreatType::Chaser && bHasTarget) || (bStalker && T.StalkState == EStalkState::Pounce));
+		if (bHelped)
+		{
+			MX = In.PackDirX;
+			MY = In.PackDirY;
+			Speed = In.bPackWait ? 0.0 : Spec.BaseSpeed;
+		}
+
 		// 6c. 식사 중 제자리 (켰을 때만, world.py R3 (j) eat_in_place): 쿨다운 때문에 사냥하지 않는 보통 위협은 잠처럼 move = head,
 		//     속력 0 (상태 기계 뒤, 밤잠 배수 앞 — 파이썬과 같은 자리. 뒤의 배수를 곱해도 0 이다)
 		if (Cfg.bEatInPlace && !bPlayer && T.Cooldown > 0)
@@ -818,10 +1543,44 @@ namespace EcoThreatV3
 			MY = HY;
 		}
 		Speed = Speed * (Cfg.bRealismNight ? NightSpeedMult(Spec, T, In.Dark, Cfg) : SpeedMult(Spec, In.Dark, Cfg));
+		// 7″. 야생 3단계 (x4): 눈 덮인 지역에서 위협(늑대·플레이어형)도 느려진다 — 밤잠 배수 다음, 돌아가기 앞 (world.py speed × w_w)
+		if (In.WeatherSpeedMult != 1.0)
+		{
+			Speed = Speed * In.WeatherSpeedMult;
+		}
+
+		const bool bObs = In.Obstacles != nullptr && In.NumObstacles > 0;
+		const bool bBlock = Cfg.bShelterBlock && In.Discs != nullptr && In.NumDiscs > 0;
+		// 7′. 장애물 돌아가기 (켰고 원판이 있을 때만, world.py `_step_predators_v3` 의 detour_moves — 이동 바로 앞): 원판에 막히면 가려던 쪽에서 가장 적게 돈
+		//     빈 방향으로 (은신처 막기 원 안·무대 밖 자리는 빈 방향이 아니다). 바꾸면 move = 그 방향(단위), 속력 = 가려던 이동 길이 — 이동이 시험한 이동과 같다
+		const bool bDetourOn = bObs && In.Detour != nullptr && In.Detour->bEnabled;
+		if (bDetourOn)
+		{
+			double DVX = MX * Speed;
+			double DVY = MY * Speed;
+			const FDetourResult Dr = DetourStep(QX, QY, DVX, DVY, T.Detour, In.Obstacles, In.NumObstacles, In.ObstacleBody, In.WorldSize, false,
+												bBlock ? In.Discs : nullptr, bBlock ? In.NumDiscs : 0, *In.Detour);
+			if (Dr.bUsed)
+			{
+				MX = Dr.DirX;
+				MY = Dr.DirY;
+				Speed = Dr.Speed;
+			}
+			R.bDetour = Dr.bUsed;
+			R.bDetourStart = Dr.bStart;
+			R.bDetourFail = Dr.bFail;
+		}
 
 		// 8. 이동·벽 반사·heading·변위 (world.py:2083-2113)
 		double NX = QX + MX * Speed;
 		double NY = QY + MY * Speed;
+		const double SVX = MX * Speed;   // 이번 스텝 이동 (벽 반사 전 방향 — 접선 미끄러짐·막다른 곳에 쓴다)
+		const double SVY = MY * Speed;
+		// 8′. 세로 장애물 (원판을 넘겼을 때만, world.py `obstacle_slide` — 맵 자르기 없음): 원판 앞에서 멈춰 둘레를 따라 미끄러진다 (은신처 밀어내기·벽 반사 앞)
+		const FObstacleSlideResult ObSlide = bObs ? ObstacleSlide(QX, QY, NX, NY, In.Obstacles, In.NumObstacles, In.ObstacleBody, -1.0)
+												  : FObstacleSlideResult();
+		// 8a. 은신처 진입 금지 (켰을 때만, world.py R3 (c′)): 원 안이면 둘레 밖으로 (벽 반사 전)
+		const bool bPushed = bBlock && ShelterPush(NX, NY, QX, QY, In.Discs, In.NumDiscs);
 		if (NX < 0.0 || NX > In.WorldSize)
 		{
 			MX = -MX;
@@ -834,6 +1593,68 @@ namespace EcoThreatV3
 		}
 		NX = NX < 0.0 ? 0.0 : (NX > In.WorldSize ? In.WorldSize : NX);
 		NY = NY < 0.0 ? 0.0 : (NY > In.WorldSize ? In.WorldSize : NY);
+		if (bBlock)
+		{
+			// 밀어내도(또는 clip 뒤에) 원 안이면 이전 위치에서 접선으로만, 그래도 원 안이면 이전 위치. 막다른 곳이면 돌아선다 (world.py 그대로.
+			// 플레이어의 막다른 곳 포기·reset 때 원 안 위협 옮기기는 옮기지 않았다 — 통합 무대는 플레이어가 없고 늑대는 모서리에서 시작한다)
+			const bool bInside = InsideAnyDisc(NX, NY, In.Discs, In.NumDiscs);
+			if (bInside)
+			{
+				double AX = 0.0, AY = 0.0;
+				ShelterTangent(QX, QY, SVX, SVY, In.Discs, In.NumDiscs, In.WorldSize, AX, AY);
+				const bool bOk = !InsideAnyDisc(AX, AY, In.Discs, In.NumDiscs);
+				NX = bOk ? AX : QX;
+				NY = bOk ? AY : QY;
+			}
+			const double Want = std::sqrt(SVX * SVX + SVY * SVY);
+			const double DvX = NX - QX;
+			const double DvY = NY - QY;
+			if ((bPushed || bInside) && Want > kEps && std::sqrt(DvX * DvX + DvY * DvY) < kShelterDeadFrac * Want)
+			{
+				MX = -SVX / Want;
+				MY = -SVY / Want;
+			}
+		}
+		if (bObs)
+		{
+			// 8′ 끝 (world.py 그대로): 은신처 밀어내기·벽 자르기 뒤에도 원판 안이면 이동 전 자리. 원판에 부딪혀 가려던 거리의 kShelterDeadFrac 도
+			// 못 갔으면 돌아선다 (은신처 막다른 곳과 같은 꼴)
+			R.bObstacleHit = ObSlide.bHit;
+			R.bObstacleBack = InsideAnyObstacle(NX, NY, In.Obstacles, In.NumObstacles, In.ObstacleBody);
+			if (R.bObstacleBack)
+			{
+				NX = QX;
+				NY = QY;
+			}
+			const double Want = std::sqrt(SVX * SVX + SVY * SVY);
+			const double DvX = NX - QX;
+			const double DvY = NY - QY;
+			if ((R.bObstacleHit || R.bObstacleBack) && Want > kEps && std::sqrt(DvX * DvX + DvY * DvY) < kShelterDeadFrac * Want)
+			{
+				MX = -SVX / Want;
+				MY = -SVY / Want;
+				R.bObstacleDead = true;
+			}
+		}
+		// 8″. 돕다가 막힌 늑대 (돌아가기·무리 협동을 함께 켰을 때만, world.py 그대로): 돕는 늑대가 HelpBlock 스텝 넘게 돌아가거나, 기어간 스텝(가려던 거리의
+		//     BlockFrac 몫도 못 감 — 은신처 둘레·원판 곁)이 쌓여 HelpBlock 에 닿았거나(기어가면 +1, 아니면 −1), 막혀 돌아섰으면 HelpDrop 스텝 동안 돕지 않는다
+		//     (남은 스텝 −1 뒤에 건다 — 그동안 PackPeek 이 돕는 늑대 후보에서 뺀다. 돌아선 늑대는 heading 대로 돌아선 쪽으로 간다. 그만두면 쌓인 수 0)
+		if (bDetourOn && Cfg.Pack.bEnabled)
+		{
+			const double WantS = std::sqrt(SVX * SVX + SVY * SVY);
+			const double GoX = NX - QX;
+			const double GoY = NY - QY;
+			const bool bSlow = WantS > kEps && std::sqrt(GoX * GoX + GoY * GoY) < In.Detour->BlockFrac * WantS;
+			T.DetourSlow = bSlow ? T.DetourSlow + 1 : (T.DetourSlow > 0 ? T.DetourSlow - 1 : 0);
+			const bool bDrop = bHelped && (T.Detour.Steps >= In.Detour->HelpBlock || T.DetourSlow >= In.Detour->HelpBlock || R.bObstacleDead);
+			T.PackDrop = T.PackDrop - 1 > 0 ? T.PackDrop - 1 : 0;
+			if (bDrop)
+			{
+				T.PackDrop = In.Detour->HelpDrop;
+				T.DetourSlow = 0;
+			}
+			R.bPackDrop = bDrop;
+		}
 		Normalize2(MX, MY);
 		T.HeadX = MX;
 		T.HeadY = MY;
@@ -854,7 +1675,7 @@ namespace EcoThreatV3
 			for (std::int32_t i = 0; i < In.NumPrey; ++i)
 			{
 				const FPreyView& P = In.Prey[i];
-				if (!P.bAlive)
+				if (!P.bAlive || (Cfg.bShelterSafe && P.bInCover))   // 은신처 안 사슴은 잡히지 않는다 (realism_shelter (c))
 				{
 					continue;
 				}
@@ -962,6 +1783,190 @@ namespace EcoThreatV3
 		R.Caught = K;
 		R.Speed = Speed;
 		return R;
+	}
+
+	// ------------------------------------------------------------------------------------------------------------
+	// 늑대 무리 협동 사냥 (야생 2단계 2 — 머리 주석 '늑대 무리 협동 사냥', world.py `pack_goals`·`_pack_step`)
+	// ------------------------------------------------------------------------------------------------------------
+
+	// 늑대 하나의 이번 스텝 미리 보기 (이동 전)
+	struct FPackWolf
+	{
+		double X = 0.0;             // 이동 전 위치·heading
+		double Y = 0.0;
+		double HeadX = 1.0;
+		double HeadY = 0.0;
+		bool bLeader = false;       // 앞장: 보통 위협 ∧ 전력 걸음 ∧ 표적 있음
+		bool bHelper = false;       // 돕는 늑대 후보: 보통 위협 ∧ 사냥 중 ∧ 전력 걸음 아님
+		std::int32_t Target = -1;   // 이번 스텝 표적 (앞장만 읽는다)
+	};
+
+	// 돕는 늑대 하나의 목표 (world.py `pack_goals` 의 한 행)
+	struct FPackGoal
+	{
+		bool bHelp = false;         // 돕는다 (쫓기는 사슴을 골랐다)
+		bool bWait = false;         // 목표 자리에 닿아 기다린다 (속력 0)
+		bool bDoor = false;         // 목표 = 은신처 문 (아니면 도주선 앞)
+		std::int32_t Prey = -1;     // 고른 쫓기는 사슴 (FPreyView 색인)
+		double DirX = 0.0;          // 이동 방향 (단위. 기다림이면 사슴 쪽)
+		double DirY = 0.0;
+	};
+
+	/**
+	 * 늑대 하나의 이번 스텝 사냥·표적·전력 걸음을 상태 사본으로 미리 본다 (T 는 바꾸지 않는다). In 의 무리 칸·원거리 굴림은 지우고 부른다 —
+	 * 표적·전력 걸음은 선회·굴림과 무관하다. 그래서 난수를 더 뽑지 않고, 본 스텝의 Step 결과와 같은 사냥·표적·전력 걸음이다.
+	 */
+	inline FPackWolf PackPeek(const FThreatSpec& Spec, const FThreatState& T, const FThreatStepInput& In, const FThreatConfig& Cfg)
+	{
+		FPackWolf P;
+		P.X = T.PosX;
+		P.Y = T.PosY;
+		P.HeadX = T.HeadX;
+		P.HeadY = T.HeadY;
+		FThreatState Tmp = T;
+		FThreatStepInput Pi = In;
+		Pi.bPackHelp = false;
+		Pi.bPackWait = false;
+		Pi.RangedRoll = nullptr;
+		const FThreatStepResult R = Step(Spec, Tmp, Pi, Cfg);
+		const bool bWolf = Spec.Type != EThreatType::Player;
+		P.bLeader = bWolf && R.bRunning && R.bHasTarget;
+		P.bHelper = bWolf && R.bHunting && !R.bRunning && T.PackDrop <= 0;   // 막혀 돕기를 그만둔 늑대는 남은 스텝 동안 돕지 않는다 (돌아가기를 끄면 늘 0)
+		P.Target = R.Target;
+		return P;
+	}
+
+	/**
+	 * 돕는 늑대마다 목표 (world.py `pack_goals` 와 같은 순서·같은 식 — 골든 비트 동일). Covers = 은신처 원 (x, y, r) × NumCovers, r 은 사슴 반지름
+	 * (r ≤ 0 은 지워진 은신처라 건너뛴다). WolfMargin = 늑대 몸 여유 (막지 않으면 0). Out[M] 을 모두 다시 쓴다.
+	 *   쫓기는 사슴 = JoinR 안 앞장 표적 가운데 가장 가까운 것 (같으면 앞 슬롯 앞장). 도주 방향 U = 사슴 이동 단위벡터, 서 있으면 앞장 → 사슴.
+	 *   문 = 0 < e_k ≤ DoorR ∧ (c_k − p)·U / |c_k − p| ≥ DoorCos 인 은신처 가운데 e_k = |c_k − p| − r_k 최소 (같으면 앞 번호) → c − (r + m)·(c − p)/|c − p|.
+	 *   없으면 p + Lead·U. 무대 [0, WorldSize] 로 자른다. |G − q| ≤ WaitR 면 기다림(사슴 쪽, 겹치면 heading), 아니면 (G − q)/|G − q|.
+	 */
+	inline void PackGoals(const FPackWolf* Wolves, std::int32_t M, const FPreyView* Prey, std::int32_t NumPrey, const double* Covers,
+						  std::int32_t NumCovers, double WolfMargin, double WorldSize, const FPackHuntConfig& Cfg, FPackGoal* Out)
+	{
+		for (std::int32_t m = 0; m < M; ++m)
+		{
+			Out[m] = FPackGoal();
+		}
+		if (!Cfg.bEnabled)
+		{
+			return;
+		}
+		for (std::int32_t m = 0; m < M; ++m)
+		{
+			const FPackWolf& Me = Wolves[m];
+			if (!Me.bHelper)
+			{
+				continue;
+			}
+			std::int32_t Best = -1;
+			std::int32_t BestL = -1;
+			double BestD = 0.0;
+			for (std::int32_t L = 0; L < M; ++L)
+			{
+				if (L == m || !Wolves[L].bLeader)
+				{
+					continue;
+				}
+				const std::int32_t I = Wolves[L].Target;
+				if (I < 0 || I >= NumPrey)
+				{
+					continue;
+				}
+				const double Dx = Prey[I].X - Me.X;
+				const double Dy = Prey[I].Y - Me.Y;
+				const double D = std::sqrt(Dx * Dx + Dy * Dy);
+				if (D <= Cfg.JoinR && (Best < 0 || D < BestD))
+				{
+					Best = I;
+					BestL = L;
+					BestD = D;
+				}
+			}
+			if (Best < 0)
+			{
+				continue;
+			}
+			const FPreyView& P = Prey[Best];
+			double Ux = 0.0;
+			double Uy = 0.0;
+			const double N = std::sqrt(P.MoveX * P.MoveX + P.MoveY * P.MoveY);
+			if (N > kEps)
+			{
+				Ux = P.MoveX / N;
+				Uy = P.MoveY / N;
+			}
+			else
+			{
+				const double Ax = P.X - Wolves[BestL].X;
+				const double Ay = P.Y - Wolves[BestL].Y;
+				const double Na = std::sqrt(Ax * Ax + Ay * Ay);
+				if (Na > kEps)
+				{
+					Ux = Ax / Na;
+					Uy = Ay / Na;
+				}
+			}
+			std::int32_t Bk = -1;
+			double Be = 0.0, Bex = 0.0, Bey = 0.0, Bdk = 0.0;
+			for (std::int32_t k = 0; k < NumCovers; ++k)
+			{
+				const double R = Covers[3 * k + 2];
+				if (!(R > 0.0))
+				{
+					continue;
+				}
+				const double Ex = Covers[3 * k] - P.X;
+				const double Ey = Covers[3 * k + 1] - P.Y;
+				const double Dk = std::sqrt(Ex * Ex + Ey * Ey);
+				const double E = Dk - R;
+				if (E > 0.0 && E <= Cfg.DoorR && (Ex * Ux + Ey * Uy) / Dk >= Cfg.DoorCos && (Bk < 0 || E < Be))
+				{
+					Bk = k;
+					Be = E;
+					Bex = Ex;
+					Bey = Ey;
+					Bdk = Dk;
+				}
+			}
+			double Gx, Gy;
+			if (Bk >= 0)
+			{
+				const double Rr = Covers[3 * Bk + 2] + WolfMargin;
+				Gx = Covers[3 * Bk] - Rr * (Bex / Bdk);
+				Gy = Covers[3 * Bk + 1] - Rr * (Bey / Bdk);
+			}
+			else
+			{
+				Gx = P.X + Cfg.Lead * Ux;
+				Gy = P.Y + Cfg.Lead * Uy;
+			}
+			Gx = Gx < 0.0 ? 0.0 : (Gx > WorldSize ? WorldSize : Gx);
+			Gy = Gy < 0.0 ? 0.0 : (Gy > WorldSize ? WorldSize : Gy);
+			const double Hx = Gx - Me.X;
+			const double Hy = Gy - Me.Y;
+			const double Hn = std::sqrt(Hx * Hx + Hy * Hy);
+			FPackGoal& G = Out[m];
+			if (Hn <= Cfg.WaitR)
+			{
+				const double Fx = P.X - Me.X;
+				const double Fy = P.Y - Me.Y;
+				const double Fn = std::sqrt(Fx * Fx + Fy * Fy);
+				G.DirX = Fn > kEps ? Fx / Fn : Me.HeadX;
+				G.DirY = Fn > kEps ? Fy / Fn : Me.HeadY;
+				G.bWait = true;
+			}
+			else
+			{
+				G.DirX = Hx / Hn;
+				G.DirY = Hy / Hn;
+			}
+			G.bHelp = true;
+			G.bDoor = Bk >= 0;
+			G.Prey = Best;
+		}
 	}
 
 	// 같은 스텝에 여러 위협이 같은 초식을 잡아도 사망은 한 번이다. 비명 점(M8)의 주인은 가장 낮은 위협 색인이다(world.py:2125-2132).

@@ -1,0 +1,75 @@
+{
+ "format": "eco_v3_live_round",
+ "version": 1,
+ "attempt": 1,
+ "run": "a1_20261021T063930_e1",
+ "snapshot": "eco_v3_snapshot_s20004_t473_e1.json",
+ "state": "exported",
+ "plan": {
+  "horizon": 900,
+  "judge": [
+   35000,
+   35009
+  ],
+  "horizon_g": 900,
+  "judge_g": [
+   35000,
+   35004
+  ],
+  "select": [
+   35100,
+   35119
+  ],
+  "stuck": [
+   35000,
+   35001
+  ],
+  "check": [
+   35180,
+   35199
+  ],
+  "steps": 300000,
+  "model_seeds": [
+   0
+  ],
+  "workers": 12,
+  "skip_check": true,
+  "force_export": true,
+  "ckpt": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v3\\live",
+  "test": true
+ },
+ "plan_test": true,
+ "stages": {
+  "convert": 2.2,
+  "eval_current": 34.9,
+  "train_learn": 33.0,
+  "train_and_eval_current": 39.2,
+  "eval_candidate": 34.7,
+  "gate": 1.0,
+  "export": 4.6
+ },
+ "started_utc": "2026-10-20T21:39:32Z",
+ "key": "657d0ca1ef6efba7|eca97f2ef6c0d6a1|p20261020T213824_602da0d7",
+ "env_digest": "657d0ca1ef6efba7",
+ "brain_weights_sha256": "eca97f2ef6c0d6a1c81d8fce79d9c5740fd9cde60f04a65cfa00a43b64c8bdbe",
+ "env": "Barren 나무 0→20, 비 1.0",
+ "env_revision": 1,
+ "play_id": "p20261020T213824_602da0d7",
+ "brain": "v3_r1_g995_s3_20m@eca97f2e",
+ "start": "ckpt/v3/v3_r1_g995_s3_obs21zero.zip",
+ "check": {
+  "ok": null,
+  "why": "시험: 재현 확인 건너뜀 (--skip-check)"
+ },
+ "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v3\\live\\a1_20261021T063930_e1\\live_a1_20261021T063930_e1_cand_s0.zip",
+ "verdict": "기각",
+ "why": "1차 P1 실패: 포만 없는 세계 잡힌 몫 후보 0.0669 대 지금 0.0602 (짝 t +2.51, 문턱 −2.262, 시드 10)",
+ "gate_summary": "포만 없는 세계 잡힘 6.0→6.7% (t +2.5), 게임 세계 지킴 실패",
+ "round": 1,
+ "brain_file": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\AdaptiveEcosystem\\Saved\\EcoAdapt_test\\brains\\live_r1_a1_20261021T063930_e1.json",
+ "brain_id": "live_r1_a1_20261021T063930_e1@da618ee9",
+ "exported_weights_sha256": "da618ee97c0f9a914fe115fb9234111902cfc7e489b1202d472268e86e2d31cc",
+ "last_result": "시험 내보내기: 판 1 (관문 기각)",
+ "wall_s": 81.7,
+ "ended_utc": "2026-10-20T21:40:54Z"
+}

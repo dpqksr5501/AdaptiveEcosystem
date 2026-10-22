@@ -112,8 +112,10 @@ def _run_pair(wa, wb, pa, pb, steps):
 
 def test_registry_and_config():
     assert F.FEATURE_IDS["integrated_stage"] == 26 and "integrated_stage" in F.IMPLEMENTED
-    assert "integrated_stage" not in F.OPTIONAL_KEYS                 # 새 기능이라 계수는 모두 적는다(선택 키 없음)
+    # 새 기능이라 계수는 모두 적는다. 선택 키는 10-18 R4 학습 보충 둘뿐이다(끔 값 = 지금까지 그대로, 거울 설정에는 없다 — tests/test_r4_train.py)
+    assert dict(F.OPTIONAL_KEYS["integrated_stage"]) == {"respawn_safe_r": None, "respawn_tries": 64}
     block = _raw(MIRROR)["features"]["integrated_stage"]
+    assert not set(F.OPTIONAL_KEYS["integrated_stage"]) & set(block)
     assert F.PARAM_KEYS["integrated_stage"] == frozenset(block) - {"enabled"}
     assert set(OFF) == set(block)
     cfg = load_v2_config(MIRROR)
@@ -229,7 +231,11 @@ open(sys.argv[2], "w", encoding="utf-8").write(json.dumps([run(j) for j in jobs]
 
 
 def _archive(tmp_path, commit=BASE_COMMIT):
-    """커밋 commit 의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None."""
+    """커밋 commit 의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None.
+    10-22: 사본의 env_v2/world.py 동족 무리 중심·분리 두 줄만 지금 코드와 같은 j 차례 합으로 바꾼다(tests/kin_seq.py — 옛 행렬곱은 끝 비트가 달라
+    수백 스텝 뒤 궤적이 갈린다). 이 파일을 함께 쓰는 비트 동일 시험(야생·장애물·R4·R5 등)이 모두 같은 사본을 받는다."""
+    import kin_seq
+
     paths = [f"herbivore_rl/{p}" for p in ("env", "env_v2", "policies", "configs", "repertoire_rules.py")]
     try:
         out = subprocess.run(["git", "archive", commit] + paths, cwd=ROOT.parent, capture_output=True, check=True)
@@ -237,7 +243,7 @@ def _archive(tmp_path, commit=BASE_COMMIT):
         return None
     with tarfile.open(fileobj=io.BytesIO(out.stdout)) as tf:
         tf.extractall(tmp_path / "base", **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
-    return tmp_path / "base" / "herbivore_rl"
+    return kin_seq.patch_tree(tmp_path / "base" / "herbivore_rl")
 
 
 def test_bit_identical_to_pre_mirror_code(tmp_path):

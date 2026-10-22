@@ -73,9 +73,9 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "boldness": 9,      # v2.7 개체 대담함 b, 사망 보상 조건화
     "water": 10,        # v2.8 물웅덩이, 수분, 마시기
     "boundary": 11,     # R1 (i) 언리얼 경계 반발 파리티
-    "obstacles": 12,    # R1 (ii) 원형 장애물 반발로 예약 → v3 세로 장애물(나무·바위 원판) 확장 지점. 10-14 사용자 결정으로 이번 단계에는
-                        # 넣지 않는다(구현 없음 — 켜면 읽을 때 실패, 끈 블록은 무시). 자리는 env_v2/world.py 모듈 docstring '세로 장애물'·
-                        # World.obstacles(늘 빈 (0, 3) [x, y, r])
+    "obstacles": 12,    # R1 (ii) 원형 장애물 반발로 예약 → v3 세로 장애물(나무·바위 원판). 10-14 에는 자리만 두었고 야생 2단계 3(10-17 사용자
+                        # '추천대로 끄고 2~4번 진행해')에서 넣었다: 사슴·늑대가 원판 둘레를 따라 미끄러지고, 원판이 눈길을 가리고(발소리는 못 가림),
+                        # 원판 밑 먹이가 없다. 정의는 env_v2/world.py 모듈 docstring '야생 2단계' 3, 자료 World.obstacles (K, 3) [x, y, r]
     "vigil_window": 13,  # v2.2r 경계 재설계(10-03 R2): 경계 행동 열 유무, 창 안 한정 경계(W′), 반사 돌아보기(L)
     "pred_sleep": 14,    # v2.4s 포식자 밤잠(10-07 사용자 결정 A안): 대부분 밤에 자고 세계마다 일부만 야행성
     "repertoire": 15,    # v3 R0 행동 레퍼토리(10-07 사용자 결정 (4)): 행동 실행기·잠금·사건·개체 행동 상태, 장치 M1·M2·M4·M5·M6
@@ -103,6 +103,17 @@ FEATURE_IDS: Mapping[str, int] = MappingProxyType({
     "wild_reserve": 27,     # (w1) 지방 비축: E 가 0 밑이면 느린 비축 R 에서 꺼내 쓰고 R 이 바닥나야 굶어 죽는다, E 가 바닥이면 약해진다(느림)
     "wild_satiation": 28,   # (w2) 늑대 포만: 먹고 나면 정한 시간(게임 하루 단위) 동안 쉬며 사냥하지 않는다
     "wild_flight": 29,      # (w3) 도주 반사 거리: 사냥 중인 늑대가 경계 거리 안이면 먹으며 멀어지고, 도주 거리 안·다가오면 안전할 때까지 뛴다
+    # 야생 규칙 2단계 2(10-17 사용자 '추천대로 끄고 2~4번 진행해', 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md). 난수 없음. 정의·식·현실 근거는
+    # env_v2/world.py 모듈 docstring '야생 2단계' 2
+    "wild_pack": 30,        # 늑대 무리 협동 사냥: 한 늑대가 사슴을 쫓는 동안 쉬던 동료가 그 사슴이 달아날 곳(은신처 문·도주선 앞)에 가서 기다린다
+    # 야생 3단계(10-18 사용자 '우리 테스트 레벨에도 날씨 적용되게 해 줘. 그 날씨와 장애물들을 바탕으로 만들어진 세계를 파이썬에 고대로 옮겨서 학습시킬 거야',
+    # 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md 11절). 난수 없음. 정의·식·현실 근거는 env_v2/world.py 모듈 docstring '야생 3단계'.
+    # 번호 8 weather 는 v2.6 설계(맑음↔비 Markov, 먹이 재생·회복 배수)의 자리라 그대로 두고 새 번호를 받는다(규칙 4)
+    "wild_weather": 31,     # 지역 날씨: 지역마다 맑음·비·눈과 세기(고정 표, 선택 시간표). 비는 시야·청각, 눈은 시야·이동(사슴이 늑대보다 더 느려짐)
+    # R5 장애물 관측(10-19 사용자 '일단 두뇌가 나무 같은 장애물을 인지할 수 있게 바꿔', 계획서 RL_V2_PLAN.md 10-19 (16)). 세계 규칙이 아니라 관측 칸 셋이다 —
+    # 켜도 동역학·난수는 그대로이고 관측 맨 끝에 escape_room·obstacle_near·threat_hidden 이 붙는다. 정의·식은 env_v2/world.py 모듈 docstring 'R5 장애물 관측',
+    # 계약 Docs/RL_Policy/POLICY_CONTRACT_V3.md 2-4
+    "obstacle_obs": 32,
 })
 
 # 구현을 마친 기능. 기능을 구현하는 커밋에서 이름을 더한다.
@@ -110,7 +121,8 @@ IMPLEMENTED: frozenset[str] = frozenset({"food_v", "speed", "vigilance", "vigil_
                                          "repertoire", "threats", "stare_down", "alarm",
                                          "realism_vision", "realism_hearing", "realism_shelter", "realism_night",
                                          "realism_cover_food", "realism_chase", "realism_terrain", "integrated_stage",
-                                         "wild_reserve", "wild_satiation", "wild_flight"})
+                                         "wild_reserve", "wild_satiation", "wild_flight", "wild_pack", "obstacles", "wild_weather",
+                                         "obstacle_obs"})
 
 # 구현한 기능의 계수 키. 켜면 모두 적어야 하고, 여기 없는 키는 오타로 보고 실패한다.
 # 기능을 구현하는 커밋에서 IMPLEMENTED 와 함께 더한다. 값의 범위는 기능 코드가 검사한다.
@@ -245,6 +257,29 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
     #   여유(단위). repertoire 를 함께 켜야 한다
     "wild_flight": frozenset({"alert_r", "flight_r", "safe_r", "approach", "alert_w", "rest_alert", "shelter_cos", "shelter_r",
                               "crouch", "wall_margin"}),
+    # 야생 2단계 2 (env_v2/world.py `_wild_pack_params`·`pack_goals`, 정의는 모듈 docstring '야생 2단계' 2). threats 를 함께 켜야 한다(늑대 유형·상태).
+    #   wild_pack: join_r = 동료가 쫓는 사슴이 이 실거리(단위) 안이면 돕는다, lead = 은신처가 없을 때 사슴 도주선 앞쪽 거리(단위), door_r·door_cos =
+    #   사슴이 향하는 은신처(가장자리까지 door_r 안, 도주 방향 ±acos(door_cos) 안), wait_r = 목표 자리에 이만큼(단위) 가까우면 멈춰 사슴 쪽을 보고 기다린다
+    "wild_pack": frozenset({"join_r", "lead", "door_r", "door_cos", "wait_r"}),
+    # 야생 2단계 3 세로 장애물 (env_v2/world.py `_obstacles_params`·`obstacle_layout`·`obstacle_slide`·`sight_blocked`, 정의는 모듈 docstring '야생 2단계' 3).
+    #   obstacles: tree_per_ha·rock_per_ha = 무대 1 ha 마다 나무 줄기·바위 수, tree_r·rock_r = 반지름 [하, 상](단위, 1 단위 = 2 m — 세계마다 자기 스트림
+    #   part 0 에서 U[하, 상]), body_r = 몸 반지름(단위 — 이동은 원판 반지름 + body_r 앞에서 멈춰 미끄러진다), block_sight = 원판이 눈길을 가리나(발소리는
+    #   못 가린다), no_food = 원판 밑 먹이 셀 용량을 원판이 덮은 몫만큼 줄이나. 선택 키 fixed(아래 OPTIONAL_KEYS)
+    "obstacles": frozenset({"tree_per_ha", "tree_r", "rock_per_ha", "rock_r", "body_r", "block_sight", "no_food"}),
+    # 야생 3단계 지역 날씨 (env_v2/world.py `_wild_weather_params`·`weather_mults`, 정의는 모듈 docstring '야생 3단계'). speed·daynight·repertoire 를
+    # 함께 켜야 하고(시야는 밤 탐지 반경에 곱한다, 늑대 시야는 v3 포식자 스텝), 청각 배수가 1 보다 작으면 realism_hearing 도 켜야 한다.
+    #   wild_weather: region = 이 세계가 흉내 내는 지역 이름(regions 의 키 — 짝 비교 실행기가 지도마다 덮는다), regions = 지역 → [날씨, 세기]
+    #   (날씨 clear·rain·snow, 세기 0~1, 맑음은 세기 0), rain_sight·rain_hear·snow_sight·snow_hear = 세기 1 일 때 시야(사슴 위협 탐지 반경과 늑대 시야
+    #   반경)·사슴 청각(위협 발소리 반경) 배수, snow_deer_speed·snow_wolf_speed = 세기 1 일 때 눈의 사슴·늑대(모든 위협) 이동 속력 배수(모두 (0, 1] —
+    #   세기 I 의 배수는 1 − (1 − 값)·I), obs_visibility = 관측 visibility 에 시야 배수를 곱하나(계획서 RL_V2_PLAN.md 4.2 표 9·#25 의 w).
+    #   선택 키 schedule(아래 OPTIONAL_KEYS)
+    "wild_weather": frozenset({"region", "regions", "rain_sight", "rain_hear", "snow_sight", "snow_hear", "snow_deer_speed",
+                               "snow_wolf_speed", "obs_visibility"}),
+    # R5 장애물 관측 (env_v2/world.py `_obstacle_obs_params`·`obstacle_obs_values`, 정의는 모듈 docstring 'R5 장애물 관측'). 다른 기능이 없어도 켤 수 있다
+    # (원판이 없으면 칸이 벽 거리·1·0 이다). 원판·몸 반지름은 obstacles 블록이 정한다.
+    #   obstacle_obs: escape_norm = 관측 escape_room(도망칠 쪽 빈 거리)의 분모(단위, 1 단위 = 2 m), near_norm = 관측 obstacle_near(몸 가장자리에서 가장 가까운
+    #   원판 가장자리까지)의 분모(단위). 둘 다 0 보다 크다. 관측 = clip(거리 ÷ 분모, 0, 1)
+    "obstacle_obs": frozenset({"escape_norm", "near_norm"}),
 })
 
 # 선택 계수 키(모듈 docstring 규칙 6, 10-14 R3): 기능 → {키: 끔 값}. 켠 블록에 없으면 끔 값(= 앞 버전 동작)으로 읽는다. 앞 버전 설정
@@ -256,10 +291,48 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #   threats.eat_in_place (10-15 사람 결정 '먹는 시간 주기 (약 5초)'): 늑대(플레이어형 위협 말고 모든 포식자)가 사슴을 잡은 뒤 쿨다운
 #     (v1 키 pred_eat_cd)이 남은 동안 그 자리에 서서 먹는다(env_v2/world.py `_step_predators_v3`, 모듈 docstring 'R3 세계' (j)). 먹는 시간
 #     자체는 v1 키 pred_eat_cd 를 overrides 로 덮는다(R3 설정은 38스텝). false = 지금까지 그대로(쿨다운 동안 기본 속력으로 배회)
+#   wild_flight.hold_awake·edge_r (10-16 사용자 '늑대가 먹기 시작하면 도망치던 사슴이 멈춘다'·'가장자리에서 늑대가 계속 잡아먹는다'): hold_awake
+#     true 면 시작한 도주는 깨어 있는 늑대(사냥·먹기·배부름 — 자는 늑대 말고) 모두가 실거리 safe_r 밖이 되거나 은신처 안일 때까지 이어진다
+#     (도주를 일으키는 것은 그대로 사냥 중인 늑대만). edge_r > 0 이면 도주·경계 방향이 무대 가장자리 edge_r 안에서 벽 쪽 성분을 벽을 따라가는
+#     성분으로 돌리고 모서리를 벗어나는 쪽을 고른다(env_v2/world.py `wf_edge_steer`). false·0 = 10-15 그대로
+#   wild_flight.flight_cost (10-21 실시간 고리 '도망 시간' 기준 — 학습 세계 전용, 판정 세계·언리얼에는 없다): 0 이상. 이번 스텝에 FLEE 를 실행한
+#     사슴(도주 반사 덮기·두뇌가 고른 FLEE 모두)의 보상에서 이 값을 뺀다(env_v2/world.py `step` 5)). 0 = 그대로(그 줄을 타지 않는다 — 비트 동일)
+#   wild_flight.route_fixed·quiet_end (10-21 '도망 방향을 두뇌가 고름' 1단계 — 측정 전용, 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 6·7·9절):
+#     route_fixed 가 'run'·'open'·'cover'·'shelter' 면 도주 반사 중 방향을 그 길로 고정한다(가능하지 않으면 RUN — env_v2/world.py `flight_route_geometry`·
+#     `_route_step`). 'run' 은 지금 반사 방향 그대로(비트 동일, 길 기록만 더한다). quiet_end > 0(스텝)이면 붙잡는 늑대를 그만큼 이어 알아채지 못한
+#     도주는 끝난다. null·0 = 그대로(그 줄을 타지 않는다 — 비트 동일). 두뇌가 고르는 길(계약 판 4)은 아직 없다
+#   obstacles.fixed (10-17 야생 2단계 3): [[x, y, r], …](단위) 이면 무작위 배치 대신 이 원판을 쓴다(난수를 뽑지 않는다 — 언리얼 무대에서 읽은 원판으로 거울을
+#     돌리는 짝 비교용, results/v3/mirror/run_mirror.py --unreal-obstacles). null = 자기 스트림 part 0 으로 무작위 배치
+#   obstacles.detour·detour_* (10-17 장애물 돌아가기, env_v2/world.py `detour_moves`, 모듈 docstring '야생 2단계' 3 의 6)): detour true 면 사슴·늑대가 원판에
+#     막히면(부딪혀 가려던 쪽으로 detour_block 몫도 못 감) 가려던 방향에서 가장 적게 돈 빈 방향(한 스텝에 detour_free 몫 이상 나아감 — 22.5° 씩 16 방향)으로
+#     돌아가고, 앞 보기 detour_probe(단위)가 트이거나 detour_steps 스텝이 지날 때까지 같은 쪽으로 돈다. 돕는 늑대는 detour_help_block 스텝 넘게
+#     돌아가거나 막혀 돌아서면 detour_help_drop 스텝 동안 돕지 않는다(길목 자리를 버리고 다시 고른다). false = 10-17 3 그대로(미끄러짐만). 숫자 키 기본값은
+#     켰을 때 쓰는 값이다(끄면 읽지 않는다)
+#   obstacles.foliage (10-21 숲 시야, env_v2/world.py `foliage_chord`·`foliage_blocked`, 모듈 docstring '야생 2단계' 3 의 7) — 측정용. 10-22 C++ 에 옮김
+#     (기본 끔 — 통합 모드 eco.IntegratedV3.Foliage·평가기 ceval 이 받는다. 도망길 COVER 그늘의 잎만 파이썬 전용, adapt.convert 는 켠 스냅숏을 거부)):
+#     {enabled, r, block, trees} 블록(빠진 칸은 이 끔 값). enabled true 면 나무인 원판(trees 'all' = 나무 원판 모두 — 무작위 배치는 줄기만·바위 빼고,
+#     fixed 는 모두. 또는 원판마다 0/1 목록)마다 같은 중심에 반지름 r(단위, 1 단위 = 2 m)의 잎 원을 두고, 눈길이 잎 원들 안을 지나는 길이(겹친 몫은
+#     한 번)가 block(단위) 이상이면 줄기처럼 눈길을 가린다(사슴·늑대 같게, 발소리는 그대로). block_sight 를 켜야 한다. false = 10-21 그대로(줄기만 가림)
+#   realism_shelter.wolf_margin (10-17 늑대 몸 여유): 막는 위협이 은신처 원 둘레가 아니라 반지름 r + wolf_margin(단위, 1 단위 = 2 m) 둘레를
+#     따라 미끄러진다(늑대 중심이 그 안에 들지 않는다). block_predators 를 켰을 때만 0 보다 클 수 있다. 사슴의 안전 판정(원 안 |q − c| ≤ r)은
+#     그대로다. 0 = 10-16 그대로(원 둘레에서 미끄러짐)
+#   wild_weather.schedule (10-18 야생 3단계, 시간에 따라 바뀌는 날씨의 자리): {지역: [[시작 스텝, 날씨, 세기], …]}(시작 스텝은 reset 뒤 세계 t, 0 이상이고
+#     늘어나는 정수) 이면 그 지역 세계는 시작 스텝 ≤ t 인 마지막 줄의 날씨를 쓰고, 첫 줄 앞이거나 표에 없는 지역은 regions 의 고정 날씨를 쓴다. 난수 없음.
+#     null = 고정 날씨(지역마다 늘 같다)
+#   integrated_stage.respawn_safe_r·respawn_tries (10-18 R4 학습 보충, 사람 결정 RL_V2_PLAN.md 10-18 (15) D2 — 학습 세계 전용, 판정 세계·언리얼에는 없다):
+#     respawn true 세계에서 respawn_safe_r(단위, 1 단위 = 2 m)가 숫자면 죽은 사슴이 다음 스텝에 무대 안 새 자리에 다시 나는데, 그 자리는 모든 늑대(위협)에게서
+#     respawn_safe_r 이상, 원판(r + 몸) 밖, 은신처 원 밖이다(자기 스트림 part 1 에서 후보 respawn_tries 개, 다 못 맞추면 늑대에게서 가장 먼 후보 — env_v2/world.py
+#     `_ist_safe_spawn`). v1 리스폰 뽑기(자리·각)는 그대로 하고 자리만 덮는다(규칙 2). null = v1 그대로(맵 균등 자리)
 OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
-    "realism_shelter": MappingProxyType({"block_predators": False}),
+    "realism_shelter": MappingProxyType({"block_predators": False, "wolf_margin": 0.0}),
     "realism_cover_food": MappingProxyType({"frac_range": None}),
     "threats": MappingProxyType({"eat_in_place": False}),
+    "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0}),
+    "obstacles": MappingProxyType({"fixed": None, "detour": False, "detour_block": 0.5, "detour_free": 0.8, "detour_probe": 1.5,
+                                   "detour_steps": 45, "detour_help_block": 15, "detour_help_drop": 38,
+                                   "foliage": {"enabled": False, "r": 3.0, "block": 2.0, "trees": "all"}}),
+    "wild_weather": MappingProxyType({"schedule": None}),
+    "integrated_stage": MappingProxyType({"respawn_safe_r": None, "respawn_tries": 64}),
 })
 
 

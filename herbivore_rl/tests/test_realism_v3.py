@@ -118,7 +118,7 @@ def _run_pair(wa, wb, pa, pb, steps=300):
 def test_registry_and_param_keys():
     assert (F.FEATURE_IDS["realism_vision"], F.FEATURE_IDS["realism_hearing"], F.FEATURE_IDS["realism_shelter"],
             F.FEATURE_IDS["realism_night"], F.FEATURE_IDS["realism_cover_food"]) == (19, 20, 21, 22, 23)
-    assert set(RULES) <= F.IMPLEMENTED and "obstacles" not in F.IMPLEMENTED
+    assert set(RULES) <= F.IMPLEMENTED   # obstacles(12) 는 야생 2단계 3(10-17)에서 구현했다 — tests/test_wild2_obstacle.py
     b = _blocks()
     for n in RULES:
         assert F.PARAM_KEYS[n] == frozenset(b[n]) - {"enabled"}, n
@@ -257,7 +257,10 @@ open(sys.argv[2], "w", encoding="utf-8").write(json.dumps([run(j) for j in jobs]
 
 
 def _archive(tmp_path):
-    """현실성 1단계 직전 코드(BASE_COMMIT)의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None."""
+    """현실성 1단계 직전 코드(BASE_COMMIT)의 herbivore_rl 일부를 tmp 에 푼다. git 이나 커밋이 없으면 None.
+    10-22: 사본의 동족 무리 중심·분리 두 줄만 지금 코드와 같은 j 차례 합으로 바꾼다 (tests/kin_seq.py)."""
+    import kin_seq
+
     paths = [f"herbivore_rl/{p}" for p in ("env", "env_v2", "policies", "configs", "repertoire_rules.py")]
     try:
         out = subprocess.run(["git", "archive", BASE_COMMIT] + paths, cwd=ROOT.parent, capture_output=True, check=True)
@@ -265,7 +268,7 @@ def _archive(tmp_path):
         return None
     with tarfile.open(fileobj=io.BytesIO(out.stdout)) as tf:
         tf.extractall(tmp_path / "base", **({"filter": "data"} if hasattr(tarfile, "data_filter") else {}))
-    return tmp_path / "base" / "herbivore_rl"
+    return kin_seq.patch_tree(tmp_path / "base" / "herbivore_rl")
 
 
 def test_bit_identical_to_pre_realism_code(tmp_path):
@@ -1026,8 +1029,8 @@ def test_golden_exporters_refuse_realism_worlds(tmp_path):
 
 
 def test_obstacle_extension_point_is_empty():
-    """이번 단계에는 세로 장애물을 넣지 않는다: World.obstacles 는 늘 (0, 3) [x, y, r], 기능 obstacles 를 켜면 읽을 때 실패하고 끈
-    블록은 받아들인다(v3_real1_on 에 자리 블록이 있다)."""
+    """현실성 1단계 세계에는 세로 장애물이 없다: World.obstacles 는 늘 (0, 3) [x, y, r], 끈 블록은 받아들인다(v3_real1_on 에 자리 블록이 있다).
+    기능 obstacles 는 야생 2단계 3(10-17)에서 구현했다 — 계수 없이 켜면 읽을 때 실패한다(정의·시험은 tests/test_wild2_obstacle.py)."""
     assert OBSTACLE_COLUMNS == ("x", "y", "r") and F.FEATURE_IDS["obstacles"] == 12
     for path in (R1_ON, R2_ON, REAL["all"]):
         w = World(load_v2_config(path), seeds=[32008])
@@ -1035,7 +1038,7 @@ def test_obstacle_extension_point_is_empty():
         w.step(np.zeros((w.N, 1)))
         w.reset()
         assert w.obstacles.shape == (0, 3)
-    with pytest.raises(ValueError, match="아직 구현되지 않았다"):
+    with pytest.raises(ValueError, match="계수"):
         F.parse_features({"obstacles": {"enabled": True}})
     assert not F.parse_features({"obstacles": {"enabled": False}}).enabled("obstacles")
     assert load_v2_config(REAL["all"]).v2["features"]["obstacles"] == {"enabled": False}

@@ -256,8 +256,12 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
         if (const auto* Threat = EM.GetFragmentDataPtr<FEcoThreatStateFragment>(E))
         {
             const EEcoSpeciesActivity Activities[] = {EEcoSpeciesActivity::Wander, EEcoSpeciesActivity::Stalk,
-                EEcoSpeciesActivity::Pounce, EEcoSpeciesActivity::Exhaust, EEcoSpeciesActivity::Pursue, EEcoSpeciesActivity::Eat, EEcoSpeciesActivity::Sleep};
-            Present.Activity = uint8(Activities[uint8(EcoV3Integrated::WolfStateOf(Threat->Agent))]);
+                EEcoSpeciesActivity::Pounce, EEcoSpeciesActivity::Exhaust, EEcoSpeciesActivity::Pursue, EEcoSpeciesActivity::Eat, EEcoSpeciesActivity::Sleep,
+                EEcoSpeciesActivity::Rest, EEcoSpeciesActivity::Wander};
+            static_assert(UE_ARRAY_COUNT(Activities) == static_cast<uint8>(EcoV3Integrated::EWolfState::Count),
+                "Every v3 wolf state must have a presentation activity.");
+            const uint8 StateIndex = static_cast<uint8>(EcoV3Integrated::WolfStateOf(Threat->Agent));
+            Present.Activity = uint8(StateIndex < UE_ARRAY_COUNT(Activities) ? Activities[StateIndex] : EEcoSpeciesActivity::Hold);
         }
 		if (const auto* Cue = EM.GetFragmentDataPtr<FEcoCreatureCueFragment>(E)) {
             Present.Flags |= uint8(Cue->Memory.Source)<<4;

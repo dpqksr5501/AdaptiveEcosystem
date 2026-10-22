@@ -138,3 +138,41 @@ python $W/compare_unreal_wild.py --unreal-dir $W/unreal_logs/s20000-20002 --pyth
 | 64 | 언리얼 (9) | 20.6 [0..59] | 49.2 [39..52] | 4.1 [3..4] | 4.2 [3..6] | 2.5 [1..6] | 1.4 [1..3] | 90 [58..159] | 38.5 [25..54] | 2.7 [1..6] | 1.6 [1..4] | 91.1 [75..100] |
 | 64 | 파이썬 (90) | 18.9 [0..71] | 48.9 [25..60] | 4.0 [2..5] | 3.8 [2..6] | 2.6 [1..6] | 1.5 [0..3] | 85 [35..172] | 32.6 [4..64] | 2.9 [1..6] | 1.7 [0..4] | 91.6 [64..100] |
 | 64 | z | +0.3 | +0.2 | +0.4 | +1.1 | -0.2 | -0.4 | +0.5 | +1.6 | -0.4 | -0.2 | -0.2 |
+
+## 10-16 고침 뒤 다시 견줌 (도주 유지·가장자리·은신처 안전, 사슴 128, 세션 20000~20002)
+
+- **고친 뒤에도 언리얼과 파이썬이 같게 돈다.** 230초 산·잡힘·굶음은 언리얼 97.7·2.3·0.0, 파이썬 짝 비교 97.8·2.2·0.0 이다(차이 0.1%p, z ±0.7).
+  규칙 수치(약함·배부름·경계·도주·웅크림·은신처에서 끝난 도주·비축)도 모두 |z| < 2 다. 도주 몫이 언리얼에서 조금 낮다(4.6 대 5.5%, z −1.6).
+- **언리얼에서도 은신처 안에서 잡힌 사슴은 0이다.** 세 세션 9개 지역의 기록 줄 207개 모두 '은신처 안 잡힘 0 (누적 0)'이다. 파이썬 짝 비교도 0이다.
+- 오류·ensure 0, EcoV3I 경고·오류 0. 시작 줄에 '은신처: 안전 (eco.IntegratedV3.ShelterSafe 1, 10-16)'이 찍힌다.
+- 언리얼: 위 '무엇을 돌렸나' 의 명령 그대로(통합 v3 기본값 — 고침 셋 모두 켬), 사슴 128, 세션 시드 20000·20001·20002. 기록 `unreal_logs/fix_s20000-20002/`.
+  셋째 줄('경계 거리') 끝에 '은신처 안 잡힘 n (누적 n)' 칸을 더했다(09c709f 뒤 커밋, 앞 칸·순서는 그대로).
+- 파이썬: `runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json` (고친 설정, 언리얼 지도 9개 × 반복 10).
+
+```
+# herbivore_rl/ 에서
+python results/v3/mirror/run_mirror.py --diag --config configs/v3_wild1_mirror.yaml --deer 128 --unreal-maps 20000-20002 --replicates 10 \
+    --seeds 32000-32089 --out-dir results/v3/wild1/runs --name pairdiag_d128_fix_u20000-20002_k10_s32000-32089
+W=results/v3/wild1
+python results/v3/mirror/compare_unreal.py --unreal-dir $W/unreal_logs/fix_s20000-20002 --python $W/runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json
+python $W/compare_unreal_wild.py --unreal-dir $W/unreal_logs/fix_s20000-20002 --python $W/runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json
+```
+
+## 10-17 팀 브랜치 통합 뒤 다시 견줌 (사슴 128, 세션 20000~20002)
+
+- `origin/codex/social-shelter-handoff` 를 합친 뒤(계획서 4-5b '10-17 팀 브랜치 통합') 같은 명령으로 돌렸다. 기본값은 통합 v3 야생 규칙·고침 모두 켬 +
+  팀의 사슴 Social 연결(`eco.IntegratedV3.SocialControl 1`)·은신처 생명주기(`eco.IntegratedV3.ProtectedRefuges 1`)다. 은신처 안전은 파이썬 규칙(`ShelterSafe 1`) 하나다.
+- **Social 연결을 끄면(`-EcoV3SocialControl=0`) 통합 전 기록과 CPU 시간 칸 말고 모두 같다.** 세 세션의 기록 줄 전부를 견줬다. 통합이 v3 세계를 바꾸지 않았다는 뜻이다.
+- 기본값(Social 켬) 230초 산·잡힘·굶음: 언리얼 98.1·1.9·0.0, 파이썬 짝 비교 97.8·2.2·0.0 (z +1.5), 통합 전 언리얼 97.7·2.3·0.0.
+  규칙 수치도 모두 |z| < 2 다. Social 무리 경보 때문에 도주가 늘었다(도주 몫 4.6 → 5.9%, 지역마다 도주 시작 225 → 288, 파이썬 5.5%·270). 늑대 배부름은 38.9 → 31.5%(파이썬 35.6).
+- 은신처 안 잡힘 0. `[EcoRefuge]` 줄의 팀 규칙 밀어내기·꺼내기·원 안 늑대·원 안 포획도 모두 0 이다. 오류·ensure 0.
+- 기록: `unreal_logs/merge1017_s20000-20002/`(통합 직후 기본값 = Social 켬), `unreal_logs/merge1017_social0_s20000-20002/`(`-EcoV3SocialControl=0`). 파이썬은 바뀌지 않아 `runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json` 을 그대로 쓴다.
+- **10-17 (8) 사람 결정 뒤 기본값은 Social 연결 끔이다**(`RL_V2_PLAN.md` '10-17 (8)'). 스위치 없이 돌린 세션 20000 기록 `unreal_logs/default1017_s20000/` 은
+  `merge1017_social0_s20000-20002/` 의 같은 세션과 명령줄·시작 글 한 줄·CPU 시간 칸 말고 모두 같다. 그래서 이제 기본값 = 파이썬 거울과 견주는 판이다.
+
+```
+# herbivore_rl/ 에서
+W=results/v3/wild1; P=$W/runs/pairdiag_d128_fix_u20000-20002_k10_s32000-32089.json
+python results/v3/mirror/compare_unreal.py --unreal-dir $W/unreal_logs/merge1017_s20000-20002 --python $P
+python $W/compare_unreal_wild.py --unreal-dir $W/unreal_logs/merge1017_s20000-20002 --python $P
+```

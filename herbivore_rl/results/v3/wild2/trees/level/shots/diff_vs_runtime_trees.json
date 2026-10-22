@@ -1,0 +1,14 @@
+{
+ "forest_top": {
+  "mean_abs_diff_0_255": 1.152,
+  "pixels_diff_over_32": 0.106
+ },
+ "forest_ground_debug": {
+  "mean_abs_diff_0_255": 2.064,
+  "pixels_diff_over_32": 0.269
+ },
+ "highland_ground": {
+  "mean_abs_diff_0_255": 0.348,
+  "pixels_diff_over_32": 0.001
+ }
+}

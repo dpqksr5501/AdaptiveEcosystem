@@ -1,7 +1,7 @@
 // v3 관측 18 만들기와 개체 지각 기하 — 파이썬 herbivore_rl/env_v2/world.py `_obs_from`·`_geometry`·`daynight_phase` 와
 // repertoire.obs_extra 의 거울 (R1b 두뇌, 관측 18 = v1 7 + 낮밤 2 + 레퍼토리 9. 경보 칸 alarm_heard 는 없다).
 //
-// **이 파일은 의도적으로 언리얼에 의존하지 않는다.** `<cmath>`·`<cstdint>` 와 EcoRepertoire.h 만 쓴다.
+// **이 파일은 의도적으로 언리얼에 의존하지 않는다.** `<cmath>`·`<cstdint>` 와 EcoRepertoire.h·EcoThreatModel.h(숲 시야 FoliageBlocked — 같은 엔진 무관 헤더)만 쓴다.
 //
 // 계약: AdaptiveEcosystem/Docs/RL_Policy/POLICY_CONTRACT_V3.md 2절(관측), 2-3(기하), 7-6(어둠).
 // 단위: 파이썬 단위 (1단위 = 200 cm, 1스텝 = 8/60 s). Mass 층이 cm 를 ÷ 200 해서 넘긴다.
@@ -16,13 +16,22 @@
 //
 // 언제 만드나 (계약 2-1): 스텝 끝 t + 1 → Tick → 새 t 의 어둠 → 기하 → Perceive(away·recency) → 관측 → 리스폰한 개체만 다시.
 // Arbiter 는 float 관측이 아니라 같은 때의 기하(double)를 읽는다 — FThreatPerception 을 FDecisionObs 로 옮긴다(ToDecisionObs).
+//
+// R5 장애물 관측 (10-19 사용자 '일단 두뇌가 나무 같은 장애물을 인지할 수 있게 바꿔', 계약 2-4): 관측 21 두뇌는 18 칸 뒤에 세 칸을 더 받는다
+// (escape_room·obstacle_near·threat_hidden — ObstacleObsValues·WriteObstacleObs). 관측 18 은 그대로이고, 세 칸은 따로 만든다 — 망 입력을 붙이는 것은
+// 세계 층(EcoWorldV3::DecideHerb)의 몫이다. 파이썬 world.py `obstacle_obs_values` 와 같은 식·같은 순서라 같은 double 입력이면 비트 단위로 같다
+// (골든 ObstacleObsGoldenVectorsV3.h, 시험 Policy.V3.ObstacleObs.*).
+// 숲 시야 (10-21, world.py obstacles.foliage — 기본 끔): FObstacleObsInput::bFoliage 면 threat_hidden 의 가림 = 줄기 ∨ 잎(EcoThreatV3::FoliageBlocked,
+// 위협 → 나 눈길 — 늑대 표적 고르기와 같은 판정). 끄면 위 그대로 (골든 FoliageGoldenVectorsV3.h, 시험 Policy.V3.Foliage.*).
 
 #pragma once
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
 
 #include "EcoRepertoire.h"
+#include "EcoThreatModel.h"
 
 namespace EcoObservationV3
 {
@@ -142,6 +151,9 @@ namespace EcoObservationV3
 		bool bAsleep = false;
 		double HearR = 0.0;   // 발소리 반경 (realism_hearing, HearingRadius). 0 = 들리지 않음 (끈 세계는 늘 0)
 		bool bHunting = true; // Social metadata only. Resting/eating wolves never raise a new threat alarm.
+		// 세로 장애물 (야생 2단계 3, world.py sight_blocked): 이 사슴에서 이 위협까지의 눈길을 원판이 가린다. 참이면 눈으로 못 보고 발소리만 남는다.
+		// EcoWorldV3 가 사슴마다 채운다 (끈 세계는 늘 거짓 — 지금 그대로)
+		bool bOccluded = false;
 	};
 
 	/** R3 발소리 계수 (파이썬 realism_hearing, configs/v3_r3.yaml·v3_wild1_mirror.yaml 값). 기본 끔. */
@@ -226,8 +238,8 @@ namespace EcoObservationV3
 			const double Ey = T.Y - Pos.Y;
 			const double Pd = std::sqrt(Ex * Ex + Ey * Ey);
 			const double Inv = 1.0 / (Pd > EcoRepertoireV3::kEps ? Pd : EcoRepertoireV3::kEps);
-			// 보임: 시야(반경 SeeP, 위협 시야각 ThreatFovCos) 또는 발소리(실거리 ≤ HearR, 방향 무관 — realism_hearing). 자는 위협은 빠진다
-			const bool bSight = Pd <= SeeP && (Ex * Head.X + Ey * Head.Y) * Inv >= Cfg.ThreatFovCos;
+			// 보임: 시야(반경 SeeP, 위협 시야각 ThreatFovCos, 원판에 가리지 않음) 또는 발소리(실거리 ≤ HearR, 방향 무관 — realism_hearing). 자는 위협은 빠진다
+			const bool bSight = !T.bOccluded && Pd <= SeeP && (Ex * Head.X + Ey * Head.Y) * Inv >= Cfg.ThreatFovCos;
 			const double HearLim = Cfg.bHearCapToSight ? (T.HearR < SeeP ? T.HearR : SeeP) : T.HearR;
 			const bool bHeard = T.HearR > 0.0 && Pd <= HearLim;
 			const bool bVis = (bSight || bHeard) && !T.bAsleep;
@@ -293,7 +305,8 @@ namespace EcoObservationV3
 	/**
 	 * 동족 지각 (world._geometry 동족·분리 줄). Agents 는 자기(Self)를 포함한 목록이고 Self 는 건너뛴다.
 	 * 보임 = 실거리 <= see_r(20, 밤·행동 배수 없음) ∧ 시야각 120°. 같은 좌표(거리 0)인 동족은 내적 0 이라 보이지 않는다.
-	 * 분리는 파이썬 행렬 꼴 Σc·pos − (Σc)·P 로 더한다(c = max(1 − d/5, 0) ÷ max(d, 1e-9)).
+	 * 분리는 파이썬과 같은 꼴 Σc·pos − (Σc)·P 로 더한다(c = max(1 − d/5, 0) ÷ max(d, 1e-9)). 합(SumX·CX·CSum)은 j 차례 —
+	 * 파이썬 world.py `_seq_sum` 도 10-22 부터 같은 차례라 비트 단위로 같다(그 전 행렬곱은 끝 비트가 달랐다).
 	 */
 	inline FKinPerception PerceiveKin(std::int32_t Self, const FVec2& Pos, const FVec2& Head, const FKinInput* Agents,
 									  std::int32_t NumAgents, const FObservationConfig& Cfg = kR1bObsConfig)
@@ -411,6 +424,7 @@ namespace EcoObservationV3
 		bool bHasCover = false;              // 6  세계에 은신처가 있나
 		double CoverEdge = 0.0;              //    가장 가까운 은신처 가장자리 거리 (FCoverPerception::Edge)
 		double Dark = 0.0;                   // 7  d (낮 고정 세계는 0)
+		double VisMult = 1.0;                //    visibility 날씨 배수 w (야생 3단계 — EcoWorldV3 ObsVisibilityMult). 1 = 지금 그대로
 		std::int32_t StepsToTransition = 1;  // 8  r. 음수면 낮 고정 세계 (to_transition 1)
 		double PredApproach = 0.5;           // 9
 		double KinAlarm = 0.0;               // 10
@@ -438,7 +452,8 @@ namespace EcoObservationV3
 		Out[kObsCoverDist] = In.bHasCover
 								 ? static_cast<float>(Detail::Clip01((In.CoverEdge > 0.0 ? In.CoverEdge : 0.0) / Cfg.ObsCoverNorm))
 								 : 1.0f;
-		Out[kObsVisibility] = static_cast<float>(Visibility(In.Dark, Cfg));
+		// 계획서 RL_V2_PLAN.md 4.2 표 9: visibility = (1 − 0.5·d)·w. 날씨 w = 1 이면 곱해도 같은 값이다 (world.py `_vis` = (1 − x·d) × w_s)
+		Out[kObsVisibility] = static_cast<float>(Visibility(In.Dark, Cfg) * In.VisMult);
 		Out[kObsToTransition] = In.StepsToTransition < 0
 									? 1.0f
 									: static_cast<float>(Detail::Min1(static_cast<double>(In.StepsToTransition) / Cfg.TransitionNorm));
@@ -450,5 +465,139 @@ namespace EcoObservationV3
 		}
 		Out[kObsBehSteps] = static_cast<float>(Detail::Min1(static_cast<double>(In.StepsIn) / Cfg.StepsNorm));
 		Out[kObsThreatRecency] = static_cast<float>(In.Recency);
+	}
+
+	// ---- R5 장애물 관측 세 칸 (계약 2-4, world.py 'R5 장애물 관측'·obstacle_obs_values) ----
+	//
+	// 관측 21 계약 = 관측 18 + 맨 끝 세 칸 (마스크 판 2 그대로, 계약 해시 EcoPolicyV3::kContractHashObs21Mask2). 칸 번호 18·19·20.
+	inline constexpr std::int32_t kNumObstacleObs = 3;
+	inline constexpr std::int32_t kObsDimObstacle = kObsDim + kNumObstacleObs;   // 21
+	inline constexpr std::int32_t kMaxObsDim = kObsDimObstacle;                  // 망 입력 버퍼 크기
+	inline constexpr std::int32_t kObsEscapeRoom = 18;
+	inline constexpr std::int32_t kObsObstacleNear = 19;
+	inline constexpr std::int32_t kObsThreatHidden = 20;
+	inline constexpr const char* kObstacleObsNames[kNumObstacleObs] = {"escape_room", "obstacle_near", "threat_hidden"};
+
+	/** 분모 (configs/v3_wild3_obs_mirror.yaml obstacle_obs — R5 판, results/v3/r5/obs_check.md). 계약 해시 밖이라 골든 설정 칸이 지킨다. */
+	struct FObstacleObsConfig
+	{
+		double EscapeNorm = 10.0;   // escape_room 분모 (단위, 20 m)
+		double NearNorm = 5.0;      // obstacle_near 분모 (단위, 10 m)
+	};
+
+	inline constexpr FObstacleObsConfig kR5ObstacleObsConfig{};
+
+	/** 사슴 하나의 입력 (스텝 끝 기하 — 이동 뒤 자리, 같은 관측의 위협 지각). 원판 (x, y, r) × NumDiscs, 무대 [0, StageSize]². */
+	struct FObstacleObsInput
+	{
+		FVec2 Pos;
+		FVec2 Head;
+		bool bSeen = false;             // 위협을 아나 (관측 1 의 보임 — PredCount > 0)
+		FVec2 Away;                     // 가장 가까운 보이는 위협의 반대 단위벡터 (FThreatPerception::AwayFromPred, 모르면 0)
+		FVec2 Threat;                   // 그 위협의 자리 (bSeen 일 때만 읽는다)
+		const double* Discs = nullptr;
+		std::int32_t NumDiscs = 0;
+		double BodyR = 0.0;             // 몸 반지름 (이동이 멈추는 반지름 = r + BodyR)
+		double StageSize = 0.0;
+		bool bBlockSight = false;       // 원판이 눈길을 가리나 (obstacles.block_sight)
+		// 숲 시야 (10-21, obstacles.foliage): 참이면 가림 = 줄기 ∨ 잎 (원판 가운데 나무인 것 — FoliageTrees[k] ≠ 0, nullptr = 모두 — 의 중심에 반지름 FoliageR,
+		// 눈길이 그 합집합 안을 FoliageBlock 이상 지나면). bBlockSight 일 때만 읽는다. 거짓(기본) = 줄기만
+		bool bFoliage = false;
+		const std::uint8_t* FoliageTrees = nullptr;
+		double FoliageR = 0.0;
+		double FoliageBlock = 0.0;
+	};
+
+	/** 원시 거리 (double). Near 는 원판이 없으면 +∞. */
+	struct FObstacleObs
+	{
+		double Escape = 0.0;            // E 도망칠 쪽으로 곧장 갈 때 처음 막히는 거리 (벽·원판)
+		double Near = std::numeric_limits<double>::infinity();   // N 몸 가장자리에서 가장 가까운 원판 가장자리까지 (원판 안이면 음수)
+		bool bThreatHidden = false;     // 가장 가까운 보이는 위협 → 나 선분을 줄기(r)가 가린다
+	};
+
+	/**
+	 * world.py `obstacle_obs_values` 의 C++ 꼴 (사슴 하나, 원판 순서대로, double — 줄마다 같은 식):
+	 *   W = (bSeen ∧ |Away| > 1e-9) ? Away : Head; n = |W|; U = n > 1e-9 ? W ÷ n : (1, 0)
+	 *   벽: Tx = Ux > 0 ? (S − x) ÷ Ux : (Ux < 0 ? x ÷ (−Ux) : ∞), Ty 같음, E = min(Tx, Ty), 0 보다 크지 않으면 0
+	 *   원판 k (R = r + BodyR): F = P − c, Cc = F·F − R², B = F·U, Δ = B² − Cc. Cc ≥ 0 ∧ B < 0 ∧ Δ ≥ 0 이면 E = min(E, −B − √Δ)
+	 *                          (원판 안에서 시작하면 건너뛴다·접함은 막는다 — 이동 obstacle_slide 와 같다). N = min(N, |F| − R)
+	 *   가림: bSeen ∧ bBlockSight 이면 위협 a → 나 q 선분 (EcoThreatV3::SightBlocked 와 같은 식, 반지름 r — 몸 없음, 엄격한 <)
+	 *         숲 시야(bFoliage)면 줄기가 안 가릴 때 잎도 본다 (EcoThreatV3::FoliageBlocked — world.py `obstacle_obs_values` 의 foliage 줄)
+	 */
+	inline FObstacleObs ObstacleObsValues(const FObstacleObsInput& In)
+	{
+		const double Inf = std::numeric_limits<double>::infinity();
+		const double Eps = EcoRepertoireV3::kEps;
+		double Wx = In.Head.X;
+		double Wy = In.Head.Y;
+		if (In.bSeen && std::sqrt(In.Away.X * In.Away.X + In.Away.Y * In.Away.Y) > Eps)
+		{
+			Wx = In.Away.X;
+			Wy = In.Away.Y;
+		}
+		const double Nw = std::sqrt(Wx * Wx + Wy * Wy);
+		const double Ux = Nw > Eps ? Wx / Nw : 1.0;
+		const double Uy = Nw > Eps ? Wy / Nw : 0.0;
+		const double X = In.Pos.X;
+		const double Y = In.Pos.Y;
+		const double S = In.StageSize;
+		const double Tx = Ux > 0.0 ? (S - X) / Ux : (Ux < 0.0 ? X / (-Ux) : Inf);
+		const double Ty = Uy > 0.0 ? (S - Y) / Uy : (Uy < 0.0 ? Y / (-Uy) : Inf);
+		FObstacleObs R;
+		R.Escape = Tx < Ty ? Tx : Ty;
+		if (!(R.Escape > 0.0))
+		{
+			R.Escape = 0.0;
+		}
+		R.Near = Inf;
+		const double* D = In.Discs;
+		for (std::int32_t k = 0; k < In.NumDiscs; ++k)
+		{
+			const double Fx = X - D[3 * k];
+			const double Fy = Y - D[3 * k + 1];
+			const double Rk = D[3 * k + 2] + In.BodyR;
+			const double Cc = Fx * Fx + Fy * Fy - Rk * Rk;
+			const double Bb = Fx * Ux + Fy * Uy;
+			const double Dd = Bb * Bb - Cc;
+			if (Cc >= 0.0 && Bb < 0.0 && Dd >= 0.0)
+			{
+				const double T = -Bb - std::sqrt(Dd);
+				R.Escape = T < R.Escape ? T : R.Escape;
+			}
+			const double Nk = std::sqrt(Fx * Fx + Fy * Fy) - Rk;
+			R.Near = Nk < R.Near ? Nk : R.Near;
+		}
+		if (In.bSeen && In.bBlockSight)
+		{
+			const double Jx = In.Threat.X;
+			const double Jy = In.Threat.Y;
+			const double Dx = X - Jx;
+			const double Dy = Y - Jy;
+			const double DD = Dx * Dx + Dy * Dy;
+			for (std::int32_t k = 0; k < In.NumDiscs && !R.bThreatHidden; ++k)
+			{
+				const double Gx = D[3 * k] - Jx;
+				const double Gy = D[3 * k + 1] - Jy;
+				double T = DD > 0.0 ? (Gx * Dx + Gy * Dy) / DD : 0.0;
+				T = T < 0.0 ? 0.0 : (T > 1.0 ? 1.0 : T);
+				const double Qx = Jx + T * Dx - D[3 * k];
+				const double Qy = Jy + T * Dy - D[3 * k + 1];
+				R.bThreatHidden = Qx * Qx + Qy * Qy < D[3 * k + 2] * D[3 * k + 2];
+			}
+			if (!R.bThreatHidden && In.bFoliage && In.NumDiscs > 0)
+			{
+				R.bThreatHidden = EcoThreatV3::FoliageBlocked(Jx, Jy, X, Y, D, In.NumDiscs, In.FoliageTrees, In.FoliageR, In.FoliageBlock);
+			}
+		}
+		return R;
+	}
+
+	/** 관측 세 칸 (float): clip(E ÷ EscapeNorm, 0, 1), clip(max(N, 0) ÷ NearNorm, 0, 1) (원판 없음 = 1), 가림 0/1. world.py `_obs_from` 과 같다. */
+	inline void WriteObstacleObs(const FObstacleObs& V, float Out[kNumObstacleObs], const FObstacleObsConfig& Cfg = kR5ObstacleObsConfig)
+	{
+		Out[0] = static_cast<float>(Detail::Clip01(V.Escape / Cfg.EscapeNorm));
+		Out[1] = static_cast<float>(Detail::Clip01((V.Near > 0.0 ? V.Near : 0.0) / Cfg.NearNorm));
+		Out[2] = V.bThreatHidden ? 1.0f : 0.0f;
 	}
 }

@@ -8,6 +8,7 @@
 //    스텝    전역 결정 시계가 넘긴 수만큼, 모든 지역이 같은 전역 스텝으로 EcoWorldV3::Step (계약 10-1). 지형 제약 콜백은 팀 공개 함수
 //            EcoCreatureMovement::ConstrainStep 을 30 cm 이하 토막으로 부른다(한 결정 스텝 120~180 cm 를 한 번에 쓸면 완만한 비탈도 막힌다).
 //            스텝마다 죽은 개체를 목록에서 뺀다 — 한 프레임에 스텝이 여러 번 돌아도 시체는 움직이거나 먹거나 잡히거나 동족으로 세어지지 않는다.
+//            전역 스텝 경계마다(스텝 앞) 대기 환경 바뀜(10-21, EcoV3EnvWatch.cpp — 레벨 나무·날씨)을 넣고 새 원판 안 산 사슴·늑대를 밀어낸 뒤 두뇌 바꾸기·스냅숏.
 //    넘기기  잡힘 → Vitals.HP = 0 + Lifecycle.bPredated, 굶음 → HP = 0 (사망 처리·지역 피식 사건·삭제는 팀 조정자). 에너지 E × MaxEnergy 를
 //            Vitals.Energy 로 거울 복사. 늑대: 포획 뒤 쿨다운 → FEcoPredatorStateFragment::EatCooldown, 표적을 쫓으면 Lifecycle.bPursuing.
 //    먹기    스텝마다 먹이 칸에서 실제로 먹은 사슴을 기록 구간마다 한 번 세고(AteLogEpoch), 산 사슴 에너지 평균·굶주림 수를 컨텍스트에
@@ -108,6 +109,7 @@ private:
 	TArray<FEcoIntegratedV3Fragment*> WolfInts;
 	TArray<int64> WolfIds;                  // 이번 Step 늑대 배열의 StableAgentId (밤잠 사건 줄)
 	TArray<int32> NewRows;
+	TArray<uint8> KnowsPre;                 // 이번 Step 배열의 사슴마다 스텝 앞 관측에서 늑대를 아는가 (두뇌 행동 몫 기록)
 
 	TSet<FName> ReportedMissingRegions;
 };

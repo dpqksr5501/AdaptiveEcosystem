@@ -59,6 +59,13 @@ v3 R3 (관문 사전 등록 results/v3/r3/PREREG.md 13·14절):
     # 조기 중단 니치 π (14절, R3_EARLY_PI): 보정 시드 20000~20002 × 3000, 판정 세계
     python train_v3.py measure-pi --config configs/v3_r3_on.yaml --model ckpt/v3/v3_r3_g995_s0_20m_2m.zip --out results/v3/r3/early/s0_2m_pi.json
 
+v3 R4 (사전 등록 results/v3/r4/PREREG.md — 언리얼과 같은 날씨 + 나무 세계, 학습 보충·지역 섞기 configs/v3_r4_train.yaml):
+
+    python train_v3.py measure-fdec --config configs/v3_r4_train.yaml --seeds 32000 32001 32002     # 지역 셋 × 시드 셋 (train.region_mix)
+    python train_v3.py --config configs/v3_r4_train.yaml --seed 0 --steps 20000000 --init-from-model ckpt/v3/v3_r1_g995_s3_20m.zip \
+        --init-source "R1b s3 (게임 두뇌), R1 세계, 목록 graze·flee·hide·freeze — R4 설정이 얼기를 막아 R1b-F 로 시작" --run-name v3_r4_g995_s0_20m
+
+- 설정에 train.region_mix 가 있으면 measure-fdec 는 시드마다 지역 모두를 한 번씩 돌리고(시드별 줄에 region), 학습 메타에 region_history·seed_history 를 남긴다.
 - 학습 기록·measure-pi 의 니치 정의 r3(R3 세계면 auto): R3 판정 U 와 같은 조건(`repertoire_rules.r3_u_terms`)에서 같은 묶음의 확률 합
   (`r3_u_prob`) — pi_<u>_niche·pi_<u>_base·n_<u>_*, u ∈ esc·keep·run·leave·hide(U_HIDE′)·early. 손 규칙 문턱(거주 θ·a*, 보정 1 을 쓴 니치)은
   관문 결과(`eval_v3.r3_setup`)에서 오고, 없으면 재학습 전 측정 값이다(그때는 기록에 그렇게 적는다). 허용 목록 점검(14절 '즉시 멈춤')을 위해
@@ -311,6 +318,7 @@ def init_policy_report(model, venv: MultiWorldVecEnv) -> dict:
 def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int = 0) -> dict:
     """시작 정책으로 결정 비율 f_dec 를 잰다(모듈 docstring 'f_dec 측정'). 반환: f_dec(요청을 읽은 개체-스텝 비율), 시드별 값,
     결정 시점 중 마스크가 두 칸 이상인 비율, World.repertoire_stats decide_frac(같은 값이어야 한다)."""
+    from env_v2.vec_env import region_configs, region_mix_params
     from env_v2.world import World
 
     rep = rep_params(cfg)
@@ -320,25 +328,32 @@ def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int
     model = make_model_rep(venv, rep, None, seed=model_seed)
     pol = model.policy
     pol.set_training_mode(False)
+    # v3 R4 지역 섞기(train.region_mix, env_v2/vec_env.py): 시드마다 지역 모두를 한 번씩(같은 표본 잡음 스트림). 블록이 없으면 설정 그대로 한 번 — 지금과 같다
+    rm = region_mix_params(cfg.v2.get("train", {}).get("region_mix"), cfg)
+    cfgs = [(None, cfg)] if rm is None else list(region_configs(cfg, rm).items())
     per = []
     reads_n = multi_n = total = 0
     for s in seeds:
-        w = World(cfg, seeds=[int(s)])
-        rng = np.random.default_rng([int(s), FDEC_TAG])
-        r_s = 0
-        for _ in range(steps):
-            obs = w.observe()
-            pk = w.rep_peek()
-            m = action_mask(pk, obs, rep, obs_names=w.obs_names)
-            _, pi_eps, _ = rep_distribution(pol, policy_obs(obs, m))
-            a = sample_masked(pi_eps, m, rng.random(w.N))
-            r_s += int(pk["reads"].sum())
-            multi_n += int((m[pk["reads"]].sum(1) >= 2).sum())
-            w.step(a.astype(np.float64)[:, None])
-        n = steps * w.N
-        per.append(dict(seed=int(s), f_dec=r_s / n, decide_frac_world=w.repertoire_stats()["decide_frac"]))
-        reads_n += r_s
-        total += n
+        for region, c in cfgs:
+            w = World(c, seeds=[int(s)])
+            rng = np.random.default_rng([int(s), FDEC_TAG])
+            r_s = 0
+            for _ in range(steps):
+                obs = w.observe()
+                pk = w.rep_peek()
+                m = action_mask(pk, obs, rep, obs_names=w.obs_names)
+                _, pi_eps, _ = rep_distribution(pol, policy_obs(obs, m))
+                a = sample_masked(pi_eps, m, rng.random(w.N))
+                r_s += int(pk["reads"].sum())
+                multi_n += int((m[pk["reads"]].sum(1) >= 2).sum())
+                w.step(a.astype(np.float64)[:, None])
+            n = steps * w.N
+            row = dict(seed=int(s), f_dec=r_s / n, decide_frac_world=w.repertoire_stats()["decide_frac"])
+            if region is not None:
+                row["region"] = region
+            per.append(row)
+            reads_n += r_s
+            total += n
     return dict(f_dec=reads_n / total, per_seed=per, multi_frac=multi_n / max(reads_n, 1), seeds=[int(s) for s in seeds],
                 steps=int(steps), model_seed=int(model_seed), allowed=list(rep["allowed"]))
 
@@ -647,6 +662,11 @@ def main(argv=None) -> int:
         "init_policy": init_rep, "checkpoints": cb.saved, "log_history": cb.history, "warmstart": args.warmstart,
         "warmstart_world_digest": ws_digest, "init_from_model": init_rec, "r3_setup": r3s,
     }
+    if venv.region_history is not None:     # v3 R4 지역 섞기: 세계마다 고른 지역 차례(seed_history 와 같은 순서)
+        meta["region_history"] = venv.region_history
+        meta["seed_history"] = venv.seed_history
+    if getattr(venv, "forest_history", None) is not None:     # v3 R5 무작위 숲 섞기: 세계마다 꼴('unreal' / 'rand u=… brush=… n=…')
+        meta["forest_history"] = venv.forest_history
     out.with_suffix(".json").write_text(json.dumps(meta, ensure_ascii=False, indent=1), encoding="utf-8")
     print(f"config_digest {digest}, 체크포인트 {len(cb.saved)}개, 학습한 세계 수 {meta['worlds_seen']}")
     return 0

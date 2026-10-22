@@ -1,0 +1,91 @@
+{
+ "snapshot": {
+  "map": "LV_Ecosystem_IntegrationTest",
+  "session_seed": 20004,
+  "global_step": 473,
+  "sim_seconds": 63.06666666666666,
+  "why": "환경 바뀜 #1 뒤 3.1초 그대로 (eco.IntegratedV3.AutoSnapshot)",
+  "brain": "v3_r1_g995_s3_20m@eca97f2e",
+  "tree_layout": "trees-1017a 21218665c114"
+ },
+ "anchor": "ckpt/v3/v3_r1_g995_s3_obs21zero.zip",
+ "anchor_weights_sha256": "a085b941ee119dbef63f5872e5f20714e7887da6090b37f34b26cd9574113985",
+ "N": 128,
+ "regions": [
+  "Forest",
+  "Barren",
+  "Highland"
+ ],
+ "changed": [
+  {
+   "key": "features.wild_weather.regions",
+   "template": {
+    "Barren": [
+     "clear",
+     0.0
+    ],
+    "Forest": [
+     "rain",
+     1.0
+    ],
+    "Highland": [
+     "snow",
+     1.0
+    ]
+   },
+   "snapshot": {
+    "Forest": [
+     "rain",
+     1.0
+    ],
+    "Barren": [
+     "rain",
+     1.0
+    ],
+    "Highland": [
+     "snow",
+     1.0
+    ]
+   },
+   "src": "regions.world.weather"
+  }
+ ],
+ "checks": [
+  "계약 해시 0xbc4fc2d45c47c5fd = 시작 모델",
+  "시작 모델 ckpt/v3/v3_r1_g995_s3_obs21zero.zip (가중치 sha256 a085b941ee119dbe) — 지금 두뇌 v3_r1_g995_s3_20m@eca97f2e 에서 부르는 쪽이 골랐다",
+  "팀 은신처 생명주기(ProtectedRefuges) 켬 — 지워진 은신처 없음이라 세계가 같다",
+  "먹이 규칙(셀·패치·문턱·기울기·재생) = 파이썬 상수",
+  "대응표 밖 칸 5 + 지역마다 1 개 = 기준 게임 값",
+  "Forest 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "Barren 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0.0781 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "Highland 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "은신처 원 = 파이썬 세계 (지역마다)"
+ ],
+ "template": "configs/v3_wild3_obs_mirror.yaml",
+ "f_dec_note": "R5 학습 조리법 값 그대로 (포만 켠 R5 세계에서 잰 값 — 예비 측정의 measure-fdec 로 T 값을 잰다)",
+ "live": {
+  "start": "ckpt/v3/v3_r1_g995_s3_obs21zero.zip",
+  "start_why": "R1b-F(관측 18) → R1b-F + 0 열(관측 21, 결정 같음)",
+  "current_brain": "v3_r1_g995_s3_20m@eca97f2e",
+  "brain_contract": "0x7eea0107339be4ce",
+  "start_contract": "0xbc4fc2d45c47c5fd",
+  "satiation_game": true,
+  "f_dec": 0.858922,
+  "worlds": {
+   "G": "world.yaml (늑대 포만 게임 값)",
+   "N": "world.yaml + wild_satiation.enabled false",
+   "T": "train.yaml (늑대 포만 끔)"
+  },
+  "env": {
+   "watch": true,
+   "revision": 1,
+   "changed_step": 450,
+   "first_changed_step": 450,
+   "trigger": "env_change",
+   "changes": 2
+  },
+  "env_summary": "Barren 나무 0→20, 비 1.0",
+  "env_digest": "657d0ca1ef6efba7",
+  "brain_weights_sha256": "eca97f2ef6c0d6a1c81d8fce79d9c5740fd9cde60f04a65cfa00a43b64c8bdbe"
+ }
+}

@@ -37,6 +37,26 @@ v3 R1 이산 행동 경로 (명세 `Docs/RL_Policy/RL_V3_R1_SPEC.md` 2·4절, `e
   - 학습 기록용 누적 수(`rep_counts`): 개체-스텝, 결정(요청을 읽은) 수, 피식·아사 수, 실행 행동별 수. `last_reads` = 방금
     스텝에서 요청을 읽은 개체(SB3 롤아웃 버퍼 순서와 같은 (num_envs,) bool)
 세계 뽑기·엇갈린 교체·사망 우선 규칙은 연속 경로와 같다.
+
+v3 R4 지역 섞기(10-18 사람 결정 RL_V2_PLAN.md 10-18 (15) D1·D4, 사전 등록 `results/v3/r4/PREREG.md`): 설정에 `train.region_mix` 가 있으면 새 세계를
+고를 때마다 시드(위 규칙 그대로) 다음에 지역 하나를 메타 난수로 뽑는다(`weights` 비율). 지역 = 언리얼 통합 레벨 지역 무대 하나 — 그 세계는 설정의
+`features.wild_weather.region` 을 그 지역으로, `features.obstacles.fixed` 를 그 지역 나무 원판(`obstacles[지역]`, 빈 목록 = 나무 없음)으로 덮은 설정으로
+새로 만든다(먹이 지도·시작 자리 등은 시드가 정한다 — 파이썬 난수). 블록이 없으면 지금과 같다(메타 난수 소비도 같다). wild_weather·obstacles 를 켠
+설정에서만 쓰고, 지역 이름은 wild_weather.regions 에 있어야 한다. 고른 지역은 `region_history`(세계마다 차례) 에 남는다.
+    train:
+      region_mix: {regions: [Barren, Forest, Highland], weights: [1, 1, 1], obstacles: {Barren: [], Forest: [[x, y, r], …], Highland: […]}}
+
+v3 R5 무작위 숲 섞기(10-19 사용자 '일단 두뇌가 나무 같은 장애물을 인지할 수 있게 바꿔', 계획서 RL_V2_PLAN.md 10-19 (16) (c), 사전 등록
+`results/v3/r5/PREREG.md`): `train.region_mix` 에 선택 키 `random_forest` 가 있으면 지역을 고른 다음 세계마다 메타 난수를 늘 네 번 더 쓴다 —
+(1) 균등 수 v (v < share 면 무작위 숲 세계, 아니면 위 지역 나무 원판 그대로), (2) 밀도 u ~ U[density 하, 상], (3) 균등 수 b (b < brush_share 면 덤불도
+깐다), (4) 배치 씨앗 정수 k. 무작위 숲 세계의 원판 = `world.obstacle_layout`(무작위 배치와 같은 식, 은신처 원·벽 가장자리 피함)을 난수
+default_rng([RANDOM_FOREST_TAG, k]) 하나로 차례대로: 줄기 round(u × tree_per_ha × ha) 개(반지름 tree_r) + 바위 round(u × rock_per_ha × ha) 개(rock_r),
+덤불이면 이어서 덤불 round(u × brush_per_ha × ha) 개(brush_r). 이 원판으로 `features.obstacles.fixed` 를 덮는다(날씨는 고른 지역 그대로 — 지역 날씨에
+숲 밀도만 바꾼 세계). 쓰지 않는 세계도 네 값을 뽑아 메타 난수 소비가 세계마다 같다. 키가 없으면 R4 지역 섞기와 같다(메타 난수 소비도 같다).
+고른 꼴은 `forest_history`(세계마다 차례, 'unreal' 또는 'rand u=… brush=… n=…')에 남는다(region_history 는 지역 이름 그대로).
+    train:
+      region_mix: {…, random_forest: {share: 0.5, density: [0, 1], tree_per_ha: 250, tree_r: [0.05, 0.15], rock_per_ha: 5, rock_r: [0.25, 0.75],
+                                      brush_share: 0.5, brush_per_ha: 150, brush_r: [0.5, 1.0]}}
 """
 
 from __future__ import annotations
@@ -105,6 +125,111 @@ def world_sampling_params(raw) -> dict | None:
     return {"mode": "balanced", "candidates": int(c), "keys": keys}
 
 
+REGION_MIX_KEYS = frozenset({"regions", "weights", "obstacles"})
+REGION_MIX_OPTIONAL = frozenset({"random_forest"})             # v3 R5 무작위 숲 섞기 (모듈 docstring)
+RANDOM_FOREST_KEYS = frozenset({"share", "density", "tree_per_ha", "tree_r", "rock_per_ha", "rock_r", "brush_share", "brush_per_ha", "brush_r"})
+RANDOM_FOREST_TAG = 5150                                        # 무작위 숲 배치 난수 구분값 (다른 스트림 구분값과 겹치지 않게 고른 수)
+
+
+def random_forest_params(raw) -> dict | None:
+    """`train.region_mix.random_forest`(모듈 docstring 'v3 R5 무작위 숲 섞기')를 검사한다. 없으면 None. 기본값은 없다(키 모두를 적는다)."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or set(raw) != RANDOM_FOREST_KEYS:
+        raise ValueError(f"train.region_mix.random_forest 는 키 {sorted(RANDOM_FOREST_KEYS)} 를 모두, 그것만 적는다. 받은 값: {raw!r}")
+
+    def num(k, lo=0.0, hi=math.inf):
+        v = raw[k]
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v) or not lo <= v <= hi:
+            raise ValueError(f"train.region_mix.random_forest.{k} 는 [{lo}, {hi}] 안의 수다. 받은 값: {v!r}")
+        return float(v)
+
+    def pair(k, positive=False):
+        v = raw[k]
+        if (not isinstance(v, (list, tuple)) or len(v) != 2
+                or any(isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) for x in v)
+                or v[0] < 0 or v[1] < v[0] or (positive and v[0] <= 0)):
+            raise ValueError(f"train.region_mix.random_forest.{k} 는 [하, 상] (0 ≤ 하 ≤ 상{', 하 > 0' if positive else ''}) 이다. 받은 값: {v!r}")
+        return (float(v[0]), float(v[1]))
+
+    out = dict(share=num("share", 0.0, 1.0), brush_share=num("brush_share", 0.0, 1.0), tree_per_ha=num("tree_per_ha"),
+               rock_per_ha=num("rock_per_ha"), brush_per_ha=num("brush_per_ha"), tree_r=pair("tree_r", positive=True),
+               rock_r=pair("rock_r", positive=True), brush_r=pair("brush_r", positive=True), density=pair("density"))
+    if out["density"][1] > 1.0:
+        raise ValueError(f"train.region_mix.random_forest.density 는 [0, 1] 안이다. 받은 값: {raw['density']!r}")
+    return out
+
+
+def random_forest_discs(rf: dict, u: float, brush: bool, key: int, size: float, cov_c, cov_r, body_r: float) -> list:
+    """무작위 숲 세계 원판 [[x, y, r], …] (모듈 docstring 'v3 R5 무작위 숲 섞기'). 같은 (u, brush, key, 무대)면 같은 원판."""
+    from .world import obstacle_layout
+
+    g = np.random.default_rng([RANDOM_FOREST_TAG, int(key)])
+    rows = [obstacle_layout(g, size, cov_c, cov_r, dict(tree_per_ha=u * rf["tree_per_ha"], tree_r=list(rf["tree_r"]),
+                                                        rock_per_ha=u * rf["rock_per_ha"], rock_r=list(rf["rock_r"]), body_r=body_r))]
+    if brush:
+        rows.append(obstacle_layout(g, size, cov_c, cov_r, dict(tree_per_ha=u * rf["brush_per_ha"], tree_r=list(rf["brush_r"]),
+                                                                rock_per_ha=0.0, rock_r=list(rf["rock_r"]), body_r=body_r)))
+    return [[float(x), float(y), float(r)] for a in rows for x, y, r in a]
+
+
+def region_mix_params(raw, cfg) -> dict | None:
+    """`train.region_mix` 블록(모듈 docstring 'v3 R4 지역 섞기')을 검사한다. 없으면 None (지금과 같다). 기본값은 없다.
+    반환: regions(이름 튜플), probs((n,) 합 1), obstacles({지역: [[x, y, r], …]})."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict) or not REGION_MIX_KEYS <= set(raw) <= REGION_MIX_KEYS | REGION_MIX_OPTIONAL:
+        raise ValueError(f"train.region_mix 는 키 {sorted(REGION_MIX_KEYS)} 를 모두(선택 {sorted(REGION_MIX_OPTIONAL)}), 그것만 적는다. "
+                         f"받은 값: {raw!r}")
+    regions = raw["regions"]
+    if (not isinstance(regions, (list, tuple)) or not regions or any(not isinstance(r, str) for r in regions)
+            or len(set(regions)) != len(regions)):
+        raise ValueError(f"train.region_mix.regions 는 겹치지 않는 지역 이름 목록이다. 받은 값: {regions!r}")
+    w = raw["weights"]
+    if (not isinstance(w, (list, tuple)) or len(w) != len(regions)
+            or any(isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) or x <= 0 for x in w)):
+        raise ValueError(f"train.region_mix.weights 는 지역마다 양수 하나다(regions 와 같은 길이). 받은 값: {w!r}")
+    obs = raw["obstacles"]
+    if not isinstance(obs, dict) or set(obs) != set(regions):
+        raise ValueError(f"train.region_mix.obstacles 는 지역마다 원판 목록 하나다(키 = regions). 받은 값의 키: "
+                         f"{sorted(obs) if isinstance(obs, dict) else obs!r}")
+    discs = {}
+    for r in regions:
+        rows = obs[r]
+        if not isinstance(rows, (list, tuple)) or any(
+                not isinstance(d, (list, tuple)) or len(d) != 3
+                or any(isinstance(x, bool) or not isinstance(x, (int, float)) or not math.isfinite(x) for x in d) or d[2] <= 0
+                for d in rows):
+            raise ValueError(f"train.region_mix.obstacles.{r} 는 [x, y, r>0] 목록이다(빈 목록 = 나무 없음)")
+        discs[r] = [[float(x) for x in d] for d in rows]
+    feats = (getattr(cfg, "v2", None) or {}).get("features") or {}
+    wx, ob = feats.get("wild_weather") or {}, feats.get("obstacles") or {}
+    if not (wx.get("enabled") and ob.get("enabled")):
+        raise ValueError("train.region_mix 는 features.wild_weather·obstacles 를 켠 설정에서만 쓴다(지역 = 날씨 + 나무)")
+    bad = [r for r in regions if r not in (wx.get("regions") or {})]
+    if bad:
+        raise ValueError(f"train.region_mix.regions 의 {bad} 가 features.wild_weather.regions 에 없다")
+    p = np.asarray(w, dtype=np.float64)
+    out = {"regions": tuple(regions), "probs": p / p.sum(), "obstacles": discs}
+    rf = random_forest_params(raw.get("random_forest"))
+    if rf is not None:
+        out["random_forest"] = rf
+    return out
+
+
+def region_configs(cfg, mix: dict) -> dict:
+    """지역 → 그 지역 세계 설정(wild_weather.region·obstacles.fixed 만 덮은 사본). 실행기 run_mirror.py 의 짝 비교 덮기와 같은 두 칸이다."""
+    import copy
+
+    out = {}
+    for r in mix["regions"]:
+        f = copy.deepcopy(cfg.v2["features"])
+        f["wild_weather"]["region"] = r
+        f["obstacles"]["fixed"] = copy.deepcopy(mix["obstacles"][r])
+        out[r] = cfg.replace(v2=dict(cfg.v2, features=f))
+    return out
+
+
 class MultiWorldVecEnv(VecEnv):
     metadata = {"render_modes": []}
 
@@ -150,10 +275,31 @@ class MultiWorldVecEnv(VecEnv):
             self._ws_n = 0
             self.ws_picked: list[int] = []      # 고른 순서 (진단·테스트용)
 
+        # v3 R4 지역 섞기(모듈 docstring): 블록이 없으면 None 이고 세계 설정·메타 난수 소비가 지금과 같다
+        self._rm = region_mix_params(train.get("region_mix"), cfg)
+        self._rm_cfgs = region_configs(cfg, self._rm) if self._rm is not None else None
+        self.region_history: list[list[str]] | None = [] if self._rm is not None else None
+        # v3 R5 무작위 숲 섞기(모듈 docstring): random_forest 키가 있을 때만. 무대 크기·은신처 원은 시드와 무관해 견본 세계 하나로 잰다(메타 난수 안 씀)
+        self._rf = self._rm.get("random_forest") if self._rm is not None else None
+        self.forest_history: list[list[str]] | None = [] if self._rf is not None else None
+        if self._rf is not None:
+            c0 = self._rm_cfgs[self._rm["regions"][0]]
+            probe = World(c0, seeds=[int(self.pool[0])])
+            self._rf_stage = (float(probe.size), np.asarray(probe.cov_c, dtype=np.float64).copy(),
+                              np.asarray(probe.cov_r, dtype=np.float64).copy(), float(c0.v2["features"]["obstacles"]["body_r"]))
+
         self.worlds: list[World] = []
         for _ in range(self.K):
             s = self._pick_seed(exclude=[w.seed for w in self.worlds])
-            self.worlds.append(World(cfg, seeds=[s]))
+            if self._rm is None:
+                self.worlds.append(World(cfg, seeds=[s]))
+            else:
+                r = self._pick_region()
+                c, tag = self._forest_cfg(r)
+                self.worlds.append(World(c, seeds=[s]))
+                self.region_history.append([r])
+                if self.forest_history is not None:
+                    self.forest_history.append([tag])
         if self.worlds[0].alive is not None:
             # 통합 무대 부활 없음(env_v2/world.py 모듈 docstring '통합 무대' (k)): 시체 슬롯의 행을 PPO 손실에서 뺄 마스크가 아직 없다. 그대로
             # 학습하면 죽은 행의 관측·보상 0 을 조용히 배운다 — 번식 출생 단계에서 빈 슬롯 마스크와 함께 연다
@@ -216,12 +362,47 @@ class MultiWorldVecEnv(VecEnv):
             if s not in exclude:
                 return s
 
+    def _pick_region(self) -> str:
+        """v3 R4 지역 섞기: 메타 난수로 지역 하나(weights 비율). 시드를 고른 뒤에 부른다."""
+        rm = self._rm
+        return rm["regions"][int(self._meta.choice(len(rm["regions"]), p=rm["probs"]))]
+
+    def _forest_cfg(self, r: str):
+        """v3 R5 무작위 숲 섞기: 지역 r 의 세계 설정과 꼴 이름. random_forest 가 없으면 (지역 설정, None) — 메타 난수를 쓰지 않는다."""
+        rf = self._rf
+        if rf is None:
+            return self._rm_cfgs[r], None
+        v = float(self._meta.random())
+        u = float(self._meta.uniform(rf["density"][0], rf["density"][1]))
+        b = float(self._meta.random())
+        key = int(self._meta.integers(0, 2 ** 62))
+        if v >= rf["share"]:
+            return self._rm_cfgs[r], "unreal"
+        import copy
+
+        size, cc, cr, body = self._rf_stage
+        brush = b < rf["brush_share"]
+        base = self._rm_cfgs[r]
+        f = copy.deepcopy(base.v2["features"])
+        f["obstacles"]["fixed"] = random_forest_discs(rf, u, brush, key, size, cc, cr, body)
+        return base.replace(v2=dict(base.v2, features=f)), f"rand u={u:.3f} brush={int(brush)} n={len(f['obstacles']['fixed'])}"
+
     def _renew(self, k: int) -> np.ndarray:
         others = [w.seed for j, w in enumerate(self.worlds) if j != k]
         s = self._pick_seed(exclude=others)
-        w = self.worlds[k]
-        w.seeds = np.asarray([s], dtype=np.int64)   # World.reset 은 이 풀에서 고른다
-        obs = w.reset()
+        if self._rm is not None:
+            # v3 R4 지역 섞기: 고른 지역의 설정으로 세계를 새로 만든다(설정이 지역마다 달라 reset 으로는 못 바꾼다)
+            r = self._pick_region()
+            c, tag = self._forest_cfg(r)
+            w = self.worlds[k] = World(c, seeds=[s])
+            obs = w.observe()
+            self.region_history[k].append(r)
+            if self.forest_history is not None:
+                self.forest_history[k].append(tag)
+        else:
+            w = self.worlds[k]
+            w.seeds = np.asarray([s], dtype=np.int64)   # World.reset 은 이 풀에서 고른다
+            obs = w.reset()
         self._age[k] = 0
         self.seed_history[k].append(int(w.seed))
         return obs

@@ -46,6 +46,18 @@ bool FEcoJYUSpatialFood::RunTest(const FString&) {
     E->TickSimulation(1);E->GetRegionState(S.RegionId,S);
     TestEqual(TEXT("Generic regeneration cannot be a second writer"),S.FoodAmount,77.f);
     TestTrue(TEXT("Rejected receipts do not advance sequence"),E->CommitSpatialFood(S.RegionId,2,77,7,0,70));
+    TestFalse(TEXT("Habitat adjustment cannot create food"),E->AdjustSpatialFoodHabitat(S.RegionId,3,70,-5,100,75));
+    TestFalse(TEXT("Habitat adjustment rejects stale amounts"),E->AdjustSpatialFoodHabitat(S.RegionId,3,80,30,50,50));
+    TestFalse(TEXT("Habitat adjustment rejects nonconservation"),E->AdjustSpatialFoodHabitat(S.RegionId,3,70,10,50,50));
+    TestFalse(TEXT("Habitat adjustment rejects NaN capacity"),E->AdjustSpatialFoodHabitat(S.RegionId,3,70,20,std::numeric_limits<double>::quiet_NaN(),50));
+    TestTrue(TEXT("Late refuge clips food with a separate habitat receipt"),E->AdjustSpatialFoodHabitat(S.RegionId,3,70,20,50,50));
+    TestFalse(TEXT("Duplicate habitat receipt rejected"),E->AdjustSpatialFoodHabitat(S.RegionId,3,50,0,50,50));
+    E->GetRegionState(S.RegionId,S);
+    TestEqual(TEXT("Habitat capacity reaches regional state"),S.FoodCapacity,50.f);
+    TestEqual(TEXT("Habitat loss reaches regional state"),S.FoodAmount,50.f);
+    TestTrue(TEXT("Ordinary feeding continues after habitat change"),E->CommitSpatialFood(S.RegionId,4,50,5,0,45));
+    TestTrue(TEXT("Refuge removal restores capacity without inventing food"),E->AdjustSpatialFoodHabitat(S.RegionId,5,45,0,100,45));
+    TestTrue(TEXT("Regeneration may refill restored capacity"),E->CommitSpatialFood(S.RegionId,6,45,0,40,85));
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUSavedAssets,"AdaptiveEcosystem.Creature.JYU.SavedProfilesAndBehaviorGraphs",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)

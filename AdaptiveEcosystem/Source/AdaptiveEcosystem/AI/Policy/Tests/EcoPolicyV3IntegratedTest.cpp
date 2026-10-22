@@ -23,9 +23,17 @@
 //   Integrated.NoFreeze                사슴 얼기 막음 (eco.IntegratedV3.NoFreeze 기본 1 → 설정 → 세계 허용 칸): 켜면 Mass 2000 스텝 동안 FREEZE 실행 0·
 //                                      얼기 칸이 열린 결정 0, R1b 가 얼 자리에서만 다른 행동이고 나머지 결정은 R1b 와 같다. 끄면 R1b 그대로(얼기 씀)
 //   (경계 거리 KeepAway 시험 6 개는 도주 반사 거리로 바꾸며 지웠다 — 규칙 시험은 EcoWildV3Test.cpp Wild.FlightGolden·Wild.FlightOff)
+//   Integrated.BrainSwap               두뇌 바꾸기 (10-18, EcoV3Brain.h): 60 초에 내장 R1b → R4 s0 파일 두뇌를 결정 스텝 경계에서 — 사슴 조각 바이트·개체 그대로,
+//                                      바꾸기 앞은 바꾸지 않은 판과 비트 단위로 같고 경계 스텝은 앞 두뇌의 요청을 실행, 뒤 결정은 모두 R4 로짓, 허용 = R4 ∧ 세계.
+//                                      10-21 도망 기록 연결: 지역 장부에 결정 스텝마다 누적, 바꾼 판만 두뇌 판이 한 번 넘어가고 교체 전 + 지금 판 = 누적,
+//                                      보고의 산 사슴-스텝·FLEE 스텝 = 세계 기록 (EcoV3FlightTally.h — 규칙 시험은 EcoFlightV3Test.cpp)
+//   Integrated.BrainObs21Zero          R5 관측 21 (10-19, 계약 2-4): 처음부터 관측 21 두뇌(R1b-F + 장애물 세 칸 입력 열 0)로 돌린 두 지역(숲 나무 24) 180 초 =
+//                                      내장 판 (자리·요청·로짓 비트 단위), 세계 관측 칸 수 = 두뇌 계약, 세 칸은 관측 21 판에서만 만든다, 어긋남·마스크 위반 0
 //   Integrated.WolfEating              늑대 식사 시간 (eco.IntegratedV3.WolfEatSeconds 기본 5 → 38 스텝): 위협 모델 — 식사 37 스텝 제자리, 38 번째에
 //                                      다시 잡음, 끄면 배회, 플레이어·쿨다운 0 은 그대로. Mass — 서 있음·속도 0·'먹는 중' 깃발·글자, 팀 늑대 표현이
 //                                      '먹는 중' 동작 (옛 규칙 0.67 초는 뛰기), 옛 규칙 설정은 바꾸기 전 세계와 비트 단위로 같다
+//   Integrated.EnvChangeBoundary       환경 바뀜 (10-21, EcoV3EnvWatch.cpp): Play 중 놓은 줄기 막이가 다음 결정 스텝 경계에서 세계 원판이 되고 그 안 사슴을 밀어낸다.
+//                                      바꾸기 앞·다른 지역은 바꾸지 않은 판과 비트 단위로 같고, 먹이 용량 그대로, 감시 끔(EnvWatch 0)이면 끝까지 같다
 
 #include "Misc/AutomationTest.h"
 
@@ -68,6 +76,7 @@
 #include "HAL/IConsoleManager.h"
 #include "Misc/CommandLine.h"
 #include "Misc/Parse.h"
+#include "Misc/ScopeExit.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassNetworkTrait.h"
 #include "Mass/EcoMassTags.h"
@@ -80,6 +89,7 @@
 #include "MassSpawnerSubsystem.h"
 #include "World/EcologyRegion.h"
 #include "World/EcologyWorldSubsystem.h"
+#include "Ecology/EcologySimulationSubsystem.h"
 
 namespace EcoPolicyV3IntegratedTestImpl
 {
@@ -97,6 +107,7 @@ namespace EcoPolicyV3IntegratedTestImpl
 		S.StageSizeUnits = 60.0;
 		S.LogIntervalSeconds = 1000.0f;   // 시험 중 기록 줄을 줄인다
 		S.bProtectedRefuges = false; // Existing parity fixtures exercise their original cover rule.
+		S.bPackHunt = false;         // 10-17 야생 2단계 2 전에 만든 장면들이다 (늑대 무리 협동은 Tests/EcoPackV3Test.cpp 가 본다)
 		return S;
 	}
 
@@ -1314,8 +1325,11 @@ bool FEcoPolicyV3IntegratedEndToEndTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("죽은 개체를 지워도 스텝이 계속된다"), H.Destroyed > 0 && A->Sim.T == Steps && B->Sim.T == Steps && H.Sub->GetGlobalStep() == Steps);
 	TestEqual(TEXT("시체가 움직인 프레임"), CorpseMoved, 0);
 	TestEqual(TEXT("무대 밖 자리"), OutOfStage, 0);
-	TestTrue(TEXT("잠행형 최고 속력 ≤ 돌진 1350 cm/s"), MaxStalkerCmS <= 1350.0 + 1e-3);
-	TestTrue(TEXT("추격형 최고 속력 ≤ 720 cm/s (사슴 뛰기의 0.8배)"), MaxChaserCmS <= 720.0 + 1e-3);
+	// 10-16 은신처 진입 금지(eco.IntegratedV3.ShelterSafe 기본 1): 원 안으로 들어간 늑대를 둘레 밖으로 밀면 그 스텝 변위가 걸음보다 조금 길 수 있다
+	// (파이썬 R3 (c′) 그대로 — 둘레 방향 이동 + 바깥쪽 밀기). 그 몫으로 1% 여유를 둔다 (이 시험 2000 스텝 관측: 1351·721 cm/s)
+	const double PushSlack = FEcoV3IntegratedSettings().bShelterSafe ? 1.01 : 1.0;
+	TestTrue(TEXT("잠행형 최고 속력 ≤ 돌진 1350 cm/s (은신처 밀기 여유 1%)"), MaxStalkerCmS <= 1350.0 * PushSlack + 1e-3);
+	TestTrue(TEXT("추격형 최고 속력 ≤ 720 cm/s (사슴 뛰기의 0.8배, 은신처 밀기 여유 1%)"), MaxChaserCmS <= 720.0 * PushSlack + 1e-3);
 	TestTrue(TEXT("사슴 최고 속력 ≤ 뛰기 900 cm/s"), MaxDeerCmS <= 900.0 + 1e-3);
 	TestTrue(TEXT("밤에는 주행성 늑대가 모두 잔다"), AllAsleepSteps > 0);
 	return true;
@@ -2706,6 +2720,8 @@ bool FEcoV3SocialBlindMember::RunTest(const FString&) {
     namespace R=EcoRepertoireV3;
     FIntegratedHarness H;auto Settings=TestSettings();
     Settings.bWildFlight=false;Settings.bRealismVision=false;Settings.bRealismHearing=false;
+    // 10-17 (8): 기본은 Social 연결 끔. 이 시험은 팀 연결 자체를 보므로 켠다 (끈 기본값은 아래 DefaultOffKeepsNativeMovement)
+    Settings.bSocialControl=true;
     if(!H.Setup(*this,Settings))return false;
     auto* Region=H.AddRegion(TEXT("SocialTest"),0,FVector::ZeroVector,2,1);
     // At t=0 the native dawn twilight can legitimately initialize wolves asleep. This scenario tests an awake hunter.
@@ -2762,11 +2778,70 @@ bool FEcoV3SocialBlindMember::RunTest(const FString&) {
     TestEqual(TEXT("Shared memories cannot re-emit an observed alarm after direct evidence clears"),Data.AlarmStrength,0.f);
     return true;
 }
+/**
+ * 10-17 사람 결정 (8): 통합 기본값은 Social 연결 끔이다. 위 BlindMemberReaction 과 같은 장면에서 Social 처리기는 그대로 돌아
+ * 못 본 사슴에게 Panic 을 기록하지만, v3 사슴 움직임은 파이썬 세계 규칙 그대로다(먹기 요청은 먹기로 실행, 연결 기록 None).
+ * 실제 근거: 10-13 결정 — 경보는 소리·고개 들기 같은 연출로만 쓰고 행동 논리에는 넣지 않는다.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3SocialDefaultOff,"AdaptiveEcosystem.Policy.V3.Social.DefaultOffKeepsNativeMovement",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoV3SocialDefaultOff::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    namespace R=EcoRepertoireV3;
+    TestFalse(TEXT("통합 v3 기본값: Social 연결 끔"),FEcoV3IntegratedSettings().bSocialControl);
+    IConsoleVariable* Var=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.SocialControl"));
+    if(!TestNotNull(TEXT("콘솔 변수 eco.IntegratedV3.SocialControl"),Var))return false;
+    const int32 Saved=Var->GetInt();
+    TestEqual(TEXT("콘솔 기본 0 (끔)"),Saved,0);
+    TestFalse(TEXT("콘솔 0 → 설정 끔"),FEcoV3IntegratedSettings::FromConsole().bSocialControl);
+    Var->Set(1,ECVF_SetByCode);
+    TestTrue(TEXT("콘솔 1 → 설정 켬"),FEcoV3IntegratedSettings::FromConsole().bSocialControl);
+    Var->Set(Saved,ECVF_SetByCode);
+    FIntegratedHarness H;auto Settings=TestSettings();
+    Settings.bWildFlight=false;Settings.bRealismVision=false;Settings.bRealismHearing=false;
+    TestFalse(TEXT("시험 설정도 기본값 그대로 끔"),Settings.bSocialControl);
+    if(!H.Setup(*this,Settings))return false;
+    auto* Region=H.AddRegion(TEXT("SocialOff"),0,FVector::ZeroVector,2,1);
+    Region->Sim.Config.DayOffset=225;EcoWorldV3::UpdateDayNight(Region->Sim);
+    H.Spawn(true,TEXT("SocialOff"),0,{FVector(5000,5000,0)},{13});
+    H.Spawn(false,TEXT("SocialOff"),0,{FVector(5500,5000,0),FVector(5400,5000,0)},{14,15});
+    H.Frame(0);
+    auto Observer=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[0]);
+    auto Receiver=UEcoPolicyV3Subsystem::MakeHerbView(*H.EM,H.Deer[1]);
+    Observer.Body->Head={-1,0};Receiver.Body->Head={1,0};
+    FHerbView Views[]={Observer,Receiver};
+    FThreatAgent* Threats[]={&H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent};
+    Threats[0]->Spec.BaseSpeed=0;Region->Sim.ThreatCfg.HerbSpeed=0;
+    EcoWorldV3::ObserveAndDecideAll(Region->Sim,Views,2,Threats,1);
+    TestEqual(TEXT("못 본 사슴은 늑대를 직접 느끼지 않는다"),Receiver.Perception->Threat.PredCount,0);
+    auto* Herds=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>();
+    const int32 Herd=Herds->AllocateHerd(H.EM->GetFragmentDataChecked<FEcoIdentityFragment>(H.Deer[0]).SpeciesRuntimeIndex,FVector(5450,5000,0));
+    for(const auto E:H.Deer)H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(E).HerdRuntimeIndex=Herd;
+    auto* Sense=EcoV3SocialTests::Processor<UEcoPolicyV3SocialSenseProcessor>(H);
+    auto* Prop=EcoV3SocialTests::Processor<UEcoAlarmPropagationProcessor>(H);
+    auto* Response=EcoV3SocialTests::Processor<UEcoSocialResponseProcessor>(H);
+    auto* Lifecycle=EcoV3SocialTests::Processor<UEcoShelterLifecycleProcessor>(H);
+    EcoTest::RunProcessor(*Sense,*H.EM,.016f);EcoTest::RunProcessor(*Prop,*H.EM,.016f);
+    TestTrue(TEXT("Social 처리기는 그대로 돌아 못 본 사슴에게 Panic 을 기록한다"),
+             H.EM->GetFragmentDataChecked<FEcoAlarmStateFragment>(H.Deer[1]).State==EEcoSocialState::Panic);
+    Receiver.Decision->Request=R::kGraze;
+    EcoTest::RunProcessor(*Response,*H.EM,.016f);EcoTest::RunProcessor(*Lifecycle,*H.EM,.016f);
+    H.Scoped.World->TimeSeconds+=R::kStepSeconds;H.DecisionStep();
+    TestEqual(TEXT("먹기 요청은 그대로 먹기로 실행된다 (Social 도주 없음)"),Receiver.Decision->ExecutedBehavior,R::kGraze);
+    bool bNeverApplied=true;
+    for(int32 I=0;I<6;++I){
+        H.Scoped.World->TimeSeconds+=R::kStepSeconds;H.DecisionStep();
+        bNeverApplied&=H.EM->GetFragmentDataChecked<FEcoV3SocialBridgeFragment>(H.Deer[1]).Applied==EEcoV3SocialControl::None;
+    }
+    TestTrue(TEXT("연결 기록은 한 번도 Social 제어를 적지 않는다 (훅을 걸지 않음)"),bNeverApplied
+             &&H.EM->GetFragmentDataChecked<FEcoV3SocialBridgeFragment>(H.Deer[1]).Applied==EEcoV3SocialControl::None);
+    return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3SocialSlotArrival,"AdaptiveEcosystem.Policy.V3.Social.SlotMovementAndCleanup",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoV3SocialSlotArrival::RunTest(const FString&) {
     using namespace EcoPolicyV3IntegratedTestImpl;
     namespace R=EcoRepertoireV3;
     FIntegratedHarness H;auto Settings=TestSettings();Settings.bWildFlight=false;
+    Settings.bSocialControl=true; // 10-17 (8): 팀 슬롯 이동 연결 자체를 보므로 켠다 (기본은 끔)
     if(!H.Setup(*this,Settings))return false;
     auto* Region=H.AddRegion(TEXT("SocialSlot"),0,FVector::ZeroVector,1,0);
     Region->Sim.Config.Covers.push_back({27.25,25,1.0});
@@ -2884,8 +2959,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeCapture,"AdaptiveEcosystem.Policy.V3.
 bool FEcoRefugeCapture::RunTest(const FString&) {
     using namespace EcoPolicyV3IntegratedTestImpl;
     FIntegratedHarness H;auto Settings=TestSettings();Settings.bProtectedRefuges=true;Settings.bWildSatiation=false;
+    // 10-17 통합: 팀 안전 규칙(몸 여유 1 m·쓸고 지나가기 막기·갇힌 늑대 꺼내기)은 ShelterSafe 0 일 때만 안전을 맡는다 — 그 규칙 그대로 시험한다.
+    // 통합 기본값(ShelterSafe 1 + ProtectedRefuges 1)은 아래 FEcoRefugeMergedSingleRule 이 시험한다
+    Settings.bShelterSafe=false;
     if(!H.Setup(*this,Settings))return false;
     auto* Region=H.AddRegion(TEXT("Refuge"),0,FVector::ZeroVector,1,1);
+    // 10-17 늑대 몸 여유: 팀 규칙이 안전을 맡을 때는 우리 몸 여유를 쓰지 않는다 (두 여유가 겹치지 않는다 — 팀 여유 PredatorRefugeMargin 하나만)
+    TestEqual(TEXT("팀 규칙일 때 우리 늑대 몸 여유 0"),Region->Sim.Config.ShelterWolfMargin,0.0);
     Region->Sim.Config.DayOffset=225;EcoWorldV3::UpdateDayNight(Region->Sim);
     H.Spawn(false,TEXT("Refuge"),0,{FVector(3000,3000,0)},{71});
     H.Spawn(true,TEXT("Refuge"),0,{FVector(3050,3000,0)},{72});H.Frame(0);
@@ -2912,6 +2992,140 @@ bool FEcoRefugeCapture::RunTest(const FString&) {
     Region->Sim.Config.WildFlight.bEnabled=false;
     H.DecisionStep();
     TestEqual(TEXT("Leaving refuge restores real predation"),Deer.Body->DeathCause,EcoWorldV3::kDeathCaught);
+    return true;
+}
+/**
+ * 10-17 팀 브랜치 통합: 통합 기본값(ShelterSafe 1 + ProtectedRefuges 1)에서 은신처 안전 규칙은 파이썬 realism_shelter 하나뿐이다.
+ * 같은 장면(사슴이 은신처 한가운데, 늑대가 그 원 안에서 시작)에서 늑대는 첫 이동부터 원 밖(|q − c| ≥ r — 파이썬 정의)에 있고, 원 안 사슴은 잡히지 않으며,
+ * 팀 규칙의 몸 여유 밀어내기·갇힌 늑대 꺼내기는 한 번도 일어나지 않는다(두 규칙이 한꺼번에 적용되지 않음). 원 밖으로 나온 사슴은 다시 잡힌다.
+ */
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeMergedSingleRule,"AdaptiveEcosystem.Policy.V3.Refuge.MergedDefaultSingleRule",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRefugeMergedSingleRule::RunTest(const FString&)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	FIntegratedHarness H;
+	FEcoV3IntegratedSettings Settings = TestSettings();
+	Settings.bProtectedRefuges = true;
+	Settings.bWildSatiation = false;
+	TestTrue(TEXT("통합 기본값: 파이썬 은신처 안전 켬"), FEcoV3IntegratedSettings().bShelterSafe && FEcoV3IntegratedSettings().bProtectedRefuges);
+	TestTrue(TEXT("시험 설정도 은신처 안전 켬"), Settings.bShelterSafe);
+	if (!H.Setup(*this, Settings))
+	{
+		return false;
+	}
+	FEcoV3RegionContext* Region = H.AddRegion(TEXT("RefugeMerged"), 0, FVector::ZeroVector, 1, 1);
+	TestTrue(TEXT("세계 설정: 두 칸 모두 켬, 안전은 파이썬 규칙"),
+			 Region->Sim.Config.bShelterSafe && Region->Sim.Config.bProtectedRefuges && !EcoWorldV3::RefugeOwnsSafety(Region->Sim.Config)
+				 && Region->Sim.ThreatCfg.bShelterSafe && Region->Sim.ThreatCfg.bShelterBlock);
+	// 10-17 늑대 몸 여유 (eco.IntegratedV3.WolfBodyMargin 기본 1 m = 0.5 단위, 파이썬 realism_shelter.wolf_margin)
+	const double BodyMargin = Region->Sim.Config.ShelterWolfMargin;
+	TestEqual(TEXT("통합 기본 늑대 몸 여유 0.5 단위 (1 m)"), BodyMargin, 0.5);
+	// 10-17 야생 2단계 1 은신처 먹이 부족 (eco.IntegratedV3.ShelterFood 기본 1, 파이썬 realism_cover_food 0.15): 겹치는 셀 용량 = 처음 용량 × 0.15
+	// (10-17 고침: 1b11c78 이 기본을 0 으로 바꿨던 것을 되돌렸다 — 사용자 결정 '은신처는 안전하지만 먹이가 적다')
+	{
+		const EcoWorldV3::FFoodGrid& F = Region->Sim.Food;
+		bool bFood = Region->Sim.Config.ShelterFood.bEnabled && F.CoverFoodCell.size() == F.Cap.size() && F.Cap0.size() == F.Cap.size();
+		int32 FoodCells = 0;
+		for (size_t K = 0; bFood && K < F.Cap.size(); ++K)
+		{
+			FoodCells += F.CoverFoodCell[K];
+			bFood = F.Cap[K] == (F.CoverFoodCell[K] ? F.Cap0[K] * Region->Sim.Config.ShelterFood.CapFrac : F.Cap0[K]) && F.Food[K] <= F.Cap[K];
+		}
+		TestTrue(TEXT("통합 기본 은신처 먹이 부족 켬 (겹치는 셀 용량 × 0.15)"), bFood && FoodCells > 0);
+	}
+	Region->Sim.Config.DayOffset = 225;   // 낮 — 깨어 있는 늑대
+	EcoWorldV3::UpdateDayNight(Region->Sim);
+	H.Spawn(false, TEXT("RefugeMerged"), 0, {FVector(3000, 3000, 0)}, {171});
+	H.Spawn(true, TEXT("RefugeMerged"), 0, {FVector(3050, 3000, 0)}, {172});
+	H.Frame(0);
+	std::vector<double> Discs;
+	std::vector<double> BodyDiscs;   // 늑대가 보는 원 (반지름 + 몸 여유)
+	for (const EcoObservationV3::FCoverInput& C : Region->Sim.Config.Covers)
+	{
+		Discs.insert(Discs.end(), {C.X, C.Y, C.Radius});
+		BodyDiscs.insert(BodyDiscs.end(), {C.X, C.Y, C.Radius + BodyMargin});
+	}
+	const std::int32_t NumDiscs = static_cast<std::int32_t>(Discs.size() / 3);
+	{
+		const EcoThreatV3::FThreatState& StartWolf = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent.State;
+		TestTrue(TEXT("늑대가 원 안에서 시작한다 (장면 확인)"), EcoThreatV3::InsideAnyDisc(StartWolf.PosX, StartWolf.PosY, Discs.data(), NumDiscs));
+	}
+	bool bOutside = true;
+	bool bOutsideBody = true;
+	bool bProtected = true;
+	int32 InCoverSteps = 0;
+	for (int32 I = 0; I < 120; ++I)
+	{
+		H.DecisionStep();
+		const EcoWorldV3::FHerbBody* Body = UEcoPolicyV3Subsystem::MakeHerbView(*H.EM, H.Deer[0]).Body;
+		const EcoThreatV3::FThreatState& Wolf = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent.State;
+		bOutside &= !EcoThreatV3::InsideAnyDisc(Wolf.PosX, Wolf.PosY, Discs.data(), NumDiscs);
+		bOutsideBody &= !EcoThreatV3::InsideAnyDisc(Wolf.PosX, Wolf.PosY, BodyDiscs.data(), NumDiscs);
+		if (EcoRefugeV3::Contains(Region->Sim.Config.Covers, Body->Pos))
+		{
+			++InCoverSteps;
+			bProtected &= Body->DeathCause != EcoWorldV3::kDeathCaught;
+		}
+	}
+	const EcoWorldV3::FWorldStats& St = Region->Sim.Stats;
+	TestTrue(TEXT("늑대는 첫 이동부터 원 밖 (파이썬 |q − c| ≥ r)"), bOutside);
+	TestTrue(TEXT("늑대 중심은 첫 이동부터 반지름 + 몸 여유 밖 (10-17)"), bOutsideBody);
+	TestTrue(TEXT("원 안 사슴은 잡히지 않는다"), bProtected && InCoverSteps > 0);
+	TestTrue(TEXT("생명주기 기록: 원 안 보호 스텝이 세어진다"), St.RefugeProtectedPreySteps > 0);
+	TestEqual(TEXT("팀 규칙 밀어내기는 한 번도 없다 (한꺼번에 적용 안 함)"), St.RefugeConstrainedMoves, static_cast<std::int64_t>(0));
+	TestEqual(TEXT("팀 규칙 갇힌 늑대 꺼내기도 없다 (첫 이동의 ShelterPush 가 꺼낸다)"), St.RefugeRecoveries, static_cast<std::int64_t>(0));
+	TestEqual(TEXT("원 안 늑대 스텝 0 (파이썬 정의)"), St.RefugeInsidePredatorSteps, static_cast<std::int64_t>(0));
+	TestEqual(TEXT("원 안 포획 0"), St.RefugeCaptureViolations + St.CaughtInCover, static_cast<std::int64_t>(0));
+
+	// 보호는 자리로만 정해진다: 원 밖으로 나온 사슴은 다시 잡힌다 (팀 시험과 같은 장면)
+	EcoWorldV3::FHerbView Deer = UEcoPolicyV3Subsystem::MakeHerbView(*H.EM, H.Deer[0]);
+	EcoThreatV3::FThreatState& Wolf = H.EM->GetFragmentDataChecked<FEcoThreatStateFragment>(H.Wolves[0]).Agent.State;
+	Deer.Body->Pos = Deer.Body->PrevPos = {40, 40};
+	Deer.Body->Energy = 1;
+	Deer.Body->DeathCause = 0;
+	H.EM->GetFragmentDataChecked<FEcoVitalsFragment>(H.Deer[0]).HP = 100;
+	H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Deer[0]).bDead = false;
+	EcoRepertoireV3::Enter(*Deer.Rep, EcoRepertoireV3::kGraze, Deer.Decision->DecisionObs, Region->Sim.RepCfg);
+	Deer.Decision->KeepMode = Deer.Decision->KeepActive = 0;
+	Wolf.PosX = 40.05;
+	Wolf.PosY = 40;
+	Wolf.Cooldown = Wolf.SatLeft = 0;
+	Region->Sim.Config.WildFlight.bEnabled = false;
+	H.DecisionStep();
+	TestEqual(TEXT("원 밖 사슴은 다시 잡힌다"), Deer.Body->DeathCause, EcoWorldV3::kDeathCaught);
+	return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeLateFood,"AdaptiveEcosystem.Policy.V3.Refuge.LateRegistrationFoodLedger",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRefugeLateFood::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    FIntegratedHarness H;auto Settings=TestSettings();Settings.bProtectedRefuges=true;Settings.bShelterFood=true;
+    if(!H.Setup(*this,Settings))return false;
+    const FName Id=TEXT("LateFood");
+    const auto Config=UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(Settings,0,1,0,{});
+    auto* Region=H.Sub->AddContext(Id,0,FVector::ZeroVector,Config,1,0);
+    if(!TestNotNull(TEXT("Native food context"),Region))return false;
+    auto* Ecology=H.Scoped.World->GetSubsystem<UEcologySimulationSubsystem>();
+    FRegionEcologyState State;State.RegionId=Id;
+    if(!TestTrue(TEXT("Register authority region"),Ecology->RegisterRegionState(State)))return false;
+    Region->bSpatialFoodRegistered=Ecology->RegisterSpatialFood(Id,Region->StartFood,Region->StartFood);
+    if(!TestTrue(TEXT("Register initial native food ledger"),Region->bSpatialFoodRegistered))return false;
+    H.Spawn(false,Id,0,{FVector(1000,1000,0)},{91});H.Frame(0);
+    auto* Shelters=H.Scoped.World->GetSubsystem<UEcoShelterSubsystem>();
+    const int32 Index=Shelters->RegisterShelter({6000,6000,0},FVector::UpVector,1,4,800,.55f);
+    H.DecisionStep();
+    TestTrue(TEXT("Late shelter must not stop native simulation"),H.Sub->IsActive());
+    TestTrue(TEXT("Native step advanced after clipping food"),Region->Sim.T>0);
+    Ecology->GetRegionState(Id,State);
+    TestTrue(TEXT("Late refuge lowers habitat capacity"),State.FoodCapacity<Region->StartFood);
+    TestTrue(TEXT("Authority amount follows native grid"),FMath::IsNearlyEqual(double(State.FoodAmount),Region->Sim.Food.Total(),.01));
+    const double FoodBeforeRemoval=Region->Sim.Food.Total();
+    const float ReducedCapacity=State.FoodCapacity;
+    Shelters->UnregisterShelter(Index);H.Sub->RefreshRefuges(*Region);
+    Ecology->GetRegionState(Id,State);
+    TestTrue(TEXT("Removal restores regional capacity"),State.FoodCapacity>ReducedCapacity);
+    TestEqual(TEXT("Removal does not refill native food"),Region->Sim.Food.Total(),FoodBeforeRemoval);
+    H.DecisionStep();
+    TestTrue(TEXT("Receipts continue after removal and regeneration"),H.Sub->IsActive());
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeLifecycle,"AdaptiveEcosystem.Policy.V3.Refuge.RemovalAndSlotIdentity",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
@@ -3000,5 +3214,572 @@ bool FEcoRefugeLateGround::RunTest(const FString&) {
     if(!TestNotNull(TEXT("Late physical ground"),SpawnBox(*W->World,{0,0,-20},FRotator::ZeroRotator,{40,40,.2})))return false;
     FAutomationTestFramework::Get().EnqueueLatentCommand(MakeShared<FWaitForRefugeGround>(W,Habitat,this));
     return true;
+}
+
+// -----------------------------------------------------------------------------
+// 두뇌 바꾸기 (10-18 실행 중 가중치 로더, EcoV3Brain.h): Play 를 멈추지 않고 결정 스텝 경계에서 내장 R1b → R4 s0 파일 두뇌
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedBrainSwapTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.BrainSwap",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedBrainSwapTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	namespace P3 = EcoPolicyV3;
+	constexpr int32 NB = EcoRepertoireV3::kNumBehaviors;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	Reg.ResetForTest();
+	ON_SCOPE_EXIT
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();   // 저장소는 프로세스에 하나 — 다른 시험·Play 에 R4 가 남지 않게
+	};
+	const FEcoV3BrainLoad R4 = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r4_g995_s0_20m"));
+	if (!TestTrue(FString::Printf(TEXT("R4 두뇌 파일 (%s: %s)"), EcoV3Brain::RejectName(R4.Reason), *R4.Message), R4.Ok()))
+	{
+		return false;
+	}
+	const FEcoV3BrainRef Builtin = FEcoV3BrainRegistry::Builtin();
+
+	constexpr int32 kSwapFrame = 450;   // 60 초 (프레임 = 결정 스텝 하나)
+	constexpr int32 kFrames = 1350;     // 180 초
+	struct FRun
+	{
+		TArray<TArray<double>> Pos;         // [프레임] 사슴마다 (x, y) (지워졌으면 NaN)
+		TArray<TArray<int32>> Request;      // [프레임] 다음 스텝 요청 (없으면 -1)
+		TArray<TArray<int32>> Committed;    // [프레임] 이번 스텝에 실행한 요청
+		int64 Decisions[2] = {};            // 바꾸기 전·뒤 요청을 읽은 결정 (두뇌를 부른 결정)
+		int64 LogitBad = 0;                 // 그 프레임 두뇌로 다시 계산한 로짓·요청과 다른 결정
+		int64 StateBytesChanged = 0;        // 바꾸기(SyncBrain)만으로 바뀐 사슴 조각 바이트
+		int32 DeerBefore = 0;
+		int32 DeerAfter = 0;
+		int32 HandlesChanged = 0;
+		int64 SwapStep = -1;
+		int64 GlobalStepAtSwap = -1;
+		bool bActiveIsR4 = false;
+		uint8 AllowedAfter[2][NB] = {};
+		int64 Violations = 0;
+		int64 TallyBad = 0;                 // 두뇌 집계 + 반사 ≠ 산 사슴·스텝
+		FEcoV3BrainTally Before;            // 두 지역 합 (바꾸기 앞)
+		FEcoV3BrainTally Total;
+		// 도망 기록 연결 (10-21): 도망 기록을 세는 지역 수, 장부·보고가 어긋난 지역 수, 두 지역 시작 도망 합, 화면 글 (지역 A)
+		int32 FlightRegions = 0;
+		int32 FlightBad = 0;
+		int64 FlightStarted = 0;
+		FString FlightText;
+	};
+	auto Snapshot = [](FIntegratedHarness& H, TArray<uint8>& Out, int32& OutValid)
+	{
+		Out.Reset();
+		OutValid = 0;
+		for (const FMassEntityHandle& E : H.Deer)
+		{
+			if (!H.EM->IsEntityValid(E))
+			{
+				continue;
+			}
+			++OutValid;
+			auto Add = [&Out](const void* P, int32 N)
+			{
+				const int32 At = Out.AddUninitialized(N);
+				FMemory::Memcpy(Out.GetData() + At, P, N);
+			};
+			Add(&H.EM->GetFragmentDataChecked<FEcoBehaviorStateFragment>(E), sizeof(FEcoBehaviorStateFragment));
+			Add(&H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(E), sizeof(FEcoHerbivoreBodyV3Fragment));
+			Add(&H.EM->GetFragmentDataChecked<FEcoPerceptionCacheFragment>(E), sizeof(FEcoPerceptionCacheFragment));
+			Add(&H.EM->GetFragmentDataChecked<FEcoControlOutFragment>(E), sizeof(FEcoControlOutFragment));
+			Add(&H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E), sizeof(FEcoIntegratedV3Fragment));
+			Add(&H.EM->GetFragmentDataChecked<FEcoVitalsFragment>(E), sizeof(FEcoVitalsFragment));
+			Add(&H.EM->GetFragmentDataChecked<FTransformFragment>(E), sizeof(FTransformFragment));
+		}
+	};
+	auto SumTally = [](const FEcoV3RegionContext& A, const FEcoV3RegionContext& B)
+	{
+		FEcoV3BrainTally T = A.BrainTally;
+		for (int32 b = 0; b < EcoRepertoireV3::kNumBehaviors; ++b)
+		{
+			T.Steps[b] += B.BrainTally.Steps[b];
+			T.KnowSteps[b] += B.BrainTally.KnowSteps[b];
+		}
+		T.Reflex += B.BrainTally.Reflex;
+		T.ReflexKnow += B.BrainTally.ReflexKnow;
+		return T;
+	};
+	auto Run = [&](bool bSwap, FRun& Out) -> bool
+	{
+		Reg.ResetForTest();
+		FIntegratedHarness H;
+		if (!H.Setup(*this, TestSettings(37100)))
+		{
+			return false;
+		}
+		FEcoV3RegionContext* A = H.AddRegion(TEXT("RegionA"), 0, FVector(0.0, 0.0, 0.0), 16, 2);
+		FEcoV3RegionContext* B = H.AddRegion(TEXT("RegionB"), 1, FVector(0.0, 40000.0, 0.0), 16, 2);
+		H.SpawnRegion(*A, 16, 2, 1, 0);
+		H.SpawnRegion(*B, 16, 2, 100, 1);
+		for (int32 f = 0; f < kFrames; ++f)
+		{
+			if (bSwap && f == kSwapFrame)
+			{
+				// 경계: 처리기 밖(Mass 처리 중이 아님)에서 줄에 넣고 SyncBrain — 다음 프레임 처리기 머리의 SyncBrain 은 할 일이 없다
+				TArray<uint8> Snap;
+				Snapshot(H, Snap, Out.DeerBefore);
+				TArray<FMassEntityHandle> Handles = H.Deer;
+				Out.Before = SumTally(*A, *B);
+				Reg.Queue(R4.Brain.ToSharedRef(), TEXT("시험 Integrated.BrainSwap"));
+				H.Sub->SyncBrain(/*bPollWatch*/ false);
+				TArray<uint8> After;
+				Snapshot(H, After, Out.DeerAfter);
+				Out.StateBytesChanged = After.Num() != Snap.Num() ? After.Num() : 0;
+				for (int32 i = 0; i < FMath::Min(After.Num(), Snap.Num()); ++i)
+				{
+					Out.StateBytesChanged += After[i] != Snap[i] ? 1 : 0;
+				}
+				Out.HandlesChanged = Handles == H.Deer ? 0 : 1;
+				Out.SwapStep = H.Sub->GetLastBrainSwapStep();
+				Out.GlobalStepAtSwap = H.Sub->GetGlobalStep();
+				Out.bActiveIsR4 = H.Sub->GetActiveBrain().Id == R4.Brain->Id;
+				for (int32 c = 0; c < 2; ++c)
+				{
+					for (int32 b = 0; b < NB; ++b)
+					{
+						Out.AllowedAfter[c][b] = H.Ctx(c).Sim.Allowed[b];
+					}
+				}
+			}
+			H.DecisionStep();
+			H.CoordinatorReconcile();
+			const bool bNew = bSwap && f >= kSwapFrame;   // 이 프레임 끝 결정(다음 스텝 요청)을 만든 두뇌
+			const P3::FPolicyNetV3& Want = bNew ? R4.Brain->Net : Builtin->Net;
+			TArray<double>& Pos = Out.Pos.AddDefaulted_GetRef();
+			TArray<int32>& Req = Out.Request.AddDefaulted_GetRef();
+			TArray<int32>& Com = Out.Committed.AddDefaulted_GetRef();
+			for (const FMassEntityHandle& E : H.Deer)
+			{
+				if (!H.EM->IsEntityValid(E))
+				{
+					Pos.Append({TNumericLimits<double>::Max(), TNumericLimits<double>::Max()});
+					Req.Add(-1);
+					Com.Add(-1);
+					continue;
+				}
+				const FHerbView V = DeerView(*H.EM, E);
+				Pos.Append({V.Body->Pos.X, V.Body->Pos.Y});
+				const EcoWorldV3::FHerbDecision& D = *V.Decision;
+				Req.Add(D.bPrepared ? D.Request : -1);
+				Com.Add(D.CommittedRequest);
+				if (H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead || !D.bPrepared || !D.Prep.bReads)
+				{
+					continue;
+				}
+				++Out.Decisions[bNew ? 1 : 0];
+				float L[NB];
+				const int32 Got = P3::RunPolicyV3(Want, V.Perception->Obs, D.Mask, L);
+				Out.LogitBad += (Got != D.Request || FMemory::Memcmp(L, D.Logits, sizeof(L)) != 0) ? 1 : 0;
+			}
+		}
+		Out.Total = SumTally(*A, *B);
+		for (const FEcoV3RegionContext* C : {A, B})
+		{
+			Out.Violations += C->Sim.Stats.MaskViolations;
+			Out.TallyBad += C->BrainTally.Total() + C->BrainTally.Reflex != C->Sim.Stats.LiveDeerSteps ? 1 : 0;
+			// 도망 기록 연결 (10-21): 장부에 결정 스텝마다 누적 · 교체 전 + 지금 판 = 누적 · 바꾼 판만 한 번 넘어감 · 보고 = 세계 기록 (열린 도망 = 처리기의 FlightOpen)
+			if (C->FlightOn())
+			{
+				const EcoWorldV3::FWorldStats& St = C->Sim.Stats;
+				const EcoWorldV3::FFlightReport Fr = EcoWorldV3::FlightReportOf(St.Flight, C->FlightOpen);
+				const EcoV3Flight::FTally& Tl = C->FlightTally;
+				++Out.FlightRegions;
+				Out.FlightStarted += Fr.Started;
+				Out.FlightBad += (Tl.Pushes != St.Steps || !(Tl.PrevGen.Plus(Tl.CurrentGen()) == EcoV3Flight::FSum::Of(St.Flight))
+								  || Tl.Swaps != (bSwap ? 1 : 0) || Tl.bHasPrev != bSwap || Fr.LiveSteps != St.LiveDeerSteps
+								  || Fr.FleeSteps != St.BehaviorSteps[EcoRepertoireV3::kFlee] || Fr.ReflexSteps > St.KeepSteps[EcoWorldV3::kKeepPanic])
+									 ? 1 : 0;
+			}
+		}
+		Out.FlightText = EcoV3Flight::SummaryText(A->FlightTally.Window()) + TEXT(" · ") + EcoV3Flight::CompareText(A->FlightTally);
+		return true;
+	};
+
+	FRun Swap;
+	FRun Ctl;
+	if (!Run(true, Swap) || !Run(false, Ctl))
+	{
+		return false;
+	}
+
+	// 바꾸기 앞은 두 판이 같다, 경계 스텝은 앞 두뇌가 정한 요청을 실행한다, 그 뒤 결정이 달라진다
+	int32 PreDiff = 0;
+	int32 BoundaryCommittedDiff = 0;
+	int32 PostReqDiffFrames = 0;
+	for (int32 f = 0; f < kFrames; ++f)
+	{
+		const bool bSamePos = Swap.Pos[f] == Ctl.Pos[f];
+		if (f < kSwapFrame)
+		{
+			PreDiff += (bSamePos && Swap.Request[f] == Ctl.Request[f] && Swap.Committed[f] == Ctl.Committed[f]) ? 0 : 1;
+		}
+		else if (f == kSwapFrame)
+		{
+			BoundaryCommittedDiff += (bSamePos && Swap.Committed[f] == Ctl.Committed[f]) ? 0 : 1;
+		}
+		else
+		{
+			PostReqDiffFrames += Swap.Request[f] == Ctl.Request[f] ? 0 : 1;
+		}
+	}
+	auto HideKnow = [](const FEcoV3BrainTally& T)
+	{
+		const int64 N = T.KnowTotal();
+		return N > 0 ? 100.0 * static_cast<double>(T.KnowSteps[EcoRepertoireV3::kHide]) / static_cast<double>(N) : 0.0;
+	};
+	const FEcoV3BrainTally SwapAfter = Swap.Total.Minus(Swap.Before);
+	const FEcoV3BrainTally CtlAfter = Ctl.Total.Minus(Swap.Before);   // 두 판은 바꾸기 앞까지 같다 (PreDiff 0)
+	AddInfo(FString::Printf(TEXT("바꾸기 전역 스텝 %lld · 사슴 %d → %d · 결정 앞 %lld 뒤 %lld · 다른 결정 프레임(뒤) %d/%d · 늑대를 알 때 숨기(뒤 120초) R4 %.1f%% (%lld) 대 내장 %.1f%% (%lld)"),
+							Swap.SwapStep, Swap.DeerBefore, Swap.DeerAfter, Swap.Decisions[0], Swap.Decisions[1], PostReqDiffFrames, kFrames - kSwapFrame - 1,
+							HideKnow(SwapAfter), SwapAfter.KnowTotal(), HideKnow(CtlAfter), CtlAfter.KnowTotal()));
+
+	TestEqual(TEXT("바꾼 스텝 = 그때 전역 스텝 (경계)"), Swap.SwapStep, Swap.GlobalStepAtSwap);
+	TestTrue(TEXT("바꾼 뒤 이 월드 두뇌 = R4"), Swap.bActiveIsR4);
+	TestEqual(TEXT("바꾸기는 사슴 조각(행동 상태·결정·몸·지각·제어·생명) 바이트를 하나도 바꾸지 않는다"), Swap.StateBytesChanged, static_cast<int64>(0));
+	TestTrue(TEXT("바꾸기는 개체를 만들거나 지우지 않는다 (같은 핸들·같은 수)"), Swap.HandlesChanged == 0 && Swap.DeerBefore == Swap.DeerAfter && Swap.DeerBefore > 0);
+	const uint8 WantAllowed[NB] = {1, 1, 1, 0, 0};   // R4 (먹기·도망·숨기) ∧ 세계 (얼기 막음)
+	TestTrue(TEXT("허용 칸 = R4 ∧ 세계 (두 지역)"), FMemory::Memcmp(Swap.AllowedAfter[0], WantAllowed, NB) == 0 && FMemory::Memcmp(Swap.AllowedAfter[1], WantAllowed, NB) == 0);
+	TestEqual(TEXT("바꾸기 앞 결정·실행·위치는 바꾸지 않은 판과 비트 단위로 같다"), PreDiff, 0);
+	TestEqual(TEXT("경계 스텝은 앞 두뇌가 정한 요청을 실행한다 (위치·실행 요청이 같다)"), BoundaryCommittedDiff, 0);
+	TestTrue(TEXT("바꾼 뒤 결정이 달라진다"), PostReqDiffFrames > 0);
+	TestTrue(TEXT("두 판 모두 두뇌를 부른 결정이 있다"), Swap.Decisions[0] > 0 && Swap.Decisions[1] > 0 && Ctl.Decisions[0] > 0);
+	TestEqual(TEXT("모든 결정의 로짓·요청 = 그 프레임 두뇌(앞 내장, 뒤 R4)로 다시 계산한 값 (바꾼 판)"), Swap.LogitBad, static_cast<int64>(0));
+	TestEqual(TEXT("모든 결정의 로짓·요청 = 내장 두뇌 (바꾸지 않은 판)"), Ctl.LogitBad, static_cast<int64>(0));
+	TestEqual(TEXT("마스크 위반 0 (두 판)"), Swap.Violations + Ctl.Violations, static_cast<int64>(0));
+	TestEqual(TEXT("두뇌 집계(두뇌 스텝 + 반사 스텝) = 산 사슴·스텝 (지역마다, 두 판)"), Swap.TallyBad + Ctl.TallyBad, static_cast<int64>(0));
+	// 도망 기록 연결 (10-21, 도주 반사 기본 켬 → 통합 세계 도망 기록 켬)
+	TestTrue(TEXT("도망 기록: 두 지역 모두 센다 (두 판)"), Swap.FlightRegions == 2 && Ctl.FlightRegions == 2);
+	TestEqual(TEXT("도망 기록: 장부(스텝마다 누적·두뇌 판)·보고(산 사슴-스텝·FLEE 스텝·반사) = 세계 기록 (지역마다, 두 판)"), Swap.FlightBad + Ctl.FlightBad, 0);
+	AddInfo(FString::Printf(TEXT("도망 기록: 바꾼 판 시작 %lld · 바꾸지 않은 판 %lld | 지역 A (바꾼 판): %s"), Swap.FlightStarted, Ctl.FlightStarted, *Swap.FlightText));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// R5 관측 21 (10-19, 계약 2-4): 처음부터 관측 21 두뇌(R1b-F + 장애물 세 칸 입력 열 0)로 돌린 Mass 통합 판 = 내장 R1b-F 판 (배관 확인)
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedBrainObs21ZeroTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.BrainObs21Zero",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedBrainObs21ZeroTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	namespace P3 = EcoPolicyV3;
+	namespace O3 = EcoObservationV3;
+	constexpr int32 NB = EcoRepertoireV3::kNumBehaviors;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	Reg.ResetForTest();
+	ON_SCOPE_EXIT
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	const FEcoV3BrainLoad Zero = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r1_g995_s3_obs21zero"));
+	if (!TestTrue(FString::Printf(TEXT("관측 21 두뇌 파일 (%s: %s)"), EcoV3Brain::RejectName(Zero.Reason), *Zero.Message), Zero.Ok()))
+	{
+		return false;
+	}
+	constexpr int32 kFrames = 1350;   // 180 초
+	// 두 지역 모두 숲 무대 나무 24 그루 줄기 원판 (TreeLayoutV3.h — 언리얼 통합 레벨과 같은 원판)
+	std::vector<double> Discs;
+	for (const EcoTreeLayoutV3::FTree& T : EcoTreeLayoutV3::kForestTrees)
+	{
+		Discs.insert(Discs.end(), {T.X, T.Y, T.R});
+	}
+	struct FRun
+	{
+		TArray<TArray<double>> Pos;
+		TArray<TArray<int32>> Request;
+		TArray<TArray<uint32>> LogitBits;   // [프레임] 사슴마다 다음 요청 로짓 5 (읽은 결정만, 아니면 0)
+		int32 ObsDim[2] = {};
+		int64 Decisions = 0;
+		int64 LogitBad = 0;                  // 그 두뇌·그 입력(관측 18 + 세 칸)으로 다시 돌린 로짓·요청과 다른 결정
+		int64 SlotsFilled = 0;               // 세 칸을 만든 산 사슴·프레임 (obstacle_near < 1 이거나 escape_room < 1)
+		int64 SlotsNonZero = 0;              // 세 칸 중 하나라도 0 이 아닌 산 사슴·프레임
+		int64 Mismatch = 0;
+		int64 Violations = 0;
+		FString ActiveId;
+	};
+	auto Run = [&](bool bZero, FRun& Out) -> bool
+	{
+		Reg.ResetForTest();
+		FIntegratedHarness H;
+		if (!H.Setup(*this, TestSettings(37200)))
+		{
+			return false;
+		}
+		const FEcoV3IntegratedSettings& S = H.Sub->GetSettings();
+		FEcoV3RegionContext* Ctx[2] = {};
+		for (int32 c = 0; c < 2; ++c)
+		{
+			FWorldConfig C = UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(S, c, 16, 2, EcoWorldV3::QuadCovers(S.StageSizeUnits, 6.0));
+			C.Obstacles.bEnabled = true;
+			C.Obstacles.Discs = Discs;
+			Ctx[c] = H.Sub->AddContext(c == 0 ? FName(TEXT("RegionA")) : FName(TEXT("RegionB")), c, FVector(0.0, 40000.0 * c, 0.0), C, 16, 2);
+		}
+		H.SpawnRegion(*Ctx[0], 16, 2, 1, 0);
+		H.SpawnRegion(*Ctx[1], 16, 2, 100, 1);
+		if (bZero)
+		{
+			// 시작 두뇌 (eco.V3Brain.Startup 과 같은 길): 줄에 넣으면 첫 처리기 머리의 SyncBrain 이 입양 첫 결정 앞에서 바꾼다
+			Reg.Queue(Zero.Brain.ToSharedRef(), TEXT("시험 Integrated.BrainObs21Zero"));
+		}
+		for (int32 f = 0; f < kFrames; ++f)
+		{
+			H.DecisionStep();
+			H.CoordinatorReconcile();
+			const P3::FPolicyNetV3& Net = H.Sub->ActiveNet();
+			TArray<double>& Pos = Out.Pos.AddDefaulted_GetRef();
+			TArray<int32>& Req = Out.Request.AddDefaulted_GetRef();
+			TArray<uint32>& Bits = Out.LogitBits.AddDefaulted_GetRef();
+			for (const FMassEntityHandle& E : H.Deer)
+			{
+				if (!H.EM->IsEntityValid(E))
+				{
+					Pos.Append({TNumericLimits<double>::Max(), TNumericLimits<double>::Max()});
+					Req.Add(-1);
+					Bits.AddZeroed(NB);
+					continue;
+				}
+				const FHerbView V = DeerView(*H.EM, E);
+				Pos.Append({V.Body->Pos.X, V.Body->Pos.Y});
+				const EcoWorldV3::FHerbDecision& D = *V.Decision;
+				Req.Add(D.bPrepared ? D.Request : -1);
+				const int32 At = Bits.AddZeroed(NB);
+				const bool bDead = H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead;
+				if (!bDead)
+				{
+					const float* Ob = V.Perception->ObstacleObs;
+					Out.SlotsFilled += (Ob[0] < 1.0f || Ob[1] < 1.0f) ? 1 : 0;
+					Out.SlotsNonZero += (Ob[0] != 0.0f || Ob[1] != 0.0f || Ob[2] != 0.0f) ? 1 : 0;
+				}
+				if (bDead || !D.bPrepared || !D.Prep.bReads)
+				{
+					continue;
+				}
+				++Out.Decisions;
+				FMemory::Memcpy(&Bits[At], D.Logits, sizeof(D.Logits));
+				float In[O3::kObsDimObstacle];
+				FMemory::Memcpy(In, V.Perception->Obs, sizeof(V.Perception->Obs));
+				FMemory::Memcpy(In + O3::kObsDim, V.Perception->ObstacleObs, sizeof(V.Perception->ObstacleObs));
+				float L[NB];
+				const int32 Got = P3::RunPolicyV3(Net, In, D.Mask, L);
+				Out.LogitBad += (Got != D.Request || FMemory::Memcmp(L, D.Logits, sizeof(L)) != 0) ? 1 : 0;
+			}
+		}
+		for (int32 c = 0; c < 2; ++c)
+		{
+			Out.ObsDim[c] = Ctx[c]->Sim.ObsDim;
+			Out.Mismatch += Ctx[c]->Sim.Stats.ObsLayoutMismatch;
+			Out.Violations += Ctx[c]->Sim.Stats.MaskViolations;
+		}
+		Out.ActiveId = H.Sub->GetActiveBrain().Id;
+		return true;
+	};
+
+	FRun Base;
+	FRun Z;
+	if (!Run(false, Base) || !Run(true, Z))
+	{
+		return false;
+	}
+	int32 PosDiff = 0;
+	int32 ReqDiff = 0;
+	int32 LogitDiff = 0;
+	for (int32 f = 0; f < kFrames; ++f)
+	{
+		PosDiff += Base.Pos[f] == Z.Pos[f] ? 0 : 1;
+		ReqDiff += Base.Request[f] == Z.Request[f] ? 0 : 1;
+		LogitDiff += Base.LogitBits[f] == Z.LogitBits[f] ? 0 : 1;
+	}
+	AddInfo(FString::Printf(TEXT("내장 %s 대 관측 21 %s · 결정 %lld 대 %lld · 다른 프레임 자리 %d·요청 %d·로짓 %d / %d · 세 칸 만든 산 사슴·프레임 내장 %lld 대 관측 21 %lld (0 아님 %lld)"),
+							*Base.ActiveId, *Z.ActiveId, Base.Decisions, Z.Decisions, PosDiff, ReqDiff, LogitDiff, kFrames, Base.SlotsNonZero, Z.SlotsFilled,
+							Z.SlotsNonZero));
+	TestTrue(TEXT("두 판의 두뇌 (내장 R1b-F 관측 18, 파일 관측 21)"), Base.ActiveId == FEcoV3BrainRegistry::Builtin()->Id && Z.ActiveId == Zero.Brain->Id);
+	TestTrue(TEXT("세계 관측 칸 수 = 두뇌 계약 (내장 18, 관측 21 두뇌 21 — 두 지역)"), Base.ObsDim[0] == O3::kObsDim && Base.ObsDim[1] == O3::kObsDim
+																					   && Z.ObsDim[0] == O3::kObsDimObstacle && Z.ObsDim[1] == O3::kObsDimObstacle);
+	TestEqual(TEXT("내장 판은 세 칸을 만들지 않는다 (0)"), Base.SlotsNonZero, static_cast<int64>(0));
+	TestTrue(TEXT("관측 21 판은 산 사슴마다 세 칸을 만든다 (줄기·벽이 보인다)"), Z.SlotsFilled > 0 && Z.SlotsNonZero > 0);
+	TestTrue(TEXT("두 판 모두 두뇌를 부른 결정이 있다"), Base.Decisions > 100 && Z.Decisions == Base.Decisions);
+	TestEqual(TEXT("관측 21 두뇌(새 열 0) = 내장: 사슴 자리 (비트 단위, 모든 프레임)"), PosDiff, 0);
+	TestEqual(TEXT("관측 21 두뇌(새 열 0) = 내장: 다음 요청 (모든 프레임)"), ReqDiff, 0);
+	TestEqual(TEXT("관측 21 두뇌(새 열 0) = 내장: 결정 로짓 (비트 단위, 모든 프레임)"), LogitDiff, 0);
+	TestEqual(TEXT("모든 결정 로짓·요청 = 그 두뇌로 관측 18 + 세 칸을 다시 돌린 값 (두 판)"), Base.LogitBad + Z.LogitBad, static_cast<int64>(0));
+	TestEqual(TEXT("망 칸 수와 세계 관측 칸 수 어긋남 0 (두 판)"), Base.Mismatch + Z.Mismatch, static_cast<int64>(0));
+	TestEqual(TEXT("마스크 위반 0 (두 판)"), Base.Violations + Z.Violations, static_cast<int64>(0));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 환경 바뀜 경계 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp — LIVE_ADAPT_SPEC.md 5.1): Play 중에 놓은 줄기 막이가 처리기의 다음 결정 스텝 경계에서 세계 원판이 되고
+// 그 안의 산 사슴을 밀어낸다. 바꾸기 앞 프레임·다른 지역은 바꾸지 않은 판과 비트 단위로 같고, 감시를 끄면(eco.IntegratedV3.EnvWatch 0) 줄기 막이가 있어도 끝까지 같다
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedEnvChangeBoundaryTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.EnvChangeBoundary",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedEnvChangeBoundaryTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	using FSub = UEcoPolicyV3IntegratedSubsystem;
+	FEcoV3BrainRegistry::Get().ResetForTest();
+	IConsoleVariable* Watch = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.EnvWatch"));
+	UStaticMesh* TrunkMesh = LoadObject<UStaticMesh>(nullptr, FSub::LevelTrunkMeshPath());
+	if (!TestNotNull(TEXT("eco.IntegratedV3.EnvWatch"), Watch) || !TestNotNull(TEXT("엔진 원기둥"), TrunkMesh))
+	{
+		return false;
+	}
+	const int32 SavedWatch = Watch->GetInt();
+	ON_SCOPE_EXIT
+	{
+		Watch->Set(SavedWatch, ECVF_SetByCode);
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	constexpr int32 kFrames = 300;        // 40 초
+	constexpr int32 kChangeFrame = 120;   // 16 초 — 이 프레임 앞(Mass 처리 밖)에 레벨이 줄기 막이를 놓는다
+	enum class EMode : uint8
+	{
+		Control,    // 바꾸지 않음
+		Change,     // 감시 켬 (기본)
+		WatchOff    // 감시 끔 — 줄기 막이는 놓지만 세계에 넣지 않는다
+	};
+	struct FRun
+	{
+		TArray<TArray<double>> Pos[2];      // [지역][프레임] 사슴마다 (x, y) (지워졌으면 큰 값)
+		int32 Target = INDEX_NONE;          // 줄기를 놓은 지역 A 사슴 (H.Deer 색인)
+		bool bPending = false;
+		int64 StepAtChange = -1;
+		bool bTargetInsideAfter = true;
+		int32 Revision = -1;
+		int64 ChangedStep = -1;
+		std::vector<double> Discs[2];
+		std::vector<double> CapA;
+		int64 PushMoved = 0;
+	};
+	auto Run = [&](EMode Mode, FRun& Out) -> bool
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+		Watch->Set(Mode == EMode::WatchOff ? 0 : 1, ECVF_SetByCode);
+		FIntegratedHarness H;
+		if (!H.Setup(*this, TestSettings(37600)))
+		{
+			return false;
+		}
+		FEcoV3RegionContext* Ctx[2] = {H.AddRegion(TEXT("RegionA"), 0, FVector(0.0, 0.0, 0.0), 16, 2),
+									   H.AddRegion(TEXT("RegionB"), 1, FVector(0.0, 40000.0, 0.0), 16, 2)};
+		int32 First[3] = {0, 0, 0};   // 지역마다 H.Deer 색인 [First[r], First[r + 1])
+		H.SpawnRegion(*Ctx[0], 16, 2, 1, 0);
+		First[1] = H.Deer.Num();
+		H.SpawnRegion(*Ctx[1], 16, 2, 100, 1);
+		First[2] = H.Deer.Num();
+		for (int32 f = 0; f < kFrames; ++f)
+		{
+			if (f == kChangeFrame && Mode != EMode::Control)
+			{
+				// 레벨이 줄기 막이를 놓는다 (시험용 대역과 같은 짝): 지역 A 의 산 사슴 하나가 선 자리 (은신처 원 밖)
+				const FEcoV3RegionContext& A = *Ctx[0];
+				for (int32 i = First[0]; i < First[1] && Out.Target == INDEX_NONE; ++i)
+				{
+					const FMassEntityHandle E = H.Deer[i];
+					if (!H.EM->IsEntityValid(E) || H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead)
+					{
+						continue;
+					}
+					const EcoWorldV3::FVec2 P = DeerView(*H.EM, E).Body->Pos;
+					bool bCover = false;
+					for (const EcoObservationV3::FCoverInput& Cv : A.Sim.Config.Covers)
+					{
+						bCover = bCover || FMath::Square(P.X - Cv.X) + FMath::Square(P.Y - Cv.Y) <= FMath::Square(Cv.Radius + 1.0);
+					}
+					AActor* TreeActor = nullptr;
+					AActor* TrunkActor = nullptr;
+					if (!bCover && FSub::SpawnLevelTreePair(*H.Scoped.World, FSub::MakeLevelTree(P.X, P.Y, 2.0, 0.0), A.OriginCm, 0.0, nullptr, *TrunkMesh,
+															 TEXT("EcoV3TreeId_RegionA_T00"), TreeActor, TrunkActor))
+					{
+						Out.Target = i;
+					}
+				}
+				Out.bPending = H.Sub->PollEnvironment(true) && H.Sub->HasPendingEnvChange();
+				Out.StepAtChange = H.Sub->GetGlobalStep();
+			}
+			H.DecisionStep();
+			H.CoordinatorReconcile();
+			if (f == kChangeFrame && Out.Target != INDEX_NONE && H.EM->IsEntityValid(H.Deer[Out.Target]))
+			{
+				const EcoWorldV3::FVec2 P = DeerView(*H.EM, H.Deer[Out.Target]).Body->Pos;
+				const std::vector<double>& D = Ctx[0]->Sim.Config.Obstacles.Discs;
+				Out.bTargetInsideAfter = EcoThreatV3::InsideAnyObstacle(P.X, P.Y, D.data(), static_cast<std::int32_t>(D.size() / 3), Ctx[0]->Sim.Config.Obstacles.BodyR);
+			}
+			for (int32 r = 0; r < 2; ++r)
+			{
+				TArray<double>& Pos = Out.Pos[r].AddDefaulted_GetRef();
+				for (int32 i = First[r]; i < First[r + 1]; ++i)
+				{
+					const FMassEntityHandle E = H.Deer[i];
+					if (!H.EM->IsEntityValid(E))
+					{
+						Pos.Append({TNumericLimits<double>::Max(), TNumericLimits<double>::Max()});
+						continue;
+					}
+					const EcoWorldV3::FVec2 P = DeerView(*H.EM, E).Body->Pos;
+					Pos.Append({P.X, P.Y});
+				}
+			}
+		}
+		Out.Revision = H.Sub->GetEnvRevision();
+		Out.ChangedStep = H.Sub->GetEnvChangedStep();
+		Out.Discs[0] = Ctx[0]->Sim.Config.Obstacles.Discs;
+		Out.Discs[1] = Ctx[1]->Sim.Config.Obstacles.Discs;
+		Out.CapA = Ctx[0]->Sim.Food.Cap;
+		Out.PushMoved = Ctx[0]->Sim.Stats.ObstaclePushMoved;
+		return true;
+	};
+
+	FRun Control, Change, Off;
+	if (!Run(EMode::Control, Control) || !Run(EMode::Change, Change) || !Run(EMode::WatchOff, Off))
+	{
+		return false;
+	}
+	int32 BeforeDiff = 0;   // 바꾸기 앞 프레임에 지역 A 가 다른 수
+	int32 AfterDiff = 0;    // 바꾼 뒤 지역 A 가 다른 수 (0 보다 커야 한다)
+	int32 OtherDiff = 0;    // 지역 B 가 다른 프레임
+	int32 OffDiff = 0;      // 감시 끔 판이 바꾸지 않은 판과 다른 프레임
+	for (int32 f = 0; f < kFrames; ++f)
+	{
+		const bool bA = Change.Pos[0][f] != Control.Pos[0][f];
+		BeforeDiff += f < kChangeFrame && bA ? 1 : 0;
+		AfterDiff += f >= kChangeFrame && bA ? 1 : 0;
+		OtherDiff += Change.Pos[1][f] != Control.Pos[1][f] ? 1 : 0;
+		OffDiff += (Off.Pos[0][f] != Control.Pos[0][f] || Off.Pos[1][f] != Control.Pos[1][f]) ? 1 : 0;
+	}
+	AddInfo(FString::Printf(TEXT("바꾼 판: 사슴 %d 자리에 줄기 · 대기 %d · 판 %d (스텝 %lld, 놓은 프레임 스텝 %lld) · 원판 A %d B %d · 밀어냄 %lld · 다른 프레임 앞 %d 뒤 %d 지역 B %d | 감시 끔 판 다른 프레임 %d"),
+							Change.Target, Change.bPending ? 1 : 0, Change.Revision, static_cast<long long>(Change.ChangedStep), static_cast<long long>(Change.StepAtChange),
+							static_cast<int32>(Change.Discs[0].size() / 3), static_cast<int32>(Change.Discs[1].size() / 3), Change.PushMoved, BeforeDiff, AfterDiff, OtherDiff,
+							OffDiff));
+	TestTrue(TEXT("줄기를 놓을 산 사슴 (두 판 같은 사슴)"), Change.Target != INDEX_NONE && Change.Target == Off.Target);
+	TestTrue(TEXT("감시 켬: 읽기 → 대기 변화"), Change.bPending);
+	TestEqual(TEXT("환경 판 1"), Change.Revision, 1);
+	TestEqual(TEXT("넣은 스텝 = 놓은 뒤 첫 결정 스텝 경계"), Change.ChangedStep, Change.StepAtChange);
+	TestTrue(TEXT("지역 A 세계 원판 = 놓은 줄기 하나 · 지역 B 원판 없음"), Change.Discs[0].size() == 3 && Change.Discs[1].empty());
+	TestFalse(TEXT("그 사슴은 원판 밖 (경계에서 밀렸다)"), Change.bTargetInsideAfter);
+	TestTrue(TEXT("밀어내기 기록"), Change.PushMoved >= 1 && Control.PushMoved == 0);
+	TestEqual(TEXT("바꾸기 앞 프레임은 바꾸지 않은 판과 비트 단위로 같다"), BeforeDiff, 0);
+	TestTrue(TEXT("바꾼 뒤 지역 A 는 달라진다"), AfterDiff > 0);
+	TestEqual(TEXT("다른 지역(B)은 끝까지 비트 단위로 같다"), OtherDiff, 0);
+	TestTrue(TEXT("먹이 용량 그대로 (환경 바뀜은 먹이 격자를 바꾸지 않는다)"), Change.CapA == Control.CapA);
+	TestTrue(TEXT("감시 끔: 대기·판·원판 없음"), !Off.bPending && Off.Revision == 0 && Off.Discs[0].empty());
+	TestEqual(TEXT("감시 끔: 줄기 막이가 있어도 바꾸지 않은 판과 끝까지 비트 단위로 같다 (옛 동작)"), OffDiff, 0);
+	return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

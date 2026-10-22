@@ -1,0 +1,10 @@
+{
+  "name": "shc_sound",
+  "fps": 30,
+  "frames": 84,
+  "shots": [
+    {"tag": "forest_snd", "from_m": [340.00, 300.00, 1.80], "to_m": [340.00, 300.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 5.000, "duration": 22.000, "every": 15, "first_frame": 0, "frames": 44, "t_first": 5.000, "t_last": 26.500},
+    {"tag": "highland_snd", "from_m": [340.00, -470.00, 1.80], "to_m": [340.00, -470.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 31.000, "duration": 14.000, "every": 15, "first_frame": 44, "frames": 28, "t_first": 31.000, "t_last": 44.500},
+    {"tag": "barren_snd", "from_m": [340.00, 10.00, 1.80], "to_m": [340.00, 10.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 49.000, "duration": 6.000, "every": 15, "first_frame": 72, "frames": 12, "t_first": 49.000, "t_last": 54.500}
+  ]
+}
