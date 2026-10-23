@@ -259,8 +259,14 @@ def test_prereg_doc_numbers(E):
 def test_launch_dry_run():
     """띄우기 스크립트 -DryRun: 본 학습 3 + 대조 1 의 명령이 사전 등록 이름·설정·시작 두뇌·λ 0.98 PPO 설정을 쓰고, 점검 명령이 붙는다."""
     ps = R7 / "launch_train.ps1"
-    out = subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", str(ps), "-Checks", "-DryRun"],
-                         capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=ROOT, timeout=120).stdout
+    r = subprocess.run(["powershell", "-ExecutionPolicy", "Bypass", "-File", str(ps), "-Checks", "-DryRun"],
+                       capture_output=True, text=True, encoding="utf-8", errors="replace", cwd=ROOT, timeout=120)
+    out = r.stdout
+    done = sorted((ROOT / "ckpt" / "v3").glob("v3_r7*_g995_s*_20m.zip"))
+    if done:
+        # 본 학습이 끝난 뒤(10-23 밤): 같은 실행 이름의 끝 모델이 있으면 -DryRun 이어도 명령을 적기 전에 멈춘다(덮어쓰지 않는다 — 사람이 정한다)
+        assert r.returncode != 0 and "[DryRun] train" not in out and "ckpt/v3/v3_r7_g995_s0_20m.zip" in r.stderr
+        return
     lines = [x for x in out.splitlines() if x.startswith("[DryRun] train")]
     assert len(lines) == 4 and all("--steps 20000000" in x and "--ppo-config configs/ppo_r6_lam098.yaml" in x and "--tb runs/v3_r7" in x for x in lines)
     r7 = [x for x in lines if "configs/v3_r7_train.yaml" in x]
