@@ -426,6 +426,14 @@ FString UEcoPolicyV3IntegratedSubsystem::SnapshotPath(const FString& Out) const
 bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const FString& Why, const TCHAR* Trigger) const
 {
 	using namespace EcoV3SnapshotImpl;
+	for (const auto& Ctx : Contexts)
+	{
+		if (Ctx->Sim.Food.Vegetation.bEnabled||Ctx->Sim.Config.bEcosystemLife)
+		{
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoVegetation] RL snapshot v1 rejected: soil/life world requires the separate ecosystem evaluation schema and a complete Python mirror."));
+			return false;
+		}
+	}
 	if (Path.IsEmpty() || Contexts.Num() == 0)
 	{
 		return false;

@@ -28,16 +28,31 @@ bool UEcologySimulationSubsystem::RegisterSpatialFood(FName Id, double Capacity,
 	return true;
 }
 
-bool UEcologySimulationSubsystem::CommitSpatialFood(FName Id, int64 Sequence, double Before, double Consumed, double Regenerated, double After)
+bool UEcologySimulationSubsystem::CommitSpatialFood(FName Id, int64 Sequence, double Before, double Consumed, double Regenerated, double After, double EnvironmentLost)
 {
 	auto* Source = SpatialFood.Find(Id);
 	if (!CanMutateAuthoritativeState(TEXT("CommitSpatialFood")) || bResourceStepOpen || !Source || Sequence <= Source->Sequence
 		|| !FMath::IsFinite(Before) || !FMath::IsFinite(Consumed) || !FMath::IsFinite(Regenerated) || !FMath::IsFinite(After)
+		|| !FMath::IsFinite(EnvironmentLost) || EnvironmentLost < 0
 		|| Consumed < 0 || Regenerated < -1.e-8 || After < 0 || After > Source->Capacity + 1.e-8
+		|| Consumed > Before + 1.e-6 || EnvironmentLost > Before - Consumed + 1.e-6
 		|| !FMath::IsNearlyEqual(Before, Source->Amount, 1.e-6)
-		|| !FMath::IsNearlyEqual(Before - Consumed + Regenerated, After, 1.e-6)) return false;
+		|| !FMath::IsNearlyEqual(Before - Consumed + Regenerated - EnvironmentLost, After, 1.e-6)) return false;
 	Source->Amount = After; Source->Sequence = Sequence;
 	Source->Consumed += Consumed; Source->Regenerated += FMath::Max(0.0, Regenerated);
+	Source->EnvironmentLost += EnvironmentLost;
 	RegionalStates.FindChecked(Id).FoodAmount = float(FMath::Clamp(After, 0.0, Source->Capacity));
+	return true;
+}
+
+bool UEcologySimulationSubsystem::GetSpatialFoodAudit(FName Id, FEcoSpatialFoodAudit& Out) const
+{
+	Out = {};
+	const auto* Source = SpatialFood.Find(Id);
+	if (!IsAuthoritativeWorld() || !Source) return false;
+	Out.Capacity = Source->Capacity; Out.Amount = Source->Amount;
+	Out.Consumed = Source->Consumed; Out.Regenerated = Source->Regenerated;
+	Out.HabitatRemoved = Source->HabitatRemoved; Out.EnvironmentLost = Source->EnvironmentLost;
+	Out.Sequence = Source->Sequence;
 	return true;
 }

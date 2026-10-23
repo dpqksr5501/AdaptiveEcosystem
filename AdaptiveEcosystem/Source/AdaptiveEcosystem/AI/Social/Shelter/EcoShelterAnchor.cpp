@@ -14,7 +14,8 @@ AEcoShelterAnchor::AEcoShelterAnchor()
 	RootComponent = SceneRoot;
 
 #if WITH_EDITORONLY_DATA
-	FacingArrow = CreateDefaultSubobject<UArrowComponent>(TEXT("FacingArrow"));
+	// Mark the template itself editor-only so BP overrides are stripped at cook.
+	FacingArrow = CreateEditorOnlyDefaultSubobject<UArrowComponent>(TEXT("FacingArrow"));
 	if (FacingArrow)
 	{
 		FacingArrow->SetupAttachment(SceneRoot);

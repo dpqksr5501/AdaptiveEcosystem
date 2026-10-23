@@ -2,6 +2,10 @@
 
 모든 팀원·AI의 공통 목표는 [프로젝트 공통 맥락](../PROJECT_CONTEXT.md)을 먼저 읽는다. 아래 문서는 조연우 분야의 실제 구현·검증 인계다.
 
+이번 채팅의 후속 전체 구현과 최신 재개는 [전체 상태](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행 계약/팀별 연결 API](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)를 우선한다. 아직 미커밋인 `ecfd82f` 이후 로컬 변경이며 아래 PR/기준 커밋의 완료 이력과 구분한다. 새 owned `LV_JYU_Ecosystem`에만 활성화했고, 기존 HerdMigration 맵과 기본 신호 경로는 보존했다.
+
+다음 채팅은 [life-v1 최신 인수인계](../Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)의 실제 범위·실패 수정·재현·후속 담당부터 확인한다.
+
 갱신일: **2026-10-23**. 먼저 [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 읽는다. 구현 기준 `581ce1d` + `e22dbbd`, 통합 main `a74fcac`, 작업 브랜치 `codex/social-shelter-handoff`다. [PR #14 — 먹이 부족에 따른 무리 이주 기능 추가](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)는 확인 당시 OPEN·Ready for review·미병합이고 기능/디버그 push를 완료했다.
 
 | 읽을 문서 | 확인할 내용 |
@@ -15,6 +19,14 @@
 현재 확인 맵은 `/Game/JYU/Maps/LV_JYU_HerdMigration`이다. 기존 맵의 이주 옵션은 OFF, 새 맵만 ON이다. v3 기본 `SocialControl=0`을 유지하고, 이주 의도는 Native의 유일한 이동 writer가 소비한다. 실제 지역 진입과 경로 끝 정착은 다르며 모든 무리가 성공하지는 않는다. 일반 PIE·Dedicated/Client 결과는 체크인 Evidence를 따른다. 이 문서 갱신에서 새 UBT·PIE를 실행하지 않았다.
 
 ## 다음 기획의 세부 설계
+
+시작 프롬프트를 실행한 후속 로컬 구현은 [전체 구현 상태표](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)와 [수분·식생 계약/팀 연결](../Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md)을 먼저 확인한다. 기존 이주 기본값·Native 단일 writer·V1/v3 모델은 보존하며 새 식생은 opt-in이다. 전체 구현 완료와 구분하고 실제 빌드/PIE/멀티 범위는 해당 문서의 최종 증거를 따른다.
+
+실제 저장 BP·서식지/날씨 배치는 새 `/Game/JYU/Maps/LV_JYU_Ecosystem`에 있다. [BP 실행·배치 안내](../Architecture/JYU_ECOSYSTEM_BP_SETUP_20261023.md)를 따라 별도 콘솔 입력 없이 Play한다. 기존 인수인계의 `LV_JYU_HerdMigration`과 팀 원본은 보존했다.
+
+그 이후 사용자 요청의 [통합 재점검/수정](../Architecture/ECOSYSTEM_INTEGRATION_REVIEW_20261023.md)을 수행했다. 최신 직접 UBT/213개 자동화·실제 맵/멀티 검증은 이 문서가 기준이며, 식생/이주 경계의 오류와 관찰 도구의 동일 이름 World 선택 문제를 수정했다.
+
+[다른 채팅용 전체 구현 프롬프트](../Architecture/ECOSYSTEM_IMPLEMENTATION_START_PROMPT_20261023.md)에 구조 감사·기존 팀 코드 개선·분야별 연결 안내·학습 경계·실제 동작/검증 기준을 정리했다. 새 채팅에 해당 파일을 읽고 진행하도록 요청하면 된다. 이번 문서 추가에서 기능 구현이나 새 빌드/PIE를 실행한 것은 아니다.
 
 [MMORPG 동적 생태계 세부 기획](../Architecture/DYNAMIC_ECOSYSTEM_DETAILED_DESIGN_20261023.md)은 물·토양·식생/섭식, 장소 선호·경험, 흔적·무리 사냥, 출생 스폰·세대 속도, 체형/ABP·규모/저장 구조를 정리한 **제안**이다. 현재 구현 완료 목록과 구분하며 기능 활성화나 정책 변경을 수행한 것은 아니다.
 

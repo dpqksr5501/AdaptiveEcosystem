@@ -81,6 +81,8 @@ struct FEcoV3WolfRec
 	EcoWorldV3::FThreatAgent* Agent = nullptr;
 	FEcoIntegratedV3Fragment* Int = nullptr;
 	FEcoPredatorStateFragment* PredState = nullptr;
+    FEcoVitalsFragment* Vitals=nullptr;
+    FEcoDeathFragment* Death=nullptr;
 };
 
 UCLASS()

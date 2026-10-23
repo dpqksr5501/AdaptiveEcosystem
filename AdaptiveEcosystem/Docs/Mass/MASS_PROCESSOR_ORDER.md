@@ -1,6 +1,22 @@
 # MASS PROCESSOR EXECUTION ORDER & THREAD SAFETY
 
+## 2026-10-23 life-v1 완료 경계
+
+[실행/팀 API 계약](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)을 따른다. Integrated Step은 기존처럼 GT에서 실행하며 실제 Pawn 위치/속도/눈높이·최대16 발소리 값을 snapshot으로 모은다. 개인 기억과 control/threat 의도만 보정하고 Native Step이 위치·섭식·대사·포획을 쓴다. 이주/위급 제약과 기존 SocialControl=0 경계를 보존한다.
+
+`OnWorldPostActorTick`의 Mass processing 밖에서 `ProcessPlayerStrikes → Survival/RecordDeaths → committed carcass → 기존 resource transaction → Herd/Travel/RecordMigrations → 인구/pressure → NaturalBirth → explicit Recovery → summary` 순서다. 자연 출생과 복구는 기존 capacity reservation/Spawn/CompleteSpawnRequest를 사용하며 실패/0승인도 완료한다. Source의 이 순서를 다른 Processor에서 재실행하지 않는다.
+
+checkpoint는 완료 거래만 저장한다. 채택 전 개체·미완료 native 사망이 있으면 거절하고 다음 완료 경계를 기다린다. 같은 build의 서버 시작 복원을 지원하고 과거 step으로 live rollback은 거절한다. 저장된 정책 cover 순서는 보존하면서 현재 실제 은신처의 geometry/height/registration에 재결합한다. runtime index/Actor/Entity handle을 영속 identity로 저장하지 않는다.
+
+## 2026-10-23 opt-in Native 식생의 추가 경계
+
+새 owned `LV_JYU_Ecosystem`은 spawner에 opt-in과 Field BP subclass를 저장한다. 날씨 BP는 authority WorldClock을 소비하고, Client 날씨/식생은 기존 GameState/Field DTO를 소비한다. Subsystem에 복제 프로퍼티를 추가하지 않는다. [BP 배치와 검증](../Architecture/JYU_ECOSYSTEM_BP_SETUP_20261023.md)을 따른다.
+
+`eco.Vegetation=0` 기본값, `-EcoVegetation` opt-in이다. Integrated Step의 GT 지역 snapshot(Rainfall/Temperature/Dark) → 기존 C4 실제 섭식 → C8 soil-v1 성장/환경 손실 → 관측 → `CommitSpatialFood` 순서를 사용한다. 환경 손실은 별도 비음수 항목이며 M4의 두 번째 재생 경로는 만들지 않는다. `AEcoVegetationField`는 PostUpdateWork GT에서 Mass processing 중이면 대기하고, 다음 native step이 읽을 지면/서식 입력을 bounded gather한다. 1Hz 수신 표현 snapshot은 replica Actor가 운반하며 client가 자원을 계산하지 않는다. [실행·단위·소유권·검증](../Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md), [전체 구현 상태](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)를 따른다. 기존 V1/SpeciesAI 이동 writer와 SocialControl/이주 기본값을 바꾸지 않는다.
+
 ## 2026-10-23 v3 무리 이주의 완료 경계
+
+후속 [통합 점검](../Architecture/ECOSYSTEM_INTEGRATION_REVIEW_20261023.md)은 Reconcile 내부의 아직 인구 commit 전인 이전 receipt를 후보 인구에 반영한다. 이미 목적지에 들어온 body는 outstanding incoming 예약에서 제외한다. 원래 `RecordMigrations → ReconcilePopulation` 순서와 Native 단일 writer는 그대로다. ON soil layout 검증도 Native Step/Field gather 앞에서 수행하며 다른 세계의 재생으로 fallback하지 않는다.
 
 아래 V1 Processor 표와 2026-09-30 소비자 미연결 설명은 당시 경로다. 현재 v3 실제 연결은 [이주 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md), [인수인계](../조연우/JYU_CHAT_HANDOFF_20261023.md)를 따른다. Source 기준은 `Creature/Runtime/EcoCreatureLifecycle.cpp`와 `Mass/EcoHerdMigration.*`다.
 

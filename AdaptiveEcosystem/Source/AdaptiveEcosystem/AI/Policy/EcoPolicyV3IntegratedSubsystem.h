@@ -155,6 +155,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EcoMovementTracesV3.h"
+#include "EcoLifeHistoryV3.h"
 #include "Containers/ArrayView.h"
 #include "Core/EcoMigrationTypes.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
@@ -606,6 +608,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3BrainTally
 	}
 };
 
+/** One-frame authority sound snapshot, with native evidence time. Not persistent. */
+struct FEcoLifeNoiseSample { uint64 Id=0;double X=0,Y=0,Z=0,Time=0,Range=0,Confidence=0; };
 /** 한 지역의 v3 세계 (무대 하나 = 학습 세계 하나). */
 struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 {
@@ -613,6 +617,12 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 RegionRuntimeIndex = INDEX_NONE;
 	int32 Index = INDEX_NONE;                 // 컨텍스트 색인 (FEcoIntegratedV3Fragment::ContextIndex)
 	EcoWorldV3::FWorldState Sim;
+    /** GT gathered authority pawn samples; never implicitly included in policy threat inputs in life-v1. */
+    std::vector<EcoObservationV3::FThreatInput> PlayerSamples;
+    TArray<double> PlayerEyeZ;
+    TArray<FEcoLifeNoiseSample> PlayerNoises;
+    EcoTracesV3::FField MovementTraces;
+    EcoLifeV3::FRegionalDanger KnownHumanDanger;
 	bool bSpatialFoodRegistered = false;
 	int64 ResourceReceiptSequence = 0;
 	FVector OriginCm = FVector::ZeroVector;   // 무대 (0, 0) 의 cm. Z = 무대 중심 지면 (기본 높이)
@@ -1148,13 +1158,20 @@ public:
 		StepCpuSeconds += Seconds;
 		StepCpuSteps += Steps;
 		StepCpuMaxFrameSeconds = FMath::Max(StepCpuMaxFrameSeconds, Seconds);
+        if(Steps>0&&FMath::IsFinite(Seconds)&&Seconds>=0){
+            const int32 I=StepCostCursor++%1024;
+            if(StepBatchMilliseconds.Num()<1024){StepBatchMilliseconds.Add(Seconds*1000);StepEquivalentMilliseconds.Add(Seconds*1000/Steps);}
+            else{StepBatchMilliseconds[I]=Seconds*1000;StepEquivalentMilliseconds[I]=Seconds*1000/Steps;}
+        }
 	}
+    /** Read-only bounded CPU samples, not a claim about complete server frame time. */
+    UFUNCTION(BlueprintPure,Category="Ecology|Performance") FString CaptureStepPerformance() const;
 
 	/**
 	 * 지형 제약 이동 검사: FromCm → ToCm 를 30 cm 이하 토막으로 나눠 팀 공개 함수 EcoCreatureMovement::ConstrainStep (지역 안·장애물·
 	 * 지면·물) 을 부른다. 통과하면 OutZ = 끝 지면 높이, 막히면 거짓 (OutZ = FromCm.Z).
 	 */
-	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false) const;
+	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false, float BodyRadiusCm=30.f) const;
 
 	// ---- 시험·조정자 없이 쓰는 길 ----
 
@@ -1176,6 +1193,7 @@ protected:
 
 private:
 	friend struct FEcoV3PreStartTickFunction;
+    friend struct FEcoEcosystemCheckpoint;
 
 	bool ApplyToSpawner(AEcoCreatureIntegrationSpawner& InSpawner);
 	/** 시작 직전 지면 검사 (스트리밍 조정자). 실패하면 RestoreTeamValues + 끔. */
@@ -1250,6 +1268,8 @@ private:
 	double StepCpuSeconds = 0.0;          // 시작부터 결정 스텝(모든 지역) 누적 시간
 	int64 StepCpuSteps = 0;
 	double StepCpuMaxFrameSeconds = 0.0;  // 한 프레임의 결정 스텝 시간 최댓값 (스텝이 몰린 프레임의 끊김)
+    TArray<double> StepBatchMilliseconds,StepEquivalentMilliseconds;
+    uint32 StepCostCursor=0;
 
 	// 두뇌 (SyncBrain)
 	FEcoV3BrainPtr ActiveBrain;           // 이 월드가 지금 쓰는 두뇌 (첫 SyncBrain 전에는 비어 있다)

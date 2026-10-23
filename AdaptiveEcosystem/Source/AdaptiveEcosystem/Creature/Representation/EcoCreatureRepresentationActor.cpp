@@ -25,8 +25,9 @@ static TAutoConsoleVariable<int32> CVarEcoFacingAudit(TEXT("eco.Creature.FacingA
 bool FEcoCreatureVisualState::IsValid() const
 {
 	return StableAgentId > 0 && !SpeciesId.IsNone() && Sequence > 0 && FMath::IsFinite(WorldTime) && WorldTime >= 0.0
+        &&FMath::IsFinite(BodyScale)&&BodyScale>=.65f&&BodyScale<=1.15f
 		&& !Position.ContainsNaN() && !Velocity.ContainsNaN() && FMath::IsFinite(FocusYawDegrees)
-        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::SatedRest)
+        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::Investigate)
 		&& FMath::IsFinite(NormalizedHealth) && NormalizedHealth >= 0.0f && NormalizedHealth <= 1.0f
 		&& FMath::IsFinite(NormalizedEnergy) && NormalizedEnergy >= 0.0f && NormalizedEnergy <= 1.0f;
 }
@@ -161,6 +162,7 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 	VisualTurnAmount = bContinuousTurn ? FMath::FInterpTo(VisualTurnAmount, TurnTarget, DeltaSeconds, 8.0f) : 0.0f;
 	// Moves this passive visual Actor only. Never modifies a Mass fragment or evaluates behavior.
 	SetActorLocationAndRotation(State.Position, Facing, false, nullptr, ETeleportType::TeleportPhysics);
+    SetActorScale3D(FVector(State.BodyScale));
 	VisualState = State;
 	PlaceholderBody->SetVisibility(CreatureMesh->GetSkeletalMeshAsset() == nullptr);
 	VisualMotion = !State.bAlive ? EEcoCreatureVisualMotion::Dead

@@ -78,6 +78,7 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetStringField(TEXT("activity"),UEnum::GetValueAsString(EEcoSpeciesActivity(View->Activity)));
                 Data->SetStringField(TEXT("sense"),UEnum::GetValueAsString(EEcoSenseSource((View->Flags>>4)&3)));
                 Data->SetNumberField(TEXT("energy_fraction"),View->Energy/255.0);
+                Data->SetNumberField(TEXT("body_scale"),View->BodyScale/128.);
             }
             if(const auto* Cue=Manager.GetFragmentDataPtr<FEcoCreatureCueFragment>(E)){
                 Data->SetStringField(TEXT("sense_source_key"),LexToString(Cue->Memory.SourceKey));
@@ -122,6 +123,28 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 if(const auto* Sub=World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>())
                     if(const auto* Ctx=Sub->GetContext(Link->ContextIndex)) {
                         const auto& W=Ctx->Sim;
+                        Data->SetBoolField(TEXT("ecosystem_life_enabled"),W.Config.bEcosystemLife);
+                        if(W.Config.bEcosystemLife)Data->SetNumberField(TEXT("regional_known_human_danger"),Ctx->KnownHumanDanger.At(W.T*EcoRepertoireV3::kStepSeconds));
+                        if(W.Config.bEcosystemLife&&Link->Individual.bInitialized){
+                            const auto& Life=Link->Individual;auto J=MakeShared<FJsonObject>();
+                            J->SetNumberField(TEXT("schema"),1);J->SetNumberField(TEXT("origin"),int32(Life.Origin));
+                            J->SetStringField(TEXT("parent_a"),LexToString(Life.ParentA));J->SetStringField(TEXT("parent_b"),LexToString(Life.ParentB));
+                            J->SetNumberField(TEXT("generation"),Life.Generation);J->SetNumberField(TEXT("offspring"),Life.Offspring);
+                            J->SetNumberField(TEXT("born"),Life.Born);J->SetNumberField(TEXT("speed_gene"),Life.Genome.Speed);J->SetNumberField(TEXT("size_gene"),Life.Genome.Size);
+                            J->SetNumberField(TEXT("growth"),Life.Growth(W.T*EcoRepertoireV3::kStepSeconds));
+                            J->SetNumberField(TEXT("familiarity"),Life.Memory.Familiarity);J->SetNumberField(TEXT("curiosity"),Life.Memory.Curiosity);
+                            J->SetNumberField(TEXT("fear"),Life.Memory.Fear);J->SetNumberField(TEXT("hostility"),Life.Memory.Hostility);
+                            J->SetNumberField(TEXT("unknown_fear"),Life.Memory.UnknownFear);
+                            J->SetBoolField(TEXT("last_damage_attacker_known"),Life.Memory.bLastDamageKnown);
+                            J->SetNumberField(TEXT("nutrition"),Life.Nutrition);J->SetNumberField(TEXT("meat_issued"),Life.MeatIssued);
+                            J->SetNumberField(TEXT("meat_consumed"),Life.MeatConsumed);J->SetNumberField(TEXT("meat_wasted"),Life.MeatWasted);
+                            J->SetNumberField(TEXT("meat_remaining"),Life.MealRemaining);J->SetStringField(TEXT("carcass_source"),LexToString(Life.MealSource));
+                            J->SetNumberField(TEXT("response"),int32(Life.Memory.Response));J->SetNumberField(TEXT("last_encounter"),int32(Life.Memory.LastKind));
+                            J->SetNumberField(TEXT("last_evidence"),Life.Memory.LastDirect);J->SetNumberField(TEXT("role"),int32(Life.Investigation.Role));
+                            J->SetStringField(TEXT("trace"),LexToString(Life.Investigation.Trace));J->SetStringField(TEXT("role_target"),LexToString(Life.Investigation.Target));
+                            J->SetNumberField(TEXT("role_until"),Life.Investigation.Until);J->SetNumberField(TEXT("hunt_window_captures"),W.HuntWindowCaptures);
+                            Data->SetObjectField(TEXT("life"),J);
+                        }
                         Data->SetBoolField(TEXT("refuge_safety_enabled"),W.Config.bProtectedRefuges);
                         Data->SetNumberField(TEXT("refuge_protected_prey_steps"),double(W.Stats.RefugeProtectedPreySteps));
                         Data->SetNumberField(TEXT("refuge_constrained_moves"),double(W.Stats.RefugeConstrainedMoves));
@@ -132,8 +155,11 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                             const auto P=Ctx->UnitsToCm(Body->Body.Pos.X,Body->Body.Pos.Y,Link->GroundZ);
                             Data->SetArrayField(TEXT("native_world_position"),{MakeShared<FJsonValueNumber>(P.X),MakeShared<FJsonValueNumber>(P.Y),MakeShared<FJsonValueNumber>(P.Z)});
                         }
-                        if(const auto* Wolf=Manager.GetFragmentDataPtr<FEcoThreatStateFragment>(E))
+                        if(const auto* Wolf=Manager.GetFragmentDataPtr<FEcoThreatStateFragment>(E)){
                             Data->SetBoolField(TEXT("wolf_inside_refuge"),EcoRefugeV3::Contains(W.Config.Covers,{Wolf->Agent.State.PosX,Wolf->Agent.State.PosY}));
+                            const auto P=Ctx->UnitsToCm(Wolf->Agent.State.PosX,Wolf->Agent.State.PosY,Link->GroundZ);
+                            Data->SetArrayField(TEXT("native_world_position"),{MakeShared<FJsonValueNumber>(P.X),MakeShared<FJsonValueNumber>(P.Y),MakeShared<FJsonValueNumber>(P.Z)});
+                        }
                     }
             Data->SetBoolField(TEXT("social_runtime"),Manager.GetFragmentDataPtr<FEcoSocialBehaviorFragment>(E)!=nullptr);
             Data->SetBoolField(TEXT("species_ai_movement"),Manager.GetFragmentDataPtr<FEcoSpeciesAIMoveFragment>(E)!=nullptr);
@@ -352,6 +378,13 @@ void AEcoCreatureInspectorHUD::DrawHUD()
                     InspectionDetail+=FString(Key)+TEXT(": ")+Value+TEXT("\n");
                 }
                 if(GetWorld()->GetNetMode()==NM_Client)InspectionDetail=TEXT("Client: presentation only. Policy details are available on authority.");
+                else if(const TSharedPtr<FJsonObject>* Life=nullptr;J->TryGetObjectField(TEXT("life"),Life)&&Life&&Life->IsValid()){
+                    const auto& L=**Life;
+                    InspectionDetail+=FString::Printf(TEXT("Life gen %.0f | growth %.0f%% | genes speed %.3f size %.3f\nFamiliar %.2f Curious %.2f Fear %.2f Hostile %.2f Unknown %.2f\nEncounter %.0f Response %.0f Role %.0f | nutrition %.2f\n"),
+                        L.GetNumberField(TEXT("generation")),L.GetNumberField(TEXT("growth"))*100,L.GetNumberField(TEXT("speed_gene")),L.GetNumberField(TEXT("size_gene")),
+                        L.GetNumberField(TEXT("familiarity")),L.GetNumberField(TEXT("curiosity")),L.GetNumberField(TEXT("fear")),L.GetNumberField(TEXT("hostility")),L.GetNumberField(TEXT("unknown_fear")),
+                        L.GetNumberField(TEXT("last_encounter")),L.GetNumberField(TEXT("response")),L.GetNumberField(TEXT("role")),L.GetNumberField(TEXT("nutrition")));
+                }
             }
         }
     }

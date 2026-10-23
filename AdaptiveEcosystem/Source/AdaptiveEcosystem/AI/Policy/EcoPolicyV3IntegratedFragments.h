@@ -7,6 +7,7 @@
 
 #include "CoreMinimal.h"
 #include "MassEntityTypes.h"
+#include "EcoLifeHistoryV3.h"
 
 #include "EcoPolicyV3IntegratedFragments.generated.h"
 
@@ -35,6 +36,7 @@ struct FEcoIntegratedV3Fragment : public FMassFragment
 	GENERATED_BODY()
 
 	/** 우리 처리기가 v3 상태를 만들었는가 (조정자가 막 만든 개체는 거짓). */
+    EcoLifeV3::FIndividual Individual;
 	UPROPERTY(VisibleAnywhere, Transient, Category = "Ecology|PolicyV3")
 	bool bAdopted = false;
 

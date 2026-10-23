@@ -36,8 +36,7 @@ bool EcoHerdMigrationDebug::Capture(UWorld& W,FEcoHerdMigrationDebugSnapshot& Ou
     if(!N||!N->IsActive()||!M||!Mass)return false;
     auto& EM=Mass->GetMutableEntityManager();if(EM.IsProcessing())return false;
     Out.WorldSeconds=W.GetTimeSeconds();TSet<FName> Connected;
-    for(TActorIterator<AEcoHerdMigrationRoute> It(&W);It;++It)if(It->bEnabled&&It->Points.Num()>=2
-        &&!It->Points.ContainsByPredicate([](const FVector& P){return P.ContainsNaN();})){
+    for(TActorIterator<AEcoHerdMigrationRoute> It(&W);It;++It)if(It->bEnabled&&It->IsValidRoute()){
         Out.Routes.Add({It->FromRegion,It->ToRegion,It->Points});Connected.Add(It->FromRegion);Connected.Add(It->ToRegion);
     }
     Out.Routes.Sort([](const auto& A,const auto& B){return A.From==B.From?A.To.LexicalLess(B.To):A.From.LexicalLess(B.From);});

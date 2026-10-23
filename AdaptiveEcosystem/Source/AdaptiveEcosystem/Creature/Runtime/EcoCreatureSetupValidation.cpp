@@ -15,6 +15,7 @@ bool AEcoCreatureIntegrationSpawner::CollectSetupIssues(TArray<FString>& Errors,
 	Errors.Reset(); Notes.Reset();
 	UWorld* World = GetWorld();
 	if (!World) { Errors.Add(TEXT("Coordinator has no World.")); return false; }
+    if(bEnableEcosystemLife&&!bUseV3Policy)Errors.Add(TEXT("Ecosystem Life requires the supported Integrated Native V3 backend; V1/SpeciesAI life execution is not implemented."));
 	int32 Coordinators = 0;
 	for (TActorIterator<AEcoCreatureIntegrationSpawner> It(World); It; ++It) ++Coordinators;
 	if (Coordinators != 1) Errors.Add(FString::Printf(TEXT("Keep exactly one EcoCreatureIntegrationSpawner; found %d."), Coordinators));

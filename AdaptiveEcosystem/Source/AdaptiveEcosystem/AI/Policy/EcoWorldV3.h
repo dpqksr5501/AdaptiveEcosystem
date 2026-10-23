@@ -100,6 +100,7 @@
 #include "EcoRepertoire.h"
 #include "EcoThreatModel.h"
 #include "EcoRefugeSafetyV3.h"
+#include "EcoVegetationV3.h"
 
 namespace EcoWorldV3
 {
@@ -913,6 +914,9 @@ namespace EcoWorldV3
 
 	struct FWorldConfig
 	{
+        /** Opt-in integrated life cycle owns actual birth costs instead of the legacy energy-only event. */
+        bool bEcosystemLife = false;
+		EcoVegetationV3::FConfig Vegetation; // opt-in; schema/weights are unchanged
 		double WorldSize = 100.0;           // 정사각 맵 한 변 (단위, 학습 60~110). 100 = 200 m
 		std::int64_t Seed = 20000;          // 지연 해시 Seed(계약 5-5) 이자 세계 난수 시드
 		std::int32_t NumHerbivores = 128;   // 초식 수 N (학습 128). 피식 EMA 분모이기도 하다
@@ -1163,6 +1167,18 @@ namespace EcoWorldV3
 
 	struct FFoodGrid
 	{
+		EcoVegetationV3::FConfig Vegetation;
+		EcoVegetationV3::FWeather VegetationWeather;
+		std::vector<EcoVegetationV3::FCell> VegetationCells;
+		std::vector<EcoVegetationV3::FHabitat> Habitats;
+		double EnvironmentLost = 0.0; // cumulative, distinct from feeding
+		double VegetationGrown = 0.0;
+		bool HasValidVegetationLayout() const
+		{
+			return !Vegetation.bEnabled || (Vegetation.IsValid() && Gw > 0 && std::isfinite(Cell) && Cell > 0
+				&& Food.size() == static_cast<size_t>(Gw) * Gw && Cap.size() == Food.size() && Regen.size() == Food.size()
+				&& VegetationCells.size() == Food.size() && Habitats.size() == Food.size());
+		}
 		std::int32_t Gw = 0;                  // 격자 한 변 셀 수 = ceil(size ÷ cell)
 		double Cell = 2.0;                    // 셀 한 변 (단위) = 400 cm
 		std::int32_t GradBlur = 2;
@@ -1179,6 +1195,22 @@ namespace EcoWorldV3
 		std::vector<double> Tmp;
 		std::vector<double> Tmp2;
 		std::vector<double> Demand;
+
+        /** Visual-density-dependent foliage, not refuge safety or capture immunity. */
+        bool BlocksSight(double Ax,double Ay,double Bx,double By) const
+        {
+            if(!Vegetation.bEnabled||!HasValidVegetationLayout())return false;
+            const double Dx=Bx-Ax,Dy=By-Ay,Length=std::sqrt(Dx*Dx+Dy*Dy);
+            if(!std::isfinite(Length)||Length<1e-6||Length>1000)return false;
+            const int Steps=std::clamp(int(std::ceil(Length/Cell)),1,16);double Occlusion=0;
+            for(int K=0;K<Steps;++K){const double T=(K+.5)/Steps,X=Ax+Dx*T,Y=Ay+Dy*T;
+                if(X<0||Y<0||X>=Gw*Cell||Y>=Gw*Cell)continue;
+                const auto I=size_t(CellOf({X,Y}));const auto& H=Habitats[I];
+                if(H.Plant==EcoVegetationV3::EPlant::Grass||Cap[I]<=0)continue;
+                Occlusion+=Length/Steps*H.Shade*(Food[I]/Cap[I]);
+            }
+            return Occlusion>=3;
+        }
 
 		/** world._cell_index: ix = clip(int(x · (1/cell)), 0, gw − 1). 반환은 iy·Gw + ix. */
 		std::int32_t CellOf(const FVec2& P) const
@@ -1211,11 +1243,15 @@ namespace EcoWorldV3
 		/** 세계 생성 (world._build_world 먹이·은신처 셀·재생률). 잡음은 행 우선(iy, ix)으로 Gw² 개를 뽑는다. */
 		void Build(const FWorldConfig& C, FRng& Rng)
 		{
+			Vegetation = C.Vegetation;
+			EnvironmentLost = VegetationGrown = 0;
 			Cell = C.FoodCell > 0.0 ? C.FoodCell : 2.0;
 			GradBlur = C.FoodGradBlur;
 			Gw = static_cast<std::int32_t>(std::ceil(C.WorldSize / Cell));
 			Gw = Gw < 1 ? 1 : Gw;
 			const size_t Cells = static_cast<size_t>(Gw) * Gw;
+			VegetationCells.assign(Vegetation.bEnabled ? Cells : 0, {});
+			Habitats.assign(Vegetation.bEnabled ? Cells : 0, {});
 
 			std::vector<double> Noise(Cells);
 			for (double& V : Noise)
@@ -1389,8 +1425,18 @@ namespace EcoWorldV3
 		/** 먹이 재생 (world.step 7): food ← clip(food + regen·(cap − food), 0, cap). */
 		void Regrow()
 		{
+			if (!HasValidVegetationLayout()) return; // ON never falls back to a different world's regeneration.
 			for (size_t k = 0; k < Food.size(); ++k)
 			{
+				if (Vegetation.bEnabled)
+				{
+					const auto Result = EcoVegetationV3::Advance(Vegetation, VegetationWeather, Habitats[k],
+						VegetationCells[k], Food[k], Cap[k], Regen[k], EcoRepertoireV3::kStepSeconds);
+					Food[k] = Result.Food;
+					EnvironmentLost += Result.Loss;
+					VegetationGrown += Result.Growth;
+					continue;
+				}
 				const double F = Food[k] + Regen[k] * (Cap[k] - Food[k]);
 				Food[k] = F < 0.0 ? 0.0 : (F > Cap[k] ? Cap[k] : F);
 			}
@@ -1470,6 +1516,7 @@ namespace EcoWorldV3
 	/** 위협 하나 (FEcoThreatStateFragment). */
 	struct FThreatAgent
 	{
+        bool bDead=false; // opt-in integrated nutrition death; absent from all legacy trajectories
 		std::uint32_t Slot = 0;
 		EcoThreatV3::FThreatSpec Spec;
 		EcoThreatV3::FThreatState State;
@@ -1605,6 +1652,8 @@ namespace EcoWorldV3
         void (*HerbControl)(void* User, std::int32_t Index, const FHerbView& Herb) = nullptr;
         // Opt-in authored inter-region journey. Null retains every bounded golden trajectory.
         bool (*HerbTravel)(void* User, std::int32_t Index) = nullptr;
+        /** Evidence/intent adapter before the existing threat Step; never integrates position or applies captures. */
+        void (*ThreatInput)(void* User,std::int32_t Index,FThreatAgent& Threat,EcoThreatV3::FThreatStepInput& Input) = nullptr;
 		bool (*HerbMove)(void* User, std::int32_t Index, const FVec2& From, const FVec2& To) = nullptr;
 		bool (*ThreatMove)(void* User, std::int32_t Index, double FromX, double FromY, double ToX, double ToY) = nullptr;
 	};
@@ -1623,6 +1672,9 @@ namespace EcoWorldV3
 		FFoodGrid Food;
 		FRng Rng;
 		std::int64_t T = 0;                  // 전역 스텝 번호 (계약 10-1: 모든 개체가 같은 스텝)
+        // life-v1 game rules: bounded regional predation, distinct from natural equilibrium.
+        std::int64_t HuntWindow=0;
+        std::int32_t HuntWindowCaptures=0;
 		double Dark = 0.0;                   // d(t)
 		std::int32_t StepsToTransition = -1; // r (낮 고정이면 -1 → to_transition 1)
 		double PredEma = 0.0;                // 전역 피식 EMA
@@ -1916,7 +1968,7 @@ namespace EcoWorldV3
 	 * AgentKey = MakeAgentKeyFromStableId(StableAgentId), Seed = 세계 설정의 Seed(세션 시드). Slot·Generation 은 0 으로 둔다(쓰지 않는다).
 	 * 첫 관측·첫 요청은 ObserveAndDecideRows 로 만든다.
 	 */
-	inline void AdoptHerb(FWorldState& W, const FHerbView& H, const FVec2& Pos, const FVec2& Head, std::uint64_t AgentKey)
+	inline void AdoptHerb(FWorldState& W, const FHerbView& H, const FVec2& Pos, const FVec2& Head, std::uint64_t AgentKey, bool bNaturalBirth = false)
 	{
 		const double Size = W.Config.WorldSize;
 		*H.Body = FHerbBody();
@@ -1925,9 +1977,10 @@ namespace EcoWorldV3
 		const FVec2 Hn = EcoRepertoireV3::Normalize(Head);
 		H.Body->Head = EcoRepertoireV3::IsNonZero(Hn) ? Hn : FVec2{1.0, 0.0};
 		H.Body->PrevPos = H.Body->Pos;
-		H.Body->Energy = W.RepCfg.InitEnergy;
+        const bool Offspring=W.Config.bEcosystemLife&&bNaturalBirth;
+		H.Body->Energy = Offspring?.4:W.RepCfg.InitEnergy;
 		H.Body->ReproCd = 0;
-		H.Body->Reserve = W.Config.WildReserve.bEnabled ? W.Config.WildReserve.Init : 0.0;   // 야생 (w1): 시작·새 개체 비축
+		H.Body->Reserve = !Offspring&&W.Config.WildReserve.bEnabled ? W.Config.WildReserve.Init : 0.0;
 		*H.Decision = FHerbDecision();
 		*H.Perception = FHerbPerception();
 		*H.Control = EcoRepertoireV3::FControlOutput();
@@ -1983,6 +2036,7 @@ namespace EcoWorldV3
                 In.bHunting = A.State.Cooldown == 0 && (!W.ThreatCfg.bWildSatiation || A.State.SatLeft == 0)
                     && !(A.Spec.Type == EcoThreatV3::EThreatType::Player && A.State.PlayerMode == EcoThreatV3::EPlayerMode::Rest);
 				In.bAsleep = ThreatAsleepNow(W, A);   // 굴에서 자면 안 보인다 (끄면 새 t 의 어둠으로 다시 판정, 켜면 늑대별 상태)
+                In.bAsleep=In.bAsleep||A.bDead;
 				In.bOccluded = false;                 // 세로 장애물 가림은 사슴마다 ObserveHerb 가 채운다
 				// R3 발소리 (켰을 때만): 지난 스텝 변위 크기 ÷ 사슴 걸음과 그 스텝의 걸음새 (world.py hearing_radius·pred_running)
 				In.HearR = W.Config.RealismHearing.bEnabled
@@ -2097,12 +2151,14 @@ namespace EcoWorldV3
 			// 야생 2단계 3 세로 장애물: 이 사슴에서 위협마다 눈길을 원판이 가리는가 (world.py `_geometry` 의 pvis 가림 — 발소리는 그대로).
 			// 숲 시야를 켜면 줄기 ∨ 잎 (EyeBlocked). 시야 밖 쌍은 재지 않는다 (EyeCandidate — 가림은 bSight 에서만 읽어 값이 같다)
 			const FObstacleConfig& Ob = W.Config.Obstacles;
-			if (Ob.Active() && Ob.bBlockSight)
+			if ((Ob.Active() && Ob.bBlockSight)||W.Config.bEcosystemLife)
 			{
 				const double SeeP = SeePredNow(W) * S.SeeMult;   // PerceiveThreats 의 SeeP 와 같은 곱
 				for (EcoObservationV3::FThreatInput& T : W.ThreatIn)
 				{
-					T.bOccluded = EyeCandidate(B.Pos, B.Head, SeeP, T.X, T.Y, OC) && EyeBlocked(Ob, B.Pos.X, B.Pos.Y, T.X, T.Y);
+					T.bOccluded = EyeCandidate(B.Pos, B.Head, SeeP, T.X, T.Y, OC)
+                        && ((Ob.Active()&&Ob.bBlockSight&&EyeBlocked(Ob,B.Pos.X,B.Pos.Y,T.X,T.Y))
+                            ||(W.Config.bEcosystemLife&&W.Food.BlocksSight(B.Pos.X,B.Pos.Y,T.X,T.Y)));
 				}
 			}
 			P.Threat = EcoObservationV3::PerceiveThreats(B.Pos, B.Head, SeePredNow(W), S.SeeMult,
@@ -2356,8 +2412,9 @@ namespace EcoWorldV3
 					const bool bHunt = FlightHunting(W, A);
 					EcoObservationV3::FThreatInput Ti = W.ThreatIn[static_cast<size_t>(m)];
 					// 야생 2단계 3: 이 사슴의 눈길 가림 (ObserveHerb 가 마지막 사슴 것으로 남긴 칸을 이 쌍으로 다시 잰다 — world.py wf_pvis = 관측 보임, 숲 시야 포함)
-					Ti.bOccluded = bSightBlock && EyeCandidate(P, H.Body->Head, SeePred * S.SeeMult, Ti.X, Ti.Y, W.ObsCfg)
-								   && EyeBlocked(W.Config.Obstacles, P.X, P.Y, Ti.X, Ti.Y);   // 시야 밖 쌍은 재지 않는다 (값 같음)
+					Ti.bOccluded = EyeCandidate(P, H.Body->Head, SeePred * S.SeeMult, Ti.X, Ti.Y, W.ObsCfg)
+                        &&((bSightBlock&&EyeBlocked(W.Config.Obstacles,P.X,P.Y,Ti.X,Ti.Y))
+                            ||(W.Config.bEcosystemLife&&W.Food.BlocksSight(P.X,P.Y,Ti.X,Ti.Y)));
 					const bool bPv = EcoObservationV3::PerceiveThreats(P, H.Body->Head, SeePred, S.SeeMult, S.SeeMult, &Ti, 1, W.ObsCfg).PredCount == 1;
 					Ex[m] = A.State.PosX - P.X;
 					Ey[m] = A.State.PosY - P.Y;
@@ -2934,6 +2991,7 @@ namespace EcoWorldV3
 			Pi.NumPrey = N;
 			Pi.Dark = W.Dark;
 			Pi.WorldSize = W.Config.WorldSize;
+            if(W.Config.bEcosystemLife){Pi.SightUser=&W.Food;Pi.ExtraSightBlocked=[](void* U,double Ax,double Ay,double Bx,double By){return static_cast<FFoodGrid*>(U)->BlocksSight(Ax,Ay,Bx,By);};}
 			Pi.Discs = W.ShelterDiscs.empty() ? nullptr : W.ShelterDiscs.data();
 			Pi.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
 			if (bWeather)
@@ -2983,6 +3041,7 @@ namespace EcoWorldV3
 			In.NumPrey = N;
 			In.Dark = W.Dark;
 			In.WorldSize = W.Config.WorldSize;
+            if(W.Config.bEcosystemLife){In.SightUser=&W.Food;In.ExtraSightBlocked=[](void* U,double Ax,double Ay,double Bx,double By){return static_cast<FFoodGrid*>(U)->BlocksSight(Ax,Ay,Bx,By);};}
 			In.WanderTurn = W.Rng.Uniform(-W.ThreatCfg.PredWanderTurn, W.ThreatCfg.PredWanderTurn);
 			In.Discs = W.ShelterDiscs.empty() ? nullptr : W.ShelterDiscs.data();
 			In.NumDiscs = static_cast<std::int32_t>(W.ShelterDiscs.size() / 3);
@@ -3043,7 +3102,18 @@ namespace EcoWorldV3
 				Detail::FlightBeforeThreatStep(W, m, A, In);   // 도망 기록: 지난 표적과의 표적 고르기 쌍 (이동 전 상태 — 기록만)
 			}
 			const std::int32_t PreCd = A.State.Cooldown;
+            if(W.Config.bEcosystemLife){
+                const auto Window=int64_t(W.T*EcoRepertoireV3::kStepSeconds/60);
+                if(Window!=W.HuntWindow){W.HuntWindow=Window;W.HuntWindowCaptures=0;}
+                In.bHuntingAllowed=N>8&&W.HuntWindowCaptures<2;
+            }
+            if(Hooks&&Hooks->ThreatInput)Hooks->ThreatInput(Hooks->User,m,A,In);
+            if(A.bDead){A.Last={};A.Last.bAsleep=true;A.State.VelX=A.State.VelY=0;W.CaughtByThreat[m]=-1;continue;}
 			A.Last = EcoThreatV3::Step(A.Spec, A.State, In, W.ThreatCfg);
+            if(W.Config.bEcosystemLife&&A.Last.Caught>=0){
+                bool Unique=true;for(int32_t K=0;K<m;++K)Unique&=W.CaughtByThreat[K]!=A.Last.Caught;
+                W.HuntWindowCaptures+=Unique;
+            }
 			if (bFlight)
 			{
 				W.FlightWolves[static_cast<size_t>(m)].bHuntSel = A.Last.bHunting;
@@ -3180,7 +3250,7 @@ namespace EcoWorldV3
 			}
 
 			// C5. 번식
-			B.bReproduced = R3::ApplyReproduction(B.Energy, B.ReproCd, RC);
+			B.bReproduced = !W.Config.bEcosystemLife && R3::ApplyReproduction(B.Energy, B.ReproCd, RC);
 			Report.Reproduced += B.bReproduced ? 1 : 0;
 
 			// C6. 사망 (잡힘 또는 아사)

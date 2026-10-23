@@ -7,11 +7,13 @@
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "Misc/App.h"
+#include "HAL/IConsoleManager.h"
 #include "Particles/ParticleSystem.h"
 #include "Particles/ParticleSystemComponent.h"
 #include "Sound/SoundBase.h"
 #include "UObject/UnrealType.h"
 #include "World/EcologyRegion.h"
+#include "Network/EcoGameState.h"
 
 #include "EcoPolicyV3IntegratedSubsystem.h"
 #include "EcoWorldV3.h"
@@ -197,11 +199,14 @@ bool UEcoV3WeatherPresenterSubsystem::DoesSupportWorldType(const EWorldType::Typ
 void UEcoV3WeatherPresenterSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
 	Super::OnWorldBeginPlay(InWorld);
-	// 그릴 수 없는 실행·전용 서버·클라이언트(지역 세계가 없다)는 연출을 만들지 않는다 — 틱도 걸지 않는다
-	if (!FApp::CanEverRender() || InWorld.GetNetMode() == NM_DedicatedServer || InWorld.GetNetMode() == NM_Client || !InWorld.PersistentLevel)
+	// Dedicated는 그리지 않는다. opt-in BP 맵의 Client는 수신 Environment만 소비한다.
+	if (!FApp::CanEverRender() || InWorld.GetNetMode() == NM_DedicatedServer || !InWorld.PersistentLevel)
 	{
 		return;
 	}
+	for (TActorIterator<AEcoCreatureIntegrationSpawner> It(&InWorld); It; ++It)
+		bEcologyWeatherView = bEcologyWeatherView || (It->bUseV3Policy && It->bEnableVegetation);
+	if (InWorld.GetNetMode() == NM_Client && !bEcologyWeatherView) return;
 	if (!UEcoPolicyV3IntegratedSubsystem::IsRequested())
 	{
 		bool bCoordinator = false;
@@ -411,10 +416,20 @@ void UEcoV3WeatherPresenterSubsystem::FadeAll(double DeltaSeconds)
 void UEcoV3WeatherPresenterSubsystem::TickPresenter(float DeltaSeconds)
 {
 	UWorld* World = GetWorld();
-	UEcoPolicyV3IntegratedSubsystem* Sub = World ? World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+	UEcoPolicyV3IntegratedSubsystem* Sub = World && !bEcologyWeatherView ? World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
 	const double DeltaS = static_cast<double>(DeltaSeconds);
 	RainDensity = Sub ? Sub->GetSettings().WeatherRainDensity : 1.0;
-	if (!Sub || !Sub->IsActive() || Sub->NumContexts() == 0 || !Sub->GetSettings().bWeather || !Sub->GetSettings().bWeatherVisuals)
+	// The received-summary view has no native subsystem, but still honors local
+	// presentation controls. Disabling visuals must not disable authoritative rain.
+	static const auto* VisualsCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.WeatherVisuals"));
+	static const auto* DensityCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.IntegratedV3.WeatherRainDensity"));
+	if (bEcologyWeatherView && DensityCVar)
+	{
+		const double Density = DensityCVar->GetFloat();
+		RainDensity = FMath::IsFinite(Density) ? FMath::Clamp(Density, .1, 10.0) : 1.0;
+	}
+	if (!World || (bEcologyWeatherView && VisualsCVar && VisualsCVar->GetInt() == 0)
+		|| (!bEcologyWeatherView && (!Sub || !Sub->IsActive() || Sub->NumContexts() == 0 || !Sub->GetSettings().bWeather || !Sub->GetSettings().bWeatherVisuals)))
 	{
 		FadeAll(DeltaS);   // 꺼짐·아직 무대 전: 만들지 않는다 (켜져 있던 것은 끈다)
 		return;
@@ -430,7 +445,15 @@ void UEcoV3WeatherPresenterSubsystem::TickPresenter(float DeltaSeconds)
 	const FName Region = RegionAt(Cam);
 	int32 Kind = EcoWorldV3::kWeatherClear;
 	double Intensity = 0.0;
-	if (const FEcoV3RegionContext* Ctx = Region.IsNone() ? nullptr : Sub->FindContext(Region))
+	if (bEcologyWeatherView)
+	{
+		if (const auto* State = World->GetGameState<AEcoGameState>())
+			for (const auto& Summary : State->GetEcologySummary().Regions)
+				if (Summary.RegionId == Region && Summary.Environment.Rainfall > 0
+					&& (Summary.Environment.WeatherState == EEcoWeatherState::Rain || Summary.Environment.WeatherState == EEcoWeatherState::Storm))
+				{ Kind = EcoWorldV3::kWeatherRain; Intensity = Summary.Environment.Rainfall; break; }
+	}
+	else if (const FEcoV3RegionContext* Ctx = Region.IsNone() ? nullptr : Sub->FindContext(Region))
 	{
 		if (Ctx->Sim.Config.Weather.bEnabled)
 		{

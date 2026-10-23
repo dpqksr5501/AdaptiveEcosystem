@@ -103,6 +103,9 @@ public:
 	bool PollSpawnWave(FName RegionId, const FEcoServerTimeSnapshot& Time, FEcoSpawnRequest& Out);
 	/** Call after publishing actual Mass metrics; release the reservation exactly once. */
 	bool CompleteSpawnRequest(int64 RequestId, int32 ActualCount);
+    /** Capacity reservation only; caller verifies parents, real ground and pays cost on successful outcome. */
+    bool RequestNaturalBirth(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator=false);
+    bool RequestRecoverySpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator);
 
 	bool StartResourceSimulation(int32 Epoch, const FEcoFoodEventSettings& Day, const FEcoFoodEventSettings& Night, bool bLogChanges);
 	/** Queue an authority-only debug event at the given server time. */
@@ -117,7 +120,8 @@ public:
 	bool CompleteResourceStep();
 	/** Exclusive spatial adapter; Ecology verifies conservation and monotonic receipts. */
 	bool RegisterSpatialFood(FName RegionId, double Capacity, double Amount);
-	bool CommitSpatialFood(FName RegionId, int64 Sequence, double Before, double Consumed, double Regenerated, double After);
+	bool CommitSpatialFood(FName RegionId, int64 Sequence, double Before, double Consumed, double Regenerated, double After, double EnvironmentLost = 0.0);
+	bool GetSpatialFoodAudit(FName RegionId, FEcoSpatialFoodAudit& Out) const;
 	/** Habitat capacity changes remove food explicitly; they are neither feeding nor regeneration. */
 	bool AdjustSpatialFoodHabitat(FName RegionId, int64 Sequence, double Before, double Removed, double Capacity, double After);
 	void GetResourceSnapshots(TArray<FEcoResourceSnapshot>& Out) const { Out = CompletedResources; }
@@ -139,6 +143,7 @@ public:
 	FOnRegionPredationRecorded OnRegionPredationRecorded;
 
 private:
+    friend struct FEcoEcosystemCheckpoint;
 	bool CaptureEnvironmentInputs(const FEcoServerTimeSnapshot& Time);
 	bool CanMutateAuthoritativeState(const TCHAR* OperationName) const;
 	static FRegionEcologyState MakeSanitizedRegionState(const FRegionEcologyState& InState);
@@ -163,7 +168,8 @@ private:
 	TSet<int64> DeathReceipts;
 	int64 LastMigrationReceiptStep = 0;
 	TSet<int64> MigrationReceipts;
-	bool ReserveSpawn(FName RegionId, FEcoSpawnRequest& Request);
+	bool ReserveSpawn(FName RegionId, FEcoSpawnRequest& Request,bool bSpatialBudget=false);
+    bool RequestLifeSpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator,EEcoSpawnOrigin Origin,int32 Count);
 	struct FResourceLedger
 	{
 		double Before = 0.0;
@@ -190,6 +196,6 @@ private:
 	TArray<FEcoResourceSnapshot> CompletedResources;
 	/** Receipt watermark only; feeding schedules remain on Mass entities. */
 	TMap<int64, double> LastAcceptedFeedTime;
-	struct FSpatialFoodState { double Capacity = 0, Amount = 0, Consumed = 0, Regenerated = 0, HabitatRemoved = 0; int64 Sequence = -1; };
+	struct FSpatialFoodState { double Capacity = 0, Amount = 0, Consumed = 0, Regenerated = 0, HabitatRemoved = 0, EnvironmentLost = 0; int64 Sequence = -1; };
 	TMap<FName, FSpatialFoodState> SpatialFood;
 };

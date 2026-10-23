@@ -87,6 +87,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	auto& EM = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
 	const int64 NextStep = Step + 1;
 	TArray<FEcoDeathOutcome> Deaths;
+    ProcessPlayerStrikes(Time);
 	FEcoSurvivalSettings Fallback;
 	if (!EcoMassSurvival::Advance(EM, Time, ObservedTime, NextStep, Fallback, Deaths, true)
 		|| !Ecology->RecordDeaths(Deaths, NextStep)) return false;
@@ -94,6 +95,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	for (const auto& Death : Deaths)
 	{
 		++SpeciesTotals.FindOrAdd(Death.RegionId).FindOrAdd(Death.SpeciesId).Deaths;
+        if(bEnableEcosystemLife)CommitNativeCarcass(Death);
 		// Award only committed, uniquely receipted predation, to a still-living predator.
 		if (Death.Cause != EEcoDeathCause::Predation) continue;
 		const auto* Predator = AgentLookup.Find(Death.PredatorStableAgentId);
@@ -231,6 +233,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 		NextMigrationTime = Time.ServerTimeSeconds + Migration.DecisionIntervalSeconds;
 	}
 	if (!BuildAgentLookup() || !ReconcilePopulation() || !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return false;
+    if(!ProcessNaturalBirths(Time)||!ProcessPopulationRecovery(Time)||(bEnableEcosystemLife&&!ReconcilePopulation()))return false;
 	CompletedTime = Time;
 	PublishSummary();
 	return bReady;
@@ -245,6 +248,11 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 		const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
 		const auto& Life = EM.GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(E);
 		auto& Present = EM.GetFragmentDataChecked<FEcoCreaturePresentationFragment>(E);
+        Present.BodyScale=128;
+        if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized)
+            Present.BodyScale=uint8(FMath::RoundToInt(Link->Individual.BodyScale(
+                V.HP<=0 && Life.DeathTime>=0 ? Life.DeathTime :
+                GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds)*128));
 		Present.Velocity = V.HP > 0 ? EM.GetFragmentDataChecked<FMassVelocityFragment>(E).Value : FVector::ZeroVector;
 		const auto* Predator = EM.GetFragmentDataPtr<FEcoPredatorStateFragment>(E);
 		const auto* Execution = EM.GetFragmentDataPtr<FEcoSpeciesAIExecutionFragment>(E);
@@ -268,6 +276,14 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 Present.Activity=uint8(J->bPause?EEcoSpeciesActivity::Rest:EEcoSpeciesActivity::Travel);
                 if(!J->bPause)Present.Flags&=~uint8(2);
             }
+            if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized){
+                switch(Link->Individual.Memory.Response){
+                    case EcoLifeV3::EResponse::Curious:Present.Activity=uint8(EEcoSpeciesActivity::Curious);Present.Flags&=~uint8(2);break;
+                    case EcoLifeV3::EResponse::Vigilant:Present.Activity=uint8(EEcoSpeciesActivity::Vigilant);Present.Flags&=~uint8(2);break;
+                    case EcoLifeV3::EResponse::Retreat:Present.Activity=uint8(EEcoSpeciesActivity::Flee);Present.Flags&=~uint8(2);break;
+                    default:break;
+                }
+            }
         }
         if (const auto* Threat = EM.GetFragmentDataPtr<FEcoThreatStateFragment>(E))
         {
@@ -280,6 +296,16 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
             Present.Activity = uint8(StateIndex < UE_ARRAY_COUNT(Activities) ? Activities[StateIndex] : EEcoSpeciesActivity::Hold);
             if(Threat->Agent.State.SatLeft>0&&Threat->Agent.State.Cooldown<=0&&!Threat->Agent.State.bAsleep)
                 Present.Activity=uint8(EEcoSpeciesActivity::SatedRest);
+            if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);
+                Link&&Link->Individual.Investigation.Role==EcoTracesV3::ERole::Investigate)Present.Activity=uint8(EEcoSpeciesActivity::Investigate);
+            if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);
+                Link&&Link->Individual.LastMeatIntake>0){Present.Activity=uint8(EEcoSpeciesActivity::Eat);Present.Flags|=2;}
+            if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link){
+                const auto Response=Link->Individual.Memory.Response;
+                if(Response==EcoLifeV3::EResponse::Curious)Present.Activity=uint8(EEcoSpeciesActivity::Curious);
+                else if(Response==EcoLifeV3::EResponse::Vigilant)Present.Activity=uint8(EEcoSpeciesActivity::Vigilant);
+                else if(Response==EcoLifeV3::EResponse::Retreat)Present.Activity=uint8(EEcoSpeciesActivity::Flee);
+            }
         }
         if(auto* Audit=EM.GetFragmentDataPtr<FEcoV3SocialBridgeFragment>(E)){
             FName Reason=TEXT("NativePolicy");
@@ -289,6 +315,11 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
             else if(B&&B->Decision.KeepActive==EcoWorldV3::kKeepPanic)Reason=TEXT("NativeThreatEscape");
             else if(B&&B->Decision.KeepActive==EcoWorldV3::kKeepShelter)Reason=TEXT("NativeRefugeSafety");
             else if(J&&J->bActive)Reason=J->Reason;
+            else if(J&&J->bStranded)Reason=TEXT("JourneyAbandonedOutsideRegion");
+            else if(bEnableEcosystemLife&&Present.Activity==uint8(EEcoSpeciesActivity::Curious))Reason=TEXT("ObservedHarmlessCuriosity");
+            else if(bEnableEcosystemLife&&Present.Activity==uint8(EEcoSpeciesActivity::Vigilant))Reason=TEXT("RecentEncounterVigilance");
+            else if(bEnableEcosystemLife&&Present.Activity==uint8(EEcoSpeciesActivity::Flee))Reason=TEXT("RecentEncounterRetreat");
+            else if(bEnableEcosystemLife&&Present.Activity==uint8(EEcoSpeciesActivity::Investigate))Reason=TEXT("MovementTraceInvestigation");
             else if(Present.Activity==uint8(EEcoSpeciesActivity::AlertGraze))Reason=TEXT("NativeAlertGraze");
             else if(Present.Activity==uint8(EEcoSpeciesActivity::WeakTravel))Reason=TEXT("LowEnergyReserve");
             else if(Audit->Applied!=EEcoV3SocialControl::None)Reason=TEXT("LegacySocialOverride");
@@ -317,7 +348,7 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 		{
 			const FVector Position = EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation();
 			const float Speed = Present.Velocity.Size2D();
-			if (Cadence.Advance(Position, Speed, V.HP > 0, Delta, FootstepAudioSet->GetStride(Speed), FootstepAudioSet->MinimumSpeed))
+			if (Cadence.Advance(Position, Speed, V.HP > 0, Delta, FootstepAudioSet->GetStride(Speed)*Present.BodyScale/128.f, FootstepAudioSet->MinimumSpeed))
 				if (auto* Noise = GetWorld()->GetSubsystem<UEcoNoiseSubsystem>())
 				{
 					const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);

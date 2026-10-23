@@ -21,7 +21,7 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Super::NativeUpdateAnimation(DeltaSeconds);
 	const auto* Visual = Cast<AEcoCreatureRepresentationActor>(GetOwningActor());
 	bAlive = Visual && Visual->bBound && Visual->VisualState.bAlive;
-	SpeedCmPerSecond = bAlive ? Visual->VisualState.Velocity.Size2D() : 0.0f;
+	SpeedCmPerSecond = bAlive ? Visual->VisualState.Velocity.Size2D()/FMath::Max(.65f,Visual->VisualState.BodyScale) : 0.0f;
 	DirectionDegrees = bAlive ? Visual->DirectionDegrees : 0.0f;
 	TurnAmount = bAlive ? Visual->VisualTurnAmount : 0.0f;
 	bEating = bAlive && Visual->VisualState.bEating;
@@ -46,7 +46,7 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
             else if(Activity==EEcoSpeciesActivity::SatedRest)Desired=7;
             // A fresh cue briefly interrupts grazing; a persistent cue never pins the animal in alert forever.
             else if(SensoryAlertSeconds>0)Desired=2;
-            else if(Activity==EEcoSpeciesActivity::AlertGraze)Desired=2;
+            else if(Activity==EEcoSpeciesActivity::AlertGraze||Activity==EEcoSpeciesActivity::Vigilant||Activity==EEcoSpeciesActivity::Curious||Activity==EEcoSpeciesActivity::Investigate)Desired=2;
             else if(Activity==EEcoSpeciesActivity::Graze||Activity==EEcoSpeciesActivity::Eat)Desired=1;
             else if(Activity==EEcoSpeciesActivity::Recover||Activity==EEcoSpeciesActivity::Exhaust||Activity==EEcoSpeciesActivity::Rest||Activity==EEcoSpeciesActivity::SatedRest)Desired=7;
             else if(Activity==EEcoSpeciesActivity::Search || Visual->VisualState.SenseSource==EEcoSenseSource::Hearing || Visual->VisualState.SenseSource==EEcoSenseSource::Memory)Desired=2;

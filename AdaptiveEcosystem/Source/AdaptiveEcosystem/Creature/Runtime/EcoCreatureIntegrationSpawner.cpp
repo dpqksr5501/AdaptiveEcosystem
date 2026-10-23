@@ -68,6 +68,8 @@ void AEcoCreatureIntegrationSpawner::PostInitializeComponents()
 void AEcoCreatureIntegrationSpawner::BeginPlay()
 {
 	Super::BeginPlay();
+    int32 LifeOverride=-1;
+    if(FParse::Value(FCommandLine::Get(),TEXT("EcoEcosystemLife="),LifeOverride)&&(LifeOverride==0||LifeOverride==1))bEnableEcosystemLife=LifeOverride!=0;
 	PostTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &AEcoCreatureIntegrationSpawner::OnWorldPostActorTick);
 	StartedAt = GetWorld()->GetTimeSeconds();
 #if WITH_DEV_AUTOMATION_TESTS

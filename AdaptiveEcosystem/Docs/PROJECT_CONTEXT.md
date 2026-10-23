@@ -2,6 +2,10 @@
 
 갱신일 2026-10-23. 팀원과 각 AI agent가 대화 기록 없이 프로젝트의 목표·제품 방향·구현 경계를 이해하기 위한 공통 진입 문서다. 개인 담당 인수인계보다 먼저 읽고 작업 분야의 Source/계약으로 이어간다. 종 이름과 예시는 교체 가능한 표현이며 현재 구현을 과장하는 근거가 아니다.
 
+사용자의 후속 전체 구현은 원래 저장소의 미커밋 작업으로 진행했다. 최신 시작점은 [전체 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)와 [life-v1 실행/팀 API 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)이다. owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 식생·경험/흔적·출생/유전/성장·사체 영양·저장/운영 복구를 opt-in한다. 아래의 soil 최초 구축·미연결 설명은 당시 이력이다. 기존 맵/기본 SocialControl=0·단일 Native writer·모델 차원을 보존하며 재학습/임의 종 지원 완료로 확대하지 않는다.
+
+대화 없이 이어갈 때는 [life-v1 최신 인수인계](Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)의 §1–27 대응·직전 실패 수정·실행 도구·후속 경계도 읽는다.
+
 ## 1 만들려는 게임 시스템
 
 **MMORPG 환경을 고려해, 환경·식생·자원·몬스터 간 상호작용·플레이어 활동이 함께 작동하면서 개체의 행동·지역별 분포·개체군과 장기적인 집단 특성이 달라지는 동적 생태계를 만든다.**
@@ -93,6 +97,14 @@ MMORPG는 적용 대상과 설계 조건이다. 이번 프로젝트가 완성된
 첫 구현 범위는 기존 종·맵에서 원인을 추적할 수 있는 세로 흐름을 완성하는 것이다. 새 종·새 생리 변수·플러그인·종분화·분산 서버는 필요와 지원 범위를 확인하고 확장한다.
 
 ## 8 공유용 시작 문구
+
+2026-10-23 후속 구현의 실제 상태·남은 항목은 [구현 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), 첫 opt-in 수분→기존 먹이→섭식→표현 연결은 [식생 계약·팀 연결](Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md)을 따른다. 전체 세부 기획의 구현 완료를 의미하지 않는다.
+
+저장된 BP와 배치까지 연결한 실행 맵은 `/Game/JYU/Maps/LV_JYU_Ecosystem`이다. [BP 실행·배치 안내](Architecture/JYU_ECOSYSTEM_BP_SETUP_20261023.md)를 따라 Play한다. 다른 맵의 식생 기본값이나 원본 팀 맵을 바꾸지 않았다.
+
+후속 [전체 통합 점검](Architecture/ECOSYSTEM_INTEGRATION_REVIEW_20261023.md)에서 이주 혼잡 중복·경로/서식지/soil 검증과 관찰 World 선택을 보완했다. 최신213개 자동화와 실제 재검증 범위는 이 기록을 우선한다. 전체 기획의 미구현 기능을 완료로 선언한 것은 아니다.
+
+조연우의 후속 전체 구현을 다른 채팅에서 시작할 때는 [구현 시작 프롬프트](Architecture/ECOSYSTEM_IMPLEMENTATION_START_PROMPT_20261023.md)를 사용한다. 기존 구조의 개선 허용 범위, 팀 연결 기반, 학습 대기 중 실행 가능한 기준 동작, 단계별 실제 완료 조건을 담았다. 이 문서가 추가된 것만으로 새 기능이 구현되거나 기본 설정이 변경된 것은 아니다.
 
 다른 AI가 AGENTS.md를 자동으로 읽지 않는 도구라면 다음 문구로 시작할 수 있다.
 

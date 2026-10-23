@@ -1,5 +1,17 @@
 # 팀원별 요청 — 통합 레벨 v3 사슴·늑대 (2026-10-17, 팀 브랜치 통합 뒤)
 
+## 2026-10-23 후속 soil-v1 세계 연결 요청
+
+후속 **life-v1**은 soil뿐 아니라 경험 규칙, genome/growth/maintenance, 제한된 사냥/사체 영양, 자연 출생과 장소 보고를 실행한다. [life 실행 계약/RL 인계](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md#rl-인계)를 먼저 확인한다. soil leaf의 실제 C++/Python 2400개 비교는 최대 절대 오차0으로 통과했다. 이는 전체 life 세계의 mirror/궤적 parity/재학습이 아니다.
+
+`CaptureDiagnostics(true)`의 실제 900개 셀/지역과 Inspector의 개체 observation/request/mask·부모/유전/경험/규칙 결과가 학습 연결 입력 예제다. `Saved/EcosystemLife_20261023/*_LearningSnapshot.json`에는 일반 자연 세계와 실제 피해 fixture의 비영 기억 예제가 있다. `training_ready=false`다. 환경 입력은 producer에서 재현하고 Unknown 원인/검증 정답을 관측 슬롯에 넣지 않는다. V1 7/4·v3 18/5 mask2·별도21과 현재 가중치를 보존한다.
+
+새 모델 교체는 기존 `EcoV3Brain` registry의 schema/mask/model 검사와 Native 정책 추론을 따른다. 새 경험 입력을 학습하려면 별도 버전 계약/정규화·golden과 `IntegratedControlHook`/`EvidenceThreatHook`의 명시적인 adapter 선택을 함께 정의해야 한다. 현재 새 경험/사냥 보정은 실행되는 rules-v1이며 모델이 새 경험을 학습했다고 표시하지 않는다. 기존 18개 슬롯의 뜻을 바꾸거나 rule와 학습 출력을 동시에 최종 writer로 두지 않는다. 이 요청은 RL 담당의 수락/학습 완료가 아니다.
+
+새 owned `/Game/JYU/Maps/LV_JYU_Ecosystem`에서 저장 BP의 권위 강수→토양 수분/식물 내성→기존 FoodGrid→실제 섭식/장부/표현을 연결했다. V1/v3 차원·슬롯·가중치·mask2는 바꾸지 않았다. 새 입력/결정 경계·단위·bounded dt·예제·engine-free 평가와 Python 후속은 [soil-v1 계약의 RL 인계](../Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md#rl-인계-기존-모델과-새-세계-구분)를 따른다. 이 절은 RL 담당 수락/학습 완료를 뜻하지 않는다.
+
+`EcoVegetationV3.h`/`EcoWorldV3.h`의 기존 regrow producer가 달라진 세계다. ON은 기존 RL snapshot v1 export를 명시적으로 거절하며 새 schema·Python mirror·Golden·재학습은 남아 있다. 규칙 결과를 PPO가 수분을 새로 학습한 결과로 설명하지 않는다. [실제 BP/맵 실행·검증](../Architecture/JYU_ECOSYSTEM_BP_SETUP_20261023.md), [전체 남은 범위](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)를 함께 확인한다. 다른 팀/채팅에 자동 메시지는 보내지 않았다.
+
 ## 조연우 통합 후속 확인 — 2026-10-23
 
 아래 요청 원문은 권신혁 작성 당시 기록으로 보존한다. 이 절은 조연우 측 통합 Source `581ce1d` + `e22dbbd`의 확인 결과이며 RL 담당의 수락·학습 완료·모든 요청 종료를 뜻하지 않는다. 별도 메시지는 보내지 않았다. [최신 인수인계](../조연우/JYU_CHAT_HANDOFF_20261023.md)와 [통합 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다.

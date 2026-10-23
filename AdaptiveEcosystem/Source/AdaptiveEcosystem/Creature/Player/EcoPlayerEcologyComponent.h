@@ -25,7 +25,10 @@ public:
     UPROPERTY(ReplicatedUsing=OnRep_Gait,BlueprintReadOnly,Category="Player|Ecology") EEcoPlayerGait Gait=EEcoPlayerGait::Walk;
     UFUNCTION(BlueprintCallable,Category="Player|Ecology") void SetGait(EEcoPlayerGait NewGait);
     UFUNCTION(Server,Reliable) void ServerSetGait(EEcoPlayerGait NewGait);
+    UFUNCTION(BlueprintCallable,Category="Player|Ecology") void TryStrike();
+    UFUNCTION(Server,Reliable) void ServerTryStrike();
 private:
+    bool bStrikeHeld=false;
     UFUNCTION() void OnRep_Gait();
     FEcoFootstepCadence ServerCadence;
     UPROPERTY(Transient) TObjectPtr<UEcoThreatSourceComponent> ThreatSource;
