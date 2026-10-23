@@ -16,7 +16,9 @@ live.py 와 같은 꼴 (나중에 live.py 가 바꿔 쓸 수 있게 — 이 파�
   model 은 모델 zip(그 가중치의 두뇌 파일을 EcoBrains·Saved/EcoBrains·캐시에서 찾고, 없으면 export_weights_v3 로 캐시에 쓴다) 또는 두뇌 파일 .json.
   live.py 판정 실행기 갈림(live.evaluator): LIVE evaluator 를 'ceval' 로 바꾸면 이 파일의 run_items(items, workers, on_done)·version() 을 쓴다.
   10-23 (LIVE_GATE.md 변경 기록 (6)): 1차 숨음 비율이 쓰는 숨은 뒤 10 초 지켜보기를 같은 날 C++ 도망 기록에 옮겨 평가기가 flight.hide 를 낸다(HIDE_WATCH
-  참) — LIVE evaluator 기본값은 다시 'ceval' 이다(옮기기 전 잠깐 'python' 이었다).
+  참) — LIVE evaluator 기본값은 다시 'ceval' 이었다(옮기기 전 잠깐 'python' 이었다).
+  10-24 (LIVE_GATE.md 변경 기록 (7)): 1차·GH·GE 가 쓰는 쫓김 사건(flight.episode)은 아직 C++ 에 없다(EPISODE 거짓) — live.py 는 이 실행기를 판정에서
+  거부하고 LIVE evaluator 를 'python' 으로 둔다. C++ 갈래가 사건 셈을 옮기면 EPISODE 를 참으로 바꾸고 'ceval' 로 되돌린다.
   version() = 평가기 실행 파일·그 C++ 소스(include 닫힘)·이 파일·바탕 설정·파이썬 판정 셈 길(live.eval_code_tag('python'))의 sha256 — 판정 저장 열쇠.
   실행 파일이 소스(include 닫힘)보다 오래되면 쓰지 않는다(다시 빌드하라고 멈춘다).
   세계 설정은 허용 목록으로 본다: 바탕(REF_CFG — C++ 상수가 맞춘 판정 세계)과 다른 칸은 world 블록·시작 상태로 옮기는 칸(FREE_V1·FREE_FEATURES)이어야
@@ -95,6 +97,12 @@ VERSION_TAG = "ceval-1"                                                         
 # 같은 날 C++ 도망 기록(EcoWorldV3.h FlightUpdate·FlightReportOf — FFlightTrack::Watch)에 같은 정의로 옮겼고 평가기가 flight.hide 를 낸다(골든
 # FlightGoldenVectorsV3.h 의 숨은 뒤 지켜보기 장면·칸, compare 의 flight.hide 까지 세계 기록 정확히 같음 — LIVE_GATE.md 변경 기록 (6) 10-23 덧붙임).
 HIDE_WATCH = True
+# 10-24 (results/v3/live/LIVE_GATE.md 변경 기록 (7)): 실시간 관문 1차 사건 숨음 비율·지킴 GH·GE 는 도망 기록의 쫓김 사건(파이썬 flight.episode — 같은
+# 사슴의 이어진 도망을 한 사건으로 묶은 셈, env_v2/world.py '쫓김 사건')을 쓴다. C++ 도망 기록(EcoWorldV3.h)·평가기는 아직 그 칸을 내지 않는다 — 거짓이면
+# live.py 가 이 실행기를 판정에서 분명한 말로 거부한다(live.require_episode — LIVE evaluator 는 그동안 'python'). C++ 갈래가 같은 정의를 옮기고 compare 의
+# flight.episode 까지 세계 기록이 정확히 같아지면 참으로 바꾸고 LIVE evaluator 를 'ceval' 로 되돌린다. compare 는 그동안 flight.episode 를 python_only 로 적고
+# 두 기록에 함께 있는 칸만 견준다(그대로 같아야 한다).
+EPISODE = False
 
 # 세계 설정 허용 목록 (world_block). REF_CFG = C++ 세계 상수가 맞춘 판정 세계 바탕 (live.TEMPLATE_OBS — 관측 21 거울, v3_wild3_mirror.yaml 과 세계가
 # 비트 단위로 같다). 바탕과 달라도 되는 칸은 평가기가 world 블록·시작 상태(native_job)로 옮기는 칸뿐이다.

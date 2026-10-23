@@ -128,7 +128,7 @@ def _traj_hash(cfg, seed, steps, acts_seed=7):
         o, r, d, to = w.step(rng.integers(0, 3, (w.N, 1)).astype(np.float64))
         h.update(_H(o, r, d, to, w.pos, w.pred_pos, w.energy, w.wf_mode, w.wf_dir).digest())
     f = w.flight_stats()
-    for k in ("route", "quiet_ends", "hide"):
+    for k in ("route", "quiet_ends", "hide", "episode"):        # episode = 10-24 쫓김 사건 칸 (HEAD 뒤에 더한 통계 전용 칸)
         f.pop(k, None)
     ws = w.wild_stats()
     ws.pop("panic_quiet_ends", None)
@@ -193,7 +193,9 @@ def _masked_hash(cfg, seed, steps, rs):
         a = sample_masked(np.ones(m.shape), m, rng.random(w.N)).astype(np.float64)[:, None]
         o, r, d, to = w.step(a)
         h.update(_H(o, r, d, to, w.pos, w.pred_pos, w.energy, w.wf_mode, w.wf_dir, w.behavior).digest())
-    st = json.dumps(dict(flight=w.flight_stats(), wild=w.wild_stats(), hunt=w.hunt_stats(), rep=w.repertoire_stats(),
+    f = w.flight_stats()
+    f.pop("episode", None)              # 10-24 쫓김 사건 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
+    st = json.dumps(dict(flight=f, wild=w.wild_stats(), hunt=w.hunt_stats(), rep=w.repertoire_stats(),
                          rng=str(w.rng.bit_generator.state)), sort_keys=True, default=str)
     h.update(st.encode())
     return h.hexdigest(), w._rep_decide

@@ -120,6 +120,7 @@ def _traj_hash(cfg, seed, steps, acts_seed=7):
     f.pop("route", None)
     f.pop("quiet_ends", None)
     f.pop("hide", None)                 # 10-23 숨은 뒤 지켜보기 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
+    f.pop("episode", None)              # 10-24 쫓김 사건 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
     ws = w.wild_stats()
     ws.pop("panic_quiet_ends", None)
     st = json.dumps(dict(flight=f, wild=ws, hunt=w.hunt_stats(), rng=str(w.rng.bit_generator.state)), sort_keys=True, default=str)
@@ -138,6 +139,7 @@ def _full_hash(cfg, seed, steps, acts_seed=7):
         h.update(_H(o, r, d, to, w.pos, w.pred_pos, w.energy, w.wf_mode, w.wf_dir).digest())
     f = w.flight_stats()
     f.pop("hide", None)                 # 10-23 숨은 뒤 지켜보기 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
+    f.pop("episode", None)              # 10-24 쫓김 사건 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
     st = json.dumps(dict(flight=f, wild=w.wild_stats(), hunt=w.hunt_stats(), rng=str(w.rng.bit_generator.state)),
                     sort_keys=True, default=str)
     h.update(st.encode())

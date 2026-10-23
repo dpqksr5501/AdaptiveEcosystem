@@ -336,6 +336,25 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
           지켜보는 동안 그 사슴이 다시 도망을 시작해도 지켜보기는 이어진다(새 도망은 따로 기록된다 — 그 도망이 또 cover 로 끝나면 지켜보기가 하나 더 열린다).
           시계는 기록 훅을 부른 횟수(스텝)다. 학습 세계에서 죽은 칸에 다시 난 개체는 지켜보지 않는다(죽음 스텝에 끝낸다). hidden + cover_then_caught +
           cover_then_starved = 끝 까닭 cover 수.
+        쫓김 사건 (10-24 사람 결정 "'쫓김 사건' 단위로 셈" — 실시간 관문 1차 숨음 비율·GH·GE, results/v3/live/LIVE_GATE.md 변경 기록 (7). 같은 기록 훅 안의
+          통계 전용 칸 — 덮기·동역학·난수·관측·보상·마스크와 무관, `flight_stats` 의 episode. 위 도망 한 번·hide 셈은 그대로 두고 옆에 더한다). 까닭: 도망
+          하나하나를 세면 은신처로 끝난 도망 뒤 몇 초 만에 도주 반사가 다시 켜져 또 뛴 '은신처 들락날락'이 숨음을 두 번 세어 숨음 비율을 부풀릴 수 있다.
+          같은 사슴(슬롯)의 도망이 이어지는 조건(사전 등록): 앞 도망이 cover 로 끝났으면 그 마지막 FLEE 스텝 뒤 EPISODE_LINK_COVER_STEPS(= FLIGHT_HIDE_WATCH_STEPS
+          75 — 10 초 지켜보기와 같은 스텝들), 그 밖 끝 까닭으로 살아 끝났으면 EPISODE_LINK_OTHER_STEPS(= FLIGHT_REFLEE_STEPS 38 — GR '살아 끝난 도망 뒤 5 초 안
+          다시 도망'과 같은 스텝 수·경계: 다음 도망의 첫 FLEE 스텝 − 앞 도망의 마지막 FLEE 스텝 ≤ 38) 안(그 스텝 포함)에 다음 도망이 시작하면 같은 사건,
+          아니면 새 사건. 사건 시작 = 열린 사건이 없는 사슴이 도망을 시작한 스텝(started — 도망 시작 = 사건 시작 + 이어진 도망 joined).
+          사건 결과(서로 겹치지 않는다, EPISODE_OUTCOMES — 합 = 사건 시작):
+            caught·starved: 사건 안 어느 도망이 FLEE 를 실행한 스텝에 잡힘·굶음으로 끝남, 또는 마지막 도망이 cover 로 끝난 뒤 이음 창(10 초 지켜보기) 안에 잡힘·굶음
+              (그 사슴이 죽으면 사건은 그 스텝에 닫힌다 — 닫는 스텝에 죽은 것도 그 안이다. 학습 세계에서 죽은 칸에 다시 난 개체는 새 사건이다)
+            hidden: 마지막 도망이 cover 로 끝났고 이음 창(10 초 지켜보기)을 다음 도망 없이 잡히지·굶지 않고 지남. 판이 끝날 때 아직 그 창 안이면 hide 와 같이
+              지켜본 만큼 본다 — 숨음에 넣고 watching 으로도 적는다(잘림이 아니다)
+            other: 마지막 도망이 cover 밖 까닭으로 살아 끝났고 이음 창(5 초)을 다음 도망 없이 지남. 그 창 안에 도망 없이 죽어도 사건은 그 스텝에 닫고 결과는
+              other 다(사전 등록 정의 그대로 — 도망 밖 죽음은 cover 뒤 10 초만 잡힘·굶음이다). 그 죽음은 window_caught·window_starved 로 따로 적는다(보고만)
+            truncated: 판이 끝날 때(`flight_stats` 를 부를 때) 사건이 닫히지 않음 — 마지막 도망이 아직 열려 있거나, 마지막 도망이 cover 밖 까닭으로 끝나 5 초
+              이음 창 안
+          쫓긴 사건(chased) = 잘림이 아니고 사건 안에 끝 까닭이 unchased 가 아닌 도망이 하나라도 있는 사건(hidden·caught·starved 는 모두 쫓긴 사건이다 —
+          other 가운데 쫓긴 것 other_chased). 사건 숨음 비율 = hidden / chased, 사건 잡힘 비율 = caught / chased (관문은 시드마다 지역 셋의 분자·분모를 각각 더해
+          나눈다). GE = 1000 × started / 산 사슴-스텝. 보고 칸: joined_cover·joined_other = cover 뒤·그 밖 뒤 이음 창 안에서 시작해 앞 사건에 이어진 도망 수.
       도망길 1단계 (10-21 사용자 '도망 방향을 두뇌가 고름' — 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 3-1·6·7절. 이 단계는 손 규칙 측정 전용이다:
         두뇌가 고르는 길·관측 24·마스크 판 4 는 아직 없다). 선택 키(features.OPTIONAL_KEYS, 기본 null·0 = 위 그대로, 그 코드 경로를 타지 않는다 — 비트 동일):
         route_fixed ∈ {run, open, cover, shelter}: 도주 반사 중 방향을 그 길로 고정한다(가능하지 않으면 RUN). 길(ROUTE_NAMES):
@@ -1443,6 +1462,12 @@ ROUTE_OBS_NAMES = ("in_panic", "shelter_reach", "shelter_edge")
 ROUTE_SHELTER_EDGE_NORM_U = 20.0                         # 관측 shelter_edge = clip(e* / 20, 0, 1)
 ROUTE_SLOT_RUN, ROUTE_SLOT_SHELTER, ROUTE_SLOT_RESERVED = rep.FLEE, rep.SLEEP, rep.FREEZE
 FLIGHT_REFLEE_STEPS = 38                                 # 도망 기록(길 켬): 살아 끝난 도망 뒤 이 스텝(5 초) 안에 다시 시작한 도망을 센다 (설계 12절 GR)
+# 10-24 쫓김 사건 (사람 결정 10-24 — results/v3/live/LIVE_GATE.md 변경 기록 (7), 모듈 docstring '야생 1단계' (w3) 도망 기록의 '쫓김 사건', `World.flight_stats`
+# 의 episode). 앞 도망의 마지막 FLEE 스텝 뒤 이 스텝 수 안(그 스텝 포함)에 같은 사슴의 다음 도망이 시작하면 같은 사건: cover 끝 = 10 초 지켜보기와 같은
+# 75 스텝, 그 밖 끝 = GR 과 같은 38 스텝(5 초). 사건 결과(서로 겹치지 않는다, 합 = 사건 시작)
+EPISODE_LINK_COVER_STEPS = FLIGHT_HIDE_WATCH_STEPS
+EPISODE_LINK_OTHER_STEPS = FLIGHT_REFLEE_STEPS
+EPISODE_OUTCOMES = ("hidden", "caught", "starved", "other", "truncated")
 IST_GOLDEN_ANGLE = 2.399963
 IST_WOLF_HEAD_OFFSET = 2
 # 통합 무대 (p) 늑대 모서리 순서(C++ PlanStage Corners)와 무작위 자리 시도 수, 사슴 시도 수 max(IST_DEER_TRIES_MIN, IST_DEER_TRIES_PER × N)
@@ -6267,6 +6292,17 @@ class World:
         self._fl_watch_open = 0                             # 지켜보는 도망 수 (= _fl_watch 합)
         self._fl_hidden = 0                                 # 끝까지 지켜본 숨어 살아남은 도망
         self._fl_cover_caught = self._fl_cover_starved = 0  # 지켜보는 동안 잡힘·굶음
+        # 10-24 쫓김 사건 (모듈 docstring '야생 1단계' (w3) 도망 기록의 '쫓김 사건' — `flight_stats` 의 episode). 시계 = _fl_clock (지켜보기와 같다).
+        # 사슴마다 열린 사건 하나 — 도망 중(_fl_len > 0)이거나, 마지막 도망이 살아 끝나 이음 창(_fe_until 까지) 안이다
+        self._fe_open = np.zeros(N, dtype=bool)             # 열린 사건이 있나
+        self._fe_chased = np.zeros(N, dtype=bool)           # 열린 사건 안에 끝 까닭이 unchased 가 아닌 닫힌 도망이 있나
+        self._fe_cover = np.zeros(N, dtype=bool)            # 열린 사건의 마지막 도망이 cover 로 살아 끝났나 (도망 중이면 거짓)
+        self._fe_until = np.zeros(N, dtype=np.int64)        # 이음 창의 마지막 스텝(시계) — 다음 도망이 이 스텝까지 시작하면 같은 사건
+        self._fe_started = 0                                # 시작한 사건 수
+        self._fe_n = np.zeros(len(EPISODE_OUTCOMES) - 1, dtype=np.int64)    # 닫힌 사건 수 (결과 hidden·caught·starved·other — 잘림은 판 끝에 센다)
+        self._fe_chased_n = self._fe_other_chased = 0       # 닫힌 쫓긴 사건 수, 그 가운데 결과 other
+        self._fe_joined = np.zeros(2, dtype=np.int64)       # 앞 사건에 이어진 도망 (cover 뒤, 그 밖 뒤)
+        self._fe_win_died = np.zeros(2, dtype=np.int64)     # 그 밖 끝 뒤 이음 창 안 도망 없이 죽음 (잡힘, 굶음) — 결과 other 의 일부
         if self._ob is not None and self._ob["foliage"] is not None:
             # 10-21 숲 시야(모듈 docstring '야생 2단계' 3 의 7)) 켬 세계만: 원판 놓침(obstacle) 가운데 잎 때문인 것(lost_foliage)
             self._fl_why_fol = np.zeros(N, dtype=bool)      # 열린 도망의 마지막 놓침이 잎 때문인가(그 스텝 원판 놓침이 모두 잎만 가림)
@@ -6373,12 +6409,26 @@ class World:
                 # 10-23 숨은 뒤 지켜보기: 이번 스텝(끝 스텝 다음)부터 FLIGHT_HIDE_WATCH_STEPS 스텝 — 마지막으로 보는 스텝(지금 + 74)의 칸에 하나 더한다
                 self._fl_watch[cv, (self._fl_clock + FLIGHT_HIDE_WATCH_STEPS - 1) % FLIGHT_HIDE_WATCH_STEPS] += 1
                 self._fl_watch_open += int(np.count_nonzero(cv))
+            # 10-24 쫓김 사건: 살아 끝난 도망의 사건은 이음 창에 든다 — 마지막 FLEE 스텝(= 지금 시계 − 1) 뒤 cover 면 EPISODE_LINK_COVER_STEPS(10 초
+            # 지켜보기와 같은 마지막 스텝 지금 + 74), 그 밖이면 EPISODE_LINK_OTHER_STEPS(GR 과 같은 경계) 스텝까지 다음 도망이 시작하면 같은 사건
+            self._fe_chased |= gone & (cause != ci("unchased"))
+            self._fe_cover = np.where(gone, cv, self._fe_cover)
+            self._fe_until = np.where(gone, self._fl_clock - 1 + np.where(cv, EPISODE_LINK_COVER_STEPS, EPISODE_LINK_OTHER_STEPS), self._fe_until)
             self._fl_close(gone, cause)
             if rt:
                 self._fl_last_t[gone] = self.t - 2                  # 끝난 도망의 마지막 FLEE 스텝 번호 (이번 스텝 = self.t − 1)
         # 2) 이번 스텝 FLEE
         new = ex & (L == 0)
         self._fl_started += int(np.count_nonzero(new))
+        if new.any():
+            # 10-24 쫓김 사건: 열린 사건(이음 창 안 — 창이 지난 사건은 지난 스텝 끝에 닫았다)이면 그 사건에 잇고, 아니면 새 사건
+            jn = new & self._fe_open
+            self._fe_joined += np.array([np.count_nonzero(jn & self._fe_cover), np.count_nonzero(jn & ~self._fe_cover)], dtype=np.int64)
+            sn = new & ~self._fe_open
+            self._fe_started += int(np.count_nonzero(sn))
+            self._fe_open |= sn
+            self._fe_chased &= ~sn
+            self._fe_cover &= ~new
         if rt and new.any():
             self._flr_refled += int(np.count_nonzero(new & ((self.t - 1) - self._fl_last_t <= FLIGHT_REFLEE_STEPS)))
         self._fl_chased[new] = targeted(tp)[new]
@@ -6470,6 +6520,33 @@ class World:
                 self._fl_hidden += e
                 wt[:, col] = 0
                 self._fl_watch_open -= e
+        # 5) 10-24 쫓김 사건: 이번 스텝에 죽은 사슴의 사건을 닫고(학습 세계의 새 개체에 잇지 않는다), 이음 창의 마지막 스텝이 이번 스텝이고 다음 도망이
+        #    없는 사건을 닫는다 (모듈 docstring '쫓김 사건' — 결과는 EPISODE_OUTCOMES 차례의 칸 _fe_n)
+        if self._fe_open.any():
+            fe = self._fe_n
+            dd = done & self._fe_open
+            if dd.any():
+                cg = np.zeros(N, dtype=bool) if caught is None else np.asarray(caught, dtype=bool)
+                fin = dd & (ex | self._fe_cover)                    # 도망 중 죽음(그 도망이 caught·starved) 또는 cover 끝 뒤 10 초 지켜보기 안 죽음
+                oth = dd & ~fin                                     # cover 밖 끝 뒤 5 초 이음 창 안에 도망 없이 죽음 → other (사전 등록 그대로)
+                kc, ks = int(np.count_nonzero(fin & cg)), int(np.count_nonzero(fin & ~cg))
+                fe[1] += kc
+                fe[2] += ks
+                fe[3] += int(np.count_nonzero(oth))
+                oc = int(np.count_nonzero(oth & self._fe_chased))
+                self._fe_chased_n += kc + ks + oc
+                self._fe_other_chased += oc
+                self._fe_win_died += np.array([np.count_nonzero(oth & cg), np.count_nonzero(oth & ~cg)], dtype=np.int64)
+                self._fe_open &= ~dd
+            xp = self._fe_open & (L == 0) & (self._fe_until <= self._fl_clock)
+            if xp.any():
+                hd, ot = xp & self._fe_cover, xp & ~self._fe_cover   # cover 끝 → 숨음, 그 밖 끝 → other
+                oc = int(np.count_nonzero(ot & self._fe_chased))
+                fe[0] += int(np.count_nonzero(hd))
+                fe[3] += int(np.count_nonzero(ot))
+                self._fe_chased_n += int(np.count_nonzero(hd)) + oc
+                self._fe_other_chased += oc
+                self._fe_open &= ~xp
         self._fl_clock += 1
         nt = tgt.copy()
         if done.any():
@@ -6488,7 +6565,12 @@ class World:
         hide (10-23 숨은 뒤 지켜보기 — 모듈 docstring): chased = 쫓긴 도망 수(끝난 도망 가운데 unchased·truncated 가 아닌 것), hidden = 끝 까닭 cover 이고
         지켜보는 FLIGHT_HIDE_WATCH_STEPS 스텝 안에 죽지 않은 도망(지금 지켜보는 것 포함 — 지켜본 만큼만), watching = 그 가운데 아직 지켜보는 것,
         cover_then_caught·cover_then_starved = 끝 까닭 cover 이고 지켜보는 동안 잡힘·굶음, watch_steps = 지켜보는 스텝 수.
-        hidden + cover_then_caught + cover_then_starved = n['cover']."""
+        hidden + cover_then_caught + cover_then_starved = n['cover'].
+        episode (10-24 쫓김 사건 — 모듈 docstring '쫓김 사건'): started = 시작한 사건, chased = 쫓긴 사건(잘림 아님 ∧ unchased 밖 끝 도망 있음),
+        hidden·caught·starved·other·truncated = 사건 결과(EPISODE_OUTCOMES — 합 = started; hidden 은 판 끝에 cover 뒤 이음 창 안인 사건 포함 = watching),
+        other_chased = other 가운데 쫓긴 사건(chased = hidden + caught + starved + other_chased), joined = 앞 사건에 이어진 도망(= joined_cover +
+        joined_other, 도망 시작 started = 사건 started + joined), window_caught·window_starved = cover 밖 끝 뒤 5 초 이음 창 안 도망 없이 죽은 사건(결과
+        other 의 일부, 보고만), link_cover_steps·link_other_steps = 이음 창 스텝 수. 판 끝에 열린 사건은 세계를 바꾸지 않고 센다."""
         if self._wf is None:
             raise ValueError("flight_stats 는 wild_flight 를 켠 세계에만 있다")
         if not self.track_flight:
@@ -6512,6 +6594,7 @@ class World:
                            hidden=int(self._fl_hidden + self._fl_watch_open), watching=int(self._fl_watch_open),
                            cover_then_caught=int(self._fl_cover_caught), cover_then_starved=int(self._fl_cover_starved),
                            watch_steps=FLIGHT_HIDE_WATCH_STEPS)
+        out["episode"] = self._episode_block(op)
         if self._wf["quiet_end"] > 0:
             out["quiet_ends"] = int(self._wf_quiet_ends)       # 10-21 끝 규칙 quiet_end 로 끝난 도주 (켠 세계만)
         if self._ob is not None and self._ob["foliage"] is not None:
@@ -6520,6 +6603,20 @@ class World:
         if self._route_on:
             out["route"] = self._flight_route_block(op)
         return out
+
+    def _episode_block(self, op: np.ndarray) -> dict:
+        """`flight_stats` 의 episode (10-24 쫓김 사건 — 모듈 docstring '쫓김 사건'). op = 지금 열린 도망. 판 끝에 열린 사건: cover 뒤 이음 창 안(도망 없음)은
+        지켜본 만큼 숨음(watching), 도망 중이거나 cover 밖 끝 뒤 이음 창 안은 잘림. 세계는 그대로다."""
+        eo = self._fe_open
+        wa = eo & ~op & self._fe_cover
+        tr = eo & ~wa
+        n = self._fe_n
+        nw = int(np.count_nonzero(wa))
+        return dict(started=int(self._fe_started), chased=int(self._fe_chased_n) + nw, hidden=int(n[0]) + nw, caught=int(n[1]), starved=int(n[2]),
+                    other=int(n[3]), truncated=int(np.count_nonzero(tr)), watching=nw, other_chased=int(self._fe_other_chased),
+                    joined=int(self._fe_joined.sum()), joined_cover=int(self._fe_joined[0]), joined_other=int(self._fe_joined[1]),
+                    window_caught=int(self._fe_win_died[0]), window_starved=int(self._fe_win_died[1]),
+                    link_cover_steps=EPISODE_LINK_COVER_STEPS, link_other_steps=EPISODE_LINK_OTHER_STEPS)
 
     def _flight_route_block(self, op: np.ndarray) -> dict:
         """`flight_stats` 의 route (10-21 도망길 기록, 길 켬 세계만): route_stats 칸 + 그 도망의 길(반사 스텝이 가장 많은 길, 없으면 none)별 끝 까닭 수·

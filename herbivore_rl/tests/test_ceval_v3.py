@@ -209,3 +209,7 @@ def test_pool_record_schema(ce, prepared, monkeypatch):
     assert set(out[0][1]["flight"]) == core and core <= set(py["flight"])
     assert set(out[0][1]["flight"]["hide"]) == {"chased", "hidden", "watching", "cover_then_caught", "cover_then_starved", "watch_steps"}
     assert out[0][1]["flight"]["hide"] == py["flight"]["hide"] and out[0][1]["flight"]["hide"]["watch_steps"] == 75
+    # 10-24 쫓김 사건(flight.episode — LIVE_GATE.md 변경 기록 (7))은 아직 파이썬에만 있다: 평가기 EPISODE 거짓(관문이 거부), compare 는 python_only.
+    # C++ 갈래가 사건 셈을 옮기면 이 줄을 core 로 옮기고 ce.EPISODE 를 참으로 바꾼다
+    assert "episode" in py["flight"] and "episode" not in out[0][1]["flight"] and ce.EPISODE is False
+    assert ce.exact_worlds([py], [out[0][1]])["python_only"] == ["flight.episode"]

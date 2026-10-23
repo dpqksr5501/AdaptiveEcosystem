@@ -35,7 +35,7 @@ ceval.python_trace 와 같은 스텝·같은 칸(+ 계획서 7-3 의 길 칸 rou
     route  route·route_k·route_age·route_feas·route_decide·route_req i4 — 스텝 끝 산 슬롯 (route_req = 길 결정(route_decide ∧ 도주) 사슴의 두뇌 출력,
            아니면 −1. 스텝 끝 `_wf_update` 뒤·다음 스텝 `_route_apply` 앞 — C++ 은 H 뒤·다음 A 앞)
   C++ trace(계획서 7-2 의 WriteState 확장)를 ceval 이 읽은 dict 에 같은 `digest_state` 를 걸면 스텝·칸마다 견줄 수 있다(첫 갈림 칸을 바로 안다).
-세계 기록 (stats/<같은 이름>.json): record = ceval compare 파이썬 쪽 기록(adapt._world_one — wall_s 뺌, flight.route·flight.hide 포함), trace = 궤적 판
+세계 기록 (stats/<같은 이름>.json): record = ceval compare 파이썬 쪽 기록(adapt._world_one — wall_s 뺌, flight.route·flight.hide·flight.episode(10-24 쫓김 사건) 포함), trace = 궤적 판
   끝(잡힘·굶음·산·도망 기록이 record 와 같은지·repertoire_stats — decide_frac), check = 두뇌 파일 순전파(numpy float32)와 torch argmax 가 다른 산 사슴
   줄 수(0 이어야)·모든 결정과 길 결정의 1·2위 로짓 차 최솟값·근접 동점(< 1e-4) 수, chain = 칸마다 스텝 sha256 32 바이트를 이은 것의 sha256,
   events.decide = [s, 슬롯, 시작, SHELTER 가능(마스크 칸 4), k*, 요청, 고른 길(RUN 0·SHELTER 2 — 다음 스텝 첫머리에 적용)], events.death = [s, 슬롯, 까닭],
