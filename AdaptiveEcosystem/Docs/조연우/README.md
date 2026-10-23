@@ -12,6 +12,10 @@
 
 현재 확인 맵은 `/Game/JYU/Maps/LV_JYU_HerdMigration`이다. 기존 맵의 이주 옵션은 OFF, 새 맵만 ON이다. v3 기본 `SocialControl=0`을 유지하고, 이주 의도는 Native의 유일한 이동 writer가 소비한다. 실제 지역 진입과 경로 끝 정착은 다르며 모든 무리가 성공하지는 않는다. 일반 PIE·Dedicated/Client 결과는 체크인 Evidence를 따른다. 이 문서 갱신에서 새 UBT·PIE를 실행하지 않았다.
 
+## 다음 기획의 세부 설계
+
+[MMORPG 동적 생태계 세부 기획](../Architecture/DYNAMIC_ECOSYSTEM_DETAILED_DESIGN_20261023.md)은 물·토양·식생/섭식, 장소 선호·경험, 흔적·무리 사냥, 출생 스폰·세대 속도, 체형/ABP·규모/저장 구조를 정리한 **제안**이다. 현재 구현 완료 목록과 구분하며 기능 활성화나 정책 변경을 수행한 것은 아니다.
+
 ## 이전 통합 이력 — 아래 날짜의 현재/대기는 당시 상태
 
 2026-10-22 main 병합·날씨 호환 검증은 [main 통합 기록](JYU_MAIN_MERGE_20261022.md), 이후 PR #12 `a74fcac` 반영·늦은 은신처 먹이 장부 복구는 [PR #12 통합 기록](JYU_PR12_MAIN_INTEGRATION_20261022.md)에 보존한다. 과거 PR 제목·HEAD·Draft·push 전 상태를 현재 상태로 사용하지 않는다.
