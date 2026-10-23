@@ -13,7 +13,8 @@
 - 10-24 쫓김 사건(flight_stats 의 episode — results/v3/live/LIVE_GATE.md 변경 기록 (7)): cover 끝 뒤 10 초(75 스텝) 안 다시 도망 = 한 사건(들락날락을
   두 번 세지 않음), 그 밖 끝 뒤 5 초(38 스텝 — GR 과 같은 경계) 안·밖, 사건 안 잡힘, 지켜보기 안 잡힘·굶음, 판 끝 잘림(열린 도망·5 초 창 안 — cover 뒤
   지켜보기는 숨음), 5 초 창 안 도망 없는 죽음(other), 다시 난 개체는 새 사건. 실제 세계에서 불변식(사건 결과 합 = 사건 시작, 도망 시작 = 사건 시작 + 이어진
-  도망)과 길 켬 세계의 GR 과 같은 경계(joined_other ≤ refled ≤ joined_other + joined_cover).
+  도망)과 길 켬 세계의 GR 과 같은 경계(joined_other ≤ refled ≤ joined_other + joined_cover). 검토: 무작위 손 장면에서 벡터 셈 = 사건 정의를 사슴마다
+  다시 짠 독립 셈(모든 칸, 판 중간 포함).
 시드는 탐색 32084~32099·학습 32000~32049 만 쓴다.
 """
 
@@ -655,6 +656,122 @@ def test_episode_real_worlds_invariants():
     _invariants(f3)
     e3, rf = f3["episode"], f3["route"]["refled"]
     assert e3["joined_other"] <= rf <= e3["joined_other"] + e3["joined_cover"] and rf > 0
+
+
+def _ep_log(w):
+    """기록 훅을 감싸(읽기만) 도망 시작 (시계, 사슴)·닫힘 (시계, 사슴, 끝 까닭)·죽음 (시계, 사슴, 잡힘인가)을 적는다."""
+    log = dict(start=[], close=[], death=[])
+    close0, upd0 = w._fl_close, w._fl_update
+
+    def close(m, cause):
+        log["close"] += [(w._fl_clock, int(i), FLIGHT_CAUSES[int(cause[i])]) for i in np.flatnonzero(m)]
+        return close0(m, cause)
+
+    def upd(flee, reflex, done, caught, live, in_cov, **kw):
+        k, d = w._fl_clock, np.asarray(done, dtype=bool)
+        ex = np.asarray(flee, dtype=bool) & (np.asarray(live, dtype=bool) | d)
+        cg = np.zeros(w.N, dtype=bool) if caught is None else np.asarray(caught, dtype=bool)
+        log["start"] += [(k, int(i)) for i in np.flatnonzero(ex & (w._fl_len == 0))]
+        log["death"] += [(k, int(i), bool(cg[i])) for i in np.flatnonzero(d)]
+        return upd0(flee, reflex, done, caught, live, in_cov, **kw)
+
+    w._fl_close, w._fl_update = close, upd
+    return log
+
+
+def _ep_oracle(log, N, T):
+    """사전 등록 정의(LIVE_GATE.md 5-1 '쫓김 사건')를 사슴마다 사건 목록으로 그대로 다시 짠 셈 (벡터 코드와 따로 — 시계 T 전 기록만)."""
+    out = {k: 0 for k in ("started", "chased", "hidden", "caught", "starved", "other", "truncated", "watching", "other_chased", "joined", "joined_cover",
+                          "joined_other", "window_caught", "window_starved")}
+    ev: dict = {}
+    for k, i, c in log["close"]:
+        ev.setdefault((k, i), {})["dead" if c in ("caught", "starved") else "gone"] = c
+    for k, i in log["start"]:
+        ev.setdefault((k, i), {})["start"] = True
+    for k, i, cg in log["death"]:
+        ev.setdefault((k, i), {})["death"] = cg
+    st = [dict(open=False, flee=False, last=0, cover=False, chased=False) for _ in range(N)]
+
+    def win(s):
+        return EPISODE_LINK_COVER_STEPS if s["cover"] else EPISODE_LINK_OTHER_STEPS
+
+    def close_ok(s):                                                # 이음 창을 다음 도망·죽음 없이 지남
+        out["hidden" if s["cover"] else "other"] += 1
+        if s["cover"] or s["chased"]:
+            out["chased"] += 1
+            out["other_chased"] += 0 if s["cover"] else 1
+        s["open"] = False
+
+    for k, i in sorted(x for x in ev if x[0] < T):
+        e, s = ev[(k, i)], st[i]
+        if s["open"] and not s["flee"] and k - s["last"] > win(s):
+            close_ok(s)
+        if "gone" in e:                                             # 살아 끝난 도망 — 마지막 FLEE 스텝 = k − 1
+            s.update(flee=False, last=k - 1, cover=e["gone"] == "cover", chased=s["chased"] or e["gone"] != "unchased")
+        if "start" in e:
+            if s["open"]:
+                out["joined"] += 1
+                out["joined_cover" if s["cover"] else "joined_other"] += 1
+            else:
+                out["started"] += 1
+                s.update(open=True, chased=False)
+            s.update(flee=True, cover=False)
+        if "dead" in e:                                             # 도망 중 죽음
+            out[e["dead"]] += 1
+            out["chased"] += 1
+            s.update(open=False, flee=False)
+        elif "death" in e and s["open"]:                            # 이음 창 안 도망 없는 죽음
+            if s["cover"]:
+                out["caught" if e["death"] else "starved"] += 1
+                out["chased"] += 1
+            else:
+                out["other"] += 1
+                out["window_caught" if e["death"] else "window_starved"] += 1
+                if s["chased"]:
+                    out["chased"] += 1
+                    out["other_chased"] += 1
+            s["open"] = False
+    for s in st:                                                    # 판 끝 (마지막 시계 T − 1)
+        if not s["open"]:
+            continue
+        if s["flee"]:
+            out["truncated"] += 1
+        elif T - 1 - s["last"] >= win(s):
+            close_ok(s)
+        elif s["cover"]:
+            out["hidden"] += 1
+            out["watching"] += 1
+            out["chased"] += 1
+        else:
+            out["truncated"] += 1
+    return out
+
+
+def test_episode_matches_independent_reconstruction():
+    """10-24 검토: 손 장면에 도망·표적·은신처·죽음(잡힘·굶음)을 무작위로 섞어, 벡터 셈(`_fl_update` 5)·`_episode_block`)이 사건 정의를 사슴마다 그대로
+    다시 짠 셈(_ep_oracle)과 모든 칸에서 같다 — 판 중간에 부른 flight_stats 도. 이음 창 경계·지켜보기 안 잡힘·굶음·5 초 창 안 죽음·판 끝 잘림·지켜보는 중
+    숨음·다시 난 개체(죽은 칸이 다음 틱에 다시 뜀)가 모두 나온다."""
+    seen = dict(watching=0, window_caught=0, window_starved=0, joined_cover=0, starved=0, truncated=0)
+    for trial in range(60):
+        rng = np.random.default_rng(1000 + trial)
+        n = int(rng.integers(2, 7))
+        w = _scene(n)
+        log = _ep_log(w)
+        fl = np.zeros(n, dtype=bool)
+        p_start, p_stop, p_die, p_cov, p_tgt = rng.uniform(0.01, 0.2), rng.uniform(0.05, 0.6), rng.uniform(0, 0.03), rng.uniform(0, 0.9), rng.uniform()
+        T = int(rng.integers(50, 400))
+        for t in range(T):
+            fl = np.where(fl, rng.random(n) > p_stop, rng.random(n) < p_start)
+            done = [int(i) for i in np.flatnonzero(rng.random(n) < p_die)]
+            _tick(w, list(np.flatnonzero(fl)), tgt=[int(rng.integers(0, n)) if rng.random() < p_tgt else -1 for _ in range(w.M)], done=done,
+                  caught=[i for i in done if rng.random() < 0.6], in_cov=list(np.flatnonzero(rng.random(n) < p_cov)))
+            if rng.random() < 0.05 or t == T - 1:
+                got = _ep(w)
+                assert got == _ep_oracle(log, n, w._fl_clock), (trial, t)
+                _episode_invariants(w.flight_stats())
+        for k in seen:
+            seen[k] += got[k]
+    assert all(v > 0 for v in seen.values()), seen
 
 
 # --------------------------------------------------------------------- #

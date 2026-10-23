@@ -1067,4 +1067,5 @@ route_decide_i = in_panic_i ∧ ( 시작 ∨ 무효 ∨ (route_i = RUN ∧ age_i
 - 예(보고만 — route0, N 세계, R7 점검 시드 38120~38139 × 지역 셋 × 1800 스텝): 숨음 비율 도망 단위 13.0 % → 사건 단위 11.9 %, 잡힘 비율 9.7 % → 10.4 %
   (전체 합), 도망 ÷ 사건 1.09, GF 2.07 · GE 1.91.
 - C++ 이식(이번 단계 밖): `EcoWorldV3.h` 도망 기록에 같은 사건 셈(이음 창 두 개·결과 다섯·쫓긴 사건)과 평가기 `flight.episode` 를 넣고, `ceval.py compare` 가
-  `flight.episode` 까지 정확히 같으면 `ceval.EPISODE` 를 참으로 바꾸고 LIVE evaluator 를 'ceval' 로 되돌린다.
+  `flight.episode` 까지 정확히 같으면 `ceval.EPISODE` 를 참으로 바꾸고 LIVE evaluator 를 'ceval' 로 되돌린다. 게임 화면 도망 집계(`EcoV3FlightTally.h`
+  '쫓긴 도망 중 숨음 x% · 잡힘 y%')는 그때까지 도망 단위라 관문 1차(사건 단위)와 셈이 다르다 — 이식 때 함께 맞춘다(LIVE_GATE 변경 기록 (7) 검토 덧붙임).

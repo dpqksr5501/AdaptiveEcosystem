@@ -2085,7 +2085,7 @@ def judge_candidate(info: dict, cand: Path, cur: dict, plan: dict, check: dict |
         if st is not None:
             st.set(state="gating", message=f"중간 판정: 기각(나아지지 않음) — 사건 숨음 비율 {pct(look['b'])}→{pct(look['a'])} t {tfmt(look['t'], 1)}", progress=-1.0)
         return out(g, cnd, "interim_futility", False, look)
-    # 앞서 통과(켰을 때)여도 지킴(GH·GN·GF·GV·GC·G4 의 N 몫)은 뒤 절반까지 N 전체로 봐야 느슨해지지 않는다 — 뒤 절반·G·끼임을 끝까지 돌린다(10-21 검토)
+    # 앞서 통과(켰을 때)여도 지킴(GH·GN·GF·GE·GV·GC·G4 의 N 몫)은 뒤 절반까지 N 전체로 봐야 느슨해지지 않는다 — 뒤 절반·G·끼임을 끝까지 돌린다(10-21 검토)
     early = look["action"] == "efficacy"
     if early:
         print("중간 판정: 1차 앞서 통과 경계를 넘음 — 1차는 통과로 정하고 지킴은 뒤 절반까지 전체로 본다", flush=True)
