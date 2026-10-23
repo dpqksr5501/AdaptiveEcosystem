@@ -65,8 +65,10 @@
 - 명령: 1-3 그대로 `judge --model ckpt/v3/v3_r7_g995_s1_20m.zip --off ckpt/v3/v3_r7off_g995_s0_20m.zip`. 끝 코드 0(통과). 한 번만 돌렸다.
 - 기록: `judge.md`·`judge.json`(판정 표·보고만 표·사건 표·지역 표·보고 줄), `logs/judge.log`(화면 그대로), 두뇌 파일 `brains/v3_r7_g995_s1_20m.json`.
 - 돌린 환경: 언리얼·UBT·다른 파이썬 끈 PC(시작 때 확인), 워커 14(기본).
-  - 같은 작업 트리에서 다른 갈래가 `results/v3/live/live.py`·`ceval.py`(실행기 설정 'ceval' 로 되돌림·글)와 C++ 파일을 아직 커밋하지 않은 채 고쳐 두었다.
+  - 시작 때 같은 작업 트리에서 다른 갈래가 `results/v3/live/live.py`·`ceval.py`(실행기 설정 'ceval' 로 되돌림·글)와 C++ 파일을 커밋하지 않은 채 고쳐 두었다.
+    그 갈래는 판정 도중 05:50 에 그것을 `f2deaf6`(C++ 쫓김 사건 셈 이식)으로 커밋했다.
   - R7e 는 파이썬 거울 실행기를 직접 쓰므로 그 설정과 무관하다. `live.py` 의 바뀐 줄은 실행기 설정·글·오류 글뿐이고 셈 줄은 그대로다(diff 확인).
+  - `f2deaf6` 은 파이썬 세계 코드(`env/`·`env_v2/`·`policies/`·거울 파일)를 고치지 않았다. 판정 뒤 다시 잰 세계 셈 길 지문도 `21b240bfbd18ade6980ec4f7` 로 같다.
 - 판 9 개(N: R7·route0·대조·'늘 SHELTER'·R6 / G: R7·route0 / 끼임: R7·route0)의 세계 셈 길 지문이 모두 `21b240bfbd18ade6980ec4f7` 다. 점검·고르기와 같다.
   - 판 메타의 두뇌 sha1 은 PREREG 1-1 표와 같다: R7 s1 `12c8d90cf44c` · route0 `b56aa34e8696` · 대조 `bdc05f6cfb26` · '늘 SHELTER' `de25bcbb5296` · R6 `9d6fa521dd4c`.
   - 판 파일은 `runs/`(git 밖)에 있다: `judge_{r7,route0}_{N,G}` · `stuck_{r7,route0}` · `judge_{off,rule,r6}_N`.
@@ -109,6 +111,7 @@
   - 두뇌 파일: id `v3_r7_g995_s1_20m@40d8710d`, 가중치 sha256 `40d8710d5cb5…`, 원본 zip sha256 `8ed144a2fed3a6dd…`(PREREG 1-1 과 같음), 골든 세계 `configs/v3_wild3_route5_mirror.yaml`.
   - `EcoBrains/` 에는 넣지 않았다. 게임 쪽 배포는 PREREG 6절 이식·확인 뒤 사람이 정한다.
 - 다음: PREREG 6절 '통과하면' ①~③.
+  - ② 의 C++ 쫓김 사건 셈은 다른 갈래가 `f2deaf6` 에서 옮겼다고 적었다(파이썬과 `flight.episode` 비트 동일). 이 판정에서는 확인하지 않았다 — 다음 단계에서 확인한다.
 
 ## 1. 돌릴 명령 (herbivore_rl/ 에서)
 
