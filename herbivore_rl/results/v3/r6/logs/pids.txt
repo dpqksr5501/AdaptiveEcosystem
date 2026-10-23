@@ -1,0 +1,7 @@
+﻿train v3_r6e_l95_c0_s0_5m cmd_pid 43252 python_pid 14508 log results\v3\r6\logs\train_v3_r6e_l95_c0_s0_5m.log started 2026-10-23T16:54:26
+train v3_r6e_l95_c0027_s0_5m cmd_pid 33728 python_pid 12340 log results\v3\r6\logs\train_v3_r6e_l95_c0027_s0_5m.log started 2026-10-23T16:54:27
+train v3_r6e_l95_c005_s0_5m cmd_pid 15216 python_pid 40860 log results\v3\r6\logs\train_v3_r6e_l95_c005_s0_5m.log started 2026-10-23T16:54:28
+train v3_r6e_l98_c0_s0_5m cmd_pid 41776 python_pid 28056 log results\v3\r6\logs\train_v3_r6e_l98_c0_s0_5m.log started 2026-10-23T16:54:29
+train v3_r6e_l98_c0027_s0_5m cmd_pid 45700 python_pid 18592 log results\v3\r6\logs\train_v3_r6e_l98_c0027_s0_5m.log started 2026-10-23T16:54:29
+train v3_r6e_l98_c005_s0_5m cmd_pid 44632 python_pid 28384 log results\v3\r6\logs\train_v3_r6e_l98_c005_s0_5m.log started 2026-10-23T16:54:30
+early_checks combos cmd_pid 26248 python_pid 29292 log results\v3\r6\logs\early_checks_combos.log started 2026-10-23T16:54:31
