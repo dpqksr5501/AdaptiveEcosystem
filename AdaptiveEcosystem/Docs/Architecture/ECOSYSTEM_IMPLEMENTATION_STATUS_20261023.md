@@ -6,6 +6,8 @@
 
 실행 맵은 **`/Game/JYU/Maps/LV_JYU_Ecosystem`**이다. 원본 팀 맵·이전 JYU 맵은 변경하지 않는다. 기존 맵의 기본 flag와 V1 7/4·v3 18/5 mask2·opt-in21·가중치를 유지한다. 새 맵의 `bEnableVegetation=true`, `bEnableEcosystemLife=true`가 후속 세계 규칙을 켠다. 기본 `SocialControl=0`, Native 단일 이동/대사/섭식·포획 writer를 유지한다.
 
+[레벨 디자인 담당 안내](../Team/ECOSYSTEM_LEVEL_DESIGN_AGENT_GUIDE_20261024.md)와 [날씨 담당 안내](../Team/ECOSYSTEM_WEATHER_AGENT_GUIDE_20261024.md)도 추가했다. 먹이 섭취는 실제 셀 잔량에 따른 풀 ISM의 축소·1% 이하 숨김으로 표현하며, mesh 절단/개별 먹이 BP 파괴는 구현 범위가 아니다. 모든 기획의 완료와 현재 지원 backend에서 연결·검증한 범위를 구분한다.
+
 최신 구현·단위/시간·실패 정리·팀 API·재현은 [life-v1 실행 계약](ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)을 우선한다. 아래는 목표 설계와 현재 Source를 구분한 상태표다. 완료하지 않은 실행 gate는 완료로 표시하지 않는다.
 
 | 범위 | 현재 실제 연결 | 지원 범위 / 제한 |

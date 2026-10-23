@@ -1,6 +1,6 @@
 # 생태계 통합 이후 팀 AI 작업 안내
 
-작성일: **2026-10-24**. 구현 기준 커밋은 **`d095948`**, 작업 브랜치는 `codex/social-shelter-handoff`다. 서버·네트워킹·학습 담당자가 이전 채팅 없이 AI agent로 후속 작업을 시작하기 위한 공통 진입 문서다. 개인별 담당 수락이나 새 기능의 완료를 대신 선언하지 않는다.
+작성일: **2026-10-24**. 구현 기준 커밋은 **`d095948`**, 작업 브랜치는 `codex/social-shelter-handoff`다. 서버·네트워킹·학습·레벨 디자인·날씨 담당자가 이전 채팅 없이 AI agent로 후속 작업을 시작하기 위한 공통 진입 문서다. 개인별 담당 수락이나 새 기능의 완료를 대신 선언하지 않는다.
 
 ## 1. 지금부터 무엇을 읽고 시작할까
 
@@ -11,6 +11,8 @@
 | 3 | [life-v1 실행 계약](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md), [soil 계약](../Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md) | 실제 생산자→소비자→결과→장부·저장·표현 |
 | 4A | [서버·네트워킹 AI 작업 안내](../Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md) | 권위·transport·저장/운영·성능 후속 |
 | 4B | [학습 AI 작업 안내](../RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md) | 세계 mirror·입출력 계약·모델 교체·평가 후속 |
+| 4C | [레벨 디자인 AI 작업 안내](ECOSYSTEM_LEVEL_DESIGN_AGENT_GUIDE_20261024.md) | 지역·지면/수원·식생·은신처·이주·World Partition authoring |
+| 4D | [날씨 AI 작업 안내](ECOSYSTEM_WEATHER_AGENT_GUIDE_20261024.md) | 권위 환경/clock·Native 규칙·수신 연출의 연결과 검증 |
 | 5 | [AI 시작 프롬프트](ECOSYSTEM_AGENT_START_PROMPTS_20261024.md) | 역할별 복사 가능한 실행 요청 |
 | 6 | [최종 검증 근거](../Architecture/Evidence/EcosystemLife_20261023.json) | 테스트 조건과 수치의 실제 범위 |
 
@@ -124,6 +126,8 @@ baseline / candidate / acceptance / rollback:
 이번 문서 작업의 별도 근거는 [10-24 문서 감사 JSON](../Architecture/Evidence/DocumentationAudit_20261024.json)이다. 상대 링크·문서 명령 구문·예제와 실제 원본의 값 일치·Python 구문·runtime Source/Content/Config 비변경과 LFS pointer 검사를 수행했다. 모델 학습이나 새로운 런타임 테스트 결과와 섞지 않는다.
 
 ## 9. Git·에셋·인수인계
+
+레벨/날씨 안내 추가분의 [별도 문서 감사](../Architecture/Evidence/LevelWeatherDocumentationAudit_20261024.json)는 상대 링크/앵커와 실제 Source 경계, 런타임 Source·Content·Config 비변경을 기록한다. 새 런타임 검증 결과가 아니다.
 
 새 담당자는 작업 성격에 맞는 `codex/` 브랜치에서 기준 SHA와 owner 파일을 기록한다. 공유 checkout을 무조건 reset/clean하거나 다른 사람의 WIP를 stash·삭제하지 않는다. 같은 `.umap`/`.uasset`을 동시에 편집하지 말고 owned 복사 또는 담당 에셋을 정한다. World Partition 맵은 해당 `__ExternalActors__`/`__ExternalObjects__`와 함께 검토한다. `.umap` 하나만 복사했다고 통합이 끝난 것이 아니다.
 

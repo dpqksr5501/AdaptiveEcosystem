@@ -139,6 +139,8 @@ PR #14는 2026-10-23 사용자 요청으로 기능·디버그를 push하고 Read
 
 ## 14. 2026-10-24 soil/life 통합과 팀 AI 작업 진입점
 
+레벨 디자인은 [역할별 안내](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_LEVEL_DESIGN_AGENT_GUIDE_20261024.md), 날씨·낮밤은 [역할별 안내](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_WEATHER_AGENT_GUIDE_20261024.md)를 따른다. owned 맵/World Partition·실제 지면/수원·단일 날씨 writer와 기존 환경 adapter를 먼저 확인하며, 장식 표현과 생태 입력·Native 감각 날씨/Dark를 자동으로 동일시하지 않는다.
+
 후속 soil/life 구현은 `d095948`에 기록했다. 최신 재개는 [팀 AI 공통 안내](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [현재 구현 상태](AdaptiveEcosystem/Docs/Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life 실행 계약](AdaptiveEcosystem/Docs/Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)를 먼저 읽는다. 앞 절의 날짜별 Pending/로컬 미커밋 설명은 당시 이력이다. 새 owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 soil/life를 opt-in하고 원본 팀 맵·기존 맵 옵션·V1/v3 모델/계약·SocialControl=0·Native 단일 writer와 기존 M4 장부를 보존한다.
 
 서버·네트워킹은 [역할별 안내](AdaptiveEcosystem/Docs/Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), 학습은 [역할별 안내](AdaptiveEcosystem/Docs/RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md)를 따른다. 복사 가능한 [작업 시작 프롬프트](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AGENT_START_PROMPTS_20261024.md)와 [실제 부분 예제](AdaptiveEcosystem/Docs/RL_Policy/Examples/README.md)를 제공한다. 예제는 training_ready=false이며 진단 정답/부분 cell을 기존 정책 관측이나 전체 복원 상태로 사용하지 않는다. 현재 Client proxy와 권위 논리를 구분하고 새 학습/임의 종/분산 서버 완료로 확대하지 않는다.

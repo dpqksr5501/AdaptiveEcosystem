@@ -6,6 +6,8 @@
 
 ## life-v1 후속 배치와 사용
 
+담당자 후속 작업은 [레벨 디자인 안내](../Team/ECOSYSTEM_LEVEL_DESIGN_AGENT_GUIDE_20261024.md)와 [날씨 안내](../Team/ECOSYSTEM_WEATHER_AGENT_GUIDE_20261024.md)를 따른다. 현재 상태를 보존해 수정하고 아래 최초 구축 이력의 미완료 설명으로 맵을 재생성하지 않는다.
+
 현재 같은 맵에 `bEnableEcosystemLife=true`, 식생 true를 저장했다. **BP7종·habitat10개·날씨3개**다. 새 `BP_JYU_AuthoredSpring` 하나를 Forest `(33800,28700)`에 배치하고 수면Z `-1084.09448cm`를 지면 조사로 정했다. 최대 수심 약12cm/둑 높이 약82cm의 작은 얕은 물 표현이며 강/수영 backend는 아니다. Field는 shrub에 GrassB, riparian에 GrassC를 사용하며 논리 food 감소가 외형과 Native 시야 차폐를 함께 줄인다. 기존 grass 재질 복사본과 새 water 재질만 사용한다.
 
 `PAL_JYU_EcosystemRuntime`은 동적 soft/string 참조의 비·눈·소리와 식물/물 mesh·material에 AlwaysCook을 명시하는 owned PrimaryAssetLabel이다. **DefaultGame의 PrimaryAssetLabel type scan도 non-editor-only여야 이 규칙이 실제 cook에 적용된다.** 표준 /Game scan·Map 규칙과 다른 label의 Unknown은 유지했다. 원본 SHC 날씨 에셋을 수정하지 않는다. 재현 도구는 `extend_jyu_ecosystem_life.py`, `ensure_ecosystem_runtime_dependencies.py`, 저장 후 재로드 감사와 실제 패키지 smoke다. registry에 이름이 보이는 것만으로 cook을 판정하지 않는다.
