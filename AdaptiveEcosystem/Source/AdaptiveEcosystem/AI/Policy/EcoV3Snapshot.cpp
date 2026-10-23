@@ -199,6 +199,12 @@ namespace EcoV3SnapshotImpl
 		J->SetNumberField(TEXT("mean_seconds"), S.MeanSeconds());
 		J->SetNumberField(TEXT("own_chase_seconds"), S.OwnChaseSeconds());
 		J->SetNumberField(TEXT("own_share"), S.OwnShare());
+		// 10-23 쫓긴 도망 중 숨음·잡힘 (관문 1차 숨음 비율·지킴 GH 와 같은 몫 — EcoV3FlightTally.h)
+		J->SetNumberField(TEXT("chased"), static_cast<double>(S.Chased));
+		J->SetNumberField(TEXT("hidden"), static_cast<double>(S.Hidden));
+		J->SetNumberField(TEXT("caught"), static_cast<double>(S.Caught));
+		J->SetNumberField(TEXT("hide_share"), S.HideShare());
+		J->SetNumberField(TEXT("caught_share"), S.CaughtShare());
 		return J;
 	}
 
@@ -656,6 +662,17 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 			}
 			J->SetArrayField(TEXT("hist"), IntArray(F.Hist));
 			J->SetArrayField(TEXT("hist_edges"), IntArray(EcoWorldV3::kFlightHistSteps));
+			{
+				// 10-23 숨은 뒤 10 초 지켜보기 (파이썬 flight_stats 의 hide 와 같은 이름·정의 — EcoWorldV3.h 머리 주석)
+				TSharedRef<FJsonObject> H = MakeShared<FJsonObject>();
+				H->SetNumberField(TEXT("chased"), static_cast<double>(F.Chased));
+				H->SetNumberField(TEXT("hidden"), static_cast<double>(F.Hidden));
+				H->SetNumberField(TEXT("watching"), static_cast<double>(F.Watching));
+				H->SetNumberField(TEXT("cover_then_caught"), static_cast<double>(F.CoverCaught));
+				H->SetNumberField(TEXT("cover_then_starved"), static_cast<double>(F.CoverStarved));
+				H->SetNumberField(TEXT("watch_steps"), EcoWorldV3::kFlightHideWatchSteps);
+				J->SetObjectField(TEXT("hide"), H);
+			}
 			const EcoV3Flight::FTally& T = Ctx.FlightTally;
 			J->SetNumberField(TEXT("window_steps"), static_cast<double>(T.WindowSteps()));
 			J->SetObjectField(TEXT("window"), FlightSumJson(T.Window()));

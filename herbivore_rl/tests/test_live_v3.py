@@ -874,8 +874,8 @@ def test_seq_final_equals_single_look(lv, prepared, seq_setup, monkeypatch):
 def test_eval_runner_switch(lv, tmp_path, monkeypatch):
     """판정 실행기 갈림: 'python' 은 워커 풀(일이 없으면 빈 목록), 모르는 실행기는 멈춤, 등록한 실행기는 꼬리표·순서를 맞춰 봐야 받는다.
     live.py 옆 <이름>.py 의 run_items·version·HIDE_WATCH 는 LIVE evaluator 이름만으로 불러 등록한다(네이티브 판정기를 끼울 자리).
-    10-23 (변경 기록 (6)): 숨은 뒤 10 초 지켜보기를 세지 못하는 실행기(hide_watch 거짓 — C++ 평가기 'ceval')는 분명한 말로 거부한다."""
-    assert lv.LIVE["evaluator"] == "python" and lv.eval_runner([], 4, "python") == []        # 10-23 (6): 기본 실행기 = 파이썬 (C++ 이식 전)
+    10-23 (변경 기록 (6)): 숨은 뒤 10 초 지켜보기를 세지 못하는 실행기(hide_watch 거짓)는 분명한 말로 거부한다."""
+    assert lv.LIVE["evaluator"] == "ceval" and lv.eval_runner([], 4, "python") == []         # 10-23 (6) 덧붙임: 기본 실행기 = C++ 평가기 (숨은 뒤 지켜보기 이식 뒤)
     with pytest.raises(ValueError, match="모르는 판정 실행기"):
         lv.eval_runner([("world", "x:N", {})], 2, "native")
     calls = []
@@ -925,27 +925,36 @@ def test_eval_runner_switch(lv, tmp_path, monkeypatch):
         lv.eval_runner([("world", "x:N", {})], 2, "os")                                             # 옆 파일이 아닌 모듈 이름은 불러오지 않는다
 
 
-def test_ceval_refused_for_hide_gate(lv, monkeypatch):
-    """10-23 (변경 기록 (6)): C++ 평가기(results/v3/live/ceval.py — HIDE_WATCH 거짓)는 숨은 뒤 10 초 지켜보기(cover_then_caught)를 아직 세지 못한다 —
-    1차 숨음 비율 관문에서 판정 실행기로 쓰면 분명한 말로 거부한다(eval_runner·require_hide_watch, 판·감시 시작 전 plan_from_args). 평가기 빌드와 무관
-    (ceval.py 를 불러오기만 한다). 'python' 은 늘 받는다. compare·selftest 는 이 거부를 지나지 않는다(test_ceval_v3)."""
+def test_hide_watch_gate_evaluators(lv, monkeypatch):
+    """10-23 (변경 기록 (6)·같은 날 덧붙임): 1차 숨음 비율·지킴 GH 는 숨은 뒤 10 초 지켜보기(flight.hide — cover_then_caught)를 세는 실행기만 쓴다.
+    C++ 평가기(results/v3/live/ceval.py — HIDE_WATCH 참: EcoWorldV3.h 도망 기록에 같은 정의로 옮겼다)는 받는다(기본 LIVE evaluator). 세지 못하는
+    실행기(hide_watch 거짓)는 분명한 말로 거부한다(eval_runner·require_hide_watch, 판·감시 시작 전 plan_from_args). 평가기 빌드와 무관(ceval.py 를
+    불러오기만 한다). 'python' 은 늘 받는다."""
     lv.require_hide_watch("python")
     ev = lv.evaluator("ceval")
-    assert ev["hide_watch"] is False and callable(ev["run"])
-    for call in (lambda: lv.require_hide_watch("ceval"), lambda: lv.eval_runner([("world", "x:N", dict(seed=1, region="A"))], 2, "ceval")):
-        with pytest.raises(ValueError) as ei:
-            call()
-        msg = str(ei.value)
-        assert "C++ 평가기 'ceval'" in msg and "cover_then_caught" in msg and "숨음 비율" in msg and "'python'" in msg and "두 길 C++ 이식" in msg
-    monkeypatch.setitem(lv.LIVE, "evaluator", "ceval")
-    with pytest.raises(ValueError, match="10 초 지켜보기"):
-        lv.require_hide_watch()                                                                     # 기본 = LIVE evaluator
-    a = Namespace(root=str(ROOT / "results" / "v3" / "live" / "_never"), workers=4, ckpt=None, steps=None, model_seeds=None, horizon=None,
-                  judge_seeds=None, select_seeds=None, stuck_seeds=None, check_seeds=None, skip_check=False, force_export=False, horizon_g=None,
-                  judge_seeds_g=None, flight_cost=None)
-    with pytest.raises(SystemExit, match="10 초 지켜보기"):
-        lv.plan_from_args(a)                                                                         # 판·감시를 시작하지 않는다
-    assert not (ROOT / "results" / "v3" / "live" / "_never").exists()
+    assert ev["hide_watch"] is True and callable(ev["run"])
+    lv.require_hide_watch("ceval")
+    assert lv.LIVE["evaluator"] == "ceval"
+    lv.require_hide_watch()                                                                         # 기본 = LIVE evaluator 'ceval'
+    lv.EVALUATORS["nohide"] = dict(run=lambda items, w, on_done: [], version=lambda: "n1", hide_watch=False)
+    try:
+        for call in (lambda: lv.require_hide_watch("nohide"), lambda: lv.eval_runner([("world", "x:N", dict(seed=1, region="A"))], 2, "nohide")):
+            with pytest.raises(ValueError) as ei:
+                call()
+            msg = str(ei.value)
+            assert "판정 실행기 'nohide'" in msg and "cover_then_caught" in msg and "숨음 비율" in msg and "'ceval'" in msg and "'python'" in msg
+        monkeypatch.setitem(lv.LIVE, "evaluator", "nohide")
+        with pytest.raises(ValueError, match="10 초 지켜보기"):
+            lv.require_hide_watch()                                                                 # 기본 = LIVE evaluator
+        a = Namespace(root=str(ROOT / "results" / "v3" / "live" / "_never"), workers=4, ckpt=None, steps=None, model_seeds=None, horizon=None,
+                      judge_seeds=None, select_seeds=None, stuck_seeds=None, check_seeds=None, skip_check=False, force_export=False, horizon_g=None,
+                      judge_seeds_g=None, flight_cost=None)
+        with pytest.raises(SystemExit, match="10 초 지켜보기"):
+            lv.plan_from_args(a)                                                                     # 판·감시를 시작하지 않는다
+        assert not (ROOT / "results" / "v3" / "live" / "_never").exists()
+    finally:
+        lv.EVALUATORS.pop("nohide", None)
+        lv._CODE.pop("nohide", None)
 
 
 def test_cache_save_state(lv, prepared, tmp_path, monkeypatch):
@@ -1400,7 +1409,7 @@ def test_constants_match_md(lv):
     assert L["hide_min_chased"] == 1 and "| P1·GH 짝 시드 조건 | 두 두뇌 모두 쫓긴 도망 1개 이상 (`hide_min_chased`" in md
     assert L["hide_min_effect"] == 0.0 and "| P1 최소 차이 δ_H | 0 %p (유의성만 — `hide_min_effect`) | 예비 측정 뒤 확정" in md
     assert "9.48 % 대 9.50 %" in md and "12.73 % → 21.19 %" in md and "13.25 % → 21.89 %" in md and "10 초 지켜보기 전 값" in md
-    assert L["evaluator"] == "python" and "| 판정 실행기 evaluator | python (파이썬 워커 풀)" in md and "두 길 C++ 이식 때 ceval 로 되돌린다" in md
+    assert L["evaluator"] == "ceval" and "| 판정 실행기 evaluator | ceval (" in md and "10-23 덧붙임 — 숨은 뒤 10 초 지켜보기를 C++ 에 옮김" in md
     assert lv.CACHE_VERSION == 2 and lv.GATE_CRITERION in md and lv.EVAL_CODE_TAG in md and "저장 판 2" in md
     # 10-21 (4) 중간 판정 (두 번 보기)·지금 두뇌 판정 다시 쓰기·판정 실행기 — 시점·기각 경계는 예비 측정 뒤 확정 (10-23 (6) 부호 뒤집음)
     assert "### 2026-10-21 (4) 중간 판정" in md and "### 5-3. 중간 판정 (두 번 보기" in md

@@ -5,8 +5,11 @@
 //   (i)  최근 60 초 창 (kWindowSteps = 450 결정 스텝): 그 사이에 끝난 도망 — 지금 누적 − 450 스텝 전 누적 (Play 시작이 450 스텝 안이면 시작부터)
 //   (ii) 두뇌 판 합: 두뇌가 바뀔 때(OnBrainSwap — 되돌림 포함) 지금 판의 합을 '교체 전'으로 넘기고 새 판을 0 에서 센다. 바뀌는 순간 열려 있던 도망은
 //        끝나는 판(새 판)에 든다
-// 화면의 '쫓긴' = 스스로 벗어난 도망(은신처·나무·시야각 밖·시야 밖)의 쫓긴 시간 평균 — 실시간 고리 관문 1차(results/v3/live/LIVE_GATE.md 5-1 P1)와 같은 재료다.
-// 교체 전·지금 비교는 두 판 모두 스스로 벗어난 도망이 kMinCompare 번 이상일 때만 숫자로 (적으면 '모으는 중'). 판정이 아니라 화면 비교다 (관문은 파이썬 쪽).
+// 화면의 '쫓긴' = 스스로 벗어난 도망(은신처·나무·시야각 밖·시야 밖)의 쫓긴 시간 평균 — 10-21 (3) 관문 1차였고 10-23 (6) 부터 보고만이다.
+// 10-23 (LIVE_GATE.md 변경 기록 (6) — 관문 1차 숨음 비율·지킴 GH 와 같은 재료): '쫓긴 도망 중 숨음 x% · 잡힘 y%' = 쫓긴 도망(끝난 도망 가운데 안 쫓김·
+// 잘림 아닌 것) 가운데 은신처에 들어 끝나고 그 뒤 10 초 지켜보는 동안 죽지 않은 몫(지켜보는 중 포함 — 파이썬 flight_stats hide.hidden 과 같은 셈)·잡혀 끝난 몫.
+// 교체 전·지금 비교는 그 두 몫을 두 판 모두 쫓긴 도망이 kMinCompare 번 이상일 때만 숫자로 (적으면 '모으는 중'). 판정이 아니라 화면 비교다 (관문은
+// results/v3/live/live.py — 판마다 시드 짝).
 
 #pragma once
 
@@ -16,7 +19,7 @@
 namespace EcoV3Flight
 {
 	inline constexpr int32 kWindowSteps = 450;   // 최근 60 초 (1 결정 스텝 = 2/15 초)
-	inline constexpr int32 kMinCompare = 10;     // 교체 전·지금 비교에 필요한 판마다 스스로 벗어난 도망 수
+	inline constexpr int32 kMinCompare = 10;     // 교체 전·지금 비교에 필요한 판마다 쫓긴 도망 수 (10-23 전에는 스스로 벗어난 도망 수)
 
 	/** 끝난 도망 합 (FFlightStats 에서 화면에 쓰는 칸만). 누적끼리 빼면 구간 합이다. 잘림(열린 도망)은 넣지 않는다. */
 	struct FSum
@@ -28,6 +31,10 @@ namespace EcoV3Flight
 		int64 OwnSteps = 0;                             // 그 FLEE 스텝 합
 		int64 OwnContact = 0;                           // 그 쫓긴 스텝 합 (관문 1차 재료)
 		int64 Unsafe = 0;                               // 잡힘·굶음으로 끝난 도망
+		// 10-23 숨은 뒤 지켜보기 (관문 1차 숨음 비율·지킴 GH 의 재료 — EcoWorldV3.h 머리 주석)
+		int64 Chased = 0;                               // 쫓긴 도망 (끝난 도망 가운데 안 쫓김·잘림 아닌 것 — 숨음·잡힘 몫의 분모)
+		int64 Hidden = 0;                               // 은신처로 끝나 지켜보는 10 초 안에 죽지 않은 도망 (= 은신처 끝 − 지켜보는 동안 잡힘·굶음, 지켜보는 중 포함)
+		int64 Caught = 0;                               // 잡혀 끝난 도망 (끝 까닭 잡힘 — GH 의 분자)
 
 		static FSum Of(const EcoWorldV3::FFlightStats& S)
 		{
@@ -45,6 +52,15 @@ namespace EcoV3Flight
 				R.OwnContact += S.Contact[c];
 			}
 			R.Unsafe = S.Num[EcoWorldV3::kFlightCaught] + S.Num[EcoWorldV3::kFlightStarved];
+			R.Chased = R.Ended;
+			for (const int32 c : EcoWorldV3::kFlightNotChased)
+			{
+				R.Chased -= S.Num[c];
+			}
+			// 지켜보는 중인 도망은 사슴 쪽(FFlightTrack::Watch)에 있지만, 숨음 + 지켜보는 동안 잡힘·굶음 = 은신처 끝 이라 누적만으로 같은 값이 나온다
+			// (FlightReportOf 의 Hidden 과 같은 식 — 로그·스냅숏 누적과 화면 창·판이 같은 셈이다)
+			R.Hidden = S.Num[EcoWorldV3::kFlightCover] - S.CoverCaught - S.CoverStarved;
+			R.Caught = S.Num[EcoWorldV3::kFlightCaught];
 			return R;
 		}
 
@@ -61,6 +77,9 @@ namespace EcoV3Flight
 			R.OwnSteps = OwnSteps + Sign * O.OwnSteps;
 			R.OwnContact = OwnContact + Sign * O.OwnContact;
 			R.Unsafe = Unsafe + Sign * O.Unsafe;
+			R.Chased = Chased + Sign * O.Chased;
+			R.Hidden = Hidden + Sign * O.Hidden;
+			R.Caught = Caught + Sign * O.Caught;
 			return R;
 		}
 		FSum Minus(const FSum& O) const { return Plus(O, -1); }
@@ -68,7 +87,7 @@ namespace EcoV3Flight
 		bool operator==(const FSum& O) const
 		{
 			bool bSame = Started == O.Started && Ended == O.Ended && EndedSteps == O.EndedSteps && OwnSteps == O.OwnSteps && OwnContact == O.OwnContact
-						 && Unsafe == O.Unsafe;
+						 && Unsafe == O.Unsafe && Chased == O.Chased && Hidden == O.Hidden && Caught == O.Caught;
 			for (int32 c = 0; c < EcoWorldV3::kNumFlightOwn; ++c)
 			{
 				bSame = bSame && Own[c] == O.Own[c];
@@ -95,6 +114,13 @@ namespace EcoV3Flight
 		}
 		/** 끝난 도망 가운데 스스로 벗어난 몫 (0~1). */
 		double OwnShare() const { return Ended > 0 ? static_cast<double>(OwnN()) / static_cast<double>(Ended) : 0.0; }
+		/**
+		 * 10-23 쫓긴 도망 가운데 숨어 살아남은 몫 (0~1 — 관문 1차 숨음 비율과 같은 셈, 이 구간 합). 없으면 0. 구간 차이는 구간 앞에 은신처로 끝난 도망이 구간 안에
+		 * 잡히면 숨음이 1 줄어 드물게 음수가 될 수 있어 0 아래는 0 으로 본다.
+		 */
+		double HideShare() const { return Chased > 0 ? FMath::Max(0.0, static_cast<double>(Hidden) / static_cast<double>(Chased)) : 0.0; }
+		/** 10-23 쫓긴 도망 가운데 잡혀 끝난 몫 (0~1 — 지킴 GH 와 같은 셈). 없으면 0. */
+		double CaughtShare() const { return Chased > 0 ? static_cast<double>(Caught) / static_cast<double>(Chased) : 0.0; }
 	};
 
 	/** 한 지역의 창·두뇌 판 장부 (FEcoV3RegionContext::FlightTally). */
@@ -189,33 +215,44 @@ namespace EcoV3Flight
 		return Out;
 	}
 
-	/** 창 요약 '최근 60초 도망 12번: 평균 6.2초 · 쫓긴 3.1초 · 스스로 벗어남 8% (은신처 6·나무 1·시야 밖 1)'. 쫓긴 = 스스로 벗어난 도망의 쫓긴 시간. */
+	/** 10-23 '숨음 25% · 잡힘 8%' (쫓긴 도망 가운데 — HideShare·CaughtShare, 정수 %). */
+	inline FString HideCaughtText(const FSum& S)
+	{
+		return FString::Printf(TEXT("숨음 %.0f%% · 잡힘 %.0f%%"), 100.0 * S.HideShare(), 100.0 * S.CaughtShare());
+	}
+
+	/**
+	 * 창 요약 '최근 60초 도망 12번: 평균 6.2초 · 쫓긴 도망 중 숨음 50% · 잡힘 10% · 쫓긴 3.1초 · 스스로 벗어남 67% (은신처 6·나무 1·시야 밖 1)'.
+	 * 쫓긴 도망 중 숨음·잡힘 = 10-23 관문 1차·GH 와 같은 몫 (쫓긴 도망이 없으면 뺀다), 쫓긴 = 스스로 벗어난 도망의 쫓긴 시간 (보고만).
+	 */
 	inline FString SummaryText(const FSum& S, const TCHAR* Span = TEXT("최근 60초"))
 	{
 		if (S.Ended <= 0)
 		{
 			return FString::Printf(TEXT("%s 끝난 도망 없음"), Span);
 		}
+		const FString Hide = S.Chased > 0 ? FString::Printf(TEXT(" · 쫓긴 도망 중 %s"), *HideCaughtText(S)) : FString();
 		const FString Chase = S.OwnN() > 0 ? FString::Printf(TEXT("%.1f초"), S.OwnChaseSeconds()) : FString(TEXT("-"));
 		const FString Own = OwnBreakdownText(S);
-		return FString::Printf(TEXT("%s 도망 %lld번: 평균 %.1f초 · 쫓긴 %s · 스스로 벗어남 %.0f%%%s"), Span, static_cast<long long>(S.Ended), S.MeanSeconds(),
-							   *Chase, 100.0 * S.OwnShare(), Own.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *Own));
+		return FString::Printf(TEXT("%s 도망 %lld번: 평균 %.1f초%s · 쫓긴 %s · 스스로 벗어남 %.0f%%%s"), Span, static_cast<long long>(S.Ended), S.MeanSeconds(),
+							   *Hide, *Chase, 100.0 * S.OwnShare(), Own.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *Own));
 	}
 
 	/**
-	 * 두뇌 판 비교 '교체 전 x초 → 지금 y초' (스스로 벗어난 도망의 쫓긴 시간 — 관문 1차). 두 판 모두 kMinCompare 번 이상일 때만 숫자, 지금 판이 모자라면
-	 * '모으는 중 b/10', 교체 전 판이 모자라면 '표본 부족 a/10'. 바뀐 적이 없으면 '이 두뇌 쫓긴 y초'.
+	 * 두뇌 판 비교 '교체 전 숨음 80% · 잡힘 20% → 지금 숨음 67% · 잡힘 20%' (쫓긴 도망 가운데 — 10-23 관문 1차 숨음 비율·지킴 GH 와 같은 몫. 10-21 의
+	 * 쫓긴 시간 비교를 바꿨다 — 쫓긴 시간은 창 요약에 남는다). 두 판 모두 쫓긴 도망이 kMinCompare 번 이상일 때만 숫자, 지금 판이 모자라면 '모으는 중 b/10',
+	 * 교체 전 판이 모자라면 '표본 부족 a/10'. 바뀐 적이 없으면 '이 두뇌 숨음 x% · 잡힘 y%'.
 	 */
 	inline FString CompareText(const FSum& Prev, const FSum& Cur, bool bHasPrev)
 	{
-		const FString Now = Cur.OwnN() >= kMinCompare ? FString::Printf(TEXT("%.1f초"), Cur.OwnChaseSeconds())
-													  : FString::Printf(TEXT("모으는 중 %lld/%d"), static_cast<long long>(Cur.OwnN()), kMinCompare);
+		const FString Now = Cur.Chased >= kMinCompare ? HideCaughtText(Cur)
+													  : FString::Printf(TEXT("모으는 중 %lld/%d"), static_cast<long long>(Cur.Chased), kMinCompare);
 		if (!bHasPrev)
 		{
-			return FString::Printf(TEXT("이 두뇌 쫓긴 %s"), *Now);
+			return FString::Printf(TEXT("이 두뇌 %s"), *Now);
 		}
-		const FString Before = Prev.OwnN() >= kMinCompare ? FString::Printf(TEXT("%.1f초"), Prev.OwnChaseSeconds())
-														  : FString::Printf(TEXT("표본 부족 %lld/%d"), static_cast<long long>(Prev.OwnN()), kMinCompare);
+		const FString Before = Prev.Chased >= kMinCompare ? HideCaughtText(Prev)
+														  : FString::Printf(TEXT("표본 부족 %lld/%d"), static_cast<long long>(Prev.Chased), kMinCompare);
 		return FString::Printf(TEXT("교체 전 %s → 지금 %s"), *Before, *Now);
 	}
 

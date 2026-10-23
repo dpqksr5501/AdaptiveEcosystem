@@ -29,6 +29,8 @@
 // 기록 한 줄 = {"id", "record": {seed, region, n, caught, starved, alive, shelter_steps, live_steps, beh_steps, catch_cover, catch_fled, catches,
 //   starve_fled, hunt{...}, weather{...}, obstacles_n, flight{...}, at{h: {caught, starved, alive, flight}}, wall_s, steps_per_s},
 //   "init"·"trace" (trace > 0 일 때만 — 파리티 진단)}. 실패한 세계는 {"id", "error"} 한 줄이고 종료 코드 1.
+//   flight 는 파이썬 world.py flight_stats 와 같은 칸이다 — 10-23 부터 숨은 뒤 10 초 지켜보기 hide{chased, hidden, watching, cover_then_caught,
+//   cover_then_starved, watch_steps}(실시간 관문 1차 숨음 비율·지킴 GH 의 재료)도 낸다.
 
 #include <chrono>
 #include <cmath>
@@ -830,6 +832,16 @@ namespace EcoV3Eval
 		O.KInt("shelter_end", F.ShelterEnd);
 		O.KIntArr("hist", F.Hist, W3::kNumFlightHistEdges + 1);
 		O.KIntArr("hist_edges", W3::kFlightHistSteps, W3::kNumFlightHistEdges);
+		// 10-23 숨은 뒤 지켜보기 (파이썬 flight_stats 의 hide 와 같은 칸 — 실시간 관문 1차 숨음 비율·지킴 GH 의 재료, EcoWorldV3.h 머리 주석)
+		O.Key("hide");
+		O.BeginObj();
+		O.KInt("chased", F.Chased);
+		O.KInt("hidden", F.Hidden);
+		O.KInt("watching", F.Watching);
+		O.KInt("cover_then_caught", F.CoverCaught);
+		O.KInt("cover_then_starved", F.CoverStarved);
+		O.KInt("watch_steps", W3::kFlightHideWatchSteps);
+		O.EndObj();
 		if (bFoliage)
 		{
 			// 숲 시야 켬 세계만 (파이썬 flight_stats 의 lost_foliage — 끈 세계에는 칸이 없다)

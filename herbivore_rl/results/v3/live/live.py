@@ -7,7 +7,8 @@
 안에 잡히지 않은 몫(숨음 비율)이 유의하게 크다. 새 지킴 GH = 쫓긴 도망 가운데 잡힘 몫이 유의하게 나빠지지 않음. 옛 1차 쫓긴 시간(스스로 벗어난 도망)은
 판정에서 빼고 보고만 한다. 잡힘·도망 횟수·달린 시간·잡혀 끝난 도망·게임 세계는 지킴 그대로다. 도망 = FLEE 를 실행한 스텝 묶음(도주 반사·두뇌가 고른
 FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 기록·숨은 뒤 지켜보기(World.flight_stats 의 hide, 판정 실행기가 켠다).
-판정 실행기는 파이썬이다(LIVE evaluator 'python' — C++ 평가기는 숨은 뒤 지켜보기를 아직 세지 못한다, 두 길 C++ 이식 때 되돌린다).
+판정 실행기는 C++ 평가기다(LIVE evaluator 'ceval' — 10-23 같은 날 숨은 뒤 지켜보기를 C++ 도망 기록에 옮겨 파이썬과 flight.hide 까지 같다. 옮기기 전
+잠깐 'python' 이었다).
 이 기준의 크기는 예비 측정 뒤 확정한다 — 확정 전(LIVE flight_sizes_confirmed 거짓)에는 실제 폴더에서 판·감시를 돌리지 않는다.
 
     # herbivore_rl/ 에서 (Anaconda base python, PYTHONUTF8=1)
@@ -124,10 +125,10 @@ LIVE = dict(
                                             #   봐야 느슨해지지 않아 뒤 절반까지 돌리므로 시간이 줄지 않는다. 그래서 끔(10-21 검토 — 끝 문턱 = 옛 한 번 보기 그대로)
     seq_futility_t=0.0,                     # 중간 기각(나아지지 않음): 앞 절반 숨음 비율 짝 t ≤ −이 값(0 이면 t ≤ 0)이면 뒤 절반·G·끼임 없이 기각 — 구속력 없음
                                             #   (끝 문턱 셈에 넣지 않는다). None = 끔. 10-23: 1차가 클수록 좋은 숨음 비율이 되어 부호만 뒤집었다(쫓긴 시간 때는 t ≥ 이 값)
-    evaluator="python",                     # 판정 실행기 (eval_runner 의 갈림): 'python' = 파이썬 워커 풀, 'ceval' = 게임과 같은 C++ 세계 코드의 네이티브 판정기
-                                            # (Tools/EcoV3Eval, 변경 기록 (5)). 10-23 (변경 기록 (6)): C++ 평가기는 숨은 뒤 10 초 지켜보기(flight.hide — cover_then_caught)를
-                                            # 아직 세지 못해 1차 숨음 비율을 잴 수 없다 — 'python' 으로 바꾸고 'ceval' 은 eval_runner 가 거부한다(require_hide_watch).
-                                            # 두 길 C++ 이식(RL_V3_FLIGHT_ROUTE_DESIGN.md 16-14 단계 6) 때 평가기에 넣고 'ceval' 로 되돌린다
+    evaluator="ceval",                      # 판정 실행기 (eval_runner 의 갈림): 'ceval' = 게임과 같은 C++ 세계 코드의 네이티브 판정기(Tools/EcoV3Eval, 변경 기록 (5)),
+                                            # 'python' = 파이썬 워커 풀. 네이티브가 못 받는 일(끼임 세기 등)은 ceval 이 파이썬으로 돌린다. 10-23 (변경 기록 (6)):
+                                            # 1차 숨음 비율은 숨은 뒤 10 초 지켜보기(flight.hide)를 세는 실행기만 쓴다(require_hide_watch) — 그 칸을 C++ 에 옮기기 전
+                                            # 잠깐 'python' 이었고, 같은 날 옮겨(ceval HIDE_WATCH 참, compare 의 flight.hide 까지 같음) 'ceval' 로 되돌렸다
     cache_current=True,                     # 지금 두뇌 판정 결과 다시 쓰기 (live/cache — 환경·세계·두뇌·시드·길이·실행기·셈 길 판이 모두 같을 때만)
 )
 STEP_S = 2.0 / 15.0                         # 1 스텝 = 2/15 초 (게임 결정 간격 — 1800 스텝 = 240 초)
@@ -1155,7 +1156,7 @@ class Pool:
 # hide_watch=참이면 도망 기록에 숨은 뒤 10 초 지켜보기(flight.hide — 10-23 1차 숨음 비율의 재료)를 낸다).
 # 'python' 은 여기 워커 풀이다. 다른 실행기는 이 표에 등록하거나, 이 파일 옆 <이름>.py (예: ceval.py)가 run_items(items, workers, on_done)·version()
 # (·HIDE_WATCH) 을 내면 LIVE evaluator 를 그 이름으로 바꾸는 것만으로 처음 쓸 때 불러 등록한다. 판정 저장 열쇠에 실행기 이름·판이 들어가므로 바꾸면 지금 두뇌
-# 판정도 새로 잰다. hide_watch 가 참이 아닌 실행기는 판정에 쓰지 않는다(require_hide_watch — 10-23 C++ 평가기 'ceval' 이 그렇다).
+# 판정도 새로 잰다. hide_watch 가 참이 아닌 실행기는 판정에 쓰지 않는다(require_hide_watch — 10-23 C++ 평가기 'ceval' 은 같은 날 그 칸을 옮겨 참이다).
 EVALUATORS: dict = {}
 
 
@@ -1179,14 +1180,15 @@ def evaluator(kind: str) -> dict:
 
 def require_hide_watch(kind: str | None = None) -> None:
     """10-23 (LIVE_GATE.md 변경 기록 (6)): 1차 숨음 비율·지킴 GH 는 도망 기록의 숨은 뒤 10 초 지켜보기(flight.hide — cover_then_caught)를 쓴다.
-    그것을 세지 못하는 판정 실행기(hide_watch 거짓 — C++ 평가기 'ceval' 은 아직이다)는 분명한 말로 거부한다(ValueError). 'python' 은 늘 센다."""
+    그것을 세지 못하는 판정 실행기(hide_watch 거짓 — 등록한 실행기·옆 파일의 HIDE_WATCH)는 분명한 말로 거부한다(ValueError). 'python' 은 늘 센다.
+    C++ 평가기 'ceval' 은 10-23 같은 날 그 칸을 옮겨 받는다(ceval.HIDE_WATCH 참)."""
     kind = str(kind or LIVE["evaluator"])
     if kind == "python" or evaluator(kind).get("hide_watch"):
         return
     what = "C++ 평가기 'ceval'(AdaptiveEcosystem/Tools/EcoV3Eval)" if kind == "ceval" else f"판정 실행기 {kind!r}"
     raise ValueError(f"{what} 은(는) 은신처에서 끝난 도망 뒤 10 초 지켜보기(flight.hide — cover_then_caught)를 아직 세지 못한다 — 10-23 1차 숨음 비율·"
-                     f"지킴 GH(LIVE_GATE.md 변경 기록 (6))를 잴 수 없어 이 실행기로는 판정하지 않는다. LIVE evaluator 를 'python' 으로 둔다 "
-                     f"(C++ 평가기는 두 길 C++ 이식 때 이 칸을 넣고 되돌린다)")
+                     f"지킴 GH(LIVE_GATE.md 변경 기록 (6))를 잴 수 없어 이 실행기로는 판정하지 않는다. LIVE evaluator 를 그 칸을 세는 실행기 "
+                     f"('ceval' — C++ 평가기, 또는 'python')로 둔다")
 
 
 def open_pool(workers: int, kind: str | None = None):
@@ -1515,7 +1517,7 @@ def has_hide(f: dict) -> bool:
 
 def flight_of(w: dict, hide: bool = False) -> dict:
     """세계 요약 하나의 도망 기록 (env_v2/world.py World.flight_stats). 없거나 옛 꼴이면 ValueError — 관문은 도망 기록 없는 판을 받지 않는다.
-    hide 참(1차 숨음 비율·GH — hide_pair): 숨은 뒤 지켜보기(hide)가 없는 기록(옛 실행기·옛 저장·아직 그 칸을 세지 못하는 C++ 평가기)도 받지 않는다.
+    hide 참(1차 숨음 비율·GH — hide_pair): 숨은 뒤 지켜보기(hide)가 없는 기록(옛 실행기·옛 저장·10-23 전 C++ 평가기)도 받지 않는다.
     쫓긴 시간 셈(flight_pair — 보고·GG_chase, 도망길 측정 route_rules 의 옛 raw 기록)은 hide 없이도 읽는다."""
     f = w.get("flight")
     if not isinstance(f, dict):
@@ -1524,7 +1526,7 @@ def flight_of(w: dict, hide: bool = False) -> dict:
         raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 의 도망 기록이 옛 꼴이다(쫓긴 시간·산 사슴-스텝 없음) — 지금 실행기로 다시 돌린다")
     if hide and not has_hide(f):
         raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 의 도망 기록에 숨은 뒤 지켜보기(hide — 10-23 1차 숨음 비율)가 없다 — 옛 실행기·"
-                         f"옛 저장이거나 아직 그 칸을 세지 못하는 C++ 평가기 기록이다. 파이썬 실행기(LIVE evaluator 'python')로 다시 돌린다")
+                         f"옛 저장이거나 그 칸을 세지 못하는 실행기 기록이다(C++ 평가기는 10-23 부터 센다 — 옛 실행 파일이면 다시 빌드). 지금 실행기로 다시 돌린다")
     return f
 
 
@@ -2206,7 +2208,7 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         procs = launch_training(info, rd, start, rid, plan["model_seeds"], plan["steps"], plan["steps"], plan["ckpt"])
         judge, judge_g = seeds_of(plan["judge"]), seeds_of(plan["judge_g"])
         kind = str(LIVE["evaluator"])
-        require_hide_watch(kind)                             # 10-23: 숨은 뒤 지켜보기를 세지 못하는 실행기(C++ 평가기 — 이식 전)는 판정 전에 거부한다
+        require_hide_watch(kind)                             # 10-23: 숨은 뒤 지켜보기를 세지 못하는 실행기(HIDE_WATCH 거짓)는 판정 전에 거부한다
         groups = [("N", eval_items(info, "current", start, judge, H, "N")), ("G", eval_items(info, "current", start, judge_g, HG, "G")),
                   ("stuck", stuck_items(info, "current", start, seeds_of(plan["stuck"]), HG))]
         keys, hits, cache_rows = {}, {}, {}

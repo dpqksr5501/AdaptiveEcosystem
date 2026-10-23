@@ -249,6 +249,17 @@ bool FEcoV3SnapshotExportTest::RunTest(const FString& Parameters)
 						 && (*Fl)->GetObjectField(TEXT("n"))->Values.Num() == EcoWorldV3::kNumFlightCauses
 						 && (*Fl)->GetArrayField(TEXT("hist")).Num() == EcoWorldV3::kNumFlightHistEdges + 1 && (*Fl)->HasField(TEXT("window"))
 						 && (*Fl)->HasField(TEXT("generation")) && (*Fl)->HasField(TEXT("prev_generation")));
+			// 10-23 숨은 뒤 10 초 지켜보기 (파이썬 flight_stats 의 hide 와 같은 칸)
+			const TSharedPtr<FJsonObject>* Hd = nullptr;
+			TestTrue(*FString::Printf(TEXT("%s 도망 기록 hide = 세계 (쫓긴 도망·숨음·지켜보는 중·지켜보는 동안 잡힘·굶음·75 스텝)"), *Tag),
+					 (*Fl)->TryGetObjectField(TEXT("hide"), Hd) && Hd != nullptr && Hd->IsValid()
+						 && static_cast<int64>((*Hd)->GetNumberField(TEXT("chased"))) == Fr.Chased
+						 && static_cast<int64>((*Hd)->GetNumberField(TEXT("hidden"))) == Fr.Hidden
+						 && static_cast<int64>((*Hd)->GetNumberField(TEXT("watching"))) == Fr.Watching
+						 && static_cast<int64>((*Hd)->GetNumberField(TEXT("cover_then_caught"))) == Fr.CoverCaught
+						 && static_cast<int64>((*Hd)->GetNumberField(TEXT("cover_then_starved"))) == Fr.CoverStarved
+						 && static_cast<int32>((*Hd)->GetNumberField(TEXT("watch_steps"))) == EcoWorldV3::kFlightHideWatchSteps
+						 && (*Fl)->GetObjectField(TEXT("window"))->HasField(TEXT("hide_share")));
 		}
 	}
 	TestTrue(TEXT("숲은 원판 셋·먹은 셀이 있다 (시험 장면)"), H.Forest->Sim.Config.Obstacles.Num() == 3 && H.Forest->Sim.Food.Total() < H.Forest->StartFood);
