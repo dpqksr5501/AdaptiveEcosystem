@@ -2,7 +2,7 @@
 
 모든 팀원·AI의 공통 목표는 [프로젝트 공통 맥락](../PROJECT_CONTEXT.md)을 먼저 읽는다. 아래 문서는 조연우 분야의 실제 구현·검증 인계다.
 
-이번 채팅의 후속 전체 구현과 최신 재개는 [전체 상태](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행 계약/팀별 연결 API](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)를 우선한다. 아직 미커밋인 `ecfd82f` 이후 로컬 변경이며 아래 PR/기준 커밋의 완료 이력과 구분한다. 새 owned `LV_JYU_Ecosystem`에만 활성화했고, 기존 HerdMigration 맵과 기본 신호 경로는 보존했다.
+후속 전체 구현과 최신 재개는 [팀 AI 공통 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [전체 상태](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행 계약/팀별 연결 API](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)를 우선한다. `ecfd82f` 이후 구현은 **`d095948`**로 기록했다. 아래 PR/기준 커밋은 그 이전 이력이며 새 owned `LV_JYU_Ecosystem`에만 활성화했다. 기존 HerdMigration 맵과 기본 신호 경로는 보존했다. 2026-10-24 갱신에서는 문서/Source·예제·링크를 감사했으며 새 UBT/PIE를 실행했다고 기록하지 않는다.
 
 다음 채팅은 [life-v1 최신 인수인계](../Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)의 실제 범위·실패 수정·재현·후속 담당부터 확인한다.
 

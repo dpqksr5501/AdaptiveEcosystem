@@ -1,10 +1,12 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
-갱신일 2026-10-23. 팀원과 각 AI agent가 대화 기록 없이 프로젝트의 목표·제품 방향·구현 경계를 이해하기 위한 공통 진입 문서다. 개인 담당 인수인계보다 먼저 읽고 작업 분야의 Source/계약으로 이어간다. 종 이름과 예시는 교체 가능한 표현이며 현재 구현을 과장하는 근거가 아니다.
+갱신일 **2026-10-24**. 팀원과 각 AI agent가 대화 기록 없이 프로젝트의 목표·제품 방향·구현 경계를 이해하기 위한 공통 진입 문서다. 개인 담당 인수인계보다 먼저 읽고 작업 분야의 Source/계약으로 이어간다. 종 이름과 예시는 교체 가능한 표현이며 현재 구현을 과장하는 근거가 아니다.
 
-사용자의 후속 전체 구현은 원래 저장소의 미커밋 작업으로 진행했다. 최신 시작점은 [전체 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)와 [life-v1 실행/팀 API 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)이다. owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 식생·경험/흔적·출생/유전/성장·사체 영양·저장/운영 복구를 opt-in한다. 아래의 soil 최초 구축·미연결 설명은 당시 이력이다. 기존 맵/기본 SocialControl=0·단일 Native writer·모델 차원을 보존하며 재학습/임의 종 지원 완료로 확대하지 않는다.
+사용자의 후속 전체 구현은 원래 저장소에서 진행해 **`d095948`**로 기록했다. 최신 시작점은 [팀 AI 공통 안내](Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [전체 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행/팀 API 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)이다. owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 식생·경험/흔적·출생/유전/성장·사체 영양·저장/운영 복구를 opt-in한다. 아래의 soil 최초 구축·미연결 설명은 당시 이력이다. 기존 맵/기본 SocialControl=0·단일 Native writer·모델 차원을 보존하며 재학습/임의 종 지원 완료로 확대하지 않는다.
 
 대화 없이 이어갈 때는 [life-v1 최신 인수인계](Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)의 §1–27 대응·직전 실패 수정·실행 도구·후속 경계도 읽는다.
+
+서버·네트워킹 담당은 [역할별 서버 안내](Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), 학습 담당은 [역할별 RL 안내](RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md)와 [실제 부분 예제](RL_Policy/Examples/README.md)를 따른다. [시작 프롬프트](Team/ECOSYSTEM_AGENT_START_PROMPTS_20261024.md)에는 작업 요청·검증·인계 양식이 있다. 2026-10-24는 Source/문서/샘플·링크 감사를 수행한 날이며 이전225개 자동화·PIE/멀티/패키지를 새로 실행한 날로 기록하지 않는다.
 
 ## 1 만들려는 게임 시스템
 

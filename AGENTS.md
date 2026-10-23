@@ -136,3 +136,11 @@ PR #14는 2026-10-23 사용자 요청으로 기능·디버그를 push하고 Read
 현재 통합 `ShelterSafe=1`은 Python realism_shelter에 맞춘 Native 안전 규칙, `ProtectedRefuges=1`은 실제 은신처 생명주기다. ShelterSafe=0일 때만 JYU 보호 규칙이 안전을 맡으며 중첩하지 않는다. 8절의 Native 보호 기본 OFF는 하위 `FWorldConfig` 기본값을 의미한다. 기존 안전 기준 세계의 파리티와 새 이주 ON 세계 전체 궤적 파리티/재학습 미완료를 구분한다. V1 7관측/4출력과 opt-in v3 18관측/5행동·mask2를 서로 대체하지 않는다.
 
 사용자의 후속 이동 요청에 따라 최종 개인 PPT `겜캡디_조연우_1023.pptx`는 바탕화면 바로 아래에 있다. 캡처·대본·렌더/제작 작업은 9절의 외부 날짜별 폴더를 유지한다. 개인 파일을 Git에 넣지 않는다. 이번 문서 감사는 Source·링크·diff를 확인하고 새 UBT/PIE를 실행하지 않는다.
+
+## 14. 2026-10-24 soil/life 통합과 팀 AI 작업 진입점
+
+후속 soil/life 구현은 `d095948`에 기록했다. 최신 재개는 [팀 AI 공통 안내](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [현재 구현 상태](AdaptiveEcosystem/Docs/Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life 실행 계약](AdaptiveEcosystem/Docs/Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)를 먼저 읽는다. 앞 절의 날짜별 Pending/로컬 미커밋 설명은 당시 이력이다. 새 owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 soil/life를 opt-in하고 원본 팀 맵·기존 맵 옵션·V1/v3 모델/계약·SocialControl=0·Native 단일 writer와 기존 M4 장부를 보존한다.
+
+서버·네트워킹은 [역할별 안내](AdaptiveEcosystem/Docs/Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), 학습은 [역할별 안내](AdaptiveEcosystem/Docs/RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md)를 따른다. 복사 가능한 [작업 시작 프롬프트](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AGENT_START_PROMPTS_20261024.md)와 [실제 부분 예제](AdaptiveEcosystem/Docs/RL_Policy/Examples/README.md)를 제공한다. 예제는 training_ready=false이며 진단 정답/부분 cell을 기존 정책 관측이나 전체 복원 상태로 사용하지 않는다. 현재 Client proxy와 권위 논리를 구분하고 새 학습/임의 종/분산 서버 완료로 확대하지 않는다.
+
+225개 자동화·PIE/멀티·저장·패키지 수치는2026-10-23 실행의 근거다. 10-24 안내/공유 갱신은 새 UBT/PIE 실행을 뜻하지 않는다. 새 담당자가 코드를 변경하면 기존3절 빌드 규칙과 해당 역할의 실제 acceptance를 적용한다. 다른 PC의 같은 Git SHA라도 checkpoint의 runtime image hash가 달라질 수 있으므로 재빌드 간 자동 복원을 가정하지 않는다.

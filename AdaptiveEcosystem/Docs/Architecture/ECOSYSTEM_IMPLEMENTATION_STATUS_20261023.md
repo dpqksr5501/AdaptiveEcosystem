@@ -1,6 +1,8 @@
 # 동적 생태계 구현 상태 — 2026-10-23
 
-사용자의 [전체 구현 요청](ECOSYSTEM_IMPLEMENTATION_START_PROMPT_20261023.md)에 따라 아래 지원 범위의 실제 실행·에셋·로컬 검증을 완료했다. branch `codex/social-shelter-handoff`, 기준 HEAD `ecfd82fab04d16531ae7e00a2adaf3a4737d2fcf`. 시작 시 있던 공통 맥락/README 변경과 사용자 에셋을 보존한다. 변경은 미커밋이며 push/PR 작업은 수행하지 않았다.
+사용자의 [전체 구현 요청](ECOSYSTEM_IMPLEMENTATION_START_PROMPT_20261023.md)에 따라 아래 지원 범위의 실제 실행·에셋·검증을 완료했다. branch `codex/social-shelter-handoff`, 작업 시작 HEAD `ecfd82fab04d16531ae7e00a2adaf3a4737d2fcf`, **구현 기록 `d095948`**이다. 시작 시 있던 공통 맥락/README 변경과 사용자 에셋을 보존했다. 2026-10-23 검증 당시 미커밋이던 구현을 사용자의 10-24 공유 요청에 따라 커밋했다. 공개 검토는 [PR #14](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)를 따른다. 자동 병합은 수행하지 않는다.
+
+2026-10-24 추가한 [팀 AI 공통 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [서버·네트워킹](../Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), [학습](../RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md), [실제 예제](../RL_Policy/Examples/README.md)를 새 작업의 진입점으로 사용한다. 기존225개/장면 증거는10-23 실행이며 이번 문서 감사의 새 UBT/PIE 결과가 아니다.
 
 실행 맵은 **`/Game/JYU/Maps/LV_JYU_Ecosystem`**이다. 원본 팀 맵·이전 JYU 맵은 변경하지 않는다. 기존 맵의 기본 flag와 V1 7/4·v3 18/5 mask2·opt-in21·가중치를 유지한다. 새 맵의 `bEnableVegetation=true`, `bEnableEcosystemLife=true`가 후속 세계 규칙을 켠다. 기본 `SocialControl=0`, Native 단일 이동/대사/섭식·포획 writer를 유지한다.
 

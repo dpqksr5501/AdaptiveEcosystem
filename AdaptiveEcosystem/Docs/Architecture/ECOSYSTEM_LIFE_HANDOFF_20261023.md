@@ -1,6 +1,8 @@
 # life-v1 재개·팀 인수인계
 
-원래 checkout `codex/social-shelter-handoff`, 기반 HEAD `ecfd82f`의 로컬 구현이다. Source/Content/문서는 미커밋이며 push/PR/merge는 수행하지 않았다. 시작 시 사용자 변경은 보존했다. 원본 팀 맵이 아닌 **`/Game/JYU/Maps/LV_JYU_Ecosystem`**만 authoring했다.
+원래 checkout `codex/social-shelter-handoff`, 작업 시작 HEAD `ecfd82f`에서 구현해 **`d095948`**로 기록했다. 2026-10-23 검증 당시의 미커밋 상태와10-24 공유 갱신을 구분한다. 원본 팀 맵이 아닌 **`/Game/JYU/Maps/LV_JYU_Ecosystem`**만 authoring했다. 시작 시 사용자 변경과 개인 발표 파일은 보존했다. PR/공개 검토는 [#14](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)를 따르며 자동 merge는 하지 않는다.
+
+새 담당자의 최신 시작점은 [팀 AI 공통 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md)와 그 안의 서버/학습 가이드·복사 가능한 프롬프트다. 10-24는 Source/문서·실제 부분 예제의 감사이며 새 UBT/PIE 실행을 의미하지 않는다.
 
 현재 결과/수치는 [상태표](ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), 실제 실행 순서·API·저장 제한은 [life-v1 계약](ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md), 에셋은 [BP 안내](JYU_ECOSYSTEM_BP_SETUP_20261023.md), 최종 계측은 [증거 JSON](Evidence/EcosystemLife_20261023.json)을 우선한다. soil/BP/첫 review 문서의 과거 Pending은 당시 상태다.
 

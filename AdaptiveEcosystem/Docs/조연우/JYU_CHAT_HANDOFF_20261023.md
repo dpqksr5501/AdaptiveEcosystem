@@ -1,6 +1,6 @@
 # 조연우 최신 작업 인수인계 — 2026-10-23
 
-**후속 로컬 구현 재개는 [life-v1 최신 인수인계](../Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)를 먼저 읽는다.** `ecfd82f` 이후 미커밋 Source/에셋·owned `LV_JYU_Ecosystem`이 추가됐다. 아래 공개 PR/이주 기준은 그 작업 이전의 이력이며 후속 코드는 push하지 않았다.
+**후속 구현 재개는 [팀 AI 공통 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md)와 [life-v1 최신 인수인계](../Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)를 먼저 읽는다.** `ecfd82f` 이후 Source/owned `LV_JYU_Ecosystem`은2026-10-24에 **`d095948`**로 기록했다. 아래 공개 PR/이주 기준과 당시 push 상태는 그 작업 이전의 이력이다. 새 공유 상태는 현재 PR/Git에서 확인한다.
 
 이 문서는 다른 채팅에서 재개할 때의 시작점이다. 구현 기준은 `581ce1d`(이주·신호·표현)와 `e22dbbd`(경로·목적지 시각화), 통합한 main은 `a74fcac`다. 이 문서 추가는 문서 감사이며 새 빌드·PIE 실행을 의미하지 않는다.
 

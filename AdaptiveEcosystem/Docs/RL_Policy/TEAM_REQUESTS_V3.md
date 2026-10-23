@@ -1,5 +1,9 @@
 # 팀원별 요청 — 통합 레벨 v3 사슴·늑대 (2026-10-17, 팀 브랜치 통합 뒤)
 
+## 2026-10-24 학습 담당 AI 재개
+
+후속 구현 기준은 **`d095948`**이다. [학습 AI 가이드](ECOSYSTEM_RL_AGENT_GUIDE_20261024.md), [팀 공통 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [실제 부분 예제](Examples/README.md)를 새 작업의 진입점으로 사용한다. 기존 요청은 당시 이력과 담당자의 수락/완료를 구분한다. 현재 soil/life의 규칙 동작을 새 PPO 학습으로 설명하지 않고, mirror→버전/adapter→평가/학습→Native 검증 순서로 이어간다. 전체 원시 snapshot은 Saved라 clone에 없으며 예제의 일부 cell/진단 정답을 policy observation에 넣지 않는다. 새 weights/대규모 학습을 이번 문서 작업에서 실행하지 않았다.
+
 ## 2026-10-23 후속 soil-v1 세계 연결 요청
 
 후속 **life-v1**은 soil뿐 아니라 경험 규칙, genome/growth/maintenance, 제한된 사냥/사체 영양, 자연 출생과 장소 보고를 실행한다. [life 실행 계약/RL 인계](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md#rl-인계)를 먼저 확인한다. soil leaf의 실제 C++/Python 2400개 비교는 최대 절대 오차0으로 통과했다. 이는 전체 life 세계의 mirror/궤적 parity/재학습이 아니다.

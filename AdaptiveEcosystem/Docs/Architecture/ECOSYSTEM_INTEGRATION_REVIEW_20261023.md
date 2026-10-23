@@ -2,6 +2,8 @@
 
 최신 후속 점검은 이 문서 아래 **life-v1 구현 후 재점검**과 [현재 상태표](ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)·[최종 evidence](Evidence/EcosystemLife_20261023.json)를 우선한다. 아래213개/후속 미구현 설명은 첫 soil 통합 당시의 이력이다.
 
+2026-10-24 공유 갱신: 구현은 `d095948`에 기록했고 [팀 AI 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md)·역할별 가이드·실제 부분 예제를 추가했다. 아래225개/장면 검증은10-23 실행이며10-24 문서 감사에서 재실행했다고 간주하지 않는다.
+
 사용자의 전체 재점검 요청에 따라 이번 구현과 실제 호출되는 Native/M4/World/무리 이주/표현/복제 연결부를 다시 검토했다. 파일 존재나 process exit code만으로 완료를 판정하지 않고 실제 결과와 실패 보고서를 확인한다. 전체 기획의 미구현 항목을 구현 완료로 바꾸는 감사가 아니다. [전체 상태](ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)와 [BP 실행 안내](JYU_ECOSYSTEM_BP_SETUP_20261023.md)를 함께 읽는다.
 
 ## 확인하고 고친 문제

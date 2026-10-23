@@ -1,6 +1,6 @@
 # 생태계 life-v1 실행·팀 연결 계약
 
-사용자의 “남은 작업 전부 진행” 요청으로 연결한 soil-v1/life-v1의 실제 실행·지원 범위·검증·팀 인계 기록이다. 목표 전체와 현재 지원 범위는 [상태표](ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)를 구분해 읽는다. branch `codex/social-shelter-handoff`, 기준 HEAD `ecfd82f`, 기존 dirty 변경을 보존하며 commit/push는 하지 않았다.
+사용자의 “남은 작업 전부 진행” 요청으로 연결한 soil-v1/life-v1의 실제 실행·지원 범위·검증·팀 인계 기록이다. 목표 전체와 현재 지원 범위는 [상태표](ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)를 구분해 읽는다. branch `codex/social-shelter-handoff`, 작업 시작 HEAD `ecfd82f`, 구현 기록 **`d095948`**이다. 기존 dirty 변경을 보존했으며 10-23의 로컬 검증 뒤10-24 사용자 요청으로 공유 커밋을 만들었다. 새 역할별 작업은 [팀 AI 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md)를 따른다.
 
 ## 현재 실행 경로
 
@@ -154,4 +154,4 @@ foreach($taskSeed in @(11,23,47)) {
 
 ## 수정할 때의 주의
 
-기존 `setup_jyu_ecosystem.py`로 맵을 재생성하지 않는다. 후속 `extend_jyu_ecosystem_life.py`는 기존 owned 맵만 편집하고 label/owner 충돌을 거절한다. UBT/에디터/LiveCoding/dotnet/MSBuild/ShaderCompileWorker가 실행 중이면 새 UBT를 시작하거나 중단하지 않는다. 모든 Source·Content 변경은 여전히 미커밋 상태다.
+기존 `setup_jyu_ecosystem.py`로 맵을 재생성하지 않는다. 후속 `extend_jyu_ecosystem_life.py`는 기존 owned 맵만 편집하고 label/owner 충돌을 거절한다. UBT/에디터/LiveCoding/dotnet/MSBuild/ShaderCompileWorker가 실행 중이면 새 UBT를 시작하거나 중단하지 않는다. Source·Content는 `d095948`에 기록됐고 이후 작업 트리 상태는 실제 Git을 확인한다.
