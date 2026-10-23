@@ -1,0 +1,96 @@
+  early_base: 같은 조건의 판이 있다 — 다시 쓴다 (results/v3/r6/runs/early_base.json)
+  early_s0_2m: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r6_g995_s0_20m_2m.zip · check 시드 37120~37139 × 지역 3 × 1800 스텝 · 탐침
+  early_s0_2m 50/60 (85 초)
+  early_s0_2m 60/60 (94 초)
+s0_2m (v3_r6_g995_s0_20m_2m.zip, 96초): 통과
+  (a) 통과: π′(SHELTER) 0.7162 (route0 0.1382, 차이 +0.5779), π 0.7275, 두 칸 결정 23847
+  (b) 통과: 도주 스텝 설명 분산(λ 0.98) +0.4176 (route0 +0.7494, 표본 1404900) · 보고만 몬테카를로 +0.0586 (route0 -1.7314)
+  (c) 숨음 비율 통과: 0.2274 대 route0 0.1294 (차이 +0.0980, t +14.79, 시드 20)
+  (c) 잡힘 비율 통과: 0.0969 대 route0 0.1022 (차이 -0.0053, t −1.04, 시드 20)
+  (c) 잡힌 몫 통과: 0.1397 대 route0 0.1428 (차이 -0.0031, t −0.55, 시드 20)
+  결함 없음: 얼기·잠 몫 0, COVER 확률 최대 0, 마스크 밖 SHELTER 0
+  길: 결정 40226 · SHELTER 고름 22703 (몫 0.5645) · 다시 고름 11290 · 무효 1510
+  보고만(R5 점검 칸): flee 0.1123 (route0 0.1325) · shelter 0.1392 (route0 0.1076) · starved 0.0000 (route0 0.0004)
+  early_s1_2m: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r6_g995_s1_20m_2m.zip · check 시드 37120~37139 × 지역 3 × 1800 스텝 · 탐침
+  early_s1_2m 50/60 (77 초)
+  early_s1_2m 60/60 (84 초)
+s1_2m (v3_r6_g995_s1_20m_2m.zip, 86초): 못 넘음
+  (a) 걸림: π′(SHELTER) 0.1554 (route0 0.1382, 차이 +0.0171), π 0.1372, 두 칸 결정 24768
+  (b) 통과: 도주 스텝 설명 분산(λ 0.98) +0.5195 (route0 +0.7494, 표본 1609419) · 보고만 몬테카를로 +0.0806 (route0 -1.7314)
+  (c) 숨음 비율 통과: 0.1307 대 route0 0.1294 (차이 +0.0013, t +0.30, 시드 20)
+  (c) 잡힘 비율 통과: 0.0941 대 route0 0.1022 (차이 -0.0081, t −1.40, 시드 20)
+  (c) 잡힌 몫 통과: 0.1319 대 route0 0.1428 (차이 -0.0109, t −2.14, 시드 20)
+  결함 없음: 얼기·잠 몫 0, COVER 확률 최대 0, 마스크 밖 SHELTER 0
+  길: 결정 46202 · SHELTER 고름 0 (몫 0.0000) · 다시 고름 20710 · 무효 0
+  보고만(R5 점검 칸): flee 0.1321 (route0 0.1325) · shelter 0.1143 (route0 0.1076) · starved 0.0000 (route0 0.0004)
+  early_s2_2m: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r6_g995_s2_20m_2m.zip · check 시드 37120~37139 × 지역 3 × 1800 스텝 · 탐침
+  early_s2_2m 50/60 (75 초)
+  early_s2_2m 60/60 (85 초)
+s2_2m (v3_r6_g995_s2_20m_2m.zip, 86초): 통과
+  (a) 통과: π′(SHELTER) 0.4120 (route0 0.1382, 차이 +0.2737), π 0.4073, 두 칸 결정 24803
+  (b) 통과: 도주 스텝 설명 분산(λ 0.98) +0.5643 (route0 +0.7494, 표본 1510732) · 보고만 몬테카를로 +0.0753 (route0 -1.7314)
+  (c) 숨음 비율 통과: 0.1949 대 route0 0.1294 (차이 +0.0656, t +12.85, 시드 20)
+  (c) 잡힘 비율 통과: 0.0973 대 route0 0.1022 (차이 -0.0049, t −1.13, 시드 20)
+  (c) 잡힌 몫 통과: 0.1406 대 route0 0.1428 (차이 -0.0022, t −0.40, 시드 20)
+  결함 없음: 얼기·잠 몫 0, COVER 확률 최대 0, 마스크 밖 SHELTER 0
+  길: 결정 44493 · SHELTER 고름 8853 (몫 0.1990) · 다시 고름 17397 · 무효 361
+  보고만(R5 점검 칸): flee 0.1195 (route0 0.1325) · shelter 0.1235 (route0 0.1076) · starved 0.0000 (route0 0.0004)
+  early_off_2m: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r6off_g995_s0_20m_2m.zip · check 시드 37120~37139 × 지역 3 × 1800 스텝 · 탐침
+  early_off_2m 50/60 (59 초)
+  early_off_2m 60/60 (69 초)
+off_2m (v3_r6off_g995_s0_20m_2m.zip, 70초): 통과
+  (a) —: 대조 '길 끔' — 길 결정이 없다 (보지 않는다)
+  (b) 통과: 도주 스텝 설명 분산(λ 0.98) +0.4249 (route0 +0.7494, 표본 1711418) · 보고만 몬테카를로 +0.0909 (route0 -1.7314)
+  (c) 숨음 비율 통과: 0.1281 대 route0 0.1294 (차이 -0.0012, t −0.35, 시드 20)
+  (c) 잡힘 비율 통과: 0.0981 대 route0 0.1022 (차이 -0.0041, t −1.26, 시드 20)
+  (c) 잡힌 몫 통과: 0.1400 대 route0 0.1428 (차이 -0.0029, t −0.73, 시드 20)
+  결함 없음: 얼기·잠 몫 0, COVER 확률 최대 0, 마스크 밖 SHELTER 0
+  보고만(R5 점검 칸): flee 0.1353 (route0 0.1325) · shelter 0.1114 (route0 0.1076) · starved 0.0001 (route0 0.0004)
+  early_s0_5m: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r6_g995_s0_20m_5m.zip · check 시드 37120~37139 × 지역 3 × 1800 스텝 · 탐침
+  early_s0_5m 50/60 (68 초)
+  early_s0_5m 60/60 (77 초)
+s0_5m (v3_r6_g995_s0_20m_5m.zip, 79초): 통과
+  (a) 통과: π′(SHELTER) 0.7203 (route0 0.1382, 차이 +0.5820), π 0.7319, 두 칸 결정 23410
+  (b) 통과: 도주 스텝 설명 분산(λ 0.98) +0.4818 (route0 +0.7494, 표본 1370467) · 보고만 몬테카를로 +0.1398 (route0 -1.7314)
+  (c) 숨음 비율 통과: 0.2193 대 route0 0.1294 (차이 +0.0899, t +15.93, 시드 20)
+  (c) 잡힘 비율 통과: 0.0923 대 route0 0.1022 (차이 -0.0099, t −1.78, 시드 20)
+  (c) 잡힌 몫 통과: 0.1353 대 route0 0.1428 (차이 -0.0076, t −1.49, 시드 20)
+  결함 없음: 얼기·잠 몫 0, COVER 확률 최대 0, 마스크 밖 SHELTER 0
+  길: 결정 39676 · SHELTER 고름 20351 (몫 0.5131) · 다시 고름 11913 · 무효 1033
+  보고만(R5 점검 칸): flee 0.1166 (route0 0.1325) · shelter 0.1386 (route0 0.1076) · starved 0.0000 (route0 0.0004)
+  early_s1_5m: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r6_g995_s1_20m_5m.zip · check 시드 37120~37139 × 지역 3 × 1800 스텝 · 탐침
+  early_s1_5m 50/60 (69 초)
+  early_s1_5m 60/60 (78 초)
+s1_5m (v3_r6_g995_s1_20m_5m.zip, 80초): 통과
+  (a) 통과: π′(SHELTER) 0.6108 (route0 0.1382, 차이 +0.4726), π 0.6166, 두 칸 결정 24272
+  (b) 통과: 도주 스텝 설명 분산(λ 0.98) +0.4711 (route0 +0.7494, 표본 1479865) · 보고만 몬테카를로 +0.1440 (route0 -1.7314)
+  (c) 숨음 비율 통과: 0.1778 대 route0 0.1294 (차이 +0.0484, t +11.84, 시드 20)
+  (c) 잡힘 비율 통과: 0.0927 대 route0 0.1022 (차이 -0.0095, t −1.65, 시드 20)
+  (c) 잡힌 몫 통과: 0.1342 대 route0 0.1428 (차이 -0.0086, t −1.54, 시드 20)
+  결함 없음: 얼기·잠 몫 0, COVER 확률 최대 0, 마스크 밖 SHELTER 0
+  길: 결정 41923 · SHELTER 고름 16034 (몫 0.3826) · 다시 고름 14488 · 무효 923
+  보고만(R5 점검 칸): flee 0.1238 (route0 0.1325) · shelter 0.1361 (route0 0.1076) · starved 0.0000 (route0 0.0004)
+  early_s2_5m: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r6_g995_s2_20m_5m.zip · check 시드 37120~37139 × 지역 3 × 1800 스텝 · 탐침
+  early_s2_5m 50/60 (68 초)
+  early_s2_5m 60/60 (77 초)
+s2_5m (v3_r6_g995_s2_20m_5m.zip, 78초): 통과
+  (a) 통과: π′(SHELTER) 0.5030 (route0 0.1382, 차이 +0.3647), π 0.5031, 두 칸 결정 23313
+  (b) 통과: 도주 스텝 설명 분산(λ 0.98) +0.4763 (route0 +0.7494, 표본 1398288) · 보고만 몬테카를로 +0.0609 (route0 -1.7314)
+  (c) 숨음 비율 통과: 0.2113 대 route0 0.1294 (차이 +0.0819, t +16.06, 시드 20)
+  (c) 잡힘 비율 통과: 0.0916 대 route0 0.1022 (차이 -0.0106, t −2.16, 시드 20)
+  (c) 잡힌 몫 통과: 0.1306 대 route0 0.1428 (차이 -0.0122, t −2.97, 시드 20)
+  결함 없음: 얼기·잠 몫 0, COVER 확률 최대 0, 마스크 밖 SHELTER 0
+  길: 결정 41342 · SHELTER 고름 12213 (몫 0.2955) · 다시 고름 14964 · 무효 556
+  보고만(R5 점검 칸): flee 0.1132 (route0 0.1325) · shelter 0.1330 (route0 0.1076) · starved 0.0000 (route0 0.0004)
+  early_off_5m: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\v3_r6off_g995_s0_20m_5m.zip · check 시드 37120~37139 × 지역 3 × 1800 스텝 · 탐침
+  early_off_5m 50/60 (59 초)
+  early_off_5m 60/60 (68 초)
+off_5m (v3_r6off_g995_s0_20m_5m.zip, 69초): 통과
+  (a) —: 대조 '길 끔' — 길 결정이 없다 (보지 않는다)
+  (b) 통과: 도주 스텝 설명 분산(λ 0.98) +0.4153 (route0 +0.7494, 표본 1736708) · 보고만 몬테카를로 +0.1193 (route0 -1.7314)
+  (c) 숨음 비율 통과: 0.1297 대 route0 0.1294 (차이 +0.0003, t +0.05, 시드 20)
+  (c) 잡힘 비율 통과: 0.0978 대 route0 0.1022 (차이 -0.0044, t −0.83, 시드 20)
+  (c) 잡힌 몫 통과: 0.1406 대 route0 0.1428 (차이 -0.0022, t −0.44, 시드 20)
+  결함 없음: 얼기·잠 몫 0, COVER 확률 최대 0, 마스크 밖 SHELTER 0
+  보고만(R5 점검 칸): flee 0.1373 (route0 0.1325) · shelter 0.1133 (route0 0.1076) · starved 0.0003 (route0 0.0004)
+제외 시드: 없음 · 멈춤: 아니오

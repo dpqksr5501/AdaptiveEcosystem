@@ -1,0 +1,117 @@
+{
+ "rows": {
+  "s0_2m": {
+   "passed": true,
+   "a": true,
+   "b": true,
+   "c": true,
+   "defect": false,
+   "pe_shelter": 0.7161720970920253,
+   "ev": 0.4176182957333676,
+   "hide_diff": 0.09796308122189326,
+   "hide_t": 14.787742070987871,
+   "caught_ratio_t": -1.0416960127087553,
+   "caught_t": -0.5475424744631445
+  },
+  "s1_2m": {
+   "passed": false,
+   "a": false,
+   "b": true,
+   "c": true,
+   "defect": false,
+   "pe_shelter": 0.15536827812403275,
+   "ev": 0.5194740317026068,
+   "hide_diff": 0.001335646529354128,
+   "hide_t": 0.2982697552723933,
+   "caught_ratio_t": -1.3972382640492882,
+   "caught_t": -2.140371908838865
+  },
+  "s2_2m": {
+   "passed": true,
+   "a": true,
+   "b": true,
+   "c": true,
+   "defect": false,
+   "pe_shelter": 0.4119738862338996,
+   "ev": 0.564273594436622,
+   "hide_diff": 0.06555430077562084,
+   "hide_t": 12.853588960945265,
+   "caught_ratio_t": -1.1276499208887212,
+   "caught_t": -0.4008638356058986
+  },
+  "off_2m": {
+   "passed": true,
+   "a": null,
+   "b": true,
+   "c": true,
+   "defect": false,
+   "pe_shelter": null,
+   "ev": 0.4248703444567955,
+   "hide_diff": -0.001247012350682411,
+   "hide_t": -0.3484945777479792,
+   "caught_ratio_t": -1.2565916249983082,
+   "caught_t": -0.7321354948640473
+  },
+  "s0_5m": {
+   "passed": true,
+   "a": true,
+   "b": true,
+   "c": true,
+   "defect": false,
+   "pe_shelter": 0.7202766337162636,
+   "ev": 0.4818264271921736,
+   "hide_diff": 0.08990981152738682,
+   "hide_t": 15.927207873767797,
+   "caught_ratio_t": -1.7768629963379896,
+   "caught_t": -1.48674225920421
+  },
+  "s1_5m": {
+   "passed": true,
+   "a": true,
+   "b": true,
+   "c": true,
+   "defect": false,
+   "pe_shelter": 0.6107987242194608,
+   "ev": 0.47108880354111016,
+   "hide_diff": 0.04838478203572972,
+   "hide_t": 11.839453324607305,
+   "caught_ratio_t": -1.6525746610817529,
+   "caught_t": -1.5429642559702843
+  },
+  "s2_5m": {
+   "passed": true,
+   "a": true,
+   "b": true,
+   "c": true,
+   "defect": false,
+   "pe_shelter": 0.5029610334631291,
+   "ev": 0.4762940877902444,
+   "hide_diff": 0.08192555082276672,
+   "hide_t": 16.064172268615767,
+   "caught_ratio_t": -2.156306219037905,
+   "caught_t": -2.9722281509020343
+  },
+  "off_5m": {
+   "passed": true,
+   "a": null,
+   "b": true,
+   "c": true,
+   "defect": false,
+   "pe_shelter": null,
+   "ev": 0.41526992641229066,
+   "hide_diff": 0.00025920874241828763,
+   "hide_t": 0.04668800615428953,
+   "caught_ratio_t": -0.831175058327708,
+   "caught_t": -0.43777991190234705
+  }
+ },
+ "rules": {
+  "excluded": {},
+  "stop": false,
+  "why": [],
+  "defect": false
+ },
+ "cost": "0",
+ "lam": "98",
+ "control_note": "대조 '길 끔' 줄은 보고만 (고르기·멈춤에 쓰지 않는다)"
+}
