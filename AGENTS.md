@@ -2,6 +2,10 @@
 
 이 문서는 `AdaptiveEcosystem` 저장소에서 작업하는 모든 AI coding agent의 최상위 지침이다.
 
+## 0. 모든 팀원과 AI agent의 공통 맥락
+
+새 채팅/독립 작업을 시작할 때 [프로젝트 공통 맥락](AdaptiveEcosystem/Docs/PROJECT_CONTEXT.md)을 먼저 읽고 실제 branch/Source와 담당 계약을 확인한다. 이 문서는 목표·현재 구현·후속 제안을 구분하는 공통 진입점이다. 환경·식생·몬스터 간 상호작용·플레이어 활동이 함께 작동하는 MMORPG용 동적 생태계를 목표로 하며, 플레이어 영향만의 시스템이나 관찰 전용으로 축소하지 않는다. 사슴·늑대는 현재 예시이고 종의 식성/공격성/사회성/이동 능력/실행 backend를 분리해 확장한다. 현재 Native 늑대 구현이 임의 몬스터를 이미 지원한다는 뜻은 아니다. 세부 제안은 [고도화 기획](AdaptiveEcosystem/Docs/Architecture/DYNAMIC_ECOSYSTEM_DETAILED_DESIGN_20261023.md)을 참고하며, 현재 요청 범위를 넘어 기능을 일괄 활성화하지 않는다.
+
 ---
 
 ## 1. 프로젝트 기준 정보

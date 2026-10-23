@@ -1,5 +1,7 @@
 # 조연우 작업 시작 문서 — 역할·진행상황·다음 연결
 
+모든 팀원·AI의 공통 목표는 [프로젝트 공통 맥락](../PROJECT_CONTEXT.md)을 먼저 읽는다. 아래 문서는 조연우 분야의 실제 구현·검증 인계다.
+
 갱신일: **2026-10-23**. 먼저 [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 읽는다. 구현 기준 `581ce1d` + `e22dbbd`, 통합 main `a74fcac`, 작업 브랜치 `codex/social-shelter-handoff`다. [PR #14 — 먹이 부족에 따른 무리 이주 기능 추가](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)는 확인 당시 OPEN·Ready for review·미병합이고 기능/디버그 push를 완료했다.
 
 | 읽을 문서 | 확인할 내용 |

@@ -1,5 +1,7 @@
 # PPO + MassEntity 기반 동적 생태계 종합 아키텍처 (PPO & Mass Dynamic Ecosystem)
 
+프로젝트의 공통 목표·종 독립성·작업 시작 순서는 [공통 맥락](../PROJECT_CONTEXT.md)을 먼저 따른다. 아래의 현재 구현과 후속 제안/날짜별 감사를 구분한다.
+
 ## 2026-10-23 실제 통합 경로와 아래 설계의 적용 범위
 
 아래 V1 구조도·2026-09-30 gap은 목표 및 당시 감사다. 현재 branch `codex/social-shelter-handoff`의 opt-in v3 구현 기준은 `581ce1d` + `e22dbbd`이며 main `a74fcac`를 포함한다. [현재 인수인계](../조연우/JYU_CHAT_HANDOFF_20261023.md)와 [무리 이주·신호 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 함께 읽는다. V1 7관측/4출력과 v3 R1b 18관측/5행동·mask2는 별도 계약이다.
