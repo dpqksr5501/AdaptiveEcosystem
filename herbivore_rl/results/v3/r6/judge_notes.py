@@ -10,6 +10,9 @@
    없는 도망)으로 나눈 시드당 수, 끝 까닭, GF(1000 산 사슴-스텝당 시작한 도망)·GR(살아 끝난 도망 뒤 5 초 안 다시 도망) — R6·route0·'늘 SHELTER'·대조 '길 끔'.
    '늘 SHELTER'·대조의 GF(·GR) 짝 t 도 route0 대비로 적는다(live.flight_rate_pair·r6_eval.route_guards 와 같은 셈 — 보고만).
 2. 점검(37120~37139)·고르기(37100~37119) 판의 같은 칸 — 조기 점검·고르기 잣대에는 GF·GR 이 없었다(PREREG 5·6절).
+   판마다 같은 시드의 route0 판(점검 = early_base, 고르기 = select_route0)과의 GF·GR 짝 차이·t 도 적는다(시드 20 — 문턱이었다면 t_crit(19) 2.093).
+10-23 판정 뒤 검토 덧붙임(셈 길은 그대로, 칸만 더함): 길마다 도망 하나의 평균 길이(초), 반사 도망(run·shelter) 하나당 길 결정·다시 고름(judge.md 의
+'도망 하나당'은 none 도망까지 분모에 넣는다), none 도망 판 전체 수, 위 2 의 짝 t.
 """
 
 from __future__ import annotations
@@ -41,6 +44,7 @@ def flights(res: dict) -> dict:
     t = Counter()
     ends = Counter()
     by = {r: Counter() for r in ROUTES}
+    by_steps = Counter()
     has_route = all((w.get("flight") or {}).get("route") for w in W)
     for w in W:
         f = lv.flight_of(w)
@@ -50,23 +54,32 @@ def flights(res: dict) -> dict:
         r = f.get("route")
         if r is not None:
             t["refled"] += int(r["refled"])
+            t["decisions"] += int(r["decisions"])
+            t["redecide"] += int(r["redecide_feas"])
             for k in ROUTES:
                 by[k].update((r["by_route"].get(k) or {}).get("n", {}))
+                by_steps[k] += sum(((r["by_route"].get(k) or {}).get("steps") or {}).values())
     out = dict(seeds=S, started=t["started"] / S, gf=1000.0 * t["started"] / t["live"], chased=t["chased"] / S, hidden=t["hidden"] / S,
                hide_share=t["hidden"] / t["chased"] if t["chased"] else float("nan"), nonreflex_flee=(t["flee"] - t["reflex"]) / S,
                ends={k: v / S for k, v in ends.items() if v})
     if has_route:
-        out.update(refled=t["refled"] / S, by_route={k: dict(n=sum(c.values()) / S, unchased=c["unchased"] / S, cover=c["cover"] / S,
-                                                             caught=c["caught"] / S) for k, c in by.items()})
+        reflex_n = sum(by["run"].values()) + sum(by["shelter"].values())
+        out.update(refled=t["refled"] / S,
+                   by_route={k: dict(n=sum(c.values()) / S, unchased=c["unchased"] / S, cover=c["cover"] / S, caught=c["caught"] / S,
+                                     mean_s=lv.ratio(by_steps[k] * lv.STEP_S, sum(c.values()))) for k, c in by.items()},
+                   none_total=int(sum(by["none"].values())), dec_per_reflex=lv.ratio(t["decisions"], reflex_n),
+                   redecide_per_reflex=lv.ratio(t["redecide"], reflex_n))
     return out
 
 
 def line(name: str, x: dict) -> str:
-    s = (f"{name:30s} 시드 {x['seeds']:3d} · 시작한 도망 {x['started']:7.1f}/시드 · GF {x['gf']:.4f} · GR {x.get('refled', float('nan')):6.1f}/시드 · "
+    s = (f"{name:30s} 시드 {x['seeds']:3d} · 시작한 도망 {x['started']:7.1f}/시드 · GF(전체 합) {x['gf']:.4f} · GR {x.get('refled', float('nan')):6.1f}/시드 · "
          f"쫓긴 도망 {x['chased']:6.1f} · 숨음 {x['hidden']:6.1f} ({x['hide_share'] * 100:.2f}%) · 반사 밖 실행 FLEE {x['nonreflex_flee']:7.1f} 스텝/시드")
     if "by_route" in x:
-        s += "\n" + " " * 32 + " · ".join(f"길 {k} {v['n']:.1f} (안 쫓김 끝 {v['unchased']:.1f} · 은신처 끝 {v['cover']:.1f} · 잡힘 {v['caught']:.1f})"
-                                          for k, v in x["by_route"].items() if v["n"] > 0.05)
+        s += "\n" + " " * 32 + " · ".join(f"길 {k} {v['n']:.1f} (안 쫓김 끝 {v['unchased']:.1f} · 은신처 끝 {v['cover']:.1f} · 잡힘 {v['caught']:.1f} · "
+                                          f"평균 {v['mean_s']:.2f} 초)" for k, v in x["by_route"].items() if v["n"] > 0.05)
+        s += ("\n" + " " * 32 + f"none 도망 판 전체 {x['none_total']} 개 · 반사 도망(run·shelter) 하나당 길 결정 {x['dec_per_reflex']:.3f} · "
+              f"다시 고름 {x['redecide_per_reflex']:.3f}")
     return s
 
 
@@ -90,13 +103,19 @@ def main() -> int:
     L += ["", "route0 대비 짝 (보고만 — R6 의 칸은 judge.md 와 같다):"]
     for k, label in (("r6", "R6"), ("rule", "'늘 SHELTER'"), ("off", "대조 '길 끔'")):
         L += pair_rows(N[k], N["route0"], label)
-    L += ["", "## 2. 점검·고르기 판 (조기 점검·고르기 잣대에 GF·GR 이 없었다 — 사후 셈)", ""]
+    L += ["", "## 2. 점검·고르기 판 (조기 점검·고르기 잣대에 GF·GR 이 없었다 — 사후 셈)", "",
+          "판마다 아래 줄: 같은 시드 route0 판(점검 early_base · 고르기 select_route0) 대비 GF·GR 짝 (시드 20 — 문턱이었다면 t_crit(19) 2.093, 보고만)", ""]
+    bases = {"early": "early_base", "select": "select_route0"}
     for name in ("early_base", "early_l95_c0", "early_l95_c0027", "early_l95_c005", "early_l98_c0", "early_l98_c0027", "early_l98_c005",
                  "early_s0_2m", "early_s1_2m", "early_s2_2m", "early_s0_5m", "early_s1_5m", "early_s2_5m", "early_off_5m",
                  "select_route0", "select_v3_r6_g995_s0_20m", "select_v3_r6_g995_s1_20m", "select_v3_r6_g995_s2_20m"):
         p = RUNS / f"{name}.json"
         if p.exists():
-            L.append(line(name, flights(load(name))))
+            res = load(name)
+            L.append(line(name, flights(res)))
+            base = bases[name.split("_")[0]]
+            if name != base and (RUNS / f"{base}.json").exists():
+                L += [" " * 30 + x.strip() for x in pair_rows(res, load(base), f"{base} 대비")]
     text = "\n".join(L) + "\n"
     OUT.write_text(text, encoding="utf-8")
     print(text)
