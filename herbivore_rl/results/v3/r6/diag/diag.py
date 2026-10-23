@@ -524,8 +524,11 @@ def conclusion_lines(an: dict) -> list[str]:
     M, d, T = an["models"], an["decision"], an["t_crit"]
     b, r, z = M["r6_block"], M["r6"], M["route0"]
     ex = d["gr_excess_by"]
-    L = [f"- **판단: {d['decision']}** — {d['why']}.",
-         f"- R6 두뇌에서 반사 밖 FLEE 만 막자: 숨음 비율 {b['hide']['a'] * 100:.1f}% (route0 {z['hide']['a'] * 100:.1f}%, R6 그대로 {r['hide']['a'] * 100:.1f}%), "
+    L = [f"- **판단: {d['decision']}** — {d['why']}."]
+    if d["decision"] == "GO":
+        L.append("- 쉽게 말해: 늑대가 쫓지 않는데 두뇌가 스스로 툭툭 뛰던 것만 막으면, 도망을 너무 자주 시작하던 것(GF)과 끝나자마자 또 뛰던 것(GR)이 지금 두뇌 "
+                 "수준으로 돌아오고, 은신처에 숨는 비율 이득은 그대로 남는다.")
+    L += [f"- R6 두뇌에서 반사 밖 FLEE 만 막자: 숨음 비율 {b['hide']['a'] * 100:.1f}% (route0 {z['hide']['a'] * 100:.1f}%, R6 그대로 {r['hide']['a'] * 100:.1f}%), "
          f"도망 시작 GF {b['GF']['a']:.3f} (route0 {z['GF']['a']:.3f}, R6 그대로 {r['GF']['a']:.3f} — 짝 t {_t(b['GF'])}), "
          f"5 초 안 다시 도망 GR 시드당 {b['GR']['a']:.0f} 번 (route0 {z['GR']['a']:.0f}, R6 그대로 {r['GR']['a']:.0f} — 짝 t {_t(b['GR'])}). 문턱은 {T:.3f}.",
          f"- 잡힘: 쫓긴 도망 가운데 잡힘 {b['caught_ratio']['a'] * 100:.1f}% (route0 {z['caught_ratio']['a'] * 100:.1f}%, t {_t(b['caught_ratio'])}), "
@@ -533,6 +536,18 @@ def conclusion_lines(an: dict) -> list[str]:
          (f"- 남은 GR 초과분(route0 대비) 시드당 {d['gr_excess']:+.1f} 번의 원인: (가) 은신처로 끝난 도망 뒤 다시 도망 {ex['ga']:+.1f} · (나) 그 밖 끝 까닭 뒤 "
           f"{ex['na']:+.1f} · (다) 두뇌 스스로 뛰기 {ex['da']:+.1f}." if d["gr_excess"] > 0 else
           f"- GR 초과분이 없다(route0 대비 시드당 {d['gr_excess']:+.1f} 번 — (가) {ex['ga']:+.1f} · (나) {ex['na']:+.1f} · (다) {ex['da']:+.1f}).")]
+    # 주의 (보고만 — 판단 규칙과 무관한 글)
+    u = M["rule"]
+    rb = {x[5:]: v for x, v in b["dec"].items() if x.startswith("repl_")}
+    L += ["", "주의 (판정이 아니다):",
+          "- 평가 때만 막은 값이다(재학습 없음). R7 은 이 막기를 마스크로 넣고 다시 배우므로 값이 달라질 수 있다 — 새 사전 등록 · 새 시드로 다시 판정해야 한다.",
+          f"- 점검 시드 {an['seeds'][0]}~{an['seeds'][1]}(조기 점검에서 이미 쓴 시드 {an['n']} 개)로 본 값이다. 판정 · 고르기 시드는 쓰지 않았다.",
+          f"- 은신처 들락날락((가))은 지금 두뇌에서도 GR 의 대부분이다(route0 시드당 {z['gr_cat']['ga']['a']:.0f} / {z['GR']['a']:.0f}). 막은 R6 의 (가)는 route0 와 "
+          f"비슷하다({ex['ga']:+.1f}, t {_t(b['gr_cat']['ga'])}). '늘 SHELTER' 규칙은 (가)가 크게 늘어(+{u['gr_cat']['ga']['diff']:.1f}, "
+          f"t {_t(u['gr_cat']['ga'])}) GR 이 걸린다(t {_t(u['GR'])}).",
+          f"- 막힌 선택은 시드당 {b['dec'].get('blocked', 0):.0f} 번이고 대신 " + " · ".join(f"{x} {v:.0f}" for x, v in sorted(rb.items(), key=lambda kv: -kv[1]))
+          + f" 번을 골랐다. 은신처 안 몫(산 사슴-스텝)은 route0 {z['shelter']['a'] * 100:.1f}% → {b['shelter']['a'] * 100:.1f}% (R6 그대로 "
+          f"{r['shelter']['a'] * 100:.1f}%) — 보고만."]
     return L
 
 
