@@ -10,3 +10,4 @@ train v3_r6_g995_s1_20m cmd_pid 39928 python_pid 32528 log results\v3\r6\logs\tr
 train v3_r6_g995_s2_20m cmd_pid 38208 python_pid 45792 log results\v3\r6\logs\train_v3_r6_g995_s2_20m.log started 2026-10-23T17:18:00
 train v3_r6off_g995_s0_20m cmd_pid 28732 python_pid 41780 log results\v3\r6\logs\train_v3_r6off_g995_s0_20m.log started 2026-10-23T17:18:01
 early_checks main cmd_pid 41456 python_pid 13372 log results\v3\r6\logs\early_checks_main.log started 2026-10-23T17:18:01
+judge v3_r6_g995_s1_20m cmd_pid 42208 python_pid 44660 log results\v3\r6\logs\judge.log started 2026-10-23T17:59:17
