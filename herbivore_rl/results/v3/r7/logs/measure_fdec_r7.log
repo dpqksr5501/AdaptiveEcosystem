@@ -1,0 +1,97 @@
+{
+ "f_dec": 0.7146944444444444,
+ "per_seed": [
+  {
+   "seed": 32000,
+   "f_dec": 0.614046875,
+   "decide_frac_world": 0.614046875,
+   "gate_free": 234522,
+   "gate_flee": 0,
+   "region": "Barren"
+  },
+  {
+   "seed": 32000,
+   "f_dec": 0.7373958333333334,
+   "decide_frac_world": 0.7373958333333334,
+   "gate_free": 282079,
+   "gate_flee": 0,
+   "region": "Forest"
+  },
+  {
+   "seed": 32000,
+   "f_dec": 0.7877135416666666,
+   "decide_frac_world": 0.7877135416666666,
+   "gate_free": 301689,
+   "gate_flee": 0,
+   "region": "Highland"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.6655859375,
+   "decide_frac_world": 0.6655859375,
+   "gate_free": 254124,
+   "gate_flee": 0,
+   "region": "Barren"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.6913411458333333,
+   "decide_frac_world": 0.6913411458333333,
+   "gate_free": 263905,
+   "gate_flee": 0,
+   "region": "Forest"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.7735104166666666,
+   "decide_frac_world": 0.7735104166666666,
+   "gate_free": 296232,
+   "gate_flee": 0,
+   "region": "Highland"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.6804583333333334,
+   "decide_frac_world": 0.6804583333333334,
+   "gate_free": 260075,
+   "gate_flee": 0,
+   "region": "Barren"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.753140625,
+   "decide_frac_world": 0.753140625,
+   "gate_free": 288041,
+   "gate_flee": 0,
+   "region": "Forest"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.7290572916666667,
+   "decide_frac_world": 0.7290572916666667,
+   "gate_free": 278958,
+   "gate_flee": 0,
+   "region": "Highland"
+  }
+ ],
+ "multi_frac": 0.029073872543303923,
+ "seeds": [
+  32000,
+  32001,
+  32002
+ ],
+ "steps": 3000,
+ "model_seed": 0,
+ "allowed": [
+  "graze",
+  "flee",
+  "hide"
+ ],
+ "mask_version": 5,
+ "route_decisions": 10359,
+ "route_choice": 5662,
+ "route_dec_frac": 0.0029973958333333332,
+ "gate_free": 2459625,
+ "gate_flee": 0
+}
+f_dec = 0.714694 (보정 시드 [32000, 32001, 32002] × 3000스텝, 목록 ['graze', 'flee', 'hide'], 110초) → yaml train.repertoire.f_dec 에 적는다

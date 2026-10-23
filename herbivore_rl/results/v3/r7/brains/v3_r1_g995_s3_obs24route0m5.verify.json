@@ -1,0 +1,623 @@
+{
+ "steps": 1800,
+ "seeds": [
+  32090,
+  32091
+ ],
+ "regions": [
+  "Barren",
+  "Forest",
+  "Highland"
+ ],
+ "pairs": {
+  "route0m5": {
+   "versions": [
+    4,
+    5
+   ],
+   "runs": [
+    {
+     "world": "N",
+     "region": "Barren",
+     "seed": 32090,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 167162,
+     "argmax_diff": 0,
+     "dead_slot_diff": 210,
+     "repl": {},
+     "started_old": 457,
+     "started_new": 457,
+     "none_old": 0,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 167162,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Barren",
+     "seed": 32091,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 174453,
+     "argmax_diff": 0,
+     "dead_slot_diff": 48,
+     "repl": {},
+     "started_old": 458,
+     "started_new": 458,
+     "none_old": 0,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 174453,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Forest",
+     "seed": 32090,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 160342,
+     "argmax_diff": 0,
+     "dead_slot_diff": 163,
+     "repl": {},
+     "started_old": 642,
+     "started_new": 642,
+     "none_old": 0,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 160342,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Forest",
+     "seed": 32091,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 158030,
+     "argmax_diff": 0,
+     "dead_slot_diff": 90,
+     "repl": {},
+     "started_old": 605,
+     "started_new": 605,
+     "none_old": 0,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 158030,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Highland",
+     "seed": 32090,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 167834,
+     "argmax_diff": 0,
+     "dead_slot_diff": 400,
+     "repl": {},
+     "started_old": 284,
+     "started_new": 284,
+     "none_old": 0,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 167834,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Highland",
+     "seed": 32091,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 163130,
+     "argmax_diff": 0,
+     "dead_slot_diff": 316,
+     "repl": {},
+     "started_old": 356,
+     "started_new": 356,
+     "none_old": 0,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 163130,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Barren",
+     "seed": 32090,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 572,
+     "free_decisions": 198001,
+     "argmax_diff": 1,
+     "dead_slot_diff": 177,
+     "repl": {
+      "graze": 1
+     },
+     "started_old": 220,
+     "started_new": 402,
+     "none_old": 0,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 182888,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Barren",
+     "seed": 32091,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 573,
+     "free_decisions": 192349,
+     "argmax_diff": 29,
+     "dead_slot_diff": 138,
+     "repl": {
+      "graze": 15,
+      "hide": 14
+     },
+     "started_old": 338,
+     "started_new": 237,
+     "none_old": 21,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 197427,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Forest",
+     "seed": 32090,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 153,
+     "free_decisions": 184689,
+     "argmax_diff": 12,
+     "dead_slot_diff": 89,
+     "repl": {
+      "graze": 3,
+      "hide": 9
+     },
+     "started_old": 476,
+     "started_new": 221,
+     "none_old": 9,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 202182,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Forest",
+     "seed": 32091,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 202280,
+     "argmax_diff": 0,
+     "dead_slot_diff": 137,
+     "repl": {},
+     "started_old": 198,
+     "started_new": 198,
+     "none_old": 0,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 202280,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Highland",
+     "seed": 32090,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 1096,
+     "free_decisions": 199453,
+     "argmax_diff": 52,
+     "dead_slot_diff": 274,
+     "repl": {
+      "graze": 29,
+      "hide": 23
+     },
+     "started_old": 256,
+     "started_new": 210,
+     "none_old": 44,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 199964,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Highland",
+     "seed": 32091,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 283,
+     "free_decisions": 205055,
+     "argmax_diff": 3,
+     "dead_slot_diff": 80,
+     "repl": {
+      "graze": 3
+     },
+     "started_old": 146,
+     "started_new": 155,
+     "none_old": 3,
+     "none_new": 0,
+     "gate_new": {
+      "free_decisions": 203633,
+      "brain_flee": 0
+     }
+    }
+   ],
+   "worlds": 12,
+   "all_same": false,
+   "same_worlds": 7,
+   "free_decisions": 2172778,
+   "argmax_diff": 97,
+   "dead_slot_diff": 2122,
+   "argmax_diff_per_1000_free": 0.04464330916458101,
+   "repl": {
+    "graze": 51,
+    "hide": 46
+   },
+   "none_old": 77,
+   "none_new": 0,
+   "started_old": 4436,
+   "started_new": 4225,
+   "gate_free_new": 2179325,
+   "gate_flee_new": 0
+  },
+  "obs21zero_m6": {
+   "versions": [
+    2,
+    6
+   ],
+   "runs": [
+    {
+     "world": "N",
+     "region": "Barren",
+     "seed": 32090,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 167162,
+     "argmax_diff": 0,
+     "dead_slot_diff": 210,
+     "repl": {},
+     "started_old": 457,
+     "started_new": 457,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 167162,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Barren",
+     "seed": 32091,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 174453,
+     "argmax_diff": 0,
+     "dead_slot_diff": 48,
+     "repl": {},
+     "started_old": 458,
+     "started_new": 458,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 174453,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Forest",
+     "seed": 32090,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 160342,
+     "argmax_diff": 0,
+     "dead_slot_diff": 163,
+     "repl": {},
+     "started_old": 642,
+     "started_new": 642,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 160342,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Forest",
+     "seed": 32091,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 158030,
+     "argmax_diff": 0,
+     "dead_slot_diff": 90,
+     "repl": {},
+     "started_old": 605,
+     "started_new": 605,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 158030,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Highland",
+     "seed": 32090,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 167834,
+     "argmax_diff": 0,
+     "dead_slot_diff": 400,
+     "repl": {},
+     "started_old": 284,
+     "started_new": 284,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 167834,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "N",
+     "region": "Highland",
+     "seed": 32091,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 163130,
+     "argmax_diff": 0,
+     "dead_slot_diff": 316,
+     "repl": {},
+     "started_old": 356,
+     "started_new": 356,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 163130,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Barren",
+     "seed": 32090,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 572,
+     "free_decisions": 198001,
+     "argmax_diff": 1,
+     "dead_slot_diff": 177,
+     "repl": {
+      "graze": 1
+     },
+     "started_old": 220,
+     "started_new": 402,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 182888,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Barren",
+     "seed": 32091,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 573,
+     "free_decisions": 192349,
+     "argmax_diff": 29,
+     "dead_slot_diff": 138,
+     "repl": {
+      "graze": 15,
+      "hide": 14
+     },
+     "started_old": 338,
+     "started_new": 237,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 197427,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Forest",
+     "seed": 32090,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 153,
+     "free_decisions": 184689,
+     "argmax_diff": 12,
+     "dead_slot_diff": 89,
+     "repl": {
+      "graze": 3,
+      "hide": 9
+     },
+     "started_old": 476,
+     "started_new": 221,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 202182,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Forest",
+     "seed": 32091,
+     "steps": 1800,
+     "same": true,
+     "first_diff": null,
+     "free_decisions": 202280,
+     "argmax_diff": 0,
+     "dead_slot_diff": 137,
+     "repl": {},
+     "started_old": 198,
+     "started_new": 198,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 202280,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Highland",
+     "seed": 32090,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 1096,
+     "free_decisions": 199453,
+     "argmax_diff": 52,
+     "dead_slot_diff": 274,
+     "repl": {
+      "graze": 29,
+      "hide": 23
+     },
+     "started_old": 256,
+     "started_new": 210,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 199964,
+      "brain_flee": 0
+     }
+    },
+    {
+     "world": "G",
+     "region": "Highland",
+     "seed": 32091,
+     "steps": 1800,
+     "same": false,
+     "first_diff": 283,
+     "free_decisions": 205055,
+     "argmax_diff": 3,
+     "dead_slot_diff": 80,
+     "repl": {
+      "graze": 3
+     },
+     "started_old": 146,
+     "started_new": 155,
+     "none_old": null,
+     "none_new": null,
+     "gate_new": {
+      "free_decisions": 203633,
+      "brain_flee": 0
+     }
+    }
+   ],
+   "worlds": 12,
+   "all_same": false,
+   "same_worlds": 7,
+   "free_decisions": 2172778,
+   "argmax_diff": 97,
+   "dead_slot_diff": 2122,
+   "argmax_diff_per_1000_free": 0.04464330916458101,
+   "repl": {
+    "graze": 51,
+    "hide": 46
+   },
+   "none_old": null,
+   "none_new": null,
+   "started_old": 4436,
+   "started_new": 4225,
+   "gate_free_new": 2179325,
+   "gate_flee_new": 0
+  }
+ },
+ "models": {
+  "route0m5": {
+   "out": "ckpt/v3/v3_r1_g995_s3_obs24route0m5.zip",
+   "src": "ckpt/v3/v3_r1_g995_s3_obs24route0.zip",
+   "src_version": 4,
+   "version": 5,
+   "sha256": "b8e4c5d4352235940d991a56d8e1ab9fff2a9c57fb174f470d4dd9cba1f803bb",
+   "src_sha256": "293c3165b1edb11e24d5a616ef58c24196fb164164b7902dcf5622d8e7d3dffc",
+   "weights_sha256": "2813f4d31bfdcadd731a1fefa43b5794b3e8bd96035d67e6fafc8402e8bbc3c6",
+   "src_weights_sha256": "2813f4d31bfdcadd731a1fefa43b5794b3e8bd96035d67e6fafc8402e8bbc3c6",
+   "weights_same": true,
+   "policy_pth_same": true,
+   "allowed": [
+    "graze",
+    "flee",
+    "hide"
+   ]
+  },
+  "obs21zero_m6": {
+   "out": "ckpt/v3/v3_r1_g995_s3_obs21zero_m6.zip",
+   "src": "ckpt/v3/v3_r1_g995_s3_obs21zero.zip",
+   "src_version": 2,
+   "version": 6,
+   "sha256": "436ec27e5e5c227da935741b5b13fda2d693370781ca4d111eea13c08cc40806",
+   "src_sha256": "e268476da76ecdfb8db5dcfd17e089a51088e2035bf205464c8185efdb9ea3a1",
+   "weights_sha256": "b0095ae05d04cea519efd60482792b9be66c09a14f0ccc9a2332e7857d242759",
+   "src_weights_sha256": "b0095ae05d04cea519efd60482792b9be66c09a14f0ccc9a2332e7857d242759",
+   "weights_same": true,
+   "policy_pth_same": true,
+   "allowed": [
+    "graze",
+    "flee",
+    "hide",
+    "freeze"
+   ]
+  }
+ },
+ "brain_file": {
+  "path": "results/v3/r7/brains/v3_r1_g995_s3_obs24route0m5.json",
+  "id": "v3_r1_g995_s3_obs24route0m5@078c56be",
+  "contract_hash": "0xad7bad5e1acaf071",
+  "mask_version": 5,
+  "golden": 28,
+  "kinds": {
+   "rollout": 12,
+   "single": 2,
+   "route_edge": 2,
+   "route": 4,
+   "route_single": 2,
+   "random": 6
+  },
+  "weights_sha256": "078c56be3d4bacb2a0b1a3a539bd505a975004fb182152a99ca5557eca84a51e"
+ }
+}

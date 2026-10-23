@@ -53,6 +53,9 @@ torch 는 스레드 1 로 돈다(`env.torch_init`, main 안에서도 다시 고�
   셋째 계약(10-22, 파이썬만 — C++ 은 다음 단계): 관측 24·마스크 판 4(0xe302dee198197444 — 관측 21 + 두뇌 길 세 칸, 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 16-5).
   계약 dict 에 키 flight_route 가 판 4 에만 붙는다(옛 둘·판 3 의 dict·해시는 그대로). 골든 세계는 configs/v3_wild3_route_mirror.yaml 이고 도주 길 결정 사례
   (route·route_edge·route_single)를 더한다. 시작 두뇌(obs21zero + 열 0 + 칸 4 = 칸 1 − 2)는 results/v3/route/route_extend.py 가 만든다.
+  넷째 계약(10-23 R7, 파이썬만 — 설계 17절): 관측 24·마스크 판 5(= 판 4 + 반사 밖 두뇌 FLEE 막음). 계약 dict 에 flight_route(판 4 와 같은 값)와 키
+  brain_flee_outside_reflex = false 가 붙는다(판 2·3·4 dict·해시는 그대로). 골든 세계는 configs/v3_wild3_route5_mirror.yaml 이다. 판 6(R7 대조 '길 끔')은
+  파이썬 학습 대조 전용이라 두뇌 파일을 만들지 않는다. 판 5 시작 두뇌(route0 가중치 그대로 + 판만 5)는 results/v3/r7/r7_start.py 가 만든다.
   허용 칸 1·2위 로짓 차가 NEAR_TIE_GAP 보다 작은 사례는 넣지 않는다(float32 순서 차이로 argmax 가 갈릴 수 있다).
   언리얼 로더는 버전·차원·이름·마스크·문턱·모양·NaN·sha256 을 보고, 골든을 C++ 순전파(EcoPolicyV3Inference.h)로 다시 돌려
   로짓이 허용 오차 안이고 행동이 같아야 받는다. 시각·절대 경로를 적지 않아 같은 모델이면 바이트 단위로 같은 파일이 나온다.
@@ -100,6 +103,7 @@ BRAIN_FORMAT_VERSION = 1
 BRAIN_GOLDEN_CONFIG = ROOT / "configs" / "v3_wild3_mirror.yaml"   # 언리얼 통합 레벨과 같은 세계 (나무 + 지역 날씨, 관측 18)
 BRAIN_GOLDEN_CONFIG_OBS21 = ROOT / "configs" / "v3_wild3_obs_mirror.yaml"   # 같은 세계 + R5 장애물 관측 세 칸 (관측 21, 10-19 — 계약 2-4)
 BRAIN_GOLDEN_CONFIG_ROUTE = ROOT / "configs" / "v3_wild3_route_mirror.yaml"  # 관측 21 거울 + 두뇌 길(관측 24·마스크 판 4, 10-22 — 설계 16절)
+BRAIN_GOLDEN_CONFIG_ROUTE5 = ROOT / "configs" / "v3_wild3_route5_mirror.yaml"  # 위 + 반사 밖 두뇌 FLEE 막음(관측 24·마스크 판 5, 10-23 R7 — 설계 17절)
 BRAIN_GOLDEN_SEED = 32099              # 파이썬 탐색 시드 칸(32000~32099)의 끝 — 학습·판정·고르기에 쓰지 않는다
 BRAIN_GOLDEN_STEPS = 600
 BRAIN_PER_ACTION = 6                   # 다중 칸 결정 시점을 고른 행동별로 많아야 이만큼
@@ -207,7 +211,8 @@ def torch_logits(policy, pobs: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
 def contract_dict(obs_names, mask_version: int) -> dict:
     """정책 입출력 계약 (관측 순서, 행동 순서, 망 모양, 마스크 판·문턱, 선택 규칙). 가중치는 넣지 않는다(모델 지문이 따로 있다).
     이 dict 가 바뀌면 `contract_hash` 가 바뀌고, C++ `EcoPolicyV3Inference.h` 의 알려진 해시 static_assert 가 걸린다."""
-    from env_v2.rep_policy import ALARM_MASK_OBS, HIDE_COVER_OBS, MASK_LOGIT, MASK_VERSION_ALARM, THREAT_RECENCY_OBS
+    from env_v2.rep_policy import (ALARM_MASK_OBS, FLEE_GATE_KEY, HIDE_COVER_OBS, MASK_LOGIT, MASK_VERSION_ALARM, THREAT_RECENCY_OBS,
+                                   flee_gated)
     from env_v2.repertoire import BEHAVIOR_NAMES
 
     d = {
@@ -222,19 +227,23 @@ def contract_dict(obs_names, mask_version: int) -> dict:
     }
     fr = flight_route_contract(mask_version)
     if fr is not None:
-        # 10-22 두뇌 길(마스크 판 4)만 키를 더한다 — 판 2·3 계약 dict 는 바이트까지 그대로라 옛 해시 셋이 바뀌지 않는다(설계 16-5)
+        # 10-22 두뇌 길(마스크 판 4·5)만 키를 더한다 — 판 2·3 계약 dict 는 바이트까지 그대로라 옛 해시 셋이 바뀌지 않는다(설계 16-5)
         d["flight_route"] = fr
+    if flee_gated(mask_version):
+        # 10-23 R7 반사 밖 두뇌 FLEE 막음(마스크 판 5·6 — 설계 17절)만 키를 더한다: 덮기(도주 반사·웅크림) 밖 결정 행에서 칸 1(FLEE)을 막는다.
+        # 판 2·3·4 계약 dict 는 바이트까지 그대로라 옛 해시 넷이 바뀌지 않는다
+        d[FLEE_GATE_KEY] = False
     return d
 
 
 def flight_route_contract(mask_version: int) -> dict | None:
-    """마스크 판 4(두뇌 길 '두 길', 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 16-5)의 계약 키 `flight_route`, 다른 판은 None. 값은 세계·마스크 상수에서
+    """마스크 판 4·5(두뇌 길 '두 길', 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 16-5·17절)의 계약 키 `flight_route`, 다른 판은 None. 값은 세계·마스크 상수에서
     읽는다(관측 shelter_reach·shelter_edge 값이 이 계수에 달려 있다). COVER 기하 계수는 넣지 않는다(칸 3 은 늘 막힌 자리)."""
-    from env_v2.rep_policy import MASK_VERSION_ROUTE, ROUTE_SLOT_RESERVED, ROUTE_SLOT_RUN, ROUTE_SLOT_SHELTER
+    from env_v2.rep_policy import ROUTE_MASK_VERSIONS, ROUTE_SLOT_RESERVED, ROUTE_SLOT_RUN, ROUTE_SLOT_SHELTER
     from env_v2.world import (ROUTE_LOCK_STEPS, ROUTE_OBS_NAMES, ROUTE_SHELTER_COS_MIN, ROUTE_SHELTER_EDGE_NORM_U, ROUTE_SHELTER_ENTER_U,
                               ROUTE_SHELTER_EXIT_U, ROUTE_SHELTER_MAX_EDGE_U, ROUTE_SHELTER_REACH_U)
 
-    if int(mask_version) != MASK_VERSION_ROUTE:
+    if int(mask_version) not in ROUTE_MASK_VERSIONS:        # 판 4·5 (10-23 판 5 = 판 4 + 반사 밖 FLEE 막음 — 길 줄은 같다)
         return None
     return {
         "slots": {"run": int(ROUTE_SLOT_RUN), "shelter": int(ROUTE_SLOT_SHELTER), "reserved_masked": [int(ROUTE_SLOT_RESERVED)]},
@@ -839,13 +848,13 @@ def brain_dict(model, model_path: Path, golden_config: Path, seed: int = BRAIN_G
     import base64
 
     from env_v2.config import load_v2_config
-    from env_v2.rep_policy import ALARM_MASK_OBS, HIDE_COVER_OBS, MASK_LOGIT, THREAT_RECENCY_OBS, check_mask_version
+    from env_v2.rep_policy import ALARM_MASK_OBS, HIDE_COVER_OBS, MASK_LOGIT, THREAT_RECENCY_OBS, check_model_mask_version
     from env_v2.repertoire import BEHAVIOR_NAMES
 
     pol = model.policy
     names = tuple(pol.rep_obs_names)
     mver = int(getattr(pol, "rep_mask_version", 1))
-    check_mask_version(mver, names)
+    check_model_mask_version(mver, names)
     w = extract(model)
     cfg = load_v2_config(Path(golden_config))
     g = brain_golden(model, w, cfg, seed, steps)
@@ -897,13 +906,19 @@ def write_brain_file(path: Path, d: dict) -> None:
     Path(path).write_text(json.dumps(d, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
 
 
-def brain_golden_config_for(obs_names) -> Path:
-    """모델 관측에 맞는 두뇌 골든 세계: 관측 맨 끝이 두뇌 길 세 칸이면 관측 24 거울(`BRAIN_GOLDEN_CONFIG_ROUTE`), R5 장애물 관측 세 칸이면 관측 21 거울
-    (`BRAIN_GOLDEN_CONFIG_OBS21`), 아니면 관측 18 거울."""
+def brain_golden_config_for(obs_names, mask_version: int | None = None) -> Path:
+    """모델 관측(과 마스크 판)에 맞는 두뇌 골든 세계: 관측 맨 끝이 두뇌 길 세 칸이면 관측 24 거울(`BRAIN_GOLDEN_CONFIG_ROUTE` — 판 5 면 반사 밖 FLEE 막음
+    거울 `BRAIN_GOLDEN_CONFIG_ROUTE5`), R5 장애물 관측 세 칸이면 관측 21 거울(`BRAIN_GOLDEN_CONFIG_OBS21`), 아니면 관측 18 거울.
+    판 6(R7 대조 '길 끔' — 파이썬 학습 대조 전용)은 두뇌 파일을 만들지 않는다(멈춘다)."""
+    from env_v2.rep_policy import MASK_VERSION_GATE, MASK_VERSION_ROUTE_GATE
     from env_v2.world import OBSTACLE_OBS_NAMES, ROUTE_OBS_NAMES
 
     names = tuple(obs_names)
+    if mask_version is not None and int(mask_version) == MASK_VERSION_GATE:
+        raise SystemExit("마스크 판 6(R7 대조 '길 끔', 파이썬 전용)은 두뇌 파일·골든을 만들지 않는다 — C++ 로더 계약이 아니다")
     if names[-len(ROUTE_OBS_NAMES):] == tuple(ROUTE_OBS_NAMES):
+        if mask_version is not None and int(mask_version) == MASK_VERSION_ROUTE_GATE:
+            return BRAIN_GOLDEN_CONFIG_ROUTE5
         return BRAIN_GOLDEN_CONFIG_ROUTE
     k = len(OBSTACLE_OBS_NAMES)
     return BRAIN_GOLDEN_CONFIG_OBS21 if names[-k:] == tuple(OBSTACLE_OBS_NAMES) else BRAIN_GOLDEN_CONFIG
@@ -920,7 +935,7 @@ def export_brain_file(model_path: Path, out_file: Path, golden_config: Path | No
     try:
         model = load_model(model_path)
         if golden_config is None:
-            golden_config = brain_golden_config_for(model.policy.rep_obs_names)
+            golden_config = brain_golden_config_for(model.policy.rep_obs_names, int(getattr(model.policy, "rep_mask_version", 1)))
         d = brain_dict(model, model_path, Path(golden_config), seed, steps, world_label)
     finally:
         th.set_num_threads(prev_threads)
@@ -935,7 +950,7 @@ def export(model_path: Path, config: Path, alarm_config: Path, out: Path, seeds=
            steps: int = GOLDEN_STEPS) -> dict:
     """두 헤더를 `out` 에 쓴다. 반환: 메타·통계 (main 이 찍는다)."""
     from env_v2.config import load_v2_config
-    from env_v2.rep_policy import check_mask_version, mask_version_of
+    from env_v2.rep_policy import check_model_mask_version, mask_version_of
     from env_v2.world import obs_names
 
     model_path, config, alarm_config, out = Path(model_path), Path(config), Path(alarm_config), Path(out)
@@ -948,7 +963,7 @@ def export(model_path: Path, config: Path, alarm_config: Path, out: Path, seeds=
         pol = model.policy
         names = tuple(pol.rep_obs_names)
         mver = int(getattr(pol, "rep_mask_version", 1))
-        check_mask_version(mver, names)
+        check_model_mask_version(mver, names)
         cfg = load_v2_config(config)
         alarm_names = tuple(obs_names(load_v2_config(alarm_config)))
         if mask_version_of(alarm_names) != 3:

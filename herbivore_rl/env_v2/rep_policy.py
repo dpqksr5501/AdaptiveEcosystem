@@ -23,6 +23,14 @@
       웅크림 덮기(은신처 안)  → HIDE 한 칸
       그 밖                   → 판 2 그대로(허용 ∧ 가능 ∧ 결정 — reads 는 덮기 스텝을 뺀 값이다: 판 2·3 학습의 '덮기 스텝도 결정으로 셈' 결함을 판 4 에서만 고친다)
     판 4 세계는 얼기·잠이 허용 목록에 없어야 한다(칸 3·4 의 뜻이 부딪친다 — `check_route_allowed`). alarm_heard 와 in_panic 이 함께 있으면 멈춘다.
+    마스크 판 5·6 (10-23 R7 '반사 밖 두뇌 FLEE 막음' — 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 17절, 세계 키 wild_flight.brain_flee_outside_reflex false):
+    반사(도주 반사 거리)가 '언제' 도망칠지, 두뇌가 '어디로'를 정한다 — 덮기 밖 결정 줄(reads ∧ override 가 WF_NONE)에서 칸 1(FLEE)을 막는다.
+      판 5 = 판 4 + 막기 (관측 24, 두뇌 길 켬). 도주·웅크림 줄은 판 4 그대로다(도주 길 결정 {1, 4}·비결정 지금 길 한 칸·웅크림 HIDE 한 칸).
+      판 6 = R7 대조 '길 끔' (관측에 in_panic 이 없는 세계 — 판 2 + 막기). 도주 줄 = FLEE 한 칸(판 5 에서 SHELTER 가 늘 가능하지 않은 것과 같다), 웅크림 줄 =
+             HIDE 한 칸, reads 는 덮기 스텝을 뺀다(판 4·5 와 같은 결정 셈). 파이썬 학습 대조 전용이다(C++ 로더에 넣지 않는다).
+    판은 관측 이름과 세계 키로 정한다(`mask_version_of(이름, brain_flee_outside_reflex)`, 세계는 `world_mask_version`). 미리 보기(`World.rep_peek`)가
+    brain_flee_outside_reflex = False 를 알리면 `action_mask` 가 판 5·6 으로 셈한다. GRAZE 는 늘 허용 ∧ 가능이라 막아도 빈 줄이 없다.
+    경보 세계(판 3)와는 섞지 않는다.
   - 결정 (`World.rep_peek`): 다음 스텝의 `arbitrate` 가 요청을 읽는 개체만 고를 수 있다. 읽지 않는 개체는 지금 행동 한 칸만
     1 이다(log π = 0 이라 actor 기울기가 없고 critic 만 배운다). 기상 결정에서는 SLEEP 을 막는다(기상 결정의 SLEEP 요청은
     wake_target 으로 바뀌어 다른 칸과 같은 뜻이 된다)
@@ -85,6 +93,13 @@ MASK_VERSION_ALARM = 3
 MASK_VERSION_ROUTE = 4
 ROUTE_PANIC_COL, ROUTE_REACH_COL = "in_panic", "shelter_reach"
 ROUTE_SLOT_RUN, ROUTE_SLOT_SHELTER, ROUTE_SLOT_RESERVED = FLEE, SLEEP, FREEZE
+# 10-23 R7 반사 밖 두뇌 FLEE 막음 (모듈 docstring '마스크 판 5·6'): 판 5 = 판 4 + 막기, 판 6 = 길 끔 대조(판 2 + 막기 + 덮기 줄 한 칸 — 파이썬 전용).
+# 세계 키·미리 보기 키 이름은 FLEE_GATE_KEY 다(계약 dict 에도 판 5·6 일 때만 같은 이름의 키가 붙는다 — export_weights_v3.contract_dict)
+MASK_VERSION_ROUTE_GATE = 5
+MASK_VERSION_GATE = 6
+FLEE_GATE_KEY = "brain_flee_outside_reflex"
+ROUTE_MASK_VERSIONS = (MASK_VERSION_ROUTE, MASK_VERSION_ROUTE_GATE)       # 도주 중 칸 1·4 가 길인 판 (얼기·잠이 막혀야 한다)
+GATE_MASK_VERSIONS = (MASK_VERSION_ROUTE_GATE, MASK_VERSION_GATE)         # 반사 밖 FLEE 를 막는 판
 # 판 3 의 경보 문턱(사람 확인 H5 10-12). 관측 계약 값이다(C++ 마스크도 같은 값). yaml 의 alarm.event_alarm 과 같은 값으로 둔다
 ALARM_MASK_OBS = 0.4
 # 막힌 칸의 로짓. softmax 의 exp(−1e9 − ·) 는 float32 에서 정확히 0 이고, 유한한 값이라 0·log 0 이 nan 이 되지 않는다
@@ -173,42 +188,70 @@ def effective_allowed(model_allowed, cfg) -> tuple[str, ...]:
     return names
 
 
-def mask_version_of(obs_names) -> int:
-    """세계(관측 이름)의 마스크 판: 관측에 in_panic 이 있으면 4(MASK_VERSION_ROUTE — 10-22 두뇌 길), alarm_heard 가 있으면 3(MASK_VERSION_ALARM),
-    없으면 2(MASK_VERSION). in_panic 과 alarm_heard 가 함께 있으면 멈춘다(판 3 과 4 를 섞지 않는다)."""
+def mask_version_of(obs_names, brain_flee_outside_reflex: bool = True) -> int:
+    """세계(관측 이름·세계 키)의 마스크 판: 관측에 in_panic 이 있으면 4(MASK_VERSION_ROUTE — 10-22 두뇌 길), alarm_heard 가 있으면 3(MASK_VERSION_ALARM),
+    없으면 2(MASK_VERSION). in_panic 과 alarm_heard 가 함께 있으면 멈춘다(판 3 과 4 를 섞지 않는다).
+    brain_flee_outside_reflex 가 False(10-23 R7 세계 키 wild_flight.brain_flee_outside_reflex false — 반사 밖 두뇌 FLEE 막음)면 판 4 → 5, 판 2 → 6 이고
+    판 3(경보)이면 멈춘다. 기본 True 는 위 그대로다(옛 호출이 같은 값)."""
+    if not isinstance(brain_flee_outside_reflex, (bool, np.bool_)):
+        raise ValueError(f"brain_flee_outside_reflex 는 bool 이다. 받은 값: {brain_flee_outside_reflex!r}")
     names = tuple(obs_names)
     if ROUTE_PANIC_COL in names:
         if REP_ALARM_COL in names:
             raise ValueError("관측에 in_panic(마스크 판 4)과 alarm_heard(판 3)가 함께 있다 — 두 판을 섞지 않는다")
-        return MASK_VERSION_ROUTE
-    return MASK_VERSION_ALARM if REP_ALARM_COL in names else MASK_VERSION
+        base = MASK_VERSION_ROUTE
+    else:
+        base = MASK_VERSION_ALARM if REP_ALARM_COL in names else MASK_VERSION
+    if brain_flee_outside_reflex:
+        return base
+    if base == MASK_VERSION_ALARM:
+        raise ValueError("반사 밖 두뇌 FLEE 막음(마스크 판 5·6)은 경보 세계(관측 alarm_heard, 판 3)와 섞지 않는다")
+    return MASK_VERSION_ROUTE_GATE if base == MASK_VERSION_ROUTE else MASK_VERSION_GATE
+
+
+def world_mask_version(world) -> int:
+    """세계(World — 관측 이름과 공개 칸 brain_flee_outside_reflex)의 마스크 판. 그 칸이 없는 객체는 키를 끈 세계로 본다."""
+    return mask_version_of(world.obs_names, bool(getattr(world, FLEE_GATE_KEY, True)))
+
+
+def flee_gated(mask_version) -> bool:
+    """반사 밖 두뇌 FLEE 를 막는 판(5·6)인가."""
+    return int(mask_version) in GATE_MASK_VERSIONS
 
 
 def check_route_allowed(allowed, mask_version: int) -> None:
-    """마스크 판 4(두뇌 길)는 칸 3·4 를 도주 중 길 칸으로 다시 쓰므로 허용 목록(행동 이름)에 얼기·잠이 있으면 멈춘다(설계 4-1·16-2 '로더 검사'). 다른 판은 그대로.
-    allowed 는 실제 허용 목록(모델 목록 ∧ 세계 목록 — `effective_allowed`, 학습은 설정 목록 = 모델 목록)이다. 계약 키
+    """마스크 판 4·5(두뇌 길)는 칸 3·4 를 도주 중 길 칸으로 다시 쓰므로 허용 목록(행동 이름)에 얼기·잠이 있으면 멈춘다(설계 4-1·16-2 '로더 검사'). 다른 판은
+    그대로. allowed 는 실제 허용 목록(모델 목록 ∧ 세계 목록 — `effective_allowed`, 학습은 설정 목록 = 모델 목록)이다. 계약 키
     flight_route.freeze_sleep_must_be_blocked = "effective_allowed" 와 같은 뜻 — 세계 칸만 보지 않는다(언리얼 통합 세계는 잠을 허용하고 모델 목록이 막는다)."""
-    if int(mask_version) != MASK_VERSION_ROUTE:
+    if int(mask_version) not in ROUTE_MASK_VERSIONS:
         return
     bad = [b for b in ("freeze", "sleep") if b in tuple(allowed)]
     if bad:
-        raise ValueError(f"마스크 판 4(두뇌 길) 세계는 허용 목록에 얼기·잠이 없어야 한다(칸 3·4 = 도주 중 길 칸). 받은 목록에 {bad}")
+        raise ValueError(f"마스크 판 {int(mask_version)}(두뇌 길) 세계는 허용 목록에 얼기·잠이 없어야 한다(칸 3·4 = 도주 중 길 칸). 받은 목록에 {bad}")
 
 
-def check_mask_version(model_version, obs_names) -> None:
-    """모델이 저장한 마스크 판이 세계(관측 이름)의 판과 다르면 멈춘다 — 다른 마스크로 조용히 판정하지 않게. 판 2 모델(R1)을
-    경보 세계(판 3)에 넣거나 그 반대일 때 여기서 멈춘다."""
-    want = mask_version_of(obs_names)
+def check_mask_version(model_version, obs_names, brain_flee_outside_reflex: bool = True) -> None:
+    """모델이 저장한 마스크 판이 세계(관측 이름·세계 키 brain_flee_outside_reflex — `world_mask_version`)의 판과 다르면 멈춘다 — 다른 마스크로 조용히
+    판정하지 않게. 판 2 모델(R1)을 경보 세계(판 3)에 넣거나 그 반대, 판 4 모델을 반사 밖 FLEE 막음 세계(판 5)에 넣거나 그 반대일 때 여기서 멈춘다."""
+    want = mask_version_of(obs_names, brain_flee_outside_reflex)
     got = int(model_version)
     if got != want:
         why = (" 경보 세계(관측 alarm_heard, 판 3)는 경보를 '위협을 안다'에 넣는다 — R1 모델(판 2)은 이 세계를 판정할 수 없다"
                if want == MASK_VERSION_ALARM else
                (" 두뇌 길 세계(관측 in_panic, 판 4)는 도주 중 칸 1·4 가 길이다 — 판 2·3 모델은 이 세계를 판정할 수 없다(route_extend 로 만든다)"
-                if want == MASK_VERSION_ROUTE else
-                (" 판 3 모델(경보 세계에서 학습)은 경보가 없는 세계를 판정할 수 없다" if got == MASK_VERSION_ALARM else
-                 (" 판 4 모델(두뇌 길)은 길을 끈 세계를 판정할 수 없다" if got == MASK_VERSION_ROUTE else ""))))
+                if want == MASK_VERSION_ROUTE and got != MASK_VERSION_ROUTE_GATE else
+                (" 반사 밖 FLEE 막음 세계(판 5·6, wild_flight.brain_flee_outside_reflex false)는 덮기 밖 결정에서 칸 1 을 막는다 — 판 2·4 모델은 이 세계를 "
+                 "판정할 수 없다(시작 두뇌는 results/v3/r7/r7_start.py 가 판만 붙여 만든다)" if flee_gated(want) else
+                 (" 판 5·6 모델(반사 밖 FLEE 막음)은 막지 않는 세계를 판정할 수 없다" if flee_gated(got) else
+                  (" 판 3 모델(경보 세계에서 학습)은 경보가 없는 세계를 판정할 수 없다" if got == MASK_VERSION_ALARM else
+                   (" 판 4 모델(두뇌 길)은 길을 끈 세계를 판정할 수 없다" if got == MASK_VERSION_ROUTE else ""))))))
         raise ValueError(f"모델의 마스크 판 {got} 이 이 세계의 마스크 판 {want} 과 다르다(env_v2/rep_policy.py "
                          f"mask_version_of) — 다른 마스크로 판정하지 않는다.{why}")
+
+
+def check_model_mask_version(model_version, obs_names) -> None:
+    """세계 없이 모델 스스로의 판이 관측 이름과 맞는지(내보내기·시작 두뇌): 판 5·6 은 반사 밖 FLEE 막음 판으로 본다(판 5 = 관측 24, 판 6 = in_panic 없음)."""
+    check_mask_version(model_version, obs_names, not flee_gated(model_version))
 
 
 def feasible_mask(obs, obs_names) -> np.ndarray:
@@ -236,6 +279,8 @@ def action_mask(src, obs, params, obs_names=None) -> np.ndarray:
     준다). `obs` 는 지금 세계 관측(가능 조건용 — 결정 때 관측). `params` 는 `rep_params` 반환(또는 allowed_mask 가 있는 dict).
     결정 시점이 아닌 개체는 지금 행동 한 칸, 기상 결정은 SLEEP 을 막는다. 빈 행이 있으면 멈춘다(설계상 없다).
     마스크 판 4(관측 in_panic — 모듈 docstring '마스크 판 4')는 미리 보기의 override·route_decide·route_now 로 도주·웅크림 행을 덮는다.
+    마스크 판 5·6(미리 보기에 brain_flee_outside_reflex = False — 모듈 docstring '마스크 판 5·6')은 덮기 밖 결정 행의 칸 1(FLEE)을 막는다(판 6 은 도주 행 =
+    FLEE 한 칸, 웅크림 행 = HIDE 한 칸).
     """
     if isinstance(src, dict):
         if obs_names is None:
@@ -251,8 +296,13 @@ def action_mask(src, obs, params, obs_names=None) -> np.ndarray:
     one = np.zeros_like(m)
     one[np.arange(len(beh)), beh] = True
     m = np.where(reads[:, None], m, one)
-    if mask_version_of(obs_names) == MASK_VERSION_ROUTE:
+    ver = mask_version_of(obs_names, pk.get(FLEE_GATE_KEY, True))
+    if ver in ROUTE_MASK_VERSIONS:
         m = _route_rows(m, pk, obs, obs_names, params)
+    elif ver == MASK_VERSION_GATE:
+        m = _gate_over_rows(m, pk)
+    if flee_gated(ver):
+        m = _gate_free_rows(m, pk)
     if not m.any(1).all():
         raise ValueError(f"빈 마스크 행이 있다(개체 {np.flatnonzero(~m.any(1))[:5].tolist()}). GRAZE 가 허용·가능이어야 한다")
     return m
@@ -279,6 +329,38 @@ def _route_rows(m: np.ndarray, pk: dict, obs, obs_names, params) -> np.ndarray:
     rows[:, ROUTE_SLOT_SHELTER] = (rd & sok) | (pan & ~rd & now_sh)
     rows[:, HIDE] = crouch
     return np.where((pan | crouch)[:, None], rows, m)
+
+
+def _gate_over_rows(m: np.ndarray, pk: dict) -> np.ndarray:
+    """마스크 판 6(R7 대조 '길 끔')의 덮기 행: 도주 = FLEE 한 칸(판 5 에서 SHELTER 가 늘 가능하지 않은 것과 같다), 웅크림 = HIDE 한 칸. 실행기가 덮기 중
+    요청을 FLEE·HIDE 로 바꾸므로 궤적은 그대로이고, 한 칸이라 기울기가 없다."""
+    from .world import WF_PANIC, WF_SHELTER
+
+    if "override" not in pk:
+        raise ValueError("마스크 판 6 은 rep_peek 의 override 가 필요하다(wild_flight.brain_flee_outside_reflex false 세계)")
+    ov = np.asarray(pk["override"])
+    pan, crouch = ov == WF_PANIC, ov == WF_SHELTER
+    if not (pan.any() or crouch.any()):
+        return m
+    rows = np.zeros_like(m)
+    rows[:, FLEE] = pan
+    rows[:, HIDE] = crouch
+    return np.where((pan | crouch)[:, None], rows, m)
+
+
+def _gate_free_rows(m: np.ndarray, pk: dict) -> np.ndarray:
+    """마스크 판 5·6: 덮기 밖 결정 행(reads ∧ override = WF_NONE)의 칸 1(FLEE)을 막는다 — 도주는 반사만 시작한다. 결정이 아닌 행(지금 행동 한 칸 — 반사가
+    끝난 뒤 잠금 중인 FLEE 포함)과 덮기 행(도주 길 결정·웅크림)은 그대로다. GRAZE 는 늘 허용 ∧ 가능이라 빈 행이 생기지 않는다."""
+    from .world import WF_NONE
+
+    if "override" not in pk:
+        raise ValueError("마스크 판 5·6 은 rep_peek 의 override 가 필요하다(wild_flight.brain_flee_outside_reflex false 세계)")
+    free = np.asarray(pk["reads"], dtype=bool) & (np.asarray(pk["override"]) == WF_NONE)
+    if not free.any():
+        return m
+    m = m.copy()
+    m[free, FLEE] = False
+    return m
 
 
 def sample_masked(probs, mask, u) -> np.ndarray:
@@ -392,7 +474,7 @@ class RepertoirePolicy(ActorCriticPolicy):
 
     policy_kwargs 로 `rep_allowed`(허용 행동 이름 — 판정 롤아웃의 `rep_learned` 가 마스크를 다시 만들 때 쓴다), `rep_epsilon`,
     `rep_ent_scale`(= cat_ent_coef / ent_coef), `rep_init_logits`(시작 로짓 편향 5), `rep_obs_names`(학습 세계 관측 이름 —
-    판정 세계와 맞는지 본다), `rep_mask_version`(학습 세계의 마스크 판 — `mask_version_of(rep_obs_names)`)을 받는다. 구조(net_arch·activation_fn)는 train.PPO_KWARGS 그대로다. 마스크는 관측 뒤 5칸에서
+    판정 세계와 맞는지 본다), `rep_mask_version`(학습 세계의 마스크 판 — `world_mask_version`, 반사 밖 FLEE 막음을 끈 세계는 `mask_version_of(rep_obs_names)`)을 받는다. 구조(net_arch·activation_fn)는 train.PPO_KWARGS 그대로다. 마스크는 관측 뒤 5칸에서
     만들므로 관측을 받는 공개 메서드마다 먼저 계산해 둔다(env_v2/cm.py 와 같은 방식).
     """
 

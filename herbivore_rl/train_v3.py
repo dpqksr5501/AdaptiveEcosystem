@@ -76,6 +76,17 @@ v3 R4 (사전 등록 results/v3/r4/PREREG.md — 언리얼과 같은 날씨 + �
   만든 모델에 strict 로 싣는다(구조·ε·엔트로피·허용 목록은 이 설정 값 — R1b 의 FREEZE 로짓은 남지만 마스크가 늘 막는다). 관측 이름·마스크
   판이 다르면 멈춘다. 출처 글은 비울 수 없고, 곁 파일 `<out>.init.json`(학습 전에 쓴다)과 학습 메타 `init_from_model` 에 경로·sha1·출처·
   원래 목록을 남긴다. --warmstart 와 함께 쓰지 않는다.
+
+v3 R7 (10-23 사람 결정 '짧게 진단 후 R7' — 반사 밖 두뇌 FLEE 막음, 마스크 판 5·6, 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 17절,
+설정 생성기 results/v3/r7/make_r7_configs.py, 시작 두뇌 results/v3/r7/r7_start.py):
+
+    python train_v3.py measure-fdec --config configs/v3_r7_train.yaml --seeds 32000 32001 32002
+    python train_v3.py --config configs/v3_r7_train.yaml --ppo-config configs/ppo_r6_lam098.yaml --seed 0 --steps 20000000 \
+        --init-from-model ckpt/v3/v3_r1_g995_s3_obs24route0m5.zip --init-source "<출처>" --run-name v3_r7_g995_s0_20m
+
+- 모델의 마스크 판은 관측 이름과 세계 키 wild_flight.brain_flee_outside_reflex 로 정한다(`rep_policy.world_mask_version` — 판 5 = 두뇌 길 + 막기,
+  판 6 = 대조 '길 끔' + 막기). 막는 세계는 학습 기록·measure-fdec 에 덮기 밖 결정 수 gate_free 와 그 가운데 두뇌가 낸 FLEE 수 gate_flee(마스크 안
+  표본이라 늘 0)를 더 적는다.
 """
 
 from __future__ import annotations
@@ -96,8 +107,8 @@ import torch
 from stable_baselines3.common.callbacks import BaseCallback
 
 from env_v2.config import load_v2_config
-from env_v2.rep_policy import (MASK_VERSION_ALARM, ROUTE_PANIC_COL, ROUTE_SLOT_SHELTER, RepertoirePolicy, action_mask, mask_version_of,
-                               policy_obs, rep_distribution, rep_params, sample_masked)
+from env_v2.rep_policy import (MASK_VERSION_ALARM, ROUTE_MASK_VERSIONS, ROUTE_PANIC_COL, ROUTE_SLOT_SHELTER, RepertoirePolicy, action_mask,
+                               flee_gated, mask_version_of, policy_obs, rep_distribution, rep_params, sample_masked, world_mask_version)
 from env_v2.repertoire import BEHAVIOR_NAMES, FLEE, FREEZE, HIDE, N_BEHAVIORS, SLEEP
 from env_v2.vec_env import MultiWorldVecEnv
 from train import PPO_KWARGS, load_tuned
@@ -138,7 +149,8 @@ def make_model_rep(venv: MultiWorldVecEnv, rep: dict, tensorboard_log: str | Non
     kw["policy_kwargs"] = dict(PPO_KWARGS["policy_kwargs"], rep_allowed=list(rep["allowed"]), rep_epsilon=rep["epsilon"],
                                rep_ent_scale=rep["cat_ent_coef"] / ent, rep_init_logits=rep["init_logits"],
                                rep_obs_names=list(venv.obs_names),
-                               rep_mask_version=mask_version_of(venv.obs_names))   # 경보 세계(v3 R2 M8)는 판 3
+                               # 경보 세계(v3 R2 M8)는 판 3, 두뇌 길은 판 4, 10-23 반사 밖 FLEE 막음은 판 5·6(세계 키 — world_mask_version)
+                               rep_mask_version=world_mask_version(venv.worlds[0]))
     return PPO(RepertoirePolicy, venv, tensorboard_log=tensorboard_log, device="cpu", **kw)
 
 
@@ -290,6 +302,9 @@ class RepLogCallback(BaseCallback):
                 two = rt & (pobs[:, venv.obs_dim + ROUTE_SLOT_SHELTER] > 0.5)
                 row.update(n_route_dec=int(rt.sum()), n_route_choice=int(two.sum()),
                            pi_shelter_route=float(pi[two, ROUTE_SLOT_SHELTER].mean()) if two.any() else None)
+        if "gate_flee" in d:
+            # 10-23 반사 밖 두뇌 FLEE 막음(마스크 판 5·6): 구간의 덮기 밖 결정 수와 그 가운데 두뇌가 낸 FLEE 수(마스크 안 표본이라 늘 0)
+            row.update(gate_free=int(d["gate_free"]), gate_flee=int(d["gate_flee"]))
         return row
 
     def _log(self) -> None:
@@ -305,7 +320,8 @@ class RepLogCallback(BaseCallback):
         print(f"  [{row['timesteps']:,}] 사용 {use} · 결정 {row['decide_frac']:.3f} · 결정 엔트로피 "
               f"{row.get('ent_dec', float('nan')):.3f} · 아사 {row['starve_rate']:.2e} · 피식 {row['pred_rate']:.2e}"
               + (f" · 길 결정 {row['n_route_dec']} (두 칸 {row['n_route_choice']}, π SHELTER "
-                 + (f"{row['pi_shelter_route']:.3f}" if row["pi_shelter_route"] is not None else "—") + ")" if "n_route_dec" in row else ""),
+                 + (f"{row['pi_shelter_route']:.3f}" if row["pi_shelter_route"] is not None else "—") + ")" if "n_route_dec" in row else "")
+              + (f" · 반사 밖 두뇌 FLEE {row['gate_flee']} / 덮기 밖 결정 {row['gate_free']:,}" if "gate_flee" in row else ""),
               flush=True)
 
 
@@ -342,7 +358,8 @@ def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int
     cfgs = [(None, cfg)] if rm is None else list(region_configs(cfg, rm).items())
     per = []
     reads_n = multi_n = total = 0
-    route_n = route_two = 0             # 10-22 두뇌 길(마스크 판 4)만: 도주 길 결정, 그 가운데 SHELTER 가 열린 결정
+    route_n = route_two = 0             # 10-22 두뇌 길(마스크 판 4·5)만: 도주 길 결정, 그 가운데 SHELTER 가 열린 결정
+    gate_free = gate_flee = 0           # 10-23 반사 밖 FLEE 막음(판 5·6)만: 덮기 밖 결정, 그 가운데 두뇌가 낸 FLEE(마스크 안 표본이라 늘 0)
     for s in seeds:
         for region, c in cfgs:
             w = World(c, seeds=[int(s)])
@@ -362,6 +379,11 @@ def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int
                 w.step(a.astype(np.float64)[:, None])
             n = steps * w.N
             row = dict(seed=int(s), f_dec=r_s / n, decide_frac_world=w.repertoire_stats()["decide_frac"])
+            if w._fb:
+                g = w.flee_gate_stats()
+                row.update(gate_free=g["free_decisions"], gate_flee=g["brain_flee"])
+                gate_free += g["free_decisions"]
+                gate_flee += g["brain_flee"]
             if region is not None:
                 row["region"] = region
             per.append(row)
@@ -369,8 +391,12 @@ def measure_fdec(cfg, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, model_seed: int
             total += n
     out = dict(f_dec=reads_n / total, per_seed=per, multi_frac=multi_n / max(reads_n, 1), seeds=[int(s) for s in seeds],
                steps=int(steps), model_seed=int(model_seed), allowed=list(rep["allowed"]))
-    if mask_version_of(venv.obs_names) == 4:
+    mver = world_mask_version(venv.worlds[0])
+    out["mask_version"] = int(mver)
+    if mver in ROUTE_MASK_VERSIONS:
         out.update(route_decisions=route_n, route_choice=route_two, route_dec_frac=route_n / total)
+    if flee_gated(mver):
+        out.update(gate_free=gate_free, gate_flee=gate_flee)
     return out
 
 
@@ -404,7 +430,7 @@ def measure_pi(cfg, model_path, seeds=FDEC_SEEDS, steps: int = FDEC_STEPS, udef:
     per, P, O, M = [], [], [], []
     for s in seeds:
         w = World(cfg, seeds=[int(s)])
-        check_mask_version(getattr(pol, "rep_mask_version", 1), w.obs_names)
+        check_mask_version(getattr(pol, "rep_mask_version", 1), w.obs_names, w.brain_flee_outside_reflex)
         if tuple(w.obs_names) != tuple(pol.rep_obs_names):
             raise ValueError(f"모델의 관측 {list(pol.rep_obs_names)} 이 세계의 관측 {list(w.obs_names)} 과 다르다")
         if udef == "auto":

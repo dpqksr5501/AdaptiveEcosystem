@@ -36,9 +36,9 @@ v1 에 없는 것:
   stare_down(v3 R2 M7)·alarm(v3 R2 M8)을 켠 세계의 행에는 `World.stare_stats()` 열(STARE_COLUMNS)·`World.alarm_stats()`
   열(ALARM_COLUMNS)이 붙는다. realism_*(v3 현실성 1단계) 중 하나라도 켠 세계의 행에는 `World.realism_stats()` 열(REALISM_COLUMNS,
   켜지 않은 규칙의 열은 nan)이, v3 R3 규칙 중 하나라도 켠 세계의 행에는 `World.r3_stats()` 열(R3_COLUMNS)이 붙는다.
-  rep_learned 는 모델의 마스크 판이 세계의 판(관측 이름, `rep_policy.mask_version_of`)과 다르면 연결 때 멈춘다(R1 모델(판 2)은 경보
-  세계(판 3)에서 거부된다). 허용 행동은 모델의 목록 ∩ 세계 설정의 목록(train.repertoire.allowed)이다 — v3 R3 세계(얼기를 뺀 목록)에서
-  R1b(얼기가 든 목록)를 돌리면 FREEZE 가 마스크로 막힌다(`rep_policy.effective_allowed`). 지금까지의 세계는 두 목록이 같아 그대로다.
+  rep_learned 는 모델의 마스크 판이 세계의 판(관측 이름과 세계 키 brain_flee_outside_reflex, `rep_policy.world_mask_version`)과 다르면 연결 때
+  멈춘다(R1 모델(판 2)은 경보 세계(판 3)에서, 판 4 모델은 반사 밖 FLEE 막음 세계(판 5)에서 거부된다). 허용 행동은 모델의 목록 ∩ 세계 설정의
+  목록(train.repertoire.allowed)이다 — v3 R3 세계(얼기를 뺀 목록)에서 R1b(얼기가 든 목록)를 돌리면 FREEZE 가 마스크로 막힌다(`rep_policy.effective_allowed`). 지금까지의 세계는 두 목록이 같아 그대로다.
   범주형 보행 CM 모델 (`env_v2/cm.py`)은 `_base_policy` 가 알아보고 CM 평가 정책(결정·유지 표본·확률)으로 돌린다.
 
 정책 스펙 예:
@@ -734,19 +734,20 @@ class RepLearned:
         pol = self.model.policy
         if getattr(world, "_rp", None) is None:
             raise ValueError("rep_learned 는 repertoire 세계(v3)에서만 쓴다")
-        from .rep_policy import check_mask_version
+        from .rep_policy import FLEE_GATE_KEY, check_mask_version
 
-        # 마스크 판을 먼저 본다(판 2 모델(R1)을 경보 세계(판 3, 관측 19)에 넣으면 관측 이름보다 이 이유가 먼저다)
-        check_mask_version(getattr(pol, "rep_mask_version", 1), world.obs_names)
+        # 마스크 판을 먼저 본다(판 2 모델(R1)을 경보 세계(판 3, 관측 19)에 넣으면 관측 이름보다 이 이유가 먼저다). 10-23 반사 밖 FLEE 막음 세계(판 5·6)는
+        # 세계 키도 본다 — 판 4 모델을 판 5 세계에 넣거나 그 반대면 멈춘다
+        check_mask_version(getattr(pol, "rep_mask_version", 1), world.obs_names, bool(getattr(world, FLEE_GATE_KEY, True)))
         if tuple(world.obs_names) != tuple(pol.rep_obs_names):
             raise ValueError(f"모델의 관측 {list(pol.rep_obs_names)} 이 세계의 관측 {list(world.obs_names)} 과 다르다")
         from .rep_policy import allowed_mask_of, effective_allowed
 
         # 허용 = 모델 목록 ∩ 세계 목록(v3 R3: 얼기를 뺀 세계에서는 R1b 의 FREEZE 가 막힌다. 두 목록이 같으면 모델 목록 그대로)
         self.allowed = effective_allowed(pol.rep_allowed, world.cfg)
-        from .rep_policy import check_route_allowed, mask_version_of
+        from .rep_policy import check_route_allowed, world_mask_version
 
-        check_route_allowed(self.allowed, mask_version_of(world.obs_names))     # 10-22 판 4(두뇌 길) 세계는 얼기·잠이 막혀야 한다
+        check_route_allowed(self.allowed, world_mask_version(world))     # 10-22 판 4·5(두뇌 길) 세계는 얼기·잠이 막혀야 한다
         self.params = {"allowed_mask": allowed_mask_of(self.allowed)}
         self.world = world
 

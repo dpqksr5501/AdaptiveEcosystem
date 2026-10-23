@@ -1,0 +1,94 @@
+{
+ "f_dec": 0.7089076967592592,
+ "per_seed": [
+  {
+   "seed": 32000,
+   "f_dec": 0.6352005208333333,
+   "decide_frac_world": 0.6352005208333333,
+   "gate_free": 243917,
+   "gate_flee": 0,
+   "region": "Barren"
+  },
+  {
+   "seed": 32000,
+   "f_dec": 0.7496223958333333,
+   "decide_frac_world": 0.7496223958333333,
+   "gate_free": 287855,
+   "gate_flee": 0,
+   "region": "Forest"
+  },
+  {
+   "seed": 32000,
+   "f_dec": 0.7735338541666666,
+   "decide_frac_world": 0.7735338541666666,
+   "gate_free": 297037,
+   "gate_flee": 0,
+   "region": "Highland"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.653015625,
+   "decide_frac_world": 0.653015625,
+   "gate_free": 250758,
+   "gate_flee": 0,
+   "region": "Barren"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.7425130208333334,
+   "decide_frac_world": 0.7425130208333334,
+   "gate_free": 285125,
+   "gate_flee": 0,
+   "region": "Forest"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.7274713541666666,
+   "decide_frac_world": 0.7274713541666666,
+   "gate_free": 279349,
+   "gate_flee": 0,
+   "region": "Highland"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.660171875,
+   "decide_frac_world": 0.660171875,
+   "gate_free": 253506,
+   "gate_flee": 0,
+   "region": "Barren"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.7164036458333334,
+   "decide_frac_world": 0.7164036458333334,
+   "gate_free": 275099,
+   "gate_flee": 0,
+   "region": "Forest"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.7222369791666666,
+   "decide_frac_world": 0.7222369791666666,
+   "gate_free": 277339,
+   "gate_flee": 0,
+   "region": "Highland"
+  }
+ ],
+ "multi_frac": 0.026914858662399975,
+ "seeds": [
+  32000,
+  32001,
+  32002
+ ],
+ "steps": 3000,
+ "model_seed": 0,
+ "allowed": [
+  "graze",
+  "flee",
+  "hide"
+ ],
+ "mask_version": 6,
+ "gate_free": 2449985,
+ "gate_flee": 0
+}
+f_dec = 0.708908 (보정 시드 [32000, 32001, 32002] × 3000스텝, 목록 ['graze', 'flee', 'hide'], 100초) → yaml train.repertoire.f_dec 에 적는다

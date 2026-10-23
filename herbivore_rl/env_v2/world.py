@@ -361,6 +361,14 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
         shelter_edge = 가능하면 clip(e*/20, 0, 1) (e* = k* 가장자리까지 거리) — 가능하지 않거나 도주가 아니면 0. `_wf_update` 뒤에 산 사슴 모두에 쓰고(다시 난
         사슴은 그 값), 죽은 사슴의 terminal_obs 는 0 이다. 마스크 판 4(env_v2/rep_policy.py): 도주 결정 = {1, 4 (관측 shelter_reach > 0 일 때)}, 도주 비결정 =
         지금 길 한 칸, 웅크림 = HIDE 한 칸, 그 밖 판 2 — `rep_peek` 의 reads 는 덮기 스텝을 결정에서 뺀다(C++ DecideHerb 와 같다).
+      반사 밖 두뇌 FLEE 막음 (10-23 R7 — 사람 결정 '짧게 진단 후 R7', 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 17절, 선택 키 brain_flee_outside_reflex, 기본 true =
+        위 그대로·그 코드 경로를 타지 않는다 — 비트 동일). false 면 반사(도주 반사 거리)가 '언제' 도망칠지, 두뇌가 '어디로'(RUN·SHELTER)를 정한다는 원칙대로
+        덮기(도주 WF_PANIC·웅크림 WF_SHELTER) 밖의 결정에서 두뇌가 FLEE(칸 1)를 고르지 못한다(R6 판정 뒤 진단 results/v3/r6/diag — 늑대가 쫓지 않는데 두뇌가
+        스스로 고른 짧은 도망이 GF·GR 을 걸었다). 막기는 마스크가 한다(env_v2/rep_policy.py 판 5 = 판 4 + 막기, 판 6 = 길 끔 대조 — 판 2 + 막기 + 덮기 줄
+        한 칸). 세계는 동역학·난수·관측·보상을 바꾸지 않고: `rep_peek` 이 덮기 칸(override)과 brain_flee_outside_reflex = False 를 알리고, reads·결정 셈
+        (`_rep_accumulate`)은 판 4 처럼 덮기 스텝을 뺀다(길 끔 세계는 길 결정이 없다). 통계 `flee_gate_stats`(덮기 밖 결정, 그 가운데 두뇌가 낸 FLEE —
+        마스크를 지키면 0). 같은 행동을 넣으면 궤적(위치·관측·보상·난수·도망 기록)은 키를 끈 세계와 비트 단위로 같다 — 결정 셈만 길 끔 판 6 이 판 2 와 다르다
+        (덮기 스텝을 뺀다).
 - 야생 2단계(10-16 사용자 승인 '추천대로' — 늑대가 거의 못 잡는 세계를 사실감과 사냥 성공을 함께 올려 고친다. 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md,
   설정 configs/v3_wild2_mirror.yaml = v3_wild1_mirror.yaml + 아래 규칙). 순서: 1 은신처 먹이 부족 → 2 늑대 무리·협동 사냥 → 3 장애물.
   1 은신처 먹이 부족: 새 규칙이 아니라 위 v3 현실성 (e) realism_cover_food 를 거울 세계에 켠다(cap_frac·regen_frac 0.15). 언리얼 FFoodGrid 가 같은 식이다
@@ -1583,6 +1591,18 @@ def _wild_flight_params(p: dict, f: Features) -> dict:
         if f.enabled("alarm"):
             raise ValueError("features.wild_flight.route(마스크 판 4)는 alarm(관측 alarm_heard, 마스크 판 3)과 함께 켜지 못한다")
     out["route"] = rt
+    # 10-23 R7 반사 밖 두뇌 FLEE 막음 (선택 키 brain_flee_outside_reflex — true 면 그 코드 경로를 타지 않는다). 막기는 마스크(판 5·6)가 하고 세계는
+    # 덮기 칸·이 키를 미리 보기에 알리고 결정 셈만 덮기 스텝을 뺀다(동역학·난수·관측·보상 그대로). 경보 세계(판 3)와 섞지 않는다
+    bf = p["brain_flee_outside_reflex"]
+    if not isinstance(bf, bool):
+        raise ValueError(f"features.wild_flight.brain_flee_outside_reflex 는 true/false 여야 한다. 받은 값: {bf!r}")
+    if not bf:
+        if f.params("repertoire").get("obs_extra") is not True:
+            raise ValueError("features.wild_flight.brain_flee_outside_reflex false 는 repertoire.obs_extra 를 켠 세계(마스크가 관측으로 '위협을 안다'를 본다)"
+                             "에서만 쓴다")
+        if f.enabled("alarm"):
+            raise ValueError("features.wild_flight.brain_flee_outside_reflex false(마스크 판 5·6)는 alarm(관측 alarm_heard, 마스크 판 3)과 함께 켜지 못한다")
+    out["brain_flee_outside_reflex"] = bf
     return out
 
 
@@ -2694,6 +2714,12 @@ class World:
         # 도망길 (10-21 측정 전용 route_fixed·10-22 두뇌 길 route): 길 상태·기록을 두는 세계. 둘 다 끈 세계는 False 이고 그 코드 경로를 타지 않는다
         self._route_brain = bool(self._wf is not None and self._wf["route"])
         self._route_on = bool(self._wf is not None and (self._wf["route_fixed"] is not None or self._route_brain))
+        # 10-23 R7 반사 밖 두뇌 FLEE 막음(선택 키 brain_flee_outside_reflex false — 마스크 판 5·6): 미리 보기가 덮기 칸·이 키를 알리고, 덮기 스텝은 결정이 아니다.
+        # 끈 세계(키 없음·true)는 False 이고 그 코드 경로를 타지 않는다. 공개 칸 brain_flee_outside_reflex 는 마스크 판을 정한다(rep_policy.world_mask_version)
+        self._fb = bool(self._wf is not None and not self._wf["brain_flee_outside_reflex"])
+        self.brain_flee_outside_reflex = not self._fb
+        # 덮기 줄(도주·웅크림 스텝은 결정이 아니다 — 판 4·5·6): 두뇌 길 또는 반사 밖 FLEE 막음 세계
+        self._over_rows = self._route_brain or self._fb
         # 야생 2단계 2(모듈 docstring '야생 2단계' 2): 늑대 무리 협동 사냥. 끈 세계는 None 이고 그 코드 경로를 타지 않는다
         self._wp = (_wild_pack_params(f.params("wild_pack"), f) if f.enabled("wild_pack") else None)
         # 야생 2단계 3(모듈 docstring '야생 2단계' 3): 세로 장애물. 끈 세계는 None 이고 그 코드 경로를 타지 않는다(World.obstacles 는 늘 빈 목록)
@@ -4102,10 +4128,11 @@ class World:
         cfg = self.cfg
         a = np.asarray(a, dtype=np.float64)
         self._check_action(a)
-        if self._route_brain:
-            # 10-22 두뇌 길: 이번 스텝 첫머리 덮기·길 결정(`rep_peek` 과 같은 값 — 결정 셈 `_rep_accumulate` 가 쓴다)을 떠 두고,
-            # 지난 `_wf_update` 가 길 결정으로 표시한 도주 사슴의 요청 칸으로 길을 정한다(덮기 방향 wf_dir — 아래 실행기가 쓴다)
+        if self._over_rows:
+            # 10-22 두뇌 길·10-23 반사 밖 FLEE 막음: 이번 스텝 첫머리 덮기·길 결정(`rep_peek` 과 같은 값 — 결정 셈 `_rep_accumulate` 가 쓴다)을 떠 둔다
             _, self._rt_step_over, self._rt_step_rd = self._route_override()
+        if self._route_brain:
+            # 10-22 두뇌 길: 지난 `_wf_update` 가 길 결정으로 표시한 도주 사슴의 요청 칸으로 길을 정한다(덮기 방향 wf_dir — 아래 실행기가 쓴다)
             self._route_apply(a[:, 0])
         rew = np.full(self.N, cfg.rew_alive)
         vg, vw, rp = self._vg, self._vw, self._rp
@@ -4125,6 +4152,14 @@ class World:
         if rp is not None:
             # v3 0r·1r) 행동 실행기: 결정 시점에만 요청을 받고(잠금·사건·지연), 행동별 제어기가 속도·보행을 정한다
             v, rep_out = self._rep_step(a)
+            if self._fb:
+                # 10-23 반사 밖 FLEE 막음(통계 전용): 덮기 밖 결정(arbitrate 의 decide ∧ ¬덮기 — `rep_peek` 의 reads 와 같은 셈, 산 사슴)과 그 가운데 두뇌가
+                # FLEE 를 낸 수(마스크 밖 — 판 5·6 마스크를 지키는 정책이면 늘 0). 세계는 막지 않는다(막기는 마스크가 한다)
+                fr = np.asarray(rep_out["decide"], dtype=bool) & ~self._rt_step_over
+                if live is not None:
+                    fr = fr & live
+                self._fb_free += int(np.count_nonzero(fr))
+                self._fb_flee += int(np.count_nonzero(fr & (a[:, 0] == float(rep.FLEE))))
             if self._wf is not None and (wf_exec is not None or self._wf["flight_cost"] > 0.0):
                 # 야생 (w3) 이번 스텝에 실행하는 FLEE(도주 반사 덮기·두뇌 FLEE 모두 — 리스폰이 죽은 칸을 지우기 전 사본): 도망 기록·학습 전용 도주 비용
                 wf_flee = self._rs.behavior == rep.FLEE
@@ -4526,6 +4561,9 @@ class World:
           - route_now: 도주 사슴의 지금 길(ROUTE_RUN·ROUTE_SHELTER, 결정 스텝은 RUN), 그 밖 −1
           - reads = (arbitrate 의 decide ∧ ¬덮기) ∨ route_decide, wake_decide 도 덮기 중이면 거짓 — 덮기 스텝은 결정이 아니다(C++ DecideHerb 와 같다.
             판 2·3 세계는 고치지 않아 학습이 비트 단위로 그대로다)
+        10-23 반사 밖 두뇌 FLEE 막음(wild_flight.brain_flee_outside_reflex false, 마스크 판 5·6 — 설계 17절)을 켠 세계는 override 와 위 reads·wake_decide 셈
+        (길을 끈 판 6 은 route_decide 가 늘 거짓이라 reads = decide ∧ ¬덮기)에 더해 brain_flee_outside_reflex = False 를 알린다(마스크가 판을 정한다 —
+        rep_policy.action_mask). route_decide·route_now 는 두뇌 길 세계에만 있다
         """
         if self._rp is None:
             raise ValueError("rep_peek 은 repertoire 를 켠 세계에만 있다")
@@ -4536,21 +4574,24 @@ class World:
         res = rep.arbitrate(cp, self._rp, rs.behavior.astype(np.int64), self._rep_decision_obs())
         reads = np.asarray(res["decide"], dtype=bool).copy()
         out = dict(reads=reads, wake_decide=reads & woke, behavior=rs.behavior.astype(np.int64))
-        if self._route_brain:
+        if self._over_rows:
             pan, over, rd = self._route_override()
             reads = (reads & ~over) | rd
             out.update(reads=reads, wake_decide=reads & woke & ~over,
-                       override=np.where(pan, WF_PANIC, np.where(over, WF_SHELTER, WF_NONE)).astype(np.int8),
-                       route_decide=rd.copy(), route_now=np.where(pan, self.flight_route, ROUTE_NONE).astype(np.int64))
+                       override=np.where(pan, WF_PANIC, np.where(over, WF_SHELTER, WF_NONE)).astype(np.int8))
+            if self._route_brain:
+                out.update(route_decide=rd.copy(), route_now=np.where(pan, self.flight_route, ROUTE_NONE).astype(np.int64))
+            if self._fb:
+                out["brain_flee_outside_reflex"] = False
         return out
 
     def _route_override(self) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """10-22 두뇌 길(wild_flight.route 를 켠 세계만): 다음 스텝(= 지금 스텝 첫머리) 덮기 — (도주 pan, 덮기 over = 도주 ∨ 웅크림, 길 결정 rd = 도주 ∧
-        결정 표시). 산 사슴만. `rep_peek` 의 reads 와 `step` 의 결정 셈(`_rep_accumulate`)이 같은 값을 쓴다."""
+        """10-22 두뇌 길·10-23 반사 밖 FLEE 막음(덮기 줄 세계만): 다음 스텝(= 지금 스텝 첫머리) 덮기 — (도주 pan, 덮기 over = 도주 ∨ 웅크림, 길 결정 rd =
+        도주 ∧ 결정 표시 — 두뇌 길을 끈 세계는 늘 거짓). 산 사슴만. `rep_peek` 의 reads 와 `step` 의 결정 셈(`_rep_accumulate`)이 같은 값을 쓴다."""
         live = np.ones(self.N, dtype=bool) if self.alive is None else self.alive
         pan = (self.wf_mode == WF_PANIC) & live
         over = pan | ((self.wf_mode == WF_SHELTER) & live)
-        return pan, over, self.route_decide & pan
+        return pan, over, (self.route_decide & pan) if self._route_brain else np.zeros(self.N, dtype=bool)
 
     def _rep_step(self, a: np.ndarray) -> tuple[np.ndarray, dict]:
         """v3 행동 실행기 한 스텝 (`step` 0r·1r, 순서는 env_v2/repertoire.py docstring A·B). 반환: (적용 속도, 제어 결과).
@@ -5727,6 +5768,13 @@ class World:
             if self._route_on:
                 self._route_reset()
             self._fl_reset()
+            if self._fb:
+                # 10-23 반사 밖 FLEE 막음(통계 전용 — `flee_gate_stats`): 덮기 밖 결정 수, 그 가운데 두뇌가 FLEE 를 낸 수
+                self._fb_free = self._fb_flee = 0
+                if not self._route_brain:
+                    # 길을 끈 판 6: 이번 스텝 첫머리 덮기(`step` 이 뜬다 — `_rep_accumulate` 결정 셈), 길 결정은 늘 없다
+                    self._rt_step_over = np.zeros(N, dtype=bool)
+                    self._rt_step_rd = np.zeros(N, dtype=bool)
         if self._wp is not None:
             # 야생 2단계 2 스텝 뒤 훅: 이번 스텝에 도운·기다린·은신처 문으로 간 늑대, 고른 사슴(없으면 −1). 통계 칸
             self.pack_help = np.zeros(M, dtype=bool)
@@ -6159,6 +6207,14 @@ class World:
             # 결정(마스크 밖 — 학습·판정에서는 늘 0). COVER·OPEN 은 셈하지 않는다(늘 0)
             out.update(brain=True, choice=int(self._rt_choice), bad_shelter=int(self._rt_bad_shelter))
         return out
+
+    def flee_gate_stats(self) -> dict:
+        """10-23 반사 밖 두뇌 FLEE 막음 통계 (wild_flight.brain_flee_outside_reflex false 세계만, 동역학과 무관 — reset 뒤 누적): free_decisions = 덮기(도주
+        반사·웅크림) 밖 결정(arbitrate 의 decide ∧ ¬덮기, 산 사슴 — `rep_peek` 의 reads 에서 길 결정을 뺀 것), brain_flee = 그 가운데 두뇌가 FLEE(칸 1)를
+        낸 수. 막기는 마스크(판 5·6)가 하므로 마스크를 지키는 정책이면 brain_flee 는 늘 0 이다(세계는 막지 않고 센다)."""
+        if not self._fb:
+            raise ValueError("flee_gate_stats 는 wild_flight.brain_flee_outside_reflex false 세계에만 있다")
+        return dict(free_decisions=int(self._fb_free), brain_flee=int(self._fb_flee))
 
     def wild_stats(self) -> dict:
         """야생 1단계 통계 (켠 규칙만, 동역학과 무관). 비축: 산 개체 평균·최솟값, 꺼내 쓴·채운 에너지, 약한 개체-스텝 비율·약한 채 잡힌 수.
@@ -7169,9 +7225,9 @@ class World:
         self._rep_dead[1] += np.bincount(b[starved], minlength=K)
         sw = out["switch"]
         dec = out["decide"]
-        if self._route_brain:
-            # 10-22 두뇌 길(마스크 판 4): 결정 = `rep_peek` 의 reads 와 같은 셈 — 덮기(도주·웅크림) 스텝은 결정이 아니고 길 결정은 결정이다
-            # (스텝 첫머리에 `step` 이 뜬 값). 판 2·3 세계는 arbitrate 의 decide 그대로
+        if self._over_rows:
+            # 10-22 두뇌 길(마스크 판 4·5)·10-23 반사 밖 FLEE 막음(판 6): 결정 = `rep_peek` 의 reads 와 같은 셈 — 덮기(도주·웅크림) 스텝은 결정이 아니고
+            # 길 결정은 결정이다(스텝 첫머리에 `step` 이 뜬 값). 판 2·3 세계는 arbitrate 의 decide 그대로
             dec = (np.asarray(dec, dtype=bool) & ~self._rt_step_over) | self._rt_step_rd
         self._rep_decide += int(np.count_nonzero(dec))
         if sw.any():
@@ -7199,8 +7255,8 @@ class World:
           use_seen_·use_unseen_: 결정 때 위협이 보인·안 보인 개체-스텝 안의 비율
         - pred_rate_<행동>·starve_rate_<행동>: 그 행동 중에 죽은 수(피식·아사) / 그 행동의 개체-스텝
         - seen_frac: 결정 때 위협이 보인 비율, switch_per_sec: 개체당 초당 행동 전환 수, flicker_rate: 전환 중 3초 안 A-B-A
-          되돌림 비율, decide_frac: 결정 시점(잠금 끝 또는 사건 결정)인 개체-스텝 비율 — 두뇌 길(마스크 판 4) 세계는 `rep_peek` 의 reads 와
-          같은 셈(덮기 스텝 뺌, 길 결정 더함)이라 f_dec(train_v3.py measure-fdec)와 같은 값이다
+          되돌림 비율, decide_frac: 결정 시점(잠금 끝 또는 사건 결정)인 개체-스텝 비율 — 두뇌 길(마스크 판 4·5)·반사 밖 FLEE 막음(판 6) 세계는 `rep_peek` 의
+          reads 와 같은 셈(덮기 스텝 뺌, 길 결정 더함)이라 f_dec(train_v3.py measure-fdec)와 같은 값이다
         """
         if self._rp is None:
             raise ValueError("repertoire_stats 는 repertoire 를 켠 세계에만 있다")

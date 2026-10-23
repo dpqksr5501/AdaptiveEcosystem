@@ -3,6 +3,7 @@
 - 상태: 계획만 적었다. 코드·빌드·UBT·자동화·학습은 하지 않았다.
   - 10-23 검토: 파이썬 줄과 다시 대조해 의사 코드의 남은 값 버그 둘(2-7 (나) 길 읽음 지우기 자리, (다) `bCommittedRouteReads`), `A0` 범위, 도주 아님 지울 칸,
     refled 스텝 번호를 고쳤다. 10-1·10-2 를 실제로 만든 골든·판 대조 자료(`results/v3/route/port/`)에 맞췄다(시드 2 개, 스텝 지문, 도망 길 기록 장면).
+  - 10-23 R7: R6 기각 뒤 다음 후보는 마스크 판 5(= 판 4 + 반사 밖 두뇌 FLEE 막음)다. 바뀐 마스크 줄·계약·이식 영향은 13절(설계 17절). 이식은 R7 통과 뒤다.
 - 기준 커밋: 파이썬 두 길 구현 `c109bf0`, 10 초 지켜보기 `2aac3e5`(HEAD).
   - 파이썬 줄 번호는 HEAD `2aac3e5` 의 `herbivore_rl/…` 이다(작업 트리와 같다).
   - C++ 줄 번호는 `git show 2aac3e5:AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/<파일>` 이다. 작업 트리의 `EcoWorldV3.h` 는 다른 갈래(숨음·잡힘 비율)가
@@ -640,6 +641,54 @@ herbivore_rl/results/v3/route/port/
 17. **교체 경계 스텝의 도망 길 기록(10-23 검토에서 더함).** `FlightStepEnd` 는 `UpdateWildFlight` 앞에서 `D.Route` 를 읽는다. 길 없는 두뇌 → 판 4 로
     바꾼 스텝의 열린 반사 도주는 `D.Route` 가 NONE 이라 그 한 스텝이 도망 기록의 'none' 칸(반사 없는 두뇌 FLEE 자리)에 든다. 파이썬에는 없는 경우다.
     그대로 둘지(경계 한 스텝 — 판정·학습과 무관), 반사 스텝이면 RUN 으로 셀지 정한다.
+
+---
+
+## 13. 10-23 R7 — 마스크 판 5 (설계 `RL_V3_FLIGHT_ROUTE_DESIGN.md` 17절)
+
+- 상태: 파이썬만 바꿨다(학습·판정 전). **C++ 은 고치지 않는다 — R7 이 판정을 통과한 뒤 이 절대로 옮긴다.** R6 는 기각이라 판 4 두뇌를 게임에 걸 일이 없다.
+  이식이 시작되면 위 1~12절의 판 4 줄은 판 5 에도 그대로 쓰이고, 아래만 더한다.
+- 판 5 = 판 4 + **반사 밖 두뇌 FLEE 막음**: 덮기(도주·웅크림) 밖 결정 행에서 칸 1(FLEE)을 막는다. 도주는 반사만 시작하고 두뇌는 '어디로'(RUN·SHELTER)만 고른다.
+  도주 길 결정·도주 비결정·웅크림 행과 관측 24·길 기하·결정 때는 판 4 그대로다.
+
+### 13-1. 바뀐 마스크 줄 (4절 표의 '그 밖')
+
+| 상황 | 판 4 | 판 5 | C++ |
+|---|---|---|---|
+| 그 밖 ∧ 결정(`bReads`) | 판 2(허용 ∧ 가능) | 판 2 − 칸 1 | `DecideHerb` 의 `ComposeActionMask` 뒤(`EcoWorldV3.h` :2271 근처, `fc0662f` 기준) ★ `if (D.Prep.bReads && W.bFleeGate) D.Mask[kFlee] = 0;` |
+| 그 밖 ∧ 결정 아님 | 지금 행동 한 칸 | 같다(반사가 끝난 뒤 잠금 중인 FLEE 포함) | 그대로 |
+| 도주·웅크림 | 4절 그대로 | 같다 | 덮기 분기는 지금도 망을 부르지 않는다 — 그대로 |
+
+- 파이썬: `env_v2/rep_policy.py` `_gate_free_rows`(덮기 밖 결정 행 = `reads ∧ override == WF_NONE`), `action_mask` 가 `rep_peek` 의 `brain_flee_outside_reflex: False`
+  를 보고 판 5 로 셈한다. 세계 동역학·관측·보상·난수는 그대로라 같은 행동이면 판 4 세계와 궤적이 같다(`tests/test_r7_mask5.py`).
+- 빈 줄 없음: GRAZE 는 늘 허용 ∧ 가능이다. C++ 은 판 5 두뇌를 걸 때 실제 허용 `W.Allowed[kGraze] == 1` 을 본다(지금도 늘 1).
+- 부활 없는 세계의 죽은 슬롯: 파이썬 마스크는 죽은 슬롯의 덮기 밖 결정 행에서도 칸 1 을 끈다(시체는 움직이지 않고 아무것도 바꾸지 않는다). C++ 은 죽은 사슴을
+  처리기 목록에서 빼므로 견줄 것이 없다. 판 대조(10-2)의 사슴 줄은 산 사슴만 본다.
+
+### 13-2. 계약·로더 (5절에 더함)
+
+- 계약 dict: 판 5 는 판 4 dict(`flight_route` 같은 값) + 키 `"brain_flee_outside_reflex": false`, `mask.version` 5.
+  **`kContractHashObs24Mask5 = 0xad7bad5e1acaf071ULL`** (`export_weights_v3.contract_hash(관측 24, 5)`). 옛 넷(관측 18·19·21·24)의 해시는 그대로다.
+- `kNumContracts` 에 넷째 줄 `{kContractHashObs24Mask5, 24, 5, 6, kRouteContractExtraNames, …}`. `FEcoV3Brain::MaskVersion` 5 를 받고 `bRoute()` = 판 4·5,
+  ★ `bFleeGate()` = 판 5. 판 5 거부 조건은 5-2 와 같고 `mask_version` 만 5, 파일의 `contract.brain_flee_outside_reflex` 가 `false` 가 아니면 `Contract`.
+- 판 6(R7 대조 '길 끔', 관측 21 — 해시 `0xe4b66ac546da1d77`)은 파이썬 학습 대조 전용이다. 두뇌 파일을 만들지 않고(`export_weights_v3.brain_golden_config_for`
+  가 멈춘다) C++ 계약 줄에 넣지 않는다.
+- 두뇌 파일 골든: 판 5 파일의 다중 칸 결정(`rollout`)은 판 5 마스크라 칸 1 이 늘 0 이다. 골든 세계 `configs/v3_wild3_route5_mirror.yaml`.
+  시작 두뇌 파일 `herbivore_rl/results/v3/r7/brains/v3_r1_g995_s3_obs24route0m5.json` — 가중치 바이트는 route0 파일과 같고 계약만 판 5 다.
+
+### 13-3. 세계·게임 (1-2·8절에 더함)
+
+- ★ `FWorldState::bFleeGate`(기본 `false`) — **두뇌가 정한다**(1-2 의 `bRoute` 와 같은 꼴). `SetModelRoute` 옆 ★ `SetModelFleeGate`: 판 5 두뇌일 때만 켠다.
+  파이썬 학습·판정 세계는 세계 키(`wild_flight.brain_flee_outside_reflex: false`)로 켜지만, 게임 세계에는 이 설정이 없다. 평가기는 일의
+  `world.wild_flight.brain_flee_outside_reflex` 로 넣는다(`ceval.py` 받기 — 지금은 거부).
+- **WildFlight 를 끈 지역에는 판 5 두뇌를 걸지 않는다.** 반사가 없으면 도망을 시작할 길이 아예 없어진다. 파이썬은 `wild_flight` 를 끈 세계에서 이 키를 읽지 않는다
+  (`route` 키와 같다 — 멈추지 않고 무시한다). 그 세계는 관측에 `in_panic` 이 없는 판 2 라 판 5 두뇌가 연결 때 거부된다(12절 질문 12 와 같은 자리).
+- 결정 셈(`Stats.Decisions`)·덮기 스텝 처리는 판 4 와 같다. 통계 ★ `FleeGateFree`·`FleeGateFlee`(파이썬 `flee_gate_stats` — 덮기 밖 결정 수, 그 가운데 두뇌
+  FLEE 수, 마스크를 지키면 0)는 선택이다.
+- 시험: 장면 골든에 '덮기 밖 결정 + 위협을 앎(FLEE 가능)' 줄을 더해 판 5 마스크 `[1,0,·,0,0]`·argmax 가 FLEE 가 아님을 본다. 판 대조는 10-2 꼴로 판 5 거울에서 한다.
+- 옮길 파이썬 줄(`fc0662f` 다음의 R7 구현 커밋): `rep_policy.py` `mask_version_of`·`world_mask_version`·`check_mask_version`·`_gate_over_rows`·`_gate_free_rows`,
+  `world.py` `_wild_flight_params`(키 검사)·`rep_peek`·`_route_override`·`step` 첫머리·`flee_gate_stats`·`_rep_accumulate`, `export_weights_v3.py` `contract_dict`·
+  `brain_golden_config_for`, `features.py` OPTIONAL_KEYS.
 
 ---
 

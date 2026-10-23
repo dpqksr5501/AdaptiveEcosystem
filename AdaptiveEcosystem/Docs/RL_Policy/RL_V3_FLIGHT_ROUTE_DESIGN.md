@@ -965,3 +965,77 @@ route_decide_i = in_panic_i ∧ ( 시작 ∨ 무효 ∨ (route_i = RUN ∧ age_i
 | 5 | R6: 조기 점검 6개 → 20M × 3 + 대조 → 고르기 → 판정 → 보고 | 기계 약 4시간 + 정리 |
 | 6 | C++ 이식(RUN·SHELTER만), 골든, 자동화 시험, UBT(unity를 끈 빌드 포함), 복사 맵 PIE. (끝남, 10-23) 도망 기록의 숨은 뒤 10초 지켜보기(hide — cover_then_caught 등)는 먼저 C++에 넣고 평가기 `HIDE_WATCH`를 참으로, LIVE evaluator를 'ceval'로 되돌렸음 | 약 1일 |
 | 7 | (R6가 통과하면) 고리를 관측 24로 전환, LIVE_GATE 변경 기록 (7), 첫 판 | 반나절 |
+
+## 17. 10-23 R7 — 마스크 판 5 (반사 밖 두뇌 FLEE 막음)
+
+- 상태: 파이썬 구현만 했다(설정·시작 두뇌·시험). 학습·판정·C++ 은 아직이다. 이 절이 앞 절과 다르면 이 절을 따르고, 적지 않은 것은 16절 그대로다.
+- 사람 결정(10-23): **'짧게 진단 후 R7'.** R6 판정은 기각이다(1차 숨음 비율은 통과, 지킴 GF·GR 이 걸림 — `herbivore_rl/results/v3/r6/judge.md`).
+  판정 뒤 진단(`herbivore_rl/results/v3/r6/diag/diag.md`, 커밋 `fc0662f`)은 **GO** 였다. R6 두뇌에서 반사 밖 두뇌 FLEE 만 막으면(재학습 없이 평가 때만) route0 대비
+  GF t −1.23, GR t −0.74 로 돌아오고, 숨음 비율 이득은 남았다(+6.82 %p, t +9.49). GR 초과는 거의 모두 두뇌가 스스로 뛴 짧은 도망과 그 여파였다.
+- 원칙은 그대로다: **반사(도주 반사 거리)가 '언제' 도망칠지, 두뇌가 '어디로'(RUN·SHELTER)를 정한다.** 판 5 는 이 원칙을 마스크로 지킨다.
+
+### 17-1. 바뀐 마스크 줄 (16-3 표의 '그 밖')
+
+| 상황 (`rep_peek`) | 판 4 | 판 5 |
+|---|---|---|
+| 도주 중이고 길 결정 | 1 RUN, 4 SHELTER(가능할 때) | 같다 |
+| 도주 중이고 결정 아님 | 지금 길 한 칸 | 같다 |
+| 웅크림 덮기 | HIDE 한 칸 | 같다 |
+| 그 밖 · 결정(`reads`) | 판 2(허용 ∧ 가능) | **판 2 − 칸 1(FLEE)** |
+| 그 밖 · 결정 아님 | 지금 행동 한 칸 | 같다(반사가 끝난 뒤 잠금 중인 FLEE 도 지금 행동이다) |
+
+- 반사 밖 결정에서 두뇌가 고를 수 있는 것은 먹기와 숨기(위협을 알고 은신처가 가까울 때)다. GRAZE 는 늘 허용 ∧ 가능이라 빈 줄이 없다.
+  시작 정책의 결정 가운데 두 칸 이상인 몫은 2.9% 다(R6 2.4% — `herbivore_rl/results/v3/r7/logs/measure_fdec_r7.log`).
+- **세계는 그대로다.** 동역학·관측(24 칸)·보상·난수·도주 반사·길 기하는 바꾸지 않았다. 막기는 마스크만 한다. 그래서 같은 행동을 넣으면 판 5 세계와 판 4 세계의
+  궤적이 비트 단위로 같다(시험 `tests/test_r7_mask5.py`). 세계는 막지 않고 센다 — `World.flee_gate_stats`(덮기 밖 결정 수, 그 가운데 두뇌 FLEE 수 — 마스크를
+  지키면 0). 학습 기록·measure-fdec 에도 `gate_free`·`gate_flee` 로 적는다.
+- **판 정하기.** 관측 이름은 판 4 와 같다(관측 24). 그래서 판은 관측 이름과 세계 키로 정한다.
+  - 세계 키 `features.wild_flight.brain_flee_outside_reflex` (OPTIONAL_KEYS 기본 `true` — 키가 없거나 true 인 세계는 그 코드 경로를 타지 않아 비트 단위로 그대로다).
+    `false` 면 `rep_peek` 이 `brain_flee_outside_reflex: False` 와 덮기 칸을 알리고, `rep_policy.mask_version_of(이름, 키)`·`world_mask_version(세계)` 가 판 5 를 낸다.
+  - 판이 다른 두뇌는 연결 때 멈춘다: 판 4 두뇌(route0·R6)는 판 5 세계에, 판 5 두뇌는 판 4 세계에 걸리지 않는다(`check_mask_version`).
+  - `obs_extra` 를 켠 세계만, 경보(판 3)와는 섞지 않는다. 얼기·잠은 판 4 처럼 실제 허용에서 막혀야 한다.
+
+### 17-2. 대조 '길 끔' — 판 6
+
+- R7 대조는 막기는 그대로 두고 길만 끈다(`route: false` + 키 false). 관측 21, **마스크 판 6** 이다.
+- 판 6 줄: 도주 = FLEE 한 칸, 웅크림 = HIDE 한 칸, 그 밖 결정 = 판 2 − 칸 1, `reads` 는 덮기 스텝을 뺀다. 마스크 줄은 'SHELTER 가 늘 가능하지 않은 판 5' 와 같다.
+  다만 판 6 에는 길 결정이 없어 도주 스텝은 하나도 결정이 아니다(판 5 는 도주 길 결정 스텝을 RUN 한 칸이어도 결정으로 센다).
+  실행기가 덮기 중 요청을 FLEE·HIDE 로 바꾸므로 같은 행동이면 판 2 세계와 궤적이 같다. 결정 셈만 덮기 스텝을 뺀다.
+- 그래서 f_dec 가 R6 대조(판 2)의 0.873641 에서 **0.708908** 로 크게 줄었다. 판 2 는 덮기 스텝도 결정으로 셌기 때문이다(16-3 결함 — 판 4 에서 고친 것과 같은 셈).
+- 판 6 은 파이썬 학습 대조 전용이다. 두뇌 파일·C++ 계약 줄을 만들지 않는다(해시 `0xe4b66ac546da1d77` 은 시험에만 박았다).
+
+### 17-3. 계약 (16-5 에 더함)
+
+- 판 5·6 일 때만 계약 dict 에 `"brain_flee_outside_reflex": false` 를 넣는다. 판 5 는 `flight_route` 도 판 4 와 같은 값이다.
+- **새 해시: 관측 24 · 판 5 = `0xad7bad5e1acaf071`.** 옛 넷(`0x7eea0107339be4ce`, `0xf8c26c7d02542fae`, `0xbc4fc2d45c47c5fd`, `0xe302dee198197444`)은
+  그대로이고 시험으로 고정했다.
+
+### 17-4. 시작 두뇌 · 설정
+
+- **R7 시작 두뇌 route0m5**(`herbivore_rl/results/v3/r7/r7_start.py`): route0 의 정책·가치망을 바이트 그대로 두고 판만 5 로 붙였다.
+  `ckpt/v3/v3_r1_g995_s3_obs24route0m5.zip`(가중치 지문·zip 안 `policy.pth` 바이트가 route0 과 같다), 두뇌 파일
+  `results/v3/r7/brains/v3_r1_g995_s3_obs24route0m5.json`(계약 판 5 해시, 골든 세계 `configs/v3_wild3_route5_mirror.yaml`). 대조 시작은 obs21zero 의 판만 6 으로 붙인
+  `ckpt/v3/v3_r1_g995_s3_obs21zero_m6.zip` 이다.
+- **배포 argmax 가 지금 두뇌와 같은가**(같은 기록의 `.verify.json`, 지역 셋 × G·N × 시드 32090·32091 × 1800 스텝 — route_extend 확인과 같은 판):
+  - N 세계(늑대 포만 끔 — 판정 세계 꼴) 6 판: route0 이 반사 밖 결정에서 FLEE 를 고른 일이 없어 **궤적이 비트 단위로 같다.**
+  - G 세계(늑대 포만 켬 — 게임 설정) 6 판: 12 판을 합친 덮기 밖 결정 2,172,778 개 가운데 **97 개(1000 개당 0.045)** 에서 route0 의 argmax 가 FLEE 였고, 모두 G 세계에서
+    나왔다. 판 5 는 그 자리에서 먹기 51 · 숨기 46 을 고른다. 그래서 G 6 판 가운데 5 판은 그 결정부터 궤적이 갈린다. route0 의 '두뇌 스스로 뛴 도망(길 none)' 77 개가 0 이 된다.
+  - 곧 시작 두뇌는 판정 꼴 세계에서는 지금 두뇌와 같고, 게임 설정 세계에서는 아주 드문 '스스로 뛰기'만 다르다.
+- 설정(생성기 `herbivore_rl/results/v3/r7/make_r7_configs.py` — `--check`):
+  - `configs/v3_r7_train.yaml` = `v3_r6_train.yaml` + version 3.r7 + 키 false + f_dec **0.714694**(R6 0.724090 — `results/v3/r7/logs/measure_fdec_r7.log`).
+  - λ 0.98 · 도주 비용 0 은 R6 조기 점검이 고른 값으로 고정한다(`results/v3/r6/logs/early_pick.json`): 도주 비용은 바탕 그대로, λ 는 `configs/ppo_r6_lam098.yaml`.
+  - 판정 거울 `configs/v3_wild3_route5_mirror.yaml` = `v3_wild3_route_mirror.yaml` + version 3.wild3route5 + 키 false.
+  - 대조 `configs/v3_r7off_train.yaml` = `v3_r7_train.yaml` + version 3.r7off + `route: false` + f_dec 0.708908(17-2).
+- 짧은 학습 스모크에서 반사 밖 두뇌 FLEE 는 0 이었다(`results/v3/r7/logs/train_smoke_r7.log`·`train_smoke_r7off.log`, 시험 `test_training_smoke_no_flee_outside_reflex`).
+
+### 17-5. 이식 영향 (C++ — R7 통과 뒤, `RL_V3_ROUTE_CPP_PORT_PLAN.md` 13절)
+
+- 바뀌는 곳은 `DecideHerb` 의 '그 밖' 줄 한 곳이다: 판 5 두뇌이고 `bReads` 면 `Mask[kFlee] = 0`. 덮기 분기는 지금도 망을 부르지 않으므로 그대로다.
+- 계약 줄 하나(`kContractHashObs24Mask5`), 로더 `mask_version` 5, 막음 켜기는 두뇌가 정한다(`bRoute` 와 같은 꼴). 반사(WildFlight)가 꺼진 지역에는 판 5 두뇌를
+  걸지 않는다 — 도망을 시작할 길이 없어진다.
+
+### 17-6. 다음 (이번 단계 밖)
+
+- R7 사전 등록(학습 전 커밋): 새 판정 · 고르기 · 점검 시드, 판정 1차(숨음 비율)와 지킴(R6 PREREG 꼴 — GF·GR 포함), 조기 점검을 다시 할지. 진단의 시드 37120~37139 와
+  R6 판정 · 고르기 시드는 다시 쓰지 않는다.
+- 진단 값은 재학습 없이 평가 때만 막은 값이다. R7 은 막은 채 다시 배우므로 값이 달라질 수 있다.

@@ -304,6 +304,10 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #   wild_flight.route (10-22 사용자 결정 '두 길 두뇌로 진행' — 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 16절): true 면 반사 도주 중 두뇌가 길 결정 스텝에서
 #     RUN(칸 1)·SHELTER(칸 4)를 고르고(env_v2/world.py `_route_apply`), 관측 맨 끝에 in_panic·shelter_reach·shelter_edge 세 칸이 붙는다(관측 24, 마스크
 #     판 4 — env_v2/rep_policy.py). obs_extra·obstacle_obs 를 켜고 alarm·route_fixed 를 끈 세계만. false = 그대로(그 줄을 타지 않는다 — 비트 동일)
+#   wild_flight.brain_flee_outside_reflex (10-23 R7 — 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 17절, 사람 결정 '짧게 진단 후 R7'): false 면 도주 반사(덮기) 밖의
+#     결정에서 두뇌가 FLEE(칸 1)를 고르지 못한다 — 도주는 반사만 시작하고, 반사 밖 두뇌는 먹기·숨기 등만 고른다. 막기는 마스크가 한다(동역학·난수·관측·
+#     보상은 그대로, env_v2/world.py `rep_peek` 이 덮기 칸과 이 키를 알린다): route true 면 마스크 판 5(판 4 + 막기), false 면 판 6(R7 대조 '길 끔' —
+#     판 2 + 막기 + 덮기 줄 한 칸, 파이썬 전용). obs_extra 를 켜고 alarm 을 끈 세계만. true = 그대로(그 줄을 타지 않는다 — 비트 동일)
 #   obstacles.fixed (10-17 야생 2단계 3): [[x, y, r], …](단위) 이면 무작위 배치 대신 이 원판을 쓴다(난수를 뽑지 않는다 — 언리얼 무대에서 읽은 원판으로 거울을
 #     돌리는 짝 비교용, results/v3/mirror/run_mirror.py --unreal-obstacles). null = 자기 스트림 part 0 으로 무작위 배치
 #   obstacles.detour·detour_* (10-17 장애물 돌아가기, env_v2/world.py `detour_moves`, 모듈 docstring '야생 2단계' 3 의 6)): detour true 면 사슴·늑대가 원판에
@@ -331,7 +335,7 @@ OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "realism_cover_food": MappingProxyType({"frac_range": None}),
     "threats": MappingProxyType({"eat_in_place": False}),
     "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0,
-                                     "route": False}),
+                                     "route": False, "brain_flee_outside_reflex": True}),
     "obstacles": MappingProxyType({"fixed": None, "detour": False, "detour_block": 0.5, "detour_free": 0.8, "detour_probe": 1.5,
                                    "detour_steps": 45, "detour_help_block": 15, "detour_help_drop": 38,
                                    "foliage": {"enabled": False, "r": 3.0, "block": 2.0, "trees": "all"}}),
