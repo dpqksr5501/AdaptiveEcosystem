@@ -370,13 +370,13 @@ bool FEcoStageTreesV3SpawnTest::RunTest(const FString& Parameters)
 	}
 	// 은신처를 나무 하나 위로 옮기면 그 나무만 뺀다
 	{
-		EcoTest::FScopedTestWorld W2;
-		if (W2.World && TreeFloor(*W2.World, kStageSizeUnits * EcoRepertoireV3::kUnitCm, 0.0))
+		EcoTest::FScopedTestWorld WMoved;   // W2 는 v1 PolicyWeights.h 전역 이름 — unity 묶음에서 C4459 가 되지 않게 다른 이름 (10-24)
+		if (WMoved.World && TreeFloor(*WMoved.World, kStageSizeUnits * EcoRepertoireV3::kUnitCm, 0.0))
 		{
 			std::vector<EcoObservationV3::FCoverInput> Moved = Covers;
 			Moved.push_back({Forest->Trees[5].X, Forest->Trees[5].Y, 1.0});   // 그 줄기 위 반지름 2 m 은신처 (다른 줄기는 9 m 넘게 떨어져 있다)
 			FEcoV3StageTrees T2;
-			UEcoPolicyV3IntegratedSubsystem::SpawnStageTrees(*W2.World, TEXT("Forest"), Origin, kStageSizeUnits, Moved, T2);
+			UEcoPolicyV3IntegratedSubsystem::SpawnStageTrees(*WMoved.World, TEXT("Forest"), Origin, kStageSizeUnits, Moved, T2);
 			TestTrue(TEXT("은신처 곁 나무 하나만 뺀다"), T2.Num() == 23 && T2.SkippedCover == 1 && !T2.Complete());
 		}
 	}

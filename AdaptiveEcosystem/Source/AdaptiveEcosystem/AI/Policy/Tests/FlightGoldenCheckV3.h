@@ -7,15 +7,20 @@
 // 도망 기록은 정수 셈이라 모든 칸이 == 로 같아야 한다. 쌍 장면의 거리·시야각 판정도 파이썬과 같은 식·같은 순서라 비트 단위로 같다.
 //
 // 칸 번호 (FReport::FirstField):
-//   정의     0 까닭 수, 1 까닭 이름, 2 스스로 벗어남, 3 칸 경계, 4 놓침 → 끝 까닭, 5 숨은 뒤 지켜보기 길이·쫓긴 도망에서 빼는 끝 까닭 (10-23)
+//   정의     0 까닭 수, 1 까닭 이름, 2 스스로 벗어남, 3 칸 경계, 4 놓침 → 끝 까닭, 5 숨은 뒤 지켜보기 길이·쫓긴 도망에서 빼는 끝 까닭 (10-23),
+//            6 쫓김 사건 이음 창·결과 이름·사슴 칸 수 (10-24)
 //   장면·루프 10 늑대 지난 표적(Step 앞, 파이썬 _fl_tgt), 11~59 보고 (11 + 보고 칸 — 골든 머리 주석 순서), 110~114 보고의 숨은 뒤 지켜보기 (10-23 — chased·
-//            hidden·watching·cover_then_caught·cover_then_starved), 115 보고의 숨음 = 끝까지 지켜본 숨음 + 지켜보는 중 (10-23), 60~66 사슴 칸 (_fl_len·contact·
-//            reflex·chased·why·end_now·end_cov), 67 사슴 지켜보기 칸 (_fl_watch 행 비트 — 10-23), 70 늑대 지난 표적(뒤)
+//            hidden·watching·cover_then_caught·cover_then_starved), 115 보고의 숨음 = 끝까지 지켜본 숨음 + 지켜보는 중 (10-23), 120~133 보고의 쫓김 사건
+//            (10-24 — started·chased·hidden·caught·starved·other·truncated·watching·other_chased·joined·joined_cover·joined_other·window_caught·
+//            window_starved), 116 보고의 사건 숨음(누적 식) = 닫힌 숨음 + 지금 은신처 뒤 창 안, 117 보고의 사건 잘림(누적 식) = 열린 사건 − 은신처 뒤 창 안
+//            (10-24), 60~66 사슴 칸 (_fl_len·contact·reflex·chased·why·end_now·end_cov), 67 사슴 지켜보기 칸 (_fl_watch 행 비트 — 10-23), 71~74 사슴 사건
+//            칸 (_fe_open·_fe_chased·_fe_cover·_fe_until — 10-24), 70 늑대 지난 표적(뒤)
 //   쌍 장면  80 사냥 가능, 81 반경 안, 82 반경과 시야각 안, 83 원판이 가림, 84 은신처 표적 제외, 85 설정 상수
 //   기준 루프 같음  90 위치·heading·에너지·죽음, 91 행동 상태, 92 결정·덮기, 93 위협 상태, 94 세계 난수·먹이·EMA, 95 기록(도망 말고), 96 끈 세계 도망 칸 0,
 //            97 시작 = 끝 까닭 합, 98 FLEE 스텝 = 행동 칸, 99 반사 = 도주 덮기 칸, 100 산 사슴-스텝, 101 칸 합·쫓긴 ≤ 길이,
 //            102 숨은 뒤 지켜보기 (숨음 + 지켜보는 동안 잡힘·굶음 = 은신처 끝, 숨음 = 끝까지 지켜본 숨음 + 지켜보는 중, 지켜보는 중 ≤ 숨음, 쫓긴 도망 ≥
-//            은신처 끝 + 잡힘, 시계 = 스텝)
+//            은신처 끝 + 잡힘, 시계 = 스텝), 103 쫓김 사건 (결과 합 = 사건 시작, 쫓긴 사건 = 숨음 + 잡힘 + 굶음 + 쫓긴 그 밖, 도망 시작 = 사건 시작 + 이어진
+//            도망, 숨음 = 닫힌 숨음 + 지켜보는 중, 잘림 = 열린 사건 − 지켜보는 중, 사건 ≤ 도망 단위, 이어진 도망·숨음이 있다 — 10-24)
 
 #pragma once
 
@@ -43,6 +48,9 @@ namespace EcoWorldV3::FlightCheck
 		std::int64_t Count2 = 0;       // 장면·루프 = 0 이 아닌 끝 까닭 수 (11 가운데), 쌍 = 사냥 못 하는 늑대, 같음 = 0 이 아닌 끝 까닭 수
 		std::int64_t Hidden = 0;       // 10-23 장면·루프·같음 = 끝 보고의 숨어 살아남은 도망 합 (지켜보는 중 포함)
 		std::int64_t CoverDied = 0;    // 10-23 장면·루프·같음 = 끝 보고의 지켜보는 동안 잡힘·굶음 합
+		std::int64_t EpJoined = 0;     // 10-24 장면·루프·같음 = 끝 보고의 앞 사건에 이어진 도망 합
+		std::int64_t EpHidden = 0;     // 10-24 장면·루프·같음 = 끝 보고의 숨음 사건 합 (지켜보는 중 포함)
+		std::int64_t EpOther = 0;      // 10-24 장면·루프·같음 = 끝 보고의 그 밖·잘림 사건 합
 
 		bool Passed() const { return Failures == 0 && Cases > 0; }
 	};
@@ -113,8 +121,9 @@ namespace EcoWorldV3::FlightCheck
 		}
 
 		/**
-		 * 보고를 골든 54 칸 순서로 (started, live_steps, flee_steps, reflex_steps, n·steps·contact × 11, own_n, own_steps, own_contact, shelter_end, hist × 8,
-		 * 10-23 hide: chased, hidden, watching, cover_then_caught, cover_then_starved).
+		 * 보고를 골든 68 칸 순서로 (started, live_steps, flee_steps, reflex_steps, n·steps·contact × 11, own_n, own_steps, own_contact, shelter_end, hist × 8,
+		 * 10-23 hide: chased, hidden, watching, cover_then_caught, cover_then_starved, 10-24 episode: started, chased, hidden, caught, starved, other, truncated,
+		 * watching, other_chased, joined, joined_cover, joined_other, window_caught, window_starved).
 		 */
 		inline void StatsRow(const FFlightReport& R, std::int64_t* Out)
 		{
@@ -148,12 +157,26 @@ namespace EcoWorldV3::FlightCheck
 			Out[k++] = R.Watching;
 			Out[k++] = R.CoverCaught;
 			Out[k++] = R.CoverStarved;
+			Out[k++] = R.EpStarted;
+			Out[k++] = R.EpChased;
+			Out[k++] = R.EpHidden;
+			Out[k++] = R.EpCaught;
+			Out[k++] = R.EpStarved;
+			Out[k++] = R.EpOther;
+			Out[k++] = R.EpTruncated;
+			Out[k++] = R.EpWatching;
+			Out[k++] = R.EpOtherChased;
+			Out[k++] = R.EpJoined;
+			Out[k++] = R.EpJoinedCover;
+			Out[k++] = R.EpJoinedOther;
+			Out[k++] = R.EpWindowCaught;
+			Out[k++] = R.EpWindowStarved;
 		}
 
-		/** 보고 칸 k 의 칸 번호 (머리 주석 — 앞 49 칸 11~59, 숨은 뒤 지켜보기 110~). */
+		/** 보고 칸 k 의 칸 번호 (머리 주석 — 앞 49 칸 11~59, 숨은 뒤 지켜보기 110~114, 쫓김 사건 120~133). */
 		inline std::int32_t StatsField(std::int32_t k)
 		{
-			return k < 49 ? 11 + k : 110 + (k - 49);
+			return k < 49 ? 11 + k : k < 54 ? 110 + (k - 49) : 120 + (k - 54);
 		}
 
 		/** 사슴 지켜보기 칸 비트 덩이 j (골든 kWatchChunkBits 비트씩 — 칸 j·B ~ j·B + B − 1, world.py _fl_watch 행의 0 아닌 칸). */
@@ -191,15 +214,17 @@ namespace EcoWorldV3::FlightCheck
 
 			std::int32_t N() const { return static_cast<std::int32_t>(Tracks.size()); }
 
-			FFlightReport Report() const
+			FFlightOpen Open() const
 			{
 				FFlightOpen O;
 				for (const FFlightTrack& T : Tracks)
 				{
 					O.Add(T);
 				}
-				return FlightReportOf(Stats, O);
+				return O;
 			}
+
+			FFlightReport Report() const { return FlightReportOf(Stats, Open()); }
 
 			/** 한 스텝: 늑대마다 C++ 이 사슴 비트로 찾은 지난 표적 = 파이썬 _fl_tgt 인지 보고(칸 10), 재료로 FlightUpdate. */
 			void Step(Detail::FCase& C, const std::uint8_t* DeerBits, const std::uint8_t* WolfBits, const std::int32_t* Targets, const std::int32_t* Prev,
@@ -223,7 +248,8 @@ namespace EcoWorldV3::FlightCheck
 			void Compare(Detail::FCase& C, const std::int64_t* WantStats, const std::int32_t* WantTracks, const std::int32_t* WantPrev, std::int32_t M) const
 			{
 				std::int64_t Row[G::kStatsLen] = {};
-				const FFlightReport Rp = Report();
+				const FFlightOpen Op = Open();
+				const FFlightReport Rp = FlightReportOf(Stats, Op);
 				StatsRow(Rp, Row);
 				for (std::int32_t k = 0; k < G::kStatsLen; ++k)
 				{
@@ -231,6 +257,9 @@ namespace EcoWorldV3::FlightCheck
 				}
 				// 10-23 보고의 숨음(은신처 끝 − 지켜보는 동안 잡힘·굶음) = 끝까지 지켜본 숨음 + 지금 지켜보는 것 (사슴 칸이 모두 있다 — 파이썬 _fl_hidden + _fl_watch_open)
 				C.Int(115, Stats.Hidden + Rp.Watching, Rp.Hidden);
+				// 10-24 보고의 사건 숨음·잘림(누적 식) = 닫힌 숨음 + 지금 은신처 뒤 창 안, 열린 사건 − 그것 (사슴 칸이 모두 있다 — 파이썬 `_episode_block`)
+				C.Int(116, Stats.EpClosed[kEpisodeHidden] + Op.EpWatching, Rp.EpHidden);
+				C.Int(117, Op.EpOpen - Op.EpWatching, Rp.EpTruncated);
 				const std::int32_t Nn = N();
 				for (std::int32_t i = 0; i < Nn; ++i)
 				{
@@ -247,6 +276,12 @@ namespace EcoWorldV3::FlightCheck
 					{
 						C.Int(67, WatchChunk(T, j), Wt[7 + j]);   // 10-23 숨은 뒤 지켜보기 칸
 					}
+					// 10-24 쫓김 사건 칸 (닫힌 사건의 칸도 파이썬처럼 남아 있어야 같다)
+					const std::int32_t* We = Wt + 7 + G::kWatchChunks;
+					C.Int(71, T.bEpOpen ? 1 : 0, We[0]);
+					C.Int(72, T.bEpChased ? 1 : 0, We[1]);
+					C.Int(73, T.bEpCover ? 1 : 0, We[2]);
+					C.Int(74, T.EpUntil, We[3]);
 				}
 				for (std::int32_t m = 0; m < M; ++m)
 				{
@@ -265,6 +300,9 @@ namespace EcoWorldV3::FlightCheck
 			}
 			R.Hidden += Rp.Hidden;
 			R.CoverDied += Rp.CoverCaught + Rp.CoverStarved;
+			R.EpJoined += Rp.EpJoined;
+			R.EpHidden += Rp.EpHidden;
+			R.EpOther += Rp.EpOther + Rp.EpTruncated;
 		}
 	}
 
@@ -308,12 +346,23 @@ namespace EcoWorldV3::FlightCheck
 			C.Int(5, kFlightNotChased[k], G::kNotChased[k]);
 		}
 		C.Int(5, G::kWatchChunks * G::kWatchChunkBits >= kFlightHideWatchSteps ? 1 : 0, 1);
-		C.Int(5, G::kTrackLen, 7 + G::kWatchChunks);
+		C.Int(5, G::kTrackLen, 7 + G::kWatchChunks + G::kEpTrackLen);
+		// 10-24 쫓김 사건: 이음 창(은신처 끝 = 지켜보기 75, 그 밖 끝 = GR 38)·결과 이름 차례·사슴 사건 칸 수
+		C.Int(6, kEpisodeLinkCoverSteps, G::kEpLinkCoverSteps);
+		C.Int(6, kEpisodeLinkOtherSteps, G::kEpLinkOtherSteps);
+		C.Int(6, kEpisodeLinkCoverSteps, kFlightHideWatchSteps);
+		C.Int(6, kNumEpisodeOutcomes, G::kNumEpOutcomes);
+		for (std::int32_t k = 0; k < kNumEpisodeOutcomes && k < G::kNumEpOutcomes; ++k)
+		{
+			C.Ok(6, std::strcmp(EpisodeOutcomeName(k), G::kEpOutcomeNames[k]) == 0);
+		}
+		C.Int(6, kNumEpisodeClosed, kEpisodeTruncated);
+		C.Int(6, G::kEpTrackLen, 4);
 		Detail::Close(R, 0, C);
 		return R;
 	}
 
-	/** 짜 맞춘 장면 (test_flight_v3 `_tick` 장면 셋 + 난수 장면): 틱마다 지난 표적·보고·사슴 칸·늑대 지난 표적 = 파이썬. 사례 = 틱. */
+	/** 짜 맞춘 장면 (test_flight_v3 `_tick` 장면 셋 + 난수 장면 + 숨은 뒤 지켜보기 + 쫓김 사건): 틱마다 지난 표적·보고·사슴 칸·늑대 지난 표적 = 파이썬. 사례 = 틱. */
 	inline FReport CheckScenes()
 	{
 		FReport R;
@@ -533,7 +582,7 @@ namespace EcoWorldV3::FlightCheck
 				C.Ok(92, bSame);
 				const FFlightTrack& Fa = Da.Flight;
 				C.Ok(96, Fa.Len == 0 && Fa.Contact == 0 && Fa.Reflex == 0 && !Fa.bChased && Fa.Why == 0 && !Fa.bEndNow && !Fa.bEndCov && Fa.PrevBy == 0
-							   && Fa.Watch[0] == 0 && Fa.Watch[1] == 0);
+							   && Fa.Watch[0] == 0 && Fa.Watch[1] == 0 && !Fa.bEpOpen && !Fa.bEpChased && !Fa.bEpCover && Fa.EpUntil == 0);
 			}
 			for (std::int32_t m = 0; m < A.NumThreats(); ++m)
 			{
@@ -566,11 +615,14 @@ namespace EcoWorldV3::FlightCheck
 			}
 			C.Ok(95, bStats);
 			C.Ok(96, Xa.Flight.Started == 0 && Xa.Flight.LiveSteps == 0 && Xa.Flight.ReflexSteps == 0 && Xa.Flight.Clock == 0 && Xa.Flight.Hidden == 0
-						 && Xa.Flight.CoverCaught == 0 && Xa.Flight.CoverStarved == 0);
+						 && Xa.Flight.CoverCaught == 0 && Xa.Flight.CoverStarved == 0 && Xa.Flight.EpStarted == 0 && Xa.Flight.EpClosed[0] == 0
+						 && Xa.Flight.EpClosed[1] == 0 && Xa.Flight.EpClosed[2] == 0 && Xa.Flight.EpClosed[3] == 0 && Xa.Flight.EpJoined[0] == 0
+						 && Xa.Flight.EpJoined[1] == 0 && Xa.Flight.EpOtherChased == 0);
 			Detail::Close(R, t, C);
 		}
 		// 켠 세계의 보고 (지금 열린 도망 = 잘림)
-		const FFlightReport Rp = FlightReportOf(B.World.Stats.Flight, FlightOpenOf(B.Views.data(), N));
+		const FFlightOpen Op = FlightOpenOf(B.Views.data(), N);
+		const FFlightReport Rp = FlightReportOf(B.World.Stats.Flight, Op);
 		const FWorldStats& Sb = B.World.Stats;
 		Detail::FCase C;
 		std::int64_t SumN = 0, SumHist = 0;
@@ -600,6 +652,15 @@ namespace EcoWorldV3::FlightCheck
 					  && Rp.Watching >= 0 && Rp.Watching <= Rp.Hidden
 					  && Rp.Chased == Ended - Sb.Flight.Num[kFlightUnchased] && Rp.Chased >= Rp.Num[kFlightCover] + Rp.Num[kFlightCaught]
 					  && Sb.Flight.Clock == Steps && Rp.Num[kFlightCover] > 0 && Rp.Hidden > 0);
+		// 10-24 쫓김 사건 (부활 있는 세계 — 죽은 칸의 새 개체는 새 사건): 결과 합 = 사건 시작, 쫓긴 사건 = 숨음 + 잡힘 + 굶음 + 쫓긴 그 밖, 도망 시작 = 사건
+		// 시작 + 이어진 도망, 숨음·잘림(누적 식) = 사슴 칸으로 센 값, 사건 단위 ≤ 도망 단위 (쫓긴·숨음·잡힘), 열린 도망마다 잘린 사건, 이어진 도망·숨음이 있다
+		C.Ok(103, Rp.EpStarted == Rp.EpHidden + Rp.EpCaught + Rp.EpStarved + Rp.EpOther + Rp.EpTruncated
+					  && Rp.EpChased == Rp.EpHidden + Rp.EpCaught + Rp.EpStarved + Rp.EpOtherChased && Rp.EpOtherChased <= Rp.EpOther
+					  && Rp.Started == Rp.EpStarted + Rp.EpJoined && Rp.EpJoined == Rp.EpJoinedCover + Rp.EpJoinedOther
+					  && Rp.EpHidden == Sb.Flight.EpClosed[kEpisodeHidden] + Op.EpWatching && Rp.EpTruncated == Op.EpOpen - Op.EpWatching
+					  && Rp.EpWatching >= 0 && Rp.EpWatching <= Rp.EpHidden && Rp.EpWindowCaught + Rp.EpWindowStarved <= Rp.EpOther
+					  && Rp.EpChased <= Rp.Chased && Rp.EpHidden <= Rp.Hidden && Rp.EpCaught <= Rp.Num[kFlightCaught] + Rp.CoverCaught
+					  && Rp.EpTruncated >= Rp.Num[kFlightTruncated] && Rp.EpJoined > 0 && Rp.EpHidden > 0 && Rp.EpChased > 0);
 		Detail::Close(R, Steps, C);
 		R.Count0 = Rp.Started;
 		R.Count1 = Rp.OwnN;
@@ -609,6 +670,9 @@ namespace EcoWorldV3::FlightCheck
 		}
 		R.Hidden = Rp.Hidden;
 		R.CoverDied = Rp.CoverCaught + Rp.CoverStarved;
+		R.EpJoined = Rp.EpJoined;
+		R.EpHidden = Rp.EpHidden;
+		R.EpOther = Rp.EpOther + Rp.EpTruncated;
 		if (OutReport)
 		{
 			*OutReport = Rp;

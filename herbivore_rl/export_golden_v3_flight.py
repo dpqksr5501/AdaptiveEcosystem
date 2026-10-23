@@ -14,7 +14,9 @@
 묶음:
   짜 맞춘 장면  tests/test_flight_v3.py 의 `_tick` 장면 셋(끝 까닭·은신처/붙잡힘/바꿈/그만둠/시야각·놓침 우선순위/마지막 놓침/다시 남) + 난수 장면 하나(사슴 6 ×
                 300 틱 — FLEE·표적·놓침 쌍·쉬는 늑대·죽음을 난수로) + 10-23 숨은 뒤 지켜보기 장면 하나(test_flight_v3 test_hide_* 를 사슴 8 × 100 틱에 —
-                10 초 안·뒤 잡힘, 굶음, 닫는 틱 잡힘, 다시 도망, 겹친 지켜보기, 다시 난 개체, 판 끝 지켜보는 중, 안 쫓김·잘림). 틱마다 재료와 그 뒤
+                10 초 안·뒤 잡힘, 굶음, 닫는 틱 잡힘, 다시 도망, 겹친 지켜보기, 다시 난 개체, 판 끝 지켜보는 중, 안 쫓김·잘림) + 10-24 쫓김 사건 장면
+                하나(사슴 22 × 200 틱 — 은신처 끝 뒤 75·76 스텝, 그 밖 끝 뒤 38·39 스텝 다시 도망, 사건 안 잡힘·굶음, 지켜보기 안 잡힘·굶음·닫는 틱 잡힘,
+                5 초 창 안 죽음, 안 쫓긴 사건, 들락날락·여러 번 이어짐, 다시 난 개체, 판 끝 지켜보는 중·열린 도망·5 초 창 안 잘림). 틱마다 재료와 그 뒤
                 flight_stats·사슴 칸·늑대 지난 표적.
   기준 루프     거울 세계(사슴 32)를 무작위 요청(먹기·도망·숨기 — test_flight_v3 `_run` 과 같은 꼴)으로 600 스텝 돌리며 track_flight 를 켜고, `_fl_update`
                 를 부를 때마다 재료를 적는다(사슴: FLEE·반사·죽음·잡힘·은신처·첫머리 산, 늑대: 표적·스텝 끝 사냥·표적 고르기 때 사냥, 지난 표적(_fl_tgt)과의 쌍).
@@ -26,10 +28,13 @@
   사슴 재료 비트   1 FLEE 실행 · 2 실행한 덮기 도주 · 4 죽음 · 8 잡힘 · 16 스텝 끝 은신처 원 안 · 32 스텝 첫머리에 산
   늑대 재료 비트   1 스텝 끝 사냥 중 · 2 표적 고르기 때 사냥 가능 · 4 쌍 칸 있음(_fl_pred) · 8 시야 반경 안 · 16 반경과 시야각 안 · 32 원판이 가림 ·
                    64 은신처 표적 제외 — 쌍은 (늑대, 지난 표적 _fl_tgt) 칸 (지난 표적이 없으면 쌍 비트는 1·1·0·0)
-  보고 54 칸       started, live_steps, flee_steps, reflex_steps, n × 11, steps × 11, contact × 11, own_n, own_steps, own_contact, shelter_end, hist × 8,
-                   10-23 hide(숨은 뒤 지켜보기 — flight_stats 의 hide): chased, hidden, watching, cover_then_caught, cover_then_starved
-  사슴 칸 10 개    _fl_len, _fl_contact, _fl_reflex, _fl_chased, _fl_why, _fl_end_now, _fl_end_cov, 10-23 지켜보기 칸 비트 덩이 3 개(_fl_watch 행 —
-                   칸 0~24·25~49·50~74 의 0 아닌 칸, 칸마다 0·1)
+  보고 68 칸       started, live_steps, flee_steps, reflex_steps, n × 11, steps × 11, contact × 11, own_n, own_steps, own_contact, shelter_end, hist × 8,
+                   10-23 hide(숨은 뒤 지켜보기 — flight_stats 의 hide): chased, hidden, watching, cover_then_caught, cover_then_starved,
+                   10-24 episode(쫓김 사건 — flight_stats 의 episode): started, chased, hidden, caught, starved, other, truncated, watching, other_chased,
+                   joined, joined_cover, joined_other, window_caught, window_starved
+  사슴 칸 14 개    _fl_len, _fl_contact, _fl_reflex, _fl_chased, _fl_why, _fl_end_now, _fl_end_cov, 10-23 지켜보기 칸 비트 덩이 3 개(_fl_watch 행 —
+                   칸 0~24·25~49·50~74 의 0 아닌 칸, 칸마다 0·1), 10-24 사건 칸 _fe_open, _fe_chased, _fe_cover, _fe_until (닫힌 사건의 칸도 그대로 —
+                   파이썬은 닫을 때 _fe_open 만 내린다)
 """
 
 from __future__ import annotations
@@ -42,9 +47,9 @@ import numpy as np
 
 from env_v2 import repertoire as rep
 from env_v2.config import load_v2_config
-from env_v2.world import (FL_DROP_CAUSE, FL_DROP_COVER, FL_DROP_FOV, FL_DROP_NONE, FL_DROP_OBSTACLE, FL_DROP_RANGE, FL_DROP_STOP, FL_DROP_SWITCH,
-                          FLIGHT_CAUSES, FLIGHT_HIDE_WATCH_STEPS, FLIGHT_HIST_STEPS, FLIGHT_NOT_CHASED, FLIGHT_OWN, PT_STALKER, ST_EXHAUST, ST_POUNCE, ST_ROAM,
-                          World, obstacle_inside)
+from env_v2.world import (EPISODE_LINK_COVER_STEPS, EPISODE_LINK_OTHER_STEPS, EPISODE_OUTCOMES, FL_DROP_CAUSE, FL_DROP_COVER, FL_DROP_FOV, FL_DROP_NONE,
+                          FL_DROP_OBSTACLE, FL_DROP_RANGE, FL_DROP_STOP, FL_DROP_SWITCH, FLIGHT_CAUSES, FLIGHT_HIDE_WATCH_STEPS, FLIGHT_HIST_STEPS,
+                          FLIGHT_NOT_CHASED, FLIGHT_OWN, PT_STALKER, ST_EXHAUST, ST_POUNCE, ST_ROAM, World, obstacle_inside)
 
 HERE = Path(__file__).resolve().parent
 OBS = HERE / "configs" / "v3_wild3_obs_mirror.yaml"
@@ -59,10 +64,15 @@ RANDOM_TICKS = 300
 N_PAIR = 16
 PAIR_SCENES = 48
 HIDE_STATS = ("chased", "hidden", "watching", "cover_then_caught", "cover_then_starved")     # 10-23 flight_stats 의 hide (watch_steps 는 정의 칸)
-STATS_LEN = 4 + 3 * len(FLIGHT_CAUSES) + 4 + len(FLIGHT_HIST_STEPS) + 1 + len(HIDE_STATS)
+# 10-24 flight_stats 의 episode (link_cover_steps·link_other_steps 는 정의 칸)
+EPISODE_STATS = ("started", "chased", "hidden", "caught", "starved", "other", "truncated", "watching", "other_chased", "joined", "joined_cover",
+                 "joined_other", "window_caught", "window_starved")
+STATS_LEN = 4 + 3 * len(FLIGHT_CAUSES) + 4 + len(FLIGHT_HIST_STEPS) + 1 + len(HIDE_STATS) + len(EPISODE_STATS)
 WATCH_CHUNK_BITS = 25                                               # 지켜보기 칸 비트 덩이 (int32 골든 칸 — 부호 비트를 쓰지 않는다)
 WATCH_CHUNKS = -(-FLIGHT_HIDE_WATCH_STEPS // WATCH_CHUNK_BITS)
-TRACK_LEN = 7 + WATCH_CHUNKS
+EPISODE_TRACK = 4                                                   # 10-24 사건 칸 _fe_open·_fe_chased·_fe_cover·_fe_until
+TRACK_LEN = 7 + WATCH_CHUNKS + EPISODE_TRACK
+EPISODE_TICKS = 200                                                 # 쫓김 사건 장면 길이
 
 
 def c_array(ctype: str, name: str, flat: list, per_line: int, fmt) -> str:
@@ -107,6 +117,10 @@ def stats_row(f: dict) -> list[int]:
     if h["watch_steps"] != FLIGHT_HIDE_WATCH_STEPS:
         raise SystemExit(f"hide watch_steps {h['watch_steps']} != {FLIGHT_HIDE_WATCH_STEPS}")
     out += [h[k] for k in HIDE_STATS]
+    e = f["episode"]                                                # 10-24 쫓김 사건
+    if (e["link_cover_steps"], e["link_other_steps"]) != (EPISODE_LINK_COVER_STEPS, EPISODE_LINK_OTHER_STEPS):
+        raise SystemExit(f"episode 이음 창 {e['link_cover_steps']}·{e['link_other_steps']} != {EPISODE_LINK_COVER_STEPS}·{EPISODE_LINK_OTHER_STEPS}")
+    out += [e[k] for k in EPISODE_STATS]
     if len(out) != STATS_LEN:
         raise SystemExit(f"보고 칸 수 {len(out)} != {STATS_LEN}")
     return [int(v) for v in out]
@@ -134,6 +148,7 @@ def track_rows(w: World) -> list[int]:
     for i in range(w.N):
         out += [int(w._fl_len[i]), int(w._fl_contact[i]), int(w._fl_reflex[i]), int(bool(w._fl_chased[i])), int(w._fl_why[i]),
                 int(bool(w._fl_end_now[i])), int(bool(w._fl_end_cov[i]))] + watch_chunks(w._fl_watch[i])
+        out += [int(bool(w._fe_open[i])), int(bool(w._fe_chased[i])), int(bool(w._fe_cover[i])), int(w._fe_until[i])]     # 10-24 사건 칸
     return out
 
 
@@ -393,6 +408,80 @@ def scene_hide() -> Scene:
     return sc
 
 
+def scene_episode() -> Scene:
+    """10-24 쫓김 사건 (tests/test_flight_v3.py test_episode_* 를 한 장면에, 사슴 22 × 200 틱 — 시계 = 틱 번호). 도망 (i, a, b) = 사슴 i 가 틱 a~b 에
+    FLEE 를 실행하고 마지막 틱 b 에 늑대 표적(은신처 원 안이면 cover, 밖이면 held 로 틱 b + 1 에 닫힌다 — 이음 창 마지막 틱은 cover b + 75, 그 밖 b + 38):
+      0 은 은신처 끝(틱 0) 뒤 틱 75(마지막 틱)에 다시 도망 → 이어짐, 1 은 틱 76 → 새 사건(앞 사건 틱 75 숨음), 2 는 held 끝(틱 0) 뒤 틱 38 → 이어짐, 3 은 틱 39
+      → 새 사건(앞 사건 틱 38 그 밖), 4 는 은신처 끝 뒤 다시 뛴 도망 중 잡힘(사건 잡힘), 5 는 held 끝 뒤 다시 뛴 도망 중 굶음(사건 굶음), 6 은 은신처 끝 뒤
+      지켜보기 마지막 틱 76 에 잡힘(사건 잡힘), 7 은 그 다음 틱 77 에 잡힘(사건은 틱 76 에 숨음으로 닫힘), 8 은 지켜보기 안 굶음, 9 는 held 끝 뒤 5 초 창 안
+      잡힘(그 밖 · window_caught), 10 은 닫는 틱 굶음(그 밖 · window_starved), 11 은 은신처 끝 닫는 틱 잡힘(사건 잡힘), 12 는 안 쫓긴 도망뿐(쫓기지 않은
+      그 밖), 13 은 안 쫓긴 도망 뒤 5 초 창 안 쫓긴 은신처 도망(이어짐 → 숨음), 14 는 은신처 끝 뒤 잡혀 다시 난 개체가 다음 틱부터 판 끝까지 뜀(새 사건 —
+      잘림), 15 는 held 끝 뒤 5 초 창 안 잡혀 다시 난 개체가 뜀(새 사건 → 그 밖), 16 은 판 끝에 은신처 뒤 지켜보기 안(숨음 · watching), 17 은 판 끝에
+      held 끝 뒤 5 초 창 안(잘림), 18 은 판 끝에 열린 도망(잘림), 19 는 은신처 끝 뒤 창 안에서 다시 뛰어 판 끝까지(이어짐 · 잘림), 20 은 held·held·은신처로
+      두 번 이어짐(숨음), 21 은 은신처 들락날락 세 번(도망 단위 숨음 셋 · 사건 숨음 하나).
+    죽은 칸은 다음 틱부터 새 개체다(장면 그릇은 늘 산다)."""
+    T = EPISODE_TICKS
+    sc = Scene("쫓김 사건 (이음 창 경계·사건 안 잡힘·굶음·지켜보기 안 죽음·5 초 창 안 죽음·들락날락·다시 난 개체·판 끝 잘림·지켜보는 중)", 22)
+    M = sc.M
+    C, O = EPISODE_LINK_COVER_STEPS, EPISODE_LINK_OTHER_STEPS
+    flee = [set() for _ in range(T)]
+    tgt = [[] for _ in range(T)]                                    # 그 틱의 표적 사슴 (늑대 차례대로)
+    cov = [set() for _ in range(T)]
+    die = [dict() for _ in range(T)]                                # 사슴 → 잡힘인가
+
+    def run(i, a, b, cover=False, chase=True, first=False):
+        for t in range(a, b + 1):
+            flee[t].add(i)
+        if chase:
+            tgt[a if first else b].append(i)
+        if cover:
+            cov[b].add(i)
+
+    run(0, 0, 0, cover=True), run(0, C, C, cover=True)
+    run(1, 0, 0, cover=True), run(1, C + 1, C + 1)
+    run(2, 0, 0), run(2, O, O, cover=True)
+    run(3, 0, 0), run(3, O + 1, O + 1, cover=True)
+    run(4, 1, 1, cover=True), run(4, 6, 7, first=True), tgt[7].append(4)
+    die[7][4] = True
+    run(5, 1, 1), run(5, 3, 4, first=True)
+    die[4][5] = False
+    run(6, 1, 1, cover=True)
+    die[1 + C][6] = True
+    run(7, 1, 1, cover=True)
+    die[2 + C][7] = True
+    run(8, 2, 2, cover=True)
+    die[20][8] = False
+    run(9, 2, 2)
+    die[12][9] = True
+    run(10, 2, 2)
+    die[3][10] = False
+    run(11, 2, 2, cover=True)
+    die[3][11] = True
+    run(12, 5, 5, chase=False)
+    run(13, 5, 5, chase=False), run(13, 20, 20, cover=True)
+    run(14, 3, 3, cover=True), run(14, 11, T - 1, first=True)
+    die[10][14] = True
+    run(15, 3, 3), run(15, 6, 6)
+    die[5][15] = True
+    run(16, T - 10, T - 10, cover=True)
+    run(17, T - 10, T - 10)
+    run(18, T - 5, T - 1, first=True)
+    run(19, T - 80, T - 80, cover=True), run(19, T - 6, T - 1, first=True)
+    run(20, 10, 10), run(20, 30, 30), run(20, 60, 60, cover=True)
+    run(21, 10, 10, cover=True), run(21, 20, 20, cover=True), run(21, 40, 40, cover=True)
+    for t in range(T):
+        if len(tgt[t]) > M:
+            raise SystemExit(f"쫓김 사건 장면 틱 {t}: 표적 {len(tgt[t])} > 늑대 {M}")
+        sc.tick(sorted(flee[t]), tgt=tgt[t] + [-1] * (M - len(tgt[t])), done=sorted(die[t]), caught=sorted(i for i, c in die[t].items() if c),
+                in_cov=sorted(cov[t]))
+    e = dict(sc.w.flight_stats()["episode"])
+    want = dict(started=26, chased=21, hidden=9, caught=4, starved=2, other=7, truncated=4, watching=1, other_chased=6, joined=10, joined_cover=5,
+                joined_other=5, window_caught=2, window_starved=1, link_cover_steps=C, link_other_steps=O)
+    if e != want:
+        raise SystemExit(f"쫓김 사건 장면이 짠 대로가 아니다: {e}")
+    return sc
+
+
 # --------------------------------------------------------------------- #
 # 기준 루프 (거울 세계 600 스텝)
 # --------------------------------------------------------------------- #
@@ -531,7 +620,9 @@ def build_header() -> str:
         raise SystemExit("놓침 까닭 번호가 바뀌었다 — C++ kFlDrop* 와 맞춘다")
     if (rep.GRAZE, rep.FLEE, rep.HIDE, rep.FREEZE, rep.SLEEP) != (0, 1, 2, 3, 4):
         raise SystemExit("행동 번호가 바뀌었다 — C++ kPrey* 와 맞춘다")
-    scenes = [scene_end_causes(), scene_cover_held(), scene_priority(), scene_random(), scene_hide()]
+    if EPISODE_OUTCOMES != ("hidden", "caught", "starved", "other", "truncated"):
+        raise SystemExit("사건 결과 차례가 바뀌었다 — C++ kEpisode* 와 맞춘다")
+    scenes = [scene_end_causes(), scene_cover_held(), scene_priority(), scene_random(), scene_hide(), scene_episode()]
     loop = loop_world()
     pairs, pc = pair_scenes()
 
@@ -560,14 +651,22 @@ def build_header() -> str:
     L.append(c_array("std::int32_t", "kNotChased", [FLIGHT_CAUSES.index(c) for c in FLIGHT_NOT_CHASED], 8, i_lit))
     L.append(f"\tinline constexpr std::int32_t kWatchChunks = {WATCH_CHUNKS};   // 사슴 칸의 지켜보기 칸 비트 덩이 수")
     L.append(f"\tinline constexpr std::int32_t kWatchChunkBits = {WATCH_CHUNK_BITS};")
+    L.append("\t// 10-24 쫓김 사건 (EPISODE_LINK_COVER_STEPS·EPISODE_LINK_OTHER_STEPS — 은신처 끝·그 밖 끝 뒤 이음 창, EPISODE_OUTCOMES — 사건 결과 차례)")
+    L.append(f"\tinline constexpr std::int32_t kEpLinkCoverSteps = {EPISODE_LINK_COVER_STEPS};")
+    L.append(f"\tinline constexpr std::int32_t kEpLinkOtherSteps = {EPISODE_LINK_OTHER_STEPS};")
+    L.append(f"\tinline constexpr std::int32_t kNumEpOutcomes = {len(EPISODE_OUTCOMES)};")
+    L.append("\tinline constexpr const char* kEpOutcomeNames[kNumEpOutcomes] = {" + ", ".join(f'"{c}"' for c in EPISODE_OUTCOMES) + "};")
+    L.append(f"\tinline constexpr std::int32_t kEpTrackLen = {EPISODE_TRACK};   // 사슴 칸 끝의 사건 칸 수 (_fe_open, _fe_chased, _fe_cover, _fe_until)")
     L.append(f"\tinline constexpr std::int32_t kStatsLen = {STATS_LEN};   // started, live_steps, flee_steps, reflex_steps, n·steps·contact × 11, own_n, own_steps, "
-             "own_contact, shelter_end, hist × 8, hide (chased, hidden, watching, cover_then_caught, cover_then_starved)")
+             "own_contact, shelter_end, hist × 8, hide (chased, hidden, watching, cover_then_caught, cover_then_starved), episode (" + ", ".join(EPISODE_STATS)
+             + ")")
     L.append(f"\tinline constexpr std::int32_t kTrackLen = {TRACK_LEN};   // _fl_len, _fl_contact, _fl_reflex, _fl_chased, _fl_why, _fl_end_now, _fl_end_cov, "
-             f"_fl_watch 비트 덩이 × {WATCH_CHUNKS}")
+             f"_fl_watch 비트 덩이 × {WATCH_CHUNKS}, _fe_open, _fe_chased, _fe_cover, _fe_until")
     L.append("")
 
     # 짜 맞춘 장면
-    L.append("\t// ---- 짜 맞춘 장면 (tests/test_flight_v3.py `_tick` 장면 셋 + 난수 장면 + 10-23 숨은 뒤 지켜보기 장면). 틱마다 사슴 재료 비트 N 개, 늑대 재료 비트·")
+    L.append("\t// ---- 짜 맞춘 장면 (tests/test_flight_v3.py `_tick` 장면 셋 + 난수 장면 + 10-23 숨은 뒤 지켜보기 장면 + 10-24 쫓김 사건 장면). 틱마다 사슴 재료 비트 "
+             "N 개, 늑대 재료 비트·")
     L.append("\t//      표적·지난 표적 M 개씩,")
     L.append("\t//      그 뒤 보고 kStatsLen·사슴 칸 kTrackLen × N·늑대 지난 표적(_fl_tgt) M. 장면마다 처음 상태(빈 도망)에서 시작한다 ----")
     L.append(f"\tinline constexpr std::int32_t kSceneCount = {len(scenes)};")
@@ -600,7 +699,8 @@ def build_header() -> str:
     f = loop["final"]
     L.append(f"\t// ---- 기준 루프: 거울 세계 사슴 {w.N}·늑대 {w.M}, 무작위 요청(먹기·도망·숨기, 난수 시드 {LOOP_ACTS_SEED}) {LOOP_STEPS} 스텝. 스텝마다 재료,")
     L.append(f"\t//      {LOOP_EVERY} 스텝마다 보고·사슴 칸·늑대 지난 표적. 끝 보고: 시작 {f['started']} · 끝 까닭 "
-             + " ".join(f"{c} {f['n'][c]}" for c in FLIGHT_CAUSES if f['n'][c]) + f" · 스스로 {f['own_n']} ----")
+             + " ".join(f"{c} {f['n'][c]}" for c in FLIGHT_CAUSES if f['n'][c]) + f" · 스스로 {f['own_n']} · 사건 시작 {f['episode']['started']} "
+             f"(쫓긴 {f['episode']['chased']} · 숨음 {f['episode']['hidden']} · 이어진 도망 {f['episode']['joined']}) ----")
     L.append(f"\tinline constexpr std::int32_t kLoopN = {w.N};")
     L.append(f"\tinline constexpr std::int32_t kLoopM = {w.M};")
     L.append(f"\tinline constexpr std::int32_t kLoopSteps = {LOOP_STEPS};")
@@ -661,7 +761,7 @@ def build_header() -> str:
         counts += [(v >> b) & 1 for b in range(4)]
     print(f"짜 맞춘 장면 {len(scenes)} (틱 {sum(len(sc.stats) for sc in scenes)}) · 기준 루프 {LOOP_STEPS} 스텝 (시작 {f['started']}, 스스로 {f['own_n']}, "
           f"끝 까닭 { {c: f['n'][c] for c in FLIGHT_CAUSES if f['n'][c]} }) · 쌍 장면 {P} (반경 안 {counts[0]} · 반경과 시야각 {counts[1]} · "
-          f"가림 {counts[2]} · 은신처 {counts[3]} / {len(fl)}, 사냥 못 함 {len(hu) - sum(hu)})")
+          f"가림 {counts[2]} · 은신처 {counts[3]} / {len(fl)}, 사냥 못 함 {len(hu) - sum(hu)}) · 기준 루프 사건 {f['episode']}")
     return "\n".join(L)
 
 

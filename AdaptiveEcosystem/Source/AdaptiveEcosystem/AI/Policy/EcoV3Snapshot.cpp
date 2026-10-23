@@ -199,12 +199,20 @@ namespace EcoV3SnapshotImpl
 		J->SetNumberField(TEXT("mean_seconds"), S.MeanSeconds());
 		J->SetNumberField(TEXT("own_chase_seconds"), S.OwnChaseSeconds());
 		J->SetNumberField(TEXT("own_share"), S.OwnShare());
-		// 10-23 쫓긴 도망 중 숨음·잡힘 (관문 1차 숨음 비율·지킴 GH 와 같은 몫 — EcoV3FlightTally.h)
+		// 10-23 쫓긴 도망 중 숨음·잡힘 (옛 도망 단위 1차 숨음 비율·GH — 10-24 부터 보고만, EcoV3FlightTally.h)
 		J->SetNumberField(TEXT("chased"), static_cast<double>(S.Chased));
 		J->SetNumberField(TEXT("hidden"), static_cast<double>(S.Hidden));
 		J->SetNumberField(TEXT("caught"), static_cast<double>(S.Caught));
 		J->SetNumberField(TEXT("hide_share"), S.HideShare());
 		J->SetNumberField(TEXT("caught_share"), S.CaughtShare());
+		// 10-24 닫힌 쫓김 사건 (관문 1차 사건 숨음 비율·지킴 GH 와 같은 몫 — 화면 '쫓긴 사건 중 숨음·잡힘', EcoV3FlightTally.h)
+		J->SetNumberField(TEXT("ep_started"), static_cast<double>(S.EpStarted));
+		J->SetNumberField(TEXT("ep_ended"), static_cast<double>(S.EpEnded));
+		J->SetNumberField(TEXT("ep_chased"), static_cast<double>(S.EpChased));
+		J->SetNumberField(TEXT("ep_hidden"), static_cast<double>(S.EpHidden));
+		J->SetNumberField(TEXT("ep_caught"), static_cast<double>(S.EpCaught));
+		J->SetNumberField(TEXT("ep_hide_share"), S.EpHideShare());
+		J->SetNumberField(TEXT("ep_caught_share"), S.EpCaughtShare());
 		return J;
 	}
 
@@ -672,6 +680,22 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 				H->SetNumberField(TEXT("cover_then_starved"), static_cast<double>(F.CoverStarved));
 				H->SetNumberField(TEXT("watch_steps"), EcoWorldV3::kFlightHideWatchSteps);
 				J->SetObjectField(TEXT("hide"), H);
+			}
+			{
+				// 10-24 쫓김 사건 (파이썬 flight_stats 의 episode 와 같은 이름·정의 — EcoWorldV3.h 머리 주석 '쫓김 사건'. 지금 열린 사건은 지켜본 만큼 숨음·잘림)
+				TSharedRef<FJsonObject> E = MakeShared<FJsonObject>();
+				const TPair<const TCHAR*, int64> EpFields[] = {
+					{TEXT("started"), F.EpStarted}, {TEXT("chased"), F.EpChased}, {TEXT("hidden"), F.EpHidden}, {TEXT("caught"), F.EpCaught},
+					{TEXT("starved"), F.EpStarved}, {TEXT("other"), F.EpOther}, {TEXT("truncated"), F.EpTruncated}, {TEXT("watching"), F.EpWatching},
+					{TEXT("other_chased"), F.EpOtherChased}, {TEXT("joined"), F.EpJoined}, {TEXT("joined_cover"), F.EpJoinedCover},
+					{TEXT("joined_other"), F.EpJoinedOther}, {TEXT("window_caught"), F.EpWindowCaught}, {TEXT("window_starved"), F.EpWindowStarved}};
+				for (const TPair<const TCHAR*, int64>& Fd : EpFields)
+				{
+					E->SetNumberField(Fd.Key, static_cast<double>(Fd.Value));
+				}
+				E->SetNumberField(TEXT("link_cover_steps"), EcoWorldV3::kEpisodeLinkCoverSteps);
+				E->SetNumberField(TEXT("link_other_steps"), EcoWorldV3::kEpisodeLinkOtherSteps);
+				J->SetObjectField(TEXT("episode"), E);
 			}
 			const EcoV3Flight::FTally& T = Ctx.FlightTally;
 			J->SetNumberField(TEXT("window_steps"), static_cast<double>(T.WindowSteps()));

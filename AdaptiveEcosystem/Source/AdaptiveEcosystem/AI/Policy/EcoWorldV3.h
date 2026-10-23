@@ -77,7 +77,8 @@
 //   FWorldConfig::bFlightStats     야생 (w3) 도망 기록 (10-21, FWorldStats::Flight·FHerbDecision::Flight — world.py track_flight·flight_stats). 기록만, WildFlight 를
 //                                  켠 세계만. C2 의 위협 Step 바로 앞에 지난 표적과의 표적 고르기 쌍을 재고(FlightPairOf), H 의 UpdateWildFlight 앞에 한 스텝을 센다.
 //                                  통합 모드가 켠다. 골든 FlightGoldenVectorsV3.h (herbivore_rl/export_golden_v3_flight.py), 시험 Tests/EcoFlightV3Test.cpp.
-//                                  10-23 숨은 뒤 10 초 지켜보기(실시간 관문 1차 숨음 비율 — FFlightReport::Hidden 등, world.py flight_stats 의 hide)도 같은 훅이 센다
+//                                  10-23 숨은 뒤 10 초 지켜보기(옛 1차 숨음 비율 — FFlightReport::Hidden 등, world.py flight_stats 의 hide)와 10-24 쫓김 사건(실시간
+//                                  관문 1차 사건 숨음 비율·GH·GE — FFlightReport::Ep*, world.py flight_stats 의 episode)도 같은 훅이 센다
 //   FWorldState::ObsDim            R5 장애물 관측 (10-19, 계약 2-4). 지금 두뇌의 관측 칸 수 18·21 (SetModelObsDim — 통합 모드 두뇌 바꾸기가 정한다). 21 이면 E 에서
 //                                  사슴마다 세 칸(FHerbPerception::ObstacleObs — EcoObservationV3::ObstacleObsValues)을 더 만들고 H 의 망 입력이 18 + 3 칸이다.
 //                                  bObstacleObsProbe 는 관측 18 두뇌여도 세 칸을 만든다(대조 기록 전용). 기본 18·끔 = 지금 그대로 (조각 바이트도 같다)
@@ -547,6 +548,32 @@ namespace EcoWorldV3
 	//   도망 하나만 닫으므로 칸마다 0·1 이다(새 칸 = 지금 + 74 의 칸은 지난 스텝에 끝난 칸이라 늘 비어 있다). 통합 모드에서 죽음 기록 없이 목록에서 빠진 사슴
 	//   (팀 규칙이 HP 를 0 으로 하거나 개체를 지움 — 단계 함수 밖)의 지켜보기는 Watching 에서 빠지고 Hidden 에는 지켜본 만큼 남는다(판 끝과 같은 셈 — 화면
 	//   집계 EcoV3FlightTally.h FSum 과 같은 값. 단계 함수 안의 죽음은 죽은 스텝에 끝내므로 이 경우가 아니다)
+	// 쫓김 사건 (10-24 사람 결정 "'쫓김 사건' 단위로 셈" — 실시간 관문 1차 사건 숨음 비율·지킴 GH·GE, herbivore_rl/results/v3/live/LIVE_GATE.md 변경 기록 (7).
+	//   R7 결과를 본 뒤 정한 규칙 변경이다: 도망 하나하나를 세면 은신처로 끝난 도망 뒤 몇 초 만에 도주 반사가 다시 켜져 또 뛴 '은신처 들락날락'이 숨음을 두 번
+	//   세어 숨음 비율을 부풀릴 수 있다. 같은 기록 훅 안의 통계 전용 칸, world.py 모듈 docstring '쫓김 사건'·`_fl_update` 의 5)·`flight_stats` 의 episode 와 같다.
+	//   위 도망 한 번·숨은 뒤 지켜보기 셈은 그대로 두고 옆에 더한다):
+	//   같은 사슴의 도망이 이어지는 조건(사전 등록): 앞 도망이 은신처로 끝났으면 그 마지막 FLEE 스텝 뒤 kEpisodeLinkCoverSteps(= kFlightHideWatchSteps 75 —
+	//   10 초 지켜보기와 같은 스텝들), 그 밖 끝 까닭으로 살아 끝났으면 kEpisodeLinkOtherSteps(= kFlightRefleeSteps 38 — GR '살아 끝난 도망 뒤 5 초 안 다시
+	//   도망'과 같은 경계: 다음 도망의 첫 FLEE 스텝 − 앞 도망의 마지막 FLEE 스텝 ≤ 38) 안(그 스텝 포함)에 다음 도망이 시작하면 같은 사건, 아니면 새 사건.
+	//   사건 결과 (서로 겹치지 않는다, kEpisode* — 합 = 사건 시작):
+	//     잡힘·굶음: 사건 안 어느 도망이 FLEE 스텝에 잡힘·굶음으로 끝남, 또는 마지막 도망이 은신처로 끝난 뒤 이음 창(10 초 지켜보기) 안에 잡힘·굶음 (그 사슴이
+	//       죽으면 사건은 그 스텝에 닫는다 — 닫는 스텝에 죽은 것도 그 안이다. 평면 맵에서 죽은 칸에 다시 난 개체는 새 사건이다)
+	//     숨음: 마지막 도망이 은신처로 끝났고 이음 창을 다음 도망 없이 잡히지·굶지 않고 지남. 보고 때 아직 그 창 안이면 지켜본 만큼 본다 — 숨음에 넣고
+	//       Watching 으로도 적는다(잘림이 아니다)
+	//     그 밖: 마지막 도망이 은신처 밖 까닭으로 살아 끝났고 이음 창(5 초)을 다음 도망 없이 지남. 그 창 안에 도망 없이 죽어도 사건은 그 스텝에 닫고 결과는
+	//       그 밖이다(사전 등록 정의가 말하지 않아 파이썬 코드가 정한 칸 — 도망 밖 죽음은 은신처 뒤 10 초만 잡힘·굶음). 그 죽음은 WindowCaught·WindowStarved
+	//       로 따로 적는다(보고만)
+	//     잘림: 보고 때 닫히지 않은 사건 — 마지막 도망이 아직 열려 있거나, 마지막 도망이 은신처 밖 까닭으로 끝나 5 초 이음 창 안
+	//   쫓긴 사건 = 잘림이 아니고 사건 안에 끝 까닭이 안 쫓김이 아닌 도망이 하나라도 있는 사건 (숨음·잡힘·굶음은 모두 쫓긴 사건이다 — 그 밖 가운데 쫓긴 것
+	//   OtherChased). 사건 숨음 비율 = 숨음 / 쫓긴 사건, 사건 잡힘 비율 = 잡힘 / 쫓긴 사건 (관문은 시드마다 지역 셋의 분자·분모를 각각 더해 나눈다).
+	//   GE = 1000 × 사건 시작 / 산 사슴-스텝. 보고 칸 EpJoinedCover·EpJoinedOther = 은신처 뒤·그 밖 뒤 이음 창 안에서 시작해 앞 사건에 이어진 도망 수.
+	//   시계 = FFlightStats::Clock (지켜보기와 같다). 사슴마다 열린 사건 하나(FFlightTrack::bEpOpen — 도망 중이거나, 마지막 도망이 살아 끝나 이음 창
+	//   EpUntil 까지 안). 파이썬과 같은 꼴: 사건이 닫혀도 bEpOpen 만 내리고 bEpChased·bEpCover·EpUntil 은 남긴다(열린 사건에서만 읽는다 — `_fe_*` 와 같다).
+	//   보고(FlightReportOf)의 숨음은 누적 식 '은신처로 끝난 도망 − 그 뒤 이음 창 안 이어진 도망(EpJoined[0]) − 그 창 안 잡힘·굶음(EpCoverDied)'으로 낸다
+	//   (사슴 칸이 모두 있으면 '닫힌 숨음(EpClosed[kEpisodeHidden]) + 지금 은신처 뒤 창 안(Watching)'과 같은 값 — 파이썬 n[0] + watching. 은신처로 끝난
+	//   도망은 늘 열린 사건 안에서 닫히고, 그 사건은 이어짐·죽음·숨음으로 닫힘·아직 창 안 가운데 하나로만 그 상태를 떠난다), 잘림은 '사건 시작 − 숨음 − 잡힘 −
+	//   굶음 − 그 밖'이다. 그래서 통합 모드에서 죽음 기록 없이 목록에서 빠진 사슴의 열린 사건도 합 = 사건 시작이 늘 선다(은신처 뒤 창 안이던 것은 지켜본 만큼
+	//   숨음, 그 밖은 잘림 — 숨은 뒤 지켜보기의 Hidden 과 같은 셈). 화면 집계(EcoV3FlightTally.h FSum)는 닫힌 사건만 센다(EpClosed — 창·두뇌 판 차이가 늘 0 이상)
 	inline constexpr std::int32_t kNumFlightCauses = 11;
 	inline constexpr std::int32_t kFlightCover = 0;       // 스스로: 은신처 (끝 스텝 원 안, 또는 원 안이라 표적에서 빠짐)
 	inline constexpr std::int32_t kFlightObstacle = 1;    // 스스로: 원판(나무 줄기·바위)이 늑대 눈길을 가림
@@ -568,6 +595,19 @@ namespace EcoWorldV3
 	inline constexpr std::int32_t kNumFlightNotChased = 2;
 	inline constexpr std::int32_t kFlightNotChased[kNumFlightNotChased] = {kFlightUnchased, kFlightTruncated};
 	static_assert(kFlightHideWatchSteps > 1 && kFlightHideWatchSteps <= 128, "지켜보기 칸은 사슴마다 64 비트 둘 (FFlightTrack::Watch)");
+	// 쫓김 사건 (10-24 — world.py EPISODE_LINK_COVER_STEPS·EPISODE_LINK_OTHER_STEPS·FLIGHT_REFLEE_STEPS·EPISODE_OUTCOMES, 머리 주석 '쫓김 사건'):
+	// 앞 도망의 마지막 FLEE 스텝 뒤 이 스텝 수 안(그 스텝 포함)에 같은 사슴의 다음 도망이 시작하면 같은 사건. 은신처 끝 = 10 초 지켜보기와 같은 75 스텝,
+	// 그 밖 끝 = GR(살아 끝난 도망 뒤 5 초 안 다시 도망 — 파이썬 도망길 기록 refled, C++ 에는 도망길 기록이 없어 이 경계만 쓴다)과 같은 38 스텝
+	inline constexpr std::int32_t kFlightRefleeSteps = 38;
+	inline constexpr std::int32_t kEpisodeLinkCoverSteps = kFlightHideWatchSteps;
+	inline constexpr std::int32_t kEpisodeLinkOtherSteps = kFlightRefleeSteps;
+	inline constexpr std::int32_t kNumEpisodeOutcomes = 5;   // 사건 결과 (서로 겹치지 않는다, 합 = 사건 시작) — 앞 넷은 닫힌 사건(FFlightStats::EpClosed)
+	inline constexpr std::int32_t kEpisodeHidden = 0;
+	inline constexpr std::int32_t kEpisodeCaught = 1;
+	inline constexpr std::int32_t kEpisodeStarved = 2;
+	inline constexpr std::int32_t kEpisodeOther = 3;
+	inline constexpr std::int32_t kEpisodeTruncated = 4;      // 보고 때 닫히지 않은 사건 (보고만 낸다)
+	inline constexpr std::int32_t kNumEpisodeClosed = 4;
 	// 놓침 까닭 (FL_DROP_*): 뒤 번호가 앞선다
 	inline constexpr std::int32_t kFlDropNone = 0;
 	inline constexpr std::int32_t kFlDropRange = 1;
@@ -594,6 +634,13 @@ namespace EcoWorldV3
 		return Cause >= 0 && Cause < kNumFlightCauses ? Names[Cause] : "?";
 	}
 
+	/** 사건 결과 이름 (파이썬 EPISODE_OUTCOMES 와 같은 글자 — 스냅숏·골든). */
+	inline const char* EpisodeOutcomeName(std::int32_t Outcome)
+	{
+		static const char* const Names[kNumEpisodeOutcomes] = {"hidden", "caught", "starved", "other", "truncated"};
+		return Outcome >= 0 && Outcome < kNumEpisodeOutcomes ? Names[Outcome] : "?";
+	}
+
 	/** 사슴 하나의 열린 도망 (FHerbDecision::Flight — world.py `_fl_*` 칸의 한 행). */
 	struct FFlightTrack
 	{
@@ -609,6 +656,11 @@ namespace EcoWorldV3
 		// 10-23 숨은 뒤 지켜보기 (머리 주석): 비트 j = 마지막으로 보는 스텝(FFlightStats::Clock 시계) mod kFlightHideWatchSteps 가 j 인 지켜보기
 		// (world.py `_fl_watch` 의 이 사슴 행 — 칸마다 0·1). 도망이 닫혀도 남는다(FlightClose 는 건드리지 않는다)
 		std::uint64_t Watch[2] = {0, 0};
+		// 10-24 쫓김 사건 (머리 주석 — world.py `_fe_*` 의 이 사슴 행). 도망이 닫혀도 남고(FlightClose 는 건드리지 않는다), 사건이 닫혀도 bEpOpen 만 내린다
+		bool bEpOpen = false;        // 열린 사건이 있나 (도망 중이거나, 마지막 도망이 살아 끝나 이음 창 안 — _fe_open)
+		bool bEpChased = false;      // 열린 사건 안에 끝 까닭이 안 쫓김이 아닌 닫힌 도망이 있나 (_fe_chased)
+		bool bEpCover = false;       // 열린 사건의 마지막 도망이 은신처로 살아 끝났나 — 도망 중이면 거짓 (_fe_cover)
+		std::int64_t EpUntil = 0;    // 이음 창의 마지막 스텝 (FFlightStats::Clock 시계 — 다음 도망이 이 스텝까지 시작하면 같은 사건, _fe_until)
 	};
 
 	/** 지켜보기 칸 Col (0 ≤ Col < kFlightHideWatchSteps)이 열려 있나. */
@@ -648,6 +700,13 @@ namespace EcoWorldV3
 		std::int64_t Hidden = 0;                         // 75 스텝을 끝까지 지켜본 숨어 살아남은 도망 (_fl_hidden)
 		std::int64_t CoverCaught = 0;                    // 끝 까닭 은신처이고 지켜보는 동안 잡힘 (cover_then_caught)
 		std::int64_t CoverStarved = 0;                   // 끝 까닭 은신처이고 지켜보는 동안 굶음 (cover_then_starved)
+		// 10-24 쫓김 사건 (머리 주석 — 열린 사건은 사슴 쪽 FFlightTrack::bEpOpen, 보고는 FlightReportOf). 모두 늘기만 하는 누적이다
+		std::int64_t EpStarted = 0;                      // 시작한 사건 (_fe_started — 도망 시작 = 사건 시작 + 이어진 도망)
+		std::int64_t EpClosed[kNumEpisodeClosed] = {};   // 닫힌 사건 수 — 결과 숨음·잡힘·굶음·그 밖 (kEpisode* 차례, _fe_n)
+		std::int64_t EpOtherChased = 0;                  // 닫힌 그 밖 가운데 쫓긴 사건 (_fe_other_chased)
+		std::int64_t EpJoined[2] = {};                   // 앞 사건에 이어진 도망 — 은신처 끝 뒤·그 밖 끝 뒤 이음 창 안에서 시작 (_fe_joined)
+		std::int64_t EpCoverDied[2] = {};                // 은신처 끝 뒤 이음 창 안에 도망 없이 잡힘·굶음 (결과 잡힘·굶음의 일부 — 보고의 숨음 식 재료, C++ 만)
+		std::int64_t EpWinDied[2] = {};                  // 그 밖 끝 뒤 이음 창 안에 도망 없이 잡힘·굶음 (결과 그 밖의 일부 — _fe_win_died, 보고만)
 	};
 
 	/** 한 스텝의 사슴 재료 (world.py `_fl_update` 인자의 한 행). 단계 함수는 산 사슴만 넘기므로 bAlive0 은 늘 참이다 (골든 되풀이만 거짓을 쓴다). */
@@ -824,6 +883,11 @@ namespace EcoWorldV3
 					// 10-23 숨은 뒤 지켜보기: 이번 스텝(끝 스텝 다음)부터 kFlightHideWatchSteps 스텝 — 마지막으로 보는 스텝의 칸 (늘 비어 있다 — 머리 주석)
 					T.Watch[OpenCol >> 6] |= 1ULL << (OpenCol & 63);
 				}
+				// 10-24 쫓김 사건: 살아 끝난 도망의 사건은 이음 창에 든다 — 마지막 FLEE 스텝(= 지금 시계 − 1) 뒤 은신처면 kEpisodeLinkCoverSteps(10 초
+				// 지켜보기와 같은 마지막 스텝 지금 + 74), 그 밖이면 kEpisodeLinkOtherSteps(GR 과 같은 경계) 스텝까지 다음 도망이 시작하면 같은 사건
+				T.bEpChased = T.bEpChased || Cause != kFlightUnchased;
+				T.bEpCover = Cause == kFlightCover;
+				T.EpUntil = S.Clock - 1 + (T.bEpCover ? kEpisodeLinkCoverSteps : kEpisodeLinkOtherSteps);
 				FlightClose(S, T, Cause);
 			}
 			if (bEx)
@@ -832,6 +896,18 @@ namespace EcoWorldV3
 				if (T.Len == 0)
 				{
 					++S.Started;
+					// 10-24 쫓김 사건: 열린 사건(이음 창 안 — 창이 지난 사건은 지난 스텝 끝에 닫았다)이면 그 사건에 잇고, 아니면 새 사건
+					if (T.bEpOpen)
+					{
+						++S.EpJoined[T.bEpCover ? 0 : 1];
+					}
+					else
+					{
+						++S.EpStarted;
+						T.bEpOpen = true;
+						T.bEpChased = false;
+					}
+					T.bEpCover = false;
 					T.bChased = Prev != 0;
 					T.Why = kFlDropNone;
 					T.bWhyFol = false;
@@ -888,6 +964,43 @@ namespace EcoWorldV3
 				++S.Hidden;
 				T.Watch[EndCol >> 6] &= ~(1ULL << (EndCol & 63));
 			}
+			// 5) 10-24 쫓김 사건: 이번 스텝에 죽은 사슴의 사건을 닫고(평면 맵의 새 개체에 잇지 않는다), 이음 창의 마지막 스텝이 이번 스텝이고 다음 도망이
+			//    없는 사건을 닫는다 (머리 주석 '쫓김 사건' — world.py `_fl_update` 의 5))
+			if (T.bEpOpen)
+			{
+				if (Dd.bDone)
+				{
+					const std::int32_t Dk = Dd.bCaught ? 0 : 1;
+					if (bEx || T.bEpCover)
+					{
+						// 도망 중 죽음(그 도망이 잡힘·굶음) 또는 은신처 끝 뒤 10 초 지켜보기 안 죽음 (도망 중이면 bEpCover 는 늘 거짓이다)
+						++S.EpClosed[Dd.bCaught ? kEpisodeCaught : kEpisodeStarved];
+						S.EpCoverDied[Dk] += bEx ? 0 : 1;
+					}
+					else
+					{
+						// 은신처 밖 끝 뒤 5 초 이음 창 안에 도망 없이 죽음 → 그 밖 (사전 등록 그대로)
+						++S.EpClosed[kEpisodeOther];
+						S.EpOtherChased += T.bEpChased ? 1 : 0;
+						++S.EpWinDied[Dk];
+					}
+					T.bEpOpen = false;
+				}
+				else if (T.Len == 0 && T.EpUntil <= S.Clock)
+				{
+					// 은신처 끝 → 숨음, 그 밖 끝 → 그 밖
+					if (T.bEpCover)
+					{
+						++S.EpClosed[kEpisodeHidden];
+					}
+					else
+					{
+						++S.EpClosed[kEpisodeOther];
+						S.EpOtherChased += T.bEpChased ? 1 : 0;
+					}
+					T.bEpOpen = false;
+				}
+			}
 			// 다음 스텝의 지난 표적. 죽은(평면 맵은 다시 난) 사슴을 쫓던 기록은 잇지 않는다
 			T.PrevBy = Dd.bDone ? 0ULL : Now;
 		}
@@ -902,6 +1015,8 @@ namespace EcoWorldV3
 		std::int64_t Contact = 0;
 		std::int64_t Reflex = 0;
 		std::int64_t Watching = 0;   // 10-23 지금 지켜보는 도망 (숨은 뒤 지켜보기 — 도망이 닫힌 사슴에도 있다, world.py _fl_watch_open. 보고의 Watching 칸)
+		std::int64_t EpOpen = 0;     // 10-24 지금 열린 쫓김 사건 (_fe_open 합)
+		std::int64_t EpWatching = 0; // 그 가운데 마지막 도망이 은신처로 끝나 이음 창(10 초 지켜보기) 안인 사건 (보고의 사건 Watching 칸 — 지켜본 만큼 숨음)
 
 		void Add(const FFlightTrack& T)
 		{
@@ -913,6 +1028,11 @@ namespace EcoWorldV3
 				Reflex += T.Reflex;
 			}
 			Watching += FlightWatchCount(T);
+			if (T.bEpOpen)
+			{
+				++EpOpen;
+				EpWatching += (T.Len == 0 && T.bEpCover) ? 1 : 0;   // world.py `_episode_block` 의 wa = 열림 ∧ 도망 없음 ∧ 은신처 끝
+			}
 		}
 	};
 
@@ -938,6 +1058,22 @@ namespace EcoWorldV3
 		std::int64_t Watching = 0;       // 그 가운데 아직 지켜보는 것 (watching)
 		std::int64_t CoverCaught = 0;    // 끝 까닭 은신처이고 지켜보는 동안 잡힘 (cover_then_caught)
 		std::int64_t CoverStarved = 0;   // 끝 까닭 은신처이고 지켜보는 동안 굶음 (cover_then_starved)
+		// 10-24 쫓김 사건 (파이썬 flight_stats 의 episode 와 같은 칸·같은 이름 차례 — 머리 주석 '쫓김 사건'). 결과 숨음·잡힘·굶음·그 밖·잘림 합 = EpStarted,
+		// EpChased = 숨음 + 잡힘 + 굶음 + EpOtherChased, 도망 시작 Started = EpStarted + EpJoined
+		std::int64_t EpStarted = 0;        // 시작한 사건 (started)
+		std::int64_t EpChased = 0;         // 쫓긴 사건 (잘림 아님 ∧ 안 쫓김 밖 끝 도망 있음, chased)
+		std::int64_t EpHidden = 0;         // 결과 숨음 (보고 때 은신처 뒤 이음 창 안인 사건 포함 = EpWatching, hidden)
+		std::int64_t EpCaught = 0;         // 결과 잡힘 (caught)
+		std::int64_t EpStarved = 0;        // 결과 굶음 (starved)
+		std::int64_t EpOther = 0;          // 결과 그 밖 (other)
+		std::int64_t EpTruncated = 0;      // 결과 잘림 (truncated — 보고 때 닫히지 않은 사건)
+		std::int64_t EpWatching = 0;       // 숨음 가운데 아직 은신처 뒤 이음 창 안 (watching)
+		std::int64_t EpOtherChased = 0;    // 그 밖 가운데 쫓긴 사건 (other_chased)
+		std::int64_t EpJoined = 0;         // 앞 사건에 이어진 도망 (joined = joined_cover + joined_other)
+		std::int64_t EpJoinedCover = 0;    // 은신처 끝 뒤 이음 창 안에서 이어짐 (joined_cover)
+		std::int64_t EpJoinedOther = 0;    // 그 밖 끝 뒤 이음 창 안에서 이어짐 (joined_other)
+		std::int64_t EpWindowCaught = 0;   // 그 밖 끝 뒤 5 초 이음 창 안 도망 없이 잡힘 (결과 그 밖의 일부, window_caught)
+		std::int64_t EpWindowStarved = 0;  // 같은 창 안 굶음 (window_starved)
 	};
 
 	inline FFlightReport FlightReportOf(const FFlightStats& S, const FFlightOpen& Open)
@@ -989,6 +1125,22 @@ namespace EcoWorldV3
 		R.Watching = Open.Watching;
 		R.CoverCaught = S.CoverCaught;
 		R.CoverStarved = S.CoverStarved;
+		// 10-24 쫓김 사건 (머리 주석 — 숨음은 누적 식 '은신처 끝 − 그 뒤 이어진 도망 − 그 창 안 잡힘·굶음', 잘림은 '사건 시작 − 나머지 결과'. 사슴 칸이 모두
+		// 있으면 숨음 = 닫힌 숨음 + Open.EpWatching, 잘림 = Open.EpOpen − Open.EpWatching 과 같다 — 파이썬 `_episode_block`)
+		R.EpStarted = S.EpStarted;
+		R.EpHidden = S.Num[kFlightCover] - S.EpJoined[0] - S.EpCoverDied[0] - S.EpCoverDied[1];
+		R.EpCaught = S.EpClosed[kEpisodeCaught];
+		R.EpStarved = S.EpClosed[kEpisodeStarved];
+		R.EpOther = S.EpClosed[kEpisodeOther];
+		R.EpTruncated = S.EpStarted - R.EpHidden - R.EpCaught - R.EpStarved - R.EpOther;
+		R.EpWatching = Open.EpWatching;
+		R.EpOtherChased = S.EpOtherChased;
+		R.EpChased = R.EpHidden + R.EpCaught + R.EpStarved + R.EpOtherChased;
+		R.EpJoinedCover = S.EpJoined[0];
+		R.EpJoinedOther = S.EpJoined[1];
+		R.EpJoined = R.EpJoinedCover + R.EpJoinedOther;
+		R.EpWindowCaught = S.EpWinDied[0];
+		R.EpWindowStarved = S.EpWinDied[1];
 		return R;
 	}
 

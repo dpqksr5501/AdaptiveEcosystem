@@ -30,7 +30,9 @@
 //   starve_fled, hunt{...}, weather{...}, obstacles_n, flight{...}, at{h: {caught, starved, alive, flight}}, wall_s, steps_per_s},
 //   "init"·"trace" (trace > 0 일 때만 — 파리티 진단)}. 실패한 세계는 {"id", "error"} 한 줄이고 종료 코드 1.
 //   flight 는 파이썬 world.py flight_stats 와 같은 칸이다 — 10-23 부터 숨은 뒤 10 초 지켜보기 hide{chased, hidden, watching, cover_then_caught,
-//   cover_then_starved, watch_steps}(실시간 관문 1차 숨음 비율·지킴 GH 의 재료)도 낸다.
+//   cover_then_starved, watch_steps}(옛 1차 숨음 비율 — 보고만)도, 10-24 부터 쫓김 사건 episode{started, chased, hidden, caught, starved, other,
+//   truncated, watching, other_chased, joined, joined_cover, joined_other, window_caught, window_starved, link_cover_steps, link_other_steps}(실시간 관문
+//   1차 사건 숨음 비율·지킴 GH·GE 의 재료)도 낸다.
 
 #include <chrono>
 #include <cmath>
@@ -832,7 +834,7 @@ namespace EcoV3Eval
 		O.KInt("shelter_end", F.ShelterEnd);
 		O.KIntArr("hist", F.Hist, W3::kNumFlightHistEdges + 1);
 		O.KIntArr("hist_edges", W3::kFlightHistSteps, W3::kNumFlightHistEdges);
-		// 10-23 숨은 뒤 지켜보기 (파이썬 flight_stats 의 hide 와 같은 칸 — 실시간 관문 1차 숨음 비율·지킴 GH 의 재료, EcoWorldV3.h 머리 주석)
+		// 10-23 숨은 뒤 지켜보기 (파이썬 flight_stats 의 hide 와 같은 칸 — 옛 도망 단위 1차 숨음 비율·GH 의 재료, 10-24 부터 보고만. EcoWorldV3.h 머리 주석)
 		O.Key("hide");
 		O.BeginObj();
 		O.KInt("chased", F.Chased);
@@ -841,6 +843,26 @@ namespace EcoV3Eval
 		O.KInt("cover_then_caught", F.CoverCaught);
 		O.KInt("cover_then_starved", F.CoverStarved);
 		O.KInt("watch_steps", W3::kFlightHideWatchSteps);
+		O.EndObj();
+		// 10-24 쫓김 사건 (파이썬 flight_stats 의 episode 와 같은 칸·차례 — 실시간 관문 1차 사건 숨음 비율·지킴 GH·GE 의 재료, EcoWorldV3.h 머리 주석 '쫓김 사건')
+		O.Key("episode");
+		O.BeginObj();
+		O.KInt("started", F.EpStarted);
+		O.KInt("chased", F.EpChased);
+		O.KInt("hidden", F.EpHidden);
+		O.KInt("caught", F.EpCaught);
+		O.KInt("starved", F.EpStarved);
+		O.KInt("other", F.EpOther);
+		O.KInt("truncated", F.EpTruncated);
+		O.KInt("watching", F.EpWatching);
+		O.KInt("other_chased", F.EpOtherChased);
+		O.KInt("joined", F.EpJoined);
+		O.KInt("joined_cover", F.EpJoinedCover);
+		O.KInt("joined_other", F.EpJoinedOther);
+		O.KInt("window_caught", F.EpWindowCaught);
+		O.KInt("window_starved", F.EpWindowStarved);
+		O.KInt("link_cover_steps", W3::kEpisodeLinkCoverSteps);
+		O.KInt("link_other_steps", W3::kEpisodeLinkOtherSteps);
 		O.EndObj();
 		if (bFoliage)
 		{

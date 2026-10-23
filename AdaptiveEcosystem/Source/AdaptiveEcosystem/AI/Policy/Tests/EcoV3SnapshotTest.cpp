@@ -260,6 +260,25 @@ bool FEcoV3SnapshotExportTest::RunTest(const FString& Parameters)
 						 && static_cast<int64>((*Hd)->GetNumberField(TEXT("cover_then_starved"))) == Fr.CoverStarved
 						 && static_cast<int32>((*Hd)->GetNumberField(TEXT("watch_steps"))) == EcoWorldV3::kFlightHideWatchSteps
 						 && (*Fl)->GetObjectField(TEXT("window"))->HasField(TEXT("hide_share")));
+			// 10-24 쫓김 사건 (파이썬 flight_stats 의 episode 와 같은 칸)·창의 사건 숨음·잡힘 몫
+			const TSharedPtr<FJsonObject>* Ep = nullptr;
+			TestTrue(*FString::Printf(TEXT("%s 도망 기록 episode = 세계 (사건 시작·쫓긴·숨음·잡힘·굶음·그 밖·잘림·지켜보는 중·이어진 도망·75·38 스텝)"), *Tag),
+					 (*Fl)->TryGetObjectField(TEXT("episode"), Ep) && Ep != nullptr && Ep->IsValid()
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("started"))) == Fr.EpStarted
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("chased"))) == Fr.EpChased
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("hidden"))) == Fr.EpHidden
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("caught"))) == Fr.EpCaught
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("starved"))) == Fr.EpStarved
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("other"))) == Fr.EpOther
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("truncated"))) == Fr.EpTruncated
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("watching"))) == Fr.EpWatching
+						 && static_cast<int64>((*Ep)->GetNumberField(TEXT("joined"))) == Fr.EpJoined
+						 && (*Ep)->Values.Num() == 16
+						 && static_cast<int32>((*Ep)->GetNumberField(TEXT("link_cover_steps"))) == EcoWorldV3::kEpisodeLinkCoverSteps
+						 && static_cast<int32>((*Ep)->GetNumberField(TEXT("link_other_steps"))) == EcoWorldV3::kEpisodeLinkOtherSteps
+						 && Fr.EpStarted == Fr.EpHidden + Fr.EpCaught + Fr.EpStarved + Fr.EpOther + Fr.EpTruncated
+						 && (*Fl)->GetObjectField(TEXT("window"))->HasField(TEXT("ep_hide_share"))
+						 && (*Fl)->GetObjectField(TEXT("generation"))->HasField(TEXT("ep_chased")));
 		}
 	}
 	TestTrue(TEXT("숲은 원판 셋·먹은 셀이 있다 (시험 장면)"), H.Forest->Sim.Config.Obstacles.Num() == 3 && H.Forest->Sim.Food.Total() < H.Forest->StartFood);

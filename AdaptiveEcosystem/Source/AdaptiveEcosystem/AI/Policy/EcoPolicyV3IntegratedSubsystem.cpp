@@ -3896,8 +3896,8 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	}
 	// 열째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — 정의는 EcoWorldV3.h 머리 주석 '도망 기록' = world.py flight_stats, 집계는 EcoV3FlightTally.h).
 	//   구간(지난 기록 줄 뒤)에 끝난 도망의 끝 까닭별 수·평균 길이·스스로 벗어난 도망의 쫓긴 시간(10-23 부터 보고만), 최근 60 초 창, 누적(열린 도망 = 잘림,
-	//   10-23 쫓긴 도망·숨음(지켜보는 중 포함)·지켜보는 동안 잡힘·굶음 — 관문 1차 숨음 비율의 재료), 두뇌 판 비교. 앞 아홉 줄의 정규식은 '<지역> 도망 |' 꼴에
-	//   걸리지 않는다
+	//   10-23 쫓긴 도망·숨음(지켜보는 중 포함)·지켜보는 동안 잡힘·굶음 — 옛 도망 단위 숨음 비율, 보고만. 10-24 쫓긴 사건·숨음(지켜보는 중 포함)·잡힘·굶음·
+	//   이어진 도망 — 관문 1차 사건 숨음 비율·GH 의 재료), 두뇌 판 비교(사건 단위). 앞 아홉 줄의 정규식은 '<지역> 도망 |' 꼴에 걸리지 않는다
 	if (Ctx.FlightOn())
 	{
 		const EcoV3Flight::FSum Iv = EcoV3Flight::FSum::Of(S.Flight).Minus(EcoV3Flight::FSum::Of(P.Flight));
@@ -3916,7 +3916,8 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		UE_LOG(LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 도망 | %.1f초 | 구간 시작 %lld · 끝 %lld (스스로: %s) · 평균 %.1f초 · 스스로 벗어난 도망 %lld번 쫓긴 %.1f초 | %s | ")
 				   TEXT("누적 시작 %lld · 끝 %lld · 열린 %lld · 스스로 벗어남 %lld (%.1f%%) 쫓긴 %.1f초 · 은신처 원 안에서 끝 %lld · 반사 스텝 %lld/%lld · ")
-					   TEXT("쫓긴 도망 %lld 중 숨음 %lld (지켜보는 중 %lld) · 숨은 뒤 10초 안 잡힘 %lld·굶음 %lld | 두뇌 판 (교체 %d번): %s"),
+					   TEXT("쫓긴 도망 %lld 중 숨음 %lld (지켜보는 중 %lld) · 숨은 뒤 10초 안 잡힘 %lld·굶음 %lld · ")
+						   TEXT("쫓긴 사건 %lld 중 숨음 %lld (지켜보는 중 %lld) · 잡힘 %lld · 굶음 %lld · 잘림 %lld · 이어진 도망 %lld | 두뇌 판 (교체 %d번): %s"),
 			   *Ctx.RegionId.ToString(), Seconds, static_cast<long long>(Iv.Started), static_cast<long long>(Iv.Ended), *Causes, Iv.MeanSeconds(),
 			   static_cast<long long>(Iv.OwnN()), Iv.OwnChaseSeconds(), *EcoV3Flight::SummaryText(Ctx.FlightTally.Window()),
 			   static_cast<long long>(Tot.Started), static_cast<long long>(TotEnded), static_cast<long long>(Tot.Num[EcoWorldV3::kFlightTruncated]),
@@ -3924,7 +3925,9 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   Tot.OwnN > 0 ? static_cast<double>(Tot.OwnContact) * EcoRepertoireV3::kStepSeconds / static_cast<double>(Tot.OwnN) : 0.0,
 			   static_cast<long long>(Tot.ShelterEnd), static_cast<long long>(Tot.ReflexSteps), static_cast<long long>(Tot.FleeSteps),
 			   static_cast<long long>(Tot.Chased), static_cast<long long>(Tot.Hidden), static_cast<long long>(Tot.Watching),
-			   static_cast<long long>(Tot.CoverCaught), static_cast<long long>(Tot.CoverStarved), Ctx.FlightTally.Swaps,
+			   static_cast<long long>(Tot.CoverCaught), static_cast<long long>(Tot.CoverStarved), static_cast<long long>(Tot.EpChased),
+			   static_cast<long long>(Tot.EpHidden), static_cast<long long>(Tot.EpWatching), static_cast<long long>(Tot.EpCaught),
+			   static_cast<long long>(Tot.EpStarved), static_cast<long long>(Tot.EpTruncated), static_cast<long long>(Tot.EpJoined), Ctx.FlightTally.Swaps,
 			   *EcoV3Flight::CompareText(Ctx.FlightTally));
 	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
@@ -4133,7 +4136,7 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 										Ctx.OnReserveDeer, 100.0 * EcoV3Integrated::kLowReserve, Ctx.LowReserveDeer, Ctx.WeakDeer);
 		}
 		// 셋째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — EcoV3FlightTally.h): 최근 60 초 창과 두뇌 판 비교 (쫓긴 = 스스로 벗어난 도망의 쫓긴
-		// 시간, 10-23 쫓긴 도망 중 숨음·잡힘 = 관문 1차 숨음 비율·지킴 GH 와 같은 몫)
+		// 시간, 10-24 쫓긴 사건 중 숨음·잡힘 = 관문 1차 사건 숨음 비율·지킴 GH 와 같은 몫 — 닫힌 사건)
 		const FString FlightLine = Ctx.FlightOn() ? FString::Printf(TEXT("도망 %s | %s | %s"), *Ctx.RegionId.ToString(),
 																	 *EcoV3Flight::SummaryText(Ctx.FlightTally.Window()),
 																	 *EcoV3Flight::CompareText(Ctx.FlightTally))
@@ -4263,7 +4266,7 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 	{
 		Line += TEXT(" · ") + Live;
 	}
-	// 도망 요약 (10-21 — 모든 지역 합: 최근 60 초 창 · 교체 전 → 지금. 10-23 부터 쫓긴 도망 중 숨음·잡힘 몫 — EcoV3FlightTally.h)
+	// 도망 요약 (10-21 — 모든 지역 합: 최근 60 초 창 · 교체 전 → 지금. 10-24 부터 쫓긴 사건 중 숨음·잡힘 몫 — EcoV3FlightTally.h)
 	const FString FlightText = FlightStatusText();
 	if (!FlightText.IsEmpty())
 	{

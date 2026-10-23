@@ -591,7 +591,7 @@ def test_gate_decisions(lv, monkeypatch):
         w["flight"].pop("hide")
     with pytest.raises(ValueError, match="숨은 뒤 지켜보기"):
         lv.gate_live(ev(good, cur, n_cur=nohide), stuck, skip)
-    noep = _fake(seeds, cb)                                                   # 10-24: 쫓김 사건이 없는 기록(옛 저장·아직 사건을 못 세는 C++ 평가기)도 받지 않는다
+    noep = _fake(seeds, cb)                                                   # 10-24: 쫓김 사건이 없는 기록(옛 저장·이식 전 C++ 평가기)도 받지 않는다
     for w in noep["worlds"]:
         w["flight"].pop("episode")
     with pytest.raises(ValueError, match="쫓김 사건"):
@@ -925,7 +925,7 @@ def test_eval_runner_switch(lv, tmp_path, monkeypatch):
     """판정 실행기 갈림: 'python' 은 워커 풀(일이 없으면 빈 목록), 모르는 실행기는 멈춤, 등록한 실행기는 꼬리표·순서를 맞춰 봐야 받는다.
     live.py 옆 <이름>.py 의 run_items·version·HIDE_WATCH 는 LIVE evaluator 이름만으로 불러 등록한다(네이티브 판정기를 끼울 자리).
     10-23 (변경 기록 (6)): 숨은 뒤 10 초 지켜보기를 세지 못하는 실행기(hide_watch 거짓)는 분명한 말로 거부한다."""
-    assert lv.LIVE["evaluator"] == "python" and lv.eval_runner([], 4, "python") == []        # 10-24 (7): 기본 실행기 = 파이썬 (C++ 평가기는 아직 사건을 못 센다)
+    assert lv.LIVE["evaluator"] == "ceval" and lv.eval_runner([], 4, "python") == []         # 10-24 (7) 덧붙임: 기본 실행기 = C++ 평가기 (쫓김 사건 이식 뒤)
     with pytest.raises(ValueError, match="모르는 판정 실행기"):
         lv.eval_runner([("world", "x:N", {})], 2, "native")
     calls = []
@@ -988,9 +988,9 @@ def test_hide_watch_gate_evaluators(lv, monkeypatch):
     ev = lv.evaluator("ceval")
     assert ev["hide_watch"] is True and callable(ev["run"])
     lv.require_hide_watch("ceval")
-    assert lv.LIVE["evaluator"] == "python"                                                         # 10-24 (7): C++ 평가기가 사건을 셀 때까지 파이썬
+    assert lv.LIVE["evaluator"] == "ceval"                                                          # 10-24 (7) 덧붙임: 쫓김 사건도 C++ 에 옮겨 다시 ceval
     lv.require_hide_watch()
-    lv.require_gate_records()                                                                       # 기본 = LIVE evaluator 'python' — 숨은 뒤 지켜보기·쫓김 사건 모두
+    lv.require_gate_records()                                                                       # 기본 = LIVE evaluator 'ceval' — 숨은 뒤 지켜보기·쫓김 사건 모두
     lv.EVALUATORS["nohide"] = dict(run=lambda items, w, on_done: [], version=lambda: "n1", hide_watch=False, episode=True)
     try:
         for call in (lambda: lv.require_hide_watch("nohide"), lambda: lv.eval_runner([("world", "x:N", dict(seed=1, region="A"))], 2, "nohide")):
@@ -1013,29 +1013,36 @@ def test_hide_watch_gate_evaluators(lv, monkeypatch):
 
 
 def test_episode_gate_evaluators(lv, monkeypatch):
-    """10-24 (변경 기록 (7)): 1차 사건 숨음 비율·GH·GE 는 쫓김 사건(flight.episode)을 세는 실행기만 쓴다. C++ 평가기(ceval.py EPISODE 거짓 — C++ 도망 기록에
-    아직 없다)는 분명한 말로 거부한다(require_episode·eval_runner — 돌리기 전, 판·감시 시작 전 plan_from_args). 기본 LIVE evaluator 는 'python'(늘 센다).
-    평가기 빌드와 무관(ceval.py 를 불러오기만 한다)."""
+    """10-24 (변경 기록 (7)·같은 날 덧붙임): 1차 사건 숨음 비율·GH·GE 는 쫓김 사건(flight.episode)을 세는 실행기만 쓴다. C++ 평가기(ceval.py EPISODE 참 —
+    EcoWorldV3.h 도망 기록에 같은 정의로 옮겼다)는 받는다(기본 LIVE evaluator). 세지 못하는 실행기(episode 거짓)는 분명한 말로 거부한다
+    (require_episode·eval_runner — 돌리기 전, 판·감시 시작 전 plan_from_args). 평가기 빌드와 무관(ceval.py 를 불러오기만 한다). 'python' 은 늘 센다."""
     ev = lv.evaluator("ceval")
-    assert ev["episode"] is False and ev["hide_watch"] is True and lv.LIVE["evaluator"] == "python"
+    assert ev["episode"] is True and ev["hide_watch"] is True and lv.LIVE["evaluator"] == "ceval"
     lv.require_episode("python")
-    lv.require_episode()
+    lv.require_episode("ceval")
+    lv.require_gate_records("ceval")
+    lv.require_episode()                                                                            # 기본 = LIVE evaluator 'ceval'
     calls = []
-    monkeypatch.setitem(ev, "run", lambda items, w, on_done: calls.append(w) or [])
-    for call in (lambda: lv.require_episode("ceval"), lambda: lv.require_gate_records("ceval"),
-                 lambda: lv.eval_runner([("world", "x:N", dict(seed=1, region="A"))], 2, "ceval")):
-        with pytest.raises(ValueError) as ei:
-            call()
-        msg = str(ei.value)
-        assert "C++ 평가기 'ceval'" in msg and "쫓김 사건" in msg and "flight.episode" in msg and "'python'" in msg and "변경 기록 (7)" in msg
-    assert calls == []
-    monkeypatch.setitem(lv.LIVE, "evaluator", "ceval")
-    a = Namespace(root=str(ROOT / "results" / "v3" / "live" / "_never"), workers=4, ckpt=None, steps=None, model_seeds=None, horizon=None,
-                  judge_seeds=None, select_seeds=None, stuck_seeds=None, check_seeds=None, skip_check=False, force_export=False, horizon_g=None,
-                  judge_seeds_g=None, flight_cost=None)
-    with pytest.raises(SystemExit, match="쫓김 사건"):
-        lv.plan_from_args(a)                                                                         # 판·감시를 시작하지 않는다
-    assert not (ROOT / "results" / "v3" / "live" / "_never").exists()
+    lv.EVALUATORS["noep"] = dict(run=lambda items, w, on_done: calls.append(w) or [], version=lambda: "e1", hide_watch=True, episode=False)
+    try:
+        for call in (lambda: lv.require_episode("noep"), lambda: lv.require_gate_records("noep"),
+                     lambda: lv.eval_runner([("world", "x:N", dict(seed=1, region="A"))], 2, "noep")):
+            with pytest.raises(ValueError) as ei:
+                call()
+            msg = str(ei.value)
+            assert ("판정 실행기 'noep'" in msg and "쫓김 사건" in msg and "flight.episode" in msg and "'ceval'" in msg and "'python'" in msg
+                    and "변경 기록 (7)" in msg)
+        assert calls == []
+        monkeypatch.setitem(lv.LIVE, "evaluator", "noep")
+        a = Namespace(root=str(ROOT / "results" / "v3" / "live" / "_never"), workers=4, ckpt=None, steps=None, model_seeds=None, horizon=None,
+                      judge_seeds=None, select_seeds=None, stuck_seeds=None, check_seeds=None, skip_check=False, force_export=False, horizon_g=None,
+                      judge_seeds_g=None, flight_cost=None)
+        with pytest.raises(SystemExit, match="쫓김 사건"):
+            lv.plan_from_args(a)                                                                     # 판·감시를 시작하지 않는다
+        assert not (ROOT / "results" / "v3" / "live" / "_never").exists()
+    finally:
+        lv.EVALUATORS.pop("noep", None)
+        lv._CODE.pop("noep", None)
 
 
 def test_cache_save_state(lv, prepared, tmp_path, monkeypatch):
@@ -1503,7 +1510,7 @@ def test_constants_match_md(lv):
     assert "`EPISODE_LINK_COVER_STEPS`" in md and "`EPISODE_LINK_OTHER_STEPS`" in md and "| 쫓김 사건 이음 창 | 앞 도망이 cover 로 끝났으면 75 스텝" in md
     assert all(k in md for k in ("GE_episode_starts", "REPORT_N_flight_hide", "REPORT_N_flight_caught", "| GE 재료 | 1000 산 사슴-스텝당 시작한 쫓김 사건"))
     assert "- **통과 = R(잰 때), P1, GH, GN, GF, GE, GV, GC, GG, G4, G5, G6, A5 모두.**" in md and "약 26%" in md
-    assert L["evaluator"] == "python" and "| 판정 실행기 evaluator | python (" in md and "`ceval.EPISODE` 거짓" in md
+    assert L["evaluator"] == "ceval" and "| 판정 실행기 evaluator | ceval (" in md and "10-24 덧붙임 — 쫓김 사건 셈을 C++ 에 옮김" in md
     assert lv.CACHE_VERSION == 3 and lv.GATE_CRITERION == "hide-episode-v1" and lv.GATE_CRITERION in md and lv.EVAL_CODE_TAG == "live-eval-3"
     assert lv.EVAL_CODE_TAG in md and "저장 판 3" in md
     # 10-21 (4) 중간 판정 (두 번 보기)·지금 두뇌 판정 다시 쓰기·판정 실행기 — 시점·기각 경계는 예비 측정 뒤 확정 (10-23 (6) 부호 뒤집음)

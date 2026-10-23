@@ -3361,7 +3361,9 @@ bool FEcoPolicyV3IntegratedBrainSwapTest::RunTest(const FString& Parameters)
 				Out.FlightStarted += Fr.Started;
 				Out.FlightBad += (Tl.Pushes != St.Steps || !(Tl.PrevGen.Plus(Tl.CurrentGen()) == EcoV3Flight::FSum::Of(St.Flight))
 								  || Tl.Swaps != (bSwap ? 1 : 0) || Tl.bHasPrev != bSwap || Fr.LiveSteps != St.LiveDeerSteps
-								  || Fr.FleeSteps != St.BehaviorSteps[EcoRepertoireV3::kFlee] || Fr.ReflexSteps > St.KeepSteps[EcoWorldV3::kKeepPanic])
+								  || Fr.FleeSteps != St.BehaviorSteps[EcoRepertoireV3::kFlee] || Fr.ReflexSteps > St.KeepSteps[EcoWorldV3::kKeepPanic]
+								  // 10-24 쫓김 사건: 도망 시작 = 사건 시작 + 이어진 도망, 잘림·지켜보는 중은 0 이상 (통합 모드 목록 빼기에도)
+								  || Fr.Started != Fr.EpStarted + Fr.EpJoined || Fr.EpTruncated < 0 || Fr.EpWatching < 0 || Fr.EpWatching > Fr.EpHidden)
 									 ? 1 : 0;
 			}
 		}

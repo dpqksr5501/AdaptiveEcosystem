@@ -1054,7 +1054,8 @@ route_decide_i = in_panic_i ∧ ( 시작 ∨ 무효 ∨ (route_i = RUN ∧ age_i
 ## 18. 10-24 쫓김 사건 단위 (사람 결정 — `herbivore_rl/results/v3/live/LIVE_GATE.md` 변경 기록 (7))
 
 - 상태: 파이썬 셈(`env_v2/world.py` — `flight_stats` 의 `episode`)과 실시간 관문(`results/v3/live/live.py`)을 바꿨다. 학습·판정은 하지 않았다.
-  C++ 도망 기록·평가기는 아직 사건을 세지 않는다(`ceval.EPISODE` 거짓 — 관문 판정 실행기는 그동안 파이썬). 이 절이 앞 절과 다르면 이 절을 따른다.
+  같은 날 C++ 도망 기록(`EcoWorldV3.h`)·평가기·게임 화면에도 같은 사건 셈을 옮겼다(`ceval.EPISODE` 참 — 관문 판정 실행기는 다시 ceval, 아래 'C++ 이식').
+  이 절이 앞 절과 다르면 이 절을 따른다.
 - 사람 결정(10-24): **"'쫓김 사건' 단위로 셈"** — 같은 사슴의 이어진 도망을 한 사건으로 묶어 사건의 마지막 결과로 숨음·잡힘 비율을 세고, GR(5 초 안
   다시 도망) 지킴은 '사건 시작 수'(GE)로 바꾼다. 이미 학습한 R7 두뇌는 새 규칙을 미리 적은 뒤 아직 쓰지 않은 판정 시드(38000~38099)로 판정한다(따로 사전 등록).
 - **R7 결과를 본 뒤 정한 규칙 변경이다.** R7 의 GR 초과분은 거의 모두 '은신처 들락날락'이었다(17-6, `herbivore_rl/results/v3/r7/gr_split.md` — route0 도
@@ -1066,6 +1067,8 @@ route_decide_i = in_panic_i ∧ ( 시작 ∨ 무효 ∨ (route_i = RUN ∧ age_i
   GE = 1000 산 사슴-스텝당 사건 시작이 늘지 않음(GR 자리), 나머지 지킴 그대로, 옛 도망 단위 숨음·잡힘 비율·GR·쫓긴 시간은 보고만. GF(도망 시작)는 그대로 지킴이다.
 - 예(보고만 — route0, N 세계, R7 점검 시드 38120~38139 × 지역 셋 × 1800 스텝): 숨음 비율 도망 단위 13.0 % → 사건 단위 11.9 %, 잡힘 비율 9.7 % → 10.4 %
   (전체 합), 도망 ÷ 사건 1.09, GF 2.07 · GE 1.91.
-- C++ 이식(이번 단계 밖): `EcoWorldV3.h` 도망 기록에 같은 사건 셈(이음 창 두 개·결과 다섯·쫓긴 사건)과 평가기 `flight.episode` 를 넣고, `ceval.py compare` 가
-  `flight.episode` 까지 정확히 같으면 `ceval.EPISODE` 를 참으로 바꾸고 LIVE evaluator 를 'ceval' 로 되돌린다. 게임 화면 도망 집계(`EcoV3FlightTally.h`
-  '쫓긴 도망 중 숨음 x% · 잡힘 y%')는 그때까지 도망 단위라 관문 1차(사건 단위)와 셈이 다르다 — 이식 때 함께 맞춘다(LIVE_GATE 변경 기록 (7) 검토 덧붙임).
+- C++ 이식(10-24 같은 날 — LIVE_GATE 변경 기록 (7) '10-24 덧붙임'): `EcoWorldV3.h` 도망 기록에 같은 사건 셈(이음 창 두 개·결과 다섯·쫓긴 사건 —
+  `FlightUpdate`·`FlightReportOf`, 사슴 칸 `FFlightTrack::bEpOpen` 등)과 평가기 `flight.episode` 를 넣었다. `ceval.py compare` 가 `flight.episode` 까지 정확히
+  같아(기본 N 15/15·G 15/15, 숲 시야 켬 N 90/90·G 90/90) `ceval.EPISODE` 를 참으로 바꾸고 LIVE evaluator 를 'ceval' 로 되돌렸다. 골든
+  `FlightGoldenVectorsV3.h` 에 사건 칸·쫓김 사건 장면을 더했다. 게임 화면 도망 집계(`EcoV3FlightTally.h`)도 '쫓긴 사건 중 숨음 a% · 잡힘 b%'(닫힌 사건 —
+  은신처 뒤 10 초를 지켜보는 중인 사건은 닫힐 때 든다)로 맞췄다(옛 '쫓긴 도망 중 숨음 x% · 잡힘 y%' 는 스냅숏 보고만).

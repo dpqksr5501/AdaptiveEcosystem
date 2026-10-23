@@ -6,8 +6,8 @@
 - 같은 시작 상태에서 C++ 세계가 파이썬 세계(world.py 그대로)와 비트 단위로 같다 — 궤적 모든 칸·기록 칸 전체. 10-22 world.py 가 동족 무리 중심·분리를
   C++ PerceiveKin 과 같은 j 차례 합으로 더한다(`_seq_sum`). 그 전에는 행렬곱이라 시작 지각의 그 두 칸만 끝 비트가 달랐고, 이 시험은 그 두 칸만 바꾼
   진단 기하(옛 ceval.seq_kin_geometry)로 같음을 보았다 — 진단은 world.py 와 같아져 지웠다.
-- Pool.run 기록 칸 = 파이썬 판정 기록 칸 (+ native), 'multi' 는 판정 길이마다 at. 10-23 부터 도망 기록의 숨은 뒤 10 초 지켜보기(flight.hide)까지
-  같다(평가기 HIDE_WATCH 참 — 실시간 관문 판정 실행기 'ceval').
+- Pool.run 기록 칸 = 파이썬 판정 기록 칸 (+ native), 'multi' 는 판정 길이마다 at. 10-23 부터 도망 기록의 숨은 뒤 10 초 지켜보기(flight.hide),
+  10-24 부터 쫓김 사건(flight.episode)까지 같다(평가기 HIDE_WATCH·EPISODE 참 — 실시간 관문 판정 실행기 'ceval').
 평가기 실행 파일이 없으면 건너뛴다 (빌드: AdaptiveEcosystem/Tools/EcoV3Eval/build.ps1).
 """
 
@@ -123,9 +123,11 @@ def test_records_equal_python_judge(ce, prepared, monkeypatch):
         assert not diff, (kind, job["region"], {k: (py[k], r[k]) for k in diff})
         assert r["flight"] == {k: py["flight"][k] for k in r["flight"]}, (kind, job["region"])     # 네이티브 도망 칸은 모두 파이썬과 같다
         assert r["flight"]["hide"] == py["flight"]["hide"], (kind, job["region"])                   # 10-23 숨은 뒤 10 초 지켜보기도 (빠진 칸 없이)
+        assert r["flight"]["episode"] == py["flight"]["episode"], (kind, job["region"])             # 10-24 쫓김 사건도 (빠진 칸 없이)
         if kind == "multi":
             for h in ("150", "300"):
                 assert r["at"][h]["flight"] == {k: py["at"][h]["flight"][k] for k in r["at"][h]["flight"]}, (job["region"], h)
+                assert r["at"][h]["flight"]["episode"] == py["at"][h]["flight"]["episode"], (job["region"], h)     # 판정 길이마다 사건
         f = r["flight"]
         tot["started"] += f["started"]
         tot["own_n"] += f["own_n"]
@@ -172,7 +174,10 @@ def test_live_evaluator_hook(ce):
 
     ev = live.evaluator("ceval")
     assert callable(ev["run"]) and callable(ev["version"]) and ev["hide_watch"] is True and ce.HIDE_WATCH is True     # 10-23 숨은 뒤 지켜보기를 센다
+    assert ev["episode"] is True and ce.EPISODE is True                                                               # 10-24 쫓김 사건을 센다
     live.require_hide_watch("ceval")
+    live.require_episode("ceval")
+    live.require_gate_records("ceval")
     tag = live.eval_code_tag("ceval")
     assert isinstance(tag, str) and len(tag) == 24 and tag != live.eval_code_tag("python")
     names = {p.name for p in ce.native_sources()}
@@ -202,14 +207,17 @@ def test_pool_record_schema(ce, prepared, monkeypatch):
     py = ad._world_one(dict(job))
     assert set(py) | {"native"} == set(out[0][1])
     assert py["hunt"].keys() == out[0][1]["hunt"].keys() and py["weather"].keys() == out[0][1]["weather"].keys()
-    # 도망 기록: 10-21 정의 칸과 10-23 숨은 뒤 지켜보기(hide)는 모두 같다. 파이썬에 뒤에 더한 칸(도망길 등 — C++ 에 아직 없는 기능)은 네이티브에 없을 수
-    # 있다 (compare 가 python_only 로 적는다)
+    # 도망 기록: 10-21 정의 칸과 10-23 숨은 뒤 지켜보기(hide)·10-24 쫓김 사건(episode)은 모두 같다. 파이썬에 뒤에 더한 칸(도망길 등 — C++ 에 아직 없는
+    # 기능)은 네이티브에 없을 수 있다 (compare 가 python_only 로 적는다)
     core = {"started", "live_steps", "flee_steps", "reflex_steps", "n", "steps", "contact", "own_n", "own_steps", "own_contact", "shelter_end", "hist",
-            "hist_edges", "hide"}
+            "hist_edges", "hide", "episode"}
     assert set(out[0][1]["flight"]) == core and core <= set(py["flight"])
     assert set(out[0][1]["flight"]["hide"]) == {"chased", "hidden", "watching", "cover_then_caught", "cover_then_starved", "watch_steps"}
     assert out[0][1]["flight"]["hide"] == py["flight"]["hide"] and out[0][1]["flight"]["hide"]["watch_steps"] == 75
-    # 10-24 쫓김 사건(flight.episode — LIVE_GATE.md 변경 기록 (7))은 아직 파이썬에만 있다: 평가기 EPISODE 거짓(관문이 거부), compare 는 python_only.
-    # C++ 갈래가 사건 셈을 옮기면 이 줄을 core 로 옮기고 ce.EPISODE 를 참으로 바꾼다
-    assert "episode" in py["flight"] and "episode" not in out[0][1]["flight"] and ce.EPISODE is False
-    assert ce.exact_worlds([py], [out[0][1]])["python_only"] == ["flight.episode"]
+    # 10-24 쫓김 사건(flight.episode — LIVE_GATE.md 변경 기록 (7)): 같은 날 C++ 도망 기록에 옮겨 평가기가 같은 칸·같은 차례로 낸다(EPISODE 참),
+    # compare 에 파이썬에만 있는 칸이 없다
+    ep = out[0][1]["flight"]["episode"]
+    assert list(ep) == list(py["flight"]["episode"]) and ep == py["flight"]["episode"] and ce.EPISODE is True
+    assert ep["link_cover_steps"] == 75 and ep["link_other_steps"] == 38 and ep["started"] == sum(ep[k] for k in ("hidden", "caught", "starved", "other",
+                                                                                                                  "truncated"))
+    assert ce.exact_worlds([py], [out[0][1]])["python_only"] == []

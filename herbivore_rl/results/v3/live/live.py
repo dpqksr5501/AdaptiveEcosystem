@@ -11,8 +11,8 @@ FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 �
 사슴의 이어진 도망(앞 도망이 은신처로 끝났으면 10 초 지켜보기 안, 그 밖이면 GR 과 같은 5 초 안에 다음 도망이 시작)을 한 사건으로 묶어, 1차 P1 = 쫓긴
 사건 가운데 숨음 사건 몫(사건 숨음 비율), 지킴 GH = 쫓긴 사건 가운데 잡힘 사건 몫, 새 지킴 GE = 1000 산 사슴-스텝당 사건 시작(GR 자리 — GF 는 그대로).
 옛 도망 단위 숨음·잡힘 비율과 쫓긴 시간은 보고만 한다. 사건 정의는 env_v2/world.py 모듈 docstring '쫓김 사건'(World.flight_stats 의 episode).
-판정 실행기는 지금 파이썬이다(LIVE evaluator 'python' — C++ 평가기는 아직 사건을 못 센다(ceval EPISODE 거짓 → 판정에서 거부). C++ 갈래가 사건 셈을
-옮기면 'ceval' 로 되돌린다. 10-23 에는 숨은 뒤 지켜보기를 C++ 에 옮겨 'ceval' 이었다).
+판정 실행기는 C++ 평가기다(LIVE evaluator 'ceval' — 10-24 같은 날 쫓김 사건 셈을 C++ 도망 기록에 옮겨 파이썬과 flight.episode 까지 같다. 옮기기 전
+잠깐 'python' 이었다. 10-23 에도 숨은 뒤 지켜보기를 C++ 에 옮기는 동안 잠깐 'python' 이었다).
 이 기준의 크기는 예비 측정 뒤 확정한다 — 확정 전(LIVE flight_sizes_confirmed 거짓)에는 실제 폴더에서 판·감시를 돌리지 않는다.
 
     # herbivore_rl/ 에서 (Anaconda base python, PYTHONUTF8=1)
@@ -131,13 +131,12 @@ LIVE = dict(
                                             #   봐야 느슨해지지 않아 뒤 절반까지 돌리므로 시간이 줄지 않는다. 그래서 끔(10-21 검토 — 끝 문턱 = 옛 한 번 보기 그대로)
     seq_futility_t=0.0,                     # 중간 기각(나아지지 않음): 앞 절반 숨음 비율 짝 t ≤ −이 값(0 이면 t ≤ 0)이면 뒤 절반·G·끼임 없이 기각 — 구속력 없음
                                             #   (끝 문턱 셈에 넣지 않는다). None = 끔. 10-23: 1차가 클수록 좋은 숨음 비율이 되어 부호만 뒤집었다(쫓긴 시간 때는 t ≥ 이 값)
-    evaluator="python",                     # 판정 실행기 (eval_runner 의 갈림): 'ceval' = 게임과 같은 C++ 세계 코드의 네이티브 판정기(Tools/EcoV3Eval, 변경 기록 (5)),
+    evaluator="ceval",                      # 판정 실행기 (eval_runner 의 갈림): 'ceval' = 게임과 같은 C++ 세계 코드의 네이티브 판정기(Tools/EcoV3Eval, 변경 기록 (5)),
                                             # 'python' = 파이썬 워커 풀. 네이티브가 못 받는 일(끼임 세기 등)은 ceval 이 파이썬으로 돌린다. 10-23 (변경 기록 (6)):
                                             # 1차 숨음 비율은 숨은 뒤 10 초 지켜보기(flight.hide)를 세는 실행기만 쓴다(require_hide_watch) — 그 칸을 C++ 에 옮기기 전
                                             # 잠깐 'python' 이었고, 같은 날 옮겨(ceval HIDE_WATCH 참, compare 의 flight.hide 까지 같음) 'ceval' 로 되돌렸다.
-                                            # 10-24 (변경 기록 (7)): 1차·GH·GE 는 쫓김 사건 셈(flight.episode)을 세는 실행기만 쓴다(require_episode). C++ 평가기는 아직
-                                            # 사건을 못 세어(ceval EPISODE 거짓) 'python' 으로 둔다 — C++ 갈래가 사건 셈을 옮기고 compare 의 flight.episode 까지 같으면
-                                            # ceval EPISODE 를 참으로 바꾸고 여기를 'ceval' 로 되돌린다
+                                            # 10-24 (변경 기록 (7)): 1차·GH·GE 는 쫓김 사건 셈(flight.episode)을 세는 실행기만 쓴다(require_episode). 그 셈을 C++ 에
+                                            # 옮기기 전 잠깐 'python' 이었고, 같은 날 옮겨(ceval EPISODE 참, compare 의 flight.episode 까지 같음) 'ceval' 로 되돌렸다
     cache_current=True,                     # 지금 두뇌 판정 결과 다시 쓰기 (live/cache — 환경·세계·두뇌·시드·길이·실행기·셈 길 판이 모두 같을 때만)
 )
 STEP_S = 2.0 / 15.0                         # 1 스텝 = 2/15 초 (게임 결정 간격 — 1800 스텝 = 240 초)
@@ -1170,7 +1169,7 @@ class Pool:
 # (·HIDE_WATCH) 을 내면 LIVE evaluator 를 그 이름으로 바꾸는 것만으로 처음 쓸 때 불러 등록한다. 판정 저장 열쇠에 실행기 이름·판이 들어가므로 바꾸면 지금 두뇌
 # 판정도 새로 잰다. hide_watch 가 참이 아닌 실행기는 판정에 쓰지 않는다(require_hide_watch — 10-23 C++ 평가기 'ceval' 은 같은 날 그 칸을 옮겨 참이다).
 # 10-24 (변경 기록 (7)): episode = 참이면 도망 기록에 쫓김 사건(flight.episode — 1차 사건 숨음 비율·GH·GE 의 재료)을 낸다(옆 파일의 EPISODE). 참이 아닌
-# 실행기도 판정에 쓰지 않는다(require_episode — C++ 평가기 'ceval' 은 아직 거짓이다).
+# 실행기도 판정에 쓰지 않는다(require_episode — C++ 평가기 'ceval' 은 같은 날 그 셈을 옮겨 참이다).
 EVALUATORS: dict = {}
 
 
@@ -1209,14 +1208,14 @@ def require_hide_watch(kind: str | None = None) -> None:
 def require_episode(kind: str | None = None) -> None:
     """10-24 (LIVE_GATE.md 변경 기록 (7)): 1차 사건 숨음 비율·지킴 GH(사건 잡힘 비율)·GE(사건 시작)는 도망 기록의 쫓김 사건(flight.episode)을 쓴다.
     그것을 세지 못하는 판정 실행기(episode 거짓 — 등록한 실행기·옆 파일의 EPISODE)는 분명한 말로 거부한다(ValueError). 'python' 은 늘 센다.
-    C++ 평가기 'ceval' 은 아직 세지 못한다(ceval.EPISODE 거짓 — C++ 갈래가 사건 셈을 옮기면 참으로 바꾼다)."""
+    C++ 평가기 'ceval' 은 10-24 같은 날 그 셈을 옮겨 받는다(ceval.EPISODE 참)."""
     kind = str(kind or LIVE["evaluator"])
     if kind == "python" or evaluator(kind).get("episode"):
         return
     what = "C++ 평가기 'ceval'(AdaptiveEcosystem/Tools/EcoV3Eval)" if kind == "ceval" else f"판정 실행기 {kind!r}"
     raise ValueError(f"{what} 은(는) 쫓김 사건(flight.episode — 같은 사슴의 이어진 도망을 한 사건으로 묶은 셈)을 아직 세지 못한다 — 10-24 1차 사건 숨음 비율·"
-                     f"지킴 GH·GE(LIVE_GATE.md 변경 기록 (7))를 잴 수 없어 이 실행기로는 판정하지 않는다. LIVE evaluator 를 'python' 으로 둔다 "
-                     f"(C++ 평가기는 사건 셈을 옮긴 뒤 EPISODE 를 참으로 바꾸면 받는다)")
+                     f"지킴 GH·GE(LIVE_GATE.md 변경 기록 (7))를 잴 수 없어 이 실행기로는 판정하지 않는다. LIVE evaluator 를 그 셈을 하는 실행기 "
+                     f"('ceval' — C++ 평가기, 또는 'python')로 둔다")
 
 
 def require_gate_records(kind: str | None = None) -> None:
@@ -1562,7 +1561,7 @@ def has_episode(f: dict) -> bool:
 def flight_of(w: dict, hide: bool = False, episode: bool = False) -> dict:
     """세계 요약 하나의 도망 기록 (env_v2/world.py World.flight_stats). 없거나 옛 꼴이면 ValueError — 관문은 도망 기록 없는 판을 받지 않는다.
     hide 참(옛 도망 단위 숨음·잡힘 비율 — hide_pair): 숨은 뒤 지켜보기(hide)가 없는 기록(옛 실행기·옛 저장·10-23 전 C++ 평가기)도 받지 않는다.
-    episode 참(10-24 1차 사건 숨음 비율·GH·GE — episode_pair·GE): 쫓김 사건(episode)이 없는 기록(옛 실행기·옛 저장·아직 사건을 못 세는 C++ 평가기)도
+    episode 참(10-24 1차 사건 숨음 비율·GH·GE — episode_pair·GE): 쫓김 사건(episode)이 없는 기록(옛 실행기·옛 저장·10-24 이식 전 C++ 평가기)도
     받지 않는다. 쫓긴 시간 셈(flight_pair — 보고·GG_chase, 도망길 측정 route_rules 의 옛 raw 기록)은 hide·episode 없이도 읽는다."""
     f = w.get("flight")
     if not isinstance(f, dict):
@@ -1574,7 +1573,7 @@ def flight_of(w: dict, hide: bool = False, episode: bool = False) -> dict:
                          f"옛 저장이거나 그 칸을 세지 못하는 실행기 기록이다(C++ 평가기는 10-23 부터 센다 — 옛 실행 파일이면 다시 빌드). 지금 실행기로 다시 돌린다")
     if episode and not has_episode(f):
         raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 의 도망 기록에 쫓김 사건(episode — 10-24 1차 사건 숨음 비율·GH·GE)이 없다 — 옛 실행기·"
-                         f"옛 저장이거나 그 칸을 세지 못하는 실행기 기록이다(C++ 평가기는 아직 사건을 못 센다 — LIVE evaluator 'python'). 지금 실행기로 다시 돌린다")
+                         f"옛 저장이거나 그 칸을 세지 못하는 실행기 기록이다(C++ 평가기는 10-24 부터 센다 — 옛 실행 파일이면 다시 빌드). 지금 실행기로 다시 돌린다")
     return f
 
 
