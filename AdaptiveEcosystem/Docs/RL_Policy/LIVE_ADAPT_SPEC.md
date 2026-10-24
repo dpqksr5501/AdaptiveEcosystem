@@ -18,6 +18,10 @@
   R7 결과를 본 뒤 '은신처 들락날락'이 숨음을 두 번 세는 것을 막으려고 바꿨다. 판정 실행기는 C++ 평가기 ceval(사건 셈을 같은 날 C++ 도망 기록에 옮겨 파이썬과
   `flight.episode` 까지 같다 — 옮기기 전 잠깐 파이썬). 주고받는 파일 꼴은 그대로이고 `adapt.gate`·상태 줄 글만 '사건 숨음 비율'로 바뀐다. 게임 화면 도망 줄도
   '쫓긴 사건 중 숨음 a% · 잡힘 b%'(닫힌 사건)이고, 스냅숏 flight 에 `episode` 블록이 더해졌다. 규칙 `LIVE_GATE.md` 변경 기록 (7)·'10-24 덧붙임'.
+- 10-24 (8) 두 길·판 5 두뇌 (R7e 판정 통과·C++ 이식 `80bbf13` 뒤): 게임에 판 5 두뇌 파일(관측 24 두 길 + 반사 밖 두뇌 FLEE 막음, 계약 `0xad7bad5e1acaf071` —
+  `EcoBrains/v3_r7_g995_s1_20m.json`)을 `eco.V3Brain.Startup`·`-EcoV3Brain=`·`eco.V3Brain.Load` 로 건 Play 의 스냅숏이면, 파이썬이 그 두뇌를 '지금 두뇌'로
+  받아 판 5 세계에서 판정하고 판 5 그대로 이어 배워 판 5 두뇌 파일을 낸다(아래 2·6절). 주고받는 파일 꼴은 그대로다(스냅숏은 이식 2/2 에서 더한 칸을 읽을 뿐).
+  게임 기본 두뇌(내장 R1b-F)·기본 설정·관측 21 고리는 그대로이고, 판 4 두뇌(route0·R6)를 건 Play 의 스냅숏은 거부(refused)한다. 규칙 `LIVE_GATE.md` 변경 기록 (8).
 
 ## 0. 고리 한눈에
 
@@ -58,6 +62,13 @@
 ```
 `source` = `level`(레벨 나무 액터) · `cvar:<이름>`(우리 지역 날씨 콘솔 변수) · `team_env`(팀 `FRegionEnvironmentState`) · `test`(시험용 대역).
 `brain` 안에 `"adapt": {"round", "attempt", "run", "snapshot"}`(지금 두뇌 파일에 adapt 블록이 있었을 때, 없으면 `{}`). 지역 `obstacles` 안에 `"level_trunks"`(지금 무대 안 줄기 막이 수).
+
+10-24 두 길 두뇌 이식(`80bbf13`, `RL_V3_ROUTE_CPP_PORT_PLAN.md` 15-1)이 더한 칸 — 파이썬이 읽는다(변경 기록 (8)):
+- `brain.contract_hash`·`obs_dim`(이식 전부터)·`mask_version`(2·4·5)·`route`·`flee_gate`: 파이썬 시작 모델 고르기(`live.resolve_start`)가 계약 해시로 묶음을
+  정하고(관측 21 `0xbc4fc2d45c47c5fd` · 관측 24 판 5 `0xad7bad5e1acaf071`, 판 4 `0xe302dee198197444` 는 거부), `mask_version` 이 있으면 그 묶음의 판과 같아야 한다.
+- 지역 `world.wild_flight.route`·`brain_flee_outside_reflex`(게임이 지금 두뇌로 실제로 건 값): 있으면 시작 모델 묶음(판 5 = 참·거짓, 관측 21 = 거짓·참)과
+  같아야 한다(`live.check_snapshot_route` — 다르면 거부). 판정·학습 세계의 두 길 칸은 이 칸이 아니라 묶음의 바탕 설정이 정한다(`adapt.convert` 는 이 칸을 읽지 않는다).
+- 지역 `flight.route`(길 통계): 보고만 — 파이썬은 쓰지 않는다.
 
 ## 3. 두뇌 파일 `adapt` 블록 (파이썬이 쓰고, 언리얼은 있으면 읽는다 — 없거나 값이 깨져도 거부하지 않는다)
 ```json
@@ -128,10 +139,14 @@
 - `watch`(감시 데몬) · `round --snapshot F`(한 판) · `pilot --snapshot F`(예비 측정 — 시드 34900~34999 만). 적응 고리 `results/v3/adapt/adapt.py` 를 쓴다.
 - 새 스냅숏 → 환경 지문(원판·날씨·먹이 용량·은신처) + 두뇌 sha 가 지난 것과 같으면 건너뜀. 판 도중 다른 환경 스냅숏이 오면 그 판을 끝내고 새 것으로.
 - 세 세계: G 게임(스냅숏 그대로, 포만 켬), N 포만 없는 세계(G 에서 포만만 끔), T 학습(N + R5 학습 조리법, 무작위 숲 없음, 스냅숏 먹이 지도).
-- 시작 모델: 관측 18 + R1b-F → `ckpt/v3/v3_r1_g995_s3_obs21zero.zip`, 관측 21 → 두뇌 파일의 같은 가중치 zip, 그 밖 거부.
+- 시작 모델: 관측 18 + R1b-F → `ckpt/v3/v3_r1_g995_s3_obs21zero.zip`, 관측 21 → 두뇌 파일의 같은 가중치 zip, 10-24 (8) 관측 24 · 판 5 → 두뇌 파일의 같은
+  가중치 zip(R7e 면 `ckpt/v3/v3_r7_g995_s1_20m.zip`), 그 밖(관측 24 · 판 4 포함) 거부. 판 5 면 G·N 바탕 `configs/v3_wild3_route5_mirror.yaml`, T 조리법
+  `configs/v3_r7_train.yaml`(f_dec 0.714694), PPO `configs/ppo_r6_lam098.yaml`(λ 0.98) — 시작 모델 계약의 묶음(`live.PROFILES`)이 정한다.
 - 관문(`LIVE_GATE.md`, 10-24 (7) 뒤): R(바뀜 없는 스냅숏만) → P1(N 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율 — 마지막 도망이 은신처 끝 + 10 초 안
   안 잡힘·다시 안 뜀) 증가, 짝 t) → GH(N 쫓긴 사건 가운데 잡힘 사건 몫이 늘지 않음) → GN(N 잡힘·굶음·산) → GF·GE·GV·GC(N 도망 시작·사건 시작·달린 시간·
   잡힘/잘림으로 끝난 도망이 늘지 않음) → GG(G 잡힘·굶음·산·쫓긴 시간) → G4(은신처 안 잡힘 0) → G5(끼임) → G6(악용) → A5(다시 읽기). N 도망 단위 숨음·잡힘
-  비율과 쫓긴 시간은 보고만. 판정 실행기 `LIVE.evaluator` 'python'(10-24 — 쫓김 사건 `flight.episode` 를 세지 못하는 실행기는 거부, C++ 평가기는 사건 셈을
-  옮긴 뒤 'ceval' 로 되돌린다. 10-23 에는 숨은 뒤 10 초 지켜보기 `flight.hide` 까지 파이썬과 같아 'ceval' 이었다).
+  비율과 쫓긴 시간은 보고만. 판정 실행기 `LIVE.evaluator` 'ceval'(C++ 평가기 — 10-24 쫓김 사건 `flight.episode` 셈을 C++ 에 옮긴 뒤 파이썬과 세계 기록이
+  같아 'python' 에서 되돌렸다. 쫓김 사건·숨은 뒤 10 초 지켜보기를 세지 못하는 실행기는 거부). 10-24 (8) 두 길(판 5) 판은 설계 12절 길 지킴 GT·GTr·GR 을
+  `gate.md` '길 기록' 절에 보고만 한다(관문 칸 아님 — GR 자리는 GE).
+- 내보내기 A5 계약: 시작 모델 묶음의 계약·관측 수·마스크 판(관측 21, 또는 관측 24 · 판 5 — 골든 세계 판 5 거울).
 - 내보내기: `brains/live_r<판>_<시도>.json`(adapt 블록, `play_id` 포함), `status.json`·`state.json` 갱신.

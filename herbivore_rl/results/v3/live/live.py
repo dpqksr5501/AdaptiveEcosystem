@@ -14,6 +14,11 @@ FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 �
 판정 실행기는 C++ 평가기다(LIVE evaluator 'ceval' — 10-24 같은 날 쫓김 사건 셈을 C++ 도망 기록에 옮겨 파이썬과 flight.episode 까지 같다. 옮기기 전
 잠깐 'python' 이었다. 10-23 에도 숨은 뒤 지켜보기를 C++ 에 옮기는 동안 잠깐 'python' 이었다).
 이 기준의 크기는 예비 측정 뒤 확정한다 — 확정 전(LIVE flight_sizes_confirmed 거짓)에는 실제 폴더에서 판·감시를 돌리지 않는다.
+10-24 (LIVE_GATE.md 변경 기록 (8) — R7e 판정 통과·C++ 이식 뒤): 게임에 판 5 두뇌(관측 24 두 길 + 반사 밖 두뇌 FLEE 막음, 계약 0xad7bad5e1acaf071 —
+EcoBrains/v3_r7_g995_s1_20m.json)를 불러 쓰는 Play 의 스냅숏이면 그 두뇌를 '지금 두뇌'로 받아 판 5 세계(G·N 바탕 configs/v3_wild3_route5_mirror.yaml)에서
+판정하고 판 5 학습 세계(R7 조리법 configs/v3_r7_train.yaml 의 train 블록, PPO configs/ppo_r6_lam098.yaml)에서 이어 배운다 — 묶음은 시작 모델 계약이 정한다
+(PROFILES). 관측 18·21 지금 두뇌는 옛 길 그대로(관측 21)이고 판 4 두뇌(route0·R6)는 받지 않는다. 관문 표는 그대로이고, 설계 12절 길 지킴 GT·GTr·GR 은 두 길
+판에서 gate.md '길 기록' 절에 보고만 한다(GR 자리는 10-24 (7) 의 GE, GT = 60 × GV).
 
     # herbivore_rl/ 에서 (Anaconda base python, PYTHONUTF8=1)
     python results/v3/live/live.py watch                        # 감시: <프로젝트>/Saved/EcoAdapt/snapshots 를 2초마다 보고, 새 환경이면 한 판
@@ -38,7 +43,8 @@ FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 �
                  (+ LIVE train_flight_cost > 0 이면 FLEE 를 실행한 스텝마다 보상에서 그만큼 뺀다 — wild_flight.flight_cost, 기본 0)
 두뇌는 관측 21 계약(R5 장애물 관측 0xbc4fc2d45c47c5fd)으로 배운다(사람 결정 10-21 '관측 21로 올려 배움'): 스냅숏의 지금 두뇌가 R1b-F(관측 18)면
 R1b-F + 0 열(ckpt/v3/v3_r1_g995_s3_obs21zero.zip — 결정이 비트 단위로 같다)에서, 관측 21 두뇌면 그 두뇌 파일의 모델 zip 에서 시작한다(가중치 sha256 을
-다시 맞춰 본다). 다른 관측 18 파일 두뇌는 거부(refused). 판정의 '지금 두뇌' = 시작 zip.
+다시 맞춰 본다). 다른 관측 18 파일 두뇌는 거부(refused). 판정의 '지금 두뇌' = 시작 zip. 10-24 (8): 관측 24 · 판 5 두뇌면 그 두뇌 파일의 모델 zip 에서
+판 5 계약 그대로 이어 배운다(위 문단).
 
 한 판: 변환(converting) → 재현 확인 R(checking, 환경 판 0·두뇌 바꿈 없음일 때만) → 학습 K 모델 × S 스텝 ‖ 지금 두뇌 판정 N·G·끼임(training —
 같은 환경·같은 두뇌·같은 크기·같은 셈 길로 잰 결과가 live/cache/ 에 있으면 다시 쓴다) → 후보 고르기(K > 1, N 고르기 시드) → 후보 판정(evaluating — 10-21 (4)
@@ -95,6 +101,19 @@ PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
 LIVE_GATE_MD = HERE.parent / "LIVE_GATE.md"
 CONTRACT_OBS18 = "0x7eea0107339be4ce"                                         # 관측 18 계약 (빌드 내장 R1b)
 CONTRACT_OBS21 = "0xbc4fc2d45c47c5fd"                                         # 관측 21 계약 (R5 장애물 관측)
+CONTRACT_OBS24_M4 = "0xe302dee198197444"                                      # 관측 24 · 마스크 판 4 (두 길 — route0·R6). 고리는 받지 않는다 (변경 기록 (8))
+CONTRACT_OBS24_M5 = "0xad7bad5e1acaf071"                                      # 관측 24 · 마스크 판 5 (두 길 + 반사 밖 두뇌 FLEE 막음 — R7e)
+TEMPLATE_ROUTE5 = ROOT / "configs" / "v3_wild3_route5_mirror.yaml"            # 판 5 거울 (= 관측 21 거울 + wild_flight.route true + brain_flee_outside_reflex false)
+R7_TRAIN = ROOT / "configs" / "v3_r7_train.yaml"                              # 판 5 학습 조리법 (R7 — train 블록 f_dec 0.714694·부활 계수)
+PPO_ROUTE5 = ROOT / "configs" / "ppo_r6_lam098.yaml"                          # 판 5 PPO 설정 (R7 과 같은 λ 0.98)
+# 10-24 (LIVE_GATE.md 변경 기록 (8)) 이어 배우는 두뇌 묶음: 시작 모델의 계약 → 판정 세계 바탕(template — G·N), 학습 조리법(recipe — T 의 train 블록·부활 계수),
+# PPO 설정. 판 5 두뇌가 '지금 두뇌'면 G·N·T 모두 두 길·반사 밖 FLEE 막음 세계다. 계약이 이 표에 없는 시작 모델은 거부한다(판 4·판 6·관측 18 파일 두뇌).
+PROFILES = {
+    CONTRACT_OBS21: dict(name="obs21", obs_dim=21, mask_version=2, route=False, flee_gate=False, template=TEMPLATE_OBS, recipe=R5_TRAIN, ppo=PPO_CONFIG,
+                         label="관측 21 (R5 장애물 관측, 마스크 판 2)"),
+    CONTRACT_OBS24_M5: dict(name="route5", obs_dim=24, mask_version=5, route=True, flee_gate=True, template=TEMPLATE_ROUTE5, recipe=R7_TRAIN,
+                            ppo=PPO_ROUTE5, label="관측 24 두 길·반사 밖 도망 막음 (마스크 판 5)"),
+}
 STATUS_FORMAT, STATE_FORMAT, ROUND_FORMAT = "eco_v3_live_status", "eco_v3_live_state", "eco_v3_live_round"
 
 # 빠른 관문 (LIVE_GATE.md 와 같은 값 — 10-21 예비 측정 p_20261021T050321 뒤 확정. 바꾸면 LIVE_GATE.md 변경 기록에 먼저 적는다)
@@ -931,9 +950,10 @@ def brain_folders(root: Path) -> tuple:
 
 
 def resolve_start(snap: dict, folders) -> dict:
-    """스냅숏의 지금 두뇌 → 이어 배울 시작 모델 (명세 6절). 관측 18 이고 가중치가 R1b-F 면 R1b-F + 0 열, 관측 21 이면 두뇌 파일들에서 같은 가중치의
-    모델 zip. 스냅숏 두뇌 계약(brain.contract_hash, 옛 스냅숏은 맨 위 contract_hash)이 그 두뇌의 모델 계약과 같아야 하고, 시작 모델은 관측 21 계약이어야
-    한다. 아니면 adapt.Refused."""
+    """스냅숏의 지금 두뇌 → 이어 배울 시작 모델 (명세 6절). 관측 18 이고 가중치가 R1b-F 면 R1b-F + 0 열, 관측 21·24 면 두뇌 파일들에서 같은 가중치의
+    모델 zip. 스냅숏 두뇌 계약(brain.contract_hash, 옛 스냅숏은 맨 위 contract_hash)이 그 두뇌의 모델 계약과 같아야 하고, 시작 모델 계약은 PROFILES 에
+    있어야 한다 — 관측 21(판 2) 또는 10-24 (변경 기록 (8)) 관측 24 · 판 5(두 길·반사 밖 FLEE 막음 — R7e). 관측 24 · 판 4(route0·R6)는 받지 않는다.
+    스냅숏 brain.mask_version(10-24 이식 뒤 스냅숏)이 있으면 그 묶음의 판과 같아야 한다. 아니면 adapt.Refused. 반환의 profile = PROFILES 이름."""
     b = snap["brain"]
     want = brain_sha(snap)
     obs = int(b.get("obs_dim") or 18)
@@ -942,23 +962,54 @@ def resolve_start(snap: dict, folders) -> dict:
         if want != zip_weights_sha(ad.R1BF):
             raise ad.Refused(f"지금 두뇌 {b.get('id')} 는 R1b-F 가 아닌 관측 18 두뇌다 — 관측 21 로 올려 배울 시작점은 R1b-F(+ 0 열)뿐이다")
         cur, start, why = ad.R1BF, OBS21ZERO, "R1b-F(관측 18) → R1b-F + 0 열(관측 21, 결정 같음)"
-    elif obs == 21:
+    elif obs in (21, 24):
+        if obs == 24 and bc == CONTRACT_OBS24_M4:
+            raise ad.Refused(f"지금 두뇌 {b.get('id')} 는 관측 24 · 마스크 판 4(두 길 — route0·R6, 계약 {CONTRACT_OBS24_M4}) 다 — 고리가 이어 배우는 관측 24 두뇌는 "
+                             f"판 5(반사 밖 도망 막음, 계약 {CONTRACT_OBS24_M5})뿐이다 (LIVE_GATE.md 변경 기록 (8))")
         z = find_brain_zip(want, folders)
         if z is None:
-            raise ad.Refused(f"관측 21 두뇌 {b.get('id')} (가중치 sha256 {want[:16]}) 의 모델 zip 을 두뇌 파일 폴더에서 찾지 못했다 — 이어 배울 시작점이 없다")
-        cur, start, why = z, z, "관측 21 두뇌 → 그 두뇌 파일의 모델 zip"
+            raise ad.Refused(f"관측 {obs} 두뇌 {b.get('id')} (가중치 sha256 {want[:16]}) 의 모델 zip 을 두뇌 파일 폴더에서 찾지 못했다 — 이어 배울 시작점이 없다")
+        cur, start, why = z, z, f"관측 {obs} 두뇌 → 그 두뇌 파일의 모델 zip"
     else:
-        raise ad.Refused(f"관측 {obs} 칸 두뇌는 받지 않는다 (관측 18·21 만)")
+        raise ad.Refused(f"관측 {obs} 칸 두뇌는 받지 않는다 (관측 18·21·24 만)")
     if not Path(start).exists():
         raise ad.Refused(f"시작 모델 {start} 가 없다")
     cc = zip_contract(cur)
     if cc != bc:
         raise ad.Refused(f"계약 해시가 다르다: 스냅숏 두뇌 {bc} 대 모델 {cc} ({path_text(cur)})")
     sc = zip_contract(start)
-    if sc != CONTRACT_OBS21:
-        raise ad.Refused(f"시작 모델 계약 {sc} 이 관측 21 계약 {CONTRACT_OBS21} 이 아니다")
+    prof = PROFILES.get(sc)
+    if prof is None:
+        raise ad.Refused(f"시작 모델 계약 {sc} 은 고리가 이어 배우는 계약이 아니다 (관측 21 {CONTRACT_OBS21} · 관측 24 판 5 {CONTRACT_OBS24_M5} 만 — "
+                         f"LIVE_GATE.md 변경 기록 (8))")
+    if prof["obs_dim"] != (21 if obs == 18 else obs):
+        raise ad.Refused(f"시작 모델 계약 {sc} 은 관측 {prof['obs_dim']} 이다 — 스냅숏 두뇌 관측 {obs} 와 맞지 않는다")
+    mv = b.get("mask_version")
+    if mv is not None and obs != 18 and int(mv) != int(prof["mask_version"]):
+        raise ad.Refused(f"스냅숏 두뇌 마스크 판 {mv} 이 시작 모델 계약 {sc} 의 판 {prof['mask_version']} 과 다르다")
     return dict(zip=Path(start), current_model=Path(cur), obs_dim=obs, brain=str(b.get("id", "")), brain_contract=bc, start_contract=sc,
-                weights_sha256=want, why=why)
+                weights_sha256=want, why=why, profile=prof["name"])
+
+
+def profile_of(contract: str) -> dict:
+    """계약 해시 → 이어 배우는 두뇌 묶음 (PROFILES). 없으면 ValueError."""
+    prof = PROFILES.get(str(contract))
+    if prof is None:
+        raise ValueError(f"계약 {contract} 은 고리가 이어 배우는 두뇌 묶음이 아니다 ({', '.join(PROFILES)})")
+    return prof
+
+
+def check_snapshot_route(snap: dict, prof: dict) -> None:
+    """10-24 (변경 기록 (8)): 스냅숏 지역 world.wild_flight 의 route·brain_flee_outside_reflex(게임이 지금 두뇌로 실제로 건 값 — 이식 2/2 뒤 스냅숏만,
+    없으면 보지 않는다)가 시작 모델 묶음과 같아야 한다 — 두 길을 건 게임 세계를 길 없는 세계로(또는 그 반대로) 조용히 옮기지 않는다. 다르면 adapt.Refused."""
+    for r in snap["regions"]:
+        wf = (r.get("world") or {}).get("wild_flight") or {}
+        if "route" in wf and bool(wf["route"]) != bool(prof["route"]):
+            raise ad.Refused(f"지역 {r.get('region')} 세계의 두 길(wild_flight.route {bool(wf['route'])})이 시작 모델 묶음 {prof['name']}(두 길 "
+                             f"{'켬' if prof['route'] else '끔'})과 다르다")
+        if "brain_flee_outside_reflex" in wf and bool(wf["brain_flee_outside_reflex"]) != (not prof["flee_gate"]):
+            raise ad.Refused(f"지역 {r.get('region')} 세계의 반사 밖 도망 막음(brain_flee_outside_reflex {bool(wf['brain_flee_outside_reflex'])})이 "
+                             f"시작 모델 묶음 {prof['name']}(막음 {'켬' if prof['flee_gate'] else '끔'})과 다르다")
 
 
 # --------------------------------------------------------------------- #
@@ -969,13 +1020,22 @@ def resolve_start(snap: dict, folders) -> dict:
 def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None = None, flight_cost: float | None = None) -> dict:
     """스냅숏 → 판 폴더 rd: snapshot.json(그대로)·world.yaml(G)·train.yaml(T)·regions.json·convert.json. N 은 G + NOSAT 변형(판정 때 덮는다).
     flight_cost (None = LIVE train_flight_cost) > 0 이면 T 에 wild_flight.flight_cost 를 적는다(0 이면 적지 않는다 — train.yaml 이 그대로).
-    반환 = adapt 의 run 정보 꼴 {record, regions, dir} + start. 거부는 adapt.Refused (도주 반사를 끈 세계도 — 관문이 도망 기록을 쓴다)."""
+    반환 = adapt 의 run 정보 꼴 {record, regions, dir} + start. 거부는 adapt.Refused (도주 반사를 끈 세계도 — 관문이 도망 기록을 쓴다).
+    10-24 (변경 기록 (8)): 바탕 설정·학습 조리법·PPO 설정은 시작 모델 계약의 묶음(PROFILES)이 정한다 — 관측 21 이면 관측 21 거울·R5 조리법·ppo_best(옛것
+    그대로), 관측 24 · 판 5 면 판 5 거울(두 길·반사 밖 FLEE 막음)·R7 조리법(f_dec 0.714694)·λ 0.98. G·N·T 가 모두 그 판의 세계다."""
     start = resolve_start(snap, folders)
+    prof = profile_of(start["start_contract"])
+    check_snapshot_route(snap, prof)
     ref = json.loads(ad.REFERENCE.read_text(encoding="utf-8")) if ad.REFERENCE.exists() else None
-    out = ad.convert(snap, ref, template=TEMPLATE_OBS, start=start["zip"], contract=CONTRACT_OBS21, recipe=R5_TRAIN)
+    out = ad.convert(snap, ref, template=prof["template"], start=start["zip"], contract=start["start_contract"], recipe=prof["recipe"])
     world, train = out["world"], out["train"]
     if not bool(world["features"]["wild_flight"]["enabled"]):
         raise ad.Refused("도주 반사(wild_flight)를 끈 세계다 — 1차 숨음 비율·지킴 도망 기록을 잴 수 없다 (LIVE_GATE.md 5-1)")
+    for name, d in (("G·N", world), ("T", train)):                   # 바탕 설정의 두 길 칸이 묶음과 같은가 (판 5 두뇌를 판 5 가 아닌 세계에 걸지 않는다)
+        wf = d["features"]["wild_flight"]
+        if bool(wf.get("route", False)) != bool(prof["route"]) or bool(wf.get("brain_flee_outside_reflex", True)) != (not prof["flee_gate"]):
+            raise ad.Refused(f"{name} 세계의 두 길 칸(route {wf.get('route', False)} · brain_flee_outside_reflex {wf.get('brain_flee_outside_reflex', True)})이 "
+                             f"시작 모델 묶음 {prof['name']} 과 다르다 — 바탕 설정 {path_text(prof['template'])} 을 본다")
     sat_g = bool(world["features"]["wild_satiation"]["enabled"])
     train["features"]["wild_satiation"]["enabled"] = False             # T: 학습할 때는 늑대 포만을 끈다 (게임 G 는 그대로)
     fc = float(LIVE["train_flight_cost"] if flight_cost is None else flight_cost)
@@ -986,7 +1046,8 @@ def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None 
     train["version"] = "3.live.train"
     rep = train["train"]["repertoire"]
     fd = LIVE["f_dec"] if f_dec is None else f_dec
-    fd_src = "R5 학습 조리법 값 그대로 (포만 켠 R5 세계에서 잰 값 — 예비 측정의 measure-fdec 로 T 값을 잰다)"
+    fd_src = ("R5 학습 조리법 값 그대로 (포만 켠 R5 세계에서 잰 값 — 예비 측정의 measure-fdec 로 T 값을 잰다)" if prof["name"] == "obs21" else
+              f"{path_text(prof['recipe'])} 값 그대로 (그 학습 세계에서 시작 정책으로 잰 값 — 변경 기록 (8))")
     if fd is not None:
         rep["f_dec"] = float(fd)
         rep["ent_coef_base"] = round(0.01 * float(fd), 8)              # 범주 엔트로피 계수 0.01 그대로 (R5 와 같은 셈)
@@ -999,15 +1060,18 @@ def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None 
             f"# 스냅숏 {Path(snap_path).name}: 지도 {snap.get('map')} 세션 {snap['session_seed']} 전역 스텝 {snap['global_step']} 환경 #{e['revision']}, "
             f"두뇌 {snap['brain'].get('id')}\n")
     ad.write_yaml(rd / "world.yaml", world, head + f"# G 게임 세계 (부활 없음, 늑대 포만 = 게임 값 {'켬' if sat_g else '끔'}) = "
-                                                   "configs/v3_wild3_obs_mirror.yaml + convert.json 'changed'. N = 이 세계 + wild_satiation 끔\n")
-    ad.write_yaml(rd / "train.yaml", train, head + "# T 학습 세계 = world.yaml + 늑대 포만 끔 + R5 학습 조리법(학습 전용 40 m 밖 부활·학습 시드 "
-                                                   "32000~32049·지역 섞기, 무작위 숲 없음)"
+                                                   f"{path_text(prof['template'])} + convert.json 'changed' (두뇌 묶음 {prof['name']} — {prof['label']}). "
+                                                   "N = 이 세계 + wild_satiation 끔\n")
+    ad.write_yaml(rd / "train.yaml", train, head + f"# T 학습 세계 = world.yaml + 늑대 포만 끔 + 학습 조리법 {path_text(prof['recipe'])} 의 train 블록·부활 계수"
+                                                   f"(학습 전용 40 m 밖 부활·학습 시드 32000~32049·지역 섞기, 무작위 숲 없음, PPO {path_text(prof['ppo'])})"
                   + (f" + 도주 비용 wild_flight.flight_cost {fc:g}" if fc > 0.0 else "") + "\n")
     (rd / "regions.json").write_text(json.dumps(out["regions"], ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     rec = dict(out["record"])
     rec["f_dec_note"] = fd_src
     rec["live"] = dict(start=path_text(start["zip"]), start_why=start["why"], current_brain=start["brain"], brain_contract=start["brain_contract"],
-                       start_contract=start["start_contract"], satiation_game=sat_g, f_dec=float(rep["f_dec"]), flight_cost=fc,
+                       start_contract=start["start_contract"], profile=prof["name"], profile_label=prof["label"], template=path_text(prof["template"]),
+                       recipe=path_text(prof["recipe"]), ppo_config=path_text(prof["ppo"]),
+                       satiation_game=sat_g, f_dec=float(rep["f_dec"]), flight_cost=fc,
                        worlds=dict(G="world.yaml (늑대 포만 게임 값)", N="world.yaml + wild_satiation.enabled false", T="train.yaml (늑대 포만 끔)"),
                        env=e, env_summary=env_summary(snap), env_digest=env_digest(snap), brain_weights_sha256=brain_sha(snap))
     (rd / "convert.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
@@ -1430,6 +1494,15 @@ def gather(results: list, models: dict, steps: dict) -> dict:
 # --------------------------------------------------------------------- #
 
 
+def ppo_config_of(info: dict) -> Path:
+    """판의 PPO 설정 (변경 기록 (8) — 두뇌 묶음이 정한다: convert.json live.ppo_config, 없으면(옛 판 폴더) ppo_best)."""
+    t = (info["record"].get("live") or {}).get("ppo_config")
+    if not t:
+        return PPO_CONFIG
+    p = Path(t)
+    return p if p.is_absolute() else ROOT / p
+
+
 def launch_training(info: dict, rd: Path, start: Path, rid: str, seeds, steps: int, every: int, ckpt: Path, config: Path | None = None,
                     tag: str = "") -> list[dict]:
     """train_v3.py 를 live.py train-one 으로 띄운다 (스냅숏 먹이 지도 + 진행 파일). config = T 세계 설정(기본 판 폴더 train.yaml — 예비 측정의
@@ -1437,6 +1510,7 @@ def launch_training(info: dict, rd: Path, start: Path, rid: str, seeds, steps: i
     rec = info["record"]
     (rd / "logs").mkdir(parents=True, exist_ok=True)
     config = Path(config) if config is not None else rd / "train.yaml"
+    ppo = ppo_config_of(info)
     procs = []
     for s in seeds:
         name = f"live_{rid}_cand{tag}_s{int(s)}"
@@ -1447,7 +1521,7 @@ def launch_training(info: dict, rd: Path, start: Path, rid: str, seeds, steps: i
                f"{rec['snapshot']['brain']} — 포만 없는 학습 세계 T ({config.name}), 시작 {rec['live']['start']}")
         args = ["--config", str(config), "--seed", str(int(s)), "--steps", str(int(steps)), "--init-from-model", str(start),
                 "--init-source", src, "--run-name", name, "--out", str(out), "--tb", str(TB), "--threads", "1",
-                "--ppo-config", str(PPO_CONFIG), "--every", str(int(every))]
+                "--ppo-config", str(ppo), "--every", str(int(every))]
         cmd = [sys.executable, str(HERE), "train-one", "--dir", str(rd), "--progress", str(prog), "--"] + args
         fh = open(log, "w", encoding="utf-8")
         p = subprocess.Popen(cmd, cwd=str(ROOT), stdout=fh, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONUTF8="1"), **own_group())
@@ -1732,6 +1806,89 @@ def flight_pooled(res: dict) -> dict:
 
 
 # --------------------------------------------------------------------- #
+# 길 기록 (10-24 변경 기록 (8) — 판 5 두뇌 판의 보고만: 길 지킴 GT·GTr·GR 은 관문 칸이 아니다)
+# --------------------------------------------------------------------- #
+
+ROUTE_REPORT_KEYS = ("GT_flight_time", "GTr_truncated", "GR_reflee")       # 설계 12절 길 지킴 이름 그대로 (r6_eval.route_guards 와 같은 셈) — 여기서는 보고만
+
+
+def route_seed(res: dict) -> dict:
+    """시드 → 길 보고 재료 (지역 셋 합, r6_eval.route_seed 와 같은 셈): flee·live (GT), truncated (GTr), refled (GR — 길 켬 세계만), route(모든 세계에
+    길 기록 flight.route 가 있나)."""
+    out: dict = {}
+    for w in res["worlds"]:
+        f = flight_of(w)
+        a = out.setdefault(int(w["seed"]), dict(flee=0, live=0, truncated=0, refled=0, route=True))
+        a["flee"] += int(f["flee_steps"])
+        a["live"] += int(f["live_steps"])
+        a["truncated"] += int(f["n"]["truncated"])
+        r = f.get("route")
+        if r is None:
+            a["route"] = False
+        else:
+            a["refled"] += int(r["refled"])
+    return out
+
+
+def route_pooled(res: dict) -> dict:
+    """판 전체 길 통계 (보고 — 세계 기록 flight.route 의 합): 실행한 반사 도주 스텝(RUN·SHELTER)과 SHELTER 몫, 시작한 도주·시작 때 SHELTER 가능, 길 결정·
+    그 가운데 SHELTER 가 열린 결정(choice)·SHELTER 고름·가능 바뀜 다시 고름·길 바꿈·무효, GR(refled)."""
+    t = dict(run_steps=0, shelter_steps=0, onsets=0, onset_shelter=0, decisions=0, choice=0, picked_shelter=0, picked_run=0, redecide_feas=0,
+             switches=0, invalid=0, refled=0)
+    for w in res["worlds"]:
+        r = flight_of(w).get("route")
+        if r is None:
+            continue
+        t["run_steps"] += int(r["steps"]["run"])
+        t["shelter_steps"] += int(r["steps"]["shelter"])
+        for k in ("onsets", "onset_shelter", "decisions", "redecide_feas", "switches", "refled"):
+            t[k] += int(r[k])
+        t["choice"] += int(r.get("choice", 0))
+        t["picked_shelter"] += int(r["picked"]["shelter"])
+        t["picked_run"] += int(r["picked"]["run"])
+        t["invalid"] += sum(int(v) for v in r["invalid"].values())
+    return dict(t, shelter_step_share=ratio(t["shelter_steps"], t["run_steps"] + t["shelter_steps"]))
+
+
+def route_report(cand: dict, cur: dict) -> dict | None:
+    """10-24 (LIVE_GATE.md 변경 기록 (8)) 길 보고: 두 판의 모든 세계에 길 기록(flight.route — 두 길 세계)이 있을 때만, 아니면 None(관측 21 판은 보고하지
+    않는다 — gate.md 그대로). 설계 12절 길 지킴 셋을 같은 셈(r6_eval.route_guards)으로 짝 차이만 적는다 — 관문 칸이 아니다(ok None):
+    GT 사슴-분당 총 도주 초(= 60 × GV — 짝 t 가 GV 와 같아 GV 지킴이 이미 본다), GTr 잘린 도망 수(시드마다 지역 셋 합 — 잘림 쪽 쏠림은 GC 지킴이 본다),
+    GR 살아 끝난 도망 뒤 5 초 안 다시 도망 수(10-24 (7) 사건 단위에서 그 자리는 GE 지킴). 그리고 두 판의 길 통계(route_pooled)."""
+    import r4_eval as re_
+
+    ws = list(cand.get("worlds") or []) + list(cur.get("worlds") or [])
+    if not cand.get("worlds") or not all(isinstance(w.get("flight"), dict) and isinstance(w["flight"].get("route"), dict) for w in ws):
+        return None
+    a, b = route_seed(cand), route_seed(cur)
+    c = {}
+    for name, fn, why in (("GT_flight_time", lambda x: 60.0 * x["flee"] / x["live"] if x["live"] else 0.0,
+                           "사슴-분당 총 도주 초 (= 60 × GV — GV 지킴과 짝 t 가 같다)"),
+                          ("GTr_truncated", lambda x: float(x["truncated"]), "잘린 도망 수 (잘림 쪽 쏠림은 GC 지킴)"),
+                          ("GR_reflee", lambda x: float(x["refled"]), "살아 끝난 도망 뒤 5 초 안 다시 도망 수 (10-24 (7) 그 자리는 GE 지킴)")):
+        q = re_.paired({s: fn(v) for s, v in a.items()}, {s: fn(v) for s, v in b.items()})
+        c[name] = dict(q, ok=None, rule=f"보고만 (변경 기록 (8) — 설계 12절 길 지킴, 관문 칸 아님): N {why}, 시드 {q['n']}")
+    return dict(criteria=c, pooled=dict(candidate=route_pooled(cand), current=route_pooled(cur)))
+
+
+def fmt_route_report(rr: dict | None) -> str:
+    """gate.md '길 기록 (보고만)' 절 — route_report 가 None 이면 빈 글."""
+    if not rr:
+        return ""
+    L = ["", "## 길 기록 (보고만 — 두 길 두뇌 판, LIVE_GATE.md 변경 기록 (8). 설계 12절 길 지킴 GT·GTr·GR 은 관문 칸이 아니다)", "",
+         "| 칸 | 후보 | 지금 두뇌 | 차이 | t | 규칙 |", "|---|---|---|---|---|---|"]
+    for k, v in rr["criteria"].items():
+        L.append(f"| {k} | {v['a']:.4f} | {v['b']:.4f} | {v['diff']:+.4f} ± {v['se']:.4f} | {tfmt(v['t'])} | {v['rule']} |")
+    L += ["", "| N 세계 두뇌 | 반사 도주 스텝 RUN·SHELTER (SHELTER 몫) | 시작한 도주 (시작 때 SHELTER 가능) | 길 결정 (SHELTER 열린 결정) | SHELTER 고름·RUN 고름 | "
+              "다시 고름·길 바꿈·무효 | GR 다시 도망 |", "|---|---|---|---|---|---|---|"]
+    for b, nm in (("current", "지금"), ("candidate", "후보")):
+        p = rr["pooled"][b]
+        L.append(f"| {nm} | {p['run_steps']}·{p['shelter_steps']} ({pct(p['shelter_step_share'])}) | {p['onsets']} ({p['onset_shelter']}) | "
+                 f"{p['decisions']} ({p['choice']}) | {p['picked_shelter']}·{p['picked_run']} | {p['redecide_feas']}·{p['switches']}·{p['invalid']} | {p['refled']} |")
+    return "\n".join(L)
+
+
+# --------------------------------------------------------------------- #
 # 관문 (LIVE_GATE.md 5절 — 10-23 변경 기록 (6) 1차 = 숨음 비율, 지킴 GH, 쫓긴 시간은 보고만 · 10-24 (7) 쫓김 사건 단위, GE, 옛 도망 단위는 보고만)
 # --------------------------------------------------------------------- #
 
@@ -1996,7 +2153,9 @@ def gate_md(rid: str, g: dict, cache_note: str = "") -> str:
     head = (f"# 실시간 관문 {rid}\n\n후보 `{g['candidate']}` 대 지금 두뇌 `{g['current']}` (규칙 LIVE_GATE.md, {g['profile']}, "
             f"판정 단계 {STAGE_KO.get(g.get('stage'), g.get('stage'))}, N 시드 {g['n']}·문턱 {g['t_crit']:.3f}, {p1_head(g)}"
             + (f", G 시드 {g['n_g']}·문턱 {g['t_crit_g']:.3f})" if g.get("n_g") else ", G 돌리지 않음)"))
-    return f"{head}\n\n{fmt_gate_live(g)}\n{fmt_flight(g)}\n{fmt_seq(g)}\n" + (f"\n## 지금 두뇌 시험\n\n{cache_note}\n" if cache_note else "")
+    rr = fmt_route_report(g.get("route_report"))                     # 10-24 (8): 두 길 두뇌 판만 (관측 21 판은 이 절이 없다 — 옛 gate.md 그대로)
+    return (f"{head}\n\n{fmt_gate_live(g)}\n{fmt_flight(g)}\n" + (f"{rr}\n" if rr else "") + f"{fmt_seq(g)}\n"
+            + (f"\n## 지금 두뇌 시험\n\n{cache_note}\n" if cache_note else ""))
 
 
 def futility_gate(look: dict, check: dict | None, cand_n: dict, cur_n: dict) -> dict:
@@ -2062,8 +2221,11 @@ def judge_candidate(info: dict, cand: Path, cur: dict, plan: dict, check: dict |
     def stk(cnd: dict) -> dict:
         return dict(current=cur.get("current:stuck"), candidate=cnd.get("candidate:stuck"))
 
-    def out(g, cnd, stage, complete, look=None) -> dict:
+    def out(g, cnd, stage, complete, look=None, cur_n=None) -> dict:
         g.update(stage=stage, seq=look)
+        rr = route_report(cnd["candidate:N"], cur["current:N"] if cur_n is None else cur_n)   # 10-24 (8) 길 보고 (두 길 판만 — 관문 칸 아님)
+        if rr is not None:
+            g["route_report"] = rr
         return dict(gate=g, cand=cnd, raw=raw, stage=stage, complete=complete, ran=ran, times=times)
 
     k = seq_sizes(len(judge))
@@ -2083,7 +2245,7 @@ def judge_candidate(info: dict, cand: Path, cur: dict, plan: dict, check: dict |
         g = futility_gate(look, check, cnd["candidate:N"], cur_n1)
         if st is not None:
             st.set(state="gating", message=f"중간 판정: 기각(나아지지 않음) — 사건 숨음 비율 {pct(look['b'])}→{pct(look['a'])} t {tfmt(look['t'], 1)}", progress=-1.0)
-        return out(g, cnd, "interim_futility", False, look)
+        return out(g, cnd, "interim_futility", False, look, cur_n=cur_n1)
     # 앞서 통과(켰을 때)여도 지킴(GH·GN·GF·GE·GV·GC·G4 의 N 몫)은 뒤 절반까지 N 전체로 봐야 느슨해지지 않는다 — 뒤 절반·G·끼임을 끝까지 돌린다(10-21 검토)
     early = look["action"] == "efficacy"
     if early:
@@ -2105,7 +2267,9 @@ def export_brain(model: Path, brains: Path, round_no: int, attempt: int, rid: st
                  play_id: str = "") -> dict:
     """두뇌 파일 brains/live_r<판>_<시도 이름>.json 을 쓴다: model.name = live_r<판>_<시도 이름>(언리얼 id = <이름>@<sha8>), adapt 블록(명세 3절).
     play_id = 스냅숏의 Play 번호 (언리얼은 적응 고리 Play 마다 새 번호를 정하고, 다른 Play 의 번호가 적힌 두뇌는 받지 않는다 — 앞 Play 에서 시작한 판이 늦게 끝난 경우).
-    <이름>.json.tmp 에 써서 다시 읽어 확인(sha256·골든·행동·유한, 관측 21 계약)한 뒤에만 os.replace. 같은 이름이 있으면 쓰지 않는다."""
+    <이름>.json.tmp 에 써서 다시 읽어 확인(sha256·골든·행동·유한, 계약)한 뒤에만 os.replace. 같은 이름이 있으면 쓰지 않는다.
+    10-24 (변경 기록 (8)): 계약 확인 = 모델 계약이 두뇌 묶음(PROFILES — 관측 21, 관측 24 · 판 5)에 있고 파일의 계약 해시·관측 수·마스크 판이 그 묶음과 같다.
+    골든 세계는 모델 관측·마스크 판으로 고른다(판 5 면 판 5 거울 — export_weights_v3.brain_golden_config_for)."""
     import torch as th
 
     import export_weights_v3 as ex
@@ -2116,11 +2280,13 @@ def export_brain(model: Path, brains: Path, round_no: int, attempt: int, rid: st
     final, tmp = brains / f"{name}.json", brains / f"{name}.json.tmp"
     if final.exists():
         raise FileExistsError(f"두뇌 파일 {final} 이 이미 있다 — 같은 이름은 덮지 않는다")
+    want_c = zip_contract(Path(model))
+    prof = profile_of(want_c)
     prev = th.get_num_threads()
     th.set_num_threads(1)
     try:
         m = ex.load_model(Path(model))
-        d = ex.brain_dict(m, Path(model), ex.brain_golden_config_for(m.policy.rep_obs_names),
+        d = ex.brain_dict(m, Path(model), ex.brain_golden_config_for(m.policy.rep_obs_names, int(getattr(m.policy, "rep_mask_version", 1))),
                           world_label=f"실시간 적응 {rid} (포만 없는 스냅숏 세계 T)")
     finally:
         th.set_num_threads(prev)
@@ -2135,7 +2301,10 @@ def export_brain(model: Path, brains: Path, round_no: int, attempt: int, rid: st
         ex.write_brain_file(tmp, d)
         v = ad.verify_brain_file(tmp)
         back = read_json(tmp) or {}
-        v["contract_ok"] = bool(back.get("contract_hash") == CONTRACT_OBS21 and int(back.get("obs_dim", 0)) == 21)
+        v["contract_ok"] = bool(back.get("contract_hash") == want_c and int(back.get("obs_dim", 0)) == prof["obs_dim"]
+                                and int(back.get("mask_version", 0)) == prof["mask_version"])
+        v.update(contract_hash=back.get("contract_hash"), obs_dim=back.get("obs_dim"), mask_version=back.get("mask_version"), profile=prof["name"],
+                 golden_world=(back.get("golden") or {}).get("world_config"))
         v["adapt_ok"] = back.get("adapt") == d["adapt"] and (back.get("model") or {}).get("name") == name
         v["ok"] = bool(v["ok"] and v["finite"] and v["contract_ok"] and v["adapt_ok"])
         if not v["ok"]:
@@ -2294,8 +2463,9 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         mark("convert", t0)
         start = Path(ad.ROOT / info["record"]["anchor"])
         res["start"] = info["record"]["anchor"]
-        print(f"시도 {attempt} ({rid}): 스냅숏 {Path(snap_path).name} · 환경 #{e['revision']} {env_txt} · 두뇌 {snap['brain'].get('id')} → 시작 {res['start']}",
-              flush=True)
+        res["brain_profile"] = info["record"]["live"]["profile"]     # 10-24 (8) 두뇌 묶음 (obs21 · route5 — 판정 크기 이름 gate profile 과 다르다)
+        print(f"시도 {attempt} ({rid}): 스냅숏 {Path(snap_path).name} · 환경 #{e['revision']} {env_txt} · 두뇌 {snap['brain'].get('id')} → 시작 {res['start']} "
+              f"(묶음 {res['brain_profile']} — {info['record']['live']['profile_label']})", flush=True)
 
         # R 재현 확인 (환경·두뇌가 처음 그대로일 때만)
         ok_r, why_r = r_applicable(snap)
@@ -2424,14 +2594,14 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         # 관문 (판정은 judge_candidate 가 했다 — 여기서는 기록)
         t0 = time.perf_counter()
         st.set(state="gating", message=f"관문 — {STAGE_KO[jc['stage']]}", progress=-1.0)
-        g.update(candidate=ad._rel(cand), current=ad._rel(start), plan=plan_record(plan), current_cache=cache_rows,
+        g.update(candidate=ad._rel(cand), current=ad._rel(start), plan=plan_record(plan), current_cache=cache_rows, brain_profile=res["brain_profile"],
                  profile="시험 크기 (관문 상수 아님 — 판정 아님)" if plan["test"] else "LIVE_GATE.md 관문 상수")
         atomic_write_json(rd / "gate.json", g)
         cache_note = cache_note_md(cache_rows, reuse)
         (rd / "gate.md").write_text(gate_md(rid, g, cache_note), encoding="utf-8", newline="\n")
         mark("gate", t0)
         res.update(verdict=g["verdict"], why=g["why"], gate_summary=g["summary"], stage_note=g.get("note", ""))
-        print(f"1차 P1 숨음 비율: 짝 시드 {g['n_flight']}/{g['n']} (두 두뇌 가운데 하나라도 쫓긴 도망이 없어 빠진 시드 {len(g['dropped_flight'])}) — "
+        print(f"1차 P1 사건 숨음 비율: 짝 시드 {g['n_flight']}/{g['n']} (두 두뇌 가운데 하나라도 쫓긴 사건이 없어 빠진 시드 {len(g['dropped_flight'])}) — "
               f"{STAGE_KO[jc['stage']]}", flush=True)
         print(f"관문 {g['verdict']} — {g['why']}", flush=True)
         if not g["passed"] and not plan["force_export"]:
@@ -2797,7 +2967,7 @@ def cmd_watch(a) -> int:
     try:
         w = Watcher(Path(a.root), pl, new_only=not a.existing)
         w.log(f"감시 시작: {w.snapdir} (워커 {pl['workers']}, 학습 {fmt_steps(pl['steps'])} × 모델 {len(pl['model_seeds'])}, 판정 시드 "
-              f"N {pl['judge'][0]}~{pl['judge'][1]} × {pl['horizon']} 스텝 · G {pl['judge_g'][0]}~{pl['judge_g'][1]} × {pl['horizon_g']} 스텝, 1차 = 숨음 비율"
+              f"N {pl['judge'][0]}~{pl['judge'][1]} × {pl['horizon']} 스텝 · G {pl['judge_g'][0]}~{pl['judge_g'][1]} × {pl['horizon_g']} 스텝, 1차 = 사건 숨음 비율"
               + (", 도주 비용 {:g}".format(pl["flight_cost"]) if pl["flight_cost"] > 0 else "") + (", 시험 크기)" if pl["test"] else ")"))
         k = seq_sizes(len(seeds_of(pl["judge"])))
         w.log(("중간 판정 앞 " + f"{k}/{len(seeds_of(pl['judge']))} 시드" if k else "한 번 보기") + f", 판정 실행기 {LIVE['evaluator']}"
@@ -2979,7 +3149,8 @@ def cmd_pilot(a) -> int:
             fproc = subprocess.Popen(fcmd, cwd=str(ROOT), stdout=fh, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONUTF8="1"), **own_group())
         busy = len(procs) + (1 if fproc is not None else 0)
         seeds = seeds_of(seeds_lh)
-        models = {"current": start, "r5": R5S3} | extras
+        # 'r5' 견줌(R5 s3 — 관측 21·판 2)은 관측 21 묶음 판만 (10-24 (8): 판 5 지금 두뇌의 세계에는 판 2 두뇌를 걸 수 없다 — 마스크 판이 다르다)
+        models = {"current": start} | ({"r5": R5S3} if info["record"]["live"].get("profile", "obs21") == "obs21" else {}) | extras
         if "brains" in parts or "scale" in parts:
             items = []
             if "brains" in parts:

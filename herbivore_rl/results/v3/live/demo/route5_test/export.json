@@ -1,0 +1,35 @@
+{
+ "ok": true,
+ "file": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\AdaptiveEcosystem\\Saved\\EcoAdapt_route5_test\\brains\\live_r1_a1_20261024T185534_e1.json",
+ "name": "live_r1_a1_20261024T185534_e1",
+ "id": "live_r1_a1_20261024T185534_e1@11a05ada",
+ "weights_sha256": "11a05ada7e2b311f651b6a8d3db86b1528f19d61b20d4f48d07128cf28515e99",
+ "verify": {
+  "file": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\AdaptiveEcosystem\\Saved\\EcoAdapt_route5_test\\brains\\live_r1_a1_20261024T185534_e1.json.tmp",
+  "id": "live_r1_a1_20261024T185534_e1@11a05ada",
+  "sha256_ok": true,
+  "golden": 27,
+  "max_logit_err": 1.9073486328125e-06,
+  "tolerance": 9.999999747378752e-05,
+  "actions_ok": true,
+  "finite": true,
+  "ok": true,
+  "contract_ok": true,
+  "contract_hash": "0xad7bad5e1acaf071",
+  "obs_dim": 24,
+  "mask_version": 5,
+  "profile": "route5",
+  "golden_world": "configs/v3_wild3_route5_mirror.yaml",
+  "adapt_ok": true
+ },
+ "adapt": {
+  "round": 1,
+  "attempt": 1,
+  "run": "a1_20261024T185534_e1",
+  "snapshot": "eco_v3_snapshot_s20004_t473_e1.json",
+  "env": "Barren 나무 0→20, 비 1.0",
+  "gate": "시험 내보내기(--force-export) — 관문 기각: 1차 사건 숨음 비율 19.5%→21.9% t +1.6 (문턱 +12.71)",
+  "created_utc": "2026-10-24T09:56:08Z",
+  "play_id": "p20261024T095430_d6553818"
+ }
+}

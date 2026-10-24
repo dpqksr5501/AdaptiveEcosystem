@@ -1,0 +1,4 @@
+[live 18:52:36] 감시 시작: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\AdaptiveEcosystem\Saved\EcoAdapt_route5_test\snapshots (워커 10, 학습 20k × 모델 1, 판정 시드 N 35000~35001 × 600 스텝 · G 35000~35001 × 600 스텝, 1차 = 숨음 비율, 시험 크기)
+[live 18:52:36] 한 번 보기, 판정 실행기 ceval, 지금 두뇌 판정 다시 쓰기 켬
+[live 18:55:34] 시도 1 시작: eco_v3_snapshot_s20004_t473_e1.json → a1_20261024T185534_e1 (pid 15524, 기록 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\AdaptiveEcosystem\Saved\EcoAdapt_route5_test\live\rounds\a1_20261024T185534_e1\round.log)
+[live 18:56:11] 시도 1 끝 (rc 0): exported — 시험 내보내기: 판 1 (관문 기각)

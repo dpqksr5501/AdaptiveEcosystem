@@ -415,6 +415,9 @@ W.Stats.Decisions += (D.bCommittedReads || D.bCommittedRouteReads) ? 1 : 0;   //
  → Saved/EcoAdapt/brains → EcoV3Brain 감시·Parse(5절) → 줄 → 결정 스텝 경계 SyncBrain(8-2) → 그 스텝 끝 H 부터 길
 ```
 - 파이썬 쪽(live.py `resolve_start`·A5·템플릿을 `v3_wild3_route_mirror.yaml` 로)은 16-11 의 몫이고 이 이식의 범위 밖이다. 이식은 C++ 이 판 4 파일을 받고 돌리게만 한다.
+- (10-24 이식 뒤 — `herbivore_rl/results/v3/live/LIVE_GATE.md` 변경 기록 (8)) 파이썬 쪽은 판 5 로 했다: `live.resolve_start` 가 계약 해시로 시작 모델 묶음을 고르고
+  (관측 21 · 관측 24 판 5 — 판 4 는 거부), 판 5 면 바탕 `v3_wild3_route5_mirror.yaml`·학습 조리법 `v3_r7_train.yaml`·PPO λ 0.98, A5 는 판 5 계약·골든 세계를 본다.
+  C++ 은 고치지 않았다. 시험 폴더에서 R7e 를 시작 두뇌로 건 헤드리스 게임이 스냅숏 → 이어 배우기 → 관문 → 판 5 두뇌 파일 → 같은 Play 에서 바꿔 끼우기까지 돌았다.
 
 ### 8-2. `SyncBrain` (`EcoPolicyV3IntegratedSubsystem.cpp:3295-3400`)
 

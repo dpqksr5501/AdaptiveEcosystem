@@ -1,0 +1,186 @@
+{
+ "file": "eco_v3_snapshot_s20004_t473_e1.json",
+ "play_id": "p20261024T095430_d6553818",
+ "global_step": 473,
+ "session_seed": 20004,
+ "contract_hash": "0x7eea0107339be4ce",
+ "env": {
+  "watch": true,
+  "revision": 1,
+  "changed_step": 450,
+  "first_changed_step": 450,
+  "trigger": "env_change",
+  "changes": [
+   {
+    "revision": 1,
+    "step": 450,
+    "seconds": 60,
+    "region": "Barren",
+    "kind": "trees",
+    "detail": "나무 0→20 (+20 −0)",
+    "source": "test"
+   },
+   {
+    "revision": 1,
+    "step": 450,
+    "seconds": 60,
+    "region": "Barren",
+    "kind": "weather",
+    "detail": "맑음→비 1.00",
+    "source": "cvar:eco.IntegratedV3.WeatherBarren"
+   }
+  ]
+ },
+ "brain": {
+  "id": "v3_r7_g995_s1_20m@40d8710d",
+  "model": "v3_r7_g995_s1_20m",
+  "model_path": "ckpt/v3/v3_r7_g995_s1_20m.zip",
+  "model_sha256": "8ed144a2fed3a6dd2214df0bb1732af553a4c3cb7cd3862d467088d741a0f229",
+  "weights_sha256": "40d8710d5cb5ed80081b2c6651458cfb545e42418e4193ffbd31ca70c92999c9",
+  "builtin": false,
+  "train_world": "v3_r7_train",
+  "source_file": "v3_r7_g995_s1_20m.json",
+  "allowed": [
+   1,
+   1,
+   1,
+   0,
+   0
+  ],
+  "last_swap_step": -1,
+  "contract_hash": "0xad7bad5e1acaf071",
+  "obs_dim": 24,
+  "mask_version": 5,
+  "route": true,
+  "flee_gate": true,
+  "adapt": {}
+ },
+ "regions": [
+  {
+   "region": "Forest",
+   "allowed": [
+    1,
+    1,
+    1,
+    0,
+    0
+   ],
+   "wild_flight": {
+    "enabled": true,
+    "alert_r": 15,
+    "flight_r": 7.5,
+    "safe_r": 20,
+    "approach": 0.9,
+    "alert_w": 1.5,
+    "rest_alert": true,
+    "shelter_cos": 0.5,
+    "shelter_r": 15,
+    "crouch": true,
+    "wall_margin": 1,
+    "hold_awake": true,
+    "edge_r": 5,
+    "route": true,
+    "brain_flee_outside_reflex": false
+   },
+   "weather": {
+    "enabled": true,
+    "kind": "rain",
+    "intensity": 1,
+    "rain_sight": 0.9,
+    "rain_hear": 0.5,
+    "snow_sight": 0.7,
+    "snow_hear": 1,
+    "snow_deer_speed": 0.6,
+    "snow_wolf_speed": 0.85,
+    "obs_visibility": true,
+    "schedule_rows": 0
+   },
+   "discs": 24,
+   "flight_route": true
+  },
+  {
+   "region": "Barren",
+   "allowed": [
+    1,
+    1,
+    1,
+    0,
+    0
+   ],
+   "wild_flight": {
+    "enabled": true,
+    "alert_r": 15,
+    "flight_r": 7.5,
+    "safe_r": 20,
+    "approach": 0.9,
+    "alert_w": 1.5,
+    "rest_alert": true,
+    "shelter_cos": 0.5,
+    "shelter_r": 15,
+    "crouch": true,
+    "wall_margin": 1,
+    "hold_awake": true,
+    "edge_r": 5,
+    "route": true,
+    "brain_flee_outside_reflex": false
+   },
+   "weather": {
+    "enabled": true,
+    "kind": "rain",
+    "intensity": 1,
+    "rain_sight": 0.9,
+    "rain_hear": 0.5,
+    "snow_sight": 0.7,
+    "snow_hear": 1,
+    "snow_deer_speed": 0.6,
+    "snow_wolf_speed": 0.85,
+    "obs_visibility": true,
+    "schedule_rows": 0
+   },
+   "discs": 20,
+   "flight_route": true
+  },
+  {
+   "region": "Highland",
+   "allowed": [
+    1,
+    1,
+    1,
+    0,
+    0
+   ],
+   "wild_flight": {
+    "enabled": true,
+    "alert_r": 15,
+    "flight_r": 7.5,
+    "safe_r": 20,
+    "approach": 0.9,
+    "alert_w": 1.5,
+    "rest_alert": true,
+    "shelter_cos": 0.5,
+    "shelter_r": 15,
+    "crouch": true,
+    "wall_margin": 1,
+    "hold_awake": true,
+    "edge_r": 5,
+    "route": true,
+    "brain_flee_outside_reflex": false
+   },
+   "weather": {
+    "enabled": true,
+    "kind": "snow",
+    "intensity": 1,
+    "rain_sight": 0.9,
+    "rain_hear": 0.5,
+    "snow_sight": 0.7,
+    "snow_hear": 1,
+    "snow_deer_speed": 0.6,
+    "snow_wolf_speed": 0.85,
+    "obs_visibility": true,
+    "schedule_rows": 0
+   },
+   "discs": 9,
+   "flight_route": true
+  }
+ ]
+}

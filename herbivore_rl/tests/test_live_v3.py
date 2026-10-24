@@ -17,6 +17,9 @@
   짝 t ≥ +b₁)도 뒤 절반·G·끼임을 돌려 지킴을 전체로 봄(검토 사례: 뒤 절반 은신처 안 잡힘·더 잡힘 → 기각), 끝 판정 = 옛 한 번 보기. 지금 두뇌 판정 저장:
   맞음·틀림·열쇠 무효(10-23 저장 판 2·기준 판 — 옛 저장을 쓰지 않음), 임시 파일 → os.replace, 저장 실패 기록. 판정 실행기 갈림(결과의 시드·지역 확인).
 - 관문 상수 = LIVE_GATE.md.
+- 10-24 (8) 두 길·판 5 두뇌: 묶음 표(계약 = 바탕 설정·학습 조리법 세계의 관측·마스크 판으로 다시 셈한 해시, 판 5 = 판 5 거울·R7 조리법·λ 0.98), R7e 지금 두뇌
+  → 그 zip·판 5 세계(G·N·T, 평가기 일 포함), 판 4·마스크 판·지역 두 길 칸 어긋남 거부, 판 5 두뇌 파일 A5(계약·골든 세계), 길 보고 GT·GTr·GR = r6_eval 셈
+  (보고만 — 관문 판정 그대로, 관측 21 판은 보고 없음, 중간 기각이면 앞 절반 짝).
 학습·판정 세계를 돌리지 않는다(내보내기 골든 600 스텝, 도주 비용 기준 크기 T 세계 셋 × 20 스텝만). 시드는 관문 범위 이름만 쓰고 세계를 돌리지 않는다.
 """
 
@@ -1453,6 +1456,265 @@ def test_measure_fdec_snapshot_food(lv, prepared):
 
 
 # --------------------------------------------------------------------- #
+# 10-24 (LIVE_GATE.md 변경 기록 (8)) 두 길·판 5 두뇌 — 지금 두뇌로 받아 판 5 세계에서 판정·이어 배우기, 길 지킴은 보고만
+# --------------------------------------------------------------------- #
+
+R7E_FILE = ECOBRAINS / "v3_r7_g995_s1_20m.json"
+ROUTE0_FILE = ECOBRAINS / "v3_r1_g995_s3_obs24route0.json"
+R7E_ZIP = ROOT / "ckpt" / "v3" / "v3_r7_g995_s1_20m.zip"
+need_r7e = pytest.mark.skipif(not (R7E_FILE.exists() and R7E_ZIP.exists()), reason="R7e 두뇌 파일·모델 zip 이 없다 (저장소 밖 ckpt)")
+
+
+def _route_snap(snap: dict, brain_file: Path = R7E_FILE, world_route=True) -> dict:
+    """스냅숏의 지금 두뇌를 두뇌 파일의 것으로 바꾼 사본 (10-24 이식 2/2 스냅숏 꼴 — brain.mask_version·route·flee_gate, 지역 world.wild_flight.route·
+    brain_flee_outside_reflex). world_route None 이면 지역 칸을 적지 않는다(이식 전 스냅숏 꼴)."""
+    b = json.loads(Path(brain_file).read_text(encoding="utf-8"))
+    s = copy.deepcopy(snap)
+    mv = int(b["mask_version"])
+    s["brain"].update(id=b["id"], weights_sha256=b["weights_sha256"], obs_dim=int(b["obs_dim"]), contract_hash=b["contract_hash"], builtin=False,
+                      mask_version=mv, route=mv in (4, 5), flee_gate=mv == 5)
+    if world_route is not None:
+        for r in s["regions"]:
+            r["world"]["wild_flight"].update(route=bool(world_route), brain_flee_outside_reflex=not (bool(world_route) and mv == 5))
+    return s
+
+
+@pytest.fixture(scope="module")
+def r7e_prepared(lv, snap, tmp_path_factory):
+    if not (R7E_FILE.exists() and R7E_ZIP.exists()):
+        pytest.skip("R7e 두뇌 파일·모델 zip 이 없다")
+    rd = tmp_path_factory.mktemp("round_r5") / "a1_route5_e0"
+    return lv.prepare(SNAP, _route_snap(snap), rd, lv.BRAIN_FOLDERS)
+
+
+def test_profiles_match_contracts(lv):
+    """두뇌 묶음 표(PROFILES)의 계약 해시 = 그 바탕 설정(G·N)·학습 조리법(T) 세계의 관측 이름·마스크 판으로 다시 셈한 해시, 판 5 묶음은 R7 학습 조리법·
+    λ 0.98 PPO, 관측 21 묶음은 옛것 그대로. 판 4(route0·R6)는 표에 없다."""
+    import yaml
+
+    import export_weights_v3 as ex
+    from env_v2.config import load_v2_config
+    from env_v2.rep_policy import world_mask_version
+    from env_v2.world import World
+
+    assert set(lv.PROFILES) == {lv.CONTRACT_OBS21, lv.CONTRACT_OBS24_M5} and lv.CONTRACT_OBS24_M4 not in lv.PROFILES
+    o21, r5 = lv.PROFILES[lv.CONTRACT_OBS21], lv.PROFILES[lv.CONTRACT_OBS24_M5]
+    assert (o21["template"], o21["recipe"], o21["ppo"]) == (lv.TEMPLATE_OBS, lv.R5_TRAIN, lv.PPO_CONFIG)       # 관측 21 고리 그대로
+    assert (r5["template"], r5["recipe"], r5["ppo"]) == (lv.TEMPLATE_ROUTE5, lv.R7_TRAIN, lv.PPO_ROUTE5)
+    assert yaml.safe_load(lv.PPO_ROUTE5.read_text(encoding="utf-8"))["params"]["gae_lambda"] == 0.98
+    assert "gae_lambda" not in yaml.safe_load(lv.PPO_CONFIG.read_text(encoding="utf-8"))["params"]
+    for contract, prof in lv.PROFILES.items():
+        for cfg_path in (prof["template"], prof["recipe"]):
+            w = World(load_v2_config(cfg_path), seeds=[35000])
+            mv = int(world_mask_version(w))
+            assert mv == prof["mask_version"] and len(w.obs_names) == prof["obs_dim"], (contract, cfg_path)
+            assert f"0x{ex.contract_hash(tuple(w.obs_names), mv):016x}" == contract, (contract, cfg_path)
+        wf = load_v2_config(prof["template"]).v2["features"]["wild_flight"]
+        assert bool(wf.get("route", False)) == prof["route"] and (not bool(wf.get("brain_flee_outside_reflex", True))) == prof["flee_gate"]
+
+
+@need_r7e
+def test_route5_start_resolution(lv, snap, tmp_path):
+    """판 5 두뇌(R7e)가 지금 두뇌면 그 두뇌 파일의 zip 이 시작 모델(묶음 route5), 판 4 두뇌(route0)·마스크 판이 어긋난 스냅숏·지역 두 길 칸이 어긋난
+    스냅숏은 거부. 옛 스냅숏(지역 두 길 칸 없음)은 받는다."""
+    s = _route_snap(snap)
+    r = lv.resolve_start(s, lv.BRAIN_FOLDERS)
+    assert r["zip"].resolve() == R7E_ZIP.resolve() and r["current_model"].resolve() == R7E_ZIP.resolve()
+    assert r["obs_dim"] == 24 and r["start_contract"] == r["brain_contract"] == lv.CONTRACT_OBS24_M5 and r["profile"] == "route5"
+    assert lv.resolve_start(snap, lv.BRAIN_FOLDERS)["profile"] == "obs21"                       # 내장 R1b-F → 관측 21 그대로
+    if ROUTE0_FILE.exists():
+        with pytest.raises(lv.ad.Refused, match="판 4"):
+            lv.resolve_start(_route_snap(snap, ROUTE0_FILE), lv.BRAIN_FOLDERS)
+    bad = copy.deepcopy(s)
+    bad["brain"]["mask_version"] = 4
+    with pytest.raises(lv.ad.Refused, match="마스크 판"):
+        lv.resolve_start(bad, lv.BRAIN_FOLDERS)
+    bad = copy.deepcopy(s)
+    bad["brain"]["contract_hash"] = lv.CONTRACT_OBS21                                          # 관측 24 인데 관측 21 계약이라 적힌 스냅숏
+    with pytest.raises(lv.ad.Refused, match="계약 해시"):
+        lv.resolve_start(bad, lv.BRAIN_FOLDERS)
+    bad = copy.deepcopy(s)
+    bad["brain"]["obs_dim"] = 30
+    with pytest.raises(lv.ad.Refused, match="관측 18·21·24"):
+        lv.resolve_start(bad, lv.BRAIN_FOLDERS)
+    # 지역 세계 두 길 칸 (게임이 실제로 건 값) — 묶음과 다르면 거부, 없으면(이식 전 스냅숏) 보지 않는다
+    lv.check_snapshot_route(s, lv.PROFILES[lv.CONTRACT_OBS24_M5])
+    lv.check_snapshot_route(_route_snap(snap, world_route=None), lv.PROFILES[lv.CONTRACT_OBS24_M5])
+    lv.check_snapshot_route(snap, lv.PROFILES[lv.CONTRACT_OBS21])
+    with pytest.raises(lv.ad.Refused, match="두 길"):
+        lv.check_snapshot_route(_route_snap(snap, world_route=False), lv.PROFILES[lv.CONTRACT_OBS24_M5])
+    with pytest.raises(lv.ad.Refused, match="두 길"):
+        lv.check_snapshot_route(s, lv.PROFILES[lv.CONTRACT_OBS21])                             # 관측 21 두뇌인데 지역 세계는 두 길 켬
+    gate_only = copy.deepcopy(s)
+    for r_ in gate_only["regions"]:
+        r_["world"]["wild_flight"]["brain_flee_outside_reflex"] = True
+    with pytest.raises(lv.ad.Refused, match="반사 밖 도망 막음"):
+        lv.check_snapshot_route(gate_only, lv.PROFILES[lv.CONTRACT_OBS24_M5])
+    with pytest.raises(lv.ad.Refused, match="두 길"):
+        lv.prepare(SNAP, _route_snap(snap, world_route=False), tmp_path / "a_r5_bad", lv.BRAIN_FOLDERS)
+    assert not (tmp_path / "a_r5_bad").exists()                                                 # 변환 전에 거부 — 판 폴더를 만들지 않는다
+
+
+@need_r7e
+def test_route5_worlds(lv, r7e_prepared):
+    """판 5 묶음: G·N·T 모두 두 길·반사 밖 FLEE 막음(마스크 판 5·관측 24) 세계, T 는 늑대 포만 끔 + R7 조리법(f_dec 0.714694)·부활, PPO λ 0.98.
+    판정 일(N·G·끼임)과 C++ 평가기 일(native_job)이 판 5 세계를 그대로 싣는다(평가기가 받는 칸 — unsupported_settings 빈 목록)."""
+    import yaml
+
+    import ceval
+    from env_v2.config import load_v2_config
+    from env_v2.rep_policy import check_mask_version, rep_params, world_mask_version
+    from env_v2.world import World
+
+    rd = r7e_prepared["dir"]
+    world = yaml.safe_load((rd / "world.yaml").read_text(encoding="utf-8"))
+    train = yaml.safe_load((rd / "train.yaml").read_text(encoding="utf-8"))
+    for d in (world, train):
+        assert d["features"]["wild_flight"]["route"] is True and d["features"]["wild_flight"]["brain_flee_outside_reflex"] is False
+        assert d["features"]["obstacle_obs"]["enabled"] is True
+    assert world["features"]["wild_satiation"]["enabled"] is True and train["features"]["wild_satiation"]["enabled"] is False
+    assert "flight_cost" not in train["features"]["wild_flight"]
+    assert world["features"]["integrated_stage"]["respawn"] is False and train["features"]["integrated_stage"]["respawn"] is True
+    mix = train["train"]["region_mix"]
+    assert "random_forest" not in mix and mix["obstacles"]["Forest"] == r7e_prepared["regions"]["Forest"]["discs"]
+    rep = rep_params(load_v2_config(rd / "train.yaml"))
+    assert rep["f_dec"] == pytest.approx(0.714694) and rep["cat_ent_coef"] == pytest.approx(0.01)
+    assert "configs/v3_r7_train.yaml" in (rd / "train.yaml").read_text(encoding="utf-8").splitlines()[2]
+    rec = json.loads((rd / "convert.json").read_text(encoding="utf-8"))
+    assert rec["anchor"] == "ckpt/v3/v3_r7_g995_s1_20m.zip" and rec["template"] == "configs/v3_wild3_route5_mirror.yaml"
+    lvr = rec["live"]
+    assert (lvr["profile"], lvr["start_contract"], lvr["recipe"], lvr["ppo_config"]) == (
+        "route5", lv.CONTRACT_OBS24_M5, "configs/v3_r7_train.yaml", "configs/ppo_r6_lam098.yaml")
+    assert lv.ppo_config_of(r7e_prepared) == lv.PPO_ROUTE5 and lv.ppo_config_of(dict(record={})) == lv.PPO_CONFIG
+    from stable_baselines3 import PPO
+
+    pol = PPO.load(str(R7E_ZIP), device="cpu").policy
+    for f in ("world.yaml", "train.yaml"):
+        w = World(load_v2_config(rd / f), seeds=[35000])
+        assert world_mask_version(w) == 5 and len(w.obs_names) == 24
+        check_mask_version(pol.rep_mask_version, w.obs_names, w.brain_flee_outside_reflex)   # R7e 를 그 세계에 걸 수 있다
+    n = lv.eval_items(r7e_prepared, "current", R7E_ZIP, [35000], 10, "N")
+    g = lv.eval_items(r7e_prepared, "current", R7E_ZIP, [35000], 10, "G")
+    st = lv.stuck_items(r7e_prepared, "current", R7E_ZIP, [35000], 10)
+    for _, _, j in n + g + st:
+        wf = j["cfg"]["v2"]["features"]["wild_flight"]
+        assert wf["route"] is True and wf["brain_flee_outside_reflex"] is False
+    assert all(j["cfg"]["v2"]["features"]["wild_satiation"]["enabled"] is False for _, _, j in n)
+    for _, _, j in (n[0], g[0]):
+        assert ceval.unsupported_settings(j["cfg"]) == []
+        nj = ceval.native_job(j, 0, brain_mask_version=5)
+        assert nj["world"]["wild_flight"]["route"] is True and nj["world"]["wild_flight"]["brain_flee_outside_reflex"] is False
+        with pytest.raises(ValueError, match="마스크 판"):
+            ceval.native_job(j, 0, brain_mask_version=2)                                     # 관측 21 두뇌 파일로는 판 5 세계 일을 만들지 않는다
+
+
+@need_r7e
+def test_route5_export(lv, tmp_path):
+    """판 5 후보의 두뇌 파일: 계약 0xad7bad5e1acaf071·관측 24·판 5, 골든 세계 = 판 5 거울, 다시 읽기(A5) 통과, 다음 판의 시작점으로 찾힌다. 판 4 모델은
+    두뇌 묶음에 없어 내보내지 않는다."""
+    brains = tmp_path / "brains"
+    gate = "시험 내보내기(--force-export) — 관문 기각: 1차 사건 숨음 비율 12.0%→12.4% t +0.5 (문턱 +12.71)"
+    x = lv.export_brain(R7E_ZIP, brains, 1, 1, "a1_20261024T190000_e1", "eco_v3_snapshot_s20004_t480_e1.json", "Barren 나무 0→20, 비 1.0", gate,
+                        play_id="p20261024T100000_0badcafe")
+    assert x["ok"] and x["verify"]["contract_ok"] and x["verify"]["adapt_ok"]
+    v = x["verify"]
+    assert (v["contract_hash"], v["obs_dim"], v["mask_version"], v["profile"], v["golden_world"]) == (
+        lv.CONTRACT_OBS24_M5, 24, 5, "route5", "configs/v3_wild3_route5_mirror.yaml")
+    d = json.loads(Path(x["file"]).read_text(encoding="utf-8"))
+    r7 = json.loads(R7E_FILE.read_text(encoding="utf-8"))
+    assert d["weights_sha256"] == r7["weights_sha256"] and d["contract"] == r7["contract"] and d["allowed"] == r7["allowed"]
+    assert d["model"]["path"] == "ckpt/v3/v3_r7_g995_s1_20m.zip" and d["adapt"]["gate"] == gate
+    assert lv.ad.verify_brain_file(Path(x["file"]))["ok"]
+    assert lv.find_brain_zip(d["weights_sha256"], [brains]).resolve() == R7E_ZIP.resolve()
+    route0_zip = ROOT / "ckpt" / "v3" / "v3_r1_g995_s3_obs24route0.zip"
+    if route0_zip.exists():
+        with pytest.raises(ValueError, match="두뇌 묶음"):
+            lv.export_brain(route0_zip, brains, 2, 2, "a2_x_e1", "s.json", "", "")
+        assert sorted(p.name for p in brains.iterdir()) == [Path(x["file"]).name]               # 임시 파일이 남지 않는다
+
+
+def _route_block(refled: int, run: int, shelter: int, decisions: int = 40, choice: int = 20, pick_shelter: int = 12) -> dict:
+    """세계 하나의 길 기록 (짜 맞춤 — World.flight_stats 의 route 꼴에서 보고가 읽는 칸만)."""
+    z = dict(run=0, cover=0, shelter=0, open=0)
+    return dict(brain=True, steps=dict(z, run=run, shelter=shelter), onsets=30, onset_cover=0, onset_shelter=14, onset_both=0, decisions=decisions,
+                redecide_feas=3, switches=2, fallback=0, invalid=dict(z, shelter=1), picked=dict(z, run=decisions - pick_shelter, shelter=pick_shelter),
+                choice=choice, bad_shelter=0, refled=refled, refled_steps=38)
+
+
+def test_route_report(lv, monkeypatch):
+    """10-24 (8) 길 보고: 설계 12절 길 지킴 GT·GTr·GR 을 r6_eval.route_guards 와 같은 셈으로 짝 차이만 적고(ok None — 관문 칸이 아니다), 관문
+    판정(gate_live)은 길 기록이 있어도 없어도 같다. 길 기록이 없는 판(관측 21)은 보고 없음 — gate.md 그대로."""
+    sys.path.insert(0, str(ROOT / "results" / "v3" / "r6"))
+    import r6_eval
+
+    seeds = range(35000, 35010)
+    rng = np.random.default_rng(35208)
+    cand = _fake(seeds, lambda s, r: 20, hidden=lambda s, r: 9, flee=lambda s, r: 0.08 + 0.001 * (s % 3), trunc=lambda s, r: 1 + s % 2)
+    cur = _fake(seeds, lambda s, r: 20, hidden=lambda s, r: 7)
+    plain = copy.deepcopy(cand), copy.deepcopy(cur)
+    for res, k in ((cand, 0), (cur, 1)):
+        for w in res["worlds"]:
+            w["flight"]["route"] = _route_block(int(rng.integers(5, 15)) + 3 * (1 - k), 400, 300 + 50 * (1 - k))
+    rr = lv.route_report(cand, cur)
+    ref = r6_eval.route_guards(cand, cur)
+    assert set(rr["criteria"]) == set(lv.ROUTE_REPORT_KEYS) == set(ref)
+    for key in lv.ROUTE_REPORT_KEYS:
+        got, want = rr["criteria"][key], ref[key]
+        assert got["ok"] is None and "보고만" in got["rule"]
+        assert all(got[f] == pytest.approx(want[f]) for f in ("a", "b", "diff", "se", "t", "n")), key
+    gv = lv.flight_rate_pair(cand, cur, "flee")
+    assert rr["criteria"]["GT_flight_time"]["t"] == pytest.approx(gv["t"])                    # GT = 60 × GV — 짝 t 가 같다
+    p = rr["pooled"]["candidate"]
+    assert (p["run_steps"], p["shelter_steps"], p["decisions"], p["choice"], p["picked_shelter"]) == (400 * 20, 350 * 20, 800, 400, 240)
+    assert p["shelter_step_share"] == pytest.approx(350 / 750)
+    assert lv.route_report(*plain) is None and lv.route_report(cand, plain[1]) is None          # 길 기록이 없는 판(관측 21) — 보고 없음
+    text = lv.fmt_route_report(rr)
+    assert "## 길 기록 (보고만" in text and all(k in text for k in lv.ROUTE_REPORT_KEYS) and lv.fmt_route_report(None) == ""
+    # 관문 판정은 길 기록과 무관하다 (칸·값 그대로)
+    monkeypatch.setitem(lv.LIVE, "hide_min_effect", 0.0)
+    G = _fake(range(35000, 35005), lambda s, r: 10)
+    stk = dict(current=dict(summary=dict(deer=0, wolf=0)), candidate=dict(summary=dict(deer=0, wolf=0)))
+    import r4_eval
+
+    monkeypatch.setattr(r4_eval, "stuck_counts", lambda s: dict(deer=0, wolf=0))
+    ga = lv.gate_live(dict(N=dict(candidate=cand, current=cur), G=dict(candidate=G, current=G)), stk, None)
+    gb = lv.gate_live(dict(N=dict(candidate=plain[0], current=plain[1]), G=dict(candidate=G, current=G)), stk, None)
+    assert ga["verdict"] == gb["verdict"] and list(ga["criteria"]) == list(gb["criteria"])
+    assert not any(k in ga["criteria"] for k in lv.ROUTE_REPORT_KEYS)
+    for k in ga["criteria"]:
+        assert {f: ga["criteria"][k].get(f) for f in ("ok", "t")} == {f: gb["criteria"][k].get(f) for f in ("ok", "t")}, k
+
+
+def test_route_report_in_judge(lv, prepared, seq_setup):
+    """judge_candidate 가 두 길 판(N 세계 기록에 flight.route)이면 gate 에 route_report 를 붙이고 gate.md 에 '길 기록' 절을 쓴다. 중간 기각이면 앞 절반
+    짝으로 적는다. 길 기록이 없는 판(관측 21 — 옛 판)은 붙이지 않는다."""
+    base, hb = seq_setup["base"], seq_setup["hb"]
+    jc, _ = _judge(lv, prepared, seq_setup, {("candidate", "N"): lambda s, r: dict(chase=base[(s, r)], hidden=hb[(s, r)] - 2)})
+    assert jc["stage"] == "interim_futility" and "route_report" not in jc["gate"]
+    assert "## 길 기록" not in lv.gate_md("a1_t", dict(jc["gate"], candidate="c", current="k", profile="시험"))
+    cur = copy.deepcopy(seq_setup["cur"])
+    for w in cur["current:N"]["worlds"]:
+        w["flight"]["route"] = _route_block(10, 400, 300)
+    rows = dict(seq_setup, cur=cur)
+    log: list = []
+
+    def runner(items, on_done=None):
+        out = _fake_runner({("candidate", "N"): lambda s, r: dict(chase=base[(s, r)], hidden=hb[(s, r)] - 2),
+                            ("candidate", "G"): lambda s, r: dict(chase=base[(s, r)], hidden=hb[(s, r)])}, log)(items, on_done)
+        for tag, row in out:
+            if "flight" in row:
+                row["flight"]["route"] = _route_block(14, 400, 360)
+        return out
+
+    jc = lv.judge_candidate(prepared, lv.OBS21ZERO, rows["cur"], rows["plan"], dict(ok=None, why="시험"), None, runner=runner)
+    assert jc["stage"] == "interim_futility"
+    rr = jc["gate"]["route_report"]
+    assert rr["criteria"]["GR_reflee"]["n"] == jc["gate"]["seq"]["n_int"] and rr["criteria"]["GR_reflee"]["diff"] == pytest.approx(4 * len(prepared["regions"]))
+    text = lv.gate_md("a1_t", dict(jc["gate"], candidate="c", current="k", profile="시험"))
+    assert "## 길 기록 (보고만" in text and text.index("## 길 기록") < text.index("## 중간 판정")
+
+
+# --------------------------------------------------------------------- #
 # 관문 상수 = LIVE_GATE.md
 # --------------------------------------------------------------------- #
 
@@ -1534,3 +1796,11 @@ def test_constants_match_md(lv):
     assert lv.fut_bound_text(L["seq_futility_t"]) == "t ≤ 0" and "`gate.md` 머리 `중간 기각 경계 t ≤ 0`" in md
     assert "### 2026-10-21 (5)" in md
     assert L["cache_current"] is True and "| 지금 두뇌 판정 다시 쓰기 cache_current | 켬" in md
+    # 10-24 (8) 두 길·판 5 두뇌: 묶음 표(계약·바탕·조리법·PPO)·판 4 거부·길 지킴 GT·GTr·GR 은 보고만·관문 표 그대로·실제 폴더 잠금 그대로
+    assert "### 2026-10-24 (8)" in md and "10-24 (8) 두 길·판 5 두뇌를 고리에 받음" in md
+    assert all(c in md for c in (lv.CONTRACT_OBS21, lv.CONTRACT_OBS24_M5, lv.CONTRACT_OBS24_M4))
+    assert all(p.exists() and p.name in md for p in (lv.TEMPLATE_ROUTE5, lv.R7_TRAIN, lv.PPO_ROUTE5, lv.TEMPLATE_OBS, lv.R5_TRAIN, lv.PPO_CONFIG))
+    assert "f_dec 0.714694" in md and "λ 0.98" in md and "| 이어 배우는 두뇌 묶음 (`live.PROFILES`" in md
+    assert "| 길 지킴 GT·GTr·GR (설계 12절·16-11) | 보고만" in md and all(f"`{k}`" in md for k in lv.ROUTE_REPORT_KEYS)
+    assert "GT = 60 × GV" in md and "GR 자리 = GE" in md
+    assert not any(k.startswith(("GT", "GR")) for k in lv.GUARD_PREFIXES)                         # 관문 지킴 칸은 그대로 (GE 를 쓰는 표)
