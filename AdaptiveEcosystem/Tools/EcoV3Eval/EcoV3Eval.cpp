@@ -33,6 +33,13 @@
 //   cover_then_starved, watch_steps}(옛 1차 숨음 비율 — 보고만)도, 10-24 부터 쫓김 사건 episode{started, chased, hidden, caught, starved, other,
 //   truncated, watching, other_chased, joined, joined_cover, joined_other, window_caught, window_starved, link_cover_steps, link_other_steps}(실시간 관문
 //   1차 사건 숨음 비율·지킴 GH·GE 의 재료)도 낸다.
+//   10-24 두 길 두뇌 (이식 계획서 Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 7절): 두뇌 파일 관측 24·마스크 판 4(계약 0xe302dee198197444)·판 5(0xad7bad5e1acaf071 —
+//   반사 밖 두뇌 FLEE 막음)를 받는다. 일의 world.wild_flight.route·brain_flee_outside_reflex 가 두뇌 판과 같아야 하고(아니면 그 일은 오류), 두뇌 판이
+//   SetModelRoute·SetModelFleeGate 로 세계를 켠다. 길 켬 세계면 flight 에 route{route_stats 칸·by_route·drop_obstacle·chased_steps·hidden_steps·refled}
+//   (파이썬 flight_stats 의 route 와 같은 칸)를, trace 에 관측 24·길 칸(route·route_k·route_age·route_feas·route_decide·route_req·route_gap)을 더한다.
+//   trace 의 gap = 망을 돌린 사슴의 로짓 1·2 위 차 (근접 동점 갈림 진단). 기록의 min_gap·near_ties·min_route_gap = 판 전체의 그 최솟값·1e-4 밑 수.
+//   일의 선택 칸 trace_digest (스텝 수) 면 전체 궤적 대신 스텝마다 칸 아홉의 지문을 traj 로 낸다 (TrajDigest — herbivore_rl/results/v3/route/port/
+//   make_traces.py digest_state 와 같은 바이트, port/native_check.py 가 traj/ 와 견준다).
 
 #include <chrono>
 #include <cmath>
@@ -40,6 +47,8 @@
 #include <cstdio>
 #include <cstring>
 #include <fstream>
+#include <initializer_list>
+#include <limits>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -216,12 +225,112 @@ namespace EcoV3Eval
 		std::string Id;
 		std::string WeightsSha256;
 		std::int32_t ObsDim = 0;
+		std::int32_t MaskVersion = 2;        // 마스크 판 (2 = 관측 18·21, 4 = 두 길 두뇌 관측 24, 5 = 판 4 + 반사 밖 두뇌 FLEE 막음 — 10-24 이식)
 		std::uint8_t Allowed[R3::kNumBehaviors] = {};
 		std::vector<float> Wt0, Bs0, Wt1, Bs1, Wt2, Bs2;
 		P3::FPolicyNetV3 Net{};
 		std::int32_t GoldenCases = 0;
 		double GoldenMaxErr = 0.0;
+
+		bool Route() const { return P3::IsRouteMaskVersion(MaskVersion); }            // 두 길 두뇌 (SetModelRoute)
+		bool FleeGate() const { return MaskVersion == P3::kMaskVersionRouteGate; }    // 판 5 (SetModelFleeGate)
 	};
+
+	/** 두뇌 파일의 관측 이름이 계약 차례(관측 18 · 장애물 세 칸 · 길 세 칸)와 같은가. */
+	bool ObsNamesOk(const FValue& R, std::int32_t Dim)
+	{
+		const FValue* Nv = R.Find("obs_names");
+		if (Nv == nullptr || !Nv->IsArray() || Nv->Arr().size() != static_cast<size_t>(Dim))
+		{
+			return false;
+		}
+		for (std::int32_t i = 0; i < Dim; ++i)
+		{
+			const char* Want = i < O3::kObsDim ? O3::kObsNames[i]
+							   : i < O3::kObsDimObstacle ? O3::kObstacleObsNames[i - O3::kObsDim]
+														 : O3::kRouteObsNames[i - O3::kObsDimObstacle];
+			if (Nv->Arr()[static_cast<size_t>(i)].Str() != Want)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * 두 길 두뇌 파일의 계약 dict flight_route 가 이 빌드의 상수와 같은가 (이식 계획서 5-2 의 5 — 해시가 이미 덮지만 어긋난 칸을 거부 글에 적는다).
+	 * 다르면 그 칸 이름을 돌려준다 (같으면 빈 글).
+	 */
+	std::string RouteContractDiff(const FValue& R, std::int32_t MaskVersion)
+	{
+		const FValue* Ct = R.Find("contract");
+		const FValue* Fr = Ct != nullptr ? Ct->Find("flight_route") : nullptr;
+		if (Fr == nullptr || !Fr->IsObject())
+		{
+			return "contract.flight_route 없음";
+		}
+		const FValue& Sl = Fr->At("slots");
+		if (static_cast<int>(Sl.At("run").Num()) != W3::kRouteSlotRun || static_cast<int>(Sl.At("shelter").Num()) != W3::kRouteSlotShelter
+			|| Sl.At("reserved_masked").Arr().size() != 1 || static_cast<int>(Sl.At("reserved_masked").Arr()[0].Num()) != W3::kRouteSlotReserved)
+		{
+			return "flight_route.slots";
+		}
+		const std::vector<FValue>& Ob = Fr->At("obs").Arr();
+		for (std::int32_t j = 0; j < O3::kNumRouteObs; ++j)
+		{
+			if (Ob.size() != static_cast<size_t>(O3::kNumRouteObs) || Ob[static_cast<size_t>(j)].Str() != O3::kRouteObsNames[j])
+			{
+				return "flight_route.obs";
+			}
+		}
+		// 글자 배열이 Want 와 같은 차례·같은 길이인가
+		auto StringList = [](const FValue& A, std::initializer_list<const char*> Want)
+		{
+			const std::vector<FValue>& V = A.Arr();
+			if (V.size() != Want.size())
+			{
+				return false;
+			}
+			size_t j = 0;
+			for (const char* W : Want)
+			{
+				if (V[j++].Str() != W)
+				{
+					return false;
+				}
+			}
+			return true;
+		};
+		// 결정 조건 on = 시작·무효·잠금 뒤 가능 바뀜 (world.py `_route_step` — EcoWorldV3 Detail::RouteStep 의 onset·invalid·refeas. UE 로더와 같은 칸)
+		const FValue& De = Fr->At("decide");
+		if (static_cast<int>(De.At("lock_steps").Num()) != W3::kRouteLockSteps
+			|| !StringList(De.At("on"), {"onset", "invalid", "lock_and_feasible_changed"}) || !StringList(De.At("feasible"), {"shelter"})
+			|| !StringList(De.At("refeas_from"), {"run"}))
+		{
+			return "flight_route.decide";
+		}
+		const FValue& Sh = Fr->At("shelter");
+		if (Sh.At("max_edge_u").Num() != W3::kRouteShelterMaxEdgeU || Sh.At("cos_min").Num() != W3::kRouteShelterCosMin
+			|| Sh.At("enter_margin_u").Num() != W3::kRouteShelterEnterU || Sh.At("exit_margin_u").Num() != W3::kRouteShelterExitU
+			|| Sh.At("reach_norm_u").Num() != W3::kRouteShelterReachU || Sh.At("edge_norm_u").Num() != W3::kRouteShelterEdgeNormU)
+		{
+			return "flight_route.shelter";
+		}
+		if (Fr->StrOr("freeze_sleep_must_be_blocked", "") != "effective_allowed")
+		{
+			return "flight_route.freeze_sleep_must_be_blocked";
+		}
+		const FValue* Gate = Ct->Find("brain_flee_outside_reflex");
+		if (MaskVersion == P3::kMaskVersionRouteGate && (Gate == nullptr || Gate->IsNull() || Gate->Bool()))
+		{
+			return "brain_flee_outside_reflex (판 5 는 false)";
+		}
+		if (MaskVersion == P3::kMaskVersionRoute && Gate != nullptr && !Gate->IsNull())
+		{
+			return "brain_flee_outside_reflex (판 4 에는 없다)";
+		}
+		return "";
+	}
 
 	std::vector<std::uint8_t> Base64Decode(const std::string& In)
 	{
@@ -326,18 +435,50 @@ namespace EcoV3Eval
 			throw std::runtime_error("두뇌 형식이 eco_v3_brain 판 1 이 아니다: " + Path);
 		}
 		const std::string Hash = Lower(R.At("contract_hash").Str());
-		char Want18[32], Want21[32];
-		std::snprintf(Want18, sizeof(Want18), "0x%016llx", static_cast<unsigned long long>(P3::kContractHashObs18Mask2));
-		std::snprintf(Want21, sizeof(Want21), "0x%016llx", static_cast<unsigned long long>(P3::kContractHashObs21Mask2));
-		const std::int32_t Dim = static_cast<std::int32_t>(R.At("obs_dim").Num());
-		if (!((Hash == Want18 && Dim == O3::kObsDim) || (Hash == Want21 && Dim == O3::kObsDimObstacle)))
+		// 받는 계약 (해시 · 관측 칸 수 · 마스크 판): 관측 18·21 판 2, 10-24 두 길 두뇌 관측 24 판 4·5 (이식 계획서 5-1·13-2)
+		struct FContractRow
 		{
-			throw std::runtime_error("두뇌 계약 해시 " + Hash + " · 관측 " + std::to_string(Dim) + " 을 이 세계가 만들 수 없다 (관측 18·21, 마스크 판 2 만)");
+			std::uint64_t Hash;
+			std::int32_t Dim;
+			std::int32_t Mask;
+		};
+		static constexpr FContractRow kContracts[4] = {{P3::kContractHashObs18Mask2, O3::kObsDim, 2},
+													   {P3::kContractHashObs21Mask2, O3::kObsDimObstacle, 2},
+													   {P3::kContractHashObs24Mask4, O3::kObsDimRoute, P3::kMaskVersionRoute},
+													   {P3::kContractHashObs24Mask5, O3::kObsDimRoute, P3::kMaskVersionRouteGate}};
+		const std::int32_t Dim = static_cast<std::int32_t>(R.At("obs_dim").Num());
+		const FContractRow* Row = nullptr;
+		for (const FContractRow& C : kContracts)
+		{
+			char Want[32];
+			std::snprintf(Want, sizeof(Want), "0x%016llx", static_cast<unsigned long long>(C.Hash));
+			if (Hash == Want)
+			{
+				Row = &C;
+			}
+		}
+		if (Row == nullptr || Row->Dim != Dim)
+		{
+			throw std::runtime_error("두뇌 계약 해시 " + Hash + " · 관측 " + std::to_string(Dim) +
+									 " 을 이 세계가 만들 수 없다 (관측 18·21 판 2, 관측 24 판 4·5 만)");
 		}
 		if (static_cast<int>(R.At("hidden").Num()) != P3::kHiddenDim || static_cast<int>(R.At("num_behaviors").Num()) != P3::kNumBehaviors
-			|| static_cast<int>(R.At("mask_version").Num()) != 2)
+			|| static_cast<int>(R.At("mask_version").Num()) != Row->Mask)
 		{
 			throw std::runtime_error("두뇌 차원·마스크 판이 계약과 다르다");
+		}
+		if (!ObsNamesOk(R, Dim))
+		{
+			throw std::runtime_error("두뇌 관측 이름이 계약 차례와 다르다 (관측 18 · escape_room·obstacle_near·threat_hidden · in_panic·shelter_reach·shelter_edge)");
+		}
+		B.MaskVersion = Row->Mask;
+		if (B.Route())
+		{
+			const std::string Why = RouteContractDiff(R, B.MaskVersion);
+			if (!Why.empty())
+			{
+				throw std::runtime_error("두 길 두뇌 계약 칸이 이 빌드와 다르다: " + Why);
+			}
 		}
 		const FValue& Th = R.At("thresholds");
 		if (static_cast<float>(Th.At("threat_recency_obs").Num()) != P3::kThreatRecencyObs
@@ -353,6 +494,11 @@ namespace EcoV3Eval
 		for (std::int32_t b = 0; b < R3::kNumBehaviors; ++b)
 		{
 			B.Allowed[b] = Am[static_cast<size_t>(b)].Num() != 0.0 ? 1 : 0;
+		}
+		if (B.Route() && (B.Allowed[R3::kFreeze] != 0 || B.Allowed[R3::kSleep] != 0))
+		{
+			// 판 4·5 는 칸 3·4 를 도주 중 길 칸으로 다시 쓴다 — 모델 허용에 얼기·잠이 있으면 거부 (이식 계획서 5-2 의 4, 걸 때 실제 허용도 Init 이 본다)
+			throw std::runtime_error("두 길 두뇌(마스크 판 4·5)의 허용에 얼기·잠이 있다");
 		}
 		const std::vector<FValue>& L = R.At("layers").Arr();
 		if (L.size() != 3)
@@ -520,6 +666,8 @@ namespace EcoV3Eval
 			K.WallMargin = F.At("wall_margin").Num();
 			K.bHoldAwake = F.At("hold_awake").Bool();
 			K.EdgeR = F.At("edge_r").Num();
+			// 10-24 두 길 두뇌 (선택 칸 — 옛 일은 없다): 세계 키 route. 실제로 켜는 것은 두뇌 판(SetModelRoute — Init 이 어긋나면 거부한다)
+			K.bRoute = F.BoolOr("route", false);
 		}
 		{
 			const FValue& F = Wb.At("wild_reserve");
@@ -664,9 +812,58 @@ namespace EcoV3Eval
 		std::vector<std::int32_t> Cause;      // 0 산, 1 잡힘, 2 굶음 (world.py death_cause)
 		std::vector<std::int64_t> LastFlee;
 		std::int64_t Catches = 0, CatchFled = 0, Starves = 0, StarveFled = 0;
+		// 10-24 근접 동점 진단 (기록만): 산 사슴의 망 결정(열린 칸 둘 이상) 가운데 로짓 1·2 위 차 최솟값·1e-4 밑 수, 길 결정의 |ℓ4 − ℓ1| 최솟값
+		double MinGap = 1e300, MinRouteGap = 1e300;
+		std::int64_t GapDecisions = 0, RouteGapDecisions = 0, NearTies = 0;
 		FPcg64 Pcg;
 		std::string Region;
 	};
+
+	/** 10-24 근접 동점 진단: 지금 산 사슴(E.Live)의 다음 결정 (H 의 DecideHerb 가 망을 돌린 사슴만 — 열린 칸 둘 이상). */
+	void TallyGaps(FEval& E)
+	{
+		for (const W3::FHerbView& H : E.Live)
+		{
+			const W3::FHerbDecision& D = *H.Decision;
+			if (!(D.Prep.bReads || D.bRouteReads))
+			{
+				continue;
+			}
+			double A = -1e300, B = -1e300;
+			std::int32_t Open = 0;
+			for (std::int32_t b = 0; b < R3::kNumBehaviors; ++b)
+			{
+				if (D.Mask[b] == 0)
+				{
+					continue;
+				}
+				++Open;
+				const double V = static_cast<double>(D.Logits[b]);
+				if (V > A)
+				{
+					B = A;
+					A = V;
+				}
+				else if (V > B)
+				{
+					B = V;
+				}
+			}
+			if (Open < 2)
+			{
+				continue;
+			}
+			const double G = A - B;
+			E.MinGap = G < E.MinGap ? G : E.MinGap;
+			++E.GapDecisions;
+			E.NearTies += G < 1e-4 ? 1 : 0;
+			if (D.bRouteReads)
+			{
+				E.MinRouteGap = G < E.MinRouteGap ? G : E.MinRouteGap;
+				++E.RouteGapDecisions;
+			}
+		}
+	}
 
 	W3::FHerbView ViewOf(FEval& E, std::int32_t s)
 	{
@@ -679,6 +876,28 @@ namespace EcoV3Eval
 		W3::InitWorld(E.W, ConfigOf(Job.At("world"), Job));
 		W3::SetModelAllowed(E.W, Brain.Allowed);
 		W3::SetModelObsDim(E.W, Brain.ObsDim);
+		{
+			// 10-24 두 길 두뇌 (이식 계획서 7-2·13-3): 세계 키(route·brain_flee_outside_reflex)와 두뇌 판이 같아야 한다 — 파이썬 rep_policy.check_mask_version 과 같은 뜻.
+			// 판 4·5 두뇌는 도주 반사(WildFlight)를 켠 세계만, 실제 허용(두뇌 ∧ 세계)의 얼기·잠이 0 이어야 한다(rep_policy.check_route_allowed)
+			const FValue& Wf = Job.At("world").At("wild_flight");
+			const bool bWorldRoute = Wf.BoolOr("route", false);
+			const bool bWorldGate = !Wf.BoolOr("brain_flee_outside_reflex", true);
+			if (bWorldRoute != Brain.Route() || bWorldGate != Brain.FleeGate())
+			{
+				throw std::runtime_error("세계(wild_flight.route " + std::string(bWorldRoute ? "true" : "false") + "·brain_flee_outside_reflex " +
+										 (bWorldGate ? "false" : "true") + ")와 두뇌 마스크 판 " + std::to_string(Brain.MaskVersion) + " 이 다르다");
+			}
+			if (Brain.Route() && !E.W.Config.WildFlight.bEnabled)
+			{
+				throw std::runtime_error("두 길 두뇌(마스크 판 4·5)는 도주 반사(wild_flight)를 켠 세계만 받는다");
+			}
+			W3::SetModelRoute(E.W, Brain.Route());
+			W3::SetModelFleeGate(E.W, Brain.FleeGate());
+			if (Brain.Route() && (E.W.Allowed[R3::kFreeze] != 0 || E.W.Allowed[R3::kSleep] != 0))
+			{
+				throw std::runtime_error("두 길 두뇌(마스크 판 4·5)는 실제 허용의 얼기·잠이 막혀 있어야 한다");
+			}
+		}
 		E.Region = Job.StrOr("region", "");
 		// 먹이 격자: 파이썬 거울 세계가 reset·스냅숏 덮기 뒤 남긴 용량·먹이·재생률 (InitWorld 의 난수 지도는 버린다 — 은신처 셀 칸은 같은 원으로 이미 같다)
 		{
@@ -805,11 +1024,79 @@ namespace EcoV3Eval
 		}
 		W3::ObserveAndDecideAll(E.W, E.Live.data(), static_cast<std::int32_t>(E.Live.size()), E.ThreatPtrs.data(),
 								static_cast<std::int32_t>(E.ThreatPtrs.size()), Brain.Net);
+		TallyGaps(E);
 	}
 
 	// ---- 기록 ----
 
-	void WriteFlight(FOut& O, const W3::FFlightReport& F, bool bFoliage)
+	/**
+	 * 10-24 두 길 두뇌 도망 길 기록 (파이썬 flight_stats 의 route = `_flight_route_block` 과 같은 칸·차례: route_stats 칸 + by_route·drop_obstacle·chased_steps·
+	 * hidden_steps·refled·refled_steps, 숲 시야 켬 세계만 drop_foliage). C++ 두뇌 길에 없는 칸(fixed·quiet_end·fallback·onset_cover·onset_both)은 늘 같은 값이다.
+	 */
+	void WriteRoute(FOut& O, const W3::FFlightRouteReport& R, bool bFoliage)
+	{
+		auto Routes = [&](const char* K, const std::int64_t* V, std::int32_t N)
+		{
+			O.Key(K);
+			O.BeginObj();
+			for (std::int32_t r = 0; r < N; ++r)
+			{
+				O.KInt(W3::RouteName(r), V[r]);
+			}
+			O.EndObj();
+		};
+		O.BeginObj();
+		O.Key("fixed");
+		O.Raw("null");
+		O.KInt("quiet_end", 0);
+		Routes("steps", R.Route.Steps, W3::kNumRoutes);
+		O.KInt("onsets", R.Route.Onsets);
+		O.KInt("onset_cover", 0);
+		O.KInt("onset_shelter", R.Route.OnsetShelter);
+		O.KInt("onset_both", 0);
+		O.KInt("decisions", R.Route.Decisions);
+		O.KInt("redecide_feas", R.Route.RedecideFeas);
+		O.KInt("switches", R.Route.Switches);
+		O.KInt("fallback", 0);
+		Routes("invalid", R.Route.Invalid, W3::kNumRoutes);
+		Routes("picked", R.Route.Picked, W3::kNumRoutes);
+		O.KBool("brain", true);
+		O.KInt("choice", R.Route.Choice);
+		O.KInt("bad_shelter", R.Route.BadShelter);
+		O.Key("by_route");
+		O.BeginObj();
+		for (std::int32_t r = 0; r < W3::kNumFlightRouteRows; ++r)
+		{
+			O.Key(W3::RouteName(r));
+			O.BeginObj();
+			const std::int64_t* Parts[3] = {R.N[r], R.Steps[r], R.Contact[r]};
+			const char* Names[3] = {"n", "steps", "contact"};
+			for (int p = 0; p < 3; ++p)
+			{
+				O.Key(Names[p]);
+				O.BeginObj();
+				for (std::int32_t c = 0; c < W3::kNumFlightCauses; ++c)
+				{
+					O.KInt(W3::FlightCauseName(c), Parts[p][c]);
+				}
+				O.EndObj();
+			}
+			O.EndObj();
+		}
+		O.EndObj();
+		Routes("drop_obstacle", R.DropObstacle, W3::kNumFlightRouteRows);
+		Routes("chased_steps", R.Chased, W3::kNumFlightRouteRows);
+		Routes("hidden_steps", R.Hidden, W3::kNumFlightRouteRows);
+		O.KInt("refled", R.Refled);
+		O.KInt("refled_steps", W3::kFlightRefleeSteps);
+		if (bFoliage)
+		{
+			Routes("drop_foliage", R.DropFoliage, W3::kNumFlightRouteRows);
+		}
+		O.EndObj();
+	}
+
+	void WriteFlight(FOut& O, const W3::FFlightReport& F, bool bFoliage, const W3::FFlightRouteReport* Route = nullptr)
 	{
 		O.BeginObj();
 		O.KInt("started", F.Started);
@@ -874,12 +1161,24 @@ namespace EcoV3Eval
 			O.KInt("contact", F.LostFoliage[2]);
 			O.EndObj();
 		}
+		if (Route != nullptr)
+		{
+			// 10-24 두 길 두뇌 세계만 (파이썬 flight_stats 의 route — 길 끈 세계에는 칸이 없다)
+			O.Key("route");
+			WriteRoute(O, *Route, bFoliage);
+		}
 		O.EndObj();
 	}
 
 	W3::FFlightReport FlightNow(FEval& E)
 	{
 		return W3::FlightReportOf(E.W.Stats.Flight, W3::FlightOpenOf(E.Live.data(), static_cast<std::int32_t>(E.Live.size())));
+	}
+
+	/** 10-24 두 길 두뇌 도망 길 보고 (지금 열린 도망은 잘림). */
+	W3::FFlightRouteReport RouteNow(FEval& E)
+	{
+		return W3::FlightRouteReportOf(E.W.Stats.Route, E.W.Stats.FlightRoute, W3::FlightOpenOf(E.Live.data(), static_cast<std::int32_t>(E.Live.size())));
 	}
 
 	void WriteHunt(FOut& O, const FEval& E)
@@ -942,6 +1241,7 @@ namespace EcoV3Eval
 	{
 		std::int64_t H = 0, Caught = 0, Starved = 0, Alive = 0;
 		W3::FFlightReport Flight;
+		W3::FFlightRouteReport Route;   // 10-24 두 길 두뇌 세계만 쓴다
 	};
 
 	/**
@@ -994,6 +1294,7 @@ namespace EcoV3Eval
 		Vec("separation", [](const W3::FHerbPerception& P) { return P.Kin.Separation; });
 		Vec("away_from_pred", [](const W3::FHerbPerception& P) { return P.Threat.AwayFromPred; });
 		Vec("food_grad", [](const W3::FHerbPerception& P) { return P.FoodGrad; });
+		const bool bRouteObs = E.W.ObsDim >= O3::kObsDimRoute;   // 10-24 관측 24 두뇌: 길 세 칸까지 (파이썬 w._obs 24 칸)
 		O.Key("obs");
 		O.BeginArr();
 		for (std::int32_t i = 0; i < N; ++i)
@@ -1008,9 +1309,78 @@ namespace EcoV3Eval
 			{
 				O.Num(static_cast<double>(P.ObstacleObs[k]));
 			}
+			for (std::int32_t k = 0; bRouteObs && k < O3::kNumRouteObs; ++k)
+			{
+				O.Num(static_cast<double>(P.RouteObs[k]));
+			}
 			O.EndArr();
 		}
 		O.EndArr();
+		if (E.W.Config.WildFlight.bRoute)
+		{
+			// 10-24 두 길 두뇌 길 칸 (이식 계획서 7-2 — make_traces.trace_state 와 같은 칸: H 뒤·다음 A 앞). route_req = 길 결정 ∧ 도주 사슴의 두뇌 출력, 아니면 −1.
+			// route_gap = 그 사슴의 로짓 차 ℓ4 − ℓ1 (칸 4 SHELTER − 칸 1 RUN, 길 결정 아니면 null — 근접 동점 갈림 진단, 계획서 9절 R13)
+			Arr("route", [&](std::int32_t i) { O.Int(E.Dec[static_cast<size_t>(i)].Route); });
+			Arr("route_k", [&](std::int32_t i) { O.Int(E.Dec[static_cast<size_t>(i)].RouteK); });
+			Arr("route_age", [&](std::int32_t i) { O.Int(E.Dec[static_cast<size_t>(i)].RouteAge); });
+			Arr("route_feas", [&](std::int32_t i) { O.Int(E.Dec[static_cast<size_t>(i)].RouteFeas); });
+			Arr("route_decide", [&](std::int32_t i) { O.Bool(E.Dec[static_cast<size_t>(i)].bRouteDecide); });
+			Arr("route_req", [&](std::int32_t i)
+				{
+					const W3::FHerbDecision& D = E.Dec[static_cast<size_t>(i)];
+					O.Int((D.bRouteDecide && D.KeepMode == W3::kKeepPanic && E.Cause[static_cast<size_t>(i)] == 0) ? D.RouteRequest : -1);
+				});
+			Arr("route_gap", [&](std::int32_t i)
+				{
+					const W3::FHerbDecision& D = E.Dec[static_cast<size_t>(i)];
+					if (D.bRouteReads && E.Cause[static_cast<size_t>(i)] == 0)
+					{
+						O.Num(static_cast<double>(D.Logits[W3::kRouteSlotShelter]) - static_cast<double>(D.Logits[W3::kRouteSlotRun]));
+					}
+					else
+					{
+						O.Raw("null");
+					}
+				});
+		}
+		// 결정 로짓 1·2 위 차 (막은 칸 빼고, 망을 돌린 사슴만 — 아니면 null): 갈림이 근접 동점 결정에서 났는지 가른다
+		Arr("gap", [&](std::int32_t i)
+			{
+				const W3::FHerbDecision& D = E.Dec[static_cast<size_t>(i)];
+				if (!(D.Prep.bReads || D.bRouteReads) || E.Cause[static_cast<size_t>(i)] != 0)
+				{
+					O.Raw("null");
+					return;
+				}
+				double A = -1e300, B = -1e300;
+				std::int32_t Open = 0;
+				for (std::int32_t b = 0; b < R3::kNumBehaviors; ++b)
+				{
+					if (D.Mask[b] == 0)
+					{
+						continue;
+					}
+					++Open;
+					const double V = static_cast<double>(D.Logits[b]);
+					if (V > A)
+					{
+						B = A;
+						A = V;
+					}
+					else if (V > B)
+					{
+						B = V;
+					}
+				}
+				if (Open < 2)
+				{
+					O.Raw("null");
+				}
+				else
+				{
+					O.Num(A - B);
+				}
+			});
 		O.Key("wolves");
 		O.BeginObj();
 		const std::int32_t M = static_cast<std::int32_t>(E.Threats.size());
@@ -1046,6 +1416,186 @@ namespace EcoV3Eval
 		O.EndObj();
 	}
 
+	/**
+	 * 10-24 궤적 지문 한 스텝 (herbivore_rl/results/v3/route/port/make_traces.py `digest_state` 와 같은 바이트·같은 칸 아홉 — 리틀 엔디언, C 순서):
+	 *   clock  t i8 ‖ dark f8 ‖ pred_ema f8                  deer  x·y·hx·hy·energy·reserve (모든 슬롯) f8
+	 *   fate   덮기 (N) i4 ‖ 죽음 (N) i4                     beh   행동 i4 (Alive0 슬롯)
+	 *   obs    관측 (Alive0 슬롯, 행 우선) f4 — 관측 24 두뇌면 24 칸, 아니면 21 칸
+	 *   req    다음 요청 i4 (스텝 끝 산 ∧ 덮기 < 2)          kin   무리 중심·분리·위협 반대·먹이 기울기 (Alive0 슬롯 × 2) f8
+	 *   wolf   늑대 x·y·hx·hy f8 ‖ 쿨다운·배부름·잠·표적 i4 (StepSlots 가 없으면 표적 −1)
+	 *   route  길·route_k·route_age·route_feas·route_decide·route_req i4 (스텝 끝 산 슬롯)
+	 * 칸마다 sha256 앞 8 자리 16 진. 전체 궤적(수백 MB)을 쓰지 않고 판 단위 대조 자료(traj/)와 견준다.
+	 */
+	std::vector<std::string> TrajDigest(FEval& E, const std::vector<std::uint8_t>& Alive0, const std::vector<std::int32_t>* StepSlots)
+	{
+		const std::int32_t N = static_cast<std::int32_t>(E.Bodies.size());
+		const std::int32_t M = static_cast<std::int32_t>(E.Threats.size());
+		const bool bRouteObs = E.W.ObsDim >= O3::kObsDimRoute;
+		std::vector<std::string> Out;
+		std::vector<std::uint8_t> B;
+		auto Put = [&B](const void* P, size_t Len)
+		{
+			const std::uint8_t* Q = static_cast<const std::uint8_t*>(P);
+			B.insert(B.end(), Q, Q + Len);
+		};
+		auto PutD = [&Put](double V) { Put(&V, 8); };
+		auto PutF = [&Put](float V) { Put(&V, 4); };
+		auto PutI = [&Put](std::int32_t V) { Put(&V, 4); };
+		auto Done = [&B, &Out]()
+		{
+			EcoSha256::FState S;
+			EcoSha256::Update(S, B.data(), B.size());
+			std::uint8_t Dg[EcoSha256::kDigestBytes];
+			EcoSha256::Final(S, Dg);
+			char Hex[2 * EcoSha256::kDigestBytes + 1];
+			EcoSha256::ToHex(Dg, Hex);
+			Out.emplace_back(Hex, 8);
+			B.clear();
+		};
+		const auto Live = [&E](std::int32_t i) { return E.Cause[static_cast<size_t>(i)] == 0; };
+		// clock
+		const std::int64_t T = E.W.T;
+		Put(&T, 8);
+		PutD(E.W.Dark);
+		PutD(E.W.PredEma);
+		Done();
+		// deer
+		for (std::int32_t f = 0; f < 6; ++f)
+		{
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				const W3::FHerbBody& Bd = E.Bodies[static_cast<size_t>(i)];
+				const double V[6] = {Bd.Pos.X, Bd.Pos.Y, Bd.Head.X, Bd.Head.Y, Bd.Energy, Bd.Reserve};
+				PutD(V[f]);
+			}
+		}
+		Done();
+		// fate
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			PutI(E.Dec[static_cast<size_t>(i)].KeepMode);
+		}
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			PutI(E.Cause[static_cast<size_t>(i)]);
+		}
+		Done();
+		// beh
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			if (Alive0[static_cast<size_t>(i)] != 0)
+			{
+				PutI(E.Reps[static_cast<size_t>(i)].Behavior);
+			}
+		}
+		Done();
+		// obs
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			if (Alive0[static_cast<size_t>(i)] == 0)
+			{
+				continue;
+			}
+			const W3::FHerbPerception& P = E.Perc[static_cast<size_t>(i)];
+			for (std::int32_t k = 0; k < O3::kObsDim; ++k)
+			{
+				PutF(P.Obs[k]);
+			}
+			for (std::int32_t k = 0; k < O3::kNumObstacleObs; ++k)
+			{
+				PutF(P.ObstacleObs[k]);
+			}
+			for (std::int32_t k = 0; bRouteObs && k < O3::kNumRouteObs; ++k)
+			{
+				PutF(P.RouteObs[k]);
+			}
+		}
+		Done();
+		// req
+		for (std::int32_t i = 0; i < N; ++i)
+		{
+			const W3::FHerbDecision& D = E.Dec[static_cast<size_t>(i)];
+			if (Live(i) && D.KeepMode < 2)
+			{
+				PutI(D.Request);
+			}
+		}
+		Done();
+		// kin
+		for (std::int32_t g = 0; g < 4; ++g)
+		{
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				if (Alive0[static_cast<size_t>(i)] == 0)
+				{
+					continue;
+				}
+				const W3::FHerbPerception& P = E.Perc[static_cast<size_t>(i)];
+				const R3::FVec2 V = g == 0 ? P.Kin.ToCentroid : g == 1 ? P.Kin.Separation : g == 2 ? P.Threat.AwayFromPred : P.FoodGrad;
+				PutD(V.X);
+				PutD(V.Y);
+			}
+		}
+		Done();
+		// wolf
+		for (std::int32_t f = 0; f < 4; ++f)
+		{
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				const T3::FThreatState& S = E.Threats[static_cast<size_t>(m)].State;
+				const double V[4] = {S.PosX, S.PosY, S.HeadX, S.HeadY};
+				PutD(V[f]);
+			}
+		}
+		for (std::int32_t m = 0; m < M; ++m)
+		{
+			PutI(E.Threats[static_cast<size_t>(m)].State.Cooldown);
+		}
+		for (std::int32_t m = 0; m < M; ++m)
+		{
+			PutI(E.Threats[static_cast<size_t>(m)].State.SatLeft);
+		}
+		for (std::int32_t m = 0; m < M; ++m)
+		{
+			PutI(W3::ThreatAsleepNow(E.W, E.Threats[static_cast<size_t>(m)]) ? 1 : 0);
+		}
+		for (std::int32_t m = 0; m < M; ++m)
+		{
+			const W3::FThreatAgent& A = E.Threats[static_cast<size_t>(m)];
+			const std::int32_t Ti = A.Last.bHasTarget ? A.Last.Target : -1;
+			PutI((StepSlots != nullptr && Ti >= 0 && Ti < static_cast<std::int32_t>(StepSlots->size())) ? (*StepSlots)[static_cast<size_t>(Ti)] : -1);
+		}
+		Done();
+		// route
+		for (std::int32_t f = 0; f < 6; ++f)
+		{
+			for (std::int32_t i = 0; i < N; ++i)
+			{
+				if (!Live(i))
+				{
+					continue;
+				}
+				const W3::FHerbDecision& D = E.Dec[static_cast<size_t>(i)];
+				const std::int32_t Req = (D.bRouteDecide && D.KeepMode == W3::kKeepPanic) ? D.RouteRequest : -1;
+				const std::int32_t V[6] = {D.Route, D.RouteK, D.RouteAge, D.RouteFeas, D.bRouteDecide ? 1 : 0, Req};
+				PutI(V[f]);
+			}
+		}
+		Done();
+		return Out;
+	}
+
+	void WriteDigestLine(FOut& O, std::int64_t S, const std::vector<std::string>& Dg)
+	{
+		O.BeginArr();
+		O.Int(S);
+		for (const std::string& H : Dg)
+		{
+			O.Str(H);
+		}
+		O.EndArr();
+	}
+
 	std::string RunJob(const FValue& Job, const FBrain& Brain, bool& bOk)
 	{
 		const auto T0 = std::chrono::steady_clock::now();
@@ -1075,12 +1625,27 @@ namespace EcoV3Eval
 				Tr.Key("trace");
 				Tr.BeginArr();
 			}
+			// 10-24 궤적 지문 (선택 칸 trace_digest — 스텝 수, 0 = 끔): 스텝 s = 0..trace_digest 마다 칸 아홉의 sha256 앞 8 자리 (TrajDigest)
+			const std::int64_t DigestSteps = static_cast<std::int64_t>(Job.NumOr("trace_digest", 0.0));
+			FOut Dg;
+			std::vector<std::uint8_t> Alive0(E.Bodies.size(), 1);
+			if (DigestSteps > 0)
+			{
+				Dg.First.push_back(true);
+				Dg.Key("traj");
+				Dg.BeginArr();
+				WriteDigestLine(Dg, 0, TrajDigest(E, Alive0, nullptr));
+			}
 			std::vector<FAt> Ats;
 			std::vector<std::int32_t> PrevSlot;
 			const std::int32_t M = static_cast<std::int32_t>(E.ThreatPtrs.size());
 			for (std::int64_t s = 0; s < Steps; ++s)
 			{
 				const std::int32_t n = static_cast<std::int32_t>(E.Live.size());
+				for (size_t k = 0; k < Alive0.size(); ++k)
+				{
+					Alive0[k] = E.Cause[k] == 0 ? 1 : 0;   // 이번 스텝 첫머리에 산 슬롯 (지문의 beh·obs·kin)
+				}
 				W3::Step(E.W, E.Live.data(), n, E.ThreatPtrs.data(), M, Brain.Net, nullptr);
 				const std::int64_t T = E.W.T;
 				// 진단 칸 (run_mirror.py _Diag.after): 이번 스텝 첫머리에 산 사슴의 이번 스텝 행동이 FLEE 면 마지막 도망 = T, 그다음 죽음
@@ -1115,9 +1680,14 @@ namespace EcoV3Eval
 				}
 				E.Live.resize(w);
 				E.LiveSlot.resize(w);
+				TallyGaps(E);
 				if (Trace > 0 && s < Trace)
 				{
 					WriteState(Tr, E, &PrevSlot);
+				}
+				if (DigestSteps > 0 && s < DigestSteps)
+				{
+					WriteDigestLine(Dg, s + 1, TrajDigest(E, Alive0, &PrevSlot));
 				}
 				for (const std::int64_t H : Hs)
 				{
@@ -1132,6 +1702,7 @@ namespace EcoV3Eval
 							A.Alive += E.Cause[k] == 0 ? 1 : 0;
 						}
 						A.Flight = FlightNow(E);
+						A.Route = RouteNow(E);
 						Ats.push_back(A);
 					}
 				}
@@ -1139,6 +1710,10 @@ namespace EcoV3Eval
 			if (Trace > 0)
 			{
 				Tr.EndArr();
+			}
+			if (DigestSteps > 0)
+			{
+				Dg.EndArr();
 			}
 			const double Wall = std::chrono::duration<double>(std::chrono::steady_clock::now() - T0).count();
 			const W3::FWorldStats& S = E.W.Stats;
@@ -1175,10 +1750,12 @@ namespace EcoV3Eval
 			{
 				O.KInt("obstacles_n", E.W.Config.Obstacles.Num());
 			}
+			const bool bRoute = E.W.Config.WildFlight.bRoute;   // 10-24 두 길 두뇌 세계 (flight.route 칸)
 			if (E.W.Config.bFlightStats && E.W.Config.WildFlight.bEnabled)
 			{
 				O.Key("flight");
-				WriteFlight(O, FlightNow(E), E.W.Config.Obstacles.FoliageConfigured());
+				const W3::FFlightRouteReport Rr = RouteNow(E);
+				WriteFlight(O, FlightNow(E), E.W.Config.Obstacles.FoliageConfigured(), bRoute ? &Rr : nullptr);
 			}
 			if (!Hs.empty())
 			{
@@ -1194,7 +1771,7 @@ namespace EcoV3Eval
 					if (E.W.Config.bFlightStats && E.W.Config.WildFlight.bEnabled)
 					{
 						O.Key("flight");
-						WriteFlight(O, A.Flight, E.W.Config.Obstacles.FoliageConfigured());
+						WriteFlight(O, A.Flight, E.W.Config.Obstacles.FoliageConfigured(), bRoute ? &A.Route : nullptr);
 					}
 					O.EndObj();
 				}
@@ -1208,10 +1785,19 @@ namespace EcoV3Eval
 			O.KInt("mask_violations", S.MaskViolations);
 			O.KInt("obs_layout_mismatch", S.ObsLayoutMismatch);
 			O.KInt("refuge_capture_violations", S.RefugeCaptureViolations);
+			O.KInt("gap_decisions", E.GapDecisions);
+			O.KNum("min_gap", E.GapDecisions > 0 ? E.MinGap : std::numeric_limits<double>::quiet_NaN());
+			O.KInt("near_ties", E.NearTies);
+			O.KInt("route_gap_decisions", E.RouteGapDecisions);
+			O.KNum("min_route_gap", E.RouteGapDecisions > 0 ? E.MinRouteGap : std::numeric_limits<double>::quiet_NaN());
 			O.EndObj();
 			if (Trace > 0)
 			{
 				O.Raw(Tr.S);
+			}
+			if (DigestSteps > 0)
+			{
+				O.Raw(Dg.S);
 			}
 		}
 		catch (const std::exception& Ex)
@@ -1280,9 +1866,10 @@ int main(int Argc, char** Argv)
 		{
 			FBrain B;
 			LoadBrain(BrainCheck, B);
-			std::printf("{\"id\":\"%s\",\"obs_dim\":%d,\"weights_sha256\":\"%s\",\"golden_cases\":%d,\"golden_max_err\":%.9g,\"allowed\":[%d,%d,%d,%d,%d]}\n",
-						B.Id.c_str(), B.ObsDim, B.WeightsSha256.c_str(), B.GoldenCases, B.GoldenMaxErr, B.Allowed[0], B.Allowed[1], B.Allowed[2],
-						B.Allowed[3], B.Allowed[4]);
+			std::printf("{\"id\":\"%s\",\"obs_dim\":%d,\"mask_version\":%d,\"weights_sha256\":\"%s\",\"golden_cases\":%d,\"golden_max_err\":%.9g,"
+						"\"allowed\":[%d,%d,%d,%d,%d]}\n",
+						B.Id.c_str(), B.ObsDim, B.MaskVersion, B.WeightsSha256.c_str(), B.GoldenCases, B.GoldenMaxErr, B.Allowed[0], B.Allowed[1],
+						B.Allowed[2], B.Allowed[3], B.Allowed[4]);
 			return 0;
 		}
 		if (JobsPath.empty() || OutPath.empty())

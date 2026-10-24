@@ -510,8 +510,18 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
             Hooks.ThreatMove = Sub->UsesTerrain() ? &ThreatMoveHook : nullptr;
 			const double BeforeFood = Ctx.Sim.Food.Total();
 			const double BeforeEaten = Ctx.Sim.Stats.FoodEaten;
+			// 10-24 두 길 두뇌 (기록만): 이 스텝에 실행한 반사 길 RUN·SHELTER 사슴-스텝 = 세계 길 통계의 스텝 차 (길 끔이면 늘 0)
+			const int64 RouteRun0 = Ctx.Sim.Stats.Route.Steps[EcoWorldV3::kRouteRun];
+			const int64 RouteShelter0 = Ctx.Sim.Stats.Route.Steps[EcoWorldV3::kRouteShelter];
 			const EcoWorldV3::FStepReport Report = EcoWorldV3::Step(Ctx.Sim, Views.GetData(), Views.Num(), ThreatPtrs.GetData(),
 																	ThreatPtrs.Num(), Net, &Hooks);
+			{
+				const int64 RunD = Ctx.Sim.Stats.Route.Steps[EcoWorldV3::kRouteRun] - RouteRun0;
+				const int64 ShelterD = Ctx.Sim.Stats.Route.Steps[EcoWorldV3::kRouteShelter] - RouteShelter0;
+				Ctx.BrainTally.AddRoute(RunD, ShelterD);
+				Ctx.SinceSwapBrainTally.AddRoute(RunD, ShelterD);
+				Ctx.RouteTally.Push(Ctx.Sim.Stats.Route);   // 최근 60 초 창 (결정 스텝마다 한 번 — 길 끔이어도 넣어 창이 시각과 맞는다)
+			}
 			// R5 장애물 관측 대조 기록 (eco.IntegratedV3.ObsParityLog — 기본 끔): 이 스텝 끝 관측의 세 칸과 그 입력 (읽기만)
 			Sub->LogObsParity(Ctx, Views.GetData(), StableViewIds.GetData(), Views.Num());
 			// 야생 (w3) 도망 기록 (10-21, 기록만): 이 스텝 뒤 열린 도망 합 — 10초 기록 줄·스냅숏 보고의 잘림 (이번 스텝에 죽은 사슴의 도망은 Step 이 이미 닫았다)
@@ -628,6 +638,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		FMemory::Memzero(Ctx.BehaviorNow, sizeof(Ctx.BehaviorNow));
 		FMemory::Memzero(Ctx.WolvesNow, sizeof(Ctx.WolvesNow));
 		FMemory::Memzero(Ctx.KeepNow, sizeof(Ctx.KeepNow));
+		FMemory::Memzero(Ctx.RouteNow, sizeof(Ctx.RouteNow));
 		for (const int32 k : DeerByContext[c])
 		{
 			FEcoV3DeerRec& D = Deer[k];
@@ -642,6 +653,12 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			if (Km >= 0 && Km < EcoWorldV3::kNumKeepModes)
 			{
 				++Ctx.KeepNow[Km];
+			}
+			// 10-24 두 길 두뇌: 다음 스텝 도주 덮기 사슴의 고른 길 (길 결정 스텝은 두뇌가 고른 칸 — 다음 A 가 적용한다, EcoV3Integrated::ShownRoute)
+			const int32 Rt = EcoV3Integrated::ShownRoute(*D.View.Decision);
+			if (D.View.Decision->KeepMode == EcoWorldV3::kKeepPanic && (Rt == EcoWorldV3::kRouteRun || Rt == EcoWorldV3::kRouteShelter))
+			{
+				++Ctx.RouteNow[Rt == EcoWorldV3::kRouteRun ? 0 : 1];
 			}
 		}
 		for (const int32 k : WolvesByContext[c])
@@ -744,9 +761,10 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 					// 팀 시계에 다시 맞추면 전역 스텝이 뒤로 갈 수 있다 — 음수 경과는 표시하지 않는다
 					const int64 SinceRepro = NowStep - Int.ReproducedStep;
 					const bool bRecentRepro = Int.ReproducedStep >= 0 && SinceRepro >= 0 && SinceRepro <= EcoV3Integrated::kReproMarkSteps;
-					// 도주 반사 덮기 중이면 '경계(먹으며 멀어짐)'·'도주(안전해질 때까지)'·'웅크림(은신처·경계)' (야생 w3)
+					// 도주 반사 덮기 중이면 '경계(먹으며 멀어짐)'·'도주(안전해질 때까지)'·'웅크림(은신처·경계)' (야생 w3). 10-24 두 길 두뇌면 도주 글자가
+					// 고른 길 '도주(트인 쪽)'·'도주(은신처)' (길 끈 두뇌는 Route 가 늘 NONE 이라 지금 그대로)
 					Label = EcoV3Integrated::DeerLabel(Rep, B, bRecentRepro, Color, States[i].Decision.KeepActive,
-													   bReserveOn);
+													   bReserveOn, EcoV3Integrated::ShownRoute(States[i].Decision));
 				}
 				DrawDebugString(World, Loc + FVector(0.0, 0.0, 230.0), Label, nullptr, Color, 0.0f, true, 1.1f);
 			}

@@ -168,6 +168,81 @@ def test_world_block_refuses_unported_settings(ce, prepared):
         ce.world_block(ce.make_world(job))
 
 
+ROUTE_SHELTER_BRAIN = ROOT / "results" / "v3" / "route" / "port" / "brains" / "v3_obs24route_shelter2.json"   # 판 4 늘 SHELTER 시험 두뇌 (zip 은 git 밖)
+
+
+def test_route_world_block_and_pairing(ce, prepared):
+    """10-24 두 길 두뇌 C++ 이식 (이식 계획서 7-1·13-3): world 블록이 wild_flight.route·brain_flee_outside_reflex 를 넘기고(끔 세계는 false·true), 판 6(막기만 —
+    route 끔)은 C++ 에 없어 거부한다. 두뇌 판 ≠ 세계 판이면 native_job 이 일을 만들지 않고, 평가기도 그 일을 오류로 낸다(판 2 두뇌 × 길 켬 세계)."""
+    import adapt as ad
+
+    def job_of(sets):
+        return ad.make_jobs(prepared["info"], prepared["zip"], [34900], 1, True, dict(name="t", sets=sets))[0]
+
+    def block(sets):
+        return ce.world_block(ce.make_world(job_of(sets)))
+
+    off = block({})["wild_flight"]
+    assert (off["route"], off["brain_flee_outside_reflex"]) == (False, True)
+    on = block({"wild_flight.route": True})["wild_flight"]
+    assert (on["route"], on["brain_flee_outside_reflex"]) == (True, True)
+    g5 = block({"wild_flight.route": True, "wild_flight.brain_flee_outside_reflex": False})["wild_flight"]
+    assert (g5["route"], g5["brain_flee_outside_reflex"]) == (True, False)
+    with pytest.raises(ValueError, match="판 6"):
+        block({"wild_flight.brain_flee_outside_reflex": False})
+    j4 = job_of({"wild_flight.route": True})
+    with pytest.raises(ValueError, match="마스크 판"):
+        ce.native_job(j4, 0, brain_mask_version=2)
+    with pytest.raises(ValueError, match="마스크 판"):
+        ce.native_job(job_of({}), 0, brain_mask_version=4)
+    nj = ce.native_job(j4, 0, brain_mask_version=4)
+    assert nj["world"]["wild_flight"]["route"] is True
+    with pytest.raises(RuntimeError, match="마스크 판"):
+        ce.run_native([nj], BRAIN21, 1)                                  # 평가기 Init 의 짝 검사 (세계 route true · 두뇌 판 2)
+
+
+@pytest.mark.skipif(not (ROUTE_SHELTER_BRAIN.with_suffix(".zip")).exists(), reason="늘 SHELTER 시험 두뇌 zip 이 없다 (results/v3/route/port/make_traces.py 가 만든다)")
+def test_route_bit_identical_to_python_world(ce, prepared):
+    """10-24 두 길 두뇌: 판 4 늘 SHELTER 시험 두뇌 × 길 켬 세계 150 스텝 궤적이 파이썬과 첫 비트 차이가 없고(관측 24·길 칸 route·route_k·route_age·
+    route_feas·route_decide·route_req 까지), 세계 기록의 flight.route 가 파이썬 flight_stats 의 route 와 같다."""
+    import copy
+
+    import adapt as ad
+
+    zp = ROUTE_SHELTER_BRAIN.with_suffix(".zip")
+    kind, tag, job = ce.eval_items(prepared["info"], "t", zp, [34901], 150, "N", world_set={"features.wild_flight.route": True})[0]
+    row = ce.run_native([ce.native_job(job, 0, trace=150, brain_mask_version=4)], ROUTE_SHELTER_BRAIN, 1)[0]
+    real = ce.trace_diff(ce.python_trace(job, zp, 150), row)
+    assert real["first_bit_difference"] is None, real["rows"][real["first_bit_difference"]]
+    assert all(r["route"] == 0 and r["route_req"] == 0 for r in real["rows"])
+    nat = ce.shape("world", job, row, 0.0, ROUTE_SHELTER_BRAIN)
+    py = ad._world_one(copy.deepcopy(job))
+    assert nat["flight"]["route"] == py["flight"]["route"] and py["flight"]["route"]["picked"]["shelter"] > 0
+
+
+def test_trace_diff_split_gap_uses_top2_gap(ce):
+    """10-24 이식 적대적 검토: 갈린 결정의 근접 동점 잣대 split_gap 은 C++ trace 의 'gap'(열린 칸 1·2 위 로짓 차 ≥ 0)만 읽는다 — 부호 있는 'route_gap'
+    (ℓ4 − ℓ1, RUN 을 고르면 음수)을 섞으면 갈림의 차가 음수로 적혀 근접 동점처럼 보였다. 짜 맞춘 두 스텝 궤적: 1 스텝 째 사슴 0 의 길 요청만 갈리고
+    (파이썬 SHELTER·C++ RUN — C++ gap 0.5 = |ℓ4 − ℓ1|, route_gap −0.5)."""
+    n = 2
+
+    def state(t, route_req, gap=None, route_gap=None):
+        d = dict(t=t, dark=0.0, pred_ema=0.0, x=[1.0] * n, y=[1.0] * n, hx=[1.0] * n, hy=[0.0] * n, energy=[1.0] * n, reserve=[0.0] * n,
+                 behavior=[1] * n, request=[1] * n, keep=[2] * n, cause=[0] * n, obs=[[0.0] * 24 for _ in range(n)],
+                 wolves=dict(x=[0.0], y=[0.0], hx=[1.0], hy=[0.0], cd=[0], sat=[0], asleep=[False], target=[-1]),
+                 route=[0] * n, route_k=[-1] * n, route_age=[0] * n, route_feas=[2] * n, route_decide=[True] * n, route_req=route_req)
+        if gap is not None:
+            d.update(gap=gap, route_gap=route_gap)
+        return d
+
+    py = [state(0, [-1, -1]), state(1, [4, 4])]
+    nat = dict(init=state(0, [-1, -1], [None, None], [None, None]), trace=[state(1, [1, 4], [0.5, 0.25], [-0.5, 0.25])])
+    d = ce.trace_diff(py, nat)
+    r = d["rows"][1]
+    assert r["route_req"] == 1 and r["split_deer"] == [0]
+    assert r["split_gap"] == 0.5
+
+
 def test_live_evaluator_hook(ce):
     """live.py 판정 실행기 갈림이 이 파일을 'ceval' 로 불러 쓴다: run_items·version (판정 저장 열쇠 — 실행 파일·C++ 소스·파이썬 셈 길 지문)."""
     import live

@@ -20,10 +20,16 @@ live.py 와 같은 꼴 (나중에 live.py 가 바꿔 쓸 수 있게 — 이 파�
   10-24 (LIVE_GATE.md 변경 기록 (7)): 1차·GH·GE 가 쓰는 쫓김 사건(flight.episode)을 같은 날 C++ 도망 기록(EcoWorldV3.h FlightUpdate·FlightReportOf)에
   같은 정의로 옮겨 평가기가 flight.episode 를 낸다(EPISODE 참, compare 의 flight.episode 까지 같음) — LIVE evaluator 기본값은 다시 'ceval' 이다(옮기기 전
   잠깐 'python' 이었다).
+  10-24 (두 길 두뇌 C++ 이식 — 이식 계획서 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 7절·13절): 평가기가 두 길 세계를 받는다 —
+  features.wild_flight.route(관측 24·마스크 판 4)와 brain_flee_outside_reflex false(판 5 — route 와 함께만, 판 6 은 C++ 에 없어 거부)를 world 블록
+  wild_flight.route·brain_flee_outside_reflex 로 넘기고, 두뇌 파일의 마스크 판이 세계 판(rep_policy.world_mask_version)과 같아야 일을 만든다. 평가기 기록의
+  flight.route(길 통계·길별 도망 기록)는 파이썬 flight_stats 의 route 와 같은 칸이고, compare 의 궤적 대조는 길 칸(route·route_k·route_age·route_feas·
+  route_decide·route_req)까지 보며 갈린 결정의 C++ 로짓 1·2 위 차(근접 동점)를 적는다. 셈 길 판 VERSION_TAG ceval-2.
   version() = 평가기 실행 파일·그 C++ 소스(include 닫힘)·이 파일·바탕 설정·파이썬 판정 셈 길(live.eval_code_tag('python'))의 sha256 — 판정 저장 열쇠.
   실행 파일이 소스(include 닫힘)보다 오래되면 쓰지 않는다(다시 빌드하라고 멈춘다).
   세계 설정은 허용 목록으로 본다: 바탕(REF_CFG — C++ 상수가 맞춘 판정 세계)과 다른 칸은 world 블록·시작 상태로 옮기는 칸(FREE_V1·FREE_FEATURES)이어야
   하고, 그 밖 칸이 다르면(예: wild_flight.route_fixed·quiet_end, threats·realism_night 계수) 거부한다 — C++ 이 제 상수로 다른 세계를 돌지 않게.
+  (wild_flight.route·brain_flee_outside_reflex 는 10-24 부터 받는 칸이다 — 두뇌 판이 정한다.)
   숲 시야(features.obstacles.foliage, 10-21)는 C++ 에 옮겼다(EcoThreatModel.h FoliageChord·FoliageBlocked, EcoWorldV3.h FObstacleConfig::Foliage) — world 블록
   obstacle_rules 의 foliage·foliage_r·foliage_block 과 일의 foliage_trees(원판마다 나무 0/1)로 넘긴다. 도망길 COVER 그늘의 잎(route_fixed)은 파이썬 전용이라
   route_fixed 를 거부하는 것은 그대로다. compare --world-set 키=값 (route_rules.py 와 같은 점 경로 덮기)으로 숲 시야 세계를 견준다.
@@ -92,7 +98,7 @@ WORLD_KEYS = ("seed", "region", "n", "caught", "starved", "alive", "shelter_step
 MULTI_KEYS = ("seed", "region", "n", "caught", "starved", "alive", "shelter_steps", "live_steps", "beh_steps", "catch_cover", "hunt", "wall_s")
 EXE_SRC = PROJECT / "Tools" / "EcoV3Eval" / "EcoV3Eval.cpp"
 INCLUDE_DIRS = (PROJECT / "Tools" / "EcoV3Eval", PROJECT / "Source" / "AdaptiveEcosystem" / "AI" / "Policy")   # build.ps1 의 /I 순서
-VERSION_TAG = "ceval-1"                                                           # 셈 길 판 — 아래 지문 밖에서 결과를 바꾸는 고침이면 올린다
+VERSION_TAG = "ceval-2"                                                           # 셈 길 판 — 아래 지문 밖에서 결과를 바꾸는 고침이면 올린다 (10-24 두 길 세계 받기)
 # 10-23 (results/v3/live/LIVE_GATE.md 변경 기록 (6)): 실시간 관문 1차 숨음 비율·지킴 GH 는 도망 기록의 숨은 뒤 10 초 지켜보기(파이썬 flight.hide —
 # cover_then_caught 등, env_v2/world.py '숨은 뒤 지켜보기')를 쓴다. live.py 는 이 값이 참인 실행기만 판정에 쓴다(live.require_hide_watch).
 # 같은 날 C++ 도망 기록(EcoWorldV3.h FlightUpdate·FlightReportOf — FFlightTrack::Watch)에 같은 정의로 옮겼고 평가기가 flight.hide 를 낸다(골든
@@ -120,6 +126,7 @@ _FREE_EXTRA = {
     "obstacles": ("fixed", "tree_per_ha", "tree_r", "rock_per_ha", "rock_r",      # 원판 = 시작 상태 discs
                   "foliage"),                                                     # 숲 시야 = obstacle_rules.foliage* + 일의 foliage_trees (10-22 C++ 에 옮김)
     "obstacle_obs": ("enabled",),                                                 # 관측 칸 수는 두뇌 계약이 정한다 (계수는 바탕 그대로)
+    "wild_flight": ("route", "brain_flee_outside_reflex"),                        # 10-24 두 길 두뇌 (관측 24·마스크 판 4·5 — world 블록 wild_flight 로, 두뇌 판과 짝)
 }
 FREE_FEATURES = {blk: frozenset(keys) | frozenset(_FREE_EXTRA.get(blk, ())) for blk, keys in ad.FEATURE_MAPS.values()}
 for _blk, _keys in _FREE_EXTRA.items():
@@ -338,11 +345,12 @@ def world_block(w, protected_refuges: bool = False) -> dict:
         raise ValueError("날씨 시간표는 평가기가 받지 않는다")
     if w._wf is not None and float(w._wf.get("flight_cost", 0.0)) > 0.0:
         raise ValueError("wild_flight.flight_cost 는 학습 세계 전용이다 (판정 세계에 없어야 한다)")
-    if w._wf is not None and (w._wf.get("route_fixed") is not None or int(w._wf.get("quiet_end", 0) or 0) > 0 or w._wf.get("route")):
-        # 10-21 도망길 측정(route_fixed·quiet_end)·10-22 두뇌 길(route — 관측 24·마스크 판 4)은 C++ 에 없다 — 'run' 도 세계는 같지만 도망길 기록(flight.route 등)을
-        # 낼 수 없다
-        raise ValueError(f"wild_flight.route_fixed {w._wf.get('route_fixed')!r}·quiet_end {w._wf.get('quiet_end')!r}·route {w._wf.get('route')!r} 는 "
-                         "C++ 세계에 없다 — 평가기가 받지 않는다")
+    if w._wf is not None and (w._wf.get("route_fixed") is not None or int(w._wf.get("quiet_end", 0) or 0) > 0):
+        # 10-21 도망길 측정(route_fixed·quiet_end)은 C++ 에 없다 — 'run' 도 세계는 같지만 도망길 기록(flight.route 등)을 낼 수 없다.
+        # 10-22 두뇌 길(route — 관측 24·마스크 판 4)·10-23 판 5 는 10-24 에 옮겼다 (아래 world 블록 wild_flight.route·brain_flee_outside_reflex)
+        raise ValueError(f"wild_flight.route_fixed {w._wf.get('route_fixed')!r}·quiet_end {w._wf.get('quiet_end')!r} 는 C++ 세계에 없다 — 평가기가 받지 않는다")
+    if w._wf is not None and w._wf.get("brain_flee_outside_reflex") is False and not w._wf.get("route"):
+        raise ValueError("wild_flight.brain_flee_outside_reflex false 에 route 를 끈 세계(마스크 판 6 — R7 학습 대조 전용)는 C++ 에 없다 — 평가기가 받지 않는다")
     bad = unsupported_settings(cfg.to_dict())
     if bad:
         raise ValueError(f"평가기가 옮기지 않는 세계 칸이 바탕({REF_CFG.name})과 다르다 — C++ 은 제 상수로 돈다: " + "; ".join(bad[:8])
@@ -380,6 +388,10 @@ def world_block(w, protected_refuges: bool = False) -> dict:
     else:
         wx["kind"], wx["intensity"] = "clear", 0.0
     wx["schedule_rows"] = 0
+    # 10-24 두 길 두뇌 (이식 계획서 7-1): 세계 키 그대로 — 평가기는 두뇌 판과 같은지 보고(어긋나면 그 일은 오류) 두뇌 판으로 켠다
+    wfp = w._wf or {}
+    wb["wild_flight"]["route"] = bool(wfp.get("route", False))
+    wb["wild_flight"]["brain_flee_outside_reflex"] = bool(wfp.get("brain_flee_outside_reflex", True))
     return wb
 
 
@@ -407,9 +419,16 @@ def foliage_trees(w) -> list:
 
 
 def native_job(job: dict, idx: int, horizons=None, trace: int = 0, protected_refuges: bool = False, rng: str = "pcg64",
-               world=None) -> dict:
-    """job (adapt.make_jobs 꼴) → 평가기 일 하나 (시작 상태 그대로)."""
+               world=None, brain_mask_version: int | None = None) -> dict:
+    """job (adapt.make_jobs 꼴) → 평가기 일 하나 (시작 상태 그대로). brain_mask_version 을 주면 세계의 마스크 판(rep_policy.world_mask_version — 관측
+    in_panic·brain_flee_outside_reflex)과 같은지 본다 (10-24 두 길 두뇌 — 다르면 일을 만들지 않는다. 평가기도 같은 짝을 다시 본다)."""
     w = make_world(job) if world is None else world
+    if brain_mask_version is not None:
+        from env_v2.rep_policy import world_mask_version
+
+        wm = int(world_mask_version(w))
+        if wm != int(brain_mask_version):
+            raise ValueError(f"두뇌 마스크 판 {int(brain_mask_version)} 이 세계 마스크 판 {wm} 과 다르다 (wild_flight.route·brain_flee_outside_reflex)")
     st = w.rng.bit_generator.state
     if st.get("bit_generator") != "PCG64" or st.get("has_uint32"):
         raise ValueError(f"v1 난수가 PCG64(32 비트 남김 없음)가 아니다: {st.get('bit_generator')}")
@@ -491,7 +510,9 @@ def shape(kind: str, job: dict, row: dict, prep_s: float, brain: Path) -> dict:
     if kind == "multi":
         out["at"] = rec.get("at", {})
     out["native"] = dict(engine="EcoV3Eval", brain=Path(brain).name, steps=rec["steps"], steps_per_s=rec["steps_per_s"], prep_s=round(prep_s, 4),
-                         rng_draws=rec["rng_draws"], mask_violations=rec["mask_violations"], obs_layout_mismatch=rec["obs_layout_mismatch"])
+                         rng_draws=rec["rng_draws"], mask_violations=rec["mask_violations"], obs_layout_mismatch=rec["obs_layout_mismatch"],
+                         # 10-24 근접 동점 진단 (산 사슴 망 결정의 로짓 1·2 위 차 최솟값·1e-4 밑 수, 길 결정 최솟값 — 갈림 까닭 가르기)
+                         min_gap=rec.get("min_gap"), near_ties=rec.get("near_ties"), min_route_gap=rec.get("min_route_gap"))
     return out
 
 
@@ -523,10 +544,12 @@ class Pool:
         t_prep = t_run = 0.0
         for b, ks in groups.items():
             jobs, preps = [], {}
+            bmv = int(read_brain(Path(b)).get("mask_version", 2))
             for k in ks:
                 kind, tag, job = items[k]
                 t0 = time.perf_counter()
-                jobs.append(native_job(job, k, job.get("horizons") if kind == "multi" else None, protected_refuges=self.protected_refuges))
+                jobs.append(native_job(job, k, job.get("horizons") if kind == "multi" else None, protected_refuges=self.protected_refuges,
+                                       brain_mask_version=bmv))
                 preps[k] = time.perf_counter() - t0
             t_prep += sum(preps.values())
             t0 = time.perf_counter()
@@ -624,7 +647,16 @@ METRICS = (("caught", lambda r: r["caught"]), ("starved", lambda r: r["starved"]
            ("ep_hidden", lambda r: r["flight"]["episode"]["hidden"]), ("ep_caught", lambda r: r["flight"]["episode"]["caught"]),
            ("ep_starved", lambda r: r["flight"]["episode"]["starved"]), ("ep_other", lambda r: r["flight"]["episode"]["other"]),
            ("ep_truncated", lambda r: r["flight"]["episode"]["truncated"]), ("ep_joined_cover", lambda r: r["flight"]["episode"]["joined_cover"]),
-           ("ep_joined_other", lambda r: r["flight"]["episode"]["joined_other"]))
+           ("ep_joined_other", lambda r: r["flight"]["episode"]["joined_other"]),
+           # 10-24 두 길 두뇌 (flight.route — 길 끈 세계는 0): 길 결정·SHELTER 고름·SHELTER 길 반사 스텝·길 바꿈·SHELTER 무효
+           ("route_decisions", lambda r: _route(r).get("decisions", 0)), ("route_picked_shelter", lambda r: _route(r).get("picked", {}).get("shelter", 0)),
+           ("route_steps_shelter", lambda r: _route(r).get("steps", {}).get("shelter", 0)), ("route_switches", lambda r: _route(r).get("switches", 0)),
+           ("route_invalid_shelter", lambda r: _route(r).get("invalid", {}).get("shelter", 0)))
+
+
+def _route(r: dict) -> dict:
+    """세계 기록의 flight.route (두 길 세계만 — 없으면 빈 dict)."""
+    return (r.get("flight") or {}).get("route") or {}
 
 
 def stat_compare(py: list, nat: list) -> dict:
@@ -705,6 +737,16 @@ def python_trace(job: dict, model: Path, steps: int) -> list:
                              cd=w.pred_cd.astype(int).tolist(), sat=np.asarray(getattr(w, "pred_sat", np.zeros(w.M))).astype(int).tolist(),
                              asleep=np.asarray(w.pred_asleep).astype(bool).tolist(),
                              target=np.asarray(getattr(w, "pred_target", np.full(w.M, -1))).astype(int).tolist()))
+        if w._route_brain:
+            # 10-24 두 길 두뇌 길 칸 (이식 계획서 7-3 — make_traces.trace_state 와 같다: step 뒤·다음 _route_apply 앞, route_req = 길 결정 ∧ 도주 산 사슴의 정책 출력)
+            from env_v2.world import WF_PANIC
+
+            rd = np.asarray(w.route_decide, dtype=bool)
+            live = np.asarray(w.death_cause) == 0
+            rq = np.asarray(req).reshape(-1).astype(int)
+            d.update(route=np.asarray(w.flight_route).astype(int).tolist(), route_k=np.asarray(w.route_k).astype(int).tolist(),
+                     route_age=np.asarray(w.route_age).astype(int).tolist(), route_feas=np.asarray(w.route_feas).astype(int).tolist(),
+                     route_decide=rd.tolist(), route_req=np.where(rd & (np.asarray(w.wf_mode) == WF_PANIC) & live, rq, -1).astype(int).tolist())
         return d
 
     a = np.asarray(pol(w.observe()), dtype=np.float64)
@@ -753,7 +795,24 @@ def trace_diff(py: list, nat: dict) -> dict:
                 dv = np.abs(np.asarray(p[k], dtype=np.float64) - np.asarray(q[k], dtype=np.float64)).max(1)
                 r[k] = float(dv[alive0].max()) if alive0.any() else 0.0
                 r[k + "_n"] = int(np.count_nonzero((dv > 0) & alive0))
-        disc = r["behavior"] or r["keep"] or r["cause"] or r["request"] or r["wolf_cd"] or r["wolf_asleep"] or r["wolf_target"]
+        rq_diff = (np.asarray(p["request"]) != np.asarray(q["request"])) & keep_ok
+        if "route" in p and "route" in q:
+            # 10-24 두 길 두뇌 길 칸 (스텝 끝 산 사슴 — 이식 계획서 7-3): 길 상태가 다른 사슴 수, 길 결정 요청이 다른 사슴 수
+            rd = np.zeros(len(pc), dtype=bool)
+            for k in ("route", "route_k", "route_age", "route_feas", "route_decide"):
+                rd |= np.asarray(p[k]) != np.asarray(q[k])
+            r["route"] = int(np.count_nonzero(rd & live_end))
+            rr = (np.asarray(p["route_req"]) != np.asarray(q["route_req"])) & live_end
+            r["route_req"] = int(np.count_nonzero(rr))
+            rq_diff = rq_diff | rr
+        if rq_diff.any() and "gap" in q:
+            # 갈린 결정(요청·길 요청)의 C++ 로짓 1·2 위 차 — 작으면 근접 동점(float 누적 1e-6 쯤) 갈림 (계획서 9절 R13). 'gap' 만 읽는다: 망 결정·길 결정 모두
+            # 열린 칸 둘 이상이면 1·2 위 차(≥ 0)이고, 'route_gap'(ℓ4 − ℓ1)은 부호가 있고 SHELTER 가 막힌 한 칸 결정에도 있어 근접 동점 잣대가 아니다
+            gp = [q["gap"][i] for i in np.flatnonzero(rq_diff) if q["gap"][i] is not None]
+            r["split_gap"] = float(min(gp)) if gp else None
+            r["split_deer"] = np.flatnonzero(rq_diff).astype(int).tolist()[:8]
+        disc = (r["behavior"] or r["keep"] or r["cause"] or r["request"] or r["wolf_cd"] or r["wolf_asleep"] or r["wolf_target"] or r.get("route", 0)
+                or r.get("route_req", 0))
         if first is None and (r["pos"] > 1e-9 or r["wolf_pos"] > 1e-9 or disc):
             first = s
         if first_any is None and (r["pos"] > 0 or r["head"] > 0 or r["energy"] > 0 or r["obs"] > 0 or r["wolf_pos"] > 0 or disc):
@@ -867,7 +926,9 @@ def cmd_compare(a) -> int:
             for r in d["rows"][: (fd + 3 if fd is not None else 3)][-6:]:
                 print(f"  t={r['t']:>4} 자리 {r['pos']:.3g} heading {r['head']:.3g} 에너지 {r['energy']:.3g} 관측 {r['obs']:.3g} 행동≠{r['behavior']} "
                       f"덮기≠{r['keep']} 요청≠{r['request']} 죽음≠{r['cause']} 늑대 {r['wolf_pos']:.3g} cd≠{r['wolf_cd']} 표적≠{r['wolf_target']} "
-                      f"잠≠{r['wolf_asleep']} 무리중심 {r.get('to_centroid', 0):.3g} 분리 {r.get('separation', 0):.3g}", flush=True)
+                      f"잠≠{r['wolf_asleep']} 무리중심 {r.get('to_centroid', 0):.3g} 분리 {r.get('separation', 0):.3g}"
+                      + (f" 길≠{r['route']} 길요청≠{r['route_req']}" if "route" in r else "")
+                      + (f" 갈린 결정 로짓 차 {r['split_gap']:.3g} (사슴 {r['split_deer']})" if r.get("split_gap") is not None else ""), flush=True)
             res["trace"] = tr
             save()
     save()

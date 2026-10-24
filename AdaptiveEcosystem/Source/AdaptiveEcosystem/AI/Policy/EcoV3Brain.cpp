@@ -13,6 +13,10 @@
 
 #include "EcoObservationV3.h"
 #include "EcoSha256.h"
+#include "EcoWorldV3.h"
+
+#include <initializer_list>
+#include <limits>
 
 DEFINE_LOG_CATEGORY(LogEcoV3Brain);
 
@@ -22,19 +26,33 @@ static_assert(EcoPolicyV3::kContractHash == EcoPolicyV3::kContractHashObs18Mask2
 				  && EcoPolicyV3::kMaskVersion == 2,
 			  "관측 21 장애물 계약은 내장 관측 18·마스크 판 2 계약 위에 있다");
 static_assert(EcoObservationV3::kObsDimObstacle <= EcoPolicyV3::kMaxObsDim, "관측 21 이 망 입력 상한을 넘는다");
+// 10-24 두 길 두뇌 (이식 계획서 5-1): 관측 24 = 관측 21 + 길 세 칸
+static_assert(EcoObservationV3::kObsDimRoute <= EcoPolicyV3::kMaxObsDim, "관측 24 가 망 입력 상한을 넘는다");
+static_assert(EcoObservationV3::kObsDimRoute == EcoPolicyV3::kObsDim + EcoObservationV3::kNumObstacleObs + EcoObservationV3::kNumRouteObs,
+			  "관측 24 계약 = 관측 18 · 장애물 세 칸 · 길 세 칸");
 
 namespace EcoV3BrainImpl
 {
 	using namespace EcoV3Brain;
 	namespace P3 = EcoPolicyV3;
+	namespace O3 = EcoObservationV3;
 
 	const TCHAR* const kBehaviorKo[P3::kNumBehaviors] = {TEXT("먹기"), TEXT("도망"), TEXT("숨기"), TEXT("얼기"), TEXT("잠")};
 
-	// 받는 계약 (EcoV3Brain.h 머리 주석 '받는 계약'). 0 = 내장 계약, 1 = R5 장애물 관측 21
+	// 관측 24 계약의 18 칸 뒤 여섯 이름 (장애물 세 칸 · 길 세 칸 — 파이썬 obs_names 차례, ContractObsName 이 i ≥ 18 을 여기서 읽는다)
+	const char* const kRouteContractExtraNames[O3::kNumObstacleObs + O3::kNumRouteObs] = {
+		O3::kObstacleObsNames[0], O3::kObstacleObsNames[1], O3::kObstacleObsNames[2],
+		O3::kRouteObsNames[0],	  O3::kRouteObsNames[1],	O3::kRouteObsNames[2]};
+
+	// 받는 계약 (EcoV3Brain.h 머리 주석 '받는 계약'). 0 = 내장 계약, 1 = R5 장애물 관측 21, 2·3 = 10-24 두 길 두뇌 관측 24 판 4·5
 	const FContract kContracts[kNumContracts] = {
 		{P3::kContractHash, P3::kObsDim, P3::kMaskVersion, 0, nullptr, TEXT("관측 18 · 마스크 판 2 (내장 R1b 와 같은 계약)")},
-		{P3::kContractHashObs21Mask2, EcoObservationV3::kObsDimObstacle, 2, EcoObservationV3::kNumObstacleObs, EcoObservationV3::kObstacleObsNames,
+		{P3::kContractHashObs21Mask2, O3::kObsDimObstacle, 2, O3::kNumObstacleObs, O3::kObstacleObsNames,
 		 TEXT("관측 21 · 마스크 판 2 (R5 장애물 관측 — 18 칸 + escape_room·obstacle_near·threat_hidden)")},
+		{P3::kContractHashObs24Mask4, O3::kObsDimRoute, P3::kMaskVersionRoute, O3::kNumObstacleObs + O3::kNumRouteObs, kRouteContractExtraNames,
+		 TEXT("관측 24 · 마스크 판 4 (두 길 두뇌 — 21 칸 + in_panic·shelter_reach·shelter_edge)")},
+		{P3::kContractHashObs24Mask5, O3::kObsDimRoute, P3::kMaskVersionRouteGate, O3::kNumObstacleObs + O3::kNumRouteObs, kRouteContractExtraNames,
+		 TEXT("관측 24 · 마스크 판 5 (두 길 두뇌 + 반사 밖 두뇌 FLEE 막음 — R7)")},
 	};
 
 #if !UE_BUILD_SHIPPING
@@ -244,6 +262,116 @@ const char* EcoV3Brain::ContractObsName(const FContract& C, int32 i)
 	return i < EcoPolicyV3::kObsDim ? EcoPolicyV3::kObsNames[i] : C.ExtraNames[i - EcoPolicyV3::kObsDim];
 }
 
+FString EcoV3Brain::RouteContractDiff(const FJsonObject& Root, int32 MaskVersion)
+{
+	namespace P3 = EcoPolicyV3;
+	namespace O3 = EcoObservationV3;
+	namespace W3 = EcoWorldV3;
+	using EcoV3BrainImpl::ObjectField;
+	// 숫자 칸 하나 (없거나 수가 아니면 NaN — 비교가 거짓이 된다)
+	auto Num = [](const FJsonObject* O, const TCHAR* Field)
+	{
+		double V = std::numeric_limits<double>::quiet_NaN();
+		if (O)
+		{
+			O->TryGetNumberField(Field, V);
+		}
+		return V;
+	};
+	// 글자 배열이 Want 와 같은 차례·같은 길이인가
+	auto StringList = [](const FJsonObject* O, const TCHAR* Field, std::initializer_list<const TCHAR*> Want)
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Arr = nullptr;
+		if (!O || !O->TryGetArrayField(Field, Arr) || Arr->Num() != static_cast<int32>(Want.size()))
+		{
+			return false;
+		}
+		int32 j = 0;
+		for (const TCHAR* W : Want)
+		{
+			FString S;
+			if (!(*Arr)[j].IsValid() || !(*Arr)[j]->TryGetString(S) || S != W)
+			{
+				return false;
+			}
+			++j;
+		}
+		return true;
+	};
+	const FJsonObject* Ct = ObjectField(Root, TEXT("contract"));
+	const FJsonObject* Fr = Ct ? ObjectField(*Ct, TEXT("flight_route")) : nullptr;
+	if (!Fr)
+	{
+		return TEXT("contract.flight_route 없음");
+	}
+	{
+		const FJsonObject* Sl = ObjectField(*Fr, TEXT("slots"));
+		const TArray<TSharedPtr<FJsonValue>>* Res = nullptr;
+		double R0 = std::numeric_limits<double>::quiet_NaN();
+		const bool bRes = Sl && Sl->TryGetArrayField(TEXT("reserved_masked"), Res) && Res->Num() == 1 && (*Res)[0].IsValid() && (*Res)[0]->TryGetNumber(R0);
+		if (!(Num(Sl, TEXT("run")) == W3::kRouteSlotRun && Num(Sl, TEXT("shelter")) == W3::kRouteSlotShelter && bRes && R0 == W3::kRouteSlotReserved))
+		{
+			return TEXT("flight_route.slots");
+		}
+	}
+	{
+		const TArray<TSharedPtr<FJsonValue>>* Ob = nullptr;
+		bool bOk = Fr->TryGetArrayField(TEXT("obs"), Ob) && Ob->Num() == O3::kNumRouteObs;
+		for (int32 j = 0; bOk && j < O3::kNumRouteObs; ++j)
+		{
+			FString S;
+			bOk = (*Ob)[j].IsValid() && (*Ob)[j]->TryGetString(S) && S == UTF8_TO_TCHAR(O3::kRouteObsNames[j]);
+		}
+		if (!bOk)
+		{
+			return TEXT("flight_route.obs");
+		}
+	}
+	{
+		// 결정 조건 on = 시작·무효·잠금 뒤 가능 바뀜 (world.py `_route_step` — EcoWorldV3 Detail::RouteStep 의 onset·invalid·refeas, 길 없음 cur < 0 은 C++ 교체 전용)
+		const FJsonObject* De = ObjectField(*Fr, TEXT("decide"));
+		if (!(Num(De, TEXT("lock_steps")) == W3::kRouteLockSteps
+			  && StringList(De, TEXT("on"), {TEXT("onset"), TEXT("invalid"), TEXT("lock_and_feasible_changed")})
+			  && StringList(De, TEXT("feasible"), {TEXT("shelter")}) && StringList(De, TEXT("refeas_from"), {TEXT("run")})))
+		{
+			return TEXT("flight_route.decide");
+		}
+	}
+	{
+		const FJsonObject* Sh = ObjectField(*Fr, TEXT("shelter"));
+		if (!(Num(Sh, TEXT("max_edge_u")) == W3::kRouteShelterMaxEdgeU && Num(Sh, TEXT("cos_min")) == W3::kRouteShelterCosMin
+			  && Num(Sh, TEXT("enter_margin_u")) == W3::kRouteShelterEnterU && Num(Sh, TEXT("exit_margin_u")) == W3::kRouteShelterExitU
+			  && Num(Sh, TEXT("reach_norm_u")) == W3::kRouteShelterReachU && Num(Sh, TEXT("edge_norm_u")) == W3::kRouteShelterEdgeNormU))
+		{
+			return TEXT("flight_route.shelter");
+		}
+	}
+	{
+		FString Blocked;
+		if (!Fr->TryGetStringField(TEXT("freeze_sleep_must_be_blocked"), Blocked) || Blocked != TEXT("effective_allowed"))
+		{
+			return TEXT("flight_route.freeze_sleep_must_be_blocked");
+		}
+	}
+	// 판 5 는 contract.brain_flee_outside_reflex = false, 판 4 에는 그 칸이 없다 (null 은 없음으로 본다 — 평가기와 같다)
+	const TSharedPtr<FJsonValue> Gate = Ct->TryGetField(TEXT("brain_flee_outside_reflex"));
+	const bool bGateSet = Gate.IsValid() && !Gate->IsNull();
+	bool bGateValue = true;
+	if (bGateSet && !Gate->TryGetBool(bGateValue))
+	{
+		return TEXT("brain_flee_outside_reflex (참·거짓이 아니다)");
+	}
+	if (MaskVersion == P3::kMaskVersionRouteGate && (!bGateSet || bGateValue))
+	{
+		return TEXT("brain_flee_outside_reflex (판 5 는 false)");
+	}
+	if (MaskVersion == P3::kMaskVersionRoute && bGateSet)
+	{
+		return TEXT("brain_flee_outside_reflex (판 4 에는 없다)");
+	}
+	return FString();
+}
+
 FString EcoV3Brain::WeightsSha256(const EcoPolicyV3::FPolicyNetV3& Net)
 {
 	namespace P3 = EcoPolicyV3;
@@ -413,7 +541,12 @@ FString EcoV3Brain::LiveStatusText(const FEcoV3LiveStatus& Status, bool bFileExi
 FString FEcoV3Brain::Describe() const
 {
 	FString Extra;
-	if (ObsDim > EcoPolicyV3::kObsDim)
+	if (bRoute())
+	{
+		// 10-24 두 길 두뇌 (판 4·5 — 도주 반사 중 두뇌가 RUN·SHELTER 를 고른다. 판 5 는 반사 밖 두뇌 FLEE 를 막는다)
+		Extra += FString::Printf(TEXT(", 관측 %d 도망길%s"), ObsDim, bFleeGate() ? TEXT("·반사 밖 도망 막음") : TEXT(""));
+	}
+	else if (ObsDim > EcoPolicyV3::kObsDim)
 	{
 		Extra += FString::Printf(TEXT(", 관측 %d 장애물"), ObsDim);
 	}
@@ -522,8 +655,11 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 	const FContract* Ct = FindContract(Hash);
 	if (!Ct)
 	{
-		return Fail(EReject::Contract, FString::Printf(TEXT("계약 해시 %s 가 이 빌드가 받는 0x%016llx (관측 18)·0x%016llx (관측 21 장애물) 가 아니다 (관측·마스크 계약이 다른 모델 — C++ 관측 코드를 함께 바꿔야 한다)"),
-													 *HashText, static_cast<unsigned long long>(Contract(0).Hash), static_cast<unsigned long long>(Contract(1).Hash)));
+		return Fail(EReject::Contract,
+					FString::Printf(TEXT("계약 해시 %s 가 이 빌드가 받는 0x%016llx (관측 18)·0x%016llx (관측 21 장애물)·0x%016llx (관측 24 도망길 판 4)·0x%016llx (관측 24 도망길 판 5) 가 ")
+										TEXT("아니다 (관측·마스크 계약이 다른 모델 — C++ 관측 코드를 함께 바꿔야 한다)"),
+									*HashText, static_cast<unsigned long long>(Contract(0).Hash), static_cast<unsigned long long>(Contract(1).Hash),
+									static_cast<unsigned long long>(Contract(2).Hash), static_cast<unsigned long long>(Contract(3).Hash)));
 	}
 	const int32 WantObs = Ct->ObsDim;
 
@@ -568,6 +704,16 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 	{
 		return Fail(EReject::Mask, FString::Printf(TEXT("마스크 판 %d 이 계약의 %d 와 다르다"), MaskVersion, Ct->MaskVersion));
 	}
+	// 10-24 두 길 두뇌 (판 4·5, 이식 계획서 5-2 의 5·13-2): 계약 dict 의 flight_route·brain_flee_outside_reflex 를 이 빌드 상수와 견준다
+	// (해시가 이미 덮지만 어긋난 칸 이름을 적는다 — 평가기 Tools/EcoV3Eval 과 같은 칸)
+	if (P3::IsRouteMaskVersion(Ct->MaskVersion))
+	{
+		const FString Diff = RouteContractDiff(R, Ct->MaskVersion);
+		if (!Diff.IsEmpty())
+		{
+			return Fail(EReject::Contract, FString::Printf(TEXT("두 길 두뇌 계약 칸이 이 빌드와 다르다: %s (%s)"), *Diff, Ct->Label));
+		}
+	}
 	const FJsonObject* Th = ObjectField(R, TEXT("thresholds"));
 	double Tr = 0.0;
 	double Hc = 0.0;
@@ -585,6 +731,7 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 	TSharedRef<FEcoV3Brain, ESPMode::ThreadSafe> B = MakeShared<FEcoV3Brain, ESPMode::ThreadSafe>();
 	B->ContractHash = Ct->Hash;
 	B->ObsDim = WantObs;
+	B->MaskVersion = Ct->MaskVersion;
 
 	// 허용 칸: 이름 목록 = 칸 (먹기는 늘 — 마스크가 비지 않게)
 	{
@@ -613,6 +760,12 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 		if (B->Allowed[P3::kGraze] == 0)
 		{
 			return Fail(EReject::Allowed, TEXT("먹기(graze)가 허용되지 않는다 — 마스크가 빌 수 있다"));
+		}
+		if (B->bRoute() && (B->Allowed[P3::kFreeze] != 0 || B->Allowed[P3::kSleep] != 0))
+		{
+			// 판 4·5 는 칸 3·4 를 도주 중 길 칸으로 다시 쓴다 — 모델 허용에 얼기·잠이 있으면 거부 (이식 계획서 5-2 의 4. 걸 때 실제 허용은 SyncBrain 이 다시 본다)
+			return Fail(EReject::Allowed, FString::Printf(TEXT("두 길 두뇌(마스크 판 %d)의 허용에 얼기·잠이 있다 (%s) — 칸 3·4 는 도주 중 길 칸이라 막혀야 한다"),
+														  B->MaskVersion, *AllowedText(B->Allowed)));
 		}
 	}
 
@@ -977,6 +1130,25 @@ bool FEcoV3BrainRegistry::CommitPending(FEcoV3BrainPtr* OutFrom, FString* OutWhy
 	return true;
 }
 
+bool FEcoV3BrainRegistry::DiscardPending(const FString& Why)
+{
+	check(IsInGameThread());
+	if (!Pending.IsValid())
+	{
+		return false;
+	}
+	UE_LOG(LogEcoV3Brain, Warning, TEXT("[EcoV3Brain] 대기 두뇌 %s 를 버린다 — %s. 지금 두뇌 %s 그대로"), *Pending->Id, *Why, *Active->Id);
+	// 대기 되돌림이었으면 꺼낸 칸들을 꺼낸 반대 순서로 쌓개에 돌려놓는다 (QueueImpl 이 대기 되돌림을 덮을 때와 같다)
+	for (int32 i = PendingRollback.Num() - 1; i >= 0; --i)
+	{
+		History.Add(MoveTemp(PendingRollback[i]));
+	}
+	PendingRollback.Reset();
+	Pending.Reset();
+	PendingWhy.Empty();
+	return true;
+}
+
 bool FEcoV3BrainRegistry::Rollback(const FString& Why, FString* OutMessage)
 {
 	check(IsInGameThread());
@@ -1254,9 +1426,10 @@ namespace EcoV3BrainImpl
 	void PrintBrain(FOutputDevice& Ar, const TCHAR* Label, const FEcoV3Brain& B)
 	{
 		Ar.Logf(TEXT("[EcoV3Brain] %s: %s"), Label, *B.Describe());
-		Ar.Logf(TEXT("[EcoV3Brain]   모델 %s (%s) · zip sha256 %s · 가중치 sha256 %s · 계약 0x%016llx (관측 %d)"), *B.ModelName,
+		Ar.Logf(TEXT("[EcoV3Brain]   모델 %s (%s) · zip sha256 %s · 가중치 sha256 %s · 계약 0x%016llx (관측 %d · 마스크 판 %d%s)"), *B.ModelName,
 				B.ModelPath.IsEmpty() ? TEXT("-") : *B.ModelPath, B.ModelSha256.IsEmpty() ? TEXT("-") : *B.ModelSha256.Left(16), *B.WeightsSha256.Left(16),
-				static_cast<unsigned long long>(B.ContractHash), B.ObsDim);
+				static_cast<unsigned long long>(B.ContractHash), B.ObsDim, B.MaskVersion,
+				B.bRoute() ? TEXT(" — 두 길 두뇌: 도주 반사 중 RUN·SHELTER 를 고른다") : TEXT(""));
 		Ar.Logf(TEXT("[EcoV3Brain]   학습 %s%s%s"), *B.TrainWorld, B.TrainConfig.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" · 설정 %s"), *B.TrainConfig),
 				B.TrainDigest.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *B.TrainDigest));
 		if (!B.bBuiltin)

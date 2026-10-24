@@ -34,6 +34,16 @@
 //                                      '먹는 중' 동작 (옛 규칙 0.67 초는 뛰기), 옛 규칙 설정은 바꾸기 전 세계와 비트 단위로 같다
 //   Integrated.EnvChangeBoundary       환경 바뀜 (10-21, EcoV3EnvWatch.cpp): Play 중 놓은 줄기 막이가 다음 결정 스텝 경계에서 세계 원판이 되고 그 안 사슴을 밀어낸다.
 //                                      바꾸기 앞·다른 지역은 바꾸지 않은 판과 비트 단위로 같고, 먹이 용량 그대로, 감시 끔(EnvWatch 0)이면 끝까지 같다
+//   (10-24 두 길 두뇌 — 이식 계획서 Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 15절)
+//   Integrated.BrainObs24Route0        route0(관측 24·판 4·길 켬) = obs21zero(관측 21·길 끔): 두 지역(숲 나무 24) 180 초 자리·요청·덮기 밖 로짓 비트 단위, 길 결정은 늘 RUN,
+//                                      모든 결정(길 결정 줄 포함) = 그 두뇌로 다시 돌린 값, 화면 집계(두뇌 몫 반사 RUN·SHELTER·60 초 창) = 세계 길 통계
+//   Integrated.BrainRouteSwap          열린 도주 중 내장 → R7e(판 5) → obs21zero → 되돌림(R7e) → 내장: 관측 칸 수·길·반사 밖 FLEE 막음, 길 없는 두뇌 → 두 길은 그 H 에서
+//                                      길 없음 결정, 두 길 → 길 없는 두뇌는 그 H 가 길 상태를 지우고 길 통계가 멈춤, 조각 바이트 그대로, 스냅숏 칸, 마스크 위반 0
+//   Integrated.RouteRequiresWildFlight 도주 반사를 끈 지역에는 판 4·5 두뇌를 걸지 않는다 (대기 두뇌 버림·지금 두뇌 그대로, 한 지역만 꺼도, 저장소 두뇌가 이미 판 5 여도
+//                                      그 월드는 내장), 실제 허용(두뇌 ∧ 세계)의 얼기·잠 검사, 판 2 는 그대로 건다
+//   Integrated.RouteRefugeLifecycle    SHELTER 유지 중 은신처가 지워지면(반경 0) 무효 결정, 늦게 붙은 은신처는 다음 H 부터 후보(잠금 뒤 다시 고름), 목록 밖 번호 무효 (엔진 함수),
+//                                      Mass 통합 세계(늘 SHELTER 시험 두뇌)에서 지운 은신처로 가는 사슴이 없다
+//   Integrated.RouteDisplay            사슴 글자 '도주(트인 쪽)'·'도주(은신처)'·색, 결정 스텝의 보일 길, 60 초 창(450 스텝)·글자
 
 #include "Misc/AutomationTest.h"
 
@@ -63,6 +73,12 @@
 #include "AI/Social/Senses/EcoSensoryTypes.h"
 #include "Algo/Reverse.h"
 #include "CollisionQueryParams.h"
+#include "Dom/JsonObject.h"
+#include "HAL/FileManager.h"
+#include "Misc/FileHelper.h"
+#include "Misc/Paths.h"
+#include "Serialization/JsonReader.h"
+#include "Serialization/JsonSerializer.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
@@ -3748,6 +3764,838 @@ bool FEcoPolicyV3IntegratedEnvChangeBoundaryTest::RunTest(const FString& Paramet
 	TestTrue(TEXT("먹이 용량 그대로 (환경 바뀜은 먹이 격자를 바꾸지 않는다)"), Change.CapA == Control.CapA);
 	TestTrue(TEXT("감시 끔: 대기·판·원판 없음"), !Off.bPending && Off.Revision == 0 && Off.Discs[0].empty());
 	TestEqual(TEXT("감시 끔: 줄기 막이가 있어도 바꾸지 않은 판과 끝까지 비트 단위로 같다 (옛 동작)"), OffDiff, 0);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 10-24 두 길 두뇌 (이식 계획서 Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 8절·10-3·13-3, 15절): 판 4·5 두뇌를 Mass 통합 세계에 걸고 바꾸고 거부한다
+// -----------------------------------------------------------------------------
+
+namespace EcoPolicyV3IntegratedTestImpl
+{
+	/**
+	 * 늘 SHELTER 시험 두뇌 (herbivore_rl/results/v3/route/port/brains/v3_obs24route_shelter2 와 같은 가중치 — 내장 R1b 첫 층 24 열(새 여섯 열 0), 출력층
+	 * 칸 4 = 칸 1, 편향 칸 4 = 칸 1 + 2). 길 결정에서 SHELTER 가 열리면 늘 SHELTER 를 고른다. 시험 전용 (파일 검사를 거치지 않고 저장소 줄에 직접 넣는다).
+	 */
+	FEcoV3BrainRef MakeShelterBrain()
+	{
+		namespace P3 = EcoPolicyV3;
+		namespace O3 = EcoObservationV3;
+		TSharedRef<FEcoV3Brain, ESPMode::ThreadSafe> B = MakeShared<FEcoV3Brain, ESPMode::ThreadSafe>();
+		const int32 In = O3::kObsDimRoute;
+		B->Layer0Weight.Init(0.0f, P3::kHiddenDim * In);
+		for (int32 j = 0; j < P3::kHiddenDim; ++j)
+		{
+			for (int32 i = 0; i < P3::kObsDim; ++i)
+			{
+				B->Layer0Weight[j * In + i] = P3::kW0[j * P3::kObsDim + i];
+			}
+		}
+		B->Layer0Bias.Append(P3::kB0, P3::kHiddenDim);
+		B->Layer1Weight.Append(P3::kW1, P3::kHiddenDim * P3::kHiddenDim);
+		B->Layer1Bias.Append(P3::kB1, P3::kHiddenDim);
+		B->Layer2Weight.Append(P3::kW2, P3::kNumBehaviors * P3::kHiddenDim);
+		B->Layer2Bias.Append(P3::kB2, P3::kNumBehaviors);
+		for (int32 i = 0; i < P3::kHiddenDim; ++i)
+		{
+			B->Layer2Weight[P3::kSleep * P3::kHiddenDim + i] = B->Layer2Weight[P3::kFlee * P3::kHiddenDim + i];
+		}
+		B->Layer2Bias[P3::kSleep] = B->Layer2Bias[P3::kFlee] + 2.0f;
+		B->Net = {In, B->Layer0Weight.GetData(), B->Layer0Bias.GetData(), B->Layer1Weight.GetData(), B->Layer1Bias.GetData(), B->Layer2Weight.GetData(),
+				  B->Layer2Bias.GetData()};
+		B->ObsDim = In;
+		B->MaskVersion = P3::kMaskVersionRoute;
+		B->ContractHash = P3::kContractHashObs24Mask4;
+		const uint8 Allowed[P3::kNumBehaviors] = {1, 1, 1, 0, 0};
+		FMemory::Memcpy(B->Allowed, Allowed, sizeof(Allowed));
+		B->ModelName = TEXT("v3_obs24route_shelter2");
+		B->WeightsSha256 = EcoV3Brain::WeightsSha256(B->Net);
+		B->Id = FString::Printf(TEXT("%s@%s"), *B->ModelName, *B->WeightsSha256.Left(8));
+		B->TrainWorld = TEXT("늘 SHELTER 시험 두뇌 (시험 전용)");
+		return FEcoV3BrainRef(B);
+	}
+
+	/** 두 지역 (A·B) 사슴 16·늑대 2 통합 세계 (BrainSwap 과 같은 무대). Discs 를 주면 두 지역 모두 그 원판(숲 나무). */
+	bool SetupTwoRegions(FAutomationTestBase& Test, FIntegratedHarness& H, const FEcoV3IntegratedSettings& S, const std::vector<double>* Discs = nullptr)
+	{
+		if (!H.Setup(Test, S))
+		{
+			return false;
+		}
+		FEcoV3RegionContext* Ctx[2] = {};
+		for (int32 c = 0; c < 2; ++c)
+		{
+			FWorldConfig C = UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(H.Sub->GetSettings(), c, 16, 2,
+																					 EcoWorldV3::QuadCovers(H.Sub->GetSettings().StageSizeUnits, 6.0));
+			if (Discs)
+			{
+				C.Obstacles.bEnabled = true;
+				C.Obstacles.Discs = *Discs;
+			}
+			Ctx[c] = H.Sub->AddContext(c == 0 ? FName(TEXT("RegionA")) : FName(TEXT("RegionB")), c, FVector(0.0, 40000.0 * c, 0.0), C, 16, 2);
+		}
+		H.SpawnRegion(*Ctx[0], 16, 2, 1, 0);
+		H.SpawnRegion(*Ctx[1], 16, 2, 100, 1);
+		return true;
+	}
+
+	std::vector<double> ForestDiscs()
+	{
+		std::vector<double> Discs;
+		for (const EcoTreeLayoutV3::FTree& T : EcoTreeLayoutV3::kForestTrees)
+		{
+			Discs.insert(Discs.end(), {T.X, T.Y, T.R});
+		}
+		return Discs;
+	}
+
+	inline constexpr int32 kAnyPanic = -2;    // CountPanic: 길과 무관
+	inline constexpr int32 kAnyRoute = 99;    // CountPanic: 길이 있는 (RUN·SHELTER)
+	/** 두 지역 산 사슴 가운데 다음 스텝 덮기가 도주인 수 (WantRoute = 길 번호면 그 길만, kAnyRoute 면 길이 있는 것만, kAnyPanic 이면 모두). */
+	int32 CountPanic(FIntegratedHarness& H, int32 WantRoute = kAnyPanic)
+	{
+		int32 N = 0;
+		for (const FMassEntityHandle& E : H.Deer)
+		{
+			if (!H.EM->IsEntityValid(E) || H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead)
+			{
+				continue;
+			}
+			const EcoWorldV3::FHerbDecision& D = *DeerView(*H.EM, E).Decision;
+			const bool bRouteOk = WantRoute == kAnyPanic || (WantRoute == kAnyRoute ? D.Route != EcoWorldV3::kRouteNone : D.Route == WantRoute);
+			N += (D.KeepMode == EcoWorldV3::kKeepPanic && bRouteOk) ? 1 : 0;
+		}
+		return N;
+	}
+
+	/** 산 사슴 가운데 길 상태가 남은 수 (길 칸·관측 21~23). */
+	int32 CountRouteLeft(FIntegratedHarness& H)
+	{
+		int32 N = 0;
+		for (const FMassEntityHandle& E : H.Deer)
+		{
+			if (!H.EM->IsEntityValid(E) || H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead)
+			{
+				continue;
+			}
+			const FHerbView V = DeerView(*H.EM, E);
+			const EcoWorldV3::FHerbDecision& D = *V.Decision;
+			const float* Ro = V.Perception->RouteObs;
+			N += (D.Route != EcoWorldV3::kRouteNone || D.RouteK != -1 || D.bRouteDecide || Ro[0] != 0.0f || Ro[1] != 0.0f || Ro[2] != 0.0f) ? 1 : 0;
+		}
+		return N;
+	}
+}
+
+// -----------------------------------------------------------------------------
+// Integrated.BrainObs24Route0 — 통합 세계에서 route0 (관측 24·판 4·길 켬) = obs21zero (관측 21·길 끔) (BrainObs21Zero 꼴, 계획서 10-3)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedBrainObs24Route0Test,
+	"AdaptiveEcosystem.Policy.V3.Integrated.BrainObs24Route0",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedBrainObs24Route0Test::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	namespace P3 = EcoPolicyV3;
+	namespace O3 = EcoObservationV3;
+	constexpr int32 NB = EcoRepertoireV3::kNumBehaviors;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	Reg.ResetForTest();
+	ON_SCOPE_EXIT
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	const FEcoV3BrainLoad Z21 = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r1_g995_s3_obs21zero"));
+	const FEcoV3BrainLoad Z24 = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r1_g995_s3_obs24route0"));
+	if (!TestTrue(TEXT("관측 21·관측 24 두뇌 파일"), Z21.Ok() && Z24.Ok()))
+	{
+		return false;
+	}
+	constexpr int32 kFrames = 1350;   // 180 초
+	const std::vector<double> Discs = ForestDiscs();
+	struct FRun
+	{
+		TArray<TArray<double>> Pos;
+		TArray<TArray<int32>> Request;
+		TArray<TArray<uint32>> LogitBits;   // 읽은 결정(덮기 밖)의 로짓 칸 0~3 — 칸 4(잠, 실제 허용에서 막힘)는 route0 이 출력층을 칸 1 − 2 로 바꿨다. 길 결정 줄은
+											// 넣지 않는다 (길 끈 판은 망을 부르지 않는다)
+		int32 ObsDim[2] = {};
+		bool bRoute[2] = {};
+		int64 Decisions = 0;
+		int64 LogitBad = 0;        // 그 두뇌·그 입력(관측 18 + 장애물 셋 + 길 셋)으로 다시 돌린 로짓·요청과 다른 결정 (길 결정 줄 포함)
+		int64 RouteRows = 0;       // 길 결정 줄 (산 사슴·프레임)
+		int64 RouteRowsRun = 0;    // 그 가운데 칸 1 로짓 > 칸 4 로짓 (RUN)
+		int64 SleepOpen = 0;       // 덮기 밖 결정 가운데 칸 4(잠)가 열린 결정 (실제 허용이 막아 늘 0)
+		EcoWorldV3::FRouteStats Route[2];
+		int64 Violations = 0;
+		int64 Mismatch = 0;
+		int64 TallyBad = 0;        // 두뇌 집계의 반사 RUN + SHELTER ≠ 세계 길 통계 실행 칸, 창 누적 ≠ 세계 누적
+		FString ActiveId;
+		FString RouteLine;
+	};
+	auto Run = [&](bool bRouteBrain, FRun& Out) -> bool
+	{
+		Reg.ResetForTest();
+		FIntegratedHarness H;
+		if (!SetupTwoRegions(*this, H, TestSettings(37200), &Discs))
+		{
+			return false;
+		}
+		Reg.Queue((bRouteBrain ? Z24 : Z21).Brain.ToSharedRef(), TEXT("시험 Integrated.BrainObs24Route0"));
+		for (int32 f = 0; f < kFrames; ++f)
+		{
+			H.DecisionStep();
+			H.CoordinatorReconcile();
+			const P3::FPolicyNetV3& Net = H.Sub->ActiveNet();
+			TArray<double>& Pos = Out.Pos.AddDefaulted_GetRef();
+			TArray<int32>& Req = Out.Request.AddDefaulted_GetRef();
+			TArray<uint32>& Bits = Out.LogitBits.AddDefaulted_GetRef();
+			for (const FMassEntityHandle& E : H.Deer)
+			{
+				if (!H.EM->IsEntityValid(E))
+				{
+					Pos.Append({TNumericLimits<double>::Max(), TNumericLimits<double>::Max()});
+					Req.Add(-1);
+					Bits.AddZeroed(NB);
+					continue;
+				}
+				const FHerbView V = DeerView(*H.EM, E);
+				Pos.Append({V.Body->Pos.X, V.Body->Pos.Y});
+				const EcoWorldV3::FHerbDecision& D = *V.Decision;
+				Req.Add(D.bPrepared ? D.Request : -1);
+				const int32 At = Bits.AddZeroed(NB);
+				if (H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead || !D.bPrepared)
+				{
+					continue;
+				}
+				float Buf[P3::kMaxObsDim] = {};
+				const float* In = EcoWorldV3::Detail::NetInputOf(*V.Perception, Net.ObsDim, Buf);
+				if (D.bRouteReads)
+				{
+					++Out.RouteRows;
+					float L[NB];
+					const int32 Got = P3::RunPolicyV3(Net, In, D.Mask, L);
+					Out.LogitBad += (Got != D.RouteRequest || FMemory::Memcmp(L, D.Logits, sizeof(L)) != 0) ? 1 : 0;
+					Out.RouteRowsRun += L[P3::kRouteSlotRun] > L[P3::kRouteSlotShelter] ? 1 : 0;
+				}
+				if (!D.Prep.bReads)
+				{
+					continue;
+				}
+				++Out.Decisions;
+				FMemory::Memcpy(&Bits[At], D.Logits, sizeof(float) * P3::kRouteSlotShelter);   // 칸 0~3 (칸 4 는 두 판이 다른 출력층 줄이고 막혀 있다)
+				Out.SleepOpen += D.Mask[P3::kSleep] != 0 ? 1 : 0;
+				float L[NB];
+				const int32 Got = P3::RunPolicyV3(Net, In, D.Mask, L);
+				Out.LogitBad += (Got != D.Request || FMemory::Memcmp(L, D.Logits, sizeof(L)) != 0) ? 1 : 0;
+			}
+		}
+		for (int32 c = 0; c < 2; ++c)
+		{
+			const FEcoV3RegionContext& C = H.Ctx(c);
+			Out.ObsDim[c] = C.Sim.ObsDim;
+			Out.bRoute[c] = C.RouteOn();
+			Out.Route[c] = C.Sim.Stats.Route;
+			Out.Mismatch += C.Sim.Stats.ObsLayoutMismatch;
+			Out.Violations += C.Sim.Stats.MaskViolations;
+			const FEcoV3RouteSum Sum = FEcoV3RouteSum::Of(C.Sim.Stats.Route);
+			Out.TallyBad += (C.BrainTally.ReflexRun != Sum.RunSteps || C.BrainTally.ReflexShelter != Sum.ShelterSteps
+							 || C.BrainTally.ReflexRun + C.BrainTally.ReflexShelter > C.BrainTally.Reflex || C.RouteTally.Pushes != C.Sim.Stats.Steps
+							 || C.RouteTally.Now.Decisions != Sum.Decisions || C.RouteTally.Now.RunSteps != Sum.RunSteps)
+								? 1
+								: 0;
+		}
+		Out.ActiveId = H.Sub->GetActiveBrain().Id;
+		Out.RouteLine = H.Ctx(0).RouteTally.Window().Text();
+		return true;
+	};
+
+	FRun Base;
+	FRun Z;
+	if (!Run(false, Base) || !Run(true, Z))
+	{
+		return false;
+	}
+	int32 PosDiff = 0;
+	int32 ReqDiff = 0;
+	int32 LogitDiff = 0;
+	for (int32 f = 0; f < kFrames; ++f)
+	{
+		PosDiff += Base.Pos[f] == Z.Pos[f] ? 0 : 1;
+		ReqDiff += Base.Request[f] == Z.Request[f] ? 0 : 1;
+		LogitDiff += Base.LogitBits[f] == Z.LogitBits[f] ? 0 : 1;
+	}
+	const int64 ZDec = Z.Route[0].Decisions + Z.Route[1].Decisions;
+	const int64 ZShelter = Z.Route[0].Picked[EcoWorldV3::kRouteShelter] + Z.Route[1].Picked[EcoWorldV3::kRouteShelter];
+	AddInfo(FString::Printf(TEXT("obs21zero %s 대 route0 %s · 결정 %lld 대 %lld · 다른 프레임 자리 %d·요청 %d·로짓 %d / %d · route0 길 결정 %lld (줄 %lld, RUN %lld) · SHELTER 고름 %lld · 지역 A 창 %s"),
+							*Base.ActiveId, *Z.ActiveId, Base.Decisions, Z.Decisions, PosDiff, ReqDiff, LogitDiff, kFrames, ZDec, Z.RouteRows, Z.RouteRowsRun, ZShelter,
+							*Z.RouteLine));
+	TestTrue(TEXT("두 판의 두뇌 (obs21zero 관측 21, route0 관측 24)"), Base.ActiveId == Z21.Brain->Id && Z.ActiveId == Z24.Brain->Id);
+	TestTrue(TEXT("세계 관측 칸 수·길 = 두뇌 계약 (21 길 끔, 24 길 켬 — 두 지역)"), Base.ObsDim[0] == O3::kObsDimObstacle && Base.ObsDim[1] == O3::kObsDimObstacle
+																		  && Z.ObsDim[0] == O3::kObsDimRoute && Z.ObsDim[1] == O3::kObsDimRoute && !Base.bRoute[0]
+																		  && !Base.bRoute[1] && Z.bRoute[0] && Z.bRoute[1]);
+	TestTrue(TEXT("route0 판에 길 결정이 있다 (도주가 있었다)"), ZDec > 0 && Z.RouteRows > 0);
+	TestEqual(TEXT("route0 의 길 결정은 늘 RUN (칸 1 로짓 > 칸 4 로짓)"), Z.RouteRowsRun, Z.RouteRows);
+	TestEqual(TEXT("route0 은 SHELTER 를 고르지 않는다"), ZShelter, static_cast<int64>(0));
+	TestTrue(TEXT("길 끈 판은 길 통계 0"), FEcoV3RouteSum::Of(Base.Route[0]).RouteSteps() + FEcoV3RouteSum::Of(Base.Route[1]).RouteSteps() + Base.Route[0].Decisions
+										 + Base.Route[1].Decisions
+									 == 0);
+	TestTrue(TEXT("두 판 모두 두뇌를 부른 결정이 있다 (같은 수)"), Base.Decisions > 100 && Z.Decisions == Base.Decisions);
+	TestEqual(TEXT("route0(길 켬) = obs21zero(길 끔): 사슴 자리 (비트 단위, 모든 프레임)"), PosDiff, 0);
+	TestEqual(TEXT("route0 = obs21zero: 다음 요청 (모든 프레임)"), ReqDiff, 0);
+	TestEqual(TEXT("route0 = obs21zero: 덮기 밖 결정 로짓 칸 0~3 (비트 단위, 모든 프레임 — 칸 4 는 출력층이 달라도 막혀 있다)"), LogitDiff, 0);
+	TestEqual(TEXT("덮기 밖 결정에서 칸 4(잠)는 늘 막혀 있다 (두 판)"), Base.SleepOpen + Z.SleepOpen, static_cast<int64>(0));
+	TestEqual(TEXT("모든 결정 로짓·요청 = 그 두뇌로 다시 돌린 값 (길 결정 줄 포함, 두 판)"), Base.LogitBad + Z.LogitBad, static_cast<int64>(0));
+	TestEqual(TEXT("망 칸 수와 세계 관측 칸 수 어긋남 0 (두 판)"), Base.Mismatch + Z.Mismatch, static_cast<int64>(0));
+	TestEqual(TEXT("마스크 위반 0 (두 판)"), Base.Violations + Z.Violations, static_cast<int64>(0));
+	TestEqual(TEXT("화면 집계: 두뇌 몫 반사 RUN·SHELTER = 세계 길 통계, 60 초 창 누적 = 세계 누적 (지역마다, 두 판)"), Base.TallyBad + Z.TallyBad, static_cast<int64>(0));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Integrated.BrainRouteSwap — 열린 도망 중 교체 내장(18) → R7e(24 판 5) → obs21zero(21) → 되돌림(R7e) → 내장 (계획서 8-2 의 3)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedBrainRouteSwapTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.BrainRouteSwap",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedBrainRouteSwapTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	namespace O3 = EcoObservationV3;
+	namespace W3 = EcoWorldV3;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	Reg.ResetForTest();
+	ON_SCOPE_EXIT
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	const FEcoV3BrainLoad R7 = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r7_g995_s1_20m"));
+	const FEcoV3BrainLoad Z21 = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r1_g995_s3_obs21zero"));
+	if (!TestTrue(FString::Printf(TEXT("R7e (%s)·obs21zero 두뇌 파일"), *R7.Message), R7.Ok() && Z21.Ok()))
+	{
+		return false;
+	}
+	const FEcoV3BrainRef R7Ref = R7.Brain.ToSharedRef();
+	const FEcoV3BrainRef Z21Ref = Z21.Brain.ToSharedRef();
+	const FEcoV3BrainRef BuiltinRef = FEcoV3BrainRegistry::Builtin();
+	FIntegratedHarness H;
+	if (!SetupTwoRegions(*this, H, TestSettings(37500)))
+	{
+		return false;
+	}
+	auto Frame = [&H]()
+	{
+		H.DecisionStep();
+		H.CoordinatorReconcile();
+	};
+	auto WorldState = [&H](int32 c) { return H.Ctx(c).Sim.ObsDim * 100 + (H.Ctx(c).RouteOn() ? 10 : 0) + (H.Ctx(c).Sim.bFleeGate ? 1 : 0); };
+	auto BothWorlds = [&](int32 Want) { return WorldState(0) == Want && WorldState(1) == Want; };
+	auto Swap = [&](const FEcoV3BrainRef* Brain, const TCHAR* Why)
+	{
+		if (Brain)
+		{
+			Reg.Queue(*Brain, Why);
+		}
+		else
+		{
+			Reg.Rollback(Why);
+		}
+		H.Sub->SyncBrain(/*bPollWatch*/ false);
+	};
+	int32 Frames = 0;
+	// 1) 내장으로 시작해 열린 도주가 생길 때까지
+	while (Frames < 1500 && (Frames < 60 || CountPanic(H) == 0))
+	{
+		Frame();
+		++Frames;
+	}
+	TestTrue(TEXT("내장: 관측 18·길 끔"), BothWorlds(1800));
+	// 2) 내장 → R7e (판 5): 열린 도주는 길 상태 없이 들어온다 → 그 스텝 H 에서 길 없음 결정 (새 두뇌가 곧바로 고름 — 질문 1)
+	TArray<FMassEntityHandle> OpenPanic;
+	for (const FMassEntityHandle& E : H.Deer)
+	{
+		if (H.EM->IsEntityValid(E) && !H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead
+			&& DeerView(*H.EM, E).Decision->KeepMode == W3::kKeepPanic)
+		{
+			OpenPanic.Add(E);
+		}
+	}
+	const int32 PanicAtSwap = OpenPanic.Num();
+	TArray<uint8> StateBefore;
+	for (const FMassEntityHandle& E : H.Deer)
+	{
+		if (H.EM->IsEntityValid(E))
+		{
+			const FEcoBehaviorStateFragment& S = H.EM->GetFragmentDataChecked<FEcoBehaviorStateFragment>(E);
+			StateBefore.Append(reinterpret_cast<const uint8*>(&S), sizeof(S));
+		}
+	}
+	Swap(&R7Ref, TEXT("시험 BrainRouteSwap 내장 → R7e"));
+	TArray<uint8> StateAfter;
+	for (const FMassEntityHandle& E : H.Deer)
+	{
+		if (H.EM->IsEntityValid(E))
+		{
+			const FEcoBehaviorStateFragment& S = H.EM->GetFragmentDataChecked<FEcoBehaviorStateFragment>(E);
+			StateAfter.Append(reinterpret_cast<const uint8*>(&S), sizeof(S));
+		}
+	}
+	TestTrue(TEXT("R7e: 이 월드 두뇌·관측 24·길 켬·반사 밖 FLEE 막음 (두 지역)"), H.Sub->GetActiveBrain().Id == R7.Brain->Id && BothWorlds(2411));
+	TestTrue(TEXT("바꾸기(SyncBrain)는 사슴 행동 상태·결정 조각 바이트를 바꾸지 않는다"), StateBefore == StateAfter);
+	const W3::FRouteStats Rs0 = H.Ctx(0).Sim.Stats.Route;
+	Frame();
+	++Frames;
+	int32 Continued = 0;
+	int32 DecidedNone = 0;
+	for (const FMassEntityHandle& E : OpenPanic)
+	{
+		if (!H.EM->IsEntityValid(E) || H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead)
+		{
+			continue;
+		}
+		const W3::FHerbDecision& D = *DeerView(*H.EM, E).Decision;
+		if (D.KeepActive == W3::kKeepPanic && D.KeepMode == W3::kKeepPanic)
+		{
+			++Continued;
+			DecidedNone += (D.bRouteDecide && D.RouteDecPrev == W3::kRouteNone && D.Route == W3::kRouteRun && D.bRouteReads) ? 1 : 0;
+		}
+	}
+	AddInfo(FString::Printf(TEXT("내장 → R7e: %d 프레임, 열린 도주 %d · 이어짐 %d · 길 없음 결정 %d"), Frames, PanicAtSwap, Continued, DecidedNone));
+	TestTrue(TEXT("교체 순간 열린 도주가 있었다"), PanicAtSwap > 0);
+	TestEqual(TEXT("이어진 도주는 모두 그 스텝 H 에서 길 없음 결정 (RouteDecPrev NONE)"), DecidedNone, Continued);
+	TestTrue(TEXT("그 스텝 길 통계: 결정이 늘고 경계 스텝의 실행한 길은 없다 (질문 17 — 경계 한 스텝은 none)"),
+			 H.Ctx(0).Sim.Stats.Route.Decisions >= Rs0.Decisions && H.Ctx(0).Sim.Stats.Route.Steps[W3::kRouteRun] == Rs0.Steps[W3::kRouteRun]);
+	// 3) R7e 로 달리며 길이 있는 열린 도주(되도록 SHELTER)를 기다린다. 그동안 스냅숏 칸을 본다
+	int32 Waited = 0;
+	while (Waited < 2500 && (Waited < 150 || CountPanic(H, W3::kRouteShelter) == 0) && !(Waited >= 1500 && CountPanic(H, kAnyRoute) > 0))
+	{
+		Frame();
+		++Waited;
+	}
+	Frames += Waited;
+	const int32 ShelterOpen = CountPanic(H, W3::kRouteShelter);
+	const int32 RouteOpen = CountPanic(H, kAnyRoute);
+	const int64 PickedShelter = H.Ctx(0).Sim.Stats.Route.Picked[W3::kRouteShelter] + H.Ctx(1).Sim.Stats.Route.Picked[W3::kRouteShelter];
+	{
+		const FString Path = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("Automation"), TEXT("EcoRouteSwapSnapshot.json"));
+		ON_SCOPE_EXIT
+		{
+			IFileManager::Get().Delete(*Path);
+		};
+		FString Text;
+		TSharedPtr<FJsonObject> Root;
+		const bool bWrote = H.Sub->ExportSnapshot(Path, TEXT("시험 BrainRouteSwap")) && FFileHelper::LoadFileToString(Text, *Path)
+							&& FJsonSerializer::Deserialize(TJsonReaderFactory<>::Create(Text), Root) && Root.IsValid();
+		if (TestTrue(TEXT("스냅숏 쓰기·읽기"), bWrote))
+		{
+			const TSharedPtr<FJsonObject> Brain = Root->GetObjectField(TEXT("brain"));
+			const TSharedPtr<FJsonObject> Reg0 = Root->GetArrayField(TEXT("regions"))[0]->AsObject();
+			const TSharedPtr<FJsonObject> Wf = Reg0->GetObjectField(TEXT("world"))->GetObjectField(TEXT("wild_flight"));
+			const TSharedPtr<FJsonObject>* RouteBlock = nullptr;
+			const bool bRouteBlock = Reg0->GetObjectField(TEXT("flight"))->TryGetObjectField(TEXT("route"), RouteBlock) && RouteBlock && RouteBlock->IsValid();
+			TestTrue(TEXT("스냅숏 brain: mask_version 5·route·flee_gate"), static_cast<int32>(Brain->GetNumberField(TEXT("mask_version"))) == 5
+																		  && Brain->GetBoolField(TEXT("route")) && Brain->GetBoolField(TEXT("flee_gate")));
+			TestTrue(TEXT("스냅숏 world.wild_flight: route 참·brain_flee_outside_reflex 거짓 (두뇌가 정한 값)"),
+					 Wf->GetBoolField(TEXT("route")) && !Wf->GetBoolField(TEXT("brain_flee_outside_reflex")));
+			TestTrue(TEXT("스냅숏 flight.route (파이썬 flight_stats route 칸 — picked·by_route·refled)"),
+					 bRouteBlock && (*RouteBlock)->HasField(TEXT("picked")) && (*RouteBlock)->HasField(TEXT("by_route")) && (*RouteBlock)->HasField(TEXT("refled"))
+						 && static_cast<int64>((*RouteBlock)->GetNumberField(TEXT("decisions"))) == H.Ctx(0).Sim.Stats.Route.Decisions);
+		}
+	}
+	// 4) R7e → obs21zero (길 없는 두뇌, 질문 2): 경계 스텝 A 는 반사 방향, 그 H 가 길 상태를 지운다. 길 통계는 더 늘지 않는다
+	Swap(&Z21Ref, TEXT("시험 BrainRouteSwap R7e → obs21zero"));
+	TestTrue(TEXT("obs21zero: 관측 21·길 끔·막음 끔 (두 지역)"), BothWorlds(2100));
+	const FEcoV3RouteSum Frozen0 = FEcoV3RouteSum::Of(H.Ctx(0).Sim.Stats.Route);
+	const FEcoV3RouteSum Frozen1 = FEcoV3RouteSum::Of(H.Ctx(1).Sim.Stats.Route);
+	Frame();
+	const int32 LeftAfterOff = CountRouteLeft(H);
+	for (int32 k = 0; k < 90; ++k)
+	{
+		Frame();
+	}
+	const bool bFrozen = FEcoV3RouteSum::Of(H.Ctx(0).Sim.Stats.Route).Minus(Frozen0).RouteSteps() == 0
+						 && FEcoV3RouteSum::Of(H.Ctx(1).Sim.Stats.Route).Minus(Frozen1).RouteSteps() == 0
+						 && H.Ctx(0).Sim.Stats.Route.Decisions == Frozen0.Decisions && H.Ctx(1).Sim.Stats.Route.Decisions == Frozen1.Decisions;
+	AddInfo(FString::Printf(TEXT("R7e → obs21zero: R7e %d 프레임 · 교체 순간 길 있는 열린 도주 %d (SHELTER %d) · SHELTER 고름 누적 %lld · 경계 뒤 남은 길 상태 %d"), Waited,
+							RouteOpen, ShelterOpen, PickedShelter, LeftAfterOff));
+	TestTrue(TEXT("교체 순간 길이 있는 열린 도주가 있었다"), RouteOpen > 0);
+	TestEqual(TEXT("경계 스텝 H 뒤 산 사슴의 길 상태·관측 21~23 이 모두 지워진다"), LeftAfterOff, 0);
+	TestTrue(TEXT("길 끈 뒤 길 통계는 늘지 않는다 (90 프레임)"), bFrozen);
+	// 5) 되돌림 (eco.V3Brain.Rollback): 쌓개 맨 위 = R7e → 다시 길 켬
+	Swap(nullptr, TEXT("시험 BrainRouteSwap 되돌림"));
+	TestTrue(TEXT("되돌림 → R7e: 관측 24·길 켬·막음 (두 지역)"), H.Sub->GetActiveBrain().Id == R7.Brain->Id && BothWorlds(2411) && Reg.WasLastCommitRollback());
+	for (int32 k = 0; k < 150; ++k)
+	{
+		Frame();
+	}
+	// 6) 내장으로: 관측 18·길 끔
+	Swap(&BuiltinRef, TEXT("시험 BrainRouteSwap → 내장"));
+	TestTrue(TEXT("내장: 관측 18·길 끔 (두 지역)"), BothWorlds(1800) && H.Sub->GetActiveBrain().bBuiltin);
+	Frame();
+	TestEqual(TEXT("내장으로 바꾼 경계 스텝 뒤 길 상태가 남지 않는다"), CountRouteLeft(H), 0);
+	int64 Violations = 0;
+	int64 Mismatch = 0;
+	int64 TallyBad = 0;
+	for (int32 c = 0; c < 2; ++c)
+	{
+		const FEcoV3RegionContext& C = H.Ctx(c);
+		Violations += C.Sim.Stats.MaskViolations;
+		Mismatch += C.Sim.Stats.ObsLayoutMismatch;
+		const FEcoV3RouteSum Sum = FEcoV3RouteSum::Of(C.Sim.Stats.Route);
+		TallyBad += (C.BrainTally.ReflexRun != Sum.RunSteps || C.BrainTally.ReflexShelter != Sum.ShelterSteps) ? 1 : 0;
+	}
+	TestEqual(TEXT("마스크 위반 0 (교체 넷 내내)"), Violations, static_cast<int64>(0));
+	TestEqual(TEXT("망 칸 수와 세계 관측 칸 수 어긋남 0 (교체 넷 내내)"), Mismatch, static_cast<int64>(0));
+	TestEqual(TEXT("두뇌 몫 반사 RUN·SHELTER = 세계 길 통계 (지역마다)"), TallyBad, static_cast<int64>(0));
+	TestEqual(TEXT("이 Play 교체 넷 (되돌림 포함)"), H.Sub->GetBrainSwapsThisPlay(), 4);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Integrated.RouteRequiresWildFlight — 도주 반사를 끈 지역에는 판 4·5 두뇌를 걸지 않는다 (계획서 8-2 의 1, 12절 질문 12 — 권고대로 거부)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedRouteRequiresWildFlightTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.RouteRequiresWildFlight",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedRouteRequiresWildFlightTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	namespace O3 = EcoObservationV3;
+	using FSub = UEcoPolicyV3IntegratedSubsystem;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	Reg.ResetForTest();
+	ON_SCOPE_EXIT
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	// 거부 줄은 기대한 경고다: 대기 버림 3 (R7e·route0·섞인 지역 R7e), 서브시스템 '두뇌 거부' 4 (그 셋 + 저장소 두뇌를 이 월드에 못 검)
+	AddExpectedMessagePlain(TEXT("를 버린다"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 3);
+	AddExpectedMessagePlain(TEXT("[EcoV3I] 두뇌 거부"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 4);
+	const FEcoV3BrainLoad R7 = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r7_g995_s1_20m"));
+	const FEcoV3BrainLoad Z24 = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r1_g995_s3_obs24route0"));
+	const FEcoV3BrainLoad Z21 = FEcoV3BrainRegistry::LoadFile(TEXT("v3_r1_g995_s3_obs21zero"));
+	if (!TestTrue(TEXT("두뇌 파일 셋"), R7.Ok() && Z24.Ok() && Z21.Ok()))
+	{
+		return false;
+	}
+	// (가) 걸기 전 검사 함수 (세계 하나)
+	{
+		FEcoV3IntegratedSettings S = TestSettings(37600);
+		const FWorldConfig On = FSub::MakeRegionWorldConfig(S, 0, 16, 2, EcoWorldV3::QuadCovers(S.StageSizeUnits, 6.0));
+		S.bWildFlight = false;
+		const FWorldConfig Off = FSub::MakeRegionWorldConfig(S, 0, 16, 2, EcoWorldV3::QuadCovers(S.StageSizeUnits, 6.0));
+		EcoWorldV3::FWorldState Won;
+		EcoWorldV3::FWorldState Woff;
+		EcoWorldV3::InitWorld(Won, On);
+		EcoWorldV3::InitWorld(Woff, Off);
+		TestTrue(TEXT("도주 반사 켠 세계: 판 4·5 두뇌를 걸 수 있다"), FSub::RouteBrainBlocker(Won, *R7.Brain).IsEmpty() && FSub::RouteBrainBlocker(Won, *Z24.Brain).IsEmpty());
+		TestTrue(TEXT("도주 반사 끈 세계: 판 4·5 두뇌 거부 (까닭 '도주 반사')"), FSub::RouteBrainBlocker(Woff, *R7.Brain).Contains(TEXT("도주 반사"))
+																			 && !FSub::RouteBrainBlocker(Woff, *Z24.Brain).IsEmpty());
+		TestTrue(TEXT("판 2 두뇌는 보지 않는다 (끈 세계에도 건다)"), FSub::RouteBrainBlocker(Woff, *Z21.Brain).IsEmpty()
+																	&& FSub::RouteBrainBlocker(Woff, *FEcoV3BrainRegistry::Builtin()).IsEmpty());
+		// 실제 허용(두뇌 ∧ 세계)에 잠이 남는 두뇌 (파일 검사는 이런 두뇌를 만들지 않는다 — 방어 줄)
+		FEcoV3Brain Odd;
+		Odd.MaskVersion = EcoPolicyV3::kMaskVersionRoute;
+		const uint8 A[EcoPolicyV3::kNumBehaviors] = {1, 1, 1, 0, 1};
+		FMemory::Memcpy(Odd.Allowed, A, sizeof(A));
+		TestTrue(TEXT("실제 허용에 잠이 남으면 거부 (까닭 '얼기·잠')"), FSub::RouteBrainBlocker(Won, Odd).Contains(TEXT("얼기·잠")));
+		Won.Config.WorldAllowed[EcoPolicyV3::kSleep] = 0;
+		TestTrue(TEXT("세계 칸이 잠을 막으면 실제 허용이 0 이라 건다 (effective_allowed)"), FSub::RouteBrainBlocker(Won, Odd).IsEmpty());
+	}
+	// (나) 도주 반사를 끈 통합 세계: 판 5·판 4 대기 두뇌는 버리고 지금 두뇌(내장)를 둔다, 판 2 는 건다
+	{
+		FEcoV3IntegratedSettings S = TestSettings(37601);
+		S.bWildFlight = false;
+		FIntegratedHarness H;
+		if (!SetupTwoRegions(*this, H, S))
+		{
+			return false;
+		}
+		H.DecisionStep();
+		const uint32 Gen0 = Reg.GetGeneration();
+		Reg.Queue(R7.Brain.ToSharedRef(), TEXT("시험 RouteRequiresWildFlight R7e"));
+		H.Sub->SyncBrain(false);
+		TestTrue(TEXT("R7e 거부: 대기 없음·저장소 세대 그대로·이 월드 내장"), !Reg.GetPending().IsValid() && Reg.GetGeneration() == Gen0 && H.Sub->GetActiveBrain().bBuiltin);
+		TestTrue(TEXT("… 세계는 관측 18·길 끔·막음 끔 그대로"), H.Ctx(0).Sim.ObsDim == O3::kObsDim && !H.Ctx(0).RouteOn() && !H.Ctx(0).Sim.bFleeGate
+																&& !H.Ctx(1).RouteOn());
+		Reg.Queue(Z24.Brain.ToSharedRef(), TEXT("시험 RouteRequiresWildFlight route0"));
+		H.Sub->SyncBrain(false);
+		TestTrue(TEXT("route0 (판 4) 도 거부"), !Reg.GetPending().IsValid() && H.Sub->GetActiveBrain().bBuiltin && H.Ctx(0).Sim.ObsDim == O3::kObsDim);
+		Reg.Queue(Z21.Brain.ToSharedRef(), TEXT("시험 RouteRequiresWildFlight obs21zero"));
+		H.Sub->SyncBrain(false);
+		TestTrue(TEXT("관측 21 (판 2) 는 건다"), H.Sub->GetActiveBrain().Id == Z21.Brain->Id && H.Ctx(0).Sim.ObsDim == O3::kObsDimObstacle && !H.Ctx(0).RouteOn());
+		for (int32 f = 0; f < 30; ++f)
+		{
+			H.DecisionStep();
+		}
+		TestEqual(TEXT("끈 세계는 계속 돈다 (마스크 위반 0)"), H.Ctx(0).Sim.Stats.MaskViolations + H.Ctx(1).Sim.Stats.MaskViolations, static_cast<int64>(0));
+	}
+	// (다) 한 지역만 도주 반사를 끈 세계: 판 5 두뇌는 거부 (모든 지역을 본다 — 까닭에 그 지역 이름)
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+		FIntegratedHarness H;
+		if (!H.Setup(*this, TestSettings(37602)))
+		{
+			return false;
+		}
+		const FEcoV3IntegratedSettings& S = H.Sub->GetSettings();
+		FWorldConfig Ca = FSub::MakeRegionWorldConfig(S, 0, 8, 2, EcoWorldV3::QuadCovers(S.StageSizeUnits, 6.0));
+		FWorldConfig Cb = Ca;
+		Cb.WildFlight = EcoWorldV3::FWildFlightConfig();
+		FEcoV3RegionContext* A = H.Sub->AddContext(FName(TEXT("RegionOn")), 0, FVector::ZeroVector, Ca, 8, 2);
+		FEcoV3RegionContext* B = H.Sub->AddContext(FName(TEXT("RegionOff")), 1, FVector(0.0, 40000.0, 0.0), Cb, 8, 2);
+		H.SpawnRegion(*A, 8, 2, 1, 0);
+		H.SpawnRegion(*B, 8, 2, 100, 1);
+		H.DecisionStep();
+		TestTrue(TEXT("걸기 전 검사 까닭에 끈 지역 이름"), H.Sub->BrainBlocker(*R7.Brain).StartsWith(TEXT("RegionOff:")));
+		Reg.Queue(R7.Brain.ToSharedRef(), TEXT("시험 섞인 지역 R7e"));
+		H.Sub->SyncBrain(false);
+		TestTrue(TEXT("한 지역이라도 끄면 판 5 두뇌 거부 — 켠 지역도 길 끔"), H.Sub->GetActiveBrain().bBuiltin && !A->RouteOn() && !B->RouteOn() && A->Sim.ObsDim == O3::kObsDim);
+	}
+	// (라) 저장소의 지금 두뇌가 이미 판 5 (앞 Play·다른 월드가 걸었다) 인데 이 월드가 도주 반사를 껐다: 첫 SyncBrain 이 이 월드만 내장으로 (저장소 그대로)
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+		Reg.Queue(R7.Brain.ToSharedRef(), TEXT("시험 앞 Play 의 두뇌"));
+		Reg.CommitPending();
+		FEcoV3IntegratedSettings S = TestSettings(37603);
+		S.bWildFlight = false;
+		FIntegratedHarness H;
+		if (!SetupTwoRegions(*this, H, S))
+		{
+			return false;
+		}
+		TestTrue(TEXT("첫 SyncBrain 전 지역 세계는 저장소 두뇌로 만들었다 (관측 24 — 길은 반사가 없어 켜지지 않는다)"),
+				 H.Ctx(0).Sim.ObsDim == O3::kObsDimRoute && !H.Ctx(0).RouteOn());
+		H.DecisionStep();   // 처리기 머리의 SyncBrain
+		TestTrue(TEXT("이 월드는 내장 (관측 18·길 끔), 저장소 지금 두뇌는 R7e 그대로"),
+				 H.Sub->GetActiveBrain().bBuiltin && H.Ctx(0).Sim.ObsDim == O3::kObsDim && H.Ctx(1).Sim.ObsDim == O3::kObsDim && Reg.GetActive()->Id == R7.Brain->Id);
+		for (int32 f = 0; f < 30; ++f)
+		{
+			H.DecisionStep();
+		}
+		TestEqual(TEXT("… 계속 돈다 (마스크 위반·관측 칸 어긋남 0)"),
+				  H.Ctx(0).Sim.Stats.MaskViolations + H.Ctx(1).Sim.Stats.MaskViolations + H.Ctx(0).Sim.Stats.ObsLayoutMismatch, static_cast<int64>(0));
+	}
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Integrated.RouteRefugeLifecycle — SHELTER 유지 중 은신처가 지워지면(반경 0) 무효 결정, 늦게 붙은 은신처는 다음 H 부터 후보 (계획서 2-4 의 C++ 전용 두 줄·12절 질문 4)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedRouteRefugeLifecycleTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.RouteRefugeLifecycle",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedRouteRefugeLifecycleTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	namespace W3 = EcoWorldV3;
+	namespace WD = EcoWorldV3::Detail;
+	// (가) 사슴 하나 길 단계 (엔진 함수 — 무대 60, 은신처 넷 반경 6, 늑대 하나가 뒤에서 쫓음)
+	{
+		std::vector<EcoObservationV3::FCoverInput> Covers = W3::QuadCovers(60.0, 6.0);
+		const double Q[2] = {22.0, 15.0};
+		W3::FHerbDecision D;
+		float Obs[EcoObservationV3::kNumRouteObs] = {};
+		W3::FRouteStats St;
+		WD::FRouteStepInput In;
+		In.Prev = W3::kKeepNone;
+		In.Next = W3::kKeepPanic;
+		In.P = W3::FVec2{30.0, 15.0};
+		In.A0 = W3::FVec2{1.0, 0.0};
+		In.Q = Q;
+		In.SBits = 1;
+		In.M = 1;
+		In.Covers = Covers.data();
+		In.NumCovers = static_cast<int32>(Covers.size());
+		In.Size = 60.0;
+		In.Mg = 1.0;
+		W3::FVec2 Dir{1.0, 0.0};
+		const WD::FRouteStepResult Res1 = WD::RouteStep(D, Obs, In, Dir, St);
+		const int32 K1 = D.RouteCandK;
+		TestTrue(TEXT("도주 시작 = 결정, 앞쪽 은신처가 SHELTER 후보 (관측 22 > 0)"), Res1.bOnset && Res1.bDecide && D.bRouteSok && K1 >= 0 && Obs[1] > 0.0f);
+		D.RouteRequest = W3::kRouteSlotShelter;
+		D.bRouteReads = true;
+		D.KeepMode = W3::kKeepPanic;
+		WD::RouteApply(D, true, St);
+		TestTrue(TEXT("두뇌가 칸 4 → SHELTER (그 은신처)"), D.Route == W3::kRouteShelter && D.RouteK == K1 && St.Picked[W3::kRouteShelter] == 1);
+		// 그 은신처가 지워졌다 (통합 RefreshRefuges — 번호를 남기고 반경 0)
+		Covers[static_cast<size_t>(K1)].Radius = 0.0;
+		In.Prev = W3::kKeepPanic;
+		Dir = W3::FVec2{1.0, 0.0};
+		const WD::FRouteStepResult Res2 = WD::RouteStep(D, Obs, In, Dir, St);
+		TestTrue(TEXT("지워진 유지 은신처 → 무효 → 결정 (RUN 으로, 그 은신처는 후보가 아니다)"),
+				 Res2.bInvalid && Res2.bDecide && !Res2.bKeepOk && D.Route == W3::kRouteRun && D.RouteK == -1 && D.RouteCandK != K1 && St.Invalid[W3::kRouteShelter] == 1);
+		// 늦게 붙은 은신처 (통합 RefreshRefuges 가 목록 끝에 더한다): 다음 H 부터 후보 — RUN 길이라 잠금 15 스텝 뒤 가능 바뀜으로 다시 고른다
+		Covers.push_back({40.0, 21.0, 4.0});
+		In.Covers = Covers.data();
+		In.NumCovers = static_cast<int32>(Covers.size());
+		const int32 Late = In.NumCovers - 1;
+		int32 Redecided = -1;
+		for (int32 s = 1; s <= W3::kRouteLockSteps + 1 && Redecided < 0; ++s)
+		{
+			Dir = W3::FVec2{1.0, 0.0};
+			const WD::FRouteStepResult Rs = WD::RouteStep(D, Obs, In, Dir, St);
+			if (s == 1)
+			{
+				TestTrue(TEXT("늦게 붙은 은신처가 곧바로 후보 (관측 22 > 0) — 잠금 안이라 결정은 아님"), D.RouteCandK == Late && D.bRouteSok && !Rs.bDecide);
+			}
+			Redecided = Rs.bDecide ? s : -1;
+		}
+		TestTrue(TEXT("잠금 15 스텝 뒤 가능 바뀜(0 → 2)으로 다시 결정, 후보 = 늦게 붙은 은신처"), Redecided == W3::kRouteLockSteps && D.RouteCandK == Late && St.RedecideFeas == 1);
+		// 유지 은신처 번호가 목록 밖 (C++ 전용) → 유지 거짓 → 무효
+		D.Route = W3::kRouteShelter;
+		D.RouteK = 99;
+		Dir = W3::FVec2{1.0, 0.0};
+		const WD::FRouteStepResult Res3 = WD::RouteStep(D, Obs, In, Dir, St);
+		TestTrue(TEXT("목록 밖 유지 은신처 번호 → 무효 결정"), Res3.bInvalid && Res3.bDecide && D.Route == W3::kRouteRun);
+	}
+	// (나) Mass 통합 세계 (늘 SHELTER 시험 두뇌): SHELTER 로 가는 사슴의 은신처를 지우면 다음 스텝 뒤 그 은신처로 가는 사슴이 없고 무효가 셈에 든다
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	Reg.ResetForTest();
+	ON_SCOPE_EXIT
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	FIntegratedHarness H;
+	if (!SetupTwoRegions(*this, H, TestSettings(37700)))
+	{
+		return false;
+	}
+	const FEcoV3BrainRef Shelter = MakeShelterBrain();
+	Reg.Queue(Shelter, TEXT("시험 RouteRefugeLifecycle 늘 SHELTER"));
+	int32 Frames = 0;
+	int32 Region = -1;
+	int32 K = -1;
+	while (Frames < 3000 && K < 0)
+	{
+		H.DecisionStep();
+		H.CoordinatorReconcile();
+		++Frames;
+		for (const FMassEntityHandle& E : H.Deer)
+		{
+			if (K >= 0 || !H.EM->IsEntityValid(E) || H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead)
+			{
+				continue;
+			}
+			const W3::FHerbDecision& D = *DeerView(*H.EM, E).Decision;
+			if (D.KeepMode == W3::kKeepPanic && D.Route == W3::kRouteShelter && D.RouteK >= 0)
+			{
+				K = D.RouteK;
+				Region = H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).ContextIndex;
+			}
+		}
+	}
+	if (!TestTrue(FString::Printf(TEXT("늘 SHELTER 두뇌: SHELTER 길로 가는 사슴이 생긴다 (%d 프레임)"), Frames), K >= 0 && Region >= 0))
+	{
+		return false;
+	}
+	FEcoV3RegionContext& Ctx = *H.Sub->GetContext(Region);
+	const int64 Invalid0 = Ctx.Sim.Stats.Route.Invalid[W3::kRouteShelter];
+	int32 Heading = 0;
+	for (const FMassEntityHandle& E : H.Deer)
+	{
+		if (H.EM->IsEntityValid(E) && !H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead
+			&& H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).ContextIndex == Region)
+		{
+			const W3::FHerbDecision& D = *DeerView(*H.EM, E).Decision;
+			Heading += (D.KeepMode == W3::kKeepPanic && D.Route == W3::kRouteShelter && D.RouteK == K) ? 1 : 0;
+		}
+	}
+	Ctx.Sim.Config.Covers[static_cast<size_t>(K)].Radius = 0.0;   // 통합 RefreshRefuges 와 같은 지움 (번호 그대로, 반경 0)
+	H.DecisionStep();
+	H.CoordinatorReconcile();
+	int32 StillThere = 0;
+	for (const FMassEntityHandle& E : H.Deer)
+	{
+		if (H.EM->IsEntityValid(E) && !H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).bDead
+			&& H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).ContextIndex == Region)
+		{
+			const W3::FHerbDecision& D = *DeerView(*H.EM, E).Decision;
+			StillThere += (D.Route == W3::kRouteShelter && D.RouteK == K) || (EcoV3Integrated::ShownRoute(D) == W3::kRouteShelter && D.RouteCandK == K) ? 1 : 0;
+		}
+	}
+	const int64 Invalid1 = Ctx.Sim.Stats.Route.Invalid[W3::kRouteShelter];
+	AddInfo(FString::Printf(TEXT("은신처 %d (지역 %d) 를 %d 프레임에 지움: 그쪽으로 가던 사슴 %d · 무효 %lld → %lld · 지운 뒤 그쪽 %d"), K, Region, Frames, Heading,
+							static_cast<long long>(Invalid0), static_cast<long long>(Invalid1), StillThere));
+	TestEqual(TEXT("지운 은신처로 가는(또는 고른) 사슴이 없다"), StillThere, 0);
+	TestTrue(TEXT("무효 셈이 줄지 않는다 (이어진 도주는 무효 결정)"), Invalid1 >= Invalid0);
+	for (int32 f = 0; f < 60; ++f)
+	{
+		H.DecisionStep();
+		H.CoordinatorReconcile();
+	}
+	TestEqual(TEXT("마스크 위반·관측 칸 어긋남 0"), Ctx.Sim.Stats.MaskViolations + Ctx.Sim.Stats.ObsLayoutMismatch, static_cast<int64>(0));
+	TestTrue(TEXT("늘 SHELTER 두뇌: SHELTER 를 고른 결정이 있다 (bad_shelter 0)"), Ctx.Sim.Stats.Route.Picked[W3::kRouteShelter] > 0 && Ctx.Sim.Stats.Route.BadShelter == 0);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Integrated.RouteDisplay — 두 길 두뇌 화면 글자·색·창 (계획서 8-3, 12절 질문 9)
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedRouteDisplayTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.RouteDisplay",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedRouteDisplayTest::RunTest(const FString& Parameters)
+{
+	using EcoV3Integrated::DeerLabel;
+	namespace W3 = EcoWorldV3;
+	EcoRepertoireV3::FRepState Rep;
+	Rep.Behavior = EcoRepertoireV3::kFlee;
+	W3::FHerbBody Body;
+	Body.Energy = 0.58;
+	FColor C0;
+	FColor C1;
+	FColor C2;
+	const FString Old = DeerLabel(Rep, Body, false, C0, W3::kKeepPanic);
+	TestEqual(TEXT("길 없음: 지금 글자 그대로"), Old, FString(TEXT("도주(안전해질 때까지) 58%")));
+	TestEqual(TEXT("길 없음: 지금 색 (진한 주황)"), C0, FColor(255, 110, 20));
+	TestEqual(TEXT("RUN: '도주(트인 쪽)'"), DeerLabel(Rep, Body, false, C1, W3::kKeepPanic, false, W3::kRouteRun), FString(TEXT("도주(트인 쪽) 58%")));
+	TestEqual(TEXT("SHELTER: '도주(은신처)'"), DeerLabel(Rep, Body, false, C2, W3::kKeepPanic, false, W3::kRouteShelter), FString(TEXT("도주(은신처) 58%")));
+	TestTrue(TEXT("색: RUN 연노랑·SHELTER 하늘색 — 반사 주황·웅크림 파랑·두뇌 도망 노랑과 다르다"),
+			 C1 == FColor(255, 240, 120) && C2 == FColor(110, 230, 255) && C2 != FColor(60, 150, 255) && C1 != FColor(255, 215, 0) && C1 != C0);
+	FColor C3;
+	TestEqual(TEXT("웅크림은 길과 무관"), DeerLabel(Rep, Body, false, C3, W3::kKeepShelter, false, W3::kRouteShelter), FString(TEXT("웅크림(은신처·경계) 58%")));
+	// 화면에 보일 길: 길 결정 스텝은 두뇌가 고른 칸 (다음 A 가 적용)
+	W3::FHerbDecision D;
+	D.KeepMode = W3::kKeepPanic;
+	D.Route = W3::kRouteRun;
+	D.bRouteDecide = true;
+	D.RouteRequest = W3::kRouteSlotShelter;
+	D.bRouteSok = true;
+	TestEqual(TEXT("결정 스텝 칸 4·가능 → SHELTER"), EcoV3Integrated::ShownRoute(D), W3::kRouteShelter);
+	D.bRouteSok = false;
+	TestEqual(TEXT("가능하지 않으면 RUN"), EcoV3Integrated::ShownRoute(D), W3::kRouteRun);
+	// 60 초 창 (450 결정 스텝): 누적 차
+	FEcoV3RouteTally T;
+	W3::FRouteStats S;
+	for (int32 i = 1; i <= 600; ++i)
+	{
+		S.Steps[W3::kRouteRun] += 2;
+		S.Steps[W3::kRouteShelter] += i > 300 ? 1 : 0;
+		S.Decisions += i % 10 == 0 ? 1 : 0;
+		T.Push(S);
+		if (i == 100)
+		{
+			TestEqual(TEXT("창: 450 스텝 전이면 시작부터"), T.Window().RunSteps, static_cast<int64>(200));
+		}
+	}
+	TestTrue(TEXT("창: 마지막 450 스텝 (RUN 900·SHELTER 300·결정 45)"), T.Window().RunSteps == 900 && T.Window().ShelterSteps == 300 && T.Window().Decisions == 45
+																&& T.WindowSteps() == 450);
+	const FString Text = T.Window().Text();
+	AddInfo(Text);
+	TestTrue(TEXT("글자: '길 RUN 75% · 은신처 25% (반사 사슴-스텝 1200) · 길 결정 45 · 은신처 고름 0/0 (열린 결정) · 무효 0'"),
+			 Text == TEXT("길 RUN 75% · 은신처 25% (반사 사슴-스텝 1200) · 길 결정 45 · 은신처 고름 0/0 (열린 결정) · 무효 0"));
+	TestEqual(TEXT("빈 창 글자"), FEcoV3RouteSum().Text(), FString(TEXT("길 반사 스텝 없음 · 길 결정 0 · 은신처 고름 0/0 (열린 결정) · 무효 0")));
 	return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

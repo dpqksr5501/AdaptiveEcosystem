@@ -709,7 +709,9 @@ CFG_BLOCKS = {
                 ("snow_hear", "C.Weather.SnowHear", "d"), ("snow_deer_speed", "C.Weather.SnowDeerSpeed", "d"), ("snow_wolf_speed", "C.Weather.SnowWolfSpeed", "d"),
                 ("obs_visibility", "C.Weather.bObsVisibility", "b")),
 }
-CFG_SKIP = {("weather", "schedule_rows")}
+# 옮기지 않는 칸: 날씨 시간표 줄 수(늘 0 — 따로 본다), 10-24 두 길 두뇌의 세계 키(wild_flight.route·brain_flee_outside_reflex — 평가기는 두뇌 판으로 켜고
+# 세계 키는 짝 검사에만 쓴다. 두 길 골든 FillWorldConfig 는 C.WildFlight.bRoute 를 따로 적는다)
+CFG_SKIP = {("weather", "schedule_rows"), ("wild_flight", "route"), ("wild_flight", "brain_flee_outside_reflex")}
 WEATHER_KIND = {"clear": "EcoWorldV3::kWeatherClear", "rain": "EcoWorldV3::kWeatherRain", "snow": "EcoWorldV3::kWeatherSnow"}
 
 

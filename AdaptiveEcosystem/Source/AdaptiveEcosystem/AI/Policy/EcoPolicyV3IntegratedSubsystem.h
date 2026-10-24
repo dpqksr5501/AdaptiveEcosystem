@@ -149,6 +149,15 @@
 //      사슴·늑대 밀어내기, 먹이 격자 그대로. 넣은 묶음마다 환경 판 + 1, '[EcoV3I] 환경 바뀜 #n |'. 바뀐 것이 없으면 비트 단위로 지금과 같다. 0 = 시작 때 고정.
 //      자동 스냅숏 eco.IntegratedV3.AutoSnapshot (-1 = AutoAdapt 따름)·SnapshotEvery·AutoSnapshotSettle·AutoSnapshotOut (EcoV3Snapshot.cpp, 'env' 블록).
 //      시험용 대역 eco.IntegratedV3.Test.AddTrees·Test.RemoveTrees·Test.At (-EcoV3TestAt= -EcoV3TestCmd=), 보기 eco.IntegratedV3.EnvInfo.
+//  22. 10-24 두 길 두뇌 (이식 계획서 Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 8절·13절·15절, R7e 판정 통과): 관측 24·마스크 판 4·5 두뇌 파일(EcoV3Brain.h)을
+//      eco.V3Brain.Load 로 걸면 도주 반사 중 두뇌가 '어디로'(RUN = 반사 방향·SHELTER = 늑대보다 먼저 닿는 은신처)를 고른다. 게임 기본 두뇌는 그대로 내장 R1b-F 다
+//      (두 길은 그 두뇌를 걸 때만 — 콘솔 변수가 없다). SyncBrain 이 걸기 전에 지역마다 도주 반사(eco.IntegratedV3.WildFlight)·실제 허용의 얼기·잠 0 을 보고
+//      (RouteBrainBlocker — 어긋나면 대기 두뇌를 버리고 거부 알림), 걸 때 ApplyBrainToWorld 가 허용·관측 칸 수·SetModelRoute·SetModelFleeGate 를 함께 정한다.
+//      열린 도망: 길 없는 두뇌 → 두 길 = 그 스텝 끝 H 에서 새 두뇌가 곧바로 고름(길 없음 결정), 두 길 → 길 없는 두뇌 = 경계 스텝 A 가 반사 방향(RUN)으로 두고 H 가 길
+//      상태를 지운다. 화면: 사슴 '도주(트인 쪽)'(연노랑)·'도주(은신처)'(하늘색), 지역 넷째 줄 '길 <지역> | 최근 60초 …'(FEcoV3RouteTally), 상태 줄 '두 길(마스크 판 n)',
+//      맨 위 줄 '두뇌 <이름> 두 길'. 10초 기록 '[EcoV3I] <지역> 길 |'(길 통계가 있을 때만), 스냅숏 brain.mask_version·route, world.wild_flight.route·
+//      brain_flee_outside_reflex, flight.route (world.py flight_stats 의 route 와 같은 칸). 실행 행동은 늘 FLEE 라 Social 인계·애니메이션·복제는 그대로다
+//      (eco.IntegratedV3.SocialControl 1 이면 Social 훅이 SHELTER 길보다 나중에 와서 슬롯 쪽이 이긴다 — 기본 0).
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -237,9 +246,26 @@ namespace EcoV3Integrated
 	 * '도주(안전해질 때까지)'(진한 주황)·'웅크림(은신처·경계)'(파랑). 0 이면 지금 그대로.
 	 * bReserveOn = 지방 비축을 켠 세계 (야생 w1): 에너지 15% 아래면 ' 굶주림' 대신 ' 배고픔 비축 63%'(빨강, 비축으로 버티는 중),
 	 * 비축 0 이면 ' 비축 바닥', 배 10% 밑이면 ' 약함(느림)'. 배는 괜찮은데 비축이 25% 밑이면 ' 비축 20%'. 거짓이면 지금 그대로.
+	 * Route = 10-24 두 길 두뇌의 고른 길 (FHerbDecision::Route — 도주 덮기일 때만 읽는다): RUN 이면 '도주(트인 쪽) 58%'(연노랑 255,240,120),
+	 * SHELTER 면 '도주(은신처) 58%'(하늘색 110,230,255 — 웅크림 파랑 60,150,255 과 다르다, 이식 계획서 12절 질문 9). 길이 없으면(kRouteNone) 지금 그대로.
 	 */
 	ADAPTIVEECOSYSTEM_API FString DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
-											FColor& OutColor, int32 KeepMode = EcoWorldV3::kKeepNone, bool bReserveOn = false);
+											FColor& OutColor, int32 KeepMode = EcoWorldV3::kKeepNone, bool bReserveOn = false,
+											int32 Route = EcoWorldV3::kRouteNone);
+	/** 10-24 두 길 두뇌 도주 글자 (기록·화면): RUN '도주(트인 쪽)', SHELTER '도주(은신처)', 그 밖 nullptr. */
+	ADAPTIVEECOSYSTEM_API const TCHAR* RouteNameKo(int32 Route);
+	/**
+	 * 화면에 보일 고른 길 (스텝 끝 H 뒤 — 길 결정 스텝은 두뇌가 고른 칸을 다음 A 가 적용하므로, 그 칸이 SHELTER 이고 열렸으면 SHELTER, 아니면 지금 길 D.Route).
+	 * 세계 상태는 바꾸지 않는다 (EcoWorldV3::Detail::RouteApply 와 같은 판정).
+	 */
+	inline int32 ShownRoute(const EcoWorldV3::FHerbDecision& D)
+	{
+		return (D.bRouteDecide && D.KeepMode == EcoWorldV3::kKeepPanic && D.RouteRequest == EcoWorldV3::kRouteSlotShelter && D.bRouteSok)
+				   ? EcoWorldV3::kRouteShelter
+				   : D.Route;
+	}
+	/** 두 길 두뇌 도주 색 (RUN 연노랑·SHELTER 하늘색 — 그 밖은 FColor(0) 이 아니라 Fallback). */
+	ADAPTIVEECOSYSTEM_API FColor RouteColor(int32 Route, const FColor& Fallback);
 	/** 도주 반사 덮기 이름 (기록·화면): 두뇌 / 경계(먹으며 멀어짐) / 도주(안전해질 때까지) / 웅크림(은신처·경계). */
 	ADAPTIVEECOSYSTEM_API const TCHAR* KeepModeNameKo(int32 KeepMode);
 
@@ -557,6 +583,16 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3BrainTally
 	int64 KnowSteps[EcoRepertoireV3::kNumBehaviors] = {};   // 그중 늑대를 앎
 	int64 Reflex = 0;                                       // 도주 반사가 덮은 스텝
 	int64 ReflexKnow = 0;                                   // 그중 늑대를 앎
+	// 10-24 두 길 두뇌 (이식 계획서 8-3): 반사 스텝 가운데 그 스텝에 실행한 길 (세계 길 통계 FRouteStats::Steps 의 스텝 차 — 길 켬 세계만, 끄면 0)
+	int64 ReflexRun = 0;                                    // RUN (반사 방향 그대로)
+	int64 ReflexShelter = 0;                                // SHELTER (늑대보다 먼저 닿는 은신처 쪽)
+
+	/** 이번 결정 스텝 지역 세계의 길 통계 차 (실행한 RUN·SHELTER 사슴-스텝). */
+	void AddRoute(int64 Run, int64 Shelter)
+	{
+		ReflexRun += Run;
+		ReflexShelter += Shelter;
+	}
 
 	void Add(int32 Behavior, bool bKnows, bool bReflex)
 	{
@@ -602,8 +638,100 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3BrainTally
 		}
 		D.Reflex = Reflex - O.Reflex;
 		D.ReflexKnow = ReflexKnow - O.ReflexKnow;
+		D.ReflexRun = ReflexRun - O.ReflexRun;
+		D.ReflexShelter = ReflexShelter - O.ReflexShelter;
 		return D;
 	}
+};
+
+/**
+ * 두 길 두뇌 화면·기록 합 (10-24 이식 계획서 8-3 — 기록만, 규칙이 아니다). 재료는 지역 세계의 누적 길 통계 EcoWorldV3::FWorldStats::Route
+ * (world.py route_stats 와 같은 칸 — 길 켬 세계만 센다). 누적끼리 빼면 구간 합이다.
+ */
+struct ADAPTIVEECOSYSTEM_API FEcoV3RouteSum
+{
+	int64 RunSteps = 0;        // 실행한 RUN 반사 사슴-스텝 (steps.run)
+	int64 ShelterSteps = 0;    // 실행한 SHELTER 반사 사슴-스텝 (steps.shelter)
+	int64 Onsets = 0;          // 도주 시작 (onsets)
+	int64 Decisions = 0;       // 길 결정 (decisions — 시작·SHELTER 무효·RUN 길 잠금 뒤 가능 바뀜·길 없음)
+	int64 Choice = 0;          // 그 가운데 SHELTER 가 열린 결정 (적용 때 센다 — choice)
+	int64 PickedRun = 0;       // 두뇌가 RUN 을 고른 결정 (적용 때 — picked.run)
+	int64 PickedShelter = 0;   // 두뇌가 SHELTER 를 고른 결정 (picked.shelter)
+	int64 Invalid = 0;         // SHELTER 무효 (늑대가 문에 먼저 닿음·은신처 지워짐 — invalid.shelter)
+	int64 Switches = 0;        // 결정 전 길과 고른 길이 다름 (switches)
+
+	static FEcoV3RouteSum Of(const EcoWorldV3::FRouteStats& S)
+	{
+		FEcoV3RouteSum R;
+		R.RunSteps = S.Steps[EcoWorldV3::kRouteRun];
+		R.ShelterSteps = S.Steps[EcoWorldV3::kRouteShelter];
+		R.Onsets = S.Onsets;
+		R.Decisions = S.Decisions;
+		R.Choice = S.Choice;
+		R.PickedRun = S.Picked[EcoWorldV3::kRouteRun];
+		R.PickedShelter = S.Picked[EcoWorldV3::kRouteShelter];
+		R.Invalid = S.Invalid[EcoWorldV3::kRouteShelter];
+		R.Switches = S.Switches;
+		return R;
+	}
+	FEcoV3RouteSum Plus(const FEcoV3RouteSum& O, int64 Sign = 1) const
+	{
+		FEcoV3RouteSum R;
+		R.RunSteps = RunSteps + Sign * O.RunSteps;
+		R.ShelterSteps = ShelterSteps + Sign * O.ShelterSteps;
+		R.Onsets = Onsets + Sign * O.Onsets;
+		R.Decisions = Decisions + Sign * O.Decisions;
+		R.Choice = Choice + Sign * O.Choice;
+		R.PickedRun = PickedRun + Sign * O.PickedRun;
+		R.PickedShelter = PickedShelter + Sign * O.PickedShelter;
+		R.Invalid = Invalid + Sign * O.Invalid;
+		R.Switches = Switches + Sign * O.Switches;
+		return R;
+	}
+	FEcoV3RouteSum Minus(const FEcoV3RouteSum& O) const { return Plus(O, -1); }
+	/** 실행한 반사 길 스텝 (RUN + SHELTER). */
+	int64 RouteSteps() const { return RunSteps + ShelterSteps; }
+	/**
+	 * 화면·기록 글자: '길 RUN 82% · 은신처 18% (반사 사슴-스텝 410) · 길 결정 37 · 은신처 고름 6/9 (열린 결정) · 무효 1'. 길 스텝이 없으면
+	 * '길 반사 스텝 없음 · 길 결정 0'.
+	 */
+	FString Text() const;
+};
+
+/** 두 길 두뇌 최근 60 초 창 (FEcoV3RouteSum — 결정 스텝마다 누적을 한 번 넣는다, EcoV3Flight::FTally 의 창과 같은 450 결정 스텝). */
+struct ADAPTIVEECOSYSTEM_API FEcoV3RouteTally
+{
+	static constexpr int32 kWindowSteps = 450;   // 최근 60 초 (1 결정 스텝 = 2/15 초)
+
+	/** 결정 스텝 하나 끝의 누적 (지역 세계 Sim.Stats.Route). */
+	void Push(const EcoWorldV3::FRouteStats& Cumulative)
+	{
+		if (Ring.Num() != kWindowSteps + 1)
+		{
+			Ring.Init(FEcoV3RouteSum(), kWindowSteps + 1);   // 0 번 칸 = Play 시작 (지역 세계의 길 통계는 0 에서 센다)
+			Pushes = 0;
+		}
+		++Pushes;
+		Now = FEcoV3RouteSum::Of(Cumulative);
+		Ring[static_cast<int32>(Pushes % (kWindowSteps + 1))] = Now;
+	}
+	/** 최근 60 초 합 (Play 시작이 450 스텝 안이면 시작부터). */
+	FEcoV3RouteSum Window() const
+	{
+		if (Ring.Num() != kWindowSteps + 1)
+		{
+			return FEcoV3RouteSum();
+		}
+		const int32 Base = Pushes >= kWindowSteps ? static_cast<int32>((Pushes - kWindowSteps) % (kWindowSteps + 1)) : 0;
+		return Now.Minus(Ring[Base]);
+	}
+	/** 넣은 결정 스텝 수와 창 길이 (스텝). */
+	int64 Pushes = 0;
+	int64 WindowSteps() const { return Pushes < kWindowSteps ? Pushes : kWindowSteps; }
+	FEcoV3RouteSum Now;
+
+private:
+	TArray<FEcoV3RouteSum> Ring;   // 누적 (Pushes % (kWindowSteps + 1) 칸) — 450 스텝 전 누적이 덮이지 않게 한 칸 더
 };
 
 /** 한 지역의 v3 세계 (무대 하나 = 학습 세계 하나). */
@@ -707,6 +835,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int64 NearEatingDeerSteps = 0;            // 식사 중(쿨다운 > 0)인 깨어 있는 늑대의 15 m 안에 있던 산 사슴 (개체·스텝, 스텝 끝)
 	int64 LastLogNearEatingDeerSteps = 0;
 	int32 KeepNow[EcoWorldV3::kNumKeepModes] = {};   // 프레임 끝 산 사슴의 덮기 (화면 집계)
+	int32 RouteNow[2] = {};                   // 10-24 두 길 두뇌: 프레임 끝 도주 덮기 산 사슴의 다음 스텝 길 [RUN, SHELTER] (화면 집계 — 길 끔이면 0)
 
 	// 두뇌 행동 몫 (10-18 두뇌 바꾸기, 처리기가 결정 스텝마다 채운다 — FEcoV3BrainTally)
 	FEcoV3BrainTally BrainTally;              // 누적 (Play 시작부터)
@@ -719,6 +848,13 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	EcoV3Flight::FTally FlightTally;          // 최근 60 초 창·두뇌 판 합
 	/** 도망 기록을 세는 세계인가 (기록 켬 ∧ 도주 반사 켬 — 파이썬도 wild_flight 세계에만 있다). */
 	bool FlightOn() const { return Sim.Config.bFlightStats && Sim.Config.WildFlight.bEnabled; }
+
+	// 10-24 두 길 두뇌 화면·기록 (이식 계획서 8-3 — 처리기가 결정 스텝마다 세계 길 통계 누적 Sim.Stats.Route 를 넣는다. 길은 두뇌가 켠다: SyncBrain → SetModelRoute)
+	FEcoV3RouteTally RouteTally;              // 최근 60 초 창
+	/** 지금 두 길 두뇌가 이 세계의 길을 켰나 (Sim.Config.WildFlight.bRoute). */
+	bool RouteOn() const { return Sim.Config.WildFlight.bRoute; }
+	/** 길 통계가 하나라도 있나 (지금 켰거나, 앞서 켰던 두뇌가 센 것 — 기록 줄·스냅숏의 'route' 칸). */
+	bool RouteSeen() const { return RouteOn() || Sim.Stats.Route.Onsets > 0 || Sim.Stats.Route.Decisions > 0; }
 
 	// R5 장애물 관측 대조 기록 (10-19, eco.IntegratedV3.ObsParityLog — LogObsParity)
 	bool bObsParityDiscsLogged = false;       // 이 무대의 원판 줄을 남겼다
@@ -1040,6 +1176,19 @@ public:
 	 * '[EcoV3I] 두뇌 바꿈' 한 줄을 남긴다 (처음 한 번은 '[EcoV3I] 두뇌 시작'). 사슴 몸·행동 상태·요청은 건드리지 않는다.
 	 */
 	void SyncBrain(bool bPollWatch);
+	/**
+	 * 10-24 두 길 두뇌 걸기 전 검사 (이식 계획서 8-2 의 1·4절·12절 질문 12) — 지역 세계 하나에 두뇌 B 를 걸 수 있나. 판 4·5 두뇌만 보고(그 밖은 빈 값), 걸 수
+	 * 없으면 까닭: 도주 반사(WildFlight)를 끈 세계('도주 반사가 없다'), 실제 허용(두뇌 ∧ 세계 칸 WorldAllowed)에 얼기·잠이 남음, 실제 허용에 먹기가 없음(판 5 막기로 빈 줄).
+	 * 세계는 바꾸지 않는다 (읽기만).
+	 */
+	static FString RouteBrainBlocker(const EcoWorldV3::FWorldState& W, const FEcoV3Brain& B);
+	/** 모든 지역 세계에 두뇌 B 를 걸 수 있나 (RouteBrainBlocker 를 지역마다 — 걸 수 없으면 '<지역>: <까닭>', 빈 값 = 걸 수 있다). */
+	FString BrainBlocker(const FEcoV3Brain& B) const;
+	/**
+	 * 두뇌 B 를 지역 세계 하나에 건다: 허용 칸(두뇌 ∧ 세계)·관측 칸 수·10-24 두 길(SetModelRoute — 판 4·5)·반사 밖 FLEE 막음(SetModelFleeGate — 판 5).
+	 * 사슴 상태는 건드리지 않는다 — 열린 도망의 길 상태는 다음 스텝 A·H 가 정한다 (길 없는 두뇌 → 두 길: 그 H 에서 길 없음 결정, 두 길 → 길 없는 두뇌: A 는 반사 방향, H 가 지움).
+	 */
+	static void ApplyBrainToWorld(EcoWorldV3::FWorldState& W, const FEcoV3Brain& B);
 	/** 이 월드가 지금 쓰는 두뇌 (SyncBrain 전에는 저장소의 지금 두뇌). */
 	const FEcoV3Brain& GetActiveBrain() const;
 	const EcoPolicyV3::FPolicyNetV3& ActiveNet() const { return GetActiveBrain().Net; }

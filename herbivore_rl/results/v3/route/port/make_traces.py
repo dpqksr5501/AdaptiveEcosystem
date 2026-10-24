@@ -1,6 +1,8 @@
 """두 길 두뇌 C++ 이식 판 단위 대조 자료 (이식 계획서 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 10-2, 설계
 RL_V3_FLIGHT_ROUTE_DESIGN.md 16-12·16-14 단계 6 — C++ 은 RUN·SHELTER 기하만). 장면 단위 골든은 herbivore_rl/export_golden_v3_route.py →
-results/v3/route/port/RouteGoldenVectorsV3.h·.json.
+AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/RouteGoldenVectorsV3.h (10-24 이식 때 Source 로 옮김) + 같은 내용 results/v3/route/port/RouteGoldenVectorsV3.json.
+10-24 C++ 평가기 대조: results/v3/route/port/native_check.py 가 같은 일을 평가기(Tools/EcoV3Eval — 두 길 세계를 받는다)로 돌려 C++ trace 에 이 파일의
+`digest_state` 를 걸어 traj/ 지문과, 세계 기록을 stats/ 의 record 와 견준다.
 
     # herbivore_rl/ 에서 (Anaconda base python, PYTHONUTF8=1). 결과 → results/v3/route/port/{brains,traj,stats}/ + MANIFEST.json
     python results/v3/route/port/make_traces.py [--workers 4]

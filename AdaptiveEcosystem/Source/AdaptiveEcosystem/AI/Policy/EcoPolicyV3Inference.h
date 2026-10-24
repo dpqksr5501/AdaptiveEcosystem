@@ -52,7 +52,7 @@ namespace EcoPolicyV3
 	inline constexpr std::int32_t kFreeze = 3;
 	inline constexpr std::int32_t kSleep = 4;
 
-	// 관측 칸 수의 상한 (스택 배열 크기). 계약은 18·19·21 이다.
+	// 관측 칸 수의 상한 (스택 배열 크기). 계약은 18·19·21·24 이다.
 	inline constexpr std::int32_t kMaxObsDim = 32;
 
 	// 알려진 계약 해시 (export_weights_v3.contract_hash). 생성 헤더의 kContractHash 가 이 중 하나가 아니면 빌드가 멈춘다 —
@@ -63,6 +63,26 @@ namespace EcoPolicyV3
 	// R5: 관측 21 (18 + escape_room·obstacle_near·threat_hidden), 판 2 (계약 2-4). 내장 모델의 계약이 아니라 실행 중 두뇌 파일(EcoV3Brain.h)이 쓴다 —
 	// 세 칸은 EcoObservationV3::ObstacleObsValues 가 만들고 EcoWorldV3::DecideHerb 가 관측 18 뒤에 붙인다
 	inline constexpr std::uint64_t kContractHashObs21Mask2 = 0xbc4fc2d45c47c5fdULL;
+	// 두 길 두뇌 (10-22 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 16절, 이식 계획서 RL_V3_ROUTE_CPP_PORT_PLAN.md): 관측 24 (21 + in_panic·shelter_reach·shelter_edge —
+	// EcoObservationV3::kRouteObsNames), 마스크 판 4 (도주 중 칸 1 = RUN·칸 4 = SHELTER·칸 3 막힘). export_weights_v3.contract_hash(관측 24, 판 4) — 계약 dict 의
+	// flight_route 키(칸·관측·결정·SHELTER 문턱)까지 덮는다. 내장 모델이 아니라 실행 중 두뇌 파일·평가기가 쓴다
+	inline constexpr std::uint64_t kContractHashObs24Mask4 = 0xe302dee198197444ULL;
+	// 10-23 R7 판 5 = 판 4 + 반사 밖 두뇌 FLEE 막음 (설계 17절, 이식 계획서 13절 — 계약 dict 에 brain_flee_outside_reflex: false 키). R7e 판정 통과 두뇌의 계약
+	inline constexpr std::uint64_t kContractHashObs24Mask5 = 0xad7bad5e1acaf071ULL;
+
+	// ---- 마스크 판 4·5 (두 길 두뇌 — 파이썬 env_v2/rep_policy.py MASK_VERSION_ROUTE·MASK_VERSION_ROUTE_GATE, `_route_rows`·`_gate_free_rows`) ----
+	inline constexpr std::int32_t kMaskVersionRoute = 4;        // 관측 in_panic 이 있는 세계: 도주 덮기 줄의 칸 1·4 가 길이다
+	inline constexpr std::int32_t kMaskVersionRouteGate = 5;    // 판 4 + 덮기 밖 결정 줄에서 칸 1(FLEE) 막음 — 도주는 반사만 시작한다
+	inline constexpr std::int32_t kRouteSlotRun = kFlee;        // 도주 중 칸 1 = RUN (반사 방향 그대로)
+	inline constexpr std::int32_t kRouteSlotShelter = kSleep;   // 도주 중 칸 4 = SHELTER (늑대보다 먼저 닿는 은신처)
+	inline constexpr std::int32_t kRouteSlotReserved = kFreeze; // 칸 3 = COVER 자리 (판 4·5 에서 늘 막힘)
+	// 마스크 덮기 줄 종류 (rep_peek 의 override — 값은 EcoWorldV3::kKeep* 와 같다)
+	inline constexpr std::int32_t kMaskOverrideNone = 0;
+	inline constexpr std::int32_t kMaskOverridePanic = 2;
+	inline constexpr std::int32_t kMaskOverrideCrouch = 3;
+
+	/** 판 4·5 인가 (도주 중 칸 1·4 가 길 — 얼기·잠이 실제 허용에서 막혀야 한다). */
+	constexpr bool IsRouteMaskVersion(std::int32_t MaskVersion) { return MaskVersion == kMaskVersionRoute || MaskVersion == kMaskVersionRouteGate; }
 
 	namespace Detail
 	{
@@ -266,5 +286,44 @@ namespace EcoPolicyV3
 								  std::int32_t CurrentBehavior, std::uint8_t OutMask[kNumBehaviors])
 	{
 		ComposeActionMask(kAllowedMask, Feasible, bReads, bWakeDecide, CurrentBehavior, OutMask);
+	}
+
+	/**
+	 * 마스크 판 4·5 의 덮기 줄과 판 5 의 반사 밖 FLEE 막음 (rep_policy.action_mask 의 `_route_rows`·`_gate_free_rows` — 이식 계획서 4절·13-1).
+	 * InOutMask 는 판 2 마스크(ComposeActionMask — 허용 ∧ 가능 ∧ 결정)를 받아 고친다. 판 4·5 가 아니면 그대로 둔다.
+	 *   Override       다음 스텝 덮기 (kMaskOverride* — 파이썬 rep_peek 의 override: 도주·웅크림, 그 밖(경계 포함)은 None)
+	 *   bRouteDecide   도주 길 결정 스텝 (덮기 도주일 때만 읽는다)        bRouteNowShelter  지금 길이 SHELTER (도주 ∧ 결정 아님일 때만 읽는다)
+	 *   ShelterReachObs 관측 22 (shelter_reach — > 0 이면 SHELTER 가능)   bReads            요청을 읽나 (덮기 밖이면 Arbiter 결정)
+	 * 줄:  도주 ∧ 결정 → {1 RUN, 4 SHELTER (관측 22 > 0)}, 도주 ∧ 결정 아님 → 지금 길 한 칸 (RUN 1 · SHELTER 4), 웅크림 → {HIDE},
+	 *      그 밖 → 판 2 그대로 — 판 5 이고 bReads 면 칸 1(FLEE)을 막는다(결정이 아닌 줄 = 지금 행동 한 칸은 그대로 — 반사가 끝난 뒤 잠금 중인 FLEE 포함).
+	 * 칸 3 은 판 4·5 에서 늘 0 이다: 덮기 줄은 1·4 만 켜고, 그 밖 줄은 실제 허용이 막는다(판 4·5 두뇌를 걸 때 얼기·잠 허용 0 을 확인한다).
+	 * GRAZE 는 늘 허용 ∧ 가능이라 판 5 막기로 빈 줄이 생기지 않는다(파이썬 `_gate_free_rows`).
+	 */
+	inline void ApplyRouteMaskRows(std::int32_t MaskVersion, std::int32_t Override, bool bRouteDecide, bool bRouteNowShelter, float ShelterReachObs,
+								   bool bReads, std::uint8_t InOutMask[kNumBehaviors])
+	{
+		if (!IsRouteMaskVersion(MaskVersion))
+		{
+			return;
+		}
+		if (Override == kMaskOverridePanic || Override == kMaskOverrideCrouch)
+		{
+			for (std::int32_t j = 0; j < kNumBehaviors; ++j)
+			{
+				InOutMask[j] = 0;
+			}
+			if (Override == kMaskOverrideCrouch)
+			{
+				InOutMask[kHide] = 1;
+				return;
+			}
+			InOutMask[kRouteSlotRun] = (bRouteDecide || !bRouteNowShelter) ? 1 : 0;
+			InOutMask[kRouteSlotShelter] = ((bRouteDecide && ShelterReachObs > 0.0f) || (!bRouteDecide && bRouteNowShelter)) ? 1 : 0;
+			return;
+		}
+		if (MaskVersion == kMaskVersionRouteGate && bReads)
+		{
+			InOutMask[kFlee] = 0;
+		}
 	}
 }

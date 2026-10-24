@@ -276,6 +276,10 @@ namespace EcoV3SnapshotImpl
 			F->SetNumberField(TEXT("wall_margin"), K.WallMargin);
 			F->SetBoolField(TEXT("hold_awake"), K.bHoldAwake);
 			F->SetNumberField(TEXT("edge_r"), K.EdgeR);
+			// 10-24 두 길 두뇌 (더하기만 — 기록. 세계 설정이 아니라 지금 두뇌가 정한 값이다: 판 4·5 두뇌면 route 참, 판 5 면 brain_flee_outside_reflex 거짓.
+			// 파이썬 이름 그대로 — ceval.world_block 의 wild_flight.route·brain_flee_outside_reflex. adapt.py 는 FEATURE_MAPS 밖이라 읽지 않는다)
+			F->SetBoolField(TEXT("route"), K.bRoute);
+			F->SetBoolField(TEXT("brain_flee_outside_reflex"), !W.bFleeGate);
 			J->SetObjectField(TEXT("wild_flight"), F);
 		}
 		{
@@ -475,6 +479,10 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 		// 두뇌의 입출력 계약 (10-19 R5: 관측 18 또는 21 — 위 contract_hash 는 빌드 내장 계약)
 		J->SetStringField(TEXT("contract_hash"), FString::Printf(TEXT("0x%016llx"), static_cast<unsigned long long>(B.ContractHash)));
 		J->SetNumberField(TEXT("obs_dim"), B.ObsDim);
+		// 10-24 두 길 두뇌 (더하기만): 마스크 판 (2·4·5), 길·반사 밖 FLEE 막음 (판 4·5 / 판 5 — 지역 world.wild_flight.route·brain_flee_outside_reflex 가 실제로 건 값)
+		J->SetNumberField(TEXT("mask_version"), B.MaskVersion);
+		J->SetBoolField(TEXT("route"), B.bRoute());
+		J->SetBoolField(TEXT("flee_gate"), B.bFleeGate());
 		// 적응 고리 판 (10-21, LIVE_ADAPT_SPEC.md 2절): 지금 두뇌 파일의 'adapt' 블록 (판·시도·실행·바탕 스냅숏). 블록이 없는 두뇌(내장·손 파일)는 빈 객체
 		{
 			TSharedRef<FJsonObject> A = MakeShared<FJsonObject>();
@@ -696,6 +704,65 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 				E->SetNumberField(TEXT("link_cover_steps"), EcoWorldV3::kEpisodeLinkCoverSteps);
 				E->SetNumberField(TEXT("link_other_steps"), EcoWorldV3::kEpisodeLinkOtherSteps);
 				J->SetObjectField(TEXT("episode"), E);
+			}
+			if (Ctx.RouteSeen())
+			{
+				// 10-24 두 길 두뇌 도망 길 기록 (길 통계가 있는 세계만 — 파이썬 flight_stats 의 route = `_flight_route_block` 과 같은 이름·칸. 지금 열린 도망은 그 길의
+				// truncated. 도망 길 칸(by_route 등)은 길을 켠 동안만 센다 — 두뇌를 바꿔 끈 뒤에는 그 앞까지)
+				const EcoWorldV3::FFlightRouteReport Rr = EcoWorldV3::FlightRouteReportOf(W.Stats.Route, W.Stats.FlightRoute, Ctx.FlightOpen);
+				auto Routes = [](const int64* V, int32 N)
+				{
+					TSharedRef<FJsonObject> O = MakeShared<FJsonObject>();
+					for (int32 r = 0; r < N; ++r)
+					{
+						O->SetNumberField(UTF8_TO_TCHAR(EcoWorldV3::RouteName(r)), static_cast<double>(V[r]));
+					}
+					return O;
+				};
+				TSharedRef<FJsonObject> Rt = MakeShared<FJsonObject>();
+				Rt->SetBoolField(TEXT("on"), Ctx.RouteOn());
+				Rt->SetBoolField(TEXT("brain"), true);
+				Rt->SetObjectField(TEXT("steps"), Routes(Rr.Route.Steps, EcoWorldV3::kNumRoutes));
+				Rt->SetNumberField(TEXT("onsets"), static_cast<double>(Rr.Route.Onsets));
+				Rt->SetNumberField(TEXT("onset_shelter"), static_cast<double>(Rr.Route.OnsetShelter));
+				Rt->SetNumberField(TEXT("decisions"), static_cast<double>(Rr.Route.Decisions));
+				Rt->SetNumberField(TEXT("redecide_feas"), static_cast<double>(Rr.Route.RedecideFeas));
+				Rt->SetNumberField(TEXT("switches"), static_cast<double>(Rr.Route.Switches));
+				Rt->SetObjectField(TEXT("invalid"), Routes(Rr.Route.Invalid, EcoWorldV3::kNumRoutes));
+				Rt->SetObjectField(TEXT("picked"), Routes(Rr.Route.Picked, EcoWorldV3::kNumRoutes));
+				Rt->SetNumberField(TEXT("choice"), static_cast<double>(Rr.Route.Choice));
+				Rt->SetNumberField(TEXT("bad_shelter"), static_cast<double>(Rr.Route.BadShelter));
+				TSharedRef<FJsonObject> By = MakeShared<FJsonObject>();
+				for (int32 r = 0; r < EcoWorldV3::kNumFlightRouteRows; ++r)
+				{
+					TSharedRef<FJsonObject> One = MakeShared<FJsonObject>();
+					One->SetObjectField(TEXT("n"), ByCause(Rr.N[r]));
+					One->SetObjectField(TEXT("steps"), ByCause(Rr.Steps[r]));
+					One->SetObjectField(TEXT("contact"), ByCause(Rr.Contact[r]));
+					By->SetObjectField(UTF8_TO_TCHAR(EcoWorldV3::RouteName(r)), One);
+				}
+				Rt->SetObjectField(TEXT("by_route"), By);
+				Rt->SetObjectField(TEXT("drop_obstacle"), Routes(Rr.DropObstacle, EcoWorldV3::kNumFlightRouteRows));
+				Rt->SetObjectField(TEXT("chased_steps"), Routes(Rr.Chased, EcoWorldV3::kNumFlightRouteRows));
+				Rt->SetObjectField(TEXT("hidden_steps"), Routes(Rr.Hidden, EcoWorldV3::kNumFlightRouteRows));
+				Rt->SetNumberField(TEXT("refled"), static_cast<double>(Rr.Refled));
+				Rt->SetNumberField(TEXT("refled_steps"), EcoWorldV3::kFlightRefleeSteps);
+				if (W.Config.Obstacles.FoliageConfigured())
+				{
+					Rt->SetObjectField(TEXT("drop_foliage"), Routes(Rr.DropFoliage, EcoWorldV3::kNumFlightRouteRows));
+				}
+				// 화면 창 (최근 60 초 — FEcoV3RouteTally)
+				const FEcoV3RouteSum Win = Ctx.RouteTally.Window();
+				TSharedRef<FJsonObject> Wj = MakeShared<FJsonObject>();
+				Wj->SetNumberField(TEXT("window_steps"), static_cast<double>(Ctx.RouteTally.WindowSteps()));
+				Wj->SetNumberField(TEXT("run_steps"), static_cast<double>(Win.RunSteps));
+				Wj->SetNumberField(TEXT("shelter_steps"), static_cast<double>(Win.ShelterSteps));
+				Wj->SetNumberField(TEXT("decisions"), static_cast<double>(Win.Decisions));
+				Wj->SetNumberField(TEXT("picked_shelter"), static_cast<double>(Win.PickedShelter));
+				Wj->SetNumberField(TEXT("choice"), static_cast<double>(Win.Choice));
+				Wj->SetNumberField(TEXT("invalid_shelter"), static_cast<double>(Win.Invalid));
+				Rt->SetObjectField(TEXT("window"), Wj);
+				J->SetObjectField(TEXT("route"), Rt);
 			}
 			const EcoV3Flight::FTally& T = Ctx.FlightTally;
 			J->SetNumberField(TEXT("window_steps"), static_cast<double>(T.WindowSteps()));

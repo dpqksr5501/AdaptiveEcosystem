@@ -1,11 +1,13 @@
 """두 길 두뇌 C++ 이식 검증 자료 (이식 계획서 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 10-1·10-2) —
-export_golden_v3_route.py → results/v3/route/port/RouteGoldenVectorsV3.h·.json (장면 단위 골든),
+export_golden_v3_route.py → AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/RouteGoldenVectorsV3.h (10-24 C++ 이식 때 Source 골든 자리로 옮김) +
+results/v3/route/port/RouteGoldenVectorsV3.json (같은 내용 — 장면 단위 골든),
 results/v3/route/port/make_traces.py → results/v3/route/port/{brains,traj,stats}/·MANIFEST.json (판 단위 궤적 지문·세계 기록).
 
 - 골든: 지금 코드로 다시 만든 헤더·JSON 이 올린 것과 바이트까지 같다(결정성), 헤더와 JSON 이 같은 내용이다, 계획 장면(과제 목록 — 도주 시작 두 칸·한 칸,
   SHELTER 문턱 근처, 무효, 2 초 잠금 뒤 RUN 다시 고르기·SHELTER 유지, 관측 21~23, 마스크 판 4 줄, 실행 덮기 방향, 길 통계, 다시 난 개체 + 계획서 10-1 의
-  묶음 1~6 — 6 은 도망 길 기록 짜 맞춘 장면 포함)을 다 덮는다, 시드가 판정·학습 시드가 아니다. g++ 가 있으면 C++ 꼴 스칼라 참조
-  (tests/cpp/route_ref_main.cpp)가 골든을 비트 단위로 다시 낸다.
+  묶음 1~6 — 6 은 도망 길 기록 짜 맞춘 장면 포함, 13-3 판 5 마스크 줄)을 다 덮는다, 시드가 판정·학습 시드가 아니다. g++ 가 있으면 C++ 꼴 스칼라 참조
+  (tests/cpp/route_ref_main.cpp)와 엔진 함수 하네스(tests/cpp/route_v3_main.cpp — 검사 본문 AI/Policy/Tests/RouteGoldenCheckV3.h: 기하·길 셈 줄·적용·
+  장면 통계·마스크 판 4·5·관측·도망 길 기록 장면·기준 루프 지문 두뇌 둘)가 골든을 비트 단위로 다시 낸다.
 - 판 단위: MANIFEST 의 파일 sha256·신선도 입력(world.py 등)이 지금 파일과 맞고, 판 24 (두뇌 2 × N·G × 지역 셋 × 시드 34900·34901), 결정 사건이 세계 길 통계와
   맞고, route0 은 늘 RUN·길 끈 obs21zero 기록과 같고, 늘 SHELTER 시험 두뇌는 열리면 늘 SHELTER, 두뇌 파일 순전파와 torch argmax 가 같고 근접 동점이 없다.
   늘 SHELTER 두뇌 파일·zip 을 다시 만들면 바이트가 같고, 지금 코드로 만든 일(스냅숏 → live.prepare → ceval.eval_items) 12 개의 지문이 MANIFEST 와 같고
@@ -31,10 +33,12 @@ import pytest
 from env.config import ROOT
 
 PORT = ROOT / "results" / "v3" / "route" / "port"
-HEADER = PORT / "RouteGoldenVectorsV3.h"
+UE_POLICY = ROOT.parent / "AdaptiveEcosystem" / "Source" / "AdaptiveEcosystem" / "AI" / "Policy"
+HEADER = UE_POLICY / "RouteGoldenVectorsV3.h"                  # 10-24 Source 골든 자리 (다른 *GoldenVectorsV3.h 와 같다)
 GOLDEN_JSON = PORT / "RouteGoldenVectorsV3.json"
 MANIFEST = PORT / "MANIFEST.json"
 REF_MAIN = ROOT / "tests" / "cpp" / "route_ref_main.cpp"
+ENGINE_MAIN = ROOT / "tests" / "cpp" / "route_v3_main.cpp"
 ROUTE0_ZIP = ROOT / "ckpt" / "v3" / "v3_r1_g995_s3_obs24route0.zip"
 SLOW = os.environ.get("ECO_ROUTE_PORT_SLOW") == "1"
 PREFIX_STEPS = 150
@@ -203,11 +207,24 @@ def test_cpp_scalar_reference_matches_golden(tmp_path):
     """C++ 꼴 스칼라 참조(double, 사슴 하나)가 기하·길 셈 줄·적용·손 장면 통계·마스크·다시 난 개체·관측 사례를 비트 단위로 다시 낸다
     (FMA 축약 끔 — 계획서 9절 R16)."""
     exe = tmp_path / ("route_ref.exe" if sys.platform == "win32" else "route_ref")
-    build = subprocess.run(["g++", "-std=c++17", "-O2", "-ffp-contract=off", "-Wall", "-Wextra", "-Werror", "-Wshadow", "-I", str(PORT), str(REF_MAIN),
+    build = subprocess.run(["g++", "-std=c++17", "-O2", "-ffp-contract=off", "-Wall", "-Wextra", "-Werror", "-Wshadow", "-I", str(UE_POLICY), str(REF_MAIN),
                             "-o", str(exe)], capture_output=True, text=True)
     assert build.returncode == 0, f"컴파일 실패:\n{build.stderr}"
     run = subprocess.run([str(exe)], capture_output=True, text=True, encoding="utf-8")
     assert run.returncode == 0 and "PASS" in run.stdout, f"참조 실패:\n{run.stdout}\n{run.stderr}"
+
+
+@pytest.mark.skipif(shutil.which("g++") is None, reason="g++ 없음")
+def test_cpp_engine_matches_golden(tmp_path):
+    """10-24 C++ 이식: 엔진 함수(EcoWorldV3.h Detail::RouteShelterGeometry·RouteStep·RouteApply·ClearRoute·FlightUpdate 의 도망 길 기록·Step 전체,
+    EcoObservationV3.h WriteRouteObs, EcoPolicyV3Inference.h ApplyRouteMaskRows)가 골든을 비트 단위로 다시 낸다 — 기준 루프 지문(두뇌 둘 × 450 스텝)까지
+    (검사 본문 AI/Policy/Tests/RouteGoldenCheckV3.h, FMA 축약 끔 — 계획서 9절 R16)."""
+    exe = tmp_path / ("route_v3.exe" if sys.platform == "win32" else "route_v3")
+    build = subprocess.run(["g++", "-std=c++17", "-O2", "-ffp-contract=off", "-Wall", "-Wextra", "-Werror", "-Wshadow", "-Wno-unused-parameter", "-I",
+                            str(UE_POLICY), str(ENGINE_MAIN), "-o", str(exe)], capture_output=True, text=True)
+    assert build.returncode == 0, f"컴파일 실패:\n{build.stderr}"
+    run = subprocess.run([str(exe)], capture_output=True, text=True, encoding="utf-8")
+    assert run.returncode == 0 and run.stdout.strip().endswith("PASS"), f"엔진 하네스 실패:\n{run.stdout}\n{run.stderr}"
 
 
 def test_golden_world_brain_is_port_brain(golden, manifest):

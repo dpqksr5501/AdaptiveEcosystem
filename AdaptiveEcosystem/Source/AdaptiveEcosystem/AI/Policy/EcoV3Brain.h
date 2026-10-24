@@ -22,7 +22,13 @@
 //   관측 18 · 마스크 판 2  0x7eea0107339be4ce  내장 R1b 와 같은 계약 (빌드의 kContractHash)
 //   관측 21 · 마스크 판 2  0xbc4fc2d45c47c5fd  18 칸 + escape_room·obstacle_near·threat_hidden. 통합 모드가 두뇌를 바꾸면 세계가 세 칸을 더 만든다
 //                                              (EcoWorldV3::SetModelObsDim — 망 입력 = 관측 18 + 세 칸)
-//   그 밖(예: R2 관측 19·판 3)은 '계약 해시' 로 거부한다 — C++ 관측 코드를 함께 바꿔야 한다.
+//   관측 24 · 마스크 판 4  0xe302dee198197444  10-24 두 길 두뇌 (이식 계획서 RL_V3_ROUTE_CPP_PORT_PLAN.md 5절): 21 칸 + in_panic·shelter_reach·shelter_edge.
+//                                              도주 반사 중 두뇌가 '어디로'(칸 1 RUN·칸 4 SHELTER)를 고른다. 걸면 세계가 길을 켠다 (EcoWorldV3::SetModelRoute)
+//   관측 24 · 마스크 판 5  0xad7bad5e1acaf071  판 4 + 반사 밖 두뇌 FLEE 막음 (13절 — R7e 판정 통과 두뇌). 걸면 길과 함께 EcoWorldV3::SetModelFleeGate
+//   판 4·5 는 파일의 contract.flight_route(칸·관측·결정·SHELTER 문턱·freeze_sleep_must_be_blocked)와 판 5 의 contract.brain_flee_outside_reflex(false)를
+//   이 빌드 상수와 견주고(다르면 '계약 해시' — 어긋난 칸 이름을 적는다), 모델 허용에 얼기·잠이 있으면 '허용 칸' 으로 거부한다(칸 3·4 를 길 칸으로 다시 쓴다).
+//   걸 때(통합 서브시스템 SyncBrain)는 실제 허용(두뇌 ∧ 세계)의 얼기·잠 0 과 도주 반사(WildFlight)를 지역마다 다시 본다 — 하나라도 어긋나면 대기 두뇌를 버린다.
+//   그 밖(예: R2 관측 19·판 3, R7 대조 판 6)은 '계약 해시' 로 거부한다 — C++ 관측 코드를 함께 바꿔야 한다.
 //
 // 콘솔 (개발 빌드):
 //   eco.V3Brain.Load <파일|builtin>   파일 = 절대 경로, 또는 찾는 폴더(<프로젝트>/EcoBrains, <프로젝트>/Saved/EcoBrains) 안의 이름(.json 빼도 됨)
@@ -61,6 +67,7 @@
 DECLARE_LOG_CATEGORY_EXTERN(LogEcoV3Brain, Log, All);
 
 struct FEcoV3LiveStatus;
+class FJsonObject;
 
 namespace EcoV3Brain
 {
@@ -105,18 +112,23 @@ namespace EcoV3Brain
 		uint64 Hash = 0;
 		int32 ObsDim = 0;
 		int32 MaskVersion = 0;
-		int32 NumExtra = 0;                    // 관측 18 뒤 칸 수 (0 또는 3)
+		int32 NumExtra = 0;                    // 관측 18 뒤 칸 수 (0·3·6)
 		const char* const* ExtraNames = nullptr;
 		const TCHAR* Label = TEXT("");
 	};
 
-	/** 받는 계약 수 (관측 18 · 판 2, 관측 21 · 판 2). */
-	inline constexpr int32 kNumContracts = 2;
+	/** 받는 계약 수 (관측 18 · 판 2, 관측 21 · 판 2, 관측 24 · 판 4, 관측 24 · 판 5). */
+	inline constexpr int32 kNumContracts = 4;
 	ADAPTIVEECOSYSTEM_API const FContract& Contract(int32 Index);
 	/** 계약 해시 → 받는 계약 (없으면 nullptr). */
 	ADAPTIVEECOSYSTEM_API const FContract* FindContract(uint64 Hash);
 	/** 계약의 관측 칸 i 이름 (UTF-8). */
 	ADAPTIVEECOSYSTEM_API const char* ContractObsName(const FContract& C, int32 i);
+	/**
+	 * 두 길 두뇌 파일(판 4·5)의 계약 dict 가 이 빌드 상수와 같은가 (이식 계획서 5-2 의 5·13-2 — 해시가 이미 덮지만 어긋난 칸 이름을 거부 글에 적는다).
+	 * Root = 두뇌 파일 JSON 맨 위. 같으면 빈 값, 다르면 그 칸 이름 ('flight_route.decide' 등 — 평가기 Tools/EcoV3Eval RouteContractDiff 와 같은 칸·차례).
+	 */
+	ADAPTIVEECOSYSTEM_API FString RouteContractDiff(const FJsonObject& Root, int32 MaskVersion);
 
 	/** 망 가중치 바이트(W0, B0, W1, B1, W2, B2 순서, float32 리틀 엔디언)의 sha256 16진 — 파이썬 export_weights_v3.weights_bytes 와 같은 바이트. */
 	ADAPTIVEECOSYSTEM_API FString WeightsSha256(const EcoPolicyV3::FPolicyNetV3& Net);
@@ -166,8 +178,14 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3Brain
 	FString SourceFile;      // 불러온 파일 (내장이면 빈 값)
 	bool bBuiltin = false;
 	uint64 ContractHash = 0; // 입출력 계약 해시 (내장 = kContractHash)
-	int32 ObsDim = 0;        // 관측 칸 수 = Net.ObsDim (18 또는 21)
+	int32 ObsDim = 0;        // 관측 칸 수 = Net.ObsDim (18·21·24)
+	int32 MaskVersion = EcoPolicyV3::kMaskVersion;   // 마스크 판 (계약 줄의 판 — 내장·관측 18·21 = 2, 두 길 두뇌 4·5)
 	uint8 Allowed[EcoPolicyV3::kNumBehaviors] = {};   // 모델 허용 칸 (실제 허용 = 이 칸 ∧ 세계 칸)
+
+	/** 두 길 두뇌 (마스크 판 4·5 — 걸면 세계가 길을 켠다, EcoWorldV3::SetModelRoute). 이름은 이식 계획서 5-1·13-2 그대로. */
+	bool bRoute() const { return EcoPolicyV3::IsRouteMaskVersion(MaskVersion); }
+	/** 판 5 (반사 밖 두뇌 FLEE 막음 — 걸면 EcoWorldV3::SetModelFleeGate). */
+	bool bFleeGate() const { return MaskVersion == EcoPolicyV3::kMaskVersionRouteGate; }
 	int32 GoldenCount = 0;
 	float GoldenTolerance = 0.0f;
 	float GoldenMaxError = 0.0f;
@@ -193,7 +211,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3Brain
 
 	/**
 	 * 한 줄 요약: 'v3_r4_g995_s0_20m@f807bea5 (파일 v3_r4_g995_s0_20m.json, 허용 먹기·도망·숨기)'. 관측 21 두뇌는 '…, 관측 21 장애물)' 을,
-	 * 'adapt' 판이 있으면 '…, 판 3)' 을 붙인다.
+	 * 관측 24 두 길 두뇌는 '…, 관측 24 도망길)'(판 5 는 '…, 관측 24 도망길·반사 밖 도망 막음)')을, 'adapt' 판이 있으면 '…, 판 3)' 을 붙인다.
 	 */
 	FString Describe() const;
 	/** 판 글자: 'adapt' 판이 있으면 '판 3', 내장이면 '판 0', 그 밖(손으로 만든 파일)은 빈 값. */
@@ -293,6 +311,11 @@ public:
 	 * 되돌림이 아니면 나가는 두뇌를 되돌리기 쌓개에 쌓는다 (같은 id 로 바꾸면 쌓지 않는다, 많아야 kHistoryMax — 넘으면 가장 오래된 것을 버린다).
 	 */
 	bool CommitPending(FEcoV3BrainPtr* OutFrom = nullptr, FString* OutWhy = nullptr, bool* bOutRollback = nullptr);
+	/**
+	 * 대기 두뇌 버리기 (10-24 두 길 두뇌 — 걸 수 없는 두뇌: 통합 서브시스템 SyncBrain 이 걸기 전 검사(도주 반사·실제 허용)에서 거부할 때). 지금 두뇌·세대는
+	 * 그대로다. 대기 되돌림이면 그 되돌리기들이 꺼낸 칸을 모두 쌓개에 돌려놓는다 (Queue 가 대기 되돌림을 덮을 때와 같다). 버렸으면 참.
+	 */
+	bool DiscardPending(const FString& Why);
 	/**
 	 * 되돌리기 (eco.V3Brain.Rollback): 쌓개 맨 위 두뇌를 되돌림으로 줄에 넣는다 — 다음 결정 스텝 경계에서 바뀌고, 나가는 두뇌는 쌓지 않는다.
 	 * 이미 대기 되돌림이 있으면 그 두뇌를 건너뛰고 하나 더 앞으로 (건너뛴 칸은 경계에서 되돌림이 바뀌면 버리고, 다른 두뇌가 줄을 덮으면 돌려놓는다).

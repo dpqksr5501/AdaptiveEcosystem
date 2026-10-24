@@ -454,12 +454,17 @@ def test_contract_hashes():
         ex.brain_golden_config_for(names[21], 6)
 
 
-def test_ceval_refuses_gate_world():
-    """C++ 평가기(ceval)는 판 5·6 세계를 아직 모른다 — 키 false 는 '옮기지 않는 세계 칸'으로 거부된다(C++ 이식은 R7 통과 뒤 — 이식 계획서 13절)."""
+def test_ceval_gate_world():
+    """10-24 C++ 이식(R7e 판정 통과 뒤 — 이식 계획서 13절·14절): C++ 평가기(ceval)는 판 5 세계(route + 키 false)를 받는다 — 허용 목록을 지나고 world 블록이
+    wild_flight.route·brain_flee_outside_reflex 를 넘긴다(평가기가 두뇌 판과 짝을 본다). 판 6 세계(route 끔 + 키 false — R7 학습 대조 전용)는 C++ 에 없어
+    world_block 이 거부한다. (이식 전에는 키 false 를 '옮기지 않는 세계 칸'으로 거부했다.)"""
     cv = _module("_ceval_for_r7", ROOT / "results" / "v3" / "live" / "ceval.py")
-    assert "features.wild_flight.brain_flee_outside_reflex: False (바탕 True)" in cv.unsupported_settings(load_v2_config(ROUTE5).to_dict())
-    assert "features.wild_flight.brain_flee_outside_reflex: False (바탕 True)" in cv.unsupported_settings(_with(load_v2_config(OBS), wild_flight=GATE).to_dict())
-    assert not any("brain_flee_outside_reflex" in x for x in cv.unsupported_settings(load_v2_config(OBS).to_dict()))
+    for cfg in (load_v2_config(ROUTE5), _with(load_v2_config(OBS), wild_flight=GATE), load_v2_config(OBS)):
+        assert not any("brain_flee_outside_reflex" in x for x in cv.unsupported_settings(cfg.to_dict()))
+    wb = cv.world_block(World(load_v2_config(ROUTE5).replace(N=8), seeds=[32091]))["wild_flight"]
+    assert (wb["route"], wb["brain_flee_outside_reflex"]) == (True, False)
+    with pytest.raises(ValueError, match="판 6"):
+        cv.world_block(World(_with(load_v2_config(OBS), wild_flight=GATE).replace(N=8), seeds=[32091]))
 
 
 # --------------------------------------------------------------------- #

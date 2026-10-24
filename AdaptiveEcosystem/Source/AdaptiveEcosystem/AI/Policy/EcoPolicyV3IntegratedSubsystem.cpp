@@ -541,15 +541,29 @@ const TCHAR* EcoV3Integrated::KeepModeNameKo(int32 KeepMode)
 	return (KeepMode >= 0 && KeepMode < EcoWorldV3::kNumKeepModes) ? Names[KeepMode] : TEXT("?");
 }
 
+const TCHAR* EcoV3Integrated::RouteNameKo(int32 Route)
+{
+	return Route == EcoWorldV3::kRouteRun ? TEXT("도주(트인 쪽)") : Route == EcoWorldV3::kRouteShelter ? TEXT("도주(은신처)") : nullptr;
+}
+
+FColor EcoV3Integrated::RouteColor(int32 Route, const FColor& Fallback)
+{
+	// 10-24 두 길 두뇌 (이식 계획서 12절 질문 9 — 정한 것): RUN 연노랑, SHELTER 하늘색. 반사 도주 주황(255,110,20)·웅크림 파랑(60,150,255)·
+	// 두뇌 도망 노랑(255,215,0)·경계(255,175,80)와 겹치지 않게
+	return Route == EcoWorldV3::kRouteRun ? FColor(255, 240, 120) : Route == EcoWorldV3::kRouteShelter ? FColor(110, 230, 255) : Fallback;
+}
+
 FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
-								   FColor& OutColor, int32 KeepMode, bool bReserveOn)
+								   FColor& OutColor, int32 KeepMode, bool bReserveOn, int32 Route)
 {
 	const double E = FMath::Clamp(Body.Energy, 0.0, 1.0);
 	// 도주 반사 거리 덮기 중이면 행동 이름 대신 덮기 이름 ('경계(먹으며 멀어짐) 64%', '도주(안전해질 때까지) 58%').
 	// 경계는 두뇌가 먹기를 고른 동안만 (두뇌가 도망·숨기·잠이면 그 행동 이름 그대로 — world.py _wf_alert_control 과 같은 조건)
 	const bool bKeep = KeepMode == EcoWorldV3::kKeepPanic || KeepMode == EcoWorldV3::kKeepShelter
 					   || (KeepMode == EcoWorldV3::kKeepAlert && Rep.Behavior == EcoRepertoireV3::kGraze);
-	FString Label = bKeep ? FString::Printf(TEXT("%s %d%%"), KeepModeNameKo(KeepMode), FMath::RoundToInt32(100.0 * E))
+	// 10-24 두 길 두뇌: 도주 덮기면 고른 길 ('도주(트인 쪽) 58%'·'도주(은신처) 58%'). 길이 없으면(길 끈 두뇌) 지금 글자 그대로
+	const TCHAR* RouteKo = KeepMode == EcoWorldV3::kKeepPanic ? RouteNameKo(Route) : nullptr;
+	FString Label = bKeep ? FString::Printf(TEXT("%s %d%%"), RouteKo ? RouteKo : KeepModeNameKo(KeepMode), FMath::RoundToInt32(100.0 * E))
 						  : FString::Printf(TEXT("%s%s %d%%"), BehaviorNameKo(Rep.Behavior),
 											Rep.Behavior == EcoRepertoireV3::kHide && Rep.bArrived ? TEXT("(웅크림)") : TEXT(""),
 											FMath::RoundToInt32(100.0 * E));
@@ -567,7 +581,7 @@ FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const 
 	if (bKeep)
 	{
 		OutColor = KeepMode == EcoWorldV3::kKeepAlert ? FColor(255, 175, 80)
-				   : KeepMode == EcoWorldV3::kKeepPanic ? FColor(255, 110, 20)
+				   : KeepMode == EcoWorldV3::kKeepPanic ? (RouteKo ? RouteColor(Route, FColor(255, 110, 20)) : FColor(255, 110, 20))
 														: FColor(60, 150, 255);
 	}
 	if (bReserveOn)
@@ -3205,10 +3219,10 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	Ctx->PlannedDeer = PlannedDeer;
 	Ctx->PlannedWolves = PlannedWolves;
 	EcoWorldV3::InitWorld(Ctx->Sim, Config);
-	// 허용 칸 = 지금 두뇌 ∧ 세계 칸 (내장 두뇌면 InitWorld 그대로 — 두뇌가 바뀌면 SyncBrain 이 다시 정한다)
-	EcoWorldV3::SetModelAllowed(Ctx->Sim, GetActiveBrain().Allowed);
-	// 관측 칸 수 = 지금 두뇌의 계약 (18 또는 21 — R5 장애물 관측, 계약 2-4). 대조 기록을 켜면 18 두뇌여도 세 칸을 만든다 (결정 그대로)
-	EcoWorldV3::SetModelObsDim(Ctx->Sim, GetActiveBrain().Net.ObsDim);
+	// 허용 칸 = 지금 두뇌 ∧ 세계 칸 (내장 두뇌면 InitWorld 그대로 — 두뇌가 바뀌면 SyncBrain 이 다시 정한다), 관측 칸 수 = 지금 두뇌의 계약 (18·21·24 —
+	// R5 장애물 관측 계약 2-4, 10-24 두 길 두뇌), 두 길·반사 밖 FLEE 막음 = 지금 두뇌가 판 4·5 일 때만 (내장 두뇌면 모두 InitWorld 그대로). 걸 수 없는 두뇌
+	// (예: 도주 반사를 끈 세계에 앞 Play 의 두 길 두뇌)는 첫 SyncBrain 이 이 월드에서 내장으로 되돌린다. 대조 기록을 켜면 18 두뇌여도 세 칸을 만든다 (결정 그대로)
+	ApplyBrainToWorld(Ctx->Sim, GetActiveBrain());
 	Ctx->Sim.bObstacleObsProbe = ObsParityEvery() > 0;
 	Ctx->Sim.T = GlobalT;
 	EcoWorldV3::UpdateDayNight(Ctx->Sim);
@@ -3292,6 +3306,58 @@ const FEcoV3Brain& UEcoPolicyV3IntegratedSubsystem::GetActiveBrain() const
 	return ActiveBrain.IsValid() ? *ActiveBrain : *FEcoV3BrainRegistry::Get().GetActive();
 }
 
+FString UEcoPolicyV3IntegratedSubsystem::RouteBrainBlocker(const EcoWorldV3::FWorldState& W, const FEcoV3Brain& B)
+{
+	namespace R3 = EcoRepertoireV3;
+	if (!B.bRoute())
+	{
+		return FString();
+	}
+	// 이식 계획서 12절 질문 12 (정한 것 — 권고대로 거부): 두 길은 도주 반사 안에서만 고른다. 반사가 없으면 판 5 는 도망을 시작할 길이 아예 없다
+	if (!W.Config.WildFlight.bEnabled)
+	{
+		return FString::Printf(TEXT("도주 반사(eco.IntegratedV3.WildFlight)를 끈 세계 — 마스크 판 %d 두뇌는 반사 도주 안에서만 길을 고른다"), B.MaskVersion);
+	}
+	// 실제 허용 = 두뇌 ∧ 세계 칸 (rep_policy.check_route_allowed 의 effective_allowed — 이식 계획서 4절). 칸 3·4 는 도주 중 길 칸이라 막혀야 한다
+	uint8 Eff[R3::kNumBehaviors] = {};
+	for (int32 b = 0; b < R3::kNumBehaviors; ++b)
+	{
+		Eff[b] = (B.Allowed[b] != 0 && W.Config.WorldAllowed[b] != 0) ? 1 : 0;
+	}
+	if (Eff[R3::kFreeze] != 0 || Eff[R3::kSleep] != 0)
+	{
+		return FString::Printf(TEXT("실제 허용(두뇌 ∧ 세계) %s 에 얼기·잠이 남는다 — 판 %d 는 칸 3·4 를 길 칸으로 쓴다"), *EcoV3Brain::AllowedText(Eff), B.MaskVersion);
+	}
+	if (Eff[R3::kGraze] == 0)
+	{
+		return TEXT("실제 허용에 먹기가 없다 — 덮기 밖 결정 줄이 빌 수 있다");
+	}
+	return FString();
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::BrainBlocker(const FEcoV3Brain& B) const
+{
+	for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
+	{
+		const FString Why = RouteBrainBlocker(Ctx->Sim, B);
+		if (!Why.IsEmpty())
+		{
+			return FString::Printf(TEXT("%s: %s"), *Ctx->RegionId.ToString(), *Why);
+		}
+	}
+	return FString();
+}
+
+void UEcoPolicyV3IntegratedSubsystem::ApplyBrainToWorld(EcoWorldV3::FWorldState& W, const FEcoV3Brain& B)
+{
+	EcoWorldV3::SetModelAllowed(W, B.Allowed);
+	EcoWorldV3::SetModelObsDim(W, B.Net.ObsDim);
+	// 10-24 두 길 두뇌 (이식 계획서 8-2 의 2·13-3): 세계 설정이 아니라 두뇌가 정한다 — 판 4·5 면 길, 판 5 면 반사 밖 FLEE 막음 (둘 다 도주 반사를 켠 세계만).
+	// 판 2 두뇌는 둘 다 거짓이라 InitWorld 그대로다 (끈 세계 비트 동일)
+	EcoWorldV3::SetModelRoute(W, B.bRoute());
+	EcoWorldV3::SetModelFleeGate(W, B.bFleeGate());
+}
+
 void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 {
 	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
@@ -3331,6 +3397,20 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 			}
 		}
 	}
+	// 10-24 두 길 두뇌 걸기 전 검사 (이식 계획서 8-2 의 1): 대기 두뇌가 판 4·5 인데 어느 지역이 도주 반사를 껐거나 실제 허용(두뇌 ∧ 세계)에 얼기·잠이 남으면
+	// 대기 두뇌를 버리고 지금 두뇌를 둔다 (거부 알림 — 폴더 감시 거부와 같은 꼴). 판 2 두뇌는 보지 않는다 (지금 그대로)
+	if (const FEcoV3BrainPtr Pend = Reg.GetPending())
+	{
+		const FString Block = BrainBlocker(*Pend);
+		if (!Block.IsEmpty())
+		{
+			const FString PendId = Pend->Id;
+			Reg.DiscardPending(FString::Printf(TEXT("두 길 두뇌를 걸 수 없다 — %s"), *Block));
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 두뇌 거부 | %.1f초 (전역 스텝 %lld) | %s — %s | %s 그대로"), Seconds, static_cast<long long>(GlobalT),
+				   *PendId, *Block, *GetActiveBrain().Id);
+			PostNotice(EcoV3Integrated::ENotice::Reject, FString::Printf(TEXT("두뇌 거부 — %s: %s"), *PendId, *Block));
+		}
+	}
 	FString Why;
 	bool bRollback = false;
 	const bool bSwapped = Reg.CommitPending(nullptr, &Why, &bRollback);
@@ -3338,22 +3418,42 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 	{
 		return;
 	}
-	const FEcoV3BrainRef Now = Reg.GetActive();
+	FEcoV3BrainRef Now = Reg.GetActive();
 	const FEcoV3BrainPtr Before = ActiveBrain;
+	{
+		// 저장소의 지금 두뇌를 이 월드에 걸 수 없다 (앞 Play·다른 월드가 건 두 길 두뇌를 도주 반사를 끈 이 월드가 받음 — 대기 검사를 지나지 않은 길):
+		// 저장소는 그대로 두고 이 월드만 앞 두뇌(처음이면 내장)를 쓴다
+		const FString Block = BrainBlocker(*Now);
+		if (!Block.IsEmpty())
+		{
+			const FEcoV3BrainRef Keep = Before.IsValid() ? Before.ToSharedRef() : FEcoV3BrainRegistry::Builtin();
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 두뇌 거부 | %.1f초 (전역 스텝 %lld) | 저장소 두뇌 %s 를 이 월드에 걸 수 없다 — %s | 이 월드는 %s"), Seconds,
+				   static_cast<long long>(GlobalT), *Now->Id, *Block, *Keep->Id);
+			PostNotice(EcoV3Integrated::ENotice::Reject, FString::Printf(TEXT("두뇌 거부 — %s: %s"), *Now->Id, *Block));
+			AppliedBrainGen = Reg.GetGeneration();
+			if (Before.IsValid())
+			{
+				return;   // 지역 세계는 앞 두뇌 그대로다
+			}
+			Now = Keep;
+		}
+	}
 	FString AllowedByRegion;
 	for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
 	{
-		EcoWorldV3::SetModelAllowed(Ctx->Sim, Now->Allowed);
-		// 관측 칸 수 = 새 두뇌의 계약 (R5 장애물 관측 21 이면 이 스텝 끝 관측부터 세 칸을 더 만들고, 그 결정부터 새 두뇌가 21 칸을 읽는다)
-		EcoWorldV3::SetModelObsDim(Ctx->Sim, Now->Net.ObsDim);
+		// 허용 칸 = 새 두뇌 ∧ 세계, 관측 칸 수 = 새 두뇌의 계약 (R5 장애물 관측 21 이면 이 스텝 끝 관측부터 세 칸을 더 만들고, 그 결정부터 새 두뇌가 21 칸을 읽는다),
+		// 10-24 두 길 (판 4·5 두뇌만 — 이 스텝 H 부터 길 단계. 열린 도주는 길 없음 결정으로 새 두뇌가 곧바로 고르고, 길 없는 두뇌로 바꾸면 A 가 반사 방향으로 둔 뒤
+		// H 가 길 상태를 지운다 — 이식 계획서 8-2 의 3)·반사 밖 FLEE 막음 (판 5)
+		ApplyBrainToWorld(Ctx->Sim, *Now);
 		Ctx->SinceSwapBrainTally = FEcoV3BrainTally();
 		if (Before.IsValid() && Ctx->FlightOn())
 		{
 			// 도망 기록 두뇌 판 (EcoV3FlightTally.h): 지금 판의 합을 '교체 전'으로, 새 판은 0 에서 (결정 스텝 경계 — 열린 도망은 새 판에 든다)
 			Ctx->FlightTally.OnBrainSwap(EcoV3Flight::FSum::Of(Ctx->Sim.Stats.Flight));
 		}
-		AllowedByRegion += FString::Printf(TEXT("%s%s %s"), AllowedByRegion.IsEmpty() ? TEXT("") : TEXT(" · "), *Ctx->RegionId.ToString(),
-										   *EcoV3Brain::AllowedText(Ctx->Sim.Allowed));
+		AllowedByRegion += FString::Printf(TEXT("%s%s %s%s"), AllowedByRegion.IsEmpty() ? TEXT("") : TEXT(" · "), *Ctx->RegionId.ToString(),
+										   *EcoV3Brain::AllowedText(Ctx->Sim.Allowed),
+										   Ctx->RouteOn() ? (Ctx->Sim.bFleeGate ? TEXT(" (두 길·반사 밖 도망 막음)") : TEXT(" (두 길)")) : TEXT(""));
 	}
 	if (AllowedByRegion.IsEmpty())
 	{
@@ -3894,6 +3994,17 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   static_cast<long long>(D.Reflex), static_cast<long long>(D.ReflexKnow));
 		Ctx.LastLogBrainTally = Ctx.BrainTally;
 	}
+	// 아홉째 줄 뒤 (10-24 두 길 두뇌, 이식 계획서 8-3 — 길 통계가 있는 세계만: 지금 판 4·5 두뇌이거나 앞서 걸었던 세계): 구간·누적의 실행한 반사 길 RUN·SHELTER 스텝,
+	//   길 결정·은신처 고름(SHELTER 가 열린 결정 가운데)·무효·바꿈 (world.py route_stats 와 같은 칸 — 고름·열림·바꿈은 적용 때 센다). 아홉째 줄 '<지역> 두뇌 |' 꼴은
+	//   그대로 두고 따로 적는다 (results/v3/brain_swap/compare_swap.py 정규식이 그 줄 끝을 본다)
+	if (Ctx.RouteSeen())
+	{
+		const FEcoV3RouteSum Tot = FEcoV3RouteSum::Of(S.Route);
+		const FEcoV3RouteSum Iv = Tot.Minus(FEcoV3RouteSum::Of(P.Route));
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 길 | %.1f초 | %s | 구간 %s | 누적 %s · 도주 시작 %lld · 바꿈 %lld"), *Ctx.RegionId.ToString(), Seconds,
+			   Ctx.RouteOn() ? (Ctx.Sim.bFleeGate ? TEXT("두 길 켬 (판 5 — 반사 밖 도망 막음)") : TEXT("두 길 켬 (판 4)")) : TEXT("두 길 끔 (앞 두뇌가 센 누적)"),
+			   *Iv.Text(), *Tot.Text(), static_cast<long long>(Tot.Onsets), static_cast<long long>(Tot.Switches));
+	}
 	// 열째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — 정의는 EcoWorldV3.h 머리 주석 '도망 기록' = world.py flight_stats, 집계는 EcoV3FlightTally.h).
 	//   구간(지난 기록 줄 뒤)에 끝난 도망의 끝 까닭별 수·평균 길이·스스로 벗어난 도망의 쫓긴 시간(10-23 부터 보고만), 최근 60 초 창, 누적(열린 도망 = 잘림,
 	//   10-23 쫓긴 도망·숨음(지켜보는 중 포함)·지켜보는 동안 잡힘·굶음 — 옛 도망 단위 숨음 비율, 보고만. 10-24 쫓긴 사건·숨음(지켜보는 중 포함)·잡힘·굶음·
@@ -4115,8 +4226,10 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 								  : FString(TEXT(" 맑음"));
 		// 두뇌 (10-18 두뇌 바꾸기): 내장이면 'R1b−F'(얼기 막음)·'R1b', 파일 두뇌면 모델 이름. 바뀐 뒤 늑대를 알 때 숨기 몫 (FEcoV3BrainTally)
 		const FEcoV3Brain& Brain = GetActiveBrain();
+		// 10-24 두 길 두뇌면 '두뇌 <이름> 두 길' (판 5 는 '두 길·반사 밖 도망 막음')
 		const FString BrainTag = Brain.bBuiltin ? FString(Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"))
-												: FString::Printf(TEXT("두뇌 %s"), *Brain.ModelName);
+												: FString::Printf(TEXT("두뇌 %s%s"), *Brain.ModelName,
+																  Ctx.RouteOn() ? (Ctx.Sim.bFleeGate ? TEXT(" 두 길·반사 밖 도망 막음") : TEXT(" 두 길")) : TEXT(""));
 		const FEcoV3BrainTally& Since = Ctx.SinceSwapBrainTally;
 		const int64 KnowN = Since.KnowTotal();
 		const FString Line = FString::Printf(TEXT("v3 %s %s | %s%s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld | 이 두뇌로 늑대를 알 때 숨기 %.1f%% (%lld 스텝)"),
@@ -4141,7 +4254,14 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 																	 *EcoV3Flight::SummaryText(Ctx.FlightTally.Window()),
 																	 *EcoV3Flight::CompareText(Ctx.FlightTally))
 												  : FString();
-		DrawDebugString(World, Center + FVector(0, 0, 600.0), Line + TEXT("\n") + FoodLine + (FlightLine.IsEmpty() ? FString() : TEXT("\n") + FlightLine),
+		// 넷째 줄: 10-24 두 길 두뇌 (이식 계획서 8-3 — 길을 켠 세계만): 최근 60 초 실행한 반사 길 몫·길 결정·은신처 고름·무효, 사슴 머리 위 글자는
+		// '도주(트인 쪽)'(연노랑)·'도주(은신처)'(하늘색) — EcoV3Integrated::DeerLabel
+		const FString RouteLine = Ctx.RouteOn() ? FString::Printf(TEXT("길 %s | 최근 %.0f초: %s | 지금 도주 트인 쪽 %d · 은신처 %d"), *Ctx.RegionId.ToString(),
+																   static_cast<double>(Ctx.RouteTally.WindowSteps()) * EcoRepertoireV3::kStepSeconds,
+																   *Ctx.RouteTally.Window().Text(), Ctx.RouteNow[0], Ctx.RouteNow[1])
+												: FString();
+		DrawDebugString(World, Center + FVector(0, 0, 600.0),
+						Line + TEXT("\n") + FoodLine + (FlightLine.IsEmpty() ? FString() : TEXT("\n") + FlightLine) + (RouteLine.IsEmpty() ? FString() : TEXT("\n") + RouteLine),
 						nullptr, FColor::White, 0.0f, true, 1.4f);
 		if (bScreen)
 		{
@@ -4151,6 +4271,10 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			{
 				// 키 733000 + 지역 (732000~732004 는 두뇌 알림·상태 줄)
 				GEngine->AddOnScreenDebugMessage(static_cast<uint64>(733000 + Ctx.Index), 1.5f, FColor(255, 190, 140), FlightLine);
+			}
+			if (!RouteLine.IsEmpty())
+			{
+				GEngine->AddOnScreenDebugMessage(static_cast<uint64>(734000 + Ctx.Index), 1.5f, FColor(140, 225, 255), RouteLine);
 			}
 		}
 	}
@@ -4260,6 +4384,19 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 	FString Line = B.bBuiltin	   ? FString::Printf(TEXT("두뇌 판 0 (내장 %s)"), Settings.bNoFreeze ? TEXT("R1b−F") : TEXT("R1b"))
 				   : Round.IsEmpty() ? FString::Printf(TEXT("두뇌 %s"), *B.ShortId())
 									 : FString::Printf(TEXT("두뇌 %s (%s)"), *Round, *B.ShortId());
+	if (B.bRoute())
+	{
+		// 10-24 두 길 두뇌 (이식 계획서 8-3): 판과 모든 지역 최근 60 초 길 요약
+		FEcoV3RouteSum Win;
+		for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
+		{
+			if (Ctx && Ctx->RouteOn())
+			{
+				Win = Win.Plus(Ctx->RouteTally.Window());
+			}
+		}
+		Line += FString::Printf(TEXT(" · 두 길(마스크 판 %d) %s"), B.MaskVersion, *Win.Text());
+	}
 	Line += FString::Printf(TEXT(" · 교체 %d번 · 환경 #%d"), BrainSwapsThisPlay, EnvRevision);
 	const FString Live = Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds());
 	if (!Live.IsEmpty())
@@ -4295,6 +4432,18 @@ FString UEcoPolicyV3IntegratedSubsystem::FlightStatusText() const
 		bHasPrev = bHasPrev || Ctx->FlightTally.bHasPrev;
 	}
 	return bAny ? FString::Printf(TEXT("%s · %s"), *EcoV3Flight::SummaryText(WinSum), *EcoV3Flight::CompareText(PrevSum, CurSum, bHasPrev)) : FString();
+}
+
+FString FEcoV3RouteSum::Text() const
+{
+	// 10-24 두 길 두뇌 화면·기록 글자 (FEcoV3RouteSum 머리 주석)
+	const int64 Steps = RouteSteps();
+	const FString StepsText = Steps > 0 ? FString::Printf(TEXT("길 RUN %.0f%% · 은신처 %.0f%% (반사 사슴-스텝 %lld)"),
+														   100.0 * static_cast<double>(RunSteps) / static_cast<double>(Steps),
+														   100.0 * static_cast<double>(ShelterSteps) / static_cast<double>(Steps), static_cast<long long>(Steps))
+										: FString(TEXT("길 반사 스텝 없음"));
+	return FString::Printf(TEXT("%s · 길 결정 %lld · 은신처 고름 %lld/%lld (열린 결정) · 무효 %lld"), *StepsText, static_cast<long long>(Decisions),
+						   static_cast<long long>(PickedShelter), static_cast<long long>(Choice), static_cast<long long>(Invalid));
 }
 
 void UEcoPolicyV3IntegratedSubsystem::RejectResourceContract()

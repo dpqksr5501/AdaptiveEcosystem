@@ -2,7 +2,8 @@
 // configs/v3_r6_train.yaml), 탐색 시드 32097(다시 난)·32096(길 셈 루프)·32099(손 장면·도망 길 기록 장면)·32098(난수 기하·관측)·32080(기준 루프). 같은 내용 JSON = RouteGoldenVectorsV3.json (배열 이름이 같다).
 // v3 두 길 두뇌(RUN·SHELTER — 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 16절) 장면 골든. 정의: herbivore_rl/env_v2/world.py 모듈 docstring
 // '야생 1단계' (w3) 두뇌 길 (`_route_step`·`_route_apply`·`flight_route_geometry` SHELTER·`route_stats`), env_v2/rep_policy.py 마스크 판 4.
-// 아직 Source 에 넣지 않았다(results/v3/route/port/ — C++ 이식 단계가 Tests 와 함께 옮긴다).
+// 10-24 C++ 이식: 검사 본문 Tests/RouteGoldenCheckV3.h (g++ herbivore_rl/tests/cpp/route_v3_main.cpp — 엔진 함수), 같은 내용 JSON 은
+// herbivore_rl/results/v3/route/port/ (판 단위 궤적 지문·세계 기록 옆).
 //
 // 길 셈 한 줄 (사슴 하나, 스텝 끝 H — `_route_step`). 입력: prev_mode·next_mode(덮기 WF_*), alive0(스텝 첫머리 산), executed(이번 스텝에 실행한 길 —
 //   길 통계 steps), 전 상태 b_route·b_k·b_age·b_feas, 사슴 자리 p, a₀(은신처 굽히기 전 반사 방향), run(반사 최종 방향 — 은신처 굽히기·가장자리·벽 뒤),
@@ -20,6 +21,7 @@
 //   invalid_shelter 는 무효, steps_* = 산(alive0) 사슴의 executed 길별 수.
 // 마스크 판 4 한 줄: override 도주면 결정 ? {1, 4 (관측 22 > 0)} : {지금 길 한 칸}, 웅크림이면 {2}, 그 밖 = 판 2 (a ∧ 가능 ∧ reads, 기상 결정은 잠
 //   막음, reads 가 아니면 지금 행동 한 칸). reads·wake 는 판 4 미리 보기 값(덮기 스텝은 결정이 아니다).
+//   종류 'gate' 줄은 판 5 (= 판 4 + 반사 밖 두뇌 FLEE 막음 — 이식 계획서 13-1): override 가 도주·웅크림이 아니고 reads 면 칸 1 도 막는다.
 // 관측 세 칸 한 사례 (WriteRouteObs(bPanic, bOk, Mu, E) — 계획서 3절): 도주 ? (1, ok ? (float)clip(μ/10) : 0, ok ? (float)clip(e/20) : 0) : 0.
 //   double 로 나누고(역수 곱 아님) clip 한 뒤 float 로 내린다(가까운 짝수). μ = +∞ 는 1.
 // 기준 루프 (계획서 10-1 의 5·6, 두뇌 둘): 거울 세계(부활 없음, 길 켬) kWorldN 마리 kWorldSteps 스텝. 시작 상태 = 길 끈 같은 시드 세계의 평가기 일
@@ -36,8 +38,8 @@
 //   남기고(kFsTrack 넷째), 새 도망은 StepNow − 그 값 ≤ kFsRefleeSteps 면 refled, 죽음(재료 4)은 kFsNotLast 로 지운다. 원판 놓침은 늑대마다, 쫓김·
 //   가림은 사슴마다(쫓는 늑대 모두의 쌍이 원판에 가려야 가림). 시간은 건너뛰지만(5 → 10, 11 → 40) 건너뛰는 틱 앞뒤로 끝나는 도망은 없다.
 // ±∞ 는 kInf (1e300) 로 적는다. double 은 다시 읽으면 같은 값이 되는 가장 짧은 표기, float 는 f32 가장 짧은 표기.
-// 줄 923 (손 장면 32 · 길 셈 루프 891), 적용 117, 기하 90, 마스크 51, 다시 난 9, 통계 50, 관측 사례 37, 기준 루프 시드 32080 × 두뇌 2, 도망 길 기록 장면 틱 10.
-// 덮는 계획 꼬리표 (줄 수): onset_two 26, onset_one 38, geo_mu_enter_edge 1, geo_cos_edge 1, geo_e_edge 1, scene_threshold 2, obs_reach_min 1, invalid 8, invalid_then_two 2, keep_mu_zero 1, lock_inside_no_redecide 197, lock_redecide_two 36, lock_redecide_one 7, run_after_lock_same 154, shelter_hold 312, shelter_hold_after_lock 19, obs_two 560, obs_one 302, obs_zero 61, clear_end 46, clear_crouch 14, clear_dead 4, exec_run 550, exec_shelter_apply 50, exec_shelter_hold 312, geo_wall 1, apply_shelter 50, apply_run 67, apply_bad 3, apply_switch 38, mask_dec2 6, mask_dec1 6, mask_keep_run 6, mask_keep_shelter 6, mask_crouch 6, mask_other_reads 6, mask_other_hold 6, stats_scene 32, stats_loop 18, respawn_run 6, respawn_shelter 3, cur_none 2, apply_run_open 15, shelter_hold_inside 1, geo_mu_ulp 1, geo_e_ulp 1, geo_keep_ulp 1, geo_cos_neg_zero 1, geo_s_empty 1, geo_keep_far_behind 1, geo_center_eps 1, geo_random 56, obs_cases 37, world_route0 191, world_shelter 105, fr_by_route_run 149, fr_by_route_shelter 114, fr_chased 2260, fr_drop 29, fr_hidden 22, fr_refled 89, fs_refled_38 1, fs_not_refled_39 1, fs_dead_reset 1, fs_tie_run 1, fs_none_route 1, fs_drop_per_wolf 1, fs_hidden_partial 1, fs_truncated 1, fs_caught 1
+// 줄 923 (손 장면 32 · 길 셈 루프 891), 적용 117, 기하 90, 마스크 57, 다시 난 9, 통계 50, 관측 사례 37, 기준 루프 시드 32080 × 두뇌 2, 도망 길 기록 장면 틱 10.
+// 덮는 계획 꼬리표 (줄 수): onset_two 26, onset_one 38, geo_mu_enter_edge 1, geo_cos_edge 1, geo_e_edge 1, scene_threshold 2, obs_reach_min 1, invalid 8, invalid_then_two 2, keep_mu_zero 1, lock_inside_no_redecide 197, lock_redecide_two 36, lock_redecide_one 7, run_after_lock_same 154, shelter_hold 312, shelter_hold_after_lock 19, obs_two 560, obs_one 302, obs_zero 61, clear_end 46, clear_crouch 14, clear_dead 4, exec_run 550, exec_shelter_apply 50, exec_shelter_hold 312, geo_wall 1, apply_shelter 50, apply_run 67, apply_bad 3, apply_switch 38, mask_dec2 6, mask_dec1 6, mask_keep_run 6, mask_keep_shelter 6, mask_crouch 6, mask_other_reads 6, mask_other_hold 6, mask_gate_free 2, mask_gate_hold 1, mask_gate_over 3, stats_scene 32, stats_loop 18, respawn_run 6, respawn_shelter 3, cur_none 2, apply_run_open 15, shelter_hold_inside 1, geo_mu_ulp 1, geo_e_ulp 1, geo_keep_ulp 1, geo_cos_neg_zero 1, geo_s_empty 1, geo_keep_far_behind 1, geo_center_eps 1, geo_random 56, obs_cases 37, world_route0 191, world_shelter 105, fr_by_route_run 149, fr_by_route_shelter 114, fr_chased 2260, fr_drop 29, fr_hidden 22, fr_refled 89, fs_refled_38 1, fs_not_refled_39 1, fs_dead_reset 1, fs_tie_run 1, fs_none_route 1, fs_drop_per_wolf 1, fs_hidden_partial 1, fs_truncated 1, fs_caught 1
 #pragma once
 
 #include <cstdint>
@@ -88,7 +90,7 @@ namespace EcoWorldV3::GoldenRoute
 	inline constexpr std::int32_t kLoopN = 32;   // 길 셈 루프 사슴 수 (기준 루프 kWorldN 과 다른 루프)
 	inline constexpr std::int32_t kLoopSteps = 900;
 	inline constexpr std::int32_t kLoopChecks = 9;
-	inline constexpr std::int32_t kMaskRows = 51;
+	inline constexpr std::int32_t kMaskRows = 57;
 	inline constexpr std::int32_t kRespawnRows = 9;
 	inline constexpr std::int32_t kObsCases = 37;   // 관측 세 칸 사례 수
 	inline constexpr std::int32_t kFlightRouteLen = 182;   // 도망 기록 길 덩어리 칸 수 (kLoopFlightRoute·kWorldFlightRoute 한 벌)
@@ -114,7 +116,7 @@ namespace EcoWorldV3::GoldenRoute
 	inline constexpr std::int32_t kFsRefleeSteps = 38;   // 살아 끝난 도망 뒤 이 스텝 안 새 도망 = refled (FLIGHT_REFLEE_STEPS, 경계 포함)
 	inline constexpr const char* kRouteObsNames[3] = {"in_panic", "shelter_reach", "shelter_edge"};
 	inline constexpr const char* kGeoKinds[35] = {"basic", "mu_eq_enter", "mu_below_enter", "cos_eq_zero", "cos_below_zero", "edge_eq_max", "edge_over_max", "inside_cover", "on_rim", "at_center", "not_in_S_ignored", "in_S_blocks", "tie_low_index", "nearest_edge", "nearest_blocked", "wall_strip_x", "wall_strip_all", "keep_mu_zero", "keep_mu_below", "keep_other", "no_covers", "mu_ulp_at_enter", "mu_ulp_above_enter", "mu_ulp_below_enter", "edge_ulp_below_max", "edge_ulp_above_max", "keep_mu_ulp_above", "keep_mu_ulp_below", "cos_neg_zero", "s_empty_inf", "keep_behind_far", "keep_at_center", "keep_center_below_eps", "wall_strip_y_low", "random"};
-	inline constexpr const char* kMaskKinds[9] = {"dec2", "dec1", "keep_run", "keep_shelter", "crouch", "other_reads", "other_hold", "other_wake", "hand"};
+	inline constexpr const char* kMaskKinds[10] = {"dec2", "dec1", "keep_run", "keep_shelter", "crouch", "other_reads", "other_hold", "other_wake", "hand", "gate"};
 	inline constexpr const char* kWorldBrainNames[2] = {"route0", "shelter2"};
 	inline constexpr const char* kWorldBrainSha256[2] = {"078c56be3d4bacb2a0b1a3a539bd505a975004fb182152a99ca5557eca84a51e", "e536a0f83be5be5eedab08cb7a18d6826911b596a108c8c5f1bfd05cdcfd6822"};
 
@@ -222,7 +224,7 @@ namespace EcoWorldV3::GoldenRoute
 		C.Weather.SnowWolfSpeed = 0.85;
 		C.Weather.bObsVisibility = true;
 		C.Obstacles.Foliage.bEnabled = C.Obstacles.bEnabled && C.Obstacles.Foliage.bEnabled;   // EcoV3Eval ConfigOf 와 같다
-		C.WildFlight.bRoute = true;   // ★ 두뇌 길 (계획서 1-2 — InitWorld 가 bEnabled 와 묶는다). 이식 전 C++ 에는 없는 칸
+		C.WildFlight.bRoute = true;   // ★ 두뇌 길 (계획서 1-2 — InitWorld 가 bEnabled 와 묶는다. 평가기는 두뇌 판이 SetModelRoute 로 정한다)
 		C.bSenseStats = false;   // 평가기와 같다 (기록만)
 		C.bFlightStats = true;
 	}
@@ -5728,7 +5730,7 @@ namespace EcoWorldV3::GoldenRoute
 		14LL, 0LL, 2LL, 0LL, 1LL, 586LL, 0LL, 234LL, 0LL, 4LL, 9LL,
 		0LL, 2LL, 0LL, 0LL, 56LL, 38LL
 	};
-	inline constexpr std::int32_t kMaskInt[867] = {   // 줄마다 kind·override·rdecide·route_now·reads·wake·behavior·a0·a1·a2·a3·a4·m0·m1·m2·m3·m4 (a = 허용, m = 마스크)
+	inline constexpr std::int32_t kMaskInt[969] = {   // 줄마다 kind·override·rdecide·route_now·reads·wake·behavior·a0·a1·a2·a3·a4·m0·m1·m2·m3·m4 (a = 허용, m = 마스크)
 		8, 2, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1,
 		8, 2, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0,
 		8, 2, 1, 2, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0,
@@ -5738,6 +5740,12 @@ namespace EcoWorldV3::GoldenRoute
 		8, 0, 0, -1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0,
 		8, 0, 0, -1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0,
 		8, 0, 0, -1, 0, 0, 2, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0,
+		9, 0, 0, -1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0,
+		9, 0, 0, -1, 1, 1, 2, 1, 1, 1, 0, 0, 1, 0, 1, 0, 0,
+		9, 0, 0, -1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0,
+		9, 2, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1,
+		9, 2, 0, 2, 0, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1,
+		9, 3, 0, -1, 0, 0, 2, 1, 1, 1, 0, 0, 0, 0, 1, 0, 0,
 		6, 0, 0, -1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0,
 		6, 0, 0, -1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0,
 		6, 0, 0, -1, 0, 0, 0, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0,
@@ -5781,7 +5789,7 @@ namespace EcoWorldV3::GoldenRoute
 		0, 2, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 1,
 		1, 2, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 1, 0, 0, 0
 	};
-	inline constexpr float kMaskObs[1224] = {   // 줄마다 관측 24
+	inline constexpr float kMaskObs[1368] = {   // 줄마다 관측 24
 		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
 		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
 		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 1.e+00f, 2.e-01f, 0.e+00f,
@@ -5806,6 +5814,24 @@ namespace EcoWorldV3::GoldenRoute
 		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
 		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
 		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 1.e+00f, 2.e-01f, 0.e+00f,
+		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
+		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 1.e+00f, 0.e+00f, 0.e+00f,
 		0.e+00f, 1.25e-01f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 5.e-02f, 0.e+00f,
 		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,
 		0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f, 0.e+00f,

@@ -2,9 +2,10 @@
 `_route_apply`·`flight_route_geometry` 의 SHELTER·`route_stats`, env_v2/rep_policy.py 마스크 판 4)를 언리얼 C++ 이식(설계
 AdaptiveEcosystem/Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 16-12·16-14 단계 6 — C++ 은 RUN·SHELTER 기하만)과 대조할 골든을 만든다.
 
-    # herbivore_rl/ 에서 (PYTHONUTF8=1). 아직 Source 에 넣지 않는다 — results/v3/route/port/ 에 헤더와 같은 내용 JSON 을 쓴다
+    # herbivore_rl/ 에서 (PYTHONUTF8=1). 헤더는 언리얼 모듈 폴더(AI/Policy)에, 같은 내용 JSON 은 results/v3/route/port/ 에 쓴다 (10-24 C++ 이식 —
+    # 검사 본문 AI/Policy/Tests/RouteGoldenCheckV3.h, g++ 하네스 tests/cpp/route_v3_main.cpp)
     python export_golden_v3_route.py
-    # 시험용 다른 폴더
+    # 시험용 다른 폴더 (헤더·JSON 둘 다)
     python export_golden_v3_route.py --out <폴더>
 
 세계: configs/v3_wild3_route_mirror.yaml (관측 21 거울 + wild_flight.route — 관측 24·마스크 판 4, 계약 0xe302dee198197444), 다시 난 개체는
@@ -30,6 +31,8 @@ results/v3/route/port/make_traces.py 가 만든다.
   [3] 관측  관측 세 칸 사례 37 (WriteRouteObs — μ = 2·10·+∞·문턱 위 ulp, e 아주 작음·20·20 밑 ulp, 도주 아님·가능 아님 + 난수 24). 같은 식이 길 셈 줄의
             세계 관측을 모두 다시 내는지도 본다.
   [4] 마스크 판 4 줄: 손 줄 + 길 셈 루프에서 갈래마다 처음 몇 줄(도주 결정 두 칸·한 칸·도주 비결정 RUN·SHELTER·웅크림·그 밖 판 2 — 결정·비결정).
+            10-24 이식 계획서 13-3: 판 5(= 판 4 + 반사 밖 두뇌 FLEE 막음 — rep_peek 의 brain_flee_outside_reflex = False) 손 줄(종류 'gate' — 덮기 밖 결정·기상
+            결정은 칸 1 막힘, 덮기 밖 비결정 FLEE 한 칸·도주 결정·도주 비결정·웅크림은 판 4 그대로)도 더한다.
   [5] 기준 루프 거울 세계(사슴 48, 부활 없음, 길 켬) 450 스텝을 두뇌 둘의 argmax 로 돌린 스텝마다 지문(헤더 머리 주석)·90 스텝마다 기록. 두뇌 = route0
             (ckpt/v3/v3_r1_g995_s3_obs24route0.zip — 내장 R1b + 0 열 + 칸 4 = 칸 1 − 2)과 늘 SHELTER 시험 두뇌(같은 꼴, 칸 4 = 칸 1 + 2 — 학습·판정에 쓰지
             않는다). 시작 상태는 길 끈 같은 시드 세계의 평가기 일(ceval.native_job)과 같고(길은 reset 난수를 쓰지 않는다 — 확인), 세계 난수는 PCG64 날 64
@@ -43,9 +46,10 @@ results/v3/route/port/make_traces.py 가 만든다.
 덮는지 셈 `coverage(data)` (tests/test_route_port_v3.py 가 같은 함수를 부른다): 계획 장면 꼬리표마다 줄 수 — 하나라도 0 이면 멈춘다.
 C++ 꼴 스칼라 참조 tests/cpp/route_ref_main.cpp (헤더 머리 주석의 식을 사슴 하나·double 로 옮긴 것 — 엔진 코드 아님)가 기하·길 셈 줄·적용·손 장면 통계·
 마스크·다시 난 개체·관측 사례·도망 길 기록 장면의 길 칸(놓침·쫓김·가림·refled·길별 반사 스텝·마지막 끝 스텝)을 비트 단위로 다시 낸다(g++ 가 있으면
-시험이 컴파일해 돌린다). 길 셈 루프 통계·기준 루프 지문·도망 길 기록 장면의 끝 까닭별 by_route 는 세계 전체·도망 기록 전체가 필요하다(이식 단계의 UE
-시험 Route.StepGolden·Route.World·Route.FlightRecord). 기준 루프 세계 설정은 템플릿 FillWorldConfig(TConfig&) 라 이 헤더는 EcoWorldV3.h 없이도
-컴파일된다(이식 전 C++ 에 없는 칸 C.WildFlight.bRoute 를 쓴다). 기준 루프 두뇌의 바탕(내장 R1b = PolicyWeightsV3.h)이 route0 의 앞 18 열·출력층과 같은지도
+시험이 컴파일해 돌린다). 10-24 C++ 이식 뒤에는 엔진 함수(EcoWorldV3.h Detail::RouteShelterGeometry·RouteStep·RouteApply, EcoObservationV3.h WriteRouteObs,
+EcoPolicyV3Inference.h ApplyRouteMaskRows, FlightUpdate 의 도망 길 기록)와 기준 루프 지문·기록·도망 길 기록 장면의 끝 까닭별 by_route 를
+AI/Policy/Tests/RouteGoldenCheckV3.h 가 보고 g++ 하네스 tests/cpp/route_v3_main.cpp 가 그것을 돌린다(UE 자동화 Route.* 는 다음 단계).
+기준 루프 세계 설정은 템플릿 FillWorldConfig(TConfig&) 라 이 헤더는 EcoWorldV3.h 없이도 컴파일된다(C.WildFlight.bRoute 를 쓴다). 기준 루프 두뇌의 바탕(내장 R1b = PolicyWeightsV3.h)이 route0 의 앞 18 열·출력층과 같은지도
 본다(C++ 이 내장 망을 24 열로 늘려 같은 두뇌를 만든다는 머리 주석의 전제).
 이름: '길 셈 루프'(kLoop* — 사슴 32, 900 스텝, 줄을 적는 루프)와 '기준 루프'(kWorld* — 사슴 48, 450 스텝, 두뇌 둘의 지문)는 다른 루프다.
 결정성: 시각·절대 경로를 적지 않는다. 같은 코드·설정이면 바이트 단위로 같은 헤더·JSON 이 나온다(시험).
@@ -70,8 +74,8 @@ for _p in ("live", "adapt", "mirror", "r4", "wild2"):              # 기준 루�
 
 import export_weights_v3 as ew
 from env_v2.config import load_v2_config
-from env_v2.rep_policy import (HIDE_COVER_OBS, MASK_VERSION_ROUTE, ROUTE_SLOT_RESERVED, ROUTE_SLOT_RUN, ROUTE_SLOT_SHELTER, THREAT_RECENCY_OBS,
-                               action_mask, allowed_mask_of, mask_version_of, rep_params, sample_masked)
+from env_v2.rep_policy import (FLEE_GATE_KEY, HIDE_COVER_OBS, MASK_VERSION_ROUTE, MASK_VERSION_ROUTE_GATE, ROUTE_SLOT_RESERVED, ROUTE_SLOT_RUN,
+                               ROUTE_SLOT_SHELTER, THREAT_RECENCY_OBS, action_mask, allowed_mask_of, mask_version_of, rep_params, sample_masked)
 from env_v2.repertoire import FLEE, FREEZE, GRAZE, HIDE, SLEEP
 from env_v2.steering import EPS
 from env_v2.world import (ROUTE_FEAS_SHELTER, ROUTE_LOCK_STEPS, ROUTE_NAMES, ROUTE_NONE, ROUTE_OBS_NAMES, ROUTE_RUN, ROUTE_SHELTER,
@@ -82,7 +86,8 @@ HERE = Path(__file__).resolve().parent
 ROUTE_CFG = HERE / "configs" / "v3_wild3_route_mirror.yaml"
 R6_CFG = HERE / "configs" / "v3_r6_train.yaml"
 LAYOUT = HERE / "results" / "v3" / "wild2" / "trees" / "tree_layout.json"
-DEFAULT_OUT = HERE / "results" / "v3" / "route" / "port"
+DEFAULT_OUT = HERE / "results" / "v3" / "route" / "port"                                    # JSON (파이썬 시험·판 단위 대조 자료 옆)
+DEFAULT_HEADER_OUT = HERE.parent / "AdaptiveEcosystem" / "Source" / "AdaptiveEcosystem" / "AI" / "Policy"   # 헤더 (다른 *GoldenVectorsV3.h 와 같은 자리)
 HEADER = "RouteGoldenVectorsV3.h"
 JSON_NAME = "RouteGoldenVectorsV3.json"
 CONTRACT_OBS24 = 0xE302DEE198197444
@@ -139,7 +144,7 @@ GEO_OUT_I = ("k", "ok", "keep_ok")
 GEO_OUT_D = ("mu", "e", "dirx", "diry", "keep_mu", "keep_dirx", "keep_diry")
 MASK_INT = ("kind", "override", "rdecide", "route_now", "reads", "wake", "behavior", "a0", "a1", "a2", "a3", "a4", "m0", "m1", "m2", "m3", "m4")
 RESPAWN_INT = ("t", "slot", "cause", "b_mode", "b_route", "b_k", "b_age", "b_feas", "a_mode", "a_route", "a_k", "a_age", "a_feas", "a_decide")
-MASK_KINDS = ("dec2", "dec1", "keep_run", "keep_shelter", "crouch", "other_reads", "other_hold", "other_wake", "hand")
+MASK_KINDS = ("dec2", "dec1", "keep_run", "keep_shelter", "crouch", "other_reads", "other_hold", "other_wake", "hand", "gate")
 SRC_SCENE, SRC_LOOP = 0, 1
 
 
@@ -828,14 +833,18 @@ def hand_mask_rows(names) -> tuple[list, list]:
     base[list(names).index("pred_count")] = np.float32(0.125)
     base[list(names).index("cover_dist")] = np.float32(0.05)
 
-    def one(override, rdecide, route_now, reads, wake, behavior, o22):
+    def one(override, rdecide, route_now, reads, wake, behavior, o22, gate=False):
         o = base.copy()
         o[k22] = np.float32(o22)
         o[k22 - 1] = np.float32(1.0 if override == WF_PANIC else 0.0)
         pk = dict(override=np.array([override], dtype=np.int8), route_decide=np.array([rdecide]), route_now=np.array([route_now]),
                   reads=np.array([reads]), wake_decide=np.array([wake]), behavior=np.array([behavior], dtype=np.int64))
+        if gate:
+            pk[FLEE_GATE_KEY] = False           # 판 5 (rep_peek 이 판 5 세계에서 알리는 값 — rep_policy.mask_version_of)
+        if gate != (mask_version_of(names, pk.get(FLEE_GATE_KEY, True)) == MASK_VERSION_ROUTE_GATE):
+            raise SystemExit("판 5 손 줄의 마스크 판이 5 가 아니다")
         m = action_mask(pk, o[None], {"allowed_mask": allowed}, obs_names=names)
-        ri, ro = mask_row(MASK_KINDS.index("hand"), pk, m, o[None], allowed, 0)
+        ri, ro = mask_row(MASK_KINDS.index("gate" if gate else "hand"), pk, m, o[None], allowed, 0)
         rows.append(ri)
         obs_rows.append(ro)
 
@@ -848,6 +857,13 @@ def hand_mask_rows(names) -> tuple[list, list]:
     one(WF_NONE, False, ROUTE_NONE, True, False, GRAZE, 0.0)        # 그 밖 결정: 허용 ∧ 가능 (얼기·잠 막힘)
     one(WF_NONE, False, ROUTE_NONE, True, True, GRAZE, 0.0)         # 기상 결정
     one(WF_NONE, False, ROUTE_NONE, False, False, HIDE, 0.0)        # 비결정: 지금 행동 한 칸
+    # 10-24 판 5 (이식 계획서 13-3 — 덮기 밖 결정 + 위협을 앎(FLEE 가능)이면 칸 1 막힘, 덮기 줄·비결정은 판 4 그대로)
+    one(WF_NONE, False, ROUTE_NONE, True, False, GRAZE, 0.0, gate=True)      # 덮기 밖 결정: 판 2 − 칸 1 = {0, 2}
+    one(WF_NONE, False, ROUTE_NONE, True, True, HIDE, 0.0, gate=True)        # 기상 결정: 잠 막힘 + 칸 1 막힘
+    one(WF_NONE, False, ROUTE_NONE, False, False, FLEE, 0.0, gate=True)      # 덮기 밖 비결정 FLEE (반사가 끝난 뒤 잠금 중): FLEE 한 칸 그대로
+    one(WF_PANIC, True, ROUTE_RUN, True, False, FLEE, 0.2, gate=True)        # 도주 길 결정: {1, 4} 그대로
+    one(WF_PANIC, False, ROUTE_SHELTER, False, False, FLEE, 0.0, gate=True)  # 도주 비결정 SHELTER: {4} 그대로
+    one(WF_SHELTER, False, ROUTE_NONE, False, False, HIDE, 0.0, gate=True)   # 웅크림: {2} 그대로
     return rows, obs_rows
 
 
@@ -1325,7 +1341,7 @@ def world_config_code(wb: dict) -> list[str]:
     if wb["weather"].get("schedule_rows", 0):
         raise SystemExit("날씨 시간표는 옮기지 않는다")
     out.append("\t\tC.Obstacles.Foliage.bEnabled = C.Obstacles.bEnabled && C.Obstacles.Foliage.bEnabled;   // EcoV3Eval ConfigOf 와 같다")
-    out.append("\t\tC.WildFlight.bRoute = true;   // ★ 두뇌 길 (계획서 1-2 — InitWorld 가 bEnabled 와 묶는다). 이식 전 C++ 에는 없는 칸")
+    out.append("\t\tC.WildFlight.bRoute = true;   // ★ 두뇌 길 (계획서 1-2 — InitWorld 가 bEnabled 와 묶는다. 평가기는 두뇌 판이 SetModelRoute 로 정한다)")
     out.append("\t\tC.bSenseStats = false;   // 평가기와 같다 (기록만)")
     out.append("\t\tC.bFlightStats = true;")
     return out
@@ -1375,6 +1391,9 @@ PLAN = (
     ("mask_crouch", "마스크 판 4 — 웅크림 HIDE"),
     ("mask_other_reads", "마스크 판 4 — 그 밖 결정 (판 2)"),
     ("mask_other_hold", "마스크 판 4 — 그 밖 비결정 (판 2)"),
+    ("mask_gate_free", "마스크 판 5 — 덮기 밖 결정에서 칸 1(FLEE) 막힘 (위협을 앎)"),
+    ("mask_gate_hold", "마스크 판 5 — 덮기 밖 비결정 FLEE 한 칸은 그대로"),
+    ("mask_gate_over", "마스크 판 5 — 도주·웅크림 줄은 판 4 그대로"),
     ("stats_scene", "길 통계 — 손 장면 틱마다"),
     ("stats_loop", "길 통계 — 기준 루프"),
     ("respawn_run", "다시 난 개체 — RUN 길에서 죽음"),
@@ -1444,6 +1463,11 @@ def coverage(data: dict) -> dict:
     mk = [data["kMaskInt"][nk * j] for j in range(len(data["kMaskInt"]) // nk)]
     for kind in ("dec2", "dec1", "keep_run", "keep_shelter", "crouch", "other_reads", "other_hold"):
         c["mask_" + kind] = sum(1 for x in mk if MASK_KINDS[x] == kind)
+    mr = [data["kMaskInt"][nk * j:nk * (j + 1)] for j in range(len(data["kMaskInt"]) // nk)]
+    gr = [r for r in mr if MASK_KINDS[r[0]] == "gate"]      # 칸: kind·override·rdecide·route_now·reads·wake·behavior·a0..a4·m0..m4
+    c["mask_gate_free"] = sum(1 for r in gr if r[1] == WF_NONE and r[4] and r[7 + FLEE] and not r[12 + FLEE])
+    c["mask_gate_hold"] = sum(1 for r in gr if r[1] == WF_NONE and not r[4] and r[6] == FLEE and r[12 + FLEE])
+    c["mask_gate_over"] = sum(1 for r in gr if r[1] in (WF_PANIC, WF_SHELTER))
     ns = len(STATS_INT)
     st = data["kStatsInt"]
     c["stats_scene"] = sum(1 for j in range(len(st) // ns) if st[ns * j] == SRC_SCENE)
@@ -1767,7 +1791,8 @@ def render_header(b: dict) -> str:
         f"{b['world']['seed']}(기준 루프). 같은 내용 JSON = {JSON_NAME} (배열 이름이 같다).",
         "// v3 두 길 두뇌(RUN·SHELTER — 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 16절) 장면 골든. 정의: herbivore_rl/env_v2/world.py 모듈 docstring",
         "// '야생 1단계' (w3) 두뇌 길 (`_route_step`·`_route_apply`·`flight_route_geometry` SHELTER·`route_stats`), env_v2/rep_policy.py 마스크 판 4.",
-        "// 아직 Source 에 넣지 않았다(results/v3/route/port/ — C++ 이식 단계가 Tests 와 함께 옮긴다).",
+        "// 10-24 C++ 이식: 검사 본문 Tests/RouteGoldenCheckV3.h (g++ herbivore_rl/tests/cpp/route_v3_main.cpp — 엔진 함수), 같은 내용 JSON 은",
+        "// herbivore_rl/results/v3/route/port/ (판 단위 궤적 지문·세계 기록 옆).",
         "//",
         "// 길 셈 한 줄 (사슴 하나, 스텝 끝 H — `_route_step`). 입력: prev_mode·next_mode(덮기 WF_*), alive0(스텝 첫머리 산), executed(이번 스텝에 실행한 길 —",
         "//   길 통계 steps), 전 상태 b_route·b_k·b_age·b_feas, 사슴 자리 p, a₀(은신처 굽히기 전 반사 방향), run(반사 최종 방향 — 은신처 굽히기·가장자리·벽 뒤),",
@@ -1785,6 +1810,7 @@ def render_header(b: dict) -> str:
         "//   invalid_shelter 는 무효, steps_* = 산(alive0) 사슴의 executed 길별 수.",
         "// 마스크 판 4 한 줄: override 도주면 결정 ? {1, 4 (관측 22 > 0)} : {지금 길 한 칸}, 웅크림이면 {2}, 그 밖 = 판 2 (a ∧ 가능 ∧ reads, 기상 결정은 잠",
         "//   막음, reads 가 아니면 지금 행동 한 칸). reads·wake 는 판 4 미리 보기 값(덮기 스텝은 결정이 아니다).",
+        "//   종류 'gate' 줄은 판 5 (= 판 4 + 반사 밖 두뇌 FLEE 막음 — 이식 계획서 13-1): override 가 도주·웅크림이 아니고 reads 면 칸 1 도 막는다.",
         "// 관측 세 칸 한 사례 (WriteRouteObs(bPanic, bOk, Mu, E) — 계획서 3절): 도주 ? (1, ok ? (float)clip(μ/10) : 0, ok ? (float)clip(e/20) : 0) : 0.",
         "//   double 로 나누고(역수 곱 아님) clip 한 뒤 float 로 내린다(가까운 짝수). μ = +∞ 는 1.",
         "// 기준 루프 (계획서 10-1 의 5·6, 두뇌 둘): 거울 세계(부활 없음, 길 켬) kWorldN 마리 kWorldSteps 스텝. 시작 상태 = 길 끈 같은 시드 세계의 평가기 일",
@@ -1854,25 +1880,28 @@ def render_json(b: dict) -> str:
     return "\n".join(parts) + "\n"
 
 
-def write(out: Path) -> dict:
+def write(out: Path | None = None) -> dict:
+    """out 이 있으면 헤더·JSON 을 그 폴더에(시험), 없으면 헤더는 DEFAULT_HEADER_OUT(Source AI/Policy)·JSON 은 DEFAULT_OUT(results/v3/route/port)에 쓴다."""
     b = build()
-    out = Path(out)
-    out.mkdir(parents=True, exist_ok=True)
+    hdir = Path(out) if out is not None else DEFAULT_HEADER_OUT
+    jdir = Path(out) if out is not None else DEFAULT_OUT
+    for d in (hdir, jdir):
+        d.mkdir(parents=True, exist_ok=True)
     h = render_header(b)
     j = render_json(b)
-    (out / HEADER).write_text(h, encoding="utf-8", newline="\n")
-    (out / JSON_NAME).write_text(j, encoding="utf-8", newline="\n")
-    return dict(build=b, header=h, json=j)
+    (hdir / HEADER).write_text(h, encoding="utf-8", newline="\n")
+    (jdir / JSON_NAME).write_text(j, encoding="utf-8", newline="\n")
+    return dict(build=b, header=h, json=j, header_path=hdir / HEADER, json_path=jdir / JSON_NAME)
 
 
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
-    ap.add_argument("--out", type=Path, default=DEFAULT_OUT)
+    ap.add_argument("--out", type=Path, default=None, help="헤더·JSON 을 함께 쓸 폴더 (시험용). 없으면 헤더 = Source AI/Policy, JSON = results/v3/route/port")
     a = ap.parse_args(argv)
-    out = a.out if a.out.is_absolute() else Path.cwd() / a.out
+    out = None if a.out is None else (a.out if a.out.is_absolute() else Path.cwd() / a.out)
     r = write(out)
     b = r["build"]
-    print(f"썼다: {out / HEADER} ({len(r['header'].encode('utf-8'))} 바이트), {out / JSON_NAME} ({len(r['json'].encode('utf-8'))} 바이트)")
+    print(f"썼다: {r['header_path']} ({len(r['header'].encode('utf-8'))} 바이트), {r['json_path']} ({len(r['json'].encode('utf-8'))} 바이트)")
     print(f"손 장면 {len(b['scenes'])}: " + " / ".join(f"{s['name']} (줄 {s['rows']}·적용 {s['applies']})" for s in b["scenes"]))
     lp = b["loop"]
     print(f"기하 {len(b['geo'])} · 길 셈 루프 줄 {lp['rows']}·적용 {lp['applies']}·통계 {lp['stats']}·죽음 {lp['deaths']} · 마스크 "

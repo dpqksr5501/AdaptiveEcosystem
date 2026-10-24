@@ -5,9 +5,9 @@
 //   도망 길 기록 장면의 길 칸(길별 반사 스텝·마지막 끝 스텝·놓침·쫓김·가림·refled — 끝 까닭별 by_route 는 UE Route.FlightRecord),
 //   기준 루프 머리 칸(배열 크기·두뇌 편향·근접 동점 없음 — 지문·기록 자체는 세계 전체가 필요해 이식 단계의 Route.World 시험이 본다).
 //   계획서: AdaptiveEcosystem/Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 10-1.
-// 엔진 코드가 아니라 식의 참조다 — C++ 이식 단계는 EcoWorldV3 의 함수로 같은 검사를 UE 자동화 시험과 함께 둔다.
+// 엔진 코드가 아니라 식의 참조다 — 10-24 C++ 이식 뒤 엔진 함수로 같은 골든을 보는 하네스는 route_v3_main.cpp (검사 본문 AI/Policy/Tests/RouteGoldenCheckV3.h)다.
 //
-//   g++ -std=c++17 -O2 -ffp-contract=off -I <골든 헤더 폴더> route_ref_main.cpp   (FMA 축약은 μ·e 의 마지막 비트를 바꿀 수 있다)
+//   g++ -std=c++17 -O2 -ffp-contract=off -I <AI/Policy 폴더 — 골든 헤더 자리> route_ref_main.cpp   (FMA 축약은 μ·e 의 마지막 비트를 바꿀 수 있다)
 //   하나라도 어긋나면 종료 코드 1, 다 맞으면 'PASS'.
 //
 // 자동 실행: herbivore_rl/tests/test_route_port_v3.py
@@ -15,6 +15,7 @@
 #include <cmath>
 #include <cstdint>
 #include <cstdio>
+#include <cstring>
 #include <limits>
 
 #include "RouteGoldenVectorsV3.h"
@@ -319,9 +320,23 @@ namespace
 		}
 	}
 
-	// 마스크 판 4 한 줄
+	// 마스크 판 4 한 줄 (종류 'gate' 는 판 5 = 판 4 + 덮기 밖 결정 줄의 칸 1 막힘 — 이식 계획서 13-1)
+	int GateKind()
+	{
+		for (int k = 0; k < static_cast<int>(sizeof(G::kMaskKinds) / sizeof(G::kMaskKinds[0])); ++k)
+		{
+			if (std::strcmp(G::kMaskKinds[k], "gate") == 0)
+			{
+				return k;
+			}
+		}
+		return -1;
+	}
+
 	void CheckMask()
 	{
+		const int Gate = GateKind();
+		if (Gate < 0) Fail("mask gate kind", 0, -1, 0);
 		for (int r = 0; r < G::kMaskRows; ++r)
 		{
 			const std::int32_t* I = G::kMaskInt + kMaskIntN * r;
@@ -359,6 +374,10 @@ namespace
 				{
 					M[j] = j == 2;
 				}
+			}
+			else if (I[0] == Gate && Reads)
+			{
+				M[G::kSlotRun] = 0;                                          // 판 5: 덮기 밖 결정 줄은 FLEE 막음 (rep_policy.py `_gate_free_rows`)
 			}
 			if (M[G::kSlotReserved]) Fail("mask slot 3 open", r, 1, 0);
 			for (int j = 0; j < 5; ++j)

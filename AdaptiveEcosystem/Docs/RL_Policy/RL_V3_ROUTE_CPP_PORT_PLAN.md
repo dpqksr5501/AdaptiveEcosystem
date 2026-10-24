@@ -1,9 +1,16 @@
 # 두 길 두뇌 C++ 이식 계획서 (RUN·SHELTER, 관측 24·마스크 판 4)
 
-- 상태: 계획만 적었다. 코드·빌드·UBT·자동화·학습은 하지 않았다.
+- 상태: 처음에는 계획만 적었다(코드·빌드·UBT·자동화·학습 없음). 10-24 에 아래 차례로 이식하고 검토했다.
   - 10-23 검토: 파이썬 줄과 다시 대조해 의사 코드의 남은 값 버그 둘(2-7 (나) 길 읽음 지우기 자리, (다) `bCommittedRouteReads`), `A0` 범위, 도주 아님 지울 칸,
     refled 스텝 번호를 고쳤다. 10-1·10-2 를 실제로 만든 골든·판 대조 자료(`results/v3/route/port/`)에 맞췄다(시드 2 개, 스텝 지문, 도망 길 기록 장면).
   - 10-23 R7: R6 기각 뒤 다음 후보는 마스크 판 5(= 판 4 + 반사 밖 두뇌 FLEE 막음)다. 바뀐 마스크 줄·계약·이식 영향은 13절(설계 17절). 이식은 R7 통과 뒤다.
+  - 10-24 이식 1/2 (엔진 무관 부분 — R7e 판정 통과 뒤): 엔진 무관 헤더(EcoWorldV3.h·EcoObservationV3.h·EcoPolicyV3Inference.h)·평가기(Tools/EcoV3Eval)·
+    `ceval.py` 에 판 4·5 를 옮기고 골든을 Source 로 옮겼다. 한 것·정한 것(12절 질문)·대조 결과는 14절. UE 로더·통합 서브시스템·UE 자동화·UBT 는 2/2 몫이다.
+  - 10-24 이식 2/2 (게임 쪽): UE 두뇌 로더(판 4·5)·통합 서브시스템(SyncBrain 걸기 전 검사·길 켜고 끄기)·화면·스냅숏·UE 자동화 14 개를 더했다. 직접 UBT 두 가지
+    빌드(기본·`-DisableAdaptiveUnity`) 성공, 자동화 `AdaptiveEcosystem` 214 개 실패 0. 게임 기본 두뇌·기본 설정은 그대로다(R1b-F, 두 길은 판 4·5 두뇌를 걸 때만).
+    한 것·정한 것·검증은 15절. 계약 문서 `POLICY_CONTRACT_V3.md` 갱신(11-1 의 8)과 눈으로 보는 PIE 는 남았다.
+  - 10-24 적대적 검토 (1/2·2/2 뒤): 파이썬 줄과 C++ 줄을 다시 견줘 결함 셋(게임 refled 시계, `ceval.py` 근접 동점 진단, 계약 대조의 `decide.on`)을 고쳤다.
+    세계 동역학·두뇌 출력·파이썬 대조 값은 바뀌지 않았다. 고친 것·다시 확인한 것·남은 차이·검증은 16절.
 - 기준 커밋: 파이썬 두 길 구현 `c109bf0`, 10 초 지켜보기 `2aac3e5`(HEAD).
   - 파이썬 줄 번호는 HEAD `2aac3e5` 의 `herbivore_rl/…` 이다(작업 트리와 같다).
   - C++ 줄 번호는 `git show 2aac3e5:AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/<파일>` 이다. 작업 트리의 `EcoWorldV3.h` 는 다른 갈래(숨음·잡힘 비율)가
@@ -361,6 +368,8 @@ W.Stats.Decisions += (D.bCommittedReads || D.bCommittedRouteReads) ? 1 : 0;   //
 - **바꾸는 꼴**: `FlightUpdate(…, FFlightRouteStats* RS = nullptr, std::int64_t StepNow = 0)` — `nullptr` 이면 지금 줄 그대로(도망 골든·평가기 기록 바이트 그대로).
   `StepNow` 는 이번 스텝 번호(`Step` H 에서 `W.T − 1`)이고 refled 만 쓴다. 골든 도망 길 기록 장면은 이 값을 `kFsTickT − 1` 로 준다(10-1 의 6).
   `Step` H :3311 은 `bRoute` 일 때만 넘긴다.
+  - (10-24 적대적 검토 — 16-1 의 1: `Step` H 는 `W.T − 1` 대신 도망 기록 시계 `FFlightStats::Clock` 을 넘긴다. 차이가 같아 파이썬·골든 값은 그대로이고,
+    통합 모드에서 팀 시계에 다시 맞출 때 `W.T` 가 뛰어도 refled 가 틀리지 않는다.)
 - 보고: ★ `FlightRouteReportOf(RouteStats, FlightRouteStats, 열린 도망)` → 파이썬 `flight_stats()['route']` 와 같은 키(6483-6488 + `route_stats` 칸).
 - **도망 기록과의 관계**: 길 기록은 `FFlightStats`(끝 까닭·쫓긴 시간·10-23 숨은 뒤 지켜보기 hide)를 하나도 바꾸지 않는 **덧붙임 칸**이다. 지켜보기(hide)는 다른 갈래가
   `FFlightTrack::Watch`·`FFlightStats` 에 넣는 중이고, 길 기록은 그 위에 쌓는다(11-3). 파이썬도 `hide` 와 `route` 는 따로다(6455-6465).
@@ -464,6 +473,7 @@ W.Stats.Decisions += (D.bCommittedReads || D.bCommittedRouteReads) ? 1 : 0;   //
 
 ### 10-1. 장면 골든 (UE 자동화 + g++ 하네스)
 
+- (10-24 이식 1/2 에서 헤더를 Source `AI/Policy/` 로 옮기고 검사 본문 `Tests/RouteGoldenCheckV3.h`·g++ `route_v3_main.cpp` 를 더했다 — 14-1. 아래는 그 전 글이다.)
 - 내보내기 `herbivore_rl/export_golden_v3_route.py`(만들었다 — 손으로 고치지 않는 생성 파일). 지금은 Source 밖
   `herbivore_rl/results/v3/route/port/RouteGoldenVectorsV3.h` + 같은 내용 `RouteGoldenVectorsV3.json` 에 쓴다((나) 갈래와 겹치지 않게). 이식 11-1 단계 2 에서
   `--out` 으로 `AI/Policy/RouteGoldenVectorsV3.h` 에 쓰고 검사 본문 `Tests/RouteGoldenCheckV3.h`, UE `Tests/EcoRouteV3Test.cpp` 를 더한다
@@ -606,6 +616,8 @@ herbivore_rl/results/v3/route/port/
 
 ## 12. 열린 질문 (고치지 않았다 — 정할 것)
 
+> 10-24 이식 1/2 에서 정한 것은 14-2 에 적었다(권고가 있으면 권고대로, 없으면 파이썬 동작과 같게 — 비트 일치 우선). 아래 글은 그때 물은 그대로 둔다.
+
 1. **판 4 두뇌로 바꾸는 순간의 열린 도망.** 설계 11절은 'RUN 으로 두고(age 0), 다음 결정 시점부터'라고 적었다. 파이썬 규칙대로면 길 상태가 없는 도주(`cur < 0`,
    `world.py:6037`)는 바로 그 H 에서 결정이다. 'RUN·age 0'으로 두면 결정 때 가능 비트(`route_feas`)를 무엇으로 둘지 정해야 하고, SHELTER 가 이미 가능하면
    잠금이 끝날 때까지 고를 기회가 없다. **권고: 파이썬 `cur < 0` 규칙(교체 스텝 H 에서 새 두뇌가 곧바로 고름).**
@@ -691,6 +703,165 @@ herbivore_rl/results/v3/route/port/
   `brain_golden_config_for`, `features.py` OPTIONAL_KEYS.
 
 ---
+
+## 14. 10-24 이식 1/2 — 엔진 무관 부분 (한 것·정한 것·대조)
+
+- 범위: R7e 판정 통과(`ae789ce`·`1e26df6`) 뒤 판 4·5 를 엔진 무관 헤더·평가기·`ceval.py` 에 옮겼다. 파이썬 세계 코드(`env_v2`)·게임 기본 두뇌(R1b-F)·기본 설정은
+  고치지 않았다. 두 길은 두뇌가 켠다(SetModelRoute·SetModelFleeGate — 기본 끔). UE 로더(`EcoV3Brain.h/.cpp`)·통합 서브시스템·화면·스냅숏·UE 자동화 `Route.*`·
+  UBT·unity 끈 빌드·PIE 는 2/2 몫이다(빌드는 그때 함께 한다 — 이번에는 g++ 하네스·평가기 빌드까지).
+
+### 14-1. 한 것
+
+| 자리 | 한 것 |
+|---|---|
+| `EcoObservationV3.h` | 관측 21~23 칸 번호·이름(`kObsInPanic`·`kObsShelterReach`·`kObsShelterEdge`·`kRouteObsNames`), `kObsDimRoute` 24, `kMaxObsDim` 21 → 24, `WriteRouteObs` (3절) |
+| `EcoPolicyV3Inference.h` | 계약 해시 `kContractHashObs24Mask4`·`kContractHashObs24Mask5`, 판 번호 `kMaskVersionRoute` 4·`kMaskVersionRouteGate` 5, 길 칸 `kRouteSlot*`, `ApplyRouteMaskRows`(판 4·5 덮기 줄 + 판 5 반사 밖 FLEE 막음 — 4절·13-1). 마스크 코드는 `ComposeActionMask` 가 있는 이 파일에 두었다(`EcoRepertoire.h` 는 고치지 않았다) |
+| `EcoWorldV3.h` 상수·상태 | 1-3 의 길 상수, `FWildFlightConfig::bRoute`, `FWorldState::bFleeGate`, `FHerbDecision` 길 칸 15 개·`FHerbPerception::RouteObs`(2-8), `FRouteStats`·`FFlightRouteStats`·`FFlightRouteReport`(6절), `FFlightTrack::RouteSteps`·`LastEndT`, `FFlightDeerStep::Route`, `FFlightOpen` 길별 잘림 |
+| `EcoWorldV3.h` 함수 | `InitWorld`(bRoute ∧ bEnabled), `SetModelObsDim`(24 받음), `SetModelRoute`·`SetModelFleeGate`, `Detail::WallKeep`(반사 줄에서 뽑음 — 연산 그대로), `Detail::RouteShelterGeometry`·`ClearRoute`·`RouteStep`·`RouteApply`(사슴 하나의 순수 함수 — 골든이 직접 부른다), `Detail::NetInputOf`(망 입력 18·21·24), `DecideHerb`(첫머리 길 요청 지움·길 결정 줄 망·판 5 막음), `UpdateWildFlight`(실행한 길 셈·죽음 분기 지움·a₀·길 단계), `FlightStepEnd`(실행한 길·도망 길 기록 RS·StepNow), `FlightClose`·`FlightUpdate`(선택 인자 RS·StepNow — nullptr 면 지금 줄 그대로), `FlightRouteReportOf`, `Step` A(`RouteApply`·결정 수에 길 결정) |
+| 골든 | `RouteGoldenVectorsV3.h` 를 Source `AI/Policy/` 로 옮겼다(내보내기 기본 자리, 같은 내용 JSON 은 `port/` 에 남김). 13-3 의 판 5 마스크 손 줄 6 개(종류 `gate`)를 더했다(마스크 51 → 57 줄, 꼬리표 `mask_gate_free`·`mask_gate_hold`·`mask_gate_over`) |
+| 검사 | `AI/Policy/Tests/RouteGoldenCheckV3.h`(엔진 함수 검사 본문 — 2/2 의 UE `Route.*` 가 같은 본문을 부른다), g++ `herbivore_rl/tests/cpp/route_v3_main.cpp`, 스칼라 참조 `route_ref_main.cpp` 는 판 5 줄·Source 헤더로, 새 시험 셋(`test_route_port_v3.py` 엔진 하네스, `test_ceval_v3.py` 길 세계 짝·150 스텝 비트 동일), `test_r7_mask5.py` 의 'ceval 은 판 5 를 거부' 시험을 '판 5 받음·판 6 거부'로 바꿈 |
+| 평가기 `Tools/EcoV3Eval` | 계약 넷(18·21 판 2, 24 판 4·5), 관측 이름 차례·`contract.flight_route`·`brain_flee_outside_reflex` 대조, 판 4·5 모델 허용의 얼기·잠 거부, 일의 `world.wild_flight.route`·`brain_flee_outside_reflex` 와 두뇌 판 짝(어긋나면 그 일 오류)·WildFlight 끈 세계 거부·실제 허용 확인, `flight.route` 기록(파이썬 `_flight_route_block` 과 같은 칸), trace 관측 24·길 칸·`route_gap`·`gap`, 선택 칸 `trace_digest`(궤적 지문 — `make_traces.digest_state` 와 같은 바이트), 근접 동점 진단(`min_gap`·`near_ties`·`min_route_gap`), `--brain-check` 의 `mask_version` |
+| `ceval.py` | `world_block` 이 route·판 5 를 받는다(판 6 은 거부, `route_fixed`·`quiet_end` 거부 그대로), `native_job` 두뇌 판 짝 검사, `python_trace`·`trace_diff` 길 칸·갈린 결정 로짓 차, `METRICS` 길 다섯, `VERSION_TAG` ceval-2 |
+| 그 밖 | `export_golden_v3_foliage.py` `CFG_SKIP`(world 블록 새 칸 — 숲 골든 바이트 그대로), `port/native_check.py`(판 단위 C++ 대조 — 아래 14-3) |
+
+### 14-2. 정한 것 (12절 질문 — 권고가 있으면 권고대로, 없으면 파이썬 동작과 같게)
+
+| 질문 | 정한 것 |
+|---|---|
+| 1 판 4 로 바꾸는 순간 | 권고대로 `cur < 0` 결정 — 길 상태 없는 열린 도주는 그 H 에서 새 두뇌가 곧바로 고른다(골든 `cur_none` 줄) |
+| 2 판 4 → 길 없는 두뇌 경계 | 8-2 본문대로 남긴다: `RouteStep` 이 `D.RouteRunDir`(그 H 의 반사 방향)를 두고, A 의 `RouteApply` 가 `bRoute` 거짓이면 고른 칸을 버리고 열린 도주의 `KeepDir` 를 그 값으로 둔다(곧바로 RUN). 남은 길 상태는 그 H 가 지운다. 파이썬에 없는 경우이고 끈 세계는 `Route` 가 늘 NONE 이라 그대로다 |
+| 3 부활 세계의 다시 난 사슴 | 기존 차이 그대로 둔다 — C++ 을 파이썬처럼 바꾸면 길 끈 부활 세계(평면 맵 기준 루프)도 바뀐다(끈 세계 비트 동일이 앞선다). C++ 죽음 분기가 길 상태·관측 21~23 을 지운다(골든 다시 난 줄의 지움·terminal_obs 0 은 `ClearRoute` 로 본다) |
+| 4 지워진·늦게 붙은 은신처 | 2-4 의 C++ 전용 두 줄로 충분(반경 0 은 후보에서 빼고, 유지 은신처가 반경 0·목록 밖이면 유지 거짓 → 무효 결정). 늦게 붙은 은신처는 다음 H 부터 후보다 — 파이썬 세계에 없어 판정과 견줄 일은 없다 |
+| 5 셈 시점 | 파이썬과 같게 — `picked`·`switches`·`choice`·`bad_shelter` 는 다음 A 의 적용 때 센다(뜻 = 적용된 결정, 판 끝 마지막 H 결정은 들지 않는다 — `FRouteStats` 주석) |
+| 6 관측 22·23 의 뜻 | 파이썬과 같게 — 유지 중에도 새로 고를 수 있는 k\* 의 값 |
+| 7 늑대 8 마리 이상 | 그대로(지금 무대 4 마리, C++ 차례 합·64 상한) |
+| 8 Social 제어와 SHELTER 길 · 9 디버그 색 | 통합 서브시스템 몫이라 2/2 에서 정한다(이번에 손대지 않았다) |
+| 10 로더의 허용 검사 위치 | 둘 다 — 파일을 읽을 때 모델 허용, 걸 때 실제 허용(평가기 `LoadBrain`·`Init`). 파이썬도 학습 설정 목록과 마스크(`check_route_allowed` — 실제 허용) 둘에서 본다 |
+| 11 `contract.flight_route` 대조 | 한다 — 평가기가 칸·관측·결정(10-24 검토 뒤 `on` 까지 — 16-1 의 3)·SHELTER 문턱·`freeze_sleep_must_be_blocked`·판 5 의 `brain_flee_outside_reflex` 를 C++ 상수와 견주고 다르면 그 칸 이름으로 거부(UE 로더는 2/2) |
+| 12 WildFlight 끈 지역의 판 4·5 두뇌 | 권고대로 거부 — 평가기는 그 일을 오류로 내고, `SetModelRoute`·`SetModelFleeGate` 도 `bEnabled` 와 묶는다. 통합의 '대기 두뇌 버리기'는 2/2 |
+| 13 근접 동점 | 10-2 조건 3 그대로(근접 동점 갈림은 허용, 그 밖 갈림 0). R7e 판 30 에서 갈림 없음(14-3) |
+| 14 옮기지 않는 것 | 확인 — `route_fixed`·`quiet_end`·COVER·OPEN 은 옮기지 않았고 평가기·`ceval.py` 가 거부한다 |
+| 15 판 2·3 의 결정 셈 | 기존 차이 그대로. 판 4·5 는 같다(`Stats.Decisions` = Arbiter 결정(덮기 아님) + 길 결정 = 파이썬 `_rep_accumulate`) |
+| 16 RUN 길에서 가능 2 → 0 | 파이썬과 같게 — 한 칸 결정도 결정이다 |
+| 17 교체 경계 스텝의 도망 길 기록 | 파이썬 식(`re_ = 반사 ? 실행한 길 : NONE`)과 같게 'none' 칸 — 교체 경계 한 스텝뿐이다 |
+| 13절 판 5 | `FWorldState::bFleeGate`·`SetModelFleeGate`·`ApplyRouteMaskRows`(덮기 밖 결정 줄 칸 1 막음)·평가기 판 5 받기. 선택 통계 `FleeGateFree`·`FleeGateFlee` 는 넣지 않았다 |
+| 그 밖 | 도주 비결정·웅크림 덮기 줄의 `D.Mask` 는 지금처럼 0 이다(망을 부르지 않는다 — 결과가 같다). 길 결정 줄만 `Mask {1, 4}`·로짓을 남긴다. 덮기 밖 결정의 관측 24 두뇌 망 입력은 길 세 칸(도주 밖이라 0)을 붙인다(`NetInputOf`) |
+
+### 14-3. 대조 결과 (10-24)
+
+| 대조 | 결과 |
+|---|---|
+| g++ 엔진 하네스 `route_v3_main.cpp` (`-O2 -ffp-contract=off -Wall -Wextra -Werror -Wshadow`) | PASS — 정의, 기하 90, 길 셈 줄 923, 적용 117, 손 장면 통계 32, 마스크 57(판 5 6 줄), 다시 난 9, 관측 37, 도망 길 기록 장면 10 틱(길 덩어리 182 칸·사슴 칸), 기준 루프 두뇌 둘 × 지문 451·기록 5·끝 길 덩어리. 묶어 곱하기(`-mfma -ffp-contract=fast`)면 기하·줄·루프 지문이 어긋난다(골든이 잡는다) |
+| g++ 스칼라 참조 `route_ref_main.cpp` (Source 헤더) | PASS |
+| MSVC VS2022 `cl /W4 /WX` + 그림자 변수(C4456~4459) 오류 + `/fp:precise` | 같은 검사 본문 모두 통과 (UBT 는 2/2) |
+| 기존 g++ 하네스 18 (도망·숲 시야·레퍼토리·파리티·돌아가기·장애물·날씨·무리·위협) | 통과 — 끈 세계 비트 그대로 |
+| 판 단위 `port/native_check.py` (route0·늘 SHELTER × N·G × 지역 셋 × 시드 34900·34901 × 1800) | 24/24 — 궤적 지문 1801 스텝 × 칸 아홉 첫 차이 없음, 세계 기록 정확히 같음(`flight.route`·`hide`·`episode` 포함) |
+| `ceval.py compare` R7e 두뇌(판 5 세계 — `route=true`·`brain_flee_outside_reflex=false`, 시드 34900~34904 × 지역 셋, 1800) | N 15/15·G 15/15 기록 정확히 같음(파이썬에만 있는 칸 없음), 궤적 셋 첫 비트 차이 없음·갈림 없음. C++ 근접 동점 진단: 망 결정 최소 로짓 차 1.14e-4, 길 결정 3.2e-4, 1e-4 밑 0 |
+| `ceval.py compare` 끈 세계(obs21zero, 같은 시드) | N 15/15·G 15/15, 궤적 셋 첫 비트 차이 없음 — 이식 전과 같다 |
+| pytest | `test_route_port_v3.py` 13 + 느린 `make_traces.py --check` 1, `test_ceval_v3.py` 를 넣은 골든·평가기 관련 묶음 186, `test_r7_mask5.py`·`test_foliage_v3.py`·`test_live_v3.py` 65 — 모두 통과 |
+
+- 설정 대조의 `world_allowed`(스냅숏 `[1,1,1,0,1]`·네이티브 `[1,1,1,0,0]`)는 이식 전부터 있는 표기 차이다(파이썬 = 실제 허용 목록, 스냅숏 = 세계 칸 — 두뇌 허용과 곱하면 같다, `test_ceval_v3.py`).
+
+## 15. 10-24 이식 2/2 — 게임 쪽 (한 것·정한 것·검증)
+
+- 범위: 1/2 의 엔진 무관 함수(`SetModelRoute`·`SetModelFleeGate`·길 단계)를 게임이 쓰게 했다. 엔진 무관 헤더·평가기·`ceval.py`·파이썬 세계 코드(`env_v2`)는 고치지 않았다.
+  게임 기본 두뇌(내장 R1b-F)·기본 설정(콘솔 변수)은 그대로다 — 두 길은 판 4·5 두뇌 파일을 `eco.V3Brain.Load`·`-EcoV3Brain=` 로 걸 때만 켜진다(콘솔 변수가 없다).
+
+### 15-1. 한 것
+
+| 자리 | 한 것 |
+|---|---|
+| `EcoV3Brain.h/.cpp` (로더) | 계약 줄 넷(셋째 `0xe302dee198197444` 관측 24 판 4, 넷째 `0xad7bad5e1acaf071` 관측 24 판 5 — 여섯 이름 `kRouteContractExtraNames`), `FEcoV3Brain::MaskVersion`·`bRoute()`(판 4·5)·`bFleeGate()`(판 5), `RouteContractDiff`(파일 `contract.flight_route` 의 slots·obs·decide(lock_steps·`on`(10-24 검토에서 더함 — 16-1 의 3)·feasible·`refeas_from`)·shelter 문턱·`freeze_sleep_must_be_blocked "effective_allowed"` 와 판 5 의 `brain_flee_outside_reflex: false`, 판 4 에는 그 칸이 없어야 함 — 평가기와 같은 칸 이름, 다르면 '계약 해시' 로 거부), 판 4·5 모델 허용에 얼기·잠 → '허용 칸' 거부, 거부 글에 해시 넷, `Describe` '관측 24 도망길(·반사 밖 도망 막음)', `eco.V3Brain.Info` 에 마스크 판, 저장소 `DiscardPending`(대기 두뇌 버리기 — 대기 되돌림이면 꺼낸 칸을 쌓개에 돌려놓음). 18·21 줄은 그대로 |
+| `EcoBrains/` | route0 `v3_r1_g995_s3_obs24route0.json`(= `results/v3/route/brains`, 가중치 `078c56be…`)·R7e `v3_r7_g995_s1_20m.json`(= `results/v3/r7e/brains`, `40d8710d…`)을 바이트 그대로 복사 — 시험이 이름으로 찾는다. 걸 때만 쓴다(시작 두뇌가 아니다) |
+| 통합 서브시스템 | `RouteBrainBlocker`(세계 하나 — 판 4·5 두뇌만: 도주 반사 끔, 실제 허용(두뇌 ∧ 세계 칸)의 얼기·잠, 먹기 없음)·`BrainBlocker`(모든 지역)·`ApplyBrainToWorld`(허용·관측 칸 수·`SetModelRoute(bRoute())`·`SetModelFleeGate(bFleeGate())` — `AddContext`·`SyncBrain` 이 같은 줄). `SyncBrain`: 대기 두뇌를 걸기 전에 검사해 어긋나면 버리고 경고 '[EcoV3I] 두뇌 거부 |'·거부 알림, 저장소 지금 두뇌를 이 월드에 걸 수 없으면(앞 Play·다른 월드가 건 판 5 두뇌를 도주 반사 끈 월드가 받음) 저장소는 그대로 두고 이 월드만 앞 두뇌(처음이면 내장). '두뇌 시작/바꿈' 줄의 지역 허용 뒤 '(두 길)'·'(두 길·반사 밖 도망 막음)' |
+| 화면 | 사슴 글자(`DeerLabel` 의 선택 인자 Route — 도주 덮기면 '도주(트인 쪽)' 연노랑 255,240,120·'도주(은신처)' 하늘색 110,230,255, 길 결정 스텝은 두뇌가 고른 칸 `ShownRoute`), 지역 맨 위 줄 '두뇌 <이름> 두 길(·반사 밖 도망 막음)', 넷째 줄 '길 <지역> \| 최근 60초: …'(`FEcoV3RouteTally` — 450 결정 스텝 창, 화면 키 734000 + 지역), 상태 줄 '두 길(마스크 판 n) …'(모든 지역 60 초 합). 두뇌 몫 `FEcoV3BrainTally::ReflexRun·ReflexShelter`(반사 스텝 가운데 실행한 길 — 세계 길 통계의 스텝 차) |
+| 기록 | 10 초 기록 '[EcoV3I] <지역> 길 \|'(길 통계가 있는 세계만 — 지금 켰거나 앞 두뇌가 센 누적): 구간·누적 `FEcoV3RouteSum::Text`·도주 시작·바꿈. 아홉째 줄 '<지역> 두뇌 \|' 꼴은 그대로(`compare_swap.py` 정규식) |
+| 스냅숏 (판 1 그대로, 더하기만) | `brain.mask_version`·`route`·`flee_gate`, 지역 `world.wild_flight.route`·`brain_flee_outside_reflex`(두뇌가 정한 값 — `ceval.world_block` 과 같은 이름, `adapt.py` 는 FEATURE_MAPS 밖이라 읽지 않는다), 지역 `flight.route`(길 통계가 있을 때만 — 파이썬 `flight_stats()['route']` 와 같은 칸 + 60 초 창). `settings` 는 그대로(새 콘솔 변수 없음 — `adapt.py IGNORE_SETTINGS` 고칠 것 없음) |
+| 자동화 (새 14) | `Policy.V3.Route.*` 7 (`Tests/EcoRouteV3Test.cpp` — Geometry·StepGolden·MaskRows·World·FlightRecord 은 1/2 의 검사 본문 `RouteGoldenCheckV3.h` 를 부른다, Off·ZeroIdentity), `Policy.V3.Brain.LoadObs24Route`·`RejectRoute`, `Policy.V3.Integrated.BrainObs24Route0`·`BrainRouteSwap`·`RouteRequiresWildFlight`·`RouteRefugeLifecycle`·`RouteDisplay` |
+
+### 15-2. 정한 것 (12절 질문 8·9·12 와 새로 생긴 것)
+
+| 질문 | 정한 것 |
+|---|---|
+| 8 Social 제어와 SHELTER 길 | 지금 순서 그대로 둔다 — `eco.IntegratedV3.SocialControl 1`(기본 0)이면 Social 훅(B 의 제어 입력)이 A 의 `RouteApply` 뒤에 와서 슬롯 쪽이 이긴다(덮기 도주와 같은 순서). 훅의 '위험 쪽으로 되돌아가지 않음' 검사는 `KeepDir`(= 고른 길 방향)를 Away 로 쓴다. 기본 0 이라 파리티·판정과 무관하고, 둘을 함께 켤 때의 우선은 팀 결정으로 남긴다 |
+| 9 디버그 색 | 계획서 예시대로 SHELTER 는 하늘색(110,230,255 — 웅크림 파랑 60,150,255 과 다름), RUN 은 노랑 계열 가운데 두뇌 도망 노랑(255,215,0)과 다른 연노랑(255,240,120). 길이 없으면(길 끈 두뇌) 지금 주황 그대로 — 끈 세계 글자·색은 바뀌지 않는다(`Integrated.RouteDisplay`) |
+| 12 WildFlight 끈 지역 (통합) | 권고대로 거부 — 걸기 전 검사가 한 지역이라도 걸리면 대기 두뇌를 버린다(지금 두뇌 유지). 저장소 함수 `DiscardPending` 을 더했다 |
+| 10 걸 때 실제 허용 | `RouteBrainBlocker` 가 두뇌 ∧ 세계 칸(`WorldAllowed`)으로 본다(`SetModelAllowed` 와 같은 식, 세계를 바꾸지 않고 미리). 파일 검사(모델 허용)와 둘 다다 |
+| 새: 저장소 지금 두뇌를 걸 수 없는 월드 | 대기 검사를 지나지 않고 들어오는 길(앞 Play 에 건 두뇌가 저장소에 남음·다른 PIE 월드가 걸음)은 저장소를 고치지 않고 이 월드만 앞 두뇌(첫 시작이면 내장)를 쓴다 — 저장소는 프로세스에 하나라 다른 월드의 두뇌를 빼앗지 않는다 |
+| 새: 10 초 기록 칸 자리 | 계획 8-3 은 '<지역> 두뇌 \|' 줄에 같은 칸을 붙이자고 했지만, 그 줄 끝을 읽는 정규식(`compare_swap.py`)을 깨지 않게 바로 뒤 따로 '<지역> 길 \|' 줄에 적었다 |
+| 새: 화면 길 | 스텝 끝(H 뒤) 길 결정 스텝은 `D.Route` 가 RUN 이고 고른 칸은 다음 A 가 적용한다. 화면은 두뇌가 고른 칸(칸 4 ∧ 가능이면 SHELTER — `ShownRoute`, `RouteApply` 와 같은 판정)을 보인다. 세계는 바꾸지 않는다 |
+| 새: 60 초 창 | 도망 기록 창(`EcoV3FlightTally.h`)과 같은 450 결정 스텝. 길을 끈 동안에도 매 스텝 넣어 창이 시각과 맞는다(그동안 길 칸은 늘지 않는다) |
+
+### 15-3. 검증 (10-24)
+
+| 검증 | 결과 |
+|---|---|
+| 직접 UBT `AdaptiveEcosystemEditor Win64 Development -WaitMutex -NoHotReloadFromIDE` | 성공 (경고 0). 처음 `-DisableAdaptiveUnity` 빌드에서 새 시험의 지역 변수 `W2` 가 v1 전역 `PolicyWeights.h` 를 가려 C4459 — 이름을 바꾼 뒤 성공 |
+| 직접 UBT `-DisableAdaptiveUnity` | 성공 (마지막 C++ 고침 뒤 두 빌드 모두 다시 성공) |
+| 자동화 `Automation RunTests AdaptiveEcosystem` (-NullRHI) | 214 개 실패 0 (213 Success + 1 기존 예상 경고 `Predation.SaveLoadGlobalEma` 저장 파일). 새 14 개 모두 통과 |
+| `Route.Geometry`·`StepGolden`·`MaskRows`·`World`·`FlightRecord` | UE(MSVC, 적응 unity) 빌드에서도 골든과 비트 단위로 같다 — 기하 90·줄 923·적용 117·통계 32·다시 난 9·관측 37·마스크 57·기준 루프 두뇌 둘 × 452·도망 길 기록 10 틱 어긋남 0 (g++ 하네스와 같은 결과) |
+| `Route.ZeroIdentity` | 통합 지역 셋(숲·고지·메마른 땅, 사슴 32·늑대 4) × 1800 스텝 route0(길 켬) = obs21zero(길 끔) 첫 갈림 없음, 기록 같음. 길 결정 410·실행한 길 스텝 11133·SHELTER 가 열린 결정 248 가운데 SHELTER 고름 0 |
+| `Integrated.BrainObs24Route0` | Mass 두 지역 180 초 route0 = obs21zero (자리·요청·덮기 밖 로짓 칸 0~3 비트 단위 — 칸 4 는 route0 이 출력층 줄을 바꿨고 늘 막힘), 길 결정 110 모두 RUN |
+| `Integrated.BrainRouteSwap` | 내장 → R7e 경계의 열린 도주가 그 H 에서 길 없음 결정, R7e 150 프레임 동안 SHELTER 고름 16, R7e → obs21zero 경계 뒤 길 상태 0·길 통계 멈춤, 되돌림 → R7e, 내장으로, 교체 넷, 스냅숏 칸, 마스크 위반·관측 칸 어긋남 0 |
+| 헤드리스 게임 (`/Game/JYU/Maps/LV_JYU_V3Integration -game -NullRHI -EcoV3Brain=v3_r7_g995_s1_20m -EcoV3BrainSwapAt=80 -EcoV3BrainSwapTo=builtin`, 100 초) | '두뇌 시작 … 관측 24 도망길·반사 밖 도망 막음 … (두 길·반사 밖 도망 막음)', 10 초마다 '<지역> 길 \|'(예: 80 초 Barren 누적 'RUN 29% · 은신처 71% (반사 사슴-스텝 2207) · 길 결정 114 · 은신처 고름 90/95 · 무효 2'), 반사 밖 두뇌 도망 0%, 80 초 내장으로 바꾼 뒤 '두 길 끔 (앞 두뇌가 센 누적)'·구간 0. 경고·오류 줄 없음 |
+| pytest (`herbivore_rl/`, PYTHONUTF8=1) | `test_route_port_v3`·`test_route2_v3`·`test_r7_mask5`·`test_ceval_v3`·`test_live_v3`·`test_flight_v3`·`test_flight_golden_v3` 115 통과·1 건너뜀(느린 `make_traces --check` — `ECO_ROUTE_PORT_SLOW=1` 일 때만, 파이썬·엔진 무관 헤더를 고치지 않았다). `test_ceval_v3` 의 EcoBrains 두뇌 파일 전부 검사(`--brain-check`)에 새 두 파일이 들고 통과 |
+
+- 눈으로 보는 PIE(사슴 색·지역 줄·은신처 도착 웅크림)는 이번에 하지 않았다 — 글자·색은 `Integrated.RouteDisplay`, 길 줄·기록은 헤드리스 게임으로 봤다.
+
+## 16. 10-24 적대적 검토 (이식 1/2·2/2 뒤 — 고친 것·다시 확인한 것·남은 차이·검증)
+
+- 방법: 파이썬 줄(`world.py` `step` 첫머리·`_wf_update`·`_route_step`·`_route_apply`·`_route_shelter`·`_route_override`·`rep_peek`·`_fl_update`·`_fl_close`·
+  `_rep_accumulate`, `rep_policy.py` `action_mask`·`_route_rows`·`_gate_free_rows`, `export_weights_v3.py` `contract_dict`·`flight_route_contract`)과 C++ 줄
+  (`EcoWorldV3.h` `Step` A·H·`UpdateWildFlight`·`Detail::Route*`·`DecideHerb`·`FlightUpdate`·`FlightClose`, `EcoPolicyV3Inference.h` `ApplyRouteMaskRows`,
+  로더·평가기·통합 서브시스템)을 줄마다 다시 견줬다. 볼 것: 스텝 차례·결정 조건·유지/무효·관측 시점·마스크 판 5·로더 계약·통계·사건 셈과의 관계,
+  끈 세계 비트 동일, 열린 질문 처리, 게임 교체 경계. 파이썬 세계 코드(`env_v2`)·게임 기본 두뇌·기본 설정은 고치지 않았다.
+
+### 16-1. 고친 것 (결함 셋 — 세계 동역학·두뇌 출력·파이썬 대조 값은 그대로)
+
+| # | 결함 | 고침 | 시험 |
+|---|---|---|---|
+| 1 | **게임 refled 시계.** `Step` H 가 도망 길 기록에 스텝 번호로 `W.T − 1` 을 넘겼다. 통합 모드의 `W.T` 는 `CheckClockDrift` 가 팀 시계에 다시 맞출 때 4 스텝 넘게 뛴다(뒤로도). 그러면 끝난 도망의 끝 스텝(`FFlightTrack::LastEndT`)과 새 도망의 스텝 번호가 다른 시계라 refled 가 틀린다 — 뒤로 뛰면 50 스텝 뒤 새 도망도 refled, 앞으로 뛰면 20 스텝 뒤 새 도망도 아님(옛 줄을 g++ 로 돌려 확인). 평가기·파이썬 대조에는 시계가 뛰지 않아 드러나지 않았다 | `FlightStepEnd` 가 도망 기록 시계 `FFlightStats::Clock`(FlightUpdate 를 부른 횟수 — 쫓김 사건 이음 창 `EpUntil` 과 같은 시계)을 넘긴다. 스텝마다 1 씩 늘어 `W.T − 1`·파이썬 `self.t − 1` 과 **차이가 같으므로** 평가기·골든·파이썬 값은 그대로다(판 24 의 refled 737 건 그대로). `FlightUpdate` 꼴·골든 장면(`StepNow = kFsTickT − 1`)은 그대로 | `Route.FlightRecord` 에 시계 줄: `W.T` 1000 → 10(뒤로)·100 → 5000(앞으로)·경계 38(refled)/39(아님) |
+| 2 | **`ceval.py trace_diff` 의 `split_gap`.** 갈린 결정의 근접 동점 잣대를 `gap`(열린 칸 1·2 위 로짓 차 ≥ 0)과 부호 있는 `route_gap`(ℓ4 − ℓ1)을 함께 `min` 해서 구했다. RUN 쪽으로 갈린 길 결정이면 음수가 적혀 근접 동점처럼 보이고, SHELTER 가 막힌 한 칸 결정의 `route_gap` 도 섞였다(진단 글만 — 판정·기록 무관. R7e 대조는 갈림이 없어 드러나지 않았다) | `gap` 만 읽는다(망 결정·길 결정 모두 열린 칸 둘 이상이면 1·2 위 차) | `test_trace_diff_split_gap_uses_top2_gap` (짜 맞춘 두 스텝 궤적) |
+| 3 | **계약 대조의 `decide.on`.** 5-2 의 5 는 `decide {lock_steps, on, feasible, refeas_from}` 을 견주자고 했는데 UE 로더(`EcoV3Brain::RouteContractDiff`)·평가기 `RouteContractDiff` 가 `on` 을 보지 않았다(해시가 덮지만, 해시를 다시 셈하지 않고 손으로 고친 파일의 어긋난 칸 이름을 놓친다) | 둘 다 `on == ["onset", "invalid", "lock_and_feasible_changed"]`(차례 그대로)를 본다. 어긋나면 같은 칸 이름 `flight_route.decide` | `Brain.RejectRoute` 거부 사례 27 가지('flight_route.decide.on 에 invalid 없음'), 평가기 `--brain-check` 로 같은 파일 거부 확인 |
+
+### 16-2. 다시 확인한 것 (고칠 것 없음)
+
+| 볼 것 | 확인 |
+|---|---|
+| 스텝 차례 | A 첫머리 `RouteApply`(Commit·`KeepActive = KeepMode` 앞 — `KeepMode` = 파이썬 `wf_mode`) → B `FlightControlInput`(`KeepDir`) → … → D `++W.T` → H `FlightStepEnd`(실행한 길 = 적용 뒤·길 단계 전 = `rt_exec`) → `UpdateWildFlight`(실행한 길 셈 → 죽음 분기 지움 → 반사 방향 → a₀ → 은신처 굽히기·가장자리·벽 여유 → `RouteStep`) → `DecideAll`(길 결정 줄 망). `RouteStep` 뒤 `Dir` 를 바꾸는 줄이 없어 `RouteRunDir` = RUN 방향이다 |
+| 결정 조건·유지/무효 | onset·cur·keep·feas·inval·age(먼저 더함)·refeas(RUN 만 — `cur ≠ SHELTER`)·dec 와 결정 뒤 칸(new·RouteK·Age·Feas·DecPrev·CandK·ShelterDir·Mu·E·관측)이 `_route_step` 두뇌 줄과 같다. 유지는 후보 조건 없이 μ_keep ≥ 0, 후보 동점은 엄격한 < (argmin 첫 번째), S 가 비면 μ = +∞ |
+| 관측 시점 | H 에서 `Next` 를 정한 뒤 쓰고 E 는 건드리지 않는다. 죽음 분기·도주 아님·길 끈 두뇌는 0. SHELTER 가능 ⟺ 관측 22 > 0 (μ* ≥ 2 → μ*/10 ≥ 0.2, +∞ → 1) 이라 마스크(관측 22)와 적용(`bRouteSok`)이 늘 같은 판정이다 |
+| 마스크 판 5 | 파이썬 `_gate_free_rows` = `reads ∧ override == WF_NONE`(경계 사슴은 override 가 NONE 이라 든다) = C++ 덮기 밖 갈래(경계 포함)의 `Prep.bReads`. 길 결정 줄(덮기)에는 걸리지 않고, 막은 뒤 GRAZE 가 늘 남는다(걸 때 실제 허용 GRAZE 확인) |
+| 결정 셈 | `Stats.Decisions` = `bCommittedReads`(덮기 아님) ∨ `bCommittedRouteReads` = `_rep_accumulate` 의 `(decide ∧ ¬덮기) ∨ 길 결정`(판 4·5). `RouteRequest`·`bRouteReads` 는 `DecideHerb` 첫머리에서 모든 갈래 지움 |
+| 통계·도망 길 기록 | picked·switches·choice·bad 는 A(적용 때), steps 는 H 죽음 분기 앞(스텝 첫머리 산 사슴), 길 칸 = 반사 ? 실행한 길 : none, 도망의 길 = 반사 스텝 최다(동점 앞 번호 = `np.argmax`), 원판 놓침 늑대마다·쫓김/가림 사슴마다(지난 표적 늑대 모두 가려야 가림), 열린 도망 잘림, 죽으면 `LastEndT` 지움 |
+| 사건 셈과의 관계 | 길 기록은 `FFlightStats`(끝 까닭·지켜보기 hide·쫓김 사건 episode)를 하나도 바꾸지 않는 덧붙임 칸이다(`FlightClose` 의 길 칸 비우기는 끈 세계에서 늘 0). 16-1 의 1 뒤로는 refled 와 사건 이음 창이 같은 시계다 |
+| 끈 세계 비트 동일 | 새 줄은 모두 `bRoute`·`bFleeGate`·`RS != nullptr` 안이거나 값이 같은 리팩터다(`WallKeep` — 같은 `kEps²`·같은 `Normalize`·다 지워지면 입력 그대로, `NetInputOf` 관측 21 — 같은 칸 차례). 판 2 두뇌의 `ObsLayoutMismatch`·마스크·결정 셈 그대로 |
+| 로더·평가기 계약 | 해시 넷·관측 이름 24 차례·판(해시와 짝)·`flight_route` 칸 전부(16-1 의 3 뒤)·판 5 키(판 4 에는 없음)·모델 허용 얼기/잠 거부가 파이썬 `contract_dict`·`check_route_allowed` 와 같은 뜻이다. 걸 때 실제 허용(두뇌 ∧ 세계)은 평가기 `Init`·통합 `RouteBrainBlocker` 가 다시 본다 |
+| 열린 질문 처리 (14-2·15-2) | 권고(1·12)·파이썬 동작(5·6·16·17)과 맞다. 1·2·17 은 교체 경계 한 스텝만, 3·15 는 부활 세계·판 2·3 만이라 판정·게임 기본과 무관하다 |
+| 게임 교체 경계 | 내장 → 판 5: 열린 도주는 그 H 에서 `cur < 0` 결정(새 두뇌가 고름). 판 5 ↔ 판 4: 길 상태 그대로, 경계 스텝의 요청·마스크는 앞 두뇌 것(경계 스텝 마스크 확인도 앞 마스크). 판 4·5 → 길 없는 두뇌: A 가 `RouteRunDir`(곧바로 RUN), 그 H 가 지움, 그 스텝부터 도망 길 기록 끔. 대기 두뇌 거부(`DiscardPending`)는 되돌림 쌓개를 복구하고, 폴더 감시는 그 파일을 `WatchedFile` 로 기억해 같은 파일을 되풀이해 거부하지 않는다. 지역 세계는 `TryCreateContexts` 가 한꺼번에 만들고 WildFlight 는 콘솔 변수 하나라 지역마다 걸기 전 검사가 갈리지 않는다 |
+
+### 16-3. 남은 차이 (고치지 않았다)
+
+1. **화면 한 스텝.** 사슴 글자는 덮기를 `KeepActive`(이번 스텝에 실행한 덮기)로, 길을 다음 스텝 길(`ShownRoute`)로 고른다. 도주가 끝나는 스텝은 H 가 길 상태를 지워
+   `KeepActive` 만 도주라, 두 길 두뇌에서도 그 한 스텝(2/15 초) '도주(안전해질 때까지)' 주황이 보인다. 세계·기록은 그대로이고 실행한 길을 따로 남겨야 고칠 수 있어 두었다.
+2. **Social 제어(기본 꺼짐).** `eco.IntegratedV3.SocialControl 1` 이면 Social 훅(B)이 SHELTER 길보다 나중이라 슬롯 쪽이 이기고(15-2 질문 8), 훅이 도주 사슴의 행동을
+   바꿔도 길 통계 steps 는 반사 덮기 기준으로 그 스텝을 센다. 파이썬에 Social 이 없어 파리티와 무관하다.
+3. **기존 차이 그대로:** 부활 세계 다시 난 사슴(질문 3), 판 2·3 결정 셈(질문 15), 길 없는 두뇌 → 판 4·5 경계 한 스텝의 도망 길 기록 'none'(질문 17), 도망 길 칸은
+   길을 켠 동안만 센다(끈 동안 끝난 도망은 refled 의 끝 스텝을 남기지 않는다), 근접 동점 갈림 허용(질문 13).
+4. **계약 문서·눈으로 보는 PIE**(11-1 의 8, 15-3)는 이번에도 하지 않았다.
+
+### 16-4. 검증 (10-24, 고친 뒤)
+
+| 검증 | 결과 |
+|---|---|
+| 직접 UBT `AdaptiveEcosystemEditor Win64 Development -WaitMutex -NoHotReloadFromIDE` (적응 unity — 바뀐 파일 따로) | 성공, 경고 0 |
+| 직접 UBT `-DisableAdaptiveUnity` (바뀐 파일도 unity 묶음) | 성공, 경고 0 |
+| 자동화 `Automation RunTests AdaptiveEcosystem` (-NullRHI) | 214 개 실패 0 (213 Success + 1 기존 예상 경고 `Predation.SaveLoadGlobalEma` 저장 파일). `Route.*` 7·`Brain.LoadObs24Route`·`RejectRoute`(27 사례)·`Integrated.*Route*` 5 통과 |
+| g++ 하네스 (`-O2 -ffp-contract=off -Wall -Wextra -Werror -Wshadow`) | 엔진 `route_v3_main.cpp`(기하 90·줄 923·적용 117·마스크 57·기준 루프 두뇌 둘·도망 길 기록 장면)·스칼라 참조 `route_ref_main.cpp`·기존 하네스(추론 v1·v3·도망·숲 시야·장애물 관측·레퍼토리·위협·밤·돌아가기·장애물·무리·날씨) — g++ 로 짓고 돌리는 시험 14 개를 넣은 골든 묶음 87 시험 모두 통과 |
+| 판 단위 궤적 대조 `port/native_check.py` (route0·늘 SHELTER × N·G × 지역 셋 × 시드 34900·34901 × 1800) | 24/24 — 궤적 지문 1801 스텝 × 칸 아홉 첫 차이 없음, 세계 기록 정확히 같음(`flight.route` refled 합 737 포함) |
+| `ceval.py compare` R7e (`route=true`·`brain_flee_outside_reflex=false`, 시드 34900~34904 × 지역 셋, 1800) | N 15/15·G 15/15 기록 정확히 같음, 파이썬에만 있는 칸 없음, 궤적 셋 첫 비트 차이·갈림 없음. 근접 동점: 망 결정 최소 로짓 차 1.14e-4, 길 결정 3.23e-4, 1e-4 밑 0 |
+| `ceval.py compare` 끈 세계 (obs21zero, 같은 시드) | N 15/15·G 15/15, 궤적 셋 첫 비트 차이 없음 — 이식 전과 같다 |
+| pytest (`ECO_ROUTE_PORT_SLOW=1`) | `test_route_port_v3`(느린 `make_traces --check` 포함)·`test_route2_v3`·`test_r7_mask5`·`test_ceval_v3`(새 `split_gap` 시험 포함)·`test_live_v3`·`test_flight_v3`·`test_flight_golden_v3` 117 통과, 건너뜀 0 |
 
 ## 부록: 파이썬 줄 묶음 (HEAD `2aac3e5`)
 
