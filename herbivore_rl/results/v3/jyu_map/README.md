@@ -10,7 +10,7 @@
 - 원본을 우리 폴더에 그대로 복사했다. 액터 설명 185(편집기 액터 121 + HLOD 액터 64)·외부 개체 11 이다. 편집기 액터 121 의 꼴·이름·자리·방향·크기·꼬리표·폴더·컴포넌트·메시가 원본과 모두 같다. 은신처 장식 인스턴스(풀 183·돌 20 × 12)의 높이도 같다.
 - 같은 인수로 헤드리스를 돌리면 원본과 기록 줄이 같다(팀 날씨 감시를 끈 판 기준. 판마다 새로 뽑는 세션 epoch 와 디버그 등록 줄 순서만 다름).
 - 레벨 설정은 바꾸지 않았다. 팀 기능을 끄고 켜는 것은 실행 인수로 한다. 그래서 '대조 모드'와 '전체 모드' 두 가지로 띄운다.
-- **팀 식생(soil-v1)은 실행 인수로 끌 수 없다.** 그래서 대조 모드에서도 240초 스냅숏이 거부된다(`[EcoVegetation] RL snapshot v1 rejected`). 지금은 파이썬 거울과 견주는 시험을 이 맵으로 할 수 없다(아래 '남은 것' 1).
+- (복사 때 기록 — 바로 아래 후속 줄로 풀림) 팀 식생(soil-v1)은 끄는 실행 인수가 없다. 그래서 아래 처음 대조 모드 인수만으로는 240초 스냅숏이 거부됐다(`[EcoVegetation] RL snapshot v1 rejected`). 그때는 파이썬 거울과 견주는 시험을 이 맵으로 할 수 없었다(아래 '남은 것' 1).
 - **10-25 후속 — 식생은 실행 때만 끈다.** 엔진 콘솔 명령 `setnopec EcoCreatureIntegrationSpawner bEnableVegetation False` 를 대조 모드 `-ExecCmds` 에 더하면 이 Play 의 조정자 값만 꺼진다(맵 파일·C++ 그대로). 그러면 240초 스냅숏이 써지고 파이썬 거울과 견줄 수 있다. 결과와 실행 명령은 [`../level_jyu_eco/README.md`](../level_jyu_eco/README.md) 에 있다. 아래 '남은 것' 1·2 는 그 전의 기록이다.
 
 ## 만든 방법
@@ -60,11 +60,11 @@ Git Bash 에서는 `/Game/...` 가 윈도 경로로 바뀌지 않게 `MSYS_NO_PA
 - 같은 시드여도 판마다 조금 다르다. 환경 감시가 실시간 1 초마다 팀 날씨를 읽기 때문이다. 원본 맵을 같은 인수로 두 번 돌려도 19초쯤부터 갈라졌다(팀 날씨 바뀜이 들어가는 결정 스텝이 판마다 다름).
 - 편집기에서 맵을 열고 Play 하면 이 모드다. 다만 `-EcoIntegratedV3` 가 없으므로 사슴은 지역마다 48 이다.
 
-### 대조 모드 — 우리 v3 규칙 + 이 맵의 지형·은신처·나무(없음)·시작 날씨, 팀 life·이주·날씨 바뀜 끔
+### 대조 모드 — 우리 v3 규칙 + 이 맵의 지형·은신처·나무(없음)·시작 날씨, 팀 life·이주·날씨 바뀜·식생 끔
 
 ```
 <UE> <uproject> /Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem -game -EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=20010 \
-  -EcoEcosystemLife=0 -EcoV3EnvWatch=0 "-ExecCmds=eco.HerdMigration 0" \
+  -EcoEcosystemLife=0 -EcoV3EnvWatch=0 "-ExecCmds=eco.HerdMigration 0, setnopec EcoCreatureIntegrationSpawner bEnableVegetation False" \
   -EcoV3SnapshotAt=240 -EcoV3SnapshotOut=<스냅숏 json> \
   -benchmark -fps=30 -seconds=241 -NullRHI -NoSound -unattended -nosplash -nopause -DisablePlugins=Bridge,Fab -abslog=<기록>
 ```
@@ -74,7 +74,9 @@ Git Bash 에서는 `/Game/...` 가 윈도 경로로 바뀌지 않게 `MSYS_NO_PA
 | `-EcoEcosystemLife=0` | 팀 life (조정자 BeginPlay 가 읽음) | `[EcoLife]` 줄 0 (전체 모드는 출생·사체 줄이 나옴) |
 | `-EcoV3EnvWatch=0` | 팀 날씨 BP 가 바꾸는 날씨를 v3 로 옮기기. v3 날씨는 시작값 Forest 비 1 · Barren 맑음 · Highland 눈 1 로 고정(= 파이썬 `configs/v3_wild3_mirror.yaml`) | 240초까지 v3 날씨 그대로 |
 | `"-ExecCmds=eco.HerdMigration 0"` | 무리 이주 새 출발 (팀 콘솔 변수 — 0 프레임에 들어감, 무대는 8 프레임에 만들어짐) | `eco.HerdMigration = "0"`, 이주 줄 0 |
-| (끌 수 없음) | 식생 soil-v1 | `[EcoVegetation] Enabled … Python parity pending` 이 지역마다 나오고 스냅숏이 거부됨 |
+| `setnopec EcoCreatureIntegrationSpawner bEnableVegetation False` (같은 `-ExecCmds` 안, 10-25 후속) | 식생 soil-v1 (이 Play 의 조정자 값만 — 맵 파일·C++ 그대로) | `[EcoVegetation] Enabled` 줄 0, 스냅숏 써짐. 이 명령이 없던 처음 판은 `Enabled … Python parity pending` 이 지역마다 나오고 스냅숏이 거부됐다 |
+
+- 위 명령은 10-25 후속 판([`../level_jyu_eco/README.md`](../level_jyu_eco/README.md))에서 쓴 대조 모드다. 아래 '확인한 것'의 대조 모드 판은 식생 끄기 명령이 없던 처음 판이다.
 
 - 두뇌를 바꾸려면 `-EcoV3Brain=v3_r7_g995_s1_20m` 처럼 더한다(R7e 확인 때와 같다, [`../r7e/unreal_parity.md`](../r7e/unreal_parity.md)).
 - 우리 맵과 같은 나무 조건이 필요하면 `-EcoV3StageTrees=1` 을 더한다. 레벨을 바꾸지 않고 Play 때 배치 표 `trees-1017a` 대로 나무를 띄운다(Forest 24 · Barren 0 · Highland 9, 충돌 없음, 줄기 원판은 세계에 넣음). 이 맵에서 확인했다.
@@ -99,7 +101,7 @@ Git Bash 에서는 `/Game/...` 가 윈도 경로로 바뀌지 않게 `MSYS_NO_PA
 
 ## 남은 것 — 꺼지지 않거나 파이썬과 다른 것 (손대지 않고 그대로 둠)
 
-1. **식생 soil-v1 끄기 인수가 없다.**
+1. **식생 soil-v1 끄기 인수가 없다.** (10-25 후속: 실행 인수 대신 `setnopec` 콘솔 명령으로 이 Play 만 끄는 것으로 풀었다 — [`../level_jyu_eco/README.md`](../level_jyu_eco/README.md) 2절. 아래는 그 전 기록이다.)
    - 켜지는 조건은 `Config.Vegetation.bEnabled = AEcoVegetationField::IsRequested() || Spawner->bEnableVegetation`(`EcoPolicyV3IntegratedSubsystem.cpp`)이다.
    - `eco.Vegetation`·`-EcoVegetation` 은 켜기만 한다.
    - 이 맵은 조정자에 켬이 저장돼 있어 대조 모드에서도 식생이 돈다. 칸마다 기온·빛·수분 적합도로 재생이 바뀐다.
@@ -107,10 +109,16 @@ Git Bash 에서는 `/Game/...` 가 윈도 경로로 바뀌지 않게 `MSYS_NO_PA
    - 길은 둘이다(이번에는 하지 않음).
      - (가) life 처럼 조정자 BeginPlay 에 `-EcoVegetation=0` 덮기를 더한다. C++ 변경이라 빌드·자동 시험을 다시 해야 한다.
      - (나) 복사 맵 조정자의 식생 켬을 끈다. 레벨 설정 변경이 되고, 이 경우 전체 모드는 `-EcoVegetation` 으로 다시 켠다(다만 날씨 보기 연출 한 곳 `EcoV3WeatherPresenter` 는 조정자 값을 따로 읽는다).
-2. **Highland 은신처 2 개가 늦게 등록된다.**
+2. **Highland 은신처 2 개가 늦게 등록된다.** (10-25 후속 진단 스냅숏: 늦은 둘은 (15,15)·(45,15)이고 스텝 3(0.4초)에는 넷이다 — [`../level_jyu_eco/README.md`](../level_jyu_eco/README.md) 1절 표. 아래 '어느 둘인지 확인하지 못했다'는 그 전 기록이다.)
    - 무대를 만들 때(BeginPlay 뒤 약 0.27 초, 8 프레임) Highland 은신처는 2 개만 등록돼 있다. Forest·Barren 은 4 개다.
    - 은신처 BP 는 지면이 불려 있어야 등록되고, 아니면 0.25 초마다 다시 시도한다. 무대가 지형 칸 두 개(y −50400 경계)에 걸쳐 있어 한쪽 칸이 늦게 불린 것으로 보인다. 어느 둘인지는 기록 줄이 없어 확인하지 못했다.
    - 30 초 재시도 끝의 실패 경고(`Ground registration unavailable`)는 없었다. 그러니 뒤에 등록됐고, v3 는 늦은 은신처를 원 목록 끝에 더한다(`RefreshRefuges`).
    - 파이썬 거울은 처음부터 넷이다. 그래서 Highland 시작 자리 계획과 은신처 순서가 거울과 다를 수 있다. 원본 맵도 같다.
 3. **팀 날씨를 따라가는 v3 날씨는 파이썬이 받지 못한다.** 대조 모드는 시작 날씨로 고정한다. 팀 비 순환(180초·위상 0/30/60·비 0.65)을 파이썬으로 옮기려면 날씨 시간표를 받는 거울이 필요하다.
 4. **나무가 없다.** 그대로 쓰면 R7e 확인 때(우리 맵, 나무 Forest 24 · Highland 9)와 세계가 다르다. 견주려면 `-EcoV3StageTrees=1` 을 쓰고, 파이썬도 같은 배치 표로 돌린다.
+5. **HLOD 액터가 바탕 레벨 이름을 담고 있다 (10-25 적대적 검토에서 찾음, 원본에서 물려받음).**
+   - 복사본의 외부 액터 가운데 지형 HLOD 액터(`WorldPartitionHLOD`, 지형 조각 `LandscapeStreamingProxy` 의 HLOD) 파일 48 개가 바탕 레벨 이름을 담고 있다.
+     - 담은 이름: `/Game/Map/LV_Ecosystem_IntegrationTest`(지형 조각 이름)·`/Game/__ExternalActors__/Map/LV_Ecosystem_IntegrationTest/…`·HLOD 층 `/Game/Map/LV_Ecosystem_IntegrationTest_HLOD0_Instancing`
+   - 원본 `LV_JYU_Ecosystem` 도 같은 파일 48 개가 같은 이름을 담는다. 복사 때 생긴 것이 아니고 팀 맵이 우리 통합 테스트 맵에서 복사될 때부터 있던 HLOD 빌드 기록이다.
+   - 실행(지형·지면 검사·은신처 등록)에는 영향이 없었다. 우리 맵 `/Game/Map/LV_Ecosystem_IntegrationTest` 나 그 HLOD 층을 지우거나 이름을 바꾸면 두 맵의 HLOD 가 깨질 수 있다.
+   - HLOD 를 다시 빌드하면 풀리지만 맵 파일이 바뀐다. 손대지 않았다.
