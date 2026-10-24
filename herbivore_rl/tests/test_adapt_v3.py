@@ -106,6 +106,19 @@ def test_refusals(ad, snap, ref, edit, needle):
     assert needle in str(e.value)
 
 
+def test_authored_covers_convert(ad, snap, ref):
+    """10-25 저작 은신처 맵(팀 생태계 맵 — 조정자 bV3UseAuthoredShelters, v3 가 놓는 은신처 0): 은신처 원이 파이썬 자리와 같으면 옮기고, 다르면 거부한다."""
+    s = copy.deepcopy(snap)
+    s["settings"]["extra_cover_count"] = 0
+    out = ad.convert(s, ref)
+    assert out["record"]["changed"] == []
+    assert any("v3 가 놓는 은신처 0" in c for c in out["record"]["checks"])
+    s["regions"][0]["covers"][0][0] = 44.0
+    with pytest.raises(ad.Refused) as e:
+        ad.convert(s, ref)
+    assert "은신처 원" in str(e.value)
+
+
 def test_foliage_off_snapshot_converts(ad, snap, ref):
     """숲 시야 칸이 있어도 끈 세계(foliage 거짓, 또는 장애물을 끈 세계)는 지금처럼 옮긴다 — 끈 C++ 세계와 같다."""
     s = copy.deepcopy(snap)

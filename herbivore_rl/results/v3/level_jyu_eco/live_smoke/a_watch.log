@@ -1,0 +1,10 @@
+[live 01:18:12] 감시 시작: <시험 폴더>/live_a\snapshots (워커 10, 학습 20k × 모델 1, 판정 시드 N 35000~35001 × 600 스텝 · G 35000~35001 × 600 스텝, 1차 = 사건 숨음 비율, 시험 크기)
+[live 01:18:12] 한 번 보기, 판정 실행기 ceval, 지금 두뇌 판정 다시 쓰기 켬
+[live 01:19:12] 시도 1 시작: eco_v3_snapshot_s20004_t252_e19.json → a1_20261025T011912_e19 (pid 38348, 기록 <시험 폴더>/live_a\live\rounds\a1_20261025T011912_e19\round.log)
+[live 01:19:42] 시도 1 그만둠 — 새 스냅숏 eco_v3_snapshot_s20004_t474_e37.json (판 프로세스 나무를 끝냈다): superseded — 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t474_e37.json (다른 환경)
+[live 01:19:42] 시도 2 시작: eco_v3_snapshot_s20004_t474_e37.json → a2_20261025T011942_e37 (pid 27448, 기록 <시험 폴더>/live_a\live\rounds\a2_20261025T011942_e37\round.log)
+[live 01:20:12] 시도 2 그만둠 — 새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (판 프로세스 나무를 끝냈다): superseded — 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (다른 환경)
+[live 01:20:12] 시도 3 시작: eco_v3_snapshot_s20004_t704_e56.json → a3_20261025T012012_e56 (pid 39772, 기록 <시험 폴더>/live_a\live\rounds\a3_20261025T012012_e56\round.log)
+[live 01:20:42] 시도 3 그만둠 — 새 스냅숏 eco_v3_snapshot_s20004_t925_e74.json (판 프로세스 나무를 끝냈다): superseded — 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t925_e74.json (다른 환경)
+[live 01:20:42] 시도 4 시작: eco_v3_snapshot_s20004_t925_e74.json → a4_20261025T012042_e74 (pid 30832, 기록 <시험 폴더>/live_a\live\rounds\a4_20261025T012042_e74\round.log)
+[live 01:21:20] 시도 4 끝 (rc 0): exported — 시험 내보내기: 판 1 (관문 기각)

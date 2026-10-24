@@ -1,0 +1,8 @@
+{
+ "about": "팀 생태계 맵 복사본 /Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem 의 세로 장애물 원판 — 나무·충돌 메시가 없어 지역마다 0 (results/v3/jyu_map/README.md '맵 구성'). 꼴 = 언리얼 장애물 JSON(run_mirror load_unreal_obstacles)·나무 배치 표(r7e unreal_parity 원판 확인)와 같다.",
+ "regions": [
+  {"region": "Barren", "discs": []},
+  {"region": "Forest", "discs": []},
+  {"region": "Highland", "discs": []}
+ ]
+}

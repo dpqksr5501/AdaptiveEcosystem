@@ -1,0 +1,153 @@
+{
+ "a": {
+  "command": "/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem -game -NullRHI -unattended -NoSound -nosplash -nopause -DisablePlugins=Bridge,Fab -EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=20004 -EcoV3AutoAdapt -EcoV3Brain=v3_r7_g995_s1_20m -EcoV3AutoSnapshotOut=<시험 폴더>/live_a/snapshots -EcoV3BrainWatch=<시험 폴더>/live_a/brains -EcoEcosystemLife=0 -ExecCmds=\"eco.HerdMigration 0, setnopec EcoCreatureIntegrationSpawner bEnableVegetation False, t.MaxFPS 30, eco.V3Brain.StatusFile <시험 폴더>/live_a/status.json\" -EcoV3TestAt=150 -EcoV3TestCmd=quit -abslog=<시험 폴더>/live_a/game.log",
+  "env_changes": 92,
+  "snapshots": [
+   "eco_v3_snapshot_s20004_t252_e19.json",
+   "eco_v3_snapshot_s20004_t474_e37.json",
+   "eco_v3_snapshot_s20004_t704_e56.json",
+   "eco_v3_snapshot_s20004_t925_e74.json"
+  ],
+  "brains": [
+   "live_r1_a4_20261025T012042_e74.json"
+  ],
+  "rounds": [
+   {
+    "run": "a1_20261025T011912_e19",
+    "state": "superseded",
+    "snapshot": "eco_v3_snapshot_s20004_t252_e19.json",
+    "env": null,
+    "env_revision": null,
+    "brain": null,
+    "brain_profile": null,
+    "verdict": null,
+    "why": "새 스냅숏 eco_v3_snapshot_s20004_t474_e37.json (다른 환경)",
+    "brain_id": null,
+    "wall_s": 30.1,
+    "last_result": "그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t474_e37.json (다른 환경)",
+    "stages": null
+   },
+   {
+    "run": "a2_20261025T011942_e37",
+    "state": "superseded",
+    "snapshot": "eco_v3_snapshot_s20004_t474_e37.json",
+    "env": null,
+    "env_revision": null,
+    "brain": null,
+    "brain_profile": null,
+    "verdict": null,
+    "why": "새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (다른 환경)",
+    "brain_id": null,
+    "wall_s": 30.1,
+    "last_result": "그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (다른 환경)",
+    "stages": null
+   },
+   {
+    "run": "a3_20261025T012012_e56",
+    "state": "superseded",
+    "snapshot": "eco_v3_snapshot_s20004_t704_e56.json",
+    "env": null,
+    "env_revision": null,
+    "brain": null,
+    "brain_profile": null,
+    "verdict": null,
+    "why": "새 스냅숏 eco_v3_snapshot_s20004_t925_e74.json (다른 환경)",
+    "brain_id": null,
+    "wall_s": 30.1,
+    "last_result": "그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t925_e74.json (다른 환경)",
+    "stages": null
+   },
+   {
+    "run": "a4_20261025T012042_e74",
+    "state": "exported",
+    "snapshot": "eco_v3_snapshot_s20004_t925_e74.json",
+    "env": "Highland 맑음 · Barren 비 0.6 · Forest 비 0.6",
+    "env_revision": 74,
+    "brain": "v3_r7_g995_s1_20m@40d8710d",
+    "brain_profile": "route5",
+    "verdict": "기각",
+    "why": "1차 P1 실패: 포만 없는 세계 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율) 후보 23.70% 대 지금 22.66% (짝 t +0.87, 문턱 +12.706, 시드 2, 빠진 시드 0)",
+    "brain_id": "live_r1_a4_20261025T012042_e74@4b33b958",
+    "wall_s": 34.6,
+    "last_result": "시험 내보내기: 판 1 (관문 기각)",
+    "stages": {
+     "convert": 2.3,
+     "eval_current": 10.4,
+     "train_learn": 3.6,
+     "train_and_eval_current": 10.6,
+     "eval_candidate_N_G": 15.2,
+     "eval_candidate": 16.3,
+     "gate": 0.0,
+     "export": 5.2
+    }
+   }
+  ],
+  "swaps": []
+ },
+ "b": {
+  "command": "/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem -game -NullRHI -unattended -NoSound -nosplash -nopause -DisablePlugins=Bridge,Fab -EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=20004 -EcoV3AutoAdapt -EcoV3Brain=v3_r7_g995_s1_20m -EcoV3AutoSnapshotOut=<시험 폴더>/live_b/snapshots -EcoV3BrainWatch=<시험 폴더>/live_b/brains -EcoEcosystemLife=0 -ExecCmds=\"eco.HerdMigration 0, setnopec EcoCreatureIntegrationSpawner bEnableVegetation False, t.MaxFPS 30, slomo 0.15, eco.V3Brain.StatusFile <시험 폴더>/live_b/status.json\" -EcoV3TestAt=75 -EcoV3TestCmd=quit -abslog=<시험 폴더>/live_b/game.log",
+  "env_changes": 196,
+  "snapshots": [
+   "eco_v3_snapshot_s20004_t250_e91.json",
+   "eco_v3_snapshot_s20004_t475_e182.json"
+  ],
+  "brains": [
+   "live_r1_a1_20261025T012602_e91.json",
+   "live_r2_a2_20261025T012922_e182.json"
+  ],
+  "rounds": [
+   {
+    "run": "a1_20261025T012602_e91",
+    "state": "exported",
+    "snapshot": "eco_v3_snapshot_s20004_t250_e91.json",
+    "env": "Highland 비 0.6",
+    "env_revision": 91,
+    "brain": "v3_r7_g995_s1_20m@40d8710d",
+    "brain_profile": "route5",
+    "verdict": "기각",
+    "why": "1차 P1 실패: 포만 없는 세계 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율) 후보 22.14% 대 지금 26.10% (짝 t −3.28, 문턱 +12.706, 시드 2, 빠진 시드 0)",
+    "brain_id": "live_r1_a1_20261025T012602_e91@6769a61e",
+    "wall_s": 38.7,
+    "last_result": "시험 내보내기: 판 1 (관문 기각)",
+    "stages": {
+     "convert": 2.9,
+     "eval_current": 11.5,
+     "train_learn": 3.6,
+     "train_and_eval_current": 11.7,
+     "eval_candidate_N_G": 17.1,
+     "eval_candidate": 18.4,
+     "gate": 0.0,
+     "export": 5.5
+    }
+   },
+   {
+    "run": "a2_20261025T012922_e182",
+    "state": "exported",
+    "snapshot": "eco_v3_snapshot_s20004_t475_e182.json",
+    "env": "Highland 비 0.6 · Barren 비 0.6",
+    "env_revision": 182,
+    "brain": "live_r1_a1_20261025T012602_e91@6769a61e",
+    "brain_profile": "route5",
+    "verdict": "기각",
+    "why": "1차 P1 실패: 포만 없는 세계 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율) 후보 22.73% 대 지금 23.98% (짝 t −33.69, 문턱 +12.706, 시드 2, 빠진 시드 0)",
+    "brain_id": "live_r2_a2_20261025T012922_e182@499f8213",
+    "wall_s": 38.1,
+    "last_result": "시험 내보내기: 판 2 (관문 기각)",
+    "stages": {
+     "convert": 2.8,
+     "eval_current": 11.3,
+     "train_learn": 3.6,
+     "train_and_eval_current": 11.5,
+     "eval_candidate_N_G": 16.7,
+     "eval_candidate": 18.0,
+     "gate": 0.0,
+     "export": 5.6
+    }
+   }
+  ],
+  "swaps": [
+   "[EcoV3I] 두뇌 바꿈 | 39.7초 (전역 스텝 298) | v3_r7_g995_s1_20m@40d8710d → live_r1_a1_20261025T012602_e91@6769a61e (파일 live_r1_a1_20261025T012602_e91.json, 허용 먹기·도망·숨기, 관측 24 도망길·반사 밖 도망 막음, 판 1) | 까닭: 폴더 감시 eco.V3Brain.WatchFolder <시험 폴더>/live_b/brains | 허용(모델 ∧ 세계): Forest 먹기·도망·숨기 (두 길·반사 밖 도망 막음) · Barren 먹기·도망·숨기 (두 길·반사 밖 도망 막음) · Highland 먹기·도망·숨기 (두 길·반사 밖 도망 막음) | 사슴 몸·행동 상태 그대로 — 이 스텝은 앞 두뇌가 정한 요청을 실행하고, 이 스텝 끝 결정부터 새 두뇌 | 학습 실시간 적응 a1_20261025T012602_e91 (포만 없는 스냅숏 세계 T) | 골든 28 사례 최대 로짓 오차 2.86e-06",
+   "[EcoV3I] 두뇌 바꿈 | 69.9초 (전역 스텝 524) | live_r1_a1_20261025T012602_e91@6769a61e → live_r2_a2_20261025T012922_e182@499f8213 (파일 live_r2_a2_20261025T012922_e182.json, 허용 먹기·도망·숨기, 관측 24 도망길·반사 밖 도망 막음, 판 2) | 까닭: 폴더 감시 eco.V3Brain.WatchFolder <시험 폴더>/live_b/brains | 허용(모델 ∧ 세계): Forest 먹기·도망·숨기 (두 길·반사 밖 도망 막음) · Barren 먹기·도망·숨기 (두 길·반사 밖 도망 막음) · Highland 먹기·도망·숨기 (두 길·반사 밖 도망 막음) | 사슴 몸·행동 상태 그대로 — 이 스텝은 앞 두뇌가 정한 요청을 실행하고, 이 스텝 끝 결정부터 새 두뇌 | 학습 실시간 적응 a2_20261025T012922_e182 (포만 없는 스냅숏 세계 T) | 골든 27 사례 최대 로짓 오차 3.81e-06"
+  ]
+ }
+}

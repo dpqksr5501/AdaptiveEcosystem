@@ -332,6 +332,11 @@ def convert(snap: dict, reference: dict | None, template: Path | None = None, st
         mine = scalar_fields(snap)
         for k, v in mine["settings"].items():
             if k in reference["settings"] and reference["settings"][k] != v:
+                if k == "extra_cover_count" and v == 0:
+                    # 10-25 저작 은신처 맵(조정자 bV3UseAuthoredShelters — 팀 생태계 맵 LV_JYU_Ecosystem·우리 복사본): v3 가 은신처를 놓지 않고(0) 레벨
+                    # 은신처를 쓴다. 누가 놓았나는 세계 규칙이 아니다 — 세계 은신처 원은 아래 '은신처 원·먹이 격자'에서 파이썬 자리와 견주고 다르면 거부한다
+                    checks.append("v3 가 놓는 은신처 0 (레벨 저작 은신처 맵) — 은신처 원은 파이썬 자리와 따로 견준다")
+                    continue
                 raise Refused(f"설정 {k} = {v!r} 가 기준 게임 값 {reference['settings'][k]!r} 과 다르고 파이썬 대응이 없다")
         ref_w = next(iter(reference["world"].values()))
         for reg, row in mine["world"].items():

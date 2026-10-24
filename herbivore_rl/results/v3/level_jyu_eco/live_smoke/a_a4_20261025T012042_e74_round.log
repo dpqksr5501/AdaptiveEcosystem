@@ -1,0 +1,11 @@
+== convert: 2.3초
+시도 4 (a4_20261025T012042_e74): 스냅숏 eco_v3_snapshot_s20004_t925_e74.json · 환경 #74 Highland 맑음 · Barren 비 0.6 · Forest 비 0.6 · 두뇌 v3_r7_g995_s1_20m@40d8710d → 시작 ckpt/v3/v3_r7_g995_s1_20m.zip (묶음 route5 — 관측 24 두 길·반사 밖 도망 막음 (마스크 판 5))
+  학습 시작: 모델 시드 0 × 20k → <저장소>/herbivore_rl\ckpt\v3\live\a4_20261025T012042_e74\live_a4_20261025T012042_e74_cand_s0.zip (기록 <시험 폴더>/live_a\live\rounds\a4_20261025T012042_e74\logs\train_s0.log)
+== train_and_eval_current: 10.6초
+== eval_candidate: 16.3초
+== gate: 0.0초
+1차 P1 사건 숨음 비율: 짝 시드 2/2 (두 두뇌 가운데 하나라도 쫓긴 사건이 없어 빠진 시드 0) — 한 번 보기
+관문 기각 — 1차 P1 실패: 포만 없는 세계 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율) 후보 23.70% 대 지금 22.66% (짝 t +0.87, 문턱 +12.706, 시드 2, 빠진 시드 0)
+== export: 5.2초
+두뇌 파일 <시험 폴더>/live_a\brains\live_r1_a4_20261025T012042_e74.json (live_r1_a4_20261025T012042_e74@4b33b958) — 판 1
+시도 4 끝: exported — 시험 내보내기: 판 1 (관문 기각) (34.6초, 단계 {'convert': 2.3, 'eval_current': 10.4, 'train_learn': 3.6, 'train_and_eval_current': 10.6, 'eval_candidate_N_G': 15.2, 'eval_candidate': 16.3, 'gate': 0.0, 'export': 5.2})

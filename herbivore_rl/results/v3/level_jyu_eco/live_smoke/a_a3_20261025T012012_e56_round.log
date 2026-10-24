@@ -1,0 +1,5 @@
+== convert: 2.2초
+시도 3 (a3_20261025T012012_e56): 스냅숏 eco_v3_snapshot_s20004_t704_e56.json · 환경 #56 Highland 비 0.6 · Barren 비 0.6 · Forest 비 0.6 · 두뇌 v3_r7_g995_s1_20m@40d8710d → 시작 ckpt/v3/v3_r7_g995_s1_20m.zip (묶음 route5 — 관측 24 두 길·반사 밖 도망 막음 (마스크 판 5))
+  학습 시작: 모델 시드 0 × 20k → <저장소>/herbivore_rl\ckpt\v3\live\a3_20261025T012012_e56\live_a3_20261025T012012_e56_cand_s0.zip (기록 <시험 폴더>/live_a\live\rounds\a3_20261025T012012_e56\logs\train_s0.log)
+== train_and_eval_current: 10.0초
+== eval_candidate: 15.9초
