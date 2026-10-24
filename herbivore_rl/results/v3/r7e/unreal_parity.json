@@ -1,0 +1,4257 @@
+{
+ "sessions": [
+  20010,
+  20011,
+  20012,
+  20013,
+  20014,
+  20015,
+  20016,
+  20017,
+  20018,
+  20019
+ ],
+ "replicates": 10,
+ "brains": {
+  "cur": {
+   "label": "내장 R1b-F",
+   "unreal_id": "v3_r1_g995_s3_20m@eca97f2e",
+   "builtin": true,
+   "obs": 18,
+   "mask": 2,
+   "route": false,
+   "gate": false,
+   "model": "ckpt/v3/v3_r1_g995_s3_20m.zip",
+   "config": "configs/v3_wild3_mirror.yaml"
+  },
+  "r7e": {
+   "label": "R7e 두 길·판 5",
+   "unreal_id": "v3_r7_g995_s1_20m@40d8710d",
+   "builtin": false,
+   "obs": 24,
+   "mask": 5,
+   "route": true,
+   "gate": true,
+   "model": "ckpt/v3/v3_r7_g995_s1_20m.zip",
+   "config": "configs/v3_wild3_route5_mirror.yaml"
+  }
+ },
+ "python_meta": {
+  "cur": {
+   "config": "configs\\v3_wild3_mirror.yaml",
+   "config_digest": "18457cffb2c8",
+   "model": "v3_r1_g995_s3_20m.zip",
+   "deer": 128,
+   "eat_steps": 38,
+   "eat_seconds": 5.067,
+   "steps": 1800,
+   "log_every": 75,
+   "seeds": [
+    32000,
+    32001,
+    32002,
+    32003,
+    32004,
+    32005,
+    32006,
+    32007,
+    32008,
+    32009,
+    32010,
+    32011,
+    32012,
+    32013,
+    32014,
+    32015,
+    32016,
+    32017,
+    32018,
+    32019,
+    32020,
+    32021,
+    32022,
+    32023,
+    32024,
+    32025,
+    32026,
+    32027,
+    32028,
+    32029,
+    32030,
+    32031,
+    32032,
+    32033,
+    32034,
+    32035,
+    32036,
+    32037,
+    32038,
+    32039,
+    32040,
+    32041,
+    32042,
+    32043,
+    32044,
+    32045,
+    32046,
+    32047,
+    32048,
+    32049,
+    32050,
+    32051,
+    32052,
+    32053,
+    32054,
+    32055,
+    32056,
+    32057,
+    32058,
+    32059,
+    32060,
+    32061,
+    32062,
+    32063,
+    32064,
+    32065,
+    32066,
+    32067,
+    32068,
+    32069,
+    32070,
+    32071,
+    32072,
+    32073,
+    32074,
+    32075,
+    32076,
+    32077,
+    32078,
+    32079,
+    32080,
+    32081,
+    32082,
+    32083,
+    32084,
+    32085,
+    32086,
+    32087,
+    32088,
+    32089,
+    32090,
+    32091,
+    32092,
+    32093,
+    32094,
+    32095,
+    32096,
+    32097,
+    32098,
+    32099,
+    33000,
+    33001,
+    33002,
+    33003,
+    33004,
+    33005,
+    33006,
+    33007,
+    33008,
+    33009,
+    33010,
+    33011,
+    33012,
+    33013,
+    33014,
+    33015,
+    33016,
+    33017,
+    33018,
+    33019,
+    33020,
+    33021,
+    33022,
+    33023,
+    33024,
+    33025,
+    33026,
+    33027,
+    33028,
+    33029,
+    33030,
+    33031,
+    33032,
+    33033,
+    33034,
+    33035,
+    33036,
+    33037,
+    33038,
+    33039,
+    33040,
+    33041,
+    33042,
+    33043,
+    33044,
+    33045,
+    33046,
+    33047,
+    33048,
+    33049,
+    33050,
+    33051,
+    33052,
+    33053,
+    33054,
+    33055,
+    33056,
+    33057,
+    33058,
+    33059,
+    33060,
+    33061,
+    33062,
+    33063,
+    33064,
+    33065,
+    33066,
+    33067,
+    33068,
+    33069,
+    33070,
+    33071,
+    33072,
+    33073,
+    33074,
+    33075,
+    33076,
+    33077,
+    33078,
+    33079,
+    33080,
+    33081,
+    33082,
+    33083,
+    33084,
+    33085,
+    33086,
+    33087,
+    33088,
+    33089,
+    33090,
+    33091,
+    33092,
+    33093,
+    33094,
+    33095,
+    33096,
+    33097,
+    33098,
+    33099,
+    33100,
+    33101,
+    33102,
+    33103,
+    33104,
+    33105,
+    33106,
+    33107,
+    33108,
+    33109,
+    33110,
+    33111,
+    33112,
+    33113,
+    33114,
+    33115,
+    33116,
+    33117,
+    33118,
+    33119,
+    33120,
+    33121,
+    33122,
+    33123,
+    33124,
+    33125,
+    33126,
+    33127,
+    33128,
+    33129,
+    33130,
+    33131,
+    33132,
+    33133,
+    33134,
+    33135,
+    33136,
+    33137,
+    33138,
+    33139,
+    33140,
+    33141,
+    33142,
+    33143,
+    33144,
+    33145,
+    33146,
+    33147,
+    33148,
+    33149,
+    33150,
+    33151,
+    33152,
+    33153,
+    33154,
+    33155,
+    33156,
+    33157,
+    33158,
+    33159,
+    33160,
+    33161,
+    33162,
+    33163,
+    33164,
+    33165,
+    33166,
+    33167,
+    33168,
+    33169,
+    33170,
+    33171,
+    33172,
+    33173,
+    33174,
+    33175,
+    33176,
+    33177,
+    33178,
+    33179,
+    33180,
+    33181,
+    33182,
+    33183,
+    33184,
+    33185,
+    33186,
+    33187,
+    33188,
+    33189,
+    33190,
+    33191,
+    33192,
+    33193,
+    33194,
+    33195,
+    33196,
+    33197,
+    33198,
+    33199
+   ],
+   "session_size": 3,
+   "wall_s": 229.07,
+   "unreal_maps": [
+    20010,
+    20011,
+    20012,
+    20013,
+    20014,
+    20015,
+    20016,
+    20017,
+    20018,
+    20019
+   ],
+   "replicates": 10,
+   "unreal_obstacles": "results/v3/wild2/trees/tree_layout.json",
+   "brain": "cur",
+   "model_sha1": "d6e6434e296c"
+  },
+  "r7e": {
+   "config": "configs\\v3_wild3_route5_mirror.yaml",
+   "config_digest": "0e72bb715e5f",
+   "model": "v3_r7_g995_s1_20m.zip",
+   "deer": 128,
+   "eat_steps": 38,
+   "eat_seconds": 5.067,
+   "steps": 1800,
+   "log_every": 75,
+   "seeds": [
+    32000,
+    32001,
+    32002,
+    32003,
+    32004,
+    32005,
+    32006,
+    32007,
+    32008,
+    32009,
+    32010,
+    32011,
+    32012,
+    32013,
+    32014,
+    32015,
+    32016,
+    32017,
+    32018,
+    32019,
+    32020,
+    32021,
+    32022,
+    32023,
+    32024,
+    32025,
+    32026,
+    32027,
+    32028,
+    32029,
+    32030,
+    32031,
+    32032,
+    32033,
+    32034,
+    32035,
+    32036,
+    32037,
+    32038,
+    32039,
+    32040,
+    32041,
+    32042,
+    32043,
+    32044,
+    32045,
+    32046,
+    32047,
+    32048,
+    32049,
+    32050,
+    32051,
+    32052,
+    32053,
+    32054,
+    32055,
+    32056,
+    32057,
+    32058,
+    32059,
+    32060,
+    32061,
+    32062,
+    32063,
+    32064,
+    32065,
+    32066,
+    32067,
+    32068,
+    32069,
+    32070,
+    32071,
+    32072,
+    32073,
+    32074,
+    32075,
+    32076,
+    32077,
+    32078,
+    32079,
+    32080,
+    32081,
+    32082,
+    32083,
+    32084,
+    32085,
+    32086,
+    32087,
+    32088,
+    32089,
+    32090,
+    32091,
+    32092,
+    32093,
+    32094,
+    32095,
+    32096,
+    32097,
+    32098,
+    32099,
+    33000,
+    33001,
+    33002,
+    33003,
+    33004,
+    33005,
+    33006,
+    33007,
+    33008,
+    33009,
+    33010,
+    33011,
+    33012,
+    33013,
+    33014,
+    33015,
+    33016,
+    33017,
+    33018,
+    33019,
+    33020,
+    33021,
+    33022,
+    33023,
+    33024,
+    33025,
+    33026,
+    33027,
+    33028,
+    33029,
+    33030,
+    33031,
+    33032,
+    33033,
+    33034,
+    33035,
+    33036,
+    33037,
+    33038,
+    33039,
+    33040,
+    33041,
+    33042,
+    33043,
+    33044,
+    33045,
+    33046,
+    33047,
+    33048,
+    33049,
+    33050,
+    33051,
+    33052,
+    33053,
+    33054,
+    33055,
+    33056,
+    33057,
+    33058,
+    33059,
+    33060,
+    33061,
+    33062,
+    33063,
+    33064,
+    33065,
+    33066,
+    33067,
+    33068,
+    33069,
+    33070,
+    33071,
+    33072,
+    33073,
+    33074,
+    33075,
+    33076,
+    33077,
+    33078,
+    33079,
+    33080,
+    33081,
+    33082,
+    33083,
+    33084,
+    33085,
+    33086,
+    33087,
+    33088,
+    33089,
+    33090,
+    33091,
+    33092,
+    33093,
+    33094,
+    33095,
+    33096,
+    33097,
+    33098,
+    33099,
+    33100,
+    33101,
+    33102,
+    33103,
+    33104,
+    33105,
+    33106,
+    33107,
+    33108,
+    33109,
+    33110,
+    33111,
+    33112,
+    33113,
+    33114,
+    33115,
+    33116,
+    33117,
+    33118,
+    33119,
+    33120,
+    33121,
+    33122,
+    33123,
+    33124,
+    33125,
+    33126,
+    33127,
+    33128,
+    33129,
+    33130,
+    33131,
+    33132,
+    33133,
+    33134,
+    33135,
+    33136,
+    33137,
+    33138,
+    33139,
+    33140,
+    33141,
+    33142,
+    33143,
+    33144,
+    33145,
+    33146,
+    33147,
+    33148,
+    33149,
+    33150,
+    33151,
+    33152,
+    33153,
+    33154,
+    33155,
+    33156,
+    33157,
+    33158,
+    33159,
+    33160,
+    33161,
+    33162,
+    33163,
+    33164,
+    33165,
+    33166,
+    33167,
+    33168,
+    33169,
+    33170,
+    33171,
+    33172,
+    33173,
+    33174,
+    33175,
+    33176,
+    33177,
+    33178,
+    33179,
+    33180,
+    33181,
+    33182,
+    33183,
+    33184,
+    33185,
+    33186,
+    33187,
+    33188,
+    33189,
+    33190,
+    33191,
+    33192,
+    33193,
+    33194,
+    33195,
+    33196,
+    33197,
+    33198,
+    33199
+   ],
+   "session_size": 3,
+   "wall_s": 262.44,
+   "unreal_maps": [
+    20010,
+    20011,
+    20012,
+    20013,
+    20014,
+    20015,
+    20016,
+    20017,
+    20018,
+    20019
+   ],
+   "replicates": 10,
+   "unreal_obstacles": "results/v3/wild2/trees/tree_layout.json",
+   "brain": "r7e",
+   "model_sha1": "12c8d90cf44c"
+  }
+ },
+ "rerun": [
+  {
+   "name": "s20010_r7e_b",
+   "against": "s20010_r7e",
+   "same": true
+  }
+ ],
+ "unreal_runs": [
+  {
+   "name": "s20010_cur",
+   "brain": "cur",
+   "session": 20010,
+   "log": "s20010_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 346,
+     "live": 220959,
+     "flee": 28285,
+     "reflex": 28221,
+     "ep_started": 318,
+     "ep_chased": 61,
+     "ep_hidden": 7,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 271,
+     "ep_truncated": 32,
+     "ep_watching": 0,
+     "ep_joined": 28,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 409,
+     "live": 223537,
+     "flee": 23621,
+     "reflex": 23590,
+     "ep_started": 378,
+     "ep_chased": 147,
+     "ep_hidden": 21,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 349,
+     "ep_truncated": 2,
+     "ep_watching": 0,
+     "ep_joined": 31,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 206,
+     "live": 220507,
+     "flee": 16303,
+     "reflex": 16149,
+     "ep_started": 198,
+     "ep_chased": 22,
+     "ep_hidden": 1,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 185,
+     "ep_truncated": 4,
+     "ep_watching": 0,
+     "ep_joined": 8,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20010_r7e",
+   "brain": "r7e",
+   "session": 20010,
+   "log": "s20010_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 322,
+     "live": 222655,
+     "flee": 12276,
+     "reflex": 12276,
+     "ep_started": 295,
+     "ep_chased": 99,
+     "ep_hidden": 20,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 268,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 27,
+     "rt_run": 7974,
+     "rt_shelter": 4302,
+     "pk_run": 221,
+     "pk_shelter": 243,
+     "refled": 26,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 352,
+     "live": 222872,
+     "flee": 14901,
+     "reflex": 14901,
+     "ep_started": 331,
+     "ep_chased": 140,
+     "ep_hidden": 25,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 299,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 21,
+     "rt_run": 10184,
+     "rt_shelter": 4717,
+     "pk_run": 244,
+     "pk_shelter": 282,
+     "refled": 21,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 179,
+     "live": 220722,
+     "flee": 13209,
+     "reflex": 13209,
+     "ep_started": 175,
+     "ep_chased": 32,
+     "ep_hidden": 10,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 146,
+     "ep_truncated": 11,
+     "ep_watching": 0,
+     "ep_joined": 4,
+     "rt_run": 9624,
+     "rt_shelter": 3585,
+     "pk_run": 147,
+     "pk_shelter": 138,
+     "refled": 4,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20011_cur",
+   "brain": "cur",
+   "session": 20011,
+   "log": "s20011_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 429,
+     "live": 222924,
+     "flee": 20693,
+     "reflex": 20625,
+     "ep_started": 376,
+     "ep_chased": 161,
+     "ep_hidden": 14,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 356,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 53,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 443,
+     "live": 224954,
+     "flee": 21813,
+     "reflex": 21806,
+     "ep_started": 403,
+     "ep_chased": 190,
+     "ep_hidden": 24,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 369,
+     "ep_truncated": 5,
+     "ep_watching": 1,
+     "ep_joined": 40,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 181,
+     "live": 220345,
+     "flee": 10677,
+     "reflex": 10559,
+     "ep_started": 172,
+     "ep_chased": 16,
+     "ep_hidden": 1,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 163,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 9,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20011_r7e",
+   "brain": "r7e",
+   "session": 20011,
+   "log": "s20011_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 510,
+     "live": 224708,
+     "flee": 21901,
+     "reflex": 21901,
+     "ep_started": 465,
+     "ep_chased": 173,
+     "ep_hidden": 35,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 411,
+     "ep_truncated": 14,
+     "ep_watching": 0,
+     "ep_joined": 45,
+     "rt_run": 16311,
+     "rt_shelter": 5590,
+     "pk_run": 408,
+     "pk_shelter": 359,
+     "refled": 45,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 426,
+     "live": 222655,
+     "flee": 19240,
+     "reflex": 19240,
+     "ep_started": 388,
+     "ep_chased": 167,
+     "ep_hidden": 38,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 343,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 38,
+     "rt_run": 13577,
+     "rt_shelter": 5663,
+     "pk_run": 266,
+     "pk_shelter": 341,
+     "refled": 38,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 121,
+     "live": 221236,
+     "flee": 7891,
+     "reflex": 7891,
+     "ep_started": 121,
+     "ep_chased": 33,
+     "ep_hidden": 2,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 105,
+     "ep_truncated": 6,
+     "ep_watching": 0,
+     "ep_joined": 0,
+     "rt_run": 4974,
+     "rt_shelter": 2917,
+     "pk_run": 82,
+     "pk_shelter": 96,
+     "refled": 0,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20012_cur",
+   "brain": "cur",
+   "session": 20012,
+   "log": "s20012_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 636,
+     "live": 223974,
+     "flee": 23460,
+     "reflex": 23452,
+     "ep_started": 557,
+     "ep_chased": 241,
+     "ep_hidden": 31,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 508,
+     "ep_truncated": 13,
+     "ep_watching": 3,
+     "ep_joined": 79,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 424,
+     "live": 222706,
+     "flee": 22571,
+     "reflex": 22523,
+     "ep_started": 402,
+     "ep_chased": 144,
+     "ep_hidden": 12,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 383,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 22,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 265,
+     "live": 220562,
+     "flee": 16138,
+     "reflex": 15858,
+     "ep_started": 240,
+     "ep_chased": 36,
+     "ep_hidden": 4,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 228,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 25,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20012_r7e",
+   "brain": "r7e",
+   "session": 20012,
+   "log": "s20012_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 404,
+     "live": 224176,
+     "flee": 11982,
+     "reflex": 11982,
+     "ep_started": 361,
+     "ep_chased": 133,
+     "ep_hidden": 29,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 326,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 43,
+     "rt_run": 7025,
+     "rt_shelter": 4957,
+     "pk_run": 221,
+     "pk_shelter": 303,
+     "refled": 40,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 476,
+     "live": 223939,
+     "flee": 23523,
+     "reflex": 23523,
+     "ep_started": 431,
+     "ep_chased": 183,
+     "ep_hidden": 34,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 384,
+     "ep_truncated": 7,
+     "ep_watching": 0,
+     "ep_joined": 45,
+     "rt_run": 17152,
+     "rt_shelter": 6371,
+     "pk_run": 421,
+     "pk_shelter": 371,
+     "refled": 43,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 236,
+     "live": 220777,
+     "flee": 11489,
+     "reflex": 11489,
+     "ep_started": 226,
+     "ep_chased": 35,
+     "ep_hidden": 10,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 208,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 10,
+     "rt_run": 6392,
+     "rt_shelter": 5097,
+     "pk_run": 168,
+     "pk_shelter": 195,
+     "refled": 10,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20013_cur",
+   "brain": "cur",
+   "session": 20013,
+   "log": "s20013_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 475,
+     "live": 222492,
+     "flee": 19256,
+     "reflex": 19118,
+     "ep_started": 416,
+     "ep_chased": 173,
+     "ep_hidden": 26,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 380,
+     "ep_truncated": 3,
+     "ep_watching": 0,
+     "ep_joined": 59,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 258,
+     "live": 221115,
+     "flee": 12067,
+     "reflex": 12013,
+     "ep_started": 242,
+     "ep_chased": 79,
+     "ep_hidden": 10,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 224,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 16,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 189,
+     "live": 223260,
+     "flee": 12243,
+     "reflex": 12123,
+     "ep_started": 171,
+     "ep_chased": 48,
+     "ep_hidden": 12,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 134,
+     "ep_truncated": 19,
+     "ep_watching": 1,
+     "ep_joined": 18,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20013_r7e",
+   "brain": "r7e",
+   "session": 20013,
+   "log": "s20013_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 524,
+     "live": 224785,
+     "flee": 16881,
+     "reflex": 16881,
+     "ep_started": 471,
+     "ep_chased": 202,
+     "ep_hidden": 44,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 420,
+     "ep_truncated": 2,
+     "ep_watching": 1,
+     "ep_joined": 53,
+     "rt_run": 9885,
+     "rt_shelter": 6996,
+     "pk_run": 307,
+     "pk_shelter": 453,
+     "refled": 51,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 397,
+     "live": 225795,
+     "flee": 12627,
+     "reflex": 12627,
+     "ep_started": 350,
+     "ep_chased": 117,
+     "ep_hidden": 31,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 314,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 47,
+     "rt_run": 6413,
+     "rt_shelter": 6214,
+     "pk_run": 192,
+     "pk_shelter": 329,
+     "refled": 47,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 115,
+     "live": 220436,
+     "flee": 5393,
+     "reflex": 5393,
+     "ep_started": 111,
+     "ep_chased": 19,
+     "ep_hidden": 4,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 99,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 4,
+     "rt_run": 2269,
+     "rt_shelter": 3124,
+     "pk_run": 82,
+     "pk_shelter": 117,
+     "refled": 4,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20014_cur",
+   "brain": "cur",
+   "session": 20014,
+   "log": "s20014_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 289,
+     "live": 224277,
+     "flee": 22532,
+     "reflex": 22532,
+     "ep_started": 272,
+     "ep_chased": 105,
+     "ep_hidden": 16,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 250,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 17,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 315,
+     "live": 221728,
+     "flee": 20239,
+     "reflex": 20185,
+     "ep_started": 284,
+     "ep_chased": 100,
+     "ep_hidden": 13,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 249,
+     "ep_truncated": 15,
+     "ep_watching": 1,
+     "ep_joined": 31,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 189,
+     "live": 221343,
+     "flee": 17311,
+     "reflex": 17311,
+     "ep_started": 185,
+     "ep_chased": 39,
+     "ep_hidden": 7,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 171,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 4,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20014_r7e",
+   "brain": "r7e",
+   "session": 20014,
+   "log": "s20014_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 490,
+     "live": 224245,
+     "flee": 21440,
+     "reflex": 21440,
+     "ep_started": 451,
+     "ep_chased": 194,
+     "ep_hidden": 41,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 391,
+     "ep_truncated": 13,
+     "ep_watching": 1,
+     "ep_joined": 39,
+     "rt_run": 15142,
+     "rt_shelter": 6298,
+     "pk_run": 352,
+     "pk_shelter": 352,
+     "refled": 39,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 288,
+     "live": 224289,
+     "flee": 12930,
+     "reflex": 12930,
+     "ep_started": 265,
+     "ep_chased": 85,
+     "ep_hidden": 15,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 240,
+     "ep_truncated": 4,
+     "ep_watching": 2,
+     "ep_joined": 23,
+     "rt_run": 8764,
+     "rt_shelter": 4166,
+     "pk_run": 229,
+     "pk_shelter": 244,
+     "refled": 23,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 253,
+     "live": 221711,
+     "flee": 11737,
+     "reflex": 11737,
+     "ep_started": 239,
+     "ep_chased": 41,
+     "ep_hidden": 13,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 212,
+     "ep_truncated": 7,
+     "ep_watching": 0,
+     "ep_joined": 14,
+     "rt_run": 6699,
+     "rt_shelter": 5038,
+     "pk_run": 182,
+     "pk_shelter": 201,
+     "refled": 14,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20015_cur",
+   "brain": "cur",
+   "session": 20015,
+   "log": "s20015_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 225,
+     "live": 220725,
+     "flee": 27837,
+     "reflex": 27756,
+     "ep_started": 212,
+     "ep_chased": 50,
+     "ep_hidden": 2,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 202,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 13,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 404,
+     "live": 222689,
+     "flee": 17353,
+     "reflex": 17353,
+     "ep_started": 365,
+     "ep_chased": 151,
+     "ep_hidden": 15,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 343,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 39,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 233,
+     "live": 220719,
+     "flee": 14999,
+     "reflex": 14940,
+     "ep_started": 217,
+     "ep_chased": 31,
+     "ep_hidden": 4,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 205,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 16,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20015_r7e",
+   "brain": "r7e",
+   "session": 20015,
+   "log": "s20015_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 9,
+     "starved": 0,
+     "started": 322,
+     "live": 220766,
+     "flee": 17548,
+     "reflex": 17548,
+     "ep_started": 300,
+     "ep_chased": 77,
+     "ep_hidden": 17,
+     "ep_caught": 9,
+     "ep_starved": 0,
+     "ep_other": 268,
+     "ep_truncated": 6,
+     "ep_watching": 0,
+     "ep_joined": 22,
+     "rt_run": 13119,
+     "rt_shelter": 4429,
+     "pk_run": 268,
+     "pk_shelter": 299,
+     "refled": 22,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 313,
+     "live": 222165,
+     "flee": 12787,
+     "reflex": 12787,
+     "ep_started": 287,
+     "ep_chased": 132,
+     "ep_hidden": 18,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 262,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 26,
+     "rt_run": 9278,
+     "rt_shelter": 3509,
+     "pk_run": 231,
+     "pk_shelter": 257,
+     "refled": 26,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 255,
+     "live": 221986,
+     "flee": 9285,
+     "reflex": 9285,
+     "ep_started": 246,
+     "ep_chased": 62,
+     "ep_hidden": 24,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 214,
+     "ep_truncated": 1,
+     "ep_watching": 2,
+     "ep_joined": 9,
+     "rt_run": 3380,
+     "rt_shelter": 5905,
+     "pk_run": 108,
+     "pk_shelter": 239,
+     "refled": 7,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20016_cur",
+   "brain": "cur",
+   "session": 20016,
+   "log": "s20016_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 235,
+     "live": 222281,
+     "flee": 11866,
+     "reflex": 11850,
+     "ep_started": 221,
+     "ep_chased": 67,
+     "ep_hidden": 3,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 211,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 14,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 318,
+     "live": 224577,
+     "flee": 18329,
+     "reflex": 18329,
+     "ep_started": 300,
+     "ep_chased": 163,
+     "ep_hidden": 12,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 283,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 18,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 249,
+     "live": 222396,
+     "flee": 17441,
+     "reflex": 17390,
+     "ep_started": 239,
+     "ep_chased": 45,
+     "ep_hidden": 3,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 213,
+     "ep_truncated": 16,
+     "ep_watching": 0,
+     "ep_joined": 10,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20016_r7e",
+   "brain": "r7e",
+   "session": 20016,
+   "log": "s20016_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 365,
+     "live": 224790,
+     "flee": 12828,
+     "reflex": 12828,
+     "ep_started": 334,
+     "ep_chased": 172,
+     "ep_hidden": 39,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 283,
+     "ep_truncated": 7,
+     "ep_watching": 0,
+     "ep_joined": 31,
+     "rt_run": 7794,
+     "rt_shelter": 5034,
+     "pk_run": 213,
+     "pk_shelter": 266,
+     "refled": 31,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 237,
+     "live": 220967,
+     "flee": 14109,
+     "reflex": 14109,
+     "ep_started": 228,
+     "ep_chased": 76,
+     "ep_hidden": 14,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 190,
+     "ep_truncated": 16,
+     "ep_watching": 0,
+     "ep_joined": 9,
+     "rt_run": 10580,
+     "rt_shelter": 3529,
+     "pk_run": 182,
+     "pk_shelter": 188,
+     "refled": 8,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 161,
+     "live": 220427,
+     "flee": 9818,
+     "reflex": 9818,
+     "ep_started": 157,
+     "ep_chased": 20,
+     "ep_hidden": 4,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 145,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 4,
+     "rt_run": 6347,
+     "rt_shelter": 3471,
+     "pk_run": 133,
+     "pk_shelter": 135,
+     "refled": 4,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20017_cur",
+   "brain": "cur",
+   "session": 20017,
+   "log": "s20017_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 712,
+     "live": 225198,
+     "flee": 28919,
+     "reflex": 28904,
+     "ep_started": 620,
+     "ep_chased": 263,
+     "ep_hidden": 28,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 574,
+     "ep_truncated": 13,
+     "ep_watching": 0,
+     "ep_joined": 92,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 376,
+     "live": 224176,
+     "flee": 17788,
+     "reflex": 17688,
+     "ep_started": 343,
+     "ep_chased": 169,
+     "ep_hidden": 15,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 322,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 33,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 134,
+     "live": 221518,
+     "flee": 7005,
+     "reflex": 7005,
+     "ep_started": 121,
+     "ep_chased": 19,
+     "ep_hidden": 4,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 110,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 13,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20017_r7e",
+   "brain": "r7e",
+   "session": 20017,
+   "log": "s20017_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 350,
+     "live": 223931,
+     "flee": 16645,
+     "reflex": 16645,
+     "ep_started": 327,
+     "ep_chased": 150,
+     "ep_hidden": 26,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 296,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 23,
+     "rt_run": 12803,
+     "rt_shelter": 3842,
+     "pk_run": 269,
+     "pk_shelter": 266,
+     "refled": 21,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 472,
+     "live": 223938,
+     "flee": 19000,
+     "reflex": 19000,
+     "ep_started": 416,
+     "ep_chased": 165,
+     "ep_hidden": 33,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 377,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 56,
+     "rt_run": 13414,
+     "rt_shelter": 5586,
+     "pk_run": 304,
+     "pk_shelter": 348,
+     "refled": 54,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 210,
+     "live": 220749,
+     "flee": 11665,
+     "reflex": 11665,
+     "ep_started": 203,
+     "ep_chased": 33,
+     "ep_hidden": 12,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 179,
+     "ep_truncated": 4,
+     "ep_watching": 1,
+     "ep_joined": 7,
+     "rt_run": 7770,
+     "rt_shelter": 3895,
+     "pk_run": 135,
+     "pk_shelter": 151,
+     "refled": 7,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20018_cur",
+   "brain": "cur",
+   "session": 20018,
+   "log": "s20018_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 439,
+     "live": 223069,
+     "flee": 17919,
+     "reflex": 17884,
+     "ep_started": 389,
+     "ep_chased": 130,
+     "ep_hidden": 19,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 360,
+     "ep_truncated": 4,
+     "ep_watching": 0,
+     "ep_joined": 50,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 372,
+     "live": 223938,
+     "flee": 15708,
+     "reflex": 15704,
+     "ep_started": 348,
+     "ep_chased": 136,
+     "ep_hidden": 8,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 334,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 24,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 197,
+     "live": 220861,
+     "flee": 12889,
+     "reflex": 12762,
+     "ep_started": 180,
+     "ep_chased": 30,
+     "ep_hidden": 4,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 168,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 17,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20018_r7e",
+   "brain": "r7e",
+   "session": 20018,
+   "log": "s20018_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 362,
+     "live": 221273,
+     "flee": 14806,
+     "reflex": 14806,
+     "ep_started": 333,
+     "ep_chased": 118,
+     "ep_hidden": 20,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 305,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 29,
+     "rt_run": 9415,
+     "rt_shelter": 5391,
+     "pk_run": 250,
+     "pk_shelter": 283,
+     "refled": 29,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 411,
+     "live": 224033,
+     "flee": 14123,
+     "reflex": 14123,
+     "ep_started": 386,
+     "ep_chased": 140,
+     "ep_hidden": 26,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 355,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 25,
+     "rt_run": 7954,
+     "rt_shelter": 6169,
+     "pk_run": 241,
+     "pk_shelter": 319,
+     "refled": 23,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 218,
+     "live": 221682,
+     "flee": 13077,
+     "reflex": 13077,
+     "ep_started": 203,
+     "ep_chased": 23,
+     "ep_hidden": 7,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 178,
+     "ep_truncated": 11,
+     "ep_watching": 0,
+     "ep_joined": 15,
+     "rt_run": 8746,
+     "rt_shelter": 4331,
+     "pk_run": 154,
+     "pk_shelter": 178,
+     "refled": 15,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  },
+  {
+   "name": "s20019_cur",
+   "brain": "cur",
+   "session": 20019,
+   "log": "s20019_cur.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 572,
+     "live": 224227,
+     "flee": 26976,
+     "reflex": 26976,
+     "ep_started": 495,
+     "ep_chased": 216,
+     "ep_hidden": 26,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 439,
+     "ep_truncated": 25,
+     "ep_watching": 5,
+     "ep_joined": 77,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 348,
+     "live": 222510,
+     "flee": 15148,
+     "reflex": 15148,
+     "ep_started": 327,
+     "ep_chased": 128,
+     "ep_hidden": 19,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 301,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 21,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 8,
+     "starved": 0,
+     "started": 208,
+     "live": 220380,
+     "flee": 22706,
+     "reflex": 22577,
+     "ep_started": 193,
+     "ep_chased": 30,
+     "ep_hidden": 5,
+     "ep_caught": 8,
+     "ep_starved": 0,
+     "ep_other": 180,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 15,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 23
+  },
+  {
+   "name": "s20019_r7e",
+   "brain": "r7e",
+   "session": 20019,
+   "log": "s20019_r7e.log",
+   "regions": {
+    "Forest": {
+     "n": 128,
+     "caught": 6,
+     "starved": 0,
+     "started": 629,
+     "live": 224065,
+     "flee": 22041,
+     "reflex": 22041,
+     "ep_started": 534,
+     "ep_chased": 209,
+     "ep_hidden": 37,
+     "ep_caught": 6,
+     "ep_starved": 0,
+     "ep_other": 490,
+     "ep_truncated": 1,
+     "ep_watching": 0,
+     "ep_joined": 95,
+     "rt_run": 13813,
+     "rt_shelter": 8228,
+     "pk_run": 380,
+     "pk_shelter": 498,
+     "refled": 88,
+     "region": "Forest"
+    },
+    "Barren": {
+     "n": 128,
+     "caught": 5,
+     "starved": 0,
+     "started": 406,
+     "live": 224713,
+     "flee": 13686,
+     "reflex": 13686,
+     "ep_started": 373,
+     "ep_chased": 169,
+     "ep_hidden": 36,
+     "ep_caught": 5,
+     "ep_starved": 0,
+     "ep_other": 332,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 33,
+     "rt_run": 8529,
+     "rt_shelter": 5157,
+     "pk_run": 224,
+     "pk_shelter": 302,
+     "refled": 33,
+     "region": "Barren"
+    },
+    "Highland": {
+     "n": 128,
+     "caught": 7,
+     "starved": 0,
+     "started": 241,
+     "live": 221227,
+     "flee": 15013,
+     "reflex": 15013,
+     "ep_started": 225,
+     "ep_chased": 44,
+     "ep_hidden": 7,
+     "ep_caught": 7,
+     "ep_starved": 0,
+     "ep_other": 211,
+     "ep_truncated": 0,
+     "ep_watching": 0,
+     "ep_joined": 16,
+     "rt_run": 10365,
+     "rt_shelter": 4648,
+     "pk_run": 166,
+     "pk_shelter": 187,
+     "refled": 16,
+     "region": "Highland"
+    }
+   },
+   "checks_failed": [],
+   "checks": 24
+  }
+ ],
+ "groups": {
+  "모든 지역": {
+   "ep_hide": {
+    "unreal": {
+     "cur": 0.11473354231974922,
+     "r7e": 0.20690718470551958
+    },
+    "python": {
+     "cur": 0.10892267019167218,
+     "r7e": 0.20087751595483555
+    },
+    "unreal_pair": {
+     "diff": 0.09238235849422308,
+     "se": 0.008743688715653088,
+     "t": 10.56560468911007,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.09045277554406296,
+     "se": 0.0032610845041557064,
+     "t": 27.737022891861905,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.09167769873503986,
+     "sd": 0.010255592025058482,
+     "min": 0.06799031100910921,
+     "max": 0.10386519406181476
+    },
+    "unreal_diff": 0.09217364238577036,
+    "diff_z": 0.048358363858342725,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.10904800449007176,
+      "sd": 0.00489692939451654,
+      "min": 0.10379177377892031,
+      "max": 0.11872309899569584,
+      "z": 1.1610414142470546
+     },
+     "r7e": {
+      "mean": 0.2007257032251116,
+      "sd": 0.011032702675934525,
+      "min": 0.17488789237668162,
+      "max": 0.21259618124821886,
+      "z": 0.560287144680474
+     }
+    }
+   },
+   "ep_caught": {
+    "unreal": {
+     "cur": 0.06332288401253919,
+     "r7e": 0.061671292013567684
+    },
+    "python": {
+     "cur": 0.0689358889623265,
+     "r7e": 0.06210112911143839
+    },
+    "unreal_pair": {
+     "diff": -0.004001532008170423,
+     "se": 0.004174711934452749,
+     "t": -0.9585169158970899,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.007116730792417241,
+     "se": 0.0029125173132105078,
+     "t": -2.4434981931737845,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.00662272483163936,
+     "sd": 0.009690707547005921,
+     "min": -0.020753765782842472,
+     "max": 0.012606255943735711
+    },
+    "unreal_diff": -0.0016515919989715036,
+    "diff_z": 0.5129793473340093,
+    "direction": "예 (언리얼은 0 근처)",
+    "level": {
+     "cur": {
+      "mean": 0.06920531392176761,
+      "sd": 0.005140008175101251,
+      "min": 0.06121230217975515,
+      "max": 0.07614579574160953,
+      "z": -1.1444397963652164
+     },
+     "r7e": {
+      "mean": 0.06258258909012825,
+      "sd": 0.006631100489156152,
+      "min": 0.05403930131004367,
+      "max": 0.07381855812349086,
+      "z": -0.13742772833118835
+     }
+    }
+   },
+   "gf": {
+    "unreal": {
+     "cur": 1.5097512761189142,
+     "r7e": 1.5033569984224104
+    },
+    "python": {
+     "cur": 1.4580484389310255,
+     "r7e": 1.5043954715068268
+    },
+    "unreal_pair": {
+     "diff": -0.0066066479260752375,
+     "se": 0.06698863639993861,
+     "t": -0.09862341258347053,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.04627841041280249,
+     "se": 0.028066740270366736,
+     "t": 1.6488701561707149,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.046316193143401296,
+     "sd": 0.12113382532476431,
+     "min": -0.16100738251226732,
+     "max": 0.21839192830745424
+    },
+    "unreal_diff": -0.006394277696503803,
+    "diff_z": -0.43514246081626134,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 1.4580242482549015,
+      "sd": 0.05441587878710078,
+      "min": 1.3762822690969676,
+      "max": 1.5488543273656108,
+      "z": 0.9505870164551043
+     },
+     "r7e": {
+      "mean": 1.5043404413983028,
+      "sd": 0.08505751630446252,
+      "min": 1.3878469448533435,
+      "max": 1.6177266673692885,
+      "z": -0.011562093729284826
+     }
+    }
+   },
+   "ge": {
+    "unreal": {
+     "cur": 1.376097233016684,
+     "r7e": 1.3816816136820005
+    },
+    "python": {
+     "cur": 1.3376179781711317,
+     "r7e": 1.3708508941156317
+    },
+    "unreal_pair": {
+     "diff": 0.0054175532289709285,
+     "se": 0.05695757690742064,
+     "t": 0.09511558467061666,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.03319834889998147,
+     "se": 0.02494830153617556,
+     "t": 1.330685732327035,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.03320771254254003,
+     "sd": 0.10566455877515,
+     "min": -0.14287535163028053,
+     "max": 0.18077667340181858
+    },
+    "unreal_diff": 0.005584380665316413,
+    "diff_z": -0.2614247596112616,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 1.337595632110792,
+      "sd": 0.051067450144235305,
+      "min": 1.2644199201467994,
+      "max": 1.4198205996576485,
+      "z": 0.7539362313400773
+     },
+     "r7e": {
+      "mean": 1.370803344653332,
+      "sd": 0.07167463649562494,
+      "min": 1.276945248027368,
+      "max": 1.467571212309933,
+      "z": 0.15177292220145983
+     }
+    }
+   },
+   "caught_share": {
+    "unreal": {
+     "cur": 0.05260416666666667,
+     "r7e": 0.05234375
+    },
+    "python": {
+     "cur": 0.054427083333333334,
+     "r7e": 0.052890625
+    },
+    "unreal_pair": {
+     "diff": -0.00026041666666666715,
+     "se": 0.0012549333589236945,
+     "t": -0.20751433915982276,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.0015364583333333337,
+     "se": 0.0005614612224521658,
+     "t": -2.7365350836214404,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.0015364583333333328,
+     "sd": 0.0018514222953766924,
+     "min": -0.004687499999999997,
+     "max": 0.0023437500000000056
+    },
+    "unreal_diff": -0.00026041666666666574,
+    "diff_z": 0.689222372363752,
+    "direction": "예 (언리얼은 0 근처)",
+    "level": {
+     "cur": {
+      "mean": 0.054427083333333334,
+      "sd": 0.0011184113478060003,
+      "min": 0.05286458333333333,
+      "max": 0.055989583333333336,
+      "z": -1.6299161039832997
+     },
+     "r7e": {
+      "mean": 0.05289062499999999,
+      "sd": 0.0015305865122146665,
+      "min": 0.050520833333333334,
+      "max": 0.05572916666666667,
+      "z": -0.35729767356220404
+     }
+    }
+   },
+   "self_flee": {
+    "unreal": {
+     "cur": 0.0002638618496670711,
+     "r7e": 0.0
+    },
+    "python": {
+     "cur": 0.00027974961202419714,
+     "r7e": 0.0
+    },
+    "unreal_pair": {
+     "diff": -0.00026398499571449457,
+     "se": 4.579795386138604e-05,
+     "t": -5.76412205037549,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.0002797513387456397,
+     "se": 1.7028807476788427e-05,
+     "t": -16.42812270483193,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.00027975570785670047,
+     "sd": 3.1470031372161374e-05,
+     "min": -0.00031862000600302916,
+     "max": -0.00021912456887016255
+    },
+    "unreal_diff": -0.0002638618496670711,
+    "diff_z": 0.5050474212011501,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.00027975570785670047,
+      "sd": 3.1470031372161374e-05,
+      "min": 0.00021912456887016255,
+      "max": 0.00031862000600302916,
+      "z": -0.5050474212011501
+     },
+     "r7e": {
+      "mean": 0.0,
+      "sd": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "z": null
+     }
+    }
+   },
+   "flee_share": {
+    "unreal": {
+     "cur": 0.08392215281302054,
+     "r7e": 0.06493110374540181
+    },
+    "python": {
+     "cur": 0.07851247174402189,
+     "r7e": 0.06378604735305224
+    },
+    "unreal_pair": {
+     "diff": -0.01901472496487381,
+     "se": 0.00357145668387475,
+     "t": -5.324081081740665,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.014727709736137852,
+     "se": 0.001689361222348973,
+     "t": -8.717916299546467,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.014727377117931973,
+     "sd": 0.0072697595402597,
+     "min": -0.023695796306960067,
+     "max": 0.00031799125308158704
+    },
+    "unreal_diff": -0.018991049067618726,
+    "diff_z": -0.5864942197984228,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.07851123364329889,
+      "sd": 0.004740050667238579,
+      "min": 0.07148940136555769,
+      "max": 0.08400035727805674,
+      "z": 1.1415319264664958
+     },
+     "r7e": {
+      "mean": 0.06378385652536692,
+      "sd": 0.003884596980214721,
+      "min": 0.05842797098992555,
+      "max": 0.07180739261863928,
+      "z": 0.2953323667495316
+     }
+    }
+   },
+   "picked_shelter": {
+    "unreal": {
+     "cur": null,
+     "r7e": 0.5394021739130435
+    },
+    "python": {
+     "cur": null,
+     "r7e": 0.5549106806361649
+    },
+    "level": {
+     "r7e": {
+      "mean": 0.5548169658818113,
+      "sd": 0.007953293730595412,
+      "min": 0.536804699398071,
+      "max": 0.564033512866547,
+      "z": -1.9381645505520415
+     }
+    }
+   },
+   "shelter_route": {
+    "unreal": {
+     "cur": null,
+     "r7e": 0.34149742653583837
+    },
+    "python": {
+     "cur": null,
+     "r7e": 0.3542082776139113
+    },
+    "level": {
+     "r7e": {
+      "mean": 0.35442088100441516,
+      "sd": 0.013130847457459495,
+      "min": 0.33486709983749874,
+      "max": 0.3746340247928736,
+      "z": -0.9842056661190678
+     }
+    }
+   },
+   "sums": {
+    "unreal": {
+     "cur": {
+      "n": 3840,
+      "caught": 202,
+      "starved": 0,
+      "started": 10076,
+      "live": 6673947,
+      "flee": 560092,
+      "reflex": 558331,
+      "ep_started": 9184,
+      "ep_chased": 3190,
+      "ep_hidden": 366,
+      "ep_caught": 202,
+      "ep_starved": 0,
+      "ep_other": 8465,
+      "ep_truncated": 151,
+      "ep_watching": 11,
+      "ep_joined": 892
+     },
+     "r7e": {
+      "n": 3840,
+      "caught": 201,
+      "starved": 0,
+      "started": 10045,
+      "live": 6681713,
+      "flee": 433851,
+      "reflex": 433851,
+      "ep_started": 9232,
+      "ep_chased": 3243,
+      "ep_hidden": 671,
+      "ep_caught": 200,
+      "ep_starved": 0,
+      "ep_other": 8251,
+      "ep_truncated": 110,
+      "ep_watching": 7,
+      "ep_joined": 813,
+      "rt_run": 285692,
+      "rt_shelter": 148159,
+      "pk_run": 6780,
+      "pk_shelter": 7940,
+      "refled": 789
+     }
+    },
+    "python": {
+     "cur": {
+      "n": 38400,
+      "caught": 2090,
+      "starved": 0,
+      "started": 97219,
+      "live": 66677483,
+      "flee": 5235014,
+      "reflex": 5216361,
+      "ep_started": 89189,
+      "ep_chased": 30260,
+      "ep_hidden": 3296,
+      "ep_caught": 2086,
+      "ep_starved": 0,
+      "ep_other": 81802,
+      "ep_truncated": 2005,
+      "ep_watching": 62,
+      "ep_joined": 8030
+     },
+     "r7e": {
+      "n": 38400,
+      "caught": 2031,
+      "starved": 0,
+      "started": 100406,
+      "live": 66741759,
+      "flee": 4257193,
+      "reflex": 4257193,
+      "ep_started": 91493,
+      "ep_chased": 32592,
+      "ep_hidden": 6547,
+      "ep_caught": 2024,
+      "ep_starved": 0,
+      "ep_other": 80624,
+      "ep_truncated": 2298,
+      "ep_watching": 131,
+      "ep_joined": 8913,
+      "rt_run": 2749260,
+      "rt_shelter": 1507933,
+      "pk_run": 64955,
+      "pk_shelter": 80982,
+      "refled": 8715
+     }
+    }
+   },
+   "unreal_sessions": {
+    "cur": {
+     "20010": {
+      "ep_hide": 0.12608695652173912,
+      "ep_caught": 0.09565217391304348,
+      "gf": 1.4451062626785143,
+      "ge": 1.3443548374969736,
+      "caught_share": 0.057291666666666664,
+      "self_flee": 0.00037443440104781484,
+      "flee_share": 0.10256946209265222,
+      "chased": 230
+     },
+     "20011": {
+      "ep_hide": 0.10626702997275204,
+      "ep_caught": 0.051771117166212535,
+      "gf": 1.5758212453028406,
+      "ge": 1.4231775919116822,
+      "caught_share": 0.049479166666666664,
+      "self_flee": 0.0002888257363185643,
+      "flee_share": 0.07958870017943112,
+      "chased": 367
+     },
+     "20012": {
+      "ep_hide": 0.11163895486935867,
+      "ep_caught": 0.047505938242280284,
+      "gf": 1.9857862664520518,
+      "ge": 1.796949232812083,
+      "caught_share": 0.052083333333333336,
+      "self_flee": 0.0005035654230399166,
+      "flee_share": 0.09317309162193027,
+      "chased": 421
+     },
+     "20013": {
+      "ep_hide": 0.16,
+      "ep_caught": 0.07,
+      "gf": 1.382584533347729,
+      "ge": 1.2431264405046283,
+      "caught_share": 0.0546875,
+      "self_flee": 0.00046785940824782156,
+      "flee_share": 0.0653293685247583,
+      "chased": 300
+     },
+     "20014": {
+      "ep_hide": 0.14754098360655737,
+      "ep_caught": 0.08196721311475409,
+      "gf": 1.1882855721452676,
+      "ge": 1.1103652067586927,
+      "caught_share": 0.052083333333333336,
+      "self_flee": 8.09173025168278e-05,
+      "flee_share": 0.09003098832992681,
+      "chased": 244
+     },
+     "20015": {
+      "ep_hide": 0.09051724137931035,
+      "ep_caught": 0.09913793103448276,
+      "gf": 1.2979327935820084,
+      "ge": 1.1955436636938686,
+      "caught_share": 0.059895833333333336,
+      "self_flee": 0.00021080114976969975,
+      "flee_share": 0.09062793145348899,
+      "chased": 232
+     },
+     "20016": {
+      "ep_hide": 0.06545454545454546,
+      "ep_caught": 0.06909090909090909,
+      "gf": 1.198349206728686,
+      "ge": 1.135592764481049,
+      "caught_share": 0.049479166666666664,
+      "self_flee": 0.00010011146739503984,
+      "flee_share": 0.07117775911686744,
+      "chased": 275
+     },
+     "20017": {
+      "ep_hide": 0.10421286031042129,
+      "ep_caught": 0.03991130820399113,
+      "gf": 1.8214556143164622,
+      "ge": 1.6157593174460272,
+      "caught_share": 0.046875,
+      "self_flee": 0.00017141358072536266,
+      "flee_share": 0.08006057606887547,
+      "chased": 451
+     },
+     "20018": {
+      "ep_hide": 0.10472972972972973,
+      "ep_caught": 0.06756756756756757,
+      "gf": 1.5092802769409523,
+      "ge": 1.3730258074948942,
+      "caught_share": 0.052083333333333336,
+      "self_flee": 0.0002485521090994029,
+      "flee_share": 0.06964849341486641,
+      "chased": 296
+     },
+     "20019": {
+      "ep_hide": 0.13368983957219252,
+      "ep_caught": 0.053475935828877004,
+      "gf": 1.6908578255388484,
+      "ge": 1.521472245498166,
+      "caught_share": 0.052083333333333336,
+      "self_flee": 0.00019336937898449598,
+      "flee_share": 0.09717935534546414,
+      "chased": 374
+     }
+    },
+    "r7e": {
+     "20010": {
+      "ep_hide": 0.2029520295202952,
+      "ep_caught": 0.08118081180811808,
+      "gf": 1.2803021092714586,
+      "ge": 1.2022532116370905,
+      "caught_share": 0.057291666666666664,
+      "self_flee": 0.0,
+      "flee_share": 0.06061697653579968,
+      "shelter_route": 0.31208834744713515,
+      "picked_shelter": 0.52,
+      "chased": 271
+     },
+     "20011": {
+      "ep_hide": 0.20107238605898123,
+      "ep_caught": 0.05361930294906166,
+      "gf": 1.5809177100175142,
+      "ge": 1.4567775303283432,
+      "caught_share": 0.052083333333333336,
+      "self_flee": 0.0,
+      "flee_share": 0.07333543723517384,
+      "shelter_route": 0.2889949420786425,
+      "picked_shelter": 0.5128865979381443,
+      "chased": 373
+     },
+     "20012": {
+      "ep_hide": 0.20797720797720798,
+      "ep_caught": 0.05698005698005698,
+      "gf": 1.6684307780628262,
+      "ge": 1.521919831602112,
+      "caught_share": 0.052083333333333336,
+      "self_flee": 0.0,
+      "flee_share": 0.07025648385688571,
+      "shelter_route": 0.34951270374941484,
+      "picked_shelter": 0.5175699821322216,
+      "chased": 351
+     },
+     "20013": {
+      "ep_hide": 0.23372781065088757,
+      "ep_caught": 0.05325443786982249,
+      "gf": 1.543927417528047,
+      "ge": 1.3889385648032238,
+      "caught_share": 0.046875,
+      "self_flee": 0.0,
+      "flee_share": 0.05201217258604862,
+      "shelter_route": 0.4680095126214149,
+      "picked_shelter": 0.6074324324324324,
+      "chased": 338
+     },
+     "20014": {
+      "ep_hide": 0.215625,
+      "ep_caught": 0.059375,
+      "gf": 1.5382434781311312,
+      "ge": 1.424852106319331,
+      "caught_share": 0.049479166666666664,
+      "self_flee": 0.0,
+      "flee_share": 0.06879126289640355,
+      "shelter_route": 0.33621792786344806,
+      "picked_shelter": 0.5108974358974359,
+      "chased": 320
+     },
+     "20015": {
+      "ep_hide": 0.2177121771217712,
+      "ep_caught": 0.08487084870848709,
+      "gf": 1.338512927177377,
+      "ge": 1.2527879419536574,
+      "caught_share": 0.059895833333333336,
+      "self_flee": 0.0,
+      "flee_share": 0.0595863844660311,
+      "shelter_route": 0.3493942453306411,
+      "picked_shelter": 0.5670470756062768,
+      "chased": 271
+     },
+     "20016": {
+      "ep_hide": 0.2126865671641791,
+      "ep_caught": 0.07835820895522388,
+      "gf": 1.1453292183540884,
+      "ge": 1.079281399733407,
+      "caught_share": 0.0546875,
+      "self_flee": 0.0,
+      "flee_share": 0.05517244485007145,
+      "shelter_route": 0.32741123656645355,
+      "picked_shelter": 0.5273052820053715,
+      "chased": 268
+     },
+     "20017": {
+      "ep_hide": 0.20402298850574713,
+      "ep_caught": 0.05459770114942529,
+      "gf": 1.5434822275200488,
+      "ge": 1.4148587085600448,
+      "caught_share": 0.049479166666666664,
+      "self_flee": 0.0,
+      "flee_share": 0.07075789165113712,
+      "shelter_route": 0.2816106531388713,
+      "picked_shelter": 0.5193482688391039,
+      "chased": 348
+     },
+     "20018": {
+      "ep_hide": 0.18861209964412812,
+      "ep_caught": 0.0711743772241993,
+      "gf": 1.4857838521832476,
+      "ge": 1.382333715149298,
+      "caught_share": 0.0546875,
+      "self_flee": 0.0,
+      "flee_share": 0.06297864429345056,
+      "shelter_route": 0.3783030995572061,
+      "picked_shelter": 0.5473684210526316,
+      "chased": 281
+     },
+     "20019": {
+      "ep_hide": 0.1895734597156398,
+      "ep_caught": 0.04265402843601896,
+      "gf": 1.9044633995268692,
+      "ge": 1.6895396303012664,
+      "caught_share": 0.046875,
+      "self_flee": 0.0,
+      "flee_share": 0.07573077812852143,
+      "shelter_route": 0.35540007883326763,
+      "picked_shelter": 0.5617529880478087,
+      "chased": 422
+     }
+    }
+   }
+  },
+  "Barren": {
+   "ep_hide": {
+    "unreal": {
+     "cur": 0.10589907604832978,
+     "r7e": 0.1965065502183406
+    },
+    "python": {
+     "cur": 0.10288369348772033,
+     "r7e": 0.19735783261802575
+    },
+    "unreal_pair": {
+     "diff": 0.08745783912905525,
+     "se": 0.012058728234487096,
+     "t": 7.25265860780676,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.09469264394909721,
+     "se": 0.00442307196377938,
+     "t": 21.408795679685312,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.0946172886883562,
+     "sd": 0.01321796685296997,
+     "min": 0.06605842336934774,
+     "max": 0.11292860150157832
+    },
+    "unreal_diff": 0.09060747417001082,
+    "diff_z": -0.3033609149537554,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.10289862185316967,
+      "sd": 0.0052314579333041355,
+      "min": 0.09403669724770643,
+      "max": 0.10884353741496598,
+      "z": 0.5735407286865162
+     },
+     "r7e": {
+      "mean": 0.19751591054152587,
+      "sd": 0.013695818548982849,
+      "min": 0.17490196078431372,
+      "max": 0.21504660452729693,
+      "z": -0.07369842989488448
+     }
+    }
+   },
+   "ep_caught": {
+    "unreal": {
+     "cur": 0.04548685145700071,
+     "r7e": 0.04512372634643377
+    },
+    "python": {
+     "cur": 0.048528652555498195,
+     "r7e": 0.04164431330472103
+    },
+    "unreal_pair": {
+     "diff": -3.661052994668179e-05,
+     "se": 0.0107049812885952,
+     "t": -0.003419952726651252,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.01012140524121122,
+     "se": 0.004097293862402437,
+     "t": -2.4702658830715554,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.006844672939227217,
+     "sd": 0.010916913328377737,
+     "min": -0.02000515193611599,
+     "max": 0.018580523118338244
+    },
+    "unreal_diff": -0.0003631251105669364,
+    "diff_z": 0.5937161570946945,
+    "direction": "예 (언리얼은 0 근처)",
+    "level": {
+     "cur": {
+      "mean": 0.04927027519435442,
+      "sd": 0.007454391309655336,
+      "min": 0.03710575139146568,
+      "max": 0.06164383561643835,
+      "z": -0.507542947531237
+     },
+     "r7e": {
+      "mean": 0.04242560225512721,
+      "sd": 0.007441351303119167,
+      "min": 0.02983484283431007,
+      "max": 0.05568627450980392,
+      "z": 0.36258523235902046
+     }
+    }
+   },
+   "gf": {
+    "unreal": {
+     "cur": 1.6429726738741806,
+     "r7e": 1.6901035445649617
+    },
+    "python": {
+     "cur": 1.6540301741675685,
+     "r7e": 1.7658554259332948
+    },
+    "unreal_pair": {
+     "diff": 0.04680901143374698,
+     "se": 0.10635449518845322,
+     "t": 0.4401225481894721,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.11172195570070471,
+     "se": 0.057243599264770996,
+     "t": 1.9516934143842513,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.11180286395428529,
+     "sd": 0.18054070736760192,
+     "min": -0.18564922197657352,
+     "max": 0.32476569565429947
+    },
+    "unreal_diff": 0.047130870690781146,
+    "diff_z": -0.35821280533605326,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 1.6538153160521134,
+      "sd": 0.13597002476981365,
+      "min": 1.475650861815163,
+      "max": 1.8937637512919663,
+      "z": -0.07974288595069812
+     },
+     "r7e": {
+      "mean": 1.7656181800063986,
+      "sd": 0.16732528945206385,
+      "min": 1.509358110018028,
+      "max": 2.064825887486637,
+      "z": -0.45130437657524974
+     }
+    }
+   },
+   "ge": {
+    "unreal": {
+     "cur": 1.519760924401751,
+     "r7e": 1.545608191231324
+    },
+    "python": {
+     "cur": 1.5203199386557726,
+     "r7e": 1.6087919706402856
+    },
+    "unreal_pair": {
+     "diff": 0.025676557724572537,
+     "se": 0.08530997067583665,
+     "t": 0.30097956336357307,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.08848514314205119,
+     "se": 0.04986281376441729,
+     "t": 1.774571799339476,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.08848216350912827,
+     "sd": 0.15200710432754222,
+     "min": -0.16129022719463704,
+     "max": 0.26453023145288457
+    },
+    "unreal_diff": 0.025847266829573057,
+    "diff_z": -0.4120524297640105,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 1.520121108011593,
+      "sd": 0.12715355058187722,
+      "min": 1.3453009532174178,
+      "max": 1.746366478007117,
+      "z": -0.0028326665531074125
+     },
+     "r7e": {
+      "mean": 1.608603271520721,
+      "sd": 0.13801287121122569,
+      "min": 1.3877659436045662,
+      "max": 1.8402135558677404,
+      "z": -0.4564435167281206
+     }
+    }
+   },
+   "caught_share": {
+    "unreal": {
+     "cur": 0.05,
+     "r7e": 0.04921875
+    },
+    "python": {
+     "cur": 0.051640625,
+     "r7e": 0.048671875
+    },
+    "unreal_pair": {
+     "diff": -0.00078125,
+     "se": 0.004427083333333333,
+     "t": -0.17647058823529413,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.00296875,
+     "se": 0.0012552171743055928,
+     "t": -2.365128569597817,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.0029687500000000005,
+     "sd": 0.004462177081375812,
+     "min": -0.007031250000000003,
+     "max": 0.008593749999999997
+    },
+    "unreal_diff": -0.0007812500000000042,
+    "diff_z": 0.49023155291845344,
+    "direction": "예 (언리얼은 0 근처)",
+    "level": {
+     "cur": {
+      "mean": 0.051640624999999996,
+      "sd": 0.00264165721935745,
+      "min": 0.046875,
+      "max": 0.05625,
+      "z": -0.6210590034081159
+     },
+     "r7e": {
+      "mean": 0.048671874999999996,
+      "sd": 0.003436118725009529,
+      "min": 0.04375,
+      "max": 0.05546875,
+      "z": 0.15915486156506004
+     }
+    }
+   },
+   "self_flee": {
+    "unreal": {
+     "cur": 0.00013351673215557835,
+     "r7e": 0.0
+    },
+    "python": {
+     "cur": 0.0002063329817548591,
+     "r7e": 0.0
+    },
+    "unreal_pair": {
+     "diff": -0.00013370263802909324,
+     "se": 4.785962770471407e-05,
+     "t": -2.793641414304688,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.00020653172907200666,
+     "se": 2.3415505129743743e-05,
+     "t": -8.82029782947787,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.00020636519251933396,
+     "sd": 6.366349146809596e-05,
+     "min": -0.0003217520519535458,
+     "max": -0.00011962027953512065
+    },
+    "unreal_diff": -0.00013351673215557835,
+    "diff_z": 1.1442737224090602,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.00020636519251933396,
+      "sd": 6.366349146809596e-05,
+      "min": 0.00011962027953512065,
+      "max": 0.0003217520519535458,
+      "z": -1.1442737224090602
+     },
+     "r7e": {
+      "mean": 0.0,
+      "sd": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "z": null
+     }
+    }
+   },
+   "flee_share": {
+    "unreal": {
+     "cur": 0.08272526468124,
+     "r7e": 0.07020147931032324
+    },
+    "python": {
+     "cur": 0.08331453804594811,
+     "r7e": 0.07089518332019246
+    },
+    "unreal_pair": {
+     "diff": -0.012486714925048234,
+     "se": 0.004792905837284301,
+     "t": -2.6052493725024455,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.01243262346509657,
+     "se": 0.0027546363631646043,
+     "t": -4.51334471269871,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.012419947341717594,
+     "sd": 0.008582102757928237,
+     "min": -0.024875896601344732,
+     "max": -8.590435477204283e-05
+    },
+    "unreal_diff": -0.012523785370916765,
+    "diff_z": -0.01209936913226125,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.08330449435869768,
+      "sd": 0.006992169463987515,
+      "min": 0.0709953024589836,
+      "max": 0.09246932705082485,
+      "z": -0.08283976531760845
+     },
+     "r7e": {
+      "mean": 0.07088454701698008,
+      "sd": 0.0075419980027962115,
+      "min": 0.059676490814641915,
+      "max": 0.08496553116127702,
+      "z": -0.09056853454530098
+     }
+    }
+   },
+   "picked_shelter": {
+    "unreal": {
+     "cur": null,
+     "r7e": 0.5405258386219401
+    },
+    "python": {
+     "cur": null,
+     "r7e": 0.5535879085479462
+    },
+    "level": {
+     "r7e": {
+      "mean": 0.5535211161200065,
+      "sd": 0.011435993203497894,
+      "min": 0.528124434798336,
+      "max": 0.5646036916395223,
+      "z": -1.1363488301209872
+     }
+    }
+   },
+   "shelter_route": {
+    "unreal": {
+     "cur": null,
+     "r7e": 0.32551011304691385
+    },
+    "python": {
+     "cur": null,
+     "r7e": 0.34821448312588793
+    },
+    "level": {
+     "r7e": {
+      "mean": 0.3483512526952067,
+      "sd": 0.017742611461062992,
+      "min": 0.3177201737037324,
+      "max": 0.37050216586713514,
+      "z": -1.2873606401413256
+     }
+    }
+   },
+   "sums": {
+    "unreal": {
+     "cur": {
+      "n": 1280,
+      "caught": 64,
+      "starved": 0,
+      "started": 3667,
+      "live": 2231930,
+      "flee": 184637,
+      "reflex": 184339,
+      "ep_started": 3392,
+      "ep_chased": 1407,
+      "ep_hidden": 149,
+      "ep_caught": 64,
+      "ep_starved": 0,
+      "ep_other": 3157,
+      "ep_truncated": 22,
+      "ep_watching": 2,
+      "ep_joined": 275
+     },
+     "r7e": {
+      "n": 1280,
+      "caught": 63,
+      "starved": 0,
+      "started": 3778,
+      "live": 2235366,
+      "flee": 156926,
+      "reflex": 156926,
+      "ep_started": 3455,
+      "ep_chased": 1374,
+      "ep_hidden": 270,
+      "ep_caught": 62,
+      "ep_starved": 0,
+      "ep_other": 3096,
+      "ep_truncated": 27,
+      "ep_watching": 2,
+      "ep_joined": 323,
+      "rt_run": 105845,
+      "rt_shelter": 51081,
+      "pk_run": 2534,
+      "pk_shelter": 2981,
+      "refled": 316
+     }
+    },
+    "python": {
+     "cur": {
+      "n": 12800,
+      "caught": 661,
+      "starved": 0,
+      "started": 36851,
+      "live": 22279521,
+      "flee": 1856208,
+      "reflex": 1851611,
+      "ep_started": 33872,
+      "ep_chased": 13559,
+      "ep_hidden": 1395,
+      "ep_caught": 658,
+      "ep_starved": 0,
+      "ep_other": 31106,
+      "ep_truncated": 713,
+      "ep_watching": 27,
+      "ep_joined": 2979
+     },
+     "r7e": {
+      "n": 12800,
+      "caught": 623,
+      "starved": 0,
+      "started": 39429,
+      "live": 22328555,
+      "flee": 1582987,
+      "reflex": 1582987,
+      "ep_started": 35922,
+      "ep_chased": 14912,
+      "ep_hidden": 2943,
+      "ep_caught": 621,
+      "ep_starved": 0,
+      "ep_other": 31492,
+      "ep_truncated": 866,
+      "ep_watching": 57,
+      "ep_joined": 3507,
+      "rt_run": 1031768,
+      "rt_shelter": 551219,
+      "pk_run": 25637,
+      "pk_shelter": 31792,
+      "refled": 3452
+     }
+    }
+   }
+  },
+  "Forest": {
+   "ep_hide": {
+    "unreal": {
+     "cur": 0.11724608043626449,
+     "r7e": 0.2017026850032744
+    },
+    "python": {
+     "cur": 0.11510072274334922,
+     "r7e": 0.20961881011756323
+    },
+    "unreal_pair": {
+     "diff": 0.09281456908298588,
+     "se": 0.01660958148468647,
+     "t": 5.588013711757765,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.08891002942858728,
+     "se": 0.004789952162843392,
+     "t": 18.561778156842568,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.09384446398895108,
+     "sd": 0.010354219099670096,
+     "min": 0.07159159840383685,
+     "max": 0.1052109728818883
+    },
+    "unreal_diff": 0.08445660456700992,
+    "diff_z": -0.9066699604840576,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.115359799191973,
+      "sd": 0.007495542221778494,
+      "min": 0.10783608914450037,
+      "max": 0.1275109170305677,
+      "z": 0.25165374144792885
+     },
+     "r7e": {
+      "mean": 0.2092042631809241,
+      "sd": 0.012843693837067325,
+      "min": 0.1794276875483372,
+      "max": 0.2296137339055794,
+      "z": -0.58406703498334
+     }
+    }
+   },
+   "ep_caught": {
+    "unreal": {
+     "cur": 0.04294478527607362,
+     "r7e": 0.04060248853962017
+    },
+    "python": {
+     "cur": 0.05120713516838382,
+     "r7e": 0.045030281439258996
+    },
+    "unreal_pair": {
+     "diff": -0.016336494880650497,
+     "se": 0.010970563886536298,
+     "t": -1.489120800864172,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.005611157989226895,
+     "se": 0.004071479059479115,
+     "t": -1.3781620652482884,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.00587760801559152,
+     "sd": 0.008320805356859081,
+     "min": -0.017343553798002134,
+     "max": 0.004118988012401736
+    },
+    "unreal_diff": -0.0023422967364534544,
+    "diff_z": 0.42487609402181314,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 0.051490867711018594,
+      "sd": 0.004558505035016587,
+      "min": 0.04551820728291316,
+      "max": 0.06026200873362445,
+      "z": -1.8747555106986684
+     },
+     "r7e": {
+      "mean": 0.04561325969542708,
+      "sd": 0.006575137049489447,
+      "min": 0.031286210892236384,
+      "max": 0.05492730210016155,
+      "z": -0.762078587578033
+     }
+    }
+   },
+   "gf": {
+    "unreal": {
+     "cur": 1.9541496758479118,
+     "r7e": 1.9137565905607692
+    },
+    "python": {
+     "cur": 1.748839449400425,
+     "r7e": 1.827386828765942
+    },
+    "unreal_pair": {
+     "diff": -0.03880065210658905,
+     "se": 0.24226957794328247,
+     "t": -0.1601548673010552,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.07790537060562205,
+     "se": 0.05463276731975275,
+     "t": 1.4259825088057543,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.07844108285123372,
+     "sd": 0.18406967561370605,
+     "min": -0.1871138971012034,
+     "max": 0.34371405207691597
+    },
+    "unreal_diff": -0.04039308528714258,
+    "diff_z": -0.6455934022927553,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 1.7487689268067257,
+      "sd": 0.12693039808236206,
+      "min": 1.4994842151867724,
+      "max": 1.9188263365753233,
+      "z": 1.6180580234840158
+     },
+     "r7e": {
+      "mean": 1.8272100096579595,
+      "sd": 0.16151426685800294,
+      "min": 1.6104232091514108,
+      "max": 2.1249967640776015,
+      "z": 0.5358448054554712
+     }
+    }
+   },
+   "ge": {
+    "unreal": {
+     "cur": 1.7380183899923143,
+     "r7e": 1.7316857788828277
+    },
+    "python": {
+     "cur": 1.5877154657295707,
+     "r7e": 1.6311775279071532
+    },
+    "unreal_pair": {
+     "diff": -0.00502315951758866,
+     "se": 0.20482485855852767,
+     "t": -0.024524169346140757,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.04299274836001979,
+     "se": 0.04733949916772927,
+     "t": 0.9081791974116912,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.04335790730511402,
+     "sd": 0.17040924592067197,
+     "min": -0.19705190887425972,
+     "max": 0.29905104449931774
+    },
+    "unreal_diff": -0.0063326111094865745,
+    "diff_z": -0.2915952015756954,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 1.5876526203975383,
+      "sd": 0.11206324396433566,
+      "min": 1.3677849121143133,
+      "max": 1.732280004251104,
+      "z": 1.3417938324418859
+     },
+     "r7e": {
+      "mean": 1.6310105277026525,
+      "sd": 0.1437611988686903,
+      "min": 1.4445716422586197,
+      "max": 1.915666059949814,
+      "z": 0.7002950168225204
+     }
+    }
+   },
+   "caught_share": {
+    "unreal": {
+     "cur": 0.04921875,
+     "r7e": 0.0484375
+    },
+    "python": {
+     "cur": 0.05203125,
+     "r7e": 0.049765625
+    },
+    "unreal_pair": {
+     "diff": -0.00078125,
+     "se": 0.0033854166666666668,
+     "t": -0.23076923076923078,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.002265625,
+     "se": 0.0010011965596118154,
+     "t": -2.2629172845724015,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.002265624999999999,
+     "sd": 0.003483164182994314,
+     "min": -0.008593749999999997,
+     "max": 0.0023437500000000056
+    },
+    "unreal_diff": -0.0007812499999999972,
+    "diff_z": 0.4261570577830051,
+    "direction": "예 (언리얼은 0 근처)",
+    "level": {
+     "cur": {
+      "mean": 0.052031249999999994,
+      "sd": 0.0010546071214227396,
+      "min": 0.05078125,
+      "max": 0.05390625,
+      "z": -2.666869910953886
+     },
+     "r7e": {
+      "mean": 0.049765624999999994,
+      "sd": 0.0031260848811297142,
+      "min": 0.04296875,
+      "max": 0.05390625,
+      "z": -0.42485250737018715
+     }
+    }
+   },
+   "self_flee": {
+    "unreal": {
+     "cur": 0.00019057219188512218,
+     "r7e": 0.0
+    },
+    "python": {
+     "cur": 0.00021248253405242487,
+     "r7e": 0.0
+    },
+    "unreal_pair": {
+     "diff": -0.00019131122554809718,
+     "se": 6.375558939324287e-05,
+     "t": -3.000697309346391,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.00021264341002167852,
+     "se": 1.8587777982193953e-05,
+     "t": -11.43995856983976,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.00021247761155425519,
+     "sd": 5.26925422946777e-05,
+     "min": -0.00030856584158193816,
+     "max": -0.00014325631023838029
+    },
+    "unreal_diff": -0.00019057219188512218,
+    "diff_z": 0.4157214420710463,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.00021247761155425519,
+      "sd": 5.26925422946777e-05,
+      "min": 0.00014325631023838029,
+      "max": 0.00030856584158193816,
+      "z": -0.4157214420710463
+     },
+     "r7e": {
+      "mean": 0.0,
+      "sd": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "z": null
+     }
+    }
+   },
+   "flee_share": {
+    "unreal": {
+     "cur": 0.10212113575645501,
+     "r7e": 0.07531021376992154
+    },
+    "python": {
+     "cur": 0.08701058758311869,
+     "r7e": 0.06875614106646322
+    },
+    "unreal_pair": {
+     "diff": -0.026822073732285436,
+     "se": 0.008627019974726261,
+     "t": -3.1090775042672263,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.018254562035327954,
+     "se": 0.0029256832908436587,
+     "t": -6.23941835825436,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.018257012677879568,
+     "sd": 0.011472728598154876,
+     "min": -0.03188259682784798,
+     "max": -0.002164405800611807
+    },
+    "unreal_diff": -0.026810921986533467,
+    "diff_z": -0.7455863036827698,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.08700700674676129,
+      "sd": 0.008237649814789121,
+      "min": 0.0697929893719112,
+      "max": 0.09445298202832365,
+      "z": 1.8347622622363966
+     },
+     "r7e": {
+      "mean": 0.06874999406888173,
+      "sd": 0.006229826276577842,
+      "min": 0.061362591922056724,
+      "max": 0.08145329961427805,
+      "z": 1.0530341312572626
+     }
+    }
+   },
+   "picked_shelter": {
+    "unreal": {
+     "cur": null,
+     "r7e": 0.5348575108678152
+    },
+    "python": {
+     "cur": null,
+     "r7e": 0.563090634807789
+    },
+    "level": {
+     "r7e": {
+      "mean": 0.5632520168001277,
+      "sd": 0.012033826892581681,
+      "min": 0.547152891944403,
+      "max": 0.5876054510058404,
+      "z": -2.3595574529841765
+     }
+    }
+   },
+   "shelter_route": {
+    "unreal": {
+     "cur": null,
+     "r7e": 0.3271021930762468
+    },
+    "python": {
+     "cur": null,
+     "r7e": 0.3462389791621979
+    },
+    "level": {
+     "r7e": {
+      "mean": 0.3468255129269797,
+      "sd": 0.022629247400057735,
+      "min": 0.3241876674523076,
+      "max": 0.4023839674062655,
+      "z": -0.8715853206272591
+     }
+    }
+   },
+   "sums": {
+    "unreal": {
+     "cur": {
+      "n": 1280,
+      "caught": 63,
+      "starved": 0,
+      "started": 4358,
+      "live": 2230126,
+      "flee": 227743,
+      "reflex": 227318,
+      "ep_started": 3876,
+      "ep_chased": 1467,
+      "ep_hidden": 172,
+      "ep_caught": 63,
+      "ep_starved": 0,
+      "ep_other": 3551,
+      "ep_truncated": 90,
+      "ep_watching": 8,
+      "ep_joined": 482
+     },
+     "r7e": {
+      "n": 1280,
+      "caught": 62,
+      "starved": 0,
+      "started": 4278,
+      "live": 2235394,
+      "flee": 168348,
+      "reflex": 168348,
+      "ep_started": 3871,
+      "ep_chased": 1527,
+      "ep_hidden": 308,
+      "ep_caught": 62,
+      "ep_starved": 0,
+      "ep_other": 3458,
+      "ep_truncated": 43,
+      "ep_watching": 2,
+      "ep_joined": 407,
+      "rt_run": 113281,
+      "rt_shelter": 55067,
+      "pk_run": 2889,
+      "pk_shelter": 3322,
+      "refled": 392
+     }
+    },
+    "python": {
+     "cur": {
+      "n": 12800,
+      "caught": 666,
+      "starved": 0,
+      "started": 38955,
+      "live": 22274772,
+      "flee": 1938141,
+      "reflex": 1933408,
+      "ep_started": 35366,
+      "ep_chased": 13006,
+      "ep_hidden": 1497,
+      "ep_caught": 666,
+      "ep_starved": 0,
+      "ep_other": 32462,
+      "ep_truncated": 741,
+      "ep_watching": 19,
+      "ep_joined": 3589
+     },
+     "r7e": {
+      "n": 12800,
+      "caught": 637,
+      "starved": 0,
+      "started": 40765,
+      "live": 22307811,
+      "flee": 1533799,
+      "reflex": 1533799,
+      "ep_started": 36388,
+      "ep_chased": 14035,
+      "ep_hidden": 2942,
+      "ep_caught": 632,
+      "ep_starved": 0,
+      "ep_other": 32028,
+      "ep_truncated": 786,
+      "ep_watching": 57,
+      "ep_joined": 4377,
+      "rt_run": 1002738,
+      "rt_shelter": 531061,
+      "pk_run": 25197,
+      "pk_shelter": 32474,
+      "refled": 4245
+     }
+    }
+   }
+  },
+  "Highland": {
+   "ep_hide": {
+    "unreal": {
+     "cur": 0.14240506329113925,
+     "r7e": 0.2719298245614035
+    },
+    "python": {
+     "cur": 0.10933694181326116,
+     "r7e": 0.18161865569272978
+    },
+    "unreal_pair": {
+     "diff": 0.12458136292758126,
+     "se": 0.034027301958748986,
+     "t": 3.66121777972906,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.06502916679897085,
+     "se": 0.009148765700558704,
+     "t": 7.107971602661066,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.07071924529118027,
+     "sd": 0.029370321271407266,
+     "min": 0.026078419340982997,
+     "max": 0.1332013193226823
+    },
+    "unreal_diff": 0.12952476127026427,
+    "diff_z": 2.002208809214921,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.10929307481502656,
+      "sd": 0.01636124540940087,
+      "min": 0.09116022099447514,
+      "max": 0.136986301369863,
+      "z": 2.023806113016748
+     },
+     "r7e": {
+      "mean": 0.18001232010620685,
+      "sd": 0.03044831802867792,
+      "min": 0.13953488372093023,
+      "max": 0.22564102564102564,
+      "z": 3.018804006468392
+     }
+    }
+   },
+   "ep_caught": {
+    "unreal": {
+     "cur": 0.23734177215189872,
+     "r7e": 0.2222222222222222
+    },
+    "python": {
+     "cur": 0.20622462787550744,
+     "r7e": 0.21152263374485597
+    },
+    "unreal_pair": {
+     "diff": -0.01741740096950142,
+     "se": 0.055144402662308384,
+     "t": -0.31585075054963546,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.005757015324028585,
+     "se": 0.010930435321864777,
+     "t": 0.5266958867148225,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.007433322745978266,
+     "sd": 0.027255392159488703,
+     "min": -0.02870470746690318,
+     "max": 0.03872715682107947
+    },
+    "unreal_diff": -0.015119549929676512,
+    "diff_z": -0.8274646185123119,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 0.207033295688213,
+      "sd": 0.01552255846025951,
+      "min": 0.18465227817745802,
+      "max": 0.23460410557184752,
+      "z": 1.9525438761452103
+     },
+     "r7e": {
+      "mean": 0.2144666184341913,
+      "sd": 0.026956845246665924,
+      "min": 0.17798594847775176,
+      "max": 0.2422360248447205,
+      "z": 0.2877044296936099
+     }
+    }
+   },
+   "gf": {
+    "unreal": {
+     "cur": 0.9272608822044124,
+     "r7e": 0.8996120677373061
+    },
+    "python": {
+     "cur": 0.9678983907836076,
+     "r7e": 0.9143470102522041
+    },
+    "unreal_pair": {
+     "diff": -0.02806510459632584,
+     "se": 0.08151075966933485,
+     "t": -0.3443116554204341,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.05338970069071225,
+     "se": 0.03164100649568143,
+     "t": -1.6873578499470052,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.05356745732252186,
+     "sd": 0.07902396346856047,
+     "min": -0.18464719733703117,
+     "max": 0.03417202688729948
+    },
+    "unreal_diff": -0.02764881446710632,
+    "diff_z": 0.32798459755473064,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 0.9679117101357724,
+      "sd": 0.056648887037424704,
+      "min": 0.8967082654763695,
+      "max": 1.0856864830450228,
+      "z": -0.7175927022980044
+     },
+     "r7e": {
+      "mean": 0.9143442528132505,
+      "sd": 0.07767172131804063,
+      "min": 0.7500291602657246,
+      "max": 0.9900224721539227,
+      "z": -0.1896724422472998
+     }
+    }
+   },
+   "ge": {
+    "unreal": {
+     "cur": 0.8662271332538538,
+     "r7e": 0.8620716948754678
+    },
+    "python": {
+     "cur": 0.901813888503421,
+     "r7e": 0.8677972836764314
+    },
+    "unreal_pair": {
+     "diff": -0.004540361373019874,
+     "se": 0.0755398261777869,
+     "t": -0.06010553111856384,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.03386419793684178,
+     "se": 0.028313603142131365,
+     "t": -1.1960398599516637,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.03402470410102737,
+     "sd": 0.07487692523648372,
+     "min": -0.164892344773913,
+     "max": 0.05203430188338454
+    },
+    "unreal_diff": -0.004155438378386056,
+    "diff_z": 0.3989114887971861,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 0.9018196229117967,
+      "sd": 0.054387259492582794,
+      "min": 0.8342104166704407,
+      "max": 1.0079113580622057,
+      "z": -0.654426974074635
+     },
+     "r7e": {
+      "mean": 0.8677949188107694,
+      "sd": 0.07095558124205464,
+      "min": 0.7188344573975299,
+      "max": 0.9411994461298937,
+      "z": -0.0806592495631559
+     }
+    }
+   },
+   "caught_share": {
+    "unreal": {
+     "cur": 0.05859375,
+     "r7e": 0.059375
+    },
+    "python": {
+     "cur": 0.059609375,
+     "r7e": 0.060234375
+    },
+    "unreal_pair": {
+     "diff": 0.00078125,
+     "se": 0.0024567659198064073,
+     "t": 0.317999364001908,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": 0.000625,
+     "se": 0.000625,
+     "t": 1.0,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": 0.0006249999999999991,
+     "sd": 0.0015537951968933649,
+     "min": -0.0007812500000000042,
+     "max": 0.00390625
+    },
+    "unreal_diff": 0.0007812499999999972,
+    "diff_z": 0.10056022847309737,
+    "direction": "파이썬 0 근처",
+    "level": {
+     "cur": {
+      "mean": 0.059609375000000006,
+      "sd": 0.001879696086731103,
+      "min": 0.05625,
+      "max": 0.0625,
+      "z": -0.5403134087310013
+     },
+     "r7e": {
+      "mean": 0.06023437499999999,
+      "sd": 0.0011321388082960503,
+      "min": 0.05859375,
+      "max": 0.0625,
+      "z": -0.7590721152765855
+     }
+    }
+   },
+   "self_flee": {
+    "unreal": {
+     "cur": 0.00046928171415318385,
+     "r7e": 0.0
+    },
+    "python": {
+     "cur": 0.0004214130059905466,
+     "r7e": 0.0
+    },
+    "unreal_pair": {
+     "diff": -0.00046978923538207735,
+     "se": 0.00011857166736455182,
+     "t": -3.962069909480969,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.0004214767733945129,
+     "se": 4.1954409694505255e-05,
+     "t": -10.04606610994013,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.0004214733061101897,
+     "sd": 9.84313244996865e-05,
+     "min": -0.0006190910095485844,
+     "max": -0.00024734130703828454
+    },
+    "unreal_diff": -0.00046928171415318385,
+    "diff_z": -0.4857031873338898,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.0004214733061101897,
+      "sd": 9.84313244996865e-05,
+      "min": 0.00024734130703828454,
+      "max": 0.0006190910095485844,
+      "z": 0.4857031873338898
+     },
+     "r7e": {
+      "mean": 0.0,
+      "sd": 0.0,
+      "min": 0.0,
+      "max": 0.0,
+      "z": null
+     }
+    }
+   },
+   "flee_share": {
+    "unreal": {
+     "cur": 0.06678086759248082,
+     "r7e": 0.0491086875207207
+    },
+    "python": {
+     "cur": 0.06512012960156288,
+     "r7e": 0.05158953744907408
+    },
+    "unreal_pair": {
+     "diff": -0.017697653041675317,
+     "se": 0.005533446283595463,
+     "t": -3.1983057455788524,
+     "n": 10
+    },
+    "python_pair": {
+     "diff": -0.013522212420630488,
+     "se": 0.002537835345698433,
+     "t": -5.328246548205066,
+     "n": 100
+    },
+    "python_rep_diff": {
+     "mean": -0.01353286669683344,
+     "sd": 0.008738071503447556,
+     "min": -0.026002495656511714,
+     "max": 0.003155853188130192
+    },
+    "unreal_diff": -0.01767218007176012,
+    "diff_z": -0.47371017429801754,
+    "direction": "예",
+    "level": {
+     "cur": {
+      "mean": 0.06512193172204107,
+      "sd": 0.007464738478798059,
+      "min": 0.056976752611776045,
+      "max": 0.08026474111233048,
+      "z": 0.22223630139911657
+     },
+     "r7e": {
+      "mean": 0.05158906502520764,
+      "sd": 0.006197068019874981,
+      "min": 0.03978861745981083,
+      "max": 0.06269599845574576,
+      "z": -0.4002501661321084
+     }
+    }
+   },
+   "picked_shelter": {
+    "unreal": {
+     "cur": null,
+     "r7e": 0.5467601870407481
+    },
+    "python": {
+     "cur": null,
+     "r7e": 0.5420760774394396
+    },
+    "level": {
+     "r7e": {
+      "mean": 0.542632963205816,
+      "sd": 0.01671885193554519,
+      "min": 0.5095962938451357,
+      "max": 0.5634608509116911,
+      "z": 0.24686048126052448
+     }
+    }
+   },
+   "shelter_route": {
+    "unreal": {
+     "cur": null,
+     "r7e": 0.3869235657643884
+    },
+    "python": {
+     "cur": null,
+     "r7e": 0.37324656898808933
+    },
+    "level": {
+     "r7e": {
+      "mean": 0.37584850826301597,
+      "sd": 0.03336522549001674,
+      "min": 0.3176338255652976,
+      "max": 0.41636650797077573,
+      "z": 0.33193414217105255
+     }
+    }
+   },
+   "sums": {
+    "unreal": {
+     "cur": {
+      "n": 1280,
+      "caught": 75,
+      "starved": 0,
+      "started": 2051,
+      "live": 2211891,
+      "flee": 147712,
+      "reflex": 146674,
+      "ep_started": 1916,
+      "ep_chased": 316,
+      "ep_hidden": 45,
+      "ep_caught": 75,
+      "ep_starved": 0,
+      "ep_other": 1757,
+      "ep_truncated": 39,
+      "ep_watching": 1,
+      "ep_joined": 135
+     },
+     "r7e": {
+      "n": 1280,
+      "caught": 76,
+      "starved": 0,
+      "started": 1989,
+      "live": 2210953,
+      "flee": 108577,
+      "reflex": 108577,
+      "ep_started": 1906,
+      "ep_chased": 342,
+      "ep_hidden": 93,
+      "ep_caught": 76,
+      "ep_starved": 0,
+      "ep_other": 1697,
+      "ep_truncated": 40,
+      "ep_watching": 3,
+      "ep_joined": 83,
+      "rt_run": 66566,
+      "rt_shelter": 42011,
+      "pk_run": 1357,
+      "pk_shelter": 1637,
+      "refled": 81
+     }
+    },
+    "python": {
+     "cur": {
+      "n": 12800,
+      "caught": 763,
+      "starved": 0,
+      "started": 21413,
+      "live": 22123190,
+      "flee": 1440665,
+      "reflex": 1431342,
+      "ep_started": 19951,
+      "ep_chased": 3695,
+      "ep_hidden": 404,
+      "ep_caught": 762,
+      "ep_starved": 0,
+      "ep_other": 18234,
+      "ep_truncated": 551,
+      "ep_watching": 16,
+      "ep_joined": 1462
+     },
+     "r7e": {
+      "n": 12800,
+      "caught": 771,
+      "starved": 0,
+      "started": 20212,
+      "live": 22105393,
+      "flee": 1140407,
+      "reflex": 1140407,
+      "ep_started": 19183,
+      "ep_chased": 3645,
+      "ep_hidden": 662,
+      "ep_caught": 771,
+      "ep_starved": 0,
+      "ep_other": 17104,
+      "ep_truncated": 646,
+      "ep_watching": 17,
+      "ep_joined": 1029,
+      "rt_run": 714754,
+      "rt_shelter": 425653,
+      "pk_run": 14121,
+      "pk_shelter": 16716,
+      "refled": 1018
+     }
+    }
+   }
+  }
+ },
+ "checks_ok": true
+}
