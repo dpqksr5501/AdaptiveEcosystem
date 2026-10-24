@@ -1,5 +1,13 @@
 # Social 이동 인계와 Shelter 예약 생명주기
 
+## 2026-10-23 소비 경로와 이주 연결
+
+이 문서의 Request/Feedback·lease/slot 계약은 V1 및 보존된 v3 opt-in SocialControl에 적용한다. v3 기본 `SocialControl=0`은 신호 경로이며 slot 목적지가 항상 실제 이동을 제어한다고 설명하지 않는다. [ReadSignal·무리 이주 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)과 [현재 기본값](JYU_CHAT_HANDOFF_20261023.md)을 함께 읽는다.
+
+새 무리 여정은 기존 Travel/예약 생명주기와 연결해 출발·실패·죽음·삭제·지역 이전 시 묵은 예약을 정리한다. 이동은 Native 하나가 수행하고 실제 body 위치로 도착을 검사한다. 이주 목적지 stage 진입에 따른 지역 인계와 은신처 slot 점유·여정 끝 도착은 서로 다른 이벤트다. 보호 은신처 안의 안전은 슬롯 수와 무관하며, legacy Social 훅도 lease 부족만으로 보호 개체를 밖으로 내보내지 않는다.
+
+아래 날짜별 미연결/검증 대기는 당시 이력이다. 현재 멀티·PIE 근거는 최신 인수인계에서 확인한다.
+
 > **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
 
 > **2026-10-08 통합 갱신:** `/Game/Map/LV_Ecosystem_IntegrationTest`의 opt-in Creature는 기존 단일 Movement writer가 Request를 소비하고 Feedback을 반환한다. 실제 Moving→Occupied와 사망 시 슬롯 반환, Client 표현 및 재접속을 검증했다. 아래의 “연결 대기”와 JYU 기록은 2026-10-01 당시 범위다. 현재 실행·검증은 [Creature 통합](CREATURE_PRODUCTION_INTEGRATION.md), [감각·Notify 고도화](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md)를 따른다. 기존 JYU/M3 전체 전환 완료를 의미하지 않는다.

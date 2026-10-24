@@ -1,5 +1,39 @@
 # 조연우 작업 시작 문서 — 역할·진행상황·다음 연결
 
+모든 팀원·AI의 공통 목표는 [프로젝트 공통 맥락](../PROJECT_CONTEXT.md)을 먼저 읽는다. 아래 문서는 조연우 분야의 실제 구현·검증 인계다.
+
+후속 전체 구현과 최신 재개는 [팀 AI 공통 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [전체 상태](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행 계약/팀별 연결 API](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)를 우선한다. `ecfd82f` 이후 구현은 **`d095948`**로 기록했다. 아래 PR/기준 커밋은 그 이전 이력이며 새 owned `LV_JYU_Ecosystem`에만 활성화했다. 기존 HerdMigration 맵과 기본 신호 경로는 보존했다. 2026-10-24 갱신에서는 문서/Source·예제·링크를 감사했으며 새 UBT/PIE를 실행했다고 기록하지 않는다.
+
+다음 채팅은 [life-v1 최신 인수인계](../Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)의 실제 범위·실패 수정·재현·후속 담당부터 확인한다.
+
+갱신일: **2026-10-23**. 먼저 [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 읽는다. 구현 기준 `581ce1d` + `e22dbbd`, 통합 main `a74fcac`, 작업 브랜치 `codex/social-shelter-handoff`다. [PR #14 — 먹이 부족에 따른 무리 이주 기능 추가](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/14)는 확인 당시 OPEN·Ready for review·미병합이고 기능/디버그 push를 완료했다.
+
+| 읽을 문서 | 확인할 내용 |
+|---|---|
+| [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md) | 현재 기본값·위치·연결 범위·기존 검증·후속 작업·발표 자료 위치 |
+| [무리 이주와 신호 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md) | ReadSignal, Persistent Herd, 실제 Native 이동/지역 인계, M4 자원·인구·복제 연결 |
+| [이주 디버그 사용법](HERD_MIGRATION_DEBUG_20261023.md) | 지도·현재 목적지·실제 구성원·조작·가뭄 재현·촬영 |
+| [현재 상태](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md) | 현재 통합과 과거 V1/MVP 기록의 구분 |
+| [문서 감사 기록](JYU_DOCUMENTATION_AUDIT_20261023.md) | 갱신한 문서와 Source 근거·검증 한계 |
+
+현재 확인 맵은 `/Game/JYU/Maps/LV_JYU_HerdMigration`이다. 기존 맵의 이주 옵션은 OFF, 새 맵만 ON이다. v3 기본 `SocialControl=0`을 유지하고, 이주 의도는 Native의 유일한 이동 writer가 소비한다. 실제 지역 진입과 경로 끝 정착은 다르며 모든 무리가 성공하지는 않는다. 일반 PIE·Dedicated/Client 결과는 체크인 Evidence를 따른다. 이 문서 갱신에서 새 UBT·PIE를 실행하지 않았다.
+
+## 다음 기획의 세부 설계
+
+시작 프롬프트를 실행한 후속 로컬 구현은 [전체 구현 상태표](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)와 [수분·식생 계약/팀 연결](../Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md)을 먼저 확인한다. 기존 이주 기본값·Native 단일 writer·V1/v3 모델은 보존하며 새 식생은 opt-in이다. 전체 구현 완료와 구분하고 실제 빌드/PIE/멀티 범위는 해당 문서의 최종 증거를 따른다.
+
+실제 저장 BP·서식지/날씨 배치는 새 `/Game/JYU/Maps/LV_JYU_Ecosystem`에 있다. [BP 실행·배치 안내](../Architecture/JYU_ECOSYSTEM_BP_SETUP_20261023.md)를 따라 별도 콘솔 입력 없이 Play한다. 기존 인수인계의 `LV_JYU_HerdMigration`과 팀 원본은 보존했다.
+
+그 이후 사용자 요청의 [통합 재점검/수정](../Architecture/ECOSYSTEM_INTEGRATION_REVIEW_20261023.md)을 수행했다. 최신 직접 UBT/213개 자동화·실제 맵/멀티 검증은 이 문서가 기준이며, 식생/이주 경계의 오류와 관찰 도구의 동일 이름 World 선택 문제를 수정했다.
+
+[다른 채팅용 전체 구현 프롬프트](../Architecture/ECOSYSTEM_IMPLEMENTATION_START_PROMPT_20261023.md)에 구조 감사·기존 팀 코드 개선·분야별 연결 안내·학습 경계·실제 동작/검증 기준을 정리했다. 새 채팅에 해당 파일을 읽고 진행하도록 요청하면 된다. 이번 문서 추가에서 기능 구현이나 새 빌드/PIE를 실행한 것은 아니다.
+
+[MMORPG 동적 생태계 세부 기획](../Architecture/DYNAMIC_ECOSYSTEM_DETAILED_DESIGN_20261023.md)은 물·토양·식생/섭식, 장소 선호·경험, 흔적·무리 사냥, 출생 스폰·세대 속도, 체형/ABP·규모/저장 구조를 정리한 **제안**이다. 현재 구현 완료 목록과 구분하며 기능 활성화나 정책 변경을 수행한 것은 아니다.
+
+## 이전 통합 이력 — 아래 날짜의 현재/대기는 당시 상태
+
+2026-10-22 main 병합·날씨 호환 검증은 [main 통합 기록](JYU_MAIN_MERGE_20261022.md), 이후 PR #12 `a74fcac` 반영·늦은 은신처 먹이 장부 복구는 [PR #12 통합 기록](JYU_PR12_MAIN_INTEGRATION_20261022.md)에 보존한다. 과거 PR 제목·HEAD·Draft·push 전 상태를 현재 상태로 사용하지 않는다.
+
 > **최신 보호 은신처 구현:** 새 복사 맵 `/Game/JYU/Maps/LV_JYU_RefugeSafety`에 수풀·바위 12곳과 실제 늑대 진입 차단·내부 피식 보호·지면 슬롯/도착 검증을 연결했다. 기존 맵·사용자 변경은 보존한다. [구현·에디터 확인·검증](JYU_REFUGE_SAFETY_20261016.md)을 먼저 읽는다. PPO 재학습 완료를 의미하지 않는다.
 
 > **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
@@ -12,7 +46,7 @@
 
 ---
 
-**이하 2026-10-08 기준 기록**
+**이하 2026-10-08 기준 상세 기록**
 
 갱신일: **2026-10-08**. 다른 Codex 채팅이나 팀원이 조연우 작업을 이어갈 때 읽는 진입 문서다. 대화 기록 없이 현재 범위와 연결 지점을 파악하는 것이 목적이며, 상세 계약을 대체하지 않는다.
 

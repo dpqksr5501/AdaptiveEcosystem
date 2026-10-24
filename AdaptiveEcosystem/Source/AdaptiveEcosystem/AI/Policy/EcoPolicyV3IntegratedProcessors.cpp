@@ -11,17 +11,21 @@
 #include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
+#include "Mass/EcoHerdMigration.h"
 #include "Mass/EntityFragments.h"
 #include "MassExecutionContext.h"
 #include "MassMovementFragments.h"
 #include "Ecology/EcologySimulationSubsystem.h"
 #include "Creature/Player/EcoPlayerEcologyComponent.h"
+#include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "GameFramework/Pawn.h"
 #include "EngineUtils.h"
 #include "MassCommonTypes.h"
 #include "AI/Social/EcoPolicyV3SocialBridge.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "AI/Social/Shelter/EcoShelterLifecycleProcessor.h"
+#include "World/EcologyWorldSubsystem.h"
+#include "World/EcologyRegion.h"
 
 namespace EcoPolicyV3IntegratedProcImpl
 {
@@ -34,9 +38,65 @@ namespace EcoPolicyV3IntegratedProcImpl
 		const TArray<FEcoIntegratedV3Fragment*>* WolfInts = nullptr;
         const TArray<FEcoV3DeerRec>* Deer = nullptr;
         const TArray<int32>* Rows = nullptr;
+        const TArray<int64>* HerbIds=nullptr;
+        const TArray<int64>* WolfKeys=nullptr;
+        TArray<uint8> CaptureMask;
         UEcoShelterSubsystem* Shelters = nullptr;
         double Now = 0;
 	};
+
+    bool Traveling(void* User,int32 Index){
+        const auto& A=*static_cast<const FMoveAdapter*>(User);
+        if(!A.Rows||!A.Rows->IsValidIndex(Index)||!A.Deer)return false;
+        const auto* J=(*A.Deer)[(*A.Rows)[Index]].Journey;return J&&(J->bActive||J->bStranded);
+    }
+    void JourneyControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H){
+        const auto& A=*static_cast<const FMoveAdapter*>(User);
+        const auto& D=(*A.Deer)[(*A.Rows)[Index]];const auto* J=D.Journey;
+        if(!J)return;
+        if(J->bStranded){
+            H.Control->Velocity={0,0};H.Control->Gait=EcoRepertoireV3::kGaitStop;
+            H.Control->DrainMult=1;H.Control->EatMult=0;H.Control->bStill=true;return;
+        }
+        if(!J->bActive)return;
+        // Native personal danger wins. Shared alarm never creates an untrained flee override.
+        if(H.Decision->KeepActive==EcoWorldV3::kKeepPanic||H.Decision->KeepActive==EcoWorldV3::kKeepShelter)return;
+        namespace R=EcoRepertoireV3;const auto& C=A.Ctx->Sim.RepCfg;
+        if(H.Rep->Behavior!=R::kGraze)R::Enter(*H.Rep,R::kGraze,H.Decision->DecisionObs,C);
+        const FVector P=A.Ctx->UnitsToCm(H.Body->Pos.X,H.Body->Pos.Y,D.Int->GroundZ);
+        const FVector Delta=J->Goal-P;
+        FVector Separation=FVector::ZeroVector;
+        for(const auto& Other:*A.Deer){
+            if(Other.Id==D.Id||!Other.Journey||!Other.Journey->bActive||Other.Journey->PlanId!=J->PlanId||Other.Int->bDead)continue;
+            const auto* Context=A.Sub->GetContext(Other.Int->ContextIndex);if(!Context)continue;
+            const FVector Q=Context->UnitsToCm(Other.View.Body->Pos.X,Other.View.Body->Pos.Y,Other.Int->GroundZ);
+            const FVector Away=P-Q;const double Distance=Away.Size2D();
+            if(Distance>0.1&&Distance<220)Separation+=Away.GetSafeNormal2D()*(1-Distance/220);
+            else if(Distance<=.1)Separation+=FVector(D.Id<Other.Id?-1:1,0,0);
+        }
+        const FVector Dir=(Delta.GetSafeNormal2D()+Separation.GetClampedToMaxSize(1)*.8).GetSafeNormal2D();
+        H.Control->Gait=J->bPause?R::kGaitStop:R::kGaitWalk;
+        const double Speed=C.HerbSpeed*C.GaitSpeed[H.Control->Gait]*J->SpeedScale;
+        H.Control->Velocity={Dir.X*Speed,Dir.Y*Speed};
+        H.Control->DrainMult=C.GaitDrain[H.Control->Gait];H.Control->EatMult=J->bPause?C.GaitEat[R::kGaitStop]:0;
+        H.Control->SeeMult=1;H.Control->bCrouch=false;H.Control->bStill=J->bPause;
+        H.Control->CoverMult=1;
+        // Test bounded alternate headings through the existing terrain writer's constraints.
+        if(A.Sub->UsesTerrain()&&!J->bPause){
+            const FVector Step(Dir.X*Speed*R::kUnitCm,Dir.Y*Speed*R::kUnitCm,0);
+            double Z=P.Z;
+            if(!A.Sub->TraceMove(A.RegionId,P,P+Step,Z,true)){
+                bool Found=false;
+                for(const float Angle:{35.f,-35.f,70.f,-70.f}){
+                    const FVector Alternative=Step.RotateAngleAxis(Angle,FVector::UpVector);
+                    if(A.Sub->TraceMove(A.RegionId,P,P+Alternative,Z,true)){
+                        H.Control->Velocity={Alternative.X/R::kUnitCm,Alternative.Y/R::kUnitCm};Found=true;break;
+                    }
+                }
+                if(!Found)H.Control->Velocity={0,0};
+            }
+        }
+    }
 
     void SocialControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H)
     {
@@ -53,13 +113,183 @@ namespace EcoPolicyV3IntegratedProcImpl
             &&D.SocialAudit->AppliedReservation==0)
             D.Feedback->Report(R.ReservationId,Valid?EEcoShelterMovementStatus::Yielded:EEcoShelterMovementStatus::Failed);
     }
+    void ObservePlayers(const FMoveAdapter& A,EcoLifeV3::FMemory& Memory,const EcoWorldV3::FVec2& Position,
+        const EcoWorldV3::FVec2& Head,double GroundZ,double Now,double Fov,double Radius)
+    {
+        if(Now<Memory.NextScan)return;
+        Memory.NextScan=Now+1;Memory.Age(Now);
+        double Best=MAX_dbl;const EcoObservationV3::FThreatInput* Seen=nullptr;
+        for(size_t K=0;K<A.Ctx->PlayerSamples.size();++K){
+            const auto& Player=A.Ctx->PlayerSamples[K];
+            if(!A.Ctx->PlayerEyeZ.IsValidIndex(int32(K)))continue;
+            const double X=Player.X-Position.X,Y=Player.Y-Position.Y,D=FMath::Sqrt(X*X+Y*Y);
+            if(D>FMath::Min(18.,Radius)||D>=Best||D<.01||(X*Head.X+Y*Head.Y)/D<Fov)continue;
+            if(A.Ctx->Sim.Food.BlocksSight(Position.X,Position.Y,Player.X,Player.Y))continue;
+            const FVector Start=A.Ctx->UnitsToCm(Position.X,Position.Y,GroundZ)+FVector(0,0,75);
+            const FVector End=A.Ctx->UnitsToCm(Player.X,Player.Y,A.Ctx->PlayerEyeZ[int32(K)]);
+            if(A.Sub->GetWorld()->LineTraceTestByObjectType(Start,End,FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionQueryParams(SCENE_QUERY_STAT(EcoLifeEncounter),false)))continue;
+            Seen=&Player;Best=D;
+        }
+        if(!Seen){
+            Memory.PursuitExposure=FMath::Max(0.,Memory.PursuitExposure-1);
+            // Actual footstep emission, never a hidden live player location.
+            const FEcoLifeNoiseSample* Heard=nullptr;double Nearest=MAX_dbl;
+            for(const auto& N:A.Ctx->PlayerNoises){
+                const double D=FMath::Sqrt(FMath::Square(N.X-Position.X)+FMath::Square(N.Y-Position.Y));
+                if(Now<N.Time||Now-N.Time>UEcoNoiseSubsystem::EventLifetime||D>=Nearest||D>N.Range*A.Ctx->Sim.Weather.Hear)continue;
+                const FVector Start=A.Ctx->UnitsToCm(Position.X,Position.Y,GroundZ)+FVector(0,0,75);
+                const FVector End=A.Ctx->UnitsToCm(N.X,N.Y,N.Z)+FVector(0,0,75);
+                const bool Blocked=A.Sub->GetWorld()->LineTraceTestByObjectType(Start,End,FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionQueryParams(SCENE_QUERY_STAT(EcoLifeHearing),false));
+                if(Blocked&&D>N.Range*A.Ctx->Sim.Weather.Hear*.25)continue;
+                Heard=&N;Nearest=D;
+            }
+            if(Heard)Memory.Observe(EcoLifeV3::EEncounter::Noise,EcoLifeV3::Mix(Heard->Id)^0xF00757E950000000ULL,Heard->Time,Now,Heard->X,Heard->Y,Heard->Confidence);
+            return;
+        }
+        const double Closing=((Position.X-Seen->X)*Seen->VelX+(Position.Y-Seen->Y)*Seen->VelY)/Best;
+        const bool ClosingFast=Closing>.35&&Best<12;
+        Memory.PursuitExposure=ClosingFast?FMath::Min(3.,Memory.PursuitExposure+1):FMath::Max(0.,Memory.PursuitExposure-1);
+        const auto Kind=Memory.PursuitExposure>=2?EcoLifeV3::EEncounter::Pursuit:ClosingFast?EcoLifeV3::EEncounter::FastApproach:EcoLifeV3::EEncounter::Harmless;
+        Memory.Observe(Kind,EcoLifeV3::Mix(uint64(Now/5)+1),Now,Now,Seen->X,Seen->Y);
+    }
+    void IntegratedControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H){
+        const auto& A=*static_cast<const FMoveAdapter*>(User);
+        if(Traveling(User,Index))JourneyControlHook(User,Index,H);
+        else if(A.Sub->GetSettings().bSocialControl)SocialControlHook(User,Index,H);
+        if(A.Ctx->Sim.Config.bEcosystemLife){
+            auto& Life=(*A.Deer)[(*A.Rows)[Index]].Int->Individual;
+            if(Life.bInitialized){
+                const double SimTime=A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds;
+                auto& Memory=Life.Memory;
+                const bool Awake=H.Rep->Behavior!=EcoRepertoireV3::kSleep;
+                if(Awake)ObservePlayers(A,Memory,H.Body->Pos,H.Body->Head,(*A.Deer)[(*A.Rows)[Index]].Int->GroundZ,SimTime,A.Ctx->Sim.ObsCfg.ThreatFovCos,EcoWorldV3::SeePredNow(A.Ctx->Sim));
+                const double X=Memory.LastX-H.Body->Pos.X,Y=Memory.LastY-H.Body->Pos.Y;
+                const double Distance=FMath::Sqrt(X*X+Y*Y);
+                const bool Safe=H.Decision->KeepActive!=EcoWorldV3::kKeepPanic&&H.Decision->KeepActive!=EcoWorldV3::kKeepShelter
+                    &&Awake&&H.Perception->Threat.PredCount==0&&H.Body->Energy>.25;
+                const auto Response=Memory.Decide(SimTime,Distance,Safe,Traveling(User,Index));
+                if(Response!=EcoLifeV3::EResponse::Policy){
+                    const double Direction=Response==EcoLifeV3::EResponse::Retreat?-1:Response==EcoLifeV3::EResponse::Curious?1:0;
+                    const double V=A.Ctx->Sim.RepCfg.HerbSpeed*(Direction<0?A.Ctx->Sim.RepCfg.GaitSpeed[EcoRepertoireV3::kGaitRun]:.3);
+                    const double AppliedSpeed=Direction>0?FMath::Min(V,FMath::Max(0.,Distance-6)):V;
+                    H.Control->Velocity={Direction*X/FMath::Max(.01,Distance)*AppliedSpeed,Direction*Y/FMath::Max(.01,Distance)*AppliedSpeed};
+                    const bool UnknownEscape=!Memory.bLastDamageKnown&&Memory.UnknownFear>.15&&Memory.LastDamage>=0&&SimTime-Memory.LastDamage<8;
+                    if(UnknownEscape)H.Control->Velocity={H.Body->Head.X*V,H.Body->Head.Y*V};
+                    H.Control->Gait=Direction?EcoRepertoireV3::kGaitWalk:EcoRepertoireV3::kGaitStop;
+                    H.Control->EatMult=0;H.Control->DrainMult=1;H.Control->bStill=!Direction;
+                    if(Direction<0){H.Control->Gait=EcoRepertoireV3::kGaitRun;H.Control->DrainMult=A.Ctx->Sim.RepCfg.GaitDrain[EcoRepertoireV3::kGaitRun];}
+                    if(UnknownEscape){H.Control->Gait=EcoRepertoireV3::kGaitWalk;H.Control->bStill=false;}
+                    if(Direction<0||UnknownEscape){
+                        const double ActualSpeed=FMath::Sqrt(FMath::Square(H.Control->Velocity.X)+FMath::Square(H.Control->Velocity.Y));
+                        if(ActualSpeed>.001){
+                            const auto Dir=EcoWorldV3::WildEdgeSteer(H.Body->Pos,{H.Control->Velocity.X/ActualSpeed,H.Control->Velocity.Y/ActualSpeed},
+                                A.Ctx->Sim.Config.WorldSize,A.Ctx->Sim.Config.WildFlight.EdgeR);
+                            H.Control->Velocity={Dir.X*ActualSpeed,Dir.Y*ActualSpeed};
+                        }
+                    }
+                }
+                const double Speed=Life.SpeedScale(SimTime);
+                H.Control->Velocity.X*=Speed;H.Control->Velocity.Y*=Speed;
+                H.Control->DrainMult*=Life.Maintenance();
+            }
+        }
+    }
+
+    void EvidenceThreatHook(void* User,int32 Index,EcoWorldV3::FThreatAgent& Threat,EcoThreatV3::FThreatStepInput& Input)
+    {
+        auto& A=*static_cast<FMoveAdapter*>(User);
+        if(!A.Ctx->Sim.Config.bEcosystemLife||!A.WolfInts||!A.WolfInts->IsValidIndex(Index))return;
+        auto& Link=*(*A.WolfInts)[Index];auto& I=Link.Individual.Investigation;
+        const double Now=A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds;
+        auto& Life=Link.Individual;
+        if(!Life.PredatorStep(Now,Threat.State.PosX,Threat.State.PosY,Threat.Last.bRunning,EcoRepertoireV3::kStepSeconds)){
+            Threat.bDead=true;I.Cancel(Now);Life.AbandonMeat();Input.bHuntingAllowed=false;return;
+        }
+        if(Life.BaseSpeed<=0){Life.BaseSpeed=Threat.Spec.BaseSpeed;Life.BaseCatchRadius=Threat.Spec.CatchRadius;}
+        Threat.Spec.BaseSpeed=Life.BaseSpeed*Life.SpeedScale(Now)*(Life.Nutrition<.15?.7:1.);
+        Threat.Spec.CatchRadius=Life.BaseCatchRadius*Life.BodyScale(Now);
+        Input.bHuntingAllowed=Input.bHuntingAllowed&&Life.Nutrition<.9;
+        if(Life.MealRemaining>0&&Now<Life.MealExpires&&(Life.Nutrition<.9||Life.bFeedingMeat)){
+            const double X=Life.MealX-Threat.State.PosX,Y=Life.MealY-Threat.State.PosY,D=FMath::Sqrt(X*X+Y*Y);
+            Input.bHuntingAllowed=false;Input.bResourceApproach=true;Input.bResourceWait=D<=2.5;
+            Input.ResourceDirX=X/FMath::Max(.01,D);Input.ResourceDirY=Y/FMath::Max(.01,D);
+        }
+        if(!Threat.State.bAsleep)ObservePlayers(A,Life.Memory,{Threat.State.PosX,Threat.State.PosY},{Threat.State.HeadX,Threat.State.HeadY},Link.GroundZ,Now,
+            A.Ctx->Sim.ThreatCfg.PredFovCos,EcoWorldV3::WolfViewNow(A.Ctx->Sim));
+        const double HumanX=Life.Memory.LastX-Threat.State.PosX,HumanY=Life.Memory.LastY-Threat.State.PosY;
+        const double HumanDistance=FMath::Sqrt(HumanX*HumanX+HumanY*HumanY);
+        const auto Response=Life.Memory.Decide(Now,HumanDistance,!Threat.State.bAsleep&&Life.Nutrition>.2,false);
+        if(Response!=EcoLifeV3::EResponse::Policy&&(Response!=EcoLifeV3::EResponse::Curious||Life.Nutrition>.5)){
+            Input.bHuntingAllowed=false;Input.bResourceApproach=true;
+            const double Direction=Response==EcoLifeV3::EResponse::Retreat?-1:Response==EcoLifeV3::EResponse::Curious?1:0;
+            Input.bResourceWait=Direction==0||(Direction>0&&HumanDistance<=6);
+            Input.ResourceDirX=Direction*HumanX/FMath::Max(.01,HumanDistance);Input.ResourceDirY=Direction*HumanY/FMath::Max(.01,HumanDistance);
+            if(!Life.Memory.bLastDamageKnown&&Life.Memory.UnknownFear>.15&&Life.Memory.LastDamage>=0&&Now-Life.Memory.LastDamage<8){
+                Input.bResourceWait=false;Input.ResourceDirX=Threat.State.HeadX;Input.ResourceDirY=Threat.State.HeadY;
+            }
+        }
+        auto ClearLine=[&](double X,double Y,double Z){
+            const FVector Start=A.Ctx->UnitsToCm(Threat.State.PosX,Threat.State.PosY,Link.GroundZ)+FVector(0,0,65);
+            const FVector End=A.Ctx->UnitsToCm(X,Y,Z)+FVector(0,0,65);
+            return !A.Ctx->Sim.Food.BlocksSight(Threat.State.PosX,Threat.State.PosY,X,Y)
+                &&!A.Sub->GetWorld()->LineTraceTestByObjectType(Start,End,FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionQueryParams(SCENE_QUERY_STAT(EcoHuntSight),false));
+        };
+        A.CaptureMask.Init(1,Input.NumPrey);
+        for(int32 K=0;K<Input.NumPrey;++K){const auto& P=Input.Prey[K];
+            if(FMath::Square(P.X-Threat.State.PosX)+FMath::Square(P.Y-Threat.State.PosY)<=FMath::Square(Threat.Spec.CatchRadius*3))
+                A.CaptureMask[K]=ClearLine(P.X,P.Y,(*A.HerbInts)[K]->GroundZ)?1:0;
+        }
+        Input.CaptureAllowed=A.CaptureMask.GetData();
+        if(I.Role==EcoTracesV3::ERole::Lead&&Now<I.Until&&A.HerbIds){
+            const int32 Previous=A.HerbIds->Find(I.Target);if(Previous!=INDEX_NONE)Input.PreferredTarget=Previous;
+        }
+        auto Probe=Threat.State;const auto Perceived=EcoThreatV3::Step(Threat.Spec,Probe,Input,A.Ctx->Sim.ThreatCfg);
+        if(!Perceived.bHunting){I.Cancel(Now);return;}
+        if(Input.bPackHelp&&A.Ctx->Sim.PackGoalBuf.size()>size_t(Index)){
+            const auto& Goal=A.Ctx->Sim.PackGoalBuf[Index];
+            const int64 Target=A.HerbIds&&A.HerbIds->IsValidIndex(Goal.Prey)?(*A.HerbIds)[Goal.Prey]:0;
+            if(Target){
+                Life.LastHuntTarget=Target;Life.LastHuntTime=Now;
+                if(I.Role!=EcoTracesV3::ERole::Intercept||I.Target!=Target||Now>=I.Until){
+                    I.Role=EcoTracesV3::ERole::Intercept;I.Target=Target;I.Until=Now+3;I.Trace=0;
+                    I.X=Threat.State.PosX+Input.PackDirX*5;I.Y=Threat.State.PosY+Input.PackDirY*5;
+                }
+                const double X=I.X-Threat.State.PosX,Y=I.Y-Threat.State.PosY,D=FMath::Sqrt(X*X+Y*Y);
+                Input.bPackWait=D<1;Input.PackDirX=X/FMath::Max(.01,D);Input.PackDirY=Y/FMath::Max(.01,D);return;
+            }
+        }
+        if(Perceived.bHasTarget){
+            const int64 Target=A.HerbIds&&A.HerbIds->IsValidIndex(Perceived.Target)?(*A.HerbIds)[Perceived.Target]:0;
+            Life.LastHuntTarget=Target;Life.LastHuntTime=Now;
+            if(I.Role!=EcoTracesV3::ERole::Lead||I.Target!=Target||Now>=I.Until){I.Role=EcoTracesV3::ERole::Lead;I.Target=Target;I.Until=Now+3;I.Trace=0;}
+            return;
+        }
+        if(I.Role==EcoTracesV3::ERole::Lead||I.Role==EcoTracesV3::ERole::Intercept)I.Cancel(Now);
+        if(I.Trace){
+            const double D=FMath::Sqrt(FMath::Square(I.X-Threat.State.PosX)+FMath::Square(I.Y-Threat.State.PosY));
+            if(D+.15<I.BestDistance){I.BestDistance=D;I.LastProgress=Now;}
+            if(Now>I.Until||Now-I.Started>12||Now-I.LastProgress>4||D<1){I.Cancel(Now);return;}
+        }else if(Now>=I.NextQuery&&Now>=I.Cooldown){
+            I.NextQuery=Now+1;const EcoTracesV3::FTrace* Best=nullptr;
+            A.Ctx->MovementTraces.Query(Threat.State.PosX,Threat.State.PosY,Now,[&](const auto& T){
+                if(T.Id<=I.LastUsed||(Best&&Best->Time>=T.Time))return;
+                const double X=T.X-Threat.State.PosX,Y=T.Y-Threat.State.PosY,D=FMath::Sqrt(X*X+Y*Y);
+                if(D<.5||(X*Threat.State.HeadX+Y*Threat.State.HeadY)/D<A.Ctx->Sim.ThreatCfg.PredFovCos||!ClearLine(T.X,T.Y,T.Z))return;
+                Best=&T;
+            });
+            if(Best){I.Trace=I.LastUsed=Best->Id;I.X=Best->X;I.Y=Best->Y;I.Started=I.LastProgress=Now;I.Until=FMath::Min(Now+12,Best->Time+20);I.BestDistance=MAX_dbl;I.Role=EcoTracesV3::ERole::Investigate;}
+        }
+        if(I.Trace){const double X=I.X-Threat.State.PosX,Y=I.Y-Threat.State.PosY,D=FMath::Sqrt(X*X+Y*Y);
+            Input.bPackHelp=true;Input.bPackWait=false;Input.PackDirX=X/FMath::Max(.01,D);Input.PackDirY=Y/FMath::Max(.01,D);}
+    }
 
 	/** 이번 Step 배열의 색인 = HerbInts/WolfInts 색인 (BuildViews 가 같은 순서로 채운다). 통과하면 그 개체의 지면 높이를 갱신한다. */
 	bool MoveOne(const FMoveAdapter& A, FEcoIntegratedV3Fragment& F, double FromX, double FromY, double ToX, double ToY)
 	{
 		++A.Ctx->TerrainChecks;
 		double Z = F.GroundZ;
-		const bool bOk = A.Sub->TraceMove(A.RegionId, A.Ctx->UnitsToCm(FromX, FromY, F.GroundZ), A.Ctx->UnitsToCm(ToX, ToY, F.GroundZ), Z);
+        const float Radius=A.Ctx->Sim.Config.bEcosystemLife&&F.Individual.bInitialized?float(30*F.Individual.BodyScale(A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds)):30.f;
+		const bool bOk = A.Sub->TraceMove(A.RegionId, A.Ctx->UnitsToCm(FromX, FromY, F.GroundZ), A.Ctx->UnitsToCm(ToX, ToY, F.GroundZ), Z,false,Radius);
 		if (bOk)
 		{
 			F.GroundZ = Z;
@@ -78,6 +308,12 @@ namespace EcoPolicyV3IntegratedProcImpl
 		{
 			return true;
 		}
+        if(Traveling(User,Index)){
+            auto& F=*(*A.HerbInts)[Index];double Z=F.GroundZ;
+            const float Radius=A.Ctx->Sim.Config.bEcosystemLife&&F.Individual.bInitialized?float(30*F.Individual.BodyScale(A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds)):30.f;
+            const bool Ok=A.Sub->TraceMove(A.RegionId,A.Ctx->UnitsToCm(From.X,From.Y,Z),A.Ctx->UnitsToCm(To.X,To.Y,Z),Z,true,Radius);
+            if(Ok)F.GroundZ=Z;else ++F.BlockedMoves;return Ok;
+        }
 		return MoveOne(A, *(*A.HerbInts)[Index], From.X, From.Y, To.X, To.Y);
 	}
 
@@ -193,6 +429,7 @@ void UEcoPolicyV3IntegratedStepProcessor::ConfigureQueries(const TSharedRef<FMas
     DeerQuery.AddRequirement<FEcoAlarmStateFragment>(EMassFragmentAccess::ReadOnly,EMassFragmentPresence::Optional);
     DeerQuery.AddRequirement<FEcoShelterMovementFeedbackFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
     DeerQuery.AddRequirement<FEcoV3SocialBridgeFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
+    DeerQuery.AddRequirement<FEcoHerdTravelFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
 
 	DeerQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	DeerQuery.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
@@ -212,7 +449,8 @@ void UEcoPolicyV3IntegratedStepProcessor::ConfigureQueries(const TSharedRef<FMas
 	WolfQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	WolfQuery.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
 	WolfQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
-	WolfQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly);
+	WolfQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadWrite);
+    WolfQuery.AddRequirement<FEcoDeathFragment>(EMassFragmentAccess::ReadWrite,EMassFragmentPresence::Optional);
 	WolfQuery.AddRequirement<FEcoCreatureLifecycleFragment>(EMassFragmentAccess::ReadWrite);
 	WolfQuery.AddRequirement<FEcoThreatStateFragment>(EMassFragmentAccess::ReadWrite);
 	WolfQuery.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadWrite);
@@ -251,6 +489,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
         const auto Alarms=Ctx.GetFragmentView<FEcoAlarmStateFragment>();
         auto Feedback=Ctx.GetMutableFragmentView<FEcoShelterMovementFeedbackFragment>();
         auto SocialAudit=Ctx.GetMutableFragmentView<FEcoV3SocialBridgeFragment>();
+        auto Journeys=Ctx.GetMutableFragmentView<FEcoHerdTravelFragment>();
 
 		const TConstArrayView<FEcoRegionFragment> Regions = Ctx.GetFragmentView<FEcoRegionFragment>();
 		const TConstArrayView<FTransformFragment> Xfs = Ctx.GetFragmentView<FTransformFragment>();
@@ -281,6 +520,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
             R.Alarm=Alarms.IsEmpty()?nullptr:&Alarms[i];
             R.Feedback=Feedback.IsEmpty()?nullptr:&Feedback[i];
             R.SocialAudit=SocialAudit.IsEmpty()?nullptr:&SocialAudit[i];
+            R.Journey=Journeys.IsEmpty()?nullptr:&Journeys[i];
             R.View.Rep = &States[i].Rep;
 			R.View.Decision = &States[i].Decision;
 			R.View.Body = &Bodies[i].Body;
@@ -293,7 +533,8 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		const TConstArrayView<FEcoIdentityFragment> Ids = Ctx.GetFragmentView<FEcoIdentityFragment>();
 		const TConstArrayView<FEcoRegionFragment> Regions = Ctx.GetFragmentView<FEcoRegionFragment>();
 		const TConstArrayView<FTransformFragment> Xfs = Ctx.GetFragmentView<FTransformFragment>();
-		const TConstArrayView<FEcoVitalsFragment> Vits = Ctx.GetFragmentView<FEcoVitalsFragment>();
+		const auto Vits = Ctx.GetMutableFragmentView<FEcoVitalsFragment>();
+        const auto Deaths=Ctx.GetMutableFragmentView<FEcoDeathFragment>();
 		const TArrayView<FEcoCreatureLifecycleFragment> Lives = Ctx.GetMutableFragmentView<FEcoCreatureLifecycleFragment>();
 		const TArrayView<FEcoThreatStateFragment> Agents = Ctx.GetMutableFragmentView<FEcoThreatStateFragment>();
 		const TArrayView<FEcoIntegratedV3Fragment> Ints = Ctx.GetMutableFragmentView<FEcoIntegratedV3Fragment>();
@@ -312,6 +553,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			R.Agent = &Agents[i].Agent;
 			R.Int = &Ints[i];
 			R.PredState = &Preds[i];
+            R.Vitals=&Vits[i];R.Death=Deaths.IsEmpty()?nullptr:&Deaths[i];
 		}
 	});
 	Deer.Sort([](const FEcoV3DeerRec& A, const FEcoV3DeerRec& B) { return A.Id < B.Id; });
@@ -371,16 +613,34 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		}
 	};
 
+    TArray<FEcoNoiseEvent> RecentNoises;
+    if(auto* Noise=World->GetSubsystem<UEcoNoiseSubsystem>())Noise->GatherRecent(RecentNoises);
     for(int32 c=0;c<NumCtx;++c) {
-        auto& Region=*Sub->GetContext(c);Region.Sim.ExternalThreats.clear();
+        auto& Region=*Sub->GetContext(c);Region.Sim.ExternalThreats.clear();Region.PlayerSamples.clear();Region.PlayerEyeZ.Reset();Region.PlayerNoises.Reset();
         TArray<APawn*> Players;
         for(TActorIterator<APawn> It(World);It;++It)
             if(auto* Link=It->FindComponentByClass<UEcoPlayerEcologyComponent>();Link&&Link->bThreatEnabled&&It->IsPlayerControlled())Players.Add(*It);
-        Players.Sort([](const APawn& A,const APawn& B){return A.GetPathName()<B.GetPathName();});
+        const FVector Center=Region.UnitsToCm(Region.SizeUnits*.5,Region.SizeUnits*.5,Region.OriginCm.Z);
+        Players.Sort([&](const APawn& A,const APawn& B){
+            const double DA=FVector::DistSquared2D(A.GetActorLocation(),Center),DB=FVector::DistSquared2D(B.GetActorLocation(),Center);
+            return DA==DB?A.GetPathName()<B.GetPathName():DA<DB;
+        });
         for(const auto* Player:Players) {
+            if(Region.PlayerSamples.size()>=16)break;
             const auto P=Region.CmToUnits(Player->GetActorLocation());
             const FVector V=Player->GetVelocity()*EcoRepertoireV3::kStepSeconds/EcoRepertoireV3::kUnitCm;
-            Region.Sim.ExternalThreats.push_back({P.X,P.Y,V.X,V.Y,false});
+            Region.PlayerSamples.push_back({P.X,P.Y,V.X,V.Y,false});
+            FVector Eye;FRotator EyeRotation;Player->GetActorEyesViewPoint(Eye,EyeRotation);Region.PlayerEyeZ.Add(Eye.Z);
+            if(!Region.Sim.Config.bEcosystemLife)Region.Sim.ExternalThreats.push_back(Region.PlayerSamples.back());
+        }
+        if(Region.Sim.Config.bEcosystemLife)for(int32 K=RecentNoises.Num()-1;K>=0&&Region.PlayerNoises.Num()<16;--K){
+            const auto& Noise=RecentNoises[K];const auto* Pawn=Cast<APawn>(Noise.Instigator.Get());
+            const auto* Bridge=Pawn?Pawn->FindComponentByClass<UEcoPlayerEcologyComponent>():nullptr;
+            if(Noise.Tag!=TEXT("Player.Footstep")||!Pawn||!Pawn->IsPlayerControlled()||!Bridge||!Bridge->bThreatEnabled)continue;
+            const double Age=World->GetTimeSeconds()-Noise.EmittedAt;if(Age<0||Age>UEcoNoiseSubsystem::EventLifetime)continue;
+            const auto P=Region.CmToUnits(Noise.Position);
+            Region.PlayerNoises.Add({uint64(Noise.Id),P.X,P.Y,Noise.Position.Z,FMath::Max(0.,Region.Sim.T*EcoRepertoireV3::kStepSeconds-Age),
+                Noise.MaxRange*Noise.Loudness/EcoRepertoireV3::kUnitCm,Noise.Loudness});
         }
     }
     // --- 3. 입양 (조정자가 막 만든 개체). 늑대 먼저 — 새 사슴의 첫 관측이 늑대를 보게 ---
@@ -388,6 +648,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	{
 		FEcoV3RegionContext& Ctx = *Sub->GetContext(c);
 		Sub->RefreshRefuges(Ctx);
+		if (!Sub->IsActive()) return;
 		for (const int32 k : WolvesByContext[c])
 		{
 			FEcoV3WolfRec& W = Wolves[k];
@@ -415,12 +676,14 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			FEcoV3DeerRec& D = Deer[List[r]];
 			if (D.Int->bAdopted)
 			{
+				if(D.Int->bRefreshObservation){NewRows.Add(r);D.Int->bRefreshObservation=false;}
 				continue;
 			}
 			const FTransform& Xf = D.Transform->GetTransform();
 			const FVector Loc = Xf.GetLocation();
 			const FVector Fwd = Xf.GetRotation().GetForwardVector();
-			EcoWorldV3::AdoptHerb(Ctx.Sim, D.View, Ctx.CmToUnits(Loc), {Fwd.X, Fwd.Y}, EcoRepertoireV3::MakeAgentKeyFromStableId(D.Id));
+			EcoWorldV3::AdoptHerb(Ctx.Sim, D.View, Ctx.CmToUnits(Loc), {Fwd.X, Fwd.Y}, EcoRepertoireV3::MakeAgentKeyFromStableId(D.Id),
+                Ctx.Sim.Config.bEcosystemLife&&D.Int->Individual.Origin==EcoLifeV3::EOrigin::NaturalBirth);
 			D.Int->bAdopted = true;
 			D.Int->ContextIndex = Ctx.Index;
 			D.Int->GroundZ = Loc.Z;
@@ -479,6 +742,17 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		{
 			FEcoV3RegionContext& Ctx = *Sub->GetContext(c);
 			Sub->SyncContextClock(Ctx);
+			if (Ctx.Sim.Food.Vegetation.bEnabled)
+			{
+				if (!Ctx.Sim.Food.HasValidVegetationLayout()) { Sub->RejectResourceContract(); return; }
+				const auto* Regions = World->GetSubsystem<UEcologyWorldSubsystem>();
+				const auto* Region = Regions ? Regions->GetRegion(Ctx.RegionId) : nullptr;
+				if (!Region) { Sub->RejectResourceContract(); return; }
+				const auto Input = Region->GetEnvironmentState();
+				auto& Weather = Ctx.Sim.Food.VegetationWeather;
+				Weather = {Input.Rainfall, Input.Temperature, 1.0 - Ctx.Sim.Dark};
+				if (!Weather.IsValid()) { Sub->RejectResourceContract(); return; }
+			}
 			BuildViews(c);
 			// 두뇌 행동 몫 기록: 늑대를 앎 = 이 스텝 결정 관측(스텝 앞 기하)의 pred_count > 0 (FEcoV3BrainTally)
 			KnowsPre.SetNumUninitialized(Views.Num());
@@ -505,11 +779,16 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			EcoWorldV3::FStepHooks Hooks;
 			Hooks.User = &Adapter;
 			// 사슴 Social 행동 연결 (조연우 님 22eb1b6). eco.IntegratedV3.SocialControl 1 일 때만 건다 — 기본 0 (사람 결정 10-17 (8))
-			Hooks.HerbControl = Sub->GetSettings().bSocialControl ? &SocialControlHook : nullptr;
+			Hooks.HerbControl = &IntegratedControlHook;
+            Adapter.HerbIds=&StableViewIds;Adapter.WolfKeys=&WolfIds;
+            Hooks.ThreatInput=&EvidenceThreatHook;
+            Hooks.HerbTravel = &Traveling;
             Hooks.HerbMove = Sub->UsesTerrain() ? &HerbMoveHook : nullptr;
             Hooks.ThreatMove = Sub->UsesTerrain() ? &ThreatMoveHook : nullptr;
 			const double BeforeFood = Ctx.Sim.Food.Total();
 			const double BeforeEaten = Ctx.Sim.Stats.FoodEaten;
+			const double BeforeLoss = Ctx.Sim.Food.EnvironmentLost;
+			const double BeforeGrowth = Ctx.Sim.Food.VegetationGrown;
 			// 10-24 두 길 두뇌 (기록만): 이 스텝에 실행한 반사 길 RUN·SHELTER 사슴-스텝 = 세계 길 통계의 스텝 차 (길 끔이면 늘 0)
 			const int64 RouteRun0 = Ctx.Sim.Stats.Route.Steps[EcoWorldV3::kRouteRun];
 			const int64 RouteShelter0 = Ctx.Sim.Stats.Route.Steps[EcoWorldV3::kRouteShelter];
@@ -547,6 +826,12 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			{
 				const EcoWorldV3::FHerbBody& Body = *Views[r].Body;
 				FEcoIntegratedV3Fragment& Int = *HerbInts[r];
+                if(Ctx.Sim.Config.bEcosystemLife&&Body.DeathCause==EcoWorldV3::kDeathNone){
+                    auto& Life=Int.Individual;const double SimNow=Ctx.Sim.T*EcoRepertoireV3::kStepSeconds;
+                    if(SimNow>=Life.NextTrace&&FMath::Square(Body.Pos.X-Body.PrevPos.X)+FMath::Square(Body.Pos.Y-Body.PrevPos.Y)>.01){
+                        Life.NextTrace=SimNow+2;Ctx.MovementTraces.Add(StableViewIds[r],Body.Pos.X,Body.Pos.Y,Int.GroundZ,SimNow);
+                    }
+                }
 				// 사슴 얼기 막음 확인: 요청을 읽은 결정의 마스크에 얼기 칸이 열렸는가 (eco.IntegratedV3.NoFreeze 1 이면 늘 0)
 				const EcoWorldV3::FHerbDecision& Dec = *Views[r].Decision;
 				Ctx.FreezeMaskOpen += (Dec.bCommittedReads && Dec.CommittedMask[EcoRepertoireV3::kFreeze] != 0) ? 1 : 0;
@@ -600,7 +885,14 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			for (const int32 k : WolvesByContext[c])
 			{
 				const EcoWorldV3::FThreatAgent& A = *Wolves[k].Agent;
+                if(A.bDead){
+                    Wolves[k].Int->bDead=true;Wolves[k].Int->DeathCause=EcoWorldV3::kDeathStarved;
+                    Wolves[k].Vitals->HP=0;Wolves[k].Vitals->Energy=0;
+                    if(Wolves[k].Death)Wolves[k].Death->Cause=EEcoDeathCause::Starvation;
+                    continue;
+                }
 				Wolves[k].PredState->EatCooldown = static_cast<float>(A.State.Cooldown * EcoRepertoireV3::kStepSeconds);
+                if(Ctx.Sim.Config.bEcosystemLife&&Wolves[k].Int->Individual.LastMeatIntake>0)Wolves[k].PredState->EatCooldown=FMath::Max(.2f,Wolves[k].PredState->EatCooldown);
 				Wolves[k].Life->bPursuing = A.Last.bHunting && A.Last.bHasTarget;
                 const int32 Target=A.Last.Target;
                 if(A.Last.bHasTarget&&Views.IsValidIndex(Target)&&Views[Target].Body->DeathCause==EcoWorldV3::kDeathNone) {
@@ -619,8 +911,10 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
             {
                 const double AfterFood = Ctx.Sim.Food.Total();
                 const double Eaten = Ctx.Sim.Stats.FoodEaten - BeforeEaten;
+				const double Lost = Ctx.Sim.Food.EnvironmentLost - BeforeLoss;
+				const double Grown = Ctx.Sim.Food.Vegetation.bEnabled ? Ctx.Sim.Food.VegetationGrown - BeforeGrowth : AfterFood - BeforeFood + Eaten;
                 auto* Ecology = World->GetSubsystem<UEcologySimulationSubsystem>();
-                if (!Ecology || !Ecology->CommitSpatialFood(Ctx.RegionId, ++Ctx.ResourceReceiptSequence, BeforeFood, Eaten, AfterFood - BeforeFood + Eaten, AfterFood))
+                if (!Ecology || !Ecology->CommitSpatialFood(Ctx.RegionId, ++Ctx.ResourceReceiptSequence, BeforeFood, Eaten, Grown, AfterFood, Lost))
                 { UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] Resource conservation receipt rejected: %s"), *Ctx.RegionId.ToString()); Sub->RejectResourceContract(); return; }
             }
 		}
@@ -661,8 +955,10 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				++Ctx.RouteNow[Rt == EcoWorldV3::kRouteRun ? 0 : 1];
 			}
 		}
+		WolvesByContext[c].RemoveAll([&](int32 K){return Wolves[K].Agent->bDead;});
 		for (const int32 k : WolvesByContext[c])
 		{
+            if(Ctx.Sim.Config.bEcosystemLife)Wolves[k].Vitals->Energy=float(Wolves[k].Int->Individual.Nutrition)*Wolves[k].Vitals->MaxEnergy;
 			++Ctx.WolvesNow[static_cast<int32>(EcoV3Integrated::WolfStateOf(*Wolves[k].Agent, Ctx.Sim.ThreatCfg))];
 		}
 		Ctx.AliveDeer = DeerByContext[c].Num();

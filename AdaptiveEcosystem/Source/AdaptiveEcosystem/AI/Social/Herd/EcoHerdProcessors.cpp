@@ -5,6 +5,7 @@
 #include "AI/Social/EcoSocialFragments.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
+#include "Mass/EcoHerdMigration.h"
 #include "Mass/EntityFragments.h"
 #include "MassMovementFragments.h"
 #include "MassCommonTypes.h"
@@ -31,6 +32,7 @@ void UEcoHerdMembershipProcessor::ConfigureQueries(const TSharedRef<FMassEntityM
 	EntityQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddRequirement<FEcoHerdMemberFragment>(EMassFragmentAccess::ReadWrite);
+	EntityQuery.AddRequirement<FEcoHerdTravelFragment>(EMassFragmentAccess::ReadOnly,EMassFragmentPresence::Optional);
 	EntityQuery.AddSharedRequirement<FEcoSocialSpeciesSharedFragment>(EMassFragmentAccess::ReadOnly);
 	EntityQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
 	EntityQuery.RegisterWithProcessor(*this);
@@ -70,12 +72,14 @@ void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMa
 	// -------------------------------------------------------------------------
 	// Pass 1: Evaluate existing membership and join proximity against established herds
 	// -------------------------------------------------------------------------
-	EntityQuery.ForEachEntityChunk(Context, [HerdSubsystem, DeltaTime](FMassExecutionContext& ChunkContext)
+	const double Now=World->GetTimeSeconds();
+	EntityQuery.ForEachEntityChunk(Context, [HerdSubsystem, DeltaTime, Now](FMassExecutionContext& ChunkContext)
 	{
 		const int32 NumEntities = ChunkContext.GetNumEntities();
 		TConstArrayView<FEcoIdentityFragment> IdentityList = ChunkContext.GetFragmentView<FEcoIdentityFragment>();
 		TConstArrayView<FTransformFragment> TransformList = ChunkContext.GetFragmentView<FTransformFragment>();
 		TArrayView<FEcoHerdMemberFragment> MemberList = ChunkContext.GetMutableFragmentView<FEcoHerdMemberFragment>();
+		const auto Journeys=ChunkContext.GetFragmentView<FEcoHerdTravelFragment>();
 		const FEcoSocialSpeciesSharedFragment& SocialConfig = ChunkContext.GetSharedFragment<FEcoSocialSpeciesSharedFragment>();
 
 		for (int32 i = 0; i < NumEntities; ++i)
@@ -84,6 +88,13 @@ void UEcoHerdMembershipProcessor::Execute(FMassEntityManager& EntityManager, FMa
 			const FVector AgentLocation = TransformList[i].GetTransform().GetLocation();
 			FEcoHerdMemberFragment& Member = MemberList[i];
 			const int32 SpeciesIdx = Identity.SpeciesRuntimeIndex;
+			if(!Journeys.IsEmpty()&&(Journeys[i].bActive||Now<Journeys[i].MembershipUntil)
+                &&HerdSubsystem->IsValidHerdIndex(Member.HerdRuntimeIndex)){
+                FEcoHerdRuntimeData Pinned;
+                if(HerdSubsystem->GetHerdData(Member.HerdRuntimeIndex,Pinned)&&Pinned.PersistentHerdId==Journeys[i].PersistentHerdId){
+                    Member.LeaveDwellTimer=0;continue;
+                }
+            }
 
 			// Case 1: Agent currently belongs to a valid herd
 			if (Member.HerdRuntimeIndex != INDEX_NONE_ECO)

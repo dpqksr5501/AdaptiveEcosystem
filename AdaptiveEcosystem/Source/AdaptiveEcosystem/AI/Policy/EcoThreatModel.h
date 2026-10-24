@@ -912,6 +912,14 @@ namespace EcoThreatV3
 
 	struct FThreatStepInput
 	{
+        /** Optional integration constraints; defaults preserve existing golden trajectories. */
+        std::int32_t PreferredTarget=-1;
+        const std::uint8_t* CaptureAllowed=nullptr;
+        bool bHuntingAllowed=true;
+        bool (*ExtraSightBlocked)(void*,double,double,double,double)=nullptr;
+        void* SightUser=nullptr;
+        bool bResourceApproach=false,bResourceWait=false;
+        double ResourceDirX=0,ResourceDirY=0;
 		const FPreyView* Prey = nullptr;
 		std::int32_t NumPrey = 0;
 		// 원거리형만 읽는다: 초식마다 U[0, 1) 하나 ([NumPrey]). roll < PredRangedCatchP 여야 잡는다. nullptr 면 원거리형은 잡지 않는다
@@ -960,6 +968,7 @@ namespace EcoThreatV3
 	/** 위협 눈길 가림 (world.py `_ob_occlude` 한 쌍): bObstacleSight 면 줄기 SightBlocked ∨ 숲 시야 InputFoliageBlocked. 원판이 없으면 거짓. */
 	inline bool InputSightBlocked(const FThreatStepInput& In, double Ax, double Ay, double Bx, double By)
 	{
+        if(In.ExtraSightBlocked&&In.ExtraSightBlocked(In.SightUser,Ax,Ay,Bx,By))return true;
 		if (!In.bObstacleSight || In.Obstacles == nullptr || In.NumObstacles <= 0)
 		{
 			return false;
@@ -1367,7 +1376,7 @@ namespace EcoThreatV3
 		{
 			--T.SatLeft;
 		}
-		bool bHunting = T.Cooldown == 0 && !bAsleep && !bSated;
+		bool bHunting = T.Cooldown == 0 && !bAsleep && !bSated && In.bHuntingAllowed;
 		if (Cfg.bRealismNight && In.Dark >= Cfg.NightHuntDark)
 		{
 			bHunting = bHunting && (Spec.bNocturnal || T.bNightHunt);
@@ -1406,7 +1415,7 @@ namespace EcoThreatV3
 					const double Inv = 1.0 / (Dist > kEps ? Dist : kEps);
 					bVis = Perceived <= ViewR && (DX * HX + DY * HY) * Inv >= Cfg.PredFovCos;
 				}
-				if (bVis && (J < 0 || Perceived < DT))
+				if (bVis && (i==In.PreferredTarget || J < 0 || (J!=In.PreferredTarget && Perceived < DT)))
 				{
 					// 세로 장애물: 보통 위협의 눈길이 원판을 지나면 안 보인다 (더 가까운 후보일 때만 재도 결과는 파이썬의 보임 행렬과 같다).
 					// 숲 시야(In.bFoliage)면 잎 원 합집합 안 길이가 문턱 이상이어도 안 보인다 (줄기 ∨ 잎)
@@ -1521,6 +1530,10 @@ namespace EcoThreatV3
 			MY = In.PackDirY;
 			Speed = In.bPackWait ? 0.0 : Spec.BaseSpeed;
 		}
+        if(In.bResourceApproach&&!bPlayer&&!bAsleep){
+            MX=In.ResourceDirX;MY=In.ResourceDirY;Speed=In.bResourceWait?0:Spec.BaseSpeed;
+            if(bStalker){T.StalkState=EStalkState::Roam;T.StalkLeft=0;bDash=false;bFinal=false;}
+        }
 
 		// 6c. 식사 중 제자리 (켰을 때만, world.py R3 (j) eat_in_place): 쿨다운 때문에 사냥하지 않는 보통 위협은 잠처럼 move = head,
 		//     속력 0 (상태 기계 뒤, 밤잠 배수 앞 — 파이썬과 같은 자리. 뒤의 배수를 곱해도 0 이다)
@@ -1675,6 +1688,7 @@ namespace EcoThreatV3
 			for (std::int32_t i = 0; i < In.NumPrey; ++i)
 			{
 				const FPreyView& P = In.Prey[i];
+				if(In.CaptureAllowed&&!In.CaptureAllowed[i])continue;
 				if (!P.bAlive || (Cfg.bShelterSafe && P.bInCover))   // 은신처 안 사슴은 잡히지 않는다 (realism_shelter (c))
 				{
 					continue;

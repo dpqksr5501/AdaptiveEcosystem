@@ -107,9 +107,10 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		Binding.MovementRevision = Input.ResetRevision;
 		State.Velocity = Input.Visual.Velocity; State.bAlive = (Input.Visual.Flags & 1) != 0;
 		State.bEating = (Input.Visual.Flags & 2) != 0; State.bPursuingPrey = (Input.Visual.Flags & 4) != 0;
-		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::Exhaust) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
+		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::Investigate) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
 		State.SenseSource = EEcoSenseSource((Input.Visual.Flags>>4)&3);
 		State.FocusYawDegrees = float(Input.Visual.FocusYaw)/182.0389f;
+        State.BodyScale=Input.Visual.BodyScale/128.f;
 		State.bHasVitals = (Input.Visual.Flags & 8) != 0;
 		State.NormalizedHealth = Input.Visual.Health / 255.f; State.NormalizedEnergy = Input.Visual.Energy / 255.f;
 		Binding.Actor->Footsteps->AudioSet = FootstepAudioSet;

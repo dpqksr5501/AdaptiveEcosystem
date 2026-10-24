@@ -48,6 +48,7 @@ struct FEcoCreaturePresentationFragment : public FMassFragment
 	uint8 Health = 255;
 	uint8 Energy = 255;
 	uint8 Activity = 0;
+	uint8 BodyScale = 128; // scale = byte / 128; authority computes from genome + age
 	int16 FocusYaw = 0;
 };
 

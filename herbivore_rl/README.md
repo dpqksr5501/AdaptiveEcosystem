@@ -1,5 +1,7 @@
 # herbivore_rl
 
+**2026-10-24 팀 인계:** 새 soil/life 세계 연결은 [학습 AI 작업 가이드](../AdaptiveEcosystem/Docs/RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md), [실제 부분 예제](../AdaptiveEcosystem/Docs/RL_Policy/Examples/README.md), [팀 공통 안내](../AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AI_COLLABORATION_20261024.md)를 먼저 읽는다. 아래 Phase1~6과 초기 Golden 수치는 기존 정책 이력이며 새 life 세계의 재학습·전체 trajectory parity 완료를 뜻하지 않는다. 기존 V1/v3 weights·관측 슬롯을 조용히 바꾸지 않는다.
+
 초식 몬스터 행동 정책 학습. 사양서는 `herbivore_policy_spec.md` (저장소 밖, 프로젝트 루트 상위).
 아래 §는 전부 그 사양서의 절 번호다.
 

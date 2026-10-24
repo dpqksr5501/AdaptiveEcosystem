@@ -1,5 +1,37 @@
 # MASS PROCESSOR EXECUTION ORDER & THREAD SAFETY
 
+## 2026-10-23 life-v1 완료 경계
+
+[실행/팀 API 계약](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)을 따른다. Integrated Step은 기존처럼 GT에서 실행하며 실제 Pawn 위치/속도/눈높이·최대16 발소리 값을 snapshot으로 모은다. 개인 기억과 control/threat 의도만 보정하고 Native Step이 위치·섭식·대사·포획을 쓴다. 이주/위급 제약과 기존 SocialControl=0 경계를 보존한다.
+
+`OnWorldPostActorTick`의 Mass processing 밖에서 `ProcessPlayerStrikes → Survival/RecordDeaths → committed carcass → 기존 resource transaction → Herd/Travel/RecordMigrations → 인구/pressure → NaturalBirth → explicit Recovery → summary` 순서다. 자연 출생과 복구는 기존 capacity reservation/Spawn/CompleteSpawnRequest를 사용하며 실패/0승인도 완료한다. Source의 이 순서를 다른 Processor에서 재실행하지 않는다.
+
+checkpoint는 완료 거래만 저장한다. 채택 전 개체·미완료 native 사망이 있으면 거절하고 다음 완료 경계를 기다린다. 같은 build의 서버 시작 복원을 지원하고 과거 step으로 live rollback은 거절한다. 저장된 정책 cover 순서는 보존하면서 현재 실제 은신처의 geometry/height/registration에 재결합한다. runtime index/Actor/Entity handle을 영속 identity로 저장하지 않는다.
+
+## 2026-10-23 opt-in Native 식생의 추가 경계
+
+새 owned `LV_JYU_Ecosystem`은 spawner에 opt-in과 Field BP subclass를 저장한다. 날씨 BP는 authority WorldClock을 소비하고, Client 날씨/식생은 기존 GameState/Field DTO를 소비한다. Subsystem에 복제 프로퍼티를 추가하지 않는다. [BP 배치와 검증](../Architecture/JYU_ECOSYSTEM_BP_SETUP_20261023.md)을 따른다.
+
+`eco.Vegetation=0` 기본값, `-EcoVegetation` opt-in이다. Integrated Step의 GT 지역 snapshot(Rainfall/Temperature/Dark) → 기존 C4 실제 섭식 → C8 soil-v1 성장/환경 손실 → 관측 → `CommitSpatialFood` 순서를 사용한다. 환경 손실은 별도 비음수 항목이며 M4의 두 번째 재생 경로는 만들지 않는다. `AEcoVegetationField`는 PostUpdateWork GT에서 Mass processing 중이면 대기하고, 다음 native step이 읽을 지면/서식 입력을 bounded gather한다. 1Hz 수신 표현 snapshot은 replica Actor가 운반하며 client가 자원을 계산하지 않는다. [실행·단위·소유권·검증](../Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md), [전체 구현 상태](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)를 따른다. 기존 V1/SpeciesAI 이동 writer와 SocialControl/이주 기본값을 바꾸지 않는다.
+
+## 2026-10-23 v3 무리 이주의 완료 경계
+
+후속 [통합 점검](../Architecture/ECOSYSTEM_INTEGRATION_REVIEW_20261023.md)은 Reconcile 내부의 아직 인구 commit 전인 이전 receipt를 후보 인구에 반영한다. 이미 목적지에 들어온 body는 outstanding incoming 예약에서 제외한다. 원래 `RecordMigrations → ReconcilePopulation` 순서와 Native 단일 writer는 그대로다. ON soil layout 검증도 Native Step/Field gather 앞에서 수행하며 다른 세계의 재생으로 fallback하지 않는다.
+
+아래 V1 Processor 표와 2026-09-30 소비자 미연결 설명은 당시 경로다. 현재 v3 실제 연결은 [이주 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md), [인수인계](../조연우/JYU_CHAT_HANDOFF_20261023.md)를 따른다. Source 기준은 `Creature/Runtime/EcoCreatureLifecycle.cpp`와 `Mass/EcoHerdMigration.*`다.
+
+| 순서/경계 | 책임 |
+|---|---|
+| 기존 Native 결정/이동 스텝 | 개인 세계 규칙과 유효한 이주 의도를 소비하는 유일한 이동·섭식·대사 writer. Raw Request와 실행 결과를 구분 |
+| 권위 `OnWorldPostActorTick` 완료 처리 | Mass processing이 끝난 GameThread에서 생명주기/자원 결과를 조정 |
+| `CompleteResourceStep` 성공 이후 | `UEcoHerdMigrationSubsystem::Reconcile`로 공동 여행/Travel·실제 지역/context 이전 결과를 조정 |
+| 기존 이주 결과 처리 | 기존 `EcoMassMigration::Reconcile` 경로와 공통 `RecordMigrations`·개체군/압력/합계를 연결. 같은 v3 개체에 레거시 개별 이주 중복 금지 |
+| 진단 읽기 | 권위 snapshot을 Mass processing 외 GameThread에서 생성. HUD는 최대 4Hz 읽기, `OnRuntimeSample`은 리스너가 있을 때 2초 간격 로컬 관찰 이벤트 |
+
+Reconcile은 별도 이동 적분/프레임 Tick Subsystem이 아니다. Worker 중 UObject/Entity 구조를 직접 바꾸거나 HUD에서 fragment를 쓰지 않는다. Client는 이주 Subsystem/논리 Entity를 만들지 않으며 기존 표현 transport만 소비한다. V1/Custom Movement 혼용 가드와 기존 thread-safety 수칙은 유지한다.
+
+## 기존 Processor 계약과 날짜별 감사 기록
+
 > **2026-10-08 opt-in 동물 통합:** 별도 Integrated Entity 경로는 기존 PPO→Social Lifecycle→Steering/포식자 이동을 사용하고, 자원·인구·구조 변경·표현 조정은 모든 Mass phase가 끝난 `OnWorldPostActorTick`에서 직렬 처리한다. Actor의 PostPhysics tick에서는 관찰자 잠금이 남을 수 있어 삭제하지 않는다. 그 프레임 경계의 동기 batch destruction은 삭제 전 replication observer를 실행한다. 아래 command buffer 수칙은 실행 중 Processor/Entity loop의 구조 변경에 적용한다. M3 Box 가드와 이동 경로는 유지한다. [실행·검증·인계](../조연우/CREATURE_PRODUCTION_INTEGRATION.md) 참조.
 
 > **2026-10-13 main 합치기 (Branch_Sinhyeok):** 포획(`UEcoPredationProcessor`)은 조향 뒤에 둔다(파이썬 `world.py` 와 같은 순서). main 은 조향을 포획 뒤에 두었고(`ExecuteAfter("EcoPredationProcessor")`) 우리 가지는 포획을 조향 뒤에 두어서, 둘 다 남기면 실행 순서가 순환한다. 합칠 때 조향 쪽 그 한 줄을 뺐다. 잡힌 개체는 HP 0 이 되고 Alive → PendingDeath 로 바뀌어 다음 틱부터 초식 쿼리에서 빠진다. 조향도 HP 0 개체를 건너뛴다. 통합 생명체의 죽음은 지금처럼 조정자(`AEcoCreatureIntegrationSpawner::Reconcile`)가 닫는다(`bPredated` 표시, Alive 떼기, 2초 뒤 삭제). 정책 관측 5(최근 피식)는 파이썬과 같은 전역 EMA 이고, 지역 `PredationHistory` 는 생태·이주·UI 가 쓴다. 자세한 내용: [RL_V3_UNREAL_TRAINING_PLAN.md](../RL_Policy/RL_V3_UNREAL_TRAINING_PLAN.md) 3-5.
@@ -74,6 +106,8 @@ Alarm/Response는 Server/Standalone 실행 및 Client guard를 명시하고, Res
 ---
 
 ## 2. 멀티스레드 병렬 안전성 수칙 (Strict Concurrency Rules)
+
+2026-10-23 opt-in v3 무리 이주 추가: M4 Spawner의 `OnWorldPostActorTick` → Native 완료 결과/자원 receipt → `CompleteResourceStep` → `UEcoHerdMigrationSubsystem::Reconcile` → 기존 `RecordMigrations`/종별 유입·유출/재집계 → 표현 snapshot 순서다. Mass processing 외 GameThread에서 공동 계획과 실제 지역 진입을 commit한다. 다음 Native Step의 control hook이 목적 방향을 소비하며 **위치·에너지 적분은 기존 Native 단일 writer**다. 기존 V1/M3 이동 순서는 변경하지 않았다. [계약·검증](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md).
 
 MassEntity는 태스크 그래프(TaskGraph) 상에서 여러 워커 스레드에 청크(Chunk) 단위로 병렬 디스패치됩니다. 다음 행위는 엔진 크래시를 유발하므로 엄격히 금지됩니다:
 

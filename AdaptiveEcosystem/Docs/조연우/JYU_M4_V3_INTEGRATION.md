@@ -1,5 +1,7 @@
 # M4 공통 런타임 · v3 정책 · JYU 표현 통합
 
+> **2026-10-23 현재 통합:** [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 먼저 읽는다. 아래 10-15/16의 migration·Social 미연결 설명은 당시 범위다. 현재 SocialControl=0 신호 계약과 보존된 opt-in 행동 훅, 별도 새 맵 `/Game/JYU/Maps/LV_JYU_HerdMigration`의 무리 이주가 연결됐다. 기존 맵 이주 OFF와 v3 개별 이주/wave 비활성 정책은 유지한다. 공동 이주는 실제 Native 이동/context 이전→기존 M4 Migration receipt/인구/Client 표현을 사용한다. 기존 V1 계약·단일 이동 writer·원본 팀 레벨 분리는 유지한다.
+
 > **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
 
 > **2026-10-16 작업 위치 통합:** 검증 커밋 `8e2f34f`를 기존 `codex/social-shelter-handoff`에 반영했다. 앞으로 원래 저장소 `C:/Users/I/Documents/GitHub/AdaptiveEcosystem`의 `AdaptiveEcosystem/AdaptiveEcosystem.uproject`를 연다. 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`은 그대로 사용한다. 아래 브랜치명은 최초 통합 이력이다. 원래 위치의 빌드·검증 및 worktree 정리는 [작업 위치 통합 기록](JYU_WORKTREE_RETURN_20261016.md)을 따른다.

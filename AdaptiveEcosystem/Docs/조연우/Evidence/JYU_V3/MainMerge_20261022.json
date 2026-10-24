@@ -1,0 +1,297 @@
+{
+  "Date": "2026-10-22",
+  "MainCommit": "ff4f287d367536b52acf32926c649408475493ff",
+  "PreMergeFeatureCommit": "5cd07e4",
+  "MainAssetPaths": 251,
+  "MainOriginalPathsMatch": true,
+  "GitConflicts": 0,
+  "Build": {
+    "Result": "Succeeded",
+    "Log": "Saved/MainMerge_20261022/Build.log",
+    "ExitCode": 0
+  },
+  "Automation": {
+    "BeforeCompatibilityAssetCreation": true,
+    "NotRun": 0,
+    "Succeeded": 146,
+    "Failed": 0,
+    "SucceededWithWarnings": 1
+  },
+  "WeatherAssets": [
+    {
+      "path": "/Game/Actors/BP_SkyManager",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    },
+    {
+      "path": "/Game/Actors/BP_WeatherManager",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    },
+    {
+      "path": "/Game/Actors/BP_WeatherManager_PlayerFollow",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    },
+    {
+      "path": "/Game/SHC/Blueprints/Sky/BP_SkyManager",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    },
+    {
+      "path": "/Game/SHC/Blueprints/Weather/BP_SHC_RainRegionalWeather",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    },
+    {
+      "path": "/Game/SHC/Blueprints/Weather/BP_SHC_RegionalWeather",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    },
+    {
+      "path": "/Game/SHC/Blueprints/Weather/BP_SHC_SnowRegionalWeather",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    },
+    {
+      "path": "/Game/SHC/Blueprints/Weather/BP_WeatherManager_Region",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    },
+    {
+      "path": "/Game/SHC/Blueprints/Weather/BP_WeatherManager",
+      "class": "Blueprint",
+      "compiled_in_memory": true
+    }
+  ],
+  "WeatherCompatibility": {
+    "target": "/Game/SHC/Blueprints/Weather/BP_WeatherManager_PlayerFollow",
+    "parent": "/Game/SHC/Blueprints/Weather/BP_WeatherManager",
+    "legacy_class_resolved": true,
+    "main_original_assets_unchanged": true
+  },
+  "CompatibilityToolVerified": true,
+  "PIE": {
+    "result": "FINISHED",
+    "samples": 80,
+    "deer_records": 3819,
+    "wolf_records": 160,
+    "protected_records": 798,
+    "sitting_protected_records": 237,
+    "occupied_records": 141,
+    "wolf_inside_records": 0,
+    "executed_counts": {
+      "0": 3329,
+      "1": 202,
+      "2": 288
+    },
+    "region_safety_counters": {
+      "Forest": {
+        "refuge_protected_prey_steps": 2747,
+        "refuge_constrained_moves": 18,
+        "refuge_capture_violations": 0,
+        "refuge_inside_predator_steps": 0
+      }
+    },
+    "ready_refuges": 12,
+    "refuges": [
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 37000.000000, y: 4000.000000, z: 1571.868265}>",
+        "brush": 183,
+        "rocks": 20,
+        "registration": 2,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 31000.000000, y: -2000.000000, z: 1518.739867}>",
+        "brush": 192,
+        "rocks": 20,
+        "registration": 3,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 37200.000000, y: 43500.000000, z: -1662.500131}>",
+        "brush": 188,
+        "rocks": 20,
+        "registration": 4,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 37000.000000, y: -46000.000000, z: 2672.646952}>",
+        "brush": 185,
+        "rocks": 20,
+        "registration": 5,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 37200.000000, y: 49500.000000, z: -2009.377420}>",
+        "brush": 188,
+        "rocks": 20,
+        "registration": 6,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 37000.000000, y: -52000.000000, z: 2619.529569}>",
+        "brush": 193,
+        "rocks": 20,
+        "registration": 13,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 31200.000000, y: 49500.000000, z: -1590.635145}>",
+        "brush": 188,
+        "rocks": 20,
+        "registration": 7,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 31000.000000, y: -52000.000000, z: 2553.903139}>",
+        "brush": 184,
+        "rocks": 20,
+        "registration": 12,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 31000.000000, y: 4000.000000, z: 1282.017898}>",
+        "brush": 194,
+        "rocks": 20,
+        "registration": 8,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 31200.000000, y: 43500.000000, z: -1659.380758}>",
+        "brush": 190,
+        "rocks": 20,
+        "registration": 9,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 31000.000000, y: -46000.000000, z: 2604.680741}>",
+        "brush": 187,
+        "rocks": 20,
+        "registration": 10,
+        "ready": true,
+        "projected_slots": true
+      },
+      {
+        "position": "<Struct 'Vector' (0x0000023AA7678330) {x: 37000.000000, y: -2000.000000, z: 1885.153210}>",
+        "brush": 193,
+        "rocks": 20,
+        "registration": 11,
+        "ready": true,
+        "projected_slots": true
+      }
+    ]
+  },
+  "PIERegionCounters": [
+    {
+      "Region": "Barren",
+      "NativeStep": 228,
+      "ProtectedPreySteps": 947,
+      "Deflections": 37,
+      "Recoveries": 0,
+      "InsidePredatorSteps": 0,
+      "CaptureViolations": 0
+    },
+    {
+      "Region": "Forest",
+      "NativeStep": 228,
+      "ProtectedPreySteps": 2438,
+      "Deflections": 18,
+      "Recoveries": 0,
+      "InsidePredatorSteps": 0,
+      "CaptureViolations": 0
+    },
+    {
+      "Region": "Highland",
+      "NativeStep": 228,
+      "ProtectedPreySteps": 1415,
+      "Deflections": 39,
+      "Recoveries": 0,
+      "InsidePredatorSteps": 0,
+      "CaptureViolations": 0
+    }
+  ],
+  "NetworkProcesses": [
+    {
+      "Name": "ClientA",
+      "Refuges": 12,
+      "Passed": true,
+      "ExitCode": 0,
+      "Visible": 12,
+      "Ready": 12
+    },
+    {
+      "Name": "ClientB",
+      "Refuges": 12,
+      "Passed": true,
+      "ExitCode": 0,
+      "Visible": 12,
+      "Ready": 12
+    },
+    {
+      "ExitCode": 0,
+      "Name": "Server"
+    }
+  ],
+  "NetworkClients": [
+    {
+      "NativeStep": 0,
+      "Name": "ClientA",
+      "LogicalOwned": 0,
+      "AuthoritySamples": 3,
+      "MaxVisuals": 62.0
+    },
+    {
+      "NativeStep": 0,
+      "Name": "ClientB",
+      "LogicalOwned": 0,
+      "AuthoritySamples": 3,
+      "MaxVisuals": 48.0
+    }
+  ],
+  "DedicatedRegionCounters": [
+    {
+      "Region": "Barren",
+      "NativeStep": 750,
+      "ProtectedPreySteps": 7549,
+      "Deflections": 15,
+      "Recoveries": 0,
+      "InsidePredatorSteps": 0,
+      "CaptureViolations": 0
+    },
+    {
+      "Region": "Forest",
+      "NativeStep": 750,
+      "ProtectedPreySteps": 11570,
+      "Deflections": 18,
+      "Recoveries": 0,
+      "InsidePredatorSteps": 0,
+      "CaptureViolations": 0
+    },
+    {
+      "Region": "Highland",
+      "NativeStep": 750,
+      "ProtectedPreySteps": 10236,
+      "Deflections": 5,
+      "Recoveries": 0,
+      "InsidePredatorSteps": 0,
+      "CaptureViolations": 0
+    }
+  ],
+  "Notes": [
+    "PIE counts are repeated observations, not unique agents.",
+    "Existing LowLevelTestAdapter startup conditions are separate from the project automation report.",
+    "No Python retraining or protected-world parity claim."
+  ]
+}

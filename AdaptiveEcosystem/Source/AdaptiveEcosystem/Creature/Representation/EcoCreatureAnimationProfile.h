@@ -35,6 +35,8 @@ public:
     /** Limb end is HorseLink/Hand, while Foot/Finger0 is the separate sole contact marker. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<FName> IKEndBones;
     UPROPERTY(EditAnywhere,BlueprintReadOnly) FName BodyBone;
+    /** Optional neck branch used to layer head-up vigilance over moving legs. */
+    UPROPERTY(EditAnywhere,BlueprintReadOnly) FName AlertHeadBone;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<float> ContactHeights;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0",ClampMax="40")) float MaxFootCorrectionCm = 12;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0",ClampMax="20")) float FootClearanceCm = .5f;

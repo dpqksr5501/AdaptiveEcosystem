@@ -1,5 +1,6 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
+#include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
@@ -125,7 +126,7 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 	return true;
 }
 
-int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bPredator)
+int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bPredator, const TArray<FVector>* PositionsOverride)
 {
 	if (GetNetMode() == NM_Client || Count <= 0 || !IsSpeciesEnabled(bPredator)) return 0;
 	auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
@@ -134,7 +135,8 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 	if (!Ecology || !Spawner || !Found) return 0;
 	TArray<FVector> Positions;
 	const auto* Group = Groups.FindByPredicate([&](const FEcoCreatureSpawnGroup& G) { return G.RegionId == RegionId; });
-	if (!Group || !BuildSpawnPositions(*Group, Count, bPredator, Positions)) return 0;
+    if(PositionsOverride){if(PositionsOverride->Num()!=Count)return 0;Positions=*PositionsOverride;}
+    else if (!Group || !BuildSpawnPositions(*Group, Count, bPredator, Positions)) return 0;
 	auto& EM = Spawner->GetEntityManagerChecked();
 	TArray<FMassEntityHandle> Entities;
 	const auto& Template = (bPredator ? WolfConfig : HerbivoreConfig)->GetOrCreateEntityTemplate(*GetWorld());
@@ -145,6 +147,13 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 	{
 		auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entities[I]);
 		Id.StableAgentId = Ecology->AllocateStableAgentId(); Id.SpeciesId = Species; Id.SpeciesRuntimeIndex = SpeciesIndex;
+        if(bEnableEcosystemLife)if(auto* Native=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entities[I])){
+            auto& Life=Native->Individual;Life.bInitialized=true;
+            const auto* N=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+            Life.Genome=EcoLifeV3::Founder(N?N->GetSettings().Seed:101,Id.StableAgentId);
+            Life.Origin=bReady?EcoLifeV3::EOrigin::Recovery:EcoLifeV3::EOrigin::Initial;
+            Life.Born=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds-180;
+        }
 		auto& Membership = EM.GetFragmentDataChecked<FEcoRegionFragment>(Entities[I]);
 		Membership.CurrentRegionId = RegionId; Membership.CurrentRegionIndex = Ecology->GetRegionRuntimeIndex(RegionId);
 		const auto Time = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime();
@@ -158,6 +167,7 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 		Profile.Settings.bEnabled = !bPredator || bEnablePredatorSurvival;
 		// v3 owns action-dependent metabolism; M4 still commits all death receipts and cleanup.
 		if (EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entities[I])) Profile.Settings.bEnabled = false;
+        if(bEnableEcosystemLife&&EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entities[I]))Profile.Settings.DeadRetentionSeconds=22;
 		Profile.Settings.BaseMetabolism = bPredator ? PredatorEnergyDrainPerSecond : EnergyDrainPerSecond;
 		Profile.Settings.TravelMetabolism = 0.0f;
 		Profile.Settings.FoodEnergyGain = EnergyPerFood;

@@ -100,7 +100,13 @@ void AEcoRefugeHabitat::RebuildHabitat()
     for(int I=0;I<28;++I) {
         const float Angle=2*PI*(I+.5f)/28;
         if(FMath::Abs(FMath::Sin(Angle))<.20f||FMath::Abs(FMath::Cos(Angle))<.20f)continue;
-        const float Scale=Random.FRandRange(5.5f,8.f);
-        Place(Boulders,FMath::Cos(Angle)*(R-65),FMath::Sin(Angle)*(R-65),{Scale,Scale*.8f,Scale*.95f},{0,Random.FRandRange(0,360),0});
+        const auto Bounds=BoulderMesh->GetBounds();
+        const float MeshRadius=FMath::Max(1.f,FVector2D(Bounds.BoxExtent.X,Bounds.BoxExtent.Y*.8f).Size());
+        const float Scale=FMath::Min(Random.FRandRange(5.5f,8.f),R*.4f/MeshRadius);
+        const FRotator Rotation(0,Random.FRandRange(0,360),0);
+        const FVector Offset=Rotation.RotateVector(Bounds.Origin*FVector(Scale,Scale*.8f,Scale*.95f));
+        // Actual mesh bounds stay within the native wolf body margin (100cm); pivots need not be centered.
+        const float Ring=FMath::Max(0.f,R+50.f-MeshRadius*Scale);
+        Place(Boulders,FMath::Cos(Angle)*Ring-Offset.X,FMath::Sin(Angle)*Ring-Offset.Y,{Scale,Scale*.8f,Scale*.95f},Rotation);
     }
 }

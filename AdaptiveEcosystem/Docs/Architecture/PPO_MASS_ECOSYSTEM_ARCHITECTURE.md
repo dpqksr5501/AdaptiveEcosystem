@@ -1,5 +1,30 @@
 # PPO + MassEntity 기반 동적 생태계 종합 아키텍처 (PPO & Mass Dynamic Ecosystem)
 
+프로젝트의 공통 목표·종 독립성·작업 시작 순서는 [공통 맥락](../PROJECT_CONTEXT.md)을 먼저 따른다. 아래의 현재 구현과 후속 제안/날짜별 감사를 구분한다.
+
+## 2026-10-23 실제 통합 경로와 아래 설계의 적용 범위
+
+아래 V1 구조도·2026-09-30 gap은 목표 및 당시 감사다. 현재 branch `codex/social-shelter-handoff`의 opt-in v3 구현 기준은 `581ce1d` + `e22dbbd`이며 main `a74fcac`를 포함한다. [현재 인수인계](../조연우/JYU_CHAT_HANDOFF_20261023.md)와 [무리 이주·신호 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 함께 읽는다. V1 7관측/4출력과 v3 R1b 18관측/5행동·mask2는 별도 계약이다.
+
+| 층 | 현재 v3 경로의 소유권 |
+|---|---|
+| World | 실제 지역 환경·인접성, owned 맵의 authored Barren↔Forest corridor |
+| Policy/개인 반응 | Native 관측·Raw Request 및 기존 위협/은신처 세계 규칙. 기본 SocialControl=0, 읽기 ReadSignal은 별도 |
+| Social/Herd | 감각 증거/경보·영속 무리, 완료된 자원 경계의 공동 여행·Travel 의도. 기존 행동 훅은 opt-in |
+| Native 이동 | control hook 의도 소비, 단일 Step의 실제 이동·섭식·대사·피식. Social/HUD가 위치를 적분하지 않음 |
+| M4 생태계 | 실제 지역 진입/context 이전 결과를 기존 이주 영수증·종별 유입/유출·인구/압력·요약으로 환류 |
+| Client/진단 | 기존 Bubble Actor 표현. 권위 HUD/Inspector는 Mass processing 외 snapshot을 읽으며 새 복제 transport 없음 |
+
+무리 이주는 새 맵에서만 기본 활성이다. 목적지 진입과 여정 끝 정착은 다르고, 위협·고갈·정체에 따른 복귀/사망이 가능하다. 개별 이주/wave를 v3에 중복 적용하지 않는다. 은신처 안전은 ShelterSafe=1의 기존 규칙 또는 ShelterSafe=0의 JYU 보호 중 하나가 담당한다.
+
+이는 제어된 PIE·Dedicated/Client에서 확인한 기능 폐루프이며 장기 균형·전체 Python 이주 ON 궤적 파리티·재학습·Shipping 완료를 의미하지 않는다. 개인 발표 파일은 저장소 밖에 둔다. 이번 문서 감사에서 새 실행 검증은 하지 않았다.
+
+## 후속 기획과 구현의 구분
+
+사용자와 논의한 환경·식생·경험·협동 사냥·출생/세대·체형·대규모 실행의 세분화는 [동적 생태계 세부 기획](DYNAMIC_ECOSYSTEM_DETAILED_DESIGN_20261023.md)에 있다. 이는 신규 **제안 설계**이며 현재 Source/정책 계약을 대체하거나 전체 구현 완료를 뜻하지 않는다. 기존 단일 이동·자원 writer와 권위·복제 경계를 유지하며 단계적으로 검증한다.
+
+## V1 목표와 2026-09-30 Source 감사 기록
+
 > 기준 엔진: **Unreal Engine 5.8**  
 > 모듈: `AdaptiveEcosystem`  
 > 상태: **Target Architecture + Current Implementation Gap**<br>

@@ -13,6 +13,7 @@
 #include "World/EcologyRegion.h"
 #include "EngineUtils.h"
 #include "HAL/IConsoleManager.h"
+#include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 static TAutoConsoleVariable<int32> CVarPlayerGaitLog(TEXT("eco.Player.GaitLog"),0,TEXT("Log accepted player gait changes and server movement speed."));
 UEcoPlayerEcologyComponent::UEcoPlayerEcologyComponent()
 {
@@ -48,10 +49,21 @@ void UEcoPlayerEcologyComponent::SetGait(EEcoPlayerGait NewGait)
 }
 void UEcoPlayerEcologyComponent::ServerSetGait_Implementation(EEcoPlayerGait NewGait)
 {if(uint8(NewGait)<=uint8(EEcoPlayerGait::Run)){Gait=NewGait;OnRep_Gait();}}
+void UEcoPlayerEcologyComponent::TryStrike()
+{if(GetOwner()->HasAuthority())ServerTryStrike_Implementation();else ServerTryStrike();}
+void UEcoPlayerEcologyComponent::ServerTryStrike_Implementation()
+{if(auto* P=Cast<APawn>(GetOwner());P&&P->HasAuthority()&&P->IsPlayerControlled())
+    for(TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld());It;++It){It->QueuePlayerStrike(*P);break;}}
 void UEcoPlayerEcologyComponent::TickComponent(float Dt,ELevelTick Type,FActorComponentTickFunction* Function)
 {
     Super::TickComponent(Dt,Type,Function);
     auto* Pawn=Cast<ACharacter>(GetOwner());if(!Pawn||!Pawn->IsPlayerControlled())return;
+    if(Pawn->IsLocallyControlled())if(auto* PC=Cast<APlayerController>(Pawn->GetController())){
+        const bool Pressed=PC->IsInputKeyDown(EKeys::F);
+        if(Pressed&&!bStrikeHeld)for(TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld());It;++It)
+            if(It->bEnableEcosystemLife){TryStrike();break;}
+        bStrikeHeld=Pressed;
+    }
     if(bUseKeyboardGait&&Pawn->IsLocallyControlled()) if(auto* PC=Cast<APlayerController>(Pawn->GetController()))
         SetGait(PC->IsInputKeyDown(EKeys::LeftControl)?EEcoPlayerGait::Sneak:PC->IsInputKeyDown(EKeys::LeftShift)?EEcoPlayerGait::Run:EEcoPlayerGait::Walk);
     const float Speed=Pawn->GetVelocity().Size2D();

@@ -1,5 +1,39 @@
 # 팀원별 요청 — 통합 레벨 v3 사슴·늑대 (2026-10-17, 팀 브랜치 통합 뒤)
 
+## 2026-10-24 학습 담당 AI 재개
+
+후속 구현 기준은 **`d095948`**이다. [학습 AI 가이드](ECOSYSTEM_RL_AGENT_GUIDE_20261024.md), [팀 공통 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [실제 부분 예제](Examples/README.md)를 새 작업의 진입점으로 사용한다. 기존 요청은 당시 이력과 담당자의 수락/완료를 구분한다. 현재 soil/life의 규칙 동작을 새 PPO 학습으로 설명하지 않고, mirror→버전/adapter→평가/학습→Native 검증 순서로 이어간다. 전체 원시 snapshot은 Saved라 clone에 없으며 예제의 일부 cell/진단 정답을 policy observation에 넣지 않는다. 새 weights/대규모 학습을 이번 문서 작업에서 실행하지 않았다.
+
+## 2026-10-23 후속 soil-v1 세계 연결 요청
+
+후속 **life-v1**은 soil뿐 아니라 경험 규칙, genome/growth/maintenance, 제한된 사냥/사체 영양, 자연 출생과 장소 보고를 실행한다. [life 실행 계약/RL 인계](../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md#rl-인계)를 먼저 확인한다. soil leaf의 실제 C++/Python 2400개 비교는 최대 절대 오차0으로 통과했다. 이는 전체 life 세계의 mirror/궤적 parity/재학습이 아니다.
+
+`CaptureDiagnostics(true)`의 실제 900개 셀/지역과 Inspector의 개체 observation/request/mask·부모/유전/경험/규칙 결과가 학습 연결 입력 예제다. `Saved/EcosystemLife_20261023/*_LearningSnapshot.json`에는 일반 자연 세계와 실제 피해 fixture의 비영 기억 예제가 있다. `training_ready=false`다. 환경 입력은 producer에서 재현하고 Unknown 원인/검증 정답을 관측 슬롯에 넣지 않는다. V1 7/4·v3 18/5 mask2·별도21과 현재 가중치를 보존한다.
+
+새 모델 교체는 기존 `EcoV3Brain` registry의 schema/mask/model 검사와 Native 정책 추론을 따른다. 새 경험 입력을 학습하려면 별도 버전 계약/정규화·golden과 `IntegratedControlHook`/`EvidenceThreatHook`의 명시적인 adapter 선택을 함께 정의해야 한다. 현재 새 경험/사냥 보정은 실행되는 rules-v1이며 모델이 새 경험을 학습했다고 표시하지 않는다. 기존 18개 슬롯의 뜻을 바꾸거나 rule와 학습 출력을 동시에 최종 writer로 두지 않는다. 이 요청은 RL 담당의 수락/학습 완료가 아니다.
+
+새 owned `/Game/JYU/Maps/LV_JYU_Ecosystem`에서 저장 BP의 권위 강수→토양 수분/식물 내성→기존 FoodGrid→실제 섭식/장부/표현을 연결했다. V1/v3 차원·슬롯·가중치·mask2는 바꾸지 않았다. 새 입력/결정 경계·단위·bounded dt·예제·engine-free 평가와 Python 후속은 [soil-v1 계약의 RL 인계](../Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md#rl-인계-기존-모델과-새-세계-구분)를 따른다. 이 절은 RL 담당 수락/학습 완료를 뜻하지 않는다.
+
+`EcoVegetationV3.h`/`EcoWorldV3.h`의 기존 regrow producer가 달라진 세계다. ON은 기존 RL snapshot v1 export를 명시적으로 거절하며 새 schema·Python mirror·Golden·재학습은 남아 있다. 규칙 결과를 PPO가 수분을 새로 학습한 결과로 설명하지 않는다. [실제 BP/맵 실행·검증](../Architecture/JYU_ECOSYSTEM_BP_SETUP_20261023.md), [전체 남은 범위](../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)를 함께 확인한다. 다른 팀/채팅에 자동 메시지는 보내지 않았다.
+
+## 조연우 통합 후속 확인 — 2026-10-23
+
+아래 요청 원문은 권신혁 작성 당시 기록으로 보존한다. 이 절은 조연우 측 통합 Source `581ce1d` + `e22dbbd`의 확인 결과이며 RL 담당의 수락·학습 완료·모든 요청 종료를 뜻하지 않는다. 별도 메시지는 보내지 않았다. [최신 인수인계](../조연우/JYU_CHAT_HANDOFF_20261023.md)와 [통합 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다.
+
+| 원문 요청 | 현재 구현/범위 | 남은 부분 |
+|---|---|---|
+| §2-1 신호 계약 | 버전 1 `ReadSignal`에 직접/기억/shared·강도/위치·증거/수신 시각·Herd/TTL 검증. 기본 SocialControl=0 유지 | legacy ApplyControl은 opt-in 보존. RL Native 무리 반응/관측·Python 학습 연결은 별도 |
+| §2-2 슬롯 없는 보호 개체 | legacy 훅도 보호 원 안 개체를 lease 부족만으로 내보내지 않게 guard | 보호 안전은 슬롯 수와 분리. 기존 안전 규칙 하나만 사용 |
+| §2-3 Policy 헤더 변경 | 기존 Native hook에서 이주 방향/단계 경계와 context 이전을 연결; engine-free EcoV3Eval을 변경 헤더로 재컴파일 | 새 이주 ON 세계의 전체 Python 궤적 파리티/재학습 미검증, 후속 Policy 변경은 공동 계약 필요 |
+| §2-4 바위 외형 | 실제 mesh bounds/pivot으로 ring을 배치해 보이는 끝을 반경+50cm 안에 둠 | 늑대 몸 여유 100cm와 중첩 안전 writer를 만들지 않음 |
+| §2-5 관찰자 | 실제 촬영/검증 도구가 관찰자 위협을 비활성화 | 일반 플레이어의 사냥꾼/관찰자 제품 의도는 별도이며 전역 기본을 바꾸지 않음 |
+| §2-7 남은 표현 | AlertGraze(이동+목 look), WeakTravel(실제 저속), SatedRest(포만 휴식), 수신 enum 검증 연결 | 모든 미래 야생 상태/새 종의 애니메이션 완료는 아님 |
+| §4/5 레벨 | JWJ 대형 레벨 owned 복사 `LV_JYU_HerdMigration`, 실제 은신처 12곳·Barren↔Forest 경로 검증 | 원본 공식 레벨 선정/원본 팀 맵 authoring 요청을 닫은 것은 아님 |
+
+먹이 장부는 PR #12 main 통합의 `AdjustSpatialFoodHabitat` 거래로 늦은 은신처 등록/제거를 반영했다. 제어된 가뭄 fixture도 거래를 사용한다. §9 EnvWatch/날씨·나무·#S1 등 다른 담당의 진행 여부는 각 Source/계약으로 확인하며 이 절에서 일괄 완료 처리하지 않는다.
+
+## 요청 원문과 날짜별 진행 기록
+
 - 쓴 사람: 권신혁(RL·정책). 메시지는 권신혁이 직접 보낸다.
 - 기준: `Branch_Sinhyeok`. 팀 브랜치 `codex/social-shelter-handoff` 를 합친 `7029579`, Social 연결을 기본으로 끈 `422e307`(사람 결정 10-17 (8)) 뒤다.
 - 담당은 `RL_V3_UNREAL_TRAINING_PLAN.md` 5절 표의 '누가' 칸을 따랐다. 확실하지 않은 담당은 '(추정)'으로 적었다.

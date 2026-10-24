@@ -1,0 +1,89 @@
+{
+  "date": "2026-10-22",
+  "incoming_main": "a74fcac06985039e7669e5c3a039fe2689987141",
+  "previous_branch_head": "5e270f4",
+  "branch": "codex/social-shelter-handoff",
+  "git_conflicts": 0,
+  "build": {
+    "target": "AdaptiveEcosystemEditor Win64 Development",
+    "log": "Saved/MainMerge_PR12_20261022/Build02.log",
+    "tool": "UnrealBuildTool.exe",
+    "exit_code": 0,
+    "result": "Succeeded"
+  },
+  "automation": {
+    "failed": 0,
+    "report": "Saved/MainMerge_PR12_20261022/AutomationFixed/index.json",
+    "success": 200,
+    "not_run": 0,
+    "expected_warning": 1
+  },
+  "runtime": [
+    {
+      "resource_contract_errors": 0,
+      "net_mode": "Standalone",
+      "last_logged_regions": {
+        "Highland": {
+          "inside_predator_steps": 0,
+          "protected_prey_steps": 3124,
+          "step": 225,
+          "capture_violations": 0
+        },
+        "Forest": {
+          "inside_predator_steps": 0,
+          "protected_prey_steps": 3306,
+          "step": 225,
+          "capture_violations": 0
+        },
+        "Barren": {
+          "inside_predator_steps": 0,
+          "protected_prey_steps": 4350,
+          "step": 225,
+          "capture_violations": 0
+        }
+      },
+      "social_control": 0,
+      "log": "Saved/MainMerge_PR12_20261022/RuntimeFixedSocial0.log",
+      "rhi": "NullRHI",
+      "moving_to_occupied_count": 0,
+      "exit_code": 0,
+      "duration_seconds": 40
+    },
+    {
+      "resource_contract_errors": 0,
+      "net_mode": "Standalone",
+      "last_logged_regions": {
+        "Highland": {
+          "inside_predator_steps": 0,
+          "protected_prey_steps": 3043,
+          "step": 225,
+          "capture_violations": 0
+        },
+        "Forest": {
+          "inside_predator_steps": 0,
+          "protected_prey_steps": 3351,
+          "step": 225,
+          "capture_violations": 0
+        },
+        "Barren": {
+          "inside_predator_steps": 0,
+          "protected_prey_steps": 4746,
+          "step": 225,
+          "capture_violations": 0
+        }
+      },
+      "social_control": 1,
+      "log": "Saved/MainMerge_PR12_20261022/RuntimeFixedSocial1.log",
+      "rhi": "NullRHI",
+      "moving_to_occupied_count": 45,
+      "exit_code": 0,
+      "duration_seconds": 40
+    }
+  ],
+  "limits": [
+    "Headless standalone checks only; no new visual PIE or Dedicated/Client validation.",
+    "NullRHI game runs log missing editor AnimGraph package imports and a null thunder attachment warning; visual IK/audio are not revalidated.",
+    "Main SocialControl default remains OFF.",
+    "Python retraining and parity are not revalidated."
+  ]
+}

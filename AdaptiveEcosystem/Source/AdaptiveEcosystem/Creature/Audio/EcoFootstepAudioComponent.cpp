@@ -43,7 +43,7 @@ void UEcoFootstepAudioComponent::Consume(const FEcoCreatureVisualState& State, f
         return;
     }
     NotifyGate.Reset();
-    if (!Cadence.Advance(State.Position, Speed, State.bAlive, Delta, AudioSet->GetStride(Speed), AudioSet->MinimumSpeed, bSnap)) return;
+    if (!Cadence.Advance(State.Position, Speed, State.bAlive, Delta, AudioSet->GetStride(Speed)*State.BodyScale, AudioSet->MinimumSpeed, bSnap)) return;
     PlayContact(Source, TEXT("Distance"));
 }
 

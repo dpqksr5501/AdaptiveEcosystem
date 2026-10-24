@@ -103,6 +103,7 @@ public:
 	void GatherActorThreats(TArray<FEcoActorThreatSnapshot>& OutThreats);
 
 private:
+    friend struct FEcoEcosystemCheckpoint;
 	void ResolveAlarm(int32 RuntimeIndex);
 	TArray<FEcoHerdAlarmInput> InjectedAlarms;
 	TArray<FEcoHerdAlarmInput> ObservedAlarms;

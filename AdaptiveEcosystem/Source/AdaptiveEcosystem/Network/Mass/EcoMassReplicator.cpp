@@ -112,7 +112,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		if (!VisualFragments.IsEmpty())
 		{
 			const auto& V = VisualFragments[EntityIndex];
-			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy, V.Activity, V.FocusYaw);
+			ReplicatedAgent.SetPresentation(V.Velocity, V.Flags, V.Health, V.Energy, V.Activity, V.FocusYaw, V.BodyScale);
 		}
 
 		FEcoMassClientBubbleHandler& Bubble = BubbleInfo.GetSerializer().Bubble;
@@ -156,7 +156,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		const bool bReset = Item.Agent.GetMovementDiscontinuityRevision() != DiscontinuityFragments[EntityIndex].Revision;
 		const FEcoCreaturePresentationFragment* Presentation = VisualFragments.IsEmpty() ? nullptr : &VisualFragments[EntityIndex];
 		const bool bPresentationPriority = Presentation && (Item.Agent.GetVisualFlags() != Presentation->Flags
-			|| Item.Agent.GetHealth() != Presentation->Health || Item.Agent.GetEnergy() != Presentation->Energy || Item.Agent.GetActivity() != Presentation->Activity);
+			|| Item.Agent.GetHealth() != Presentation->Health || Item.Agent.GetEnergy() != Presentation->Energy || Item.Agent.GetActivity() != Presentation->Activity || Item.Agent.GetBodyScale()!=Presentation->BodyScale);
 		const FEcoIdentityFragment& Identity = IdentityFragments[EntityIndex];
 		const FEcoRegionFragment& Region = RegionFragments[EntityIndex];
 		const bool bIdentityChanged = Item.Agent.GetStableAgentId() != Identity.StableAgentId
@@ -178,7 +178,7 @@ void UEcoMassReplicator::ProcessClientReplication(FMassExecutionContext& Context
 		Item.LastTransformCheckRealTime = RealTime;
 		// Velocity-only changes follow the connection interval; flags/vitals bypass it.
 		const bool bPresentationChanged = Presentation && Item.Agent.SetPresentation(
-			Presentation->Velocity, Presentation->Flags, Presentation->Health, Presentation->Energy, Presentation->Activity, Presentation->FocusYaw);
+			Presentation->Velocity, Presentation->Flags, Presentation->Health, Presentation->Energy, Presentation->Activity, Presentation->FocusYaw, Presentation->BodyScale);
 
 		const FReplicatedAgentPositionYawData PreviousTransform = Item.Agent.GetReplicatedPositionYawData();
 		if (bReset)

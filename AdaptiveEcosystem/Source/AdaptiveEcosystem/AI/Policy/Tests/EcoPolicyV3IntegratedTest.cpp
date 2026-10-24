@@ -1,3 +1,4 @@
+#include "Creature/Debug/EcoHerdMigrationDebug.h"
 // 팀 통합 레벨용 v3 연결("몸은 팀 것, 머리만 우리 것")의 자동화 시험 (계획서 RL_V3_UNREAL_TRAINING_PLAN.md 4-5b).
 //
 // 실행:
@@ -105,6 +106,8 @@
 #include "MassSpawnerSubsystem.h"
 #include "World/EcologyRegion.h"
 #include "World/EcologyWorldSubsystem.h"
+#include "Ecology/EcologySimulationSubsystem.h"
+#include "Mass/EcoHerdMigration.h"
 
 namespace EcoPolicyV3IntegratedTestImpl
 {
@@ -3110,6 +3113,172 @@ bool FEcoRefugeMergedSingleRule::RunTest(const FString&)
 	TestEqual(TEXT("원 밖 사슴은 다시 잡힌다"), Deer.Body->DeathCause, EcoWorldV3::kDeathCaught);
 	return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoHerdJourneyNative,"AdaptiveEcosystem.Policy.V3.HerdMigration.NativeJourneyAndIdentity",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoHerdJourneyNative::RunTest(const FString&){
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    auto* Enable=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration"));
+    auto* Dwell=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration.ShortageSeconds"));
+    const int32 WasEnabled=Enable->GetInt();const float WasDwell=Dwell->GetFloat();
+    ON_SCOPE_EXIT{Enable->Set(WasEnabled,ECVF_SetByCode);Dwell->Set(WasDwell,ECVF_SetByCode);};
+    Enable->Set(1,ECVF_SetByCode);Dwell->Set(0.f,ECVF_SetByCode);
+    FIntegratedHarness H;auto Settings=TestSettings();Settings.bWildFlight=false;Settings.bObstacles=false;
+    if(!H.Setup(*this,Settings))return false;
+    auto* A=H.AddRegion(TEXT("Origin"),0,FVector::ZeroVector,2,0);
+    auto* B=H.AddRegion(TEXT("Destination"),1,FVector(14000,0,0),0,0);
+    auto* E=H.Scoped.World->GetSubsystem<UEcologySimulationSubsystem>();
+    FRegionEcologyState State;State.RegionId=A->RegionId;State.FoodAmount=1;State.FoodCapacity=100;
+    if(!TestTrue(TEXT("Origin ledger"),E->RegisterRegionState(State)))return false;
+    State.RegionId=B->RegionId;State.FoodAmount=10000;State.FoodCapacity=10000;
+    if(!TestTrue(TEXT("Destination ledger"),E->RegisterRegionState(State)))return false;
+    H.Spawn(false,A->RegionId,0,{FVector(5000,5000,0),FVector(5200,5100,0)},{91,92});H.Frame(0);
+    auto* Herds=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>();const int32 Herd=Herds->AllocateHerd(0,FVector(5000,5000,0));
+    FEcoHerdRuntimeData HerdData;Herds->GetHerdData(Herd,HerdData);
+    for(const auto Entity:H.Deer){H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(Entity).HerdRuntimeIndex=Herd;
+        H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Entity).Body.Energy=.3;}
+    for(double& Food:A->Sim.Food.Food)Food=0;
+    auto* Route=H.Scoped.World->SpawnActor<AEcoHerdMigrationRoute>();Route->FromRegion=A->RegionId;Route->ToRegion=B->RegionId;
+    Route->Points={FVector(5000,5000,0),FVector(18000,5000,0)};
+    auto* Journeys=H.Scoped.World->GetSubsystem<UEcoHerdMigrationSubsystem>();
+    FEcoServerTimeSnapshot Time;TArray<FEcoMigrationOutcome> Receipts;
+    TestTrue(TEXT("Plan is coordinated outside Mass"),Journeys->Reconcile(*H.EM,Time,1,Receipts));
+    TestEqual(TEXT("Exactly one shared plan"),Journeys->GetPlans().Num(),1);
+    FEcoHerdMigrationDebugSnapshot Debug;
+    TestTrue(TEXT("Read-only route snapshot is available on authority"),EcoHerdMigrationDebug::Capture(*H.Scoped.World,Debug));
+    TestEqual(TEXT("Debug snapshot has the authored corridor"),Debug.Routes.Num(),1);
+    TestEqual(TEXT("Debug snapshot shows both native habitats"),Debug.Regions.Num(),2);
+    TestEqual(TEXT("Debug snapshot shows actual members"),Debug.Members.Num(),2);
+    FString DebugJson;TestTrue(TEXT("Debug snapshot serializes for reproducible captures"),EcoHerdMigrationDebug::ToJson(Debug,DebugJson));
+    TestEqual(TEXT("Debug capture cannot create or alter plans"),Journeys->GetPlans().Num(),1);
+    for(const auto Entity:H.Deer)TestTrue(TEXT("Both members travel together"),H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(Entity).bActive);
+    // Turning off new departures must not clamp or abandon an existing journey.
+    Enable->Set(0,ECVF_SetByCode);
+    bool CrossedBoundary=false;int32 Arrivals=0;
+    for(int32 I=1;I<=1200;++I){
+        H.DecisionStep();Time.ServerTimeSeconds=I*EcoBehaviorConfig::StepSeconds;Receipts.Reset();
+        if(!Journeys->Reconcile(*H.EM,Time,I+1,Receipts))return false;
+        Arrivals+=Receipts.Num();
+        for(const auto Entity:H.Deer){const auto& Link=H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Entity);
+            const auto& Body=H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Entity).Body;
+            CrossedBoundary|=Link.ContextIndex==A->Index&&Body.Pos.X>A->Sim.Config.WorldSize;
+        }
+        bool Done=true;for(const auto Entity:H.Deer)Done&=!H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(Entity).bActive;
+        if(Done)break;
+    }
+    TestTrue(TEXT("Native body crosses stage boundary continuously"),CrossedBoundary);
+    TestEqual(TEXT("One arrival per stable identity"),Arrivals,2);
+    for(const auto Entity:H.Deer){
+        TestEqual(TEXT("Region ownership changes only on arrival"),H.EM->GetFragmentDataChecked<FEcoRegionFragment>(Entity).CurrentRegionId,B->RegionId);
+        TestEqual(TEXT("Native context transfers"),H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Entity).ContextIndex,B->Index);
+        TestEqual(TEXT("Herd membership survives the journey"),H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(Entity).HerdRuntimeIndex,Herd);
+        TestFalse(TEXT("Arrival ends travel intent"),H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(Entity).bActive);
+    }
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoHerdIncomingAccounting,"AdaptiveEcosystem.Review.HerdIncomingCountsRegionalEntryOnce",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoHerdIncomingAccounting::RunTest(const FString&)
+{
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    auto* Enable=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration"));
+    auto* Dwell=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration.ShortageSeconds"));
+    const int32 WasEnabled=Enable->GetInt();const float WasDwell=Dwell->GetFloat();
+    ON_SCOPE_EXIT{Enable->Set(WasEnabled,ECVF_SetByCode);Dwell->Set(WasDwell,ECVF_SetByCode);};
+    Enable->Set(1,ECVF_SetByCode);Dwell->Set(0.f,ECVF_SetByCode);
+    for(const bool SameBoundary:{false,true})
+    {
+        FIntegratedHarness H;auto Settings=TestSettings();Settings.bWildFlight=false;Settings.bObstacles=false;
+        if(!H.Setup(*this,Settings))return false;
+        auto* A=H.AddRegion(TEXT("Origin"),0,FVector::ZeroVector,4,0);
+        auto* B=H.AddRegion(TEXT("Destination"),1,FVector(14000,0,0),0,0);
+        auto* E=H.Scoped.World->GetSubsystem<UEcologySimulationSubsystem>();
+        FRegionEcologyState S;S.RegionId=A->RegionId;S.FoodAmount=.1f;S.FoodCapacity=100;S.Population=2;
+        if(!E->RegisterRegionState(S))return false;
+        S.RegionId=B->RegionId;S.FoodAmount=SameBoundary?1.5:2.5;S.Population=0;
+        if(!E->RegisterRegionState(S))return false;
+        auto* Herds=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>();
+        auto AddGroup=[&](int64 First){
+            auto Group=H.Spawn(false,A->RegionId,0,{FVector(5000,5000,0),FVector(5200,5100,0)},{First,First+1});H.Frame(0);
+            const int32 Herd=Herds->AllocateHerd(0,FVector(5000,5000,0));
+            for(const auto Entity:Group){H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(Entity).HerdRuntimeIndex=Herd;
+                H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Entity).Body.Energy=.3;}
+            return Group;
+        };
+        const auto First=AddGroup(91);for(double& Food:A->Sim.Food.Food)Food=0;
+        auto* Route=H.Scoped.World->SpawnActor<AEcoHerdMigrationRoute>();
+        Route->FromRegion=A->RegionId;Route->ToRegion=B->RegionId;
+        Route->Points={FVector(5000,5000,0),FVector(18000,5000,0)};
+        auto* M=H.Scoped.World->GetSubsystem<UEcoHerdMigrationSubsystem>();FEcoServerTimeSnapshot Time;TArray<FEcoMigrationOutcome> Receipts;
+        if(!TestTrue(TEXT("First plan"),M->Reconcile(*H.EM,Time,1,Receipts)&&M->GetPlans().Num()==1))return false;
+        // Deterministic regional-entry fixture, deliberately short of the route end.
+        // Continuous native movement/identity is covered by NativeJourneyAndIdentity.
+        for(const auto Entity:First){auto& Body=H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Entity).Body;
+            Body.Pos=Body.PrevPos=A->CmToUnits(FVector(15000,5000,0));}
+        if(!SameBoundary){
+            Time.ServerTimeSeconds=1;if(!M->Reconcile(*H.EM,Time,2,Receipts))return false;
+            TestEqual(TEXT("Actual region entry precedes route settlement"),Receipts.Num(),2);
+            FEcoRegionPopulationSnapshot P;P.RegionId=B->RegionId;P.Population=2;E->UpdatePopulationMetrics(P);
+        }
+        const auto Next=AddGroup(93);
+        FEcoRegionPopulationSnapshot P;P.RegionId=A->RegionId;P.Population=SameBoundary?4:2;E->UpdatePopulationMetrics(P);
+        Receipts.Reset();Time.ServerTimeSeconds=2;
+        if(!M->Reconcile(*H.EM,Time,3,Receipts))return false;
+        TestEqual(SameBoundary?TEXT("Uncommitted regional receipts still count as occupants"):TEXT("Entered bodies are not population plus incoming reservations"),
+            M->GetPlans().Num(),SameBoundary?1:2);
+        for(const auto Entity:Next)TestEqual(TEXT("Decision reaches actual per-agent journey intent"),
+            H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(Entity).bActive,!SameBoundary);
+    }
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoSocialSignalContract,"AdaptiveEcosystem.Policy.V3.Social.SignalEvidenceAndHistory",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoSocialSignalContract::RunTest(const FString&){
+    FEcoSensoryStateFragment Sense;FEcoAlarmStateFragment Alarm;FEcoSensorySettings Settings;Alarm.AlarmStrength=.8f;
+    Sense.Observe(EEcoSenseSource::Sight,FVector(10,20,0),1,0,1,77,10);
+    auto Direct=EcoV3Social::ReadSignal(Sense,Alarm,3,10,Settings);
+    TestTrue(TEXT("Direct evidence retains source and timestamp"),Direct.bValid&&Direct.bDirect&&Direct.SourceKey==77&&Direct.EvidenceTime==10);
+    Sense.Forget();Sense.ReceiveSharedInformation(FVector(50,20,0),.8f,3,10,11);
+    auto Shared=EcoV3Social::ReadSignal(Sense,Alarm,3,11,Settings);
+    TestTrue(TEXT("Shared evidence is never direct"),Shared.bValid&&!Shared.bDirect&&Shared.PersistentHerdId==3);
+    Sense.ReceiveSharedInformation(FVector(50,20,0),.8f,3,10,30);
+    TestFalse(TEXT("Repeated reception cannot refresh expired evidence"),EcoV3Social::ReadSignal(Sense,Alarm,3,30,Settings).bValid);
+    TestFalse(TEXT("Different herd cannot read the old report"),EcoV3Social::ReadSignal(Sense,Alarm,4,11,Settings).bValid);
+    FEcoV3SocialBridgeFragment Audit;
+    for(int32 I=0;I<20;++I)Audit.RecordReason(I,FName(*FString::Printf(TEXT("Reason%d"),I)),TEXT("Forest"),I);
+    Audit.RecordReason(21,TEXT("Reason19"),TEXT("Forest"),21);
+    TestEqual(TEXT("History is bounded and repeated reasons are coalesced"),Audit.History.Num(),16);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeLateFood,"AdaptiveEcosystem.Policy.V3.Refuge.LateRegistrationFoodLedger",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRefugeLateFood::RunTest(const FString&) {
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    FIntegratedHarness H;auto Settings=TestSettings();Settings.bProtectedRefuges=true;Settings.bShelterFood=true;
+    if(!H.Setup(*this,Settings))return false;
+    const FName Id=TEXT("LateFood");
+    const auto Config=UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(Settings,0,1,0,{});
+    auto* Region=H.Sub->AddContext(Id,0,FVector::ZeroVector,Config,1,0);
+    if(!TestNotNull(TEXT("Native food context"),Region))return false;
+    auto* Ecology=H.Scoped.World->GetSubsystem<UEcologySimulationSubsystem>();
+    FRegionEcologyState State;State.RegionId=Id;
+    if(!TestTrue(TEXT("Register authority region"),Ecology->RegisterRegionState(State)))return false;
+    Region->bSpatialFoodRegistered=Ecology->RegisterSpatialFood(Id,Region->StartFood,Region->StartFood);
+    if(!TestTrue(TEXT("Register initial native food ledger"),Region->bSpatialFoodRegistered))return false;
+    H.Spawn(false,Id,0,{FVector(1000,1000,0)},{91});H.Frame(0);
+    auto* Shelters=H.Scoped.World->GetSubsystem<UEcoShelterSubsystem>();
+    const int32 Index=Shelters->RegisterShelter({6000,6000,0},FVector::UpVector,1,4,800,.55f);
+    H.DecisionStep();
+    TestTrue(TEXT("Late shelter must not stop native simulation"),H.Sub->IsActive());
+    TestTrue(TEXT("Native step advanced after clipping food"),Region->Sim.T>0);
+    Ecology->GetRegionState(Id,State);
+    TestTrue(TEXT("Late refuge lowers habitat capacity"),State.FoodCapacity<Region->StartFood);
+    TestTrue(TEXT("Authority amount follows native grid"),FMath::IsNearlyEqual(double(State.FoodAmount),Region->Sim.Food.Total(),.01));
+    const double FoodBeforeRemoval=Region->Sim.Food.Total();
+    const float ReducedCapacity=State.FoodCapacity;
+    Shelters->UnregisterShelter(Index);H.Sub->RefreshRefuges(*Region);
+    Ecology->GetRegionState(Id,State);
+    TestTrue(TEXT("Removal restores regional capacity"),State.FoodCapacity>ReducedCapacity);
+    TestEqual(TEXT("Removal does not refill native food"),Region->Sim.Food.Total(),FoodBeforeRemoval);
+    H.DecisionStep();
+    TestTrue(TEXT("Receipts continue after removal and regeneration"),H.Sub->IsActive());
+    return true;
+}
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeLifecycle,"AdaptiveEcosystem.Policy.V3.Refuge.RemovalAndSlotIdentity",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoRefugeLifecycle::RunTest(const FString&) {
     using namespace EcoPolicyV3IntegratedTestImpl;
@@ -3149,6 +3318,14 @@ bool FEcoRefugeVisuals::RunTest(const FString&) {
     TestTrue(TEXT("Refuge has distributed cover instead of an empty marker"),Habitat->Brush->GetInstanceCount()>50&&Habitat->Boulders->GetInstanceCount()>8);
     TestTrue(TEXT("Occupant slots are inset from the predator boundary"),Habitat->SlotRadiusFraction<.75f);
     TestTrue(TEXT("Visual foliage does not create a second movement writer or collision trap"),Habitat->Brush->GetCollisionEnabled()==ECollisionEnabled::NoCollision);
+    const FBox Bounds=Habitat->Boulders->GetStaticMesh()->GetBoundingBox();bool RimSafe=true;
+    for(int32 I=0;I<Habitat->Boulders->GetInstanceCount();++I){
+        FTransform T;Habitat->Boulders->GetInstanceTransform(I,T,true);
+        for(int32 K=0;K<8;++K){const FVector P(K&1?Bounds.Min.X:Bounds.Max.X,K&2?Bounds.Min.Y:Bounds.Max.Y,K&4?Bounds.Min.Z:Bounds.Max.Z);
+            RimSafe&=FVector::Dist2D(T.TransformPosition(P),Habitat->GetActorLocation())<=Habitat->Radius+100.1;
+        }
+    }
+    TestTrue(TEXT("Actual boulder bounds remain within native wolf body clearance"),RimSafe);
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRefugeGroundSlots,"AdaptiveEcosystem.Policy.V3.Refuge.GroundProjectedSlots",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
@@ -4597,5 +4774,36 @@ bool FEcoPolicyV3IntegratedRouteDisplayTest::RunTest(const FString& Parameters)
 			 Text == TEXT("길 RUN 75% · 은신처 25% (반사 사슴-스텝 1200) · 길 결정 45 · 은신처 고름 0/0 (열린 결정) · 무효 0"));
 	TestEqual(TEXT("빈 창 글자"), FEcoV3RouteSum().Text(), FString(TEXT("길 반사 스텝 없음 · 길 결정 0 · 은신처 고름 0/0 (열린 결정) · 무효 0")));
 	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoHerdReturnFailure,"AdaptiveEcosystem.Life.ReturnFailureTerminatesWithoutClampingBody",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoHerdReturnFailure::RunTest(const FString&)
+{
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    auto* Enable=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration"));
+    auto* Dwell=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration.ShortageSeconds"));
+    const int32 Before=Enable->GetInt();const float BeforeDwell=Dwell->GetFloat();
+    ON_SCOPE_EXIT{Enable->Set(Before,ECVF_SetByCode);Dwell->Set(BeforeDwell,ECVF_SetByCode);};Enable->Set(1,ECVF_SetByCode);Dwell->Set(0.f,ECVF_SetByCode);
+    FIntegratedHarness H;auto Settings=TestSettings();Settings.bWildFlight=false;Settings.bObstacles=false;
+    if(!H.Setup(*this,Settings))return false;
+    auto* A=H.AddRegion(TEXT("Origin"),0,FVector::ZeroVector,2,0);auto* B=H.AddRegion(TEXT("Destination"),1,FVector(14000,0,0),0,0);
+    auto* Ecology=H.Scoped.World->GetSubsystem<UEcologySimulationSubsystem>();FRegionEcologyState S;S.RegionId=A->RegionId;S.FoodAmount=1;S.FoodCapacity=100;
+    if(!Ecology->RegisterRegionState(S))return false;S.RegionId=B->RegionId;S.FoodAmount=S.FoodCapacity=10000;if(!Ecology->RegisterRegionState(S))return false;
+    H.Spawn(false,A->RegionId,0,{FVector(5000,5000,0),FVector(5200,5100,0)},{91,92});H.Frame(0);
+    const int32 Herd=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>()->AllocateHerd(0,FVector(5000,5000,0));
+    for(const auto Entity:H.Deer){H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(Entity).HerdRuntimeIndex=Herd;H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Entity).Body.Energy=.3;}
+    for(auto& F:A->Sim.Food.Food)F=0;
+    auto* Route=H.Scoped.World->SpawnActor<AEcoHerdMigrationRoute>();Route->FromRegion=A->RegionId;Route->ToRegion=B->RegionId;Route->Points={FVector(5000,5000,0),FVector(18000,5000,0)};
+    auto* Migration=H.Scoped.World->GetSubsystem<UEcoHerdMigrationSubsystem>();FEcoServerTimeSnapshot Time;TArray<FEcoMigrationOutcome> Outcomes;
+    if(!Migration->Reconcile(*H.EM,Time,1,Outcomes))return false;
+    auto& Body=H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(H.Deer[1]).Body;Body.Pos.X=65;
+    Time.ServerTimeSeconds=51;if(!Migration->Reconcile(*H.EM,Time,2,Outcomes))return false;
+    Time.ServerTimeSeconds=102;if(!Migration->Reconcile(*H.EM,Time,3,Outcomes))return false;
+    const auto& J=H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(H.Deer[1]);
+    TestFalse(TEXT("The impossible journey terminates"),J.bActive);TestTrue(TEXT("Off-stage body retains the no-clamp guard"),J.bStranded);
+    TestEqual(TEXT("A terminal plan releases destination capacity"),int(Migration->GetPlans().CreateConstIterator().Value().State),int(EEcoHerdJourneyState::Abandoned));
+    H.DecisionStep();TestEqual(TEXT("Next native Step cannot teleport the stranded body"),Body.Pos.X,65.);
+    TestEqual(TEXT("An off-stage stranded body cannot eat clamped boundary food"),Body.LastIntake,0.);
+    return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

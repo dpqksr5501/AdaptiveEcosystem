@@ -14,9 +14,11 @@ if ($active) {
 $outputDir = Join-Path $projectRoot 'Saved\IntegrationBuilds'
 New-Item -ItemType Directory -Path $outputDir -Force | Out-Null
 $logPath = Join-Path $outputDir ("Milestone_{0}_{1}.log" -f $Milestone,(Get-Date -Format 'yyyyMMdd_HHmmss'))
-$ubaRoot = Join-Path $outputDir 'UBA'
+# UE 5.8 initializes UBA even with -NoUBA. GoogleDriveFS can hold memgroups
+# open inside the synced checkout; isolate each completed build's transient store.
+$ubaRoot = Join-Path ([IO.Path]::GetTempPath()) ('AdaptiveEcosystemUBT\' + [guid]::NewGuid().ToString('N'))
 $ubt = Join-Path $EngineRoot 'Engine\Binaries\DotNET\UnrealBuildTool\UnrealBuildTool.exe'
-# UE 5.8 still initializes UBA storage with -NoUBA. Keep storage within the project.
+# Keep logs in the project; this disposable executor store is never source/content.
 & $ubt AdaptiveEcosystemEditor Win64 Development "-Project=$projectRoot\AdaptiveEcosystem.uproject" `
     -WaitMutex -NoHotReload -NoUBA "-UBARootDir=$ubaRoot" 2>&1 | Tee-Object -FilePath $logPath
 $buildExitCode = $LASTEXITCODE
