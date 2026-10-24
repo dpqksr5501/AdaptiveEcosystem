@@ -12,6 +12,22 @@ AEcoRegionEnvironmentAdapter::AEcoRegionEnvironmentAdapter()
 	PrimaryActorTick.TickInterval = .2f;
 }
 
+bool AEcoRegionEnvironmentAdapter::EvaluateCycleRainfall(double SimulationSeconds, float& OutRainfall) const
+{
+	OutRainfall = 0;
+	if (!bCycleRainfall || bApplyAuthoredWeather || !FMath::IsFinite(SimulationSeconds) || SimulationSeconds < 0
+		|| !FMath::IsFinite(RainCycleSeconds) || RainCycleSeconds < 20 || RainCycleSeconds > 86400
+		|| !FMath::IsFinite(RainPhaseOffsetSeconds) || !FMath::IsFinite(DryRainfall) || DryRainfall < 0 || DryRainfall > 1
+		|| !FMath::IsFinite(WetRainfall) || WetRainfall < 0 || WetRainfall > 1
+		|| !FMath::IsFinite(RainTransitionFraction) || RainTransitionFraction < .01f || RainTransitionFraction > .25f) return false;
+	const double Phase = FMath::Fmod(FMath::Fmod(SimulationSeconds + RainPhaseOffsetSeconds, RainCycleSeconds) + RainCycleSeconds, RainCycleSeconds) / RainCycleSeconds;
+	const double Blend = RainTransitionFraction;
+	double Alpha = Phase < .5 - Blend ? 0 : (Phase < .5 ? (Phase - (.5 - Blend)) / Blend : (Phase < 1 - Blend ? 1 : (1 - Phase) / Blend));
+	Alpha = Alpha * Alpha * (3 - 2 * Alpha);
+	OutRainfall = FMath::Lerp(DryRainfall, WetRainfall, float(Alpha));
+	return true;
+}
+
 bool AEcoRegionEnvironmentAdapter::ResolveAuthorityRegions(TArray<AEcologyRegion*>& Targets) const
 {
 	Targets.Reset();
@@ -66,10 +82,17 @@ void AEcoRegionEnvironmentAdapter::Tick(float DeltaSeconds)
 	FEcoServerTimeSnapshot Time;
 	if (bAuthorityWorld)
 	{
-		if (bApplyAuthoredWeather) ApplyWeather(AuthoredWeather);
+		if (bApplyAuthoredWeather && !bCycleRainfall) ApplyWeather(AuthoredWeather);
 		const auto* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
 		if (!Clock || !Clock->IsClockRunning()) return;
 		Time = Clock->GetServerTime();
+		if (bCycleRainfall)
+		{
+			float Rain = 0;
+			const bool bValid = EvaluateCycleRainfall(Time.ServerTimeSeconds, Rain);
+			if (bValid) { ApplyRainfall(Rain, Rain > 0 ? EEcoWeatherState::Rain : EEcoWeatherState::Clear); bCycleRejected = false; }
+			else if (!bCycleRejected) { UE_LOG(LogTemp, Error, TEXT("[Eco Environment] Rejected climate cycle on %s"), *GetPathName()); bCycleRejected = true; }
+		}
 	}
 	const auto* GameState = GetWorld()->GetGameState<AEcoGameState>();
 	if (GameState)

@@ -26,8 +26,8 @@ class UEcoV3WeatherPresenterSubsystem;
 //      나오면 kFadeOutSeconds 동안 약해진 뒤 끄고 빗소리를 멈춘다. 눈 애셋은 세기 칸이 없어 나오는 순간 새 눈송이를 멈추고(Deactivate — 떠 있는 눈송이만 마저 내린다)
 //      들어가면 곧바로 켠다. 팀 블루프린트(BP_SHC_*RegionalWeather)와 달리 7~9 초 늦게 오지 않고, 나온 뒤 5.5 초 동안 눈이 그대로 오지 않고, 음량 0 으로 소리가
 //      계속 돌지 않는다(herbivore_rl/results/v3/wild2/weather_check/README.md 4절).
-//   4. eco.IntegratedV3.Weather 0·eco.IntegratedV3.WeatherVisuals 0·통합 v3 모드 꺼짐·그릴 수 없는 실행(-NullRHI)·전용 서버·클라이언트(세계가 없다)에서는
-//      아무것도 만들지 않는다.
+//   4. 기본 Native 뷰는 Weather/WeatherVisuals·통합 모드를 따른다. 새 식생 BP 맵은 Client도 기존 GameState Environment를 소비하며
+//      Native 논리를 만들지 않는다. 이 뷰에서도 WeatherVisuals 0은 연출만 끄고 권위 강수는 유지한다. Dedicated/NullRHI는 그리지 않는다.
 // 액터 AEcoV3WeatherFxActor (실행 중에만, 저장 안 함) 하나가 컴포넌트를 쥔다. 촬영 감독 -EcoV3FilmWatch=EcoV3WeatherFx 로 상태(켜짐·자리·음량·페이드)를 읽을 수 있다.
 // 현실 근거: 비·눈은 지역 전체에 오고(팀 설계 — 지역 상자마다 날씨), 보는 사람 둘레에서 보인다(카메라 곁 연출).
 
@@ -141,6 +141,7 @@ private:
 
 	FEcoV3WeatherFxTickFunction TickFn;
 	bool bTickRegistered = false;
+	bool bEcologyWeatherView = false; // opt-in map: received GameState environment, including clients
 	bool bTried = false;              // EnsureFx 를 한 번 해 봤다
 	bool bReady = false;              // 액터·컴포넌트가 있다
 	bool bRainRateParam = false;      // Rain_System 에 User.SpawnRate 칸이 있다 (없으면 켬·끔과 소리만 페이드)

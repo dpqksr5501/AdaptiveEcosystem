@@ -1,5 +1,7 @@
 # 사슴·늑대 독립 개발 및 후속 통합 마스터 계획
 
+프로젝트 전체 목표와 종 독립성은 [공통 맥락](../../PROJECT_CONTEXT.md)을 먼저 읽는다. [세부 기획 §21](../../Architecture/DYNAMIC_ECOSYSTEM_DETAILED_DESIGN_20261023.md#21-종에-독립적인-능력과-실행-계약)은 아래 기존 경로를 재사용/확장하는 후속 제안이며, Native v3 기본 경로의 자동 교체나 모든 신규 종의 지원 완료를 뜻하지 않는다.
+
 작성일: 2026-10-14 / UE 5.8 / Source 기준: `M4` HEAD `3062180f895c7dc7e738f8f9efdc720788f40ef1` + 미커밋 작업 폴더.
 
 상태: **기본 M1~M5 코드·설정 에셋 구현 / Editor 빌드·에셋 재로드 확인 / PIE·네트워크·성능 gate 대기**. 아래 상세 계획은 목표 설계이며, 실제 구현 범위와 차이는 [구현 마일스톤](IMPLEMENTATION_MILESTONES.md), [파일별 책임·현재 계약](SOURCE_RESPONSIBILITIES.md)을 사실 기준으로 읽는다. 사용 순서는 [Editor 빠른 시작](EDITOR_QUICK_START.md)이다.

@@ -1,5 +1,15 @@
 # 실제 보호 은신처와 지형·표현 연결
 
+## 2026-10-23 main 통합 이후의 현재 계약
+
+아래 10-16 구현·테스트는 이력이며 현재 통합 기본값은 `eco.IntegratedV3.ShelterSafe=1`, `eco.IntegratedV3.ProtectedRefuges=1`이다. ShelterSafe=1에서는 Python `realism_shelter`와 맞춘 Native 안전 규칙(영역 안 표적/포획 제외·늑대 진입 금지)이 보호를 맡고 ProtectedRefuges는 실제 등록/제거·도착 생명주기를 보완한다. ShelterSafe=0일 때만 기존 JYU swept/body-margin 안전을 사용한다. 두 보호 규칙과 몸 여유를 중복 적용하지 않는다. Native `FWorldConfig::bProtectedRefuges` 기본 false와 통합 CVar 기본값을 구분한다.
+
+PR #12 통합에서는 늦은 은신처 등록으로 바뀐 먹이 용량/잔량을 `AdjustSpatialFoodHabitat` 거래로 M4 장부에 반영하고, 제거 시 용량만 복구하며 먹이를 생성하지 않는다. [main 장부 통합 근거](JYU_PR12_MAIN_INTEGRATION_20261022.md)를 따른다. 후속 이주 작업은 바위 mesh bounds/pivot 기준으로 외형 테두리를 계산해 늑대 보호 여유 안에 배치했다. 별도 물리 이동 writer를 만들지 않는다.
+
+새 이주 맵에도 실제 수풀/바위 12곳을 배치했지만 기존 은신처 맵의 이주는 자동 활성화하지 않았다. 기존 안전 기준 세계의 Python 파리티와 새 이주 ON 세계 전체 궤적 미검증을 구분한다. [현재 실행·검증·한계](JYU_CHAT_HANDOFF_20261023.md)를 우선한다.
+
+## 2026-10-16 최초 구현 기록
+
 2026-10-16, `codex/social-shelter-handoff`, 원래 저장소. 직전 진단의 “은신처는 논리적 원일 뿐 실제로 안전하지 않음”을 수정했다. 기존 M4/v3 Social 인계 위에 추가한 **Unreal 세계 규칙**이다. PPO 재학습이나 새 모델 도입을 의미하지 않는다.
 
 ## 에디터에서 확인

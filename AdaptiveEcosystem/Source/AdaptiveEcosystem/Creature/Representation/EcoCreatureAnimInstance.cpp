@@ -10,6 +10,7 @@ void UEcoCreatureAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
 	AnimationIndex = 0; PoseAgeSeconds = 0; GroundIKAlpha = 0;
+    AlertHeadAlpha=0;
     SensoryAlertSeconds=0;PreviousSense=EEcoSenseSource::None;
 	GroundValid0=GroundValid1=GroundValid2=GroundValid3=0;
 	SetRootMotionMode(ERootMotionMode::IgnoreRootMotion);
@@ -20,7 +21,7 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	Super::NativeUpdateAnimation(DeltaSeconds);
 	const auto* Visual = Cast<AEcoCreatureRepresentationActor>(GetOwningActor());
 	bAlive = Visual && Visual->bBound && Visual->VisualState.bAlive;
-	SpeedCmPerSecond = bAlive ? Visual->VisualState.Velocity.Size2D() : 0.0f;
+	SpeedCmPerSecond = bAlive ? Visual->VisualState.Velocity.Size2D()/FMath::Max(.65f,Visual->VisualState.BodyScale) : 0.0f;
 	DirectionDegrees = bAlive ? Visual->DirectionDegrees : 0.0f;
 	TurnAmount = bAlive ? Visual->VisualTurnAmount : 0.0f;
 	bEating = bAlive && Visual->VisualState.bEating;
@@ -29,6 +30,8 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	VisualMotion = Visual && Visual->bBound ? Visual->VisualMotion : EEcoCreatureVisualMotion::Idle;
     int32 Desired = 0;
     const auto* Profile = Visual ? Visual->AnimationProfile.Get() : nullptr;
+    const bool MovingAlert=bAlive&&Activity==EEcoSpeciesActivity::AlertGraze&&SpeedCmPerSecond>(Profile?Profile->StationarySpeed:40);
+    AlertHeadAlpha=FMath::FInterpTo(AlertHeadAlpha,MovingAlert?1.f:0.f,DeltaSeconds,5.f);
     const EEcoSenseSource Sense=bAlive?Visual->VisualState.SenseSource:EEcoSenseSource::None;
     const bool FreshCue=Sense!=PreviousSense&&(Sense==EEcoSenseSource::Sight||Sense==EEcoSenseSource::Hearing);
     PreviousSense=Sense;
@@ -40,10 +43,12 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
         else if(Activity==EEcoSpeciesActivity::Attack||Activity==EEcoSpeciesActivity::Pounce) Desired=6;
         else if(SpeedCmPerSecond<=(Profile?Profile->StationarySpeed:40)) {
             if(Activity==EEcoSpeciesActivity::ShelterHold)Desired=3;
+            else if(Activity==EEcoSpeciesActivity::SatedRest)Desired=7;
             // A fresh cue briefly interrupts grazing; a persistent cue never pins the animal in alert forever.
             else if(SensoryAlertSeconds>0)Desired=2;
+            else if(Activity==EEcoSpeciesActivity::AlertGraze||Activity==EEcoSpeciesActivity::Vigilant||Activity==EEcoSpeciesActivity::Curious||Activity==EEcoSpeciesActivity::Investigate)Desired=2;
             else if(Activity==EEcoSpeciesActivity::Graze||Activity==EEcoSpeciesActivity::Eat)Desired=1;
-            else if(Activity==EEcoSpeciesActivity::Recover||Activity==EEcoSpeciesActivity::Exhaust||Activity==EEcoSpeciesActivity::Rest)Desired=7;
+            else if(Activity==EEcoSpeciesActivity::Recover||Activity==EEcoSpeciesActivity::Exhaust||Activity==EEcoSpeciesActivity::Rest||Activity==EEcoSpeciesActivity::SatedRest)Desired=7;
             else if(Activity==EEcoSpeciesActivity::Search || Visual->VisualState.SenseSource==EEcoSenseSource::Hearing || Visual->VisualState.SenseSource==EEcoSenseSource::Memory)Desired=2;
         }
     }

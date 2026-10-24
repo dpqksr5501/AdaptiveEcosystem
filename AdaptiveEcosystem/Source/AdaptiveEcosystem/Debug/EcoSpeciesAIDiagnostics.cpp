@@ -111,7 +111,7 @@ namespace
             UE_LOG(LogTemp,Display,TEXT("[SpeciesAI CSV] Saved=%d %s"),OK,*File);
         }
     }
-    FAutoConsoleCommandWithWorld Status(TEXT("eco.SpeciesAI.Status"),TEXT("Read authoritative species AI, path, slot and fixture counters."),
+    FAutoConsoleCommandWithWorld SpeciesAIStatusCommand(TEXT("eco.SpeciesAI.Status"),TEXT("Read authoritative species AI, path, slot and fixture counters."),
         FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W){Snapshot(W,false);}));
     FAutoConsoleCommandWithWorld Capture(TEXT("eco.SpeciesAI.Capture"),TEXT("Export an on-demand diagnostic snapshot to Saved/SpeciesAI. No automatic test or gameplay mutation."),
         FConsoleCommandWithWorldDelegate::CreateLambda([](UWorld* W){Snapshot(W,true);}));

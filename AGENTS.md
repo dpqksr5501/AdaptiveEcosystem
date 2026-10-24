@@ -2,6 +2,10 @@
 
 이 문서는 `AdaptiveEcosystem` 저장소에서 작업하는 모든 AI coding agent의 최상위 지침이다.
 
+## 0. 모든 팀원과 AI agent의 공통 맥락
+
+새 채팅/독립 작업을 시작할 때 [프로젝트 공통 맥락](AdaptiveEcosystem/Docs/PROJECT_CONTEXT.md)을 먼저 읽고 실제 branch/Source와 담당 계약을 확인한다. 이 문서는 목표·현재 구현·후속 제안을 구분하는 공통 진입점이다. 환경·식생·몬스터 간 상호작용·플레이어 활동이 함께 작동하는 MMORPG용 동적 생태계를 목표로 하며, 플레이어 영향만의 시스템이나 관찰 전용으로 축소하지 않는다. 사슴·늑대는 현재 예시이고 종의 식성/공격성/사회성/이동 능력/실행 backend를 분리해 확장한다. 현재 Native 늑대 구현이 임의 몬스터를 이미 지원한다는 뜻은 아니다. 세부 제안은 [고도화 기획](AdaptiveEcosystem/Docs/Architecture/DYNAMIC_ECOSYSTEM_DETAILED_DESIGN_20261023.md)을 참고하며, 현재 요청 범위를 넘어 기능을 일괄 활성화하지 않는다.
+
 ---
 
 ## 1. 프로젝트 기준 정보
@@ -110,3 +114,35 @@ UBT는 프로젝트 외부 엔진 캐시에도 쓰므로 필요한 쓰기 권한
 사용자 요청에 따라 개인 주간 발표 PPT, 발표 대본, 멘토 검토용 PDF와 제작·렌더·임시 산출물은 **저장소 밖의 바탕화면 `AdaptiveEcosystem_발표자료/`** 아래에 날짜·용도별로 저장한다. 작업 폴더도 그 외부 경로 안에 만든다. 저장소의 `Deliverables/`, `output/`, `tmp/`에는 새 발표 산출물을 생성하거나 추적하지 않는다. 해당 경로는 Git 제외 규칙으로 보호한다.
 
 프로젝트 소스·Unreal 에셋·설계/계약 문서·동작 검증 근거는 기존 저장소 구조를 유지한다. 팀원이 관리하는 기존 `Docs/Roadmap/M3/Presentation` 등 공유 설계 자료는 개인 발표 분리 대상으로 간주하지 않는다. 사용자 개인 발표 파일을 push하거나 공개 이력을 다시 쓰지 않는다.
+
+## 10. 2026-10-22 PR #12 main 후속 통합
+
+`main a74fcac`를 작업 브랜치에 병합했다. 현재 통합 v3의 `eco.IntegratedV3.SocialControl` 기본값은 **0**이며 기존 Social 처리·경보 표현과 Native 행동 개입을 구분한다. 기존 훅의 opt-in 연결은 보존한다. main의 은신처 먹이 규칙으로 늦은 은신처 등록 시 용량·남은 먹이가 변하므로 `AdjustSpatialFoodHabitat` 거래로 권위 장부에 반영하고, 제거 시 용량만 복구하며 먹이를 생성하지 않는다. 기존 자원 보존 검사를 우회하거나 두 번째 이동 writer를 추가하지 않는다. 최신 검증·한계·로컬 병합 상태는 [PR #12 main 통합 기록](AdaptiveEcosystem/Docs/조연우/JYU_PR12_MAIN_INTEGRATION_20261022.md)을 따른다.
+
+## 11. 2026-10-23 신호 계약·무리 이주 통합
+
+PR #14는 2026-10-23 사용자 요청으로 기능·디버그를 push하고 Ready for review로 전환했다. 확인 당시 OPEN·미병합이다. v3 기본 SocialControl=0 신호 경로를 유지하고 `ReadSignal`의 증거/수신 시각·TTL·Herd 일치 계약을 제공한다. opt-in `UEcoHerdMigrationSubsystem`은 완료된 M4 자원 경계에서 Persistent Herd 공동 계획·기존 Travel·실제 Native context 인계·기존 Migration receipt/인구 집계를 연결한다. Native Step이 유일한 이동·대사 writer다. Client는 기존 Bubble 표현만 받는다.
+
+기존 맵의 이주 옵션은 OFF이며 `/Game/JYU/Maps/LV_JYU_HerdMigration`만 ON이다. 팀 JWJ 대형 레벨의 owned 복사 맵이고 Barren↔Forest 지면 경로를 authoring했다. 원본 팀 레벨은 변경하지 않는다. 기본 가중치·V1 계약·Python ON 세계 파리티/재학습을 변경 완료로 간주하지 않는다. 정확한 실행·검증·한계는 [무리 이주와 신호 계약](AdaptiveEcosystem/Docs/조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다. 개발 가뭄 fixture는 명시적으로 실행한 세션에만 적용하며 자연 발생 생태 균형 검증으로 설명하지 않는다.
+
+## 12. 2026-10-23 이주 경로·목적지 디버그
+
+새 이주 맵은 읽기 전용 HUD 지도·실제 Native 개체 위치·선택 계획의 경로/현재 목적지를 표시한다. `M` 토글, `[`/`]` 계획 선택이며 기존 맵/Client의 논리 권위를 확장하지 않는다. snapshot은 Mass processing 외 GameThread에서 만들고 HUD는 4Hz로 읽는다. `Blocked`는 무진행 진단이며 지형 충돌 확정으로 설명하지 않는다. [표시 계약·재현·검증](AdaptiveEcosystem/Docs/조연우/HERD_MIGRATION_DEBUG_20261023.md)을 따른다. 개인 PPT·캡처와 제작 작업은 9절의 저장소 밖 발표자료 폴더에 두며 Git에 넣지 않는다.
+
+## 13. 2026-10-23 최신 재개 기준과 문서 이력
+
+현재 작업 시작점은 [최신 조연우 인수인계](AdaptiveEcosystem/Docs/조연우/JYU_CHAT_HANDOFF_20261023.md)다. 기능 기준 `581ce1d`, 디버그 기준 `e22dbbd`, 통합 main `a74fcac`이며 이후 문서 커밋은 별도 확인한다. 앞 절과 설계 문서의 날짜별 미연결·Pending·Draft·push 전 설명은 당시 이력이다. 현재 기본 `SocialControl=0`, 기존 맵 이주 OFF·새 owned 이주 맵 ON을 유지한다. Native의 단일 이동·대사 writer와 기존 자원/인구/복제 계약을 보존한다.
+
+현재 통합 `ShelterSafe=1`은 Python realism_shelter에 맞춘 Native 안전 규칙, `ProtectedRefuges=1`은 실제 은신처 생명주기다. ShelterSafe=0일 때만 JYU 보호 규칙이 안전을 맡으며 중첩하지 않는다. 8절의 Native 보호 기본 OFF는 하위 `FWorldConfig` 기본값을 의미한다. 기존 안전 기준 세계의 파리티와 새 이주 ON 세계 전체 궤적 파리티/재학습 미완료를 구분한다. V1 7관측/4출력과 opt-in v3 18관측/5행동·mask2를 서로 대체하지 않는다.
+
+사용자의 후속 이동 요청에 따라 최종 개인 PPT `겜캡디_조연우_1023.pptx`는 바탕화면 바로 아래에 있다. 캡처·대본·렌더/제작 작업은 9절의 외부 날짜별 폴더를 유지한다. 개인 파일을 Git에 넣지 않는다. 이번 문서 감사는 Source·링크·diff를 확인하고 새 UBT/PIE를 실행하지 않는다.
+
+## 14. 2026-10-24 soil/life 통합과 팀 AI 작업 진입점
+
+레벨 디자인은 [역할별 안내](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_LEVEL_DESIGN_AGENT_GUIDE_20261024.md), 날씨·낮밤은 [역할별 안내](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_WEATHER_AGENT_GUIDE_20261024.md)를 따른다. owned 맵/World Partition·실제 지면/수원·단일 날씨 writer와 기존 환경 adapter를 먼저 확인하며, 장식 표현과 생태 입력·Native 감각 날씨/Dark를 자동으로 동일시하지 않는다.
+
+후속 soil/life 구현은 `d095948`에 기록했다. 최신 재개는 [팀 AI 공통 안내](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [현재 구현 상태](AdaptiveEcosystem/Docs/Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life 실행 계약](AdaptiveEcosystem/Docs/Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)를 먼저 읽는다. 앞 절의 날짜별 Pending/로컬 미커밋 설명은 당시 이력이다. 새 owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 soil/life를 opt-in하고 원본 팀 맵·기존 맵 옵션·V1/v3 모델/계약·SocialControl=0·Native 단일 writer와 기존 M4 장부를 보존한다.
+
+서버·네트워킹은 [역할별 안내](AdaptiveEcosystem/Docs/Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), 학습은 [역할별 안내](AdaptiveEcosystem/Docs/RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md)를 따른다. 복사 가능한 [작업 시작 프롬프트](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AGENT_START_PROMPTS_20261024.md)와 [실제 부분 예제](AdaptiveEcosystem/Docs/RL_Policy/Examples/README.md)를 제공한다. 예제는 training_ready=false이며 진단 정답/부분 cell을 기존 정책 관측이나 전체 복원 상태로 사용하지 않는다. 현재 Client proxy와 권위 논리를 구분하고 새 학습/임의 종/분산 서버 완료로 확대하지 않는다.
+
+225개 자동화·PIE/멀티·저장·패키지 수치는2026-10-23 실행의 근거다. 10-24 안내/공유 갱신은 새 UBT/PIE 실행을 뜻하지 않는다. 새 담당자가 코드를 변경하면 기존3절 빌드 규칙과 해당 역할의 실제 acceptance를 적용한다. 다른 PC의 같은 Git SHA라도 checkpoint의 runtime image hash가 달라질 수 있으므로 재빌드 간 자동 복원을 가정하지 않는다.

@@ -50,6 +50,7 @@ struct FEcoSocialMovementRequestFragment;
 struct FEcoShelterMovementFeedbackFragment;
 struct FEcoAlarmStateFragment;
 struct FEcoV3SocialBridgeFragment;
+struct FEcoHerdTravelFragment;
 
 /** 통합 v3 사슴 하나 (처리기 한 번 실행 안에서만 유효한 조각 주소). */
 struct FEcoV3DeerRec
@@ -66,6 +67,7 @@ struct FEcoV3DeerRec
     const FEcoAlarmStateFragment* Alarm = nullptr;
     FEcoShelterMovementFeedbackFragment* Feedback = nullptr;
     FEcoV3SocialBridgeFragment* SocialAudit = nullptr;
+    FEcoHerdTravelFragment* Journey = nullptr;
 	EcoWorldV3::FHerbView View;
 };
 
@@ -79,6 +81,8 @@ struct FEcoV3WolfRec
 	EcoWorldV3::FThreatAgent* Agent = nullptr;
 	FEcoIntegratedV3Fragment* Int = nullptr;
 	FEcoPredatorStateFragment* PredState = nullptr;
+    FEcoVitalsFragment* Vitals=nullptr;
+    FEcoDeathFragment* Death=nullptr;
 };
 
 UCLASS()

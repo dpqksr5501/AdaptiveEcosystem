@@ -1,0 +1,1202 @@
+{
+  "schema": 2,
+  "map": "/Game/JYU/Maps/LV_JYU_Ecosystem",
+  "profile": "soil-v1 + ecosystem-life-v1 opt-in; SocialControl=0",
+  "policy": "V1 7/4, v3 18/5 mask2 and optional21 unchanged; existing weights; rules overlay, no retraining",
+  "automation": {
+    "succeeded": 224,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "soil_parity": {
+    "schema": 1,
+    "model": "soil-v1 leaf only",
+    "cases": 2400,
+    "seed": 20261023,
+    "max_absolute_error": 0.0,
+    "native_header_sha256": "3c0f6d7257b1ff9848689cdb2e7423cd6561f727ee54e58c917f1c61b0abe6bd",
+    "full_world_parity": false,
+    "retraining_performed": false,
+    "passed": true
+  },
+  "asset_reload": {
+    "b_blueprints": {
+      "BP_JYU_VegetationField": "<Object '/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C' (0x0000029F7704D900) Class 'BlueprintGeneratedClass'>",
+      "BP_JYU_EcosystemWeather": "<Object '/Game/JYU/Ecosystem/BP_JYU_EcosystemWeather.BP_JYU_EcosystemWeather_C' (0x0000029F7704E700) Class 'BlueprintGeneratedClass'>",
+      "BP_JYU_GrassHabitat": "<Object '/Game/JYU/Ecosystem/BP_JYU_GrassHabitat.BP_JYU_GrassHabitat_C' (0x0000029F77DB1500) Class 'BlueprintGeneratedClass'>",
+      "BP_JYU_MoistSoilHabitat": "<Object '/Game/JYU/Ecosystem/BP_JYU_MoistSoilHabitat.BP_JYU_MoistSoilHabitat_C' (0x0000029F77DB3F00) Class 'BlueprintGeneratedClass'>",
+      "BP_JYU_ShrubHabitat": "<Object '/Game/JYU/Ecosystem/BP_JYU_ShrubHabitat.BP_JYU_ShrubHabitat_C' (0x0000029F77DB6900) Class 'BlueprintGeneratedClass'>",
+      "BP_JYU_RiparianHabitat": "<Object '/Game/JYU/Ecosystem/BP_JYU_RiparianHabitat.BP_JYU_RiparianHabitat_C' (0x0000029F77DB9300) Class 'BlueprintGeneratedClass'>",
+      "BP_JYU_AuthoredSpring": "<Object '/Game/JYU/Ecosystem/BP_JYU_AuthoredSpring.BP_JYU_AuthoredSpring_C' (0x0000029F64495B00) Class 'BlueprintGeneratedClass'>"
+    },
+    "weather": [
+      {
+        "label": "JYU_Ecosystem_Weather_Forest",
+        "region_ids": [
+          "Forest"
+        ],
+        "cycle": true,
+        "period": 180.0,
+        "offset": 0.0
+      },
+      {
+        "label": "JYU_Ecosystem_Weather_Highland",
+        "region_ids": [
+          "Highland"
+        ],
+        "cycle": true,
+        "period": 180.0,
+        "offset": 60.0
+      },
+      {
+        "label": "JYU_Ecosystem_Weather_Barren",
+        "region_ids": [
+          "Barren"
+        ],
+        "cycle": true,
+        "period": 180.0,
+        "offset": 30.0
+      }
+    ],
+    "habitats": [
+      {
+        "label": "JYU_Ecosystem_Forest_Grass",
+        "region": "Forest",
+        "plant": 0,
+        "drainage": 0.6000000238418579,
+        "shade": 0.10000000149011612,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61AC0920) {x: 1800.000000, y: 1800.000000, z: 5000.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Forest_AuthoredSpring",
+        "region": "Forest",
+        "plant": 1,
+        "drainage": 0.20000000298023224,
+        "shade": 0.25,
+        "connected_water": true,
+        "extent": "<Struct 'Vector' (0x0000029F61AC0920) {x: 600.000000, y: 600.000000, z: 300.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Highland_Grass",
+        "region": "Highland",
+        "plant": 0,
+        "drainage": 0.6000000238418579,
+        "shade": 0.10000000149011612,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61AC0830) {x: 1800.000000, y: 1800.000000, z: 5000.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Barren_Grass",
+        "region": "Barren",
+        "plant": 0,
+        "drainage": 0.6000000238418579,
+        "shade": 0.10000000149011612,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61A6A950) {x: 1800.000000, y: 1800.000000, z: 5000.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Highland_Shrub",
+        "region": "Highland",
+        "plant": 2,
+        "drainage": 0.6000000238418579,
+        "shade": 0.6000000238418579,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61A97580) {x: 1800.000000, y: 1800.000000, z: 5000.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Forest_MoistSoil",
+        "region": "Forest",
+        "plant": 0,
+        "drainage": 0.20000000298023224,
+        "shade": 0.3499999940395355,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61A97530) {x: 1800.000000, y: 2600.000000, z: 5000.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Barren_MoistSoil",
+        "region": "Barren",
+        "plant": 0,
+        "drainage": 0.20000000298023224,
+        "shade": 0.3499999940395355,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61A94740) {x: 1800.000000, y: 2600.000000, z: 5000.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Barren_Shrub",
+        "region": "Barren",
+        "plant": 2,
+        "drainage": 0.6000000238418579,
+        "shade": 0.6000000238418579,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61A94510) {x: 1800.000000, y: 1800.000000, z: 5000.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Forest_Shrub",
+        "region": "Forest",
+        "plant": 2,
+        "drainage": 0.6000000238418579,
+        "shade": 0.6000000238418579,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61A94100) {x: 1800.000000, y: 1800.000000, z: 5000.000000}>"
+      },
+      {
+        "label": "JYU_Ecosystem_Highland_MoistSoil",
+        "region": "Highland",
+        "plant": 0,
+        "drainage": 0.20000000298023224,
+        "shade": 0.3499999940395355,
+        "connected_water": false,
+        "extent": "<Struct 'Vector' (0x0000029F61A974E0) {x: 1800.000000, y: 2600.000000, z: 5000.000000}>"
+      }
+    ],
+    "mesh": "<Object '/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA' (0x0000029F237A6000) Class 'StaticMesh'>",
+    "material": "<Object '/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass' (0x0000029F74ECF800) Class 'MaterialInstanceConstant'>",
+    "legacy_visual_weather": [],
+    "routes": [
+      {
+        "label": "JYU_HerdRoute_Barren_Forest",
+        "points": 29,
+        "valid": true
+      }
+    ],
+    "map_opt_in": true,
+    "life_opt_in": true,
+    "field_class": "<Object '/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C' (0x0000029F7704D900) Class 'BlueprintGeneratedClass'>",
+    "spring": {
+      "region": "Forest",
+      "water_z": -1084.094482421875
+    },
+    "rig_review": {
+      "Herbivore": {
+        "mesh": "/Game/AnimalVarietyPack/DeerStagAndDoe/Meshes/SK_DeerStag.SK_DeerStag",
+        "skeleton": "/Game/AnimalVarietyPack/DeerStagAndDoe/Meshes/SK_DeerStag_Skeleton.SK_DeerStag_Skeleton",
+        "morph_targets": [],
+        "foot_bones": [
+          "STAG_-L-Foot",
+          "STAG_-L-Finger0",
+          "STAG_-R-Foot",
+          "STAG_-R-Finger0"
+        ],
+        "ik_end_bones": [
+          "STAG_-L-HorseLink",
+          "STAG_-L-Hand",
+          "STAG_-R-HorseLink",
+          "STAG_-R-Hand"
+        ],
+        "ground_ik": true,
+        "shipped_shape_path": "bounded uniform body scale; stride/speed compensation and existing foot IK",
+        "bone_proportion_authoring": false
+      },
+      "Wolf": {
+        "mesh": "/Game/AnimalVarietyPack/Wolf/Meshes/SK_Wolf.SK_Wolf",
+        "skeleton": "/Game/AnimalVarietyPack/Wolf/Meshes/SK_Wolf_Skeleton.SK_Wolf_Skeleton",
+        "morph_targets": [],
+        "foot_bones": [
+          "Wolf_-L-Foot",
+          "Wolf_-L-Finger0",
+          "Wolf_-R-Foot",
+          "Wolf_-R-Finger0"
+        ],
+        "ik_end_bones": [
+          "Wolf_-L-HorseLink",
+          "Wolf_-L-Hand",
+          "Wolf_-R-HorseLink",
+          "Wolf_-R-Hand"
+        ],
+        "ground_ik": true,
+        "shipped_shape_path": "bounded uniform body scale; stride/speed compensation and existing foot IK",
+        "bone_proportion_authoring": false
+      }
+    },
+    "passed": true
+  },
+  "runtime_dependencies": {
+    "label": "/Game/JYU/Ecosystem/PAL_JYU_EcosystemRuntime",
+    "owner": "JYU.Ecosystem.RuntimeDependencies.20261023",
+    "dependencies": [
+      "/Game/SHC/ART/FX/Rain_System",
+      "/Game/SHC/ART/FX/NiagaraSnowfall/Effects/NS_Blizzard",
+      "/Game/SHC/Audio/Environment/A_Rain_Cue",
+      "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA",
+      "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassB",
+      "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC",
+      "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD",
+      "/Engine/BasicShapes/Cube",
+      "/Engine/BasicShapes/Plane",
+      "/Game/JYU/Materials/M_JYU_Surface_Water",
+      "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass"
+    ],
+    "cook_rule": "<PrimaryAssetCookRule.ALWAYS_COOK: 5>",
+    "passed": true
+  },
+  "experiments": [
+    {
+      "name": "FinalExtended11",
+      "seed": 11,
+      "ecosystem_life_enabled": true,
+      "fixed_step_benchmark": true,
+      "finished": true,
+      "requested_simulation_seconds": 1800.0,
+      "last_observed_simulation_seconds": 1800.0,
+      "observation_wall_seconds": 83.31200000000536,
+      "fixture": "none; authored climate and actual authority outcomes",
+      "alive_last_sample": 66,
+      "peak_alive_sampled": 156,
+      "living_species": {
+        "Herbivore": 64,
+        "Wolf": 2
+      },
+      "observed_natural_children": 57,
+      "generations": [
+        {
+          "generation": 0,
+          "observed_individuals": 156,
+          "mean_speed_gene": 1.0035736514206177,
+          "mean_size_gene": 1.0029318855301366,
+          "observed_offspring_contributions": 106
+        },
+        {
+          "generation": 1,
+          "observed_individuals": 49,
+          "mean_speed_gene": 0.9990518744567464,
+          "mean_size_gene": 0.995309212538083,
+          "observed_offspring_contributions": 6
+        },
+        {
+          "generation": 2,
+          "observed_individuals": 6,
+          "mean_speed_gene": 1.0068186152619132,
+          "mean_size_gene": 0.9914984759174073,
+          "observed_offspring_contributions": 2
+        },
+        {
+          "generation": 3,
+          "observed_individuals": 2,
+          "mean_speed_gene": 1.0326905614299409,
+          "mean_size_gene": 0.9892333870028172,
+          "observed_offspring_contributions": 0
+        }
+      ],
+      "region_transfers_observed": 0,
+      "roles_with_movement_samples": {
+        "0": 7702,
+        "2": 58,
+        "1": 88
+      },
+      "simultaneous_lead_intercept_samples": 24,
+      "hunting_role_transitions": 181,
+      "lead_intercept_switches": 12,
+      "migration_plans_last_observed": {},
+      "food_audit_max_error": 0.0,
+      "meat_audit_max_error": 9.992007221626409e-16,
+      "performance_last_sample": {
+        "samples": 1024,
+        "native_batch_p95_ms": 0.5951002240180969,
+        "native_batch_max_ms": 1.2760981917381287,
+        "native_step_equivalent_p95_ms": 0.5951002240180969,
+        "native_steps_total": 13515,
+        "native_cpu_total_ms": 11959.303576499224,
+        "process_used_physical_bytes": 2198429696,
+        "process_peak_physical_bytes": 2199060480,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      },
+      "final_regions": [
+        {
+          "region": "Forest",
+          "food": 34.08503970666377,
+          "moisture": 0.7606436688048451
+        },
+        {
+          "region": "Barren",
+          "food": 41.39429631247573,
+          "moisture": 0.5374653227647826
+        },
+        {
+          "region": "Highland",
+          "food": 62.500073731897906,
+          "moisture": 0.6647715243781099
+        }
+      ]
+    },
+    {
+      "name": "FinalExtended23",
+      "seed": 23,
+      "ecosystem_life_enabled": true,
+      "fixed_step_benchmark": true,
+      "finished": true,
+      "requested_simulation_seconds": 1800.0,
+      "last_observed_simulation_seconds": 1800.0,
+      "observation_wall_seconds": 92.29699999999139,
+      "fixture": "none; authored climate and actual authority outcomes",
+      "alive_last_sample": 117,
+      "peak_alive_sampled": 156,
+      "living_species": {
+        "Wolf": 5,
+        "Herbivore": 112
+      },
+      "observed_natural_children": 97,
+      "generations": [
+        {
+          "generation": 0,
+          "observed_individuals": 156,
+          "mean_speed_gene": 1.0031597271017534,
+          "mean_size_gene": 1.0013719278241515,
+          "observed_offspring_contributions": 185
+        },
+        {
+          "generation": 1,
+          "observed_individuals": 90,
+          "mean_speed_gene": 1.004379860227683,
+          "mean_size_gene": 0.9935017429369236,
+          "observed_offspring_contributions": 7
+        },
+        {
+          "generation": 2,
+          "observed_individuals": 7,
+          "mean_speed_gene": 1.007023563545936,
+          "mean_size_gene": 0.99765008521433,
+          "observed_offspring_contributions": 0
+        }
+      ],
+      "region_transfers_observed": 0,
+      "roles_with_movement_samples": {
+        "0": 9987,
+        "1": 111,
+        "2": 40
+      },
+      "simultaneous_lead_intercept_samples": 23,
+      "hunting_role_transitions": 183,
+      "lead_intercept_switches": 4,
+      "migration_plans_last_observed": {},
+      "food_audit_max_error": 0.0,
+      "meat_audit_max_error": 2.1094237467877974e-15,
+      "performance_last_sample": {
+        "samples": 1024,
+        "native_batch_p95_ms": 1.1678971350193024,
+        "native_batch_max_ms": 1.7367973923683167,
+        "native_step_equivalent_p95_ms": 1.1678971350193024,
+        "native_steps_total": 13515,
+        "native_cpu_total_ms": 12812.589671462774,
+        "process_used_physical_bytes": 2280857600,
+        "process_peak_physical_bytes": 2282770432,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      },
+      "final_regions": [
+        {
+          "region": "Forest",
+          "food": 102.77164417145342,
+          "moisture": 0.7197795811408858
+        },
+        {
+          "region": "Barren",
+          "food": 73.27768102432587,
+          "moisture": 0.5189087297185226
+        },
+        {
+          "region": "Highland",
+          "food": 82.76296286303325,
+          "moisture": 0.6540783416222532
+        }
+      ]
+    },
+    {
+      "name": "FinalExtended47",
+      "seed": 47,
+      "ecosystem_life_enabled": true,
+      "fixed_step_benchmark": true,
+      "finished": true,
+      "requested_simulation_seconds": 1800.0,
+      "last_observed_simulation_seconds": 1800.0,
+      "observation_wall_seconds": 80.59399999999732,
+      "fixture": "none; authored climate and actual authority outcomes",
+      "alive_last_sample": 67,
+      "peak_alive_sampled": 156,
+      "living_species": {
+        "Herbivore": 65,
+        "Wolf": 2
+      },
+      "observed_natural_children": 64,
+      "generations": [
+        {
+          "generation": 0,
+          "observed_individuals": 156,
+          "mean_speed_gene": 1.0026144178568246,
+          "mean_size_gene": 1.001148997590057,
+          "observed_offspring_contributions": 119
+        },
+        {
+          "generation": 1,
+          "observed_individuals": 57,
+          "mean_speed_gene": 1.0011008312289051,
+          "mean_size_gene": 0.9998399986811464,
+          "observed_offspring_contributions": 7
+        },
+        {
+          "generation": 2,
+          "observed_individuals": 5,
+          "mean_speed_gene": 1.0008556307741618,
+          "mean_size_gene": 1.0039886790948478,
+          "observed_offspring_contributions": 2
+        },
+        {
+          "generation": 3,
+          "observed_individuals": 2,
+          "mean_speed_gene": 1.0024826121687647,
+          "mean_size_gene": 0.9945070130325165,
+          "observed_offspring_contributions": 0
+        }
+      ],
+      "region_transfers_observed": 0,
+      "roles_with_movement_samples": {
+        "0": 7787,
+        "2": 47,
+        "1": 84,
+        "3": 2
+      },
+      "simultaneous_lead_intercept_samples": 24,
+      "hunting_role_transitions": 173,
+      "lead_intercept_switches": 6,
+      "migration_plans_last_observed": {},
+      "food_audit_max_error": 0.0,
+      "meat_audit_max_error": 8.881784197001252e-16,
+      "performance_last_sample": {
+        "samples": 1024,
+        "native_batch_p95_ms": 0.6399005651473999,
+        "native_batch_max_ms": 2.0353980362415314,
+        "native_step_equivalent_p95_ms": 0.6399005651473999,
+        "native_steps_total": 13515,
+        "native_cpu_total_ms": 11406.407237052917,
+        "process_used_physical_bytes": 2181124096,
+        "process_peak_physical_bytes": 2182430720,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      },
+      "final_regions": [
+        {
+          "region": "Forest",
+          "food": 35.47175632337078,
+          "moisture": 0.7498923897327789
+        },
+        {
+          "region": "Barren",
+          "food": 49.621586767412445,
+          "moisture": 0.5396122206043025
+        },
+        {
+          "region": "Highland",
+          "food": 30.32386368112688,
+          "moisture": 0.6867744296340037
+        }
+      ]
+    },
+    {
+      "name": "FinalOn23_600",
+      "seed": 23,
+      "ecosystem_life_enabled": true,
+      "fixed_step_benchmark": true,
+      "finished": true,
+      "requested_simulation_seconds": 600.0,
+      "last_observed_simulation_seconds": 600.0,
+      "observation_wall_seconds": 35.375,
+      "fixture": "none; authored climate and actual authority outcomes",
+      "alive_last_sample": 140,
+      "peak_alive_sampled": 156,
+      "living_species": {
+        "Wolf": 9,
+        "Herbivore": 131
+      },
+      "observed_natural_children": 32,
+      "generations": [
+        {
+          "generation": 0,
+          "observed_individuals": 156,
+          "mean_speed_gene": 1.0031597271017534,
+          "mean_size_gene": 1.0013719278241515,
+          "observed_offspring_contributions": 64
+        },
+        {
+          "generation": 1,
+          "observed_individuals": 32,
+          "mean_speed_gene": 1.0103824727167543,
+          "mean_size_gene": 0.9973481653141733,
+          "observed_offspring_contributions": 0
+        }
+      ],
+      "region_transfers_observed": 0,
+      "roles_with_movement_samples": {
+        "0": 9519,
+        "1": 172,
+        "2": 85
+      },
+      "simultaneous_lead_intercept_samples": 44,
+      "hunting_role_transitions": 164,
+      "lead_intercept_switches": 14,
+      "migration_plans_last_observed": {},
+      "food_audit_max_error": 0.0,
+      "meat_audit_max_error": 3.3306690738754696e-16,
+      "performance_last_sample": {
+        "samples": 1024,
+        "native_batch_p95_ms": 1.5221014618873596,
+        "native_batch_max_ms": 2.3005977272987366,
+        "native_step_equivalent_p95_ms": 1.5221014618873596,
+        "native_steps_total": 4515,
+        "native_cpu_total_ms": 5473.078168928623,
+        "process_used_physical_bytes": 2294628352,
+        "process_peak_physical_bytes": 2295934976,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      },
+      "final_regions": [
+        {
+          "region": "Forest",
+          "food": 115.60430211505769,
+          "moisture": 0.4680305462028087
+        },
+        {
+          "region": "Barren",
+          "food": 80.99309472215899,
+          "moisture": 0.39447123834064146
+        },
+        {
+          "region": "Highland",
+          "food": 25.265742991518458,
+          "moisture": 0.817629812648336
+        }
+      ]
+    },
+    {
+      "name": "FinalOff23",
+      "seed": 23,
+      "ecosystem_life_enabled": false,
+      "fixed_step_benchmark": true,
+      "finished": true,
+      "requested_simulation_seconds": 600.0,
+      "last_observed_simulation_seconds": 600.0,
+      "observation_wall_seconds": 31.421999999991385,
+      "fixture": "none; authored climate and actual authority outcomes",
+      "alive_last_sample": 96,
+      "peak_alive_sampled": 156,
+      "living_species": {
+        "Wolf": 12,
+        "Herbivore": 84
+      },
+      "observed_natural_children": 0,
+      "generations": [
+        {
+          "generation": 0,
+          "observed_individuals": 156,
+          "mean_speed_gene": null,
+          "mean_size_gene": null,
+          "observed_offspring_contributions": 0
+        }
+      ],
+      "region_transfers_observed": 0,
+      "roles_with_movement_samples": {
+        "0": 9845
+      },
+      "simultaneous_lead_intercept_samples": 0,
+      "hunting_role_transitions": 0,
+      "lead_intercept_switches": 0,
+      "migration_plans_last_observed": {},
+      "food_audit_max_error": 0.0,
+      "meat_audit_max_error": 0,
+      "performance_last_sample": {
+        "samples": 1024,
+        "native_batch_p95_ms": 1.265302300453186,
+        "native_batch_max_ms": 1.9950009882450104,
+        "native_step_equivalent_p95_ms": 1.265302300453186,
+        "native_steps_total": 4515,
+        "native_cpu_total_ms": 5129.018194973469,
+        "process_used_physical_bytes": 2196344832,
+        "process_peak_physical_bytes": 2197131264,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      },
+      "final_regions": [
+        {
+          "region": "Forest",
+          "food": 97.69405041519073,
+          "moisture": 0.4722144170280796
+        },
+        {
+          "region": "Barren",
+          "food": 78.5344507903335,
+          "moisture": 0.3929655994603267
+        },
+        {
+          "region": "Highland",
+          "food": 59.1043726595061,
+          "moisture": 0.8074588092535603
+        }
+      ]
+    }
+  ],
+  "migration_drought_fixture": {
+    "name": "FinalDrought23",
+    "seed": 23,
+    "ecosystem_life_enabled": true,
+    "fixed_step_benchmark": true,
+    "finished": true,
+    "requested_simulation_seconds": 600.0,
+    "last_observed_simulation_seconds": 600.0,
+    "observation_wall_seconds": 29.735000000000582,
+    "fixture": "EXPLICIT development drought: Barren food loss with M4 habitat receipt, regeneration suspended; not natural ecology",
+    "alive_last_sample": 94,
+    "peak_alive_sampled": 144,
+    "living_species": {
+      "Herbivore": 94
+    },
+    "observed_natural_children": 4,
+    "generations": [
+      {
+        "generation": 0,
+        "observed_individuals": 144,
+        "mean_speed_gene": 1.0027052267641658,
+        "mean_size_gene": 1.001932035976829,
+        "observed_offspring_contributions": 8
+      },
+      {
+        "generation": 1,
+        "observed_individuals": 4,
+        "mean_speed_gene": 0.9926346918407318,
+        "mean_size_gene": 0.9887883969411188,
+        "observed_offspring_contributions": 0
+      }
+    ],
+    "region_transfers_observed": 19,
+    "roles_with_movement_samples": {
+      "0": 5948
+    },
+    "simultaneous_lead_intercept_samples": 0,
+    "hunting_role_transitions": 0,
+    "lead_intercept_switches": 0,
+    "migration_plans_last_observed": {
+      "1": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 2,
+        "migration_members": 2
+      },
+      "2": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 2,
+        "migration_members": 2
+      },
+      "3": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 2,
+        "migration_members": 2
+      },
+      "4": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 2,
+        "migration_members": 2
+      },
+      "5": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 2,
+        "migration_members": 2
+      },
+      "6": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 2,
+        "migration_members": 2
+      },
+      "7": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 3,
+        "migration_members": 3
+      },
+      "8": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 2,
+        "migration_members": 2
+      },
+      "9": {
+        "migration_state": "Settled",
+        "migration_destination": "Forest",
+        "migration_arrived": 2,
+        "migration_members": 2
+      }
+    },
+    "food_audit_max_error": 0.0,
+    "meat_audit_max_error": 0,
+    "performance_last_sample": {
+      "samples": 1024,
+      "native_batch_p95_ms": 0.7748976349830627,
+      "native_batch_max_ms": 1.7740018665790558,
+      "native_step_equivalent_p95_ms": 0.7748976349830627,
+      "native_steps_total": 4515,
+      "native_cpu_total_ms": 4292.8211987018585,
+      "process_used_physical_bytes": 2190520320,
+      "process_peak_physical_bytes": 2190807040,
+      "client": false,
+      "contexts": 3,
+      "net_received_total_bytes": 0,
+      "net_sent_total_bytes": 0,
+      "net_received_bytes_per_second": 0,
+      "net_sent_bytes_per_second": 0
+    },
+    "final_regions": [
+      {
+        "region": "Forest",
+        "food": 103.72735223157316,
+        "moisture": 0.4669939478567229
+      },
+      {
+        "region": "Barren",
+        "food": 0,
+        "moisture": 0.4555656703173693
+      },
+      {
+        "region": "Highland",
+        "food": 37.70729439912376,
+        "moisture": 0.8069431025347397
+      }
+    ]
+  },
+  "pre_reserve_fix_experiments": "LongSeed*/Extended* are historical, including free adult reserve at birth; excluded from final biological conclusions",
+  "checkpoints": {
+    "FinalSave": {
+      "result": "FINISHED",
+      "operation": {
+        "saved": true,
+        "bytes": 829116,
+        "sha256": "a227adcf2ba1bf3a7a5b0a4973432af81043e56d051beca6c2a0e220f024cc8f",
+        "agents": 156,
+        "live_rollback_rejected": true
+      },
+      "food_audit_max_error": 0.0
+    },
+    "FinalLoad": {
+      "result": "FINISHED",
+      "operation": {
+        "restored_exactly": true,
+        "rejected_load_unchanged": true,
+        "agents": 156
+      },
+      "food_audit_max_error": 0.0
+    },
+    "RecoveryLoad": {
+      "result": "FINISHED",
+      "operation": {
+        "restored_exactly": true,
+        "rejected_load_unchanged": true,
+        "agents": 150
+      },
+      "food_audit_max_error": 0.0
+    },
+    "EncounterLoad": {
+      "result": "FINISHED",
+      "operation": {
+        "restored_exactly": true,
+        "rejected_load_unchanged": true,
+        "agents": 144
+      },
+      "food_audit_max_error": 0.0
+    }
+  },
+  "encounters": {
+    "harmless": {
+      "subject": 17,
+      "samples": 29,
+      "strike_requests": 0,
+      "minimum_hp": 100,
+      "maximum_actual_player_speed": 0.0,
+      "peak_memory": {
+        "familiarity": 0.6309972672358729,
+        "curiosity": 0.992930652709695,
+        "fear": 0,
+        "hostility": 0,
+        "unknown_fear": 0
+      },
+      "encounter_kinds": [
+        0
+      ],
+      "responses": [
+        0,
+        1
+      ],
+      "checkpoint": {
+        "slot": "Encounter_harmless",
+        "agents": 144
+      }
+    },
+    "ambush": {
+      "subject": 17,
+      "samples": 29,
+      "strike_requests": 6,
+      "minimum_hp": 40,
+      "maximum_actual_player_speed": 0.0,
+      "peak_memory": {
+        "familiarity": 0.11810876193647508,
+        "curiosity": 0.21681361019578066,
+        "fear": 0,
+        "hostility": 0,
+        "unknown_fear": 0.567654221317992
+      },
+      "encounter_kinds": [
+        0,
+        5
+      ],
+      "responses": [
+        0,
+        2
+      ],
+      "checkpoint": {
+        "slot": "Encounter_ambush",
+        "agents": 144
+      }
+    },
+    "chase": {
+      "subject": 17,
+      "samples": 29,
+      "strike_requests": 0,
+      "minimum_hp": 100,
+      "maximum_actual_player_speed": 900.0000000017889,
+      "peak_memory": {
+        "familiarity": 0.1762077810085769,
+        "curiosity": 0.2320618062719508,
+        "fear": 0.5157859301119638,
+        "hostility": 0.15657796327453394,
+        "unknown_fear": 0
+      },
+      "encounter_kinds": [
+        0,
+        1,
+        2,
+        6
+      ],
+      "responses": [
+        0,
+        2,
+        3
+      ],
+      "checkpoint": {
+        "slot": "Encounter_chase",
+        "agents": 144
+      }
+    }
+  },
+  "recovery": {
+    "result": "FINISHED",
+    "initial_wolf_ids": [
+      "1",
+      "2"
+    ],
+    "strike_requests": 9,
+    "checkpoint": {
+      "slot": "RecoveryRestart",
+      "agents": 150
+    }
+  },
+  "pie": {
+    "result": "FINISHED",
+    "seconds": 125.0,
+    "screenshots": 3,
+    "food_audit_max_error": 0.0,
+    "child_visual_samples": 31,
+    "child_ids": [
+      "157"
+    ],
+    "child_scale_range": [
+      0.75,
+      0.828125
+    ],
+    "animation_classes": [
+      "ABP_JYU_Deer_C"
+    ],
+    "max_ik_alpha": 1.0
+  },
+  "network": [
+    {
+      "folder": "EcosystemLifeConcurrent_20261023",
+      "relevance": {
+        "grace_seconds": 3,
+        "clients": [
+          {
+            "name": "ClientA",
+            "passed": true,
+            "checked_near_region_samples": 118,
+            "evaluated_regions": [
+              "Barren",
+              "Forest",
+              "Highland"
+            ],
+            "received_regions": [
+              "Barren",
+              "Forest",
+              "Highland"
+            ],
+            "missing_after_grace": [],
+            "missing_camera_samples": []
+          },
+          {
+            "name": "ClientB",
+            "passed": true,
+            "checked_near_region_samples": 29,
+            "evaluated_regions": [
+              "Barren",
+              "Forest",
+              "Highland"
+            ],
+            "received_regions": [
+              "Barren",
+              "Forest",
+              "Highland"
+            ],
+            "missing_after_grace": [],
+            "missing_camera_samples": []
+          }
+        ],
+        "passed": true,
+        "concurrent_clients": {
+          "samples": 15,
+          "observed_span_seconds": 28.187000000005355,
+          "passed": true
+        },
+        "late_join_life": {
+          "authority_child_ids": [
+            "157",
+            "158",
+            "159"
+          ],
+          "received_child_ids": [
+            "157"
+          ],
+          "scale_tolerance": 0.015625,
+          "scale_mismatches": [],
+          "passed": true
+        }
+      },
+      "clients": {
+        "ClientA": {
+          "authority_agents": 0,
+          "migration_subsystems": 0,
+          "native": {
+            "samples": 0,
+            "native_steps_total": 0,
+            "native_cpu_total_ms": 0,
+            "process_used_physical_bytes": 2714644480,
+            "process_peak_physical_bytes": 2778419200,
+            "client": true,
+            "contexts": 0,
+            "net_received_total_bytes": 989771,
+            "net_sent_total_bytes": 581396,
+            "net_received_bytes_per_second": 0,
+            "net_sent_bytes_per_second": 0
+          },
+          "scale_matches": true,
+          "received_creatures": 133,
+          "rendered_frame_time": {
+            "samples": 3600,
+            "p95_ms": 2.7994997799396515,
+            "max_ms": 7.392600178718567
+          }
+        },
+        "ClientB": {
+          "authority_agents": 0,
+          "migration_subsystems": 0,
+          "native": {
+            "samples": 0,
+            "native_steps_total": 0,
+            "native_cpu_total_ms": 0,
+            "process_used_physical_bytes": 2692927488,
+            "process_peak_physical_bytes": 2757074944,
+            "client": true,
+            "contexts": 0,
+            "net_received_total_bytes": 291516,
+            "net_sent_total_bytes": 183881,
+            "net_received_bytes_per_second": 0,
+            "net_sent_bytes_per_second": 0
+          },
+          "scale_matches": true,
+          "received_creatures": 82,
+          "rendered_frame_time": {
+            "samples": 3600,
+            "p95_ms": 4.684600979089737,
+            "max_ms": 10.063599795103073
+          }
+        }
+      },
+      "food_audit_max_error": 0.0,
+      "authority_last_performance": {
+        "samples": 830,
+        "native_batch_p95_ms": 2.2437982261180878,
+        "native_batch_max_ms": 31.299497932195663,
+        "native_step_equivalent_p95_ms": 2.2437982261180878,
+        "native_steps_total": 830,
+        "native_cpu_total_ms": 1403.208628296852,
+        "process_used_physical_bytes": 2108063744,
+        "process_peak_physical_bytes": 2113257472,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 814344,
+        "net_sent_total_bytes": 1341598,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      },
+      "observed_net_rate_bytes_per_second": {
+        "net_received_bytes_per_second": {
+          "samples": 54,
+          "p95": 13171.836533709862,
+          "max": 19009.5
+        },
+        "net_sent_bytes_per_second": {
+          "samples": 54,
+          "p95": 22910.0,
+          "max": 39071.5
+        }
+      },
+      "net_rate_method": "Cumulative NetDriver total byte differences / actual observer wall seconds; monotonic intervals only. Direct Driver *BytesPerSecond counters remained zero in this capture and are not a traffic measurement.",
+      "csv": {
+        "Server": {
+          "FrameTime": {
+            "samples": 3107,
+            "p95": 34.0157,
+            "max": 78.4212
+          },
+          "PhysicalUsedMB": {
+            "samples": 3107,
+            "p95": 2005.0625,
+            "max": 2011.8594
+          },
+          "InstrumentedGameThreadNonWaitScopesMs": {
+            "samples": 3108,
+            "p95": 4.100200000000001,
+            "max": 1304.4438999999998
+          }
+        },
+        "ClientA": {
+          "GameThreadTime": {
+            "samples": 25847,
+            "p95": 2.7624,
+            "max": 341.836
+          },
+          "RenderThreadTime": {
+            "samples": 25847,
+            "p95": 4.2214,
+            "max": 56.0514
+          },
+          "FrameTime": {
+            "samples": 25847,
+            "p95": 4.2365,
+            "max": 350.0578
+          },
+          "PhysicalUsedMB": {
+            "samples": 25847,
+            "p95": 2593.0742,
+            "max": 2644.3594
+          },
+          "InstrumentedGameThreadNonWaitScopesMs": {
+            "samples": 25847,
+            "p95": 4.0581000000000005,
+            "max": 54.864200000000004
+          }
+        },
+        "ClientB": {
+          "GameThreadTime": {
+            "samples": 5222,
+            "p95": 2.7694,
+            "max": 8.8708
+          },
+          "RenderThreadTime": {
+            "samples": 5222,
+            "p95": 4.4489,
+            "max": 7.5252
+          },
+          "FrameTime": {
+            "samples": 5222,
+            "p95": 4.4805,
+            "max": 8.8201
+          },
+          "PhysicalUsedMB": {
+            "samples": 5222,
+            "p95": 2574.043,
+            "max": 2628.4414
+          },
+          "InstrumentedGameThreadNonWaitScopesMs": {
+            "samples": 5222,
+            "p95": 4.2928,
+            "max": 20.914099999999998
+          }
+        }
+      }
+    }
+  ],
+  "earlier_network_reference": "EcosystemLifeNetwork_20261023 contains earlier successive late-join coverage; final metrics use the current concurrent run only",
+  "latest_editor_build": "Milestone_Final_20261023_234012.log",
+  "verification_scopes": {
+    "long_runs_pie_concurrent_network": "Milestone_Final_20261023_230551.log",
+    "automation_checkpoints_drought_and_package": "Milestone_Final_20261023_234012.log",
+    "changes_after_long_scene_validation": "Editor-only FacingArrow template creation, its regression test, and asset-label cook configuration; Native life/movement/replication code unchanged"
+  },
+  "game_build": {
+    "log": "GameBuild.log",
+    "passed": true
+  },
+  "package": {
+    "log": "Package.log",
+    "passed": true
+  },
+  "packaged_smoke": {
+    "log": "PackagedSmoke.log",
+    "passed": true,
+    "rendered_image": "EcosystemLife_Packaged_20261023.png",
+    "fixture": "Development executable, D3D11 1280x720, NoSound, observer pawn cycle, 90 seconds; no Python observer/inference"
+  },
+  "cooked_runtime_dependencies": {
+    "/Game/SHC/ART/FX/Rain_System": true,
+    "/Game/SHC/ART/FX/NiagaraSnowfall/Effects/NS_Blizzard": true,
+    "/Game/SHC/Audio/Environment/A_Rain_Cue": true,
+    "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA": true,
+    "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassB": true,
+    "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC": true,
+    "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD": true,
+    "/Engine/BasicShapes/Cube": true,
+    "/Engine/BasicShapes/Plane": true,
+    "/Game/JYU/Materials/M_JYU_Surface_Water": true,
+    "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass": true,
+    "/Game/JYU/Ecosystem/BP_JYU_AuthoredSpring": true
+  },
+  "limits": [
+    "No full-life Python trajectory parity or new weights",
+    "Uniform scale only; no authored morph/bone proportions",
+    "Observed cohorts are not proof of beneficial selection or equilibrium",
+    "Measured at this scene population, not 500/1000 creatures",
+    "Same-build startup restore only; no cross-build migration or live rollback",
+    "Prototype plant shapes and movement marks; no bone-accurate footprint art",
+    "No complete MMO service, player persistence, quest or loot economy implementation"
+  ]
+}

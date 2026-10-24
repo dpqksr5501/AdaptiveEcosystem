@@ -9,6 +9,7 @@
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoHerdMigration.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityTemplateRegistry.h"
 #include "MassEntityUtils.h"
@@ -74,6 +75,7 @@ void UEcoCreatureV3Trait::BuildV3Composition(FMassEntityTemplateBuildContext& Co
         Context.AddFragment<FEcoSensoryStateFragment>();
         Context.AddFragment<FEcoSensoryProfileFragment>();
         Context.AddFragment<FEcoV3SocialBridgeFragment>();
+        Context.AddFragment<FEcoHerdTravelFragment>();
         FEcoSocialSpeciesSharedFragment Social;
         Social.bDetectThreats = false; // Native direct evidence replaces generic V1 sensing, not the Social runtime.
         Context.AddSharedFragment(Manager.GetOrCreateSharedFragment(Social));

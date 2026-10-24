@@ -39,6 +39,9 @@
 #include "UnrealClient.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "World/EcologyRegion.h"
+#include "World/EcoVegetationField.h"
+#include "HAL/PlatformMemory.h"
+#include "Engine/NetDriver.h"
 
 DEFINE_LOG_CATEGORY(LogEcoPolicyV3I);
 
@@ -2494,8 +2497,9 @@ void UEcoPolicyV3IntegratedSubsystem::RefreshRefuges(FEcoV3RegionContext& Contex
         Context.CoverRegistrations.Add(Point.RegistrationId);Context.CoverGroundZ.Add(Point.Position.Z);Changed=true;
     }
     if(Changed) {
-        // Preserve food amounts and capacity. Only the removed refuge's regeneration modifier changes.
+        // Reconcile clipping and capacity changes with the authoritative ledger before the next native step.
         auto& F=W.Food;
+        const double BeforeFood=F.Total();
         for(int Y=0;Y<F.Gw;++Y)for(int X=0;X<F.Gw;++X) {
             const int K=Y*F.Gw+X;
             const bool In=EcoRefugeV3::Contains(W.Config.Covers,{(X+.5)*F.Cell,(Y+.5)*F.Cell});
@@ -2505,6 +2509,17 @@ void UEcoPolicyV3IntegratedSubsystem::RefreshRefuges(FEcoV3RegionContext& Contex
         // 10-17 야생 2단계 1 (eco.IntegratedV3.ShelterFood): 은신처 먹이 부족을 바뀐 원 목록으로 다시 건다 — 지워진 은신처의 셀은 처음 용량으로 돌아가고
         // (먹이는 그대로, 재생으로 다시 찬다) 늦게 더한 은신처의 셀은 용량·재생이 15% 로 준다 (FFoodGrid::ApplyShelterFood)
         if(W.Config.ShelterFood.bEnabled)F.ApplyShelterFood(W.Config);
+        if(Context.bSpatialFoodRegistered) {
+            double Capacity=0;
+            for(const double CellCapacity:F.Cap)Capacity+=CellCapacity;
+            const double AfterFood=F.Total();
+            auto* Ecology=GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
+            if(!Ecology||!Ecology->AdjustSpatialFoodHabitat(Context.RegionId,++Context.ResourceReceiptSequence,
+                BeforeFood,BeforeFood-AfterFood,Capacity,AfterFood)) {
+                UE_LOG(LogEcoPolicyV3I,Error,TEXT("[EcoV3I] Refuge habitat resource adjustment rejected: %s"),*Context.RegionId.ToString());
+                RejectResourceContract();
+            }
+        }
     }
 }
 
@@ -2981,6 +2996,8 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			ScanStageObstacles(*World, Origin, Plan.SizeUnits, Covers, Exclude, true, Scan, G.RegionId);
 		}
 		EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers, G.RegionId);
+		Config.Vegetation.bEnabled = AEcoVegetationField::IsRequested() || (Spawner.IsValid() && Spawner->bEnableVegetation);
+        Config.bEcosystemLife = Spawner.IsValid() && Spawner->bEnableEcosystemLife;
 		// 세로 장애물 (eco.IntegratedV3.Obstacles): 레벨에서 읽은 원판 + 무대 나무 줄기 원판 ((x, y, r) 순, 측정 때는 가져온 원판). 원판이 없으면 세계는 지금 그대로다
 		TArray<uint8> IsTree;
 		if (Config.Obstacles.bEnabled)
@@ -3148,6 +3165,15 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			Ctx->bSpatialFoodRegistered = Ecology->RegisterSpatialFood(G.RegionId, Ctx->StartFood, Ctx->StartFood);
 		if (!Ctx->bSpatialFoodRegistered)
 		{ UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] Spatial food registration rejected: %s"), *G.RegionId.ToString()); bActive = false; return; }
+		if (Config.Vegetation.bEnabled)
+		{
+			const auto FieldClass = Spawner.IsValid() && Spawner->VegetationFieldClass
+				? Spawner->VegetationFieldClass : TSubclassOf<AEcoVegetationField>(AEcoVegetationField::StaticClass());
+			auto* Field = World->SpawnActor<AEcoVegetationField>(FieldClass, Origin, FRotator::ZeroRotator);
+			if (!Field) { RejectResourceContract(); return; }
+			Field->RegionId = G.RegionId; Field->ContextIndex = Ctx->Index;
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoVegetation] Enabled %s: soil-v1, existing PPO unchanged, Python parity pending"), *G.RegionId.ToString());
+		}
 		UE_LOG(LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] 지역 무대 %s (지역 번호 %d): 원점 (%.0f, %.0f, %.0f), 한 변 %.0f m | 사슴 %d 늑대 %d | 은신처 %d (레벨 %d + v3 %d, v3 반경 %.0f m, ")
 				   TEXT("학습 범위 밖이라 뺀 레벨 은신처 %d) | t=%lld"),
@@ -3940,15 +3966,38 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 	++Ctx.LogEpoch;
 }
 
-bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ) const
+FString UEcoPolicyV3IntegratedSubsystem::CaptureStepPerformance() const
 {
-	OutZ = FromCm.Z;
+    auto J=MakeShared<FJsonObject>();auto Sorted=StepBatchMilliseconds,Equivalent=StepEquivalentMilliseconds;Sorted.Sort();Equivalent.Sort();
+    const auto Memory=FPlatformMemory::GetStats();J->SetNumberField(TEXT("samples"),Sorted.Num());
+    if(!Sorted.IsEmpty()){
+        const int32 K=FMath::Clamp(FMath::CeilToInt(Sorted.Num()*.95)-1,0,Sorted.Num()-1);
+        J->SetNumberField(TEXT("native_batch_p95_ms"),Sorted[K]);J->SetNumberField(TEXT("native_batch_max_ms"),Sorted.Last());
+        J->SetNumberField(TEXT("native_step_equivalent_p95_ms"),Equivalent[K]);
+    }
+    J->SetNumberField(TEXT("native_steps_total"),double(StepCpuSteps));J->SetNumberField(TEXT("native_cpu_total_ms"),StepCpuSeconds*1000);
+    J->SetNumberField(TEXT("process_used_physical_bytes"),double(Memory.UsedPhysical));J->SetNumberField(TEXT("process_peak_physical_bytes"),double(Memory.PeakUsedPhysical));
+    J->SetBoolField(TEXT("client"),GetWorld()->GetNetMode()==NM_Client);J->SetNumberField(TEXT("contexts"),NumContexts());
+    if(auto* Driver=GetWorld()->GetNetDriver()){
+        Driver->LockNetDriverStats(false);
+        J->SetNumberField(TEXT("net_received_total_bytes"),Driver->InTotalBytes);J->SetNumberField(TEXT("net_sent_total_bytes"),Driver->OutTotalBytes);
+        J->SetNumberField(TEXT("net_received_bytes_per_second"),Driver->InBytesPerSecond);J->SetNumberField(TEXT("net_sent_bytes_per_second"),Driver->OutBytesPerSecond);
+        Driver->UnlockNetDriverStats(false);
+    }
+    FString Out;FJsonSerializer::Serialize(J,TJsonWriterFactory<>::Create(&Out));return Out;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling, float BodyRadiusCm) const
+{
+	OutZ = FMath::IsFinite(FromCm.Z) ? FromCm.Z : 0;
 	UWorld* World = GetWorld();
-	if (!World)
+	if (!World || FromCm.ContainsNaN() || ToCm.ContainsNaN()||!FMath::IsFinite(BodyRadiusCm)||BodyRadiusCm<20||BodyRadiusCm>40)
 	{
 		return false;
 	}
 	const double Dist = FVector::Dist2D(FromCm, ToCm);
+	// Bound public route/step sweeps before float-to-int conversion or World queries.
+	if (!FMath::IsFinite(Dist) || Dist > 1024 * EcoPolicyV3IntegratedImpl::kSubStepCm) return false;
 	if (Dist < 1.0)
 	{
 		return true;   // 길이 0 쓸기는 처음 겹침을 막힘으로 볼 수 있다 — 움직이지 않은 것으로 본다
@@ -3959,7 +4008,7 @@ bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& F
 	{
 		const double A = static_cast<double>(k) / static_cast<double>(Pieces);
 		FVector Next(FMath::Lerp(FromCm.X, ToCm.X, A), FMath::Lerp(FromCm.Y, ToCm.Y, A), Cur.Z);
-		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, false, Cur, Next))
+		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, bTraveling, Cur, Next, BodyRadiusCm))
 		{
 			return false;
 		}

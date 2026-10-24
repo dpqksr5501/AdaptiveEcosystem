@@ -18,14 +18,16 @@
 
 static TAutoConsoleVariable<int32> CVarEcoDrawFacing(TEXT("eco.Creature.DrawFacing"), 0,
 	TEXT("Draw actual velocity (green) and calibrated mesh forward (cyan). Visual-only."));
+static TAutoConsoleVariable<int32> CVarEcoIdentityLabels(TEXT("eco.Creature.Labels"),1,TEXT("Show representation identity labels. Visual-only; disable for scene captures."));
 static TAutoConsoleVariable<int32> CVarEcoFacingAudit(TEXT("eco.Creature.FacingAudit"), 0,
 	TEXT("Log moving representation facing error once per second, including client proxies."));
 
 bool FEcoCreatureVisualState::IsValid() const
 {
 	return StableAgentId > 0 && !SpeciesId.IsNone() && Sequence > 0 && FMath::IsFinite(WorldTime) && WorldTime >= 0.0
+        &&FMath::IsFinite(BodyScale)&&BodyScale>=.65f&&BodyScale<=1.15f
 		&& !Position.ContainsNaN() && !Velocity.ContainsNaN() && FMath::IsFinite(FocusYawDegrees)
-        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::Exhaust)
+        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::Investigate)
 		&& FMath::IsFinite(NormalizedHealth) && NormalizedHealth >= 0.0f && NormalizedHealth <= 1.0f
 		&& FMath::IsFinite(NormalizedEnergy) && NormalizedEnergy >= 0.0f && NormalizedEnergy <= 1.0f;
 }
@@ -125,6 +127,7 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 	if (!bBound || !State.IsValid() || State.StableAgentId != VisualState.StableAgentId || State.SpeciesId != VisualState.SpeciesId
 		|| State.Sequence <= VisualState.Sequence || State.WorldTime < VisualState.WorldTime
 		|| !FMath::IsFinite(DeltaSeconds) || DeltaSeconds < 0.0f) { return false; }
+    IdentityLabel->SetVisibility(CVarEcoIdentityLabels.GetValueOnGameThread()!=0);
 	const bool bSnap = VisualState.Sequence == 0 || State.bDiscontinuity
 		|| FVector::DistSquared(GetActorLocation(), State.Position) > FMath::Square(FMath::Max(1.0f, TeleportDistance));
 	const float Speed = State.bAlive ? State.Velocity.Size2D() : 0.0f;
@@ -159,6 +162,7 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 	VisualTurnAmount = bContinuousTurn ? FMath::FInterpTo(VisualTurnAmount, TurnTarget, DeltaSeconds, 8.0f) : 0.0f;
 	// Moves this passive visual Actor only. Never modifies a Mass fragment or evaluates behavior.
 	SetActorLocationAndRotation(State.Position, Facing, false, nullptr, ETeleportType::TeleportPhysics);
+    SetActorScale3D(FVector(State.BodyScale));
 	VisualState = State;
 	PlaceholderBody->SetVisibility(CreatureMesh->GetSkeletalMeshAsset() == nullptr);
 	VisualMotion = !State.bAlive ? EEcoCreatureVisualMotion::Dead

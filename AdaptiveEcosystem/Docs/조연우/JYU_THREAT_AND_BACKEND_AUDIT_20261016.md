@@ -1,5 +1,7 @@
 # 늑대 접근 반응 · 팀원 기능 사용 감사 (2026-10-16)
 
+> **이력 문서 안내 — 2026-10-23:** 아래 HEAD·PR 제목·Draft/push 전 상태·미연결 항목·테스트 결과는 해당 작업 시점의 기록이다. 현재 작업 위치·실제 기본값·후속 기능·검증은 [2026-10-23 최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 우선한다. 기능/디버그는 원격 push했으며 PR #14는 확인 당시 OPEN·Ready for review·미병합이다.
+
 > **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
 
 현재 실행 위치는 원래 저장소의 `AdaptiveEcosystem/AdaptiveEcosystem.uproject`, 브랜치는 `codex/social-shelter-handoff`, 맵은 `/Game/JYU/Maps/LV_JYU_V3Integration`이다.

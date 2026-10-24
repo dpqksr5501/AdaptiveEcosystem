@@ -78,3 +78,10 @@ struct FEcoResourceSnapshot
 	double Consumed = 0.0;
 	double RoundingAdjustment = 0.0;
 };
+
+/** Read-only spatial ledger diagnostics, in existing Native food units. */
+struct FEcoSpatialFoodAudit
+{
+	double Capacity = 0, Amount = 0, Consumed = 0, Regenerated = 0, HabitatRemoved = 0, EnvironmentLost = 0;
+	int64 Sequence = -1;
+};

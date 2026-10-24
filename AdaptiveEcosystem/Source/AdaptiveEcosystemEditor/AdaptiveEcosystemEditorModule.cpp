@@ -8,6 +8,7 @@
 #include "AnimGraphNode_BlendListByInt.h"
 #include "AnimGraphNode_BlendSpacePlayer.h"
 #include "AnimGraphNode_SequencePlayer.h"
+#include "AnimGraphNode_LayeredBoneBlend.h"
 #include "K2Node_VariableGet.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -75,6 +76,23 @@ bool FAdaptiveEcosystemEditorModule::BuildPoseGraph(UAnimBlueprint* BP,UEcoCreat
         if(auto* Time=Blend->FindPin(FName(*FString::Printf(TEXT("BlendTime_%d"),I))))
             Schema->TrySetDefaultValue(*Time,LexToString(P->Poses[I].BlendSeconds));
     }
+    UEdGraphPin* FinalPose=Blend->FindPin(TEXT("Pose"));
+    if(!P->AlertHeadBone.IsNone()){
+        auto* Head=NewNode.operator()<UAnimGraphNode_SequencePlayer>(300,-400);
+        Head->SetAnimationAsset(P->Poses[2].Clip);Head->Node.SetLoopAnimation(true);Head->ReconstructNode();
+        auto* Layer=NewNode.operator()<UAnimGraphNode_LayeredBoneBlend>(500,-200);
+        while(Layer->Node.BlendPoses.Num()<1)Layer->AddPinToBlendByFilter();
+        Layer->Node.LayerSetup.SetNum(1);Layer->Node.LayerSetup[0].BranchFilters.Reset();
+        FBranchFilter Filter;Filter.BoneName=P->AlertHeadBone;Filter.BlendDepth=1;
+        Layer->Node.LayerSetup[0].BranchFilters.Add(Filter);
+        for(auto& Pin:Layer->ShowPinForProperties)if(Pin.PropertyName==TEXT("BlendWeights"))Pin.bShowPin=true;
+        Layer->ReconstructNode();
+        if(!Connect(FinalPose,Layer->FindPin(TEXT("BasePose")))||!Connect(Head->FindPin(TEXT("Pose")),Layer->FindPin(TEXT("BlendPoses_0")))
+            ||!Connect(Getter.operator()<float>(TEXT("AlertHeadAlpha"),100,-250),Layer->FindPin(TEXT("BlendWeights_0"))))return false;
+        FinalPose=Layer->FindPin(TEXT("Pose"));
+    }
+    Root->FindPin(TEXT("Result"))->BreakAllPinLinks();
+    if(!Connect(FinalPose,Root->FindPin(TEXT("Result"))))return false;
     if(P->bEnableGroundIK) {
         auto* IK=NewNode.operator()<UAnimGraphNode_EcoGroundFeet>(650,0);
         IK->Node.Body.BoneName=P->BodyBone;
@@ -82,7 +100,7 @@ bool FAdaptiveEcosystemEditorModule::BuildPoseGraph(UAnimBlueprint* BP,UEcoCreat
         for(int32 Index=0;Index<4;++Index){FEcoGroundLeg& Leg=IK->Node.Legs.AddDefaulted_GetRef();Leg.Contact.BoneName=P->FootBones[Index];Leg.End.BoneName=P->IKEndBones[Index];Leg.ContactHeight=P->ContactHeights[Index];}
         for(auto& Pin:IK->ShowPinForProperties)if(Pin.PropertyName==TEXT("Alpha"))Pin.bShowPin=true;
         IK->ReconstructNode();Root->FindPin(TEXT("Result"))->BreakAllPinLinks();
-        if(!Connect(Blend->FindPin(TEXT("Pose")),IK->FindPin(TEXT("ComponentPose")))||!Connect(IK->FindPin(TEXT("Pose")),Root->FindPin(TEXT("Result"))))return false;
+        if(!Connect(FinalPose,IK->FindPin(TEXT("ComponentPose")))||!Connect(IK->FindPin(TEXT("Pose")),Root->FindPin(TEXT("Result"))))return false;
         for(int32 Index=0;Index<4;++Index) {
             const FName Point(*FString::Printf(TEXT("GroundPoint%d"),Index)),Valid(*FString::Printf(TEXT("GroundValid%d"),Index));
             if(!Connect(Getter.operator()<FVector>(Point,400,300+Index*120),IK->FindPin(Point))||!Connect(Getter.operator()<float>(Valid,400,350+Index*120),IK->FindPin(Valid)))return false;

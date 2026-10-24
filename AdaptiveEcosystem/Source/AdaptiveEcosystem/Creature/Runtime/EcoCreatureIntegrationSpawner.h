@@ -12,10 +12,15 @@
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "EcoCreatureIntegrationSpawner.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FEcoRuntimeSample, float, DeltaSeconds);
+
 class UMassEntityConfigAsset;
 class AEcologyRegion;
 class UWorldPartitionStreamingSourceComponent;
 class UEcoFootstepAudioSet;
+class AEcoVegetationField;
+class APawn;
+struct FEcoDeathOutcome;
 
 USTRUCT(BlueprintType)
 struct FEcoCreatureSpawnGroup
@@ -41,12 +46,19 @@ class ADAPTIVEECOSYSTEM_API AEcoCreatureIntegrationSpawner : public AActor,
 	GENERATED_BODY()
 public:
 	AEcoCreatureIntegrationSpawner();
+    /** Passive diagnostics at completed runtime boundaries, including headless servers. */
+    UPROPERTY(BlueprintAssignable, Category="Creature|Inspection") FEcoRuntimeSample OnRuntimeSample;
 	UPROPERTY(EditAnywhere, Category="Creature|Config") EEcoEnabledSpecies EnabledSpecies = EEcoEnabledSpecies::Both;
 	UPROPERTY(EditAnywhere, Category="Creature|Config") bool bEnableSpeciesAIFixtures = false;
 	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bUseV3Policy = false;
 	UPROPERTY(EditAnywhere, Category="Creature|V3", meta=(ClampMin="1",ClampMax="128")) int32 V3DeerPerRegion = 48;
 	/** Copy-level opt-in: consume only authored shelter anchors. */
 	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bV3UseAuthoredShelters = false;
+	/** Owned-map opt-in; does not change other maps or policy schemas. */
+	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") bool bEnableVegetation = false;
+    /** Owned scene opt-in: deterministic diversity, observed encounters and conditional offspring. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Creature|Life") bool bEnableEcosystemLife = false;
+	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") TSubclassOf<AEcoVegetationField> VegetationFieldClass;
 	bool IsSpeciesEnabled(bool bPredator) const
 	{ return EnabledSpecies == EEcoEnabledSpecies::Both || (bPredator ? EnabledSpecies == EEcoEnabledSpecies::WolfOnly : EnabledSpecies == EEcoEnabledSpecies::DeerOnly); }
 	virtual void PostInitializeComponents() override;
@@ -64,6 +76,8 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|Time", meta=(ClampMin="1")) double DaySeconds = 60;
 	UPROPERTY(EditAnywhere, Category="Creature|Time", meta=(ClampMin="1")) double NightSeconds = 60;
 	UPROPERTY(EditAnywhere, Category="Creature|Migration") FEcoMigrationSettings Migration;
+    /** Separate opt-in for shared native-v3 herd journeys; legacy per-agent migration remains guarded. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Creature|Migration") bool bEnableHerdJourneys=false;
 	UPROPERTY(EditAnywhere, Category="Creature|Population") bool bEnableWaves = false;
 	UPROPERTY(EditAnywhere, Category="Creature|Streaming") bool bUseHabitatStreaming = false;
 	UPROPERTY(EditAnywhere, Category="Creature|Streaming", meta=(ClampMin="3000", Units="cm")) float HabitatStreamingRadius = 10000.0f;
@@ -89,6 +103,13 @@ public:
 	UFUNCTION(BlueprintPure, Category="Creature") int32 GetVisualCount() const { return Visuals.Num(); }
 	UFUNCTION(BlueprintPure, Category="Creature") bool IsRuntimeReady() const { return bReady; }
 	UFUNCTION(BlueprintCallable, Category="Creature|Diagnostics") void DumpRuntime(bool bDetails = false) const;
+    /** Explicit authority checkpoint. Slots are local Saved/Ecosystem names, not arbitrary paths. */
+    UFUNCTION(BlueprintCallable, Category="Creature|Persistence") bool SaveEcosystem(const FString& Slot);
+    UFUNCTION(BlueprintCallable, Category="Creature|Persistence") bool LoadEcosystem(const FString& Slot);
+    /** Server-owned melee request; no client position, damage, target or outcome is accepted. */
+    bool QueuePlayerStrike(APawn& Player);
+    /** Explicit authority operation only; two founders in an empty population, never a natural birth. */
+    UFUNCTION(BlueprintCallable,BlueprintAuthorityOnly,Category="Creature|Life") bool QueuePopulationRecovery(FName RegionId,bool bPredator);
 	/** Read-only authoring report. Never creates Entities, edits actors, or saves the level. */
 	UFUNCTION(CallInEditor, BlueprintCallable, Category="Creature|Setup") void ValidateEditorSetup() const;
 	virtual float GetFoodDensity(const FVector& Location, float Radius) const override;
@@ -99,11 +120,26 @@ public:
 	virtual FVector GetCoverDirection(const FVector& Location) const override;
 	virtual bool IsInCover(const FVector& Location) const override;
 private:
+	friend struct FEcoEcosystemCheckpoint;
 	friend class UEcoPolicyV3IntegratedSubsystem;
 	bool RegisterTemplates();
 	bool CollectSetupIssues(TArray<FString>& Errors, TArray<FString>& Notes) const;
 	bool StartAuthority();
-	int32 Spawn(FName RegionId, int32 Count, bool bPredator);
+	int32 Spawn(FName RegionId, int32 Count, bool bPredator, const TArray<FVector>* PositionsOverride=nullptr);
+    bool ProcessNaturalBirths(const FEcoServerTimeSnapshot& Time);
+    struct FPendingBirth { int64 ParentA=0,ParentB=0; FName Region; double Due=0; bool bPredator=false; };
+    TArray<FPendingBirth> PendingBirths;
+    struct FPendingRecovery { FName Region;double Issued=0;bool bPredator=false; };
+    TArray<FPendingRecovery> PendingRecoveries;
+    TMap<FName,double> LastHerbRecovery,LastWolfRecovery;
+    bool ProcessPopulationRecovery(const FEcoServerTimeSnapshot& Time);
+    double NextBirthScan=0;
+    struct FPlayerStrike { TWeakObjectPtr<APawn> Player; double Issued=0; };
+    TArray<FPlayerStrike> PlayerStrikes;
+    TMap<TWeakObjectPtr<APawn>,double> StrikeCooldown;
+    uint64 StrikeSequence=0;
+    void ProcessPlayerStrikes(const FEcoServerTimeSnapshot& Time);
+    void CommitNativeCarcass(const FEcoDeathOutcome& Death);
 	bool BuildSpawnPositions(const FEcoCreatureSpawnGroup& Group, int32 Count, bool bPredator, TArray<FVector>& Out) const;
 	void UpdateHabitatStreaming();
 	void Reconcile(float DeltaSeconds);
@@ -132,6 +168,7 @@ private:
 	double NextStreamingUpdate = 0;
 	double LastResourceTime = 0;
 	double NextLog = 0;
+    double NextAuditSample = 0;
 	int64 Step = 0;
 	int32 SummaryRevision = 0;
 	double NextMigrationTime = 0.0;

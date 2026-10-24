@@ -2,7 +2,11 @@
 
 기준: 2026-10-14 working tree. 소스 기준 구현 설명이다. 레벨 실행을 통과했다는 의미는 아니다. 아래 파일은 `Source/AdaptiveEcosystem/` 기준이다. 각 header는 해당 cpp의 타입/계약을 선언한다.
 
+2026-10-23 후속 soil-v1은 Integrated Native v3의 `FFoodGrid` 확장이다. SpeciesAI의 기존 Profile/Movement/Attack/지역 feeding을 같은 공간 셀 소비자로 전환한 것은 아니다. 기존 writer를 보존하며, 공간 feeding 전환 시 실제 접근 셀·동시 부분 지급·공통 완료 receipt를 함께 연결해야 한다. 파일/API·중복 금지·검증과 미연결 경계는 [식생 팀 연결](../../Architecture/ECOSYSTEM_VEGETATION_CONTRACT_20261023.md#팀별-실제-확장-지점), 실제 활성 backend는 [전체 구현 상태](../../Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md)를 따른다.
+
 ## 1. 파일별 책임
+
+후속 life-v1의 `EcoCreatureNaturalBirth`/`EcoCreatureCarcass`/`EcoCreaturePlayerOutcomes`/`EcoPopulationRecovery`/`EcoEcosystemCheckpoint`는 기존 spawner의 완료 경계를 나눈 구현 파일이며 새 관리자들이 아니다. Native Step의 control/threat hook을 소비하고 M4 receipt로 결과를 확정한다. 실제 API·실패/중복·저장/클라이언트 계약은 [life 팀 연결](../../Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md#팀별-연결-지점과-실패-확인)을 따른다. life opt-in을 V1/SpeciesAI와 조합하면 시작 검증이 거절한다. SpeciesAI의 별도 공격/상호작용 writer에 Native의 사체나 피해를 다시 적용하지 않는다.
 
 | 파일 | 소유하는 책임 | 다른 계층에 맡기는 책임 |
 | --- | --- | --- |

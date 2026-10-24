@@ -1,5 +1,7 @@
 # v3 실제 Social 경보·은신처 인계
 
+> **2026-10-23 현재 기본값:** 아래는 10-16 실제 행동 훅을 연결한 당시 계약·검증이다. PR #12 main 통합 후 v3 `eco.IntegratedV3.SocialControl=0`이 기본이며 해당 훅은 opt-in으로 보존한다. 기본 신호 소비는 [ReadSignal 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md), 별도 무리 이주는 [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 따른다. 보호 영역 안 개체는 슬롯 부족만으로 강제 이탈시키지 않는다. 아래 테스트 수를 현재 최종 테스트 수로 사용하지 않는다.
+
 > 후속 [실제 보호 은신처 구현](JYU_REFUGE_SAFETY_20261016.md)에서 새 복사 맵에 수풀·바위와 늑대 접근 차단·내부 피식 보호를 추가했다. [근접 장면 진단](JYU_THREAT_SCENE_DIAGNOSIS_20261016.md)의 안전 미구현 설명은 이 변경 전 기준이다. 아래 내용은 예약·도착 인계 구현 당시의 기록이다.
 
 2026-10-16, 기존 `codex/social-shelter-handoff`, 원래 프로젝트 폴더, 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`에서 구현한다. 신혁 최신 `b5c7384`와 원준 M4 `67c860c`를 포함한다. 직전 [감지 감사](JYU_THREAT_AND_BACKEND_AUDIT_20261016.md)의 **Social 미연결 항목을 이번 변경으로 연결**한다. 원본 팀 맵·사용자 에셋 변경은 보존한다.
