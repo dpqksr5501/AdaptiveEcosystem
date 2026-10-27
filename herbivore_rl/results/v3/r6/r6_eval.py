@@ -680,7 +680,7 @@ def judge(N: dict, G: dict, stuck: dict, a5: dict | None, off: dict | None = Non
     A5 를 통과로 두지 않는다). off·rule = 같은 N 판정 시드의 대조 '길 끔'·손 규칙 '늘 SHELTER' 판(보고만).
     1차 P1 = live.gate_live 의 P1_N_hide (숨음 비율 짝 차이 > 0 ∧ t ≥ +t_crit(n₁ − 1) — n₁ 100 이면 +1.984), 지킴 = GH·GN·GF·GV·GC(live.gate_live) +
     GT·GTr·GR(route_guards) + GG·G4·G5·G6(live.gate_live) + A5. R_check(재현 확인)는 이 판정에 없다(스냅숏 거울 세계 그대로 — 실시간 관문 몫)."""
-    g = lv.gate_live(dict(N=N, G=G), stuck, None)
+    g = lv.gate_live(dict(N=N, G=G), stuck, None, hide_min_effect=0.0)   # PREREG δ 0 (LIVE 값 0.01 은 실시간 고리 것 — 10-27 (10))
     c = {k: v for k, v in g["criteria"].items() if k != "R_check"}
     c.update(route_guards(N["candidate"], N["current"]))
     c["A5_export"] = (dict(a5, rule="두뇌 파일 다시 읽기: sha256·골든 로짓 오차 ≤ 허용·행동 같음·유한·관측 24·판 4·계약 0xe302dee198197444")

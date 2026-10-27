@@ -506,7 +506,7 @@ def judge(N: dict, G: dict, stuck: dict, a5: dict | None, others: dict | None = 
         for who in ("candidate", "current"):
             need_episode(d[who], f"{w} {who}")
     same_code(N["candidate"], N["current"], G["candidate"], G["current"], stuck.get("candidate"), stuck.get("current"), *(others or {}).values())
-    g = lv.gate_live(dict(N=N, G=G), stuck, None)
+    g = lv.gate_live(dict(N=N, G=G), stuck, None, hide_min_effect=0.0)   # PREREG δ 0 (LIVE 값 0.01 은 실시간 고리 것 — 10-27 (10))
     if g.get("unit") != "episode":
         raise ValueError("live.gate_live 가 쫓김 사건 단위가 아니다 — 10-24 (7) 셈(4d33c18) 뒤의 live.py 를 쓴다")
     c = {k: v for k, v in g["criteria"].items() if k != "R_check"}

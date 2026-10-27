@@ -852,4 +852,6 @@ N·G 세계 두 두뇌마다(전체 합의 비율 — P1·GH 는 시드마다 �
   판정 도구(`r6_eval`·`r7_eval`·`r7e_eval` 의 judge)도 `live.gate_live` 를 부른다. 그 PREREG 는 1차 최소 차이 0(유의성만 — `r7e/PREREG.md` '최소 차이 δ 는 0')이라,
   이제 그 도구를 다시 돌리면 1 %p 가 더해진 1차로 판정한다. 이미 낸 판정의 1차 차이(R6 +6.89 %p · R7e +8.37 %p — `judge.json`)는 1 %p 를 넘어 결과는 바뀌지
   않는다. 새 오프라인 판정에 이 도구를 쓰면 δ 를 그 PREREG 에서 따로 정한다(또는 `gate_live` 가 δ 를 인자로 받게 고친다 — 사람 결정).
+  - 10-27 고침: `live.gate_live(…, hide_min_effect=None)` 인자를 더했다(None = `LIVE` 값 — 실시간 고리 그대로). `r6_eval`·`r7_eval`·`r7e_eval` 의 judge 는
+    0 을 넘겨 각 PREREG(δ 0)대로 판정한다. 실시간 고리·예비 측정 셈은 바뀌지 않는다(시험 `test_gate_decisions` 가 인자가 `LIVE` 값보다 앞서는지 본다).
 - 관문 시드(35000~35199)로 이 크기를 돌린 판은 아직 없다.

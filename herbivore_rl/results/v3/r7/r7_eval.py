@@ -580,7 +580,7 @@ def judge(N: dict, G: dict, stuck: dict, a5: dict | None, others: dict | None = 
     A5 를 통과로 두지 않는다). others = {'off': 대조 '길 끔' 판, 'rule': '늘 SHELTER' 판, 'r6': R6 고른 두뇌 판} (같은 N 판정 시드 — 보고만).
     1차 P1 = live.gate_live 의 P1_N_hide (숨음 비율 짝 차이 > 0 ∧ t ≥ +t_crit(n₁ − 1) — n₁ 100 이면 +1.984), 지킴 = GH·GN·GF·GV·GC(live.gate_live) +
     GT·GTr·GR(r6_eval.route_guards) + GG·G4·G5·G6(live.gate_live) + A5 — R6 판정과 같은 셈이다."""
-    g = lv.gate_live(dict(N=N, G=G), stuck, None)
+    g = lv.gate_live(dict(N=N, G=G), stuck, None, hide_min_effect=0.0)   # PREREG δ 0 (LIVE 값 0.01 은 실시간 고리 것 — 10-27 (10))
     c = {k: v for k, v in g["criteria"].items() if k != "R_check"}
     c.update(R6.route_guards(N["candidate"], N["current"]))
     c["A5_export"] = (dict(a5, rule="두뇌 파일 다시 읽기: sha256·골든 로짓 오차 ≤ 허용·행동 같음·유한·관측 24·판 5·계약 0xad7bad5e1acaf071")

@@ -1932,7 +1932,8 @@ def r_check_criterion(check: dict | None) -> dict:
     return dict(ok=bool(check["ok"]), steps=check.get("steps"), rule="재현 확인 (adapt GATE.md 변경 기록 (1) 규칙)")
 
 
-def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1_note: str = "", p1_interim: dict | None = None) -> dict:
+def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1_note: str = "", p1_interim: dict | None = None,
+              hide_min_effect: float | None = None) -> dict:
     """빠른 관문 (LIVE_GATE.md 5절, 변경 기록 (6) 사람 결정 10-23 — 1차 = 숨음 비율, 변경 기록 (7) 사람 결정 10-24 — 쫓김 사건 단위로 셈).
     ev = {'N': {'current', 'candidate'}, 'G': {...}} (판 {meta, worlds}, 세계마다 도망 기록 flight — 숨은 뒤 지켜보기 hide·쫓김 사건 episode 포함),
     stuck = {'current', 'candidate'} (끼임 {summary}), check = 재현 확인 결과(ok None = 건너뜀).
@@ -1944,7 +1945,8 @@ def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1
     GN(잡힘·굶음·산), GF(1000 산 사슴-스텝당 시작한 도망), GE(GE_episode_starts — 1000 산 사슴-스텝당 시작한 사건, 10-24 GR 자리), GV(실행 FLEE 몫),
     GC(잡힘·굶음·잘림으로 끝난 도망 몫) / G: GG(잡힘·굶음·산·쫓긴 시간) / G4·G5·G6.
     보고만 (ok None): REPORT_N_flight_hide·REPORT_N_flight_caught(옛 도망 단위 숨음·잡힘 비율 — 10-23 (6) 의 1차·GH), REPORT_N_chase(옛 1차 N 쫓긴 시간).
-    통과 = R(했으면)·P1·지킴 모두 — A5 는 내보낼 때."""
+    통과 = R(했으면)·P1·지킴 모두 — A5 는 내보낼 때.
+    hide_min_effect = 1차 최소 차이 δ_H (None = LIVE 값 — 실시간 고리). 미리 적힌 오프라인 판정(R6·R7·R7e PREREG, δ 0)은 0 을 넘긴다 (10-27 (10) 뒤 LIVE 값이 0.01 이 되어서)."""
     import r4_eval as re_
 
     N, G = ev["N"], ev["G"]
@@ -1957,7 +1959,7 @@ def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1
     p = episode_pair(N["candidate"], N["current"], "hide")
     n1 = int(p["n"])
     T1 = t_crit(n1 - 1) if p1_crit is None else float(p1_crit(n1))   # 1차 문턱은 두 두뇌 모두 쫓긴 사건이 있는 시드 수에서
-    dl = float(LIVE["hide_min_effect"])
+    dl = float(LIVE["hide_min_effect"] if hide_min_effect is None else hide_min_effect)
 
     def t_ok(q: dict, cond: bool) -> bool:
         # 시드 하나면 표준오차가 nan 이고 t 가 ±∞ 라 어느 쪽 문턱도 넘는다 — 짝 t 를 셀 수 없으면 어떤 t 기준도 통과로 두지 않는다

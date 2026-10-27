@@ -500,6 +500,11 @@ def test_gate_decisions(lv, monkeypatch):
     assert g["verdict"] == "기각" and "최소 차이 +10%p" in g["why"] and "≥ +10%p" in g["criteria"]["P1_N_hide"]["rule"]
     monkeypatch.setitem(lv.LIVE, "hide_min_effect", 0.05)
     assert lv.gate_live(ev(good, cur), stuck, skip)["verdict"] == "통과"
+    # 인자로 준 δ 가 LIVE 값보다 앞선다 (오프라인 PREREG 판정은 0 을 넘긴다 — 10-27 (10) 뒤 LIVE 값 0.01)
+    monkeypatch.setitem(lv.LIVE, "hide_min_effect", 0.10)
+    g = lv.gate_live(ev(good, cur), stuck, skip, hide_min_effect=0.0)
+    assert g["verdict"] == "통과" and "최소 차이" not in g["criteria"]["P1_N_hide"]["rule"]
+    assert lv.gate_live(ev(good, cur), stuck, skip, hide_min_effect=0.10)["verdict"] == "기각"
     monkeypatch.setitem(lv.LIVE, "hide_min_effect", 0.0)
     # 지킴 GH (10-24 사건 단위): 사건 숨음 비율은 크지만 쫓긴 사건 가운데 잡힘 사건 몫이 늘어남(도망 단위 잡힘 비율·GC 는 그대로 — 예: 은신처 들락날락
     # 끝에 잡힘) → GH 기각
