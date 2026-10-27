@@ -2896,6 +2896,10 @@ void UEcoPolicyV3IntegratedSubsystem::HandlePreActorTick(UWorld* InWorld, ELevel
 	}
 	if (!bActive)
 	{
+		// 10-27 적대적 검토: Play 중 통합 v3 모드가 꺼지면(조정자 시작 실패·자원 계약 거부 등 — Deactivate 또는 bActive 거짓) 스냅숏도 두뇌 교체도 더 없고
+		// 상태 줄·감시 살핌(DrawBrainNotices)도 멈춘다. 우리가 띄운 파이썬 감시를 그때 끝낸다 — Play 끝까지 두면 이미 받은 스냅숏으로 학습 일꾼이 헛돈다.
+		// 사람·다른 언리얼이 띄운 감시는 건드리지 않는다 (bWatchOurs 는 이 서브시스템이 띄운 것만)
+		StopAutoWatchIfInactive();
 		return;
 	}
 	UpdateViewEnvironment();
@@ -4847,17 +4851,17 @@ void UEcoPolicyV3IntegratedSubsystem::PollAutoWatch()
 	}
 }
 
-void UEcoPolicyV3IntegratedSubsystem::EndAutoWatch()
+void UEcoPolicyV3IntegratedSubsystem::EndAutoWatch(const TCHAR* Why)
 {
 	if (bWatchOurs)
 	{
 		FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
 		const int32 Pid = L.GetPid();
 		const bool bJob = L.UsesJob();
-		if (L.GetOwner() == this && L.Stop(this, TEXT("Play 끝")))
+		if (L.GetOwner() == this && L.Stop(this, Why))
 		{
-			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 끝냄 | pid %d (우리가 띄움) · 학습 자식 포함 프로세스 나무째 (%s) · 기록 %s"), Pid,
-				   bJob ? TEXT("작업 개체") : TEXT("프로세스 나무 걷기"), *L.GetLogPath());
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 끝냄 | pid %d (우리가 띄움) · 학습 자식 포함 프로세스 나무째 (%s) · 기록 %s · 까닭: %s"), Pid,
+				   bJob ? TEXT("작업 개체") : TEXT("프로세스 나무 걷기"), *L.GetLogPath(), Why);
 		}
 	}
 	bWatchOurs = false;
@@ -4865,6 +4869,29 @@ void UEcoPolicyV3IntegratedSubsystem::EndAutoWatch()
 	WatchWhy.Empty();
 	WatchOtherPid = 0;
 	LastWatchLine.Empty();
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::StopAutoWatchIfInactive()
+{
+	if (bActive || !bWatchOurs)
+	{
+		return false;
+	}
+	EndAutoWatch(TEXT("통합 v3 모드가 꺼짐"));
+	return true;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::LaunchWatchForTest(const FString& Exe, const FString& Args, const FString& Root, FString& OutWhy)
+{
+	FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	L.Poll();
+	if (!L.Launch(Exe, Args, Root, Root / TEXT("watch_test.log"), Root, TEXT("ptest_sub"), this, OutWhy))
+	{
+		return false;
+	}
+	bWatchOurs = true;
+	WatchDecision = EcoV3Watch::EDecide::Launch;
+	return true;
 }
 
 FString UEcoPolicyV3IntegratedSubsystem::WatchStatusText(const FString& Live) const

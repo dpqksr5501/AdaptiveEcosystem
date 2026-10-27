@@ -1415,6 +1415,13 @@ public:
 	FString WatchStatusText(const FString& Live) const;
 	/** 이 Play 의 자동 감시 판정 (기록·시험). */
 	EcoV3Watch::EDecide GetWatchDecision() const { return WatchDecision; }
+	/**
+	 * 통합 v3 모드가 Play 중 꺼졌는데(Deactivate·자원 계약 거부 등) 이 서브시스템이 띄운 감시가 남았으면 프로세스 나무째 끝낸다 — HandlePreActorTick 이 꺼진 뒤
+	 * 프레임마다 (10-27 적대적 검토: 꺼진 뒤에는 스냅숏·두뇌 교체·감시 살핌이 모두 멈추는데 감시와 학습 자식은 Play 끝까지 돌았다). 끝냈으면 참.
+	 */
+	bool StopAutoWatchIfInactive();
+	/** 시험: 판정 없이(자동화 시험 중에도) 이 서브시스템이 띄운 감시로 Exe Args 를 띄운다 (작업 폴더·기록·root = Root). 띄웠으면 참. */
+	bool LaunchWatchForTest(const FString& Exe, const FString& Args, const FString& Root, FString& OutWhy);
 
 	// ---- R5 장애물 관측 대조 기록 (10-19, 계약 2-4) ----
 
@@ -1520,8 +1527,11 @@ private:
 	void BeginAutoWatch();
 	/** DrawBrainNotices (2 초마다 — 그릴 수 없는 실행도): 우리가 띄운 감시가 끝났나 보고 까닭을 기록·알림 (한 번). */
 	void PollAutoWatch();
-	/** Deinitialize: 우리가 띄운 감시를 프로세스 나무째 끝낸다. */
-	void EndAutoWatch();
+	/**
+	 * Deinitialize (Why = 'Play 끝') · Play 중 통합 v3 모드가 꺼진 첫 프레임 (HandlePreActorTick — 10-27 적대적 검토, Why = '통합 v3 모드가 꺼짐'):
+	 * 우리가 띄운 감시를 프로세스 나무째 끝낸다. 사람·다른 언리얼이 띄운 감시는 건드리지 않는다.
+	 */
+	void EndAutoWatch(const TCHAR* Why = TEXT("Play 끝"));
 	/**
 	 * 보기 환경 (Play 동안만, 끝나면 되돌린다).
 	 * - 엔진은 한 액터에 디버그 글자를 128개까지만 그린다(r.DebugSafeZone.MaxDebugTextStringsPerActor). 우리 글자는 모두 WorldSettings 에

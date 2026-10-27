@@ -3,6 +3,7 @@
 - 작성: 권신혁(RL·정책). **상태: 구현했다 (10-27, `Branch_Sinhyeok`).** 1~8절은 설계이고, 구현하면서 바꾼 점은 각 절에 '구현:' 으로 적었다. 바꾼 파일·콘솔 변수·
   확인 결과(UBT 두 판·자동화 263 개 실패 0·창 없는 헤드리스 확인)는 9절. [LIVE_ADAPT_SPEC.md](LIVE_ADAPT_SPEC.md) 2·5.2·5.3·새 5.5절도 구현대로 고쳤다.
   구현 커밋(`51130c0`) 뒤 실제 실행 확인과 그때 찾아 고친 알림 글(나무 다 자람 묶음에 섞인 '비→비')은 **9.4절 '10-27 확인'**.
+  그 뒤 `ae91f90..171c384` C++ 적대적 검토(찾은 것·고친 것 — Play 중 통합 v3 모드가 꺼지면 감시도 끝냄 — 과 남은 점)는 **9.5절**.
 - 기준: C++ 은 `Branch_Sinhyeok` `ae91f90`(그 뒤 커밋 `8f191c0` 은 파이썬 예비 측정 자료뿐). 파이썬은 커밋본과 **다른 워크플로의 10-27 작업 사본**
   (`LIVE_GATE.md` 변경 기록 (10) '실제 폴더 잠금 풀자' — 이 문서를 쓸 때 아직 커밋 전) 둘 다 읽었다. **구현하는 동안 그쪽이 커밋했다**(`2708a78` 잠금 풀기·`94e1b17` δ 인자·
   `7445bc6` 적대적 확인) — 아래 '작업 사본'은 이제 그 커밋이고, '커밋본(잠김)'은 `8f191c0` 까지다. 읽은 코드: `S/AI/Policy/EcoV3EnvWatch.cpp`·`EcoV3Snapshot.cpp`·`EcoV3PlaceTreesCommandlet.cpp`·
@@ -124,7 +125,7 @@
 `AEcoV3ForestTree` (새 액터, `S/AI/Policy/EcoV3ForestTree.{h,cpp}`) — 팀 `AEcoRefugeHabitat` 와 같은 꼴:
 `bReplicates = true`, `bAlwaysRelevant = true`(24 그루뿐), `SetReplicateMovement(false)`, `RF_Transient`(저장 안 함), 다 자란 뒤 휴면(`DORM_DormantAll`).
 - 구현: 휴면은 쓰지 않았다 — 갱신 빈도 1 Hz(`SetNetUpdateFrequency`) + 바뀔 때 `ForceNetUpdate` (많아야 64 그루라 값 견주기가 싸다. 휴면 전환 시각에 바뀐 값이 빠지는 일을
-  피했다). 계획 칸은 구조체 `FEcoV3ForestPlan` 하나(`ReplicatedUsing = OnRep_Plan` — 한 번에 받는다)이고 `R`·`PivotX/Y` 는 보내지 않고 `MakeLevelTree(X, Y, Scale, YawDeg)` 로
+  피했다). 계획 칸은 구조체 `FEcoV3ForestPlan` 하나(`ReplicatedUsing = OnRep_Plan` — 한 번에 받는다)이고 `R` 은 기록·보기용으로만 함께 보내며(변환에는 쓰지 않는다 — 10-27 적대적 검토가 바로잡은 글) `PivotX/Y` 는 보내지 않고 `MakeLevelTree(X, Y, Scale, YawDeg)` 로
   서버·클라이언트가 같이 셈한다. 액터 변환은 늘 원점·단위 변환이라 구성요소의 세계 변환 = 상대 변환(합성 오차 없음). 나무 메시는 실행 중에 읽는다(생성자에서 읽으면
   편집기를 켤 때마다 팀 애셋을 불러온다).
 
@@ -226,7 +227,7 @@
 
 ### 2.3 무엇을 세나 (모두 `ApplyEnvChange` 안 — 결정 스텝 경계)
 
-| 일 | 큰 변화 바뀜 시계(`LastBigActivityStep`) | 지역 날씨 종류 시작(`KindSinceStep`) | 화면 알림 |
+| 일 | 큰 변화 바뀜 시계(구현 `FState::LastActivityStep`) | 지역 날씨 종류 시작(`KindSinceStep`) | 화면 알림 |
 |---|---|---|---|
 | 줄기 원판이 바뀐 묶음 (레벨·시험·숲) | 지금 스텝 | — | 지금처럼 |
 | 날씨 종류가 바뀐 묶음 | 지금 스텝 | 지금 스텝 | 지금처럼 |
@@ -363,7 +364,11 @@
 - Play 끝(편집기 Play 멈춤·게임 종료 = 서브시스템 `Deinitialize`, 띄운 그 월드일 때만): `TerminateJobObject` → 감시 손잡이를 최대 3 초 기다림 → 손잡이·작업 개체 닫기 →
   `watcher.pid` 지움 → `[EcoV3I] 파이썬 감시 끝냄 | pid n (우리가 띄움) · 학습 자식 포함 프로세스 나무째 · 기록 …`.
   작업 개체는 부모가 먼저 죽어 끊긴 손자까지 끝낸다(`TerminateProc` 나무 걷기는 못 한다). 작업 개체를 못 쓰면(`AssignProcessToJobObject` 실패) `TerminateProc(KillTree)` 로.
-- 편집기가 죽으면 작업 개체 손잡이가 닫히며 감시 나무도 끝난다(고아 감시가 남지 않는다).
+  - 10-27 적대적 검토 고침: **Play 중 통합 v3 모드가 꺼지면**(조정자 시작 실패·자원 계약 거부 — `Deactivate` 또는 `bActive` 거짓) 그 뒤 첫 프레임
+    (`HandlePreActorTick` → `StopAutoWatchIfInactive`)에 우리가 띄운 감시를 같은 길로 끝낸다. 꺼진 뒤에는 스냅숏·두뇌 교체·감시 살핌(`DrawBrainNotices`)이 모두 멈추는데,
+    고치기 전에는 감시와 (이미 받은 스냅숏의) 학습 자식이 Play 끝까지 돌았다. 기록 끝에 까닭이 붙는다: `… · 기록 … · 까닭: Play 끝` / `까닭: 통합 v3 모드가 꺼짐`.
+- 편집기가 죽으면 작업 개체 손잡이가 닫히며 감시 나무도 끝난다(고아 감시가 남지 않는다). — 10-27 적대적 검토에서 확인(9.5): 우리가 띄운 `UnrealEditor-Cmd` 를
+  밖에서 강제로 끝냈더니(크래시 대역) 진짜 `live.py watch` 와 그 콘솔 호스트가 모두 사라졌다.
 - 건드리지 않는 것: 사람이 띄운 감시·판, 다른 워크플로의 파이썬, `live.py` 의 파일(`watch.lock`·`status.json`·`state.json` — 끊긴 잠금은 다음 감시가 `proc_alive` 로 치운다).
   학습 중 끊긴 시도는 `state.json` 에 시도 번호만 오르고 기록 줄이 없다 — 다음 Play 는 `play_id` 가 달라 그 판의 두뇌를 어차피 받지 않는다.
 - 남는 경주: `CreateProcess` 와 작업 개체 넣기 사이에 감시가 자식을 띄우면 그 자식은 빠진다. 감시는 시작 몇 초 동안 토치를 불러오고 스냅숏이 와야 자식을
@@ -416,7 +421,8 @@
 - PIE 마다: 시작 때 띄우고 끝에 끝낸다. 그때마다 파이썬 시작(몇 초)이 든다. 앞 Play 의 판은 끝나며, 그 두뇌는 `play_id` 가 달라 받지 않는다(지금 규칙).
 - 한 프로세스 PIE(리슨·데디케이티드 + 클라이언트들): 서버 월드만 서브시스템이 켜지므로 하나만 띄운다. 따로 된 프로세스면 서버 프로세스만 띄운다(클라이언트는 `NM_Client`).
 - 헤드리스 여러 판을 같은 root 로 함께 돌리면 첫 판만 띄운다(3.5). 시험은 판마다 `AdaptRoot` 를 따로 준다.
-- 편집기 크래시: 작업 개체가 감시 나무를 끝낸다. `watcher.pid` 는 남지만 다음 Play 가 죽은 pid 로 보고 지운다.
+- 편집기 크래시: 작업 개체가 감시 나무를 끝낸다. `watcher.pid` 는 남지만 다음 Play 가 죽은 pid 로 보고 지운다. `live/watch.lock` 도 남지만 다음 감시가
+  `proc_alive` 로 치운다 (10-27 적대적 검토 9.5 — 한 `-game` 프로세스에서 예약 `open` 으로 Play 셋을 이어 진짜 감시가 매번 '감시 시작'까지 떴다).
 
 ## 4. 위험·열린 질문
 
@@ -659,3 +665,52 @@
 - 남은 점 (고치지 않음): 막 돋은 묘목(크기 몫 0.15 언저리)은 위에서 보면 몇 초 동안 검은 덩이로 그려진다 — 그리기만의 일이다. 관찰 카메라 칸(오른쪽 위)이 긴 상태 줄의
   끝을 가린다. 클라이언트 캐릭터가 막 자란 줄기에 걸릴 때의 위치 되돌림 수는 여전히 세지 않았다(9.3). 진짜 감시를 실제 폴더(`Saved/EcoAdapt`)에서 띄우는 확인은
   실제 폴더에 파일을 남기지 않기 위해 하지 않았다 — 그래서 '실제 폴더 고리는 판 5 두뇌로 시작한 Play 만'(3.7)의 거부 글은 이번에도 직접 보지 않았다. 편집기 PIE 는 창이 필요해 하지 않았다.
+
+### 9.5 10-27 적대적 검토 (`ae91f90..171c384` C++ 줄 단위 — 창 없음)
+
+- 방법: 새·고친 C++(`EcoV3BigChange.h`·`EcoV3ForestGrowth.{h,cpp}`·`EcoV3ForestTree.{h,cpp}`·`EcoV3WatchLauncher.{h,cpp}`·`EcoV3EnvWatch.cpp`·`EcoV3Snapshot.cpp`·서브시스템·처리기)를
+  줄 단위로 읽고 깨 보려 했다. 프로세스 쪽은 엔진 `WindowsPlatformProcess.cpp`·`live.py`(읽기만)와 대조했다. 실행은 모두 `UnrealEditor-Cmd … -game -NullRHI -unattended -nosplash -NoSound`
+  (`-windowed`·OS 키 메시지 없음), AutoAdapt 판은 `-EcoV3AdaptRoot=<scratch>` 라 실제 `Saved/EcoAdapt` 를 건드리지 않았다. 판마다 0.25 초마다 보이는 창을 봤다 — 새 창 0 개.
+- **찾아 고친 것** — Play 중 통합 v3 모드가 꺼지면(조정자 시작 실패·자원 계약 거부 — `Deactivate` 또는 `bActive` 거짓) 스냅숏·두뇌 교체·감시 살핌(`DrawBrainNotices` 는
+  `bActive` 일 때만 불린다)이 모두 멈추는데, 우리가 띄운 감시와 (이미 받은 스냅숏의) 학습 자식은 Play 끝(`Deinitialize`)까지 돌았다. 이제 꺼진 뒤 첫 프레임
+  (`HandlePreActorTick` → `StopAutoWatchIfInactive`)에 같은 길(작업 개체째)로 끝낸다. 기록 끝에 까닭: `… · 까닭: 통합 v3 모드가 꺼짐` (Play 끝은 `까닭: Play 끝`).
+  사람·다른 언리얼이 띄운 감시는 그대로다. 새 자동화 `AdaptiveEcosystem.Policy.V3.WatchLauncher.Deactivate`(cmd.exe → ping 나무를 서브시스템 주인으로 띄움: 켜진 동안 그대로,
+  `RejectResourceContract` 뒤 나무째 끝남·`watcher.pid` 지움). 시험용 `LaunchWatchForTest` 를 더했다(판정 없이 띄움 — `StartForestForTest` 와 같은 꼴).
+- **바로잡은 글**: 1.6 '구현' (`R` 은 복제 칸에 있다 — 변환에만 쓰지 않는다), 2.3 표의 바뀜 시계 이름(구현 `LastActivityStep`), LIVE_ADAPT_SPEC 5.3 의 다 자람 기록 꼴
+  (`단독|리슨 서버|데디케이티드 서버|클라이언트`), 3.6·3.9 (크래시·꺼짐 정리).
+- **고친 뒤**: UBT `AdaptiveEcosystemEditor Win64 Development` 기본 적응 unity·`-DisableAdaptiveUnity` 두 판 성공(경고 0), 자동화(`-ini:Engine:[ConsoleVariables]:eco.IntegratedPolicyVersion=1`)
+  **264 개 성공, 실패 0** (새 `Deactivate` 포함, 경고 1 = 앞서부터의 저장 파일 읽기). 숲 끔 121 초 사슴 줄 `[EcoV3Obs]` 343218 개 md5 `6386f290…` — `ae91f90` 기록과 같다.
+  보통 Play 끝(한글·빈칸 root, 진짜 감시)은 `파이썬 감시 끝냄 | … (작업 개체) · … · 까닭: Play 끝`, 남은 자손 0.
+
+| 확인 (고치기 전 빌드 `171c384` 로 — 감시 정리 길은 이번 고침과 같은 함수) | 결과 |
+|---|---|
+| 한글·빈칸 든 `AdaptRoot` + **기본 명령**(진짜 `live.py watch`, 스냅숏 없음 → 학습 없음) | `--root "…/한글 폴더 A"` 따옴표 그대로 떠 `watch_<play>.log` 에 `감시 시작: …\한글 폴더 A\snapshots`, 상태 `켜는 중 (0초)` → `스냅숏 기다림` |
+| Play 여러 번 (한 `-game` 프로세스, 예약 `open` 25 초마다) | Play 셋 모두 `띄움` → 다음 `open` 때 `끝냄 (작업 개체)` → 새 감시가 남은 `live/watch.lock`(죽은 pid)을 치우고 `감시 시작` |
+| 크래시 대역 — 우리 `UnrealEditor-Cmd` 를 65 초에 밖에서 강제로 끝냄 (그 pid 만) | 그때 돌던 셋째 Play 의 감시와 그 콘솔 호스트가 사라짐(앞 두 Play 의 감시는 Play 가 바뀔 때 이미 끝남 — 남은 자손 0). `watcher.pid`·`live/watch.lock` 은 남는다 — 다음 Play·감시가 죽은 pid 로 보고 치운다(3.9) |
+| python 없음 (`-EcoV3AutoWatchPython=C:/nope/python.exe`) | `파이썬 감시 \| 못 켬 — python 없음 — python 실행 파일 C:/nope/python.exe 가 없다`, 상태 `파이썬 감시를 못 켬 — …`, 아무것도 띄우지 않음 |
+| 다른 워크플로 python | 판마다 전후 같은 pid 그대로 (우리 자손에 한 번도 없음) |
+| 기록 근거 다시 셈 | 9.4 ③ 리슨·데디 기록에서 다 자람 지문 서버·클라이언트 24/24 (c1·c2late 포함) 같음, ② 조연우 맵 환경 판 247·세기만 234/230 — 문서 숫자와 같다 |
+
+- **검토했지만 문제가 아니었던 것** (근거):
+  - 끔 = 비트 동일: 끈 Play 에서 새 코드가 하는 일은 설정 읽기·기준선 복사(`BigAddRegion` — 읽기만)·`ApplyEnvChange` 안 `BigState` 셈·알림 글 고르기(규칙이 돌 때만)뿐이다.
+    숲 액터·강제 읽기·난수·스텝 경계 호출은 없다(`ForestStepBoundary`·`ForestPreActorTick` 은 `bForestOn` 거짓이면 곧바로 돌아간다). 숲 자리 난수는 따로 된 `FRng` 라 켠 판에서도
+    세계 난수를 쓰지 않는다. 위 md5 로 다시 확인.
+  - 큰 변화 경계: 정확히 10 은 ≥ 라 조건, 생겼다 지워지면 대칭차 0 → 조건·조건 시각 지움, 종류가 `WeatherHold` 전에 돌아오면 조건 없음(종류 시작 시각은 바뀔 때마다 다시),
+    기준선은 자동 스냅숏을 쓸 때만(쓰기 실패여도) 다시 — 주기·콘솔 스냅숏은 아니다. `BigState` 는 서브시스템마다라 Play·PIE 를 다시 시작하면 새로 선다.
+  - 숲: 다 자람은 처리기 스텝 고리의 정확한 전역 스텝(`GlobalT ≥ 다 자람 스텝` while — 시계 다시 맞춤으로 스텝이 뛰어도 빠지지 않는다)에서 줄기 충돌·꼬리표를 켜고 같은 경계의
+    `ApplyEnvChange` 가 넣는다. 실시간 읽기는 그 사이에 끼지 못한다(다 자람과 넣기가 같은 경계). 클라이언트는 서브시스템이 꺼져 숲을 따로 키우지 않는다(복제 액터만).
+  - 감시 창: `CREATE_NO_WINDOW` 숨은 콘솔을 판·학습·`taskkill`·`EcoV3Eval` 자식이 물려받는다(`live.py` 는 `CREATE_NEW_PROCESS_GROUP` 만 쓴다). 남의 프로세스: 끝내는 길은 작업 개체
+    (우리가 넣은 감시의 자손만)와 그 대안뿐이고, 잠금·pid 파일은 시작 시각까지 견줘 읽기만 한다.
+- **남은 점 (고치지 않음)**:
+  1. 작업 개체를 못 쓸 때의 대안 엔진 `TerminateProc(KillTree)` 는 부모 pid 만 보고 걷는다(시작 시각을 보지 않는다) — pid 재사용으로 남의 프로세스를 끝낼 이론상 위험이 있다.
+     윈도 8 뒤 겹친 작업 개체를 받으므로 이번 모든 판은 작업 개체 길이었다.
+  2. 팀 날씨 출처를 지역 세계가 생긴 **뒤에** 처음 알게 되면(늦은 등록) 그 처음 값이 기준선 종류와 다를 때 종류 바뀜으로 센다 — 그 종류가 `WeatherHold` 넘게 이어지면 레벨이
+     바뀌지 않았어도 스냅숏 하나. 지금 두 맵은 해당 없다(조연우 맵은 시작 때 출처를 알아 기준선이 팀 날씨, 통합 맵은 출처 없음).
+  3. 숲 자리 땅 높이는 `GroundStageTree`(WorldStatic 채널 선 검사)로 잰다 — 계획 순간 그 자리에 폰처럼 그 채널을 막는 액터가 있으면 나무가 떠 보일 수 있다(세계 원판은 가로
+     자리만 쓰므로 세계·결정성은 같다). `Test.AddTrees` 와 같은 길이라 함께 두었다.
+  4. 숲 자리는 계획 때의 은신처 원만 피한다 — `ProtectedRefuges` 맵에서 늦게 등록된 은신처 원 안에 숲 줄기가 들 수 있다(다 자랄 때는 다른 줄기와의 겹침만 다시 본다).
+  5. 다 자랄 때 겹쳐 뺀 그루가 있으면 클라이언트 화면 줄은 계획 수를 목표로 세어 '자라는 중' 에 머물고, `F00` 을 뺐으면 클라이언트 줄이 없다(화면만 — 네트워크 판에서는
+     `Test.AddTrees` 가 거부되므로 레벨 팀이 실행 중에 그 자리에 줄기를 놓을 때만).
+  6. 숲 나무를 밖에서 지우면(팀 도구 등) `ForestState` 는 '다 자람' 으로 남는다 — 세계 원판은 환경 감시가 맞추고 숲 셈 글만 어긋난다.
+  7. 진짜 판의 학습 일꾼 = CPU − 6 (이 컴퓨터 14, 감시 기록 `워커 14`) — 편집기 프레임이 떨어질 수 있다(4절 9).
+  8. 앞서부터 남은 것: 클라이언트 보정 수, 실제 폴더에서 진짜 감시, 편집기 PIE (창이 필요).

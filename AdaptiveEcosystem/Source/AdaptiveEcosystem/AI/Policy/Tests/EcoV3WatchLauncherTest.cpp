@@ -7,12 +7,15 @@
 //                          시험 중·클라이언트·폴더·이미 돈다(우리·사람·다른 언리얼)·python 없음·live.py 없음), 프로세스 살았나 (이 편집기 pid·시작 시각·python 이름),
 //                          기록 끝 읽기 (UTF-8), 기록 20 개만 남기기
 //   WatchLauncher.Process  (윈도) cmd.exe 를 창 없이 띄워: 잠김 글을 쓰고 종료 코드 1 → 까닭 '잠김'·watcher.pid 지움, 오래 도는 것 → Stop 이 작업 개체째 끝냄
+//   WatchLauncher.Deactivate (윈도, 10-27 적대적 검토) 서브시스템이 띄운 감시: 켜진 동안 그대로, Play 중 통합 v3 모드가 꺼지면(자원 계약 거부) 그때 나무째 끝냄
 
 #include "Misc/AutomationTest.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "../EcoPolicyV3IntegratedSubsystem.h"
 #include "../EcoV3WatchLauncher.h"
+#include "EcoTestWorld.h"
 #include "HAL/FileManager.h"
 #include "HAL/PlatformProcess.h"
 #include "Misc/FileHelper.h"
@@ -269,6 +272,71 @@ bool FEcoV3WatchProcessTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("그 pid 는 더 살아 있지 않다"), FEcoV3WatchLauncher::IsProcessAlive(Pid, Created, false));
 		TestFalse(TEXT("watcher.pid 지움"), FPaths::FileExists(Root / TEXT("watcher.pid")));
 	}
+	return true;
+}
+
+// 10-27 적대적 검토: Play 중 통합 v3 모드가 꺼지면(자원 계약 거부 등) 서브시스템이 띄운 감시를 그때 끝낸다 (HandlePreActorTick → StopAutoWatchIfInactive).
+// 켜진 동안은 건드리지 않는다. cmd.exe → ping 나무를 서브시스템 주인으로 띄워 본다 (파이썬 없음)
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoV3WatchDeactivateTest,
+	"AdaptiveEcosystem.Policy.V3.WatchLauncher.Deactivate",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3WatchDeactivateTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoV3WatchTestImpl;
+	FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	if (L.IsRunning())
+	{
+		AddWarning(TEXT("이 프로세스에 띄운 감시가 돈다 — 시험을 건너뛴다"));
+		return true;
+	}
+	const FString Cmd = FPlatformMisc::GetEnvironmentVariable(TEXT("ComSpec"));
+	const FString Exe = Cmd.IsEmpty() ? FString(TEXT("C:\\Windows\\System32\\cmd.exe")) : Cmd;
+	if (!FPaths::FileExists(Exe))
+	{
+		AddWarning(TEXT("cmd.exe 가 없다 — 시험을 건너뛴다"));
+		return true;
+	}
+	const FString Root = TempDir(TEXT("EcoV3WatchDeactivate"));
+	ON_SCOPE_EXIT
+	{
+		L.ResetEnded();
+		IFileManager::Get().DeleteDirectory(*Root, false, true);
+	};
+	EcoTest::FScopedTestWorld W;
+	if (!TestNotNull(TEXT("시험 월드"), W.World))
+	{
+		return false;
+	}
+	UEcoPolicyV3IntegratedSubsystem* Sub = W.World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+	if (!TestNotNull(TEXT("통합 서브시스템"), Sub))
+	{
+		return false;
+	}
+	FEcoV3IntegratedSettings S;
+	S.Seed = 38200;
+	Sub->ActivateForTest(S, false);
+	FString Why;
+	const bool bLaunched = Sub->LaunchWatchForTest(Exe, TEXT("/d /c ping -n 60 127.0.0.1 >nul"), Root, Why);
+	if (!TestTrue(*FString::Printf(TEXT("서브시스템 주인으로 띄움 (%s)"), *Why), bLaunched))
+	{
+		return false;
+	}
+	const int32 Pid = L.GetPid();
+	double Created = 0.0;
+	FEcoV3WatchLauncher::ProcessCreateUnix(Pid, Created);
+	FPlatformProcess::Sleep(0.3f);
+	TestFalse(TEXT("켜진 동안은 끝내지 않는다"), Sub->StopAutoWatchIfInactive());
+	TestTrue(TEXT("켜진 동안 감시가 돈다"), L.IsRunning() && FEcoV3WatchLauncher::IsProcessAlive(Pid, Created, false));
+	AddExpectedErrorPlain(TEXT("통합 v3 모드를 끈다"), EAutomationExpectedErrorFlags::Contains, 1);
+	Sub->RejectResourceContract();   // Play 중 꺼짐 (자원 계약 거부 — Deactivate)
+	TestFalse(TEXT("통합 v3 모드 꺼짐"), Sub->IsActive());
+	TestTrue(TEXT("꺼지면 우리가 띄운 감시를 끝낸다"), Sub->StopAutoWatchIfInactive());
+	TestTrue(TEXT("까닭 '우리가 끝냄' · 더 돌지 않음"), L.GetEnd() == EEnd::Stopped && !L.IsRunning());
+	TestFalse(TEXT("그 pid 는 더 살아 있지 않다"), FEcoV3WatchLauncher::IsProcessAlive(Pid, Created, false));
+	TestFalse(TEXT("watcher.pid 지움"), FPaths::FileExists(Root / TEXT("watcher.pid")));
+	TestFalse(TEXT("두 번째는 할 일이 없다"), Sub->StopAutoWatchIfInactive());
 	return true;
 }
 #endif
