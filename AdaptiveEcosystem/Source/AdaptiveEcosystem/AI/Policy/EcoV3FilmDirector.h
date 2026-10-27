@@ -5,8 +5,11 @@
 #include "EcoV3FilmDirector.generated.h"
 
 class ACameraActor;
-class AEcoCreatureRepresentationActor;
 struct FEcoV3RegionContext;
+namespace EcoV3Observe
+{
+	struct FSubject;
+}
 
 // 통합 v3 촬영 감독 (발표 영상용, 10-16).
 //
@@ -23,6 +26,9 @@ struct FEcoV3RegionContext;
 //             top    무대 위에서 곧게 내려다봄 (높이 기본 = 무대가 화면에 들어오는 높이)
 //             wolf   대상 = 지역 늑대 번호 (StableAgentId 차례, 0 부터). 고정 거리에서 따라감 (기본 22 m, 높이 16 m, 방위 225°)
 //             deer   장면 시작 때 늑대 '대상' 에게 가장 가까운 산 사슴을 잡아 따라감
+//             (10-27) wolf·deer 대상과 정찰 기록(scout.csv)은 논리 Mass 개체에서 고른다 (EcoV3Observe::Gather — 관찰 카메라와 같은 찾기).
+//             예전에는 팀 표현 액터에서 골랐는데 표현 액터는 보는 자리 200 m 안 가까운 64 마리에게만 생기고(HostVisualDistance·
+//             MaxActorRepresentations) 촬영 카메라가 월드 원점(무대에서 300 m+)에서 시작해 대상을 못 찾았다. 자리는 표현 액터가 있으면 그 자리다
 //             shelter 대상 = 은신처 원 번호 (FWorldConfig::Covers). 둘레를 천천히 돎 (기본 26 m, 높이 14 m)
 //   -EcoV3FilmScout=<초>       촬영 없이 0.5 초마다 늑대별 상태를 scout.csv 로 남기고 그 시뮬레이션 초에 끝낸다 (시간 창 고르기)
 //   -EcoV3FilmUI               HUD·화면 메시지·팀 개체 이름표를 숨기지 않는다 (eco.V3Debug 글자는 이것 없이도 그대로 그려진다)
@@ -87,9 +93,11 @@ protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 
 private:
-	/** 지역의 표현 액터 (산 것만): 늑대는 StableAgentId 차례. */
-	void GatherActors(FName RegionId, TArray<AEcoCreatureRepresentationActor*>& OutWolves, TArray<AEcoCreatureRepresentationActor*>& OutDeer) const;
-	AEcoCreatureRepresentationActor* FindById(int64 Id) const;
+	/**
+	 * 지역의 산 개체 (논리 Mass 개체 — EcoV3Observe::Gather, 표현 액터 예산과 무관): 늑대·사슴 모두 StableAgentId 차례.
+	 * 자리는 표현 액터가 있으면 그 자리, 없으면 논리 자리. Mass 처리 중이면 거짓 (둘 다 비운다).
+	 */
+	bool GatherSubjects(FName RegionId, TArray<EcoV3Observe::FSubject>& OutWolves, TArray<EcoV3Observe::FSubject>& OutDeer) const;
 	/** 장면 카메라 자리 (cm) 와 방향. 따라갈 대상을 못 찾으면 거짓. */
 	bool ComputeView(const FShot& Shot, const FEcoV3RegionContext& Ctx, double ShotTime, FVector& OutLoc, FRotator& OutRot, float& OutFov);
 	void EnsureCamera();

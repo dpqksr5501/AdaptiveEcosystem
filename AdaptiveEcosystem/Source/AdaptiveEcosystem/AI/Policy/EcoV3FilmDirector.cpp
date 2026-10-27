@@ -8,6 +8,7 @@
 #include "Components/TimelineComponent.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "EcoPolicyV3IntegratedSubsystem.h"
+#include "EcoV3ObserverCamera.h"
 #include "EcoV3WeatherPresenter.h"
 #include "Engine/Engine.h"
 #include "Engine/World.h"
@@ -33,7 +34,6 @@ DEFINE_LOG_CATEGORY_STATIC(LogEcoV3Film, Log, All);
 
 namespace EcoV3FilmImpl
 {
-	static const FName WolfSpecies(TEXT("Wolf"));
 	constexpr double kPrerollSeconds = 2.0;    // 장면 시작 전 카메라를 먼저 옮겨 노출이 자리 잡게 한다
 	constexpr double kScoutEvery = 0.5;        // 정찰 기록 간격 (시뮬레이션 초)
 	constexpr int32 kQuitWaitFrames = 30;      // 마지막 캡처 뒤 끝내기까지 기다리는 프레임 (PNG 쓰기)
@@ -182,34 +182,27 @@ TStatId UEcoV3FilmDirectorSubsystem::GetStatId() const
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UEcoV3FilmDirectorSubsystem, STATGROUP_Tickables);
 }
 
-void UEcoV3FilmDirectorSubsystem::GatherActors(FName RegionId, TArray<AEcoCreatureRepresentationActor*>& OutWolves,
-											   TArray<AEcoCreatureRepresentationActor*>& OutDeer) const
+bool UEcoV3FilmDirectorSubsystem::GatherSubjects(FName RegionId, TArray<EcoV3Observe::FSubject>& OutWolves,
+												 TArray<EcoV3Observe::FSubject>& OutDeer) const
 {
+	// 10-27: 논리 Mass 개체에서 고른다 — 팀 표현 액터는 보는 자리 200 m 안 가까운 64 마리에게만 생겨, 촬영 카메라가 월드 원점(무대에서 300 m+)에서
+	// 시작하면 wolf·deer 장면이 대상을 못 찾았다. 자리는 표현 액터가 있으면 그 자리 (EcoV3Observe::Gather)
 	OutWolves.Reset();
 	OutDeer.Reset();
-	for (TActorIterator<AEcoCreatureRepresentationActor> It(GetWorld()); It; ++It)
+	UWorld* World = GetWorld();
+	TArray<EcoV3Observe::FSubject> All;
+	if (!World || !EcoV3Observe::Gather(*World, All))
 	{
-		AEcoCreatureRepresentationActor* Rep = *It;
-		if (!Rep || !Rep->bBound || !Rep->VisualState.bAlive || Rep->VisualState.RegionId != RegionId)
-		{
-			continue;
-		}
-		(Rep->VisualState.SpeciesId == EcoV3FilmImpl::WolfSpecies ? OutWolves : OutDeer).Add(Rep);
+		return false;
 	}
-	OutWolves.Sort([](const AEcoCreatureRepresentationActor& A, const AEcoCreatureRepresentationActor& B)
-				   { return A.VisualState.StableAgentId < B.VisualState.StableAgentId; });
-}
-
-AEcoCreatureRepresentationActor* UEcoV3FilmDirectorSubsystem::FindById(int64 Id) const
-{
-	for (TActorIterator<AEcoCreatureRepresentationActor> It(GetWorld()); It; ++It)
+	for (EcoV3Observe::FSubject& Subject : All)   // Gather 는 StableAgentId 차례로 돌려준다
 	{
-		if (*It && (*It)->bBound && (*It)->VisualState.StableAgentId == Id)
+		if (Subject.bAlive && Subject.Region == RegionId)
 		{
-			return *It;
+			(Subject.bWolf ? OutWolves : OutDeer).Add(MoveTemp(Subject));
 		}
 	}
-	return nullptr;
+	return true;
 }
 
 bool UEcoV3FilmDirectorSubsystem::ComputeView(const FShot& Shot, const FEcoV3RegionContext& Ctx, double ShotTime, FVector& OutLoc,
@@ -252,33 +245,38 @@ bool UEcoV3FilmDirectorSubsystem::ComputeView(const FShot& Shot, const FEcoV3Reg
 	// wolf·deer: 장면 첫 프레임에 대상을 정하고 끝까지 같은 개체를 따라간다
 	if (!bLocked)
 	{
-		TArray<AEcoCreatureRepresentationActor*> Wolves, Deer;
-		GatherActors(Shot.RegionId, Wolves, Deer);
-		if (Wolves.Num() == 0)
+		TArray<EcoV3Observe::FSubject> Wolves, Deer;
+		if (!GatherSubjects(Shot.RegionId, Wolves, Deer) || Wolves.Num() == 0)
 		{
 			return false;
 		}
-		const AEcoCreatureRepresentationActor* W = Wolves[FMath::Clamp(Shot.Subject, 0, Wolves.Num() - 1)];
-		LockedId = W->VisualState.StableAgentId;
+		const EcoV3Observe::FSubject& W = Wolves[FMath::Clamp(Shot.Subject, 0, Wolves.Num() - 1)];
+		LockedId = W.Id;
 		if (Shot.Mode == TEXT("deer"))
 		{
 			double Best = TNumericLimits<double>::Max();
-			for (const AEcoCreatureRepresentationActor* D : Deer)
+			for (const EcoV3Observe::FSubject& D : Deer)
 			{
-				const double Dist = FVector::DistSquared2D(D->GetActorLocation(), W->GetActorLocation());
+				const double Dist = FVector::DistSquared2D(D.Location, W.Location);
 				if (Dist < Best)
 				{
 					Best = Dist;
-					LockedId = D->VisualState.StableAgentId;
+					LockedId = D.Id;
 				}
 			}
 		}
 		bLocked = true;
-		UE_LOG(LogEcoV3Film, Log, TEXT("[EcoV3Film] 장면 %d (%s %s) 대상 StableAgentId %lld"), ShotIndex, *Shot.RegionId.ToString(), *Shot.Mode, LockedId);
+		UE_LOG(LogEcoV3Film, Log, TEXT("[EcoV3Film] 장면 %d (%s %s) 대상 StableAgentId %lld (논리 개체 늑대 %d·사슴 %d 가운데)"), ShotIndex,
+			   *Shot.RegionId.ToString(), *Shot.Mode, LockedId, Wolves.Num(), Deer.Num());
 	}
-	if (const AEcoCreatureRepresentationActor* A = FindById(LockedId))
+	// 따라가는 개체의 지금 자리 (표현 액터가 있으면 그 자리, 없으면 논리 자리). 사라지면 마지막 자리에 머문다
+	TArray<EcoV3Observe::FSubject> All;
+	if (EcoV3Observe::Gather(*GetWorld(), All))
 	{
-		LastTarget = A->GetActorLocation() + FVector(0, 0, 80);
+		if (const int32 Found = EcoV3Observe::FindIndex(All, LockedId); Found != INDEX_NONE)
+		{
+			LastTarget = All[Found].Location + FVector(0, 0, 80);
+		}
 	}
 	Orbit(LastTarget, 2200.0, 1600.0, 225.0, 0.0);
 	return true;
@@ -363,22 +361,23 @@ void UEcoV3FilmDirectorSubsystem::WriteScoutRows(double SimSeconds)
 		{
 			continue;
 		}
-		TArray<AEcoCreatureRepresentationActor*> Wolves, Deer;
-		GatherActors(Ctx->RegionId, Wolves, Deer);
+		// 10-27: 논리 Mass 개체 (표현 액터가 붙은 보는 자리 둘레 일부가 아니라 지역 전부 — 늑대 번호 widx 가 wolf 장면 '대상'과 같은 차례)
+		TArray<EcoV3Observe::FSubject> Wolves, Deer;
+		GatherSubjects(Ctx->RegionId, Wolves, Deer);
 		const double Side = Ctx->SizeCm();
 		const int32 NumCovers = static_cast<int32>(Ctx->Sim.Config.Covers.size());
 		for (int32 w = 0; w < Wolves.Num(); ++w)
 		{
-			const AEcoCreatureRepresentationActor* W = Wolves[w];
-			const FVector WL = W->GetActorLocation();
+			const EcoV3Observe::FSubject& W = Wolves[w];
+			const FVector WL = W.Location;
 			double Nd = TNumericLimits<double>::Max();
 			int32 Run20 = 0, Edge25 = 0;
-			for (const AEcoCreatureRepresentationActor* D : Deer)
+			for (const EcoV3Observe::FSubject& D : Deer)
 			{
-				const FVector DL = D->GetActorLocation();
+				const FVector DL = D.Location;
 				const double Dist = FVector::Dist2D(DL, WL);
 				Nd = FMath::Min(Nd, Dist);
-				const bool bRun = D->VisualMotion == EEcoCreatureVisualMotion::Run;
+				const bool bRun = D.Motion == EEcoCreatureVisualMotion::Run;
 				Run20 += (bRun && Dist < 2000.0) ? 1 : 0;
 				const double Rx = DL.X - Ctx->OriginCm.X;
 				const double Ry = DL.Y - Ctx->OriginCm.Y;
@@ -401,18 +400,18 @@ void UEcoV3FilmDirectorSubsystem::WriteScoutRows(double SimSeconds)
 			{
 				const FVector Cc = CoverCenter(*Ctx, Cov);
 				const double R = Ctx->Sim.Config.Covers[static_cast<size_t>(Cov)].Radius * EcoRepertoireV3::kUnitCm;
-				for (const AEcoCreatureRepresentationActor* D : Deer)
+				for (const EcoV3Observe::FSubject& D : Deer)
 				{
-					CovIn += FVector::Dist2D(D->GetActorLocation(), Cc) < R ? 1 : 0;
+					CovIn += FVector::Dist2D(D.Location, Cc) < R ? 1 : 0;
 				}
 			}
 			ScoutLines.Add(FString::Printf(TEXT("%.2f,%s,%d,%lld,%lld,%.3f,%d,%d,%d,%d,%lld,%.1f,%.1f,%d,%d,%d,%d,%.1f,%d,%d,%d,%.1f,%d"),
 										   SimSeconds, *Ctx->RegionId.ToString(), Ctx->AliveDeer, static_cast<long long>(Ctx->Sim.Stats.Caught),
 										   static_cast<long long>(Ctx->Sim.Stats.Starved), Ctx->Sim.Dark, Ctx->KeepNow[EcoWorldV3::kKeepPanic],
 										   Ctx->KeepNow[EcoWorldV3::kKeepAlert], Ctx->KeepNow[EcoWorldV3::kKeepShelter], w,
-										   W->VisualState.StableAgentId, (WL.X - Ctx->OriginCm.X) / 100.0, (WL.Y - Ctx->OriginCm.Y) / 100.0,
-										   W->VisualState.bEating ? 1 : 0, W->VisualState.bPursuingPrey ? 1 : 0, static_cast<int32>(W->VisualMotion),
-										   Ctx->WolfCatchesById.FindRef(W->VisualState.StableAgentId), Nd / 100.0, Run20, Edge25, Cov,
+										   W.Id, (WL.X - Ctx->OriginCm.X) / 100.0, (WL.Y - Ctx->OriginCm.Y) / 100.0,
+										   W.bEating ? 1 : 0, W.bPursuing ? 1 : 0, static_cast<int32>(W.Motion),
+										   Ctx->WolfCatchesById.FindRef(W.Id), Nd / 100.0, Run20, Edge25, Cov,
 										   CovD / 100.0, CovIn));
 		}
 	}
