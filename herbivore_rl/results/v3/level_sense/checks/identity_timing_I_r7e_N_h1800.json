@@ -1,0 +1,150 @@
+{
+ "made_by": "level_sense 확인 (10-27) — sense.py run --maps --regions Barren 판이 지도 없이 세 지역을 돌린 판·평가기 판과 같은가, 그리고 판 시간",
+ "identity": {
+  "maps_barren_python_vs_full_python": {
+   "worlds": 100,
+   "exact": 100,
+   "only_a": 0,
+   "only_b": 0,
+   "bad": []
+  },
+  "maps_barren_python_vs_full_ceval": {
+   "worlds": 100,
+   "exact": 100,
+   "only_a": 0,
+   "only_b": 0,
+   "bad": []
+  },
+  "py_probe_blocks_equal": "100/100 (지도 칸은 따로 저장하고 뺀 뒤)"
+ },
+ "time": {
+  "base__ceval.json.gz": {
+   "label": "평가기·세 지역",
+   "worlds": 300,
+   "horizon": 1800,
+   "workers": 6,
+   "run_s": 55.97,
+   "when": "2026-10-27T15:48:39"
+  },
+  "t30__ceval.json.gz": {
+   "label": "평가기·세 지역",
+   "worlds": 300,
+   "horizon": 1800,
+   "workers": 6,
+   "run_s": 58.71,
+   "when": "2026-10-27T15:51:37"
+  },
+  "base__python.json.gz": {
+   "label": "파이썬·세 지역",
+   "worlds": 300,
+   "horizon": 1800,
+   "workers": 6,
+   "run_s": 598.41,
+   "when": "2026-10-27T16:21:15"
+  },
+  "t30__python.json.gz": {
+   "label": "파이썬·세 지역",
+   "worlds": 300,
+   "horizon": 1800,
+   "workers": 6,
+   "run_s": 796.95,
+   "when": "2026-10-27T16:11:15"
+  },
+  "base__python__R-Barren.json.gz": {
+   "label": "파이썬·Barren·공간 지도",
+   "worlds": 100,
+   "horizon": 1800,
+   "workers": 6,
+   "run_s": 297.3,
+   "when": "2026-10-27T17:36:58"
+  },
+  "gate__python__R-Barren.json.gz": {
+   "label": "파이썬·Barren",
+   "worlds": 100,
+   "horizon": 1800,
+   "workers": 6,
+   "run_s": 227.39,
+   "when": "2026-10-27T17:54:56"
+  },
+  "t30sight__python__R-Barren.json.gz": {
+   "label": "파이썬·Barren·길 떼어 보기",
+   "worlds": 100,
+   "horizon": 1800,
+   "workers": 6,
+   "run_s": 246.59,
+   "when": "2026-10-27T18:03:18"
+  },
+  "spot_*__ceval__R-Barren (격자 32 점 + 지도 후보 15 점, 겹침 2 — 45 점)": {
+   "label": "평가기·Barren·작은 숲 8 그루",
+   "worlds": 100,
+   "horizon": 1800,
+   "workers": 6,
+   "n": 45,
+   "run_s_median": 17.86,
+   "run_s_min": 16.1,
+   "run_s_max": 21.18
+  }
+ },
+ "note": "워커 6, 같은 때 다른 일(언리얼 헤드리스·파이썬)이 CPU 를 나눔. 한 변형(두뇌 하나·시드 100·지역 셋·N·1800 스텝 = 세계 300) = 평가기 약 1 분, 파이썬 10~13 분. 지역 하나(--regions)면 세계 100 개: 평가기 약 17~19 초, 파이썬 약 4~5 분.",
+ "raw_sha256_16": {
+  "base__ceval.json.gz": "0199ce5f74b3d5d6",
+  "base__maps__R-Barren.json.gz": "c380dd84eb2f1d3d",
+  "base__python.json.gz": "caadd26729c2dbd7",
+  "base__python__R-Barren.json.gz": "f22d0962e71596a6",
+  "gate__ceval.json.gz": "80a007c8aec7eef8",
+  "gate__python__R-Barren.json.gz": "97778d20828b989f",
+  "spot_10_10_8_10__ceval__R-Barren.json.gz": "210493a2779b40b3",
+  "spot_10_110_8_10__ceval__R-Barren.json.gz": "e7bf2c905c220859",
+  "spot_10_30_8_10__ceval__R-Barren.json.gz": "5f7b4589ef6304c9",
+  "spot_10_50_8_10__ceval__R-Barren.json.gz": "4dcc1700deba857e",
+  "spot_10_70_8_10__ceval__R-Barren.json.gz": "b5ebadf4d8f90b25",
+  "spot_10_90_8_10__ceval__R-Barren.json.gz": "41f239c2da6b4a64",
+  "spot_110_106_8_10__ceval__R-Barren.json.gz": "5aed65d9b04102e7",
+  "spot_110_10_8_10__ceval__R-Barren.json.gz": "2def66ac30b1ec0c",
+  "spot_110_110_8_10__ceval__R-Barren.json.gz": "174e2f0fcb36c0d0",
+  "spot_110_30_8_10__ceval__R-Barren.json.gz": "081d153ed6f5acf8",
+  "spot_110_50_8_10__ceval__R-Barren.json.gz": "068e7110c30aed1e",
+  "spot_110_6_8_10__ceval__R-Barren.json.gz": "a435d41090b3b484",
+  "spot_110_70_8_10__ceval__R-Barren.json.gz": "86abb7b04c0f9d57",
+  "spot_110_90_8_10__ceval__R-Barren.json.gz": "c20fa797b29595f0",
+  "spot_114_18_8_10__ceval__R-Barren.json.gz": "45c57441d05c8543",
+  "spot_114_86_8_10__ceval__R-Barren.json.gz": "46d4a11a2114837a",
+  "spot_14_106_8_10__ceval__R-Barren.json.gz": "2d62dde77b828037",
+  "spot_30_10_8_10__ceval__R-Barren.json.gz": "4634acc4f35cb06e",
+  "spot_30_110_8_10__ceval__R-Barren.json.gz": "27121faf0bd443f4",
+  "spot_30_50_8_10__ceval__R-Barren.json.gz": "d98fec3726744495",
+  "spot_30_70_8_10__ceval__R-Barren.json.gz": "db4d52893c9c5952",
+  "spot_42_26_8_10__ceval__R-Barren.json.gz": "67aba59b57134d17",
+  "spot_42_90_8_10__ceval__R-Barren.json.gz": "bbb11f4962dacf04",
+  "spot_50_10_8_10__ceval__R-Barren.json.gz": "e5eedb964905bca1",
+  "spot_50_110_8_10__ceval__R-Barren.json.gz": "bdf93166170fd46f",
+  "spot_50_30_8_10__ceval__R-Barren.json.gz": "b91b402e3d1e2915",
+  "spot_50_50_8_10__ceval__R-Barren.json.gz": "5fc73481350ac632",
+  "spot_50_70_8_10__ceval__R-Barren.json.gz": "a0b3d9f332228880",
+  "spot_50_90_8_10__ceval__R-Barren.json.gz": "1a1da000a3dbf8dd",
+  "spot_66_110_8_10__ceval__R-Barren.json.gz": "23018e94217780b4",
+  "spot_70_10_8_10__ceval__R-Barren.json.gz": "512b08f762ed0066",
+  "spot_70_110_8_10__ceval__R-Barren.json.gz": "c51480a00c879c96",
+  "spot_70_30_8_10__ceval__R-Barren.json.gz": "b0921084d1f9c08c",
+  "spot_70_50_8_10__ceval__R-Barren.json.gz": "e57bcfa95fa11f32",
+  "spot_70_70_8_10__ceval__R-Barren.json.gz": "642b1d9d2f89e980",
+  "spot_70_90_8_10__ceval__R-Barren.json.gz": "971e6399795a29c9",
+  "spot_74_110_8_10__ceval__R-Barren.json.gz": "f8394a021d1a5c33",
+  "spot_78_94_8_10__ceval__R-Barren.json.gz": "234f5c70ba6fb8b7",
+  "spot_78_98_8_10__ceval__R-Barren.json.gz": "eb29813f73b1f43c",
+  "spot_82_106_8_10__ceval__R-Barren.json.gz": "0b01764d7e3d42a7",
+  "spot_82_114_8_10__ceval__R-Barren.json.gz": "ed88a44981056e6e",
+  "spot_90_10_8_10__ceval__R-Barren.json.gz": "34bd8f751a2ee302",
+  "spot_90_110_8_10__ceval__R-Barren.json.gz": "86092b39f0294b72",
+  "spot_90_50_8_10__ceval__R-Barren.json.gz": "fac8404fe4e3df40",
+  "spot_90_70_8_10__ceval__R-Barren.json.gz": "94a746539e30bac4",
+  "t10__ceval.json.gz": "ee74234578e6b7b3",
+  "t20__ceval.json.gz": "313fe6eeedfb0bed",
+  "t30__ceval.json.gz": "aa609e56f92b1630",
+  "t30__python.json.gz": "cd90a735bb5f1684",
+  "t30move__python__R-Barren.json.gz": "402ca8c9fe8c02ac",
+  "t30noobs__python__R-Barren.json.gz": "a56a9be87c2c4015",
+  "t30obs__python__R-Barren.json.gz": "5a7a1546a5589e7a",
+  "t30sight__python__R-Barren.json.gz": "84cf2984e0511977"
+ }
+}
