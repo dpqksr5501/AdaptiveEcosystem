@@ -4,7 +4,15 @@
 맞춰 게임 중에 두뇌가 바뀌게만 한다.' 사람 결정 10-21: 관문 '포만 없는 세계 1차', 한 바퀴 '빠른 판 10~15분', 두뇌 '관측 21로 올려 배움'
 (`AdaptiveEcosystem/Docs/RL_Policy/RL_V2_PLAN.md` 10-20 (17)·10-21 (18)).
 
-파일: 도구 `live.py`, 관문 `LIVE_GATE.md`, 예비 측정 `pilot/`, 시연 `demo/`, 주고받기 약속 `AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md`.
+파일: 도구 `live.py`, 관문 `LIVE_GATE.md`, 예비 측정 `pilot/`·`pilot_mask5/`, 시연 `demo/`, 주고받기 약속 `AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md`.
+
+> **10-27 (10) 실제 폴더 잠금을 풀었다 — 판 5 두뇌(R7e)를 건 Play 만** (사용자 '실제 폴더 잠금 풀자'): 판 5 예비 측정(`pilot_mask5/`)으로 관문 크기를
+> 규칙대로 정했다. 판 길이·시드 수·모델 수·중간 판정·도주 비용은 그대로이고, 학습은 2M → **1M 스텝**, 1차 최소 차이는 0 → **1 %p** 다.
+> `flight_sizes_confirmed` 가 참이라 `live.py watch`·`round` 가 실제 폴더(`Saved/EcoAdapt`)에서 돈다. 다만 크기를 잰 두뇌 묶음은 판 5 뿐이라, 게임 기본
+> 두뇌(내장 R1b-F)나 관측 21 두뇌로 시작한 Play 의 스냅숏은 실제 폴더에서 거부한다(상태 줄 `거부 — 지금 두뇌 묶음 obs21 은 실제 폴더 관문 크기 미확정 …`).
+> 실제 게임에서 고리가 두뇌를 바꾸려면 Play 를 판 5 두뇌로 시작한다(`-EcoV3Brain=v3_r7_g995_s1_20m`·`eco.V3Brain.Startup`, `eco.IntegratedV3.AutoAdapt 1`).
+> **미리 적는 예상: 판은 거의 다 기각된다** — 예비 측정에서 이어 배운 후보 36 개가 모두 지금 두뇌보다 덜 숨었다(−0.3~−4.1 %p). 한 바퀴는 언리얼을 끈 PC 에서
+> 중간 기각이면 약 2 분, 끝까지면 약 4 분이다. 두뇌가 실제로 바뀌려면 학습이 숨음을 보게 하거나 1차 기준을 바꿔야 한다(사람 결정). 규칙 `LIVE_GATE.md` 변경 기록 (10).
 
 > **10-24 (8) 두 길·판 5 두뇌도 받는다** (R7e 판정 통과·C++ 이식 `80bbf13` 뒤): 게임에 판 5 두뇌(관측 24 두 길 + 반사 밖 두뇌 도망 막음 — `EcoBrains/v3_r7_g995_s1_20m.json`)를
 > 불러 쓴 Play 에서 환경이 바뀌면, 고리가 그 두뇌를 '지금 두뇌'로 받아 판 5 세계에서 판정하고 판 5 그대로 이어 배운다(바탕 `configs/v3_wild3_route5_mirror.yaml`,

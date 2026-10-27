@@ -14,6 +14,10 @@ FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 �
 판정 실행기는 C++ 평가기다(LIVE evaluator 'ceval' — 10-24 같은 날 쫓김 사건 셈을 C++ 도망 기록에 옮겨 파이썬과 flight.episode 까지 같다. 옮기기 전
 잠깐 'python' 이었다. 10-23 에도 숨은 뒤 지켜보기를 C++ 에 옮기는 동안 잠깐 'python' 이었다).
 이 기준의 크기는 예비 측정 뒤 확정한다 — 확정 전(LIVE flight_sizes_confirmed 거짓)에는 실제 폴더에서 판·감시를 돌리지 않는다.
+10-27 (LIVE_GATE.md 변경 기록 (10) — 사람 결정 '실제 폴더 잠금 풀자'): 판 5 묶음(R7e 지금 두뇌) 예비 측정(results/v3/live/pilot_mask5/)으로 크기를
+확정했다 — H_N 1800 · n 80 · H_G 3600 · n_G 40 · K 1 · 중간 판정(앞 1/2, 짝 t ≤ 0 기각) · 도주 비용 0 그대로, S 2M → 1M, δ_H 0 → 1 %p,
+flight_sizes_confirmed 참. 실제 폴더에서는 크기를 확정한 두뇌 묶음(PROFILES sizes_confirmed — 지금은 판 5 route5 만)의 지금 두뇌일 때만 판을 돌린다.
+관측 18·21 지금 두뇌(묶음 obs21 — 게임 기본 내장 R1b-F 포함)는 사건 숨음 비율 기준 예비 측정이 없어 실제 폴더에서 거부(refused)한다(시험 폴더에서는 그대로 돈다).
 10-24 (LIVE_GATE.md 변경 기록 (8) — R7e 판정 통과·C++ 이식 뒤): 게임에 판 5 두뇌(관측 24 두 길 + 반사 밖 두뇌 FLEE 막음, 계약 0xad7bad5e1acaf071 —
 EcoBrains/v3_r7_g995_s1_20m.json)를 불러 쓰는 Play 의 스냅숏이면 그 두뇌를 '지금 두뇌'로 받아 판 5 세계(G·N 바탕 configs/v3_wild3_route5_mirror.yaml)에서
 판정하고 판 5 학습 세계(R7 조리법 configs/v3_r7_train.yaml 의 train 블록, PPO configs/ppo_r6_lam098.yaml)에서 이어 배운다 — 묶음은 시작 모델 계약이 정한다
@@ -108,15 +112,20 @@ R7_TRAIN = ROOT / "configs" / "v3_r7_train.yaml"                              # 
 PPO_ROUTE5 = ROOT / "configs" / "ppo_r6_lam098.yaml"                          # 판 5 PPO 설정 (R7 과 같은 λ 0.98)
 # 10-24 (LIVE_GATE.md 변경 기록 (8)) 이어 배우는 두뇌 묶음: 시작 모델의 계약 → 판정 세계 바탕(template — G·N), 학습 조리법(recipe — T 의 train 블록·부활 계수),
 # PPO 설정. 판 5 두뇌가 '지금 두뇌'면 G·N·T 모두 두 길·반사 밖 FLEE 막음 세계다. 계약이 이 표에 없는 시작 모델은 거부한다(판 4·판 6·관측 18 파일 두뇌).
+# 10-27 (변경 기록 (10)) sizes_confirmed: 관문 크기(LIVE)를 그 묶음의 지금 두뇌로 예비 측정해 확정했는가 — 거짓인 묶음은 실제 폴더(Saved/EcoAdapt)에서
+# 판을 돌리지 않는다(prepare real_root — 상태 refused). sizes_basis = 그 근거(LIVE_GATE.md 에 같은 글).
 PROFILES = {
     CONTRACT_OBS21: dict(name="obs21", obs_dim=21, mask_version=2, route=False, flee_gate=False, template=TEMPLATE_OBS, recipe=R5_TRAIN, ppo=PPO_CONFIG,
-                         label="관측 21 (R5 장애물 관측, 마스크 판 2)"),
+                         label="관측 21 (R5 장애물 관측, 마스크 판 2)", sizes_confirmed=False,
+                         sizes_basis="사건 숨음 비율 기준 예비 측정 없음 — 실제 폴더 잠금 유지"),
     CONTRACT_OBS24_M5: dict(name="route5", obs_dim=24, mask_version=5, route=True, flee_gate=True, template=TEMPLATE_ROUTE5, recipe=R7_TRAIN,
-                            ppo=PPO_ROUTE5, label="관측 24 두 길·반사 밖 도망 막음 (마스크 판 5)"),
+                            ppo=PPO_ROUTE5, label="관측 24 두 길·반사 밖 도망 막음 (마스크 판 5)", sizes_confirmed=True,
+                            sizes_basis="10-27 예비 측정 results/v3/live/pilot_mask5 (변경 기록 (10))"),
 }
 STATUS_FORMAT, STATE_FORMAT, ROUND_FORMAT = "eco_v3_live_status", "eco_v3_live_state", "eco_v3_live_round"
 
-# 빠른 관문 (LIVE_GATE.md 와 같은 값 — 10-21 예비 측정 p_20261021T050321 뒤 확정. 바꾸면 LIVE_GATE.md 변경 기록에 먼저 적는다)
+# 빠른 관문 (LIVE_GATE.md 와 같은 값 — 10-21 예비 측정 p_20261021T050321 뒤 확정, 10-27 (변경 기록 (10)) 판 5 묶음 예비 측정 pilot_mask5 로 사건 숨음 비율
+# 기준 크기 확정. 바꾸면 LIVE_GATE.md 변경 기록에 먼저 적는다)
 LIVE = dict(
     horizon=1800,                           # H_N: 포만 없는 세계 N 판정 길이 1800 스텝 = 4 분 (P1·GN)
     judge_seeds=(35000, 35079),             # N 판정: 시드 n = 80 × 지역, 짝 = 시드(지역 합) — 문턱 t_crit(n − 1)
@@ -125,24 +134,29 @@ LIVE = dict(
     select_seeds=(35100, 35119),            # 후보 고르기 (K > 1 일 때만, N 세계, H_N): 시드 20 × 지역
     stuck_seeds=(35000, 35004),             # 끼임 세기 (G 세계, H_G): 판정 시드 앞 5 × 지역
     check_seeds=(35180, 35199),             # 재현 확인 R (G 세계, 스냅숏 시각까지): 시드 20 × 지역
-    train_steps=2_000_000,                  # S: 모델마다 학습 스텝
+    train_steps=1_000_000,                  # S: 모델마다 학습 스텝 (10-27 (10): 2M → 1M — 판 5 예비 측정에서 1차 차이가 덜 나빴다 −1.25 대 −1.73 %p, 판 1.8 분 짧음)
     model_seeds=(0,),                       # K = 1
     shelter_x=2.0, use_min=0.01,            # G6: 은신처 안 몫 ≤ 지금의 2배, 먹기·도망·숨기 모두 1% 넘게
-    f_dec=None,                             # T 세계 f_dec — None = R5 조리법 값 그대로 (예비 측정 T 값 0.885549 는 기록만: 예비 후보가 R5 값으로 배웠다)
+    f_dec=None,                             # T 세계 f_dec — None = 묶음 조리법 값 그대로 (관측 21 = R5 0.858922 — 예비 측정 T 값 0.885549 는 기록만: 예비 후보가 R5
+                                            #   값으로 배웠다. 판 5 = R7 0.714694 — 10-27 (10) 예비 측정 T 값 0.680748 은 기록만, 같은 까닭)
     # 10-23 사람 결정 — 1차 = 숨음 비율 (LIVE_GATE.md 변경 기록 (6)): 쫓긴 도망(끝난 도망 가운데 끝 까닭이 unchased·truncated 아님 — env_v2/world.py
     # FLIGHT_NOT_CHASED) 가운데 은신처에 들어 끝나고(cover) 그 뒤 10 초(75 스텝) 안에 잡히지 않은 몫. 시드마다 지역 셋의 분자·분모를 더한 뒤 나눈다.
     # 10-24 사람 결정 (변경 기록 (7)): 같은 셈을 '쫓김 사건' 단위로 — 쫓긴 사건 가운데 숨음 사건 몫(env_v2/world.py '쫓김 사건', flight.episode)
     hide_min_chased=1,                      # P1·GH 짝: 두 두뇌 모두 쫓긴 사건(10-24 — 그 전은 쫓긴 도망)이 이만큼 있는 시드만 (C = 0 이면 그 시드 값 없음 —
                                             #   빠진 시드로 기록). 보고만 하는 옛 도망 단위 숨음·잡힘 비율 짝도 같은 수(쫓긴 도망)를 쓴다
-    hide_min_effect=0.0,                    # P1 최소 차이 δ_H (몫 0~1): 후보 − 지금 ≥ δ_H — 0 = 유의성만, 예비 측정 뒤 정한다 (옛 쫓긴 시간 δ 초를 바꿈)
+    hide_min_effect=0.01,                   # P1 최소 차이 δ_H (몫 0~1): 후보 − 지금 ≥ δ_H (옛 쫓긴 시간 δ 초를 바꿈). 10-27 (10): 0 → 0.01 (1 %p — 가장 작은
+                                            #   관심 크기 2 %p 의 절반, 효과 없는 두뇌 우연 통과 2.44% → 0.07%, 참 +2 %p 거의 모두·+1 %p 절반 통과)
     # 10-21 (3) 쫓긴 시간 (10-23 부터 1차가 아니라 보고만 — 쫓긴 시간 보고 줄·GG_chase·GC 의 재료)
     flight_own=("cover", "obstacle", "fov", "range"),   # 쫓긴 시간 보고: 스스로 벗어난 도망 = 이 끝 까닭 (env_v2/world.py FLIGHT_OWN 과 같다)
     flight_unsafe=("caught", "starved", "truncated"),   # GC: 잡힘·굶음·잘림으로 끝난 도망 (env_v2/world.py FLIGHT_UNSAFE 와 같다)
     flight_min_episodes=1,                  # 쫓긴 시간 짝(보고·GG_chase): 두 두뇌 모두 스스로 벗어난 도망이 이만큼 있는 시드만 (빠진 시드는 기록)
-    train_flight_cost=0.0,                  # T 세계 wild_flight.flight_cost (FLEE 를 실행한 스텝마다 보상에서 뺌) — 0 = 끔, 예비 측정 뒤 정한다
-    flight_sizes_confirmed=False,           # 위 크기·δ·도주 비용과 H·n·S·K 를 이 기준의 예비 측정으로 확정해 LIVE_GATE.md 에 적기 전에는 거짓 —
-                                            #   거짓이면 실제 폴더(Saved/EcoAdapt)에서 판·감시를 돌리지 않는다 (plan_from_args)
-    # 10-21 (4) 사용자 '중간에 미리 판정'·'지금 두뇌 시험 재사용'·네이티브 판정기 자리 (LIVE_GATE.md 변경 기록 (4), 5-3 — 시점·기각 경계는 예비 측정 뒤 확정)
+    train_flight_cost=0.0,                  # T 세계 wild_flight.flight_cost (FLEE 를 실행한 스텝마다 보상에서 뺌) — 0 = 끔. 10-27 (10): 0 그대로 확정 (판 5 는 반사
+                                            #   밖 두뇌 FLEE 를 막아 비용이 막으려던 '반사 전에 먼저 달아나기'가 없다 — 달린 시간은 GV 가 지킨다)
+    flight_sizes_confirmed=True,            # 위 크기·δ·도주 비용과 H·n·S·K 를 이 기준의 예비 측정으로 확정해 LIVE_GATE.md 에 적기 전에는 거짓 —
+                                            #   거짓이면 실제 폴더(Saved/EcoAdapt)에서 판·감시를 돌리지 않는다 (plan_from_args). 10-27 (10) 판 5 묶음 예비 측정
+                                            #   pilot_mask5 로 확정해 참 — 그래도 실제 폴더에서는 크기를 확정한 묶음(PROFILES sizes_confirmed)의 지금 두뇌만 받는다
+    # 10-21 (4) 사용자 '중간에 미리 판정'·'지금 두뇌 시험 재사용'·네이티브 판정기 자리 (LIVE_GATE.md 변경 기록 (4), 5-3 — 시점·기각 경계는 10-27 (10) 판 5
+    # 예비 측정 뒤 그대로 확정: 효과 없는 두뇌 흉내에서 49.9% 를 중간에 끝내고 통과 몫은 2.04 → 2.02%)
     seq_interim_frac=0.5,                   # 중간 판정: N 판정 시드 앞 이 몫(반올림 — n 80 이면 앞 40 = 35000~35039)을 먼저 돌려 1차 P1 을 한 번 본다. None = 끔
     seq_alpha=0.025,                        # 1차 P1 한쪽 α (지금 양쪽 5% 문턱과 같은 엄격함) — 두 번 봐도 '같은 두뇌가 우연히 통과할 몫' 합이 이 값 이하
     seq_spending="obf",                     # α 쓰기 함수: Lan–DeMets O'Brien–Fleming 꼴 (중간에는 아주 조금만 쓴다 — 끝 문턱이 거의 그대로)
@@ -1017,14 +1031,32 @@ def check_snapshot_route(snap: dict, prof: dict) -> None:
 # --------------------------------------------------------------------- #
 
 
-def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None = None, flight_cost: float | None = None) -> dict:
+def is_real_root(root) -> bool:
+    """<root> 가 실제 폴더(DEFAULT_ROOT = AdaptiveEcosystem/Saved/EcoAdapt — 언리얼이 두뇌를 받아 끼우는 곳)인가."""
+    return Path(root).resolve() == Path(DEFAULT_ROOT).resolve()
+
+
+def check_profile_sizes(prof: dict) -> None:
+    """10-27 (변경 기록 (10)): 실제 폴더에서는 관문 크기(LIVE)를 예비 측정으로 확정한 두뇌 묶음(PROFILES sizes_confirmed)의 지금 두뇌만 판을 돌린다.
+    아니면 adapt.Refused — 상태 줄 '거부 — …' (그 환경은 처리한 것으로 적혀 다시 하지 않는다). 시험 폴더(--root 다른 곳)는 보지 않는다."""
+    if not prof.get("sizes_confirmed"):
+        ok = ", ".join(f"{p['name']}({p['label']})" for p in PROFILES.values() if p.get("sizes_confirmed")) or "없음"
+        raise ad.Refused(f"지금 두뇌 묶음 {prof['name']} 은 실제 폴더 관문 크기 미확정 — 판 5 두뇌(R7e 등)를 건 Play 만 판을 돈다 "
+                         f"({prof.get('sizes_basis', '')}. 크기를 확정한 묶음: {ok} — LIVE_GATE.md 변경 기록 (10))")
+
+
+def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None = None, flight_cost: float | None = None,
+            real_root: bool = False) -> dict:
     """스냅숏 → 판 폴더 rd: snapshot.json(그대로)·world.yaml(G)·train.yaml(T)·regions.json·convert.json. N 은 G + NOSAT 변형(판정 때 덮는다).
     flight_cost (None = LIVE train_flight_cost) > 0 이면 T 에 wild_flight.flight_cost 를 적는다(0 이면 적지 않는다 — train.yaml 이 그대로).
     반환 = adapt 의 run 정보 꼴 {record, regions, dir} + start. 거부는 adapt.Refused (도주 반사를 끈 세계도 — 관문이 도망 기록을 쓴다).
     10-24 (변경 기록 (8)): 바탕 설정·학습 조리법·PPO 설정은 시작 모델 계약의 묶음(PROFILES)이 정한다 — 관측 21 이면 관측 21 거울·R5 조리법·ppo_best(옛것
-    그대로), 관측 24 · 판 5 면 판 5 거울(두 길·반사 밖 FLEE 막음)·R7 조리법(f_dec 0.714694)·λ 0.98. G·N·T 가 모두 그 판의 세계다."""
+    그대로), 관측 24 · 판 5 면 판 5 거울(두 길·반사 밖 FLEE 막음)·R7 조리법(f_dec 0.714694)·λ 0.98. G·N·T 가 모두 그 판의 세계다.
+    10-27 (변경 기록 (10)): real_root(실제 폴더의 판)면 그 묶음의 크기가 확정됐는지 본다(check_profile_sizes — 변환 전에 거부, rd 를 만들지 않는다)."""
     start = resolve_start(snap, folders)
     prof = profile_of(start["start_contract"])
+    if real_root:
+        check_profile_sizes(prof)
     check_snapshot_route(snap, prof)
     ref = json.loads(ad.REFERENCE.read_text(encoding="utf-8")) if ad.REFERENCE.exists() else None
     out = ad.convert(snap, ref, template=prof["template"], start=start["zip"], contract=start["start_contract"], recipe=prof["recipe"])
@@ -2359,9 +2391,9 @@ def plan_from_args(a) -> dict:
                                                 "flight_cost")) \
         or pl["skip_check"] \
         or pl["force_export"]
-    if pl["test"] and Path(a.root).resolve() == DEFAULT_ROOT.resolve():
+    if pl["test"] and is_real_root(a.root):
         raise SystemExit("시험 크기·시험 깃발은 --root 로 실제 폴더(Saved/EcoAdapt)가 아닌 곳을 줄 때만 쓴다 — 미리 적은 관문이 아니다")
-    if not LIVE["flight_sizes_confirmed"] and Path(a.root).resolve() == DEFAULT_ROOT.resolve():
+    if not LIVE["flight_sizes_confirmed"] and is_real_root(a.root):
         raise SystemExit("1차 사건 숨음 비율 기준의 크기(H·n·S·K·δ_H·도주 비용)를 아직 예비 측정으로 확정하지 않았다 (LIVE flight_sizes_confirmed 거짓, "
                          "LIVE_GATE.md 변경 기록 (3)·(6)·(7)) — 확정해 LIVE_GATE.md 와 LIVE 에 먼저 적기 전에는 실제 폴더에서 판·감시를 돌리지 않는다. "
                          "시험은 --root 로 다른 폴더를 준다")
@@ -2455,7 +2487,7 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
                message=f"변환 중 — 시도 {attempt}, 환경 #{e['revision']}")
         st.start_heartbeat()                                 # 재현 확인·판정처럼 긴 단계에서도 HEARTBEAT_S 마다 다시 쓴다
         try:
-            info = prepare(snap_path, snap, rd, brain_folders(root), flight_cost=plan["flight_cost"])
+            info = prepare(snap_path, snap, rd, brain_folders(root), flight_cost=plan["flight_cost"], real_root=is_real_root(root))
         except ad.Refused as ex_:
             res.update(state="refused", why=str(ex_), last_result=f"거부: {short(ex_, 60)}")
             mark("convert", t0)
@@ -2971,7 +3003,13 @@ def cmd_watch(a) -> int:
               + (", 도주 비용 {:g}".format(pl["flight_cost"]) if pl["flight_cost"] > 0 else "") + (", 시험 크기)" if pl["test"] else ")"))
         k = seq_sizes(len(seeds_of(pl["judge"])))
         w.log(("중간 판정 앞 " + f"{k}/{len(seeds_of(pl['judge']))} 시드" if k else "한 번 보기") + f", 판정 실행기 {LIVE['evaluator']}"
-              + (", 지금 두뇌 판정 다시 쓰기 켬" if LIVE["cache_current"] else ""))
+              + (", 지금 두뇌 판정 다시 쓰기 켬" if LIVE["cache_current"] else "")
+              + (f", 1차 최소 차이 +{float(LIVE['hide_min_effect']) * 100:g}%p" if float(LIVE["hide_min_effect"]) > 0 else ""))
+        if is_real_root(a.root):                            # 10-27 (변경 기록 (10)): 실제 폴더는 크기를 확정한 두뇌 묶음의 지금 두뇌만 받는다
+            ok_p = [f"{p['name']} ({p['label']})" for p in PROFILES.values() if p.get("sizes_confirmed")]
+            no_p = [p["name"] for p in PROFILES.values() if not p.get("sizes_confirmed")]
+            w.log("실제 폴더: 판을 돌리는 지금 두뇌 묶음 = " + (", ".join(ok_p) or "없음")
+                  + (f" — 그 밖({', '.join(no_p)}{' — 게임 기본 내장 R1b-F 포함' if 'obs21' in no_p else ''})은 거부" if no_p else ""))
         try:
             while True:
                 try:
@@ -3128,6 +3166,7 @@ def cmd_pilot(a) -> int:
     res: dict = {}
     out_rows: dict = dict(pilot=pid, snapshot=Path(a.snapshot).name, seeds=list(seeds_lh), cand_seeds=list(cand_lh), horizons=hs, steps=S_list,
                           model_seeds=K, flight_costs=fcs, extra_models={k: path_text(v) for k, v in extras.items()}, workers=W, times=times,
+                          profile=info["record"]["live"]["profile"], f_dec_recipe=float(info["record"]["live"]["f_dec"]),
                           criterion=("1차 = 포만 없는 세계 쫓긴 사건 가운데 숨음 사건 몫 — 사건 숨음 비율, 지킴 GH = 쫓긴 사건 가운데 잡힘 사건 몫, GE = "
                                      "1000 산 사슴-스텝당 사건 시작 (LIVE_GATE.md 변경 기록 (7) — 쫓김 사건). 도망 단위 숨음·잡힘 비율(변경 기록 (6))·"
                                      "쫓긴 시간(변경 기록 (3))은 보고만"))
@@ -3293,7 +3332,8 @@ def fmt_pilot(r: dict) -> str:
          f"- 기준: {r.get('criterion', '')}. 끝 까닭 몫은 시작한 도망 가운데, 끝 까닭 표는 전체 합(정의 env_v2/world.py '야생 1단계' (w3) 도망 기록)",
          f"- 스냅숏 {r['snapshot']}, 워커 {r['workers']}, 더 견줄 두뇌 {r.get('extra_models') or {}}, 도주 비용 후보 {r.get('flight_costs')}",
          f"- 시간 {json.dumps(r['times'], ensure_ascii=False)}",
-         f"- T 세계(늑대 포만 끔, 스냅숏 먹이 지도) f_dec = {r.get('f_dec_T')} (R5 조리법 값 0.858922)", ""]
+         f"- T 세계(늑대 포만 끔, 스냅숏 먹이 지도) f_dec = {r.get('f_dec_T')} ("
+         + (f"학습에 쓴 조리법 값 {r['f_dec_recipe']:g} — 두뇌 묶음 {r.get('profile')}" if r.get("f_dec_recipe") is not None else "R5 조리법 값 0.858922") + ")", ""]
     if r.get("vs_current"):
         if any("ep_hide" in x["flight"] for by in r["vs_current"].values() for hh in by.values() for x in hh.values()):
             L += ["## 두뇌 − 지금 두뇌: 1차 사건 숨음 비율·지킴 GH·GE (시드마다 짝 차이 — 관문과 같은 셈, 10-24 변경 기록 (7) 쫓김 사건)", "",

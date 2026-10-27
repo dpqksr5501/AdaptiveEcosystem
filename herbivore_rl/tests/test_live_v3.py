@@ -20,6 +20,9 @@
 - 10-24 (8) 두 길·판 5 두뇌: 묶음 표(계약 = 바탕 설정·학습 조리법 세계의 관측·마스크 판으로 다시 셈한 해시, 판 5 = 판 5 거울·R7 조리법·λ 0.98), R7e 지금 두뇌
   → 그 zip·판 5 세계(G·N·T, 평가기 일 포함), 판 4·마스크 판·지역 두 길 칸 어긋남 거부, 판 5 두뇌 파일 A5(계약·골든 세계), 길 보고 GT·GTr·GR = r6_eval 셈
   (보고만 — 관문 판정 그대로, 관측 21 판은 보고 없음, 중간 기각이면 앞 절반 짝).
+- 10-27 (10) 실제 폴더 잠금 풀기: 판 5 예비 측정(pilot_mask5)으로 정한 상수(S 1M·δ_H 1 %p·flight_sizes_confirmed 참) = LIVE_GATE.md, 묶음 잠금(임시 폴더를
+  실제 폴더로 놓고 감시 → 판 명령 → 판: 판 5 R7e 는 변환·학습 시작까지, 관측 18 내장 R1b-F 는 변환 전에 거부·처리함, 진짜 Saved/EcoAdapt 그대로),
+  예비 측정 pilot.md f_dec 머리 줄(묶음 조리법 값).
 학습·판정 세계를 돌리지 않는다(내보내기 골든 600 스텝, 도주 비용 기준 크기 T 세계 셋 × 20 스텝만). 시드는 관문 범위 이름만 쓰고 세계를 돌리지 않는다.
 """
 
@@ -351,12 +354,12 @@ def test_plan_guard(lv, tmp_path, monkeypatch):
     assert "--judge-seeds-g" in lv.plan_args(pl) and "--horizon-g" in lv.plan_args(pl) and "--judge-seeds" not in lv.plan_args(pl)
     with pytest.raises(SystemExit):
         lv.plan_from_args(ns(root=str(lv.DEFAULT_ROOT), steps=20000))     # 시험 크기는 실제 폴더에서 받지 않는다
-    assert lv.LIVE["flight_sizes_confirmed"] is False                      # 10-21 (3) 쫓긴 시간 기준의 크기는 예비 측정 뒤 확정
-    with pytest.raises(SystemExit, match="예비 측정으로 확정하지 않았다"):
-        lv.plan_from_args(ns(root=str(lv.DEFAULT_ROOT)))                   # 확정 전에는 관문 크기여도 실제 폴더에서 판·감시를 돌리지 않는다
-    monkeypatch.setitem(lv.LIVE, "flight_sizes_confirmed", True)
-    assert not lv.plan_from_args(ns(root=str(lv.DEFAULT_ROOT)))["test"]
+    assert lv.LIVE["flight_sizes_confirmed"] is True                       # 10-27 (10) 판 5 예비 측정으로 확정 (그 전 10-21 (3)~ 거짓)
+    assert not lv.plan_from_args(ns(root=str(lv.DEFAULT_ROOT)))["test"]   # 관문 크기면 실제 폴더에서 판·감시를 시작한다 (묶음 잠금은 판에서 — test_real_root_profile_lock)
     monkeypatch.setitem(lv.LIVE, "flight_sizes_confirmed", False)
+    with pytest.raises(SystemExit, match="예비 측정으로 확정하지 않았다"):
+        lv.plan_from_args(ns(root=str(lv.DEFAULT_ROOT)))                   # 확정 전에는 관문 크기여도 실제 폴더에서 판·감시를 돌리지 않는다 (전역 잠금 그대로)
+    assert not lv.plan_from_args(ns())["test"]                             # 시험 폴더는 잠금과 상관없다
     with pytest.raises(SystemExit):
         lv.plan_from_args(ns(judge_seeds="34900-34902"))                   # 예비 측정 시드는 관문에 쓰지 않는다
     for kw in (dict(judge_seeds="35000"), dict(judge_seeds_g="35000-35000"), dict(select_seeds="35100-35100")):
@@ -637,6 +640,10 @@ def test_pilot_flight_pair(lv):
     assert "두뇌 − 지금 두뇌" in text and "도망 끝 까닭" in text and "쫓긴 시간 지금 초" in text and "GF 시작/1000" in text
     assert "숨음 비율 지금" in text and "2·5·10 %p 가를 시드 수" in text and "숨음 비율 (쫓긴 도망 가운데, 전체 합)" in text
     assert "1차 사건 숨음 비율·지킴 GH·GE" in text and "사건 숨음 비율 지금" in text and "도망 단위 숨음 비율·잡힘 비율" in text
+    assert "f_dec = None (R5 조리법 값 0.858922)" in text                    # 옛 기록(조리법 값 없음)은 옛 글 그대로
+    text = lv.fmt_pilot(dict(pilot="p_t", seeds=[34900, 34919], snapshot="s.json", workers=2, times={}, flight_costs=[0.0], f_dec_T=0.680748,
+                             f_dec_recipe=0.714694, profile="route5"))
+    assert "f_dec = 0.680748 (학습에 쓴 조리법 값 0.714694 — 두뇌 묶음 route5)" in text and "R5 조리법 값" not in text   # 10-27 (10): 판 5 묶음 글 고침
 
 
 # --------------------------------------------------------------------- #
@@ -1633,6 +1640,103 @@ def test_route5_export(lv, tmp_path):
         assert sorted(p.name for p in brains.iterdir()) == [Path(x["file"]).name]               # 임시 파일이 남지 않는다
 
 
+class _LazyProc:
+    """감시가 띄운 판을 이 프로세스에서 돌리는 프로세스 꼴 (poll·wait·kill·returncode·pid — 감시가 쓰는 것만). 판은 감시가 처음 poll 할 때 끝까지 돈다 —
+    진짜 판 프로세스처럼 감시가 상태 줄 '시작'을 쓴 뒤에 판이 상태 줄을 쓴다."""
+
+    def __init__(self, fn):
+        self._fn, self.returncode, self.pid = fn, None, os.getpid()
+
+    def poll(self):
+        if self.returncode is None:
+            self.returncode = int(self._fn())
+        return self.returncode
+
+    def wait(self, timeout=None):
+        return self.poll()
+
+    def kill(self):
+        pass
+
+
+def _tree(p: Path) -> dict:
+    return {str(q.relative_to(p)): (q.stat().st_mtime_ns, q.stat().st_size) for q in p.rglob("*")} if p.exists() else {}
+
+
+@need_r7e
+def test_real_root_profile_lock(lv, snap, tmp_path, monkeypatch):
+    """10-27 (변경 기록 (10)) 실제 폴더 잠금 풀기 — 임시 폴더를 실제 폴더(DEFAULT_ROOT)로 놓고 본다(진짜 Saved/EcoAdapt 에는 쓰지 않는다): 관문 크기 plan 이
+    시작되고, 감시가 띄우는 판 명령은 시험 깃발 없이 그 폴더를 쓴다. 그 명령(이 프로세스에서 live.main 으로 돌림)으로 판 5 두뇌(R7e) 스냅숏은 묶음 잠금을
+    지나 변환·학습 시작까지 가고(학습은 가짜로 멈춘다), 관측 18 내장 R1b-F 스냅숏(묶음 obs21 — 크기 미확정)은 변환 전에 거부된다(refused·처리함·상태 줄
+    '거부 — …'). 시험 폴더(real_root 거짓)는 관측 21 묶음도 그대로 받는다."""
+    real = Path(lv.DEFAULT_ROOT)
+    before = _tree(real)
+    fake = tmp_path / "Saved" / "EcoAdapt"
+    monkeypatch.setattr(lv, "DEFAULT_ROOT", fake)
+    assert lv.is_real_root(fake) and not lv.is_real_root(real) and not lv.is_real_root(tmp_path / "other")
+    # 묶음 잠금은 변환 전에 (판 폴더를 만들지 않는다). 시험 폴더는 그대로 받는다
+    with pytest.raises(lv.ad.Refused, match="obs21 은 실제 폴더 관문 크기 미확정"):
+        lv.prepare(SNAP, snap, tmp_path / "a_o21", lv.BRAIN_FOLDERS, real_root=True)
+    assert not (tmp_path / "a_o21").exists()
+    assert lv.prepare(SNAP, snap, tmp_path / "a_o21_test", lv.BRAIN_FOLDERS)["record"]["live"]["profile"] == "obs21"
+    lv.check_profile_sizes(lv.PROFILES[lv.CONTRACT_OBS24_M5])                                     # 판 5 묶음은 확정
+
+    # 감시 → 판 명령 → 판 (실제 폴더 꼴). 재현 확인·학습은 돌리지 않는다 (세계를 돌리지 않는 시험)
+    monkeypatch.setattr(lv, "r_applicable", lambda s: (False, "시험 — 재현 확인 건너뜀"))
+
+    def stop_training(*a, **k):
+        raise RuntimeError("시험: 학습 앞에서 멈춤")
+
+    monkeypatch.setattr(lv, "launch_training", stop_training)
+    ran = []
+
+    def launcher(cmd, fh):
+        assert cmd[2] == "round" and cmd[cmd.index("--root") + 1] == str(fake) and "--child" in cmd
+        assert not any(f in cmd for f in ("--steps", "--model-seeds", "--horizon", "--horizon-g", "--judge-seeds", "--judge-seeds-g", "--skip-check",
+                                          "--force-export", "--flight-cost"))                    # 관문 크기 그대로 (시험 깃발 없음)
+        def run():
+            rc = lv.main(cmd[2:])
+            ran.append((cmd[cmd.index("--run-id") + 1], rc))
+            return rc
+
+        return _LazyProc(run)
+
+    a = Namespace(root=str(fake), workers=2, ckpt=str(tmp_path / "ckpt"), steps=None, model_seeds=None, horizon=None, judge_seeds=None, select_seeds=None,
+                  stuck_seeds=None, check_seeds=None, skip_check=False, force_export=False, horizon_g=None, judge_seeds_g=None, flight_cost=None)
+    pl = lv.plan_from_args(a)                                                                     # 실제 폴더에서 관문 크기 plan 이 시작된다 (잠금 풀림)
+    assert not pl["test"] and pl["steps"] == lv.LIVE["train_steps"] == 1_000_000 and pl["horizon"] == 1800 and pl["judge"] == (35000, 35079)
+    w = lv.Watcher(fake, pl, launcher=launcher, log=lambda s: None)
+    now = time.time()
+    r7e = _route_snap(snap)
+    _write_snap(w.snapdir, "eco_v3_snapshot_s20003_t1800_e1.json", r7e, now - 10)
+    w.tick()                                                                                      # 판 5 → 판 띄움
+    assert w.child is not None and not ran
+    _write_snap(w.snapdir, "eco_v3_snapshot_s20003_t1900_e1.json", snap, now - 5)                # 관측 18 내장 R1b-F (게임 기본)
+    w.tick()                                                                                      # 판 5 판이 돌고(가짜 학습에서 멈춤) 정리 → 관측 18 판 띄움
+    assert len(ran) == 1 and w.child is not None
+    w.tick()                                                                                      # 관측 18 판 → 변환 전에 거부 → 정리
+    assert w.child is None and len(ran) == 2
+    w.tick()
+    assert len(ran) == 2                                                                          # 거부한 환경을 다시 띄우지 않는다
+    rid5, rid18 = ran[0][0], ran[1][0]
+    r5 = json.loads((lv.rounds_dir(fake) / rid5 / "result.json").read_text(encoding="utf-8"))
+    assert r5["state"] == "error" and "시험: 학습 앞에서 멈춤" in r5["why"] and r5["brain_profile"] == "route5" and not r5["plan_test"]
+    assert r5["plan"]["steps"] == 1_000_000 and r5["start"] == "ckpt/v3/v3_r7_g995_s1_20m.zip"
+    cv = json.loads((lv.rounds_dir(fake) / rid5 / "convert.json").read_text(encoding="utf-8"))
+    assert cv["live"]["profile"] == "route5" and cv["live"]["f_dec"] == pytest.approx(0.714694)
+    r18 = json.loads((lv.rounds_dir(fake) / rid18 / "result.json").read_text(encoding="utf-8"))
+    assert r18["state"] == "refused" and "obs21 은 실제 폴더 관문 크기 미확정" in r18["why"] and ran[1][1] == 0
+    assert not (lv.rounds_dir(fake) / rid18 / "world.yaml").exists()                              # 변환 전에 거부
+    st = lv.load_state(fake)
+    assert lv.is_processed(st, lv.pair_key(snap)) and not lv.is_processed(st, lv.pair_key(r7e))   # 거부 = 처리함 (같은 환경을 다시 하지 않는다)
+    assert [h["state"] for h in st["history"]] == ["error", "refused"] and st["round"] == 0
+    d = json.loads((fake / "status.json").read_text(encoding="utf-8"))
+    assert d["state"] == "refused" and d["message"].startswith("거부 — 지금 두뇌 묶음 obs21 은 실제 폴더 관문 크기 미확정")
+    assert not list((fake / "brains").glob("*.json"))                                           # 두뇌 파일은 쓰지 않았다
+    w.stop()
+    assert _tree(real) == before                                                                  # 진짜 실제 폴더는 그대로
+
+
 def _route_block(refled: int, run: int, shelter: int, decisions: int = 40, choice: int = 20, pick_shelter: int = 12) -> dict:
     """세계 하나의 길 기록 (짜 맞춤 — World.flight_stats 의 route 꼴에서 보고가 읽는 칸만)."""
     z = dict(run=0, cover=0, shelter=0, open=0)
@@ -1748,9 +1852,16 @@ def test_constants_match_md(lv):
     assert tuple(L["flight_unsafe"]) == FLIGHT_UNSAFE and "(caught · starved · truncated)" in md
     assert L["flight_min_episodes"] == 1 and "스스로 벗어난 도망 1개 이상" in md
     assert "flight_min_effect_s" not in L                                                          # 10-23 (6): 쫓긴 시간 δ(초)는 δ_H 로 바꿨다
-    assert L["train_flight_cost"] == 0.0 and "| T 세계 도주 비용 flight_cost | 0 (끔) | 예비 측정 뒤 확정" in md
-    assert L["flight_sizes_confirmed"] is False and "| 크기 확정 표시 flight_sizes_confirmed | 거짓 |" in md
-    assert md.count("숨음 비율 기준은 예비 측정 뒤 확정") >= 6
+    assert L["train_flight_cost"] == 0.0 and "| T 세계 도주 비용 flight_cost | 0 (끔) | 확정 (10-27 (10) 판 5 예비 측정" in md
+    # 10-27 (10) 사람 결정 '실제 폴더 잠금 풀자' — 판 5 묶음 예비 측정 pilot_mask5 로 크기 확정, 관측 21 묶음은 실제 폴더 잠금 유지
+    assert "### 2026-10-27 (10) 사람 결정 '실제 폴더 잠금 풀자'" in md and "'실제 폴더 잠금 풀자'" in md and "'두뇌를 다시 배우는 건" in md
+    assert L["flight_sizes_confirmed"] is True and "| 크기 확정 표시 flight_sizes_confirmed | 참 |" in md
+    assert md.count("사건 숨음 비율 기준도 그대로 확정 (10-27 (10) 판 5 예비 측정 `pilot_mask5`)") == 5          # H_N·n·H_G·n_G·K
+    assert L["train_steps"] == 1_000_000 and "| 학습 스텝 S | 1M | 확정 (10-27 (10) 판 5 예비 측정" in md and "**S = 1M 스텝**(10-27 (10) — 그 전 2M)" in md
+    conf = {p_["name"]: p_["sizes_confirmed"] for p_ in lv.PROFILES.values()}
+    assert conf == {"obs21": False, "route5": True} and all(p_["sizes_basis"] for p_ in lv.PROFILES.values())
+    assert "| 크기를 확정한 두뇌 묶음 (`live.PROFILES` `sizes_confirmed`) | 판 5 `route5`" in md and "관측 21 `obs21`(관측 18 R1b-F·관측 21 지금 두뇌) 거짓" in md
+    assert (LIVE_DIR / "pilot_mask5" / "README.md").exists() and "`pilot_mask5/`" in md
     assert all(k in md for k in ("GF", "GV", "GC", "GG_chase", "GN_caught", "P1_N_hide", "GH_flight_caught", "REPORT_N_chase"))
     assert all(f"`{c}`" in md for c in FLIGHT_CAUSES)
     assert lv.STEP_S == pytest.approx(2.0 / 15.0) == FLIGHT_STEP_S and "× 2/15 초" in md
@@ -1761,7 +1872,7 @@ def test_constants_match_md(lv):
     assert FLIGHT_HIDE_WATCH_STEPS == 75 and "| 지켜보는 길이 | 75 스텝 (10 초 ÷ 1 스텝 2/15 초 — 코드 `FLIGHT_HIDE_WATCH_STEPS`) |" in md
     assert FLIGHT_NOT_CHASED == ("unchased", "truncated") and "`unchased`·`truncated`(코드 `FLIGHT_NOT_CHASED`)" in md
     assert L["hide_min_chased"] == 1 and "| P1·GH 짝 시드 조건 | 두 두뇌 모두 쫓긴 사건 1개 이상 (`hide_min_chased`" in md
-    assert L["hide_min_effect"] == 0.0 and "| P1 최소 차이 δ_H | 0 %p (유의성만 — `hide_min_effect`) | 예비 측정 뒤 확정" in md
+    assert L["hide_min_effect"] == 0.01 and "| P1 최소 차이 δ_H | 1 %p (`hide_min_effect` 0.01" in md and "≥ δ_H(`LIVE.hide_min_effect` 0.01 = **1 %p**" in md
     assert "9.48 % 대 9.50 %" in md and "12.73 % → 21.19 %" in md and "13.25 % → 21.89 %" in md and "10 초 지켜보기 전 값" in md
     assert "10-23 덧붙임 — 숨은 뒤 10 초 지켜보기를 C++ 에 옮김" in md
     # 10-24 (7) 쫓김 사건: 사람 결정·까닭(R7 결과를 본 뒤 — 두 번 세기)·정의·이음 창 상수·GE·판정 실행기 python·저장 판
@@ -1778,7 +1889,7 @@ def test_constants_match_md(lv):
     # 10-21 (4) 중간 판정 (두 번 보기)·지금 두뇌 판정 다시 쓰기·판정 실행기 — 시점·기각 경계는 예비 측정 뒤 확정 (10-23 (6) 부호 뒤집음)
     assert "### 2026-10-21 (4) 중간 판정" in md and "### 5-3. 중간 판정 (두 번 보기" in md
     k = lv.seq_sizes(n)
-    assert L["seq_interim_frac"] == 0.5 and k == 40 and f"| 중간 판정 시점 seq_interim_frac | N 판정 시드 앞 1/2 (n {n} 이면 35000~{35000 + k - 1}, {k}개) | 예비 측정 뒤 확정" in md
+    assert L["seq_interim_frac"] == 0.5 and k == 40 and f"| 중간 판정 시점 seq_interim_frac | N 판정 시드 앞 1/2 (n {n} 이면 35000~{35000 + k - 1}, {k}개) | 확정 (10-27 (10)" in md
     assert L["seq_alpha"] == 0.025 and "| 1차 한쪽 α seq_alpha | 0.025" in md and L["seq_spending"] == "obf" and "| α 쓰기 함수 seq_spending | obf" in md
     assert L["seq_efficacy"] is False and lv.seq_final_bound(n, dict(lv.seq_interim_bound(k, n), n1=k))["bound"] == tc     # 끈 기본: 끝 문턱 = 옛 것
     old = L["seq_efficacy"]
@@ -1792,7 +1903,7 @@ def test_constants_match_md(lv):
     assert f"| 끝 문턱 b₂ (두 번 보기) | 끈 기본: 짝 t ≥ +{tc:.3f} (옛 한 번 보기 그대로). 앞서 통과를 켜면 +{b2['bound']:.3f} (n₁ {n}, t_{{α − α₁}})" in md
     assert f"앞서 통과를 켜면 끝 문턱 b₂ = +{b2['bound']:.3f} (n₁ {n}), 중간 b₁ = +{b1['bound']:.3f} (n₁ {k})" in md                  # 5절 P1 줄
     assert f"중간 c₁ = {b1['c1']:.3f}" in md and f"참고 c₂ = {b2['c2']:.3f}" in md and f"+{b2['bound_z']:.3f}" in md
-    assert L["seq_futility_t"] == 0.0 and "| 중간 기각 경계 seq_futility_t | 짝 t ≤ 0 (나아지는 쪽도 아님) — 구속력 없음 | 예비 측정 뒤 확정" in md
+    assert L["seq_futility_t"] == 0.0 and "| 중간 기각 경계 seq_futility_t | 짝 t ≤ 0 (나아지는 쪽도 아님) — 구속력 없음 | 확정 (10-27 (10)" in md
     assert lv.fut_bound_text(L["seq_futility_t"]) == "t ≤ 0" and "`gate.md` 머리 `중간 기각 경계 t ≤ 0`" in md
     assert "### 2026-10-21 (5)" in md
     assert L["cache_current"] is True and "| 지금 두뇌 판정 다시 쓰기 cache_current | 켬" in md
