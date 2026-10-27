@@ -8,6 +8,8 @@
 //   - 부드러운 따라가기: 넘침 없음, 큰 프레임에도 안정, 앞보기를 더하면 9 m/s 대상도 뒤처지지 않음, 각도는 짧은 쪽.
 //   - 논리 개체 찾기(Gather): 표현 액터 없이 600 m 떨어진 개체도 찾는다(촬영 감독 wolf·deer 가 대상을 못 찾던 원인),
 //     클라이언트 표본이 없는 개체는 빼고 표본이 있으면 그 자리. 서브시스템 흐름(로컬 플레이어 없이): 1·1·, .·2·3·지역·5·0.
+//   - 관찰 중 플레이어 이동 입력 막기(10-27 사용자 결정): 원래 카메라 = 안 막음, 1~5 = 막음(폰 이동 입력이 0), 다시 맞춰도 한 번만 더함,
+//     엔진이 지우면(ResetIgnoreInputFlags) 다시 막음, eco.Cam.BlockMove 0 = 풀림, 0 = 풀림, 팀이 건 막기는 남김, 컨트롤러가 바뀌면 전 것을 풂.
 // 문서: AdaptiveEcosystem/Docs/RL_Policy/OBSERVER_CAMERA.md
 
 #include "Misc/AutomationTest.h"
@@ -18,6 +20,8 @@
 #include "../EcoV3ObserverCamera.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "EcoTestWorld.h"
+#include "GameFramework/Pawn.h"
+#include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
 #include "InputCoreTypes.h"
 #include "Mass/EcoMassFragments.h"
@@ -182,7 +186,7 @@ bool FEcoV3ObserverCameraKeysTest::RunTest(const FString& Parameters)
 	// 6. 콘솔 명령·변수가 있다
 	for (const TCHAR* Name : {TEXT("eco.Cam.Wolf"), TEXT("eco.Cam.Deer"), TEXT("eco.Cam.Top"), TEXT("eco.Cam.Quarter"), TEXT("eco.Cam.Auto"),
 							  TEXT("eco.Cam.Next"), TEXT("eco.Cam.Prev"), TEXT("eco.Cam.Zoom"), TEXT("eco.Cam.Region"), TEXT("eco.Cam.Player"),
-							  TEXT("eco.Cam.Help"), TEXT("eco.Cam.Enable"), TEXT("eco.Cam.HudScale")})
+							  TEXT("eco.Cam.Help"), TEXT("eco.Cam.Enable"), TEXT("eco.Cam.HudScale"), TEXT("eco.Cam.BlockMove")})
 	{
 		TestNotNull(*FString::Printf(TEXT("콘솔 %s"), Name), IConsoleManager::Get().FindConsoleObject(Name));
 	}
@@ -790,6 +794,155 @@ bool FEcoV3ObserverCameraWorldTest::RunTest(const FString& Parameters)
 	Cam->SetMode(EEcoV3CamMode::Player);
 	TestTrue(TEXT("0 = 원래 카메라"), Cam->GetMode() == EEcoV3CamMode::Player);
 	TestEqual(TEXT("원래 카메라는 대상 없음"), Cam->GetSubjectId(), static_cast<int64>(0));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 관찰 중 플레이어 이동 입력 막기 (10-27 사용자 결정 — 안 보이는 폰이 걸어 발소리 Player.Footstep 를 사슴이 듣지 않게)
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3ObserverCameraMoveBlockTest, "AdaptiveEcosystem.Policy.V3.ObserverCamera.MoveInputBlock",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3ObserverCameraMoveBlockTest::RunTest(const FString& Parameters)
+{
+	EcoTest::FScopedTestWorld Scoped;
+	if (!TestNotNull(TEXT("테스트 월드"), Scoped.World))
+	{
+		return false;
+	}
+	UWorld& World = *Scoped.World;
+	UMassEntitySubsystem* MassSub = World.GetSubsystem<UMassEntitySubsystem>();
+	UEcoV3ObserverCameraSubsystem* Cam = World.GetSubsystem<UEcoV3ObserverCameraSubsystem>();
+	IConsoleVariable* BlockVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Cam.BlockMove"));
+	if (!TestNotNull(TEXT("UMassEntitySubsystem"), MassSub) || !TestNotNull(TEXT("관찰 카메라 서브시스템"), Cam)
+		|| !TestNotNull(TEXT("eco.Cam.BlockMove"), BlockVar))
+	{
+		return false;
+	}
+	const int32 SavedBlock = BlockVar->GetInt();
+	BlockVar->Set(1, ECVF_SetByCode);
+
+	// 관찰 모드를 켜려면 통합 개체가 있어야 한다 (늑대 하나·사슴 하나)
+	FMassEntityManager& EM = MassSub->GetMutableEntityManager();
+	const FMassArchetypeHandle Arch = EM.CreateArchetype({
+		FEcoIntegratedCreatureTag::StaticStruct(),
+		FEcoIdentityFragment::StaticStruct(),
+		FEcoRegionFragment::StaticStruct(),
+		FTransformFragment::StaticStruct(),
+		FEcoCreaturePresentationFragment::StaticStruct(),
+	});
+	auto Spawn = [&EM, &Arch](int64 Id, const TCHAR* Species, const FVector& At)
+	{
+		const FMassEntityHandle E = EM.CreateEntity(Arch);
+		FEcoIdentityFragment& Ident = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
+		Ident.StableAgentId = Id;
+		Ident.SpeciesId = FName(Species);
+		EM.GetFragmentDataChecked<FEcoRegionFragment>(E).CurrentRegionId = FName(TEXT("A"));
+		EM.GetFragmentDataChecked<FTransformFragment>(E).GetMutableTransform().SetLocation(At);
+		FEcoCreaturePresentationFragment& Pres = EM.GetFragmentDataChecked<FEcoCreaturePresentationFragment>(E);
+		Pres.Flags = 1;   // 살아 있음
+		Pres.Activity = static_cast<uint8>(EEcoSpeciesActivity::Hold);
+	};
+	Spawn(501, TEXT("Wolf"), FVector(1000.0, 0.0, 0.0));
+	Spawn(502, TEXT("Herbivore"), FVector(2000.0, 0.0, 0.0));
+
+	// 보는 플레이어 컨트롤러와 폰 (엔진 시험처럼 직접 만든다). 로컬 플레이어(ULocalPlayer)가 없어 서브시스템의 로컬 컨트롤러 찾기는 이것을 고르지 않는다
+	// — 카메라 액터·보기 대상은 건드리지 않고, Tick 이 하는 막기 맞추기(SyncMoveInputBlock)를 직접 부른다
+	APlayerController* PC = World.SpawnActor<APlayerController>();
+	APawn* Pawn = World.SpawnActor<APawn>();
+	if (!TestNotNull(TEXT("플레이어 컨트롤러"), PC) || !TestNotNull(TEXT("폰"), Pawn))
+	{
+		BlockVar->Set(SavedBlock, ECVF_SetByCode);
+		return false;
+	}
+	PC->Possess(Pawn);
+	TestTrue(TEXT("폰을 잡았다"), Pawn->GetController() == PC);
+	// WASD 한 프레임 (프로젝트 캐릭터 Move 가 부르는 AddMovementInput) 뒤 폰에 남은 이동 입력
+	auto MoveInputAfterW = [Pawn]() -> FVector
+	{
+		Pawn->ConsumeMovementInputVector();
+		Pawn->AddMovementInput(FVector::ForwardVector, 1.0f);
+		return Pawn->ConsumeMovementInputVector();
+	};
+
+	// 1. 원래 카메라: 막지 않는다
+	Cam->SyncMoveInputBlock(PC);
+	TestFalse(TEXT("원래 카메라 = 안 막음"), Cam->IsBlockingMoveInput());
+	TestFalse(TEXT("원래 카메라 = 컨트롤러 이동 무시 아님"), PC->IsMoveInputIgnored());
+	TestEqual(TEXT("원래 카메라 = W 가 폰에 들어간다"), MoveInputAfterW(), FVector::ForwardVector, 1.0e-4f);
+
+	// 2. 관찰(1) = 막는다 — 폰 이동 입력이 0 (발소리가 나지 않는다)
+	Cam->SetMode(EEcoV3CamMode::Wolf);
+	if (!TestTrue(TEXT("1 = 늑대 시점"), Cam->GetMode() == EEcoV3CamMode::Wolf))
+	{
+		BlockVar->Set(SavedBlock, ECVF_SetByCode);
+		return false;
+	}
+	Cam->SyncMoveInputBlock(PC);
+	TestTrue(TEXT("관찰 중 = 막음"), Cam->IsBlockingMoveInput());
+	TestTrue(TEXT("관찰 중 = 컨트롤러 이동 무시"), PC->IsMoveInputIgnored());
+	TestTrue(TEXT("관찰 중 = 폰도 이동 무시"), Pawn->IsMoveInputIgnored());
+	TestTrue(TEXT("관찰 중 = W 가 폰에 들어가지 않는다"), MoveInputAfterW().IsNearlyZero());
+	TestTrue(TEXT("상태 줄에 이동 막음"), Cam->DescribeStatus().Contains(TEXT("이동 막음")));
+	// 매 프레임 다시 맞춰도·다른 관찰 모드로 바꿔도 한 번만 더한다 (풀 때 한 번 빼면 0 — 아래 4에서 본다)
+	Cam->SyncMoveInputBlock(PC);
+	Cam->SetMode(EEcoV3CamMode::Deer);
+	Cam->SyncMoveInputBlock(PC);
+	Cam->SetMode(EEcoV3CamMode::Top);
+	Cam->SyncMoveInputBlock(PC);
+	TestTrue(TEXT("모드를 바꿔도 막음"), Cam->IsBlockingMoveInput() && PC->IsMoveInputIgnored());
+
+	// 3. 엔진이 이동 무시 수를 지우면 (폰 다시 시작 — ClientRestart 의 ResetIgnoreInputFlags) 다음 맞추기에서 다시 막는다
+	PC->ResetIgnoreInputFlags();
+	TestFalse(TEXT("엔진이 지움"), PC->IsMoveInputIgnored());
+	Cam->SyncMoveInputBlock(PC);
+	TestTrue(TEXT("다시 막음"), PC->IsMoveInputIgnored());
+	TestTrue(TEXT("다시 막은 뒤 W 가 폰에 들어가지 않는다"), MoveInputAfterW().IsNearlyZero());
+
+	// 4. eco.Cam.BlockMove 0 = 풀림, 1 = 다시 막음
+	BlockVar->Set(0, ECVF_SetByCode);
+	Cam->SyncMoveInputBlock(PC);
+	TestFalse(TEXT("BlockMove 0 = 풀림"), Cam->IsBlockingMoveInput());
+	TestFalse(TEXT("BlockMove 0 = 수가 0 으로 (한 번만 더했다)"), PC->IsMoveInputIgnored());
+	TestEqual(TEXT("BlockMove 0 = W 가 폰에 들어간다"), MoveInputAfterW(), FVector::ForwardVector, 1.0e-4f);
+	BlockVar->Set(1, ECVF_SetByCode);
+	Cam->SyncMoveInputBlock(PC);
+	TestTrue(TEXT("BlockMove 1 = 다시 막음"), Cam->IsBlockingMoveInput() && PC->IsMoveInputIgnored());
+
+	// 5. 0 (원래 카메라) = 풀림
+	Cam->SetMode(EEcoV3CamMode::Player);
+	TestTrue(TEXT("0 = 원래 카메라"), Cam->GetMode() == EEcoV3CamMode::Player);
+	TestFalse(TEXT("0 = 풀림"), Cam->IsBlockingMoveInput());
+	TestFalse(TEXT("0 = 컨트롤러 이동 무시 아님"), PC->IsMoveInputIgnored());
+	TestEqual(TEXT("0 = W 가 다시 폰에 들어간다"), MoveInputAfterW(), FVector::ForwardVector, 1.0e-4f);
+
+	// 6. 팀·엔진이 이미 건 막기는 남긴다 (우리가 더한 하나만 뺀다)
+	PC->SetIgnoreMoveInput(true);   // 팀 막기 하나
+	Cam->SetMode(EEcoV3CamMode::Auto);
+	Cam->SyncMoveInputBlock(PC);
+	TestTrue(TEXT("팀 막기 + 관찰 = 막음"), Cam->IsBlockingMoveInput() && PC->IsMoveInputIgnored());
+	Cam->SetMode(EEcoV3CamMode::Player);
+	TestFalse(TEXT("0 = 우리 막기는 풀림"), Cam->IsBlockingMoveInput());
+	TestTrue(TEXT("0 뒤에도 팀 막기는 남는다"), PC->IsMoveInputIgnored());
+	PC->SetIgnoreMoveInput(false);
+	TestFalse(TEXT("팀이 풀면 이동 무시 아님"), PC->IsMoveInputIgnored());
+
+	// 7. 컨트롤러가 바뀌면 전 컨트롤러를 풀고 새 것을 막는다. 로컬 컨트롤러가 없어지면(nullptr) 푼다
+	APlayerController* PC2 = World.SpawnActor<APlayerController>();
+	if (TestNotNull(TEXT("둘째 컨트롤러"), PC2))
+	{
+		Cam->SetMode(EEcoV3CamMode::Quarter);
+		Cam->SyncMoveInputBlock(PC);
+		Cam->SyncMoveInputBlock(PC2);
+		TestFalse(TEXT("바뀌면 전 컨트롤러 풀림"), PC->IsMoveInputIgnored());
+		TestTrue(TEXT("새 컨트롤러 막음"), PC2->IsMoveInputIgnored());
+		Cam->SyncMoveInputBlock(nullptr);
+		TestFalse(TEXT("컨트롤러 없음 = 풀림"), Cam->IsBlockingMoveInput());
+		TestFalse(TEXT("컨트롤러 없음 = 새 컨트롤러도 풀림"), PC2->IsMoveInputIgnored());
+		Cam->SetMode(EEcoV3CamMode::Player);
+	}
+	BlockVar->Set(SavedBlock, ECVF_SetByCode);
 	return true;
 }
 

@@ -45,11 +45,16 @@ namespace EcoV3ObserverCameraImpl
 {
 	static TAutoConsoleVariable<int32> CVarCamEnable(
 		TEXT("eco.Cam.Enable"), 1,
-		TEXT("관찰 카메라 (EcoV3ObserverCamera.h): 1 = 단축키 1~5·0·, .·- =·휠·G·H 와 오른쪽 위 화면 글, 0 = 끔 (원래 카메라로 돌아가고 키·글·eco.Cam 명령을 받지 않는다). ")
+		TEXT("관찰 카메라 (EcoV3ObserverCamera.h): 1 = 단축키 1~5·0·, .·- =·휠·G·H 와 오른쪽 위 화면 글, 0 = 끔 (원래 카메라로 돌아가고 플레이어 이동 막기를 풀며 키·글·eco.Cam 명령을 받지 않는다). ")
 			TEXT("보기만 바꾼다 — 시뮬레이션에 쓰지 않는다."));
 	static TAutoConsoleVariable<float> CVarCamHudScale(
 		TEXT("eco.Cam.HudScale"), 1.0f,
 		TEXT("관찰 카메라 오른쪽 위 글 배율 (기본 1 — 화면 높이에 맞춘 배율에 곱한다, 0.5~3)."));
+	static TAutoConsoleVariable<int32> CVarCamBlockMove(
+		TEXT("eco.Cam.BlockMove"), 1,
+		TEXT("관찰 카메라로 보는 동안(1~5 모드) 플레이어 폰 이동 입력 막기: 1 = 막음 (기본 — 안 보이는 폰이 걸어 발소리 Player.Footstep 를 사슴이 듣지 않게, 0 으로 원래 카메라에 돌아오면 풀린다), ")
+			TEXT("0 = 막지 않음 (다음 프레임에 풀린다). 로컬 플레이어 컨트롤러의 이동 무시 수(AController::SetIgnoreMoveInput — 쌓인다)를 하나 더하고 빼기만 한다 — ")
+			TEXT("시야(마우스)·점프·F·Shift·Ctrl 은 그대로."));
 
 	constexpr float kFov = 70.0f;
 	constexpr double kFocusSmooth = 0.18;     // 초점 시간 상수 (초) — 대상 속도 × 이 값만큼 앞을 봐 9 m/s 도 뒤처지지 않는다
@@ -941,6 +946,8 @@ void UEcoV3ObserverCameraSubsystem::Deinitialize()
 	{
 		ClearOccluders(LocalPlayerController());
 	}
+	// 이동 막기는 월드를 닫는 중에도 푼다 — 끊김 없는 이동(seamless travel)이면 플레이어 컨트롤러가 다음 월드로 넘어간다
+	ReleaseMoveInputBlock(TEXT("월드 닫기"));
 	HiddenOccluders.Reset();
 	OccluderCandidates.Reset();
 	Camera = nullptr;
@@ -977,6 +984,7 @@ void UEcoV3ObserverCameraSubsystem::Tick(float DeltaTime)
 	APlayerController* PC = LocalPlayerController();
 	if (!PC)
 	{
+		SyncMoveInputBlock(nullptr);   // 로컬 플레이어 컨트롤러가 없어졌다 — 막아 둔 것이 있으면 푼다
 		return;
 	}
 	if (CVarCamEnable.GetValueOnGameThread() == 0)
@@ -985,9 +993,12 @@ void UEcoV3ObserverCameraSubsystem::Tick(float DeltaTime)
 		{
 			RestorePlayerView(TEXT("eco.Cam.Enable 0"));
 		}
+		SyncMoveInputBlock(PC);   // 꺼짐 = 막지 않는다
 		return;
 	}
 	HandleKeys(*PC);
+	// 관찰 중(1~5)이면 플레이어 이동 입력을 막고 원래 카메라면 푼다 (eco.Cam.BlockMove 를 바꾸면 이 자리에서 따른다)
+	SyncMoveInputBlock(PC);
 	const double Now = FPlatformTime::Seconds();
 	if (Mode != EEcoV3CamMode::Player)
 	{
@@ -1483,6 +1494,68 @@ void UEcoV3ObserverCameraSubsystem::ActivateCamera(APlayerController& PC)
 	{
 		PC.SetViewTarget(Camera);
 	}
+	SyncMoveInputBlock(&PC);   // 콘솔 명령(eco.Cam.*)으로 켜도 다음 Tick 을 기다리지 않고 바로 막는다
+}
+
+void UEcoV3ObserverCameraSubsystem::SyncMoveInputBlock(APlayerController* PC)
+{
+	using namespace EcoV3ObserverCameraImpl;
+	const bool bWant = PC != nullptr && Mode != EEcoV3CamMode::Player && CVarCamEnable.GetValueOnGameThread() != 0
+					   && CVarCamBlockMove.GetValueOnGameThread() != 0;
+	APlayerController* Held = MoveBlockedPC.Get();
+	if (!Held)
+	{
+		MoveBlockedPC.Reset();   // 막아 둔 컨트롤러가 사라졌다 — 뺄 것이 없다
+	}
+	else if (!bWant || Held != PC)
+	{
+		const TCHAR* Why = TEXT("eco.Cam.BlockMove 0");
+		if (bWant)
+		{
+			Why = TEXT("플레이어 컨트롤러 바뀜");   // 새 컨트롤러는 아래에서 막는다
+		}
+		else if (!PC)
+		{
+			Why = TEXT("로컬 플레이어 컨트롤러 없음");
+		}
+		else if (Mode == EEcoV3CamMode::Player)
+		{
+			Why = TEXT("원래 카메라");
+		}
+		else if (CVarCamEnable.GetValueOnGameThread() == 0)
+		{
+			Why = TEXT("eco.Cam.Enable 0");
+		}
+		ReleaseMoveInputBlock(Why);
+		Held = nullptr;
+	}
+	if (!bWant)
+	{
+		return;
+	}
+	if (Held)
+	{
+		// 엔진이 이동 무시 수를 지웠으면 (폰 다시 시작 — APlayerController::ClientRestart 의 ResetIgnoreInputFlags) 다시 건다
+		if (!PC->IsMoveInputIgnored())
+		{
+			PC->SetIgnoreMoveInput(true);
+			UE_LOG(LogEcoV3Cam, Log, TEXT("[EcoCam] 플레이어 이동 막기가 지워졌다 (폰 다시 시작) — 다시 막음"));
+		}
+		return;
+	}
+	PC->SetIgnoreMoveInput(true);   // 쌓이는 수에 하나만 더한다 (풀 때 이 하나만 뺀다)
+	MoveBlockedPC = PC;
+	UE_LOG(LogEcoV3Cam, Log, TEXT("[EcoCam] 플레이어 이동 입력 막음 — 관찰 중 (0 으로 원래 카메라에 돌아오면 풀린다, eco.Cam.BlockMove 0 이면 막지 않는다)"));
+}
+
+void UEcoV3ObserverCameraSubsystem::ReleaseMoveInputBlock(const TCHAR* Why)
+{
+	if (APlayerController* Held = MoveBlockedPC.Get())
+	{
+		Held->SetIgnoreMoveInput(false);   // 우리가 더한 하나만 뺀다 — 팀·엔진이 건 막기(영화 모드 등)는 남는다
+		UE_LOG(LogEcoV3Cam, Log, TEXT("[EcoCam] 플레이어 이동 입력 풀림 — %s"), Why);
+	}
+	MoveBlockedPC.Reset();
 }
 
 void UEcoV3ObserverCameraSubsystem::RestorePlayerView(const TCHAR* Why)
@@ -1499,6 +1572,7 @@ void UEcoV3ObserverCameraSubsystem::RestorePlayerView(const TCHAR* Why)
 		PC->SetViewTarget(Back ? Back : static_cast<AActor*>(PC));
 	}
 	ClearOccluders(LocalPlayerController());   // 이 화면에서 숨긴 나무를 되돌린다
+	ReleaseMoveInputBlock(Why);                // 플레이어 이동 입력을 다시 받는다
 	bViewOwned = false;
 	bSnap = true;
 	if (Prev != EEcoV3CamMode::Player)
@@ -1802,14 +1876,15 @@ FString UEcoV3ObserverCameraSubsystem::DescribeStatus() const
 	{
 		return TEXT("모드 원래 카메라");
 	}
+	const TCHAR* MoveNote = IsBlockingMoveInput() ? TEXT(" · 플레이어 이동 막음") : TEXT("");
 	if (Si == INDEX_NONE)
 	{
-		return FString::Printf(TEXT("모드 %s · 대상 없음 (%s 무대 전체) · 거리 %.0f m"), ModeNameKo(Mode), *Region.ToString(), Dist / 100.0);
+		return FString::Printf(TEXT("모드 %s · 대상 없음 (%s 무대 전체) · 거리 %.0f m%s"), ModeNameKo(Mode), *Region.ToString(), Dist / 100.0, MoveNote);
 	}
 	const EcoV3Observe::FSubject& S = Subjects[Si];
-	return FString::Printf(TEXT("모드 %s · 대상 %s #%lld (%s) · %s%s%s · 거리 %.0f m"), ModeNameKo(Mode), S.bWolf ? TEXT("늑대") : TEXT("사슴"), S.Id,
+	return FString::Printf(TEXT("모드 %s · 대상 %s #%lld (%s) · %s%s%s · 거리 %.0f m%s"), ModeNameKo(Mode), S.bWolf ? TEXT("늑대") : TEXT("사슴"), S.Id,
 						   *S.Region.ToString(), EcoV3Observe::StateNameKo(S.State), S.Detail.IsEmpty() ? TEXT("") : TEXT(" · "), *S.Detail,
-						   Dist / 100.0);
+						   Dist / 100.0, MoveNote);
 }
 
 void UEcoV3ObserverCameraSubsystem::BuildStatusLines()
@@ -1887,6 +1962,10 @@ void UEcoV3ObserverCameraSubsystem::BuildStatusLines()
 									   : FString(TEXT("자동   사건 따라가는 중")))
 				   : FString(TEXT("자동   사건 기다리는 중")),
 			FColor(255, 220, 120));
+	}
+	if (IsBlockingMoveInput())
+	{
+		Add(TEXT("플레이어   이동 키 막음 (0 으로 풀림)"), FColor(175, 175, 175));
 	}
 }
 

@@ -3,6 +3,9 @@
 // 보기만 바꾼다 — 사슴·늑대·먹이·난수·Mass 조각·플레이어 폰에 쓰지 않는다 (Mass 읽기도 지연 명령을 비우지 않는다). 로컬 플레이어 화면마다 따로 돈다(단독·리슨 서버·클라이언트, 데디케이티드 서버는 없음).
 // 다만 보는 자리(PlayerController view point)를 옮기므로, 그 자리를 읽는 엔진·팀 코드는 플레이어가 카메라를 옮길 때처럼 따라 바뀐다:
 // 팀 종 AI 결정 간격 단계(EcoSpeciesAIInputProcessor — 통합 v3 Native 세계는 읽지 않는다)·표현 액터 예산·복제 관련도·World Partition 스트리밍 원천.
+// 관찰 중(1~5 모드)에는 로컬 플레이어 컨트롤러의 이동 입력만 막는다 (10-27 사용자 결정 — 안 보이는 폰이 WASD 로 걸어 발소리 Player.Footstep 를 사슴이 듣지 않게).
+//   이동 무시 수(AController::SetIgnoreMoveInput — 쌓인다)를 하나 더하고, 원래 카메라(0)·eco.Cam.Enable 0·eco.Cam.BlockMove 0·월드 닫기에서 그 하나만 뺀다.
+//   폰 자체(자리·속도·부품)에는 쓰지 않는다 — 누르던 중이면 폰의 제동으로 멈춘다. 시야(마우스)·점프·F(플레이어 치기)·Shift·Ctrl 은 그대로.
 // 촬영 감독(-EcoV3Film=)이 도는 실행에는 만들지 않는다 — 촬영 카메라와 보기 대상을 다투지 않고, 촬영 프레임(-EcoV3FilmUI 포함)이 전과 같다.
 //   1. 카메라 액터 하나를 띄워 첫 로컬 플레이어 컨트롤러의 보기 대상으로 삼는다. 0 (eco.Cam.Player) 이면 원래 폰으로 돌려준다.
 //   2. 대상 찾기 = EcoV3Observe::Gather: 논리 Mass 개체(통합 개체 꼬리표)를 읽는다 — 팀 표현 액터는 보는 자리 200 m 안 가까운 64 마리에게만
@@ -26,7 +29,8 @@
 //   4 쿼터뷰(대상 기준 45° 사선)  5 자동 추적(쫓기는 사슴·사냥 중인 늑대 — 사건이 끝나면 다음)  , . 이전·다음 대상  - = 또는 휠 줌
 //   G 지역 바꾸기  0 원래 카메라  H 단축키 목록 숨기기/보이기
 // 콘솔 (시험·촬영용): eco.Cam.Wolf [id] · Deer [id] · Top · Quarter · Auto · Next · Prev · Zoom <m> · Region <이름> · Player · Help,
-//   콘솔 변수 eco.Cam.Enable (기본 1 — 0 이면 키·화면 글을 끄고 원래 카메라로), eco.Cam.HudScale (기본 1, 화면 글 배율).
+//   콘솔 변수 eco.Cam.Enable (기본 1 — 0 이면 키·화면 글을 끄고 원래 카메라로), eco.Cam.HudScale (기본 1, 화면 글 배율),
+//   eco.Cam.BlockMove (기본 1 — 관찰 중 플레이어 이동 입력 막기, 0 이면 막지 않는다).
 // 문서: AdaptiveEcosystem/Docs/RL_Policy/OBSERVER_CAMERA.md
 
 #pragma once
@@ -274,6 +278,16 @@ public:
 	void ToggleKeyList();
 	/** 지금 상태 한 줄 (기록·콘솔). */
 	FString DescribeStatus() const;
+	/**
+	 * 관찰 중 플레이어 이동 입력 막기를 맞춘다 (10-27 사용자 결정 — 안 보이는 폰이 걸어 발소리 Player.Footstep 를 사슴이 듣지 않게).
+	 * 바라는 상태 = PC 가 있고 관찰 중(1~5 모드)이며 eco.Cam.Enable·eco.Cam.BlockMove 가 켜짐. 막을 때 PC 의 이동 무시 수(AController::SetIgnoreMoveInput
+	 * — 쌓인다)를 하나 더하고, 풀 때 우리가 더한 하나만 뺀다 (팀·엔진이 건 막기는 그대로). PC 가 바뀌면 전 PC 를 먼저 풀고, 엔진이 수를 지웠으면
+	 * (폰 다시 시작 — APlayerController::ClientRestart 의 ResetIgnoreInputFlags) 다시 건다. 시야(마우스) 입력은 건드리지 않는다.
+	 * Tick 이 매 프레임 로컬 플레이어 컨트롤러로 부르고(없으면 nullptr — 막아 둔 것을 푼다), 카메라를 켤 때도 바로 부른다. 시험은 직접 부른다.
+	 */
+	void SyncMoveInputBlock(APlayerController* PC);
+	/** 지금 우리가 플레이어 이동 입력을 막고 있는가. */
+	bool IsBlockingMoveInput() const { return MoveBlockedPC.IsValid(); }
 
 	EEcoV3CamMode GetMode() const { return Mode; }
 	int64 GetSubjectId() const { return SubjectId; }
@@ -299,6 +313,8 @@ private:
 	void SelectSubject(int64 Id, const TCHAR* Why);
 	void ActivateCamera(APlayerController& PC);
 	void RestorePlayerView(const TCHAR* Why);
+	/** 우리가 건 이동 입력 막기를 푼다 (원래 카메라·끔·닫기). 건 것이 없으면 아무 일도 하지 않는다. */
+	void ReleaseMoveInputBlock(const TCHAR* Why);
 	void UpdateCamera(double Dt, APlayerController& PC);
 	double BaseDistanceCm() const;
 	double GroundZ(double XCm, double YCm, double Fallback) const;
@@ -315,6 +331,7 @@ private:
 	TObjectPtr<ACameraActor> Camera;
 	TWeakObjectPtr<AActor> SavedViewTarget;
 	bool bViewOwned = false;         // 보기 대상을 우리 카메라로 바꿔 두었다 (원래 대상 = SavedViewTarget, 0 이면 폰으로 돌려준다)
+	TWeakObjectPtr<APlayerController> MoveBlockedPC;   // 이동 무시 수를 하나 더해 둔 컨트롤러 (비었으면 막지 않음 — 풀 때 이것에서 하나만 뺀다)
 
 	TArray<EcoV3Observe::FSubject> Subjects;
 	TArray<EcoV3Observe::FRegionInfo> Regions;
