@@ -388,6 +388,27 @@ v1 파일은 언리얼에 연결된 계약(관측 7·행동 4)의 원본이라 �
         (`_rep_accumulate`)은 판 4 처럼 덮기 스텝을 뺀다(길 끔 세계는 길 결정이 없다). 통계 `flee_gate_stats`(덮기 밖 결정, 그 가운데 두뇌가 낸 FLEE —
         마스크를 지키면 0). 같은 행동을 넣으면 궤적(위치·관측·보상·난수·도망 기록)은 키를 끈 세계와 비트 단위로 같다 — 결정 셈만 길 끔 판 6 이 판 2 와 다르다
         (덮기 스텝을 뺀다).
+      거리 두기(쉬는 늑대) (10-27 사용자 '늑대가 쉬고 있어도 아주 잘 보이는 데서 사슴이 멈춰 있는 게 이상하다 — 늑대 시야 밖까지 물러난 뒤 쉬게', 선택 키
+        rest_keep·rest_keep_margin·rest_keep_band·rest_keep_asleep, 기본 false·2·0·false = 위 그대로·그 코드 경로를 타지 않는다 — 비트 동일). 덮기 WF_REST(4,
+        C++ kKeepRest). 쉬는 늑대 = 사냥 중이 아닌(`_wf_hunting` 거짓 — 먹기·배부름·플레이어 휴식) 깨어 있는 늑대(rest_keep_asleep 이면 자는 늑대도). V = 늑대
+        시야 반경 pred_view_r × 날씨 시야(`_wx_view` — 늑대 시야각은 쓰지 않는다: 쉬는 늑대는 둘러보고, 사슴은 늑대가 어디를 보는지 모른다). 눈길 트임 = 줄기
+        원판(숲 시야를 켜면 잎도)이 사슴 → 늑대 눈길을 가리지 않음. 스텝 끝(H) 위 덮기를 정한 뒤:
+          고른 쉬는 늑대 = 눈길 트임 ∧ (시작: d ≤ V ∧ (고개 든 시야 — 반경 see_r·(1 − detect_night·d)·날씨, 위협 시야각, 행동 배수 없음 — 로 보임 ∨ 지금 알아챔
+            wf_pvis(발소리 포함)) ∨ 이어짐: 지난 덮기 REST ∧ d ≤ V + rest_keep_margin — 사슴 시야와 무관한 기억, 들어갈 때 V·나올 때 V + 여유의 히스테리시스)
+          다음 덮기가 없음(WF_NONE)이고 은신처 원 밖이고 산 사슴이 고른 쉬는 늑대가 있으면 REST. 우선순위 = 은신처 안(웅크림·없음) > 도주 > 사냥 늑대 경계 >
+            REST > 없음. rest_keep 을 켜면 rest_alert 의 쉬는 늑대 경계(nr)는 쓰지 않는다(REST 가 맡는다)
+          방향 = 고른 쉬는 늑대들 반대(거리 역수 가중 합, 0 이면 가장 가까운 그 늑대 반대) → (이어짐이면 관성 — 아래) → 가장자리 굽히기(edge_r) → 벽 여유 —
+          경계 방향 줄과 같다. 관성(10-27 적대적 검토, WF_REST_INERTIA 1): 지난 덮기도 REST 이고 지난 방향이 있으면 n(반대 방향 + 1·지난 방향)(0 이면 반대
+          방향 그대로) — 고른 늑대가 V + 여유 경계에서 들고 나거나 벽 앞 굽히는 쪽 부호가 바뀌어도 방향이 스텝마다 뒤집히지 않는다
+        실행(B, `_wf_rest_control`): 두뇌 행동이 GRAZE 면 걸으며 먹고(보행·섭식·대사 = 걷기) 고개를 든다(자기 탐지 반경 배수 1). 방향 = 분리 S 의 늑대 쪽 성분
+          (덮기 방향 D 와 내적 c < 0 이면 S − c·D)을 지운 n(D + sep_weight·S)(0 이면 D) → 벽 여유(wall_margin) — 분리는 옆으로 비켜 가게만 하고 늑대 쪽으로
+          되돌리거나 벽으로 밀지 않는다(10-27 적대적 검토). 두뇌의 FLEE·HIDE·SLEEP 은 그대로 — 덮기가 아니라 경계와 같은 꼴이라 두뇌가 매번 결정하고(`rep_peek` reads 그대로),
+          도망 기록·쫓김 사건·GF 에 세지 않는다(FLEE 실행이 아니다). 관측 칸·차원·계약 해시는 그대로다.
+        다가가지 않기 띠(rest_keep_band > 0, `_wf_rest_band`): REST 가 아닌 GRAZE 걷기(평소·경계)는 결정 때 쉬는 늑대 j(번호 오름차순) 가운데 눈길 트임 ∧
+          d ≤ min(V + rest_keep_margin + rest_keep_band, 고개 든 탐지 반경)인 것마다 차례로 속도의 그 늑대 쪽 성분 c > 0 을 지우고, 하나라도 지웠으면 걷기
+          속력으로 다시 맞춘다(0 이면 정지). 현실 근거: 사슴은 쉬고 있는 포식자도 지켜보며 그 시야 밖으로 물러나 쉬고, 그쪽으로 풀을 뜯어 다가가지 않는다.
+        통계(wild_stats, 켠 세계만): mode_rest_frac, rest_starts·rest_steps·rest_ends(WF_REST_ENDS 까닭별)·rest_reentry(끝난 뒤 10 초 안 다시 시작)·
+          band_turn_steps·band_stop_steps.
 - 야생 2단계(10-16 사용자 승인 '추천대로' — 늑대가 거의 못 잡는 세계를 사실감과 사냥 성공을 함께 올려 고친다. 명세 Docs/RL_Policy/RL_V3_WILD2_SPEC.md,
   설정 configs/v3_wild2_mirror.yaml = v3_wild1_mirror.yaml + 아래 규칙). 순서: 1 은신처 먹이 부족 → 2 늑대 무리·협동 사냥 → 3 장애물.
   1 은신처 먹이 부족: 새 규칙이 아니라 위 v3 현실성 (e) realism_cover_food 를 거울 세계에 켠다(cap_frac·regen_frac 0.15). 언리얼 FFoodGrid 가 같은 식이다
@@ -1417,7 +1438,18 @@ def _rz_night_params(p: dict, f: Features, ps: dict | None) -> dict:
 # 통합 무대 (q) head_layout 'golden' 의 순번 각(rad, C++ AEcoCreatureIntegrationSpawner 의 2.399963 그대로)과 늑대 순번 밀기
 # 야생 (w3) 도주 반사 덮기 wf_mode (모듈 docstring '야생 1단계'). C++ kKeepNone·kKeepAlert·kKeepPanic·kKeepShelter 와 같은 번호
 WF_NONE, WF_ALERT, WF_PANIC, WF_SHELTER = 0, 1, 2, 3
-WF_MODE_NAMES = ("none", "alert", "panic", "shelter")
+# 10-27 거리 두기(쉬는 늑대) — 선택 키 rest_keep 을 켠 세계만 나온다. C++ kKeepRest 와 같은 번호. 끈 세계의 wild_stats 는 앞 넷만 적는다
+WF_REST = 4
+WF_MODE_NAMES = ("none", "alert", "panic", "shelter", "rest")
+# 거리 두기 끝 까닭 (wild_stats rest_end_*, 통계 전용 — 같은 스텝에 여럿이면 앞 것): 죽음, 은신처 원 안, 더 앞선 덮기(도주·사냥 늑대 경계), 그 밖은 늑대 시야
+# 반경 + 여유 안에 남은 쉬는 늑대가 없는 까닭 — 눈길이 가려짐, 그 늑대가 다시 사냥, 잠듦(rest_keep_asleep 거짓), 거리(반경 + 여유 밖)
+WF_REST_ENDS = ("death", "cover", "priority", "occluded", "hunt", "sleep", "range")
+WF_REST_REENTRY_STEPS = 75          # 끝난 거리 두기 뒤 이 스텝(10 초 — 아래 FLIGHT_HIDE_WATCH_STEPS 와 같은 수) 안에 다시 시작하면 '다시 들어옴'
+# 10-27 적대적 검토 — 이어지는 거리 두기의 방향 관성 (C++ kRestKeepInertia): 지난 스텝에도 거리 두기였으면 새 반대 방향에 지난 덮기 방향 × 이 값을 더해
+# 단위화한다(가장자리 굽히기·벽 여유 앞). 없으면 고른 늑대 집합이 V + 여유 경계에서 들고 나거나 벽 앞에서 굽히는 쪽 부호가 바뀔 때 덮기 방향이 스텝마다 뒤집혀
+# 거리 두기 사슴-스텝의 11.5~14.6% 가 제자리 빙빙(8 스텝에 뒤집힘 ≥ 2·순 이동 < 2 m)이었다 — 사용자 보고 '제자리에서 미친 듯이 돈다'가 거리 두기에서
+# 다시 생긴 것(거울 R1b-F·R7e × 시드 두 벌. 아래 `_wf_rest_control` 의 분리 고침과 함께 0.14~0.67%)
+WF_REST_INERTIA = 1.0
 # 야생 (w3) 도망 기록 (10-21, 통계 전용 — 모듈 docstring '야생 1단계' (w3) 도망 기록, `World.flight_stats`). 끝 까닭(서로 겹치지 않는다, 합 = 시작):
 # 살아서 끝난 도망은 늑대와의 접촉이 어떻게 끊겼나로 나눈다 — 앞 넷 = 스스로 벗어남(FLIGHT_OWN, 실시간 고리 1차 재료), 다음 넷 = 그 밖, 끝 셋 = 잡힘·굶음·잘림.
 # 쫓긴 시간 칸 경계(스텝, 1 스텝 = 2/15 초): 약 1·2·5·10·20·40·80 초 — 칸 k = 경계 가운데 c 이하인 수(첫 칸 c < 8)
@@ -1628,6 +1660,13 @@ def _wild_flight_params(p: dict, f: Features) -> dict:
         if f.enabled("alarm"):
             raise ValueError("features.wild_flight.brain_flee_outside_reflex false(마스크 판 5·6)는 alarm(관측 alarm_heard, 마스크 판 3)과 함께 켜지 못한다")
     out["brain_flee_outside_reflex"] = bf
+    # 10-27 거리 두기(쉬는 늑대) (선택 키 rest_keep — false 면 그 코드 경로를 타지 않는다. 모듈 docstring '야생 1단계' (w3) 거리 두기)
+    out["rest_keep"] = _wild_bool(n, p, "rest_keep")
+    out["rest_keep_asleep"] = _wild_bool(n, p, "rest_keep_asleep")
+    out["rest_keep_margin"] = _wild_num(n, p, "rest_keep_margin", 0.0)
+    out["rest_keep_band"] = _wild_num(n, p, "rest_keep_band", 0.0)
+    if out["rest_keep_asleep"] and not out["rest_keep"]:
+        raise ValueError("features.wild_flight.rest_keep_asleep 은 rest_keep true 와 함께만 쓴다")
     return out
 
 
@@ -2383,12 +2422,9 @@ def wf_edge_steer(pos: np.ndarray, d: np.ndarray, size: float, edge_r: float) ->
 
 def wf_wall_keep(pos: np.ndarray, d: np.ndarray, size: float, mg: float) -> np.ndarray:
     """야생 (w3) 무대 벽 여유: 축마다 위치가 벽 여유 mg 안이고 방향이 그 벽 쪽이면 그 성분을 지우고 단위화한다(다 지워지면 d 그대로). `_wf_update` 의
-    벽 여유 줄(C++ KeepDirection)과 같은 식 — 도망길 방향(`flight_route_geometry`)이 쓰는 사본이다(반사 방향 줄은 그대로 둔다)."""
-    sl = d.copy()
-    sl[:, 0] = np.where(((pos[:, 0] <= mg) & (sl[:, 0] < 0.0)) | ((pos[:, 0] >= size - mg) & (sl[:, 0] > 0.0)), 0.0, sl[:, 0])
-    sl[:, 1] = np.where(((pos[:, 1] <= mg) & (sl[:, 1] < 0.0)) | ((pos[:, 1] >= size - mg) & (sl[:, 1] > 0.0)), 0.0, sl[:, 1])
-    sl = normalize(sl)
-    return np.where(((sl * sl).sum(1) > EPS * EPS)[:, None], sl, d)
+    벽 여유 줄(C++ KeepDirection)과 같은 식 — 도망길 방향(`flight_route_geometry`)·10-27 거리 두기 방향이 쓰는 사본이다(반사 방향 줄은 그대로 둔다).
+    식은 repertoire.wall_keep 하나다(10-27 먹기 걷기 고침의 벽 여유도 같은 함수)."""
+    return rep.wall_keep(pos, d, size, mg)
 
 
 def _route_edge_wall(pos: np.ndarray, d: np.ndarray, size: float, mg: float, edge_r: float) -> np.ndarray:
@@ -4166,6 +4202,8 @@ class World:
         live = self.alive
         # 야생 (w3) 도망 기록(통계 전용): 이번 스텝에 실행하는 덮기 — 학습 세계 리스폰(`_spawn_slots`)이 죽은 칸의 wf_mode 를 지우기 전 값
         wf_exec = self.wf_mode.copy() if self.track_flight and self._wf is not None else None
+        if self._wf is not None and self._wf["rest_keep"]:
+            self._wf_rest_exec = self.wf_mode == WF_REST     # 10-27 거리 두기 통계: 이번 스텝에 실행하는 거리 두기(리스폰이 지우기 전)
         # 10-21 도망길(route_fixed·route 켬 세계만): 이번 스텝에 실행하는 길 — 리스폰이 죽은 칸의 길 상태를 지우기 전 값 (길 기록)
         rt_exec = self.flight_route.astype(np.int64) if self._route_on else None
         wf_flee = None
@@ -4655,6 +4693,9 @@ class World:
         inp = dict(food_grad=g["food_grad"], to_centroid=g["to_centroid"], separation=g["separation"],
                    away_from_pred=g["away_from_pred"], to_target=to_target, pred_count=g["pred_count"],
                    food_ok=self.food[iy, ix] >= rp["graze_eat_min"], in_cover=g["in_cover"], dark=self.dark)
+        if rp["calm"]:
+            # 10-27 먹기 걷기 고침 (선택 키 graze_*): 결정 때 위치·이번 이동 전 heading·무대 한 변 (C++ FControlInput::Pos·Head·WorldSize)
+            inp.update(pos=self.pos, head=self.head, size=self.size)
         if wf is not None:
             # 야생 (w3) 도주: FLEE 제어기의 위협 반대 방향 = 덮기 방향(보인 위협으로 둔다 — C++ KeepControl 과 같은 꼴)
             pan = (self.wf_mode == WF_PANIC) & (self.wf_dir != 0.0).any(1)
@@ -4664,6 +4705,10 @@ class World:
         out = rep.control(rs, rp, inp, cfg, self._sp)
         if wf is not None:
             self._wf_alert_control(out, inp)
+            if wf["rest_keep"]:
+                self._wf_rest_control(out, inp)     # 10-27 거리 두기(쉬는 늑대): 덮기 REST ∧ GRAZE 는 걸어서 물러난다
+                if wf["rest_keep_band"] > 0.0:
+                    self._wf_rest_band(out)         # 그 밖 GRAZE 걷기는 쉬는 늑대 쪽으로 다가가지 않는다
         self.gait, self.gait_cmd, self.vel = out["gait"], out["gait"].copy(), out["vel"]
         self._rep_eat, self._rep_drain = out["eat"], out["drain"]
         self._rep_see_last = self._rep_see                  # 결정 관측(self._g)을 만든 배수 → 다음 관측의 '직전' 배수
@@ -5786,6 +5831,13 @@ class World:
             self.wf_dir = np.zeros((N, 2))                 # 경계·도주 방향(단위, 없으면 0)
             self._wf_mode_n = np.zeros(len(WF_MODE_NAMES), dtype=np.int64)   # 실행한 덮기별 산 개체-스텝
             self._wf_panic_starts = self._wf_panic_ends = self._wf_panic_end_shelter = 0
+            if self._wf["rest_keep"]:
+                # 10-27 거리 두기 통계 (wild_stats rest_* — 동역학과 무관): 시작·끝 까닭·끝난 뒤 10 초 안 다시 들어옴·마지막 끝 스텝, 띠가 방향을 바꾼·멈춘 사슴-스텝
+                self._wf_rest_starts = self._wf_rest_reentry = 0
+                self._wf_rest_ends = np.zeros(len(WF_REST_ENDS), dtype=np.int64)
+                self._wf_rest_last_end = np.full(N, -(10 ** 9), dtype=np.int64)
+                self._wf_rest_exec = None
+                self._wf_band_n = self._wf_band_stop_n = 0
             if self._wf["quiet_end"] > 0:
                 # 10-21 끝 규칙 quiet_end: 도주 중 붙잡는 늑대를 알아채지 못한 연속 스텝 수, 그 규칙으로 끝난 도주 수
                 self.wf_quiet = np.zeros(N, dtype=np.int64)
@@ -5879,12 +5931,112 @@ class World:
         d = (rp["graze_forage"] * inp["food_grad"][al] + rp["graze_cohesion"] * inp["to_centroid"][al]
              + cfg.sep_weight * inp["separation"][al] + self._wf["alert_w"] * self.wf_dir[al])
         n = normalize(d)
+        # 10-27 먹기 걷기 고침(graze_*)은 여기에 쓰지 않는다 — 경계 방향은 이미 늑대 반대·가장자리 굽히기·벽 여유를 거친 덮기 방향이 이끈다. 10-27 적대적 검토:
+        # 처음 판은 여기에도 graze_calm_dir 을 걸었는데, 가장자리 되돌림(무게 2.5)이 덮기 방향(alert_w 1.5)을 이겨 가장자리 4 m 안 경계 걷기 가운데 알아챈 사냥
+        # 늑대 쪽으로 다가가는 걸음 몫이 끈 세계 6.6~9.3% → 14.6~17.6% 로 늘었다(빼면 5.9~7.5% — 거울 R1b-F·R7e × 시드 두 벌). 그래서 4e3afd7 식 그대로 둔다
         n = np.where(((n * n).sum(1) > EPS * EPS)[:, None], n, self.wf_dir[al])
         out["vel"][al] = n * (cfg.herb_speed * sp["speed"][GAIT_WALK])
         out["gait"][al] = GAIT_WALK
         out["eat"][al] = sp["eat"][GAIT_WALK]
         out["drain"][al] = sp["drain_mult"][GAIT_WALK]
         out["see"][al] = 1.0
+
+    # ------------------------------------------------------------------ #
+    # 10-27 거리 두기(쉬는 늑대) — 선택 키 wild_flight.rest_keep (모듈 docstring '야생 1단계' (w3) 거리 두기)
+    # ------------------------------------------------------------------ #
+
+    def _wf_rest_wolves(self) -> np.ndarray:
+        """쉬는 늑대 (M,): 사냥 중이 아니고(`_wf_hunting` 거짓 — 먹기·배부름·플레이어 휴식) 깨어 있다(rest_keep_asleep 이면 자는 늑대도). C++ RestWolf."""
+        rest = ~self._wf_hunting()
+        if self._ps is not None and not self._wf["rest_keep_asleep"]:
+            rest = rest & ~self.pred_asleep
+        return rest
+
+    def _wf_view(self) -> float:
+        """늑대 시야 반경 V = pred_view_r × 날씨 시야 (C++ WolfViewNow)."""
+        return float(self._wx_view) if self._wx is not None else float(self.cfg.pred_view_r)
+
+    def _wf_see_up(self) -> float:
+        """사슴의 고개 든 위협 탐지 반경 = see_r·(1 − detect_night·d)·날씨 시야, 행동 배수 없음 (C++ SeePredNow)."""
+        return float(self._see_pred) if self._dn is not None else float(self.cfg.see_r)
+
+    def _wf_los(self, cand: np.ndarray) -> np.ndarray:
+        """사슴 × 늑대 후보 cand (N, M) 가운데 원판(줄기 — 숲 시야를 켜면 잎도)이 눈길(사슴 → 늑대)을 가리지 않는 쌍 (C++ Detail::EyeBlocked 의 부정)."""
+        if self._ob is not None and self._ob["block_sight"] and len(self.obstacles) and cand.any():
+            cand, _, _, _ = self._ob_occlude(cand, self.pos, self.pred_pos)
+        return cand
+
+    def _wf_rest_control(self, out: dict, inp: dict) -> None:
+        """B 거리 두기: 덮기 REST 이고 두뇌 행동이 GRAZE 인 사슴은 걸으며 먹고(보행·섭식·대사 = 걷기) 물러나며 고개를 든다(자기 탐지 반경 배수 1).
+        방향: D = 덮기 방향, S = 분리. c = S·D < 0 이면 S ← S − c·D (분리의 늑대 쪽 — D 반대 — 성분을 지운다), n = normalize(D + sep_weight·S)(0 이면 D),
+        그다음 벽 여유(wild_flight.wall_margin — repertoire.wall_keep). 두뇌가 고른 FLEE·HIDE·SLEEP 은 그대로다. C++ Detail::FlightRestControl.
+        10-27 적대적 검토: 처음 판(n(D + sep_weight·S) 만)은 앞을 막은 무리 동료의 분리(1.35 배)가 D 를 지워 걸음이 스텝마다 앞뒤로 뒤집혔고(거리 두기
+        뒤집힘의 대부분), 벽을 따라 물러나는 사슴을 분리가 벽으로 밀어 제자리에 붙잡았다(벽에서 걷기 명령인데 움직이지 못한 거리 두기 스텝 1.1~1.4%, 길게는
+        10 초). 분리는 옆으로 비켜 가게만 쓰고 늑대 쪽으로 되돌리지 않는다."""
+        rs, sp, cfg = self._rs, self._sp, self.cfg
+        rk = (self.wf_mode == WF_REST) & (rs.behavior == rep.GRAZE) & (self.wf_dir != 0.0).any(1)
+        if self.alive is not None:
+            rk &= self.alive
+        if not rk.any():
+            return
+        D = self.wf_dir[rk]
+        S = inp["separation"][rk]
+        c = (S * D).sum(1)
+        S = np.where((c < 0.0)[:, None], S - c[:, None] * D, S)
+        n = normalize(D + cfg.sep_weight * S)
+        n = np.where(((n * n).sum(1) > EPS * EPS)[:, None], n, D)
+        n = rep.wall_keep(self.pos[rk], n, self.size, self._wf["wall_margin"])
+        out["vel"][rk] = n * (cfg.herb_speed * sp["speed"][GAIT_WALK])
+        out["gait"][rk] = GAIT_WALK
+        out["eat"][rk] = sp["eat"][GAIT_WALK]
+        out["drain"][rk] = sp["drain_mult"][GAIT_WALK]
+        out["see"][rk] = 1.0
+
+    def _wf_rest_band(self, out: dict) -> None:
+        """B 다가가지 않기 띠 (rest_keep_band > 0): 덮기 REST 가 아닌 GRAZE 걷기(평소·경계) 사슴마다, 쉬는 늑대 j(번호 오름차순) 가운데 실거리 ≤
+        min(V + rest_keep_margin + rest_keep_band, 고개 든 탐지 반경) ∧ 눈길 트임인 것에 대해 차례로 속도 v 의 그 늑대 쪽 성분 c = v·u_j > 0 을 지운다
+        (v ← v − c·u_j, u_j = 늑대 쪽 단위벡터). 하나라도 지웠으면 v = normalize(v) × 걷기 속력, 0 이면 정지(보행·섭식·대사 = 정지). C++ Detail::FlightRestBand."""
+        if self.M == 0:
+            return
+        rs, sp, cfg, wf = self._rs, self._sp, self.cfg, self._wf
+        walk = (rs.behavior == rep.GRAZE) & (out["gait"] == GAIT_WALK) & (self.wf_mode != WF_REST)
+        if self.alive is not None:
+            walk &= self.alive
+        if not walk.any():
+            return
+        lim = min(self._wf_view() + wf["rest_keep_margin"] + wf["rest_keep_band"], self._wf_see_up())
+        ex = self.pred_pos[:, 0][None, :] - self.pos[:, 0:1]
+        ey = self.pred_pos[:, 1][None, :] - self.pos[:, 1:2]
+        pd = np.sqrt(ex * ex + ey * ey)
+        pinv = 1.0 / np.maximum(pd, EPS)
+        band = self._wf_los(walk[:, None] & self._wf_rest_wolves()[None, :] & (pd <= lim))
+        if not band.any():
+            return
+        v = out["vel"].copy()
+        hit = np.zeros(self.N, dtype=bool)
+        for j in np.flatnonzero(band.any(0)):
+            bj = band[:, j]
+            ux, uy = ex[:, j] * pinv[:, j], ey[:, j] * pinv[:, j]
+            c = v[:, 0] * ux + v[:, 1] * uy
+            m = bj & (c > 0.0)
+            if m.any():
+                v[m, 0] = v[m, 0] - c[m] * ux[m]
+                v[m, 1] = v[m, 1] - c[m] * uy[m]
+                hit |= m
+        self._wf_band_n += int(np.count_nonzero(hit))
+        if not hit.any():
+            return
+        ih = np.flatnonzero(hit)
+        nv = normalize(v[ih])
+        ok = (nv * nv).sum(1) > EPS * EPS
+        out["vel"][ih[ok]] = nv[ok] * (cfg.herb_speed * sp["speed"][GAIT_WALK])
+        st = ih[~ok]
+        if len(st):
+            out["vel"][st] = 0.0
+            out["gait"][st] = GAIT_STOP
+            out["eat"][st] = sp["eat"][GAIT_STOP]
+            out["drain"][st] = sp["drain_mult"][GAIT_STOP]
+            self._wf_band_stop_n += len(st)
 
     def _wf_update(self, done: np.ndarray, caught: np.ndarray | None = None, executed: np.ndarray | None = None,
                    flee: np.ndarray | None = None, route_executed: np.ndarray | None = None) -> None:
@@ -5914,7 +6066,9 @@ class World:
             locked = (tgt[None, :] == np.arange(N)[:, None]) if tgt is not None else np.zeros((N, M), dtype=bool)
             coming = hunt & (locked | appr)
             nh = pv & hunt & (pd <= wf["alert_r"])               # 경계 거리 안에서 알아챈 사냥 중인 늑대
-            nr = (pv & ~hunt & (pd <= wf["alert_r"])) if wf["rest_alert"] else np.zeros((N, M), dtype=bool)
+            # 쉬는 늑대 경계(rest_alert). 10-27 거리 두기(rest_keep)를 켜면 쓰지 않는다 — 거리 두기가 그 자리를 맡는다
+            nr = ((pv & ~hunt & (pd <= wf["alert_r"])) if wf["rest_alert"] and not wf["rest_keep"]
+                  else np.zeros((N, M), dtype=bool))
             near_h = hunt & (pd <= wf["safe_r"])                  # 안전 거리 안의 사냥 중인 늑대(실거리 — 쫓는 늑대는 돌아보며 안다)
             if wf["hold_awake"]:
                 # 10-16: 지난 도주는 깨어 있는 늑대(사냥·먹기·배부름, 자는 늑대 말고)가 안전 거리 안에 하나라도 있으면 이어진다
@@ -5936,18 +6090,43 @@ class World:
             if wf["quiet_end"] > 0:
                 self.wf_quiet = np.where(nxt == WF_PANIC, qn, 0)
                 self._wf_quiet_ends += int(np.count_nonzero(quiet & ~in_cov & (nxt != WF_PANIC) & live))
-            # 방향: 도주 = 안전 거리 안 사냥 중인 늑대들, 경계 = 알아챈 늑대들의 반대(거리 역수 가중 합). 0 이면 가장 가까운 그 늑대 반대
+            rest_kept = wf["rest_keep"]
+            if rest_kept:
+                # 10-27 거리 두기(쉬는 늑대, 우선순위: 은신처 안 > 도주 > 사냥 늑대 경계 > 거리 두기 > 없음). 쉬는 늑대 j 마다 V = 늑대 시야 반경(× 날씨,
+                # 늑대 시야각은 쓰지 않는다 — 쉬는 늑대는 둘러보고 사슴은 늑대가 어디를 보는지 모른다), 눈길 트임(줄기·잎)
+                #   시작: d ≤ V ∧ (고개 든 시야(see_r·(1 − detect_night·d)·날씨 반경, 위협 시야각 — 행동 배수 없음)로 보임 ∨ 지금 알아챔 wf_pvis(발소리 포함))
+                #   이어짐: 지난 덮기 REST ∧ d ≤ V + rest_keep_margin (사슴 시야와 무관 — 기억)
+                restw = self._wf_rest_wolves()[None, :]
+                vr = self._wf_view()
+                rk_cand = self._wf_los(restw & (pd <= vr + wf["rest_keep_margin"]))
+                see_up = self._wf_see_up()
+                tcos = self._zv["threat_cos"] if self._zv is not None else self.cfg.fov_cos
+                cosv = (ex * self.head[:, 0:1] + ey * self.head[:, 1:2]) * pinv
+                eye = (pd <= see_up) & (cosv >= tcos)
+                rsel = rk_cand & (((pd <= vr) & (eye | pv)) | (prev == WF_REST)[:, None])
+                rest_now = (nxt == WF_NONE) & ~in_cov & live & rsel.any(1)
+                nxt = np.where(rest_now, WF_REST, nxt).astype(np.int8)
+            # 방향: 도주 = 안전 거리 안 사냥 중인 늑대들, 경계 = 알아챈 늑대들(거리 두기 = 고른 쉬는 늑대들)의 반대(거리 역수 가중 합). 0 이면 가장 가까운 그 늑대 반대
             sel = np.where((nxt == WF_PANIC)[:, None], near_h, nh | nr)
+            if rest_kept:
+                sel = np.where((nxt == WF_REST)[:, None], rsel, sel)
             wt = sel / np.maximum(pd, 0.5)
             s = np.stack([-(ex * pinv * wt).sum(1), -(ey * pinv * wt).sum(1)], 1)
             dirs = normalize(s)
-            zero = ((nxt == WF_ALERT) | (nxt == WF_PANIC)) & ~((dirs * dirs).sum(1) > EPS * EPS)
+            zero = ((nxt == WF_ALERT) | (nxt == WF_PANIC) | (nxt == WF_REST)) & ~((dirs * dirs).sum(1) > EPS * EPS)
             if zero.any():
                 j = np.where(sel[zero], pd[zero], np.inf).argmin(1)
                 iz = np.flatnonzero(zero)
                 dirs[zero] = -np.stack([ex[iz, j], ey[iz, j]], 1) * pinv[iz, j][:, None]
             if self._route_on:
                 a0 = dirs.copy()                                  # 10-21 도망길: 은신처 굽히기 전 도주 방향 a₀
+            if rest_kept:
+                # 10-27 적대적 검토 — 이어지는 거리 두기(지난 덮기도 REST)는 지난 덮기 방향을 이어받는다: n(새 반대 방향 + WF_REST_INERTIA·지난 방향),
+                # 0 이면 새 반대 방향 그대로. 가장자리 굽히기·벽 여유 앞이라 굽히는 쪽(벽을 따라 어느 쪽으로)도 지난 쪽을 따른다 (C++ kRestKeepInertia)
+                ci = (nxt == WF_REST) & (prev == WF_REST) & (self.wf_dir != 0.0).any(1)
+                if ci.any():
+                    q = normalize(dirs[ci] + WF_REST_INERTIA * self.wf_dir[ci])
+                    dirs[ci] = np.where(((q * q).sum(1) > EPS * EPS)[:, None], q, dirs[ci])
             pan = nxt == WF_PANIC
             to_sh = np.zeros(N, dtype=bool)                       # 은신처 쪽으로 정한 도주(가장자리 굽히기에서 뺀다)
             if pan.any() and len(self.cov_r):
@@ -5968,7 +6147,7 @@ class World:
                     to_sh[ih] = True
             if wf["edge_r"] > 0.0:
                 # 10-16: 가장자리·모서리 굽히기(wf_edge_steer) — 경계·도주(은신처 쪽 도주 말고)
-                eg = ((nxt == WF_ALERT) | pan) & ~to_sh & ((dirs * dirs).sum(1) > EPS * EPS)
+                eg = ((nxt == WF_ALERT) | pan | (nxt == WF_REST)) & ~to_sh & ((dirs * dirs).sum(1) > EPS * EPS)
                 if eg.any():
                     dirs[eg] = wf_edge_steer(self.pos[eg], dirs[eg], self.size, wf["edge_r"])
             # 무대 벽 여유 안이면 벽 쪽 성분을 지운다(다 지워지면 그대로) — C++ KeepDirection
@@ -5978,7 +6157,7 @@ class World:
             sl[:, 1] = np.where(((p[:, 1] <= mg) & (sl[:, 1] < 0.0)) | ((p[:, 1] >= size - mg) & (sl[:, 1] > 0.0)), 0.0, sl[:, 1])
             sl = normalize(sl)
             dirs = np.where(((sl * sl).sum(1) > EPS * EPS)[:, None], sl, dirs)
-            dirs[(nxt != WF_ALERT) & (nxt != WF_PANIC)] = 0.0
+            dirs[(nxt != WF_ALERT) & (nxt != WF_PANIC) & (nxt != WF_REST)] = 0.0
         elif wf["quiet_end"] > 0:
             self.wf_quiet = np.zeros(N, dtype=np.int64)
         rt_exec = None
@@ -6000,7 +6179,46 @@ class World:
             ex_mode = prev if executed is None else executed
             kw = {} if rt_exec is None else dict(route_exec=rt_exec)       # 길 끈 세계는 옛 호출 꼴 그대로(감싸는 기록 도구가 같은 인자를 받는다)
             self._fl_update(ex_mode == WF_PANIC if flee is None else flee, ex_mode == WF_PANIC, done, caught, live, in_cov, **kw)
+        if wf["rest_keep"]:
+            self._wf_rest_tally(prev, nxt, done, in_cov)
         self.wf_mode, self.wf_dir = nxt, dirs
+
+    def _wf_rest_tally(self, prev: np.ndarray, nxt: np.ndarray, done: np.ndarray, in_cov: np.ndarray) -> None:
+        """거리 두기 통계 (wild_stats rest_*, 동역학과 무관 — `_wf_update` 끝, 덮기를 바꾸기 전): 시작, 끝 까닭(WF_REST_ENDS — 죽음·은신처·우선순위, 그 밖은
+        이번 스텝 끝 기하로 늑대 시야 반경 + 여유 안 쉬는 늑대가 가려짐 > 늑대가 다시 사냥 > 잠듦 > 거리), 끝난 뒤 WF_REST_REENTRY_STEPS 안 다시 시작.
+        지난 덮기 = `step` 이 리스폰 전에 떠 둔 사본(_wf_rest_exec — 학습 세계 리스폰이 죽은 칸을 지우기 전), 없으면 prev."""
+        ex_rest = self._wf_rest_exec if getattr(self, "_wf_rest_exec", None) is not None else prev == WF_REST
+        self._wf_rest_exec = None
+        now = nxt == WF_REST
+        st = now & ~ex_rest
+        if st.any():
+            self._wf_rest_starts += int(np.count_nonzero(st))
+            self._wf_rest_reentry += int(np.count_nonzero(st & (self.t - self._wf_rest_last_end <= WF_REST_REENTRY_STEPS)))
+        en = ex_rest & ~now
+        if en.any():
+            cause = np.full(self.N, len(WF_REST_ENDS) - 1, dtype=np.int64)            # 거리
+            ie = np.flatnonzero(en & ~done & ~in_cov & (nxt == WF_NONE))
+            if len(ie) and self.M > 0:
+                vr = self._wf_view() + self._wf["rest_keep_margin"]
+                ex = self.pred_pos[:, 0][None, :] - self.pos[ie, 0:1]
+                ey = self.pred_pos[:, 1][None, :] - self.pos[ie, 1:2]
+                inr = np.sqrt(ex * ex + ey * ey) <= vr
+                hunt = self._wf_hunting()[None, :]
+                asleep = (self.pred_asleep if self._ps is not None else np.zeros(self.M, dtype=bool))[None, :]
+                restw = self._wf_rest_wolves()[None, :]
+                rin = inr & restw
+                vis = rin.copy()
+                if self._ob is not None and self._ob["block_sight"] and len(self.obstacles) and rin.any():
+                    vis, _, _, _ = self._ob_occlude(rin, self.pos[ie], self.pred_pos)
+                c = np.where((rin & ~vis).any(1), WF_REST_ENDS.index("occluded"),
+                             np.where((inr & hunt).any(1), WF_REST_ENDS.index("hunt"),
+                                      np.where((inr & asleep & ~restw).any(1), WF_REST_ENDS.index("sleep"), len(WF_REST_ENDS) - 1)))
+                cause[ie] = c
+            cause = np.where(done, 0, np.where(in_cov, 1, np.where(nxt != WF_NONE, 2, cause)))
+            self._wf_rest_ends += np.bincount(cause[en], minlength=len(WF_REST_ENDS))
+            self._wf_rest_last_end = np.where(en & ~done, self.t, self._wf_rest_last_end)
+        if done.any():
+            self._wf_rest_last_end = np.where(done, -(10 ** 9), self._wf_rest_last_end)
 
     # ------------------------------------------------------------------ #
     # 야생 (w3) 도망길 1단계 (10-21, 측정 전용 route_fixed — 모듈 docstring '야생 1단계' (w3) 도망길)·두뇌 길 (10-22 route — '야생 1단계' (w3) 두뇌 길)
@@ -6257,8 +6475,14 @@ class World:
                        sat_steps=self._ws_sat_steps)
         if self._wf is not None:
             tot = max(int(self._wf_mode_n.sum()), 1)
-            out.update({f"mode_{k}_frac": int(c) / tot for k, c in zip(WF_MODE_NAMES, self._wf_mode_n)})
+            # 10-27: 거리 두기(rest)는 rest_keep 을 켠 세계만 적는다(끈 세계의 칸은 그대로 넷)
+            names = WF_MODE_NAMES if self._wf["rest_keep"] else WF_MODE_NAMES[:WF_REST]
+            out.update({f"mode_{k}_frac": int(c) / tot for k, c in zip(names, self._wf_mode_n)})
             out.update(panic_starts=self._wf_panic_starts, panic_ends=self._wf_panic_ends, panic_end_shelter=self._wf_panic_end_shelter)
+            if self._wf["rest_keep"]:
+                out.update(rest_starts=int(self._wf_rest_starts), rest_steps=int(self._wf_mode_n[WF_REST]),
+                           rest_ends={k: int(v) for k, v in zip(WF_REST_ENDS, self._wf_rest_ends)},
+                           rest_reentry=int(self._wf_rest_reentry), band_turn_steps=int(self._wf_band_n), band_stop_steps=int(self._wf_band_stop_n))
             if self._wf["quiet_end"] > 0:
                 out["panic_quiet_ends"] = int(self._wf_quiet_ends)     # 10-21 끝 규칙 quiet_end 로 끝난 도주 (켠 세계만)
         if not out:

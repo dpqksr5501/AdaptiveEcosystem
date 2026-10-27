@@ -175,6 +175,15 @@ namespace EcoWorldV3
 	//   bHoldAwake  지난 도주를 붙잡는 늑대 = 깨어 있는 늑대 전부(사냥·먹기·배부름 — 자는 늑대 말고). 도주 방향도 그 늑대들 반대. 도주 시작은 그대로
 	//   EdgeR > 0   경계·도주 방향(은신처 쪽 도주 말고)을 벽 여유 처리 앞에 WildEdgeSteer 로 굽힌다 — 가장자리 EdgeR 안에서 벽을 따라, 모서리에서 빠져나오게
 	// 값 = configs/v3_wild1_mirror.yaml wild_flight (단위: 1 = 2 m). 골든 WildGoldenVectorsV3.h '도주 장면'·'고친 도주 장면'·'가장자리 굽히기'
+	// 10-27 거리 두기(쉬는 늑대) (사용자 '늑대가 쉬고 있어도 아주 잘 보이는 데서 사슴이 멈춰 있는 게 이상하다 — 늑대 시야 밖까지 물러난 뒤 쉬게', 파이썬 선택 키
+	// rest_keep·rest_keep_margin·rest_keep_band·rest_keep_asleep — world.py 모듈 docstring '거리 두기', 기본 끔 = 위 그대로):
+	//   bRestKeep   덮기 kKeepRest. 쉬는 늑대(사냥 중이 아님 — 먹기·배부름·플레이어 휴식, 깨어 있음 — bRestKeepAsleep 이면 자는 늑대도, 죽은 늑대 말고) V = 늑대 시야
+	//               반경(WolfViewNow, 늑대 시야각 안 씀) 안에서 눈길이 트이고 사슴이 알아채면(고개 든 시야 SeePredNow·위협 시야각, 또는 관측 보임) 다음 덮기가
+	//               없음이고 은신처 밖이면 거리 두기 — V + RestKeepMargin 밖(또는 가림·사냥·잠)이 될 때까지 걸어서 물러난다(방향 = 경계 방향 줄, 이어지는 거리 두기는
+	//               지난 방향 관성 kRestKeepInertia 를 굽히기 앞에 더한다). 켜면 bRestAlert 의 쉬는 늑대 경계는 쓰지 않는다. 실행(B, FlightRestControl): 두뇌가 GRAZE 면
+	//               걷기·n(덮기 방향 + 1.35·분리 — 분리의 늑대 쪽 성분은 지운다) → 벽 여유·시야 배수 1
+	//   RestKeepBand > 0  다가가지 않기 띠 (FlightRestBand): 거리 두기가 아닌 GRAZE 걷기는 실거리 ≤ min(V + 여유 + 띠, SeePredNow)·눈길 트임인 쉬는 늑대 쪽 성분을 지운다
+	// 골든 CalmGoldenVectorsV3.h (herbivore_rl/export_golden_v3_calm.py). 통합 모드 eco.IntegratedV3.RestKeep (기본 1 — 여유 2·띠 4)
 	struct FWildFlightConfig
 	{
 		bool bEnabled = false;              // 끄면 아래 칸을 아무도 읽지 않는다
@@ -192,6 +201,23 @@ namespace EcoWorldV3
 		double EdgeR = 0.0;                 // 10-16 edge_r (설정 5 = 10 m): 가장자리 굽히기 거리. 0 = 끔
 		// 10-22 두 길 두뇌 (파이썬 선택 키 route — 머리 주석 FWildFlightConfig::bRoute). InitWorld·SetModelRoute 가 bEnabled 와 묶는다. 기본 끔 = 지금 그대로
 		bool bRoute = false;
+		// 10-27 거리 두기(쉬는 늑대) (파이썬 선택 키 rest_keep·rest_keep_margin·rest_keep_band·rest_keep_asleep — 위 주석). 기본 끔 = 지금 그대로
+		bool bRestKeep = false;
+		double RestKeepMargin = 2.0;        // 나올 때 V + 이 값 (4 m — 들어갈 때 V 와의 히스테리시스)
+		double RestKeepBand = 0.0;          // 다가가지 않기 띠 (설정 4 = 8 m). 0 = 끔
+		bool bRestKeepAsleep = false;       // 자는 늑대도 넣는다 (자는 늑대는 굴에 있어 안 보인다는 규칙과 어긋나 기본 끔)
+	};
+
+	/**
+	 * 10-27 먹기 걷기 고침 (파이썬 선택 키 repertoire.graze_* — EcoRepertoire.h GrazeCalmDir). InitWorld 가 W.RepCfg 의 GrazeEdgeR·GrazeEdgeW·GrazeInertia·
+	 * GrazeWallMargin 으로 옮긴다 (0 이상 유한한 값만). 기본 0 = R1b 세계 그대로. 통합 모드 eco.IntegratedV3.GrazeCalm (기본 1 = 2·2.5·0.5·1)
+	 */
+	struct FGrazeCalmConfig
+	{
+		double EdgeR = 0.0;                 // graze_edge_r (단위)
+		double EdgeW = 0.0;                 // graze_edge_w
+		double Inertia = 0.0;               // graze_inertia
+		double WallMargin = 0.0;            // graze_wall_margin (단위)
 	};
 
 	/**
@@ -253,7 +279,11 @@ namespace EcoWorldV3
 	inline constexpr std::int32_t kKeepAlert = 1;     // 경계: 두뇌 행동 그대로, GRAZE 면 걸으며 먹고 멀어짐
 	inline constexpr std::int32_t kKeepPanic = 2;     // 도주(안전해질 때까지): FLEE + 뛰기
 	inline constexpr std::int32_t kKeepShelter = 3;   // 은신처 안 웅크림: HIDE 도착
-	inline constexpr std::int32_t kNumKeepModes = 4;
+	inline constexpr std::int32_t kKeepRest = 4;      // 10-27 거리 두기(쉬는 늑대): 두뇌 행동 그대로, GRAZE 면 걸어서 늑대 시야 밖으로 (bRestKeep 일 때만)
+	// 10-27 적대적 검토 — 이어지는 거리 두기의 방향 관성 (world.py WF_REST_INERTIA): 지난 덮기도 거리 두기면 n(새 반대 방향 + 이 값·지난 KeepDir)(0 이면 새
+	// 반대 방향). 가장자리 굽히기·벽 여유 앞. 없으면 고른 늑대가 V + 여유 경계에서 들고 나거나 벽 앞 굽히는 쪽 부호가 바뀔 때 방향이 스텝마다 뒤집혔다
+	inline constexpr double kRestKeepInertia = 1.0;
+	inline constexpr std::int32_t kNumKeepModes = 5;
 	static_assert(kKeepNone == EcoPolicyV3::kMaskOverrideNone && kKeepPanic == EcoPolicyV3::kMaskOverridePanic
 					  && kKeepShelter == EcoPolicyV3::kMaskOverrideCrouch,
 				  "마스크 판 4·5 덮기 줄 번호는 덮기 번호와 같다 (파이썬 rep_peek override = WF_*)");
@@ -1432,6 +1462,8 @@ namespace EcoWorldV3
 		std::uint8_t WorldAllowed[EcoRepertoireV3::kNumBehaviors] = {1, 1, 1, 1, 1};
 		// 야생 1단계 (w3) 도주 반사 거리 (통합 모드 eco.IntegratedV3.WildFlight — 경계 거리 실험 KeepAway 를 바꿨다). 기본 끔 = 지금 그대로
 		FWildFlightConfig WildFlight;
+		// 10-27 먹기 걷기 고침 (통합 모드 eco.IntegratedV3.GrazeCalm). 기본 0 = 지금 그대로 (평면 맵·기준 루프·골든)
+		FGrazeCalmConfig GrazeCalm;
 		// 야생 1단계 (w1) 지방 비축 (사람 결정 10-15 (7), 통합 모드 eco.IntegratedV3.WildReserve). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든).
 		// 낮 고정 세계(DayPeriod ≤ 0)에서는 InitWorld 가 끈다 (파이썬도 daynight 없이 켤 수 없다)
 		FWildReserveConfig WildReserve;
@@ -2045,6 +2077,10 @@ namespace EcoWorldV3
 		std::int64_t KeepAlertStarts = 0;    // 경계(멀어짐) 시작
 		std::int64_t KeepPanicStarts = 0;    // 도망 시작
 		std::int64_t KeepShelterStarts = 0;  // 은신처 웅크림 시작
+		std::int64_t KeepRestStarts = 0;     // 10-27 거리 두기(쉬는 늑대) 시작 (bRestKeep 일 때만)
+		std::int64_t KeepRestEnds = 0;       // 끝난 거리 두기 (산 사슴 — 죽음은 세지 않는다)
+		std::int64_t RestBandTurnSteps = 0;  // 다가가지 않기 띠가 방향을 바꾼 사슴·스텝 (RestKeepBand > 0 일 때만 — 파이썬 band_turn_steps)
+		std::int64_t RestBandStopSteps = 0;  // 그 가운데 다 지워져 멈춘 사슴·스텝 (band_stop_steps)
 		std::int64_t KeepPanicEnds = 0;      // 끝난 도망 (안전 거리 밖 또는 은신처)
 		std::int64_t KeepPanicEndShelter = 0; // 그중 은신처에서 끝남
 		std::int64_t KeepPanicEndSteps = 0;  // 끝난 도망의 길이 합 (스텝)
@@ -2268,6 +2304,21 @@ namespace EcoWorldV3
 		W.Config.ShelterWolfMargin = C.bShelterSafe && std::isfinite(C.ShelterWolfMargin) && C.ShelterWolfMargin > 0.0 ? C.ShelterWolfMargin : 0.0;
 		// 10-22 두 길 두뇌: 도주 반사가 없는 세계에서는 켜지 않는다 (파이썬도 wild_flight 없이 route 를 켤 수 없다)
 		W.Config.WildFlight.bRoute = C.WildFlight.bRoute && C.WildFlight.bEnabled;
+		// 10-27 거리 두기: 도주 반사가 없는 세계에서는 켜지 않는다 (파이썬 선택 키는 wild_flight 블록 안). 여유·띠는 0 이상 유한한 값만 (파이썬이 거부하는 값은 끈다)
+		{
+			FWildFlightConfig& K = W.Config.WildFlight;
+			K.bRestKeep = K.bRestKeep && K.bEnabled && std::isfinite(K.RestKeepMargin) && K.RestKeepMargin >= 0.0 && std::isfinite(K.RestKeepBand)
+						  && K.RestKeepBand >= 0.0;
+			K.bRestKeepAsleep = K.bRestKeepAsleep && K.bRestKeep;
+		}
+		// 10-27 먹기 걷기 고침: 0 이상 유한한 값만 W.RepCfg 로 (파이썬 parse_params 가 음수·무한을 거부한다 — 그런 값은 0 = 끔)
+		{
+			auto Ok = [](double V) { return std::isfinite(V) && V > 0.0 ? V : 0.0; };
+			W.RepCfg.GrazeEdgeR = Ok(C.GrazeCalm.EdgeR);
+			W.RepCfg.GrazeEdgeW = Ok(C.GrazeCalm.EdgeW);
+			W.RepCfg.GrazeInertia = Ok(C.GrazeCalm.Inertia);
+			W.RepCfg.GrazeWallMargin = Ok(C.GrazeCalm.WallMargin);
+		}
 		// 야생 (w1): 하루 단위 계수라 낮 고정 세계에서는 끈다 (파이썬 _wild_reserve_params 가 daynight 없이 켜기를 거부한다)
 		W.Config.WildReserve.bEnabled = C.WildReserve.bEnabled && W.Config.DayPeriod > 0;
 		W.ReserveCap = W.Config.WildReserve.bEnabled
@@ -2889,6 +2940,10 @@ namespace EcoWorldV3
 			In.bFoodOk = EcoRepertoireV3::IsFoodOk(W.Food.FoodAt(B.Pos), W.RepCfg);
 			In.bInCover = H.Decision->DecisionObs.bInCover;
 			In.Dark = W.Dark;
+			// 10-27 먹기 걷기 고침의 입력 (GrazeCalmOn 일 때만 읽는다 — 끈 세계는 값만 채운다): 결정 때 위치·이번 이동 전 heading·무대 한 변
+			In.Pos = B.Pos;
+			In.Head = B.Head;
+			In.WorldSize = W.Config.WorldSize;
 			return In;
 		}
 
@@ -2907,18 +2962,7 @@ namespace EcoWorldV3
 		 */
 		inline FVec2 WallKeep(const FVec2& P, const FVec2& D, double Size, double Mg)
 		{
-			namespace R3 = EcoRepertoireV3;
-			FVec2 Sl = D;
-			if ((P.X <= Mg && Sl.X < 0.0) || (P.X >= Size - Mg && Sl.X > 0.0))
-			{
-				Sl.X = 0.0;
-			}
-			if ((P.Y <= Mg && Sl.Y < 0.0) || (P.Y >= Size - Mg && Sl.Y > 0.0))
-			{
-				Sl.Y = 0.0;
-			}
-			Sl = R3::Normalize(Sl);
-			return (Sl.X * Sl.X + Sl.Y * Sl.Y > R3::kEps * R3::kEps) ? Sl : D;
+			return EcoRepertoireV3::WallKeepDir(P, D, Size, Mg);   // 식은 하나 (10-27 먹기 걷기 고침의 벽 여유도 같은 함수)
 		}
 
 		// ---- 10-22 두 길 두뇌 (FWildFlightConfig::bRoute 일 때만 — 머리 주석, 이식 계획서 2절) ----
@@ -3147,6 +3191,19 @@ namespace EcoWorldV3
 				   && !(A.Spec.Type == EcoThreatV3::EThreatType::Player && A.State.PlayerMode == EcoThreatV3::EPlayerMode::Rest);
 		}
 
+		/** 10-27 거리 두기의 쉬는 늑대 (world.py `_wf_rest_wolves`): 죽지 않았고 사냥 중이 아니고(먹기·배부름·플레이어 휴식) 깨어 있다 (bRestKeepAsleep 이면 자는 늑대도). */
+		inline bool RestWolf(const FWorldState& W, const FThreatAgent& A)
+		{
+			return !A.bDead && !FlightHunting(W, A) && (W.Config.WildFlight.bRestKeepAsleep || !ThreatAsleepNow(W, A));
+		}
+
+		/** 사슴 P → 위협 자리 (X, Y) 눈길이 트였나 (world.py `_wf_los` — 줄기 원판·숲 시야 잎. 통합 모드 식생 가림도 — 관측 보임과 같은 가림). */
+		inline bool EyeClear(const FWorldState& W, const FVec2& P, double X, double Y)
+		{
+			const FObstacleConfig& Ob = W.Config.Obstacles;
+			return !((Ob.Active() && Ob.bBlockSight && EyeBlocked(Ob, P.X, P.Y, X, Y)) || (W.Config.bEcosystemLife && W.Food.BlocksSight(P.X, P.Y, X, Y)));
+		}
+
 		/**
 		 * 스텝 끝(H, DecideAll 앞): 사슴마다 다음 스텝의 덮기·방향을 정한다 (world.py `_wf_update` 와 줄마다 같다). 지난 덮기 = 이번 스텝에
 		 * 실행한 KeepActive. 알아챔은 E 의 관측과 같은 보임(W.ThreatIn — 시야·발소리·잠)을 위협마다 하나씩 다시 판정한다.
@@ -3163,6 +3220,10 @@ namespace EcoWorldV3
 			const bool bSightBlock = W.Config.Obstacles.Active() && W.Config.Obstacles.bBlockSight;
 			constexpr std::int32_t kMaxM = 64;
 			const std::int32_t Mc = M < kMaxM ? M : kMaxM;
+			// 10-27 거리 두기 (머리 주석 FWildFlightConfig::bRestKeep): 늑대 시야 반경 V (× 날씨 — world.py `_wf_view`), 나올 때 V + 여유
+			const bool bRestKeep = F.bRestKeep;
+			const double RestV = WolfViewNow(W);
+			const double RestOut = RestV + F.RestKeepMargin;
 			// 10-22 두 길 두뇌 (머리 주석 FWildFlightConfig::bRoute): 늑대 자리 (스텝 끝 — world.py pred_pos, SHELTER 경주 여유의 q_m)
 			const bool bRoute = F.bRoute;
 			double Q[2 * kMaxM] = {};
@@ -3204,7 +3265,7 @@ namespace EcoWorldV3
 				const bool bInCov = H.Perception->Cover.bInCover;
 				bool bNoticedH = false, bAnyNr = false, bAnyNearH = false, bPanicNow = false;
 				// 위협마다 판정을 먼저 모은다 (방향은 다음 덮기가 정해진 뒤 고른 늑대들로)
-				bool Nh[kMaxM] = {}, Nr[kMaxM] = {}, NearH[kMaxM] = {};
+				bool Nh[kMaxM] = {}, Nr[kMaxM] = {}, NearH[kMaxM] = {}, Pv[kMaxM] = {}, Rs[kMaxM] = {};
 				double Ex[kMaxM] = {}, Ey[kMaxM] = {}, Pd[kMaxM] = {}, Inv[kMaxM] = {};
 				for (std::int32_t m = 0; m < Mc; ++m)
 				{
@@ -3216,6 +3277,7 @@ namespace EcoWorldV3
                         &&((bSightBlock&&EyeBlocked(W.Config.Obstacles,P.X,P.Y,Ti.X,Ti.Y))
                             ||(W.Config.bEcosystemLife&&W.Food.BlocksSight(P.X,P.Y,Ti.X,Ti.Y)));
 					const bool bPv = EcoObservationV3::PerceiveThreats(P, H.Body->Head, SeePred, S.SeeMult, S.SeeMult, &Ti, 1, W.ObsCfg).PredCount == 1;
+					Pv[m] = bPv;
 					Ex[m] = A.State.PosX - P.X;
 					Ey[m] = A.State.PosY - P.Y;
 					Pd[m] = std::sqrt(Ex[m] * Ex[m] + Ey[m] * Ey[m]);
@@ -3224,7 +3286,7 @@ namespace EcoWorldV3
 					const bool bLocked = A.Last.bHasTarget && A.Last.Target == i;   // 이번 스텝 이 사슴을 쫓음 (world.py pred_target)
 					const bool bComing = bHunt && (bLocked || bAppr);
 					Nh[m] = bPv && bHunt && Pd[m] <= F.AlertR;
-					Nr[m] = F.bRestAlert && bPv && !bHunt && Pd[m] <= F.AlertR;
+					Nr[m] = F.bRestAlert && !bRestKeep && bPv && !bHunt && Pd[m] <= F.AlertR;   // 10-27 거리 두기를 켜면 쉬는 늑대 경계는 쓰지 않는다
 					// 지난 도주를 붙잡는 늑대: 사냥 중 (10-16 bHoldAwake 면 깨어 있는 늑대 전부 — 먹기·배부름 포함, 자는 늑대 말고)
 					NearH[m] = (F.bHoldAwake ? !ThreatAsleepNow(W, A) : bHunt) && Pd[m] <= F.SafeR;
 					bPanicNow = bPanicNow || (Nh[m] && (Pd[m] <= F.FlightR || bComing));
@@ -3245,17 +3307,37 @@ namespace EcoWorldV3
 				{
 					Next = kKeepAlert;
 				}
+				if (bRestKeep && Next == kKeepNone && !bInCov)
+				{
+					// 10-27 거리 두기 (world.py `_wf_update` 의 rest_keep 줄): 쉬는 늑대마다 눈길 트임 ∧ (시작: d ≤ V ∧ (고개 든 시야 — SeePredNow·위협 시야각, 행동 배수
+					// 없음 — 로 보임 ∨ 지금 알아챔) ∨ 이어짐: 지난 덮기 거리 두기 ∧ d ≤ V + 여유). 하나라도 고르면 다음 덮기 = 거리 두기
+					const FVec2 Hd = H.Body->Head;
+					bool bAnyRs = false;
+					for (std::int32_t m = 0; m < Mc; ++m)
+					{
+						const FThreatAgent& A = *Threats[m];
+						if (!(Pd[m] <= RestOut) || !RestWolf(W, A) || !EyeClear(W, P, A.State.PosX, A.State.PosY))
+						{
+							continue;
+						}
+						const bool bEye = Pd[m] <= SeePred && (Ex[m] * Hd.X + Ey[m] * Hd.Y) * Inv[m] >= W.ObsCfg.ThreatFovCos;
+						Rs[m] = (Pd[m] <= RestV && (bEye || Pv[m])) || Prev == kKeepRest;
+						bAnyRs = bAnyRs || Rs[m];
+					}
+					Next = bAnyRs ? kKeepRest : kKeepNone;
+				}
 				FVec2 Dir;
 				FVec2 A0;   // 10-22 두 길 두뇌: 은신처 굽히기 전 반사 방향 a₀ (world.py `_wf_update` 의 a0 — SHELTER 후보의 cos 기준)
 				bool bToShelter = false;
-				if (Next == kKeepAlert || Next == kKeepPanic)
+				if (Next == kKeepAlert || Next == kKeepPanic || Next == kKeepRest)
 				{
 					// 도주 = 안전 거리 안 사냥 중인 늑대들, 경계 = 알아챈 늑대들의 반대 (거리 역수 가중 합). 0 이면 가장 가까운 그 늑대 반대
+					// 10-27 거리 두기 = 고른 쉬는 늑대들의 반대 (같은 식)
 					double Sx = 0.0, Sy = 0.0;
 					std::int32_t J = -1;
 					for (std::int32_t m = 0; m < Mc; ++m)
 					{
-						const bool bSel = Next == kKeepPanic ? NearH[m] : (Nh[m] || Nr[m]);
+						const bool bSel = Next == kKeepPanic ? NearH[m] : (Next == kKeepRest ? Rs[m] : (Nh[m] || Nr[m]));
 						if (!bSel)
 						{
 							continue;
@@ -3274,6 +3356,16 @@ namespace EcoWorldV3
 						Dir = FVec2{-Ex[J] * Inv[J], -Ey[J] * Inv[J]};
 					}
 					A0 = Dir;
+					if (Next == kKeepRest && Prev == kKeepRest && (D.KeepDir.X != 0.0 || D.KeepDir.Y != 0.0))
+					{
+						// 10-27 적대적 검토 — 이어지는 거리 두기는 지난 덮기 방향을 이어받는다 (world.py `_wf_update` 의 WF_REST_INERTIA 줄): n(반대 방향 + 관성·지난 방향),
+						// 0 이면 반대 방향 그대로. 가장자리 굽히기·벽 여유 앞 (굽히는 쪽도 지난 쪽을 따른다)
+						const FVec2 Held = R3::Normalize(FVec2{Dir.X + kRestKeepInertia * D.KeepDir.X, Dir.Y + kRestKeepInertia * D.KeepDir.Y});
+						if (Held.X * Held.X + Held.Y * Held.Y > Eps2)
+						{
+							Dir = Held;
+						}
+					}
 					if (Next == kKeepPanic && K > 0)
 					{
 						// 늑대 반대쪽(±acos(ShelterCos)) 은신처가 가장자리 ShelterR 안에 있으면 가장 가까운 그 은신처 중심 쪽 (동점 낮은 색인)
@@ -3338,6 +3430,7 @@ namespace EcoWorldV3
 				{
 					ClearRoute(D, H.Perception->RouteObs);   // 판 4·5 → 길 없는 두뇌로 바꾼 뒤 남은 길 상태 (길 끈 세계는 늘 NONE 이라 그대로)
 				}
+				W.Stats.KeepRestEnds += (Prev == kKeepRest && Next != kKeepRest) ? 1 : 0;   // 10-27 기록만 (산 사슴)
 				if (Prev == kKeepPanic && Next != kKeepPanic)
 				{
 					++W.Stats.KeepPanicEnds;
@@ -3464,6 +3557,8 @@ namespace EcoWorldV3
 											 R3::Scale(In.Separation, RC.SepWeight)),
 									 R3::Scale(D.KeepDir, W.Config.WildFlight.AlertW));
 			FVec2 Nv = R3::Normalize(Dv);
+			// 10-27 먹기 걷기 고침(GrazeCalmDir)은 여기에 쓰지 않는다 — 경계 방향은 이미 늑대 반대·가장자리 굽히기·벽 여유를 거친 KeepDir 가 이끈다
+			// (10-27 적대적 검토: 처음 판은 걸었는데 가장자리 되돌림이 AlertW 를 이겨 가장자리에서 사냥 늑대 쪽으로 걷는 몫이 늘었다 — world.py `_wf_alert_control`)
 			if (!(Nv.X * Nv.X + Nv.Y * Nv.Y > R3::kEps * R3::kEps))
 			{
 				Nv = D.KeepDir;
@@ -3474,6 +3569,103 @@ namespace EcoWorldV3
 			O.EatMult = RC.GaitEat[R3::kGaitWalk];
 			O.DrainMult = RC.GaitDrain[R3::kGaitWalk];
 			O.SeeMult = 1.0;
+		}
+
+		/**
+		 * B 의 거리 두기 제어 (world.py `_wf_rest_control`): 덮기가 거리 두기이고 두뇌 행동이 GRAZE 인 사슴은 걸으며 먹고(보행·섭식·대사 = 걷기) 물러나며
+		 * 고개를 든다(시야 배수 1). 방향: D = 덮기 방향, S = 분리, c = S·D < 0 이면 S ← S − c·D (분리의 늑대 쪽 성분을 지운다), n(D + SepWeight·S)(0 이면 D),
+		 * 그다음 벽 여유(WallMargin — 위치는 결정 때 자리 H.Body->Pos). 다른 행동(두뇌의 FLEE·HIDE·SLEEP)은 그대로다.
+		 * 10-27 적대적 검토: 처음 판(n(D + SepWeight·S) 만)은 앞을 막은 동료의 분리가 D 를 지워 걸음이 스텝마다 앞뒤로 뒤집혔고, 벽을 따라 물러나는 사슴을
+		 * 분리가 벽으로 밀어 제자리에 붙잡았다.
+		 */
+		inline void FlightRestControl(const FWorldState& W, const FHerbView& H, const EcoRepertoireV3::FControlInput& In)
+		{
+			namespace R3 = EcoRepertoireV3;
+			const FHerbDecision& D = *H.Decision;
+			if (D.KeepActive != kKeepRest || H.Rep->Behavior != R3::kGraze || !(D.KeepDir.X != 0.0 || D.KeepDir.Y != 0.0))
+			{
+				return;
+			}
+			const R3::FRepertoireConfig& RC = W.RepCfg;
+			const FVec2 Dk = D.KeepDir;
+			FVec2 S = In.Separation;
+			const double C = S.X * Dk.X + S.Y * Dk.Y;
+			if (C < 0.0)
+			{
+				S = FVec2{S.X - C * Dk.X, S.Y - C * Dk.Y};   // 분리의 늑대 쪽(덮기 방향 반대) 성분을 지운다 — 옆으로 비켜 가게만
+			}
+			FVec2 Nv = R3::Normalize(R3::Add(Dk, R3::Scale(S, RC.SepWeight)));
+			if (!(Nv.X * Nv.X + Nv.Y * Nv.Y > R3::kEps * R3::kEps))
+			{
+				Nv = Dk;
+			}
+			Nv = R3::WallKeepDir(H.Body->Pos, Nv, W.Config.WorldSize, W.Config.WildFlight.WallMargin);   // 벽으로 밀지 않는다
+			R3::FControlOutput& O = *H.Control;
+			O.Velocity = R3::Scale(Nv, RC.HerbSpeed * RC.GaitSpeed[R3::kGaitWalk]);
+			O.Gait = R3::kGaitWalk;
+			O.EatMult = RC.GaitEat[R3::kGaitWalk];
+			O.DrainMult = RC.GaitDrain[R3::kGaitWalk];
+			O.SeeMult = 1.0;
+		}
+
+		/**
+		 * B 의 다가가지 않기 띠 (world.py `_wf_rest_band`, RestKeepBand > 0): 거리 두기가 아닌 GRAZE 걷기(평소·경계) 사슴은 쉬는 늑대(번호 오름차순) 가운데
+		 * 실거리 ≤ min(V + 여유 + 띠, SeePredNow)·눈길 트임인 것마다 차례로 속도의 그 늑대 쪽 성분 c = v·u > 0 을 지운다. 하나라도 지웠으면 걷기 속력으로
+		 * 다시 맞추고, 다 지워졌으면 정지(보행·섭식·대사 = 정지). 위협 자리는 지난 스텝 끝(H 와 같은 자리 — 아직 움직이지 않았다).
+		 */
+		inline void FlightRestBand(FWorldState& W, const FHerbView& H, FThreatAgent* const* Threats, std::int32_t M)
+		{
+			namespace R3 = EcoRepertoireV3;
+			R3::FControlOutput& O = *H.Control;
+			if (H.Decision->KeepActive == kKeepRest || H.Rep->Behavior != R3::kGraze || O.Gait != R3::kGaitWalk)
+			{
+				return;
+			}
+			const FWildFlightConfig& F = W.Config.WildFlight;
+			const double Out = WolfViewNow(W) + F.RestKeepMargin + F.RestKeepBand;
+			const double See = SeePredNow(W);
+			const double Lim = Out < See ? Out : See;
+			const FVec2 P = H.Body->Pos;
+			FVec2 V = O.Velocity;
+			bool bHit = false;
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				const FThreatAgent& A = *Threats[m];
+				const double Ex = A.State.PosX - P.X;
+				const double Ey = A.State.PosY - P.Y;
+				const double Pd = std::sqrt(Ex * Ex + Ey * Ey);
+				if (!(Pd <= Lim) || !RestWolf(W, A) || !EyeClear(W, P, A.State.PosX, A.State.PosY))
+				{
+					continue;
+				}
+				const double Inv = 1.0 / (Pd > R3::kEps ? Pd : R3::kEps);
+				const double Ux = Ex * Inv;
+				const double Uy = Ey * Inv;
+				const double C = V.X * Ux + V.Y * Uy;
+				if (C > 0.0)
+				{
+					V.X = V.X - C * Ux;
+					V.Y = V.Y - C * Uy;
+					bHit = true;
+				}
+			}
+			if (!bHit)
+			{
+				return;
+			}
+			++W.Stats.RestBandTurnSteps;
+			const FVec2 Nv = R3::Normalize(V);
+			const R3::FRepertoireConfig& RC = W.RepCfg;
+			if (Nv.X * Nv.X + Nv.Y * Nv.Y > R3::kEps * R3::kEps)
+			{
+				O.Velocity = R3::Scale(Nv, RC.HerbSpeed * RC.GaitSpeed[R3::kGaitWalk]);
+				return;
+			}
+			++W.Stats.RestBandStopSteps;
+			O.Velocity = FVec2{};
+			O.Gait = R3::kGaitStop;
+			O.EatMult = RC.GaitEat[R3::kGaitStop];
+			O.DrainMult = RC.GaitDrain[R3::kGaitStop];
 		}
 
 		// ---- 야생 (w3) 도망 기록 (FWorldConfig::bFlightStats ∧ WildFlight — 기록만. 머리 주석 '도망 기록') ----
@@ -3626,6 +3818,7 @@ namespace EcoWorldV3
 					W.Stats.KeepAlertStarts += D.KeepActive == kKeepAlert ? 1 : 0;
 					W.Stats.KeepPanicStarts += D.KeepActive == kKeepPanic ? 1 : 0;
 					W.Stats.KeepShelterStarts += D.KeepActive == kKeepShelter ? 1 : 0;
+					W.Stats.KeepRestStarts += D.KeepActive == kKeepRest ? 1 : 0;
 				}
 				D.KeepPanicSteps += D.KeepActive == kKeepPanic ? 1 : 0;
 				++W.Stats.KeepSteps[D.KeepActive];
@@ -3669,6 +3862,15 @@ namespace EcoWorldV3
 				Detail::FlightControlInput(H, In);
 				*H.Control = R3::Control(*H.Rep, In, RC);
 				Detail::FlightAlertControl(W, H, In);
+				if (W.Config.WildFlight.bRestKeep)
+				{
+					// 10-27 거리 두기: 덮기 거리 두기 ∧ GRAZE 는 걸어서 물러나고, 그 밖 GRAZE 걷기는 쉬는 늑대 쪽으로 다가가지 않는다 (world.py _rep_step 의 rest 줄)
+					Detail::FlightRestControl(W, H, In);
+					if (W.Config.WildFlight.RestKeepBand > 0.0)
+					{
+						Detail::FlightRestBand(W, H, Threats, M);
+					}
+				}
 			}
 			else
 			{

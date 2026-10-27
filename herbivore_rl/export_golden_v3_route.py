@@ -1331,15 +1331,17 @@ def world_config_code(wb: dict) -> list[str]:
         for key, lhs, kind in fields:
             out.append(f"\t\t{lhs} = {lit(d[key], kind)};")
             got.add(key)
-        left = {k for k in d if k not in got and (blk, k) not in fg.CFG_SKIP}
+        left = {k for k in d if k not in got and (blk, k) not in fg.CFG_SKIP and (blk, k) not in fg.CFG_OPTIONAL_KEYS}
         if left:
             raise SystemExit(f"world 블록 {blk} 에 C++ 로 옮기지 않은 칸: {sorted(left)}")
         used.add(blk)
+    used |= fg.CFG_OPTIONAL_BLOCKS
     left = set(wb) - used
     if left:
         raise SystemExit(f"world 블록에 C++ 로 옮기지 않은 칸: {sorted(left)}")
     if wb["weather"].get("schedule_rows", 0):
         raise SystemExit("날씨 시간표는 옮기지 않는다")
+    out += fg.optional_code(wb, lit)           # 10-27 선택 칸 (끈 세계는 줄이 없다 — 옛 골든 바이트 그대로)
     out.append("\t\tC.Obstacles.Foliage.bEnabled = C.Obstacles.bEnabled && C.Obstacles.Foliage.bEnabled;   // EcoV3Eval ConfigOf 와 같다")
     out.append("\t\tC.WildFlight.bRoute = true;   // ★ 두뇌 길 (계획서 1-2 — InitWorld 가 bEnabled 와 묶는다. 평가기는 두뇌 판이 SetModelRoute 로 정한다)")
     out.append("\t\tC.bSenseStats = false;   // 평가기와 같다 (기록만)")

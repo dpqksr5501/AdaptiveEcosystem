@@ -25,6 +25,9 @@
    스냅숏 칸마다 셋 중 하나다: (가) 대응표(MAPS)에 있는 칸 → 파이썬 설정 값으로 옮긴다, (나) 대응이 없는 칸 → 기준 스냅숏(reference_snapshot.json —
    거울이 맞춘 기본 게임 값)과 같아야 한다, 다르면 거부(파이썬에 그 규칙이 없다), (다) 기록만(IGNORE — 시드·시각·화면). 지역마다 날씨·원판(레벨 나무)·
    먹이 용량 격자(풀 — 언리얼 값 그대로 regions.json)를 싣는다. 은신처 원은 파이썬 세계가 놓는 자리와 같아야 한다(다르면 거부).
+   10-27: 거리 두기(world.wild_flight.rest_keep*)·먹기 걷기 고침(world.graze_calm → features.repertoire.graze_*)은 대응표의 선택 키다 — 바탕 설정에 없어도
+   끔 값을 바탕 값으로 보고 켠 값만 옮긴다. 그 칸이 없는 옛 스냅숏(10-26 까지)은 끈 세계로 읽는다. 게임 기본(eco.IntegratedV3.RestKeep·GrazeCalm 1)의
+   스냅숏은 켠 세계(configs/v3_wild3_calm_mirror.yaml 과 같은 규칙)로 옮겨진다.
 2) check: 지금 두뇌로 스냅숏 세계를 스냅숏 시각까지 돌려(시드 32050~32069 × 지역) 언리얼의 잡힘·굶음·산 수가 파이썬 분포 안인지 본다(지역마다 |z| ≤ 3).
 3) train: 시작 = 스냅숏의 지금 두뇌(내장이면 R1b s3 zip — 가중치 sha256 을 맞춰 본다). train_v3.py 그대로(γ 0.995, ppo_best, 세계 8, ε 0.05, 1M 마다 저장),
    학습 세계의 먹이 지도는 스냅숏 지도(--train-food snapshot, 기본 — 지역마다 언리얼 용량 격자를 세계를 만들 때마다 덮는다) 또는 파이썬 난수 지도(random — R4 와 같다).
@@ -91,7 +94,10 @@ DEFAULT_STEPS = 3_000_000
 # (가) 대응표: 스냅숏 지역 world.<블록> 의 칸 → 파이썬 features.<블록> 의 같은 이름 칸 (C++ 이 파이썬 이름을 그대로 쓴다). enabled 도 옮긴다.
 FEATURE_MAPS = {
     "wild_flight": ("wild_flight", ("enabled", "alert_r", "flight_r", "safe_r", "approach", "alert_w", "rest_alert", "shelter_cos", "shelter_r",
-                                    "crouch", "wall_margin", "hold_awake", "edge_r")),
+                                    "crouch", "wall_margin", "hold_awake", "edge_r",
+                                    "rest_keep", "rest_keep_margin", "rest_keep_band", "rest_keep_asleep")),   # 10-27 거리 두기 (선택 키)
+    # 10-27 먹기 걷기 고침 (스냅숏 지역 world.graze_calm — W.RepCfg 값, 파이썬 features.repertoire 의 선택 키). enabled 칸이 없다(repertoire 는 늘 켬)
+    "graze_calm": ("repertoire", ("graze_edge_r", "graze_edge_w", "graze_inertia", "graze_wall_margin")),
     "wild_reserve": ("wild_reserve", ("enabled", "reserve_days", "init", "refill_e", "refill_frac", "weak_e", "weak_speed")),
     "wild_satiation": ("wild_satiation", ("enabled", "sat_days", "rest_speed")),
     "realism_vision": ("realism_vision", ("enabled", "threat_fov_deg")),
@@ -108,7 +114,7 @@ IGNORE_SETTINGS = {"seed", "weather_forest", "weather_highland", "weather_barren
                    "flight_hold_awake", "flight_edge_avoid", "wild_flight", "wild_reserve", "wild_satiation", "realism_vision", "realism_hearing",
                    "shelter_safe", "wolf_body_margin_m", "shelter_food", "pack_hunt", "obstacles", "obstacle_detour", "weather", "no_freeze",
                    "gradual_night", "wolf_eat_seconds", "wolf_eat_steps", "deer_per_region", "wolves_per_region", "stage_size_units", "pred_speed_mult",
-                   "stage_trees", "obstacle_import", "social_control", "protected_refuges", "foliage"}
+                   "stage_trees", "obstacle_import", "social_control", "protected_refuges", "foliage", "rest_keep", "graze_calm"}
 IGNORE_WORLD = {"seed", "rng_stream", "world_size", "num_herbivores", "num_stalkers", "num_chasers", "num_ranged", "num_nocturnal", "player_proxy",
                 "pred_speed_mult", "pred_eat_cd", "eat_in_place", "realism_night", "respawn_dead", "day_period", "day_offset", "twilight_steps",
                 "shelter_safe", "shelter_wolf_margin", "protected_refuges", "world_allowed", "food_rules"} | set(FEATURE_MAPS)
@@ -163,10 +169,20 @@ def find_anchor(brain: dict) -> tuple[Path, str]:
 
 
 def _set_feature(f: dict, block: str, key: str, val, log: list, src: str) -> None:
+    """바탕 설정 features.<block>.<key> 를 스냅숏 값으로 덮는다. 바탕에 없는 선택 키(features.OPTIONAL_KEYS — 10-27 거리 두기·먹기 걷기 고침 등)는 끔 값을
+    바탕 값으로 보고, 스냅숏 값이 끔 값이면 칸을 더하지 않는다(옛 스냅숏·끈 세계의 변환 결과가 그대로다)."""
+    from env_v2.features import OPTIONAL_KEYS
+
     if block not in f:
         raise Refused(f"바탕 설정에 기능 블록 {block} 이 없다 ({src})")
-    old = f[block].get(key, None) if key in f[block] or key == "enabled" else "(없음)"
-    if old == "(없음)":
+    opt = OPTIONAL_KEYS.get(block, {})
+    if key in f[block] or key == "enabled":
+        old = f[block].get(key, None)
+    elif key in opt:
+        old = opt[key]
+        if val == old and isinstance(val, bool) == isinstance(old, bool):
+            return
+    else:
         raise Refused(f"바탕 설정 {block} 에 칸 {key} 가 없다 ({src}) — 파이썬 대응이 없다")
     if isinstance(old, bool) or isinstance(val, bool):
         val = bool(val)
@@ -291,10 +307,19 @@ def convert(snap: dict, reference: dict | None, template: Path | None = None, st
         if bad:
             raise Refused(f"지워진 은신처(반지름 0)가 있다 {bad} — 팀 은신처 생명주기는 파이썬에 없다")
         checks.append("팀 은신처 생명주기(ProtectedRefuges) 켬 — 지워진 은신처 없음이라 세계가 같다")
-    # 기능 블록 계수
+    # 기능 블록 계수. 10-27 선택 키(거리 두기·먹기 걷기 고침)가 없는 옛 스냅숏(10-26 까지 — 그 규칙이 없던 빌드)은 끔 값으로 읽는다
+    from env_v2.features import OPTIONAL_KEYS
+
     for sblock, (pblock, keys) in FEATURE_MAPS.items():
+        blk = w0.get(sblock) or {}
         for k in keys:
-            _set_feature(f, pblock, k, w0[sblock][k], changed, f"world.{sblock}.{k}")
+            if k in blk:
+                v = blk[k]
+            elif k in OPTIONAL_KEYS.get(pblock, {}):
+                v = OPTIONAL_KEYS[pblock][k]
+            else:
+                raise Refused(f"스냅숏 지역 world.{sblock}.{k} 가 없다 — 이 변환이 모르는 빌드다")
+            _set_feature(f, pblock, k, v, changed, f"world.{sblock}.{k}")
     if int(w0["weather"]["schedule_rows"]) != 0:
         raise Refused("날씨 시간표가 있다 — 스냅숏이 시간표를 싣지 않는다(고정 날씨만 옮긴다)")
     wx_regions = {}

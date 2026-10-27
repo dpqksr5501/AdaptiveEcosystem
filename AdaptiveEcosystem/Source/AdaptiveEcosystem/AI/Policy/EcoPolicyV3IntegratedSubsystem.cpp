@@ -172,6 +172,23 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("0 = 굽히지 않는다(857da45). eco.IntegratedV3.WildFlight 1 일 때만 뜻이 있다. Play 전에 바꾼다. 명령줄 -EcoV3FlightEdgeAvoid= 는 시작값."),
 		ECVF_Default);
 
+	static TAutoConsoleVariable<int32> CVarRestKeep(
+		TEXT("eco.IntegratedV3.RestKeep"),
+		1,
+		TEXT("통합 v3 모드 거리 두기 — 쉬는 늑대 (1 = 켬, 기본 — 10-27 사용자 '늑대가 쉬고 있어도 잘 보이는 데서 사슴이 멈춰 있다'). 먹거나 배불러 쉬는 늑대의 시야 ")
+		TEXT("반경(28 m × 날씨) 안에서 그 늑대를 알아챈 사슴은 걸어서 늑대 시야 + 4 m 밖까지 물러난 뒤 쉬고, 그 밖 8 m 띠에서는 쉬는 늑대 쪽으로 풀을 뜯어 다가가지 ")
+		TEXT("않는다. 값 = 파이썬 configs/v3_wild3_calm_mirror.yaml wild_flight.rest_keep. 0 = 쉬는 늑대는 경계(먹으며 멀어짐)만(10-26). ")
+		TEXT("eco.IntegratedV3.WildFlight 1 일 때만 뜻이 있다. Play 전에 바꾼다. 명령줄 -EcoV3RestKeep= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarGrazeCalm(
+		TEXT("eco.IntegratedV3.GrazeCalm"),
+		1,
+		TEXT("통합 v3 모드 먹기 걷기 고침 (1 = 켬, 기본 — 10-27 사용자 '평소 사슴이 갈 곳을 못 정하고 방향만 왔다갔다 하며 제자리에서 돈다'). 먹이를 찾아 걷는 ")
+		TEXT("사슴은 무대 가장자리 4 m 안에서 안쪽으로 되돌아오고, 몸이 향한 쪽으로 이어 걷고(관성 0.5), 벽 2 m 안에서는 벽 쪽으로 가지 않는다. ")
+		TEXT("값 = 파이썬 configs/v3_wild3_calm_mirror.yaml repertoire.graze_*. 0 = 10-26 그대로. Play 전에 바꾼다. 명령줄 -EcoV3GrazeCalm= 는 시작값."),
+		ECVF_Default);
+
 	static TAutoConsoleVariable<int32> CVarShelterSafe(
 		TEXT("eco.IntegratedV3.ShelterSafe"),
 		1,
@@ -540,7 +557,7 @@ const TCHAR* EcoV3Integrated::BehaviorNameKo(int32 B)
 const TCHAR* EcoV3Integrated::KeepModeNameKo(int32 KeepMode)
 {
 	static const TCHAR* Names[EcoWorldV3::kNumKeepModes] = {TEXT("두뇌"), TEXT("경계(먹으며 멀어짐)"), TEXT("도주(안전해질 때까지)"),
-															 TEXT("웅크림(은신처·경계)")};
+															 TEXT("웅크림(은신처·경계)"), TEXT("거리 두기(쉬는 늑대)")};
 	return (KeepMode >= 0 && KeepMode < EcoWorldV3::kNumKeepModes) ? Names[KeepMode] : TEXT("?");
 }
 
@@ -562,8 +579,9 @@ FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const 
 	const double E = FMath::Clamp(Body.Energy, 0.0, 1.0);
 	// 도주 반사 거리 덮기 중이면 행동 이름 대신 덮기 이름 ('경계(먹으며 멀어짐) 64%', '도주(안전해질 때까지) 58%').
 	// 경계는 두뇌가 먹기를 고른 동안만 (두뇌가 도망·숨기·잠이면 그 행동 이름 그대로 — world.py _wf_alert_control 과 같은 조건)
+	// 10-27 거리 두기(쉬는 늑대)도 경계와 같다 — 두뇌가 먹기를 고른 동안만 ('거리 두기(쉬는 늑대) 64%')
 	const bool bKeep = KeepMode == EcoWorldV3::kKeepPanic || KeepMode == EcoWorldV3::kKeepShelter
-					   || (KeepMode == EcoWorldV3::kKeepAlert && Rep.Behavior == EcoRepertoireV3::kGraze);
+					   || ((KeepMode == EcoWorldV3::kKeepAlert || KeepMode == EcoWorldV3::kKeepRest) && Rep.Behavior == EcoRepertoireV3::kGraze);
 	// 10-24 두 길 두뇌: 도주 덮기면 고른 길 ('도주(트인 쪽) 58%'·'도주(은신처) 58%'). 길이 없으면(길 끈 두뇌) 지금 글자 그대로
 	const TCHAR* RouteKo = KeepMode == EcoWorldV3::kKeepPanic ? RouteNameKo(Route) : nullptr;
 	FString Label = bKeep ? FString::Printf(TEXT("%s %d%%"), RouteKo ? RouteKo : KeepModeNameKo(KeepMode), FMath::RoundToInt32(100.0 * E))
@@ -584,6 +602,7 @@ FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const 
 	if (bKeep)
 	{
 		OutColor = KeepMode == EcoWorldV3::kKeepAlert ? FColor(255, 175, 80)
+				   : KeepMode == EcoWorldV3::kKeepRest	? FColor(230, 200, 120)   // 10-27 거리 두기: 옅은 주황 (경계보다 약하게)
 				   : KeepMode == EcoWorldV3::kKeepPanic ? (RouteKo ? RouteColor(Route, FColor(255, 110, 20)) : FColor(255, 110, 20))
 														: FColor(60, 150, 255);
 	}
@@ -695,6 +714,8 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bPackHunt = CVarPackHunt.GetValueOnGameThread() != 0;
 	S.bFlightHoldAwake = CVarFlightHoldAwake.GetValueOnGameThread() != 0;
 	S.bFlightEdgeAvoid = CVarFlightEdgeAvoid.GetValueOnGameThread() != 0;
+	S.bRestKeep = CVarRestKeep.GetValueOnGameThread() != 0;
+	S.bGrazeCalm = CVarGrazeCalm.GetValueOnGameThread() != 0;
 	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
 	S.bSocialControl = CVarSocialControl.GetValueOnGameThread() != 0;
 	S.bObstacles = CVarObstacles.GetValueOnGameThread() != 0;
@@ -881,6 +902,16 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	if (FParse::Value(CmdLine, TEXT("EcoV3FlightEdgeAvoid="), EdgeArg))
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.FlightEdgeAvoid"), LexToString(EdgeArg));
+	}
+	int32 RestKeepArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3RestKeep="), RestKeepArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.RestKeep"), LexToString(RestKeepArg));
+	}
+	int32 GrazeCalmArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3GrazeCalm="), GrazeCalmArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.GrazeCalm"), LexToString(GrazeCalmArg));
 	}
 	int32 ShelterArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ShelterSafe="), ShelterArg))
@@ -1198,6 +1229,18 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   *(Keep.EdgeR > 0.0 ? FString::Printf(TEXT("가장자리 %.0f m 안은 벽을 따라·모서리 밖으로"), Keep.EdgeR * MPerUnit)
 													  : FString(TEXT("가장자리 굽히기 끔 (eco.IntegratedV3.FlightEdgeAvoid 0)"))))
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildFlight 0 — 두뇌 그대로)"))));
+	// 10-27 사용자 보고 두 고침 (거리 두기 = 쉬는 늑대, 먹기 걷기 고침)
+	const EcoWorldV3::FGrazeCalmConfig Calm = Settings.GrazeCalmConfig();
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 쉬는 늑대 거리 두기: %s | 먹기 걷기 고침: %s"),
+		   *(Keep.bRestKeep
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.RestKeep 1) — 먹거나 배불러 쉬는 늑대의 시야(%.0f m × 날씨) 안에서 알아채면 걸어서 시야 + %.0f m 밖까지 ")
+									   TEXT("물러난 뒤 쉼, 그 밖 %.0f m 띠에서는 그 늑대 쪽으로 다가가지 않음"),
+								   EcoThreatV3::FThreatConfig().PredViewR * MPerUnit, Keep.RestKeepMargin * MPerUnit, Keep.RestKeepBand * MPerUnit)
+				 : FString(TEXT("끔 (eco.IntegratedV3.RestKeep 0 또는 도주 반사 끔 — 쉬는 늑대는 경계만)"))),
+		   *(Calm.EdgeR > 0.0 || Calm.Inertia > 0.0 || Calm.WallMargin > 0.0
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.GrazeCalm 1) — 가장자리 %.0f m 안 되돌림 %.1f · 방향 관성 %.1f · 벽 %.0f m 안 벽 쪽 안 감"),
+								   Calm.EdgeR * MPerUnit, Calm.EdgeW, Calm.Inertia, Calm.WallMargin * MPerUnit)
+				 : FString(TEXT("끔 (eco.IntegratedV3.GrazeCalm 0)"))));
 	const EcoWorldV3::FWildReserveConfig Wr;
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 지방 비축: %s"),
 		   *(Settings.bWildReserve
@@ -1660,6 +1703,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	}
 	// 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight, 야생 w3 — 경계 거리 KeepAway 를 바꿨다): 끄면 기본값(꺼짐) 그대로
 	C.WildFlight = S.WildFlightConfig();
+	// 먹기 걷기 고침 (eco.IntegratedV3.GrazeCalm, 10-27 — 평소 사슴이 무대 벽에 붙어 제자리에서 방향만 뒤집는 것을 막는다): 값 = configs/v3_wild3_calm_mirror.yaml
+	C.GrazeCalm = S.GrazeCalmConfig();
 	// 사슴 지방 비축 (eco.IntegratedV3.WildReserve, 사람 결정 10-15 (7) 야생 1단계 w1): 값 = configs/v3_wild1_mirror.yaml (FWildReserveConfig 기본값)
 	C.WildReserve.bEnabled = S.bWildReserve;
 	// 늑대 포만 (eco.IntegratedV3.WildSatiation, 야생 w2): 값 = configs/v3_wild1_mirror.yaml (FWildSatiationConfig 기본값, 하루 900 스텝 → 450 스텝)
@@ -3859,7 +3904,8 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		{
 			CaughtKeep[k] = S.CaughtByKeep[k] - P.CaughtByKeep[k];
 		}
-		const int64 CaughtOutside = Caught - CaughtKeep[1] - CaughtKeep[2] - CaughtKeep[3];
+		// 10-27: 거리 두기(kKeepRest) 중 잡힘도 덮기 안이다 (아래 거리 두기 줄에 따로 적는다)
+		const int64 CaughtOutside = Caught - CaughtKeep[1] - CaughtKeep[2] - CaughtKeep[3] - CaughtKeep[EcoWorldV3::kKeepRest];
 		const FString Rule = K.bEnabled ? FString::Printf(TEXT("도주 반사 켬 (경계 %.0f m · 도주 %.0f m · 안전 %.0f m)"), K.AlertR * MPerUnit,
 														  K.FlightR * MPerUnit, K.SafeR * MPerUnit)
 										: FString(TEXT("끔 (두뇌 그대로)"));
@@ -3879,6 +3925,37 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   static_cast<long long>(Near),
 			   Steps > 0 ? static_cast<double>(Near) / static_cast<double>(Steps) : 0.0, Ctx.KeepNow[1], Ctx.KeepNow[2], Ctx.KeepNow[3],
 			   static_cast<long long>(S.CaughtInCover - P.CaughtInCover), static_cast<long long>(S.CaughtInCover));
+		if (K.bRestKeep)
+		{
+			// 10-27 거리 두기(쉬는 늑대) 줄 — '<지역> 거리 두기 |' 꼴 (compare_unreal.py 의 첫 줄·경계 거리 줄 정규식에 걸리지 않는다)
+			UE_LOG(LogEcoPolicyV3I, Log,
+				   TEXT("[EcoV3I] %s 거리 두기 | %.1f초 | 쉬는 늑대 시야 + %.0f m 밖까지 물러남 · 다가가지 않기 띠 %.0f m | 구간 시작 %lld · 끝 %lld · ")
+					   TEXT("개체·스텝 %lld · 그 중 잡힘 %lld | 띠가 방향을 바꾼 개체·스텝 %lld (멈춤 %lld) | 지금 거리 두기 %d"),
+				   *Ctx.RegionId.ToString(), Seconds, K.RestKeepMargin * MPerUnit, K.RestKeepBand * MPerUnit,
+				   static_cast<long long>(S.KeepRestStarts - P.KeepRestStarts), static_cast<long long>(S.KeepRestEnds - P.KeepRestEnds),
+				   static_cast<long long>(S.KeepSteps[EcoWorldV3::kKeepRest] - P.KeepSteps[EcoWorldV3::kKeepRest]),
+				   static_cast<long long>(CaughtKeep[EcoWorldV3::kKeepRest]), static_cast<long long>(S.RestBandTurnSteps - P.RestBandTurnSteps),
+				   static_cast<long long>(S.RestBandStopSteps - P.RestBandStopSteps), Ctx.KeepNow[EcoWorldV3::kKeepRest]);
+		}
+		{
+			// 10-27 쉬는 늑대 시야 줄 (측정 전용 — 거리 두기 켬·끔 모두 적는다. '<지역> 쉬는 늑대 시야 |' 꼴이라 다른 기록 줄 정규식에 걸리지 않는다)
+			const int64 LiveN = Ctx.RestViewLiveSteps - Ctx.LastLogRestViewLiveSteps;
+			const int64 InView = Ctx.RestViewDeerSteps - Ctx.LastLogRestViewDeerSteps;
+			const int64 Stop = Ctx.RestViewStopSteps - Ctx.LastLogRestViewStopSteps;
+			UE_LOG(LogEcoPolicyV3I, Log,
+				   TEXT("[EcoV3I] %s 쉬는 늑대 시야 | %.1f초 | 거리 두기 %s | 구간 산 사슴·스텝 %lld 중 쉬는 늑대 시야 안 %lld (%.2f%%) · 그중 멈춤 %lld (%.2f%%) | ")
+					   TEXT("누적 %lld 중 시야 안 %lld (%.2f%%) · 멈춤 %lld (%.2f%%)"),
+				   *Ctx.RegionId.ToString(), Seconds, K.bRestKeep ? TEXT("켬") : TEXT("끔"), static_cast<long long>(LiveN), static_cast<long long>(InView),
+				   LiveN > 0 ? 100.0 * static_cast<double>(InView) / static_cast<double>(LiveN) : 0.0, static_cast<long long>(Stop),
+				   LiveN > 0 ? 100.0 * static_cast<double>(Stop) / static_cast<double>(LiveN) : 0.0, static_cast<long long>(Ctx.RestViewLiveSteps),
+				   static_cast<long long>(Ctx.RestViewDeerSteps),
+				   Ctx.RestViewLiveSteps > 0 ? 100.0 * static_cast<double>(Ctx.RestViewDeerSteps) / static_cast<double>(Ctx.RestViewLiveSteps) : 0.0,
+				   static_cast<long long>(Ctx.RestViewStopSteps),
+				   Ctx.RestViewLiveSteps > 0 ? 100.0 * static_cast<double>(Ctx.RestViewStopSteps) / static_cast<double>(Ctx.RestViewLiveSteps) : 0.0);
+			Ctx.LastLogRestViewLiveSteps = Ctx.RestViewLiveSteps;
+			Ctx.LastLogRestViewDeerSteps = Ctx.RestViewDeerSteps;
+			Ctx.LastLogRestViewStopSteps = Ctx.RestViewStopSteps;
+		}
 		Ctx.LastLogNearEatingDeerSteps = Ctx.NearEatingDeerSteps;
 	}
 	// 넷째 줄: 야생 1단계 (사람 결정 10-15 (7)). 켠 규칙만 적는다. 구간 = 지난 기록 줄 뒤. 앞 세 줄의 칸·순서는 그대로다
@@ -4268,6 +4345,10 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 		{
 			Tally += FString::Printf(TEXT(" | 경계(멀어짐) %d 도망(안전해질 때까지) %d 숨기(은신처·경계) %d"), Ctx.KeepNow[EcoWorldV3::kKeepAlert],
 									 Ctx.KeepNow[EcoWorldV3::kKeepPanic], Ctx.KeepNow[EcoWorldV3::kKeepShelter]);
+			if (Ctx.Sim.Config.WildFlight.bRestKeep)
+			{
+				Tally += FString::Printf(TEXT(" 거리 두기(쉬는 늑대) %d"), Ctx.KeepNow[EcoWorldV3::kKeepRest]);   // 10-27
+			}
 		}
 		// 지역 날씨 (10-18): 첫 줄 낮밤 옆에 '비 1.00' (끄거나 맑으면 '맑음')
 		const FString WxTag = Ctx.Sim.Config.Weather.bEnabled && Ctx.Sim.WeatherKind != EcoWorldV3::kWeatherClear

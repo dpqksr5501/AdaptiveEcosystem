@@ -158,6 +158,14 @@
 //      맨 위 줄 '두뇌 <이름> 두 길'. 10초 기록 '[EcoV3I] <지역> 길 |'(길 통계가 있을 때만), 스냅숏 brain.mask_version·route, world.wild_flight.route·
 //      brain_flee_outside_reflex, flight.route (world.py flight_stats 의 route 와 같은 칸). 실행 행동은 늘 FLEE 라 Social 인계·애니메이션·복제는 그대로다
 //      (eco.IntegratedV3.SocialControl 1 이면 Social 훅이 SHELTER 길보다 나중에 와서 슬롯 쪽이 이긴다 — 기본 0).
+//  23. 10-27 사용자 보고 두 고침 (세계 규칙 — 파이썬 configs/v3_wild3_calm_mirror.yaml 과 같은 값, 골든 CalmGoldenVectorsV3.h):
+//      먹기 걷기 고침 eco.IntegratedV3.GrazeCalm (-EcoV3GrazeCalm=, 기본 1 — FWorldConfig::GrazeCalm 2·2.5·0.5·1): 먹이를 찾아 걷는 사슴은 무대 가장자리 4 m 안에서
+//      안쪽으로 되돌아오고 몸이 향한 쪽으로 이어 걷고 벽 2 m 안에서는 벽 쪽으로 가지 않는다 ('평소 사슴이 벽에 붙어 제자리에서 방향만 뒤집는다').
+//      거리 두기 eco.IntegratedV3.RestKeep (-EcoV3RestKeep=, 기본 1 — FWildFlightConfig::bRestKeep 여유 2·띠 4, WildFlight 1 일 때만): 쉬는 늑대(먹기·배부름)의
+//      시야 안에서 그 늑대를 알아챈 사슴은 걸어서 늑대 시야 + 4 m 밖까지 물러난 뒤 쉬고, 그 밖 8 m 띠에서는 그 늑대 쪽으로 다가가지 않는다(덮기 kKeepRest,
+//      화면 '거리 두기(쉬는 늑대)' 옅은 주황, 10초 기록 '[EcoV3I] <지역> 거리 두기 |'). 둘 다 학습 세계(R1b·R7e)에는 없던 규칙이라 0 이면 10-26 그대로다
+//      (파이썬 짝 비교·unreal_parity 는 -EcoV3GrazeCalm=0 -EcoV3RestKeep=0 이면 옛 거울 설정, 켜면 calm 거울 설정).
+//      측정 전용 10초 기록 '[EcoV3I] <지역> 쉬는 늑대 시야 |' (켬·끔 모두): 쉬는 늑대 시야 안 산 사슴·스텝 몫과 그중 멈춘 몫 (세계는 읽지 않는다 — 처리기 TallyRestWolfView).
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -309,6 +317,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bWildFlight = true;            // 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight 기본 1, 야생 w3 — 경계 거리 KeepAway 를 바꿨다). 거짓 = 두뇌 그대로
 	bool bFlightHoldAwake = true;       // 도주 붙잡기 (eco.IntegratedV3.FlightHoldAwake 기본 1, 10-16 hold_awake). 거짓 = 사냥 중인 늑대만 도주를 붙잡는다 (857da45)
 	bool bFlightEdgeAvoid = true;       // 가장자리 굽히기 (eco.IntegratedV3.FlightEdgeAvoid 기본 1, 10-16 edge_r 5). 거짓 = 굽히지 않는다 (857da45)
+	bool bRestKeep = true;              // 거리 두기(쉬는 늑대) (eco.IntegratedV3.RestKeep 기본 1, 10-27 — 파이썬 wild_flight.rest_keep 여유 2·띠 4). bWildFlight 일 때만.
+										// 거짓 = 쉬는 늑대는 경계(먹으며 멀어짐)만 (10-26 그대로)
+	bool bGrazeCalm = true;             // 먹기 걷기 고침 (eco.IntegratedV3.GrazeCalm 기본 1, 10-27 — 파이썬 repertoire.graze_* 2·2.5·0.5·1). 거짓 = 10-26 그대로
 	double AlertDistM = 30.0;           // 경계 거리 alert_r (m, eco.IntegratedV3.AlertDistM) — 사냥 중인 늑대를 이 안에서 알아채면 먹으며 멀어진다
 	double PanicDistM = 15.0;           // 도주 거리 flight_r (m, eco.IntegratedV3.PanicDistM) — 이 안이거나 다가오면 뛰어서 달아난다
 	double SafeDistM = 40.0;            // 안전 거리 safe_r (m, eco.IntegratedV3.SafeDistM) — 사냥 중인 늑대가 모두 이 밖일 때까지 도주
@@ -419,7 +430,30 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 		// 두 고침은 따로 끌 수 있다 (eco.IntegratedV3.FlightHoldAwake·FlightEdgeAvoid, 고치기 전·뒤 영상용). 끄면 857da45 와 같다
 		K.bHoldAwake = bFlightHoldAwake;
 		K.EdgeR = bFlightEdgeAvoid ? 5.0 : 0.0;
+		// 10-27 거리 두기(쉬는 늑대) (eco.IntegratedV3.RestKeep — 파이썬 configs/v3_wild3_calm_mirror.yaml wild_flight.rest_keep·rest_keep_margin 2·rest_keep_band 4).
+		// 끄면 FWildFlightConfig 기본(끔) = 10-26 그대로
+		K.bRestKeep = bRestKeep;
+		K.RestKeepMargin = 2.0;
+		K.RestKeepBand = bRestKeep ? 4.0 : 0.0;
+		K.bRestKeepAsleep = false;
 		return K;
+	}
+
+	/**
+	 * 10-27 먹기 걷기 고침의 세계 칸 (eco.IntegratedV3.GrazeCalm — 파이썬 configs/v3_wild3_calm_mirror.yaml repertoire.graze_edge_r 2·graze_edge_w 2.5·
+	 * graze_inertia 0.5·graze_wall_margin 1). 끄면 0 = 10-26 그대로.
+	 */
+	EcoWorldV3::FGrazeCalmConfig GrazeCalmConfig() const
+	{
+		EcoWorldV3::FGrazeCalmConfig G;
+		if (bGrazeCalm)
+		{
+			G.EdgeR = 2.0;
+			G.EdgeW = 2.5;
+			G.Inertia = 0.5;
+			G.WallMargin = 1.0;
+		}
+		return G;
 	}
 
 	/** 사슴 Deer 마리가 한 변 SizeUnits 무대에서 학습 밀도 하한(128 / 110² 마리/단위²) 아래인가. */
@@ -844,6 +878,14 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	// 경계 거리 기록 (사람 결정 10-15 (C), 처리기가 채운다. 규칙 켬·끔 모두 센다)
 	int64 NearEatingDeerSteps = 0;            // 식사 중(쿨다운 > 0)인 깨어 있는 늑대의 15 m 안에 있던 산 사슴 (개체·스텝, 스텝 끝)
 	int64 LastLogNearEatingDeerSteps = 0;
+	// 10-27 쉬는 늑대 시야 기록 (측정 전용 — 세계가 읽지 않는다. 거리 두기 eco.IntegratedV3.RestKeep 켬·끔 모두 센다). 스텝 끝 산 사슴 가운데
+	// 쉬는 늑대(죽지 않았고 깨어 있고 사냥 중이 아님 — Detail::FlightHunting 거짓)의 시야(WolfViewNow) 안 ∧ 눈길 트임 ∧ 은신처 밖 ∧ 경계 거리 안 사냥 늑대 없음 (개체·스텝)
+	int64 RestViewLiveSteps = 0;              // 산 사슴 개체·스텝 (분모)
+	int64 RestViewDeerSteps = 0;              // 쉬는 늑대 시야 안
+	int64 RestViewStopSteps = 0;              // 그중 이번 스텝 이동이 0.001 단위 밑 (멈춤)
+	int64 LastLogRestViewLiveSteps = 0;
+	int64 LastLogRestViewDeerSteps = 0;
+	int64 LastLogRestViewStopSteps = 0;
 	int32 KeepNow[EcoWorldV3::kNumKeepModes] = {};   // 프레임 끝 산 사슴의 덮기 (화면 집계)
 	int32 RouteNow[2] = {};                   // 10-24 두 길 두뇌: 프레임 끝 도주 덮기 산 사슴의 다음 스텝 길 [RUN, SHELTER] (화면 집계 — 길 끔이면 0)
 

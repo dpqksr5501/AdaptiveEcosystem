@@ -165,6 +165,13 @@ namespace EcoRepertoireV3
 		double GaitDrain[3] = {0.7142857142857143, 1.0, 2.5};          // 파이썬 c_rest + c_move·s·s 의 float64 값 그대로
 		double SleepRest = 0.6;               // SLEEP·은신처 안 대사 × (1 − 0.6·d)
 
+		// 10-27 먹기 걷기 고침 (파이썬 선택 키 repertoire.graze_edge_r·graze_edge_w·graze_inertia·graze_wall_margin — repertoire.py `graze_calm_dir`).
+		// 기본 0 = R1b 세계 그대로 (그 줄을 타지 않는다). FWorldConfig::GrazeCalm 을 InitWorld 가 옮긴다. 통합 모드 eco.IntegratedV3.GrazeCalm (기본 1 = 2·2.5·0.5·1)
+		double GrazeEdgeR = 0.0;              // 가장자리 되돌림 거리 (단위)
+		double GrazeEdgeW = 0.0;              // 가장자리 되돌림 무게
+		double GrazeInertia = 0.0;            // 이번 이동 전 heading 관성 무게
+		double GrazeWallMargin = 0.0;         // 벽 여유 (단위) — 이 안이면 벽 쪽 성분을 지운다
+
 		// 은신 배수 (은신처 안일 때, 행동별) · 정지 탐지
 		double CoverMultCrouch = 4.0;
 		double CoverMultGraze = 1.5;
@@ -588,6 +595,10 @@ namespace EcoRepertoireV3
 		bool bFoodOk = false;    // 결정 때 위치 셀 먹이(섭식 전) >= GrazeEatMin (IsFoodOk)
 		bool bInCover = false;   // 결정 관측의 in_cover
 		double Dark = 0.0;       // d(t)
+		// 10-27 먹기 걷기 고침 (GrazeCalmOn 일 때만 읽는다): 결정 때 위치·이번 이동 전 heading·무대 한 변 (EcoWorldV3 MakeControlInput 이 채운다)
+		FVec2 Pos;
+		FVec2 Head;
+		double WorldSize = 0.0;
 	};
 
 	struct FControlOutput
@@ -626,8 +637,73 @@ namespace EcoRepertoireV3
 	}
 
 	/**
+	 * 무대 벽 여유 (repertoire.py `wall_keep` = world.py `wf_wall_keep`): 축마다 위치가 벽 여유 Mg 안이고 방향이 그 벽 쪽이면 그 성분을 지우고 단위화한다
+	 * (다 지워지면 D 그대로). 지운 성분이 없어도 늘 Normalize 를 거친다 — 빼면 끝자리가 바뀐다. EcoWorldV3 Detail::WallKeep 이 이 함수다.
+	 */
+	inline FVec2 WallKeepDir(const FVec2& P, const FVec2& D, double Size, double Mg)
+	{
+		FVec2 Sl = D;
+		if ((P.X <= Mg && Sl.X < 0.0) || (P.X >= Size - Mg && Sl.X > 0.0))
+		{
+			Sl.X = 0.0;
+		}
+		if ((P.Y <= Mg && Sl.Y < 0.0) || (P.Y >= Size - Mg && Sl.Y > 0.0))
+		{
+			Sl.Y = 0.0;
+		}
+		Sl = Normalize(Sl);
+		return (Sl.X * Sl.X + Sl.Y * Sl.Y > kEps * kEps) ? Sl : D;
+	}
+
+	/** 10-27 먹기 걷기 고침을 켰나 (가장자리 항은 거리·무게 둘 다 0 보다 클 때만 뜻이 있다 — 파이썬 parse_params 의 calm). */
+	constexpr bool GrazeCalmOn(const FRepertoireConfig& Cfg)
+	{
+		return (Cfg.GrazeEdgeR > 0.0 && Cfg.GrazeEdgeW > 0.0) || Cfg.GrazeInertia > 0.0 || Cfg.GrazeWallMargin > 0.0;
+	}
+
+	/**
+	 * 10-27 먹기 걷기 고침 (repertoire.py `graze_calm_dir` 과 줄마다 같다): 먹이가 모자라 걷는 GRAZE 의 방향(Control 의 걷는 GRAZE —
+	 * 덮기 경계·거리 두기·도주는 EcoWorldV3 의 덮기 제어가 덮어쓴다. 10-27 적대적 검토로 경계 걷기에서는 뺐다). Raw = 원래 조향 합(|Raw| > EPS),
+	 * Base = Normalize(Raw). S = Raw (+ Inertia·Head) → 축마다 가까운 벽까지 E < EdgeR 이면 S += EdgeW·(W·N) (W = 1 − E/EdgeR, N = 안쪽 부호) →
+	 * D = Normalize(S) → 벽 여유 (Mg > 0) → |D| ≤ EPS 면 Base.
+	 */
+	inline FVec2 GrazeCalmDir(const FVec2& Raw, const FVec2& Base, const FVec2& Pos, const FVec2& Head, double Size, const FRepertoireConfig& Cfg)
+	{
+		double Sa[2] = {Raw.X, Raw.Y};
+		if (Cfg.GrazeInertia > 0.0)
+		{
+			Sa[0] = Sa[0] + Cfg.GrazeInertia * Head.X;
+			Sa[1] = Sa[1] + Cfg.GrazeInertia * Head.Y;
+		}
+		const double R = Cfg.GrazeEdgeR;
+		const double Wt = Cfg.GrazeEdgeW;
+		if (R > 0.0 && Wt > 0.0)
+		{
+			const double Pa[2] = {Pos.X, Pos.Y};
+			for (int a = 0; a < 2; ++a)
+			{
+				const double Hi = Size - Pa[a];
+				const double E = Pa[a] < Hi ? Pa[a] : Hi;
+				if (E < R)
+				{
+					const double N = Pa[a] <= Hi ? 1.0 : -1.0;
+					const double W = 1.0 - E / R;
+					Sa[a] = Sa[a] + Wt * (W * N);
+				}
+			}
+		}
+		FVec2 D = Normalize(FVec2{Sa[0], Sa[1]});
+		if (Cfg.GrazeWallMargin > 0.0)
+		{
+			D = WallKeepDir(Pos, D, Size, Cfg.GrazeWallMargin);
+		}
+		return (D.X * D.X + D.Y * D.Y > kEps * kEps) ? D : Base;
+	}
+
+	/**
 	 * 행동별 제어기 (계약 6-2). S 는 Commit 뒤 상태(이번 스텝 행동). 합 순서는 파이썬과 같다(비트 단위 대조용).
 	 *   GRAZE  n(0.83·G + 0.71·C + 1.35·Sep), 먹이 충분이면 정지 아니면 걷기, 섭식 GaitEat[보행], 탐지 × 0.6
+	 *          (10-27 GrazeCalmOn 이면 걷는 방향 = GrazeCalmDir — 가장자리 되돌림·heading 관성·벽 여유)
 	 *   FLEE   n(3·A + 0.71·C + 1.35·Sep), 놀람 중 정지 아니면 뛰기, A = 보이면 위협 반대 아니면 S.Away
 	 *   HIDE   도착 전: 목표가 있으면 n(T + 1.35·Sep), 보이면 뛰기 아니면 걷기. 도착: 정지·웅크림
 	 *   FREEZE 정지, heading ← −A (A ≠ 0 일 때)
@@ -680,7 +756,12 @@ namespace EcoRepertoireV3
 		}
 
 		Out.Gait = Gait;
-		Out.Velocity = Scale(Scale(Normalize(Raw), Cfg.HerbSpeed), Cfg.GaitSpeed[Gait]);
+		FVec2 Dir = Normalize(Raw);
+		if (bGraze && Gait == kGaitWalk && GrazeCalmOn(Cfg))
+		{
+			Dir = GrazeCalmDir(Raw, Dir, In.Pos, In.Head, In.WorldSize, Cfg);   // 10-27 먹기 걷기 고침 (먹이가 모자라 걷는 GRAZE 만)
+		}
+		Out.Velocity = Scale(Scale(Dir, Cfg.HerbSpeed), Cfg.GaitSpeed[Gait]);
 		Out.EatMult = bGraze ? Cfg.GaitEat[Gait] : 0.0;
 		const bool bRest = S.Behavior == kSleep && In.bInCover;
 		Out.DrainMult = Cfg.GaitDrain[Gait] * (bRest ? 1.0 - Cfg.SleepRest * In.Dark : 1.0);

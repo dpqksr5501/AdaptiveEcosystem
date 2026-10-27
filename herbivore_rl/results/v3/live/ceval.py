@@ -30,6 +30,9 @@ live.py 와 같은 꼴 (나중에 live.py 가 바꿔 쓸 수 있게 — 이 파�
   세계 설정은 허용 목록으로 본다: 바탕(REF_CFG — C++ 상수가 맞춘 판정 세계)과 다른 칸은 world 블록·시작 상태로 옮기는 칸(FREE_V1·FREE_FEATURES)이어야
   하고, 그 밖 칸이 다르면(예: wild_flight.route_fixed·quiet_end, threats·realism_night 계수) 거부한다 — C++ 이 제 상수로 다른 세계를 돌지 않게.
   (wild_flight.route·brain_flee_outside_reflex 는 10-24 부터 받는 칸이다 — 두뇌 판이 정한다.)
+  10-27: 거리 두기(features.wild_flight.rest_keep*)·먹기 걷기 고침(features.repertoire.graze_* → world 블록 graze_calm)도 옮기는 칸이다(adapt.FEATURE_MAPS).
+  끔 값이면 world 블록에 적지 않아 끈 세계의 일·지문은 10-26 그대로다. 켠 세계 비교는 compare --world-set features.repertoire.graze_edge_r=2.0 … 또는 바탕 설정
+  configs/v3_wild3_calm_mirror.yaml 의 세계로 만든다.
   숲 시야(features.obstacles.foliage, 10-21)는 C++ 에 옮겼다(EcoThreatModel.h FoliageChord·FoliageBlocked, EcoWorldV3.h FObstacleConfig::Foliage) — world 블록
   obstacle_rules 의 foliage·foliage_r·foliage_block 과 일의 foliage_trees(원판마다 나무 0/1)로 넘긴다. 도망길 COVER 그늘의 잎(route_fixed)은 파이썬 전용이라
   route_fixed 를 거부하는 것은 그대로다. compare --world-set 키=값 (route_rules.py 와 같은 점 경로 덮기)으로 숲 시야 세계를 견준다.
@@ -131,6 +134,11 @@ _FREE_EXTRA = {
 FREE_FEATURES = {blk: frozenset(keys) | frozenset(_FREE_EXTRA.get(blk, ())) for blk, keys in ad.FEATURE_MAPS.values()}
 for _blk, _keys in _FREE_EXTRA.items():
     FREE_FEATURES.setdefault(_blk, frozenset(_keys))
+# 10-27 선택 칸 (world 블록 이름 → 끔 값): 거리 두기(wild_flight.rest_keep*)·먹기 걷기 고침(graze_calm — 파이썬 features.repertoire.graze_*). FEATURE_MAPS 로
+# 옮기고(FREE_FEATURES 에 든다), 끔 값이면 world_block 이 적지 않는다(끈 세계의 일 지문이 그대로)
+CALM_OFF = {("wild_flight", "rest_keep"): False, ("wild_flight", "rest_keep_margin"): 2.0, ("wild_flight", "rest_keep_band"): 0.0,
+            ("wild_flight", "rest_keep_asleep"): False, ("graze_calm", "graze_edge_r"): 0.0, ("graze_calm", "graze_edge_w"): 0.0,
+            ("graze_calm", "graze_inertia"): 0.0, ("graze_calm", "graze_wall_margin"): 0.0}
 _MISSING = object()
 _REF: dict = {}
 _BRAIN_MEMO: dict = {}
@@ -392,6 +400,13 @@ def world_block(w, protected_refuges: bool = False) -> dict:
     wfp = w._wf or {}
     wb["wild_flight"]["route"] = bool(wfp.get("route", False))
     wb["wild_flight"]["brain_flee_outside_reflex"] = bool(wfp.get("brain_flee_outside_reflex", True))
+    # 10-27 선택 칸 (거리 두기 wild_flight.rest_keep*·먹기 걷기 고침 블록 graze_calm): 끔 값이면 world 블록에 적지 않는다 — 끈 세계의 일·일 지문·골든 FillWorldConfig 가
+    # 10-26 그대로다. 평가기(EcoV3Eval.cpp ConfigOf)는 칸이 없으면 끔으로 읽는다
+    for (blk, key), off in CALM_OFF.items():
+        if blk in wb and key in wb[blk] and wb[blk][key] == off and isinstance(wb[blk][key], bool) == isinstance(off, bool):
+            del wb[blk][key]
+    if "graze_calm" in wb and not wb["graze_calm"]:
+        del wb["graze_calm"]
     return wb
 
 

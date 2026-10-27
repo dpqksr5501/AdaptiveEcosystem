@@ -280,7 +280,21 @@ namespace EcoV3SnapshotImpl
 			// 파이썬 이름 그대로 — ceval.world_block 의 wild_flight.route·brain_flee_outside_reflex. adapt.py 는 FEATURE_MAPS 밖이라 읽지 않는다)
 			F->SetBoolField(TEXT("route"), K.bRoute);
 			F->SetBoolField(TEXT("brain_flee_outside_reflex"), !W.bFleeGate);
+			// 10-27 거리 두기(쉬는 늑대) (더하기만 — 파이썬 선택 키 wild_flight.rest_keep* 이름 그대로, adapt.FEATURE_MAPS·ceval.world_block 이 옮긴다)
+			F->SetBoolField(TEXT("rest_keep"), K.bRestKeep);
+			F->SetNumberField(TEXT("rest_keep_margin"), K.RestKeepMargin);
+			F->SetNumberField(TEXT("rest_keep_band"), K.RestKeepBand);
+			F->SetBoolField(TEXT("rest_keep_asleep"), K.bRestKeepAsleep);
 			J->SetObjectField(TEXT("wild_flight"), F);
+		}
+		{
+			// 10-27 먹기 걷기 고침 (더하기만 — 실제로 쓰는 W.RepCfg 값. 파이썬 선택 키 repertoire.graze_* 이름 그대로, adapt.FEATURE_MAPS 'graze_calm')
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetNumberField(TEXT("graze_edge_r"), W.RepCfg.GrazeEdgeR);
+			F->SetNumberField(TEXT("graze_edge_w"), W.RepCfg.GrazeEdgeW);
+			F->SetNumberField(TEXT("graze_inertia"), W.RepCfg.GrazeInertia);
+			F->SetNumberField(TEXT("graze_wall_margin"), W.RepCfg.GrazeWallMargin);
+			J->SetObjectField(TEXT("graze_calm"), F);
 		}
 		{
 			const EcoWorldV3::FWildReserveConfig& R = C.WildReserve;
@@ -396,6 +410,8 @@ namespace EcoV3SnapshotImpl
 		J->SetBoolField(TEXT("wild_flight"), S.bWildFlight);
 		J->SetBoolField(TEXT("flight_hold_awake"), S.bFlightHoldAwake);
 		J->SetBoolField(TEXT("flight_edge_avoid"), S.bFlightEdgeAvoid);
+		J->SetBoolField(TEXT("rest_keep"), S.bRestKeep);     // 10-27 거리 두기 스위치 (세계 값은 지역 world.wild_flight.rest_keep*)
+		J->SetBoolField(TEXT("graze_calm"), S.bGrazeCalm);   // 10-27 먹기 걷기 고침 스위치 (세계 값은 지역 world.graze_calm)
 		J->SetNumberField(TEXT("alert_dist_m"), S.AlertDistM);
 		J->SetNumberField(TEXT("panic_dist_m"), S.PanicDistM);
 		J->SetNumberField(TEXT("safe_dist_m"), S.SafeDistM);

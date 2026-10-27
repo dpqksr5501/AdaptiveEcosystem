@@ -712,6 +712,32 @@ CFG_BLOCKS = {
 # 옮기지 않는 칸: 날씨 시간표 줄 수(늘 0 — 따로 본다), 10-24 두 길 두뇌의 세계 키(wild_flight.route·brain_flee_outside_reflex — 평가기는 두뇌 판으로 켜고
 # 세계 키는 짝 검사에만 쓴다. 두 길 골든 FillWorldConfig 는 C.WildFlight.bRoute 를 따로 적는다)
 CFG_SKIP = {("weather", "schedule_rows"), ("wild_flight", "route"), ("wild_flight", "brain_flee_outside_reflex")}
+# 10-27 선택 칸 (거리 두기 wild_flight.rest_keep*·먹기 걷기 고침 블록 graze_calm — EcoV3Eval.cpp ConfigOf 의 선택 칸). 끔 값(= C++ 기본값)이면 줄을 적지 않는다 —
+# 끈 세계의 골든(이 파일·두 길 골든 FillWorldConfig)은 바이트가 그대로다. 켠 세계(calm 골든)만 줄이 생긴다. (블록, 칸, C++ 칸, 형, 끔 값)
+CFG_OPTIONAL = (("wild_flight", "rest_keep", "C.WildFlight.bRestKeep", "b", False),
+                ("wild_flight", "rest_keep_margin", "C.WildFlight.RestKeepMargin", "d", 2.0),
+                ("wild_flight", "rest_keep_band", "C.WildFlight.RestKeepBand", "d", 0.0),
+                ("wild_flight", "rest_keep_asleep", "C.WildFlight.bRestKeepAsleep", "b", False),
+                ("graze_calm", "graze_edge_r", "C.GrazeCalm.EdgeR", "d", 0.0),
+                ("graze_calm", "graze_edge_w", "C.GrazeCalm.EdgeW", "d", 0.0),
+                ("graze_calm", "graze_inertia", "C.GrazeCalm.Inertia", "d", 0.0),
+                ("graze_calm", "graze_wall_margin", "C.GrazeCalm.WallMargin", "d", 0.0))
+CFG_OPTIONAL_KEYS = {(blk, key) for blk, key, _, _, _ in CFG_OPTIONAL}
+CFG_OPTIONAL_BLOCKS = {blk for blk, _, _, _, _ in CFG_OPTIONAL} - set(CFG_BLOCKS)
+
+
+def optional_code(wb: dict, lit) -> list[str]:
+    """world 블록의 10-27 선택 칸 가운데 끔 값이 아닌 것 → FillWorldConfig 줄 (CFG_OPTIONAL — 끈 세계는 빈 목록). 모르는 칸이 있는 선택 블록이면 멈춘다."""
+    for blk in sorted(CFG_OPTIONAL_BLOCKS):
+        left = {k for k in wb.get(blk, {}) if (blk, k) not in CFG_OPTIONAL_KEYS}
+        if left:
+            raise SystemExit(f"world 블록 {blk} 에 C++ 로 옮기지 않은 칸: {sorted(left)}")
+    out = []
+    for blk, key, lhs, kind, off in CFG_OPTIONAL:
+        v = wb.get(blk, {}).get(key, off)
+        if v != off or isinstance(v, bool) != isinstance(off, bool):
+            out.append(f"\t\t{lhs} = {lit(v, kind)};")
+    return out
 WEATHER_KIND = {"clear": "EcoWorldV3::kWeatherClear", "rain": "EcoWorldV3::kWeatherRain", "snow": "EcoWorldV3::kWeatherSnow"}
 
 
@@ -750,15 +776,17 @@ def config_code(wb: dict) -> list[str]:
         for key, lhs, kind in fields:
             out.append(f"\t\t{lhs} = {lit(d[key], kind)};")
             got.add(key)
-        left = {k for k in d if k not in got and (blk, k) not in CFG_SKIP}
+        left = {k for k in d if k not in got and (blk, k) not in CFG_SKIP and (blk, k) not in CFG_OPTIONAL_KEYS}
         if left:
             raise SystemExit(f"world 블록 {blk} 에 C++ 로 옮기지 않은 칸: {sorted(left)}")
         used.add(blk)
+    used |= CFG_OPTIONAL_BLOCKS
     left = set(wb) - used
     if left:
         raise SystemExit(f"world 블록에 C++ 로 옮기지 않은 칸: {sorted(left)}")
     if wb["weather"].get("schedule_rows", 0):
         raise SystemExit("날씨 시간표는 옮기지 않는다")
+    out += optional_code(wb, lit)           # 10-27 선택 칸 (끈 세계는 줄이 없다 — 옛 골든 바이트 그대로)
     out.append("\t\tC.Obstacles.Foliage.bEnabled = C.Obstacles.bEnabled && C.Obstacles.Foliage.bEnabled;   // EcoV3Eval ConfigOf 와 같다")
     out.append("\t\tC.bSenseStats = false;   // 평가기와 같다 (기록만)")
     out.append("\t\tC.bFlightStats = true;")

@@ -40,6 +40,9 @@
 //   trace 의 gap = 망을 돌린 사슴의 로짓 1·2 위 차 (근접 동점 갈림 진단). 기록의 min_gap·near_ties·min_route_gap = 판 전체의 그 최솟값·1e-4 밑 수.
 //   일의 선택 칸 trace_digest (스텝 수) 면 전체 궤적 대신 스텝마다 칸 아홉의 지문을 traj 로 낸다 (TrajDigest — herbivore_rl/results/v3/route/port/
 //   make_traces.py digest_state 와 같은 바이트, port/native_check.py 가 traj/ 와 견준다).
+//   10-27 (사용자 '평소 사슴이 제자리에서 빙빙 돈다'·'쉬는 늑대 곁에서 멈춰 있다'): world 블록의 선택 칸 wild_flight.rest_keep·rest_keep_margin·rest_keep_band·
+//   rest_keep_asleep(거리 두기 — 덮기 4 = kKeepRest, trace keep 칸에도 4 가 나온다)과 선택 블록 graze_calm{graze_edge_r, graze_edge_w, graze_inertia,
+//   graze_wall_margin}(먹기 걷기 고침 — FWorldConfig::GrazeCalm)을 읽는다. 없으면 끔 = 옛 일 그대로.
 
 #include <chrono>
 #include <cmath>
@@ -668,6 +671,19 @@ namespace EcoV3Eval
 			K.EdgeR = F.At("edge_r").Num();
 			// 10-24 두 길 두뇌 (선택 칸 — 옛 일은 없다): 세계 키 route. 실제로 켜는 것은 두뇌 판(SetModelRoute — Init 이 어긋나면 거부한다)
 			K.bRoute = F.BoolOr("route", false);
+			// 10-27 거리 두기(쉬는 늑대) (선택 칸 — 옛 일은 없다 = 끔. 파이썬 wild_flight.rest_keep* 와 같은 이름)
+			K.bRestKeep = F.BoolOr("rest_keep", false);
+			K.RestKeepMargin = F.NumOr("rest_keep_margin", K.RestKeepMargin);
+			K.RestKeepBand = F.NumOr("rest_keep_band", K.RestKeepBand);
+			K.bRestKeepAsleep = F.BoolOr("rest_keep_asleep", false);
+		}
+		if (const FValue* G = Wb.Find("graze_calm"))
+		{
+			// 10-27 먹기 걷기 고침 (선택 블록 — 옛 일은 없다 = 끔. 파이썬 repertoire.graze_* 와 같은 이름, adapt.FEATURE_MAPS 'graze_calm')
+			C.GrazeCalm.EdgeR = G->NumOr("graze_edge_r", 0.0);
+			C.GrazeCalm.EdgeW = G->NumOr("graze_edge_w", 0.0);
+			C.GrazeCalm.Inertia = G->NumOr("graze_inertia", 0.0);
+			C.GrazeCalm.WallMargin = G->NumOr("graze_wall_margin", 0.0);
 		}
 		{
 			const FValue& F = Wb.At("wild_reserve");

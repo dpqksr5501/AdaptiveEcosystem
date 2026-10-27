@@ -403,6 +403,63 @@ namespace EcoPolicyV3IntegratedProcImpl
 			}
 		}
 	}
+
+	/**
+	 * 10-27 쉬는 늑대 시야 기록 (측정 전용 — 거리 두기 규칙 켬·끔 모두 센다): 이 스텝 끝 산 사슴 가운데 쉬는 늑대(죽지 않았고 깨어 있고 사냥 중이 아님)의 시야(WolfViewNow) 안이고
+	 * 눈길이 트였고(EyeClear) 은신처 밖이며 경계 거리(AlertR) 안에 사냥 중인 늑대가 없는 사슴 → 컨텍스트 누적 (개체·스텝), 그중 이번 스텝 이동이 0.001 단위
+	 * 밑이면 '멈춤'. 측정 도구(scratch measure_calm.py 의 rest_exposed·rest_exposed_stopped)와 같은 뜻이다 (그쪽은 스텝 앞 자리, 여기는 스텝 끝 자리).
+	 */
+	void TallyRestWolfView(FEcoV3RegionContext& Ctx, const TArray<FEcoV3DeerRec>& Deer, const TArray<int32>& DeerList,
+						   const TArray<FEcoV3WolfRec>& Wolves, const TArray<int32>& WolfList)
+	{
+		namespace WD = EcoWorldV3::Detail;
+		const EcoWorldV3::FWorldState& W = Ctx.Sim;
+		const double View = EcoWorldV3::WolfViewNow(W);
+		const double View2 = View * View;
+		const double AlertR2 = W.Config.WildFlight.AlertR * W.Config.WildFlight.AlertR;
+		for (const int32 k : DeerList)
+		{
+			const EcoWorldV3::FHerbView& V = Deer[k].View;
+			const EcoWorldV3::FHerbBody& B = *V.Body;
+			if (B.DeathCause != EcoWorldV3::kDeathNone)
+			{
+				continue;
+			}
+			++Ctx.RestViewLiveSteps;
+			if (V.Perception->Cover.bInCover)
+			{
+				continue;
+			}
+			bool bInView = false;
+			bool bNearHunt = false;
+			for (const int32 w : WolfList)
+			{
+				const EcoWorldV3::FThreatAgent& A = *Wolves[w].Agent;
+				if (A.bDead)
+				{
+					continue;
+				}
+				const double Dx = A.State.PosX - B.Pos.X;
+				const double Dy = A.State.PosY - B.Pos.Y;
+				const double D2 = Dx * Dx + Dy * Dy;
+				if (WD::FlightHunting(W, A))
+				{
+					bNearHunt = bNearHunt || D2 <= AlertR2;
+				}
+				else if (!bInView && D2 <= View2 && !EcoWorldV3::ThreatAsleepNow(W, A) && WD::EyeClear(W, B.Pos, A.State.PosX, A.State.PosY))
+				{
+					bInView = true;
+				}
+			}
+			if (bInView && !bNearHunt)
+			{
+				++Ctx.RestViewDeerSteps;
+				const double Mx = B.Pos.X - B.PrevPos.X;
+				const double My = B.Pos.Y - B.PrevPos.Y;
+				Ctx.RestViewStopSteps += Mx * Mx + My * My < 1e-6 ? 1 : 0;
+			}
+		}
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -904,6 +961,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				Ctx.TallyWolfStep(A, Wolves[k].Id, Ctx.Sim.T - 1);
 			}
 			TallyNearEatingWolves(Ctx, Deer, List, Wolves, WolvesByContext[c]);   // 경계 거리 기록 (규칙 켬·끔 모두)
+			TallyRestWolfView(Ctx, Deer, List, Wolves, WolvesByContext[c]);       // 10-27 쉬는 늑대 시야 기록 (측정 전용, 거리 두기 켬·끔 모두)
 			TallyEnergy(Ctx, Deer, List);   // 기록 줄이 이 스텝 끝 에너지를 쓴다
 			Sub->NotifyNightStep(Ctx, ThreatPtrs.GetData(), WolfIds.GetData(), ThreatPtrs.Num());   // 늑대 밤잠 사건 줄 (켠 세계만)
 			Sub->NotifyContextStep(Ctx, Report);

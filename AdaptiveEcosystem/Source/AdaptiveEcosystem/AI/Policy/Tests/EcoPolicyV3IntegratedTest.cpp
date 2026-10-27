@@ -126,6 +126,8 @@ namespace EcoPolicyV3IntegratedTestImpl
 		S.LogIntervalSeconds = 1000.0f;   // 시험 중 기록 줄을 줄인다
 		S.bProtectedRefuges = false; // Existing parity fixtures exercise their original cover rule.
 		S.bPackHunt = false;         // 10-17 야생 2단계 2 전에 만든 장면들이다 (늑대 무리 협동은 Tests/EcoPackV3Test.cpp 가 본다)
+		S.bGrazeCalm = false;        // 10-27 먹기 걷기 고침·거리 두기 전에 만든 장면들이다 (두 고침은 Tests/EcoCalmV3Test.cpp 가 본다)
+		S.bRestKeep = false;
 		return S;
 	}
 

@@ -70,6 +70,15 @@
   같아야 한다(`live.check_snapshot_route` — 다르면 거부). 판정·학습 세계의 두 길 칸은 이 칸이 아니라 묶음의 바탕 설정이 정한다(`adapt.convert` 는 이 칸을 읽지 않는다).
 - 지역 `flight.route`(길 통계): 보고만 — 파이썬은 쓰지 않는다.
 
+10-27 사용자 보고 두 고침(`RL_V3_WILD1_SPEC.md` 13절 — 먹기 걷기 고침·거리 두기)이 더한 칸 — 파이썬이 읽는다:
+- 지역 `world.graze_calm{graze_edge_r, graze_edge_w, graze_inertia, graze_wall_margin}`(실제로 쓰는 `W.RepCfg` 값)·`world.wild_flight.rest_keep·rest_keep_margin·
+  rest_keep_band·rest_keep_asleep`: `adapt.FEATURE_MAPS` 가 `features.repertoire.graze_*`·`features.wild_flight.rest_keep*`(선택 키)로 옮긴다. 바탕 설정에 없는 칸은
+  끔 값을 바탕 값으로 보고, 칸이 없는 옛 스냅숏(10-26 까지)은 끈 세계로 읽는다. `settings.rest_keep`·`graze_calm`(콘솔 스위치)은 기록만.
+- **영향 메모**: 게임 기본(`eco.IntegratedV3.GrazeCalm`·`RestKeep` 1)의 스냅숏은 두 고침을 켠 세계로 옮겨진다(`configs/v3_wild3_calm_mirror.yaml` 과 같은 규칙).
+  그래서 고리의 판정·학습 세계도 켠 세계다. 지금 판정 기준선(예비 측정·R7e 판정의 사건 숨음 등)은 끈 세계에서 잰 값이라 켠 세계 판정과 섞지 않는다 — 판정
+  저장 열쇠(`live.eval_code_tag` — `world.py` 바이트 포함)가 바뀌어 옛 저장 값과 저절로 갈린다. 켠 세계의 기준선은 다시 잰다(`herbivore_rl/results/v3/live/LIVE_GATE.md`
+  변경 기록 (9)). 평가기(`Tools/EcoV3Eval`)는 같은 칸을 world 블록에서 읽는다 — 이 칸이 든 소스로 다시 빌드해야 한다.
+
 ## 3. 두뇌 파일 `adapt` 블록 (파이썬이 쓰고, 언리얼은 있으면 읽는다 — 없거나 값이 깨져도 거부하지 않는다)
 ```json
 "adapt": {
