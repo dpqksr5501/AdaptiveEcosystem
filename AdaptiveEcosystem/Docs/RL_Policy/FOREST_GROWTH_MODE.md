@@ -2,6 +2,7 @@
 
 - 작성: 권신혁(RL·정책). **상태: 구현했다 (10-27, `Branch_Sinhyeok`).** 1~8절은 설계이고, 구현하면서 바꾼 점은 각 절에 '구현:' 으로 적었다. 바꾼 파일·콘솔 변수·
   확인 결과(UBT 두 판·자동화 263 개 실패 0·창 없는 헤드리스 확인)는 9절. [LIVE_ADAPT_SPEC.md](LIVE_ADAPT_SPEC.md) 2·5.2·5.3·새 5.5절도 구현대로 고쳤다.
+  구현 커밋(`51130c0`) 뒤 실제 실행 확인과 그때 찾아 고친 알림 글(나무 다 자람 묶음에 섞인 '비→비')은 **9.4절 '10-27 확인'**.
 - 기준: C++ 은 `Branch_Sinhyeok` `ae91f90`(그 뒤 커밋 `8f191c0` 은 파이썬 예비 측정 자료뿐). 파이썬은 커밋본과 **다른 워크플로의 10-27 작업 사본**
   (`LIVE_GATE.md` 변경 기록 (10) '실제 폴더 잠금 풀자' — 이 문서를 쓸 때 아직 커밋 전) 둘 다 읽었다. **구현하는 동안 그쪽이 커밋했다**(`2708a78` 잠금 풀기·`94e1b17` δ 인자·
   `7445bc6` 적대적 확인) — 아래 '작업 사본'은 이제 그 커밋이고, '커밋본(잠김)'은 `8f191c0` 까지다. 읽은 코드: `S/AI/Policy/EcoV3EnvWatch.cpp`·`EcoV3Snapshot.cpp`·`EcoV3PlaceTreesCommandlet.cpp`·
@@ -155,6 +156,8 @@
   `숲이 자라는 중 — 메마른 땅 나무 12/24 (묘목 6 그루 자라는 중)` → 다 자라면 `숲이 다 자랐다 — 메마른 땅 나무 24/24` 를 10 초 보이고 끈다.
   숫자 = 다 자란 그루/목표. 지역 이름은 숲·고지·메마른 땅(그 밖은 ID).
 - 다 자람마다 지금 환경 알림 그대로: `환경 바뀜 #2 — Barren: 나무 6→12`.
+  - 10-27 확인 고침(9.4): '큰 변화만' 규칙이 돌 때 같은 결정 스텝 묶음에 든 **세기만 바뀐 지역은 알림 글에서 뺀다** — 조연우 맵에서 다 자람 묶음에 팀 비 세기
+    흔들림이 섞여 `환경 바뀜 #27 — Barren: 나무 0→6 · Barren: 비→비` 로 보였다. 기록 줄 `[EcoV3I] 환경 바뀜 #n | …` 에는 날씨 칸이 그대로 남는다.
 - 클라이언트 줄(덤, 1.6-1 에서 뺄 수 있음): 클라이언트는 복제된 숲 나무 액터를 세어 같은 글을 그린다(`Target`·`RegionId` 는 액터 칸).
 - 기록(헤드리스 증거): Play 시작 `[EcoV3I] 숲 자람 | 켬 — Barren 6 그루 × 40초, 묘목 20초, 목표 24, 첫 단계 30초, 씨 n | 자리 24/24: F00 (x, y) r … · …`
   (또는 `끔`·거부 까닭), 단계마다 `[EcoV3I] 숲 자람 | 30.0초 (전역 스텝 225) 묘목 6 돋음 (F00~F05)`·`… 50.0초 (전역 스텝 375) 6 그루 다 자람 → 세계에 넣음`.
@@ -259,6 +262,8 @@
   스냅숏에 적히는 날씨는 쓰는 순간의 날씨다(4절 열린 질문 6).
   - 구현 확인(9.3): 한 번은 맞고 217.7 초였다 — 숲이 다 자란 뒤 다른 두 지역의 종류 바뀜이 잇따라(183.9·197.7 초) 바뀜 시계를 되돌렸다. 세 지역 위상이 30 초씩
     어긋나 종류 바뀜이 약 30 초마다 오므로 20 초 고요는 늘 오지만, 늦어짐은 '최대 20 초'가 아니라 '마지막 종류 바뀜 + 20 초'다.
+  - 10-27 확인(9.4, 400 초 실시간 두 판): 숲 켬 = 213.1 초 하나(고지 종류 바뀜 193.1 초 + 20 초), 숲 끔 = 0 — 팀 비 주기만으로는 큰 변화가 아니다
+    (비 약 108 초·맑음 약 72 초 이어짐 < 120 초).
 
 ### 2.6 파이썬 판이 끊기지 않게 (live.py 는 이번에 바꾸지 않는다)
 
@@ -549,11 +554,11 @@
 | `S/AI/Policy/EcoV3ForestTree.{h,cpp}` (새) | 복제 숲 나무 액터 `AEcoV3ForestTree` (계획 구조체 `FEcoV3ForestPlan`, `bMature`, 자람 그리기, 다 자람 기록 줄, 클라이언트 화면 줄) |
 | `S/AI/Policy/EcoV3BigChange.h` (새) | '큰 변화만' 순수 규칙 (대칭차·날씨 종류·묶기·기다림·상한·기준선·상태 줄 글) |
 | `S/AI/Policy/EcoV3WatchLauncher.{h,cpp}` (새) | 감시 명령·python 찾기·잠금/pid 파일·끝 까닭·폴더 안전장치·판정(순수), 윈도 `CreateProcessW` + 작업 개체·살핌·끝내기·기록 정리 |
-| `S/AI/Policy/EcoV3EnvWatch.cpp` | `PollEnvironment(bForce, bTreesOnly)`·출처 `forest_growth`, `ApplyEnvChange` 의 큰 변화 셈·세기만 바뀐 묶음 알림(`eco.IntegratedV3.EnvNoticeMinor`), Test.AddTrees 숲 자리 피함·Test.RemoveTrees 숲 나무 뺌, EnvInfo 첫 줄 |
+| `S/AI/Policy/EcoV3EnvWatch.cpp` | `PollEnvironment(bForce, bTreesOnly)`·출처 `forest_growth`, `ApplyEnvChange` 의 큰 변화 셈·세기만 바뀐 묶음 알림(`eco.IntegratedV3.EnvNoticeMinor`), Test.AddTrees 숲 자리 피함·Test.RemoveTrees 숲 나무 뺌, EnvInfo 첫 줄. 10-27 확인 고침: 큰 바뀜과 한 묶음에 든 세기만 바뀐 지역은 알림 글에서 뺌(9.4) |
 | `S/AI/Policy/EcoV3Snapshot.cpp` | `AutoSnapshotRule`·`BigTrees`·`WeatherHold`·`BigSettle`·`BigMaxWait`·`AdaptRoot` 콘솔 변수, `MaybeAutoSnapshot` 규칙 1·0, `env.rule`·`env.big`·`env.forest`, `AdaptRootDir`·`AutoSnapshotDir` |
-| `S/AI/Policy/EcoPolicyV3IntegratedSubsystem.{h,cpp}` | 새 멤버·API, `AutoWatch*` 콘솔 변수, 명령줄 시작값, Play 시작(숲 설정·적응 폴더·감시 띄우기)·끝(감시 끝냄·숲 지움), 프레임 앞 숲, 지역 세계 뒤 숲 계획, 기준선, 상태 줄 칸 |
+| `S/AI/Policy/EcoPolicyV3IntegratedSubsystem.{h,cpp}` | 새 멤버·API, `AutoWatch*` 콘솔 변수, 명령줄 시작값, Play 시작(숲 설정·적응 폴더·감시 띄우기)·끝(감시 끝냄·숲 지움), 프레임 앞 숲, 지역 세계 뒤 숲 계획, 기준선, 상태 줄 칸. 10-27 확인 고침: 마지막 환경 알림 글 `GetLastEnvNotice` (자동화가 본다) |
 | `S/AI/Policy/EcoPolicyV3IntegratedProcessors.cpp` | 스텝 고리 `HasPendingEnvChange` 바로 앞에 `Sub->ForestStepBoundary()` |
-| `S/AI/Policy/Tests/EcoV3BigChangeTest.cpp` (새) | `Policy.V3.AutoSnapshot.BigRule`(순수), `Policy.V3.EnvWatch.BigRule`(서브시스템·스냅숏 파일) |
+| `S/AI/Policy/Tests/EcoV3BigChangeTest.cpp` (새) | `Policy.V3.AutoSnapshot.BigRule`(순수), `Policy.V3.EnvWatch.BigRule`(서브시스템·스냅숏 파일; 10-27 확인 고침 뒤 1b 장면 — 나무 +2 와 세기만 바뀜 한 묶음의 알림 = 나무만, 규칙 0 은 옛 글) |
 | `S/AI/Policy/Tests/EcoV3ForestGrowthTest.cpp` (새) | `Policy.V3.ForestGrowth.Plan`·`.Schedule`·`.Off`·`.Refuse` |
 | `S/AI/Policy/Tests/EcoV3WatchLauncherTest.cpp` (새) | `Policy.V3.WatchLauncher.Command`(순수 + 이 프로세스 살았나·기록 끝·기록 정리), `.Process`(윈도 — cmd.exe 를 창 없이 띄워 잠김 까닭·작업 개체째 끝냄) |
 | `S/AI/Policy/Tests/EcoV3EnvWatchTest.cpp` | `EnvWatch.AutoSnapshot` 은 규칙 0 을 걸고 끝에 되돌린다 (판마다 한 번 = 옛 동작을 본다) |
@@ -609,6 +614,48 @@
 
 - 하지 않은 것: 6.4 클라이언트 폰 보정 수 세기(치트 명령으로 폰을 다 자랄 자리로 옮기기) — 하지 않았다. 묘목이 20 초 자라 보인 뒤 막히므로 드물 것으로 보지만 확인 전이다(4절 1·4).
   3.7-2 '거부' 글 흉내 — 상태 글을 그대로 보이는 길은 가짜 감시의 '스냅숏 기다림' 글로 같은 코드(`LiveStatusText`)를 봤다. 진짜 `live.py watch` 를 띄운 확인 — 다른 워크플로가
-  파이썬 쪽을 쓰는 중이라 하지 않았다(6.6). 편집기 PIE — 창이 필요해 하지 않았다(헤드리스 `open` 으로 Play 여러 번만 봤다).
+  파이썬 쪽을 쓰는 중이라 하지 않았다(6.6 — 시험 root 로는 9.4 에서 했다). 편집기 PIE — 창이 필요해 하지 않았다(헤드리스 `open` 으로 Play 여러 번만 봤다).
 - 결정성 메모: 숲 켠 판의 결정성은 '다 자람을 결정 스텝 경계에서 강제로 읽는 것'에 기댄다. 조연우 맵처럼 팀 날씨를 실시간 주기로 읽는 맵은 원래 같은 시드 바이트 비교가
   안 된다(5.1) — 이번에도 그 맵은 바이트 비교에서 뺐다.
+
+### 9.4 10-27 확인 (구현 커밋 `51130c0` 뒤 실제 실행 — 창 없음)
+
+- 방법: 모두 `UnrealEditor-Cmd <uproject> <맵> -game -NullRHI -unattended -nosplash -nopause -NoSound`(화면 찍기만 `-RenderOffscreen -ResX=1280 -ResY=720`),
+  `-windowed`·OS 키 메시지 없음 — 명령은 예약 `-EcoV3TestAt=<초> -EcoV3TestCmd="…"` 과 CSV 프레임 명령(`-csvCaptureFrames=100000000 -csvExecCmds="r<N>:<명령>"`)만 썼다.
+  AutoAdapt 판은 모두 `-EcoV3AdaptRoot=<scratch 폴더>` — 실제 `Saved/EcoAdapt` 의 파일 29 개는 확인 전후 크기·고친 시각이 같다. 실행마다 0.25 초마다 보이는 창을
+  모두 보고, 우리 언리얼과 그 자손(1 초마다 부모 pid 로 모음)이 가진 새 창을 셌다 — **모든 판 0 개**(사이에 뜬 창은 메신저·탐색기·캡처 도구 같은 사용자 앱뿐).
+- 공통: 세션 시드 20010(`-EcoV3Seed=20010`), 사슴 128 × 지역 셋(`-EcoV3DeerPerRegion=128`), `-EcoIntegratedV3`, 숲은 따로 적지 않으면 기본값(6 그루 × 40 초, 묘목 20 초,
+  목표 24, 첫 단계 30 초). 같은 컴퓨터에서 다른 워크플로가 헤드리스 언리얼·파이썬을 같이 돌렸다(빌드 때만 잠금 파일로 비킴).
+- **찾아 고친 것**: 조연우 복사 맵 실시간 판에서 나무 다 자람과 같은 결정 스텝 묶음에 팀 비 세기만 바뀐 지역이 섞이면 화면 알림이
+  `환경 바뀜 #27 — Barren: 나무 0→6 · Barren: 비→비` 처럼 '비→비'를 보였다(400 초 판의 다 자람 넷 가운데 셋 — #27·#56·#104). '큰 변화만' 규칙이 돌 때(세기만 바뀐 알림 끔)
+  세기만 바뀐 지역을 알림 글에서 뺀다 — 기록 줄 `[EcoV3I] 환경 바뀜 #n | …` 의 날씨 칸은 그대로. 규칙이 돌지 않으면(자동 스냅숏 끔·규칙 0·`EnvNoticeMinor 1`) 옛 글 그대로다
+  (`S/AI/Policy/EcoV3EnvWatch.cpp` `ApplyEnvChange`, 시험용 읽기 `GetLastEnvNotice`, 자동화 `Policy.V3.EnvWatch.BigRule` 1b 장면 — 나무 +2 와 비 0.8→0.9 한 묶음의 알림이
+  `환경 바뀜 #2 — Forest: 나무 0→2`, 끝의 규칙 0 장면은 `… Forest: 비→비` 그대로). 세계에 넣는 것·스냅숏·다시 배우기 셈은 바뀌지 않는다.
+- 고친 뒤 UBT `AdaptiveEcosystemEditor Win64 Development` 기본 적응 unity·`-DisableAdaptiveUnity` 두 판 성공, 자동화 `Automation RunTests AdaptiveEcosystem`
+  (`-ini:Engine:[ConsoleVariables]:eco.IntegratedPolicyVersion=1`) **263 개 성공, 실패 0** (경고 1 = 앞서부터의 저장 파일 읽기).
+
+| 확인 | 명령 (요점) | 결과 |
+|---|---|---|
+| ① 단계대로 자람·다 자란 뒤에만 세계에 | 팀 통합 맵 `/Game/Map/LV_Ecosystem_IntegrationTest`, `-benchmark -fps=30 -seconds=230 -EcoV3ObsParityLog=1 -EcoV3ForestGrowth -EcoV3AutoAdapt -EcoV3AdaptRoot=<scratch> -EcoV3AutoWatchCmd="-X utf8 -u <scratch>/fake_watch.py --root {root} --play {play}"`, 예약 `eco.IntegratedV3.EnvInfo; eco.IntegratedV3.ForestInfo` 29·40·51·95·175·225 초 | 묘목 30·70·110·150 초(전역 스텝 225·525·825·1125) 6 그루씩 `묘목은 아무것도 막지 않음`, 다 자람 50·90·130·170 초(스텝 375·675·975·1275) `환경 바뀜 #1~#4 \| … Barren: 나무 0→6 … 18→24 (출처 forest_growth · 세계 원판 0→6 …)`. 40 초 `EnvInfo`: 묘목 6 이 서 있어도 Barren `무대 안 줄기 막이 0 · 세계 원판 0`, 51 초 `6 · 6`. 숲 켠 판과 끈 판의 사슴 줄은 Barren `t 376` 결정 지문에서 처음 갈리고 숲·고지 줄은 끝까지 같다 |
+| ① 목표에서 멈춤 | 같은 판 175·225 초 `ForestInfo` · 문턱 판 `-EcoV3ForestPerStage=5 -EcoV3ForestTarget=9`·`=10 -EcoV3AutoWatch=0`, 150 초 | `놓음 24 · 다 자람 24 · 묘목 0 · 단계 4/4 다 자람 · 다음 다 자람 전역 스텝 -1`, `다 자랐다 — Barren 나무 24/24 (뺌 0) · 더 돋지 않음, Play 끝까지 그대로`. 문턱 판은 `9/9`·`10/10` 에서 멈춤 |
+| ① 큰 변화 규칙 ('나무 +10 넘고 20 초 조용') | 위 두 가지 | 기본: 90 초 `다시 배우기 조건 됨 \| … 메마른 땅 나무 +12/10 · 날씨 그대로 \| 기다림: 숲이 다 자랄 때까지`, 170 초 마지막 다 자람 + 20 초 = **190.0 초(전역 스텝 1425) 하나** (`why` `큰 변화 — 메마른 땅 나무 +24/10 · 날씨 그대로 (기준 전역 스텝 0) · 바뀜 없이 20.0초 · 조건 뒤 100.0초`). 목표 9(+9) → **스냅숏 0**. 목표 10(+10) → 90 초 조건, 숲이 다 자라 기다림 없이 **110.0 초(스텝 825) 하나** |
+| ① 같은 씨 두 판 | 위 숲 판 셋 (고치기 전 빌드 둘·고친 뒤 하나) | 230 초 사슴 줄 `[EcoV3Obs]` 644202 개 md5 `efc46a20…` 셋 모두 같다 |
+| ① 끄면 같음 | 같은 시드 `-benchmark -fps=30 -seconds=121 -EcoV3ObsParityLog=1`, 숲 끔 | 사슴 줄 343218 개 md5 `6386f290…` — `ae91f90` 빌드 기록(9.3)과 같다 (고치기 전·뒤 빌드 모두) |
+| ② 조연우 맵 — 팀 비 주기만 | `/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem` 실시간 400 초(`t.MaxFPS=60`), `-EcoEcosystemLife=0 -ExecCmds="eco.HerdMigration 0, setnopec EcoCreatureIntegrationSpawner bEnableVegetation False"`, `-EcoV3AutoAdapt -EcoV3AutoWatch=0`, 고친 뒤 빌드 | 환경 판 247 = 세기만 234 + 날씨 종류 13. 화면 알림 13 (종류 바뀜만), 세기만 바뀐 판은 기록 줄 `… \| 세기만 바뀜 — 다시 배우기 셈·화면 알림 없음 (eco.IntegratedV3.EnvNoticeMinor 0)` 만. **스냅숏 0** — 비는 약 108 초, 맑음은 약 72 초 이어져 120 초를 넘지 않는다 (예 고지 12.3 초 맑음→비, 120.4 초 비→맑음) |
+| ② 숲과 겹침 | 같은 맵·설정 + `-EcoV3ForestGrowth` | 환경 판 247 (세기만 230), 환경 알림 17 (종류 13·나무 4) + 스냅숏 알림 1. **스냅숏 하나 213.1 초(전역 스텝 1598)** `큰 변화 — 메마른 땅 나무 +24/10 · 고지 날씨 맑음→비 20/120초 (기준 전역 스텝 0) · 바뀜 없이 20.0초 · 조건 뒤 123.1초` — 나무 조건으로 썼고 날씨 칸은 아직 20/120 초다. 늦어짐 = 고지 종류 바뀜(193.1 초) + 20 초. 다 자람 묶음 셋(#27·#56·#104)에 세기 바뀜이 섞였는데 알림은 `환경 바뀜 #27 — Barren: 나무 0→6` 처럼 나무만 (기록 줄은 `… \| Barren: 날씨 비 0.22→비 0.27 (출처 team_env)` 그대로). 고치기 전 같은 판은 `… · Barren: 비→비` |
+| ③ 리슨 + 클라이언트 1 | 통합 맵 `"<맵>?listen" -game -NullRHI -port=17791` + `127.0.0.1:17791 -game -NullRHI`, 실시간 240 초, 둘 다 `-EcoV3ForestGrowth`. 서버 예약 덤프 45·100·185·205 초, 클라이언트는 CSV 프레임 명령 `r1200:` 로 같은 덤프 — `ForestInfo`·`getall EcoV3ForestTree Plan`·`bMature`·`getall StaticMeshComponent RelativeScale3D\|RelativeLocation\|RelativeRotation Name=TreeMesh`·`… Name=TrunkBlocker` | 클라이언트 다 자람 줄 24 개의 줄기 변환 지문이 서버와 **24/24 같고** 줄기 충돌 켬 24, 서버보다 0.01~0.02 초 늦게. 마지막 덤프: 나무 크기·회전·줄기 막이 자리·크기·계획·`bMature` 24/24 같음, 메시 자리 차 최대 9.2e-5 cm(복제 반올림). 클라이언트 기록에 숲 계획·묘목 돋음 줄 0 개(서버 5 개) — 숲을 따로 키우지 않고 받은 나무만 센다(`숲 자람 (클라이언트) \| 받은 숲 나무 6 · 다 자람 0` → `24 · 24`). 묘목 크기는 클라이언트에서도 0.29 → 1.96 으로 자란다 |
+| ③ 데디케이티드 + 클라이언트 2 | `<맵> -server -port=17791` 240 초 + 클라이언트 c1(처음부터)·c2late(`Barren_F11` 다 자란 뒤 = 약 90 초에 들어옴) | 두 클라이언트 모두 지문 24/24 같음·충돌 켬 24, 크기·회전·줄기 24/24 같음, 메시 자리 차 최대 9.9e-5 cm. 늦게 들어온 c2late 는 첫 덤프부터 `12 그루 · 다 자람 12` (다 자란 채로 받음) |
+| 자동 감시 — 가짜 감시 | ① 숲 판 (`AutoWatchCmd` 로 scratch `fake_watch.py`) | `파이썬 감시 \| 띄움 — pid n · C:\Users\Sinhyeok\anaconda3\python.exe -X utf8 -u …`, 상태 `가짜 감시 — 스냅숏 기다림`, 끝에 `파이썬 감시 끝냄 \| … 학습 자식 포함 프로세스 나무째 (작업 개체)` 뒤 가짜 감시·그 자식 모두 없음 |
+| 중복 방지 — 사람이 띄운 감시 | scratch `fake_watch.py --lock --life 240` 을 먼저 손으로 띄워(`<root>/live/watch.lock`) 같은 root 로 60 초 판 | `파이썬 감시 \| 이미 돈다 — 사람이 띄움, 건드리지 않음 — pid 25440 (watch, 잠금 …)`, 상태 기록 끝 `(사람이 띄운 감시)`. 언리얼이 끝난 뒤에도 그 감시가 살아 있다가 제 수명(240 초, 맥박 120 번)에 스스로 끝났다 |
+| 중복 방지 — 언리얼 둘 | 같은 root 로 A(400 초)가 감시를 띄운 뒤 B(60 초) 시작 | B: `이미 돈다 — 다른 언리얼 프로세스가 띄움 — pid 33116`, 상태 끝 `(다른 언리얼 프로세스가 띄운 감시 pid 33116)`. B 가 먼저 끝나도 A 의 감시는 그대로였고 A 끝에 `끝냄`·`watcher.pid` 지움, 남은 프로세스 0 |
+| ④ 진짜 `live.py watch` | 통합 맵 실시간(`t.MaxFPS=60`) 170 초, 짧은 숲(`-EcoV3ForestStartSeconds=10 -EcoV3ForestStageSeconds=15 -EcoV3ForestGrowSeconds=10 -EcoV3ForestTarget=12`), `-EcoV3Brain=v3_r7_g995_s1_20m`, `-EcoV3AutoWatchCmd="-X utf8 -u results/v3/live/live.py watch --root {root} --ckpt <scratch> --steps 20000 --judge-seeds 35000-35001 --judge-seeds-g 35000-35001 --horizon 300 --horizon-g 300 --stuck-seeds 35000-35000 --workers 4"` (시험 root — 실제 폴더 아님, 시험 크기) | 상태 줄: `파이썬 감시 켜는 중 (0초)` → 4 초 뒤 `스냅숏 기다림` → 55.1 초 스냅숏(스텝 413, 나무 0→12) → 2.7 초 뒤 `새 환경 — 시도 1 시작` → `학습 중 0/20k` → `후보 판정 0/15 세계` → `기각 — 게임 두뇌 그대로 (1차 사건 숨음 비율 19.8%→20.6% t +0.5 (문턱 +12.71))` (스냅숏부터 52 초 — 변환 4.1·학습과 지금 판정 15.4·후보 판정 26.5 초). **시험 크기(판정 시드 2)라 t 문턱이 커서 관문에서 멈춘다** |
+| ④ 시험 내보내기 | 같은 판 + `--force-export` | `exported — 시험 내보내기: 판 1 (관문 기각)` → 언리얼 **94.3 초(전역 스텝 707)** `두뇌 바꿈 \| v3_r7_g995_s1_20m@40d8710d → live_r1_…@06b992e9` (골든 27 사례 최대 로짓 오차 4.77e-06), 알림 `새 두뇌 — 판 1 · … 관문: 시험 내보내기(--force-export) — 관문 기각 …` |
+| ④ Play 끝 정리 | 같은 판, `--steps 400000` — 학습·판정 중에 Play 가 끝남 | 끝날 때 상태 `후보 판정 3/15 세계`. 감시·`round`·`train-one`·멀티프로세싱 일꾼 6·`EcoV3Eval` 3 등 자손 15 개 모두 사라짐 |
+| ④ 다른 python 그대로 | 판마다 실행 전후 python·`EcoV3Eval` 목록 + 1 초마다 우리 자손 목록 | 다른 워크플로의 python 은 우리 자손 목록에 한 번도 없었고, 그쪽 주 프로세스(예 `r7e_game.py`)는 전후 모두 살아 있었다. 사이에 바뀐 pid 는 그쪽 작업 풀이 스스로 바꾼 것이다(작업 개체는 우리 감시가 띄운 프로세스만 담는다) |
+| ⑤ 화면 | 통합 맵 `-RenderOffscreen -ResX=1280 -ResY=720` 실시간(`t.MaxFPS=30`) 235 초, 기본 숲, 내장 두뇌, 진짜 `live.py watch`(시험 root), 예약 `eco.Cam.Region Barren; eco.Cam.Top; eco.Cam.Help`, `-csvExecCmds="r150:shot showui filename=…,r151:shot filename=…"` | 저장소 밖 `week8_assets/forest/` 5 장 — 자라기 전 23 초·중 157 초(18/24 + 묘목 6)·후 173 초(24/24, 같은 자리 위에서), 같은 순간 화면 글(알림 `환경 바뀜 #4 — Barren: 나무 18→24`·`숲이 다 자랐다 — 메마른 땅 나무 24/24`·상태 `다시 배우기: 조건 됨 — 바뀜이 멈추길 기다림 2/20초`), 193 초(`스냅숏 #4 내보냄 → 파이썬 학습 대기`·`적응 고리 \| 새 환경 — 시도 1 시작 (Barren 나무 0→24)`). 이 판의 감시는 190 초 스냅숏을 받아 `기각 (9.7%→9.7%)` 으로 끝났다 |
+
+- 빌드 메모: 리슨·데디 판·문턱 판·진짜 `live.py` 판 셋(①의 문턱, ③, ④)은 고치기 전 빌드(`51130c0`)로 돌렸다. 고침은 알림 글만 바꾸고, 날씨 출처가 없는 통합 맵에서는
+  날씨 바뀜이 없어 고친 길을 타지 않는다. 숲 판·끔 판·조연우 맵 두 판·화면 판은 고친 뒤 빌드로 다시 돌렸다.
+- 남은 점 (고치지 않음): 막 돋은 묘목(크기 몫 0.15 언저리)은 위에서 보면 몇 초 동안 검은 덩이로 그려진다 — 그리기만의 일이다. 관찰 카메라 칸(오른쪽 위)이 긴 상태 줄의
+  끝을 가린다. 클라이언트 캐릭터가 막 자란 줄기에 걸릴 때의 위치 되돌림 수는 여전히 세지 않았다(9.3). 진짜 감시를 실제 폴더(`Saved/EcoAdapt`)에서 띄우는 확인은
+  실제 폴더에 파일을 남기지 않기 위해 하지 않았다 — 그래서 '실제 폴더 고리는 판 5 두뇌로 시작한 Play 만'(3.7)의 거부 글은 이번에도 직접 보지 않았다. 편집기 PIE 는 창이 필요해 하지 않았다.

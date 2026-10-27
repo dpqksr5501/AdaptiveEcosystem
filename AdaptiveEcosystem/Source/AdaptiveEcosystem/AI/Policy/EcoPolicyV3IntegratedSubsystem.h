@@ -1280,6 +1280,8 @@ public:
 	void PostNotice(EcoV3Integrated::ENotice Kind, const FString& Text);
 	/** 환경 바뀜 판 (Play 시작부터 적용한 환경 변경 묶음 수, 0 = 그대로 — EcoV3EnvWatch 가 올린다. 상태 줄 '환경 #n'). */
 	int32 GetEnvRevision() const { return EnvRevision; }
+	/** 마지막 환경 바뀜 화면 알림 글 ('환경 바뀜 #n — …', 없으면 빈 값 — 10-27 확인 고침의 자동화 시험이 본다). */
+	const FString& GetLastEnvNotice() const { return LastEnvNotice; }
 	/** 적응 고리 Play 번호 (eco.IntegratedV3.AutoAdapt 일 때 Play 시작마다 새로 — 스냅숏 play_id, 감시는 다른 Play 의 두뇌를 받지 않는다). 끄면 빈 값. */
 	const FString& GetPlayId() const { return PlayId; }
 
@@ -1597,6 +1599,7 @@ private:
 	int64 EnvChangedStep = 0;             // 마지막 환경 바뀜을 넣은 전역 스텝 (없으면 0)
 	int64 EnvFirstChangedStep = 0;        // 처음 환경 바뀜을 넣은 전역 스텝 (없으면 0)
 	TArray<FEcoV3EnvChange> EnvChanges;   // 넣은 바뀜 (오래된 것부터)
+	FString LastEnvNotice;                // 마지막 환경 바뀜 화면 알림 글 (GetLastEnvNotice)
 	FDelegateHandle EnvSpawnHandle;
 	FDelegateHandle EnvDestroyHandle;
 	TArray<FEcoV3TestAt> TestAts;         // 시험용 예약 명령 (아직 안 돌린 것)

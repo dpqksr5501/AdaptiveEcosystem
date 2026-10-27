@@ -548,6 +548,7 @@ void UEcoPolicyV3IntegratedSubsystem::EndEnvWatch()
 	EnvChangedStep = 0;
 	EnvFirstChangedStep = 0;
 	EnvChanges.Reset();
+	LastEnvNotice.Reset();
 	TestAts.Reset();
 	TestTrees.Reset();
 	TestTreeSerial.Reset();
@@ -1015,8 +1016,13 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 				Ch.Detail = FString::Printf(TEXT("%s→%s"), *WeatherText(OldKind, OldIntensity), *WeatherText(Wx.Kind, Wx.Intensity));
 				Ch.Source = P.WeatherSource;
 				LogParts.Add(FString::Printf(TEXT("%s: 날씨 %s (출처 %s)"), *Region, *Ch.Detail, *Ch.Source));
-				NoticeParts.Add(FString::Printf(TEXT("%s: %s→%s"), *Region, UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(OldKind)),
-												UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Wx.Kind))));
+				// 10-27 확인 고침: '큰 변화만' 규칙이 돌 때(세기만 바뀐 알림 끔) 세기만 바뀐 지역은 화면 알림 글에서 뺀다 — 나무 다 자람과 같은 묶음에 든 팀 비 세기
+				// 흔들림이 'Barren: 비→비' 로 알림에 섞였다 (조연우 복사 맵 실시간 확인). 기록 줄 LogParts 는 그대로. 규칙이 돌지 않으면 옛 글 그대로
+				if (OldKind != Wx.Kind || NoticeMinorChanges())
+				{
+					NoticeParts.Add(FString::Printf(TEXT("%s: %s→%s"), *Region, UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(OldKind)),
+													UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Wx.Kind))));
+				}
 				// '큰 변화만' 다시 배우기: 날씨 종류가 바뀐 묶음만 큰 변화 바뀜 (세기만 바뀐 것은 세계에는 넣되 세지 않는다)
 				bMajor = EcoV3BigChange::OnWeather(BigState, c, Wx.Kind, GlobalT) || bMajor;
 			}
@@ -1039,7 +1045,8 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 		   bNotice ? TEXT("") : TEXT(" | 세기만 바뀜 — 다시 배우기 셈·화면 알림 없음 (eco.IntegratedV3.EnvNoticeMinor 0)"));
 	if (bNotice)
 	{
-		PostNotice(EcoV3Integrated::ENotice::Env, FString::Printf(TEXT("환경 바뀜 #%d — %s"), Rev, *FString::Join(NoticeParts, TEXT(" · "))));
+		LastEnvNotice = FString::Printf(TEXT("환경 바뀜 #%d — %s"), Rev, *FString::Join(NoticeParts, TEXT(" · ")));
+		PostNotice(EcoV3Integrated::ENotice::Env, LastEnvNotice);
 	}
 }
 

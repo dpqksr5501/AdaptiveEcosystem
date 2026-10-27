@@ -371,6 +371,18 @@ bool FEcoV3EnvWatchBigRuleTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("세기 바뀜은 세계에 들어간다 (판 1, 세기 0.8)"), Sub->GetEnvRevision() == 1 && Forest->Sim.Config.Weather.Intensity == 0.8);
 	TestEqual(TEXT("세기만 바뀜 — 스냅숏 없음 (규칙 0 이면 3 초 뒤 썼다)"), Files().Num(), 0);
 	TestTrue(TEXT("세기만 바뀜 — 바뀜 시계 그대로"), Sub->GetBigState().LastActivityStep == Sub->GetBigState().BaselineStep);
+	TestTrue(TEXT("세기만 바뀜 — 화면 알림 없음"), Sub->GetLastEnvNotice().IsEmpty());
+
+	// 1b. (10-27 확인 고침) 나무 +2 와 세기만 바뀜(비 0.8 → 0.9)이 한 묶음: 알림은 나무만 — 세기만 바뀐 지역이 '숲: 비→비' 로 섞이지 않는다
+	{
+		FString Msg;
+		TestEqual(TEXT("시험용 나무 2"), Sub->TestAddTrees(TEXT("Forest"), 2, TOptional<int32>(2), Msg), 2);
+		SetCVar(Vars[4], TEXT("rain:0.9"));
+		Sub->PollEnvironment(true);
+		Run(5);
+		TestTrue(TEXT("묶음 하나 (판 2, 세기 0.9)"), Sub->GetEnvRevision() == 2 && Forest->Sim.Config.Weather.Intensity == 0.9);
+		TestEqual(TEXT("섞인 묶음 알림 = 나무만"), Sub->GetLastEnvNotice(), FString(TEXT("환경 바뀜 #2 — Forest: 나무 0→2")));
+	}
 
 	// 2. 종류 (비 → 맑음): 120 초(900 스텝) 뒤 한 번
 	SetCVar(Vars[4], TEXT("clear"));
@@ -448,6 +460,7 @@ bool FEcoV3EnvWatchBigRuleTest::RunTest(const FString& Parameters)
 	Sub->PollEnvironment(true);
 	Run(30);
 	TestEqual(TEXT("규칙 0 — 판마다 (파일 둘 더)"), Files().Num(), 4);
+	TestTrue(TEXT("규칙 0 — 세기만 바뀜도 옛 글 그대로 알림 (비→비)"), Sub->GetLastEnvNotice().EndsWith(TEXT("Forest: 비→비")));
 	TestTrue(TEXT("규칙 0 상태 줄"), Sub->BigChangeStatusText().Contains(TEXT("AutoSnapshotRule 0")));
 	return true;
 }
