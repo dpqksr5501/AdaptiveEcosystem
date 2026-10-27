@@ -14,6 +14,11 @@
 //         팀 FRegionEnvironmentState (UEcologyWorldSubsystem — 지역 세계를 만들 때 값이 바탕, 바뀌면 비·폭풍 = 비 세기 Rainfall(0 이면 1), 맑음·가뭄 = 맑음.
 //         팀에는 눈이 없다. 팀 콘솔 eco.Environment.Rain <지역> <0..1> 이 레벨 쪽 계기로 쓰인다). 세계 설정 Weather.Kind·Intensity 를 바꾸고 UpdateDayNight 로
 //         배수를 다시 정한다. 시간표(Weather.Schedule)는 쓰지 않는다 (파이썬이 거부한다). 날씨를 끈 세계(eco.IntegratedV3.Weather 0)는 무시한다.
+//         시작 날씨 (10-27 사용자 결정 (C)): 팀 날씨 출처(FindTeamWeatherSource — 그 지역을 맡아 실제로 쓰는 팀 환경 어댑터 AEcoRegionEnvironmentAdapter,
+//         조연우 BP_JYU_EcosystemWeather 등)가 있는 지역은 지역 세계를 만들 때(InitContextEnv) 팀 지역 환경을 규칙 날씨로 넣는다 — 그 날씨로 세계를 만든 것과 같다
+//         (InitWorld 는 날씨로 난수·먹이를 정하지 않는다). 출처가 없는 지역만 우리 고정 날씨(팀 설계 기본·덮기). Play 시작 덮기 글자가 날씨를 고르면 그것,
+//         eco.IntegratedV3.TeamWeatherStart 0 이나 감시 끔(EnvWatch 0)이면 지금까지처럼 우리 고정 날씨로 시작한다. 늦게 등록된 지역은 처음 읽을 때 바뀜(team_env)으로 넣는다.
+//         스냅숏은 세계 설정 날씨를 적으므로 파이썬 변환·짝 비교는 그대로 맞는다.
 // 읽기: eco.IntegratedV3.EnvWatchSeconds(실시간 1 초)마다와 액터가 생기거나 지워진 다음 프레임 (꼬리표는 생긴 뒤에 붙을 수 있다 — 표시만 하고 다음 읽기에서 본다).
 //   움직인 액터·월드 파티션 스트리밍은 알림이 없어 정기 읽기가 잡는다. PIE 중 편집기 월드를 고친 것은 PIE 월드에 닿지 않는다.
 // 넣기: 처리기가 전역 결정 스텝 경계(두뇌 바꾸기와 같은 곳, 스텝 앞)에서 ApplyEnvChange. 새 원판 안 산 사슴·늑대를 밖으로 밀고(PushOutAndCount) 돌아가기를 지운다.
@@ -43,6 +48,7 @@
 #include "HAL/IConsoleManager.h"
 #include "Misc/OutputDevice.h"
 #include "Misc/Parse.h"
+#include "World/EcoRegionEnvironmentAdapter.h"
 #include "World/EcologyWorldSubsystem.h"
 
 namespace EcoV3EnvWatchImpl
@@ -61,6 +67,16 @@ namespace EcoV3EnvWatchImpl
 		TEXT("eco.IntegratedV3.EnvWatchSeconds"),
 		1.0f,
 		TEXT("통합 v3 모드 환경 바뀜 감시 주기 (실시간 초, 기본 1 — 0.1~60 으로 자른다). 액터가 생기거나 지워지면 다음 프레임에 곧바로 읽는다."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarTeamWeatherStart(
+		TEXT("eco.IntegratedV3.TeamWeatherStart"),
+		1,
+		TEXT("통합 v3 모드 시작 날씨를 팀 날씨 출처에서 (1 = 켬, 기본 — 10-27 사용자 결정 (C)). 지역을 맡아 실제로 쓰는 팀 환경 어댑터(AEcoRegionEnvironmentAdapter — ")
+		TEXT("조연우 BP_JYU_EcosystemWeather 등, 비 주기 또는 작성 날씨 켬)가 있는 지역은 지역 세계를 만들 때 팀 지역 환경(FRegionEnvironmentState)을 규칙 날씨로 ")
+		TEXT("넣는다 (Play 시작 덮기 글자 eco.IntegratedV3.WeatherForest·WeatherHighland·WeatherBarren 이 날씨를 고르면 그것). 출처가 없는 지역은 우리 고정 날씨 ")
+		TEXT("(팀 설계 기본·덮기) 그대로. 환경 감시(eco.IntegratedV3.EnvWatch)가 꺼졌으면 쓰지 않는다. 0 = 10-27 전 (시작은 우리 고정 날씨, 팀 값은 바뀔 때만 — ")
+		TEXT("앞선 측정 다시 내기용). Play 전에 바꾼다."),
 		ECVF_Default);
 #endif
 
@@ -128,6 +144,69 @@ namespace EcoV3EnvWatchImpl
 #else
 		return 1.0;
 #endif
+	}
+
+	/** 시작 날씨를 팀 날씨 출처에서 가져오나 (eco.IntegratedV3.TeamWeatherStart — Shipping 은 감시가 늘 꺼져 쓰이지 않는다). */
+	bool TeamWeatherStartEnabled()
+	{
+#if !UE_BUILD_SHIPPING
+		return CVarTeamWeatherStart.GetValueOnGameThread() != 0;
+#else
+		return true;
+#endif
+	}
+
+	/** 덮기 글자가 날씨를 고르나 (비지 않고 읽힌다). 빈 값·못 읽는 글자는 고르지 않는다 (WeatherFor 도 그때 팀 설계 기본을 쓴다). */
+	bool PicksWeather(const FString& Text)
+	{
+		int32 Kind = EcoWorldV3::kWeatherClear;
+		double Intensity = 0.0;
+		return !Text.TrimStartAndEnd().IsEmpty() && FEcoV3IntegratedSettings::ParseWeather(Text, Kind, Intensity);
+	}
+
+	/**
+	 * 팀 날씨 출처 (10-27 사용자 결정 (C)): 그 지역의 팀 지역 환경(FRegionEnvironmentState)을 Play 중에 실제로 쓰는 팀 환경 어댑터가 있나.
+	 * 어댑터 = AEcoRegionEnvironmentAdapter (World/EcoRegionEnvironmentAdapter.h — 팀 C++, 조연우 BP_JYU_EcosystemWeather 같은 자식 블루프린트 포함).
+	 * 어댑터 Tick 이 지역 환경을 쓰는 조건을 그대로 본다 (서버·단독 월드, 팀 월드 시계가 돌면 0.2 초마다):
+	 *   ① 이 지역을 맡는다 — RegionIds 에 있거나 비었다 (빈 목록 = 등록된 모든 지역).
+	 *   ② 쓰는 길이 켜졌다 — 비 주기(bCycleRainfall: EvaluateCycleRainfall 이 설정을 받아들인다. 작성 날씨와 함께 켜면 어댑터가 거부해 아무것도 쓰지 않는다)
+	 *      또는 작성 날씨(bApplyAuthoredWeather, 비 주기 끔).
+	 * 둘 다 끈 어댑터(블루프린트가 ApplyWeather·ApplyRainfall 을 직접 부르는 다리일 수 있다 — 언제 무엇을 쓸지 미리 알 수 없다), 팀 지역 환경을 쓰지 않고
+	 * 그리기만 하는 날씨 BP(SHC BP_SHC_*RegionalWeather), 팀 콘솔 eco.Environment.Rain 은 시작 출처로 보지 않는다 — 그 값은 바뀔 때 Play 중 바뀜(team_env)으로 따른다.
+	 * 어댑터가 실제로 못 쓰는 경우(다른 지정 지역이 등록되지 않아 묶음을 거부, 월드 시계가 서 있음)에도 팀 지역 환경은 팀 화면이 보이는 값이라 그 값으로
+	 * 시작하는 쪽이 화면과 어긋나지 않는다.
+	 * OutWho = 찾은 어댑터 (이름·종류·쓰는 길 — 기록·EnvInfo), 없으면 빈 값.
+	 */
+	bool FindTeamWeatherSource(UWorld& World, FName RegionId, FString& OutWho)
+	{
+		TArray<FString> Who;
+		for (TActorIterator<AEcoRegionEnvironmentAdapter> It(&World); It; ++It)
+		{
+			const AEcoRegionEnvironmentAdapter* A = *It;
+			if (!A || !(A->RegionIds.IsEmpty() || A->RegionIds.Contains(RegionId)))
+			{
+				continue;
+			}
+			float Probe = 0.0f;
+			const bool bCycle = A->EvaluateCycleRainfall(0.0, Probe);   // 비 주기 켬 ∧ 작성 날씨 끔 ∧ 주기 설정이 맞다
+			const bool bAuthored = A->bApplyAuthoredWeather && !A->bCycleRainfall;
+			if (bCycle || bAuthored)
+			{
+				Who.Add(FString::Printf(TEXT("%s (%s · %s%s)"), *A->GetActorNameOrLabel(), *A->GetClass()->GetName(),
+										bCycle ? *FString::Printf(TEXT("비 주기 %.0f초·위상 %.0f초"), A->RainCycleSeconds, A->RainPhaseOffsetSeconds)
+											   : TEXT("작성 날씨"),
+										A->RegionIds.IsEmpty() ? TEXT(" · 모든 지역") : TEXT("")));
+			}
+		}
+		OutWho = FString::Join(Who, TEXT(", "));
+		return !Who.IsEmpty();
+	}
+
+	/** 팀 날씨 상태 이름 (기록 — Clear·Rain·Storm·Drought). */
+	FString TeamStateName(uint8 State)
+	{
+		const UEnum* E = StaticEnum<EEcoWeatherState>();
+		return E ? E->GetNameStringByValue(static_cast<int64>(State)) : FString::FromInt(State);
 	}
 
 	/** 지역의 날씨 덮기 콘솔 변수 이름 (숲·고지·메마른 땅 밖은 없다). */
@@ -308,7 +387,8 @@ bool UEcoPolicyV3IntegratedSubsystem::IsEnvWatchEnabled()
 void UEcoPolicyV3IntegratedSubsystem::InitContextEnv(FEcoV3RegionContext& Ctx)
 {
 	using namespace EcoV3EnvWatchImpl;
-	// 바탕: 시작 레벨 읽기가 쓴 은신처 원(= 세계 설정 원 목록), 날씨 콘솔 변수의 Play 시작 값, 지금 줄기 원판, 팀 지역 환경 (읽기만 — 세계는 그대로)
+	// 바탕: 시작 레벨 읽기가 쓴 은신처 원(= 세계 설정 원 목록), 날씨 콘솔 변수의 Play 시작 값, 지금 줄기 원판, 팀 지역 환경 (읽기만 — 세계는 그대로.
+	// 시작 날씨만 아래 팀 날씨 출처 판정에 따라 바꿀 수 있다)
 	Ctx.EnvScanCovers = Ctx.Sim.Config.Covers;
 	const FString* Override = WeatherOverride(Settings, Ctx.RegionId);
 	Ctx.EnvWeatherCvarSeen = Override ? *Override : FString();
@@ -322,9 +402,9 @@ void UEcoPolicyV3IntegratedSubsystem::InitContextEnv(FEcoV3RegionContext& Ctx)
 	int32 Snapped = 0;
 	double MaxSnapCm = 0.0;
 	Ctx.EnvTrunks = StageTrunkDiscs(Trunks, Ctx.RegionId, Ctx.OriginCm, Ctx.SizeUnits, Ctx.EnvScanCovers, Ctx.EnvLevelTrunks, Snapped, MaxSnapCm);
+	FRegionEnvironmentState Team;
 	if (const UEcologyWorldSubsystem* Regions = World->GetSubsystem<UEcologyWorldSubsystem>())
 	{
-		FRegionEnvironmentState Team;
 		if (Regions->GetEnvironmentState(Ctx.RegionId, Team))
 		{
 			Ctx.bEnvTeamKnown = true;
@@ -332,6 +412,51 @@ void UEcoPolicyV3IntegratedSubsystem::InitContextEnv(FEcoV3RegionContext& Ctx)
 			Ctx.EnvTeamRainfall = Team.Rainfall;
 		}
 	}
+
+	// 시작 날씨 = 팀 날씨 출처 (10-27 사용자 결정 (C)): 팀 날씨 BP 가 도는 맵(조연우 BP_JYU_EcosystemWeather — 비 주기 180 초, 위상 숲 0·메마른 땅 30·고지 60 초)에서
+	// 우리 고정 날씨(숲 비 1·고지 눈 1)로 시작하면 팀 값이 처음 바뀔 때까지(숲 0~73 초·고지 0~13 초) 규칙 ≠ 화면(팀 지역 환경을 그리는 식생 맵 보기)이었다.
+	// 출처가 맡는 지역은 지금 팀 값을 세계 설정 날씨로 넣는다 — InitWorld 직후 같은 T 라 그 날씨로 세계를 만든 것과 같다 (InitWorld 는 날씨로 난수·먹이를
+	// 정하지 않고, 날씨 검사는 TeamWeather 의 값(맑음 0·비 (0, 1])이 늘 통과한다). 바뀜이 아니라 시작값이라 환경 판·기록·알림은 그대로다.
+	Ctx.bEnvTeamSource = FindTeamWeatherSource(*World, Ctx.RegionId, Ctx.EnvTeamSourceWho);
+	EcoWorldV3::FWorldState& W = Ctx.Sim;
+	if (!Ctx.bEnvTeamSource || !W.Config.Weather.bEnabled || !IsEnvWatchEnabled())
+	{
+		return;   // 출처 없음 = 우리 고정 날씨 (지금까지와 같다). 날씨를 끈 세계·감시를 끈 실행(Play 시작 때 환경 고정 — 옛 동작)도 그대로
+	}
+	const FString Region = Ctx.RegionId.ToString();
+	const FString Ours = WeatherText(W.Config.Weather.Kind, W.Config.Weather.Intensity);
+	if (!Ctx.bEnvTeamKnown)
+	{
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 시작 날씨 | 팀 날씨 출처 %s 가 있지만 팀 지역이 아직 등록되지 않았다 — 우리 고정 날씨 %s 로 시작하고 팀 지역을 처음 읽을 때 ")
+										 TEXT("그 값을 바뀜(team_env)으로 넣는다"),
+			   *Region, *Ctx.EnvTeamSourceWho, *Ours);
+		return;
+	}
+	int32 Kind = EcoWorldV3::kWeatherClear;
+	double Intensity = 0.0;
+	TeamWeather(Team, Kind, Intensity);
+	const FString TeamText = FString::Printf(TEXT("%s (팀 지역 환경 %s·비 세기 %.2f)"), *WeatherText(Kind, Intensity), *TeamStateName(Ctx.EnvTeamWeather),
+											 static_cast<double>(Team.Rainfall));
+	if (!TeamWeatherStartEnabled())
+	{
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 시작 날씨 | 팀 날씨 출처 %s 가 있지만 우리 고정 날씨 %s 로 시작한다 (eco.IntegratedV3.TeamWeatherStart 0 — 10-27 전 동작, ")
+										 TEXT("팀 값 %s 은 바뀔 때만 따른다)"),
+			   *Region, *Ctx.EnvTeamSourceWho, *Ours, *TeamText);
+		return;
+	}
+	if (PicksWeather(Ctx.EnvWeatherCvarSeen))
+	{
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 시작 날씨 | 팀 날씨 출처 %s 가 있지만 Play 시작 덮기 글자 '%s' 의 %s 로 시작한다 (사람이 고른 값 — 팀 값 %s 은 다음 팀 바뀜부터 ")
+										 TEXT("따른다. 빈 값이면 팀 값으로 시작)"),
+			   *Region, *Ctx.EnvTeamSourceWho, *Ctx.EnvWeatherCvarSeen, *Ours, *TeamText);
+		return;
+	}
+	W.Config.Weather.Kind = Kind;
+	W.Config.Weather.Intensity = Intensity;
+	EcoWorldV3::UpdateDayNight(W);
+	Ctx.bEnvStartFromTeam = true;
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 시작 날씨 | 팀 날씨 출처 %s → %s — 우리 고정 날씨 %s 대신 (eco.IntegratedV3.TeamWeatherStart 1, 10-27 (C))"), *Region,
+		   *Ctx.EnvTeamSourceWho, *TeamText, *Ours);
 }
 
 void UEcoPolicyV3IntegratedSubsystem::BeginEnvWatch(UWorld& InWorld)
@@ -353,8 +478,11 @@ void UEcoPolicyV3IntegratedSubsystem::BeginEnvWatch(UWorld& InWorld)
 	}
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 감시: %s | 자동 스냅숏 %s | 시험용 예약 %d%s"),
 		   bWatch ? *FString::Printf(TEXT("켬 (eco.IntegratedV3.EnvWatch 1 — %.1f초마다·액터가 생기거나 지워지면 곧바로 읽어 결정 스텝 경계에서 넣는다: 레벨 나무 줄기 막이(꼬리표 %s)·")
-										 TEXT("지역 날씨 콘솔 변수·팀 지역 환경. 환경 규칙은 레벨 몫, 먹이 격자 그대로)"),
-									 EcoV3EnvWatchImpl::EnvWatchSeconds(), *LevelTrunkTag().ToString())
+										 TEXT("지역 날씨 콘솔 변수·팀 지역 환경. 환경 규칙은 레벨 몫, 먹이 격자 그대로. 시작 날씨 %s)"),
+									 EcoV3EnvWatchImpl::EnvWatchSeconds(), *LevelTrunkTag().ToString(),
+									 EcoV3EnvWatchImpl::TeamWeatherStartEnabled()
+										 ? TEXT("= 팀 날씨 출처(팀 환경 어댑터)가 맡는 지역은 팀 값, 없는 지역은 우리 고정 날씨 (eco.IntegratedV3.TeamWeatherStart 1)")
+										 : TEXT("= 우리 고정 날씨 (eco.IntegratedV3.TeamWeatherStart 0 — 10-27 전)"))
 				  : TEXT("끔 (eco.IntegratedV3.EnvWatch 0 — Play 시작 때 환경 고정)"),
 		   *DescribeAutoSnapshot(), TestAts.Num(), *Schedule);
 }
@@ -493,7 +621,8 @@ bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce)
 			}
 		}
 
-		// 2. 날씨: 팀 지역 환경 (바뀌었을 때만), 그 뒤 우리 지역 날씨 콘솔 변수 (바뀌었을 때만 — 같은 읽기에서 둘 다 바뀌면 콘솔 변수가 이긴다)
+		// 2. 날씨: 팀 지역 환경 (바뀌었을 때만 — 늦게 등록된 지역은 팀 날씨 출처가 맡을 때 처음 값도), 그 뒤 우리 지역 날씨 콘솔 변수 (바뀌었을 때만 — 같은 읽기에서
+		//    둘 다 바뀌면 콘솔 변수가 이긴다)
 		bool bWant = false;
 		int32 WantKind = EcoWorldV3::kWeatherClear;
 		double WantIntensity = 0.0;
@@ -504,7 +633,16 @@ bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce)
 			const uint8 State = static_cast<uint8>(Team.WeatherState);
 			if (!Ctx.bEnvTeamKnown)
 			{
-				Ctx.bEnvTeamKnown = true;   // 처음 본 값이 바탕 (지역이 늦게 등록됐다)
+				// 처음 본 값이 바탕 (지역이 늦게 등록됐다). 팀 날씨 출처가 맡는 지역이면 그 값은 시작 때 넣었을 날씨다 (InitContextEnv) — 이미 세계가 돌고 있으므로
+				// 바뀜(team_env)으로 넣는다. 덮기 글자가 날씨를 고르거나 eco.IntegratedV3.TeamWeatherStart 0 이면 지금까지처럼 바탕만 적는다
+				Ctx.bEnvTeamKnown = true;
+				Ctx.bEnvTeamSource = FindTeamWeatherSource(*World, Ctx.RegionId, Ctx.EnvTeamSourceWho);
+				if (Ctx.bEnvTeamSource && TeamWeatherStartEnabled() && !PicksWeather(Ctx.EnvWeatherCvarSeen))
+				{
+					TeamWeather(Team, WantKind, WantIntensity);
+					WantSource = TEXT("team_env");
+					bWant = true;
+				}
 			}
 			else if (State != Ctx.EnvTeamWeather || Team.Rainfall != Ctx.EnvTeamRainfall)
 			{
@@ -881,10 +1019,12 @@ TArray<FString> UEcoPolicyV3IntegratedSubsystem::EnvInfoLines() const
 			Wait += FString::Printf(TEXT(" · 대기 날씨 %s (출처 %s)"), *WeatherText(PendingEnv[c].WeatherKind, PendingEnv[c].WeatherIntensity),
 									*PendingEnv[c].WeatherSource);
 		}
-		Lines.Add(FString::Printf(TEXT("[EcoV3I] %s | 무대 안 줄기 막이 %d · 세계에 넣은 줄기 %d · 세계 원판 %d (장애물 %s) | 날씨 %s (%s) · 지금 %s%s"), *Ctx.RegionId.ToString(),
-								  Ctx.EnvLevelTrunks, NumOf(Ctx.EnvTrunks), W.Config.Obstacles.Num(), W.Config.Obstacles.bEnabled ? TEXT("켬") : TEXT("끔"),
+		const FString TeamSource = Ctx.bEnvTeamSource ? FString::Printf(TEXT("%s%s"), *Ctx.EnvTeamSourceWho, Ctx.bEnvStartFromTeam ? TEXT(" — 시작 날씨 = 팀 값") : TEXT(""))
+													  : FString(TEXT("없음"));
+		Lines.Add(FString::Printf(TEXT("[EcoV3I] %s | 무대 안 줄기 막이 %d · 세계에 넣은 줄기 %d · 세계 원판 %d (장애물 %s) | 날씨 %s (%s) · 지금 %s · 팀 날씨 출처 %s%s"),
+								  *Ctx.RegionId.ToString(), Ctx.EnvLevelTrunks, NumOf(Ctx.EnvTrunks), W.Config.Obstacles.Num(), W.Config.Obstacles.bEnabled ? TEXT("켬") : TEXT("끔"),
 								  *WeatherText(W.Config.Weather.Kind, W.Config.Weather.Intensity), W.Config.Weather.bEnabled ? TEXT("켬") : TEXT("끔"),
-								  *WeatherText(W.WeatherKind, W.WeatherIntensity), *Wait));
+								  *WeatherText(W.WeatherKind, W.WeatherIntensity), *TeamSource, *Wait));
 	}
 	return Lines;
 }

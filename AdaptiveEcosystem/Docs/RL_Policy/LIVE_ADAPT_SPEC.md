@@ -118,6 +118,42 @@
   ② 팀 `FRegionEnvironmentState`(`UEcologyWorldSubsystem::GetEnvironmentState`) — 지역 세계를 만들 때 값이 바탕, 바뀌면 비·폭풍 → 비(세기 = Rainfall, 0 이면 1),
   맑음·가뭄 → 맑음(팀에는 눈이 없다). 팀 콘솔 `eco.Environment.Rain <지역> <0..1>` 이 레벨 쪽 계기로 쓰인다. 세계 설정 `Weather.Kind·Intensity` 를 바꾸고
   `UpdateDayNight` 로 배수를 다시 정한다. 시간표(`Weather.Schedule`)는 쓰지 않는다. 날씨를 끈 판은 무시.
+- **시작 날씨 = 팀 날씨 출처** (10-27 사용자 결정 (C), `eco.IntegratedV3.TeamWeatherStart` 기본 1): 팀 날씨 출처가 있는 지역은 지역 세계를 만들 때(`InitContextEnv`)
+  팀 `FRegionEnvironmentState` 를 위 ② 와 같은 식으로 규칙 날씨에 넣는다. 우리 고정 날씨(팀 설계 기본 숲 비 1·고지 눈 1·메마른 땅 맑음, 덮기 글자)는 출처가 없는
+  지역에서만 쓴다. 고치기 전에는 조연우 맵(팀 날씨 BP `BP_JYU_EcosystemWeather` — 비 주기 180 초, 위상 숲 0·메마른 땅 30·고지 60 초)에서 팀 값이 처음 바뀔 때까지
+  (숲 0~73 초·고지 0~13 초) 규칙 ≠ 화면이었다(식생 맵 보기 연출은 팀 지역 환경을 그린다).
+  - 출처 판정(`EcoV3EnvWatch.cpp` `FindTeamWeatherSource`) = 그 지역을 맡는 팀 환경 어댑터 `AEcoRegionEnvironmentAdapter`(자식 BP 포함)가 쓰는 길을 켰나. 어댑터
+    `Tick` 이 지역 환경을 쓰는 조건을 그대로 본다: ① `RegionIds` 에 그 지역이 있거나 목록이 비었다(모든 지역), ② 비 주기(`bCycleRainfall` — `EvaluateCycleRainfall`
+    이 설정을 받아들임. 작성 날씨와 함께 켜면 어댑터가 거부한다) 또는 작성 날씨(`bApplyAuthoredWeather`, 비 주기 끔). 둘 다 끈 어댑터(블루프린트가 `ApplyRainfall`
+    을 직접 부르는 다리일 수 있다), 팀 지역 환경을 쓰지 않는 그리기 BP(SHC `BP_SHC_*RegionalWeather`), 팀 콘솔 `eco.Environment.Rain` 은 출처가 아니다 — 그 값은
+    지금처럼 바뀔 때 `team_env` 바뀜으로 따른다. '팀 지역 환경을 썼는가'로 판정하지 않는 까닭: 어댑터는 팀 월드 시계가 돈 뒤 0.2 초마다 쓰므로 지역 세계를 만드는
+    순간에는 아직 안 썼을 수 있고, 처음 쓴 값이 레벨에 적힌 값과 같으면 썼는지 알 수 없다.
+  - 10-27 확인(읽기 전용 — 맵은 고치지 않았다. `Content/` 전체에서 어댑터 클래스·`BP_JYU_EcosystemWeather` 를 가리키는 애셋 찾기 + 맵 넷 읽기): 출처가 있는 맵은
+    `/Game/JYU/Maps/LV_JYU_Ecosystem`·복사본 `/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem` 둘뿐이다(맵마다 지역 셋 모두 비 주기 어댑터). 팀 통합
+    `/Game/Map/LV_Ecosystem_IntegrationTest`·SHC 날씨 시험 맵 등 나머지는 출처가 없어 지금 그대로 우리 고정 날씨로 시작한다.
+  - Play 시작 덮기 글자(`eco.IntegratedV3.WeatherForest|WeatherHighland|WeatherBarren`, 비지 않고 읽힘)가 날씨를 고르면 그것으로 시작한다(사람이 고른 값 — 팀 값은
+    다음 팀 바뀜부터 따른다). 못 읽는 글자는 빈 값처럼 팀 값. 콘솔 변수는 편집기 프로세스에 남아 앞 Play 에서 친 값이 덮기가 될 수 있으므로 기록 줄
+    `[EcoV3I] <지역> 시작 날씨 | …` 가 어느 쪽으로 시작했는지 적는다. 보기 `eco.IntegratedV3.EnvInfo` 지역 줄 '팀 날씨 출처'.
+  - 바뀜이 아니라 시작값이다 — 환경 판·`env.changes`·알림은 그대로(판 0). 같은 T 에서 `InitWorld` 직후 날씨만 바꾸고 `UpdateDayNight` 하므로 그 날씨로 세계를
+    만든 것과 같다(`InitWorld` 는 날씨로 난수·먹이를 정하지 않는다 — 자동화 `Policy.V3.EnvWatch.TeamWeatherStart` 가 같은 날씨를 덮기 글자로 고른 세계와 견준다).
+    늦게 등록된 지역은 처음 읽을 때 팀 값을 바뀜(`team_env`)으로 넣는다(출처 없는 지역은 지금처럼 바탕만).
+  - 감시 끔(`EnvWatch 0` — 옛 동작, `results/v3/level_jyu_eco` 대조 모드 `-EcoV3EnvWatch=0`)·`TeamWeatherStart 0`(10-27 전 — 앞선 전체 모드 측정 다시 내기:
+    `-ini:Engine:[ConsoleVariables]:eco.IntegratedV3.TeamWeatherStart=0`)이면 지금까지처럼 우리 고정 날씨로 시작한다.
+  - v3 세계 규칙·배수는 바꾸지 않았다. 스냅숏 지역 `world.weather`(와 `ObstacleExport` 의 지역 `weather`)가 세계 설정 날씨를 적으므로 파이썬 변환·짝 비교는 그대로 맞는다.
+  - 남는 점(기록만): 출처 없이 식생 맵 보기(조정자 `bUseV3Policy ∧ bEnableVegetation`)를 쓰는 맵은 화면 = 팀 지역 환경, 규칙 = 우리 고정 날씨로 다를 수 있다(10-27
+    `Content/` 찾기로 `bEnableVegetation` 을 켠 맵은 출처가 있는 위 둘뿐이라 지금은 없다). 팀 비 주기의 전환 구간(한 번에 18 초, 위상 0.4~0.5·0.9~1.0)에는 팀 값이 0.2 초마다 바뀌어 환경 판이 감시 주기(실시간 1 초)마다 오른다(10-27 복사본
+    헤드리스 기록: 고지 첫 전환 13~31 초에 판 7개 — 이번 고침 전과 같다. `results/v3/level_jyu_eco/README.md` 5절의 잦은 작은 변화 문제).
+  - 10-27 확인 (창 없는 헤드리스 `UnrealEditor-Cmd -game -NullRHI -benchmark -fps=30`, 세션 20010, 사슴 128 × 지역 셋): UBT 두 판(적응 unity·`-DisableAdaptiveUnity`)
+    성공, 자동화 `AdaptiveEcosystem` 255 개 실패 0 (`Policy.V3.EnvWatch.TeamWeatherStart` 포함).
+    - 조연우 복사 맵: 세 지역 모두 시작 줄이 `시작 날씨 | 팀 날씨 출처 JYU_Ecosystem_Weather_<지역> (BP_JYU_EcosystemWeather_C · 비 주기 180초·위상 0·30·60초) → 맑음
+      (팀 지역 환경 Clear·비 세기 0.00)` 이다. 0~84 초 동안 2 초마다 `getall EcologyRegion EnvironmentState`(팀 값)와 규칙 날씨를 견줬다 — 어긋난 칸(종류 다름 또는
+      비 세기 차 0.10 넘음): 숲 고치기 전 41/43 → 고친 뒤 3/43, 고지 11/43 → 5/43, 메마른 땅 4/43 → 6/43. 시작 구간(숲 0~72 초·고지 0~12 초)은 모두 맞는다.
+      남은 칸은 모두 팀 비 주기 전환 구간(한 번에 18 초)에서 팀 값이 0.2 초마다 바뀌는 동안 실시간 1 초 감시가 뒤따르는 늦음이다. 헤드리스는 실시간보다 몇 배 빨리
+      돌아 감시 간격이 시뮬레이션 몇 초가 되므로 늦음이 커 보인다 (이번 고침과 무관 — 고치기 전에도 같은 구간이 어긋났다).
+    - 팀 통합 맵 `/Game/Map/LV_Ecosystem_IntegrationTest`: 출처가 없어 '시작 날씨' 줄 없이 우리 고정 날씨로 시작한다. 같은 시드 121 초 사슴 줄 `[EcoV3Obs]` 343218 개가
+      변경 전 빌드(`28baef7`)와 바이트까지 같다 (`TeamWeatherStart 0` 판도 같다).
+    - 조연우 복사 맵은 같은 빌드·같은 설정 두 판끼리도 사슴 줄이 다르다 (`TeamWeatherStart 0` 두 판은 고지 108 스텝부터, 기본 두 판은 고지 119 스텝부터). 팀 날씨 바뀜을
+      실시간 주기로 읽어 넣으므로 넣는 스텝이 실행마다 달라서다. 그래서 이 맵은 같은 시드 바이트 비교에서 뺐다.
 - 넣은 묶음마다 환경 판 + 1, 기록 `[EcoV3I] 환경 바뀜 #<판> | <초> (전역 스텝 <t>) | Barren: 나무 0→20 (+20 −0) | …`, 화면 알림.
 - 은신처는 다루지 않는다(`RefreshRefuges` 가 맡고, 파이썬은 바뀐 은신처를 거부한다). 보기 `eco.IntegratedV3.EnvInfo`.
 

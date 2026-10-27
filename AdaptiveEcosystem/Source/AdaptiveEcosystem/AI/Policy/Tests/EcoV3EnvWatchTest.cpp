@@ -12,6 +12,10 @@
 //                          실행 중 무대 나무(StageTrees 1) 무대: 줄기 A 가 생기면 'A 로 시작'(무대 나무 원판 뺌), A 를 지우면 '무대 나무로 시작'(다시 넣음)
 //   EnvWatch.Weather       지역 날씨 콘솔 변수 (Play 중): 세계 설정 날씨·배수(UpdateDayNight)·어둠 그대로·시간표 없음·다른 지역 그대로, 같은 값 = 대기 없음, 빈 값 = 팀 설계
 //                          기본, 못 읽는 값 = 그대로(경고 한 줄). 팀 지역 환경: 비 0.4 → 비 0.4, 가뭄 → 맑음, 폭풍 세기 0 → 비 1. 날씨를 끈 세계는 무시
+//   EnvWatch.TeamWeatherStart  시작 날씨 = 팀 날씨 출처 (10-27 사용자 결정 (C)): 지역을 맡아 실제로 쓰는 팀 환경 어댑터(비 주기·작성 날씨)가 있으면 팀 지역 환경으로
+//                          시작(우리 고정 날씨 대신 — 그 날씨 덮기로 만든 세계와 날씨 칸이 비트 단위로 같다, 환경 판 0), 쓰는 길을 끈·거부되는 어댑터는 출처 아님,
+//                          빈 지역 목록 = 모든 지역, 날씨를 고르는 덮기 글자가 이김(못 읽는 글자는 팀 값), TeamWeatherStart 0·감시 끔 = 옛 동작, 늦게 등록된 지역은
+//                          처음 읽을 때 바뀜(team_env — 출처 없는 지역은 지금처럼 바탕만), 시작 뒤 팀 바뀜은 그대로 따른다
 //   EnvWatch.PushOut       새 줄기 원판 안 사슴·늑대는 밖으로 (보간 앞 자리도), 밖 개체 자리는 그대로, 돌아가기 지움, 밀어내기 기록, 거울 칸
 //   EnvWatch.Off           eco.IntegratedV3.EnvWatch 0: 나무를 더해도 대기 변화·판·원판 그대로 (옛 동작). 대기 중에 끄면 넣지 않는다
 //   EnvWatch.AutoSnapshot  자동 스냅숏 (eco.IntegratedV3.AutoSnapshot 1): 판마다 한 번, 바뀜 뒤 3 초(23 스텝) 그대로일 때, 이름 _e<판>, 'env' 블록·level_trunks,
@@ -40,6 +44,7 @@
 #include "Misc/ScopeExit.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#include "World/EcoRegionEnvironmentAdapter.h"
 #include "World/EcologyRegion.h"
 #include "World/EcologyWorldSubsystem.h"
 
@@ -165,6 +170,43 @@ namespace EcoV3EnvWatchTestImpl
 	int32 Num3(const std::vector<double>& Flat)
 	{
 		return static_cast<int32>(Flat.size() / 3);
+	}
+
+	/** 팀 지역 하나 (지역 환경 = 날씨 State·비 세기 Rainfall) — 등록까지. */
+	AEcologyRegion* TeamRegion(UWorld& World, FName Id, double Y, EEcoWeatherState State, float Rainfall)
+	{
+		AEcologyRegion* R = World.SpawnActor<AEcologyRegion>(FVector(0.0, Y, 0.0), FRotator::ZeroRotator);
+		UEcologyWorldSubsystem* Regions = World.GetSubsystem<UEcologyWorldSubsystem>();
+		if (!R || !Regions)
+		{
+			return nullptr;
+		}
+		R->RegionId = Id;
+		FRegionEnvironmentState Env = R->GetEnvironmentState();
+		Env.WeatherState = State;
+		Env.Rainfall = Rainfall;
+		R->SetEnvironmentState(Env);
+		Regions->RegisterRegion(R);
+		return R;
+	}
+
+	/** 팀 환경 어댑터 하나 (월드가 돌지 않아 쓰지는 않는다 — 출처 판정만 본다). Ids 가 비면 모든 지역. */
+	AEcoRegionEnvironmentAdapter* TeamAdapter(UWorld& World, const TArray<FName>& Ids, bool bCycle, bool bAuthored)
+	{
+		AEcoRegionEnvironmentAdapter* A = World.SpawnActor<AEcoRegionEnvironmentAdapter>(FVector::ZeroVector, FRotator::ZeroRotator);
+		if (A)
+		{
+			A->RegionIds = Ids;
+			A->bCycleRainfall = bCycle;
+			A->bApplyAuthoredWeather = bAuthored;
+		}
+		return A;
+	}
+
+	/** 날씨 배수 넷이 같다. */
+	bool SameMults(const EcoWorldV3::FWeatherMults& A, const EcoWorldV3::FWeatherMults& B)
+	{
+		return A.Sight == B.Sight && A.Hear == B.Hear && A.DeerSpeed == B.DeerSpeed && A.WolfSpeed == B.WolfSpeed;
 	}
 
 	/** 월드의 줄기 막이 수 (지운 것 빼고). */
@@ -539,6 +581,240 @@ bool FEcoV3EnvWatchWeatherTest::RunTest(const FString& Parameters)
 			TestTrue(TEXT("날씨 끈 세계: 대기 변화 없음"), B2 && Sub2->PollEnvironment(true) && !Sub2->HasPendingEnvChange());
 			TestTrue(TEXT("날씨 끈 세계: 판 0·날씨 꺼짐 그대로"), B2 && Sub2->GetEnvRevision() == 0 && !B2->Sim.Config.Weather.bEnabled);
 		}
+	}
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 시작 날씨 = 팀 날씨 출처 (10-27 사용자 결정 (C) — 조연우 맵 날씨 시작 고침)
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoV3EnvWatchTeamWeatherStartTest,
+	"AdaptiveEcosystem.Policy.V3.EnvWatch.TeamWeatherStart",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3EnvWatchTeamWeatherStartTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoV3EnvWatchTestImpl;
+	namespace W3 = EcoWorldV3;
+	const TCHAR* const Vars[5] = {TEXT("eco.IntegratedV3.WeatherForest"), TEXT("eco.IntegratedV3.WeatherHighland"), TEXT("eco.IntegratedV3.WeatherBarren"),
+								  TEXT("eco.IntegratedV3.TeamWeatherStart"), TEXT("eco.IntegratedV3.EnvWatch")};
+	FString SavedVars[5];
+	for (int32 i = 0; i < 5; ++i)
+	{
+		SavedVars[i] = GetCVar(Vars[i]);
+	}
+	ON_SCOPE_EXIT
+	{
+		for (int32 i = 0; i < 5; ++i)
+		{
+			SetCVar(Vars[i], *SavedVars[i]);
+		}
+	};
+	TestEqual(TEXT("TeamWeatherStart 기본 켬"), SavedVars[3], FString(TEXT("1")));
+	for (int32 i = 0; i < 3; ++i)
+	{
+		SetCVar(Vars[i], TEXT(""));   // Play 중 콘솔 값 = 빈 값 (읽기가 콘솔 바뀜으로 보지 않게 — 시작 덮기 글자는 설정으로 준다)
+	}
+	SetCVar(Vars[3], TEXT("1"));
+	SetCVar(Vars[4], TEXT("1"));
+	const FName Forest(TEXT("Forest"));
+	const FName Highland(TEXT("Highland"));
+	const FName Barren(TEXT("Barren"));
+	const std::vector<FCoverInput> Covers = W3::QuadCovers(FEcoV3IntegratedSettings().StageSizeUnits, 6.0);   // 날씨 시험과 같은 기본 무대
+	auto MakeCtx = [&Covers](UEcoPolicyV3IntegratedSubsystem& Sub, const FEcoV3IntegratedSettings& S, FName Id, int32 Index, double Y)
+	{
+		return Sub.AddContext(Id, Index, FVector(0.0, Y, 0.0), FSub::MakeRegionWorldConfig(S, Index, 16, 2, Covers, Id), 16, 2);
+	};
+
+	// 1. 지역마다 맡는 어댑터: 숲 = 비 주기 (팀 맑음), 고지 = 작성 날씨 (팀 비 0.5), 메마른 땅 = 쓰는 길을 끈 어댑터 + 둘 다 켜 거부되는 어댑터 (팀 비 0.5 — 출처 아님)
+	W3::FWeatherConfig HighCfg;
+	struct FNow
+	{
+		std::int32_t Kind = -1;
+		double Intensity = -1.0;
+		W3::FWeatherMults Mults;
+		double Dark = -1.0;
+		std::int32_t StepsToTransition = -2;
+		std::int64_t T = -1;
+	} HighNow;   // 팀 값으로 시작한 고지의 지금 날씨·배수·어둠·T
+	{
+		EcoTest::FScopedTestWorld W;
+		UEcoPolicyV3IntegratedSubsystem* Sub = W.World ? W.World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+		if (!TestNotNull(TEXT("시험 월드·통합 서브시스템"), Sub))
+		{
+			return false;
+		}
+		FEcoV3IntegratedSettings S;
+		S.Seed = 37720;
+		Sub->ActivateForTest(S, /*bTerrain*/ false);
+		const bool bTeam = TeamRegion(*W.World, Forest, 0.0, EEcoWeatherState::Clear, 0.0f) && TeamRegion(*W.World, Highland, 80000.0, EEcoWeatherState::Rain, 0.5f)
+						   && TeamRegion(*W.World, Barren, -80000.0, EEcoWeatherState::Rain, 0.5f);
+		const bool bAdapters = TeamAdapter(*W.World, {Forest}, /*bCycle*/ true, /*bAuthored*/ false) && TeamAdapter(*W.World, {Highland}, false, true)
+							   && TeamAdapter(*W.World, {Barren}, false, false) && TeamAdapter(*W.World, {Barren}, true, true);
+		if (!TestTrue(TEXT("팀 지역 셋·어댑터 넷"), bTeam && bAdapters))
+		{
+			return false;
+		}
+		FEcoV3RegionContext* F = MakeCtx(*Sub, S, Forest, 1, 0.0);
+		FEcoV3RegionContext* H = MakeCtx(*Sub, S, Highland, 2, 80000.0);
+		FEcoV3RegionContext* B = MakeCtx(*Sub, S, Barren, 0, -80000.0);
+		if (!TestTrue(TEXT("지역 세계 셋"), F && H && B))
+		{
+			return false;
+		}
+		TestTrue(TEXT("숲: 비 주기 어댑터 = 출처 → 팀 맑음으로 시작 (우리 고정 비 1 대신), 배수 1"),
+				 F->bEnvTeamSource && F->bEnvStartFromTeam && F->EnvTeamSourceWho.Contains(TEXT("비 주기 180초")) && F->Sim.Config.Weather.bEnabled
+					 && F->Sim.Config.Weather.Kind == W3::kWeatherClear && F->Sim.Config.Weather.Intensity == 0.0 && F->Sim.WeatherKind == W3::kWeatherClear
+					 && SameMults(F->Sim.Weather, W3::FWeatherMults()));
+		TestTrue(TEXT("고지: 작성 날씨 어댑터 = 출처 → 팀 비 0.5 로 시작 (우리 고정 눈 1 대신)"),
+				 H->bEnvTeamSource && H->bEnvStartFromTeam && H->EnvTeamSourceWho.Contains(TEXT("작성 날씨")) && H->Sim.Config.Weather.Kind == W3::kWeatherRain
+					 && H->Sim.Config.Weather.Intensity == 0.5 && H->Sim.WeatherKind == W3::kWeatherRain && H->Sim.WeatherIntensity == 0.5);
+		TestTrue(TEXT("메마른 땅: 쓰는 길을 끈·거부되는 어댑터는 출처 아님 → 우리 고정 맑음 (팀 비 0.5 는 바탕만)"),
+				 !B->bEnvTeamSource && !B->bEnvStartFromTeam && B->EnvTeamSourceWho.IsEmpty() && B->bEnvTeamKnown && B->Sim.Config.Weather.Kind == W3::kWeatherClear);
+		TestTrue(TEXT("시작값이라 환경 판 0·바뀜 없음, 읽어도 대기 변화 없음"),
+				 Sub->GetEnvRevision() == 0 && Sub->GetEnvChanges().IsEmpty() && Sub->PollEnvironment(true) && !Sub->HasPendingEnvChange());
+		const TArray<FString> Info = Sub->EnvInfoLines();
+		TestTrue(TEXT("EnvInfo: 숲 '시작 날씨 = 팀 값' · 메마른 땅 '팀 날씨 출처 없음'"),
+				 Info.Num() == 4 && Info[1].Contains(TEXT("시작 날씨 = 팀 값")) && Info[3].Contains(TEXT("팀 날씨 출처 없음")));
+		HighCfg = H->Sim.Config.Weather;
+		HighNow = {H->Sim.WeatherKind, H->Sim.WeatherIntensity, H->Sim.Weather, H->Sim.Dark, H->Sim.StepsToTransition, H->Sim.T};
+
+		// 시작 뒤 팀 바뀜은 지금까지처럼 따른다: 숲 팀 비 0.65 → 비 0.65 (출처 team_env, 판 1)
+		AEcologyRegion* TeamForest = W.World->GetSubsystem<UEcologyWorldSubsystem>()->GetRegion(Forest);
+		if (!TestNotNull(TEXT("팀 숲 지역"), TeamForest))
+		{
+			return false;
+		}
+		FRegionEnvironmentState Env = TeamForest->GetEnvironmentState();
+		Env.WeatherState = EEcoWeatherState::Rain;
+		Env.Rainfall = 0.65f;
+		TeamForest->SetEnvironmentState(Env);
+		TestTrue(TEXT("숲 팀 비 0.65 → 대기 변화"), Sub->PollEnvironment(true) && Sub->HasPendingEnvChange());
+		Sub->ApplyEnvChange({}, {});
+		TestTrue(TEXT("숲 = 비 0.65 · '맑음→비 0.65' · 출처 team_env · 판 1"),
+				 F->Sim.Config.Weather.Kind == W3::kWeatherRain && F->Sim.Config.Weather.Intensity == static_cast<double>(0.65f) && Sub->GetEnvRevision() == 1
+					 && Sub->GetEnvChanges().Num() == 1 && Sub->GetEnvChanges()[0].Region == Forest && Sub->GetEnvChanges()[0].Detail == TEXT("맑음→비 0.65")
+					 && Sub->GetEnvChanges()[0].Source == TEXT("team_env"));
+	}
+
+	// 2. 같은 날씨를 덮기 글자로 고른 세계 (팀 출처 없음): 팀 값으로 시작한 고지와 날씨 칸이 비트 단위로 같다 — '그 날씨로 세계를 만든 것과 같다'
+	{
+		EcoTest::FScopedTestWorld W;
+		UEcoPolicyV3IntegratedSubsystem* Sub = W.World ? W.World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+		if (!TestNotNull(TEXT("시험 월드 2"), Sub))
+		{
+			return false;
+		}
+		FEcoV3IntegratedSettings S;
+		S.Seed = 37720;
+		S.WeatherHighland = TEXT("rain:0.5");
+		Sub->ActivateForTest(S, false);
+		const FEcoV3RegionContext* Ref = MakeCtx(*Sub, S, Highland, 2, 80000.0);
+		if (TestNotNull(TEXT("덮기 고지"), Ref))
+		{
+			const W3::FWeatherConfig& Rc = Ref->Sim.Config.Weather;
+			TestTrue(TEXT("세계 설정 날씨 같음 (켬·종류·세기·시간표 없음·계수)"),
+					 Rc.bEnabled == HighCfg.bEnabled && Rc.Kind == HighCfg.Kind && Rc.Intensity == HighCfg.Intensity && Rc.Schedule.empty() && HighCfg.Schedule.empty()
+						 && Rc.RainSight == HighCfg.RainSight && Rc.RainHear == HighCfg.RainHear && Rc.SnowSight == HighCfg.SnowSight && Rc.SnowHear == HighCfg.SnowHear
+						 && Rc.SnowDeerSpeed == HighCfg.SnowDeerSpeed && Rc.SnowWolfSpeed == HighCfg.SnowWolfSpeed && Rc.bObsVisibility == HighCfg.bObsVisibility);
+			TestTrue(TEXT("지금 날씨·배수·어둠·T 같음"), Ref->Sim.WeatherKind == HighNow.Kind && Ref->Sim.WeatherIntensity == HighNow.Intensity
+															 && SameMults(Ref->Sim.Weather, HighNow.Mults) && Ref->Sim.Dark == HighNow.Dark
+															 && Ref->Sim.StepsToTransition == HighNow.StepsToTransition && Ref->Sim.T == HighNow.T);
+			TestTrue(TEXT("덮기 세계는 팀 출처 없음"), !Ref->bEnvTeamSource && !Ref->bEnvStartFromTeam);
+		}
+	}
+
+	// 3. 빈 지역 목록 어댑터 (모든 지역) + 덮기 글자: 숲 '눈 0.5' 가 이김, 메마른 땅 못 읽는 'fog' 는 팀 값, 고지는 팀 값
+	{
+		EcoTest::FScopedTestWorld W;
+		UEcoPolicyV3IntegratedSubsystem* Sub = W.World ? W.World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+		if (!TestNotNull(TEXT("시험 월드 3"), Sub))
+		{
+			return false;
+		}
+		AddExpectedMessagePlain(TEXT("'fog' 를 못 읽었다"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 0);   // WeatherFor (팀 설계 기본을 쓴다)
+		FEcoV3IntegratedSettings S;
+		S.Seed = 37721;
+		S.WeatherForest = TEXT("snow:0.5");
+		S.WeatherBarren = TEXT("fog");
+		Sub->ActivateForTest(S, false);
+		const bool bTeam = TeamRegion(*W.World, Forest, 0.0, EEcoWeatherState::Clear, 0.0f) && TeamRegion(*W.World, Highland, 80000.0, EEcoWeatherState::Clear, 0.0f)
+						   && TeamRegion(*W.World, Barren, -80000.0, EEcoWeatherState::Rain, 0.5f) && TeamAdapter(*W.World, {}, true, false);
+		FEcoV3RegionContext* F = bTeam ? MakeCtx(*Sub, S, Forest, 1, 0.0) : nullptr;
+		FEcoV3RegionContext* H = bTeam ? MakeCtx(*Sub, S, Highland, 2, 80000.0) : nullptr;
+		FEcoV3RegionContext* B = bTeam ? MakeCtx(*Sub, S, Barren, 0, -80000.0) : nullptr;
+		if (TestTrue(TEXT("팀 지역 셋·모든 지역 어댑터·지역 세계 셋"), F && H && B))
+		{
+			TestTrue(TEXT("숲: 날씨를 고르는 덮기 글자가 이김 (눈 0.5, 출처는 있음)"),
+					 F->bEnvTeamSource && !F->bEnvStartFromTeam && F->Sim.Config.Weather.Kind == W3::kWeatherSnow && F->Sim.Config.Weather.Intensity == 0.5);
+			TestTrue(TEXT("고지: 빈 목록 = 모든 지역 → 팀 맑음 (눈 1 대신)"), H->bEnvStartFromTeam && H->EnvTeamSourceWho.Contains(TEXT("모든 지역"))
+																				  && H->Sim.Config.Weather.Kind == W3::kWeatherClear);
+			TestTrue(TEXT("메마른 땅: 못 읽는 덮기 글자는 고르지 않음 → 팀 비 0.5"),
+					 B->bEnvStartFromTeam && B->Sim.Config.Weather.Kind == W3::kWeatherRain && B->Sim.Config.Weather.Intensity == 0.5);
+			TestEqual(TEXT("환경 판 0"), Sub->GetEnvRevision(), 0);
+		}
+	}
+
+	// 4. 끄개: TeamWeatherStart 0 → 숲 우리 고정 비 1 (10-27 전), 감시 끔 → 고지 우리 고정 눈 1 (옛 동작). 출처 판정은 그대로 적는다
+	{
+		EcoTest::FScopedTestWorld W;
+		UEcoPolicyV3IntegratedSubsystem* Sub = W.World ? W.World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+		if (!TestNotNull(TEXT("시험 월드 4"), Sub))
+		{
+			return false;
+		}
+		FEcoV3IntegratedSettings S;
+		S.Seed = 37722;
+		Sub->ActivateForTest(S, false);
+		const bool bTeam = TeamRegion(*W.World, Forest, 0.0, EEcoWeatherState::Clear, 0.0f) && TeamRegion(*W.World, Highland, 80000.0, EEcoWeatherState::Clear, 0.0f)
+						   && TeamAdapter(*W.World, {Forest, Highland}, true, false);
+		SetCVar(Vars[3], TEXT("0"));
+		FEcoV3RegionContext* F = bTeam ? MakeCtx(*Sub, S, Forest, 1, 0.0) : nullptr;
+		SetCVar(Vars[3], TEXT("1"));
+		SetCVar(Vars[4], TEXT("0"));
+		FEcoV3RegionContext* H = bTeam ? MakeCtx(*Sub, S, Highland, 2, 80000.0) : nullptr;
+		SetCVar(Vars[4], TEXT("1"));
+		if (TestTrue(TEXT("팀 지역 둘·어댑터·지역 세계 둘"), F && H))
+		{
+			TestTrue(TEXT("TeamWeatherStart 0: 숲 비 1 (우리 고정)"), F->bEnvTeamSource && !F->bEnvStartFromTeam && F->Sim.Config.Weather.Kind == W3::kWeatherRain
+																			 && F->Sim.Config.Weather.Intensity == 1.0);
+			TestTrue(TEXT("감시 끔: 고지 눈 1 (우리 고정)"), H->bEnvTeamSource && !H->bEnvStartFromTeam && H->Sim.Config.Weather.Kind == W3::kWeatherSnow
+																 && H->Sim.Config.Weather.Intensity == 1.0);
+			TestTrue(TEXT("뒤에 켜도 시작값은 되돌아보지 않는다 (팀 값 그대로 = 대기 변화 없음)"), Sub->PollEnvironment(true) && !Sub->HasPendingEnvChange());
+		}
+	}
+
+	// 5. 늦게 등록된 지역: 출처가 맡으면 처음 읽을 때 팀 값을 바뀜(team_env)으로, 출처가 없으면 지금처럼 바탕만
+	{
+		EcoTest::FScopedTestWorld W;
+		UEcoPolicyV3IntegratedSubsystem* Sub = W.World ? W.World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+		if (!TestNotNull(TEXT("시험 월드 5"), Sub))
+		{
+			return false;
+		}
+		FEcoV3IntegratedSettings S;
+		S.Seed = 37723;
+		Sub->ActivateForTest(S, false);
+		const bool bAdapter = TeamAdapter(*W.World, {Forest}, true, false) != nullptr;
+		FEcoV3RegionContext* F = bAdapter ? MakeCtx(*Sub, S, Forest, 1, 0.0) : nullptr;
+		FEcoV3RegionContext* B = bAdapter ? MakeCtx(*Sub, S, Barren, 0, -80000.0) : nullptr;
+		if (!TestTrue(TEXT("어댑터·지역 세계 둘"), F && B))
+		{
+			return false;
+		}
+		TestTrue(TEXT("팀 지역 전: 숲 출처는 있으나 우리 고정 비 1, 메마른 땅 맑음"),
+				 !F->bEnvTeamKnown && F->bEnvTeamSource && !F->bEnvStartFromTeam && F->Sim.Config.Weather.Kind == W3::kWeatherRain && !B->bEnvTeamKnown
+					 && !B->bEnvTeamSource && B->Sim.Config.Weather.Kind == W3::kWeatherClear);
+		const bool bTeam = TeamRegion(*W.World, Forest, 0.0, EEcoWeatherState::Clear, 0.0f) && TeamRegion(*W.World, Barren, -80000.0, EEcoWeatherState::Rain, 0.5f);
+		TestTrue(TEXT("팀 지역 둘 등록 → 대기 변화"), bTeam && Sub->PollEnvironment(true) && Sub->HasPendingEnvChange());
+		Sub->ApplyEnvChange({}, {});
+		TestTrue(TEXT("숲 = 팀 맑음 · '비 1.00→맑음' · 출처 team_env · 판 1, 메마른 땅 맑음 그대로 (바탕만)"),
+				 F->Sim.Config.Weather.Kind == W3::kWeatherClear && F->Sim.WeatherKind == W3::kWeatherClear && Sub->GetEnvRevision() == 1
+					 && Sub->GetEnvChanges().Num() == 1 && Sub->GetEnvChanges()[0].Region == Forest && Sub->GetEnvChanges()[0].Detail == TEXT("비 1.00→맑음")
+					 && Sub->GetEnvChanges()[0].Source == TEXT("team_env") && B->bEnvTeamKnown && B->Sim.Config.Weather.Kind == W3::kWeatherClear);
+		TestTrue(TEXT("다시 읽으면 대기 변화 없음"), Sub->PollEnvironment(true) && !Sub->HasPendingEnvChange());
 	}
 	return true;
 }

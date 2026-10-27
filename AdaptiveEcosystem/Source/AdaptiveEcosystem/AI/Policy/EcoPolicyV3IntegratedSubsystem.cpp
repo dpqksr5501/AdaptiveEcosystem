@@ -3306,7 +3306,7 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	Ctx->bDarkKnown = true;
 	FEcoV3RegionContext* Raw = Ctx.Get();
 	Contexts.Add(MoveTemp(Ctx));
-	InitContextEnv(*Raw);   // 환경 바뀜 감시 바탕 (10-21, EcoV3EnvWatch.cpp — 읽기만, 세계는 그대로)
+	InitContextEnv(*Raw);   // 환경 바뀜 감시 바탕 (10-21, EcoV3EnvWatch.cpp — 읽기만. 단 10-27 (C): 팀 날씨 출처가 맡는 지역은 시작 날씨를 팀 값으로 넣는다)
 	return Raw;
 }
 

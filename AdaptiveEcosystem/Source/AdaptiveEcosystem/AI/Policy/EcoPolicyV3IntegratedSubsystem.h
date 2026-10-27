@@ -147,6 +147,8 @@
 //      eco.IntegratedV3.EnvWatch (-EcoV3EnvWatch=, 기본 1)·EnvWatchSeconds (실시간 1 초): Play 중 레벨 나무(꼬리표 EcoV3Trunk 줄기 막이)와 지역 날씨(우리 날씨 콘솔
 //      변수·팀 FRegionEnvironmentState)를 읽어 다음 전역 결정 스텝 경계에서 지역 세계에 넣는다 — 세계 원판 = 그 나무로 Play 를 시작했을 때와 같은 목록, 새 원판 안
 //      사슴·늑대 밀어내기, 먹이 격자 그대로. 넣은 묶음마다 환경 판 + 1, '[EcoV3I] 환경 바뀜 #n |'. 바뀐 것이 없으면 비트 단위로 지금과 같다. 0 = 시작 때 고정.
+//      10-27 (C) 시작 날씨: 팀 날씨 출처(지역을 맡아 실제로 쓰는 팀 환경 어댑터 — 조연우 BP_JYU_EcosystemWeather 등)가 있는 지역은 팀 지역 환경으로 시작
+//      (eco.IntegratedV3.TeamWeatherStart, 기본 1 — 감시 0 이면 쓰지 않는다), 없는 지역은 우리 고정 날씨.
 //      자동 스냅숏 eco.IntegratedV3.AutoSnapshot (-1 = AutoAdapt 따름)·SnapshotEvery·AutoSnapshotSettle·AutoSnapshotOut (EcoV3Snapshot.cpp, 'env' 블록).
 //      시험용 대역 eco.IntegratedV3.Test.AddTrees·Test.RemoveTrees·Test.At (-EcoV3TestAt= -EcoV3TestCmd=), 보기 eco.IntegratedV3.EnvInfo.
 //  22. 10-24 두 길 두뇌 (이식 계획서 Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 8절·13절·15절, R7e 판정 통과): 관측 24·마스크 판 4·5 두뇌 파일(EcoV3Brain.h)을
@@ -922,6 +924,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	bool bEnvTeamKnown = false;               // 팀 지역 환경(FRegionEnvironmentState)을 읽었다
 	uint8 EnvTeamWeather = 0;                 // 그때 날씨 (EEcoWeatherState)
 	float EnvTeamRainfall = 0.0f;             // 그때 비 세기
+	bool bEnvTeamSource = false;              // 팀 날씨 출처가 있다 (이 지역을 맡아 실제로 쓰는 팀 환경 어댑터 — 10-27 (C). AddContext 때, 늦게 등록된 지역은 처음 읽을 때 판정)
+	FString EnvTeamSourceWho;                 // 그 어댑터 (이름·종류·쓰는 길 — 기록·EnvInfo)
+	bool bEnvStartFromTeam = false;           // 시작 날씨를 팀 값으로 넣었다 (eco.IntegratedV3.TeamWeatherStart 1 ∧ 감시 켬 ∧ 덮기 글자 없음)
 	bool bEnvTreesIgnoredLogged = false;      // 장애물 끔·가져온 원판이라 나무 바뀜을 넣지 않는다고 적었다
 	bool bEnvWeatherIgnoredLogged = false;    // 날씨 끔이라 날씨 바뀜을 넣지 않는다고 적었다
 
@@ -1269,7 +1274,8 @@ public:
 	static bool IsEnvWatchEnabled();
 	/**
 	 * 환경 읽기 (HandlePreActorTick 이 프레임마다, 시험은 직접): eco.IntegratedV3.EnvWatchSeconds(실시간)마다, 액터가 생기거나 지워진 다음 읽기, 또는 bForce 면
-	 * 레벨 줄기 막이(GatherLevelTrunks — 무대마다 시작 레벨 읽기와 같은 셈)와 날씨 원천(지역 날씨 콘솔 변수 — 바뀐 값만, 팀 FRegionEnvironmentState — 바뀐 값만)을
+	 * 레벨 줄기 막이(GatherLevelTrunks — 무대마다 시작 레벨 읽기와 같은 셈)와 날씨 원천(지역 날씨 콘솔 변수 — 바뀐 값만, 팀 FRegionEnvironmentState — 바뀐 값만,
+	 * 늦게 등록된 지역은 팀 날씨 출처가 맡으면 처음 값도)을
 	 * 읽어 지역마다 대기 변화를 정한다. 세계는 바꾸지 않는다 (ApplyEnvChange). 감시가 꺼졌거나 지역 세계가 없거나 때가 아니면 거짓.
 	 */
 	bool PollEnvironment(bool bForce);
@@ -1404,7 +1410,12 @@ private:
 	/** 상태 줄의 도망 요약 (모든 지역 합: 최근 60 초 창·두뇌 판 비교 — EcoV3FlightTally.h). 도망 기록을 세는 지역이 없으면 빈 글. */
 	FString FlightStatusText() const;
 	// 환경 바뀜 감시 (10-21, EcoV3EnvWatch.cpp)
-	/** 지역 세계의 환경 바탕을 적는다 (AddContext): 시작 은신처 원, 지금 레벨 줄기 원판, 날씨 콘솔 변수의 Play 시작 값, 팀 지역 환경. */
+	/**
+	 * 지역 세계의 환경 바탕을 적는다 (AddContext): 시작 은신처 원, 지금 레벨 줄기 원판, 날씨 콘솔 변수의 Play 시작 값, 팀 지역 환경.
+	 * 세계는 읽기만 하되 시작 날씨 하나는 바꿀 수 있다 (10-27 사용자 결정 (C)): 팀 날씨 출처(이 지역을 맡아 실제로 쓰는 팀 환경 어댑터 — EcoV3EnvWatch.cpp
+	 * FindTeamWeatherSource)가 있고 감시가 켜졌고 eco.IntegratedV3.TeamWeatherStart 1 이고 Play 시작 덮기 글자가 날씨를 고르지 않으면 팀 지역 환경을 세계 설정
+	 * 날씨로 넣고 UpdateDayNight (그 날씨로 세계를 만든 것과 같다). 출처가 없는 지역은 우리 고정 날씨 그대로.
+	 */
 	void InitContextEnv(FEcoV3RegionContext& Ctx);
 	/** Play 시작 (OnWorldBeginPlay — 켜졌을 때): 액터 생김·지움 알림을 걸고 명령줄 예약을 옮기고 시작 줄을 남긴다. */
 	void BeginEnvWatch(UWorld& InWorld);
