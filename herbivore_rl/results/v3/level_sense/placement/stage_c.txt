@@ -1,0 +1,17 @@
+# place.py select 2026-10-27T20:10:27 — 띠 순서 (늑대가 놓친 도망 몫 평균, 큰 것부터): spotd_hi graze_hi spotw_hi flee_hi d0-5 d5-10 d10-20 edge rest_hi flee_lo d20-40
+I Barren r7e N zone_spotd_hi_n8_s1 zone_spotd_hi_n8_s2 zone_spotd_hi_n40_s1 zone_spotd_hi_n40_s2 zone_d0-5_n8_s1 zone_d0-5_n8_s2 zone_d0-5_n40_s1 zone_d0-5_n40_s2 zone_d20-40_n8_s1 zone_d20-40_n8_s2 zone_d20-40_n40_s1 zone_d20-40_n40_s2
+I Barren r7e G spot:90:110:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate
+I Barren r1bf N spot:90:110:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate
+I Barren r1bf G spot:90:110:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate
+I Forest r7e N zone_spotd_hi_n8_s1 zone_spotd_hi_n8_s2 zone_spotd_hi_n40_s1 zone_spotd_hi_n40_s2 zone_d0-5_n8_s1 zone_d0-5_n8_s2 zone_d0-5_n40_s1 zone_d0-5_n40_s2 zone_d20-40_n8_s1 zone_d20-40_n8_s2 zone_d20-40_n40_s1 zone_d20-40_n40_s2
+I Forest r7e G spot:30:10:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2
+I Forest r1bf N spot:30:10:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2
+I Forest r1bf G spot:30:10:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2
+J Barren r7e N zone_spotd_hi_n8_s1 zone_spotd_hi_n8_s2 zone_spotd_hi_n40_s1 zone_spotd_hi_n40_s2 zone_d0-5_n8_s1 zone_d0-5_n8_s2 zone_d0-5_n40_s1 zone_d0-5_n40_s2 zone_d20-40_n8_s1 zone_d20-40_n8_s2 zone_d20-40_n40_s1 zone_d20-40_n40_s2
+J Barren r7e G spot:90:70:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate
+J Barren r1bf N spot:90:70:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate
+J Barren r1bf G spot:90:70:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate
+J Forest r7e N zone_spotd_hi_n8_s1 zone_spotd_hi_n8_s2 zone_spotd_hi_n40_s1 zone_spotd_hi_n40_s2 zone_d0-5_n8_s1 zone_d0-5_n8_s2 zone_d0-5_n40_s1 zone_d0-5_n40_s2 zone_d20-40_n8_s1 zone_d20-40_n8_s2 zone_d20-40_n40_s1 zone_d20-40_n40_s2 gate@Forest
+J Forest r7e G spot:50:10:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate@Forest
+J Forest r1bf N spot:50:10:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate@Forest
+J Forest r1bf G spot:50:10:8:10 zone_spotd_hi_n20_s1 zone_spotd_hi_n20_s2 zone_d0-5_n20_s1 zone_d0-5_n20_s2 trees:20:rand:1 trees:20:rand:2 gate@Forest

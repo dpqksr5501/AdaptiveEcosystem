@@ -1,0 +1,63 @@
+{
+ "I_Barren": [
+  "spot_90_110_8_10",
+  "zone_spotd_hi_n20_s1",
+  "zone_spotd_hi_n20_s2",
+  "zone_d0-5_n20_s1",
+  "zone_d0-5_n20_s2",
+  "trees_20_rand_1",
+  "trees_20_rand_2",
+  "gate"
+ ],
+ "I_Forest": [
+  "spot_30_10_8_10",
+  "zone_spotd_hi_n20_s1",
+  "zone_spotd_hi_n20_s2",
+  "zone_d0-5_n20_s1",
+  "zone_d0-5_n20_s2",
+  "trees_20_rand_1",
+  "trees_20_rand_2"
+ ],
+ "J_Barren": [
+  "spot_90_70_8_10",
+  "zone_spotd_hi_n20_s1",
+  "zone_spotd_hi_n20_s2",
+  "zone_d0-5_n20_s1",
+  "zone_d0-5_n20_s2",
+  "trees_20_rand_1",
+  "trees_20_rand_2",
+  "gate"
+ ],
+ "J_Forest": [
+  "spot_50_10_8_10",
+  "zone_spotd_hi_n20_s1",
+  "zone_spotd_hi_n20_s2",
+  "zone_d0-5_n20_s1",
+  "zone_d0-5_n20_s2",
+  "trees_20_rand_1",
+  "trees_20_rand_2",
+  "gate_Forest"
+ ],
+ "_zones": {
+  "order": [
+   "spotd_hi",
+   "graze_hi",
+   "spotw_hi",
+   "flee_hi",
+   "d0-5",
+   "d5-10",
+   "d10-20",
+   "edge",
+   "rest_hi",
+   "flee_lo",
+   "d20-40"
+  ],
+  "best": "spotd_hi",
+  "worst": "d20-40",
+  "quantity": [
+   "spotd_hi",
+   "d0-5",
+   "d20-40"
+  ]
+ }
+}
