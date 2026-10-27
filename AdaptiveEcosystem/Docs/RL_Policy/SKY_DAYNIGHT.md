@@ -6,7 +6,8 @@
 - 시험: `Source/AdaptiveEcosystem/AI/Policy/Tests/EcoV3SkyPresenterTest.cpp` (`AdaptiveEcosystem.Policy.V3.Sky.*` 5 개)
 - 상태 (10-27 오후): UBT 두 판(적응 unity·`-DisableAdaptiveUnity`) 성공, 자동화 `AdaptiveEcosystem` 255 개 실패 0 (`Sky.*` 5 개 포함). 창 없는 게임(`-RenderOffscreen`·`-NullRHI`)으로
   두 맵의 낮·해 질 녘·밤·새벽 화면과 하늘 어둠 = v3 어둠, 팀 기본 v1 은 그대로, 같은 시드 사슴 줄 바이트 동일을 확인했다 (9절). 기본값은 오전 창 모드 확인(달 색 섞기 1)과 9절 화면으로 정했다.
-  Dedicated + Client·PIE·fps 비교는 아직이다.
+  10-27 적대적 확인(코드 그대로)에서 창 없는 리슨 + 클라이언트 1·데디케이티드 + 클라이언트 2 의 클라이언트 하늘이 되감김·건너뜀 없이 서버 시계를 따라가는 것과
+  원본 `LV_JYU_Ecosystem` 에서도 같은 길로 도는 것을 봤다 (9.1절). 편집기 PIE·fps 비교는 아직이다.
 
 ## 1. 그리기만 한다
 
@@ -173,7 +174,7 @@
 | 켬·끔 | 124 초 `eco.Sky.Link 0` → 125 초 화면이 315°(45° 높이) 고정 하늘, `하늘 연출 끔` 기록. 127 초 `1` → 다시 연동 |
 | 팀 기본 v1 | `-ini:Engine:[ConsoleVariables]:eco.IntegratedPolicyVersion=1` 통합 맵 131 초: 하늘 기록 0 줄, pitch 315 내내, 화면 밝기 155~156 내내 |
 | 같은 시드 | `-NullRHI` 121 초 사슴 줄 `[EcoV3Obs]` 343218 개가 변경 전 빌드(`28baef7`) = 하늘 켬(기본) = `eco.Sky.Link=0` 으로 바이트까지 같다 |
-| 조연우 복사 맵 | 같은 팀 하늘 BP·라이트 구성으로 같은 길로 돈다 (원본 `LV_JYU_Ecosystem` 은 돌리지 않았다) |
+| 조연우 복사 맵 | 같은 팀 하늘 BP·라이트 구성으로 같은 길로 돈다 (원본 `LV_JYU_Ecosystem` 은 9.1절) |
 
 화면 밝기 (화면 평균 휘도 0~255, Rec.709 가중, 1 초 표본):
 
@@ -200,4 +201,20 @@
 - 조연우 복사 맵 숲은 처음부터 맑고 74 초쯤부터 비가 온다 — 팀 날씨(비 주기)와 같은 때다 (LIVE_ADAPT_SPEC.md 5.1 '시작 날씨').
 - 화면 파일 (저장소 밖 `C:/kwon/univ/3-1/GameContentsCapstoneDesign/week8_assets/sky/`): 판마다 30·60·90·120 초 한 장(`sky_<맵>_forest_<wide|wolf>_t030_day.png` 등), 사진판(`*_sheet.png`), 밝기 표(`*_brightness.tsv`),
   하늘 d·v3 d 표(`sky_vs_v3_darkness.tsv`), 밤 달빛 비교 사진판(`sky_IT_forest_wolf_nightlux*_sheet.png`).
-- 아직: Dedicated + Client 2, 편집기 PIE, 켬·끔 fps 비교, 원본 `LV_JYU_Ecosystem`.
+- 아직: 편집기 PIE, 켬·끔 fps 비교 (Dedicated + Client 2·원본 `LV_JYU_Ecosystem` 은 9.1절).
+
+### 9.1 클라이언트·원본 맵 (10-27 적대적 확인, 코드 그대로)
+
+조건: 보이는 창 없이 모두 `UnrealEditor-Cmd`(서버 `-server`, 리슨 호스트·클라이언트·단독 `-game -NullRHI`)로, 실시간(고정 스텝 아님)·`-seconds` 끝 시간,
+`-EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=20010 -NoSound -unattended -nosplash`, `eco.Sky.LogSeconds 0.25`. 실행마다 0.25 초 간격으로 언리얼 프로세스의
+보이는 창을 찾았고 0 개였다. 통합 맵 `/Game/Map/LV_Ecosystem_IntegrationTest`, 같은 컴퓨터 127.0.0.1.
+
+| 판 | 클라이언트 하늘 | 서버 시계와 차 |
+|---|---|---|
+| 리슨 호스트 + 클라이언트 1 (115 초) | `하늘 연출 켬 (… 클라이언트 — GameState 요약 사이를 이어 그린다)` 한 번, 끔 0. 표시 시계 8 → 122 초에서 되감김 0, 0.25 초 기록 사이 (Δ표시 시계 − Δ벽시계)가 −0.06 ~ +0.16 초 (+0.16 은 켠 직후 한 번) | 같은 벽시계의 호스트(권위 팀 시계)와 평균 −0.01 초, −0.23 ~ +0.07 초 → 하늘 d 차 최대 0.02 |
+| 데디케이티드 + 클라이언트 2 (115 초) | 두 클라이언트 모두 켬 한 번·끔 0, 되감김 0, 기록 사이 차 −0.08 ~ +0.11 초 | 서버 기록(`Forest 날씨 \| N초`, 10 초마다 — 벽시계와 0.03 초 안)으로 잰 서버 시각보다 평균 0.1 초 늦다. 켠 처음 몇 초는 0.8~1.0 초 늦게 시작해 메우고, 5 초 뒤부터 0.03 ~ 0.42 초 |
+| 원본 `/Game/JYU/Maps/LV_JYU_Ecosystem` 단독 (80 초) | 하늘 연출 켬 (권위), 같은 팀 하늘 BP·라이트 | 하늘 d 와 v3 세계 d 차 최대 0.02 (316 줄 — 기록이 소수 둘째 자리로 반올림하고, 실시간이라 v3 전역 스텝이 팀 시계와 조금 벌어진다. 다시 맞추는 문턱 0.53 초 = d 0.044 안) |
+
+- 클라이언트 하늘은 요약(약 1 초마다)이 늦게 오는 만큼 0.1 초쯤 늦게 돈다 — 어스름(d 가 바뀌는 12 초)에서도 d 차 0.01 쯤이라 눈으로는 같다.
+- 데디케이티드 서버 기록에는 하늘 줄이 없다 (서버에는 만들지 않는다).
+- 화면을 찍지는 않았다 (클라이언트 `-NullRHI`). 클라이언트가 그리는 빛 값은 기록의 해 pitch·세기로 봤다 — 해 pitch 와 표시 시계 식의 차 최대 0.1° (기록 반올림).
