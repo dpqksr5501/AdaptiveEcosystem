@@ -33,6 +33,10 @@
 //   eco.IntegratedV3.Test.RemoveTrees <지역> <수>     시험용으로 놓은 짝을 나중 것부터 (모자라면 그 무대의 레벨 나무 짝) 지운다
 //   eco.IntegratedV3.Test.At <초> <명령>[; <명령>…]   시뮬레이션 초가 되면 콘솔 명령을 한 번 (명령줄 -EcoV3TestAt=<초> -EcoV3TestCmd="명령1; 명령2", 쌍 여러 개)
 //   eco.IntegratedV3.EnvInfo                          지역마다 줄기·원판·날씨, 환경 판·마지막 바뀜
+// 10-27 (설계 FOREST_GROWTH_MODE.md): 숲 자람 모드(EcoV3ForestGrowth.cpp)가 다 자란 나무를 결정 스텝 경계에서 나무만 다시 읽어(PollEnvironment(true, true)) 출처
+//   forest_growth 로 넣는다. Test.RemoveTrees 는 숲 나무를 지우지 않고, Test.AddTrees 는 숲 자리를 피한다. '큰 변화만' 다시 배우기(EcoV3BigChange.h)의 셈을
+//   ApplyEnvChange 가 한다 — 원판이 바뀐 묶음·날씨 종류가 바뀐 묶음만 큰 변화 바뀜이고, 규칙이 돌 때(자동 스냅숏 켬 ∧ AutoSnapshotRule 1) 세기만 바뀐 묶음은
+//   화면 알림을 내지 않는다 (eco.IntegratedV3.EnvNoticeMinor 1 = 옛 동작 — 기록 줄은 늘). 세계에 넣는 것은 그대로다.
 
 #include "EcoPolicyV3IntegratedSubsystem.h"
 
@@ -50,6 +54,8 @@
 #include "Misc/Parse.h"
 #include "World/EcoRegionEnvironmentAdapter.h"
 #include "World/EcologyWorldSubsystem.h"
+
+#include "EcoV3ForestTree.h"
 
 namespace EcoV3EnvWatchImpl
 {
@@ -78,7 +84,25 @@ namespace EcoV3EnvWatchImpl
 		TEXT("(팀 설계 기본·덮기) 그대로. 환경 감시(eco.IntegratedV3.EnvWatch)가 꺼졌으면 쓰지 않는다. 0 = 10-27 전 (시작은 우리 고정 날씨, 팀 값은 바뀔 때만 — ")
 		TEXT("앞선 측정 다시 내기용). Play 전에 바꾼다."),
 		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarEnvNoticeMinor(
+		TEXT("eco.IntegratedV3.EnvNoticeMinor"),
+		0,
+		TEXT("세기만 바뀐 환경 판의 화면 알림 (0 = 기본 — '큰 변화만' 다시 배우기 규칙이 돌 때(자동 스냅숏 켬 ∧ eco.IntegratedV3.AutoSnapshotRule 1) 세기만 바뀐 묶음은 ")
+		TEXT("기록 줄 '[EcoV3I] 환경 바뀜 #n |' 만 남기고 화면 알림을 내지 않는다 — 10-27 조연우 맵 팀 비 주기의 잦은 세기 바뀜. 1 = 옛 동작 (늘 알림). 세계에 넣는 것은 그대로다."),
+		ECVF_Default);
 #endif
+
+	/** 세기만 바뀐 환경 판의 화면 알림을 낼까 (규칙이 돌 때만 끈다 — 끄면 지금까지와 같다). */
+	bool NoticeMinorChanges()
+	{
+#if !UE_BUILD_SHIPPING
+		return CVarEnvNoticeMinor.GetValueOnGameThread() != 0 || !UEcoPolicyV3IntegratedSubsystem::IsAutoSnapshotOn()
+			   || UEcoPolicyV3IntegratedSubsystem::AutoSnapshotRule() == 0;
+#else
+		return true;
+#endif
+	}
 
 	/** 액터 알림으로 당기는 읽기 사이 최소 간격 (실시간 초). */
 	constexpr double kDirtyPollGapSeconds = 0.1;
@@ -530,6 +554,8 @@ void UEcoPolicyV3IntegratedSubsystem::EndEnvWatch()
 	AutoSnapshotRevision = 0;
 	PeriodicNextSeconds = -1.0;
 	PeriodicEverySeen = 0.0;
+	BigState = EcoV3BigChange::FState();
+	LevelChangeHolds.Reset();
 }
 
 void UEcoPolicyV3IntegratedSubsystem::HandleEnvActorChanged(AActor* Actor)
@@ -552,7 +578,7 @@ void UEcoPolicyV3IntegratedSubsystem::TickEnvWatch()
 // 읽기 (세계는 바꾸지 않는다)
 // -----------------------------------------------------------------------------
 
-bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce)
+bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce, bool bTreesOnly)
 {
 	using namespace EcoV3EnvWatchImpl;
 	UWorld* World = GetWorld();
@@ -560,17 +586,22 @@ bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce)
 	{
 		return false;
 	}
-	const double Now = FPlatformTime::Seconds();
-	// 정기 읽기 때가 아니면 액터 알림이 있을 때만 (FX·표현 액터가 잦게 생겨도 kDirtyPollGapSeconds 에 한 번 — 줄기 읽기는 모든 액터를 훑는다)
-	if (!bForce && Now < NextEnvPoll && (!bEnvDirty || Now < LastEnvPoll + kDirtyPollGapSeconds))
+	bool bTestEdit = false;
+	if (!bTreesOnly)
 	{
-		return false;
+		const double Now = FPlatformTime::Seconds();
+		// 정기 읽기 때가 아니면 액터 알림이 있을 때만 (FX·표현 액터가 잦게 생겨도 kDirtyPollGapSeconds 에 한 번 — 줄기 읽기는 모든 액터를 훑는다)
+		if (!bForce && Now < NextEnvPoll && (!bEnvDirty || Now < LastEnvPoll + kDirtyPollGapSeconds))
+		{
+			return false;
+		}
+		NextEnvPoll = Now + EnvWatchSeconds();
+		LastEnvPoll = Now;
+		bEnvDirty = false;
+		bTestEdit = bEnvTestEdit;
+		bEnvTestEdit = false;
 	}
-	NextEnvPoll = Now + EnvWatchSeconds();
-	LastEnvPoll = Now;
-	bEnvDirty = false;
-	const bool bTestEdit = bEnvTestEdit;
-	bEnvTestEdit = false;
+	// 숲 자람 (bTreesOnly — 결정 스텝 경계): 실시간 읽기 주기·액터 알림 표시·날씨 칸은 그대로 두고 나무만 읽는다 (출처 forest_growth)
 	PendingEnv.SetNum(Contexts.Num());
 
 	TArray<FVector> Trunks;
@@ -617,8 +648,13 @@ bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce)
 				P.InStage = InStage;
 				P.Snapped = Snapped;
 				P.MaxSnapCm = MaxSnapCm;
-				P.TreeSource = bTestEdit ? TEXT("test") : TEXT("level");
+				P.TreeSource = bTreesOnly ? TEXT("forest_growth") : bTestEdit ? TEXT("test") : TEXT("level");
 			}
+		}
+		if (bTreesOnly)
+		{
+			bAny = bAny || P.bTrees || P.bWeather;   // 앞서 대기한 날씨 바뀜은 그대로 (같은 경계에서 함께 넣는다)
+			continue;
 		}
 
 		// 2. 날씨: 팀 지역 환경 (바뀌었을 때만 — 늦게 등록된 지역은 팀 날씨 출처가 맡을 때 처음 값도), 그 뒤 우리 지역 날씨 콘솔 변수 (바뀌었을 때만 — 같은 읽기에서
@@ -743,6 +779,7 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 	TArray<FEcoV3EnvChange> Changes;
 	TArray<FString> LogParts;
 	TArray<FString> NoticeParts;
+	bool bMajor = false;   // 원판이 바뀌었거나 날씨 종류가 바뀌었다 ('큰 변화만' 규칙의 바뀜 시계 — 세기만 바뀐 묶음은 거짓)
 	for (int32 c = 0; c < Contexts.Num() && c < Pending.Num(); ++c)
 	{
 		FEcoV3RegionContext& Ctx = *Contexts[c];
@@ -941,6 +978,12 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 			LogParts.Add(FString::Printf(TEXT("%s: %s (출처 %s · 세계 원판 %d→%d · 밀어냄 사슴 %d·늑대 %d)"), *Region, *Ch.Detail, *Ch.Source, OldNum, NumOf(Discs),
 										 PushedDeer, PushedWolves));
 			NoticeParts.Add(FString::Printf(TEXT("%s: 나무 %d→%d"), *Region, OldTrunks, NewTrunks));
+			// '큰 변화만' 다시 배우기 (EcoV3BigChange.h): 이 지역 세계 원판과 기준선의 대칭차를 다시 세고 바뀜 시계를 이 스텝으로 (원판이 그대로면 바뀜이 아니다)
+			if (!BigState.Regions.IsValidIndex(c) || Discs != BigState.Regions[c].NowDiscs)
+			{
+				EcoV3BigChange::OnTrees(BigState, c, Discs, GlobalT);
+				bMajor = true;
+			}
 			if (Missing > 0)
 			{
 				UE_LOG(LogEcoPolicyV3I, Warning,
@@ -974,6 +1017,8 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 				LogParts.Add(FString::Printf(TEXT("%s: 날씨 %s (출처 %s)"), *Region, *Ch.Detail, *Ch.Source));
 				NoticeParts.Add(FString::Printf(TEXT("%s: %s→%s"), *Region, UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(OldKind)),
 												UTF8_TO_TCHAR(EcoWorldV3::WeatherNameKoUtf8(Wx.Kind))));
+				// '큰 변화만' 다시 배우기: 날씨 종류가 바뀐 묶음만 큰 변화 바뀜 (세기만 바뀐 것은 세계에는 넣되 세지 않는다)
+				bMajor = EcoV3BigChange::OnWeather(BigState, c, Wx.Kind, GlobalT) || bMajor;
 			}
 		}
 	}
@@ -988,9 +1033,14 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 	}
 	EnvChangedStep = GlobalT;
 	EnvChanges.Append(Changes);
-	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 바뀜 #%d | %.1f초 (전역 스텝 %lld) | %s"), Rev, Seconds, static_cast<long long>(GlobalT),
-		   *FString::Join(LogParts, TEXT(" | ")));
-	PostNotice(EcoV3Integrated::ENotice::Env, FString::Printf(TEXT("환경 바뀜 #%d — %s"), Rev, *FString::Join(NoticeParts, TEXT(" · "))));
+	const bool bNotice = bMajor || NoticeMinorChanges();
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 바뀜 #%d | %.1f초 (전역 스텝 %lld) | %s%s"), Rev, Seconds, static_cast<long long>(GlobalT),
+		   *FString::Join(LogParts, TEXT(" | ")),
+		   bNotice ? TEXT("") : TEXT(" | 세기만 바뀜 — 다시 배우기 셈·화면 알림 없음 (eco.IntegratedV3.EnvNoticeMinor 0)"));
+	if (bNotice)
+	{
+		PostNotice(EcoV3Integrated::ENotice::Env, FString::Printf(TEXT("환경 바뀜 #%d — %s"), Rev, *FString::Join(NoticeParts, TEXT(" · "))));
+	}
 }
 
 TArray<FString> UEcoPolicyV3IntegratedSubsystem::EnvInfoLines() const
@@ -998,13 +1048,16 @@ TArray<FString> UEcoPolicyV3IntegratedSubsystem::EnvInfoLines() const
 	using namespace EcoV3EnvWatchImpl;
 	TArray<FString> Lines;
 	const FEcoV3EnvChange* Last = EnvChanges.IsEmpty() ? nullptr : &EnvChanges.Last();
-	Lines.Add(FString::Printf(TEXT("[EcoV3I] 환경 | 감시 %s | 환경 판 #%d%s | 대기 변화 %s"),
+	Lines.Add(FString::Printf(TEXT("[EcoV3I] 환경 | 감시 %s | 환경 판 #%d%s | 대기 변화 %s | %s%s"),
 							  IsEnvWatchEnabled() ? *FString::Printf(TEXT("켬 (%.1f초마다)"), EnvWatchSeconds()) : TEXT("끔 (eco.IntegratedV3.EnvWatch 0)"), EnvRevision,
 							  Last ? *FString::Printf(TEXT(" (처음 전역 스텝 %lld · 마지막 %.1f초 전역 스텝 %lld: %s %s %s, 출처 %s)"),
 													  static_cast<long long>(EnvFirstChangedStep), Last->Seconds, static_cast<long long>(Last->Step),
 													  *Last->Region.ToString(), *Last->Kind, *Last->Detail, *Last->Source)
 								   : TEXT(" (바뀐 적 없음)"),
-							  bEnvPending ? TEXT("있음 (다음 결정 스텝 경계에서 넣는다)") : TEXT("없음")));
+							  bEnvPending ? TEXT("있음 (다음 결정 스텝 경계에서 넣는다)") : TEXT("없음"), *BigChangeStatusText(),
+							  bForestOn ? *FString::Printf(TEXT(" | 숲 자람 %s 나무 %d/%d (묘목 %d)"), *ForestSettings.Region.ToString(), ForestMatureCount(),
+														   ForestSlots.Num(), ForestSaplingCount())
+										: TEXT("")));
 	for (int32 c = 0; c < Contexts.Num(); ++c)
 	{
 		const FEcoV3RegionContext& Ctx = *Contexts[c];
@@ -1156,7 +1209,18 @@ int32 UEcoPolicyV3IntegratedSubsystem::TestAddTrees(FName RegionId, int32 Count,
 			Avoid.insert(Avoid.end(), {T.X, T.Y, T.R});
 		}
 	}
-	// 지면 검사에서 뺄 액터 = 우리 나무·줄기 막이 (줄기 막이 윗면을 땅으로 읽지 않게 — 명령과 같다)
+	// 숲 자람 모드 자리 (10-27 — 아직 자라는 묘목·계획 자리도 피한다. 뺀 자리는 빼고)
+	if (bForestOn && ForestSettings.Region == RegionId)
+	{
+		for (int32 i = 0; i < ForestSlots.Num(); ++i)
+		{
+			if (ForestState.IsValidIndex(i) && ForestState[i] != 3)
+			{
+				Avoid.insert(Avoid.end(), {ForestSlots[i].Tree.X, ForestSlots[i].Tree.Y, ForestSlots[i].Tree.R});
+			}
+		}
+	}
+	// 지면 검사에서 뺄 액터 = 우리 나무·줄기 막이 (줄기 막이 윗면을 땅으로 읽지 않게 — 명령과 같다. 숲 나무도 꼬리표 EcoV3Tree 라 빠진다)
 	TArray<AActor*> Ignore;
 	for (TActorIterator<AActor> It(World); It; ++It)
 	{
@@ -1285,9 +1349,9 @@ int32 UEcoPolicyV3IntegratedSubsystem::TestRemoveTrees(FName RegionId, int32 Cou
 		TArray<TPair<FString, AActor*>> Level;
 		for (TActorIterator<AActor> It(World); It; ++It)
 		{
-			if (!It->ActorHasTag(LevelTrunkTag()))
+			if (!It->ActorHasTag(LevelTrunkTag()) || It->IsA<AEcoV3ForestTree>())
 			{
-				continue;
+				continue;   // 숲 자람 모드 나무는 지우지 않는다 (숲은 자라기만 한다)
 			}
 			const FVector L = It->GetActorLocation();
 			if (L.X - Ctx->OriginCm.X < 0.0 || L.Y - Ctx->OriginCm.Y < 0.0 || L.X - Ctx->OriginCm.X > SizeCm || L.Y - Ctx->OriginCm.Y > SizeCm)

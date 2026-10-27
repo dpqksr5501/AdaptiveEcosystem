@@ -373,6 +373,29 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("뒤에 나타난 파일만 바꾼다, 화면 상태 줄. 환경 변화 자동 스냅숏(eco.IntegratedV3.AutoSnapshot -1)도 이 값을 따른다. Play 전에 바꾼다. ")
 		TEXT("명령줄 -EcoV3AutoAdapt (또는 -EcoV3AutoAdapt=0|1) 는 시작값."),
 		ECVF_Default);
+
+	// 10-27 Play 때 파이썬 감시 자동 시작 (FOREST_GROWTH_MODE.md 3절, EcoV3WatchLauncher.h — 학습 파이프라인을 따로 띄우는 개발용 도구, 추론 아님)
+	static TAutoConsoleVariable<int32> CVarAutoWatch(
+		TEXT("eco.IntegratedV3.AutoWatch"),
+		1,
+		TEXT("Play 때 파이썬 감시(herbivore_rl/results/v3/live/live.py watch) 자동 시작 (1 = AutoAdapt 를 따름, 기본 — AutoAdapt 를 켠 Play 에서 창 없이 띄우고 Play 가 끝나면 ")
+		TEXT("학습 자식까지 프로세스 나무째 끝낸다. 사람이 띄운 감시가 이미 돌면 띄우지도 끄지도 않는다. 0 = 띄우지 않음). 학습 파이프라인을 따로 띄우는 개발용 도구다 — ")
+		TEXT("게임 추론은 그대로 C++ 네이티브만. Play 시작 때 읽는다. 명령줄 -EcoV3AutoWatch=0|1 은 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<FString> CVarAutoWatchPython(
+		TEXT("eco.IntegratedV3.AutoWatchPython"), TEXT("python"),
+		TEXT("파이썬 감시 실행 파일 (기본 python — 경로 구분자가 없으면 PATH 에서 찾아 전체 경로로 기록한다. \\WindowsApps\\ 아래 스토어 대역은 쓰지 않는다). ")
+		TEXT("명령줄 -EcoV3AutoWatchPython= 은 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<FString> CVarAutoWatchCmd(
+		TEXT("eco.IntegratedV3.AutoWatchCmd"), TEXT(""),
+		TEXT("파이썬 감시 명령 덮기 (시험용 — 실행 파일 뒤 인자 전체, 자리표 {root}·{play}·{log}). 빈 값 = -X utf8 -u results/v3/live/live.py watch --root \"<root>\". ")
+		TEXT("명령줄 -EcoV3AutoWatchCmd=\"…\" 는 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<FString> CVarAutoWatchDir(
+		TEXT("eco.IntegratedV3.AutoWatchDir"), TEXT(""),
+		TEXT("파이썬 감시 작업 폴더 (빈 값 = <프로젝트>/../herbivore_rl — results/v3/live/live.py 가 없으면 띄우지 않는다). 명령줄 -EcoV3AutoWatchDir= 은 시작값."),
+		ECVF_Default);
 #endif
 
 	static TAutoConsoleVariable<int32> CVarDebug(
@@ -1092,6 +1115,59 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.AutoSnapshotOut"), AutoSnapshotOutArg);
 	}
+	// 10-27 숲 자람 모드·'큰 변화만' 다시 배우기·파이썬 감시 자동 시작 (FOREST_GROWTH_MODE.md — 개발 빌드. 글자 값은 쉼표·공백에서 끊지 않는다)
+	int32 ForestArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ForestGrowth="), ForestArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ForestGrowth"), LexToString(ForestArg));
+	}
+	else if (FParse::Param(CmdLine, TEXT("EcoV3ForestGrowth")))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ForestGrowth"), TEXT("1"));
+	}
+	{
+		// 숫자 값 (명령줄 이름 → 콘솔 변수)
+		const TCHAR* const NumPairs[][2] = {
+			{TEXT("EcoV3ForestPerStage="), TEXT("eco.IntegratedV3.ForestPerStage")},
+			{TEXT("EcoV3ForestStageSeconds="), TEXT("eco.IntegratedV3.ForestStageSeconds")},
+			{TEXT("EcoV3ForestGrowSeconds="), TEXT("eco.IntegratedV3.ForestGrowSeconds")},
+			{TEXT("EcoV3ForestTarget="), TEXT("eco.IntegratedV3.ForestTarget")},
+			{TEXT("EcoV3ForestStartSeconds="), TEXT("eco.IntegratedV3.ForestStartSeconds")},
+			{TEXT("EcoV3ForestSeed="), TEXT("eco.IntegratedV3.ForestSeed")},
+			{TEXT("EcoV3ForestSapling="), TEXT("eco.IntegratedV3.ForestSapling")},
+			{TEXT("EcoV3AutoSnapshotRule="), TEXT("eco.IntegratedV3.AutoSnapshotRule")},
+			{TEXT("EcoV3BigTrees="), TEXT("eco.IntegratedV3.BigTrees")},
+			{TEXT("EcoV3WeatherHold="), TEXT("eco.IntegratedV3.WeatherHold")},
+			{TEXT("EcoV3BigSettle="), TEXT("eco.IntegratedV3.BigSettle")},
+			{TEXT("EcoV3BigMaxWait="), TEXT("eco.IntegratedV3.BigMaxWait")},
+			{TEXT("EcoV3EnvNoticeMinor="), TEXT("eco.IntegratedV3.EnvNoticeMinor")},
+			{TEXT("EcoV3AutoWatch="), TEXT("eco.IntegratedV3.AutoWatch")},
+		};
+		for (const auto& Pair : NumPairs)
+		{
+			FString Value;
+			if (FParse::Value(CmdLine, Pair[0], Value) && Value.IsNumeric())
+			{
+				SetIfUnset(Pair[1], Value);   // 글자 그대로 (큰 정수 씨가 float 로 깎이지 않게)
+			}
+		}
+		// 글자 값 (경로·명령 — 따옴표 안 공백·쉼표 그대로)
+		const TCHAR* const TextPairs[][2] = {
+			{TEXT("EcoV3ForestRegion="), TEXT("eco.IntegratedV3.ForestRegion")},
+			{TEXT("EcoV3AdaptRoot="), TEXT("eco.IntegratedV3.AdaptRoot")},
+			{TEXT("EcoV3AutoWatchPython="), TEXT("eco.IntegratedV3.AutoWatchPython")},
+			{TEXT("EcoV3AutoWatchCmd="), TEXT("eco.IntegratedV3.AutoWatchCmd")},
+			{TEXT("EcoV3AutoWatchDir="), TEXT("eco.IntegratedV3.AutoWatchDir")},
+		};
+		for (const auto& Pair : TextPairs)
+		{
+			FString Value;
+			if (FParse::Value(CmdLine, Pair[0], Value, /*bShouldStopOnSeparator*/ false) && !Value.TrimStartAndEnd().IsEmpty())
+			{
+				SetIfUnset(Pair[1], Value.TrimStartAndEnd());
+			}
+		}
+	}
 #if !UE_BUILD_SHIPPING
 	// 시험용 예약 (10-21 — 시연 대본): -EcoV3TestAt=<초> -EcoV3TestCmd="명령1; 명령2" (쌍 여러 개, 명령은 따옴표 안 ';'·공백 그대로)
 	ParseCommandLineTestAts(CmdLine);
@@ -1197,6 +1273,11 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	// 환경 바뀜 감시 (10-21, EcoV3EnvWatch.cpp): 액터 생김·지움 알림, 명령줄 예약, 시작 줄
 	BeginEnvWatch(InWorld);
+	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp): Play 시작 때 한 번 읽는다 (같은 씨 같은 결과 — Play 중 바꿈은 다음 Play 부터). 계획은 지역 세계가 생긴 직후
+	ForestSettings = ForestSettingsFromConsole();
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 숲 자람: %s"),
+		   ForestSettings.bOn ? *FString::Printf(TEXT("켬 (eco.IntegratedV3.ForestGrowth 1 — 시험 모드) — %s, 지역 세계가 생기면 자리를 정한다"), *ForestSettings.Region.ToString())
+							  : TEXT("끔 (eco.IntegratedV3.ForestGrowth 0)"));
 	const int32 Wolves = Settings.WolvesPerRegion;
 	UE_LOG(LogEcoPolicyV3I, Log,
 		   TEXT("[EcoV3I] 통합 모드 켬 — 조정자 %s | 모델 %s (관측 %d, 마스크 판 %d) | 지역 %d, 지역마다 사슴 %d·늑대 %d (잠행 %d·추격 %d, 모두 주행성, 속력 %.2f배) | ")
@@ -1357,8 +1438,10 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		// 적응 고리 (10-21 실시간 두뇌 교체): 켜면 감시 폴더·상태 파일 기본을 정하고(콘솔 변수가 비었을 때만 쓰인다), 지금 폴더에 있는 두뇌 파일은
 		// 읽지 않게 감시를 준비한다 — Play 뒤에 나타난 파일만 바꾼다. 끄면 앞 Play 가 남긴 기본을 지운다
 		const bool bAutoAdapt = IsAutoAdaptEnabled();
-		Reg.SetDefaultWatchFolder(bAutoAdapt ? FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("EcoAdapt/brains")) : FString());
-		Reg.SetDefaultStatusFile(bAutoAdapt ? FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("EcoAdapt/status.json")) : FString());
+		// 10-27: 기본 폴더 셋은 적응 고리 폴더 하나(eco.IntegratedV3.AdaptRoot, 빈 값 = Saved/EcoAdapt) 아래 — 시험은 이것 하나만 바꿔 실제 폴더를 건드리지 않는다
+		const FString AdaptRoot = AdaptRootDir();
+		Reg.SetDefaultWatchFolder(bAutoAdapt ? FPaths::Combine(AdaptRoot, TEXT("brains")) : FString());
+		Reg.SetDefaultStatusFile(bAutoAdapt ? FPaths::Combine(AdaptRoot, TEXT("status.json")) : FString());
 		bAdaptDefaultsSet = bAutoAdapt;
 		// Play 번호: 이 Play 의 스냅숏에 적고, 파이썬이 두뇌 파일 adapt.play_id 로 돌려준다 — 앞 Play 에서 시작한 판의 두뇌는 받지 않는다
 		PlayId = bAutoAdapt ? FString::Printf(TEXT("p%s_%08x"), *FDateTime::UtcNow().ToString(TEXT("%Y%m%dT%H%M%S")), FGuid::NewGuid().A) : FString();
@@ -1408,6 +1491,8 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 													 : TEXT("켬 (eco.V3Brain.Notice 1)"),
 			   EcoV3Brain::NoticeShot() ? TEXT("켬 (eco.V3Brain.NoticeShot 1 — Saved/EcoAdapt/shots)") : TEXT("끔"));
 	}
+	// 10-27 Play 때 파이썬 감시 자동 시작 (EcoV3WatchLauncher.h — 학습 파이프라인을 따로 띄우는 개발용 도구, 추론 아님. AutoAdapt 일 때만)
+	BeginAutoWatch();
 }
 
 void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
@@ -1418,6 +1503,8 @@ void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
 		PreTickHandle.Reset();
 	}
 	PreStartTick.UnRegisterTickFunction();
+	EndAutoWatch();  // 우리가 띄운 파이썬 감시를 프로세스 나무째 끝낸다 (10-27, EcoV3WatchLauncher.cpp — 사람이 띄운 감시는 건드리지 않는다)
+	EndForest();     // 숲 자람 모드 상태 (액터는 월드와 함께 없어진다)
 	EndEnvWatch();   // 환경 바뀜 감시 알림을 푼다 (10-21, EcoV3EnvWatch.cpp)
 	bActive = false;
 	RestoreViewEnvironment();
@@ -2832,6 +2919,7 @@ void UEcoPolicyV3IntegratedSubsystem::HandlePreActorTick(UWorld* InWorld, ELevel
 	{
 		CheckClockDrift();
 		TickEnvWatch();   // 환경 바뀜 감시·시험용 예약 (10-21, EcoV3EnvWatch.cpp — 읽기만, 세계는 결정 스텝 경계에서 바꾼다)
+		ForestPreActorTick();   // 숲 자람 모드 묘목·화면 줄 (10-27 — 끄면 아무것도 하지 않는다. 다 자람은 결정 스텝 경계 ForestStepBoundary)
 		TallyTeamWolfVisuals();
 		if (IsDebugDrawEnabled())
 		{
@@ -3275,6 +3363,12 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 장애물 원판 목록을 쓰지 못했다: %s"), *Path);
 		}
 	}
+	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp): 지역 세계가 생긴 직후 자리를 한꺼번에 정한다 (시작 직전 지면 검사로 무대 땅이 불린 뒤). 끄면 아무것도 하지 않는다
+	if (bActive && ForestSettings.bOn)
+	{
+		FString Why;
+		PlanForest(ForestSettings, Why);
+	}
 }
 
 FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId, int32 RegionRuntimeIndex, const FVector& OriginCm,
@@ -3307,6 +3401,7 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	FEcoV3RegionContext* Raw = Ctx.Get();
 	Contexts.Add(MoveTemp(Ctx));
 	InitContextEnv(*Raw);   // 환경 바뀜 감시 바탕 (10-21, EcoV3EnvWatch.cpp — 읽기만. 단 10-27 (C): 팀 날씨 출처가 맡는 지역은 시작 날씨를 팀 값으로 넣는다)
+	BigAddRegion(*Raw);     // '큰 변화만' 다시 배우기 기준선 (10-27, EcoV3BigChange.h — 세계 원판·날씨 종류, 읽기만)
 	return Raw;
 }
 
@@ -4486,6 +4581,12 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 							: TEXT(""));
 		}
 	}
+	// 10-27 파이썬 감시 자동 시작 (EcoV3WatchLauncher): 우리가 띄운 감시가 끝났나 2 초마다 (기다리지 않는다 — 그릴 수 없는 실행도)
+	if (Now >= NextWatchPoll)
+	{
+		NextWatchPoll = Now + EcoV3Watch::kPollSeconds;
+		PollAutoWatch();
+	}
 	const bool bCanDraw = EcoV3Brain::NoticeEnabled() && GEngine && FApp::CanEverRender();
 	// 미뤄 둔 화면 찍기 (eco.V3Brain.NoticeShot — 바꾸기·되돌리기 알림 1.5 초 뒤, 게임 화면만)
 	if (PendingShotAt >= 0.0 && Now >= PendingShotAt)
@@ -4528,7 +4629,11 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 		Line += FString::Printf(TEXT(" · 두 길(마스크 판 %d) %s"), B.MaskVersion, *Win.Text());
 	}
 	Line += FString::Printf(TEXT(" · 교체 %d번 · 환경 #%d"), BrainSwapsThisPlay, EnvRevision);
-	const FString Live = Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds());
+	if (IsAutoSnapshotOn())
+	{
+		Line += TEXT(" · ") + BigChangeStatusText();   // 10-27 '큰 변화만' 다시 배우기 진행 (규칙 0 이면 '환경 판마다')
+	}
+	const FString Live = WatchStatusText(Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds()));   // 10-27 우리가 띄운 감시의 켜는 중·끝난 까닭
 	if (!Live.IsEmpty())
 	{
 		Line += TEXT(" · ") + Live;
@@ -4540,6 +4645,264 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 		Line += TEXT(" · ") + FlightText;
 	}
 	GEngine->AddOnScreenDebugMessage(kNoticeKeyStatus, 1.5f, FColor(200, 220, 255), Line);
+}
+
+// -----------------------------------------------------------------------------
+// Play 때 파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.h — 설계 FOREST_GROWTH_MODE.md 3절)
+// 학습 파이프라인(live.py watch)을 따로 띄우는 개발용 도구다 — 추론이 아니다 (게임 추론은 그대로 C++ 네이티브만). 게임 스레드를 막지 않는다:
+// 띄우기 몇 ms, 살핌 2 초마다 기다림 없음, 끝낼 때만 최대 3 초. 개발 빌드·AutoAdapt·서버·단독만.
+// -----------------------------------------------------------------------------
+
+namespace EcoPolicyV3IntegratedImpl
+{
+	/** 상대 경로 = 프로젝트 폴더 기준 → 절대 (빈 값은 빈 값). */
+	FString ProjectAbs(const FString& In)
+	{
+		const FString T = In.TrimStartAndEnd();
+		if (T.IsEmpty())
+		{
+			return FString();
+		}
+		return FPaths::ConvertRelativePathToFull(FPaths::IsRelative(T) ? FPaths::Combine(FPaths::ProjectDir(), T) : T);
+	}
+
+	/** '적응 고리 | ' 머리를 뗀 글. */
+	FString LiveBody(const FString& Live)
+	{
+		const FString Head = TEXT("적응 고리 | ");
+		return Live.StartsWith(Head) ? Live.RightChop(Head.Len()) : Live;
+	}
+
+	/** <root>/live/watch.lock 의 주인 pid (못 읽으면 0). */
+	int32 LockOwnerPid(const FString& Root)
+	{
+		FString Text;
+		EcoV3Watch::FLock Lock;
+		return FFileHelper::LoadFileToString(Text, *(Root / TEXT("live/watch.lock"))) && EcoV3Watch::ParseLock(Text, Lock) ? Lock.Pid : 0;
+	}
+}
+
+void UEcoPolicyV3IntegratedSubsystem::BeginAutoWatch()
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	WatchDecision = EcoV3Watch::EDecide::NoAdapt;
+	WatchWhy.Empty();
+	WatchOtherPid = 0;
+	bWatchOurs = false;
+	bWatchEndReported = false;
+	NextWatchPoll = 0.0;
+	LastWatchLine.Empty();
+#if !UE_BUILD_SHIPPING
+	EcoV3Watch::FDecideIn In;
+	In.bAutoAdapt = IsAutoAdaptEnabled();
+	In.bAutoWatch = CVarAutoWatch.GetValueOnGameThread() != 0;
+	if (!In.bAutoAdapt)
+	{
+		return;   // 적응 고리 끔 (기본) — 기록도 남기지 않는다 (지금까지와 같다)
+	}
+	if (!In.bAutoWatch)
+	{
+		WatchDecision = EcoV3Watch::EDecide::Off;
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 | 끔 (eco.IntegratedV3.AutoWatch 0) — 사람이 live.py watch 를 따로 띄운다"));
+		return;
+	}
+	const UWorld* World = GetWorld();
+	In.bTesting = GIsAutomationTesting;
+	In.bClient = World && World->GetNetMode() == NM_Client;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	const FString Root = AdaptRootDir();
+	In.RootMismatch = EcoV3Watch::RootMismatch(Root, AutoSnapshotDir(), ProjectAbs(Reg.EffectiveWatchFolder()), ProjectAbs(Reg.EffectiveStatusFile()));
+	FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	L.Poll();
+	In.bOursAlive = L.IsRunning();
+	// 1. live.py 잠금 주인이 산 python (사람이 띄운 감시 — 또는 아래 pid 파일과 같으면 다른 언리얼이 띄운 감시)
+	EcoV3Watch::FLock Lock;
+	FString Text;
+	if (FFileHelper::LoadFileToString(Text, *(Root / TEXT("live/watch.lock"))) && EcoV3Watch::ParseLock(Text, Lock))
+	{
+		In.bLockAlive = FEcoV3WatchLauncher::IsProcessAlive(Lock.Pid, Lock.bHasCreateTime ? Lock.CreateTime : -1.0, /*bRequirePython*/ true);
+	}
+	// 2. 우리 기록 watcher.pid (죽은 pid 면 지우고 넘어간다)
+	EcoV3Watch::FPidFile Pf;
+	const FString PidPath = Root / TEXT("watcher.pid");
+	if (FFileHelper::LoadFileToString(Text, *PidPath) && EcoV3Watch::ParsePidFile(Text, Pf))
+	{
+		In.bPidFileAlive = FEcoV3WatchLauncher::IsProcessAlive(Pf.Pid, Pf.CreateUnix, /*bRequirePython*/ false);
+		if (!In.bPidFileAlive && !In.bOursAlive)
+		{
+			IFileManager::Get().Delete(*PidPath, false, true, true);
+		}
+		In.bLockIsOurs = In.bLockAlive && Lock.Pid == Pf.Pid;
+	}
+	// 3. python·live.py·작업 폴더
+	FString PyWhy;
+	const FString Python = EcoV3Watch::ResolvePython(CVarAutoWatchPython.GetValueOnGameThread(), FPlatformMisc::GetEnvironmentVariable(TEXT("PATH")),
+													 [](const FString& P) { return FPaths::FileExists(P); }, PyWhy);
+	In.bPython = !Python.IsEmpty();
+	const FString Override = CVarAutoWatchCmd.GetValueOnGameThread().TrimStartAndEnd();
+	FString WorkDir = ProjectAbs(CVarAutoWatchDir.GetValueOnGameThread());
+	if (WorkDir.IsEmpty())
+	{
+		WorkDir = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectDir(), TEXT(".."), TEXT("herbivore_rl")));
+	}
+	In.bScript = FPaths::DirectoryExists(WorkDir) && (!Override.IsEmpty() || FPaths::FileExists(WorkDir / EcoV3Watch::kScriptRel));
+	WatchDecision = EcoV3Watch::Decide(In);
+	switch (WatchDecision)
+	{
+	case EcoV3Watch::EDecide::Unsafe:
+		WatchWhy = In.RootMismatch;
+		break;
+	case EcoV3Watch::EDecide::NoPython:
+		WatchWhy = PyWhy;
+		break;
+	case EcoV3Watch::EDecide::NoScript:
+		WatchWhy = FString::Printf(TEXT("%s 가 없다 (eco.IntegratedV3.AutoWatchDir)"), *(WorkDir / EcoV3Watch::kScriptRel));
+		break;
+	case EcoV3Watch::EDecide::HumanRunning:
+	case EcoV3Watch::EDecide::OtherEditor:
+		WatchOtherPid = In.bLockAlive ? Lock.Pid : Pf.Pid;
+		break;
+	case EcoV3Watch::EDecide::OursRunning:
+		WatchOtherPid = L.GetPid();
+		break;
+	default:
+		break;
+	}
+	if (WatchDecision != EcoV3Watch::EDecide::Launch)
+	{
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 | %s%s%s"), EcoV3Watch::DecideName(WatchDecision),
+			   WatchOtherPid > 0 ? *FString::Printf(TEXT(" — pid %d%s"), WatchOtherPid,
+													In.bLockAlive ? *FString::Printf(TEXT(" (%s, 잠금 %s)"), *Lock.What, *(Root / TEXT("live/watch.lock"))) : TEXT(""))
+								 : TEXT(""),
+			   WatchWhy.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" — %s"), *WatchWhy));
+		return;
+	}
+	FEcoV3WatchLauncher::PruneLogs(Root, EcoV3Watch::kKeepLogs - 1);
+	const FString WatchLog = Root / FString::Printf(TEXT("watch_%s.log"), PlayId.IsEmpty() ? TEXT("noplay") : *PlayId);
+	const FString Args = EcoV3Watch::BuildArgs(Override, Root, PlayId, WatchLog);
+	FString Why;
+	if (!L.Launch(Python, Args, WorkDir, WatchLog, Root, PlayId, this, Why))
+	{
+		WatchDecision = EcoV3Watch::EDecide::LaunchFailed;
+		WatchWhy = Why;
+		UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 파이썬 감시 | 못 켬 — %s (%s %s)"), *Why, *Python, *Args);
+		return;
+	}
+	bWatchOurs = true;
+	UE_LOG(LogEcoPolicyV3I, Log,
+		   TEXT("[EcoV3I] 파이썬 감시 | 띄움 — pid %d · %s %s · 작업 폴더 %s · 기록 %s · 창 없음 · 작업 개체 %s — Play 가 끝나면 학습 자식까지 프로세스 나무째 끝낸다 ")
+			   TEXT("(학습 파이프라인을 따로 띄우는 개발용 도구 — 게임 추론은 C++ 네이티브 그대로)"),
+		   L.GetPid(), *Python, *Args, *WorkDir, *WatchLog, L.UsesJob() ? TEXT("켬") : TEXT("못 씀 (끝낼 때 프로세스 나무 걷기)"));
+	{
+		// 10-27 실제 폴더 고리는 두뇌 묶음마다 관문 크기 확정 여부가 다르다 (LIVE_GATE.md 변경 기록 (10) — 언리얼은 그 규칙을 다시 적지 않고 파이썬 상태 글을 그대로 보인다)
+		const FEcoV3BrainPtr Pending = Reg.GetPending();
+		const bool bBuiltin = Pending.IsValid() ? Pending->bBuiltin : Reg.GetActive()->bBuiltin;
+		if (bBuiltin && EcoV3Watch::SamePath(Root, FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("EcoAdapt"))))
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 | 참고: 실제 폴더 고리는 두뇌 묶음마다 관문 크기 확정 여부가 다르다 — 거부가 보이면 ")
+											 TEXT("herbivore_rl/results/v3/live/LIVE_GATE.md 변경 기록 (10). 판 5 두뇌로 시작하려면 -EcoV3Brain=v3_r7_g995_s1_20m"));
+		}
+	}
+#endif
+}
+
+void UEcoPolicyV3IntegratedSubsystem::PollAutoWatch()
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	if (WatchDecision == EcoV3Watch::EDecide::NoAdapt || WatchDecision == EcoV3Watch::EDecide::Off)
+	{
+		return;   // 적응 고리 끔·자동 감시 끔 — 아무것도 하지 않는다
+	}
+	FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	if (bWatchOurs && L.GetOwner() == this && L.Poll())
+	{
+		const FString LogName = FPaths::GetCleanFilename(L.GetLogPath());
+		WatchOtherPid = L.GetEnd() == EcoV3Watch::EEnd::OtherLoop ? LockOwnerPid(L.GetRoot()) : 0;
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 끝남 | pid %d · 종료 코드 %d · %s · 기록 %s — 다시 띄우지 않는다 (이 Play 의 나머지는 감시 없이 — 스냅숏은 쓰이고 두뇌는 오지 않는다)"),
+			   L.GetPid(), L.GetExitCode(), *EcoV3Watch::EndStatusText(L.GetEnd(), L.GetExitCode(), LogName, WatchOtherPid), *L.GetLogPath());
+		if (!bWatchEndReported)
+		{
+			bWatchEndReported = true;
+			const FString Notice = EcoV3Watch::EndNoticeText(L.GetEnd(), LogName);
+			if (!Notice.IsEmpty())
+			{
+				PostNotice(EcoV3Integrated::ENotice::Reject, Notice);
+			}
+		}
+	}
+	// 상태 줄 '적응 고리' 감시 글이 바뀌면 기록 한 줄 (헤드리스 증거 — '켜는 중' 초 세기는 한 번만, 파이썬 상태 글 자체의 바뀜은 DrawBrainNotices 가 이미 적는다)
+	const FString Live = FEcoV3BrainRegistry::Get().GetLiveStatusText(EcoV3Brain::NowUnixSeconds());
+	const FString Text = WatchStatusText(Live);
+	const FString Key = Text.Contains(TEXT("켜는 중"))																	   ? FString(TEXT("starting"))
+						: WatchDecision == EcoV3Watch::EDecide::HumanRunning || WatchDecision == EcoV3Watch::EDecide::OtherEditor ? FString(TEXT("other"))
+						: Text == Live																						   ? FString(TEXT("live"))
+																															   : Text;
+	if (Key != LastWatchLine)
+	{
+		LastWatchLine = Key;
+		if (!Text.IsEmpty())
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 적응 고리 감시 | %s"), *Text);
+		}
+	}
+}
+
+void UEcoPolicyV3IntegratedSubsystem::EndAutoWatch()
+{
+	if (bWatchOurs)
+	{
+		FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+		const int32 Pid = L.GetPid();
+		const bool bJob = L.UsesJob();
+		if (L.GetOwner() == this && L.Stop(this, TEXT("Play 끝")))
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 끝냄 | pid %d (우리가 띄움) · 학습 자식 포함 프로세스 나무째 (%s) · 기록 %s"), Pid,
+				   bJob ? TEXT("작업 개체") : TEXT("프로세스 나무 걷기"), *L.GetLogPath());
+		}
+	}
+	bWatchOurs = false;
+	WatchDecision = EcoV3Watch::EDecide::NoAdapt;
+	WatchWhy.Empty();
+	WatchOtherPid = 0;
+	LastWatchLine.Empty();
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::WatchStatusText(const FString& Live) const
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	const FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	if (bWatchOurs && L.GetOwner() == this)
+	{
+		if (!L.IsRunning() && L.GetEnd() != EcoV3Watch::EEnd::None)
+		{
+			const FString Ended = EcoV3Watch::EndStatusText(L.GetEnd(), L.GetExitCode(), FPaths::GetCleanFilename(L.GetLogPath()), WatchOtherPid);
+			return L.GetEnd() == EcoV3Watch::EEnd::OtherLoop && !Live.IsEmpty() ? FString::Printf(TEXT("%s · %s"), *Ended, *LiveBody(Live)) : Ended;
+		}
+		if (L.IsRunning())
+		{
+			// 앞 Play 가 남긴 옛 상태 글(120 초 안이면 '학습 중 …'으로 보였을 것)을 보이지 않는다 — 감시가 새로 쓸 때까지 '켜는 중'
+			const FEcoV3LiveStatus& S = FEcoV3BrainRegistry::Get().GetLiveStatus();
+			if (!S.bValid || S.UpdatedUnix < L.GetLaunchedUnix())
+			{
+				return FString::Printf(TEXT("적응 고리 | 파이썬 감시 켜는 중 (%.0f초)"), FMath::Max(0.0, EcoV3Brain::NowUnixSeconds() - L.GetLaunchedUnix()));
+			}
+		}
+		return Live;
+	}
+	switch (WatchDecision)
+	{
+	case EcoV3Watch::EDecide::HumanRunning:
+		return Live.IsEmpty() ? Live : Live + TEXT(" (사람이 띄운 감시)");
+	case EcoV3Watch::EDecide::OtherEditor:
+		return Live.IsEmpty() ? Live : Live + FString::Printf(TEXT(" (다른 언리얼 프로세스가 띄운 감시 pid %d)"), WatchOtherPid);
+	case EcoV3Watch::EDecide::Unsafe:
+	case EcoV3Watch::EDecide::NoPython:
+	case EcoV3Watch::EDecide::NoScript:
+	case EcoV3Watch::EDecide::LaunchFailed:
+		return FString::Printf(TEXT("적응 고리 | 파이썬 감시를 못 켬 — %s"), WatchWhy.IsEmpty() ? EcoV3Watch::DecideName(WatchDecision) : *WatchWhy);
+	default:
+		return Live;
+	}
 }
 
 FString UEcoPolicyV3IntegratedSubsystem::FlightStatusText() const

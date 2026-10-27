@@ -767,6 +767,9 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	const double CpuStart = FPlatformTime::Seconds();
 	for (int32 s = 0; s < Steps; ++s)
 	{
+		// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp): 다 자랄 단계면 이 정확한 스텝에서 줄기 막이를 켜고 나무만 다시 읽는다 — 바로 아래 ApplyEnvChange 가 넣는다
+		// (실시간 읽기 주기·프레임 나눔과 무관). 숲을 끄면 아무것도 하지 않는다
+		Sub->ForestStepBoundary();
 		// 환경 바뀜 (10-21 실시간 두뇌 교체, EcoV3EnvWatch.cpp): 레벨이 바꾼 나무·날씨를 이 경계(스텝 앞)에서 지역 세계에 넣는다 — 새 원판 안 산 사슴·늑대는
 		// 밖으로 민다. 대기 변화가 없으면 아무것도 하지 않는다 (지금까지와 비트 단위로 같다)
 		if (Sub->HasPendingEnvChange())

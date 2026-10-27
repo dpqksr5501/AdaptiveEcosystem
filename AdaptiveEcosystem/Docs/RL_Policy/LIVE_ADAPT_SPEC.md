@@ -22,14 +22,19 @@
   `EcoBrains/v3_r7_g995_s1_20m.json`)을 `eco.V3Brain.Startup`·`-EcoV3Brain=`·`eco.V3Brain.Load` 로 건 Play 의 스냅숏이면, 파이썬이 그 두뇌를 '지금 두뇌'로
   받아 판 5 세계에서 판정하고 판 5 그대로 이어 배워 판 5 두뇌 파일을 낸다(아래 2·6절). 주고받는 파일 꼴은 그대로다(스냅숏은 이식 2/2 에서 더한 칸을 읽을 뿐).
   게임 기본 두뇌(내장 R1b-F)·기본 설정·관측 21 고리는 그대로이고, 판 4 두뇌(route0·R6)를 건 Play 의 스냅숏은 거부(refused)한다. 규칙 `LIVE_GATE.md` 변경 기록 (8).
+- 사용자 결정 10-27: "변화하는 레벨은 팀에 맡기고 나는 변했을 때 어떻게 반응할지에 대해서만 설계하자. 그래서 일단은 모드를 하나 만들어서 해당 모드에서는 숲이 점점 자라게
+  만들고 그걸 언리얼이 인식하면 그에 맞춰 두뇌 다시 만들어서 교체하는걸로 가자." 다시 배우기 기준 = '큰 변화만'(날씨 종류 바뀜 또는 나무 수가 문턱 이상 바뀜, 세기 흔들림은
+  세계에만 넣음, 잦은 변화는 묶음), Play 때 파이썬 감시 자동 시작. 구현: 숲 자람 모드(5.3), 자동 스냅숏 규칙(5.2), 감시 자동 시작(5.5) — 설계·구현 기록과 확인 결과는
+  [FOREST_GROWTH_MODE.md](FOREST_GROWTH_MODE.md). 주고받는 파일 꼴은 그대로다(스냅숏 `env` 에 칸을 더하기만 — 2절).
 
 ## 0. 고리 한눈에
 
 ```
-레벨(팀)이 나무·날씨를 바꿈  ─▶  언리얼 환경 감시(EcoV3EnvWatch) ─▶ 결정 스텝 경계에서 지역 세계에 넣음 ─▶ 자동 스냅숏 (snapshots/)
+레벨(팀)이 나무·날씨를 바꿈 (시험: 숲 자람 모드 5.3) ─▶ 언리얼 환경 감시(EcoV3EnvWatch) ─▶ 결정 스텝 경계에서 지역 세계에 넣음
+                                                                                             └▶ '큰 변화만'일 때 바뀜이 멈춘 뒤 한 번 자동 스냅숏 (snapshots/, 5.2)
                                                                                                         │
 언리얼 두뇌 감시(eco.V3Brain) ◀─ brains/live_r<판>_<시도>.json ◀─ 관문 통과 ◀─ 포만 없는 세계에서 이어 배움 ◀─ 파이썬 live.py watch
-  └▶ 다음 결정 스텝 경계에서 교체 · 화면 알림 · 판 번호 · eco.V3Brain.Rollback 되돌리기
+  └▶ 다음 결정 스텝 경계에서 교체 · 화면 알림 · 판 번호 · eco.V3Brain.Rollback 되돌리기          (AutoAdapt Play 가 창 없이 띄우고 Play 끝에 끝냄, 5.5)
 ```
 
 ## 1. 폴더와 파일 (모두 `AdaptiveEcosystem/Saved/EcoAdapt/` 아래 — `**/Saved/` 라 git 밖)
@@ -60,7 +65,23 @@
   ]
 }
 ```
-`source` = `level`(레벨 나무 액터) · `cvar:<이름>`(우리 지역 날씨 콘솔 변수) · `team_env`(팀 `FRegionEnvironmentState`) · `test`(시험용 대역).
+`source` = `level`(레벨 나무 액터) · `cvar:<이름>`(우리 지역 날씨 콘솔 변수) · `team_env`(팀 `FRegionEnvironmentState`) · `test`(시험용 대역) ·
+`forest_growth`(10-27 숲 자람 모드가 다 자란 나무를 넣음 — 5.3. `detail` 은 같은 `나무 a→b (+n −m)` 꼴).
+
+10-27 '큰 변화만'·숲 자람이 더한 칸 (`env` 안 — 파이썬은 모르는 칸을 읽지 않는다. `live.py`·`adapt.py` 는 바꾸지 않았다):
+```json
+"rule": "big",                     // 자동 스냅숏 규칙: big (eco.IntegratedV3.AutoSnapshotRule 1, 기본) | each (0 — 옛 동작). 콘솔·예정 스냅숏에도 적힌다
+"big": {                           // rule big 일 때만 — 쓰는 순간의 셈 (5.2)
+  "baseline_step": 0, "big_trees": 10, "weather_hold_s": 120, "settle_s": 20, "max_wait_s": 300,
+  "trees": {"Forest": 0, "Barren": 24, "Highland": 0},          // 지역마다 기준선과 세계 원판의 대칭차
+  "weather": {"Forest": {"base": "rain", "now": "rain", "held_s": 0}, …},
+  "condition": true, "quiet_s": 20.0, "held_s": 100.0,          // 마지막 큰 변화 바뀜 뒤 초 · 조건이 선 뒤 초
+  "level_change_hold": false, "capped": false
+},
+"forest": {"on": true, "region": "Barren", "target": 24, "planned": 24, "mature": 24, "saplings": 0, "per_stage": 6,   // 숲 자람 모드를 켰을 때만
+           "start_seconds": 30, "stage_seconds": 40, "grow_seconds": 20, "next_mature_step": -1, "done": true}
+```
+`trigger` 는 그대로 `env_change` 다. 자동 스냅숏의 `why` 는 규칙 1 이면 `큰 변화 — 메마른 땅 나무 +24/10 · 날씨 그대로 (기준 전역 스텝 0) · 바뀜 없이 20.0초 · 조건 뒤 100.0초`.
 `brain` 안에 `"adapt": {"round", "attempt", "run", "snapshot"}`(지금 두뇌 파일에 adapt 블록이 있었을 때, 없으면 `{}`). 지역 `obstacles` 안에 `"level_trunks"`(지금 무대 안 줄기 막이 수).
 
 10-24 두 길 두뇌 이식(`80bbf13`, `RL_V3_ROUTE_CPP_PORT_PLAN.md` 15-1)이 더한 칸 — 파이썬이 읽는다(변경 기록 (8)):
@@ -164,9 +185,25 @@
 ### 5.2 자동 스냅숏 (`S/AI/Policy/EcoV3Snapshot.cpp`)
 - `eco.IntegratedV3.AutoAdapt` (기본 0, 명령줄 `-EcoV3AutoAdapt`): 적응 고리 큰 스위치. 켜면 — 환경 바뀜 뒤 자동 스냅숏, 두뇌 감시 폴더 기본
   `Saved/EcoAdapt/brains`(`eco.V3Brain.WatchFolder` 가 비었을 때), Play 시작 때 있던 파일은 읽지 않음, Play 번호(`play_id`), 상태 줄(`Saved/EcoAdapt/status.json`),
-  Play 마다 내장 두뇌(판 0)에서 시작(레벨이 Play 마다 처음 상태로 돌아오므로 — `eco.V3Brain.Startup` 을 주면 그 두뇌).
-- `eco.IntegratedV3.AutoSnapshot` (기본 −1 = AutoAdapt 따름, 0 끔, 1 켬): 마지막 환경 판이 `AutoSnapshotSettle`(시뮬레이션 3 초) 동안 그대로면 판마다 한 번.
-- `eco.IntegratedV3.SnapshotEvery` (시뮬레이션 초, 기본 0 = 끔): 주기 스냅숏(`periodic`). `eco.IntegratedV3.AutoSnapshotOut` (기본 `Saved/EcoAdapt/snapshots`).
+  Play 마다 내장 두뇌(판 0)에서 시작(레벨이 Play 마다 처음 상태로 돌아오므로 — `eco.V3Brain.Startup` 을 주면 그 두뇌). 10-27: 기본 폴더 셋은 `eco.IntegratedV3.AdaptRoot`
+  (빈 값 = `Saved/EcoAdapt`) 아래이고, Play 때 파이썬 감시를 창 없이 띄워 Play 끝에 끝낸다(5.5 — `eco.IntegratedV3.AutoWatch 0` 이면 지금까지처럼 사람이 띄운다).
+- `eco.IntegratedV3.AutoSnapshot` (기본 −1 = AutoAdapt 따름, 0 끔, 1 켬): 환경 바뀜 자동 스냅숏. 언제 쓰는지는 아래 규칙.
+- **`eco.IntegratedV3.AutoSnapshotRule`** (10-27, 기본 1 = 큰 변화만 — `S/AI/Policy/EcoV3BigChange.h`, 판정은 `MaybeAutoSnapshot`, 셈은 `ApplyEnvChange`):
+  - 기준선 = Play 시작(지역 세계를 만든 때) 또는 마지막 **자동** 스냅숏 때의 지역마다 (세계 원판, 날씨 종류). 주기·콘솔·예정 스냅숏은 기준선을 바꾸지 않는다.
+  - 나무: 한 지역 세계 원판과 기준선 원판의 대칭차(같은 (x, y, r) 끼리 하나씩 지우고 남은 양쪽 합) ≥ `eco.IntegratedV3.BigTrees`(10).
+  - 날씨: 지역 날씨 종류(맑음·비·눈)가 기준선과 다르고 그 종류가 된 뒤 `eco.IntegratedV3.WeatherHold`(시뮬레이션 120 초) 이상 이어짐 — 팀 비 주기 180 초의 반 주기(약 90 초)를
+    넘지 않는 오가는 비는 큰 변화가 아니다. **세기만 바뀐 묶음은 세계에는 넣지만 셈·바뀜 시계에 넣지 않는다.**
+  - 묶기: 조건이 선 뒤 큰 변화 바뀜(원판·날씨 종류)이 `eco.IntegratedV3.BigSettle`(20 초) 없을 때 한 번. 숲 자람 모드가 아직 자라는 동안('레벨 바뀜 진행 중' —
+    `SetLevelChangeHold` 로 다른 쪽도 걸 수 있다)은 기다린다. 조건 뒤 `eco.IntegratedV3.BigMaxWait`(300 초)가 지나면 진행 중·묶기와 상관없이 쓴다(`capped`).
+  - 쓰면(쓰기에 실패해도) 기준선 = 지금. 조건이 처음 선 때 기록 `[EcoV3I] 다시 배우기 조건 됨 | 90.0초 (전역 스텝 675) | 메마른 땅 나무 +12/10 · 날씨 그대로 | 기다림: …`.
+  - 규칙이 돌 때(자동 스냅숏 켬 ∧ 규칙 1) 세기만 바뀐 환경 판은 화면 알림을 내지 않는다 — 기록 줄 `[EcoV3I] 환경 바뀜 #n | … | 세기만 바뀜 — 다시 배우기 셈·화면 알림 없음`
+    은 남는다 (`eco.IntegratedV3.EnvNoticeMinor 1` = 늘 알림). 자동 스냅숏이 꺼졌으면 알림은 지금까지와 같다.
+  - 상태 줄(AutoAdapt — 5.4)의 `환경 #n` 뒤 칸: `다시 배우기까지: 메마른 땅 나무 +7/10 · 날씨 그대로` → `다시 배우기: 조건 됨 — 숲이 다 자랄 때까지 기다림 (45/300초)` →
+    `다시 배우기: 조건 됨 — 바뀜이 멈추길 기다림 12/20초`. `eco.IntegratedV3.EnvInfo` 첫 줄에도 같은 글.
+  - 이 규칙은 **언제 쓰는지만** 바꾼다 — 세계에 넣는 것은 그대로다 (10-27 확인: 규칙 0·1 두 판의 사슴 줄이 바이트까지 같고 스냅숏 수만 4 → 1, FOREST_GROWTH_MODE.md 9절).
+  - `0` = 옛 동작: 마지막 환경 판이 `AutoSnapshotSettle`(시뮬레이션 3 초) 동안 그대로면 판마다 한 번 (자동화 `Policy.V3.EnvWatch.AutoSnapshot` 은 규칙 0 을 걸고 본다).
+  - 명령줄 시작값: `-EcoV3AutoSnapshotRule=`·`-EcoV3BigTrees=`·`-EcoV3WeatherHold=`·`-EcoV3BigSettle=`·`-EcoV3BigMaxWait=`·`-EcoV3EnvNoticeMinor=`.
+- `eco.IntegratedV3.SnapshotEvery` (시뮬레이션 초, 기본 0 = 끔): 주기 스냅숏(`periodic`). `eco.IntegratedV3.AutoSnapshotOut` (기본 `<AdaptRoot>/snapshots` — 5.5).
 - 모든 스냅숏 쓰기(자동·주기·콘솔·예정)는 `.tmp` 에 쓰고 옮겨 바꾼다.
 
 ### 5.3 시험용 대역 (레벨 팀이 할 일을 흉내 낼 뿐 — 세계 규칙이 아니다)
@@ -174,6 +211,21 @@
   땅에 붙임)에 놓는다. `Test.RemoveTrees <지역> <수>`: 놓은 짝을 나중 것부터. **단독 실행만**(짝을 복제하지 않아 서버에서 놓으면 클라이언트 충돌과 달라진다).
 - `eco.IntegratedV3.Test.At <초> <명령>[; <명령>…]`, 명령줄 `-EcoV3TestAt=<초> -EcoV3TestCmd="명령1; 명령2"`(쌍 여러 개): 시뮬레이션 초에 콘솔 명령을 한 번.
   예약 명령이 바꾼 콘솔 변수는 Play 가 끝나면 예약 전 값으로 되돌린다.
+- **숲 자람 모드** (10-27 — `S/AI/Policy/EcoV3ForestGrowth.{h,cpp}`·`EcoV3ForestTree.{h,cpp}`, 시험 모드·세계 규칙 아님. 설계·확인 FOREST_GROWTH_MODE.md):
+  `eco.IntegratedV3.ForestGrowth`(기본 0, 명령줄 `-EcoV3ForestGrowth`). 켜면 `ForestRegion`(기본 Barren) 무대에 `ForestPerStage`(6) 그루씩 `ForestStageSeconds`(40 초)마다
+  묘목이 돋아 `ForestGrowSeconds`(20 초) 뒤 다 자라고 `ForestTarget`(24)에서 멈춘다. 첫 단계 `ForestStartSeconds`(30 초), 자리 씨 `ForestSeed`(−1 = 세션 시드), 묘목 크기 몫
+  `ForestSapling`(0.15, 그리기만). 모두 Play 시작 때 한 번 읽는다(명령줄 `-EcoV3Forest*=`).
+  - 자리: 지역 세계가 생긴 직후 목표 수만큼 한꺼번에 — `Test.AddTrees` 와 같은 규칙(벽 4 m·은신처 원 + 2 m·다른 원판 + 3 m 밖, 크기 1.8~2.2, 땅에 붙임), 난수
+    `HashChain3("V3FG", 씨, 지역 색인 + 1)` 하나에서 그루 순서대로. 씨가 같으면 같은 자리.
+  - 묘목(복제 액터 `AEcoV3ForestTree`, 꼬리표 `EcoV3Tree`·`EcoV3TreeId_<지역>_F<nn>`)은 줄기 막이 충돌이 없고 꼬리표 `EcoV3Trunk` 도 없어 아무것도 막지 않는다.
+  - 다 자람은 처리기 결정 스텝 경계(`ForestStepBoundary` — 환경 넣기 바로 앞)의 정확한 전역 스텝(기본 375·675·975·1275)에서: 줄기 막이 BlockAll·꼬리표 `EcoV3Trunk` →
+    나무만 다시 읽기(`PollEnvironment(true, true)`) → 같은 경계의 `ApplyEnvChange` 가 출처 `forest_growth` 로 넣는다 — 레벨 나무와 같은 길, 먹이 격자 그대로.
+    실시간 읽기 주기·fps·프레임 나눔과 무관하다 (10-27 확인: fps 30·20 판의 사슴 줄이 바이트까지 같다).
+  - 복제(bReplicates·bAlwaysRelevant, 계획 값은 double 그대로, 다 자람 `bMature` 는 서버 값)라 단독·리슨·데디케이티드 + 클라이언트가 같은 나무·줄기 충돌을 갖는다
+    (클라이언트도 같은 정적 함수로 변환을 셈한다). 다 자랄 때 기록 `[EcoV3I] 숲 Barren_F07 다 자람 (서버|클라이언트|단독) | 줄기 충돌 켬 · 줄기 변환 지문 …`.
+  - 화면 줄 `숲이 자라는 중 — 메마른 땅 나무 12/24 (묘목 6 그루 자라는 중)`(키 732005, 클라이언트도 복제된 나무를 세어 같은 줄). 보기 `eco.IntegratedV3.ForestInfo`.
+  - 거부(아무것도 놓지 않고 까닭 한 줄): 그 지역 v3 무대 없음·환경 감시 끔·그 지역 장애물 끔·원판 가져옴·실행 중 무대 나무가 서 있음.
+  - `Test.RemoveTrees` 는 숲 나무를 지우지 않고, `Test.AddTrees` 는 숲 자리를 피한다. 끄면 숲 코드가 돌지 않는다 (10-27 확인: 끈 판의 사슴 줄이 바꾸기 전 빌드와 바이트까지 같다).
 
 ### 5.4 두뇌 교체 화면·되돌리기 (`S/AI/Policy/EcoV3Brain.{h,cpp}`, `SyncBrain`)
 - 되돌리기 쌓개(16): 바꿀 때마다 나가는 두뇌를 쌓는다. `eco.V3Brain.Rollback`(다음 결정 스텝 경계에서 바로 앞 두뇌로, 두 번 누르면 둘 앞), `eco.V3Brain.History`.
@@ -182,7 +234,33 @@
 - 화면 알림(`eco.V3Brain.Notice`, 기본 1 — `eco.V3Debug` 와 상관없이, 그리는 실행에서만, 클라이언트 아님. 모든 알림은 기록 `[EcoV3I] 알림 | …` 으로도 남는다):
   새 두뇌(판·id·환경·관문·되돌리기 안내), 되돌림, 두뇌 파일 거부, 환경 바뀜, 스냅숏 내보냄, 그리고 상태 줄
   `두뇌 판 3 (live_r3…@abcd) · 교체 3번 · 환경 #2 · 적응 고리 | <status.message>`.
-- `eco.V3Brain.NoticeShot` (기본 0): 바꿈·되돌림 알림 1.5 초 뒤 화면 찍기(`Saved/EcoAdapt/shots`). `eco.V3Brain.StatusFile`(기본 빈 값 = AutoAdapt 면 `Saved/EcoAdapt/status.json`).
+- `eco.V3Brain.NoticeShot` (기본 0): 바꿈·되돌림 알림 1.5 초 뒤 화면 찍기(`Saved/EcoAdapt/shots`). `eco.V3Brain.StatusFile`(기본 빈 값 = AutoAdapt 면 `<AdaptRoot>/status.json`).
+
+### 5.5 Play 때 파이썬 감시 자동 시작 (10-27 — `S/AI/Policy/EcoV3WatchLauncher.{h,cpp}`, 훅은 `EcoPolicyV3IntegratedSubsystem.cpp`)
+- **AGENTS.md 원칙과의 관계**: 게임 런타임 추론은 지금처럼 **C++ 네이티브만**이다 — 사슴 결정은 내장·두뇌 파일 가중치를 C++ 가 계산한다. 자동으로 띄우는 것은
+  **학습 파이프라인(`live.py watch`)을 따로 띄우는 개발용 도구**다: 추론이 아니고, 게임 스레드를 막지 않으며(띄우기 몇 ms, 살아 있나 보기는 2 초마다 기다림 없는
+  `WaitForSingleObject(…, 0)`, 끝낼 때만 최대 3 초), `#if !UE_BUILD_SHIPPING` 이고, `eco.IntegratedV3.AutoAdapt` 를 켰을 때만, 서버·단독 월드에서만 돈다. 파이썬이 내는 것은
+  지금처럼 두뇌 파일뿐이고, 언리얼은 그것을 결정 스텝 경계에서 C++ 가중치로 바꿔 끼운다.
+- 스위치 (Play 시작 때 읽음): `eco.IntegratedV3.AutoWatch`(기본 1 = AutoAdapt 를 따름, 0 = 안 띄움, `-EcoV3AutoWatch=`) · `AutoWatchPython`(기본 `python` — PATH 에서 찾아 전체
+  경로로 기록, `\WindowsApps\` 스토어 대역은 쓰지 않음. 이 컴퓨터는 `C:\Users\Sinhyeok\anaconda3\python.exe`) · `AutoWatchCmd`(시험용 덮기 — 실행 파일 뒤 인자, 자리표
+  `{root}`·`{play}`·`{log}`) · `AutoWatchDir`(빈 값 = `<프로젝트>/../herbivore_rl`) · **`eco.IntegratedV3.AdaptRoot`**(빈 값 = `Saved/EcoAdapt` — 스냅숏 `<root>/snapshots`·두뇌 감시
+  `<root>/brains`·상태 파일 `<root>/status.json`·감시 `--root` 의 기본을 하나로 묶는다. 시험은 이것 하나만 바꿔 실제 폴더를 건드리지 않는다, `-EcoV3AdaptRoot=`).
+- 띄우는 명령: 작업 폴더 `herbivore_rl` 에서 `<python> -X utf8 -u results/v3/live/live.py watch --root "<root>"`, 표준 출력·오류 = `<root>/watch_<play_id>.log`(최근 20 개만 남김).
+  `-X utf8` = `PYTHONUTF8=1` (편집기 환경 변수는 바꾸지 않는다). `--existing` 은 주지 않는다(앞 Play 의 스냅숏으로 배우지 않게).
+- 창 없이·나무째: `CreateProcessW`(`CREATE_NO_WINDOW` — 숨은 콘솔을 판·학습 자식이 물려받아 창이 없다, 물려줄 손잡이는 기록·NUL 둘뿐)를 **멈춘 채** 만들어 윈도 작업 개체
+  (`KILL_ON_JOB_CLOSE`)에 넣은 뒤 깨운다 — 감시가 자식을 띄우기 전에 작업 개체 안이다. Play 끝(서브시스템 `Deinitialize`, 띄운 그 서브시스템만)에 작업 개체째 끝내고
+  (`[EcoV3I] 파이썬 감시 끝냄 | pid n (우리가 띄움) · 학습 자식 포함 프로세스 나무째 (작업 개체)`), 편집기가 죽으면 작업 개체 손잡이가 닫히며 함께 끝난다.
+- 중복 방지(먼저 맞는 것에서 멈춤): 이 편집기가 띄운 감시가 산다 → `<root>/live/watch.lock`(live.py 잠금) 주인이 산 python(시작 시각 0.5 초 안) → `[EcoV3I] 파이썬 감시 | 이미 돈다 —
+  사람이 띄움, 건드리지 않음 — pid n` (상태 줄 끝에 ` (사람이 띄운 감시)`) → `<root>/watcher.pid`(언리얼이 띄울 때 쓰는 JSON) 주인이 산다 → 다른 언리얼이 띄움. 죽은 pid 의
+  `watcher.pid` 는 지운다. 그래도 경주가 나면 live.py 의 O_EXCL 잠금이 마지막 심판이다. 사람이 띄운 감시·다른 워크플로의 파이썬·live.py 의 파일은 건드리지 않는다.
+- 안 띄움: AutoWatch 0 · AutoAdapt 0 · 자동화 시험 중 · 클라이언트 · **폴더 안전장치**(스냅숏·두뇌 감시·상태 파일이 한 root 아래가 아님 — 예 `level_jyu_eco` 스모크처럼 따로
+  덮은 시험 꾸밈) · python·live.py 없음 → 상태 줄 `적응 고리 | 파이썬 감시를 못 켬 — <까닭>`.
+- 상태 줄 '적응 고리 | …' (FOREST_GROWTH_MODE.md 3.7·3.8): 우리가 띄웠고 `status.json` 이 띄운 뒤에 고쳐지지 않았으면 `파이썬 감시 켜는 중 (n초)`, 감시가 끝나면 기록 끝
+  줄로 까닭 — `flight_sizes_confirmed`(실제 폴더 잠김) → `파이썬 감시 꺼짐 — 실제 폴더 잠김 (관문 크기 확정 전)` + 화면 알림 한 번, `다른 실시간 고리` → `다른 감시가 돈다 (pid n)`,
+  그 밖 종료 코드 ≠ 0 → `파이썬 감시 꺼짐 — 종료 코드 n (기록 watch_<play>.log)` + 알림, 0 → `파이썬 감시 끝남`. 다시 띄우지 않는다. 글이 바뀌면 기록
+  `[EcoV3I] 적응 고리 감시 | …`.
+- 쓰는 순서가 바뀐다: 사람이 `live.py watch` 를 먼저 띄워 두면 언리얼은 그것을 쓴다(위 중복 방지). 언리얼이 먼저 띄웠는데 사람이 또 띄우면 사람 쪽이 live.py 잠금으로
+  '다른 실시간 고리' 로 끝난다. 실제 폴더 고리의 두뇌 묶음 규칙(`LIVE_GATE.md` 변경 기록 (10) — 판 5 두뇌로 시작한 Play 만)은 언리얼에 다시 적지 않고 파이썬 상태 글을 그대로 보인다.
 
 ## 6. 파이썬 (`herbivore_rl/results/v3/live/live.py`, 시험 `herbivore_rl/tests/test_live_v3.py`)
 - `watch`(감시 데몬) · `round --snapshot F`(한 판) · `pilot --snapshot F`(예비 측정 — 시드 34900~34999 만). 적응 고리 `results/v3/adapt/adapt.py` 를 쓴다.

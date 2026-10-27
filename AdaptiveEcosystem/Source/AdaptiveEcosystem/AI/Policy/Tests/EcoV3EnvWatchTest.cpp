@@ -971,10 +971,13 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 bool FEcoV3EnvWatchAutoSnapshotTest::RunTest(const FString& Parameters)
 {
 	using namespace EcoV3EnvWatchTestImpl;
-	const TCHAR* const Vars[6] = {TEXT("eco.IntegratedV3.AutoSnapshot"),  TEXT("eco.IntegratedV3.AutoSnapshotOut"), TEXT("eco.IntegratedV3.AutoSnapshotSettle"),
-								  TEXT("eco.IntegratedV3.SnapshotEvery"), TEXT("eco.IntegratedV3.WeatherBarren"),   TEXT("eco.IntegratedV3.WeatherForest")};
-	FString Saved[6];
-	for (int32 i = 0; i < 6; ++i)
+	// 10-27: 기본 규칙이 '큰 변화만'(eco.IntegratedV3.AutoSnapshotRule 1)으로 바뀌어, 이 시험(판마다 한 번 = 옛 동작)은 규칙 0 을 걸고 끝에 되돌린다.
+	// 큰 변화 규칙은 AutoSnapshot.BigRule (순수)·EnvWatch.BigRule (서브시스템) 이 본다
+	const TCHAR* const Vars[7] = {TEXT("eco.IntegratedV3.AutoSnapshot"),  TEXT("eco.IntegratedV3.AutoSnapshotOut"), TEXT("eco.IntegratedV3.AutoSnapshotSettle"),
+								  TEXT("eco.IntegratedV3.SnapshotEvery"), TEXT("eco.IntegratedV3.WeatherBarren"),   TEXT("eco.IntegratedV3.WeatherForest"),
+								  TEXT("eco.IntegratedV3.AutoSnapshotRule")};
+	FString Saved[7];
+	for (int32 i = 0; i < 7; ++i)
 	{
 		Saved[i] = GetCVar(Vars[i]);
 	}
@@ -982,19 +985,21 @@ bool FEcoV3EnvWatchAutoSnapshotTest::RunTest(const FString& Parameters)
 	IFileManager::Get().DeleteDirectory(*Dir, /*RequireExists*/ false, /*Tree*/ true);
 	ON_SCOPE_EXIT
 	{
-		for (int32 i = 0; i < 6; ++i)
+		for (int32 i = 0; i < 7; ++i)
 		{
 			SetCVar(Vars[i], *Saved[i]);
 		}
 		IFileManager::Get().DeleteDirectory(*Dir, false, true);
 	};
 	TestEqual(TEXT("기본: 자동 스냅숏 -1 (AutoAdapt 따름)"), Saved[0], FString(TEXT("-1")));
+	TestEqual(TEXT("기본: 자동 스냅숏 규칙 1 (큰 변화만)"), Saved[6], FString(TEXT("1")));
 	SetCVar(Vars[0], TEXT("1"));
 	SetCVar(Vars[1], *Dir);
 	SetCVar(Vars[2], TEXT("3"));
 	SetCVar(Vars[3], TEXT("0"));
 	SetCVar(Vars[4], TEXT(""));
 	SetCVar(Vars[5], TEXT(""));   // 숲 날씨는 Play 시작 값(빈 값) 그대로 — 바뀜은 메마른 땅 하나
+	SetCVar(Vars[6], TEXT("0"));  // 옛 동작 (판마다)
 	auto Files = [&Dir](const TCHAR* Pattern)
 	{
 		TArray<FString> Found;

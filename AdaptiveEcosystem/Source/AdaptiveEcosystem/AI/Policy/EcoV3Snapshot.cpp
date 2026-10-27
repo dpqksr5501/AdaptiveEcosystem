@@ -19,6 +19,11 @@
 // 지역 obstacles 에 foliage_trees (discs 순서로 원판마다 나무 0/1), settings 에 foliage (스위치), 켠 세계의 flight 에 lost_foliage {n, steps, contact}.
 // 파이썬 adapt.convert 는 켠 세계(장애물 ∧ 눈길 가림 ∧ foliage)를 거부한다(Refused — 대응을 아직 옮기지 않았다). 옮길 때 대응은 obstacle_rules.foliage →
 // features.obstacles.foliage.enabled, foliage_r → .r, foliage_block → .block, obstacles.foliage_trees → .trees (fixed 원판 순서의 0/1 목록).
+// 10-27 '큰 변화만' 다시 배우기 (설계·구현 기록 FOREST_GROWTH_MODE.md 2절, LIVE_ADAPT_SPEC.md 5.2): eco.IntegratedV3.AutoSnapshotRule 1 (기본) = 자동 스냅숏을
+// 나무가 BigTrees(10) 이상 바뀌었거나 날씨 종류가 WeatherHold(120 초) 이상 바뀐 채일 때만, 큰 변화 바뀜이 BigSettle(20 초) 멈춘 뒤 한 번 쓴다. 숲 자람 모드가
+// 자라는 동안('레벨 바뀜 진행 중')은 기다린다 — 조건 뒤 BigMaxWait(300 초)가 지나면 무엇이든 쓴다. 쓰면 기준선 = 지금. 0 = 옛 동작 (환경 판마다 AutoSnapshotSettle 뒤 한 번).
+// 이 규칙은 언제 쓰는지만 바꾼다 — 세계는 그대로다. 'env' 블록에 더하기만: rule ("big"·"each"), big (규칙 1 — 기준선·대칭차·날씨 종류·묶기·기다림), forest (숲 자람 켬일 때만).
+// 적응 고리 폴더 eco.IntegratedV3.AdaptRoot (빈 값 = Saved/EcoAdapt) 하나가 자동·주기 스냅숏(<root>/snapshots)·두뇌 감시·상태 파일·파이썬 감시 --root 의 기본을 묶는다.
 
 #include "EcoPolicyV3IntegratedSubsystem.h"
 
@@ -72,10 +77,47 @@ namespace EcoV3SnapshotImpl
 	static TAutoConsoleVariable<FString> CVarAutoSnapshotOut(
 		TEXT("eco.IntegratedV3.AutoSnapshotOut"),
 		TEXT(""),
-		TEXT("통합 v3 모드 자동·주기 스냅숏 폴더 (상대 경로는 프로젝트 폴더 기준, 비면 <프로젝트>/Saved/EcoAdapt/snapshots — 파이썬 live.py 가 본다). ")
-		TEXT("파일 이름 eco_v3_snapshot_s<세션 시드>_t<전역 스텝>_e<환경 판>.json. 명령줄 -EcoV3AutoSnapshotOut= 는 시작값."),
+		TEXT("통합 v3 모드 자동·주기 스냅숏 폴더 (상대 경로는 프로젝트 폴더 기준, 비면 <eco.IntegratedV3.AdaptRoot>/snapshots — 기본 <프로젝트>/Saved/EcoAdapt/snapshots, ")
+		TEXT("파이썬 live.py 가 본다). 파일 이름 eco_v3_snapshot_s<세션 시드>_t<전역 스텝>_e<환경 판>.json. 명령줄 -EcoV3AutoSnapshotOut= 는 시작값."),
+		ECVF_Default);
+
+	// 10-27 '큰 변화만' 다시 배우기 (FOREST_GROWTH_MODE.md 2절 — Play 중 바꿔도 다음 결정 스텝부터. 세계에 닿지 않는다)
+	static TAutoConsoleVariable<int32> CVarAutoSnapshotRule(
+		TEXT("eco.IntegratedV3.AutoSnapshotRule"),
+		1,
+		TEXT("자동 스냅숏(= 파이썬 다시 배우기 계기)을 언제 쓰나 (1 = 큰 변화만, 기본 — 10-27 사용자 결정). 나무가 eco.IntegratedV3.BigTrees 이상 바뀌었거나 날씨 종류가 ")
+		TEXT("eco.IntegratedV3.WeatherHold 초 이상 바뀐 채일 때만, 큰 변화 바뀜이 eco.IntegratedV3.BigSettle 초 멈춘 뒤 한 번 쓴다. 숲 자람 모드가 자라는 동안은 기다린다 ")
+		TEXT("(상한 eco.IntegratedV3.BigMaxWait). 세기만 바뀐 날씨는 세계에는 넣되 세지 않는다. 0 = 옛 동작 (환경 판마다 eco.IntegratedV3.AutoSnapshotSettle 뒤 한 번). ")
+		TEXT("세계는 그대로다. 명령줄 -EcoV3AutoSnapshotRule= 는 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<int32> CVarBigTrees(
+		TEXT("eco.IntegratedV3.BigTrees"), 10,
+		TEXT("'큰 변화만' 나무 문턱 — 한 지역 세계 원판이 기준선(Play 시작·마지막 자동 스냅숏)과 이만큼 이상 다르면 (같은 (x, y, r) 끼리 지우고 남은 양쪽 합, 기본 10). ")
+		TEXT("명령줄 -EcoV3BigTrees= 는 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<float> CVarWeatherHold(
+		TEXT("eco.IntegratedV3.WeatherHold"), 120.0f,
+		TEXT("'큰 변화만' 날씨 — 기준선과 다른 날씨 종류가 이만큼 이어져야 한다 (시뮬레이션 초, 기본 120 — 팀 비 주기 180 초의 맑음·비 반 주기 약 90 초를 넘는다). ")
+		TEXT("명령줄 -EcoV3WeatherHold= 는 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<float> CVarBigSettle(
+		TEXT("eco.IntegratedV3.BigSettle"), 20.0f,
+		TEXT("'큰 변화만' 묶기 — 조건이 선 뒤 큰 변화 바뀜(원판·날씨 종류)이 이만큼 없을 때 쓴다 (시뮬레이션 초, 기본 20). 명령줄 -EcoV3BigSettle= 는 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<float> CVarBigMaxWait(
+		TEXT("eco.IntegratedV3.BigMaxWait"), 300.0f,
+		TEXT("'큰 변화만' 기다림 상한 — 조건이 선 뒤 이만큼 지나면 '레벨 바뀜 진행 중'·묶기와 상관없이 쓴다 (시뮬레이션 초, 기본 300). 명령줄 -EcoV3BigMaxWait= 는 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<FString> CVarAdaptRoot(
+		TEXT("eco.IntegratedV3.AdaptRoot"), TEXT(""),
+		TEXT("적응 고리 폴더 하나 (빈 값 = <프로젝트>/Saved/EcoAdapt, 상대 경로는 프로젝트 폴더 기준): 자동·주기 스냅숏 <root>/snapshots·두뇌 감시 <root>/brains·")
+		TEXT("상태 파일 <root>/status.json·파이썬 감시 --root 의 기본. 시험이 실제 폴더를 건드리지 않게 이것 하나만 바꾼다 (eco.IntegratedV3.AutoSnapshotOut·")
+		TEXT("eco.V3Brain.WatchFolder·StatusFile 은 지금처럼 따로 덮을 수 있다). Play 전에 바꾼다. 명령줄 -EcoV3AdaptRoot= 는 시작값."),
 		ECVF_Default);
 #endif
+
+	/** 큰 변화 규칙 기다림 표시 (숲 자람 모드). */
+	const TCHAR* const kForestHoldWhat = TEXT("숲이 다 자랄 때까지");
 
 	/** 자동 스냅숏 켬 (eco.IntegratedV3.AutoSnapshot: -1 = AutoAdapt 따름). Shipping 은 늘 끔. */
 	bool AutoSnapshotOn()
@@ -220,6 +262,37 @@ namespace EcoV3SnapshotImpl
 	{
 		static const TCHAR* const Names[EcoWorldV3::kNumWeatherKinds] = {TEXT("clear"), TEXT("rain"), TEXT("snow")};
 		return Names[FMath::Clamp(Kind, 0, EcoWorldV3::kNumWeatherKinds - 1)];
+	}
+
+	/** 스냅숏 env.big (10-27 '큰 변화만' — 쓰는 순간의 기준선·대칭차·날씨 종류·묶기·기다림. 규칙 1 일 때만). */
+	TSharedRef<FJsonObject> BigJson(const EcoV3BigChange::FState& B, const EcoV3BigChange::FConfig& C, int64 Step, bool bHold)
+	{
+		const EcoV3BigChange::FDecision D = EcoV3BigChange::Evaluate(B, C, Step, bHold);
+		TSharedRef<FJsonObject> J = MakeShared<FJsonObject>();
+		J->SetNumberField(TEXT("baseline_step"), static_cast<double>(B.BaselineStep));
+		J->SetNumberField(TEXT("big_trees"), FMath::Max(1, C.BigTrees));
+		J->SetNumberField(TEXT("weather_hold_s"), C.WeatherHoldSeconds);
+		J->SetNumberField(TEXT("settle_s"), C.SettleSeconds);
+		J->SetNumberField(TEXT("max_wait_s"), C.MaxWaitSeconds);
+		TSharedRef<FJsonObject> Trees = MakeShared<FJsonObject>();
+		TSharedRef<FJsonObject> Weather = MakeShared<FJsonObject>();
+		for (const EcoV3BigChange::FRegion& R : B.Regions)
+		{
+			Trees->SetNumberField(R.RegionId.ToString(), R.TreeDiff());
+			TSharedRef<FJsonObject> W = MakeShared<FJsonObject>();
+			W->SetStringField(TEXT("base"), WeatherName(R.BaseKind));
+			W->SetStringField(TEXT("now"), WeatherName(R.NowKind));
+			W->SetNumberField(TEXT("held_s"), R.NowKind != R.BaseKind ? EcoV3BigChange::StepsToSeconds(Step - R.KindSinceStep) : 0.0);
+			Weather->SetObjectField(R.RegionId.ToString(), W);
+		}
+		J->SetObjectField(TEXT("trees"), Trees);
+		J->SetObjectField(TEXT("weather"), Weather);
+		J->SetBoolField(TEXT("condition"), D.bCondition);
+		J->SetNumberField(TEXT("quiet_s"), D.QuietSeconds);
+		J->SetNumberField(TEXT("held_s"), D.WaitSeconds);
+		J->SetBoolField(TEXT("level_change_hold"), bHold);
+		J->SetBoolField(TEXT("capped"), D.bCapped);
+		return J;
 	}
 
 	/** 지역 세계 설정 값 (파이썬 거울 설정과 하나씩 견줄 칸 — adapt.py 변환표). */
@@ -545,6 +618,30 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 			Changes.Add(MakeShared<FJsonValueObject>(C));
 		}
 		E->SetArrayField(TEXT("changes"), Changes);
+		// 10-27 (더하기만 — 파이썬은 모르는 칸을 읽지 않는다): 자동 스냅숏 규칙, 큰 변화 셈 (규칙 1), 숲 자람 모드 (켰을 때만)
+		const int32 Rule = AutoSnapshotRule();
+		E->SetStringField(TEXT("rule"), Rule == 1 ? TEXT("big") : TEXT("each"));
+		if (Rule == 1)
+		{
+			E->SetObjectField(TEXT("big"), BigJson(BigState, BigChangeConfig(), GlobalT, IsLevelChangeHeld()));
+		}
+		if (bForestOn)
+		{
+			TSharedRef<FJsonObject> F = MakeShared<FJsonObject>();
+			F->SetBoolField(TEXT("on"), true);
+			F->SetStringField(TEXT("region"), ForestSettings.Region.ToString());
+			F->SetNumberField(TEXT("target"), ForestSettings.Target);
+			F->SetNumberField(TEXT("planned"), ForestSlots.Num());
+			F->SetNumberField(TEXT("mature"), ForestMatureCount());
+			F->SetNumberField(TEXT("saplings"), ForestSaplingCount());
+			F->SetNumberField(TEXT("per_stage"), ForestSettings.PerStage);
+			F->SetNumberField(TEXT("start_seconds"), ForestSettings.StartSeconds);
+			F->SetNumberField(TEXT("stage_seconds"), ForestSettings.StageSeconds);
+			F->SetNumberField(TEXT("grow_seconds"), ForestSettings.GrowSeconds);
+			F->SetNumberField(TEXT("next_mature_step"), static_cast<double>(ForestNextMatureStep()));
+			F->SetBoolField(TEXT("done"), !IsForestGrowing());
+			E->SetObjectField(TEXT("forest"), F);
+		}
 		Root->SetObjectField(TEXT("env"), E);
 	}
 
@@ -837,33 +934,135 @@ void UEcoPolicyV3IntegratedSubsystem::MaybeScheduledSnapshot()
 	}
 }
 
-FString UEcoPolicyV3IntegratedSubsystem::AutoSnapshotPath() const
+FString UEcoPolicyV3IntegratedSubsystem::AdaptRootDir()
 {
-	const FString Name = FString::Printf(TEXT("eco_v3_snapshot_s%lld_t%lld_e%d.json"), static_cast<long long>(Settings.Seed), static_cast<long long>(GlobalT),
-										 EnvRevision);
+	FString Root;
+#if !UE_BUILD_SHIPPING
+	Root = EcoV3SnapshotImpl::CVarAdaptRoot.GetValueOnGameThread().TrimStartAndEnd().TrimQuotes();
+#endif
+	if (Root.IsEmpty())
+	{
+		Root = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("EcoAdapt"));
+	}
+	else if (FPaths::IsRelative(Root))
+	{
+		Root = FPaths::Combine(FPaths::ProjectDir(), Root);
+	}
+	Root = FPaths::ConvertRelativePathToFull(Root);
+	FPaths::NormalizeDirectoryName(Root);
+	return Root;
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::AutoSnapshotDir()
+{
 	FString Dir = EcoV3SnapshotImpl::AutoSnapshotOutFolder();
 	if (Dir.IsEmpty())
 	{
-		Dir = FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("EcoAdapt"), TEXT("snapshots"));
+		Dir = FPaths::Combine(AdaptRootDir(), TEXT("snapshots"));
 	}
 	else if (FPaths::IsRelative(Dir))
 	{
 		Dir = FPaths::Combine(FPaths::ProjectDir(), Dir);
 	}
-	return FPaths::ConvertRelativePathToFull(FPaths::Combine(Dir, Name));
+	return FPaths::ConvertRelativePathToFull(Dir);
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::AutoSnapshotPath() const
+{
+	const FString Name = FString::Printf(TEXT("eco_v3_snapshot_s%lld_t%lld_e%d.json"), static_cast<long long>(Settings.Seed), static_cast<long long>(GlobalT),
+										 EnvRevision);
+	return FPaths::ConvertRelativePathToFull(FPaths::Combine(AutoSnapshotDir(), Name));
+}
+
+int32 UEcoPolicyV3IntegratedSubsystem::AutoSnapshotRule()
+{
+#if !UE_BUILD_SHIPPING
+	return EcoV3SnapshotImpl::CVarAutoSnapshotRule.GetValueOnGameThread() != 0 ? 1 : 0;
+#else
+	return 0;
+#endif
+}
+
+EcoV3BigChange::FConfig UEcoPolicyV3IntegratedSubsystem::BigChangeConfig()
+{
+	EcoV3BigChange::FConfig C;
+#if !UE_BUILD_SHIPPING
+	using namespace EcoV3SnapshotImpl;
+	auto Seconds = [](float V, double Def) { return FMath::IsFinite(V) && V >= 0.0f ? static_cast<double>(V) : Def; };
+	C.BigTrees = FMath::Max(1, CVarBigTrees.GetValueOnGameThread());
+	C.WeatherHoldSeconds = Seconds(CVarWeatherHold.GetValueOnGameThread(), C.WeatherHoldSeconds);
+	C.SettleSeconds = Seconds(CVarBigSettle.GetValueOnGameThread(), C.SettleSeconds);
+	C.MaxWaitSeconds = Seconds(CVarBigMaxWait.GetValueOnGameThread(), C.MaxWaitSeconds);
+#endif
+	return C;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::IsAutoSnapshotOn()
+{
+	return EcoV3SnapshotImpl::AutoSnapshotOn();
+}
+
+void UEcoPolicyV3IntegratedSubsystem::BigAddRegion(const FEcoV3RegionContext& Ctx)
+{
+	EcoV3BigChange::AddRegion(BigState, Ctx.RegionId, Ctx.Sim.Config.Obstacles.Discs, Ctx.Sim.Config.Weather.Kind, GlobalT);
+}
+
+void UEcoPolicyV3IntegratedSubsystem::SetLevelChangeHold(FName Who, bool bOn)
+{
+	if (bOn)
+	{
+		LevelChangeHolds.Add(Who);
+	}
+	else
+	{
+		LevelChangeHolds.Remove(Who);
+	}
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::IsLevelChangeHeld(FString* OutWhat) const
+{
+	TArray<FString> What;
+	if (IsForestGrowing())
+	{
+		What.Add(EcoV3SnapshotImpl::kForestHoldWhat);
+	}
+	for (const FName& Who : LevelChangeHolds)
+	{
+		What.Add(FString::Printf(TEXT("%s 이 끝날 때까지"), *Who.ToString()));
+	}
+	if (OutWhat)
+	{
+		*OutWhat = FString::Join(What, TEXT("·"));
+	}
+	return !What.IsEmpty();
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::BigChangeStatusText() const
+{
+	if (AutoSnapshotRule() == 0)
+	{
+		return TEXT("다시 배우기: 환경 판마다 (eco.IntegratedV3.AutoSnapshotRule 0)");
+	}
+	FString What;
+	const bool bHold = IsLevelChangeHeld(&What);
+	return EcoV3BigChange::ProgressText(BigState, BigChangeConfig(), GlobalT, bHold, What);
 }
 
 FString UEcoPolicyV3IntegratedSubsystem::DescribeAutoSnapshot()
 {
 	using namespace EcoV3SnapshotImpl;
 	const double Every = SnapshotEverySeconds();
-	FString Out = AutoSnapshotOn() ? FString::Printf(TEXT("환경 바뀜 켬 (판이 %.1f초 그대로면 판마다 한 번)"), AutoSnapshotSettleSeconds())
-								   : FString(TEXT("환경 바뀜 끔 (eco.IntegratedV3.AutoSnapshot — -1 이면 AutoAdapt 를 따른다)"));
+	const EcoV3BigChange::FConfig Big = BigChangeConfig();
+	FString Out = !AutoSnapshotOn() ? FString(TEXT("환경 바뀜 끔 (eco.IntegratedV3.AutoSnapshot — -1 이면 AutoAdapt 를 따른다)"))
+				  : AutoSnapshotRule() == 1
+					  ? FString::Printf(TEXT("큰 변화만 (eco.IntegratedV3.AutoSnapshotRule 1 — 한 지역 나무 %d 이상·날씨 종류 %.0f초 이상 바뀐 채, 바뀜이 %.0f초 멈춘 뒤 한 번, ")
+										 TEXT("숲이 자라는 동안 기다림·상한 %.0f초, 세기만 바뀜은 셈·화면 알림 없음 — eco.IntegratedV3.EnvNoticeMinor)"),
+										Big.BigTrees, Big.WeatherHoldSeconds, Big.SettleSeconds, Big.MaxWaitSeconds)
+					  : FString::Printf(TEXT("환경 바뀜 켬 (eco.IntegratedV3.AutoSnapshotRule 0 — 판이 %.1f초 그대로면 판마다 한 번)"), AutoSnapshotSettleSeconds());
 	Out += Every > 0.0 ? FString::Printf(TEXT(" · 주기 %.1f초"), Every) : FString(TEXT(" · 주기 끔"));
 	if (AutoSnapshotOn() || Every > 0.0)
 	{
-		const FString Folder = AutoSnapshotOutFolder();
-		Out += FString::Printf(TEXT(" → %s"), Folder.IsEmpty() ? TEXT("Saved/EcoAdapt/snapshots") : *Folder);
+		Out += FString::Printf(TEXT(" → %s"), *AutoSnapshotDir());
 	}
 	return Out;
 }
@@ -876,12 +1075,39 @@ void UEcoPolicyV3IntegratedSubsystem::MaybeAutoSnapshot()
 		return;
 	}
 	const double Seconds = static_cast<double>(GlobalT) * EcoRepertoireV3::kStepSeconds;
-	// 1. 환경 바뀜: 마지막 환경 판이 가라앉음 초 동안 그대로이면 판마다 한 번 (레벨이 나무를 여럿 놓는 동안 판마다 쓰지 않게)
+	// 1. 환경 바뀜
+	//    규칙 0 (옛 동작): 마지막 환경 판이 가라앉음 초 동안 그대로이면 판마다 한 번 (레벨이 나무를 여럿 놓는 동안 판마다 쓰지 않게)
+	//    규칙 1 (큰 변화만, 기본 — EcoV3BigChange.h): 나무 대칭차 ≥ BigTrees 또는 날씨 종류가 WeatherHold 넘게 바뀐 채 → 바뀜이 BigSettle 멈추고 '진행 중'이 아닐 때 한 번
 	bool bEnvDue = false;
-	if (AutoSnapshotOn() && EnvRevision > AutoSnapshotRevision)
+	FString BigWhy;
+	const bool bBigRule = AutoSnapshotOn() && AutoSnapshotRule() == 1;
+	if (AutoSnapshotOn() && !bBigRule && EnvRevision > AutoSnapshotRevision)
 	{
 		const double Since = static_cast<double>(GlobalT - EnvChangedStep) * EcoRepertoireV3::kStepSeconds;
 		bEnvDue = Since + 1e-9 >= AutoSnapshotSettleSeconds();
+	}
+	if (bBigRule)
+	{
+		const EcoV3BigChange::FConfig Big = BigChangeConfig();
+		FString HoldWhat;
+		const bool bHold = IsLevelChangeHeld(&HoldWhat);
+		const EcoV3BigChange::FDecision D = EcoV3BigChange::Tick(BigState, Big, GlobalT, bHold);
+		if (D.bNewCondition)
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 다시 배우기 조건 됨 | %.1f초 (전역 스텝 %lld) | %s | %s"), Seconds, static_cast<long long>(GlobalT),
+				   *EcoV3BigChange::SummaryText(BigState, Big, GlobalT),
+				   bHold ? *FString::Printf(TEXT("기다림: %s (상한 %.0f초)"), *HoldWhat, Big.MaxWaitSeconds)
+						 : *FString::Printf(TEXT("바뀜이 %.0f초 멈추면 쓴다"), Big.SettleSeconds));
+		}
+		if (D.bWrite)
+		{
+			bEnvDue = true;
+			BigWhy = FString::Printf(TEXT("큰 변화 — %s (기준 전역 스텝 %lld) · 바뀜 없이 %.1f초 · 조건 뒤 %.1f초%s"), *EcoV3BigChange::SummaryText(BigState, Big, GlobalT),
+									 static_cast<long long>(BigState.BaselineStep), D.QuietSeconds, D.WaitSeconds,
+									 D.bCapped ? *FString::Printf(TEXT(" · 기다림 상한 %.0f초 — '%s' 를 더 기다리지 않음"), Big.MaxWaitSeconds,
+																  HoldWhat.IsEmpty() ? TEXT("바뀜이 멈추기") : *HoldWhat)
+											   : TEXT(""));
+		}
 	}
 	// 2. 주기: 켜거나 값을 바꾼 때부터 그 주기로 (늦었으면 지금부터 다시)
 	bool bPeriodicDue = false;
@@ -916,19 +1142,27 @@ void UEcoPolicyV3IntegratedSubsystem::MaybeAutoSnapshot()
 	// 같은 경계에서 둘 다 되면 한 번만 쓴다 (계기 env_change — 이름이 같다)
 	const TCHAR* Trigger = bEnvDue ? TEXT("env_change") : TEXT("periodic");
 	const FString Path = AutoSnapshotPath();
-	const FString Why = bEnvDue ? FString::Printf(TEXT("환경 바뀜 #%d 뒤 %.1f초 그대로 (eco.IntegratedV3.AutoSnapshot)"), EnvRevision,
-												  static_cast<double>(GlobalT - EnvChangedStep) * EcoRepertoireV3::kStepSeconds)
-								: FString::Printf(TEXT("주기 eco.IntegratedV3.SnapshotEvery %.1f"), Every);
-	if (ExportSnapshot(Path, Why, Trigger))
+	const FString Why = !BigWhy.IsEmpty() ? BigWhy
+						: bEnvDue		  ? FString::Printf(TEXT("환경 바뀜 #%d 뒤 %.1f초 그대로 (eco.IntegratedV3.AutoSnapshot)"), EnvRevision,
+															static_cast<double>(GlobalT - EnvChangedStep) * EcoRepertoireV3::kStepSeconds)
+										  : FString::Printf(TEXT("주기 eco.IntegratedV3.SnapshotEvery %.1f"), Every);
+	const bool bWritten = ExportSnapshot(Path, Why, Trigger);
+	if (bWritten)
 	{
-		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s | 계기 %s · 환경 판 #%d"), Seconds,
-			   static_cast<long long>(GlobalT), *Path, Contexts.Num(), *GetActiveBrain().Id, Trigger, EnvRevision);
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 환경 스냅숏 | %.1f초 (전역 스텝 %lld) | %s | 지역 %d | 두뇌 %s | 계기 %s · 환경 판 #%d%s"), Seconds,
+			   static_cast<long long>(GlobalT), *Path, Contexts.Num(), *GetActiveBrain().Id, Trigger, EnvRevision,
+			   BigWhy.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" | %s"), *BigWhy));
 		PostNotice(EcoV3Integrated::ENotice::Snapshot, bEnvDue ? FString::Printf(TEXT("스냅숏 #%d 내보냄 → 파이썬 학습 대기"), EnvRevision)
 															   : FString::Printf(TEXT("스냅숏 #%d 내보냄 (주기 %.0f초) → 파이썬 학습 대기"), EnvRevision, Every));
 	}
 	else
 	{
 		UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 환경 스냅숏을 쓰지 못했다 (계기 %s): %s"), Trigger, *Path);
+	}
+	if (!BigWhy.IsEmpty())
+	{
+		// 큰 변화 규칙: 쓴 뒤(쓰기에 실패해도 — 다음 경계마다 다시 쓰지 않게) 기준선 = 지금, 바뀜 시계·조건 지움
+		EcoV3BigChange::Rebase(BigState, GlobalT);
 	}
 }
 

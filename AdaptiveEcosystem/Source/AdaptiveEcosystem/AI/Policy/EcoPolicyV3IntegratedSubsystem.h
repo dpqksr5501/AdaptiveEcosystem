@@ -168,6 +168,18 @@
 //      화면 '거리 두기(쉬는 늑대)' 옅은 주황, 10초 기록 '[EcoV3I] <지역> 거리 두기 |'). 둘 다 학습 세계(R1b·R7e)에는 없던 규칙이라 0 이면 10-26 그대로다
 //      (파이썬 짝 비교·unreal_parity 는 -EcoV3GrazeCalm=0 -EcoV3RestKeep=0 이면 옛 거울 설정, 켜면 calm 거울 설정).
 //      측정 전용 10초 기록 '[EcoV3I] <지역> 쉬는 늑대 시야 |' (켬·끔 모두): 쉬는 늑대 시야 안 산 사슴·스텝 몫과 그중 멈춘 몫 (세계는 읽지 않는다 — 처리기 TallyRestWolfView).
+//  24. 10-27 레벨 바뀜에 반응하기 (사용자 결정 '변화하는 레벨은 팀에 맡기고 나는 변했을 때 어떻게 반응할지에 대해서만 설계하자', 설계·구현 기록
+//      Docs/RL_Policy/FOREST_GROWTH_MODE.md, LIVE_ADAPT_SPEC.md 5.2·5.3·5.5):
+//      숲 자람 모드 eco.IntegratedV3.ForestGrowth (-EcoV3ForestGrowth, 기본 0 — 시험 모드, 세계 규칙 아님. EcoV3ForestGrowth.{h,cpp}·EcoV3ForestTree.{h,cpp}):
+//      고른 지역(기본 메마른 땅)에 묘목이 단계마다 돋아 자라고, 다 자라는 결정 스텝 경계(ForestStepBoundary — 처리기 스텝 고리, 환경 넣기 바로 앞)에서 줄기 막이를 켜
+//      지금 레벨 나무와 같은 길(꼬리표 EcoV3Trunk → 나무만 다시 읽기 → ApplyEnvChange, 출처 forest_growth)로 세계에 들어간다. 복제 액터라 리슨·데디케이티드에서도 같다.
+//      끄면 숲 코드가 하나도 돌지 않는다 (액터·강제 읽기·스냅숏 칸 없음).
+//      '큰 변화만' 다시 배우기 eco.IntegratedV3.AutoSnapshotRule (기본 1 — EcoV3BigChange.h·EcoV3Snapshot.cpp): 자동 스냅숏은 나무가 BigTrees(10) 이상 바뀌었거나
+//      날씨 종류가 WeatherHold(120 초) 이상 바뀐 채일 때만, 바뀜이 BigSettle(20 초) 멈춘 뒤 한 번, 숲이 자라는 동안은 기다린다(상한 BigMaxWait 300 초). 0 = 판마다 (옛 동작).
+//      규칙이 돌 때 세기만 바뀐 환경 판은 화면 알림을 내지 않는다 (eco.IntegratedV3.EnvNoticeMinor 1 = 옛 동작). 세계에 넣는 것은 그대로다.
+//      파이썬 감시 자동 시작 eco.IntegratedV3.AutoWatch (기본 1 = AutoAdapt 를 따름 — EcoV3WatchLauncher.{h,cpp}): AutoAdapt Play 를 시작하면 live.py watch 를 창 없이
+//      띄우고 Play 가 끝나면 학습 자식까지 프로세스 나무째 끝낸다. 학습 파이프라인을 따로 띄우는 개발용 도구다 — 런타임 추론은 그대로 C++ 네이티브만.
+//      적응 고리 폴더 eco.IntegratedV3.AdaptRoot (-EcoV3AdaptRoot=, 빈 값 = Saved/EcoAdapt) 하나가 스냅숏·두뇌·상태 파일·감시 --root 의 기본을 묶는다.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -185,8 +197,11 @@
 #include "Templates/UniquePtr.h"
 
 #include "EcoPolicyClock.h"
+#include "EcoV3BigChange.h"
 #include "EcoV3Brain.h"
 #include "EcoV3FlightTally.h"
+#include "EcoV3ForestGrowth.h"
+#include "EcoV3WatchLauncher.h"
 #include "EcoWorldV3.h"
 #include "TreeLayoutV3.h"
 
@@ -964,7 +979,7 @@ struct FEcoV3EnvChange
 	FName Region;
 	FString Kind;            // trees · weather
 	FString Detail;          // '나무 0→20 (+20 −0)' · '맑음→비 1.00'
-	FString Source;          // level · test · cvar:<콘솔 변수> · team_env
+	FString Source;          // level · test · forest_growth · cvar:<콘솔 변수> · team_env
 };
 
 /** 지역 하나의 대기 환경 변화 (PollEnvironment 가 만들고 ApplyEnvChange 가 결정 스텝 경계에서 넣는다). */
@@ -975,7 +990,7 @@ struct FEcoV3EnvPending
 	int32 InStage = 0;            // 무대 안 줄기 막이 (은신처 원 안 포함)
 	int32 Snapped = 0;            // 넣는 줄기 가운데 배치 표 값으로 바꾼 수
 	double MaxSnapCm = 0.0;       // 그 차이 최대 (cm)
-	FString TreeSource;           // level · test
+	FString TreeSource;           // level · test · forest_growth
 	bool bWeather = false;
 	int32 WeatherKind = 0;        // EcoWorldV3::kWeather*
 	double WeatherIntensity = 0.0;
@@ -1277,8 +1292,10 @@ public:
 	 * 레벨 줄기 막이(GatherLevelTrunks — 무대마다 시작 레벨 읽기와 같은 셈)와 날씨 원천(지역 날씨 콘솔 변수 — 바뀐 값만, 팀 FRegionEnvironmentState — 바뀐 값만,
 	 * 늦게 등록된 지역은 팀 날씨 출처가 맡으면 처음 값도)을
 	 * 읽어 지역마다 대기 변화를 정한다. 세계는 바꾸지 않는다 (ApplyEnvChange). 감시가 꺼졌거나 지역 세계가 없거나 때가 아니면 거짓.
+	 * bTreesOnly (10-27 숲 자람 — ForestStepBoundary 가 결정 스텝 경계에서): 나무만 곧바로 다시 읽고 출처를 forest_growth 로 적는다. 날씨 칸·실시간 읽기 주기·
+	 * 액터 알림 표시는 건드리지 않는다 (앞서 대기한 날씨 바뀜은 그대로 둔다).
 	 */
-	bool PollEnvironment(bool bForce);
+	bool PollEnvironment(bool bForce, bool bTreesOnly = false);
 	/** 결정 스텝 경계에서 넣을 환경 변화가 있나 (처리기가 보고 ApplyEnvChange 를 부른다). */
 	bool HasPendingEnvChange() const { return bEnvPending; }
 	/**
@@ -1336,6 +1353,66 @@ public:
 	static TArray<FEcoV3TestAt>& CommandLineTestAts();
 	/** 명령줄에서 예약 쌍을 읽는다 (ApplyCommandLineToConsole). 하나라도 찾으면 CommandLineTestAts 를 바꾼다. 명령은 따옴표 안 ';'·공백을 그대로 둔다. */
 	static void ParseCommandLineTestAts(const TCHAR* CmdLine);
+
+	// ---- 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp — 설계 FOREST_GROWTH_MODE.md 1절. 시험 모드 — 세계 규칙이 아니다) ----
+
+	/** 콘솔 변수 eco.IntegratedV3.ForestGrowth·ForestRegion·ForestPerStage·ForestStageSeconds·ForestGrowSeconds·ForestTarget·ForestStartSeconds·ForestSeed·ForestSapling (Shipping 은 늘 끔). */
+	static EcoV3Forest::FSettings ForestSettingsFromConsole();
+	/**
+	 * 결정 스텝 경계 (처리기가 HasPendingEnvChange 바로 앞에서 — 프레임 나눔·fps·실시간 읽기와 무관한 정확한 스텝): 다 자랄 단계면 그 단계 나무를 다 자람으로 바꾸고
+	 * (그새 생긴 다른 줄기와 겹치는 그루는 뺀다 — 묘목을 지운다), 나무만 다시 읽는다 (PollEnvironment(true, true) — 출처 forest_growth). 같은 경계의 ApplyEnvChange 가 넣는다.
+	 * 숲이 꺼졌으면 아무것도 하지 않는다.
+	 */
+	void ForestStepBoundary();
+	/** 프레임 앞 (HandlePreActorTick — Mass 처리 밖, 시험은 직접): 돋을 차례가 된 단계의 묘목(숲 나무 액터)을 놓고, 숲 화면 줄을 그린다. */
+	void ForestPreActorTick();
+	/** 시험: 숲을 지금 켠다 (지역 세계가 생긴 뒤 — TryCreateContexts 끝과 같은 계획). 거부하면 거짓 (OutWhy). */
+	bool StartForestForTest(const EcoV3Forest::FSettings& InSettings, FString& OutWhy);
+	bool IsForestOn() const { return bForestOn; }
+	/** 아직 다 자라지 않은 단계가 남았나 ('레벨 바뀜 진행 중' — 큰 변화 규칙이 기다린다). */
+	bool IsForestGrowing() const;
+	const EcoV3Forest::FSettings& GetForestSettings() const { return ForestSettings; }
+	const TArray<EcoV3Forest::FSlot>& GetForestSlots() const { return ForestSlots; }
+	/** 자리마다 상태 (0 계획 · 1 묘목 · 2 다 자람 · 3 뺌). */
+	const TArray<uint8>& GetForestSlotStates() const { return ForestState; }
+	int32 ForestMatureCount() const;
+	int32 ForestSaplingCount() const;
+	/** 다음 다 자람 전역 스텝 (다 자랐으면 -1). */
+	int64 ForestNextMatureStep() const;
+	/** 숲 나무 액터 (자리 순 — 없으면 nullptr). */
+	AActor* GetForestActor(int32 Slot) const;
+	/** 보기 eco.IntegratedV3.ForestInfo (서버·단독): 계획·단계·다 자람 스텝·자리·액터마다 다 자람·줄기 충돌·줄기 변환 지문. */
+	TArray<FString> ForestInfoLines() const;
+
+	// ---- '큰 변화만' 다시 배우기 (10-27, EcoV3BigChange.h·EcoV3Snapshot.cpp — 설계 FOREST_GROWTH_MODE.md 2절) ----
+
+	/** eco.IntegratedV3.AutoSnapshotRule (1 = 큰 변화만, 기본 / 0 = 환경 판마다 — 옛 동작). Shipping 은 0 (자동 스냅숏이 늘 끔). */
+	static int32 AutoSnapshotRule();
+	/** eco.IntegratedV3.BigTrees·WeatherHold·BigSettle·BigMaxWait. */
+	static EcoV3BigChange::FConfig BigChangeConfig();
+	/** 자동 스냅숏이 켜졌나 (eco.IntegratedV3.AutoSnapshot — -1 = AutoAdapt 따름). */
+	static bool IsAutoSnapshotOn();
+	const EcoV3BigChange::FState& GetBigState() const { return BigState; }
+	/**
+	 * '레벨 바뀜 진행 중' 표시 (일반 꼴 — 지금은 숲 자람 모드만 쓴다. 레벨 팀이 여러 번에 나눠 바꾸는 동안 켜 두면 큰 변화 규칙이 끝날 때까지 기다린다, 상한 BigMaxWait).
+	 * Who = 표시 이름 (켜고 끄는 쪽이 같은 이름).
+	 */
+	void SetLevelChangeHold(FName Who, bool bOn);
+	/** 진행 중인가 (숲이 자라는 중 ∨ 표시가 하나라도 켜짐). OutWhat = 화면 글 ('숲이 다 자랄 때까지' 등). */
+	bool IsLevelChangeHeld(FString* OutWhat = nullptr) const;
+	/** 상태 줄 칸: 규칙 1 이면 EcoV3BigChange::ProgressText, 0 이면 '다시 배우기: 환경 판마다 (eco.IntegratedV3.AutoSnapshotRule 0)'. */
+	FString BigChangeStatusText() const;
+
+	// ---- 적응 고리 폴더·파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.{h,cpp} — 설계 FOREST_GROWTH_MODE.md 3절. 개발용 도구 — 추론 아님) ----
+
+	/** eco.IntegratedV3.AdaptRoot (빈 값 = <프로젝트>/Saved/EcoAdapt, 상대 경로는 프로젝트 폴더 기준) — 절대 경로. */
+	static FString AdaptRootDir();
+	/** 자동·주기 스냅숏 폴더 (eco.IntegratedV3.AutoSnapshotOut, 비면 <AdaptRoot>/snapshots) — 절대 경로. */
+	static FString AutoSnapshotDir();
+	/** 상태 줄 '적응 고리 | …' 칸 (FOREST_GROWTH_MODE.md 3.8 — 우리가 띄운 감시·사람 감시·못 켬·그 밖은 Live 그대로). */
+	FString WatchStatusText(const FString& Live) const;
+	/** 이 Play 의 자동 감시 판정 (기록·시험). */
+	EcoV3Watch::EDecide GetWatchDecision() const { return WatchDecision; }
 
 	// ---- R5 장애물 관측 대조 기록 (10-19, 계약 2-4) ----
 
@@ -1425,6 +1502,24 @@ private:
 	void HandleEnvActorChanged(AActor* Actor);
 	/** HandlePreActorTick (지역 세계가 생긴 뒤 프레임마다): 예약 명령, 환경 읽기. */
 	void TickEnvWatch();
+	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp)
+	/** 숲 계획 (자리 고르기 — 지역 세계가 생긴 직후). 거부하면 거짓 (OutWhy, 아무것도 놓지 않는다). */
+	bool PlanForest(const EcoV3Forest::FSettings& InSettings, FString& OutWhy);
+	/** 자리 하나의 숲 나무 액터를 놓는다 (묘목). 놓았으면 참. */
+	bool SpawnForestTree(int32 Slot);
+	/** 숲 화면 줄 (1 초마다, 키 732005 — 그리는 실행·서버·단독). */
+	void DrawForestNotice();
+	/** Play 끝: 숲 상태를 지운다 (액터는 월드와 함께 없어진다). */
+	void EndForest();
+	/** 큰 변화 규칙 기준선에 지역 하나를 더한다 (AddContext — 지역 세계를 만든 때). */
+	void BigAddRegion(const FEcoV3RegionContext& Ctx);
+	// 파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.cpp)
+	/** OnWorldBeginPlay (PlayId 뒤): 판정하고 띄운다. 기록 '[EcoV3I] 파이썬 감시 | …'. */
+	void BeginAutoWatch();
+	/** DrawBrainNotices (2 초마다 — 그릴 수 없는 실행도): 우리가 띄운 감시가 끝났나 보고 까닭을 기록·알림 (한 번). */
+	void PollAutoWatch();
+	/** Deinitialize: 우리가 띄운 감시를 프로세스 나무째 끝낸다. */
+	void EndAutoWatch();
 	/**
 	 * 보기 환경 (Play 동안만, 끝나면 되돌린다).
 	 * - 엔진은 한 액터에 디버그 글자를 128개까지만 그린다(r.DebugSafeZone.MaxDebugTextStringsPerActor). 우리 글자는 모두 WorldSettings 에
@@ -1512,6 +1607,30 @@ private:
 	int32 AutoSnapshotRevision = 0;       // 자동 스냅숏을 쓴 마지막 환경 판
 	double PeriodicNextSeconds = -1.0;    // 다음 주기 스냅숏 시뮬레이션 초 (음수 = 아직 정하지 않음)
 	double PeriodicEverySeen = 0.0;       // 그 주기를 정한 eco.IntegratedV3.SnapshotEvery 값
+	// '큰 변화만' 다시 배우기 (10-27, EcoV3BigChange.h — AddContext·ApplyEnvChange 가 채우고 MaybeAutoSnapshot 이 판정)
+	EcoV3BigChange::FState BigState;
+	TSet<FName> LevelChangeHolds;         // '레벨 바뀜 진행 중' 표시 (SetLevelChangeHold)
+
+	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp — 끄면 모두 비어 있다)
+	EcoV3Forest::FSettings ForestSettings;   // Play 시작 때 읽은 값 (Sanitize 뒤)
+	bool bForestOn = false;                  // 계획이 섰다 (거부·끔이면 거짓 — 숲 코드가 돌지 않는다)
+	int32 ForestCtx = INDEX_NONE;            // 숲 지역 컨텍스트 색인
+	TArray<EcoV3Forest::FSlot> ForestSlots;  // 고른 자리 (순번 = F<nn>)
+	TArray<uint8> ForestState;               // 자리마다 0 계획 · 1 묘목 · 2 다 자람 · 3 뺌
+	TArray<TWeakObjectPtr<AActor>> ForestActors;   // 자리마다 숲 나무 액터 (AEcoV3ForestTree)
+	int32 ForestNextSprout = 0;              // 다음 묘목 돋을 단계
+	int32 ForestNextMature = 0;              // 다음 다 자랄 단계
+	double ForestDoneRealTime = -1.0;        // 다 자란 실시간 (화면 줄 10 초)
+	double NextForestNotice = 0.0;
+
+	// 파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.cpp)
+	EcoV3Watch::EDecide WatchDecision = EcoV3Watch::EDecide::NoAdapt;
+	FString WatchWhy;                     // 못 켬·안 띄움 까닭 (화면·기록)
+	int32 WatchOtherPid = 0;              // 사람·다른 언리얼이 띄운 감시 pid
+	bool bWatchOurs = false;              // 이 서브시스템이 띄웠다
+	bool bWatchEndReported = false;       // 끝난 까닭을 알렸다
+	double NextWatchPoll = 0.0;           // 다음 살핌 (실시간)
+	FString LastWatchLine;                // 기록한 마지막 '적응 고리' 감시 글
 
 	FDelegateHandle PreTickHandle;
 
