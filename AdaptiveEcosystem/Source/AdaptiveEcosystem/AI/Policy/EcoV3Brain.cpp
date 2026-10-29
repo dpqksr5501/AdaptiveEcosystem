@@ -14,11 +14,22 @@
 #include "EcoObservationV3.h"
 #include "EcoSha256.h"
 #include "EcoWorldV3.h"
+#include "PolicyBrainV3Default.h"
 
 #include <initializer_list>
 #include <limits>
 
 DEFINE_LOG_CATEGORY(LogEcoV3Brain);
+
+// 10-29 기본 두뇌 (PolicyBrainV3Default.h — export_weights_v3.py --default-brain): 이 빌드가 관측을 만들 수 있는 계약이어야 한다.
+// 실행 때 Default() 가 넣은 바이트를 파일 두뇌와 같은 Parse 검사로 다시 본다 — 여기서는 계약이 다른 두뇌를 넣은 빌드를 막는다
+static_assert(EcoPolicyV3Default::kObsDim > 0 && EcoPolicyV3Default::kObsDim <= EcoPolicyV3::kMaxObsDim, "기본 두뇌 관측 칸 수가 망 입력 상한을 넘는다");
+static_assert(EcoPolicyV3Default::kContractHash == EcoPolicyV3::kContractHashObs18Mask2 || EcoPolicyV3Default::kContractHash == EcoPolicyV3::kContractHashObs21Mask2
+				  || EcoPolicyV3Default::kContractHash == EcoPolicyV3::kContractHashObs24Mask4
+				  || EcoPolicyV3Default::kContractHash == EcoPolicyV3::kContractHashObs24Mask5,
+			  "기본 두뇌의 계약 해시를 이 빌드가 받지 않는다 (EcoV3Brain 받는 계약 넷 — C++ 관측 코드를 함께 바꿔야 한다)");
+static_assert(EcoPolicyV3Default::kFileBytes > 0 && sizeof(EcoPolicyV3Default::kFile) == static_cast<size_t>(EcoPolicyV3Default::kFileBytes),
+			  "기본 두뇌 바이트 수가 배열 크기와 다르다");
 
 static_assert(PLATFORM_LITTLE_ENDIAN, "두뇌 파일 가중치는 float32 리틀 엔디언 바이트다 — 큰 엔디언 플랫폼은 바이트를 뒤집어 읽어야 한다");
 // 관측 21 계약은 내장 관측 18·판 2 계약(R1b) 뒤에 세 칸을 붙인 것이다 — 내장 계약이 바뀌면 이 표를 함께 고친다
@@ -58,7 +69,9 @@ namespace EcoV3BrainImpl
 #if !UE_BUILD_SHIPPING
 	TAutoConsoleVariable<FString> CVarStartup(
 		TEXT("eco.V3Brain.Startup"), TEXT(""),
-		TEXT("통합 v3 Play 를 시작할 때 불러올 사슴 두뇌 파일 (EcoV3Brain.h). 빈 값 = 지금 두뇌 그대로(처음은 내장 R1b). 'builtin' = 내장. 명령줄 -EcoV3Brain= 은 시작값."),
+		TEXT("통합 v3 Play 를 시작할 때 걸 사슴 두뇌 (EcoV3Brain.h '기본 두뇌'). 빈 값 = 기본 두뇌 R7e (이 프로세스 첫 Play·적응 고리 Play — 그 밖은 지금 두뇌 그대로). ")
+			TEXT("'default'·'기본'·'R7e' = 기본 두뇌, 'builtin'·'내장'·'R1b'·'R1b-F' = 내장 R1b-F (10-28 까지의 기본), 그 밖 = 두뇌 파일 이름·경로. ")
+			TEXT("거부되면 기록·화면에 알리고 빈 값처럼 고른다. 명령줄 -EcoV3Brain= 은 시작값."),
 		ECVF_Default);
 	TAutoConsoleVariable<float> CVarSwapAt(
 		TEXT("eco.V3Brain.SwapAtSeconds"), -1.0f,
@@ -554,9 +567,10 @@ FString FEcoV3Brain::Describe() const
 	{
 		Extra += FString::Printf(TEXT(", 판 %d"), AdaptRound);
 	}
-	return FString::Printf(TEXT("%s (%s, 허용 %s%s)"), *Id,
-						   bBuiltin ? TEXT("내장 PolicyWeightsV3.h") : *FString::Printf(TEXT("파일 %s"), *FPaths::GetCleanFilename(SourceFile)),
-						   *EcoV3Brain::AllowedText(Allowed), *Extra);
+	const FString Origin = bBuiltin	  ? FString(TEXT("내장 R1b PolicyWeightsV3.h"))
+						   : bDefault ? FString::Printf(TEXT("기본 두뇌 %s — 빌드에 넣은 %s"), *Label, UTF8_TO_TCHAR(EcoPolicyV3Default::kFileName))
+									  : FString::Printf(TEXT("파일 %s"), *FPaths::GetCleanFilename(SourceFile));
+	return FString::Printf(TEXT("%s (%s, 허용 %s%s)"), *Id, *Origin, *EcoV3Brain::AllowedText(Allowed), *Extra);
 }
 
 FString FEcoV3Brain::RoundTag() const
@@ -565,7 +579,12 @@ FString FEcoV3Brain::RoundTag() const
 	{
 		return FString::Printf(TEXT("판 %d"), AdaptRound);
 	}
-	return bBuiltin ? FString(TEXT("판 0")) : FString();
+	return bBuiltin || bDefault ? FString(TEXT("판 0")) : FString();
+}
+
+FString FEcoV3Brain::OriginText() const
+{
+	return bDefault ? FString::Printf(TEXT("기본 두뇌 %s"), *Label) : bBuiltin ? FString(TEXT("내장 두뇌")) : FString();
 }
 
 FString FEcoV3Brain::ShortId() const
@@ -605,10 +624,11 @@ FEcoV3BrainRef FEcoV3BrainRegistry::Builtin()
 		B->ObsDim = P3::kObsDim;
 		B->Net = P3::kBuiltinNet;
 		B->ModelName = UTF8_TO_TCHAR(P3::kModelName);
+		B->Label = TEXT("R1b");
 		B->WeightsSha256 = EcoV3Brain::WeightsSha256(B->Net);
 		B->Id = FString::Printf(TEXT("%s@%s"), *B->ModelName, *B->WeightsSha256.Left(8));
 		B->ModelSha256 = FString::Printf(TEXT("%016llx…"), static_cast<unsigned long long>(P3::kModelDigest));
-		B->TrainWorld = TEXT("R1b (빌드에 들어간 게임 두뇌 — 통합 모드는 얼기를 세계가 막아 R1b-F)");
+		B->TrainWorld = TEXT("R1b (빌드에 들어간 내장 두뇌 — 10-28 까지의 게임 기본, 통합 모드는 얼기를 세계가 막아 R1b-F)");
 		for (int32 b = 0; b < P3::kNumBehaviors; ++b)
 		{
 			B->Allowed[b] = P3::kAllowedMask[b];
@@ -618,7 +638,42 @@ FEcoV3BrainRef FEcoV3BrainRegistry::Builtin()
 	return Brain;
 }
 
+namespace EcoV3BrainImpl
+{
+	/** 두뇌 파일 글자 → 검사 → 두뇌 (Parse 의 몸. bDefaultBrain = 빌드에 넣은 기본 두뇌 — 같은 검사, 표시만 다르다). */
+	FEcoV3BrainLoad ParseBrain(const FString& JsonText, const FString& Source, bool bDefaultBrain);
+}
+
+FEcoV3BrainRef FEcoV3BrainRegistry::Default()
+{
+	static const FEcoV3BrainRef Brain = []() -> FEcoV3BrainRef
+	{
+		namespace D = EcoPolicyV3Default;
+		// 넣은 바이트 그대로 (UTF-8 JSON — 파일 두뇌와 같은 Parse). 바이트 sha256 = 헤더 값, 검사 통과, id = 헤더 id 여야 한다
+		char Hex[2 * EcoSha256::kDigestBytes + 1];
+		EcoSha256::HashHex(D::kFile, static_cast<size_t>(D::kFileBytes), Hex);
+		const auto Conv = StringCast<TCHAR>(reinterpret_cast<const UTF8CHAR*>(D::kFile), D::kFileBytes);
+		const FString Text(Conv.Length(), Conv.Get());
+		const FEcoV3BrainLoad L = EcoV3BrainImpl::ParseBrain(Text, FString(), /*bDefaultBrain*/ true);
+		const FString WantId = UTF8_TO_TCHAR(D::kBrainId);
+		if (FCStringAnsi::Strcmp(Hex, D::kFileSha256) != 0 || !L.Ok() || L.Brain->Id != WantId)
+		{
+			UE_LOG(LogEcoV3Brain, Error, TEXT("[EcoV3Brain] 기본 두뇌(PolicyBrainV3Default.h %s, %s) 검사 실패 — 바이트 sha256 %s (헤더 %s) · %s: %s · id %s — 내장 두뇌 %s 로 대신한다"),
+				   UTF8_TO_TCHAR(D::kFileName), *WantId, ANSI_TO_TCHAR(Hex), UTF8_TO_TCHAR(D::kFileSha256), EcoV3Brain::RejectName(L.Reason), *L.Message,
+				   L.Brain.IsValid() ? *L.Brain->Id : TEXT("-"), *Builtin()->Id);
+			return Builtin();
+		}
+		return L.Brain.ToSharedRef();
+	}();
+	return Brain;
+}
+
 FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FString& Source)
+{
+	return EcoV3BrainImpl::ParseBrain(JsonText, Source, /*bDefaultBrain*/ false);
+}
+
+FEcoV3BrainLoad EcoV3BrainImpl::ParseBrain(const FString& JsonText, const FString& Source, bool bDefaultBrain)
 {
 	using namespace EcoV3BrainImpl;
 	namespace P3 = EcoPolicyV3;
@@ -892,6 +947,13 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 	B->TrainWorld = StringField(Train, TEXT("world"));
 	B->SourceFile = Source;
 	B->Id = FString::Printf(TEXT("%s@%s"), *ModelName, *B->WeightsSha256.Left(8));
+	if (bDefaultBrain)
+	{
+		// 10-29 기본 두뇌 (PolicyBrainV3Default.h): 같은 검사를 지난 같은 두뇌 — 출처 표시만 다르다 (디스크 파일이 아니다)
+		B->bDefault = true;
+		B->Label = UTF8_TO_TCHAR(EcoPolicyV3Default::kLabel);
+		B->SourceFile.Empty();
+	}
 
 	// 적응 고리 'adapt' 블록 (선택 — 없거나 값이 깨졌으면 빈 칸으로 두고 거부하지 않는다. 가중치·골든 검사와 무관)
 	if (const FJsonObject* Adapt = ObjectField(R, TEXT("adapt")))
@@ -919,7 +981,15 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::Parse(const FString& JsonText, const FStrin
 bool FEcoV3BrainRegistry::IsBuiltinName(const FString& Name)
 {
 	const FString N = Name.TrimStartAndEnd();
-	return N.Equals(TEXT("builtin"), ESearchCase::IgnoreCase) || N == TEXT("내장");
+	return N.Equals(TEXT("builtin"), ESearchCase::IgnoreCase) || N == TEXT("내장") || N.Equals(TEXT("R1b"), ESearchCase::IgnoreCase)
+		|| N.Equals(TEXT("R1b-F"), ESearchCase::IgnoreCase);
+}
+
+bool FEcoV3BrainRegistry::IsDefaultName(const FString& Name)
+{
+	const FString N = Name.TrimStartAndEnd();
+	return N.Equals(TEXT("default"), ESearchCase::IgnoreCase) || N == TEXT("기본")
+		|| N.Equals(UTF8_TO_TCHAR(EcoPolicyV3Default::kLabel), ESearchCase::IgnoreCase);
 }
 
 TArray<FString> FEcoV3BrainRegistry::SearchFolders()
@@ -977,6 +1047,12 @@ FEcoV3BrainLoad FEcoV3BrainRegistry::LoadFile(const FString& PathOrName)
 	{
 		FEcoV3BrainLoad L;
 		L.Brain = Builtin();
+		return L;
+	}
+	if (IsDefaultName(PathOrName))
+	{
+		FEcoV3BrainLoad L;
+		L.Brain = Default();
 		return L;
 	}
 	FString Tried;
@@ -1120,6 +1196,7 @@ bool FEcoV3BrainRegistry::CommitPending(FEcoV3BrainPtr* OutFrom, FString* OutWhy
 	}
 	Active = Pending.ToSharedRef();
 	ActiveWhy = PendingWhy;
+	bCommitted = true;
 	bLastCommitRollback = bRollback;
 	LastCommitWhy = PendingWhy;
 	Pending.Reset();
@@ -1180,6 +1257,49 @@ bool FEcoV3BrainRegistry::Rollback(const FString& Why, FString* OutMessage)
 		*OutMessage = FString::Printf(TEXT("되돌림 대기: %s — 다음 결정 스텝 경계에서 바뀐다 (남은 쌓개 %d)"), *Brain->Describe(), History.Num());
 	}
 	return true;
+}
+
+FEcoV3StartPick FEcoV3BrainRegistry::PickStart(const FString& Startup, bool bAutoAdapt) const
+{
+	FEcoV3StartPick P;
+	P.Startup = Startup.TrimStartAndEnd();
+	if (!P.Startup.IsEmpty())
+	{
+		// 1. eco.V3Brain.Startup·-EcoV3Brain= — 통과하면 그 두뇌 (적응 고리 Play 여도: 사람이 고른 시작 두뇌가 이긴다)
+		P.StartupLoad = LoadFile(P.Startup);
+		if (P.StartupLoad.Ok())
+		{
+			P.Brain = P.StartupLoad.Brain;
+			P.Why = FString::Printf(TEXT("시작 두뇌 eco.V3Brain.Startup %s"), *P.Startup);
+			return P;
+		}
+		P.bStartupRejected = true;
+	}
+	const FString Rejected = P.bStartupRejected ? FString::Printf(TEXT(" (시작 두뇌 '%s' 거부)"), *P.Startup) : FString();
+	const FEcoV3BrainRef Def = Default();
+	const FEcoV3Brain& Will = Pending.IsValid() ? *Pending : *Active;
+	if (bAutoAdapt)
+	{
+		// 2. 적응 고리 Play 는 늘 기본 두뇌(판 0)에서: 레벨은 Play 마다 저장된 처음 상태로 돌아오므로 앞 Play 의 바뀐 환경에 맞춘 두뇌는 맞지 않는다
+		//    (저장소의 지금 두뇌는 프로세스에 하나라 PIE 를 다시 시작해도 남는다)
+		if (Will.Id == Def->Id)
+		{
+			P.Why = FString::Printf(TEXT("적응 고리 Play — 이미 기본 두뇌(판 0) %s%s"), *Def->Id, *Rejected);
+			return P;
+		}
+		P.Brain = Def;
+		P.Why = FString::Printf(TEXT("적응 고리 Play 시작 — %s(판 0)에서 시작%s"), *Def->OriginText(), *Rejected);
+		return P;
+	}
+	if (!bCommitted && !Pending.IsValid())
+	{
+		// 3. 이 프로세스의 첫 통합 v3 Play (두뇌를 건 적 없음 — 지금 두뇌는 저장소 처음 두뇌 내장 R1b): 기본 두뇌
+		P.Brain = Def;
+		P.Why = FString::Printf(TEXT("%s (처음 Play — eco.V3Brain.Startup 빔)%s"), *Def->OriginText(), *Rejected);
+		return P;
+	}
+	P.Why = FString::Printf(TEXT("지금 두뇌 그대로 %s (이 프로세스에서 이미 두뇌를 걸었다 — 기본으로 돌리려면 eco.V3Brain.Startup default)%s"), *Will.Id, *Rejected);
+	return P;
 }
 
 FString FEcoV3BrainRegistry::EffectiveWatchFolder() const
@@ -1353,6 +1473,7 @@ void FEcoV3BrainRegistry::ResetForTest()
 	PendingWhy.Empty();
 	PendingRollback.Reset();
 	History.Reset();
+	bCommitted = false;
 	bLastCommitRollback = false;
 	LastCommitWhy.Empty();
 	++Generation;
@@ -1399,7 +1520,8 @@ namespace EcoV3BrainImpl
 		}
 		if (Args.IsEmpty())
 		{
-			Ar.Log(TEXT("[EcoV3Brain] 쓰기: eco.V3Brain.Load <파일|builtin> — 파일은 절대 경로이거나 <프로젝트>/EcoBrains·Saved/EcoBrains 안 이름 (eco.V3Brain.List)"));
+			Ar.Log(TEXT("[EcoV3Brain] 쓰기: eco.V3Brain.Load <파일|default|builtin> — default = 기본 두뇌 R7e, builtin = 내장 R1b-F, 파일은 절대 경로이거나 ")
+					   TEXT("<프로젝트>/EcoBrains·Saved/EcoBrains 안 이름 (eco.V3Brain.List)"));
 			return;
 		}
 		const FString Arg = FString::Join(Args, TEXT(" "));
@@ -1412,9 +1534,9 @@ namespace EcoV3BrainImpl
 			return;
 		}
 		FEcoV3BrainRegistry::Get().Queue(L.Brain.ToSharedRef(), FString::Printf(TEXT("콘솔 eco.V3Brain.Load %s"), *Arg));
-		if (L.Brain->bBuiltin)
+		if (L.Brain->bBuiltin || L.Brain->bDefault)
 		{
-			Ar.Logf(TEXT("[EcoV3Brain] 내장 두뇌 %s 로 — 다음 결정 스텝 경계에서 바뀐다 (통합 v3 Play 중이 아니면 Play 를 시작할 때)"), *L.Brain->Id);
+			Ar.Logf(TEXT("[EcoV3Brain] %s %s 로 — 다음 결정 스텝 경계에서 바뀐다 (통합 v3 Play 중이 아니면 Play 를 시작할 때)"), *L.Brain->OriginText(), *L.Brain->Id);
 		}
 		else
 		{
@@ -1434,8 +1556,11 @@ namespace EcoV3BrainImpl
 				B.TrainDigest.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" (%s)"), *B.TrainDigest));
 		if (!B.bBuiltin)
 		{
-			Ar.Logf(TEXT("[EcoV3Brain]   검사 통과: 골든 %d 사례 (세계 %s) 최대 로짓 오차 %.2e ≤ %.0e · 파일 %s"), B.GoldenCount, *B.GoldenWorld, B.GoldenMaxError,
-					B.GoldenTolerance, *B.SourceFile);
+			Ar.Logf(TEXT("[EcoV3Brain]   검사 통과: 골든 %d 사례 (세계 %s) 최대 로짓 오차 %.2e ≤ %.0e · %s"), B.GoldenCount, *B.GoldenWorld, B.GoldenMaxError,
+					B.GoldenTolerance,
+					B.bDefault ? *FString::Printf(TEXT("빌드에 넣은 두뇌 파일 %s (PolicyBrainV3Default.h, 바이트 sha256 %s…)"),
+												  UTF8_TO_TCHAR(EcoPolicyV3Default::kFileName), *FString(UTF8_TO_TCHAR(EcoPolicyV3Default::kFileSha256)).Left(16))
+							   : *FString::Printf(TEXT("파일 %s"), *B.SourceFile));
 		}
 		if (B.AdaptRound > 0 || !B.AdaptRun.IsEmpty())
 		{
@@ -1453,11 +1578,14 @@ namespace EcoV3BrainImpl
 			PrintBrain(Ar, Reg.IsPendingRollback() ? TEXT("대기 두뇌 (되돌림, 다음 결정 스텝 경계에서)") : TEXT("대기 두뇌 (다음 결정 스텝 경계에서)"), *P);
 			Ar.Logf(TEXT("[EcoV3Brain]   까닭: %s"), *Reg.GetPendingWhy());
 		}
-		Ar.Logf(TEXT("[EcoV3Brain] 바꾼 횟수 %d · 세대 %u · 내장 %s · 서버·단독만 (이 월드 %s)"), Reg.GetSwapCount(), Reg.GetGeneration(), *FEcoV3BrainRegistry::Builtin()->Id,
+		Ar.Logf(TEXT("[EcoV3Brain] 바꾼 횟수 %d · 세대 %u · 기본 %s · 내장 %s · 서버·단독만 (이 월드 %s)"), Reg.GetSwapCount(), Reg.GetGeneration(),
+				*FEcoV3BrainRegistry::Default()->Id, *FEcoV3BrainRegistry::Builtin()->Id,
 				!World ? TEXT("없음") : World->GetNetMode() == NM_Client ? TEXT("클라이언트 — 두뇌를 돌리지 않음") : TEXT("서버·단독"));
 		const float At = EcoV3Brain::SwapAtSeconds();
 		const FString Watch = Reg.EffectiveWatchFolder();
-		Ar.Logf(TEXT("[EcoV3Brain] 시작 두뇌 eco.V3Brain.Startup '%s' · 예정 바꾸기 %s · 폴더 감시 %s%s"), *EcoV3Brain::StartupFile(),
+		Ar.Logf(TEXT("[EcoV3Brain] 시작 두뇌 eco.V3Brain.Startup '%s'%s · 예정 바꾸기 %s · 폴더 감시 %s%s"), *EcoV3Brain::StartupFile(),
+				EcoV3Brain::StartupFile().IsEmpty() ? (Reg.HasCommitted() ? TEXT(" (빔 — 다음 Play 는 지금 두뇌 그대로, 적응 고리 Play 는 기본)") : TEXT(" (빔 — 다음 Play 는 기본 두뇌)"))
+													: TEXT(""),
 				At >= 0.0f ? *FString::Printf(TEXT("%.1f초에 '%s'"), At, *EcoV3Brain::SwapFile()) : TEXT("끔"), Watch.IsEmpty() ? TEXT("끔") : *Watch,
 				!Watch.IsEmpty() && EcoV3Brain::WatchFolder().IsEmpty() ? TEXT(" (적응 고리 기본)") : TEXT(""));
 		Ar.Logf(TEXT("[EcoV3Brain] 되돌리기 쌓개 %d (eco.V3Brain.History·Rollback) · 지금 두뇌가 된 까닭: %s"), Reg.GetHistory().Num(), *Reg.GetActiveWhy());
@@ -1497,7 +1625,8 @@ namespace EcoV3BrainImpl
 	void CmdList(const TArray<FString>& Args, UWorld* World, FOutputDevice& Ar)
 	{
 		const TArray<FString> Files = FEcoV3BrainRegistry::ListFiles();
-		Ar.Logf(TEXT("[EcoV3Brain] 두뇌 파일 %d (찾는 폴더 %s) · 내장 = %s · 지금 = %s"), Files.Num(), *FString::Join(FEcoV3BrainRegistry::SearchFolders(), TEXT(" · ")),
+		Ar.Logf(TEXT("[EcoV3Brain] 두뇌 파일 %d (찾는 폴더 %s) · 기본(default) = %s · 내장(builtin) = %s · 지금 = %s"), Files.Num(),
+				*FString::Join(FEcoV3BrainRegistry::SearchFolders(), TEXT(" · ")), *FEcoV3BrainRegistry::Default()->Describe(),
 				*FEcoV3BrainRegistry::Builtin()->Id, *FEcoV3BrainRegistry::Get().GetActive()->Id);
 		for (const FString& F : Files)
 		{
@@ -1515,8 +1644,8 @@ namespace EcoV3BrainImpl
 
 	FAutoConsoleCommandWithWorldArgsAndOutputDevice CmdLoadReg(
 		TEXT("eco.V3Brain.Load"),
-		TEXT("사슴 두뇌 바꾸기: eco.V3Brain.Load <파일|builtin>. 검사(계약·차원·마스크·sha256·골든)를 통과하면 다음 결정 스텝 경계에서 바뀐다 — Play 를 다시 시작하지 않는다. ")
-			TEXT("서버·단독만 (EcoV3Brain.h)."),
+		TEXT("사슴 두뇌 바꾸기: eco.V3Brain.Load <파일|default|builtin> (default = 기본 두뇌 R7e, builtin = 내장 R1b-F). 검사(계약·차원·마스크·sha256·골든)를 통과하면 ")
+			TEXT("다음 결정 스텝 경계에서 바뀐다 — Play 를 다시 시작하지 않는다. 서버·단독만 (EcoV3Brain.h)."),
 		FConsoleCommandWithWorldArgsAndOutputDeviceDelegate::CreateStatic(&CmdLoad));
 	FAutoConsoleCommandWithWorldArgsAndOutputDevice CmdInfoReg(
 		TEXT("eco.V3Brain.Info"), TEXT("지금 사슴 두뇌·대기 두뇌·바꾼 횟수·출처 (EcoV3Brain.h)."),

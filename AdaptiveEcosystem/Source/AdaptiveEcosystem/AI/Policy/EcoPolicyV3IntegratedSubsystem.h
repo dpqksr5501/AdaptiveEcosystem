@@ -180,6 +180,13 @@
 //      파이썬 감시 자동 시작 eco.IntegratedV3.AutoWatch (기본 1 = AutoAdapt 를 따름 — EcoV3WatchLauncher.{h,cpp}): AutoAdapt Play 를 시작하면 live.py watch 를 창 없이
 //      띄우고 Play 가 끝나면 학습 자식까지 프로세스 나무째 끝낸다. 학습 파이프라인을 따로 띄우는 개발용 도구다 — 런타임 추론은 그대로 C++ 네이티브만.
 //      적응 고리 폴더 eco.IntegratedV3.AdaptRoot (-EcoV3AdaptRoot=, 빈 값 = Saved/EcoAdapt) 하나가 스냅숏·두뇌·상태 파일·감시 --root 의 기본을 묶는다.
+//  25. 10-29 기본 두뇌 R7e (사용자 결정 '기본 두뇌 R7e로', EcoV3Brain.h '기본 두뇌', 문서 Docs/RL_Policy/LIVE_ADAPT_SPEC.md 5.6): 아무것도 고르지 않은 Play 의
+//      사슴 두뇌는 빌드에 넣은 기본 두뇌 R7e(v3_r7_g995_s1_20m@40d8710d, 관측 24·마스크 판 5 — PolicyBrainV3Default.h)다. 위 19·20·22 의 '처음은 내장'·
+//      '적응 고리 Play 는 내장 두뇌(판 0)에서'·'게임 기본 두뇌는 그대로 내장 R1b-F' 는 그때의 이력이다. OnWorldBeginPlay 가 FEcoV3BrainRegistry::PickStart 로 고른
+//      두뇌를 줄에 넣고, 첫 SyncBrain 이 걸기 전 검사(RouteBrainBlocker)를 지나면 건다 — 못 걸면(도주 반사 끔 등) 대기를 버리고 내장 R1b-F 로 돈다(기록 Warning·
+//      화면 알림). 내장 R1b-F 로 시작 = eco.V3Brain.Startup builtin (-EcoV3Brain=builtin), Play 중 eco.V3Brain.Load builtin. 처리기 시험(ActivateForTest)은
+//      PickStart 를 지나지 않아 저장소 처음 두뇌(내장 R1b-F)로 돈다. 화면: 맨 위 줄 '기본 R7e 두 길·반사 밖 도망 막음', 상태 줄 '두뇌 판 0 (기본 R7e)',
+//      알림 '새 두뇌 — 기본 두뇌 R7e (판 0) · …'·'두뇌 되돌림 → 기본 두뇌 R7e (판 0)'. 스냅숏 brain.default 참.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 

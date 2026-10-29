@@ -18,6 +18,7 @@
 | v3 내장 R1b | 기본18관측/5행동·mask2 | 기본 모델/Golden/슬롯 의미 보존 |
 | v3 opt-in21 | 장애물 관측을 포함하는 별도 입출력 계약 | 새 경험·유전 입력이 자동으로 포함된 것이 아님 |
 | v3 다른 mask/경보 판 | [V3 계약](POLICY_CONTRACT_V3.md)의 별도 경로 | default R1b와 같은 판이라고 가정 금지 |
+| v3 기본 두뇌 R7e (10-29 덧붙임) | 통합 v3 Play 시작 두뇌 = 빌드에 넣은 R7e(관측 24·mask5, 계약 `0xad7bad5e1acaf071`, `PolicyBrainV3Default.h`) | 위 '내장 R1b' 줄은 그대로(평가기·골든·평면 v3 경로의 바탕, `eco.V3Brain.Startup builtin` 으로 고름). 고르는 규칙·되돌리는 법은 [LIVE_ADAPT_SPEC.md](LIVE_ADAPT_SPEC.md) 5.6 |
 
 입력 순서·정규화·clamp·mask/argmax·동점 규칙은 [V1](POLICY_CONTRACT_V1.md), [V3](POLICY_CONTRACT_V3.md)와 실제 `EcoObservationV3.h`, `EcoPolicyV3Inference.h`, Python encoder/export를 대조한다. 충돌을 발견하면 Source/계약 차이를 기록하고 담당자 합의로 수정한다. Golden 기대값을 새 코드에 맞춰 덮어써서 통과시키지 않는다.
 

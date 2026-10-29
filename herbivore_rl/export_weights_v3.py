@@ -59,6 +59,15 @@ torch 는 스레드 1 로 돈다(`env.torch_init`, main 안에서도 다시 고�
   허용 칸 1·2위 로짓 차가 NEAR_TIE_GAP 보다 작은 사례는 넣지 않는다(float32 순서 차이로 argmax 가 갈릴 수 있다).
   언리얼 로더는 버전·차원·이름·마스크·문턱·모양·NaN·sha256 을 보고, 골든을 C++ 순전파(EcoPolicyV3Inference.h)로 다시 돌려
   로짓이 허용 오차 안이고 행동이 같아야 받는다. 시각·절대 경로를 적지 않아 같은 모델이면 바이트 단위로 같은 파일이 나온다.
+
+기본 두뇌 헤더 (10-29 사용자 결정 '기본 두뇌 R7e로' — 언리얼 `AI/Policy/EcoV3Brain.h` '기본 두뇌'):
+
+    # 저장소 두뇌 파일 하나를 바이트 그대로 C++ 배열로 (모델·torch 없이 — 두뇌 파일만 읽는다)
+    python export_weights_v3.py --default-brain ../AdaptiveEcosystem/EcoBrains/v3_r7_g995_s1_20m.json --default-label R7e
+
+  `PolicyBrainV3Default.h`(네임스페이스 `EcoPolicyV3Default`)를 --out(기본 언리얼 모듈 AI/Policy)에 쓴다. 통합 v3 모드에서 eco.V3Brain.Startup 이 빈
+  Play 의 시작 두뇌가 이 두뇌다(파일 없이도 패키지·데디케이티드 서버·Shipping 에서 돈다). 언리얼은 이 바이트를 파일 두뇌와 같은 검사(Parse)로 읽는다.
+  `PolicyWeightsV3.h`(내장 R1b — 평가기·평면 v3 경로·골든의 바탕)는 그대로다. 줄 끝을 LF 로 맞추고 시각·절대 경로를 적지 않아 같은 파일이면 바이트 단위로 같은 헤더다.
 """
 
 from __future__ import annotations
@@ -114,6 +123,10 @@ BRAIN_N_ROUTE_EDGE = 2
 BRAIN_N_ROUTE_SINGLE = 2               # 마스크 판 4: SHELTER 가 가능하지 않은 도주 길 결정(RUN 한 칸)
 BRAIN_LAYERS = (("W0", "B0", "mlp_extractor.policy_net.0"), ("W1", "B1", "mlp_extractor.policy_net.2"),
                 ("W2", "B2", "action_net"))
+# 기본 두뇌 헤더 (10-29 — 모듈 docstring '기본 두뇌 헤더'): 통합 v3 모드 Play 시작 두뇌 = 저장소 두뇌 파일 바이트 그대로
+DEFAULT_BRAIN_HEADER = "PolicyBrainV3Default.h"
+DEFAULT_BRAIN_FILE = ROOT.parent / "AdaptiveEcosystem" / "EcoBrains" / "v3_r7_g995_s1_20m.json"   # R7e (판정 통과 두 길 두뇌, 관측 24·판 5)
+DEFAULT_BRAIN_LABEL = "R7e"
 
 
 # --------------------------------------------------------------------- #
@@ -944,6 +957,88 @@ def export_brain_file(model_path: Path, out_file: Path, golden_config: Path | No
 
 
 # --------------------------------------------------------------------- #
+# 기본 두뇌 헤더 (10-29 사용자 결정 '기본 두뇌 R7e로' — 통합 v3 모드 Play 시작 두뇌, 언리얼 EcoV3Brain.h '기본 두뇌')
+# --------------------------------------------------------------------- #
+
+
+def _repo_rel(path: Path) -> str:
+    """헤더에 적는 두뇌 파일 경로: 저장소 루트(herbivore_rl/ 의 부모) 기준. 밖이면 파일 이름만 (절대 경로를 적지 않아야 결정적이다)."""
+    p = Path(path).resolve()
+    try:
+        return p.relative_to(ROOT.parent).as_posix()
+    except ValueError:
+        return p.name
+
+
+def default_brain_header_text(brain_file: Path, label: str) -> tuple[str, dict]:
+    """두뇌 파일(JSON) 바이트를 그대로 담은 C++ 헤더 글자와 요약. 줄 끝은 LF 로 맞춘다(git core.autocrlf 가 꺼낼 때 CRLF 로 바꿔도 같은 헤더 —
+    두뇌 파일은 write_brain_file 이 LF 로 쓴다). 언리얼은 이 바이트를 파일 두뇌와 같은 검사(EcoV3Brain.cpp Parse)로 읽으므로 여기서는
+    형식·id·가중치 sha256 만 다시 본다 (깨진 파일을 헤더로 굳히지 않게)."""
+    import base64
+
+    raw = Path(brain_file).read_bytes().replace(bytes([13, 10]), bytes([10]))
+    d = json.loads(raw.decode("utf-8"))
+    if d.get("format") != BRAIN_FORMAT or int(d.get("format_version", 0)) != BRAIN_FORMAT_VERSION:
+        raise SystemExit(f"{brain_file} 는 두뇌 파일({BRAIN_FORMAT} 판 {BRAIN_FORMAT_VERSION})이 아니다")
+    blob = b"".join(base64.b64decode(L[k]) for L in d["layers"] for k in ("w_f32le_b64", "b_f32le_b64"))
+    wsha = hashlib.sha256(blob).hexdigest()
+    if wsha != d.get("weights_sha256") or d.get("id") != f"{d['model']['name']}@{wsha[:8]}":
+        raise SystemExit(f"{brain_file}: 가중치 sha256·id 가 파일에 적힌 값과 다르다")
+    if not str(d.get("contract_hash", "")).startswith("0x"):
+        raise SystemExit(f"{brain_file}: contract_hash 가 0x… 가 아니다")
+    if not label or not all(c.isalnum() or c in "-_" for c in label) or not label.isascii():
+        raise SystemExit(f"이름표 '{label}' 는 ASCII 글자·숫자·-·_ 만 쓴다 (C++ 문자열·콘솔 이름)")
+    fsha = hashlib.sha256(raw).hexdigest()
+    name = Path(brain_file).name
+    g = d["golden"]
+    per_line = 32
+    rows = [", ".join(str(b) for b in raw[i:i + per_line]) for i in range(0, len(raw), per_line)]
+    body = "\n".join("\t\t" + r + ("," if i + 1 < len(rows) else "") for i, r in enumerate(rows))
+    text = f"""// 자동 생성. 수정 금지.
+// 생성: herbivore_rl/export_weights_v3.py --default-brain {_repo_rel(brain_file)} --default-label {label}
+//       통합 v3 모드 기본 두뇌 (eco.V3Brain.Startup 이 빈 Play 의 시작 두뇌 — 10-29 사용자 결정 '기본 두뇌 R7e로', EcoV3Brain.h '기본 두뇌')
+// 두뇌 파일: {_repo_rel(brain_file)}  ({len(raw)} 바이트, 줄 끝 LF, sha256 {fsha})
+//            바이트 그대로 넣는다 — 파일 없이도(패키지·데디케이티드 서버·Shipping) 돈다. 언리얼은 파일 두뇌와 같은 검사(EcoV3Brain.cpp Parse —
+//            형식·계약 해시·두 길 계약 칸·차원·이름·마스크 판·문턱·허용 칸·층 모양·NaN·가중치 sha256·골든 자체 확인)를 지난 뒤에만 쓴다
+// 두뇌:     {d["id"]}  ({label} — 관측 {d["obs_dim"]} · 마스크 판 {d["mask_version"]} · 계약 {d["contract_hash"]} · 허용 {" ".join(d["allowed"])})
+// 모델:     {d["model"]["path"]}  (sha256 {d["model"]["sha256"]})
+// 학습:     {d["train"]["config"]}  (config_digest {d["train"]["config_digest"]}) — {d["train"]["world"]}
+// 골든:     {len(g["cases"])} 사례 (세계 {g["world_config"]}, 로짓 허용 오차 {g["logit_tolerance"]:g})
+//
+// 사용: EcoV3Brain.cpp FEcoV3BrainRegistry::Default
+#pragma once
+
+#include <cstdint>
+
+namespace EcoPolicyV3Default
+{{
+	inline constexpr const char* kLabel = "{label}";
+	inline constexpr const char* kFileName = "{name}";
+	inline constexpr const char* kBrainId = "{d["id"]}";
+	inline constexpr const char* kFileSha256 = "{fsha}";
+	inline constexpr std::uint64_t kContractHash = {d["contract_hash"]}ULL;
+	inline constexpr std::int32_t kObsDim = {int(d["obs_dim"])};
+	inline constexpr std::int32_t kMaskVersion = {int(d["mask_version"])};
+	inline constexpr std::int32_t kFileBytes = {len(raw)};
+
+	inline constexpr std::uint8_t kFile[kFileBytes] = {{   // 두뇌 파일 바이트 (UTF-8 JSON, LF)
+{body}
+	}};
+}}
+"""
+    return text, dict(id=d["id"], label=label, file=_repo_rel(brain_file), bytes=len(raw), sha256=fsha, contract=d["contract_hash"],
+                      obs_dim=int(d["obs_dim"]), mask_version=int(d["mask_version"]), golden=len(g["cases"]))
+
+
+def write_default_brain_header(brain_file: Path, out: Path, label: str) -> dict:
+    """기본 두뇌 헤더(`DEFAULT_BRAIN_HEADER`)를 `out` 폴더에 쓴다 (UTF-8, LF — 같은 파일·이름표면 바이트 단위로 같다). 반환: 요약."""
+    text, info = default_brain_header_text(Path(brain_file), label)
+    Path(out).mkdir(parents=True, exist_ok=True)
+    (Path(out) / DEFAULT_BRAIN_HEADER).write_text(text, encoding="utf-8", newline="\n")
+    return info
+
+
+# --------------------------------------------------------------------- #
 
 
 def export(model_path: Path, config: Path, alarm_config: Path, out: Path, seeds=GOLDEN_SEEDS,
@@ -1002,7 +1097,18 @@ def main(argv=None) -> int:
     p.add_argument("--golden-seed", type=int, default=BRAIN_GOLDEN_SEED)
     p.add_argument("--golden-steps", type=int, default=BRAIN_GOLDEN_STEPS)
     p.add_argument("--world-label", default=None, help="두뇌 파일 train.world (사람이 읽을 학습 세계 이름, 기본: 학습 설정 파일 이름)")
+    p.add_argument("--default-brain", nargs="?", const=str(DEFAULT_BRAIN_FILE), default=None,
+                   help=f"주면 가중치 헤더 대신 기본 두뇌 헤더({DEFAULT_BRAIN_HEADER}) 하나만 --out 에 쓴다 — 두뇌 파일 바이트 그대로 "
+                        f"(값을 빼면 {_repo_rel(DEFAULT_BRAIN_FILE)}, 모듈 docstring '기본 두뇌 헤더')")
+    p.add_argument("--default-label", default=DEFAULT_BRAIN_LABEL, help="기본 두뇌 짧은 이름 (화면·콘솔 — 기본 R7e)")
     args = p.parse_args(argv)
+
+    if args.default_brain:
+        info = write_default_brain_header(Path(args.default_brain), Path(args.out), args.default_label)
+        print(f"기본 두뇌: {info['id']} ({info['label']})  관측 {info['obs_dim']}  마스크 판 {info['mask_version']}  계약 {info['contract']}  골든 {info['golden']}")
+        print(f"두뇌 파일: {info['file']}  {info['bytes']} 바이트  sha256 {info['sha256'][:16]}")
+        print(f"생성: {Path(args.out) / DEFAULT_BRAIN_HEADER}")
+        return 0
 
     if args.brain_file:
         d = export_brain_file(Path(args.model), Path(args.brain_file), Path(args.golden_config) if args.golden_config else None, args.golden_seed,

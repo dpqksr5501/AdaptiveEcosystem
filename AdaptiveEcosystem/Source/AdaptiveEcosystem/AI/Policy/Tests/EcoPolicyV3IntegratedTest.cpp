@@ -42,6 +42,9 @@
 //                                      길 없음 결정, 두 길 → 길 없는 두뇌는 그 H 가 길 상태를 지우고 길 통계가 멈춤, 조각 바이트 그대로, 스냅숏 칸, 마스크 위반 0
 //   Integrated.RouteRequiresWildFlight 도주 반사를 끈 지역에는 판 4·5 두뇌를 걸지 않는다 (대기 두뇌 버림·지금 두뇌 그대로, 한 지역만 꺼도, 저장소 두뇌가 이미 판 5 여도
 //                                      그 월드는 내장), 실제 허용(두뇌 ∧ 세계)의 얼기·잠 검사, 판 2 는 그대로 건다
+//   Integrated.DefaultBrainStart       (10-29 기본 두뇌 R7e) Play 시작 고르기로 줄에 넣은 기본 두뇌가 첫 SyncBrain 에 걸린다(관측 24·두 길·반사 밖 FLEE 막음, 300 스텝
+//                                      마스크 위반 0), 도주 반사를 끈 세계는 대기를 버리고 내장 R1b-F (저장소 '건 적 없음' 그대로). 처리기 시험은 Play 시작 고르기를
+//                                      지나지 않아 저장소 처음 두뇌(내장 R1b-F)로 돈다 — 다른 Integrated 시험의 기대값은 그대로다
 //   Integrated.RouteRefugeLifecycle    SHELTER 유지 중 은신처가 지워지면(반경 0) 무효 결정, 늦게 붙은 은신처는 다음 H 부터 후보(잠금 뒤 다시 고름), 목록 밖 번호 무효 (엔진 함수),
 //                                      Mass 통합 세계(늘 SHELTER 시험 두뇌)에서 지운 은신처로 가는 사슴이 없다
 //   Integrated.RouteDisplay            사슴 글자 '도주(트인 쪽)'·'도주(은신처)'·색, 결정 스텝의 보일 길, 60 초 창(450 스텝)·글자
@@ -4560,6 +4563,103 @@ bool FEcoPolicyV3IntegratedRouteRequiresWildFlightTest::RunTest(const FString& P
 		}
 		TestEqual(TEXT("… 계속 돈다 (마스크 위반·관측 칸 어긋남 0)"),
 				  H.Ctx(0).Sim.Stats.MaskViolations + H.Ctx(1).Sim.Stats.MaskViolations + H.Ctx(0).Sim.Stats.ObsLayoutMismatch, static_cast<int64>(0));
+	}
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// Integrated.DefaultBrainStart — 10-29 기본 두뇌 R7e (EcoV3Brain.h '기본 두뇌'): Play 시작 고르기(PickStart)로 줄에 넣은 기본 두뇌가 첫 SyncBrain 에서 걸린다
+// (관측 24·두 길·반사 밖 FLEE 막음, 허용 먹기·도망·숨기). 도주 반사를 끈 세계는 대기를 버리고 내장 R1b-F 로 돈다 — 저장소는 '건 적 없음' 그대로
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(
+	FEcoPolicyV3IntegratedDefaultBrainStartTest,
+	"AdaptiveEcosystem.Policy.V3.Integrated.DefaultBrainStart",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedDefaultBrainStartTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	namespace O3 = EcoObservationV3;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	Reg.ResetForTest();
+	ON_SCOPE_EXIT
+	{
+		FEcoV3BrainRegistry::Get().ResetForTest();
+	};
+	// 도주 반사를 끈 판의 거부 줄은 기대한 경고다: 대기 버림 1, 서브시스템 '두뇌 거부' 1
+	AddExpectedMessagePlain(TEXT("를 버린다"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+	AddExpectedMessagePlain(TEXT("[EcoV3I] 두뇌 거부"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 1);
+	const FEcoV3BrainRef Def = FEcoV3BrainRegistry::Default();
+	if (!TestTrue(TEXT("기본 두뇌 = R7e (빌드에 넣은 두뇌)"), Def->bDefault && Def->Id == TEXT("v3_r7_g995_s1_20m@40d8710d")))
+	{
+		return false;
+	}
+	// (가) 도주 반사 켠 세계 (기본 설정): 처음 Play → 기본 두뇌
+	{
+		FIntegratedHarness H;
+		if (!SetupTwoRegions(*this, H, TestSettings(37700)))
+		{
+			return false;
+		}
+		TestTrue(TEXT("Play 전: 지역 세계는 저장소 처음 두뇌(내장)로 만들었다 (관측 18)"), H.Ctx(0).Sim.ObsDim == O3::kObsDim && !H.Ctx(0).RouteOn());
+		const FEcoV3StartPick Pick = Reg.PickStart(TEXT(""), false);
+		if (!TestTrue(TEXT("빈 Startup · 처음 → 기본 두뇌를 고른다"), Pick.Brain.IsValid() && Pick.Brain->Id == Def->Id))
+		{
+			return false;
+		}
+		Reg.Queue(Pick.Brain.ToSharedRef(), Pick.Why);
+		H.DecisionStep();   // 처리기 머리의 SyncBrain 이 건다 (입양 첫 결정부터 그 두뇌)
+		const FEcoV3Brain& Now = H.Sub->GetActiveBrain();
+		TestTrue(TEXT("이 월드 = 기본 두뇌, 저장소 지금 = 기본·건 적 있음"), Now.bDefault && &Now == &*Def && Reg.GetActive()->Id == Def->Id && Reg.HasCommitted());
+		for (int32 c = 0; c < 2; ++c)
+		{
+			const FEcoV3RegionContext& C = H.Ctx(c);
+			TestTrue(FString::Printf(TEXT("지역 %d: 관측 24 · 두 길 · 반사 밖 FLEE 막음 · 허용 먹기·도망·숨기"), c),
+					 C.Sim.ObsDim == O3::kObsDimRoute && C.RouteOn() && C.Sim.bFleeGate && C.Sim.Allowed[EcoPolicyV3::kGraze] && C.Sim.Allowed[EcoPolicyV3::kFlee]
+						 && C.Sim.Allowed[EcoPolicyV3::kHide] && !C.Sim.Allowed[EcoPolicyV3::kFreeze] && !C.Sim.Allowed[EcoPolicyV3::kSleep]);
+		}
+		TestTrue(TEXT("Net 은 기본 두뇌 가중치"), H.Sub->ActiveNet().W0 == Def->Net.W0 && H.Sub->ActiveNet().ObsDim == O3::kObsDimRoute);
+		for (int32 f = 0; f < 300; ++f)
+		{
+			H.DecisionStep();
+		}
+		int64 Bad = 0;
+		int64 Decided = 0;
+		for (int32 c = 0; c < 2; ++c)
+		{
+			Bad += H.Ctx(c).Sim.Stats.MaskViolations + H.Ctx(c).Sim.Stats.ObsLayoutMismatch;
+			Decided += H.Ctx(c).BrainTally.Total();
+		}
+		TestEqual(TEXT("300 스텝: 마스크 위반·관측 칸 어긋남 0"), Bad, static_cast<int64>(0));
+		TestTrue(TEXT("두뇌가 결정했다"), Decided > 0);
+		TestEqual(TEXT("다음 Play (빈 Startup) 는 지금 두뇌 그대로"), Reg.PickStart(TEXT(""), false).Brain.IsValid(), false);
+	}
+	// (나) 도주 반사를 끈 세계: 기본 두뇌(판 5)는 걸 수 없다 → 대기 버림, 내장 R1b-F 로 돈다, 저장소는 건 적 없음 그대로 (다음 Play 가 다시 기본을 고른다)
+	{
+		Reg.ResetForTest();
+		FEcoV3IntegratedSettings S = TestSettings(37701);
+		S.bWildFlight = false;
+		FIntegratedHarness H;
+		if (!SetupTwoRegions(*this, H, S))
+		{
+			return false;
+		}
+		const FEcoV3StartPick Pick = Reg.PickStart(TEXT(""), false);
+		if (!TestTrue(TEXT("고르기는 세계를 보지 않는다 (기본 두뇌)"), Pick.Brain.IsValid() && Pick.Brain->Id == Def->Id))
+		{
+			return false;
+		}
+		Reg.Queue(Pick.Brain.ToSharedRef(), Pick.Why);
+		H.DecisionStep();
+		TestTrue(TEXT("기본 두뇌 거부: 대기 없음 · 이 월드 내장 · 관측 18 · 길 끔"),
+				 !Reg.GetPending().IsValid() && H.Sub->GetActiveBrain().bBuiltin && H.Ctx(0).Sim.ObsDim == O3::kObsDim && !H.Ctx(0).RouteOn() && !H.Ctx(1).RouteOn());
+		TestTrue(TEXT("저장소: 지금 = 내장 · 건 적 없음 → 다음 Play 도 기본 두뇌를 고른다"),
+				 Reg.GetActive()->bBuiltin && !Reg.HasCommitted() && Reg.PickStart(TEXT(""), false).Brain.IsValid());
+		for (int32 f = 0; f < 60; ++f)
+		{
+			H.DecisionStep();
+		}
+		TestEqual(TEXT("끈 세계는 계속 돈다 (마스크 위반 0)"), H.Ctx(0).Sim.Stats.MaskViolations + H.Ctx(1).Sim.Stats.MaskViolations, static_cast<int64>(0));
 	}
 	return true;
 }

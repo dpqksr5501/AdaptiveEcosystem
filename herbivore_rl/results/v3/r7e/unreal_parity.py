@@ -31,6 +31,7 @@ R7e 판정(`judge.md` — 파이썬 판 5 거울 N 세계)을 통과한 두뇌 v
         [-EcoV3Brain=v3_r7_g995_s1_20m] -EcoV3SnapshotAt=240 -EcoV3SnapshotOut=<폴더>/s<S>_<cur|r7e>.json
         -benchmark -fps=30 -seconds=241 -NullRHI -NoSound -unattended -nosplash -nopause -DisablePlugins=Bridge,Fab -abslog=<폴더>/s<S>_<cur|r7e>.log
     Git Bash 면 MSYS_NO_PATHCONV=1 (안 주면 /Game/... 가 윈도 경로로 바뀌어 지도를 못 연다). 같은 시드 다시 돌림은 s<S>_r7e_b 로 두면 견준다.
+    10-29 부터 두뇌 인수가 없으면 기본 두뇌 R7e 다 — cur(내장 R1b-F) 판은 -EcoV3Brain=builtin 을 붙인다 (LIVE_ADAPT_SPEC.md 5.6).
 출력: <out>.json (판마다 지역 칸·확인·셈), <out>.md (표).
 """
 

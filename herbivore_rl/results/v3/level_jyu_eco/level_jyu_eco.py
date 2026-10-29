@@ -24,7 +24,8 @@
   full_nolife · full_noveg · full_noenv · full_nomig  전체 모드에서 팀 기능 하나씩만 끈 판(life · 식생 · 환경 감시 · 무리 이주) — 전체 모드와 대조 모드의
           차이가 어디서 오나 보는 '하나씩 빼 보기'(판정 아님). compare 의 --full-nolife 등으로 넣는다.
   모두: -game -EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=<세션> [-EcoV3Brain=v3_r7_g995_s1_20m] -benchmark -fps=30 -seconds=241 -NullRHI
-  -NoSound -unattended -nosplash -nopause -DisablePlugins=Bridge,Fab -abslog=<폴더>/s<세션>_<두뇌>.log. 두뇌 cur = 게임 기본(내장 R1b-F), r7e = R7e 두 길·판 5.
+  -NoSound -unattended -nosplash -nopause -DisablePlugins=Bridge,Fab -abslog=<폴더>/s<세션>_<두뇌>.log. 두뇌 cur = 내장 R1b-F(10-28 까지 게임 기본 — 10-29 부터 기본 두뇌가 R7e 라
+  -EcoV3Brain=builtin 으로 명시한다), r7e = R7e 두 길·판 5.
 
 셈: results/v3/r7e/unreal_parity.py 와 같다 (그 모듈을 불러 쓴다 — 지역 기록·합·짝 t·같은 방향·크기 z, 언리얼 스냅숏 확인). 다른 것은 셋:
   - 나무 배치 표 대신 '나무 없음' 표(no_trees.json — 지역마다 원판 0). 이 맵에는 나무가 없다. 파이썬 거울도 obstacles.fixed = [] 로 같은 세계.
@@ -78,7 +79,7 @@ VARIANTS = (("full_nolife", "life 만 끔"), ("full_noveg", "식생 soil-v1 만 
             ("full_nomig", "무리 이주만 끔"))
 COMMON = ["-benchmark", "-fps=30", "-seconds=241", "-NullRHI", "-NoSound", "-unattended", "-nosplash", "-nopause", "-DisablePlugins=Bridge,Fab"]
 REGIONS = ("Barren", "Forest", "Highland")
-BRAIN_ARGS = {"cur": [], "r7e": [f"-EcoV3Brain={R7E_BRAIN}"]}
+BRAIN_ARGS = {"cur": ["-EcoV3Brain=builtin"], "r7e": [f"-EcoV3Brain={R7E_BRAIN}"]}   # 10-29 기본 두뇌 = R7e → 내장 R1b-F 는 명시
 
 
 def up():

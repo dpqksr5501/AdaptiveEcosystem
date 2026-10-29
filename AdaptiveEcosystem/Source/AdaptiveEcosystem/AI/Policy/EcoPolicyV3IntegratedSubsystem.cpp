@@ -51,7 +51,7 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("eco.IntegratedPolicyVersion"),
 		1,
 		TEXT("팀 통합 레벨(AEcoCreatureIntegrationSpawner)의 두뇌 판. 1 = 팀 그대로 (v1 + Social + 팀 늑대, 기본), ")
-		TEXT("3 = 모든 사슴은 v3 R1b 학습 두뇌, 늑대는 학습 위협 규칙. Play 전에 바꾼다 (서버·단독 권위, Client는 표현만). ")
+		TEXT("3 = 모든 사슴은 v3 학습 두뇌(10-29 부터 기본 R7e — eco.V3Brain.Startup builtin 이면 내장 R1b-F), 늑대는 학습 위협 규칙. Play 전에 바꾼다 (서버·단독 권위, Client는 표현만). ")
 		TEXT("명령줄 -EcoIntegratedV3 는 시작값만 3 으로 둔다 (콘솔에서 1 을 넣으면 꺼진다)."),
 		ECVF_Default);
 
@@ -493,19 +493,20 @@ namespace EcoPolicyV3IntegratedImpl
 	constexpr double kNoticeShotDelaySeconds = 1.5;
 
 	/**
-	 * 두뇌 알림 글자 (LIVE_ADAPT_SPEC.md 5.4): 되돌림 '두뇌 되돌림 → 판 2 (id)' (내장이면 '두뇌 되돌림 → 내장 두뇌 (판 0)', 판 없는 파일이면 id 만),
-	 * 바꾸기 '새 두뇌 — 판 3 · id · 환경: … · 관문: … · 되돌리기 eco.V3Brain.Rollback' (빈 칸은 뺀다).
+	 * 두뇌 알림 글자 (LIVE_ADAPT_SPEC.md 5.4): 되돌림 '두뇌 되돌림 → 판 2 (id)' (기본·내장이면 '두뇌 되돌림 → 기본 두뇌 R7e (판 0)'·'… → 내장 두뇌 (판 0)',
+	 * 판 없는 파일이면 id 만), 바꾸기 '새 두뇌 — 판 3 · id · 환경: … · 관문: … · 되돌리기 eco.V3Brain.Rollback' (빈 칸은 뺀다).
 	 */
 	FString BrainNoticeText(const FEcoV3Brain& B, bool bRollback)
 	{
 		const FString Round = B.RoundTag();
+		const FString Origin = B.OriginText();   // 10-29: 기본 두뇌 R7e·내장 두뇌 (파일 두뇌는 빈 값)
 		if (bRollback)
 		{
-			return B.bBuiltin	  ? FString(TEXT("두뇌 되돌림 → 내장 두뇌 (판 0)"))
+			return !Origin.IsEmpty() ? FString::Printf(TEXT("두뇌 되돌림 → %s (판 0)"), *Origin)
 				   : Round.IsEmpty() ? FString::Printf(TEXT("두뇌 되돌림 → %s"), *B.Id)
 									 : FString::Printf(TEXT("두뇌 되돌림 → %s (%s)"), *Round, *B.Id);
 		}
-		FString Text = B.bBuiltin	   ? FString::Printf(TEXT("새 두뇌 — 내장 두뇌 (판 0) · %s"), *B.Id)
+		FString Text = !Origin.IsEmpty() ? FString::Printf(TEXT("새 두뇌 — %s (판 0) · %s"), *Origin, *B.Id)
 					   : Round.IsEmpty() ? FString::Printf(TEXT("새 두뇌 — %s"), *B.Id)
 										 : FString::Printf(TEXT("새 두뇌 — %s · %s"), *Round, *B.Id);
 		if (!B.AdaptEnv.IsEmpty())
@@ -1280,9 +1281,9 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 							  : TEXT("끔 (eco.IntegratedV3.ForestGrowth 0)"));
 	const int32 Wolves = Settings.WolvesPerRegion;
 	UE_LOG(LogEcoPolicyV3I, Log,
-		   TEXT("[EcoV3I] 통합 모드 켬 — 조정자 %s | 모델 %s (관측 %d, 마스크 판 %d) | 지역 %d, 지역마다 사슴 %d·늑대 %d (잠행 %d·추격 %d, 모두 주행성, 속력 %.2f배) | ")
-			   TEXT("무대 한 변 %.0f m | 시드 %lld | 이주·웨이브·1초 에너지 소모 끔, 낮밤 60+60초 | 늑대 밤잠: %s | 시작 자리 지면 검사: %s"),
-		   *GetNameSafe(Found[0]), UTF8_TO_TCHAR(EcoPolicyV3::kModelName), EcoPolicyV3::kObsDim, EcoPolicyV3::kMaskVersion, Plans.Num(),
+		   TEXT("[EcoV3I] 통합 모드 켬 — 조정자 %s | 내장 모델 %s (관측 %d, 마스크 판 %d — 시작 두뇌는 '사슴 두뇌' 줄, 기본 %s) | 지역 %d, 지역마다 사슴 %d·늑대 %d ")
+			   TEXT("(잠행 %d·추격 %d, 모두 주행성, 속력 %.2f배) | 무대 한 변 %.0f m | 시드 %lld | 이주·웨이브·1초 에너지 소모 끔, 낮밤 60+60초 | 늑대 밤잠: %s | 시작 자리 지면 검사: %s"),
+		   *GetNameSafe(Found[0]), UTF8_TO_TCHAR(EcoPolicyV3::kModelName), EcoPolicyV3::kObsDim, EcoPolicyV3::kMaskVersion, *FEcoV3BrainRegistry::Default()->Id, Plans.Num(),
 		   Plans.IsEmpty() ? 0 : Plans[0].DeerPoints.Num(), Wolves, (Wolves + 1) / 2, Wolves / 2, Settings.PredSpeedMult,
 		   Settings.StageSizeUnits * EcoRepertoireV3::kUnitCm / 100.0, static_cast<long long>(Settings.Seed),
 		   Settings.bGradualNight ? TEXT("서서히 (eco.IntegratedV3.GradualNight 1 — 16 m 안 사슴·사냥 중이면 안 누움, 깜깜하면 새 사냥 없음, 늑대마다 지연, R1b 측정으로 허용)")
@@ -1451,32 +1452,28 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			Reg.PrimeWatch();
 		}
 		ShownRejectSerial = Reg.GetLastWatchReject().Serial;   // 앞 Play 의 거부는 다시 알리지 않는다
-		const FString Startup = EcoV3Brain::StartupFile();
-		if (!Startup.IsEmpty())
+		// 10-29 기본 두뇌 (EcoV3Brain.h '기본 두뇌', LIVE_ADAPT_SPEC.md 5.6): eco.V3Brain.Startup 이 있으면 그 두뇌, 적응 고리 Play 는 늘 기본 두뇌 R7e(판 0),
+		// 그 밖은 이 프로세스 첫 Play 면 기본 두뇌·아니면 지금 두뇌 그대로. 줄에 넣어 첫 결정 스텝 경계(SyncBrain)가 걸기 전 검사(도주 반사·실제 허용) 뒤 건다 —
+		// 못 걸면 대기를 버리고 내장 R1b-F 로 돈다 (기록 Warning·화면 알림 '두뇌 거부 — …')
+		const FEcoV3StartPick Pick = Reg.PickStart(EcoV3Brain::StartupFile(), bAutoAdapt);
+		if (Pick.bStartupRejected)
 		{
-			const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(Startup);
-			if (L.Ok())
-			{
-				Reg.Queue(L.Brain.ToSharedRef(), FString::Printf(TEXT("시작 두뇌 eco.V3Brain.Startup %s"), *Startup));
-			}
-			else
-			{
-				UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 시작 두뇌 eco.V3Brain.Startup '%s' 거부 (%s): %s — %s 로 시작한다"), *Startup,
-					   EcoV3Brain::RejectName(L.Reason), *L.Message, *Reg.GetActive()->Id);
-			}
+			const FString Then = Pick.Brain.IsValid() ? Pick.Brain->Id : (Reg.GetPending().IsValid() ? Reg.GetPending()->Id : Reg.GetActive()->Id);
+			UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 시작 두뇌 eco.V3Brain.Startup '%s' 거부 (%s): %s — %s 로 시작한다"), *Pick.Startup,
+				   EcoV3Brain::RejectName(Pick.StartupLoad.Reason), *Pick.StartupLoad.Message, *Then);
+			PostNotice(EcoV3Integrated::ENotice::Reject, FString::Printf(TEXT("시작 두뇌 '%s' 거부 (%s) — %s 로 시작"), *Pick.Startup,
+																		 EcoV3Brain::RejectName(Pick.StartupLoad.Reason), *Then));
 		}
-		if (bAutoAdapt && Startup.IsEmpty() && !Reg.GetActive()->bBuiltin)
+		if (Pick.Brain.IsValid())
 		{
-			// 적응 고리 Play 는 늘 내장 두뇌(판 0)에서 시작한다: 레벨은 Play 마다 저장된 처음 상태로 돌아오므로, 앞 Play 의 바뀐 환경에 맞춘 두뇌는 맞지 않는다
-			// (저장소의 지금 두뇌는 프로세스에 하나라 PIE 를 다시 시작해도 남는다). 다른 두뇌로 시작하려면 eco.V3Brain.Startup
-			Reg.Queue(FEcoV3BrainRegistry::Builtin(), TEXT("적응 고리 Play 시작 — 내장 두뇌(판 0)에서 시작"));
+			Reg.Queue(Pick.Brain.ToSharedRef(), Pick.Why);
 		}
 		const float SwapAt = EcoV3Brain::SwapAtSeconds();
 		UE_LOG(LogEcoPolicyV3I, Log,
-			   TEXT("[EcoV3I] 사슴 두뇌: 지금 %s%s | 내장 %s | 예정 바꾸기 %s | 폴더 감시 %s | 바꾸기 eco.V3Brain.Load <파일|builtin> (결정 스텝 경계에서, Play 그대로), ")
-				   TEXT("보기 eco.V3Brain.Info·List, 찾는 폴더 %s"),
+			   TEXT("[EcoV3I] 사슴 두뇌: 지금 %s%s | 시작 고르기: %s | 기본 %s · 내장 %s | 예정 바꾸기 %s | 폴더 감시 %s | ")
+				   TEXT("바꾸기 eco.V3Brain.Load <파일|default|builtin> (결정 스텝 경계에서, Play 그대로), 보기 eco.V3Brain.Info·List, 찾는 폴더 %s"),
 			   *Reg.GetActive()->Describe(), Reg.GetPending().IsValid() ? *FString::Printf(TEXT(" → 첫 결정 스텝에 %s"), *Reg.GetPending()->Id) : TEXT(""),
-			   *FEcoV3BrainRegistry::Builtin()->Id,
+			   *Pick.Why, *FEcoV3BrainRegistry::Default()->Id, *FEcoV3BrainRegistry::Builtin()->Id,
 			   SwapAt >= 0.0f ? *FString::Printf(TEXT("%.1f초에 %s (eco.V3Brain.SwapAtSeconds·SwapFile — 측정·시연용)"), SwapAt, *EcoV3Brain::SwapFile())
 							  : TEXT("끔"),
 			   Reg.EffectiveWatchFolder().IsEmpty() ? TEXT("끔 (eco.V3Brain.WatchFolder)") : *Reg.EffectiveWatchFolder(),
@@ -1516,7 +1513,7 @@ void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
 	TeamValues = FEcoV3SpawnerTeamValues();
 	TeamHerbivoreConfig = nullptr;
 	TeamWolfConfig = nullptr;
-	ActiveBrain.Reset();   // 저장소(프로세스에 하나)의 지금 두뇌는 그대로 — 다음 Play 도 그 두뇌로 시작한다 (eco.V3Brain.Load builtin 으로 되돌린다)
+	ActiveBrain.Reset();   // 저장소(프로세스에 하나)의 지금 두뇌는 그대로 — 다음 Play 도 그 두뇌로 시작한다 (적응 고리 Play 는 기본 두뇌로. 고르기 PickStart·eco.V3Brain.Startup)
 	AppliedBrainGen = 0;
 	if (bAdaptDefaultsSet)
 	{
@@ -3575,10 +3572,14 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 		if (!Block.IsEmpty())
 		{
 			const FString PendId = Pend->Id;
+			// 10-29 기본 두뇌 R7e(판 5)를 걸 수 없는 세계 (도주 반사 끔 등): 대기를 버리고 지금 두뇌(처음 Play 면 내장 R1b-F)로 돈다 — 알림에 그 뜻을 적는다
+			const FString PendName = Pend->bDefault ? FString::Printf(TEXT("%s %s"), *Pend->OriginText(), *PendId) : PendId;
 			Reg.DiscardPending(FString::Printf(TEXT("두 길 두뇌를 걸 수 없다 — %s"), *Block));
 			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 두뇌 거부 | %.1f초 (전역 스텝 %lld) | %s — %s | %s 그대로"), Seconds, static_cast<long long>(GlobalT),
-				   *PendId, *Block, *GetActiveBrain().Id);
-			PostNotice(EcoV3Integrated::ENotice::Reject, FString::Printf(TEXT("두뇌 거부 — %s: %s"), *PendId, *Block));
+				   *PendName, *Block, *GetActiveBrain().Id);
+			PostNotice(EcoV3Integrated::ENotice::Reject,
+					   Pend->bDefault ? FString::Printf(TEXT("두뇌 거부 — %s 를 걸 수 없어 %s 로 돈다: %s"), *PendName, *GetActiveBrain().Id, *Block)
+									  : FString::Printf(TEXT("두뇌 거부 — %s: %s"), *PendId, *Block));
 		}
 	}
 	FString Why;
@@ -4455,10 +4456,11 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 								  : FString(TEXT(" 맑음"));
 		// 두뇌 (10-18 두뇌 바꾸기): 내장이면 'R1b−F'(얼기 막음)·'R1b', 파일 두뇌면 모델 이름. 바뀐 뒤 늑대를 알 때 숨기 몫 (FEcoV3BrainTally)
 		const FEcoV3Brain& Brain = GetActiveBrain();
-		// 10-24 두 길 두뇌면 '두뇌 <이름> 두 길' (판 5 는 '두 길·반사 밖 도망 막음')
-		const FString BrainTag = Brain.bBuiltin ? FString(Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"))
-												: FString::Printf(TEXT("두뇌 %s%s"), *Brain.ModelName,
-																  Ctx.RouteOn() ? (Ctx.Sim.bFleeGate ? TEXT(" 두 길·반사 밖 도망 막음") : TEXT(" 두 길")) : TEXT(""));
+		// 10-24 두 길 두뇌면 '두뇌 <이름> 두 길' (판 5 는 '두 길·반사 밖 도망 막음'). 10-29 기본 두뇌면 '기본 R7e 두 길·반사 밖 도망 막음'
+		const TCHAR* const RouteTag = Ctx.RouteOn() ? (Ctx.Sim.bFleeGate ? TEXT(" 두 길·반사 밖 도망 막음") : TEXT(" 두 길")) : TEXT("");
+		const FString BrainTag = Brain.bBuiltin	  ? FString(Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"))
+								 : Brain.bDefault ? FString::Printf(TEXT("기본 %s%s"), *Brain.Label, RouteTag)
+												  : FString::Printf(TEXT("두뇌 %s%s"), *Brain.ModelName, RouteTag);
 		const FEcoV3BrainTally& Since = Ctx.SinceSwapBrainTally;
 		const int64 KnowN = Since.KnowTotal();
 		const FString Line = FString::Printf(TEXT("v3 %s %s | %s%s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld | 이 두뇌로 늑대를 알 때 숨기 %.1f%% (%lld 스텝)"),
@@ -4617,6 +4619,7 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 	const FEcoV3Brain& B = GetActiveBrain();
 	const FString Round = B.RoundTag();
 	FString Line = B.bBuiltin	   ? FString::Printf(TEXT("두뇌 판 0 (내장 %s)"), Settings.bNoFreeze ? TEXT("R1b−F") : TEXT("R1b"))
+				   : B.bDefault	   ? FString::Printf(TEXT("두뇌 판 0 (기본 %s)"), *B.Label)   // 10-29 기본 두뇌 R7e
 				   : Round.IsEmpty() ? FString::Printf(TEXT("두뇌 %s"), *B.ShortId())
 									 : FString::Printf(TEXT("두뇌 %s (%s)"), *Round, *B.ShortId());
 	if (B.bRoute())
@@ -4799,12 +4802,14 @@ void UEcoPolicyV3IntegratedSubsystem::BeginAutoWatch()
 		   L.GetPid(), *Python, *Args, *WorkDir, *WatchLog, L.UsesJob() ? TEXT("켬") : TEXT("못 씀 (끝낼 때 프로세스 나무 걷기)"));
 	{
 		// 10-27 실제 폴더 고리는 두뇌 묶음마다 관문 크기 확정 여부가 다르다 (LIVE_GATE.md 변경 기록 (10) — 언리얼은 그 규칙을 다시 적지 않고 파이썬 상태 글을 그대로 보인다)
+		// 10-29: 시작 두뇌가 판 5 가 아니면(eco.V3Brain.Startup builtin·관측 21 파일 등 — 기본 두뇌 R7e 는 판 5) 실제 폴더 고리가 그 Play 의 스냅숏을 거부한다
 		const FEcoV3BrainPtr Pending = Reg.GetPending();
-		const bool bBuiltin = Pending.IsValid() ? Pending->bBuiltin : Reg.GetActive()->bBuiltin;
-		if (bBuiltin && EcoV3Watch::SamePath(Root, FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("EcoAdapt"))))
+		const FEcoV3Brain& Start = Pending.IsValid() ? *Pending : *Reg.GetActive();
+		if (!Start.bFleeGate() && EcoV3Watch::SamePath(Root, FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("EcoAdapt"))))
 		{
-			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 | 참고: 실제 폴더 고리는 두뇌 묶음마다 관문 크기 확정 여부가 다르다 — 거부가 보이면 ")
-											 TEXT("herbivore_rl/results/v3/live/LIVE_GATE.md 변경 기록 (10). 판 5 두뇌로 시작하려면 -EcoV3Brain=v3_r7_g995_s1_20m"));
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 | 참고: 시작 두뇌 %s 는 마스크 판 %d 다 — 실제 폴더 고리는 판 5 두뇌 묶음만 다시 배우므로 스냅숏마다 거부가 보인다 ")
+											 TEXT("(herbivore_rl/results/v3/live/LIVE_GATE.md 변경 기록 (10)). 기본 두뇌 R7e(판 5)로 시작하려면 eco.V3Brain.Startup 을 비우거나 default"),
+				   *Start.Id, Start.MaskVersion);
 		}
 	}
 #endif

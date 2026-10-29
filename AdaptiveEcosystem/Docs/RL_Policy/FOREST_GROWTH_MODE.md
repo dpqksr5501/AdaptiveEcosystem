@@ -23,6 +23,9 @@
 3. **파이썬 감시 자동 시작**(다)은 AutoAdapt Play 를 시작하면 `live.py watch` 를 창 없이 띄우고, Play 가 끝나면 학습 자식까지 함께 끝낸다.
    사람이 직접 띄운 감시가 이미 돌면 새로 띄우지도, 끄지도 않는다. 실제 폴더가 잠겨 있으면(`8f191c0` 까지) 감시가 곧바로 끝나고 화면 상태 줄이 그 까닭을 보인다.
    잠금을 푼 뒤(`2708a78` — 지금)에도 실제 폴더 고리는 **판 5 두뇌(R7e)로 시작한 Play 만** 다시 배운다 — 기본 내장 두뇌로 시작하면 스냅숏마다 '거부'가 보인다(3.7).
+   **10-29 덧붙임**: 사용자 결정 '기본 두뇌 R7e로'에 따라 이제 통합 v3 Play 의 기본 두뇌(적응 고리 판 0)가 R7e 다(빌드에 넣은 두뇌 — [LIVE_ADAPT_SPEC.md](LIVE_ADAPT_SPEC.md) 5.6).
+   그래서 아무것도 고르지 않고 AutoAdapt Play 를 해도 실제 폴더 고리가 다시 배운다. 아래 3.7-2·4절 15·8절의 '판 5 두뇌로 시작(`-EcoV3Brain=v3_r7_g995_s1_20m`)'은 10-27 의 이력이다.
+   내장 R1b-F 로 시작하려면 `eco.V3Brain.Startup builtin`(`-EcoV3Brain=builtin`) — 그 Play 의 스냅숏은 여전히 실제 폴더에서 거부된다.
 
 ## 0. 지금 코드에서 읽은 사실 (설계의 근거)
 
@@ -402,6 +405,9 @@
   적혀 같은 Play 안에서 다시 하지 않는다. 다시 배우기를 보려면 **판 5 두뇌로 시작**한다: `-EcoV3Brain=v3_r7_g995_s1_20m` 또는 `eco.V3Brain.Startup v3_r7_g995_s1_20m`(8절).
 - 언리얼은 이 묶음 규칙을 C++ 에 다시 적지 않는다(파이썬 관문 규칙이 바뀌면 어긋나므로). 파이썬이 쓰는 '거부' 상태 글을 그대로 보인다. 덤으로 Play 시작 기록에 한 줄만
   남긴다: `[EcoV3I] 파이썬 감시 | 참고: 실제 폴더 고리는 묶음마다 관문 크기 확정 여부가 다르다 — 거부가 보이면 LIVE_GATE.md 변경 기록 (10)` (지금 두뇌가 내장일 때만).
+- 10-29: 기본 두뇌가 R7e(판 5)가 되어 기본 AutoAdapt Play 는 위 '거부' 없이 실제 폴더에서 판을 돈다. 참고 줄은 이제 **시작 두뇌가 판 5 가 아닐 때만**
+  (`eco.V3Brain.Startup builtin`·관측 21 파일 등) `[EcoV3I] 파이썬 감시 | 참고: 시작 두뇌 <id> 는 마스크 판 n 다 — … 기본 두뇌 R7e(판 5)로 시작하려면 eco.V3Brain.Startup 을 비우거나 default`
+  로 남긴다 ([LIVE_ADAPT_SPEC.md](LIVE_ADAPT_SPEC.md) 5.6).
 
 ### 3.8 상태 줄 '적응 고리 | …' 고르기 (위에서부터)
 
@@ -454,6 +460,7 @@
     — 10-27 그쪽이 `2708a78` 로 커밋했다(작업 사본과 같은 규칙 — 실제 폴더는 판 5 묶음만, 관측 18·21 지금 두뇌는 변환 전 거부). 그래서 지금 실제 폴더에서 자동 감시는
     잠기지 않고 뜨며, 기본 AutoAdapt Play(내장 R1b-F)의 스냅숏은 '거부' 로 보인다 — 다시 배우기를 보려면 판 5 두뇌로 시작한다(8절). 3.7-1 '잠김' 줄은 커밋 `8f191c0` 이하나
     잠금을 다시 걸 때의 길로 남는다(9.3 에서 가짜 스크립트로 확인).
+    — **10-29 풀림**: 기본 두뇌가 R7e(판 5, 묶음 route5)라 기본 AutoAdapt Play 의 스냅숏을 실제 폴더 고리가 받는다(LIVE_ADAPT_SPEC.md 5.6). 내장 R1b-F 로 시작한 Play 만 15 그대로다.
 
 ## 5. 작업 목록 (Build 단계)
 
@@ -540,7 +547,8 @@
 
 - 편집기: Play 전에 콘솔 `eco.IntegratedPolicyVersion 3` · `eco.IntegratedV3.AutoAdapt 1` · `eco.IntegratedV3.ForestGrowth 1` · `eco.V3Brain.Startup v3_r7_g995_s1_20m`
   (실제 폴더 고리가 판을 도는 판 5 두뇌 — 3.7-2) → Play. 파이썬 감시는 저절로 뜨고 Play 를 멈추면 저절로 끝난다. 사람이 감시를 따로 띄워 두었으면 그것을 쓴다.
-- 독립형·헤드리스: `-EcoIntegratedV3 -EcoV3AutoAdapt -EcoV3ForestGrowth -EcoV3Brain=v3_r7_g995_s1_20m` (+ 창 없이 `-NullRHI` 또는 `-RenderOffscreen`).
+  10-29 부터 기본 두뇌가 R7e 라 `eco.V3Brain.Startup …` 은 빼도 된다(적응 고리 Play 는 늘 기본 두뇌 판 0 에서 시작 — LIVE_ADAPT_SPEC.md 5.6).
+- 독립형·헤드리스: `-EcoIntegratedV3 -EcoV3AutoAdapt -EcoV3ForestGrowth -EcoV3Brain=v3_r7_g995_s1_20m` (+ 창 없이 `-NullRHI` 또는 `-RenderOffscreen`). 10-29 부터 `-EcoV3Brain=` 은 빼도 된다.
 - 보는 것: 숲 줄 '숲이 자라는 중 — 메마른 땅 나무 12/24', 상태 줄 '다시 배우기까지: …' → 190 초쯤 '스냅숏 #4 내보냄 → 파이썬 학습 대기' →
   '적응 고리 | 학습 중 …' → '새 두뇌 — 판 1 …' 또는 '기각 — 게임 두뇌 그대로'.
 - 끄기: `eco.IntegratedV3.ForestGrowth 0`(다음 Play), 자동 감시만 끄기 `eco.IntegratedV3.AutoWatch 0`, 옛 스냅숏 규칙 `eco.IntegratedV3.AutoSnapshotRule 0`,

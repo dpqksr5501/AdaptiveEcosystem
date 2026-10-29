@@ -34,6 +34,11 @@
   만들고 그걸 언리얼이 인식하면 그에 맞춰 두뇌 다시 만들어서 교체하는걸로 가자." 다시 배우기 기준 = '큰 변화만'(날씨 종류 바뀜 또는 나무 수가 문턱 이상 바뀜, 세기 흔들림은
   세계에만 넣음, 잦은 변화는 묶음), Play 때 파이썬 감시 자동 시작. 구현: 숲 자람 모드(5.3), 자동 스냅숏 규칙(5.2), 감시 자동 시작(5.5) — 설계·구현 기록과 확인 결과는
   [FOREST_GROWTH_MODE.md](FOREST_GROWTH_MODE.md). 주고받는 파일 꼴은 그대로다(스냅숏 `env` 에 칸을 더하기만 — 2절).
+- 10-29 (11) 기본 두뇌 R7e (사용자 결정 원문 "기본 두뇌 R7e로 고치고"): 통합 v3 모드에서 아무것도 고르지 않은 Play 의 사슴 두뇌 — 그래서 AutoAdapt Play 의
+  판 0 — 가 R7e(`v3_r7_g995_s1_20m@40d8710d`, 관측 24·마스크 판 5, 묶음 `route5`)다. 저장소 두뇌 파일을 바이트 그대로 빌드에 넣었다(`PolicyBrainV3Default.h`).
+  그래서 위 (8)·(10) 의 '게임 기본 두뇌(내장 R1b-F)'·'판 5 두뇌로 시작하려면 `-EcoV3Brain=`' 은 그때의 이력이고, 이제 그냥 Play 해도 실제 폴더 고리가
+  다시 배운다. 내장 R1b-F 는 `eco.V3Brain.Startup builtin`(`-EcoV3Brain=builtin`)으로 고른다 — 그 Play 의 스냅숏은 지금처럼 실제 폴더에서 거부된다.
+  주고받는 파일 꼴은 그대로다(스냅숏 `brain.default` 칸을 더하기만 — 2절). 고르는 규칙·못 걸 때·되돌리는 법·확인은 5.6.
 
 ## 0. 고리 한눈에
 
@@ -98,6 +103,10 @@
 - 지역 `world.wild_flight.route`·`brain_flee_outside_reflex`(게임이 지금 두뇌로 실제로 건 값): 있으면 시작 모델 묶음(판 5 = 참·거짓, 관측 21 = 거짓·참)과
   같아야 한다(`live.check_snapshot_route` — 다르면 거부). 판정·학습 세계의 두 길 칸은 이 칸이 아니라 묶음의 바탕 설정이 정한다(`adapt.convert` 는 이 칸을 읽지 않는다).
 - 지역 `flight.route`(길 통계): 보고만 — 파이썬은 쓰지 않는다.
+
+10-29 기본 두뇌(5.6)가 더한 칸: `brain.default`(참 = 빌드에 넣은 기본 두뇌 R7e). 기록만 — 파이썬 고리는 지금처럼 `weights_sha256`·계약으로 두뇌를 찾는다
+(기본 두뇌는 `EcoBrains/v3_r7_g995_s1_20m.json` 과 id·가중치 sha256 이 같아 같은 모델 zip 으로 간다). `brain.builtin` 은 그대로 내장 R1b 일 때만 참이고,
+기본 두뇌의 `source_file` 은 빈 값이다(디스크 파일이 아니다). 맨 위 `contract_hash` 는 그대로 빌드 내장(R1b) 계약이다 — 두뇌 계약은 `brain.contract_hash`.
 
 10-27 사용자 보고 두 고침(`RL_V3_WILD1_SPEC.md` 13절 — 먹기 걷기 고침·거리 두기)이 더한 칸 — 파이썬이 읽는다:
 - 지역 `world.graze_calm{graze_edge_r, graze_edge_w, graze_inertia, graze_wall_margin}`(실제로 쓰는 `W.RepCfg` 값)·`world.wild_flight.rest_keep·rest_keep_margin·
@@ -194,7 +203,8 @@
 ### 5.2 자동 스냅숏 (`S/AI/Policy/EcoV3Snapshot.cpp`)
 - `eco.IntegratedV3.AutoAdapt` (기본 0, 명령줄 `-EcoV3AutoAdapt`): 적응 고리 큰 스위치. 켜면 — 환경 바뀜 뒤 자동 스냅숏, 두뇌 감시 폴더 기본
   `Saved/EcoAdapt/brains`(`eco.V3Brain.WatchFolder` 가 비었을 때), Play 시작 때 있던 파일은 읽지 않음, Play 번호(`play_id`), 상태 줄(`Saved/EcoAdapt/status.json`),
-  Play 마다 내장 두뇌(판 0)에서 시작(레벨이 Play 마다 처음 상태로 돌아오므로 — `eco.V3Brain.Startup` 을 주면 그 두뇌). 10-27: 기본 폴더 셋은 `eco.IntegratedV3.AdaptRoot`
+  Play 마다 기본 두뇌(판 0)에서 시작(레벨이 Play 마다 처음 상태로 돌아오므로 — `eco.V3Brain.Startup` 을 주면 그 두뇌. 10-28 까지는 내장 R1b-F,
+  10-29 부터 기본 두뇌 R7e — 5.6). 10-27: 기본 폴더 셋은 `eco.IntegratedV3.AdaptRoot`
   (빈 값 = `Saved/EcoAdapt`) 아래이고, Play 때 파이썬 감시를 창 없이 띄워 Play 끝에 끝낸다(5.5 — `eco.IntegratedV3.AutoWatch 0` 이면 지금까지처럼 사람이 띄운다).
 - `eco.IntegratedV3.AutoSnapshot` (기본 −1 = AutoAdapt 따름, 0 끔, 1 켬): 환경 바뀜 자동 스냅숏. 언제 쓰는지는 아래 규칙.
 - **`eco.IntegratedV3.AutoSnapshotRule`** (10-27, 기본 1 = 큰 변화만 — `S/AI/Policy/EcoV3BigChange.h`, 판정은 `MaybeAutoSnapshot`, 셈은 `ApplyEnvChange`):
@@ -290,6 +300,66 @@
     일꾼·`EcoV3Eval` 자손 15 개가 모두 사라졌다. 다른 워크플로의 python 은 우리 자손에 한 번도 없었고 그쪽 주 프로세스는 전후 살아 있었다.
   - 중복 방지: 손으로 먼저 띄운 가짜 감시(`live/watch.lock`)가 있으면 `이미 돈다 — 사람이 띄움, 건드리지 않음 — pid 25440` 이고 그 감시는 언리얼이 끝난 뒤에도 제 수명까지 돌았다.
     같은 root 로 언리얼 둘이면 뒤 것이 `이미 돈다 — 다른 언리얼 프로세스가 띄움 — pid 33116` 이고, 먼저 끝나도 앞 것의 감시를 끄지 않는다.
+
+### 5.6 기본 두뇌 R7e (10-29 — `S/AI/Policy/EcoV3Brain.{h,cpp}` '기본 두뇌', `PolicyBrainV3Default.h`, 고르기는 `OnWorldBeginPlay`)
+- 무엇: 통합 v3 모드(`eco.IntegratedPolicyVersion 3`)에서 시작 두뇌를 고르지 않은 Play 의 사슴 두뇌가 **R7e** 다 — `v3_r7_g995_s1_20m@40d8710d`(관측 24·마스크 판 5,
+  계약 `0xad7bad5e1acaf071`, 허용 먹기·도망·숨기, 모델 `ckpt/v3/v3_r7_g995_s1_20m.zip`). 근거: 판정 통과(`herbivore_rl/results/v3/r7e/README.md`), C++ 이식 비트 동일(`80bbf13`),
+  게임 시험(`herbivore_rl/results/v3/r7e_game/README.md` — 사건 숨음 비율 통합 맵 11→20%·조연우 맵 17→32%, 잡힘은 같거나 조금 줄고 고친 이상 행동 되살아남 없음).
+  V1(7관측/4출력)·`eco.IntegratedPolicyVersion` 기본값(1)·평면 v3 경로·평가기(`Tools/EcoV3Eval` — 늘 두뇌 파일을 받는다)·파이썬 거울은 그대로다.
+- 방식 — **(가) 빌드에 넣은 두뇌**를 골랐다 (`(나) 시작 두뇌 콘솔 변수의 기본값을 R7e 파일 이름으로` 대신). 까닭:
+  1. Shipping 에는 `eco.V3Brain.*` 콘솔 변수가 없다(`#if !UE_BUILD_SHIPPING`) — (나) 는 Shipping 기본을 바꾸지 못한다.
+  2. `EcoBrains/` 는 패키지에 실리지 않는다(`Config/DefaultGame.ini` 에 `DirectoriesToAlwaysStageAsNonUFS` 없음) — (나) 는 패키지·데디케이티드 서버에서 파일을 못 찾아
+     R1b-F 로 떨어진다. (가) 는 파일 없이 돈다.
+  3. 같은 검사를 지난다: `export_weights_v3.py --default-brain` 이 저장소 두뇌 파일을 **바이트 그대로** C++ 배열로 내고(줄 끝 LF), 언리얼은 처음 부를 때 파일 두뇌와 같은
+     `Parse`(형식·계약 해시·두 길 계약 칸·차원·이름·마스크·문턱·허용·층·NaN·가중치 sha256·골든 26 사례)로 읽고 바이트 sha256·id 도 헤더 값과 견준다. 못 지나면(빌드가
+     어긋남 — 시험이 막는다) 기록 Error 뒤 내장 R1b 를 쓴다. 파일 두뇌와 id·가중치가 같아 파이썬 고리·기록·스냅숏에서 같은 두뇌로 보인다.
+  4. 내장 R1b(`PolicyWeightsV3.h`)는 그대로 둔다 — 평면 v3 경로·골든·`kBuiltinNet` 기본 인수·평가기 바탕이 관측 18 계약에 기대므로 갈아 끼우지 않았다.
+- '내장'·'기본'의 뜻 (10-29 부터):
+
+  | 이름 (콘솔·명령줄, 대소문자 무시) | 두뇌 | 쓰임 |
+  |---|---|---|
+  | `default`·`기본`·`R7e` | 기본 두뇌 R7e (`PolicyBrainV3Default.h`) | 통합 v3 Play 시작 두뇌, 적응 고리 판 0 |
+  | `builtin`·`내장`·`R1b`·`R1b-F` | 내장 두뇌 R1b (`PolicyWeightsV3.h`, 통합 모드는 얼기를 막아 R1b-F) | 저장소 처음 두뇌·걸 수 없을 때의 바닥, 10-28 까지의 게임 기본 |
+  | 파일 이름 (`v3_r7_g995_s1_20m` 등) | `EcoBrains`·`Saved/EcoBrains` 의 두뇌 파일 | 같은 R7e 파일을 이름으로 걸어도 같은 두뇌(id 같음 — 출처 표시만 '파일') |
+
+- Play 시작 고르기 (`FEcoV3BrainRegistry::PickStart` — 서버·단독, 고른 두뇌를 줄에 넣고 첫 결정 스텝 경계 `SyncBrain` 이 걸기 전 검사 뒤 건다):
+  1. `eco.V3Brain.Startup`(`-EcoV3Brain=`)이 있으면 그 두뇌. 거부되면(파일 없음 등) 기록 `[EcoV3I] 시작 두뇌 … 거부`(Error)·화면 알림 `시작 두뇌 '…' 거부 (…) — <두뇌> 로 시작`
+     뒤 빈 값처럼 고른다.
+  2. 적응 고리 Play(`eco.IntegratedV3.AutoAdapt 1`): 늘 기본 두뇌(판 0) — 지금·대기 두뇌가 이미 기본이면 그대로.
+  3. 그 밖: 이 프로세스가 아직 두뇌를 건 적이 없으면 기본 두뇌, 걸었으면 지금 두뇌 그대로(편집기에서 Play 를 다시 해도 앞서 `eco.V3Brain.Load` 로 건 두뇌가 남는다 —
+     전처럼. 기본으로 돌리려면 `eco.V3Brain.Startup default` 또는 `eco.V3Brain.Load default`). 명령줄 실행·Shipping 은 프로세스마다 처음이라 늘 기본 두뇌다.
+- 걸 수 없을 때: 기본 두뇌는 판 5 라 도주 반사(`eco.IntegratedV3.WildFlight`)를 끈 지역이 하나라도 있으면 걸지 않는다(10-24 `RouteBrainBlocker` 그대로) — 대기를 버리고
+  내장 R1b-F 로 돈다. 기록 `[EcoV3I] 두뇌 거부 | … | 기본 두뇌 R7e v3_r7_g995_s1_20m@40d8710d — <지역>: 도주 반사 … | v3_r1_g995_s3_20m@eca97f2e 그대로`(Warning),
+  화면 알림 `두뇌 거부 — 기본 두뇌 R7e … 를 걸 수 없어 v3_r1_g995_s3_20m@eca97f2e 로 돈다: …`. 저장소는 '건 적 없음' 그대로라 다음 Play 가 다시 기본을 고른다.
+- 되돌리기·이력: 첫 Play 에서 기본 두뇌를 걸면 저장소 처음 두뇌(내장 R1b)가 되돌리기 쌓개 맨 아래에 들어간다 — 판 1 두뇌에서 `eco.V3Brain.Rollback` 하면 기본 두뇌 R7e(판 0),
+  한 번 더 하면 내장 R1b-F. 화면: 상태 줄 `두뇌 판 0 (기본 R7e) · 두 길(마스크 판 5) …`, 알림 `새 두뇌 — 기본 두뇌 R7e (판 0) · <id> · …`·`두뇌 되돌림 → 기본 두뇌 R7e (판 0)`,
+  `eco.V3Brain.Load builtin` 뒤 `두뇌 판 0 (내장 R1b−F)`·`새 두뇌 — 내장 두뇌 (판 0) · …`. 맨 위 줄 `v3 기본 R7e 두 길·반사 밖 도망 막음 <지역> | …`.
+- 실시간 고리: 판 0 이 판 5 라 실제 폴더(`Saved/EcoAdapt`)에서 그냥 받는다 — `live.resolve_start` 가 가중치 sha256 으로 `EcoBrains/v3_r7_g995_s1_20m.json` 의 모델 zip 을
+  찾고(묶음 `route5`, `sizes_confirmed` 참), `check_snapshot_route` 도 지난다. 언리얼의 '실제 폴더 고리는 판 5 두뇌만' 참고 줄은 이제 시작 두뇌가 판 5 가 아닐 때만 남긴다.
+- R1b-F 로 되돌리는 법: Play 하나 — `eco.V3Brain.Startup builtin`(편집기 콘솔, Play 전) 또는 `-EcoV3Brain=builtin`(명령줄). Play 중 — `eco.V3Brain.Load builtin`.
+  옛 실험 도구 가운데 두뇌 인수 없이 R1b-F 를 띄우던 것(`herbivore_rl/results/v3/r7e_game/r7e_game.py`·`level_jyu_eco/level_jyu_eco.py` 의 `cur`)은 `-EcoV3Brain=builtin` 을 붙였다.
+  기본 자체를 R1b-F 로 되돌리려면 `export_weights_v3.py --default-brain ../AdaptiveEcosystem/EcoBrains/v3_r1_g995_s3_20m.json --default-label R1bF` 로 헤더를 다시 만들고 빌드한다
+  (이 문서·AGENTS.md 15절도 함께 고친다).
+- 관측 18 에 기대던 다른 길 (찾은 것):
+  - 사회 행동 투영(`eco.IntegratedV3.SocialControl` 1 — 기본 0, `EcoV3Social::ProjectPolicy`): 행동 요청 `Decision.Request` 만 읽는다. 두 길 두뇌의 길 칸은 따로
+    (`RouteRequest`)라 칸 4 를 잠으로 잘못 읽지 않는다 — 그대로 맞다. 판 5 라 반사 밖 FLEE 요청이 없고 HIDE 가 늘 뿐이다.
+  - 디버그 화면(`eco.V3Debug` 맨 위 줄)·상태 줄·알림: 기본 두뇌 글자를 더했다(위). 결정 마스크·로짓 표시는 두뇌 칸 수와 무관하다.
+  - 스냅숏: `brain.*` 은 지금 두뇌 값(관측 24·판 5)이고 `brain.default` 를 더했다. 맨 위 `contract_hash` 는 빌드 내장 계약 그대로(2절).
+  - 평가기(`Tools/EcoV3Eval`)·`live.py`·`ceval.py`: 늘 두뇌 파일을 받는다 — 기본값이 없어 바뀌지 않는다.
+  - **남은 차이 (고치지 않음)**: 팀 진단 `Creature/Debug/EcoCreatureInspection.cpp`(조연우 파일)는 v3 사슴의 `brain`·`policy_obs_dim`·`policy_mask_version`·
+    `policy_contract` 를 빌드 내장 상수(`PPO_V3_builtin`·18·2·R1b 계약)로 적고 `observation` 도 관측 18 칸만 낸다. 10-19 관측 21 때와 같은 차이(`RL_V3_UNREAL_TRAINING_PLAN.md`)가
+    이제 기본에서도 보인다 — 그 JSON 의 두뇌 칸은 지금 두뇌가 아니다. 지금 두뇌는 기록 `[EcoV3I] 두뇌 시작 |`·스냅숏 `brain`·`eco.V3Brain.Info` 로 본다.
+  - 저장 체크포인트(`EcoEcosystemCheckpoint.cpp`)는 지금 두뇌 id 가 같아야 불러온다 — R1b-F 로 저장한 것은 `-EcoV3Brain=builtin` Play 에서만 불러온다(재빌드 뒤 자동 복원을
+    가정하지 않는 원칙 그대로).
+  - 팀 네트워크 시험 대본(`Tools/Editor/test_jyu_refuge_network.ps1`·`test_jyu_social_network.ps1`)은 두뇌 인수 없이 `-EcoIntegratedV3` 로 띄우므로 이제 R7e 로 돈다(두뇌와
+    무관한 복제·은신처 확인이라 고치지 않았다).
+- 시험이 보는 것: 처리기 시험(`ActivateForTest`)은 Play 시작 고르기를 지나지 않아 저장소 처음 두뇌(내장 R1b-F)로 돈다 — 기존 시험의 기대값은 그대로다. 새 시험
+  `Policy.V3.Brain.Default`(넣은 바이트 = 헤더 sha256 = 저장소 파일, 같은 검사·가중치·id, 이름, PickStart 규칙, 쌓개)·`Policy.V3.Integrated.DefaultBrainStart`(기본 두뇌가 첫
+  SyncBrain 에 걸림·300 스텝 마스크 위반 0, 도주 반사 끈 세계는 R1b-F), 파이썬 `herbivore_rl/tests/test_default_brain_v3.py`(올린 헤더 = 지금 파일로 만든 헤더).
+- 10-29 확인 (창 없음): UBT 기본 적응 unity·`-DisableAdaptiveUnity` 성공, 자동화 `AdaptiveEcosystem` 266 개 실패 0. 통합 맵 세션 20020 300 초 사슴 줄 지문 —
+  두뇌 인수 없음(기본) = `-EcoV3Brain=v3_r7_g995_s1_20m`(파일) = 10-27 R7e 판 `c2fb89b0…`(829684 줄), `-EcoV3Brain=builtin` = 10-27 R1b-F 판 `1e5a6f03…`(827214 줄) —
+  바이트까지 같다. 60 초 스냅숏 `brain.default` 참·`live.resolve_start` → `route5`·`check_profile_sizes`·`check_snapshot_route` 통과(실제 폴더 기준, 학습은 돌리지 않음).
+  `-RenderOffscreen` AutoAdapt 판(시험 root, 감시 끔)에서 상태 줄·바꿈·되돌림 알림을 화면으로 확인, 도주 반사 끈 판·없는 시작 두뇌 판의 거부 줄·알림 확인.
 
 ## 6. 파이썬 (`herbivore_rl/results/v3/live/live.py`, 시험 `herbivore_rl/tests/test_live_v3.py`)
 - `watch`(감시 데몬) · `round --snapshot F`(한 판) · `pilot --snapshot F`(예비 측정 — 시드 34900~34999 만). 적응 고리 `results/v3/adapt/adapt.py` 를 쓴다.

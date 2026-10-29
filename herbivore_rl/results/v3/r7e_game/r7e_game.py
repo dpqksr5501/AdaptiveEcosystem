@@ -9,7 +9,8 @@
   jyu = 사용자가 지금 쓰는 조연우 맵 복사본 /Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem, 맵 값 그대로 (식생 soil-v1·팀 life·무리 이주·팀 비 순환을 환경 감시가
         v3 날씨로 옮김 — level_jyu_eco 의 '전체 모드'). 팀 비를 실제 시간으로 읽어 같은 세션도 판마다 조금 다르다 → 세션 여러 개 합으로 본다.
         스냅숏은 식생·life 때문에 거부되므로 쓰지 않는다 (기록 줄만).
-두 두뇌 (BRAINS): cur = 게임 기본(내장 R1b-F v3_r1_g995_s3_20m@eca97f2e, 관측 18·판 2 — 명령줄 두뇌 인수 없음),
+두 두뇌 (BRAINS): cur = 내장 R1b-F (v3_r1_g995_s3_20m@eca97f2e, 관측 18·판 2 — 10-28 까지의 게임 기본. 10-29 부터 기본 두뇌가 R7e 라
+  -EcoV3Brain=builtin 으로 명시한다 — 이 측정 때(10-27)는 두뇌 인수 없음이었다. 같은 두뇌라 같은 판),
   r7e = -EcoV3Brain=v3_r7_g995_s1_20m (AdaptiveEcosystem/EcoBrains/v3_r7_g995_s1_20m.json, id v3_r7_g995_s1_20m@40d8710d, 계약 0xad7bad5e1acaf071, 관측 24·판 5).
 같은 인수 (모두): -game -EcoIntegratedV3 -ini:Engine:[ConsoleVariables]:eco.IntegratedPolicyVersion=3 -EcoV3DeerPerRegion=128 -EcoV3Seed=<세션>
   -EcoV3ObsParityLog=1 (사슴 줄 '[EcoV3Obs] <지역> | t … | p … | h … | seen …' 을 결정 스텝마다 — 측정 전용, 결정은 그대로) -benchmark -fps=30 -seconds=<초+1>
@@ -48,7 +49,7 @@ LOCK = Path("C:/Users/Sinhyeok/AppData/Local/Temp/claude/C--kwon-univ-3-1-GameCo
 MAPS = {"it": "/Game/Map/LV_Ecosystem_IntegrationTest", "jyu": "/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem"}
 MAP_LABEL = {"it": "팀 통합 맵 (LV_Ecosystem_IntegrationTest)", "jyu": "조연우 맵 복사본 (LV_EcoV3_JYUEcosystem, 맵 값 그대로)"}
 R7E = "v3_r7_g995_s1_20m"
-BRAINS = {"cur": dict(label="내장 R1b-F (게임 기본)", id="v3_r1_g995_s3_20m@eca97f2e", args=[]),
+BRAINS = {"cur": dict(label="내장 R1b-F (10-28 까지 게임 기본)", id="v3_r1_g995_s3_20m@eca97f2e", args=["-EcoV3Brain=builtin"]),   # 10-29 기본 = R7e → 명시
           "r7e": dict(label="R7e 두 길·판 5", id="v3_r7_g995_s1_20m@40d8710d", args=[f"-EcoV3Brain={R7E}"])}
 COMMON = ["-benchmark", "-fps=30", "-NullRHI", "-NoSound", "-unattended", "-nosplash", "-nopause", "-DisablePlugins=Bridge,Fab"]
 SECONDS = 300

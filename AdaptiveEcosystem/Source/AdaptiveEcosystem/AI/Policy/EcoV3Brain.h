@@ -3,8 +3,9 @@
 //
 // 무엇을 하나:
 //   파이썬(herbivore_rl/export_weights_v3.py --brain-file)이 쓴 두뇌 파일(JSON)을 읽어 검사하고, 통과하면 Play 를 다시 시작하지 않고
-//   통합 v3 모드의 사슴 두뇌(관측 18 또는 21 → 64 → 64 → 로짓 5, EcoPolicyV3Inference.h 의 같은 순전파)를 바꾼다. 내장 두뇌(PolicyWeightsV3.h,
-//   R1b s3 — 통합 모드는 얼기를 세계가 막아 R1b-F)는 늘 남아 있고 'builtin' 으로 언제든 돌아간다. 추론은 그대로 C++ 이고 파이썬은 게임 안에서
+//   통합 v3 모드의 사슴 두뇌(관측 18·21·24 → 64 → 64 → 로짓 5, EcoPolicyV3Inference.h 의 같은 순전파)를 바꾼다. 내장 두뇌(PolicyWeightsV3.h,
+//   R1b s3 — 통합 모드는 얼기를 세계가 막아 R1b-F)는 늘 남아 있고 'builtin' 으로 언제든 돌아간다. 10-29 부터 통합 v3 Play 의 시작 두뇌는 빌드에 넣은
+//   기본 두뇌 R7e 다 (아래 '기본 두뇌' — 'default' 로 돌아간다). 추론은 그대로 C++ 이고 파이썬은 게임 안에서
 //   돌지 않는다 — 바뀌는 것은 가중치의 출처뿐이다 (AGENTS.md 2절 4항).
 //
 // 안전 지점 (계약):
@@ -24,17 +25,18 @@
 //                                              (EcoWorldV3::SetModelObsDim — 망 입력 = 관측 18 + 세 칸)
 //   관측 24 · 마스크 판 4  0xe302dee198197444  10-24 두 길 두뇌 (이식 계획서 RL_V3_ROUTE_CPP_PORT_PLAN.md 5절): 21 칸 + in_panic·shelter_reach·shelter_edge.
 //                                              도주 반사 중 두뇌가 '어디로'(칸 1 RUN·칸 4 SHELTER)를 고른다. 걸면 세계가 길을 켠다 (EcoWorldV3::SetModelRoute)
-//   관측 24 · 마스크 판 5  0xad7bad5e1acaf071  판 4 + 반사 밖 두뇌 FLEE 막음 (13절 — R7e 판정 통과 두뇌). 걸면 길과 함께 EcoWorldV3::SetModelFleeGate
+//   관측 24 · 마스크 판 5  0xad7bad5e1acaf071  판 4 + 반사 밖 두뇌 FLEE 막음 (13절 — R7e 판정 통과 두뇌, 10-29 부터 기본 두뇌). 걸면 길과 함께 EcoWorldV3::SetModelFleeGate
 //   판 4·5 는 파일의 contract.flight_route(칸·관측·결정·SHELTER 문턱·freeze_sleep_must_be_blocked)와 판 5 의 contract.brain_flee_outside_reflex(false)를
 //   이 빌드 상수와 견주고(다르면 '계약 해시' — 어긋난 칸 이름을 적는다), 모델 허용에 얼기·잠이 있으면 '허용 칸' 으로 거부한다(칸 3·4 를 길 칸으로 다시 쓴다).
 //   걸 때(통합 서브시스템 SyncBrain)는 실제 허용(두뇌 ∧ 세계)의 얼기·잠 0 과 도주 반사(WildFlight)를 지역마다 다시 본다 — 하나라도 어긋나면 대기 두뇌를 버린다.
 //   그 밖(예: R2 관측 19·판 3, R7 대조 판 6)은 '계약 해시' 로 거부한다 — C++ 관측 코드를 함께 바꿔야 한다.
 //
 // 콘솔 (개발 빌드):
-//   eco.V3Brain.Load <파일|builtin>   파일 = 절대 경로, 또는 찾는 폴더(<프로젝트>/EcoBrains, <프로젝트>/Saved/EcoBrains) 안의 이름(.json 빼도 됨)
+//   eco.V3Brain.Load <파일|default|builtin>   파일 = 절대 경로, 또는 찾는 폴더(<프로젝트>/EcoBrains, <프로젝트>/Saved/EcoBrains) 안의 이름(.json 빼도 됨).
+//                                    default·기본·R7e = 기본 두뇌, builtin·내장·R1b·R1b-F = 내장 두뇌 (대소문자 무시)
 //   eco.V3Brain.Info                  지금 두뇌·대기 중 두뇌·바꾼 횟수·출처·검사 결과
 //   eco.V3Brain.List                  찾는 폴더의 두뇌 파일과 검사 결과
-//   eco.V3Brain.Startup <파일>        통합 v3 Play 를 시작할 때 불러올 두뇌 (빈 값 = 지금 두뇌 그대로, 처음은 내장). 명령줄 -EcoV3Brain=
+//   eco.V3Brain.Startup <파일>        통합 v3 Play 를 시작할 때 걸 두뇌 (빈 값 = 위 '기본 두뇌' 의 Play 시작 고르기 — 처음은 기본 R7e). 명령줄 -EcoV3Brain=
 //   eco.V3Brain.SwapAtSeconds <초>    예정 바꾸기 (측정·시연용, -1 = 끔): 시뮬레이션 시각(기록 줄의 초)이 되는 결정 스텝 경계에서 SwapFile 로.
 //   eco.V3Brain.SwapFile <파일>         명령줄 -EcoV3BrainSwapAt= -EcoV3BrainSwapTo=
 //   eco.V3Brain.WatchFolder <폴더>    폴더 감시 (기본 빈 값 = 끔): 2 초마다 폴더의 가장 새 *.json 이 바뀌면 불러와 다음 경계에서 바꾼다.
@@ -55,6 +57,18 @@
 // 기록: 바꿀 때마다 '[EcoV3I] 두뇌 바꿈 |' 한 줄(시각·전역 스텝·앞 → 새 두뇌 id·까닭·허용 칸), 10 초마다 지역마다 '[EcoV3I] <지역> 두뇌 |'
 //   (지금 두뇌 id, 구간 두뇌 스텝(도주 반사 밖)의 행동 몫, 그중 늑대를 앎(관측 pred_count > 0)의 행동 몫 — R4 situ_eval.py 와 같은 정의).
 // 두뇌 id = <모델 이름>@<가중치 sha256 앞 8자리>. 내장 두뇌와 같은 가중치의 파일은 id 가 같다.
+//
+// 기본 두뇌 (10-29 사용자 결정 '기본 두뇌 R7e로', 문서 Docs/RL_Policy/LIVE_ADAPT_SPEC.md 5.6):
+//   빌드에 들어간 두뇌가 둘이다. 이름이 뜻하는 것:
+//     기본 두뇌 (default·기본·R7e)  FEcoV3BrainRegistry::Default — PolicyBrainV3Default.h (저장소 EcoBrains/v3_r7_g995_s1_20m.json 바이트 그대로,
+//                                    export_weights_v3.py --default-brain). 파일 두뇌와 같은 Parse 검사를 지난다. 관측 24·마스크 판 5(두 길·반사 밖 도망 막음).
+//                                    통합 v3 Play 의 시작 두뇌다 (아래 PickStart). 파일 없이도 패키지·데디케이티드 서버·Shipping 에서 돈다.
+//     내장 두뇌 (builtin·내장·R1b·R1b-F) FEcoV3BrainRegistry::Builtin — PolicyWeightsV3.h (R1b s3, 10-28 까지의 게임 기본. 통합 모드는 얼기를 세계가 막아 R1b-F).
+//                                    저장소의 처음 두뇌이자 바닥이다: 기본 두뇌를 걸 수 없는 세계(도주 반사를 끔 등 — SyncBrain 의 RouteBrainBlocker)는 이 두뇌로 돈다.
+//                                    평면 v3 경로·평가기(Tools/EcoV3Eval)·골든·파이썬 거울은 그대로 이 두뇌가 바탕이다.
+//   Play 시작 고르기 (PickStart — 통합 서브시스템 OnWorldBeginPlay, 서버·단독): eco.V3Brain.Startup(-EcoV3Brain=) 이 있으면 그 두뇌(거부되면 기록 Error·화면 알림 뒤
+//   아래로), 적응 고리 Play 는 늘 기본 두뇌(판 0), 그 밖은 이 프로세스가 아직 두뇌를 건 적이 없으면 기본 두뇌, 걸었으면 지금 두뇌 그대로(편집기 PIE 를 다시 해도 —
+//   Shipping 은 콘솔이 없어 늘 기본 두뇌). R1b-F 로 시작하려면 eco.V3Brain.Startup builtin (-EcoV3Brain=builtin), Play 중에는 eco.V3Brain.Load builtin.
 
 #pragma once
 
@@ -175,8 +189,10 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3Brain
 	FString TrainDigest;
 	FString TrainWorld;      // 사람이 읽을 학습 세계 이름
 	FString GoldenWorld;     // 골든을 뽑은 세계 설정
-	FString SourceFile;      // 불러온 파일 (내장이면 빈 값)
-	bool bBuiltin = false;
+	FString SourceFile;      // 불러온 파일 (내장·기본 두뇌면 빈 값)
+	bool bBuiltin = false;   // 내장 두뇌 R1b (PolicyWeightsV3.h — 스냅숏 brain.builtin)
+	bool bDefault = false;   // 기본 두뇌 (PolicyBrainV3Default.h — 10-29 R7e, 스냅숏 brain.default). 파일 두뇌와 같은 검사를 지났다
+	FString Label;           // 짧은 이름 (내장 'R1b', 기본 'R7e', 파일 두뇌는 빈 값 — 화면 글자)
 	uint64 ContractHash = 0; // 입출력 계약 해시 (내장 = kContractHash)
 	int32 ObsDim = 0;        // 관측 칸 수 = Net.ObsDim (18·21·24)
 	int32 MaskVersion = EcoPolicyV3::kMaskVersion;   // 마스크 판 (계약 줄의 판 — 내장·관측 18·21 = 2, 두 길 두뇌 4·5)
@@ -212,10 +228,13 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3Brain
 	/**
 	 * 한 줄 요약: 'v3_r4_g995_s0_20m@f807bea5 (파일 v3_r4_g995_s0_20m.json, 허용 먹기·도망·숨기)'. 관측 21 두뇌는 '…, 관측 21 장애물)' 을,
 	 * 관측 24 두 길 두뇌는 '…, 관측 24 도망길)'(판 5 는 '…, 관측 24 도망길·반사 밖 도망 막음)')을, 'adapt' 판이 있으면 '…, 판 3)' 을 붙인다.
+	 * 출처 칸은 내장 '내장 R1b PolicyWeightsV3.h', 기본 '기본 두뇌 R7e — 빌드에 넣은 v3_r7_g995_s1_20m.json'.
 	 */
 	FString Describe() const;
-	/** 판 글자: 'adapt' 판이 있으면 '판 3', 내장이면 '판 0', 그 밖(손으로 만든 파일)은 빈 값. */
+	/** 판 글자: 'adapt' 판이 있으면 '판 3', 내장·기본 두뇌면 '판 0'(Play 시작 두뇌), 그 밖(손으로 만든 파일)은 빈 값. */
 	FString RoundTag() const;
+	/** 출처 이름 (화면 알림·상태 줄): 기본 '기본 두뇌 R7e', 내장 '내장 두뇌', 파일 두뇌는 빈 값. */
+	FString OriginText() const;
 	/** 화면용 짧은 id: 'live_r3…@abcd' (모델 이름 10 자 넘으면 7 자 + '…' — live_r<판> 이름은 판 번호 끝까지 'live_r12…', 지문 앞 4 자). */
 	FString ShortId() const;
 };
@@ -232,6 +251,16 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3BrainLoad
 	FEcoV3BrainPtr Brain;
 
 	bool Ok() const { return Reason == EcoV3Brain::EReject::None && Brain.IsValid(); }
+};
+
+/** Play 시작 두뇌 고르기 결과 (FEcoV3BrainRegistry::PickStart — 10-29 기본 두뇌). */
+struct ADAPTIVEECOSYSTEM_API FEcoV3StartPick
+{
+	FEcoV3BrainPtr Brain;           // 줄에 넣을 두뇌 (비면 지금·대기 두뇌 그대로)
+	FString Why;                    // 줄에 넣는 까닭, 또는 그대로 두는 까닭 (기록용)
+	FString Startup;                // 읽은 eco.V3Brain.Startup 값 (빈 값 = 읽지 않음)
+	FEcoV3BrainLoad StartupLoad;    // 그 결과 (Startup 이 비면 Reason None·Brain 없음)
+	bool bStartupRejected = false;  // Startup 을 줬지만 거부했다 (기록 Error·화면 알림 — 서브시스템). 그때는 Startup 이 빈 것처럼 고른다
 };
 
 /** 되돌리기 쌓개 한 칸 (앞 두뇌). */
@@ -277,12 +306,17 @@ class ADAPTIVEECOSYSTEM_API FEcoV3BrainRegistry
 public:
 	static FEcoV3BrainRegistry& Get();
 
-	/** 내장 두뇌 (PolicyWeightsV3.h). 늘 같은 객체다. */
+	/** 내장 두뇌 (PolicyWeightsV3.h — R1b, 통합 모드는 R1b-F). 늘 같은 객체다. 저장소의 처음 두뇌·걸 수 없는 두뇌의 바닥. */
 	static FEcoV3BrainRef Builtin();
+	/**
+	 * 기본 두뇌 (PolicyBrainV3Default.h — 10-29 R7e, 통합 v3 Play 시작 두뇌). 늘 같은 객체다. 넣은 두뇌 파일 바이트를 처음 부를 때 Parse 검사로 읽는다
+	 * (바이트 sha256·id 도 헤더 값과 견준다). 검사를 못 지나면(빌드가 어긋남 — 시험 Brain.Default 가 막는다) 기록 Error 뒤 내장 두뇌를 돌려준다.
+	 */
+	static FEcoV3BrainRef Default();
 
 	/** 두뇌 파일 글자 → 검사 → 두뇌. Source = 기록에 적을 출처(파일 경로). */
 	static FEcoV3BrainLoad Parse(const FString& JsonText, const FString& Source);
-	/** 파일 이름·경로 → 찾기(Resolve) → 읽기 → Parse. 'builtin'·'내장' 은 내장 두뇌. */
+	/** 파일 이름·경로 → 찾기(Resolve) → 읽기 → Parse. 'default'·'기본'·'R7e' 는 기본 두뇌, 'builtin'·'내장'·'R1b'·'R1b-F' 는 내장 두뇌. */
 	static FEcoV3BrainLoad LoadFile(const FString& PathOrName);
 	/** 절대 경로면 그대로, 아니면 찾는 폴더마다 (이름, 이름.json). 못 찾으면 빈 값 (OutTried = 찾아본 경로들). */
 	static FString Resolve(const FString& PathOrName, FString* OutTried = nullptr);
@@ -290,7 +324,21 @@ public:
 	static TArray<FString> SearchFolders();
 	/** 찾는 폴더의 *.json (폴더 순, 이름 순). */
 	static TArray<FString> ListFiles();
+	/** 'builtin'·'내장'·'R1b'·'R1b-F' (앞뒤 빈칸·대소문자 무시) — 내장 두뇌. */
 	static bool IsBuiltinName(const FString& Name);
+	/** 'default'·'기본'·기본 두뇌 이름표('R7e') (앞뒤 빈칸·대소문자 무시) — 기본 두뇌. */
+	static bool IsDefaultName(const FString& Name);
+
+	/**
+	 * Play 시작 두뇌 고르기 (10-29 기본 두뇌 — 통합 서브시스템 OnWorldBeginPlay 가 고른 두뇌를 Queue 한다. 첫 결정 스텝 경계 SyncBrain 이 걸기 전 검사 뒤 건다).
+	 *   1. Startup(eco.V3Brain.Startup·-EcoV3Brain=) 이 있으면 LoadFile — 통과하면 그 두뇌. 거부면 bStartupRejected 를 세우고 2·3 으로.
+	 *   2. 적응 고리 Play(bAutoAdapt): 기본 두뇌(판 0). 지금 두뇌(대기가 있으면 대기)가 이미 기본 두뇌 id 면 그대로.
+	 *   3. 그 밖: 이 프로세스가 아직 두뇌를 건 적이 없고(HasCommitted 거짓) 대기도 없으면 기본 두뇌, 아니면 지금·대기 두뇌 그대로.
+	 * 저장소를 바꾸지 않는다 (읽기만 — 줄에 넣는 것은 부르는 쪽).
+	 */
+	FEcoV3StartPick PickStart(const FString& Startup, bool bAutoAdapt) const;
+	/** 이 프로세스에서 두뇌를 한 번이라도 걸었나 (CommitPending 이 바꿨다 — ResetForTest 가 지운다). PickStart 3 의 '처음'. */
+	bool HasCommitted() const { return bCommitted; }
 
 	FEcoV3BrainRef GetActive() const { return Active; }
 	FEcoV3BrainPtr GetPending() const { return Pending; }
@@ -366,7 +414,10 @@ public:
 	/** 화면 글자 (EcoV3Brain::LiveStatusText). 상태 파일이 꺼졌거나 아직 읽지 않았으면 빈 값. */
 	FString GetLiveStatusText(double NowUnix) const;
 
-	/** 시험 전용: 내장 두뇌로 곧바로 되돌리고 대기·감시·쌓개·상태 파일·기본 폴더를 지운다 (거부 Serial 은 되돌리지 않는다). */
+	/**
+	 * 시험 전용: 저장소 처음 상태(지금 = 내장 두뇌, 건 적 없음 — 프로세스 시작과 같다)로 곧바로 되돌리고 대기·감시·쌓개·상태 파일·기본 폴더를 지운다
+	 * (거부 Serial 은 되돌리지 않는다). 처리기 시험은 Play 시작 고르기(PickStart)를 지나지 않으므로 이 뒤의 지역 세계는 내장 R1b-F 로 돈다.
+	 */
 	void ResetForTest();
 
 private:
@@ -383,6 +434,7 @@ private:
 	TArray<FEcoV3BrainHistoryEntry> History;               // 되돌리기 쌓개 (오래된 것부터)
 	uint32 Generation = 1;
 	int32 SwapCount = 0;
+	bool bCommitted = false;      // 두뇌를 한 번이라도 걸었다 (HasCommitted)
 	bool bLastCommitRollback = false;
 	FString LastCommitWhy;
 

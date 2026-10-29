@@ -6,6 +6,10 @@
 
 파일: 도구 `live.py`, 관문 `LIVE_GATE.md`, 예비 측정 `pilot/`·`pilot_mask5/`, 시연 `demo/`, 주고받기 약속 `AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md`.
 
+> **10-29 (11) 게임 기본 두뇌가 R7e 다** (사용자 결정 '기본 두뇌 R7e로' — `AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md` 5.6): 통합 v3 Play 의 시작 두뇌
+> (적응 고리 판 0)가 빌드에 넣은 R7e(판 5, 묶음 `route5`)라, 아무것도 고르지 않은 `eco.IntegratedV3.AutoAdapt 1` Play 의 스냅숏을 실제 폴더에서 바로 받는다.
+> 아래 (10)·(8) 의 '게임 기본 두뇌(내장 R1b-F)'·'판 5 두뇌로 시작한다(`-EcoV3Brain=…`)'는 그때의 이력이다. 내장 R1b-F 는 `-EcoV3Brain=builtin` 으로 고르고, 그 Play 는 지금처럼 거부된다.
+
 > **10-27 (10) 실제 폴더 잠금을 풀었다 — 판 5 두뇌(R7e)를 건 Play 만** (사용자 '실제 폴더 잠금 풀자'): 판 5 예비 측정(`pilot_mask5/`)으로 관문 크기를
 > 정했다(규칙 글과 다르게 판단한 칸은 `LIVE_GATE.md` 변경 기록 (10) '숨기지 않고 적는 것'). 판 길이·시드 수·모델 수·중간 판정·도주 비용은 그대로이고, 학습은 2M → **1M 스텝**, 1차 최소 차이는 0 → **1 %p** 다.
 > `flight_sizes_confirmed` 가 참이라 `live.py watch`·`round` 가 실제 폴더(`Saved/EcoAdapt`)에서 돈다. 다만 크기를 잰 두뇌 묶음은 판 5 뿐이라, 게임 기본

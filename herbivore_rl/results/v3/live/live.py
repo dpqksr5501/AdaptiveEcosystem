@@ -17,7 +17,9 @@ FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 �
 10-27 (LIVE_GATE.md 변경 기록 (10) — 사람 결정 '실제 폴더 잠금 풀자'): 판 5 묶음(R7e 지금 두뇌) 예비 측정(results/v3/live/pilot_mask5/)으로 크기를
 확정했다 — H_N 1800 · n 80 · H_G 3600 · n_G 40 · K 1 · 중간 판정(앞 1/2, 짝 t ≤ 0 기각) · 도주 비용 0 그대로, S 2M → 1M, δ_H 0 → 1 %p,
 flight_sizes_confirmed 참. 실제 폴더에서는 크기를 확정한 두뇌 묶음(PROFILES sizes_confirmed — 지금은 판 5 route5 만)의 지금 두뇌일 때만 판을 돌린다.
-관측 18·21 지금 두뇌(묶음 obs21 — 게임 기본 내장 R1b-F 포함)는 사건 숨음 비율 기준 예비 측정이 없어 실제 폴더에서 거부(refused)한다(시험 폴더에서는 그대로 돈다).
+관측 18·21 지금 두뇌(묶음 obs21 — 내장 R1b-F 포함)는 사건 숨음 비율 기준 예비 측정이 없어 실제 폴더에서 거부(refused)한다(시험 폴더에서는 그대로 돈다).
+10-29 (사용자 결정 '기본 두뇌 R7e로' — Docs/RL_Policy/LIVE_ADAPT_SPEC.md 5.6): 게임 기본 두뇌(통합 v3 Play 시작 두뇌, 적응 고리 판 0)가 R7e(판 5, 묶음 route5)라
+아무것도 고르지 않은 AutoAdapt Play 의 스냅숏을 실제 폴더에서 바로 받는다. 언리얼 스냅숏 brain.default 참 = 빌드에 넣은 같은 바이트(같은 id·가중치 sha256).
 10-24 (LIVE_GATE.md 변경 기록 (8) — R7e 판정 통과·C++ 이식 뒤): 게임에 판 5 두뇌(관측 24 두 길 + 반사 밖 두뇌 FLEE 막음, 계약 0xad7bad5e1acaf071 —
 EcoBrains/v3_r7_g995_s1_20m.json)를 불러 쓰는 Play 의 스냅숏이면 그 두뇌를 '지금 두뇌'로 받아 판 5 세계(G·N 바탕 configs/v3_wild3_route5_mirror.yaml)에서
 판정하고 판 5 학습 세계(R7 조리법 configs/v3_r7_train.yaml 의 train 블록, PPO configs/ppo_r6_lam098.yaml)에서 이어 배운다 — 묶음은 시작 모델 계약이 정한다
@@ -3011,7 +3013,7 @@ def cmd_watch(a) -> int:
             ok_p = [f"{p['name']} ({p['label']})" for p in PROFILES.values() if p.get("sizes_confirmed")]
             no_p = [p["name"] for p in PROFILES.values() if not p.get("sizes_confirmed")]
             w.log("실제 폴더: 판을 돌리는 지금 두뇌 묶음 = " + (", ".join(ok_p) or "없음")
-                  + (f" — 그 밖({', '.join(no_p)}{' — 게임 기본 내장 R1b-F 포함' if 'obs21' in no_p else ''})은 거부" if no_p else ""))
+                  + (f" — 그 밖({', '.join(no_p)}{' — 내장 R1b-F 포함, 10-29 부터 게임 기본은 판 5 R7e' if 'obs21' in no_p else ''})은 거부" if no_p else ""))
         try:
             while True:
                 try:

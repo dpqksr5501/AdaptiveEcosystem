@@ -27,6 +27,9 @@
 //                      받음, 판·두 길·반사 밖 FLEE 막음 표시, 설명 '관측 24 도망길', 내장·옛 18·21 두뇌는 판 2 그대로
 //   Brain.RejectRoute  판 4·5 파일의 어긋남 27 가지(관측 칸 수·이름 차례·마스크 판·판 6·flight_route 칸·brain_flee_outside_reflex·허용에 얼기·잠·층·골든)를
 //                      맞는 까닭으로 거부, RouteContractDiff 칸 이름, 옛 파일 그대로 받음, 대기 두뇌 버리기(DiscardPending — 대기 되돌림이면 쌓개 복구)
+//   Brain.Default      (10-29 기본 두뇌 R7e) 빌드에 넣은 바이트 = 헤더 sha256 = 저장소 파일(LF), 같은 Parse 검사(골든 26), 파일 두뇌와 같은 가중치·id·허용,
+//                      표시(기본·이름표·판 0·설명), 이름 default·기본·R7e / builtin·내장·R1b·R1b-F, Play 시작 고르기 PickStart(처음·적응 고리·Startup·거부·
+//                      건 뒤·대기), 처음 Play 뒤 쌓개 = [내장], 콘솔 eco.V3Brain.Load default
 
 #include "Misc/AutomationTest.h"
 
@@ -35,6 +38,7 @@
 #include "../EcoObservationV3.h"
 #include "../EcoSha256.h"
 #include "../EcoV3Brain.h"
+#include "../PolicyBrainV3Default.h"
 #include "../PolicyGoldenVectorsV3.h"
 #include "Dom/JsonObject.h"
 #include "HAL/FileManager.h"
@@ -1232,7 +1236,7 @@ bool FEcoV3BrainLiveStatusTest::RunTest(const FString& Parameters)
 namespace EcoV3BrainTestImpl
 {
 	const TCHAR* const kRoute0File = TEXT("v3_r1_g995_s3_obs24route0");   // 판 4 (EcoBrains — 결정 = R1b-F 와 같다)
-	const TCHAR* const kR7eFile = TEXT("v3_r7_g995_s1_20m");              // 판 5 (R7e 판정 통과 두뇌 — 게임 기본 두뇌가 아니다, 걸 때만)
+	const TCHAR* const kR7eFile = TEXT("v3_r7_g995_s1_20m");              // 판 5 (R7e 판정 통과 두뇌 — 10-29 부터 같은 바이트가 빌드에 든 기본 두뇌, Brain.Default)
 
 	TArray<TSharedPtr<FJsonValue>> ObsNameValues(int32 Dim)
 	{
@@ -1549,6 +1553,157 @@ bool FEcoV3BrainRejectRouteTest::RunTest(const FString& Parameters)
 		TestTrue(TEXT("되돌리기 대기"), Reg.Rollback(TEXT("시험")) && Reg.IsPendingRollback() && Reg.GetHistory().Num() == H0 - 1);
 		TestTrue(TEXT("대기 되돌림 버림 → 쌓개 복구"), Reg.DiscardPending(TEXT("시험")) && !Reg.IsPendingRollback() && Reg.GetHistory().Num() == H0);
 	}
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 10-29 기본 두뇌 R7e (사용자 결정 '기본 두뇌 R7e로' — EcoV3Brain.h '기본 두뇌', PolicyBrainV3Default.h): 빌드에 넣은 두뇌 파일 바이트 = 저장소 파일,
+// 같은 Parse 검사, 파일 두뇌와 같은 가중치·id, 이름(default·기본·R7e / builtin·내장·R1b·R1b-F), Play 시작 고르기(PickStart) 규칙
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3BrainDefaultTest, "AdaptiveEcosystem.Policy.V3.Brain.Default",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3BrainDefaultTest::RunTest(const FString& Parameters)
+{
+	namespace O3 = EcoObservationV3;
+	const FRegistryGuard Guard;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	const FEcoV3BrainRef Def = FEcoV3BrainRegistry::Default();
+	const FEcoV3BrainRef Bi = FEcoV3BrainRegistry::Builtin();
+	const FEcoV3Brain& D = *Def;
+	AddInfo(FString::Printf(TEXT("%s | 골든 %d 최대 오차 %.3e | 학습 %s"), *D.Describe(), D.GoldenCount, D.GoldenMaxError, *D.TrainWorld));
+
+	// --- 기본 두뇌 = R7e (빌드에 넣은 바이트, 검사 통과) ---
+	TestTrue(TEXT("기본 두뇌 표시 (내장 아님)"), D.bDefault && !D.bBuiltin && &D != &*Bi);
+	TestEqual(TEXT("기본 두뇌 id = R7e"), D.Id, FString(TEXT("v3_r7_g995_s1_20m@40d8710d")));
+	TestEqual(TEXT("헤더 id 와 같다"), D.Id, FString(UTF8_TO_TCHAR(EcoPolicyV3Default::kBrainId)));
+	TestTrue(TEXT("관측 24 · 마스크 판 5 · 계약 0xad7b… · 두 길·반사 밖 FLEE 막음"),
+			 D.ObsDim == O3::kObsDimRoute && D.Net.ObsDim == O3::kObsDimRoute && D.MaskVersion == P3::kMaskVersionRouteGate
+				 && D.ContractHash == P3::kContractHashObs24Mask5 && D.bRoute() && D.bFleeGate());
+	const uint8 WantAllowed[P3::kNumBehaviors] = {1, 1, 1, 0, 0};
+	TestTrue(TEXT("허용 = 먹기·도망·숨기"), FMemory::Memcmp(D.Allowed, WantAllowed, sizeof(WantAllowed)) == 0);
+	TestTrue(TEXT("골든 26 사례 통과 (Parse 검사 그대로)"), D.GoldenCount == 26 && D.GoldenMaxError <= D.GoldenTolerance);
+	TestTrue(TEXT("이름표 R7e · 출처 글자 '기본 두뇌 R7e' · 판 0 · 디스크 파일 아님"),
+			 D.Label == TEXT("R7e") && D.OriginText() == TEXT("기본 두뇌 R7e") && D.RoundTag() == TEXT("판 0") && D.SourceFile.IsEmpty());
+	TestTrue(TEXT("설명에 '기본 두뇌 R7e — 빌드에 넣은 v3_r7_g995_s1_20m.json' · '관측 24 도망길·반사 밖 도망 막음'"),
+			 D.Describe().Contains(TEXT("기본 두뇌 R7e — 빌드에 넣은 v3_r7_g995_s1_20m.json")) && D.Describe().Contains(TEXT("관측 24 도망길·반사 밖 도망 막음")));
+	TestTrue(TEXT("부를 때마다 같은 객체"), &*FEcoV3BrainRegistry::Default() == &D);
+	TestTrue(TEXT("내장 두뇌는 그대로 R1b (관측 18 · 판 2 · 이름표 R1b · 출처 '내장 두뇌')"),
+			 Bi->bBuiltin && !Bi->bDefault && Bi->ObsDim == P3::kObsDim && Bi->MaskVersion == 2 && Bi->Label == TEXT("R1b") && Bi->OriginText() == TEXT("내장 두뇌"));
+	{
+		// 넣은 바이트 = 헤더 sha256 = 저장소 파일 (줄 끝 LF 로 맞춰 — git core.autocrlf 가 CRLF 로 꺼냈어도)
+		char Hex[65];
+		EcoSha256::HashHex(EcoPolicyV3Default::kFile, static_cast<size_t>(EcoPolicyV3Default::kFileBytes), Hex);
+		TestEqual(TEXT("넣은 바이트 sha256 = 헤더 kFileSha256"), FString(ANSI_TO_TCHAR(Hex)), FString(UTF8_TO_TCHAR(EcoPolicyV3Default::kFileSha256)));
+		TArray<uint8> FileBytes;
+		const FString Path = FEcoV3BrainRegistry::Resolve(kR7eFile);
+		if (TestFalse(TEXT("저장소 R7e 두뇌 파일"), Path.IsEmpty()) && TestTrue(TEXT("읽기"), FFileHelper::LoadFileToArray(FileBytes, *Path)))
+		{
+			TArray<uint8> Lf;
+			Lf.Reserve(FileBytes.Num());
+			for (int32 i = 0; i < FileBytes.Num(); ++i)
+			{
+				if (!(FileBytes[i] == 13 && i + 1 < FileBytes.Num() && FileBytes[i + 1] == 10))
+				{
+					Lf.Add(FileBytes[i]);
+				}
+			}
+			TestTrue(TEXT("넣은 바이트 = 저장소 파일 (LF) — 다르면 python export_weights_v3.py --default-brain 로 헤더를 다시 만든다"),
+					 Lf.Num() == EcoPolicyV3Default::kFileBytes && FMemory::Memcmp(Lf.GetData(), EcoPolicyV3Default::kFile, Lf.Num()) == 0);
+		}
+	}
+	{
+		// 파일 두뇌와 같은 가중치 (비트 단위)·같은 id·같은 허용 — 파이썬 고리(live.py find_brain_zip)가 가중치 sha256 으로 같은 모델 zip 을 찾는다
+		const FEcoV3BrainLoad F = FEcoV3BrainRegistry::LoadFile(kR7eFile);
+		if (TestTrue(TEXT("R7e 파일 검사 통과"), F.Ok()))
+		{
+			const P3::FPolicyNetV3& A = D.Net;
+			const P3::FPolicyNetV3& B = F.Brain->Net;
+			const bool bSame = A.ObsDim == B.ObsDim && FMemory::Memcmp(A.W0, B.W0, sizeof(float) * P3::kHiddenDim * A.ObsDim) == 0
+							   && FMemory::Memcmp(A.B0, B.B0, sizeof(float) * P3::kHiddenDim) == 0
+							   && FMemory::Memcmp(A.W1, B.W1, sizeof(float) * P3::kHiddenDim * P3::kHiddenDim) == 0
+							   && FMemory::Memcmp(A.B1, B.B1, sizeof(float) * P3::kHiddenDim) == 0
+							   && FMemory::Memcmp(A.W2, B.W2, sizeof(float) * P3::kNumBehaviors * P3::kHiddenDim) == 0
+							   && FMemory::Memcmp(A.B2, B.B2, sizeof(float) * P3::kNumBehaviors) == 0;
+			TestTrue(TEXT("가중치 = R7e 파일 (비트 단위)"), bSame);
+			TestTrue(TEXT("id·가중치 sha256·계약·허용 = R7e 파일, 파일 두뇌는 기본 표시 없음"),
+					 F.Brain->Id == D.Id && F.Brain->WeightsSha256 == D.WeightsSha256 && F.Brain->ContractHash == D.ContractHash
+						 && FMemory::Memcmp(F.Brain->Allowed, D.Allowed, sizeof(D.Allowed)) == 0 && !F.Brain->bDefault && F.Brain->Label.IsEmpty());
+		}
+	}
+
+	// --- 이름 ---
+	for (const TCHAR* N : {TEXT("default"), TEXT(" Default "), TEXT("기본"), TEXT("R7e"), TEXT("r7e")})
+	{
+		const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(N);
+		TestTrue(FString::Printf(TEXT("'%s' → 기본 두뇌"), N), FEcoV3BrainRegistry::IsDefaultName(N) && L.Ok() && &*L.Brain == &D);
+	}
+	for (const TCHAR* N : {TEXT("builtin"), TEXT("내장"), TEXT("R1b"), TEXT("r1b-f"), TEXT("R1b-F")})
+	{
+		const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(N);
+		TestTrue(FString::Printf(TEXT("'%s' → 내장 두뇌"), N), FEcoV3BrainRegistry::IsBuiltinName(N) && L.Ok() && &*L.Brain == &*Bi);
+	}
+	TestFalse(TEXT("파일 이름은 기본·내장 이름이 아니다"), FEcoV3BrainRegistry::IsDefaultName(kR7eFile) || FEcoV3BrainRegistry::IsBuiltinName(kR1bFile));
+
+	// --- Play 시작 고르기 (PickStart — 읽기만, 기록 줄 없음) ---
+	Reg.ResetForTest();
+	TestTrue(TEXT("처음: 지금 = 내장, 건 적 없음"), &*Reg.GetActive() == &*Bi && !Reg.HasCommitted() && !Reg.GetPending().IsValid());
+	{
+		const FEcoV3StartPick P = Reg.PickStart(TEXT(""), false);
+		TestTrue(TEXT("빈 Startup · 처음 Play → 기본 두뇌"), P.Brain.IsValid() && &*P.Brain == &D && !P.bStartupRejected && P.Why.Contains(TEXT("처음 Play")));
+		const FEcoV3StartPick A = Reg.PickStart(TEXT(""), true);
+		TestTrue(TEXT("빈 Startup · 적응 고리 Play → 기본 두뇌 (판 0)"), A.Brain.IsValid() && &*A.Brain == &D && A.Why.Contains(TEXT("판 0")));
+		const FEcoV3StartPick S = Reg.PickStart(TEXT("builtin"), true);
+		TestTrue(TEXT("Startup builtin → 내장 R1b-F (적응 고리여도 사람이 고른 두뇌)"), S.Brain.IsValid() && &*S.Brain == &*Bi && !S.bStartupRejected);
+		const FEcoV3StartPick F = Reg.PickStart(kR4File, false);
+		TestTrue(TEXT("Startup 파일 → 그 파일 두뇌"), F.Brain.IsValid() && !F.Brain->bDefault && !F.Brain->bBuiltin && F.Why.Contains(kR4File));
+		const FEcoV3StartPick X = Reg.PickStart(TEXT("없는_두뇌"), false);
+		TestTrue(TEXT("Startup 거부 → 빈 값처럼 (처음 Play 면 기본 두뇌), 까닭 기록"),
+				 X.bStartupRejected && X.StartupLoad.Reason == EcoV3Brain::EReject::File && X.Brain.IsValid() && &*X.Brain == &D && X.Why.Contains(TEXT("거부")));
+		TestTrue(TEXT("PickStart 는 저장소를 바꾸지 않는다"), !Reg.GetPending().IsValid() && &*Reg.GetActive() == &*Bi && !Reg.HasCommitted());
+	}
+	// 처음 Play 처럼 기본 두뇌를 걸면: 저장소 처음 두뇌(내장)가 되돌리기 쌓개에 남는다 (되돌리기로 R1b-F 로 갈 수 있다)
+	Reg.Queue(Def, TEXT("시험 처음 Play"));
+	TestTrue(TEXT("걸면 지금 = 기본, 건 적 있음"), Reg.CommitPending() && &*Reg.GetActive() == &D && Reg.HasCommitted());
+	TestTrue(TEXT("쌓개 = [내장]"), HistoryIs(Reg, {&*Bi}));
+	{
+		const FEcoV3StartPick P = Reg.PickStart(TEXT(""), false);
+		TestTrue(TEXT("다음 Play (빈 Startup) → 지금 두뇌 그대로"), !P.Brain.IsValid() && P.Why.Contains(TEXT("지금 두뇌 그대로")));
+		const FEcoV3StartPick A = Reg.PickStart(TEXT(""), true);
+		TestTrue(TEXT("적응 고리 Play 인데 이미 기본 → 그대로"), !A.Brain.IsValid() && A.Why.Contains(TEXT("이미 기본")));
+		const FEcoV3StartPick X = Reg.PickStart(TEXT("없는_두뇌"), false);
+		TestTrue(TEXT("Startup 거부 · 건 적 있음 → 지금 두뇌 그대로"), X.bStartupRejected && !X.Brain.IsValid());
+	}
+	// 앞 Play 에 파일 두뇌(R4)를 걸었다
+	const FEcoV3BrainLoad R4 = FEcoV3BrainRegistry::LoadFile(kR4File);
+	if (TestTrue(TEXT("R4 파일"), R4.Ok()))
+	{
+		Reg.Queue(R4.Brain.ToSharedRef(), TEXT("시험 앞 Play 의 R4"));
+		Reg.CommitPending();
+		const FEcoV3StartPick A = Reg.PickStart(TEXT(""), true);
+		TestTrue(TEXT("적응 고리 Play → 기본 두뇌로 다시 (앞 Play 의 두뇌는 앞 환경의 것)"), A.Brain.IsValid() && &*A.Brain == &D);
+		const FEcoV3StartPick P = Reg.PickStart(TEXT(""), false);
+		TestTrue(TEXT("그 밖 Play → R4 그대로"), !P.Brain.IsValid());
+		const FEcoV3StartPick S = Reg.PickStart(TEXT("default"), false);
+		TestTrue(TEXT("Startup default → 기본 두뇌"), S.Brain.IsValid() && &*S.Brain == &D);
+	}
+	// 대기가 있으면 (Play 전 콘솔 eco.V3Brain.Load): 처음이어도 그 대기 그대로, 적응 고리는 대기가 기본이 아니면 기본
+	Reg.ResetForTest();
+	if (R4.Ok())
+	{
+		Reg.Queue(R4.Brain.ToSharedRef(), TEXT("시험 Play 전 Load"));
+		TestFalse(TEXT("처음 · 대기 R4 → 그대로 (대기가 이긴다)"), Reg.PickStart(TEXT(""), false).Brain.IsValid());
+		const FEcoV3StartPick A = Reg.PickStart(TEXT(""), true);
+		TestTrue(TEXT("적응 고리 · 대기 R4 → 기본 두뇌"), A.Brain.IsValid() && &*A.Brain == &D);
+		Reg.Queue(Def, TEXT("시험 대기 기본"));
+		TestFalse(TEXT("적응 고리 · 대기가 이미 기본 → 그대로"), Reg.PickStart(TEXT(""), true).Brain.IsValid());
+	}
+	// 콘솔 eco.V3Brain.Load default
+	Reg.ResetForTest();
+	IConsoleManager::Get().ProcessUserConsoleInput(TEXT("eco.V3Brain.Load default"), *GLog, nullptr);
+	TestTrue(TEXT("eco.V3Brain.Load default → 대기 기본 두뇌"), Reg.GetPending().IsValid() && &*Reg.GetPending() == &D);
+	IConsoleManager::Get().ProcessUserConsoleInput(TEXT("eco.V3Brain.Info"), *GLog, nullptr);
+	IConsoleManager::Get().ProcessUserConsoleInput(TEXT("eco.V3Brain.List"), *GLog, nullptr);
 	return true;
 }
 

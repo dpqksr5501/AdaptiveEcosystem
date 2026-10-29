@@ -57,6 +57,7 @@
 
 - 맵 `/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem` (조연우 맵 복사본, 맵 값 그대로), 세션 20020, 사슴 128 × 지역 셋, 메마른 땅(Barren)만 찍음.
 - 두뇌: R1b-F = 두뇌 인수 없음(게임 기본 내장), R7e = `-EcoV3Brain=v3_r7_g995_s1_20m`. 게임 기본 두뇌·`UserEngine.ini` 는 그대로다.
+  - 10-29 덧붙임: 이제 기본 두뇌가 R7e 다(`Docs/RL_Policy/LIVE_ADAPT_SPEC.md` 5.6). 이 장면을 다시 찍을 때 R1b-F 판은 `-EcoV3Brain=builtin` 을 붙인다.
 - 빌드: HEAD `fc35c86`, 작업 트리 `Source`·`Config`(사용자 로컬 `DefaultEngine.ini` 빼고) 변경 없음. 이 일은 빌드하지 않았다.
   모든 판의 DLL 이 `2026-10-27 18:12:50 · 12587520` 바이트로 앞뒤 같았다 (`fd33712` 소스로 지은 DLL — 그 뒤 커밋은 문서·자료뿐).
 - 창: `UnrealEditor.exe … -game -RenderOffscreen` (`-windowed` 없음). 판마다 0.25 초마다 우리 프로세스 나무의 보이는 창을 셌다 — 끝까지 돈 16 판 모두 0 개.

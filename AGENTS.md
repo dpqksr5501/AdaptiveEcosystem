@@ -146,3 +146,9 @@ PR #14는 2026-10-23 사용자 요청으로 기능·디버그를 push하고 Read
 서버·네트워킹은 [역할별 안내](AdaptiveEcosystem/Docs/Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), 학습은 [역할별 안내](AdaptiveEcosystem/Docs/RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md)를 따른다. 복사 가능한 [작업 시작 프롬프트](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AGENT_START_PROMPTS_20261024.md)와 [실제 부분 예제](AdaptiveEcosystem/Docs/RL_Policy/Examples/README.md)를 제공한다. 예제는 training_ready=false이며 진단 정답/부분 cell을 기존 정책 관측이나 전체 복원 상태로 사용하지 않는다. 현재 Client proxy와 권위 논리를 구분하고 새 학습/임의 종/분산 서버 완료로 확대하지 않는다.
 
 225개 자동화·PIE/멀티·저장·패키지 수치는2026-10-23 실행의 근거다. 10-24 안내/공유 갱신은 새 UBT/PIE 실행을 뜻하지 않는다. 새 담당자가 코드를 변경하면 기존3절 빌드 규칙과 해당 역할의 실제 acceptance를 적용한다. 다른 PC의 같은 Git SHA라도 checkpoint의 runtime image hash가 달라질 수 있으므로 재빌드 간 자동 복원을 가정하지 않는다.
+
+## 15. 2026-10-29 v3 기본 두뇌 R7e
+
+사용자 결정("기본 두뇌 R7e로")에 따라 통합 v3 모드에서 시작 두뇌를 고르지 않은 Play(적응 고리 판 0 포함)의 사슴 두뇌는 R7e `v3_r7_g995_s1_20m@40d8710d`(**24관측/5행동·mask5**, 두 길·반사 밖 도망 막음)다. 4절의 'R1b 18관측/5행동·mask2'는 당시 이력이다. 저장소 두뇌 파일을 바이트 그대로 빌드에 넣었고(`PolicyBrainV3Default.h`) 파일 두뇌와 같은 검사를 지난다. 런타임 추론은 그대로 C++ Native이고 V1 7관측/4출력·`eco.IntegratedPolicyVersion` 기본값·내장 R1b(`PolicyWeightsV3.h`)·평가기·Python 거울은 바꾸지 않았다. R7e를 걸 수 없는 세계(도주 반사 끔 등)는 내장 R1b-F로 돈다.
+
+R1b-F로 되돌리려면 Play 전 `eco.V3Brain.Startup builtin`(명령줄 `-EcoV3Brain=builtin`), Play 중 `eco.V3Brain.Load builtin`을 쓴다. 고르기 규칙·실시간 고리·검증은 [LIVE_ADAPT_SPEC.md 5.6](AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md)을 따른다.

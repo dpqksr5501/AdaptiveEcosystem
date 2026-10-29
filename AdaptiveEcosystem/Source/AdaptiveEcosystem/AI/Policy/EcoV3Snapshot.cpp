@@ -569,6 +569,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 		J->SetStringField(TEXT("model_sha256"), B.ModelSha256);
 		J->SetStringField(TEXT("weights_sha256"), B.WeightsSha256);
 		J->SetBoolField(TEXT("builtin"), B.bBuiltin);
+		J->SetBoolField(TEXT("default"), B.bDefault);   // 10-29 기본 두뇌 (빌드에 넣은 R7e — 같은 가중치의 EcoBrains 파일과 id·sha256 이 같다, 더하기만)
 		J->SetStringField(TEXT("train_world"), B.TrainWorld);
 		J->SetStringField(TEXT("source_file"), B.SourceFile.IsEmpty() ? FString() : FPaths::GetCleanFilename(B.SourceFile));
 		J->SetArrayField(TEXT("allowed"), IntArray(B.Allowed));
