@@ -4,6 +4,7 @@
   확인 결과(UBT 두 판·자동화 263 개 실패 0·창 없는 헤드리스 확인)는 9절. [LIVE_ADAPT_SPEC.md](LIVE_ADAPT_SPEC.md) 2·5.2·5.3·새 5.5절도 구현대로 고쳤다.
   구현 커밋(`51130c0`) 뒤 실제 실행 확인과 그때 찾아 고친 알림 글(나무 다 자람 묶음에 섞인 '비→비')은 **9.4절 '10-27 확인'**.
   그 뒤 `ae91f90..171c384` C++ 적대적 검토(찾은 것·고친 것 — Play 중 통합 v3 모드가 꺼지면 감시도 끝냄 — 과 남은 점)는 **9.5절**.
+  10-29 기본 두뇌 R7e 뒤 두뇌 인수 없는 AutoAdapt + 숲 자람 실행 확인은 **9.6절 '10-29 확인'**.
 - 기준: C++ 은 `Branch_Sinhyeok` `ae91f90`(그 뒤 커밋 `8f191c0` 은 파이썬 예비 측정 자료뿐). 파이썬은 커밋본과 **다른 워크플로의 10-27 작업 사본**
   (`LIVE_GATE.md` 변경 기록 (10) '실제 폴더 잠금 풀자' — 이 문서를 쓸 때 아직 커밋 전) 둘 다 읽었다. **구현하는 동안 그쪽이 커밋했다**(`2708a78` 잠금 풀기·`94e1b17` δ 인자·
   `7445bc6` 적대적 확인) — 아래 '작업 사본'은 이제 그 커밋이고, '커밋본(잠김)'은 `8f191c0` 까지다. 읽은 코드: `S/AI/Policy/EcoV3EnvWatch.cpp`·`EcoV3Snapshot.cpp`·`EcoV3PlaceTreesCommandlet.cpp`·
@@ -722,3 +723,16 @@
   6. 숲 나무를 밖에서 지우면(팀 도구 등) `ForestState` 는 '다 자람' 으로 남는다 — 세계 원판은 환경 감시가 맞추고 숲 셈 글만 어긋난다.
   7. 진짜 판의 학습 일꾼 = CPU − 6 (이 컴퓨터 14, 감시 기록 `워커 14`) — 편집기 프레임이 떨어질 수 있다(4절 9).
   8. 앞서부터 남은 것: 클라이언트 보정 수, 실제 폴더에서 진짜 감시, 편집기 PIE (창이 필요).
+
+### 9.6 10-29 확인 (기본 두뇌 R7e 커밋 `16cef08` 뒤 — 두뇌 인수 없는 AutoAdapt Play, 창 없음)
+
+- 방법: 팀 통합 맵 `/Game/Map/LV_Ecosystem_IntegrationTest`, `UnrealEditor-Cmd … -game -RenderOffscreen -ResX=1280 -ResY=720` 실시간 180 초,
+  `-ini:Engine:[ConsoleVariables]:eco.IntegratedPolicyVersion=3 -EcoIntegratedV3 -EcoV3Seed=20010 -EcoV3DeerPerRegion=128 -EcoV3ForestGrowth`(짧은 숲
+  `-EcoV3ForestStartSeconds=10 -EcoV3ForestStageSeconds=15 -EcoV3ForestGrowSeconds=10 -EcoV3ForestTarget=12`), `-EcoV3AutoAdapt -EcoV3AdaptRoot=<scratch>/root`,
+  진짜 `live.py watch`(명령 덮기 `-EcoV3AutoWatchCmd="-X utf8 -u results/v3/live/live.py watch --root {root} --ckpt <scratch> --steps 20000 --judge-seeds 35000-35001 …"`).
+  **`-EcoV3Brain=` 없음** (9.4 ④ 는 `-EcoV3Brain=v3_r7_g995_s1_20m` 이었다). `-windowed` 없음, 새 보이는 창 0, 실제 `Saved/EcoAdapt` 29 파일 앞뒤 같음.
+- 결과: 시작 고르기 `적응 고리 Play 시작 — 기본 두뇌 R7e(판 0)에서 시작`, 화면 상태 줄 `두뇌 판 0 (기본 R7e) · 두 길(마스크 판 5) …`. 나무 0→6(20.0 초)→12(35.1 초),
+  `다시 배우기 조건 됨 … 나무 +12/10` → 55.1 초 스냅숏(`brain.default` 참·관측 24·판 5) → 감시 `새 환경 — 시도 1 시작` → 판 기록 묶음 `route5`
+  (`시작 ckpt/v3/v3_r7_g995_s1_20m.zip`) → `기각 — 게임 두뇌 그대로 (1차 사건 숨음 비율 19.8%→20.6% t +0.5 (문턱 +12.71))` — 9.4 ④ 의 R7e 파일 판과 같은 수다.
+  Play 끝에 우리 언리얼의 자손 19 개(감시·`round`·`train-one`·일꾼 파이썬 9·`EcoV3Eval` 7 등) 모두 사라짐. 같은 스냅숏은 실제 폴더 기준 입구 검사(`check_profile_sizes` 등, 읽기만)도 지난다.
+  그 밖의 10-29 확인(두 맵 같은 세계·리슨/데디케이티드·두뇌 파일 없음·깨짐)과 고친 기록 글은 [LIVE_ADAPT_SPEC.md](LIVE_ADAPT_SPEC.md) 5.6 '10-29 확인'.

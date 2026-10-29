@@ -360,6 +360,29 @@
   두뇌 인수 없음(기본) = `-EcoV3Brain=v3_r7_g995_s1_20m`(파일) = 10-27 R7e 판 `c2fb89b0…`(829684 줄), `-EcoV3Brain=builtin` = 10-27 R1b-F 판 `1e5a6f03…`(827214 줄) —
   바이트까지 같다. 60 초 스냅숏 `brain.default` 참·`live.resolve_start` → `route5`·`check_profile_sizes`·`check_snapshot_route` 통과(실제 폴더 기준, 학습은 돌리지 않음).
   `-RenderOffscreen` AutoAdapt 판(시험 root, 감시 끔)에서 상태 줄·바꿈·되돌림 알림을 화면으로 확인, 도주 반사 끈 판·없는 시작 두뇌 판의 거부 줄·알림 확인.
+- **10-29 확인 (구현 커밋 `16cef08` 뒤 실제 실행 — 창 없음)**: 모두 `UnrealEditor-Cmd … -ini:Engine:[ConsoleVariables]:eco.IntegratedPolicyVersion=3 -EcoIntegratedV3`,
+  `-NullRHI`(화면만 `-RenderOffscreen`), `-windowed` 없음 — 보이는 새 창 0 (사이에 뜬 창은 사용자 메신저뿐). 실제 `Saved/EcoAdapt` 29 파일은 앞뒤 크기·고친 시각이 같고,
+  띄운 언리얼·파이썬·`EcoV3Eval` 은 모두 스스로 끝났다(남은 자손 0). 도구·기록은 저장소 밖 scratchpad `v1029/`.
+
+  | 확인 | 방법 | 결과 |
+  |---|---|---|
+  | (1) 두뇌 인수 없는 Play — 팀 통합 맵 | `/Game/Map/LV_Ecosystem_IntegrationTest` 세션 20021·20032 × 300 초, `-benchmark -fps=30 -EcoV3DeerPerRegion=128 -EcoV3ObsParityLog=1` (`r7e_game.py` 그대로) | 시작 줄 `시작 고르기: 기본 두뇌 R7e (처음 Play — eco.V3Brain.Startup 빔)`·`두뇌 시작 \| 0.0초 (전역 스텝 0) \| v3_r7_g995_s1_20m@40d8710d (기본 두뇌 R7e — 빌드에 넣은 …)`, 10 초 두뇌 줄 90/90 이 R7e, 바꿈·거부 0. 사슴 줄 지문이 10-27 `-EcoV3Brain=v3_r7_g995_s1_20m` 판과 **바이트까지 같다** — 20021 `f1353d60…`(833422 줄)·20032 `7fc9ce37…`(829591 줄) |
+  | (1) R1b-F 를 고른 판 | 같은 세션 `-EcoV3Brain=builtin` | 10-27 R1b-F 판(그때 두뇌 인수 없음)과 바이트까지 같다 — 20021 `d9f8bfc5…`(828494 줄)·20032 `75904d8c…`(832316 줄), 10 초 두뇌 줄 모두 `v3_r1_g995_s3_20m@eca97f2e` |
+  | (1) 조연우 맵 복사본 | `/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem` 세션 20021 × 300 초, 인수 없음·`builtin`·R7e 파일 셋 | 시작 줄 R7e(인수 없음·파일)·R1b-F(`builtin`), 10 초 두뇌 줄 모두 그 두뇌. 팀 비를 실제 시간으로 읽는 맵이라 지문은 판마다 다르다 — 처음 갈린 결정 스텝: 인수 없음 대 R7e 파일 Barren 361·Forest 571·Highland 139, R7e 파일 이번 대 10-27 364·571·139(같은 두뇌의 판 흔들림과 같은 크기), 인수 없음 대 `builtin` 42·42·30 (다른 두뇌는 5 초 안에 갈림) |
+  | (2) 리슨 + 클라이언트 1 | 통합 맵 `?listen -game -NullRHI` 150 초 + `127.0.0.1 -game -NullRHI`, 실시간 `t.MaxFPS=60`, 둘 다 인수 없음 | 호스트: 시작 줄 R7e·10 초 두뇌 줄 42/42 R7e·`eco.V3Brain.Info` 지금 두뇌 R7e. 클라이언트: `[EcoV3I] Client: presentation only` 뒤 두뇌 줄·`[EcoV3Brain]` 줄 0, `[Eco Integration] NetMode=3 LogicalOwned=0 … Step=0`, 사슴·늑대 표현 12~64 개를 받음 |
+  | (2) 데디케이티드 + 클라이언트 2 | 통합 맵 `-server` 170 초 + 클라이언트 둘(둘째는 30 초 뒤) | 서버 시작 줄 R7e·10 초 두뇌 줄 48/48 R7e, `Error:` 0. 두 클라이언트 모두 두뇌 줄 0·`LogicalOwned=0 … Step=0`, 표현 12~64 개 |
+  | (2) 데디케이티드 + 2 — 조연우 맵 복사본 | 같은 꼴 | 서버 R7e(48/48), 두 클라이언트 두뇌 줄 0·`LogicalOwned=0 … Step=0`. **클라이언트 표현이 0 개** — 서버 `-EcoV3Brain=builtin` 대조 판도 0 개라 두뇌와 무관한 맵 쪽 상태다(원인은 이번에 보지 않았다) |
+  | (3) AutoAdapt + 숲 자람 | 통합 맵 `-RenderOffscreen 1280x720` 실시간 180 초, `-EcoV3ForestGrowth`(짧은 숲 6 그루 × 2), `-EcoV3AutoAdapt -EcoV3AdaptRoot=<scratch>/root`, 진짜 `live.py watch`(명령 덮기 `-EcoV3AutoWatchCmd` — 시험 root, `--steps 20000`·판정 시드 2) | `시작 고르기: 적응 고리 Play 시작 — 기본 두뇌 R7e(판 0)에서 시작`, 상태 줄 화면 `두뇌 판 0 (기본 R7e) · 두 길(마스크 판 5) …`, `eco.V3Brain.History` 쌓개 1 = 내장 R1b. 나무 0→6→12 뒤 55.1 초 스냅숏(`brain.default` 참·관측 24·판 5·`source_file` 빔) → 감시 `새 환경 — 시도 1 시작` → `convert.json`·`result.json` 묶음 **`route5`**(`시작 ckpt/v3/v3_r7_g995_s1_20m.zip`) → 학습·판정 → `기각 — 게임 두뇌 그대로 (19.8%→20.6% t +0.5 (문턱 +12.71))`(시험 크기라 관문에서 멈춤 — 10-27 R7e 파일 판과 같은 수). 같은 스냅숏을 실제 폴더 기준 입구(`resolve_start`·`check_profile_sizes`·`check_snapshot_route` — 읽기만)에 넣으면 받음, (1) 의 `builtin` 판 300 초 스냅숏은 `지금 두뇌 묶음 obs21 은 실제 폴더 관문 크기 미확정` 으로 거부 |
+  | (4) 시작 두뇌 파일 없음·깨짐 | 통합 맵 `-benchmark` 40 초: 없는 이름·반쯤 잘린 JSON·가중치 한 칸 바꾼 파일(sha256 칸 그대로)·계약 해시 바꾼 파일 (`-EcoV3Brain=<절대 경로>`) | 기록 Error `시작 두뇌 … 거부 (파일 / JSON / sha256 / 계약 해시)`·알림 `… 거부 (…) — v3_r7_g995_s1_20m@40d8710d 로 시작` 뒤 기본 R7e 로 돈다(10 초 두뇌 줄 모두 R7e) |
+  | (4) 적응 고리 + 없는 시작 두뇌 · 감시 폴더의 깨진 파일 | AutoAdapt(감시 끔) + `-EcoV3Brain=no_such_brain_1029`, 시작 뒤 시험 root `brains/` 에 깨진 두뇌 파일 | `적응 고리 Play 시작 — 기본 두뇌 R7e(판 0)에서 시작 (시작 두뇌 … 거부)`, 폴더 감시 Warning `… 거부 (sha256)`·알림 `두뇌 파일 거부 — live_r1_broken.json: sha256`, 두뇌는 R7e 그대로 |
+  | (4) 저장소 R7e 파일이 없을 때 | `EcoBrains/v3_r7_g995_s1_20m.json` 을 판 동안만 scratch 로 옮김(뒤에 되돌림 — sha256 `5f479503…` 같음, git 변경 없음) | 인수 없음: 기본 두뇌 R7e 그대로(검사 통과 골든 26 사례·바이트 sha256 `5f479503…` — 빌드에 넣은 바이트). `-EcoV3Brain=v3_r7_g995_s1_20m`: `거부 (파일)` 뒤 같은 id 의 기본 R7e. 파이썬 고리는 그 파일로 모델 zip 을 찾으므로 파일이 없거나 깨지면 `모델 zip 을 두뇌 파일 폴더에서 찾지 못했다` 로 거부(학습만 안 돌고 게임은 R7e 그대로) |
+  | (4) 이름·걸 수 없는 세계 | `-EcoV3Brain=R1b-F`·`=R7e`, 도주 반사 끔 | 각각 내장 R1b-F·기본 R7e. 도주 반사 끔: Warning `두뇌 거부 \| … 기본 두뇌 R7e … — Forest: 도주 반사 … \| v3_r1_g995_s3_20m@eca97f2e 그대로`·알림 `두뇌 거부 — 기본 두뇌 R7e … 를 걸 수 없어 … 로 돈다` |
+
+  - **고친 것**: 시작 두뇌를 줬지만 거부된 판의 까닭이 `기본 두뇌 R7e (처음 Play — eco.V3Brain.Startup 빔) (시작 두뇌 '…' 거부)` 로 '빔'과 '거부'를 함께 적었다.
+    이제 거부면 `기본 두뇌 R7e (처음 Play) (시작 두뇌 '…' 거부)`, 빈 값이면 그대로다(`EcoV3Brain.cpp` `PickStart` — 글만, 고르는 두뇌는 같음. 시험 `Policy.V3.Brain.Default` 에 한 줄).
+    고친 뒤 UBT 기본 적응 unity·`-DisableAdaptiveUnity` 성공(경고 0), 자동화 `AdaptiveEcosystem` 266 개 성공·실패 0, 통합 맵 세션 20021 인수 없음 지문 `f1353d60…` 그대로.
+  - 참고: `-RenderOffscreen` 적응 고리 판은 `두뇌 시작 | 0.4초 (전역 스텝 3)` 으로 적힌다 — 지역 세계를 만들 때 전역 스텝을 팀 시계에 맞추기 때문이고(`TryCreateContexts`),
+    그 앞에 다른 두뇌로 돈 결정은 없다(첫 결정 스텝이 3). 상태 줄 끝(`적응 고리 | …`)은 관찰 카메라 칸에 가린다([FOREST_GROWTH_MODE.md](FOREST_GROWTH_MODE.md) 9.4 남은 점 그대로) — 기록 줄로 본다.
 
 ## 6. 파이썬 (`herbivore_rl/results/v3/live/live.py`, 시험 `herbivore_rl/tests/test_live_v3.py`)
 - `watch`(감시 데몬) · `round --snapshot F`(한 판) · `pilot --snapshot F`(예비 측정 — 시드 34900~34999 만). 적응 고리 `results/v3/adapt/adapt.py` 를 쓴다.

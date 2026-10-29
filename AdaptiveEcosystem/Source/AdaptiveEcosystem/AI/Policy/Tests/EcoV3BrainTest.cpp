@@ -1660,6 +1660,9 @@ bool FEcoV3BrainDefaultTest::RunTest(const FString& Parameters)
 		const FEcoV3StartPick X = Reg.PickStart(TEXT("없는_두뇌"), false);
 		TestTrue(TEXT("Startup 거부 → 빈 값처럼 (처음 Play 면 기본 두뇌), 까닭 기록"),
 				 X.bStartupRejected && X.StartupLoad.Reason == EcoV3Brain::EReject::File && X.Brain.IsValid() && &*X.Brain == &D && X.Why.Contains(TEXT("거부")));
+		// 10-29 확인: 거부된 Startup 을 '빔' 이라 적지 않는다 (빈 Startup 만 '빔')
+		TestTrue(TEXT("Startup 거부 까닭에 'Startup 빔' 없음 · 빈 Startup 까닭에는 있음"),
+				 X.Why.Contains(TEXT("처음 Play")) && !X.Why.Contains(TEXT("Startup 빔")) && P.Why.Contains(TEXT("Startup 빔")));
 		TestTrue(TEXT("PickStart 는 저장소를 바꾸지 않는다"), !Reg.GetPending().IsValid() && &*Reg.GetActive() == &*Bi && !Reg.HasCommitted());
 	}
 	// 처음 Play 처럼 기본 두뇌를 걸면: 저장소 처음 두뇌(내장)가 되돌리기 쌓개에 남는다 (되돌리기로 R1b-F 로 갈 수 있다)

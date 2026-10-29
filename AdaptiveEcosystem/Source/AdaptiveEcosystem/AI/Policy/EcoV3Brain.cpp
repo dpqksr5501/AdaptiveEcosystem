@@ -1295,7 +1295,9 @@ FEcoV3StartPick FEcoV3BrainRegistry::PickStart(const FString& Startup, bool bAut
 	{
 		// 3. 이 프로세스의 첫 통합 v3 Play (두뇌를 건 적 없음 — 지금 두뇌는 저장소 처음 두뇌 내장 R1b): 기본 두뇌
 		P.Brain = Def;
-		P.Why = FString::Printf(TEXT("%s (처음 Play — eco.V3Brain.Startup 빔)%s"), *Def->OriginText(), *Rejected);
+		// 10-29 확인: Startup 을 줬지만 거부했으면 '빔' 이라 적지 않는다 (기록 '… (처음 Play) (시작 두뇌 '…' 거부)')
+		P.Why = P.bStartupRejected ? FString::Printf(TEXT("%s (처음 Play)%s"), *Def->OriginText(), *Rejected)
+								   : FString::Printf(TEXT("%s (처음 Play — eco.V3Brain.Startup 빔)"), *Def->OriginText());
 		return P;
 	}
 	P.Why = FString::Printf(TEXT("지금 두뇌 그대로 %s (이 프로세스에서 이미 두뇌를 걸었다 — 기본으로 돌리려면 eco.V3Brain.Startup default)%s"), *Will.Id, *Rejected);
