@@ -3,9 +3,14 @@
 // 보기만 바꾼다 — 사슴·늑대·먹이·난수·Mass 조각·플레이어 폰에 쓰지 않는다 (Mass 읽기도 지연 명령을 비우지 않는다). 로컬 플레이어 화면마다 따로 돈다(단독·리슨 서버·클라이언트, 데디케이티드 서버는 없음).
 // 다만 보는 자리(PlayerController view point)를 옮기므로, 그 자리를 읽는 엔진·팀 코드는 플레이어가 카메라를 옮길 때처럼 따라 바뀐다:
 // 팀 종 AI 결정 간격 단계(EcoSpeciesAIInputProcessor — 통합 v3 Native 세계는 읽지 않는다)·표현 액터 예산·복제 관련도·World Partition 스트리밍 원천.
-// 관찰 중(1~5 모드)에는 로컬 플레이어 컨트롤러의 이동 입력만 막는다 (10-27 사용자 결정 — 안 보이는 폰이 WASD 로 걸어 발소리 Player.Footstep 를 사슴이 듣지 않게).
-//   이동 무시 수(AController::SetIgnoreMoveInput — 쌓인다)를 하나 더하고, 원래 카메라(0)·eco.Cam.Enable 0·eco.Cam.BlockMove 0·월드 닫기에서 그 하나만 뺀다.
+// 관찰 중(1~5 모드와 자유 카메라)에는 로컬 플레이어 컨트롤러의 이동 입력만 막는다 (10-27 사용자 결정 — 안 보이는 폰이 WASD 로 걸어 발소리 Player.Footstep 를 사슴이 듣지 않게).
+//   이동 무시 수(AController::SetIgnoreMoveInput — 쌓인다)를 하나 더하고, 원래 카메라(자유 카메라에서 0·eco.Cam.Player)·eco.Cam.Enable 0·eco.Cam.BlockMove 0·월드 닫기에서 그 하나만 뺀다.
 //   폰 자체(자리·속도·부품)에는 쓰지 않는다 — 누르던 중이면 폰의 제동으로 멈춘다. 시야(마우스)·점프·F(플레이어 치기)·Shift·Ctrl 은 그대로.
+// 자유 카메라 (10-29 사용자 '1·2 로 따라가다 0 을 누르면 그 자리에서 추적이 풀려 바로 직접 움직이게'): 관찰 중(1~5) 0 = 지금 카메라 자리·방향 그대로 추적을 푼다.
+//   W A S D (방향키도) = 보는 방향 기준 앞뒤(숙임 포함)·옆, Q·E = 아래·위(세계 위), 마우스 = 시야(컨트롤러 방향이 바뀐 만큼 — 컨트롤러 방향에는 쓰지 않는다),
+//   Shift = 4 배 빠르게, - = 휠 = 이동 속도. 폰은 그대로 서 있고 이동 입력 막기도 그대로다 (WASD 가 폰을 걷게 하지 않는다). 땅 2 m 위 밑으로 가지 않는다.
+//   자유 카메라에서 0 을 한 번 더 = 원래 카메라(폰). 1~5 = 그 자리에서 다시 그 모드 (화면 가운데 가까운 대상 — EcoV3Observe::CenterSubject, 없으면 지금 규칙).
+//   Q·E 는 팀·기본 입력이 쓰지 않는다 (Space = 점프·Ctrl = 살금살금은 팀 키라 위아래로 쓰지 않았다). Shift·WASD·방향키는 자유 카메라에서만 누른 채로 읽는다.
 // 촬영 감독(-EcoV3Film=)이 도는 실행에는 만들지 않는다 — 촬영 카메라와 보기 대상을 다투지 않고, 촬영 프레임(-EcoV3FilmUI 포함)이 전과 같다.
 //   1. 카메라 액터 하나를 띄워 첫 로컬 플레이어 컨트롤러의 보기 대상으로 삼는다. 0 (eco.Cam.Player) 이면 원래 폰으로 돌려준다.
 //   2. 대상 찾기 = EcoV3Observe::Gather: 논리 Mass 개체(통합 개체 꼬리표)를 읽는다 — 팀 표현 액터는 보는 자리 200 m 안 가까운 64 마리에게만
@@ -27,8 +32,10 @@
 // 팀 키 Tab·R·M·[ ]·마우스 가운데(JYU 검사 HUD·무리 이주 판), F·Shift·Ctrl(플레이어), WASD·Space·방향키(기본 입력)와 겹치지 않게 골랐다 — EcoV3Observe::Keys):
 //   1 늑대 시점(뒤에서 따라감, 다시 누르면 다음 늑대)  2 사슴 시점(다시 누르면 다음 사슴)  3 탑뷰(대상 위, 대상 없으면 지역 무대 전체)
 //   4 쿼터뷰(대상 기준 45° 사선)  5 자동 추적(쫓기는 사슴·사냥 중인 늑대 — 사건이 끝나면 다음)  , . 이전·다음 대상  - = 또는 휠 줌
-//   G 지역 바꾸기  0 원래 카메라  H 단축키 목록 숨기기/보이기
-// 콘솔 (시험·촬영용): eco.Cam.Wolf [id] · Deer [id] · Top · Quarter · Auto · Next · Prev · Zoom <m> · Region <이름> · Player · Help,
+//   G 지역 바꾸기(자유 카메라면 그 지역 무대 전체가 보이는 자리로)  0 관찰 중 = 그 자리에서 추적 풀기(자유 카메라), 자유 카메라 = 원래 카메라로
+//   (원래 카메라일 때 0 은 아무 일 없음)  H 단축키 목록 숨기기/보이기
+// 콘솔 (시험·촬영용): eco.Cam.Wolf [id] · Deer [id] · Top · Quarter · Auto · Next · Prev · Zoom <m> · Region <이름> · Player(바로 폰으로) · Help,
+//   Free (지금 보는 자리에서 자유 카메라 — 원래 카메라에서도) · Speed <m/s> (자유 카메라 이동 속도) · Status (지금 상태 한 줄),
 //   콘솔 변수 eco.Cam.Enable (기본 1 — 0 이면 키·화면 글을 끄고 원래 카메라로), eco.Cam.HudScale (기본 1, 화면 글 배율),
 //   eco.Cam.BlockMove (기본 1 — 관찰 중 플레이어 이동 입력 막기, 0 이면 막지 않는다).
 // 문서: AdaptiveEcosystem/Docs/RL_Policy/OBSERVER_CAMERA.md
@@ -42,6 +49,7 @@
 #include "InputCoreTypes.h"
 #include "Math/Box2D.h"
 #include "Subsystems/WorldSubsystem.h"
+#include "Templates/Function.h"
 
 #include "EcoV3ObserverCamera.generated.h"
 
@@ -218,7 +226,49 @@ namespace EcoV3Observe
 	/** 팀 HERD MIGRATION 판 자리 (EcoHerdMigrationDebug::Draw 와 같은 셈 — 너비 화면 32% 를 300~430 으로, 오른쪽 16 px, 위 16 px, 높이 376). */
 	ADAPTIVEECOSYSTEM_API FBox2D TeamMigrationPanelRect(const FVector2D& Canvas);
 
-	/** 단축키 동작. */
+	/**
+	 * 화면 가운데 대상 (자유 카메라에서 1~5 — 10-29): Eye 에서 Forward 쪽 MaxAngleDeg 안·MaxRangeCm 안의 산 개체 가운데 보는 방향과의 각이 가장 작은 것
+	 * (같으면 가까운 것, 그다음 id 작은 것). Species: −1 아무 종, 0 사슴, 1 늑대. 없으면 INDEX_NONE.
+	 */
+	ADAPTIVEECOSYSTEM_API int32 CenterSubject(TConstArrayView<FSubject> Subjects, int32 Species, const FVector& Eye, const FVector& Forward, double MaxAngleDeg,
+											  double MaxRangeCm);
+	/** 자유 카메라에서 1~5 를 누를 때 화면 가운데 대상으로 보는 원뿔 (반각 20°, 300 m). 밖이면 지금 규칙(보는 자리 곁)으로 고른다. */
+	inline constexpr double kCenterPickDeg = 20.0;
+	inline constexpr double kCenterPickCm = 30000.0;
+
+	/** 자유 카메라 (10-29). 속도는 cm/s. */
+	inline constexpr double kFreeDefaultSpeedCm = 1200.0;   // 12 m/s (늑대 돌진 9 m/s 보다 조금 빠르게)
+	inline constexpr double kFreeMinSpeedCm = 100.0;
+	inline constexpr double kFreeMaxSpeedCm = 15000.0;
+	inline constexpr double kFreeFastMul = 4.0;              // Shift
+	inline constexpr double kFreeSpeedStep = 1.2;            // - = 휠 한 번 (줌과 같은 배)
+	inline constexpr double kFreeAccelSmooth = 0.12;         // 바라는 속도에 다가가는 시간 상수 (초) — 넘침 없이 부드럽게 서고 출발한다
+	inline constexpr double kFreePitchLimit = 89.0;
+	inline constexpr double kFreeLookJumpDeg = 90.0;         // 컨트롤러 방향이 한 프레임에 이보다 크게 바뀌면 마우스가 아니다 (폰 다시 잡기 등) — 시야에 더하지 않는다
+	/** 자유 카메라 조작 키 하나: 누르고 있으면 Axis(앞, 오른쪽, 위)를 더한다. */
+	struct FFreeKey
+	{
+		FKey Key;
+		FVector Axis;
+	};
+	/** 자유 카메라 이동 키 (W A S D·방향키 = 앞뒤·옆, E·Q = 위·아래). 모드가 자유 카메라일 때만 누른 채로 읽는다 (그때는 폰 이동 입력이 막혀 있다). */
+	ADAPTIVEECOSYSTEM_API TConstArrayView<FFreeKey> FreeMoveKeys();
+	/** 자유 카메라 빠르게 키 (왼·오른 Shift). */
+	ADAPTIVEECOSYSTEM_API TConstArrayView<FKey> FreeFastKeys();
+	/** 누른 키로 (앞, 오른쪽, 위) 입력 — 칸마다 −1~1 (반대 키를 같이 누르면 0). */
+	ADAPTIVEECOSYSTEM_API FVector FreeMoveInput(TFunctionRef<bool(const FKey&)> IsDown);
+	/**
+	 * 자유 카메라 한 프레임: 앞뒤 = 보는 방향(숙임 포함), 옆 = 보는 방향의 가로 오른쪽, 위아래 = 세계 위. 입력 길이가 1 을 넘으면 1 로 줄인다 (사선도 같은 속도).
+	 * 속도는 임계 감쇠(SmoothDampVector, kFreeAccelSmooth)로 입력 × SpeedCm 에 다가가고(넘침 없음 — 키를 떼면 부드럽게 선다), 자리는 속도 × 시간만큼 간다.
+	 */
+	ADAPTIVEECOSYSTEM_API void FreeFlyStep(FVector& Location, FVector& Velocity, const FRotator& View, const FVector& Input, double SpeedCm, double DeltaSeconds);
+	/**
+	 * 자유 카메라 마우스 시야: 컨트롤러 방향(마우스가 돌리는 것)이 Prev → Now 로 바뀐 만큼(짧은 쪽) 방위·숙임에 더한다. 숙임은 ±kFreePitchLimit.
+	 * 컨트롤러 방향을 쓰지 않고 바뀐 양만 읽는다 — 폰·컨트롤러에는 손대지 않는다.
+	 */
+	ADAPTIVEECOSYSTEM_API void FreeLookStep(double& YawDeg, double& PitchDeg, const FRotator& PrevControl, const FRotator& NowControl);
+
+	/** 단축키 동작. Player = 키 0 (관찰 중이면 자유 카메라, 자유 카메라면 원래 카메라, 원래 카메라면 아무 일 없음). */
 	enum class EAction : uint8
 	{
 		Wolf, Deer, Top, Quarter, Auto, Player, Prev, Next, ZoomOut, ZoomIn, Region, Help
@@ -244,7 +294,8 @@ enum class EEcoV3CamMode : uint8
 	Deer,      // 사슴 시점 (뒤에서 따라감)
 	Top,       // 탑뷰 (대상 위, 없으면 무대 전체)
 	Quarter,   // 쿼터뷰 (45° 사선)
-	Auto       // 자동 추적
+	Auto,      // 자동 추적
+	Free       // 자유 카메라 (10-29 — 관찰 중 0: 그 자리에서 추적을 풀고 W A S D·Q E·마우스로 직접 움직인다, 폰 이동 막기는 그대로)
 };
 
 /** 관찰 카메라 (로컬 보기만 — 헤더 머리말). */
@@ -264,8 +315,25 @@ public:
 	static const TCHAR* ModeNameKo(EEcoV3CamMode InMode);
 
 	// ---- 동작 (단축키·콘솔이 부른다) ----
-	/** 모드 바꾸기. ExplicitId > 0 이면 그 개체(종이 맞아야)를 대상으로. 늑대·사슴 모드에서 같은 모드를 다시 고르면 다음 개체. */
+	/** 단축키 하나의 동작 (HandleKeys 가 키마다 부른다 — 시험도 같은 길로 부른다). */
+	void DoAction(EcoV3Observe::EAction Action);
+	/**
+	 * 모드 바꾸기. ExplicitId > 0 이면 그 개체(종이 맞아야)를 대상으로. 늑대·사슴 모드에서 같은 모드를 다시 고르면 다음 개체.
+	 * Player = 바로 원래 카메라(eco.Cam.Player), Free = EnterFree. 자유 카메라에서 1~5 는 화면 가운데 대상을 먼저 보고, 카메라가 그 자리에서 부드럽게 옮겨 간다.
+	 */
 	void SetMode(EEcoV3CamMode NewMode, int64 ExplicitId = 0);
+	/**
+	 * 자유 카메라로 (관찰 중 0·eco.Cam.Free): 지금 화면의 카메라 자리·방향 그대로 추적을 푼다. 원래 카메라에서 부르면 지금 보는 자리(폰 카메라)에서 시작한다.
+	 * 폰 이동 입력 막기는 그대로(원래 카메라에서 부르면 새로 막는다). 이미 자유 카메라면 아무 일 없음.
+	 */
+	void EnterFree(const TCHAR* Why);
+	/** 자유 카메라 이동 속도 (m/s, 1~150). */
+	void SetFreeSpeed(double MetersPerSecond);
+	/** 자유 카메라 자리·방향 (시험 — 자유 카메라가 아니면 쓰지 않는다). */
+	void SetFreePose(const FVector& Location, const FRotator& Rotation);
+	double GetFreeSpeedCm() const { return FreeSpeedCm; }
+	FVector GetFreeLocation() const { return FreeLoc; }
+	FRotator GetFreeRotation() const { return FRotator(FreePitch, FreeYaw, 0.0); }
 	/** 이전·다음 대상 (자동 추적이면 다음 사건). */
 	void StepSubject(int32 Dir);
 	/** 줌 배율 곱 (> 1 = 멀리). */
@@ -280,7 +348,7 @@ public:
 	FString DescribeStatus() const;
 	/**
 	 * 관찰 중 플레이어 이동 입력 막기를 맞춘다 (10-27 사용자 결정 — 안 보이는 폰이 걸어 발소리 Player.Footstep 를 사슴이 듣지 않게).
-	 * 바라는 상태 = PC 가 있고 관찰 중(1~5 모드)이며 eco.Cam.Enable·eco.Cam.BlockMove 가 켜짐. 막을 때 PC 의 이동 무시 수(AController::SetIgnoreMoveInput
+	 * 바라는 상태 = PC 가 있고 관찰 중(1~5 모드·자유 카메라)이며 eco.Cam.Enable·eco.Cam.BlockMove 가 켜짐. 막을 때 PC 의 이동 무시 수(AController::SetIgnoreMoveInput
 	 * — 쌓인다)를 하나 더하고, 풀 때 우리가 더한 하나만 뺀다 (팀·엔진이 건 막기는 그대로). PC 가 바뀌면 전 PC 를 먼저 풀고, 엔진이 수를 지웠으면
 	 * (폰 다시 시작 — APlayerController::ClientRestart 의 ResetIgnoreInputFlags) 다시 건다. 시야(마우스) 입력은 건드리지 않는다.
 	 * Tick 이 매 프레임 로컬 플레이어 컨트롤러로 부르고(없으면 nullptr — 막아 둔 것을 푼다), 카메라를 켤 때도 바로 부른다. 시험은 직접 부른다.
@@ -302,7 +370,16 @@ protected:
 private:
 	APlayerController* LocalPlayerController() const;
 	void HandleKeys(APlayerController& PC);
-	void DoAction(EcoV3Observe::EAction Action);
+	/** 따라가기 모드(1~5)인가 (원래 카메라·자유 카메라가 아님). */
+	bool IsFollowing() const { return Mode != EEcoV3CamMode::Player && Mode != EEcoV3CamMode::Free; }
+	/** 자유 카메라 한 프레임 (키·마우스 → 자리·방향, 땅 위로). */
+	void UpdateFreeCamera(double Dt, APlayerController& PC);
+	/** 자유 카메라를 그 지역 무대 전체가 보이는 자리로 (G·eco.Cam.Region). */
+	void MoveFreeToRegion(const EcoV3Observe::FRegionInfo& R);
+	/** 자유 카메라 화면 가운데 점: 보는 방향 500 m 안 처음 닿는 보이는 WorldStatic 물체, 없으면 카메라 자리. */
+	FVector FreeViewCenter() const;
+	/** 자유 카메라에서 따라가기로: 카메라가 지금 자유 카메라 자리에서 출발하도록 따라가기 상태를 맞춘다 (끊어 옮기지 않는다). */
+	void FollowFromFree(const FVector& TargetPoint);
 	/** 개체·지역 다시 읽기. */
 	void Refresh();
 	/** 대상이 없어졌거나 죽었거나(사건 끝) 자동 추적 차례면 다음 대상으로. */
@@ -360,6 +437,17 @@ private:
 	TArray<TWeakObjectPtr<UPrimitiveComponent>> HiddenOccluders;      // 지금 이 화면에서 숨긴 것 (PC->HiddenPrimitiveComponents 에 우리가 넣은 것만)
 	double NextOccluderScan = 0.0;
 	double LastGroundZ = 0.0;
+
+	// 자유 카메라 (10-29)
+	FVector FreeLoc = FVector::ZeroVector;
+	FVector FreeVel = FVector::ZeroVector;
+	double FreeYaw = 0.0;
+	double FreePitch = 0.0;
+	double FreeSpeedCm = EcoV3Observe::kFreeDefaultSpeedCm;
+	bool bFreeFast = false;             // 이 프레임 Shift (화면 글)
+	bool bFreeGround = false;           // 이 프레임 자유 카메라 밑에 땅을 찾았다 (LastGroundZ — 화면 글 '땅에서 n m')
+	FRotator LastControlRot = FRotator::ZeroRotator;   // 지난 프레임 컨트롤러 방향 (마우스 시야 = 바뀐 양)
+	bool bHasLastControl = false;
 
 	// 화면 글
 	bool bShowKeys = true;

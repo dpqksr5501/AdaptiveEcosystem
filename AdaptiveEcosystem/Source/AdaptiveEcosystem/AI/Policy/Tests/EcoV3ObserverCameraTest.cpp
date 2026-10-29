@@ -10,6 +10,9 @@
 //     클라이언트 표본이 없는 개체는 빼고 표본이 있으면 그 자리. 서브시스템 흐름(로컬 플레이어 없이): 1·1·, .·2·3·지역·5·0.
 //   - 관찰 중 플레이어 이동 입력 막기(10-27 사용자 결정): 원래 카메라 = 안 막음, 1~5 = 막음(폰 이동 입력이 0), 다시 맞춰도 한 번만 더함,
 //     엔진이 지우면(ResetIgnoreInputFlags) 다시 막음, eco.Cam.BlockMove 0 = 풀림, 0 = 풀림, 팀이 건 막기는 남김, 컨트롤러가 바뀌면 전 것을 풂.
+//   - 자유 카메라(10-29 사용자 '0 을 누르면 그 자리에서 추적이 풀려 바로 직접 움직이게'): 키 입력(W A S D·방향키·Q E), 한 프레임 이동(보는 방향 앞뒤·가로 옆·
+//     세계 위, 넘침 없음·부드럽게 섬), 마우스 시야(컨트롤러 방향이 바뀐 양), 화면 가운데 대상, 서브시스템 흐름(1 → 0 자유 카메라(막기 그대로) → 2 화면 가운데 사슴
+//     → 0 → 0 원래 카메라(풀림) → 0 아무 일 없음 → eco.Cam.Free → 1 화면 가운데 늑대 → G 지역 → 2, 속도 - =).
 // 문서: AdaptiveEcosystem/Docs/RL_Policy/OBSERVER_CAMERA.md
 
 #include "Misc/AutomationTest.h"
@@ -186,9 +189,43 @@ bool FEcoV3ObserverCameraKeysTest::RunTest(const FString& Parameters)
 	// 6. 콘솔 명령·변수가 있다
 	for (const TCHAR* Name : {TEXT("eco.Cam.Wolf"), TEXT("eco.Cam.Deer"), TEXT("eco.Cam.Top"), TEXT("eco.Cam.Quarter"), TEXT("eco.Cam.Auto"),
 							  TEXT("eco.Cam.Next"), TEXT("eco.Cam.Prev"), TEXT("eco.Cam.Zoom"), TEXT("eco.Cam.Region"), TEXT("eco.Cam.Player"),
-							  TEXT("eco.Cam.Help"), TEXT("eco.Cam.Enable"), TEXT("eco.Cam.HudScale"), TEXT("eco.Cam.BlockMove")})
+							  TEXT("eco.Cam.Help"), TEXT("eco.Cam.Enable"), TEXT("eco.Cam.HudScale"), TEXT("eco.Cam.BlockMove"), TEXT("eco.Cam.Free"),
+							  TEXT("eco.Cam.Speed"), TEXT("eco.Cam.Status")})
 	{
 		TestNotNull(*FString::Printf(TEXT("콘솔 %s"), Name), IConsoleManager::Get().FindConsoleObject(Name));
+	}
+	// 7. 자유 카메라 키 (10-29): 위아래 Q·E 는 팀·기본 입력 키도 단축키도 아니다 (Space = 점프·Ctrl = 살금살금은 팀 키라 쓰지 않았다).
+	//    W A S D·방향키·Shift 는 팀 키지만 자유 카메라에서만 누른 채로 읽는다 (그때는 폰 이동 입력이 막혀 있다)
+	for (const FKey& Key : {EKeys::Q, EKeys::E})
+	{
+		TestFalse(FString::Printf(TEXT("자유 카메라 %s 는 팀·기본 입력 키가 아니다"), *Key.ToString()), Reserved.Contains(Key));
+		TestEqual(*FString::Printf(TEXT("자유 카메라 %s 는 단축키가 아니다"), *Key.ToString()), ActionOf(Key), -1);
+	}
+	auto FreeAxisOf = [](const FKey& Key) -> FVector
+	{
+		for (const EcoV3Observe::FFreeKey& K : EcoV3Observe::FreeMoveKeys())
+		{
+			if (K.Key == Key)
+			{
+				return K.Axis;
+			}
+		}
+		return FVector(99.0);
+	};
+	TestEqual(TEXT("W = 앞"), FreeAxisOf(EKeys::W), FVector(1.0, 0.0, 0.0));
+	TestEqual(TEXT("S = 뒤"), FreeAxisOf(EKeys::S), FVector(-1.0, 0.0, 0.0));
+	TestEqual(TEXT("D = 오른쪽"), FreeAxisOf(EKeys::D), FVector(0.0, 1.0, 0.0));
+	TestEqual(TEXT("A = 왼쪽"), FreeAxisOf(EKeys::A), FVector(0.0, -1.0, 0.0));
+	TestEqual(TEXT("E = 위"), FreeAxisOf(EKeys::E), FVector(0.0, 0.0, 1.0));
+	TestEqual(TEXT("Q = 아래"), FreeAxisOf(EKeys::Q), FVector(0.0, 0.0, -1.0));
+	TestTrue(TEXT("Shift = 빠르게"), EcoV3Observe::FreeFastKeys().Contains(EKeys::LeftShift));
+	for (const FKey& Key : {EKeys::SpaceBar, EKeys::LeftControl, EKeys::F})
+	{
+		TestEqual(*FString::Printf(TEXT("%s (팀 점프·살금살금·치기) 는 자유 카메라 이동 키가 아니다"), *Key.ToString()), FreeAxisOf(Key), FVector(99.0));
+	}
+	for (const TCHAR* Token : {TEXT("자유 카메라"), TEXT("W A S D"), TEXT("Q E"), TEXT("Shift"), TEXT("마우스"), TEXT("다시 0")})
+	{
+		TestTrue(FString::Printf(TEXT("단축키 줄에 '%s' 가 있다"), Token), Joined.Contains(Token));
 	}
 	return true;
 }
@@ -942,6 +979,278 @@ bool FEcoV3ObserverCameraMoveBlockTest::RunTest(const FString& Parameters)
 		TestFalse(TEXT("컨트롤러 없음 = 새 컨트롤러도 풀림"), PC2->IsMoveInputIgnored());
 		Cam->SetMode(EEcoV3CamMode::Player);
 	}
+	BlockVar->Set(SavedBlock, ECVF_SetByCode);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 자유 카메라 (10-29 사용자 — 관찰 중 0: 그 자리에서 추적 풀기, 자유 카메라에서 다시 0: 플레이어로)
+// -----------------------------------------------------------------------------
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3ObserverCameraFreeTest, "AdaptiveEcosystem.Policy.V3.ObserverCamera.FreeCamera",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3ObserverCameraFreeTest::RunTest(const FString& Parameters)
+{
+	using EcoV3Observe::EAction;
+	using EcoV3Observe::EState;
+	using EcoV3Observe::FSubject;
+	using EcoV3ObserverCameraTestImpl::MakeSubject;
+	constexpr double Dt = 1.0 / 30.0;
+	constexpr double Speed = EcoV3Observe::kFreeDefaultSpeedCm;
+
+	// 1. 키 입력 (앞, 오른쪽, 위)
+	auto InputOf = [](std::initializer_list<FKey> Down) -> FVector
+	{
+		TArray<FKey> Held(Down);
+		return EcoV3Observe::FreeMoveInput([&Held](const FKey& K) { return Held.Contains(K); });
+	};
+	TestEqual(TEXT("아무 키도 없음 = 0"), InputOf({}), FVector::ZeroVector);
+	TestEqual(TEXT("W = 앞"), InputOf({EKeys::W}), FVector(1.0, 0.0, 0.0));
+	TestEqual(TEXT("W + S = 0"), InputOf({EKeys::W, EKeys::S}), FVector::ZeroVector);
+	TestEqual(TEXT("W + 위 방향키 = 앞 1"), InputOf({EKeys::W, EKeys::Up}), FVector(1.0, 0.0, 0.0));
+	TestEqual(TEXT("D + E = 오른쪽 위"), InputOf({EKeys::D, EKeys::E}), FVector(0.0, 1.0, 1.0));
+	TestEqual(TEXT("A + Q = 왼쪽 아래"), InputOf({EKeys::A, EKeys::Q}), FVector(0.0, -1.0, -1.0));
+	TestEqual(TEXT("Space·Ctrl 은 움직이지 않는다"), InputOf({EKeys::SpaceBar, EKeys::LeftControl}), FVector::ZeroVector);
+
+	// 2. 한 프레임 이동: 앞 = 보는 방향(숙임 포함), 바라는 속도에 넘침 없이 다가가고, 떼면 부드럽게 선다
+	{
+		const FRotator View(-30.0, 90.0, 0.0);
+		FVector Loc = FVector::ZeroVector, Vel = FVector::ZeroVector;
+		double MaxSpeed = 0.0;
+		for (int32 i = 0; i < 60; ++i)   // 2 초
+		{
+			EcoV3Observe::FreeFlyStep(Loc, Vel, View, FVector(1.0, 0.0, 0.0), Speed, Dt);
+			MaxSpeed = FMath::Max(MaxSpeed, Vel.Size());
+		}
+		TestTrue(TEXT("넘침 없음 (속도 ≤ 바라는 속도)"), MaxSpeed <= Speed + 1.0e-6);
+		TestEqual(TEXT("2 초 뒤 바라는 속도"), Vel.Size(), Speed, Speed * 0.01);
+		TestTrue(TEXT("보는 방향(숙임 포함)으로 간다"), FVector::DotProduct(Loc.GetSafeNormal(), View.Vector()) > 0.9999);
+		// 지수 다가가기: 간 거리 ≈ 속도 × (2 − 시간 상수)
+		TestEqual(TEXT("2 초에 간 거리"), Loc.Size(), Speed * (2.0 - EcoV3Observe::kFreeAccelSmooth), Speed * 0.05);
+		const FVector Before = Loc;
+		bool bNoBack = true;
+		for (int32 i = 0; i < 30; ++i)   // 1 초 떼기
+		{
+			const FVector Prev = Loc;
+			EcoV3Observe::FreeFlyStep(Loc, Vel, View, FVector::ZeroVector, Speed, Dt);
+			bNoBack = bNoBack && FVector::DotProduct(Loc - Prev, View.Vector()) >= -1.0e-9;
+		}
+		TestTrue(TEXT("떼면 뒤로 가지 않는다"), bNoBack);
+		TestTrue(TEXT("1 초 뒤 선다 (속도 0)"), Vel.IsZero());
+		TestEqual(TEXT("서는 동안 간 거리 ≈ 속도 × 시간 상수"), (Loc - Before).Size(), Speed * EcoV3Observe::kFreeAccelSmooth, Speed * 0.02);
+	}
+	{
+		// 옆 = 보는 방향의 가로 오른쪽 (숙여도 땅과 나란히), 위 = 세계 위, 사선도 같은 속도, 0 프레임 그대로, 1 초 프레임에도 넘치지 않음
+		FVector Loc = FVector::ZeroVector, Vel = FVector::ZeroVector;
+		const FRotator Down(-60.0, 0.0, 0.0);
+		for (int32 i = 0; i < 60; ++i)
+		{
+			EcoV3Observe::FreeFlyStep(Loc, Vel, Down, FVector(0.0, 1.0, 0.0), Speed, Dt);
+		}
+		TestTrue(TEXT("D = 가로 오른쪽 (+Y, 높이 그대로)"), Vel.GetSafeNormal().Equals(FVector(0.0, 1.0, 0.0), 1.0e-6) && FMath::Abs(Loc.Z) < 1.0e-6);
+		Loc = Vel = FVector::ZeroVector;
+		for (int32 i = 0; i < 60; ++i)
+		{
+			EcoV3Observe::FreeFlyStep(Loc, Vel, Down, FVector(0.0, 0.0, 1.0), Speed, Dt);
+		}
+		TestTrue(TEXT("E = 세계 위"), Vel.GetSafeNormal().Equals(FVector::UpVector, 1.0e-6));
+		Loc = Vel = FVector::ZeroVector;
+		for (int32 i = 0; i < 60; ++i)
+		{
+			EcoV3Observe::FreeFlyStep(Loc, Vel, FRotator(-30.0, 0.0, 0.0), FVector(1.0, 1.0, 1.0), Speed, Dt);
+		}
+		TestTrue(TEXT("세 키를 같이 눌러도 바라는 속도를 넘지 않는다"), Vel.Size() <= Speed + 1.0e-6);
+		const FVector Held = Loc;
+		EcoV3Observe::FreeFlyStep(Loc, Vel, Down, FVector(1.0, 0.0, 0.0), Speed, 0.0);
+		TestEqual(TEXT("0 프레임 = 그대로"), Loc, Held);
+		Vel = FVector::ZeroVector;
+		EcoV3Observe::FreeFlyStep(Loc, Vel, Down, FVector(1.0, 0.0, 0.0), Speed, 1.0);
+		TestTrue(TEXT("1 초 프레임에도 넘치지 않는다"), Vel.Size() <= Speed + 1.0e-6);
+	}
+
+	// 3. 마우스 시야: 컨트롤러 방향이 바뀐 양만 (짧은 쪽), 숙임은 ±89°
+	{
+		double Yaw = 10.0, Pitch = -20.0;
+		EcoV3Observe::FreeLookStep(Yaw, Pitch, FRotator(0.0, 359.0, 0.0), FRotator(0.0, 1.0, 0.0));
+		TestEqual(TEXT("방위 359 → 1 = +2°"), Yaw, 12.0, 1.0e-9);
+		EcoV3Observe::FreeLookStep(Yaw, Pitch, FRotator(350.0, 0.0, 0.0), FRotator(340.0, 0.0, 0.0));
+		TestEqual(TEXT("숙임 350(−10) → 340(−20) = −10°"), Pitch, -30.0, 1.0e-9);
+		Pitch = 85.0;
+		EcoV3Observe::FreeLookStep(Yaw, Pitch, FRotator(0.0, 0.0, 0.0), FRotator(10.0, 0.0, 0.0));
+		TestEqual(TEXT("숙임은 89° 까지"), Pitch, EcoV3Observe::kFreePitchLimit, 1.0e-9);
+		EcoV3Observe::FreeLookStep(Yaw, Pitch, FRotator(10.0, 30.0, 0.0), FRotator(10.0, 30.0, 0.0));
+		TestEqual(TEXT("컨트롤러가 그대로면 시야도 그대로"), Yaw, 12.0, 1.0e-9);
+		EcoV3Observe::FreeLookStep(Yaw, Pitch, FRotator(0.0, 0.0, 0.0), FRotator(0.0, 170.0, 0.0));
+		TestEqual(TEXT("한 프레임에 90° 넘게 바뀌면 (폰 다시 잡기) 돌리지 않는다"), Yaw, 12.0, 1.0e-9);
+	}
+
+	// 4. 화면 가운데 대상: 원뿔(20°·300 m) 안에서 각이 가장 작은 것, 같으면 가까운 것. 죽은 개체·뒤·밖은 뺀다
+	{
+		const FName A(TEXT("A"));
+		const TArray<FSubject> List = {
+			MakeSubject(11, false, A, 10000.0, 300.0, EState::Eat),     // 사슴 1.7°
+			MakeSubject(12, false, A, 5000.0, 1000.0, EState::Eat),     // 사슴 11.3°
+			MakeSubject(13, true, A, 3000.0, 0.0, EState::Roam),        // 늑대 0°
+			MakeSubject(14, false, A, -5000.0, 0.0, EState::Eat),       // 뒤
+			MakeSubject(15, false, A, 8000.0, 0.0, EState::Eat, false), // 죽음 (0°)
+			MakeSubject(16, false, A, 40000.0, 0.0, EState::Eat),       // 400 m — 밖
+			MakeSubject(17, false, A, 2000.0, 2000.0, EState::Eat),     // 45° — 밖
+			MakeSubject(18, false, A, 20000.0, 600.0, EState::Eat),     // 사슴 1.7° — 11 과 같은 쪽, 더 멂
+		};
+		// 눈 높이 = 개체 몸 가운데 높이 (Location + 1 m)
+		const FVector Eye(0.0, 0.0, 100.0);
+		using EcoV3ObserverCameraTestImpl::IdAt;
+		TestEqual(TEXT("사슴 = 가운데에 가장 가까운 산 사슴 (같은 쪽이면 가까운 것)"),
+				  IdAt(List, EcoV3Observe::CenterSubject(List, 0, Eye, FVector::ForwardVector, 20.0, 30000.0)), static_cast<int64>(11));
+		TestEqual(TEXT("늑대"), IdAt(List, EcoV3Observe::CenterSubject(List, 1, Eye, FVector::ForwardVector, 20.0, 30000.0)), static_cast<int64>(13));
+		TestEqual(TEXT("아무 종"), IdAt(List, EcoV3Observe::CenterSubject(List, -1, Eye, FVector::ForwardVector, 20.0, 30000.0)), static_cast<int64>(13));
+		TestEqual(TEXT("원뿔 밖이면 없음"), EcoV3Observe::CenterSubject(List, 0, Eye, FVector(0.0, -1.0, 0.0), 20.0, 30000.0), static_cast<int32>(INDEX_NONE));
+		TestEqual(TEXT("방향 0 이면 없음"), EcoV3Observe::CenterSubject(List, 0, Eye, FVector::ZeroVector, 20.0, 30000.0), static_cast<int32>(INDEX_NONE));
+	}
+
+	// 5. 서브시스템 흐름 (로컬 플레이어가 없어 카메라 액터·보기 대상은 건드리지 않는다 — 모드·대상·막기만 본다)
+	EcoTest::FScopedTestWorld Scoped;
+	if (!TestNotNull(TEXT("테스트 월드"), Scoped.World))
+	{
+		return false;
+	}
+	UWorld& World = *Scoped.World;
+	UMassEntitySubsystem* MassSub = World.GetSubsystem<UMassEntitySubsystem>();
+	UEcoV3ObserverCameraSubsystem* Cam = World.GetSubsystem<UEcoV3ObserverCameraSubsystem>();
+	IConsoleVariable* BlockVar = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Cam.BlockMove"));
+	if (!TestNotNull(TEXT("UMassEntitySubsystem"), MassSub) || !TestNotNull(TEXT("관찰 카메라 서브시스템"), Cam)
+		|| !TestNotNull(TEXT("eco.Cam.BlockMove"), BlockVar))
+	{
+		return false;
+	}
+	const int32 SavedBlock = BlockVar->GetInt();
+	BlockVar->Set(1, ECVF_SetByCode);
+	FMassEntityManager& EM = MassSub->GetMutableEntityManager();
+	const FMassArchetypeHandle Arch = EM.CreateArchetype({
+		FEcoIntegratedCreatureTag::StaticStruct(),
+		FEcoIdentityFragment::StaticStruct(),
+		FEcoRegionFragment::StaticStruct(),
+		FTransformFragment::StaticStruct(),
+		FEcoCreaturePresentationFragment::StaticStruct(),
+	});
+	auto Spawn = [&EM, &Arch](int64 Id, const TCHAR* Species, const TCHAR* RegionId, const FVector& At)
+	{
+		const FMassEntityHandle E = EM.CreateEntity(Arch);
+		FEcoIdentityFragment& Ident = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
+		Ident.StableAgentId = Id;
+		Ident.SpeciesId = FName(Species);
+		EM.GetFragmentDataChecked<FEcoRegionFragment>(E).CurrentRegionId = FName(RegionId);
+		EM.GetFragmentDataChecked<FTransformFragment>(E).GetMutableTransform().SetLocation(At);
+		FEcoCreaturePresentationFragment& Pres = EM.GetFragmentDataChecked<FEcoCreaturePresentationFragment>(E);
+		Pres.Flags = 1;   // 살아 있음
+		Pres.Activity = static_cast<uint8>(EEcoSpeciesActivity::Hold);
+	};
+	constexpr int64 kWolf1 = 601, kWolf2 = 602, kDeer1 = 701, kDeer2 = 702, kDeerB = 703;
+	Spawn(kWolf1, TEXT("Wolf"), TEXT("A"), FVector(1000.0, 0.0, 0.0));
+	Spawn(kWolf2, TEXT("Wolf"), TEXT("A"), FVector(3000.0, 2000.0, 0.0));
+	Spawn(kDeer1, TEXT("Herbivore"), TEXT("A"), FVector(2000.0, 0.0, 0.0));
+	Spawn(kDeer2, TEXT("Herbivore"), TEXT("A"), FVector(2000.0, 3000.0, 0.0));
+	Spawn(kDeerB, TEXT("Herbivore"), TEXT("B"), FVector(-80000.0, 0.0, 0.0));
+	APlayerController* PC = World.SpawnActor<APlayerController>();
+	APawn* Pawn = World.SpawnActor<APawn>();
+	if (!TestNotNull(TEXT("플레이어 컨트롤러"), PC) || !TestNotNull(TEXT("폰"), Pawn))
+	{
+		BlockVar->Set(SavedBlock, ECVF_SetByCode);
+		return false;
+	}
+	PC->Possess(Pawn);
+	auto MoveInputAfterW = [Pawn]() -> FVector
+	{
+		Pawn->ConsumeMovementInputVector();
+		Pawn->AddMovementInput(FVector::ForwardVector, 1.0f);
+		return Pawn->ConsumeMovementInputVector();
+	};
+	auto Blocked = [&]() -> bool
+	{
+		Cam->SyncMoveInputBlock(PC);   // Tick 이 매 프레임 하는 막기 맞추기
+		return Cam->IsBlockingMoveInput() && PC->IsMoveInputIgnored() && MoveInputAfterW().IsNearlyZero();
+	};
+
+	// 5-1. 1 → 0 = 자유 카메라 (대상 없음, 폰 이동 막기 그대로)
+	Cam->DoAction(EAction::Wolf);
+	TestTrue(TEXT("1 = 늑대 시점"), Cam->GetMode() == EEcoV3CamMode::Wolf && Cam->GetSubjectId() != 0);
+	TestTrue(TEXT("늑대 시점 = 막음"), Blocked());
+	Cam->DoAction(EAction::Player);
+	TestTrue(TEXT("관찰 중 0 = 자유 카메라"), Cam->GetMode() == EEcoV3CamMode::Free);
+	TestEqual(TEXT("자유 카메라는 대상 없음"), Cam->GetSubjectId(), static_cast<int64>(0));
+	TestTrue(TEXT("자유 카메라 = 폰 이동 막기 그대로 (W 가 폰에 들어가지 않는다)"), Blocked());
+	TestTrue(TEXT("상태 줄 자유 카메라"), Cam->DescribeStatus().Contains(TEXT("자유 카메라")));
+	TestTrue(TEXT("자유 카메라 자리·방향이 유한하다"), !Cam->GetFreeLocation().ContainsNaN() && !Cam->GetFreeRotation().ContainsNaN());
+	Cam->DoAction(EAction::Next);
+	Cam->DoAction(EAction::Prev);
+	TestTrue(TEXT("자유 카메라에서 , . 는 아무 일 없음"), Cam->GetMode() == EEcoV3CamMode::Free && Cam->GetSubjectId() == 0);
+	// 속도: = 휠 위 = 빠르게, - 휠 아래 = 느리게, 1~150 m/s
+	Cam->DoAction(EAction::ZoomIn);
+	TestEqual(TEXT("= = 1.2 배 빠르게"), Cam->GetFreeSpeedCm(), Speed * EcoV3Observe::kFreeSpeedStep, 1.0e-6);
+	Cam->DoAction(EAction::ZoomOut);
+	TestEqual(TEXT("- = 다시 12 m/s"), Cam->GetFreeSpeedCm(), Speed, 1.0e-6);
+	Cam->SetFreeSpeed(1000.0);
+	TestEqual(TEXT("150 m/s 까지"), Cam->GetFreeSpeedCm(), EcoV3Observe::kFreeMaxSpeedCm, 1.0e-6);
+	Cam->SetFreeSpeed(0.01);
+	TestEqual(TEXT("1 m/s 밑으로 가지 않는다"), Cam->GetFreeSpeedCm(), EcoV3Observe::kFreeMinSpeedCm, 1.0e-6);
+	Cam->SetFreeSpeed(Speed / 100.0);
+
+	// 5-2. 자유 카메라에서 2 = 화면 가운데 사슴 (먼 사슴 702 도 같은 쪽이지만 가까운 701)
+	Cam->SetFreePose(FVector(2000.0, -1500.0, 100.0), FRotator(0.0, 90.0, 0.0));
+	TestEqual(TEXT("자유 카메라 자리"), Cam->GetFreeLocation(), FVector(2000.0, -1500.0, 100.0));
+	Cam->DoAction(EAction::Deer);
+	TestTrue(TEXT("자유 카메라에서 2 = 사슴 시점"), Cam->GetMode() == EEcoV3CamMode::Deer);
+	TestEqual(TEXT("2 = 화면 가운데 사슴"), Cam->GetSubjectId(), kDeer1);
+	TestTrue(TEXT("사슴 시점 = 막음"), Blocked());
+
+	// 5-3. 0 을 빠르게 두 번 = 자유 카메라 → 원래 카메라 (막기 풀림), 원래 카메라에서 0 = 아무 일 없음
+	Cam->DoAction(EAction::Player);
+	TestTrue(TEXT("0 = 자유 카메라"), Cam->GetMode() == EEcoV3CamMode::Free);
+	Cam->DoAction(EAction::Player);
+	TestTrue(TEXT("자유 카메라에서 다시 0 = 원래 카메라"), Cam->GetMode() == EEcoV3CamMode::Player);
+	Cam->SyncMoveInputBlock(PC);
+	TestFalse(TEXT("원래 카메라 = 풀림"), Cam->IsBlockingMoveInput() || PC->IsMoveInputIgnored());
+	TestEqual(TEXT("원래 카메라 = W 가 다시 폰에 들어간다"), MoveInputAfterW(), FVector::ForwardVector, 1.0e-4f);
+	Cam->DoAction(EAction::Player);
+	Cam->SyncMoveInputBlock(PC);
+	TestTrue(TEXT("원래 카메라에서 0 = 아무 일 없음"), Cam->GetMode() == EEcoV3CamMode::Player && !Cam->IsBlockingMoveInput());
+
+	// 5-4. eco.Cam.Free (원래 카메라에서도) → 1 = 화면 가운데 늑대 (지금 규칙(보는 자리 곁·같으면 id 작은 것)이면 601 — 가운데 602 를 고른다)
+	Cam->SetMode(EEcoV3CamMode::Free);
+	TestTrue(TEXT("eco.Cam.Free = 자유 카메라"), Cam->GetMode() == EEcoV3CamMode::Free);
+	TestTrue(TEXT("eco.Cam.Free = 막음"), Blocked());
+	Cam->EnterFree(TEXT("시험 — 두 번"));
+	TestTrue(TEXT("이미 자유 카메라면 그대로"), Cam->GetMode() == EEcoV3CamMode::Free);
+	Cam->SetFreePose(FVector(3000.0, 0.0, 100.0), FRotator(0.0, 90.0, 0.0));
+	Cam->DoAction(EAction::Wolf);
+	TestEqual(TEXT("1 = 화면 가운데 늑대"), Cam->GetSubjectId(), kWolf2);
+	// 가운데에 아무도 없으면 지금 규칙 (보는 자리 곁 — 같은 거리면 id 작은 것)
+	Cam->DoAction(EAction::Player);
+	Cam->SetFreePose(FVector(3000.0, 0.0, 100.0), FRotator(0.0, -90.0, 0.0));
+	Cam->DoAction(EAction::Wolf);
+	TestEqual(TEXT("가운데에 없으면 보는 자리 곁 늑대"), Cam->GetSubjectId(), kWolf1);
+	TestTrue(TEXT("늑대 시점 = 막음"), Blocked());
+
+	// 5-5. 자유 카메라에서 G = 자유 카메라 그대로 다음 지역 무대가 보이는 자리로, 거기서 2 = 그 지역 사슴
+	Cam->DoAction(EAction::Player);
+	const FVector BeforeG = Cam->GetFreeLocation();
+	Cam->DoAction(EAction::Region);
+	TestTrue(TEXT("G 뒤에도 자유 카메라"), Cam->GetMode() == EEcoV3CamMode::Free);
+	TestEqual(TEXT("G = 다음 지역 B"), Cam->GetRegion(), FName(TEXT("B")));
+	TestTrue(TEXT("G = 카메라가 B 로 옮겼다"), FVector::Dist2D(Cam->GetFreeLocation(), FVector(-80000.0, 0.0, 0.0)) < 10000.0
+		&& FVector::Dist(BeforeG, Cam->GetFreeLocation()) > 50000.0);
+	TestTrue(TEXT("G 뒤에도 막음"), Blocked());
+	Cam->DoAction(EAction::Deer);
+	TestEqual(TEXT("B 에서 2 = 화면 가운데 B 사슴"), Cam->GetSubjectId(), kDeerB);
+	TestEqual(TEXT("지역 B"), Cam->GetRegion(), FName(TEXT("B")));
+
+	// 5-6. 끄기 (eco.Cam.Player = 바로 폰으로)
+	Cam->DoAction(EAction::Player);
+	Cam->SetMode(EEcoV3CamMode::Player);
+	TestTrue(TEXT("eco.Cam.Player = 원래 카메라"), Cam->GetMode() == EEcoV3CamMode::Player);
+	Cam->SyncMoveInputBlock(PC);
+	TestFalse(TEXT("끝 = 풀림"), PC->IsMoveInputIgnored());
 	BlockVar->Set(SavedBlock, ECVF_SetByCode);
 	return true;
 }
