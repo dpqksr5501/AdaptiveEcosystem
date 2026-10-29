@@ -43,7 +43,8 @@
 //   Integrated.RouteRequiresWildFlight 도주 반사를 끈 지역에는 판 4·5 두뇌를 걸지 않는다 (대기 두뇌 버림·지금 두뇌 그대로, 한 지역만 꺼도, 저장소 두뇌가 이미 판 5 여도
 //                                      그 월드는 내장), 실제 허용(두뇌 ∧ 세계)의 얼기·잠 검사, 판 2 는 그대로 건다
 //   Integrated.DefaultBrainStart       (10-29 기본 두뇌 R7e) Play 시작 고르기로 줄에 넣은 기본 두뇌가 첫 SyncBrain 에 걸린다(관측 24·두 길·반사 밖 FLEE 막음, 300 스텝
-//                                      마스크 위반 0), 도주 반사를 끈 세계는 대기를 버리고 내장 R1b-F (저장소 '건 적 없음' 그대로). 처리기 시험은 Play 시작 고르기를
+//                                      마스크 위반 0, 저장 체크포인트 코덱 왕복 뒤에도 반사 밖 FLEE 막음·관측 24·두 길 그대로), 도주 반사를 끈 세계는 대기를 버리고
+//                                      내장 R1b-F (저장소 '건 적 없음' 그대로). 처리기 시험은 Play 시작 고르기를
 //                                      지나지 않아 저장소 처음 두뇌(내장 R1b-F)로 돈다 — 다른 Integrated 시험의 기대값은 그대로다
 //   Integrated.RouteRefugeLifecycle    SHELTER 유지 중 은신처가 지워지면(반경 0) 무효 결정, 늦게 붙은 은신처는 다음 H 부터 후보(잠금 뒤 다시 고름), 목록 밖 번호 무효 (엔진 함수),
 //                                      Mass 통합 세계(늘 SHELTER 시험 두뇌)에서 지운 은신처로 가는 사슴이 없다
@@ -83,6 +84,8 @@
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
 #include "Serialization/JsonSerializer.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
@@ -90,6 +93,7 @@
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "Creature/Runtime/EcoCreatureNetworkTrait.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoEcosystemArchive.h"
 #include "EcoTestWorld.h"
 #include "Engine/StaticMesh.h"
 #include "Engine/StaticMeshActor.h"
@@ -4633,6 +4637,26 @@ bool FEcoPolicyV3IntegratedDefaultBrainStartTest::RunTest(const FString& Paramet
 		TestEqual(TEXT("300 스텝: 마스크 위반·관측 칸 어긋남 0"), Bad, static_cast<int64>(0));
 		TestTrue(TEXT("두뇌가 결정했다"), Decided > 0);
 		TestEqual(TEXT("다음 Play (빈 Startup) 는 지금 두뇌 그대로"), Reg.PickStart(TEXT(""), false).Brain.IsValid(), false);
+		{
+			// 10-29 적대적 검토: 저장 체크포인트 코덱(EcoCheckpoint::World — eco.Ecosystem.Save/Load, life 맵)이 기본 두뇌가 세계에 건 칸(허용·관측 24·두 길·
+			// 반사 밖 FLEE 막음)을 그대로 옮긴다. 전에는 bFleeGate 를 싣지 않아 불러온 세계가 두뇌 id 는 R7e 인데 판 4 처럼 반사 밖 FLEE 를 허용했다
+			EcoWorldV3::FWorldState Saved = H.Ctx(0).Sim;
+			TArray<uint8> Bytes;
+			{
+				FMemoryWriter A(Bytes);
+				EcoCheckpoint::World(A, Saved);
+				TestFalse(TEXT("체크포인트 코덱 쓰기"), A.IsError());
+			}
+			EcoWorldV3::FWorldState Back;
+			{
+				FMemoryReader A(Bytes);
+				EcoCheckpoint::World(A, Back);
+				TestFalse(TEXT("체크포인트 코덱 읽기"), A.IsError());
+			}
+			TestTrue(TEXT("체크포인트를 거쳐도 기본 두뇌 세계 칸 그대로 (관측 24 · 두 길 · 반사 밖 FLEE 막음 · 허용)"),
+					 Saved.bFleeGate && Back.bFleeGate && Back.ObsDim == O3::kObsDimRoute && Back.Config.WildFlight.bRoute
+						 && FMemory::Memcmp(Back.Allowed, Saved.Allowed, sizeof(Saved.Allowed)) == 0);
+		}
 	}
 	// (나) 도주 반사를 끈 세계: 기본 두뇌(판 5)는 걸 수 없다 → 대기 버림, 내장 R1b-F 로 돈다, 저장소는 건 적 없음 그대로 (다음 Play 가 다시 기본을 고른다)
 	{

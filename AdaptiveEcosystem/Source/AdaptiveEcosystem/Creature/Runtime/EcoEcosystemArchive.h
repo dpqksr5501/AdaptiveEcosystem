@@ -66,6 +66,9 @@ namespace EcoCheckpoint
 #define P(X) Pod(A,W.X)
         P(RepCfg);P(ObsCfg);P(ThreatCfg);P(Allowed);P(Rng.State);P(T);P(HuntWindow);P(HuntWindowCaptures);P(Dark);P(StepsToTransition);P(PredEma);
         P(WeatherKind);P(WeatherIntensity);P(Weather);P(ReserveCap);P(ObsDim);P(bObstacleObsProbe);P(ObstacleObsCfg);P(Stats);
+        // 10-29: the active brain also sets the mask-5 gate (SetModelFleeGate — default v3 brain R7e). Without it a restored
+        // world would keep ObsDim 24/route but silently allow brain FLEE outside the reflex (mask 4 rows).
+        P(bFleeGate);
 #undef P
         // External observations and Step scratch contain live-frame data/pointers.
         // They are reconstructed before consumption, never deserialized as handles.

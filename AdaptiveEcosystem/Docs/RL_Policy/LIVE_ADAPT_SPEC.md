@@ -339,7 +339,11 @@
 - R1b-F 로 되돌리는 법: Play 하나 — `eco.V3Brain.Startup builtin`(편집기 콘솔, Play 전) 또는 `-EcoV3Brain=builtin`(명령줄). Play 중 — `eco.V3Brain.Load builtin`.
   옛 실험 도구 가운데 두뇌 인수 없이 R1b-F 를 띄우던 것(`herbivore_rl/results/v3/r7e_game/r7e_game.py`·`level_jyu_eco/level_jyu_eco.py` 의 `cur`)은 `-EcoV3Brain=builtin` 을 붙였다.
   기본 자체를 R1b-F 로 되돌리려면 `export_weights_v3.py --default-brain ../AdaptiveEcosystem/EcoBrains/v3_r1_g995_s3_20m.json --default-label R1bF` 로 헤더를 다시 만들고 빌드한다
-  (이 문서·AGENTS.md 15절도 함께 고친다).
+  (이 문서·AGENTS.md 15절도 함께 고친다. R7e id 를 못 박은 시험 `Policy.V3.Brain.Default`·`Policy.V3.Integrated.DefaultBrainStart`·`herbivore_rl/tests/test_default_brain_v3.py`
+  도 함께 고친다 — 10-29 검토에서 이 명령이 헤더를 내는 것(관측 18·판 2 계약, 빌드의 static_assert 가 받는 계약)까지만 저장소 밖에서 확인했다).
+- 어떤 맵이 기본 두뇌로 도나: 콘솔 `eco.IntegratedPolicyVersion 3`(`-EcoIntegratedV3`)인 Play 와 **맵 조정자 `bUseV3Policy` 로 v3 를 켜는 맵**(콘솔 변수가 1 이어도 —
+  `OnWorldBeginPlay`). life 는 v3 가 있어야 하므로(`EcoCreatureSetupValidation.cpp`) 조연우 life·이주 맵(`/Game/JYU/Maps/LV_JYU_*` 가운데 조정자가 v3 를 켠 맵)도 10-29 부터
+  사슴이 R7e 로 시작한다. 그 맵의 저장 체크포인트(`eco.Ecosystem.Save/Load`)는 두뇌 id 가 같아야 불러오므로 R1b-F 로 저장한 것은 `-EcoV3Brain=builtin` Play 에서만 불러온다(아래).
 - 관측 18 에 기대던 다른 길 (찾은 것):
   - 사회 행동 투영(`eco.IntegratedV3.SocialControl` 1 — 기본 0, `EcoV3Social::ProjectPolicy`): 행동 요청 `Decision.Request` 만 읽는다. 두 길 두뇌의 길 칸은 따로
     (`RouteRequest`)라 칸 4 를 잠으로 잘못 읽지 않는다 — 그대로 맞다. 판 5 라 반사 밖 FLEE 요청이 없고 HIDE 가 늘 뿐이다.
@@ -351,6 +355,17 @@
     이제 기본에서도 보인다 — 그 JSON 의 두뇌 칸은 지금 두뇌가 아니다. 지금 두뇌는 기록 `[EcoV3I] 두뇌 시작 |`·스냅숏 `brain`·`eco.V3Brain.Info` 로 본다.
   - 저장 체크포인트(`EcoEcosystemCheckpoint.cpp`)는 지금 두뇌 id 가 같아야 불러온다 — R1b-F 로 저장한 것은 `-EcoV3Brain=builtin` Play 에서만 불러온다(재빌드 뒤 자동 복원을
     가정하지 않는 원칙 그대로).
+  - **고침 (10-29 적대적 검토)**: 체크포인트 코덱 `Creature/Runtime/EcoEcosystemArchive.h` `EcoCheckpoint::World` 가 두뇌가 세계에 거는 칸 가운데 `bFleeGate`(판 5 반사 밖
+    FLEE 막음 — `SetModelFleeGate`)만 싣지 않았다. 관측 칸 수(`ObsDim`)·허용(`Allowed`)·두 길(`Config.WildFlight.bRoute`)은 실었다. 불러오기는 `C->Sim` 을 통째로 바꾸고
+    두뇌를 다시 걸지 않으므로(두뇌 세대가 그대로라 `SyncBrain` 이 건너뜀) 불러온 세계는 두뇌 id 검사는 지나지만 관측 24·두 길에 막음만 풀린 판 4 꼴이 되어 R7e 가
+    반사 밖에서 FLEE 를 고를 수 있었다(기록·알림 없는 행동 차이). 10-28 까지 기본 두뇌(R1b, 막음 없음)에서는 드러나지 않았고, 기본 두뇌가 R7e 가 되며 조연우 life 맵의
+    기본 저장·불러오기에서 닿게 됐다. 그 칸 하나를 더 싣는다(형식 판 그대로 — 옛 파일은 실행 이미지 해시가 달라 원래 못 불러온다). 시험 `Integrated.DefaultBrainStart` 가
+    기본 두뇌 세계를 코덱으로 왕복해 막음·관측 24·두 길·허용이 그대로인지 본다.
+    확인 (창 없음 `-NullRHI -benchmark -fps=30`, 조연우 맵 복사본 `/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem`, 두뇌 인수 없음·`eco.IntegratedPolicyVersion=1` — 조정자
+    `bUseV3Policy` 만으로 v3, 시작 줄 `기본 두뇌 R7e`): 60~63 초 `eco.Ecosystem.Save` → 새 프로세스 5 초 `eco.Ecosystem.Load` (`Loaded … Step=63 Native=473`).
+    고치기 전 코덱으로 지은 판은 불러온 뒤 10 초 줄이 세 지역 모두 `두 길 켬 (판 4)` 이고 Highland 73.1 초 구간에 반사 밖 두뇌 도망 6 번(판 5 에서는 막히는 결정),
+    고친 판은 `두 길 켬 (판 5 — 반사 밖 도망 막음)`·반사 밖 도망 0. 고친 뒤 UBT 기본 적응 unity·`-DisableAdaptiveUnity` 성공(경고 0), 자동화 `AdaptiveEcosystem` 266 개
+    실패 0(`-ini:…IntegratedPolicyVersion=1`). 시험 저장 파일은 저장소 밖 scratchpad 로 옮겼다(`Saved/Ecosystem` 은 원래 없었다).
   - 팀 네트워크 시험 대본(`Tools/Editor/test_jyu_refuge_network.ps1`·`test_jyu_social_network.ps1`)은 두뇌 인수 없이 `-EcoIntegratedV3` 로 띄우므로 이제 R7e 로 돈다(두뇌와
     무관한 복제·은신처 확인이라 고치지 않았다).
 - 시험이 보는 것: 처리기 시험(`ActivateForTest`)은 Play 시작 고르기를 지나지 않아 저장소 처음 두뇌(내장 R1b-F)로 돈다 — 기존 시험의 기대값은 그대로다. 새 시험

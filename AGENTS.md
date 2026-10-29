@@ -149,6 +149,6 @@ PR #14는 2026-10-23 사용자 요청으로 기능·디버그를 push하고 Read
 
 ## 15. 2026-10-29 v3 기본 두뇌 R7e
 
-사용자 결정("기본 두뇌 R7e로")에 따라 통합 v3 모드에서 시작 두뇌를 고르지 않은 Play(적응 고리 판 0 포함)의 사슴 두뇌는 R7e `v3_r7_g995_s1_20m@40d8710d`(**24관측/5행동·mask5**, 두 길·반사 밖 도망 막음)다. 4절의 'R1b 18관측/5행동·mask2'는 당시 이력이다. 저장소 두뇌 파일을 바이트 그대로 빌드에 넣었고(`PolicyBrainV3Default.h`) 파일 두뇌와 같은 검사를 지난다. 런타임 추론은 그대로 C++ Native이고 V1 7관측/4출력·`eco.IntegratedPolicyVersion` 기본값·내장 R1b(`PolicyWeightsV3.h`)·평가기·Python 거울은 바꾸지 않았다. R7e를 걸 수 없는 세계(도주 반사 끔 등)는 내장 R1b-F로 돈다.
+사용자 결정("기본 두뇌 R7e로")에 따라 통합 v3 모드에서 시작 두뇌를 고르지 않은 Play(적응 고리 판 0 포함)의 사슴 두뇌는 R7e `v3_r7_g995_s1_20m@40d8710d`(**24관측/5행동·mask5**, 두 길·반사 밖 도망 막음)다. 4절의 'R1b 18관측/5행동·mask2'는 당시 이력이다. 저장소 두뇌 파일을 바이트 그대로 빌드에 넣었고(`PolicyBrainV3Default.h`) 파일 두뇌와 같은 검사를 지난다. 런타임 추론은 그대로 C++ Native이고 V1 7관측/4출력·`eco.IntegratedPolicyVersion` 기본값·내장 R1b(`PolicyWeightsV3.h`)·평가기·Python 거울은 바꾸지 않았다. R7e를 걸 수 없는 세계(도주 반사 끔 등)는 내장 R1b-F로 돈다. 맵 조정자 `bUseV3Policy`로 v3를 켜는 맵(조연우 life 맵 등)도 콘솔 변수와 무관하게 같은 규칙으로 R7e에서 시작한다. 같은 날 검토에서 저장 체크포인트가 두뇌의 반사 밖 도망 막음(`bFleeGate`)을 싣지 않던 것을 고쳤다.
 
 R1b-F로 되돌리려면 Play 전 `eco.V3Brain.Startup builtin`(명령줄 `-EcoV3Brain=builtin`), Play 중 `eco.V3Brain.Load builtin`을 쓴다. 고르기 규칙·실시간 고리·검증은 [LIVE_ADAPT_SPEC.md 5.6](AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md)을 따른다.

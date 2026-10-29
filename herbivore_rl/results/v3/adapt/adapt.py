@@ -19,6 +19,8 @@
     #   PIE·단독 콘솔: eco.IntegratedV3.Snapshot            → <프로젝트>/Saved/EcoSnapshots/eco_v3_snapshot_s<세션>_t<스텝>.json
     #   헤드리스:      -EcoIntegratedV3 -EcoV3SnapshotAt=240 -EcoV3SnapshotOut=<파일>
     #   바꿔 끼우기:   eco.V3Brain.Load <내보낸 두뇌 이름>   (되돌리기 eco.V3Brain.Load builtin)
+    #   10-29 부터 두뇌 인수 없는 통합 v3 Play 의 두뇌는 기본 두뇌 R7e(관측 24·판 5 — Docs/RL_Policy/LIVE_ADAPT_SPEC.md 5.6)다. 이 도구(관측 18 R1b-F 고리)에
+    #   넣을 스냅숏은 -EcoV3Brain=builtin 을 붙여 만든다 — R7e 스냅숏은 convert 가 '계약 해시가 다르다'로 거부한다(실시간 고리 live.py 는 R7e 를 받는다).
 
 1) convert: 스냅숏을 검사하고(형식·판·계약 해시·두뇌 지문·지역 수) configs/v3_wild3_mirror.yaml(언리얼 통합 v3 기본값의 거울, 10-18 wild3/verify 로 확인)
    위에 바뀐 칸만 덮어 runs/<이름>/world.yaml(판정 세계 — 부활 없음)과 train.yaml(학습 세계 — R4 조리법: 학습 전용 40 m 밖 부활 + 지역 섞기)을 쓴다.
