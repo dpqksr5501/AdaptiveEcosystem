@@ -1,0 +1,280 @@
+{
+  "date": "2026-10-23",
+  "base_commit": "581ce1d",
+  "build": "Direct UBT Build04 succeeded",
+  "automation": {
+    "succeeded": 202,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "capture_run": "Actual PIE Story03, normal exit 0, Build03; final Build04 also reverses selected-plan arrows on return",
+  "fixture": "Actual PIE. Explicit sustained Barren drought. Observer threats disabled. No creature relocation or policy writes.",
+  "observed_states": [
+    "Blocked",
+    "Preparing",
+    "Regrouping",
+    "Resting",
+    "Settled",
+    "Traveling"
+  ],
+  "tracked_agent": "57",
+  "before": {
+    "agent": "57",
+    "plan": 1,
+    "region": "Barren",
+    "reason": "FoodShortageJourney",
+    "active": true,
+    "waypoint": 13,
+    "position": [
+      34098.46038114456,
+      24071.191743712134,
+      -595.7349586825907
+    ],
+    "goal": [
+      34098.97637139146,
+      24514.271576863808,
+      -678.9075970855265
+    ]
+  },
+  "after": {
+    "agent": "57",
+    "plan": 1,
+    "region": "Forest",
+    "reason": "FoodShortageJourney",
+    "active": true,
+    "waypoint": 18,
+    "position": [
+      34098.51154016409,
+      26483.183027809257,
+      -959.7701319196767
+    ],
+    "goal": [
+      34099.19433352963,
+      27012.668235694513,
+      -992.1946645876251
+    ]
+  },
+  "settled_plan": {
+    "plan": 1,
+    "herd": 30,
+    "origin": "Barren",
+    "destination": "Forest",
+    "state": "Settled",
+    "reason": "JourneyComplete",
+    "members": 3,
+    "arrived": 3,
+    "dead": 0,
+    "returning": false,
+    "points": [
+      [
+        34000,
+        18000,
+        169.51233119706922
+      ],
+      [
+        34000,
+        18500,
+        153.1108854047443
+      ],
+      [
+        34000,
+        19000,
+        133.58639467460034
+      ],
+      [
+        34000,
+        19500,
+        106.24337186236335
+      ],
+      [
+        34000,
+        20000,
+        72.65425917448647
+      ],
+      [
+        34000,
+        20500,
+        1.5449282825975388
+      ],
+      [
+        34000,
+        21000,
+        -53.927338445105306
+      ],
+      [
+        34000,
+        21500,
+        -121.10556382085997
+      ],
+      [
+        34000,
+        22000,
+        -191.40683413443185
+      ],
+      [
+        34000,
+        22500,
+        -280.4900530251016
+      ],
+      [
+        34000,
+        23000,
+        -375.7975223163194
+      ],
+      [
+        34000,
+        23500,
+        -482.04656862745105
+      ],
+      [
+        34000,
+        24000,
+        -582.0495250629428
+      ],
+      [
+        34000,
+        24500,
+        -678.9075970855265
+      ],
+      [
+        34000,
+        25000,
+        -762.5091077286943
+      ],
+      [
+        34000,
+        25500,
+        -839.0683294232113
+      ],
+      [
+        34000,
+        26000,
+        -905.4700613221939
+      ],
+      [
+        34000,
+        26500,
+        -960.9508158808276
+      ],
+      [
+        34000,
+        27000,
+        -992.1946645876251
+      ],
+      [
+        34000,
+        27500,
+        -1011.7237807087822
+      ],
+      [
+        34000,
+        28000,
+        -1028.912687399863
+      ],
+      [
+        34000,
+        28500,
+        -1049.2218733310438
+      ],
+      [
+        34000,
+        29000,
+        -1077.3454427977413
+      ],
+      [
+        34000,
+        29500,
+        -1107.8229071297792
+      ],
+      [
+        34000,
+        30000,
+        -1140.6268954566258
+      ],
+      [
+        34000,
+        30500,
+        -1177.3449182688637
+      ],
+      [
+        34000,
+        31000,
+        -1214.856696326391
+      ],
+      [
+        34000,
+        31500,
+        -1251.5747191386308
+      ],
+      [
+        34000,
+        32000,
+        -1285.9388470855265
+      ]
+    ]
+  },
+  "frames": [
+    {
+      "name": "00_overview_before",
+      "elapsed": 4.0,
+      "selected_plan": 0
+    },
+    {
+      "name": "01_food_shortage",
+      "elapsed": 10.514999999999418,
+      "selected_plan": 0
+    },
+    {
+      "name": "02_departure",
+      "elapsed": 20.57799999999952,
+      "selected_plan": 1
+    },
+    {
+      "name": "07_rest_or_regroup",
+      "elapsed": 47.65600000000086,
+      "selected_plan": 1
+    },
+    {
+      "name": "10_blocked",
+      "elapsed": 50.65600000000086,
+      "selected_plan": 2
+    },
+    {
+      "name": "09_after_rest",
+      "elapsed": 51.67100000000028,
+      "selected_plan": 1
+    },
+    {
+      "name": "03_along_route",
+      "elapsed": 53.6869999999999,
+      "selected_plan": 1
+    },
+    {
+      "name": "04_before_arrival",
+      "elapsed": 62.76499999999942,
+      "selected_plan": 1
+    },
+    {
+      "name": "05_after_arrival",
+      "elapsed": 71.78100000000086,
+      "selected_plan": 1
+    },
+    {
+      "name": "06_settled",
+      "elapsed": 97.34300000000076,
+      "selected_plan": 1
+    },
+    {
+      "name": "08_refuge",
+      "elapsed": 130.90600000000086,
+      "selected_plan": 1
+    }
+  ],
+  "presentation_assets": "Personal PPT and PNG files are stored outside Git under the Desktop presentation directory.",
+  "limits": [
+    "Snapshot/drawing only; no policy, movement, resource or replication transport changes.",
+    "Some plans returned after stalls; a captured successful journey does not imply all herds succeed.",
+    "No new multiplayer or shipping/cook validation in this visualization-only follow-up."
+  ]
+}

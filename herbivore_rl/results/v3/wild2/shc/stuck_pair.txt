@@ -1,0 +1,26 @@
+v3_wild2_obstacle_mirror.yaml 32000-32089 1800 스텝  | 짝 지도 20000-20002 × 10 · 원판 results\v3\wild2\shc\obstacle_maps
+  worlds: 90
+  wolf_stuck: 0
+  wolf_stuck_helper: 0
+  wolf_stuck_wall: 0
+  wolf_stuck_max_s: 0.0
+  wolf_wall_stuck: 22
+  wolf_wall_stuck_helper: 17
+  wolf_wall_stuck_max_s: 6.0
+  deer_stuck: 0
+  deer_stuck_by_beh: {}
+  deer_stuck_panic: 0
+  deer_stuck_max_s: 0.0
+  wolf_stuck_frac: 0.0
+  wolf_wall_stuck_frac: 0.0003340596600183733
+  deer_stuck_frac: 0.0
+  old_wolf_runs: 0
+  old_wolf_max_s: 0.0
+  old_deer_still: 0
+  old_deer_flee: 0
+  old_deer_push: 0
+  old_deer_max_s: 0.0
+  worst_wolf: []
+  worst_wolf_wall: [(45, 32073, 0, 952, True), (39, 32065, 3, 1227, True), (34, 32028, 2, 573, False), (33, 32024, 0, 35, True), (30, 32001, 2, 957, True), (29, 32005, 0, 439, False)]
+  worst_deer: []
+  by_region: {'Barren': {'worlds': 30, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 8, 'wolf_wall_stuck_helper': 5, 'wolf_wall_stuck_max_s': 5.2, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.00038922015849044854, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 0, 'old_deer_flee': 0, 'old_deer_push': 0, 'old_deer_max_s': 0.0}, 'Forest': {'worlds': 30, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 7, 'wolf_wall_stuck_helper': 6, 'wolf_wall_stuck_max_s': 6.0, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.0002939555392246923, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 0, 'old_deer_flee': 0, 'old_deer_push': 0, 'old_deer_max_s': 0.0}, 'Highland': {'worlds': 30, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 7, 'wolf_wall_stuck_helper': 6, 'wolf_wall_stuck_max_s': 4.533333333333333, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.00032158772453714336, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 0, 'old_deer_flee': 0, 'old_deer_push': 0, 'old_deer_max_s': 0.0}}

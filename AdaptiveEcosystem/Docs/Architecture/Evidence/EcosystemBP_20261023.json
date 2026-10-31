@@ -1,0 +1,1643 @@
+{
+  "date": "2026-10-23",
+  "baseline_head": "ecfd82fab04d16531ae7e00a2adaf3a4737d2fcf",
+  "branch": "codex/social-shelter-handoff",
+  "dirty": true,
+  "policy_weights_changed": false,
+  "python_retraining": false,
+  "map": "/Game/JYU/Maps/LV_JYU_Ecosystem",
+  "assets": {
+    "source": "/Game/JYU/Maps/LV_JYU_HerdMigration",
+    "target": "/Game/JYU/Maps/LV_JYU_Ecosystem",
+    "assets": [
+      "/Game/JYU/Ecosystem/M_JYU_EcosystemGrass.M_JYU_EcosystemGrass",
+      "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+      "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField",
+      "/Game/JYU/Ecosystem/BP_JYU_EcosystemWeather.BP_JYU_EcosystemWeather",
+      "/Game/JYU/Ecosystem/BP_JYU_GrassHabitat.BP_JYU_GrassHabitat",
+      "/Game/JYU/Ecosystem/BP_JYU_MoistSoilHabitat.BP_JYU_MoistSoilHabitat",
+      "/Game/JYU/Ecosystem/BP_JYU_ShrubHabitat.BP_JYU_ShrubHabitat",
+      "/Game/JYU/Ecosystem/BP_JYU_RiparianHabitat.BP_JYU_RiparianHabitat"
+    ],
+    "habitats": [
+      {
+        "region": "Forest",
+        "kind": "Grass",
+        "position": [
+          31600.0,
+          29800.0,
+          -1020.3182340543226
+        ],
+        "connected_water": false
+      },
+      {
+        "region": "Forest",
+        "kind": "MoistSoil",
+        "position": [
+          36400.0,
+          33800.0,
+          -1465.6286120965897
+        ],
+        "connected_water": false
+      },
+      {
+        "region": "Forest",
+        "kind": "Shrub",
+        "position": [
+          31600.0,
+          34200.0,
+          -1360.168647955291
+        ],
+        "connected_water": false
+      },
+      {
+        "region": "Barren",
+        "kind": "Grass",
+        "position": [
+          31600.0,
+          15800.0,
+          282.0293068589308
+        ],
+        "connected_water": false
+      },
+      {
+        "region": "Barren",
+        "kind": "MoistSoil",
+        "position": [
+          36400.0,
+          19800.0,
+          40.61574921797546
+        ],
+        "connected_water": false
+      },
+      {
+        "region": "Barren",
+        "kind": "Shrub",
+        "position": [
+          31600.0,
+          20200.0,
+          53.89415007248044
+        ],
+        "connected_water": false
+      },
+      {
+        "region": "Highland",
+        "kind": "Grass",
+        "position": [
+          31600.0,
+          -51200.0,
+          2579.6828150034335
+        ],
+        "connected_water": false
+      },
+      {
+        "region": "Highland",
+        "kind": "MoistSoil",
+        "position": [
+          36400.0,
+          -47200.0,
+          2664.0602826733802
+        ],
+        "connected_water": false
+      },
+      {
+        "region": "Highland",
+        "kind": "Shrub",
+        "position": [
+          31600.0,
+          -46800.0,
+          2611.716890306706
+        ],
+        "connected_water": false
+      }
+    ],
+    "weather": [
+      {
+        "region": "Forest",
+        "offset": 0.0,
+        "cycle": 180
+      },
+      {
+        "region": "Barren",
+        "offset": 30.0,
+        "cycle": 180
+      },
+      {
+        "region": "Highland",
+        "offset": 60.0,
+        "cycle": 180
+      }
+    ],
+    "removed_visual_weather": []
+  },
+  "saved_asset_reload": {
+    "passed": true,
+    "weather_actors": 3,
+    "habitat_actors": 9,
+    "blueprints": 6
+  },
+  "weather_copy_cleanup": {
+    "map": "/Game/JYU/Maps/LV_JYU_Ecosystem",
+    "removed": [
+      {
+        "label": "BP_WeatherManager_PlayerFollow",
+        "actor": "/Game/JYU/Maps/LV_JYU_Ecosystem.LV_JYU_Ecosystem:PersistentLevel.BP_WeatherManager_PlayerFollow_C_UAID_644ED7F0E5F70B0903_1676971272",
+        "cls": "/Game/SHC/Blueprints/Weather/BP_WeatherManager_PlayerFollow.BP_WeatherManager_PlayerFollow_C"
+      }
+    ],
+    "remaining": []
+  },
+  "build": {
+    "succeeded": true,
+    "log": "Saved\\IntegrationBuilds\\Milestone_Final_20261023_151545.log"
+  },
+  "full_network_and_pie_build": "Saved/IntegrationBuilds/Milestone_B_20261023_145312.log",
+  "final_build_change": "Received weather now honors local visuals OFF and density controls; no simulation/DTO change. Final automation and actual PIE controls tested after rebuilding.",
+  "final_weather_controls": {
+    "passed": true,
+    "error": null,
+    "samples": [
+      {
+        "elapsed": 0.0,
+        "enabled": 0,
+        "rain": 0.6016270518302917,
+        "moisture": 0.49062722213462084,
+        "step": 203,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 300.81353759765625,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 0.25,
+        "enabled": 0,
+        "rain": 0.6016270518302917,
+        "moisture": 0.4914062968569819,
+        "step": 204,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 364.2027587890625,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 0.5,
+        "enabled": 0,
+        "rain": 0.6131423711776733,
+        "moisture": 0.49299497769585393,
+        "step": 206,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 114.19924926757812,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 0.75,
+        "enabled": 0,
+        "rain": 0.6183304786682129,
+        "moisture": 0.49460131968813276,
+        "step": 208,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 1.0,
+        "enabled": 0,
+        "rain": 0.6231656670570374,
+        "moisture": 0.496232849687515,
+        "step": 210,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 1.25,
+        "enabled": 0,
+        "rain": 0.6317344903945923,
+        "moisture": 0.49788628850102584,
+        "step": 212,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 1.5,
+        "enabled": 0,
+        "rain": 0.6354467272758484,
+        "moisture": 0.49955204974296835,
+        "step": 214,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 1.75,
+        "enabled": 0,
+        "rain": 0.6387631893157959,
+        "moisture": 0.501234723310811,
+        "step": 216,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 2.0,
+        "enabled": 0,
+        "rain": 0.6416732668876648,
+        "moisture": 0.5020806108475993,
+        "step": 217,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 2.25,
+        "enabled": 0,
+        "rain": 0.6441663503646851,
+        "moisture": 0.503779927725334,
+        "step": 219,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 2.5,
+        "enabled": 0,
+        "rain": 0.6478581428527832,
+        "moisture": 0.5054876733388202,
+        "step": 221,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 2.75,
+        "enabled": 0,
+        "rain": 0.6490355730056763,
+        "moisture": 0.5071984581327105,
+        "step": 223,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 3.0,
+        "enabled": 0,
+        "rain": 0.6497530341148376,
+        "moisture": 0.5089119014183106,
+        "step": 225,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 3.25,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5106241370865234,
+        "step": 227,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 3.5,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.51233423994224,
+        "step": 229,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 3.75,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5140422160848295,
+        "step": 231,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 4.0,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.514895425786009,
+        "step": 232,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 4.25,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5166002542751863,
+        "step": 234,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 4.5,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5183029812635987,
+        "step": 236,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 4.75,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5200037413589335,
+        "step": 238,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 5.0,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5217027387047081,
+        "step": 240,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 5.864452362060547,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 5.25,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.523399736238482,
+        "step": 242,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 166.6689910888672,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 5.5,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5250946410952443,
+        "step": 244,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 333.3380126953125,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 5.75,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5267875137773168,
+        "step": 246,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 500.0075988769531,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 6.0,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5276332040932069,
+        "step": 247,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 6.25,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5293229788747027,
+        "step": 249,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 6.5,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5310106451562389,
+        "step": 251,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 6.75,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5326962752042387,
+        "step": 253,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 7.0,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5343798482583755,
+        "step": 255,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 7.25,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5360613784960617,
+        "step": 257,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 7.5,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5377408364205428,
+        "step": 259,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 7.75,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5394182384811465,
+        "step": 261,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 8.0,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5402561624235306,
+        "step": 262,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 8.25,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5419304338064806,
+        "step": 264,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 8.5,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.543602605887501,
+        "step": 266,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 8.75,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5452726747942654,
+        "step": 268,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 9.0,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5469406785205226,
+        "step": 270,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 9.25,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5486066266850389,
+        "step": 272,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 9.5,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5502705249198218,
+        "step": 274,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 9.75,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5519324003408269,
+        "step": 276,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 10.0,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5527625688707017,
+        "step": 277,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 10.25,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5544213595500065,
+        "step": 279,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 10.5,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5560781479573509,
+        "step": 281,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 10.75,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5577331139631287,
+        "step": 283,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 11.0,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5593860678515779,
+        "step": 285,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 11.25,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5610369950406989,
+        "step": 287,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 11.5,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5626859355028937,
+        "step": 289,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 11.75,
+        "enabled": 1,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5643328581699301,
+        "step": 291,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 12.0,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5651555468494287,
+        "step": 292,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 650.0,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 12.25,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5667993693064061,
+        "step": 294,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 399.9958801269531,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 12.5,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5684411490656318,
+        "step": 296,
+        "rain_on": true,
+        "sound_on": true,
+        "rate": 149.98597717285156,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 12.75,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5700809160995411,
+        "step": 298,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 13.0,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5717186552543982,
+        "step": 300,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 13.25,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5733545002715338,
+        "step": 302,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 13.5,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5749884000379142,
+        "step": 304,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 13.75,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5766202928041758,
+        "step": 306,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 14.0,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5774354684266851,
+        "step": 307,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 14.25,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5790642916649106,
+        "step": 309,
+        "rain_on": true,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 14.5,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5806910941500633,
+        "step": 311,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 14.75,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5823158540909827,
+        "step": 313,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 15.0,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5839386084199977,
+        "step": 315,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 15.25,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5855593373844535,
+        "step": 317,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 15.5,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5871780731497064,
+        "step": 319,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 15.75,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5887948316011687,
+        "step": 321,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 16.0,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5896024711284419,
+        "step": 322,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 16.25,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5912162366673461,
+        "step": 324,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 16.5,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5928280097479111,
+        "step": 326,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 16.75,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.594437835495023,
+        "step": 328,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 17.0,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5960456967112001,
+        "step": 330,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 17.25,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5976517069750581,
+        "step": 332,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 17.5,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.5992557482715796,
+        "step": 334,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      },
+      {
+        "elapsed": 17.75,
+        "enabled": 0,
+        "rain": 0.6499999761581421,
+        "moisture": 0.6008578966068602,
+        "step": 336,
+        "rain_on": false,
+        "sound_on": false,
+        "rate": 8.317373275756836,
+        "rate_valid": true
+      }
+    ],
+    "scenario": "Saved BP climate; visuals 0->1(density2)->0. No weather/food/agent overrides"
+  },
+  "automation": {
+    "succeeded": 208,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0,
+    "totalDuration": 10.814640045166016
+  },
+  "pie": {
+    "result": "FINISHED",
+    "fixture": "Authored BP climate; no weather/food/agent writes; observer threats disabled",
+    "samples": 63,
+    "observed_wall_seconds": 124.0,
+    "observed_world_seconds": 124.4889527335763,
+    "final_population": 149,
+    "regions": {
+      "Forest": {
+        "final": {
+          "region": "Forest",
+          "authority": true,
+          "visual_cells": 129,
+          "instances": 128,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "food": 95.60061251727079,
+          "grown": 260.51043862736594,
+          "environment_lost": 5.125323307743594,
+          "consumed": 291.4836975588685,
+          "mean_moisture": 0.48545280917989697,
+          "rain": 0.6499999761581421,
+          "ground_cells": 900,
+          "grass_cells": 810,
+          "riparian_cells": 0,
+          "shrub_cells": 90,
+          "connected_water_cells": 0,
+          "native_step": 933,
+          "ledger_amount": 95.60061251727079,
+          "ledger_consumed": 291.4836975588685,
+          "ledger_grown": 260.51043862736594,
+          "ledger_environment_lost": 5.125323307743594,
+          "ledger_habitat_removed": 0,
+          "receipt_sequence": 930
+        },
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "moisture_range": [
+          0.22488404903484782,
+          0.5
+        ],
+        "food_range": [
+          94.52841211518837,
+          131.6991947565678
+        ],
+        "instance_range": [
+          7,
+          129
+        ]
+      },
+      "Barren": {
+        "final": {
+          "region": "Barren",
+          "authority": true,
+          "visual_cells": 56,
+          "instances": 56,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "food": 13.719553823185395,
+          "grown": 206.21944232271554,
+          "environment_lost": 0.2741363238075484,
+          "consumed": 244.11061661649867,
+          "mean_moisture": 0.675391519308732,
+          "rain": 0.6499999761581421,
+          "ground_cells": 900,
+          "grass_cells": 810,
+          "riparian_cells": 0,
+          "shrub_cells": 90,
+          "connected_water_cells": 0,
+          "native_step": 933,
+          "ledger_amount": 13.719553823185395,
+          "ledger_consumed": 244.11061661649867,
+          "ledger_grown": 206.21944232271554,
+          "ledger_environment_lost": 0.2741363238075484,
+          "ledger_habitat_removed": 0,
+          "receipt_sequence": 930
+        },
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "moisture_range": [
+          0.2847646461108019,
+          0.675391519308732
+        ],
+        "food_range": [
+          13.304311305822415,
+          51.88486444082277
+        ],
+        "instance_range": [
+          2,
+          56
+        ]
+      },
+      "Highland": {
+        "final": {
+          "region": "Highland",
+          "authority": true,
+          "visual_cells": 35,
+          "instances": 25,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "food": 6.378015401423121,
+          "grown": 27.722695530529545,
+          "environment_lost": 0.1793020561450004,
+          "consumed": 53.32498293795202,
+          "mean_moisture": 0.8541195414108704,
+          "rain": 0,
+          "ground_cells": 900,
+          "grass_cells": 810,
+          "riparian_cells": 0,
+          "shrub_cells": 90,
+          "connected_water_cells": 0,
+          "native_step": 933,
+          "ledger_amount": 6.378015401423121,
+          "ledger_consumed": 53.32498293795202,
+          "ledger_grown": 27.722695530529545,
+          "ledger_environment_lost": 0.1793020561450004,
+          "ledger_habitat_removed": 1.1606379875136952,
+          "receipt_sequence": 931
+        },
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "moisture_range": [
+          0.46250385442001707,
+          0.8957182441663535
+        ],
+        "food_range": [
+          5.930724393964183,
+          33.320242852503306
+        ],
+        "instance_range": [
+          3,
+          33
+        ]
+      }
+    },
+    "max_ledger_errors": {
+      "food": 0.0,
+      "consumed": 0,
+      "grown": 0,
+      "environment_lost": 0
+    },
+    "actual_intake_samples": 5485,
+    "active_journey_samples": 0,
+    "region_transfers": [],
+    "screenshots": 3
+  },
+  "server": {
+    "result": "FINISHED",
+    "fixture": "Authored BP climate; no weather/food/agent writes; observer threats disabled",
+    "samples": 105,
+    "observed_wall_seconds": 209.59300000000076,
+    "observed_world_seconds": 211.89784390479326,
+    "final_population": 137,
+    "regions": {
+      "Forest": {
+        "final": {
+          "region": "Forest",
+          "authority": true,
+          "visual_cells": 129,
+          "instances": 0,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "food": 100.92962878749188,
+          "grown": 501.8908044864045,
+          "environment_lost": 5.37407595446224,
+          "consumed": 527.2862945006832,
+          "mean_moisture": 0.5070994747426886,
+          "rain": 0,
+          "ground_cells": 900,
+          "grass_cells": 810,
+          "riparian_cells": 0,
+          "shrub_cells": 90,
+          "connected_water_cells": 0,
+          "native_step": 1588,
+          "ledger_amount": 100.92962878749188,
+          "ledger_consumed": 527.2862945006832,
+          "ledger_grown": 501.8908044864045,
+          "ledger_environment_lost": 5.37407595446224,
+          "ledger_habitat_removed": 0,
+          "receipt_sequence": 1588
+        },
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "moisture_range": [
+          0.22375711837579676,
+          0.6493808467369017
+        ],
+        "food_range": [
+          87.62166720952474,
+          124.56838116121727
+        ],
+        "instance_range": [
+          0,
+          0
+        ]
+      },
+      "Barren": {
+        "final": {
+          "region": "Barren",
+          "authority": true,
+          "visual_cells": 56,
+          "instances": 0,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "food": 23.097121265853463,
+          "grown": 360.3936794570717,
+          "environment_lost": 0.36490395226605277,
+          "consumed": 388.8165186795806,
+          "mean_moisture": 0.41377294766715195,
+          "rain": 0,
+          "ground_cells": 900,
+          "grass_cells": 810,
+          "riparian_cells": 0,
+          "shrub_cells": 90,
+          "connected_water_cells": 0,
+          "native_step": 1588,
+          "ledger_amount": 23.097121265853463,
+          "ledger_consumed": 388.8165186795806,
+          "ledger_grown": 360.3936794570717,
+          "ledger_environment_lost": 0.36490395226605277,
+          "ledger_habitat_removed": 0,
+          "receipt_sequence": 1588
+        },
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "moisture_range": [
+          0.28293758301141725,
+          0.7062982584530769
+        ],
+        "food_range": [
+          11.876185048010013,
+          43.38393330207689
+        ],
+        "instance_range": [
+          0,
+          0
+        ]
+      },
+      "Highland": {
+        "final": {
+          "region": "Highland",
+          "authority": true,
+          "visual_cells": 35,
+          "instances": 0,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "food": 6.84334067830414,
+          "grown": 82.37748770307795,
+          "environment_lost": 0.25601547192436586,
+          "consumed": 107.38512895348751,
+          "mean_moisture": 0.6589828393542784,
+          "rain": 0.6499999761581421,
+          "ground_cells": 900,
+          "grass_cells": 810,
+          "riparian_cells": 0,
+          "shrub_cells": 90,
+          "connected_water_cells": 0,
+          "native_step": 1588,
+          "ledger_amount": 6.84334067830414,
+          "ledger_consumed": 107.38512895348751,
+          "ledger_grown": 82.37748770307795,
+          "ledger_environment_lost": 0.25601547192436586,
+          "ledger_habitat_removed": 0,
+          "receipt_sequence": 1588
+        },
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "moisture_range": [
+          0.46133201493390896,
+          0.8960631381564713
+        ],
+        "food_range": [
+          3.778968694597184,
+          31.048514579388492
+        ],
+        "instance_range": [
+          0,
+          0
+        ]
+      }
+    },
+    "max_ledger_errors": {
+      "food": 0.0,
+      "consumed": 0.0,
+      "grown": 0.0,
+      "environment_lost": 0
+    },
+    "actual_intake_samples": 9424,
+    "active_journey_samples": 686,
+    "region_transfers": [
+      {
+        "id": "89",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 171.23399999999674,
+        "previous": [
+          33902.468940269435,
+          25969.71078262325,
+          -902.1580375446733
+        ],
+        "current": [
+          33903.31042013859,
+          26437.707719691476,
+          -953.3211638561618
+        ]
+      },
+      {
+        "id": "100",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 171.23399999999674,
+        "previous": [
+          34049.77958682901,
+          25584.786736086127,
+          -850.3352637198986
+        ],
+        "current": [
+          34049.81093895551,
+          26052.786731345586,
+          -912.4382300277406
+        ]
+      },
+      {
+        "id": "63",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 173.26499999999942,
+        "previous": [
+          34143.26342570424,
+          25676.557550139667,
+          -864.3114110168165
+        ],
+        "current": [
+          34143.12957636919,
+          26216.543120864844,
+          -930.1494695107936
+        ]
+      },
+      {
+        "id": "79",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 177.2809999999954,
+        "previous": [
+          34049.75903757458,
+          25857.483262404305,
+          -888.1112861546953
+        ],
+        "current": [
+          34049.75628727695,
+          26397.483253950464,
+          -950.1584707631553
+        ]
+      },
+      {
+        "id": "57",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 187.375,
+        "previous": [
+          34098.25891563398,
+          25934.423889985916,
+          -897.2509346475456
+        ],
+        "current": [
+          34097.9303782293,
+          26474.422830802156,
+          -958.7472328640297
+        ]
+      },
+      {
+        "id": "85",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 187.375,
+        "previous": [
+          34098.33564151275,
+          25669.96215116921,
+          -863.281534083375
+        ],
+        "current": [
+          34098.07618045482,
+          26209.96097461099,
+          -929.2223411015916
+        ]
+      },
+      {
+        "id": "102",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 189.375,
+        "previous": [
+          33950.20035159451,
+          25899.584936365733,
+          -894.082226020035
+        ],
+        "current": [
+          33950.23414166842,
+          26439.584924947263,
+          -954.419434416835
+        ]
+      },
+      {
+        "id": "69",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 191.4059999999954,
+        "previous": [
+          33855.10081330626,
+          25914.380039046482,
+          -896.107807323313
+        ],
+        "current": [
+          33855.89218662579,
+          26454.373412997975,
+          -953.6433500744529
+        ]
+      },
+      {
+        "id": "74",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 191.4059999999954,
+        "previous": [
+          33950.21919748453,
+          25924.425449524468,
+          -897.0050298427967
+        ],
+        "current": [
+          33950.261831827025,
+          26464.42543236644,
+          -956.7225920759454
+        ]
+      },
+      {
+        "id": "87",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 191.4059999999954,
+        "previous": [
+          34000.00000006393,
+          26034.212141399155,
+          -909.4826042803876
+        ],
+        "current": [
+          34000.00000002288,
+          26574.212141399163,
+          -968.4867567704223
+        ]
+      },
+      {
+        "id": "75",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 203.56199999999808,
+        "previous": [
+          33901.67733493507,
+          25696.457975351077,
+          -865.9823444826338
+        ],
+        "current": [
+          33901.95049893104,
+          26236.456881057242,
+          -933.9214408119108
+        ]
+      },
+      {
+        "id": "72",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 205.59300000000076,
+        "previous": [
+          34049.70192558095,
+          26033.273548032714,
+          -909.6353303046509
+        ],
+        "current": [
+          34049.57009090403,
+          26429.273497851456,
+          -953.8291743633877
+        ]
+      },
+      {
+        "id": "98",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 205.59300000000076,
+        "previous": [
+          34143.73286279066,
+          26012.140714434372,
+          -906.2625699727765
+        ],
+        "current": [
+          34142.5691948882,
+          26552.12349875544,
+          -966.0602474453285
+        ]
+      }
+    ],
+    "screenshots": 0
+  },
+  "clients": [
+    {
+      "name": "ClientA",
+      "passed": true,
+      "authority_agents": 0,
+      "zero_native_step": true,
+      "local_migration_subsystems": 0,
+      "received_migrated_forest_ids": [],
+      "received_rain_fx": true,
+      "fields": [
+        {
+          "region": "Highland",
+          "authority": false,
+          "visual_cells": 35,
+          "instances": 35,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass"
+        },
+        {
+          "region": "Barren",
+          "authority": false,
+          "visual_cells": 56,
+          "instances": 56,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass"
+        },
+        {
+          "region": "Forest",
+          "authority": false,
+          "visual_cells": 129,
+          "instances": 127,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass"
+        }
+      ]
+    },
+    {
+      "name": "ClientB",
+      "passed": true,
+      "authority_agents": 0,
+      "zero_native_step": true,
+      "local_migration_subsystems": 0,
+      "received_migrated_forest_ids": [
+        "100",
+        "102",
+        "57",
+        "63",
+        "79",
+        "85",
+        "89"
+      ],
+      "received_rain_fx": true,
+      "fields": [
+        {
+          "region": "Forest",
+          "authority": false,
+          "visual_cells": 129,
+          "instances": 128,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass"
+        },
+        {
+          "region": "Barren",
+          "authority": false,
+          "visual_cells": 56,
+          "instances": 56,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass"
+        },
+        {
+          "region": "Highland",
+          "authority": false,
+          "visual_cells": 35,
+          "instances": 26,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass"
+        }
+      ]
+    }
+  ],
+  "server_full_270_second_log": {
+    "completed_plans": [
+      {
+        "plan": 6,
+        "herd": 58,
+        "origin": "Barren",
+        "destination": "Forest",
+        "arrived": 2,
+        "members": 2
+      },
+      {
+        "plan": 1,
+        "herd": 37,
+        "origin": "Barren",
+        "destination": "Forest",
+        "arrived": 2,
+        "members": 2
+      },
+      {
+        "plan": 5,
+        "herd": 122,
+        "origin": "Barren",
+        "destination": "Forest",
+        "arrived": 1,
+        "members": 2
+      },
+      {
+        "plan": 4,
+        "herd": 119,
+        "origin": "Barren",
+        "destination": "Forest",
+        "arrived": 3,
+        "members": 3
+      },
+      {
+        "plan": 2,
+        "herd": 57,
+        "origin": "Barren",
+        "destination": "Forest",
+        "arrived": 2,
+        "members": 2
+      },
+      {
+        "plan": 3,
+        "herd": 98,
+        "origin": "Barren",
+        "destination": "Forest",
+        "arrived": 2,
+        "members": 2
+      }
+    ],
+    "completion_may_include_dead_members": true,
+    "note": "Detailed sampler stops at 210 seconds; these normal server lifecycle log events continue until exit"
+  },
+  "process_exits": [
+    {
+      "name": "ClientA",
+      "exit_code": 0
+    },
+    {
+      "name": "ClientB",
+      "exit_code": 0
+    },
+    {
+      "name": "Server",
+      "exit_code": 0
+    }
+  ],
+  "limitations": [
+    "Authored periodic climate, not stochastic seasonal weather or ecological equilibrium",
+    "Representative exact cell visuals <=256 per region; all three plant types currently share the grass mesh",
+    "Riparian BP is an unplaced template; no verified connected water surface in the three native stages",
+    "No complete ecosystem save, conditional natural birth/genome/body pipeline, experience system or trace investigation",
+    "No Python soil-world parity/retraining, cook/package or server/client p95 and bandwidth claim",
+    "A short observer session does not prove long-term survival, migration settlement or balance"
+  ]
+}

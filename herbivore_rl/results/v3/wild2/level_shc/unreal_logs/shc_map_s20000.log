@@ -1,0 +1,2 @@
+LogInit: Command Line: /Game/SHC/Maps/LV_SHC_RegionalWeatherTest -game -EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=20000 -EcoV3ObstacleExport=<scratch>/v3_shc_export_s20000.json -benchmark -fps=60 -seconds=20 -NullRHI -NoSound -unattended -nosplash -nopause -DisablePlugins=Bridge,Fab
+[2026.10.17-12.45.49:513][  0]LogEcoPolicyV3I: [EcoV3I] 통합 모드가 요청됐지만 이 월드에 통합 조정자(AEcoCreatureIntegrationSpawner)가 없다 — 아무것도 바꾸지 않는다

@@ -32,6 +32,7 @@ void UEcoHerdSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	ActiveHerds.Reset();
 	InjectedAlarms.Reset();
 	ObservedAlarms.Reset();
+	NativeV3Alarms.Reset();
 	ThreatSources.Reset();
 	HerdSpeciesIndices.Reset();
 	FreeSlots.Reset();
@@ -43,6 +44,7 @@ void UEcoHerdSubsystem::Deinitialize()
 	ActiveHerds.Reset();
 	InjectedAlarms.Reset();
 	ObservedAlarms.Reset();
+	NativeV3Alarms.Reset();
 	ThreatSources.Reset();
 	HerdSpeciesIndices.Reset();
 	FreeSlots.Reset();
@@ -62,11 +64,13 @@ int32 UEcoHerdSubsystem::AllocateHerd(int32 SpeciesRuntimeIndex, const FVector& 
 		HerdSpeciesIndices.AddDefaulted();
 		InjectedAlarms.AddDefaulted();
 		ObservedAlarms.AddDefaulted();
+		NativeV3Alarms.AddDefaulted();
 	}
 
 	FEcoHerdRuntimeData& NewHerd = ActiveHerds[SlotIndex];
 	InjectedAlarms[SlotIndex] = {};
 	ObservedAlarms[SlotIndex] = {};
+	NativeV3Alarms[SlotIndex] = {};
 	NewHerd.RuntimeIndex = SlotIndex;
 	NewHerd.PersistentHerdId = NextPersistentHerdId++;
 	NewHerd.Center = InitialCenter;
@@ -93,6 +97,7 @@ void UEcoHerdSubsystem::ReleaseHerd(int32 RuntimeIndex)
 		ActiveHerds[RuntimeIndex].Representative.Reset();
 		InjectedAlarms[RuntimeIndex] = {};
 		ObservedAlarms[RuntimeIndex] = {};
+		NativeV3Alarms[RuntimeIndex] = {};
 		ActiveHerds[RuntimeIndex].AlarmStrength = 0.0f;
 		ActiveHerds[RuntimeIndex].LastThreatPosition = FVector::ZeroVector;
 		ActiveHerds[RuntimeIndex].LastThreatEvidenceTime = -1.0;
@@ -226,6 +231,7 @@ void UEcoHerdSubsystem::DecayHerdAlarms(float DeltaTime, float DecayRate)
 
 		InjectedAlarms[i].Strength = FMath::Max(0.0f, InjectedAlarms[i].Strength - DecayRate * DeltaTime);
 		ObservedAlarms[i].Strength = FMath::Max(0.0f, ObservedAlarms[i].Strength - DecayRate * DeltaTime);
+		NativeV3Alarms[i].Strength = FMath::Max(0.0f, NativeV3Alarms[i].Strength - DecayRate * DeltaTime);
 		ResolveAlarm(i);
 	}
 }
@@ -239,6 +245,7 @@ void UEcoHerdSubsystem::ClearHerdAlarms()
 		{
 			InjectedAlarms[i] = {};
 			ObservedAlarms[i] = {};
+			NativeV3Alarms[i] = {};
 			ResolveAlarm(i);
 		}
 	}
@@ -246,17 +253,18 @@ void UEcoHerdSubsystem::ClearHerdAlarms()
 
 void UEcoHerdSubsystem::ResolveAlarm(int32 RuntimeIndex)
 {
-	const FEcoHerdAlarmInput& Input = ObservedAlarms[RuntimeIndex].Strength >= InjectedAlarms[RuntimeIndex].Strength
-		? ObservedAlarms[RuntimeIndex] : InjectedAlarms[RuntimeIndex];
+	const FEcoHerdAlarmInput& Observed = NativeV3Alarms[RuntimeIndex].Strength > ObservedAlarms[RuntimeIndex].Strength ? NativeV3Alarms[RuntimeIndex] : ObservedAlarms[RuntimeIndex];
+    const FEcoHerdAlarmInput& Input = Observed.Strength >= InjectedAlarms[RuntimeIndex].Strength ? Observed : InjectedAlarms[RuntimeIndex];
 	ActiveHerds[RuntimeIndex].AlarmStrength = Input.Strength;
 	ActiveHerds[RuntimeIndex].LastThreatPosition = Input.Strength > 0.0f ? Input.Position : FVector::ZeroVector;
 	ActiveHerds[RuntimeIndex].LastThreatEvidenceTime = Input.Strength > 0.0f ? Input.EvidenceWorldTime : -1.0;
 }
 
-void UEcoHerdSubsystem::ApplyObservedHerdThreats(TConstArrayView<FEcoObservedHerdThreat> Threats)
+void UEcoHerdSubsystem::ApplyObservedHerdThreats(TConstArrayView<FEcoObservedHerdThreat> Threats, bool bNativeV3Channel)
 {
 	check(IsInGameThread());
-	for (FEcoHerdAlarmInput& Input : ObservedAlarms)
+	auto& Channel = bNativeV3Channel ? NativeV3Alarms : ObservedAlarms;
+	for (FEcoHerdAlarmInput& Input : Channel)
 	{
 		Input = {};
 	}
@@ -266,9 +274,9 @@ void UEcoHerdSubsystem::ApplyObservedHerdThreats(TConstArrayView<FEcoObservedHer
 		if (IsValidHerdIndex(Index) && ActiveHerds[Index].PersistentHerdId == Threat.PersistentHerdId
 			&& !Threat.Position.ContainsNaN() && FMath::IsFinite(Threat.Strength))
 		{
-			ObservedAlarms[Index].Position = Threat.Position;
-			ObservedAlarms[Index].Strength = FMath::Clamp(Threat.Strength, 0.0f, 1.0f);
-			ObservedAlarms[Index].EvidenceWorldTime = GetWorld()->GetTimeSeconds();
+			Channel[Index].Position = Threat.Position;
+			Channel[Index].Strength = FMath::Clamp(Threat.Strength, 0.0f, 1.0f);
+			Channel[Index].EvidenceWorldTime = GetWorld()->GetTimeSeconds();
 		}
 	}
 	for (int32 Index = 0; Index < ActiveHerds.Num(); ++Index)

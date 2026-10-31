@@ -11,6 +11,8 @@ class UTextRenderComponent;
 class USkeletalMesh;
 class UBlendSpace;
 class UAnimSequence;
+class UEcoCreatureAnimationProfile;
+class UEcoCreatureAnimInstance;
 class UEcoFootstepAudioComponent;
 
 /** Passive Mass representation. No controller, movement component, physics, or logical state writer. */
@@ -31,6 +33,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<USkeletalMesh> VisualMesh;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<UBlendSpace> LocomotionBlendSpace;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<UAnimSequence> DeathAnimation;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<UEcoCreatureAnimationProfile> AnimationProfile;
+	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TSubclassOf<UEcoCreatureAnimInstance> BehaviorAnimationClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") FRotator MeshRotation = FRotator::ZeroRotator;
 	/** Anatomical forward in the imported mesh's local space; independent of Actor +X. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") FVector MeshForwardAxis = FVector::ForwardVector;
@@ -59,6 +63,9 @@ protected:
 	virtual void BeginPlay() override;
 	void RefreshAppearance();
 	double LastFacingAuditTime = -1.0;
+	FTimerHandle AlarmTimer;
+	double LastAlarmTime = -10;
+	void PlayAlarmCue();
 };
 
 UCLASS(Blueprintable)

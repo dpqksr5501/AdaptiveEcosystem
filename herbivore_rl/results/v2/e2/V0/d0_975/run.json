@@ -1,0 +1,117 @@
+{
+ "label": "V0/d0_975",
+ "config_digest": {
+  "": "2249d942876c",
+  "tf/": "539c8d252274",
+  "g998/": "2249d942876c"
+ },
+ "smoke": false,
+ "steps": [
+  {
+   "stem": "a_forbid",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag a_forbid --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.0",
+   "returncode": 0,
+   "elapsed_s": 41.7,
+   "finished": "2026-10-02T16:14:04+00:00"
+  },
+  {
+   "stem": "a_allow",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag a_allow --seg-bins threat_recency:0.5,1 --seg-dims vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25",
+   "returncode": 0,
+   "elapsed_s": 1132.8,
+   "finished": "2026-10-02T16:32:56+00:00"
+  },
+  {
+   "stem": "b_forbid",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag b_forbid --seg-bins threat_recency:0.5,1 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.0",
+   "returncode": 0,
+   "elapsed_s": 1136.2,
+   "finished": "2026-10-02T16:51:53+00:00"
+  },
+  {
+   "stem": "b_allow",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag b_allow --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --enqueue 0.4913744307309694 0.25 0.4913744307309694 0.25 0.4913744307309694 0.25 --enqueue 0.4913744307309694 0.25 0.4913744307309694 0.25 0.4913744307309694 0.25",
+   "returncode": 0,
+   "elapsed_s": 1136.6,
+   "finished": "2026-10-02T17:10:49+00:00"
+  },
+  {
+   "stem": "e2b_vig",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag e2b_vig --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 0.4913744307309694 1.0 1.0 0.0",
+   "returncode": 0,
+   "elapsed_s": 74.7,
+   "finished": "2026-10-02T17:12:04+00:00"
+  },
+  {
+   "stem": "e2b_run",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag e2b_run --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 1.0 0.0 1.0 0.0",
+   "returncode": 0,
+   "elapsed_s": 75.7,
+   "finished": "2026-10-02T17:13:20+00:00"
+  },
+  {
+   "stem": "tf/e2b_run18",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975_tf1.yaml --workers 6 --out results/v2/e2/V0/d0_975/tf --tag e2b_run18 --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 1.0 0.0 1.0 0.0",
+   "returncode": 0,
+   "elapsed_s": 75.3,
+   "finished": "2026-10-02T17:14:35+00:00"
+  },
+  {
+   "stem": "e2b_tab_vig",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag e2b_tab_vig --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --const-action 0.4913744307309694 0.25 0.4913744307309694 1.0 0.4913744307309694 0.25",
+   "returncode": 0,
+   "elapsed_s": 74.3,
+   "finished": "2026-10-02T17:15:49+00:00"
+  },
+  {
+   "stem": "e2b_tab_run",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975 --tag e2b_tab_run --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --const-action 0.4913744307309694 0.25 1.0 0.0 0.4913744307309694 0.25",
+   "returncode": 0,
+   "elapsed_s": 74.0,
+   "finished": "2026-10-02T17:17:03+00:00"
+  },
+  {
+   "stem": "g998/a_forbid",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag a_forbid --g998 --const-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.0",
+   "returncode": 0,
+   "elapsed_s": 81.8,
+   "finished": "2026-10-02T17:18:25+00:00"
+  },
+  {
+   "stem": "g998/a_allow",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag a_allow --g998 --seg-bins threat_recency:0.5,1 --seg-dims vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --const-action 0.25 0.25 0.25",
+   "returncode": 0,
+   "elapsed_s": 143.2,
+   "finished": "2026-10-02T17:20:48+00:00"
+  },
+  {
+   "stem": "g998/b_forbid",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag b_forbid --g998 --seg-bins threat_recency:0.5,1 --seg-dims speed --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.4913744307309694 0.4913744307309694",
+   "returncode": 0,
+   "elapsed_s": 144.2,
+   "finished": "2026-10-02T17:23:13+00:00"
+  },
+  {
+   "stem": "g998/b_allow",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag b_allow --g998 --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 0.2182330585135458 0.03358694847233987 0.4913744307309694 0.25 --const-action 0.4913744307309694 0.25 0.4913744307309694 0.25 0.4913744307309694 0.25",
+   "returncode": 0,
+   "elapsed_s": 143.0,
+   "finished": "2026-10-02T17:25:36+00:00"
+  },
+  {
+   "stem": "g998/e2b_vig",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag e2b_vig --g998 --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 0.4913744307309694 1.0 1.0 0.0",
+   "returncode": 0,
+   "elapsed_s": 144.0,
+   "finished": "2026-10-02T17:28:00+00:00"
+  },
+  {
+   "stem": "g998/e2b_run",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e2/configs/V0_d0_975.yaml --workers 6 --out results/v2/e2/V0/d0_975/g998 --tag e2b_run --g998 --seg-bins threat_recency:0.5,1 --seg-dims speed vigilance --base-action 0.9709889334578663 0.7849404966375042 1.0 0.03358694847233987 0.4913744307309694 0.0 --const-action 0.4913744307309694 0.0 1.0 0.0 1.0 0.0",
+   "returncode": 0,
+   "elapsed_s": 144.8,
+   "finished": "2026-10-02T17:30:24+00:00"
+  }
+ ],
+ "python": "3.13.5"
+}

@@ -1,5 +1,11 @@
 # 감각·인지 AI와 Social 연동
 
+## 2026-10-23 v3 신호 소비 보완
+
+현재 v3용 읽기 경계는 `EcoV3Social::ReadSignal(Sense, Alarm, CurrentHerdId, Now, Settings)` 버전 1이다. 기존 aged sensory snapshot을 이용해 유효한 개인 증거를 우선하고 없으면 현재 Herd와 일치하는 유효 shared report를 제공한다. Direct/Memory/Shared와 증거/수신 시각을 구분하며 재수신으로 원 증거 TTL을 갱신하지 않는다. 모르는 SourceKey는 0이다.
+
+기본 SocialControl=0을 유지한다. 이 API 추가는 RL 관측 차원·Raw Request·학습 가중치를 바꾸거나 모든 경보를 직접 Sight로 승격하지 않는다. [현재 신호·원인 기록 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md#신호-계약과-원인-기록), [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 따른다. 아래 감각 MVP/초기 Pending은 해당 날짜 기록이다.
+
 > 최초 구현 2026-10-02 · 인지 인계 계약 확장 2026-10-05 · 조연우 담당 · UE 5.8
 >
 > 범위: 시각·청각·개체별 위협 기억·정보 출처 구분. 후각은 제외한다.
@@ -118,8 +124,8 @@ AI 감지 반경과 플레이어가 듣는 SA 범위는 서로 다른 규칙이�
   Senses 5 + 기존 Threat 4 + ShelterLifecycle 5. 실행은 빌드 완료 후 시작하고 종료까지 기다렸다.
 - 새 Senses 테스트: sight loss/reacquisition, hearing occlusion/once-only, 환경·개체 프로필,
   전달 정보 분리, 소음 수명·컴포넌트·queue bound. 기존 Social Threat/Lifecycle 회귀도 통과했다.
-- [테스트 보고서](../../Saved/Automation/SocialSensory/index.json), [테스트 로그](../../Saved/Logs/SocialSensoryAutomation.log),
-  [빌드 로그](../../Saved/Logs/EcoSensoryBuild.log). Saved 산출물은 로컬 파일이고 Git에 포함하지 않는다.
+- 당시 로컬 테스트 보고서: `Saved/Automation/SocialSensory/index.json`; 테스트 로그: `Saved/Logs/SocialSensoryAutomation.log`;
+  빌드 로그: `Saved/Logs/EcoSensoryBuild.log` (프로젝트 루트 기준). Saved 산출물은 Git에 포함하지 않으며 로그 파일이 현재 체크아웃에 남아 있다는 보장은 없다.
 - UBT의 기존 StructUtils/MassEntityHandle deprecated 경고는 남아 있다. 테스트 경고 0과 빌드 경고를 구분한다.
 - JYU 시각 PIE, 실제 Sound/SA 청취, production EntityConfig/Client, 전체 실제 이동은 **아직 검증하지 않았다**.
 

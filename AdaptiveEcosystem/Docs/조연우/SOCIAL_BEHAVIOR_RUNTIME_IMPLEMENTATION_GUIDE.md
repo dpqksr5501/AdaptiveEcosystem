@@ -1,5 +1,15 @@
 # Social Behavior & Shelter Runtime — AI Coding Agent Implementation Guide
 
+## 2026-10-23 재개 지침
+
+[최신 인수인계](JYU_CHAT_HANDOFF_20261023.md) → [현재 이주·신호 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md) → [디버그 계약](HERD_MIGRATION_DEBUG_20261023.md)을 먼저 읽는다. 아래 TASK 4/Current Base/소비자 대기 목록은 2026-09~10월 초기 통합 감사다. 이미 연결된 v3 Native 이동·실제 도착·M4 장부·Client 표현을 다시 구현하라는 지시가 아니다.
+
+수정 전 `AI/Social/EcoPolicyV3SocialBridge.*`, `Mass/EcoHerdMigration.*`, `Creature/Runtime/EcoCreatureLifecycle.cpp`, `Creature/Debug/EcoHerdMigrationDebug.*`와 실제 production Trait/Spawner를 대조한다. 기본 SocialControl=0, 기존 맵 이주 OFF, 새 owned 이주 맵 ON을 보존한다. Native 단일 이동 writer·기존 V1 경로/Bootstrap 가드를 유지한다. 다음 후보는 장기 균형·정체 원인 세분화·추가 authored 경로·배포 검증이며 상세 완료 기준은 인수인계에 있다.
+
+Source/빌드 입력을 바꾸면 루트 빌드 규칙을 따른다. 이번 문서만 갱신한 작업은 링크·Source·diff 확인이며 새 UBT/PIE 성공을 추가하지 않는다.
+
+## 과거 구현 가이드
+
 > **2026-10-08 현재 구현:** 별도 opt-in Creature 경로는 PPO→Social Request→단일 Movement→Feedback, 은신처 Moving/Occupied·해제 및 기존 Mass Client 표현을 실제 테스트 레벨에 연결했다. 늑대 감각·발 접촉 Notify·Grass/Dry 표면도 적용했고 전체 자동화 43/43 및 PIE·서버/재접속 검증을 마쳤다. 아래 TASK 4 우선순위는 기존 JYU/M3 기준 이력이며, 현재 범위와 담당자 후속 연결은 [CURRENT_STATE](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md), [최신 구현·검증](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md)을 우선한다.
 
 > **Project:** AdaptiveEcosystem  
@@ -14,7 +24,7 @@
 > 구현 전 반드시 `AGENTS.md` → Active Architecture → Policy Contract → [Social CURRENT_STATE](SOCIAL_BEHAVIOR_RUNTIME_CURRENT_STATE.md) → Mass Processor Order를 먼저 읽고,
 > 이 문서를 Social Behavior 기능 구현을 위한 추가 지침으로 사용한다.
 
-## CURRENT PRIORITY — TASK 4 Production Integration
+## Historical priority — TASK 4 Production Integration
 
 Verified Herd / Alarm / Shelter MVP를 production PPO / Steering / Lifecycle 경로와 통합한다. 아래 기존 TASK 0~3과 후보 타입/알고리즘은 **Historical / MVP Completed 범위의 설계 이력**이다. 현재 소스를 처음부터 재구현하라는 지시가 아니다. Editor Verified는 기존 기록이며 이번 감사는 Source/Docs 검토만 수행했다.
 
@@ -1513,7 +1523,7 @@ reservation
 release
 ```
 
-## Phase 5 — CURRENT PRIORITY: Production Integration
+## Phase 5 — Historical priority: Production Integration
 
 ```text
 Real Threat → Alarm
@@ -1743,7 +1753,7 @@ release
 
 ---
 
-# 26. CURRENT PRIORITY — TASK 4 Production Integration
+# 26. Historical priority — TASK 4 Production Integration
 
 최종:
 

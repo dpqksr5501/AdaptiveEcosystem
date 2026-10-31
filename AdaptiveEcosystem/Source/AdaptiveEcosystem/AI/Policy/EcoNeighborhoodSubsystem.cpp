@@ -17,7 +17,7 @@ int64 UEcoNeighborhoodSubsystem::CellKey(const FVector& Location) const
 {
 	const int64 X = static_cast<int64>(FMath::FloorToInt(Location.X / CellSize));
 	const int64 Y = static_cast<int64>(FMath::FloorToInt(Location.Y / CellSize));
-	return (X << 32) ^ (Y & 0xFFFFFFFF);
+	return static_cast<int64>((static_cast<uint64>(X) << 32) | (static_cast<uint64>(Y) & 0xFFFFFFFFULL));
 }
 
 void UEcoNeighborhoodSubsystem::Build()
@@ -49,7 +49,7 @@ void UEcoNeighborhoodSubsystem::QueryRadius(const FVector& Location, float Radiu
 	{
 		for (int32 dx = -Span; dx <= Span; ++dx)
 		{
-			const int64 Key = ((CX + dx) << 32) ^ ((CY + dy) & 0xFFFFFFFF);
+			const int64 Key = static_cast<int64>((static_cast<uint64>(CX + dx) << 32) | (static_cast<uint64>(CY + dy) & 0xFFFFFFFFULL));
 			if (const TArray<int32>* Bucket = Cells.Find(Key))
 			{
 				for (int32 Index : *Bucket)

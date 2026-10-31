@@ -1,0 +1,564 @@
+{
+  "date": "2026-10-16",
+  "branch": "codex/social-shelter-handoff",
+  "teammate_tips": {
+    "Branch_Sinhyeok": "b5c7384",
+    "wonkii/M4": "67c860c"
+  },
+  "map": "/Game/JYU/Maps/LV_JYU_V3Integration",
+  "rhi": "D3D11",
+  "build": {
+    "result": "Succeeded",
+    "log": "Saved/SocialV3_20261016/Build09.log"
+  },
+  "automation": {
+    "succeeded": 139,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "social_tests": [
+    {
+      "fullTestPath": "AdaptiveEcosystem.Policy.V3.Social.BlindMemberReaction",
+      "state": "Success",
+      "entries": [
+        {
+          "event": {
+            "type": "Info",
+            "message": "Native source: active=1 threats=1 adopted=1 context=0 observerSense=1 herd=0 strength=1.000",
+            "context": "",
+            "artifact": "00000000000000000000000000000000"
+          },
+          "filename": "",
+          "lineNumber": -1,
+          "timestamp": "2026.10.15-17.56.28"
+        },
+        {
+          "event": {
+            "type": "Info",
+            "message": "Reaction step=0 x=27.000 death=0 behavior=1 startle=1 shared=1 override=2 vx=0.000",
+            "context": "",
+            "artifact": "00000000000000000000000000000000"
+          },
+          "filename": "",
+          "lineNumber": -1,
+          "timestamp": "2026.10.15-17.56.28"
+        },
+        {
+          "event": {
+            "type": "Info",
+            "message": "Reaction step=1 x=27.000 death=0 behavior=1 startle=0 shared=0 override=2 vx=0.000",
+            "context": "",
+            "artifact": "00000000000000000000000000000000"
+          },
+          "filename": "",
+          "lineNumber": -1,
+          "timestamp": "2026.10.15-17.56.28"
+        },
+        {
+          "event": {
+            "type": "Info",
+            "message": "Reaction step=2 x=27.600 death=0 behavior=1 startle=0 shared=0 override=2 vx=0.600",
+            "context": "",
+            "artifact": "00000000000000000000000000000000"
+          },
+          "filename": "",
+          "lineNumber": -1,
+          "timestamp": "2026.10.15-17.56.28"
+        },
+        {
+          "event": {
+            "type": "Info",
+            "message": "Reaction step=3 x=28.200 death=0 behavior=1 startle=0 shared=0 override=2 vx=0.600",
+            "context": "",
+            "artifact": "00000000000000000000000000000000"
+          },
+          "filename": "",
+          "lineNumber": -1,
+          "timestamp": "2026.10.15-17.56.28"
+        },
+        {
+          "event": {
+            "type": "Info",
+            "message": "Reaction step=4 x=28.800 death=0 behavior=1 startle=0 shared=0 override=2 vx=0.600",
+            "context": "",
+            "artifact": "00000000000000000000000000000000"
+          },
+          "filename": "",
+          "lineNumber": -1,
+          "timestamp": "2026.10.15-17.56.28"
+        },
+        {
+          "event": {
+            "type": "Info",
+            "message": "Reaction step=5 x=29.400 death=0 behavior=1 startle=0 shared=0 override=2 vx=0.600",
+            "context": "",
+            "artifact": "00000000000000000000000000000000"
+          },
+          "filename": "",
+          "lineNumber": -1,
+          "timestamp": "2026.10.15-17.56.28"
+        }
+      ]
+    },
+    {
+      "fullTestPath": "AdaptiveEcosystem.Policy.V3.Social.EvidenceChannelsAndUnsafeTarget",
+      "state": "Success",
+      "entries": []
+    },
+    {
+      "fullTestPath": "AdaptiveEcosystem.Policy.V3.Social.PlayerFootstepEvidence",
+      "state": "Success",
+      "entries": []
+    },
+    {
+      "fullTestPath": "AdaptiveEcosystem.Policy.V3.Social.SlotMovementAndCleanup",
+      "state": "Success",
+      "entries": []
+    }
+  ],
+  "pie": {
+    "samples": 70,
+    "deer_records": 3274,
+    "detected_records": 697,
+    "flight_override_counts": {
+      "0": 2841,
+      "2": 87,
+      "3": 119,
+      "1": 227
+    },
+    "executed_counts": {
+      "0": 3064,
+      "1": 87,
+      "2": 123
+    },
+    "kin_alarm_records": 192,
+    "heard_cue_records": 133,
+    "learned_policy_read_records": 2863,
+    "preview_fixture_records": 0,
+    "social_override_counts": {
+      "1": 29,
+      "5": 527,
+      "0": 2698,
+      "3": 16,
+      "4": 3,
+      "2": 1
+    },
+    "shelter_state_counts": {
+      "0": 3257,
+      "3": 13,
+      "4": 3,
+      "2": 1
+    },
+    "blind_social_reaction_records": 265,
+    "policy_graze_to_social_flee_records": 0
+  },
+  "blind_alert_or_shelter_records": 25,
+  "actual_occupied_records": [
+    {
+      "stable_id": "47",
+      "world_seconds": 11.516277804970741,
+      "position": "V(X=32370.21, Y=49485.95, Z=-1606.12)",
+      "request": 2,
+      "executed": 2,
+      "native_threat_count": 2,
+      "social_state": 4,
+      "alarm_strength": 0.09520848095417023,
+      "social_override": 4,
+      "shelter_state": 4,
+      "reservation_id": "4",
+      "target": "V(X=32400.00, Y=49500.00, Z=-1590.64)",
+      "visual_speed_cm_s": 0.0,
+      "last_intake": 0,
+      "animation_pose": 3
+    },
+    {
+      "stable_id": "47",
+      "world_seconds": 12.017676707357168,
+      "position": "V(X=32370.21, Y=49485.95, Z=-1606.12)",
+      "request": 2,
+      "executed": 2,
+      "native_threat_count": 2,
+      "social_state": 4,
+      "alarm_strength": 0.07037050276994705,
+      "social_override": 4,
+      "shelter_state": 4,
+      "reservation_id": "4",
+      "target": "V(X=32400.00, Y=49500.00, Z=-1590.64)",
+      "visual_speed_cm_s": 0.0,
+      "last_intake": 0,
+      "animation_pose": 3
+    },
+    {
+      "stable_id": "47",
+      "world_seconds": 12.518929407000542,
+      "position": "V(X=32370.21, Y=49485.95, Z=-1606.12)",
+      "request": 2,
+      "executed": 2,
+      "native_threat_count": 2,
+      "social_state": 4,
+      "alarm_strength": 0.05187249928712845,
+      "social_override": 4,
+      "shelter_state": 4,
+      "reservation_id": "4",
+      "target": "V(X=32400.00, Y=49500.00, Z=-1590.64)",
+      "visual_speed_cm_s": 0.0,
+      "last_intake": 0,
+      "animation_pose": 3
+    }
+  ],
+  "blind_reaction_examples": [
+    {
+      "stable_id": "41",
+      "world_seconds": 1.0177385061979294,
+      "position": "V(X=34711.00, Y=48988.47, Z=-1729.85)",
+      "request": 0,
+      "executed": 0,
+      "native_threat_count": 0,
+      "social_state": 1,
+      "alarm_strength": 0.48131799697875977,
+      "social_override": 1,
+      "shelter_state": 0,
+      "reservation_id": "0",
+      "target": "V(0)",
+      "visual_speed_cm_s": 359.99999999999847,
+      "last_intake": 0,
+      "animation_pose": 0
+    },
+    {
+      "stable_id": "45",
+      "world_seconds": 1.0177385061979294,
+      "position": "V(X=33880.29, Y=49508.83, Z=-1678.24)",
+      "request": 0,
+      "executed": 0,
+      "native_threat_count": 0,
+      "social_state": 1,
+      "alarm_strength": 0.3189716339111328,
+      "social_override": 1,
+      "shelter_state": 0,
+      "reservation_id": "0",
+      "target": "V(0)",
+      "visual_speed_cm_s": 360.0000000000018,
+      "last_intake": 0.0073200001090765,
+      "animation_pose": 0
+    },
+    {
+      "stable_id": "26",
+      "world_seconds": 1.0177385061979294,
+      "position": "V(X=33308.32, Y=49136.56, Z=-1638.43)",
+      "request": 0,
+      "executed": 0,
+      "native_threat_count": 0,
+      "social_state": 1,
+      "alarm_strength": 0.3041751980781555,
+      "social_override": 1,
+      "shelter_state": 0,
+      "reservation_id": "0",
+      "target": "V(0)",
+      "visual_speed_cm_s": 360.0000000000013,
+      "last_intake": 0,
+      "animation_pose": 0
+    },
+    {
+      "stable_id": "28",
+      "world_seconds": 1.0177385061979294,
+      "position": "V(X=33642.46, Y=47847.74, Z=-1634.36)",
+      "request": 0,
+      "executed": 0,
+      "native_threat_count": 0,
+      "social_state": 1,
+      "alarm_strength": 0.40593433380126953,
+      "social_override": 1,
+      "shelter_state": 0,
+      "reservation_id": "0",
+      "target": "V(0)",
+      "visual_speed_cm_s": 360.00000000000097,
+      "last_intake": 0,
+      "animation_pose": 0
+    }
+  ],
+  "network": {
+    "Server": {
+      "ready": true,
+      "snapshots": [
+        {
+          "net_mode": 1,
+          "logical": 390,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 0
+        },
+        {
+          "net_mode": 1,
+          "logical": 390,
+          "visuals": 0,
+          "moving": 1,
+          "occupied": 1,
+          "step": 5
+        },
+        {
+          "net_mode": 1,
+          "logical": 389,
+          "visuals": 0,
+          "moving": 5,
+          "occupied": 1,
+          "step": 10
+        },
+        {
+          "net_mode": 1,
+          "logical": 388,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 2,
+          "step": 15
+        },
+        {
+          "net_mode": 1,
+          "logical": 388,
+          "visuals": 0,
+          "moving": 1,
+          "occupied": 1,
+          "step": 20
+        },
+        {
+          "net_mode": 1,
+          "logical": 387,
+          "visuals": 0,
+          "moving": 2,
+          "occupied": 1,
+          "step": 25
+        },
+        {
+          "net_mode": 1,
+          "logical": 386,
+          "visuals": 0,
+          "moving": 1,
+          "occupied": 1,
+          "step": 30
+        },
+        {
+          "net_mode": 1,
+          "logical": 385,
+          "visuals": 0,
+          "moving": 1,
+          "occupied": 1,
+          "step": 35
+        },
+        {
+          "net_mode": 1,
+          "logical": 385,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 40
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 45
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 50
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 55
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 60
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 65
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 70
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 75
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 80
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 85
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 1,
+          "occupied": 0,
+          "step": 90
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 95
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 100
+        },
+        {
+          "net_mode": 1,
+          "logical": 384,
+          "visuals": 0,
+          "moving": 0,
+          "occupied": 0,
+          "step": 105
+        }
+      ],
+      "occupied_transitions": [
+        "[2026.10.15-17.58.16:840][139]LogEcoSocialShelter: [Shelter][Transition] World=LV_JYU_V3Integration Time=4.76 Agent=288 Reservation=2 Moving->Occupied Slot=32 Distance=24.6 Seq=13",
+        "[2026.10.15-17.58.24:009][354]LogEcoSocialShelter: [Shelter][Transition] World=LV_JYU_V3Integration Time=11.93 Agent=337 Reservation=5 Moving->Occupied Slot=36 Distance=29.4 Seq=26",
+        "[2026.10.15-17.58.25:105][387]LogEcoSocialShelter: [Shelter][Transition] World=LV_JYU_V3Integration Time=13.02 Agent=109 Reservation=10 Moving->Occupied Slot=12 Distance=16.4 Seq=14",
+        "[2026.10.15-17.58.35:900][711]LogEcoSocialShelter: [Shelter][Transition] World=LV_JYU_V3Integration Time=23.82 Agent=373 Reservation=17 Moving->Occupied Slot=28 Distance=8.6 Seq=16",
+        "[2026.10.15-17.58.41:093][863]LogEcoSocialShelter: [Shelter][Transition] World=LV_JYU_V3Integration Time=29.01 Agent=319 Reservation=22 Moving->Occupied Slot=36 Distance=28.7 Seq=18",
+        "[2026.10.15-17.58.45:611][999]LogEcoSocialShelter: [Shelter][Transition] World=LV_JYU_V3Integration Time=33.53 Agent=295 Reservation=29 Moving->Occupied Slot=32 Distance=50.1 Seq=5",
+        "[2026.10.15-17.59.46:167][814]LogEcoSocialShelter: [Shelter][Transition] World=LV_JYU_V3Integration Time=94.09 Agent=179 Reservation=40 Moving->Occupied Slot=52 Distance=32.7 Seq=15"
+      ],
+      "unexpected_errors": [],
+      "startup_low_level_test_messages": 0
+    },
+    "ClientA": {
+      "ready": true,
+      "snapshots": [
+        {
+          "net_mode": 3,
+          "logical": 0,
+          "visuals": 64,
+          "moving": 0,
+          "occupied": 0,
+          "step": 0
+        },
+        {
+          "net_mode": 3,
+          "logical": 0,
+          "visuals": 60,
+          "moving": 0,
+          "occupied": 0,
+          "step": 0
+        },
+        {
+          "net_mode": 3,
+          "logical": 0,
+          "visuals": 48,
+          "moving": 0,
+          "occupied": 0,
+          "step": 0
+        }
+      ],
+      "occupied_transitions": [],
+      "unexpected_errors": [],
+      "startup_low_level_test_messages": 0
+    },
+    "ClientB": {
+      "ready": true,
+      "snapshots": [
+        {
+          "net_mode": 3,
+          "logical": 0,
+          "visuals": 39,
+          "moving": 0,
+          "occupied": 0,
+          "step": 0
+        },
+        {
+          "net_mode": 3,
+          "logical": 0,
+          "visuals": 47,
+          "moving": 0,
+          "occupied": 0,
+          "step": 0
+        },
+        {
+          "net_mode": 3,
+          "logical": 0,
+          "visuals": 47,
+          "moving": 0,
+          "occupied": 0,
+          "step": 0
+        }
+      ],
+      "occupied_transitions": [],
+      "unexpected_errors": [],
+      "startup_low_level_test_messages": 0
+    }
+  },
+  "process_results": [
+    {
+      "Name": "ClientA",
+      "ExitCode": 0
+    },
+    {
+      "Name": "ClientB",
+      "ExitCode": 0
+    },
+    {
+      "Name": "Server",
+      "ExitCode": 0
+    }
+  ],
+  "user_assets": {
+    "checked": 68,
+    "changed_from_backup": 0,
+    "staged": false
+  },
+  "limits": [
+    "Sample records are not unique animal counts. Natural PIE had no raw-Graze/shared-Panic-Flee sample; the controlled regression verifies that contract.",
+    "BlindMemberReaction holds an actual hunting source stationary; separate existing capture tests and PIE retain moving hunters.",
+    "Startup LowLevelTestAdapter Condition failed messages also occur in the previous successful editor baseline, before PIE. They are not claimed as fixed.",
+    "Python training dependencies are unavailable; no retraining/Python training tests. Native golden-vector tests passed.",
+    "Migration/waves remain disabled. Native terrain constraints are not full NavMesh pathfinding."
+  ]
+}

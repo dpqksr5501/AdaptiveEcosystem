@@ -1,0 +1,26 @@
+v3_wild2_obstacle_mirror.yaml 32000-32029 7200 스텝 
+  worlds: 30
+  wolf_stuck: 1
+  wolf_stuck_helper: 1
+  wolf_stuck_wall: 1
+  wolf_stuck_max_s: 3.3333333333333335
+  wolf_wall_stuck: 17
+  wolf_wall_stuck_helper: 8
+  wolf_wall_stuck_max_s: 4.8
+  deer_stuck: 0
+  deer_stuck_by_beh: {}
+  deer_stuck_panic: 0
+  deer_stuck_max_s: 0.0
+  wolf_stuck_frac: 5.845731154824189e-06
+  wolf_wall_stuck_frac: 0.00013445181656095636
+  deer_stuck_frac: 0.0
+  old_wolf_runs: 0
+  old_wolf_max_s: 0.0
+  old_deer_still: 667
+  old_deer_flee: 0
+  old_deer_push: 1
+  old_deer_max_s: 116.66666666666667
+  worst_wolf: [(25, 32010, 2, 5352, True, True)]
+  worst_wolf_wall: [(36, 32012, 2, 272, False), (30, 32008, 2, 5854, False), (29, 32007, 3, 5937, False), (28, 32009, 2, 6813, False), (27, 32020, 0, 928, True), (26, 32010, 2, 48, True)]
+  worst_deer: []
+  detour: {'deer_used': 138135, 'deer_start': 82862, 'deer_fail': 0, 'wolf_used': 3990, 'wolf_start': 3099, 'wolf_fail': 0, 'help_drop': 125}

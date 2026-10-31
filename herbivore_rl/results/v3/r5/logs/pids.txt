@@ -1,0 +1,7 @@
+﻿seed 0 cmd_pid 18740 python_pid 17328 run v3_r5_g995_s0_20m log results\v3\r5\logs\train_s0.log started 2026-10-19T04:21:37
+seed 1 cmd_pid 37416 python_pid 30052 run v3_r5_g995_s1_20m log results\v3\r5\logs\train_s1.log started 2026-10-19T04:21:38
+seed 2 cmd_pid 32424 python_pid 38172 run v3_r5_g995_s2_20m log results\v3\r5\logs\train_s2.log started 2026-10-19T04:21:39
+seed 3 cmd_pid 38076 python_pid 39808 run v3_r5_g995_s3_20m log results\v3\r5\logs\train_s3.log started 2026-10-19T04:21:39
+seed 4 cmd_pid 39772 python_pid 4176 run v3_r5_g995_s4_20m log results\v3\r5\logs\train_s4.log started 2026-10-19T04:21:40
+seed 5 cmd_pid 37492 python_pid 20476 run v3_r5_g995_s5_20m log results\v3\r5\logs\train_s5.log started 2026-10-19T04:21:41
+early_checks cmd_pid 24624 python_pid 30316 started 2026-10-19T04:21:49

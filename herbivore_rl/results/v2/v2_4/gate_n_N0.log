@@ -1,0 +1,12 @@
+[  398.8s] on 끝
+[  792.2s] rest0 끝
+[ 1211.0s] ref 끝
+{
+ "safety": true,
+ "a1": true,
+ "a2": false,
+ "a3": true,
+ "prune": [
+  "eat_night"
+ ]
+}

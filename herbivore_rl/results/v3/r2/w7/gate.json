@@ -1,0 +1,215 @@
+{
+ "meta": {
+  "world": "w7",
+  "config": "configs/v3_r2_w7_on.yaml",
+  "seeds": [
+   12160,
+   12161,
+   12162,
+   12163,
+   12164,
+   12165,
+   12166,
+   12167,
+   12168,
+   12169,
+   12170,
+   12171,
+   12172,
+   12173,
+   12174,
+   12175,
+   12176,
+   12177,
+   12178,
+   12179,
+   12180,
+   12181,
+   12182,
+   12183,
+   12184,
+   12185,
+   12186,
+   12187,
+   12188,
+   12189,
+   12190,
+   12191,
+   12192,
+   12193,
+   12194,
+   12195,
+   12196,
+   12197,
+   12198,
+   12199
+  ],
+  "steps": 3000,
+  "theta": 4.0,
+  "approach": 0.6,
+  "cells": [
+   "ps0.3_pl_T600",
+   "ps0.3_pl_T1800",
+   "ps0.3_np_T600",
+   "ps0.3_np_T1800",
+   "ps0.7_pl_T600",
+   "ps0.7_pl_T1800",
+   "ps0.7_np_T600",
+   "ps0.7_np_T1800"
+  ],
+  "variants": [
+   [
+    "stare",
+    "niche"
+   ],
+   [
+    "stare",
+    "out"
+   ],
+   [
+    "stare",
+    "cross"
+   ],
+   [
+    "stare_still",
+    "niche"
+   ],
+   [
+    "stare_far",
+    "niche"
+   ],
+   [
+    "stare_chase",
+    "niche"
+   ]
+  ],
+  "t_crit": 2.023,
+  "event_k": 60,
+  "low_use": 0.05,
+  "elapsed_s": 1211.1,
+  "digest": {
+   "ps0.3_pl_T600": "596a123b6e34",
+   "ps0.3_pl_T1800": "bcadf33a6317",
+   "ps0.3_np_T600": "7a58ae86fe44",
+   "ps0.3_np_T1800": "3e3159200767",
+   "ps0.7_pl_T600": "6626baea61fa",
+   "ps0.7_pl_T1800": "276770a29d0f",
+   "ps0.7_np_T600": "c64a41d64dcd",
+   "ps0.7_np_T1800": "2e04524e9782"
+  }
+ },
+ "gate": {
+  "stare": {
+   "complete": true,
+   "niche_pos": 8,
+   "niche_sig_neg": 0,
+   "out_sig_neg": 8,
+   "cross_sig_neg": 7,
+   "c1": true,
+   "c2": true,
+   "c3": true,
+   "pass_": true,
+   "cross_use_focal": 0.0477900390625,
+   "verdict": "pass"
+  }
+ },
+ "gate_did_report_only": {
+  "stare": {
+   "complete": true,
+   "niche_pos": 8,
+   "niche_sig_neg": 0,
+   "out_sig_neg": 8,
+   "cross_sig_neg": 4,
+   "c1": true,
+   "c2": true,
+   "c3": false,
+   "pass_": false,
+   "cross_use_focal": 0.0477900390625,
+   "verdict": "low_power"
+  }
+ },
+ "h1": {
+  "complete": true,
+  "gate_verdict": "pass",
+  "pop_sig_neg": 0,
+  "pop_mean8": 0.0017469930450247986,
+  "rev_rbase_wins": 0,
+  "conditional": false,
+  "verdict": "pass"
+ },
+ "pop_meta": {
+  "world": "w7",
+  "config": "configs/v3_r2_w7_on.yaml",
+  "off_config": "configs/v3_r1_on.yaml",
+  "seeds": [
+   12160,
+   12161,
+   12162,
+   12163,
+   12164,
+   12165,
+   12166,
+   12167,
+   12168,
+   12169,
+   12170,
+   12171,
+   12172,
+   12173,
+   12174,
+   12175,
+   12176,
+   12177,
+   12178,
+   12179,
+   12180,
+   12181,
+   12182,
+   12183,
+   12184,
+   12185,
+   12186,
+   12187,
+   12188,
+   12189,
+   12190,
+   12191,
+   12192,
+   12193,
+   12194,
+   12195,
+   12196,
+   12197,
+   12198,
+   12199
+  ],
+  "steps": 3000,
+  "theta": 4.0,
+  "approach": 0.6,
+  "cells": [
+   "ps0.3_pl_T600",
+   "ps0.3_pl_T1800",
+   "ps0.3_np_T600",
+   "ps0.3_np_T1800",
+   "ps0.7_pl_T600",
+   "ps0.7_pl_T1800",
+   "ps0.7_np_T600",
+   "ps0.7_np_T1800"
+  ],
+  "xs": [
+   "stare"
+  ],
+  "t_crit": 2.023,
+  "elapsed_s": 648.0,
+  "digest": {
+   "ps0.3_pl_T600": "596a123b6e34",
+   "ps0.3_pl_T1800": "bcadf33a6317",
+   "ps0.3_np_T600": "7a58ae86fe44",
+   "ps0.3_np_T1800": "3e3159200767",
+   "ps0.7_pl_T600": "6626baea61fa",
+   "ps0.7_pl_T1800": "276770a29d0f",
+   "ps0.7_np_T600": "c64a41d64dcd",
+   "ps0.7_np_T1800": "2e04524e9782"
+  }
+ }
+}

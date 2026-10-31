@@ -1,0 +1,402 @@
+{
+ "source": "LV_SHC_RegionalWeatherTest 나무를 LV_Ecosystem_IntegrationTest 무대 좌표에 겹침 (두 맵은 같은 지형·지역·먹이 자리)",
+ "beech_mesh": "/Game/SHC/Fab/Realistic_Beech_Tree_3D_Vegetation/Beech_Tree.Beech_Tree",
+ "beech_agg_counts": {
+  "sphere_elems": 0,
+  "box_elems": 0,
+  "sphyl_elems": 0,
+  "convex_elems": 1,
+  "tapered_capsule_elems": 0
+ },
+ "beech_hull_aabb_mesh_cm": [
+  [
+   -721.64,
+   -642.48,
+   -0.1
+  ],
+  [
+   687.52,
+   717.38,
+   1242.93
+  ]
+ ],
+ "beech_trunk_base_r_cm_at_scale1": 40.4,
+ "stages": {
+  "Forest": {
+   "origin_cm": [
+    28200,
+    40500,
+    -1631.2616230830854
+   ],
+   "size_m": 120.0,
+   "discs_in_unreal_export": 0,
+   "shc_trees_reader_would_keep": 0,
+   "kept": [],
+   "covers": [
+    [
+     45,
+     45,
+     6
+    ],
+    [
+     15,
+     45,
+     6
+    ],
+    [
+     15,
+     15,
+     6
+    ],
+    [
+     45,
+     15,
+     6
+    ]
+   ]
+  },
+  "Barren": {
+   "origin_cm": [
+    28000,
+    -5000,
+    1663.2631299114973
+   ],
+   "size_m": 120.0,
+   "discs_in_unreal_export": 0,
+   "shc_trees_reader_would_keep": 0,
+   "kept": [],
+   "covers": [
+    [
+     45,
+     45,
+     6
+    ],
+    [
+     15,
+     45,
+     6
+    ],
+    [
+     15,
+     15,
+     6
+    ],
+    [
+     45,
+     15,
+     6
+    ]
+   ]
+  },
+  "Highland": {
+   "origin_cm": [
+    28000,
+    -55000,
+    2639.8401021400778
+   ],
+   "size_m": 120.0,
+   "discs_in_unreal_export": 0,
+   "shc_trees_reader_would_keep": 0,
+   "kept": [],
+   "covers": [
+    [
+     45,
+     45,
+     6
+    ],
+    [
+     15,
+     45,
+     6
+    ],
+    [
+     15,
+     15,
+     6
+    ],
+    [
+     45,
+     15,
+     6
+    ]
+   ]
+  }
+ },
+ "trees": [
+  {
+   "label": "Beech_Tree5",
+   "x": 18650.0,
+   "y": 32610.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -982.42,
+   "buried_cm": 327.6,
+   "reader_disc": {
+    "center_cm": [
+     18615.89,
+     32684.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 1154.5,
+   "dist_to_forest_stage_m": 123.9
+  },
+  {
+   "label": "Beech_Tree2",
+   "x": 24420.0,
+   "y": 47170.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -1385.63,
+   "buried_cm": -75.6,
+   "reader_disc": {
+    "center_cm": [
+     24385.89,
+     47244.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 0.0,
+   "dist_to_forest_stage_m": 37.8
+  },
+  {
+   "label": "Beech_Tree11",
+   "x": 34360.0,
+   "y": 39030.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -1629.15,
+   "buried_cm": -319.2,
+   "reader_disc": {
+    "center_cm": [
+     34325.89,
+     39104.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 0.0,
+   "dist_to_forest_stage_m": 14.7
+  },
+  {
+   "label": "Beech_Tree7",
+   "x": -1200.0,
+   "y": 36160.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -995.63,
+   "buried_cm": 314.4,
+   "reader_disc": {
+    "center_cm": [
+     -1234.11,
+     36234.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 1141.2,
+   "dist_to_forest_stage_m": 297.2
+  },
+  {
+   "label": "Beech_Tree",
+   "x": 22070.0,
+   "y": 42440.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -1129.62,
+   "buried_cm": 180.4,
+   "reader_disc": {
+    "center_cm": [
+     22035.89,
+     42514.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 992.8,
+   "dist_to_forest_stage_m": 61.3
+  },
+  {
+   "label": "Beech_Tree4",
+   "x": 12050.0,
+   "y": 42440.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -945.16,
+   "buried_cm": 364.8,
+   "reader_disc": {
+    "center_cm": [
+     12015.89,
+     42514.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 1190.3,
+   "dist_to_forest_stage_m": 161.5
+  },
+  {
+   "label": "Beech_Tree3",
+   "x": 18860.0,
+   "y": 52250.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -916.57,
+   "buried_cm": 393.4,
+   "reader_disc": {
+    "center_cm": [
+     18825.89,
+     52324.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 1216.0,
+   "dist_to_forest_stage_m": 93.4
+  },
+  {
+   "label": "Beech_Tree10",
+   "x": -7840.0,
+   "y": 51040.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -889.85,
+   "buried_cm": 420.2,
+   "reader_disc": {
+    "center_cm": [
+     -7874.11,
+     51114.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 1238.9,
+   "dist_to_forest_stage_m": 360.4
+  },
+  {
+   "label": "Beech_Tree8",
+   "x": 7680.0,
+   "y": 32100.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -994.69,
+   "buried_cm": 315.3,
+   "reader_disc": {
+    "center_cm": [
+     7645.89,
+     32174.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 1142.1,
+   "dist_to_forest_stage_m": 221.7
+  },
+  {
+   "label": "Beech_Tree6",
+   "x": 6890.0,
+   "y": 49400.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -846.1,
+   "buried_cm": 463.9,
+   "reader_disc": {
+    "center_cm": [
+     6855.89,
+     49474.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 1273.8,
+   "dist_to_forest_stage_m": 213.1
+  },
+  {
+   "label": "Beech_Tree9",
+   "x": 12050.0,
+   "y": 61580.0,
+   "z": -1310.0,
+   "scale": [
+    2.0,
+    2.0,
+    2.0
+   ],
+   "ground_z": -846.09,
+   "buried_cm": 463.9,
+   "reader_disc": {
+    "center_cm": [
+     12015.89,
+     61654.9,
+     -67.17
+    ],
+    "r_cm": 1384.51,
+    "height_cm": 2486.05
+   },
+   "trunk_r_cm": 80.9,
+   "body_section_eq_r_cm": 1273.8,
+   "dist_to_forest_stage_m": 185.3
+  }
+ ]
+}

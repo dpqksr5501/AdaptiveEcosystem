@@ -1,0 +1,1585 @@
+{
+  "date": "2026-10-23",
+  "base_commit": "3cc772e",
+  "map": "/Game/JYU/Maps/LV_JYU_HerdMigration",
+  "mode": "Native v3, SocialControl=0, authored herd journeys, 48 deer per region, 3 regions",
+  "fixture": "Explicit receipted sustained Barren drought; observer threats disabled. No creature teleport or weight changes.",
+  "build": "Direct UnrealBuildTool.exe Build13 succeeded",
+  "automation": {
+    "succeeded": 202,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "native_evaluator": "EcoV3Eval rebuilt from the changed engine-free headers (EvaluatorBuild02.log)",
+  "network_processes": [
+    {
+      "Refuges": 12,
+      "Name": "ClientA",
+      "Visuals": 17,
+      "AuthorityAgents": 0,
+      "ExitCode": 0
+    },
+    {
+      "Refuges": 12,
+      "Name": "ClientB",
+      "Visuals": 32,
+      "AuthorityAgents": 0,
+      "ExitCode": 0
+    },
+    {
+      "RegionTransfers": 23,
+      "Name": "Server",
+      "ExitCode": 0
+    }
+  ],
+  "clients": [
+    {
+      "client": "ClientA",
+      "passed": true,
+      "authority_agents": 0,
+      "local_migration_subsystems": 0,
+      "refuges": 12,
+      "ready": 12,
+      "visible": 12,
+      "maximum_visuals": 17,
+      "observations": 19,
+      "received_id_regions": [
+        [
+          "1",
+          "Forest"
+        ],
+        [
+          "105",
+          "Highland"
+        ],
+        [
+          "106",
+          "Highland"
+        ],
+        [
+          "108",
+          "Highland"
+        ],
+        [
+          "113",
+          "Highland"
+        ],
+        [
+          "114",
+          "Highland"
+        ],
+        [
+          "119",
+          "Highland"
+        ],
+        [
+          "12",
+          "Forest"
+        ],
+        [
+          "123",
+          "Highland"
+        ],
+        [
+          "132",
+          "Highland"
+        ],
+        [
+          "134",
+          "Highland"
+        ],
+        [
+          "135",
+          "Highland"
+        ],
+        [
+          "137",
+          "Highland"
+        ],
+        [
+          "138",
+          "Highland"
+        ],
+        [
+          "14",
+          "Forest"
+        ],
+        [
+          "140",
+          "Highland"
+        ],
+        [
+          "143",
+          "Highland"
+        ],
+        [
+          "151",
+          "Highland"
+        ],
+        [
+          "152",
+          "Highland"
+        ],
+        [
+          "153",
+          "Highland"
+        ],
+        [
+          "154",
+          "Highland"
+        ],
+        [
+          "2",
+          "Forest"
+        ],
+        [
+          "21",
+          "Forest"
+        ],
+        [
+          "3",
+          "Forest"
+        ],
+        [
+          "32",
+          "Forest"
+        ],
+        [
+          "33",
+          "Forest"
+        ],
+        [
+          "4",
+          "Forest"
+        ],
+        [
+          "44",
+          "Forest"
+        ],
+        [
+          "45",
+          "Forest"
+        ],
+        [
+          "46",
+          "Forest"
+        ],
+        [
+          "53",
+          "Barren"
+        ],
+        [
+          "59",
+          "Barren"
+        ],
+        [
+          "68",
+          "Barren"
+        ],
+        [
+          "70",
+          "Barren"
+        ],
+        [
+          "73",
+          "Barren"
+        ],
+        [
+          "74",
+          "Barren"
+        ],
+        [
+          "77",
+          "Barren"
+        ],
+        [
+          "81",
+          "Barren"
+        ],
+        [
+          "88",
+          "Barren"
+        ],
+        [
+          "92",
+          "Barren"
+        ],
+        [
+          "96",
+          "Barren"
+        ]
+      ],
+      "received_migrated_agents_in_forest": []
+    },
+    {
+      "client": "ClientB",
+      "passed": true,
+      "authority_agents": 0,
+      "local_migration_subsystems": 0,
+      "refuges": 12,
+      "ready": 12,
+      "visible": 12,
+      "maximum_visuals": 32,
+      "observations": 19,
+      "received_id_regions": [
+        [
+          "1",
+          "Forest"
+        ],
+        [
+          "10",
+          "Forest"
+        ],
+        [
+          "102",
+          "Forest"
+        ],
+        [
+          "14",
+          "Forest"
+        ],
+        [
+          "16",
+          "Forest"
+        ],
+        [
+          "21",
+          "Forest"
+        ],
+        [
+          "24",
+          "Forest"
+        ],
+        [
+          "28",
+          "Forest"
+        ],
+        [
+          "37",
+          "Forest"
+        ],
+        [
+          "39",
+          "Forest"
+        ],
+        [
+          "4",
+          "Forest"
+        ],
+        [
+          "46",
+          "Forest"
+        ],
+        [
+          "53",
+          "Barren"
+        ],
+        [
+          "57",
+          "Forest"
+        ],
+        [
+          "58",
+          "Forest"
+        ],
+        [
+          "59",
+          "Forest"
+        ],
+        [
+          "6",
+          "Forest"
+        ],
+        [
+          "61",
+          "Barren"
+        ],
+        [
+          "66",
+          "Barren"
+        ],
+        [
+          "67",
+          "Forest"
+        ],
+        [
+          "68",
+          "Forest"
+        ],
+        [
+          "69",
+          "Forest"
+        ],
+        [
+          "70",
+          "Forest"
+        ],
+        [
+          "71",
+          "Barren"
+        ],
+        [
+          "74",
+          "Forest"
+        ],
+        [
+          "76",
+          "Forest"
+        ],
+        [
+          "77",
+          "Forest"
+        ],
+        [
+          "79",
+          "Forest"
+        ],
+        [
+          "8",
+          "Forest"
+        ],
+        [
+          "80",
+          "Forest"
+        ],
+        [
+          "81",
+          "Forest"
+        ],
+        [
+          "82",
+          "Barren"
+        ],
+        [
+          "83",
+          "Barren"
+        ],
+        [
+          "85",
+          "Barren"
+        ],
+        [
+          "86",
+          "Barren"
+        ],
+        [
+          "88",
+          "Forest"
+        ],
+        [
+          "89",
+          "Forest"
+        ],
+        [
+          "90",
+          "Forest"
+        ],
+        [
+          "91",
+          "Barren"
+        ],
+        [
+          "94",
+          "Forest"
+        ],
+        [
+          "95",
+          "Barren"
+        ],
+        [
+          "97",
+          "Barren"
+        ],
+        [
+          "98",
+          "Forest"
+        ],
+        [
+          "99",
+          "Forest"
+        ]
+      ],
+      "received_migrated_agents_in_forest": [
+        "102",
+        "57",
+        "58",
+        "59",
+        "67",
+        "68",
+        "69",
+        "70",
+        "74",
+        "76",
+        "77",
+        "79",
+        "80",
+        "81",
+        "88",
+        "89",
+        "90",
+        "94",
+        "98",
+        "99"
+      ]
+    }
+  ],
+  "server": {
+    "summary": {
+      "result": "FINISHED",
+      "name": "Server",
+      "samples": 82,
+      "food_loss_fixture": true,
+      "error": null,
+      "migration_samples": 1241,
+      "plan_ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14
+      ],
+      "arrived_ids": [
+        "102",
+        "57",
+        "58",
+        "59",
+        "67",
+        "68",
+        "69",
+        "70",
+        "72",
+        "73",
+        "74",
+        "76",
+        "77",
+        "79",
+        "80",
+        "81",
+        "83",
+        "87",
+        "88",
+        "89",
+        "90",
+        "93",
+        "94",
+        "95",
+        "96",
+        "98",
+        "99"
+      ],
+      "region_transfers": [
+        {
+          "id": 76,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 542.7066091883656,
+          "sample_seconds": 2
+        },
+        {
+          "id": 87,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.8546415759118,
+          "sample_seconds": 2
+        },
+        {
+          "id": 89,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 544.3973841223251,
+          "sample_seconds": 2
+        },
+        {
+          "id": 98,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.3749664119588,
+          "sample_seconds": 2
+        },
+        {
+          "id": 94,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.8579976704856,
+          "sample_seconds": 2
+        },
+        {
+          "id": 99,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 544.4287810407995,
+          "sample_seconds": 2
+        },
+        {
+          "id": 90,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 544.03318563557,
+          "sample_seconds": 2
+        },
+        {
+          "id": 57,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.4944143239435,
+          "sample_seconds": 2
+        },
+        {
+          "id": 59,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 544.1202671629579,
+          "sample_seconds": 2
+        },
+        {
+          "id": 67,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.0290552691071,
+          "sample_seconds": 2
+        },
+        {
+          "id": 72,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 542.9265676873957,
+          "sample_seconds": 2
+        },
+        {
+          "id": 74,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.144620144959,
+          "sample_seconds": 2
+        },
+        {
+          "id": 88,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.5749138601564,
+          "sample_seconds": 2
+        },
+        {
+          "id": 68,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.7055784616667,
+          "sample_seconds": 2
+        },
+        {
+          "id": 70,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.4174693407965,
+          "sample_seconds": 2
+        },
+        {
+          "id": 81,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.5241668854916,
+          "sample_seconds": 2
+        },
+        {
+          "id": 77,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.3923817947427,
+          "sample_seconds": 2
+        },
+        {
+          "id": 79,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.5825883057653,
+          "sample_seconds": 2
+        },
+        {
+          "id": 102,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.9337142455415,
+          "sample_seconds": 2
+        },
+        {
+          "id": 58,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 580.9334523968766,
+          "sample_seconds": 2
+        },
+        {
+          "id": 69,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 544.4713594538102,
+          "sample_seconds": 2
+        },
+        {
+          "id": 80,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 544.1139380504778,
+          "sample_seconds": 2
+        },
+        {
+          "id": 104,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 579.9528114659046,
+          "sample_seconds": 2
+        }
+      ],
+      "history_records": 116378,
+      "world_elapsed_seconds": 165.0,
+      "fixture": "Sustained Barren drought (receipted food loss and suspended regeneration), observers disabled; model weights unchanged"
+    },
+    "observed_plan_states": [
+      "",
+      "Blocked",
+      "Preparing",
+      "Regrouping",
+      "Resting",
+      "Settled",
+      "Traveling"
+    ],
+    "observed_primary_reasons": [
+      "",
+      "Dead",
+      "FoodShortageJourney",
+      "GatheringForJourney",
+      "LowEnergyReserve",
+      "NativeAlertGraze",
+      "NativePolicy",
+      "NativeRefugeSafety",
+      "NativeThreatEscape",
+      "PathBlocked",
+      "Preparing",
+      "Resting",
+      "Returning",
+      "SharedAlarmSignalOnly",
+      "WaitingForHerd"
+    ],
+    "maximum_history_size": 16,
+    "transferred_identity": [
+      {
+        "id": "76",
+        "plan_ids": [
+          1
+        ],
+        "herd_ids": [
+          "31"
+        ]
+      },
+      {
+        "id": "87",
+        "plan_ids": [
+          11
+        ],
+        "herd_ids": [
+          "118",
+          "52"
+        ]
+      },
+      {
+        "id": "89",
+        "plan_ids": [
+          11
+        ],
+        "herd_ids": [
+          "33",
+          "50",
+          "52"
+        ]
+      },
+      {
+        "id": "98",
+        "plan_ids": [
+          13
+        ],
+        "herd_ids": [
+          "123",
+          "57",
+          "8"
+        ]
+      },
+      {
+        "id": "94",
+        "plan_ids": [
+          10
+        ],
+        "herd_ids": [
+          "108",
+          "128",
+          "50"
+        ]
+      },
+      {
+        "id": "99",
+        "plan_ids": [
+          10
+        ],
+        "herd_ids": [
+          "123",
+          "50"
+        ]
+      },
+      {
+        "id": "90",
+        "plan_ids": [
+          7
+        ],
+        "herd_ids": [
+          "105",
+          "124",
+          "133",
+          "33",
+          "44"
+        ]
+      },
+      {
+        "id": "57",
+        "plan_ids": [
+          1
+        ],
+        "herd_ids": [
+          "31"
+        ]
+      },
+      {
+        "id": "59",
+        "plan_ids": [
+          3
+        ],
+        "herd_ids": [
+          "33"
+        ]
+      },
+      {
+        "id": "67",
+        "plan_ids": [
+          3
+        ],
+        "herd_ids": [
+          "118",
+          "33"
+        ]
+      },
+      {
+        "id": "72",
+        "plan_ids": [
+          7
+        ],
+        "herd_ids": [
+          "120",
+          "44"
+        ]
+      },
+      {
+        "id": "74",
+        "plan_ids": [
+          5
+        ],
+        "herd_ids": [
+          "128",
+          "41"
+        ]
+      },
+      {
+        "id": "88",
+        "plan_ids": [
+          13
+        ],
+        "herd_ids": [
+          "33",
+          "37",
+          "57"
+        ]
+      },
+      {
+        "id": "68",
+        "plan_ids": [
+          5
+        ],
+        "herd_ids": [
+          "108",
+          "41"
+        ]
+      },
+      {
+        "id": "70",
+        "plan_ids": [
+          5
+        ],
+        "herd_ids": [
+          "127",
+          "41"
+        ]
+      },
+      {
+        "id": "81",
+        "plan_ids": [
+          9
+        ],
+        "herd_ids": [
+          "123",
+          "46"
+        ]
+      },
+      {
+        "id": "77",
+        "plan_ids": [
+          9
+        ],
+        "herd_ids": [
+          "125",
+          "46"
+        ]
+      },
+      {
+        "id": "79",
+        "plan_ids": [
+          4
+        ],
+        "herd_ids": [
+          "37"
+        ]
+      },
+      {
+        "id": "102",
+        "plan_ids": [
+          2
+        ],
+        "herd_ids": [
+          "32"
+        ]
+      },
+      {
+        "id": "58",
+        "plan_ids": [
+          2
+        ],
+        "herd_ids": [
+          "32"
+        ]
+      },
+      {
+        "id": "69",
+        "plan_ids": [
+          6
+        ],
+        "herd_ids": [
+          "42"
+        ]
+      },
+      {
+        "id": "80",
+        "plan_ids": [
+          2
+        ],
+        "herd_ids": [
+          "32"
+        ]
+      },
+      {
+        "id": "104",
+        "plan_ids": [
+          2
+        ],
+        "herd_ids": [
+          "32"
+        ]
+      }
+    ],
+    "maximum_sampled_region_crossing_distance_cm": 580.9334523968766,
+    "arrival_example": {
+      "stable_id": "102",
+      "herd_id": "32",
+      "region": "Forest",
+      "migration_plan": 2,
+      "migration_state": "Resting",
+      "migration_reason": "Arrived",
+      "native_world_position": [
+        28894.74901948996,
+        33703.10786185536,
+        -1183.4583192653529
+      ],
+      "reason_history": [
+        {
+          "time": 134.9790853112936,
+          "reason": "LowEnergyReserve",
+          "region": "Forest",
+          "native_step": 1011
+        },
+        {
+          "time": 137.7717353105545,
+          "reason": "NativePolicy",
+          "region": "Forest",
+          "native_step": 1032
+        },
+        {
+          "time": 138.17075661197305,
+          "reason": "LowEnergyReserve",
+          "region": "Forest",
+          "native_step": 1035
+        },
+        {
+          "time": 138.30676370859146,
+          "reason": "NativePolicy",
+          "region": "Forest",
+          "native_step": 1036
+        },
+        {
+          "time": 140.66869051009417,
+          "reason": "SharedAlarmSignalOnly",
+          "region": "Forest",
+          "native_step": 1053
+        },
+        {
+          "time": 140.90072920918465,
+          "reason": "NativePolicy",
+          "region": "Forest",
+          "native_step": 1055
+        },
+        {
+          "time": 143.12491321191192,
+          "reason": "SharedAlarmSignalOnly",
+          "region": "Forest",
+          "native_step": 1072
+        },
+        {
+          "time": 147.20391881093383,
+          "reason": "NativePolicy",
+          "region": "Forest",
+          "native_step": 1102
+        },
+        {
+          "time": 147.4363721087575,
+          "reason": "SharedAlarmSignalOnly",
+          "region": "Forest",
+          "native_step": 1104
+        },
+        {
+          "time": 147.66875870898366,
+          "reason": "NativePolicy",
+          "region": "Forest",
+          "native_step": 1106
+        },
+        {
+          "time": 147.90164341032505,
+          "reason": "SharedAlarmSignalOnly",
+          "region": "Forest",
+          "native_step": 1108
+        },
+        {
+          "time": 148.76723121106625,
+          "reason": "NativePolicy",
+          "region": "Forest",
+          "native_step": 1114
+        },
+        {
+          "time": 149.66594801098108,
+          "reason": "SharedAlarmSignalOnly",
+          "region": "Forest",
+          "native_step": 1121
+        },
+        {
+          "time": 150.06744220852852,
+          "reason": "NativePolicy",
+          "region": "Forest",
+          "native_step": 1124
+        },
+        {
+          "time": 158.3024079091847,
+          "reason": "NativeAlertGraze",
+          "region": "Forest",
+          "native_step": 1186
+        },
+        {
+          "time": 161.9200879111886,
+          "reason": "NativePolicy",
+          "region": "Forest",
+          "native_step": 1213
+        }
+      ]
+    }
+  },
+  "pie": {
+    "summary": {
+      "result": "FINISHED",
+      "name": "PIE",
+      "samples": 60,
+      "food_loss_fixture": true,
+      "error": null,
+      "migration_samples": 1484,
+      "plan_ids": [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+        12,
+        13,
+        14,
+        15
+      ],
+      "arrived_ids": [
+        "100",
+        "102",
+        "104",
+        "57",
+        "58",
+        "60",
+        "62",
+        "63",
+        "67",
+        "68",
+        "69",
+        "70",
+        "73",
+        "74",
+        "75",
+        "76",
+        "77",
+        "78",
+        "79",
+        "80",
+        "82",
+        "83",
+        "88",
+        "95",
+        "96",
+        "99"
+      ],
+      "region_transfers": [
+        {
+          "id": 96,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 433.67910175742617,
+          "sample_seconds": 2
+        },
+        {
+          "id": 68,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.659339990725,
+          "sample_seconds": 2
+        },
+        {
+          "id": 59,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 72.49300048187132,
+          "sample_seconds": 2
+        },
+        {
+          "id": 73,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.2422543861718,
+          "sample_seconds": 2
+        },
+        {
+          "id": 82,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 542.3436012662365,
+          "sample_seconds": 2
+        },
+        {
+          "id": 72,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 380.2655880542478,
+          "sample_seconds": 2
+        },
+        {
+          "id": 79,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 542.8660458474047,
+          "sample_seconds": 2
+        },
+        {
+          "id": 57,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.2053440426437,
+          "sample_seconds": 2
+        },
+        {
+          "id": 62,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.7827640148253,
+          "sample_seconds": 2
+        },
+        {
+          "id": 63,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.3327416069384,
+          "sample_seconds": 2
+        },
+        {
+          "id": 69,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.7867495847025,
+          "sample_seconds": 2
+        },
+        {
+          "id": 75,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 542.510120653413,
+          "sample_seconds": 2
+        },
+        {
+          "id": 76,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 542.6677682829559,
+          "sample_seconds": 2
+        },
+        {
+          "id": 83,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.7330713449519,
+          "sample_seconds": 2
+        },
+        {
+          "id": 77,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.713862852565,
+          "sample_seconds": 2
+        },
+        {
+          "id": 101,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 544.0484718127346,
+          "sample_seconds": 2
+        },
+        {
+          "id": 70,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 326.045427521824,
+          "sample_seconds": 2
+        },
+        {
+          "id": 74,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 326.1821015862215,
+          "sample_seconds": 2
+        },
+        {
+          "id": 100,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.6496017696514,
+          "sample_seconds": 2
+        },
+        {
+          "id": 80,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 543.1579301546666,
+          "sample_seconds": 2
+        },
+        {
+          "id": 95,
+          "from": "Barren",
+          "to": "Forest",
+          "distance_cm": 542.1551117437571,
+          "sample_seconds": 2
+        },
+        {
+          "id": 101,
+          "from": "Forest",
+          "to": "Barren",
+          "distance_cm": 550.7512164209046,
+          "sample_seconds": 2
+        }
+      ],
+      "history_records": 77843,
+      "world_elapsed_seconds": 120.0,
+      "fixture": "Sustained Barren drought (receipted food loss and suspended regeneration), observers disabled; model weights unchanged"
+    },
+    "observed_plan_states": [
+      "Blocked",
+      "Preparing",
+      "Regrouping",
+      "Resting",
+      "Settled",
+      "Traveling"
+    ],
+    "observed_primary_reasons": [
+      "",
+      "Dead",
+      "FoodShortageJourney",
+      "GatheringForJourney",
+      "LowEnergyReserve",
+      "NativeAlertGraze",
+      "NativePolicy",
+      "NativeRefugeSafety",
+      "NativeThreatEscape",
+      "PathBlocked",
+      "Preparing",
+      "Resting",
+      "Returning",
+      "SharedAlarmSignalOnly",
+      "WaitingForHerd"
+    ],
+    "maximum_history_size": 16,
+    "transferred_identity": [
+      {
+        "id": "96",
+        "plan_ids": [
+          14
+        ],
+        "herd_ids": [
+          "53"
+        ]
+      },
+      {
+        "id": "68",
+        "plan_ids": [
+          8
+        ],
+        "herd_ids": [
+          "40",
+          "41"
+        ]
+      },
+      {
+        "id": "59",
+        "plan_ids": [
+          3
+        ],
+        "herd_ids": [
+          "32"
+        ]
+      },
+      {
+        "id": "73",
+        "plan_ids": [
+          5
+        ],
+        "herd_ids": [
+          "35",
+          "36"
+        ]
+      },
+      {
+        "id": "82",
+        "plan_ids": [
+          12
+        ],
+        "herd_ids": [
+          "45"
+        ]
+      },
+      {
+        "id": "72",
+        "plan_ids": [
+          7
+        ],
+        "herd_ids": [
+          "39"
+        ]
+      },
+      {
+        "id": "79",
+        "plan_ids": [
+          6
+        ],
+        "herd_ids": [
+          "36",
+          "43"
+        ]
+      },
+      {
+        "id": "57",
+        "plan_ids": [
+          1
+        ],
+        "herd_ids": [
+          "30",
+          "36"
+        ]
+      },
+      {
+        "id": "62",
+        "plan_ids": [
+          5
+        ],
+        "herd_ids": [
+          "35",
+          "45"
+        ]
+      },
+      {
+        "id": "63",
+        "plan_ids": [
+          6
+        ],
+        "herd_ids": [
+          "36"
+        ]
+      },
+      {
+        "id": "69",
+        "plan_ids": [
+          9
+        ],
+        "herd_ids": [
+          "41"
+        ]
+      },
+      {
+        "id": "75",
+        "plan_ids": [
+          9
+        ],
+        "herd_ids": [
+          "41"
+        ]
+      },
+      {
+        "id": "76",
+        "plan_ids": [
+          1
+        ],
+        "herd_ids": [
+          "30",
+          "53"
+        ]
+      },
+      {
+        "id": "83",
+        "plan_ids": [
+          12
+        ],
+        "herd_ids": [
+          "45"
+        ]
+      },
+      {
+        "id": "77",
+        "plan_ids": [
+          10
+        ],
+        "herd_ids": [
+          "43"
+        ]
+      },
+      {
+        "id": "101",
+        "plan_ids": [
+          11
+        ],
+        "herd_ids": [
+          "44"
+        ]
+      },
+      {
+        "id": "70",
+        "plan_ids": [
+          8
+        ],
+        "herd_ids": [
+          "36",
+          "40"
+        ]
+      },
+      {
+        "id": "74",
+        "plan_ids": [
+          8
+        ],
+        "herd_ids": [
+          "40",
+          "41"
+        ]
+      },
+      {
+        "id": "100",
+        "plan_ids": [
+          15
+        ],
+        "herd_ids": [
+          "116",
+          "56"
+        ]
+      },
+      {
+        "id": "80",
+        "plan_ids": [
+          15
+        ],
+        "herd_ids": [
+          "115",
+          "56"
+        ]
+      },
+      {
+        "id": "95",
+        "plan_ids": [
+          14
+        ],
+        "herd_ids": [
+          "53"
+        ]
+      },
+      {
+        "id": "101",
+        "plan_ids": [
+          11
+        ],
+        "herd_ids": [
+          "44"
+        ]
+      }
+    ],
+    "maximum_sampled_region_crossing_distance_cm": 550.7512164209046,
+    "arrival_example": {
+      "stable_id": "104",
+      "herd_id": "31",
+      "region": "Barren",
+      "migration_plan": 2,
+      "migration_state": "Settled",
+      "migration_reason": "Arrived",
+      "native_world_position": [
+        33888.86928478129,
+        17153.378225364606,
+        192.6919385434153
+      ],
+      "reason_history": [
+        {
+          "time": 14.65931859984994,
+          "reason": "NativeRefugeSafety",
+          "region": "Barren",
+          "native_step": 110
+        },
+        {
+          "time": 19.729831904172897,
+          "reason": "FoodShortageJourney",
+          "region": "Barren",
+          "native_step": 148
+        },
+        {
+          "time": 37.72772220149636,
+          "reason": "NativeThreatEscape",
+          "region": "Barren",
+          "native_step": 283
+        },
+        {
+          "time": 40.1271844021976,
+          "reason": "NativeRefugeSafety",
+          "region": "Barren",
+          "native_step": 301
+        },
+        {
+          "time": 46.39799829572439,
+          "reason": "Resting",
+          "region": "Barren",
+          "native_step": 348
+        },
+        {
+          "time": 47.00634089484811,
+          "reason": "FoodShortageJourney",
+          "region": "Barren",
+          "native_step": 352
+        },
+        {
+          "time": 49.00584289431572,
+          "reason": "WaitingForHerd",
+          "region": "Barren",
+          "native_step": 367
+        },
+        {
+          "time": 54.00795649364591,
+          "reason": "FoodShortageJourney",
+          "region": "Barren",
+          "native_step": 405
+        },
+        {
+          "time": 58.666002694517374,
+          "reason": "NativeThreatEscape",
+          "region": "Barren",
+          "native_step": 440
+        },
+        {
+          "time": 63.058848194777966,
+          "reason": "WaitingForHerd",
+          "region": "Barren",
+          "native_step": 473
+        },
+        {
+          "time": 64.00049099326134,
+          "reason": "PathBlocked",
+          "region": "Barren",
+          "native_step": 480
+        },
+        {
+          "time": 84.00344429165125,
+          "reason": "FoodShortageJourney",
+          "region": "Barren",
+          "native_step": 630
+        },
+        {
+          "time": 89.00529419258237,
+          "reason": "Returning",
+          "region": "Barren",
+          "native_step": 667
+        },
+        {
+          "time": 103.00244558602571,
+          "reason": "Resting",
+          "region": "Barren",
+          "native_step": 772
+        },
+        {
+          "time": 107.00154288858175,
+          "reason": "Returning",
+          "region": "Barren",
+          "native_step": 802
+        },
+        {
+          "time": 112.00357818603516,
+          "reason": "LowEnergyReserve",
+          "region": "Barren",
+          "native_step": 840
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "Controlled drought fixture, not a long-duration natural equilibrium study.",
+    "Server raw summary world_elapsed_seconds denotes wall observation duration; individual world_seconds/native_step fields are authoritative.",
+    "Uncooked -game logs retain editor AnimGraph/HLOD package import warnings; client meshes and refuges were received. Shipping/cook not verified.",
+    "Only Barren-Forest corridor authored; Highland has no validated route. No new Python parity/retraining claim."
+  ]
+}

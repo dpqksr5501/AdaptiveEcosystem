@@ -4,6 +4,7 @@
 #include "Mass/EcoMassTags.h"
 #include "Mass/EcoMassFeeding.h"
 #include "Mass/EcoMassMigration.h"
+#include "Mass/EcoMassSurvival.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcologyRegion.h"
@@ -48,6 +49,7 @@ void UEcoMassLifecycleSubsystem::Deinitialize()
 	NextSummaryTime = 0.0;
 	SummaryRevision = 0;
 	ProcessedTime = 0.0;
+	SuccessfulBirths = CommittedDeaths = 0;
 	Super::Deinitialize();
 }
 
@@ -75,13 +77,16 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	const UEcoRuntimeSettings* Settings = GetDefault<UEcoRuntimeSettings>();
 	FeedingSettings = Settings->Feeding;
 	MigrationSettings = Settings->Migration;
+	SurvivalSettings = Settings->Survival;
+	PressureSettings = Settings->Overcrowding;
 	const FEcoFoodEventSettings DayEvent = Settings->DayFoodEvent;
 	const FEcoFoodEventSettings NightEvent = Settings->NightFoodEvent;
 	bSpawnWaves = Settings->bEnableSpawnWaves;
 	bReportDaily = Settings->bPrintDailyPopulation;
 	bReportDailyToScreen = Settings->bPrintDailyPopulationToScreen;
-	if (!FeedingSettings.IsValid() || !DayEvent.IsValid() || !NightEvent.IsValid() || !MigrationSettings.IsValid())
-		return Fail(TEXT("Invalid feeding, food-event or migration settings. Restart PIE after correcting Project Settings."));
+	if (!FeedingSettings.IsValid() || !DayEvent.IsValid() || !NightEvent.IsValid() || !MigrationSettings.IsValid()
+		|| !SurvivalSettings.IsValid() || !PressureSettings.IsValid())
+		return Fail(TEXT("Invalid feeding, food-event, migration, survival or overcrowding settings. Restart PIE after correcting Project Settings."));
 	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
 	UEcoWorldClockSubsystem* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
 	UMassSpawnerSubsystem* Mass = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>();
@@ -133,6 +138,8 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 	const AEcoGameState* State = GetWorld()->GetGameState<AEcoGameState>();
 	InitialTime.WorldEpoch = State ? FMath::Max(1, State->GetWorldEpoch()) : 1;
 	if (!Ecology->ConfigurePopulationLimit(Settings->GlobalPopulationLimit)) return Fail(TEXT("Population limits already locked."));
+	if (!Ecology->ConfigurePressure(PressureSettings, FeedingSettings.bEnabled ? FeedingSettings.Amount / FeedingSettings.IntervalSeconds : 0.0))
+		return Fail(TEXT("Invalid pressure configuration."));
 
 	// All authoring inputs were checked before committing state or creating any population.
 	TArray<FName> RegionOrder;
@@ -148,6 +155,7 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 		AEcoMassNetworkBootstrap& Bootstrap = *ByRegion[RegionId];
 		FRegionEcologyState Initial;
 		Region.MakeInitialEcologyState(Initial);
+		Initial.EcologicalComfortPopulation = Bootstrap.EcologicalComfortPopulation;
 		if (!Ecology->RegisterRegionState(Initial) || !Ecology->RegisterSpawnSchedule(RegionId, Bootstrap.SpawnSchedule))
 			return Fail(TEXT("Region state or spawn schedule already registered."));
 		Bootstrap.PrepareRuntime(Region, Ecology->GetRegionRuntimeIndex(RegionId), Ecology->RegisterSpecies(Bootstrap.SpeciesId), FeedingSettings.FirstFeedDelaySeconds);
@@ -165,6 +173,7 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 		if (!Ecology->RequestInitialSpawn(Bootstrap.GetConfiguredRegionId(), Bootstrap.InitialAgentCount, InitialTime, Request))
 			return Fail(TEXT("Initial spawn request rejected."));
 		const int32 Actual = Bootstrap.ExecuteSpawnRequest(Request, 0.0);
+		SuccessfulBirths += Actual;
 		const bool bMetricsValid = ReconcilePopulation();
 		Ecology->CompleteSpawnRequest(Request.RequestId, Actual);
 		if (!bMetricsValid || Actual != Bootstrap.InitialAgentCount || !Bootstrap.IsMassNetworkInitialized())
@@ -199,30 +208,44 @@ bool UEcoMassLifecycleSubsystem::ReconcilePopulation()
 	Metrics.SetNum(RegionIds.Num());
 	for (int32 Index = 0; Index < RegionIds.Num(); ++Index) Metrics[Index].RegionId = RegionIds[Index];
 	bool bValid = true;
+	TSet<int64> StableIds;
 	// This subsystem query has no processor owner to initialize it. Bind to this
 	// world's manager before adding requirements (required by UE 5.8).
 	FMassEntityQuery Query(Manager.AsShared());
+	Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddRequirement<FEcoTravelFragment>(EMassFragmentAccess::ReadOnly);
 	Query.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
 	Query.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+	Query.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
 	FMassExecutionContext Context = Manager.CreateExecutionContext(0.0f);
-	Query.ForEachEntityChunk(Context, [&Metrics, &bValid](FMassExecutionContext& Chunk)
+	Query.ForEachEntityChunk(Context, [&Metrics, &bValid, &StableIds](FMassExecutionContext& Chunk)
 	{
 		const auto Regions = Chunk.GetFragmentView<FEcoRegionFragment>();
+		const auto Ids = Chunk.GetFragmentView<FEcoIdentityFragment>();
 		const auto Vitals = Chunk.GetFragmentView<FEcoVitalsFragment>();
 		const auto Travels = Chunk.GetFragmentView<FEcoTravelFragment>();
 		for (int32 Index = 0; Index < Chunk.GetNumEntities(); ++Index)
 		{
 			const int32 RegionIndex = Regions[Index].CurrentRegionIndex;
 			if (!Metrics.IsValidIndex(RegionIndex) || Metrics[RegionIndex].RegionId != Regions[Index].CurrentRegionId
-				|| !FMath::IsFinite(Vitals[Index].Energy) || !FMath::IsFinite(Vitals[Index].MaxEnergy))
+				|| !FMath::IsFinite(Vitals[Index].Energy) || !FMath::IsFinite(Vitals[Index].MaxEnergy)
+				|| Ids[Index].StableAgentId <= 0 || StableIds.Contains(Ids[Index].StableAgentId))
 			{
 				bValid = false;
 				continue;
 			}
 			++Metrics[RegionIndex].Population;
+			StableIds.Add(Ids[Index].StableAgentId);
+			Metrics[RegionIndex].ResidentCount += Travels[Index].State == EEcoResidenceState::Resident ? 1 : 0;
+			if (Travels[Index].State == EEcoResidenceState::Traveling)
+			{
+				const int32 Target = Travels[Index].TargetRegionIndex;
+				if (!Metrics.IsValidIndex(Target) || Metrics[Target].RegionId != Travels[Index].TargetRegionId)
+				{ bValid = false; continue; }
+				if (Target != RegionIndex) { ++Metrics[RegionIndex].OutboundCount; ++Metrics[Target].IncomingCount; }
+			}
 			Metrics[RegionIndex].TravelingCount += Travels[Index].State == EEcoResidenceState::Traveling ? 1 : 0;
 			Metrics[RegionIndex].WaitingCount += Travels[Index].State == EEcoResidenceState::WaitingForFood ? 1 : 0;
 			Metrics[RegionIndex].AverageEnergy += Vitals[Index].MaxEnergy > 0.0f
@@ -230,6 +253,12 @@ bool UEcoMassLifecycleSubsystem::ReconcilePopulation()
 		}
 	});
 	if (!bValid) return false;
+	if (StableIds.Num() != SuccessfulBirths - CommittedDeaths)
+	{
+		UE_LOG(LogAdaptiveEcosystem, Error, TEXT("[Eco Conservation] ActualAlive=%d Births=%lld Deaths=%lld"),
+			StableIds.Num(), SuccessfulBirths, CommittedDeaths);
+		return false;
+	}
 	for (FEcoRegionPopulationSnapshot& Metric : Metrics)
 	{
 		Metric.AverageEnergy = Metric.Population > 0 ? Metric.AverageEnergy / Metric.Population : 0.0f;
@@ -290,9 +319,16 @@ bool UEcoMassLifecycleSubsystem::ProcessEcologyStep(const FEcoServerTimeSnapshot
 {
 	UEcologySimulationSubsystem* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
 	FMassEntityManager& Manager = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
-	if (Manager.IsProcessing() || !ReconcilePopulation()) return Fail(TEXT("Invalid population membership at resource boundary."));
-	if (!Ecology->BeginResourceStep(Time, ++StepId)) return Fail(TEXT("Resource step rejected (epoch/order/state)."));
-	// Equal-time priority: environmental loss -> spawn -> feeding -> completed resources -> migration/arrival -> metrics -> summary.
+	if (Manager.IsProcessing()) return Fail(TEXT("Mass processing at survival boundary."));
+	++StepId;
+	TArray<FEcoDeathOutcome> Deaths;
+	if (!EcoMassSurvival::Advance(Manager, Time, ActualTime, StepId, SurvivalSettings, Deaths)
+		|| !Ecology->RecordDeaths(Deaths, StepId)) return Fail(TEXT("Survival/death batch rejected."));
+	CommittedDeaths += Deaths.Num();
+	if (!ReconcilePopulation()) return Fail(TEXT("Invalid population membership after death commit."));
+	if (!Ecology->BeginResourceStep(Time, StepId)) return Fail(TEXT("Resource step rejected (epoch/order/state)."));
+	if (!Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return Fail(TEXT("Pressure snapshot rejected."));
+	// Equal-time lethal damage precedes environmental loss, spawn, food recovery, arrival and migration.
 	if (bSpawnWaves)
 	{
 		for (const auto& Weak : Spawners)
@@ -303,6 +339,7 @@ bool UEcoMassLifecycleSubsystem::ProcessEcologyStep(const FEcoServerTimeSnapshot
 			while (Ecology->PollSpawnWave(Bootstrap->GetConfiguredRegionId(), Time, Request))
 			{
 				const int32 Actual = Request.Count > 0 ? Bootstrap->ExecuteSpawnRequest(Request, ActualTime) : 0;
+				SuccessfulBirths += Actual;
 				const bool bMetricsValid = ReconcilePopulation();
 				const bool bCompleted = Ecology->CompleteSpawnRequest(Request.RequestId, Actual);
 				if (!bMetricsValid || !bCompleted || Actual != Request.Count) return Fail(TEXT("Wave spawn incomplete; request is terminal."));
@@ -316,7 +353,8 @@ bool UEcoMassLifecycleSubsystem::ProcessEcologyStep(const FEcoServerTimeSnapshot
 	TArray<FEcoFeedResult> Results;
 	if (!EcoMassFeeding::Collect(Manager, Time, StepId, FeedingSettings, Requests)) return Fail(TEXT("Invalid Mass feeding request."));
 	if (!Ecology->ResolveFeeding(Requests, Results)) return Fail(TEXT("Feeding batch rejected; stopped without retry."));
-	if (!EcoMassFeeding::Apply(Manager, Results, FeedingSettings.IntervalSeconds)) return Fail(TEXT("Feeding result no longer matches its entity."));
+	if (!EcoMassFeeding::Apply(Manager, Results, FeedingSettings.IntervalSeconds,
+		SurvivalSettings.bEnabled ? SurvivalSettings.FoodEnergyGain : 0.0f)) return Fail(TEXT("Feeding result no longer matches its entity."));
 	if (!Ecology->CompleteResourceStep()) return Fail(TEXT("Resource conservation/snapshot failed."));
 	TArray<FName> RegionOrder;
 	Ecology->GetRegionIds(RegionOrder);
@@ -325,12 +363,27 @@ bool UEcoMassLifecycleSubsystem::ProcessEcologyStep(const FEcoServerTimeSnapshot
 		return Fail(TEXT("Invalid/unloaded region geometry or adjacency at migration boundary."));
 	TArray<FEcoResourceSnapshot> Resources;
 	Ecology->GetResourceSnapshots(Resources);
-	const bool bDecisionDue = Time.ServerTimeSeconds >= NextMigrationTime;
+	// Arrival commits first, then the decision snapshot includes the newly resident agents.
+	TArray<FEcoMigrationOutcome> Arrivals;
 	if (!EcoMassMigration::Reconcile(Manager, Time, ActualTime, StepId, Resources, Spaces,
-		MigrationSettings, bDecisionDue, FeedingSettings.IntervalSeconds))
+		MigrationSettings, false, FeedingSettings.IntervalSeconds, nullptr, nullptr, {}, 0.0, &Arrivals)
+		|| !Ecology->RecordMigrations(Arrivals))
 		return Fail(TEXT("Migration snapshot/membership validation failed."));
-	if (bDecisionDue) NextMigrationTime = Time.ServerTimeSeconds + MigrationSettings.DecisionIntervalSeconds;
 	if (!ReconcilePopulation()) return Fail(TEXT("Invalid membership after migration commit."));
+	if (!Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return Fail(TEXT("Post-arrival pressure invalid."));
+	const bool bDecisionDue = Time.ServerTimeSeconds >= NextMigrationTime;
+	if (bDecisionDue)
+	{
+		TArray<FEcoMigrationPressureSnapshot> Pressure;
+		if (!Ecology->BuildMigrationPressure(Pressure)
+			|| !EcoMassMigration::Reconcile(Manager, Time, ActualTime, StepId, Resources, Spaces,
+				MigrationSettings, true, FeedingSettings.IntervalSeconds, &PressureSettings, &SurvivalSettings, Pressure,
+				FeedingSettings.bEnabled ? FeedingSettings.Amount / FeedingSettings.IntervalSeconds : 0.0))
+			return Fail(TEXT("Pressure migration decision rejected."));
+		NextMigrationTime = Time.ServerTimeSeconds + MigrationSettings.DecisionIntervalSeconds;
+		if (!ReconcilePopulation() || !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return Fail(TEXT("Post-departure metrics invalid."));
+	}
+	if (!EcoMassSurvival::RemoveExpired(Manager, ActualTime)) return Fail(TEXT("Dead entity cleanup rejected."));
 	if (Time.ServerTimeSeconds >= NextSummaryTime)
 	{
 		PublishCompletedSummary(Time);
@@ -389,11 +442,27 @@ void UEcoMassLifecycleSubsystem::PublishCompletedSummary(const FEcoServerTimeSna
 		Row.SummaryRevision = Summary.Revision;
 		Row.FoodAmount = Resource.Food;
 		Row.FoodCapacity = Resource.Capacity;
+		Row.Environment = Region.CompletedEnvironment;
+		Row.EffectiveFoodRegenerationRate = Region.FoodRegenerationRate * Region.EffectiveRegenerationMultiplier;
 		Row.Population = Region.Population;
 		Row.AverageEnergy = Region.AverageEnergy;
 		Row.PredationHistory = Region.PredationHistory;
 		Row.TravelingCount = Region.TravelingCount;
 		Row.WaitingCount = Region.WaitingCount;
+		Row.ResidentCount = Region.ResidentCount;
+		Row.OutboundCount = Region.OutboundCount;
+		Row.IncomingCount = Region.IncomingCount;
+		Row.ProjectedPopulation = Region.ProjectedPopulation;
+		Row.EcologicalComfortPopulation = Region.EcologicalComfortPopulation;
+		Row.CrowdingRatio = Region.CrowdingRatio;
+		Row.FoodSatisfaction = Region.FoodSatisfaction;
+		Row.bPressureActive = Region.bPressureActive;
+		Row.PressureSince = Region.PressureSince;
+		Row.StarvationDeaths = Region.StarvationDeaths;
+		Row.MigrationInCount = Region.MigrationInCount;
+		Row.MigrationOutCount = Region.MigrationOutCount;
+		Row.OvercrowdingDeparturesCompleted = Region.OvercrowdingDeparturesCompleted;
+		Row.ExternalDeaths = Region.ExternalDeaths;
 	}
 	State->PublishEcologySummary(Summary);
 }

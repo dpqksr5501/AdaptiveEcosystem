@@ -1,0 +1,69 @@
+{
+  "project": "AdaptiveEcosystem/AdaptiveEcosystem.uproject",
+  "branch": "codex/social-shelter-handoff",
+  "integrated_commit": "8e2f34f",
+  "build": "BuildOriginal02.log: Succeeded",
+  "first_build": "BuildOriginal01.log.gz: cache permissions; interrupted once with explicit user authorization",
+  "automation": {
+    "succeeded": 118,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "visual_conditions": 12,
+  "runtime": {
+    "Server": {
+      "heartbeat_count": 20,
+      "first": [
+        1,
+        150,
+        0,
+        0
+      ],
+      "last": [
+        1,
+        51,
+        0,
+        95
+      ],
+      "ready_on_normal_exit": true
+    },
+    "Client": {
+      "heartbeat_count": 3,
+      "first": [
+        3,
+        0,
+        24,
+        0
+      ],
+      "last": [
+        3,
+        0,
+        17,
+        0
+      ],
+      "ready_on_normal_exit": true
+    },
+    "Reconnect": {
+      "heartbeat_count": 3,
+      "first": [
+        3,
+        0,
+        19,
+        0
+      ],
+      "last": [
+        3,
+        0,
+        9,
+        0
+      ],
+      "ready_on_normal_exit": true
+    }
+  },
+  "worktree_archived": true,
+  "preserved_original_untracked_files": 110,
+  "quarantined_historical_source_copies": 6,
+  "worktree_saved_files_preserved": 203,
+  "lfs_materialized_files": 1847
+}

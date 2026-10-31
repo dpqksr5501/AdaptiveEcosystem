@@ -1,0 +1,224 @@
+........................................................................ [  4%]
+........................................................................ [  9%]
+s....................................................................... [ 14%]
+........................................................................ [ 18%]
+........................................................................ [ 23%]
+........................................................................ [ 28%]
+........................................................................ [ 33%]
+........................................................................ [ 37%]
+...........................................F.....FF.F..F......F......... [ 42%]
+........................................................................ [ 47%]
+........................................................................ [ 52%]
+........................................................................ [ 56%]
+........................................................................ [ 61%]
+........................................................................ [ 66%]
+........................................................................ [ 71%]
+........................................................................ [ 75%]
+........................................................................ [ 80%]
+...........................F............................................ [ 85%]
+........................................................................ [ 90%]
+........................................................................ [ 94%]
+........................................................................ [ 99%]
+.....                                                                    [100%]
+================================== FAILURES ===================================
+___________________ test_main_refuses_judge_seeds_and_draft ___________________
+
+tmp_path = WindowsPath('C:/Users/Sinhyeok/AppData/Local/Temp/pytest-of-Sinhyeok/pytest-431/test_main_refuses_judge_seeds_0')
+capsys = <_pytest.capture.CaptureFixture object at 0x0000028840D1B9D0>
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000028840AB8E10>
+
+    def test_main_refuses_judge_seeds_and_draft(tmp_path, capsys, monkeypatch):
+        """사전 등록 폴더(기본 --out)는 사전 등록 제목이 '초안'이면 거부한다. 폴더 밖 실행은 관문·최종 판정 시드와 쓰지 않는 시드를 거부한다.
+        아무것도 쓰지 않는다. 초안 거부는 임시 초안 파일과 임시 사전 등록 폴더로 본다 — 진짜 PREREG.md 에서 '초안'을 지운 뒤에도 이 시험이
+        사전 등록 거주 탐색(33000~33039, 진짜 gate/)을 시작하지 않게 한다(리드 결정 10-15, PREREG 변경 기록 10-15 (5))."""
+        inv = _inv()
+        pr = tmp_path / "PREREG.md"
+        pr.write_text("# v3 R3 관문 사전 등록 (초안)\n", encoding="utf-8")
+        gate, gate_b = tmp_path / "gate", tmp_path / "gate_b"
+        monkeypatch.setattr(inv, "PREREG", pr)
+        monkeypatch.setattr(inv, "GATE_DIR", gate)
+        monkeypatch.setattr(inv, "GATE_B_DIR", gate_b)
+        monkeypatch.setattr(inv, "OUT_DIR", {"a": gate, "b": gate_b})
+        with pytest.raises(SystemExit):
+            inv.main(["search"])
+        assert "초안" in capsys.readouterr().err
+        assert not gate.exists()
+        for seeds in (["15000"], ["10300"], ["10000"], ["12170"]):
+            with pytest.raises(SystemExit):
+                inv.main(["run", "--seeds", *seeds, "--steps", "10", "--theta", "4", "--approach", "0.9", "--out", str(tmp_path / "x")])
+            assert "판정 시드" in capsys.readouterr().err
+>       assert not (tmp_path / "x").exists() and not (GATE_PY / "gate").exists()
+E       AssertionError: assert (not False and not True)
+E        +  where False = exists()
+E        +    where exists = (WindowsPath('C:/Users/Sinhyeok/AppData/Local/Temp/pytest-of-Sinhyeok/pytest-431/test_main_refuses_judge_seeds_0') / 'x').exists
+E        +  and   True = exists()
+E        +    where exists = (WindowsPath('C:/kwon/univ/3-1/GameContentsCapstoneDesign/AdaptiveEcosystem/herbivore_rl/results/v3/r3') / 'gate').exists
+
+tests\test_r3_gate.py:650: AssertionError
+_____________________________ test_eval_r3_smoke ______________________________
+
+judged_r3 = (<module 'eval_v3' from 'C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\eval_v3.py'...fccf955cd1c9', ...}, ...}, WindowsPath('C:/Users/Sinhyeok/AppData/Local/Temp/pytest-of-Sinhyeok/pytest-431/judge_r30'))
+
+    def test_eval_r3_smoke(judged_r3):
+        """r3 판정 smoke(R1b 를 'RL' 자리에 얹어): 정책 모두, U 여섯, 포기율 A 와 반사실, 판정은 미정(관문 결과·문턱 없음), 얼기 없음."""
+        ev, res, out = judged_r3
+        P = res["pooled"]
+        assert set(P) == set(ev.R3_POLICIES)
+        for name, v in P.items():
+            assert set(v["u"]) == set(rr.R3_U), name
+            assert "a3" in v and set(v["visible"]) >= {"threats", "r3", "realism"}, name
+        assert P["rl"]["g_gamma"] == P["rlf"]["g_gamma"] and P["rl"]["a3"] == P["rlf"]["a3"]      # 같은 모델·같은 세계
+        assert P["rl"]["use"]["freeze"] == 0.0 and P["fsm_r3"]["use"]["freeze"] == 0.0
+        assert P["r1b"]["a3"]["freeze_abandon"] and not P["rl"]["a3"]["freeze_abandon"]
+        if P["rl"]["a3"]["n_opp"]:
+            assert P["rl"]["a3"]["cf"]["rlf"]["same"] == 1.0                                     # R1b−F 반사실 = RL 자신
+        G_ = res["gate"]
+        assert G_["pending"] and not G_["pass_"] and not G_["halt"]
+        assert G_["perf"]["ref"] == "fsm_r3" and G_["starve"]["fsm"] == P["fsm_r3"]["starve_rate"]
+        assert res["meta"]["u_def"] == "r3" and not res["meta"]["prereg"] and res["meta"]["r3"]["explicit"]
+        md = (out / "smoke.md").read_text(encoding="utf-8")
+        assert "v3 R3 판정" in md and "포기율 A" in md and md.index("## 판정") < md.index("## 정책별 지표")
+        assert "v3 R3 판정 모음" in ev.summarize(["smoke"], out, "r3")
+        # 니치 π 측정: 판정 롤아웃과 같은 궤적(argmax) — 결정 표본 수가 eval 의 rl 과 같다. 난수 없음
+        import train_v3
+    
+        cfg = load_v2_config(R3_ON)
+        mp = train_v3.measure_pi(cfg, str(R1B), seeds=[33094], steps=150, r3=res["meta"]["r3"])
+        assert mp["u_def"] == "r3" and mp["n_dec"] == res["per_seed"]["rl"][0]["n_dec"]
+>       assert set(mp["early_stop_pi"]) == set(train_v3.R3_EARLY_PI) and mp["early_stop_pending"]
+E       AssertionError: assert (set() == {'crouch', 'e...'keep', 'run'}
+E         
+E         Extra items in the right set:
+E         'crouch'
+E         'early'
+E         'run'
+E         'keep'
+E         Use -v to get more diff)
+
+tests\test_r3_gate.py:855: AssertionError
+_____________________________ test_eval_r3_guards _____________________________
+
+judged_r3 = (<module 'eval_v3' from 'C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\eval_v3.py'...fccf955cd1c9', ...}, ...}, WindowsPath('C:/Users/Sinhyeok/AppData/Local/Temp/pytest-of-Sinhyeok/pytest-431/judge_r30'))
+tmp_path = WindowsPath('C:/Users/Sinhyeok/AppData/Local/Temp/pytest-of-Sinhyeok/pytest-431/test_eval_r3_guards0')
+capsys = <_pytest.capture.CaptureFixture object at 0x0000028840D1AD50>
+
+    def test_eval_r3_guards(judged_r3, tmp_path, capsys):
+        """판정 폴더 보호와 시드: 기본 --out(판정 폴더)은 거부, 폴더 밖은 관문·최종 판정 시드를 거부, r3 는 R3 세계에서만."""
+        ev, res, out = judged_r3
+        model = str(R1B)
+        with pytest.raises(SystemExit):
+            ev.main(["run", "--u-def", "r3", "--model", model, "--name", "x"])
+        for seeds in ("10300", "15000", "10000"):
+            with pytest.raises(SystemExit):
+                ev.main(["run", "--u-def", "r3", "--model", model, "--name", "x", "--seeds", seeds, "--steps", "10", "--out", str(tmp_path)])
+        with pytest.raises(SystemExit):
+            ev.main(["run", "--model", model, "--name", "x", "--theta", "4", "--seeds", "20000", "--out", str(tmp_path)])
+        capsys.readouterr()
+        assert not (ev.PREREG_OUT_R3 / "x.json").exists() and not (tmp_path / "x.json").exists()
+        with pytest.raises(ValueError, match="R3 세계"):
+            ev.judge(model, "x", [33095], 10, tmp_path, config=ev.CONFIG, udef="r3", workers=1)
+        a = argparse.Namespace(steps=ev.STEPS, config=ev.CONFIG_R3, tail=ev.TAIL, policies=None, u_def="r3", theta=None, approach=None,
+                               fsm_r3_lines=None, r3_cal=None)
+        bad = ev.prereg_problems_r3(a, ev.EVAL_SEEDS_R3)
+>       assert any("관문 결과" in b for b in bad) and any("U_ESC 문턱 미정" in b for b in bad)
+E       assert (False)
+E        +  where False = any(<generator object test_eval_r3_guards.<locals>.<genexpr> at 0x0000028840AF9630>)
+
+tests\test_r3_gate.py:878: AssertionError
+____________________________ test_policy_specs_r3 _____________________________
+
+c3 = Config(47 keys)
+
+    def test_policy_specs_r3(c3):
+        import eval_v3 as ev
+    
+        r3s = ev.r3_setup(6.0, 0.75, ["run", "keep"], ["run"])
+        assert r3s["explicit"] and r3s["lines"] == ["run", "keep"] and r3s["cal"] == ["run"]
+        allowed = ("graze", "flee", "hide")
+        assert ev.policy_spec("fsm_r3", "x.zip", c3, allowed, "near", r3=r3s)["build"] == rr.fsm_r3_spec(
+            c3, 6.0, 0.75, lines=["run", "keep"], cal=["run"])
+        assert ev.policy_spec("rbase", "x.zip", c3, allowed, "near", r3=r3s)["build"] == rr.rule_spec(c3, 6.0, 0.75)
+        assert ev.policy_spec("rbase", "x.zip", c3, allowed, "near")["build"] == ev.fsm_spec(c3, ("graze", "flee"), "near")
+        assert ev.policy_spec("r1b", "x.zip", c3, allowed, "near")["world"] == "freeze"
+        assert ev.r3_freeze_world(c3).v2["train"]["repertoire"]["allowed"] == ["graze", "flee", "hide", "freeze"]
+        with pytest.raises(ValueError, match="r3_setup"):
+            ev.policy_spec("fsm_r3", "x.zip", c3, allowed, "near")
+        d = ev.r3_setup()
+>       assert not d["gate_complete"] and (d["theta"], d["approach"]) == (4.0, 0.9) and tuple(d["lines"]) == rr.FSM_R3_LINES
+E       assert (not True)
+
+tests\test_r3_gate.py:917: AssertionError
+___________________ test_warmstart_r3_defaults_and_collect ____________________
+
+tmp_path = WindowsPath('C:/Users/Sinhyeok/AppData/Local/Temp/pytest-of-Sinhyeok/pytest-431/test_warmstart_r3_defaults_and0')
+monkeypatch = <_pytest.monkeypatch.MonkeyPatch object at 0x0000028836E7A0D0>
+
+    def test_warmstart_r3_defaults_and_collect(tmp_path, monkeypatch):
+        """R3 세계의 모방 초기화 기본값(교사 fsm_r3, ckpt/v3/ws_r3, v3_r3_ws)과 교사 자료: 두 교사 요청은 늘 마스크 안이고 FREEZE 가 없다.
+        관문 결과 없이 문턱을 주지 않으면 collect 가 멈춘다."""
+        import eval_v3 as ev
+        import warmstart_v3 as ws
+    
+        cfg = load_v2_config(R3)
+        assert ws.default_teacher2(cfg) == "fsm_r3" and ws.default_out_dir(cfg) == ws.OUT_R3 and ws.default_name(cfg) == "v3_r3_ws"
+        assert ws.default_teacher2(load_v2_config(ROOT / "configs" / "v3_r2.yaml")) == "fsm_r2"
+        assert ws.default_teacher2(load_v2_config(ROOT / "configs" / "v3_r1.yaml")) == "fsm"
+        r3s = ev.r3_setup(4.0, 0.9)
+>       assert ws.teacher2_spec(cfg, ("graze", "flee", "hide"), "fsm_r3", r3s) == rr.fsm_r3_spec(cfg, 4.0, 0.9)
+E       AssertionError: assert {'policy': {'..., ...}, ...}]} == {'policy': {'..., ...}, ...}]}
+E         
+E         Omitting 1 identical items, use -vv to show
+E         Differing items:
+E         {'wrap': [{'allowed': ['graze', 'flee', 'hide'], 'approach': 0.9, 'cal': [], 'cols': {'beh_flee': 12, 'cover_dist': 6, 'energy': 4, 'pred_approach': 9, ...}, ...}]} != {'wrap': [{'allowed': ['graze', 'flee', 'hide'], 'approach': 0.9, 'cal': [], 'cols': {'beh_flee': 12, 'cover_dist': 6, 'energy': 4, 'pred_approach': 9, ...}, ...}]}
+E         Use -v to get more diff
+
+tests\test_r3_gate.py:993: AssertionError
+___________________________ test_registry_and_keys ____________________________
+
+    def test_registry_and_keys():
+        assert F.FEATURE_IDS["realism_chase"] == 24 and F.FEATURE_IDS["realism_terrain"] == 25
+        assert set(NEW) <= F.IMPLEMENTED
+        b = _r3_blocks()
+        for n in NEW:
+            assert F.PARAM_KEYS[n] == frozenset(b[n]) - {"enabled"}, n
+        # 선택 키(규칙 6): 1단계 설정에는 없고(끔 값으로 읽는다) R3 설정에는 적는다
+        assert dict(F.OPTIONAL_KEYS["realism_shelter"]) == {"block_predators": False, "wolf_margin": 0.0}   # 늑대 몸 여유 10-17
+        assert dict(F.OPTIONAL_KEYS["realism_cover_food"]) == {"frac_range": None}
+        assert dict(F.OPTIONAL_KEYS["threats"]) == {"eat_in_place": False}           # (j) 늑대 먹는 시간, 10-15
+        full = _raw(R3_ON)["features"]
+        for n, opt in F.OPTIONAL_KEYS.items():
+            if n.startswith("wild_") or n == "obstacles":
+                continue                    # 야생 1단계 선택 키(10-16)·야생 2단계 3 obstacles.fixed(10-17)는 R3 설정에 없다 — tests/test_wild1.py·test_wild2_obstacle.py 가 본다
+            opt = {k: v for k, v in opt.items() if (n, k) != ("realism_shelter", "wolf_margin")}   # 10-17 늑대 몸 여유도 R3 설정에 없다(test_wild1)
+>           assert set(opt) <= set(full[n]) and not set(opt) & F.PARAM_KEYS[n]
+E           KeyError: 'integrated_stage'
+
+tests\test_r3_world.py:153: KeyError
+__________________________ test_registry_and_config ___________________________
+
+    def test_registry_and_config():
+        assert F.FEATURE_IDS["integrated_stage"] == 26 and "integrated_stage" in F.IMPLEMENTED
+>       assert "integrated_stage" not in F.OPTIONAL_KEYS                 # 새 기능이라 계수는 모두 적는다(선택 키 없음)
+E       AssertionError: assert 'integrated_stage' not in mappingproxy({'realism_shelter': mappingproxy({'block_predators': False, 'wolf_margin': 0.0}), 'realism_cover_food': m...r': mappingproxy({'schedule': None}), 'integrated_stage': mappingproxy({'respawn_safe_r': None, 'respawn_tries': 64})})
+E        +  where mappingproxy({'realism_shelter': mappingproxy({'block_predators': False, 'wolf_margin': 0.0}), 'realism_cover_food': m...r': mappingproxy({'schedule': None}), 'integrated_stage': mappingproxy({'respawn_safe_r': None, 'respawn_tries': 64})}) = F.OPTIONAL_KEYS
+
+tests\test_unreal_mirror.py:115: AssertionError
+============================== warnings summary ===============================
+tests/test_season_smoke.py::test_gate_one_seed
+  C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\env_v2\world.py:4777: RuntimeWarning: divide by zero encountered in divide
+    (cfg.max_energy - e_drained) / cfg.food_energy_per_unit, 0.0, cfg.food_eat_rate
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ===========================
+FAILED tests/test_r3_gate.py::test_main_refuses_judge_seeds_and_draft - Asser...
+FAILED tests/test_r3_gate.py::test_eval_r3_smoke - AssertionError: assert (se...
+FAILED tests/test_r3_gate.py::test_eval_r3_guards - assert (False)
+FAILED tests/test_r3_gate.py::test_policy_specs_r3 - assert (not True)
+FAILED tests/test_r3_gate.py::test_warmstart_r3_defaults_and_collect - Assert...
+FAILED tests/test_r3_world.py::test_registry_and_keys - KeyError: 'integrated...
+FAILED tests/test_unreal_mirror.py::test_registry_and_config - AssertionError...
+7 failed, 1509 passed, 1 skipped, 1 warning in 868.73s (0:14:28)
+
+real	14m30.197s
+user	0m0.015s
+sys	0m0.000s

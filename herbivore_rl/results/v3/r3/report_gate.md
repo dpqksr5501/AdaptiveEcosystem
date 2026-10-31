@@ -1,0 +1,24 @@
+# v3 R3 관문 보고 (사전 등록 results/v3/r3/PREREG.md 11절)
+
+거주 R_base(θ 4, a 0.9) — 탐색 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r3\gate\search.json. 사람이 확인한 뒤 판정 사전 등록으로 간다.
+
+## 관문표
+
+| 관문 | 규칙 | 최종 결과 | 보정 | 근거 |
+|---|---|---|---|---|
+| G1 | keep | 실패 | 1 | `results/v3/r3/gate/cal1/keep/gate.json` |
+| G2 | run | 실패 | 1 | `results/v3/r3/gate/cal1/run/gate.json` |
+| G3 | leave | 실패 | — | `results/v3/r3/gate/gate.json` |
+| G4a | crouch | 실패 | — | `results/v3/r3/gate/gate.json` |
+| G6 | early | 실패 | 1 | `results/v3/r3/gate/cal1/early/gate.json` |
+| G0 | shelter_all | 손해 확인(통과) | — | `results/v3/r3/gate/gate.json` |
+| G0b | camp | 손해 확인(통과) | — | `results/v3/r3/gate/gate.json` |
+| G1-H | keep_hide | 보고만 | — | `results/v3/r3/gate/gate.json` |
+
+## 학습과 판정에 쓰이는 방식 (9-2 표)
+
+- FSM_R3 관문 줄: 없음 (줄 4 R_base·줄 7 GRAZE 는 늘). 보정 1 을 쓴 줄: 없음. 잠 줄: 없음(SLEEP 은 막힌 채).
+- 판정 U: U_ESC. 보고만: U_KEEP, U_RUN, U_LEAVE, U_HIDE, U_EARLY.
+- P3(포기율 A): 보고만 — 사람에게 보인다. HIDE 사용 하한: 걸지 않는다.
+- 악용 점검이 '손해 아님'이면 학습 전에 멈추고 사람이 본다. 니치 밖 판정 불가·(2) 실패도 멈추고 사람이 본다.
+- **멈춤**: leave, crouch

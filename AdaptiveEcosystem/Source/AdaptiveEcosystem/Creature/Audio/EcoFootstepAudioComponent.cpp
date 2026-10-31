@@ -43,7 +43,7 @@ void UEcoFootstepAudioComponent::Consume(const FEcoCreatureVisualState& State, f
         return;
     }
     NotifyGate.Reset();
-    if (!Cadence.Advance(State.Position, Speed, State.bAlive, Delta, AudioSet->GetStride(Speed), AudioSet->MinimumSpeed, bSnap)) return;
+    if (!Cadence.Advance(State.Position, Speed, State.bAlive, Delta, AudioSet->GetStride(Speed)*State.BodyScale, AudioSet->MinimumSpeed, bSnap)) return;
     PlayContact(Source, TEXT("Distance"));
 }
 
@@ -66,9 +66,10 @@ void UEcoFootstepAudioComponent::PlayContact(const FVector& Source, const TCHAR*
     LastMaterial = nullptr;
     if (GetWorld()->LineTraceSingleByChannel(Hit, Source + FVector(0,0,100), Source - FVector(0,0,300), ECC_Visibility, Params))
         LastMaterial = Hit.PhysMaterial.Get();
-    const bool bGrass = AudioSet->IsGrassSurface(LastMaterial, CachedState.RegionId);
-    const auto& Sounds = bGrass ? AudioSet->Grass : AudioSet->Dry;
-    LastSurface = bGrass ? TEXT("Grass") : TEXT("Dry");
+    const EEcoFootstepSurface Surface = AudioSet->GetSurface(LastMaterial, CachedState.RegionId);
+    const auto& Sounds = AudioSet->GetSounds(Surface);
+    const FName Names[] = {TEXT("Grass"),TEXT("Dry"),TEXT("Snow"),TEXT("Water"),TEXT("Wet")};
+    LastSurface = Names[uint8(Surface)];
     if (Sounds.IsEmpty()) return; // Missing surface stays silent; never plays an unrelated fallback.
     int32 Pick = Random.RandRange(0, Sounds.Num()-1);
     if (Sounds.Num() > 1 && Pick == LastIndex) Pick = (Pick + 1) % Sounds.Num();

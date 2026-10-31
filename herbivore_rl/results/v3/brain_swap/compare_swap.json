@@ -1,0 +1,1888 @@
+{
+ "swap_t": 120.0,
+ "end_t": 240.0,
+ "behaviors": [
+  "먹기",
+  "도망",
+  "숨기",
+  "얼기",
+  "잠"
+ ],
+ "sessions": {
+  "20000": {
+   "prefix": {
+    "lines": 377,
+    "same": 377,
+    "first_diff": null,
+    "first_diff_line": null
+   },
+   "swaps": [
+    {
+     "t": 120.0,
+     "step": 900,
+     "src": "v3_r1_g995_s3_20m@eca97f2e",
+     "dst": "v3_r4_g995_s0_20m@f807bea5"
+    }
+   ],
+   "base_swaps": [],
+   "starts": {
+    "base": [
+     {
+      "t": 0.0,
+      "step": 0,
+      "id": "v3_r1_g995_s3_20m@eca97f2e"
+     }
+    ],
+    "swap": [
+     {
+      "t": 0.0,
+      "step": 0,
+      "id": "v3_r1_g995_s3_20m@eca97f2e"
+     }
+    ]
+   },
+   "warnings": {
+    "base": 0,
+    "swap": 0
+   },
+   "windows": {
+    "base_pre": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 309558,
+     "share": [
+      99.84,
+      0.01,
+      0.15,
+      0.0,
+      0.0
+     ],
+     "know_steps": 16743,
+     "know_share": [
+      97.04,
+      0.13,
+      2.83,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      16248,
+      21,
+      474,
+      0,
+      0
+     ],
+     "reflex": 27620,
+     "reflex_know": 21618,
+     "caught": 12,
+     "starved": 0,
+     "alive_end": 372
+    },
+    "base_post": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 284853,
+     "share": [
+      99.84,
+      0.01,
+      0.16,
+      0.0,
+      0.0
+     ],
+     "know_steps": 13407,
+     "know_share": [
+      96.65,
+      0.07,
+      3.28,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      12958,
+      9,
+      440,
+      0,
+      0
+     ],
+     "reflex": 42862,
+     "reflex_know": 30250,
+     "caught": 10,
+     "starved": 0,
+     "alive_end": 362
+    },
+    "swap_pre": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 309558,
+     "share": [
+      99.84,
+      0.01,
+      0.15,
+      0.0,
+      0.0
+     ],
+     "know_steps": 16743,
+     "know_share": [
+      97.04,
+      0.13,
+      2.83,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      16248,
+      21,
+      474,
+      0,
+      0
+     ],
+     "reflex": 27620,
+     "reflex_know": 21618,
+     "caught": 12,
+     "starved": 0,
+     "alive_end": 372
+    },
+    "swap_post": {
+     "ids": [
+      "v3_r4_g995_s0_20m@f807bea5"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 293192,
+     "share": [
+      99.44,
+      0.06,
+      0.5,
+      0.0,
+      0.0
+     ],
+     "know_steps": 12496,
+     "know_share": [
+      88.47,
+      0.8,
+      10.73,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      11055,
+      100,
+      1341,
+      0,
+      0
+     ],
+     "reflex": 34849,
+     "reflex_know": 23673,
+     "caught": 10,
+     "starved": 0,
+     "alive_end": 362
+    }
+   },
+   "regions": {
+    "Barren": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 100599,
+      "share": [
+       100.0,
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_steps": 7058,
+      "know_share": [
+       100.0,
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       7058,
+       0,
+       0,
+       0,
+       0
+      ],
+      "reflex": 12005,
+      "reflex_know": 11001,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 89554,
+      "share": [
+       99.6,
+       0.0,
+       0.4,
+       0.0,
+       0.0
+      ],
+      "know_steps": 6609,
+      "know_share": [
+       94.73,
+       0.0,
+       5.27,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       6261,
+       0,
+       348,
+       0,
+       0
+      ],
+      "reflex": 19911,
+      "reflex_know": 14899,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 121
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 100599,
+      "share": [
+       100.0,
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_steps": 7058,
+      "know_share": [
+       100.0,
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       7058,
+       0,
+       0,
+       0,
+       0
+      ],
+      "reflex": 12005,
+      "reflex_know": 11001,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 96816,
+      "share": [
+       99.57,
+       0.0,
+       0.42,
+       0.0,
+       0.0
+      ],
+      "know_steps": 4639,
+      "know_share": [
+       91.1,
+       0.09,
+       8.82,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       4226,
+       4,
+       409,
+       0,
+       0
+      ],
+      "reflex": 13407,
+      "reflex_know": 11034,
+      "caught": 2,
+      "starved": 0,
+      "alive_end": 122
+     }
+    },
+    "Forest": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 104647,
+      "share": [
+       99.85,
+       0.0,
+       0.15,
+       0.0,
+       0.0
+      ],
+      "know_steps": 3835,
+      "know_share": [
+       95.91,
+       0.0,
+       4.09,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       3678,
+       0,
+       157,
+       0,
+       0
+      ],
+      "reflex": 7832,
+      "reflex_know": 6533,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 90296,
+      "share": [
+       99.96,
+       0.0,
+       0.04,
+       0.0,
+       0.0
+      ],
+      "know_steps": 4335,
+      "know_share": [
+       99.19,
+       0.0,
+       0.81,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       4300,
+       0,
+       35,
+       0,
+       0
+      ],
+      "reflex": 19239,
+      "reflex_know": 13394,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 121
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 104647,
+      "share": [
+       99.85,
+       0.0,
+       0.15,
+       0.0,
+       0.0
+      ],
+      "know_steps": 3835,
+      "know_share": [
+       95.91,
+       0.0,
+       4.09,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       3678,
+       0,
+       157,
+       0,
+       0
+      ],
+      "reflex": 7832,
+      "reflex_know": 6533,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 91358,
+      "share": [
+       99.24,
+       0.06,
+       0.71,
+       0.0,
+       0.0
+      ],
+      "know_steps": 5166,
+      "know_share": [
+       88.17,
+       0.33,
+       11.5,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       4555,
+       17,
+       594,
+       0,
+       0
+      ],
+      "reflex": 17746,
+      "reflex_know": 10677,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 120
+     }
+    },
+    "Highland": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 104312,
+      "share": [
+       99.67,
+       0.02,
+       0.3,
+       0.0,
+       0.0
+      ],
+      "know_steps": 5850,
+      "know_share": [
+       94.22,
+       0.36,
+       5.42,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       5512,
+       21,
+       317,
+       0,
+       0
+      ],
+      "reflex": 7783,
+      "reflex_know": 4084,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 105003,
+      "share": [
+       99.93,
+       0.02,
+       0.05,
+       0.0,
+       0.0
+      ],
+      "know_steps": 2463,
+      "know_share": [
+       97.32,
+       0.37,
+       2.31,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       2397,
+       9,
+       57,
+       0,
+       0
+      ],
+      "reflex": 3712,
+      "reflex_know": 1957,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 120
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 104312,
+      "share": [
+       99.67,
+       0.02,
+       0.3,
+       0.0,
+       0.0
+      ],
+      "know_steps": 5850,
+      "know_share": [
+       94.22,
+       0.36,
+       5.42,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       5512,
+       21,
+       317,
+       0,
+       0
+      ],
+      "reflex": 7783,
+      "reflex_know": 4084,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 105018,
+      "share": [
+       99.49,
+       0.11,
+       0.4,
+       0.0,
+       0.0
+      ],
+      "know_steps": 2691,
+      "know_share": [
+       84.5,
+       2.94,
+       12.56,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       2274,
+       79,
+       338,
+       0,
+       0
+      ],
+      "reflex": 3696,
+      "reflex_know": 1962,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 120
+     }
+    }
+   }
+  },
+  "20001": {
+   "prefix": {
+    "lines": 376,
+    "same": 376,
+    "first_diff": null,
+    "first_diff_line": null
+   },
+   "swaps": [
+    {
+     "t": 120.0,
+     "step": 900,
+     "src": "v3_r1_g995_s3_20m@eca97f2e",
+     "dst": "v3_r4_g995_s0_20m@f807bea5"
+    }
+   ],
+   "base_swaps": [],
+   "starts": {
+    "base": [
+     {
+      "t": 0.0,
+      "step": 0,
+      "id": "v3_r1_g995_s3_20m@eca97f2e"
+     }
+    ],
+    "swap": [
+     {
+      "t": 0.0,
+      "step": 0,
+      "id": "v3_r1_g995_s3_20m@eca97f2e"
+     }
+    ]
+   },
+   "warnings": {
+    "base": 0,
+    "swap": 0
+   },
+   "windows": {
+    "base_pre": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 296531,
+     "share": [
+      99.88,
+      0.04,
+      0.08,
+      0.0,
+      0.0
+     ],
+     "know_steps": 21173,
+     "know_share": [
+      98.72,
+      0.31,
+      0.97,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      20902,
+      66,
+      205,
+      0,
+      0
+     ],
+     "reflex": 41934,
+     "reflex_know": 26164,
+     "caught": 10,
+     "starved": 0,
+     "alive_end": 374
+    },
+    "base_post": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 303966,
+     "share": [
+      99.81,
+      0.07,
+      0.12,
+      0.0,
+      0.0
+     ],
+     "know_steps": 19029,
+     "know_share": [
+      97.38,
+      0.68,
+      1.94,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      18530,
+      129,
+      370,
+      0,
+      0
+     ],
+     "reflex": 24559,
+     "reflex_know": 14406,
+     "caught": 11,
+     "starved": 0,
+     "alive_end": 363
+    },
+    "swap_pre": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 296531,
+     "share": [
+      99.88,
+      0.04,
+      0.08,
+      0.0,
+      0.0
+     ],
+     "know_steps": 21173,
+     "know_share": [
+      98.72,
+      0.31,
+      0.97,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      20902,
+      66,
+      205,
+      0,
+      0
+     ],
+     "reflex": 41934,
+     "reflex_know": 26164,
+     "caught": 10,
+     "starved": 0,
+     "alive_end": 374
+    },
+    "swap_post": {
+     "ids": [
+      "v3_r4_g995_s0_20m@f807bea5"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 299445,
+     "share": [
+      98.97,
+      0.09,
+      0.94,
+      0.0,
+      0.0
+     ],
+     "know_steps": 17586,
+     "know_share": [
+      84.14,
+      0.85,
+      15.01,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      14797,
+      149,
+      2640,
+      0,
+      0
+     ],
+     "reflex": 29406,
+     "reflex_know": 19777,
+     "caught": 11,
+     "starved": 0,
+     "alive_end": 363
+    }
+   },
+   "regions": {
+    "Barren": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 99270,
+      "share": [
+       99.85,
+       0.03,
+       0.12,
+       0.0,
+       0.0
+      ],
+      "know_steps": 10211,
+      "know_share": [
+       98.67,
+       0.2,
+       1.14,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       10075,
+       20,
+       116,
+       0,
+       0
+      ],
+      "reflex": 13989,
+      "reflex_know": 12121,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 125
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 102300,
+      "share": [
+       99.56,
+       0.08,
+       0.36,
+       0.0,
+       0.0
+      ],
+      "know_steps": 11063,
+      "know_share": [
+       96.32,
+       0.41,
+       3.27,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       10656,
+       45,
+       362,
+       0,
+       0
+      ],
+      "reflex": 7363,
+      "reflex_know": 4157,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 121
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 99270,
+      "share": [
+       99.85,
+       0.03,
+       0.12,
+       0.0,
+       0.0
+      ],
+      "know_steps": 10211,
+      "know_share": [
+       98.67,
+       0.2,
+       1.14,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       10075,
+       20,
+       116,
+       0,
+       0
+      ],
+      "reflex": 13989,
+      "reflex_know": 12121,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 125
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 99206,
+      "share": [
+       97.78,
+       0.17,
+       2.06,
+       0.0,
+       0.0
+      ],
+      "know_steps": 7926,
+      "know_share": [
+       73.74,
+       1.15,
+       25.11,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       5845,
+       91,
+       1990,
+       0,
+       0
+      ],
+      "reflex": 10652,
+      "reflex_know": 9299,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 121
+     }
+    },
+    "Forest": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 93586,
+      "share": [
+       99.97,
+       0.03,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_steps": 2956,
+      "know_share": [
+       99.46,
+       0.54,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       2940,
+       16,
+       0,
+       0,
+       0
+      ],
+      "reflex": 19534,
+      "reflex_know": 10774,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 125
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 101143,
+      "share": [
+       99.99,
+       0.0,
+       0.01,
+       0.0,
+       0.0
+      ],
+      "know_steps": 3156,
+      "know_share": [
+       99.75,
+       0.0,
+       0.25,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       3148,
+       0,
+       8,
+       0,
+       0
+      ],
+      "reflex": 9106,
+      "reflex_know": 5979,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 122
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 93586,
+      "share": [
+       99.97,
+       0.03,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_steps": 2956,
+      "know_share": [
+       99.46,
+       0.54,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       2940,
+       16,
+       0,
+       0,
+       0
+      ],
+      "reflex": 19534,
+      "reflex_know": 10774,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 125
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 97925,
+      "share": [
+       99.41,
+       0.07,
+       0.53,
+       0.0,
+       0.0
+      ],
+      "know_steps": 5649,
+      "know_share": [
+       92.0,
+       0.76,
+       7.24,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       5197,
+       43,
+       409,
+       0,
+       0
+      ],
+      "reflex": 12459,
+      "reflex_know": 7019,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 122
+     }
+    },
+    "Highland": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 103675,
+      "share": [
+       99.84,
+       0.05,
+       0.11,
+       0.0,
+       0.0
+      ],
+      "know_steps": 8006,
+      "know_share": [
+       98.51,
+       0.37,
+       1.11,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       7887,
+       30,
+       89,
+       0,
+       0
+      ],
+      "reflex": 8411,
+      "reflex_know": 3269,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 100523,
+      "share": [
+       99.88,
+       0.12,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_steps": 4810,
+      "know_share": [
+       98.25,
+       1.75,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       4726,
+       84,
+       0,
+       0,
+       0
+      ],
+      "reflex": 8090,
+      "reflex_know": 4270,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 120
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 103675,
+      "share": [
+       99.84,
+       0.05,
+       0.11,
+       0.0,
+       0.0
+      ],
+      "know_steps": 8006,
+      "know_share": [
+       98.51,
+       0.37,
+       1.11,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       7887,
+       30,
+       89,
+       0,
+       0
+      ],
+      "reflex": 8411,
+      "reflex_know": 3269,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 102314,
+      "share": [
+       99.72,
+       0.03,
+       0.24,
+       0.0,
+       0.0
+      ],
+      "know_steps": 4011,
+      "know_share": [
+       93.62,
+       0.37,
+       6.01,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       3755,
+       15,
+       241,
+       0,
+       0
+      ],
+      "reflex": 6295,
+      "reflex_know": 3459,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 120
+     }
+    }
+   }
+  },
+  "20002": {
+   "prefix": {
+    "lines": 376,
+    "same": 376,
+    "first_diff": null,
+    "first_diff_line": null
+   },
+   "swaps": [
+    {
+     "t": 120.0,
+     "step": 900,
+     "src": "v3_r1_g995_s3_20m@eca97f2e",
+     "dst": "v3_r4_g995_s0_20m@f807bea5"
+    }
+   ],
+   "base_swaps": [],
+   "starts": {
+    "base": [
+     {
+      "t": 0.0,
+      "step": 0,
+      "id": "v3_r1_g995_s3_20m@eca97f2e"
+     }
+    ],
+    "swap": [
+     {
+      "t": 0.0,
+      "step": 0,
+      "id": "v3_r1_g995_s3_20m@eca97f2e"
+     }
+    ]
+   },
+   "warnings": {
+    "base": 0,
+    "swap": 0
+   },
+   "windows": {
+    "base_pre": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 290949,
+     "share": [
+      99.85,
+      0.02,
+      0.13,
+      0.0,
+      0.0
+     ],
+     "know_steps": 18439,
+     "know_share": [
+      97.75,
+      0.37,
+      1.88,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      18024,
+      68,
+      347,
+      0,
+      0
+     ],
+     "reflex": 47274,
+     "reflex_know": 32077,
+     "caught": 10,
+     "starved": 0,
+     "alive_end": 374
+    },
+    "base_post": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 293777,
+     "share": [
+      99.96,
+      0.01,
+      0.03,
+      0.0,
+      0.0
+     ],
+     "know_steps": 14242,
+     "know_share": [
+      99.21,
+      0.12,
+      0.67,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      14129,
+      17,
+      96,
+      0,
+      0
+     ],
+     "reflex": 35296,
+     "reflex_know": 23490,
+     "caught": 10,
+     "starved": 0,
+     "alive_end": 364
+    },
+    "swap_pre": {
+     "ids": [
+      "v3_r1_g995_s3_20m@eca97f2e"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 290949,
+     "share": [
+      99.85,
+      0.02,
+      0.13,
+      0.0,
+      0.0
+     ],
+     "know_steps": 18439,
+     "know_share": [
+      97.75,
+      0.37,
+      1.88,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      18024,
+      68,
+      347,
+      0,
+      0
+     ],
+     "reflex": 47274,
+     "reflex_know": 32077,
+     "caught": 10,
+     "starved": 0,
+     "alive_end": 374
+    },
+    "swap_post": {
+     "ids": [
+      "v3_r4_g995_s0_20m@f807bea5"
+     ],
+     "mixed": 0,
+     "intervals": 36,
+     "brain_steps": 300624,
+     "share": [
+      99.58,
+      0.01,
+      0.41,
+      0.0,
+      0.0
+     ],
+     "know_steps": 7704,
+     "know_share": [
+      86.19,
+      0.29,
+      13.53,
+      0.0,
+      0.0
+     ],
+     "know_counts": [
+      6640,
+      22,
+      1042,
+      0,
+      0
+     ],
+     "reflex": 27864,
+     "reflex_know": 19678,
+     "caught": 11,
+     "starved": 0,
+     "alive_end": 363
+    }
+   },
+   "regions": {
+    "Barren": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 93079,
+      "share": [
+       99.87,
+       0.07,
+       0.06,
+       0.0,
+       0.0
+      ],
+      "know_steps": 9214,
+      "know_share": [
+       98.68,
+       0.74,
+       0.59,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       9092,
+       68,
+       54,
+       0,
+       0
+      ],
+      "reflex": 19869,
+      "reflex_know": 16055,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 125
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 91874,
+      "share": [
+       99.98,
+       0.02,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_steps": 9170,
+      "know_share": [
+       99.9,
+       0.1,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       9161,
+       9,
+       0,
+       0,
+       0
+      ],
+      "reflex": 19309,
+      "reflex_know": 15060,
+      "caught": 2,
+      "starved": 0,
+      "alive_end": 123
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 93079,
+      "share": [
+       99.87,
+       0.07,
+       0.06,
+       0.0,
+       0.0
+      ],
+      "know_steps": 9214,
+      "know_share": [
+       98.68,
+       0.74,
+       0.59,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       9092,
+       68,
+       54,
+       0,
+       0
+      ],
+      "reflex": 19869,
+      "reflex_know": 16055,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 125
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 103044,
+      "share": [
+       99.66,
+       0.01,
+       0.33,
+       0.0,
+       0.0
+      ],
+      "know_steps": 3602,
+      "know_share": [
+       90.39,
+       0.11,
+       9.49,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       3256,
+       4,
+       342,
+       0,
+       0
+      ],
+      "reflex": 6494,
+      "reflex_know": 5714,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 121
+     }
+    },
+    "Forest": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 92189,
+      "share": [
+       99.82,
+       0.0,
+       0.18,
+       0.0,
+       0.0
+      ],
+      "know_steps": 5090,
+      "know_share": [
+       97.25,
+       0.0,
+       2.75,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       4950,
+       0,
+       140,
+       0,
+       0
+      ],
+      "reflex": 20905,
+      "reflex_know": 13091,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 125
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 100948,
+      "share": [
+       100.0,
+       0.0,
+       0.0,
+       0.0,
+       0.0
+      ],
+      "know_steps": 2951,
+      "know_share": [
+       99.97,
+       0.0,
+       0.03,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       2950,
+       0,
+       1,
+       0,
+       0
+      ],
+      "reflex": 8444,
+      "reflex_know": 4707,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 121
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 92189,
+      "share": [
+       99.82,
+       0.0,
+       0.18,
+       0.0,
+       0.0
+      ],
+      "know_steps": 5090,
+      "know_share": [
+       97.25,
+       0.0,
+       2.75,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       4950,
+       0,
+       140,
+       0,
+       0
+      ],
+      "reflex": 20905,
+      "reflex_know": 13091,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 125
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 98584,
+      "share": [
+       99.34,
+       0.01,
+       0.65,
+       0.0,
+       0.0
+      ],
+      "know_steps": 1505,
+      "know_share": [
+       63.06,
+       0.4,
+       36.54,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       949,
+       6,
+       550,
+       0,
+       0
+      ],
+      "reflex": 11695,
+      "reflex_know": 7063,
+      "caught": 3,
+      "starved": 0,
+      "alive_end": 122
+     }
+    },
+    "Highland": {
+     "base_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 105681,
+      "share": [
+       99.86,
+       0.0,
+       0.14,
+       0.0,
+       0.0
+      ],
+      "know_steps": 4135,
+      "know_share": [
+       96.3,
+       0.0,
+       3.7,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       3982,
+       0,
+       153,
+       0,
+       0
+      ],
+      "reflex": 6500,
+      "reflex_know": 2931,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "base_post": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 100955,
+      "share": [
+       99.89,
+       0.02,
+       0.09,
+       0.0,
+       0.0
+      ],
+      "know_steps": 2121,
+      "know_share": [
+       95.14,
+       0.38,
+       4.48,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       2018,
+       8,
+       95,
+       0,
+       0
+      ],
+      "reflex": 7543,
+      "reflex_know": 3723,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 120
+     },
+     "swap_pre": {
+      "ids": [
+       "v3_r1_g995_s3_20m@eca97f2e"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 105681,
+      "share": [
+       99.86,
+       0.0,
+       0.14,
+       0.0,
+       0.0
+      ],
+      "know_steps": 4135,
+      "know_share": [
+       96.3,
+       0.0,
+       3.7,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       3982,
+       0,
+       153,
+       0,
+       0
+      ],
+      "reflex": 6500,
+      "reflex_know": 2931,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 124
+     },
+     "swap_post": {
+      "ids": [
+       "v3_r4_g995_s0_20m@f807bea5"
+      ],
+      "mixed": 0,
+      "intervals": 12,
+      "brain_steps": 98996,
+      "share": [
+       99.74,
+       0.02,
+       0.25,
+       0.0,
+       0.0
+      ],
+      "know_steps": 2597,
+      "know_share": [
+       93.76,
+       0.46,
+       5.78,
+       0.0,
+       0.0
+      ],
+      "know_counts": [
+       2435,
+       12,
+       150,
+       0,
+       0
+      ],
+      "reflex": 9675,
+      "reflex_know": 6901,
+      "caught": 4,
+      "starved": 0,
+      "alive_end": 120
+     }
+    }
+   }
+  }
+ },
+ "total": {
+  "base_pre": {
+   "know_steps": 56355,
+   "know_counts": [
+    55174,
+    155,
+    1026,
+    0,
+    0
+   ],
+   "hide_know_pct": 1.82,
+   "caught": 32,
+   "starved": 0
+  },
+  "base_post": {
+   "know_steps": 46678,
+   "know_counts": [
+    45617,
+    155,
+    906,
+    0,
+    0
+   ],
+   "hide_know_pct": 1.94,
+   "caught": 31,
+   "starved": 0
+  },
+  "swap_pre": {
+   "know_steps": 56355,
+   "know_counts": [
+    55174,
+    155,
+    1026,
+    0,
+    0
+   ],
+   "hide_know_pct": 1.82,
+   "caught": 32,
+   "starved": 0
+  },
+  "swap_post": {
+   "know_steps": 37786,
+   "know_counts": [
+    32492,
+    271,
+    5023,
+    0,
+    0
+   ],
+   "hide_know_pct": 13.29,
+   "caught": 32,
+   "starved": 0
+  }
+ }
+}

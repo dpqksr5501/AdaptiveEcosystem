@@ -1,0 +1,110 @@
+{
+ "format": "eco_v3_live_round",
+ "version": 1,
+ "attempt": 1,
+ "run": "a1_20261021T183141_e1",
+ "snapshot": "eco_v3_snapshot_s20004_t475_e1.json",
+ "state": "rejected",
+ "plan": {
+  "horizon": 1800,
+  "judge": [
+   35000,
+   35079
+  ],
+  "horizon_g": 3600,
+  "judge_g": [
+   35000,
+   35039
+  ],
+  "select": [
+   35100,
+   35119
+  ],
+  "stuck": [
+   35000,
+   35004
+  ],
+  "check": [
+   35180,
+   35199
+  ],
+  "steps": 2000000,
+  "model_seeds": [
+   0
+  ],
+  "workers": 14,
+  "flight_cost": 0.0,
+  "skip_check": false,
+  "force_export": false,
+  "ckpt": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v3\\live",
+  "test": false
+ },
+ "plan_test": false,
+ "stages": {
+  "convert": 1.6,
+  "eval_current": 79.0,
+  "train_learn": 123.6,
+  "train_and_eval_current": 129.1,
+  "eval_candidate_N1": 11.9,
+  "eval_candidate_N2": 64.9,
+  "eval_candidate": 77.6,
+  "gate": 0.0
+ },
+ "started_utc": "2026-10-21T09:31:41Z",
+ "key": "657d0ca1ef6efba7|eca97f2ef6c0d6a1|p20261020T200242_86566bfa",
+ "env_digest": "657d0ca1ef6efba7",
+ "brain_weights_sha256": "eca97f2ef6c0d6a1c81d8fce79d9c5740fd9cde60f04a65cfa00a43b64c8bdbe",
+ "env": "Barren 나무 0→20, 비 1.0",
+ "env_revision": 1,
+ "play_id": "p20261020T200242_86566bfa",
+ "brain": "v3_r1_g995_s3_20m@eca97f2e",
+ "start": "ckpt/v3/v3_r1_g995_s3_obs21zero.zip",
+ "check": {
+  "ok": null,
+  "why": "중간 변화로 재현 확인 없음 (환경 #1)"
+ },
+ "current_cache": {
+  "N": {
+   "state": "saved",
+   "file": "N_efb6b111b4af5ba70a48feb4.json",
+   "why": null
+  },
+  "G": {
+   "state": "saved",
+   "file": "G_437d2da4ffbf862dfbee89d2.json",
+   "why": null
+  },
+  "stuck": {
+   "state": "saved",
+   "file": "stuck_e0e7dfbcbde53ba906198a2f.json",
+   "why": null
+  }
+ },
+ "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v3\\live\\a1_20261021T183141_e1\\live_a1_20261021T183141_e1_cand_s0.zip",
+ "stage": "final",
+ "ran": [
+  {
+   "stage": "N1",
+   "items": 120,
+   "tags": [
+    "candidate:N"
+   ]
+  },
+  {
+   "stage": "N2",
+   "items": 255,
+   "tags": [
+    "candidate:G",
+    "candidate:N",
+    "candidate:stuck"
+   ]
+  }
+ ],
+ "verdict": "기각",
+ "why": "1차 P1 실패: 포만 없는 세계 스스로 벗어난 도망의 쫓긴 시간 평균 후보 3.60초 대 지금 3.54초 (짝 t +0.62, 문턱 −1.990, 시드 80, 빠진 시드 0)",
+ "gate_summary": "포만 없는 세계 쫓긴 시간 3.5→3.6초 (t +0.6), 지킴 실패",
+ "stage_note": "",
+ "last_result": "기각: 1차 쫓긴 시간 3.5→3.6초 t +0.6 (문턱 −1.99)",
+ "wall_s": 208.8,
+ "ended_utc": "2026-10-21T09:35:10Z"
+}

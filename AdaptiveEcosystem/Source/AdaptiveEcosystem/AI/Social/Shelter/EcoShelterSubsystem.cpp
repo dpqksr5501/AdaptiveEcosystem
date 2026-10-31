@@ -34,6 +34,7 @@ void UEcoShelterSubsystem::Initialize(FSubsystemCollectionBase& Collection)
 	ShelterSlots.Reset();
 	FreeShelterIndices.Reset();
 	NextReservationId = 1;
+	NextShelterRegistrationId = 1;
 }
 
 void UEcoShelterSubsystem::Deinitialize()
@@ -44,13 +45,32 @@ void UEcoShelterSubsystem::Deinitialize()
 	Super::Deinitialize();
 }
 
-int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVector& Normal, float Quality, int32 Capacity, float Radius)
+int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVector& Normal, float Quality, int32 Capacity, float Radius, float SlotRadiusFraction, bool bProjectSlotsToGround)
 {
 	check(IsInGameThread());
 	if (Location.ContainsNaN() || Normal.ContainsNaN() || !FMath::IsFinite(Quality)
-		|| !FMath::IsFinite(Radius) || Radius < 0.0f || Capacity <= 0 || Capacity > 1024)
+		|| !FMath::IsFinite(Radius) || Radius < 0.0f || !FMath::IsFinite(SlotRadiusFraction) || SlotRadiusFraction<.1f || SlotRadiusFraction>1.f || Capacity <= 0 || Capacity > 1024)
 	{
 		return INDEX_NONE_ECO;
+	}
+	TArray<FVector> SlotPositions;
+	const float SafeRadius = FMath::Max(50.0f, Radius);
+	for(int32 I=0;I<Capacity;++I) {
+		const float Angle=float(I)/Capacity*2*PI;
+		FVector P=Location+FVector(FMath::Cos(Angle)*SafeRadius*SlotRadiusFraction,FMath::Sin(Angle)*SafeRadius*SlotRadiusFraction,0);
+		if(bProjectSlotsToGround) {
+			bool Grounded=false;
+			for(int Attempt=0;Attempt<5&&!Grounded;++Attempt) {
+				const float Fraction=SlotRadiusFraction*(1.f-.15f*Attempt);
+				P=Location+FVector(FMath::Cos(Angle)*SafeRadius*Fraction,FMath::Sin(Angle)*SafeRadius*Fraction,0);
+				FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoRefugeSlotGround),true);
+				if(GetWorld()->LineTraceSingleByChannel(Hit,P+FVector(0,0,2000),P-FVector(0,0,4000),ECC_WorldStatic,Params)&&Hit.ImpactNormal.Z>=.65f) {
+					P.Z=Hit.ImpactPoint.Z;Grounded=true;
+				}
+			}
+			if(!Grounded)return INDEX_NONE_ECO;
+		}
+		SlotPositions.Add(P);
 	}
 	int32 ShelterIndex = INDEX_NONE_ECO;
 	if (FreeShelterIndices.Num() > 0)
@@ -63,13 +83,13 @@ int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVect
 	}
 
 	FEcoShelterPoint& NewShelter = Shelters[ShelterIndex];
+	NewShelter.RegistrationId = NextShelterRegistrationId++;
 	NewShelter.RuntimeIndex = ShelterIndex;
 	NewShelter.Position = Location;
 	NewShelter.SurfaceNormal = Normal.GetSafeNormal();
 	NewShelter.Quality = FMath::Clamp(Quality, 0.0f, 1.0f);
 	NewShelter.Capacity = FMath::Max(1, Capacity);
 
-	const float SafeRadius = FMath::Max(50.0f, Radius);
 	NewShelter.Radius = SafeRadius;
 
 	// Allocate discrete reservation slots distributed evenly in a circle around shelter center
@@ -81,8 +101,7 @@ int32 UEcoShelterSubsystem::RegisterShelter(const FVector& Location, const FVect
 		Slot.SlotIndex = NewSlotIndex;
 		
 		// Angle = 2 * PI * SlotIdx / Capacity
-		const float Angle = (float)SlotIdx / (float)NewShelter.Capacity * 2.0f * PI;
-		Slot.Position = Location + FVector(FMath::Cos(Angle) * SafeRadius, FMath::Sin(Angle) * SafeRadius, 0.0f);
+		Slot.Position = SlotPositions[SlotIdx];
 		Slot.ReservedBy = 0;
 		Slot.ReservationExpireTime = 0.0;
 	}
@@ -267,7 +286,7 @@ bool UEcoShelterSubsystem::CheckThreatOcclusion(const FVector& ThreatLocation, c
 }
 
 int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocation, const FVector& ThreatLocation,
-	bool bHasThreat, float SearchRadius, int32& OutSlotIndex, float& OutScore) const
+	bool bHasThreat, float SearchRadius, int32& OutSlotIndex, float& OutScore, const TFunction<bool(const FVector&)>* SlotFilter) const
 {
 	OutSlotIndex = INDEX_NONE_ECO;
 	OutScore = 0.0f;
@@ -300,7 +319,8 @@ int32 UEcoShelterSubsystem::FindBestAvailableShelter(const FVector& AgentLocatio
 		for (int32 SlotIdx = 0; SlotIdx < ShelterSlots.Num(); ++SlotIdx)
 		{
 			const FEcoShelterSlot& Slot = ShelterSlots[SlotIdx];
-			if (Slot.ShelterRuntimeIndex == i && (Slot.ReservedBy == 0 || Slot.ReservationExpireTime <= CurrentTime))
+			if (Slot.ShelterRuntimeIndex == i && (Slot.ReservedBy == 0 || Slot.ReservationExpireTime <= CurrentTime)
+                && (!SlotFilter || (*SlotFilter)(Slot.Position)))
 			{
 				FoundAvailableSlot = SlotIdx;
 				break;

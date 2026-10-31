@@ -2,11 +2,15 @@
 
 #include "AI/Policy/EcoBehaviorConfig.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
+#include "AI/Policy/EcoHeading.h"
+#include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Policy/EcoWorldProviders.h"
 #include "DrawDebugHelpers.h"
 #include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
+#include "MassCommandBuffer.h"
 #include "MassEntityManager.h"
 #include "MassEntitySubsystem.h"
 #include "MassMovementFragments.h"
@@ -78,10 +82,23 @@ void AEcoPolicyTestSpawner::BeginPlay()
 {
 	Super::BeginPlay();
 	if (!GetWorld() || GetWorld()->GetNetMode() == NM_Client) { return; }
-	SpawnEntities();
+	SwitchPolicyVersion(ResolvePolicyVersion(PolicyVersionOverride, UEcoPolicyV3Subsystem::GetRequestedPolicyVersion(),
+											 bAssignStableAgentIds));
+	// 실행 중 판 바꾸기: 월드 틱 시작은 Mass 처리 밖이라 개체를 만들고 지워도 된다.
+	WorldTickStartHandle = FWorldDelegates::OnWorldTickStart.AddUObject(this, &AEcoPolicyTestSpawner::OnWorldTickStart);
 }
 
 void AEcoPolicyTestSpawner::EndPlay(const EEndPlayReason::Type Reason)
+{
+	FWorldDelegates::OnWorldTickStart.Remove(WorldTickStartHandle);
+	WorldTickStartHandle.Reset();
+	DespawnV3();
+	DespawnV1();
+	ActivePolicyVersion = 0;
+	Super::EndPlay(Reason);
+}
+
+void AEcoPolicyTestSpawner::DespawnV1()
 {
 	if (FMassEntityManager* EM = GetEntityManager(GetWorld()))
 	{
@@ -100,7 +117,7 @@ void AEcoPolicyTestSpawner::EndPlay(const EEndPlayReason::Type Reason)
 	PredatorTargets.Reset();
 	CatchesSinceLog = 0;
 	TotalCatches = 0;
-	Super::EndPlay(Reason);
+	bSpawned = false;
 }
 
 float AEcoPolicyTestSpawner::GetWorldExtent() const
@@ -120,7 +137,8 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 		return;
 	}
 
-	// §9.4/§9.5 쿼리가 요구하는 프래그먼트·태그의 합집합.
+	// §9.4/§9.5 쿼리가 요구하는 프래그먼트·태그의 합집합. 트레잇(UEcoHerbivoreTrait),
+	// 테스트(EcoTest::HerbivoreComposition)와 같아야 한다 — 바꾸면 세 곳을 같이 바꾼다.
 	TArray<const UScriptStruct*> HerbComposition = {
 		FTransformFragment::StaticStruct(),
 		FMassVelocityFragment::StaticStruct(),
@@ -132,6 +150,8 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 		FEcoHerbivoreTag::StaticStruct(),
 		// 트레잇과 같은 구성. 이동은 조향 프로세서 몫이라 엔진 이동 프로세서를 막아 둔다.
 		FMassCustomMovementTag::StaticStruct(),
+		// 초식 쿼리는 전부 생존 태그를 요구한다. 잡히면 PendingDeath 로 바뀐다.
+		FEcoAliveTag::StaticStruct(),
 	};
 	// FEcoPredatorStateFragment 가 없으면 UEcoPredationProcessor 가 이 포식자를 못 본다.
 	TArray<const UScriptStruct*> PredComposition = {
@@ -165,11 +185,13 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 			const float R = Radius * FMath::Sqrt(Rand.FRand());   // 면적 균등
 			const FVector Loc = Origin + FVector(R * FMath::Cos(Angle), R * FMath::Sin(Angle), 0.0f);
 
-			EM->GetFragmentDataChecked<FTransformFragment>(E).GetMutableTransform().SetLocation(Loc);
-			// 정지 상태면 시야 판정이 전방 축에 고정되므로 초기 속도를 준다.
+			FTransform& T = EM->GetFragmentDataChecked<FTransformFragment>(E).GetMutableTransform();
+			T.SetLocation(Loc);
+			// 초기 heading(파이썬은 무작위)은 회전으로 준다. 속도는 첫 틱 지각에서 같은 방향을 주므로 남겨 둔다.
 			const float A2 = Rand.FRandRange(0.0f, 2.0f * PI);
-			EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value =
-				FVector(FMath::Cos(A2), FMath::Sin(A2), 0.0f) * 10.0f;
+			const FVector Dir(FMath::Cos(A2), FMath::Sin(A2), 0.0f);
+			T.SetRotation(EcoHeading::YawQuatFromDir(Dir));
+			EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value = Dir * 10.0f;
 			Out.Add(E);
 		}
 	};
@@ -209,6 +231,8 @@ void AEcoPolicyTestSpawner::SpawnEntities()
 	{
 		const float A = Rand.FRandRange(0.0f, 2.0f * PI);
 		PredatorHeadings[i] = FVector(FMath::Cos(A), FMath::Sin(A), 0.0f);
+		EM->GetFragmentDataChecked<FTransformFragment>(Predators[i]).GetMutableTransform()
+			.SetRotation(EcoHeading::YawQuatFromDir(PredatorHeadings[i]));
 	}
 
 	bSpawned = true;
@@ -221,9 +245,9 @@ void AEcoPolicyTestSpawner::RespawnCaught()
 {
 	// 파이썬 §4.3 — 잡힌 슬롯을 즉시 월드 전체 균일 랜덤 위치로 되살린다. 개체 수는 고정.
 	//
-	// 실제 게임에서는 Lifecycle 계층의 몫이고 UEcoPredationProcessor 는 HP=0 으로 표시만 한다.
-	// 테스트 레벨에는 그 계층이 없어서, 이게 없으면 잡힌 개체가 HP 0 인 채로 계속 달리고
-	// 포식자는 그 "시체"를 최근접 표적으로 영원히 쫓는다.
+	// 실제 게임에서는 Lifecycle 계층의 몫이고 UEcoPredationProcessor 는 HP=0 + Alive→PendingDeath
+	// 로 표시만 한다. 시체는 초식 쿼리에서 빠져 그 자리에 멈춘다. 테스트 레벨에는 그 계층이 없어서
+	// 여기서 되살리고 태그를 Alive 로 되돌린다.
 	FMassEntityManager* EM = GetEntityManager(GetWorld());
 	if (!EM)
 	{
@@ -253,10 +277,19 @@ void AEcoPolicyTestSpawner::RespawnCaught()
 		T.SetLocation(FVector(SimRand.FRandRange(-Extent, Extent),
 							  SimRand.FRandRange(-Extent, Extent), Death.Z));
 		const float A = SimRand.FRandRange(0.0f, 2.0f * PI);
-		EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value =
-			FVector(FMath::Cos(A), FMath::Sin(A), 0.0f) * 10.0f;
+		const FVector Dir(FMath::Cos(A), FMath::Sin(A), 0.0f);
+		T.SetRotation(EcoHeading::YawQuatFromDir(Dir));   // world.py 리스폰 무작위 heading
+		EM->GetFragmentDataChecked<FMassVelocityFragment>(E).Value = Dir * 10.0f;
 		Vitals.HP = Vitals.MaxHP;
 		Vitals.Energy = Vitals.MaxEnergy * EcoBehaviorConfig::InitEnergyFrac;
+		// 포획 때 넣은 Alive→PendingDeath 는 PrePhysics 페이즈 끝에 이미 반영됐다. 되돌리는 교체도
+		// 지연으로 넣는다 — 액터 틱은 Mass 처리와 겹칠 수 있어 동기 API 를 쓰지 않는다. 다음 틱
+		// 게더 전(이후 처리 페이즈 끝)에 반영된다.
+		EM->Defer().SwapTags<FEcoPendingDeathTag, FEcoAliveTag>(E);
+		// 파이썬은 리스폰한 슬롯의 관측을 바로 다시 만든다(world.py _observe_subset).
+		// 다음 틱에 새 위치의 관측으로 정책을 돌게 한다.
+		EM->GetFragmentDataChecked<FEcoPolicyRuntimeFragment>(E).LastPolicyStep =
+			FMath::Max(EcoBehaviorConfig::PolicyInterval, 1) - 1;
 		OnTestEntityReset(E);
 	}
 }
@@ -359,6 +392,7 @@ void AEcoPolicyTestSpawner::MovePredators(float DeltaSeconds)
 		}
 
 		T.SetLocation(NewPos);
+		T.SetRotation(EcoHeading::YawQuatFromDir(Dir));   // 표현·복제가 보는 방향을 시야 부채꼴과 맞춘다
 		EM->GetFragmentDataChecked<FMassVelocityFragment>(Predators[i]).Value = Dir * Speed;
 		PredatorHeadings[i] = Dir.GetSafeNormal2D();
 		PredatorTargets[i] = Target;
@@ -368,6 +402,15 @@ void AEcoPolicyTestSpawner::MovePredators(float DeltaSeconds)
 void AEcoPolicyTestSpawner::Tick(float DeltaSeconds)
 {
 	Super::Tick(DeltaSeconds);
+	if (ActivePolicyVersion == 3)
+	{
+		// v3: 움직임·포획·리스폰·기록은 UEcoPolicyV3StepProcessor·서브시스템이 한다. 여기서는 그리기만.
+		if (bDrawDebug)
+		{
+			DrawDebugV3();
+		}
+		return;
+	}
 	if (!bSpawned)
 	{
 		return;
@@ -414,10 +457,14 @@ void AEcoPolicyTestSpawner::DrawDebug() const
 		{
 			DrawDebugPoint(World, Top, HerbivorePointSize, Color, false, -1.0f, 0);
 		}
-		if (HeadingLineLength > 0.0f && !V.IsNearlyZero())
+		if (HeadingLineLength > 0.0f)
 		{
-			DrawDebugLine(World, Top, Top + V.GetSafeNormal2D() * HeadingLineLength, Color,
-						  false, -1.0f, 0, 3.0f);
+			// 지각이 쓰는 것과 같은 방향. 멈춘 개체는 유지된 heading 을 회색 가는 선으로 보인다.
+			const FTransform& Xf = EM->GetFragmentDataChecked<FTransformFragment>(E).GetTransform();
+			const FVector Head = EcoHeading::HeadingOf(Xf, V);
+			const bool bMoving = EcoHeading::IsMoving2D(V);
+			DrawDebugLine(World, Top, Top + Head * HeadingLineLength,
+						  bMoving ? Color : FColor(140, 140, 140), false, -1.0f, 0, bMoving ? 3.0f : 1.5f);
 		}
 		// §3.3 도주 분기가 켜진 개체 — 포식자 반대쪽으로 굵게.
 		if (G.DistPredMin < A.FleeDist * EcoBehaviorConfig::SeeRadiusCm)
@@ -517,4 +564,208 @@ void AEcoPolicyTestSpawner::LogSummary() const
 		   Mode == 1 ? TEXT("학습") : (Mode == 0 ? TEXT("Utility") : TEXT("?")),
 		   N, Moving, SawPredator, Fleeing, CatchesSinceLog, TotalCatches,
 		   SumForage / N, SumCohesion / N, SumFlee / N, SumCover / N);
+}
+
+// -----------------------------------------------------------------------------
+// v3 (R1b 행동 고르기) — 계획서 4-5 e3 우리 시험 경로
+// -----------------------------------------------------------------------------
+
+int32 AEcoPolicyTestSpawner::ResolvePolicyVersion(int32 Override, int32 RequestedByConsole, bool bAssignsStableIds)
+{
+	if (bAssignsStableIds)
+	{
+		return 1;   // 정체성 관찰자(Creature 데모 등)는 v1 개체(FEcoIdentityFragment·FEcoVitalsFragment)에 기댄다
+	}
+	const int32 Wanted = Override != 0 ? Override : RequestedByConsole;
+	return Wanted == 3 ? 3 : 1;
+}
+
+void AEcoPolicyTestSpawner::OnWorldTickStart(UWorld* InWorld, ELevelTick TickType, float DeltaSeconds)
+{
+	if (InWorld != GetWorld() || !HasActorBegunPlay() || InWorld->GetNetMode() == NM_Client)
+	{
+		return;
+	}
+	const int32 Wanted = ResolvePolicyVersion(PolicyVersionOverride, UEcoPolicyV3Subsystem::GetRequestedPolicyVersion(),
+											  bAssignStableAgentIds);
+	if (Wanted != ActivePolicyVersion)
+	{
+		UE_LOG(LogEcoPolicyV3, Log, TEXT("[EcoV3] 정책 판을 바꾼다: %d -> %d"), ActivePolicyVersion, Wanted);
+		SwitchPolicyVersion(Wanted);
+	}
+}
+
+void AEcoPolicyTestSpawner::SwitchPolicyVersion(int32 Version)
+{
+	if (ActivePolicyVersion == 3)
+	{
+		DespawnV3();
+	}
+	else if (ActivePolicyVersion == 1)
+	{
+		DespawnV1();
+	}
+	ActivePolicyVersion = Version;
+	if (Version == 3)
+	{
+		if (!SpawnV3())
+		{
+			// v3 를 열 수 없으면(다른 v3 개체군이 이미 있다 등) 아무것도 돌리지 않는다. 판은 그대로 두어 매 틱 다시 시도하지 않는다
+			UE_LOG(LogEcoPolicyV3, Error, TEXT("[EcoV3] v3 개체군을 만들지 못했다"));
+		}
+	}
+	else
+	{
+		SpawnEntities();
+	}
+}
+
+bool AEcoPolicyTestSpawner::SpawnV3()
+{
+	UWorld* World = GetWorld();
+	FMassEntityManager* EM = GetEntityManager(World);
+	UEcoPolicyV3Subsystem* Sub = World ? World->GetSubsystem<UEcoPolicyV3Subsystem>() : nullptr;
+	if (!EM || !Sub)
+	{
+		return false;
+	}
+	const EcoWorldV3::FWorldConfig Config = UEcoPolicyV3Subsystem::MakeWorldConfig(V3Settings);
+	if (!Sub->BeginSession(Config, GetActorLocation(), V3Settings.LogIntervalSeconds))
+	{
+		return false;
+	}
+	if (!Sub->SpawnPopulation(*EM, V3Herbivores, V3Threats))
+	{
+		Sub->EndSession();
+		return false;
+	}
+	bOwnsV3Session = true;
+	UE_LOG(LogEcoPolicyV3, Log, TEXT("[EcoV3] 사슴 %d, 늑대 %d 스폰 (R1b 두뇌). eco.PolicyVersion 1 로 v1 에 돌아간다."),
+		   V3Herbivores.Num(), V3Threats.Num());
+	return true;
+}
+
+void AEcoPolicyTestSpawner::DespawnV3()
+{
+	UWorld* World = GetWorld();
+	UEcoPolicyV3Subsystem* Sub = World ? World->GetSubsystem<UEcoPolicyV3Subsystem>() : nullptr;
+	const bool bOwned = bOwnsV3Session;
+	bOwnsV3Session = false;
+	if (bOwned && Sub && Sub->IsSessionActive())
+	{
+		Sub->LogSummary();   // 마지막 구간을 남긴다
+	}
+	if (FMassEntityManager* EM = GetEntityManager(World))
+	{
+		UEcoPolicyV3Subsystem::DestroyPopulation(*EM, V3Herbivores, V3Threats);
+	}
+	V3Herbivores.Reset();
+	V3Threats.Reset();
+	if (bOwned && Sub)
+	{
+		Sub->EndSession();
+	}
+}
+
+void AEcoPolicyTestSpawner::DrawDebugV3() const
+{
+	UWorld* World = GetWorld();
+	FMassEntityManager* EM = GetEntityManager(World);
+	const UEcoPolicyV3Subsystem* Sub = World ? World->GetSubsystem<UEcoPolicyV3Subsystem>() : nullptr;
+	if (!EM || !Sub || !Sub->IsSessionActive())
+	{
+		return;
+	}
+	const EcoWorldV3::FWorldState& Sim = Sub->GetSim();
+
+	// --- 사슴: 점 색 = 행동 (먹기 초록, 도망 노랑, 숨기 하늘색(웅크리면 진파랑), 얼기 흰색, 잠 보라) + 바라보는 방향 ---
+	auto BehaviorColor = [](int32 Behavior, bool bArrived)
+	{
+		switch (Behavior)
+		{
+		case EcoRepertoireV3::kGraze: return FColor(70, 200, 70);
+		case EcoRepertoireV3::kFlee: return FColor(255, 215, 0);
+		case EcoRepertoireV3::kHide: return bArrived ? FColor(20, 60, 200) : FColor(60, 150, 255);
+		case EcoRepertoireV3::kFreeze: return FColor(245, 245, 245);
+		default: return FColor(170, 70, 210);
+		}
+	};
+	for (const FMassEntityHandle& E : V3Herbivores)
+	{
+		if (!EM->IsEntityValid(E)) { continue; }
+		const FTransform& Xf = EM->GetFragmentDataChecked<FTransformFragment>(E).GetTransform();
+		const EcoRepertoireV3::FRepState& Rep = EM->GetFragmentDataChecked<FEcoBehaviorStateFragment>(E).Rep;
+		const EcoWorldV3::FHerbBody& Body = EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(E).Body;
+		const FVector Top = Xf.GetLocation() + DrawLift;
+		const FColor Color = BehaviorColor(Rep.Behavior, Rep.bArrived);
+		if (HerbivorePointSize > 0.0f)
+		{
+			DrawDebugPoint(World, Top, HerbivorePointSize, Color, false, -1.0f, 0);
+		}
+		if (HeadingLineLength > 0.0f)
+		{
+			const FVector Head(Body.Head.X, Body.Head.Y, 0.0);
+			DrawDebugLine(World, Top, Top + Head * HeadingLineLength, Color, false, -1.0f, 0,
+						  Rep.Behavior == EcoRepertoireV3::kFlee ? 6.0f : 2.0f);
+		}
+	}
+
+	// --- 늑대: X (빨강 사냥, 주황 돌진, 회색 쿨다운·탈진·휴식, 남색 잠) + 시야 부채꼴 + 표적선. 플레이어 대역은 크게 ---
+	const double ViewCm = Sim.ThreatCfg.PredViewR * EcoRepertoireV3::kUnitCm;
+	const float HalfFov = FMath::Acos(static_cast<float>(Sim.ThreatCfg.PredFovCos));
+	for (const FMassEntityHandle& E : V3Threats)
+	{
+		if (!EM->IsEntityValid(E)) { continue; }
+		const EcoWorldV3::FThreatAgent& A = EM->GetFragmentDataChecked<FEcoThreatStateFragment>(E).Agent;
+		const FVector Pos = EM->GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation() + DrawLift;
+		const bool bPlayer = A.Spec.Type == EcoThreatV3::EThreatType::Player;
+		const bool bDash = (A.Spec.Type == EcoThreatV3::EThreatType::Stalker && A.State.StalkState == EcoThreatV3::EStalkState::Pounce)
+						   || (bPlayer && A.State.PlayerMode == EcoThreatV3::EPlayerMode::Charge);
+		FColor Mark = A.Last.bHunting ? FColor::Red : FColor(150, 150, 150);
+		if (bDash) { Mark = FColor(255, 120, 0); }
+		if (A.Last.bAsleep) { Mark = FColor(40, 40, 120); }
+		const float S = PredatorMarkSize * (bPlayer ? 1.5f : 1.0f);
+		const float Thick = bPlayer ? 18.0f : 12.0f;
+		DrawDebugLine(World, Pos + FVector(-S, -S, 0), Pos + FVector(S, S, 0), Mark, false, -1.0f, 0, Thick);
+		DrawDebugLine(World, Pos + FVector(-S, S, 0), Pos + FVector(S, -S, 0), Mark, false, -1.0f, 0, Thick);
+		if (!bDrawPredatorView || A.Last.bAsleep) { continue; }
+		const FVector Head(A.State.HeadX, A.State.HeadY, 0.0);
+		if (!bPlayer && !Head.IsNearlyZero())
+		{
+			DrawFan(World, Pos, Head, static_cast<float>(ViewCm), HalfFov,
+					A.Last.bHunting ? FColor(170, 40, 40) : FColor(110, 110, 110), 3.0f);
+		}
+		if (A.State.Target >= 0 && V3Herbivores.IsValidIndex(A.State.Target) && EM->IsEntityValid(V3Herbivores[A.State.Target]))
+		{
+			const FVector TargetPos =
+				EM->GetFragmentDataChecked<FTransformFragment>(V3Herbivores[A.State.Target]).GetTransform().GetLocation() + DrawLift;
+			DrawDebugLine(World, Pos, TargetPos, bDash ? FColor(255, 120, 0) : FColor::Red, false, -1.0f, 0, 5.0f);
+		}
+	}
+
+	// --- 포획 자리 (1.5초) ---
+	for (const FEcoPolicyV3CatchMark& Mark : Sub->GetRecentCatches())
+	{
+		DrawDebugSphere(World, Mark.Location + DrawLift, 350.0f, 12, FColor::Orange, false, -1.0f, 0, 8.0f);
+	}
+
+	// --- 은신처 (v3 세계의 원) + 맵 경계 ---
+	const FColor CoverColor(85, 102, 170);
+	for (const EcoObservationV3::FCoverInput& C : Sim.Config.Covers)
+	{
+		const FVector P = Sub->UnitsToCm(C.X, C.Y) + DrawLift;
+		const float R = static_cast<float>(C.Radius * EcoRepertoireV3::kUnitCm);
+		DrawDebugCircle(World, P, R, 48, CoverColor, false, -1.0f, 0, 10.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+		DrawDebugCircle(World, P, R * 0.55f, 32, CoverColor, false, -1.0f, 0, 4.0f, FVector(1, 0, 0), FVector(0, 1, 0), false);
+	}
+	const double Half = 0.5 * Sub->GetWorldSizeCm();
+	const FVector Center = Sub->GetOriginCm() + FVector(Half, Half, 0.0) + DrawLift;
+	DrawDebugBox(World, Center, FVector(Half, Half, 0.0), FColor(30, 30, 30), false, -1.0f, 0, 10.0f);
+
+	// --- 낮밤·스텝 ---
+	DrawDebugString(World, Center + FVector(0, 0, 600.0f),
+					FString::Printf(TEXT("v3 R1b | t=%lld %s d=%.2f | 포획 %lld 굶음 %lld"), static_cast<long long>(Sim.T),
+									Sim.Dark >= 0.5 ? TEXT("밤") : TEXT("낮"), Sim.Dark, static_cast<long long>(Sim.Stats.Caught),
+									static_cast<long long>(Sim.Stats.Starved)),
+					nullptr, FColor::White, 0.0f, true);
 }

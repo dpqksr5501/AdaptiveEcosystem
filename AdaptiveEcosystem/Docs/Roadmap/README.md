@@ -27,11 +27,13 @@
 | [M1](M1/M1_STEAM_SESSION_FOUNDATION.md) | Steam 방 생성/참가 | Listen Server 기반 멀티플레이 수직 슬라이스 |
 | [M2](M2/M2_MASS_NETWORK_VERTICAL_SLICE.md) | Mass 네트워크 검증 | Server Entity와 Client Mass 프록시 연결 |
 | [M3](M3/M3_ECOLOGY_SIMULATION_CORE.md) · [MVP 구현 계획](M3/M3_IMPLEMENTATION_PLAN.md) | 생태 Simulation 본체 | Food, Energy, Death, Migration 폐루프 |
-| [M4](M4/M4_REPRESENTATION_INTERACTION.md) | 표현과 상호작용 | Client LOD 표현과 플레이어 포식 피드백 |
+| [M4](M4/M4_REPRESENTATION_INTERACTION.md) · [상세 구현 계획](M4/M4_IMPLEMENTATION_PLAN.md) | 표현과 상호작용 | Client별 공간 검색·Replication LOD·표현과 플레이어 포식 피드백 |
 | [M5](M5/M5_PPO_CLOSED_LOOP.md) | PPO 정책 통합 | C++ 추론과 전체 생태 피드백 연결 |
 | [M6](M6/M6_MVP_VALIDATION.md) | MVP 검증 | 멀티플레이·성능·정합성 통합 검증 |
 
-Milestone은 선행 단계의 완료 조건을 만족한 뒤 진행한다. 각 문서는 세부 클래스 구현서가 아니라 해당 단계의 목적, 범위와 완료 판단 기준만 정의한다.
+Milestone은 선행 단계의 완료 조건을 만족한 뒤 진행한다. 각 개요 문서는 목적, 범위와 완료 판단 기준을 정의하고, 연결된 구현 계획은 단계별 작업·계약·구현 위치·검증 절차를 구체화한다. M4의 Network/Representation은 기존 Box 경로로 먼저 진행하며 특성별 최종 Spawn 통합은 별도 추적한다.
+
+M4 코드 진행은 [M4.1 계약](M4/M4_1_DATA_CONTRACT.md), [M4.2 구현·관련 소스](M4/M4_2_REPLICATION_INTERVAL.md)에서 확인한다. [수동 테스트](M4/M4_EDITOR_TEST.md), [검증 기록](M4/M4_VALIDATION_REPORT.md)은 미실행 PIE 게이트와 빌드 결과를 구분한다.
 
 ---
 

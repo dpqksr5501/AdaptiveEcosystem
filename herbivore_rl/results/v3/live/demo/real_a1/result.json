@@ -1,0 +1,69 @@
+{
+ "format": "eco_v3_live_round",
+ "version": 1,
+ "attempt": 1,
+ "run": "a1_20261021T062037_e1",
+ "snapshot": "eco_v3_snapshot_s20004_t473_e1.json",
+ "state": "rejected",
+ "plan": {
+  "horizon": 1800,
+  "judge": [
+   35000,
+   35079
+  ],
+  "horizon_g": 3600,
+  "judge_g": [
+   35000,
+   35039
+  ],
+  "select": [
+   35100,
+   35119
+  ],
+  "stuck": [
+   35000,
+   35004
+  ],
+  "check": [
+   35180,
+   35199
+  ],
+  "steps": 2000000,
+  "model_seeds": [
+   0
+  ],
+  "workers": 14,
+  "skip_check": false,
+  "force_export": false,
+  "ckpt": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v3\\live",
+  "test": false
+ },
+ "plan_test": false,
+ "stages": {
+  "convert": 3.0,
+  "eval_current": 563.2,
+  "train_learn": 253.2,
+  "train_and_eval_current": 563.5,
+  "eval_candidate": 388.7,
+  "gate": 0.6
+ },
+ "started_utc": "2026-10-20T21:20:39Z",
+ "key": "657d0ca1ef6efba7|eca97f2ef6c0d6a1",
+ "env_digest": "657d0ca1ef6efba7",
+ "brain_weights_sha256": "eca97f2ef6c0d6a1c81d8fce79d9c5740fd9cde60f04a65cfa00a43b64c8bdbe",
+ "env": "Barren 나무 0→20, 비 1.0",
+ "env_revision": 1,
+ "brain": "v3_r1_g995_s3_20m@eca97f2e",
+ "start": "ckpt/v3/v3_r1_g995_s3_obs21zero.zip",
+ "check": {
+  "ok": null,
+  "why": "중간 변화로 재현 확인 없음 (환경 #1)"
+ },
+ "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v3\\live\\a1_20261021T062037_e1\\live_a1_20261021T062037_e1_cand_s0.zip",
+ "verdict": "기각",
+ "why": "1차 P1 실패: 포만 없는 세계 잡힌 몫 후보 0.1396 대 지금 0.1368 (짝 t +1.15, 문턱 −1.990, 시드 80)",
+ "gate_summary": "포만 없는 세계 잡힘 13.7→14.0% (t +1.1), 게임 세계 나빠짐 없음",
+ "last_result": "기각: 1차 t +1.1 (문턱 −1.99)",
+ "wall_s": 955.7,
+ "ended_utc": "2026-10-20T21:36:35Z"
+}

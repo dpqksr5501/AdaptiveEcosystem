@@ -1,0 +1,10 @@
+== convert: 1.6초
+시도 1 (a1_20261021T183141_e1): 스냅숏 eco_v3_snapshot_s20004_t475_e1.json · 환경 #1 Barren 나무 0→20, 비 1.0 · 두뇌 v3_r1_g995_s3_20m@eca97f2e → 시작 ckpt/v3/v3_r1_g995_s3_obs21zero.zip
+  학습 시작: 모델 시드 0 × 2M → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\live\a1_20261021T183141_e1\live_a1_20261021T183141_e1_cand_s0.zip (기록 C:\Users\Sinhyeok\AppData\Local\Temp\claude\C--kwon-univ-3-1-GameContentsCapstoneDesign-AdaptiveEcosystem\929c780f-6f46-4644-81c6-914789098bd9\scratchpad\timing_root\live\rounds\a1_20261021T183141_e1\logs\train_s0.log)
+== train_and_eval_current: 129.1초
+중간 판정 (앞 시드 40/80): 쫓긴 시간 지금 3.56초 → 후보 3.55초, 짝 t −0.07 (짝 시드 40) — 기각 경계 t ≥ 0.0, 앞서 통과 경계 끔 → continue
+== eval_candidate: 77.6초
+== gate: 0.0초
+1차 P1 쫓긴 시간: 짝 시드 80/80 (두 두뇌 모두 스스로 벗어난 도망이 없어 빠진 시드 0) — 두 번 보기 — 끝 판정
+관문 기각 — 1차 P1 실패: 포만 없는 세계 스스로 벗어난 도망의 쫓긴 시간 평균 후보 3.60초 대 지금 3.54초 (짝 t +0.62, 문턱 −1.990, 시드 80, 빠진 시드 0)
+시도 1 끝: rejected — 기각: 1차 쫓긴 시간 3.5→3.6초 t +0.6 (문턱 −1.99) (208.8초, 단계 {'convert': 1.6, 'eval_current': 79.0, 'train_learn': 123.6, 'train_and_eval_current': 129.1, 'eval_candidate_N1': 11.9, 'eval_candidate_N2': 64.9, 'eval_candidate': 77.6, 'gate': 0.0})

@@ -1,0 +1,44 @@
+# V2 설정 — 갈림 4 조사(10-03, results/v2/v2_2r_explore/inv4/MEMO.md) 대조 팔 T1-d0: T1 과 같고 threat_recency 감쇠만 0.
+#
+# decay 0 이면 threat_recency = (지금 포식자 보임 ? 1 : 0) 이라 관측 1(포식자 수 > 0)과 같은 정보다 — 기억이 없다.
+# 입력 수(8)·세계 동역학(경계 행동 열 없음)은 T1 과 같다. 묻는 것: T1 이 T0 보다 낮은 것이 '기억 내용'(H3) 때문인가,
+# '입력이 하나 늘어난 것'(H4) 때문인가. T1-d0 ≈ T0 이면 H3, T1-d0 ≈ T1 이면 H4 쪽이다.
+#   python train_v2.py --config configs/v2_2r_t1d0.yaml --steps 20000000 --seed 20 --run-name v2_2r_t1d0_s20
+# 나머지 주석은 configs/v2_2r_t1.yaml 과 같다.
+version: "2.2r_t1d0"
+
+overrides:
+  rand:
+    pred_speed_mult: [0.6, 0.95]
+
+features:
+  speed:
+    # configs/v2_1.yaml·v2_2.yaml 블록 그대로 (Gate E1-b 통과 계수 r2_5_ew0_5)
+    enabled: true
+    thresholds: [0.3333333333333333, 0.6666666666666666]
+    gait_speed: [0.0, 0.4, 1.0]
+    gait_eat: [1.0, 0.5, 0.0]
+    c_rest: 0.7142857142857143
+    c_move: 1.7857142857142858
+    net_energy_reward: true
+  vigilance:
+    # configs/v2_2.yaml 블록에서 decay 만 0 으로 바꿨다(갈림 4 조사 대조). action: false 라 threshold·eat_mult·fov_deg 는 쓰이지 않는다
+    enabled: true
+    threshold: 0.5
+    decay: 0.0
+    eat_mult: 0.0
+    fov_deg: 360.0
+    threat_flee: 0.0
+  vigil_window:
+    enabled: true
+    action: false
+    window_only: false
+    look_back: false
+    # 창 문턱 = Gate E2 의 θ (env_v2/world.py RECENT_THREAT, 놓친 뒤 13스텝). T1 은 창 지표(window_stats)를 재는 데만 쓴다
+    theta: 0.5
+
+train:
+  # v2.1·v2.2 와 같다. 경계 행동 열이 없어 init_action_bias 를 두지 않는다(speed 는 SB3 기본 편향 0, v2.1 과 같다)
+  num_worlds: 8
+  reset_interval: 4000
+  rollout_world_steps: 256

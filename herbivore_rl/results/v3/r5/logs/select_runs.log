@@ -1,0 +1,7 @@
+select_s0: 관측 21·unreal 세계 60개 155초 · 잡힘 0.2208 굶음 0.2134 산 0.5658 은신처 안 0.0593 도망 0.0775 숨기 0.0212 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\select_s0.json
+select_s1: 관측 21·unreal 세계 60개 156초 · 잡힘 0.2195 굶음 0.2076 산 0.5729 은신처 안 0.0606 도망 0.0788 숨기 0.0223 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\select_s1.json
+select_s2: 관측 21·unreal 세계 60개 157초 · 잡힘 0.2206 굶음 0.2091 산 0.5703 은신처 안 0.0595 도망 0.0779 숨기 0.0220 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\select_s2.json
+select_s3: 관측 21·unreal 세계 60개 155초 · 잡힘 0.2173 굶음 0.2307 산 0.5520 은신처 안 0.0617 도망 0.0778 숨기 0.0214 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\select_s3.json
+select_s4: 관측 21·unreal 세계 60개 155초 · 잡힘 0.2204 굶음 0.2057 산 0.5738 은신처 안 0.0587 도망 0.0771 숨기 0.0208 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\select_s4.json
+select_s5: 관측 21·unreal 세계 60개 156초 · 잡힘 0.2190 굶음 0.1992 산 0.5818 은신처 안 0.0596 도망 0.0780 숨기 0.0216 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\select_s5.json
+select_base: 관측 18·unreal 세계 60개 149초 · 잡힘 0.2228 굶음 0.2042 산 0.5730 은신처 안 0.0602 도망 0.0749 숨기 0.0220 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\select_base.json

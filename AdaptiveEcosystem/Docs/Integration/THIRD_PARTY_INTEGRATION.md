@@ -22,6 +22,8 @@
 
 참고와 실제 복사/적응 코드를 구분한다. 아래 과거 전략과 기존 license 고지를 유지하되, 새로운 Source를 도입할 때 해당 upstream LICENSE·적용 범위·파일 provenance를 확인하고 고지를 갱신한다. 기존 고지의 존재만으로 현재 runtime dependency를 단정하지 않는다.
 
+> 2026-10-05 현황 보충: 아래 내용은 참조·도입 전략이다. 실제 Python 학습은 `herbivore_rl/env/world.py`의 자체 World를 사용하며 Aquarium wrapper는 현재 구현 경로가 아니다. M4의 공식 문서와 공개 소스 비교는 [M4 참고 조사](../Roadmap/M4/M4_REFERENCE_RESEARCH.md)를 따른다.
+
 ---
 
 ## 1. 외부 라이브러리 및 오픈소스 활용 원칙

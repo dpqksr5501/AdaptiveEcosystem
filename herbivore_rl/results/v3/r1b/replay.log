@@ -1,0 +1,7 @@
+수집 중: RL 출시 모델 (s3): 먹기·도망·숨기·얼기를 스스로 고름 — 1800 스텝, 매 3스텝 1프레임
+수집 중: FSM 손 규칙: 숨기 > 얼기 > 먹다가 도망 — 1800 스텝, 매 3스텝 1프레임
+렌더 중: 600 프레임 × 2칸 -> results\v3\r1b\replay_rl_vs_fsm.mp4
+완료: results\v3\r1b\replay_rl_vs_fsm.mp4  (13.08 MB, 600 프레임, 20.0초)
+PNG: results\v3\r1b\replay_rl_vs_fsm.png  (step 900, 0.40 MB)
+  [RL 출시 모델 (s3): 먹기·도망·숨기·얼기를 스스로 고름] mean_return=-11.29  survival=277  repro=2.52  predation_rate=0.00241  보행 정지/걷기/뛰기=0.2836/0.7052/0.0112
+  [FSM 손 규칙: 숨기 > 얼기 > 먹다가 도망] mean_return=-26.53  survival=249  repro=1.80  predation_rate=0.00239  보행 정지/걷기/뛰기=0.3860/0.5950/0.0190

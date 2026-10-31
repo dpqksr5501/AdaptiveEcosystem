@@ -1,0 +1,66 @@
+{
+  "result": "FINISHED",
+  "measurement": "last sample; contact marker minus ground minus authored neutral marker height; swing feet included",
+  "cases": [
+    {
+      "case": "IdleFlat",
+      "ik_on_mean_absolute_marker_residual_cm": 0.5016072720237332,
+      "ik_off_mean_absolute_marker_residual_cm": 0.5843200899608973,
+      "ik_alpha": 1.0
+    },
+    {
+      "case": "GrazeSlope",
+      "ik_on_mean_absolute_marker_residual_cm": 0.5002335216878748,
+      "ik_off_mean_absolute_marker_residual_cm": 2.938981340489619,
+      "ik_alpha": 1.0
+    },
+    {
+      "case": "WalkSlope",
+      "ik_on_mean_absolute_marker_residual_cm": 3.609056226749516,
+      "ik_off_mean_absolute_marker_residual_cm": 6.050013043901032,
+      "ik_alpha": 1.0
+    },
+    {
+      "case": "RunSlope",
+      "ik_on_mean_absolute_marker_residual_cm": 30.1099914216681,
+      "ik_off_mean_absolute_marker_residual_cm": 30.479277183978127,
+      "ik_alpha": 1.0
+    },
+    {
+      "case": "HideTransition",
+      "ik_on_mean_absolute_marker_residual_cm": 4.349058149871411,
+      "ik_off_mean_absolute_marker_residual_cm": 4.349058149871411,
+      "ik_alpha": 0.0
+    },
+    {
+      "case": "Sleep",
+      "ik_on_mean_absolute_marker_residual_cm": 4.333342216399274,
+      "ik_off_mean_absolute_marker_residual_cm": 4.333342216399274,
+      "ik_alpha": 0.0
+    },
+    {
+      "case": "ReturnToWalk",
+      "ik_on_mean_absolute_marker_residual_cm": 1.5075110235220563,
+      "ik_off_mean_absolute_marker_residual_cm": 5.104396018536079,
+      "ik_alpha": 1.0
+    },
+    {
+      "case": "IdleSlope",
+      "ik_on_mean_absolute_marker_residual_cm": 0.5032324643179606,
+      "ik_off_mean_absolute_marker_residual_cm": 2.88559004638833,
+      "ik_alpha": 1.0
+    },
+    {
+      "case": "IdleSlope8",
+      "ik_on_mean_absolute_marker_residual_cm": 0.4995828960977633,
+      "ik_off_mean_absolute_marker_residual_cm": 5.84662471302866,
+      "ik_alpha": 1.0
+    },
+    {
+      "case": "IdleSlope12",
+      "ik_on_mean_absolute_marker_residual_cm": 0.8149566847014285,
+      "ik_off_mean_absolute_marker_residual_cm": 8.864223753803003,
+      "ik_alpha": 1.0
+    }
+  ]
+}

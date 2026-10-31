@@ -27,6 +27,7 @@ struct FEcoSpawnScheduleSettings
 };
 
 /** Server-local value request. No UObject, entity handle or replication ownership. */
+enum class EEcoSpawnOrigin : uint8 { Initial, Recovery, NaturalBirth, Fixture };
 struct FEcoSpawnRequest
 {
 	int64 RequestId = 0;
@@ -38,4 +39,5 @@ struct FEcoSpawnRequest
 	int32 Count = 0;
 	double ScheduledTime = 0.0;
 	bool bInitial = false;
+    EEcoSpawnOrigin Origin=EEcoSpawnOrigin::Recovery;
 };

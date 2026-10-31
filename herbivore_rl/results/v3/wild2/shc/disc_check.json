@@ -1,0 +1,201 @@
+{
+ "sessions": [
+  20000,
+  20001,
+  20002
+ ],
+ "config": "configs\\v3_wild2_obstacle_mirror.yaml",
+ "seed": 32000,
+ "all_ok": true,
+ "rows": [
+  {
+   "session": 20000,
+   "region": "Barren",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  },
+  {
+   "session": 20000,
+   "region": "Forest",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  },
+  {
+   "session": 20000,
+   "region": "Highland",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  },
+  {
+   "session": 20001,
+   "region": "Barren",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  },
+  {
+   "session": 20001,
+   "region": "Forest",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  },
+  {
+   "session": 20001,
+   "region": "Highland",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  },
+  {
+   "session": 20002,
+   "region": "Barren",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  },
+  {
+   "session": 20002,
+   "region": "Forest",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  },
+  {
+   "session": 20002,
+   "region": "Highland",
+   "unreal_discs": 0,
+   "map_discs": 0,
+   "python_discs": 0,
+   "python_shape": [
+    0,
+    3
+   ],
+   "imported": true,
+   "level_discs": 0,
+   "unreal_eq_map": true,
+   "unreal_eq_python": true,
+   "covers_bit_eq": false,
+   "covers_max_diff": 3.552713678800501e-15,
+   "origin_eq": true,
+   "size_eq": true,
+   "covers_close": true,
+   "all_ok": true
+  }
+ ]
+}

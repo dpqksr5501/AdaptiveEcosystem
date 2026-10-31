@@ -1,0 +1,52 @@
+{
+ "round": "R1",
+ "arm": "r1_5_ew0_5",
+ "config": "results/v2/e1/configs/R1_r1_5_ew0_5.yaml",
+ "config_digest": "189b36558c05",
+ "smoke": false,
+ "steps": [
+  {
+   "stem": "constsearch",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r1_5_ew0_5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.1667 --enqueue 0.4207 0.8656 0.1054 0.0044 0.5 --enqueue 0.4207 0.8656 0.1054 0.0044 0.8333 --enqueue 0.39 0.99 0.92 0.15 0.5",
+   "returncode": 0,
+   "elapsed_s": 950.7,
+   "finished": "2026-10-02T10:22:55+00:00"
+  },
+  {
+   "stem": "constsearch_seg",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r1_5_ew0_5 --seg-bins 2:0.5 4:0.5 --seg-dims speed",
+   "returncode": 0,
+   "elapsed_s": 970.3,
+   "finished": "2026-10-02T10:39:06+00:00"
+  },
+  {
+   "stem": "fixed_stop",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r1_5_ew0_5 --tag fixed_stop --const-action 0.8148014563351118 0.8436060271648771 0.20038134823593723 0.02131622914453077 0.0",
+   "returncode": 0,
+   "elapsed_s": 37.5,
+   "finished": "2026-10-02T10:39:43+00:00"
+  },
+  {
+   "stem": "fixed_walk",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r1_5_ew0_5 --tag fixed_walk --const-action 0.8148014563351118 0.8436060271648771 0.20038134823593723 0.02131622914453077 0.5",
+   "returncode": 0,
+   "elapsed_s": 36.1,
+   "finished": "2026-10-02T10:40:19+00:00"
+  },
+  {
+   "stem": "fixed_run",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r1_5_ew0_5 --tag fixed_run --const-action 0.8148014563351118 0.8436060271648771 0.20038134823593723 0.02131622914453077 1.0",
+   "returncode": 0,
+   "elapsed_s": 38.1,
+   "finished": "2026-10-02T10:40:57+00:00"
+  },
+  {
+   "stem": "g998/c2seg_g998",
+   "command": "python diagnose_v2.py constsearch --config results/v2/e1/configs/R1_r1_5_ew0_5.yaml --workers 6 --out results/v2/e1/R1/r1_5_ew0_5/g998 --tag c2seg_g998 --g998 --seg-bins 2:0.5 4:0.5 --seg-dims speed --base-action 0.8148014563351118 0.8436060271648771 0.20038134823593723 0.02131622914453077 0.39214918555849276 --const-action 0.39214918555849276 0.39214918555849276 0.39214918555849276 0.39214918555849276",
+   "returncode": 0,
+   "elapsed_s": 125.9,
+   "finished": "2026-10-02T10:43:03+00:00"
+  }
+ ],
+ "python": "3.13.5"
+}

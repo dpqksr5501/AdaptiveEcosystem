@@ -21,6 +21,8 @@ struct FEcoNeighborEntry
 {
 	/** 포획 판정이 잡힌 개체의 Vitals 를 고칠 때 쓴다 (§9.6). */
 	FMassEntityHandle Entity;
+	FName SpeciesId = NAME_None;
+	int64 StableAgentId = 0;
 	FVector Location = FVector::ZeroVector;
 	/** 진행 방향 단위벡터. 시야 각도 판정에 쓴다. */
 	FVector Heading = FVector::ForwardVector;

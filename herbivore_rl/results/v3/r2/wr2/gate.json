@@ -1,0 +1,129 @@
+{
+ "meta": {
+  "world": "wr2",
+  "config": "configs/v3_r2_on.yaml",
+  "seeds": [
+   12160,
+   12161,
+   12162,
+   12163,
+   12164,
+   12165,
+   12166,
+   12167,
+   12168,
+   12169,
+   12170,
+   12171,
+   12172,
+   12173,
+   12174,
+   12175,
+   12176,
+   12177,
+   12178,
+   12179,
+   12180,
+   12181,
+   12182,
+   12183,
+   12184,
+   12185,
+   12186,
+   12187,
+   12188,
+   12189,
+   12190,
+   12191,
+   12192,
+   12193,
+   12194,
+   12195,
+   12196,
+   12197,
+   12198,
+   12199
+  ],
+  "steps": 3000,
+  "theta": 4.0,
+  "approach": 0.9,
+  "cells": [
+   "ps0.3_pl_T600",
+   "ps0.3_pl_T1800",
+   "ps0.3_np_T600",
+   "ps0.3_np_T1800",
+   "ps0.7_pl_T600",
+   "ps0.7_pl_T1800",
+   "ps0.7_np_T600",
+   "ps0.7_np_T1800"
+  ],
+  "variants": [
+   [
+    "look",
+    "niche"
+   ],
+   [
+    "hide",
+    "niche"
+   ],
+   [
+    "freeze",
+    "cross"
+   ]
+  ],
+  "t_crit": 2.023,
+  "event_k": 60,
+  "low_use": 0.05,
+  "elapsed_s": 928.1,
+  "digest": {
+   "ps0.3_pl_T600": "4f2653fe933d",
+   "ps0.3_pl_T1800": "a0fbca9acf19",
+   "ps0.3_np_T600": "903b4cee5571",
+   "ps0.3_np_T1800": "90bba75f8bfa",
+   "ps0.7_pl_T600": "e39f9b8353ed",
+   "ps0.7_pl_T1800": "2065af31e181",
+   "ps0.7_np_T600": "a74ef1cb247e",
+   "ps0.7_np_T1800": "5c706e5366f4"
+  }
+ },
+ "gate": {
+  "look|niche": {
+   "complete": true,
+   "pos": 8,
+   "sig_neg": 0,
+   "ok": true
+  },
+  "hide|niche": {
+   "complete": true,
+   "pos": 8,
+   "sig_neg": 0,
+   "ok": true
+  },
+  "freeze|cross": {
+   "complete": true,
+   "pos": 8,
+   "sig_neg": 0,
+   "ok": true
+  }
+ },
+ "gate_did_report_only": {
+  "look|niche": {
+   "complete": true,
+   "pos": 7,
+   "sig_neg": 0,
+   "ok": true
+  },
+  "hide|niche": {
+   "complete": true,
+   "pos": 7,
+   "sig_neg": 0,
+   "ok": true
+  },
+  "freeze|cross": {
+   "complete": true,
+   "pos": 7,
+   "sig_neg": 0,
+   "ok": true
+  }
+ }
+}

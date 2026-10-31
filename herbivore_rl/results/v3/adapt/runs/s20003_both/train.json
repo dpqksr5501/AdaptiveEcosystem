@@ -1,0 +1,22 @@
+{
+ "control": false,
+ "steps": 3000000,
+ "train_food": "snapshot",
+ "runs": [
+  {
+   "seed": 0,
+   "rc": 0,
+   "model": "ckpt/v3/adapt/s20003_both/adapt_s20003_both_cand_s0_3m.zip",
+   "log": "results/v3/adapt/runs/s20003_both/logs/train_cand_s0.log",
+   "ok": true
+  },
+  {
+   "seed": 1,
+   "rc": 0,
+   "model": "ckpt/v3/adapt/s20003_both/adapt_s20003_both_cand_s1_3m.zip",
+   "log": "results/v3/adapt/runs/s20003_both/logs/train_cand_s1.log",
+   "ok": true
+  }
+ ],
+ "wall_s": 447.6
+}

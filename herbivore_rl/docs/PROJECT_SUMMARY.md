@@ -275,11 +275,12 @@ Docs/RL_Policy/UNREAL_POLICY_INTEGRATION.md
 - 전부 게임 스레드에서 돈다
 - Mass 표현(ISM)이 없다 — 테스트 스포너는 디버그 드로우
 
-**이 개발 환경의 문제 두 가지** (우리 코드와 무관)
-- 엔진 설치본에 `Bridge`(Megascans)·`Fab` 플러그인 바이너리가 없어 **에디터가 안 켜진다**.
-  모든 헤드리스 명령이 `-DisablePlugins=Bridge,Fab`를 다는 이유다.
-- `Content/` 에셋 144개가 UE 5.8보다 새 엔진에서 저장돼 로드되지 않는다
-  (`OpenWorld.umap` 포함). 테스트 레벨을 `/Game/EcoTest/`에 새로 만든 이유다.
+**이 개발 환경에서 막혔던 것** (우리 코드와 무관, 2026-09-30 해결)
+- 이 PC 의 UE 5.8 설치본이 정식 5.8.0 보다 이전 빌드(CL 53629095)였다. 그래서 `Bridge`·`Fab`
+  플러그인 DLL 이 로드되지 않아 **에디터가 안 켜졌고**, 팀원이 5.8.2·5.8.3 으로 저장한
+  `Content/` 에셋(`OpenWorld.umap` 등)도 열리지 않았다. 테스트 레벨을 `/Game/EcoTest/`에
+  새로 만든 이유다.
+- 5.8.3 으로 업데이트한 뒤 둘 다 풀렸다. `-DisablePlugins=Bridge,Fab` 도 더는 필요 없다.
 
 ---
 

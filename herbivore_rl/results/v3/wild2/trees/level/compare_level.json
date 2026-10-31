@@ -1,0 +1,405 @@
+{
+ "layout": "trees-1017a 21218665c114",
+ "sessions": {
+  "20000": {
+   "regions": {
+    "Forest": {
+     "discs": 24,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": true,
+     "runtime_tree_discs": 0,
+     "snapped": 24,
+     "unmatched": 0,
+     "max_snap_cm": 3.2751579226442118e-12,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 24,
+      "cross_blocked": 24,
+      "cross_by_trunk": 24,
+      "ring_steps": 288,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 68,
+      "no_collision": 44,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    },
+    "Barren": {
+     "discs": 0,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": false,
+     "runtime_tree_discs": 0,
+     "snapped": 0,
+     "unmatched": 0,
+     "max_snap_cm": 0,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 0,
+      "cross_blocked": 0,
+      "cross_by_trunk": 0,
+      "ring_steps": 0,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 0,
+      "no_collision": 0,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    },
+    "Highland": {
+     "discs": 9,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": true,
+     "runtime_tree_discs": 0,
+     "snapped": 9,
+     "unmatched": 0,
+     "max_snap_cm": 4.263256414560601e-12,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 9,
+      "cross_blocked": 9,
+      "cross_by_trunk": 9,
+      "ring_steps": 108,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 18,
+      "no_collision": 9,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    }
+   },
+   "logs": {
+    "old_lines": 569,
+    "new_lines": 569,
+    "compared": 561,
+    "same_count": true,
+    "different": 0,
+    "first_diffs": [],
+    "skipped_new": {
+     "명령줄·내보내기 경로": 2,
+     "설정 '무대 나무:'": 1,
+     "시작 '<지역> 장애물 |'": 3,
+     "시작 '<지역> 나무 |'": 2
+    },
+    "warnings_new": 0
+   }
+  },
+  "20001": {
+   "regions": {
+    "Forest": {
+     "discs": 24,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": true,
+     "runtime_tree_discs": 0,
+     "snapped": 24,
+     "unmatched": 0,
+     "max_snap_cm": 3.2751579226442118e-12,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 24,
+      "cross_blocked": 24,
+      "cross_by_trunk": 24,
+      "ring_steps": 288,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 68,
+      "no_collision": 44,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    },
+    "Barren": {
+     "discs": 0,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": false,
+     "runtime_tree_discs": 0,
+     "snapped": 0,
+     "unmatched": 0,
+     "max_snap_cm": 0,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 0,
+      "cross_blocked": 0,
+      "cross_by_trunk": 0,
+      "ring_steps": 0,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 0,
+      "no_collision": 0,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    },
+    "Highland": {
+     "discs": 9,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": true,
+     "runtime_tree_discs": 0,
+     "snapped": 9,
+     "unmatched": 0,
+     "max_snap_cm": 4.263256414560601e-12,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 9,
+      "cross_blocked": 9,
+      "cross_by_trunk": 9,
+      "ring_steps": 108,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 18,
+      "no_collision": 9,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    }
+   },
+   "logs": {
+    "old_lines": 558,
+    "new_lines": 558,
+    "compared": 550,
+    "same_count": true,
+    "different": 0,
+    "first_diffs": [],
+    "skipped_new": {
+     "명령줄·내보내기 경로": 2,
+     "설정 '무대 나무:'": 1,
+     "시작 '<지역> 장애물 |'": 3,
+     "시작 '<지역> 나무 |'": 2
+    },
+    "warnings_new": 0
+   }
+  },
+  "20002": {
+   "regions": {
+    "Forest": {
+     "discs": 24,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": true,
+     "runtime_tree_discs": 0,
+     "snapped": 24,
+     "unmatched": 0,
+     "max_snap_cm": 3.2751579226442118e-12,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 24,
+      "cross_blocked": 24,
+      "cross_by_trunk": 24,
+      "ring_steps": 288,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 68,
+      "no_collision": 44,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    },
+    "Barren": {
+     "discs": 0,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": false,
+     "runtime_tree_discs": 0,
+     "snapped": 0,
+     "unmatched": 0,
+     "max_snap_cm": 0,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 0,
+      "cross_blocked": 0,
+      "cross_by_trunk": 0,
+      "ring_steps": 0,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 0,
+      "no_collision": 0,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    },
+    "Highland": {
+     "discs": 9,
+     "discs_eq_table": true,
+     "discs_eq_old": true,
+     "level_tree_discs_eq_table": true,
+     "plan_trunk_discs_eq_table": true,
+     "level_trees_on": true,
+     "runtime_tree_discs": 0,
+     "snapped": 9,
+     "unmatched": 0,
+     "max_snap_cm": 4.263256414560601e-12,
+     "origin_eq_old": true,
+     "covers_eq_old": true,
+     "weather_eq_old": true,
+     "trunk_probe": {
+      "trees": 9,
+      "cross_blocked": 9,
+      "cross_by_trunk": 9,
+      "ring_steps": 108,
+      "ring_blocked": 0,
+      "ring_blocked_by_tree": 0
+     },
+     "counts": {
+      "seen_meshes": 18,
+      "no_collision": 9,
+      "tiny": 0,
+      "low": 0,
+      "in_cover": 0,
+      "refuge_decor": 0,
+      "capped": 0,
+      "near_edge": 0,
+      "ground_cells": 3600,
+      "steep_cells": 0,
+      "water_cells": 0,
+      "no_ground_cells": 0
+     },
+     "ok": true
+    }
+   },
+   "logs": {
+    "old_lines": 559,
+    "new_lines": 559,
+    "compared": 551,
+    "same_count": true,
+    "different": 0,
+    "first_diffs": [],
+    "skipped_new": {
+     "명령줄·내보내기 경로": 2,
+     "설정 '무대 나무:'": 1,
+     "시작 '<지역> 장애물 |'": 3,
+     "시작 '<지역> 나무 |'": 2
+    },
+    "warnings_new": 0
+   }
+  }
+ },
+ "ok": true
+}

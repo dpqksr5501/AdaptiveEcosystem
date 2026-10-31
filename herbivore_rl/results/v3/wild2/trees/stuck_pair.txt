@@ -1,0 +1,27 @@
+v3_wild2_trees_mirror.yaml 32000-32089 1800 스텝  | 짝 지도 20000-20002 × 10 · 원판 results\v3\wild2\trees\tree_layout.json
+  worlds: 90
+  wolf_stuck: 0
+  wolf_stuck_helper: 0
+  wolf_stuck_wall: 0
+  wolf_stuck_max_s: 0.0
+  wolf_wall_stuck: 21
+  wolf_wall_stuck_helper: 11
+  wolf_wall_stuck_max_s: 5.2
+  deer_stuck: 0
+  deer_stuck_by_beh: {}
+  deer_stuck_panic: 0
+  deer_stuck_max_s: 0.0
+  wolf_stuck_frac: 0.0
+  wolf_wall_stuck_frac: 0.00023947092211590393
+  deer_stuck_frac: 0.0
+  old_wolf_runs: 0
+  old_wolf_max_s: 0.0
+  old_deer_still: 34
+  old_deer_flee: 0
+  old_deer_push: 2
+  old_deer_max_s: 66.53333333333333
+  worst_wolf: []
+  worst_wolf_wall: [(39, 32065, 3, 1227, True), (33, 32081, 3, 482, False), (31, 32047, 3, 911, True), (31, 32019, 2, 1353, False), (30, 32001, 2, 957, True), (29, 32005, 0, 439, False)]
+  worst_deer: []
+  detour: {'deer_used': 19730, 'deer_start': 6954, 'deer_fail': 0, 'wolf_used': 159, 'wolf_start': 110, 'wolf_fail': 0, 'help_drop': 23}
+  by_region: {'Barren': {'worlds': 30, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 8, 'wolf_wall_stuck_helper': 5, 'wolf_wall_stuck_max_s': 5.2, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.00038922015849044854, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 0, 'old_deer_flee': 0, 'old_deer_push': 0, 'old_deer_max_s': 0.0}, 'Forest': {'worlds': 30, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 7, 'wolf_wall_stuck_helper': 3, 'wolf_wall_stuck_max_s': 4.133333333333334, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.0001782120872348167, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 26, 'old_deer_flee': 0, 'old_deer_push': 2, 'old_deer_max_s': 66.53333333333333, 'detour': {'deer_used': 16185, 'deer_start': 5477, 'deer_fail': 0, 'wolf_used': 111, 'wolf_start': 78, 'wolf_fail': 0, 'help_drop': 13}}, 'Highland': {'worlds': 30, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 6, 'wolf_wall_stuck_helper': 3, 'wolf_wall_stuck_max_s': 4.4, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.00015456069985084891, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 8, 'old_deer_flee': 0, 'old_deer_push': 0, 'old_deer_max_s': 16.666666666666668, 'detour': {'deer_used': 3545, 'deer_start': 1477, 'deer_fail': 0, 'wolf_used': 48, 'wolf_start': 32, 'wolf_fail': 0, 'help_drop': 10}}}

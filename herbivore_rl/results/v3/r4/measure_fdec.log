@@ -1,0 +1,73 @@
+{
+ "f_dec": 0.8549560185185185,
+ "per_seed": [
+  {
+   "seed": 32000,
+   "f_dec": 0.8170729166666667,
+   "decide_frac_world": 0.8170729166666667,
+   "region": "Barren"
+  },
+  {
+   "seed": 32000,
+   "f_dec": 0.8089296875,
+   "decide_frac_world": 0.8089296875,
+   "region": "Forest"
+  },
+  {
+   "seed": 32000,
+   "f_dec": 0.894203125,
+   "decide_frac_world": 0.894203125,
+   "region": "Highland"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.8407291666666666,
+   "decide_frac_world": 0.8407291666666666,
+   "region": "Barren"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.8524453125,
+   "decide_frac_world": 0.8524453125,
+   "region": "Forest"
+  },
+  {
+   "seed": 32001,
+   "f_dec": 0.9151171875,
+   "decide_frac_world": 0.9151171875,
+   "region": "Highland"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.778578125,
+   "decide_frac_world": 0.778578125,
+   "region": "Barren"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.844734375,
+   "decide_frac_world": 0.844734375,
+   "region": "Forest"
+  },
+  {
+   "seed": 32002,
+   "f_dec": 0.9427942708333333,
+   "decide_frac_world": 0.9427942708333333,
+   "region": "Highland"
+  }
+ ],
+ "multi_frac": 0.11772352649719366,
+ "seeds": [
+  32000,
+  32001,
+  32002
+ ],
+ "steps": 3000,
+ "model_seed": 0,
+ "allowed": [
+  "graze",
+  "flee",
+  "hide"
+ ]
+}
+f_dec = 0.854956 (보정 시드 [32000, 32001, 32002] × 3000스텝, 목록 ['graze', 'flee', 'hide'], 95초) → yaml train.repertoire.f_dec 에 적는다

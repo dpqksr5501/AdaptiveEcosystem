@@ -1,6 +1,30 @@
 # Social Behavior & Shelter Runtime — Current State & Implementation Status
 
+## 2026-10-23 현재 통합 상태
+
+구현 기준 `581ce1d` + `e22dbbd`, 통합 main `a74fcac`. [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)를 먼저 읽는다. 아래 날짜별 Current Base/HEAD/Pending/테스트 수는 해당 날짜의 감사 기록이며 현재 실행 상태를 덮어쓰지 않는다.
+
+| 영역 | 현재 상태 | 미완료/주의 |
+|---|---|---|
+| v3 Social | 버전 1 ReadSignal 제공, 기본 SocialControl=0, legacy opt-in 훅 보존 | 신호를 새 RL 관측·학습된 행동으로 연결한 것은 아님 |
+| Herd migration | 새 owned 맵에서 공동 여정·실제 Native 이동·지역/context 인계·M4 영수증/인구 연결 | 기존 맵 OFF, Barren↔Forest만, 포식자 공동 이주/merge/split 없음 |
+| 행동/원인 | AlertGraze·WeakTravel·SatedRest, 사슴 v3 원인 이력 최대 16건 | 모든 종의 모든 행동 이력을 새로 구현한 것은 아님 |
+| 은신처 | 통합 ShelterSafe=1 안전, ProtectedRefuges=1 생명주기, 실제 먹이 거래와 bounds 외형 | Native struct의 보호 기본 false와 구분. 두 안전 규칙 중첩 금지 |
+| 화면/멀티 | 권위 지도/실제 위치 snapshot, 기존 Client Bubble 표현 검증 | Client 계획 지도/원인 이력 복제 없음 |
+
+기능 검증은 [203개 자동화·실제 PIE·Dedicated/Client 근거](Evidence/JYU_V3/HerdMigration_20261023.json), 디버그는 [최종 Build04·203개 자동화와 Story03 촬영 근거](Evidence/JYU_V3/HerdVisualization_20261023.json)를 따른다. 이번 문서 감사는 새 빌드·PIE를 수행하지 않았다. 장기 생태 균형·Shipping/cook·이주 ON 세계 전체 Python 파리티/재학습은 미검증이다.
+
+## 날짜별 감사·설계 이력
+
+> **2026-10-23 후속:** v3는 기본 signal-only이며, `ReadSignal`이 개인 증거/기억/유효한 Herd report를 구분한다. 별도 opt-in 무리 이주가 공통 Travel·Native 단일 이동·M4 지역/자원/인구·기존 복제에 연결됐다. 최신 Source 근거·새 복사 맵·검증·제한은 [무리 이주와 신호 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다. 아래의 기본 Social 행동 개입/이주 미연결 설명은 해당 날짜의 이력이다. PR #14는 기능·디버그 push 후 OPEN·Ready for review·미병합이다.
+
+> **2026-10-16 Social 실제 연결 갱신:** v3의 Persistent Herd 경보→행동 보정→예약 슬롯 이동·실제 도착 feedback을 연결했다. 아래의 “v3 Social 미연결”은 이전 시점 기록이다. 현재 계약·검증은 [v3 Social 인계](JYU_V3_SOCIAL_HANDOFF.md)를 우선한다.
+
+> **작업 위치 갱신 2026-10-16:** 기존 `codex/social-shelter-handoff`와 원래 프로젝트 폴더로 `8e2f34f` 통합 내용을 반영했다. 복사 JYU 맵을 계속 사용한다. [작업 위치·보존·검증 기록](JYU_WORKTREE_RETURN_20261016.md). 아래 통합 브랜치명은 이력이다.
+
 다른 채팅에서 역할·진행상황·다음 연결을 처음 파악할 때는 [조연우 작업 시작 문서](README.md)를 먼저 읽는다.
+
+> **최신 2026-10-15 통합 브랜치 `codex/m4-v3-creature-integration`:** 원준 M4 `67c860c`와 신혁 v3 `8292856`을 병합하고 공통 authority/lifecycle/resource/replication에 owned 표현·플레이어·Inspector를 연결했다. 독립 복사 맵 `/Game/JYU/Maps/LV_JYU_V3Integration`, 직접 UBT 성공, 전체 자동화 119개(118 Success + 예상 warning 1), IK/감각 반응 총 12조건 화면 검증. **v3 R1b는 V1 Social slot handoff를 소비하는 경로가 아니며**, hearing/alarm은 표현 입력이고 migration/wave는 비활성화했다. 최신 계약과 검증 한계는 [M4/v3 통합 기록](JYU_M4_V3_INTEGRATION.md), [IK 검증](JYU_IK_VALIDATION.md)을 우선한다. 아래 Pending/기준 commit 표는 당시 이력이다.
 
 > **최신 2026-10-08 실제 팀 레벨/감각 고도화 (`edba605` 이후 작업 트리):** main의 3지역 레벨에 owned 런타임을 연결하고 실제 Grass/Dry 발소리·SA·시야 디버그를 적용했다. 늑대의 별도 먹잇감 감각과 단일 이동 인계, 접촉 Notify 40개·Physical Material 우선 선택을 추가했다. 최종 직접 UBT 및 전체 자동화 **43/43** 성공. 아래 오래된 Pending 표는 당시 이력이며 최신 범위·검증·학습/네트워크 인계는 [감각·Notify 고도화](CREATURE_SENSORY_AND_NOTIFY_REFINEMENT.md), [실제 레벨 배치](ECOSYSTEM_LEVEL_RUNTIME_PLACEMENT.md)를 우선한다.
 

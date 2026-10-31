@@ -1,0 +1,8 @@
+  ckpt\v3\v3_r4_g995_s0_20m.zip: 잡힘 0.2177 굶음 0.2211 산 0.5612 은신처 안 0.0700 (runs/select_s0.json)
+  ckpt\v3\v3_r4_g995_s2_20m.zip: 잡힘 0.2191 굶음 0.2372 산 0.5436 은신처 안 0.0594 (runs/select_s2.json)
+  ckpt\v3\v3_r4_g995_s1_20m.zip: 잡힘 0.2194 굶음 0.2169 산 0.5637 은신처 안 0.0636 (runs/select_s1.json)
+  ckpt\v3\v3_r4_g995_s4_20m.zip: 잡힘 0.2206 굶음 0.2134 산 0.5660 은신처 안 0.0629 (runs/select_s4.json)
+  ckpt\v3\v3_r4_g995_s5_20m.zip: 잡힘 0.2215 굶음 0.2193 산 0.5592 은신처 안 0.0602 (runs/select_s5.json)
+  ckpt\v3\v3_r4_g995_s3_20m.zip: 잡힘 0.2236 굶음 0.2117 산 0.5647 은신처 안 0.0591 (runs/select_s3.json)
+  (R1b-F 같은 세계: 잡힘 0.2228 굶음 0.2042 산 0.5730)
+고른 모델: ckpt\v3\v3_r4_g995_s0_20m.zip

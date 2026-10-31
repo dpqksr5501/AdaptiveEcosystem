@@ -92,7 +92,8 @@ FVector AEcoMassNetworkBootstrap::GetSpawnPosition(int64 Slot) const
 
 bool AEcoMassNetworkBootstrap::ValidateConfiguration(const AEcologyRegion& Region, FString& OutError) const
 {
-	if (GetNetMode() == NM_Client || !SpawnSchedule.IsValid() || SpeciesId.IsNone()
+	if (GetNetMode() == NM_Client || !SpawnSchedule.IsValid() || SpeciesId.IsNone() || EcologicalComfortPopulation < 1
+		|| !FMath::IsFinite(InitialEnergyRatio) || InitialEnergyRatio < 0 || InitialEnergyRatio > 1
 		|| InitialAgentCount < 0 || InitialAgentCount > SpawnSchedule.RegionPopulationLimit
 		|| !FMath::IsFinite(SpawnSpacing) || SpawnSpacing < 0.0f
 		|| GetConfiguredRegionId() != Region.RegionId || Region.GetWorld() != GetWorld())
@@ -126,6 +127,8 @@ bool AEcoMassNetworkBootstrap::ValidateConfiguration(const AEcologyRegion& Regio
 	RequireElement.operator()<FEcoIdentityFragment>();
 	RequireElement.operator()<FEcoRegionFragment>();
 	RequireElement.operator()<FEcoVitalsFragment>();
+	RequireElement.operator()<FEcoVitalsRuntimeFragment>();
+	RequireElement.operator()<FEcoDeathFragment>();
 	RequireElement.operator()<FEcoTravelFragment>();
 	RequireElement.operator()<FEcoLifetimeFragment>();
 	RequireElement.operator()<FEcoFeedingFragment>();
@@ -211,6 +214,14 @@ int32 AEcoMassNetworkBootstrap::ExecuteSpawnRequest(const FEcoSpawnRequest& Requ
 		Lifetime.SpawnTimeSeconds = ActualSpawnTime;
 		Lifetime.NextFeedTimeSeconds = ActualSpawnTime + FirstFeedDelaySeconds;
 		View.GetFragmentData<FEcoFeedingFragment>() = FEcoFeedingFragment();
+		FEcoVitalsFragment& Vitals = View.GetFragmentData<FEcoVitalsFragment>();
+		Vitals.Energy = Vitals.MaxEnergy * InitialEnergyRatio;
+		FEcoVitalsRuntimeFragment& VitalsRuntime = View.GetFragmentData<FEcoVitalsRuntimeFragment>();
+		VitalsRuntime = FEcoVitalsRuntimeFragment();
+		VitalsRuntime.WorldEpoch = Request.WorldEpoch;
+		VitalsRuntime.LastTime = ActualSpawnTime;
+		View.GetFragmentData<FEcoTravelFragment>().LastArrivalTime = ActualSpawnTime;
+		View.GetFragmentData<FEcoDeathFragment>() = FEcoDeathFragment();
 	}
 	// Publish fully initialized agents to MassReplication add observers.
 	CreationContext.Reset();
@@ -232,10 +243,17 @@ bool AEcoMassNetworkBootstrap::RegisterTemplate() const
 		return false;
 	}
 
-	if (!EntityConfig->FindTrait(UEcoMassNetworkTrait::StaticClass()))
+	const UEcoMassNetworkTrait* NetworkTrait = Cast<UEcoMassNetworkTrait>(EntityConfig->FindTrait(UEcoMassNetworkTrait::StaticClass()));
+	if (!NetworkTrait)
 	{
 		UE_LOG(LogAdaptiveEcosystem, Error,
 			TEXT("%s EntityConfig must contain UEcoMassNetworkTrait."), *GetName());
+		return false;
+	}
+	FString SettingsError;
+	if (!NetworkTrait->ValidateNetworkSettings(SettingsError))
+	{
+		UE_LOG(LogAdaptiveEcosystem, Error, TEXT("%s: %s"), *GetName(), *SettingsError);
 		return false;
 	}
 

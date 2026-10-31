@@ -1,0 +1,26 @@
+{
+ "settings": {
+  "extra_cover_count": 4,
+  "extra_cover_radius_frac": 0.1,
+  "wolf_start_corner_frac": 0.4,
+  "wolf_min_start_dist_cm": 2800,
+  "deer_min_spacing_cm": 150
+ },
+ "world": {
+  "Forest": {
+   "pred_ema_denominator": 128
+  },
+  "Barren": {
+   "pred_ema_denominator": 128
+  },
+  "Highland": {
+   "pred_ema_denominator": 128
+  }
+ },
+ "made_from": {
+  "file": "eco_v3_snapshot_s20003_240s.json",
+  "session_seed": 20003,
+  "map": "LV_Ecosystem_IntegrationTest",
+  "note": "기본 게임 설정(통합 v3 기본값 — configs/v3_wild3_mirror.yaml 가 맞춘 값, 10-18 results/v3/wild3/verify)"
+ }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "shc_sun",
+  "fps": 30,
+  "frames": 6,
+  "shots": [
+    {"tag": "sun_tree_a", "from_m": [343.00, 418.00, 1.80], "to_m": [343.00, 418.00, 1.80], "yaw": -90.0, "pitch": 4.0, "start": 8.000, "duration": 0.200, "every": 6, "first_frame": 0, "frames": 1, "t_first": 8.000, "t_last": 8.000},
+    {"tag": "sun_wide_a", "from_m": [342.00, 300.00, 60.00], "to_m": [342.00, 300.00, 60.00], "yaw": 90.0, "pitch": -15.0, "start": 9.000, "duration": 0.200, "every": 6, "first_frame": 1, "frames": 1, "t_first": 9.000, "t_last": 9.000},
+    {"tag": "sun_tree_b", "from_m": [343.00, 418.00, 1.80], "to_m": [343.00, 418.00, 1.80], "yaw": -90.0, "pitch": 4.0, "start": 14.000, "duration": 0.200, "every": 6, "first_frame": 2, "frames": 1, "t_first": 14.000, "t_last": 14.000},
+    {"tag": "sun_wide_b", "from_m": [342.00, 300.00, 60.00], "to_m": [342.00, 300.00, 60.00], "yaw": 90.0, "pitch": -15.0, "start": 15.000, "duration": 0.200, "every": 6, "first_frame": 3, "frames": 1, "t_first": 15.000, "t_last": 15.000},
+    {"tag": "sun_tree_c", "from_m": [343.00, 418.00, 1.80], "to_m": [343.00, 418.00, 1.80], "yaw": -90.0, "pitch": 4.0, "start": 20.000, "duration": 0.200, "every": 6, "first_frame": 4, "frames": 1, "t_first": 20.000, "t_last": 20.000},
+    {"tag": "sun_wide_c", "from_m": [342.00, 300.00, 60.00], "to_m": [342.00, 300.00, 60.00], "yaw": 90.0, "pitch": -15.0, "start": 21.000, "duration": 0.200, "every": 6, "first_frame": 5, "frames": 1, "t_first": 21.000, "t_last": 21.000}
+  ]
+}

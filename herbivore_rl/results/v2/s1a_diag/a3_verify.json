@@ -1,0 +1,110 @@
+[
+ {
+  "model": "v2_1c_s30",
+  "mode": "det",
+  "seed": 10000,
+  "g_gamma": 0.5342417326725196,
+  "g_gamma_ref": 0.5342417326725196,
+  "starve_rate": 0.0004109375,
+  "starve_rate_ref": 0.0004109375,
+  "p_stop_hungry": 0.0,
+  "p_stop_hungry_ref": 0.0,
+  "same": true
+ },
+ {
+  "model": "v2_1c_s30",
+  "mode": "det",
+  "seed": 10001,
+  "g_gamma": -0.7607916365409074,
+  "g_gamma_ref": -0.7607916365409074,
+  "starve_rate": 0.0017015625,
+  "starve_rate_ref": 0.0017015625,
+  "p_stop_hungry": 0.0,
+  "p_stop_hungry_ref": 0.0,
+  "same": true
+ },
+ {
+  "model": "v2_1c_s30",
+  "mode": "det",
+  "seed": 10002,
+  "g_gamma": 2.480123306008861,
+  "g_gamma_ref": 2.480123306008861,
+  "starve_rate": 0.00054375,
+  "starve_rate_ref": 0.00054375,
+  "p_stop_hungry": 0.0,
+  "p_stop_hungry_ref": 0.0,
+  "same": true
+ },
+ {
+  "model": "v2_1c_s30",
+  "mode": "k24",
+  "seed": 10000,
+  "g_gamma": -0.649858632307817,
+  "g_gamma_ref": -0.649858632307817,
+  "starve_rate": 0.0007078125,
+  "starve_rate_ref": 0.0007078125,
+  "p_stop_hungry": 0.16683685141476534,
+  "p_stop_hungry_ref": 0.16683685141476534,
+  "same": true
+ },
+ {
+  "model": "v2_1c_s30",
+  "mode": "k24",
+  "seed": 10001,
+  "g_gamma": -0.9431378275452457,
+  "g_gamma_ref": -0.9431378275452457,
+  "starve_rate": 0.001828125,
+  "starve_rate_ref": 0.001828125,
+  "p_stop_hungry": 0.19948566677480412,
+  "p_stop_hungry_ref": 0.19948566677480412,
+  "same": true
+ },
+ {
+  "model": "v2_1c_s30",
+  "mode": "k24",
+  "seed": 10002,
+  "g_gamma": 1.496998799516538,
+  "g_gamma_ref": 1.496998799516538,
+  "starve_rate": 0.0007859375,
+  "starve_rate_ref": 0.0007859375,
+  "p_stop_hungry": 0.19529229811013096,
+  "p_stop_hungry_ref": 0.19529229811013096,
+  "same": true
+ },
+ {
+  "model": "v2_1c_s31",
+  "mode": "det",
+  "seed": 10000,
+  "g_gamma": -1.1195742746836561,
+  "g_gamma_ref": -1.1195742746836561,
+  "starve_rate": 0.0010296875,
+  "starve_rate_ref": 0.0010296875,
+  "p_stop_hungry": 0.6075767465755975,
+  "p_stop_hungry_ref": 0.6075767465755975,
+  "same": true
+ },
+ {
+  "model": "v2_1c_s31",
+  "mode": "det",
+  "seed": 10001,
+  "g_gamma": -1.0674195297363893,
+  "g_gamma_ref": -1.0674195297363893,
+  "starve_rate": 0.0017875,
+  "starve_rate_ref": 0.0017875,
+  "p_stop_hungry": 0.756445584036097,
+  "p_stop_hungry_ref": 0.756445584036097,
+  "same": true
+ },
+ {
+  "model": "v2_1c_s31",
+  "mode": "det",
+  "seed": 10002,
+  "g_gamma": 2.2497930196544513,
+  "g_gamma_ref": 2.2497930196544513,
+  "starve_rate": 0.000934375,
+  "starve_rate_ref": 0.000934375,
+  "p_stop_hungry": 0.7465070232417659,
+  "p_stop_hungry_ref": 0.7465070232417659,
+  "same": true
+ }
+]

@@ -1,0 +1,23 @@
+{
+ "steps": {
+  "4_eval_current": 1571.0,
+  "3_train": 447.6,
+  "5_select": 604.7,
+  "6_eval_candidate": 1404.9,
+  "7_stuck": 338.3,
+  "8_gate": 0.1,
+  "9_export": 0.0
+ },
+ "args": {
+  "cmd": "all",
+  "snapshot": null,
+  "run": "s20003_both",
+  "steps": 3000000,
+  "model_seeds": [
+   0,
+   1
+  ],
+  "train_food": "snapshot",
+  "workers": 16
+ }
+}

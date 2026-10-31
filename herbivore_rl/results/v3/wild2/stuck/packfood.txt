@@ -1,0 +1,25 @@
+v3_wild2_pack_mirror.yaml 32000-32029 7200 스텝 
+  worlds: 30
+  wolf_stuck: 0
+  wolf_stuck_helper: 0
+  wolf_stuck_wall: 0
+  wolf_stuck_max_s: 0.0
+  wolf_wall_stuck: 32
+  wolf_wall_stuck_helper: 25
+  wolf_wall_stuck_max_s: 5.333333333333333
+  deer_stuck: 0
+  deer_stuck_by_beh: {}
+  deer_stuck_panic: 0
+  deer_stuck_max_s: 0.0
+  wolf_stuck_frac: 0.0
+  wolf_wall_stuck_frac: 0.0002933417332755837
+  deer_stuck_frac: 0.0
+  old_wolf_runs: 0
+  old_wolf_max_s: 0.0
+  old_deer_still: 0
+  old_deer_flee: 0
+  old_deer_push: 0
+  old_deer_max_s: 0.0
+  worst_wolf: []
+  worst_wolf_wall: [(40, 32009, 0, 745, False), (40, 32004, 0, 3158, False), (36, 32026, 0, 2044, True), (32, 32012, 0, 1257, True), (28, 32009, 2, 153, True), (27, 32022, 0, 5555, True)]
+  worst_deer: []

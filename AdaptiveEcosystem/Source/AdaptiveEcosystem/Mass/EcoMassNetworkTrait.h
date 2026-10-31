@@ -18,6 +18,10 @@ class ADAPTIVEECOSYSTEM_API UEcoMassNetworkTrait : public UMassReplicationTrait
 
 public:
 	UEcoMassNetworkTrait();
+	/** Explicit opt-in; updates the inherited Params used at the next template creation. */
+	UFUNCTION(CallInEditor, Category="M4|Replication")
+	void ApplyM4ExperimentalPreset();
+	bool ValidateNetworkSettings(FString& OutError) const;
 
 	virtual void BuildTemplate(FMassEntityTemplateBuildContext& BuildContext, const UWorld& World) const override;
 };

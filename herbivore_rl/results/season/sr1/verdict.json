@@ -1,0 +1,80 @@
+{
+ "combos": {
+  "m1@v1": {
+   "method": "m1",
+   "anchor": "v1",
+   "seasons_passed": [],
+   "seasons_seen": [
+    "a"
+   ],
+   "pass": false
+  },
+  "m1@v20": {
+   "method": "m1",
+   "anchor": "v20",
+   "seasons_passed": [],
+   "seasons_seen": [
+    "a"
+   ],
+   "pass": false
+  },
+  "m2@v1": {
+   "method": "m2",
+   "anchor": "v1",
+   "seasons_passed": [],
+   "seasons_seen": [
+    "a"
+   ],
+   "pass": false
+  },
+  "m2@v20": {
+   "method": "m2",
+   "anchor": "v20",
+   "seasons_passed": [],
+   "seasons_seen": [
+    "a"
+   ],
+   "pass": false
+  },
+  "m3k0p1@v1": {
+   "method": "m3k0p1",
+   "anchor": "v1",
+   "seasons_passed": [],
+   "seasons_seen": [
+    "a"
+   ],
+   "pass": false
+  },
+  "m3k0p1@v20": {
+   "method": "m3k0p1",
+   "anchor": "v20",
+   "seasons_passed": [],
+   "seasons_seen": [
+    "a",
+    "b",
+    "c"
+   ],
+   "pass": false
+  },
+  "m3k0p5@v1": {
+   "method": "m3k0p5",
+   "anchor": "v1",
+   "seasons_passed": [],
+   "seasons_seen": [
+    "a"
+   ],
+   "pass": false
+  },
+  "m3k0p5@v20": {
+   "method": "m3k0p5",
+   "anchor": "v20",
+   "seasons_passed": [],
+   "seasons_seen": [
+    "a"
+   ],
+   "pass": false
+  }
+ },
+ "pass": false,
+ "rule": "시즌 2개 이상 × 학습 시드 [0, 1] 모두 A1~A5·보류 통과"
+}

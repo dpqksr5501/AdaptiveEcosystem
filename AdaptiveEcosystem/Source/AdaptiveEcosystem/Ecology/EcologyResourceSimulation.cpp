@@ -21,8 +21,19 @@ bool UEcologySimulationSubsystem::QueueManualStarvation(FName RegionId, const FE
 	if (!CanMutateAuthoritativeState(TEXT("QueueManualStarvation")) || ResourceEpoch <= 0
 		|| RequestedAt.WorldEpoch != ResourceEpoch || !EcoClock::IsValidPhase(RequestedAt.ServerTimeSeconds, RequestedAt.DayCycle)
 		|| RequestedAt.ServerTimeSeconds < ResourceTime || RegionId.IsNone() || !RegionalStates.Contains(RegionId)
-		|| PendingManualStarvation.Contains(RegionId)) return false;
+		|| PendingManualStarvation.Contains(RegionId) || SpatialFood.Contains(RegionId)) return false;
 	PendingManualStarvation.Add(RegionId, RequestedAt.ServerTimeSeconds);
+	return true;
+}
+
+bool UEcologySimulationSubsystem::QueueManualFoodSupply(FName RegionId, float Amount, const FEcoServerTimeSnapshot& RequestedAt)
+{
+	if (!CanMutateAuthoritativeState(TEXT("QueueManualFoodSupply")) || bResourceStepOpen || ResourceEpoch <= 0
+		|| RequestedAt.WorldEpoch != ResourceEpoch || RequestedAt.ServerTimeSeconds < ResourceTime
+		|| !EcoClock::IsValidPhase(RequestedAt.ServerTimeSeconds, RequestedAt.DayCycle)
+		|| !RegionalStates.Contains(RegionId) || PendingManualFoodSupply.Contains(RegionId) || SpatialFood.Contains(RegionId)
+		|| !FMath::IsFinite(Amount) || Amount <= 0) return false;
+	PendingManualFoodSupply.Add(RegionId, {RequestedAt.ServerTimeSeconds, Amount});
 	return true;
 }
 
@@ -43,6 +54,8 @@ double UEcologySimulationSubsystem::GetNextScheduledTime(const FEcoServerTimeSna
 	}
 	for (const auto& Pair : PendingManualStarvation)
 		Next = FMath::Min(Next, Pair.Value);
+	for (const auto& Pair : PendingManualFoodSupply)
+		Next = FMath::Min(Next, Pair.Value.Time);
 	return FMath::Max(Time.ServerTimeSeconds, Next);
 }
 
@@ -57,6 +70,8 @@ bool UEcologySimulationSubsystem::BeginResourceStep(const FEcoServerTimeSnapshot
 		if (!FMath::IsFinite(State.FoodAmount) || !FMath::IsFinite(State.FoodCapacity)
 			|| State.FoodAmount < 0.0f || State.FoodAmount > State.FoodCapacity) return false;
 	}
+	const double EnvironmentDelta = Time.ServerTimeSeconds - FMath::Max(0.0, ResourceTime);
+	if (!CaptureEnvironmentInputs(Time)) return false;
 	ResourceStepId = StepId;
 	ResourceTime = Time.ServerTimeSeconds;
 	bResourceStepOpen = true;
@@ -65,6 +80,10 @@ bool UEcologySimulationSubsystem::BeginResourceStep(const FEcoServerTimeSnapshot
 	ResourceLedger.SetNum(RegionIds.Num());
 	for (int32 I = 0; I < RegionIds.Num(); ++I)
 		ResourceLedger[I].Before = RegionalStates.FindChecked(RegionIds[I]).FoodAmount;
+	// Advance the regional environment exactly once per chronological resource step.
+	TickSimulation(static_cast<float>(EnvironmentDelta));
+	for (int32 I = 0; I < RegionIds.Num(); ++I)
+		ResourceLedger[I].Supplied = RegionalStates.FindChecked(RegionIds[I]).FoodAmount - ResourceLedger[I].Before;
 	for (int32 I = 0; I < RegionIds.Num(); ++I)
 	{
 		const FName RegionId = RegionIds[I];
@@ -100,6 +119,21 @@ bool UEcologySimulationSubsystem::BeginResourceStep(const FEcoServerTimeSnapshot
 				ResourceEpoch, ResourceStepId, Time.DayCycle.CycleId, bDay ? TEXT("Day") : TEXT("Night"),
 				*Event.RegionId.ToString(), Due, Event.FoodLoss, ActualLoss);
 	}
+	// Explicit debug supply occurs after due losses and participates in the same conservation ledger.
+	for (int32 I = 0; I < RegionIds.Num(); ++I)
+	{
+		const FName RegionId = RegionIds[I];
+		const FFoodSupply* Supply = PendingManualFoodSupply.Find(RegionId);
+		if (!Supply || Supply->Time > ResourceTime) continue;
+		auto& State = RegionalStates.FindChecked(RegionId);
+		const double Before = State.FoodAmount;
+		State.FoodAmount = static_cast<float>(FMath::Min<double>(State.FoodCapacity, Before + Supply->Amount));
+		ResourceLedger[I].Supplied += State.FoodAmount - Before;
+		ResourceLedger[I].bEvent = true;
+		UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Food Supply] Region=%s Step=%lld Requested=%.3f Actual=%.3f"),
+			*RegionId.ToString(), ResourceStepId, Supply->Amount, ResourceLedger[I].Supplied);
+		PendingManualFoodSupply.Remove(RegionId);
+	}
 	return true;
 }
 
@@ -117,7 +151,7 @@ bool UEcologySimulationSubsystem::ResolveFeeding(TConstArrayView<FEcoFeedRequest
 		const double* LastDue = LastAcceptedFeedTime.Find(Request.Food.StableAgentId);
 		if (Request.WorldEpoch != ResourceEpoch || Request.StepId != ResourceStepId
 			|| Request.Food.StableAgentId <= PreviousId || !RegionIds.IsValidIndex(Request.RegionIndex)
-			|| RegionIds[Request.RegionIndex] != Request.Food.RegionId || !FMath::IsFinite(Request.DueTime)
+			|| RegionIds[Request.RegionIndex] != Request.Food.RegionId || SpatialFood.Contains(Request.Food.RegionId) || !FMath::IsFinite(Request.DueTime)
 			|| Request.DueTime < 0.0 || Request.DueTime > ResourceTime || (LastDue && Request.DueTime <= *LastDue)
 			|| !FMath::IsFinite(Request.Food.RequestedAmount) || Request.Food.RequestedAmount <= 0.0f)
 		{
@@ -182,17 +216,18 @@ bool UEcologySimulationSubsystem::CompleteResourceStep()
 		Snapshot.Capacity = State.FoodCapacity;
 		Snapshot.bDepleted = State.FoodAmount == 0.0f;
 		Snapshot.EventLoss = Ledger.EventLoss;
+		Snapshot.SuppliedFood = Ledger.Supplied;
 		Snapshot.Consumed = Ledger.Granted;
-		Snapshot.RoundingAdjustment = Ledger.Before - Ledger.EventLoss - Ledger.Granted - State.FoodAmount;
-		const double Tolerance = 1.e-6 * FMath::Max(1.0, Ledger.Before);
+		Snapshot.RoundingAdjustment = Ledger.Before + Ledger.Supplied - Ledger.EventLoss - Ledger.Granted - State.FoodAmount;
+		const double Tolerance = 1.e-6 * FMath::Max(1.0, Ledger.Before + Ledger.Supplied);
 		if (!FMath::IsFinite(Snapshot.RoundingAdjustment) || FMath::Abs(Snapshot.RoundingAdjustment) > Tolerance)
 		{
 			UE_LOG(LogAdaptiveEcosystem, Error, TEXT("[Eco Food] Resource conservation failed: Region=%s Step=%lld"), *RegionIds[I].ToString(), ResourceStepId);
 			return false;
 		}
-		if (bPrintResourceChanges && (Ledger.bEvent || Ledger.Requests > 0))
-			UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Food] Epoch=%d Step=%lld Time=%.3f Region=%s Before=%.6f EventLoss=%.6f Consumed=%.6f Rounding=%.9f After=%.6f Requests=%d Population=%d Depleted=%d"),
-				ResourceEpoch, ResourceStepId, ResourceTime, *RegionIds[I].ToString(), Ledger.Before, Ledger.EventLoss,
+		if (bPrintResourceChanges && (Ledger.bEvent || Ledger.Requests > 0 || Ledger.Supplied > 0))
+			UE_LOG(LogAdaptiveEcosystem, Log, TEXT("[Eco Food] Epoch=%d Step=%lld Time=%.3f Region=%s Before=%.6f Supplied=%.6f EventLoss=%.6f Consumed=%.6f Rounding=%.9f After=%.6f Requests=%d Population=%d Depleted=%d"),
+				ResourceEpoch, ResourceStepId, ResourceTime, *RegionIds[I].ToString(), Ledger.Before, Ledger.Supplied, Ledger.EventLoss,
 				Ledger.Granted, Snapshot.RoundingAdjustment, State.FoodAmount, Ledger.Requests, State.Population, Snapshot.bDepleted);
 	}
 	CompletedResources = MoveTemp(Next);

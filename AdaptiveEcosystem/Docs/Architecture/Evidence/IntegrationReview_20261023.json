@@ -1,0 +1,909 @@
+{
+  "date": "2026-10-23",
+  "baseline_head": "ecfd82fab04d16531ae7e00a2adaf3a4737d2fcf",
+  "branch": "codex/social-shelter-handoff",
+  "dirty": true,
+  "scope": "Implemented Native/M4/vegetation/authoring/migration/representation and client boundaries; not every planned ecosystem feature",
+  "build": {
+    "succeeded": true,
+    "log": "Saved\\IntegrationBuilds\\Milestone_Final_20261023_154448.log"
+  },
+  "automation": {
+    "succeeded": 212,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0,
+    "totalDuration": 10.755624771118164
+  },
+  "regression_tests": [
+    {
+      "name": "AdaptiveEcosystem.Review.HabitatRejectsCollapsedBounds",
+      "state": "Success"
+    },
+    {
+      "name": "AdaptiveEcosystem.Review.HerdIncomingCountsRegionalEntryOnce",
+      "state": "Success"
+    },
+    {
+      "name": "AdaptiveEcosystem.Review.NativeRouteRejectsInvalidAndUnboundedSweep",
+      "state": "Success"
+    },
+    {
+      "name": "AdaptiveEcosystem.Review.SoilCannotFallBackOnInvalidLayout",
+      "state": "Success"
+    }
+  ],
+  "saved_assets": {
+    "blueprints": 6,
+    "weather_actors": 3,
+    "habitat_actors": 9,
+    "routes": [
+      {
+        "label": "JYU_HerdRoute_Barren_Forest",
+        "points": 29,
+        "valid": true
+      }
+    ]
+  },
+  "pie": {
+    "result": "FINISHED",
+    "fixture": "Authored BP climate; no weather/food/agent writes; observer threats disabled",
+    "observed_seconds": 124.0,
+    "samples": 63,
+    "max_ledger_errors": {
+      "food": 0.0,
+      "consumed": 0.0,
+      "grown": 0.0,
+      "environment_lost": 0
+    },
+    "final_population": 148,
+    "final_fields": [
+      {
+        "region": "Forest",
+        "authority": true,
+        "visual_cells": 129,
+        "instances": 129,
+        "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+        "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+        "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+        "food": 96.54106569909776,
+        "grown": 262.51078416380574,
+        "environment_lost": 5.1267902944685755,
+        "consumed": 292.54212292676254,
+        "mean_moisture": 0.4859681094301789,
+        "rain": 0.6499999761581421,
+        "ground_cells": 900,
+        "grass_cells": 810,
+        "riparian_cells": 0,
+        "shrub_cells": 90,
+        "connected_water_cells": 0,
+        "native_step": 934,
+        "ledger_amount": 96.54106569909776,
+        "ledger_consumed": 292.54212292676254,
+        "ledger_grown": 262.51078416380574,
+        "ledger_environment_lost": 5.1267902944685755,
+        "ledger_habitat_removed": 0,
+        "receipt_sequence": 931
+      },
+      {
+        "region": "Barren",
+        "authority": true,
+        "visual_cells": 56,
+        "instances": 55,
+        "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+        "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+        "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+        "food": 15.379622385921072,
+        "grown": 206.42059348830708,
+        "environment_lost": 0.2629206356483802,
+        "consumed": 242.66291490750675,
+        "mean_moisture": 0.6762634986559355,
+        "rain": 0.6499999761581421,
+        "ground_cells": 900,
+        "grass_cells": 810,
+        "riparian_cells": 0,
+        "shrub_cells": 90,
+        "connected_water_cells": 0,
+        "native_step": 934,
+        "ledger_amount": 15.379622385921072,
+        "ledger_consumed": 242.66291490750675,
+        "ledger_grown": 206.42059348830708,
+        "ledger_environment_lost": 0.2629206356483802,
+        "ledger_habitat_removed": 0,
+        "receipt_sequence": 931
+      },
+      {
+        "region": "Highland",
+        "authority": true,
+        "visual_cells": 35,
+        "instances": 28,
+        "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+        "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+        "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+        "food": 5.2023123504350615,
+        "grown": 28.839373564733805,
+        "environment_lost": 0.15389596055497548,
+        "consumed": 55.64277011873377,
+        "mean_moisture": 0.8541381860754239,
+        "rain": 0,
+        "ground_cells": 900,
+        "grass_cells": 810,
+        "riparian_cells": 0,
+        "shrub_cells": 90,
+        "connected_water_cells": 0,
+        "native_step": 934,
+        "ledger_amount": 5.2023123504350615,
+        "ledger_consumed": 55.64277011873377,
+        "ledger_grown": 28.839373564733805,
+        "ledger_environment_lost": 0.15389596055497548,
+        "ledger_habitat_removed": 1.1606379875136952,
+        "receipt_sequence": 932
+      }
+    ],
+    "actual_intake_samples": 5485,
+    "active_journey_samples": 0,
+    "region_transfers": [],
+    "screenshots": 3
+  },
+  "server": {
+    "result": "FINISHED",
+    "fixture": "Authored BP climate; no weather/food/agent writes; observer threats disabled",
+    "observed_seconds": 209.98500000000058,
+    "samples": 105,
+    "max_ledger_errors": {
+      "food": 0.0,
+      "consumed": 0.0,
+      "grown": 0.0,
+      "environment_lost": 0
+    },
+    "final_population": 139,
+    "final_fields": [
+      {
+        "region": "Forest",
+        "authority": true,
+        "visual_cells": 129,
+        "instances": 0,
+        "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+        "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+        "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+        "food": 106.45525742141191,
+        "grown": 481.99285705544366,
+        "environment_lost": 5.123226525939967,
+        "consumed": 502.113567864333,
+        "mean_moisture": 0.5078808125434844,
+        "rain": 0,
+        "ground_cells": 900,
+        "grass_cells": 810,
+        "riparian_cells": 0,
+        "shrub_cells": 90,
+        "connected_water_cells": 0,
+        "native_step": 1590,
+        "ledger_amount": 106.45525742141191,
+        "ledger_consumed": 502.113567864333,
+        "ledger_grown": 481.99285705544366,
+        "ledger_environment_lost": 5.123226525939967,
+        "ledger_habitat_removed": 0,
+        "receipt_sequence": 1590,
+        "actor_location": [
+          28000.0,
+          26000.0,
+          -1285.9388470855265
+        ],
+        "net_cull_distance_squared": 2500000000.0
+      },
+      {
+        "region": "Barren",
+        "authority": true,
+        "visual_cells": 56,
+        "instances": 0,
+        "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+        "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+        "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+        "food": 30.22073435735129,
+        "grown": 329.1111362280449,
+        "environment_lost": 0.37272681663217055,
+        "consumed": 350.40253949470656,
+        "mean_moisture": 0.41284776348646524,
+        "rain": 0,
+        "ground_cells": 900,
+        "grass_cells": 810,
+        "riparian_cells": 0,
+        "shrub_cells": 90,
+        "connected_water_cells": 0,
+        "native_step": 1590,
+        "ledger_amount": 30.22073435735129,
+        "ledger_consumed": 350.40253949470656,
+        "ledger_grown": 329.1111362280449,
+        "ledger_environment_lost": 0.37272681663217055,
+        "ledger_habitat_removed": 0,
+        "receipt_sequence": 1590,
+        "actor_location": [
+          28000.0,
+          12000.0,
+          169.51233119707013
+        ],
+        "net_cull_distance_squared": 2500000000.0
+      },
+      {
+        "region": "Highland",
+        "authority": true,
+        "visual_cells": 35,
+        "instances": 0,
+        "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+        "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+        "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+        "food": 5.2512887970744595,
+        "grown": 84.08817557489456,
+        "environment_lost": 0.24737069173777795,
+        "consumed": 110.69651348671997,
+        "mean_moisture": 0.6613449793725353,
+        "rain": 0.6499999761581421,
+        "ground_cells": 900,
+        "grass_cells": 810,
+        "riparian_cells": 0,
+        "shrub_cells": 90,
+        "connected_water_cells": 0,
+        "native_step": 1590,
+        "ledger_amount": 5.2512887970744595,
+        "ledger_consumed": 110.69651348671997,
+        "ledger_grown": 84.08817557489456,
+        "ledger_environment_lost": 0.24737069173777795,
+        "ledger_habitat_removed": 0,
+        "receipt_sequence": 1590,
+        "actor_location": [
+          28000.0,
+          -55000.0,
+          2639.8401021400778
+        ],
+        "net_cull_distance_squared": 2500000000.0
+      }
+    ],
+    "actual_intake_samples": 8790,
+    "active_journey_samples": 750,
+    "region_transfers": [
+      {
+        "id": "75",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 183.78100000000268,
+        "previous": [
+          33902.22031804373,
+          25967.857907304802,
+          -901.9554318769485
+        ],
+        "current": [
+          33901.6810625479,
+          26507.857530920934,
+          -959.2416686822371
+        ]
+      },
+      {
+        "id": "95",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 187.84399999999732,
+        "previous": [
+          33950.25137448817,
+          25905.02349822106,
+          -894.731892128115
+        ],
+        "current": [
+          33950.33048014307,
+          26293.82345407742,
+          -940.0540787383038
+        ]
+      },
+      {
+        "id": "66",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 189.86000000000058,
+        "previous": [
+          34000.719175318794,
+          26090.092343566284,
+          -916.047688119564
+        ],
+        "current": [
+          34000.085897521094,
+          26666.091836559983,
+          -976.7842890280676
+        ]
+      },
+      {
+        "id": "72",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 191.875,
+        "previous": [
+          34049.81532847875,
+          26177.029398838058,
+          -925.6213843441251
+        ],
+        "current": [
+          34049.818202777125,
+          26717.029395253918,
+          -980.780248325151
+        ]
+      },
+      {
+        "id": "98",
+        "origin": "Barren",
+        "destination": "Forest",
+        "elapsed": 209.98500000000058,
+        "previous": [
+          34143.826771969,
+          25758.195101629302,
+          -874.9094164885913
+        ],
+        "current": [
+          34143.98141945619,
+          26298.18972095077,
+          -938.8698569850003
+        ]
+      }
+    ],
+    "screenshots": 0
+  },
+  "clients": [
+    {
+      "name": "ClientA",
+      "passed": true,
+      "authority_agents": 0,
+      "local_migration_subsystems": 0,
+      "zero_native_step": true,
+      "fields": [
+        {
+          "region": "Highland",
+          "authority": false,
+          "visual_cells": 35,
+          "instances": 34,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "actor_location": [
+            28000.0,
+            -55000.0,
+            2639.8
+          ]
+        },
+        {
+          "region": "Barren",
+          "authority": false,
+          "visual_cells": 56,
+          "instances": 56,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "actor_location": [
+            28000.0,
+            12000.0,
+            169.5
+          ]
+        },
+        {
+          "region": "Forest",
+          "authority": false,
+          "visual_cells": 129,
+          "instances": 128,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "actor_location": [
+            28000.0,
+            26000.0,
+            -1285.9
+          ]
+        }
+      ],
+      "received_migrated_forest_ids": []
+    },
+    {
+      "name": "ClientB",
+      "passed": true,
+      "authority_agents": 0,
+      "local_migration_subsystems": 0,
+      "zero_native_step": true,
+      "fields": [
+        {
+          "region": "Forest",
+          "authority": false,
+          "visual_cells": 129,
+          "instances": 124,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "actor_location": [
+            28000.0,
+            26000.0,
+            -1285.9
+          ]
+        },
+        {
+          "region": "Barren",
+          "authority": false,
+          "visual_cells": 56,
+          "instances": 53,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "actor_location": [
+            28000.0,
+            12000.0,
+            169.5
+          ]
+        },
+        {
+          "region": "Highland",
+          "authority": false,
+          "visual_cells": 35,
+          "instances": 32,
+          "visual_class": "/Game/JYU/Ecosystem/BP_JYU_VegetationField.BP_JYU_VegetationField_C",
+          "visual_mesh": "/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA",
+          "visual_material": "/Game/JYU/Ecosystem/MI_JYU_EcosystemGrass.MI_JYU_EcosystemGrass",
+          "actor_location": [
+            28000.0,
+            -55000.0,
+            2639.8
+          ]
+        }
+      ],
+      "received_migrated_forest_ids": [
+        "66",
+        "72",
+        "75",
+        "95"
+      ]
+    }
+  ],
+  "relevance": {
+    "grace_seconds": 3,
+    "clients": [
+      {
+        "name": "ClientA",
+        "passed": true,
+        "checked_near_region_samples": 34,
+        "evaluated_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "received_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "missing_after_grace": [],
+        "missing_camera_samples": []
+      },
+      {
+        "name": "ClientB",
+        "passed": true,
+        "checked_near_region_samples": 30,
+        "evaluated_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "received_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "missing_after_grace": [],
+        "missing_camera_samples": []
+      }
+    ],
+    "passed": true
+  },
+  "additional_region_roundtrip": {
+    "grace_seconds": 3,
+    "clients": [
+      {
+        "name": "ClientA",
+        "passed": true,
+        "checked_near_region_samples": 31,
+        "evaluated_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "received_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "missing_after_grace": []
+      },
+      {
+        "name": "ClientB",
+        "passed": true,
+        "checked_near_region_samples": 22,
+        "evaluated_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "received_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "missing_after_grace": []
+      }
+    ],
+    "passed": true
+  },
+  "relevance_fault_injection": {
+    "passed": true,
+    "injected_fault": "Removed only recorded ClientA Barren fields; peak fields/passed flag left intact",
+    "exit_code": 1,
+    "detected_missing_samples": 12
+  },
+  "client_world_identity": [
+    {
+      "name": "ClientA",
+      "world": "/Game/JYU/Maps/LV_JYU_Ecosystem.LV_JYU_Ecosystem",
+      "same_named_worlds": 58,
+      "active_candidates": [
+        {
+          "path": "/Game/JYU/Maps/LV_JYU_Ecosystem.LV_JYU_Ecosystem",
+          "has_controller": true,
+          "has_game_state": true
+        }
+      ],
+      "inactive_examples": [
+        {
+          "path": "/Game/JYU/Maps/LV_JYU_Ecosystem/6XLZXTUI5F4I1P1S5T1GNYU7N.LV_JYU_Ecosystem",
+          "has_controller": false,
+          "has_game_state": false
+        },
+        {
+          "path": "/Game/JYU/Maps/LV_JYU_Ecosystem/ADC0U3U5YFZNIMTQTLJD6EWIW.LV_JYU_Ecosystem",
+          "has_controller": false,
+          "has_game_state": false
+        }
+      ]
+    },
+    {
+      "name": "ClientB",
+      "world": "/Game/JYU/Maps/LV_JYU_Ecosystem.LV_JYU_Ecosystem",
+      "same_named_worlds": 50,
+      "active_candidates": [
+        {
+          "path": "/Game/JYU/Maps/LV_JYU_Ecosystem.LV_JYU_Ecosystem",
+          "has_controller": true,
+          "has_game_state": true
+        }
+      ],
+      "inactive_examples": [
+        {
+          "path": "/Game/JYU/Maps/LV_JYU_Ecosystem/E7X214X3ISO46OIH46NMQ1FY9.LV_JYU_Ecosystem",
+          "has_controller": false,
+          "has_game_state": false
+        },
+        {
+          "path": "/Game/JYU/Maps/LV_JYU_Ecosystem/BQ85VBGBB9GUF84KB0LZ0DK09.LV_JYU_Ecosystem",
+          "has_controller": false,
+          "has_game_state": false
+        }
+      ]
+    }
+  ],
+  "full_server_log": {
+    "seconds": 270,
+    "completed_plans": [
+      {
+        "plan": 1,
+        "herd": 32,
+        "origin": "Barren",
+        "destination": "Barren",
+        "arrived": 2,
+        "members": 2
+      },
+      {
+        "plan": 3,
+        "herd": 41,
+        "origin": "Barren",
+        "destination": "Barren",
+        "arrived": 3,
+        "members": 3
+      },
+      {
+        "plan": 2,
+        "herd": 40,
+        "origin": "Barren",
+        "destination": "Forest",
+        "arrived": 3,
+        "members": 3
+      },
+      {
+        "plan": 7,
+        "herd": 126,
+        "origin": "Barren",
+        "destination": "Forest",
+        "arrived": 1,
+        "members": 2
+      }
+    ],
+    "completion_may_include_dead_members": true
+  },
+  "processes": [
+    {
+      "name": "ClientA",
+      "exit": 0
+    },
+    {
+      "name": "ClientB",
+      "exit": 0
+    },
+    {
+      "name": "Server",
+      "exit": 0
+    }
+  ],
+  "engine_free": {
+    "schema": 1,
+    "world": "native-soil-v1",
+    "python_parity": false,
+    "terrain": false,
+    "runs": [
+      {
+        "seed": 11,
+        "climate": "off",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 42,
+        "starved": 6,
+        "initial_food": 173.216122698,
+        "food": 173.216122698,
+        "consumed": 188.34304381,
+        "grown": 0,
+        "environment_lost": 0,
+        "mean_moisture": 0,
+        "balance_checked": false,
+        "max_step_balance_error": 0,
+        "native_reference_step_p95_us": 73.2
+      },
+      {
+        "seed": 11,
+        "climate": "rain",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 42,
+        "starved": 6,
+        "initial_food": 173.216122698,
+        "food": 173.216122698,
+        "consumed": 188.34304381,
+        "grown": 188.34304381,
+        "environment_lost": 0,
+        "mean_moisture": 0.870002464458,
+        "balance_checked": true,
+        "max_step_balance_error": 7.1054273576e-13,
+        "native_reference_step_p95_us": 167.8
+      },
+      {
+        "seed": 11,
+        "climate": "dry",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 38,
+        "starved": 10,
+        "initial_food": 173.216122698,
+        "food": 18.3068482198,
+        "consumed": 139.612624514,
+        "grown": 120.668005985,
+        "environment_lost": 135.964655949,
+        "mean_moisture": 0,
+        "balance_checked": true,
+        "max_step_balance_error": 7.67386154621e-13,
+        "native_reference_step_p95_us": 163.7
+      },
+      {
+        "seed": 11,
+        "climate": "flood_grass",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 34,
+        "starved": 14,
+        "initial_food": 173.216122698,
+        "food": 8.29086777089,
+        "consumed": 79.609846929,
+        "grown": 0,
+        "environment_lost": 85.3154079977,
+        "mean_moisture": 1,
+        "balance_checked": true,
+        "max_step_balance_error": 4.54747350886e-13,
+        "native_reference_step_p95_us": 179.4
+      },
+      {
+        "seed": 23,
+        "climate": "off",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 32,
+        "starved": 16,
+        "initial_food": 36.5799627719,
+        "food": 36.5799627719,
+        "consumed": 44.6853866939,
+        "grown": 0,
+        "environment_lost": 0,
+        "mean_moisture": 0,
+        "balance_checked": false,
+        "max_step_balance_error": 0,
+        "native_reference_step_p95_us": 69.8
+      },
+      {
+        "seed": 23,
+        "climate": "rain",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 32,
+        "starved": 16,
+        "initial_food": 36.5799627719,
+        "food": 36.5799627719,
+        "consumed": 44.6853866939,
+        "grown": 44.6853866939,
+        "environment_lost": 0,
+        "mean_moisture": 0.910167244505,
+        "balance_checked": true,
+        "max_step_balance_error": 7.81597009336e-14,
+        "native_reference_step_p95_us": 166.5
+      },
+      {
+        "seed": 23,
+        "climate": "dry",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 33,
+        "starved": 15,
+        "initial_food": 36.5799627719,
+        "food": 4.32837885107,
+        "consumed": 42.6938394911,
+        "grown": 41.4077354375,
+        "environment_lost": 30.9654798672,
+        "mean_moisture": 0,
+        "balance_checked": true,
+        "max_step_balance_error": 1.13686837722e-13,
+        "native_reference_step_p95_us": 179.7
+      },
+      {
+        "seed": 23,
+        "climate": "flood_grass",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 28,
+        "starved": 20,
+        "initial_food": 36.5799627719,
+        "food": 1.22214270914,
+        "consumed": 22.0082233037,
+        "grown": 0,
+        "environment_lost": 13.349596759,
+        "mean_moisture": 1,
+        "balance_checked": true,
+        "max_step_balance_error": 4.26325641456e-14,
+        "native_reference_step_p95_us": 171
+      },
+      {
+        "seed": 47,
+        "climate": "off",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 38,
+        "starved": 10,
+        "initial_food": 106.67046962,
+        "food": 106.67046962,
+        "consumed": 77.3106972177,
+        "grown": 0,
+        "environment_lost": 0,
+        "mean_moisture": 0,
+        "balance_checked": false,
+        "max_step_balance_error": 0,
+        "native_reference_step_p95_us": 73.9
+      },
+      {
+        "seed": 47,
+        "climate": "rain",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 38,
+        "starved": 10,
+        "initial_food": 106.67046962,
+        "food": 106.67046962,
+        "consumed": 77.3106972177,
+        "grown": 77.3106972176,
+        "environment_lost": 0,
+        "mean_moisture": 0.886913028125,
+        "balance_checked": true,
+        "max_step_balance_error": 2.41584530158e-13,
+        "native_reference_step_p95_us": 167.5
+      },
+      {
+        "seed": 47,
+        "climate": "dry",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 37,
+        "starved": 11,
+        "initial_food": 106.67046962,
+        "food": 12.787226673,
+        "consumed": 85.8188260321,
+        "grown": 83.5960389717,
+        "environment_lost": 91.6604558867,
+        "mean_moisture": 0,
+        "balance_checked": true,
+        "max_step_balance_error": 4.26325641456e-13,
+        "native_reference_step_p95_us": 168.8
+      },
+      {
+        "seed": 47,
+        "climate": "flood_grass",
+        "simulation_seconds": 600,
+        "initial_deer": 48,
+        "wolves": 4,
+        "survivors": 0,
+        "caught": 28,
+        "starved": 20,
+        "initial_food": 106.67046962,
+        "food": 4.28350315712,
+        "consumed": 57.6956384973,
+        "grown": 0,
+        "environment_lost": 44.6913279656,
+        "mean_moisture": 1,
+        "balance_checked": true,
+        "max_step_balance_error": 3.69482222595e-13,
+        "native_reference_step_p95_us": 182.1
+      }
+    ]
+  },
+  "fixes": [
+    "Regional entry is counted once; outstanding plans reserve only living members outside the destination; current receipt deltas bridge the population commit",
+    "Shared route validator rejects non-finite/degenerate/unbounded paths before terrain and debug consumers; direct native sweep is bounded",
+    "Collapsed/zero habitat bounds cannot supply an unbounded axis; invalid regional habitats are rejected before gathering",
+    "Invalid ON soil layout cannot silently regenerate using the OFF world or index absent arrays",
+    "Network observation times reject NaN/infinity and observer durations beyond the normal server exit",
+    "Runtime observers retain a game world owning GameState/local PlayerController; a same-named inactive WorldPartition UWorld cannot replace it",
+    "Near-field delivery is checked over camera transitions; a preserved peak count cannot hide missing fields/camera"
+  ],
+  "preflight_negative_cases": [
+    "NaN duration rejected before process start",
+    "Observer duration beyond exit rejected before process start",
+    "Infinite exit rejected before process start"
+  ],
+  "validation_notes": [
+    "Automation01 contained one new test fixture failure (missing route actor). Fixed fixture and reran the entire suite as Automation02.",
+    "Unreal process exit 0 did not imply test success; final acceptance uses exported JSON failed/notRun/inProcess counts.",
+    "Initial 18-second and reproduced 26-second apparent client gaps came from name-only UWorld selection; the wrong world also had no camera. Preserved InitialClientA_18s.json/log and WrongWorldClientA_26s.json/Relevance.json. Fixed world selection, then repeated the same 30-second join and 190-second late join with continuous near-field/camera validation.",
+    "Earlier weather-controls PIE remains historical evidence; this review does not change weather presentation or policy schema/weights."
+  ],
+  "remaining": [
+    "Full ecosystem roadmap C-G is not complete; see implementation status",
+    "No complete ecosystem save/restore, cook/package, Python ON-world parity/retraining or measured server/client p95 and bandwidth",
+    "No verified connected water scene; dedicated riparian/shrub meshes and vegetation cover sensing remain open",
+    "Recovery forecasting and limited place knowledge remain future migration extensions",
+    "A journey that cannot return still needs an explicit recovery/termination contract preserving native out-of-stage guards; no teleport fix introduced",
+    "All deer die by 600s in the distinct flat engine-free baseline; short integrated success does not prove ecological equilibrium",
+    "Inherited HLOD/Editor AnimGraph load and NavMesh warnings require packaging/performance follow-up"
+  ]
+}

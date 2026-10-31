@@ -1,0 +1,87 @@
+{
+ "started": "2026-10-03T08:37:46+00:00",
+ "steps": 20000000,
+ "early_stop": {
+  "L": {
+   "at": 2000000,
+   "values": {
+    "20": -0.16617784128280289,
+    "21": -0.2179120835028457,
+    "22": -0.06294666041912195
+   },
+   "low_seeds": [
+    20,
+    21,
+    22
+   ]
+  },
+  "W": {
+   "at": 5000000,
+   "values": {
+    "20": 0.006578183761340857,
+    "21": 0.0259448599240099
+   },
+   "low_seeds": [
+    20
+   ]
+  }
+ },
+ "runs": {
+  "v2_2r_t0_s20": {
+   "returncode": 0,
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 20 --run-name v2_2r_t0_s20 --probe-every 1000000 --threads 1",
+   "model": "ckpt/v2/v2_2r_t0_s20.zip"
+  },
+  "v2_2r_t0_s21": {
+   "returncode": 0,
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 21 --run-name v2_2r_t0_s21 --probe-every 1000000 --threads 1",
+   "model": "ckpt/v2/v2_2r_t0_s21.zip"
+  },
+  "v2_2r_t0_s22": {
+   "returncode": 0,
+   "cmd": "train_v2.py --config configs/v2_1.yaml --steps 20000000 --seed 22 --run-name v2_2r_t0_s22 --probe-every 1000000 --threads 1",
+   "model": "ckpt/v2/v2_2r_t0_s22.zip"
+  },
+  "v2_2r_t1_s20": {
+   "returncode": 0,
+   "cmd": "train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 20 --run-name v2_2r_t1_s20 --probe-every 1000000 --threads 1",
+   "model": "ckpt/v2/v2_2r_t1_s20.zip"
+  },
+  "v2_2r_t1_s21": {
+   "returncode": 0,
+   "cmd": "train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 21 --run-name v2_2r_t1_s21 --probe-every 1000000 --threads 1",
+   "model": "ckpt/v2/v2_2r_t1_s21.zip"
+  },
+  "v2_2r_t1_s22": {
+   "returncode": 0,
+   "cmd": "train_v2.py --config configs/v2_2r_t1.yaml --steps 20000000 --seed 22 --run-name v2_2r_t1_s22 --probe-every 1000000 --threads 1",
+   "model": "ckpt/v2/v2_2r_t1_s22.zip"
+  },
+  "v2_2r_l_s20": {
+   "returncode": 1,
+   "cmd": "train_v2.py --config configs/v2_2r_l.yaml --steps 20000000 --seed 20 --run-name v2_2r_l_s20 --probe-every 1000000 --threads 1",
+   "model": null
+  },
+  "v2_2r_l_s21": {
+   "returncode": 1,
+   "cmd": "train_v2.py --config configs/v2_2r_l.yaml --steps 20000000 --seed 21 --run-name v2_2r_l_s21 --probe-every 1000000 --threads 1",
+   "model": null
+  },
+  "v2_2r_l_s22": {
+   "returncode": 1,
+   "cmd": "train_v2.py --config configs/v2_2r_l.yaml --steps 20000000 --seed 22 --run-name v2_2r_l_s22 --probe-every 1000000 --threads 1",
+   "model": null
+  },
+  "v2_2r_w_s20": {
+   "returncode": 1,
+   "cmd": "train_v2.py --config configs/v2_2r_w.yaml --steps 20000000 --seed 20 --run-name v2_2r_w_s20 --probe-every 1000000 --threads 1",
+   "model": null
+  },
+  "v2_2r_w_s21": {
+   "returncode": 1,
+   "cmd": "train_v2.py --config configs/v2_2r_w.yaml --steps 20000000 --seed 21 --run-name v2_2r_w_s21 --probe-every 1000000 --threads 1",
+   "model": null
+  }
+ },
+ "finished": "2026-10-03T09:15:21+00:00"
+}

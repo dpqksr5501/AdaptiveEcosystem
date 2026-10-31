@@ -1,0 +1,157 @@
+{
+	"session_seed": 20000,
+	"units": "stage units, 1 unit = 200 cm, x·y from stage origin",
+	"obstacles_on": true,
+	"regions": [
+		{
+			"region": "Forest",
+			"region_index": 1,
+			"size": 60,
+			"origin_cm": [
+				28200,
+				40500,
+				-1631.2616230830854
+			],
+			"discs": [],
+			"imported": false,
+			"level_discs": 0,
+			"covers": [
+				[
+					45,
+					45,
+					6
+				],
+				[
+					15,
+					45,
+					6
+				],
+				[
+					15,
+					15,
+					6
+				],
+				[
+					45,
+					15,
+					6
+				]
+			],
+			"counts":
+			{
+				"seen_meshes": 20,
+				"no_collision": 20,
+				"tiny": 0,
+				"low": 0,
+				"in_cover": 0,
+				"refuge_decor": 0,
+				"capped": 0,
+				"near_edge": 0,
+				"ground_cells": 3600,
+				"steep_cells": 0,
+				"water_cells": 0,
+				"no_ground_cells": 0
+			}
+		},
+		{
+			"region": "Barren",
+			"region_index": 0,
+			"size": 60,
+			"origin_cm": [
+				28000,
+				-5000,
+				1663.2631299114973
+			],
+			"discs": [],
+			"imported": false,
+			"level_discs": 0,
+			"covers": [
+				[
+					45,
+					45,
+					6
+				],
+				[
+					15,
+					45,
+					6
+				],
+				[
+					15,
+					15,
+					6
+				],
+				[
+					45,
+					15,
+					6
+				]
+			],
+			"counts":
+			{
+				"seen_meshes": 0,
+				"no_collision": 0,
+				"tiny": 0,
+				"low": 0,
+				"in_cover": 0,
+				"refuge_decor": 0,
+				"capped": 0,
+				"near_edge": 0,
+				"ground_cells": 3600,
+				"steep_cells": 0,
+				"water_cells": 0,
+				"no_ground_cells": 0
+			}
+		},
+		{
+			"region": "Highland",
+			"region_index": 2,
+			"size": 60,
+			"origin_cm": [
+				28000,
+				-55000,
+				2639.8401021400778
+			],
+			"discs": [],
+			"imported": false,
+			"level_discs": 0,
+			"covers": [
+				[
+					45,
+					45,
+					6
+				],
+				[
+					15,
+					45,
+					6
+				],
+				[
+					15,
+					15,
+					6
+				],
+				[
+					45,
+					15,
+					6
+				]
+			],
+			"counts":
+			{
+				"seen_meshes": 0,
+				"no_collision": 0,
+				"tiny": 0,
+				"low": 0,
+				"in_cover": 0,
+				"refuge_decor": 0,
+				"capped": 0,
+				"near_edge": 0,
+				"ground_cells": 3600,
+				"steep_cells": 0,
+				"water_cells": 0,
+				"no_ground_cells": 0
+			}
+		}
+	]
+}

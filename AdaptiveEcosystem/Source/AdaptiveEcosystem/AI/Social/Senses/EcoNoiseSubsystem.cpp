@@ -44,6 +44,10 @@ int64 UEcoNoiseSubsystem::ReportNoise(FVector Position, float Loudness, float Ma
 	Event.ThreatStrength = ThreatStrength;
 	Event.Instigator = Instigator;
 	Event.Tag = Tag;
+    if(CVarEcoNoiseLog.GetValueOnGameThread()&&(Tag==TEXT("Player.Footstep")||Tag==TEXT("Herd.Alarm")))
+        UE_LOG(LogTemp,Log,TEXT("[Eco GameplayNoise] Tag=%s Mode=%d Loudness=%.2f Range=%.0f Position=%s"),
+            *Tag.ToString(),int32(World->GetNetMode()),Loudness,MaxRange,*Position.ToCompactString());
+
 	if (CVarEcoDrawNoise.GetValueOnGameThread() && World->GetNetMode() != NM_DedicatedServer)
 		DrawDebugSphere(World, Position + FVector(0, 0, 20), MaxRange, 20, FColor::Orange, false, 0.2f, 0, 1.f);
 	return Event.Id;
@@ -77,4 +81,12 @@ void UEcoNoiseSubsystem::Deinitialize()
 {
 	Events.Reset(); NextId = 1;
 	Super::Deinitialize();
+}
+
+int64 UEcoNoiseSubsystem::ReportCreatureAlarm(FVector Position,int64 StableAgentId,FName SpeciesId)
+{
+    if(StableAgentId<=0||SpeciesId.IsNone())return 0;
+    const int64 Id=ReportNoise(Position,.8f,3000.f,.7f,nullptr,TEXT("Herd.Alarm"));
+    if(Id>0){Events.Last().SourceAgentId=StableAgentId;Events.Last().SourceSpeciesId=SpeciesId;}
+    return Id;
 }

@@ -1,0 +1,111 @@
+{
+  "result": "FINISHED",
+  "cases": [
+    {
+      "case": "HearingWhileGraze",
+      "samples": [
+        {
+          "seconds_in_case": 0.046999999991385266,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 0.29699999999138527,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 0.5469999999913853,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 0.7969999999913853,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 1.0469999999913853,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 1.2969999999913853,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 1.5469999999913853,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 1.7969999999913853,
+          "pose": 2
+        },
+        {
+          "seconds_in_case": 2.1559999999881256,
+          "pose": 2
+        },
+        {
+          "seconds_in_case": 2.4059999999881256,
+          "pose": 2
+        },
+        {
+          "seconds_in_case": 2.6559999999881256,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 2.9059999999881256,
+          "pose": 1
+        }
+      ]
+    },
+    {
+      "case": "SightWhileGraze",
+      "samples": [
+        {
+          "seconds_in_case": 0.15599999998812564,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 0.40599999998812564,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 0.6559999999881256,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 0.9059999999881256,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 1.1559999999881256,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 1.4059999999881256,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 1.6559999999881256,
+          "pose": 2
+        },
+        {
+          "seconds_in_case": 1.9059999999881256,
+          "pose": 2
+        },
+        {
+          "seconds_in_case": 2.187999999994645,
+          "pose": 2
+        },
+        {
+          "seconds_in_case": 2.437999999994645,
+          "pose": 2
+        },
+        {
+          "seconds_in_case": 2.687999999994645,
+          "pose": 1
+        },
+        {
+          "seconds_in_case": 2.937999999994645,
+          "pose": 1
+        }
+      ]
+    }
+  ]
+}

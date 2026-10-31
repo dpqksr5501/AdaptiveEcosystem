@@ -2,6 +2,7 @@
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
 #include "MassEntityManager.h"
+#include "MassEntityView.h"
 #include "MassEntityQuery.h"
 #include "MassExecutionContext.h"
 
@@ -103,9 +104,10 @@ bool EcoMassFeeding::Collect(FMassEntityManager& Manager, const FEcoServerTimeSn
 	return true;
 }
 
-bool EcoMassFeeding::Apply(FMassEntityManager& Manager, TConstArrayView<FEcoFeedResult> Results, double Interval)
+bool EcoMassFeeding::Apply(FMassEntityManager& Manager, TConstArrayView<FEcoFeedResult> Results, double Interval, float FoodEnergyGain)
 {
-	if (!IsInGameThread() || Manager.IsProcessing() || !FMath::IsFinite(Interval) || Interval <= 0.0) return false;
+	if (!IsInGameThread() || Manager.IsProcessing() || !FMath::IsFinite(Interval) || Interval <= 0.0
+		|| !FMath::IsFinite(FoodEnergyGain) || FoodEnergyGain < 0) return false;
 	TMap<int64, const FEcoFeedResult*> ById;
 	for (const FEcoFeedResult& Result : Results)
 	{
@@ -114,19 +116,23 @@ bool EcoMassFeeding::Apply(FMassEntityManager& Manager, TConstArrayView<FEcoFeed
 		ById.Add(Result.Request.Food.StableAgentId, &Result);
 	}
 	bool bValid = true;
-	int32 Applied = 0;
+	struct FApplication { FMassEntityHandle Entity; const FEcoFeedResult* Result; };
+	TArray<FApplication> Applications;
 	FMassEntityQuery Query(Manager.AsShared());
 	AddMembership(Query);
 	Query.AddRequirement<FEcoLifetimeFragment>(EMassFragmentAccess::ReadWrite);
 	Query.AddRequirement<FEcoFeedingFragment>(EMassFragmentAccess::ReadWrite);
+	Query.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadWrite);
+	Query.AddRequirement<FEcoVitalsRuntimeFragment>(EMassFragmentAccess::ReadWrite, EMassFragmentPresence::Optional);
 	FMassExecutionContext Context = Manager.CreateExecutionContext(0.0f);
-	Query.ForEachEntityChunk(Context, [&ById, &bValid, &Applied, Interval](FMassExecutionContext& Chunk)
+	Query.ForEachEntityChunk(Context, [&ById, &bValid, &Applications](FMassExecutionContext& Chunk)
 	{
 		const auto Ids = Chunk.GetFragmentView<FEcoIdentityFragment>();
 		const auto Regions = Chunk.GetFragmentView<FEcoRegionFragment>();
 		const auto Travel = Chunk.GetFragmentView<FEcoTravelFragment>();
-		auto Lives = Chunk.GetMutableFragmentView<FEcoLifetimeFragment>();
-		auto Feeding = Chunk.GetMutableFragmentView<FEcoFeedingFragment>();
+		const auto Lives = Chunk.GetFragmentView<FEcoLifetimeFragment>();
+		const auto Feeding = Chunk.GetFragmentView<FEcoFeedingFragment>();
+		const auto Vitals = Chunk.GetFragmentView<FEcoVitalsFragment>();
 		for (int32 I = 0; I < Chunk.GetNumEntities(); ++I)
 		{
 			const FEcoFeedResult* const* Found = ById.Find(Ids[I].StableAgentId);
@@ -135,19 +141,31 @@ bool EcoMassFeeding::Apply(FMassEntityManager& Manager, TConstArrayView<FEcoFeed
 			const FEcoFeedRequest& Pending = Feeding[I].PendingRequest;
 			if (!Feeding[I].bPending || Travel[I].State != EEcoResidenceState::Resident || Pending.StepId != Result.Request.StepId
 				|| Pending.WorldEpoch != Result.Request.WorldEpoch || Pending.DueTime != Result.Request.DueTime
+				|| Pending.Food.RequestedAmount != Result.Request.Food.RequestedAmount
+				|| !FMath::IsFinite(Vitals[I].Energy) || !FMath::IsFinite(Vitals[I].MaxEnergy) || Vitals[I].MaxEnergy <= 0 || Vitals[I].HP <= 0
 				|| Lives[I].NextFeedTimeSeconds != Pending.DueTime || Pending.DueTime <= Feeding[I].LastFeedTime
 				|| Regions[I].CurrentRegionId != Result.Request.Food.RegionId || Regions[I].CurrentRegionIndex != Result.Request.RegionIndex)
 			{
 				bValid = false;
 				continue;
 			}
-			Feeding[I].LastFeedTime = Pending.DueTime;
-			Feeding[I].LastGrantedAmount = Result.GrantedAmount;
-			Feeding[I].TotalGrantedAmount += Result.GrantedAmount;
-			Feeding[I].bPending = false;
-			Lives[I].NextFeedTimeSeconds = Pending.DueTime + Interval;
-			++Applied;
+			Applications.Add({Chunk.GetEntity(I), &Result});
 		}
 	});
-	return bValid && Applied == Results.Num();
+	if (!bValid || Applications.Num() != Results.Num()) return false;
+	for (const auto& Application : Applications)
+	{
+		FMassEntityView View(Manager, Application.Entity);
+		auto& Feeding = View.GetFragmentData<FEcoFeedingFragment>();
+		auto& Vitals = View.GetFragmentData<FEcoVitalsFragment>();
+		const auto& Result = *Application.Result;
+		Feeding.LastFeedTime = Feeding.PendingRequest.DueTime;
+		Feeding.LastGrantedAmount = Result.GrantedAmount;
+		Feeding.TotalGrantedAmount += Result.GrantedAmount;
+		Feeding.bPending = false;
+		View.GetFragmentData<FEcoLifetimeFragment>().NextFeedTimeSeconds = Feeding.LastFeedTime + Interval;
+		Vitals.Energy = static_cast<float>(FMath::Min<double>(Vitals.MaxEnergy, Vitals.Energy + Result.GrantedAmount * FoodEnergyGain));
+		if (auto* Runtime = View.GetFragmentDataPtr<FEcoVitalsRuntimeFragment>(); Runtime && Vitals.Energy > 0) Runtime->ZeroEnergySeconds = 0;
+	}
+	return true;
 }

@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/EcoActivityTypes.h"
+#include "AI/Social/Senses/EcoSensoryTypes.h"
 #include "EcoCreatureVisualState.generated.h"
 
 UENUM(BlueprintType)
@@ -11,6 +13,7 @@ USTRUCT(BlueprintType)
 struct FEcoCreatureVisualState
 {
 	GENERATED_BODY()
+    UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float BodyScale=1;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") int64 StableAgentId = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") FName SpeciesId = NAME_None;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") FName RegionId = NAME_None;
@@ -24,6 +27,9 @@ struct FEcoCreatureVisualState
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bAlive = true;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bEating = false;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bPursuingPrey = false;
+	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") EEcoSpeciesActivity Activity = EEcoSpeciesActivity::Hold;
+	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") EEcoSenseSource SenseSource = EEcoSenseSource::None;
+	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float FocusYawDegrees = 0;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bDiscontinuity = false;
 	bool IsValid() const;
 };

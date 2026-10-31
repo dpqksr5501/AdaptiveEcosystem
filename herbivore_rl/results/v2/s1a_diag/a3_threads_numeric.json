@@ -1,0 +1,93 @@
+{
+ "batch": 4096,
+ "model": "ckpt/v2/v2_1c_s30.zip",
+ "tensors": {
+  "loss": {
+   "size": 1,
+   "bits_diff_t1_vs_t3": 0,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 0.0
+  },
+  "log_std": {
+   "size": 5,
+   "bits_diff_t1_vs_t3": 0,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 0.0
+  },
+  "mlp_extractor.policy_net.0.weight": {
+   "size": 448,
+   "bits_diff_t1_vs_t3": 393,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 2.700604113670124e-07
+  },
+  "mlp_extractor.policy_net.0.bias": {
+   "size": 64,
+   "bits_diff_t1_vs_t3": 2,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 3.271618354006023e-08
+  },
+  "mlp_extractor.policy_net.2.weight": {
+   "size": 4096,
+   "bits_diff_t1_vs_t3": 3713,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 3.243768276206538e-07
+  },
+  "mlp_extractor.policy_net.2.bias": {
+   "size": 64,
+   "bits_diff_t1_vs_t3": 6,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 1.9720383548360587e-08
+  },
+  "mlp_extractor.value_net.0.weight": {
+   "size": 448,
+   "bits_diff_t1_vs_t3": 323,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 3.5086998195765773e-07
+  },
+  "mlp_extractor.value_net.0.bias": {
+   "size": 64,
+   "bits_diff_t1_vs_t3": 0,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 0.0
+  },
+  "mlp_extractor.value_net.2.weight": {
+   "size": 4096,
+   "bits_diff_t1_vs_t3": 2975,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 2.2004864774771704e-07
+  },
+  "mlp_extractor.value_net.2.bias": {
+   "size": 64,
+   "bits_diff_t1_vs_t3": 0,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 0.0
+  },
+  "action_net.weight": {
+   "size": 320,
+   "bits_diff_t1_vs_t3": 286,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 2.0996074567847245e-07
+  },
+  "action_net.bias": {
+   "size": 5,
+   "bits_diff_t1_vs_t3": 0,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 0.0
+  },
+  "value_net.weight": {
+   "size": 64,
+   "bits_diff_t1_vs_t3": 63,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 2.3261277419805992e-06
+  },
+  "value_net.bias": {
+   "size": 1,
+   "bits_diff_t1_vs_t3": 0,
+   "bits_diff_t1_vs_t1": 0,
+   "max_rel_diff_t1_vs_t3": 0.0
+  }
+ },
+ "n_tensors": 14,
+ "n_tensors_differ_t1_vs_t3": 8,
+ "n_tensors_differ_t1_vs_t1": 0
+}

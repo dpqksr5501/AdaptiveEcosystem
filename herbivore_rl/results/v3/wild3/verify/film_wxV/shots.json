@@ -1,0 +1,13 @@
+{
+  "name": "wxV",
+  "fps": 30,
+  "frames": 84,
+  "shots": [
+    {"tag": "forest_ground", "from_m": [330.00, 470.00, 1.80], "to_m": [330.00, 470.00, 1.80], "yaw": 0.0, "pitch": 0.0, "start": 3.000, "duration": 3.000, "every": 10, "first_frame": 0, "frames": 9, "t_first": 3.000, "t_last": 5.667},
+    {"tag": "barren_border", "from_m": [340.00, 240.00, 1.80], "to_m": [340.00, 240.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 8.000, "duration": 3.000, "every": 10, "first_frame": 9, "frames": 9, "t_first": 8.000, "t_last": 10.667},
+    {"tag": "cross_out", "from_m": [340.00, 300.00, 1.80], "to_m": [340.00, 220.00, 1.80], "yaw": -90.0, "pitch": 0.0, "start": 12.000, "duration": 8.000, "every": 10, "first_frame": 18, "frames": 24, "t_first": 12.000, "t_last": 19.667},
+    {"tag": "highland_ground", "from_m": [340.00, -490.00, 1.80], "to_m": [340.00, -490.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 22.000, "duration": 3.000, "every": 10, "first_frame": 42, "frames": 9, "t_first": 22.000, "t_last": 24.667},
+    {"tag": "snow_out", "from_m": [340.00, -300.00, 1.80], "to_m": [340.00, -220.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 26.000, "duration": 8.000, "every": 10, "first_frame": 51, "frames": 24, "t_first": 26.000, "t_last": 33.667},
+    {"tag": "barren_ground", "from_m": [340.00, 10.00, 1.80], "to_m": [340.00, 10.00, 1.80], "yaw": 90.0, "pitch": 0.0, "start": 36.000, "duration": 3.000, "every": 10, "first_frame": 75, "frames": 9, "t_first": 36.000, "t_last": 38.667}
+  ]
+}

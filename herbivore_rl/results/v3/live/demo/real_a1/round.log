@@ -1,0 +1,8 @@
+== convert: 3.0초
+시도 1 (a1_20261021T062037_e1): 스냅숏 eco_v3_snapshot_s20004_t473_e1.json · 환경 #1 Barren 나무 0→20, 비 1.0 · 두뇌 v3_r1_g995_s3_20m@eca97f2e → 시작 ckpt/v3/v3_r1_g995_s3_obs21zero.zip
+  학습 시작: 모델 시드 0 × 2M → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\ckpt\v3\live\a1_20261021T062037_e1\live_a1_20261021T062037_e1_cand_s0.zip (기록 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\AdaptiveEcosystem\Saved\EcoAdapt\live\rounds\a1_20261021T062037_e1\logs\train_s0.log)
+== train_and_eval_current: 563.5초
+== eval_candidate: 388.7초
+== gate: 0.6초
+관문 기각 — 1차 P1 실패: 포만 없는 세계 잡힌 몫 후보 0.1396 대 지금 0.1368 (짝 t +1.15, 문턱 −1.990, 시드 80)
+시도 1 끝: rejected — 기각: 1차 t +1.1 (문턱 −1.99) (955.7초, 단계 {'convert': 3.0, 'eval_current': 563.2, 'train_learn': 253.2, 'train_and_eval_current': 563.5, 'eval_candidate': 388.7, 'gate': 0.6})

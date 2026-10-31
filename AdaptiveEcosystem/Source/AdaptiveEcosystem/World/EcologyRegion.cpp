@@ -43,12 +43,19 @@ bool AEcologyRegion::MakeInitialEcologyState(FRegionEcologyState& OutState) cons
 {
 	if (RegionId.IsNone() || !RegionBounds || !FMath::IsFinite(InitialFoodAmount)
 		|| !FMath::IsFinite(FoodCapacity) || FoodCapacity < 0.0f || InitialFoodAmount < 0.0f
-		|| InitialFoodAmount > FoodCapacity) return false;
+		|| InitialFoodAmount > FoodCapacity || !FMath::IsFinite(FoodRegenerationRate) || FoodRegenerationRate < 0
+		|| EcologicalComfortPopulation <= 0 || !FMath::IsFinite(DryRegenerationMultiplier)
+		|| !FMath::IsFinite(WetRegenerationMultiplier) || DryRegenerationMultiplier < 0
+		|| DryRegenerationMultiplier > 4 || WetRegenerationMultiplier < 0 || WetRegenerationMultiplier > 4) return false;
 	OutState = FRegionEcologyState();
 	OutState.RegionId = RegionId;
 	OutState.FoodAmount = InitialFoodAmount;
 	OutState.FoodCapacity = FoodCapacity;
-	OutState.FoodRegenerationRate = 0.0f;
+	OutState.FoodRegenerationRate = FoodRegenerationRate;
+	OutState.bRainfallAffectsRegeneration = bRainfallAffectsRegeneration;
+	OutState.DryRegenerationMultiplier = DryRegenerationMultiplier;
+	OutState.WetRegenerationMultiplier = WetRegenerationMultiplier;
+	OutState.EcologicalComfortPopulation = EcologicalComfortPopulation;
 	OutState.Population = 0;
 	OutState.AverageEnergy = 0.0f;
 	return true;

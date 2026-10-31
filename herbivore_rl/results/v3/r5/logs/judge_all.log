@@ -1,0 +1,81 @@
+start Mon Oct 19 05:19:31     2026
+judge_r5_16m: 관측 21·unreal 세계 300개 675초 · 잡힘 0.2191 굶음 0.1932 산 0.5878 은신처 안 0.0594 도망 0.0794 숨기 0.0211 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\judge_r5_16m.json
+judge_base_16m: 관측 18·unreal 세계 300개 652초 · 잡힘 0.2186 굶음 0.1890 산 0.5924 은신처 안 0.0607 도망 0.0783 숨기 0.0230 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\judge_base_16m.json
+judge_r5_240s: 관측 21·unreal 세계 300개 176초 · 잡힘 0.0549 굶음 0.0000 산 0.9450 은신처 안 0.0701 도망 0.0789 숨기 0.0243 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\judge_r5_240s.json
+judge_base_240s: 관측 18·unreal 세계 300개 169초 · 잡힘 0.0545 굶음 0.0000 산 0.9455 은신처 안 0.0705 도망 0.0781 숨기 0.0260 은신처 안 잡힘 0 -> C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r5\runs\judge_base_240s.json
+v3_wild3_obs_mirror.yaml 33100-33129 7200 스텝  | 짝 지도 20000-20009 × 1 · 원판 results\v3\wild2\trees\tree_layout.json
+  worlds: 30
+  wolf_stuck: 0
+  wolf_stuck_helper: 0
+  wolf_stuck_wall: 0
+  wolf_stuck_max_s: 0.0
+  wolf_wall_stuck: 34
+  wolf_wall_stuck_helper: 26
+  wolf_wall_stuck_max_s: 4.8
+  deer_stuck: 0
+  deer_stuck_by_beh: {}
+  deer_stuck_panic: 0
+  deer_stuck_max_s: 0.0
+  wolf_stuck_frac: 0.0
+  wolf_wall_stuck_frac: 0.00028390872830728853
+  deer_stuck_frac: 0.0
+  old_wolf_runs: 0
+  old_wolf_max_s: 0.0
+  old_deer_still: 44
+  old_deer_flee: 0
+  old_deer_push: 4
+  old_deer_max_s: 67.2
+  worst_wolf: []
+  worst_wolf_wall: [(36, 33116, 1, 3137, False), (32, 33106, 2, 6409, True), (31, 33109, 0, 30, True), (30, 33117, 2, 4101, False), (29, 33127, 2, 2798, True), (29, 33117, 3, 5836, False)]
+  worst_deer: []
+  detour: {'deer_used': 15772, 'deer_start': 5540, 'deer_fail': 0, 'wolf_used': 211, 'wolf_start': 148, 'wolf_fail': 0, 'help_drop': 44}
+  by_region: {'Barren': {'worlds': 10, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 19, 'wolf_wall_stuck_helper': 16, 'wolf_wall_stuck_max_s': 4.266666666666667, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.0005203773654212302, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 0, 'old_deer_flee': 0, 'old_deer_push': 0, 'old_deer_max_s': 0.0}, 'Forest': {'worlds': 10, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 8, 'wolf_wall_stuck_helper': 6, 'wolf_wall_stuck_max_s': 4.8, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.00018877162762436804, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 33, 'old_deer_flee': 0, 'old_deer_push': 1, 'old_deer_max_s': 67.2, 'detour': {'deer_used': 11467, 'deer_start': 4425, 'deer_fail': 0, 'wolf_used': 142, 'wolf_start': 101, 'wolf_fail': 0, 'help_drop': 22}}, 'Highland': {'worlds': 10, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 7, 'wolf_wall_stuck_helper': 4, 'wolf_wall_stuck_max_s': 4.0, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.0001522043284569408, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 11, 'old_deer_flee': 0, 'old_deer_push': 3, 'old_deer_max_s': 61.733333333333334, 'detour': {'deer_used': 4305, 'deer_start': 1115, 'deer_fail': 0, 'wolf_used': 69, 'wolf_start': 47, 'wolf_fail': 0, 'help_drop': 22}}}
+v3_wild3_mirror.yaml 33100-33129 7200 스텝  | 짝 지도 20000-20009 × 1 · 원판 results\v3\wild2\trees\tree_layout.json
+  worlds: 30
+  wolf_stuck: 0
+  wolf_stuck_helper: 0
+  wolf_stuck_wall: 0
+  wolf_stuck_max_s: 0.0
+  wolf_wall_stuck: 23
+  wolf_wall_stuck_helper: 14
+  wolf_wall_stuck_max_s: 4.666666666666667
+  deer_stuck: 0
+  deer_stuck_by_beh: {}
+  deer_stuck_panic: 0
+  deer_stuck_max_s: 0.0
+  wolf_stuck_frac: 0.0
+  wolf_wall_stuck_frac: 0.00021987729679348852
+  deer_stuck_frac: 0.0
+  old_wolf_runs: 0
+  old_wolf_max_s: 0.0
+  old_deer_still: 47
+  old_deer_flee: 0
+  old_deer_push: 4
+  old_deer_max_s: 82.13333333333334
+  worst_wolf: []
+  worst_wolf_wall: [(35, 33124, 2, 5406, True), (32, 33125, 1, 3171, False), (31, 33109, 0, 30, True), (30, 33108, 2, 2252, False), (28, 33128, 3, 2238, False), (28, 33124, 2, 6739, False)]
+  worst_deer: []
+  detour: {'deer_used': 17416, 'deer_start': 6074, 'deer_fail': 0, 'wolf_used': 206, 'wolf_start': 155, 'wolf_fail': 0, 'help_drop': 39}
+  by_region: {'Barren': {'worlds': 10, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 10, 'wolf_wall_stuck_helper': 8, 'wolf_wall_stuck_max_s': 4.666666666666667, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.0003480160087364019, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 0, 'old_deer_flee': 0, 'old_deer_push': 0, 'old_deer_max_s': 0.0}, 'Forest': {'worlds': 10, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 9, 'wolf_wall_stuck_helper': 4, 'wolf_wall_stuck_max_s': 4.266666666666667, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.00021018905653517542, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 31, 'old_deer_flee': 0, 'old_deer_push': 1, 'old_deer_max_s': 82.13333333333334, 'detour': {'deer_used': 12956, 'deer_start': 4934, 'deer_fail': 0, 'wolf_used': 139, 'wolf_start': 107, 'wolf_fail': 0, 'help_drop': 21}}, 'Highland': {'worlds': 10, 'wolf_stuck': 0, 'wolf_stuck_helper': 0, 'wolf_stuck_wall': 0, 'wolf_stuck_max_s': 0.0, 'wolf_wall_stuck': 4, 'wolf_wall_stuck_helper': 2, 'wolf_wall_stuck_max_s': 4.0, 'deer_stuck': 0, 'deer_stuck_by_beh': {}, 'deer_stuck_panic': 0, 'deer_stuck_max_s': 0.0, 'wolf_stuck_frac': 0.0, 'wolf_wall_stuck_frac': 0.00010512053821715567, 'deer_stuck_frac': 0.0, 'old_wolf_runs': 0, 'old_wolf_max_s': 0.0, 'old_deer_still': 16, 'old_deer_flee': 0, 'old_deer_push': 3, 'old_deer_max_s': 29.466666666666665, 'detour': {'deer_used': 4460, 'deer_start': 1140, 'deer_fail': 0, 'wolf_used': 67, 'wolf_start': 48, 'wolf_fail': 0, 'help_drop': 18}}}
+| 기준 | R5 | R1b-F | 차이 | t | 규칙 | 통과 |
+|---|---|---|---|---|---|---|
+| P1_caught_16m | 0.2191 | 0.2186 | +0.0004 ± 0.0011 | +0.40 | R5 − R1b-F < 0 이고 짝 t ≤ −1.984 | 아니오 |
+| G1_starved_16m | 0.1932 | 0.1890 | +0.0042 ± 0.0059 | +0.71 | 짝 t < +1.984 | 예 |
+| G2_alive_16m | 0.5878 | 0.5924 | -0.0046 ± 0.0058 | -0.80 | 짝 t > −1.984 | 예 |
+| G2_alive_240s | 0.9450 | 0.9455 | -0.0005 ± 0.0004 | -1.20 | 짝 t > −1.984 | 예 |
+| G3_Barren_caught_16m | 0.2066 | 0.2097 | -0.0030 ± 0.0020 | -1.50 | 짝 t < +2.626 | 예 |
+| G3_Barren_starved_16m | 0.1798 | 0.1711 | +0.0087 ± 0.0086 | +1.01 | 짝 t < +2.626 | 예 |
+| G3_Barren_alive_16m | 0.6136 | 0.6192 | -0.0056 ± 0.0083 | -0.68 | 짝 t > −2.626 | 예 |
+| G3_Forest_caught_16m | 0.2125 | 0.2090 | +0.0035 ± 0.0019 | +1.83 | 짝 t < +2.626 | 예 |
+| G3_Forest_starved_16m | 0.1812 | 0.1804 | +0.0008 ± 0.0086 | +0.09 | 짝 t < +2.626 | 예 |
+| G3_Forest_alive_16m | 0.6063 | 0.6106 | -0.0043 ± 0.0085 | -0.51 | 짝 t > −2.626 | 예 |
+| G3_Highland_caught_16m | 0.2380 | 0.2372 | +0.0009 ± 0.0015 | +0.58 | 짝 t < +2.626 | 예 |
+| G3_Highland_starved_16m | 0.2186 | 0.2155 | +0.0030 ± 0.0092 | +0.33 | 짝 t < +2.626 | 예 |
+| G3_Highland_alive_16m | 0.5434 | 0.5473 | -0.0039 ± 0.0094 | -0.42 | 짝 t > −2.626 | 예 |
+| G4_catch_in_shelter | {"value": 0} | | | | 16분·240초 판정 세계 모두 0 | 예 |
+| G5_stuck | {"r4": {"deer": 0, "wolf": 0, "wall": 34, "worlds": 30}, "base": {"deer": 0, "wolf": 0, "wall": 23, "worlds": 30}} | | | | 사슴 끼임 0, 늑대 끼임 ≤ R1b-F | 예 |
+| G6_no_exploit | {"shelter": 0.0593832783918324, "shelter_base": 0.06070434601323798, "beh": {"graze": 0.8994669135331849, "flee": 0.07941754804053247, "hide": 0.02111553842628269, "freeze": 0.0, "sleep": 0.0}} | | | | 은신처 안 몫 ≤ R1b-F 의 2배, 먹기·도망·숨기 모두 1% 넘게 | 예 |
+
+**R5 실패**
+judge exit 1
+end Mon Oct 19 05:50:31     2026

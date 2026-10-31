@@ -1,6 +1,8 @@
 #include "EcoBehaviorTraits.h"
 
+#include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
 #include "MassCommonUtils.h"
 #include "MassEntityManager.h"
@@ -15,6 +17,12 @@ void UEcoHerbivoreTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildCon
 	BuildContext.RequireFragment<FMassVelocityFragment>();
 
 	BuildContext.AddTag<FEcoHerbivoreTag>();
+	// 초식 쿼리는 전부 생존 태그를 요구한다. 논리 상태는 서버/스탠드얼론에만 있으므로
+	// EcoMassNetworkTrait 와 같은 규칙으로 붙인다. 여러 트레잇이 같은 태그를 넣어도 된다.
+	if (BuildContext.IsInspectingData() || World.GetNetMode() != NM_Client)
+	{
+		BuildContext.AddTag<FEcoAliveTag>();
+	}
 	// 이동은 UEcoSteeringProcessor 가 직접 적분한다. 엔진 UMassMovementTrait 는 기본값
 	// (bIsCodeDrivenMovement = true)에서 FMassCodeDrivenMovementTag 를 붙이므로, 같이 쓰면
 	// UMassApplyMovementProcessor 도 이 개체를 움직여 이동이 이중으로 적용되거나 속도가
@@ -25,10 +33,11 @@ void UEcoHerbivoreTrait::BuildTemplate(FMassEntityTemplateBuildContext& BuildCon
 	BuildContext.AddFragment<FEcoObservationFragment>();
 	BuildContext.AddFragment<FEcoPolicyOutputFragment>();
 
-	// §9.2 "스폰 시 0~PolicyInterval 랜덤으로 초기화" — 정책 계산 부하를 틱마다 고르게
-	// 흩기 위해서다. 전부 같은 틱에 몰리면 8틱에 한 번 스파이크가 생긴다.
+	// §9.2 "스폰 시 0~PolicyInterval 로 흩는다" — 정책 계산 부하를 틱마다 고르게 퍼뜨린다.
+	// 템플릿 초기값은 모든 개체에 그대로 복사되므로 여기서 난수를 뽑으면 위상이 하나로 몰린다.
+	// -1(미배정)로 두면 UEcoPolicyProcessor 가 엔티티 인덱스로 흩는다.
 	FEcoPolicyRuntimeFragment& Runtime = BuildContext.AddFragment_GetRef<FEcoPolicyRuntimeFragment>();
-	Runtime.LastPolicyStep = FMath::RandRange(0, FMath::Max(BehaviorConfig.PolicyInterval - 1, 0));
+	Runtime.LastPolicyStep = -1;
 
 	FEcoVitalsFragment& Vitals = BuildContext.AddFragment_GetRef<FEcoVitalsFragment>();
 	Vitals.MaxEnergy = MaxEnergy;

@@ -1,0 +1,55 @@
+{
+ "gates": {
+  "keep": {
+   "verdict": "fail",
+   "cal": 1,
+   "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r3\\gate\\cal1\\keep\\gate.json",
+   "human": false
+  },
+  "run": {
+   "verdict": "fail",
+   "cal": 1,
+   "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r3\\gate\\cal1\\run\\gate.json",
+   "human": false
+  },
+  "leave": {
+   "verdict": "fail",
+   "cal": 0,
+   "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r3\\gate\\gate.json",
+   "human": true
+  },
+  "crouch": {
+   "verdict": "fail",
+   "cal": 0,
+   "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r3\\gate\\gate.json",
+   "human": true
+  },
+  "early": {
+   "verdict": "fail",
+   "cal": 1,
+   "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r3\\gate\\cal1\\early\\gate.json",
+   "human": false
+  },
+  "shelter_all": {
+   "verdict": "exploit_loss",
+   "cal": 0,
+   "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r3\\gate\\gate.json",
+   "human": false
+  },
+  "camp": {
+   "verdict": "exploit_loss",
+   "cal": 0,
+   "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r3\\gate\\gate.json",
+   "human": false
+  },
+  "keep_hide": {
+   "verdict": "report",
+   "cal": 0,
+   "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v3\\r3\\gate\\gate.json",
+   "human": false
+  }
+ },
+ "theta": 4.0,
+ "approach": 0.9,
+ "generated": "2026-10-15 13:57:14"
+}

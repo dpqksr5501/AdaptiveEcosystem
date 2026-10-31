@@ -1,0 +1,466 @@
+{
+ "meta": {
+  "generated": "2026-10-06T20:00:32+00:00",
+  "round": 2,
+  "seeds": [
+   10000,
+   10001,
+   10002,
+   10003,
+   10004,
+   10005,
+   10006,
+   10007,
+   10008,
+   10009,
+   10010,
+   10011,
+   10012,
+   10013,
+   10014,
+   10015,
+   10016,
+   10017,
+   10018,
+   10019
+  ],
+  "eval_steps": 5000,
+  "train_steps": 5000000,
+  "prereg": false,
+  "elapsed_min": 32.7,
+  "sim_digest": "7a75763123ba",
+  "eval_cache_code": "7a75763123ba",
+  "command": "python -m season.sr1 --round 2 --pick M3k0.1@v20 --train-steps 5000000 --root runs/season/sr1_5m --workers 8"
+ },
+ "candidates": [
+  {
+   "name": "v20_a_m3k0p1_s0_5000k",
+   "anchor": "v20",
+   "season": "a",
+   "method": "m3k0p1",
+   "seed": 0,
+   "train_steps": 5000000,
+   "prereg": false,
+   "candidate": "runs\\season\\sr1_5m\\train\\v20_a_m3k0p1_s0_5000k.zip",
+   "k2b": "runs\\season\\sr1_5m\\train\\v20_k2b_m3k0p1_s0_5000k.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 4.593,
+    "worlds": {
+     "per_part": {
+      "0G": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "bc0f653e0885",
+    "last_rollout": {
+     "anchor_kl_before": 0.0035817825701087713,
+     "anchor_kl": 0.003310981336593007,
+     "reward_0G": 0.013171404600143433,
+     "reward_1B": 0.05520381033420563
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 4.282,
+    "worlds": {
+     "per_part": {
+      "0B": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "445c7912e04b",
+    "last_rollout": {
+     "anchor_kl_before": 0.0018691613804548979,
+     "anchor_kl": 0.0013643141525487106,
+     "reward_0B": 0.02635803259909153,
+     "reward_1B": 0.04161374270915985
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": false,
+    "A4": false,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음",
+    "A3 망각",
+    "A4 결과 악화"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": 0.007828810020876821,
+    "ge_pred_t_vs_cur": 1.074021581764776,
+    "ge_pred_rel_vs_k2b": 0.011227717379919965,
+    "ge_pred_t_vs_k2b": 2.0048185681523223,
+    "g_gamma_drop": 0.07147842852608892,
+    "g_gamma_t": -1.2886658639510913,
+    "c0c1_frac": 0.7924124088802508,
+    "c0c1_t": 2.3115064444986064,
+    "b_react_ratio": 0.967294601664021,
+    "b_act_shift_max": 0.002453865536628297
+   }
+  },
+  {
+   "name": "v20_a_m3k0p1_s1_5000k",
+   "anchor": "v20",
+   "season": "a",
+   "method": "m3k0p1",
+   "seed": 1,
+   "train_steps": 5000000,
+   "prereg": false,
+   "candidate": "runs\\season\\sr1_5m\\train\\v20_a_m3k0p1_s1_5000k.zip",
+   "k2b": "runs\\season\\sr1_5m\\train\\v20_k2b_m3k0p1_s1_5000k.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 4.569,
+    "worlds": {
+     "per_part": {
+      "0G": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "398b2bb25be3",
+    "last_rollout": {
+     "anchor_kl_before": 0.0018569661770015955,
+     "anchor_kl": 0.001463952157064341,
+     "reward_0G": 0.012370717711746693,
+     "reward_1B": 0.04176659882068634
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 4.267,
+    "worlds": {
+     "per_part": {
+      "0B": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "586fa1b59486",
+    "last_rollout": {
+     "anchor_kl_before": 0.0014153070515021682,
+     "anchor_kl": 0.0009769178732919196,
+     "reward_0B": 0.04461650550365448,
+     "reward_1B": 0.032262980937957764
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.0026304801670146024,
+    "ge_pred_t_vs_cur": -0.3126108693760146,
+    "ge_pred_rel_vs_k2b": 0.004795356076220932,
+    "ge_pred_t_vs_k2b": 0.4990187874397459,
+    "g_gamma_drop": 0.11060514602588022,
+    "g_gamma_t": -2.4448939790049073,
+    "c0c1_frac": 0.8327997589813891,
+    "c0c1_t": 2.9004582954654556,
+    "b_react_ratio": 1.025906397810037,
+    "b_act_shift_max": 0.002147488572875722
+   }
+  },
+  {
+   "name": "v20_b_m3k0p1_s0_5000k",
+   "anchor": "v20",
+   "season": "b",
+   "method": "m3k0p1",
+   "seed": 0,
+   "train_steps": 5000000,
+   "prereg": false,
+   "candidate": "runs\\season\\sr1_5m\\train\\v20_b_m3k0p1_s0_5000k.zip",
+   "k2b": "runs\\season\\sr1_5m\\train\\v20_k2b_m3k0p1_s0_5000k.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 4.504,
+    "worlds": {
+     "per_part": {
+      "0G": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "3a184e16d2ce",
+    "last_rollout": {
+     "anchor_kl_before": 0.002224674914032221,
+     "anchor_kl": 0.004567099411118155,
+     "reward_0G": 0.03873556852340698,
+     "reward_1B": 0.02540627494454384
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 4.282,
+    "worlds": {
+     "per_part": {
+      "0B": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "445c7912e04b",
+    "last_rollout": {
+     "anchor_kl_before": 0.0018691613804548979,
+     "anchor_kl": 0.0013643141525487106,
+     "reward_0B": 0.02635803259909153,
+     "reward_1B": 0.04161374270915985
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.028295678876946718,
+    "ge_pred_t_vs_cur": -1.096451591288176,
+    "ge_pred_rel_vs_k2b": 0.02451433857539312,
+    "ge_pred_t_vs_k2b": 1.0813423208447293,
+    "g_gamma_drop": -0.0034374528117074163,
+    "g_gamma_t": 0.2068649992269253,
+    "c0c1_frac": 0.7717164149662655,
+    "c0c1_t": 2.1359777294297806,
+    "b_react_ratio": 0.9949968188142453,
+    "b_act_shift_max": 0.004608197983293816
+   }
+  },
+  {
+   "name": "v20_b_m3k0p1_s1_5000k",
+   "anchor": "v20",
+   "season": "b",
+   "method": "m3k0p1",
+   "seed": 1,
+   "train_steps": 5000000,
+   "prereg": false,
+   "candidate": "runs\\season\\sr1_5m\\train\\v20_b_m3k0p1_s1_5000k.zip",
+   "k2b": "runs\\season\\sr1_5m\\train\\v20_k2b_m3k0p1_s1_5000k.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 4.497,
+    "worlds": {
+     "per_part": {
+      "0G": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "fa4c9f79fe82",
+    "last_rollout": {
+     "anchor_kl_before": 0.003332932712510228,
+     "anchor_kl": 0.002920698702412968,
+     "reward_0G": 0.04042139649391174,
+     "reward_1B": 0.026069633662700653
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 4.267,
+    "worlds": {
+     "per_part": {
+      "0B": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "586fa1b59486",
+    "last_rollout": {
+     "anchor_kl_before": 0.0014153070515021682,
+     "anchor_kl": 0.0009769178732919196,
+     "reward_0B": 0.04461650550365448,
+     "reward_1B": 0.032262980937957764
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.016999341960956354,
+    "ge_pred_t_vs_cur": -0.4906497488249663,
+    "ge_pred_rel_vs_k2b": 0.006513194834362701,
+    "ge_pred_t_vs_k2b": 0.19410470116923503,
+    "g_gamma_drop": -0.002059474260243645,
+    "g_gamma_t": 0.15240407487053856,
+    "c0c1_frac": 1.1757019486360911,
+    "c0c1_t": 2.550350166447773,
+    "b_react_ratio": 1.0005282666270505,
+    "b_act_shift_max": 0.0034771978954581118
+   }
+  },
+  {
+   "name": "v20_c_m3k0p1_s0_5000k",
+   "anchor": "v20",
+   "season": "c",
+   "method": "m3k0p1",
+   "seed": 0,
+   "train_steps": 5000000,
+   "prereg": false,
+   "candidate": "runs\\season\\sr1_5m\\train\\v20_c_m3k0p1_s0_5000k.zip",
+   "k2b": "runs\\season\\sr1_5m\\train\\v20_k2b_m3k0p1_s0_5000k.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 4.542,
+    "worlds": {
+     "per_part": {
+      "0G": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "6b0e74e01cc8",
+    "last_rollout": {
+     "anchor_kl_before": 0.0011115274392068386,
+     "anchor_kl": 0.0010855072105186991,
+     "reward_0G": 0.04620993882417679,
+     "reward_1B": 0.04852733016014099
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 4.282,
+    "worlds": {
+     "per_part": {
+      "0B": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "445c7912e04b",
+    "last_rollout": {
+     "anchor_kl_before": 0.0018691613804548979,
+     "anchor_kl": 0.0013643141525487106,
+     "reward_0B": 0.02635803259909153,
+     "reward_1B": 0.04161374270915985
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": false,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음",
+    "A2 상수화"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.006953903505627633,
+    "ge_pred_t_vs_cur": -0.29851390151854995,
+    "ge_pred_rel_vs_k2b": -0.005099475687711011,
+    "ge_pred_t_vs_k2b": -0.25550855075911294,
+    "g_gamma_drop": 0.011547135295247668,
+    "g_gamma_t": -0.9384878446110246,
+    "c0c1_frac": 0.5247280509189376,
+    "c0c1_t": 1.2351532351883132,
+    "b_react_ratio": 0.9920473614369287,
+    "b_act_shift_max": 0.002737912545502208
+   }
+  },
+  {
+   "name": "v20_c_m3k0p1_s1_5000k",
+   "anchor": "v20",
+   "season": "c",
+   "method": "m3k0p1",
+   "seed": 1,
+   "train_steps": 5000000,
+   "prereg": false,
+   "candidate": "runs\\season\\sr1_5m\\train\\v20_c_m3k0p1_s1_5000k.zip",
+   "k2b": "runs\\season\\sr1_5m\\train\\v20_k2b_m3k0p1_s1_5000k.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 4.525,
+    "worlds": {
+     "per_part": {
+      "0G": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "2082a25ef33e",
+    "last_rollout": {
+     "anchor_kl_before": 0.0012921978486701846,
+     "anchor_kl": 0.0014017434160147483,
+     "reward_0G": 0.048532065004110336,
+     "reward_1B": 0.031718771904706955
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 4.267,
+    "worlds": {
+     "per_part": {
+      "0B": 8,
+      "1B": 8
+     },
+     "total": 16,
+     "resets": 8
+    },
+    "sha1": "586fa1b59486",
+    "last_rollout": {
+     "anchor_kl_before": 0.0014153070515021682,
+     "anchor_kl": 0.0009769178732919196,
+     "reward_0B": 0.04461650550365448,
+     "reward_1B": 0.032262980937957764
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.00028675890744853853,
+    "ge_pred_t_vs_cur": -0.013628947984770176,
+    "ge_pred_rel_vs_k2b": 0.01270878721859113,
+    "ge_pred_t_vs_k2b": 0.5477943462158389,
+    "g_gamma_drop": 0.003862294683206199,
+    "g_gamma_t": -0.21083981500886412,
+    "c0c1_frac": 1.2378860121677926,
+    "c0c1_t": 2.722956555939276,
+    "b_react_ratio": 1.0122349459336397,
+    "b_act_shift_max": 0.0044406977193081065
+   }
+  }
+ ]
+}

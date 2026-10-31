@@ -1,0 +1,348 @@
+{
+ "scan": "scan_LV_SHC_RegionalWeatherTest.json",
+ "export": "v3_export_integration_s20000.json",
+ "body_r_units": 0.15,
+ "kept": {
+  "Barren": 0,
+  "Forest": 0,
+  "Highland": 0
+ },
+ "trees": {
+  "Barren": [
+   {
+    "label": "Beech_Tree5",
+    "mesh": "Beech_Tree",
+    "x": -46.9206,
+    "y": 188.4245,
+    "r": 6.9226,
+    "gap_center_m": 273.45,
+    "gap_disc_m": 259.61,
+    "gap_body_m": 259.31
+   },
+   {
+    "label": "Beech_Tree2",
+    "mesh": "Beech_Tree",
+    "x": -18.0706,
+    "y": 261.2245,
+    "r": 6.9226,
+    "gap_center_m": 404.07,
+    "gap_disc_m": 390.22,
+    "gap_body_m": 389.92
+   },
+   {
+    "label": "Beech_Tree11",
+    "mesh": "Beech_Tree",
+    "x": 31.6294,
+    "y": 220.5245,
+    "r": 6.9226,
+    "gap_center_m": 321.05,
+    "gap_disc_m": 307.2,
+    "gap_body_m": 306.9
+   },
+   {
+    "label": "Beech_Tree7",
+    "mesh": "Beech_Tree",
+    "x": -146.1705,
+    "y": 206.1745,
+    "r": 6.9226,
+    "gap_center_m": 413.44,
+    "gap_disc_m": 399.59,
+    "gap_body_m": 399.29
+   },
+   {
+    "label": "Beech_Tree",
+    "mesh": "Beech_Tree",
+    "x": -29.8206,
+    "y": 237.5745,
+    "r": 6.9226,
+    "gap_center_m": 360.12,
+    "gap_disc_m": 346.28,
+    "gap_body_m": 345.98
+   },
+   {
+    "label": "Beech_Tree4",
+    "mesh": "Beech_Tree",
+    "x": -79.9206,
+    "y": 237.5745,
+    "r": 6.9226,
+    "gap_center_m": 389.46,
+    "gap_disc_m": 375.62,
+    "gap_body_m": 375.32
+   },
+   {
+    "label": "Beech_Tree3",
+    "mesh": "Beech_Tree",
+    "x": -45.8706,
+    "y": 286.6245,
+    "r": 6.9226,
+    "gap_center_m": 462.44,
+    "gap_disc_m": 448.6,
+    "gap_body_m": 448.3
+   },
+   {
+    "label": "Beech_Tree10",
+    "mesh": "Beech_Tree",
+    "x": -179.3706,
+    "y": 280.5745,
+    "r": 6.9226,
+    "gap_center_m": 568.6,
+    "gap_disc_m": 554.76,
+    "gap_body_m": 554.46
+   },
+   {
+    "label": "Beech_Tree8",
+    "mesh": "Beech_Tree",
+    "x": -101.7706,
+    "y": 185.8745,
+    "r": 6.9226,
+    "gap_center_m": 323.74,
+    "gap_disc_m": 309.89,
+    "gap_body_m": 309.59
+   },
+   {
+    "label": "Beech_Tree6",
+    "mesh": "Beech_Tree",
+    "x": -105.7206,
+    "y": 272.3745,
+    "r": 6.9226,
+    "gap_center_m": 474.47,
+    "gap_disc_m": 460.62,
+    "gap_body_m": 460.32
+   },
+   {
+    "label": "Beech_Tree9",
+    "mesh": "Beech_Tree",
+    "x": -79.9206,
+    "y": 333.2745,
+    "r": 6.9226,
+    "gap_center_m": 569.44,
+    "gap_disc_m": 555.6,
+    "gap_body_m": 555.3
+   }
+  ],
+  "Forest": [
+   {
+    "label": "Beech_Tree5",
+    "mesh": "Beech_Tree",
+    "x": -47.9206,
+    "y": -39.0755,
+    "r": 6.9226,
+    "gap_center_m": 123.67,
+    "gap_disc_m": 109.82,
+    "gap_body_m": 109.52
+   },
+   {
+    "label": "Beech_Tree2",
+    "mesh": "Beech_Tree",
+    "x": -19.0706,
+    "y": 33.7245,
+    "r": 6.9226,
+    "gap_center_m": 38.14,
+    "gap_disc_m": 24.3,
+    "gap_body_m": 24.0
+   },
+   {
+    "label": "Beech_Tree11",
+    "mesh": "Beech_Tree",
+    "x": 30.6294,
+    "y": -6.9755,
+    "r": 6.9226,
+    "gap_center_m": 13.95,
+    "gap_disc_m": 0.11,
+    "gap_body_m": -0.19
+   },
+   {
+    "label": "Beech_Tree7",
+    "mesh": "Beech_Tree",
+    "x": -147.1705,
+    "y": -21.3255,
+    "r": 6.9226,
+    "gap_center_m": 297.42,
+    "gap_disc_m": 283.57,
+    "gap_body_m": 283.27
+   },
+   {
+    "label": "Beech_Tree",
+    "mesh": "Beech_Tree",
+    "x": -30.8206,
+    "y": 10.0745,
+    "r": 6.9226,
+    "gap_center_m": 61.64,
+    "gap_disc_m": 47.8,
+    "gap_body_m": 47.5
+   },
+   {
+    "label": "Beech_Tree4",
+    "mesh": "Beech_Tree",
+    "x": -80.9206,
+    "y": 10.0745,
+    "r": 6.9226,
+    "gap_center_m": 161.84,
+    "gap_disc_m": 148.0,
+    "gap_body_m": 147.7
+   },
+   {
+    "label": "Beech_Tree3",
+    "mesh": "Beech_Tree",
+    "x": -46.8706,
+    "y": 59.1245,
+    "r": 6.9226,
+    "gap_center_m": 93.74,
+    "gap_disc_m": 79.9,
+    "gap_body_m": 79.6
+   },
+   {
+    "label": "Beech_Tree10",
+    "mesh": "Beech_Tree",
+    "x": -180.3706,
+    "y": 53.0745,
+    "r": 6.9226,
+    "gap_center_m": 360.74,
+    "gap_disc_m": 346.9,
+    "gap_body_m": 346.6
+   },
+   {
+    "label": "Beech_Tree8",
+    "mesh": "Beech_Tree",
+    "x": -102.7706,
+    "y": -41.6255,
+    "r": 6.9226,
+    "gap_center_m": 221.76,
+    "gap_disc_m": 207.92,
+    "gap_body_m": 207.62
+   },
+   {
+    "label": "Beech_Tree6",
+    "mesh": "Beech_Tree",
+    "x": -106.7206,
+    "y": 44.8745,
+    "r": 6.9226,
+    "gap_center_m": 213.44,
+    "gap_disc_m": 199.6,
+    "gap_body_m": 199.3
+   },
+   {
+    "label": "Beech_Tree9",
+    "mesh": "Beech_Tree",
+    "x": -80.9206,
+    "y": 105.7745,
+    "r": 6.9226,
+    "gap_center_m": 185.94,
+    "gap_disc_m": 172.1,
+    "gap_body_m": 171.8
+   }
+  ],
+  "Highland": [
+   {
+    "label": "Beech_Tree5",
+    "mesh": "Beech_Tree",
+    "x": -46.9206,
+    "y": 438.4245,
+    "r": 6.9226,
+    "gap_center_m": 762.64,
+    "gap_disc_m": 748.8,
+    "gap_body_m": 748.5
+   },
+   {
+    "label": "Beech_Tree2",
+    "mesh": "Beech_Tree",
+    "x": -18.0706,
+    "y": 511.2245,
+    "r": 6.9226,
+    "gap_center_m": 903.17,
+    "gap_disc_m": 889.33,
+    "gap_body_m": 889.03
+   },
+   {
+    "label": "Beech_Tree11",
+    "mesh": "Beech_Tree",
+    "x": 31.6294,
+    "y": 470.5245,
+    "r": 6.9226,
+    "gap_center_m": 821.05,
+    "gap_disc_m": 807.2,
+    "gap_body_m": 806.9
+   },
+   {
+    "label": "Beech_Tree7",
+    "mesh": "Beech_Tree",
+    "x": -146.1705,
+    "y": 456.1745,
+    "r": 6.9226,
+    "gap_center_m": 844.56,
+    "gap_disc_m": 830.71,
+    "gap_body_m": 830.41
+   },
+   {
+    "label": "Beech_Tree",
+    "mesh": "Beech_Tree",
+    "x": -29.8206,
+    "y": 487.5745,
+    "r": 6.9226,
+    "gap_center_m": 857.23,
+    "gap_disc_m": 843.38,
+    "gap_body_m": 843.08
+   },
+   {
+    "label": "Beech_Tree4",
+    "mesh": "Beech_Tree",
+    "x": -79.9206,
+    "y": 487.5745,
+    "r": 6.9226,
+    "gap_center_m": 869.96,
+    "gap_disc_m": 856.11,
+    "gap_body_m": 855.81
+   },
+   {
+    "label": "Beech_Tree3",
+    "mesh": "Beech_Tree",
+    "x": -45.8706,
+    "y": 536.6245,
+    "r": 6.9226,
+    "gap_center_m": 957.65,
+    "gap_disc_m": 943.81,
+    "gap_body_m": 943.51
+   },
+   {
+    "label": "Beech_Tree10",
+    "mesh": "Beech_Tree",
+    "x": -179.3706,
+    "y": 530.5745,
+    "r": 6.9226,
+    "gap_center_m": 1007.2,
+    "gap_disc_m": 993.36,
+    "gap_body_m": 993.06
+   },
+   {
+    "label": "Beech_Tree8",
+    "mesh": "Beech_Tree",
+    "x": -101.7706,
+    "y": 435.8745,
+    "r": 6.9226,
+    "gap_center_m": 778.82,
+    "gap_disc_m": 764.97,
+    "gap_body_m": 764.67
+   },
+   {
+    "label": "Beech_Tree6",
+    "mesh": "Beech_Tree",
+    "x": -105.7206,
+    "y": 522.3745,
+    "r": 6.9226,
+    "gap_center_m": 948.61,
+    "gap_disc_m": 934.77,
+    "gap_body_m": 934.47
+   },
+   {
+    "label": "Beech_Tree9",
+    "mesh": "Beech_Tree",
+    "x": -79.9206,
+    "y": 583.2745,
+    "r": 6.9226,
+    "gap_center_m": 1058.69,
+    "gap_disc_m": 1044.84,
+    "gap_body_m": 1044.54
+   }
+  ]
+ }
+}

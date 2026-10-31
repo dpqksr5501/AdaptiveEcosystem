@@ -8,6 +8,7 @@
 #include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Mass/EcoMassFragments.h"
+#include "Mass/EcoMassTags.h"
 #include "Mass/EntityFragments.h"
 #include "MassMovementFragments.h"
 #include "MassEntitySubsystem.h"
@@ -36,8 +37,10 @@ namespace EcoPreyTests
             EM.BatchCreateEntities(EM.CreateArchetype(Composition), Shared, 1, Entities); Wolf = Entities[0];
             EM.GetFragmentDataChecked<FEcoIdentityFragment>(Wolf).StableAgentId = 1;
             EM.GetFragmentDataChecked<FMassVelocityFragment>(Wolf).Value = FVector(100,0,0);
+            // 초식 쿼리(이웃 모으기·포획)는 생존 태그를 요구한다. 실제 사슴은 EcoMassNetworkTrait 가 붙인다.
             const TArray<const UScriptStruct*> Prey = {FTransformFragment::StaticStruct(), FMassVelocityFragment::StaticStruct(),
-                FEcoVitalsFragment::StaticStruct(), FEcoIdentityFragment::StaticStruct(), FEcoHerbivoreTag::StaticStruct()};
+                FEcoVitalsFragment::StaticStruct(), FEcoIdentityFragment::StaticStruct(), FEcoHerbivoreTag::StaticStruct(),
+                FEcoAliveTag::StaticStruct()};
             Deer = EM.CreateEntity(EM.CreateArchetype(Prey));
             auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Deer); Id.StableAgentId = 2; Id.SpeciesId = TEXT("Herbivore");
             Gather = NewObject<UEcoNeighborhoodGatherProcessor>(Scoped.World);

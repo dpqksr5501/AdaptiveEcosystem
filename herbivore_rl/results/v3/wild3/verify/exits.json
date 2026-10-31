@@ -1,0 +1,1822 @@
+{
+ "picks": [
+  {
+   "title": "숲 (비) 땅 높이",
+   "tag": "forest_ground",
+   "frame": 6,
+   "state": {
+    "t": 5.0,
+    "frame": 6,
+    "cam_y_m": 470.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0",
+     "SW_Grass_Grass3@BP_EcoDeer_C_2",
+     "SW_Grass_Grass4@BP_EcoDeer_C_1",
+     "SW_Grass_Grass2@BP_EcoDeer_C_0",
+     "SW_Grass_Grass7@BP_EcoDeer_C_2",
+     "SW_Grass_Grass5@BP_EcoDeer_C_0",
+     "SW_Grass_Grass3@BP_EcoDeer_C_0",
+     "SW_Grass_Grass1@BP_EcoDeer_C_2",
+     "SW_Grass_Grass3@BP_EcoDeer_C_1",
+     "SW_Grass_Grass2@BP_EcoDeer_C_63",
+     "SW_Grass_Grass5@BP_EcoDeer_C_55",
+     "SW_Grass_Grass7@BP_EcoDeer_C_59"
+    ]
+   }
+  },
+  {
+   "title": "메마른 땅, 숲 경계 10 m 앞에서 숲 쪽을 봄 (비 없어야)",
+   "tag": "barren_border",
+   "frame": 15,
+   "state": {
+    "t": 10.0,
+    "frame": 15,
+    "cam_y_m": 240.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   }
+  },
+  {
+   "title": "고지 (눈) 땅 높이",
+   "tag": "highland_ground",
+   "frame": 48,
+   "state": {
+    "t": 24.0,
+    "frame": 48,
+    "cam_y_m": -490.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "SW_Dry_Dry4@BP_EcoDeer_C_61",
+     "SW_Dry_Dry5@BP_EcoDeer_C_63",
+     "SW_Dry_Dry2@BP_EcoDeer_C_63",
+     "SW_Dry_Dry2@BP_EcoDeer_C_61",
+     "SW_Dry_Dry4@BP_EcoDeer_C_61",
+     "SW_Dry_Dry7@BP_EcoDeer_C_63",
+     "SW_Dry_Dry2@BP_EcoDeer_C_63",
+     "SW_Dry_Dry4@BP_EcoDeer_C_60",
+     "SW_Dry_Dry3@BP_EcoDeer_C_15",
+     "SW_Dry_Dry6@BP_EcoDeer_C_45",
+     "SW_Dry_Dry2@BP_EcoWolf_C_0",
+     "SW_Dry_Dry1@BP_EcoWolf_C_6",
+     "SW_Dry_Dry4@BP_EcoDeer_C_56",
+     "SW_Dry_Dry4@BP_EcoDeer_C_62"
+    ]
+   }
+  },
+  {
+   "title": "메마른 땅 가운데 (맑음)",
+   "tag": "barren_ground",
+   "frame": 81,
+   "state": {
+    "t": 38.0,
+    "frame": 81,
+    "cam_y_m": 10.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "SW_Dry_Dry6@BP_EcoDeer_C_49",
+     "SW_Dry_Dry3@BP_EcoDeer_C_62",
+     "SW_Dry_Dry4@BP_EcoDeer_C_49",
+     "SW_Dry_Dry7@BP_EcoDeer_C_62",
+     "SW_Dry_Dry6@BP_EcoDeer_C_65",
+     "SW_Dry_Dry6@BP_EcoDeer_C_49",
+     "SW_Dry_Dry4@BP_EcoDeer_C_62",
+     "SW_Dry_Dry5@BP_EcoDeer_C_62",
+     "SW_Dry_Dry4@BP_EcoDeer_C_35",
+     "SW_Dry_Dry3@BP_EcoDeer_C_42",
+     "SW_Dry_Dry2@BP_EcoDeer_C_70"
+    ]
+   }
+  }
+ ],
+ "exits": {
+  "cross_out": [
+   {
+    "t": 12.0,
+    "frame": 18,
+    "cam_y_m": 300.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     333.3
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     0.67
+    ],
+    "alpha": [
+     0.667,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 12.33,
+    "frame": 19,
+    "cam_y_m": 296.67,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     444.4
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     0.89
+    ],
+    "alpha": [
+     0.889,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 12.67,
+    "frame": 20,
+    "cam_y_m": 293.33,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 13.0,
+    "frame": 21,
+    "cam_y_m": 290.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 13.33,
+    "frame": 22,
+    "cam_y_m": 286.67,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 13.67,
+    "frame": 23,
+    "cam_y_m": 283.33,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 14.0,
+    "frame": 24,
+    "cam_y_m": 280.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 14.33,
+    "frame": 25,
+    "cam_y_m": 276.67,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 14.67,
+    "frame": 26,
+    "cam_y_m": 273.33,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 15.0,
+    "frame": 27,
+    "cam_y_m": 270.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 15.33,
+    "frame": 28,
+    "cam_y_m": 266.67,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 15.67,
+    "frame": 29,
+    "cam_y_m": 263.33,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 16.0,
+    "frame": 30,
+    "cam_y_m": 260.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 16.33,
+    "frame": 31,
+    "cam_y_m": 256.67,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 16.67,
+    "frame": 32,
+    "cam_y_m": 253.33,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 17.0,
+    "frame": 33,
+    "cam_y_m": 250.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     500.0
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     1.0
+    ],
+    "alpha": [
+     1.0,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     1.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 17.33,
+    "frame": 34,
+    "cam_y_m": 246.67,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     333.3
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     0.67
+    ],
+    "alpha": [
+     0.667,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 17.67,
+    "frame": 35,
+    "cam_y_m": 243.33,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     166.7
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     1.0,
+     1.0,
+     0.33
+    ],
+    "alpha": [
+     0.333,
+     0.0
+    ],
+    "flags": [
+     1.0,
+     0.0,
+     1.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": [
+     "A_Rain_Cue@EcoV3WeatherFx_0"
+    ]
+   },
+   {
+    "t": 18.0,
+    "frame": 36,
+    "cam_y_m": 240.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 18.33,
+    "frame": 37,
+    "cam_y_m": 236.67,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 18.67,
+    "frame": 38,
+    "cam_y_m": 233.33,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 19.0,
+    "frame": 39,
+    "cam_y_m": 230.0,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 19.33,
+    "frame": 40,
+    "cam_y_m": 226.67,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 19.67,
+    "frame": 41,
+    "cam_y_m": 223.33,
+    "rain_active": [
+     1.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     0.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   }
+  ],
+  "snow_out": [
+   {
+    "t": 26.0,
+    "frame": 51,
+    "cam_y_m": -300.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 26.33,
+    "frame": 52,
+    "cam_y_m": -296.67,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 26.67,
+    "frame": 53,
+    "cam_y_m": -293.33,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 27.0,
+    "frame": 54,
+    "cam_y_m": -290.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 27.33,
+    "frame": 55,
+    "cam_y_m": -286.67,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 27.67,
+    "frame": 56,
+    "cam_y_m": -283.33,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 28.0,
+    "frame": 57,
+    "cam_y_m": -280.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 28.33,
+    "frame": 58,
+    "cam_y_m": -276.67,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 28.67,
+    "frame": 59,
+    "cam_y_m": -273.33,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 29.0,
+    "frame": 60,
+    "cam_y_m": -270.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 29.33,
+    "frame": 61,
+    "cam_y_m": -266.67,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 29.67,
+    "frame": 62,
+    "cam_y_m": -263.33,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 30.0,
+    "frame": 63,
+    "cam_y_m": -260.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 30.33,
+    "frame": 64,
+    "cam_y_m": -256.67,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 30.67,
+    "frame": 65,
+    "cam_y_m": -253.33,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 31.0,
+    "frame": 66,
+    "cam_y_m": -250.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     1.0
+    ],
+    "flags": [
+     0.0,
+     1.0,
+     0.0,
+     2.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 31.33,
+    "frame": 67,
+    "cam_y_m": -246.67,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.667
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 31.67,
+    "frame": 68,
+    "cam_y_m": -243.33,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.333
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 32.0,
+    "frame": 69,
+    "cam_y_m": -240.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 32.33,
+    "frame": 70,
+    "cam_y_m": -236.67,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 32.67,
+    "frame": 71,
+    "cam_y_m": -233.33,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 33.0,
+    "frame": 72,
+    "cam_y_m": -230.0,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 33.33,
+    "frame": 73,
+    "cam_y_m": -226.67,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   },
+   {
+    "t": 33.67,
+    "frame": 74,
+    "cam_y_m": -223.33,
+    "rain_active": [
+     0.0
+    ],
+    "spawn": [
+     16.7
+    ],
+    "snow_active": [
+     1.0
+    ],
+    "sound": [
+     0.0,
+     0.0,
+     0.03
+    ],
+    "alpha": [
+     0.0,
+     0.0
+    ],
+    "flags": [
+     0.0,
+     0.0,
+     0.0,
+     0.0
+    ],
+    "audio": [
+     1.0
+    ],
+    "playing": []
+   }
+  ]
+ }
+}

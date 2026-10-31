@@ -1,5 +1,7 @@
 # Mass Network Authority Contract
 
+2026-10-24 후속 soil/life의 서버·클라이언트 실제 경로와 작업 acceptance는 [서버·네트워킹 AI 가이드](ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md)를 함께 읽는다. 기존 권위 원칙은 유지한다. 아래 Steam Listen MVP의 목표와 새 Dedicated world 로컬 검증을 구분하고, 새 기본 BodyScale/Field DTO·same-build 저장·운영 API를 Source와 대조한다. 이번 문서 갱신 자체는 Steam/배포/새 UBT·PIE 검증을 뜻하지 않는다.
+
 > 기준 엔진: **Unreal Engine 5.8**  
 > 상태: **MVP Active Contract**  
 > 대상: Steam Lobby/Session 기반 Listen Server 멀티플레이와 MassEntity 생태 시뮬레이션

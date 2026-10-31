@@ -1,0 +1,296 @@
+{
+ "condition": {
+  "gamma": 0.9916661555611042,
+  "eval_steps": 5000,
+  "head": 0,
+  "tail": 600
+ },
+ "eval_seeds": [
+  10000,
+  10001,
+  10002,
+  10003,
+  10004,
+  10005,
+  10006,
+  10007,
+  10008,
+  10009,
+  10010,
+  10011,
+  10012,
+  10013,
+  10014,
+  10015,
+  10016,
+  10017,
+  10018,
+  10019
+ ],
+ "t_crit": 2.093,
+ "df": 19,
+ "reps": 2000,
+ "boot_seed": 0,
+ "groups": [
+  {
+   "gamma": 0.9916661555611042,
+   "R": 5,
+   "train_seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+   ],
+   "g_eval_gamma": 0.9916661555611042,
+   "tail": 600,
+   "dirs_det": [
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s0",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s1",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s2",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s3",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s4"
+   ],
+   "dirs_stoch": [
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s0_stoch",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s1_stoch",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s2_stoch",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s3_stoch",
+    "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\results\\v2\\diag_v2_2_s4_stoch"
+   ],
+   "cols": {
+    "g_gamma": {
+     "det": -0.026998061215254145,
+     "stoch": 1.0763882103196325,
+     "diff": 1.1033862715348866,
+     "sd": 0.8925439306881824,
+     "t": 5.528572037209899,
+     "sig": true,
+     "p": 2.475831524566835e-05,
+     "ci": {
+      "point": 1.1033862715348868,
+      "lo": 0.9337175626470028,
+      "hi": 1.271502831696006,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true,
+     "verdict": true
+    },
+    "mean_return": {
+     "det": -0.40882784448652515,
+     "stoch": 49.72853803116966,
+     "diff": 50.1373658756562,
+     "sd": 37.42439566836959,
+     "t": 5.991308947468152,
+     "sig": true,
+     "p": 9.146473298557636e-06,
+     "ci": {
+      "point": 50.137365875656194,
+      "lo": 41.87921941111812,
+      "hi": 58.44789333599894,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "survival": {
+     "det": 348.8968634440534,
+     "stoch": 419.771493328887,
+     "diff": 70.87462988483358,
+     "sd": 91.52532899096808,
+     "t": 3.463095780147705,
+     "sig": true,
+     "p": 0.002604468935951861,
+     "ci": {
+      "point": 70.87462988483355,
+      "lo": 58.54253106446458,
+      "hi": 81.7240684977667,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true,
+     "p_holm": 0.005208937871903722,
+     "verdict": true
+    },
+    "repro": {
+     "det": 10.029375,
+     "stoch": 13.314140625,
+     "diff": 3.284765625,
+     "sd": 2.111176367467641,
+     "t": 6.958167342944323,
+     "sig": true,
+     "p": 1.2469356003530015e-06,
+     "ci": {
+      "point": 3.284765625,
+      "lo": 2.723384765625,
+      "hi": 3.8316152343749996,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "predation_rate": {
+     "det": 0.0021984062500000003,
+     "stoch": 0.0022545,
+     "diff": 5.609374999999994e-05,
+     "sd": 7.286803280995107e-05,
+     "t": 3.4426464740722267,
+     "sig": true,
+     "p": 0.0027279950928932512,
+     "ci": {
+      "point": 5.609374999999998e-05,
+      "lo": 3.157343749999999e-05,
+      "hi": 8.095624999999997e-05,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true,
+     "p_holm": 0.005208937871903722,
+     "verdict": true
+    },
+    "starve_rate": {
+     "det": 0.0008708906250000001,
+     "stoch": 0.00053209375,
+     "diff": -0.000338796875,
+     "sd": 0.000276682693459107,
+     "t": -5.476112969649591,
+     "sig": true,
+     "p": 2.776095600308174e-05,
+     "ci": {
+      "point": -0.00033879687500000007,
+      "lo": -0.0003802519531250001,
+      "hi": -0.00029831132812500004,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true,
+     "p_holm": 8.328286800924522e-05,
+     "verdict": true
+    },
+    "cohesion_mean": {
+     "det": 0.9235588508956678,
+     "stoch": 0.9151183536917624,
+     "diff": -0.008440497203905556,
+     "sd": 0.0014598265325591862,
+     "t": -25.85721671840422,
+     "sig": true,
+     "p": 2.856570019960119e-16,
+     "ci": {
+      "point": -0.008440497203905592,
+      "lo": -0.009514397805962712,
+      "hi": -0.007383938919220385,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "flee_dist_mean": {
+     "det": 0.31256272551711506,
+     "stoch": 0.3228700465411777,
+     "diff": 0.010307321024062486,
+     "sd": 0.0034356364359772336,
+     "t": 13.416943792052153,
+     "sig": true,
+     "p": 3.848028250789379e-11,
+     "ci": {
+      "point": 0.010307321024062496,
+      "lo": 0.005786152424339756,
+      "hi": 0.01478326519713755,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "flee_dist_std": {
+     "det": 0.06280969647924385,
+     "stoch": 0.13994622499267392,
+     "diff": 0.07713652851343009,
+     "sd": 0.005366629208256227,
+     "t": 64.27964914700154,
+     "sig": true,
+     "p": 1.0804056803570117e-23,
+     "ci": {
+      "point": 0.07713652851343009,
+      "lo": 0.07058407627739705,
+      "hi": 0.08402220590176607,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "cover_frac": {
+     "det": 0.24304846875,
+     "stoch": 0.24028049999999998,
+     "diff": -0.002767968750000002,
+     "sd": 0.02387094079606213,
+     "t": -0.5185691119150323,
+     "sig": false,
+     "p": 0.6100482836767048,
+     "ci": {
+      "point": -0.0027679687500000005,
+      "lo": -0.011488679296875002,
+      "hi": 0.006016439062499992,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": false
+    },
+    "react_pred": {
+     "det": 0.0627004995908896,
+     "stoch": 0.05718794539487493,
+     "diff": -0.005512554196014691,
+     "sd": 0.002208988831190764,
+     "t": -11.160260964557192,
+     "sig": true,
+     "p": 8.733007896206695e-10,
+     "ci": {
+      "point": -0.005512554196014688,
+      "lo": -0.0069883735238068945,
+      "hi": -0.004032456986549552,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "react_hunger": {
+     "det": 0.031055333016361823,
+     "stoch": 0.01874714394161142,
+     "diff": -0.012308189074750401,
+     "sd": 0.004693423712568757,
+     "t": -11.727876763974974,
+     "sig": true,
+     "p": 3.813030624768248e-10,
+     "ci": {
+      "point": -0.012308189074750403,
+      "lo": -0.016461210051761106,
+      "hi": -0.008380124151019503,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    },
+    "starve_share": {
+     "det": 0.3076870890448309,
+     "stoch": 0.19042662897284404,
+     "diff": -0.11726046007198679,
+     "sd": 0.10092654101714242,
+     "t": -5.195905004796056,
+     "sig": true,
+     "p": 5.14231791377234e-05,
+     "ci": {
+      "point": -0.11726046007198677,
+      "lo": -0.1291907431585622,
+      "hi": -0.10443493519377316,
+      "runs": 5,
+      "strata": 20
+     },
+     "ci_excludes_0": true
+    }
+   },
+   "trigger": true
+  }
+ ],
+ "generated": "2026-10-02T20:01:50+00:00",
+ "command": "python diagnose_v2.py modecmp --config configs/v2_2.yaml --out results/v2/diag_v2_2 --tag modecmp --det v2_2_s0 v2_2_s1 v2_2_s2 v2_2_s3 v2_2_s4 --stoch v2_2_s0_stoch v2_2_s1_stoch v2_2_s2_stoch v2_2_s3_stoch v2_2_s4_stoch"
+}

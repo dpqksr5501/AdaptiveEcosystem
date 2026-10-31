@@ -6,6 +6,8 @@
 #include "Engine/DeveloperSettings.h"
 #include "Core/EcoResourceTypes.h"
 #include "Core/EcoMigrationTypes.h"
+#include "Network/Mass/EcoMassNetworkSettings.h"
+#include "Core/EcoSurvivalTypes.h"
 #include "EcoRuntimeSettings.generated.h"
 
 /** Project-level switches for selecting explicitly opt-in legacy runtime paths. */
@@ -15,6 +17,13 @@ class ADAPTIVEECOSYSTEM_API UEcoRuntimeSettings : public UDeveloperSettings
 	GENERATED_BODY()
 
 public:
+	/** Box survival/pressure settings are captured once. Restart PIE after changing. */
+	UPROPERTY(Config, EditAnywhere, Category="Ecology|Survival") FEcoSurvivalSettings Survival;
+	UPROPERTY(Config, EditAnywhere, Category="Ecology|Survival") bool bDrawSurvivalDebug = false;
+	UPROPERTY(Config, EditAnywhere, Category="Ecology|Overcrowding") FEcoOvercrowdingSettings Overcrowding;
+	/** Connection-wide admission/Add and local Actor caps across templates. Restart PIE after editing. */
+	UPROPERTY(Config, EditAnywhere, Category="M4|Connection Budget")
+	FEcoConnectionBudgetSettings ConnectionBudget;
 	UPROPERTY(Config, EditAnywhere, Category="M3|Migration")
 	FEcoMigrationSettings Migration;
 	/** Read-only region summaries on host/client; authoritative agent IDs and arrows on host. */

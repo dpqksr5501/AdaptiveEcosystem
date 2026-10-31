@@ -1,0 +1,604 @@
+{
+ "meta": {
+  "generated": "2026-10-06T19:08:43+00:00",
+  "round": 1,
+  "seeds": [
+   10000,
+   10001,
+   10002,
+   10003,
+   10004,
+   10005,
+   10006,
+   10007,
+   10008,
+   10009,
+   10010,
+   10011,
+   10012,
+   10013,
+   10014,
+   10015,
+   10016,
+   10017,
+   10018,
+   10019
+  ],
+  "eval_steps": 5000,
+  "train_steps": 2000000,
+  "prereg": true,
+  "elapsed_min": 27.6,
+  "sim_digest": "7a75763123ba",
+  "eval_cache_code": "7a75763123ba",
+  "command": "python -m season.sr1"
+ },
+ "candidates": [
+  {
+   "name": "v1_a_m1_s0",
+   "anchor": "v1",
+   "season": "a",
+   "method": "m1",
+   "seed": 0,
+   "train_steps": 2000000,
+   "prereg": true,
+   "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v1_a_m1_s0.zip",
+   "k2b": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v1_k2b_m1_s0.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 1.367,
+    "worlds": {
+     "per_part": {
+      "0G": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "23c40b079e0e",
+    "last_rollout": {
+     "anchor_kl_before": 0.6644480228424072,
+     "reward_0G": -0.00947011448442936,
+     "reward_1B": 0.0185242947191
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 1.364,
+    "worlds": {
+     "per_part": {
+      "0B": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "240705da3eea",
+    "last_rollout": {
+     "anchor_kl_before": 0.43825194239616394,
+     "reward_0B": 0.010976005345582962,
+     "reward_1B": 0.026349330320954323
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": false,
+    "A4": false,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음",
+    "A3 망각",
+    "A4 결과 악화"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": 0.06820540495661921,
+    "ge_pred_t_vs_cur": 7.66692901436944,
+    "ge_pred_rel_vs_k2b": 0.009058468295360967,
+    "ge_pred_t_vs_k2b": 0.7751900680497241,
+    "g_gamma_drop": -0.04015337406316555,
+    "g_gamma_t": 0.4272239111638175,
+    "c0c1_frac": 0.978086798383911,
+    "c0c1_t": 5.154645961932671,
+    "b_react_ratio": 1.39409698430808,
+    "b_act_shift_max": 0.14134212215802772
+   }
+  },
+  {
+   "name": "v1_a_m2_s0",
+   "anchor": "v1",
+   "season": "a",
+   "method": "m2",
+   "seed": 0,
+   "train_steps": 2000000,
+   "prereg": true,
+   "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v1_a_m2_s0.zip",
+   "k2b": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v1_k2b_m2_s0.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 1.36,
+    "worlds": {
+     "per_part": {
+      "0G": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "8ecc22902532",
+    "last_rollout": {
+     "anchor_kl_before": 0.12510958313941956,
+     "reward_0G": -0.0025886963121593,
+     "reward_1B": 0.027244675904512405
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 1.37,
+    "worlds": {
+     "per_part": {
+      "0B": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "87c8d7285b25",
+    "last_rollout": {
+     "anchor_kl_before": 0.12122884392738342,
+     "reward_0B": 0.011909314431250095,
+     "reward_1B": 0.00969083420932293
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": true,
+    "A4": false,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음",
+    "A4 결과 악화"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": 0.011312217194570148,
+    "ge_pred_t_vs_cur": 1.6829549973723332,
+    "ge_pred_rel_vs_k2b": -0.043559341996780666,
+    "ge_pred_t_vs_k2b": -5.716072366620334,
+    "g_gamma_drop": -0.0979453752812246,
+    "g_gamma_t": 1.2844528206153984,
+    "c0c1_frac": 1.0513219186622162,
+    "c0c1_t": 4.983603795419861,
+    "b_react_ratio": 1.0669797477491694,
+    "b_act_shift_max": 0.038270381016403565
+   }
+  },
+  {
+   "name": "v1_a_m3k0p1_s0",
+   "anchor": "v1",
+   "season": "a",
+   "method": "m3k0p1",
+   "seed": 0,
+   "train_steps": 2000000,
+   "prereg": true,
+   "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v1_a_m3k0p1_s0.zip",
+   "k2b": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v1_k2b_m3k0p1_s0.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 1.718,
+    "worlds": {
+     "per_part": {
+      "0G": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "651a2a8e9e4c",
+    "last_rollout": {
+     "anchor_kl_before": 0.002066791756078601,
+     "anchor_kl": 0.0017048060205221798,
+     "reward_0G": -0.007650482002645731,
+     "reward_1B": 0.016638580709695816
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 1.74,
+    "worlds": {
+     "per_part": {
+      "0B": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "2d983582d12b",
+    "last_rollout": {
+     "anchor_kl_before": 0.002619044855237007,
+     "anchor_kl": 0.0025606996612623336,
+     "reward_0B": 0.024337902665138245,
+     "reward_1B": 0.030886836349964142
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": false,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음",
+    "A2 상수화"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.027336128523392424,
+    "ge_pred_t_vs_cur": -3.683330447078517,
+    "ge_pred_rel_vs_k2b": -0.027618691899070385,
+    "ge_pred_t_vs_k2b": -3.8585648233516703,
+    "g_gamma_drop": 0.08594442750528763,
+    "g_gamma_t": -1.1763365204913603,
+    "c0c1_frac": 0.6963594656578946,
+    "c0c1_t": 4.120322211992467,
+    "b_react_ratio": 1.0296444760732486,
+    "b_act_shift_max": 0.0029445048848167343
+   }
+  },
+  {
+   "name": "v1_a_m3k0p5_s0",
+   "anchor": "v1",
+   "season": "a",
+   "method": "m3k0p5",
+   "seed": 0,
+   "train_steps": 2000000,
+   "prereg": true,
+   "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v1_a_m3k0p5_s0.zip",
+   "k2b": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v1_k2b_m3k0p5_s0.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 1.739,
+    "worlds": {
+     "per_part": {
+      "0G": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "7b7360c5cb75",
+    "last_rollout": {
+     "anchor_kl_before": 0.0003509347152430564,
+     "anchor_kl": 0.0005905461512156762,
+     "reward_0G": 0.0077497027814388275,
+     "reward_1B": 0.01590300351381302
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 1.722,
+    "worlds": {
+     "per_part": {
+      "0B": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "ba9e3fe701b1",
+    "last_rollout": {
+     "anchor_kl_before": 0.0003908115322701633,
+     "anchor_kl": 0.000441754071895654,
+     "reward_0B": 0.01667878031730652,
+     "reward_1B": 0.013992154970765114
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": false,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음",
+    "A2 상수화"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.002034123458840112,
+    "ge_pred_t_vs_cur": -0.25253935769691926,
+    "ge_pred_rel_vs_k2b": 0.0016040664125159215,
+    "ge_pred_t_vs_k2b": 0.28502975865548547,
+    "g_gamma_drop": 0.04602502879294453,
+    "g_gamma_t": -0.5539603969406739,
+    "c0c1_frac": 0.5789927908591834,
+    "c0c1_t": 3.63065720093608,
+    "b_react_ratio": 0.9798414066615482,
+    "b_act_shift_max": 0.001805393670338662
+   }
+  },
+  {
+   "name": "v20_a_m1_s0",
+   "anchor": "v20",
+   "season": "a",
+   "method": "m1",
+   "seed": 0,
+   "train_steps": 2000000,
+   "prereg": true,
+   "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v20_a_m1_s0.zip",
+   "k2b": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v20_k2b_m1_s0.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 1.369,
+    "worlds": {
+     "per_part": {
+      "0G": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "b61defa26791",
+    "last_rollout": {
+     "anchor_kl_before": 0.5613572001457214,
+     "reward_0G": 0.0063454038463532925,
+     "reward_1B": 0.01970251463353634
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 1.363,
+    "worlds": {
+     "per_part": {
+      "0B": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "e4c42e942058",
+    "last_rollout": {
+     "anchor_kl_before": 0.9048252105712891,
+     "reward_0B": 0.007517661899328232,
+     "reward_1B": 0.03048296831548214
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": false,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음",
+    "A3 망각"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.03883089770354903,
+    "ge_pred_t_vs_cur": -4.745528654275365,
+    "ge_pred_rel_vs_k2b": -0.04415886395249855,
+    "ge_pred_t_vs_k2b": -6.229039103388069,
+    "g_gamma_drop": 0.05134623920127355,
+    "g_gamma_t": -1.0847096586192857,
+    "c0c1_frac": 0.9580970571625211,
+    "c0c1_t": 2.202435431644687,
+    "b_react_ratio": 0.8773766549784932,
+    "b_act_shift_max": 0.08148284900718022
+   }
+  },
+  {
+   "name": "v20_a_m2_s0",
+   "anchor": "v20",
+   "season": "a",
+   "method": "m2",
+   "seed": 0,
+   "train_steps": 2000000,
+   "prereg": true,
+   "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v20_a_m2_s0.zip",
+   "k2b": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v20_k2b_m2_s0.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 1.38,
+    "worlds": {
+     "per_part": {
+      "0G": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "9dd77ba4f534",
+    "last_rollout": {
+     "anchor_kl_before": 0.04911335930228233,
+     "reward_0G": 0.01364847831428051,
+     "reward_1B": 0.023705855011940002
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 1.364,
+    "worlds": {
+     "per_part": {
+      "0B": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "53343333e5cc",
+    "last_rollout": {
+     "anchor_kl_before": 0.032638564705848694,
+     "reward_0B": 0.03733929991722107,
+     "reward_1B": 0.016682960093021393
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": false,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음",
+    "A2 상수화"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.008246346555323587,
+    "ge_pred_t_vs_cur": -0.914617697541642,
+    "ge_pred_rel_vs_k2b": -0.016764979819931688,
+    "ge_pred_t_vs_k2b": -2.175713740889299,
+    "g_gamma_drop": 0.10192433539727176,
+    "g_gamma_t": -1.4627797222862513,
+    "c0c1_frac": 0.6482568862648189,
+    "c0c1_t": 1.5744674993170065,
+    "b_react_ratio": 0.938310022012225,
+    "b_act_shift_max": 0.02524942742184977
+   }
+  },
+  {
+   "name": "v20_a_m3k0p1_s0",
+   "anchor": "v20",
+   "season": "a",
+   "method": "m3k0p1",
+   "seed": 0,
+   "train_steps": 2000000,
+   "prereg": true,
+   "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v20_a_m3k0p1_s0.zip",
+   "k2b": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v20_k2b_m3k0p1_s0.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 1.749,
+    "worlds": {
+     "per_part": {
+      "0G": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "95f940f5e61f",
+    "last_rollout": {
+     "anchor_kl_before": 0.0019879688043147326,
+     "anchor_kl": 0.002126060069228212,
+     "reward_0G": 0.0005547758191823959,
+     "reward_1B": 0.01772054098546505
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 1.699,
+    "worlds": {
+     "per_part": {
+      "0B": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "2d5a817af72f",
+    "last_rollout": {
+     "anchor_kl_before": 0.0018008784390985966,
+     "anchor_kl": 0.0014559308872170126,
+     "reward_0B": 0.02130391262471676,
+     "reward_1B": 0.02381196618080139
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.012296450939457198,
+    "ge_pred_t_vs_cur": -1.5059895177670626,
+    "ge_pred_rel_vs_k2b": -0.004062815762883117,
+    "ge_pred_t_vs_k2b": -0.48414546675845516,
+    "g_gamma_drop": -0.0479275462777759,
+    "g_gamma_t": 1.0509691872394165,
+    "c0c1_frac": 1.6249230903471197,
+    "c0c1_t": 4.018253702635501,
+    "b_react_ratio": 1.0065690963902711,
+    "b_act_shift_max": 0.0008795802716607959
+   }
+  },
+  {
+   "name": "v20_a_m3k0p5_s0",
+   "anchor": "v20",
+   "season": "a",
+   "method": "m3k0p5",
+   "seed": 0,
+   "train_steps": 2000000,
+   "prereg": true,
+   "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v20_a_m3k0p5_s0.zip",
+   "k2b": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\runs\\season\\sr1\\train\\v20_k2b_m3k0p5_s0.zip",
+   "ok": false,
+   "train": {
+    "elapsed_min": 1.742,
+    "worlds": {
+     "per_part": {
+      "0G": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "493c8e5aeef5",
+    "last_rollout": {
+     "anchor_kl_before": 0.0003601562057156116,
+     "anchor_kl": 0.0005198540881489558,
+     "reward_0G": 0.012538693845272064,
+     "reward_1B": 0.011783008463680744
+    }
+   },
+   "k2b_train": {
+    "elapsed_min": 1.556,
+    "worlds": {
+     "per_part": {
+      "0B": 5,
+      "1B": 5
+     },
+     "total": 10,
+     "resets": 2
+    },
+    "sha1": "94b3c71132ee",
+    "last_rollout": {
+     "anchor_kl_before": 0.00044224062003195286,
+     "anchor_kl": 0.000262456344110736,
+     "reward_0B": 0.015147540718317032,
+     "reward_1B": 0.021015139296650887
+    }
+   },
+   "gates": {
+    "A1": false,
+    "A2": true,
+    "A3": true,
+    "A4": true,
+    "A5": true
+   },
+   "holdout": null,
+   "reasons": [
+    "A1 이득 없음"
+   ],
+   "brief": {
+    "ge_pred_rel_vs_cur": -0.0055949895615866425,
+    "ge_pred_t_vs_cur": -0.5901477522860606,
+    "ge_pred_rel_vs_k2b": -0.0026174173419603436,
+    "ge_pred_t_vs_k2b": -0.3236518390905922,
+    "g_gamma_drop": 0.03011740272022806,
+    "g_gamma_t": -0.5600440665184039,
+    "c0c1_frac": 1.37391444007198,
+    "c0c1_t": 3.075765960359255,
+    "b_react_ratio": 1.0082927979022116,
+    "b_act_shift_max": 0.0014166919219097962
+   }
+  }
+ ]
+}

@@ -12,5 +12,5 @@ namespace EcoMassFeeding
 	bool FindNextTime(FMassEntityManager& Manager, double After, double& OutTime);
 	bool Collect(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, int64 StepId,
 		const FEcoFeedingSettings& Settings, TArray<FEcoFeedRequest>& Out);
-	bool Apply(FMassEntityManager& Manager, TConstArrayView<FEcoFeedResult> Results, double Interval);
+	bool Apply(FMassEntityManager& Manager, TConstArrayView<FEcoFeedResult> Results, double Interval, float FoodEnergyGain = 0.0f);
 }

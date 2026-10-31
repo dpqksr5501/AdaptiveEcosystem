@@ -36,6 +36,7 @@ public:
 	UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Ecology|Time")
 	void PrintServerTime(bool bPrintToScreen = true) const;
 private:
+    friend struct FEcoEcosystemCheckpoint;
 	bool HasServerAuthority() const;
 	UPROPERTY(Transient)
 	TObjectPtr<UObject> DayCycleProvider;

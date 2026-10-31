@@ -1,0 +1,48 @@
+{
+ "snapshot": {
+  "map": "LV_Ecosystem_IntegrationTest",
+  "session_seed": 20003,
+  "global_step": 1800,
+  "sim_seconds": 240,
+  "why": "예정 eco.IntegratedV3.SnapshotAt 240.0",
+  "brain": "v3_r1_g995_s3_20m@eca97f2e",
+  "tree_layout": "trees-1017a 21218665c114"
+ },
+ "anchor": "ckpt/v3/v3_r1_g995_s3_20m.zip",
+ "anchor_weights_sha256": "eca97f2ef6c0d6a1c81d8fce79d9c5740fd9cde60f04a65cfa00a43b64c8bdbe",
+ "N": 128,
+ "regions": [
+  "Forest",
+  "Barren",
+  "Highland"
+ ],
+ "changed": [],
+ "checks": [
+  "계약 해시 0x7eea0107339be4ce = 시작 모델",
+  "지금 두뇌 v3_r1_g995_s3_20m@eca97f2e = ckpt/v3/v3_r1_g995_s3_20m.zip (가중치 sha256 eca97f2ef6c0d6a1)",
+  "팀 은신처 생명주기(ProtectedRefuges) 켬 — 지워진 은신처 없음이라 세계가 같다",
+  "먹이 규칙(셀·패치·문턱·기울기·재생) = 파이썬 상수",
+  "대응표 밖 칸 5 + 지역마다 1 개 = 기준 게임 값",
+  "Forest 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "Barren 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "Highland 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "은신처 원 = 파이썬 세계 (지역마다)"
+ ],
+ "template": "configs/v3_wild3_mirror.yaml",
+ "f_dec_note": "f_dec·ent_coef_base 는 R4 학습 세계에서 잰 값 그대로 (규칙이 같은 세계 — 규칙이 바뀌면 train_v3.py measure-fdec 로 다시 잰다)",
+ "wall_s": 1.62,
+ "derived_from": "s20003",
+ "variant": {
+  "name": "both",
+  "shrubs": true,
+  "sets": {
+   "integrated_stage.wolf_kinds": null,
+   "threats.stalk_frac": [
+    1.0,
+    1.0
+   ],
+   "threats.pounce_steps": 8,
+   "threats.exhaust_steps": 75
+  }
+ }
+}

@@ -1,0 +1,90 @@
+{
+ "summary": {
+  "worlds": 30,
+  "wolf_stuck": 1,
+  "wolf_stuck_helper": 0,
+  "wolf_stuck_wall": 1,
+  "wolf_stuck_max_s": 3.066666666666667,
+  "wolf_wall_stuck": 33,
+  "wolf_wall_stuck_helper": 4,
+  "wolf_wall_stuck_max_s": 15.6,
+  "deer_stuck": 0,
+  "deer_stuck_by_beh": {},
+  "deer_stuck_panic": 0,
+  "deer_stuck_max_s": 0.0,
+  "wolf_stuck_frac": 1.9421133689257975e-06,
+  "wolf_wall_stuck_frac": 0.0004719335486489688,
+  "deer_stuck_frac": 0.0,
+  "old_wolf_runs": 0,
+  "old_wolf_max_s": 0.0,
+  "old_deer_still": 1678,
+  "old_deer_flee": 6,
+  "old_deer_push": 425,
+  "old_deer_max_s": 254.26666666666668,
+  "worst_wolf": [
+   [
+    23,
+    33003,
+    2,
+    3792,
+    false,
+    true
+   ]
+  ],
+  "worst_wolf_wall": [
+   [
+    117,
+    33000,
+    0,
+    5898,
+    false
+   ],
+   [
+    38,
+    33002,
+    3,
+    4086,
+    false
+   ],
+   [
+    35,
+    33005,
+    2,
+    3237,
+    false
+   ],
+   [
+    31,
+    33009,
+    1,
+    2290,
+    false
+   ],
+   [
+    31,
+    33008,
+    1,
+    3741,
+    false
+   ],
+   [
+    31,
+    33006,
+    1,
+    4089,
+    false
+   ]
+  ],
+  "worst_deer": [],
+  "detour": {
+   "deer_used": 1098541,
+   "deer_start": 181303,
+   "deer_fail": 1,
+   "wolf_used": 12085,
+   "wolf_start": 6128,
+   "wolf_fail": 0,
+   "help_drop": 20
+  }
+ },
+ "model": "ckpt/v3/v3_r1_g995_s3_20m.zip"
+}

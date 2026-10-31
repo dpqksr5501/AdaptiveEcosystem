@@ -4,6 +4,7 @@
 #include "World/EcologyWorldSubsystem.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
+#include "Mass/EcoMassPresentationFragments.h"
 #include "MassSpawnerSubsystem.h"
 #include "MassEntityManager.h"
 #include "MassEntityQuery.h"
@@ -41,8 +42,10 @@ void UEcoMigrationDebugSubsystem::Tick(float DeltaTime)
 		const FColor Color = Row.FoodAmount > 0.0f ? FColor::Green : FColor::Red;
 		DrawDebugBox(World, Space.BoundsTransform.GetLocation(), Space.BoundsExtent * Space.BoundsTransform.GetScale3D().GetAbs(),
 			Space.BoundsTransform.GetRotation(), Color, false, -1.0f, 0, 3.0f);
-		const FString Label = FString::Printf(TEXT("%s Food %.1f/%.1f Pop %d Traveling %d Waiting %d"),
-			*Row.RegionId.ToString(), Row.FoodAmount, Row.FoodCapacity, Row.Population, Row.TravelingCount, Row.WaitingCount);
+		const FString Label = FString::Printf(TEXT("%s Food %.1f/%.1f Pop %d Resident %d Out %d In %d Projected %d/%d C %.2f S %.2f Starved %lld"),
+			*Row.RegionId.ToString(), Row.FoodAmount, Row.FoodCapacity, Row.Population, Row.ResidentCount,
+			Row.OutboundCount, Row.IncomingCount, Row.ProjectedPopulation, Row.EcologicalComfortPopulation,
+			Row.CrowdingRatio, Row.FoodSatisfaction, Row.StarvationDeaths);
 		DrawDebugString(World, Space.ArrivalPosition + FVector(0, 0, 180), Label, nullptr, Color, 0.0f, true);
 		if (GEngine)
 			GEngine->AddOnScreenDebugMessage(static_cast<uint64>(HashCombine(GetUniqueID(), GetTypeHash(Row.RegionId))),
@@ -54,6 +57,56 @@ void UEcoMigrationDebugSubsystem::Tick(float DeltaTime)
 				Role, *World->GetName(), Summary.Time.WorldEpoch, Summary.StepId, Summary.Revision, Summary.Time.DayCycle.CycleId + 1,
 				Summary.Time.DayCycle.Phase == EEcoDayPhase::Day ? TEXT("Day") : TEXT("Night"),
 				Summary.Time.DayCycle.PhaseEndSeconds - Summary.Time.ServerTimeSeconds));
+	// Optional read-only survival labels. Client reads transport snapshots, never logical vitals.
+	if (GetDefault<UEcoRuntimeSettings>()->bDrawSurvivalDebug)
+	{
+		if (UMassSpawnerSubsystem* Mass = World->GetSubsystem<UMassSpawnerSubsystem>())
+		{
+			FMassEntityManager& Manager = Mass->GetEntityManagerChecked();
+			if (!Manager.IsProcessing())
+			{
+				struct FLabel { FVector Position; FString Text; bool bDead; };
+				TArray<FLabel> Labels;
+				const bool bClient = World->GetNetMode() == NM_Client;
+				FMassEntityQuery SurvivalQuery(Manager.AsShared());
+				SurvivalQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadOnly);
+				SurvivalQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
+				SurvivalQuery.AddTagRequirement<FEcoClientProxyTag>(bClient ? EMassFragmentPresence::All : EMassFragmentPresence::None);
+				if (bClient) SurvivalQuery.AddRequirement<FEcoClientPresentationFragment>(EMassFragmentAccess::ReadOnly);
+				else
+				{
+					SurvivalQuery.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
+					SurvivalQuery.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly);
+				}
+				FMassExecutionContext SurvivalContext = Manager.CreateExecutionContext(0.0f);
+				SurvivalQuery.ForEachEntityChunk(SurvivalContext, [&](FMassExecutionContext& Chunk)
+				{
+					const auto Transforms = Chunk.GetFragmentView<FTransformFragment>();
+					const auto Ids = Chunk.GetFragmentView<FEcoIdentityFragment>();
+					for (int32 I = 0; I < Chunk.GetNumEntities(); ++I)
+					{
+						float HP = 0, Energy = 0;
+						bool bDead = !Chunk.DoesArchetypeHaveTag<FEcoAliveTag>();
+						if (bClient)
+						{
+							const auto& P = Chunk.GetFragmentView<FEcoClientPresentationFragment>()[I].Current;
+							HP = P.NormalizedHealth; Energy = P.NormalizedEnergy;
+							bDead = P.LifeState == EEcoVisualLifeState::Dead;
+						}
+						else
+						{
+							const auto& V = Chunk.GetFragmentView<FEcoVitalsFragment>()[I];
+							HP = V.MaxHP > 0 ? V.HP / V.MaxHP : 0; Energy = V.MaxEnergy > 0 ? V.Energy / V.MaxEnergy : 0;
+						}
+						Labels.Add({Transforms[I].GetTransform().GetLocation() + FVector(0, 0, 150),
+							FString::Printf(TEXT("ID %lld HP %.0f%% Energy %.0f%% %s"), Ids[I].StableAgentId, HP * 100, Energy * 100,
+								bDead ? TEXT("DEAD") : TEXT("Alive")), bDead});
+					}
+				});
+				for (const auto& L : Labels) DrawDebugString(World, L.Position, L.Text, nullptr, L.bDead ? FColor::Red : FColor::Yellow, 0, true);
+			}
+		}
+	}
 	// Clients have only relevance-filtered proxies. Full agent diagnostics are authority-only.
 	if (World->GetNetMode() == NM_Client) return;
 	UMassSpawnerSubsystem* Mass = World->GetSubsystem<UMassSpawnerSubsystem>();

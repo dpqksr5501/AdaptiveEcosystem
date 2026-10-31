@@ -1,0 +1,167 @@
+{
+ "meta": {
+  "generated": "2026-10-02T07:27:57+00:00",
+  "command": "python diagnose_v2.py ablate --model ckpt/v2/g07_g998_s0.zip --name g07_g998_s0 --out results/v2/g07/g998_s0/e998_stoch --g998 --act-mode stochastic --workers 10",
+  "python": "3.13.5",
+  "name": "g07_g998_s0",
+  "spec": {
+   "kind": "learned",
+   "model": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v2\\g07_g998_s0.zip",
+   "mode": "stochastic"
+  },
+  "eval_seeds": [
+   10000,
+   10001,
+   10002,
+   10003,
+   10004,
+   10005,
+   10006,
+   10007,
+   10008,
+   10009,
+   10010,
+   10011,
+   10012,
+   10013,
+   10014,
+   10015,
+   10016,
+   10017,
+   10018,
+   10019
+  ],
+  "eval_steps": 10000,
+  "gamma": 0.998,
+  "tail": 2500,
+  "model_sha1": "f3bceeb9a83e",
+  "config_version": "2.0",
+  "config_digest": "ab330a9b27fd",
+  "head": 500,
+  "act_mode": "stochastic",
+  "model_gamma": 0.998,
+  "calib_seeds": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19
+  ],
+  "calib_steps": 3000
+ },
+ "calib": {
+  "seeds": [
+   0,
+   1,
+   2,
+   3,
+   4,
+   5,
+   6,
+   7,
+   8,
+   9,
+   10,
+   11,
+   12,
+   13,
+   14,
+   15,
+   16,
+   17,
+   18,
+   19
+  ],
+  "steps": 3000,
+  "record_every": 30,
+  "mean_action": {
+   "forage": 0.2638619496513826,
+   "cohesion": 0.9503793601502265,
+   "flee_dist": 0.26615042085092194,
+   "cover": 0.07527081392854591
+  },
+  "std_action": {
+   "forage": 0.12048267983900733,
+   "cohesion": 0.009169870320051754,
+   "flee_dist": 0.11614139122200806,
+   "cover": 0.0379174807668581
+  },
+  "obs_mean": {
+   "food_density": 0.05592247514069477,
+   "pred_count": 0.05732086588541667,
+   "pred_dist": 0.8774590887528446,
+   "kin_count": 0.5008074813485044,
+   "energy": 0.6772700776497524,
+   "recent_predation": 0.01918759297643167,
+   "cover_dist": 0.31532806969229965
+  },
+  "obs_quantiles_5_50_95": {
+   "food_density": [
+    0.0005118015687912703,
+    0.025464417412877083,
+    0.2019329518079757
+   ],
+   "pred_count": [
+    0.0,
+    0.0,
+    0.25
+   ],
+   "pred_dist": [
+    0.3760579526424408,
+    1.0,
+    1.0
+   ],
+   "kin_count": [
+    0.0,
+    0.44999998807907104,
+    1.0
+   ],
+   "energy": [
+    0.199476907402277,
+    0.6769822239875793,
+    1.0
+   ],
+   "recent_predation": [
+    0.003272439225111185,
+    0.01583731360733509,
+    0.044916877523064044
+   ],
+   "cover_dist": [
+    0.0,
+    0.23243632167577744,
+    1.0
+   ]
+  },
+  "samples": 256000
+ },
+ "outcome_mean_on_calib_seeds": {
+  "mean_return": 78.13384417492443,
+  "survival": 499.0005852726357,
+  "repro": 10.2390625,
+  "predation_rate": 0.0019299479166666668,
+  "cohesion_mean": 0.9503793601502265,
+  "flee_dist_mean": 0.26615042085092194,
+  "flee_dist_std": 0.11517250428894492,
+  "cover_frac": 0.240115234375,
+  "react_pred": 0.020906288549443566,
+  "react_hunger": 0.03376784385128108,
+  "g_gamma": null,
+  "starve_rate": 0.0002553385416666666,
+  "starve_share": 0.09594687569391805
+ }
+}

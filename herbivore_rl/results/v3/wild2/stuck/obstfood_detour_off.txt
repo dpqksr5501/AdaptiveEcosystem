@@ -1,0 +1,25 @@
+v3_wild2_obstacle_mirror.yaml 32000-32029 7200 스텝 obstacles.detour=false
+  worlds: 30
+  wolf_stuck: 105
+  wolf_stuck_helper: 99
+  wolf_stuck_wall: 94
+  wolf_stuck_max_s: 23.6
+  wolf_wall_stuck: 80
+  wolf_wall_stuck_helper: 74
+  wolf_wall_stuck_max_s: 18.533333333333335
+  deer_stuck: 1228
+  deer_stuck_by_beh: {'graze': 1083, 'flee': 143, 'hide': 2}
+  deer_stuck_panic: 143
+  deer_stuck_max_s: 186.53333333333333
+  wolf_stuck_frac: 0.005739600846846019
+  wolf_wall_stuck_frac: 0.002391000561765182
+  deer_stuck_frac: 0.006032420454778145
+  old_wolf_runs: 64
+  old_wolf_max_s: 27.866666666666667
+  old_deer_still: 1050
+  old_deer_flee: 70
+  old_deer_push: 77
+  old_deer_max_s: 157.33333333333334
+  worst_wolf: [(177, 32016, 2, 1975, True, True), (177, 32010, 1, 91, True, True), (169, 32008, 3, 3826, True, True), (155, 32016, 3, 2722, True, True), (119, 32012, 0, 4544, True, True), (111, 32006, 0, 39, True, True)]
+  worst_wolf_wall: [(139, 32015, 2, 2122, True), (115, 32016, 0, 210, True), (114, 32000, 2, 6677, True), (106, 32016, 0, 47, True), (83, 32016, 2, 79, True), (74, 32019, 3, 3651, True)]
+  worst_deer: [(1399, 32009, 71, 1396, 'graze', False), (1180, 32022, 97, 4524, 'graze', False), (931, 32002, 52, 506, 'graze', False), (922, 32025, 125, 2803, 'graze', False), (887, 32014, 6, 574, 'graze', False), (834, 32025, 87, 1421, 'graze', False)]

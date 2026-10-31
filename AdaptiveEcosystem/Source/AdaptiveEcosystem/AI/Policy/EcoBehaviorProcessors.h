@@ -4,21 +4,21 @@
 //
 //   1. UEcoNeighborhoodGatherProcessor   개체 위치를 색인에 넣는다 (매 틱)
 //   2. UEcoPerceptionProcessor           §3.3 기하 입력을 만든다   (매 틱)
-//   3. UEcoPolicyProcessor               관측 7개 → 행동 4개       (PolicyInterval 틱마다)
+//   3. UEcoPolicyProcessor               관측 7개 → 행동 4개       (PolicyInterval/60 초마다)
 //   4. UEcoSteeringProcessor             §3.3 조향 → 속도          (매 틱)
 //   5. (엔진) Mass 이동
 //
 // 1과 2가 나뉘어 있는 이유: 색인이 **모든** 개체를 담은 뒤에야 조회가 맞다.
-// 2와 3이 나뉜 이유: 조향은 매 틱 기하가 필요한데 정책은 PolicyInterval 틱마다만 돈다.
+// 2와 3이 나뉜 이유: 조향은 매 틱 기하가 필요한데 정책은 경과 시간 기반으로 돈다.
 //
-// 스레드: 이 첫 판은 전부 게임 스레드에서 돈다. 서브시스템 색인을 공유하기 때문이다.
-// 병렬화는 색인을 읽기 전용으로 굳힌 뒤의 최적화 과제다.
+// Provider/색인/commit은 게임 스레드. 수치 추론 batch만 선택적으로 worker에서 계산한다.
 
 #pragma once
 
 #include "CoreMinimal.h"
 #include "MassEntityQuery.h"
 #include "MassProcessor.h"
+#include "EcoPolicyClock.h"
 
 #include "EcoBehaviorProcessors.generated.h"
 
@@ -77,9 +77,8 @@ protected:
 
 private:
 	FMassEntityQuery EntityQuery;
+	EcoPolicy::FStepClock LegacyClock;
 
-	/** §9.6 — PolicyInterval 틱마다 지역 EMA 를 한 번 갱신하기 위한 카운터. */
-	int32 TickCounter = 0;
 };
 
 /**
@@ -114,6 +113,8 @@ private:
 	FMassEntityQuery HerbivoreQuery;
 	/** 포획 판정은 파이썬 §4.2 처럼 포식자 쪽에서 한다. */
 	FMassEntityQuery PredatorQuery;
+	EcoPolicy::FStepClock StepClock;
+	int32 EmaPhase = 0;
 };
 
 /** §9.5 — §3.3 조향 수식. 파이썬 `env/steering.py` 와 한 줄씩 대응한다. */

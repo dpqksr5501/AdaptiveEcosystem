@@ -1,5 +1,15 @@
 # Social Behavior & Shelter Runtime — Architecture Context
 
+## 2026-10-23 적용 경로
+
+아래 2026-09-30/10-01 Source 감사의 미연결 표와 그림은 V1 당시 상태·목표 설계다. 현재 v3 통합은 [최신 인수인계](JYU_CHAT_HANDOFF_20261023.md)와 [이주·신호 계약](HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 우선한다.
+
+v3 기본 경로는 개인 감각/기억·Herd 경보 → ReadSignal(읽기)이며 SocialControl=0이다. 기존 행동 보정/slot 훅은 opt-in으로 보존한다. 별도 opt-in 이주는 완료된 자원 경계에서 Herd 공동 의도/Travel을 만들고 기존 Native control hook이 소비한다. Native Step만 이동·대사를 쓰며 실제 목적지 stage 진입 뒤 context/공통 Region과 M4 이주 영수증·집계를 인계한다. Client는 기존 표현만 받는다.
+
+Herd는 지속 정체성과 공동 여정, World는 인접성과 authored corridor, Ecology는 자원/인구, Native는 실제 이동·개인 생존 반응을 소유한다. HUD는 Mass processing 외 snapshot만 읽는다. 새 경로를 V1 PPO 관측/출력 또는 새 replication transport에 섞지 않는다. merge/split·multi-hop gossip·ORCA·자동 Cover는 여전히 Deferred다.
+
+## 과거 감사와 목표 설계
+
 > **Project:** AdaptiveEcosystem  
 > **Engine:** Unreal Engine 5.8  
 > **Repository:** `dpqksr5501/AdaptiveEcosystem`  

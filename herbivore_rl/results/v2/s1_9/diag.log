@@ -1,0 +1,311 @@
+[ablate] v2_1c_s30 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (33s) 평균 행동 [0.1074, 0.8993, 0.3998, 0.0497, 0.4583]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\ablate.md
+  C0                       mean_return 4.72  g_gamma -0.016  survival 371.9  repro 10.00  predation_rate 0.00206  starve_rate 0.00089
+  C1                       mean_return -1.11(-1.56)  g_gamma -0.148(-1.45)  survival 352.2(-3.55)  repro 10.15(+0.82)  predation_rate 0.00222(+6.05)  starve_rate 0.00088(-0.61)
+  C3-forage                mean_return 6.85(+0.57)  g_gamma 0.005(+0.24)  survival 383.1(+1.51)  repro 10.04(+0.18)  predation_rate 0.00203(-1.31)  starve_rate 0.00089(-0.10)
+  C3-cohesion              mean_return 0.32(-0.91)  g_gamma -0.105(-0.74)  survival 371.1(-0.14)  repro 9.81(-0.67)  predation_rate 0.00208(+1.60)  starve_rate 0.00092(+0.63)
+  C3-flee_dist             mean_return 0.80(-1.41)  g_gamma -0.122(-1.65)  survival 365.5(-1.32)  repro 9.88(-0.91)  predation_rate 0.00209(+1.42)  starve_rate 0.00091(+0.85)
+  C3-cover                 mean_return 3.51(-0.38)  g_gamma -0.064(-0.62)  survival 376.0(+0.76)  repro 9.87(-0.75)  predation_rate 0.00203(-1.37)  starve_rate 0.00091(+0.77)
+  C3-speed                 mean_return -6.41(-3.42)  g_gamma -0.249(-3.14)  survival 355.0(-4.16)  repro 9.68(-1.81)  predation_rate 0.00218(+4.35)  starve_rate 0.00092(+1.33)
+  C1'                      mean_return -0.02(-1.08)  g_gamma -0.088(-0.68)  survival 358.8(-1.69)  repro 10.15(+0.68)  predation_rate 0.00219(+3.90)  starve_rate 0.00090(+0.02)
+[permute] v2_1c_s30 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s30\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\permute.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\permute.md
+  C0                       mean_return 4.72  g_gamma -0.016  survival 371.9  repro 10.00  predation_rate 0.00206  starve_rate 0.00089
+  C4-pred_dist-fix         mean_return -6.37(-2.27)  g_gamma -0.250(-2.05)  survival 353.8(-2.70)  repro 9.93(-0.24)  predation_rate 0.00228(+6.62)  starve_rate 0.00089(-0.29)
+  C4-pred_dist-perm        mean_return 2.69(-0.62)  g_gamma -0.038(-0.31)  survival 360.2(-2.30)  repro 10.33(+2.02)  predation_rate 0.00222(+5.57)  starve_rate 0.00085(-2.02)
+  C4-energy-fix            mean_return 0.15(-1.45)  g_gamma -0.094(-0.96)  survival 368.6(-0.87)  repro 9.72(-1.72)  predation_rate 0.00202(-1.46)  starve_rate 0.00096(+2.33)
+  C4-energy-perm           mean_return 0.07(-1.72)  g_gamma -0.136(-1.45)  survival 364.7(-1.69)  repro 9.83(-1.16)  predation_rate 0.00205(-0.39)  starve_rate 0.00096(+2.94)
+[constsearch] v2_1c_s30 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\constsearch.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\constsearch.md
+  C2 vs C0: mean_return 73.96(t=+6.97, 유의)  g_gamma 1.482(t=+6.87, 유의)  survival 421.7(t=+2.30, 유의)  repro 15.63(t=+10.04, 유의)  predation_rate 0.00238(t=+3.98, 유의)  starve_rate 0.00043(t=-5.43, 유의)
+  C2 vs C1: mean_return 73.96(t=+9.57, 유의)  g_gamma 1.482(t=+8.94, 유의)  survival 421.7(t=+3.02, 유의)  repro 15.63(t=+10.61, 유의)  predation_rate 0.00238(t=+1.97, 유의 아님)  starve_rate 0.00043(t=-5.62, 유의)
+[constsearch] v2_1c_s30 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\constsearch_seg.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\constsearch_seg.md
+  C2-seg vs C2: mean_return 86.68(t=+2.37, 유의)  g_gamma 1.811(t=+2.65, 유의)  survival 434.2(t=+1.53, 유의 아님)  repro 16.37(t=+2.12, 유의)  predation_rate 0.00239(t=+0.16, 유의 아님)  starve_rate 0.00032(t=-2.64, 유의)
+  C2-seg vs C0: mean_return 86.68(t=+8.31, 유의)  g_gamma 1.811(t=+8.15, 유의)  survival 434.2(t=+2.66, 유의)  repro 16.37(t=+11.98, 유의)  predation_rate 0.00239(t=+3.93, 유의)  starve_rate 0.00032(t=-5.68, 유의)
+  C2-seg vs C1: mean_return 86.68(t=+10.98, 유의)  g_gamma 1.811(t=+10.37, 유의)  survival 434.2(t=+3.48, 유의)  repro 16.37(t=+13.00, 유의)  predation_rate 0.00239(t=+2.21, 유의)  starve_rate 0.00032(t=-5.66, 유의)
+경고: 모델 학습 γ=0.9916661555611042 와 다른 γ=0.998 로 G_γ 를 잰다 (--gamma 또는 --g998).
+[constsearch] v2_1c_s30 → results\v2\diag_v2_1c_s30\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\diag_v2_1c_s30\g998\c2seg_g998.json
+      results\v2\diag_v2_1c_s30\g998\c2seg_g998.md
+  C2-seg vs C2: mean_return 170.73(t=+2.25, 유의)  g_gamma 5.582(t=+3.63, 유의)  survival 458.7(t=+1.28, 유의 아님)  repro 32.59(t=+1.73, 유의 아님)  predation_rate 0.00239(t=-0.24, 유의 아님)  starve_rate 0.00034(t=-2.71, 유의)
+  C2-seg vs C0: mean_return 170.73(t=+8.24, 유의)  g_gamma 5.582(t=+6.54, 유의)  survival 458.7(t=+2.58, 유의)  repro 32.59(t=+12.53, 유의)  predation_rate 0.00239(t=+4.44, 유의)  starve_rate 0.00034(t=-5.57, 유의)
+[ablate] v2_1c_s30_stoch → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30_stoch  (γ=0.9916661555611042, 꼬리 600스텝, stochastic, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (77s) 평균 행동 [0.1308, 0.8867, 0.4062, 0.0519, 0.4529]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30_stoch\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30_stoch\ablate.md
+  C0                       mean_return 7.63  g_gamma 0.094  survival 372.7  repro 10.40  predation_rate 0.00209  starve_rate 0.00089
+  C1                       mean_return 10.09(+0.81)  g_gamma 0.110(+0.24)  survival 368.2(-1.31)  repro 10.81(+2.02)  predation_rate 0.00223(+5.49)  starve_rate 0.00079(-3.38)
+  C3-forage                mean_return 10.49(+0.87)  g_gamma 0.122(+0.38)  survival 379.3(+1.25)  repro 10.49(+0.50)  predation_rate 0.00208(-0.81)  starve_rate 0.00087(-1.01)
+  C3-cohesion              mean_return 6.11(-0.46)  g_gamma 0.041(-0.63)  survival 370.5(-0.32)  repro 10.26(-0.84)  predation_rate 0.00208(-0.63)  starve_rate 0.00090(+0.57)
+  C3-flee_dist             mean_return 9.32(+0.53)  g_gamma 0.116(+0.29)  survival 370.9(-0.38)  repro 10.58(+0.92)  predation_rate 0.00215(+2.29)  starve_rate 0.00083(-2.31)
+  C3-cover                 mean_return 2.58(-1.43)  g_gamma -0.009(-1.20)  survival 371.1(-0.26)  repro 10.08(-1.60)  predation_rate 0.00211(+0.90)  starve_rate 0.00090(+0.67)
+  C3-speed                 mean_return 6.56(-0.38)  g_gamma 0.049(-0.58)  survival 366.9(-1.48)  repro 10.51(+0.66)  predation_rate 0.00215(+2.97)  starve_rate 0.00088(-0.41)
+  C1'                      mean_return 7.42(-0.08)  g_gamma 0.072(-0.35)  survival 366.5(-1.43)  repro 10.75(+2.24)  predation_rate 0.00219(+4.83)  starve_rate 0.00088(-0.49)
+[curves] v2_1c_s30 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s30\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\curves.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\curves.md
+[r2] v2_1c_s30 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s30\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\r2.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s30\r2.md
+  R² C0: forage 0.892 cohesion 0.874 flee_dist 0.952 cover 0.321 speed 0.948
+[ablate] v2_1c_s31 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (85s) 평균 행동 [0.1424, 0.9503, 0.4277, 0.7204, 0.3607]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\ablate.md
+  C0                       mean_return -44.61  g_gamma -1.004  survival 315.9  repro 6.87  predation_rate 0.00201  starve_rate 0.00123
+  C1                       mean_return -55.90(-2.15)  g_gamma -1.178(-1.41)  survival 310.7(-0.58)  repro 6.75(-0.72)  predation_rate 0.00210(+1.74)  starve_rate 0.00136(+1.51)
+  C3-forage                mean_return -46.17(-0.54)  g_gamma -1.052(-0.62)  survival 316.4(+0.14)  repro 6.80(-0.48)  predation_rate 0.00203(+0.46)  starve_rate 0.00124(+0.32)
+  C3-cohesion              mean_return -52.31(-2.61)  g_gamma -1.208(-2.49)  survival 308.2(-1.42)  repro 6.44(-2.95)  predation_rate 0.00203(+1.00)  starve_rate 0.00128(+2.24)
+  C3-flee_dist             mean_return -48.72(-1.45)  g_gamma -1.125(-1.53)  survival 312.6(-0.63)  repro 6.64(-1.65)  predation_rate 0.00204(+0.83)  starve_rate 0.00125(+0.76)
+  C3-cover                 mean_return -52.06(-2.18)  g_gamma -1.204(-2.16)  survival 309.3(-1.14)  repro 6.42(-2.53)  predation_rate 0.00202(+0.49)  starve_rate 0.00128(+2.02)
+  C3-speed                 mean_return -50.55(-1.22)  g_gamma -1.051(-0.39)  survival 321.7(+0.68)  repro 6.70(-0.95)  predation_rate 0.00204(+0.58)  starve_rate 0.00130(+0.78)
+  C1'                      mean_return -50.18(-1.31)  g_gamma -1.065(-0.57)  survival 311.2(-0.76)  repro 7.02(+0.93)  predation_rate 0.00216(+4.96)  starve_rate 0.00125(+0.20)
+[permute] v2_1c_s31 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s31\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\permute.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\permute.md
+  C0                       mean_return -44.61  g_gamma -1.004  survival 315.9  repro 6.87  predation_rate 0.00201  starve_rate 0.00123
+  C4-pred_dist-fix         mean_return -55.66(-3.08)  g_gamma -1.215(-2.32)  survival 302.0(-2.89)  repro 6.66(-1.08)  predation_rate 0.00221(+5.37)  starve_rate 0.00122(-0.73)
+  C4-pred_dist-perm        mean_return -51.56(-2.14)  g_gamma -1.107(-1.28)  survival 312.1(-1.09)  repro 6.69(-1.45)  predation_rate 0.00215(+3.52)  starve_rate 0.00121(-0.90)
+  C4-energy-fix            mean_return -47.48(-0.79)  g_gamma -1.037(-0.36)  survival 328.3(+1.52)  repro 6.49(-2.79)  predation_rate 0.00185(-6.78)  starve_rate 0.00138(+2.12)
+  C4-energy-perm           mean_return -46.59(-0.55)  g_gamma -0.993(+0.12)  survival 321.5(+1.00)  repro 6.85(-0.10)  predation_rate 0.00200(-0.48)  starve_rate 0.00129(+0.92)
+[constsearch] v2_1c_s31 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\constsearch.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\constsearch.md
+  C2 vs C0: mean_return 73.96(t=+9.65, 유의)  g_gamma 1.482(t=+9.01, 유의)  survival 421.7(t=+3.48, 유의)  repro 15.63(t=+11.35, 유의)  predation_rate 0.00238(t=+5.40, 유의)  starve_rate 0.00043(t=-10.49, 유의)
+  C2 vs C1: mean_return 73.96(t=+12.17, 유의)  g_gamma 1.482(t=+11.09, 유의)  survival 421.7(t=+3.57, 유의)  repro 15.63(t=+11.52, 유의)  predation_rate 0.00238(t=+4.67, 유의)  starve_rate 0.00043(t=-10.91, 유의)
+[constsearch] v2_1c_s31 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\constsearch_seg.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\constsearch_seg.md
+  C2-seg vs C2: mean_return 86.68(t=+2.37, 유의)  g_gamma 1.811(t=+2.65, 유의)  survival 434.2(t=+1.53, 유의 아님)  repro 16.37(t=+2.12, 유의)  predation_rate 0.00239(t=+0.16, 유의 아님)  starve_rate 0.00032(t=-2.64, 유의)
+  C2-seg vs C0: mean_return 86.68(t=+11.31, 유의)  g_gamma 1.811(t=+10.87, 유의)  survival 434.2(t=+3.82, 유의)  repro 16.37(t=+13.07, 유의)  predation_rate 0.00239(t=+5.40, 유의)  starve_rate 0.00032(t=-12.83, 유의)
+  C2-seg vs C1: mean_return 86.68(t=+13.47, 유의)  g_gamma 1.811(t=+12.76, 유의)  survival 434.2(t=+3.90, 유의)  repro 16.37(t=+13.26, 유의)  predation_rate 0.00239(t=+3.42, 유의)  starve_rate 0.00032(t=-10.01, 유의)
+경고: 모델 학습 γ=0.9916661555611042 와 다른 γ=0.998 로 G_γ 를 잰다 (--gamma 또는 --g998).
+[constsearch] v2_1c_s31 → results\v2\diag_v2_1c_s31\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\diag_v2_1c_s31\g998\c2seg_g998.json
+      results\v2\diag_v2_1c_s31\g998\c2seg_g998.md
+  C2-seg vs C2: mean_return 170.73(t=+2.25, 유의)  g_gamma 5.582(t=+3.63, 유의)  survival 458.7(t=+1.28, 유의 아님)  repro 32.59(t=+1.73, 유의 아님)  predation_rate 0.00239(t=-0.24, 유의 아님)  starve_rate 0.00034(t=-2.71, 유의)
+  C2-seg vs C0: mean_return 170.73(t=+12.12, 유의)  g_gamma 5.582(t=+8.59, 유의)  survival 458.7(t=+3.78, 유의)  repro 32.59(t=+13.55, 유의)  predation_rate 0.00239(t=+5.48, 유의)  starve_rate 0.00034(t=-13.85, 유의)
+[ablate] v2_1c_s31_stoch → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31_stoch  (γ=0.9916661555611042, 꼬리 600스텝, stochastic, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (89s) 평균 행동 [0.1689, 0.9481, 0.44, 0.6982, 0.3715]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31_stoch\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31_stoch\ablate.md
+  C0                       mean_return -40.75  g_gamma -0.886  survival 330.8  repro 7.11  predation_rate 0.00208  starve_rate 0.00115
+  C1                       mean_return -44.90(-0.94)  g_gamma -0.913(-0.28)  survival 326.4(-0.63)  repro 7.32(+1.18)  predation_rate 0.00209(+0.66)  starve_rate 0.00127(+2.02)
+  C3-forage                mean_return -42.06(-0.59)  g_gamma -0.928(-0.64)  survival 326.6(-0.92)  repro 7.13(+0.21)  predation_rate 0.00209(+0.51)  starve_rate 0.00118(+1.08)
+  C3-cohesion              mean_return -45.61(-2.04)  g_gamma -0.980(-1.72)  survival 326.1(-1.01)  repro 6.89(-1.83)  predation_rate 0.00208(+0.18)  starve_rate 0.00120(+1.93)
+  C3-flee_dist             mean_return -39.91(+0.23)  g_gamma -0.838(+0.55)  survival 331.8(+0.17)  repro 7.08(-0.12)  predation_rate 0.00206(-1.20)  starve_rate 0.00115(-0.15)
+  C3-cover                 mean_return -41.37(-0.28)  g_gamma -0.897(-0.22)  survival 333.3(+0.61)  repro 7.08(-0.28)  predation_rate 0.00206(-0.51)  starve_rate 0.00117(+0.88)
+  C3-speed                 mean_return -41.65(-0.26)  g_gamma -0.840(+0.63)  survival 335.7(+0.76)  repro 7.32(+1.75)  predation_rate 0.00203(-2.13)  starve_rate 0.00126(+2.41)
+  C1'                      mean_return -47.38(-2.26)  g_gamma -0.970(-1.19)  survival 312.9(-4.13)  repro 7.40(+2.01)  predation_rate 0.00219(+4.93)  starve_rate 0.00124(+3.15)
+[curves] v2_1c_s31 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s31\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\curves.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\curves.md
+[r2] v2_1c_s31 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s31\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\r2.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s31\r2.md
+  R² C0: forage 0.887 cohesion 0.378 flee_dist 0.986 cover 0.927 speed 0.982
+[ablate] v2_1c_s32 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (36s) 평균 행동 [0.6812, 0.9434, 0.2529, 0.3453, 0.426]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\ablate.md
+  C0                       mean_return 80.09  g_gamma 1.593  survival 450.5  repro 15.20  predation_rate 0.00215  starve_rate 0.00044
+  C1                       mean_return 62.66(-3.86)  g_gamma 1.253(-3.04)  survival 415.1(-4.03)  repro 14.88(-1.22)  predation_rate 0.00242(+6.08)  starve_rate 0.00045(+0.38)
+  C3-forage                mean_return 78.25(-0.47)  g_gamma 1.605(+0.12)  survival 458.2(+1.37)  repro 15.02(-0.75)  predation_rate 0.00213(-0.63)  starve_rate 0.00045(+0.43)
+  C3-cohesion              mean_return 80.62(+0.16)  g_gamma 1.613(+0.22)  survival 453.7(+0.47)  repro 15.23(+0.15)  predation_rate 0.00213(-0.86)  starve_rate 0.00045(+0.35)
+  C3-flee_dist             mean_return 72.98(-1.83)  g_gamma 1.466(-1.25)  survival 432.7(-2.48)  repro 15.17(-0.12)  predation_rate 0.00226(+4.62)  starve_rate 0.00047(+1.07)
+  C3-cover                 mean_return 71.73(-1.93)  g_gamma 1.434(-1.44)  survival 448.8(-0.15)  repro 14.71(-2.04)  predation_rate 0.00217(+0.93)  starve_rate 0.00048(+1.34)
+  C3-speed                 mean_return 70.33(-2.27)  g_gamma 1.388(-1.85)  survival 431.4(-2.44)  repro 15.15(-0.21)  predation_rate 0.00235(+6.13)  starve_rate 0.00042(-0.63)
+  C1'                      mean_return 65.15(-2.65)  g_gamma 1.335(-1.97)  survival 423.9(-3.86)  repro 14.99(-0.72)  predation_rate 0.00238(+7.20)  starve_rate 0.00046(+0.38)
+[permute] v2_1c_s32 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s32\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\permute.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\permute.md
+  C0                       mean_return 80.09  g_gamma 1.593  survival 450.5  repro 15.20  predation_rate 0.00215  starve_rate 0.00044
+  C4-pred_dist-fix         mean_return 64.77(-3.02)  g_gamma 1.267(-2.72)  survival 416.9(-4.26)  repro 15.24(+0.16)  predation_rate 0.00244(+6.43)  starve_rate 0.00046(+0.69)
+  C4-pred_dist-perm        mean_return 65.49(-3.65)  g_gamma 1.298(-2.98)  survival 412.5(-4.84)  repro 14.93(-1.12)  predation_rate 0.00239(+7.71)  starve_rate 0.00044(-0.00)
+  C4-energy-fix            mean_return 75.75(-1.10)  g_gamma 1.513(-0.70)  survival 460.7(+1.00)  repro 14.88(-1.58)  predation_rate 0.00212(-0.78)  starve_rate 0.00048(+0.92)
+  C4-energy-perm           mean_return 68.34(-2.34)  g_gamma 1.336(-1.97)  survival 450.5(+0.00)  repro 14.44(-3.27)  predation_rate 0.00217(+1.00)  starve_rate 0.00049(+1.17)
+[constsearch] v2_1c_s32 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\constsearch.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\constsearch.md
+  C2 vs C0: mean_return 73.96(t=-1.13, 유의 아님)  g_gamma 1.482(t=-0.80, 유의 아님)  survival 421.7(t=-2.61, 유의)  repro 15.63(t=+1.11, 유의 아님)  predation_rate 0.00238(t=+4.28, 유의)  starve_rate 0.00043(t=-0.27, 유의 아님)
+  C2 vs C1: mean_return 73.96(t=+1.77, 유의 아님)  g_gamma 1.482(t=+1.44, 유의 아님)  survival 421.7(t=+0.59, 유의 아님)  repro 15.63(t=+1.78, 유의 아님)  predation_rate 0.00238(t=-0.92, 유의 아님)  starve_rate 0.00043(t=-0.57, 유의 아님)
+[constsearch] v2_1c_s32 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\constsearch_seg.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\constsearch_seg.md
+  C2-seg vs C2: mean_return 86.68(t=+2.37, 유의)  g_gamma 1.811(t=+2.65, 유의)  survival 434.2(t=+1.53, 유의 아님)  repro 16.37(t=+2.12, 유의)  predation_rate 0.00239(t=+0.16, 유의 아님)  starve_rate 0.00032(t=-2.64, 유의)
+  C2-seg vs C0: mean_return 86.68(t=+1.27, 유의 아님)  g_gamma 1.811(t=+1.90, 유의 아님)  survival 434.2(t=-1.75, 유의 아님)  repro 16.37(t=+3.63, 유의)  predation_rate 0.00239(t=+4.07, 유의)  starve_rate 0.00032(t=-3.13, 유의)
+  C2-seg vs C1: mean_return 86.68(t=+4.50, 유의)  g_gamma 1.811(t=+4.77, 유의)  survival 434.2(t=+1.90, 유의 아님)  repro 16.37(t=+3.71, 유의)  predation_rate 0.00239(t=-0.62, 유의 아님)  starve_rate 0.00032(t=-2.67, 유의)
+경고: 모델 학습 γ=0.9916661555611042 와 다른 γ=0.998 로 G_γ 를 잰다 (--gamma 또는 --g998).
+[constsearch] v2_1c_s32 → results\v2\diag_v2_1c_s32\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\diag_v2_1c_s32\g998\c2seg_g998.json
+      results\v2\diag_v2_1c_s32\g998\c2seg_g998.md
+  C2-seg vs C2: mean_return 170.73(t=+2.25, 유의)  g_gamma 5.582(t=+3.63, 유의)  survival 458.7(t=+1.28, 유의 아님)  repro 32.59(t=+1.73, 유의 아님)  predation_rate 0.00239(t=-0.24, 유의 아님)  starve_rate 0.00034(t=-2.71, 유의)
+  C2-seg vs C0: mean_return 170.73(t=+1.12, 유의 아님)  g_gamma 5.582(t=+1.08, 유의 아님)  survival 458.7(t=-2.23, 유의)  repro 32.59(t=+4.20, 유의)  predation_rate 0.00239(t=+4.50, 유의)  starve_rate 0.00034(t=-3.14, 유의)
+[ablate] v2_1c_s32_stoch → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32_stoch  (γ=0.9916661555611042, 꼬리 600스텝, stochastic, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (97s) 평균 행동 [0.6645, 0.9349, 0.2642, 0.3594, 0.4225]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32_stoch\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32_stoch\ablate.md
+  C0                       mean_return 66.85  g_gamma 1.415  survival 452.1  repro 14.29  predation_rate 0.00220  starve_rate 0.00046
+  C1                       mean_return 66.86(+0.00)  g_gamma 1.340(-0.64)  survival 433.2(-1.17)  repro 15.18(+4.07)  predation_rate 0.00239(+6.27)  starve_rate 0.00046(+0.08)
+  C3-forage                mean_return 65.63(-0.24)  g_gamma 1.403(-0.09)  survival 441.8(-1.37)  repro 14.20(-0.25)  predation_rate 0.00219(-0.26)  starve_rate 0.00047(+0.52)
+  C3-cohesion              mean_return 60.49(-1.50)  g_gamma 1.240(-1.57)  survival 444.3(-0.75)  repro 13.88(-1.63)  predation_rate 0.00221(+0.41)  starve_rate 0.00049(+1.24)
+  C3-flee_dist             mean_return 63.90(-0.70)  g_gamma 1.299(-1.14)  survival 421.9(-2.92)  repro 14.51(+0.65)  predation_rate 0.00231(+4.55)  starve_rate 0.00045(-0.51)
+  C3-cover                 mean_return 56.69(-3.83)  g_gamma 1.181(-3.23)  survival 441.0(-2.01)  repro 13.61(-2.97)  predation_rate 0.00221(+0.49)  starve_rate 0.00051(+2.74)
+  C3-speed                 mean_return 60.43(-1.74)  g_gamma 1.228(-1.91)  survival 423.8(-3.08)  repro 14.28(-0.03)  predation_rate 0.00229(+4.02)  starve_rate 0.00049(+1.38)
+  C1'                      mean_return 47.15(-5.49)  g_gamma 0.942(-5.32)  survival 396.5(-4.32)  repro 13.88(-1.68)  predation_rate 0.00238(+12.18)  starve_rate 0.00058(+3.61)
+[curves] v2_1c_s32 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s32\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\curves.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\curves.md
+[r2] v2_1c_s32 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s32\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\r2.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s32\r2.md
+  R² C0: forage 0.957 cohesion 0.537 flee_dist 0.905 cover 0.979 speed 0.944
+[ablate] v2_1c_s33 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (35s) 평균 행동 [0.2755, 0.8488, 0.2525, 0.5379, 0.3595]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\ablate.md
+  C0                       mean_return -24.33  g_gamma -0.570  survival 326.7  repro 8.53  predation_rate 0.00212  starve_rate 0.00108
+  C1                       mean_return -8.86(+1.89)  g_gamma -0.121(+2.33)  survival 368.9(+2.24)  repro 9.82(+4.39)  predation_rate 0.00229(+3.85)  starve_rate 0.00090(-1.60)
+  C3-forage                mean_return -21.62(+1.44)  g_gamma -0.486(+1.76)  survival 330.1(+0.93)  repro 8.76(+1.91)  predation_rate 0.00213(+0.38)  starve_rate 0.00107(-0.78)
+  C3-cohesion              mean_return -28.16(-1.31)  g_gamma -0.669(-1.46)  survival 321.8(-1.09)  repro 8.23(-1.78)  predation_rate 0.00213(+0.25)  starve_rate 0.00109(+0.55)
+  C3-flee_dist             mean_return -26.93(-1.21)  g_gamma -0.590(-0.34)  survival 321.9(-1.02)  repro 8.52(-0.04)  predation_rate 0.00219(+2.86)  starve_rate 0.00107(-0.79)
+  C3-cover                 mean_return -28.20(-1.87)  g_gamma -0.642(-1.45)  survival 322.5(-1.21)  repro 8.26(-2.17)  predation_rate 0.00214(+0.88)  starve_rate 0.00108(-0.06)
+  C3-speed                 mean_return -5.79(+3.88)  g_gamma -0.152(+3.51)  survival 374.1(+2.95)  repro 9.41(+5.12)  predation_rate 0.00212(+0.03)  starve_rate 0.00092(-1.66)
+  C1'                      mean_return -26.22(-0.53)  g_gamma -0.487(+0.91)  survival 335.4(+1.15)  repro 8.55(+0.17)  predation_rate 0.00231(+5.10)  starve_rate 0.00096(-2.22)
+[permute] v2_1c_s33 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s33\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\permute.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\permute.md
+  C0                       mean_return -24.33  g_gamma -0.570  survival 326.7  repro 8.53  predation_rate 0.00212  starve_rate 0.00108
+  C4-pred_dist-fix         mean_return -26.67(-0.82)  g_gamma -0.649(-1.11)  survival 318.1(-1.52)  repro 8.64(+0.67)  predation_rate 0.00219(+3.34)  starve_rate 0.00109(+0.43)
+  C4-pred_dist-perm        mean_return -22.49(+0.63)  g_gamma -0.485(+1.21)  survival 331.8(+1.08)  repro 8.61(+0.59)  predation_rate 0.00221(+3.07)  starve_rate 0.00099(-4.11)
+  C4-energy-fix            mean_return -4.12(+4.46)  g_gamma -0.008(+4.52)  survival 369.6(+3.11)  repro 9.51(+4.22)  predation_rate 0.00212(+0.14)  starve_rate 0.00090(-2.81)
+  C4-energy-perm           mean_return -9.93(+3.61)  g_gamma -0.198(+3.75)  survival 360.0(+2.79)  repro 9.30(+4.61)  predation_rate 0.00219(+3.30)  starve_rate 0.00091(-3.19)
+[constsearch] v2_1c_s33 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\constsearch.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\constsearch.md
+  C2 vs C0: mean_return 73.96(t=+9.39, 유의)  g_gamma 1.482(t=+8.62, 유의)  survival 421.7(t=+3.38, 유의)  repro 15.63(t=+10.50, 유의)  predation_rate 0.00238(t=+4.70, 유의)  starve_rate 0.00043(t=-8.80, 유의)
+  C2 vs C1: mean_return 73.96(t=+7.94, 유의)  g_gamma 1.482(t=+7.15, 유의)  survival 421.7(t=+3.96, 유의)  repro 15.63(t=+8.30, 유의)  predation_rate 0.00238(t=+1.68, 유의 아님)  starve_rate 0.00043(t=-4.57, 유의)
+[constsearch] v2_1c_s33 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\constsearch_seg.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\constsearch_seg.md
+  C2-seg vs C2: mean_return 86.68(t=+2.37, 유의)  g_gamma 1.811(t=+2.65, 유의)  survival 434.2(t=+1.53, 유의 아님)  repro 16.37(t=+2.12, 유의)  predation_rate 0.00239(t=+0.16, 유의 아님)  starve_rate 0.00032(t=-2.64, 유의)
+  C2-seg vs C0: mean_return 86.68(t=+11.40, 유의)  g_gamma 1.811(t=+10.92, 유의)  survival 434.2(t=+3.78, 유의)  repro 16.37(t=+12.34, 유의)  predation_rate 0.00239(t=+4.94, 유의)  starve_rate 0.00032(t=-11.36, 유의)
+  C2-seg vs C1: mean_return 86.68(t=+8.87, 유의)  g_gamma 1.811(t=+8.48, 유의)  survival 434.2(t=+4.33, 유의)  repro 16.37(t=+10.24, 유의)  predation_rate 0.00239(t=+1.32, 유의 아님)  starve_rate 0.00032(t=-4.68, 유의)
+경고: 모델 학습 γ=0.9916661555611042 와 다른 γ=0.998 로 G_γ 를 잰다 (--gamma 또는 --g998).
+[constsearch] v2_1c_s33 → results\v2\diag_v2_1c_s33\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\diag_v2_1c_s33\g998\c2seg_g998.json
+      results\v2\diag_v2_1c_s33\g998\c2seg_g998.md
+  C2-seg vs C2: mean_return 170.73(t=+2.25, 유의)  g_gamma 5.582(t=+3.63, 유의)  survival 458.7(t=+1.28, 유의 아님)  repro 32.59(t=+1.73, 유의 아님)  predation_rate 0.00239(t=-0.24, 유의 아님)  starve_rate 0.00034(t=-2.71, 유의)
+  C2-seg vs C0: mean_return 170.73(t=+11.41, 유의)  g_gamma 5.582(t=+8.18, 유의)  survival 458.7(t=+3.67, 유의)  repro 32.59(t=+12.85, 유의)  predation_rate 0.00239(t=+5.59, 유의)  starve_rate 0.00034(t=-11.44, 유의)
+[ablate] v2_1c_s33_stoch → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33_stoch  (γ=0.9916661555611042, 꼬리 600스텝, stochastic, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (29s) 평균 행동 [0.2905, 0.8366, 0.2687, 0.5556, 0.3742]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33_stoch\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33_stoch\ablate.md
+  C0                       mean_return -13.76  g_gamma -0.296  survival 361.9  repro 8.82  predation_rate 0.00215  starve_rate 0.00092
+  C1                       mean_return -7.25(+0.98)  g_gamma -0.114(+1.18)  survival 372.7(+0.77)  repro 9.88(+3.12)  predation_rate 0.00227(+3.06)  starve_rate 0.00090(-0.29)
+  C3-forage                mean_return -9.12(+1.54)  g_gamma -0.143(+1.88)  survival 362.9(+0.22)  repro 9.22(+2.13)  predation_rate 0.00217(+0.92)  starve_rate 0.00090(-1.20)
+  C3-cohesion              mean_return -13.59(+0.05)  g_gamma -0.279(+0.21)  survival 355.1(-1.26)  repro 8.92(+0.55)  predation_rate 0.00219(+2.03)  starve_rate 0.00090(-0.89)
+  C3-flee_dist             mean_return -12.44(+0.45)  g_gamma -0.230(+0.93)  survival 359.4(-0.57)  repro 9.06(+1.27)  predation_rate 0.00223(+3.84)  starve_rate 0.00087(-2.45)
+  C3-cover                 mean_return -15.35(-0.46)  g_gamma -0.305(-0.09)  survival 361.2(-0.11)  repro 8.71(-0.56)  predation_rate 0.00216(+0.82)  starve_rate 0.00092(-0.22)
+  C3-speed                 mean_return -8.19(+1.40)  g_gamma -0.189(+1.14)  survival 372.2(+1.32)  repro 9.32(+2.36)  predation_rate 0.00213(-0.59)  starve_rate 0.00094(+0.27)
+  C1'                      mean_return -23.66(-2.63)  g_gamma -0.455(-1.71)  survival 332.3(-4.79)  repro 8.93(+0.44)  predation_rate 0.00228(+5.84)  starve_rate 0.00102(+3.04)
+[curves] v2_1c_s33 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s33\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\curves.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\curves.md
+[r2] v2_1c_s33 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s33\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\r2.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s33\r2.md
+  R² C0: forage 0.977 cohesion 0.897 flee_dist 0.953 cover 0.995 speed 0.984
+[ablate] v2_1c_s34 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (35s) 평균 행동 [0.7699, 0.8441, 0.5988, 0.3663, 0.4557]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\ablate.md
+  C0                       mean_return 86.58  g_gamma 1.793  survival 482.1  repro 15.14  predation_rate 0.00202  starve_rate 0.00042
+  C1                       mean_return 64.32(-4.33)  g_gamma 1.362(-3.52)  survival 432.6(-4.82)  repro 14.55(-1.87)  predation_rate 0.00223(+6.37)  starve_rate 0.00053(+2.52)
+  C3-forage                mean_return 79.02(-2.29)  g_gamma 1.635(-1.84)  survival 470.4(-1.50)  repro 14.79(-1.58)  predation_rate 0.00205(+1.77)  starve_rate 0.00046(+1.64)
+  C3-cohesion              mean_return 83.27(-1.14)  g_gamma 1.764(-0.33)  survival 479.6(-0.24)  repro 15.02(-0.61)  predation_rate 0.00202(+0.15)  starve_rate 0.00046(+1.68)
+  C3-flee_dist             mean_return 82.12(-0.97)  g_gamma 1.687(-0.92)  survival 470.8(-1.71)  repro 14.99(-0.46)  predation_rate 0.00202(+0.38)  starve_rate 0.00047(+1.92)
+  C3-cover                 mean_return 78.99(-2.33)  g_gamma 1.621(-2.07)  survival 481.1(-0.13)  repro 14.67(-1.88)  predation_rate 0.00204(+1.22)  starve_rate 0.00045(+1.73)
+  C3-speed                 mean_return 66.97(-3.78)  g_gamma 1.351(-3.63)  survival 436.0(-5.94)  repro 14.62(-1.46)  predation_rate 0.00221(+8.15)  starve_rate 0.00052(+2.63)
+  C1'                      mean_return 59.01(-7.34)  g_gamma 1.204(-5.95)  survival 435.7(-5.26)  repro 13.98(-4.60)  predation_rate 0.00219(+5.67)  starve_rate 0.00055(+3.62)
+[permute] v2_1c_s34 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s34\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\permute.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\permute.md
+  C0                       mean_return 86.58  g_gamma 1.793  survival 482.1  repro 15.14  predation_rate 0.00202  starve_rate 0.00042
+  C4-pred_dist-fix         mean_return 67.00(-4.48)  g_gamma 1.352(-3.84)  survival 429.2(-5.89)  repro 14.62(-1.80)  predation_rate 0.00225(+8.57)  starve_rate 0.00048(+1.95)
+  C4-pred_dist-perm        mean_return 69.15(-4.07)  g_gamma 1.429(-3.43)  survival 442.8(-4.45)  repro 14.71(-1.65)  predation_rate 0.00224(+6.40)  starve_rate 0.00046(+1.37)
+  C4-energy-fix            mean_return 79.28(-1.46)  g_gamma 1.631(-1.28)  survival 479.0(-0.38)  repro 14.67(-1.62)  predation_rate 0.00195(-2.27)  starve_rate 0.00053(+2.31)
+  C4-energy-perm           mean_return 79.59(-1.51)  g_gamma 1.646(-1.16)  survival 477.7(-0.41)  repro 14.94(-0.64)  predation_rate 0.00206(+2.42)  starve_rate 0.00048(+1.73)
+[constsearch] v2_1c_s34 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\constsearch.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\constsearch.md
+  C2 vs C0: mean_return 73.96(t=-2.09, 유의 아님)  g_gamma 1.482(t=-1.99, 유의 아님)  survival 421.7(t=-4.72, 유의)  repro 15.63(t=+1.09, 유의 아님)  predation_rate 0.00238(t=+6.08, 유의)  starve_rate 0.00043(t=+0.15, 유의 아님)
+  C2 vs C1: mean_return 73.96(t=+1.57, 유의 아님)  g_gamma 1.482(t=+0.79, 유의 아님)  survival 421.7(t=-0.90, 유의 아님)  repro 15.63(t=+2.14, 유의)  predation_rate 0.00238(t=+2.80, 유의)  starve_rate 0.00043(t=-2.23, 유의)
+[constsearch] v2_1c_s34 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\constsearch_seg.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\constsearch_seg.md
+  C2-seg vs C2: mean_return 86.68(t=+2.37, 유의)  g_gamma 1.811(t=+2.65, 유의)  survival 434.2(t=+1.53, 유의 아님)  repro 16.37(t=+2.12, 유의)  predation_rate 0.00239(t=+0.16, 유의 아님)  starve_rate 0.00032(t=-2.64, 유의)
+  C2-seg vs C0: mean_return 86.68(t=+0.03, 유의 아님)  g_gamma 1.811(t=+0.20, 유의 아님)  survival 434.2(t=-4.76, 유의)  repro 16.37(t=+4.08, 유의)  predation_rate 0.00239(t=+6.43, 유의)  starve_rate 0.00032(t=-3.14, 유의)
+  C2-seg vs C1: mean_return 86.68(t=+4.45, 유의)  g_gamma 1.811(t=+3.87, 유의)  survival 434.2(t=+0.18, 유의 아님)  repro 16.37(t=+4.87, 유의)  predation_rate 0.00239(t=+2.45, 유의)  starve_rate 0.00032(t=-3.28, 유의)
+경고: 모델 학습 γ=0.9916661555611042 와 다른 γ=0.998 로 G_γ 를 잰다 (--gamma 또는 --g998).
+[constsearch] v2_1c_s34 → results\v2\diag_v2_1c_s34\g998  (γ=0.998, 꼬리 2500스텝, 앞 500스텝, 워커 6)
+저장: results\v2\diag_v2_1c_s34\g998\c2seg_g998.json
+      results\v2\diag_v2_1c_s34\g998\c2seg_g998.md
+  C2-seg vs C2: mean_return 170.73(t=+2.25, 유의)  g_gamma 5.582(t=+3.63, 유의)  survival 458.7(t=+1.28, 유의 아님)  repro 32.59(t=+1.73, 유의 아님)  predation_rate 0.00239(t=-0.24, 유의 아님)  starve_rate 0.00034(t=-2.71, 유의)
+  C2-seg vs C0: mean_return 170.73(t=+0.38, 유의 아님)  g_gamma 5.582(t=-0.98, 유의 아님)  survival 458.7(t=-3.41, 유의)  repro 32.59(t=+3.97, 유의)  predation_rate 0.00239(t=+6.46, 유의)  starve_rate 0.00034(t=-3.00, 유의)
+[ablate] v2_1c_s34_stoch → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34_stoch  (γ=0.9916661555611042, 꼬리 600스텝, stochastic, 워커 6)
+[보정] 학습 시드 0~19 × 3000 (31s) 평균 행동 [0.7574, 0.832, 0.5852, 0.3824, 0.4502]
+  Utility 참고 행 생략: Utility 는 행동 4개만 낸다(이 세계 5개, Utility v2 없음)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34_stoch\ablate.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34_stoch\ablate.md
+  C0                       mean_return 60.62  g_gamma 1.272  survival 449.5  repro 13.79  predation_rate 0.00211  starve_rate 0.00055
+  C1                       mean_return 57.62(-0.88)  g_gamma 1.140(-1.52)  survival 421.9(-2.56)  repro 14.13(+1.53)  predation_rate 0.00225(+5.24)  starve_rate 0.00056(+0.16)
+  C3-forage                mean_return 58.17(-0.55)  g_gamma 1.212(-0.51)  survival 438.1(-0.85)  repro 13.70(-0.32)  predation_rate 0.00214(+1.31)  starve_rate 0.00055(+0.03)
+  C3-cohesion              mean_return 58.31(-0.58)  g_gamma 1.240(-0.36)  survival 450.2(+0.07)  repro 13.58(-0.73)  predation_rate 0.00211(+0.02)  starve_rate 0.00055(+0.12)
+  C3-flee_dist             mean_return 65.74(+1.61)  g_gamma 1.415(+1.86)  survival 451.6(+0.36)  repro 14.10(+1.50)  predation_rate 0.00212(+0.31)  starve_rate 0.00051(-1.91)
+  C3-cover                 mean_return 55.45(-1.56)  g_gamma 1.162(-1.36)  survival 437.2(-1.85)  repro 13.37(-1.94)  predation_rate 0.00215(+2.19)  starve_rate 0.00054(-0.62)
+  C3-speed                 mean_return 59.75(-0.28)  g_gamma 1.220(-0.73)  survival 427.9(-2.22)  repro 14.17(+1.74)  predation_rate 0.00218(+2.09)  starve_rate 0.00059(+1.23)
+  C1'                      mean_return 44.17(-3.95)  g_gamma 0.940(-3.45)  survival 413.5(-3.15)  repro 13.33(-1.71)  predation_rate 0.00223(+6.32)  starve_rate 0.00067(+3.54)
+[curves] v2_1c_s34 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s34\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\curves.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\curves.md
+[r2] v2_1c_s34 → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+[보정] 캐시 사용 C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\runs\v2_diag\v2_1c_s34\calib.npz
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\r2.json
+      C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c_s34\r2.md
+  R² C0: forage 0.966 cohesion 0.920 flee_dist 0.982 cover 0.979 speed 0.984
+[report] v2_1c → C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\diag_v2_1c\report.md
+[modecmp] report_v2_1 → results\v2\diag_v2_1c  (γ=0.9916661555611042, 꼬리 600스텝, 워커 6)
+저장: results\v2\diag_v2_1c\modecmp.json
+      results\v2\diag_v2_1c\modecmp.md
+  γ 0.991666: #29 신호 있음

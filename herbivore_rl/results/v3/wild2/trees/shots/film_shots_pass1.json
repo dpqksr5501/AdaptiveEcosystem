@@ -1,0 +1,15 @@
+{
+  "name": "trees",
+  "fps": 30,
+  "frames": 48,
+  "shots": [
+    {"region": "Forest", "mode": "top", "subject": 0, "subject_id": -1, "start": 6.000, "duration": 0.200, "first_frame": 0, "frames": 6, "sim_first": 6.000, "sim_last": 6.167, "alive_start": 128, "alive_end": 128, "caught_start": 0, "caught_end": 0, "starved_start": 0, "starved_end": 0},
+    {"region": "Forest", "mode": "top", "subject": 0, "subject_id": -1, "start": 9.000, "duration": 0.200, "first_frame": 6, "frames": 6, "sim_first": 9.000, "sim_last": 9.167, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Forest", "mode": "wide", "subject": 0, "subject_id": -1, "start": 12.000, "duration": 0.200, "first_frame": 12, "frames": 6, "sim_first": 12.000, "sim_last": 12.167, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Forest", "mode": "wide", "subject": 0, "subject_id": -1, "start": 15.000, "duration": 0.200, "first_frame": 18, "frames": 6, "sim_first": 15.000, "sim_last": 15.167, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Forest", "mode": "shelter", "subject": 0, "subject_id": -1, "start": 18.000, "duration": 0.200, "first_frame": 24, "frames": 6, "sim_first": 18.000, "sim_last": 18.167, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Highland", "mode": "top", "subject": 0, "subject_id": -1, "start": 21.000, "duration": 0.200, "first_frame": 30, "frames": 6, "sim_first": 21.000, "sim_last": 21.167, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Highland", "mode": "wide", "subject": 0, "subject_id": -1, "start": 24.000, "duration": 0.200, "first_frame": 36, "frames": 6, "sim_first": 24.000, "sim_last": 24.167, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0},
+    {"region": "Highland", "mode": "wide", "subject": 0, "subject_id": -1, "start": 27.000, "duration": 0.200, "first_frame": 42, "frames": 6, "sim_first": 27.000, "sim_last": 27.167, "alive_start": 127, "alive_end": 127, "caught_start": 1, "caught_end": 1, "starved_start": 0, "starved_end": 0}
+  ]
+}

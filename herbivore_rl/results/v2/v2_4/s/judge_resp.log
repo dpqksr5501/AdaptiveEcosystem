@@ -1,0 +1,74 @@
+C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v2\_v2_4_run.py:380: RuntimeWarning: Mean of empty slice
+  return np.nanmean([_series(tab[n][cond], key) for n in tab], axis=0)
+{
+ "pass": false,
+ "mode": {
+  "mode": "hold",
+  "hold_minus_det": {
+   "diff": 0.9714076654789668,
+   "t": 11.297625132757235,
+   "n": 40,
+   "sig": true
+  }
+ },
+ "checks": {
+  "i": {
+   "pass_": true,
+   "routes": {
+    "n1": true,
+    "n5p": false,
+    "g": false
+   },
+   "d_n1": {
+    "diff": 0.06680209166492741,
+    "t": 11.20568460810837,
+    "n": 40,
+    "sig": true
+   },
+   "d_n5p_rel": {
+    "diff": -0.2986323316872624,
+    "t": -26.396114758329922,
+    "n": 40,
+    "sig": true
+   },
+   "d_g": {
+    "diff": -0.04127351952621926,
+    "t": -0.7744798911639061,
+    "n": 40,
+    "sig": false
+   }
+  },
+  "ii": {
+   "pass_": false,
+   "vs_C2": {
+    "diff": 0.22319183985571622,
+    "t": 2.678672836571259,
+    "n": 40,
+    "sig": true
+   },
+   "vs_C1p": {
+    "diff": -0.062382071366551474,
+    "t": -1.126725545992742,
+    "n": 40,
+    "sig": false
+   }
+  },
+  "iii": {
+   "pass_": true,
+   "starve": 0.000648828125,
+   "c2_starve": 0.000507265625,
+   "cap": 0.0007608984375000001
+  },
+  "iv": {
+   "pass_": true,
+   "p": 0.918974358974359,
+   "b1_probe": [
+    0.4926560214396778,
+    0.3064730141101515,
+    0.20065286308070865
+   ],
+   "b1_ref_median": 0.1999543541588164,
+   "n_ge_03": 2
+  }
+ }
+}
