@@ -10,17 +10,20 @@
 #include "Mass/EcoMassNetworkBootstrap.h"
 #include "Mass/EcoMassLifecycleSubsystem.h"
 #include "Network/EcoGameState.h"
+#include "Network/Session/EcoGameSession.h"
+#include "Network/Session/EcoSessionSettings.h"
 
 AAdaptiveEcosystemGameMode::AAdaptiveEcosystemGameMode()
 {
 	GameStateClass = AEcoGameState::StaticClass();
+	GameSessionClass = AEcoGameSession::StaticClass();
 }
 
 void AAdaptiveEcosystemGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
 {
 	Super::InitGame(MapName, Options, ErrorMessage);
 
-	ConfiguredMaxPlayers = FMath::Max(1, UGameplayStatics::GetIntOption(Options, TEXT("MaxPlayers"), DefaultMaxPlayers));
+	ConfiguredMaxPlayers = GetDefault<UEcoSessionSettings>()->TotalPlayers(GetNetMode() == NM_DedicatedServer);
 	WorldEpoch = FMath::Max(1, static_cast<int32>(GetTypeHash(FGuid::NewGuid()) & MAX_int32));
 	if (GameSession)
 	{
