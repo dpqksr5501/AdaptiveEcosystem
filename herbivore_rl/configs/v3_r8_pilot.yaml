@@ -1,0 +1,138 @@
+# R8 파일럿 세계 '위험을 스스로 배우는 사슴' (설계 AdaptiveEcosystem/Docs/RL_Policy/RL_R8_LEARN_DANGER_DESIGN.md 3~7절).
+# 세계 코드 env_v2/r8_world.py (기존 world.py 와 따로 선 새 세계 — 이 파일은 R8 세계만 읽는다). 단위: 1 단위 = 2 m, 1 스텝 = 2/15 초.
+# 속력은 '× deer.speed(0.6 단위/스텝 = 사슴 뛰기)' 배수로 적는다.
+
+world:
+  size: 60.0                    # 120 m 정사각, 벽
+  n_deer: 32
+  covers: [[15.0, 15.0], [45.0, 15.0], [15.0, 45.0], [45.0, 45.0]]   # R7 cover_layout quad
+  cover_r: 6.0                  # 12 m
+  decision_steps: 2             # 결정 1 번 = 2 스텝 = 0.27 초 (설계 5절)
+
+food:                           # v1 패치 먹이 (world._build_world·_eat·_food_fields)
+  cell: 2.0
+  patch_blur: 5
+  patch_threshold: 0.6
+  regen_base: 0.026
+  regen_mult: [0.5, 2.0]        # 세계마다 균등 (설계 3-6)
+  cover_mult: 0.15              # 은신처 셀 용량·재생 × 0.15 (R7 realism_cover_food)
+  eat_rate: 0.06
+  energy_per_unit: 0.5
+  grad_blur: 2                  # 먹기 걷기 기울기 블러 (셀)
+  density_blur: 10              # 관측 food_density 반경 (셀) = 20 단위
+
+deer:
+  speed: 0.6                    # 뛰기 속력 (단위/스텝) = 9 m/s
+  gait_speed: [0.0, 0.4, 1.0]   # 정지·걷기·뛰기 (× speed)
+  gait_eat: [1.0, 0.5, 0.0]
+  gait_drain: [0.714, 1.0, 2.5]
+  energy_drain: 0.002
+  init_energy: 0.5
+  max_energy: 1.0
+  repro_threshold: 0.9
+  repro_cd: 20                  # 보정 관문 C0-2 고침 (11-05, results/v3/r8/STATUS.md): R7 의 200 이면 번식이 먹기 시간이 아니라 쿨다운에 묶여
+                                # 도망이 거의 공짜다(설계 6절의 '먹기 ↔ 도망' 저울이 서지 않는다). 20 이면 번식이 먹은 양에 묶인다
+  reserve_cap: 5.4              # 지방 비축 용량 = 3 일 × 900 스텝 × 0.002 (wild_reserve)
+  reserve_init: 1.0
+  refill_e: 0.7
+  refill_frac: 0.25
+  weak_e: 0.1
+  weak_speed: 0.75
+  eat_min: 0.06                 # EAT: 지금 셀 먹이가 이만큼이면 서서 먹는다 (graze_eat_min)
+  graze_forage: 0.83
+  graze_cohesion: 0.71
+  sep_weight: 1.35
+  sep_radius: 5.0
+  respawn_r: 20.0               # 다시 남: 모든 동물에서 20 단위 밖 (설계 3-3·3-8)
+  respawn_candidates: 64
+  start_r: 14.5                 # 시작: 모든 동물에서 14.5 단위 밖
+
+sense:                          # 설계 4절 — 종과 무관한 한 규칙
+  see_r: 20.0
+  fov_deg: 300.0
+  head_down: 0.6                # EAT 중 탐지 반경 배수
+  hear_r_quiet: 2.0
+  hear_r_loud: 20.0
+  hear_s_silent: 0.05
+  hear_s_quiet: 0.3
+  hear_s_loud: 1.0
+  pos_norm: 20.0
+  vel_norm: 1.5                 # × speed — 동물 속도·다가옴 정규화 0.9 단위/스텝
+  mem_keep: 0.8                 # 다가옴 기억: 느끼면 m ← 0.8 m + 0.2 a
+  mem_gain: 0.2
+  mem_decay: 0.9                # 못 느끼면 m ← 0.9 m
+  size_norm: 2.0
+  kin_norm: 20.0
+  run_frac_speed: 0.65          # 동족 '뛰는' 문턱 (× speed)
+  free_norm: 10.0
+  edge_norm: 20.0
+  speed_norm: 1.0               # own_speed = |이동| / (1.0 × speed)
+  flow_norm: 1.0                # 동족 흐름 / (1.0 × speed)
+
+animals:                        # 늑대·짐승 공통 (설계 3-8: 겉모습·평소 걸음 같은 분포)
+  size: [0.8, 1.25]
+  roam_speed: [0.3, 0.6]        # 배회 속력 (× speed), 동물마다 한 번
+  turn: 0.15                    # 배회 꺾기 ±rad/스텝
+  shelter_margin: 0.5           # 은신처 원 (r + 0.5) 에 못 들어간다
+  min_gap: 10.0                 # 시작: 동물끼리 10 단위 이상
+
+wolves:                         # 설계 3-4
+  count: [1, 4]
+  speed_mult: [0.7, 1.0]        # 추격 속력 (× speed), 세계에 하나
+  stalk_frac: 0.5               # 늑대마다 잠행형 확률
+  view_r: 14.0
+  fov_deg: 150.0
+  catch_r: 1.0
+  eat_steps: 38                 # 잡은 뒤 서서 먹기 (5 초)
+  stalk_near: 6.0               # 잠행형: 표적이 이 안이면 덮침
+  stalk_speed: 0.3
+  pounce_speed: 1.5
+  pounce_steps: 12
+  tired_steps: 30
+  tired_speed: 0.2
+
+beasts:                         # 해 없는 짐승 (설계 3-5)
+  count: [4, 12]                # 보정 관문 C0-2 고침 (11-05): 설계 [0, 6] 이면 짐승까지 피해도 먹이 손해가 2~6% 뿐이었다
+  next_probs: [0.5, 0.3, 0.2]   # 돌아다님이 끝나면 [풀 뜯기, 내달리기, 다시 돌아다님]
+  roam_steps: [60, 240]
+  graze_steps: [40, 160]
+  dash_speed: [0.7, 1.5]        # × speed (늑대 추격 0.7~1.0·덮침 1.5 와 겹친다)
+  dash_steps: [8, 24]
+
+bears:                          # 곰 시험 (설계 10절) — 학습 세계는 0
+  count: 0
+  size: [1.6, 2.0]
+  trigger_r: 5.0
+  pounce_speed: 1.6
+  pounce_steps: 10
+  catch_r: 1.2
+  eat_steps: 60
+  start_r: 15.0
+
+reward:                         # R7 과 같은 식·값 (설계 6절)
+  alive: 0.01
+  energy: 1.0
+  repro: 10.0
+  death: -10.0
+
+train:                          # 설계 7절
+  seeds: [41100, 41400]         # 학습 세계 풀 [하, 상)
+  num_worlds: 32
+  reset_steps: 5000             # 세계 교체 (스텝) = 2500 결정, 엇갈림
+  total_decisions: 250000000    # 목표 — 스모크 속도 1.65만/초로 정함 (설계 7절 규칙, results/v3/r8/STATUS.md)
+  wall_hours: 10.0
+  ckpt_every: 10000000
+  log_every: 5000000
+  log_first: 1000000
+  ppo:
+    n_steps: 32
+    batch_size: 4096
+    n_epochs: 10
+    learning_rate: 0.0003
+    gamma: 0.99
+    gae_lambda: 0.95
+    clip_range: 0.2
+    ent_coef: 0.01
+    vf_coef: 0.5
+    max_grad_norm: 0.5
+    net: [64, 64]
