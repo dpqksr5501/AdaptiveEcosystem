@@ -142,15 +142,21 @@ python results/v3/r8/eval_r8.py eval --baselines always_eat rule_aim --seeds 419
 - 판정은 `eval/summary.md` 의 표(P1·P2·P3, 시드 3 개 중 2 개 이상)다. 기준·지표는 설계 그대로다. 5절 '아침에 읽을 때'(주 Δ 의 늑대 표본 약 80% 가 먹는 늑대)와
   '사냥 중 늑대 대 짐승' Δ 를 함께 읽는다.
 
-**③ 그림 (약 3 분)**
+**③ 그림·영상 (약 5 분)**
 
 ```
 python results/v3/r8/plot_curve.py curve                                                            # 학습 곡선 — 꼭 다시 그린다(밤새 그린 판은 대조 H0 색이 s0 와 같다, 17:30 고침 전 코드)
 python results/v3/r8/plot_curve.py bands --summary results/v3/r8/eval/summary.json --out results/v3/r8/eval/bands.png --policies RULE_BLIND RULE_ORACLE r8_p_s0 r8_p_s1 r8_p_s2 r8_h0_s0
 python results/v3/r8/r8_replay.py --model ckpt/r8/r8_p_s0.zip --compare always_eat --seed 41900 --steps 600 --out results/v3/r8/replay/r8_s0.png
+python results/v3/r8/plot_curve.py curve --talk --out C:/kwon/univ/3-1/GameContentsCapstoneDesign/week9_assets/r8/curve_talk.png                                    # 발표용 곡선 (큰 글자, 잡힘·먹음·늑대/짐승 앞 도망)
+python results/v3/r8/plot_talk.py --summary results/v3/r8/eval/summary.json --out C:/kwon/univ/3-1/GameContentsCapstoneDesign/week9_assets/r8/talk_bars.png --split   # 발표용 막대 (늘 먹기·손규칙 둘·R8 셋·대조)
+python results/v3/r8/r8_replay_video.py --model ckpt/r8/r8_p_s0.zip --seed 41900 --out C:/kwon/univ/3-1/GameContentsCapstoneDesign/week9_assets/r8/replay_s0_41900.mp4   # 발표 영상 25 초 (약 2 분)
 ```
 
 - 리플레이는 판정에서 가장 좋게 보이는 시드를 고르지 말고 s0 를 쓴다(고르면 그 사실을 적는다).
+- 영상(`r8_replay_video.py`, 11-05 덧붙임): 왼쪽 R8 · 오른쪽 늘 먹기, 같은 시드 세계. 장면은 도구 머리 주석의 정한 규칙(왼쪽 칸에서 늑대 10 단위 안 사슴이 가장 많은 스텝,
+  그 앞 15 초·뒤 10 초)으로 고른다 — 손으로 고르지 않는다. 포스터 `.png`·곁 파일 `.json`(구간·칸마다 잡힘 수)이 함께 나온다. 칸마다 '잡힘 n' 을 보이려면 `--counter`.
+  초안(11-05 18:40, 중간 모델·개발/점검 시드 — 발표에 쓰지 않는다)은 `week9_assets/r8/draft/`.
 
 **④ 곰 시험 (덤, 약 7 분 — 시간이 모자라면 뺀다)**
 

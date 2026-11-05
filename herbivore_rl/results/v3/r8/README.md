@@ -14,10 +14,12 @@
 | `train_r8.py` | 학습 (`--config --seed --steps --wall-hours --run-name`) |
 | `eval_r8.py` | `calibrate`(C0-1·2·4) · `leak`(C0-3, 탈진 나무 AUC 덧붙임) · `eval`(판정, 참고 기준 `rule_aim` 은 `--baselines` 로) · `bear`(곰 시험) |
 | `r8_replay.py` | 위에서 본 궤적 PNG |
+| `r8_replay_video.py` | 위에서 본 무대 애니메이션 mp4 (왼쪽 R8 · 오른쪽 늘 먹기, 같은 시드, 정한 규칙으로 장면 고름) + 포스터 PNG·곁 파일 JSON |
+| `plot_talk.py` | 발표용 막대: 평가 summary.json → 잡힘 비·먹음 비·늑대/짐승 앞 도망 몫 (`--split` 칸마다 따로) |
 | `launch_train.ps1` | 본 학습 3 + 대조 1 을 떨어진 프로세스로 (창 없음 — `spawn_detached.py` 를 거친다) |
 | `spawn_detached.py` | 파이썬 스크립트 하나를 창 없는 콘솔·새 프로세스 묶음으로 띄우고 끝나는 띄우개, PID 를 `logs/pids.txt` 에 |
 | `watch_train.py` · `launch_watch.ps1` | 밤새 지켜보기: 5 분마다 `logs/progress.md`(진행·이상 신호·25/50/75/100% 지점), 체크포인트 점검(점검 시드 41800~41839) `checkpoints/`, 곡선 다시 그리기 |
-| `plot_curve.py` | `curve`(학습 곡선 `checkpoints/curve.png`) · `bands`(평가 summary.json → 거리 띠별 늑대/짐승 도망 막대) |
+| `plot_curve.py` | `curve`(학습 곡선 `checkpoints/curve.png`, `--talk` 발표용 큰 글자 칸 셋) · `bands`(평가 summary.json → 거리 띠별 늑대/짐승 도망 막대) |
 | `herbivore_rl/tests/test_r8.py` | 시험 12 개 |
 | `leak_probe.py` | 학습 전 검토(11-05) 이름표 점검: 동물 칸 하나로 늑대·짐승을 숨은 상태별로 맞히는 나무 분류기 |
 | `calib/` | 보정 관문 기록 (`calibrate_design.json` = 설계 값, `calibrate.json` = 고친 값, `calibrate_<꼬리>.json` = 탐색, `*review*` = 학습 전 검토 뒤 지금 설정) |

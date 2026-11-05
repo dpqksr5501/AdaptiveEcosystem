@@ -3,12 +3,16 @@
 `herbivore_rl/` 에서 (PYTHONUTF8=1):
     python results/v3/r8/plot_curve.py curve        # logs/<실행>.log.jsonl + checkpoints/<점검>/summary.json → checkpoints/curve.png
     python results/v3/r8/plot_curve.py bands --summary results/v3/r8/eval/summary.json --out results/v3/r8/eval/bands.png
+    python results/v3/r8/plot_curve.py curve --talk --out <발표 자료 폴더>/curve_talk.png    # 발표용 (아래 talk)
 
 curve (2 × 2):
   (가) 잡힘 /1000 사슴-스텝 — 학습 세계 기록, 점선 = 보정 때 늘 먹기(개발 시드).
   (나) 번식 /1000 사슴-스텝 — 먹기를 배우는가.
   (다) 도망 몫, 가장 가까운 동물이 늑대(실선)·짐승(점선)이고 15 단위 안일 때 — 학습 세계 기록(숨은 종류는 기록에만 쓴다).
   (라) 점검 세계(41800~41839) 의 Δ = 늑대 도망 몫 − 짐승 도망 몫과 95% 구간 — `watch_train.py` 가 남긴 체크포인트 점검.
+talk (curve --talk, 11-05 덧붙임 — 기본 curve 출력은 그대로): 같은 학습 기록으로 큰 글자 칸 셋 — 늑대에게 잡힘 · 먹은 양 · 도망친 몫
+  (가까이 온 동물이 늑대 빨강 / 짐승 갈색 점선, R8 실행만). R8 시드는 한 색, 대조 H0 는 회색 점선, 가로 점선 = 보정 때 늘 먹기(개발 시드).
+  --out 을 주지 않으면 checkpoints/curve_talk.png (지켜보기가 쓰는 checkpoints/curve.png 는 건드리지 않는다). --note = 오른쪽 아래 작은 글(초안 표시).
 bands: 판정 평가 summary.json 의 정책마다 거리 띠 [0,5)·[5,10)·[10,15) 의 늑대·짐승 도망 몫 막대.
 """
 
@@ -155,6 +159,84 @@ def draw_curve(runs: list[str], check_dir: Path, out_png: Path, target: int | No
     return out_png
 
 
+TALK = dict(bg="#F5F3EC", ink="#1B2A2F", muted="#5A6468", grid="#E0DCD1", r8="#1F6F6B", h0="#7D858A",
+            wolf="#d62728", beast="#8c564b")      # 7·8주차 덱 색 + r8_replay 의 늑대·짐승 색
+
+
+def draw_curve_talk(runs: list[str], out_png: Path, note: str | None = None) -> Path:
+    """발표용 학습 곡선 (curve --talk): 큰 글자, 칸 셋 — 잡힘 · 먹음 · 늑대/짐승 앞 도망 몫. 값은 `draw_curve` 와 같은 학습 기록(logs/<실행>.log.jsonl).
+    R8 시드들은 한 색(같은 두뇌 설계의 되풀이), 대조 H0 는 회색 점선. 도망 칸은 R8 만 — 색이 '가까이 온 동물' (늑대 빨강·짐승 갈색)."""
+    plt = _plt()
+    T = TALK
+    rc = {"font.size": 15, "axes.edgecolor": "#C4C2BC", "axes.labelcolor": T["ink"], "xtick.color": T["muted"],
+          "ytick.color": T["muted"], "text.color": T["ink"]}
+    with plt.rc_context(rc):
+        return _draw_curve_talk(plt, T, runs, out_png, note)
+
+
+def _draw_curve_talk(plt, T: dict, runs: list[str], out_png: Path, note: str | None) -> Path:
+    fig, (a, b, c) = plt.subplots(1, 3, figsize=(16, 5.6), facecolor=T["bg"])
+    data = {run: _rows(run) for run in runs}
+    xmax = max([r["timesteps"] / 1e6 for rows in data.values() for r in rows] or [1.0])
+    seen_r8 = seen_h0 = False
+    fmax = 0.0
+    for run, rows in data.items():
+        if not rows:
+            continue
+        x = [r["timesteps"] / 1e6 for r in rows]
+        h0 = "h0" in run
+        kw = dict(color=T["h0"], ls="--", lw=2.4) if h0 else dict(color=T["r8"], lw=2.6, alpha=0.85)
+        lab = None
+        if h0 and not seen_h0:
+            lab, seen_h0 = "대조: 해 없는 짐승 없이 배움", True
+        elif not h0 and not seen_r8:
+            lab, seen_r8 = "R8 (시드마다 한 줄)", True
+        a.plot(x, [r["caught_per_1k"] for r in rows], label=lab, **kw)
+        b.plot(x, [r["eaten_e_x1000"] for r in rows], label=lab, **kw)
+        if not h0:
+            fw = [(xi, 100 * r["flee_wolf"]) for xi, r in zip(x, rows) if r.get("flee_wolf") is not None]
+            fb = [(xi, 100 * r["flee_beast"]) for xi, r in zip(x, rows) if r.get("flee_beast") is not None]
+            fmax = max([fmax] + [v for _, v in fw + fb])
+            if fw:
+                c.plot(*zip(*fw), color=T["wolf"], lw=2.6, alpha=0.85)
+            if fb:
+                c.plot(*zip(*fb), color=T["beast"], lw=2.6, alpha=0.85, ls=(0, (4, 2)))
+    for ax_, ref in ((a, AE_CALIB["caught_1k"]), (b, 7.909)):              # 7.909 = calib/calibrate_review.json ALWAYS_EAT 먹음 (개발 시드)
+        ax_.axhline(ref, color=T["ink"], ls=":", lw=1.8)
+        ax_.text(0.98, ref, "늘 먹기", transform=ax_.get_yaxis_transform(), ha="right", va="bottom", fontsize=14, color=T["ink"])
+    a.set_ylim(0, max(a.get_ylim()[1], AE_CALIB["caught_1k"] * 1.15))
+    b.set_ylim(bottom=0)
+    c.set_ylim(0, 50)                                   # 처음 1M(무작위에 가까운 두뇌)의 80% 대는 칸 위로 잘린다 — 잘리면 작게 적는다
+    if fmax > 50:
+        c.text(0.07, 0.985, f"↑ 처음 {fmax:.0f}% (거의 무작위)", transform=c.transAxes, ha="left", va="top", fontsize=12, color=T["muted"])
+    a.set_title("늑대에게 잡힘 ↓", fontsize=19, fontweight="bold", loc="left")
+    b.set_title("먹은 양 ↑", fontsize=19, fontweight="bold", loc="left")
+    c.set_title("도망친 몫 — 가까이 온 동물이", fontsize=19, fontweight="bold", loc="left")
+    a.set_ylabel("사슴 1000 걸음마다 잡힌 수")
+    b.set_ylabel("사슴 한 걸음마다 먹은 양 (×1000)")
+    c.set_ylabel("도망친 몫 (%)")
+    from matplotlib.lines import Line2D
+
+    c.legend(handles=[Line2D([0], [0], color=T["wolf"], lw=3, label="늑대일 때"),
+                      Line2D([0], [0], color=T["beast"], lw=3, ls=(0, (4, 2)), label="해 없는 짐승일 때")], fontsize=14, frameon=False, loc="lower right")
+    if seen_r8 or seen_h0:
+        a.legend(fontsize=13, frameon=False, loc="center right")
+    for ax_ in (a, b, c):
+        ax_.set_facecolor(T["bg"])
+        ax_.set_xlabel("학습량 (백만 번 결정)")
+        ax_.set_xlim(0, xmax * 1.02)
+        ax_.grid(color=T["grid"], lw=1)
+        for sp in ("top", "right"):
+            ax_.spines[sp].set_visible(False)
+    if note:
+        fig.text(0.995, 0.01, note, ha="right", va="bottom", fontsize=11, color="#8A8F91")
+    fig.tight_layout(rect=(0, 0.03 if note else 0, 1, 1), w_pad=2.5)
+    out_png.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(out_png, dpi=150, facecolor=T["bg"])
+    plt.close(fig)
+    return out_png
+
+
 def draw_bands(summary: Path, out_png: Path, policies: list[str] | None = None) -> Path:
     plt = _plt()
     js = json.loads(summary.read_text(encoding="utf-8"))
@@ -189,15 +271,19 @@ def main(argv=None) -> int:
     p = sub.add_parser("curve")
     p.add_argument("--runs", nargs="*", default=DEFAULT_RUNS)
     p.add_argument("--checks", default=str(HERE.parent / "checkpoints"))
-    p.add_argument("--out", default=str(HERE.parent / "checkpoints" / "curve.png"))
+    p.add_argument("--out", default=None, help="기본 checkpoints/curve.png (--talk 면 checkpoints/curve_talk.png)")
     p.add_argument("--target", type=int, default=250_000_000)
+    p.add_argument("--talk", action="store_true", help="발표용: 큰 글자, 칸 셋 (잡힘·먹음·늑대/짐승 앞 도망 몫)")
+    p.add_argument("--note", default=None, help="--talk 그림 오른쪽 아래 작은 글 (초안 표시 등)")
     q = sub.add_parser("bands")
     q.add_argument("--summary", default=str(HERE.parent / "eval" / "summary.json"))
     q.add_argument("--out", default=str(HERE.parent / "eval" / "bands.png"))
     q.add_argument("--policies", nargs="*", default=None)
     args = ap.parse_args(argv)
-    if args.cmd == "curve":
-        out = draw_curve(args.runs, Path(args.checks), Path(args.out), target=args.target)
+    if args.cmd == "curve" and args.talk:
+        out = draw_curve_talk(args.runs, Path(args.out or HERE.parent / "checkpoints" / "curve_talk.png"), note=args.note)
+    elif args.cmd == "curve":
+        out = draw_curve(args.runs, Path(args.checks), Path(args.out or HERE.parent / "checkpoints" / "curve.png"), target=args.target)
     else:
         out = draw_bands(Path(args.summary), Path(args.out), args.policies)
     print(out)
