@@ -40,6 +40,7 @@
 #include "World/EcoWorldClockSubsystem.h"
 #include "World/EcologyRegion.h"
 #include "World/EcoVegetationField.h"
+#include "World/EcoNaturalHabitatProfile.h"
 #include "HAL/PlatformMemory.h"
 #include "Engine/NetDriver.h"
 
@@ -51,7 +52,7 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("eco.IntegratedPolicyVersion"),
 		1,
 		TEXT("팀 통합 레벨(AEcoCreatureIntegrationSpawner)의 두뇌 판. 1 = 팀 그대로 (v1 + Social + 팀 늑대, 기본), ")
-		TEXT("3 = 모든 사슴은 v3 R1b 학습 두뇌, 늑대는 학습 위협 규칙. Play 전에 바꾼다 (서버·단독 권위, Client는 표현만). ")
+		TEXT("3 = 모든 사슴은 v3 학습 두뇌(10-29 부터 기본 R7e — eco.V3Brain.Startup builtin 이면 내장 R1b-F), 늑대는 학습 위협 규칙. Play 전에 바꾼다 (서버·단독 권위, Client는 표현만). ")
 		TEXT("명령줄 -EcoIntegratedV3 는 시작값만 3 으로 둔다 (콘솔에서 1 을 넣으면 꺼진다)."),
 		ECVF_Default);
 
@@ -170,6 +171,23 @@ namespace EcoPolicyV3IntegratedImpl
 		1,
 		TEXT("통합 v3 모드 가장자리 굽히기 (1 = 켬, 기본 — 10-16 edge_r 5 = 10 m). 무대 가장자리 10 m 안의 경계·도주 방향을 벽을 따라·모서리 밖으로 굽힌다. ")
 		TEXT("0 = 굽히지 않는다(857da45). eco.IntegratedV3.WildFlight 1 일 때만 뜻이 있다. Play 전에 바꾼다. 명령줄 -EcoV3FlightEdgeAvoid= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarRestKeep(
+		TEXT("eco.IntegratedV3.RestKeep"),
+		1,
+		TEXT("통합 v3 모드 거리 두기 — 쉬는 늑대 (1 = 켬, 기본 — 10-27 사용자 '늑대가 쉬고 있어도 잘 보이는 데서 사슴이 멈춰 있다'). 먹거나 배불러 쉬는 늑대의 시야 ")
+		TEXT("반경(28 m × 날씨) 안에서 그 늑대를 알아챈 사슴은 걸어서 늑대 시야 + 4 m 밖까지 물러난 뒤 쉬고, 그 밖 8 m 띠에서는 쉬는 늑대 쪽으로 풀을 뜯어 다가가지 ")
+		TEXT("않는다. 값 = 파이썬 configs/v3_wild3_calm_mirror.yaml wild_flight.rest_keep. 0 = 쉬는 늑대는 경계(먹으며 멀어짐)만(10-26). ")
+		TEXT("eco.IntegratedV3.WildFlight 1 일 때만 뜻이 있다. Play 전에 바꾼다. 명령줄 -EcoV3RestKeep= 는 시작값."),
+		ECVF_Default);
+
+	static TAutoConsoleVariable<int32> CVarGrazeCalm(
+		TEXT("eco.IntegratedV3.GrazeCalm"),
+		1,
+		TEXT("통합 v3 모드 먹기 걷기 고침 (1 = 켬, 기본 — 10-27 사용자 '평소 사슴이 갈 곳을 못 정하고 방향만 왔다갔다 하며 제자리에서 돈다'). 먹이를 찾아 걷는 ")
+		TEXT("사슴은 무대 가장자리 4 m 안에서 안쪽으로 되돌아오고, 몸이 향한 쪽으로 이어 걷고(관성 0.5), 벽 2 m 안에서는 벽 쪽으로 가지 않는다. ")
+		TEXT("값 = 파이썬 configs/v3_wild3_calm_mirror.yaml repertoire.graze_*. 0 = 10-26 그대로. Play 전에 바꾼다. 명령줄 -EcoV3GrazeCalm= 는 시작값."),
 		ECVF_Default);
 
 	static TAutoConsoleVariable<int32> CVarShelterSafe(
@@ -356,6 +374,29 @@ namespace EcoPolicyV3IntegratedImpl
 		TEXT("뒤에 나타난 파일만 바꾼다, 화면 상태 줄. 환경 변화 자동 스냅숏(eco.IntegratedV3.AutoSnapshot -1)도 이 값을 따른다. Play 전에 바꾼다. ")
 		TEXT("명령줄 -EcoV3AutoAdapt (또는 -EcoV3AutoAdapt=0|1) 는 시작값."),
 		ECVF_Default);
+
+	// 10-27 Play 때 파이썬 감시 자동 시작 (FOREST_GROWTH_MODE.md 3절, EcoV3WatchLauncher.h — 학습 파이프라인을 따로 띄우는 개발용 도구, 추론 아님)
+	static TAutoConsoleVariable<int32> CVarAutoWatch(
+		TEXT("eco.IntegratedV3.AutoWatch"),
+		1,
+		TEXT("Play 때 파이썬 감시(herbivore_rl/results/v3/live/live.py watch) 자동 시작 (1 = AutoAdapt 를 따름, 기본 — AutoAdapt 를 켠 Play 에서 창 없이 띄우고 Play 가 끝나면 ")
+		TEXT("학습 자식까지 프로세스 나무째 끝낸다. 사람이 띄운 감시가 이미 돌면 띄우지도 끄지도 않는다. 0 = 띄우지 않음). 학습 파이프라인을 따로 띄우는 개발용 도구다 — ")
+		TEXT("게임 추론은 그대로 C++ 네이티브만. Play 시작 때 읽는다. 명령줄 -EcoV3AutoWatch=0|1 은 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<FString> CVarAutoWatchPython(
+		TEXT("eco.IntegratedV3.AutoWatchPython"), TEXT("python"),
+		TEXT("파이썬 감시 실행 파일 (기본 python — 경로 구분자가 없으면 PATH 에서 찾아 전체 경로로 기록한다. \\WindowsApps\\ 아래 스토어 대역은 쓰지 않는다). ")
+		TEXT("명령줄 -EcoV3AutoWatchPython= 은 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<FString> CVarAutoWatchCmd(
+		TEXT("eco.IntegratedV3.AutoWatchCmd"), TEXT(""),
+		TEXT("파이썬 감시 명령 덮기 (시험용 — 실행 파일 뒤 인자 전체, 자리표 {root}·{play}·{log}). 빈 값 = -X utf8 -u results/v3/live/live.py watch --root \"<root>\". ")
+		TEXT("명령줄 -EcoV3AutoWatchCmd=\"…\" 는 시작값."),
+		ECVF_Default);
+	static TAutoConsoleVariable<FString> CVarAutoWatchDir(
+		TEXT("eco.IntegratedV3.AutoWatchDir"), TEXT(""),
+		TEXT("파이썬 감시 작업 폴더 (빈 값 = <프로젝트>/../herbivore_rl — results/v3/live/live.py 가 없으면 띄우지 않는다). 명령줄 -EcoV3AutoWatchDir= 은 시작값."),
+		ECVF_Default);
 #endif
 
 	static TAutoConsoleVariable<int32> CVarDebug(
@@ -453,19 +494,20 @@ namespace EcoPolicyV3IntegratedImpl
 	constexpr double kNoticeShotDelaySeconds = 1.5;
 
 	/**
-	 * 두뇌 알림 글자 (LIVE_ADAPT_SPEC.md 5.4): 되돌림 '두뇌 되돌림 → 판 2 (id)' (내장이면 '두뇌 되돌림 → 내장 두뇌 (판 0)', 판 없는 파일이면 id 만),
-	 * 바꾸기 '새 두뇌 — 판 3 · id · 환경: … · 관문: … · 되돌리기 eco.V3Brain.Rollback' (빈 칸은 뺀다).
+	 * 두뇌 알림 글자 (LIVE_ADAPT_SPEC.md 5.4): 되돌림 '두뇌 되돌림 → 판 2 (id)' (기본·내장이면 '두뇌 되돌림 → 기본 두뇌 R7e (판 0)'·'… → 내장 두뇌 (판 0)',
+	 * 판 없는 파일이면 id 만), 바꾸기 '새 두뇌 — 판 3 · id · 환경: … · 관문: … · 되돌리기 eco.V3Brain.Rollback' (빈 칸은 뺀다).
 	 */
 	FString BrainNoticeText(const FEcoV3Brain& B, bool bRollback)
 	{
 		const FString Round = B.RoundTag();
+		const FString Origin = B.OriginText();   // 10-29: 기본 두뇌 R7e·내장 두뇌 (파일 두뇌는 빈 값)
 		if (bRollback)
 		{
-			return B.bBuiltin	  ? FString(TEXT("두뇌 되돌림 → 내장 두뇌 (판 0)"))
+			return !Origin.IsEmpty() ? FString::Printf(TEXT("두뇌 되돌림 → %s (판 0)"), *Origin)
 				   : Round.IsEmpty() ? FString::Printf(TEXT("두뇌 되돌림 → %s"), *B.Id)
 									 : FString::Printf(TEXT("두뇌 되돌림 → %s (%s)"), *Round, *B.Id);
 		}
-		FString Text = B.bBuiltin	   ? FString::Printf(TEXT("새 두뇌 — 내장 두뇌 (판 0) · %s"), *B.Id)
+		FString Text = !Origin.IsEmpty() ? FString::Printf(TEXT("새 두뇌 — %s (판 0) · %s"), *Origin, *B.Id)
 					   : Round.IsEmpty() ? FString::Printf(TEXT("새 두뇌 — %s"), *B.Id)
 										 : FString::Printf(TEXT("새 두뇌 — %s · %s"), *Round, *B.Id);
 		if (!B.AdaptEnv.IsEmpty())
@@ -540,19 +582,34 @@ const TCHAR* EcoV3Integrated::BehaviorNameKo(int32 B)
 const TCHAR* EcoV3Integrated::KeepModeNameKo(int32 KeepMode)
 {
 	static const TCHAR* Names[EcoWorldV3::kNumKeepModes] = {TEXT("두뇌"), TEXT("경계(먹으며 멀어짐)"), TEXT("도주(안전해질 때까지)"),
-															 TEXT("웅크림(은신처·경계)")};
+															 TEXT("웅크림(은신처·경계)"), TEXT("거리 두기(쉬는 늑대)")};
 	return (KeepMode >= 0 && KeepMode < EcoWorldV3::kNumKeepModes) ? Names[KeepMode] : TEXT("?");
 }
 
+const TCHAR* EcoV3Integrated::RouteNameKo(int32 Route)
+{
+	return Route == EcoWorldV3::kRouteRun ? TEXT("도주(트인 쪽)") : Route == EcoWorldV3::kRouteShelter ? TEXT("도주(은신처)") : nullptr;
+}
+
+FColor EcoV3Integrated::RouteColor(int32 Route, const FColor& Fallback)
+{
+	// 10-24 두 길 두뇌 (이식 계획서 12절 질문 9 — 정한 것): RUN 연노랑, SHELTER 하늘색. 반사 도주 주황(255,110,20)·웅크림 파랑(60,150,255)·
+	// 두뇌 도망 노랑(255,215,0)·경계(255,175,80)와 겹치지 않게
+	return Route == EcoWorldV3::kRouteRun ? FColor(255, 240, 120) : Route == EcoWorldV3::kRouteShelter ? FColor(110, 230, 255) : Fallback;
+}
+
 FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
-								   FColor& OutColor, int32 KeepMode, bool bReserveOn)
+								   FColor& OutColor, int32 KeepMode, bool bReserveOn, int32 Route)
 {
 	const double E = FMath::Clamp(Body.Energy, 0.0, 1.0);
 	// 도주 반사 거리 덮기 중이면 행동 이름 대신 덮기 이름 ('경계(먹으며 멀어짐) 64%', '도주(안전해질 때까지) 58%').
 	// 경계는 두뇌가 먹기를 고른 동안만 (두뇌가 도망·숨기·잠이면 그 행동 이름 그대로 — world.py _wf_alert_control 과 같은 조건)
+	// 10-27 거리 두기(쉬는 늑대)도 경계와 같다 — 두뇌가 먹기를 고른 동안만 ('거리 두기(쉬는 늑대) 64%')
 	const bool bKeep = KeepMode == EcoWorldV3::kKeepPanic || KeepMode == EcoWorldV3::kKeepShelter
-					   || (KeepMode == EcoWorldV3::kKeepAlert && Rep.Behavior == EcoRepertoireV3::kGraze);
-	FString Label = bKeep ? FString::Printf(TEXT("%s %d%%"), KeepModeNameKo(KeepMode), FMath::RoundToInt32(100.0 * E))
+					   || ((KeepMode == EcoWorldV3::kKeepAlert || KeepMode == EcoWorldV3::kKeepRest) && Rep.Behavior == EcoRepertoireV3::kGraze);
+	// 10-24 두 길 두뇌: 도주 덮기면 고른 길 ('도주(트인 쪽) 58%'·'도주(은신처) 58%'). 길이 없으면(길 끈 두뇌) 지금 글자 그대로
+	const TCHAR* RouteKo = KeepMode == EcoWorldV3::kKeepPanic ? RouteNameKo(Route) : nullptr;
+	FString Label = bKeep ? FString::Printf(TEXT("%s %d%%"), RouteKo ? RouteKo : KeepModeNameKo(KeepMode), FMath::RoundToInt32(100.0 * E))
 						  : FString::Printf(TEXT("%s%s %d%%"), BehaviorNameKo(Rep.Behavior),
 											Rep.Behavior == EcoRepertoireV3::kHide && Rep.bArrived ? TEXT("(웅크림)") : TEXT(""),
 											FMath::RoundToInt32(100.0 * E));
@@ -570,7 +627,8 @@ FString EcoV3Integrated::DeerLabel(const EcoRepertoireV3::FRepState& Rep, const 
 	if (bKeep)
 	{
 		OutColor = KeepMode == EcoWorldV3::kKeepAlert ? FColor(255, 175, 80)
-				   : KeepMode == EcoWorldV3::kKeepPanic ? FColor(255, 110, 20)
+				   : KeepMode == EcoWorldV3::kKeepRest	? FColor(230, 200, 120)   // 10-27 거리 두기: 옅은 주황 (경계보다 약하게)
+				   : KeepMode == EcoWorldV3::kKeepPanic ? (RouteKo ? RouteColor(Route, FColor(255, 110, 20)) : FColor(255, 110, 20))
 														: FColor(60, 150, 255);
 	}
 	if (bReserveOn)
@@ -681,6 +739,8 @@ FEcoV3IntegratedSettings FEcoV3IntegratedSettings::FromConsole()
 	S.bPackHunt = CVarPackHunt.GetValueOnGameThread() != 0;
 	S.bFlightHoldAwake = CVarFlightHoldAwake.GetValueOnGameThread() != 0;
 	S.bFlightEdgeAvoid = CVarFlightEdgeAvoid.GetValueOnGameThread() != 0;
+	S.bRestKeep = CVarRestKeep.GetValueOnGameThread() != 0;
+	S.bGrazeCalm = CVarGrazeCalm.GetValueOnGameThread() != 0;
 	S.bProtectedRefuges = CVarProtectedRefuges.GetValueOnGameThread() != 0;
 	S.bSocialControl = CVarSocialControl.GetValueOnGameThread() != 0;
 	S.bObstacles = CVarObstacles.GetValueOnGameThread() != 0;
@@ -868,6 +928,16 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.FlightEdgeAvoid"), LexToString(EdgeArg));
 	}
+	int32 RestKeepArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3RestKeep="), RestKeepArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.RestKeep"), LexToString(RestKeepArg));
+	}
+	int32 GrazeCalmArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3GrazeCalm="), GrazeCalmArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.GrazeCalm"), LexToString(GrazeCalmArg));
+	}
 	int32 ShelterArg = 1;
 	if (FParse::Value(CmdLine, TEXT("EcoV3ShelterSafe="), ShelterArg))
 	{
@@ -1047,6 +1117,59 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 	{
 		SetIfUnset(TEXT("eco.IntegratedV3.AutoSnapshotOut"), AutoSnapshotOutArg);
 	}
+	// 10-27 숲 자람 모드·'큰 변화만' 다시 배우기·파이썬 감시 자동 시작 (FOREST_GROWTH_MODE.md — 개발 빌드. 글자 값은 쉼표·공백에서 끊지 않는다)
+	int32 ForestArg = 1;
+	if (FParse::Value(CmdLine, TEXT("EcoV3ForestGrowth="), ForestArg))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ForestGrowth"), LexToString(ForestArg));
+	}
+	else if (FParse::Param(CmdLine, TEXT("EcoV3ForestGrowth")))
+	{
+		SetIfUnset(TEXT("eco.IntegratedV3.ForestGrowth"), TEXT("1"));
+	}
+	{
+		// 숫자 값 (명령줄 이름 → 콘솔 변수)
+		const TCHAR* const NumPairs[][2] = {
+			{TEXT("EcoV3ForestPerStage="), TEXT("eco.IntegratedV3.ForestPerStage")},
+			{TEXT("EcoV3ForestStageSeconds="), TEXT("eco.IntegratedV3.ForestStageSeconds")},
+			{TEXT("EcoV3ForestGrowSeconds="), TEXT("eco.IntegratedV3.ForestGrowSeconds")},
+			{TEXT("EcoV3ForestTarget="), TEXT("eco.IntegratedV3.ForestTarget")},
+			{TEXT("EcoV3ForestStartSeconds="), TEXT("eco.IntegratedV3.ForestStartSeconds")},
+			{TEXT("EcoV3ForestSeed="), TEXT("eco.IntegratedV3.ForestSeed")},
+			{TEXT("EcoV3ForestSapling="), TEXT("eco.IntegratedV3.ForestSapling")},
+			{TEXT("EcoV3AutoSnapshotRule="), TEXT("eco.IntegratedV3.AutoSnapshotRule")},
+			{TEXT("EcoV3BigTrees="), TEXT("eco.IntegratedV3.BigTrees")},
+			{TEXT("EcoV3WeatherHold="), TEXT("eco.IntegratedV3.WeatherHold")},
+			{TEXT("EcoV3BigSettle="), TEXT("eco.IntegratedV3.BigSettle")},
+			{TEXT("EcoV3BigMaxWait="), TEXT("eco.IntegratedV3.BigMaxWait")},
+			{TEXT("EcoV3EnvNoticeMinor="), TEXT("eco.IntegratedV3.EnvNoticeMinor")},
+			{TEXT("EcoV3AutoWatch="), TEXT("eco.IntegratedV3.AutoWatch")},
+		};
+		for (const auto& Pair : NumPairs)
+		{
+			FString Value;
+			if (FParse::Value(CmdLine, Pair[0], Value) && Value.IsNumeric())
+			{
+				SetIfUnset(Pair[1], Value);   // 글자 그대로 (큰 정수 씨가 float 로 깎이지 않게)
+			}
+		}
+		// 글자 값 (경로·명령 — 따옴표 안 공백·쉼표 그대로)
+		const TCHAR* const TextPairs[][2] = {
+			{TEXT("EcoV3ForestRegion="), TEXT("eco.IntegratedV3.ForestRegion")},
+			{TEXT("EcoV3AdaptRoot="), TEXT("eco.IntegratedV3.AdaptRoot")},
+			{TEXT("EcoV3AutoWatchPython="), TEXT("eco.IntegratedV3.AutoWatchPython")},
+			{TEXT("EcoV3AutoWatchCmd="), TEXT("eco.IntegratedV3.AutoWatchCmd")},
+			{TEXT("EcoV3AutoWatchDir="), TEXT("eco.IntegratedV3.AutoWatchDir")},
+		};
+		for (const auto& Pair : TextPairs)
+		{
+			FString Value;
+			if (FParse::Value(CmdLine, Pair[0], Value, /*bShouldStopOnSeparator*/ false) && !Value.TrimStartAndEnd().IsEmpty())
+			{
+				SetIfUnset(Pair[1], Value.TrimStartAndEnd());
+			}
+		}
+	}
 #if !UE_BUILD_SHIPPING
 	// 시험용 예약 (10-21 — 시연 대본): -EcoV3TestAt=<초> -EcoV3TestCmd="명령1; 명령2" (쌍 여러 개, 명령은 따옴표 안 ';'·공백 그대로)
 	ParseCommandLineTestAts(CmdLine);
@@ -1152,11 +1275,16 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	// 환경 바뀜 감시 (10-21, EcoV3EnvWatch.cpp): 액터 생김·지움 알림, 명령줄 예약, 시작 줄
 	BeginEnvWatch(InWorld);
+	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp): Play 시작 때 한 번 읽는다 (같은 씨 같은 결과 — Play 중 바꿈은 다음 Play 부터). 계획은 지역 세계가 생긴 직후
+	ForestSettings = ForestSettingsFromConsole();
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 숲 자람: %s"),
+		   ForestSettings.bOn ? *FString::Printf(TEXT("켬 (eco.IntegratedV3.ForestGrowth 1 — 시험 모드) — %s, 지역 세계가 생기면 자리를 정한다"), *ForestSettings.Region.ToString())
+							  : TEXT("끔 (eco.IntegratedV3.ForestGrowth 0)"));
 	const int32 Wolves = Settings.WolvesPerRegion;
 	UE_LOG(LogEcoPolicyV3I, Log,
-		   TEXT("[EcoV3I] 통합 모드 켬 — 조정자 %s | 모델 %s (관측 %d, 마스크 판 %d) | 지역 %d, 지역마다 사슴 %d·늑대 %d (잠행 %d·추격 %d, 모두 주행성, 속력 %.2f배) | ")
-			   TEXT("무대 한 변 %.0f m | 시드 %lld | 이주·웨이브·1초 에너지 소모 끔, 낮밤 60+60초 | 늑대 밤잠: %s | 시작 자리 지면 검사: %s"),
-		   *GetNameSafe(Found[0]), UTF8_TO_TCHAR(EcoPolicyV3::kModelName), EcoPolicyV3::kObsDim, EcoPolicyV3::kMaskVersion, Plans.Num(),
+		   TEXT("[EcoV3I] 통합 모드 켬 — 조정자 %s | 내장 모델 %s (관측 %d, 마스크 판 %d — 시작 두뇌는 '사슴 두뇌' 줄, 기본 %s) | 지역 %d, 지역마다 사슴 %d·늑대 %d ")
+			   TEXT("(잠행 %d·추격 %d, 모두 주행성, 속력 %.2f배) | 무대 한 변 %.0f m | 시드 %lld | 이주·웨이브·1초 에너지 소모 끔, 낮밤 60+60초 | 늑대 밤잠: %s | 시작 자리 지면 검사: %s"),
+		   *GetNameSafe(Found[0]), UTF8_TO_TCHAR(EcoPolicyV3::kModelName), EcoPolicyV3::kObsDim, EcoPolicyV3::kMaskVersion, *FEcoV3BrainRegistry::Default()->Id, Plans.Num(),
 		   Plans.IsEmpty() ? 0 : Plans[0].DeerPoints.Num(), Wolves, (Wolves + 1) / 2, Wolves / 2, Settings.PredSpeedMult,
 		   Settings.StageSizeUnits * EcoRepertoireV3::kUnitCm / 100.0, static_cast<long long>(Settings.Seed),
 		   Settings.bGradualNight ? TEXT("서서히 (eco.IntegratedV3.GradualNight 1 — 16 m 안 사슴·사냥 중이면 안 누움, 깜깜하면 새 사냥 없음, 늑대마다 지연, R1b 측정으로 허용)")
@@ -1184,6 +1312,18 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 								   *(Keep.EdgeR > 0.0 ? FString::Printf(TEXT("가장자리 %.0f m 안은 벽을 따라·모서리 밖으로"), Keep.EdgeR * MPerUnit)
 													  : FString(TEXT("가장자리 굽히기 끔 (eco.IntegratedV3.FlightEdgeAvoid 0)"))))
 				 : FString(TEXT("끔 (eco.IntegratedV3.WildFlight 0 — 두뇌 그대로)"))));
+	// 10-27 사용자 보고 두 고침 (거리 두기 = 쉬는 늑대, 먹기 걷기 고침)
+	const EcoWorldV3::FGrazeCalmConfig Calm = Settings.GrazeCalmConfig();
+	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 쉬는 늑대 거리 두기: %s | 먹기 걷기 고침: %s"),
+		   *(Keep.bRestKeep
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.RestKeep 1) — 먹거나 배불러 쉬는 늑대의 시야(%.0f m × 날씨) 안에서 알아채면 걸어서 시야 + %.0f m 밖까지 ")
+									   TEXT("물러난 뒤 쉼, 그 밖 %.0f m 띠에서는 그 늑대 쪽으로 다가가지 않음"),
+								   EcoThreatV3::FThreatConfig().PredViewR * MPerUnit, Keep.RestKeepMargin * MPerUnit, Keep.RestKeepBand * MPerUnit)
+				 : FString(TEXT("끔 (eco.IntegratedV3.RestKeep 0 또는 도주 반사 끔 — 쉬는 늑대는 경계만)"))),
+		   *(Calm.EdgeR > 0.0 || Calm.Inertia > 0.0 || Calm.WallMargin > 0.0
+				 ? FString::Printf(TEXT("켬 (eco.IntegratedV3.GrazeCalm 1) — 가장자리 %.0f m 안 되돌림 %.1f · 방향 관성 %.1f · 벽 %.0f m 안 벽 쪽 안 감"),
+								   Calm.EdgeR * MPerUnit, Calm.EdgeW, Calm.Inertia, Calm.WallMargin * MPerUnit)
+				 : FString(TEXT("끔 (eco.IntegratedV3.GrazeCalm 0)"))));
 	const EcoWorldV3::FWildReserveConfig Wr;
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 사슴 지방 비축: %s"),
 		   *(Settings.bWildReserve
@@ -1300,8 +1440,10 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		// 적응 고리 (10-21 실시간 두뇌 교체): 켜면 감시 폴더·상태 파일 기본을 정하고(콘솔 변수가 비었을 때만 쓰인다), 지금 폴더에 있는 두뇌 파일은
 		// 읽지 않게 감시를 준비한다 — Play 뒤에 나타난 파일만 바꾼다. 끄면 앞 Play 가 남긴 기본을 지운다
 		const bool bAutoAdapt = IsAutoAdaptEnabled();
-		Reg.SetDefaultWatchFolder(bAutoAdapt ? FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("EcoAdapt/brains")) : FString());
-		Reg.SetDefaultStatusFile(bAutoAdapt ? FPaths::ConvertRelativePathToFull(FPaths::ProjectSavedDir() / TEXT("EcoAdapt/status.json")) : FString());
+		// 10-27: 기본 폴더 셋은 적응 고리 폴더 하나(eco.IntegratedV3.AdaptRoot, 빈 값 = Saved/EcoAdapt) 아래 — 시험은 이것 하나만 바꿔 실제 폴더를 건드리지 않는다
+		const FString AdaptRoot = AdaptRootDir();
+		Reg.SetDefaultWatchFolder(bAutoAdapt ? FPaths::Combine(AdaptRoot, TEXT("brains")) : FString());
+		Reg.SetDefaultStatusFile(bAutoAdapt ? FPaths::Combine(AdaptRoot, TEXT("status.json")) : FString());
 		bAdaptDefaultsSet = bAutoAdapt;
 		// Play 번호: 이 Play 의 스냅숏에 적고, 파이썬이 두뇌 파일 adapt.play_id 로 돌려준다 — 앞 Play 에서 시작한 판의 두뇌는 받지 않는다
 		PlayId = bAutoAdapt ? FString::Printf(TEXT("p%s_%08x"), *FDateTime::UtcNow().ToString(TEXT("%Y%m%dT%H%M%S")), FGuid::NewGuid().A) : FString();
@@ -1311,32 +1453,28 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 			Reg.PrimeWatch();
 		}
 		ShownRejectSerial = Reg.GetLastWatchReject().Serial;   // 앞 Play 의 거부는 다시 알리지 않는다
-		const FString Startup = EcoV3Brain::StartupFile();
-		if (!Startup.IsEmpty())
+		// 10-29 기본 두뇌 (EcoV3Brain.h '기본 두뇌', LIVE_ADAPT_SPEC.md 5.6): eco.V3Brain.Startup 이 있으면 그 두뇌, 적응 고리 Play 는 늘 기본 두뇌 R7e(판 0),
+		// 그 밖은 이 프로세스 첫 Play 면 기본 두뇌·아니면 지금 두뇌 그대로. 줄에 넣어 첫 결정 스텝 경계(SyncBrain)가 걸기 전 검사(도주 반사·실제 허용) 뒤 건다 —
+		// 못 걸면 대기를 버리고 내장 R1b-F 로 돈다 (기록 Warning·화면 알림 '두뇌 거부 — …')
+		const FEcoV3StartPick Pick = Reg.PickStart(EcoV3Brain::StartupFile(), bAutoAdapt);
+		if (Pick.bStartupRejected)
 		{
-			const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(Startup);
-			if (L.Ok())
-			{
-				Reg.Queue(L.Brain.ToSharedRef(), FString::Printf(TEXT("시작 두뇌 eco.V3Brain.Startup %s"), *Startup));
-			}
-			else
-			{
-				UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 시작 두뇌 eco.V3Brain.Startup '%s' 거부 (%s): %s — %s 로 시작한다"), *Startup,
-					   EcoV3Brain::RejectName(L.Reason), *L.Message, *Reg.GetActive()->Id);
-			}
+			const FString Then = Pick.Brain.IsValid() ? Pick.Brain->Id : (Reg.GetPending().IsValid() ? Reg.GetPending()->Id : Reg.GetActive()->Id);
+			UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] 시작 두뇌 eco.V3Brain.Startup '%s' 거부 (%s): %s — %s 로 시작한다"), *Pick.Startup,
+				   EcoV3Brain::RejectName(Pick.StartupLoad.Reason), *Pick.StartupLoad.Message, *Then);
+			PostNotice(EcoV3Integrated::ENotice::Reject, FString::Printf(TEXT("시작 두뇌 '%s' 거부 (%s) — %s 로 시작"), *Pick.Startup,
+																		 EcoV3Brain::RejectName(Pick.StartupLoad.Reason), *Then));
 		}
-		if (bAutoAdapt && Startup.IsEmpty() && !Reg.GetActive()->bBuiltin)
+		if (Pick.Brain.IsValid())
 		{
-			// 적응 고리 Play 는 늘 내장 두뇌(판 0)에서 시작한다: 레벨은 Play 마다 저장된 처음 상태로 돌아오므로, 앞 Play 의 바뀐 환경에 맞춘 두뇌는 맞지 않는다
-			// (저장소의 지금 두뇌는 프로세스에 하나라 PIE 를 다시 시작해도 남는다). 다른 두뇌로 시작하려면 eco.V3Brain.Startup
-			Reg.Queue(FEcoV3BrainRegistry::Builtin(), TEXT("적응 고리 Play 시작 — 내장 두뇌(판 0)에서 시작"));
+			Reg.Queue(Pick.Brain.ToSharedRef(), Pick.Why);
 		}
 		const float SwapAt = EcoV3Brain::SwapAtSeconds();
 		UE_LOG(LogEcoPolicyV3I, Log,
-			   TEXT("[EcoV3I] 사슴 두뇌: 지금 %s%s | 내장 %s | 예정 바꾸기 %s | 폴더 감시 %s | 바꾸기 eco.V3Brain.Load <파일|builtin> (결정 스텝 경계에서, Play 그대로), ")
-				   TEXT("보기 eco.V3Brain.Info·List, 찾는 폴더 %s"),
+			   TEXT("[EcoV3I] 사슴 두뇌: 지금 %s%s | 시작 고르기: %s | 기본 %s · 내장 %s | 예정 바꾸기 %s | 폴더 감시 %s | ")
+				   TEXT("바꾸기 eco.V3Brain.Load <파일|default|builtin> (결정 스텝 경계에서, Play 그대로), 보기 eco.V3Brain.Info·List, 찾는 폴더 %s"),
 			   *Reg.GetActive()->Describe(), Reg.GetPending().IsValid() ? *FString::Printf(TEXT(" → 첫 결정 스텝에 %s"), *Reg.GetPending()->Id) : TEXT(""),
-			   *FEcoV3BrainRegistry::Builtin()->Id,
+			   *Pick.Why, *FEcoV3BrainRegistry::Default()->Id, *FEcoV3BrainRegistry::Builtin()->Id,
 			   SwapAt >= 0.0f ? *FString::Printf(TEXT("%.1f초에 %s (eco.V3Brain.SwapAtSeconds·SwapFile — 측정·시연용)"), SwapAt, *EcoV3Brain::SwapFile())
 							  : TEXT("끔"),
 			   Reg.EffectiveWatchFolder().IsEmpty() ? TEXT("끔 (eco.V3Brain.WatchFolder)") : *Reg.EffectiveWatchFolder(),
@@ -1351,6 +1489,8 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 													 : TEXT("켬 (eco.V3Brain.Notice 1)"),
 			   EcoV3Brain::NoticeShot() ? TEXT("켬 (eco.V3Brain.NoticeShot 1 — Saved/EcoAdapt/shots)") : TEXT("끔"));
 	}
+	// 10-27 Play 때 파이썬 감시 자동 시작 (EcoV3WatchLauncher.h — 학습 파이프라인을 따로 띄우는 개발용 도구, 추론 아님. AutoAdapt 일 때만)
+	BeginAutoWatch();
 }
 
 void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
@@ -1361,6 +1501,8 @@ void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
 		PreTickHandle.Reset();
 	}
 	PreStartTick.UnRegisterTickFunction();
+	EndAutoWatch();  // 우리가 띄운 파이썬 감시를 프로세스 나무째 끝낸다 (10-27, EcoV3WatchLauncher.cpp — 사람이 띄운 감시는 건드리지 않는다)
+	EndForest();     // 숲 자람 모드 상태 (액터는 월드와 함께 없어진다)
 	EndEnvWatch();   // 환경 바뀜 감시 알림을 푼다 (10-21, EcoV3EnvWatch.cpp)
 	bActive = false;
 	RestoreViewEnvironment();
@@ -1372,7 +1514,7 @@ void UEcoPolicyV3IntegratedSubsystem::Deinitialize()
 	TeamValues = FEcoV3SpawnerTeamValues();
 	TeamHerbivoreConfig = nullptr;
 	TeamWolfConfig = nullptr;
-	ActiveBrain.Reset();   // 저장소(프로세스에 하나)의 지금 두뇌는 그대로 — 다음 Play 도 그 두뇌로 시작한다 (eco.V3Brain.Load builtin 으로 되돌린다)
+	ActiveBrain.Reset();   // 저장소(프로세스에 하나)의 지금 두뇌는 그대로 — 다음 Play 도 그 두뇌로 시작한다 (적응 고리 Play 는 기본 두뇌로. 고르기 PickStart·eco.V3Brain.Startup)
 	AppliedBrainGen = 0;
 	if (bAdaptDefaultsSet)
 	{
@@ -1646,6 +1788,8 @@ EcoWorldV3::FWorldConfig UEcoPolicyV3IntegratedSubsystem::MakeRegionWorldConfig(
 	}
 	// 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight, 야생 w3 — 경계 거리 KeepAway 를 바꿨다): 끄면 기본값(꺼짐) 그대로
 	C.WildFlight = S.WildFlightConfig();
+	// 먹기 걷기 고침 (eco.IntegratedV3.GrazeCalm, 10-27 — 평소 사슴이 무대 벽에 붙어 제자리에서 방향만 뒤집는 것을 막는다): 값 = configs/v3_wild3_calm_mirror.yaml
+	C.GrazeCalm = S.GrazeCalmConfig();
 	// 사슴 지방 비축 (eco.IntegratedV3.WildReserve, 사람 결정 10-15 (7) 야생 1단계 w1): 값 = configs/v3_wild1_mirror.yaml (FWildReserveConfig 기본값)
 	C.WildReserve.bEnabled = S.bWildReserve;
 	// 늑대 포만 (eco.IntegratedV3.WildSatiation, 야생 w2): 값 = configs/v3_wild1_mirror.yaml (FWildSatiationConfig 기본값, 하루 900 스텝 → 450 스텝)
@@ -1742,6 +1886,9 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 		TInlineComponentArray<UStaticMeshComponent*> Comps(A);
 		for (const UStaticMeshComponent* C : Comps)
 		{
+			// Authored walkable terrain is sampled by the ground backend, not a
+			// trunk-sized blocking disc. Collision/slope/step checks still apply.
+			if (A->ActorHasTag(TEXT("Eco.VegetationGround")) || (C && C->ComponentHasTag(TEXT("Eco.VegetationGround")))) continue;
 			const UStaticMesh* Mesh = C ? C->GetStaticMesh() : nullptr;
 			if (!Mesh || !C->IsRegistered())
 			{
@@ -2750,6 +2897,10 @@ void UEcoPolicyV3IntegratedSubsystem::HandlePreActorTick(UWorld* InWorld, ELevel
 	}
 	if (!bActive)
 	{
+		// 10-27 적대적 검토: Play 중 통합 v3 모드가 꺼지면(조정자 시작 실패·자원 계약 거부 등 — Deactivate 또는 bActive 거짓) 스냅숏도 두뇌 교체도 더 없고
+		// 상태 줄·감시 살핌(DrawBrainNotices)도 멈춘다. 우리가 띄운 파이썬 감시를 그때 끝낸다 — Play 끝까지 두면 이미 받은 스냅숏으로 학습 일꾼이 헛돈다.
+		// 사람·다른 언리얼이 띄운 감시는 건드리지 않는다 (bWatchOurs 는 이 서브시스템이 띄운 것만)
+		StopAutoWatchIfInactive();
 		return;
 	}
 	UpdateViewEnvironment();
@@ -2773,6 +2924,7 @@ void UEcoPolicyV3IntegratedSubsystem::HandlePreActorTick(UWorld* InWorld, ELevel
 	{
 		CheckClockDrift();
 		TickEnvWatch();   // 환경 바뀜 감시·시험용 예약 (10-21, EcoV3EnvWatch.cpp — 읽기만, 세계는 결정 스텝 경계에서 바꾼다)
+		ForestPreActorTick();   // 숲 자람 모드 묘목·화면 줄 (10-27 — 끄면 아무것도 하지 않는다. 다 자람은 결정 스텝 경계 ForestStepBoundary)
 		TallyTeamWolfVisuals();
 		if (IsDebugDrawEnabled())
 		{
@@ -2998,6 +3150,26 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers, G.RegionId);
 		Config.Vegetation.bEnabled = AEcoVegetationField::IsRequested() || (Spawner.IsValid() && Spawner->bEnableVegetation);
         Config.bEcosystemLife = Spawner.IsValid() && Spawner->bEnableEcosystemLife;
+        auto* NaturalProfile=Spawner.IsValid()?Spawner->NaturalHabitatProfile.Get():nullptr;
+        if(Spawner.IsValid())if(const auto* Override=Spawner->RegionHabitatProfiles.Find(G.RegionId))NaturalProfile=Override->Get();
+        if(NaturalProfile&&(!Config.bEcosystemLife||!Config.Vegetation.bEnabled||!NaturalProfile->IsValidProfile())){
+            UE_LOG(LogEcoPolicyV3I,Error,TEXT("[EcoHabitat] Profile requires life + vegetation and valid guilds"));RejectResourceContract();return;
+        }
+        Config.bNaturalHabitats=NaturalProfile!=nullptr;
+        if(NaturalProfile)Config.NaturalGround={NaturalProfile->WalkableSlopeDegrees,NaturalProfile->MaxStepUpCm,NaturalProfile->MaxStepDownCm,NaturalProfile->MaxWadingDepthCm};
+        Config.bWildRefuges=NaturalProfile&&NaturalProfile->bWildRefuges;
+        if(Config.bWildRefuges)Config.bShelterSafe=false;
+        if(NaturalProfile){
+            Config.HabitatSignature=NaturalProfile->Fingerprint();TArray<AEcoVegetationHabitat*> Habitats;TSet<FName> HabitatIds;
+            for(TActorIterator<AEcoVegetationHabitat> It(World);It;++It)if(It->RegionId==G.RegionId){
+                if(!It->IsValidHabitat()||It->HabitatId.IsNone()||HabitatIds.Contains(It->HabitatId)){
+                    UE_LOG(LogEcoPolicyV3I,Error,TEXT("[EcoHabitat] Invalid/duplicate input: %s"),*It->GetPathName());RejectResourceContract();return;
+                }
+                HabitatIds.Add(It->HabitatId);Habitats.Add(*It);
+            }
+            Habitats.Sort([](const AEcoVegetationHabitat& A,const AEcoVegetationHabitat& B){return A.HabitatId.LexicalLess(B.HabitatId);});
+            for(const auto* Habitat:Habitats)Config.HabitatSignature=EcoNaturalHabitat::Hash(Config.HabitatSignature^Habitat->Fingerprint());
+        }
 		// 세로 장애물 (eco.IntegratedV3.Obstacles): 레벨에서 읽은 원판 + 무대 나무 줄기 원판 ((x, y, r) 순, 측정 때는 가져온 원판). 원판이 없으면 세계는 지금 그대로다
 		TArray<uint8> IsTree;
 		if (Config.Obstacles.bEnabled)
@@ -3169,9 +3341,12 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		{
 			const auto FieldClass = Spawner.IsValid() && Spawner->VegetationFieldClass
 				? Spawner->VegetationFieldClass : TSubclassOf<AEcoVegetationField>(AEcoVegetationField::StaticClass());
-			auto* Field = World->SpawnActor<AEcoVegetationField>(FieldClass, Origin, FRotator::ZeroRotator);
+			auto* Field = World->SpawnActorDeferred<AEcoVegetationField>(FieldClass,FTransform(Origin));
 			if (!Field) { RejectResourceContract(); return; }
 			Field->RegionId = G.RegionId; Field->ContextIndex = Ctx->Index;
+            Field->NaturalProfile=NaturalProfile;
+            Field->SurfaceHalfExtentCm=float(Config.WorldSize*EcoRepertoireV3::kUnitCm*.5);
+            Field->FinishSpawning(FTransform(Origin));
 			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoVegetation] Enabled %s: soil-v1, existing PPO unchanged, Python parity pending"), *G.RegionId.ToString());
 		}
 		UE_LOG(LogEcoPolicyV3I, Log,
@@ -3216,6 +3391,12 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 장애물 원판 목록을 쓰지 못했다: %s"), *Path);
 		}
 	}
+	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp): 지역 세계가 생긴 직후 자리를 한꺼번에 정한다 (시작 직전 지면 검사로 무대 땅이 불린 뒤). 끄면 아무것도 하지 않는다
+	if (bActive && ForestSettings.bOn)
+	{
+		FString Why;
+		PlanForest(ForestSettings, Why);
+	}
 }
 
 FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId, int32 RegionRuntimeIndex, const FVector& OriginCm,
@@ -3231,10 +3412,10 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	Ctx->PlannedDeer = PlannedDeer;
 	Ctx->PlannedWolves = PlannedWolves;
 	EcoWorldV3::InitWorld(Ctx->Sim, Config);
-	// 허용 칸 = 지금 두뇌 ∧ 세계 칸 (내장 두뇌면 InitWorld 그대로 — 두뇌가 바뀌면 SyncBrain 이 다시 정한다)
-	EcoWorldV3::SetModelAllowed(Ctx->Sim, GetActiveBrain().Allowed);
-	// 관측 칸 수 = 지금 두뇌의 계약 (18 또는 21 — R5 장애물 관측, 계약 2-4). 대조 기록을 켜면 18 두뇌여도 세 칸을 만든다 (결정 그대로)
-	EcoWorldV3::SetModelObsDim(Ctx->Sim, GetActiveBrain().Net.ObsDim);
+	// 허용 칸 = 지금 두뇌 ∧ 세계 칸 (내장 두뇌면 InitWorld 그대로 — 두뇌가 바뀌면 SyncBrain 이 다시 정한다), 관측 칸 수 = 지금 두뇌의 계약 (18·21·24 —
+	// R5 장애물 관측 계약 2-4, 10-24 두 길 두뇌), 두 길·반사 밖 FLEE 막음 = 지금 두뇌가 판 4·5 일 때만 (내장 두뇌면 모두 InitWorld 그대로). 걸 수 없는 두뇌
+	// (예: 도주 반사를 끈 세계에 앞 Play 의 두 길 두뇌)는 첫 SyncBrain 이 이 월드에서 내장으로 되돌린다. 대조 기록을 켜면 18 두뇌여도 세 칸을 만든다 (결정 그대로)
+	ApplyBrainToWorld(Ctx->Sim, GetActiveBrain());
 	Ctx->Sim.bObstacleObsProbe = ObsParityEvery() > 0;
 	Ctx->Sim.T = GlobalT;
 	EcoWorldV3::UpdateDayNight(Ctx->Sim);
@@ -3247,7 +3428,8 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::AddContext(FName RegionId,
 	Ctx->bDarkKnown = true;
 	FEcoV3RegionContext* Raw = Ctx.Get();
 	Contexts.Add(MoveTemp(Ctx));
-	InitContextEnv(*Raw);   // 환경 바뀜 감시 바탕 (10-21, EcoV3EnvWatch.cpp — 읽기만, 세계는 그대로)
+	InitContextEnv(*Raw);   // 환경 바뀜 감시 바탕 (10-21, EcoV3EnvWatch.cpp — 읽기만. 단 10-27 (C): 팀 날씨 출처가 맡는 지역은 시작 날씨를 팀 값으로 넣는다)
+	BigAddRegion(*Raw);     // '큰 변화만' 다시 배우기 기준선 (10-27, EcoV3BigChange.h — 세계 원판·날씨 종류, 읽기만)
 	return Raw;
 }
 
@@ -3261,6 +3443,10 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::FindContext(FName RegionId
 		}
 	}
 	return nullptr;
+}
+const FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::FindContext(FName RegionId) const
+{
+    for(const auto& Context:Contexts)if(Context->RegionId==RegionId)return Context.Get();return nullptr;
 }
 
 void UEcoPolicyV3IntegratedSubsystem::CheckClockDrift()
@@ -3318,6 +3504,58 @@ const FEcoV3Brain& UEcoPolicyV3IntegratedSubsystem::GetActiveBrain() const
 	return ActiveBrain.IsValid() ? *ActiveBrain : *FEcoV3BrainRegistry::Get().GetActive();
 }
 
+FString UEcoPolicyV3IntegratedSubsystem::RouteBrainBlocker(const EcoWorldV3::FWorldState& W, const FEcoV3Brain& B)
+{
+	namespace R3 = EcoRepertoireV3;
+	if (!B.bRoute())
+	{
+		return FString();
+	}
+	// 이식 계획서 12절 질문 12 (정한 것 — 권고대로 거부): 두 길은 도주 반사 안에서만 고른다. 반사가 없으면 판 5 는 도망을 시작할 길이 아예 없다
+	if (!W.Config.WildFlight.bEnabled)
+	{
+		return FString::Printf(TEXT("도주 반사(eco.IntegratedV3.WildFlight)를 끈 세계 — 마스크 판 %d 두뇌는 반사 도주 안에서만 길을 고른다"), B.MaskVersion);
+	}
+	// 실제 허용 = 두뇌 ∧ 세계 칸 (rep_policy.check_route_allowed 의 effective_allowed — 이식 계획서 4절). 칸 3·4 는 도주 중 길 칸이라 막혀야 한다
+	uint8 Eff[R3::kNumBehaviors] = {};
+	for (int32 b = 0; b < R3::kNumBehaviors; ++b)
+	{
+		Eff[b] = (B.Allowed[b] != 0 && W.Config.WorldAllowed[b] != 0) ? 1 : 0;
+	}
+	if (Eff[R3::kFreeze] != 0 || Eff[R3::kSleep] != 0)
+	{
+		return FString::Printf(TEXT("실제 허용(두뇌 ∧ 세계) %s 에 얼기·잠이 남는다 — 판 %d 는 칸 3·4 를 길 칸으로 쓴다"), *EcoV3Brain::AllowedText(Eff), B.MaskVersion);
+	}
+	if (Eff[R3::kGraze] == 0)
+	{
+		return TEXT("실제 허용에 먹기가 없다 — 덮기 밖 결정 줄이 빌 수 있다");
+	}
+	return FString();
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::BrainBlocker(const FEcoV3Brain& B) const
+{
+	for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
+	{
+		const FString Why = RouteBrainBlocker(Ctx->Sim, B);
+		if (!Why.IsEmpty())
+		{
+			return FString::Printf(TEXT("%s: %s"), *Ctx->RegionId.ToString(), *Why);
+		}
+	}
+	return FString();
+}
+
+void UEcoPolicyV3IntegratedSubsystem::ApplyBrainToWorld(EcoWorldV3::FWorldState& W, const FEcoV3Brain& B)
+{
+	EcoWorldV3::SetModelAllowed(W, B.Allowed);
+	EcoWorldV3::SetModelObsDim(W, B.Net.ObsDim);
+	// 10-24 두 길 두뇌 (이식 계획서 8-2 의 2·13-3): 세계 설정이 아니라 두뇌가 정한다 — 판 4·5 면 길, 판 5 면 반사 밖 FLEE 막음 (둘 다 도주 반사를 켠 세계만).
+	// 판 2 두뇌는 둘 다 거짓이라 InitWorld 그대로다 (끈 세계 비트 동일)
+	EcoWorldV3::SetModelRoute(W, B.bRoute());
+	EcoWorldV3::SetModelFleeGate(W, B.bFleeGate());
+}
+
 void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 {
 	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
@@ -3357,6 +3595,24 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 			}
 		}
 	}
+	// 10-24 두 길 두뇌 걸기 전 검사 (이식 계획서 8-2 의 1): 대기 두뇌가 판 4·5 인데 어느 지역이 도주 반사를 껐거나 실제 허용(두뇌 ∧ 세계)에 얼기·잠이 남으면
+	// 대기 두뇌를 버리고 지금 두뇌를 둔다 (거부 알림 — 폴더 감시 거부와 같은 꼴). 판 2 두뇌는 보지 않는다 (지금 그대로)
+	if (const FEcoV3BrainPtr Pend = Reg.GetPending())
+	{
+		const FString Block = BrainBlocker(*Pend);
+		if (!Block.IsEmpty())
+		{
+			const FString PendId = Pend->Id;
+			// 10-29 기본 두뇌 R7e(판 5)를 걸 수 없는 세계 (도주 반사 끔 등): 대기를 버리고 지금 두뇌(처음 Play 면 내장 R1b-F)로 돈다 — 알림에 그 뜻을 적는다
+			const FString PendName = Pend->bDefault ? FString::Printf(TEXT("%s %s"), *Pend->OriginText(), *PendId) : PendId;
+			Reg.DiscardPending(FString::Printf(TEXT("두 길 두뇌를 걸 수 없다 — %s"), *Block));
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 두뇌 거부 | %.1f초 (전역 스텝 %lld) | %s — %s | %s 그대로"), Seconds, static_cast<long long>(GlobalT),
+				   *PendName, *Block, *GetActiveBrain().Id);
+			PostNotice(EcoV3Integrated::ENotice::Reject,
+					   Pend->bDefault ? FString::Printf(TEXT("두뇌 거부 — %s 를 걸 수 없어 %s 로 돈다: %s"), *PendName, *GetActiveBrain().Id, *Block)
+									  : FString::Printf(TEXT("두뇌 거부 — %s: %s"), *PendId, *Block));
+		}
+	}
 	FString Why;
 	bool bRollback = false;
 	const bool bSwapped = Reg.CommitPending(nullptr, &Why, &bRollback);
@@ -3364,22 +3620,42 @@ void UEcoPolicyV3IntegratedSubsystem::SyncBrain(bool bPollWatch)
 	{
 		return;
 	}
-	const FEcoV3BrainRef Now = Reg.GetActive();
+	FEcoV3BrainRef Now = Reg.GetActive();
 	const FEcoV3BrainPtr Before = ActiveBrain;
+	{
+		// 저장소의 지금 두뇌를 이 월드에 걸 수 없다 (앞 Play·다른 월드가 건 두 길 두뇌를 도주 반사를 끈 이 월드가 받음 — 대기 검사를 지나지 않은 길):
+		// 저장소는 그대로 두고 이 월드만 앞 두뇌(처음이면 내장)를 쓴다
+		const FString Block = BrainBlocker(*Now);
+		if (!Block.IsEmpty())
+		{
+			const FEcoV3BrainRef Keep = Before.IsValid() ? Before.ToSharedRef() : FEcoV3BrainRegistry::Builtin();
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 두뇌 거부 | %.1f초 (전역 스텝 %lld) | 저장소 두뇌 %s 를 이 월드에 걸 수 없다 — %s | 이 월드는 %s"), Seconds,
+				   static_cast<long long>(GlobalT), *Now->Id, *Block, *Keep->Id);
+			PostNotice(EcoV3Integrated::ENotice::Reject, FString::Printf(TEXT("두뇌 거부 — %s: %s"), *Now->Id, *Block));
+			AppliedBrainGen = Reg.GetGeneration();
+			if (Before.IsValid())
+			{
+				return;   // 지역 세계는 앞 두뇌 그대로다
+			}
+			Now = Keep;
+		}
+	}
 	FString AllowedByRegion;
 	for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
 	{
-		EcoWorldV3::SetModelAllowed(Ctx->Sim, Now->Allowed);
-		// 관측 칸 수 = 새 두뇌의 계약 (R5 장애물 관측 21 이면 이 스텝 끝 관측부터 세 칸을 더 만들고, 그 결정부터 새 두뇌가 21 칸을 읽는다)
-		EcoWorldV3::SetModelObsDim(Ctx->Sim, Now->Net.ObsDim);
+		// 허용 칸 = 새 두뇌 ∧ 세계, 관측 칸 수 = 새 두뇌의 계약 (R5 장애물 관측 21 이면 이 스텝 끝 관측부터 세 칸을 더 만들고, 그 결정부터 새 두뇌가 21 칸을 읽는다),
+		// 10-24 두 길 (판 4·5 두뇌만 — 이 스텝 H 부터 길 단계. 열린 도주는 길 없음 결정으로 새 두뇌가 곧바로 고르고, 길 없는 두뇌로 바꾸면 A 가 반사 방향으로 둔 뒤
+		// H 가 길 상태를 지운다 — 이식 계획서 8-2 의 3)·반사 밖 FLEE 막음 (판 5)
+		ApplyBrainToWorld(Ctx->Sim, *Now);
 		Ctx->SinceSwapBrainTally = FEcoV3BrainTally();
 		if (Before.IsValid() && Ctx->FlightOn())
 		{
 			// 도망 기록 두뇌 판 (EcoV3FlightTally.h): 지금 판의 합을 '교체 전'으로, 새 판은 0 에서 (결정 스텝 경계 — 열린 도망은 새 판에 든다)
 			Ctx->FlightTally.OnBrainSwap(EcoV3Flight::FSum::Of(Ctx->Sim.Stats.Flight));
 		}
-		AllowedByRegion += FString::Printf(TEXT("%s%s %s"), AllowedByRegion.IsEmpty() ? TEXT("") : TEXT(" · "), *Ctx->RegionId.ToString(),
-										   *EcoV3Brain::AllowedText(Ctx->Sim.Allowed));
+		AllowedByRegion += FString::Printf(TEXT("%s%s %s%s"), AllowedByRegion.IsEmpty() ? TEXT("") : TEXT(" · "), *Ctx->RegionId.ToString(),
+										   *EcoV3Brain::AllowedText(Ctx->Sim.Allowed),
+										   Ctx->RouteOn() ? (Ctx->Sim.bFleeGate ? TEXT(" (두 길·반사 밖 도망 막음)") : TEXT(" (두 길)")) : TEXT(""));
 	}
 	if (AllowedByRegion.IsEmpty())
 	{
@@ -3759,7 +4035,8 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		{
 			CaughtKeep[k] = S.CaughtByKeep[k] - P.CaughtByKeep[k];
 		}
-		const int64 CaughtOutside = Caught - CaughtKeep[1] - CaughtKeep[2] - CaughtKeep[3];
+		// 10-27: 거리 두기(kKeepRest) 중 잡힘도 덮기 안이다 (아래 거리 두기 줄에 따로 적는다)
+		const int64 CaughtOutside = Caught - CaughtKeep[1] - CaughtKeep[2] - CaughtKeep[3] - CaughtKeep[EcoWorldV3::kKeepRest];
 		const FString Rule = K.bEnabled ? FString::Printf(TEXT("도주 반사 켬 (경계 %.0f m · 도주 %.0f m · 안전 %.0f m)"), K.AlertR * MPerUnit,
 														  K.FlightR * MPerUnit, K.SafeR * MPerUnit)
 										: FString(TEXT("끔 (두뇌 그대로)"));
@@ -3779,6 +4056,37 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   static_cast<long long>(Near),
 			   Steps > 0 ? static_cast<double>(Near) / static_cast<double>(Steps) : 0.0, Ctx.KeepNow[1], Ctx.KeepNow[2], Ctx.KeepNow[3],
 			   static_cast<long long>(S.CaughtInCover - P.CaughtInCover), static_cast<long long>(S.CaughtInCover));
+		if (K.bRestKeep)
+		{
+			// 10-27 거리 두기(쉬는 늑대) 줄 — '<지역> 거리 두기 |' 꼴 (compare_unreal.py 의 첫 줄·경계 거리 줄 정규식에 걸리지 않는다)
+			UE_LOG(LogEcoPolicyV3I, Log,
+				   TEXT("[EcoV3I] %s 거리 두기 | %.1f초 | 쉬는 늑대 시야 + %.0f m 밖까지 물러남 · 다가가지 않기 띠 %.0f m | 구간 시작 %lld · 끝 %lld · ")
+					   TEXT("개체·스텝 %lld · 그 중 잡힘 %lld | 띠가 방향을 바꾼 개체·스텝 %lld (멈춤 %lld) | 지금 거리 두기 %d"),
+				   *Ctx.RegionId.ToString(), Seconds, K.RestKeepMargin * MPerUnit, K.RestKeepBand * MPerUnit,
+				   static_cast<long long>(S.KeepRestStarts - P.KeepRestStarts), static_cast<long long>(S.KeepRestEnds - P.KeepRestEnds),
+				   static_cast<long long>(S.KeepSteps[EcoWorldV3::kKeepRest] - P.KeepSteps[EcoWorldV3::kKeepRest]),
+				   static_cast<long long>(CaughtKeep[EcoWorldV3::kKeepRest]), static_cast<long long>(S.RestBandTurnSteps - P.RestBandTurnSteps),
+				   static_cast<long long>(S.RestBandStopSteps - P.RestBandStopSteps), Ctx.KeepNow[EcoWorldV3::kKeepRest]);
+		}
+		{
+			// 10-27 쉬는 늑대 시야 줄 (측정 전용 — 거리 두기 켬·끔 모두 적는다. '<지역> 쉬는 늑대 시야 |' 꼴이라 다른 기록 줄 정규식에 걸리지 않는다)
+			const int64 LiveN = Ctx.RestViewLiveSteps - Ctx.LastLogRestViewLiveSteps;
+			const int64 InView = Ctx.RestViewDeerSteps - Ctx.LastLogRestViewDeerSteps;
+			const int64 Stop = Ctx.RestViewStopSteps - Ctx.LastLogRestViewStopSteps;
+			UE_LOG(LogEcoPolicyV3I, Log,
+				   TEXT("[EcoV3I] %s 쉬는 늑대 시야 | %.1f초 | 거리 두기 %s | 구간 산 사슴·스텝 %lld 중 쉬는 늑대 시야 안 %lld (%.2f%%) · 그중 멈춤 %lld (%.2f%%) | ")
+					   TEXT("누적 %lld 중 시야 안 %lld (%.2f%%) · 멈춤 %lld (%.2f%%)"),
+				   *Ctx.RegionId.ToString(), Seconds, K.bRestKeep ? TEXT("켬") : TEXT("끔"), static_cast<long long>(LiveN), static_cast<long long>(InView),
+				   LiveN > 0 ? 100.0 * static_cast<double>(InView) / static_cast<double>(LiveN) : 0.0, static_cast<long long>(Stop),
+				   LiveN > 0 ? 100.0 * static_cast<double>(Stop) / static_cast<double>(LiveN) : 0.0, static_cast<long long>(Ctx.RestViewLiveSteps),
+				   static_cast<long long>(Ctx.RestViewDeerSteps),
+				   Ctx.RestViewLiveSteps > 0 ? 100.0 * static_cast<double>(Ctx.RestViewDeerSteps) / static_cast<double>(Ctx.RestViewLiveSteps) : 0.0,
+				   static_cast<long long>(Ctx.RestViewStopSteps),
+				   Ctx.RestViewLiveSteps > 0 ? 100.0 * static_cast<double>(Ctx.RestViewStopSteps) / static_cast<double>(Ctx.RestViewLiveSteps) : 0.0);
+			Ctx.LastLogRestViewLiveSteps = Ctx.RestViewLiveSteps;
+			Ctx.LastLogRestViewDeerSteps = Ctx.RestViewDeerSteps;
+			Ctx.LastLogRestViewStopSteps = Ctx.RestViewStopSteps;
+		}
 		Ctx.LastLogNearEatingDeerSteps = Ctx.NearEatingDeerSteps;
 	}
 	// 넷째 줄: 야생 1단계 (사람 결정 10-15 (7)). 켠 규칙만 적는다. 구간 = 지난 기록 줄 뒤. 앞 세 줄의 칸·순서는 그대로다
@@ -3920,9 +4228,21 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   static_cast<long long>(D.Reflex), static_cast<long long>(D.ReflexKnow));
 		Ctx.LastLogBrainTally = Ctx.BrainTally;
 	}
+	// 아홉째 줄 뒤 (10-24 두 길 두뇌, 이식 계획서 8-3 — 길 통계가 있는 세계만: 지금 판 4·5 두뇌이거나 앞서 걸었던 세계): 구간·누적의 실행한 반사 길 RUN·SHELTER 스텝,
+	//   길 결정·은신처 고름(SHELTER 가 열린 결정 가운데)·무효·바꿈 (world.py route_stats 와 같은 칸 — 고름·열림·바꿈은 적용 때 센다). 아홉째 줄 '<지역> 두뇌 |' 꼴은
+	//   그대로 두고 따로 적는다 (results/v3/brain_swap/compare_swap.py 정규식이 그 줄 끝을 본다)
+	if (Ctx.RouteSeen())
+	{
+		const FEcoV3RouteSum Tot = FEcoV3RouteSum::Of(S.Route);
+		const FEcoV3RouteSum Iv = Tot.Minus(FEcoV3RouteSum::Of(P.Route));
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 길 | %.1f초 | %s | 구간 %s | 누적 %s · 도주 시작 %lld · 바꿈 %lld"), *Ctx.RegionId.ToString(), Seconds,
+			   Ctx.RouteOn() ? (Ctx.Sim.bFleeGate ? TEXT("두 길 켬 (판 5 — 반사 밖 도망 막음)") : TEXT("두 길 켬 (판 4)")) : TEXT("두 길 끔 (앞 두뇌가 센 누적)"),
+			   *Iv.Text(), *Tot.Text(), static_cast<long long>(Tot.Onsets), static_cast<long long>(Tot.Switches));
+	}
 	// 열째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — 정의는 EcoWorldV3.h 머리 주석 '도망 기록' = world.py flight_stats, 집계는 EcoV3FlightTally.h).
-	//   구간(지난 기록 줄 뒤)에 끝난 도망의 끝 까닭별 수·평균 길이·스스로 벗어난 도망의 쫓긴 시간(관문 1차 재료), 최근 60 초 창, 누적(열린 도망 = 잘림),
-	//   두뇌 판 비교. 앞 아홉 줄의 정규식은 '<지역> 도망 |' 꼴에 걸리지 않는다
+	//   구간(지난 기록 줄 뒤)에 끝난 도망의 끝 까닭별 수·평균 길이·스스로 벗어난 도망의 쫓긴 시간(10-23 부터 보고만), 최근 60 초 창, 누적(열린 도망 = 잘림,
+	//   10-23 쫓긴 도망·숨음(지켜보는 중 포함)·지켜보는 동안 잡힘·굶음 — 옛 도망 단위 숨음 비율, 보고만. 10-24 쫓긴 사건·숨음(지켜보는 중 포함)·잡힘·굶음·
+	//   이어진 도망 — 관문 1차 사건 숨음 비율·GH 의 재료), 두뇌 판 비교(사건 단위). 앞 아홉 줄의 정규식은 '<지역> 도망 |' 꼴에 걸리지 않는다
 	if (Ctx.FlightOn())
 	{
 		const EcoV3Flight::FSum Iv = EcoV3Flight::FSum::Of(S.Flight).Minus(EcoV3Flight::FSum::Of(P.Flight));
@@ -3940,14 +4260,20 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 		const int64 TotEnded = Tot.Started - Tot.Num[EcoWorldV3::kFlightTruncated];
 		UE_LOG(LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] %s 도망 | %.1f초 | 구간 시작 %lld · 끝 %lld (스스로: %s) · 평균 %.1f초 · 스스로 벗어난 도망 %lld번 쫓긴 %.1f초 | %s | ")
-				   TEXT("누적 시작 %lld · 끝 %lld · 열린 %lld · 스스로 벗어남 %lld (%.1f%%) 쫓긴 %.1f초 · 은신처 원 안에서 끝 %lld · 반사 스텝 %lld/%lld | 두뇌 판 (교체 %d번): %s"),
+				   TEXT("누적 시작 %lld · 끝 %lld · 열린 %lld · 스스로 벗어남 %lld (%.1f%%) 쫓긴 %.1f초 · 은신처 원 안에서 끝 %lld · 반사 스텝 %lld/%lld · ")
+					   TEXT("쫓긴 도망 %lld 중 숨음 %lld (지켜보는 중 %lld) · 숨은 뒤 10초 안 잡힘 %lld·굶음 %lld · ")
+						   TEXT("쫓긴 사건 %lld 중 숨음 %lld (지켜보는 중 %lld) · 잡힘 %lld · 굶음 %lld · 잘림 %lld · 이어진 도망 %lld | 두뇌 판 (교체 %d번): %s"),
 			   *Ctx.RegionId.ToString(), Seconds, static_cast<long long>(Iv.Started), static_cast<long long>(Iv.Ended), *Causes, Iv.MeanSeconds(),
 			   static_cast<long long>(Iv.OwnN()), Iv.OwnChaseSeconds(), *EcoV3Flight::SummaryText(Ctx.FlightTally.Window()),
 			   static_cast<long long>(Tot.Started), static_cast<long long>(TotEnded), static_cast<long long>(Tot.Num[EcoWorldV3::kFlightTruncated]),
 			   static_cast<long long>(Tot.OwnN), TotEnded > 0 ? 100.0 * static_cast<double>(Tot.OwnN) / static_cast<double>(TotEnded) : 0.0,
 			   Tot.OwnN > 0 ? static_cast<double>(Tot.OwnContact) * EcoRepertoireV3::kStepSeconds / static_cast<double>(Tot.OwnN) : 0.0,
 			   static_cast<long long>(Tot.ShelterEnd), static_cast<long long>(Tot.ReflexSteps), static_cast<long long>(Tot.FleeSteps),
-			   Ctx.FlightTally.Swaps, *EcoV3Flight::CompareText(Ctx.FlightTally));
+			   static_cast<long long>(Tot.Chased), static_cast<long long>(Tot.Hidden), static_cast<long long>(Tot.Watching),
+			   static_cast<long long>(Tot.CoverCaught), static_cast<long long>(Tot.CoverStarved), static_cast<long long>(Tot.EpChased),
+			   static_cast<long long>(Tot.EpHidden), static_cast<long long>(Tot.EpWatching), static_cast<long long>(Tot.EpCaught),
+			   static_cast<long long>(Tot.EpStarved), static_cast<long long>(Tot.EpTruncated), static_cast<long long>(Tot.EpJoined), Ctx.FlightTally.Swaps,
+			   *EcoV3Flight::CompareText(Ctx.FlightTally));
 	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
 	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
@@ -4004,14 +4330,19 @@ bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& F
 	}
 	const int32 Pieces = FMath::Max(1, FMath::CeilToInt32(Dist / EcoPolicyV3IntegratedImpl::kSubStepCm));
 	FVector Cur = FromCm;
+    const auto* Context=FindContext(RegionId);
+    const bool NaturalGround=Context&&Context->Sim.Config.bNaturalHabitats;
+    const auto GroundRules=NaturalGround?Context->Sim.Config.NaturalGround:EcoNaturalHabitat::FGroundTraversal{};
 	for (int32 k = 1; k <= Pieces; ++k)
 	{
 		const double A = static_cast<double>(k) / static_cast<double>(Pieces);
 		FVector Next(FMath::Lerp(FromCm.X, ToCm.X, A), FMath::Lerp(FromCm.Y, ToCm.Y, A), Cur.Z);
-		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, bTraveling, Cur, Next, BodyRadiusCm))
+		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, bTraveling, Cur, Next, BodyRadiusCm,NaturalGround?float(FMath::Cos(FMath::DegreesToRadians(GroundRules.MaxSlopeDegrees))):.65f))
 		{
 			return false;
 		}
+        if(NaturalGround&&(!GroundRules.AllowsHeight(Cur.Z,Next.Z,FVector::Dist2D(Cur,Next))
+            ||!EcoCreatureMovement::IsWadeableGround(*World,Next,float(GroundRules.WadingDepthCm))))return false;
 		Cur = Next;
 	}
 	OutZ = Cur.Z;
@@ -4150,6 +4481,10 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 		{
 			Tally += FString::Printf(TEXT(" | 경계(멀어짐) %d 도망(안전해질 때까지) %d 숨기(은신처·경계) %d"), Ctx.KeepNow[EcoWorldV3::kKeepAlert],
 									 Ctx.KeepNow[EcoWorldV3::kKeepPanic], Ctx.KeepNow[EcoWorldV3::kKeepShelter]);
+			if (Ctx.Sim.Config.WildFlight.bRestKeep)
+			{
+				Tally += FString::Printf(TEXT(" 거리 두기(쉬는 늑대) %d"), Ctx.KeepNow[EcoWorldV3::kKeepRest]);   // 10-27
+			}
 		}
 		// 지역 날씨 (10-18): 첫 줄 낮밤 옆에 '비 1.00' (끄거나 맑으면 '맑음')
 		const FString WxTag = Ctx.Sim.Config.Weather.bEnabled && Ctx.Sim.WeatherKind != EcoWorldV3::kWeatherClear
@@ -4157,8 +4492,11 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 								  : FString(TEXT(" 맑음"));
 		// 두뇌 (10-18 두뇌 바꾸기): 내장이면 'R1b−F'(얼기 막음)·'R1b', 파일 두뇌면 모델 이름. 바뀐 뒤 늑대를 알 때 숨기 몫 (FEcoV3BrainTally)
 		const FEcoV3Brain& Brain = GetActiveBrain();
-		const FString BrainTag = Brain.bBuiltin ? FString(Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"))
-												: FString::Printf(TEXT("두뇌 %s"), *Brain.ModelName);
+		// 10-24 두 길 두뇌면 '두뇌 <이름> 두 길' (판 5 는 '두 길·반사 밖 도망 막음'). 10-29 기본 두뇌면 '기본 R7e 두 길·반사 밖 도망 막음'
+		const TCHAR* const RouteTag = Ctx.RouteOn() ? (Ctx.Sim.bFleeGate ? TEXT(" 두 길·반사 밖 도망 막음") : TEXT(" 두 길")) : TEXT("");
+		const FString BrainTag = Brain.bBuiltin	  ? FString(Ctx.Sim.Allowed[EcoRepertoireV3::kFreeze] == 0 ? TEXT("R1b−F") : TEXT("R1b"))
+								 : Brain.bDefault ? FString::Printf(TEXT("기본 %s%s"), *Brain.Label, RouteTag)
+												  : FString::Printf(TEXT("두뇌 %s%s"), *Brain.ModelName, RouteTag);
 		const FEcoV3BrainTally& Since = Ctx.SinceSwapBrainTally;
 		const int64 KnowN = Since.KnowTotal();
 		const FString Line = FString::Printf(TEXT("v3 %s %s | %s%s d=%.2f | 사슴 %d/%d:%s | 늑대%s | 포획 %lld 굶음 %lld | 이 두뇌로 늑대를 알 때 숨기 %.1f%% (%lld 스텝)"),
@@ -4177,12 +4515,20 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			FoodLine += FString::Printf(TEXT(" | 지방 비축 평균 %.0f%% · 비축으로 사는 사슴 %d · 비축 %.0f%% 밑 %d · 약함(느림) %d"), 100.0 * Ctx.MeanReserve,
 										Ctx.OnReserveDeer, 100.0 * EcoV3Integrated::kLowReserve, Ctx.LowReserveDeer, Ctx.WeakDeer);
 		}
-		// 셋째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — EcoV3FlightTally.h): 최근 60 초 창과 두뇌 판 비교 (쫓긴 = 스스로 벗어난 도망)
+		// 셋째 줄: 야생 (w3) 도망 기록 (10-21, 도망 기록을 세는 세계만 — EcoV3FlightTally.h): 최근 60 초 창과 두뇌 판 비교 (쫓긴 = 스스로 벗어난 도망의 쫓긴
+		// 시간, 10-24 쫓긴 사건 중 숨음·잡힘 = 관문 1차 사건 숨음 비율·지킴 GH 와 같은 몫 — 닫힌 사건)
 		const FString FlightLine = Ctx.FlightOn() ? FString::Printf(TEXT("도망 %s | %s | %s"), *Ctx.RegionId.ToString(),
 																	 *EcoV3Flight::SummaryText(Ctx.FlightTally.Window()),
 																	 *EcoV3Flight::CompareText(Ctx.FlightTally))
 												  : FString();
-		DrawDebugString(World, Center + FVector(0, 0, 600.0), Line + TEXT("\n") + FoodLine + (FlightLine.IsEmpty() ? FString() : TEXT("\n") + FlightLine),
+		// 넷째 줄: 10-24 두 길 두뇌 (이식 계획서 8-3 — 길을 켠 세계만): 최근 60 초 실행한 반사 길 몫·길 결정·은신처 고름·무효, 사슴 머리 위 글자는
+		// '도주(트인 쪽)'(연노랑)·'도주(은신처)'(하늘색) — EcoV3Integrated::DeerLabel
+		const FString RouteLine = Ctx.RouteOn() ? FString::Printf(TEXT("길 %s | 최근 %.0f초: %s | 지금 도주 트인 쪽 %d · 은신처 %d"), *Ctx.RegionId.ToString(),
+																   static_cast<double>(Ctx.RouteTally.WindowSteps()) * EcoRepertoireV3::kStepSeconds,
+																   *Ctx.RouteTally.Window().Text(), Ctx.RouteNow[0], Ctx.RouteNow[1])
+												: FString();
+		DrawDebugString(World, Center + FVector(0, 0, 600.0),
+						Line + TEXT("\n") + FoodLine + (FlightLine.IsEmpty() ? FString() : TEXT("\n") + FlightLine) + (RouteLine.IsEmpty() ? FString() : TEXT("\n") + RouteLine),
 						nullptr, FColor::White, 0.0f, true, 1.4f);
 		if (bScreen)
 		{
@@ -4192,6 +4538,10 @@ void UEcoPolicyV3IntegratedSubsystem::DrawOverlay()
 			{
 				// 키 733000 + 지역 (732000~732004 는 두뇌 알림·상태 줄)
 				GEngine->AddOnScreenDebugMessage(static_cast<uint64>(733000 + Ctx.Index), 1.5f, FColor(255, 190, 140), FlightLine);
+			}
+			if (!RouteLine.IsEmpty())
+			{
+				GEngine->AddOnScreenDebugMessage(static_cast<uint64>(734000 + Ctx.Index), 1.5f, FColor(140, 225, 255), RouteLine);
 			}
 		}
 	}
@@ -4273,6 +4623,12 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 							: TEXT(""));
 		}
 	}
+	// 10-27 파이썬 감시 자동 시작 (EcoV3WatchLauncher): 우리가 띄운 감시가 끝났나 2 초마다 (기다리지 않는다 — 그릴 수 없는 실행도)
+	if (Now >= NextWatchPoll)
+	{
+		NextWatchPoll = Now + EcoV3Watch::kPollSeconds;
+		PollAutoWatch();
+	}
 	const bool bCanDraw = EcoV3Brain::NoticeEnabled() && GEngine && FApp::CanEverRender();
 	// 미뤄 둔 화면 찍기 (eco.V3Brain.NoticeShot — 바꾸기·되돌리기 알림 1.5 초 뒤, 게임 화면만)
 	if (PendingShotAt >= 0.0 && Now >= PendingShotAt)
@@ -4299,21 +4655,322 @@ void UEcoPolicyV3IntegratedSubsystem::DrawBrainNotices()
 	const FEcoV3Brain& B = GetActiveBrain();
 	const FString Round = B.RoundTag();
 	FString Line = B.bBuiltin	   ? FString::Printf(TEXT("두뇌 판 0 (내장 %s)"), Settings.bNoFreeze ? TEXT("R1b−F") : TEXT("R1b"))
+				   : B.bDefault	   ? FString::Printf(TEXT("두뇌 판 0 (기본 %s)"), *B.Label)   // 10-29 기본 두뇌 R7e
 				   : Round.IsEmpty() ? FString::Printf(TEXT("두뇌 %s"), *B.ShortId())
 									 : FString::Printf(TEXT("두뇌 %s (%s)"), *Round, *B.ShortId());
+	if (B.bRoute())
+	{
+		// 10-24 두 길 두뇌 (이식 계획서 8-3): 판과 모든 지역 최근 60 초 길 요약
+		FEcoV3RouteSum Win;
+		for (const TUniquePtr<FEcoV3RegionContext>& Ctx : Contexts)
+		{
+			if (Ctx && Ctx->RouteOn())
+			{
+				Win = Win.Plus(Ctx->RouteTally.Window());
+			}
+		}
+		Line += FString::Printf(TEXT(" · 두 길(마스크 판 %d) %s"), B.MaskVersion, *Win.Text());
+	}
 	Line += FString::Printf(TEXT(" · 교체 %d번 · 환경 #%d"), BrainSwapsThisPlay, EnvRevision);
-	const FString Live = Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds());
+	if (IsAutoSnapshotOn())
+	{
+		Line += TEXT(" · ") + BigChangeStatusText();   // 10-27 '큰 변화만' 다시 배우기 진행 (규칙 0 이면 '환경 판마다')
+	}
+	const FString Live = WatchStatusText(Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds()));   // 10-27 우리가 띄운 감시의 켜는 중·끝난 까닭
 	if (!Live.IsEmpty())
 	{
 		Line += TEXT(" · ") + Live;
 	}
-	// 도망 요약 (10-21 — 모든 지역 합: 최근 60 초 창 · 교체 전 x초 → 지금 y초)
+	// 도망 요약 (10-21 — 모든 지역 합: 최근 60 초 창 · 교체 전 → 지금. 10-24 부터 쫓긴 사건 중 숨음·잡힘 몫 — EcoV3FlightTally.h)
 	const FString FlightText = FlightStatusText();
 	if (!FlightText.IsEmpty())
 	{
 		Line += TEXT(" · ") + FlightText;
 	}
 	GEngine->AddOnScreenDebugMessage(kNoticeKeyStatus, 1.5f, FColor(200, 220, 255), Line);
+}
+
+// -----------------------------------------------------------------------------
+// Play 때 파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.h — 설계 FOREST_GROWTH_MODE.md 3절)
+// 학습 파이프라인(live.py watch)을 따로 띄우는 개발용 도구다 — 추론이 아니다 (게임 추론은 그대로 C++ 네이티브만). 게임 스레드를 막지 않는다:
+// 띄우기 몇 ms, 살핌 2 초마다 기다림 없음, 끝낼 때만 최대 3 초. 개발 빌드·AutoAdapt·서버·단독만.
+// -----------------------------------------------------------------------------
+
+namespace EcoPolicyV3IntegratedImpl
+{
+	/** 상대 경로 = 프로젝트 폴더 기준 → 절대 (빈 값은 빈 값). */
+	FString ProjectAbs(const FString& In)
+	{
+		const FString T = In.TrimStartAndEnd();
+		if (T.IsEmpty())
+		{
+			return FString();
+		}
+		return FPaths::ConvertRelativePathToFull(FPaths::IsRelative(T) ? FPaths::Combine(FPaths::ProjectDir(), T) : T);
+	}
+
+	/** '적응 고리 | ' 머리를 뗀 글. */
+	FString LiveBody(const FString& Live)
+	{
+		const FString Head = TEXT("적응 고리 | ");
+		return Live.StartsWith(Head) ? Live.RightChop(Head.Len()) : Live;
+	}
+
+	/** <root>/live/watch.lock 의 주인 pid (못 읽으면 0). */
+	int32 LockOwnerPid(const FString& Root)
+	{
+		FString Text;
+		EcoV3Watch::FLock Lock;
+		return FFileHelper::LoadFileToString(Text, *(Root / TEXT("live/watch.lock"))) && EcoV3Watch::ParseLock(Text, Lock) ? Lock.Pid : 0;
+	}
+}
+
+void UEcoPolicyV3IntegratedSubsystem::BeginAutoWatch()
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	WatchDecision = EcoV3Watch::EDecide::NoAdapt;
+	WatchWhy.Empty();
+	WatchOtherPid = 0;
+	bWatchOurs = false;
+	bWatchEndReported = false;
+	NextWatchPoll = 0.0;
+	LastWatchLine.Empty();
+#if !UE_BUILD_SHIPPING
+	EcoV3Watch::FDecideIn In;
+	In.bAutoAdapt = IsAutoAdaptEnabled();
+	In.bAutoWatch = CVarAutoWatch.GetValueOnGameThread() != 0;
+	if (!In.bAutoAdapt)
+	{
+		return;   // 적응 고리 끔 (기본) — 기록도 남기지 않는다 (지금까지와 같다)
+	}
+	if (!In.bAutoWatch)
+	{
+		WatchDecision = EcoV3Watch::EDecide::Off;
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 | 끔 (eco.IntegratedV3.AutoWatch 0) — 사람이 live.py watch 를 따로 띄운다"));
+		return;
+	}
+	const UWorld* World = GetWorld();
+	In.bTesting = GIsAutomationTesting;
+	In.bClient = World && World->GetNetMode() == NM_Client;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	const FString Root = AdaptRootDir();
+	In.RootMismatch = EcoV3Watch::RootMismatch(Root, AutoSnapshotDir(), ProjectAbs(Reg.EffectiveWatchFolder()), ProjectAbs(Reg.EffectiveStatusFile()));
+	FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	L.Poll();
+	In.bOursAlive = L.IsRunning();
+	// 1. live.py 잠금 주인이 산 python (사람이 띄운 감시 — 또는 아래 pid 파일과 같으면 다른 언리얼이 띄운 감시)
+	EcoV3Watch::FLock Lock;
+	FString Text;
+	if (FFileHelper::LoadFileToString(Text, *(Root / TEXT("live/watch.lock"))) && EcoV3Watch::ParseLock(Text, Lock))
+	{
+		In.bLockAlive = FEcoV3WatchLauncher::IsProcessAlive(Lock.Pid, Lock.bHasCreateTime ? Lock.CreateTime : -1.0, /*bRequirePython*/ true);
+	}
+	// 2. 우리 기록 watcher.pid (죽은 pid 면 지우고 넘어간다)
+	EcoV3Watch::FPidFile Pf;
+	const FString PidPath = Root / TEXT("watcher.pid");
+	if (FFileHelper::LoadFileToString(Text, *PidPath) && EcoV3Watch::ParsePidFile(Text, Pf))
+	{
+		In.bPidFileAlive = FEcoV3WatchLauncher::IsProcessAlive(Pf.Pid, Pf.CreateUnix, /*bRequirePython*/ false);
+		if (!In.bPidFileAlive && !In.bOursAlive)
+		{
+			IFileManager::Get().Delete(*PidPath, false, true, true);
+		}
+		In.bLockIsOurs = In.bLockAlive && Lock.Pid == Pf.Pid;
+	}
+	// 3. python·live.py·작업 폴더
+	FString PyWhy;
+	const FString Python = EcoV3Watch::ResolvePython(CVarAutoWatchPython.GetValueOnGameThread(), FPlatformMisc::GetEnvironmentVariable(TEXT("PATH")),
+													 [](const FString& P) { return FPaths::FileExists(P); }, PyWhy);
+	In.bPython = !Python.IsEmpty();
+	const FString Override = CVarAutoWatchCmd.GetValueOnGameThread().TrimStartAndEnd();
+	FString WorkDir = ProjectAbs(CVarAutoWatchDir.GetValueOnGameThread());
+	if (WorkDir.IsEmpty())
+	{
+		WorkDir = FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectDir(), TEXT(".."), TEXT("herbivore_rl")));
+	}
+	In.bScript = FPaths::DirectoryExists(WorkDir) && (!Override.IsEmpty() || FPaths::FileExists(WorkDir / EcoV3Watch::kScriptRel));
+	WatchDecision = EcoV3Watch::Decide(In);
+	switch (WatchDecision)
+	{
+	case EcoV3Watch::EDecide::Unsafe:
+		WatchWhy = In.RootMismatch;
+		break;
+	case EcoV3Watch::EDecide::NoPython:
+		WatchWhy = PyWhy;
+		break;
+	case EcoV3Watch::EDecide::NoScript:
+		WatchWhy = FString::Printf(TEXT("%s 가 없다 (eco.IntegratedV3.AutoWatchDir)"), *(WorkDir / EcoV3Watch::kScriptRel));
+		break;
+	case EcoV3Watch::EDecide::HumanRunning:
+	case EcoV3Watch::EDecide::OtherEditor:
+		WatchOtherPid = In.bLockAlive ? Lock.Pid : Pf.Pid;
+		break;
+	case EcoV3Watch::EDecide::OursRunning:
+		WatchOtherPid = L.GetPid();
+		break;
+	default:
+		break;
+	}
+	if (WatchDecision != EcoV3Watch::EDecide::Launch)
+	{
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 | %s%s%s"), EcoV3Watch::DecideName(WatchDecision),
+			   WatchOtherPid > 0 ? *FString::Printf(TEXT(" — pid %d%s"), WatchOtherPid,
+													In.bLockAlive ? *FString::Printf(TEXT(" (%s, 잠금 %s)"), *Lock.What, *(Root / TEXT("live/watch.lock"))) : TEXT(""))
+								 : TEXT(""),
+			   WatchWhy.IsEmpty() ? TEXT("") : *FString::Printf(TEXT(" — %s"), *WatchWhy));
+		return;
+	}
+	FEcoV3WatchLauncher::PruneLogs(Root, EcoV3Watch::kKeepLogs - 1);
+	const FString WatchLog = Root / FString::Printf(TEXT("watch_%s.log"), PlayId.IsEmpty() ? TEXT("noplay") : *PlayId);
+	const FString Args = EcoV3Watch::BuildArgs(Override, Root, PlayId, WatchLog);
+	FString Why;
+	if (!L.Launch(Python, Args, WorkDir, WatchLog, Root, PlayId, this, Why))
+	{
+		WatchDecision = EcoV3Watch::EDecide::LaunchFailed;
+		WatchWhy = Why;
+		UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 파이썬 감시 | 못 켬 — %s (%s %s)"), *Why, *Python, *Args);
+		return;
+	}
+	bWatchOurs = true;
+	UE_LOG(LogEcoPolicyV3I, Log,
+		   TEXT("[EcoV3I] 파이썬 감시 | 띄움 — pid %d · %s %s · 작업 폴더 %s · 기록 %s · 창 없음 · 작업 개체 %s — Play 가 끝나면 학습 자식까지 프로세스 나무째 끝낸다 ")
+			   TEXT("(학습 파이프라인을 따로 띄우는 개발용 도구 — 게임 추론은 C++ 네이티브 그대로)"),
+		   L.GetPid(), *Python, *Args, *WorkDir, *WatchLog, L.UsesJob() ? TEXT("켬") : TEXT("못 씀 (끝낼 때 프로세스 나무 걷기)"));
+	{
+		// 10-27 실제 폴더 고리는 두뇌 묶음마다 관문 크기 확정 여부가 다르다 (LIVE_GATE.md 변경 기록 (10) — 언리얼은 그 규칙을 다시 적지 않고 파이썬 상태 글을 그대로 보인다)
+		// 10-29: 시작 두뇌가 판 5 가 아니면(eco.V3Brain.Startup builtin·관측 21 파일 등 — 기본 두뇌 R7e 는 판 5) 실제 폴더 고리가 그 Play 의 스냅숏을 거부한다
+		const FEcoV3BrainPtr Pending = Reg.GetPending();
+		const FEcoV3Brain& Start = Pending.IsValid() ? *Pending : *Reg.GetActive();
+		if (!Start.bFleeGate() && EcoV3Watch::SamePath(Root, FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("EcoAdapt"))))
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 | 참고: 시작 두뇌 %s 는 마스크 판 %d 다 — 실제 폴더 고리는 판 5 두뇌 묶음만 다시 배우므로 스냅숏마다 거부가 보인다 ")
+											 TEXT("(herbivore_rl/results/v3/live/LIVE_GATE.md 변경 기록 (10)). 기본 두뇌 R7e(판 5)로 시작하려면 eco.V3Brain.Startup 을 비우거나 default"),
+				   *Start.Id, Start.MaskVersion);
+		}
+	}
+#endif
+}
+
+void UEcoPolicyV3IntegratedSubsystem::PollAutoWatch()
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	if (WatchDecision == EcoV3Watch::EDecide::NoAdapt || WatchDecision == EcoV3Watch::EDecide::Off)
+	{
+		return;   // 적응 고리 끔·자동 감시 끔 — 아무것도 하지 않는다
+	}
+	FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	if (bWatchOurs && L.GetOwner() == this && L.Poll())
+	{
+		const FString LogName = FPaths::GetCleanFilename(L.GetLogPath());
+		WatchOtherPid = L.GetEnd() == EcoV3Watch::EEnd::OtherLoop ? LockOwnerPid(L.GetRoot()) : 0;
+		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 끝남 | pid %d · 종료 코드 %d · %s · 기록 %s — 다시 띄우지 않는다 (이 Play 의 나머지는 감시 없이 — 스냅숏은 쓰이고 두뇌는 오지 않는다)"),
+			   L.GetPid(), L.GetExitCode(), *EcoV3Watch::EndStatusText(L.GetEnd(), L.GetExitCode(), LogName, WatchOtherPid), *L.GetLogPath());
+		if (!bWatchEndReported)
+		{
+			bWatchEndReported = true;
+			const FString Notice = EcoV3Watch::EndNoticeText(L.GetEnd(), LogName);
+			if (!Notice.IsEmpty())
+			{
+				PostNotice(EcoV3Integrated::ENotice::Reject, Notice);
+			}
+		}
+	}
+	// 상태 줄 '적응 고리' 감시 글이 바뀌면 기록 한 줄 (헤드리스 증거 — '켜는 중' 초 세기는 한 번만, 파이썬 상태 글 자체의 바뀜은 DrawBrainNotices 가 이미 적는다)
+	const FString Live = FEcoV3BrainRegistry::Get().GetLiveStatusText(EcoV3Brain::NowUnixSeconds());
+	const FString Text = WatchStatusText(Live);
+	const FString Key = Text.Contains(TEXT("켜는 중"))																	   ? FString(TEXT("starting"))
+						: WatchDecision == EcoV3Watch::EDecide::HumanRunning || WatchDecision == EcoV3Watch::EDecide::OtherEditor ? FString(TEXT("other"))
+						: Text == Live																						   ? FString(TEXT("live"))
+																															   : Text;
+	if (Key != LastWatchLine)
+	{
+		LastWatchLine = Key;
+		if (!Text.IsEmpty())
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 적응 고리 감시 | %s"), *Text);
+		}
+	}
+}
+
+void UEcoPolicyV3IntegratedSubsystem::EndAutoWatch(const TCHAR* Why)
+{
+	if (bWatchOurs)
+	{
+		FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+		const int32 Pid = L.GetPid();
+		const bool bJob = L.UsesJob();
+		if (L.GetOwner() == this && L.Stop(this, Why))
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 파이썬 감시 끝냄 | pid %d (우리가 띄움) · 학습 자식 포함 프로세스 나무째 (%s) · 기록 %s · 까닭: %s"), Pid,
+				   bJob ? TEXT("작업 개체") : TEXT("프로세스 나무 걷기"), *L.GetLogPath(), Why);
+		}
+	}
+	bWatchOurs = false;
+	WatchDecision = EcoV3Watch::EDecide::NoAdapt;
+	WatchWhy.Empty();
+	WatchOtherPid = 0;
+	LastWatchLine.Empty();
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::StopAutoWatchIfInactive()
+{
+	if (bActive || !bWatchOurs)
+	{
+		return false;
+	}
+	EndAutoWatch(TEXT("통합 v3 모드가 꺼짐"));
+	return true;
+}
+
+bool UEcoPolicyV3IntegratedSubsystem::LaunchWatchForTest(const FString& Exe, const FString& Args, const FString& Root, FString& OutWhy)
+{
+	FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	L.Poll();
+	if (!L.Launch(Exe, Args, Root, Root / TEXT("watch_test.log"), Root, TEXT("ptest_sub"), this, OutWhy))
+	{
+		return false;
+	}
+	bWatchOurs = true;
+	WatchDecision = EcoV3Watch::EDecide::Launch;
+	return true;
+}
+
+FString UEcoPolicyV3IntegratedSubsystem::WatchStatusText(const FString& Live) const
+{
+	using namespace EcoPolicyV3IntegratedImpl;
+	const FEcoV3WatchLauncher& L = FEcoV3WatchLauncher::Get();
+	if (bWatchOurs && L.GetOwner() == this)
+	{
+		if (!L.IsRunning() && L.GetEnd() != EcoV3Watch::EEnd::None)
+		{
+			const FString Ended = EcoV3Watch::EndStatusText(L.GetEnd(), L.GetExitCode(), FPaths::GetCleanFilename(L.GetLogPath()), WatchOtherPid);
+			return L.GetEnd() == EcoV3Watch::EEnd::OtherLoop && !Live.IsEmpty() ? FString::Printf(TEXT("%s · %s"), *Ended, *LiveBody(Live)) : Ended;
+		}
+		if (L.IsRunning())
+		{
+			// 앞 Play 가 남긴 옛 상태 글(120 초 안이면 '학습 중 …'으로 보였을 것)을 보이지 않는다 — 감시가 새로 쓸 때까지 '켜는 중'
+			const FEcoV3LiveStatus& S = FEcoV3BrainRegistry::Get().GetLiveStatus();
+			if (!S.bValid || S.UpdatedUnix < L.GetLaunchedUnix())
+			{
+				return FString::Printf(TEXT("적응 고리 | 파이썬 감시 켜는 중 (%.0f초)"), FMath::Max(0.0, EcoV3Brain::NowUnixSeconds() - L.GetLaunchedUnix()));
+			}
+		}
+		return Live;
+	}
+	switch (WatchDecision)
+	{
+	case EcoV3Watch::EDecide::HumanRunning:
+		return Live.IsEmpty() ? Live : Live + TEXT(" (사람이 띄운 감시)");
+	case EcoV3Watch::EDecide::OtherEditor:
+		return Live.IsEmpty() ? Live : Live + FString::Printf(TEXT(" (다른 언리얼 프로세스가 띄운 감시 pid %d)"), WatchOtherPid);
+	case EcoV3Watch::EDecide::Unsafe:
+	case EcoV3Watch::EDecide::NoPython:
+	case EcoV3Watch::EDecide::NoScript:
+	case EcoV3Watch::EDecide::LaunchFailed:
+		return FString::Printf(TEXT("적응 고리 | 파이썬 감시를 못 켬 — %s"), WatchWhy.IsEmpty() ? EcoV3Watch::DecideName(WatchDecision) : *WatchWhy);
+	default:
+		return Live;
+	}
 }
 
 FString UEcoPolicyV3IntegratedSubsystem::FlightStatusText() const
@@ -4336,6 +4993,18 @@ FString UEcoPolicyV3IntegratedSubsystem::FlightStatusText() const
 		bHasPrev = bHasPrev || Ctx->FlightTally.bHasPrev;
 	}
 	return bAny ? FString::Printf(TEXT("%s · %s"), *EcoV3Flight::SummaryText(WinSum), *EcoV3Flight::CompareText(PrevSum, CurSum, bHasPrev)) : FString();
+}
+
+FString FEcoV3RouteSum::Text() const
+{
+	// 10-24 두 길 두뇌 화면·기록 글자 (FEcoV3RouteSum 머리 주석)
+	const int64 Steps = RouteSteps();
+	const FString StepsText = Steps > 0 ? FString::Printf(TEXT("길 RUN %.0f%% · 은신처 %.0f%% (반사 사슴-스텝 %lld)"),
+														   100.0 * static_cast<double>(RunSteps) / static_cast<double>(Steps),
+														   100.0 * static_cast<double>(ShelterSteps) / static_cast<double>(Steps), static_cast<long long>(Steps))
+										: FString(TEXT("길 반사 스텝 없음"));
+	return FString::Printf(TEXT("%s · 길 결정 %lld · 은신처 고름 %lld/%lld (열린 결정) · 무효 %lld"), *StepsText, static_cast<long long>(Decisions),
+						   static_cast<long long>(PickedShelter), static_cast<long long>(Choice), static_cast<long long>(Invalid));
 }
 
 void UEcoPolicyV3IntegratedSubsystem::RejectResourceContract()

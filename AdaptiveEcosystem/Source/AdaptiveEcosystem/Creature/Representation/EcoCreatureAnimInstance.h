@@ -22,6 +22,7 @@ public:
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bPursuingPrey = false;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") EEcoSpeciesActivity Activity = EEcoSpeciesActivity::Hold;
     UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float AlertHeadAlpha=0;
+    UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|Animation") float ImmatureProportionAlpha=0;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") EEcoCreatureVisualMotion VisualMotion = EEcoCreatureVisualMotion::Idle;
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") float GroundIKAlpha=0;
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundPoint0=FVector::ZeroVector;

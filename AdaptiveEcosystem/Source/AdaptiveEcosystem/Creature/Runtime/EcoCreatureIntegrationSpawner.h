@@ -19,6 +19,7 @@ class AEcologyRegion;
 class UWorldPartitionStreamingSourceComponent;
 class UEcoFootstepAudioSet;
 class AEcoVegetationField;
+class UEcoNaturalHabitatProfile;
 class APawn;
 struct FEcoDeathOutcome;
 
@@ -58,6 +59,9 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") bool bEnableVegetation = false;
     /** Owned scene opt-in: deterministic diversity, observed encounters and conditional offspring. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Creature|Life") bool bEnableEcosystemLife = false;
+    /** Explicit level opt-in; null preserves all legacy/life-v2 habitat and safety rules. */
+    UPROPERTY(EditAnywhere, Category="Creature|Habitat") TObjectPtr<UEcoNaturalHabitatProfile> NaturalHabitatProfile;
+    UPROPERTY(EditAnywhere, Category="Creature|Habitat") TMap<FName,TObjectPtr<UEcoNaturalHabitatProfile>> RegionHabitatProfiles;
 	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") TSubclassOf<AEcoVegetationField> VegetationFieldClass;
 	bool IsSpeciesEnabled(bool bPredator) const
 	{ return EnabledSpecies == EEcoEnabledSpecies::Both || (bPredator ? EnabledSpecies == EEcoEnabledSpecies::WolfOnly : EnabledSpecies == EEcoEnabledSpecies::DeerOnly); }
@@ -112,6 +116,8 @@ public:
     UFUNCTION(BlueprintCallable,BlueprintAuthorityOnly,Category="Creature|Life") bool QueuePopulationRecovery(FName RegionId,bool bPredator);
 	/** Read-only authoring report. Never creates Entities, edits actors, or saves the level. */
 	UFUNCTION(CallInEditor, BlueprintCallable, Category="Creature|Setup") void ValidateEditorSetup() const;
+    /** Bounded, read-only test/production level survey; no resource or actor writes. */
+    UFUNCTION(BlueprintPure,Category="Creature|Setup") FString CaptureHabitatAuthoringReport() const;
 	virtual float GetFoodDensity(const FVector& Location, float Radius) const override;
 	virtual FVector GetFoodGradient(const FVector& Location, float Radius) const override;
 	virtual float ConsumeFood(const FVector& Location, float Amount) override;
@@ -164,6 +170,8 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<AEcoCreatureRepresentationActor>> VisualPool;
 	TMap<int64, FMassEntityHandle> AgentLookup;
 	bool bReady = false;
+	/** Ownership is captured before travel can temporarily change the old world's NetMode. */
+	bool bAuthorityWorld = false;
 	bool bWaitingForHabitat = false;
 	double NextStreamingUpdate = 0;
 	double LastResourceTime = 0;
@@ -194,4 +202,6 @@ class ADAPTIVEECOSYSTEM_API AEcoCreatureIntegrationGameMode : public AGameModeBa
 public:
 	AEcoCreatureIntegrationGameMode();
 	virtual void InitGameState() override;
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+	virtual void Logout(AController* Exiting) override;
 };

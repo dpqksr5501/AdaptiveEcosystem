@@ -3,6 +3,7 @@
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
+#include "AI/Policy/EcoBehaviorFragments.h"
 #include "Ecology/EcologySimulationSubsystem.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoHerdMigration.h"
@@ -29,10 +30,16 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         const auto* Body=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(*E);
         const auto* Wolf=EM.GetFragmentDataPtr<FEcoThreatStateFragment>(*E);
         const auto* J=EM.GetFragmentDataPtr<FEcoHerdTravelFragment>(*E);
+        if(Link&&Link->Individual.bNaturalPopulation){
+            const auto* Behavior=EM.GetFragmentDataPtr<FEcoBehaviorStateFragment>(*E);
+            if(Link->Individual.Memory.Response==EcoLifeV3::EResponse::Retreat
+                ||(Behavior&&(Behavior->Decision.KeepActive==EcoWorldV3::kKeepPanic||Behavior->Decision.KeepActive==EcoWorldV3::kKeepShelter)))return {};
+        }
         if(!Link||Link->bDead||!Link->bAdopted||(Predator?(!Wolf||Wolf->Agent.bDead):(!Body||Body->Body.DeathCause!=0))
             ||EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).HP<=0
             ||EM.GetFragmentDataChecked<FEcoRegionFragment>(*E).CurrentRegionId!=Region
-            ||Link->Individual.Generation>=64||!Link->Individual.CanParent(Now,Predator?Link->Individual.Nutrition:Body->Body.Energy,!(J&&(J->bActive||J->bStranded))))return {};
+            ||Link->Individual.Generation>=64||!Link->Individual.CanParent(Now,Predator?Link->Individual.Nutrition:Body->Body.Energy,!(J&&(J->bActive||J->bStranded)),
+                Link->Individual.bNaturalPopulation?EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).HP/FMath::Max(1.f,EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).MaxHP):1.))return {};
         return *E;
     };
     // At most one incubation per region and one scan/5s. Reservation is acquired
@@ -65,6 +72,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if(Positions.IsEmpty())continue;
         // Copy before spawning: entity creation may move/reallocate fragment storage.
         const auto Genome=EcoLifeV3::Inherit(LA.Genome,LB.Genome,uint64(P.ParentA)^EcoLifeV3::Mix(P.ParentB)^uint64(LA.Offspring));
+        const bool NaturalPopulation=LA.bNaturalPopulation&&!P.bPredator;
+        const double Maturity=LA.MaturitySeconds;
+        const int64 Mother=LA.Sex==EcoLifeV3::ESex::Female?P.ParentA:P.ParentB;
+        const double FemaleFraction=LA.FemaleBirthFraction; // preserve the natal profile through migration
         const uint32 Generation=FMath::Max(LA.Generation,LB.Generation)+1;
         FEcoSpawnRequest Reservation;if(!Ecology->RequestNaturalBirth(P.Region,Time,Reservation,P.bPredator))return false;
         const int32 Actual=Reservation.Count?Spawn(P.Region,1,P.bPredator,&Positions):0;
@@ -73,6 +84,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         const auto Child=Owned.Last();auto& ChildLife=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Child).Individual;
         ChildLife={};ChildLife.bInitialized=true;ChildLife.Genome=Genome;ChildLife.Born=Now;
         ChildLife.ParentA=P.ParentA;ChildLife.ParentB=P.ParentB;ChildLife.Generation=Generation;ChildLife.Origin=EcoLifeV3::EOrigin::NaturalBirth;
+        if(NaturalPopulation){
+            ChildLife.bNaturalPopulation=true;ChildLife.MaturitySeconds=Maturity;ChildLife.FemaleBirthFraction=FemaleFraction;ChildLife.Caregiver=Mother;
+            ChildLife.Sex=EcoLifeV3::Unit(uint64(EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId)^uint64(Native->GetSettings().Seed))<FemaleFraction?EcoLifeV3::ESex::Female:EcoLifeV3::ESex::Male;
+        }
         if(P.bPredator)ChildLife.Nutrition=.4;
         for(const auto E:{A,B}){
             auto& Parent=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E).Individual;
@@ -95,6 +110,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
             const auto A=AgentLookup.FindChecked(Candidates[I]),B=AgentLookup.FindChecked(Candidates[J]);
             const auto& LA=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(A).Individual;
             const auto& LB=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(B).Individual;
+            if(LA.bNaturalPopulation&&(LA.Sex==LB.Sex||LA.Sex==EcoLifeV3::ESex::Unspecified||LB.Sex==EcoLifeV3::ESex::Unspecified))continue;
             // Exclude parent/child and known full/half siblings. Unknown founders are not invented relatives.
             if(LA.ParentA==Candidates[J]||LA.ParentB==Candidates[J]||LB.ParentA==Candidates[I]||LB.ParentB==Candidates[I]
                 ||(LA.ParentA&&(LA.ParentA==LB.ParentA||LA.ParentA==LB.ParentB))

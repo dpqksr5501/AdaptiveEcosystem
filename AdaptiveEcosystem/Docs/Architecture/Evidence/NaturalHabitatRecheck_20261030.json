@@ -1,0 +1,136 @@
+{
+  "scope": "Fresh 165-second PIE and dedicated+two clients; same runtime as prior release, before read-only authoring-report fix",
+  "passed": true,
+  "checks": {
+    "observer_finished": true,
+    "positive_observed_intake": true,
+    "positive_observed_growth": true,
+    "feeding_matches_actual_intake": true,
+    "morph_matches_species": true,
+    "valid_logical_cells": true,
+    "ledger_matches": true,
+    "no_observed_edge_rest": true,
+    "observed_interior_rest": true,
+    "no_growth_in_observed_dark_intervals": true,
+    "network_relevance": true,
+    "ClientA": true,
+    "ClientB": true,
+    "authoring_fix_regression": true,
+    "automation": true
+  },
+  "matched_herbivore_visual_samples": 931,
+  "feeding_mismatches": [],
+  "morph_mismatches": [],
+  "bad_cells": [],
+  "max_ledger_error": 8.526512829121202e-14,
+  "grown": {
+    "Forest": 268.40404926670635,
+    "Barren": 200.45363795281193,
+    "Highland": 73.15685421103328
+  },
+  "consumed": {
+    "Forest": 264.3229861389439,
+    "Barren": 212.29265102353273,
+    "Highland": 82.28182501449498
+  },
+  "browse_events": {
+    "Forest": 39620,
+    "Barren": 24601,
+    "Highland": 16896
+  },
+  "observed_dark_region_intervals": 12,
+  "dark_growth_violations": [],
+  "interior_rest_steps": 119,
+  "edge_rest_steps": 0,
+  "clients": {
+    "ClientA": {
+      "passed": true,
+      "authority_agents": 0,
+      "morph_matches_payload": true,
+      "scale_payload_matches_actor": true
+    },
+    "ClientB": {
+      "passed": true,
+      "authority_agents": 0,
+      "morph_matches_payload": true,
+      "scale_payload_matches_actor": true
+    }
+  },
+  "relevance": {
+    "grace_seconds": 3,
+    "clients": [
+      {
+        "name": "ClientA",
+        "passed": true,
+        "checked_near_region_samples": 164,
+        "evaluated_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "received_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "missing_after_grace": [],
+        "missing_camera_samples": []
+      },
+      {
+        "name": "ClientB",
+        "passed": true,
+        "checked_near_region_samples": 28,
+        "evaluated_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "received_regions": [
+          "Barren",
+          "Forest",
+          "Highland"
+        ],
+        "missing_after_grace": [],
+        "missing_camera_samples": []
+      }
+    ],
+    "passed": true,
+    "concurrent_clients": {
+      "samples": 15,
+      "observed_span_seconds": 28.312999999994645,
+      "passed": true
+    },
+    "late_join_life": {
+      "authority_child_ids": [
+        "157",
+        "158",
+        "159",
+        "160",
+        "161"
+      ],
+      "received_child_ids": [
+        "159"
+      ],
+      "scale_tolerance": 0.015625,
+      "scale_mismatches": [],
+      "passed": true
+    }
+  },
+  "remaining": [
+    "Existing Landscape physical-material-task warnings",
+    "Drought starvation and long-term equilibrium remain unresolved",
+    "Future production integration map/streaming/cook not tested",
+    "2.5D backend; overlapping floors/swimming unsupported"
+  ],
+  "authoring_fix_regression": {
+    "result": "FINISHED",
+    "custom_wading_limit_detected": true,
+    "unreachable_height_rejected": true
+  },
+  "automation": {
+    "succeeded": 230,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  }
+}

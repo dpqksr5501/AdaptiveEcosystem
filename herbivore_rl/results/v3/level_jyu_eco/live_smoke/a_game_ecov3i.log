@@ -1,0 +1,37 @@
+[2026.10.24-16.18.37:226][  0]LogEcoPolicyV3I: [EcoV3I] 환경 감시: 켬 (eco.IntegratedV3.EnvWatch 1 — 1.0초마다·액터가 생기거나 지워지면 곧바로 읽어 결정 스텝 경계에서 넣는다: 레벨 나무 줄기 막이(꼬리표 EcoV3Trunk)·지역 날씨 콘솔 변수·팀 지역 환경. 환경 규칙은 레벨 몫, 먹이 격자 그대로) | 자동 스냅숏 환경 바뀜 켬 (판이 3.0초 그대로면 판마다 한 번) · 주기 끔 → <시험 폴더>/live_a/snapshots | 시험용 예약 1 · 150.0초: quit
+[2026.10.24-16.18.37:229][  0]LogEcoPolicyV3I: [EcoV3I] 적응 고리: 켬 (eco.IntegratedV3.AutoAdapt 1) — Play 번호 p20261024T161837_52299b68 · 두뇌 감시 <시험 폴더>/live_a/brains (Play 시작 때 있던 파일·다른 Play 의 두뇌는 읽지 않음) · 상태 파일 <저장소>/AdaptiveEcosystem/Saved/EcoAdapt/status.json · 되돌리기 eco.V3Brain.Rollback | 화면 알림 없음 (그리지 않는 실행 — 기록 '[EcoV3I] 알림 |' 만) · 화면 찍기 끔
+[2026.10.24-16.18.37:596][  0]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 응답 없음 (326455초 전) (상태 rejected · 시도 1 · 판 0 · 지난 결과 기각: 1차 t +1.1 (문턱 −1.99))
+[2026.10.24-16.18.37:676][  1]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 스냅숏 기다림 — 환경이 바뀌면 언리얼이 씀 (상태 idle · 시도 0 · 판 0)
+[2026.10.24-16.18.37:982][  7]LogEcoPolicyV3I: [EcoV3I] 두뇌 시작 | 0.0초 (전역 스텝 0) | v3_r7_g995_s1_20m@40d8710d (파일 v3_r7_g995_s1_20m.json, 허용 먹기·도망·숨기, 관측 24 도망길·반사 밖 도망 막음) — 대기 두뇌로 시작 (시작 두뇌 eco.V3Brain.Startup v3_r7_g995_s1_20m) | 허용(모델 ∧ 세계): Forest 먹기·도망·숨기 (두 길·반사 밖 도망 막음) · Barren 먹기·도망·숨기 (두 길·반사 밖 도망 막음) · Highland 먹기·도망·숨기 (두 길·반사 밖 도망 막음)
+[2026.10.24-16.19.11:623][845]LogEcoPolicyV3I: [EcoV3I] 환경 스냅숏 | 33.6초 (전역 스텝 252) | <시험 폴더>/live_a/snapshots/eco_v3_snapshot_s20004_t252_e19.json | 지역 3 | 두뇌 v3_r7_g995_s1_20m@40d8710d | 계기 env_change · 환경 판 #19
+[2026.10.24-16.19.11:623][845]LogEcoPolicyV3I: [EcoV3I] 알림 | 스냅숏 #19 내보냄 → 파이썬 학습 대기
+[2026.10.24-16.19.14:060][906]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 새 환경 — 시도 1 시작 (Highland 비 0.6) (상태 converting · 시도 1 · 판 0)
+[2026.10.24-16.19.18:124][  6]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 학습 중 0/20k (모델 1개) · 지금 두뇌 판정 0/15 (상태 training · 시도 1 · 판 0)
+[2026.10.24-16.19.28:237][257]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 후보 판정 0/15 세계 (상태 evaluating · 시도 1 · 판 0)
+[2026.10.24-16.19.41:188][581]LogEcoPolicyV3I: [EcoV3I] 환경 스냅숏 | 63.2초 (전역 스텝 474) | <시험 폴더>/live_a/snapshots/eco_v3_snapshot_s20004_t474_e37.json | 지역 3 | 두뇌 v3_r7_g995_s1_20m@40d8710d | 계기 env_change · 환경 판 #37
+[2026.10.24-16.19.41:188][581]LogEcoPolicyV3I: [EcoV3I] 알림 | 스냅숏 #37 내보냄 → 파이썬 학습 대기
+[2026.10.24-16.19.44:391][661]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 변환 중 — 시도 2, 환경 #37 (상태 converting · 시도 2 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t474_e37.json (다른 환경))
+[2026.10.24-16.19.48:419][762]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 학습 중 0/20k (모델 1개) · 지금 두뇌 판정 0/15 (상태 training · 시도 2 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t474_e37.json (다른 환경))
+[2026.10.24-16.19.56:529][965]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 후보 판정 0/15 세계 (상태 evaluating · 시도 2 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t474_e37.json (다른 환경))
+[2026.10.24-16.20.11:863][352]LogEcoPolicyV3I: [EcoV3I] 환경 스냅숏 | 93.9초 (전역 스텝 704) | <시험 폴더>/live_a/snapshots/eco_v3_snapshot_s20004_t704_e56.json | 지역 3 | 두뇌 v3_r7_g995_s1_20m@40d8710d | 계기 env_change · 환경 판 #56
+[2026.10.24-16.20.11:863][352]LogEcoPolicyV3I: [EcoV3I] 알림 | 스냅숏 #56 내보냄 → 파이썬 학습 대기
+[2026.10.24-16.20.12:705][373]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 그만둠 — 새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (다른 환경) (상태 superseded · 시도 2 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (다른 환경))
+[2026.10.24-16.20.14:732][424]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 변환 중 — 시도 3, 환경 #56 (상태 converting · 시도 3 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (다른 환경))
+[2026.10.24-16.20.18:787][526]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 학습 중 0/20k (모델 1개) · 지금 두뇌 판정 0/15 (상태 training · 시도 3 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (다른 환경))
+[2026.10.24-16.20.26:899][729]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 후보 판정 0/15 세계 (상태 evaluating · 시도 3 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t704_e56.json (다른 환경))
+[2026.10.24-16.20.41:327][ 90]LogEcoPolicyV3I: [EcoV3I] 환경 스냅숏 | 123.3초 (전역 스텝 925) | <시험 폴더>/live_a/snapshots/eco_v3_snapshot_s20004_t925_e74.json | 지역 3 | 두뇌 v3_r7_g995_s1_20m@40d8710d | 계기 env_change · 환경 판 #74
+[2026.10.24-16.20.41:327][ 90]LogEcoPolicyV3I: [EcoV3I] 알림 | 스냅숏 #74 내보냄 → 파이썬 학습 대기
+[2026.10.24-16.20.43:047][133]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 새 환경 — 시도 4 시작 (Highland 맑음 · Barren 비 0.6 · Forest 비 0.6) (상태 converting · 시도 4 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t925_e74.json (다른 환경))
+[2026.10.24-16.20.47:134][235]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 학습 중 0/20k (모델 1개) · 지금 두뇌 판정 0/15 (상태 training · 시도 4 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t925_e74.json (다른 환경))
+[2026.10.24-16.20.59:216][536]LogEcoPolicyV3I: [EcoV3I] 적응 고리 | 후보 판정 0/15 세계 (상태 evaluating · 시도 4 · 판 0 · 지난 결과 그만둠: 새 스냅숏 eco_v3_snapshot_s20004_t925_e74.json (다른 환경))
+
+# 환경 바뀜 줄 92 개 — 처음·끝 몇 줄
+[2026.10.24-16.18.50:249][313]LogEcoPolicyV3I: [EcoV3I] 환경 바뀜 #1 | 12.3초 (전역 스텝 92) | Highland: 날씨 눈 1.00→비 0.00 (출처 team_env)
+[2026.10.24-16.18.51:352][340]LogEcoPolicyV3I: [EcoV3I] 환경 바뀜 #2 | 13.3초 (전역 스텝 100) | Highland: 날씨 비 0.00→비 0.01 (출처 team_env)
+[2026.10.24-16.18.52:278][363]LogEcoPolicyV3I: [EcoV3I] 환경 바뀜 #3 | 14.3초 (전역 스텝 107) | Highland: 날씨 비 0.01→비 0.03 (출처 team_env)
+[2026.10.24-16.18.53:329][389]LogEcoPolicyV3I: [EcoV3I] 환경 바뀜 #4 | 15.3초 (전역 스텝 115) | Highland: 날씨 비 0.03→비 0.06 (출처 team_env)
+[2026.10.24-16.18.54:285][413]LogEcoPolicyV3I: [EcoV3I] 환경 바뀜 #5 | 16.3초 (전역 스텝 122) | Highland: 날씨 비 0.06→비 0.09 (출처 team_env)
+...
+[2026.10.24-16.21.05:869][701]LogEcoPolicyV3I: [EcoV3I] 환경 바뀜 #90 | 147.9초 (전역 스텝 1109) | Barren: 날씨 비 0.06→비 0.03 (출처 team_env)
+[2026.10.24-16.21.06:792][724]LogEcoPolicyV3I: [EcoV3I] 환경 바뀜 #91 | 148.8초 (전역 스텝 1116) | Barren: 날씨 비 0.03→비 0.01 (출처 team_env)
+[2026.10.24-16.21.07:877][751]LogEcoPolicyV3I: [EcoV3I] 환경 바뀜 #92 | 149.9초 (전역 스텝 1124) | Barren: 날씨 비 0.01→비 0.00 (출처 team_env)

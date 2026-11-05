@@ -4,7 +4,35 @@
 맞춰 게임 중에 두뇌가 바뀌게만 한다.' 사람 결정 10-21: 관문 '포만 없는 세계 1차', 한 바퀴 '빠른 판 10~15분', 두뇌 '관측 21로 올려 배움'
 (`AdaptiveEcosystem/Docs/RL_Policy/RL_V2_PLAN.md` 10-20 (17)·10-21 (18)).
 
-파일: 도구 `live.py`, 관문 `LIVE_GATE.md`, 예비 측정 `pilot/`, 시연 `demo/`, 주고받기 약속 `AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md`.
+파일: 도구 `live.py`, 관문 `LIVE_GATE.md`, 예비 측정 `pilot/`·`pilot_mask5/`, 시연 `demo/`, 주고받기 약속 `AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md`.
+
+> **10-29 (11) 게임 기본 두뇌가 R7e 다** (사용자 결정 '기본 두뇌 R7e로' — `AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md` 5.6): 통합 v3 Play 의 시작 두뇌
+> (적응 고리 판 0)가 빌드에 넣은 R7e(판 5, 묶음 `route5`)라, 아무것도 고르지 않은 `eco.IntegratedV3.AutoAdapt 1` Play 의 스냅숏을 실제 폴더에서 바로 받는다.
+> 아래 (10)·(8) 의 '게임 기본 두뇌(내장 R1b-F)'·'판 5 두뇌로 시작한다(`-EcoV3Brain=…`)'는 그때의 이력이다. 내장 R1b-F 는 `-EcoV3Brain=builtin` 으로 고르고, 그 Play 는 지금처럼 거부된다.
+
+> **10-27 (10) 실제 폴더 잠금을 풀었다 — 판 5 두뇌(R7e)를 건 Play 만** (사용자 '실제 폴더 잠금 풀자'): 판 5 예비 측정(`pilot_mask5/`)으로 관문 크기를
+> 정했다(규칙 글과 다르게 판단한 칸은 `LIVE_GATE.md` 변경 기록 (10) '숨기지 않고 적는 것'). 판 길이·시드 수·모델 수·중간 판정·도주 비용은 그대로이고, 학습은 2M → **1M 스텝**, 1차 최소 차이는 0 → **1 %p** 다.
+> `flight_sizes_confirmed` 가 참이라 `live.py watch`·`round` 가 실제 폴더(`Saved/EcoAdapt`)에서 돈다. 다만 크기를 잰 두뇌 묶음은 판 5 뿐이라, 게임 기본
+> 두뇌(내장 R1b-F)나 관측 21 두뇌로 시작한 Play 의 스냅숏은 실제 폴더에서 거부한다(상태 줄 `거부 — 지금 두뇌 묶음 obs21 은 실제 폴더 관문 크기 미확정 …`).
+> 실제 게임에서 고리가 두뇌를 바꾸려면 Play 를 판 5 두뇌로 시작한다(`-EcoV3Brain=v3_r7_g995_s1_20m`·`eco.V3Brain.Startup`, `eco.IntegratedV3.AutoAdapt 1`).
+> **미리 적는 예상: 판은 거의 다 기각된다** — 예비 측정에서 이어 배운 후보 36 개가 모두 지금 두뇌보다 덜 숨었다(−0.3~−4.1 %p). 한 바퀴는 언리얼을 끈 PC(워커 14)에서
+> 중간 기각이면 약 2.1 분, 끝까지면 약 3.6 분이다(언리얼과 함께면 더 느리다 — 재지 않았다). 두뇌가 실제로 바뀌려면 학습이 숨음을 보게 하거나 1차 기준을 바꿔야 한다(사람 결정). 규칙 `LIVE_GATE.md` 변경 기록 (10).
+
+> **10-24 (8) 두 길·판 5 두뇌도 받는다** (R7e 판정 통과·C++ 이식 `80bbf13` 뒤): 게임에 판 5 두뇌(관측 24 두 길 + 반사 밖 두뇌 도망 막음 — `EcoBrains/v3_r7_g995_s1_20m.json`)를
+> 불러 쓴 Play 에서 환경이 바뀌면, 고리가 그 두뇌를 '지금 두뇌'로 받아 판 5 세계에서 판정하고 판 5 그대로 이어 배운다(바탕 `configs/v3_wild3_route5_mirror.yaml`,
+> 학습 조리법 `configs/v3_r7_train.yaml`, PPO λ 0.98 — 시작 모델 계약이 고르는 묶음 `live.PROFILES`). 게임 기본 두뇌(내장 R1b-F)·관측 21 고리는 그대로이고 판 4
+> 두뇌(route0·R6)는 받지 않는다. 관문 표는 그대로이고 설계의 길 지킴 GT·GTr·GR 은 `gate.md` '길 기록' 절에 보고만 한다(GR 자리 = GE, GT = 60 × GV).
+> 시험 폴더에서 R7e 를 시작 두뇌로 건 헤드리스 게임이 스냅숏 → 이어 배우기(작은 크기) → 관문 → 판 5 두뇌 파일 → 같은 Play 에서 바꿔 끼우기 → 되돌리기까지 돌았다
+> (아래 8절, `demo/route5_test/`). 실제 폴더는 그대로 잠겨 있다(`flight_sizes_confirmed` 거짓). 규칙 `LIVE_GATE.md` 변경 기록 (8).
+
+> **10-24 (7) 지금 기준 — 쫓김 '사건' 하나를 한 번만 센다** (사람 결정 "'쫓김 사건' 단위로 셈"): 사슴이 은신처에 들어갔다가 몇 초 만에 다시 뛰고 또
+> 숨으면, 옛 셈(도망 하나하나)은 그걸 '숨음 두 번'으로 세어 숨음 비율이 부풀 수 있었다(R7 결과를 본 뒤 알게 된 것 — `results/v3/r7/gr_split.md`).
+> 이제는 같은 사슴의 이어진 도망(은신처로 끝났으면 10 초 안, 그 밖이면 5 초 안에 다시 뜀)을 **한 사건**으로 묶어 그 사건이 마지막에 숨었나·잡혔나로 센다.
+> 1차 = 쫓긴 사건 가운데 숨은 사건 몫(사건 숨음 비율)이 유의하게 큼, GH = 쫓긴 사건 가운데 잡힌 사건 몫이 늘지 않음, 새 지킴 GE = 사건 수가 늘지 않음
+> ('5 초 안 다시 뛰기' GR 자리). 옛 도망 단위 숨음·잡힘 비율과 쫓긴 시간은 보고만 한다. 정의는 `LIVE_GATE.md` 5-1 '쫓김 사건'·변경 기록 (7),
+> 코드는 `env_v2/world.py` '쫓김 사건'(`flight_stats` 의 `episode`). 판정 실행기는 C++ 평가기(`ceval`)다 — 같은 날 사건 셈을 C++ 도망 기록에 옮겨
+> 파이썬과 `flight.episode` 까지 세계 기록이 정확히 같다(아래 7절, 옮기기 전 잠깐 파이썬이었다). 게임 화면도 '쫓긴 사건 중 숨음 a% · 잡힘 b%' 로 센다.
+> 예: 지금 두뇌 route0 은 같은 세계 60 개에서 숨음 비율이 도망 단위 13.0 % · 사건 단위 11.9 % 였다(은신처 뒤 10 초 안 다시 뛴 203 번이 묶임). 이 기준으로 돌린 판은 아직 없다.
 
 > **10-21 (3) 교체 기준을 바꿨다** (사용자 '잘 안 잡히는 두뇌가 아니라 … 도망가는 시간이 더 짧은 사슴이 똑똑한 걸로'): 관문 1차는 이제 포만 없는 세계에서
 > **스스로 벗어난 도망(은신처에 숨거나·나무 줄기·바위가 늑대 눈길을 가리거나·늑대 시야 밖으로 빠져 쫓기를 끝낸 도망)의 '쫓긴 시간'이 유의하게 짧은가**이다
@@ -18,6 +46,14 @@
 > 그대로다(`LIVE_GATE.md` 5-3·변경 기록 (4)). 같은 환경에서 같은 지금
 > 두뇌를 이미 쟀으면 그 판정을 다시 쓴다(`<root>/live/cache/`, 상태 줄 '지금 두뇌 시험: 저장된 결과 다시 씀'). 판정 일은 모두 `live.eval_runner` 를
 > 지난다(`LIVE.evaluator` — 네이티브 판정기를 끼울 자리). 시점·기각 경계는 예비 측정 뒤 확정한다.
+
+> **10-23 (6) 교체 기준을 다시 바꿨다** (사람 결정 '전체 사냥률보다 사슴 하나가 늑대에게 쫓겼을 때 잡히는지 아니면 살아서 은신처에 잘 숨는지 … 비율로 판정'):
+> 관문 1차는 이제 포만 없는 세계에서 **늑대에게 쫓긴 도망 가운데 은신처에 들어 끝나고 그 뒤 10 초(75 스텝) 안에 잡히지 않은 몫(숨음 비율)이 유의하게 큰가**이다
+> (시드마다 지역 셋 합, 짝 t ≥ +1.990 — 쫓긴 시간 때의 문턱에서 부호만 뒤집음, 중간 판정은 앞 절반 짝 t ≤ 0 이면 기각). 새 지킴 GH = 쫓긴 도망 가운데 잡힌 몫이
+> 유의하게 늘지 않음. 쫓긴 시간은 판정에서 빼고 보고만 한다. 판정 실행기는 C++ 평가기(`ceval`)다 — 10 초 지켜보기를 같은 날 C++ 도망 기록에 옮겨
+> 파이썬과 `flight.hide` 까지 세계 기록이 정확히 같다(아래 7절, 옮기기 전 잠깐 파이썬이었다). 예비 근거(도망길 m1): 쫓긴 도망 가운데 잡힘 늘 RUN 9.5 %·늘 SHELTER 9.5 % 로 같고,
+> 은신처 끝 12.7 % → 21.2 % 로 크게 바뀐다. 지금 두뇌는 은신처 끝 도망 뒤 10 초 안에 잡힌 것이 0 이다(숨음 비율 = 은신처 끝 몫, 약 13 %). 정의·까닭·
+> 크기는 `LIVE_GATE.md` 5절·5-1·변경 기록 (6) — 크기는 예비 측정 뒤 확정(실제 폴더 잠금 그대로), 이 기준으로 돌린 판은 아직 없다.
 
 ## 1. 결론 먼저
 
@@ -122,6 +158,9 @@ UnrealEditor.exe <uproject> /Game/Map/LV_Ecosystem_IntegrationTest -game -window
 - 환경이 바뀐 뒤의 스냅숏은 재현 확인(R)을 건너뛴다 — Play 시작부터의 누적 수를 파이썬이 다시 만들 수 없다. 변환이 모르는 규칙·바뀐 은신처를 거부하는 것이 안전망이다.
 - 나무를 더해도 먹이 격자는 그대로다(팀 자원 계약). 파이썬도 스냅숏 먹이 용량을 그대로 써서 둘은 같지만, 새 나무 밑 먹이 줄임은 양쪽 모두 없다.
 - 날씨 출처는 우리 지역 날씨 콘솔 변수와 팀 `FRegionEnvironmentState`(비·맑음만)다. 팀 날씨 블루프린트(SHC)는 아직 이 값을 쓰지 않는다.
+- **10-25 팀 생태계 맵(`LV_EcoV3_JYUEcosystem`)에서는 보통 속도로 판을 끝내지 못한다.** 팀 비 순환(`BP_JYU_EcosystemWeather`)이 팀 지역 환경의 비 세기를
+  1 초마다 조금씩 바꿔 환경 판이 150 초에 92 번 올라가고, 스냅숏이 약 30 초마다 와서 판(약 38 초)이 그만둬진다. 0.15 배속이면 판 둘이 끝까지 돌아 두 번 바꿔 끼웠다.
+  기다림·묶어 세기 가운데 무엇으로 갈지는 사람이 정한다 — `results/v3/level_jyu_eco/README.md` 5절.
 - 한 바퀴 16 분(게임과 함께). 판정 시드를 줄이면 빨라지지만 작은 차이를 놓친다(`LIVE_GATE.md` 변경 기록부터).
 - 개발 빌드 전용(팀 합의 #S1 은 아직 기록 없음).
 
@@ -134,6 +173,17 @@ UnrealEditor.exe <uproject> /Game/Map/LV_Ecosystem_IntegrationTest -game -window
 - 증거 (`ceval.py compare`, 스냅숏 `pilot/eco_v3_snapshot_s20004_t475_e1.json`, 두뇌 `EcoBrains/v3_r1_g995_s3_obs21zero.json`, 시드 34900~34904 × 지역 셋 × 1800 스텝):
   N 15/15·G 15/15 세계 기록이 정확히 같고 지표 23 개의 짝 차이가 모두 0, 1800 스텝 궤적 셋(사슴 자리·방향·에너지·관측·행동, 늑대 자리·표적)에 첫 비트 차이가 없다.
   숲 시야를 켠 세계(`--world-set features.obstacles.foliage.enabled=true` · r 3.0 · block 2.0)도 N 15/15·G 15/15, 궤적 셋 비트 동일.
+- 10-23 (`LIVE_GATE.md` 변경 기록 (6)) 숨은 뒤 10 초 지켜보기(`flight.hide`)를 파이썬 도망 기록에 더한 뒤 같은 compare 를 다시 쟀다: N 15/15·G 15/15 세계 기록이
+  정확히 같고(지표 짝 차이 모두 0), 궤적 셋 첫 비트 차이 없음, selftest(PCG64·저장소 두뇌 파일) 통과. 그때는 새 칸이 C++ 에 없어 compare 가 `python_only`
+  (`flight.hide`)로 적었고 관문 판정 실행기를 잠깐 파이썬으로 돌렸다.
+- 10-23 같은 날 (변경 기록 (6) '10-23 덧붙임') 그 칸을 C++ 도망 기록(`EcoWorldV3.h`)·평가기에 옮겼다: 같은 compare N 15/15·G 15/15 가 `flight.hide` 까지 정확히
+  같고(`python_only` 없음, 궤적 셋 첫 비트 차이 없음), 숲 시야 켬 시드 34905~34934 × 지역 셋 N 90/90·G 90/90 도 같다(10 초 안 잡힘 N 12·G 1 번이 나오는 판).
+  `ceval.HIDE_WATCH` 참, 관문 판정 실행기는 다시 `ceval` 이었다.
+- 10-24 (`LIVE_GATE.md` 변경 기록 (7)) 쫓김 사건(`flight.episode`)을 파이썬 도망 기록에 더했다. 그때는 C++ 에 없어 `ceval.EPISODE` 가 거짓이었고 관문 판정
+  실행기를 잠깐 파이썬으로 돌렸다(compare 는 `flight.episode` 를 python_only 로 적었다).
+- 10-24 같은 날 (변경 기록 (7) '10-24 덧붙임') 그 셈을 C++ 도망 기록(`EcoWorldV3.h`)·평가기에 옮겼다: 같은 compare N 15/15·G 15/15 가 `flight.episode` 까지 정확히
+  같고(`python_only` 없음, 궤적 셋 첫 비트 차이 없음), 숲 시야 켬 시드 34905~34934 × 지역 셋 N 90/90·G 90/90 도 같다(사건 시작 N 34,259·G 21,825, 이어진 도망
+  N 3,459·G 1,753). `ceval.EPISODE` 참, 관문 판정 실행기는 다시 `ceval` 이다.
 - **학습된 두뇌는 그대로다.** 가중치·관측 계약은 바뀌지 않았고, 바뀐 것은 동족 두 칸의 끝자리 셈뿐이다(세계 규칙·분포는 같다). 다만 같은 시드라도 옛 파이썬 판정
   기록과는 세계마다 같지 않을 수 있다 — 판정 저장 열쇠에 `world.py` 바이트가 들어가 옛 저장과 섞이지 않는다.
 - 도망길 측정 도구(`results/v3/route/route_rules.py`·`oracle.py`)는 이 저장 열쇠를 쓰지 않고 있는 raw 부분을 건너뛰어 이어 돌리므로, 10-22 부터
@@ -144,3 +194,35 @@ UnrealEditor.exe <uproject> /Game/Map/LV_Ecosystem_IntegrationTest -game -window
 - 그래서 compare 의 `--py-seq-kin` 진단(파이썬만 차례 합으로 바꿔 보던 것)은 지웠다. 비트 동일 시험: `tests/test_ceval_v3.py`(궤적·기록 칸 전체),
   `tests/test_env_v2.py::test_kin_sums_follow_cpp_order`(C++ 꼴 스칼라 합과 비트 비교). 옛 커밋 사본과 견주는 비트 동일 시험들은 사본에 같은 두 줄 바꿈을 넣어
   견준다(`tests/kin_seq.py`).
+
+## 8. 두 길·판 5 두뇌 시험 판 (10-24 (8), `demo/route5_test/`, 판정 아님)
+
+시험 폴더 `AdaptiveEcosystem/Saved/EcoAdapt_route5_test` 에서 게임과 감시를 함께 돌렸다. 크기는 시험 크기다(학습 20k × 모델 1, N·G 판정 시드 35000~35001 × 600 스텝,
+끼임 35000, `--skip-check --force-export`, 워커 10). 관문 결과는 상관없이 두뇌 파일 경로를 시험했다.
+
+```
+python results/v3/live/live.py watch --root <시험 폴더> --steps 20000 --judge-seeds 35000-35001 --judge-seeds-g 35000-35001 --stuck-seeds 35000-35000
+  --horizon 600 --horizon-g 600 --skip-check --force-export --workers 10
+UnrealEditor.exe <uproject> /Game/Map/LV_Ecosystem_IntegrationTest -game -NullRHI -unattended -EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=20004
+  -EcoV3AutoAdapt -EcoV3Brain=v3_r7_g995_s1_20m -EcoV3AutoSnapshotOut=<시험 폴더>/snapshots -EcoV3BrainWatch=<시험 폴더>/brains
+  -EcoV3TestAt=60 "-EcoV3TestCmd=eco.IntegratedV3.Test.AddTrees Barren 20 1; eco.IntegratedV3.WeatherBarren rain:1"
+  -EcoV3TestAt=240 "-EcoV3TestCmd=eco.V3Brain.Rollback" -EcoV3TestAt=300 "-EcoV3TestCmd=quit" "-ExecCmds=eco.V3Brain.StatusFile <시험 폴더>/status.json"
+```
+(Git Bash 에서 띄우면 `/Game/...` 가 윈도 경로로 바뀌어 지도를 못 연다 — PowerShell 이나 `MSYS_NO_PATHCONV=1` 로 띄운다.)
+
+| 게임 시각 | 일어난 일 (`demo/route5_test/game_ecov3i.log`, `watch.log`, `round.log`) |
+|---|---|
+| 0.0 초 | `두뇌 시작 \| v3_r7_g995_s1_20m@40d8710d (… 관측 24 도망길·반사 밖 도망 막음)` — 시작 두뇌 `eco.V3Brain.Startup` (Play 번호 p20261024T095430_d6553818) |
+| 60.0 초 | `환경 바뀜 #1 \| Barren: 나무 0→20 … \| Barren: 날씨 맑음→비 1.00` |
+| 63.1 초 | 스냅숏 `eco_v3_snapshot_s20004_t473_e1.json` — 두뇌 계약 `0xad7bad5e1acaf071`·관측 24·판 5, 지역 셋 `wild_flight.route` 참·`brain_flee_outside_reflex` 거짓 (`snapshot_head.json`) |
+| (파이썬 32 초) | 묶음 route5 · 시작 R7e zip · 학습 λ 0.98·판 5 · 판정 ceval → 관문 기각(1차 사건 숨음 비율 19.54 % → 21.86 %, t +1.64 — 시드 2) → `--force-export` 로 `live_r1_a1_20261024T185534_e1@11a05ada`(관측 24·판 5, A5 통과) |
+| 100.3 초 | `두뇌 바꿈 \| v3_r7_g995_s1_20m@40d8710d → live_r1_a1_20261024T185534_e1@11a05ada (… 관측 24 도망길·반사 밖 도망 막음, 판 1)` + 알림 '새 두뇌 — 판 1 · … · 관문: 시험 내보내기(--force-export) — 관문 기각 …' |
+| 110~240 초 | 10 초 기록 '<지역> 길 \| … 두 길 켬 (판 5 — 반사 밖 도망 막음)', 두뇌 줄의 도주 반사 밖 두뇌 도망 0 % (42 줄 모두) |
+| 240.0 초 | 예약 `eco.V3Brain.Rollback` → `두뇌 바꿈 \| live_r1… → v3_r7_g995_s1_20m@40d8710d`, 알림 '두뇌 되돌림' |
+| 300 초 | 예약 `quit`. 경고·오류 줄 없음 |
+
+- `gate.md` 에 '길 기록 (보고만)' 절이 든다(도망 기록 표 뒤·중간 판정 앞) — GT −1.22 (t −6.99) · GTr +17.5 (t +1.13) · GR −1.0 (t −0.25), N 반사 도주 스텝 SHELTER 몫 지금 37.4 % → 후보 32.1 %.
+  관측 21 판(길 기록 없음)의 `gate.md` 는 그대로다.
+- 같은 스냅숏을 N 판정 시드 6 개로 다시 돌리면(두 번 보기, 저장소 밖) 중간 판정 t +2.59 → 끝 판정 t +1.97 < +2.571 로 기각이고, 후보 가중치는 위와 같다(학습이 결정적).
+- 한계: 시험 크기라 판정이 아니다. 판 5 세계의 숨음 비율 기준 크기(H·n·S·K·δ_H)도 예비 측정 전이라 실제 폴더는 잠겨 있다(`LIVE_GATE.md` 7절·변경 기록 (8)).
+

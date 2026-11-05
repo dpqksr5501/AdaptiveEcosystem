@@ -11,6 +11,7 @@ void UEcoCreatureAnimInstance::NativeInitializeAnimation()
 	Super::NativeInitializeAnimation();
 	AnimationIndex = 0; PoseAgeSeconds = 0; GroundIKAlpha = 0;
     AlertHeadAlpha=0;
+    ImmatureProportionAlpha=0;
     SensoryAlertSeconds=0;PreviousSense=EEcoSenseSource::None;
 	GroundValid0=GroundValid1=GroundValid2=GroundValid3=0;
 	SetRootMotionMode(ERootMotionMode::IgnoreRootMotion);
@@ -20,6 +21,7 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	Super::NativeUpdateAnimation(DeltaSeconds);
 	const auto* Visual = Cast<AEcoCreatureRepresentationActor>(GetOwningActor());
+    ImmatureProportionAlpha=Visual&&Visual->bBound?1-Visual->VisualState.Maturity:0;
 	bAlive = Visual && Visual->bBound && Visual->VisualState.bAlive;
 	SpeedCmPerSecond = bAlive ? Visual->VisualState.Velocity.Size2D()/FMath::Max(.65f,Visual->VisualState.BodyScale) : 0.0f;
 	DirectionDegrees = bAlive ? Visual->DirectionDegrees : 0.0f;
@@ -47,7 +49,7 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
             // A fresh cue briefly interrupts grazing; a persistent cue never pins the animal in alert forever.
             else if(SensoryAlertSeconds>0)Desired=2;
             else if(Activity==EEcoSpeciesActivity::AlertGraze||Activity==EEcoSpeciesActivity::Vigilant||Activity==EEcoSpeciesActivity::Curious||Activity==EEcoSpeciesActivity::Investigate)Desired=2;
-            else if(Activity==EEcoSpeciesActivity::Graze||Activity==EEcoSpeciesActivity::Eat)Desired=1;
+            else if((Activity==EEcoSpeciesActivity::Graze&&(!Visual->VisualState.Appearance||bEating))||Activity==EEcoSpeciesActivity::Eat)Desired=1;
             else if(Activity==EEcoSpeciesActivity::Recover||Activity==EEcoSpeciesActivity::Exhaust||Activity==EEcoSpeciesActivity::Rest||Activity==EEcoSpeciesActivity::SatedRest)Desired=7;
             else if(Activity==EEcoSpeciesActivity::Search || Visual->VisualState.SenseSource==EEcoSenseSource::Hearing || Visual->VisualState.SenseSource==EEcoSenseSource::Memory)Desired=2;
         }

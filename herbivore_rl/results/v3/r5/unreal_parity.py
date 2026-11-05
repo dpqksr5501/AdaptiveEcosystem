@@ -17,6 +17,7 @@
     UnrealEditor-Cmd.exe <uproject> /Game/Map/LV_Ecosystem_IntegrationTest -game -EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=<S>
         [-EcoV3Brain=v3_r1_g995_s3_obs21zero] [-EcoV3ObsParityLog=75] -benchmark -fps=60 -seconds=241 -NullRHI -NoSound -unattended -nosplash -nopause
         -DisablePlugins=Bridge,Fab -abslog=<폴더>/<이름>_full.log
+    10-29 부터 두뇌 인수가 없으면 기본 두뇌 R7e(관측 24)다 — 내장 R1b-F 판은 -EcoV3Brain=builtin 을 붙인다 (LIVE_ADAPT_SPEC.md 5.6).
 출력: <out>.json (판마다 셈·처음 어긋남), <out>.md (표).
 """
 

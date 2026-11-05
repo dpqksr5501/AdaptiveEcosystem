@@ -13,6 +13,9 @@ class UMassEntityConfigAsset;
 class APawn;
 class APlayerController;
 class UMaterialInterface;
+class UFXSystemAsset;
+class USkeletalMesh;
+class UStaticMesh;
 DECLARE_DELEGATE_RetVal_TwoParams(bool,FEcoBuildPoseGraph,UAnimBlueprint*,UEcoCreatureAnimationProfile*);
 ADAPTIVEECOSYSTEM_API FEcoBuildPoseGraph& EcoPoseGraphAuthoring();
 UCLASS()
@@ -20,6 +23,9 @@ class ADAPTIVEECOSYSTEM_API UEcoCreatureAnimationBuilder : public UBlueprintFunc
 {
     GENERATED_BODY()
 public:
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor") static TArray<FName> GetSkeletalBoneNames(USkeletalMesh* Mesh);
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor") static bool ConfigureNaturalPrecipitation(UFXSystemAsset* Asset,UMaterialInterface* Material);
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor") static UStaticMesh* CreateNaturalPoolMesh(const FString& AssetPath,int32 Seed);
     /** Drives the real movement bridge only in the copied standalone PIE audit. */
     UFUNCTION(BlueprintCallable,Category="Creature|Editor")
     static bool SetAuditPlayerGait(APawn* Player,int32 GaitIndex);
@@ -42,6 +48,12 @@ public:
     static bool ConfigureIntegrationGameMode(UBlueprint* Blueprint,TSubclassOf<APawn> Pawn,TSubclassOf<APlayerController> Controller);
     UFUNCTION(BlueprintCallable,Category="Creature|Editor",meta=(WorldContext="WorldContext"))
     static bool ProjectPlacementPoint(UObject* WorldContext,FVector Point,FVector& OutPoint);
+    /** Copied ecosystem map only. Same physical constraints as native movement, no actor/state writes. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor",meta=(WorldContext="WorldContext"))
+    static bool ValidateCopiedGroundSegment(UObject* WorldContext,FVector From,FVector To);
+    /** Read-only terrain/water capability check for any designer's open level. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor",meta=(WorldContext="WorldContext"))
+    static bool ValidateHabitatGroundSegment(UObject* WorldContext,FVector From,FVector To);
     UFUNCTION(BlueprintCallable,Category="Creature|Editor")
     static bool ConfigureBehaviorRepresentation(UBlueprint* Blueprint,UEcoCreatureAnimationProfile* Profile,TSubclassOf<UEcoCreatureAnimInstance> AnimationClass);
 };

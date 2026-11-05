@@ -1,0 +1,4 @@
+# herbivore_rl/ 에서 (PYTHONUTF8=1) — pilot_mask5.py run 이 live.main 에 그대로 넘긴 인수 (판정 세계 결과를 raw 로 남기는 것만 더함)
+python results/v3/live/pilot_mask5/pilot_mask5.py run --variant I_t20 --root <시험 폴더> --raw <raw 폴더> --extra-same …
+python results/v3/live/live.py pilot --snapshot results/v3/live/pilot_mask5/snapshots/I_t20.json --root <시험 폴더> --seeds 34900-34999 --cand-seeds 34900-34999 --horizons 900 1800 2700 3600 --steps 1000000 2000000 4000000 --model-seeds 0 1 --parts brains cands fdec --workers 14 --extra-models same=ckpt/v3/v3_r7_g995_s1_20m.zip
+# 벽시계 1156 초, 예비 측정 폴더 p_20261027T114453

@@ -1,0 +1,1024 @@
+{
+  "date": "2026-10-29",
+  "branch": "codex/social-shelter-handoff",
+  "head": "ecb898e",
+  "map": "/Game/JYU/Maps/LV_JYU_Ecosystem",
+  "new_ubt": false,
+  "source_config_assets_changed": false,
+  "engine": "UE5.8",
+  "runtime_dll_sha256": "c5145aec27b62c5a0b50de677112b280a08d3a3bd42b8115720833f79df6cc00",
+  "scope": "Fresh playflow diagnosis; no fix; camera/pawn fixtures and explicit drought are distinguished from natural ecology",
+  "natural_pie": {
+    "samples": 30,
+    "wall_seconds": [
+      0.0,
+      290.0
+    ],
+    "regions": {
+      "Forest": {
+        "start": {
+          "native_step": 3,
+          "food": 145.5940066288177,
+          "grown": 0,
+          "consumed": 0,
+          "environment_lost": 0,
+          "rain": 0.2,
+          "mean_moisture": 0.5,
+          "instances": 6
+        },
+        "end": {
+          "native_step": 2159,
+          "food": 131.926482604713,
+          "grown": 459.7707342710597,
+          "consumed": 463.6796447042064,
+          "environment_lost": 9.758613590708837,
+          "rain": 0.6499999761581421,
+          "mean_moisture": 0.47738117946190484,
+          "instances": 119,
+          "ground_cells": 900,
+          "visual_cells": 120,
+          "connected_water_cells": 9
+        },
+        "delta": {
+          "food": -13.667524024104722,
+          "grown": 459.7707342710597,
+          "consumed": 463.6796447042064,
+          "environment_lost": 9.758613590708837
+        },
+        "ledger_max_abs_error": 0.0,
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "cells": 900,
+        "capacity_positive_cells": 481,
+        "sampled_positive_cells": 120,
+        "zero_capacity_cells": 419,
+        "cell_size_cm": 400,
+        "growth_cell_intervals": 7450,
+        "loss_cell_intervals": 4117,
+        "max_cell_recovery": [
+          0.6331751404574137,
+          887,
+          0
+        ],
+        "max_cell_loss": [
+          -0.7741154643503815,
+          349,
+          0
+        ],
+        "herbivores_end": 47,
+        "herbivores_in_sampled_cells": 12,
+        "nearest_rendered_plant_cm": {
+          "min": 54.5348400387615,
+          "max": 1579.5614802038135,
+          "mean": 436.86196258633015
+        }
+      },
+      "Barren": {
+        "start": {
+          "native_step": 3,
+          "food": 126.488517488759,
+          "grown": 0,
+          "consumed": 0,
+          "environment_lost": 0,
+          "rain": 0.2,
+          "mean_moisture": 0.5,
+          "instances": 6
+        },
+        "end": {
+          "native_step": 2159,
+          "food": 106.3521357485583,
+          "grown": 426.3253109985614,
+          "consumed": 439.3010739658695,
+          "environment_lost": 7.160618772689615,
+          "rain": 0.6499999761581421,
+          "mean_moisture": 0.5620117239728403,
+          "instances": 111,
+          "ground_cells": 900,
+          "visual_cells": 114,
+          "connected_water_cells": 0
+        },
+        "delta": {
+          "food": -20.136381740200704,
+          "grown": 426.3253109985614,
+          "consumed": 439.3010739658695,
+          "environment_lost": 7.160618772689615
+        },
+        "ledger_max_abs_error": 0.0,
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "cells": 900,
+        "capacity_positive_cells": 434,
+        "sampled_positive_cells": 114,
+        "zero_capacity_cells": 466,
+        "cell_size_cm": 400,
+        "growth_cell_intervals": 7938,
+        "loss_cell_intervals": 3585,
+        "max_cell_recovery": [
+          0.561043775138186,
+          563,
+          0
+        ],
+        "max_cell_loss": [
+          -0.7894015779101871,
+          563,
+          0
+        ],
+        "herbivores_end": 50,
+        "herbivores_in_sampled_cells": 14,
+        "nearest_rendered_plant_cm": {
+          "min": 172.72357316188507,
+          "max": 4050.0062043645685,
+          "mean": 1203.1060628532873
+        }
+      },
+      "Highland": {
+        "start": {
+          "native_step": 3,
+          "food": 94.34439273698298,
+          "grown": 0,
+          "consumed": 0,
+          "environment_lost": 0,
+          "rain": 0.2,
+          "mean_moisture": 0.5,
+          "instances": 6
+        },
+        "end": {
+          "native_step": 2159,
+          "food": 48.69189145061147,
+          "grown": 179.35843915569401,
+          "consumed": 217.17564441743002,
+          "environment_lost": 3.4043380946815693,
+          "rain": 0.4911341071128845,
+          "mean_moisture": 0.9361501947589492,
+          "instances": 71,
+          "ground_cells": 900,
+          "visual_cells": 85,
+          "connected_water_cells": 0
+        },
+        "delta": {
+          "food": -45.65250128637151,
+          "grown": 179.35843915569401,
+          "consumed": 217.17564441743002,
+          "environment_lost": 3.4043380946815693
+        },
+        "ledger_max_abs_error": 0.0,
+        "rain_range": [
+          0,
+          0.6499999761581421
+        ],
+        "cells": 900,
+        "capacity_positive_cells": 353,
+        "sampled_positive_cells": 85,
+        "zero_capacity_cells": 547,
+        "cell_size_cm": 400,
+        "growth_cell_intervals": 5873,
+        "loss_cell_intervals": 2420,
+        "max_cell_recovery": [
+          0.22354337822431855,
+          841,
+          0
+        ],
+        "max_cell_loss": [
+          -0.78652921834701,
+          841,
+          0
+        ],
+        "herbivores_end": 43,
+        "herbivores_in_sampled_cells": 11,
+        "nearest_rendered_plant_cm": {
+          "min": 204.7116689362561,
+          "max": 5279.4654566928175,
+          "mean": 1645.6165585150322
+        }
+      }
+    },
+    "agents": {
+      "initial_alive": 156,
+      "final_alive": 151,
+      "observed_ids": 165,
+      "natural_children": 9,
+      "activities": {
+        "EEcoSpeciesActivity::Wander": 132,
+        "EEcoSpeciesActivity::Graze": 2746,
+        "EEcoSpeciesActivity::Flee": 410,
+        "EEcoSpeciesActivity::AlertGraze": 120,
+        "EEcoSpeciesActivity::ShelterHold": 284,
+        "EEcoSpeciesActivity::WeakTravel": 725,
+        "EEcoSpeciesActivity::Pursue": 75,
+        "EEcoSpeciesActivity::Stalk": 21,
+        "EEcoSpeciesActivity::Pounce": 3,
+        "EEcoSpeciesActivity::Eat": 7,
+        "EEcoSpeciesActivity::SatedRest": 24,
+        "EEcoSpeciesActivity::Exhaust": 2,
+        "EEcoSpeciesActivity::Sleep": 104
+      },
+      "migration_active_samples": 0
+    },
+    "result": "FINISHED",
+    "region_transfers": []
+  },
+  "plant_mesh_tracks": {
+    "Forest": {
+      "shrink_then_regrowth_cells": 86,
+      "examples": [
+        {
+          "cell": 0,
+          "before": {
+            "t": 20.0,
+            "food": 0.4865773670942952,
+            "fraction": 1.0,
+            "height_scale": 1.0373112151281938,
+            "width_scale": 2.4543728968327074,
+            "component": "plants"
+          },
+          "eaten": {
+            "t": 30.0,
+            "food": 0.163058294788934,
+            "fraction": 0.3351127812678029,
+            "height_scale": 0.4612984087997977,
+            "width_scale": 1.357430969433109,
+            "component": "plants"
+          },
+          "recovered": {
+            "t": 40.0,
+            "food": 0.2659140389057187,
+            "fraction": 0.5464989884212729,
+            "height_scale": 0.6565570035640953,
+            "width_scale": 1.8055519679178078,
+            "component": "plants"
+          }
+        },
+        {
+          "cell": 4,
+          "before": {
+            "t": 110.0,
+            "food": 0.22171286242532137,
+            "fraction": 0.8993843966528577,
+            "height_scale": 0.9526991681139498,
+            "width_scale": 2.3258847578640442,
+            "component": "plants"
+          },
+          "eaten": {
+            "t": 120.0,
+            "food": 0.02063006220727169,
+            "fraction": 0.08368642147429566,
+            "height_scale": 0.3246173974110747,
+            "width_scale": 0.9221928123702128,
+            "component": "plants"
+          },
+          "recovered": {
+            "t": 130.0,
+            "food": 0.16336405041818142,
+            "fraction": 0.6626908169101464,
+            "height_scale": 0.7346604315772438,
+            "width_scale": 1.956266254193377,
+            "component": "plants"
+          }
+        }
+      ],
+      "hidden_samples": 44,
+      "hidden_fraction_max": 0.015508977044654355,
+      "hidden_examples": [
+        {
+          "t": 20.0,
+          "cell": 260,
+          "fraction": 0.0039
+        },
+        {
+          "t": 50.0,
+          "cell": 260,
+          "fraction": 0.0038452243206881496
+        },
+        {
+          "t": 50.0,
+          "cell": 292,
+          "fraction": 0.007307686658864976
+        }
+      ]
+    },
+    "Barren": {
+      "shrink_then_regrowth_cells": 92,
+      "examples": [
+        {
+          "cell": 4,
+          "before": {
+            "t": 60.0,
+            "food": 0.16918056229326123,
+            "fraction": 0.9947375268442472,
+            "height_scale": 1.034056905627646,
+            "width_scale": 2.4495556467526103,
+            "component": "plants"
+          },
+          "eaten": {
+            "t": 70.0,
+            "food": 0.0649316513039722,
+            "fraction": 0.3817811535586738,
+            "height_scale": 0.5166216703091112,
+            "width_scale": 1.4980705628462763,
+            "component": "plants"
+          },
+          "recovered": {
+            "t": 90.0,
+            "food": 0.10392041277656848,
+            "fraction": 0.6110248895780778,
+            "height_scale": 0.7118802650734087,
+            "width_scale": 1.9135346463736387,
+            "component": "plants"
+          }
+        },
+        {
+          "cell": 8,
+          "before": {
+            "t": 60.0,
+            "food": 0.29365252375299283,
+            "fraction": 0.9947168991920168,
+            "height_scale": 1.034056905627646,
+            "width_scale": 2.4495556467526103,
+            "component": "plants"
+          },
+          "eaten": {
+            "t": 70.0,
+            "food": 0.04285364944005299,
+            "fraction": 0.14516220989787004,
+            "height_scale": 0.318108778409979,
+            "width_scale": 0.8962103247460584,
+            "component": "plants"
+          },
+          "recovered": {
+            "t": 80.0,
+            "food": 0.08951837582897768,
+            "fraction": 0.30323404031155965,
+            "height_scale": 0.45153548029815416,
+            "width_scale": 1.3310706095092526,
+            "component": "plants"
+          }
+        }
+      ],
+      "hidden_samples": 24,
+      "hidden_fraction_max": 0.009604723918219453,
+      "hidden_examples": [
+        {
+          "t": 80.0,
+          "cell": 120,
+          "fraction": 0.0034666666666666674
+        },
+        {
+          "t": 90.0,
+          "cell": 420,
+          "fraction": 0.003466666666666667
+        },
+        {
+          "t": 90.0,
+          "cell": 452,
+          "fraction": 0.0034666666666666674
+        }
+      ]
+    },
+    "Highland": {
+      "shrink_then_regrowth_cells": 70,
+      "examples": [
+        {
+          "cell": 0,
+          "before": {
+            "t": 230.0,
+            "food": 0.1000502846703516,
+            "fraction": 0.9967226433359251,
+            "height_scale": 1.034056905627646,
+            "width_scale": 2.4495556467526103,
+            "component": "plants"
+          },
+          "eaten": {
+            "t": 240.0,
+            "food": 0.00019525625590582357,
+            "fraction": 0.0019451851851851846,
+            "height_scale": 0.23675103162199773,
+            "width_scale": 0.46109640618510644,
+            "component": "plants"
+          },
+          "recovered": {
+            "t": 260.0,
+            "food": 0.027268358637079767,
+            "fraction": 0.2716533050328865,
+            "height_scale": 0.42875531379431925,
+            "width_scale": 1.2674327010291084,
+            "component": "plants"
+          }
+        },
+        {
+          "cell": 4,
+          "before": {
+            "t": 170.0,
+            "food": 0.3864851372058842,
+            "fraction": 0.9933884265826559,
+            "height_scale": 1.0308025961270981,
+            "width_scale": 2.4447288876909106,
+            "component": "plants"
+          },
+          "eaten": {
+            "t": 180.0,
+            "food": 0.020068452769787547,
+            "fraction": 0.05158223900938169,
+            "height_scale": 0.2465139601236413,
+            "width_scale": 0.532428251118302,
+            "component": "plants"
+          },
+          "recovered": {
+            "t": 190.0,
+            "food": 0.06762735605738004,
+            "fraction": 0.17382358688737437,
+            "height_scale": 0.35065187341545745,
+            "width_scale": 1.0195224324441403,
+            "component": "plants"
+          }
+        }
+      ],
+      "hidden_samples": 288,
+      "hidden_fraction_max": 0.025923788562469657,
+      "hidden_examples": [
+        {
+          "t": 20.0,
+          "cell": 36,
+          "fraction": 0.004333333333333332
+        },
+        {
+          "t": 20.0,
+          "cell": 500,
+          "fraction": 0.012943748037037033
+        },
+        {
+          "t": 20.0,
+          "cell": 560,
+          "fraction": 0.004333333333333332
+        }
+      ]
+    }
+  },
+  "hidden_then_visible_cells": {
+    "Forest": 14,
+    "Barren": 15,
+    "Highland": 49
+  },
+  "behavior": {
+    "0.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 0,
+      "boundary_within_5cm": 0,
+      "migration_active": 0
+    },
+    "10.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 0,
+      "boundary_within_5cm": 7,
+      "migration_active": 0
+    },
+    "20.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 1,
+      "boundary_within_5cm": 5,
+      "migration_active": 0
+    },
+    "30.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 10,
+      "boundary_within_5cm": 15,
+      "migration_active": 0
+    },
+    "40.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 20,
+      "boundary_within_5cm": 18,
+      "migration_active": 0
+    },
+    "50.0": {
+      "alive_herbivores": 143,
+      "energy_below_5": 20,
+      "boundary_within_5cm": 22,
+      "migration_active": 0
+    },
+    "60.0": {
+      "alive_herbivores": 143,
+      "energy_below_5": 21,
+      "boundary_within_5cm": 26,
+      "migration_active": 0
+    },
+    "70.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 32,
+      "boundary_within_5cm": 26,
+      "migration_active": 0
+    },
+    "80.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 38,
+      "boundary_within_5cm": 29,
+      "migration_active": 0
+    },
+    "90.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 40,
+      "boundary_within_5cm": 32,
+      "migration_active": 0
+    },
+    "100.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 45,
+      "boundary_within_5cm": 40,
+      "migration_active": 0
+    },
+    "110.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 43,
+      "boundary_within_5cm": 44,
+      "migration_active": 0
+    },
+    "120.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 45,
+      "boundary_within_5cm": 39,
+      "migration_active": 0
+    },
+    "130.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 40,
+      "boundary_within_5cm": 35,
+      "migration_active": 0
+    },
+    "140.0": {
+      "alive_herbivores": 144,
+      "energy_below_5": 42,
+      "boundary_within_5cm": 35,
+      "migration_active": 0
+    },
+    "150.0": {
+      "alive_herbivores": 142,
+      "energy_below_5": 46,
+      "boundary_within_5cm": 34,
+      "migration_active": 0
+    },
+    "160.0": {
+      "alive_herbivores": 142,
+      "energy_below_5": 43,
+      "boundary_within_5cm": 33,
+      "migration_active": 0
+    },
+    "170.0": {
+      "alive_herbivores": 143,
+      "energy_below_5": 32,
+      "boundary_within_5cm": 29,
+      "migration_active": 0
+    },
+    "180.0": {
+      "alive_herbivores": 142,
+      "energy_below_5": 28,
+      "boundary_within_5cm": 28,
+      "migration_active": 0
+    },
+    "190.0": {
+      "alive_herbivores": 142,
+      "energy_below_5": 28,
+      "boundary_within_5cm": 29,
+      "migration_active": 0
+    },
+    "200.0": {
+      "alive_herbivores": 142,
+      "energy_below_5": 25,
+      "boundary_within_5cm": 36,
+      "migration_active": 0
+    },
+    "210.0": {
+      "alive_herbivores": 143,
+      "energy_below_5": 25,
+      "boundary_within_5cm": 38,
+      "migration_active": 0
+    },
+    "220.0": {
+      "alive_herbivores": 142,
+      "energy_below_5": 29,
+      "boundary_within_5cm": 35,
+      "migration_active": 0
+    },
+    "230.0": {
+      "alive_herbivores": 142,
+      "energy_below_5": 30,
+      "boundary_within_5cm": 35,
+      "migration_active": 0
+    },
+    "240.0": {
+      "alive_herbivores": 143,
+      "energy_below_5": 30,
+      "boundary_within_5cm": 33,
+      "migration_active": 0
+    },
+    "250.0": {
+      "alive_herbivores": 142,
+      "energy_below_5": 27,
+      "boundary_within_5cm": 30,
+      "migration_active": 0
+    },
+    "260.0": {
+      "alive_herbivores": 140,
+      "energy_below_5": 28,
+      "boundary_within_5cm": 40,
+      "migration_active": 0
+    },
+    "270.0": {
+      "alive_herbivores": 141,
+      "energy_below_5": 28,
+      "boundary_within_5cm": 30,
+      "migration_active": 0
+    },
+    "280.0": {
+      "alive_herbivores": 141,
+      "energy_below_5": 33,
+      "boundary_within_5cm": 31,
+      "migration_active": 0
+    },
+    "290.0": {
+      "alive_herbivores": 140,
+      "energy_below_5": 33,
+      "boundary_within_5cm": 38,
+      "migration_active": 0
+    }
+  },
+  "refuge_counters": {
+    "refuge_capture_violations": 0,
+    "refuge_inside_predator_steps": 0,
+    "refuge_constrained_moves": 0,
+    "refuge_protected_prey_steps": 12215
+  },
+  "ledger_max_abs_error": {
+    "food": 0.0,
+    "grown": 0,
+    "consumed": 0,
+    "environment_lost": 0
+  },
+  "encounters": {
+    "harmless": {
+      "result": "FINISHED",
+      "subject": 17,
+      "samples": 29,
+      "max_familiarity": 0.6309972672358729,
+      "curious_samples": 7,
+      "retreat_samples": 0,
+      "max_player_speed_cm_s": 0.0,
+      "min_hp": 100,
+      "max_unknown_fear": 0,
+      "strike_requests": 0
+    },
+    "chase": {
+      "result": "FINISHED",
+      "subject": 17,
+      "samples": 29,
+      "max_familiarity": 0.2274036994944028,
+      "curious_samples": 0,
+      "retreat_samples": 14,
+      "max_player_speed_cm_s": 900.0000000013312,
+      "min_hp": 100,
+      "max_unknown_fear": 0,
+      "strike_requests": 0
+    },
+    "ambush": {
+      "result": "FINISHED",
+      "subject": 17,
+      "samples": 29,
+      "max_familiarity": 0.11808251846098337,
+      "curious_samples": 0,
+      "retreat_samples": 0,
+      "max_player_speed_cm_s": 0.0,
+      "min_hp": 40,
+      "max_unknown_fear": 0.5670238446795136,
+      "strike_requests": 6
+    }
+  },
+  "drought": {
+    "result": "FINISHED",
+    "wall_seconds": 29.578000000008615,
+    "simulation_seconds": 600.0,
+    "initial_alive": 144,
+    "final_alive": 95,
+    "transfers": [
+      {
+        "id": "78",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 36.0
+      },
+      {
+        "id": "70",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 42.0
+      },
+      {
+        "id": "93",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 42.0
+      },
+      {
+        "id": "50",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "58",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "59",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "71",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "72",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "73",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "74",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "80",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "89",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "90",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 48.0
+      },
+      {
+        "id": "54",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 54.0
+      },
+      {
+        "id": "56",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 54.0
+      },
+      {
+        "id": "63",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 60.0
+      },
+      {
+        "id": "69",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 60.0
+      },
+      {
+        "id": "84",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 78.0
+      },
+      {
+        "id": "61",
+        "from": "Barren",
+        "to": "Forest",
+        "sim": 90.0
+      }
+    ],
+    "settled_plans": [
+      [
+        "6",
+        "2",
+        "2"
+      ],
+      [
+        "1",
+        "2",
+        "2"
+      ],
+      [
+        "4",
+        "2",
+        "2"
+      ],
+      [
+        "7",
+        "3",
+        "3"
+      ],
+      [
+        "8",
+        "2",
+        "2"
+      ],
+      [
+        "3",
+        "2",
+        "2"
+      ],
+      [
+        "2",
+        "2",
+        "2"
+      ],
+      [
+        "5",
+        "2",
+        "2"
+      ],
+      [
+        "9",
+        "2",
+        "2"
+      ]
+    ],
+    "death_counts": {
+      "Barren:Starvation": 29,
+      "Highland:Starvation": 24,
+      "Forest:Starvation": 1
+    },
+    "barren_initial_herd_sizes": {
+      "1": 24,
+      "2": 12
+    },
+    "barren_final": [],
+    "resource_max_error": 0.0
+  },
+  "boundary_recheck": {
+    "result": "FINISHED",
+    "samples": 12,
+    "wall_seconds": 120.0,
+    "close_pairs": [
+      {
+        "t": 10.0,
+        "ids": [
+          "16",
+          "32"
+        ],
+        "distance_cm": 13.673506402417496,
+        "region": "Forest"
+      },
+      {
+        "t": 30.0,
+        "ids": [
+          "42",
+          "52"
+        ],
+        "distance_cm": 17.086738730837443,
+        "region": "Forest"
+      },
+      {
+        "t": 40.0,
+        "ids": [
+          "42",
+          "52"
+        ],
+        "distance_cm": 17.086738730837443,
+        "region": "Forest"
+      },
+      {
+        "t": 40.0,
+        "ids": [
+          "117",
+          "153"
+        ],
+        "distance_cm": 36.171169338285246,
+        "region": "Highland"
+      },
+      {
+        "t": 50.0,
+        "ids": [
+          "42",
+          "52"
+        ],
+        "distance_cm": 17.086738730837443,
+        "region": "Forest"
+      },
+      {
+        "t": 60.0,
+        "ids": [
+          "42",
+          "52"
+        ],
+        "distance_cm": 17.086738730837443,
+        "region": "Forest"
+      },
+      {
+        "t": 80.0,
+        "ids": [
+          "63",
+          "98"
+        ],
+        "distance_cm": 33.061443542227025,
+        "region": "Barren"
+      },
+      {
+        "t": 90.0,
+        "ids": [
+          "146",
+          "152"
+        ],
+        "distance_cm": 51.36868383384153,
+        "region": "Highland"
+      },
+      {
+        "t": 100.0,
+        "ids": [
+          "82",
+          "97"
+        ],
+        "distance_cm": 7.2186504599868,
+        "region": "Barren"
+      },
+      {
+        "t": 100.0,
+        "ids": [
+          "146",
+          "152"
+        ],
+        "distance_cm": 0.005474266597502719,
+        "region": "Highland"
+      },
+      {
+        "t": 110.0,
+        "ids": [
+          "67",
+          "94"
+        ],
+        "distance_cm": 30.306195601327424,
+        "region": "Barren"
+      },
+      {
+        "t": 110.0,
+        "ids": [
+          "146",
+          "152"
+        ],
+        "distance_cm": 0.005474266597502719,
+        "region": "Highland"
+      }
+    ],
+    "min_distance_cm": 0.005474266597502719,
+    "night_light_samples": [
+      {
+        "t": 80.0,
+        "light": 0
+      },
+      {
+        "t": 90.0,
+        "light": 0
+      },
+      {
+        "t": 100.0,
+        "light": 0
+      },
+      {
+        "t": 110.0,
+        "light": 0
+      }
+    ]
+  },
+  "raw_local_folders": [
+    "Saved/PlayflowAudit_20261029",
+    "Saved/PlayflowBoundary_20261029"
+  ],
+  "not_retested": [
+    "network/late-join",
+    "checkpoint restart",
+    "cook/package",
+    "streaming lifecycle",
+    "multiple seeds/long term balance",
+    "500/1000 population"
+  ]
+}

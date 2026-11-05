@@ -88,7 +88,7 @@ void FEcoMassClientBubbleHandler::ApplyAddedAgents(const TArrayView<int32> Added
 		{
 			Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
 			Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity(); Visual->FocusYaw = Agent.GetFocusYaw();
-            Visual->BodyScale=Agent.GetBodyScale();
+            Visual->BodyScale=Agent.GetBodyScale();Visual->Maturity=Agent.GetMaturity();Visual->CoatTone=Agent.GetCoatTone();
 		}
 	};
 
@@ -196,7 +196,7 @@ void FEcoMassClientBubbleHandler::SetModifiedEntityData(const FMassEntityView& E
 	{
 		Visual->Velocity = Agent.GetVelocity(); Visual->Flags = Agent.GetVisualFlags();
 		Visual->Health = Agent.GetHealth(); Visual->Energy = Agent.GetEnergy(); Visual->Activity = Agent.GetActivity(); Visual->FocusYaw = Agent.GetFocusYaw();
-        Visual->BodyScale=Agent.GetBodyScale();
+        Visual->BodyScale=Agent.GetBodyScale();Visual->Maturity=Agent.GetMaturity();Visual->CoatTone=Agent.GetCoatTone();
 	}
 }
 #endif

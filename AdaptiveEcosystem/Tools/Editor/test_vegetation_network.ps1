@@ -4,7 +4,7 @@ param([string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8',
     [switch]$AuthoredWeather,[ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='Vegetation_20261023',
     [double]$Duration=125,[double]$ExitAfter=180,
     [int]$Seed=23,
-    [switch]$OverlapClients,
+    [switch]$OverlapClients,[switch]$ChildCoverage,
     [ValidateRange(10,600)][double]$ClientAAt=30,[ValidateRange(45,600)][double]$ClientBAt=95)
 $ErrorActionPreference='Stop'
 foreach($taskValue in @($Duration,$ExitAfter,$ClientAAt,$ClientBAt)){
@@ -27,10 +27,11 @@ $taskStarted=[DateTime]::UtcNow
 $taskServerLog=Join-Path $taskOut 'Server.log'
 $taskMode=if($AuthoredWeather){'-VegetationAuthored'}else{'-EcoVegetation'}
 $taskMapName=($Map -split '/')[-1]
+$taskObserverFlag=if($ChildCoverage){'-VegetationNetworkChildCoverage'}else{'-EcoIntegrationObserverCycle'}
 $taskConnectionMode=if($OverlapClients){'-VegetationOverlapExpected'}else{'-VegetationSequentialExpected'}
 $taskServer=Start-VegetationProcess "$taskEngine/UnrealEditor-Cmd.exe" @($taskProject,$Map,
     '-server','-NullRHI','-unattended','-nop4','-port=7777',$taskMode,$taskConnectionMode,'-EcoV3DeerPerRegion=48','-EcoV3SocialControl=0',"-EcoV3Seed=$Seed",
-    "-EcoIntegrationExitAfter=$ExitAfter",'-EcoIntegrationObserverCycle','-VegetationAuditName=Server',"-VegetationAuditDuration=$Duration",
+    "-EcoIntegrationExitAfter=$ExitAfter",$taskObserverFlag,'-VegetationAuditName=Server',"-VegetationAuditDuration=$Duration",
     "-VegetationMap=$taskMapName","-VegetationAuditFolder=$AuditFolder",
     "-ExecCmds=py $taskRoot/Tools/Editor/audit_vegetation_runtime.py","-AbsLog=$taskServerLog")
 $taskReadyDeadline=[DateTime]::UtcNow.AddSeconds(90)

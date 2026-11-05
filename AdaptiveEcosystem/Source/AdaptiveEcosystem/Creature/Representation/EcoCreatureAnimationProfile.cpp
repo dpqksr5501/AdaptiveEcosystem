@@ -4,9 +4,11 @@ bool UEcoCreatureAnimationProfile::IsValidProfile() const
 {
     if (!Locomotion || !Locomotion->GetSkeleton() || Poses.Num()!=9 || !FMath::IsFinite(StationarySpeed) || StationarySpeed<0
         || !FMath::IsFinite(MinimumPoseHoldSeconds) || MinimumPoseHoldSeconds<0
+        ||MorphScale.ContainsNaN()||MorphScale.GetMin()<.7||MorphScale.GetMax()>1.3
         || !FMath::IsFinite(MaxFootCorrectionCm) || MaxFootCorrectionCm<0 || MaxFootCorrectionCm>50
         || !FMath::IsFinite(FootClearanceCm) || FootClearanceCm<0 || FootClearanceCm>20
         || (bEnableGroundIK && (FootBones.Num()!=4 || IKEndBones.Num()!=4 || ContactHeights.Num()!=4))) return false;
+    if(!MorphBone.IsNone()&&Locomotion->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(MorphBone)==INDEX_NONE)return false;
     if(bEnableGroundIK) {
         const auto& Rig=Locomotion->GetSkeleton()->GetReferenceSkeleton();const int32 Body=Rig.FindBoneIndex(BodyBone);
         if(Body==INDEX_NONE)return false;

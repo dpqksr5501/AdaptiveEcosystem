@@ -22,6 +22,8 @@
 #include "MassCommandBuffer.h"
 #include "MassMovementFragments.h"
 #include "Network/EcoGameState.h"
+#include "Network/Session/EcoGameSession.h"
+#include "Engine/Engine.h"
 #include "World/EcologyRegion.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcoWorldClockSubsystem.h"
@@ -40,11 +42,17 @@
 static TAutoConsoleVariable<int32> EcoIntegrationLogDetails(TEXT("eco.Integration.LogDetails"), 0,
 	TEXT("Read-only agent/region/receive audit at the existing five-second integration log interval. Disable for profiling."));
 
-AEcoCreatureIntegrationGameMode::AEcoCreatureIntegrationGameMode() { GameStateClass = AEcoGameState::StaticClass(); }
+AEcoCreatureIntegrationGameMode::AEcoCreatureIntegrationGameMode()
+{
+    GameStateClass = AEcoGameState::StaticClass();
+    GameSessionClass = AEcoGameSession::StaticClass();
+}
 void AEcoCreatureIntegrationGameMode::InitGameState()
 {
 	Super::InitGameState();
-	if (auto* State = GetGameState<AEcoGameState>()) State->InitializeAuthorityState(FMath::Max(1, int32(GetTypeHash(FGuid::NewGuid()) & MAX_int32)), 8);
+	if (auto* State = GetGameState<AEcoGameState>())
+        State->InitializeAuthorityState(FMath::Max(1, int32(GetTypeHash(FGuid::NewGuid()) & MAX_int32)),
+            GameSession ? GameSession->MaxPlayers : 11);
 }
 
 AEcoCreatureIntegrationSpawner::AEcoCreatureIntegrationSpawner()
@@ -68,6 +76,7 @@ void AEcoCreatureIntegrationSpawner::PostInitializeComponents()
 void AEcoCreatureIntegrationSpawner::BeginPlay()
 {
 	Super::BeginPlay();
+	bAuthorityWorld = GetNetMode() != NM_Client;
     int32 LifeOverride=-1;
     if(FParse::Value(FCommandLine::Get(),TEXT("EcoEcosystemLife="),LifeOverride)&&(LifeOverride==0||LifeOverride==1))bEnableEcosystemLife=LifeOverride!=0;
 	PostTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &AEcoCreatureIntegrationSpawner::OnWorldPostActorTick);
@@ -148,6 +157,10 @@ void AEcoCreatureIntegrationSpawner::Tick(float Delta)
 		}
 	}
 #endif
+	// ClientTravel assigns a pending net driver before destroying the standalone world.
+	// Its authority entities belong to that outgoing world, not to the incoming client proxy world.
+	if (const FWorldContext* Context = GEngine ? GEngine->GetWorldContextFromWorld(GetWorld()) : nullptr)
+		if (Context->PendingNetGame) return;
 	if (bWaitingForHabitat)
 	{
 		if (GetWorld()->GetTimeSeconds() - StartedAt > 30.0)
@@ -262,7 +275,7 @@ void AEcoCreatureIntegrationSpawner::EndPlay(const EEndPlayReason::Type Reason)
 	Visuals.Reset();
 	for (AEcoCreatureRepresentationActor* Actor : VisualPool) if (Actor) Actor->Destroy();
 	VisualPool.Reset();
-	if (GetWorld() && GetNetMode() != NM_Client)
+	if (GetWorld() && bAuthorityWorld)
 	{
 		if (auto* Registry = GetWorld()->GetSubsystem<UEcoWorldProviderRegistry>())
 		{

@@ -201,6 +201,10 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 Arrivals.Add(O);
             }
             if(J.Waypoint==Last&&InsideTarget&&FVector::Dist2D(A.Position,Finish)<FMath::Max(220.f,P.CorridorWidth)){
+                if(Target->Sim.Config.bNaturalHabitats){
+                    A.Link->Individual.SettlementUntil=Now+45;A.Link->Individual.SettlementX=A.Body->Body.Pos.X;A.Link->Individual.SettlementY=A.Body->Body.Pos.Y;
+                    A.Link->Individual.ForageCell=-1;A.Link->Individual.NextForageScan=0;
+                }
                 *A.Travel=FEcoTravelFragment();A.Travel->LastArrivalTime=Now;J.bActive=false;J.Reason=TEXT("Arrived");++P.Arrived;continue;
             }
             const double D=FVector::Dist2D(A.Position,P.Points[J.Waypoint]);
@@ -240,20 +244,31 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
     };
     TArray<int64> HerdIds;Groups.GetKeys(HerdIds);HerdIds.Sort();
     for(const int64 Herd:HerdIds){
-        const auto& Members=Groups.FindChecked(Herd);if(Members.Num()<2)continue;
+        const auto& Members=Groups.FindChecked(Herd);if(Members.IsEmpty())continue;
         if(const auto* P=Plans.Find(Herd);P&&(!IsTerminal(P->State)||Now<P->CooldownUntil))continue;
         if(Members.ContainsByPredicate([&](int32 I){return Agents[I].Journey->bStranded;}))continue;
         const FName Origin=Agents[Members[0]].Region->CurrentRegionId;auto* Source=Native->FindContext(Origin);if(!Source)continue;
+        // A persistent herd may have one survivor. Life worlds use the same
+        // journey/receipts for that individual; never invent a replacement herd.
+        if(Members.Num()<2&&!Source->Sim.Config.bEcosystemLife)continue;
         bool SameRegion=true;int32 Hungry=0;for(const int32 I:Members){SameRegion&=Agents[I].Region->CurrentRegionId==Origin;Hungry+=Agents[I].Body->Body.Energy<.4;}
-        const bool Short=Source->FoodFraction()<FMath::Clamp(double(CVarShortage.GetValueOnGameThread()),.01,.95);
+        const double Fraction=Source->FoodFraction();
+        // Long physical journeys must not wait until weak bodies exhaust their
+        // reserve. Only life worlds admit this early, majority-hungry shortage;
+        // destination knowledge/value and the sustained dwell still apply.
+        const bool ForecastShortage=Source->Sim.Config.bEcosystemLife&&Fraction<.5&&Hungry*2>=Members.Num();
+        const bool Short=Fraction<FMath::Clamp(double(CVarShortage.GetValueOnGameThread()),.01,.95)||ForecastShortage;
         if(!SameRegion||!Short){ShortageSince.Remove(Herd);continue;}
         double& Since=ShortageSince.FindOrAdd(Herd,Now);
-        if(Now-Since<FMath::Max(0.f,CVarDwell.GetValueOnGameThread())||(Hungry==0&&Source->FoodFraction()>=.05))continue;
+        if(Now-Since<FMath::Max(0.f,CVarDwell.GetValueOnGameThread())||(Hungry==0&&Source->FoodFraction()>=.05)){
+            if(Source->Sim.Config.bEcosystemLife)for(const int32 I:Members)Agents[I].Journey->Reason=TEXT("AwaitingSustainedShortage");
+            continue;
+        }
         if(Now<NextPlanAttempt.FindRef(Herd))continue;
         NextPlanAttempt.Add(Herd,Now+3);
         TArray<AEcoHerdMigrationRoute*> Routes;for(TActorIterator<AEcoHerdMigrationRoute> It(GetWorld());It;++It)if(It->bEnabled&&It->IsValidRoute())Routes.Add(*It);
         Routes.Sort([](const AEcoHerdMigrationRoute& A,const AEcoHerdMigrationRoute& B){return A.GetPathName()<B.GetPathName();});
-        TArray<FVector> BestPoints;FName Destination;float Width=600;double BestScore=0;
+        TArray<FVector> BestPoints;FName Destination;float Width=600;double BestScore=0;bool BudgetRejected=false;
         for(const auto* Route:Routes){
             const bool Reverse=Route->bBidirectional&&Route->ToRegion==Origin;
             if(Route->FromRegion!=Origin&&!Reverse)continue;
@@ -300,16 +315,24 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 }
             // Authored adjacent route grants destination knowledge; population forecast includes live incoming plans.
             const double ExpectedFood=Report?Report->Food+Report->Recovery*.25:State.FoodAmount;
-            const int32 ExpectedPopulation=Report?Report->Population:CurrentPopulation(Dest,State.Population);
-            const double PerHead=ExpectedFood/FMath::Max(1,ExpectedPopulation+Incoming+Members.Num());
+            const int32 CommittedPopulation=CurrentPopulation(Dest,State.Population);
+            const int32 ExpectedPopulation=Report?FMath::Max(Report->Population,Target->Sim.Config.bNaturalHabitats?CommittedPopulation:0):CommittedPopulation;
+            double PerHead=ExpectedFood/FMath::Max(1,ExpectedPopulation+Incoming+Members.Num());
             FRegionEcologyState Own;if(!Ecology->GetRegionState(Origin,Own))continue;
             if(PerHead<=Own.FoodAmount/FMath::Max(1,CurrentPopulation(Origin,Own.Population))*1.2||PerHead<.5)continue;
+            if(Report&&Target->Sim.Config.bNaturalHabitats){
+                const auto& Rates=Target->Sim.RepCfg;
+                const double FoodRate=Rates.EnergyDrain*FMath::Max(.85,Rates.GaitDrain[EcoRepertoireV3::kGaitStop])/Rates.FoodEnergyPerUnit/EcoRepertoireV3::kStepSeconds;
+                const auto Budget=EcoNaturalHabitat::SettlementBudget(Report->Food,Report->Recovery,Report->Population,CommittedPopulation,
+                    Incoming,Members.Num(),FoodRate,FMath::Clamp(double(CVarCooldown.GetValueOnGameThread()),60.,300.));
+                if(!Budget.bAdmissible){BudgetRejected=true;continue;}PerHead=Budget.FoodPerHead;
+            }
             auto Points=Route->Points;if(Reverse)Algo::Reverse(Points);
             const auto Start=Source->CmToUnits(Points[0]),End=Target->CmToUnits(Points.Last());
             if(Start.X<0||Start.Y<0||Start.X>Source->Sim.Config.WorldSize||Start.Y>Source->Sim.Config.WorldSize
                 ||End.X<0||End.Y<0||End.X>Target->Sim.Config.WorldSize||End.Y>Target->Sim.Config.WorldSize)continue;
             bool Valid=true;double Length=0;
-            for(int32 K=1;K<Points.Num();++K){Length+=FVector::Dist2D(Points[K-1],Points[K]);double Z=Points[K-1].Z;
+            for(int32 K=1;K<Points.Num();++K){Length+=Target->Sim.Config.bNaturalHabitats?FVector::Dist(Points[K-1],Points[K]):FVector::Dist2D(Points[K-1],Points[K]);double Z=Points[K-1].Z;
                 if(Native->UsesTerrain()&&!Native->TraceMove(Origin,Points[K-1],Points[K],Z,true)){Valid=false;break;}}
             const double Confidence=Report?FMath::Clamp(1-(Now-Report->Observed)/180.,.5,1.):1.;
             const double Suitability=Report?(1-.5*Report->Risk)*(1+.1*Report->Water+.1*Report->Shelter)*Confidence:1.;
@@ -317,7 +340,7 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
             BestScore=Score;BestPoints=MoveTemp(Points);Destination=Dest;Width=FMath::Clamp(Route->CorridorWidth,100.f,1500.f);
         }
         if(BestPoints.IsEmpty()){
-            for(const int32 I:Members)Agents[I].Journey->Reason=TEXT("NoViableKnownRoute");
+            for(const int32 I:Members)Agents[I].Journey->Reason=BudgetRejected?TEXT("DestinationFoodBudgetInsufficient"):TEXT("NoViableKnownRoute");
             continue;
         }
         FEcoHerdJourney P;P.Id=NextPlan++;P.HerdId=Herd;P.Origin=Origin;P.Destination=Destination;P.Points=MoveTemp(BestPoints);

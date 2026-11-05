@@ -1,0 +1,104 @@
+{
+ "made_by": "level_sense/sense.py parity",
+ "dir": "I_r7e_N_h1800",
+ "rows": [
+  {
+   "variant": "base",
+   "spec": "",
+   "compared_keys": [
+    "alive",
+    "at",
+    "beh_steps",
+    "catch_cover",
+    "caught",
+    "flight",
+    "hunt",
+    "live_steps",
+    "n",
+    "region",
+    "seed",
+    "shelter_steps",
+    "starved"
+   ],
+   "worlds": 300,
+   "exact": 300,
+   "only_a": 0,
+   "only_b": 0,
+   "bad": [],
+   "time": {
+    "ceval": {
+     "build_s": 0.1,
+     "run_s": 55.97,
+     "worlds": 300,
+     "native": {
+      "prep_s": 2.78,
+      "native_s": 53.08,
+      "native_worlds": 300,
+      "python_worlds": 0
+     },
+     "world_steps_per_s_total": 9648.6
+    },
+    "python": {
+     "build_s": 0.23,
+     "run_s": 598.41,
+     "worlds": 300,
+     "native": {},
+     "world_steps_per_s_total": 902.4
+    },
+    "workers": [
+     6,
+     6
+    ]
+   }
+  },
+  {
+   "variant": "t30",
+   "spec": "trees:30:rand",
+   "compared_keys": [
+    "alive",
+    "at",
+    "beh_steps",
+    "catch_cover",
+    "caught",
+    "flight",
+    "hunt",
+    "live_steps",
+    "n",
+    "region",
+    "seed",
+    "shelter_steps",
+    "starved"
+   ],
+   "worlds": 300,
+   "exact": 300,
+   "only_a": 0,
+   "only_b": 0,
+   "bad": [],
+   "time": {
+    "ceval": {
+     "build_s": 0.18,
+     "run_s": 58.71,
+     "worlds": 300,
+     "native": {
+      "prep_s": 3.07,
+      "native_s": 55.5,
+      "native_worlds": 300,
+      "python_worlds": 0
+     },
+     "world_steps_per_s_total": 9197.1
+    },
+    "python": {
+     "build_s": 0.19,
+     "run_s": 796.95,
+     "worlds": 300,
+     "native": {},
+     "world_steps_per_s_total": 677.6
+    },
+    "workers": [
+     6,
+     6
+    ]
+   }
+  }
+ ]
+}

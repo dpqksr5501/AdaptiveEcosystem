@@ -1,0 +1,21 @@
+  select_v3_r6_g995_s0_20m: ckpt/v3/v3_r6_g995_s0_20m.zip · select 시드 37100~37119 × 지역 3 × 1800 스텝
+  select_v3_r6_g995_s0_20m 50/60 (56 초)
+  select_v3_r6_g995_s0_20m 60/60 (67 초)
+  select_v3_r6_g995_s1_20m: ckpt/v3/v3_r6_g995_s1_20m.zip · select 시드 37100~37119 × 지역 3 × 1800 스텝
+  select_v3_r6_g995_s1_20m 50/60 (56 초)
+  select_v3_r6_g995_s1_20m 60/60 (66 초)
+  select_v3_r6_g995_s2_20m: ckpt/v3/v3_r6_g995_s2_20m.zip · select 시드 37100~37119 × 지역 3 × 1800 스텝
+  select_v3_r6_g995_s2_20m 50/60 (56 초)
+  select_v3_r6_g995_s2_20m 60/60 (66 초)
+  select_route0: route0 · select 시드 37100~37119 × 지역 3 × 1800 스텝
+  select_route0 50/60 (56 초)
+  select_route0 60/60 (66 초)
+| 모델 | 숨음 비율(전체 합) | 잡힌 몫 | 굶은 몫 |
+|---|---|---|---|
+| ckpt/v3/v3_r6_g995_s1_20m.zip | 20.67% | 0.1315 | 0.0000 |
+| ckpt/v3/v3_r6_g995_s0_20m.zip | 20.25% | 0.1319 | 0.0001 |
+| ckpt/v3/v3_r6_g995_s2_20m.zip | 19.61% | 0.1281 | 0.0000 |
+| route0 (보고만) | 13.48% | 0.1400 | 0.0004 |
+
+고른 모델: ckpt/v3/v3_r6_g995_s1_20m.zip
+exit 0

@@ -21,13 +21,17 @@ simulation_duration=float(arg('LifeAuditSimulationSeconds','0'))
 sample_seconds=float(arg('LifeAuditSampleSeconds','5'))
 if not 1<=sample_seconds<=60:raise RuntimeError('Bounded sample interval required')
 csv_enabled='-lifeauditcsv' in cmd.lower()
+lineage_only='-lifeauditlineage' in cmd.lower()
 slot=arg('LifeAuditSlot','LifeRestart')
 life_expected=arg('EcoEcosystemLife','1')!='0'
 drought_region=arg('LifeAuditDrought','')
 if drought_region and (mode!='observe' or drought_region not in ('Barren','Forest','Highland')):raise RuntimeError('Unsupported drought fixture')
 if mode not in ('observe','save','load') or not re.fullmatch(r'[A-Za-z0-9_]+',name):raise RuntimeError('Unsupported audit mode/name')
+if lineage_only and mode!='observe':raise RuntimeError('Lineage sampling requires observe mode')
 root=Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()))
-out=root/'EcosystemLife_20261023';out.mkdir(parents=True,exist_ok=True)
+folder=arg('LifeAuditFolder','EcosystemLife_20261023')
+if not re.fullmatch(r'[A-Za-z0-9_]+',folder):raise RuntimeError('Simple Saved output folder required')
+out=root/folder;out.mkdir(parents=True,exist_ok=True)
 world=next((w for w in unreal.ObjectIterator(unreal.World) if w.get_name()=='LV_JYU_Ecosystem' and unreal.GameplayStatics.get_game_state(w) is not None),None)
 if world is None:raise RuntimeError('Active ecosystem game world required')
 runtime=next(iter(unreal.GameplayStatics.get_all_actors_of_class(world,unreal.EcoCreatureIntegrationSpawner)),None)
@@ -40,6 +44,17 @@ def capture():
 
 def digest(row):
     return checkpoint_digest(row)
+
+def sample(row, elapsed, simulation_elapsed):
+    if lineage_only:
+        agent_keys=('stable_id','species','region','hp','energy','brain','policy_obs_dim','policy_mask_version')
+        life_keys=('origin','generation','parent_a','parent_b','born','offspring',
+                   'age_seconds','maturity','size_gene','speed_gene','coat_gene','caution_gene','sociability_gene')
+        agents=[{**{k:a[k] for k in agent_keys if k in a},
+                 'life':{k:a['life'][k] for k in life_keys if k in a['life']}} for a in row['agents']]
+        row={**row,'agents':agents}
+    row.update(elapsed=elapsed,simulation_elapsed=simulation_elapsed)
+    state['samples'].append(row)
 
 def finish(result):
     runtime.on_runtime_sample.remove_callable(tick)
@@ -93,7 +108,18 @@ def tick(dt):
             if restored!=expected:
                 (out/(name+'_RestoreMismatch.json')).write_text(json.dumps({'expected':expected,'actual':restored},indent=2),encoding='utf-8')
                 raise AssertionError('Exact restored individual/soil/ledger state differs')
-            state['operation']={'restored_exactly':True,'rejected_load_unchanged':True,'agents':len(restored['agents'])}
+            # A one-time full cell comparison verifies new development state too;
+            # regular observation remains compact and never scans all cells per frame.
+            saved_snapshot=out/(slot+'_LearningSnapshot.json')
+            cell_verified=False;cell_count=0
+            if saved_snapshot.exists():
+                saved_regions=json.loads(saved_snapshot.read_text(encoding='utf-8'))['regions']
+                live_regions=[json.loads(f.capture_diagnostics(True)) for f in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.EcoVegetationField)]
+                def cells(regions):
+                    return {f['region']:[{k:c[k] for k in ('cell','development','food','capacity','moisture','stress')} for c in f.get('logical_cells',[])] for f in regions}
+                if cells(saved_regions)!=cells(live_regions):raise AssertionError('Restored cell development/soil/food differs')
+                cell_count=sum(len(v) for v in cells(live_regions).values());cell_verified=cell_count>0
+            state['operation']={'restored_exactly':True,'rejected_load_unchanged':True,'agents':len(restored['agents']),'restored_cell_development_exactly':cell_verified,'restored_soil_cells':cell_count}
             row=capture()
         if mode=='save' and elapsed>=save_at and state['operation'] is None:
             expected=digest(row)
@@ -105,7 +131,7 @@ def tick(dt):
             file=root/'Ecosystem'/(slot+'.eco')
             state['operation']={'saved':True,'bytes':file.stat().st_size,'sha256':hashlib.sha256(file.read_bytes()).hexdigest(),'agents':len(expected['agents'])}
             learning={'schema':'ecosystem-life-v1-evaluation','training_ready':False,'runtime_python_inference':False,
-                'policy_contract':'existing V1 7/4 and v3 18/5 mask2 unchanged; optional v3 21/5 remains separate',
+                'policy_contract':'Active v3 brain, observation dimension and mask version are recorded per herbivore.',
                 'checkpoint_sha256':state['operation']['sha256'],'agents':row['agents'],
                 'regions':[json.loads(f.capture_diagnostics(True)) for f in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.EcoVegetationField)]}
             (out/(slot+'_LearningSnapshot.json')).write_text(json.dumps(learning,ensure_ascii=False,indent=2),encoding='utf-8')
@@ -116,15 +142,17 @@ def tick(dt):
             state['operation']['live_rollback_rejected']=True
         progress=simulation_elapsed if simulation_duration else elapsed
         if progress>=state['next']:
-            state['next']=progress+sample_seconds;row['elapsed']=elapsed;row['simulation_elapsed']=simulation_elapsed;state['samples'].append(row)
+            state['next']=progress+sample_seconds
+            sample(row,elapsed,simulation_elapsed)
             for f in row['fields']:
                 for a,b in (('food','ledger_amount'),('consumed','ledger_consumed'),('grown','ledger_grown'),('environment_lost','ledger_environment_lost')):
                     if abs(f[a]-f[b])>1e-5:raise AssertionError('Authority resource mismatch '+a)
-            (out/(name+'_Progress.json')).write_text(json.dumps(row,ensure_ascii=False,indent=2),encoding='utf-8')
+            if not lineage_only:
+                (out/(name+'_Progress.json')).write_text(json.dumps(row,ensure_ascii=False,indent=2),encoding='utf-8')
         if (simulation_duration and simulation_elapsed>=simulation_duration) or (not simulation_duration and elapsed>=duration):
             if mode!='observe' and state['operation'] is None:raise AssertionError('Requested checkpoint operation did not occur')
             if not state['samples'] or row['fields'][0]['native_step']!=state['samples'][-1]['fields'][0]['native_step']:
-                row['elapsed']=elapsed;row['simulation_elapsed']=simulation_elapsed;state['samples'].append(row)
+                sample(row,elapsed,simulation_elapsed)
             finish('FINISHED')
     except Exception as error:
         state['error']=repr(error);unreal.log_error('ECOSYSTEM_LIFE_AUDIT_ERROR '+repr(error));finish('FAILED')

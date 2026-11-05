@@ -9,6 +9,9 @@
 #include "AnimGraphNode_BlendSpacePlayer.h"
 #include "AnimGraphNode_SequencePlayer.h"
 #include "AnimGraphNode_LayeredBoneBlend.h"
+#include "AnimGraphNode_ModifyBone.h"
+#include "AnimGraphNode_LocalToComponentSpace.h"
+#include "AnimGraphNode_ComponentToLocalSpace.h"
 #include "K2Node_VariableGet.h"
 #include "Kismet2/BlueprintEditorUtils.h"
 #include "Kismet2/KismetEditorUtilities.h"
@@ -90,6 +93,18 @@ bool FAdaptiveEcosystemEditorModule::BuildPoseGraph(UAnimBlueprint* BP,UEcoCreat
         if(!Connect(FinalPose,Layer->FindPin(TEXT("BasePose")))||!Connect(Head->FindPin(TEXT("Pose")),Layer->FindPin(TEXT("BlendPoses_0")))
             ||!Connect(Getter.operator()<float>(TEXT("AlertHeadAlpha"),100,-250),Layer->FindPin(TEXT("BlendWeights_0"))))return false;
         FinalPose=Layer->FindPin(TEXT("Pose"));
+    }
+    if(!P->MorphBone.IsNone()&&!P->MorphScale.Equals(FVector::OneVector)){
+        auto* Component=NewNode.operator()<UAnimGraphNode_LocalToComponentSpace>(650,-200);
+        auto* Morph=NewNode.operator()<UAnimGraphNode_ModifyBone>(800,-200);
+        auto* Local=NewNode.operator()<UAnimGraphNode_ComponentToLocalSpace>(950,-200);
+        Morph->Node.BoneToModify.BoneName=P->MorphBone;Morph->Node.Scale=P->MorphScale;Morph->Node.ScaleMode=BMM_Replace;Morph->Node.ScaleSpace=BCS_BoneSpace;
+        if(P->bAgeDrivenMorph)for(auto& Pin:Morph->ShowPinForProperties)if(Pin.PropertyName==TEXT("Alpha"))Pin.bShowPin=true;
+        Morph->ReconstructNode();
+        if(P->bAgeDrivenMorph&&!Connect(Getter.operator()<float>(TEXT("ImmatureProportionAlpha"),650,-400),Morph->FindPin(TEXT("Alpha"))))return false;
+        if(!Connect(FinalPose,Component->FindPin(TEXT("LocalPose")))||!Connect(Component->FindPin(TEXT("ComponentPose")),Morph->FindPin(TEXT("ComponentPose")))
+            ||!Connect(Morph->FindPin(TEXT("Pose")),Local->FindPin(TEXT("ComponentPose"))))return false;
+        FinalPose=Local->FindPin(TEXT("Pose"));
     }
     Root->FindPin(TEXT("Result"))->BreakAllPinLinks();
     if(!Connect(FinalPose,Root->FindPin(TEXT("Result"))))return false;

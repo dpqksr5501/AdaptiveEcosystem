@@ -1,0 +1,6 @@
+route0m5: ckpt/v3/v3_r1_g995_s3_obs24route0m5.zip  판 4 → 5  관측 24  sha256 b8e4c5d435223594  가중치 지문 2813f4d31bfdcadd (원 모델 2813f4d31bfdcadd — 같다), zip 안 policy.pth 바이트 같다
+obs21zero_m6: ckpt/v3/v3_r1_g995_s3_obs21zero_m6.zip  판 2 → 6  관측 21  sha256 436ec27e5e5c227d  가중치 지문 b0095ae05d04cea5 (원 모델 b0095ae05d04cea5 — 같다), zip 안 policy.pth 바이트 같다
+두뇌 파일: results/v3/r7/brains/v3_r1_g995_s3_obs24route0m5.json  v3_r1_g995_s3_obs24route0m5@078c56be  관측 24  판 5  계약 0xad7bad5e1acaf071  골든 28 {'rollout': 12, 'single': 2, 'route_edge': 2, 'route': 4, 'route_single': 2, 'random': 6}
+확인 route0m5 (판 4 → 5): 궤적 같은 판 7/12 (G·N × 지역 셋 × 시드 [32090, 32091] × 1800 스텝), 덮기 밖 결정 2,172,778 가운데 argmax 가 달라지는 결정 97 (0.0446 / 1000, 대신 {'graze': 51, 'hide': 46}; 죽은 슬롯만 2122), 두뇌 스스로 뛴 도망(길 none) 77 → 0, 시작한 도망 4436 → 4225, 새 판 세계의 덮기 밖 두뇌 FLEE 0
+확인 obs21zero_m6 (판 2 → 6): 궤적 같은 판 7/12 (G·N × 지역 셋 × 시드 [32090, 32091] × 1800 스텝), 덮기 밖 결정 2,172,778 가운데 argmax 가 달라지는 결정 97 (0.0446 / 1000, 대신 {'graze': 51, 'hide': 46}; 죽은 슬롯만 2122), 시작한 도망 4436 → 4225, 새 판 세계의 덮기 밖 두뇌 FLEE 0
+기록: results/v3/r7/brains/v3_r1_g995_s3_obs24route0m5.verify.json

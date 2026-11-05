@@ -15,6 +15,17 @@ class UEcoCreatureAnimationProfile;
 class UEcoCreatureAnimInstance;
 class UEcoFootstepAudioComponent;
 
+USTRUCT(BlueprintType)
+struct FEcoCreatureAppearanceVariant
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) TObjectPtr<USkeletalMesh> Mesh;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) TObjectPtr<UEcoCreatureAnimationProfile> Profile;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) TSubclassOf<UEcoCreatureAnimInstance> AnimationClass;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) FVector MeshScale=FVector::OneVector;
+    UPROPERTY(EditAnywhere,BlueprintReadWrite) TArray<TObjectPtr<class UMaterialInterface>> GrowthMaterials;
+};
+
 /** Passive Mass representation. No controller, movement component, physics, or logical state writer. */
 UCLASS(Blueprintable)
 class ADAPTIVEECOSYSTEM_API AEcoCreatureRepresentationActor : public AActor
@@ -25,6 +36,8 @@ public:
 	virtual void OnConstruction(const FTransform& Transform) override;
 	virtual FVector GetVelocity() const override;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<USkeletalMeshComponent> CreatureMesh;
+    UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Creature|Visual") TObjectPtr<USkeletalMeshComponent> ImmatureMesh;
+    UPROPERTY(EditDefaultsOnly,Category="Creature|Appearance") bool bContinuousGrowthAppearance=false;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<UStaticMeshComponent> PlaceholderBody;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<UTextRenderComponent> IdentityLabel;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Audio") TObjectPtr<UEcoFootstepAudioComponent> Footsteps;
@@ -36,6 +49,8 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<UEcoCreatureAnimationProfile> AnimationProfile;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TSubclassOf<UEcoCreatureAnimInstance> BehaviorAnimationClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") FRotator MeshRotation = FRotator::ZeroRotator;
+    /** 0 legacy, 1 antlered adult, 2 antlerless adult, 3 immature silhouette. No behavior/sex authority. */
+    UPROPERTY(EditDefaultsOnly,Category="Creature|Appearance") TArray<FEcoCreatureAppearanceVariant> AppearanceVariants;
 	/** Anatomical forward in the imported mesh's local space; independent of Actor +X. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") FVector MeshForwardAxis = FVector::ForwardVector;
 	UFUNCTION(BlueprintPure, Category="Creature|Visual") FVector GetVisualForwardDirection() const;
@@ -62,6 +77,8 @@ public:
 protected:
 	virtual void BeginPlay() override;
 	void RefreshAppearance();
+    void ApplyAppearance(uint8 Variant);
+    uint8 AppliedAppearance=255;
 	double LastFacingAuditTime = -1.0;
 	FTimerHandle AlarmTimer;
 	double LastAlarmTime = -10;

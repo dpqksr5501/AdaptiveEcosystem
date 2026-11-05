@@ -7,6 +7,14 @@
   실행한 FLEE 사슴-스텝 = 끝 까닭별 스텝 합(잘림 포함) = 진단 행동 칸, 반사 스텝 = 실행한 도주 덮기, 시작 = 까닭별 수 합.
 - flight_cost: 끔 값 0 은 키가 없는 세계와 비트 동일, 켜면 보상만 −flight_cost × [그 스텝 FLEE 실행] 으로 바뀐다(궤적 그대로).
 - 판정 실행기(run_mirror.run_world)는 wild_flight 세계에서 기록을 켜고 메타 flight·flight_at 을 적는다.
+- 10-23 숨은 뒤 지켜보기(flight_stats 의 hide — results/v3/live/LIVE_GATE.md 변경 기록 (6)): 은신처 도착(cover)으로 끝난 도망 뒤 75 스텝(10 초) 안에 잡힘 →
+  cover_then_caught, 75 스텝 지나 잡힘 → 숨어 살아남음, 지켜보는 중 판 끝 → 지켜본 만큼(숨음·watching), 굶음 → cover_then_starved(실패), 다시 도망쳐도
+  지켜보기는 이어짐, 겹친 지켜보기, 다시 난 개체는 잇지 않음, 쫓긴 도망 = 끝난 도망 − 안 쫓김(잘림 빼고). 실제 세계에서 불변식(숨음 + 잡힘 + 굶음 = cover).
+- 10-24 쫓김 사건(flight_stats 의 episode — results/v3/live/LIVE_GATE.md 변경 기록 (7)): cover 끝 뒤 10 초(75 스텝) 안 다시 도망 = 한 사건(들락날락을
+  두 번 세지 않음), 그 밖 끝 뒤 5 초(38 스텝 — GR 과 같은 경계) 안·밖, 사건 안 잡힘, 지켜보기 안 잡힘·굶음, 판 끝 잘림(열린 도망·5 초 창 안 — cover 뒤
+  지켜보기는 숨음), 5 초 창 안 도망 없는 죽음(other), 다시 난 개체는 새 사건. 실제 세계에서 불변식(사건 결과 합 = 사건 시작, 도망 시작 = 사건 시작 + 이어진
+  도망)과 길 켬 세계의 GR 과 같은 경계(joined_other ≤ refled ≤ joined_other + joined_cover). 검토: 무작위 손 장면에서 벡터 셈 = 사건 정의를 사슴마다
+  다시 짠 독립 셈(모든 칸, 판 중간 포함).
 시드는 탐색 32084~32099·학습 32000~32049 만 쓴다.
 """
 
@@ -21,8 +29,9 @@ import pytest
 from env.config import ROOT
 from env_v2 import repertoire as rep
 from env_v2.config import load_v2_config
-from env_v2.world import (FL_DROP_CAUSE, FL_DROP_COVER, FL_DROP_FOV, FL_DROP_OBSTACLE, FL_DROP_RANGE, FL_DROP_STOP, FL_DROP_SWITCH, FLIGHT_CAUSES,
-                          FLIGHT_HIST_STEPS, FLIGHT_OWN, FLIGHT_UNSAFE, WF_PANIC, World)
+from env_v2.world import (EPISODE_LINK_COVER_STEPS, EPISODE_LINK_OTHER_STEPS, EPISODE_OUTCOMES, FL_DROP_CAUSE, FL_DROP_COVER, FL_DROP_FOV,
+                          FL_DROP_OBSTACLE, FL_DROP_RANGE, FL_DROP_STOP, FL_DROP_SWITCH, FLIGHT_CAUSES, FLIGHT_HIDE_WATCH_S, FLIGHT_HIDE_WATCH_STEPS,
+                          FLIGHT_HIST_STEPS, FLIGHT_NOT_CHASED, FLIGHT_OWN, FLIGHT_REFLEE_STEPS, FLIGHT_STEP_S, FLIGHT_UNSAFE, WF_PANIC, World)
 
 CFG = ROOT / "configs"
 OBS = CFG / "v3_wild3_obs_mirror.yaml"          # 거울 (부활 없음, 장애물·늑대 4)
@@ -85,6 +94,24 @@ def _invariants(f):
     assert all(f["steps"][c] >= f["n"][c] for c in FLIGHT_CAUSES)   # 도망 하나는 1 스텝 이상
     assert all(0 <= f["contact"][c] <= f["steps"][c] for c in FLIGHT_CAUSES)
     assert f["contact"]["unchased"] == 0 and f["shelter_end"] <= f["started"] - sum(f["n"][c] for c in FLIGHT_UNSAFE)
+    h = f["hide"]                                                   # 10-23 숨은 뒤 지켜보기
+    assert h["chased"] == sum(f["n"].values()) - sum(f["n"][c] for c in FLIGHT_NOT_CHASED)       # 열린 도망(잘림)은 쫓긴 도망이 아니다
+    assert h["hidden"] + h["cover_then_caught"] + h["cover_then_starved"] == f["n"]["cover"] and 0 <= h["watching"] <= h["hidden"]
+    assert h["watch_steps"] == FLIGHT_HIDE_WATCH_STEPS and h["chased"] >= f["n"]["cover"] + f["n"]["caught"]
+    _episode_invariants(f)
+
+
+def _episode_invariants(f):
+    """10-24 쫓김 사건 불변식 (flight_stats 의 episode): 결과 합 = 사건 시작, 쫓긴 사건 = 숨음 + 잡힘 + 굶음 + 쫓긴 other, 도망 시작 = 사건 시작 + 이어진
+    도망, 사건 단위 ≤ 도망 단위(쫓긴·숨음·잡힘 — 사건은 도망을 묶을 뿐 새로 만들지 않는다)."""
+    e, h = f["episode"], f["hide"]
+    assert e["started"] == sum(e[k] for k in EPISODE_OUTCOMES)
+    assert e["chased"] == e["hidden"] + e["caught"] + e["starved"] + e["other_chased"] and 0 <= e["other_chased"] <= e["other"]
+    assert f["started"] == e["started"] + e["joined"] and e["joined"] == e["joined_cover"] + e["joined_other"]
+    assert 0 <= e["watching"] <= e["hidden"] and e["window_caught"] + e["window_starved"] <= e["other"]
+    assert e["chased"] <= h["chased"] and e["hidden"] <= h["hidden"] and e["caught"] <= f["n"]["caught"] + h["cover_then_caught"]
+    assert e["truncated"] >= f["n"]["truncated"]                   # 열린 도망마다 그 사슴의 사건이 잘림이다 (5 초 창 안 사건도 잘림)
+    assert e["link_cover_steps"] == FLIGHT_HIDE_WATCH_STEPS == 75 and e["link_other_steps"] == FLIGHT_REFLEE_STEPS == 38
 
 
 # --------------------------------------------------------------------- #
@@ -307,6 +334,444 @@ def test_reset_clears_and_reflex_tests_untouched():
     w2.wf_mode[:] = WF_PANIC
     w2._wf_update(np.zeros(4, dtype=bool))
     assert int(w2._fl_len.sum()) == 0 and w2._fl_started == 0
+
+
+# --------------------------------------------------------------------- #
+# 10-23 숨은 뒤 지켜보기 (flight_stats 의 hide — 실시간 관문 1차 숨음 비율의 재료)
+# --------------------------------------------------------------------- #
+
+
+def _hide_scene(n=4):
+    """사슴 0 이 늑대 0 에게 쫓기며 은신처 원 안에서 FLEE 를 끝낸다(첫 틱 — 표적인 채 은신처 안). 둘째 틱에 cover 로 닫히고 지켜보기가 열린다."""
+    w = _scene(n)
+    _tick(w, [0], tgt=_t(w.M, w0=0), in_cov=[0])
+    _tick(w, [])
+    f = w.flight_stats()
+    assert f["n"]["cover"] == 1 and f["hide"] == dict(chased=1, hidden=1, watching=1, cover_then_caught=0, cover_then_starved=0,
+                                                      watch_steps=FLIGHT_HIDE_WATCH_STEPS)
+    return w
+
+
+def test_hide_watch_constants():
+    """10 초 = 75 스텝 (1 스텝 = 2/15 초 ≈ 0.133 초), 쫓기지 않은 도망 = 안 쫓김·잘림 — 실시간 관문(live.py STEP_S)과 같은 스텝 길이."""
+    assert FLIGHT_STEP_S == 2.0 / 15.0 and FLIGHT_HIDE_WATCH_S == 10.0
+    assert FLIGHT_HIDE_WATCH_STEPS == round(FLIGHT_HIDE_WATCH_S / FLIGHT_STEP_S) == 75
+    assert FLIGHT_NOT_CHASED == ("unchased", "truncated") and set(FLIGHT_NOT_CHASED) <= set(FLIGHT_CAUSES)
+
+
+def test_hide_caught_within_10s():
+    """은신처 도착으로 끝난 도망: 끝 스텝 뒤 75 번째 스텝(닫는 스텝 포함 75 틱 — 마지막으로 지켜보는 스텝)에 잡히면 cover_then_caught, 숨음이 아니다."""
+    w = _hide_scene()
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS - 2):                  # 닫는 틱(끝 뒤 1 번째) 다음부터 74 번째까지 — 아직 지켜본다
+        _tick(w, [])
+    assert w.flight_stats()["hide"]["watching"] == 1
+    _tick(w, [], done=[0], caught=[0])                             # 끝 뒤 75 번째 스텝에 잡힘
+    h = w.flight_stats()["hide"]
+    assert h == dict(chased=1, hidden=0, watching=0, cover_then_caught=1, cover_then_starved=0, watch_steps=75)
+    f = w.flight_stats()
+    assert f["n"]["cover"] == 1 and f["n"]["caught"] == 0          # 도망 끝 까닭은 그대로 cover (잡힌 것은 도망 밖 — 지켜보기만 센다)
+    # 닫는 틱(끝 뒤 1 번째 스텝)에 잡혀도 그 안이다
+    w = _scene(4)
+    _tick(w, [0], tgt=_t(w.M, w0=0), in_cov=[0])
+    _tick(w, [], done=[0], caught=[0])
+    assert w.flight_stats()["hide"]["cover_then_caught"] == 1 and w.flight_stats()["hide"]["hidden"] == 0
+
+
+def test_hide_caught_after_10s_is_hidden():
+    """75 스텝을 다 지켜본 뒤(끝 뒤 76 번째 스텝)에 잡히면 숨어 살아남은 도망이다 — 지켜보기는 이미 끝났다."""
+    w = _hide_scene()
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS - 1):                  # 끝 뒤 75 번째 스텝까지 살아 있음
+        _tick(w, [])
+    h = w.flight_stats()["hide"]
+    assert h["hidden"] == 1 and h["watching"] == 0 and h["cover_then_caught"] == 0
+    _tick(w, [], done=[0], caught=[0])                             # 끝 뒤 76 번째 스텝에 잡힘 — 지켜보기 밖
+    h = w.flight_stats()["hide"]
+    assert h == dict(chased=1, hidden=1, watching=0, cover_then_caught=0, cover_then_starved=0, watch_steps=75)
+
+
+def test_hide_episode_end_while_watching():
+    """판이 75 스텝 안에 끝나면(flight_stats 를 부를 때 아직 지켜보는 중) 지켜본 만큼만 본다 — 잡히지 않았으니 숨음(watching 으로도 적는다), 세계는 그대로."""
+    w = _hide_scene()
+    for _ in range(10):
+        _tick(w, [])
+    f = w.flight_stats()
+    assert f["hide"]["hidden"] == 1 and f["hide"]["watching"] == 1 and w._fl_watch_open == 1
+    assert w.flight_stats() == f                                   # 부르는 것으로는 아무것도 바뀌지 않는다
+
+
+def test_hide_starved_during_watch():
+    """지켜보는 동안 굶어 죽으면 숨음이 아니다 — cover_then_starved 로 따로 센다 (caught 를 주지 않은 죽음 = 굶음)."""
+    w = _hide_scene()
+    for _ in range(20):
+        _tick(w, [])
+    _tick(w, [], done=[0])
+    h = w.flight_stats()["hide"]
+    assert h == dict(chased=1, hidden=0, watching=0, cover_then_caught=0, cover_then_starved=1, watch_steps=75)
+
+
+def test_hide_watch_continues_through_new_flight():
+    """지켜보는 동안 같은 사슴이 다시 도망을 시작해도 지켜보기는 이어진다: 새 도망이 잡혀 끝나면 새 도망은 caught, 지켜보기는 cover_then_caught.
+    다시 은신처로 끝난 도망은 지켜보기를 하나 더 연다(겹침) — 죽으면 둘 다 끝난다. 쫓긴 도망 = 끝난 도망 − 안 쫓김(열린 도망·잘림은 빼고)."""
+    w = _hide_scene()
+    _tick(w, [0], tgt=_t(w.M, w0=0))                              # 다시 도망 (지켜보는 중)
+    _tick(w, [0], tgt=_t(w.M, w0=0), done=[0], caught=[0])         # 그 도망 중에 잡힘
+    f = w.flight_stats()
+    assert f["n"]["cover"] == 1 and f["n"]["caught"] == 1 and f["started"] == 2
+    assert f["hide"] == dict(chased=2, hidden=0, watching=0, cover_then_caught=1, cover_then_starved=0, watch_steps=75)
+    # 겹친 지켜보기: 은신처로 두 번 끝난 뒤 죽음 → 둘 다 cover_then_caught. 다른 사슴(1)은 끝까지 살아 숨음. 안 쫓긴 도망(2)·열린 도망(3)은 쫓긴 도망이 아니다
+    w = _hide_scene()
+    _tick(w, [0, 1, 2], tgt=_t(w.M, w0=0, w1=1), in_cov=[0, 1])
+    _tick(w, [3])                                                   # 0·1 은 cover 로, 2 는 안 쫓김으로 닫힘, 3 은 열린 채
+    assert w._fl_watch_open == 3 and int(w._fl_watch[0].sum()) == 2
+    _tick(w, [3], done=[0], caught=[0])
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS):
+        _tick(w, [3])
+    f = w.flight_stats()
+    assert {c: v for c, v in f["n"].items() if v} == dict(cover=3, unchased=1, truncated=1)
+    assert f["hide"] == dict(chased=3, hidden=1, watching=0, cover_then_caught=2, cover_then_starved=0, watch_steps=75)
+
+
+def test_hide_respawned_individual_not_watched():
+    """학습 세계 꼴(죽은 칸에 새 개체): 지켜보던 사슴이 죽으면 그 스텝에 지켜보기를 끝내고 새 개체에 잇지 않는다. reset 은 지켜보기를 버린다."""
+    w = _hide_scene()
+    _tick(w, [], done=[0], caught=[0])
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS + 5):                   # 새 개체가 그 칸에서 산다 — 더 세지 않는다
+        _tick(w, [])
+    h = w.flight_stats()["hide"]
+    assert h["cover_then_caught"] == 1 and h["hidden"] == 0 and w._fl_watch_open == 0 and not w._fl_watch.any()
+    w = _hide_scene()
+    w.reset()
+    h = w.flight_stats()["hide"]
+    assert h == dict(chased=0, hidden=0, watching=0, cover_then_caught=0, cover_then_starved=0, watch_steps=75) and w._fl_clock == 0
+
+
+def test_hide_real_worlds_invariants():
+    """실제 세계(거울 — 부활 없음·숲 원판, 학습 세계 — 부활 있음)에서 숨은 뒤 지켜보기 불변식(숨음 + 지켜보는 동안 잡힘·굶음 = cover 끝 도망 수, 쫓긴 도망 =
+    끝난 도망 − 안 쫓김)이 맞는다(기록 켬·끔 궤적이 같은 것은 test_tracking_is_bit_identical_* 가 같은 훅으로 본다). 거울 세계에서 숨음이 생긴다
+    (무작위 행동·지금 두뇌 모두 10 초 안 잡힘은 드물다 — 은신처 안은 표적에서 빠지고 사슴이 그 안에 오래 머문다. 10 초 안 잡힘 셈은 위 짜 맞춘 장면이 본다)."""
+    cfg = _forest(load_v2_config(OBS).replace(N=32))
+    _, w, _, _ = _run(cfg, 32088, 1800, True)
+    f = w.flight_stats()
+    _invariants(f)
+    assert f["hide"]["hidden"] > 0 and f["n"]["cover"] > 0
+    _, w2, _, _ = _run(load_v2_config(TRAIN).replace(N=24), 32003, 1500, True, acts_seed=5)
+    _invariants(w2.flight_stats())
+
+
+# --------------------------------------------------------------------- #
+# 10-24 쫓김 사건 (flight_stats 의 episode — 실시간 관문 1차 사건 숨음 비율·GH·GE 의 재료)
+# --------------------------------------------------------------------- #
+
+
+def _ep(w):
+    e = dict(w.flight_stats()["episode"])
+    for k in ("link_cover_steps", "link_other_steps"):
+        e.pop(k)
+    return e
+
+
+def _ep0(**kw):
+    """사건 칸 기대값 (적지 않은 칸 = 0)."""
+    out = dict(started=0, chased=0, hidden=0, caught=0, starved=0, other=0, truncated=0, watching=0, other_chased=0, joined=0, joined_cover=0, joined_other=0,
+               window_caught=0, window_starved=0)
+    out.update(kw)
+    return out
+
+
+def _held_scene(n=4):
+    """사슴 0 이 늑대 0 에게 쫓기며 은신처 밖에서 FLEE 를 끝낸다(첫 틱 = 끝 스텝 0 — 표적인 채 은신처 밖). 둘째 틱에 held 로 닫히고 사건은 5 초 이음 창에 든다."""
+    w = _scene(n)
+    _tick(w, [0], tgt=_t(w.M, w0=0))
+    _tick(w, [])
+    f = w.flight_stats()
+    assert f["n"]["held"] == 1 and _ep(w) == _ep0(started=1, truncated=1)        # 5 초 창 안 = 아직 닫히지 않음 (판이 여기서 끝나면 잘림)
+    return w
+
+
+def test_episode_constants():
+    """이음 창: cover 끝 = 10 초 지켜보기(75 스텝), 그 밖 끝 = GR 의 5 초(38 스텝 — '다음 첫 FLEE 스텝 − 앞 마지막 FLEE 스텝 ≤ 38'). 결과 다섯."""
+    assert EPISODE_LINK_COVER_STEPS == FLIGHT_HIDE_WATCH_STEPS == 75 and EPISODE_LINK_OTHER_STEPS == FLIGHT_REFLEE_STEPS == 38
+    assert FLIGHT_REFLEE_STEPS * FLIGHT_STEP_S == pytest.approx(5.07, abs=0.01)
+    assert EPISODE_OUTCOMES == ("hidden", "caught", "starved", "other", "truncated")
+
+
+def test_episode_cover_then_reflee_within_watch_is_one_episode():
+    """은신처로 끝난 도망(끝 스텝 0) 뒤 지켜보기의 마지막 스텝(끝 + 75)에 다시 도망을 시작하면 같은 사건이다 — 그 두 번째 도망이 또 은신처로 끝나 10 초를
+    지나도 숨음은 사건 하나다(도망 단위는 쫓긴 도망 2·숨음 2 로 두 번 센다 — 들락날락이 숨음 비율을 부풀리는 것). 끝 + 76 에 시작하면 새 사건이고 앞
+    사건은 끝 + 75 스텝 끝에 숨음으로 닫힌다."""
+    w = _hide_scene()                                               # 끝 스텝 0, 닫는 틱 1
+    assert _ep(w) == _ep0(started=1, chased=1, hidden=1, watching=1)  # 판이 여기서 끝나면 지켜본 만큼 숨음 (잘림 아님)
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS - 2):                  # 틱 2..74
+        _tick(w, [])
+    _tick(w, [0], tgt=_t(w.M, w0=0), in_cov=[0])                   # 틱 75 = 끝 + 75 — 이음 창의 마지막 스텝에 다시 도망 (은신처 안에서 끝)
+    assert _ep(w) == _ep0(started=1, truncated=1, joined=1, joined_cover=1)    # 다시 열린 도망 — 판이 여기서 끝나면 사건 잘림
+    _tick(w, [])                                                    # 틱 76: 두 번째 도망이 cover 로 닫힘
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS):
+        _tick(w, [])
+    f = w.flight_stats()
+    assert f["n"]["cover"] == 2 and f["hide"]["chased"] == 2 and f["hide"]["hidden"] == 2      # 도망 단위: 숨음 둘
+    assert _ep(w) == _ep0(started=1, chased=1, hidden=1, joined=1, joined_cover=1)          # 사건 단위: 숨음 하나
+    # 끝 + 76 에 다시 도망 → 새 사건 (앞 사건은 틱 75 끝에 숨음으로 닫혔다)
+    w = _hide_scene()
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS - 1):                  # 틱 2..75
+        _tick(w, [])
+    assert _ep(w) == _ep0(started=1, chased=1, hidden=1)
+    _tick(w, [0], tgt=_t(w.M, w0=0))                               # 틱 76 = 끝 + 76
+    _tick(w, [])                                                    # held 로 닫힘
+    for _ in range(EPISODE_LINK_OTHER_STEPS):
+        _tick(w, [])
+    assert _ep(w) == _ep0(started=2, chased=2, hidden=1, other=1, other_chased=1)
+    _episode_invariants(w.flight_stats())
+
+
+def test_episode_other_end_link_is_gr_window():
+    """cover 밖 까닭으로 살아 끝난 도망(끝 스텝 0) 뒤 GR 과 같은 경계: 다음 도망의 첫 FLEE 스텝 − 0 ≤ 38 이면 같은 사건(이어진 도망 joined_other), 39 면 새
+    사건(앞 사건은 틱 38 끝에 other 로 닫힌다 — 쫓긴 사건)."""
+    for gap, same in ((EPISODE_LINK_OTHER_STEPS, True), (EPISODE_LINK_OTHER_STEPS + 1, False)):
+        w = _held_scene()
+        for _ in range(gap - 2):                                    # 틱 2..gap−1
+            _tick(w, [])
+        _tick(w, [0], tgt=_t(w.M, w0=0), in_cov=[0])               # 틱 gap — 다시 도망, 은신처 안에서 끝
+        _tick(w, [])
+        for _ in range(FLIGHT_HIDE_WATCH_STEPS):
+            _tick(w, [])
+        if same:
+            assert _ep(w) == _ep0(started=1, chased=1, hidden=1, joined=1, joined_other=1), gap      # 마지막 도망이 은신처 → 사건 숨음
+        else:
+            assert _ep(w) == _ep0(started=2, chased=2, hidden=1, other=1, other_chased=1), gap
+        _episode_invariants(w.flight_stats())
+    # 늑대가 쫓지 않은 도망(unchased)만 있는 사건은 other 이고 쫓긴 사건이 아니다
+    w = _scene(4)
+    _tick(w, [1])
+    _tick(w, [])
+    for _ in range(EPISODE_LINK_OTHER_STEPS):
+        _tick(w, [])
+    assert w.flight_stats()["n"]["unchased"] == 1 and _ep(w) == _ep0(started=1, other=1)
+
+
+def test_episode_caught_inside_episode():
+    """은신처로 끝난 뒤 10 초 안에 다시 뛴 도망이 잡히면 사건은 잡힘 하나다(도망 단위: 쫓긴 도망 2 — cover 1·caught 1, 지켜보기 안 잡힘 1)."""
+    w = _hide_scene()
+    for _ in range(5):
+        _tick(w, [])
+    _tick(w, [0], tgt=_t(w.M, w0=0))                               # 다시 도망 (지켜보는 중)
+    _tick(w, [0], tgt=_t(w.M, w0=0), done=[0], caught=[0])         # 그 도망 중에 잡힘
+    f = w.flight_stats()
+    assert f["n"]["cover"] == 1 and f["n"]["caught"] == 1 and f["hide"]["chased"] == 2 and f["hide"]["cover_then_caught"] == 1
+    assert _ep(w) == _ep0(started=1, chased=1, caught=1, joined=1, joined_cover=1)
+    # 5 초 창 안 다시 뛴 도망 중 굶음 → 사건 굶음
+    w = _held_scene()
+    _tick(w, [0], tgt=_t(w.M, w0=0))
+    _tick(w, [0], done=[0])
+    assert _ep(w) == _ep0(started=1, chased=1, starved=1, joined=1, joined_other=1)
+    _episode_invariants(w.flight_stats())
+
+
+def test_episode_caught_or_starved_in_watch():
+    """마지막 도망이 은신처로 끝난 뒤 10 초 지켜보기 안(끝 + 75 스텝까지, 닫는 스텝 포함)에 다시 뛰지 않고 잡히면 사건 잡힘, 굶으면 사건 굶음.
+    끝 + 76 에 잡히면 사건은 이미 숨음으로 닫혔다."""
+    w = _hide_scene()
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS - 2):
+        _tick(w, [])
+    _tick(w, [], done=[0], caught=[0])                             # 끝 + 75
+    assert _ep(w) == _ep0(started=1, chased=1, caught=1) and w.flight_stats()["hide"]["cover_then_caught"] == 1
+    w = _scene(4)                                                   # 닫는 틱(끝 + 1)에 잡힘도 그 안이다
+    _tick(w, [0], tgt=_t(w.M, w0=0), in_cov=[0])
+    _tick(w, [], done=[0], caught=[0])
+    assert _ep(w) == _ep0(started=1, chased=1, caught=1)
+    w = _hide_scene()
+    for _ in range(FLIGHT_HIDE_WATCH_STEPS - 1):
+        _tick(w, [])
+    _tick(w, [], done=[0], caught=[0])                             # 끝 + 76 — 지켜보기 밖
+    assert _ep(w) == _ep0(started=1, chased=1, hidden=1)
+    w = _hide_scene()
+    for _ in range(20):
+        _tick(w, [])
+    _tick(w, [], done=[0])                                          # 지켜보는 동안 굶음
+    assert _ep(w) == _ep0(started=1, chased=1, starved=1)
+    _episode_invariants(w.flight_stats())
+
+
+def test_episode_death_in_other_window_is_other():
+    """cover 밖 끝 뒤 5 초 이음 창 안에 다시 뛰지 않고 죽으면 사건은 그 스텝에 닫히고 결과는 other 다(사전 등록 정의 — 도망 밖 죽음은 cover 뒤 10 초만
+    잡힘·굶음). 그 죽음은 window_caught·window_starved 로 따로 적는다(보고만)."""
+    w = _held_scene()
+    for _ in range(10):
+        _tick(w, [])
+    _tick(w, [], done=[0], caught=[0])
+    assert _ep(w) == _ep0(started=1, chased=1, other=1, other_chased=1, window_caught=1)
+    w = _held_scene()
+    _tick(w, [], done=[0])                                          # 닫는 틱 다음에 굶음
+    assert _ep(w) == _ep0(started=1, chased=1, other=1, other_chased=1, window_starved=1)
+    _episode_invariants(w.flight_stats())
+
+
+def test_episode_truncated_at_episode_end():
+    """판 끝(flight_stats 를 부를 때) 닫히지 않은 사건 = 잘림: 열린 도망, cover 밖 끝 뒤 5 초 창 안. cover 끝 뒤 지켜보기 안은 지켜본 만큼 숨음(잘림 아님).
+    잘린 사건은 쫓긴 사건이 아니다. 부르는 것으로는 아무것도 바뀌지 않는다."""
+    w = _scene(6)
+    _tick(w, [0, 1, 2], tgt=_t(w.M, w0=1, w1=2), in_cov=[2])       # 0 = 안 쫓김(열린 채), 1 = held 로 끝날 것, 2 = 은신처 안에서 끝날 것
+    _tick(w, [0])
+    for _ in range(EPISODE_LINK_OTHER_STEPS - 2):                  # 틱 2..37 (1·2 의 끝 스텝 = 틱 0)
+        _tick(w, [0])
+    f = w.flight_stats()
+    assert f["n"]["truncated"] == 1 and _ep(w) == _ep0(started=3, chased=1, hidden=1, watching=1, truncated=2)
+    assert w.flight_stats() == f
+    _tick(w, [0])                                                   # 틱 38 = 1 의 5 초 창 마지막 스텝 — 다시 뛰지 않아 그 스텝 끝에 other 로 닫힌다
+    assert _ep(w) == _ep0(started=3, chased=2, hidden=1, watching=1, other=1, other_chased=1, truncated=1)
+    _episode_invariants(w.flight_stats())
+
+
+def test_episode_respawned_individual_is_new_episode():
+    """학습 세계 꼴(죽은 칸에 새 개체): 죽음은 사건을 그 스텝에 닫고, 그 칸의 새 개체가 곧바로 뛰어도 앞 사건에 잇지 않는다(새 사건). reset 은 모두 버린다."""
+    w = _hide_scene()
+    _tick(w, [], done=[0], caught=[0])                              # 지켜보기 안 잡힘 → 사건 잡힘
+    _tick(w, [0], tgt=_t(w.M, w0=0))                               # 새 개체가 다음 스텝에 뜀 (옛 개체의 10 초 창 안이지만)
+    _tick(w, [])
+    assert _ep(w) == _ep0(started=2, chased=1, caught=1, truncated=1)
+    w = _held_scene()
+    _tick(w, [], done=[0], caught=[0])                              # 5 초 창 안 죽음 → other
+    _tick(w, [0], tgt=_t(w.M, w0=0))
+    assert _ep(w) == _ep0(started=2, chased=1, other=1, other_chased=1, window_caught=1, truncated=1)
+    _episode_invariants(w.flight_stats())
+    w.reset()
+    assert _ep(w) == _ep0() and not w._fe_open.any()
+
+
+def test_episode_real_worlds_invariants():
+    """실제 세계(거울 — 부활 없음·숲 원판, 학습 세계 — 부활 있음)에서 사건 불변식(_episode_invariants)이 맞고, 무작위 행동이라 이어진 도망이 생긴다.
+    길 켬 거울 세계(관측 24 — 도망 기록에 GR refled 가 있다)에서 그 밖 끝 뒤 이음 창이 GR 과 같은 경계다: refled(살아 끝난 도망 뒤 38 스텝 안 다시
+    도망 — 앞 도망 끝 까닭을 가리지 않는다)는 joined_other(cover 밖 끝 뒤 38 스텝 안) 이상, joined_other + joined_cover(cover 끝 뒤 75 스텝 안) 이하."""
+    cfg = _forest(load_v2_config(OBS).replace(N=32))
+    _, w, _, _ = _run(cfg, 32088, 1800, True)
+    f = w.flight_stats()
+    _invariants(f)
+    e = f["episode"]
+    assert e["joined"] > 0 and e["hidden"] > 0 and e["chased"] > 0 and e["chased"] < f["hide"]["chased"]
+    _, w2, _, _ = _run(load_v2_config(TRAIN).replace(N=24), 32003, 1500, True, acts_seed=5)
+    _invariants(w2.flight_stats())
+    route = _forest(load_v2_config(CFG / "v3_wild3_route_mirror.yaml").replace(N=32))
+    _, w3, _, _ = _run(route, 32089, 1800, True)
+    f3 = w3.flight_stats()
+    _invariants(f3)
+    e3, rf = f3["episode"], f3["route"]["refled"]
+    assert e3["joined_other"] <= rf <= e3["joined_other"] + e3["joined_cover"] and rf > 0
+
+
+def _ep_log(w):
+    """기록 훅을 감싸(읽기만) 도망 시작 (시계, 사슴)·닫힘 (시계, 사슴, 끝 까닭)·죽음 (시계, 사슴, 잡힘인가)을 적는다."""
+    log = dict(start=[], close=[], death=[])
+    close0, upd0 = w._fl_close, w._fl_update
+
+    def close(m, cause):
+        log["close"] += [(w._fl_clock, int(i), FLIGHT_CAUSES[int(cause[i])]) for i in np.flatnonzero(m)]
+        return close0(m, cause)
+
+    def upd(flee, reflex, done, caught, live, in_cov, **kw):
+        k, d = w._fl_clock, np.asarray(done, dtype=bool)
+        ex = np.asarray(flee, dtype=bool) & (np.asarray(live, dtype=bool) | d)
+        cg = np.zeros(w.N, dtype=bool) if caught is None else np.asarray(caught, dtype=bool)
+        log["start"] += [(k, int(i)) for i in np.flatnonzero(ex & (w._fl_len == 0))]
+        log["death"] += [(k, int(i), bool(cg[i])) for i in np.flatnonzero(d)]
+        return upd0(flee, reflex, done, caught, live, in_cov, **kw)
+
+    w._fl_close, w._fl_update = close, upd
+    return log
+
+
+def _ep_oracle(log, N, T):
+    """사전 등록 정의(LIVE_GATE.md 5-1 '쫓김 사건')를 사슴마다 사건 목록으로 그대로 다시 짠 셈 (벡터 코드와 따로 — 시계 T 전 기록만)."""
+    out = {k: 0 for k in ("started", "chased", "hidden", "caught", "starved", "other", "truncated", "watching", "other_chased", "joined", "joined_cover",
+                          "joined_other", "window_caught", "window_starved")}
+    ev: dict = {}
+    for k, i, c in log["close"]:
+        ev.setdefault((k, i), {})["dead" if c in ("caught", "starved") else "gone"] = c
+    for k, i in log["start"]:
+        ev.setdefault((k, i), {})["start"] = True
+    for k, i, cg in log["death"]:
+        ev.setdefault((k, i), {})["death"] = cg
+    st = [dict(open=False, flee=False, last=0, cover=False, chased=False) for _ in range(N)]
+
+    def win(s):
+        return EPISODE_LINK_COVER_STEPS if s["cover"] else EPISODE_LINK_OTHER_STEPS
+
+    def close_ok(s):                                                # 이음 창을 다음 도망·죽음 없이 지남
+        out["hidden" if s["cover"] else "other"] += 1
+        if s["cover"] or s["chased"]:
+            out["chased"] += 1
+            out["other_chased"] += 0 if s["cover"] else 1
+        s["open"] = False
+
+    for k, i in sorted(x for x in ev if x[0] < T):
+        e, s = ev[(k, i)], st[i]
+        if s["open"] and not s["flee"] and k - s["last"] > win(s):
+            close_ok(s)
+        if "gone" in e:                                             # 살아 끝난 도망 — 마지막 FLEE 스텝 = k − 1
+            s.update(flee=False, last=k - 1, cover=e["gone"] == "cover", chased=s["chased"] or e["gone"] != "unchased")
+        if "start" in e:
+            if s["open"]:
+                out["joined"] += 1
+                out["joined_cover" if s["cover"] else "joined_other"] += 1
+            else:
+                out["started"] += 1
+                s.update(open=True, chased=False)
+            s.update(flee=True, cover=False)
+        if "dead" in e:                                             # 도망 중 죽음
+            out[e["dead"]] += 1
+            out["chased"] += 1
+            s.update(open=False, flee=False)
+        elif "death" in e and s["open"]:                            # 이음 창 안 도망 없는 죽음
+            if s["cover"]:
+                out["caught" if e["death"] else "starved"] += 1
+                out["chased"] += 1
+            else:
+                out["other"] += 1
+                out["window_caught" if e["death"] else "window_starved"] += 1
+                if s["chased"]:
+                    out["chased"] += 1
+                    out["other_chased"] += 1
+            s["open"] = False
+    for s in st:                                                    # 판 끝 (마지막 시계 T − 1)
+        if not s["open"]:
+            continue
+        if s["flee"]:
+            out["truncated"] += 1
+        elif T - 1 - s["last"] >= win(s):
+            close_ok(s)
+        elif s["cover"]:
+            out["hidden"] += 1
+            out["watching"] += 1
+            out["chased"] += 1
+        else:
+            out["truncated"] += 1
+    return out
+
+
+def test_episode_matches_independent_reconstruction():
+    """10-24 검토: 손 장면에 도망·표적·은신처·죽음(잡힘·굶음)을 무작위로 섞어, 벡터 셈(`_fl_update` 5)·`_episode_block`)이 사건 정의를 사슴마다 그대로
+    다시 짠 셈(_ep_oracle)과 모든 칸에서 같다 — 판 중간에 부른 flight_stats 도. 이음 창 경계·지켜보기 안 잡힘·굶음·5 초 창 안 죽음·판 끝 잘림·지켜보는 중
+    숨음·다시 난 개체(죽은 칸이 다음 틱에 다시 뜀)가 모두 나온다."""
+    seen = dict(watching=0, window_caught=0, window_starved=0, joined_cover=0, starved=0, truncated=0)
+    for trial in range(60):
+        rng = np.random.default_rng(1000 + trial)
+        n = int(rng.integers(2, 7))
+        w = _scene(n)
+        log = _ep_log(w)
+        fl = np.zeros(n, dtype=bool)
+        p_start, p_stop, p_die, p_cov, p_tgt = rng.uniform(0.01, 0.2), rng.uniform(0.05, 0.6), rng.uniform(0, 0.03), rng.uniform(0, 0.9), rng.uniform()
+        T = int(rng.integers(50, 400))
+        for t in range(T):
+            fl = np.where(fl, rng.random(n) > p_stop, rng.random(n) < p_start)
+            done = [int(i) for i in np.flatnonzero(rng.random(n) < p_die)]
+            _tick(w, list(np.flatnonzero(fl)), tgt=[int(rng.integers(0, n)) if rng.random() < p_tgt else -1 for _ in range(w.M)], done=done,
+                  caught=[i for i in done if rng.random() < 0.6], in_cov=list(np.flatnonzero(rng.random(n) < p_cov)))
+            if rng.random() < 0.05 or t == T - 1:
+                got = _ep(w)
+                assert got == _ep_oracle(log, n, w._fl_clock), (trial, t)
+                _episode_invariants(w.flight_stats())
+        for k in seen:
+            seen[k] += got[k]
+    assert all(v > 0 for v in seen.values()), seen
 
 
 # --------------------------------------------------------------------- #
