@@ -2,10 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
-#include "GameFramework/GameModeBase.h"
+#include "AdaptiveEcosystemGameMode.h"
 #include "AI/Policy/EcoWorldProviders.h"
 #include "Core/EcoMigrationTypes.h"
 #include "Core/EcoSurvivalTypes.h"
+#include "Core/EcoCombatTypes.h"
 #include "AI/Behavior/EcoSpeciesAIProfile.h"
 #include "Ecology/EcoSpawnSchedule.h"
 #include "Mass/EntityHandle.h"
@@ -20,6 +21,11 @@ class UWorldPartitionStreamingSourceComponent;
 class UEcoFootstepAudioSet;
 class AEcoVegetationField;
 class APawn;
+class AController;
+class AEcoCreatureHitProxy;
+class UEcoMeleeHitComponent;
+namespace EcoThreatV3 { struct FThreatStepInput; }
+struct FEcoV3RegionContext;
 struct FEcoDeathOutcome;
 
 USTRUCT(BlueprintType)
@@ -108,6 +114,16 @@ public:
     UFUNCTION(BlueprintCallable, Category="Creature|Persistence") bool LoadEcosystem(const FString& Slot);
     /** Server-owned melee request; no client position, damage, target or outcome is accepted. */
     bool QueuePlayerStrike(APawn& Player);
+    /** Called exclusively by authoritative socket sweeps; the server reads damage from their data asset. */
+    bool QueueComboContact(UEcoMeleeHitComponent& Source, AEcoCreatureHitProxy& Target, const FHitResult& Hit);
+    UFUNCTION(BlueprintPure, Category="Creature|Combat") FEcoCombatDiagnostics GetCombatDiagnostics() const;
+    UPROPERTY(EditAnywhere, Category="Creature|Combat") bool bEnablePlayerCombat = false;
+    UPROPERTY(EditAnywhere, Category="Creature|Combat", meta=(ClampMin="500", ClampMax="5000")) float HitProxyDistance = 1800.f;
+    UPROPERTY(EditAnywhere, Category="Creature|Combat", meta=(ClampMin="1", ClampMax="512")) int32 MaxHitProxies = 256;
+    UPROPERTY(EditAnywhere, Category="Creature|Combat", meta=(ClampMin="0", ClampMax="200")) float WolfPlayerDamage = 20.f;
+    /** Native threat hook supplies movement intent only; damage is consumed outside Mass processing. */
+    bool GuideWolfPlayerCombat(int64 Id, FEcoV3RegionContext& Context, const FVector& Position,
+        const FVector& Heading, double Now, bool bAvailable, bool bProvoked, EcoThreatV3::FThreatStepInput& Input);
     /** Explicit authority operation only; two founders in an empty population, never a natural birth. */
     UFUNCTION(BlueprintCallable,BlueprintAuthorityOnly,Category="Creature|Life") bool QueuePopulationRecovery(FName RegionId,bool bPredator);
 	/** Read-only authoring report. Never creates Entities, edits actors, or saves the level. */
@@ -121,6 +137,7 @@ public:
 	virtual bool IsInCover(const FVector& Location) const override;
 private:
 	friend struct FEcoEcosystemCheckpoint;
+    friend struct FEcoCombatTestAccess;
 	friend class UEcoPolicyV3IntegratedSubsystem;
 	bool RegisterTemplates();
 	bool CollectSetupIssues(TArray<FString>& Errors, TArray<FString>& Notes) const;
@@ -140,6 +157,43 @@ private:
     uint64 StrikeSequence=0;
     void ProcessPlayerStrikes(const FEcoServerTimeSnapshot& Time);
     void CommitNativeCarcass(const FEcoDeathOutcome& Death);
+    void UpdateHitProxies();
+    void ResetCombat();
+    void ProcessCombatDamage(const FEcoServerTimeSnapshot& Time);
+    void ProcessComboDamage(const FEcoServerTimeSnapshot& Time, uint64 ThroughSequence=MAX_uint64);
+    void ProcessWolfAttacks(const FEcoServerTimeSnapshot& Time, uint64 ThroughSequence=MAX_uint64);
+    void ApplyPlayerDamage(APawn& Player, FMassEntityHandle Target, float Damage);
+    struct FComboDamage
+    {
+        TWeakObjectPtr<APawn> Player;
+        TWeakObjectPtr<AController> Controller;
+        TWeakObjectPtr<UEcoMeleeHitComponent> Source;
+        int32 Epoch=0, Stage=0;
+        uint32 Avatar=0;
+        int64 Execution=0, Target=0;
+        uint64 Sequence=0;
+        double Issued=0, RealIssued=0;
+        float Damage=0;
+    };
+    TArray<FComboDamage> ComboDamage;
+    struct FHuntingKill { TWeakObjectPtr<UEcoMeleeHitComponent> Source; FEcoCombatDamageOutcome Outcome; };
+    TMap<int64,FHuntingKill> PendingHuntingDeaths;
+    TMap<FString,double> ComboReceipts;
+    UPROPERTY(Transient) TMap<int64,TObjectPtr<AEcoCreatureHitProxy>> HitProxies;
+    UPROPERTY(Transient) TArray<TObjectPtr<AEcoCreatureHitProxy>> HitProxyPool;
+    int32 CombatEpoch=0;
+    struct FWolfCombat
+    {
+        TWeakObjectPtr<APawn> Target;
+        uint32 Avatar=0;
+        double Due=-1, Cooldown=0, LastSeen=-1;
+        bool bPending=false;
+        double ContactTime=0;
+        uint64 Sequence=0;
+    };
+    TMap<int64,FWolfCombat> WolfCombat;
+    FEcoCombatDiagnostics CombatDiagnostics;
+    uint64 CombatContactSequence=0;
 	bool BuildSpawnPositions(const FEcoCreatureSpawnGroup& Group, int32 Count, bool bPredator, TArray<FVector>& Out) const;
 	void UpdateHabitatStreaming();
 	void Reconcile(float DeltaSeconds);
@@ -190,7 +244,7 @@ private:
 };
 
 UCLASS()
-class ADAPTIVEECOSYSTEM_API AEcoCreatureIntegrationGameMode : public AGameModeBase
+class ADAPTIVEECOSYSTEM_API AEcoCreatureIntegrationGameMode : public AAdaptiveEcosystemGameMode
 {
 	GENERATED_BODY()
 public:

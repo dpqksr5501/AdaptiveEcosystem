@@ -6,6 +6,7 @@
 #include "MassEntityManager.h"
 #include "Engine/World.h"
 #include "Creature/Audio/EcoFootstepAudioSet.h"
+#include "Player/EcoMeleeHitComponent.h"
 #include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
@@ -56,7 +57,16 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 		FEcoServerTimeSnapshot Previous;
 		if (!Clock->GetSnapshotAt(LastResourceTime, Previous)) { FailRuntime(TEXT("Historical clock snapshot")); return; }
 		double NextTime = FMath::Min(LastResourceTime + 1.0, Ecology->GetNextScheduledTime(Previous, bEnableWaves && IsSpeciesEnabled(false)));
-		if (Migration.bEnabled) NextTime = FMath::Min(NextTime, NextMigrationTime);
+        if (Migration.bEnabled) NextTime = FMath::Min(NextTime, NextMigrationTime);
+        // Combat requests wake the existing serialized transaction rather than waiting a full resource second.
+        // This remains the same survival/death/resource writer; no HP mutation occurs in Notify or Mass hooks.
+        if (bEnableEcosystemLife && bEnablePlayerCombat)
+        {
+            double ContactTime=MAX_dbl;
+            for(const auto& Request:ComboDamage)ContactTime=FMath::Min(ContactTime,Request.Issued);
+            for(const auto& Pair:WolfCombat)if(Pair.Value.bPending)ContactTime=FMath::Min(ContactTime,Pair.Value.ContactTime);
+            if(ContactTime<MAX_dbl)NextTime=FMath::Min(NextTime,FMath::Max(LastResourceTime+.001,ContactTime));
+        }
 		// Keep per-agent meal times aligned even when a phase/wave divides the second.
 		for (const auto E : Owned)
 		{
@@ -88,13 +98,22 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	const int64 NextStep = Step + 1;
 	TArray<FEcoDeathOutcome> Deaths;
     ProcessPlayerStrikes(Time);
+    ProcessCombatDamage(Time);
 	FEcoSurvivalSettings Fallback;
 	if (!EcoMassSurvival::Advance(EM, Time, ObservedTime, NextStep, Fallback, Deaths, true)
 		|| !Ecology->RecordDeaths(Deaths, NextStep)) return false;
 	CommittedDeaths += Deaths.Num();
 	for (const auto& Death : Deaths)
 	{
-		++SpeciesTotals.FindOrAdd(Death.RegionId).FindOrAdd(Death.SpeciesId).Deaths;
+        ++SpeciesTotals.FindOrAdd(Death.RegionId).FindOrAdd(Death.SpeciesId).Deaths;
+        if (const auto* Kill = PendingHuntingDeaths.Find(Death.StableAgentId))
+        {
+            ++CombatDiagnostics.HuntingDeaths;
+            auto Outcome=Kill->Outcome; Outcome.Result=EEcoDamageResult::DeathCommitted;
+            if (auto* Source=Kill->Source.Get()) Source->PublishDamageOutcome(Outcome);
+            PendingHuntingDeaths.Remove(Death.StableAgentId);
+            UE_LOG(LogTemp,Log,TEXT("[EcoCombat][DeathCommitted] Id=%lld Species=%s Region=%s Step=%lld"),Death.StableAgentId,*Death.SpeciesId.ToString(),*Death.RegionId.ToString(),NextStep);
+        }
         if(bEnableEcosystemLife)CommitNativeCarcass(Death);
 		// Award only committed, uniquely receipted predation, to a still-living predator.
 		if (Death.Cause != EEcoDeathCause::Predation) continue;
@@ -307,6 +326,8 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 else if(Response==EcoLifeV3::EResponse::Retreat)Present.Activity=uint8(EEcoSpeciesActivity::Flee);
             }
         }
+        if (const auto* Combat=WolfCombat.Find(EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId);Combat&&Combat->Target.IsValid())
+            Present.Activity=uint8(Combat->Due>=0||Combat->bPending?EEcoSpeciesActivity::Attack:EEcoSpeciesActivity::Pursue);
         if(auto* Audit=EM.GetFragmentDataPtr<FEcoV3SocialBridgeFragment>(E)){
             FName Reason=TEXT("NativePolicy");
             const auto* B=EM.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E);

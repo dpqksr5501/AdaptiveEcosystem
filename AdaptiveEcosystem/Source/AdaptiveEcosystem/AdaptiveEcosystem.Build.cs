@@ -29,6 +29,8 @@ public class AdaptiveEcosystem : ModuleRules
 			"MassAIBehavior",
 			"MassSignals",
 			"GameplayTags",
+			"GameplayAbilities",
+			"GameplayTasks",
 			"PropertyBindingUtils",
 			"WorldConditions",
 			"MassNavMeshNavigation",

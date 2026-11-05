@@ -3302,6 +3302,7 @@ bool FEcoRefugeVisuals::RunTest(const FString&) {
     TestTrue(TEXT("Refuge has distributed cover instead of an empty marker"),Habitat->Brush->GetInstanceCount()>50&&Habitat->Boulders->GetInstanceCount()>8);
     TestTrue(TEXT("Occupant slots are inset from the predator boundary"),Habitat->SlotRadiusFraction<.75f);
     TestTrue(TEXT("Visual foliage does not create a second movement writer or collision trap"),Habitat->Brush->GetCollisionEnabled()==ECollisionEnabled::NoCollision);
+    if (!Habitat->Boulders->GetStaticMesh()) return false; // Missing project art is a failed test, never a null dereference.
     const FBox Bounds=Habitat->Boulders->GetStaticMesh()->GetBoundingBox();bool RimSafe=true;
     for(int32 I=0;I<Habitat->Boulders->GetInstanceCount();++I){
         FTransform T;Habitat->Boulders->GetInstanceTransform(I,T,true);

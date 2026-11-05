@@ -17,6 +17,8 @@
 #include "MassMovementFragments.h"
 #include "Ecology/EcologySimulationSubsystem.h"
 #include "Creature/Player/EcoPlayerEcologyComponent.h"
+#include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
+#include "Player/EcoPlayerState.h"
 #include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "GameFramework/Pawn.h"
 #include "EngineUtils.h"
@@ -32,6 +34,7 @@ namespace EcoPolicyV3IntegratedProcImpl
 	struct FMoveAdapter
 	{
 		const UEcoPolicyV3IntegratedSubsystem* Sub = nullptr;
+        AEcoCreatureIntegrationSpawner* Combat = nullptr;
 		FName RegionId;
 		FEcoV3RegionContext* Ctx = nullptr;
 		const TArray<FEcoIntegratedV3Fragment*>* HerbInts = nullptr;
@@ -227,6 +230,13 @@ namespace EcoPolicyV3IntegratedProcImpl
             if(!Life.Memory.bLastDamageKnown&&Life.Memory.UnknownFear>.15&&Life.Memory.LastDamage>=0&&Now-Life.Memory.LastDamage<8){
                 Input.bResourceWait=false;Input.ResourceDirX=Threat.State.HeadX;Input.ResourceDirY=Threat.State.HeadY;
             }
+        }
+        if (A.Combat && A.WolfKeys && A.WolfKeys->IsValidIndex(Index))
+        {
+            const FVector P=A.Ctx->UnitsToCm(Threat.State.PosX,Threat.State.PosY,Link.GroundZ);
+            const bool Available=!Threat.State.bAsleep && Life.Nutrition>.2 && Life.MealRemaining<=0 && Response!=EcoLifeV3::EResponse::Retreat;
+            if (A.Combat->GuideWolfPlayerCombat((*A.WolfKeys)[Index],*A.Ctx,P,FVector(Threat.State.HeadX,Threat.State.HeadY,0),Now,Available,Life.Memory.bLastDamageKnown && Life.Memory.LastDamage>=0 && Now-Life.Memory.LastDamage<20,Input))
+            { I.Cancel(Now); return; }
         }
         auto ClearLine=[&](double X,double Y,double Z){
             const FVector Start=A.Ctx->UnitsToCm(Threat.State.PosX,Threat.State.PosY,Link.GroundZ)+FVector(0,0,65);
@@ -613,13 +623,17 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		}
 	};
 
+    AEcoCreatureIntegrationSpawner* CombatOwner=nullptr;
+    for(TActorIterator<AEcoCreatureIntegrationSpawner> It(World);It;++It)
+        if(It->bUseV3Policy && It->bEnableEcosystemLife && It->IsRuntimeReady()) { CombatOwner=*It; break; }
     TArray<FEcoNoiseEvent> RecentNoises;
     if(auto* Noise=World->GetSubsystem<UEcoNoiseSubsystem>())Noise->GatherRecent(RecentNoises);
     for(int32 c=0;c<NumCtx;++c) {
         auto& Region=*Sub->GetContext(c);Region.Sim.ExternalThreats.clear();Region.PlayerSamples.clear();Region.PlayerEyeZ.Reset();Region.PlayerNoises.Reset();
         TArray<APawn*> Players;
         for(TActorIterator<APawn> It(World);It;++It)
-            if(auto* Link=It->FindComponentByClass<UEcoPlayerEcologyComponent>();Link&&Link->bThreatEnabled&&It->IsPlayerControlled())Players.Add(*It);
+            if(auto* Link=It->FindComponentByClass<UEcoPlayerEcologyComponent>();Link&&Link->bThreatEnabled&&It->IsPlayerControlled())
+                if(const auto* State=It->GetPlayerState<AEcoPlayerState>();!State||State->IsAlive())Players.Add(*It);
         const FVector Center=Region.UnitsToCm(Region.SizeUnits*.5,Region.SizeUnits*.5,Region.OriginCm.Z);
         Players.Sort([&](const APawn& A,const APawn& B){
             const double DA=FVector::DistSquared2D(A.GetActorLocation(),Center),DB=FVector::DistSquared2D(B.GetActorLocation(),Center);
@@ -769,7 +783,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				Int->PrevGroundZ = Int->GroundZ;
 			}
 			FMoveAdapter Adapter;
-			Adapter.Sub = Sub;
+			Adapter.Sub = Sub; Adapter.Combat=CombatOwner;
 			Adapter.RegionId = Ctx.RegionId;
 			Adapter.Ctx = &Ctx;
 			Adapter.HerbInts = &HerbInts;
@@ -1031,7 +1045,7 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 				FColor Color;
 				if (Int.bDead)
 				{
-					Label = Int.DeathCause == EcoWorldV3::kDeathCaught ? TEXT("잡힘") : TEXT("굶음");
+					Label = Int.DeathCause == EcoWorldV3::kDeathCaught ? TEXT("잡힘") : Int.DeathCause == EcoWorldV3::kDeathStarved ? TEXT("굶음") : TEXT("외부 피해");
 					Color = FColor(120, 120, 120);
 				}
 				else

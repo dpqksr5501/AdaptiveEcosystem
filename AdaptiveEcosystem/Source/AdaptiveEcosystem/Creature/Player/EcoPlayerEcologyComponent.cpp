@@ -12,6 +12,7 @@
 #include "InputCoreTypes.h"
 #include "World/EcologyRegion.h"
 #include "EngineUtils.h"
+#include "Player/EcoPlayerState.h"
 #include "HAL/IConsoleManager.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 static TAutoConsoleVariable<int32> CVarPlayerGaitLog(TEXT("eco.Player.GaitLog"),0,TEXT("Log accepted player gait changes and server movement speed."));
@@ -52,7 +53,7 @@ void UEcoPlayerEcologyComponent::ServerSetGait_Implementation(EEcoPlayerGait New
 void UEcoPlayerEcologyComponent::TryStrike()
 {if(GetOwner()->HasAuthority())ServerTryStrike_Implementation();else ServerTryStrike();}
 void UEcoPlayerEcologyComponent::ServerTryStrike_Implementation()
-{if(auto* P=Cast<APawn>(GetOwner());P&&P->HasAuthority()&&P->IsPlayerControlled())
+{if(auto* P=Cast<APawn>(GetOwner());P&&P->HasAuthority()&&P->IsPlayerControlled()&&!P->GetPlayerState<AEcoPlayerState>())
     for(TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld());It;++It){It->QueuePlayerStrike(*P);break;}}
 void UEcoPlayerEcologyComponent::TickComponent(float Dt,ELevelTick Type,FActorComponentTickFunction* Function)
 {
@@ -60,12 +61,16 @@ void UEcoPlayerEcologyComponent::TickComponent(float Dt,ELevelTick Type,FActorCo
     auto* Pawn=Cast<ACharacter>(GetOwner());if(!Pawn||!Pawn->IsPlayerControlled())return;
     if(Pawn->IsLocallyControlled())if(auto* PC=Cast<APlayerController>(Pawn->GetController())){
         const bool Pressed=PC->IsInputKeyDown(EKeys::F);
-        if(Pressed&&!bStrikeHeld)for(TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld());It;++It)
+        if(Pressed&&!bStrikeHeld&&!Pawn->GetPlayerState<AEcoPlayerState>())for(TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld());It;++It)
             if(It->bEnableEcosystemLife){TryStrike();break;}
         bStrikeHeld=Pressed;
     }
     if(bUseKeyboardGait&&Pawn->IsLocallyControlled()) if(auto* PC=Cast<APlayerController>(Pawn->GetController()))
         SetGait(PC->IsInputKeyDown(EKeys::LeftControl)?EEcoPlayerGait::Sneak:PC->IsInputKeyDown(EKeys::LeftShift)?EEcoPlayerGait::Run:EEcoPlayerGait::Walk);
+    const auto* Health=Pawn->GetPlayerState<AEcoPlayerState>();
+    const bool Alive=!Health||Health->IsAlive();
+    if(ThreatSource)ThreatSource->bThreatEnabled=bThreatEnabled&&Alive;
+    if(!Alive)return;
     const float Speed=Pawn->GetVelocity().Size2D();
     const FVector Pos=Pawn->GetActorLocation()-FVector(0,0,90);
     const bool Grounded=Pawn->GetCharacterMovement()->IsMovingOnGround();

@@ -347,7 +347,7 @@ struct FEcoEcosystemCheckpoint
         S.Step=Step;S.SuccessfulBirths=Successful;S.CommittedDeaths=Deaths;S.LastResourceTime=ResourceTime;S.NextMigrationTime=MigrationTime;
         S.PendingBirths=MoveTemp(Births);S.NextBirthScan=BirthScan;S.SpeciesTotals=MoveTemp(Totals);S.CompletedTime=Completed;S.CompletedTime.WorldEpoch=NewEpoch;
         S.LastHerbRecovery=MoveTemp(HerbRecovery);S.LastWolfRecovery=MoveTemp(WolfRecovery);S.PendingRecoveries.Reset();
-        S.StrikeSequence=StrikeSerial;S.PlayerStrikes.Reset();
+        S.ResetCombat();S.StrikeSequence=StrikeSerial;S.PlayerStrikes.Reset();
         const bool Valid=S.BuildAgentLookup()&&S.ReconcilePopulation();if(!Valid){S.FailRuntime(TEXT("Checkpoint commit invariant"));return false;}
         S.UpdatePresentationAndNoise(0);S.PublishSummary();
         UE_LOG(LogTemp,Log,TEXT("[EcoCheckpoint] Loaded Slot=%s Agents=%d Step=%lld Native=%lld Epoch=%d TransientShelterLeasesCancelled=1"),*Slot,Agents.Num(),Step,GlobalT,NewEpoch);
