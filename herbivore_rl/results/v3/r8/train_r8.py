@@ -11,6 +11,9 @@
   먹은 에너지(사슴-스텝당 × 1000), 행동 몫, 은신처 안 몫, 온라인 도망 몫(가장 가까운 느낀 동물이 늑대/짐승일 때, 15 단위 안 — 숨은 종류는
   기록에만 쓴다), 결정당 속도.
 - 정책 가중치에 NaN 이 생기면 멈추고 기록에 남긴다(끝 모델은 NaN 전 마지막 체크포인트를 쓴다).
+- 이어 하기 --resume ckpt/r8/<이름>_<k>m.zip (11-05 19:18 PC 재시작으로 멈춘 실행): 체크포인트의 가중치·옵티마이저 상태·결정 수에서 이어
+  목표(--steps)까지 학습한다. 세계 고르기 난수는 처음부터 다시 돈다(같은 학습 시드 범위). 기록 jsonl 은 지우지 않고 덧붙이고,
+  벽시계 상한은 이어 한 때부터 센다. 메타에 resumed_from·resume_at 을 남긴다.
 """
 
 from __future__ import annotations
@@ -162,6 +165,7 @@ def main(argv=None) -> int:
     ap.add_argument("--overwrite", action="store_true", help="같은 이름의 끝 모델이 있어도 덮어쓴다")
     ap.add_argument("--log-every", type=int, default=None, help="기록 간격 (없으면 train.log_every)")
     ap.add_argument("--log-first", type=int, default=None, help="첫 기록 (없으면 train.log_first)")
+    ap.add_argument("--resume", default=None, help="이어 할 체크포인트 zip (herbivore_rl/ 기준)")
     args = ap.parse_args(argv)
 
     torch.set_num_threads(1)
@@ -176,20 +180,33 @@ def main(argv=None) -> int:
         print(f"이미 있는 실행: {final} — 덮어쓰지 않는다 (--overwrite)", flush=True)
         return 2
     log_path = LOGS / f"{args.run_name}.log.jsonl"
-    if log_path.exists():
+    if log_path.exists() and not args.resume:
         log_path.unlink()
 
     venv = R8VecEnv(cfg, meta_seed=args.seed)
-    model = make_model(venv, cfg, args.seed, args.tb)
+    if args.resume:
+        resume_path = ROOT / args.resume if not Path(args.resume).is_absolute() else Path(args.resume)
+        model = PPO.load(resume_path, env=venv, device="cpu", tensorboard_log=args.tb)
+    else:
+        model = make_model(venv, cfg, args.seed, args.tb)
+    n0 = int(model.num_timesteps)
+    if n0 >= total:
+        print(f"[{args.run_name}] 이어 할 체크포인트가 이미 목표에 닿았다 ({n0} ≥ {total})", flush=True)
+        return 2
     log_first = int(args.log_first if args.log_first is not None else tr["log_first"])
     log_every = int(args.log_every if args.log_every is not None else tr["log_every"])
     cb = R8Callback(venv, args.run_name, total, wall_h * 3600.0, int(tr["ckpt_every"]), log_first, log_every, log_path)
+    if n0 > 0:
+        cb.next_ckpt = (n0 // cb.ckpt_every + 1) * cb.ckpt_every
+        cb.next_log = (n0 // log_every + 1) * log_every
+        cb.snap_n = n0
     t0 = time.time()
+    resume_note = f" 이어 하기 {args.resume} ({n0 / 1e6:.2f}M 부터)" if args.resume else ""
     print(f"[{args.run_name}] 시작 {time.strftime('%Y-%m-%d %H:%M:%S')} 설정 {args.config} 시드 {args.seed} 목표 {total / 1e6:.0f}M 상한 {wall_h}h "
-          f"개체 {venv.num_envs} 관측 {OBS_DIM} git {git_sha()}", flush=True)
+          f"개체 {venv.num_envs} 관측 {OBS_DIM} git {git_sha()}{resume_note}", flush=True)
     err = None
     try:
-        model.learn(total_timesteps=total, callback=cb, progress_bar=False)
+        model.learn(total_timesteps=total - n0, callback=cb, progress_bar=False, reset_num_timesteps=n0 == 0)
     except FloatingPointError as e:
         err = str(e)
     wall = time.time() - t0
@@ -203,7 +220,8 @@ def main(argv=None) -> int:
 
         shutil.copyfile(cb.last_ckpt, final)
     meta = dict(run=args.run_name, config=args.config, seed=args.seed, target=total, timesteps=done_n, wall_s=wall,
-                dec_per_s=done_n / max(wall, 1e-9), stop=cb.stop_reason or "target", error=err, num_envs=venv.num_envs,
+                dec_per_s=(done_n - n0) / max(wall, 1e-9), stop=cb.stop_reason or "target", error=err, num_envs=venv.num_envs,
+                resumed_from=args.resume, resume_at=n0,
                 num_worlds=venv.K, reset_decisions=venv.T, num_resets=venv.num_resets, obs_dim=OBS_DIM, actions=list(ACTION_NAMES),
                 ppo=tr["ppo"], git=git_sha(), finished=time.strftime("%Y-%m-%d %H:%M:%S"),
                 seeds_seen=sorted({s for h in venv.seed_history for s in h}))

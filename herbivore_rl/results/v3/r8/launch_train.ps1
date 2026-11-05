@@ -6,12 +6,14 @@
 # PID 목록 results/v3/r8/logs/pids.txt(spawn_detached.py 가 적는다). 다른 python·언리얼 프로세스는 건드리지 않는다.
 #   powershell -ExecutionPolicy Bypass -File results/v3/r8/launch_train.ps1 -Steps 250000000 -WallHours 10
 #   -DryRun 이면 띄우지 않고 명령만 적는다. -NoControl 이면 대조 H0 를 뺀다. 이미 있는 실행 이름의 끝 모델이 있으면 멈춘다.
+#   -Resume 이면 실행마다 가장 큰 ckpt/r8/<실행 이름>_<k>m.zip 에서 이어 한다(train_r8.py --resume, 화면 기록은 덧붙임). 11-05 19:18 PC 재시작 뒤 쓴다.
 param(
     [int[]]$Seeds = @(0, 1, 2),
     [long]$Steps = 250000000,
     [double]$WallHours = 10.0,
     [string]$Prefix = 'r8_p',
     [switch]$NoControl,
+    [switch]$Resume,
     [switch]$DryRun
 )
 
@@ -22,7 +24,8 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $pidFile = Join-Path $logDir 'pids.txt'
 
 function Launch([string]$argsText, [string]$log, [string]$what) {
-    $cmd = "`"$py`" -X utf8 results/v3/r8/spawn_detached.py --log $log --what `"$what`" -- $argsText"
+    $app = if ($Resume) { '--append ' } else { '' }
+    $cmd = "`"$py`" -X utf8 results/v3/r8/spawn_detached.py $app--log $log --what `"$what`" -- $argsText"
     if ($DryRun) { Write-Output "[DryRun] $what :: $argsText > $log"; return }
     $si = New-CimInstance -Namespace root/cimv2 -ClassName Win32_ProcessStartup -ClientOnly -Property @{ShowWindow = [uint16]0}
     $r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{CommandLine = $cmd; CurrentDirectory = $root; ProcessStartupInformation = $si}
@@ -39,6 +42,13 @@ function Train([string]$cfg, [int]$seed, [string]$run) {
     if (-not (Test-Path (Join-Path $root $cfg))) { throw "없는 파일: $cfg" }
     if (Test-Path (Join-Path $root "ckpt/r8/$run.zip")) { throw "이미 있는 실행: ckpt/r8/$run.zip — 덮어쓰지 않는다 (사람이 정한다)" }
     $a = "results/v3/r8/train_r8.py --config $cfg --seed $seed --steps $Steps --wall-hours $WallHours --run-name $run"
+    if ($Resume) {
+        $last = Get-ChildItem -Path (Join-Path $root 'ckpt/r8') -Filter "${run}_*m.zip" |
+            Where-Object { $_.Name -match "^$([regex]::Escape($run))_(\d+)m\.zip$" } |
+            Sort-Object { [int]([regex]::Match($_.Name, '_(\d+)m\.zip$').Groups[1].Value) } | Select-Object -Last 1
+        if (-not $last) { throw "이어 할 체크포인트가 없다: ckpt/r8/${run}_<k>m.zip" }
+        $a += " --resume ckpt/r8/$($last.Name)"
+    }
     Launch $a "results\v3\r8\logs\train_$run.log" "train $run"
 }
 
