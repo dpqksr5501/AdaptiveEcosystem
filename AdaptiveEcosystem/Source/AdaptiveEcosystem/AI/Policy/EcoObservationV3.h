@@ -35,6 +35,7 @@
 
 #include "EcoRepertoire.h"
 #include "EcoThreatModel.h"
+#include "EcoV3Island.h"
 
 namespace EcoObservationV3
 {
@@ -515,6 +516,8 @@ namespace EcoObservationV3
 		std::int32_t NumDiscs = 0;
 		double BodyR = 0.0;             // 몸 반지름 (이동이 멈추는 반지름 = r + BodyR)
 		double StageSize = 0.0;
+		// 섬 무대 땅/물 지도 (11-05, EcoV3Island.h): 있으면 E = min(벽·원판, 그 방향 첫 막힌 칸). nullptr(기본) = 지금 그대로
+		const EcoV3Island::FLandMask* Island = nullptr;
 		bool bBlockSight = false;       // 원판이 눈길을 가리나 (obstacles.block_sight)
 		// 숲 시야 (10-21, obstacles.foliage): 참이면 가림 = 줄기 ∨ 잎 (원판 가운데 나무인 것 — FoliageTrees[k] ≠ 0, nullptr = 모두 — 의 중심에 반지름 FoliageR,
 		// 눈길이 그 합집합 안을 FoliageBlock 이상 지나면). bBlockSight 일 때만 읽는다. 거짓(기본) = 줄기만
@@ -562,6 +565,11 @@ namespace EcoObservationV3
 		const double Ty = Uy > 0.0 ? (S - Y) / Uy : (Uy < 0.0 ? Y / (-Uy) : Inf);
 		FObstacleObs R;
 		R.Escape = Tx < Ty ? Tx : Ty;
+		if (In.Island)
+		{
+			const double Ti = In.Island->RayBlocked(X, Y, Ux, Uy);
+			R.Escape = Ti < R.Escape ? Ti : R.Escape;
+		}
 		if (!(R.Escape > 0.0))
 		{
 			R.Escape = 0.0;

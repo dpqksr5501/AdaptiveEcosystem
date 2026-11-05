@@ -1,9 +1,9 @@
 # 섬 무대 — 팀 섬 맵 전체에서 사슴·늑대 시험 (조사와 설계, 2026-11-05)
 
-- 작성: 권신혁(RL·정책). **상태: 조사와 설계만 했다 (11-05). 코드·맵·설정은 아직 바꾸지 않았다.**
+- 작성: 권신혁(RL·정책). **상태: 1단계를 구현했다 (11-05 밤). 구현·켜는 법·확인은 바로 아래 'I. 구현'이고, 0 ~ 15절은 그 앞에 쓴 조사와 설계다.**
   - 0절 조사는 팀 섬 원본 맵을 읽기만 해서 얻었다.
-  - 편집기 파이썬 스크립트 4 가지(모두 6 번 실행)와 창 없는 헤드리스 게임 1 번을 돌렸다. 저장은 0 번이고 `git status` 도 그대로다(부록 B).
-  - 이 문서는 문서만 더한다. 그래서 새 UBT·PIE 확인을 했다고 적지 않는다.
+  - 조사 때는 편집기 파이썬 스크립트 4 가지(모두 6 번 실행)와 창 없는 헤드리스 게임 1 번을 돌렸다. 저장은 0 번이었다(부록 B).
+  - 설계와 구현이 다른 곳은 I.3 에 모았다. 0 ~ 15절의 '하겠다'는 그때 계획이다.
 - 기준:
   - `Branch_Sinhyeok` 로컬 `fd101278` 이다. `origin/main` `582d8cf0`(PR #15)을 병합했고 아직 push 하지 않았다.
   - 섬 맵은 메인 `307f35cb` '섬 맵'(avaroki, 11-01)으로 들어왔다.
@@ -42,11 +42,95 @@
    - 시작 뒤에는 벽이 없어 섬 어디든 다닌다.
 6. **보기:**
    - 지금은 보는 자리 200 m 안 64 마리만 몸이 보인다. 그래서 섬 모드는 먼 개체를 작은 표식으로 그린다.
-   - 카메라 `3`(탑뷰)은 섬 전체를 보고, `G` 는 무리 자리를 차례로 돈다.
+   - 카메라 `3`(탑뷰)은 섬 전체를 본다. (설계의 `G` 무리 자리 차례는 11-05 구현에서 하지 않았다 — I.3 6)
 7. **언리얼 전용 시험 무대다.**
    - 파이썬 거울·학습 파리티가 없다. 스냅숏·적응 고리는 거부한다.
    - 두뇌는 기본 R7e 그대로다.
    - 끄면(기본) 지금과 비트 단위로 같다.
+
+## I. 구현 (11-05 밤 — 1단계)
+
+### I.1 바꾼 것
+
+| 곳 (`S/` = `Source/AdaptiveEcosystem/`) | 무엇 |
+|---|---|
+| `S/AI/Policy/EcoV3Island.h` (새, 엔진 없음) | 땅/물 지도 `FLandMask`: 칸 4 m(먹이 칸과 같은 2 단위), 칸 종류 7 (땅·지형 없음·바다·호수·가파름·숲·바위), 8 이웃 거리장, 미끄러짐 `Slide`·반사 `Reflect`·광선 `RayBlocked`·해안 굽힘 `ShoreSteer`·가장 가까운 땅·땅 경계·지문(FNV-1a 64). 무리 자리 고르기 `PickHerdSites` |
+| `S/AI/Policy/EcoWorldV3.h` | `FWorldConfig::Island` (기본 nullptr). 있을 때만: 먹이 격자의 막힌 칸 용량 0, 사슴 해안 굽힘 + 미끄러짐, 늑대 반사, 기록 4 칸(`IslandDeerSteers`·`Slides`·`Stops`·`IslandWolfReflects`) |
+| `S/AI/Policy/EcoObservationV3.h` | `escape_room` = min(벽·원판, 그 방향 첫 막힌 칸) — 지도가 있을 때만 |
+| `S/AI/Policy/EcoV3IslandStage.cpp` (새) | 콘솔 변수 11 개, 켜기 판정, 섬 정사각·스트리밍 힌트, 땅/물 지도 훑기, 무리 자리·시작 자리, 섬 시작 줄, 먼 개체 표식 |
+| `S/AI/Policy/EcoPolicyV3IntegratedSubsystem.h/.cpp` | 섬 칸·함수 선언, `ApplyToSpawner`·`ValidateSpawnPointsNow`·`TryCreateContexts` 의 섬 갈래(은신처는 무리 자리마다), 명령줄 `-EcoV3Island*`, 숲 자람 거부. 섬이 아니면 지금 코드 그대로다 |
+| `S/AI/Policy/EcoV3Snapshot.cpp`·`EcoV3EnvWatch.cpp` | 섬 무대면 스냅숏(`섬 무대는 파이썬 거울이 없다`)·시험용 나무 거부 |
+| `S/AI/Policy/EcoV3ObserverCamera.cpp` | 섬 무대면 '무대 전체'(탑뷰 `3`·자유 카메라 무대 옮김) = 섬 땅 경계, 자유 카메라 속도 × max(1, 땅 위 높이 ÷ 50 m) |
+| `S/Creature/Runtime/EcoCreatureIntegrationSpawner.h` (팀 헤더) | 조정자 칸 `bV3IslandStage` 하나 (기본 거짓) |
+| `S/AdaptiveEcosystem.Build.cs` | `Landscape` 를 편집기 전용에서 실행 의존으로 옮김 (지형 충돌 높이장 읽기 `ALandscapeProxy::GetHeightAtLocation`) |
+| `S/AI/Social/Shelter/EcoRefugeHabitat.cpp`·`S/World/EcoVegetationField.cpp` | 병합 (가): MW 옛 경로 5 곳 → `/Game/SHC/Fab/MWLandscapeAutoMaterial/…` (메인 `307f35cb` 가 에셋을 옮김) |
+| `S/AI/Policy/Tests/EcoV3IslandTest.cpp` (새) | 자동화 6 개 `Policy.V3.Island.*` (I.4) |
+| `Tools/EcoV3Island/copy_island_map.py` (새) | 복사 맵 만들기 + 생태 장치 놓기 (다시 돌리면 우리 꼬리표 액터만 고친다) |
+| `Content/EcoTest/Maps/LV_EcoV3_Island` (+ 외부 액터·외부 개체·HLOD 층 사본 2) | 복사 맵 (I.2) |
+
+### I.2 복사 맵과 켜는 법
+
+- **복사 맵** `/Game/EcoTest/Maps/LV_EcoV3_Island` (`Tools/EcoV3Island/copy_island_map.py` — `new_level_from_template`, 원본 저장 0):
+  - 원본 그대로: 액터 90 (지형·물·소나무·바위·하늘·시네 카메라), 외부 개체 4, HLOD 층 사본 2.
+  - 더한 것 (꼬리표 `EcoV3IslandCopy`, 늘 로딩): 지역 `Eco_Region_Island`(지역 `Island`, 상자 가운데 (447, 492, 0) m·반폭 1400 × 1400 × 150 m, 먹이 1400/2000·재생 0),
+    조정자 `Eco_CreatureRuntime`(통합 맵 값 — `DA_EcoDeer`·`DA_EcoWolf`·`BP_EcoDeer`·`BP_EcoWolf`·`DA_EcoFootsteps`, 낮밤 60 + 60 초, 서식지 스트리밍 100 m,
+    `bUseV3Policy` 참·`bV3IslandStage` 참, 그룹 `Island` 하나), `Eco_PlayerStart_Island`, 월드 설정 게임 모드 `EcoCreatureIntegrationGameMode`.
+  - 그룹의 저장된 시작 자리(사슴 8·늑대 1, 고원)는 통합 v3 를 켜지 못했을 때 팀 그대로 돌 자리다. 통합 v3 섬 무대는 이 자리를 쓰지 않는다.
+  - 맵 메타데이터 `EcoV3Owner=EcoTest.IslandCopy.20261105`·`EcoV3CopySource=/Game/Map/LV_SHC_IslandEcosystem1_WP`.
+- **켜는 법**: 편집기에서 이 맵을 열고 Play (넷 모드 '오프라인 플레이' 또는 리슨). 맵 조정자가 `bUseV3Policy`·`bV3IslandStage` 를 켜 두어 인수가 필요 없다.
+  - 창 없는 확인: `UnrealEditor-Cmd <uproject> /Game/EcoTest/Maps/LV_EcoV3_Island -game -NullRHI -benchmark -fps=30 -seconds=300 -EcoV3Seed=20010 -unattended -nosplash -NoSound`
+  - 이 맵에서 섬 무대만 끄기: `eco.IntegratedV3.Island 0` (명령줄 `-EcoV3Island=0`) — 지금 120 m 무대 하나로 돈다.
+  - 다른 맵에서 켜기: `-EcoV3Island=1` (조정자 그룹이 `eco.IntegratedV3.IslandRegion` 지역 하나이고 서식지 스트리밍을 쓸 때만 — 아니면 거부 줄을 남기고 지금 모드).
+  - 수: `eco.IntegratedV3.IslandHerds`(4)·`IslandDeerPerHerd`(120)·`IslandWolvesPerHerd`(4)·`IslandHerdGapM`(400)·`IslandHerdClearM`(30), 땅 지도 `IslandShoreM`(0.5)·
+    `IslandSlopeZ`(0.65)·`IslandForest`(1), 표식 `IslandMarkers`(1). 명령줄 `-EcoV3Island=`·`-EcoV3IslandHerds=`·`-EcoV3IslandDeerPerHerd=`·`-EcoV3IslandWolvesPerHerd=`·
+    `-EcoV3IslandHerdGapM=`·`-EcoV3IslandForest=`·`-EcoV3IslandMarkers=`·`-EcoV3IslandRegion=` 은 시작값.
+  - 무리 자리를 사람이 고르려면 복사 맵에 `TargetPoint` 를 놓고 꼬리표 `EcoV3IslandHerd` 를 단다 (이름 차례로 `IslandHerds` 개). 없으면 자동.
+- **보기**: 관찰 카메라 그대로 (`1` 늑대·`2` 사슴·`3` 탑뷰·`4` 쿼터뷰·`5` 자동 추적·`0` 자유 카메라). 대상이 없을 때 `3` 은 섬 전체를 본다.
+  몸 액터가 없는 산 개체는 작은 공 표식(사슴 갈색·쫓기는 사슴 빨강·늑대 회색, 크기 = 카메라 거리 × 1.2 %, 최소 1.5 m)으로 그린다 (그리는 단독·리슨 호스트, 4 Hz).
+- **기록 줄** (`LogEcoPolicyV3I`): `섬 무대: 켬 …` → `섬 무대 계획 Island: …힌트 자리…` → (조정자 시작 직전) `섬 무대 | 땅 지도 700×700 (4 m) | 땅 n·지형 없음 n·바다 n·…| 지문 … | 훑기 …초`
+  → `섬 무대 | 무리 자리 4 — 자동 (…) | 자리 1 (x, y) m 사슴 120/120 늑대 4/4 | …` → `섬 무대 시작 | 세계 Island 한 변 2800 m … 은신처 16 …`.
+
+### I.3 설계와 다른 곳
+
+1. **섬 정사각 = 복사 맵 지역 상자** (가로 반폭 큰 쪽 × 2 = 2800 m, 4 m 단위로 올림, 120 m ~ 4 km). 설계는 '시작 때 훑은 땅 경계 + 50 m'였다.
+   지역 상자는 팀 이동 제약의 '지역 안' 조건 때문에 어차피 섬을 덮어야 해서 그것을 그대로 쓴다. 땅 경계는 훑기가 기록 줄에 적는다.
+2. **스트리밍 원천을 따로 두지 않았다.** 조정자 그룹 시작 자리에 섬 정사각을 덮는 격자 '힌트 자리'(간격 = 서식지 반지름 × 1.4 — 100 m 면 20 × 20)를 쓰면
+   조정자가 그 둘레(반지름 100 m)를 모두 불러온 뒤 시작한다. 조정자 시작 직전 프레임에 땅 지도를 훑고 진짜 시작 자리로 바꾼다 (조정자는 시작 뒤 매초 산 개체 둘레만 남긴다).
+   기다림 상한은 조정자 것(30 초)이다 — `IslandStreamWaitS` 는 없다. 서식지 반지름이 작아 힌트가 시작 자리 수보다 많으면 경고하고 줄인다.
+3. **칸은 4 m 고정** (먹이 칸과 같게 — 지도 칸 = 먹이 칸). `IslandCellM` 은 없다.
+4. **물 몸체는 클래스 이름으로 읽는다** (`WaterBody*` — 물 플러그인 모듈에 기대지 않는다): 바다 = 수면 높이(액터 높이) 규칙, 호수·강 = 그 몸체의 질의 충돌 컴포넌트만 위에서 아래로 선 검사
+   (`LineTraceComponent` — 장면 쿼리 아님, 다각형·스플라인 폭 대신). 나무·바위는 인스턴스 메시 이름(pine·tree… / rock·cliff·boulder)으로 가른다. 바위는 회전한 상자의 가로 경계 상자(+ 0.5 m)다.
+5. **사슴 가장자리 규칙은 '해안 굽힘' 하나다**: 해안 거리 10 m 안에서 해안 쪽으로 가면 해안 쪽 성분의 (1 − 거리/10 m) 몫을 해안을 따라가는 쪽으로 돌린다 (가장자리 굽히기의 한 축 꼴,
+   도주·먹기 모두, 마지막 속도에 — 크기 그대로). 설계의 `WildEdgeSteer`·`WallKeepDir`·먹기 걷기 고침을 해안 거리장으로 바꾸는 것 대신이다. 정사각 벽 규칙은 그대로 남는다(섬 정사각 가장자리는 바다라 닿지 않는다).
+   미끄러짐은 x 만 → y 만 다음에 **해안을 따라 한 걸음**(안쪽 법선에 수직, 가려던 쪽에 가까운 쪽 먼저)을 더 본다. 첫 300 초 실행에서 오목한 해안 구석에 사슴 하나가
+   160 초 넘게 제자리(10 초에 75 스텝)였던 것을 보고 더했다.
+8. 학습 밀도 하한 경고(`산 사슴 n 마리 — 무대 1400 단위에서 …`)는 섬 무대에서 남기지 않는다. 세계가 섬 전체라 뜻이 없고, 밀도는 무리 자리 안에서만 학습 범위다.
+6. **안 한 것**: 늑대 협동 사냥 목표를 가장 가까운 땅으로 옮기기 (목표가 물이면 늑대는 해안에서 반사된다), 카메라 `G` 의 무리 자리 차례 (지역이 하나라 `G` 는 그대로).
+7. 지도 격자 밖은 '막힘'으로 보지 않는다 (정사각 벽이 따로 막는다). 그래서 모든 칸이 열린 지도는 어떤 규칙도 걸지 않는다 — 자동화 `Island.OpenMaskNoOp` 이 지킨다.
+
+### I.4 확인 (11-05, 창 없음 — `UnrealEditor-Cmd … -NullRHI`, `-windowed` 안 씀)
+
+| 무엇 | 결과 |
+|---|---|
+| UBT `AdaptiveEcosystemEditor Win64 Development` | 마지막 소스로 기본 적응 unity 성공 (185 초) · `-DisableAdaptiveUnity` 성공 (84 초), 두 판 모두 경고 0 |
+| 자동화 `Automation RunTests AdaptiveEcosystem` (`-ini:Engine:[ConsoleVariables]:eco.IntegratedPolicyVersion=1`) | **273 개 모두 성공, 실패 0** — 새 `Policy.V3.Island.*` 6 개 포함. 병합 확인 때 크래시였던 `Creature.JYU.RefugeVisualComposition` 도 MW 경로 고침 뒤 성공 |
+| 끄면 같음 — 팀 통합 맵 `/Game/Map/LV_Ecosystem_IntegrationTest` 같은 시드 (`-game -EcoIntegratedV3 -EcoV3DeerPerRegion=128 -EcoV3Seed=20010 -EcoV3ObsParityLog=1 -benchmark -fps=30 -seconds=121`) | 사슴 줄 `[EcoV3Obs]` **344,289 개, md5 `c391d597b0462b9a8e9e8762b66b02d6` — 바꾸기 전 빌드(10-29 바이너리 = `ab36d8a2` 소스, MW 옛 경로 오류 2 줄이 나옴)와 바이트까지 같다.** 새 빌드는 MW 오류 0 줄, 섬 줄 0 줄 |
+| 복사 맵 | `copy_island_map.py` 두 번 (복사 + 생태 장치, 새 칸이 든 빌드 뒤 `bV3IslandStage` 켬·보는 자리 옮김). 외부 액터 93 = 원본 90 + 우리 3, 외부 개체 8 = 원본 4 + 우리 폴더 4 (`EcologyRuntime/…`), HLOD 층 사본 2. 원본 맵·팀 에셋 파일 변경 0 (`git status` 는 새 파일만) |
+| 섬 헤드리스 300 초 ×2 (`/Game/EcoTest/Maps/LV_EcoV3_Island -game -EcoV3Seed=20010 -benchmark -fps=30 -seconds=300`, 인수 없이 맵 깃발로 켬) | 땅 지도 700×700 (4 m): 땅 226,809 (3.629 km²)·바다 239,893·호수 4,944·가파름 6,920·숲 10,336·바위 1,098·지형 없음 0, 땅 경계 x −913 ~ 1803 m·y −548 ~ 1540 m, 물 몸체 5 (컴포넌트 선 검사 79,241), 소나무 9,432·큰 바위 53, **지문 `1d7c3ff530e12d8a` (세 판 모두 같다)**, 훑기 0.18 ~ 0.22 초 |
+| 무리 자리 (자동, 후보 3,055) | 1 (379, 444) m 고원 +31 m · 2 (1579, −176) m 해안 −43 m · 3 (−741, 524) m 중간 층 −5 m · 4 (1099, 1264) m 해안 −45 m — 자리마다 사슴 120/120·늑대 4/4, 합계 480·16, 은신처 16 (반경 12 m, 원이 땅 칸 위), 조정자 시작 직전 첫 검사(BeginPlay 뒤 0.27 초)에 끝남 |
+| 막힌 칸 위 개체 (10 초마다 29 번) | **사슴 0·늑대 0** (모든 줄) |
+| 사냥·도망 | 네 자리 모두 쫓기는 사슴·사냥 늑대가 나온다 (10 초 줄 '무리 자리 300 m 안'). 290 초까지 포획 15, 산 사슴 465/480. 해안 굽힘 10 초에 230 ~ 1,700 번, 늑대 반사 0 ~ 110 번 |
+| 해안 미끄러짐 고침 (I.3 5) | 고치기 전 판: 제자리 10 초에 75 번이 90 ~ 250 초 이어짐 (사슴 하나가 오목한 구석에 섬). 고친 뒤 판: 제자리 0 (모든 줄) |
+| 속도 | 300 초 시뮬레이션을 벽시계 약 81 초에 (`-benchmark`, 그림 없음) — 실시간의 약 3.7 배. 땅 지도 훑기는 시작 프레임 0.2 초 |
+| 거부 | 20 초 예약 `eco.IntegratedV3.Snapshot` → `스냅숏 거부 — 섬 무대는 파이썬 거울이 없다` |
+| 화면 (`-RenderOffscreen -ResX=1600 -ResY=900`, 창 없음, 10 초 `eco.Cam.Top` → 24 초 `-EcoIntegrationCaptureAt`) | 섬 전체 탑뷰(카메라 높이 약 2.99 km)에 무리 자리 네 곳의 먼 표식(사슴·쫓기는 사슴·늑대)이 보인다. 첫 판은 탑뷰 초점이 섬 땅 경계 가운데 첫 무리 자리 높이(+31 m)라 언덕 밑으로 들어가 가림 피하기가 카메라를 땅 2.5 m 위로 당겼다 → 초점 높이를 '땅 칸 가장 높은 지형 + 30 m'(훑기가 적는 `FLandMask::LandTopZ`)로 고쳤다. 그림은 저장소 밖(세션 임시 폴더)에만 두었다 |
+| 다른 맵 (병합 MW 이동 영향) | 팀 통합 맵: 빠진 MW 에셋 0 줄. 조연우 복사 맵 `LV_EcoV3_JYUEcosystem`: 불러오고 통합 v3 가 지역 셋 × 사슴 128 로 돈다. 다만 조연우 에셋이 옛 MW 자리 에셋 25 개(재질·물리 재질)를 가리켜 빠진 패키지 줄 451 개 — 보이는 것(은신처 장식 재질 등)만 깨진다. 팀 결정으로 옮긴 것이라 되살리지 않았다 |
+
+### I.5 남은 것
+
+- 2단계 (14.2): 숲을 서식지로(줄기 원판 + 공간 격자 + 숲 시야), 해안선 길 막힘 검사, 클라이언트 먼 표식(복제 필요), 칸별 날씨, 512 넘기기.
+- 파이썬 거울 없음 — 섬 무대 결과로 학습 파리티를 말하지 않는다. 학습 무대(사방이 곧은 벽인 120 ~ 220 m)와 다른 점은 1절 끝 그대로다.
+- 열린 질문(15절)은 그대로 사람 결정이다. 첫 판은 무리 자리 자동·숲 막힘·`recent_predation` 세계 전체.
 
 ## 0. 조사 결과 — 섬 원본 맵 (읽기만)
 
@@ -452,6 +536,8 @@ UnrealEditor-Cmd <uproject> /Game/Map/LV_SHC_IslandEcosystem1_WP -game -EcoInteg
 ## 14. 구현 순서와 확인
 
 ### 14.1 발표 전 (11-05 밤 ~ 11-06 아침) — 1단계
+
+- **11-05 밤: 1 ~ 7 을 했다.** 결과는 I.4 다. 6 의 `G` 무리 자리 차례와 화면(`-RenderOffscreen`) 촬영은 하지 않았다.
 
 1. **(가) MW C++ 옛 경로 5 곳 고치기:**
    - `EcoRefugeHabitat.cpp` 19 ~ 20, `EcoVegetationField.cpp` 91·100·101 을 `/Game/SHC/Fab/MWLandscapeAutoMaterial/Meshes/…` 로 바꾼다.

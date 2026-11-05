@@ -489,6 +489,15 @@ void EcoV3Observe::GatherRegions(UWorld& World, TConstArrayView<FSubject> Subjec
 				R.SizeCm = Ctx->SizeCm();
 				R.CenterCm = Ctx->OriginCm + FVector(0.5 * R.SizeCm, 0.5 * R.SizeCm, 0.0);
 				R.bStage = true;
+				FBox Land;
+				if (V3->IsIslandStage() && V3->GetIslandLandBoxCm(Land))
+				{
+					// 섬 무대 (11-05, ISLAND_STAGE.md 11절): 무대 전체 보기 = 섬 땅 경계 (탑뷰가 세로 1.1 배로 맞추므로 가로는 16:9 몫으로 줄여 견준다).
+					// 정사각 세계(2.8 km)를 그대로 쓰면 탑뷰가 너무 높다
+					const FVector Sz = Land.GetSize();
+					R.CenterCm = Land.GetCenter();
+					R.SizeCm = FMath::Max(Sz.X * 9.0 / 16.0, Sz.Y);
+				}
 				Out.Add(R);
 			}
 		}
@@ -1658,7 +1667,14 @@ void UEcoV3ObserverCameraSubsystem::UpdateFreeCamera(double Dt, APlayerControlle
 		}
 	}
 	const FRotator View = GetFreeRotation();
-	FreeFlyStep(FreeLoc, FreeVel, View, Input, FreeSpeedCm * (bFreeFast ? kFreeFastMul : 1.0), Dt);
+	// 섬 무대 (11-05, ISLAND_STAGE.md 11절): 높이 올라가면 빨라진다 — 땅 위 높이 50 m 마다 1 배 (50 m 밑은 그대로). 다른 맵은 1 배 그대로
+	double HeightMul = 1.0;
+	if (const UEcoPolicyV3IntegratedSubsystem* V3 = GetWorld() ? GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+		V3 && V3->IsIslandStage() && bFreeGround)
+	{
+		HeightMul = FMath::Clamp((FreeLoc.Z - LastGroundZ) / 5000.0, 1.0, 40.0);
+	}
+	FreeFlyStep(FreeLoc, FreeVel, View, Input, FreeSpeedCm * (bFreeFast ? kFreeFastMul : 1.0) * HeightMul, Dt);
 	// 땅 2 m 위 밑으로 가지 않는다 (따라가기와 같은 땅 찾기)
 	constexpr double kNoGround = -1.0e7;
 	LastGroundZ = GroundZ(FreeLoc.X, FreeLoc.Y, FreeLoc.Z + kNoGround);

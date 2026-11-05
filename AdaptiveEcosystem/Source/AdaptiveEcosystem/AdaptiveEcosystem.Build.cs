@@ -45,11 +45,12 @@ public class AdaptiveEcosystem : ModuleRules
 
 		SetupIrisSupport(Target);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem", "PhysicsCore", "AnimGraphRuntime", "AnimationCore", "Json" });
+		// Landscape: island stage land/water mask reads the terrain collision heightfield (ALandscapeProxy::GetHeightAtLocation, AI/Policy/EcoV3IslandStage.cpp)
+		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem", "PhysicsCore", "AnimGraphRuntime", "AnimationCore", "Json", "Landscape" });
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add("UnrealEd");
-			PrivateDependencyModuleNames.AddRange(new string[] { "StateTreeEditorModule", "AssetRegistry", "AnimGraph", "BlueprintGraph", "KismetCompiler", "Landscape" });
+			PrivateDependencyModuleNames.AddRange(new string[] { "StateTreeEditorModule", "AssetRegistry", "AnimGraph", "BlueprintGraph", "KismetCompiler" });
 		}
 
 		PublicIncludePaths.AddRange(new string[] {

@@ -106,6 +106,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <vector>
 
 #include "EcoObservationV3.h"
@@ -114,6 +115,7 @@
 #include "EcoThreatModel.h"
 #include "EcoRefugeSafetyV3.h"
 #include "EcoVegetationV3.h"
+#include "EcoV3Island.h"
 
 namespace EcoWorldV3
 {
@@ -1485,6 +1487,9 @@ namespace EcoWorldV3
 		// 야생 (w3) 도망 기록 (10-21, FWorldStats::Flight·FHerbDecision::Flight — world.py track_flight, 통합 모드가 켠다). 기록만, WildFlight 를 켠
 		// 세계만 센다. 끄면(기본) 아무것도 세지 않는다 (평면 맵·기준 루프·골든 그대로)
 		bool bFlightStats = false;
+		// 섬 무대 땅/물 지도 (11-05, 통합 모드 eco.IntegratedV3.Island — EcoV3Island.h). 있으면 막힌 칸이 못 가는 곳이다: 먹이 용량 0, 사슴 미끄러짐·해안 굽힘,
+		// 늑대 반사, 관측 escape_room 의 첫 막힌 칸. 없으면(기본 nullptr) 지금 그대로 — 평면 맵·기준 루프·골든·다른 맵 모두 비트 단위로 같다
+		std::shared_ptr<const EcoV3Island::FLandMask> Island;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -1763,6 +1768,20 @@ namespace EcoWorldV3
 				const double Mn = (M[k] - Lo) / Den;
 				const double V = (Mn - Th) / (1.0 - Th);
 				Cap[k] = V < 0.0 ? 0.0 : (V > 1.0 ? 1.0 : V);
+			}
+			if (C.Island)
+			{
+				// 섬 무대 (11-05): 막힌 칸(바다·호수·가파름·숲·바위)은 용량 0 — 칸 가운데로 판정. 패치 잡음은 위에서 Gw² 개를 다 뽑았다 (순서 그대로)
+				for (std::int32_t y = 0; y < Gw; ++y)
+				{
+					for (std::int32_t x = 0; x < Gw; ++x)
+					{
+						if (!C.Island->IsOpen((static_cast<double>(x) + 0.5) * Cell, (static_cast<double>(y) + 0.5) * Cell))
+						{
+							Cap[static_cast<size_t>(y) * Gw + x] = 0.0;
+						}
+					}
+				}
 			}
 			if (C.Obstacles.Active() && C.Obstacles.bNoFood)
 			{
@@ -2060,6 +2079,11 @@ namespace EcoWorldV3
 		std::int64_t MaskViolations = 0;     // 마스크가 막은 행동이 실행됐다 (늘 0 이어야 한다)
 		std::int64_t BlockedHerbMoves = 0;   // 이동 제약 콜백이 막은 사슴 이동 (통합 모드만. 평면 맵은 늘 0)
 		std::int64_t BlockedThreatMoves = 0; // 이동 제약 콜백이 막은 위협 이동
+		// 섬 무대 (FWorldConfig::Island 가 있을 때만 — 기록만)
+		std::int64_t IslandDeerSteers = 0;   // 해안 굽힘으로 방향을 바꾼 사슴·스텝
+		std::int64_t IslandDeerSlides = 0;   // 막힌 칸 앞에서 미끄러진 사슴·스텝
+		std::int64_t IslandDeerStops = 0;    // 미끄러지지도 못해 제자리인 사슴·스텝
+		std::int64_t IslandWolfReflects = 0; // 막힌 칸 앞에서 반사한 늑대·스텝
 		// 섭식 기록 (통합 모드 화면·기록용. 논리에 쓰지 않으므로 평면 맵·기준 루프의 상태는 그대로다)
 		double FoodEaten = 0.0;              // 누적 먹은 먹이 (먹이 단위, C4 에서 셀마다 덜어 낸 양의 셀 순서 합)
 		std::int64_t EatSteps = 0;           // 실제로 먹은 개체·스텝 (먹은 양 > 0)
@@ -2660,6 +2684,7 @@ namespace EcoWorldV3
 			Oi.NumDiscs = Ob.Active() ? Ob.Num() : 0;
 			Oi.BodyR = Ob.bEnabled ? Ob.BodyR : 0.0;
 			Oi.StageSize = W.Config.WorldSize;
+			Oi.Island = W.Config.Island.get();   // 섬 무대 (11-05): escape_room 이 첫 막힌 칸도 본다 (없으면 nullptr — 지금 그대로)
 			Oi.bBlockSight = Ob.bEnabled && Ob.bBlockSight;
 			// 숲 시야 (10-21): 가림 = 줄기 ∨ 잎 (world.py obstacle_obs_values 의 foliage — 끄면 줄기만)
 			Oi.bFoliage = Ob.FoliageOn();
@@ -3934,6 +3959,13 @@ namespace EcoWorldV3
 				W.Stats.DetourDeerStart += Dr.bStart ? 1 : 0;
 				W.Stats.DetourDeerFail += Dr.bFail ? 1 : 0;
 			}
+			const EcoV3Island::FLandMask* const Isl = W.Config.Island.get();
+			if (Isl && !Traveling)
+			{
+				// 섬 무대 (11-05): 해안 거리 kShoreEdgeR 안에서 해안 쪽으로 가면 해안을 따라가는 쪽으로 굽힌다 (크기 그대로 — 적용 속도·heading 도 굽힌 값)
+				EcoRepertoireV3::FControlOutput& Ctl = *Herbs[i].Control;
+				W.Stats.IslandDeerSteers += Isl->ShoreSteer(B.Pos.X, B.Pos.Y, Ctl.Velocity.X, Ctl.Velocity.Y) ? 1 : 0;
+			}
 			if(Traveling){
                 const auto V=Herbs[i].Control->Velocity;B.Pos=R3::Add(B.Pos,V);
                 if(R3::IsNonZero(V))B.Head=R3::Normalize(V);
@@ -3947,6 +3979,13 @@ namespace EcoWorldV3
 				++W.Stats.ObstacleDeerSteps;
 				W.Stats.ObstacleDeerHit += Sl.bHit ? 1 : 0;
 				W.Stats.ObstacleDeerBack += Sl.bBack ? 1 : 0;
+			}
+			if (Isl && !Traveling)
+			{
+				// 섬 무대 (11-05): 다음 자리가 막힌 칸이면 x 만 → y 만 순서로 미끄러지고, 둘 다 안 되면 제자리 (heading 은 가려던 쪽 그대로 — 원판 미끄러짐과 같은 꼴)
+				const std::int32_t Sl = Isl->Slide(B.PrevPos.X, B.PrevPos.Y, B.Pos.X, B.Pos.Y);
+				W.Stats.IslandDeerSlides += Sl == 1 ? 1 : 0;
+				W.Stats.IslandDeerStops += Sl == 2 ? 1 : 0;
 			}
 			// 통합 모드: 지형·장애물 제약. 막히면 이동 전 자리 (heading 은 가려던 쪽 그대로)
 			if (Hooks && Hooks->HerbMove && (B.Pos.X != B.PrevPos.X || B.Pos.Y != B.PrevPos.Y)
@@ -4176,6 +4215,17 @@ namespace EcoWorldV3
 				W.Stats.WolfSatedSteps += A.Last.bSated ? 1 : 0;
 				W.Stats.WolfEatingSteps += PreCd - 1 > 0 ? 1 : 0;
 				W.Stats.WolfKills += A.Last.Caught >= 0 ? 1 : 0;
+			}
+			if (const EcoV3Island::FLandMask* const Isl = W.Config.Island.get();
+				Isl && (A.State.PosX != A.PrevX || A.State.PosY != A.PrevY) && !Isl->IsOpen(A.State.PosX, A.State.PosY) && Isl->IsOpen(A.PrevX, A.PrevY))
+			{
+				// 섬 무대 (11-05): 다음 자리가 막힌 칸이면 제자리·변위 0, heading 은 해안 안쪽 법선으로 반사 (벽 반사의 꼴). 포획은 이미 이동 전 위치로 판정했다
+				A.State.PosX = A.PrevX;
+				A.State.PosY = A.PrevY;
+				A.State.VelX = 0.0;
+				A.State.VelY = 0.0;
+				Isl->Reflect(A.PrevX, A.PrevY, A.State.HeadX, A.State.HeadY);
+				++W.Stats.IslandWolfReflects;
 			}
 			// 통합 모드: 지형·장애물 제약. 포획은 이동 전 위치로 이미 판정했다(위 Step 9). 막히면 이동 전 자리·변위 0·heading 반전
 			// (학습의 벽 반사를 흉내 낸 근사 — 장애물의 법선은 모른다)
