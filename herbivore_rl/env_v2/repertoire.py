@@ -58,7 +58,8 @@
      그다음 alarm_new ← False.
   B) `control` — 행동별 제어기 (G 먹이 기울기, C 무리 중심, Sep 분리, A 위협 반대, T 고른 은신처 쪽, n = 정규화)
      GRAZE  방향 n(graze_forage·G + graze_cohesion·C + sep_weight·Sep). 지금 셀 먹이 ≥ graze_eat_min 이면 정지(머리 숙여
-            먹기), 아니면 걷기. 섭식 gait_eat[보행](정지 1.0, 걷기 0.5). 자기 포식자 탐지 반경 × graze_head_down(M5)
+            먹기), 아니면 걷기. 섭식 gait_eat[보행](정지 1.0, 걷기 0.5). 자기 포식자 탐지 반경 × graze_head_down(M5).
+            10-27 선택 키 graze_*(먹기 걷기 고침)를 켠 세계는 걷는 행의 방향 = `graze_calm_dir`(가장자리 되돌림·heading 관성·벽 여유)
      FLEE   방향 n(flee_weight·A + graze_cohesion·C + sep_weight·Sep), A 는 위협이 보이면 가장 가까운 위협 반대, 안 보이면
             마지막 A. 뛰기. 놀람 중이면 정지(M2). 섭식 0
      HIDE   도착 전: 방향 n(T + sep_weight·Sep), 위협이 보이면 뛰기 아니면 걷기. 고른 은신처가 없으면(세계에 은신처가 없다)
@@ -151,6 +152,7 @@ import math
 
 import numpy as np
 
+from .features import with_optional
 from .steering import EPS, normalize
 
 GRAZE, FLEE, HIDE, FREEZE, SLEEP = 0, 1, 2, 3, 4
@@ -183,6 +185,8 @@ _INT_KEYS = ("lock_graze", "lock_flee", "lock_freeze", "lock_hide", "hide_travel
              "sleep_wake", "startle_steps", "decision_jitter")
 # 은신 배수(M6, 은신처 안일 때 행동별). 체감 거리를 늘리기만 한다(≥ 1)
 COVER_KEYS = ("cover_mult_crouch", "cover_mult_graze", "cover_mult_sleep", "cover_mult_other")
+# 10-27 먹기 걷기 고침 (선택 키 — features.OPTIONAL_KEYS 'repertoire', 모두 0 = 그대로). `graze_calm_dir`
+GRAZE_CALM_KEYS = ("graze_edge_r", "graze_edge_w", "graze_inertia", "graze_wall_margin")
 
 
 def _mix64(z: np.ndarray) -> np.ndarray:
@@ -235,8 +239,11 @@ def parse_params(p: dict, f) -> dict:
     - graze_head_down·sleep_sight ∈ (0, 1], sleep_rest·event_approach·event_energy·recency_decay ∈ [0, 1],
       event_dark ∈ (0, 1), event_near > 0, steps_norm > 0, graze_eat_min·graze_forage·graze_cohesion ≥ 0
     - obs_extra (bool)
+    - 선택 키(10-27 먹기 걷기 고침, 없으면 0 = 그대로): graze_edge_r·graze_edge_w·graze_inertia·graze_wall_margin ≥ 0 (`graze_calm_dir`).
+      반환 calm = 하나라도 켜졌나(가장자리 항은 graze_edge_r·graze_edge_w 둘 다 0 보다 클 때만 뜻이 있다)
     speed·daynight 를 함께 켜야 하고(보행 속력·섭식·대사표와 어둠 d 를 쓴다) vigilance 와 함께 켤 수 없다(행동 열이 하나다).
     """
+    p = with_optional("repertoire", p)
     if not f.enabled("speed") or not f.enabled("daynight"):
         raise ValueError("features.repertoire 는 speed·daynight 를 함께 켜야 한다(v3 는 v2.4s 위의 버전이다)")
     if f.enabled("vigilance"):
@@ -279,6 +286,13 @@ def parse_params(p: dict, f) -> dict:
     if not isinstance(p["obs_extra"], bool):
         raise ValueError(f"features.repertoire.obs_extra 는 true/false 여야 한다. 받은 값: {p['obs_extra']!r}")
     out["obs_extra"] = p["obs_extra"]
+    for k in GRAZE_CALM_KEYS:
+        x = _num(k, p[k])
+        if x < 0.0:
+            raise ValueError(f"features.repertoire.{k} 는 0 이상이어야 한다(0 = 끔). 받은 값: {x}")
+        out[k] = x
+    out["calm"] = ((out["graze_edge_r"] > 0.0 and out["graze_edge_w"] > 0.0) or out["graze_inertia"] > 0.0
+                   or out["graze_wall_margin"] > 0.0)
     # 진입 잠금 표 (행동 번호 순). HIDE 는 도착까지의 최대 잠금, SLEEP 은 진입 + 최소 수면이다
     out["locks"] = np.array([out["lock_graze"], out["lock_flee"], out["hide_travel_max"], out["lock_freeze"],
                              out["sleep_enter"] + out["sleep_hold"]], dtype=np.int64)
@@ -466,6 +480,46 @@ def phase_of(rs: RepState, p: dict) -> np.ndarray:
     return ph.astype(np.int8)
 
 
+def wall_keep(pos: np.ndarray, d: np.ndarray, size: float, mg: float) -> np.ndarray:
+    """무대 벽 여유: 축마다 위치가 벽 여유 mg 안이고 방향이 그 벽 쪽이면 그 성분을 지우고 단위화한다(다 지워지면 d 그대로). 지운 성분이 없어도 늘
+    단위화한다(빼면 끝자리가 바뀐다). world.py `wf_wall_keep` 이 이 함수다 — C++ EcoRepertoireV3::WallKeepDir(EcoWorldV3 Detail::WallKeep 이 부른다)."""
+    sl = d.copy()
+    sl[:, 0] = np.where(((pos[:, 0] <= mg) & (sl[:, 0] < 0.0)) | ((pos[:, 0] >= size - mg) & (sl[:, 0] > 0.0)), 0.0, sl[:, 0])
+    sl[:, 1] = np.where(((pos[:, 1] <= mg) & (sl[:, 1] < 0.0)) | ((pos[:, 1] >= size - mg) & (sl[:, 1] > 0.0)), 0.0, sl[:, 1])
+    sl = normalize(sl)
+    return np.where(((sl * sl).sum(1) > EPS * EPS)[:, None], sl, d)
+
+
+def graze_calm_dir(raw_g: np.ndarray, base: np.ndarray, pos: np.ndarray, head: np.ndarray, size: float, p: dict) -> np.ndarray:
+    """10-27 먹기 걷기 고침 (선택 키 graze_*, `parse_params` 의 calm 이 참일 때만 부른다). 먹이가 모자라 걷는 GRAZE 사슴의 방향(`control` 의 걷는
+    GRAZE 행 — 덮기 경계·거리 두기·도주는 world.py 의 덮기 제어가 덮어쓴다. 10-27 적대적 검토로 경계 걷기에서는 뺐다 — world.py `_wf_alert_control`).
+    raw_g (K, 2) = 원래 조향 합(0.83·G + 0.71·C + 1.35·Sep — |raw_g| > EPS 인 행만 넘긴다), base (K, 2) = normalize(raw_g)(원래 방향),
+    pos·head (K, 2) = 결정 때 위치·이번 이동 전 heading, size = 무대 한 변. 반환 (K, 2) 단위 방향:
+      s = raw_g (+ graze_inertia·head, graze_inertia > 0 일 때)
+      graze_edge_r > 0 ∧ graze_edge_w > 0 이면 축 a 마다 가까운 벽까지 e_a = min(p_a, size − p_a) < graze_edge_r 인 행만 s_a += graze_edge_w·(w_a·n_a),
+        w_a = 1 − e_a / graze_edge_r, n_a = p_a ≤ size − p_a 이면 +1 아니면 −1 (안쪽)
+      d = normalize(s), graze_wall_margin > 0 이면 d = wall_keep(pos, d, size, graze_wall_margin)
+      |d| ≤ EPS 이면 base
+    현실 근거: 풀을 뜯으며 걷는 사슴은 몸이 향한 쪽으로 이어 걷고(방향을 매 걸음 뒤집지 않는다), 막힌 울타리·벽을 들이받은 채 서 있지 않고 트인 쪽으로
+    돌아선다. 난수 없음.
+    C++ 꼴 (EcoRepertoireV3::GrazeCalmDir): S = Raw; if (I > 0) S += I·Head; for a: if (EdgeR > 0 && EdgeW > 0 && E_a < EdgeR) S_a += EdgeW·(W_a·N_a);
+           D = Normalize(S); if (Mg > 0) D = WallKeepDir(P, D, Size, Mg); return |D|² > EPS² ? D : Base;"""
+    s = raw_g
+    if p["graze_inertia"] > 0.0:
+        s = s + p["graze_inertia"] * head
+    R, Wt = p["graze_edge_r"], p["graze_edge_w"]
+    if R > 0.0 and Wt > 0.0:
+        e = np.minimum(pos, size - pos)
+        near = e < R
+        n = np.where(pos <= size - pos, 1.0, -1.0)
+        w = 1.0 - e / R
+        s = np.where(near, s + Wt * (w * n), s)
+    d = normalize(s)
+    if p["graze_wall_margin"] > 0.0:
+        d = wall_keep(pos, d, size, p["graze_wall_margin"])
+    return np.where(((d * d).sum(1) > EPS * EPS)[:, None], d, base)
+
+
 def control(rs: RepState, p: dict, inp: dict, cfg, sp: dict) -> dict:
     """행동별 제어기 (모듈 docstring B). `inp`: food_grad·to_centroid·separation·away_from_pred·to_target (N,2),
     pred_count (N,), food_ok (N,) bool(지금 셀 먹이 ≥ graze_eat_min), in_cover (N,) bool·dark(스칼라 d, 결정 때 값).
@@ -491,7 +545,13 @@ def control(rs: RepState, p: dict, inp: dict, cfg, sp: dict) -> dict:
     gait = np.where(is_f, np.where(rs.startle_left > 0, _STOP, _RUN), gait)
     gait = np.where(is_h & ~crouch, np.where(seen, _RUN, _WALK), gait)
     gait = (gait * has_dir).astype(np.int8)
-    vel = normalize(raw) * cfg.herb_speed
+    dirv = normalize(raw)
+    if p.get("calm", False):
+        # 10-27 먹기 걷기 고침 (선택 키 graze_*): 먹이가 모자라 걷는 GRAZE 만. 입력 pos·head·size 는 이 키를 켠 세계만 `World._rep_step` 이 넣는다
+        gw = is_g & (gait == _WALK)
+        if gw.any():
+            dirv[gw] = graze_calm_dir(raw[gw], dirv[gw], inp["pos"][gw], inp["head"][gw], float(inp["size"]), p)
+    vel = dirv * cfg.herb_speed
     vel = vel * sp["speed"][gait][:, None]
     eat = np.where(is_g, sp["eat"][gait], 0.0)
     rest = (b == SLEEP) & np.asarray(inp["in_cover"], dtype=bool)

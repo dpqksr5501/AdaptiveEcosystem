@@ -164,3 +164,9 @@ owned Ecosystem 및 별도 작은 transfer fixture의 검증은 미래 팀 통�
 후속은 [개체군/성장 계약](AdaptiveEcosystem/Docs/Architecture/NATURAL_POPULATION_CONTRACT_20261030.md), [기획 대조](AdaptiveEcosystem/Docs/Architecture/INDIVIDUAL_TRAIT_DESIGN_AUDIT_20261030.md), [실행 기록](AdaptiveEcosystem/Docs/조연우/JYU_NATURAL_POPULATION_20261030.md)을 따른다. 자연 사슴의 초기 혼합 나이·성별, 제한된 체격/속도/털색·기질 유전, 권위 성숙/털색 DTO와 성장 표현, 가족 관계/현재 관찰 분리, 기존 건강/안전 번식 조건과 군락 cohort 발달을 연결한다. 현재 Native 사슴 예제와 새 owned 표현 범위를 임의 종의 전체 생애/완전한 새끼·뿔 아트로 확대하지 않는다.
 
 사용자는 학습 담당 역할 침범을 금지했다. 모델·관측 schema/정규화·mask·행동 의미·reward·학습/가중치/추론을 임의 변경하거나 새 Caution 기반 행동기를 추가하지 않는다. Caution은 데이터/진단만 제공한다. Sociability의 현재 소비는 이미 선택된 Graze 안의 혼잡/국소 간격이며 Raw Request를 덮어쓰지 않는다. 기존 생존/여행/Social 예약과 Native 단일 writer/M4 경계를 유지한다. 새 특성을 학습에 사용할지는 RL 담당의 별도 계약이며 현재 training_ready=false다.
+
+## 18. 2026-10-29 v3 기본 두뇌 R7e
+
+사용자 결정("기본 두뇌 R7e로")에 따라 통합 v3 모드에서 시작 두뇌를 고르지 않은 Play(적응 고리 판 0 포함)의 사슴 두뇌는 R7e `v3_r7_g995_s1_20m@40d8710d`(**24관측/5행동·mask5**, 두 길·반사 밖 도망 막음)다. 4절의 'R1b 18관측/5행동·mask2'는 당시 이력이다. 저장소 두뇌 파일을 바이트 그대로 빌드에 넣었고(`PolicyBrainV3Default.h`) 파일 두뇌와 같은 검사를 지난다. 런타임 추론은 그대로 C++ Native이고 V1 7관측/4출력·`eco.IntegratedPolicyVersion` 기본값·내장 R1b(`PolicyWeightsV3.h`)·평가기·Python 거울은 바꾸지 않았다. R7e를 걸 수 없는 세계(도주 반사 끔 등)는 내장 R1b-F로 돈다. 맵 조정자 `bUseV3Policy`로 v3를 켜는 맵(조연우 life 맵 등)도 콘솔 변수와 무관하게 같은 규칙으로 R7e에서 시작한다. 같은 날 검토에서 저장 체크포인트가 두뇌의 반사 밖 도망 막음(`bFleeGate`)을 싣지 않던 것을 고쳤다.
+
+R1b-F로 되돌리려면 Play 전 `eco.V3Brain.Startup builtin`(명령줄 `-EcoV3Brain=builtin`), Play 중 `eco.V3Brain.Load builtin`을 쓴다. 고르기 규칙·실시간 고리·검증은 [LIVE_ADAPT_SPEC.md 5.6](AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md)을 따른다.

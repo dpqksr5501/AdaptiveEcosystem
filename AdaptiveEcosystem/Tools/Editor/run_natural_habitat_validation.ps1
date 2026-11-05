@@ -1,5 +1,6 @@
 param([ValidateSet('Automation','Play','Ecology','Persistence','Network','Authoring','Transfer','Population','PopulationPlay')][string]$Mode='Automation',
-    [ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='NaturalHabitatRelease_20261030')
+    [ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='NaturalHabitatRelease_20261030',
+    [ValidateRange(30,1800)][int]$PlaySeconds=165)
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $taskOut=Join-Path $taskRoot ('Saved/'+$AuditFolder)
@@ -36,7 +37,7 @@ if($Mode -eq 'Population'){
     if($taskReport.failed -or $taskReport.notRun){throw 'Automation failed'}
 }elseif($Mode -in @('Play','PopulationPlay')){
     $taskFocus=if($Mode -eq 'PopulationPlay'){'-PopulationFocus'}else{'-NoPopulationFocus'}
-    Run-Natural 'NaturalPIE' @('/Game/JYU/Maps/LV_JYU_Ecosystem','-d3d11','-windowed','-ResX=1280','-ResY=720','-VegetationPIE','-VegetationAuthored','-VegetationMap=LV_JYU_Ecosystem',"-VegetationAuditFolder=$AuditFolder",'-VegetationAuditName=NaturalPIE','-VegetationAuditDuration=165',$taskFocus,"-ExecCmds=py $taskRoot/Tools/Editor/audit_natural_habitat_play.py") $true
+    Run-Natural 'NaturalPIE' @('/Game/JYU/Maps/LV_JYU_Ecosystem','-d3d11','-windowed','-ResX=1280','-ResY=720','-VegetationPIE','-VegetationAuthored','-VegetationMap=LV_JYU_Ecosystem',"-VegetationAuditFolder=$AuditFolder",'-VegetationAuditName=NaturalPIE',"-VegetationAuditDuration=$PlaySeconds",$taskFocus,"-ExecCmds=py $taskRoot/Tools/Editor/audit_natural_habitat_play.py") $true
     $taskReport=Get-Content "$taskOut/NaturalPIE_Runtime.json" -Raw|ConvertFrom-Json
     if($taskReport.result -ne 'FINISHED'){throw "PIE observer: $($taskReport.error)"}
 }elseif($Mode -eq 'Ecology'){

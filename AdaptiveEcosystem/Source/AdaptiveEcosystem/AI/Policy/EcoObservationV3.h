@@ -23,6 +23,9 @@
 // (골든 ObstacleObsGoldenVectorsV3.h, 시험 Policy.V3.ObstacleObs.*).
 // 숲 시야 (10-21, world.py obstacles.foliage — 기본 끔): FObstacleObsInput::bFoliage 면 threat_hidden 의 가림 = 줄기 ∨ 잎(EcoThreatV3::FoliageBlocked,
 // 위협 → 나 눈길 — 늑대 표적 고르기와 같은 판정). 끄면 위 그대로 (골든 FoliageGoldenVectorsV3.h, 시험 Policy.V3.Foliage.*).
+// 두 길 두뇌 관측 24 (10-22 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 16-4, 이식 계획서 RL_V3_ROUTE_CPP_PORT_PLAN.md 3절): 관측 21 뒤 맨 끝 세 칸
+// in_panic·shelter_reach·shelter_edge (kRouteObsNames — WriteRouteObs). 값은 스텝 끝 H 의 도주 반사 길 단계(EcoWorldV3 RouteStep)가 정하고 E 의 관측 18·21 은
+// 건드리지 않는다(파이썬 `_obs_from` 도 이 세 칸을 0 으로 두고 `step` 이 `_wf_update` 뒤에 쓴다). 길 끈 두뇌(관측 18·21)는 이 칸을 읽지 않는다.
 
 #pragma once
 
@@ -472,11 +475,24 @@ namespace EcoObservationV3
 	// 관측 21 계약 = 관측 18 + 맨 끝 세 칸 (마스크 판 2 그대로, 계약 해시 EcoPolicyV3::kContractHashObs21Mask2). 칸 번호 18·19·20.
 	inline constexpr std::int32_t kNumObstacleObs = 3;
 	inline constexpr std::int32_t kObsDimObstacle = kObsDim + kNumObstacleObs;   // 21
-	inline constexpr std::int32_t kMaxObsDim = kObsDimObstacle;                  // 망 입력 버퍼 크기
 	inline constexpr std::int32_t kObsEscapeRoom = 18;
 	inline constexpr std::int32_t kObsObstacleNear = 19;
 	inline constexpr std::int32_t kObsThreatHidden = 20;
 	inline constexpr const char* kObstacleObsNames[kNumObstacleObs] = {"escape_room", "obstacle_near", "threat_hidden"};
+
+	// ---- 두 길 두뇌 관측 세 칸 (관측 24 = 관측 21 + 맨 끝 세 칸 — world.py ROUTE_OBS_NAMES·`_route_step` 의 r_obs, 이식 계획서 3절) ----
+	// 계약 해시 EcoPolicyV3::kContractHashObs24Mask4 (마스크 판 4)·kContractHashObs24Mask5 (판 5 = 판 4 + 반사 밖 두뇌 FLEE 막음). 칸 번호 21·22·23.
+	// 망 입력 = [관측 18 | 장애물 세 칸 | 이 세 칸] (EcoWorldV3::DecideHerb)
+	inline constexpr std::int32_t kNumRouteObs = 3;
+	inline constexpr std::int32_t kObsDimRoute = kObsDimObstacle + kNumRouteObs;   // 24
+	inline constexpr std::int32_t kObsInPanic = 21;          // 다음 스텝 덮기가 도주면 1
+	inline constexpr std::int32_t kObsShelterReach = 22;     // SHELTER 가 가능하면 clip(μ* / 10, 0, 1) ∈ [0.2, 1], 아니면 0
+	inline constexpr std::int32_t kObsShelterEdge = 23;      // SHELTER 가 가능하면 clip(e* / 20, 0, 1) ∈ (0, 1], 아니면 0
+	inline constexpr const char* kRouteObsNames[kNumRouteObs] = {"in_panic", "shelter_reach", "shelter_edge"};
+	inline constexpr double kRouteShelterReachNorm = 10.0;   // world.py ROUTE_SHELTER_REACH_U (단위 — 20 m)
+	inline constexpr double kRouteShelterEdgeNorm = 20.0;    // world.py ROUTE_SHELTER_EDGE_NORM_U (단위 — 40 m)
+	inline constexpr std::int32_t kMaxObsDim = kObsDimRoute;                     // 관측 칸 수 상한 (관측 18·21·24)
+	static_assert(kObsInPanic == kObsDimObstacle && kObsShelterEdge == kObsDimRoute - 1, "길 관측 세 칸은 관측 21 바로 뒤 맨 끝이다");
 
 	/** 분모 (configs/v3_wild3_obs_mirror.yaml obstacle_obs — R5 판, results/v3/r5/obs_check.md). 계약 해시 밖이라 골든 설정 칸이 지킨다. */
 	struct FObstacleObsConfig
@@ -599,5 +615,15 @@ namespace EcoObservationV3
 		Out[0] = static_cast<float>(Detail::Clip01(V.Escape / Cfg.EscapeNorm));
 		Out[1] = static_cast<float>(Detail::Clip01((V.Near > 0.0 ? V.Near : 0.0) / Cfg.NearNorm));
 		Out[2] = V.bThreatHidden ? 1.0f : 0.0f;
+	}
+
+	// 두 길 두뇌 관측 세 칸 (world.py `_route_step` 의 r_obs — 이식 계획서 3절): 도주 ? (1, 가능 ? (float)clip(Mu / 10) : 0, 가능 ? (float)clip(E / 20) : 0) : 0
+	// (Mu = 경주 여유 μ*, E = 가장자리 거리 e*). double 로 나누고(역수 곱 아님) 자른 뒤 float 로 내린다(가까운 짝수 — 파이썬 float64 → float32 배열 대입).
+	// μ* = +∞(가까운 늑대 없음)는 1.
+	inline void WriteRouteObs(bool bPanic, bool bOk, double Mu, double E, float Out[kNumRouteObs])
+	{
+		Out[0] = bPanic ? 1.0f : 0.0f;
+		Out[1] = (bPanic && bOk) ? static_cast<float>(Detail::Clip01(Mu / kRouteShelterReachNorm)) : 0.0f;
+		Out[2] = (bPanic && bOk) ? static_cast<float>(Detail::Clip01(E / kRouteShelterEdgeNorm)) : 0.0f;
 	}
 }

@@ -211,11 +211,15 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetNumberField(TEXT("social_cohesion"),Request->EffectiveAction.Cohesion);
             }
             if(const auto* P=Manager.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E)){
-                Data->SetStringField(TEXT("brain"),TEXT("PPO_V3_builtin"));
                 Data->SetStringField(TEXT("movement"),TEXT("NativeV3_single_writer"));
-                Data->SetNumberField(TEXT("policy_obs_dim"),EcoPolicyV3::kObsDim);
-                Data->SetNumberField(TEXT("policy_mask_version"),EcoPolicyV3::kMaskVersion);
-                Data->SetStringField(TEXT("policy_contract"),LexToString(EcoPolicyV3::kContractHash));
+                if (const auto* Sub = World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>())
+                {
+                    const auto& Brain = Sub->GetActiveBrain();
+                    Data->SetStringField(TEXT("brain"), Brain.Id);
+                    Data->SetNumberField(TEXT("policy_obs_dim"), Brain.ObsDim);
+                    Data->SetNumberField(TEXT("policy_mask_version"), Brain.MaskVersion);
+                    Data->SetStringField(TEXT("policy_contract"), LexToString(Brain.ContractHash));
+                }
                 Data->SetBoolField(TEXT("committed_policy_read"),P->Decision.bCommittedReads);
                 Data->SetBoolField(TEXT("next_policy_read"),P->Decision.Prep.bReads);
                 Data->SetNumberField(TEXT("next_request"),P->Decision.Request);

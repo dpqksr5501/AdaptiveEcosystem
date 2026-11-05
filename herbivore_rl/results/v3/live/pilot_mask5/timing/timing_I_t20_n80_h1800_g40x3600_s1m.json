@@ -1,0 +1,21 @@
+{
+ "variant": "I_t20",
+ "n": 80,
+ "horizon": 1800,
+ "n_g": 40,
+ "horizon_g": 3600,
+ "steps": 1000000,
+ "workers": 14,
+ "convert": 2.0,
+ "eval_current": 104.1,
+ "train_and_eval_current": 107.4,
+ "train_learn": 100.8,
+ "train_steps_per_sec": 10098.5,
+ "eval_candidate_N1": 14.7,
+ "eval_candidate_N2_G_stuck": 85.8,
+ "export": 3.6,
+ "stuck_only": 54.3,
+ "round_futility_s": 125.1,
+ "round_full_s": 214.5,
+ "env": 1
+}

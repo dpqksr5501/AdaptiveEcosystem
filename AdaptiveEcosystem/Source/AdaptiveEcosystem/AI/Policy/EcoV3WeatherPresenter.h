@@ -127,6 +127,7 @@ public:
 	/** 한 프레임 (카메라 갱신 뒤). DeltaSeconds = 월드 프레임 초. */
 	void TickPresenter(float DeltaSeconds);
 	const AEcoV3WeatherFxActor* GetFxActor() const { return Fx; }
+	bool DrivesDayNightLighting() const { return bLifeLighting; }
 
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;

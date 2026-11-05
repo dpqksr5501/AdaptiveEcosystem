@@ -1,0 +1,140 @@
+{
+ "made_by": "level_sense/sense.py match",
+ "rows": [
+  {
+   "base": "I",
+   "variant": "t10",
+   "pilot": "I_t10",
+   "runner": "ceval",
+   "seeds_exact": 100,
+   "seeds": 100,
+   "hide_mine": 0.20219855844108806,
+   "hide_pilot": 0.20219855844108806,
+   "raw_worlds": {
+    "worlds": 300,
+    "exact": 300,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   }
+  },
+  {
+   "base": "I",
+   "variant": "t20",
+   "pilot": "I_t20",
+   "runner": "ceval",
+   "seeds_exact": 100,
+   "seeds": 100,
+   "hide_mine": 0.20128971996191913,
+   "hide_pilot": 0.20128971996191913,
+   "raw_worlds": {
+    "worlds": 300,
+    "exact": 300,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   }
+  },
+  {
+   "base": "I",
+   "variant": "t30",
+   "pilot": "I_t30",
+   "runner": "ceval",
+   "seeds_exact": 100,
+   "seeds": 100,
+   "hide_mine": 0.20002902915615872,
+   "hide_pilot": 0.20002902915615872,
+   "raw_worlds": {
+    "worlds": 300,
+    "exact": 300,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   }
+  },
+  {
+   "base": "I",
+   "variant": "base",
+   "runner": "ceval",
+   "hide_mine": 0.2050184392431571,
+   "raw_I_t10_Forest+Highland": {
+    "worlds": 200,
+    "exact": 200,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   }
+  },
+  {
+   "base": "J",
+   "variant": "t10",
+   "pilot": "J_t10",
+   "runner": "ceval",
+   "seeds_exact": 100,
+   "seeds": 100,
+   "hide_mine": 0.19619958683069363,
+   "hide_pilot": 0.19619958683069363,
+   "raw_worlds": {
+    "worlds": 300,
+    "exact": 300,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   }
+  },
+  {
+   "base": "J",
+   "variant": "t20",
+   "pilot": "J_t20",
+   "runner": "ceval",
+   "seeds_exact": 100,
+   "seeds": 100,
+   "hide_mine": 0.195281207133059,
+   "hide_pilot": 0.195281207133059,
+   "raw_worlds": {
+    "worlds": 300,
+    "exact": 300,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   }
+  },
+  {
+   "base": "J",
+   "variant": "t30",
+   "pilot": "J_t30",
+   "runner": "ceval",
+   "seeds_exact": 100,
+   "seeds": 100,
+   "hide_mine": 0.19198658287104445,
+   "hide_pilot": 0.19198658287104445,
+   "raw_worlds": {
+    "worlds": 300,
+    "exact": 300,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   }
+  },
+  {
+   "base": "J",
+   "variant": "base",
+   "runner": "ceval",
+   "hide_mine": 0.19959050580116783,
+   "raw_J_t10_Forest+Highland": {
+    "worlds": 200,
+    "exact": 200,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   },
+   "raw_J_wx_Barren+Forest": {
+    "worlds": 200,
+    "exact": 200,
+    "only_a": 0,
+    "only_b": 0,
+    "bad": []
+   }
+  }
+ ]
+}

@@ -118,7 +118,7 @@ def tick(dt):
             file=root/'Ecosystem'/(slot+'.eco')
             state['operation']={'saved':True,'bytes':file.stat().st_size,'sha256':hashlib.sha256(file.read_bytes()).hexdigest(),'agents':len(expected['agents'])}
             learning={'schema':'ecosystem-life-v1-evaluation','training_ready':False,'runtime_python_inference':False,
-                'policy_contract':'existing V1 7/4 and v3 18/5 mask2 unchanged; optional v3 21/5 remains separate',
+                'policy_contract':'Active v3 brain, observation dimension and mask version are recorded per herbivore.',
                 'checkpoint_sha256':state['operation']['sha256'],'agents':row['agents'],
                 'regions':[json.loads(f.capture_diagnostics(True)) for f in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.EcoVegetationField)]}
             (out/(slot+'_LearningSnapshot.json')).write_text(json.dumps(learning,ensure_ascii=False,indent=2),encoding='utf-8')

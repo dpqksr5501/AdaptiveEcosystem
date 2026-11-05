@@ -300,7 +300,14 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #   wild_flight.route_fixed·quiet_end (10-21 '도망 방향을 두뇌가 고름' 1단계 — 측정 전용, 설계 Docs/RL_Policy/RL_V3_FLIGHT_ROUTE_DESIGN.md 6·7·9절):
 #     route_fixed 가 'run'·'open'·'cover'·'shelter' 면 도주 반사 중 방향을 그 길로 고정한다(가능하지 않으면 RUN — env_v2/world.py `flight_route_geometry`·
 #     `_route_step`). 'run' 은 지금 반사 방향 그대로(비트 동일, 길 기록만 더한다). quiet_end > 0(스텝)이면 붙잡는 늑대를 그만큼 이어 알아채지 못한
-#     도주는 끝난다. null·0 = 그대로(그 줄을 타지 않는다 — 비트 동일). 두뇌가 고르는 길(계약 판 4)은 아직 없다
+#     도주는 끝난다. null·0 = 그대로(그 줄을 타지 않는다 — 비트 동일)
+#   wild_flight.route (10-22 사용자 결정 '두 길 두뇌로 진행' — 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 16절): true 면 반사 도주 중 두뇌가 길 결정 스텝에서
+#     RUN(칸 1)·SHELTER(칸 4)를 고르고(env_v2/world.py `_route_apply`), 관측 맨 끝에 in_panic·shelter_reach·shelter_edge 세 칸이 붙는다(관측 24, 마스크
+#     판 4 — env_v2/rep_policy.py). obs_extra·obstacle_obs 를 켜고 alarm·route_fixed 를 끈 세계만. false = 그대로(그 줄을 타지 않는다 — 비트 동일)
+#   wild_flight.brain_flee_outside_reflex (10-23 R7 — 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 17절, 사람 결정 '짧게 진단 후 R7'): false 면 도주 반사(덮기) 밖의
+#     결정에서 두뇌가 FLEE(칸 1)를 고르지 못한다 — 도주는 반사만 시작하고, 반사 밖 두뇌는 먹기·숨기 등만 고른다. 막기는 마스크가 한다(동역학·난수·관측·
+#     보상은 그대로, env_v2/world.py `rep_peek` 이 덮기 칸과 이 키를 알린다): route true 면 마스크 판 5(판 4 + 막기), false 면 판 6(R7 대조 '길 끔' —
+#     판 2 + 막기 + 덮기 줄 한 칸, 파이썬 전용). obs_extra 를 켜고 alarm 을 끈 세계만. true = 그대로(그 줄을 타지 않는다 — 비트 동일)
 #   obstacles.fixed (10-17 야생 2단계 3): [[x, y, r], …](단위) 이면 무작위 배치 대신 이 원판을 쓴다(난수를 뽑지 않는다 — 언리얼 무대에서 읽은 원판으로 거울을
 #     돌리는 짝 비교용, results/v3/mirror/run_mirror.py --unreal-obstacles). null = 자기 스트림 part 0 으로 무작위 배치
 #   obstacles.detour·detour_* (10-17 장애물 돌아가기, env_v2/world.py `detour_moves`, 모듈 docstring '야생 2단계' 3 의 6)): detour true 면 사슴·늑대가 원판에
@@ -323,11 +330,23 @@ PARAM_KEYS: Mapping[str, frozenset[str]] = MappingProxyType({
 #     respawn true 세계에서 respawn_safe_r(단위, 1 단위 = 2 m)가 숫자면 죽은 사슴이 다음 스텝에 무대 안 새 자리에 다시 나는데, 그 자리는 모든 늑대(위협)에게서
 #     respawn_safe_r 이상, 원판(r + 몸) 밖, 은신처 원 밖이다(자기 스트림 part 1 에서 후보 respawn_tries 개, 다 못 맞추면 늑대에게서 가장 먼 후보 — env_v2/world.py
 #     `_ist_safe_spawn`). v1 리스폰 뽑기(자리·각)는 그대로 하고 자리만 덮는다(규칙 2). null = v1 그대로(맵 균등 자리)
+#   repertoire.graze_edge_r·graze_edge_w·graze_inertia·graze_wall_margin (10-27 사용자 '평소 사슴이 갈 곳을 못 정하고 방향만 왔다갔다 하며 제자리에서
+#     미친 듯이 돈다' — 먹기 걷기 고침, env_v2/repertoire.py `graze_calm_dir`): GRAZE 가 먹이가 모자라 걷는 사슴(덮기 밖 — 경계·거리 두기 걷기는
+#     덮기 방향을 따른다)의 방향에 무대 가장자리 graze_edge_r(단위) 안 되돌림 항(무게 graze_edge_w)·이번 이동 전 heading 관성(graze_inertia)을 더하고,
+#     벽 graze_wall_margin(단위) 안이면 벽 쪽 성분을 지운다. 모두 0 = 그대로(그 줄을 타지 않는다 — 비트 동일). 0 이상 유한한 수
+#   wild_flight.rest_keep·rest_keep_margin·rest_keep_band·rest_keep_asleep (10-27 사용자 '늑대가 쉬고 있어도 아주 잘 보이는 데서 사슴이 멈춰 있는 게
+#     이상하다 — 늑대 시야 밖까지 물러난 뒤 쉬게', env_v2/world.py `_wf_update` 의 거리 두기 WF_REST): rest_keep true 면 쉬는 늑대(깨어 있고 사냥 중이
+#     아님 — rest_keep_asleep 이면 자는 늑대도)의 시야 반경(pred_view_r × 날씨) 안에서 그 늑대를 알아챈 사슴은 늑대 시야 반경 + rest_keep_margin(단위) 밖까지
+#     걸어서 물러난다(이때 rest_alert 의 쉬는 늑대 경계는 쓰지 않는다). rest_keep_band > 0 이면 그 밖 rest_keep_band(단위) 띠 안에서 먹으며 걷는 사슴이 쉬는
+#     늑대 쪽으로 다가가지 않는다. false·0 = 그대로(그 줄을 타지 않는다 — 비트 동일)
 OPTIONAL_KEYS: Mapping[str, Mapping[str, Any]] = MappingProxyType({
     "realism_shelter": MappingProxyType({"block_predators": False, "wolf_margin": 0.0}),
     "realism_cover_food": MappingProxyType({"frac_range": None}),
     "threats": MappingProxyType({"eat_in_place": False}),
-    "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0}),
+    "wild_flight": MappingProxyType({"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0,
+                                     "route": False, "brain_flee_outside_reflex": True,
+                                     "rest_keep": False, "rest_keep_margin": 2.0, "rest_keep_band": 0.0, "rest_keep_asleep": False}),
+    "repertoire": MappingProxyType({"graze_edge_r": 0.0, "graze_edge_w": 0.0, "graze_inertia": 0.0, "graze_wall_margin": 0.0}),
     "obstacles": MappingProxyType({"fixed": None, "detour": False, "detour_block": 0.5, "detour_free": 0.8, "detour_probe": 1.5,
                                    "detour_steps": 45, "detour_help_block": 15, "detour_help_drop": 38,
                                    "foliage": {"enabled": False, "r": 3.0, "block": 2.0, "trees": "all"}}),

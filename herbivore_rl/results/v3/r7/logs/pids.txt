@@ -1,0 +1,5 @@
+﻿train v3_r7_g995_s0_20m cmd_pid 35796 python_pid 41260 log results\v3\r7\logs\train_v3_r7_g995_s0_20m.log started 2026-10-23T23:13:55
+train v3_r7_g995_s1_20m cmd_pid 42584 python_pid 14452 log results\v3\r7\logs\train_v3_r7_g995_s1_20m.log started 2026-10-23T23:13:55
+train v3_r7_g995_s2_20m cmd_pid 26704 python_pid 21336 log results\v3\r7\logs\train_v3_r7_g995_s2_20m.log started 2026-10-23T23:13:56
+train v3_r7off_g995_s0_20m cmd_pid 37444 python_pid 34720 log results\v3\r7\logs\train_v3_r7off_g995_s0_20m.log started 2026-10-23T23:13:57
+early_checks main cmd_pid 18772 python_pid 33232 log results\v3\r7\logs\early_checks_main.log started 2026-10-23T23:13:57

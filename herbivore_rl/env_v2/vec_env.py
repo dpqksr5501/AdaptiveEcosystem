@@ -34,7 +34,8 @@ v3 R1 이산 행동 경로 (명세 `Docs/RL_Policy/RL_V3_R1_SPEC.md` 2·4절, `e
     정확히 0 이라 생기지 않는다 — 생기면 버그다)
   - 끊긴 슬롯의 terminal_observation 에도 그 세계 마지막 상태(교체 전)의 마스크를 붙인다. 사망 슬롯은 리스폰 뒤 상태의
     마스크라 그 개체의 것이 아니지만 SB3 는 사망의 terminal_observation 을 쓰지 않는다(부트스트랩은 끊긴 슬롯만)
-  - 학습 기록용 누적 수(`rep_counts`): 개체-스텝, 결정(요청을 읽은) 수, 피식·아사 수, 실행 행동별 수. `last_reads` = 방금
+  - 학습 기록용 누적 수(`rep_counts`): 개체-스텝, 결정(요청을 읽은) 수, 피식·아사 수, 실행 행동별 수(반사 밖 두뇌 FLEE 막음 세계 — 마스크 판 5·6 — 만
+    덮기 밖 결정 수 gate_free·그 가운데 두뇌가 낸 FLEE 수 gate_flee 를 더한다). `last_reads` = 방금
     스텝에서 요청을 읽은 개체(SB3 롤아웃 버퍼 순서와 같은 (num_envs,) bool)
 세계 뽑기·엇갈린 교체·사망 우선 규칙은 연속 경로와 같다.
 
@@ -326,6 +327,11 @@ class MultiWorldVecEnv(VecEnv):
             self.last_reads = np.zeros(self.K * self.N, dtype=bool)             # 방금 스텝에서 요청을 읽은 개체
             self.rep_counts = dict(agent_steps=0, decide=0, caught=0, starved=0,
                                    beh=np.zeros(N_BEHAVIORS, dtype=np.int64))
+            # 10-23 R7 반사 밖 두뇌 FLEE 막음 세계(마스크 판 5·6)만: 덮기 밖 결정 수·그 가운데 두뇌가 낸 FLEE 수(World.flee_gate_stats — 마스크 안 표본이면 늘 0).
+            # 끈 세계는 칸을 더하지 않는다(누적 수 dict 가 그대로)
+            self._gate = bool(getattr(self.worlds[0], "_fb", False))
+            if self._gate:
+                self.rep_counts.update(gate_free=0, gate_flee=0)
             for k in range(self.K):
                 self._set_mask(k, self.worlds[k].observe())
             super().__init__(self.K * self.N, obs_space(self.policy_obs_dim), Discrete(N_BEHAVIORS))
@@ -491,9 +497,14 @@ class MultiWorldVecEnv(VecEnv):
         for k, w in enumerate(self.worlds):
             sl = slice(k * N, (k + 1) * N)
             c0, s0 = w._pred_deaths, w._starve_deaths
+            if self._gate:
+                g0, f0 = w._fb_free, w._fb_flee
             obs, rew, done, term = w.step(self._actions[sl])
             cnt["caught"] += int(w._pred_deaths - c0)
             cnt["starved"] += int(w._starve_deaths - s0)
+            if self._gate:
+                cnt["gate_free"] += int(w._fb_free - g0)
+                cnt["gate_flee"] += int(w._fb_flee - f0)
             cnt["beh"] += np.bincount(w.behavior.astype(np.int64), minlength=N_BEHAVIORS)
             self._age[k] += 1
             base = k * N
