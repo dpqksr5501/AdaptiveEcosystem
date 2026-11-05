@@ -11,6 +11,9 @@
 //   Island.OpenMaskNoOp 모든 칸이 열린 지도를 건 세계 = 지도 없는 세계 (300 스텝 사슴·늑대 자리·먹이 비트 단위로 같다 — 끄면 지금 그대로의 바탕)
 //   Island.Confined    가운데 둥근 섬 + 호수 지도를 건 세계 600 스텝: 사슴·늑대가 막힌 칸에 한 번도 서지 않고, 막힌 칸 먹이는 늘 0
 //   Island.Settings    설정 기본값 (끔 = 맵 조정자 따름, 무리 4 × 사슴 120·늑대 4, 합계 ≤ 512)
+//   Island.HookAlt     지도에 없는 벼랑(이동 제약 콜백이 넘는 걸음을 막음): 섬 지도면 ±35°·±70° 돌린 걸음으로 가고 벼랑은 넘지 않는다, 지도 없으면 돌림 0
+//   Island.LazyFields  먹이 장 읽는 칸만 (11-05 확인 뒤): 격자 전체로 만든 값과 모든 칸에서 같고, 같은 섬 세계 300 스텝 궤적이 같다
+//   Island.FoodTile    먹이 패치 정규화 타일 (11-05 확인 뒤): 끔·작은 격자는 비트 단위로 지금 그대로, 큰 격자 + 타일 30 은 학습 무대(30 칸) 먹이 칸 비율·용량 언저리
 
 #include "Misc/AutomationTest.h"
 
@@ -73,7 +76,7 @@ namespace EcoV3IslandTest
 	};
 
 	/** 시작: 사슴 N·늑대 M 을 (StartX, StartY) 둘레 고리에 (지도가 있으면 땅 칸만). 같은 입력이면 같은 시작. */
-	inline void InitMini(FMiniWorld& L, std::shared_ptr<const FLandMask> Island, std::int32_t N, std::int32_t M, double StartX, double StartY)
+	inline void InitMini(FMiniWorld& L, std::shared_ptr<const FLandMask> Island, std::int32_t N, std::int32_t M, double StartX, double StartY, bool bLazyFields = false)
 	{
 		using namespace EcoWorldV3;
 		namespace R3 = EcoRepertoireV3;
@@ -89,6 +92,7 @@ namespace EcoV3IslandTest
 		Cfg.PredEmaDenominator = N;
 		Cfg.Covers = QuadCovers(Cfg.WorldSize, 6.0);
 		Cfg.Island = Island;
+		Cfg.bIslandLazyFields = bLazyFields;
 		InitWorld(L.W, Cfg);
 		SetModelAllowed(L.W, EcoPolicyV3::kAllowedMask);
 		const size_t Nz = static_cast<size_t>(N);
@@ -459,7 +463,208 @@ bool FEcoV3IslandSettingsTest::RunTest(const FString& Parameters)
 	// 세계 설정 기본: 지도 없음 (다른 맵은 지금 그대로)
 	const EcoWorldV3::FWorldConfig Wc;
 	TestTrue(TEXT("FWorldConfig::Island 기본 nullptr"), Wc.Island == nullptr);
+	TestEqual(TEXT("FWorldConfig::IslandFoodTile 기본 0 (먹이 정규화 지금 그대로)"), Wc.IslandFoodTile, 0);
 	TestTrue(TEXT("조정자 bV3IslandStage 기본 거짓"), !GetDefault<AEcoCreatureIntegrationSpawner>()->bV3IslandStage);
+	return true;
+}
+
+namespace EcoV3IslandTest
+{
+	/** 지도에 없는 '벼랑': 사슴 이동 제약 콜백이 X = CliffX 선을 넘는 걸음(어느 쪽이든)을 막는다 (팀 이동 제약이 지도보다 잘게 막는 꼴). */
+	struct FCliffHook
+	{
+		double CliffX = 45.0;
+		int64 Calls = 0;
+		static bool HerbMove(void* User, std::int32_t, const EcoWorldV3::FVec2& From, const EcoWorldV3::FVec2& To)
+		{
+			FCliffHook& H = *static_cast<FCliffHook*>(User);
+			++H.Calls;
+			return (From.X - H.CliffX) * (To.X - H.CliffX) > 0.0;
+		}
+	};
+
+	/** 콜백을 건 한 스텝 (StepMini 와 같고 Hooks 만 더한다). */
+	inline void StepMiniHooked(FMiniWorld& L, const EcoWorldV3::FStepHooks& Hooks)
+	{
+		EcoWorldV3::Step(L.W, L.Live.data(), static_cast<std::int32_t>(L.Live.size()), L.ThreatPtrs.data(), static_cast<std::int32_t>(L.ThreatPtrs.size()),
+						 EcoPolicyV3::kBuiltinNet, &Hooks);
+		size_t Keep = 0;
+		for (size_t r = 0; r < L.Live.size(); ++r)
+		{
+			if (L.Live[r].Body->DeathCause == EcoWorldV3::kDeathNone)
+			{
+				L.Live[Keep++] = L.Live[r];
+			}
+		}
+		L.Live.resize(Keep);
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3IslandHookAltTest, "AdaptiveEcosystem.Policy.V3.Island.HookAlt",
+								 EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3IslandHookAltTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoV3IslandTest;
+	// 사슴 무리 한가운데를 지나는 '벼랑'(X = 45, 지도에는 없음 — 넘는 걸음을 막음) 으로 600 스텝: 섬 무대면 막힌 걸음을 ±35°·±70° 로 돌려 가고(돌림 > 0),
+	// 벼랑은 한 번도 넘지 않는다. 지도가 없으면(다른 맵) 돌림 0 — 지금처럼 제자리
+	auto Run = [](std::shared_ptr<const EcoV3Island::FLandMask> Island, int64& OutAlts, int64& OutBlocked, int64& OutOver, int64& OutCalls, std::vector<std::uint8_t>& OutBytes)
+	{
+		FMiniWorld L;
+		InitMini(L, Island, 48, 2, 45.0, 50.0);   // 시작 고리 가운데가 벼랑 위
+		FCliffHook Cliff;
+		EcoWorldV3::FStepHooks Hooks;
+		Hooks.User = &Cliff;
+		Hooks.HerbMove = &FCliffHook::HerbMove;
+		std::vector<std::uint8_t> Side;
+		for (const EcoWorldV3::FHerbBody& Bd : L.Bodies)
+		{
+			Side.push_back(Bd.Pos.X > Cliff.CliffX ? 1 : 0);
+		}
+		OutOver = 0;
+		for (int32 t = 1; t <= 600; ++t)
+		{
+			StepMiniHooked(L, Hooks);
+			for (size_t k = 0; k < L.Bodies.size(); ++k)
+			{
+				OutOver += (L.Bodies[k].Pos.X > Cliff.CliffX ? 1 : 0) != Side[k] ? 1 : 0;   // 시작과 다른 쪽에 있다 = 넘었다
+			}
+		}
+		OutAlts = L.W.Stats.IslandDeerHookAlts;
+		OutBlocked = L.W.Stats.BlockedHerbMoves;
+		OutCalls = Cliff.Calls;
+		OutBytes = StateBytes(L);
+	};
+	int64 Alts = 0, Blocked = 0, Over = 0, Calls = 0, Alts0 = 0, Blocked0 = 0, Over0 = 0, Calls0 = 0, AltsB = 0, BlockedB = 0, OverB = 0, CallsB = 0;
+	std::vector<std::uint8_t> Bytes, Bytes0, BytesB;
+	Run(OpenMask(50, 2.0), Alts, Blocked, Over, Calls, Bytes);
+	Run(nullptr, Alts0, Blocked0, Over0, Calls0, Bytes0);
+	Run(OpenMask(50, 2.0), AltsB, BlockedB, OverB, CallsB, BytesB);
+	AddInfo(FString::Printf(TEXT("섬 지도: 돌림 %lld · 제자리 %lld · 넘음 %lld · 콜백 %lld | 지도 없음: 돌림 %lld · 제자리 %lld · 넘음 %lld · 콜백 %lld"),
+							static_cast<long long>(Alts), static_cast<long long>(Blocked), static_cast<long long>(Over), static_cast<long long>(Calls),
+							static_cast<long long>(Alts0), static_cast<long long>(Blocked0), static_cast<long long>(Over0), static_cast<long long>(Calls0)));
+	TestEqual(TEXT("벼랑을 넘은 사슴·스텝 (섬 지도) 0"), Over, static_cast<int64>(0));
+	TestEqual(TEXT("벼랑을 넘은 사슴·스텝 (지도 없음) 0"), Over0, static_cast<int64>(0));
+	TestTrue(TEXT("섬 지도면 막힌 걸음을 돌려 갔다"), Alts > 0);
+	TestEqual(TEXT("지도 없으면 돌림 0 (지금 그대로)"), Alts0, static_cast<int64>(0));
+	TestTrue(TEXT("지도 없는 판은 막혀 제자리가 있었다 (시험이 실제로 벼랑에 닿았다)"), Blocked0 > 0);
+	TestTrue(TEXT("섬 지도 판 같은 시작 같은 궤적"), Bytes == BytesB && Alts == AltsB);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3IslandLazyFieldsTest, "AdaptiveEcosystem.Policy.V3.Island.LazyFields",
+								 EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3IslandLazyFieldsTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoV3IslandTest;
+	// 먹이 장 읽는 칸만 (11-05 확인 뒤, FWorldConfig::bIslandLazyFields): 격자 전체로 만든 Blur·Grad 와 읽는 칸에서만 센 값이 모든 칸에서 같고,
+	// 같은 섬 세계를 두 길로 300 스텝 돌리면 궤적이 같다
+	const auto M = DiskIsland(50, 2.0, 50.0, 50.0, 30.0, 62.0, 50.0, 5.0);
+	FMiniWorld Full, Lazy;
+	InitMini(Full, M, 48, 4, 45.0, 50.0, false);
+	InitMini(Lazy, M, 48, 4, 45.0, 50.0, true);
+	TestTrue(TEXT("읽는 칸만 깃발이 섬 세계에만 선다"), Lazy.W.Food.bLazyFields && !Full.W.Food.bLazyFields);
+	auto CompareAllCells = [this](const EcoWorldV3::FFoodGrid& A, const EcoWorldV3::FFoodGrid& B, const TCHAR* When)
+	{
+		int64 Cells = 0, Exact = 0;
+		double MaxDiff = 0.0;
+		for (std::int32_t y = 0; y < A.Gw; ++y)
+		{
+			for (std::int32_t x = 0; x < A.Gw; ++x)
+			{
+				const EcoWorldV3::FVec2 P{(x + 0.5) * A.Cell, (y + 0.5) * A.Cell};
+				const double Ba = A.BlurAt(P), Bb = B.BlurAt(P);
+				const EcoWorldV3::FVec2 Ga = A.GradAt(P), Gb = B.GradAt(P);
+				const double D = FMath::Max3(FMath::Abs(Ba - Bb), FMath::Abs(Ga.X - Gb.X), FMath::Abs(Ga.Y - Gb.Y));
+				MaxDiff = FMath::Max(MaxDiff, D);
+				Exact += (Ba == Bb && Ga.X == Gb.X && Ga.Y == Gb.Y) ? 1 : 0;
+				++Cells;
+			}
+		}
+		AddInfo(FString::Printf(TEXT("%s: 칸 %lld 가운데 비트까지 같음 %lld, 가장 큰 차 %.3g"), When, static_cast<long long>(Cells), static_cast<long long>(Exact), MaxDiff));
+		TestTrue(FString::Printf(TEXT("%s: 모든 칸 Blur·Grad 차 ≤ 1e-12"), When), MaxDiff <= 1e-12);
+	};
+	CompareAllCells(Full.W.Food, Lazy.W.Food, TEXT("시작"));
+	int32 FirstDiff = -1;
+	for (int32 t = 1; t <= 300; ++t)
+	{
+		StepMini(Full);
+		StepMini(Lazy);
+		if (FirstDiff < 0 && StateBytes(Full) != StateBytes(Lazy))
+		{
+			FirstDiff = t;
+		}
+	}
+	CompareAllCells(Full.W.Food, Lazy.W.Food, TEXT("300 스텝 뒤"));
+	TestEqual(TEXT("300 스텝 궤적이 같다 (처음 다른 스텝 −1)"), FirstDiff, -1);
+	TestTrue(TEXT("세계가 실제로 움직였다 (먹이를 먹었다)"), Lazy.W.Stats.FoodEaten > 0.0);
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3IslandFoodTileTest, "AdaptiveEcosystem.Policy.V3.Island.FoodTile",
+								 EAutomationTestFlags_ApplicationContextMask | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3IslandFoodTileTest::RunTest(const FString& Parameters)
+{
+	using namespace EcoV3IslandTest;
+	// 먹이 패치 정규화 타일 (11-05 확인 뒤, FWorldConfig::IslandFoodTile): 큰 섬 격자도 학습 무대 크기(30 칸) 격자와 같은 먹이 칸 비율·용량이 되게
+	auto Food = [](double WorldSize, std::int64_t Seed, std::shared_ptr<const EcoV3Island::FLandMask> Island, std::int32_t Tile)
+	{
+		EcoWorldV3::FWorldConfig Cfg;
+		Cfg.WorldSize = WorldSize;
+		Cfg.Seed = Seed;
+		Cfg.NumHerbivores = 8;
+		Cfg.NumStalkers = 0;
+		Cfg.NumChasers = 0;
+		Cfg.NumRanged = 0;
+		Cfg.NumNocturnal = 0;
+		Cfg.PredEmaDenominator = 8;
+		Cfg.Island = Island;
+		Cfg.IslandFoodTile = Tile;
+		EcoWorldV3::FWorldState W;
+		EcoWorldV3::InitWorld(W, Cfg);
+		return W.Food.Cap;
+	};
+	auto Stats = [](const std::vector<double>& Cap, double& OutFrac, double& OutMean)
+	{
+		int64 N = 0;
+		double Sum = 0.0;
+		for (const double C : Cap)
+		{
+			N += C > 0.0 ? 1 : 0;
+			Sum += C;
+		}
+		OutFrac = Cap.empty() ? 0.0 : static_cast<double>(N) / static_cast<double>(Cap.size());
+		OutMean = Cap.empty() ? 0.0 : Sum / static_cast<double>(Cap.size());
+	};
+	// 1. 끔·격자가 타일 이하 = 지금 그대로 (비트 단위)
+	TestTrue(TEXT("타일 0 = 지도 없는 먹이"), Food(60.0, 20051, OpenMask(30, 2.0), 0) == Food(60.0, 20051, nullptr, 0));
+	TestTrue(TEXT("격자 30 칸 ≤ 타일 30 = 지도 없는 먹이"), Food(60.0, 20051, OpenMask(30, 2.0), 30) == Food(60.0, 20051, nullptr, 0));
+	TestTrue(TEXT("지도가 없으면 타일을 보지 않는다"), Food(600.0, 20051, nullptr, 30) == Food(600.0, 20051, nullptr, 0));
+	// 2. 학습 무대 크기 격자 (30 칸, 시드 20 개) 의 평균 통계
+	double ArenaFrac = 0.0, ArenaMean = 0.0;
+	for (std::int64_t s = 0; s < 20; ++s)
+	{
+		double F = 0.0, Mn = 0.0;
+		Stats(Food(60.0, 30000 + s, nullptr, 0), F, Mn);
+		ArenaFrac += F / 20.0;
+		ArenaMean += Mn / 20.0;
+	}
+	// 3. 큰 격자 (300 칸) — 타일 30 이면 학습 무대 통계 언저리, 같은 시드 두 번은 같다
+	const auto Big = OpenMask(300, 2.0);
+	for (std::int64_t s = 0; s < 2; ++s)
+	{
+		const std::vector<double> T1 = Food(600.0, 40000 + s, Big, 30);
+		TestTrue(TEXT("같은 시드 같은 먹이"), T1 == Food(600.0, 40000 + s, Big, 30));
+		double TFrac = 0.0, TMean = 0.0, GFrac = 0.0, GMean = 0.0;
+		Stats(T1, TFrac, TMean);
+		Stats(Food(600.0, 40000 + s, Big, 0), GFrac, GMean);
+		AddInfo(FString::Printf(TEXT("시드 %lld: 먹이 칸 비율·평균 용량 — 타일 30 %.3f·%.4f, 전체 정규화 %.3f·%.4f, 학습 무대 30 칸 20 시드 평균 %.3f·%.4f"),
+								static_cast<long long>(40000 + s), TFrac, TMean, GFrac, GMean, ArenaFrac, ArenaMean));
+		TestTrue(TEXT("타일 먹이 칸 비율 = 학습 무대 ± 0.1"), FMath::Abs(TFrac - ArenaFrac) <= 0.1);
+		TestTrue(TEXT("타일 평균 용량 = 학습 무대의 0.6 ~ 1.6 배"), TMean >= 0.6 * ArenaMean && TMean <= 1.6 * ArenaMean);
+	}
 	return true;
 }
 

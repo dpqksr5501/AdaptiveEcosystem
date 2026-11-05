@@ -3205,6 +3205,11 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			// 섬 무대 (11-05): 세계 = 섬 정사각 (한 변 IslandSizeUnits — 학습 60~110 단위 자르기를 건너뛴다), 벽 대신 땅/물 지도
 			Config.WorldSize = IslandSizeUnits;
 			Config.Island = IslandMask;
+			// 11-05 확인 뒤: 먹이 패치 정규화를 무리 자리 무대 크기 타일로 (학습 무대와 같은 먹이 칸 비율·용량 — EcoWorldV3::FWorldConfig::IslandFoodTile)
+			const double TileUnits = IslandHerdPlans.IsEmpty() ? Settings.StageSizeUnits : IslandHerdPlans[0].SizeUnits;
+			Config.IslandFoodTile = FMath::Max(1, FMath::RoundToInt32(TileUnits / (Config.FoodCell > 0.0 ? Config.FoodCell : 2.0)));
+			// 11-05 확인 뒤: 먹이 장 상자 평균·기울기는 사슴이 선 칸에서만 (700² 격자 전체 세 번이 결정 스텝 비용의 대부분 — FFoodGrid::bLazyFields)
+			Config.bIslandLazyFields = true;
 		}
 		Config.Vegetation.bEnabled = AEcoVegetationField::IsRequested() || (Spawner.IsValid() && Spawner->bEnableVegetation);
         Config.bEcosystemLife = Spawner.IsValid() && Spawner->bEnableEcosystemLife;

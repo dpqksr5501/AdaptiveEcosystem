@@ -1697,7 +1697,8 @@ private:
 	TObjectPtr<AActor> IslandMarkerActor;    // 먼 개체 표식 (인스턴스 메시 셋)
 	double NextIslandMarker = 0.0;           // 다음 표식 갱신 (실시간)
 	double NextIslandStats = 0.0;            // 다음 섬 기록 줄 (월드 초)
-	int64 IslandStatsPrev[4] = {0, 0, 0, 0}; // 지난 줄의 섬 규칙 셈 (굽힘·미끄러짐·제자리·반사)
+	int64 IslandStatsPrev[5] = {0, 0, 0, 0, 0}; // 지난 줄의 섬 규칙 셈 (굽힘·미끄러짐·제자리·반사·팀 제약 돌림)
+	TMap<int64, TPair<FVector2D, int32>> IslandShoreStill;   // 11-05 확인용 (읽기만): 산 사슴 id → (지난 줄 자리 cm, 1 m 안에 머문 10 초 구간 수)
 
 	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp — 끄면 모두 비어 있다)
 	EcoV3Forest::FSettings ForestSettings;   // Play 시작 때 읽은 값 (Sanitize 뒤)

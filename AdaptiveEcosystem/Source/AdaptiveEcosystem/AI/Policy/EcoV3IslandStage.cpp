@@ -132,6 +132,60 @@ namespace EcoV3IslandImpl
 		const double CellM = CellUnits * EcoRepertoireV3::kUnitCm / 100.0;
 		return static_cast<double>(Cells) * CellM * CellM / 1.0e6;
 	}
+
+	/**
+	 * 11-05 확인용 (읽기만): P 에서 8 방향(+X 부터 45° 씩) 1.2 m 를 팀 이동 제약(ConstrainStep, 30 cm 토막)으로 걸어 보고, 막히면 무엇에 막혔는지 짧게 적는다.
+	 * 쓸기에 닿음 = 그 액터·컴포넌트 이름, 땅 = 지면 없음·비탈(법선 Z), 지역 = 지역 상자 밖, 끝 칸 = 그 방향 1.2 m 끝의 땅/물 지도 칸 종류.
+	 */
+	FString ProbeTeamStep(UWorld& World, FName RegionId, const FVector& P, const EcoV3Island::FLandMask& M, const FVector& OriginCm)
+	{
+		FString Out;
+		FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoV3IslandProbe), false);
+		const FVector Lift(0, 0, 65);
+		for (int32 d = 0; d < 8; ++d)
+		{
+			const double A = d * UE_DOUBLE_PI / 4.0;
+			const FVector Dir(FMath::Cos(A), FMath::Sin(A), 0.0);
+			FVector Cur = P;
+			FString Why;
+			for (int32 k = 0; k < 4 && Why.IsEmpty(); ++k)
+			{
+				FVector Next = Cur + Dir * 30.0;
+				Next.Z = Cur.Z;
+				const FVector Before = Next;
+				if (EcoCreatureMovement::ConstrainStep(World, RegionId, false, Cur, Next))
+				{
+					Cur = Next;
+					continue;
+				}
+				FHitResult Hit;
+				if (World.SweepSingleByChannel(Hit, Cur + Lift, Before + Lift, FQuat::Identity, ECC_WorldStatic, FCollisionShape::MakeSphere(30.f), Params))
+				{
+					Why = FString::Printf(TEXT("닿음 %s/%s"), *GetNameSafe(Hit.GetActor()), *GetNameSafe(Hit.GetComponent()));
+				}
+				else if (!World.LineTraceSingleByObjectType(Hit, Before + FVector(0, 0, 200), Before - FVector(0, 0, 300), FCollisionObjectQueryParams(ECC_WorldStatic), Params))
+				{
+					Why = TEXT("지면 없음");
+				}
+				else if (Hit.ImpactNormal.Z < 0.65f)
+				{
+					Why = FString::Printf(TEXT("비탈 %.2f (%s)"), Hit.ImpactNormal.Z, *GetNameSafe(Hit.GetActor()));
+				}
+				else
+				{
+					Why = TEXT("지역 밖·막는 볼륨");
+				}
+			}
+			const FVector End = P + Dir * 120.0;
+			const double Ux = (End.X - OriginCm.X) / EcoRepertoireV3::kUnitCm;
+			const double Uy = (End.Y - OriginCm.Y) / EcoRepertoireV3::kUnitCm;
+			const int32 Cx = M.CellCoord(Ux), Cy = M.CellCoord(Uy);
+			const int32 Kind = M.InGrid(Cx, Cy) ? static_cast<int32>(M.Kind[M.Index(Cx, Cy)]) : -1;
+			Out += FString::Printf(TEXT("%s%d°=%s(%s)"), d == 0 ? TEXT("") : TEXT(" · "), d * 45, Why.IsEmpty() ? TEXT("열림") : *Why,
+								   Kind < 0 ? TEXT("격자 밖") : UTF8_TO_TCHAR(EcoV3Island::KindNameKoUtf8(Kind)));
+		}
+		return Out;
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -816,11 +870,12 @@ void UEcoPolicyV3IntegratedSubsystem::IslandLogStart(const FEcoV3RegionContext& 
 	}
 	UE_LOG(LogEcoPolicyV3I, Log,
 		   TEXT("[EcoV3I] 섬 무대 시작 | 세계 %s 한 변 %.0f m (원점 %.0f, %.0f m) | 사슴 %d·늑대 %d · 은신처 %d (무리 자리마다 %d, 반경 %.0f m — 원이 땅 칸 위) | ")
-			   TEXT("먹이 칸 %d×%d 가운데 먹이가 나는 칸 %lld (용량 합 %.0f) | 무리 자리: %s | 두뇌·세계 규칙은 통합 v3 그대로, 벽 대신 땅/물 지도 (지문 %016llx)"),
+			   TEXT("먹이 칸 %d×%d 가운데 먹이가 나는 칸 %lld (용량 합 %.0f, 패치 정규화 타일 %d칸 = %.0f m) | 무리 자리: %s | 두뇌·세계 규칙은 통합 v3 그대로, 벽 대신 땅/물 지도 (지문 %016llx)"),
 		   *Ctx.RegionId.ToString(), Ctx.SizeCm() / 100.0, Ctx.OriginCm.X / 100.0, Ctx.OriginCm.Y / 100.0, Ctx.PlannedDeer, Ctx.PlannedWolves,
 		   static_cast<int32>(Ctx.Sim.Config.Covers.size()), Settings.ExtraCoverCount,
 		   Settings.ExtraCoverRadiusUnits(FMath::Clamp(Settings.StageSizeUnits, 60.0, 110.0)) * kUnitCm / 100.0, F.Gw, F.Gw, static_cast<long long>(FoodCells), Ctx.StartFood,
-		   *Herds, IslandMask ? static_cast<unsigned long long>(IslandMask->Fingerprint()) : 0ULL);
+		   Ctx.Sim.Config.IslandFoodTile, Ctx.Sim.Config.IslandFoodTile * F.Cell * kUnitCm / 100.0, *Herds,
+		   IslandMask ? static_cast<unsigned long long>(IslandMask->Fingerprint()) : 0ULL);
 }
 
 // -----------------------------------------------------------------------------
@@ -965,6 +1020,25 @@ void UEcoPolicyV3IntegratedSubsystem::IslandTickStats()
 	HerdChased.Init(0, H);
 	HerdHunt.Init(0, H);
 	int32 Deer = 0, Wolves = 0, DeerBlocked = 0, WolfBlocked = 0, Away = 0, Chased = 0, Hunting = 0;
+	// 11-05 확인용 (읽기만 — 세계·난수에 쓰지 않는다): 숨음, 지형 높이와 몸 자리 Z 의 차(떨어짐·뜸), 해안에서 오래 멈춘 사슴(끼임)
+	int32 Hiding = 0, Crouching = 0;
+	int32 ZChecked[2] = {0, 0}, ZOff[2] = {0, 0}, ZUnknown = 0;   // [0] 논리 자리 (몸 액터 없음) · [1] 몸 액터 자리
+	double ZMaxAbs[2] = {0.0, 0.0};
+	int32 ShoreDeer = 0, ShoreStill = 0, ShoreStuck = 0, InlandStuck = 0;
+	FString StuckList;
+	TMap<int64, TPair<FVector2D, int32>> NextShoreStill;
+	TArray<ALandscapeProxy*> Lands;
+	for (TActorIterator<ALandscape> It(World); It; ++It)
+	{
+		Lands.Add(*It);
+	}
+	if (Lands.IsEmpty())
+	{
+		for (TActorIterator<ALandscapeProxy> It(World); It; ++It)
+		{
+			Lands.Add(*It);
+		}
+	}
 	for (const EcoV3Observe::FSubject& Sb : Subs)
 	{
 		if (!Sb.bAlive)
@@ -980,6 +1054,50 @@ void UEcoPolicyV3IntegratedSubsystem::IslandTickStats()
 		(Sb.bWolf ? WolfBlocked : DeerBlocked) += bBlocked ? 1 : 0;
 		Chased += bChased ? 1 : 0;
 		Hunting += bHunt ? 1 : 0;
+		// 지형 높이 (훑기와 같은 충돌 높이장 읽기). 몸 자리 Z 와 1 m 넘게 다르면 떨어졌거나 떴다
+		{
+			bool bHeight = false;
+			for (const ALandscapeProxy* L : Lands)
+			{
+				if (const TOptional<float> Hz = L->GetHeightAtLocation(FVector(Sb.Location.X, Sb.Location.Y, 0.0)); Hz.IsSet())
+				{
+					const int32 k = Sb.bHasActor ? 1 : 0;
+					const double Dz = FMath::Abs(Sb.Location.Z - static_cast<double>(Hz.GetValue()));
+					++ZChecked[k];
+					ZOff[k] += Dz > 100.0 ? 1 : 0;
+					ZMaxAbs[k] = FMath::Max(ZMaxAbs[k], Dz);
+					bHeight = true;
+					break;
+				}
+			}
+			ZUnknown += bHeight ? 0 : 1;
+		}
+		if (!Sb.bWolf)
+		{
+			Hiding += Sb.State == EcoV3Observe::EState::Hide ? 1 : 0;
+			Crouching += Sb.State == EcoV3Observe::EState::Crouch ? 1 : 0;
+			// 10 초 동안 1 m 안에 머문 사슴. 세 구간(30 초) 넘게 이어지고 웅크림·잠·얼기가 아니면 '오래 멈춤' — 해안 6 m 안(끼임 의심)과 안쪽(풀 뜯기 견줌)을 따로 센다
+			const bool bShore = M.ShoreDist(Ux, Uy) <= 3.0;
+			ShoreDeer += bShore ? 1 : 0;
+			const FVector2D P(Sb.Location.X, Sb.Location.Y);
+			const TPair<FVector2D, int32>* Prev = IslandShoreStill.Find(Sb.Id);
+			const bool bStill = Prev && FVector2D::Distance(Prev->Key, P) < 100.0;
+			const int32 Windows = bStill ? Prev->Value + 1 : 0;
+			ShoreStill += (bStill && bShore) ? 1 : 0;
+			const bool bResting = Sb.State == EcoV3Observe::EState::Crouch || Sb.State == EcoV3Observe::EState::Sleep ||
+								  Sb.State == EcoV3Observe::EState::Freeze;
+			if (Windows >= 3 && !bResting)
+			{
+				(bShore ? ShoreStuck : InlandStuck) += 1;
+				if (bShore && ShoreStuck <= 3)
+				{
+					StuckList += FString::Printf(TEXT(" #%lld (%.0f, %.0f) m %s·%s %d0초 [팀 이동 제약 8 방향 1.2 m: %s]"), static_cast<long long>(Sb.Id),
+												 Sb.Location.X / 100.0, Sb.Location.Y / 100.0, EcoV3Observe::StateNameKo(Sb.State), *Sb.Detail, Windows,
+												 *EcoV3IslandImpl::ProbeTeamStep(*World, Sb.Region, Sb.Location, M, IslandOriginCm));
+				}
+			}
+			NextShoreStill.Add(Sb.Id, TPair<FVector2D, int32>(P, Windows));
+		}
 		// 가장 가까운 무리 자리 (300 m 밖이면 '자리 밖')
 		int32 Best = INDEX_NONE;
 		double BestD = 300.0 * 100.0;
@@ -1002,7 +1120,7 @@ void UEcoPolicyV3IntegratedSubsystem::IslandTickStats()
 		HerdHunt[Best] += bHunt ? 1 : 0;
 	}
 	const EcoWorldV3::FWorldStats& St = Contexts[0]->Sim.Stats;
-	const int64 Now4[4] = {St.IslandDeerSteers, St.IslandDeerSlides, St.IslandDeerStops, St.IslandWolfReflects};
+	const int64 Now4[5] = {St.IslandDeerSteers, St.IslandDeerSlides, St.IslandDeerStops, St.IslandWolfReflects, St.IslandDeerHookAlts};
 	FString Herds;
 	for (int32 h = 0; h < H; ++h)
 	{
@@ -1010,11 +1128,17 @@ void UEcoPolicyV3IntegratedSubsystem::IslandTickStats()
 	}
 	UE_LOG(LogEcoPolicyV3I, Log,
 		   TEXT("[EcoV3I] 섬 무대 | %.0f초 | 산 사슴 %d·늑대 %d | 막힌 칸 위: 사슴 %d·늑대 %d | 무리 자리 300 m 안 — %s | 자리 밖 사슴 %d | 지금 쫓김 사슴 %d·사냥 늑대 %d | ")
-			   TEXT("구간 해안 굽힘 %lld · 미끄러짐 %lld · 제자리 %lld · 늑대 반사 %lld | 누적 포획 %lld"),
+			   TEXT("구간 해안 굽힘 %lld · 미끄러짐 %lld · 제자리 %lld · 늑대 반사 %lld · 팀 제약 돌림 %lld | 누적 포획 %lld"),
 		   Now, Deer, Wolves, DeerBlocked, WolfBlocked, *Herds, Away, Chased, Hunting, static_cast<long long>(Now4[0] - IslandStatsPrev[0]),
 		   static_cast<long long>(Now4[1] - IslandStatsPrev[1]), static_cast<long long>(Now4[2] - IslandStatsPrev[2]), static_cast<long long>(Now4[3] - IslandStatsPrev[3]),
-		   static_cast<long long>(St.Caught));
-	for (int32 k = 0; k < 4; ++k)
+		   static_cast<long long>(Now4[4] - IslandStatsPrev[4]), static_cast<long long>(St.Caught));
+	IslandShoreStill = MoveTemp(NextShoreStill);
+	UE_LOG(LogEcoPolicyV3I, Log,
+		   TEXT("[EcoV3I] 섬 무대 확인 | %.0f초 | 숨으러 감 %d · 웅크림 %d | 누적 포획 %lld · 굶음 %lld | 지형과 높이 차 1 m 넘음: 논리 자리 %d/%d (가장 큰 차 %.2f m) · 몸 액터 %d/%d (%.2f m) · 지형 못 읽음 %d | ")
+			   TEXT("해안 6 m 안 사슴 %d · 10초 동안 1 m 안 %d | 30초 넘게 1 m 안(웅크림·잠·얼기 빼고): 해안 %d · 안쪽 %d%s"),
+		   Now, Hiding, Crouching, static_cast<long long>(St.Caught), static_cast<long long>(St.Starved), ZOff[0], ZChecked[0], ZMaxAbs[0] / 100.0, ZOff[1], ZChecked[1],
+		   ZMaxAbs[1] / 100.0, ZUnknown, ShoreDeer, ShoreStill, ShoreStuck, InlandStuck, *StuckList);
+	for (int32 k = 0; k < 5; ++k)
 	{
 		IslandStatsPrev[k] = Now4[k];
 	}
