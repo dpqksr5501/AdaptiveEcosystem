@@ -28,6 +28,15 @@ from env_v2.r8_world import EAT, K_BEAR, K_BEAST, K_WOLF, RUN_FIRST, RUN_LAST, S
 
 ACT_COL = {"eat": "#2e9e44", "run": "#f08a24", "shelter": "#2a6fdb", "watch": "#8c8c8c"}
 KIND_COL = {K_WOLF: "#d62728", K_BEAST: "#8c564b", K_BEAR: "#000000"}
+EVAL_SEEDS = (41900, 41999)                         # 판정 평가 시드 (설계 8-1·11절)
+
+
+def guard_eval_seed(seed: int, allow: bool = False) -> None:
+    """판정 전에는 평가 시드를 쓰지 않는다(설계 8-1). 기본 --seed 가 41900 이라 판정 평가 결과(eval/summary.json)가 생긴 뒤에만,
+    또는 --allow-eval-seed 를 줄 때만 평가 시드로 돈다. 초안은 개발 시드 41400~41449 · 점검 시드 41800~41839."""
+    if EVAL_SEEDS[0] <= seed <= EVAL_SEEDS[1] and not allow and not (HERE.parent / "eval" / "summary.json").exists():
+        raise SystemExit(f"시드 {seed} 는 판정 평가 시드(41900~41999)다 — 판정 평가(STATUS.md 4절 ②, eval/summary.json) 전에는 쓰지 않는다. "
+                         "초안은 --seed 41400~41449(개발) 또는 41800~41839(점검). 꼭 써야 하면 --allow-eval-seed")
 
 
 def record(cfg, seed: int, steps: int, policy) -> dict:
@@ -135,7 +144,9 @@ def main(argv=None) -> int:
     ap.add_argument("--steps", type=int, default=600)
     ap.add_argument("--bears", type=int, default=0)
     ap.add_argument("--out", default=str(HERE.parent / "replay" / "r8.png"))
+    ap.add_argument("--allow-eval-seed", action="store_true", help="판정 평가 전에도 평가 시드 41900~41999 를 쓴다 (기본은 막음)")
     args = ap.parse_args(argv)
+    guard_eval_seed(args.seed, args.allow_eval_seed)
     cfg = EV._cfg(args.config)
     if args.bears:
         cfg = EV.override(cfg, {"bears": {"count": args.bears}})

@@ -22,6 +22,9 @@
   --start 로 구간 시작을 손으로 주면 이 규칙 밖이다(그때는 곁 파일 .json 의 rule 에 'manual' 로 남는다).
 
 나오는 것: <out>.mp4 (H.264·yuv420p·faststart — 파워포인트 재생), 포스터 <out>.png, 곁 파일 <out>.json (시드·모델·구간·정점·칸마다 잡힘 수).
+
+평가 시드 막음: 기본 --seed 41900 은 판정 평가 시드다. 판정 평가 결과 `results/v3/r8/eval/summary.json` 이 없으면(판정 전) 평가 시드 41900~41999 로는
+돌지 않는다(설계 8-1, `r8_replay.guard_eval_seed`). 초안은 개발 시드 41400~41449 · 점검 시드 41800~41839 로. 꼭 써야 하면 --allow-eval-seed.
 """
 
 from __future__ import annotations
@@ -123,7 +126,9 @@ def main(argv=None) -> int:
     ap.add_argument("--note", default=None, help="오른쪽 아래 작은 회색 글 (초안 표시 등)")
     ap.add_argument("--counter", action="store_true", help="칸마다 '잡힘 n' 을 작게 적는다")
     ap.add_argument("--out", required=True, help="mp4 경로 (포스터 .png·곁 파일 .json 이 같은 이름으로)")
+    ap.add_argument("--allow-eval-seed", action="store_true", help="판정 평가 전에도 평가 시드 41900~41999 를 쓴다 (기본은 막음)")
     args = ap.parse_args(argv)
+    RP.guard_eval_seed(args.seed, args.allow_eval_seed)          # 판정 전 평가 시드 막음 (기본 --seed 41900)
 
     t_start = time.time()
     W, H = (int(v) for v in args.size.lower().split("x"))
