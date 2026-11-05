@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
+#include "AdaptiveEcosystemGameMode.h"
 #include "PlatformingGameMode.generated.h"
 
 /**
  *  Simple GameMode for a third person platforming game
  */
 UCLASS()
-class APlatformingGameMode : public AGameModeBase
+class APlatformingGameMode : public AAdaptiveEcosystemGameMode
 {
 	GENERATED_BODY()
 	

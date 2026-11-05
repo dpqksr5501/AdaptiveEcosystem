@@ -13,6 +13,7 @@
 void ASideScrollingGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+    if (GetNetMode() == NM_DedicatedServer) return;
 
 	// create the game UI
 	APlayerController* OwningPlayer = UGameplayStatics::GetPlayerController(GetWorld(), 0);

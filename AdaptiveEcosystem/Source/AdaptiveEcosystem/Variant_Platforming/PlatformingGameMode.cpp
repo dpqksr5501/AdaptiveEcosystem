@@ -14,6 +14,7 @@ APlatformingGameMode::APlatformingGameMode()
 void APlatformingGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+    if (GetNetMode() == NM_DedicatedServer) return;
 
 	// create each additional local player.
 	// Player 0 will be created automatically as part of regular game init

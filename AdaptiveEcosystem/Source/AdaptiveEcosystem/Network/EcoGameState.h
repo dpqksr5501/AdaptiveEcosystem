@@ -6,9 +6,11 @@
 #include "GameFramework/GameStateBase.h"
 #include "Network/EcoMatchTypes.h"
 #include "Network/EcologyNetworkTypes.h"
+#include "Network/EcoClockSchedule.h"
 #include "EcoGameState.generated.h"
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnEcoAuthorityStateChanged);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnEcoClockPhaseChanged, FEcoServerTimeSnapshot, Time, bool, bInitialState);
 
 /**
  * Replicated, low-frequency summary of the authoritative world.
@@ -24,6 +26,16 @@ class ADAPTIVEECOSYSTEM_API AEcoGameState : public AGameStateBase
 
 public:
 	AEcoGameState();
+	virtual void Tick(float DeltaSeconds) override;
+	virtual void OnRep_ReplicatedWorldTimeSecondsDouble() override;
+	/** False before server time/schedule arrives or after lookahead expires. Read-only on every world. */
+	UFUNCTION(BlueprintPure, Category="Ecology|Time")
+	bool GetSynchronizedClock(FEcoServerTimeSnapshot& Time) const;
+	/** Presentation notification; initial/late join state is not a historical gameplay event. */
+	UPROPERTY(BlueprintAssignable, Category="Ecology|Time")
+	FOnEcoClockPhaseChanged OnClockPhaseChanged;
+	/** Empty test levels share a timeline without starting resource/population simulation. */
+	void EnablePresentationClock();
 
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
@@ -72,6 +84,13 @@ protected:
 	void OnRep_AuthorityState();
 
 private:
+	UPROPERTY(Replicated) FEcoClockSchedule ClockSchedule;
+	bool bPresentationClock = false;
+	bool bReceivedServerTime = false;
+	double PresentationOrigin = 0;
+	double LastClockPublication = -1;
+	FEcoServerTimeSnapshot LastPresentedClock;
+	void PublishClockSchedule();
 	void CommitAuthorityChange();
 
 	UPROPERTY(ReplicatedUsing = OnRep_AuthorityState, VisibleInstanceOnly, Category = "Ecology|Match")

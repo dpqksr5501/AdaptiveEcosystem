@@ -10,6 +10,8 @@
 #include "Mass/EcoMassNetworkBootstrap.h"
 #include "Mass/EcoMassLifecycleSubsystem.h"
 #include "Network/EcoGameState.h"
+#include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
+#include "GameFramework/PlayerController.h"
 #include "Network/Session/EcoGameSession.h"
 #include "Network/Session/EcoSessionSettings.h"
 
@@ -43,7 +45,12 @@ void AAdaptiveEcosystemGameMode::InitGameState()
 
 void AAdaptiveEcosystemGameMode::StartPlay()
 {
-	Super::StartPlay();
+    bool bIntegration = false;
+    for (TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld()); It; ++It) bIntegration = true;
+    if (auto* State = GetGameState<AEcoGameState>()) State->SetWorldPhase(EEcoWorldPhase::BootstrappingMass);
+    Super::StartPlay();
+    // Integration owns its clock, population and readiness, including asynchronous terrain loading.
+    if (bIntegration) { RefreshConnectedPlayerCount(); return; }
 
 	AEcoGameState* EcoGameState = GetGameState<AEcoGameState>();
 	if (!ensure(EcoGameState))
@@ -71,6 +78,7 @@ void AAdaptiveEcosystemGameMode::StartPlay()
 	EcoGameState->SetMassReplicationReady(bMassReady);
 	if (bMassReady || (!bFoundBootstrap && !bRequireMassNetworkBootstrap))
 	{
+        if (!bFoundBootstrap) EcoGameState->EnablePresentationClock();
 		EcoGameState->SetWorldPhase(EEcoWorldPhase::Running);
 	}
 	else
@@ -89,8 +97,11 @@ void AAdaptiveEcosystemGameMode::PostLogin(APlayerController* NewPlayer)
 
 void AAdaptiveEcosystemGameMode::Logout(AController* Exiting)
 {
-	Super::Logout(Exiting);
-	RefreshConnectedPlayerCount();
+    Super::Logout(Exiting);
+    int32 Remaining = 0;
+    for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+        if (const auto* PC = It->Get(); PC && PC != Exiting && PC->PlayerState && !PC->IsActorBeingDestroyed()) ++Remaining;
+    if (auto* State = GetGameState<AEcoGameState>()) State->SetConnectedPlayerCount(Remaining);
 }
 
 void AAdaptiveEcosystemGameMode::RefreshConnectedPlayerCount()
