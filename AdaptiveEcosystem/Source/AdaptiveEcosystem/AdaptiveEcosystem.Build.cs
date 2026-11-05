@@ -45,7 +45,8 @@ public class AdaptiveEcosystem : ModuleRules
 
 		SetupIrisSupport(Target);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem", "PhysicsCore", "AnimGraphRuntime", "AnimationCore", "Json" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem", "PhysicsCore", "AnimGraphRuntime", "AnimationCore", "Json", "SlateCore" });
+		PublicDependencyModuleNames.AddRange(new string[] { "OnlineSubsystem", "OnlineSubsystemUtils" });
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add("UnrealEd");

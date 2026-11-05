@@ -170,6 +170,8 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<AEcoCreatureRepresentationActor>> VisualPool;
 	TMap<int64, FMassEntityHandle> AgentLookup;
 	bool bReady = false;
+	/** Ownership is captured before travel can temporarily change the old world's NetMode. */
+	bool bAuthorityWorld = false;
 	bool bWaitingForHabitat = false;
 	double NextStreamingUpdate = 0;
 	double LastResourceTime = 0;
@@ -200,4 +202,6 @@ class ADAPTIVEECOSYSTEM_API AEcoCreatureIntegrationGameMode : public AGameModeBa
 public:
 	AEcoCreatureIntegrationGameMode();
 	virtual void InitGameState() override;
+	virtual void PostLogin(APlayerController* NewPlayer) override;
+	virtual void Logout(AController* Exiting) override;
 };
