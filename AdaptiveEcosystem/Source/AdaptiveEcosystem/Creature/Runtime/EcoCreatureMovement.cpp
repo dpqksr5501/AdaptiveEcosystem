@@ -1,4 +1,5 @@
 #include "Creature/Runtime/EcoCreatureMovement.h"
+#include "World/EcoVegetationField.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcologyRegion.h"
 #include "Engine/World.h"
@@ -35,20 +36,37 @@ bool EcoCreatureMovement::ProjectSpawnPoint(UWorld& World, const FVector& Hint, 
 }
 
 bool EcoCreatureMovement::ConstrainStep(UWorld& World, FName RegionId, bool bTraveling,
-    const FVector& Position, FVector& Destination, float BodyRadiusCm)
+    const FVector& Position, FVector& Destination, float BodyRadiusCm,float MinGroundNormalZ)
 {
     if (Position.ContainsNaN() || Destination.ContainsNaN()||!FMath::IsFinite(BodyRadiusCm)||BodyRadiusCm<20||BodyRadiusCm>40) return false;
     const auto* Regions = World.GetSubsystem<UEcologyWorldSubsystem>();
     const auto* Region = Regions ? Regions->GetRegion(RegionId) : nullptr;
     if (!Region || (!bTraveling && !Region->ContainsPosition(Destination))) return false;
+    return ConstrainGroundStep(World,Position,Destination,BodyRadiusCm,MinGroundNormalZ)
+        &&(bTraveling||Region->ContainsPosition(Destination));
+}
+
+bool EcoCreatureMovement::ConstrainGroundStep(UWorld& World,const FVector& Position,FVector& Destination,float BodyRadiusCm,float MinGroundNormalZ)
+{
+    if(Position.ContainsNaN()||Destination.ContainsNaN()||!FMath::IsFinite(BodyRadiusCm)||BodyRadiusCm<20||BodyRadiusCm>40
+        ||!FMath::IsFinite(MinGroundNormalZ)||MinGroundNormalZ<.65f||MinGroundNormalZ>1)return false;
     FHitResult Hit;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoCreatureStep), false);
     const FVector Lift(0,0,65);
     if (World.SweepSingleByChannel(Hit, Position + Lift, Destination + Lift, FQuat::Identity,
         ECC_WorldStatic, FCollisionShape::MakeSphere(BodyRadiusCm), Params)) return false;
     if (!World.LineTraceSingleByObjectType(Hit, Destination + FVector(0,0,200), Destination - FVector(0,0,300), FCollisionObjectQueryParams(ECC_WorldStatic), Params)
-        || Hit.ImpactNormal.Z < 0.65f) return false;
+        || Hit.ImpactNormal.Z < MinGroundNormalZ) return false;
     Destination.Z = Hit.ImpactPoint.Z;
-    if ((!bTraveling && !Region->ContainsPosition(Destination)) || CrossesExcludedArea(World, Position, Destination)) return false;
+    if (CrossesExcludedArea(World, Position, Destination)) return false;
+    return true;
+}
+bool EcoCreatureMovement::IsWadeableGround(UWorld& World,const FVector& Ground,float MaxDepthCm)
+{
+    if(Ground.ContainsNaN()||!FMath::IsFinite(MaxDepthCm)||MaxDepthCm<0)return false;
+    for(TActorIterator<AEcoVegetationHabitat> It(&World);It;++It){
+        if(!It->bConnectedFreshWater||!It->ContainsGround(Ground))continue;
+        if(!It->IsValidHabitat()||It->WaterSurfaceZ-Ground.Z>MaxDepthCm)return false;
+    }
     return true;
 }

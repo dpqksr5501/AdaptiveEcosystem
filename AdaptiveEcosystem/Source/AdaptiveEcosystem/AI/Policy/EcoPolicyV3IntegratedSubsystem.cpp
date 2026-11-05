@@ -40,6 +40,7 @@
 #include "World/EcoWorldClockSubsystem.h"
 #include "World/EcologyRegion.h"
 #include "World/EcoVegetationField.h"
+#include "World/EcoNaturalHabitatProfile.h"
 #include "HAL/PlatformMemory.h"
 #include "Engine/NetDriver.h"
 
@@ -1742,6 +1743,9 @@ void UEcoPolicyV3IntegratedSubsystem::ScanStageObstacles(UWorld& World, const FV
 		TInlineComponentArray<UStaticMeshComponent*> Comps(A);
 		for (const UStaticMeshComponent* C : Comps)
 		{
+			// Authored walkable terrain is sampled by the ground backend, not a
+			// trunk-sized blocking disc. Collision/slope/step checks still apply.
+			if (A->ActorHasTag(TEXT("Eco.VegetationGround")) || (C && C->ComponentHasTag(TEXT("Eco.VegetationGround")))) continue;
 			const UStaticMesh* Mesh = C ? C->GetStaticMesh() : nullptr;
 			if (!Mesh || !C->IsRegistered())
 			{
@@ -2998,6 +3002,26 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers, G.RegionId);
 		Config.Vegetation.bEnabled = AEcoVegetationField::IsRequested() || (Spawner.IsValid() && Spawner->bEnableVegetation);
         Config.bEcosystemLife = Spawner.IsValid() && Spawner->bEnableEcosystemLife;
+        auto* NaturalProfile=Spawner.IsValid()?Spawner->NaturalHabitatProfile.Get():nullptr;
+        if(Spawner.IsValid())if(const auto* Override=Spawner->RegionHabitatProfiles.Find(G.RegionId))NaturalProfile=Override->Get();
+        if(NaturalProfile&&(!Config.bEcosystemLife||!Config.Vegetation.bEnabled||!NaturalProfile->IsValidProfile())){
+            UE_LOG(LogEcoPolicyV3I,Error,TEXT("[EcoHabitat] Profile requires life + vegetation and valid guilds"));RejectResourceContract();return;
+        }
+        Config.bNaturalHabitats=NaturalProfile!=nullptr;
+        if(NaturalProfile)Config.NaturalGround={NaturalProfile->WalkableSlopeDegrees,NaturalProfile->MaxStepUpCm,NaturalProfile->MaxStepDownCm,NaturalProfile->MaxWadingDepthCm};
+        Config.bWildRefuges=NaturalProfile&&NaturalProfile->bWildRefuges;
+        if(Config.bWildRefuges)Config.bShelterSafe=false;
+        if(NaturalProfile){
+            Config.HabitatSignature=NaturalProfile->Fingerprint();TArray<AEcoVegetationHabitat*> Habitats;TSet<FName> HabitatIds;
+            for(TActorIterator<AEcoVegetationHabitat> It(World);It;++It)if(It->RegionId==G.RegionId){
+                if(!It->IsValidHabitat()||It->HabitatId.IsNone()||HabitatIds.Contains(It->HabitatId)){
+                    UE_LOG(LogEcoPolicyV3I,Error,TEXT("[EcoHabitat] Invalid/duplicate input: %s"),*It->GetPathName());RejectResourceContract();return;
+                }
+                HabitatIds.Add(It->HabitatId);Habitats.Add(*It);
+            }
+            Habitats.Sort([](const AEcoVegetationHabitat& A,const AEcoVegetationHabitat& B){return A.HabitatId.LexicalLess(B.HabitatId);});
+            for(const auto* Habitat:Habitats)Config.HabitatSignature=EcoNaturalHabitat::Hash(Config.HabitatSignature^Habitat->Fingerprint());
+        }
 		// 세로 장애물 (eco.IntegratedV3.Obstacles): 레벨에서 읽은 원판 + 무대 나무 줄기 원판 ((x, y, r) 순, 측정 때는 가져온 원판). 원판이 없으면 세계는 지금 그대로다
 		TArray<uint8> IsTree;
 		if (Config.Obstacles.bEnabled)
@@ -3169,9 +3193,12 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		{
 			const auto FieldClass = Spawner.IsValid() && Spawner->VegetationFieldClass
 				? Spawner->VegetationFieldClass : TSubclassOf<AEcoVegetationField>(AEcoVegetationField::StaticClass());
-			auto* Field = World->SpawnActor<AEcoVegetationField>(FieldClass, Origin, FRotator::ZeroRotator);
+			auto* Field = World->SpawnActorDeferred<AEcoVegetationField>(FieldClass,FTransform(Origin));
 			if (!Field) { RejectResourceContract(); return; }
 			Field->RegionId = G.RegionId; Field->ContextIndex = Ctx->Index;
+            Field->NaturalProfile=NaturalProfile;
+            Field->SurfaceHalfExtentCm=float(Config.WorldSize*EcoRepertoireV3::kUnitCm*.5);
+            Field->FinishSpawning(FTransform(Origin));
 			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoVegetation] Enabled %s: soil-v1, existing PPO unchanged, Python parity pending"), *G.RegionId.ToString());
 		}
 		UE_LOG(LogEcoPolicyV3I, Log,
@@ -3261,6 +3288,10 @@ FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::FindContext(FName RegionId
 		}
 	}
 	return nullptr;
+}
+const FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::FindContext(FName RegionId) const
+{
+    for(const auto& Context:Contexts)if(Context->RegionId==RegionId)return Context.Get();return nullptr;
 }
 
 void UEcoPolicyV3IntegratedSubsystem::CheckClockDrift()
@@ -4004,14 +4035,19 @@ bool UEcoPolicyV3IntegratedSubsystem::TraceMove(FName RegionId, const FVector& F
 	}
 	const int32 Pieces = FMath::Max(1, FMath::CeilToInt32(Dist / EcoPolicyV3IntegratedImpl::kSubStepCm));
 	FVector Cur = FromCm;
+    const auto* Context=FindContext(RegionId);
+    const bool NaturalGround=Context&&Context->Sim.Config.bNaturalHabitats;
+    const auto GroundRules=NaturalGround?Context->Sim.Config.NaturalGround:EcoNaturalHabitat::FGroundTraversal{};
 	for (int32 k = 1; k <= Pieces; ++k)
 	{
 		const double A = static_cast<double>(k) / static_cast<double>(Pieces);
 		FVector Next(FMath::Lerp(FromCm.X, ToCm.X, A), FMath::Lerp(FromCm.Y, ToCm.Y, A), Cur.Z);
-		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, bTraveling, Cur, Next, BodyRadiusCm))
+		if (!EcoCreatureMovement::ConstrainStep(*World, RegionId, bTraveling, Cur, Next, BodyRadiusCm,NaturalGround?float(FMath::Cos(FMath::DegreesToRadians(GroundRules.MaxSlopeDegrees))):.65f))
 		{
 			return false;
 		}
+        if(NaturalGround&&(!GroundRules.AllowsHeight(Cur.Z,Next.Z,FVector::Dist2D(Cur,Next))
+            ||!EcoCreatureMovement::IsWadeableGround(*World,Next,float(GroundRules.WadingDepthCm))))return false;
 		Cur = Next;
 	}
 	OutZ = Cur.Z;

@@ -1,5 +1,11 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
+**2026-10-30 개체군·기획 대조 후속:** [개체군/성장 계약](Architecture/NATURAL_POPULATION_CONTRACT_20261030.md), [세부 기획 대조](Architecture/INDIVIDUAL_TRAIT_DESIGN_AUDIT_20261030.md), [실행 기록](조연우/JYU_NATURAL_POPULATION_20261030.md)을 함께 읽는다. 자연 사슴의 혼합 초기 나이/성별·제한 유전/털색·연속 성장·가족 관계/관찰 분리·군락 발달을 다룬다. 학습 담당의 관측/행동·보상·가중치/추론은 보존하며 Caution은 인계 데이터만 제공한다. 현재 Native 사슴 예제를 임의 종/전체 기획/MMO 완료로 확대하지 않는다.
+
+**2026-10-30 자연 서식지 작업 트리:** [공통 계약](Architecture/NATURAL_HABITAT_CONTRACT_20261030.md), [새 레벨 적용 순서](Team/NATURAL_HABITAT_LEVEL_HANDOFF_20261030.md), [실행 기록](조연우/JYU_NATURAL_HABITAT_20261030.md)을 먼저 확인한다. 지역별/세부 volume 생육 profile, 실제 지면·수면·수문 연결, 불규칙 군락, 내부 휴식과 취약한 은폐, 표현/이주 수용 예산을 명시적 opt-in으로 제공한다. 미래 통합 레벨 자체는 아직 검증하지 않았다. Native 2.5D·단일 writer/M4·기존 모델·SocialControl=0 경계를 유지한다.
+
+**2026-10-29 후속 작업 트리:** 사용자 실제 플레이 점검 후 [플레이 흐름 수정과 life rules v2](조연우/JYU_PLAYFLOW_FIX_20261029.md)를 추가했다. 단독 무리 이주·접촉/경계·로컬 섭식·식생 표시/용량 확장·낮밤 표현과 owned Highland 통로를 보완한다. `bEnableEcosystemLife` 세계에 한정하며 기존 모델/관측·SocialControl=0·Native 단일 writer를 유지한다. 아래 life-v1은 최초 구현 이력이고, 현재 검증은 새 기록/evidence를 우선한다. main/push 완료를 뜻하지 않으며 전체 Python 세계 mirror/재학습·영구 생태 평형은 미완료다.
+
 갱신일 **2026-10-24**. 팀원과 각 AI agent가 대화 기록 없이 프로젝트의 목표·제품 방향·구현 경계를 이해하기 위한 공통 진입 문서다. 개인 담당 인수인계보다 먼저 읽고 작업 분야의 Source/계약으로 이어간다. 종 이름과 예시는 교체 가능한 표현이며 현재 구현을 과장하는 근거가 아니다.
 
 사용자의 후속 전체 구현은 원래 저장소에서 진행해 **`d095948`**로 기록했다. 최신 시작점은 [팀 AI 공통 안내](Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [전체 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행/팀 API 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)이다. owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 식생·경험/흔적·출생/유전/성장·사체 영양·저장/운영 복구를 opt-in한다. 아래의 soil 최초 구축·미연결 설명은 당시 이력이다. 기존 맵/기본 SocialControl=0·단일 Native writer·모델 차원을 보존하며 재학습/임의 종 지원 완료로 확대하지 않는다.

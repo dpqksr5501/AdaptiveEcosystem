@@ -138,6 +138,7 @@ namespace EcoRepertoireV3
 		std::int32_t SleepWake = 3;
 		std::int32_t StartleSteps = 3;        // GRAZE -> FLEE 놀람 정지 (0.4 s)
 		std::int32_t DecisionJitter = 3;      // 사건 결정 지연 0..3 스텝
+        bool bFootprintArrival=true; // Natural-habitat adapter confirms an actual interior place instead.
 
 		// 사건 문턱
 		double EventNear = 8.0;               // 1600 cm
@@ -408,7 +409,7 @@ namespace EcoRepertoireV3
 		S.bWakeEv = false;
 		S.WakeLeft = 0;
 		S.HideTarget = NewBehavior == kHide ? Obs.CoverK : -1;
-		S.bArrived = NewBehavior == kHide && Obs.bInCover;
+		S.bArrived = NewBehavior == kHide && Obs.bInCover && Cfg.bFootprintArrival;
 		if (S.bArrived)
 		{
 			S.LockLeft = Cfg.LockHide;   // 이미 은신처 안이면 곧바로 도착 (E6 없음)
@@ -425,7 +426,7 @@ namespace EcoRepertoireV3
 		FArbiterPrep P;
 
 		// a. HIDE 도착
-		const bool bArrive = S.Behavior == kHide && !S.bArrived && Obs.bInCover;
+		const bool bArrive = S.Behavior == kHide && !S.bArrived && Obs.bInCover && Cfg.bFootprintArrival;
 		if (bArrive)
 		{
 			S.bArrived = true;

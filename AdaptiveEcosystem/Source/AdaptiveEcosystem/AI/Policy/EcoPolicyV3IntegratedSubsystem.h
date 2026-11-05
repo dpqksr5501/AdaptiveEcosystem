@@ -622,6 +622,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
     TArray<double> PlayerEyeZ;
     TArray<FEcoLifeNoiseSample> PlayerNoises;
     EcoTracesV3::FField MovementTraces;
+    EcoNaturalHabitat::FBrowseEvidence BrowseEvidence;
     EcoLifeV3::FRegionalDanger KnownHumanDanger;
 	bool bSpatialFoodRegistered = false;
 	int64 ResourceReceiptSequence = 0;
@@ -1031,6 +1032,7 @@ public:
 	FEcoV3RegionContext* GetContext(int32 Index) { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	const FEcoV3RegionContext* GetContext(int32 Index) const { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	FEcoV3RegionContext* FindContext(FName RegionId);
+    const FEcoV3RegionContext* FindContext(FName RegionId) const;
 
 	/** 처리기가 한 컨텍스트의 결정 스텝 하나를 마칠 때마다 부른다 (포획 표시·기록). */
 	void NotifyContextStep(FEcoV3RegionContext& Ctx, const EcoWorldV3::FStepReport& Report);

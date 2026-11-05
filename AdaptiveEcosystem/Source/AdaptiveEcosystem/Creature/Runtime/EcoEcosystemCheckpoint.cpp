@@ -244,6 +244,12 @@ struct FEcoEcosystemCheckpoint
             const auto* C=N->FindContext(R.Id);if(!C||RegionNames.Contains(R.Id)||!C->OriginCm.Equals(R.Origin,.01)||C->Sim.Config.WorldSize!=R.Sim.Config.WorldSize
                 ||!R.Sim.Config.bEcosystemLife||R.Sim.T!=GlobalT||!ValidGrid(R.Sim.Food)||!Staged->RegionalStates.Contains(R.Id))return Reject(TEXT("region layout mismatch"));
             if(R.AdoptedDeer<0||R.AdoptedWolves<0||R.AdoptedDeer>Successful||R.AdoptedWolves>Successful)return Reject(TEXT("invalid native adoption ordinal"));
+            if(C->Sim.Config.bNaturalHabitats!=R.Sim.Config.bNaturalHabitats||C->Sim.Config.bWildRefuges!=R.Sim.Config.bWildRefuges
+                ||C->Sim.Config.HabitatSignature!=R.Sim.Config.HabitatSignature||R.Sim.RepCfg.bFootprintArrival==R.Sim.Config.bNaturalHabitats)
+                return Reject(TEXT("habitat profile/authoring or arrival contract changed"));
+            if(R.Sim.Config.bNaturalHabitats&&(!R.Sim.Config.NaturalGround.IsValid()
+                ||C->Sim.Config.NaturalGround.MaxSlopeDegrees!=R.Sim.Config.NaturalGround.MaxSlopeDegrees||C->Sim.Config.NaturalGround.StepUpCm!=R.Sim.Config.NaturalGround.StepUpCm
+                ||C->Sim.Config.NaturalGround.DropCm!=R.Sim.Config.NaturalGround.DropCm||C->Sim.Config.NaturalGround.WadingDepthCm!=R.Sim.Config.NaturalGround.WadingDepthCm))return Reject(TEXT("ground traversal profile changed"));
             const auto* Food=Staged->SpatialFood.Find(R.Id);
             if(!std::isfinite(R.HumanDanger.Human)||R.HumanDanger.Human<0||R.HumanDanger.Human>1||!std::isfinite(R.HumanDanger.Updated)
                 ||R.HumanDanger.Updated<0||R.HumanDanger.Updated>GlobalT*EcoRepertoireV3::kStepSeconds||!std::isfinite(R.HumanDanger.NextExposure)
@@ -277,6 +283,19 @@ struct FEcoEcosystemCheckpoint
                 ||!FiniteBody||V.Transform.ContainsNaN()||!FMath::IsFinite(V.Vitals.HP)||!FMath::IsFinite(V.Link.GroundZ)||!FMath::IsFinite(V.Link.Individual.Born)
                 ||V.Id>=Staged->NextStableAgentId)return Reject(TEXT("invalid individual identity/body/genome"));
             const auto& Life=V.Link.Individual;
+            if(!std::isfinite(Life.MaturitySeconds)||Life.MaturitySeconds<180||Life.MaturitySeconds>7200
+                ||!std::isfinite(Life.FemaleBirthFraction)||Life.FemaleBirthFraction<.25||Life.FemaleBirthFraction>.75
+                ||uint8(Life.Sex)>2||(Life.bNaturalPopulation&&Life.Sex==EcoLifeV3::ESex::Unspecified)
+                ||Life.Caregiver<0||Life.Caregiver==V.Id||Life.FamilyObserved<0||Life.FamilyObserved==V.Id||Life.FamilyMode>3||!std::isfinite(Life.NextFamilyScan)
+                ||!std::isfinite(Life.FamilySeen)||!std::isfinite(Life.FamilyX)||!std::isfinite(Life.FamilyY)
+                ||!std::isfinite(Life.FamilyOriginX)||!std::isfinite(Life.FamilyOriginY))return Reject(TEXT("invalid age/family evidence"));
+            if(!std::isfinite(Life.NextForageScan)||Life.NextForageScan<0||!std::isfinite(Life.ForageOriginX)||!std::isfinite(Life.ForageOriginY)
+                ||Life.ForageCell< -1||Life.ForageCell>=65536||Life.MotionReason>3)return Reject(TEXT("invalid local forage evidence"));
+            const auto& Residence=Life.Residence;
+            if(!std::isfinite(Life.SettlementUntil)||Life.SettlementUntil<0||!std::isfinite(Life.SettlementX)||!std::isfinite(Life.SettlementY))return Reject(TEXT("invalid settlement intent"));
+            if(Residence.Cover< -1||Residence.Cover>=1024||Residence.RequestedCover< -1||Residence.RequestedCover>=1024||Residence.Phase>5||Residence.Registration<0
+                ||!std::isfinite(Residence.X)||!std::isfinite(Residence.Y)||!std::isfinite(Residence.OriginX)||!std::isfinite(Residence.OriginY)
+                ||!std::isfinite(Residence.SettledSince)||!std::isfinite(Residence.NextSearch)||!std::isfinite(Residence.LastProgress)||!std::isfinite(Residence.LastDistance))return Reject(TEXT("invalid habitat residence"));
             if(!std::isfinite(Life.Nutrition)||Life.Nutrition<0||Life.Nutrition>1||!std::isfinite(Life.MealRemaining)||Life.MealRemaining<0||Life.MealRemaining>.6
                 ||!std::isfinite(Life.MeatIssued)||!std::isfinite(Life.MeatConsumed)||!std::isfinite(Life.MeatWasted)
                 ||!FMath::IsNearlyEqual(Life.MeatIssued,Life.MeatConsumed+Life.MeatWasted+Life.MealRemaining,1e-8))return Reject(TEXT("invalid carcass conservation"));

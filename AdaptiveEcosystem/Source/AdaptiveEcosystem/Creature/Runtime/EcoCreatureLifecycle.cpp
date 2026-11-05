@@ -248,11 +248,16 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 		const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
 		const auto& Life = EM.GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(E);
 		auto& Present = EM.GetFragmentDataChecked<FEcoCreaturePresentationFragment>(E);
-        Present.BodyScale=128;
+        Present.BodyScale=128;Present.Maturity=255;Present.CoatTone=128;
         if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized)
+            {
+            const double AgeNow=V.HP<=0&&Life.DeathTime>=0?Life.DeathTime:GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+            if(Link->Individual.bNaturalPopulation)Present.CoatTone=uint8(FMath::RoundToInt(FMath::Clamp((Link->Individual.Genome.Coat-.85)/.3,0.,1.)*255));
+            Present.Maturity=uint8(FMath::RoundToInt(Link->Individual.AgeFraction(AgeNow)*255));
             Present.BodyScale=uint8(FMath::RoundToInt(Link->Individual.BodyScale(
                 V.HP<=0 && Life.DeathTime>=0 ? Life.DeathTime :
                 GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds)*128));
+        }
 		Present.Velocity = V.HP > 0 ? EM.GetFragmentDataChecked<FMassVelocityFragment>(E).Value : FVector::ZeroVector;
 		const auto* Predator = EM.GetFragmentDataPtr<FEcoPredatorStateFragment>(E);
 		const auto* Execution = EM.GetFragmentDataPtr<FEcoSpeciesAIExecutionFragment>(E);
@@ -267,6 +272,19 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 EEcoSpeciesActivity::Freeze, EEcoSpeciesActivity::Sleep};
             Present.Activity = uint8(Behavior->BehaviorId < UE_ARRAY_COUNT(Activities) ? Activities[Behavior->BehaviorId] : EEcoSpeciesActivity::Hold);
             if (Behavior->BehaviorId == 0) Present.Flags |= 2;
+            if(NaturalHabitatProfile||!RegionHabitatProfiles.IsEmpty()){
+                if(const auto* Body=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E)){
+                    if(Body->Body.LastIntake<=1.e-9)Present.Flags&=~uint8(2);
+                }
+                if(EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E))if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized){
+                    const double Now=V.HP<=0&&Life.DeathTime>=0?Life.DeathTime:
+                        GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+                    const auto Id=EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).StableAgentId;
+                    const uint8 Appearance=Link->Individual.bNaturalPopulation?(Link->Individual.Sex==EcoLifeV3::ESex::Male?1:2):
+                        (Link->Individual.Growth(Now)<.97?3:uint8(1+EcoLifeV3::Mix(uint64(Id))%2));
+                    Present.Flags=EcoPresentationFlags::WithAppearance(Present.Flags,Appearance);
+                }
+            }
             if(Behavior->Decision.KeepActive==EcoWorldV3::kKeepAlert&&Behavior->BehaviorId==EcoRepertoireV3::kGraze)
                 Present.Activity=uint8(EEcoSpeciesActivity::AlertGraze);
             else if(const auto* Body=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E);Body&&Body->Body.bWeak
@@ -277,6 +295,14 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 if(!J->bPause)Present.Flags&=~uint8(2);
             }
             if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized){
+                if(NaturalHabitatProfile){
+                    switch(Link->Individual.Residence.Phase){
+                        case 1:case 5:Present.Activity=uint8(EEcoSpeciesActivity::ShelterTravel);Present.Flags&=~uint8(2);break;
+                        case 2:Present.Activity=uint8(EEcoSpeciesActivity::Vigilant);Present.Flags&=~uint8(2);break;
+                        case 4:Present.Activity=uint8(EEcoSpeciesActivity::Flee);Present.Flags&=~uint8(2);break;
+                        default:break;
+                    }
+                }
                 switch(Link->Individual.Memory.Response){
                     case EcoLifeV3::EResponse::Curious:Present.Activity=uint8(EEcoSpeciesActivity::Curious);Present.Flags&=~uint8(2);break;
                     case EcoLifeV3::EResponse::Vigilant:Present.Activity=uint8(EEcoSpeciesActivity::Vigilant);Present.Flags&=~uint8(2);break;

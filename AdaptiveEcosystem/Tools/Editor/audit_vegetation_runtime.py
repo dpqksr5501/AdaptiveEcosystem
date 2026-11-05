@@ -21,7 +21,7 @@ folder = arg('VegetationAuditFolder','Vegetation_20261023')
 if map_name not in ('LV_JYU_HerdMigration','LV_JYU_Ecosystem') or not re.fullmatch(r'[A-Za-z0-9_]+',folder):raise RuntimeError('Owned map/output folder required')
 out = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())) / folder
 out.mkdir(parents=True, exist_ok=True)
-state = dict(start=None, next=0, rows=[], error=None, phase=None, camera=None, shots=0, focus=None, hidden=False, last={}, transfers=[],world=None,csv=False,child_visuals=[])
+state = dict(start=None, next=0, rows=[], error=None, phase=None, camera=None, shots=0, focus=None, hidden=False, last={}, transfers=[],world=None,csv=False,child_visuals=[],observer_targets=[])
 deadline = time.monotonic() + duration + 180
 if pie:
     editor = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem)
@@ -45,7 +45,7 @@ def finish(result):
     if pie: unreal.unregister_slate_post_tick_callback(handle)
     else: relay.on_runtime_sample.remove_callable(tick)
     report = dict(result=result, error=state['error'], fixture=('Authored BP climate; no weather/food/agent writes; observer threats disabled' if authored else 'World rainfall=0 then 0.65; no direct food removal/refill; observer threats disabled'),
-                  duration_wall_seconds=duration, samples=state['rows'], screenshots=state['shots'], region_transfers=state['transfers'],child_visuals=state['child_visuals'],overlap_expected='-vegetationoverlapexpected' in cmd.lower())
+                  duration_wall_seconds=duration, samples=state['rows'], screenshots=state['shots'], region_transfers=state['transfers'],child_visuals=state['child_visuals'],overlap_expected='-vegetationoverlapexpected' in cmd.lower(),observer_targets=state['observer_targets'])
     (out / (name + '_Runtime.json')).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     unreal.log('VEGETATION_AUDIT_FINISHED ' + json.dumps(dict(result=result, error=state['error'], samples=len(state['rows']))))
     if pie:
@@ -107,6 +107,23 @@ def tick(dt):
                                                    previous=previous.get('native_world_position'), current=agent.get('native_world_position')))
                 state['last'][str(key)] = agent
                 agents.append(agent)
+        if '-vegetationnetworkchildcoverage' in cmd.lower():
+            # Explicit observer fixture: move server-owned viewers only. A regional
+            # camera orbit around wolves does not necessarily cover a newborn's relevance bubble.
+            region=('Forest','Barren','Highland')[int(elapsed/12)%3]
+            live=[a for a in agents if a.get('region')==region and a.get('hp',0)>0 and a.get('native_world_position')]
+            born=[a for a in live if a.get('species')=='Herbivore' and a.get('life',{}).get('origin')==1]
+            wolves=[a for a in live if a.get('species')=='Wolf']
+            candidates=born or wolves or live
+            if candidates:
+                target=min(candidates,key=lambda a:int(a['stable_id']));point=unreal.Vector(*target['native_world_position'])
+                view=point+unreal.Vector(400,250,650)
+                for controller in unreal.GameplayStatics.get_all_actors_of_class(game,unreal.PlayerController):
+                    viewer=controller.get_controlled_pawn()
+                    if viewer:
+                        viewer.set_actor_location(view,False,True)
+                        controller.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(view,point))
+                state['observer_targets'].append(dict(elapsed=elapsed,id=target['stable_id'],region=region,natural_child=bool(born)))
         pawn=unreal.GameplayStatics.get_player_pawn(game,0)
         camera=unreal.GameplayStatics.get_player_camera_manager(game,0)
         p=pawn.get_actor_location() if pawn else None;c=camera.get_camera_location() if camera else None

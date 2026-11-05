@@ -38,6 +38,13 @@ struct FEcoCreatureCueFragment : public FMassFragment
     int16 FocusYaw = 0;
 };
 
+namespace EcoPresentationFlags
+{
+    // Bits 4..5 already belong to EEcoSenseSource. Morphs use the unused top bits.
+    inline constexpr uint8 Appearance(uint8 Flags){return (Flags>>6)&3;}
+    inline constexpr uint8 WithAppearance(uint8 Flags,uint8 Variant){return (Flags&0x3f)|((Variant&3)<<6);}
+}
+
 /** Read-only presentation payload on clients; no client vitals or policy simulation. */
 USTRUCT()
 struct FEcoCreaturePresentationFragment : public FMassFragment
@@ -48,6 +55,8 @@ struct FEcoCreaturePresentationFragment : public FMassFragment
 	uint8 Health = 255;
 	uint8 Energy = 255;
 	uint8 Activity = 0;
+	uint8 CoatTone = 128; // bounded inherited colour, independent of health and age
+    uint8 Maturity = 255; // normalized age; separate from inherited size
 	uint8 BodyScale = 128; // scale = byte / 128; authority computes from genome + age
 	int16 FocusYaw = 0;
 };

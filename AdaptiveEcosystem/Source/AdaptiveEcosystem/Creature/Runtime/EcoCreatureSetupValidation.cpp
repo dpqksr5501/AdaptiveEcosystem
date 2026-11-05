@@ -9,6 +9,48 @@
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "Network/EcoGameState.h"
+#include "World/EcoNaturalHabitatProfile.h"
+#include "World/EcoVegetationField.h"
+#include "Creature/Runtime/EcoCreatureMovement.h"
+#include "Dom/JsonObject.h"
+#include "Serialization/JsonSerializer.h"
+
+FString AEcoCreatureIntegrationSpawner::CaptureHabitatAuthoringReport() const
+{
+    if(!IsInGameThread()||!GetWorld())return TEXT("{\"rejected\":\"GameThreadWorldRequired\"}");
+    auto Report=MakeShared<FJsonObject>();TArray<FString> Errors,Notes;CollectSetupIssues(Errors,Notes);
+    Report->SetStringField(TEXT("map"),GetWorld()->GetOutermost()->GetName());Report->SetStringField(TEXT("backend"),TEXT("Native ground-following 2.5D"));
+    TArray<TSharedPtr<FJsonValue>> Inputs;int32 Probes=0,Missing=0,Steep=0,DeepWater=0,Count=0;bool Truncated=false;
+    for(TActorIterator<AEcoVegetationHabitat> It(GetWorld());It;++It){
+        if(++Count>256){Truncated=true;break;}
+        const auto* Profile=NaturalHabitatProfile.Get();if(const auto* Override=RegionHabitatProfiles.Find(It->RegionId))Profile=Override->Get();
+        const auto* MovementProfile=Profile;
+        if(It->GrowthProfile)Profile=It->GrowthProfile;
+        auto Input=MakeShared<FJsonObject>();Input->SetStringField(TEXT("id"),It->HabitatId.ToString());Input->SetStringField(TEXT("region"),It->RegionId.ToString());
+        Input->SetNumberField(TEXT("priority"),It->Priority);Input->SetStringField(TEXT("profile"),Profile?Profile->ProfileId.ToString():TEXT("None"));
+        Input->SetBoolField(TEXT("connected_water"),It->bConnectedFreshWater);Input->SetNumberField(TEXT("signature"),It->Fingerprint());
+        if(!Groups.ContainsByPredicate([&](const FEcoCreatureSpawnGroup& G){return G.RegionId==It->RegionId;}))Errors.Add(TEXT("Habitat refers to an unknown coordinator region: ")+It->HabitatId.ToString());
+        int32 Grounded=0,Wadeable=0;
+        if(Profile&&Profile->IsValidProfile()){
+            const FVector E=It->Bounds->GetUnscaledBoxExtent();const FTransform T=It->Bounds->GetComponentTransform();
+            for(int32 Y=-1;Y<=1;++Y)for(int32 X=-1;X<=1;++X){
+                ++Probes;FHitResult Hit;const FVector Hint=T.TransformPosition(FVector(E.X*.7*X,E.Y*.7*Y,0));
+                if(!AEcoVegetationField::SampleNaturalGround(*GetWorld(),Hint,*Profile,Hit,*It)){++Missing;continue;}
+                const float MinNormal=MovementProfile?float(FMath::Cos(FMath::DegreesToRadians(MovementProfile->WalkableSlopeDegrees))):.65f;
+                const float MaxDepth=MovementProfile?MovementProfile->MaxWadingDepthCm:40.f;
+                ++Grounded;if(Hit.ImpactNormal.Z<MinNormal)++Steep;
+                if(EcoCreatureMovement::IsWadeableGround(*GetWorld(),Hit.ImpactPoint,MaxDepth))++Wadeable;else ++DeepWater;
+            }
+        }else Errors.Add(TEXT("Missing/invalid natural profile for: ")+It->HabitatId.ToString());
+        Input->SetNumberField(TEXT("grounded_samples"),Grounded);Input->SetNumberField(TEXT("wadeable_samples"),Wadeable);Inputs.Add(MakeShared<FJsonValueObject>(Input));
+    }
+    Report->SetArrayField(TEXT("habitats"),Inputs);Report->SetNumberField(TEXT("probes"),Probes);Report->SetNumberField(TEXT("unavailable_or_ambiguous_ground"),Missing);
+    Report->SetNumberField(TEXT("steep_samples"),Steep);Report->SetNumberField(TEXT("deep_water_samples"),DeepWater);Report->SetBoolField(TEXT("truncated"),Truncated);
+    Report->SetBoolField(TEXT("passed_configuration"),Errors.IsEmpty()&&!Truncated);Report->SetBoolField(TEXT("play_acceptance_complete"),false);
+    TArray<TSharedPtr<FJsonValue>> ErrorRows,NoteRows;for(const auto& E:Errors)ErrorRows.Add(MakeShared<FJsonValueString>(E));for(const auto& N:Notes)NoteRows.Add(MakeShared<FJsonValueString>(N));
+    Report->SetArrayField(TEXT("errors"),ErrorRows);Report->SetArrayField(TEXT("notes"),NoteRows);
+    FString Text;FJsonSerializer::Serialize(Report,TJsonWriterFactory<>::Create(&Text));return Text;
+}
 
 bool AEcoCreatureIntegrationSpawner::CollectSetupIssues(TArray<FString>& Errors, TArray<FString>& Notes) const
 {
@@ -16,6 +58,21 @@ bool AEcoCreatureIntegrationSpawner::CollectSetupIssues(TArray<FString>& Errors,
 	UWorld* World = GetWorld();
 	if (!World) { Errors.Add(TEXT("Coordinator has no World.")); return false; }
     if(bEnableEcosystemLife&&!bUseV3Policy)Errors.Add(TEXT("Ecosystem Life requires the supported Integrated Native V3 backend; V1/SpeciesAI life execution is not implemented."));
+    if(NaturalHabitatProfile||!RegionHabitatProfiles.IsEmpty()){
+        if(!bUseV3Policy||!bEnableEcosystemLife||!bEnableVegetation)Errors.Add(TEXT("Natural habitat profiles require Native V3 + Ecosystem Life + Vegetation."));
+        if(NaturalHabitatProfile&&!NaturalHabitatProfile->IsValidProfile())Errors.Add(TEXT("Invalid default natural habitat profile."));
+        for(const auto& Entry:RegionHabitatProfiles){
+            if(Entry.Key.IsNone()||!Entry.Value||!Entry.Value->IsValidProfile())Errors.Add(TEXT("Invalid region habitat profile override."));
+            if(!Groups.ContainsByPredicate([&](const FEcoCreatureSpawnGroup& G){return G.RegionId==Entry.Key;}))Errors.Add(TEXT("Habitat profile override refers to an unknown region."));
+        }
+        TSet<FString> Ids;
+        for(TActorIterator<AEcoVegetationHabitat> It(GetWorld());It;++It){
+            const FString Key=It->RegionId.ToString()+TEXT("/")+It->HabitatId.ToString();
+            if(It->HabitatId.IsNone()||Ids.Contains(Key)||!It->IsValidHabitat())Errors.Add(FString::Printf(TEXT("Invalid/duplicate natural habitat input: %s"),*It->GetPathName()));
+            Ids.Add(Key);
+        }
+        Notes.Add(TEXT("Native habitat is ground-following 2.5D; overlapping floors, swimming and automatic hydraulic connectivity are unsupported. Preview slopes/probe bands and explicit water volumes."));
+    }
 	int32 Coordinators = 0;
 	for (TActorIterator<AEcoCreatureIntegrationSpawner> It(World); It; ++It) ++Coordinators;
 	if (Coordinators != 1) Errors.Add(FString::Printf(TEXT("Keep exactly one EcoCreatureIntegrationSpawner; found %d."), Coordinators));

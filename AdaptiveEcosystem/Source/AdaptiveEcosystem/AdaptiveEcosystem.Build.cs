@@ -49,7 +49,7 @@ public class AdaptiveEcosystem : ModuleRules
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add("UnrealEd");
-			PrivateDependencyModuleNames.AddRange(new string[] { "StateTreeEditorModule", "AssetRegistry", "AnimGraph", "BlueprintGraph", "KismetCompiler", "Landscape" });
+			PrivateDependencyModuleNames.AddRange(new string[] { "StateTreeEditorModule", "AssetRegistry", "AnimGraph", "BlueprintGraph", "KismetCompiler", "Landscape", "Niagara", "MeshDescription", "StaticMeshDescription" });
 		}
 
 		PublicIncludePaths.AddRange(new string[] {

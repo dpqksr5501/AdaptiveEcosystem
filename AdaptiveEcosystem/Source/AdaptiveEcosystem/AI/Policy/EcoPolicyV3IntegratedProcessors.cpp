@@ -26,6 +26,7 @@
 #include "AI/Social/Shelter/EcoShelterLifecycleProcessor.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcologyRegion.h"
+#include "EcoLifeLocomotion.h"
 
 namespace EcoPolicyV3IntegratedProcImpl
 {
@@ -42,7 +43,12 @@ namespace EcoPolicyV3IntegratedProcImpl
         const TArray<int64>* WolfKeys=nullptr;
         TArray<uint8> CaptureMask;
         UEcoShelterSubsystem* Shelters = nullptr;
+        const UEcoHerdMigrationSubsystem* Journeys=nullptr;
         double Now = 0;
+        // Immutable pre-move positions, rebuilt once per native step. Contact
+        // queries visit adjacent buckets, rather than every animal in the world.
+        TMap<FIntPoint,TArray<int32>> BodyBuckets;
+        TMap<int64,int32> FamilyRows;
 	};
 
     bool Traveling(void* User,int32 Index){
@@ -64,7 +70,16 @@ namespace EcoPolicyV3IntegratedProcImpl
         namespace R=EcoRepertoireV3;const auto& C=A.Ctx->Sim.RepCfg;
         if(H.Rep->Behavior!=R::kGraze)R::Enter(*H.Rep,R::kGraze,H.Decision->DecisionObs,C);
         const FVector P=A.Ctx->UnitsToCm(H.Body->Pos.X,H.Body->Pos.Y,D.Int->GroundZ);
-        const FVector Delta=J->Goal-P;
+        FVector Goal=J->Goal;
+        if(A.Ctx->Sim.Config.bEcosystemLife&&A.Journeys&&!J->bPause){
+            if(const auto* Plan=A.Journeys->GetPlans().Find(J->PersistentHerdId)){
+                const int32 Lanes=FMath::Clamp(FMath::FloorToInt(Plan->CorridorWidth/150),1,4);
+                const int32 Lane=int32(EcoLifeV3::Mix(uint64(D.Id))%uint64(Lanes));
+                const double Offset=(Lane-(Lanes-1)*.5)*FMath::Min(150.f,Plan->CorridorWidth/Lanes);
+                const FVector Forward=(J->Goal-P).GetSafeNormal2D();Goal+=FVector(-Forward.Y,Forward.X,0)*Offset;
+            }
+        }
+        const FVector Delta=Goal-P;
         FVector Separation=FVector::ZeroVector;
         for(const auto& Other:*A.Deer){
             if(Other.Id==D.Id||!Other.Journey||!Other.Journey->bActive||Other.Journey->PlanId!=J->PlanId||Other.Int->bDead)continue;
@@ -152,6 +167,271 @@ namespace EcoPolicyV3IntegratedProcImpl
         const auto Kind=Memory.PursuitExposure>=2?EcoLifeV3::EEncounter::Pursuit:ClosingFast?EcoLifeV3::EEncounter::FastApproach:EcoLifeV3::EEncounter::Harmless;
         Memory.Observe(Kind,EcoLifeV3::Mix(uint64(Now/5)+1),Now,Now,Seen->X,Seen->Y);
     }
+    void LifeLocomotion(const FMoveAdapter& A,int32 Index,const EcoWorldV3::FHerbView& H)
+    {
+        namespace R=EcoRepertoireV3;
+        const auto& D=(*A.Deer)[(*A.Rows)[Index]];
+        auto& Life=D.Int->Individual;Life.MotionReason=0;Life.FamilyMode=0;
+        if(D.Journey&&(D.Journey->bStranded||(D.Journey->bActive&&D.Journey->bPause)))return;
+        const bool Journey=D.Journey&&D.Journey->bActive;
+        if(A.Sub->GetSettings().bSocialControl&&D.SocialAudit&&D.SocialAudit->AppliedReservation>0)return;
+        const auto& W=A.Ctx->Sim;const auto& C=W.RepCfg;const auto& G=W.Food;
+        const double Now=W.T*R::kStepSeconds;
+        const bool Graze=!Journey&&H.Rep->Behavior==R::kGraze&&Life.Memory.Response==EcoLifeV3::EResponse::Policy
+            &&H.Decision->KeepActive!=EcoWorldV3::kKeepPanic&&H.Decision->KeepActive!=EcoWorldV3::kKeepShelter;
+        auto Walk=[&](R::FVec2 Direction){
+            H.Control->Gait=R::kGaitWalk;H.Control->Velocity=R::Scale(R::Normalize(Direction),C.HerbSpeed*C.GaitSpeed[R::kGaitWalk]);
+            H.Control->EatMult=C.GaitEat[R::kGaitWalk];H.Control->DrainMult=C.GaitDrain[R::kGaitWalk];H.Control->bStill=false;
+        };
+        const bool Settling=W.Config.bNaturalHabitats&&Now<Life.SettlementUntil;
+        if(Graze&&H.Perception->Threat.PredCount==0&&(H.Body->Energy<.9||Settling)){
+            const double Here=G.FoodAt(H.Body->Pos);
+            // The learned .06 threshold exceeds entire small soil patches. A
+            // hungry animal can stop for two real bites, instead of walking
+            // forever over food it never considers sufficient to eat in place.
+            const double Dispersed=std::hypot(H.Body->Pos.X-Life.SettlementX,H.Body->Pos.Y-Life.SettlementY);
+            if(Here>=.012&&(!Settling||Dispersed>4||H.Body->Energy<.15)){
+                if(Settling&&Dispersed>4)Life.SettlementUntil=Now;
+                H.Control->Velocity={};H.Control->Gait=R::kGaitStop;
+                H.Control->EatMult=C.GaitEat[R::kGaitStop];H.Control->DrainMult=C.GaitDrain[R::kGaitStop];Life.MotionReason=1;
+            }else{
+                if(Life.ForageOriginX!=A.Ctx->OriginCm.X||Life.ForageOriginY!=A.Ctx->OriginCm.Y){
+                    Life.ForageCell=-1;Life.NextForageScan=0;Life.ForageOriginX=A.Ctx->OriginCm.X;Life.ForageOriginY=A.Ctx->OriginCm.Y;
+                }
+                const double Range=EcoWorldV3::SeePredNow(W);
+                if(Now>=Life.NextForageScan){
+                    Life.NextForageScan=Now+1;Life.ForageCell=-1;
+                    struct FCandidate{int32 Cell;double Score;};TArray<FCandidate> Candidates;
+                    const int32 K=G.CellOf(H.Body->Pos),X=K%G.Gw,Y=K/G.Gw,Radius=FMath::CeilToInt(Range/G.Cell);
+                    for(int32 J=FMath::Max(0,Y-Radius);J<=FMath::Min(G.Gw-1,Y+Radius);++J)
+                        for(int32 I=FMath::Max(0,X-Radius);I<=FMath::Min(G.Gw-1,X+Radius);++I){
+                            const int32 Cell=J*G.Gw+I;if(G.Food[Cell]<.02||(!G.Habitats.empty()&&!G.Habitats[Cell].bGroundUsable))continue;
+                            const R::FVec2 Q{(I+.5)*G.Cell,(J+.5)*G.Cell},Delta=R::Sub(Q,H.Body->Pos);
+                            const double Dist=std::hypot(Delta.X,Delta.Y);if(Dist>Range||Dist<.01)continue;
+                            if((Delta.X*H.Body->Head.X+Delta.Y*H.Body->Head.Y)/Dist<W.ObsCfg.ThreatFovCos||G.BlocksSight(H.Body->Pos.X,H.Body->Pos.Y,Q.X,Q.Y))continue;
+                            const auto* Bucket=A.BodyBuckets.Find(FIntPoint(FMath::FloorToInt((Q.X+A.Ctx->OriginCm.X/R::kUnitCm)/2),FMath::FloorToInt((Q.Y+A.Ctx->OriginCm.Y/R::kUnitCm)/2)));
+                            const int32 Occupants=Bucket?Bucket->Num():0;
+                            double Score=G.Food[Cell]/(1+Dist*.2)/(1+Occupants*(Life.bNaturalPopulation?2-Life.Genome.Sociability:1));
+                            if(Life.bNaturalPopulation)Score*=.92+.16*EcoLifeV3::Unit(uint64(D.Id)^EcoLifeV3::Mix(uint64(Cell)));
+                            if(Settling){
+                                const double FromArrival=std::hypot(Q.X-Life.SettlementX,Q.Y-Life.SettlementY);
+                                if(FromArrival<4)continue;
+                                Score*=1+EcoNaturalHabitat::Random(uint32(D.Id),uint32(Cell))*.7;
+                                if(!G.Habitats.empty())Score*=1+.2*G.Habitats[Cell].WaterSupply;
+                            }
+                            Candidates.Add({Cell,Score});
+                        }
+                    Candidates.Sort([](const auto& L,const auto& Rhs){return L.Score==Rhs.Score?L.Cell<Rhs.Cell:L.Score>Rhs.Score;});
+                    // Only four physical visibility/reachability checks per scan.
+                    for(int32 I=0;I<FMath::Min(4,Candidates.Num());++I){
+                        const int32 Cell=Candidates[I].Cell;const R::FVec2 Q{(Cell%G.Gw+.5)*G.Cell,(Cell/G.Gw+.5)*G.Cell};
+                        const FVector P=A.Ctx->UnitsToCm(H.Body->Pos.X,H.Body->Pos.Y,D.Int->GroundZ);
+                        const FVector Target=A.Ctx->UnitsToCm(Q.X,Q.Y,D.Int->GroundZ);double Z=D.Int->GroundZ;
+                        if(A.Sub->UsesTerrain()&&!A.Sub->TraceMove(A.RegionId,P,Target,Z,false,30.f))continue;
+                        if(A.Sub->GetWorld()->LineTraceTestByObjectType(P+FVector(0,0,60),FVector(Target.X,Target.Y,Z+30),
+                            FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionQueryParams(SCENE_QUERY_STAT(EcoLifeFoodSight),false)))continue;
+                        Life.ForageCell=Cell;break;
+                    }
+                }
+                if(Life.ForageCell>=0&&Life.ForageCell<int32(G.Food.size())&&G.Food[Life.ForageCell]>=.012){
+                    const int32 Cell=Life.ForageCell;const R::FVec2 Q{(Cell%G.Gw+.5)*G.Cell,(Cell/G.Gw+.5)*G.Cell};
+                    if(R::SizeSquared(R::Sub(Q,H.Body->Pos))<=Range*Range){Walk(R::Sub(Q,H.Body->Pos));Life.MotionReason=1;}
+                }
+            }
+        }
+        // Family is a local intent inside the existing Native writer. Never override danger,
+        // a journey, hunger, Social reservations or a refuge arrival with attachment behavior.
+        if(Life.bNaturalPopulation&&Life.AgeFraction(Now)<1&&!Journey){
+            if(Life.FamilyOriginX!=A.Ctx->OriginCm.X||Life.FamilyOriginY!=A.Ctx->OriginCm.Y){
+                Life.FamilySeen=-1;Life.NextFamilyScan=0;Life.FamilyOriginX=A.Ctx->OriginCm.X;Life.FamilyOriginY=A.Ctx->OriginCm.Y;
+            }
+            if(Now>=Life.NextFamilyScan){
+                Life.NextFamilyScan=Now+1+EcoLifeV3::Unit(uint64(D.Id))*.3;
+                auto Observe=[&](int32 Row){
+                    const auto& Adult=(*A.Deer)[Row];const auto& Kin=Adult.Int->Individual;
+                    if(Adult.Id==D.Id||Adult.Int->bDead||Adult.Vitals->HP<=0||Adult.Int->ContextIndex!=D.Int->ContextIndex
+                        ||!Kin.bNaturalPopulation||Kin.Sex!=EcoLifeV3::ESex::Female||Kin.AgeFraction(Now)<1)return false;
+                    const auto Q=Adult.View.Body->Pos;
+                    if(R::SizeSquared(R::Sub(Q,H.Body->Pos))>144||FMath::Abs(Adult.Int->GroundZ-D.Int->GroundZ)>150)return false;
+                    if(G.BlocksSight(H.Body->Pos.X,H.Body->Pos.Y,Q.X,Q.Y))return false;
+                    const FVector From=A.Ctx->UnitsToCm(H.Body->Pos.X,H.Body->Pos.Y,D.Int->GroundZ)+FVector(0,0,60);
+                    const FVector To=A.Ctx->UnitsToCm(Q.X,Q.Y,Adult.Int->GroundZ)+FVector(0,0,75);
+                    if(A.Sub->GetWorld()->LineTraceTestByObjectType(From,To,FCollisionObjectQueryParams(ECC_WorldStatic),
+                        FCollisionQueryParams(SCENE_QUERY_STAT(EcoFamilySight),false)))return false;
+                    Life.FamilyObserved=Adult.Id;Life.FamilySeen=Now;Life.FamilyX=Q.X;Life.FamilyY=Q.Y;return true;
+                };
+                bool Seen=false;
+                if(const auto* Row=A.FamilyRows.Find(Life.Caregiver))Seen=Observe(*Row);
+                if(!Seen&&Life.FamilyObserved!=Life.Caregiver)if(const auto* Row=A.FamilyRows.Find(Life.FamilyObserved))Seen=Observe(*Row);
+                // Lost/dead/separated caregiver: retain no remote target. A nearby adult can
+                // become a social companion after the old sighting expires, without changing lineage.
+                if(!Seen&&Now-Life.FamilySeen>30){
+                    Life.FamilyObserved=0;
+                    struct FCandidate{int32 Row;double Distance;};TArray<FCandidate> Candidates;
+                    const FIntPoint Center(FMath::FloorToInt((H.Body->Pos.X+A.Ctx->OriginCm.X/R::kUnitCm)/2),FMath::FloorToInt((H.Body->Pos.Y+A.Ctx->OriginCm.Y/R::kUnitCm)/2));
+                    for(int32 Y=-3;Y<=3;++Y)for(int32 X=-3;X<=3;++X)if(const auto* Bucket=A.BodyBuckets.Find(Center+FIntPoint(X,Y)))
+                        for(const int32 Row:*Bucket){const auto& Adult=(*A.Deer)[Row];if(Adult.Int->ContextIndex==D.Int->ContextIndex&&Adult.Int->Individual.Sex==EcoLifeV3::ESex::Female)
+                            Candidates.Add({Row,R::SizeSquared(R::Sub(Adult.View.Body->Pos,H.Body->Pos))});}
+                    Candidates.Sort([](const auto& L,const auto& Rhs){return L.Distance==Rhs.Distance?L.Row<Rhs.Row:L.Distance<Rhs.Distance;});
+                    for(int32 K=0;K<FMath::Min(4,Candidates.Num())&&!Seen;++K)Seen=Observe(Candidates[K].Row);
+                }
+            }
+            if(Graze&&H.Perception->Threat.PredCount==0&&H.Body->Energy>.25){
+                Life.FamilyMode=3;
+                const int32 Cell=G.CellOf(H.Body->Pos);
+                const bool Concealed=!G.Habitats.empty()&&G.Habitats[Cell].Plant==EcoVegetationV3::EPlant::Shrub&&G.Cap[Cell]>0&&G.Food[Cell]/G.Cap[Cell]>.45;
+                if(Life.AgeFraction(Now)<.12&&Concealed){
+                    Life.FamilyMode=1;++Life.FamilyHideSteps;H.Control->Velocity={};H.Control->Gait=R::kGaitStop;
+                    H.Control->DrainMult=C.GaitDrain[R::kGaitStop];H.Control->EatMult=C.GaitEat[R::kGaitStop];H.Control->bStill=true;
+                }else if(Life.FamilySeen>=0&&Now-Life.FamilySeen<=3){
+                    const double Angle=EcoLifeV3::Unit(uint64(D.Id)+17)*UE_TWO_PI;
+                    const R::FVec2 Target{Life.FamilyX+FMath::Cos(Angle)*1.4/Life.Genome.Sociability,Life.FamilyY+FMath::Sin(Angle)*1.4/Life.Genome.Sociability};
+                    const auto Delta=R::Sub(Target,H.Body->Pos);const double Distance=std::hypot(Delta.X,Delta.Y);
+                    if(Distance>1.2){
+                        // Existing terrain sweep/collision decides whether this observed target is reachable.
+                        Walk(Delta);H.Control->Velocity=R::ClampMagnitude(H.Control->Velocity,FMath::Max(0.,Distance-1.));
+                        Life.FamilyMode=2;++Life.FamilyFollowSteps;
+                    }
+                }
+            }
+        }
+        if(!H.Control->bStill&&H.Rep->Behavior!=R::kSleep&&H.Rep->Behavior!=R::kFreeze){
+            const FIntPoint Center(FMath::FloorToInt((H.Body->Pos.X+A.Ctx->OriginCm.X/R::kUnitCm)/2),FMath::FloorToInt((H.Body->Pos.Y+A.Ctx->OriginCm.Y/R::kUnitCm)/2));
+            R::FVec2 Separation;int32 Visited=0;
+            for(int32 Y=-1;Y<=1;++Y)for(int32 X=-1;X<=1;++X)if(const auto* Bucket=A.BodyBuckets.Find(Center+FIntPoint(X,Y)))
+                for(const int32 Row:*Bucket){
+                    if(Visited++>=64)break;const auto& Other=(*A.Deer)[Row];if(Other.Id==D.Id)continue;
+                    const auto* Context=A.Sub->GetContext(Other.Int->ContextIndex);if(!Context)continue;
+                    const R::FVec2 Q{Other.View.Body->Pos.X+(Context->OriginCm.X-A.Ctx->OriginCm.X)/R::kUnitCm,
+                        Other.View.Body->Pos.Y+(Context->OriginCm.Y-A.Ctx->OriginCm.Y)/R::kUnitCm};
+                    const double Clearance=.5*(Life.BodyScale(Now)+Other.Int->Individual.BodyScale(Now));
+                    Separation=R::Add(Separation,EcoLifeMotion::Separation(H.Body->Pos,Q,Clearance,uint64(D.Id),uint64(Other.Id)));
+                }
+            if(R::SizeSquared(Separation)>1.e-8){
+                const double Existing=std::hypot(H.Control->Velocity.X,H.Control->Velocity.Y),WalkSpeed=C.HerbSpeed*C.GaitSpeed[R::kGaitWalk];
+                // Freeze/arrived cover is never displaced. Moving escape keeps
+                // its forward component; grazing yields even when it was stopped.
+                if(!Graze&&Existing>1.e-8){
+                    Separation=EcoLifeMotion::PassingAvoidance(Separation,R::Normalize(H.Control->Velocity));
+                }
+                H.Control->Velocity=R::ClampMagnitude(R::Add(H.Control->Velocity,R::Scale(R::ClampMagnitude(Separation,1),WalkSpeed*2.5)),FMath::Max(Existing,WalkSpeed));
+                if(Graze){H.Control->Gait=R::kGaitWalk;H.Control->DrainMult=C.GaitDrain[R::kGaitWalk];H.Control->EatMult=C.GaitEat[R::kGaitWalk];}
+                Life.MotionReason=2;
+            }
+            const auto Before=H.Control->Velocity;
+            if(!Journey)H.Control->Velocity=EcoLifeMotion::BoundaryVelocity(H.Body->Pos,Before,W.Config.WorldSize,1.5);
+            if(Before.X!=H.Control->Velocity.X||Before.Y!=H.Control->Velocity.Y)Life.MotionReason=3;
+        }
+    }
+
+    void NaturalShelterControl(const FMoveAdapter& A,int32 Index,const EcoWorldV3::FHerbView& H)
+    {
+        namespace R=EcoRepertoireV3;
+        if(!A.Ctx->Sim.Config.bNaturalHabitats)return;
+        const auto& D=(*A.Deer)[(*A.Rows)[Index]];auto& Life=D.Int->Individual;auto& S=Life.Residence;
+        if(Traveling(const_cast<FMoveAdapter*>(&A),Index)||(A.Sub->GetSettings().bSocialControl&&D.SocialAudit&&D.SocialAudit->AppliedReservation>0)){
+            S.Cover=-1;S.Phase=0;S.SettledSince=-1;return;
+        }
+        const bool Hide=H.Rep->Behavior==R::kHide,Sleep=H.Rep->Behavior==R::kSleep;
+        if(!Hide&&!Sleep){S.Cover=-1;S.Phase=0;S.SettledSince=-1;return;}
+        const auto& W=A.Ctx->Sim;const double Now=W.T*R::kStepSeconds,Body=.15*Life.BodyScale(Now);
+        int32 Cover=Hide?H.Rep->HideTarget:-1;
+        if(Sleep)for(int32 K=0;K<int32(W.Config.Covers.size());++K){const auto& C=W.Config.Covers[K];
+            if(C.Radius>0&&std::hypot(C.X-H.Body->Pos.X,C.Y-H.Body->Pos.Y)<C.Radius){Cover=K;break;}}
+        if(Cover<0||Cover>=int32(W.Config.Covers.size())||W.Config.Covers[Cover].Radius<=Body*3){
+            S.Cover=-1;S.Phase=0;S.SettledSince=-1;return;
+        }
+        const auto& C=W.Config.Covers[Cover];
+        const int64 Registration=A.Ctx->CoverRegistrations.IsValidIndex(Cover)?A.Ctx->CoverRegistrations[Cover]:0;
+        if(S.OriginX!=A.Ctx->OriginCm.X||S.OriginY!=A.Ctx->OriginCm.Y||S.RequestedCover!=Cover||S.Registration!=Registration){
+            S.Cover=-1;S.NextSearch=0;S.SettledSince=-1;S.OriginX=A.Ctx->OriginCm.X;S.OriginY=A.Ctx->OriginCm.Y;S.Registration=Registration;
+            S.RequestedCover=Cover;
+        }
+        const bool Seen=H.Perception->Threat.PredCount>0;
+        const double Depth=C.Radius-std::hypot(H.Body->Pos.X-C.X,H.Body->Pos.Y-C.Y);
+        // Cover is an opportunity to break contact, not a promise to wait for a predator.
+        if(Seen&&H.Perception->Threat.DPredMin<5){
+            S.Cover=-1;S.Phase=4;S.SettledSince=-1;
+            const auto Away=R::Normalize(H.Perception->Threat.AwayFromPred);
+            H.Control->Velocity=R::Scale(Away,W.RepCfg.HerbSpeed*W.RepCfg.GaitSpeed[R::kGaitRun]);
+            H.Control->Gait=R::kGaitRun;H.Control->DrainMult=W.RepCfg.GaitDrain[R::kGaitRun];
+            H.Control->EatMult=0;H.Control->bStill=false;H.Control->bCrouch=false;H.Rep->bArrived=false;return;
+        }
+        auto Occupied=[&](double X,double Y){
+            int32 Count=0;
+            int32 Capacity=16;
+            if(A.Shelters&&A.Ctx->CoverShelterIndices.IsValidIndex(Cover))for(const auto& Point:A.Shelters->GetShelters())
+                if(Point.RuntimeIndex==A.Ctx->CoverShelterIndices[Cover]){Capacity=Point.Capacity;break;}
+            for(const auto& Other:*A.Deer){
+                if(Other.Id==D.Id||Other.Int->bDead||Other.View.Body->DeathCause!=EcoWorldV3::kDeathNone)continue;
+                const auto* OtherCtx=A.Sub->GetContext(Other.Int->ContextIndex);if(!OtherCtx)continue;
+                const auto& Place=Other.Int->Individual.Residence;
+                if(OtherCtx==A.Ctx&&Place.Cover==Cover&&Place.Phase>=1&&Place.Phase<=3){
+                    if(std::hypot(Place.X-X,Place.Y-Y)<1.0)return true;
+                    ++Count;
+                }
+                const auto P=OtherCtx->UnitsToCm(Other.View.Body->Pos.X,Other.View.Body->Pos.Y,Other.Int->GroundZ);
+                const auto Q=A.Ctx->UnitsToCm(X,Y,D.Int->GroundZ);
+                if(FVector::DistSquared(P,Q)<FMath::Square(160.))return true;
+            }
+            return Count>=Capacity;
+        };
+        if(S.Cover>=0&&Now>=S.NextSearch){
+            S.NextSearch=Now+1;
+            if(Occupied(S.X,S.Y)){S.Cover=-1;S.SettledSince=-1;}
+        }
+        if(S.Cover<0&&Now>=S.NextSearch){
+            S.NextSearch=Now+1+EcoNaturalHabitat::Random(uint32(D.Id),9);
+            double Best=-1.e30;bool Found=false;
+            for(int32 K=0;K<8;++K){
+                const auto P=EcoNaturalHabitat::Interior(uint32(D.Id),C.X,C.Y,C.Radius,Body,K);
+                if(Occupied(P.X,P.Y))continue;
+                // Validate a sampled ground point and the initial physical step. The native
+                // writer validates every subsequent step; a blocked approach is replanned.
+                FVector Ground=A.Ctx->UnitsToCm(P.X,P.Y,D.Int->GroundZ);
+                FVector Projected;
+                if(!EcoCreatureMovement::ProjectSpawnPoint(*A.Sub->GetWorld(),Ground,Projected))continue;
+                const double Distance=std::hypot(P.X-H.Body->Pos.X,P.Y-H.Body->Pos.Y);
+                const auto Dir=R::Normalize({P.X-H.Body->Pos.X,P.Y-H.Body->Pos.Y});
+                double Z=D.Int->GroundZ;
+                if(!A.Sub->TraceMove(A.RegionId,A.Ctx->UnitsToCm(H.Body->Pos.X,H.Body->Pos.Y,Z),
+                    A.Ctx->UnitsToCm(H.Body->Pos.X+Dir.X*.3,H.Body->Pos.Y+Dir.Y*.3,Z),Z,false,FMath::Clamp(float(Body*R::kUnitCm),20.f,40.f)))continue;
+                if(FMath::Abs(Projected.Z-Ground.Z)>200)continue;
+                const double Score=C.Radius-std::hypot(P.X-C.X,P.Y-C.Y)-Distance*.15
+                    +(Seen?(P.X-C.X)*H.Perception->Threat.AwayFromPred.X+(P.Y-C.Y)*H.Perception->Threat.AwayFromPred.Y:0);
+                if(Score>Best){Best=Score;S.X=P.X;S.Y=P.Y;Found=true;}
+            }
+            if(Found){S.Cover=Cover;S.Phase=1;S.LastProgress=Now;S.LastDistance=1.e9;}
+            else {S.Phase=5;++S.SearchFailures;}
+        }
+        H.Control->bCrouch=false;H.Rep->bArrived=false;H.Control->EatMult=0;H.Control->SeeMult=1;
+        if(S.Cover<0){
+            // No valid interior place: continue an alert walk, never crouch on the rim.
+            const auto Dir=Seen?H.Perception->Threat.AwayFromPred:H.Body->Head;
+            H.Control->Velocity=R::Scale(R::Normalize(Dir),W.RepCfg.HerbSpeed*W.RepCfg.GaitSpeed[R::kGaitWalk]);
+            H.Control->Gait=R::kGaitWalk;H.Control->DrainMult=W.RepCfg.GaitDrain[R::kGaitWalk];H.Control->bStill=false;return;
+        }
+        const double Distance=std::hypot(S.X-H.Body->Pos.X,S.Y-H.Body->Pos.Y);
+        if(Distance<S.LastDistance-.05){S.LastDistance=Distance;S.LastProgress=Now;}
+        if(Distance>std::max(.25,Body)){
+            S.SettledSince=-1;S.Phase=1;
+            const double Speed=std::min(Distance,W.RepCfg.HerbSpeed*W.RepCfg.GaitSpeed[R::kGaitWalk]);
+            H.Control->Velocity=R::Scale(R::Normalize({S.X-H.Body->Pos.X,S.Y-H.Body->Pos.Y}),Speed);
+            H.Control->Gait=R::kGaitWalk;H.Control->DrainMult=W.RepCfg.GaitDrain[R::kGaitWalk];H.Control->bStill=false;
+            if(Now-S.LastProgress>5){S.Cover=-1;S.NextSearch=Now;S.Phase=5;++S.SearchFailures;}
+        }else{
+            if(S.SettledSince<0)S.SettledSince=Now;
+            if(Seen||Life.Memory.Response==EcoLifeV3::EResponse::Retreat)S.SettledSince=Now;
+            const bool Rest=EcoNaturalHabitat::CanRest(Distance,Depth,Body,Seen,H.Rep->Recency>.05?0:8,
+                Now-S.SettledSince,3+EcoNaturalHabitat::Random(uint32(D.Id),3)*4);
+            if(Rest&&S.Phase!=3&&Hide)H.Rep->LockLeft=W.RepCfg.LockHide;
+            S.Phase=Rest?3:2;H.Control->Velocity={};H.Control->Gait=R::kGaitStop;
+            H.Control->DrainMult=W.RepCfg.GaitDrain[R::kGaitStop];H.Control->bStill=true;H.Control->bCrouch=Rest&&Hide;
+            H.Rep->bArrived=Rest&&Hide;
+            if(Rest){if(Depth<Body*2)++S.EdgeRestSteps;else ++S.InteriorRestSteps;}
+        }
+    }
+
     void IntegratedControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H){
         const auto& A=*static_cast<const FMoveAdapter*>(User);
         if(Traveling(User,Index))JourneyControlHook(User,Index,H);
@@ -188,6 +468,8 @@ namespace EcoPolicyV3IntegratedProcImpl
                         }
                     }
                 }
+                LifeLocomotion(A,Index,H);
+                NaturalShelterControl(A,Index,H);
                 const double Speed=Life.SpeedScale(SimTime);
                 H.Control->Velocity.X*=Speed;H.Control->Velocity.Y*=Speed;
                 H.Control->DrainMult*=Life.Maintenance();
@@ -301,6 +583,26 @@ namespace EcoPolicyV3IntegratedProcImpl
 		return bOk;
 	}
 
+    bool ContactAllowsMove(const FMoveAdapter& A,int32 Index,const EcoWorldV3::FVec2& From,const EcoWorldV3::FVec2& To)
+    {
+        if(!A.Ctx->Sim.Config.bEcosystemLife)return true;
+        namespace R=EcoRepertoireV3;const auto& D=(*A.Deer)[(*A.Rows)[Index]];
+        const double Now=A.Ctx->Sim.T*R::kStepSeconds;
+        const FIntPoint Center(FMath::FloorToInt((From.X+A.Ctx->OriginCm.X/R::kUnitCm)/2),FMath::FloorToInt((From.Y+A.Ctx->OriginCm.Y/R::kUnitCm)/2));
+        int32 Visited=0;
+        for(int32 Y=-1;Y<=1;++Y)for(int32 X=-1;X<=1;++X)if(const auto* Bucket=A.BodyBuckets.Find(Center+FIntPoint(X,Y)))
+            for(const int32 Row:*Bucket){
+                if(Visited++>=64)break;const auto& Other=(*A.Deer)[Row];if(Other.Id==D.Id)continue;
+                const auto* Context=A.Sub->GetContext(Other.Int->ContextIndex);if(!Context)continue;
+                const R::FVec2 Q{Other.View.Body->Pos.X+(Context->OriginCm.X-A.Ctx->OriginCm.X)/R::kUnitCm,
+                    Other.View.Body->Pos.Y+(Context->OriginCm.Y-A.Ctx->OriginCm.Y)/R::kUnitCm};
+                // Same 30cm scaled body radius as the terrain movement writer.
+                const double Clearance=30*(D.Int->Individual.BodyScale(Now)+Other.Int->Individual.BodyScale(Now))/R::kUnitCm;
+                if(!EcoLifeMotion::AllowsMotion(From,To,Q,Clearance)){++D.Int->Individual.ContactBlockedSteps;return false;}
+            }
+        return true;
+    }
+
 	bool HerbMoveHook(void* User, int32 Index, const EcoWorldV3::FVec2& From, const EcoWorldV3::FVec2& To)
 	{
 		const FMoveAdapter& A = *static_cast<const FMoveAdapter*>(User);
@@ -308,6 +610,7 @@ namespace EcoPolicyV3IntegratedProcImpl
 		{
 			return true;
 		}
+        if(!ContactAllowsMove(A,Index,From,To))return false;
         if(Traveling(User,Index)){
             auto& F=*(*A.HerbInts)[Index];double Z=F.GroundZ;
             const float Radius=A.Ctx->Sim.Config.bEcosystemLife&&F.Individual.bInitialized?float(30*F.Individual.BodyScale(A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds)):30.f;
@@ -775,7 +1078,15 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 			Adapter.HerbInts = &HerbInts;
 			Adapter.WolfInts = &WolfInts;
             Adapter.Deer=&Deer;Adapter.Rows=&DeerByContext[c];
+            if(Ctx.Sim.Config.bEcosystemLife)for(int32 Row=0;Row<Deer.Num();++Row){
+                Adapter.FamilyRows.Add(Deer[Row].Id,Row);
+                const auto* BodyContext=Sub->GetContext(Deer[Row].Int->ContextIndex);if(!BodyContext)continue;
+                const auto P=Deer[Row].View.Body->Pos;
+                Adapter.BodyBuckets.FindOrAdd(FIntPoint(FMath::FloorToInt((P.X+BodyContext->OriginCm.X/EcoRepertoireV3::kUnitCm)/2),
+                    FMath::FloorToInt((P.Y+BodyContext->OriginCm.Y/EcoRepertoireV3::kUnitCm)/2))).Add(Row);
+            }
             Adapter.Shelters=World->GetSubsystem<UEcoShelterSubsystem>();Adapter.Now=Now;
+            Adapter.Journeys=World->GetSubsystem<UEcoHerdMigrationSubsystem>();
 			EcoWorldV3::FStepHooks Hooks;
 			Hooks.User = &Adapter;
 			// 사슴 Social 행동 연결 (조연우 님 22eb1b6). eco.IntegratedV3.SocialControl 1 일 때만 건다 — 기본 0 (사람 결정 10-17 (8))
@@ -817,6 +1128,14 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				const EcoWorldV3::FHerbBody& Body = *Views[r].Body;
 				FEcoIntegratedV3Fragment& Int = *HerbInts[r];
                 if(Ctx.Sim.Config.bEcosystemLife&&Body.DeathCause==EcoWorldV3::kDeathNone){
+                    if(Ctx.Sim.Config.bNaturalHabitats&&Body.LastIntake>0){
+                        const int32 Cell=Ctx.Sim.Food.CellOf(Body.Pos);
+                        // Native's actual consumed cell is the authority. A mouth-side
+                        // cue stays within it; no animation notify writes resources.
+                        const double X=FMath::Clamp(Body.Pos.X+Body.Head.X*.35,(Cell%Ctx.Sim.Food.Gw)*Ctx.Sim.Food.Cell+.01,(Cell%Ctx.Sim.Food.Gw+1)*Ctx.Sim.Food.Cell-.01);
+                        const double Y=FMath::Clamp(Body.Pos.Y+Body.Head.Y*.35,(Cell/Ctx.Sim.Food.Gw)*Ctx.Sim.Food.Cell+.01,(Cell/Ctx.Sim.Food.Gw+1)*Ctx.Sim.Food.Cell-.01);
+                        Ctx.BrowseEvidence.Add(Cell,X,Y,Ctx.Sim.T*EcoRepertoireV3::kStepSeconds,Body.LastIntake);
+                    }
                     auto& Life=Int.Individual;const double SimNow=Ctx.Sim.T*EcoRepertoireV3::kStepSeconds;
                     if(SimNow>=Life.NextTrace&&FMath::Square(Body.Pos.X-Body.PrevPos.X)+FMath::Square(Body.Pos.Y-Body.PrevPos.Y)>.01){
                         Life.NextTrace=SimNow+2;Ctx.MovementTraces.Add(StableViewIds[r],Body.Pos.X,Body.Pos.Y,Int.GroundZ,SimNow);

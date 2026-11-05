@@ -908,6 +908,8 @@ namespace EcoThreatV3
 		bool bAlive = true;                  // 파이썬은 늘 참이다(리스폰). 거짓이면 표적·포획 후보에서 뺀다
 		double MoveX = 0.0;                  // 이번 스텝 사슴 이동 (이동 뒤 − 이동 전). 늑대 무리 협동(PackGoals)의 도주 방향만 읽는다
 		double MoveY = 0.0;
+        bool bNaturalCover=false;
+        double CoverDensity=1;
 	};
 
 	struct FThreatStepInput
@@ -1056,13 +1058,14 @@ namespace EcoThreatV3
 	// 포획 판정 거리 배수 cov (은신처 밖이면 1)
 	inline double PreyCatchMult(const FPreyView& P, const FThreatConfig& Cfg)
 	{
+		if(P.bNaturalCover)return 1.; // Concealment is not resistance to a physically valid capture.
 		return P.bInCover ? PreyCoverMult(P, Cfg) : 1.0;
 	}
 
 	// 표적 고르기 체감 거리 배수 det = max(cov, still ? c_still : 1) (world.py:2028-2029)
 	inline double PreyDetectMult(const FPreyView& P, const FThreatConfig& Cfg)
 	{
-		const double Cov = PreyCatchMult(P, Cfg);
+		const double Cov = P.bNaturalCover&&P.bInCover?1+(PreyCoverMult(P,Cfg)-1)*std::clamp(P.CoverDensity,0.,1.):PreyCatchMult(P, Cfg);
 		const double Still = PreyIsStill(P) ? Cfg.CStill : 1.0;
 		return Cov >= Still ? Cov : Still;
 	}

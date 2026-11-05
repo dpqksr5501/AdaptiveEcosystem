@@ -17,6 +17,8 @@
 #include "MassEntityTemplate.h"
 #include "Network/EcoGameState.h"
 #include "World/EcologyRegion.h"
+#include "World/EcoNaturalHabitatProfile.h"
+#include "Misc/Crc.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "EngineUtils.h"
@@ -153,6 +155,20 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
             Life.Genome=EcoLifeV3::Founder(N?N->GetSettings().Seed:101,Id.StableAgentId);
             Life.Origin=bReady?EcoLifeV3::EOrigin::Recovery:EcoLifeV3::EOrigin::Initial;
             Life.Born=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds-180;
+            const auto* Habitat=NaturalHabitatProfile.Get();
+            if(const auto* Regional=RegionHabitatProfiles.Find(RegionId))Habitat=Regional->Get();
+            if(!bPredator&&Habitat){
+                const uint64 Seed=uint64(Habitat->LayoutSeed)^FCrc::StrCrc32(*RegionId.ToString());
+                Life.Genome=EcoLifeV3::NaturalFounder(Seed,Id.StableAgentId,Habitat->FounderBodyVariation);
+                const EcoLifeV3::FPopulationProfile Profile{Habitat->MaturitySeconds,Habitat->InitialJuvenileFraction,Habitat->FemaleFraction,Habitat->MaxFounderAgeSeconds};
+                Life.bNaturalPopulation=true;Life.MaturitySeconds=Profile.MaturitySeconds;Life.FemaleBirthFraction=Profile.FemaleFraction;Life.Sex=Profile.Sex(Seed,Id.StableAgentId);
+                int32 Stride=31;while(FMath::GreatestCommonDivisor(Stride,Count)!=1)++Stride;
+                const int32 Rank=(I*Stride+int32(EcoLifeV3::Mix(Seed)%uint64(Count)))%Count;
+                const double Age=Profile.FounderAge(Seed,Rank,Count);
+                Life.Born=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds-Age;
+                // Desynchronize breeding and avoid every adult pairing at world startup.
+                Life.NextBirth=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds+15+60*EcoLifeV3::Unit(Seed^uint64(Id.StableAgentId));
+            }
         }
 		auto& Membership = EM.GetFragmentDataChecked<FEcoRegionFragment>(Entities[I]);
 		Membership.CurrentRegionId = RegionId; Membership.CurrentRegionIndex = Ecology->GetRegionRuntimeIndex(RegionId);
@@ -182,6 +198,17 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 			Id.StableAgentId, *RegionId.ToString(), *Species.ToString(), *Position.ToCompactString());
 	}
 	Creation.Reset();
+    // Initial social bonds do not invent genetic parents. Natural births receive their actual mother below.
+    if(!bPredator)for(const auto E:Entities)if(auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bNaturalPopulation){
+        auto& Child=Link->Individual;const double Now=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+        if(Child.AgeFraction(Now)>=1)continue;
+        const FVector P=EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation();double Best=FMath::Square(3000.);
+        for(const auto Adult:Entities){
+            const auto* Other=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Adult);if(!Other||Other->Individual.Sex!=EcoLifeV3::ESex::Female||Other->Individual.AgeFraction(Now)<1)continue;
+            const double Dist=FVector::DistSquared(P,EM.GetFragmentDataChecked<FTransformFragment>(Adult).GetTransform().GetLocation());
+            if(Dist<Best){Best=Dist;Child.Caregiver=EM.GetFragmentDataChecked<FEcoIdentityFragment>(Adult).StableAgentId;}
+        }
+    }
 	SuccessfulBirths += Entities.Num();
 	SpeciesTotals.FindOrAdd(RegionId).FindOrAdd(Species).Births += Entities.Num();
 	return Entities.Num();

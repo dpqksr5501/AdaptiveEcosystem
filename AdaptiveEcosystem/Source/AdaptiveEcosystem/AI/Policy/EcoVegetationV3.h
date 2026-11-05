@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include "EcoNaturalHabitat.h"
 
 namespace EcoVegetationV3
 {
@@ -38,16 +39,25 @@ namespace EcoVegetationV3
         EPlant Plant = EPlant::Grass;
         double Drainage = 0.5, Shade = 0, WaterSupply = 0, Flood = 0;
         bool bGroundUsable = true;
+        bool bNatural = false;
+        double MoistureMin=.30,MoistureMax=.75,TemperatureMin=-5,TemperatureOptimum=18,TemperatureMax=45,ShadeTolerance=.5,SiteSuitability=1;
+        double MaturationSeconds=60;
         bool IsValid() const
         {
             return static_cast<unsigned>(Plant) <= static_cast<unsigned>(EPlant::Shrub)
                 && std::isfinite(Drainage) && Drainage >= 0 && Drainage <= 1
                 && std::isfinite(Shade) && Shade >= 0 && Shade <= 1
                 && std::isfinite(WaterSupply) && WaterSupply >= 0 && WaterSupply <= 1
-                && std::isfinite(Flood) && Flood >= 0 && Flood <= 1;
+                && std::isfinite(Flood) && Flood >= 0 && Flood <= 1
+                && (!bNatural||(std::isfinite(MoistureMin)&&std::isfinite(MoistureMax)&&MoistureMin>0&&MoistureMax<1&&MoistureMin<MoistureMax
+                    &&std::isfinite(TemperatureMin)&&std::isfinite(TemperatureOptimum)&&std::isfinite(TemperatureMax)
+                    &&TemperatureMin>=-100&&TemperatureMax<=100&&TemperatureMin<TemperatureOptimum&&TemperatureOptimum<TemperatureMax
+                    &&std::isfinite(ShadeTolerance)&&ShadeTolerance>=0&&ShadeTolerance<=1
+                    &&std::isfinite(SiteSuitability)&&SiteSuitability>=0&&SiteSuitability<=1
+                    &&std::isfinite(MaturationSeconds)&&MaturationSeconds>=10&&MaturationSeconds<=7200));
         }
     };
-    struct FCell { double Moisture = 0.5, Stress = 0; };
+    struct FCell { double Moisture = 0.5, Stress = 0, Development=1; };
     struct FOutcome { double Food = 0, Growth = 0, Loss = 0; };
     inline double Unit(double V) { return std::clamp(V, 0.0, 1.0); }
 
@@ -61,7 +71,8 @@ namespace EcoVegetationV3
             || !std::isfinite(Food) || !std::isfinite(Capacity) || Capacity < 0 || Food < 0 || Food > Capacity
             || !std::isfinite(RegenPerStep) || RegenPerStep < 0
             || !std::isfinite(S.Moisture) || S.Moisture < 0 || S.Moisture > 1
-            || !std::isfinite(S.Stress) || S.Stress < 0 || S.Stress > 1) return O;
+            || !std::isfinite(S.Stress) || S.Stress < 0 || S.Stress > 1
+            || !std::isfinite(S.Development)||S.Development<0||S.Development>1) return O;
         const double Heat = std::clamp((W.Temperature + 5) / 25, 0.0, 2.0);
         const double Density = Capacity > 0 ? Food / Capacity : 0;
         const double Rate = C.Infiltration * W.Rain * (1 - 0.5 * H.Drainage)
@@ -69,19 +80,29 @@ namespace EcoVegetationV3
             - C.Evaporation * Heat * (0.25 + 0.75 * W.Light) * (1 - 0.5 * H.Shade)
             - C.Drainage * H.Drainage * S.Moisture - C.Uptake * Density;
         S.Moisture = Unit(S.Moisture + Rate * Dt);
-        const double Lo = H.Plant == EPlant::Riparian ? 0.45 : (H.Plant == EPlant::Shrub ? 0.18 : 0.30);
-        const double Hi = H.Plant == EPlant::Riparian ? 0.95 : (H.Plant == EPlant::Shrub ? 0.65 : 0.75);
+        const double Lo = H.bNatural ? H.MoistureMin : H.Plant == EPlant::Riparian ? 0.45 : (H.Plant == EPlant::Shrub ? 0.18 : 0.30);
+        const double Hi = H.bNatural ? H.MoistureMax : H.Plant == EPlant::Riparian ? 0.95 : (H.Plant == EPlant::Shrub ? 0.65 : 0.75);
         const double Dry = Unit((Lo - S.Moisture) / Lo);
         const double Wet = Unit((S.Moisture - Hi) / (1 - Hi));
         const double FloodStress = H.Flood * (H.Plant == EPlant::Riparian ? 0.1 : 1.0);
-        const double TargetStress = std::max({Dry, Wet, FloodStress, H.bGroundUsable ? 0.0 : 1.0});
+        const double TargetStress = std::max({Dry, Wet, FloodStress, H.bGroundUsable ? 0.0 : 1.0,H.bNatural?(1-H.SiteSuitability):0.});
         S.Stress = Unit(S.Stress + (TargetStress - S.Stress) * (1 - std::exp(-Dt / 8.0)));
         // Loss precedes growth; both are explicit non-negative ledger terms.
         O.Loss = H.bGroundUsable ? Food * (1 - std::exp(-C.StressLoss * S.Stress * Dt)) : Food;
         const double Remaining = Food - O.Loss;
-        const double TempSuit = Unit(1 - std::abs(W.Temperature - 20) / 30);
-        const double Suit = (1 - TargetStress) * (0.2 + 0.8 * W.Light) * TempSuit;
-        O.Growth = H.bGroundUsable ? std::min(Capacity - Remaining, RegenPerStep * Suit * (Capacity - Remaining)) : 0;
+        const double TempSuit = H.bNatural?EcoNaturalHabitat::Triangle(W.Temperature,H.TemperatureMin,H.TemperatureOptimum,H.TemperatureMax):Unit(1 - std::abs(W.Temperature - 20) / 30);
+        const double LightSuit=H.bNatural?W.Light*(1-H.Shade*(1-H.ShadeTolerance)):(0.2+0.8*W.Light);
+        const double Suit = (1 - TargetStress) * LightSuit * TempSuit;
+        if(H.bNatural){
+            // A depleted stand recruits gradually from a simplified seed/root bank.
+            // Thermal/light/moisture time advances within the Native food transaction only.
+            if(Capacity<=0||!H.bGroundUsable)S.Development=0;
+            else{
+                if(Remaining<=1.e-8)S.Development=0;
+                S.Development=Unit(S.Development+Dt*Suit/H.MaturationSeconds);
+            }
+        }
+        O.Growth = H.bGroundUsable ? std::min(Capacity - Remaining, RegenPerStep * Suit * (Capacity - Remaining)*(H.bNatural?.2+.8*S.Development:1.)) : 0;
         O.Food = Remaining + O.Growth;
         return O;
     }

@@ -1,0 +1,237 @@
+{
+  "checks": {
+    "pie_finished": true,
+    "initial_mixed_ages": true,
+    "initial_sexes": true,
+    "growth_and_appearance_valid": true,
+    "age_transport_matches_authority": true,
+    "family_follow_observed": true,
+    "family_has_fresh_local_evidence": true,
+    "food_ledger_conserved": true,
+    "existing_policy_contract": true,
+    "family_bonds_preserved": true,
+    "network_same_build_authority": true,
+    "save_passed": true,
+    "load_passed": true,
+    "individual_traits_vary": true,
+    "automation_passed": true,
+    "separate_level_passed": true,
+    "cell_development_restored": true,
+    "caution_has_no_policy_consumer": true,
+    "policy_weights_and_inference_unchanged": true
+  },
+  "passed": true,
+  "initial_deer": 144,
+  "initial_juveniles": 36,
+  "founder_age_range": [
+    70.66010423968642,
+    1799.7284422731389
+  ],
+  "matched_visuals": 1007,
+  "max_ledger_error": 0,
+  "family_following_agents": 37,
+  "bad": [],
+  "age_errors": [],
+  "stale": [],
+  "save": {
+    "result": "FINISHED",
+    "operation": {
+      "saved": true,
+      "bytes": 1094372,
+      "sha256": "911ae1ceb2246cfd1d40b7d236c3f905ab1833e8b054710b0c9c7529129d6d60",
+      "agents": 144,
+      "live_rollback_rejected": true
+    }
+  },
+  "load": {
+    "result": "FINISHED",
+    "operation": {
+      "restored_exactly": true,
+      "rejected_load_unchanged": true,
+      "agents": 144,
+      "restored_cell_development_exactly": true,
+      "restored_soil_cells": 2700
+    }
+  },
+  "network": {
+    "relevance": true,
+    "ClientA": {
+      "passed": true,
+      "authority_agents": 0,
+      "received_juvenile_ids": [
+        "104",
+        "110",
+        "113",
+        "12",
+        "121",
+        "124",
+        "127",
+        "130",
+        "138",
+        "141",
+        "144",
+        "15",
+        "152",
+        "155",
+        "157",
+        "158",
+        "159",
+        "160",
+        "20",
+        "23",
+        "26",
+        "29",
+        "37",
+        "40",
+        "43",
+        "46",
+        "59",
+        "6",
+        "62",
+        "65",
+        "73",
+        "76",
+        "79",
+        "82",
+        "9",
+        "90",
+        "93",
+        "96",
+        "99"
+      ],
+      "native_steps": 0
+    },
+    "ClientB": {
+      "passed": true,
+      "authority_agents": 0,
+      "received_juvenile_ids": [
+        "110",
+        "113",
+        "127",
+        "130",
+        "15",
+        "157",
+        "158",
+        "159",
+        "40",
+        "43",
+        "46",
+        "59",
+        "62",
+        "9"
+      ],
+      "native_steps": 0
+    }
+  },
+  "founder_traits": {
+    "size_gene": {
+      "min": 0.9210588473302601,
+      "max": 1.0790074250940813,
+      "mean": 1.001976441203265,
+      "stdev": 0.044365887122878284
+    },
+    "speed_gene": {
+      "min": 0.921276059179936,
+      "max": 1.0789624888653235,
+      "mean": 1.0013242235299034,
+      "stdev": 0.04612267494749043
+    },
+    "caution_gene": {
+      "min": 0.8502054248282465,
+      "max": 1.1461628080716508,
+      "mean": 0.9965039598687843,
+      "stdev": 0.08519601484697367
+    },
+    "sociability_gene": {
+      "min": 0.8515235976313209,
+      "max": 1.1461628080716508,
+      "mean": 0.9917104633932623,
+      "stdev": 0.0830313553633284
+    },
+    "coat_gene": {
+      "min": 0.9012311152411944,
+      "max": 1.099470695350835,
+      "mean": 0.986290177468807,
+      "stdev": 0.056260434151271015
+    }
+  },
+  "cohort_observation": {
+    "unique_observed_births": 1,
+    "contributing_parents": {
+      "27": 1,
+      "34": 1
+    },
+    "observed_migrants": 0,
+    "analysis_gate": {
+      "minimum_simulation_seconds": 1200,
+      "minimum_births": 36,
+      "minimum_distinct_parents": 8,
+      "ready": false
+    },
+    "changes_genes": false
+  },
+  "automation": {
+    "succeeded": 233,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "transfer": {
+    "result": "FINISHED",
+    "samples": 5,
+    "ground_probes": 36,
+    "missing_ground": 0,
+    "custom_wading_limit_detected": true,
+    "unreachable_height_rejected": true
+  },
+  "policy_boundary": {
+    "Source/AdaptiveEcosystem/AI/Policy/PolicyWeights.h": {
+      "sha256": "15b6093b52ae643a9a318d3f91e5a9dd7843c03b7a91f2f9cc383f8bea2bfa54",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/PolicyWeightsV3.h": {
+      "sha256": "82e4a3e7c8d20e3b19b855a452c3a4012c47ecd3f926bb998417482016159ace",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/EcoPolicyInference.cpp": {
+      "sha256": "c2fc35c1dbf8e204967f3fb7a32f004c07d460d05c5dc93415b83730aedadcef",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/EcoPolicyInference.h": {
+      "sha256": "f9620a8da8bbd55f0513ad51c307b01ffa078beeb35f91c13552f7edcf7e43e0",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/EcoPolicyV3Inference.h": {
+      "sha256": "39d5cbb2d0cc981a90c0c2b09c013d38c48d01acbba241fde4ffce72f5b19153",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Docs/RL_Policy/POLICY_CONTRACT_V1.md": {
+      "sha256": "aaf995c7bc1d07e3976de21db41593c7de5563f63ad09ebfe6c9b78ed4ed4927",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Docs/RL_Policy/POLICY_CONTRACT_V3.md": {
+      "sha256": "f90a780ed7a651646092b621b54e97fea066e9b8e2086d39013b52a00c937497",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h": {
+      "sha256": "5d205dd43a1bdd4173046555174409290dabf8def8be9733803c14f1afc9f93d",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/EcoObservationBuilder.h": {
+      "sha256": "5cc18a64b7bc8a294de93ca57005dc2017b989dbf462d7c0c9b38e0b52c36f3b",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/EcoObservationBuilder.cpp": {
+      "sha256": "0af8f31a606a47d6eee0e4ae5453ac23cca9eb3a97fa501a6065877f06583a30",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/EcoPolicyContracts.h": {
+      "sha256": "87cb40bfc96b4733f1cfd195d2e1d259fa41aeb942f762058aed9b60d3213e0c",
+      "same_as_HEAD_normalized_text": true
+    },
+    "Source/AdaptiveEcosystem/AI/Policy/EcoBehaviorConfig.h": {
+      "sha256": "d97512b46fd0e99f46c7383d442f0c234ffb9dfdba023afd6f667b91b551c1d3",
+      "same_as_HEAD_normalized_text": true
+    }
+  }
+}

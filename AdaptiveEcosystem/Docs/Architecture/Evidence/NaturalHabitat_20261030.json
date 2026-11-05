@@ -1,0 +1,517 @@
+{
+  "schema": 1,
+  "date": "2026-10-30",
+  "scope": "Owned LV_JYU_Ecosystem + explicit small transfer fixture; Native v3 opt-in natural profiles",
+  "raw_folder": "Saved\\NaturalHabitatRelease_20261030",
+  "experiments": {
+    "Natural23": {
+      "result": "FINISHED",
+      "seed": 23,
+      "fixture": "none; authored climate and actual authority outcomes",
+      "requested_simulation_seconds": 1800.0,
+      "last_simulation_seconds": 1800.0,
+      "alive_last_sample": 123,
+      "observed_children": 102,
+      "observed_transfers": 5,
+      "interior_rest_steps": 857,
+      "edge_rest_steps": 0,
+      "caught_in_cover_by_context": {
+        "Forest": 2,
+        "Barren": 1,
+        "Highland": 11
+      },
+      "migration_reason_samples": {
+        "None": 9771,
+        "DestinationFoodBudgetInsufficient": 2108,
+        "AwaitingSustainedShortage": 6026,
+        "NoViableKnownRoute": 3597,
+        "GatheringForJourney": 30,
+        "FoodShortageJourney": 702,
+        "Resting": 100,
+        "PathBlocked": 6,
+        "Returning": 1,
+        "Arrived": 219
+      },
+      "food_ledger_max_error": 5.684341886080802e-14,
+      "original_barren_survivors": 33,
+      "original_barren_count": 52,
+      "final_fields": [
+        {
+          "region": "Forest",
+          "natural_profile": "TemperateMosaic",
+          "ground_cells": 900,
+          "ground_sites": 5027,
+          "food": 67.82264121596897,
+          "capacity": 149.09216587672563,
+          "grown": 2791.470439374017,
+          "consumed": 2702.927800361215,
+          "environment_lost": 166.31400442581304
+        },
+        {
+          "region": "Barren",
+          "natural_profile": "Dryland",
+          "ground_cells": 900,
+          "ground_sites": 3034,
+          "food": 57.220006037788636,
+          "capacity": 133.35160734972473,
+          "grown": 2679.4195947513704,
+          "consumed": 2636.195754810862,
+          "environment_lost": 112.49235139093761
+        },
+        {
+          "region": "Highland",
+          "natural_profile": "Alpine",
+          "ground_cells": 900,
+          "ground_sites": 3792,
+          "food": 36.87865236601272,
+          "capacity": 89.91343480704408,
+          "grown": 1269.8042385506756,
+          "consumed": 1229.7767349822182,
+          "environment_lost": 93.062286009083
+        }
+      ],
+      "last_performance": {
+        "samples": 1024,
+        "native_batch_p95_ms": 3.1356997787952423,
+        "native_batch_max_ms": 5.792401731014252,
+        "native_step_equivalent_p95_ms": 3.1356997787952423,
+        "native_steps_total": 13515,
+        "native_cpu_total_ms": 30278.336513787508,
+        "process_used_physical_bytes": 2558619648,
+        "process_peak_physical_bytes": 2561036288,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      }
+    },
+    "Natural47": {
+      "result": "FINISHED",
+      "seed": 47,
+      "fixture": "none; authored climate and actual authority outcomes",
+      "requested_simulation_seconds": 600.0,
+      "last_simulation_seconds": 600.0,
+      "alive_last_sample": 99,
+      "observed_children": 5,
+      "observed_transfers": 3,
+      "interior_rest_steps": 280,
+      "edge_rest_steps": 0,
+      "caught_in_cover_by_context": {
+        "Forest": 4,
+        "Barren": 0,
+        "Highland": 5
+      },
+      "migration_reason_samples": {
+        "None": 1702,
+        "AwaitingSustainedShortage": 1661,
+        "DestinationFoodBudgetInsufficient": 1013,
+        "NoViableKnownRoute": 1971,
+        "GatheringForJourney": 35,
+        "FoodShortageJourney": 628,
+        "PathBlocked": 11,
+        "Resting": 42,
+        "Returning": 16,
+        "Arrived": 83
+      },
+      "food_ledger_max_error": 1.4210854715202004e-14,
+      "original_barren_survivors": 41,
+      "original_barren_count": 52,
+      "final_fields": [
+        {
+          "region": "Forest",
+          "natural_profile": "TemperateMosaic",
+          "ground_cells": 900,
+          "ground_sites": 5027,
+          "food": 9.376785469642673,
+          "capacity": 50.78268531743592,
+          "grown": 615.9684765018904,
+          "consumed": 642.6329457540023,
+          "environment_lost": 13.600324103882814
+        },
+        {
+          "region": "Barren",
+          "natural_profile": "Dryland",
+          "ground_cells": 900,
+          "ground_sites": 3034,
+          "food": 29.594302475652576,
+          "capacity": 83.34744772914604,
+          "grown": 803.9424880040687,
+          "consumed": 839.9413292111401,
+          "environment_lost": 9.22455673103335
+        },
+        {
+          "region": "Highland",
+          "natural_profile": "Alpine",
+          "ground_cells": 900,
+          "ground_sites": 3792,
+          "food": 19.11301054438616,
+          "capacity": 31.712665768613334,
+          "grown": 161.06991581477934,
+          "consumed": 165.46028602101026,
+          "environment_lost": 8.209285017978855
+        }
+      ],
+      "last_performance": {
+        "samples": 1024,
+        "native_batch_p95_ms": 3.5801008343696594,
+        "native_batch_max_ms": 6.149496883153915,
+        "native_step_equivalent_p95_ms": 3.5801008343696594,
+        "native_steps_total": 4515,
+        "native_cpu_total_ms": 14155.501462519169,
+        "process_used_physical_bytes": 2165727232,
+        "process_peak_physical_bytes": 2167193600,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      }
+    },
+    "Drought23": {
+      "result": "FINISHED",
+      "seed": 23,
+      "fixture": "EXPLICIT development drought: Barren food loss with M4 habitat receipt, regeneration suspended; not natural ecology",
+      "requested_simulation_seconds": 600.0,
+      "last_simulation_seconds": 600.0,
+      "alive_last_sample": 96,
+      "observed_children": 9,
+      "observed_transfers": 25,
+      "interior_rest_steps": 0,
+      "edge_rest_steps": 0,
+      "caught_in_cover_by_context": {
+        "Forest": 0,
+        "Barren": 0,
+        "Highland": 0
+      },
+      "migration_reason_samples": {
+        "None": 4037,
+        "GatheringForJourney": 50,
+        "DestinationFoodBudgetInsufficient": 1306,
+        "AwaitingSustainedShortage": 975,
+        "FoodShortageJourney": 803,
+        "Resting": 368,
+        "Preparing": 4,
+        "Arrived": 196
+      },
+      "food_ledger_max_error": 5.684341886080802e-14,
+      "original_barren_survivors": 5,
+      "original_barren_count": 48,
+      "final_fields": [
+        {
+          "region": "Forest",
+          "natural_profile": "TemperateMosaic",
+          "ground_cells": 900,
+          "ground_sites": 5027,
+          "food": 54.41897259657544,
+          "capacity": 149.1127507452478,
+          "grown": 728.5142651677199,
+          "consumed": 762.318216010025,
+          "environment_lost": 57.371083189746415
+        },
+        {
+          "region": "Barren",
+          "natural_profile": "Dryland",
+          "ground_cells": 900,
+          "ground_sites": 3034,
+          "food": 0,
+          "capacity": 126.488517488759,
+          "grown": 0.8246088513041567,
+          "consumed": 10.511752950817806,
+          "environment_lost": 0.006575043325706797
+        },
+        {
+          "region": "Highland",
+          "natural_profile": "Alpine",
+          "ground_cells": 900,
+          "ground_sites": 3792,
+          "food": 21.602007989452996,
+          "capacity": 89.91343480704408,
+          "grown": 496.0406826822997,
+          "consumed": 539.6859208606575,
+          "environment_lost": 24.66618863906878
+        }
+      ],
+      "last_performance": {
+        "samples": 1024,
+        "native_batch_p95_ms": 2.3293979465961456,
+        "native_batch_max_ms": 3.719102591276169,
+        "native_step_equivalent_p95_ms": 2.3293979465961456,
+        "native_steps_total": 4515,
+        "native_cpu_total_ms": 8557.602100074291,
+        "process_used_physical_bytes": 2135232512,
+        "process_peak_physical_bytes": 2136616960,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      }
+    },
+    "NoPredators47": {
+      "result": "FINISHED",
+      "seed": 47,
+      "fixture": "none; authored climate and actual authority outcomes",
+      "requested_simulation_seconds": 600.0,
+      "last_simulation_seconds": 600.0,
+      "alive_last_sample": 143,
+      "observed_children": 3,
+      "observed_transfers": 31,
+      "interior_rest_steps": 0,
+      "edge_rest_steps": 0,
+      "caught_in_cover_by_context": {
+        "Forest": 0,
+        "Barren": 0,
+        "Highland": 0
+      },
+      "migration_reason_samples": {
+        "None": 1249,
+        "AwaitingSustainedShortage": 4796,
+        "Preparing": 25,
+        "DestinationFoodBudgetInsufficient": 100,
+        "FoodShortageJourney": 748,
+        "Resting": 267,
+        "NoViableKnownRoute": 1384,
+        "GatheringForJourney": 8,
+        "Arrived": 152
+      },
+      "food_ledger_max_error": 2.842170943040401e-14,
+      "original_barren_survivors": 48,
+      "original_barren_count": 48,
+      "final_fields": [
+        {
+          "region": "Forest",
+          "natural_profile": "TemperateMosaic",
+          "ground_cells": 900,
+          "ground_sites": 5027,
+          "food": 6.41780437546634,
+          "capacity": 50.680453153873565,
+          "grown": 790.604058429847,
+          "consumed": 822.6494750601826,
+          "environment_lost": 11.178357819931902
+        },
+        {
+          "region": "Barren",
+          "natural_profile": "Dryland",
+          "ground_cells": 900,
+          "ground_sites": 3034,
+          "food": 14.496586779167696,
+          "capacity": 83.33938277210541,
+          "grown": 915.4493018756431,
+          "consumed": 966.5946329645802,
+          "environment_lost": 9.175782545564577
+        },
+        {
+          "region": "Highland",
+          "natural_profile": "Alpine",
+          "ground_cells": 900,
+          "ground_sites": 3792,
+          "food": 8.999382858446586,
+          "capacity": 31.712665768613334,
+          "grown": 241.34108807263843,
+          "consumed": 257.22637073198257,
+          "environment_lost": 6.828000250816204
+        }
+      ],
+      "last_performance": {
+        "samples": 1024,
+        "native_batch_p95_ms": 5.148500204086304,
+        "native_batch_max_ms": 8.861098438501358,
+        "native_step_equivalent_p95_ms": 5.148500204086304,
+        "native_steps_total": 4515,
+        "native_cpu_total_ms": 12569.686558097601,
+        "process_used_physical_bytes": 2166521856,
+        "process_peak_physical_bytes": 2168668160,
+        "client": false,
+        "contexts": 3,
+        "net_received_total_bytes": 0,
+        "net_sent_total_bytes": 0,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      }
+    }
+  },
+  "limitations": [
+    "Not the future designer integration map; no production streaming/cook/package acceptance",
+    "Ground-following 2.5D; no overlapping-floor ownership, swimming, river hydraulics or groundwater solver",
+    "No new PPO weights, full Python world mirror, permanent equilibrium or all-seed zero-starvation proof",
+    "Three plant guilds and reused Doe rig proportions; no complete biome species library or bespoke fawn model",
+    "Recent browse marks are bounded transient presentation evidence, not persisted plant individuals or a second food balance"
+  ],
+  "automation": {
+    "succeeded": 230,
+    "succeededWithWarnings": 1,
+    "failed": 0,
+    "notRun": 0
+  },
+  "play": {
+    "result": "FINISHED",
+    "duration_wall_seconds": 165.0,
+    "samples": 17,
+    "appearances": [
+      0,
+      1,
+      2,
+      3
+    ],
+    "child_sightings": 11,
+    "eating_sightings": 542,
+    "screenshots": 5
+  },
+  "save": {
+    "result": "FINISHED",
+    "operation": {
+      "saved": true,
+      "bytes": 1022493,
+      "sha256": "0d5769d7b07356d55b473153a27b16959316419711ddffaf52e2ded0452c0b28",
+      "agents": 144,
+      "live_rollback_rejected": true
+    },
+    "food_ledger_max_error": 8.526512829121202e-14
+  },
+  "load": {
+    "result": "FINISHED",
+    "operation": {
+      "restored_exactly": true,
+      "rejected_load_unchanged": true,
+      "agents": 144
+    },
+    "food_ledger_max_error": 2.842170943040401e-14
+  },
+  "transfer_fixture": {
+    "result": "FINISHED",
+    "error": null,
+    "map": "/Game/JYU/Maps/LV_JYU_HabitatTransferFixture",
+    "unreachable_height_rejected": true,
+    "last_fields": [
+      {
+        "region": "TransferMeadow",
+        "natural_profile": "TemperateMosaic",
+        "ground_cells": 900,
+        "ground_sites": 5812,
+        "food": 130.90582036277638
+      },
+      {
+        "region": "TransferDunes",
+        "natural_profile": "Dryland",
+        "ground_cells": 900,
+        "ground_sites": 2578,
+        "food": 49.439891265855266
+      },
+      {
+        "region": "TransferSummit",
+        "natural_profile": "Alpine",
+        "ground_cells": 900,
+        "ground_sites": 3271,
+        "food": 25.932220642342447
+      }
+    ]
+  },
+  "network": {
+    "ClientA": {
+      "passed": true,
+      "authority_agents": 0,
+      "local_migration_subsystems": 0,
+      "native_performance": {
+        "samples": 0,
+        "native_steps_total": 0,
+        "native_cpu_total_ms": 0,
+        "process_used_physical_bytes": 2720620544,
+        "process_peak_physical_bytes": 2729365504,
+        "client": true,
+        "contexts": 0,
+        "net_received_total_bytes": 4093490,
+        "net_sent_total_bytes": 817582,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      },
+      "morph_matches_payload": true,
+      "scale_payload_matches_actor": true
+    },
+    "ClientB": {
+      "passed": true,
+      "authority_agents": 0,
+      "local_migration_subsystems": 0,
+      "native_performance": {
+        "samples": 0,
+        "native_steps_total": 0,
+        "native_cpu_total_ms": 0,
+        "process_used_physical_bytes": 2677874688,
+        "process_peak_physical_bytes": 2757844992,
+        "client": true,
+        "contexts": 0,
+        "net_received_total_bytes": 994172,
+        "net_sent_total_bytes": 179585,
+        "net_received_bytes_per_second": 0,
+        "net_sent_bytes_per_second": 0
+      },
+      "morph_matches_payload": true,
+      "scale_payload_matches_actor": true
+    },
+    "relevance": {
+      "grace_seconds": 3,
+      "clients": [
+        {
+          "name": "ClientA",
+          "passed": true,
+          "checked_near_region_samples": 164,
+          "evaluated_regions": [
+            "Barren",
+            "Forest",
+            "Highland"
+          ],
+          "received_regions": [
+            "Barren",
+            "Forest",
+            "Highland"
+          ],
+          "missing_after_grace": [],
+          "missing_camera_samples": []
+        },
+        {
+          "name": "ClientB",
+          "passed": true,
+          "checked_near_region_samples": 29,
+          "evaluated_regions": [
+            "Barren",
+            "Forest",
+            "Highland"
+          ],
+          "received_regions": [
+            "Barren",
+            "Forest",
+            "Highland"
+          ],
+          "missing_after_grace": [],
+          "missing_camera_samples": []
+        }
+      ],
+      "passed": true,
+      "concurrent_clients": {
+        "samples": 15,
+        "observed_span_seconds": 28.296999999991385,
+        "passed": true
+      },
+      "late_join_life": {
+        "authority_child_ids": [
+          "157",
+          "158",
+          "159",
+          "160",
+          "161",
+          "162"
+        ],
+        "received_child_ids": [
+          "160"
+        ],
+        "scale_tolerance": 0.015625,
+        "scale_mismatches": [],
+        "passed": true
+      }
+    }
+  },
+  "latest_build_log": "Saved\\IntegrationBuilds\\Milestone_Final_20261030_031414.log"
+}

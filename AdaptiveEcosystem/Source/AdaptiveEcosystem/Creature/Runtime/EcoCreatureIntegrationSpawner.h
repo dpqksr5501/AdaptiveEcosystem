@@ -19,6 +19,7 @@ class AEcologyRegion;
 class UWorldPartitionStreamingSourceComponent;
 class UEcoFootstepAudioSet;
 class AEcoVegetationField;
+class UEcoNaturalHabitatProfile;
 class APawn;
 struct FEcoDeathOutcome;
 
@@ -58,6 +59,9 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") bool bEnableVegetation = false;
     /** Owned scene opt-in: deterministic diversity, observed encounters and conditional offspring. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Creature|Life") bool bEnableEcosystemLife = false;
+    /** Explicit level opt-in; null preserves all legacy/life-v2 habitat and safety rules. */
+    UPROPERTY(EditAnywhere, Category="Creature|Habitat") TObjectPtr<UEcoNaturalHabitatProfile> NaturalHabitatProfile;
+    UPROPERTY(EditAnywhere, Category="Creature|Habitat") TMap<FName,TObjectPtr<UEcoNaturalHabitatProfile>> RegionHabitatProfiles;
 	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") TSubclassOf<AEcoVegetationField> VegetationFieldClass;
 	bool IsSpeciesEnabled(bool bPredator) const
 	{ return EnabledSpecies == EEcoEnabledSpecies::Both || (bPredator ? EnabledSpecies == EEcoEnabledSpecies::WolfOnly : EnabledSpecies == EEcoEnabledSpecies::DeerOnly); }
@@ -112,6 +116,8 @@ public:
     UFUNCTION(BlueprintCallable,BlueprintAuthorityOnly,Category="Creature|Life") bool QueuePopulationRecovery(FName RegionId,bool bPredator);
 	/** Read-only authoring report. Never creates Entities, edits actors, or saves the level. */
 	UFUNCTION(CallInEditor, BlueprintCallable, Category="Creature|Setup") void ValidateEditorSetup() const;
+    /** Bounded, read-only test/production level survey; no resource or actor writes. */
+    UFUNCTION(BlueprintPure,Category="Creature|Setup") FString CaptureHabitatAuthoringReport() const;
 	virtual float GetFoodDensity(const FVector& Location, float Radius) const override;
 	virtual FVector GetFoodGradient(const FVector& Location, float Radius) const override;
 	virtual float ConsumeFood(const FVector& Location, float Amount) override;

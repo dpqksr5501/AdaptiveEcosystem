@@ -237,6 +237,11 @@ bool FEcoObstacleV3LevelScanTest::RunTest(const FString& Parameters)
 	SpawnBox(W.World, FVector(7000.0, 3000.0, 10.0), FVector(2.0, 2.0, 0.2), true);     // 낮음 (높이 20 cm)
 	SpawnBox(W.World, FVector(3000.0, 3000.0, 100.0), FVector(1.0, 1.0, 2.0), true);    // 은신처 원 안 (중심 (15, 15), 반경 6)
 	SpawnBox(W.World, FVector(-500.0, 3000.0, 100.0), FVector(1.0, 1.0, 2.0), true);    // 무대 밖
+	// A thick walkable platform must not erase a whole stage's food as a giant disc.
+	auto* Terrain=SpawnBox(W.World,FVector(6000,6000,-50),FVector(120,120,1),true);
+	Terrain->Tags.Add(TEXT("Eco.VegetationGround"));
+	auto* ComponentTerrain=SpawnBox(W.World,FVector(6000,6000,-150),FVector(120,120,1),true);
+	ComponentTerrain->GetStaticMeshComponent()->ComponentTags.Add(TEXT("Eco.VegetationGround"));
 	// 인스턴스 메시: 충돌하는 인스턴스 둘 (반지름 100 cm = 0.5 단위)
 	AActor* Holder = W.World->SpawnActor<AActor>();
 	UInstancedStaticMeshComponent* Ism = NewObject<UInstancedStaticMeshComponent>(Holder);
