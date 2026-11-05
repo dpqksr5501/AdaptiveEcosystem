@@ -1,6 +1,7 @@
-param([ValidateSet('Automation','Play','Ecology','Persistence','Network','Authoring','Transfer','Population','PopulationPlay')][string]$Mode='Automation',
+param([ValidateSet('Automation','Play','Ecology','Lineage','Persistence','Network','Authoring','Transfer','Population','PopulationPlay')][string]$Mode='Automation',
     [ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='NaturalHabitatRelease_20261030',
-    [ValidateRange(30,1800)][int]$PlaySeconds=165)
+    [ValidateRange(30,1800)][int]$PlaySeconds=165,
+    [ValidateRange(600,7200)][int]$LineageSeconds=1800)
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $taskOut=Join-Path $taskRoot ('Saved/'+$AuditFolder)
@@ -40,12 +41,14 @@ if($Mode -eq 'Population'){
     Run-Natural 'NaturalPIE' @('/Game/JYU/Maps/LV_JYU_Ecosystem','-d3d11','-windowed','-ResX=1280','-ResY=720','-VegetationPIE','-VegetationAuthored','-VegetationMap=LV_JYU_Ecosystem',"-VegetationAuditFolder=$AuditFolder",'-VegetationAuditName=NaturalPIE',"-VegetationAuditDuration=$PlaySeconds",$taskFocus,"-ExecCmds=py $taskRoot/Tools/Editor/audit_natural_habitat_play.py") $true
     $taskReport=Get-Content "$taskOut/NaturalPIE_Runtime.json" -Raw|ConvertFrom-Json
     if($taskReport.result -ne 'FINISHED'){throw "PIE observer: $($taskReport.error)"}
-}elseif($Mode -eq 'Ecology'){
-    foreach($taskName in @('Natural23','Natural47','Drought23','NoPredators47')){
+}elseif($Mode -in @('Ecology','Lineage')){
+    $taskRuns=if($Mode -eq 'Lineage'){@('Natural23','NoPredators23','Natural47','NoPredators47')}else{@('Natural23','Natural47','Drought23','NoPredators47')}
+    foreach($taskName in $taskRuns){
         $taskSeed=if($taskName -match '47'){47}else{23}
-        $taskSeconds=if($taskName -eq 'Natural23'){1800}else{600}
+        $taskSeconds=if($Mode -eq 'Lineage'){$LineageSeconds}elseif($taskName -eq 'Natural23'){1800}else{600}
         $taskArgs=@('/Game/JYU/Maps/LV_JYU_Ecosystem','-server','-NullRHI','-benchmark','-fps=60','-novsync',"-EcoV3Seed=$taskSeed",'-LifeAuditQuitOnFinish',"-LifeAuditName=$taskName","-LifeAuditFolder=$AuditFolder",'-LifeAuditDuration=1200',"-LifeAuditSimulationSeconds=$taskSeconds",'-LifeAuditSampleSeconds=10',"-EcoIntegrationExitAfter=$($taskSeconds+60)","-ExecCmds=py $taskRoot/Tools/Editor/audit_ecosystem_life.py")
-        if($taskName -in @('Drought23','NoPredators47')){$taskArgs+='-EcoV3Wolves=0'}
+        if($Mode -eq 'Lineage'){$taskArgs+=@('-LifeAuditLineage','-EcoV3AutoAdapt=0')}
+        if($taskName -eq 'Drought23' -or $taskName -like 'NoPredators*'){$taskArgs+='-EcoV3Wolves=0'}
         if($taskName -eq 'Drought23'){$taskArgs+='-LifeAuditDrought=Barren'}
         Run-Natural $taskName $taskArgs
         $taskReport=Get-Content "$taskOut/${taskName}_Life.json" -Raw|ConvertFrom-Json
