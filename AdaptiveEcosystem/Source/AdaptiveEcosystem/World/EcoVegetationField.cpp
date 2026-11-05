@@ -88,7 +88,7 @@ AEcoVegetationField::AEcoVegetationField()
         Component->SetupAttachment(Plants);Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
         Component->SetCanEverAffectNavigation(false);Component->NumCustomDataFloats=3;
     }
-    PatchMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD")));
+    PatchMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/SHC/Fab/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD")));
 }
 void AEcoVegetationField::BeginPlay()
 {
@@ -97,8 +97,8 @@ void AEcoVegetationField::BeginPlay()
     {
         Plants->SetStaticMesh(PatchMesh.LoadSynchronous());
         if (!PatchMaterial.IsNull()) Plants->SetMaterial(0, PatchMaterial.LoadSynchronous());
-        RiparianPlants->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC")));
-        ShrubPlants->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassB.SM_MWAM_GrassB")));
+        RiparianPlants->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Game/SHC/Fab/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC")));
+        ShrubPlants->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Game/SHC/Fab/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassB.SM_MWAM_GrassB")));
         for(auto* Component:{RiparianPlants.Get(),ShrubPlants.Get()})if(!PatchMaterial.IsNull())Component->SetMaterial(0,PatchMaterial.LoadSynchronous());
         Tracks->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Cube.Cube")));
         OnRep_Cells();
