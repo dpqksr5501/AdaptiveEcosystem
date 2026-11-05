@@ -41,8 +41,10 @@ def _plt():
 
 
 def _color(run: str) -> str:
+    if "h0" in run:                                  # r8_h0_s0 도 s0 로 끝나므로 대조를 먼저 본다
+        return COLORS["h0"]
     for k, c in COLORS.items():
-        if run.endswith(k) or f"_{k}" in run:
+        if run.endswith(k) or f"_{k}_" in run:
             return c
     return "#9467bd"
 

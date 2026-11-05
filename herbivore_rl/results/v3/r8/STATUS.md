@@ -39,6 +39,8 @@ powershell -ExecutionPolicy Bypass -File results/v3/r8/launch_train.ps1 -Steps 2
     **판정이 아니다** — 판정은 아침에 평가 시드 41900~41999 로 마지막 모델만(설계 9-2, 모델 고르기 없음).
   - 점검이 끝날 때마다 학습 곡선 `checkpoints/curve.png` 를 다시 그린다(`plot_curve.py curve`). 사건(점검 시작·끝·실패, 실행 끝·죽음)은 `logs/watch_events.log`.
   - 모든 실행이 끝나고 끝 모델 점검까지 마치면 스스로 멈춘다(늦어도 시작 12 시간 뒤). 학습 프로세스는 읽기만 한다.
+- **첫 점검(10M, 17:25~17:29, 3.1 분 — `checkpoints/m010/summary.md`)**: 지켜보기가 제대로 돈다. 점검 세계에서 잡힘 늘 먹기의 0.43~0.53 배, 먹음 1.23~1.27 배,
+  Δ 0.04~0.11(세 두뇌 모두 구간 아래 끝 > 0), ρ 1.20~1.64, '사냥 중 늑대 대 짐승' Δ 0.20~0.30. 대조 H0 잡힘 0.19 배. 판정이 아니다(곡선의 첫 점).
 - 손으로 볼 때: `python results/v3/r8/watch_train.py --once` (진행표만 다시 쓰고 보여 준다, 평가는 돌리지 않는다).
 - 평가 시드 41900~41999 는 아직 한 번도 쓰지 않았다(지켜보기도 쓰지 않는다 — 코드가 막는다).
 - 멈추고 싶으면(사람이 정할 때만): `Stop-Process -Id 21564,35920,38924,2752` (학습 넷) · `Stop-Process -Id 3380` (지켜보기). 다른 python·언리얼 프로세스는 건드리지 않는다.
@@ -143,7 +145,7 @@ python results/v3/r8/eval_r8.py eval --baselines always_eat rule_aim --seeds 419
 **③ 그림 (약 3 분)**
 
 ```
-python results/v3/r8/plot_curve.py curve                                                            # 학습 곡선 (지켜보기가 이미 그렸으면 다시 그릴 필요 없다)
+python results/v3/r8/plot_curve.py curve                                                            # 학습 곡선 — 꼭 다시 그린다(밤새 그린 판은 대조 H0 색이 s0 와 같다, 17:30 고침 전 코드)
 python results/v3/r8/plot_curve.py bands --summary results/v3/r8/eval/summary.json --out results/v3/r8/eval/bands.png --policies RULE_BLIND RULE_ORACLE r8_p_s0 r8_p_s1 r8_p_s2 r8_h0_s0
 python results/v3/r8/r8_replay.py --model ckpt/r8/r8_p_s0.zip --compare always_eat --seed 41900 --steps 600 --out results/v3/r8/replay/r8_s0.png
 ```
