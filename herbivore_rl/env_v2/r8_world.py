@@ -212,6 +212,11 @@ class R8World:
         self.gait_eat = np.asarray(d["gait_eat"], dtype=np.float64)
         self.gait_drain = np.asarray(d["gait_drain"], dtype=np.float64)
         self.run_angles = np.arange(8) * (math.pi / 4.0)           # 행동 1~8 / free_0~7 의 방향 (머리에서 반시계)
+        # 탈진 속력: 수(× 사슴 뛰기 속력) 또는 "roam"(제 배회 속력 — 짐승 돌아다님과 같은 분포, 사전 검토 11-05: 0.2 는 늑대만의 속력이라 이름표였다)
+        ts = cfg["wolves"]["tired_speed"]
+        self.tired_roam = isinstance(ts, str)
+        if self.tired_roam and ts != "roam":
+            raise ValueError(f"wolves.tired_speed 는 수 또는 'roam': {ts!r}")
         self.record_samples = bool(record_samples)
         self.step_hook = None
         self.K = 0
@@ -904,8 +909,9 @@ class R8World:
             pounce_now = pouncing | start_p
             self.tired_left = np.where(end_p, int(wl["tired_steps"]), self.tired_left)
             u_ = self.unit
+            sp_t = self.aroam if self.tired_roam else float(wl["tired_speed"]) * u_
             sp_w = np.where(eating, 0.0,
-                   np.where(tired | end_p, float(wl["tired_speed"]) * u_,
+                   np.where(tired | end_p, sp_t,
                    np.where(pounce_now, float(wl["pounce_speed"]) * u_,
                    np.where(chase, self.wolf_speed[:, None] * u_,
                    np.where(sneak, float(wl["stalk_speed"]) * u_, self.aroam)))))

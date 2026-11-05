@@ -12,11 +12,12 @@
 | `herbivore_rl/env_v2/r8_vec_env.py` | SB3 VecEnv (세계 32 × 사슴 32, 엇갈린 교체) |
 | `herbivore_rl/configs/v3_r8_pilot.yaml`·`v3_r8_pilot_h0.yaml` | 본 세계·대조(짐승 0) |
 | `train_r8.py` | 학습 (`--config --seed --steps --wall-hours --run-name`) |
-| `eval_r8.py` | `calibrate`(C0-1·2·4) · `leak`(C0-3) · `eval`(판정) · `bear`(곰 시험) |
+| `eval_r8.py` | `calibrate`(C0-1·2·4) · `leak`(C0-3, 탈진 나무 AUC 덧붙임) · `eval`(판정, 참고 기준 `rule_aim` 은 `--baselines` 로) · `bear`(곰 시험) |
 | `r8_replay.py` | 위에서 본 궤적 PNG |
 | `launch_train.ps1` | 본 학습 3 + 대조 1 을 떨어진 프로세스로 |
-| `herbivore_rl/tests/test_r8.py` | 시험 11 개 |
-| `calib/` | 보정 관문 기록 (`calibrate_design.json` = 설계 값, `calibrate.json` = 고친 값, `calibrate_<꼬리>.json` = 탐색) |
+| `herbivore_rl/tests/test_r8.py` | 시험 12 개 |
+| `leak_probe.py` | 학습 전 검토(11-05) 이름표 점검: 동물 칸 하나로 늑대·짐승을 숨은 상태별로 맞히는 나무 분류기 |
+| `calib/` | 보정 관문 기록 (`calibrate_design.json` = 설계 값, `calibrate.json` = 고친 값, `calibrate_<꼬리>.json` = 탐색, `*review*` = 학습 전 검토 뒤 지금 설정) |
 | `logs/` · `smoke/` | 학습 기록 · 스모크 점검 |
 
 모든 명령은 `herbivore_rl/` 에서 `PYTHONUTF8=1`, 파이썬 `C:/Users/Sinhyeok/anaconda3/python.exe` 로 돌린다. 시드: 학습 41100~41399, 개발·보정 41400~41449,

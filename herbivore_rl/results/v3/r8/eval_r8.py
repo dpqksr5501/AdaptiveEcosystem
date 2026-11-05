@@ -11,6 +11,7 @@
 정책 (설계 8-2): random(결정마다 11 칸 균등, 세계의 평가 갈래 난수), always_eat(늘 0), rule_blind(가장 가까운 느낀 동물이 15 단위 안이고
 approach > 0.1 이면 도망 — 은신처 가장자리 8 단위 안이면 SHELTER, 아니면 그 동물 반대에 가까운 뛰기 방향 가운데 free > 0.2 인 것, 아니면 먹기),
 rule_oracle(같은 규칙을 느낀 늑대에게만 — 숨은 종류를 쓰는 R7e 식 손규칙), 모델 zip(결정적: 가장 높은 확률 칸).
+덧붙임(학습 전 검토 11-05, 기본 목록 밖): rule_aim(이름표 없이 '바라보며 다가오는 동물'만 피함 — `--baselines ... rule_aim` 으로 부른다).
 모든 정책은 같은 시드의 같은 시작 세계에서 돈다(세계 K 개를 한 묶음으로 — 세계마다 난수 갈래가 따로라 묶음과 무관하다).
 
 지표 (설계 8-3): 잡힘·굶음·번식 1000 사슴-스텝당, 먹은 에너지 사슴-스텝당 × 1000, 행동 몫, 은신처 안 몫, 도망 몫 차이
@@ -77,6 +78,21 @@ def rule_actions(obs: np.ndarray, world: R8World | None, oracle: bool) -> np.nda
     return act.reshape(K, N)
 
 
+def aim_actions(obs: np.ndarray, facing_min: float = 0.97) -> np.ndarray:
+    """rule_aim (학습 전 검토 11-05 덧붙임, 기본 기준 정책 아님 — `--baselines` 에 적을 때만): 이름표 없이 '나를 바라보며 다가오는 동물만' 피한다.
+    가장 가까운 느낀 동물이 15 단위 안이고 approach > 0.1·facing > 0.97 이면 rule_blind 와 같은 도망, 아니면 먹기. P3 가 이름표 없이 닿는지 보는 참고."""
+    K, N, _ = obs.shape
+    o = obs.reshape(K * N, OBS_DIM)
+    c = A0
+    rel_x, rel_y, dist, appr, facing = o[:, c + 1], o[:, c + 2], o[:, c + 3], o[:, c + 6], o[:, c + 8]
+    trig = (o[:, c] > 0.5) & (dist < 15.0 / 20.0) & (appr > 0.1) & (facing > facing_min)
+    near_sh = o[:, 7] < 8.0 / 20.0
+    away = np.arctan2(-rel_y, -rel_x)
+    cosj = np.cos(away[:, None] - np.arange(8)[None, :] * (math.pi / 4.0))
+    run = 1 + np.argmax(np.where(o[:, 8:16] > 0.2, cosj, cosj - 10.0), 1)
+    return np.where(trig, np.where(near_sh, SHELTER, run), EAT).reshape(K, N)
+
+
 class ModelPolicy:
     def __init__(self, path: str):
         from stable_baselines3 import PPO
@@ -99,6 +115,8 @@ def make_policy(name: str):
         return lambda obs, w: rule_actions(obs, w, oracle=False)
     if name == "rule_oracle":
         return lambda obs, w: rule_actions(obs, w, oracle=True)
+    if name == "rule_aim":
+        return lambda obs, w: aim_actions(obs)
     if name.endswith(".zip"):
         return ModelPolicy(str(ROOT / name) if not Path(name).is_absolute() else name)
     raise ValueError(f"모르는 정책: {name}")
@@ -301,6 +319,7 @@ def cmd_leak(args) -> int:
     cfg = _cfg(args.config, args.set)
     seeds = _seeds(args.seeds)
     rows = []
+    tired_rows = []                                      # 학습 전 검토(11-05) 덧붙임: 탈진(사냥 안 함) 늑대 — 보고만, 관문 기준은 그대로
     prev = {}
 
     def hook(w: R8World, dead, ck):
@@ -314,9 +333,16 @@ def cmd_leak(args) -> int:
                 kk, aa = np.nonzero(m)
                 spd = np.sqrt((w.adisp[kk, aa] ** 2).sum(-1)) / w.unit
                 rows.append(np.stack([kk, (w.kind[kk, aa] == K_WOLF).astype(float), spd, w.asize[kk, aa], np.abs(turn[kk, aa])], 1))
+            # 이번 스텝을 탈진으로 움직인 늑대(앞 스텝 끝 tired_left > 0·먹기 아님)
+            wt = (w.kind == K_WOLF) & prev["wt"]
+            if wt.any():
+                kk, aa = np.nonzero(wt)
+                spd = np.sqrt((w.adisp[kk, aa] ** 2).sum(-1)) / w.unit
+                tired_rows.append(np.stack([kk, np.ones(len(kk)), spd, w.asize[kk, aa], np.abs(turn[kk, aa])], 1))
         prev["ahead"] = w.ahead.copy()
         prev["wn"] = (w.kind == K_WOLF) & (w.target < 0) & (w.eat_left == 0) & (w.tired_left == 0) & (w.pounce_left == 0)
         prev["bn"] = (w.kind == K_BEAST) & (w.bstate == 0)
+        prev["wt"] = (w.kind == K_WOLF) & (w.tired_left > 0) & (w.eat_left == 0)
 
     w = run_policy(cfg, seeds, args.steps, make_policy("always_eat"), record=False, hook=hook)
     X = np.concatenate(rows, 0)
@@ -326,6 +352,19 @@ def cmd_leak(args) -> int:
     clf = LogisticRegression(max_iter=1000).fit(feats[tr], X[tr, 1])
     auc = float(roc_auc_score(X[te, 1], clf.predict_proba(feats[te])[:, 1]))
     single = {nm: float(roc_auc_score(X[te, 1], feats[te, j])) for j, nm in enumerate(("speed", "size", "turn"))}
+    # 탈진 늑대 대 돌아다니는 짐승 — 속력만으로 맞히는 비선형(나무) AUC. 로지스틱은 한 점에 몰린 속력(설계 값 0.2)을 못 잡는다
+    tired_auc = None
+    if tired_rows:
+        from sklearn.ensemble import HistGradientBoostingClassifier
+
+        T = np.concatenate(tired_rows, 0)
+        B = X[X[:, 1] == 0]
+        Z = np.concatenate([T, B], 0)
+        ztr, zte = Z[:, 0] < half, Z[:, 0] >= half
+        if len(np.unique(Z[zte, 1])) == 2 and len(np.unique(Z[ztr, 1])) == 2:
+            hg = HistGradientBoostingClassifier(max_iter=200, random_state=0).fit(Z[ztr, 2:3], Z[ztr, 1])
+            tired_auc = dict(auc_speed_tree=float(roc_auc_score(Z[zte, 1], hg.predict_proba(Z[zte, 2:3])[:, 1])), n_tired=int(len(T)),
+                             mean_speed_tired=float(T[:, 2].mean()), mean_speed_beast_roam=float(B[:, 2].mean()))
     # 관측 함수 종류 바꿔치기 (설계 3-8 7)
     import copy as _c
 
@@ -345,12 +384,12 @@ def cmd_leak(args) -> int:
     swap_ok = bool(np.array_equal(o1, o2)) and swapped > 0
     ok = 0.45 <= auc <= 0.55 and swap_ok
     out = dict(config=args.config, seeds=args.seeds, steps=args.steps, n=int(len(X)), n_wolf=int(X[:, 1].sum()), auc=auc, single_auc=single,
-               swap_ok=swap_ok, swapped_worlds=swapped, ok=ok,
+               swap_ok=swap_ok, swapped_worlds=swapped, ok=ok, tired_vs_beast_roam=tired_auc,
                mean_speed=dict(wolf=float(X[X[:, 1] == 1, 2].mean()), beast=float(X[X[:, 1] == 0, 2].mean())),
                mean_size=dict(wolf=float(X[X[:, 1] == 1, 3].mean()), beast=float(X[X[:, 1] == 0, 3].mean())),
                mean_turn=dict(wolf=float(X[X[:, 1] == 1, 4].mean()), beast=float(X[X[:, 1] == 0, 4].mean())))
     Path(args.out).mkdir(parents=True, exist_ok=True)
-    (Path(args.out) / "leak.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
+    (Path(args.out) / f"leak{args.tag}.json").write_text(json.dumps(out, ensure_ascii=False, indent=1), encoding="utf-8")
     print(json.dumps(out, ensure_ascii=False, indent=1))
     print("C0-3", "통과" if ok else "못 넘음")
     return 0

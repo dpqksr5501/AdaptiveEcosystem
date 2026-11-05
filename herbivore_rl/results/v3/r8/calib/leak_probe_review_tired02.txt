@@ -1,0 +1,36 @@
+samples 419538 wolf 147424 beast 272114
+  wolf_roam(no target)   n=   6216 |v| mean 0.276 p1 0.024 p50 0.284 p99 0.395 frac(0.08<|v|<0.18) 0.053  appr_mem -0.087 size 0.506
+  wolf_eat               n= 110590 |v| mean 0.000 p1 0.000 p50 0.000 p99 0.000 frac(0.08<|v|<0.18) 0.000  appr_mem +0.016 size 0.508
+  wolf_tired             n=   3636 |v| mean 0.129 p1 0.025 p50 0.133 p99 0.133 frac(0.08<|v|<0.18) 0.980  appr_mem +0.018 size 0.533
+  wolf_pounce            n=   5641 |v| mean 1.000 p1 0.986 p50 1.000 p99 1.000 frac(0.08<|v|<0.18) 0.000  appr_mem +0.248 size 0.508
+  wolf_chase             n=  14304 |v| mean 0.551 p1 0.415 p50 0.564 p99 0.664 frac(0.08<|v|<0.18) 0.001  appr_mem +0.243 size 0.506
+  wolf_stalk_sneak       n=   7037 |v| mean 0.304 p1 0.079 p50 0.200 p99 1.000 frac(0.08<|v|<0.18) 0.076  appr_mem +0.095 size 0.511
+  beast_roam             n= 201476 |v| mean 0.289 p1 0.034 p50 0.296 p99 0.399 frac(0.08<|v|<0.18) 0.033  appr_mem +0.018 size 0.511
+  beast_graze            n=  57156 |v| mean 0.000 p1 0.000 p50 0.000 p99 0.000 frac(0.08<|v|<0.18) 0.000  appr_mem +0.001 size 0.509
+  beast_dash             n=  13482 |v| mean 0.744 p1 0.282 p50 0.751 p99 0.994 frac(0.08<|v|<0.18) 0.003  appr_mem +0.027 size 0.515
+ALL states: AUC 0.732
+pairwise (trained per pair, held-out worlds):
+  wolf roam  vs beast roam                 AUC(all 11) 0.594  AUC(|v| only) 0.532  n_w 2628 n_b 97145
+  wolf eat   vs all beasts                 AUC(all 11) 0.810  AUC(|v| only) 0.891  n_w 55518 n_b 132398
+  wolf roam  vs all beasts                 AUC(all 11) 0.658  AUC(|v| only) 0.658  n_w 2628 n_b 132398
+  wolf tired vs all beasts                 AUC(all 11) 0.951  AUC(|v| only) 0.998  n_w 2228 n_b 132398
+  wolf tired vs beast roam                 AUC(all 11) 0.929  AUC(|v| only) 0.997  n_w 2228 n_b 97145
+  wolf eat   vs beast graze                AUC(all 11) 0.670  AUC(|v| only) 0.500  n_w 55518 n_b 28782
+  wolf stalk-sneak vs beast roam           AUC(all 11) 0.900  AUC(|v| only) 0.999  n_w 3397 n_b 97145
+  wolf chase vs beast dash                 AUC(all 11) 0.730  AUC(|v| only) 0.869  n_w 6791 n_b 6471
+  wolf pounce vs beast dash                AUC(all 11) 0.896  AUC(|v| only) 0.999  n_w 2901 n_b 6471
+  wolf NON-hunting vs all beasts           AUC(all 11) 0.750  AUC(|v| only) 0.870  n_w 60374 n_b 132398
+  wolf hunting(aim) vs all beasts          AUC(all 11) 0.816  AUC(|v| only) 0.988  n_w 13089 n_b 132398
+P3-like samples (slot0, <15u): wolf mode shares
+  wolf_roam(no target)   0.025
+  wolf_eat               0.805
+  wolf_tired             0.020
+  wolf_pounce            0.034
+  wolf_chase             0.082
+  wolf_stalk_sneak       0.034
+  n wolf 95302 n beast 144285
+single-feature AUC (held-out worlds):
+  wolf eat vs beast graze: dist 0.327, approach_mem 0.649, facing 0.582, size 0.546, rel_x 0.484
+  wolf roam vs beast roam: approach_mem 0.313, approach 0.335, facing 0.343, dist 0.618, size 0.568
+  wolf tired vs beast roam: size 0.768, facing 0.553, dist 0.469, heard_only 0.480, approach_mem 0.489
+  wolf stalk vs beast roam: facing 0.802, approach 0.671, approach_mem 0.637, dist 0.621, size 0.575

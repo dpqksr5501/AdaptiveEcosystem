@@ -84,6 +84,36 @@ def test_kind_swap_same_obs(cfg):
     assert np.array_equal(o1, w2._observe())
 
 
+def test_tired_wolf_moves_like_roaming(cfg):
+    """학습 전 검토(11-05): 탈진(사냥 안 함) 늑대는 제 배회 속력으로 배회한다 — 짐승에 없는 늑대만의 속력(설계 값 0.2)은 이름표였다."""
+    assert cfg["wolves"]["tired_speed"] == "roam"
+    c = override(cfg, {"wolves": {"count": [4, 4]}, "beasts": {"count": [0, 0]}})
+    w = R8World(c, SEEDS)
+    for _ in range(5):
+        w.step(np.full((w.K, w.N), WATCH))
+    wolf = w.kind == K_WOLF
+    w.eat_left[wolf] = 0
+    w.pounce_left[wolf] = 0
+    w.lock[wolf] = -1
+    w.tired_left[wolf] = 20
+    p0 = w.apos.copy()
+    w.D = 1
+    w.step(np.full((w.K, w.N), WATCH))
+    sp = np.sqrt(((w.apos - p0) ** 2).sum(-1))
+    rr = w.cov_r + c["animals"]["shelter_margin"]
+    free = wolf & (p0 > 2).all(-1) & (p0 < w.size - 2).all(-1)
+    for cc in w.cov_c:
+        free &= np.sqrt(((p0 - cc) ** 2).sum(-1)) > rr + 2
+    assert free.sum() >= 4
+    assert np.allclose(sp[free], w.aroam[free], atol=1e-12)
+    lo, hi = c["animals"]["roam_speed"]
+    assert (w.aroam[wolf] >= lo * w.unit - 1e-12).all() and (w.aroam[wolf] <= hi * w.unit + 1e-12).all()
+    assert (w.target[wolf] == -1).all()                # 탈진 중에는 사냥하지 않는다
+    # 수로 적으면 예전 뜻(× 사슴 뛰기 속력) 그대로
+    w2 = R8World(override(c, {"wolves": {"tired_speed": 0.2}}), SEEDS)
+    assert not w2.tired_roam
+
+
 def test_beasts_never_catch(cfg):
     c = override(cfg, {"wolves": {"count": [0, 0]}, "beasts": {"count": [6, 6]}})
     w = R8World(c, SEEDS)
