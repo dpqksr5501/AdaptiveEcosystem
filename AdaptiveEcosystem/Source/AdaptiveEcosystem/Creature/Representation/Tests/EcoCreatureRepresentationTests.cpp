@@ -14,6 +14,68 @@
 #include "Engine/SkeletalMesh.h"
 #include "Animation/BlendSpace.h"
 #include "Animation/AnimSequence.h"
+#include "UI/EcoHealthBarComponent.h"
+#include "UI/EcoHealthBarWidget.h"
+#include "Network/Mass/EcoMassReplicationTypes.h"
+#include "Mass/EcoMassPresentationFragments.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoHealthBarTest, "AdaptiveEcosystem.Creature.Visual.HealthBarReplicationAndPooling",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoHealthBarTest::RunTest(const FString&)
+{
+	EcoTest::FScopedTestWorld W;
+	for (const FString Kind : {TEXT("Deer"), TEXT("Wolf")})
+	{
+		UClass* BP = LoadClass<AEcoCreatureRepresentationActor>(nullptr,
+			*(TEXT("/Game/Creatures/Integrated/BP_Eco") + Kind + TEXT(".BP_Eco") + Kind + TEXT("_C")));
+		if (!TestNotNull(TEXT("Saved species Blueprint"), BP)) return false;
+		auto* Visual = W.World->SpawnActor<AEcoCreatureRepresentationActor>(BP);
+		auto* Other = W.World->SpawnActor<AEcoCreatureRepresentationActor>(BP);
+		if (!TestNotNull(TEXT("Every saved species inherits a health bar"), Visual->HealthBar.Get())) return false;
+		TestTrue(TEXT("Screen space faces each local viewer"), Visual->HealthBar->GetWidgetSpace() == EWidgetSpace::Screen);
+		TestTrue(TEXT("Works without a widget asset"), Visual->HealthBar->GetWidgetClass() == UEcoHealthBarWidget::StaticClass());
+		Visual->BindIdentity(7, Visual->VisualSpeciesId);
+		Other->BindIdentity(8, Other->VisualSpeciesId);
+		TestFalse(TEXT("No guessed HP before the first sample"), Visual->HealthBar->IsVisible());
+		FReplicatedEcoMassAgent Agent;
+		Agent.SetStableAgentId(7); Agent.SetSpeciesId(Visual->VisualSpeciesId);
+		Agent.SetVisualState(1.f, 1.f, EEcoVisualLifeState::Alive);
+		Agent.SetPresentation(FVector::ZeroVector, 9, 255, 255);
+		Agent.StampSample(1.0);
+		FEcoClientPresentationFragment ClientA, ClientB;
+		FEcoCreatureVisualState State;
+		State.StableAgentId = 7; State.SpeciesId = Visual->VisualSpeciesId;
+		State.Sequence = 1; State.bHasVitals = true; State.NormalizedHealth = 1.f;
+		TestTrue(TEXT("First client accepts full HP"), ClientA.Receive(Agent.MakeRepresentationSnapshot(), 1.1));
+		TestTrue(TEXT("Second client accepts full HP"), ClientB.Receive(Agent.MakeRepresentationSnapshot(), 1.2));
+		Visual->ConsumeVisualState(State, .016f);
+		TestTrue(TEXT("Full health is always shown"), Visual->HealthBar->IsVisible() && Visual->HealthBar->GetHealthFraction() == 1.f);
+		// Damage without movement: visual revision must deliver HP to both clients.
+		Agent.SetVisualState(.7f, 1.f, EEcoVisualLifeState::Alive);
+		Agent.SetPresentation(FVector::ZeroVector, 9, EcoRepresentation::QuantizeUnit(.7f), 255);
+		TestTrue(TEXT("Stationary damage reaches client A"), ClientA.Receive(Agent.MakeRepresentationSnapshot(), 1.3));
+		TestTrue(TEXT("Stationary damage reaches client B"), ClientB.Receive(Agent.MakeRepresentationSnapshot(), 1.4));
+		State.Sequence++; State.NormalizedHealth = Agent.GetHealth() / 255.f;
+		Visual->ConsumeVisualState(State, .016f);
+		TestTrue(TEXT("Bar consumes received HP"), FMath::IsNearlyEqual(Visual->HealthBar->GetHealthFraction(), .7f, 1.f / 255.f));
+		TestFalse(TEXT("A different agent never inherits damaged health"), Other->HealthBar->HasHealthSample());
+		State.NormalizedHealth = 1.f;
+		TestFalse(TEXT("Late visual snapshot is rejected"), Visual->ConsumeVisualState(State, .016f));
+		TestTrue(TEXT("Rejected snapshot cannot refill bar"), Visual->HealthBar->GetHealthFraction() < 1.f);
+		State.Sequence++; State.bAlive = false;
+		Visual->ConsumeVisualState(State, .016f);
+		TestTrue(TEXT("Explicit death displays empty bar even with rounded HP"), Visual->HealthBar->IsVisible() && Visual->HealthBar->GetHealthFraction() == 0.f);
+		Visual->ClearBinding();
+		TestFalse(TEXT("Pool clears visibility and health sample"), Visual->HealthBar->IsVisible() || Visual->HealthBar->HasHealthSample());
+		Visual->BindIdentity(9, Visual->VisualSpeciesId);
+		TestFalse(TEXT("Reused actor waits for the new identity's HP"), Visual->HealthBar->IsVisible());
+		Visual->HealthBar->SetHealth(50.f, 200.f);
+		TestEqual(TEXT("Reusable adapter supports arbitrary maximum health"), Visual->HealthBar->GetHealthFraction(), .25f);
+		Visual->HealthBar->SetHealth(50.f, 0.f);
+		TestFalse(TEXT("Missing health capacity does not invent HP"), Visual->HealthBar->IsVisible());
+	}
+	return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoVisualBindingTest, "AdaptiveEcosystem.Creature.Visual.BindingAndStaleSnapshots",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

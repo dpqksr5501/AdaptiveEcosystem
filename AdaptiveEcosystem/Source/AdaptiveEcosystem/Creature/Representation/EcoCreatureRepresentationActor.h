@@ -14,6 +14,7 @@ class UAnimSequence;
 class UEcoCreatureAnimationProfile;
 class UEcoCreatureAnimInstance;
 class UEcoFootstepAudioComponent;
+class UEcoHealthBarComponent;
 
 /** Passive Mass representation. No controller, movement component, physics, or logical state writer. */
 UCLASS(Blueprintable)
@@ -28,6 +29,8 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<UStaticMeshComponent> PlaceholderBody;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Visual") TObjectPtr<UTextRenderComponent> IdentityLabel;
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|Audio") TObjectPtr<UEcoFootstepAudioComponent> Footsteps;
+	/** Inherited by every species Blueprint. Consumes the existing Mass health DTO only. */
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Creature|UI") TObjectPtr<UEcoHealthBarComponent> HealthBar;
     UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Audio") bool bUseFootstepNotifies = false;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual") FName VisualSpeciesId = TEXT("Herbivore");
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<USkeletalMesh> VisualMesh;
