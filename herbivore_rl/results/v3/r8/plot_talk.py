@@ -35,10 +35,10 @@ POLICIES = [  # (summary 이름 또는 앞머리, 이름표, 막대 색)
     ("RULE_BLIND", "손규칙 · 이름표 없음", "#A9B0B3"),
     ("RULE_ORACLE", "손규칙 · 이름표 있음", "#7D858A"),
     ("RULE_AIM", "손규칙 · 다가옴만 피함", "#A9B0B3"),
-    ("r8_p_s0", "R8 · 시드 0", "#1F6F6B"),
-    ("r8_p_s1", "R8 · 시드 1", "#1F6F6B"),
-    ("r8_p_s2", "R8 · 시드 2", "#1F6F6B"),
-    ("r8_h0_s0", "대조 · 짐승 없이 배움", "#7CC5BD"),
+    ("r8_p_s0", "R8 두뇌 1", "#1F6F6B"),
+    ("r8_p_s1", "R8 두뇌 2", "#1F6F6B"),
+    ("r8_p_s2", "R8 두뇌 3", "#1F6F6B"),
+    ("r8_h0_s0", "대조 · 짐승 없는 세계", "#7CC5BD"),
 ]
 DEFAULT = ["ALWAYS_EAT", "RULE_BLIND", "RULE_ORACLE", "r8_p_s0", "r8_p_s1", "r8_p_s2", "r8_h0_s0"]
 PANELS = ("caught", "eaten", "flee")

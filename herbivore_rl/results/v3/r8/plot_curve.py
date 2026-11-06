@@ -66,6 +66,9 @@ def _rows(run: str) -> list[dict]:
                 out.append(json.loads(line))
             except json.JSONDecodeError:
                 pass
+    # 학습 끝에 덧붙는 마지막 줄(final)은 남은 몇만 걸음만 모아 점 하나가 크게 튄다(11-06: 4천~6만 걸음 대 다른 줄 1천만) — 앞 줄의 10% 보다 작으면 뺀다.
+    if len(out) > 1 and out[-1].get("final") and out[-1].get("deer_steps", 0) < 0.1 * out[-2].get("deer_steps", 0):
+        out.pop()
     return out
 
 
@@ -188,9 +191,9 @@ def _draw_curve_talk(plt, T: dict, runs: list[str], out_png: Path, note: str | N
         kw = dict(color=T["h0"], ls="--", lw=2.4) if h0 else dict(color=T["r8"], lw=2.6, alpha=0.85)
         lab = None
         if h0 and not seen_h0:
-            lab, seen_h0 = "대조: 해 없는 짐승 없이 배움", True
+            lab, seen_h0 = "대조: 짐승 없는 세계에서 배움", True
         elif not h0 and not seen_r8:
-            lab, seen_r8 = "R8 (시드마다 한 줄)", True
+            lab, seen_r8 = "R8 (두뇌마다 한 줄)", True
         a.plot(x, [r["caught_per_1k"] for r in rows], label=lab, **kw)
         b.plot(x, [r["eaten_e_x1000"] for r in rows], label=lab, **kw)
         if not h0:
@@ -218,7 +221,7 @@ def _draw_curve_talk(plt, T: dict, runs: list[str], out_png: Path, note: str | N
     from matplotlib.lines import Line2D
 
     c.legend(handles=[Line2D([0], [0], color=T["wolf"], lw=3, label="늑대일 때"),
-                      Line2D([0], [0], color=T["beast"], lw=3, ls=(0, (4, 2)), label="해 없는 짐승일 때")], fontsize=14, frameon=False, loc="lower right")
+                      Line2D([0], [0], color=T["beast"], lw=3, ls=(0, (4, 2)), label="짐승일 때")], fontsize=14, frameon=False, loc="lower right")
     if seen_r8 or seen_h0:
         a.legend(fontsize=13, frameon=False, loc="center right")
     for ax_ in (a, b, c):

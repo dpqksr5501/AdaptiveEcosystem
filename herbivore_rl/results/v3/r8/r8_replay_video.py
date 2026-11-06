@@ -206,16 +206,16 @@ def main(argv=None) -> int:
         cats = np.vectorize(cat_idx.get)(RP.act_cat(tr["act"]))
         panels.append(dict(tr=tr, ax=ax, lc=lc, deer=deer, animals=animals, xs=xs, txt=txt, cats=cats,
                            catch=sorted(((int(t), p, kd) for (t, p, kd) in tr["catch"]), key=lambda c: c[0])))
-    ms = 11 * k
+    ms = 14 * k
     hd = [Line2D([0], [0], marker="o", lw=0, color=RP.KIND_COL[K_WOLF], mec="white", ms=ms * 1.15, label="늑대"),
-          Line2D([0], [0], marker="o", lw=0, color=RP.KIND_COL[K_BEAST], mec="white", ms=ms * 1.15, label="해 없는 짐승")]
+          Line2D([0], [0], marker="o", lw=0, color=RP.KIND_COL[K_BEAST], mec="white", ms=ms * 1.15, label="짐승")]
     if args.bears:
         hd.append(Line2D([0], [0], marker="o", lw=0, color=RP.KIND_COL[K_BEAR], ms=ms * 1.3, label="곰"))
-    hd += [Line2D([0], [0], marker="o", lw=2.4 * k, color=RP.ACT_COL[c], mec="k", mew=0.5, ms=ms * 0.8, label=f"사슴 {t}")
+    hd += [Line2D([0], [0], marker="o", lw=2.4 * k, color=RP.ACT_COL[c], mec="k", mew=0.5, ms=ms * 0.8, label=t)
            for c, t in (("eat", "먹기"), ("run", "뛰기"), ("shelter", "은신처로"), ("watch", "살피기"))]
     hd += [Line2D([0], [0], marker="x", lw=0, color="k", ms=ms, mew=2.6 * k, label="잡힌 자리"),
            Line2D([0], [0], marker="o", lw=0, color="#333333", alpha=0.35, ms=ms * 1.6, label="은신처")]
-    fig.legend(handles=hd, loc="lower center", bbox_to_anchor=(0.5, 0.012), ncol=len(hd), fontsize=17 * k, frameon=False,
+    fig.legend(handles=hd, loc="lower center", bbox_to_anchor=(0.5, 0.012), ncol=len(hd), fontsize=25 * k, frameon=False,
                handletextpad=0.35, columnspacing=1.5)
     if args.note:
         fig.text(0.995, 0.006, args.note, ha="right", va="bottom", fontsize=13 * k, color="#8A8F91")
