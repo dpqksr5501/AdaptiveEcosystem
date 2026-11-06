@@ -24,6 +24,8 @@ public:
 protected:
     void BeginPlay() override;
 private:
+    /** Editor scripting forces RPCs local; execute scripted game input after that scope ends. */
+    bool DeferEditorInput(const UInputAction* Action, bool bPressed);
     friend struct FEcoCombatTestAccess;
     void PressAbility(const UInputAction* Action, TSubclassOf<UGameplayAbility> Ability);
     void ReleaseAbility(const UInputAction* Action);

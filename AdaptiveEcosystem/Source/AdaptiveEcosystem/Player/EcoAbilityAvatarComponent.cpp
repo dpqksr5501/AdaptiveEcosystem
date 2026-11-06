@@ -3,6 +3,10 @@
 #include "AbilitySystemComponent.h"
 #include "EnhancedInputComponent.h"
 #include "GameFramework/Pawn.h"
+#include "Engine/World.h"
+#include "InputAction.h"
+#include "TimerManager.h"
+#include "CoreGlobals.h"
 
 void UEcoAbilityAvatarComponent::RefreshAvatar()
 {
@@ -137,13 +141,40 @@ void UEcoAbilityAvatarComponent::PressConfiguredAction(const UInputAction* Actio
 {
     const auto* Pawn=Cast<APawn>(GetOwner());
     if(!Pawn||!Pawn->IsLocallyControlled()||!Action)return;
+    if (DeferEditorInput(Action, true)) return;
     for(const auto& Binding:GetBindings())if(Binding.Action==Action&&Binding.Ability)
     { PressAbility(Action,Binding.Ability);return; }
 }
 void UEcoAbilityAvatarComponent::ReleaseConfiguredAction(const UInputAction* Action)
 {
     const auto* Pawn=Cast<APawn>(GetOwner());
+    if (Pawn && Pawn->IsLocallyControlled() && Action && DeferEditorInput(Action, false)) return;
     if(Pawn&&Pawn->IsLocallyControlled())ReleaseAbility(Action);
+}
+
+bool UEcoAbilityAvatarComponent::DeferEditorInput(const UInputAction* Action, bool bPressed)
+{
+#if WITH_EDITOR
+    if (GAllowActorScriptExecutionInEditor && GetWorld() && GetWorld()->IsGameWorld())
+    {
+        const TWeakObjectPtr<const UInputAction> WeakAction(Action);
+        const TWeakObjectPtr<UAbilitySystemComponent> ExpectedSystem(GetAbilitySystem());
+        const auto* Pawn = Cast<APawn>(GetOwner());
+        const TWeakObjectPtr<AController> ExpectedController(Pawn ? Pawn->GetController() : nullptr);
+        GetWorld()->GetTimerManager().SetTimerForNextTick(FTimerDelegate::CreateWeakLambda(this,
+            [this, WeakAction, ExpectedSystem, ExpectedController, bPressed]()
+            {
+                const auto* CurrentPawn = Cast<APawn>(GetOwner());
+                if (!WeakAction.IsValid() || !ExpectedSystem.IsValid() || GetAbilitySystem() != ExpectedSystem.Get()
+                    || !CurrentPawn || !CurrentPawn->IsLocallyControlled() || !ExpectedController.IsValid()
+                    || CurrentPawn->GetController() != ExpectedController.Get()) return;
+                if (bPressed) PressConfiguredAction(WeakAction.Get());
+                else ReleaseConfiguredAction(WeakAction.Get());
+            }));
+        return true;
+    }
+#endif
+    return false;
 }
 
 void UEcoAbilityAvatarComponent::BeginPlay()
