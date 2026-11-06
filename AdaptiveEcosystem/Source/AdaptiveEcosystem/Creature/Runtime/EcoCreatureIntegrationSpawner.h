@@ -102,6 +102,9 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|Scheduling", meta=(ClampMin="1",ClampMax="32")) int32 MaxCatchUpSteps = 8;
 	UPROPERTY(EditAnywhere, Category="Creature|Visual", meta=(ClampMin="0",ClampMax="1")) float InterpolationDelaySeconds = 0.1f;
 	UPROPERTY(EditAnywhere, Category="Creature|Visual", meta=(ClampMin="0",ClampMax="200000",Units="cm")) float HostVisualDistance = 20000.0f;
+	/** Client camera-to-creature 3D distance. 0 disables this local limit; Bubble relevance and Actor budgets still apply.
+	 *  Hiding a visual never removes its server logical agent or changes the authority debug map. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Creature|Visual", meta=(ClampMin="0",ClampMax="200000",Units="cm")) float ClientVisualDistance = 1000.0f;
 	/** Experimental policy scheduling only. Off by default until the scale fixture is measured. */
 	UPROPERTY(EditAnywhere, Category="Creature|Simulation LOD") bool bEnableSimulationLOD = false;
 	UPROPERTY(EditAnywhere, Category="Creature|Simulation LOD", meta=(ClampMin="4000",Units="cm")) float FarSimulationDistance = 20000.0f;

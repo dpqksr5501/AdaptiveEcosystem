@@ -59,6 +59,10 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 			double Distance = Viewers.IsEmpty() ? 0.0 : TNumericLimits<double>::Max();
 			for (const auto& Viewer : Viewers) Distance = FMath::Min(Distance, FVector::DistSquared(Viewer, Position));
 			if (GetNetMode() != NM_Client && !Viewers.IsEmpty() && Distance > FMath::Square(HostVisualDistance)) continue;
+			// Filter before retention bias/combat priority: neither may keep a distant visual alive.
+			// Client proxies and the authority simulation remain independent of local Actor selection.
+			if (GetNetMode() == NM_Client && ClientVisualDistance > 0.0f
+				&& (Viewers.IsEmpty() || Distance > FMath::Square(ClientVisualDistance))) continue;
 			const uint32 Revision = Samples.IsEmpty() ? (Resets.IsEmpty() ? 0 : Resets[I].Revision) : Samples[I].Current.MovementDiscontinuityRevision;
 			// A small retention bias prevents swapping equal-distance actors at the budget boundary.
 			if (Visuals.Contains(Ids[I].StableAgentId)) Distance *= .81;
