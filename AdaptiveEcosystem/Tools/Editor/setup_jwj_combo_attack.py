@@ -16,12 +16,25 @@ if data is None:
     factory.set_editor_property("data_asset_class", u.EcoComboAttackData)
     data = tools.create_asset("DA_EcoUnarmedCombo", ROOT, u.EcoComboAttackData, factory)
     steps = []
-    for section, socket in [("LeftPunch","Attack_Hand_L"),("RightPunch","Attack_Hand_R"),("Kick","Attack_Foot")]:
+    # Section names are legacy identifiers; MM_Attack_01 punches right, 02 punches left.
+    for section, socket in [("LeftPunch","Attack_Hand_R"),("RightPunch","Attack_Hand_L"),("Kick","foot_r")]:
         step = u.EcoComboStep()
         step.set_editor_property("section", section)
         step.set_editor_property("socket", socket)
         steps.append(step)
     data.set_editor_property("montage", montage)
+    data.set_editor_property("steps", steps)
+    assert assets.save_loaded_asset(data, False)
+# Correct existing data as well without replacing user-authored timings/radius/damage.
+steps = list(data.get_editor_property("steps"))
+if len(steps) != 3:
+    raise RuntimeError("Expected existing three-step combo")
+if [str(step.get_editor_property("section")) for step in steps] != ["LeftPunch", "RightPunch", "Kick"]:
+    raise RuntimeError("Unexpected sections; inspect the montage before applying the hand mapping")
+if [str(step.get_editor_property("socket")) for step in steps[:2]] != ["Attack_Hand_R", "Attack_Hand_L"]:
+    data.modify()
+    for step, socket in zip(steps[:2], ["Attack_Hand_R", "Attack_Hand_L"]):
+        step.set_editor_property("socket", socket)
     data.set_editor_property("steps", steps)
     assert assets.save_loaded_asset(data, False)
 pawn = u.load_asset(ROOT + "/BP_EcoPlayer_Common")

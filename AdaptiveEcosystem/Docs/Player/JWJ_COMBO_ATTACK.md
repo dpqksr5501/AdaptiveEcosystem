@@ -9,6 +9,7 @@
 - 키는 `/Game/JWJ/Gameplay/IMC_EcoAbilities_Common`에서 바꾼다. 현재 F를 재사용한다.
 - `/Game/JWJ/Gameplay/AM_EcoUnarmedCombo`는 MM_Attack_01/02/03을 각각 LeftPunch/RightPunch/Kick Section으로 사용한다. 각 Section은 기본적으로 다음 Section에 자동 연결하지 않는다.
 - 공유 SK_Mannequin Skeleton에 Attack_Hand_L(hand_l), Attack_Hand_R(hand_r), Attack_Foot(foot_l) 소켓을 추가했다. Skeleton Editor에서 위치/회전을 조정할 수 있다.
+- 2026-11-06 실제 공격 손 순서 정정: 1단계 MM_Attack_01은 오른손 `Attack_Hand_R`, 2단계 MM_Attack_02는 왼손 `Attack_Hand_L`, 3단계는 오른발 `foot_r`다. 기존 Montage Section 이름 `LeftPunch`/`RightPunch`는 호환용 식별자로 유지하므로 이름 대신 단계별 Socket을 기준으로 본다. 공격 타이밍·반경·피해는 유지한다. 기존 두 저작 도구도 이 매핑을 사용한다.
 - 단계별 Section·Socket·Radius·Damage는 DA에서 편집한다. TargetObjectTypes와 ObstructionChannel도 DA에 있다. 후속 구현은 서버 피격 Proxy를 통해 실제 생태계 HP에 피해를 확정한다. 발차기는 실제 모션에 맞춰 오른발 `foot_r` bone을 사용한다.
 - DrawDebug를 켜면 활성 Window 동안 Sphere와 Sweep 경로가 표시된다.
 

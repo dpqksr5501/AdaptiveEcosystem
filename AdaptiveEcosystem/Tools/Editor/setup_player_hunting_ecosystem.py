@@ -51,6 +51,8 @@ asset_file=Path(u.Paths.convert_relative_path_to_full(u.Paths.project_content_di
 if asset_file.exists() and not (backup/asset_file.name).exists():shutil.copy2(asset_file,backup/asset_file.name)
 steps=list(data.get_editor_property('steps'))
 if len(steps)!=3:raise RuntimeError('Expected existing three-step combo')
+steps[0].set_editor_property('socket','Attack_Hand_R')
+steps[1].set_editor_property('socket','Attack_Hand_L')
 steps[2].set_editor_property('socket','foot_r')
 data.modify();data.set_editor_property('steps',steps)
 if not assets.save_loaded_asset(data,False):raise RuntimeError('Combo data save failed')

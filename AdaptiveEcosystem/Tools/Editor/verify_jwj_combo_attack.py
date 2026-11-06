@@ -7,6 +7,8 @@ assert levels.load_level("/Game/JWJ/1102_Integration_JWJ")
 attack=u.load_asset("/Game/Variant_Combat/Input/Actions/IA_ComboAttack")
 montage=u.load_asset("/Game/JWJ/Gameplay/AM_EcoUnarmedCombo")
 data=u.load_asset("/Game/JWJ/Gameplay/DA_EcoUnarmedCombo")
+step_sockets=[str(s.get_editor_property("socket")) for s in data.get_editor_property("steps")]
+assert step_sockets[:2]==["Attack_Hand_R","Attack_Hand_L"], "Unexpected attack hand mapping"
 lengths=[u.load_asset("/Game/Characters/Mannequins/Anims/Unarmed/Attack/MM_Attack_0"+str(i)).get_play_length() for i in (1,2,3)]
 u.log("[ComboVerify] lengths="+str(lengths))
 state={"phase":0,"start":None,"sent":set(),"seen":set(),"deadline":time.monotonic()+120,"target":None,"contacts":0}
@@ -41,7 +43,7 @@ def tick(dt):
             state["start"]=now
             state["seen"].clear(); state["sent"].clear()
             state["contacts"]=hit.get_editor_property("contact_count")
-            state["origin"]=mesh.get_socket_location("Attack_Hand_L")-pawn.get_actor_location()
+            state["origin"]=mesh.get_socket_location(step_sockets[0])-pawn.get_actor_location()
             state["motion"]=0.0
             pawn.set_actor_location(u.Vector(0,-1500,3400),False,False)
             pawn.character_movement.set_movement_mode(u.MovementMode.MOVE_FLYING)
@@ -53,9 +55,14 @@ def tick(dt):
         section=str(anim.montage_get_current_section(montage)) if playing else "None"
         if playing:
             state["seen"].add(section)
-            state["motion"]=max(state["motion"],(mesh.get_socket_location("Attack_Hand_L")-pawn.get_actor_location()-state["origin"]).length())
+            state["motion"]=max(state["motion"],(mesh.get_socket_location(step_sockets[0])-pawn.get_actor_location()-state["origin"]).length())
         idx={"LeftPunch":0,"RightPunch":1,"Kick":2}.get(section,0)
-        socket=["Attack_Hand_L","Attack_Hand_R","Attack_Foot"][idx]
+        socket=step_sockets[idx]
+        active=hit.get_editor_property("active_step")
+        if active>=0:
+            sphere=next(c for c in pawn.get_components_by_class(u.SphereComponent) if c.get_name()=="MeleeQuerySphere")
+            assert str(sphere.get_attach_socket_name())==step_sockets[active], "Active sphere attached to wrong hand"
+            assert (sphere.get_world_location()-mesh.get_socket_location(step_sockets[active])).length()<1
         state["target"].set_actor_location(mesh.get_socket_location(socket),False,False)
         if playing and "audit" not in state["sent"]:
             state["sent"].add("audit")
