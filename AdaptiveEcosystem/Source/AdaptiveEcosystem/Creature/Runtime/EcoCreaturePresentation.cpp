@@ -11,6 +11,7 @@
 #include "MassEntityQuery.h"
 #include "MassExecutionContext.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/EcoCombatRelevanceComponent.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 
 void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
@@ -65,6 +66,10 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		}
 	});
 	if (!bReady) return;
+    for (auto& Input:Inputs)
+        for (auto It=GetWorld()->GetPlayerControllerIterator();It;++It)
+            if (auto* PC=It->Get(); PC && PC->IsLocalController() && PC->GetPawn())
+                if (auto* R=PC->GetPawn()->FindComponentByClass<UEcoCombatRelevanceComponent>();R && R->IsOffered(Input.Id)) { Input.Distance=-1; break; }
 	Inputs.Sort([](const FInput& A, const FInput& B) { return A.Distance == B.Distance ? A.Id < B.Id : A.Distance < B.Distance; });
 	if (Inputs.Num() > Budget.MaxActorRepresentations) Inputs.SetNum(Budget.MaxActorRepresentations);
 	TSet<int64> Selected; for (const auto& Input : Inputs) Selected.Add(Input.Id);
@@ -116,6 +121,13 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		Binding.Actor->Footsteps->AudioSet = FootstepAudioSet;
 		Binding.Actor->ConsumeVisualState(State, Delta);
 	}
+    TArray<int64> PresentedIds;
+    for (const auto& Pair:Visuals)
+        if (const auto* Actor=Pair.Value.Actor.Get(); Actor && Actor->bBound && !Actor->IsHidden() && Actor->VisualState.bAlive) PresentedIds.Add(Pair.Key);
+    PresentedIds.Sort();
+    for (auto It=GetWorld()->GetPlayerControllerIterator();It;++It)
+        if (auto* PC=It->Get(); PC && PC->IsLocalController() && PC->GetPawn())
+            if (auto* R=PC->GetPawn()->FindComponentByClass<UEcoCombatRelevanceComponent>()) R->SetPresented(this,PresentedIds);
 	// Bound hidden pool separately: changing species mix must not grow retained actors without limit.
 	const int32 MaxPool = FMath::Max(0, Budget.MaxActorRepresentations - Visuals.Num());
 	while (VisualPool.Num() > MaxPool) { AEcoCreatureRepresentationActor* Actor = VisualPool.Pop(); if (Actor) Actor->Destroy(); }

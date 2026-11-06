@@ -10,6 +10,7 @@ AEcoCreatureHitProxy::AEcoCreatureHitProxy()
     SetRootComponent(Shape);
     Shape->SetCollisionObjectType(ECC_WorldDynamic);
     Shape->SetCollisionResponseToAllChannels(ECR_Ignore);
+    Shape->SetCollisionResponseToChannel(ECC_Visibility,ECR_Block);
     Shape->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Shape->SetGenerateOverlapEvents(false);
     SetActorHiddenInGame(true);

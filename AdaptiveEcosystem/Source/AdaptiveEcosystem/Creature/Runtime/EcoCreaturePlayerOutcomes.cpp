@@ -12,6 +12,7 @@
 #include "Engine/World.h"
 #include "Player/EcoPlayerState.h"
 #include "Player/EcoMeleeHitComponent.h"
+#include "Player/EcoCombatRelevanceComponent.h"
 
 bool AEcoCreatureIntegrationSpawner::QueuePlayerStrike(APawn& Player)
 {
@@ -43,7 +44,10 @@ void AEcoCreatureIntegrationSpawner::ProcessPlayerStrikes(const FEcoServerTimeSn
         const FVector From=Player->GetActorLocation();const FVector Forward=Player->GetActorForwardVector().GetSafeNormal2D();
         FVector PlayerEye;FRotator PlayerEyeRotation;Player->GetActorEyesViewPoint(PlayerEye,PlayerEyeRotation);
         FMassEntityHandle Best;double Distance=300;
+        const auto* Relevance=Player->FindComponentByClass<UEcoCombatRelevanceComponent>();
         for(const auto Entity:Owned){
+            const int64 TargetId=EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity).StableAgentId;
+            if (!Relevance || !Relevance->CanAttack(this,Time.WorldEpoch,TargetId) || !HitProxies.Contains(TargetId)) continue;
             const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entity);
             if(!Link||!Link->bAdopted||Link->bDead||EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).HP<=0)continue;
             const FVector Point=Position(Entity)+FVector(0,0,65),Delta=Point-From;

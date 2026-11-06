@@ -7,6 +7,7 @@
 #include "Engine/World.h"
 #include "Creature/Audio/EcoFootstepAudioSet.h"
 #include "Player/EcoMeleeHitComponent.h"
+#include "Player/EcoWeaponFireComponent.h"
 #include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
@@ -111,6 +112,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
             ++CombatDiagnostics.HuntingDeaths;
             auto Outcome=Kill->Outcome; Outcome.Result=EEcoDamageResult::DeathCommitted;
             if (auto* Source=Kill->Source.Get()) Source->PublishDamageOutcome(Outcome);
+            if (auto* Weapon=Kill->WeaponSource.Get()) Weapon->PublishDamageOutcome(Outcome);
             PendingHuntingDeaths.Remove(Death.StableAgentId);
             UE_LOG(LogTemp,Log,TEXT("[EcoCombat][DeathCommitted] Id=%lld Species=%s Region=%s Step=%lld"),Death.StableAgentId,*Death.SpeciesId.ToString(),*Death.RegionId.ToString(),NextStep);
         }

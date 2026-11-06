@@ -14,6 +14,11 @@ class UInputAction;
 class UEcoAbilityAvatarComponent;
 class UEcoPlayerCombatComponent;
 class UEcoMeleeHitComponent;
+class UEcoEquipmentComponent;
+class UEcoAimComponent;
+class UEcoWeaponFireComponent;
+class UEcoCombatRelevanceComponent;
+class UEcoGASDamageReceiverComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -73,6 +78,11 @@ private:
     UPROPERTY(VisibleAnywhere, Category="Combat")
     TObjectPtr<UEcoMeleeHitComponent> MeleeHit;
 
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true")) TObjectPtr<UEcoEquipmentComponent> Equipment;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true")) TObjectPtr<UEcoAimComponent> Aim;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true")) TObjectPtr<UEcoWeaponFireComponent> WeaponFire;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true")) TObjectPtr<UEcoCombatRelevanceComponent> CombatRelevance;
+    UPROPERTY(VisibleAnywhere, Category="Combat") TObjectPtr<UEcoGASDamageReceiverComponent> DamageReceiver;
 protected:
 
 	/** Initialize input action bindings */

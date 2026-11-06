@@ -2,6 +2,9 @@
 #include "Creature/Player/EcoCreatureHitProxy.h"
 #include "Creature/Player/EcoPlayerEcologyComponent.h"
 #include "Player/EcoMeleeHitComponent.h"
+#include "Player/EcoWeaponFireComponent.h"
+#include "Player/EcoCombatRelevanceComponent.h"
+#include "Core/EcoRuntimeSettings.h"
 #include "Player/EcoPlayerState.h"
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
@@ -123,6 +126,8 @@ bool AEcoCreatureIntegrationSpawner::QueueComboContact(UEcoMeleeHitComponent& So
     auto* Player = Cast<APawn>(Source.GetOwner());
     if (!IsInGameThread() || GetNetMode() == NM_Client || !bReady || !bEnableEcosystemLife || !bEnablePlayerCombat
         || !EcoCreatureCombat::AlivePlayer(Player) || Source.GetWorld() != GetWorld() || !Source.HasAuthoritativeWindow()) return Reject(EEcoDamageResult::InvalidAttack);
+    const auto* Relevance=Player->FindComponentByClass<UEcoCombatRelevanceComponent>();
+    if (!Relevance || !Relevance->CanAttack(this,Target.WorldEpoch,Target.StableAgentId)) return Reject(EEcoDamageResult::InvalidTarget);
     const auto* State = Player->GetPlayerState<AEcoPlayerState>();
     if (CombatEpoch <= 0 || Target.WorldEpoch != CombatEpoch || Target.Coordinator.Get() != this
         || Target.StableAgentId <= 0 || HitProxies.FindRef(Target.StableAgentId) != &Target || Hit.GetActor() != &Target) return Reject(EEcoDamageResult::InvalidTarget);
@@ -176,12 +181,13 @@ void AEcoCreatureIntegrationSpawner::ProcessComboDamage(const FEcoServerTimeSnap
                 Outcome.RemainingHP = EM.GetFragmentDataChecked<FEcoVitalsFragment>(*Entity).HP;
                 Outcome.AppliedDamage = Before - Outcome.RemainingHP;
                 Outcome.Result = EEcoDamageResult::Committed; ++CombatDiagnostics.DamageCommitted;
-                if (Outcome.RemainingHP <= 0) PendingHuntingDeaths.Add(Request.Target, {Request.Source, Outcome});
+                if (Outcome.RemainingHP <= 0) PendingHuntingDeaths.Add(Request.Target, {Request.Source, Outcome, Request.WeaponSource});
                 if (Outcome.RemainingHP <= 0) if (auto* Proxy = HitProxies.FindRef(Request.Target).Get()) Proxy->ClearBinding();
             }
         }
         if (Outcome.Result != EEcoDamageResult::Committed) ++CombatDiagnostics.DamageRejected;
         if (auto* Source = Request.Source.Get()) Source->PublishDamageOutcome(Outcome);
+        if (auto* Source = Request.WeaponSource.Get()) Source->PublishDamageOutcome(Outcome);
         UE_LOG(LogTemp, Log, TEXT("[EcoCombat][Outcome] Epoch=%d Execution=%lld Stage=%d Target=%lld Result=%d Applied=%.2f HP=%.2f Queue=%.3f"),
             Outcome.WorldEpoch, Outcome.AttackExecutionId, Outcome.StepId, Outcome.TargetStableAgentId, int32(Outcome.Result), Outcome.AppliedDamage, Outcome.RemainingHP, Outcome.QueueSeconds);
     }
@@ -263,4 +269,53 @@ void AEcoCreatureIntegrationSpawner::ProcessCombatDamage(const FEcoServerTimeSna
         if(Next==MAX_uint64)break;
         ProcessComboDamage(Time,Next);ProcessWolfAttacks(Time,Next);
     }
+}
+
+void AEcoCreatureIntegrationSpawner::GetCombatCandidates(APawn& Player,int32& Epoch,TArray<int64>& Out) const
+{
+    Epoch=CombatEpoch; Out.Reset();
+    if (!HasAuthority() || !bReady || !bEnablePlayerCombat || !bEnableEcosystemLife || !EcoCreatureCombat::AlivePlayer(&Player)) return;
+    struct FCandidate { int64 Id; double Score; }; TArray<FCandidate> Candidates;
+    const double Radius=FMath::Clamp(HitProxyDistance,500.f,5000.f);
+    const auto* Current=Player.FindComponentByClass<UEcoCombatRelevanceComponent>();
+    const FVector Forward=Player.GetControlRotation().Vector();
+    for (const auto& Pair:HitProxies)
+    {
+        const auto* Proxy=Pair.Value.Get(); if (!IsValid(Proxy) || Proxy->StableAgentId!=Pair.Key || Proxy->WorldEpoch!=Epoch) continue;
+        const FVector Delta=Proxy->GetActorLocation()-Player.GetActorLocation();
+        const bool Retained=Current && Current->IsOffered(Pair.Key);
+        const double Distance=Delta.SizeSquared();
+        if (Distance>FMath::Square(Radius+(Retained?400:0))) continue;
+        const double AimBias=FVector::DotProduct(Delta.GetSafeNormal(),Forward)>.97?.5:1.;
+        Candidates.Add({Pair.Key,Distance*(Retained?.7:1.)*AimBias});
+    }
+    Candidates.Sort([](const auto& A,const auto& B){return A.Score==B.Score?A.Id<B.Id:A.Score<B.Score;});
+    const int32 Limit=FMath::Min(GetDefault<UEcoRuntimeSettings>()->ConnectionBudget.MaxActorRepresentations,FMath::Clamp(MaxHitProxies,1,512));
+    for (int32 I=0;I<FMath::Min(Limit,Candidates.Num());++I) Out.Add(Candidates[I].Id);
+    Out.Sort(); // Order changes must not reset an unchanged admission set.
+}
+bool AEcoCreatureIntegrationSpawner::QueueWeaponContact(UEcoWeaponFireComponent& Source,AEcoCreatureHitProxy& Target,const FHitResult& Hit)
+{
+    auto* Player=Cast<APawn>(Source.GetOwner());
+    const auto* R=Player?Player->FindComponentByClass<UEcoCombatRelevanceComponent>():nullptr;
+    if (!IsInGameThread() || !HasAuthority() || !bReady || !bEnableEcosystemLife || !bEnablePlayerCombat
+        || !EcoCreatureCombat::AlivePlayer(Player) || !Source.HasAuthoritativeShot() || Source.GetWorld()!=GetWorld()
+        || !R || !R->CanAttack(this,Target.WorldEpoch,Target.StableAgentId)
+        || Hit.GetActor()!=&Target || Target.Coordinator.Get()!=this || Target.WorldEpoch!=CombatEpoch
+        || HitProxies.FindRef(Target.StableAgentId)!=&Target || Hit.ImpactPoint.ContainsNaN()
+        || Source.GetExecution()<=0 || !FMath::IsFinite(Source.GetShotDamage()) || Source.GetShotDamage()<=0 || Source.GetShotDamage()>10000) return false;
+    const double Now=GetWorld()->GetTimeSeconds();
+    for (auto It=ComboReceipts.CreateIterator();It;++It) if (It.Value()<Now) It.RemoveCurrent();
+    const FString Key=FString::Printf(TEXT("gun:%u:%lld:%lld"),Source.GetUniqueID(),Source.GetExecution(),Target.StableAgentId);
+    if (ComboReceipts.Contains(Key) || ComboDamage.Num()>=128 || ComboReceipts.Num()>=4096) return false;
+    ComboReceipts.Add(Key,Now+6);
+    auto& Request=ComboDamage.AddDefaulted_GetRef();
+    Request.Player=Player; Request.Controller=Player->GetController(); Request.WeaponSource=&Source;
+    Request.Epoch=CombatEpoch; Request.Avatar=Player->GetPlayerState<AEcoPlayerState>()->AvatarGeneration;
+    Request.Execution=Source.GetExecution(); Request.Target=Target.StableAgentId; Request.Stage=INDEX_NONE;
+    Request.Damage=Source.GetShotDamage(); Request.Sequence=++CombatContactSequence; Request.RealIssued=Now;
+    Request.Issued=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+    ++CombatDiagnostics.ContactsQueued;
+    FEcoCombatDamageOutcome O; O.WorldEpoch=CombatEpoch; O.AttackExecutionId=Request.Execution;
+    O.TargetStableAgentId=Request.Target; O.Result=EEcoDamageResult::Queued; Source.PublishDamageOutcome(O); return true;
 }

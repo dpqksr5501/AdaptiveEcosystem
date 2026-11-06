@@ -116,6 +116,8 @@ public:
     bool QueuePlayerStrike(APawn& Player);
     /** Called exclusively by authoritative socket sweeps; the server reads damage from their data asset. */
     bool QueueComboContact(UEcoMeleeHitComponent& Source, AEcoCreatureHitProxy& Target, const FHitResult& Hit);
+    bool QueueWeaponContact(class UEcoWeaponFireComponent& Source, AEcoCreatureHitProxy& Target, const FHitResult& Hit);
+    void GetCombatCandidates(APawn& Player,int32& Epoch,TArray<int64>& Out) const;
     UFUNCTION(BlueprintPure, Category="Creature|Combat") FEcoCombatDiagnostics GetCombatDiagnostics() const;
     UPROPERTY(EditAnywhere, Category="Creature|Combat") bool bEnablePlayerCombat = false;
     UPROPERTY(EditAnywhere, Category="Creature|Combat", meta=(ClampMin="500", ClampMax="5000")) float HitProxyDistance = 1800.f;
@@ -168,6 +170,7 @@ private:
         TWeakObjectPtr<APawn> Player;
         TWeakObjectPtr<AController> Controller;
         TWeakObjectPtr<UEcoMeleeHitComponent> Source;
+        TWeakObjectPtr<class UEcoWeaponFireComponent> WeaponSource;
         int32 Epoch=0, Stage=0;
         uint32 Avatar=0;
         int64 Execution=0, Target=0;
@@ -176,7 +179,7 @@ private:
         float Damage=0;
     };
     TArray<FComboDamage> ComboDamage;
-    struct FHuntingKill { TWeakObjectPtr<UEcoMeleeHitComponent> Source; FEcoCombatDamageOutcome Outcome; };
+    struct FHuntingKill { TWeakObjectPtr<UEcoMeleeHitComponent> Source; FEcoCombatDamageOutcome Outcome; TWeakObjectPtr<class UEcoWeaponFireComponent> WeaponSource; };
     TMap<int64,FHuntingKill> PendingHuntingDeaths;
     TMap<FString,double> ComboReceipts;
     UPROPERTY(Transient) TMap<int64,TObjectPtr<AEcoCreatureHitProxy>> HitProxies;

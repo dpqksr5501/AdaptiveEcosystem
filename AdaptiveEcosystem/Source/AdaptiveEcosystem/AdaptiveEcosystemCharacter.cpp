@@ -15,6 +15,11 @@
 #include "Player/EcoPlayerCombatComponent.h"
 #include "Player/EcoMeleeHitComponent.h"
 #include "Player/EcoPlayerState.h"
+#include "Player/EcoEquipmentComponent.h"
+#include "Player/EcoAimComponent.h"
+#include "Player/EcoWeaponFireComponent.h"
+#include "Player/EcoCombatRelevanceComponent.h"
+#include "Player/EcoGASDamageReceiverComponent.h"
 
 AAdaptiveEcosystemCharacter::AAdaptiveEcosystemCharacter()
 {
@@ -23,6 +28,11 @@ AAdaptiveEcosystemCharacter::AAdaptiveEcosystemCharacter()
 
     MeleeHit = CreateDefaultSubobject<UEcoMeleeHitComponent>(TEXT("MeleeHit"));
 
+    Equipment=CreateDefaultSubobject<UEcoEquipmentComponent>(TEXT("Equipment"));
+    Aim=CreateDefaultSubobject<UEcoAimComponent>(TEXT("Aim"));
+    WeaponFire=CreateDefaultSubobject<UEcoWeaponFireComponent>(TEXT("WeaponFire"));
+    CombatRelevance=CreateDefaultSubobject<UEcoCombatRelevanceComponent>(TEXT("CombatRelevance"));
+    DamageReceiver=CreateDefaultSubobject<UEcoGASDamageReceiverComponent>(TEXT("DamageReceiver"));
     // Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		

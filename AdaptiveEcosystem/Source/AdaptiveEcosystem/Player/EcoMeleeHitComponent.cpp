@@ -7,6 +7,7 @@
 #include "Creature/Player/EcoCreatureHitProxy.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Player/EcoPlayerState.h"
+#include "Player/EcoCombatRelevanceComponent.h"
 #include "EngineUtils.h"
 UEcoMeleeHitComponent::UEcoMeleeHitComponent()
 {
@@ -93,6 +94,8 @@ void UEcoMeleeHitComponent::TickComponent(float Delta, ELevelTick Type, FActorCo
         auto* Target = Hit.GetActor();
         if (!IsValid(Target) || HitActors.Contains(Target) || HitActors.Num() >= AttackData->MaxTargetsPerStep) continue;
         auto* Proxy = Cast<AEcoCreatureHitProxy>(Target);
+        const auto* Relevance=GetOwner()->FindComponentByClass<UEcoCombatRelevanceComponent>();
+        if (Proxy && (!Relevance || !Relevance->CanAttack(Proxy->Coordinator.Get(),Proxy->WorldEpoch,Proxy->StableAgentId))) continue;
         if (Proxy && (Proxy->StableAgentId <= 0 || HitCreatureIds.Contains(Proxy->StableAgentId))) continue;
         if (FVector::DistSquared(GetOwner()->GetActorLocation(), Hit.ImpactPoint) > FMath::Square(AttackData->MaxReachCm)) continue;
         FHitResult Wall;
