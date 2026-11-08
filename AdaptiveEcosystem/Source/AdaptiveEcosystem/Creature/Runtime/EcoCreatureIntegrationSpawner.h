@@ -55,6 +55,9 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|V3", meta=(ClampMin="1",ClampMax="128")) int32 V3DeerPerRegion = 48;
 	/** Copy-level opt-in: consume only authored shelter anchors. */
 	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bV3UseAuthoredShelters = false;
+	/** 11-05 island stage (Docs/RL_Policy/ISLAND_STAGE.md): integrated v3 turns the single group region into one island-wide square world with a land/water mask.
+	 *  Default false; only the owned copy map /Game/EcoTest/Maps/LV_EcoV3_Island sets it. Console eco.IntegratedV3.Island 0/1 overrides. */
+	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bV3IslandStage = false;
 	/** Owned-map opt-in; does not change other maps or policy schemas. */
 	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") bool bEnableVegetation = false;
     /** Owned scene opt-in: deterministic diversity, observed encounters and conditional offspring. */

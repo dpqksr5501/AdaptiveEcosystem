@@ -106,6 +106,7 @@
 #include <cmath>
 #include <cstdint>
 #include <limits>
+#include <memory>
 #include <vector>
 
 #include "EcoObservationV3.h"
@@ -114,6 +115,7 @@
 #include "EcoThreatModel.h"
 #include "EcoRefugeSafetyV3.h"
 #include "EcoVegetationV3.h"
+#include "EcoV3Island.h"
 
 namespace EcoWorldV3
 {
@@ -1489,6 +1491,15 @@ namespace EcoWorldV3
 		// 야생 (w3) 도망 기록 (10-21, FWorldStats::Flight·FHerbDecision::Flight — world.py track_flight, 통합 모드가 켠다). 기록만, WildFlight 를 켠
 		// 세계만 센다. 끄면(기본) 아무것도 세지 않는다 (평면 맵·기준 루프·골든 그대로)
 		bool bFlightStats = false;
+		// 섬 무대 땅/물 지도 (11-05, 통합 모드 eco.IntegratedV3.Island — EcoV3Island.h). 있으면 막힌 칸이 못 가는 곳이다: 먹이 용량 0, 사슴 미끄러짐·해안 굽힘,
+		// 늑대 반사, 관측 escape_room 의 첫 막힌 칸. 없으면(기본 nullptr) 지금 그대로 — 평면 맵·기준 루프·골든·다른 맵 모두 비트 단위로 같다
+		std::shared_ptr<const EcoV3Island::FLandMask> Island;
+		// 섬 무대 먹이 패치 타일 (11-05 확인 뒤, 칸 수). Island 가 있고 0 보다 크며 먹이 격자가 이보다 크면: 패치 잡음 정규화의 최소·최대를 격자 전체 대신
+		// 이 크기 정사각 타일(꽉 찬 것만)들의 최소·최대 평균으로 쓴다. 전체 최소·최대는 격자가 클수록 넓어져(표본 수) 섬 격자(700²)의 먹이 칸 비율·용량이
+		// 학습 무대(30²)의 절반·4 분의 1 이 됐다. 타일 = 무리 자리 무대 크기면 학습 무대와 같은 통계다. 0(기본)·격자가 타일 이하면 지금 그대로
+		std::int32_t IslandFoodTile = 0;
+		// 섬 무대 먹이 장 읽는 칸만 (11-05 확인 뒤, FFoodGrid::bLazyFields). Island 가 있고 참이면 관측 상자 평균·기울기를 사슴이 선 칸에서만 센다. 거짓(기본)이면 지금 그대로
+		bool bIslandLazyFields = false;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -1655,6 +1666,35 @@ namespace EcoWorldV3
 				}
 			}
 		}
+
+		/** BoxMean 의 한 칸 (x, y) — 같은 식 (섬 무대 FFoodGrid::bLazyFields 가 읽는 칸에서만 쓴다). */
+		inline double BoxMeanAt(const std::vector<double>& Sat, std::int32_t G, std::int32_t Br, std::int32_t x, std::int32_t y)
+		{
+			const std::int32_t S = G + 1;
+			const std::int32_t R0 = ClampI(y - Br, 0, G);
+			const std::int32_t R1 = ClampI(y + Br + 1, 0, G);
+			const std::int32_t C0 = ClampI(x - Br, 0, G);
+			const std::int32_t C1 = ClampI(x + Br + 1, 0, G);
+			const double Box = Sat[static_cast<size_t>(R1) * S + C1] - Sat[static_cast<size_t>(R0) * S + C1]
+							   - Sat[static_cast<size_t>(R1) * S + C0] + Sat[static_cast<size_t>(R0) * S + C0];
+			return Box / static_cast<double>((R1 - R0) * (C1 - C0));
+		}
+
+		/** Gradient(BoxMean(Sat, Br)) 의 한 칸 (x, y) — 같은 식 (가장자리 한쪽 차분). G < 2 면 0. */
+		inline void GradientAt(const std::vector<double>& Sat, std::int32_t G, std::int32_t Br, std::int32_t x, std::int32_t y, double& Gx, double& Gy)
+		{
+			Gx = 0.0;
+			Gy = 0.0;
+			if (G < 2)
+			{
+				return;
+			}
+			const double F = BoxMeanAt(Sat, G, Br, x, y);
+			Gx = x == 0 ? BoxMeanAt(Sat, G, Br, x + 1, y) - F
+						: (x == G - 1 ? F - BoxMeanAt(Sat, G, Br, x - 1, y) : (BoxMeanAt(Sat, G, Br, x + 1, y) - BoxMeanAt(Sat, G, Br, x - 1, y)) / 2.0);
+			Gy = y == 0 ? BoxMeanAt(Sat, G, Br, x, y + 1) - F
+						: (y == G - 1 ? F - BoxMeanAt(Sat, G, Br, x, y - 1) : (BoxMeanAt(Sat, G, Br, x, y + 1) - BoxMeanAt(Sat, G, Br, x, y - 1)) / 2.0);
+		}
 	}
 
 	struct FFoodGrid
@@ -1689,6 +1729,10 @@ namespace EcoWorldV3
 		std::vector<double> Tmp;
 		std::vector<double> Tmp2;
 		std::vector<double> Demand;
+		// 섬 무대 (11-05 확인 뒤, FWorldConfig::bIslandLazyFields): Blur·GradX·GradY 를 격자 전체로 만들지 않고 BlurAt·GradAt 가 읽는 칸에서만 같은 식으로 센다
+		// (합계표 Sat 는 그대로 격자 전체). 섬 격자 700² 에서 스텝마다 격자 전체 세 번(상자 평균 둘·기울기)이 결정 스텝 비용의 대부분이었다. 끄면(기본) 지금 그대로
+		bool bLazyFields = false;
+		std::int32_t LazyRb = 1;              // 관측 상자 반경 (ComputeFields 가 SeeR 로 정한다)
 
         /** Visual-density-dependent foliage, not refuge safety or capture immunity. */
         bool BlocksSight(double Ax,double Ay,double Bx,double By) const
@@ -1718,10 +1762,25 @@ namespace EcoWorldV3
 		}
 
 		double FoodAt(const FVec2& P) const { return Food[static_cast<size_t>(CellOf(P))]; }
-		double BlurAt(const FVec2& P) const { return Blur[static_cast<size_t>(CellOf(P))]; }
+		double BlurAt(const FVec2& P) const
+		{
+			if (bLazyFields)
+			{
+				const std::int32_t k = CellOf(P);
+				return Detail::BoxMeanAt(Sat, Gw, LazyRb, k % Gw, k / Gw);
+			}
+			return Blur[static_cast<size_t>(CellOf(P))];
+		}
 
 		FVec2 GradAt(const FVec2& P) const
 		{
+			if (bLazyFields)
+			{
+				const std::int32_t k = CellOf(P);
+				double Gx = 0.0, Gy = 0.0;
+				Detail::GradientAt(Sat, Gw, GradBlur > 1 ? GradBlur : 1, k % Gw, k / Gw, Gx, Gy);
+				return EcoRepertoireV3::Normalize({Gx, Gy});
+			}
 			const size_t k = static_cast<size_t>(CellOf(P));
 			return EcoRepertoireV3::Normalize({GradX[k], GradY[k]});
 		}
@@ -1744,6 +1803,7 @@ namespace EcoWorldV3
             LastExpansionStep=0;ColonizedCells=0;
 			Cell = C.FoodCell > 0.0 ? C.FoodCell : 2.0;
 			GradBlur = C.FoodGradBlur;
+			bLazyFields = C.Island != nullptr && C.bIslandLazyFields;
 			Gw = static_cast<std::int32_t>(std::ceil(C.WorldSize / Cell));
 			Gw = Gw < 1 ? 1 : Gw;
 			const size_t Cells = static_cast<size_t>(Gw) * Gw;
@@ -1764,6 +1824,37 @@ namespace EcoWorldV3
 				Lo = V < Lo ? V : Lo;
 				Hi = V > Hi ? V : Hi;
 			}
+			if (C.Island && C.IslandFoodTile > 0 && Gw > C.IslandFoodTile)
+			{
+				// 섬 무대 (11-05 확인 뒤): 꽉 찬 타일들의 최소·최대 평균 (타일 차례 — 행 우선). 잡음·흐림은 위 그대로
+				const std::int32_t T = C.IslandFoodTile;
+				double SumLo = 0.0, SumHi = 0.0;
+				std::int64_t Tiles = 0;
+				for (std::int32_t Ty = 0; Ty + T <= Gw; Ty += T)
+				{
+					for (std::int32_t Tx = 0; Tx + T <= Gw; Tx += T)
+					{
+						double TLo = M[static_cast<size_t>(Ty) * Gw + Tx], THi = TLo;
+						for (std::int32_t y = Ty; y < Ty + T; ++y)
+						{
+							for (std::int32_t x = Tx; x < Tx + T; ++x)
+							{
+								const double V = M[static_cast<size_t>(y) * Gw + x];
+								TLo = V < TLo ? V : TLo;
+								THi = V > THi ? V : THi;
+							}
+						}
+						SumLo += TLo;
+						SumHi += THi;
+						++Tiles;
+					}
+				}
+				if (Tiles > 0)
+				{
+					Lo = SumLo / static_cast<double>(Tiles);
+					Hi = SumHi / static_cast<double>(Tiles);
+				}
+			}
 			const double Den = (Hi - Lo) > EcoRepertoireV3::kEps ? (Hi - Lo) : EcoRepertoireV3::kEps;
 			const double Th = C.FoodPatchThreshold;
 			Cap.assign(Cells, 0.0);
@@ -1772,6 +1863,20 @@ namespace EcoWorldV3
 				const double Mn = (M[k] - Lo) / Den;
 				const double V = (Mn - Th) / (1.0 - Th);
 				Cap[k] = V < 0.0 ? 0.0 : (V > 1.0 ? 1.0 : V);
+			}
+			if (C.Island)
+			{
+				// 섬 무대 (11-05): 막힌 칸(바다·호수·가파름·숲·바위)은 용량 0 — 칸 가운데로 판정. 패치 잡음은 위에서 Gw² 개를 다 뽑았다 (순서 그대로)
+				for (std::int32_t y = 0; y < Gw; ++y)
+				{
+					for (std::int32_t x = 0; x < Gw; ++x)
+					{
+						if (!C.Island->IsOpen((static_cast<double>(x) + 0.5) * Cell, (static_cast<double>(y) + 0.5) * Cell))
+						{
+							Cap[static_cast<size_t>(y) * Gw + x] = 0.0;
+						}
+					}
+				}
 			}
 			if (C.Obstacles.Active() && C.Obstacles.bNoFood)
 			{
@@ -1914,6 +2019,11 @@ namespace EcoWorldV3
 		{
 			Detail::BuildSat(Food, Gw, Sat, Tmp);
 			const std::int32_t Rb = static_cast<std::int32_t>(std::lround(SeeR / Cell));
+			if (bLazyFields)
+			{
+				LazyRb = Rb > 1 ? Rb : 1;   // 섬 무대: 상자 평균·기울기는 읽는 칸에서만 (BlurAt·GradAt)
+				return;
+			}
 			Detail::BoxMean(Sat, Gw, Rb > 1 ? Rb : 1, Blur);
 			Detail::BoxMean(Sat, Gw, GradBlur > 1 ? GradBlur : 1, Tmp2);
 			Detail::Gradient(Tmp2, Gw, GradX, GradY);
@@ -2073,6 +2183,12 @@ namespace EcoWorldV3
 		std::int64_t MaskViolations = 0;     // 마스크가 막은 행동이 실행됐다 (늘 0 이어야 한다)
 		std::int64_t BlockedHerbMoves = 0;   // 이동 제약 콜백이 막은 사슴 이동 (통합 모드만. 평면 맵은 늘 0)
 		std::int64_t BlockedThreatMoves = 0; // 이동 제약 콜백이 막은 위협 이동
+		// 섬 무대 (FWorldConfig::Island 가 있을 때만 — 기록만)
+		std::int64_t IslandDeerSteers = 0;   // 해안 굽힘으로 방향을 바꾼 사슴·스텝
+		std::int64_t IslandDeerSlides = 0;   // 막힌 칸 앞에서 미끄러진 사슴·스텝
+		std::int64_t IslandDeerStops = 0;    // 미끄러지지도 못해 제자리인 사슴·스텝
+		std::int64_t IslandWolfReflects = 0; // 막힌 칸 앞에서 반사한 늑대·스텝
+		std::int64_t IslandDeerHookAlts = 0; // 팀 이동 제약이 막아 ±35°·±70° 돌린 걸음으로 간 사슴·스텝 (11-05 확인 뒤)
 		// 섭식 기록 (통합 모드 화면·기록용. 논리에 쓰지 않으므로 평면 맵·기준 루프의 상태는 그대로다)
 		double FoodEaten = 0.0;              // 누적 먹은 먹이 (먹이 단위, C4 에서 셀마다 덜어 낸 양의 셀 순서 합)
 		std::int64_t EatSteps = 0;           // 실제로 먹은 개체·스텝 (먹은 양 > 0)
@@ -2674,6 +2790,7 @@ namespace EcoWorldV3
 			Oi.NumDiscs = Ob.Active() ? Ob.Num() : 0;
 			Oi.BodyR = Ob.bEnabled ? Ob.BodyR : 0.0;
 			Oi.StageSize = W.Config.WorldSize;
+			Oi.Island = W.Config.Island.get();   // 섬 무대 (11-05): escape_room 이 첫 막힌 칸도 본다 (없으면 nullptr — 지금 그대로)
 			Oi.bBlockSight = Ob.bEnabled && Ob.bBlockSight;
 			// 숲 시야 (10-21): 가림 = 줄기 ∨ 잎 (world.py obstacle_obs_values 의 foliage — 끄면 줄기만)
 			Oi.bFoliage = Ob.FoliageOn();
@@ -3949,6 +4066,13 @@ namespace EcoWorldV3
 				W.Stats.DetourDeerStart += Dr.bStart ? 1 : 0;
 				W.Stats.DetourDeerFail += Dr.bFail ? 1 : 0;
 			}
+			const EcoV3Island::FLandMask* const Isl = W.Config.Island.get();
+			if (Isl && !Traveling)
+			{
+				// 섬 무대 (11-05): 해안 거리 kShoreEdgeR 안에서 해안 쪽으로 가면 해안을 따라가는 쪽으로 굽힌다 (크기 그대로 — 적용 속도·heading 도 굽힌 값)
+				EcoRepertoireV3::FControlOutput& Ctl = *Herbs[i].Control;
+				W.Stats.IslandDeerSteers += Isl->ShoreSteer(B.Pos.X, B.Pos.Y, Ctl.Velocity.X, Ctl.Velocity.Y) ? 1 : 0;
+			}
 			if(Traveling){
                 const auto V=Herbs[i].Control->Velocity;B.Pos=R3::Add(B.Pos,V);
                 if(R3::IsNonZero(V))B.Head=R3::Normalize(V);
@@ -3963,12 +4087,43 @@ namespace EcoWorldV3
 				W.Stats.ObstacleDeerHit += Sl.bHit ? 1 : 0;
 				W.Stats.ObstacleDeerBack += Sl.bBack ? 1 : 0;
 			}
+			if (Isl && !Traveling)
+			{
+				// 섬 무대 (11-05): 다음 자리가 막힌 칸이면 x 만 → y 만 순서로 미끄러지고, 둘 다 안 되면 제자리 (heading 은 가려던 쪽 그대로 — 원판 미끄러짐과 같은 꼴)
+				const std::int32_t Sl = Isl->Slide(B.PrevPos.X, B.PrevPos.Y, B.Pos.X, B.Pos.Y);
+				W.Stats.IslandDeerSlides += Sl == 1 ? 1 : 0;
+				W.Stats.IslandDeerStops += Sl == 2 ? 1 : 0;
+			}
 			// 통합 모드: 지형·장애물 제약. 막히면 이동 전 자리 (heading 은 가려던 쪽 그대로)
 			if (Hooks && Hooks->HerbMove && (B.Pos.X != B.PrevPos.X || B.Pos.Y != B.PrevPos.Y)
 				&& !Hooks->HerbMove(Hooks->User, i, B.PrevPos, B.Pos))
 			{
-				B.Pos = B.PrevPos;
-				++W.Stats.BlockedHerbMoves;
+				bool bAlt = false;
+				if (Isl && !Traveling)
+				{
+					// 섬 무대 (11-05 확인 뒤): 팀 이동 제약(4 m 지도보다 잘게 보는 벼랑·비탈)이 막으면 같은 길이 걸음을 +35°·−35°·+70°·−70° 돌려 차례로
+					// 다시 묻는다 (땅 칸·세계 안만 — 통합 이동 길의 우회와 같은 각). 그래도 막히면 지금처럼 제자리. heading 은 가려던 쪽 그대로
+					static const double kAltCos[4] = {std::cos(0.6108652381980153), std::cos(-0.6108652381980153), std::cos(1.2217304763960306), std::cos(-1.2217304763960306)};
+					static const double kAltSin[4] = {std::sin(0.6108652381980153), std::sin(-0.6108652381980153), std::sin(1.2217304763960306), std::sin(-1.2217304763960306)};
+					const double Dx = B.Pos.X - B.PrevPos.X;
+					const double Dy = B.Pos.Y - B.PrevPos.Y;
+					const double Ws = W.Config.WorldSize;
+					for (std::int32_t a = 0; a < 4 && !bAlt; ++a)
+					{
+						const FVec2 To{B.PrevPos.X + kAltCos[a] * Dx - kAltSin[a] * Dy, B.PrevPos.Y + kAltSin[a] * Dx + kAltCos[a] * Dy};
+						if (To.X >= 0.0 && To.Y >= 0.0 && To.X <= Ws && To.Y <= Ws && Isl->IsOpen(To.X, To.Y) && Hooks->HerbMove(Hooks->User, i, B.PrevPos, To))
+						{
+							B.Pos = To;
+							bAlt = true;
+						}
+					}
+					W.Stats.IslandDeerHookAlts += bAlt ? 1 : 0;
+				}
+				if (!bAlt)
+				{
+					B.Pos = B.PrevPos;
+					++W.Stats.BlockedHerbMoves;
+				}
 			}
 		}
 
@@ -4197,6 +4352,17 @@ namespace EcoWorldV3
 				W.Stats.WolfSatedSteps += A.Last.bSated ? 1 : 0;
 				W.Stats.WolfEatingSteps += PreCd - 1 > 0 ? 1 : 0;
 				W.Stats.WolfKills += A.Last.Caught >= 0 ? 1 : 0;
+			}
+			if (const EcoV3Island::FLandMask* const Isl = W.Config.Island.get();
+				Isl && (A.State.PosX != A.PrevX || A.State.PosY != A.PrevY) && !Isl->IsOpen(A.State.PosX, A.State.PosY) && Isl->IsOpen(A.PrevX, A.PrevY))
+			{
+				// 섬 무대 (11-05): 다음 자리가 막힌 칸이면 제자리·변위 0, heading 은 해안 안쪽 법선으로 반사 (벽 반사의 꼴). 포획은 이미 이동 전 위치로 판정했다
+				A.State.PosX = A.PrevX;
+				A.State.PosY = A.PrevY;
+				A.State.VelX = 0.0;
+				A.State.VelY = 0.0;
+				Isl->Reflect(A.PrevX, A.PrevY, A.State.HeadX, A.State.HeadY);
+				++W.Stats.IslandWolfReflects;
 			}
 			// 통합 모드: 지형·장애물 제약. 포획은 이동 전 위치로 이미 판정했다(위 Step 9). 막히면 이동 전 자리·변위 0·heading 반전
 			// (학습의 벽 반사를 흉내 낸 근사 — 장애물의 법선은 모른다)

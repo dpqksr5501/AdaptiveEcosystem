@@ -45,12 +45,12 @@ public class AdaptiveEcosystem : ModuleRules
 
 		SetupIrisSupport(Target);
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem", "PhysicsCore", "AnimGraphRuntime", "AnimationCore", "Json", "SlateCore" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "NavigationSystem", "PhysicsCore", "AnimGraphRuntime", "AnimationCore", "Json", "SlateCore", "Landscape" });
 		PublicDependencyModuleNames.AddRange(new string[] { "OnlineSubsystem", "OnlineSubsystemUtils" });
 		if (Target.bBuildEditor)
 		{
 			PrivateDependencyModuleNames.Add("UnrealEd");
-			PrivateDependencyModuleNames.AddRange(new string[] { "StateTreeEditorModule", "AssetRegistry", "AnimGraph", "BlueprintGraph", "KismetCompiler", "Landscape", "Niagara", "MeshDescription", "StaticMeshDescription" });
+			PrivateDependencyModuleNames.AddRange(new string[] { "StateTreeEditorModule", "AssetRegistry", "AnimGraph", "BlueprintGraph", "KismetCompiler", "Niagara", "MeshDescription", "StaticMeshDescription" });
 		}
 
 		PublicIncludePaths.AddRange(new string[] {

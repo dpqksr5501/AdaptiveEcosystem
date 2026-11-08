@@ -1144,6 +1144,14 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 			{TEXT("EcoV3BigMaxWait="), TEXT("eco.IntegratedV3.BigMaxWait")},
 			{TEXT("EcoV3EnvNoticeMinor="), TEXT("eco.IntegratedV3.EnvNoticeMinor")},
 			{TEXT("EcoV3AutoWatch="), TEXT("eco.IntegratedV3.AutoWatch")},
+			// 섬 무대 (11-05, ISLAND_STAGE.md 12절)
+			{TEXT("EcoV3Island="), TEXT("eco.IntegratedV3.Island")},
+			{TEXT("EcoV3IslandHerds="), TEXT("eco.IntegratedV3.IslandHerds")},
+			{TEXT("EcoV3IslandDeerPerHerd="), TEXT("eco.IntegratedV3.IslandDeerPerHerd")},
+			{TEXT("EcoV3IslandWolvesPerHerd="), TEXT("eco.IntegratedV3.IslandWolvesPerHerd")},
+			{TEXT("EcoV3IslandHerdGapM="), TEXT("eco.IntegratedV3.IslandHerdGapM")},
+			{TEXT("EcoV3IslandForest="), TEXT("eco.IntegratedV3.IslandForest")},
+			{TEXT("EcoV3IslandMarkers="), TEXT("eco.IntegratedV3.IslandMarkers")},
 		};
 		for (const auto& Pair : NumPairs)
 		{
@@ -1160,6 +1168,7 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyCommandLineToConsole(const TCHAR* Cmd
 			{TEXT("EcoV3AutoWatchPython="), TEXT("eco.IntegratedV3.AutoWatchPython")},
 			{TEXT("EcoV3AutoWatchCmd="), TEXT("eco.IntegratedV3.AutoWatchCmd")},
 			{TEXT("EcoV3AutoWatchDir="), TEXT("eco.IntegratedV3.AutoWatchDir")},
+			{TEXT("EcoV3IslandRegion="), TEXT("eco.IntegratedV3.IslandRegion")},
 		};
 		for (const auto& Pair : TextPairs)
 		{
@@ -1251,6 +1260,9 @@ void UEcoPolicyV3IntegratedSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	Settings = FEcoV3IntegratedSettings::FromConsole();
 	if (!IsRequested() && Found[0]->bUseV3Policy) Settings.DeerPerRegion = Found[0]->V3DeerPerRegion;
 	if (Found[0]->bV3UseAuthoredShelters) Settings.ExtraCoverCount = 0;
+	// 섬 무대 (11-05, EcoV3IslandStage.cpp): 콘솔 eco.IntegratedV3.Island(−1 = 맵 조정자 bV3IslandStage) — 끄면 지금 그대로
+	IslandSettings = FEcoV3IslandSettings::FromConsole();
+	bIsland = IslandResolve(*Found[0]);
 	bUseTerrain = true;
 	BeginPlaySeconds = InWorld.GetTimeSeconds();
 	if (!ApplyToSpawner(*Found[0]))
@@ -2694,7 +2706,13 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 	// 레벨 나무 줄기 막이 (10-18, 늘 불린 액터 — 스트리밍 전에도 있다). 시작 자리가 피한다
 	TArray<FVector> LevelTrunks;
 	GatherLevelTrunks(*World, LevelTrunks);
-	for (int32 g = 0; g < NewGroups.Num(); ++g)
+	// 섬 무대 (11-05): 그룹 하나(섬 지역)에 섬 정사각을 덮는 스트리밍 힌트 자리만 쓴다 — 진짜 시작 자리는 섬 전체가 불린 뒤 땅/물 지도로 고른다 (IslandValidateNow)
+	if (bIsland && !IslandPlanHints(S, NewPlans, NewGroups, Total))
+	{
+		return false;
+	}
+	Partial.Init(false, NewPlans.Num());
+	for (int32 g = 0; !bIsland && g < NewGroups.Num(); ++g)
 	{
 		FEcoCreatureSpawnGroup& G = NewGroups[g];
 		AEcologyRegion* Region = FindRegion(World, G.RegionId);
@@ -2808,6 +2826,13 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 지역 %s: 지면 검사를 통과한 사슴 자리가 %d/%d 라 그 수로 시작한다"), *G.RegionId.ToString(),
 				   Plan.DeerPoints.Num(), Plan.WantDeer);
 		}
+		if (bIsland)
+		{
+			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 섬 무대 계획 %s: 정사각 원점 (%.0f, %.0f), 한 변 %.0f m — 힌트 자리 사슴 %d·늑대 %d 로 조정자가 섬 전체를 불러온다 ")
+										   TEXT("(서식지 스트리밍 반지름 %.0f m). 진짜 시작 자리는 조정자 시작 직전 땅/물 지도로 고른다"),
+				   *G.RegionId.ToString(), IslandOriginCm.X, IslandOriginCm.Y, Plan.SizeUnits * 2.0, G.Herbivores, G.Wolves, S.HabitatStreamingRadius / 100.0);
+			continue;
+		}
 		if (FEcoV3IntegratedSettings::IsBelowTrainingDensity(G.Herbivores, Plan.SizeUnits))
 		{
 			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 지역 %s: 사슴 %d 마리는 무대 %.0f 단위에서 학습 밀도 하한(%.1f 마리 = 128/110² 마리/단위²) 아래다"),
@@ -2833,6 +2858,10 @@ bool UEcoPolicyV3IntegratedSubsystem::ValidateSpawnPointsNow()
 		return false;
 	}
 	++ValidationPasses;
+	if (bIsland)
+	{
+		return IslandValidateNow();   // 섬 무대 (11-05): 땅/물 지도 → 무리 자리 → 자리마다 지면 검사 (EcoV3IslandStage.cpp)
+	}
 	// 모든 그룹을 지역 배열에 먼저 검사한다 — 하나라도 모자라면 조정자를 팀 값으로 되돌린다 (빈 레벨보다 팀 그대로가 낫다)
 	TArray<FEcoV3StagePlan> NewPlans;
 	TArray<FEcoCreatureSpawnGroup> NewGroups = S->Groups;
@@ -2925,6 +2954,8 @@ void UEcoPolicyV3IntegratedSubsystem::HandlePreActorTick(UWorld* InWorld, ELevel
 		CheckClockDrift();
 		TickEnvWatch();   // 환경 바뀜 감시·시험용 예약 (10-21, EcoV3EnvWatch.cpp — 읽기만, 세계는 결정 스텝 경계에서 바꾼다)
 		ForestPreActorTick();   // 숲 자람 모드 묘목·화면 줄 (10-27 — 끄면 아무것도 하지 않는다. 다 자람은 결정 스텝 경계 ForestStepBoundary)
+		IslandTickMarkers();    // 섬 무대 먼 개체 표식 (11-05 — 섬 무대가 아니면 아무것도 하지 않는다)
+		IslandTickStats();      // 섬 무대 기록 줄 (11-05 — 10 초마다, 섬 무대가 아니면 아무것도 하지 않는다)
 		TallyTeamWolfVisuals();
 		if (IsDebugDrawEnabled())
 		{
@@ -3008,6 +3039,10 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		const double Half = 0.5 * Plan.SizeUnits * EcoRepertoireV3::kUnitCm;
 		FVector CenterGround = Plan.CenterCm;
 		EcoCreatureMovement::ProjectSpawnPoint(*World, Plan.CenterCm, CenterGround);
+		if (bIsland && !IslandHerdPlans.IsEmpty())
+		{
+			CenterGround.Z = IslandHerdPlans[0].CenterCm.Z;   // 섬 정사각 가운데는 물일 수 있다 — 첫 무리 자리 지면 높이를 기본 높이로
+		}
 		FVector Origin = Plan.OriginCm();
 		Origin.Z = CenterGround.Z;
 
@@ -3016,16 +3051,33 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		// 반경 = 무대 한 변 × 0.1 (4~9 단위로 자름) — 무대 크기를 바꿔도 반경·넓이가 학습 범위 안이다
 		int32 Extra = 0;
 		TArray<FVector> Placed;
-		const float R = static_cast<float>(Settings.ExtraCoverRadiusUnits(Plan.SizeUnits) * EcoRepertoireV3::kUnitCm);
+		// 섬 무대 (11-05): 은신처는 무리 자리마다 (자리 1/4·3/4 지점, 반경 = 자리 한 변 × 0.1). 원이 모두 땅 칸 위여야 한다. 아니면 이 무대 하나
+		TArray<const FEcoV3StagePlan*> CoverStages;
+		if (bIsland)
+		{
+			for (const FEcoV3StagePlan& Hp : IslandHerdPlans)
+			{
+				CoverStages.Add(&Hp);
+			}
+		}
+		else
+		{
+			CoverStages.Add(&Plan);
+		}
+		const double CoverStageUnits = bIsland ? (CoverStages.IsEmpty() ? Settings.StageSizeUnits : CoverStages[0]->SizeUnits) : Plan.SizeUnits;
+		const float R = static_cast<float>(Settings.ExtraCoverRadiusUnits(CoverStageUnits) * EcoRepertoireV3::kUnitCm);
+		for (int32 h = 0; h < CoverStages.Num(); ++h)
 		for (int32 k = 0; k < Settings.ExtraCoverCount && Region && Shelters; ++k)
 		{
+			const FEcoV3StagePlan& Cs = *CoverStages[h];
+			const double CsZ = bIsland ? Cs.CenterCm.Z : CenterGround.Z;
 			const double Base = UE_DOUBLE_PI * 0.25 + UE_DOUBLE_HALF_PI * k;
 			for (int32 Attempt = 0; Attempt < 24; ++Attempt)
 			{
 				const double Turn = (Attempt % 2 == 0 ? 1.0 : -1.0) * ((Attempt + 1) / 2) * FMath::DegreesToRadians(15.0);
-				const double Rad = 0.25 * Plan.SizeUnits * EcoRepertoireV3::kUnitCm * UE_DOUBLE_SQRT_2 * (Attempt < 12 ? 1.0 : 0.75);
-				const FVector Hint(Plan.CenterCm.X + Rad * FMath::Cos(Base + Turn), Plan.CenterCm.Y + Rad * FMath::Sin(Base + Turn), CenterGround.Z);
-				if (!Plan.IsInsideStage(Hint, R + 200.0))
+				const double Rad = 0.25 * Cs.SizeUnits * EcoRepertoireV3::kUnitCm * UE_DOUBLE_SQRT_2 * (Attempt < 12 ? 1.0 : 0.75);
+				const FVector Hint(Cs.CenterCm.X + Rad * FMath::Cos(Base + Turn), Cs.CenterCm.Y + Rad * FMath::Sin(Base + Turn), CsZ);
+				if (!Cs.IsInsideStage(Hint, R + 200.0))
 				{
 					continue;
 				}
@@ -3035,13 +3087,14 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 					bOverlap = bOverlap || FVector::Dist2D(P, Hint) < 2.0 * R + 400.0;
 				}
 				FVector Ground;
-				if (bOverlap || !EcoCreatureMovement::ProjectSpawnPoint(*World, Hint, Ground) || !Region->ContainsPosition(Ground))
+				if (bOverlap || !EcoCreatureMovement::ProjectSpawnPoint(*World, Hint, Ground) || !Region->ContainsPosition(Ground)
+					|| !IslandCoverOnLand(Ground, R))
 				{
 					continue;
 				}
 				FActorSpawnParameters Params;
 				Params.Name = MakeUniqueObjectName(World->PersistentLevel, AEcoShelterAnchor::StaticClass(),
-												   *FString::Printf(TEXT("EcoV3_Cover_%s_%d"), *G.RegionId.ToString(), k));
+												   *FString::Printf(TEXT("EcoV3_Cover_%s_%d"), *G.RegionId.ToString(), bIsland ? h * Settings.ExtraCoverCount + k : k));
 				Params.bDeferConstruction = true;
 				Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 				const FTransform Xf(Ground);
@@ -3145,9 +3198,23 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 					Exclude.Add(A);
 				}
 			}
-			ScanStageObstacles(*World, Origin, Plan.SizeUnits, Covers, Exclude, true, Scan, G.RegionId);
+			if (!bIsland)   // 섬 무대 (11-05): 1단계는 원판 없음 — 소나무·큰 바위는 땅/물 지도의 막힌 칸 (ISLAND_STAGE.md 7.1)
+			{
+				ScanStageObstacles(*World, Origin, Plan.SizeUnits, Covers, Exclude, true, Scan, G.RegionId);
+			}
 		}
 		EcoWorldV3::FWorldConfig Config = MakeRegionWorldConfig(Settings, RegionIndex, G.Herbivores, G.Wolves, Covers, G.RegionId);
+		if (bIsland)
+		{
+			// 섬 무대 (11-05): 세계 = 섬 정사각 (한 변 IslandSizeUnits — 학습 60~110 단위 자르기를 건너뛴다), 벽 대신 땅/물 지도
+			Config.WorldSize = IslandSizeUnits;
+			Config.Island = IslandMask;
+			// 11-05 확인 뒤: 먹이 패치 정규화를 무리 자리 무대 크기 타일로 (학습 무대와 같은 먹이 칸 비율·용량 — EcoWorldV3::FWorldConfig::IslandFoodTile)
+			const double TileUnits = IslandHerdPlans.IsEmpty() ? Settings.StageSizeUnits : IslandHerdPlans[0].SizeUnits;
+			Config.IslandFoodTile = FMath::Max(1, FMath::RoundToInt32(TileUnits / (Config.FoodCell > 0.0 ? Config.FoodCell : 2.0)));
+			// 11-05 확인 뒤: 먹이 장 상자 평균·기울기는 사슴이 선 칸에서만 (700² 격자 전체 세 번이 결정 스텝 비용의 대부분 — FFoodGrid::bLazyFields)
+			Config.bIslandLazyFields = true;
+		}
 		Config.Vegetation.bEnabled = AEcoVegetationField::IsRequested() || (Spawner.IsValid() && Spawner->bEnableVegetation);
         Config.bEcosystemLife = Spawner.IsValid() && Spawner->bEnableEcosystemLife;
         auto* NaturalProfile=Spawner.IsValid()?Spawner->NaturalHabitatProfile.Get():nullptr;
@@ -3377,7 +3444,18 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		}
 		for (const FString& Why : UEcoPolicyV3Subsystem::CheckTrainingRange(Config))
 		{
-			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 지역 %s 학습 범위 밖: %s"), *G.RegionId.ToString(), *Why);
+			if (bIsland)
+			{
+				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] 지역 %s 학습 범위 밖: %s (섬 무대 — 언리얼 전용 시험 무대, 알고 쓴다)"), *G.RegionId.ToString(), *Why);
+			}
+			else
+			{
+				UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 지역 %s 학습 범위 밖: %s"), *G.RegionId.ToString(), *Why);
+			}
+		}
+		if (bIsland)
+		{
+			IslandLogStart(*Ctx);
 		}
 	}
 	// 장애물 원판 JSON (eco.IntegratedV3.ObstacleExport — 파이썬 거울 짝 비교용). 경로를 주지 않으면 쓰지 않는다
@@ -3394,7 +3472,11 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		}
 	}
 	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp): 지역 세계가 생긴 직후 자리를 한꺼번에 정한다 (시작 직전 지면 검사로 무대 땅이 불린 뒤). 끄면 아무것도 하지 않는다
-	if (bActive && ForestSettings.bOn)
+	if (bActive && ForestSettings.bOn && bIsland)
+	{
+		UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 숲 자람 | 거부 — 섬 무대는 숲 자람을 쓰지 않는다 (지역 Barren·정사각 무대 자리 규칙, ISLAND_STAGE.md 13절)"));
+	}
+	else if (bActive && ForestSettings.bOn)
 	{
 		FString Why;
 		PlanForest(ForestSettings, Why);
@@ -4278,7 +4360,8 @@ void UEcoPolicyV3IntegratedSubsystem::LogContext(FEcoV3RegionContext& Ctx)
 			   *EcoV3Flight::CompareText(Ctx.FlightTally));
 	}
 	// 부활이 없어서 산 사슴이 줄면 학습 밀도 하한 아래로 내려간다 — 그 뒤 동족 수·무리 중심·분리 입력은 학습 범위 밖일 수 있다 (한 번만 알린다)
-	if (!Ctx.bReportedLowDensity && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
+	// 섬 무대(11-05)는 세계가 섬 전체 정사각이라 이 셈이 뜻이 없다 — 밀도는 무리 자리(학습 무대 크기) 안에서만 학습 범위다 (ISLAND_STAGE.md 4절)
+	if (!Ctx.bReportedLowDensity && !bIsland && Ctx.AdoptedDeer > 0 && FEcoV3IntegratedSettings::IsBelowTrainingDensity(Ctx.AliveDeer, Ctx.SizeUnits))
 	{
 		Ctx.bReportedLowDensity = true;
 		UE_LOG(LogEcoPolicyV3I, Warning,

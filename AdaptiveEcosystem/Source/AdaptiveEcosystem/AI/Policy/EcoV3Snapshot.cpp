@@ -535,6 +535,12 @@ bool UEcoPolicyV3IntegratedSubsystem::ExportSnapshot(const FString& Path, const 
 	using namespace EcoV3SnapshotImpl;
 	for (const auto& Ctx : Contexts)
 	{
+		if (Ctx->Sim.Config.Island)
+		{
+			// 섬 무대 (11-05, ISLAND_STAGE.md 13절): 환경 스냅숏 판 1 은 정사각 무대·지역 셋을 가정한다 — 땅/물 지도를 받는 파이썬 거울이 없다
+			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoV3I] 스냅숏 거부 — 섬 무대는 파이썬 거울이 없다 (땅/물 지도·섬 정사각 세계, 언리얼 전용 시험 무대)"));
+			return false;
+		}
 		if (Ctx->Sim.Food.Vegetation.bEnabled||Ctx->Sim.Config.bEcosystemLife)
 		{
 			UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoVegetation] RL snapshot v1 rejected: soil/life world requires the separate ecosystem evaluation schema and a complete Python mirror."));

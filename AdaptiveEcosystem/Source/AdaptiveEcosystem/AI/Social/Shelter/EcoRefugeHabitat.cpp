@@ -17,8 +17,8 @@ AEcoRefugeHabitat::AEcoRefugeHabitat()
     Brush=CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("RefugeBrush"));Brush->SetupAttachment(SceneRoot);
     Boulders=CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("RefugeBoulders"));Boulders->SetupAttachment(SceneRoot);
     for(auto* C:{Brush.Get(),Boulders.Get()}) {C->SetCollisionEnabled(ECollisionEnabled::NoCollision);C->SetCanEverAffectNavigation(false);C->SetCastShadow(true);}
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> Grass(TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA"));
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> Stone(TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Cover/SM_MWAM_StoneA"));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> Grass(TEXT("/Game/SHC/Fab/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA"));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> Stone(TEXT("/Game/SHC/Fab/MWLandscapeAutoMaterial/Meshes/Cover/SM_MWAM_StoneA"));
     BrushMesh=Grass.Object;BoulderMesh=Stone.Object;
 }
 

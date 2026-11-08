@@ -1189,6 +1189,11 @@ int32 UEcoPolicyV3IntegratedSubsystem::TestAddTrees(FName RegionId, int32 Count,
 	{
 		return 0;
 	}
+	if (bIsland)
+	{
+		OutMessage = TEXT("[EcoV3I] 시험용 나무: 거부 — 섬 무대는 나무를 놓지 않는다 (자리 규칙이 정사각 무대 기준, ISLAND_STAGE.md 13절)");
+		return 0;
+	}
 	UStaticMesh* TrunkMesh = LoadObject<UStaticMesh>(nullptr, LevelTrunkMeshPath());
 	UStaticMesh* TreeMesh = LoadObject<UStaticMesh>(nullptr, UTF8_TO_TCHAR(EcoTreeLayoutV3::kMeshPath));
 	if (!TrunkMesh)

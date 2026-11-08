@@ -503,6 +503,30 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	static FEcoV3IntegratedSettings FromConsole();
 };
 
+/**
+ * 섬 무대 설정 (11-05, Docs/RL_Policy/ISLAND_STAGE.md 12절, EcoV3IslandStage.cpp). Play 시작 때 한 번 읽는다. 끔(기본 — 맵 조정자 bV3IslandStage 가 없는 맵)이면
+ * 지금 통합 v3 그대로다. 켜면 지역 하나(Region)가 섬 전체 정사각 세계가 되고 땅/물 지도(EcoV3Island.h)가 벽 대신 못 가는 곳을 정한다.
+ */
+struct ADAPTIVEECOSYSTEM_API FEcoV3IslandSettings
+{
+	int32 Mode = -1;                    // eco.IntegratedV3.Island: −1 = 맵 조정자 bV3IslandStage 를 따름, 0 = 끔, 1 = 켬
+	FName Region = TEXT("Island");      // 섬 무대가 될 지역 (조정자 그룹이 이 지역 하나여야 한다)
+	int32 Herds = 4;                    // 무리 자리 수 (1~8)
+	int32 DeerPerHerd = 120;            // 무리마다 사슴 (1~128)
+	int32 WolvesPerHerd = 4;            // 무리마다 늑대 (0~12)
+	double HerdGapM = 400.0;            // 무리 자리 가운데끼리 가장 가까운 거리
+	double HerdClearM = 30.0;           // 무리 자리 둘레 여유 (해안·숲·호수에서 더 떨어진다)
+	double ShoreM = 0.5;                // 바다·호수 수면 위 이 높이까지는 물
+	double SlopeZ = 0.65;               // 가파름 문턱 (법선 Z — 팀 이동 제약과 같은 값)
+	bool bForest = true;                // 소나무 칸 막힘 (1단계). 거짓 = 숲을 무시
+	double ForestRadiusM = 3.0;         // 칸 가운데에서 이 거리 안에 나무가 있으면 숲 칸
+	double RockMarginM = 0.5;           // 큰 바위 상자 + 이 여유
+	bool bMarkers = true;               // 먼 개체 표식 (그리는 단독·리슨 호스트)
+
+	/** 콘솔 변수 eco.IntegratedV3.Island* 에서 읽는다 (명령줄 -EcoV3Island= 등은 그 콘솔 변수의 시작값). 값은 범위로 자른다. */
+	static FEcoV3IslandSettings FromConsole();
+};
+
 /** 한 지역 무대 계획 (조정자 시작 전에 정한다). */
 struct ADAPTIVEECOSYSTEM_API FEcoV3StagePlan
 {
@@ -1480,6 +1504,20 @@ public:
 	void TallyTeamWolfVisuals();
 	const TArray<FEcoV3StagePlan>& GetPlans() const { return Plans; }
 
+	// ---- 섬 무대 (11-05, EcoV3IslandStage.cpp — 끄면 모두 비어 있다) ----
+	/** 이 Play 가 섬 무대 모드인가 (OnWorldBeginPlay 에서 정한다). */
+	bool IsIslandStage() const { return bIsland; }
+	const FEcoV3IslandSettings& GetIslandSettings() const { return IslandSettings; }
+	/** 무리 자리 계획 (시작 직전 지면 검사 뒤 — 자리마다 시작 자리). */
+	const TArray<FEcoV3StagePlan>& GetIslandHerdPlans() const { return IslandHerdPlans; }
+	/** 땅/물 지도 (훑기 뒤 — 없으면 nullptr). */
+	const EcoV3Island::FLandMask* GetIslandMask() const { return IslandMask.get(); }
+	/** 섬 땅 경계 상자 (cm, 훑기 뒤 — 카메라 탑뷰). 없으면 거짓. */
+	bool GetIslandLandBoxCm(FBox& Out) const;
+	/** 섬 무대 땅/물 지도 훑기 (서브시스템 상태를 바꾸지 않는다). 무대 원점·한 변(단위)으로 칸을 만들고 기록 줄 글을 OutLine 에 쓴다. */
+	static std::shared_ptr<EcoV3Island::FLandMask> ScanIslandMask(UWorld& World, const FVector& OriginCm, double SizeUnits, const FEcoV3IslandSettings& S,
+																  FString& OutLine);
+
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 
@@ -1531,6 +1569,21 @@ private:
 	void EndForest();
 	/** 큰 변화 규칙 기준선에 지역 하나를 더한다 (AddContext — 지역 세계를 만든 때). */
 	void BigAddRegion(const FEcoV3RegionContext& Ctx);
+	// 섬 무대 (11-05, EcoV3IslandStage.cpp)
+	/** 섬 무대 모드를 켤지 정한다 (OnWorldBeginPlay — Settings·IslandSettings 를 읽은 뒤). 켜면 참, 거부하면 까닭을 한 줄 남기고 거짓. */
+	bool IslandResolve(const AEcoCreatureIntegrationSpawner& S);
+	/** ApplyToSpawner 의 섬 계획: 섬 정사각을 덮는 스트리밍 힌트 자리 (조정자가 섬 전체를 불러오게). */
+	bool IslandPlanHints(AEcoCreatureIntegrationSpawner& S, TArray<FEcoV3StagePlan>& NewPlans, TArray<FEcoCreatureSpawnGroup>& NewGroups, int64& OutTotal);
+	/** 시작 직전 (섬 전체가 불린 프레임): 땅/물 지도 훑기 → 무리 자리 → 자리마다 시작 자리 → 그룹 하나에 합쳐 쓴다. 실패하면 RestoreTeamValues. */
+	bool IslandValidateNow();
+	/** 은신처 원이 모두 땅 칸 위인가 (cm). 섬 무대가 아니면 참. */
+	bool IslandCoverOnLand(const FVector& CenterCm, double RadiusCm) const;
+	/** 먼 개체 표식 (HandlePreActorTick — 4 Hz). */
+	void IslandTickMarkers();
+	/** 섬 기록 줄 (HandlePreActorTick — 시뮬레이션 10 초마다, 그리지 않는 실행도): 막힌 칸 위 개체·무리 자리별 사슴·쫓김·사냥·섬 규칙 셈. */
+	void IslandTickStats();
+	/** 섬 무대 시작 줄 (TryCreateContexts 끝). */
+	void IslandLogStart(const FEcoV3RegionContext& Ctx) const;
 	// 파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.cpp)
 	/** OnWorldBeginPlay (PlayId 뒤): 판정하고 띄운다. 기록 '[EcoV3I] 파이썬 감시 | …'. */
 	void BeginAutoWatch();
@@ -1632,6 +1685,22 @@ private:
 	// '큰 변화만' 다시 배우기 (10-27, EcoV3BigChange.h — AddContext·ApplyEnvChange 가 채우고 MaybeAutoSnapshot 이 판정)
 	EcoV3BigChange::FState BigState;
 	TSet<FName> LevelChangeHolds;         // '레벨 바뀜 진행 중' 표시 (SetLevelChangeHold)
+
+	// 섬 무대 (11-05, EcoV3IslandStage.cpp — 끄면 모두 비어 있다)
+	FEcoV3IslandSettings IslandSettings;
+	bool bIsland = false;                    // 이 Play 가 섬 무대 모드
+	FVector IslandOriginCm = FVector::ZeroVector;   // 섬 정사각 (0, 0) 의 cm
+	double IslandSizeUnits = 0.0;            // 섬 정사각 한 변 (단위)
+	std::shared_ptr<EcoV3Island::FLandMask> IslandMask;
+	TArray<FEcoV3StagePlan> IslandHerdPlans; // 무리 자리마다 계획 (시작 자리 — 은신처·기록·카메라)
+	FString IslandScanLine;                  // 땅 지도 기록 줄 (시작 줄에 다시 쓴다)
+	FString IslandSiteLine;                  // 무리 자리 고른 방법
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> IslandMarkerActor;    // 먼 개체 표식 (인스턴스 메시 셋)
+	double NextIslandMarker = 0.0;           // 다음 표식 갱신 (실시간)
+	double NextIslandStats = 0.0;            // 다음 섬 기록 줄 (월드 초)
+	int64 IslandStatsPrev[5] = {0, 0, 0, 0, 0}; // 지난 줄의 섬 규칙 셈 (굽힘·미끄러짐·제자리·반사·팀 제약 돌림)
+	TMap<int64, TPair<FVector2D, int32>> IslandShoreStill;   // 11-05 확인용 (읽기만): 산 사슴 id → (지난 줄 자리 cm, 1 m 안에 머문 10 초 구간 수)
 
 	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp — 끄면 모두 비어 있다)
 	EcoV3Forest::FSettings ForestSettings;   // Play 시작 때 읽은 값 (Sanitize 뒤)
