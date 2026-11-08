@@ -1,5 +1,7 @@
 # 레벨 디자인 담당·AI agent 작업 안내
 
+최신 다종 맵의 이 역할 작업과 완료 기준은 [다종 생태계 팀 인수인계](FAUNA_TEAM_HANDOFF.md)를 먼저 확인한다.
+
 2026-11-05 제안은 [체형의 레벨 디자인 인계](MORPHOLOGY_LEVEL_DESIGN_HANDOFF_20261105.md)를 참고한다. 질주·은폐·근접 사냥을 비교할 지형과 체형의 실루엣·IK·실제 충돌 검증을 정리한다.
 
 **2026-10-30 후속:** 자연 식생/물가/생물군계/내부 휴식의 재사용 입력은 [자연 서식지 적용 순서](NATURAL_HABITAT_LEVEL_HANDOFF_20261030.md)와 [공통 계약](../Architecture/NATURAL_HABITAT_CONTRACT_20261030.md)을 추가로 읽는다. 아래 10-24 수치·검증은 당시 범위다. 새 팀 레벨에서 설정 연결과 실제 플레이 acceptance를 수행한다.

@@ -68,3 +68,17 @@
 - 1,800초에 사슴 33, 늑대 4, 물소 12, 멧돼지 14, 까마귀 5가 남았다. 표범은 약 270초, 쥐는 약 600초, 여우는 약 1,020초에 처음 0으로 관측됐고 종료까지 돌아오지 않았다. 이 시점은 30초 간격 샘플이다. 사망 영수증에서 쥐 21건은 포식, 표범·여우 각 3건은 기아였다. 이 맵의 초기 배치와 규칙에서 여덟 종 공존이 지속되지는 않았다.
 - 장시간과 전용 서버의 증거는 `Saved/Logs/FaunaPackFinalLong.log`, `Saved/Logs/FaunaPackFinalServer.log`, `Saved/Logs/FaunaPackFinalClient.log`, `Saved/FaunaAudit/PackRecovery_long.json`, `Saved/FaunaAudit/PackFinalDedicatedClient.json`이다.
 - UE 5.8.4 직접 UBT 및 최종 Unreal 자동화 299개를 통과했다. 복원 증거는 `Saved/Logs/FaunaPackVerifiedSave.log`, `Saved/Logs/FaunaPackVerifiedLoad.log`, `Saved/Logs/FaunaPackVerifiedAutomation.log`, `Saved/FaunaAudit/PackRecovery_save.json`, `Saved/FaunaAudit/PackRecovery_load.json`에 있다.
+
+## 초기 일곱 종 검증 이력
+
+다음 결과는 쥐와 다종 체크포인트를 연결하기 전의 실행이다. 당시 사체는 단순한 접근 보류와 만료 규칙을 사용했다. 현재 동작은 [이동·사체·플레이어 계약](FAUNA_RAT_AND_CARCASS_20261108.md)과 [팀 인수인계](../Team/FAUNA_TEAM_HANDOFF.md)를 따른다.
+
+초기 사체 경쟁과 접근 보류에는 포획 뒤 남은 자원과 청소동물의 경계 행동을 참고했다. 표범의 접근 규칙은 먹이의 포획 용이성도 고려했다. [옐로스톤 사체 연구](https://escholarship.org/uc/item/0h09s21c) · [데날리 사체 경쟁 관찰](https://www.nps.gov/articles/000/scavenging.htm) · [표범 사냥 서식지 연구](https://doi.org/10.1016/j.anbehav.2006.12.014)
+
+- UE 5.8 직접 UnrealBuildTool 빌드와 전체 `AdaptiveEcosystem` 자동화 297개가 통과했다. 새 사체 회귀 테스트는 지역, 접근 보류, 만료, 동종 접근 설정, 부분 지급, 경쟁 요청의 초과 차감을 검사한다.
+- R7e로 300 게임초, 304번째 자원 경계까지 실행했다. 다섯 새 종의 자연 출생을 기록했다. 사체 12개에서 사망별 총량과 초기 배정·잔량을 대조했고, 섭식마다 이전 잔량에서 실제 지급만 차감되는 것을 확인했다. 1개는 고갈됐고 11개는 잔량을 남기고 만료됐다. 까마귀와 돼지가 함께 먹은 42번 사슴 사체는 Native 몫을 떼고 남은 40에서 시작했고 마지막 요청에는 1.5를 지급했다. 동종 사체 섭식은 0건이었다.
+- 까마귀의 위험 회피 이륙 16회와 지표 위 최대 약 12.56 m를 관측했다. 최종 실행에서는 까마귀와 돼지의 사체 섭식을 관측했다. 여우의 실제 사체 섭식은 동종 제외 조건을 추가하기 전 실행에서 관측했다. 최종 R7e 실행의 여우는 자연 출생을 포함한 3개체가 모두 기아로 죽었다. 후보 탐색과 사체 장부는 실행됐으며, 이 시드의 공간 배치와 먹이 공급으로는 여우 개체군을 유지하지 못했다.
+- 최종 D3D11 PIE의 일곱 표현 모두 180° 강제 방향 전환에서 한 프레임 최대 약 6.0° 회전했다. 이전 재현에서는 약 164°였다. 평지·12° 경사 보행, 달리기·정지·섭식·공격·휴식·사망을 재생했고, 까마귀는 비행 세 단계의 지면 IK 해제를 확인했다. 이 회전 테스트는 합성 표현 입력을 사용한다.
+- 내장 R1b-F로 로컬 Dedicated 서버를 80초 실행했다. 시간차 접속한 Client에 일곱 종이 표시됐고 권위 개체와 생태계 스텝은 각각 0이었다. 두 프로세스가 정상 종료했다. `Saved/Logs/FaunaCarrionFinalServer.log`, `FaunaCarrionFinalClient.log`, `Saved/FaunaAudit/CarrionFinalClient.json`을 확인할 수 있다.
+
+로컬 실행 기록은 `Saved/Logs/FaunaCarrionFinalStandalone.log`, `FaunaCarrionFinalMotion.log`, `FaunaCarrionFinalAutomation.log`에 있다. 개체·프레임 수치와 이미지의 경로는 `Saved/FaunaAudit/CarrionFinal300.json`, `CarrionFinalMotionMetrics.json`, `CarrionFinalMotion_turn.png`, `CarrionFinalMotion_feed.png`, `CarrionFinalMotion_fly.png`다.

@@ -1,10 +1,6 @@
 # 생태계 통합 이후 팀 AI 작업 안내
 
-다종 맵의 후속 작업은 [여덟 종의 이동·사체·플레이어 인계](../Architecture/FAUNA_RAT_AND_CARCASS_20261108.md)에서 시작한다. [먹이 선택과 사체 실행 계약](../Architecture/FAUNA_DECISION_AND_CARRION_20261108.md)은 권위 저장·복제 범위, 학습 요청과 실행 결과, 레벨 먹이·둥지·수역 입력의 기존 계약을 기록한다. 다종 기능은 별도의 `LV_JYU_Fauna` 테스트 맵에서 검증한다.
-
-[다종 후속 실행 점검](../Architecture/FAUNA_RUNTIME_AUDIT.md#후속-실행)에서 식생 경쟁 중 출생, 사체와 살아 있는 먹이의 비교, 냄새, 반격, 경사 IK의 최근 실행 증거와 역할별 후속 범위를 확인한다.
-
-[가족 방어·늑대 협동·복원 기록](../Architecture/FAUNA_RUNTIME_AUDIT.md#가족-방어-늑대-협동-재시작-복원)에서 종 프로필별 가로채기 조건, Native 지원 역할과 다종 체크포인트 범위를 확인한다.
+최신 다종 맵의 역할별 작업과 검증 기준은 [다종 생태계 팀 인수인계](FAUNA_TEAM_HANDOFF.md)에서 관리한다. 아래 안내는 10월 24일 soil/life 기준의 공통 작업 절차와 실행 이력이다.
 
 작성일: **2026-10-24**. 구현 기준 커밋은 **`d095948`**, 작업 브랜치는 `codex/social-shelter-handoff`다. 서버·네트워킹·학습·레벨 디자인·날씨 담당자가 이전 채팅 없이 AI agent로 후속 작업을 시작하기 위한 공통 진입 문서다. 개인별 담당 수락이나 새 기능의 완료를 대신 선언하지 않는다.
 
@@ -53,7 +49,7 @@
 
 | 책임 | 현재 소유자/실제 파일 | 새 작업에서 금지할 중복 |
 |---|---|---|
-| 공간 먹이 | `AI/Policy/EcoWorldV3.h::FFoodGrid`, `Ecology/EcologySpatialFood.cpp` | 별도 patch 잔고·BP 재생·두 번째 섭식 지급 |
+| soil/life 공간 식생 | `AI/Policy/EcoWorldV3.h::FFoodGrid`, `Ecology/EcologySpatialFood.cpp` | 식생과 별도 재고를 같은 거래로 중복 지급 |
 | 실제 개체 실행 | `EcoWorldV3.h`, `EcoPolicyV3IntegratedProcessors.cpp`, 기존 movement hook | Client/Actor/AnimNotify/새 Processor의 위치·대사 재적분 |
 | 완료 조정 | `Creature/Runtime/EcoCreatureLifecycle.cpp`와 같은 spawner의 partial 구현 파일 | 출생/죽음/사체 영양을 다른 manager에서 재확정 |
 | 지역/인구 장부 | `UEcologySimulationSubsystem` | 진단/복제/학습 코드의 직접 Population 수정 |
