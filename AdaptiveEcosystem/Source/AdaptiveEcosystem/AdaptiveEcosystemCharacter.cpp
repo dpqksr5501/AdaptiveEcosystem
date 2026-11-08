@@ -11,10 +11,29 @@
 #include "EnhancedInputSubsystems.h"
 #include "InputActionValue.h"
 #include "AdaptiveEcosystem.h"
+#include "Player/EcoAbilityAvatarComponent.h"
+#include "Player/EcoPlayerCombatComponent.h"
+#include "Player/EcoMeleeHitComponent.h"
+#include "Player/EcoPlayerState.h"
+#include "Player/EcoEquipmentComponent.h"
+#include "Player/EcoAimComponent.h"
+#include "Player/EcoWeaponFireComponent.h"
+#include "Player/EcoCombatRelevanceComponent.h"
+#include "Player/EcoGASDamageReceiverComponent.h"
 
 AAdaptiveEcosystemCharacter::AAdaptiveEcosystemCharacter()
 {
-	// Set size for collision capsule
+	AbilityAvatar = CreateDefaultSubobject<UEcoAbilityAvatarComponent>(TEXT("AbilityAvatar"));
+    Combat = CreateDefaultSubobject<UEcoPlayerCombatComponent>(TEXT("PlayerCombat"));
+
+    MeleeHit = CreateDefaultSubobject<UEcoMeleeHitComponent>(TEXT("MeleeHit"));
+
+    Equipment=CreateDefaultSubobject<UEcoEquipmentComponent>(TEXT("Equipment"));
+    Aim=CreateDefaultSubobject<UEcoAimComponent>(TEXT("Aim"));
+    WeaponFire=CreateDefaultSubobject<UEcoWeaponFireComponent>(TEXT("WeaponFire"));
+    CombatRelevance=CreateDefaultSubobject<UEcoCombatRelevanceComponent>(TEXT("CombatRelevance"));
+    DamageReceiver=CreateDefaultSubobject<UEcoGASDamageReceiverComponent>(TEXT("DamageReceiver"));
+    // Set size for collision capsule
 	GetCapsuleComponent()->InitCapsuleSize(42.f, 96.0f);
 		
 	// Don't rotate when the controller rotates. Let that just affect the camera.
@@ -50,12 +69,43 @@ AAdaptiveEcosystemCharacter::AAdaptiveEcosystemCharacter()
 	// are set in the derived blueprint asset named ThirdPersonCharacter (to avoid direct content references in C++)
 }
 
+UAbilitySystemComponent* AAdaptiveEcosystemCharacter::GetAbilitySystemComponent() const
+{
+    return AbilityAvatar->GetAbilitySystem();
+}
+
+void AAdaptiveEcosystemCharacter::PossessedBy(AController* NewController)
+{
+    Super::PossessedBy(NewController);
+    AbilityAvatar->RefreshAvatar();
+}
+
+void AAdaptiveEcosystemCharacter::OnRep_PlayerState()
+{
+    Super::OnRep_PlayerState();
+    AbilityAvatar->RefreshAvatar();
+}
+
+void AAdaptiveEcosystemCharacter::UnPossessed()
+{
+    AbilityAvatar->ReleaseAvatar();
+    Super::UnPossessed();
+}
+
+void AAdaptiveEcosystemCharacter::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    AbilityAvatar->ReleaseAvatar();
+    Super::EndPlay(EndPlayReason);
+}
+
 void AAdaptiveEcosystemCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputComponent)
 {
 	// Set up action bindings
 	if (UEnhancedInputComponent* EnhancedInputComponent = Cast<UEnhancedInputComponent>(PlayerInputComponent)) {
 		
-		// Jumping
+		AbilityAvatar->BindInput(*EnhancedInputComponent);
+
+        // Jumping
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Started, this, &ACharacter::Jump);
 		EnhancedInputComponent->BindAction(JumpAction, ETriggerEvent::Completed, this, &ACharacter::StopJumping);
 
@@ -92,6 +142,7 @@ void AAdaptiveEcosystemCharacter::Look(const FInputActionValue& Value)
 
 void AAdaptiveEcosystemCharacter::DoMove(float Right, float Forward)
 {
+    if (const auto* State=GetPlayerState<AEcoPlayerState>();State&&!State->IsAlive()) return;
 	if (GetController() != nullptr)
 	{
 		// find out which way is forward

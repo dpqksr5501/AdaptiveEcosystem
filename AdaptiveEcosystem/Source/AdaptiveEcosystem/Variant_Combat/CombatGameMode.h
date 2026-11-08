@@ -3,14 +3,14 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
+#include "AdaptiveEcosystemGameMode.h"
 #include "CombatGameMode.generated.h"
 
 /**
  *  Simple GameMode for a third person combat game
  */
 UCLASS(abstract)
-class ACombatGameMode : public AGameModeBase
+class ACombatGameMode : public AAdaptiveEcosystemGameMode
 {
 	GENERATED_BODY()
 	

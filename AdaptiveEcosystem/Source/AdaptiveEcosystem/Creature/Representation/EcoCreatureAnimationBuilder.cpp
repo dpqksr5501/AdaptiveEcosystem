@@ -205,7 +205,8 @@ bool UEcoCreatureAnimationBuilder::PrepareCopiedWorld(UObject* Context)
 {
 #if WITH_EDITOR
     UWorld* W=GEngine?GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull):nullptr;
-    if(!W||W->WorldType!=EWorldType::Editor||!W->GetPathName().StartsWith(TEXT("/Game/JYU/Maps/")))return false;
+    if(!W||W->WorldType!=EWorldType::Editor||
+        (!W->GetPathName().StartsWith(TEXT("/Game/JYU/Maps/")) && W->GetPathName()!=TEXT("/Game/JWJ/1102_Integration_JWJ.1102_Integration_JWJ")))return false;
     if(auto* WP=W->GetWorldPartition()) {
         auto* Loader=WP->CreateEditorLoaderAdapter<FLoaderAdapterShape>(W,FBox(FVector(-1000000),FVector(1000000)),TEXT("JYU copied world authoring"));
         Loader->GetLoaderAdapter()->Load();

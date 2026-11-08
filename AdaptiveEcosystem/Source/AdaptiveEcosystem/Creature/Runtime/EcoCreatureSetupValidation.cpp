@@ -124,9 +124,10 @@ bool AEcoCreatureIntegrationSpawner::CollectSetupIssues(TArray<FString>& Errors,
 		Errors.Add(TEXT("Vitals/Predator settings must be finite and nonnegative; Starvation Damage must be positive."));
 	if (!FMath::IsFinite(InterpolationDelaySeconds) || InterpolationDelaySeconds < 0 || InterpolationDelaySeconds > 1
 		|| !FMath::IsFinite(HostVisualDistance) || HostVisualDistance < 0
+		|| !FMath::IsFinite(ClientVisualDistance) || ClientVisualDistance < 0
 		|| !FMath::IsFinite(FarSimulationDistance) || FarSimulationDistance < 4000
 		|| !FMath::IsFinite(FarPolicyIntervalMultiplier) || FarPolicyIntervalMultiplier < 1 || FarPolicyIntervalMultiplier > 8)
-		Errors.Add(TEXT("Visual/Scheduling settings: interpolation 0..1s, nonnegative Host distance, Far distance >=4000cm, multiplier 1..8."));
+		Errors.Add(TEXT("Visual/Scheduling settings: interpolation 0..1s, nonnegative Host/Client distances, Far distance >=4000cm, multiplier 1..8."));
 	if (bUseHabitatStreaming && (!FMath::IsFinite(HabitatStreamingRadius) || HabitatStreamingRadius < 3000))
 		Errors.Add(TEXT("Habitat Streaming Radius must be finite and at least 3000cm."));
 	TMap<FName, const AEcologyRegion*> RegionById;

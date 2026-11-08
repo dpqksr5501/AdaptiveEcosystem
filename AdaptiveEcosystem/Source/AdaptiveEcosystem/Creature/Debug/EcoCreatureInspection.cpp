@@ -19,6 +19,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Engine/Canvas.h"
+#include "Player/EcoPlayerState.h"
 #include "EngineUtils.h"
 #include "GameFramework/PlayerController.h"
 #include "InputCoreTypes.h"
@@ -341,6 +342,9 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
 void AEcoCreatureInspectorHUD::DrawHUD()
 {
     Super::DrawHUD();if(!Canvas||!PlayerOwner)return;
+    if (const auto* State=PlayerOwner->GetPlayerState<AEcoPlayerState>())
+        DrawText(FString::Printf(TEXT("HP %.0f%s"),State->GetHealth(),State->IsAlive()?TEXT(""):TEXT("  DEFEATED")),
+            State->IsAlive()?FLinearColor::White:FLinearColor::Red,Canvas->SizeX-190,25,nullptr,1.f);
     TArray<AEcoCreatureRepresentationActor*> Actors;
     for(TActorIterator<AEcoCreatureRepresentationActor> It(GetWorld());It;++It)if(It->bBound&&!It->IsHidden())Actors.Add(*It);
     Actors.Sort([](const auto& A,const auto& B){return A.VisualState.StableAgentId<B.VisualState.StableAgentId;});

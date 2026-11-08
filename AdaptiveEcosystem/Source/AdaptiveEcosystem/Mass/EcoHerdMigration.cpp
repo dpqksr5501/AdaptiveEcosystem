@@ -52,7 +52,9 @@ bool UEcoHerdMigrationSubsystem::IsEnabled() const {
 }
 bool UEcoHerdMigrationSubsystem::ApplyFoodFractionForAudit(FName Region,float Fraction,bool bSuspendRegeneration){
 #if !UE_BUILD_SHIPPING
-    if(GetWorld()->GetNetMode()==NM_Client||!GetWorld()->GetOutermost()->GetName().StartsWith(TEXT("/Game/JYU/Maps/"))
+    const FString Map=GetWorld()->GetOutermost()->GetName();
+    const bool bAuditMap=Map.StartsWith(TEXT("/Game/JYU/Maps/"))||Map==TEXT("/Game/JWJ/1102_Integration_JWJ");
+    if(GetWorld()->GetNetMode()==NM_Client||!bAuditMap
         ||!FMath::IsFinite(Fraction)||Fraction<0||Fraction>1)return false;
     auto* Native=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
     auto* E=GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();auto* C=Native&&Native->IsActive()?Native->FindContext(Region):nullptr;
@@ -70,7 +72,7 @@ bool UEcoHerdMigrationSubsystem::ApplyFoodFractionForAudit(FName Region,float Fr
 }
 #if !UE_BUILD_SHIPPING
 static FAutoConsoleCommandWithWorldAndArgs TestHerdDrought(TEXT("eco.HerdMigration.Test.Drought"),
-    TEXT("Owned JYU map test only: drought <RegionId> removes native food with a ledger receipt and suspends regeneration. Restart Play to reset."),
+    TEXT("JYU audit maps or JWJ 1102 integration only: drought <RegionId> removes native food with a ledger receipt and suspends regeneration. Restart Play to reset."),
     FConsoleCommandWithWorldAndArgsDelegate::CreateLambda([](const TArray<FString>& Args,UWorld* World){
         auto* Migration=World?World->GetSubsystem<UEcoHerdMigrationSubsystem>():nullptr;
         if(!Migration||Args.Num()!=1||!Migration->ApplyFoodFractionForAudit(FName(*Args[0]),0,true))

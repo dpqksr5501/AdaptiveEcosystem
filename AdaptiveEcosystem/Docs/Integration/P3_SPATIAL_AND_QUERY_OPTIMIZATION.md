@@ -2,6 +2,8 @@
 
 작성일: 2026-10-11 / UE 5.8 / 기준: `M4`, `6235742` / 상태: 최적화 계획, 비용 실측 없음.
 
+2026-11-06 후속: 현재 `jwj-1024`의 Native v3와 `/Game/JWJ/1102_Integration_JWJ` 2,000개체 목표에 대한 [탐색 비용 절감 구체 계획](../Architecture/JWJ_2000_SPATIAL_QUERY_PLAN_20261106.md)을 추가했다. 기존 격자 재사용 경계, 단계별 위치·원본 행 순서, 구현 패치·정확성/성능 게이트를 정의한 제안이며 아직 구현·규모 검증 결과가 아니다. 아래 10-11 내용은 당시 기준을 유지한다.
+
 [전체 순서](README.md) · 이전: [P2](P2_PROFILING_AND_BASELINE.md) · 다음: [P4](P4_CREATURE_REPLICATION_AND_REPRESENTATION.md)
 
 ## 1. 목적과 선행 조건

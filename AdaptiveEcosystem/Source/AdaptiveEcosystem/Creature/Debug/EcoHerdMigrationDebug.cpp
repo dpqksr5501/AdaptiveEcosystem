@@ -12,6 +12,8 @@
 #include "EngineUtils.h"
 #include "GameFramework/HUD.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/Pawn.h"
+#include "Player/EcoPlayerState.h"
 #include "DrawDebugHelpers.h"
 #include "HAL/IConsoleManager.h"
 #include "Dom/JsonObject.h"
@@ -75,6 +77,29 @@ bool EcoHerdMigrationDebug::Capture(UWorld& W,FEcoHerdMigrationDebugSnapshot& Ou
             const auto& J=Journey[I];Out.Members.Add({Id[I].StableAgentId,J.PlanId,Region[I].CurrentRegionId,J.Reason,P,J.Goal,J.bActive,J.Waypoint});
         }
     });
+    FMassEntityQuery Wolves(EM.AsShared());
+    Wolves.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadOnly);
+    Wolves.AddRequirement<FEcoThreatStateFragment>(EMassFragmentAccess::ReadOnly);
+    Wolves.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
+    Wolves.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+    auto WolfExec=EM.CreateExecutionContext(0);
+    Wolves.ForEachEntityChunk(WolfExec,[&](FMassExecutionContext& C){
+        const auto Link=C.GetFragmentView<FEcoIntegratedV3Fragment>();
+        const auto Threat=C.GetFragmentView<FEcoThreatStateFragment>();
+        for(int32 I=0;I<C.GetNumEntities();++I){
+            const auto* Stage=N->GetContext(Link[I].ContextIndex);
+            if(!Stage||!Link[I].bAdopted||Link[I].bDead||Threat[I].Agent.bDead)continue;
+            const auto& Wolf=Threat[I].Agent.State;
+            const FVector Position=Stage->UnitsToCm(Wolf.PosX,Wolf.PosY,Link[I].GroundZ);
+            if(!Position.ContainsNaN())Out.Wolves.Add(Position);
+        }
+    });
+    for(auto It=W.GetPlayerControllerIterator();It;++It)if(const auto* PC=It->Get())
+        if(const APawn* Pawn=PC->GetPawn()){
+            const auto* State=Pawn->GetPlayerState<AEcoPlayerState>();
+            const auto Position=Pawn->GetActorLocation();
+            if((!State||State->IsAlive())&&!Position.ContainsNaN())Out.Players.Add(Position);
+        }
     Out.Members.Sort([](const auto& A,const auto& B){return A.Agent<B.Agent;});return true;
 }
 bool EcoHerdMigrationDebug::ToJson(const FEcoHerdMigrationDebugSnapshot& S,FString& Out)
@@ -96,6 +121,9 @@ bool EcoHerdMigrationDebug::ToJson(const FEcoHerdMigrationDebugSnapshot& S,FStri
         J->SetBoolField(TEXT("active"),M.bActive);J->SetNumberField(TEXT("waypoint"),M.Waypoint);
         J->SetArrayField(TEXT("position"),Vector(M.Position));J->SetArrayField(TEXT("goal"),Vector(M.Goal));Members.Add(MakeShared<FJsonValueObject>(J));}
     Root->SetArrayField(TEXT("regions"),Regions);Root->SetArrayField(TEXT("plans"),Plans);Root->SetArrayField(TEXT("members"),Members);
+    auto Positions=[&](const TArray<FVector>& Values){TArray<TSharedPtr<FJsonValue>> Result;
+        for(const auto& Value:Values)Result.Add(MakeShared<FJsonValueArray>(Vector(Value)));return Result;};
+    Root->SetArrayField(TEXT("wolves"),Positions(S.Wolves));Root->SetArrayField(TEXT("players"),Positions(S.Players));
     Root->SetNumberField(TEXT("known_routes"),S.Routes.Num());
     return FJsonSerializer::Serialize(Root,TJsonWriterFactory<TCHAR,TCondensedJsonPrintPolicy<TCHAR>>::Create(&Out));
 }
@@ -109,27 +137,42 @@ FLinearColor StateColor(EEcoHerdJourneyState S){
 }
 void EcoHerdMigrationDebug::Draw(AHUD& H,APlayerController& Player,FVector2D Size,const FEcoHerdMigrationDebugSnapshot& S,int64 Focus,int32 DebugMode)
 {
-    const float W=FMath::Clamp(float(Size.X*.32),300.f,430.f),X=Size.X-W-16,Y=16;
+    const float W=FMath::Min(FMath::Clamp(float(Size.X*.38),360.f,480.f),float(Size.X-32)),X=Size.X-W-16,Y=56;
+    const float RegionY=246,FooterY=RegionY+44*S.Regions.Num()+10;
     const auto* P=S.Plans.FindByPredicate([&](const auto& V){return V.Id==Focus;});
-    H.DrawRect(FLinearColor(.015f,.025f,.04f,.9f),X,Y,W,376);
+    H.DrawRect(FLinearColor(.015f,.025f,.04f,.9f),X,Y,W,FooterY+126);
+    auto Text=[&](FString Value,FLinearColor Color,float OffsetY,float TextScale=.85f){
+        float Width=0,Height=0;H.GetTextSize(Value,Width,Height,nullptr,TextScale);
+        if(Width>W-24){
+            do{Value.LeftChopInline(1);H.GetTextSize(Value+TEXT("..."),Width,Height,nullptr,TextScale);}while(Width>W-24&&!Value.IsEmpty());
+            Value+=TEXT("...");
+        }
+        H.DrawText(Value,Color,X+12,Y+OffsetY,nullptr,TextScale);
+    };
     H.DrawText(TEXT("HERD MIGRATION   M: hide   [ ]: herd"),FLinearColor::White,X+12,Y+10,nullptr,.9f);
     const FLinearColor Cyan(.2f,.85f,1),Gold(1,.8f,.2f),Grey(.45f,.52f,.58f);
-    H.DrawText(TEXT("Cyan route   Gold destination   Dots: real agents"),Grey,X+12,Y+31,nullptr,.75f);
+    const FLinearColor Deer(.15f,1,.25f),Wolf(1,.15f,.15f),Human(1,.9f,.1f);
+    H.DrawText(TEXT("Deer"),Deer,X+12,Y+31,nullptr,.8f);
+    H.DrawText(TEXT("Wolf"),Wolf,X+72,Y+31,nullptr,.8f);
+    H.DrawText(TEXT("Player"),Human,X+132,Y+31,nullptr,.8f);
+    H.DrawText(TEXT("Cyan: route"),Cyan,X+212,Y+31,nullptr,.8f);
     if(S.Routes.IsEmpty()){H.DrawText(TEXT("Waiting for authored route/runtime"),Gold,X+12,Y+70,nullptr,.9f);return;}
     FBox Bounds(ForceInit);for(const auto& R:S.Regions){Bounds+=R.Minimum;Bounds+=R.Maximum;}
     for(const auto& R:S.Routes)for(const auto& Point:R.Points)Bounds+=Point;
-    const FVector Span=Bounds.GetSize();const float MapX=X+178,MapY=Y+56,MapW=W-194,MapH=204;
+    const FVector Span=Bounds.GetSize();const float MapX=X+16,MapY=Y+56,MapW=W-32,MapH=180;
     const double Scale=FMath::Min(MapW/FMath::Max(1.,Span.X),MapH/FMath::Max(1.,Span.Y));
     const FVector2D Center(MapX+MapW*.5,MapY+MapH*.5);
     auto Map=[&](const FVector& V){const auto D=V-Bounds.GetCenter();return Center+FVector2D(D.X*Scale,-D.Y*Scale);};
     auto Line=[&](FVector2D A,FVector2D B,FLinearColor C,float Width=1){H.DrawLine(A.X,A.Y,B.X,B.Y,C,Width);};
+    int32 RegionRow=0;
     for(const auto& R:S.Regions){const auto A=Map(R.Minimum),B=Map(R.Maximum);
         const bool Target=P&&P->Destination==R.Id;const auto C=Target?Gold:Grey;
         Line(A,{A.X,B.Y},C,2);Line({A.X,B.Y},B,C,2);Line(B,{B.X,A.Y},C,2);Line({B.X,A.Y},A,C,2);
-        const float LabelY=(A.Y+B.Y)*.5f-19;
-        H.DrawText(R.Id.ToString(),C,X+12,LabelY,nullptr,1.05f);
-        H.DrawText(FString::Printf(TEXT("Food %.0f%%   Pop %d"),100*R.FoodFraction,R.Population),
-            R.FoodFraction<.25?Gold:FLinearColor::White,X+12,LabelY+21,nullptr,.9f);
+        // A dedicated row per region: equal world Y must never place labels on top of each other.
+        const float RowY=RegionY+44*RegionRow++;
+        Text(R.Id.ToString(),C,RowY);
+        Text(FString::Printf(TEXT("Food %.0f%%   Pop %d"),100*R.FoodFraction,R.Population),
+            R.FoodFraction<.25?Gold:FLinearColor::White,RowY+20);
     }
     for(const auto& R:S.Routes)for(int32 I=1;I<R.Points.Num();++I){
         Line(Map(R.Points[I-1]),Map(R.Points[I]),Cyan,2);
@@ -140,28 +183,34 @@ void EcoHerdMigrationDebug::Draw(AHUD& H,APlayerController& Player,FVector2D Siz
     if(P)for(int32 I=1;I<P->Points.Num();++I)
         DrawDebugDirectionalArrow(Player.GetWorld(),P->Points[I-1]+FVector(0,0,100),P->Points[I]+FVector(0,0,100),110,Cyan.ToFColor(true),false,0,1,5);
     for(const auto& M:S.Members){if(!Bounds.IsInsideXY(M.Position))continue;const auto Dot=Map(M.Position);
-        FLinearColor C=Grey;float Radius=2;
-        if(M.Plan>0){const auto* Plan=S.Plans.FindByPredicate([&](const auto& V){return V.Id==M.Plan;});
-            C=Plan?StateColor(Plan->State):Grey;if(M.Plan==Focus){Radius=3;C=FLinearColor::White;}}
+        const FLinearColor C=Deer;const float Radius=M.Plan>0&&M.Plan==Focus?3:2;
+        if(M.Plan>0&&M.Plan==Focus)H.DrawRect(FLinearColor::White,Dot.X-Radius-1,Dot.Y-Radius-1,Radius*2+2,Radius*2+2);
         H.DrawRect(C,Dot.X-Radius,Dot.Y-Radius,Radius*2,Radius*2);
         if(M.bActive&&(M.Plan==Focus||DebugMode>1)){
             DrawDebugSphere(Player.GetWorld(),M.Position+FVector(0,0,95),60,8,C.ToFColor(true),false,0,1,2);
             DrawDebugLine(Player.GetWorld(),M.Position+FVector(0,0,95),M.Goal+FVector(0,0,95),C.ToFColor(true),false,0,1,1);
         }
     }
+    auto Markers=[&](const TArray<FVector>& Positions,FLinearColor Color,float Radius){
+        for(const auto& Position:Positions)if(Bounds.IsInsideXY(Position)){
+            const auto Dot=Map(Position);H.DrawRect(Color,Dot.X-Radius,Dot.Y-Radius,Radius*2,Radius*2);
+        }
+    };
+    Markers(S.Wolves,Wolf,3);Markers(S.Players,Human,4);
     int32 Active=0,Completed=0;for(const auto& V:S.Plans){Active+=V.State!=EEcoHerdJourneyState::Settled;Completed+=V.State==EEcoHerdJourneyState::Settled;}
-    H.DrawText(FString::Printf(TEXT("Active herds %d   Finished %d   Known routes %d"),Active,Completed,S.Routes.Num()),FLinearColor::White,X+12,Y+267,nullptr,.85f);
+    Text(FString::Printf(TEXT("Active herds %d   Finished %d   Routes %d"),Active,Completed,S.Routes.Num()),FLinearColor::White,FooterY);
     if(P){
         int32 AtTarget=0,Live=0,Waypoint=0;for(const auto& M:S.Members)if(M.Plan==P->Id){++Live;AtTarget+=M.Region==P->Destination;Waypoint=FMath::Max(Waypoint,M.Waypoint);}
-        H.DrawText(FString::Printf(TEXT("Herd %lld / Plan %lld   %s -> %s"),P->Herd,P->Id,*P->Origin.ToString(),*P->Destination.ToString()),Gold,X+12,Y+289,nullptr,.9f);
-        H.DrawText(FString::Printf(TEXT("%s%s   waypoint %d/%d"),UEcoHerdMigrationSubsystem::StateName(P->State),P->bReturning?TEXT(" (return)"):TEXT(""),Waypoint+1,P->Points.Num()),StateColor(P->State),X+12,Y+311,nullptr,.9f);
-        H.DrawText(FString::Printf(TEXT("In target %d/%d   Finished %d   Dead %d"),AtTarget,Live,P->Arrived,P->Dead),FLinearColor::White,X+12,Y+332,nullptr,.85f);
-        H.DrawText(P->Reason.ToString(),Grey,X+12,Y+352,nullptr,.8f);
+        Text(FString::Printf(TEXT("Herd %lld / Plan %lld"),P->Herd,P->Id),Gold,FooterY+22);
+        Text(FString::Printf(TEXT("%s -> %s"),*P->Origin.ToString(),*P->Destination.ToString()),Gold,FooterY+42,.75f);
+        Text(FString::Printf(TEXT("%s%s   waypoint %d/%d"),UEcoHerdMigrationSubsystem::StateName(P->State),P->bReturning?TEXT(" (return)"):TEXT(""),Waypoint+1,P->Points.Num()),StateColor(P->State),FooterY+62);
+        Text(FString::Printf(TEXT("In target %d/%d   Finished %d   Dead %d"),AtTarget,Live,P->Arrived,P->Dead),FLinearColor::White,FooterY+82);
+        Text(P->Reason.ToString(),Grey,FooterY+104,.8f);
         if(!P->Points.IsEmpty()){
             const FVector Target=P->Points.Last()+FVector(0,0,100);
             DrawDebugSphere(Player.GetWorld(),Target,250,16,Gold.ToFColor(true),false,0,1,4);
             FVector2D Screen;if(Player.ProjectWorldLocationToScreen(Target+FVector(0,0,300),Screen)&&Screen.X>0&&Screen.X<Size.X&&Screen.Y>0&&Screen.Y<Size.Y)
                 H.DrawText(FString::Printf(TEXT("DESTINATION: %s"),*P->Destination.ToString()),Gold,Screen.X,Screen.Y,nullptr,1.1f);
         }
-    }else H.DrawText(TEXT("No departure. Sustained food shortage starts a journey."),Gold,X+12,Y+302,nullptr,.8f);
+    }else Text(TEXT("No departure. Waiting for sustained food shortage."),Gold,FooterY+25,.8f);
 }

@@ -7,7 +7,7 @@
 #include "AdaptiveEcosystemGameMode.generated.h"
 
 /** Server-only coordinator for world lifecycle and Mass network bootstrap. */
-UCLASS(Abstract)
+UCLASS(Blueprintable)
 class ADAPTIVEECOSYSTEM_API AAdaptiveEcosystemGameMode : public AGameModeBase
 {
 	GENERATED_BODY()

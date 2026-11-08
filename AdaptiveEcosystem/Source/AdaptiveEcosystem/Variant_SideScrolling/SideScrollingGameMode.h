@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "GameFramework/GameModeBase.h"
+#include "AdaptiveEcosystemGameMode.h"
 #include "SideScrollingGameMode.generated.h"
 
 class USideScrollingUI;
@@ -14,7 +14,7 @@ class USideScrollingUI;
  *  Counts pickups collected by the player
  */
 UCLASS(abstract)
-class ASideScrollingGameMode : public AGameModeBase
+class ASideScrollingGameMode : public AAdaptiveEcosystemGameMode
 {
 	GENERATED_BODY()
 	

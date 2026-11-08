@@ -15,6 +15,7 @@
 #include "Kismet/GameplayStatics.h"
 #include "Creature/Audio/EcoFootstepAudioSet.h"
 #include "Creature/Audio/EcoFootstepAudioComponent.h"
+#include "UI/EcoHealthBarComponent.h"
 
 static TAutoConsoleVariable<int32> CVarEcoDrawFacing(TEXT("eco.Creature.DrawFacing"), 0,
 	TEXT("Draw actual velocity (green) and calibrated mesh forward (cyan). Visual-only."));
@@ -39,6 +40,8 @@ AEcoCreatureRepresentationActor::AEcoCreatureRepresentationActor()
 	bReplicates = false; // The eventual production transport remains the existing Mass network path.
 	SetReplicateMovement(false);
 	SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("VisualRoot")));
+	HealthBar = CreateDefaultSubobject<UEcoHealthBarComponent>(TEXT("HealthBar"));
+	HealthBar->SetupAttachment(RootComponent);
 	Footsteps = CreateDefaultSubobject<UEcoFootstepAudioComponent>(TEXT("Footsteps"));
 	CreatureMesh = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("CreatureMesh"));
 	CreatureMesh->SetupAttachment(RootComponent);
@@ -110,6 +113,7 @@ bool AEcoCreatureRepresentationActor::BindIdentity(int64 AgentId, FName SpeciesI
 {
 	if (AgentId <= 0 || SpeciesId != VisualSpeciesId || bBound) { return false; }
 	VisualState = {};
+	HealthBar->ClearHealth();
 	VisualTurnAmount = DirectionDegrees = 0.0f;
 	LastFacingAuditTime = -1.0;
 	VisualState.StableAgentId = AgentId;
@@ -126,6 +130,7 @@ bool AEcoCreatureRepresentationActor::BindIdentity(int64 AgentId, FName SpeciesI
 void AEcoCreatureRepresentationActor::ClearBinding()
 {
 	bBound = false;
+	HealthBar->ClearHealth();
 	if(GetWorld())GetWorld()->GetTimerManager().ClearTimer(AlarmTimer);
 	LastAlarmTime=-10;
 	Footsteps->ResetCadence();
@@ -206,6 +211,7 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
         if(AppearanceVariants.IsValidIndex(State.Appearance))CreatureMesh->SetRelativeScale3D(AppearanceVariants[State.Appearance].MeshScale*Proportions);
         ImmatureMesh->SetRelativeScale3D(Proportions);
     }else{CreatureMesh->SetVisibility(true);ImmatureMesh->SetVisibility(false);}
+	HealthBar->SetHealthNormalized(State.NormalizedHealth, State.bAlive, State.bHasVitals);
 	PlaceholderBody->SetVisibility(CreatureMesh->GetSkeletalMeshAsset() == nullptr);
 	VisualMotion = !State.bAlive ? EEcoCreatureVisualMotion::Dead
 		: State.bEating && Speed <= FMath::Max(0.0f, IdleSpeed) ? EEcoCreatureVisualMotion::Eating
