@@ -17,6 +17,7 @@ public:
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") int32 AnimationIndex = 0;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float DirectionDegrees = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float TurnAmount = 0.0f;
+    UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") FRotator TurnHeadRotation = FRotator::ZeroRotator;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bAlive = false;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bEating = false;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") bool bPursuingPrey = false;
@@ -29,6 +30,10 @@ public:
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundPoint1=FVector::ZeroVector;
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundPoint2=FVector::ZeroVector;
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundPoint3=FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundNormal0=FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundNormal1=FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundNormal2=FVector::ZeroVector;
+    UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundNormal3=FVector::ZeroVector;
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") float GroundValid0=0;
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") float GroundValid1=0;
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") float GroundValid2=0;

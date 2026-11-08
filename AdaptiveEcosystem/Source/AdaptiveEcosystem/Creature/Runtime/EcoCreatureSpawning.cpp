@@ -81,17 +81,21 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 	{
 		if (Group.RegionId.IsNone() || GroupIds.Contains(Group.RegionId) || Group.Herbivores < 0 || Group.Wolves < 0 || !Group.Schedule.IsValid()) return false;
 		GroupIds.Add(Group.RegionId); Total += (IsSpeciesEnabled(false) ? int64(Group.Herbivores) : 0) + (IsSpeciesEnabled(true) ? Group.Wolves : 0);
+        for (const auto& Placement : Group.Fauna) Total += Placement.SpawnPoints.Num();
 		if (!Regions.ContainsByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; })) return false;
 		if (Group.bUseFoodPatchPosition && (Group.FoodPatchPosition.ContainsNaN()
 			|| !(*Regions.FindByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; }))->ContainsPosition(Group.FoodPatchPosition))) return false;
 	}
 	if (Total > GlobalPopulationLimit || (IsSpeciesEnabled(false) && !HerbivoreActorClass) || (IsSpeciesEnabled(true) && !WolfActorClass)) return false;
+    if (!InitializeFaunaHabitat()) return false;
 	// Validate every habitat before starting clock/resources or creating any Entity.
 	for (const auto& Group : Groups)
 	{
 		TArray<FVector> Positions;
 		if ((IsSpeciesEnabled(false) && !BuildSpawnPositions(Group, Group.Herbivores, false, Positions))
 			|| (IsSpeciesEnabled(true) && !BuildSpawnPositions(Group, Group.Wolves, true, Positions))) return false;
+        for (const auto& Placement : Group.Fauna)
+            if (!BuildFaunaPositions(Group.RegionId, Placement, Positions)) return false;
 	}
 	if (!Ecology->ConfigurePopulationLimit(GlobalPopulationLimit)) return false;
 	PopulationPressure.bEnabled = bEnablePopulationPressure;
@@ -117,9 +121,17 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 		FEcoSpawnRequest Request;
 		const int32 DeerCount = IsSpeciesEnabled(false) ? Group.Herbivores : 0;
 		const int32 WolfCount = IsSpeciesEnabled(true) ? Group.Wolves : 0;
-		if (DeerCount + WolfCount == 0) continue;
-		if (!Ecology->RequestInitialSpawn(Group.RegionId, DeerCount + WolfCount, Clock->GetServerTime(), Request)) return false;
-		const int32 Actual = Spawn(Group.RegionId, DeerCount, false) + Spawn(Group.RegionId, WolfCount, true);
+        int32 Count = DeerCount + WolfCount;
+        for (const auto& Placement : Group.Fauna) Count += Placement.SpawnPoints.Num();
+		if (Count == 0) continue;
+		if (!Ecology->RequestInitialSpawn(Group.RegionId, Count, Clock->GetServerTime(), Request)) return false;
+		int32 Actual = Spawn(Group.RegionId, DeerCount, false) + Spawn(Group.RegionId, WolfCount, true);
+        for (const auto& Placement : Group.Fauna)
+        {
+            TArray<FVector> Positions;
+            if (!BuildFaunaPositions(Group.RegionId, Placement, Positions)) break;
+            Actual += SpawnFauna(Group.RegionId, *FindFauna(Placement.SpeciesId), Positions);
+        }
 		PublishSummary(); // Commit population before releasing this group's spawn reservation.
 		if (!Ecology->CompleteSpawnRequest(Request.RequestId, Actual) || Actual != Request.Count) return false;
 	}

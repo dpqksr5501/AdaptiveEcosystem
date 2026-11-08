@@ -1827,6 +1827,8 @@ namespace EcoThreatV3
 		std::int32_t Prey = -1;     // 고른 쫓기는 사슴 (FPreyView 색인)
 		double DirX = 0.0;          // 이동 방향 (단위. 기다림이면 사슴 쪽)
 		double DirY = 0.0;
+		double GoalX = 0.0;
+		double GoalY = 0.0;
 	};
 
 	/**
@@ -1966,6 +1968,8 @@ namespace EcoThreatV3
 			const double Hy = Gy - Me.Y;
 			const double Hn = std::sqrt(Hx * Hx + Hy * Hy);
 			FPackGoal& G = Out[m];
+			G.GoalX = Gx;
+			G.GoalY = Gy;
 			if (Hn <= Cfg.WaitR)
 			{
 				const double Fx = P.X - Me.X;

@@ -28,15 +28,19 @@ public:
     UPROPERTY(BlueprintReadOnly, Transient, Category="Footsteps") TObjectPtr<UPhysicalMaterial> LastMaterial;
     UPROPERTY(BlueprintReadOnly, Transient, Category="Footsteps") int32 NotifyPlayedCount = 0;
     UPROPERTY(BlueprintReadOnly, Transient, Category="Footsteps") int32 DistancePlayedCount = 0;
+    UPROPERTY(BlueprintReadOnly, Transient, Category="Footsteps") float LastVolume = 0.f;
+    UPROPERTY(BlueprintReadOnly, Transient, Category="Footsteps") float LastPlaybackRange = 0.f;
     bool bUseAnimationNotifies = false; // Authored representation setting; never auto-fallback to double playback.
     void ResetCadence() { Cadence.Reset(); NotifyGate.Reset(); LastIndex = INDEX_NONE; CachedState = {}; }
-    void Consume(const FEcoCreatureVisualState& State, float Delta, bool bSnap);
+    void Consume(const FEcoCreatureVisualState& State, float Delta, bool bSnap, float GaitGain = 1.f, bool bRun = false);
     void NotifyContact(USkeletalMeshComponent* Mesh, FName FootBone);
 private:
-    void PlayContact(const FVector& Source, const TCHAR* Trigger);
+    void PlayContact(const FVector& Source, const TCHAR* Trigger, FName FootBone = NAME_None);
     FEcoFootstepCadence Cadence;
     FEcoFootstepNotifyGate NotifyGate;
     FEcoCreatureVisualState CachedState;
     int32 LastIndex = INDEX_NONE;
+    float CachedGaitGain = 1.f;
+    bool bCachedRun = false;
     FRandomStream Random;
 };

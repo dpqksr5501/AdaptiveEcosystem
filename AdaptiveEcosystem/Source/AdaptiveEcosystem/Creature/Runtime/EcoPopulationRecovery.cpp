@@ -37,7 +37,9 @@ bool AEcoCreatureIntegrationSpawner::ProcessPopulationRecovery(const FEcoServerT
             if(EM.GetFragmentDataChecked<FEcoVitalsFragment>(E).HP>0&&EM.GetFragmentDataChecked<FEcoIdentityFragment>(E).SpeciesId==Species
                 &&EM.GetFragmentDataChecked<FEcoRegionFragment>(E).CurrentRegionId==P.Region){Empty=false;break;}
         if(!Empty){UE_LOG(LogTemp,Log,TEXT("[EcoLife][RecoveryRejected] Region=%s Species=%s Reason=NotEmpty"),*P.Region.ToString(),*Species.ToString());continue;}
-        FEcoSpawnRequest Request;if(!Ecology->RequestRecoverySpawn(P.Region,Time,Request,P.bPredator))return false;
+        FEcoSpawnRequest Request;
+        if (!Ecology->RequestRecoverySpawn(P.Region, Time, Request, P.bPredator,
+                P.bPredator ? CountFaunaDiets(P.Region) : FIntPoint::ZeroValue)) return false;
         const auto* C=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>()->FindContext(P.Region);
         TArray<FVector> Positions;
         for(int32 K=0;K<32&&Positions.Num()<Request.Count;++K){

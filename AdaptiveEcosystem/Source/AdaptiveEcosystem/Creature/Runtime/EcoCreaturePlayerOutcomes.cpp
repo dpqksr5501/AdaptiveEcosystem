@@ -65,6 +65,23 @@ void AEcoCreatureIntegrationSpawner::ApplyPlayerDamage(APawn& Attacker, FMassEnt
     auto* Native=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
     auto& EM=GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
     const FVector From=Player->GetActorLocation();
+    if (auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Best))
+    {
+        auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Best);
+        Vitals.HP = FMath::Max(0.f, Vitals.HP - Damage);
+        if (Vitals.HP <= 0.f)
+            EM.GetFragmentDataChecked<FEcoDeathFragment>(Best).Cause = EEcoDeathCause::ExternalDamage;
+        else
+        {
+            const auto& Body = EM.GetFragmentDataChecked<FTransformFragment>(Best).GetTransform();
+            const FVector Start = Body.GetLocation() + FVector(0, 0, 10);
+            Fauna->LastThreatPosition = GetWorld()->LineTraceTestByObjectType(Start, From,
+                FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaHit)))
+                ? Body.GetLocation() - Body.GetRotation().GetForwardVector() * 100. : From;
+            Fauna->ThreatUntil = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds + 3.;
+        }
+        return;
+    }
     FVector PlayerEye; FRotator EyeRotation; Player->GetActorEyesViewPoint(PlayerEye,EyeRotation);
     auto Position=[&](FMassEntityHandle E){
         const auto& L=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E);const auto* C=Native->GetContext(L.ContextIndex);

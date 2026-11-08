@@ -51,6 +51,7 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 	if (EM.IsProcessing() || !Clock->AdvanceClock(Delta)) return;
 	const double Now = Clock->GetServerTime().ServerTimeSeconds;
 	if (!BuildAgentLookup()) { FailRuntime(TEXT("Duplicate or invalid stable agent identity")); return; }
+    MoveFauna(Delta, Now);
 	// Bounded chronological catch-up: unfinished logical time remains as observable debt.
 	const auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
 	for (int32 Pass = 0; Pass < MaxCatchUpSteps; ++Pass)
@@ -77,6 +78,9 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 			const double Due = EM.GetFragmentDataChecked<FEcoLifetimeFragment>(E).NextFeedTimeSeconds;
 			if (V.HP > 0 && Id.SpeciesId == TEXT("Herbivore") && Travel.State == EEcoResidenceState::Resident && Due > LastResourceTime)
 				NextTime = FMath::Min(NextTime, Due);
+            if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E);
+                Fauna && V.HP > 0 && Fauna->AttackContact > LastResourceTime)
+                NextTime = FMath::Min(NextTime, Fauna->AttackContact);
 		}
 		if (NextTime > Now) break;
 		FEcoServerTimeSnapshot Time;
@@ -100,6 +104,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	TArray<FEcoDeathOutcome> Deaths;
     ProcessPlayerStrikes(Time);
     ProcessCombatDamage(Time);
+    ProcessFaunaPredation(Time.ServerTimeSeconds);
 	FEcoSurvivalSettings Fallback;
 	if (!EcoMassSurvival::Advance(EM, Time, ObservedTime, NextStep, Fallback, Deaths, true)
 		|| !Ecology->RecordDeaths(Deaths, NextStep)) return false;
@@ -116,7 +121,13 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
             PendingHuntingDeaths.Remove(Death.StableAgentId);
             UE_LOG(LogTemp,Log,TEXT("[EcoCombat][DeathCommitted] Id=%lld Species=%s Region=%s Step=%lld"),Death.StableAgentId,*Death.SpeciesId.ToString(),*Death.RegionId.ToString(),NextStep);
         }
-        if(bEnableEcosystemLife)CommitNativeCarcass(Death);
+        const double NativeNutrition = bEnableEcosystemLife ? CommitNativeCarcass(Death) : 0.;
+        if (!FaunaSpecies.IsEmpty())
+        {
+            // Native nutrition is normalized; the fauna stock uses vitality energy.
+            CommitFaunaCarcass(Death, float(NativeNutrition * 100.));
+            continue;
+        }
 		// Award only committed, uniquely receipted predation, to a still-living predator.
 		if (Death.Cause != EEcoDeathCause::Predation) continue;
 		const auto* Predator = AgentLookup.Find(Death.PredatorStableAgentId);
@@ -254,7 +265,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 		NextMigrationTime = Time.ServerTimeSeconds + Migration.DecisionIntervalSeconds;
 	}
 	if (!BuildAgentLookup() || !ReconcilePopulation() || !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return false;
-    if(!ProcessNaturalBirths(Time)||!ProcessPopulationRecovery(Time)||(bEnableEcosystemLife&&!ReconcilePopulation()))return false;
+    if(!ProcessNaturalBirths(Time)||!ProcessFauna(Time)||!ProcessPopulationRecovery(Time)||(bEnableEcosystemLife&&!ReconcilePopulation()))return false;
 	CompletedTime = Time;
 	PublishSummary();
 	return bReady;
@@ -264,11 +275,13 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 {
 	TRACE_CPUPROFILER_EVENT_SCOPE(EcoCreature_PresentationSnapshot);
 	auto& EM = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    const bool bEmitFootsteps = FootstepAudioSet && FootstepAudioSet->IsValidConfiguration();
 	for (const auto E : Owned)
 	{
 		const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
 		const auto& Life = EM.GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(E);
 		auto& Present = EM.GetFragmentDataChecked<FEcoCreaturePresentationFragment>(E);
+        const uint8 PreviousActivity = Present.Activity;
         Present.BodyScale=128;Present.Maturity=255;Present.CoatTone=128;
         if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized)
             {
@@ -286,6 +299,36 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
 		const bool Pursuing = Life.bPursuing || (Execution && Execution->Activity == EEcoSpeciesActivity::Pursue);
 		Present.Flags = (V.HP > 0 ? 1 : 0) | (Eating ? 2 : 0) | (Pursuing ? 4 : 0) | 8;
 		Present.Activity = Execution ? uint8(Execution->Activity) : uint8(EEcoSpeciesActivity::Hold);
+        if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E))
+        {
+            const double Now = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+            const double AgeTime = V.HP <= 0 && Life.DeathTime >= 0. ? Life.DeathTime : Now;
+            Present.BodyScale = uint8(FMath::RoundToInt(Fauna->Life.BodyScale(AgeTime) * 128.));
+            Present.Maturity = EcoRepresentation::QuantizeUnit(Fauna->Life.AgeFraction(AgeTime));
+            const bool bMeal = Fauna->LastMeal >= 0. && Now - Fauna->LastMeal < 1. && V.HP > 0;
+            if (bMeal) Present.Flags |= 2;
+            switch (Fauna->Flight)
+            {
+                case EEcoFaunaFlightPhase::Takeoff: Present.Activity = uint8(EEcoSpeciesActivity::Takeoff); break;
+                case EEcoFaunaFlightPhase::Cruise: Present.Activity = uint8(EEcoSpeciesActivity::Fly); break;
+                case EEcoFaunaFlightPhase::Landing: Present.Activity = uint8(EEcoSpeciesActivity::Land); break;
+                default:
+                    if (Fauna->AttackContact >= 0.) Present.Activity = uint8(EEcoSpeciesActivity::Attack);
+                    else if (bMeal) Present.Activity = uint8(EEcoSpeciesActivity::Eat);
+                    else if (Now < Fauna->ThreatUntil) Present.Activity = uint8(EEcoSpeciesActivity::Flee);
+                    else if (Now < Fauna->RootingUntil) Present.Activity = uint8(EEcoSpeciesActivity::Forage);
+                    else if (Fauna->CarrionTargetId > 0 || Fauna->bInvestigatingNoise) Present.Activity = uint8(EEcoSpeciesActivity::Investigate);
+                    else if (Fauna->TargetId > 0)
+                    {
+                        Present.Activity = uint8(Fauna->bStalking ? EEcoSpeciesActivity::Stalk : EEcoSpeciesActivity::Pursue);
+                        if (!Fauna->bStalking) Present.Flags |= 4;
+                    }
+                    else if (Fauna->bFollowingCaregiver && !Present.Velocity.IsNearlyZero())
+                        Present.Activity = uint8(EEcoSpeciesActivity::Regroup);
+                    else Present.Activity = uint8(Present.Velocity.IsNearlyZero() ? EEcoSpeciesActivity::Rest : EEcoSpeciesActivity::Wander);
+                    break;
+            }
+        }
         if (const auto* Behavior = EM.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E))
         {
             const EEcoSpeciesActivity Activities[] = {EEcoSpeciesActivity::Graze, EEcoSpeciesActivity::Flee,
@@ -389,22 +432,55 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
             Present.Flags |= uint8(Cue->Memory.Source)<<4;
             Present.FocusYaw = Cue->FocusYaw;
         }
+        if (V.HP <= 0.f && !FaunaSpecies.IsEmpty() && Life.DeathTime >= 0.)
+        {
+            const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
+            const auto* Profile = FindFauna(Identity.SpeciesId);
+            const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E);
+            const double Now = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+            const double SettleStart = Fauna ? FMath::Max(Life.DeathTime, Fauna->PhaseUntil) : Life.DeathTime;
+            if ((!Fauna || Fauna->Flight == EEcoFaunaFlightPhase::Grounded)
+                && Now >= SettleStart + (Profile ? Profile->DeathSettleSeconds : 1.3))
+                Present.Activity = uint8(EEcoSpeciesActivity::CorpseSettled);
+        }
         Present.Health = EcoRepresentation::QuantizeUnit(V.HP / FMath::Max(V.MaxHP, 1.f));
 		Present.Energy = EcoRepresentation::QuantizeUnit(V.Energy / FMath::Max(V.MaxEnergy, 1.f));
 		// Observe the single movement writer's completed result. Never move the agent here.
 		auto& Cadence = EM.GetFragmentDataChecked<FEcoCreatureFootstepFragment>(E).Cadence;
-		if (FootstepAudioSet && FootstepAudioSet->IsValidConfiguration())
+		if (bEmitFootsteps)
 		{
 			const FVector Position = EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation();
 			const float Speed = Present.Velocity.Size2D();
-			if (Cadence.Advance(Position, Speed, V.HP > 0, Delta, FootstepAudioSet->GetStride(Speed)*Present.BodyScale/128.f, FootstepAudioSet->MinimumSpeed))
+            const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
+            const auto* Profile = FootstepAudioSet->FindProfile(Identity.SpeciesId);
+            const float BodyScale = Present.BodyScale / 128.f;
+            const float Spacing = Profile ? FootstepAudioSet->Evaluate(*Profile, EEcoFootstepSurface::Dry, Speed, BodyScale).Spacing
+                : FootstepAudioSet->GetStride(Speed) * BodyScale;
+            const float MinimumSpeed = Profile ? FMath::Min(FootstepAudioSet->MinimumSpeed, Profile->WalkSpeed * .35f)
+                : FootstepAudioSet->MinimumSpeed;
+            const bool bGrounded = V.HP > 0 && EcoFootsteps::IsGroundActivity(Present.Activity);
+            const bool bTouchdown = Profile && bGrounded && PreviousActivity == uint8(EEcoSpeciesActivity::Land);
+			if (Cadence.Advance(Position, Speed, bGrounded && !bTouchdown, Delta, Spacing, MinimumSpeed) || bTouchdown)
 				if (auto* Noise = GetWorld()->GetSubsystem<UEcoNoiseSubsystem>())
 				{
-					const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
-					const float Loudness = FMath::Lerp(0.45f, 1.f, FMath::Clamp((Speed - 250.f) / 650.f, 0.f, 1.f));
-					Noise->ReportCreatureFootstep(Position, Loudness, FootstepAudioSet->NoiseRange,
-						Identity.SpeciesId == TEXT("Wolf") ? FootstepAudioSet->PredatorThreat : 0.f,
-						Identity.StableAgentId, Identity.SpeciesId);
+                    if (Profile)
+                    {
+                        FEcoFootstepContact Contact;
+                        const auto& Region = EM.GetFragmentDataChecked<FEcoRegionFragment>(E);
+                        if (!FootstepAudioSet->ResolveContact(*GetWorld(), Position, Region.CurrentRegionId, nullptr, Contact)) continue;
+                        const auto Levels = FootstepAudioSet->Evaluate(*Profile, Contact.Surface, Speed, BodyScale);
+                        const bool bDangerous = Pursuing || Present.Activity == uint8(EEcoSpeciesActivity::Stalk)
+                            || Present.Activity == uint8(EEcoSpeciesActivity::Attack) || Present.Activity == uint8(EEcoSpeciesActivity::Pounce);
+                        Noise->ReportCreatureFootstep(Contact.Position, Levels.Loudness, Levels.NoiseRange,
+                            bDangerous ? Profile->Threat : 0.f, Identity.StableAgentId, Identity.SpeciesId, Region.CurrentRegionId);
+                    }
+                    else
+                    {
+                        const float Loudness = FMath::Lerp(0.45f, 1.f, FMath::Clamp((Speed - 250.f) / 650.f, 0.f, 1.f));
+                        Noise->ReportCreatureFootstep(Position, Loudness, FootstepAudioSet->NoiseRange,
+                            Identity.SpeciesId == TEXT("Wolf") ? FootstepAudioSet->PredatorThreat : 0.f,
+                            Identity.StableAgentId, Identity.SpeciesId);
+                    }
 				}
 		}
 		else Cadence.Reset();

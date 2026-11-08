@@ -18,7 +18,14 @@ namespace EcoTracesV3
         static unsigned Hash(double X,double Y)
         { return (unsigned(int(std::floor(X/8)))*73856093u ^ unsigned(int(std::floor(Y/8)))*19349663u)%64; }
         void Rebuild()
-        { for(auto& B:Buckets)B.clear();for(unsigned I=0;I<Events.size();++I)if(Events[I].Id)Buckets[Hash(Events[I].X,Events[I].Y)].push_back(I); }
+        {
+            for(auto& Bucket:Buckets)Bucket.clear();
+            const auto Start=Cursor%Events.size();
+            for(unsigned Offset=0;Offset<Events.size();++Offset){
+                const auto I=(Start+Offset)%Events.size();
+                if(Events[I].Id)Buckets[Hash(Events[I].X,Events[I].Y)].push_back(int(I));
+            }
+        }
         void Add(std::int64_t Source,double X,double Y,double Z,double Now)
         {
             if(Source<=0||!std::isfinite(X)||!std::isfinite(Y)||!std::isfinite(Z)||!std::isfinite(Now)||Now<0

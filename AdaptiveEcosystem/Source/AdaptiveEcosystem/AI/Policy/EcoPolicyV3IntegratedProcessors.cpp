@@ -2,6 +2,7 @@
 
 #include "AI/Policy/EcoBehaviorFragments.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
+#include "Creature/Audio/EcoFootstepAudioSet.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "DrawDebugHelpers.h"
 #include "EcoHeading.h"
@@ -22,6 +23,7 @@
 #include "AI/Social/Senses/EcoNoiseSubsystem.h"
 #include "GameFramework/Pawn.h"
 #include "EngineUtils.h"
+#include "HAL/IConsoleManager.h"
 #include "MassCommonTypes.h"
 #include "AI/Social/EcoPolicyV3SocialBridge.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
@@ -132,10 +134,12 @@ namespace EcoPolicyV3IntegratedProcImpl
             D.Feedback->Report(R.ReservationId,Valid?EEcoShelterMovementStatus::Yielded:EEcoShelterMovementStatus::Failed);
     }
     void ObservePlayers(const FMoveAdapter& A,EcoLifeV3::FMemory& Memory,const EcoWorldV3::FVec2& Position,
-        const EcoWorldV3::FVec2& Head,double GroundZ,double Now,double Fov,double Radius)
+        const EcoWorldV3::FVec2& Head,double GroundZ,double Now,double Fov,double Radius,FName Species)
     {
+        const auto* Set = A.Combat ? A.Combat->FootstepAudioSet.Get() : nullptr;
+        const auto* Listener = Set ? Set->FindProfile(Species) : nullptr;
         if(Now<Memory.NextScan)return;
-        Memory.NextScan=Now+1;Memory.Age(Now);
+        Memory.NextScan=Now+(Listener?.35:1.);Memory.Age(Now);
         double Best=MAX_dbl;const EcoObservationV3::FThreatInput* Seen=nullptr;
         for(size_t K=0;K<A.Ctx->PlayerSamples.size();++K){
             const auto& Player=A.Ctx->PlayerSamples[K];
@@ -151,17 +155,38 @@ namespace EcoPolicyV3IntegratedProcImpl
         if(!Seen){
             Memory.PursuitExposure=FMath::Max(0.,Memory.PursuitExposure-1);
             // Actual footstep emission, never a hidden live player location.
-            const FEcoLifeNoiseSample* Heard=nullptr;double Nearest=MAX_dbl;
+            const FEcoLifeNoiseSample* Heard=nullptr;double Nearest=MAX_dbl;float BestSignal=0.f;
             for(const auto& N:A.Ctx->PlayerNoises){
                 const double D=FMath::Sqrt(FMath::Square(N.X-Position.X)+FMath::Square(N.Y-Position.Y));
-                if(Now<N.Time||Now-N.Time>UEcoNoiseSubsystem::EventLifetime||D>=Nearest||D>N.Range*A.Ctx->Sim.Weather.Hear)continue;
+                if(Now<N.Time||Now-N.Time>UEcoNoiseSubsystem::EventLifetime)continue;
+                const float SourceRange = Listener && N.Confidence > 0. ? float(N.Range * EcoRepertoireV3::kUnitCm / N.Confidence) : 0.f;
+                const float DistanceCm = float(FMath::Sqrt(FMath::Square(D * EcoRepertoireV3::kUnitCm) + FMath::Square(GroundZ - N.Z)));
+                const float Weather = float(A.Ctx->Sim.Weather.Hear);
+                if (Listener)
+                {
+                    if (EcoFootsteps::HearingStrength(*Listener, DistanceCm, SourceRange, float(N.Confidence), Weather, false) <= BestSignal) continue;
+                }
+                else if(D>=Nearest||D>N.Range*A.Ctx->Sim.Weather.Hear)continue;
                 const FVector Start=A.Ctx->UnitsToCm(Position.X,Position.Y,GroundZ)+FVector(0,0,75);
                 const FVector End=A.Ctx->UnitsToCm(N.X,N.Y,N.Z)+FVector(0,0,75);
                 const bool Blocked=A.Sub->GetWorld()->LineTraceTestByObjectType(Start,End,FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionQueryParams(SCENE_QUERY_STAT(EcoLifeHearing),false));
-                if(Blocked&&D>N.Range*A.Ctx->Sim.Weather.Hear*.25)continue;
+                if (Listener)
+                {
+                    const float Signal = EcoFootsteps::HearingStrength(*Listener, DistanceCm, SourceRange, float(N.Confidence), Weather, Blocked);
+                    if (Signal <= BestSignal) continue;
+                    BestSignal = Signal;
+                }
+                else if(Blocked&&D>N.Range*A.Ctx->Sim.Weather.Hear*.25)continue;
                 Heard=&N;Nearest=D;
             }
-            if(Heard)Memory.Observe(EcoLifeV3::EEncounter::Noise,EcoLifeV3::Mix(Heard->Id)^0xF00757E950000000ULL,Heard->Time,Now,Heard->X,Heard->Y,Heard->Confidence);
+            if (Heard && Memory.Observe(EcoLifeV3::EEncounter::Noise,EcoLifeV3::Mix(Heard->Id)^0xF00757E950000000ULL,
+                Heard->Time,Now,Heard->X,Heard->Y,Listener?BestSignal:Heard->Confidence) && Listener)
+            {
+                const auto* Log = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Footsteps.HearingLog"));
+                if (Log && Log->GetInt()) UE_LOG(LogTemp, Log,
+                    TEXT("[Eco Footstep Hearing] Species=%s Source=Player.Footstep Signal=%.3f Reaction=Memory"),
+                    *Species.ToString(), BestSignal);
+            }
             return;
         }
         const double Closing=((Position.X-Seen->X)*Seen->VelX+(Position.Y-Seen->Y)*Seen->VelY)/Best;
@@ -453,7 +478,7 @@ namespace EcoPolicyV3IntegratedProcImpl
                 const double SimTime=A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds;
                 auto& Memory=Life.Memory;
                 const bool Awake=H.Rep->Behavior!=EcoRepertoireV3::kSleep;
-                if(Awake)ObservePlayers(A,Memory,H.Body->Pos,H.Body->Head,(*A.Deer)[(*A.Rows)[Index]].Int->GroundZ,SimTime,A.Ctx->Sim.ObsCfg.ThreatFovCos,EcoWorldV3::SeePredNow(A.Ctx->Sim));
+                if(Awake)ObservePlayers(A,Memory,H.Body->Pos,H.Body->Head,(*A.Deer)[(*A.Rows)[Index]].Int->GroundZ,SimTime,A.Ctx->Sim.ObsCfg.ThreatFovCos,EcoWorldV3::SeePredNow(A.Ctx->Sim),TEXT("Herbivore"));
                 const double X=Memory.LastX-H.Body->Pos.X,Y=Memory.LastY-H.Body->Pos.Y;
                 const double Distance=FMath::Sqrt(X*X+Y*Y);
                 const bool Safe=H.Decision->KeepActive!=EcoWorldV3::kKeepPanic&&H.Decision->KeepActive!=EcoWorldV3::kKeepShelter
@@ -495,6 +520,12 @@ namespace EcoPolicyV3IntegratedProcImpl
         auto& Link=*(*A.WolfInts)[Index];auto& I=Link.Individual.Investigation;
         const double Now=A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds;
         auto& Life=Link.Individual;
+        const int64 WolfId = A.WolfKeys && A.WolfKeys->IsValidIndex(Index) ? (*A.WolfKeys)[Index] : 0;
+        if (A.Combat && WolfId > 0)
+        {
+            FVector Ignored;
+            A.Combat->SelectWolfCarrion(WolfId, A.RegionId, FVector::ZeroVector, false, Ignored);
+        }
         if(!Life.PredatorStep(Now,Threat.State.PosX,Threat.State.PosY,Threat.Last.bRunning,EcoRepertoireV3::kStepSeconds)){
             Threat.bDead=true;I.Cancel(Now);Life.AbandonMeat();Input.bHuntingAllowed=false;return;
         }
@@ -508,7 +539,7 @@ namespace EcoPolicyV3IntegratedProcImpl
             Input.ResourceDirX=X/FMath::Max(.01,D);Input.ResourceDirY=Y/FMath::Max(.01,D);
         }
         if(!Threat.State.bAsleep)ObservePlayers(A,Life.Memory,{Threat.State.PosX,Threat.State.PosY},{Threat.State.HeadX,Threat.State.HeadY},Link.GroundZ,Now,
-            A.Ctx->Sim.ThreatCfg.PredFovCos,EcoWorldV3::WolfViewNow(A.Ctx->Sim));
+            A.Ctx->Sim.ThreatCfg.PredFovCos,EcoWorldV3::WolfViewNow(A.Ctx->Sim),TEXT("Wolf"));
         const double HumanX=Life.Memory.LastX-Threat.State.PosX,HumanY=Life.Memory.LastY-Threat.State.PosY;
         const double HumanDistance=FMath::Sqrt(HumanX*HumanX+HumanY*HumanY);
         const auto Response=Life.Memory.Decide(Now,HumanDistance,!Threat.State.bAsleep&&Life.Nutrition>.2,false);
@@ -527,6 +558,22 @@ namespace EcoPolicyV3IntegratedProcImpl
             const bool Available=!Threat.State.bAsleep && Life.Nutrition>.2 && Life.MealRemaining<=0 && Response!=EcoLifeV3::EResponse::Retreat;
             if (A.Combat->GuideWolfPlayerCombat((*A.WolfKeys)[Index],*A.Ctx,P,FVector(Threat.State.HeadX,Threat.State.HeadY,0),Now,Available,Life.Memory.bLastDamageKnown && Life.Memory.LastDamage>=0 && Now-Life.Memory.LastDamage<20,Input))
             { I.Cancel(Now); return; }
+        }
+        if (A.Combat && WolfId > 0 && !Input.bResourceApproach && !Threat.State.bAsleep && Life.Nutrition < .75)
+        {
+            const FVector Position = A.Ctx->UnitsToCm(Threat.State.PosX, Threat.State.PosY, Link.GroundZ);
+            FVector Food;
+            if (A.Combat->SelectWolfCarrion(WolfId, A.RegionId, Position, true, Food))
+            {
+                const FVector Direction = (Food - Position).GetSafeNormal2D();
+                Input.bHuntingAllowed = false;
+                Input.bResourceApproach = true;
+                Input.bResourceWait = FVector::DistSquared2D(Position, Food) <= FMath::Square(95.);
+                Input.ResourceDirX = Direction.X;
+                Input.ResourceDirY = Direction.Y;
+                I.Cancel(Now);
+                return;
+            }
         }
         auto ClearLine=[&](double X,double Y,double Z){
             const FVector Start=A.Ctx->UnitsToCm(Threat.State.PosX,Threat.State.PosY,Link.GroundZ)+FVector(0,0,65);
@@ -552,7 +599,7 @@ namespace EcoPolicyV3IntegratedProcImpl
                 Life.LastHuntTarget=Target;Life.LastHuntTime=Now;
                 if(I.Role!=EcoTracesV3::ERole::Intercept||I.Target!=Target||Now>=I.Until){
                     I.Role=EcoTracesV3::ERole::Intercept;I.Target=Target;I.Until=Now+3;I.Trace=0;
-                    I.X=Threat.State.PosX+Input.PackDirX*5;I.Y=Threat.State.PosY+Input.PackDirY*5;
+                    I.X=Goal.GoalX;I.Y=Goal.GoalY;
                 }
                 const double X=I.X-Threat.State.PosX,Y=I.Y-Threat.State.PosY,D=FMath::Sqrt(X*X+Y*Y);
                 Input.bPackWait=D<1;Input.PackDirX=X/FMath::Max(.01,D);Input.PackDirY=Y/FMath::Max(.01,D);return;

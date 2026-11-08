@@ -1488,6 +1488,8 @@ public:
 	 * 지면·물) 을 부른다. 통과하면 OutZ = 끝 지면 높이, 막히면 거짓 (OutZ = FromCm.Z).
 	 */
 	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false, float BodyRadiusCm=30.f) const;
+    /** Serialized M4 boundary for opt-in fauna sharing the Native spatial food ledger. */
+    bool ConsumeFaunaFood(FName RegionId, const FVector& Position, double Requested, double& OutNutrition);
 
 	// ---- 시험·조정자 없이 쓰는 길 ----
 

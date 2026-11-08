@@ -56,7 +56,6 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         const auto BA=NativePosition(A),BB=NativePosition(B);
         const auto& Link=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(A);
         if((BA.X-BB.X)*(BA.X-BB.X)+(BA.Y-BB.Y)*(BA.Y-BB.Y)>225)continue;
-        FRegionEcologyState State;if(!Ecology->GetRegionState(P.Region,State)||(!P.bPredator&&State.FoodAmount/FMath::Max(1,State.Population)<1))continue;
         const FVector Center=C->UnitsToCm(BA.X,BA.Y,Link.GroundZ);
         TArray<FVector> Positions;
         for(int32 K=0;K<8;++K){
@@ -77,10 +76,20 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         const int64 Mother=LA.Sex==EcoLifeV3::ESex::Female?P.ParentA:P.ParentB;
         const double FemaleFraction=LA.FemaleBirthFraction; // preserve the natal profile through migration
         const uint32 Generation=FMath::Max(LA.Generation,LB.Generation)+1;
-        FEcoSpawnRequest Reservation;if(!Ecology->RequestNaturalBirth(P.Region,Time,Reservation,P.bPredator))return false;
+        FEcoSpawnRequest Reservation;
+        if (!Ecology->RequestNaturalBirth(P.Region, Time, Reservation, P.bPredator,
+                P.bPredator ? CountFaunaDiets(P.Region) : FIntPoint::ZeroValue,
+                FaunaSpecies.IsEmpty() ? 1. : EcoFaunaNutrition::MinimumMeal * 6.)) return false;
         const int32 Actual=Reservation.Count?Spawn(P.Region,1,P.bPredator,&Positions):0;
         if(!ReconcilePopulation()||!Ecology->CompleteSpawnRequest(Reservation.RequestId,Actual))return false;
-        if(!Actual)continue;
+        if(!Actual)
+        {
+            FRegionEcologyState State;
+            if (Ecology->GetRegionState(P.Region, State))
+                UE_LOG(LogTemp, Log, TEXT("[EcoLife][BirthDeferred] Region=%s Predator=%d Food=%.3f Consumers=%d Population=%d"),
+                    *P.Region.ToString(), P.bPredator, State.FoodAmount, State.ProjectedFoodConsumers, State.ProjectedPopulation);
+            continue;
+        }
         const auto Child=Owned.Last();auto& ChildLife=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Child).Individual;
         ChildLife={};ChildLife.bInitialized=true;ChildLife.Genome=Genome;ChildLife.Born=Now;
         ChildLife.ParentA=P.ParentA;ChildLife.ParentB=P.ParentB;ChildLife.Generation=Generation;ChildLife.Origin=EcoLifeV3::EOrigin::NaturalBirth;
@@ -118,6 +127,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
             const auto PA=NativePosition(A),PB=NativePosition(B);
             if((PA.X-PB.X)*(PA.X-PB.X)+(PA.Y-PB.Y)*(PA.Y-PB.Y)>100)continue;
             PendingBirths.Add({Candidates[I],Candidates[J],G.RegionId,Now+30,Predator});Found=true;
+            UE_LOG(LogTemp, Log, TEXT("[EcoLife][BirthQueued] Region=%s Predator=%d Parents=%lld,%lld Due=%.2f"),
+                *G.RegionId.ToString(), Predator, Candidates[I], Candidates[J], Now+30.);
         }
     }
     return true;

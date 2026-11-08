@@ -307,7 +307,7 @@ bool UEcologySimulationSubsystem::RegisterSpawnSchedule(FName RegionId, const FE
 	return true;
 }
 
-bool UEcologySimulationSubsystem::ReserveSpawn(FName RegionId, FEcoSpawnRequest& Request,bool bSpatialBudget)
+bool UEcologySimulationSubsystem::ReserveSpawn(FName RegionId, FEcoSpawnRequest& Request,bool bSpatialBudget,bool bAllowsZeroPlantFood)
 {
 	const FRegionEcologyState* State = RegionalStates.Find(RegionId);
 	const FEcoSpawnScheduleSettings* Settings = SpawnSettings.Find(RegionId);
@@ -324,7 +324,8 @@ bool UEcologySimulationSubsystem::ReserveSpawn(FName RegionId, FEcoSpawnRequest&
 	Request.RegionId = RegionId;
 	const int32 RegionalLoad = Request.bInitial ? State->Population : FMath::Max(State->Population, State->ProjectedPopulation);
 	Request.Count = EcoSpawn::AllowedCount(Request.Count, RegionalLoad, GlobalAlive,
-		RegionalReserved, GlobalReserved, Settings->RegionPopulationLimit, GlobalPopulationLimit, State->FoodAmount, Request.bInitial);
+		RegionalReserved, GlobalReserved, Settings->RegionPopulationLimit, GlobalPopulationLimit,
+        bAllowsZeroPlantFood ? FMath::Max(State->FoodAmount, 1.f) : State->FoodAmount, Request.bInitial);
 	if (!Request.bInitial && !bSpatialBudget && PressureSettings.bEnabled)
 	{
 		const double Demand = (State->ProjectedFoodConsumers + RegionalReserved + Request.Count) * PerAgentConsumptionRate * PressureSettings.ForecastSeconds;
@@ -371,18 +372,37 @@ bool UEcologySimulationSubsystem::CompleteSpawnRequest(int64 RequestId, int32 Ac
 	return true;
 }
 
-bool UEcologySimulationSubsystem::RequestNaturalBirth(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator)
-{return RequestLifeSpawn(RegionId,Time,Out,bPredator,EEcoSpawnOrigin::NaturalBirth,1);}
-bool UEcologySimulationSubsystem::RequestRecoverySpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator)
-{return RequestLifeSpawn(RegionId,Time,Out,bPredator,EEcoSpawnOrigin::Recovery,2);}
-bool UEcologySimulationSubsystem::RequestLifeSpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator,EEcoSpawnOrigin Origin,int32 Count)
+bool UEcologySimulationSubsystem::RequestNaturalBirth(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator,FIntPoint ExcludedFauna,double PlantReservePerConsumer)
+{return RequestLifeSpawn(RegionId,Time,Out,bPredator,EEcoSpawnOrigin::NaturalBirth,1,ExcludedFauna,PlantReservePerConsumer);}
+
+bool UEcologySimulationSubsystem::RequestFaunaBirth(FName RegionId, const FEcoServerTimeSnapshot& Time,
+    FEcoSpawnRequest& Out, double RequiredPlantReserve)
+{
+    const auto* Spatial = SpatialFood.Find(RegionId);
+    if (!CanMutateAuthoritativeState(TEXT("RequestFaunaBirth")) || Time.WorldEpoch != ResourceEpoch
+        || !Spatial || !FMath::IsFinite(Time.ServerTimeSeconds) || Time.ServerTimeSeconds < 0.
+        || !FMath::IsFinite(RequiredPlantReserve) || RequiredPlantReserve < 0.) return false;
+    Out = {};
+    Out.WorldEpoch = Time.WorldEpoch;
+    Out.Count = Spatial->Amount >= RequiredPlantReserve ? 1 : 0;
+    Out.ScheduledTime = Time.ServerTimeSeconds;
+    Out.Origin = EEcoSpawnOrigin::NaturalBirth;
+    return ReserveSpawn(RegionId, Out, true, RequiredPlantReserve == 0.);
+}
+bool UEcologySimulationSubsystem::RequestRecoverySpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator,FIntPoint ExcludedFauna)
+{return RequestLifeSpawn(RegionId,Time,Out,bPredator,EEcoSpawnOrigin::Recovery,2,ExcludedFauna);}
+bool UEcologySimulationSubsystem::RequestLifeSpawn(FName RegionId,const FEcoServerTimeSnapshot& Time,FEcoSpawnRequest& Out,bool bPredator,EEcoSpawnOrigin Origin,int32 Count,FIntPoint ExcludedFauna,double PlantReservePerConsumer)
 {
     if(!CanMutateAuthoritativeState(TEXT("RequestNaturalBirth"))||Time.WorldEpoch!=ResourceEpoch
-        ||!FMath::IsFinite(Time.ServerTimeSeconds)||Time.ServerTimeSeconds<0)return false;
+        ||!FMath::IsFinite(Time.ServerTimeSeconds)||Time.ServerTimeSeconds<0
+        ||!FMath::IsFinite(PlantReservePerConsumer)||PlantReservePerConsumer<=0)return false;
     const auto* Spatial=SpatialFood.Find(RegionId);const auto* State=RegionalStates.Find(RegionId);
     if(!Spatial||!State)return false;
-    const int32 Predators=FMath::Max(0,State->ProjectedPopulation-State->ProjectedFoodConsumers);
-    const bool Budget=bPredator?Predators+Count<=6&&State->ProjectedFoodConsumers>=8*(Predators+Count):Spatial->Amount/FMath::Max(1,State->ProjectedPopulation+Count)>=1;
+    const int32 Predators=FMath::Max(0,State->ProjectedPopulation-State->ProjectedFoodConsumers-ExcludedFauna.Y);
+    const int32 Prey = FMath::Max(0, State->ProjectedFoodConsumers - ExcludedFauna.X);
+    const int32 PlantBudgetCount = Origin == EEcoSpawnOrigin::NaturalBirth ? State->ProjectedFoodConsumers : State->ProjectedPopulation;
+    const bool Budget=bPredator?Predators+Count<=6&&Prey>=8*(Predators+Count)
+        :Spatial->Amount>=PlantReservePerConsumer*FMath::Max(1,PlantBudgetCount+Count);
     Out={};Out.WorldEpoch=Time.WorldEpoch;Out.Count=Budget?Count:0;
     Out.ScheduledTime=Time.ServerTimeSeconds;Out.Origin=Origin;
     return ReserveSpawn(RegionId,Out,true);

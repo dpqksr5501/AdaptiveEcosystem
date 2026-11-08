@@ -159,6 +159,7 @@ bool AEcoCreatureIntegrationSpawner::CollectSetupIssues(TArray<FString>& Errors,
 		else if (!RegionById[Neighbor]->AdjacentRegionIds.Contains(Pair.Key))
 			Notes.Add(FString::Printf(TEXT("Adjacency %s -> %s is one-way; add the reverse edge if return migration is intended."), *Pair.Key.ToString(), *Neighbor.ToString()));
 	}
+    ValidateFauna(Errors);
 	int64 Total = 0; TSet<FName> GroupIds;
 	if (Groups.IsEmpty()) Errors.Add(TEXT("Groups must contain at least one habitat."));
 	if (bEnableSpeciesAIFixtures && EnabledSpecies == EEcoEnabledSpecies::Both)
@@ -172,9 +173,11 @@ bool AEcoCreatureIntegrationSpawner::CollectSetupIssues(TArray<FString>& Errors,
 		if (!RegionPtr) { Errors.Add(FString::Printf(TEXT("Group %s: matching EcologyRegion is missing."), *Label)); continue; }
 		if (Group.Herbivores < 0 || Group.Wolves < 0 || !Group.Schedule.IsValid())
 			Errors.Add(FString::Printf(TEXT("Group %s: counts must be nonnegative and Schedule valid."), *Label));
-		const int64 Count = (IsSpeciesEnabled(false) ? int64(Group.Herbivores) : 0) + (IsSpeciesEnabled(true) ? Group.Wolves : 0); Total += Count;
+		int64 Count = (IsSpeciesEnabled(false) ? int64(Group.Herbivores) : 0) + (IsSpeciesEnabled(true) ? Group.Wolves : 0);
+        for (const auto& Placement : Group.Fauna) Count += Placement.SpawnPoints.Num();
+        Total += Count;
 		if (Count > Group.Schedule.RegionPopulationLimit)
-			Errors.Add(FString::Printf(TEXT("Group %s: initial deer+wolves=%lld exceeds Schedule Region Population Limit=%d."), *Label, Count, Group.Schedule.RegionPopulationLimit));
+			Errors.Add(FString::Printf(TEXT("Group %s: initial population=%lld exceeds Schedule Region Population Limit=%d."), *Label, Count, Group.Schedule.RegionPopulationLimit));
 		const auto CheckPoints = [&Errors, &Notes, &Group, RegionPtr](const TArray<FVector>& Points, int32 Required, const TCHAR* Field)
 		{
 			if (!Points.IsEmpty() && Points.Num() < Required) Errors.Add(FString::Printf(TEXT("Group %s: %s needs at least %d world-space entries."), *Group.RegionId.ToString(), Field, Required));
@@ -184,6 +187,7 @@ bool AEcoCreatureIntegrationSpawner::CollectSetupIssues(TArray<FString>& Errors,
 		};
 		if (IsSpeciesEnabled(false)) CheckPoints(Group.HerbivoreSpawnPoints, Group.Herbivores, TEXT("Herbivore Spawn Points"));
 		if (IsSpeciesEnabled(true)) CheckPoints(Group.WolfSpawnPoints, Group.Wolves, TEXT("Wolf Spawn Points"));
+        for (const auto& Placement : Group.Fauna) CheckPoints(Placement.SpawnPoints, 0, *Placement.SpeciesId.ToString());
 		if (bEnableWaves && IsSpeciesEnabled(false) && !Group.HerbivoreSpawnPoints.IsEmpty() && Group.HerbivoreSpawnPoints.Num() < FMath::Max(Group.Schedule.DayCount, Group.Schedule.NightCount))
 			Errors.Add(FString::Printf(TEXT("Group %s: Herbivore Spawn Points must also cover the largest requested wave."), *Label));
 		if (Group.bUseFoodPatchPosition && (Group.FoodPatchPosition.ContainsNaN() || !(*RegionPtr)->ContainsPosition(Group.FoodPatchPosition)))

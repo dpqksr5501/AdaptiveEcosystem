@@ -29,7 +29,7 @@ bool FEcoCreatureVisualState::IsValid() const
         &&FMath::IsFinite(BodyScale)&&BodyScale>=.65f&&BodyScale<=1.15f&&Appearance<=3
         &&FMath::IsFinite(Maturity)&&Maturity>=0&&Maturity<=1&&FMath::IsFinite(CoatTone)&&CoatTone>=0&&CoatTone<=1
 		&& !Position.ContainsNaN() && !Velocity.ContainsNaN() && FMath::IsFinite(FocusYawDegrees)
-        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::Investigate)
+        && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::CorpseSettled)
 		&& FMath::IsFinite(NormalizedHealth) && NormalizedHealth >= 0.0f && NormalizedHealth <= 1.0f
 		&& FMath::IsFinite(NormalizedEnergy) && NormalizedEnergy >= 0.0f && NormalizedEnergy <= 1.0f;
 }
@@ -81,9 +81,16 @@ void AEcoCreatureRepresentationActor::RefreshAppearance()
 {
     Footsteps->bUseAnimationNotifies = bUseFootstepNotifies;
 	if (VisualMesh) { CreatureMesh->SetSkeletalMesh(VisualMesh); }
+    if (!FMath::IsNearlyEqual(VisualMeshScale, 1.f))
+        CreatureMesh->SetRelativeScale3D(FVector(VisualMeshScale));
     AppliedAppearance=255;ApplyAppearance(VisualState.Appearance);
 	CreatureMesh->SetRelativeRotation(MeshRotation);
     ImmatureMesh->SetRelativeRotation(MeshRotation);
+    if (!MeshOffset.IsNearlyZero())
+    {
+        CreatureMesh->SetRelativeLocation(MeshOffset);
+        ImmatureMesh->SetRelativeLocation(MeshOffset);
+    }
 	UpdateAnimation();
 	PlaceholderBody->SetVisibility(CreatureMesh->GetSkeletalMeshAsset() == nullptr);
 	IdentityLabel->SetText(FText::FromString(bBound ? FString::Printf(TEXT("%s #%lld"), *VisualSpeciesId.ToString(), VisualState.StableAgentId)
@@ -168,11 +175,17 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 	{
 		const FRotator Desired(0, State.Velocity.Rotation().Yaw, 0);
 		Facing = bSnap ? Desired : FMath::RInterpTo(Facing, Desired, DeltaSeconds, FMath::Max(0.0f, TurnInterpolationSpeed));
-		// Presentation may smooth small turns, but must never slide sideways/backwards
-		// for several frames after a sudden logical turn. No Mass state is changed.
-		const float Lag = FMath::Clamp(FMath::FindDeltaAngleDegrees(Desired.Yaw, Facing.Yaw),
-			-FMath::Clamp(MaxFacingLagDegrees, 0.0f, 45.0f), FMath::Clamp(MaxFacingLagDegrees, 0.0f, 45.0f));
-		Facing = FRotator(0, FRotator::NormalizeAxis(Desired.Yaw + Lag), 0);
+        if (bSoftenAbruptFacing && !bSnap)
+        {
+            // Keep interpolation bounded even when a frame stalls or a snapshot reverses direction.
+            Facing.Yaw = FMath::FixedTurn(PreviousYaw, Facing.Yaw, 720.f * FMath::Clamp(DeltaSeconds, 0.f, .05f));
+        }
+        else
+        {
+            const float Limit = FMath::Clamp(MaxFacingLagDegrees, 0.0f, 45.0f);
+            const float Lag = FMath::Clamp(FMath::FindDeltaAngleDegrees(Desired.Yaw, Facing.Yaw), -Limit, Limit);
+            Facing = FRotator(0, FRotator::NormalizeAxis(Desired.Yaw + Lag), 0);
+        }
 		DirectionDegrees = FMath::FindDeltaAngleDegrees(Facing.Yaw, Desired.Yaw);
 	}
 	if(Speed<=IdleSpeed && State.SenseSource!=EEcoSenseSource::None)
@@ -239,6 +252,25 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
 void AEcoCreatureRepresentationActor::UpdateAnimation()
 {
 	if (!CreatureMesh->GetSkeletalMeshAsset()) return;
+    if (!VisualState.bAlive && VisualState.Activity == EEcoSpeciesActivity::CorpseSettled)
+    {
+        auto* Clip = DeathAnimation.Get();
+        if (!Clip && AnimationProfile && AnimationProfile->Poses.IsValidIndex(8)) Clip = AnimationProfile->Poses[8].Clip.Get();
+        if (Clip)
+        {
+            auto* Current = CreatureMesh->GetSingleNodeInstance();
+            if (!Current || Current->GetCurrentAsset() != Clip || Current->IsPlaying())
+            {
+                CreatureMesh->PlayAnimation(Clip, false);
+                if (auto* Node = CreatureMesh->GetSingleNodeInstance())
+                {
+                    Node->SetPosition(Clip->GetPlayLength(), false);
+                    Node->SetPlaying(false);
+                }
+            }
+            return;
+        }
+    }
     if (BehaviorAnimationClass && AnimationProfile && AnimationProfile->IsValidProfile())
     {
         if (!CreatureMesh->GetAnimInstance() || !CreatureMesh->GetAnimInstance()->IsA(BehaviorAnimationClass))

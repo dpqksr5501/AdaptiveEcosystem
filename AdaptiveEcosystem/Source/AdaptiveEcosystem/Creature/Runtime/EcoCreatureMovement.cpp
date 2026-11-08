@@ -46,16 +46,20 @@ bool EcoCreatureMovement::ConstrainStep(UWorld& World, FName RegionId, bool bTra
         &&(bTraveling||Region->ContainsPosition(Destination));
 }
 
-bool EcoCreatureMovement::ConstrainGroundStep(UWorld& World,const FVector& Position,FVector& Destination,float BodyRadiusCm,float MinGroundNormalZ)
+bool EcoCreatureMovement::ConstrainGroundStep(UWorld& World,const FVector& Position,FVector& Destination,
+    float BodyRadiusCm,float MinGroundNormalZ,float SweepHeightCm,float MaxRiseCm)
 {
-    if(Position.ContainsNaN()||Destination.ContainsNaN()||!FMath::IsFinite(BodyRadiusCm)||BodyRadiusCm<20||BodyRadiusCm>40
+    if(Position.ContainsNaN()||Destination.ContainsNaN()||!FMath::IsFinite(BodyRadiusCm)||BodyRadiusCm<1||BodyRadiusCm>120
+        ||!FMath::IsFinite(SweepHeightCm)||SweepHeightCm<0||!FMath::IsFinite(MaxRiseCm)
         ||!FMath::IsFinite(MinGroundNormalZ)||MinGroundNormalZ<.65f||MinGroundNormalZ>1)return false;
     FHitResult Hit;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoCreatureStep), false);
-    const FVector Lift(0,0,65);
+    const FVector Lift(0,0,SweepHeightCm > 0.f ? FMath::Max(BodyRadiusCm + 1.f, SweepHeightCm)
+        : FMath::Max(65.f, BodyRadiusCm + 35.f));
     if (World.SweepSingleByChannel(Hit, Position + Lift, Destination + Lift, FQuat::Identity,
         ECC_WorldStatic, FCollisionShape::MakeSphere(BodyRadiusCm), Params)) return false;
-    if (!World.LineTraceSingleByObjectType(Hit, Destination + FVector(0,0,200), Destination - FVector(0,0,300), FCollisionObjectQueryParams(ECC_WorldStatic), Params)
+    const FVector ProbeStart(Destination.X, Destination.Y, MaxRiseCm < 0 ? Destination.Z + 200. : Position.Z + MaxRiseCm + 1.);
+    if (!World.LineTraceSingleByObjectType(Hit, ProbeStart, Destination - FVector(0,0,300), FCollisionObjectQueryParams(ECC_WorldStatic), Params)
         || Hit.ImpactNormal.Z < MinGroundNormalZ) return false;
     Destination.Z = Hit.ImpactPoint.Z;
     if (CrossesExcludedArea(World, Position, Destination)) return false;

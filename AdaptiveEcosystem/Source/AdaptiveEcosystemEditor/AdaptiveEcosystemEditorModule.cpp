@@ -4,6 +4,7 @@
 #include "Creature/Representation/EcoCreatureAnimInstance.h"
 #include "EcoGroundFeetGraphNode.h"
 #include "Animation/AnimBlueprint.h"
+#include "Animation/BlendSpace1D.h"
 #include "AnimGraphNode_Root.h"
 #include "AnimGraphNode_BlendListByInt.h"
 #include "AnimGraphNode_BlendSpacePlayer.h"
@@ -52,9 +53,9 @@ bool FAdaptiveEcosystemEditorModule::BuildPoseGraph(UAnimBlueprint* BP,UEcoCreat
         for(auto* Pin:Blend->Pins) if(Pin->Direction==EGPD_Input && Pin->PinName.ToString().StartsWith(TEXT("BlendPose_"))) Pins.Add(Pin);
         return Pins;
     };
-    while(PosePins().Num()<9) Blend->AddPinToBlendList();
+    while(PosePins().Num()<P->Poses.Num()) Blend->AddPinToBlendList();
     const auto Inputs=PosePins();
-    if(Inputs.Num()!=9) return false;
+    if(Inputs.Num()!=P->Poses.Num()) return false;
     auto Connect=[Schema](UEdGraphPin* A,UEdGraphPin* B) {return A&&B&&Schema->TryCreateConnection(A,B);};
     auto Getter=[&]<typename T>(FName Name,int32 X,int32 Y) {
         auto* N=NewNode.operator()<UK2Node_VariableGet>(X,Y);
@@ -67,9 +68,9 @@ bool FAdaptiveEcosystemEditorModule::BuildPoseGraph(UAnimBlueprint* BP,UEcoCreat
     for(auto& Pin:Move->ShowPinForProperties) if(Pin.PropertyName==TEXT("X")||Pin.PropertyName==TEXT("Y")) Pin.bShowPin=true;
     Move->ReconstructNode();
     if(!Connect(Getter.operator()<float>(TEXT("SpeedCmPerSecond"),-250,-75),Move->FindPin(TEXT("X")))
-        || !Connect(Getter.operator()<float>(TEXT("TurnAmount"),-250,75),Move->FindPin(TEXT("Y")))
+        || (!P->Locomotion->IsA<UBlendSpace1D>() && !Connect(Getter.operator()<float>(TEXT("TurnAmount"),-250,75),Move->FindPin(TEXT("Y"))))
         || !Connect(Move->FindPin(TEXT("Pose")),Inputs[0])) return false;
-    for(int32 I=1;I<9;++I) {
+    for(int32 I=1;I<P->Poses.Num();++I) {
         auto* Player=NewNode.operator()<UAnimGraphNode_SequencePlayer>(0,I*150);
         Player->SetAnimationAsset(P->Poses[I].Clip);
         Player->Node.SetLoopAnimation(P->Poses[I].bLoop);
@@ -106,19 +107,37 @@ bool FAdaptiveEcosystemEditorModule::BuildPoseGraph(UAnimBlueprint* BP,UEcoCreat
             ||!Connect(Morph->FindPin(TEXT("Pose")),Local->FindPin(TEXT("ComponentPose"))))return false;
         FinalPose=Local->FindPin(TEXT("Pose"));
     }
+    if (!P->TurnHeadBone.IsNone())
+    {
+        auto* Component = NewNode.operator()<UAnimGraphNode_LocalToComponentSpace>(975, -350);
+        auto* Turn = NewNode.operator()<UAnimGraphNode_ModifyBone>(1150, -350);
+        auto* Local = NewNode.operator()<UAnimGraphNode_ComponentToLocalSpace>(1325, -350);
+        Turn->Node.BoneToModify.BoneName = P->TurnHeadBone;
+        Turn->Node.RotationMode = BMM_Additive;
+        Turn->Node.RotationSpace = BCS_ComponentSpace;
+        for (auto& Pin : Turn->ShowPinForProperties) if (Pin.PropertyName == TEXT("Rotation")) Pin.bShowPin = true;
+        Turn->ReconstructNode();
+        if (!Connect(FinalPose, Component->FindPin(TEXT("LocalPose")))
+            || !Connect(Component->FindPin(TEXT("ComponentPose")), Turn->FindPin(TEXT("ComponentPose")))
+            || !Connect(Turn->FindPin(TEXT("Pose")), Local->FindPin(TEXT("ComponentPose")))
+            || !Connect(Getter.operator()<FRotator>(TEXT("TurnHeadRotation"), 975, -500), Turn->FindPin(TEXT("Rotation")))) return false;
+        FinalPose = Local->FindPin(TEXT("Pose"));
+    }
     Root->FindPin(TEXT("Result"))->BreakAllPinLinks();
     if(!Connect(FinalPose,Root->FindPin(TEXT("Result"))))return false;
     if(P->bEnableGroundIK) {
         auto* IK=NewNode.operator()<UAnimGraphNode_EcoGroundFeet>(650,0);
         IK->Node.Body.BoneName=P->BodyBone;
         IK->Node.MaximumCorrection=P->MaxFootCorrectionCm;IK->Node.Clearance=P->FootClearanceCm;
-        for(int32 Index=0;Index<4;++Index){FEcoGroundLeg& Leg=IK->Node.Legs.AddDefaulted_GetRef();Leg.Contact.BoneName=P->FootBones[Index];Leg.End.BoneName=P->IKEndBones[Index];Leg.ContactHeight=P->ContactHeights[Index];}
+        for(int32 Index=0;Index<P->FootBones.Num();++Index){FEcoGroundLeg& Leg=IK->Node.Legs.AddDefaulted_GetRef();Leg.Contact.BoneName=P->FootBones[Index];Leg.End.BoneName=P->IKEndBones[Index];Leg.ContactHeight=P->ContactHeights[Index];}
         for(auto& Pin:IK->ShowPinForProperties)if(Pin.PropertyName==TEXT("Alpha"))Pin.bShowPin=true;
         IK->ReconstructNode();Root->FindPin(TEXT("Result"))->BreakAllPinLinks();
         if(!Connect(FinalPose,IK->FindPin(TEXT("ComponentPose")))||!Connect(IK->FindPin(TEXT("Pose")),Root->FindPin(TEXT("Result"))))return false;
-        for(int32 Index=0;Index<4;++Index) {
+        for(int32 Index=0;Index<P->FootBones.Num();++Index) {
             const FName Point(*FString::Printf(TEXT("GroundPoint%d"),Index)),Valid(*FString::Printf(TEXT("GroundValid%d"),Index));
+            const FName Normal(*FString::Printf(TEXT("GroundNormal%d"),Index));
             if(!Connect(Getter.operator()<FVector>(Point,400,300+Index*120),IK->FindPin(Point))||!Connect(Getter.operator()<float>(Valid,400,350+Index*120),IK->FindPin(Valid)))return false;
+            if(!Connect(Getter.operator()<FVector>(Normal,400,390+Index*120),IK->FindPin(Normal)))return false;
         }
         if(!Connect(Getter.operator()<FVector>(TEXT("GroundRootPoint"),400,800),IK->FindPin(TEXT("GroundRootPoint"))))return false;
         if(!Connect(Getter.operator()<FVector>(TEXT("GroundUp"),400,850),IK->FindPin(TEXT("GroundUp")))

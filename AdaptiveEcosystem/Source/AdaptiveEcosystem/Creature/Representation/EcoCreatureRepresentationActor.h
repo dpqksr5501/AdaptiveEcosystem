@@ -52,6 +52,10 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TObjectPtr<UEcoCreatureAnimationProfile> AnimationProfile;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") TSubclassOf<UEcoCreatureAnimInstance> BehaviorAnimationClass;
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") FRotator MeshRotation = FRotator::ZeroRotator;
+    /** Actor-space correction for imported mesh pivots. Scales with the represented body. */
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation") FVector MeshOffset = FVector::ZeroVector;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation", meta=(ClampMin="0.01"))
+    float VisualMeshScale = 1.f;
     /** 0 legacy, 1 antlered adult, 2 antlerless adult, 3 immature silhouette. No behavior/sex authority. */
     UPROPERTY(EditDefaultsOnly,Category="Creature|Appearance") TArray<FEcoCreatureAppearanceVariant> AppearanceVariants;
 	/** Anatomical forward in the imported mesh's local space; independent of Actor +X. */
@@ -64,6 +68,7 @@ public:
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0")) float TurnInterpolationSpeed = 8.0f;
 	/** Bound visual lag even after a reversal. Zero aligns immediately to actual velocity. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual", meta=(ClampMin="0", ClampMax="45", Units="deg")) float MaxFacingLagDegrees = 10.0f;
+    UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Visual") bool bSoftenAbruptFacing = false;
 	/** Speed x signed turning, not strafing direction. Positive UE yaw is a right turn. */
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category="Creature|Animation", meta=(ClampMin="1")) float FullTurnRateDegrees = 180.0f;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float VisualTurnAmount = 0.0f;
