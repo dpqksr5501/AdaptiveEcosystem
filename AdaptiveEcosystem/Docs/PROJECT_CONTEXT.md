@@ -1,5 +1,7 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
+**2026-11-05 체형 설계와 확인 범위.** [세대·체형 설계](Architecture/INHERITED_MORPHOLOGY_DESIGN_20261105.md)에 현재 유전·표현의 근거와 질주·은폐·사냥 체형 제안을 구분한다. 새 축의 런타임 및 학습 적용은 보류 상태다. 새 작업은 해당 문서의 역할별 인계와 검증 순서를 따른다.
+
 **2026-10-30 개체군·기획 대조 후속:** [개체군/성장 계약](Architecture/NATURAL_POPULATION_CONTRACT_20261030.md), [세부 기획 대조](Architecture/INDIVIDUAL_TRAIT_DESIGN_AUDIT_20261030.md), [실행 기록](조연우/JYU_NATURAL_POPULATION_20261030.md)을 함께 읽는다. 자연 사슴의 혼합 초기 나이/성별·제한 유전/털색·연속 성장·가족 관계/관찰 분리·군락 발달을 다룬다. 학습 담당의 관측/행동·보상·가중치/추론은 보존하며 Caution은 인계 데이터만 제공한다. 현재 Native 사슴 예제를 임의 종/전체 기획/MMO 완료로 확대하지 않는다.
 
 **2026-10-30 자연 서식지 작업 트리:** [공통 계약](Architecture/NATURAL_HABITAT_CONTRACT_20261030.md), [새 레벨 적용 순서](Team/NATURAL_HABITAT_LEVEL_HANDOFF_20261030.md), [실행 기록](조연우/JYU_NATURAL_HABITAT_20261030.md)을 먼저 확인한다. 지역별/세부 volume 생육 profile, 실제 지면·수면·수문 연결, 불규칙 군락, 내부 휴식과 취약한 은폐, 표현/이주 수용 예산을 명시적 opt-in으로 제공한다. 미래 통합 레벨 자체는 아직 검증하지 않았다. Native 2.5D·단일 writer/M4·기존 모델·SocialControl=0 경계를 유지한다.

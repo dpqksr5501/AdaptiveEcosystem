@@ -63,6 +63,9 @@ struct FEcoVegetationVisualCell
     UPROPERTY() uint8 Food = 0;
     UPROPERTY() uint8 Moisture = 0;
     UPROPERTY() uint8 Stress = 0;
+    UPROPERTY() uint8 FreshTint = 128; // neutral when the habitat rules are off
+    UPROPERTY() uint8 PooledWater = 0;
+    UPROPERTY() uint8 Disturbance = 0;
     UPROPERTY() uint8 Plant = 0;
     UPROPERTY() uint8 WidthCm=0;
     UPROPERTY() uint8 HeightCm=0;
@@ -75,6 +78,7 @@ struct FEcoMovementTraceVisual
     GENERATED_BODY()
     UPROPERTY() FVector Position=FVector::ZeroVector;
     UPROPERTY() uint8 Age=0;
+    UPROPERTY() bool bWet=false;
 };
 
 /** Ground checked on authority, once per bounded refresh; clients never raycast food sites. */
@@ -101,6 +105,9 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out) const override;
     static bool IsRequested();
     UFUNCTION(BlueprintPure, Category="Ecology|Vegetation") FString CaptureDiagnostics(bool bIncludeLearningCells=false) const;
+    /** Authority-only ground clearing. The next Native resource step accounts for biomass loss. */
+    UFUNCTION(BlueprintCallable, BlueprintAuthorityOnly, Category="Ecology|Vegetation")
+    bool QueueGroundDisturbance(FVector WorldPosition, float Severity);
     UPROPERTY(Replicated, VisibleAnywhere, Category="Vegetation") FName RegionId;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UInstancedStaticMeshComponent> Plants;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UInstancedStaticMeshComponent> RiparianPlants;
@@ -108,10 +115,12 @@ public:
     UPROPERTY(VisibleAnywhere) TObjectPtr<UInstancedStaticMeshComponent> Tracks;
     /** Clearly dry, non-edible residue; never a second resource balance. */
     UPROPERTY(VisibleAnywhere) TObjectPtr<UInstancedStaticMeshComponent> DryResidue;
+    UPROPERTY(VisibleAnywhere) TObjectPtr<UInstancedStaticMeshComponent> Puddles;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UDecalComponent> BiomeTransition;
     UPROPERTY(ReplicatedUsing=OnRep_Profile) float SurfaceHalfExtentCm=0;
     UPROPERTY(EditDefaultsOnly, Category="Vegetation|Visual") TSoftObjectPtr<UStaticMesh> PatchMesh;
     UPROPERTY(EditDefaultsOnly, Category="Vegetation|Visual") TSoftObjectPtr<UMaterialInterface> PatchMaterial;
+    UPROPERTY(EditDefaultsOnly, Category="Vegetation|Visual") TSoftObjectPtr<UMaterialInterface> PuddleMaterial;
     UPROPERTY(EditDefaultsOnly, Category="Vegetation|Visual", meta=(ClampMin="10",ClampMax="400",Units="cm")) float PatchWidthCm = 120;
     UPROPERTY(EditDefaultsOnly, Category="Vegetation|Visual", meta=(ClampMin="5",ClampMax="100",Units="cm")) float PatchHeightCm = 45;
     UPROPERTY(Transient) TArray<FEcoVegetationVisualCell> Cells;

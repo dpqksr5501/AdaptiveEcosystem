@@ -186,11 +186,17 @@ namespace EcoPolicyV3IntegratedProcImpl
         const bool Settling=W.Config.bNaturalHabitats&&Now<Life.SettlementUntil;
         if(Graze&&H.Perception->Threat.PredCount==0&&(H.Body->Energy<.9||Settling)){
             const double Here=G.FoodAt(H.Body->Pos);
+            const bool PreferSaferGround = G.Vegetation.bHabitatDynamics && H.Body->Energy >= .15;
+            const auto HuntRisk = [&](const R::FVec2& P) {
+                return Life.Memory.HuntRisk(P.X+A.Ctx->OriginCm.X/R::kUnitCm,P.Y+A.Ctx->OriginCm.Y/R::kUnitCm,Now);
+            };
+            const bool bPreferMove = PreferSaferGround
+                && (HuntRisk(H.Body->Pos)>.42 || G.VegetationCells[G.CellOf(H.Body->Pos)].SurfaceWater>.55);
             // The learned .06 threshold exceeds entire small soil patches. A
             // hungry animal can stop for two real bites, instead of walking
             // forever over food it never considers sufficient to eat in place.
             const double Dispersed=std::hypot(H.Body->Pos.X-Life.SettlementX,H.Body->Pos.Y-Life.SettlementY);
-            if(Here>=.012&&(!Settling||Dispersed>4||H.Body->Energy<.15)){
+            if(Here>=.012&&!bPreferMove&&(!Settling||Dispersed>4||H.Body->Energy<.15)){
                 if(Settling&&Dispersed>4)Life.SettlementUntil=Now;
                 H.Control->Velocity={};H.Control->Gait=R::kGaitStop;
                 H.Control->EatMult=C.GaitEat[R::kGaitStop];H.Control->DrainMult=C.GaitDrain[R::kGaitStop];Life.MotionReason=1;
@@ -212,6 +218,8 @@ namespace EcoPolicyV3IntegratedProcImpl
                             const auto* Bucket=A.BodyBuckets.Find(FIntPoint(FMath::FloorToInt((Q.X+A.Ctx->OriginCm.X/R::kUnitCm)/2),FMath::FloorToInt((Q.Y+A.Ctx->OriginCm.Y/R::kUnitCm)/2)));
                             const int32 Occupants=Bucket?Bucket->Num():0;
                             double Score=G.Food[Cell]/(1+Dist*.2)/(1+Occupants*(Life.bNaturalPopulation?2-Life.Genome.Sociability:1));
+                            if(PreferSaferGround)
+                                Score *= (1-.85*HuntRisk(Q))*(1-.65*G.VegetationCells[Cell].SurfaceWater);
                             if(Life.bNaturalPopulation)Score*=.92+.16*EcoLifeV3::Unit(uint64(D.Id)^EcoLifeV3::Mix(uint64(Cell)));
                             if(Settling){
                                 const double FromArrival=std::hypot(Q.X-Life.SettlementX,Q.Y-Life.SettlementY);

@@ -3156,6 +3156,8 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
             UE_LOG(LogEcoPolicyV3I,Error,TEXT("[EcoHabitat] Profile requires life + vegetation and valid guilds"));RejectResourceContract();return;
         }
         Config.bNaturalHabitats=NaturalProfile!=nullptr;
+        Config.Vegetation.bHabitatDynamics = Config.bNaturalHabitats
+            && FParse::Param(FCommandLine::Get(), TEXT("EcoHabitatDynamics"));
         if(NaturalProfile)Config.NaturalGround={NaturalProfile->WalkableSlopeDegrees,NaturalProfile->MaxStepUpCm,NaturalProfile->MaxStepDownCm,NaturalProfile->MaxWadingDepthCm};
         Config.bWildRefuges=NaturalProfile&&NaturalProfile->bWildRefuges;
         if(Config.bWildRefuges)Config.bShelterSafe=false;

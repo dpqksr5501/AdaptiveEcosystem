@@ -69,6 +69,8 @@ void AEcoCreatureIntegrationSpawner::ProcessPlayerStrikes(const FEcoServerTimeSn
         auto& Memory=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Best).Individual.Memory;
         const auto PlayerLocal=Context->CmToUnits(From);
         Memory.Suffer(Episode,Now,Known,PlayerLocal.X,PlayerLocal.Y,Known&&Memory.LastKind==EcoLifeV3::EEncounter::Pursuit);
+        if(Known&&Context->Sim.Food.Vegetation.bHabitatDynamics)
+            Memory.RememberHunt(From.X/EcoRepertoireV3::kUnitCm,From.Y/EcoRepertoireV3::kUnitCm,Now);
         auto& Vitals=EM.GetFragmentDataChecked<FEcoVitalsFragment>(Best);Vitals.HP=FMath::Max(0.f,Vitals.HP-30.f);
         if(Vitals.HP<=0)EM.GetFragmentDataChecked<FEcoDeathFragment>(Best).Cause=EEcoDeathCause::ExternalDamage;
         TSet<int32> InformedHerds;
@@ -81,6 +83,8 @@ void AEcoCreatureIntegrationSpawner::ProcessPlayerStrikes(const FEcoServerTimeSn
             Recognized=true;
             const auto* C=Native->GetContext(Link->ContextIndex);const auto P=C->CmToUnits(From);
             Link->Individual.Memory.Observe(Vitals.HP<=0?EcoLifeV3::EEncounter::WitnessLoss:EcoLifeV3::EEncounter::Surprise,Episode,Now,Now,P.X,P.Y,.7);
+            if(C->Sim.Food.Vegetation.bHabitatDynamics)
+                Link->Individual.Memory.RememberHunt(From.X/EcoRepertoireV3::kUnitCm,From.Y/EcoRepertoireV3::kUnitCm,Now);
             if(const auto* H=EM.GetFragmentDataPtr<FEcoHerdMemberFragment>(E);H&&H->HerdRuntimeIndex>=0)InformedHerds.Add(H->HerdRuntimeIndex);
         }
         for(const auto E:Owned){

@@ -83,9 +83,7 @@ namespace EcoCheckpoint
         for(size_t I=0;I<N;++I){
             if(!std::isfinite(G.Food[I])||!std::isfinite(G.Cap[I])||!std::isfinite(G.Regen[I])||G.Cap[I]<0||G.Food[I]<0||G.Food[I]>G.Cap[I]+1e-9||G.Regen[I]<0)return false;
             if(!G.Cap0.empty()&&(!std::isfinite(G.Cap0[I])||G.Cap0[I]<G.Cap[I]))return false;
-            if(G.Vegetation.bEnabled&&(!G.Habitats[I].IsValid()||!std::isfinite(G.VegetationCells[I].Moisture)||G.VegetationCells[I].Moisture<0
-                ||G.VegetationCells[I].Moisture>1||!std::isfinite(G.VegetationCells[I].Stress)||G.VegetationCells[I].Stress<0||G.VegetationCells[I].Stress>1
-                ||!std::isfinite(G.VegetationCells[I].Development)||G.VegetationCells[I].Development<0||G.VegetationCells[I].Development>1))return false;
+            if(G.Vegetation.bEnabled&&(!G.Habitats[I].IsValid()||!G.VegetationCells[I].IsValid()))return false;
         }
         return true;
     }

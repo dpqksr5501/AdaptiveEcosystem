@@ -143,6 +143,10 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                             J->SetNumberField(TEXT("familiarity"),Life.Memory.Familiarity);J->SetNumberField(TEXT("curiosity"),Life.Memory.Curiosity);
                             J->SetNumberField(TEXT("fear"),Life.Memory.Fear);J->SetNumberField(TEXT("hostility"),Life.Memory.Hostility);
                             J->SetNumberField(TEXT("unknown_fear"),Life.Memory.UnknownFear);
+                            J->SetNumberField(TEXT("hunt_time"),Life.Memory.HuntTime);
+                            J->SetNumberField(TEXT("hunt_x"),Life.Memory.HuntX);
+                            J->SetNumberField(TEXT("hunt_y"),Life.Memory.HuntY);
+                            J->SetNumberField(TEXT("hunt_pressure"),Life.Memory.HuntPressure);
                             J->SetNumberField(TEXT("local_forage_cell"),Life.ForageCell);
                             J->SetNumberField(TEXT("motion_reason"),Life.MotionReason);
                             J->SetNumberField(TEXT("world_rules_version"),EcoLifeV3::kWorldRulesVersion);

@@ -55,3 +55,6 @@ Profile의 야생 은폐 설정은 무적 안전 구역을 사용하지 않는�
 새 레벨 acceptance에 초기 나이/성별 혼합, 동일 ID의 성장 전후, 위험 시 따라가기 취소, 보호자 분리/사망 후 오래된 목표 제거, 늦은 Client의 성숙도/외형 일치, 저장/복원 후 관계/군락 발달 보존을 추가한다. 기존 명시적 spawn points의 군락/지형/최소 간격도 확인한다. 초기 나이를 다양화한 것만으로 배치/무리 행동의 전체 자연스러움을 통과 처리하지 않는다.
 
 학습 담당 경계도 acceptance에 포함한다. Caution/새 나이·유전 정보를 기존 PPO 관측에 자동 추가하거나 새 도주/공격 정책을 만들지 않는다. 기존 행동/Raw Request를 보존하고 World/신체·Social/자리·Steering 책임에서만 소비한다. 현재 Source/가중치·관측 계약 보존 근거는 [기획 대조](../Architecture/INDIVIDUAL_TRAIT_DESIGN_AUDIT_20261030.md)와 실행 기록을 따른다.
+## 팀 섬 레벨 적용 사례
+
+[JYU 섬 레벨 인계](JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md)에서 World Partition 복제본의 구역별 생태 입력, 실행 방법과 폭포·수원 확인 범위를 볼 수 있다.

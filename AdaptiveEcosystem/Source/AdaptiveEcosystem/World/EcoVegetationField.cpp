@@ -119,16 +119,19 @@ AEcoVegetationField::AEcoVegetationField()
     SetRootComponent(Plants);
     Plants->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     Plants->SetCanEverAffectNavigation(false);
-    Plants->NumCustomDataFloats = 3;
+    Plants->NumCustomDataFloats = 4;
     RiparianPlants=CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("RiparianPlants"));
     ShrubPlants=CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("ShrubPlants"));
     Tracks=CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("MovementMarks"));
     DryResidue=CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("DryNonEdibleResidue"));
-    for(auto* Component:{RiparianPlants.Get(),ShrubPlants.Get(),Tracks.Get(),DryResidue.Get()}){
+    Puddles=CreateDefaultSubobject<UInstancedStaticMeshComponent>(TEXT("Puddles"));
+    for(auto* Component:{RiparianPlants.Get(),ShrubPlants.Get(),Tracks.Get(),DryResidue.Get(),Puddles.Get()}){
         Component->SetupAttachment(Plants);Component->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-        Component->SetCanEverAffectNavigation(false);Component->NumCustomDataFloats=3;
+        Component->SetCanEverAffectNavigation(false);Component->NumCustomDataFloats=4;
     }
     PatchMesh = TSoftObjectPtr<UStaticMesh>(FSoftObjectPath(TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD")));
+    PuddleMaterial = TSoftObjectPtr<UMaterialInterface>(FSoftObjectPath(
+        TEXT("/Game/JYU/Ecosystem/Natural/M_EcoHabitatPuddle.M_EcoHabitatPuddle")));
     BiomeTransition=CreateDefaultSubobject<UDecalComponent>(TEXT("BiomeTransition"));BiomeTransition->SetupAttachment(Plants);BiomeTransition->SetVisibility(false);
 }
 void AEcoVegetationField::BeginPlay()
@@ -150,6 +153,26 @@ void AEcoVegetationField::BeginPlay()
 bool AEcoVegetationField::IsRequested()
 {
     return CVarVegetation.GetValueOnGameThread() != 0 || FParse::Param(FCommandLine::Get(), TEXT("EcoVegetation"));
+}
+bool AEcoVegetationField::QueueGroundDisturbance(FVector WorldPosition, float Severity)
+{
+    if (!IsInGameThread() || !HasAuthority() || GetNetMode()==NM_Client || WorldPosition.ContainsNaN()) return false;
+    auto* World=GetWorld();
+    if (!World) return false;
+    const auto* Mass=World->GetSubsystem<UMassEntitySubsystem>();
+    if (Mass && Mass->GetEntityManager().IsProcessing()) return false;
+    auto* Native=World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+    auto* Context=Native && Native->IsActive() ? Native->GetContext(ContextIndex) : nullptr;
+    if (!Context || Context->RegionId!=RegionId) return false;
+    auto& Grid=Context->Sim.Food;
+    if (!Grid.Vegetation.bHabitatDynamics || !Grid.HasValidVegetationLayout()) return false;
+    const auto P=Context->CmToUnits(WorldPosition);
+    if (P.X<0 || P.Y<0 || P.X>=Context->SizeUnits || P.Y>=Context->SizeUnits) return false;
+    const int32 Cell=Grid.CellOf(P);
+    const auto* GroundPoint=Ground.Find(Cell);
+    if (!GroundPoint || FMath::Abs(GroundPoint->Z-WorldPosition.Z)>150
+        || !Grid.Habitats[Cell].bNatural || !Grid.Habitats[Cell].bGroundUsable || Grid.Cap[Cell]<=0) return false;
+    return Grid.VegetationCells[Cell].QueueDisturbance(Severity);
 }
 void AEcoVegetationField::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
@@ -408,7 +431,13 @@ void AEcoVegetationField::Tick(float DeltaSeconds)
         const FVector* Anchor = Ground.Find(K); if (!Anchor || Grid.Cap[K] <= 0) continue;
         auto& V = Cells.AddDefaulted_GetRef(); V.Cell = K; V.Position = *Anchor;
         V.Normal=GroundNormals.FindRef(K);
-        V.Development=uint8(FMath::RoundToInt(Grid.VegetationCells[K].Development*255));
+        const auto& Soil=Grid.VegetationCells[K];
+        if(Grid.Vegetation.bHabitatDynamics&&Grid.Habitats[K].bNatural)
+            V.FreshTint=uint8(FMath::RoundToInt(Soil.FreshFraction*255));
+        V.Development=uint8(FMath::RoundToInt(Soil.Development*255));
+        V.Disturbance=uint8(FMath::RoundToInt(Soil.Disturbance*255));
+        if(Grid.Habitats[K].Flood==0 && V.Normal.Z>.985)
+            V.PooledWater=uint8(FMath::RoundToInt(Soil.SurfaceWater*255));
         V.Food = uint8(FMath::RoundToInt(EcoVegetationV3::Unit(Grid.Food[K] / Grid.Cap[K]) * 255));
         V.Moisture = uint8(FMath::RoundToInt(Grid.VegetationCells[K].Moisture * 255));
         V.Stress = uint8(FMath::RoundToInt(Grid.VegetationCells[K].Stress * 255));
@@ -419,17 +448,25 @@ void AEcoVegetationField::Tick(float DeltaSeconds)
             const double X=(K%Grid.Gw+.5)*Grid.Cell+Candidate.X/EcoRepertoireV3::kUnitCm;
             const double Y=(K/Grid.Gw+.5)*Grid.Cell+Candidate.Y/EcoRepertoireV3::kUnitCm;
             double Damage=0;const double Now=Ctx->Sim.T*EcoRepertoireV3::kStepSeconds;
-            for(const auto& Bite:Ctx->BrowseEvidence.Events)if(Bite.Cell==K&&Now>=Bite.Time&&Now-Bite.Time<20){
+            const double TraceSeconds=EcoVegetationV3::BrowseTraceSeconds(Soil);
+            for(const auto& Bite:Ctx->BrowseEvidence.Events)if(Bite.Cell==K&&Now>=Bite.Time&&Now-Bite.Time<TraceSeconds){
                 const double D=FMath::Square(X-Bite.X)+FMath::Square(Y-Bite.Y);
-                Damage+=Bite.Amount/FMath::Max(.01,Grid.Cap[K])*9*FMath::Exp(-D/.4)*(1-(Now-Bite.Time)/20);
+                Damage+=Bite.Amount/FMath::Max(.01,Grid.Cap[K])*9*FMath::Exp(-D/.4)*(1-(Now-Bite.Time)/TraceSeconds);
             }
             V.SiteFood[I]=uint8(FMath::RoundToInt(V.Food*(1-FMath::Clamp(Damage,0.,.95))));
         }
     }
     MovementMarks.Reset();const double Now=Ctx->Sim.T*EcoRepertoireV3::kStepSeconds;
-    for(const auto& T:Ctx->MovementTraces.Events)if(T.Id&&Now>=T.Time&&Now-T.Time<20){
-        if(MovementMarks.Num()>=64)break;
-        auto& Mark=MovementMarks.AddDefaulted_GetRef();Mark.Position=Ctx->UnitsToCm(T.X,T.Y,T.Z+2);Mark.Age=uint8((Now-T.Time)*255/20);
+    const auto& TraceField=Ctx->MovementTraces;
+    for(unsigned Offset=0;Offset<TraceField.Events.size()&&MovementMarks.Num()<64;++Offset){
+        const size_t Index=Grid.Vegetation.bHabitatDynamics?(TraceField.Cursor-1-Offset)%TraceField.Events.size():Offset;
+        const auto& T=TraceField.Events[Index];
+        if(!T.Id||Now<T.Time)continue;
+        const bool Wet=Grid.Vegetation.bHabitatDynamics&&Grid.VegetationCells[Grid.CellOf({T.X,T.Y})].SurfaceWater>.18;
+        const double Duration=Wet?42:20;
+        if(Now-T.Time>=Duration)continue;
+        auto& Mark=MovementMarks.AddDefaulted_GetRef();
+        Mark.Position=Ctx->UnitsToCm(T.X,T.Y,T.Z+2);Mark.Age=uint8((Now-T.Time)*255/Duration);Mark.bWet=Wet;
     }
     PublishVisualChunks(Stride,int32(Grid.Food.size()));
     if (GetNetMode() != NM_DedicatedServer) OnRep_Cells();
@@ -437,25 +474,39 @@ void AEcoVegetationField::Tick(float DeltaSeconds)
 void AEcoVegetationField::OnRep_Cells()
 {
     Tracks->ClearInstances();
+    Puddles->ClearInstances();
     if (!Plants->GetStaticMesh()) return;
-    TArray<FTransform> Transforms[4];TArray<FVector3f> Custom[4];
+    TArray<FTransform> Transforms[4];TArray<FVector4f> Custom[4];
     TMap<int32,TArray<const FEcoVegetationSiteVisual*>> SitesByCell;
     if(NaturalProfile)for(const auto& Site:GroundSites)SitesByCell.FindOrAdd(Site.Cell).Add(&Site);
     for (const auto& V : Cells)
     {
+        if(V.PooledWater>50)
+        {
+            if(!Puddles->GetStaticMesh())
+            {
+                Puddles->SetStaticMesh(LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Plane.Plane")));
+                Puddles->SetMaterial(0,PuddleMaterial.LoadSynchronous());
+            }
+            if(Puddles->GetMaterial(0))
+            {
+                const double Scale=.25+.9*V.PooledWater/255.;
+                Puddles->AddInstance(FTransform(FRotator::ZeroRotator,V.Position+FVector(0,0,3),FVector(Scale,Scale*.65,1)),true);
+            }
+        }
         auto* Component=V.Plant==1?RiparianPlants.Get():V.Plant==2?ShrubPlants.Get():Plants.Get();
         if(!Component->GetStaticMesh())continue;
         const FBox Box=Component->GetStaticMesh()->GetBoundingBox();
         const float Amount = V.Food / 255.f;
         if (Amount <= 0.01f) {
-            if(NaturalProfile&&V.Stress>160&&DryResidue->GetStaticMesh())if(const auto* Sites=SitesByCell.Find(V.Cell)){
+            if(NaturalProfile&&(V.Stress>160||V.Disturbance>80)&&DryResidue->GetStaticMesh())if(const auto* Sites=SitesByCell.Find(V.Cell)){
                 const FBox ResidueBox=DryResidue->GetStaticMesh()->GetBoundingBox();const FVector Size=ResidueBox.GetSize();
                 for(int32 I=0;I<FMath::Min(2,Sites->Num());++I){const auto* Site=(*Sites)[I];
                     const auto C=EcoNaturalHabitat::Candidate(StableLayoutSeed(),uint32(V.Cell),Site->Ordinal,VisualCellSizeCm);
                     const FVector Scale(45/FMath::Max(1.,FMath::Max(Size.X,Size.Y)),45/FMath::Max(1.,FMath::Max(Size.X,Size.Y)),12/FMath::Max(1.,Size.Z));
                     const FQuat Rotation=FRotationMatrix::MakeFromZX(FVector(Site->Normal),FRotator(0,C.Yaw,0).Vector()).ToQuat();
                     const FVector Pivot=Rotation.RotateVector(FVector(ResidueBox.GetCenter().X*Scale.X,ResidueBox.GetCenter().Y*Scale.Y,ResidueBox.Min.Z*Scale.Z));
-                    Transforms[3].Add(FTransform(Rotation,FVector(Site->Position)-Pivot,Scale));Custom[3].Add(FVector3f(0,0,1));
+                    Transforms[3].Add(FTransform(Rotation,FVector(Site->Position)-Pivot,Scale));Custom[3].Add(FVector4f(0,0,1,128.f/255));
                 }
             }
             continue;
@@ -481,7 +532,7 @@ void AEcoVegetationField::OnRep_Cells()
                 const FVector Scale(Width,Width,Height);
                 const FVector Pivot=Rotation.RotateVector(FVector(Box.GetCenter().X*Width,Box.GetCenter().Y*Width,Box.Min.Z*Height));
                 Transforms[Kind].Add(FTransform(Rotation,FVector(Site->Position)-Pivot,Scale));
-                Custom[Kind].Add(FVector3f(Amount,V.Moisture/255.f,V.Stress/255.f));
+                Custom[Kind].Add(FVector4f(Amount,V.Moisture/255.f,V.Stress/255.f,V.FreshTint/255.f));
             }
             continue;
         }
@@ -497,7 +548,7 @@ void AEcoVegetationField::OnRep_Cells()
                 if(V.Normal.Z>.5)Offset.Z=-(V.Normal.X*Offset.X+V.Normal.Y*Offset.Y)/V.Normal.Z;
             }
             Transforms[Kind].Add(FTransform(FRotator(0,(V.Cell*137+K*73)%360,0),P+Offset,FVector(Width,Width,Height)));
-            Custom[Kind].Add(FVector3f(Amount,V.Moisture/255.f,V.Stress/255.f));
+            Custom[Kind].Add(FVector4f(Amount,V.Moisture/255.f,V.Stress/255.f,128.f/255));
         }
     }
     UInstancedStaticMeshComponent* Components[]={Plants.Get(),RiparianPlants.Get(),ShrubPlants.Get(),DryResidue.Get()};
@@ -506,12 +557,14 @@ void AEcoVegetationField::OnRep_Cells()
         if(C->GetInstanceCount()!=Ts.Num()){
             C->ClearInstances();C->AddInstances(Ts,false,true,false);
         }else if(!Ts.IsEmpty())C->BatchUpdateInstancesTransforms(0,Ts,true,false,true);
-        for(int32 K=0;K<Custom[Kind].Num();++K)for(int32 Channel=0;Channel<3;++Channel)
+        for(int32 K=0;K<Custom[Kind].Num();++K)for(int32 Channel=0;Channel<4;++Channel)
             C->SetCustomDataValue(K,Channel,Custom[Kind][K][Channel],false);
         C->MarkRenderStateDirty();
     }
     if(Tracks->GetStaticMesh())for(const auto& Mark:MovementMarks){
-        const double Scale=1-Mark.Age/255.;Tracks->AddInstance(FTransform(FRotator::ZeroRotator,Mark.Position,FVector(.25*Scale,.12*Scale,.015)),true);
+        const double Scale=1-Mark.Age/255.;
+        const FVector Footprint=Mark.bWet?FVector(.18*Scale,.10*Scale,.005):FVector(.25*Scale,.12*Scale,.015);
+        Tracks->AddInstance(FTransform(FRotator::ZeroRotator,Mark.Position,Footprint),true);
     }
 }
 FString AEcoVegetationField::CaptureDiagnostics(bool bIncludeLearningCells) const
@@ -523,6 +576,7 @@ FString AEcoVegetationField::CaptureDiagnostics(bool bIncludeLearningCells) cons
     J->SetNumberField(TEXT("instances"), Plants->GetInstanceCount()+RiparianPlants->GetInstanceCount()+ShrubPlants->GetInstanceCount());
     J->SetNumberField(TEXT("riparian_instances"),RiparianPlants->GetInstanceCount());J->SetNumberField(TEXT("shrub_instances"),ShrubPlants->GetInstanceCount());
     J->SetNumberField(TEXT("movement_marks"),MovementMarks.Num());
+    J->SetNumberField(TEXT("puddle_instances"),Puddles->GetInstanceCount());
     J->SetStringField(TEXT("visual_class"), GetClass()->GetPathName());
     J->SetStringField(TEXT("visual_mesh"), PatchMesh.ToSoftObjectPath().ToString());
     J->SetStringField(TEXT("visual_material"), PatchMaterial.ToSoftObjectPath().ToString());
@@ -541,6 +595,7 @@ FString AEcoVegetationField::CaptureDiagnostics(bool bIncludeLearningCells) cons
                 const auto& F=Ctx->Sim.Food;
                 J->SetStringField(TEXT("learning_world_schema"),Ctx->Sim.Config.bEcosystemLife?TEXT("ecosystem-life-v2"):TEXT("soil-v1"));J->SetBoolField(TEXT("training_ready"),false);
                 if(Ctx->Sim.Config.bNaturalHabitats)J->SetStringField(TEXT("learning_world_schema"),TEXT("ecosystem-natural-habitat-v2"));
+                if(F.Vegetation.bHabitatDynamics)J->SetStringField(TEXT("learning_world_schema"),TEXT("ecosystem-habitat-dynamics-v1"));
                 J->SetBoolField(TEXT("wild_refuges"),Ctx->Sim.Config.bWildRefuges);
                 J->SetNumberField(TEXT("world_rules_version"),Ctx->Sim.Config.bEcosystemLife?EcoLifeV3::kWorldRulesVersion:0);
                 J->SetStringField(TEXT("seed"),LexToString(Ctx->Sim.Config.Seed));J->SetStringField(TEXT("rng_state"),LexToString(Ctx->Sim.Rng.State));
@@ -555,6 +610,12 @@ FString AEcoVegetationField::CaptureDiagnostics(bool bIncludeLearningCells) cons
                     auto Row=MakeShared<FJsonObject>();const auto& H=F.Habitats[K];const auto& S=F.VegetationCells[K];
                     Row->SetNumberField(TEXT("development"),F.VegetationCells[K].Development);Row->SetNumberField(TEXT("cell"),double(K));Row->SetNumberField(TEXT("food"),F.Food[K]);Row->SetNumberField(TEXT("capacity"),F.Cap[K]);Row->SetNumberField(TEXT("regen_per_step"),F.Regen[K]);
                     Row->SetNumberField(TEXT("moisture"),S.Moisture);Row->SetNumberField(TEXT("stress"),S.Stress);Row->SetNumberField(TEXT("plant"),int32(H.Plant));
+                    Row->SetNumberField(TEXT("browse_pressure"),S.BrowsePressure);
+                    Row->SetNumberField(TEXT("surface_water"),S.SurfaceWater);
+                    Row->SetNumberField(TEXT("fresh_fraction"),S.FreshFraction);
+                    Row->SetNumberField(TEXT("nutrition_multiplier"),S.NutritionMultiplier());
+                    Row->SetNumberField(TEXT("disturbance"),S.Disturbance);
+                    Row->SetNumberField(TEXT("pending_disturbance"),S.PendingDisturbance);
                     Row->SetNumberField(TEXT("drainage"),H.Drainage);Row->SetNumberField(TEXT("shade"),H.Shade);Row->SetNumberField(TEXT("water_supply"),H.WaterSupply);Row->SetNumberField(TEXT("flood"),H.Flood);Row->SetBoolField(TEXT("ground_usable"),H.bGroundUsable);
                     Row->SetBoolField(TEXT("natural"),H.bNatural);Row->SetNumberField(TEXT("site_suitability"),H.SiteSuitability);
                     Row->SetNumberField(TEXT("moisture_min"),H.MoistureMin);Row->SetNumberField(TEXT("moisture_max"),H.MoistureMax);
@@ -576,6 +637,9 @@ FString AEcoVegetationField::CaptureDiagnostics(bool bIncludeLearningCells) cons
             J->SetNumberField(TEXT("consumed"), Ctx->Sim.Stats.FoodEaten);
             J->SetNumberField(TEXT("mean_moisture"), G.VegetationCells.empty() ? 0 : Moisture / G.VegetationCells.size());
             J->SetNumberField(TEXT("rain"), G.VegetationWeather.Rain);
+            J->SetBoolField(TEXT("habitat_dynamics"),G.Vegetation.bHabitatDynamics);
+            J->SetNumberField(TEXT("season_temperature_offset"),G.Vegetation.bHabitatDynamics
+                ? EcoVegetationV3::SeasonalTemperatureOffset(FMath::Max<int64>(0,Ctx->Sim.T-1)*EcoRepertoireV3::kStepSeconds):0);
             J->SetNumberField(TEXT("ground_cells"), Ground.Num());
             int32 Counts[3] = {}; int32 Connected = 0;
             for (const auto& H : G.Habitats)

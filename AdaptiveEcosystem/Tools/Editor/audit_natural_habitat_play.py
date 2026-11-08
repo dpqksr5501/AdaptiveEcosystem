@@ -1,4 +1,4 @@
-"""Real owned-map observation: explicit rain fixture only, no food/agent/policy writes.
+"""Real owned-map observation, with explicit rain and ground-clearing fixtures.
 Use -VegetationPIE for Editor PIE; otherwise binds to server completion relay.
 Outputs source verification data to Saved, never personal presentation files.
 """
@@ -16,6 +16,7 @@ if not math.isfinite(duration) or not 1<=duration<=3600:raise RuntimeError('Fini
 if not re.fullmatch(r'[A-Za-z0-9_]+',name):raise RuntimeError('Simple report name required')
 pie = '-vegetationpie' in cmd.lower()
 authored = '-vegetationauthored' in cmd.lower()
+clearing_fixture = '-vegetationdisturbancefixture' in cmd.lower()
 map_name = arg('VegetationMap','LV_JYU_Ecosystem')
 folder = arg('VegetationAuditFolder','NaturalHabitat_20261030')
 if map_name not in ('LV_JYU_HerdMigration','LV_JYU_Ecosystem') or not re.fullmatch(r'[A-Za-z0-9_]+',folder):raise RuntimeError('Owned map/output folder required')
@@ -41,10 +42,29 @@ def world():
 def finish(result):
     if result=='FINISHED' and pie and '-vegetationlifefocus' in cmd.lower() and not state['child_visuals']:
         result='FAILED';state['error']='No actual natural child representation/animation was observed'
+    if result=='FINISHED' and clearing_fixture:
+        clearing=state.get('clearing', {})
+        followup=clearing.get('followup', [])
+        field_samples=[f for row in state['rows'] for f in row['fields']]
+        checks=dict(
+            queued_once=bool(followup) and clearing['duplicate_rejected'] and followup[0]['pending_disturbance']==0,
+            cohort_development_reduced=bool(followup) and followup[0]['development']<clearing['before']['development'],
+            clearing_recovering=len(followup)>1 and followup[-1]['disturbance']<followup[0]['disturbance'],
+            pooled_water=any(f['puddle_instances']>0 for f in field_samples),
+            season_advanced=any(abs(f['season_temperature_offset'])>1 for f in field_samples),
+            conservation=all(abs(f[k]-f[ledger])<1e-7 for f in field_samples for k,ledger in
+                             (('food','ledger_amount'),('grown','ledger_grown'),
+                              ('consumed','ledger_consumed'),('environment_lost','ledger_environment_lost'))))
+        state['dynamics_checks']=checks
+        if not all(checks.values()):
+            result='FAILED';state['error']=str(checks)
     if state['csv']:unreal.SystemLibrary.execute_console_command(world(),'csvprofile STOP')
     if pie: unreal.unregister_slate_post_tick_callback(handle)
     else: relay.on_runtime_sample.remove_callable(tick)
-    report = dict(result=result, error=state['error'], fixture=('Authored BP climate; no weather/food/agent writes; observer threats disabled' if authored else 'World rainfall=0 then 0.65; no direct food removal/refill; observer threats disabled'),
+    fixture='Authored BP climate; no direct weather/food writes; observer threats disabled' if authored else 'World rainfall=0 then 0.65; no direct food removal/refill; observer threats disabled'
+    if clearing_fixture: fixture+='; one queued ground-clearing event'
+    report = dict(result=result, error=state['error'], fixture=fixture, clearing=state.get('clearing'),
+                  dynamics_checks=state.get('dynamics_checks'), puddle_screenshot=state.get('puddle_screenshot'),
                   duration_wall_seconds=duration, samples=state['rows'], screenshots=state['shots'], region_transfers=state['transfers'],child_visuals=state['child_visuals'],overlap_expected='-vegetationoverlapexpected' in cmd.lower(),population_subject=state.get('population_id'))
     (out / (name + '_Runtime.json')).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     unreal.log('VEGETATION_AUDIT_FINISHED ' + json.dumps(dict(result=result, error=state['error'], samples=len(state['rows']))))
@@ -103,6 +123,26 @@ def tick(dt):
                     row['rendered_instances'].append(dict(component=component_name,index=index,position=[loc.x,loc.y,loc.z],scale=[scale.x,scale.y,scale.z]))
             row['net_cull_distance_squared']=field.get_editor_property('net_cull_distance_squared')
             rows.append(row)
+            if clearing_fixture and row['region']=='Forest' and elapsed>=20:
+                if not row['habitat_dynamics']:raise RuntimeError('Ground clearing requires habitat dynamics')
+                cells={cell['cell']:cell for cell in row['logical_cells']}
+                clearing=state.get('clearing')
+                if clearing:
+                    clearing['followup'].append(dict(cells[clearing['cell']], seconds=elapsed))
+                else:
+                    origin=row['native_origin_cm']
+                    width=row['grid_width']
+                    cell_cm=row['cell_size_units']*row['native_unit_cm']
+                    for instance in row['rendered_instances']:
+                        x,y,z=instance['position']
+                        i,j=math.floor((x-origin[0])/cell_cm),math.floor((y-origin[1])/cell_cm)
+                        cell=cells.get(j*width+i) if 0<=i<width and 0<=j<width else None
+                        if not cell or cell['development']<.4 or cell['food']<.05:continue
+                        point=unreal.Vector(x,y,z)
+                        if field.queue_ground_disturbance(point,.8):
+                            state['clearing']=dict(cell=cell['cell'], position=[x,y,z], before=cell, followup=[],
+                                                   duplicate_rejected=not field.queue_ground_disturbance(point,.8))
+                            break
         keys = unreal.EcoCreatureInspectionLibrary.get_authority_agent_ids(game)
         agents = []
         for key in keys:
@@ -204,6 +244,20 @@ def tick(dt):
                 path = str(out / ('VegetationPIE_' + str(state['shots']) + '.png')).replace('\\','/')
                 unreal.SystemLibrary.execute_console_command(game, 'HighResShot 1280x720 filename="' + path + '"')
                 state['shots'] += 1
+            elif clearing_fixture and state['camera'] and not state.get('puddle_screenshot'):
+                puddles=next((f.get_editor_property('puddles') for f in fields
+                              if f.get_editor_property('puddles').get_instance_count()>0),None)
+                if puddles:
+                    transform=puddles.get_instance_transform(0,True)
+                    if isinstance(transform,tuple):
+                        transform=next(v for v in transform if isinstance(v,unreal.Transform))
+                    target=transform.translation
+                    eye=target+unreal.Vector(-160,-200,185)
+                    state['camera'].set_actor_location(eye,False,False)
+                    state['camera'].set_actor_rotation(unreal.MathLibrary.find_look_at_rotation(eye,target),False)
+                    path=(out/'Puddle.png').as_posix()
+                    unreal.SystemLibrary.execute_console_command(game, 'HighResShot 1280x720 filename="' + path + '"')
+                    state['puddle_screenshot']=path
     except Exception as error:
         state['error'] = repr(error); unreal.log_error('VEGETATION_AUDIT_ERROR ' + repr(error)); finish('FAILED')
 if pie: handle = unreal.register_slate_post_tick_callback(tick)

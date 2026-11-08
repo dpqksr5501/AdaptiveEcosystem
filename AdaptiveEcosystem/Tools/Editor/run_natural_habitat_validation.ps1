@@ -1,7 +1,8 @@
-param([ValidateSet('Automation','Play','Ecology','Lineage','Persistence','Network','Authoring','Transfer','Population','PopulationPlay')][string]$Mode='Automation',
+param([ValidateSet('Automation','Play','Ecology','Lineage','HabitatComparison','Hunt','Persistence','Network','Authoring','Transfer','Population','PopulationPlay')][string]$Mode='Automation',
     [ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='NaturalHabitatRelease_20261030',
     [ValidateRange(30,1800)][int]$PlaySeconds=165,
-    [ValidateRange(600,7200)][int]$LineageSeconds=1800)
+    [ValidateRange(600,7200)][int]$LineageSeconds=1800,
+    [switch]$HabitatDynamics)
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $taskOut=Join-Path $taskRoot ('Saved/'+$AuditFolder)
@@ -12,6 +13,7 @@ function Run-Natural([string]$Name,[string[]]$Extra,[bool]$Render=$false){
     if(Get-Process UnrealBuildTool,dotnet,UnrealEditor,UnrealEditor-Cmd,LiveCodingConsole,MSBuild,ShaderCompileWorker -ErrorAction SilentlyContinue){throw 'Engine/build busy. No process stopped.'}
     $taskExe=if($Render){'UnrealEditor.exe'}else{'UnrealEditor-Cmd.exe'}
     $taskArgs=@("$taskRoot/AdaptiveEcosystem.uproject",'-unattended','-nop4','-nosplash',"-abslog=$taskOut/$Name.log")+$Extra
+    if($HabitatDynamics){$taskArgs+='-EcoHabitatDynamics'}
     $taskProcess=Start-Process "$taskEngine/$taskExe" -ArgumentList (($taskArgs|ForEach-Object{'"'+$_+'"'}) -join ' ') -WindowStyle Hidden -WorkingDirectory $taskRoot -PassThru
     "STARTED $Name PID=$($taskProcess.Id)"
     while(-not $taskProcess.WaitForExit(5000)){}
@@ -38,16 +40,30 @@ if($Mode -eq 'Population'){
     if($taskReport.failed -or $taskReport.notRun){throw 'Automation failed'}
 }elseif($Mode -in @('Play','PopulationPlay')){
     $taskFocus=if($Mode -eq 'PopulationPlay'){'-PopulationFocus'}else{'-NoPopulationFocus'}
-    Run-Natural 'NaturalPIE' @('/Game/JYU/Maps/LV_JYU_Ecosystem','-d3d11','-windowed','-ResX=1280','-ResY=720','-VegetationPIE','-VegetationAuthored','-VegetationMap=LV_JYU_Ecosystem',"-VegetationAuditFolder=$AuditFolder",'-VegetationAuditName=NaturalPIE',"-VegetationAuditDuration=$PlaySeconds",$taskFocus,"-ExecCmds=py $taskRoot/Tools/Editor/audit_natural_habitat_play.py") $true
+    $taskArgs=@('/Game/JYU/Maps/LV_JYU_Ecosystem','-d3d11','-windowed','-ResX=1280','-ResY=720','-VegetationPIE','-VegetationAuthored','-VegetationMap=LV_JYU_Ecosystem',"-VegetationAuditFolder=$AuditFolder",'-VegetationAuditName=NaturalPIE',"-VegetationAuditDuration=$PlaySeconds",$taskFocus,"-ExecCmds=py $taskRoot/Tools/Editor/audit_natural_habitat_play.py")
+    if($HabitatDynamics){$taskArgs+='-VegetationDisturbanceFixture'}
+    Run-Natural 'NaturalPIE' $taskArgs $true
     $taskReport=Get-Content "$taskOut/NaturalPIE_Runtime.json" -Raw|ConvertFrom-Json
     if($taskReport.result -ne 'FINISHED'){throw "PIE observer: $($taskReport.error)"}
-}elseif($Mode -in @('Ecology','Lineage')){
-    $taskRuns=if($Mode -eq 'Lineage'){@('Natural23','NoPredators23','Natural47','NoPredators47')}else{@('Natural23','Natural47','Drought23','NoPredators47')}
+}elseif($Mode -eq 'Hunt'){
+    if(!$HabitatDynamics){throw 'The known-hunt fixture requires -HabitatDynamics.'}
+    Run-Natural 'Hunt' @('/Game/JYU/Maps/LV_JYU_Ecosystem','-game','-NullRHI','-EcoV3Seed=23','-EcoV3Wolves=0',
+        '-EcoIntegrationExitAfter=75','-EcosystemAuditQuitOnFinish','-EncounterTrial=hunt',"-EncounterAuditFolder=$AuditFolder",
+        "-ExecCmds=py $taskRoot/Tools/Editor/audit_ecosystem_encounters.py")
+    $taskReport=Get-Content "$taskOut/Encounter_hunt.json" -Raw|ConvertFrom-Json
+    if($taskReport.result -ne 'FINISHED'){throw "Hunt fixture: $($taskReport.error)"}
+}elseif($Mode -in @('Ecology','Lineage','HabitatComparison')){
+    $taskRuns=switch($Mode){
+        'HabitatComparison' {if($HabitatDynamics){throw 'HabitatComparison enables the option only in the treatment runs.'};'Baseline23','Dynamics23','Baseline47','Dynamics47'}
+        'Lineage' {'Natural23','NoPredators23','Natural47','NoPredators47'}
+        default {'Natural23','Natural47','Drought23','NoPredators47'}
+    }
     foreach($taskName in $taskRuns){
         $taskSeed=if($taskName -match '47'){47}else{23}
-        $taskSeconds=if($Mode -eq 'Lineage'){$LineageSeconds}elseif($taskName -eq 'Natural23'){1800}else{600}
+        $taskSeconds=if($Mode -in @('Lineage','HabitatComparison')){$LineageSeconds}elseif($taskName -eq 'Natural23'){1800}else{600}
         $taskArgs=@('/Game/JYU/Maps/LV_JYU_Ecosystem','-server','-NullRHI','-benchmark','-fps=60','-novsync',"-EcoV3Seed=$taskSeed",'-LifeAuditQuitOnFinish',"-LifeAuditName=$taskName","-LifeAuditFolder=$AuditFolder",'-LifeAuditDuration=1200',"-LifeAuditSimulationSeconds=$taskSeconds",'-LifeAuditSampleSeconds=10',"-EcoIntegrationExitAfter=$($taskSeconds+60)","-ExecCmds=py $taskRoot/Tools/Editor/audit_ecosystem_life.py")
-        if($Mode -eq 'Lineage'){$taskArgs+=@('-LifeAuditLineage','-EcoV3AutoAdapt=0')}
+        if($Mode -in @('Lineage','HabitatComparison')){$taskArgs+=@('-LifeAuditLineage','-EcoV3AutoAdapt=0')}
+        if($taskName -like 'Dynamics*'){$taskArgs+='-EcoHabitatDynamics'}
         if($taskName -eq 'Drought23' -or $taskName -like 'NoPredators*'){$taskArgs+='-EcoV3Wolves=0'}
         if($taskName -eq 'Drought23'){$taskArgs+='-LifeAuditDrought=Barren'}
         Run-Natural $taskName $taskArgs
@@ -55,8 +71,18 @@ if($Mode -eq 'Population'){
         "ECOLOGY $taskName result=$($taskReport.result) alive=$($taskReport.alive_at_end)"
         if($taskReport.result -ne 'FINISHED'){throw "Observer failed: $($taskReport.error)"}
     }
+    if($Mode -eq 'HabitatComparison'){
+        & python "$taskRoot/Tools/Editor/verify_habitat_comparison.py" $taskOut
+        if($LASTEXITCODE){throw 'Habitat comparison verification failed.'}
+    }
 }elseif($Mode -eq 'Network'){
-    & "$taskRoot/Tools/Editor/test_vegetation_network.ps1" -Map /Game/JYU/Maps/LV_JYU_Ecosystem -AuthoredWeather -ChildCoverage -AuditFolder ($AuditFolder+'_Network') -OverlapClients -ClientAAt 10 -ClientBAt 95 -Duration 140 -ExitAfter 190
+    $taskNetwork=@{Map='/Game/JYU/Maps/LV_JYU_Ecosystem';AuthoredWeather=$true;OverlapClients=$true;AuditFolder=($AuditFolder+'_Network')}
+    if($HabitatDynamics){
+        $taskNetwork+=@{HabitatDynamics=$true;ClientAAt=30;ClientBAt=75;Duration=115;ExitAfter=135}
+    }else{
+        $taskNetwork+=@{ChildCoverage=$true;ClientAAt=10;ClientBAt=95;Duration=140;ExitAfter=190}
+    }
+    & "$taskRoot/Tools/Editor/test_vegetation_network.ps1" @taskNetwork
 }elseif($Mode -eq 'Persistence'){
     foreach($taskName in @('Save','Load')){
         $taskDuration=if($taskName -eq 'Save'){95}else{20}

@@ -1701,7 +1701,9 @@ namespace EcoWorldV3
                 if(X<0||Y<0||X>=Gw*Cell||Y>=Gw*Cell)continue;
                 const auto I=size_t(CellOf({X,Y}));const auto& H=Habitats[I];
                 if(H.Plant==EcoVegetationV3::EPlant::Grass||Cap[I]<=0)continue;
-                Occlusion+=Length/Steps*H.Shade*(Food[I]/Cap[I]);
+                const double Cover = Vegetation.bHabitatDynamics && H.bNatural
+                    ? VegetationCells[I].Development : 1.;
+                Occlusion+=Length/Steps*H.Shade*(Food[I]/Cap[I])*Cover;
             }
             return Occlusion>=3;
         }
@@ -1918,14 +1920,18 @@ namespace EcoWorldV3
 		}
 
 		/** 먹이 재생 (world.step 7): food ← clip(food + regen·(cap − food), 0, cap). */
-		void Regrow()
+		void Regrow(double SimulationSeconds = 0)
 		{
 			if (!HasValidVegetationLayout()) return; // ON never falls back to a different world's regeneration.
+			auto GrowthWeather = VegetationWeather;
+			if (Vegetation.bHabitatDynamics)
+				GrowthWeather.Temperature = std::clamp(GrowthWeather.Temperature
+					+ EcoVegetationV3::SeasonalTemperatureOffset(SimulationSeconds), -100., 100.);
 			for (size_t k = 0; k < Food.size(); ++k)
 			{
 				if (Vegetation.bEnabled)
 				{
-					const auto Result = EcoVegetationV3::Advance(Vegetation, VegetationWeather, Habitats[k],
+					const auto Result = EcoVegetationV3::Advance(Vegetation, GrowthWeather, Habitats[k],
 						VegetationCells[k], Food[k], Cap[k], Regen[k], EcoRepertoireV3::kStepSeconds);
 					Food[k] = Result.Food;
 					EnvironmentLost += Result.Loss;
@@ -4273,20 +4279,25 @@ namespace EcoWorldV3
 			const double Taken = Dm < F.Food[k] ? Dm : F.Food[k];
 			F.Demand[k] = Dm > 0.0 ? Taken / Dm : 0.0;   // 이제 이 칸은 비율이다
 			F.Food[k] -= Taken;
+			if (F.Vegetation.bHabitatDynamics && F.Habitats[k].bNatural)
+				F.VegetationCells[k].RecordBrowse(Taken, F.Cap[k]);
 			W.Stats.FoodEaten += Taken;                   // 기록만 (아래 계산에 쓰지 않는다)
 		}
 		std::int32_t NumCaught = 0;
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			FHerbBody& B = *Herbs[i].Body;
-			const double Gain = W.Want[static_cast<size_t>(i)] * F.Demand[static_cast<size_t>(W.CellIdx[static_cast<size_t>(i)])];
-			B.Energy = R3::EnergyAfterIntake(W.EDrained[static_cast<size_t>(i)], Gain, RC);
+			const size_t Cell = static_cast<size_t>(W.CellIdx[static_cast<size_t>(i)]);
+			const double Gain = W.Want[static_cast<size_t>(i)] * F.Demand[Cell];
+			const double Nutrition = F.Vegetation.bHabitatDynamics && F.Habitats[Cell].bNatural
+				? Gain * F.VegetationCells[Cell].NutritionMultiplier() : Gain;
+			B.Energy = R3::EnergyAfterIntake(W.EDrained[static_cast<size_t>(i)], Nutrition, RC);
 			B.LastIntake = Gain;                          // 기록만
 			W.Stats.EatSteps += Gain > 0.0 ? 1 : 0;
 			if (bReserve)
 			{
 				// 야생 (w1): 모자람은 비축에서, 남음은 비축으로 (world.py step 3) 의 _wild_reserve_step — 번식 C5 앞)
-				const FWildReserveDelta Dr = WildReserveStep(B.Energy, B.Reserve, Gain * RC.FoodEnergyPerUnit, W.ReserveCap, W.Config.WildReserve);
+				const FWildReserveDelta Dr = WildReserveStep(B.Energy, B.Reserve, Nutrition * RC.FoodEnergyPerUnit, W.ReserveCap, W.Config.WildReserve);
 				W.Stats.ReserveUsed += Dr.Used;
 				W.Stats.ReserveRefill += Dr.Refill;
 				++W.Stats.ReserveLiveSteps;
@@ -4346,7 +4357,7 @@ namespace EcoWorldV3
 		// C7. 피식 EMA (분모 N 고정 — 파이썬 128 과 같은 꼴, 열린 질문 7. 통합 모드는 PredEmaDenominator 고정값). C8. 먹이 재생
 		const std::int32_t EmaDen = W.Config.PredEmaDenominator > 0 ? W.Config.PredEmaDenominator : (N > 0 ? N : 1);
 		W.PredEma = EcoObservationV3::UpdatePredationEma(W.PredEma, NumCaught, EmaDen, W.ObsCfg);
-		F.Regrow();
+		F.Regrow(W.T * EcoRepertoireV3::kStepSeconds);
 
 		// D. t ← t + 1, Tick. D′. 새 t 의 어둠
 		++W.T;

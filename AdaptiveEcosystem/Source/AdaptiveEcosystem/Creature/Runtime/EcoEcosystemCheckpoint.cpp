@@ -36,6 +36,7 @@
 
 namespace EcoCheckpoint
 {
+    constexpr uint32 CheckpointVersion = 2;
     template<class T,class F> void Array(FArchive& A,TArray<T>& Values,int32 Limit,F Item)
     {
         int32 N=Values.Num();A<<N;if(A.IsError()||N<0||N>Limit){A.SetError();return;}
@@ -222,7 +223,7 @@ struct FEcoEcosystemCheckpoint
         if(!Loading){
             FMemoryWriter Memory(Bytes);FObjectAndNameAsStringProxyArchive A(Memory,false);Serialize(A);
             if(A.IsError()||Bytes.Num()>16*1024*1024)return Reject(TEXT("serialization budget"));
-            const uint32 Crc=FCrc::MemCrc32(Bytes.GetData(),Bytes.Num());uint32 Magic=0x45434f31,Version=1,Length=Bytes.Num();
+            const uint32 Crc=FCrc::MemCrc32(Bytes.GetData(),Bytes.Num());uint32 Magic=0x45434f31,Version=CheckpointVersion,Length=Bytes.Num();
             TArray<uint8> Output;FMemoryWriter Header(Output);Header<<Magic<<Version<<Length;uint32 Check=Crc;Header<<Check;Header.Serialize(Bytes.GetData(),Bytes.Num());
             IFileManager::Get().MakeDirectory(*FPaths::GetPath(File),true);
             if(!FFileHelper::SaveArrayToFile(Output,*(File+TEXT(".tmp")))||!IFileManager::Get().Move(*File,*(File+TEXT(".tmp")),true,true))return Reject(TEXT("atomic checkpoint write"));
@@ -231,7 +232,7 @@ struct FEcoEcosystemCheckpoint
         const int64 FileSize=IFileManager::Get().FileSize(*File);
         if(FileSize<16||FileSize>16*1024*1024||!FFileHelper::LoadFileToArray(Bytes,*File))return Reject(TEXT("missing/oversized checkpoint"));
         FMemoryReader Memory(Bytes);uint32 Magic=0,Version=0,Length=0,Crc=0;Memory<<Magic<<Version<<Length<<Crc;
-        if(Magic!=0x45434f31||Version!=1||Length!=uint32(Bytes.Num()-16)||FCrc::MemCrc32(Bytes.GetData()+16,Length)!=Crc)return Reject(TEXT("version/length/checksum mismatch"));
+        if(Magic!=0x45434f31||Version!=CheckpointVersion||Length!=uint32(Bytes.Num()-16)||FCrc::MemCrc32(Bytes.GetData()+16,Length)!=Crc)return Reject(TEXT("version/length/checksum mismatch"));
         FObjectAndNameAsStringProxyArchive A(Memory,false);A.ArMaxSerializeSize=16*1024*1024;Serialize(A);
         if(A.IsError()||Memory.Tell()!=Bytes.Num()||SavedMap!=MapName||Build!=RuntimeHash()||Brain!=N->GetActiveBrain().Id
             ||Regions.Num()!=N->NumContexts()||Agents.Num()>2*S.GlobalPopulationLimit||!FMath::IsFinite(Time.ServerTimeSeconds)||Time.ServerTimeSeconds<0
@@ -245,6 +246,8 @@ struct FEcoEcosystemCheckpoint
                 ||!R.Sim.Config.bEcosystemLife||R.Sim.T!=GlobalT||!ValidGrid(R.Sim.Food)||!Staged->RegionalStates.Contains(R.Id))return Reject(TEXT("region layout mismatch"));
             if(R.AdoptedDeer<0||R.AdoptedWolves<0||R.AdoptedDeer>Successful||R.AdoptedWolves>Successful)return Reject(TEXT("invalid native adoption ordinal"));
             if(C->Sim.Config.bNaturalHabitats!=R.Sim.Config.bNaturalHabitats||C->Sim.Config.bWildRefuges!=R.Sim.Config.bWildRefuges
+                ||C->Sim.Food.Vegetation.bHabitatDynamics!=R.Sim.Food.Vegetation.bHabitatDynamics
+                ||R.Sim.Config.Vegetation.bHabitatDynamics!=R.Sim.Food.Vegetation.bHabitatDynamics
                 ||C->Sim.Config.HabitatSignature!=R.Sim.Config.HabitatSignature||R.Sim.RepCfg.bFootprintArrival==R.Sim.Config.bNaturalHabitats)
                 return Reject(TEXT("habitat profile/authoring or arrival contract changed"));
             if(R.Sim.Config.bNaturalHabitats&&(!R.Sim.Config.NaturalGround.IsValid()
@@ -283,6 +286,8 @@ struct FEcoEcosystemCheckpoint
                 ||!FiniteBody||V.Transform.ContainsNaN()||!FMath::IsFinite(V.Vitals.HP)||!FMath::IsFinite(V.Link.GroundZ)||!FMath::IsFinite(V.Link.Individual.Born)
                 ||V.Id>=Staged->NextStableAgentId)return Reject(TEXT("invalid individual identity/body/genome"));
             const auto& Life=V.Link.Individual;
+            if(!Life.Memory.IsHuntMemoryValid()||Life.Memory.HuntTime>GlobalT*EcoRepertoireV3::kStepSeconds)
+                return Reject(TEXT("invalid remembered hunt location"));
             if(!std::isfinite(Life.MaturitySeconds)||Life.MaturitySeconds<180||Life.MaturitySeconds>7200
                 ||!std::isfinite(Life.FemaleBirthFraction)||Life.FemaleBirthFraction<.25||Life.FemaleBirthFraction>.75
                 ||uint8(Life.Sex)>2||(Life.bNaturalPopulation&&Life.Sex==EcoLifeV3::ESex::Unspecified)

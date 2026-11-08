@@ -84,10 +84,28 @@ namespace EcoLifeV3
         bool bLastDamageKnown=false;
         double PursuitExposure=0;
         double LastX=0,LastY=0; // observed position only, native units
+        double HuntX=0, HuntY=0, HuntTime=-1, HuntPressure=0; // world XY in native units
         EEncounter LastKind=EEncounter::Harmless;
         EResponse Response=EResponse::Policy;
         std::array<std::uint64_t,16> Episodes{};
         std::uint32_t Cursor=0;
+        double HuntRisk(double X,double Y,double Now) const
+        {
+            if (HuntTime < 0 || Now < HuntTime) return 0;
+            const double Distance=std::hypot(X-HuntX,Y-HuntY);
+            return HuntPressure*std::exp(-(Now-HuntTime)/145)*std::clamp(1-Distance/24,0.,1.);
+        }
+        void RememberHunt(double X,double Y,double Now)
+        {
+            if (Now < HuntTime || !std::isfinite(Now) || !std::isfinite(X) || !std::isfinite(Y)) return;
+            HuntPressure=std::min(1.,HuntRisk(X,Y,Now)+.30);
+            HuntX=X;HuntY=Y;HuntTime=Now;
+        }
+        bool IsHuntMemoryValid() const
+        {
+            return std::isfinite(HuntX) && std::isfinite(HuntY) && std::isfinite(HuntTime) && HuntTime>=-1
+                && std::isfinite(HuntPressure) && HuntPressure>=0 && HuntPressure<=1;
+        }
         void Age(double Now)
         {
             if(!std::isfinite(Now)||Now<LastUpdate)return;

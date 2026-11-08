@@ -48,7 +48,7 @@ def digest(row):
 def sample(row, elapsed, simulation_elapsed):
     if lineage_only:
         agent_keys=('stable_id','species','region','hp','energy','brain','policy_obs_dim','policy_mask_version')
-        life_keys=('origin','generation','parent_a','parent_b','born','offspring',
+        life_keys=('origin','generation','parent_a','parent_b','born','sex','offspring',
                    'age_seconds','maturity','size_gene','speed_gene','coat_gene','caution_gene','sociability_gene')
         agents=[{**{k:a[k] for k in agent_keys if k in a},
                  'life':{k:a['life'][k] for k in life_keys if k in a['life']}} for a in row['agents']]
@@ -116,7 +116,9 @@ def tick(dt):
                 saved_regions=json.loads(saved_snapshot.read_text(encoding='utf-8'))['regions']
                 live_regions=[json.loads(f.capture_diagnostics(True)) for f in unreal.GameplayStatics.get_all_actors_of_class(world,unreal.EcoVegetationField)]
                 def cells(regions):
-                    return {f['region']:[{k:c[k] for k in ('cell','development','food','capacity','moisture','stress')} for c in f.get('logical_cells',[])] for f in regions}
+                    keys=('cell','development','food','capacity','moisture','stress','browse_pressure',
+                          'surface_water','fresh_fraction','disturbance','pending_disturbance')
+                    return {f['region']:[{k:c[k] for k in keys} for c in f.get('logical_cells',[])] for f in regions}
                 if cells(saved_regions)!=cells(live_regions):raise AssertionError('Restored cell development/soil/food differs')
                 cell_count=sum(len(v) for v in cells(live_regions).values());cell_verified=cell_count>0
             state['operation']={'restored_exactly':True,'rejected_load_unchanged':True,'agents':len(restored['agents']),'restored_cell_development_exactly':cell_verified,'restored_soil_cells':cell_count}
