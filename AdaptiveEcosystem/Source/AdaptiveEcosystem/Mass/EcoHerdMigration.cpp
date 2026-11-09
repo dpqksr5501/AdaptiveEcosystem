@@ -28,6 +28,21 @@ static TAutoConsoleVariable<float> CVarDwell(TEXT("eco.HerdMigration.ShortageSec
 static TAutoConsoleVariable<float> CVarCooldown(TEXT("eco.HerdMigration.SettleSeconds"),45.f,TEXT("Minimum residence after a journey."));
 static TAutoConsoleVariable<float> CVarTimeout(TEXT("eco.HerdMigration.StallSeconds"),25.f,TEXT("No-progress timeout; marks the journey blocked without teleporting."));
 
+static TAutoConsoleVariable<int32> CVarRegional(TEXT("eco.HerdMigration.Regional"),0,TEXT("Opt-in regional ordered individual departures; legacy herd mode remains available at 0."));
+static TAutoConsoleVariable<float> CVarInterval(TEXT("eco.HerdMigration.DepartureSeconds"),3.f,TEXT("Minimum interval between regional approvals."));
+static TAutoConsoleVariable<float> CVarKeep(TEXT("eco.HerdMigration.KeepFraction"),.25f,TEXT("Episode initial population fraction retained, except singleton evacuation."));
+static TAutoConsoleVariable<float> CVarRecovery(TEXT("eco.HerdMigration.RecoveryFraction"),.35f,TEXT("Food fraction required to close an episode."));
+static TAutoConsoleVariable<float> CVarRecoverySeconds(TEXT("eco.HerdMigration.RecoverySeconds"),15.f,TEXT("Continuous recovery before renewing an episode budget."));
+static TAutoConsoleVariable<float> CVarHorizon(TEXT("eco.HerdMigration.FoodHorizonSeconds"),60.f,TEXT("Food demand forecast horizon; current stock only, no speculative regeneration."));
+void UEcoHerdMigrationSubsystem::RegisterResident(FName Region,int64 Agent)
+{
+    check(IsInGameThread());
+    if(!Region.IsNone()&&Agent>0){
+        for(auto& Entry:RegionalStates)if(Entry.Key!=Region)Entry.Value.Residents.Remove(Agent);
+        RegionalStates.FindOrAdd(Region).Residents.AddUnique(Agent);
+    }
+}
+
 AEcoHerdMigrationRoute::AEcoHerdMigrationRoute(){PrimaryActorTick.bCanEverTick=false;SetRootComponent(CreateDefaultSubobject<USceneComponent>(TEXT("RouteRoot")));}
 bool AEcoHerdMigrationRoute::IsValidRoute() const
 {
@@ -122,7 +137,7 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
             auto* R=Native->GetContext(Links[I].ContextIndex);FEcoHerdRuntimeData H;
             const bool HasHerd=Herds->GetHerdData(Members[I].HerdRuntimeIndex,H);
             if(!Links[I].bAdopted||Links[I].bDead||Bodies[I].Body.DeathCause!=EcoWorldV3::kDeathNone||!R
-                ||(!HasHerd&&!Js[I].bActive))continue;
+                ||(CVarRegional.GetValueOnGameThread()==0&&!HasHerd&&!Js[I].bActive))continue;
             FMember A;A.Id=Ids[I].StableAgentId;A.Herd=Js[I].bActive?Js[I].PersistentHerdId:H.PersistentHerdId;A.Region=&Regions[I];A.Travel=&Travels[I];
             A.Journey=&Js[I];A.Link=&Links[I];A.Body=&Bodies[I];A.Behavior=&Behaviors[I];A.Entity=C.GetEntity(I);
             A.Position=R->UnitsToCm(Bodies[I].Body.Pos.X,Bodies[I].Body.Pos.Y,Links[I].GroundZ);Agents.Add(A);
@@ -199,6 +214,7 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 A.Link->ContextIndex=Target->Index;A.Link->PrevGroundZ=A.Link->GroundZ;
                 A.Link->bRefreshObservation=true;
                 A.Region->CurrentRegionId=P.Destination;A.Region->CurrentRegionIndex=Target->RegionRuntimeIndex;
+                RegisterResident(P.Destination,A.Id);
                 A.Behavior->Rep.HideTarget=-1;A.Behavior->Rep.bArrived=false;A.Behavior->Decision.bPrepared=false;
                 Arrivals.Add(O);
             }
@@ -230,7 +246,7 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
             Preparing?FName(TEXT("GatheringForJourney")):P.Failed?FName(TEXT("PathBlocked")):Rest?FName(TEXT("LowEnergyRest")):Spread?FName(TEXT("HerdSpread")):FName(TEXT("FoodShortage")));
     }
     for(auto It=Plans.CreateIterator();It;++It)if(IsTerminal(It.Value().State)&&Now>It.Value().CooldownUntil
-        &&!Groups.Contains(It.Key()))It.RemoveCurrent();
+         )It.RemoveCurrent();
     for(auto It=ShortageSince.CreateIterator();It;++It)if(!Groups.Contains(It.Key()))It.RemoveCurrent();
     for(auto It=NextPlanAttempt.CreateIterator();It;++It)if(!Groups.Contains(It.Key()))It.RemoveCurrent();
     if(!IsEnabled())return true;
@@ -240,19 +256,75 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
         int32 Delta=0;for(const auto& A:Arrivals){Delta+=(A.DestinationRegionId==Region);Delta-=(A.OriginRegionId==Region);}
         return FMath::Max(0,Committed+Delta);
     };
-    TArray<int64> HerdIds;Groups.GetKeys(HerdIds);HerdIds.Sort();
-    for(const int64 Herd:HerdIds){
-        const auto& Members=Groups.FindChecked(Herd);if(Members.Num()<2)continue;
-        if(const auto* P=Plans.Find(Herd);P&&(!IsTerminal(P->State)||Now<P->CooldownUntil))continue;
-        if(Members.ContainsByPredicate([&](int32 I){return Agents[I].Journey->bStranded;}))continue;
+    const bool Regional=CVarRegional.GetValueOnGameThread()!=0;
+    struct FCandidate { int64 Herd; TArray<int32> Members; };
+    TArray<FCandidate> Candidates;
+    if(Regional){
+        // Adoption records real registration order. Fallback covers worlds restored before adoption hooks.
+        for(const auto& A:Agents)RegisterResident(A.Region->CurrentRegionId,A.Id);
+        TArray<FName> Regions;RegionalStates.GetKeys(Regions);
+        Regions.Sort([](FName A,FName B){return A.LexicalLess(B);});
+        for(const FName Region:Regions){
+            auto& R=RegionalStates.FindChecked(Region);
+            R.Residents.RemoveAll([&](int64 Id){const auto* I=ById.Find(Id);return !I||Agents[*I].Region->CurrentRegionId!=Region;});
+            auto* Source=Native->FindContext(Region);if(!Source)continue;
+            int32 Outgoing=0;
+            for(const int64 Id:R.Residents){const auto& A=Agents[ById.FindChecked(Id)];Outgoing+=A.Journey->bActive&&A.Travel->TargetRegionId!=Region;}
+            R.Projected=FMath::Max(0,R.Residents.Num()-Outgoing);
+            // EnergyDrain is per decision step; FoodEnergyPerUnit converts food to energy.
+            // Use maximum configured gait demand as a conservative movement allowance, never actual intake (zero under starvation).
+            const auto& RC=Source->Sim.RepCfg;
+            const double Need=FMath::Max3(RC.GaitDrain[0],RC.GaitDrain[1],RC.GaitDrain[2])*RC.EnergyDrain/RC.FoodEnergyPerUnit*FMath::Max(1.f,CVarHorizon.GetValueOnGameThread())/EcoRepertoireV3::kStepSeconds;
+            R.Supported=Need>0&&FMath::IsFinite(Need)?FMath::FloorToInt(FMath::Min(1000000.,Source->Sim.Food.Total()/Need)):0;
+            const bool Short=Source->FoodFraction()<CVarShortage.GetValueOnGameThread();
+            if(!R.bEpisode){
+                if(!Short){R.ShortageSince=-1;R.Reason=TEXT("RegionSustainable");continue;}
+                if(R.ShortageSince<0)R.ShortageSince=Now;
+                if(Now-R.ShortageSince<FMath::Max(0.f,CVarDwell.GetValueOnGameThread())){R.Reason=TEXT("ShortageDwell");continue;}
+                R.bEpisode=true;R.Initial=R.Residents.Num();R.KeepFloor=R.Initial<=1?0:FMath::CeilToInt(R.Initial*FMath::Clamp(CVarKeep.GetValueOnGameThread(),0.f,1.f));
+                R.Approved.Reset();for(const int64 Id:R.Residents)if(Agents[ById.FindChecked(Id)].Journey->bActive)R.Approved.Add(Id);
+            }
+            if(Source->FoodFraction()>=CVarRecovery.GetValueOnGameThread()&&R.Projected<=R.Supported){
+                if(R.RecoverySince<0)R.RecoverySince=Now;
+                if(Now-R.RecoverySince>=FMath::Max(0.f,CVarRecoverySeconds.GetValueOnGameThread())){
+                    R.bEpisode=false;R.ShortageSince=-1;R.RecoverySince=-1;R.Reason=TEXT("Recovered");continue;
+                }
+            }else R.RecoverySince=-1;
+            if(R.Projected<=R.Supported){R.Reason=TEXT("RegionSustainable");continue;}
+            if(R.Projected<=R.KeepFloor){R.Reason=TEXT("RetentionFloor");continue;}
+            if(Now<R.NextDeparture){R.Reason=TEXT("DepartureInterval");continue;}
+            R.Reason=TEXT("NoEligibleCandidate");
+            for(const int64 Id:R.Residents){
+                const int32 I=ById.FindChecked(Id);const auto& A=Agents[I];
+                if(A.Journey->bActive||A.Journey->bStranded)continue;
+                bool Cooling=false;for(const auto& P:Plans)if(P.Value.Members.Contains(Id))Cooling|=!IsTerminal(P.Value.State)||Now<P.Value.CooldownUntil;
+                if(Cooling)continue;
+                if(!R.Approved.Contains(Id)&&R.Approved.Num()>=R.Initial-R.KeepFloor){R.Reason=TEXT("EpisodeBudgetReached");continue;}
+                Candidates.Add({A.Herd,{I}});
+            }
+        }
+    }else{
+        TArray<int64> HerdIds;Groups.GetKeys(HerdIds);HerdIds.Sort();
+        for(const int64 Herd:HerdIds)Candidates.Add({Herd,Groups.FindChecked(Herd)});
+    }
+    for(const auto& Candidate:Candidates){
+        const int64 Herd=Candidate.Herd;const auto& Members=Candidate.Members;
+        if(Members.IsEmpty()||(!Regional&&Members.Num()<2))continue;
         const FName Origin=Agents[Members[0]].Region->CurrentRegionId;auto* Source=Native->FindContext(Origin);if(!Source)continue;
-        bool SameRegion=true;int32 Hungry=0;for(const int32 I:Members){SameRegion&=Agents[I].Region->CurrentRegionId==Origin;Hungry+=Agents[I].Body->Body.Energy<.4;}
-        const bool Short=Source->FoodFraction()<FMath::Clamp(double(CVarShortage.GetValueOnGameThread()),.01,.95);
-        if(!SameRegion||!Short){ShortageSince.Remove(Herd);continue;}
-        double& Since=ShortageSince.FindOrAdd(Herd,Now);
-        if(Now-Since<FMath::Max(0.f,CVarDwell.GetValueOnGameThread())||(Hungry==0&&Source->FoodFraction()>=.05))continue;
-        if(Now<NextPlanAttempt.FindRef(Herd))continue;
-        NextPlanAttempt.Add(Herd,Now+3);
+        auto& RegionalState=RegionalStates.FindOrAdd(Origin);
+        if(Regional){if(Now<RegionalState.NextDeparture)continue;}
+        else{
+            bool Busy=false;for(const auto& P:Plans)if(P.Value.HerdId==Herd)Busy|=!IsTerminal(P.Value.State)||Now<P.Value.CooldownUntil;
+            if(Busy)continue;
+            if(Members.ContainsByPredicate([&](int32 I){return Agents[I].Journey->bStranded;}))continue;
+            bool SameRegion=true;int32 Hungry=0;for(const int32 I:Members){SameRegion&=Agents[I].Region->CurrentRegionId==Origin;Hungry+=Agents[I].Body->Body.Energy<.4;}
+            const bool Short=Source->FoodFraction()<FMath::Clamp(double(CVarShortage.GetValueOnGameThread()),.01,.95);
+            if(!SameRegion||!Short){ShortageSince.Remove(Herd);continue;}
+            double& Since=ShortageSince.FindOrAdd(Herd,Now);
+            if(Now-Since<FMath::Max(0.f,CVarDwell.GetValueOnGameThread())||(Hungry==0&&Source->FoodFraction()>=.05))continue;
+            if(Now<NextPlanAttempt.FindRef(Herd))continue;
+            NextPlanAttempt.Add(Herd,Now+3);
+        }
         TArray<AEcoHerdMigrationRoute*> Routes;for(TActorIterator<AEcoHerdMigrationRoute> It(GetWorld());It;++It)if(It->bEnabled&&It->IsValidRoute())Routes.Add(*It);
         Routes.Sort([](const AEcoHerdMigrationRoute& A,const AEcoHerdMigrationRoute& B){return A.GetPathName()<B.GetPathName();});
         TArray<FVector> BestPoints;FName Destination;float Width=600;double BestScore=0;
@@ -302,7 +374,13 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 }
             // Authored adjacent route grants destination knowledge; population forecast includes live incoming plans.
             const double ExpectedFood=Report?Report->Food+Report->Recovery*.25:State.FoodAmount;
-            const int32 ExpectedPopulation=Report?Report->Population:CurrentPopulation(Dest,State.Population);
+            int32 ExpectedPopulation=Report?Report->Population:CurrentPopulation(Dest,State.Population);
+            if(Regional){
+                ExpectedPopulation=0;for(const auto& A:Agents)ExpectedPopulation+=A.Region->CurrentRegionId==Dest;
+                const auto& RC=Target->Sim.RepCfg;
+                const double Need=FMath::Max3(RC.GaitDrain[0],RC.GaitDrain[1],RC.GaitDrain[2])*RC.EnergyDrain/RC.FoodEnergyPerUnit*FMath::Max(1.f,CVarHorizon.GetValueOnGameThread())/EcoRepertoireV3::kStepSeconds;
+                if(!FMath::IsFinite(Need)||Need<=0||ExpectedFood<(ExpectedPopulation+Incoming+1)*Need){RegionalState.Reason=TEXT("DestinationCapacity");continue;}
+            }
             const double PerHead=ExpectedFood/FMath::Max(1,ExpectedPopulation+Incoming+Members.Num());
             FRegionEcologyState Own;if(!Ecology->GetRegionState(Origin,Own))continue;
             if(PerHead<=Own.FoodAmount/FMath::Max(1,CurrentPopulation(Origin,Own.Population))*1.2||PerHead<.5)continue;
@@ -320,6 +398,7 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
         }
         if(BestPoints.IsEmpty()){
             for(const int32 I:Members)Agents[I].Journey->Reason=TEXT("NoViableKnownRoute");
+            if(Regional)RegionalState.Reason=TEXT("NoViableKnownRoute");
             continue;
         }
         FEcoHerdJourney P;P.Id=NextPlan++;P.HerdId=Herd;P.Origin=Origin;P.Destination=Destination;P.Points=MoveTemp(BestPoints);
@@ -334,7 +413,13 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 *Intent=FEcoShelterIntentFragment();
             }
         }
-        Change(P,EEcoHerdJourneyState::Preparing,TEXT("FoodShortage"));Plans.Add(Herd,MoveTemp(P));ShortageSince.Remove(Herd);
+        Change(P,EEcoHerdJourneyState::Preparing,TEXT("FoodShortage"));const int64 Key=P.Id;Plans.Add(Key,MoveTemp(P));
+        if(Regional){RegionalState.Approved.AddUnique(Agents[Members[0]].Id);RegionalState.NextDeparture=Now+FMath::Max(.01f,CVarInterval.GetValueOnGameThread());--RegionalState.Projected;RegionalState.Reason=TEXT("Approved");}
+        else ShortageSince.Remove(Herd);
+    }
+    if(Regional)for(const auto& Entry:RegionalStates){const auto& R=Entry.Value;
+        if(R.bEpisode&&FMath::Fmod(Now,3.)<.51)
+            UE_LOG(LogEcoHerdMigration,Log,TEXT("[RegionalMigration] Region=%s Live=%d Projected=%d Supported=%d Keep=%d Approved=%d/%d Reason=%s"),*Entry.Key.ToString(),R.Residents.Num(),R.Projected,R.Supported,R.KeepFloor,R.Approved.Num(),R.Initial-R.KeepFloor,*R.Reason.ToString());
     }
     return true;
 }

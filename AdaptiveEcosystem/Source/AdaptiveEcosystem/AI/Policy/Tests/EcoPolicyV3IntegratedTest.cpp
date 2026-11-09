@@ -3957,3 +3957,48 @@ bool FEcoHerdReturnFailure::RunTest(const FString&)
     return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRegionalOrderedMigration,"AdaptiveEcosystem.Policy.V3.HerdMigration.RegionalOrderedBudget",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoRegionalOrderedMigration::RunTest(const FString&)
+{
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    auto* Enable=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration"));
+    auto* Regional=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration.Regional"));
+    auto* Dwell=IConsoleManager::Get().FindConsoleVariable(TEXT("eco.HerdMigration.ShortageSeconds"));
+    const int32 OldEnable=Enable->GetInt(),OldRegional=Regional->GetInt();const float OldDwell=Dwell->GetFloat();
+    ON_SCOPE_EXIT{Enable->Set(OldEnable,ECVF_SetByCode);Regional->Set(OldRegional,ECVF_SetByCode);Dwell->Set(OldDwell,ECVF_SetByCode);};
+    Enable->Set(1,ECVF_SetByCode);Regional->Set(1,ECVF_SetByCode);Dwell->Set(0.f,ECVF_SetByCode);
+    for(const int32 Count:{1,12}){
+        FIntegratedHarness H;auto Settings=TestSettings();Settings.bWildFlight=false;Settings.bObstacles=false;
+        if(!H.Setup(*this,Settings))return false;
+        auto* A=H.AddRegion(TEXT("Origin"),0,FVector::ZeroVector,Count,0);
+        auto* B=H.AddRegion(TEXT("Destination"),1,FVector(14000,0,0),0,0);
+        auto* E=H.Scoped.World->GetSubsystem<UEcologySimulationSubsystem>();
+        FRegionEcologyState State;State.RegionId=A->RegionId;State.FoodAmount=0;State.FoodCapacity=100;E->RegisterRegionState(State);
+        State.RegionId=B->RegionId;State.FoodAmount=10000;State.FoodCapacity=10000;E->RegisterRegionState(State);
+        TArray<FVector> Positions;TArray<int64> Ids;for(int32 I=0;I<Count;++I){Positions.Add(FVector(5000+I*10,5000,0));Ids.Add(100+I);}
+        H.Spawn(false,A->RegionId,0,Positions,Ids);H.Frame(0);
+        // A single persistent herd must not force all members to depart as one plan.
+        auto* Herds=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>();const int32 Herd=Herds->AllocateHerd(0,FVector(5000,5000,0));
+        for(const auto Entity:H.Deer)H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(Entity).HerdRuntimeIndex=Herd;
+        for(double& Food:A->Sim.Food.Food)Food=0;
+        auto* Route=H.Scoped.World->SpawnActor<AEcoHerdMigrationRoute>();Route->FromRegion=A->RegionId;Route->ToRegion=B->RegionId;
+        Route->Points={FVector(5000,5000,0),FVector(18000,5000,0)};
+        auto* M=H.Scoped.World->GetSubsystem<UEcoHerdMigrationSubsystem>();
+        FEcoServerTimeSnapshot Time;TArray<FEcoMigrationOutcome> Receipts;
+        M->Reconcile(*H.EM,Time,1,Receipts);
+        TestEqual(TEXT("Only the first registration departs in a boundary"),M->GetPlans().Num(),1);
+        const auto& Order=M->GetRegionalStates().FindChecked(A->RegionId).Residents;
+        TestTrue(TEXT("First plan follows regional registration order"),M->GetPlans().CreateConstIterator().Value().Members.Contains(Order[0]));
+        M->Reconcile(*H.EM,Time,1,Receipts);
+        TestEqual(TEXT("Same boundary cannot duplicate approvals"),M->GetPlans().Num(),1);
+        for(int32 I=1;I<=9;++I){Time.ServerTimeSeconds=I*3;M->Reconcile(*H.EM,Time,I+1,Receipts);}
+        const auto& R=M->GetRegionalStates().FindChecked(A->RegionId);
+        TestEqual(TEXT("Episode caps departures including pending travelers"),R.Approved.Num(),Count==1?1:9);
+        TestEqual(TEXT("Retention floor has a singleton exception"),R.KeepFloor,Count==1?0:3);
+        TestEqual(TEXT("Projected residents count reservations once"),R.Projected,Count==1?0:3);
+        Time.ServerTimeSeconds=28;M->Reconcile(*H.EM,Time,20,Receipts);
+        TestEqual(TEXT("Further evaluations do not refill episode budget"),M->GetRegionalStates().FindChecked(A->RegionId).Approved.Num(),Count==1?1:9);
+    }
+    return true;
+}
