@@ -1689,6 +1689,13 @@ namespace EcoWorldV3
 		bool bObstacleObsProbe = false;
 		EcoObservationV3::FObstacleObsConfig ObstacleObsCfg = EcoObservationV3::kR5ObstacleObsConfig;
 		FWorldStats Stats;
+        // Derived acceleration only: never serialized or policy-visible.
+        bool bSpatialKin = true, bSpatialThreat = true, bSpatialWolf = true;
+        EcoSpatialV3::FDiagnostics SearchDiagnostics;
+        EcoSpatialV3::FGrid KinGrid, ThreatGrid, PreyGrid;
+        std::vector<std::int32_t> KinCandidates, ThreatCandidates, WolfCandidates;
+        double MaxThreatHearing = 0, MinPreyDetect = 1, MinPreyCatch = 1;
+
 		std::vector<EcoObservationV3::FThreatInput> ExternalThreats;
 		std::vector<FVec2> StepCatches;      // 이번 스텝에 잡힌 자리 (디버그)
 
@@ -2050,6 +2057,14 @@ namespace EcoWorldV3
 				}
 			}
 			W.ThreatIn.insert(W.ThreatIn.end(), W.ExternalThreats.begin(), W.ExternalThreats.end());
+            W.MaxThreatHearing = 0;
+            for (const auto& T : W.ThreatIn) W.MaxThreatHearing = std::max(W.MaxThreatHearing, T.HearR);
+            if (W.bSpatialThreat)
+            {
+                EcoSpatialV3::FScope Measure(W.SearchDiagnostics.bEnabled ? &W.SearchDiagnostics.Build : nullptr);
+                W.ThreatGrid.Build(static_cast<std::int32_t>(W.ThreatIn.size()), W.ObsCfg.SeeR,
+                    [&](std::int32_t I) { return FVec2{W.ThreatIn[I].X,W.ThreatIn[I].Y}; });
+            }
 		}
 
 		inline void BuildKinInputs(FWorldState& W, const FHerbView* Herbs, std::int32_t N)
@@ -2062,6 +2077,12 @@ namespace EcoWorldV3
 				K.Y = Herbs[i].Body->Pos.Y;
 				K.Behavior = Herbs[i].Rep->Behavior;
 			}
+            if (W.bSpatialKin)
+            {
+                EcoSpatialV3::FScope Measure(W.SearchDiagnostics.bEnabled ? &W.SearchDiagnostics.Build : nullptr);
+                W.KinGrid.Build(N, std::max(W.ObsCfg.SeeR, W.ObsCfg.SepRadius),
+                    [&](std::int32_t I) { return FVec2{W.KinIn[I].X,W.KinIn[I].Y}; });
+            }
 		}
 
 		/**
@@ -2148,22 +2169,34 @@ namespace EcoWorldV3
 			EcoRepertoireV3::FRepState& S = *H.Rep;
 			const EcoObservationV3::FObservationConfig& OC = W.ObsCfg;
 
-			// 야생 2단계 3 세로 장애물: 이 사슴에서 위협마다 눈길을 원판이 가리는가 (world.py `_geometry` 의 pvis 가림 — 발소리는 그대로).
-			// 숲 시야를 켜면 줄기 ∨ 잎 (EyeBlocked). 시야 밖 쌍은 재지 않는다 (EyeCandidate — 가림은 bSight 에서만 읽어 값이 같다)
-			const FObstacleConfig& Ob = W.Config.Obstacles;
-			if ((Ob.Active() && Ob.bBlockSight)||W.Config.bEcosystemLife)
-			{
-				const double SeeP = SeePredNow(W) * S.SeeMult;   // PerceiveThreats 의 SeeP 와 같은 곱
-				for (EcoObservationV3::FThreatInput& T : W.ThreatIn)
-				{
-					T.bOccluded = EyeCandidate(B.Pos, B.Head, SeeP, T.X, T.Y, OC)
-                        && ((Ob.Active()&&Ob.bBlockSight&&EyeBlocked(Ob,B.Pos.X,B.Pos.Y,T.X,T.Y))
-                            ||(W.Config.bEcosystemLife&&W.Food.BlocksSight(B.Pos.X,B.Pos.Y,T.X,T.Y)));
-				}
-			}
-			P.Threat = EcoObservationV3::PerceiveThreats(B.Pos, B.Head, SeePredNow(W), S.SeeMult,
-														 S.SeeMultLast, W.ThreatIn.data(), static_cast<std::int32_t>(W.ThreatIn.size()), OC);
-			P.Kin = EcoObservationV3::PerceiveKin(Self, B.Pos, B.Head, W.KinIn.data(), N, OC);
+
+            {
+                EcoSpatialV3::FScope Measure(W.SearchDiagnostics.bEnabled ? &W.SearchDiagnostics.Threat : nullptr);
+                const auto Full = static_cast<std::int32_t>(W.ThreatIn.size());
+                const double SeeP = SeePredNow(W) * S.SeeMult;
+                const double Hearing = OC.bHearCapToSight ? std::min(W.MaxThreatHearing, SeeP) : W.MaxThreatHearing;
+                const auto Rows = W.bSpatialThreat ? W.ThreatGrid.Query(B.Pos.X, B.Pos.Y,
+                    std::max(SeeP, Hearing), W.ThreatCandidates) : EcoSpatialV3::FRows{};
+                Measure.Count(Full, Rows.Count(Full));
+                const FObstacleConfig& Ob = W.Config.Obstacles;
+                if ((Ob.Active() && Ob.bBlockSight) || W.Config.bEcosystemLife)
+                    for (std::int32_t Row=0; Row<Rows.Count(Full); ++Row)
+                    {
+                        auto& T = W.ThreatIn[Rows.At(Row)];
+                        T.bOccluded = EyeCandidate(B.Pos, B.Head, SeeP, T.X, T.Y, OC)
+                            && ((Ob.Active() && Ob.bBlockSight && EyeBlocked(Ob,B.Pos.X,B.Pos.Y,T.X,T.Y))
+                                || (W.Config.bEcosystemLife && W.Food.BlocksSight(B.Pos.X,B.Pos.Y,T.X,T.Y)));
+                    }
+                P.Threat = EcoObservationV3::PerceiveThreats(B.Pos, B.Head, SeePredNow(W), S.SeeMult,
+                    S.SeeMultLast, W.ThreatIn.data(), Full, OC, Rows);
+            }
+            {
+                EcoSpatialV3::FScope Measure(W.SearchDiagnostics.bEnabled ? &W.SearchDiagnostics.Kin : nullptr);
+                const auto Rows = W.bSpatialKin ? W.KinGrid.Query(B.Pos.X, B.Pos.Y,
+                    std::max(OC.SeeR, OC.SepRadius), W.KinCandidates) : EcoSpatialV3::FRows{};
+                Measure.Count(N, Rows.Count(N));
+                P.Kin = EcoObservationV3::PerceiveKin(Self, B.Pos, B.Head, W.KinIn.data(), N, OC, Rows);
+            }
 			P.Cover = EcoObservationV3::PerceiveCover(B.Pos, W.Config.Covers.data(),
 													  static_cast<std::int32_t>(W.Config.Covers.size()), OC);
 			P.FoodDensity = W.Food.BlurAt(B.Pos);
@@ -2946,6 +2979,18 @@ namespace EcoWorldV3
 			W.Stats.RefugeProtectedPreySteps += (W.Config.bProtectedRefuges && P.bInCover) ? 1 : 0;   // 기록만 (어느 규칙이든 원 안 = 보호)
 			W.Stats.ShelterDeerSteps += P.bInCover ? 1 : 0;   // 야생 2단계 기록만: 은신처 안 시간
 		}
+        if (W.bSpatialWolf)
+        {
+            EcoSpatialV3::FScope Measure(W.SearchDiagnostics.bEnabled ? &W.SearchDiagnostics.Build : nullptr);
+            W.MinPreyDetect = W.MinPreyCatch = 1;
+            for (const auto& P : W.Prey)
+            {
+                W.MinPreyDetect = std::min(W.MinPreyDetect, EcoThreatV3::PreyDetectMult(P,W.ThreatCfg));
+                W.MinPreyCatch = std::min(W.MinPreyCatch, EcoThreatV3::PreyCatchMult(P,W.ThreatCfg));
+            }
+            W.PreyGrid.Build(N, W.ObsCfg.SeeR,
+                [&](std::int32_t I) { return FVec2{W.Prey[I].X,W.Prey[I].Y}; });
+        }
 		W.Stats.LiveDeerSteps += N;
 		if (bFlight)
 		{
@@ -2989,6 +3034,10 @@ namespace EcoWorldV3
 			EcoThreatV3::FThreatStepInput Pi;
 			Pi.Prey = W.Prey.data();
 			Pi.NumPrey = N;
+            Pi.PreyGrid = W.bSpatialWolf ? &W.PreyGrid : nullptr;
+            Pi.MinDetectMult = W.MinPreyDetect;
+            Pi.MinCatchMult = W.MinPreyCatch;
+            Pi.SearchMeasure = W.SearchDiagnostics.bEnabled ? &W.SearchDiagnostics.Wolf : nullptr;
 			Pi.Dark = W.Dark;
 			Pi.WorldSize = W.Config.WorldSize;
             if(W.Config.bEcosystemLife){Pi.SightUser=&W.Food;Pi.ExtraSightBlocked=[](void* U,double Ax,double Ay,double Bx,double By){return static_cast<FFoodGrid*>(U)->BlocksSight(Ax,Ay,Bx,By);};}
@@ -3039,6 +3088,10 @@ namespace EcoWorldV3
 			EcoThreatV3::FThreatStepInput In;
 			In.Prey = W.Prey.data();
 			In.NumPrey = N;
+            In.PreyGrid = W.bSpatialWolf ? &W.PreyGrid : nullptr;
+            In.MinDetectMult = W.MinPreyDetect;
+            In.MinCatchMult = W.MinPreyCatch;
+            In.SearchMeasure = W.SearchDiagnostics.bEnabled ? &W.SearchDiagnostics.Wolf : nullptr;
 			In.Dark = W.Dark;
 			In.WorldSize = W.Config.WorldSize;
             if(W.Config.bEcosystemLife){In.SightUser=&W.Food;In.ExtraSightBlocked=[](void* U,double Ax,double Ay,double Bx,double By){return static_cast<FFoodGrid*>(U)->BlocksSight(Ax,Ay,Bx,By);};}

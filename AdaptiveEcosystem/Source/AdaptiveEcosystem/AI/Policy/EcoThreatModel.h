@@ -122,6 +122,7 @@
 
 #include <cmath>
 #include <cstdint>
+#include "EcoSpatialIndexV3.h"
 
 namespace EcoThreatV3
 {
@@ -912,6 +913,9 @@ namespace EcoThreatV3
 
 	struct FThreatStepInput
 	{
+        const EcoSpatialV3::FGrid* PreyGrid = nullptr;
+        double MinDetectMult = 1, MinCatchMult = 1;
+        EcoSpatialV3::FMeasure* SearchMeasure = nullptr;
         /** Optional integration constraints; defaults preserve existing golden trajectories. */
         std::int32_t PreferredTarget=-1;
         const std::uint8_t* CaptureAllowed=nullptr;
@@ -1358,6 +1362,7 @@ namespace EcoThreatV3
 	inline FThreatStepResult Step(const FThreatSpec& Spec, FThreatState& T, const FThreatStepInput& In,
 								  const FThreatConfig& Cfg)
 	{
+		EcoSpatialV3::FScope Measure(In.SearchMeasure);
 		FThreatStepResult R;
 		const bool bStalker = Spec.Type == EThreatType::Stalker;
 		const bool bPlayer = Spec.Type == EThreatType::Player;
@@ -1398,8 +1403,13 @@ namespace EcoThreatV3
 		const double ViewR = Cfg.PredViewR * In.WeatherViewMult;   // 야생 3단계 (x3): 비·눈이 늑대 시야 반경을 줄인다 (world.py `_wx_view` = pred_view_r × w_s)
 		if (bHunting)
 		{
-			for (std::int32_t i = 0; i < In.NumPrey; ++i)
-			{
+			std::vector<std::int32_t> Candidates;
+            const auto Rows = In.PreyGrid && !bPlayer && In.MinDetectMult > 0 ? In.PreyGrid->Query(QX,QY,
+                ViewR / In.MinDetectMult, Candidates) : EcoSpatialV3::FRows{};
+            Measure.Count(In.NumPrey, Rows.Count(In.NumPrey));
+            for (std::int32_t Row=0; Row<Rows.Count(In.NumPrey); ++Row)
+            {
+                const std::int32_t i = Rows.At(Row);
 				const FPreyView& P = In.Prey[i];
 				if (!P.bAlive || (Cfg.bShelterSafe && P.bInCover))   // 은신처 안 사슴은 표적이 아니다 (realism_shelter untargetable)
 				{
@@ -1685,8 +1695,13 @@ namespace EcoThreatV3
 		double KD = 0.0;
 		if (bHunting)
 		{
-			for (std::int32_t i = 0; i < In.NumPrey; ++i)
-			{
+			std::vector<std::int32_t> Candidates;
+            const auto Rows = In.PreyGrid && In.MinCatchMult > 0 ? In.PreyGrid->Query(QX,QY,
+                Spec.CatchRadius / In.MinCatchMult, Candidates) : EcoSpatialV3::FRows{};
+            Measure.Count(In.NumPrey, Rows.Count(In.NumPrey));
+            for (std::int32_t Row=0; Row<Rows.Count(In.NumPrey); ++Row)
+            {
+                const std::int32_t i = Rows.At(Row);
 				const FPreyView& P = In.Prey[i];
 				if(In.CaptureAllowed&&!In.CaptureAllowed[i])continue;
 				if (!P.bAlive || (Cfg.bShelterSafe && P.bInCover))   // 은신처 안 사슴은 잡히지 않는다 (realism_shelter (c))
