@@ -1,5 +1,7 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
+PR #16 → JWJ 통합(2026-11-09~10): [충돌 해결·보존 기준·검증](Team/PR16_JWJ_MERGE_20261109.md)을 따른다. 자연 서식지/다종 기능과 JWJ 공유 풀 S1/지역 순차 이주를 함께 유지한다. 양쪽 저장 payload를 합친 현재 포맷은 **5**이며 아래 v2/v4 설명은 각 브랜치의 통합 전 이력이다. S2~S6 및 실제1102 순차 이주 acceptance는 별도다.
+
 사슴 이주 첫 구현(2026-11-09): [지역 순차 이주 구현/테스트](Architecture/REGIONAL_DEER_MIGRATION_IMPLEMENTATION_20261109.md)는 `eco.HerdMigration.Regional 1`에서 개별 순차 승인·지역 출발 예산을 제공한다. Editor 빌드/관련 자동화13개는 성공했고 실제1102 지형 도착·저장 왕복·멀티 검증은 남았다. 기본OFF이며 다음 ‘계획만 작성’ 설명은 첫 구현 이전 이력이다.
 
 후속 사슴 이주 계획(2026-11-09): [지역 생태 기반 순차 이주](Architecture/REGIONAL_DEER_MIGRATION_PLAN_20261109.md)는 지역별 등록 순서로 개체를 평가하고 예상 잔류 인원·목적지 예약·부족 기간 누적 승인 한도로 추가 출발을 중단한다. 단독 개체도 평가하며 Herd 규모는 자격 조건이 아니다. 현재는 계획만 작성했고 기존 런타임은 아직 변경하지 않았다. 다음 사슴 이주 구현은 이 상세 계획을 우선 적용한다.
@@ -7,6 +9,16 @@
 후속 요청(2026-11-08): 기존 `/Game/JWJ/1102_Integration_JWJ`의 풀/카메라 표현·사슴 부족 이주·늑대 추적 이주·포만 생활 행동은 [JWJ 1102 단계별 개발 계획](Architecture/JWJ_1102_FOOD_MIGRATION_SATIETY_PLAN_20261108.md)을 따른다. 4지역 배치와 기존 풀/카메라 기준선은 검증했고 새 행동 구현은 남아 있다. 최신 선행 작업은 [공유 풀 패치·실제 위치 섭식 명세](Architecture/FOOD_PATCH_GRAZING_IMPLEMENTATION_SPEC_20261108.md)의 S0~S6이다. [S0/S1 첫 구현](Architecture/FOOD_PATCH_GRAZING_S0_S1_20261108.md)은 writer 조사/로컬 기준선·기본OFF 공통 배치/권위 지면까지다. 패치별 먹이 배분·검색·예약·도착 소비는 아직 미구현이며 현재 소비는 셀 단위다. 기존 Actor/컴포넌트/Native 경로를 확장하고 루트 PROGRESS의 최신 재개 우선순위를 확인한다.
 
 후속 개발(2026-11-08): 서버 먹이 격자를 실제 풀밭으로 표현하는 [단계별 구현 계획](Architecture/FOOD_GRASS_IMPLEMENTATION_PLAN_20261108.md)과 [기존 맵 테스트 안내](Architecture/FOOD_GRASS_TEST_GUIDE_20261108.md)를 따른다. 기존 Field/ISM·Region·Inspector HUD에 전체 셀 변경분, 안정적인 배치, 환경 디버그를 연결하는 중이다. 현재 개발 재개 기준은 [루트 PROGRESS.md](../../PROGRESS.md)다. 실제 branch/HEAD·diff와 검증 범위를 확인해 미완료 항목부터 진행한다.
+
+**다종 생태계 작업 진입점.** [팀 인수인계](Team/FAUNA_TEAM_HANDOFF.md)에서 로컬 재현, 역할별 다음 작업, 완료 기준과 최신 검증을 확인한다.
+
+**2026-11-05 체형 설계와 확인 범위.** [세대·체형 설계](Architecture/INHERITED_MORPHOLOGY_DESIGN_20261105.md)에 현재 유전·표현의 근거와 질주·은폐·사냥 체형 제안을 구분한다. 새 축의 런타임 및 학습 적용은 보류 상태다. 새 작업은 해당 문서의 역할별 인계와 검증 순서를 따른다.
+
+**2026-10-30 개체군·기획 대조 후속:** [개체군/성장 계약](Architecture/NATURAL_POPULATION_CONTRACT_20261030.md), [세부 기획 대조](Architecture/INDIVIDUAL_TRAIT_DESIGN_AUDIT_20261030.md), [실행 기록](조연우/JYU_NATURAL_POPULATION_20261030.md)을 함께 읽는다. 자연 사슴의 혼합 초기 나이/성별·제한 유전/털색·연속 성장·가족 관계/관찰 분리·군락 발달을 다룬다. 학습 담당의 관측/행동·보상·가중치/추론은 보존하며 Caution은 인계 데이터만 제공한다. 현재 Native 사슴 예제를 임의 종/전체 기획/MMO 완료로 확대하지 않는다.
+
+**2026-10-30 자연 서식지 작업 트리:** [공통 계약](Architecture/NATURAL_HABITAT_CONTRACT_20261030.md), [새 레벨 적용 순서](Team/NATURAL_HABITAT_LEVEL_HANDOFF_20261030.md), [실행 기록](조연우/JYU_NATURAL_HABITAT_20261030.md)을 먼저 확인한다. 지역별/세부 volume 생육 profile, 실제 지면·수면·수문 연결, 불규칙 군락, 내부 휴식과 취약한 은폐, 표현/이주 수용 예산을 명시적 opt-in으로 제공한다. 미래 통합 레벨 자체는 아직 검증하지 않았다. Native 2.5D·단일 writer/M4·기존 모델·SocialControl=0 경계를 유지한다.
+
+**2026-10-29 후속 작업 트리:** 사용자 실제 플레이 점검 후 [플레이 흐름 수정과 life rules v2](조연우/JYU_PLAYFLOW_FIX_20261029.md)를 추가했다. 단독 무리 이주·접촉/경계·로컬 섭식·식생 표시/용량 확장·낮밤 표현과 owned Highland 통로를 보완한다. `bEnableEcosystemLife` 세계에 한정하며 기존 모델/관측·SocialControl=0·Native 단일 writer를 유지한다. 아래 life-v1은 최초 구현 이력이고, 현재 검증은 새 기록/evidence를 우선한다. main/push 완료를 뜻하지 않으며 전체 Python 세계 mirror/재학습·영구 생태 평형은 미완료다.
 
 갱신일 **2026-10-24**. 팀원과 각 AI agent가 대화 기록 없이 프로젝트의 목표·제품 방향·구현 경계를 이해하기 위한 공통 진입 문서다. 개인 담당 인수인계보다 먼저 읽고 작업 분야의 Source/계약으로 이어간다. 종 이름과 예시는 교체 가능한 표현이며 현재 구현을 과장하는 근거가 아니다.
 

@@ -1,5 +1,9 @@
 # 생태계 통합 이후 학습 담당 AI 작업 가이드
 
+최신 다종 맵의 이 역할 작업과 완료 기준은 [다종 생태계 팀 인수인계](../Team/FAUNA_TEAM_HANDOFF.md)를 먼저 확인한다.
+
+2026-11-05 제안은 [체형 강화학습 인계](MORPHOLOGY_RL_HANDOFF_20261105.md)를 참고한다. 고정 표현형을 읽는 행동 학습, 단기 자세 요청, 서버가 확정하는 출생값 선택을 별도 실험으로 다룬다. 본문 날짜의 구현 수치와 이후 통합 R7e 계약은 구분한다.
+
 작성일: **2026-10-24** / 구현 기준: **`d095948`**. [공통 작업 안내](../Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), 루트 AGENTS.md, [기존 RL 팀 요청](TEAM_REQUESTS_V3.md)을 먼저 읽는다. 이 문서는 학습 담당의 다음 실제 작업과 acceptance를 설명한다. 새 학습·새 가중치·전체 life 세계 parity의 완료 기록이 아니다.
 
 ## 1. 지금 학습 담당자에게 필요한 결론
@@ -18,6 +22,7 @@
 | v3 내장 R1b | 기본18관측/5행동·mask2 | 기본 모델/Golden/슬롯 의미 보존 |
 | v3 opt-in21 | 장애물 관측을 포함하는 별도 입출력 계약 | 새 경험·유전 입력이 자동으로 포함된 것이 아님 |
 | v3 다른 mask/경보 판 | [V3 계약](POLICY_CONTRACT_V3.md)의 별도 경로 | default R1b와 같은 판이라고 가정 금지 |
+| v3 기본 두뇌 R7e (10-29 덧붙임) | 통합 v3 Play 시작 두뇌 = 빌드에 넣은 R7e(관측 24·mask5, 계약 `0xad7bad5e1acaf071`, `PolicyBrainV3Default.h`) | 위 '내장 R1b' 줄은 그대로(평가기·골든·평면 v3 경로의 바탕, `eco.V3Brain.Startup builtin` 으로 고름). 고르는 규칙·되돌리는 법은 [LIVE_ADAPT_SPEC.md](LIVE_ADAPT_SPEC.md) 5.6 |
 
 입력 순서·정규화·clamp·mask/argmax·동점 규칙은 [V1](POLICY_CONTRACT_V1.md), [V3](POLICY_CONTRACT_V3.md)와 실제 `EcoObservationV3.h`, `EcoPolicyV3Inference.h`, Python encoder/export를 대조한다. 충돌을 발견하면 Source/계약 차이를 기록하고 담당자 합의로 수정한다. Golden 기대값을 새 코드에 맞춰 덮어써서 통과시키지 않는다.
 

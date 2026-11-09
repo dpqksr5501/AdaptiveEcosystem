@@ -35,9 +35,14 @@ inline FVector SelectVelocity(const FVector& Position, FVector PolicyVelocity, f
 }
 /** Authoritative movement boundary: region containment, blocking geometry and ground projection. */
 ADAPTIVEECOSYSTEM_API bool ConstrainStep(UWorld& World, FName RegionId, bool bTraveling,
-    const FVector& Position, FVector& Destination, float BodyRadiusCm=30.f);
+    const FVector& Position, FVector& Destination, float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f);
 /** Ground and clearance probe for authored spawn/arrival points; never changes logical state. */
 ADAPTIVEECOSYSTEM_API bool ProjectSpawnPoint(UWorld& World, const FVector& Hint, FVector& OutGround);
+/** Shared physical ground constraint, also used by read-only copied-map route authoring. */
+ADAPTIVEECOSYSTEM_API bool ConstrainGroundStep(UWorld& World,const FVector& Position,FVector& Destination,
+    float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f,float SweepHeightCm=0.f,float MaxRiseCm=-1.f);
 /** Conservative bounds of unconditional NavArea_Null volumes, including agent clearance. */
 ADAPTIVEECOSYSTEM_API bool CrossesExcludedArea(UWorld& World, const FVector& Start, const FVector& End);
+/** Explicit authored water only. Never infers hydraulic connectivity from a blue mesh. */
+ADAPTIVEECOSYSTEM_API bool IsWadeableGround(UWorld& World,const FVector& Ground,float MaxDepthCm);
 }

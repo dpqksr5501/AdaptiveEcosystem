@@ -54,6 +54,11 @@ public:
 	void PublishEcologySummary(const FEcoCompletedWorldSummary& Summary);
 	UFUNCTION(BlueprintPure, Category="Ecology|Summary")
 	FEcoCompletedWorldSummary GetEcologySummary() const { return EcologySummary; }
+	/** Read only the relevant row, without copying the whole regional/species summary. */
+	const FReplicatedRegionSummary* FindCompletedRegion(FName RegionId) const
+	{
+		return EcologySummary.Regions.FindByPredicate([RegionId](const auto& Row) { return Row.RegionId == RegionId; });
+	}
 
 	UFUNCTION(BlueprintPure, Category = "Ecology|Match")
 	FGuid GetMatchInstanceId() const { return MatchInstanceId; }

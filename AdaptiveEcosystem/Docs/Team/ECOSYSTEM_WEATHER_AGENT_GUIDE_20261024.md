@@ -1,5 +1,7 @@
 # 날씨·낮밤 담당·AI agent 작업 안내
 
+최신 다종 맵의 이 역할 작업과 완료 기준은 [다종 생태계 팀 인수인계](FAUNA_TEAM_HANDOFF.md)를 먼저 확인한다.
+
 작성일 **2026-10-24**. 구현 기준 `d095948`, 공통 안내 기준 `9858e61` 이후 문서 보완이다. [공통 맥락](../PROJECT_CONTEXT.md)·[팀 AI 안내](ECOSYSTEM_AI_COLLABORATION_20261024.md)와 [레벨 담당 안내](ECOSYSTEM_LEVEL_DESIGN_AGENT_GUIDE_20261024.md)를 먼저 읽는다. 문서 작성 자체는 새 날씨 기능·런타임 검증·학습 완료가 아니다.
 
 ## 1. 현재 날씨 연결을 이해하기

@@ -54,7 +54,7 @@ if jwj_camera_check and not (jwj and pie and authored and duration >= 52):
     raise RuntimeError('1102 camera check requires authored PIE for at least 52 seconds')
 out = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())) / folder
 out.mkdir(parents=True, exist_ok=True)
-state = dict(start=None, next=0, rows=[], error=None, phase=None, camera=None, shots=0, focus=None, hidden=False, last={}, transfers=[],world=None,csv=False,child_visuals=[])
+state = dict(start=None, next=0, rows=[], error=None, phase=None, camera=None, shots=0, focus=None, hidden=False, last={}, transfers=[],world=None,csv=False,child_visuals=[],observer_targets=[])
 state['feeding'] = dict(synchronous_samples=0, source_cells=0, intake_samples=0, rendered=[], changes=[], pending={})
 state['depletion'] = dict(synchronous_samples=0, positive={}, depleted={}, recovered={}, verified={})
 deadline = time.monotonic() + duration + 180
@@ -198,7 +198,7 @@ def finish(result):
                         for s in state['rows'] for f in s['fields'])):
             result = 'FAILED'; state['error'] = 'S1 layout readiness/authority world trace budget failed'
     report = dict(result=result, error=state['error'], fixture=fixture, patch_layout=patch_layout,
-                  duration_wall_seconds=duration, grass_profile=grass_profile, samples=state['rows'], screenshots=state['shots'], region_transfers=state['transfers'],child_visuals=state['child_visuals'],overlap_expected='-vegetationoverlapexpected' in cmd.lower())
+                  duration_wall_seconds=duration, grass_profile=grass_profile, samples=state['rows'], screenshots=state['shots'], region_transfers=state['transfers'],child_visuals=state['child_visuals'],observer_targets=state['observer_targets'],overlap_expected='-vegetationoverlapexpected' in cmd.lower())
     (out / (name + '_Runtime.json')).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     unreal.log('VEGETATION_AUDIT_FINISHED ' + json.dumps(dict(result=result, error=state['error'], samples=len(state['rows']))))
     if pie:
@@ -427,6 +427,23 @@ def tick(dt):
                                                    previous=previous.get('native_world_position'), current=agent.get('native_world_position')))
                 state['last'][str(key)] = agent
                 agents.append(agent)
+        if '-vegetationnetworkchildcoverage' in cmd.lower():
+            # Explicit observer fixture: move server-owned viewers only. A regional
+            # camera orbit around wolves does not necessarily cover a newborn's relevance bubble.
+            region=('Forest','Barren','Highland')[int(elapsed/12)%3]
+            live=[a for a in agents if a.get('region')==region and a.get('hp',0)>0 and a.get('native_world_position')]
+            born=[a for a in live if a.get('species')=='Herbivore' and a.get('life',{}).get('origin')==1]
+            wolves=[a for a in live if a.get('species')=='Wolf']
+            candidates=born or wolves or live
+            if candidates:
+                target=min(candidates,key=lambda a:int(a['stable_id']));point=unreal.Vector(*target['native_world_position'])
+                view=point+unreal.Vector(400,250,650)
+                for controller in unreal.GameplayStatics.get_all_actors_of_class(game,unreal.PlayerController):
+                    viewer=controller.get_controlled_pawn()
+                    if viewer:
+                        viewer.set_actor_location(view,False,True)
+                        controller.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(view,point))
+                state['observer_targets'].append(dict(elapsed=elapsed,id=target['stable_id'],region=region,natural_child=bool(born)))
         pawn=unreal.GameplayStatics.get_player_pawn(game,0)
         camera=unreal.GameplayStatics.get_player_camera_manager(game,0)
         p=pawn.get_actor_location() if pawn else None;c=camera.get_camera_location() if camera else None

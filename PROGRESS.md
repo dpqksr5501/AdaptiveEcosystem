@@ -1,5 +1,9 @@
 # 먹이와 풀 표현 개발 진행
 
+## PR #16/main 충돌 해결 통합 (2026-11-09~10)
+
+[보존 기준·PR 기능·검증 기록](AdaptiveEcosystem/Docs/Team/PR16_JWJ_MERGE_20261109.md)을 먼저 확인한다. `037c37af`에 `upstream/main 9c961e48`을 통합한다. JWJ의 공유 풀 S1/전체 셀 Fast Array·지역 순차 승인과 main의 자연 서식지/다종/기존 life 이주를 보존하며 통합 체크포인트는 v5다. 직접 Editor UBT 성공, 전체 자동화310개(성공308 + 경고 포함 성공2, 실패0/미실행0). 자연 사이트/격자 표현 격리 회귀도 성공했다. 새 프로세스 v5 저장 복원에서156개체와2700토양 셀/장부 일치를 확인했다. 중간1102 네트워크에서 자연 표현 메타데이터가 일반 풀 DTO에도 실려 초기 수신 지연/64KiB 초과가 발생한 것을 확인해 DTO를 분리했다. 일반 풀의 원래7개 전송 property를 복원했다. 최종1102 Dedicated+Client2/late join·동시 실행의 Relevance passed=true, 근거리97/10표본 누락0·네 지역 anchor 일치·64KiB 초과0·모든 프로세스0이다. 최종 동일 빌드의 자동화310개와 새 슬롯 저장/복원도 다시 통과했다. 아래 v2/v4와 과거 검증 수치는 당시 이력이며 공유 패치 S2~S6/1102 실제 순차 이주 acceptance를 새로 완료한 것은 아니다.
+
 ## 사슴 지역 순차 이주 첫 구현 (2026-11-09)
 
 [구현·간단 테스트·남은 검증](AdaptiveEcosystem/Docs/Architecture/REGIONAL_DEER_MIGRATION_IMPLEMENTATION_20261109.md)을 먼저 읽는다. `eco.HerdMigration.Regional 1` opt-in에서 등록 순서의 개별 출발, 지역 episode·생태 지원 인원·출발 예약·잔류 하한/누적 승인 한도를 연결했다. PlanId 키와 체크포인트 v2, 지도 지역 중단 이유를 추가했다. 직접 Editor UBT 성공, 관련 자동화13개 성공/실패0. 1102 실제 관측은 Python 속성 오류 후 수정했으나 재실행 엔진 감지 및 후속 프로세스 확인 승인 거절로 완료하지 못했다. 신규 모드 실제 지형 도착·다지역 경쟁·저장 왕복·멀티는 남아 있다. 기본 Regional=0이며 아래 ‘계획만 작성’은 앞선 작업 이력이다.

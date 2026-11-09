@@ -10,7 +10,7 @@ param([string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8',
     [ValidateRange(-1,200000)][double]$ClientVisualDistanceCm=-1,
     [switch]$GrassTravelCheck,[ValidateRange(370,550)][double]$TravelDuration=380,
     [switch]$NetworkProfile,
-    [switch]$OverlapClients,
+    [switch]$OverlapClients,[switch]$ChildCoverage,[switch]$HabitatDynamics,
     [ValidateRange(10,600)][double]$ClientAAt=30,[ValidateRange(45,600)][double]$ClientBAt=95)
 $ErrorActionPreference='Stop'
 foreach($taskValue in @($Duration,$ExitAfter,$ClientAAt,$ClientBAt)){
@@ -36,16 +36,19 @@ $taskStarted=[DateTime]::UtcNow
 $taskServerLog=Join-Path $taskOut 'Server.log'
 $taskMode=if($AuthoredWeather){'-VegetationAuthored'}else{'-EcoVegetation'}
 $taskMapName=($Map -split '/')[-1]
+$taskObserverFlag=if($ChildCoverage){'-VegetationNetworkChildCoverage'}else{'-EcoIntegrationObserverCycle'}
 $taskConnectionMode=if($OverlapClients){'-VegetationOverlapExpected'}else{'-VegetationSequentialExpected'}
 $taskProfileArgument=if($NetworkProfile){'-VegetationNetworkProfile'}else{'-VegetationNetworkProfileDisabled'}
 $taskServerCommands=if($NetworkProfile){"netprofile enable,eco.Grass.NetAudit 1,py $taskRoot/Tools/Editor/audit_vegetation_runtime.py"}else{"py $taskRoot/Tools/Editor/audit_vegetation_runtime.py"}
 if($PatchLayout){$taskServerCommands="eco.Grass.PatchLayout 1,$taskServerCommands"}
 $taskPatchArgument=if($PatchLayout){'-VegetationPatchLayout'}else{'-VegetationPatchLayoutDisabled'}
-$taskServer=Start-VegetationProcess "$taskEngine/UnrealEditor-Cmd.exe" @($taskProject,$Map,
-    '-server','-NullRHI','-nosteam','-unattended','-nop4','-port=7777',$taskMode,$taskConnectionMode,"-EcoV3DeerPerRegion=$DeerPerRegion",'-EcoV3SocialControl=0',"-EcoV3Seed=$Seed",$taskPatchArgument,
-    "-EcoIntegrationExitAfter=$ExitAfter",'-EcoIntegrationObserverCycle','-VegetationAuditName=Server',"-VegetationAuditDuration=$Duration",
+$taskServerArgs=@($taskProject,$Map,
+    '-server','-NullRHI','-unattended','-nop4','-nosteam','-port=7777',$taskMode,$taskConnectionMode,"-EcoV3DeerPerRegion=$DeerPerRegion",$taskPatchArgument,'-EcoV3SocialControl=0',"-EcoV3Seed=$Seed",
+    "-EcoIntegrationExitAfter=$ExitAfter",$taskObserverFlag,'-VegetationAuditName=Server',"-VegetationAuditDuration=$Duration",
     "-VegetationMap=$taskMapName","-VegetationAuditFolder=$AuditFolder",
     $taskProfileArgument,"-ExecCmds=$taskServerCommands","-AbsLog=$taskServerLog")
+if($HabitatDynamics){$taskServerArgs+='-EcoHabitatDynamics'}
+$taskServer=Start-VegetationProcess "$taskEngine/UnrealEditor-Cmd.exe" $taskServerArgs
 $taskReadyDeadline=[DateTime]::UtcNow.AddSeconds(90)
 while($true){
     if($taskServer.HasExited){throw 'Server exited before ready; inspect first error.'}
@@ -55,6 +58,7 @@ while($true){
     Start-Sleep -Seconds 1
 }
 $taskResults=@()
+$taskPuddleClients=0
 $taskClients=@()
 foreach($entry in @(@{Name='ClientA';At=$ClientAAt},@{Name='ClientB';At=$ClientBAt})){
     while(([DateTime]::UtcNow-$taskStarted).TotalSeconds -lt $entry.At){
@@ -83,6 +87,10 @@ foreach($taskEntry in $taskClients){
     if(-not(Test-Path $taskReport) -or (Get-Item $taskReport).LastWriteTimeUtc -lt $taskClientStart){throw 'Missing fresh client evidence'}
     $taskObserved=Get-Content $taskReport -Raw|ConvertFrom-Json
     if(-not $taskObserved.passed){throw 'Client received visuals/authority check failed; server timer left running.'}
+    if($HabitatDynamics){
+        if($taskObserved.native_performance.native_steps_total -ne 0){throw 'Client ran a native habitat step.'}
+        if(@($taskObserved.samples | ForEach-Object fields | Where-Object puddle_instances -gt 0).Count){$taskPuddleClients++}
+    }
     $taskResults+=@{Name=$taskEntry.Name;ExitCode=$taskClient.ExitCode;AuthorityAgents=$taskObserved.authority_agents;Fields=$taskObserved.best.fields;StartedUtc=$taskClientStart;Lifetime=$taskEntry.Lifetime}
     Write-Output "$($taskEntry.Name) normal exit; authority=$($taskObserved.authority_agents), fields=$($taskObserved.best.fields.Count)"
 }
@@ -93,6 +101,7 @@ $taskRuntimePath=Join-Path $taskOut 'Server_Runtime.json'
 if(-not(Test-Path $taskRuntimePath) -or (Get-Item $taskRuntimePath).LastWriteTimeUtc -lt $taskStarted){throw 'Missing fresh server observer evidence'}
 $taskRuntime=Get-Content $taskRuntimePath -Raw|ConvertFrom-Json
 if($taskRuntime.result -ne 'FINISHED'){throw 'Server observer did not finish'}
+if($HabitatDynamics -and !$taskPuddleClients){throw 'No client received puddle presentation.'}
 $taskRaw=Get-Content $taskServerLog -Raw
 if($taskRaw -match 'Runtime stopped|receipt rejected|VEGETATION_AUDIT_ERROR|LogNetPartialBunch: Error'){throw 'Server contract/observer/bunch-size failure'}
 if($AuthoredWeather -and $taskRaw -match 'Accessed None|NULL AttachComponent'){throw 'Legacy visual weather still active in the authored map'}

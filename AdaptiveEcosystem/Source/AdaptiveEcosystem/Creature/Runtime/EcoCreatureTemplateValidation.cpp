@@ -27,6 +27,7 @@ bool AEcoCreatureIntegrationSpawner::RegisterTemplates()
 {
 	const auto* Network = GetWorld()->GetSubsystem<UEcoMassNetworkSubsystem>();
 	if (!Network || !Network->IsBubbleInfoClassRegistered()) return false;
+    if (!RegisterFaunaTemplate()) return false;
 	const bool bClient = GetNetMode() == NM_Client;
 	// Register both immutable v3 proxy templates even when this client starts without the server's console switch.
 	// Saved V1 templates remain registered below, so late joins can consume either server backend.

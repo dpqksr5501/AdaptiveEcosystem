@@ -3,6 +3,7 @@
 #include "Creature/Audio/EcoFootstepCadence.h"
 #include "Creature/Audio/EcoFootstepNotifyGate.h"
 #include "Creature/Audio/EcoFootstepAudioSet.h"
+#include "Core/EcoActivityTypes.h"
 #include "PhysicalMaterials/PhysicalMaterial.h"
 #include "Sound/SoundAttenuation.h"
 #include "Sound/SoundConcurrency.h"
@@ -82,6 +83,39 @@ bool FEcoPhysicalFootstepTest::RunTest(const FString&)
     TestFalse(TEXT("Dry contact can override Forest region"), Set->IsGrassSurface(Dry, TEXT("Forest")));
     TestTrue(TEXT("Unknown/no streamed material falls back predictably"), Set->IsGrassSurface(Unknown, TEXT("Forest")));
     TestFalse(TEXT("Missing material retains Dry highland fallback"), Set->IsGrassSurface(nullptr, TEXT("Highland")));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoProfiledFootstepsTest, "AdaptiveEcosystem.Creature.Audio.ProfiledFootstepAndHearing",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoProfiledFootstepsTest::RunTest(const FString&)
+{
+    auto* Set = NewObject<UEcoFootstepAudioSet>();
+    auto& Stone = Set->Surfaces.Add(EEcoFootstepSurface::Stone);
+    auto* StoneMaterial = NewObject<UPhysicalMaterial>();
+    Stone.Materials.Add(StoneMaterial);
+    Stone.NoiseMultiplier = 1.3f;
+    FEcoFootstepProfile Rat, Buffalo;
+    Rat.Volume = .16f; Rat.PlaybackRange = 450.f; Rat.WalkSpacing = 7.f; Rat.NoiseRange = 320.f;
+    Buffalo.Volume = .85f; Buffalo.PlaybackRange = 2500.f; Buffalo.NoiseRange = 2200.f;
+    TestTrue(TEXT("Explicit stone overrides region fallback"), Set->GetSurface(StoneMaterial, TEXT("Forest")) == EEcoFootstepSurface::Stone);
+    const auto Small = Set->Evaluate(Rat, EEcoFootstepSurface::Dry, 150.f, .75f);
+    const auto Large = Set->Evaluate(Buffalo, EEcoFootstepSurface::Stone, 400.f, 1.f);
+    TestTrue(TEXT("Large hooves carry further than a small paw"), Large.PlaybackRange > Small.PlaybackRange && Large.NoiseRange > Small.NoiseRange);
+    TestTrue(TEXT("Small paws have shorter stride and quieter local mix"), Small.Spacing < Large.Spacing && Small.Volume < Large.Volume);
+    const auto Dry = Set->Evaluate(Buffalo, EEcoFootstepSurface::Dry, 400.f, 1.f);
+    TestTrue(TEXT("Hard ground changes source range"), Large.NoiseRange > Dry.NoiseRange);
+    const auto Sneak = Set->Evaluate(Buffalo, EEcoFootstepSurface::Stone, 150.f, 1.f, .26f);
+    TestTrue(TEXT("Sneak is quieter than running"), Sneak.Loudness < Large.Loudness && Sneak.PlaybackRange < Large.PlaybackRange);
+    Rat.HearingRange = 2200.f;
+    Buffalo.HearingRange = 900.f;
+    TestTrue(TEXT("Only the sensitive listener hears a distant run"),
+        EcoFootsteps::HearingStrength(Rat, 1000.f, Large.NoiseRange, Large.Loudness, 1.f, false) > 0.f
+        && EcoFootsteps::HearingStrength(Buffalo, 1000.f, Large.NoiseRange, Large.Loudness, 1.f, false) == 0.f);
+    TestTrue(TEXT("Near occluded run is still audible"), EcoFootsteps::HearingStrength(Rat, 150.f, Large.NoiseRange, Large.Loudness, 1.f, true) > 0.f);
+    TestTrue(TEXT("Rain and cover can suppress a farther sound"),
+        EcoFootsteps::HearingStrength(Rat, 400.f, Large.NoiseRange, Large.Loudness, .5f, true) == 0.f);
+    TestFalse(TEXT("Airborne activity cannot emit a ground step"), EcoFootsteps::IsGroundActivity(uint8(EEcoSpeciesActivity::Fly)));
     return true;
 }
 #endif

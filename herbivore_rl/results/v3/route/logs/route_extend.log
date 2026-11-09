@@ -1,0 +1,5 @@
+모델: ckpt\v3\v3_r1_g995_s3_obs24route0.zip  sha256 293c3165b1edb11e  관측 24  (로짓 0~3 차 0.0e+00, 가치 차 0.0e+00, 칸 1 − 칸 4 − 2 = 2.4e-07)
+두뇌 파일: results\v3\route\brains\v3_r1_g995_s3_obs24route0.json  v3_r1_g995_s3_obs24route0@078c56be  관측 24  판 4  계약 0xe302dee198197444  골든 34 {'rollout': 18, 'single': 2, 'route_edge': 2, 'route': 4, 'route_single': 2, 'random': 6}
+확인: 길 켬 route0 = 길 끔 obs21zero 12/12 판 × 1800 스텝 (G·N × 지역 셋 × 시드 [32090, 32091]), 길 결정 7908 (두 칸 4160, RUN 한 칸 3748) 모두 RUN
+표본 확률(두 칸 결정 평균): π RUN 0.8808 SHELTER 0.1192 · π′(ε 0.05) RUN 0.8618 SHELTER 0.1382  (기대 π SHELTER 0.1192, π′ 0.1382)
+기록: results\v3\route\brains\v3_r1_g995_s3_obs24route0.verify.json

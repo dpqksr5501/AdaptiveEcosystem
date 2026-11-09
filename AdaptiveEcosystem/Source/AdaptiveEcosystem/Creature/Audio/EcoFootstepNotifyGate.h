@@ -22,10 +22,10 @@ struct FEcoFootstepNotifyGate
         if (!bMoving) { TravelCredit = 0; return; }
         TravelCredit = FMath::Min(TravelCredit + Distance, 500.f);
     }
-    bool Contact(double Now)
+    bool Contact(double Now, float MinimumTravel = 10.f, double MinimumInterval = .07)
     {
         if (!bInitialized || !bMoving || !FMath::IsFinite(Now) || Now < FreshAt || Now - FreshAt > .25
-            || TravelCredit < 10 || (LastContact >= 0 && (Now < LastContact || Now - LastContact < .07))) return false;
+            || TravelCredit < MinimumTravel || (LastContact >= 0 && (Now < LastContact || Now - LastContact < MinimumInterval))) return false;
         LastContact = Now; TravelCredit = 0; return true;
     }
 };

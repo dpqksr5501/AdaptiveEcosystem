@@ -1,9 +1,11 @@
 #include "Misc/AutomationTest.h"
 #if WITH_DEV_AUTOMATION_TESTS
 #include "AI/Policy/EcoWorldV3.h"
+#include "AI/Policy/EcoLifeHistoryV3.h"
 #include "AI/Policy/Tests/EcoTestWorld.h"
 #include "Ecology/EcologySimulationSubsystem.h"
 #include "World/EcoVegetationField.h"
+#include "World/EcoNaturalHabitatProfile.h"
 #include "Components/BoxComponent.h"
 #include "World/EcoRegionEnvironmentAdapter.h"
 #include "World/EcologyRegion.h"
@@ -11,6 +13,49 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/InstancedStaticMeshComponent.h"
 #include <limits>
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoGrassProfileIsolation,
+    "AdaptiveEcosystem.Vegetation.ProfileAndGridPresentationIsolation", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoGrassProfileIsolation::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld World;
+    auto* Field = World.World->SpawnActor<AEcoVegetationField>();
+    auto* GridField = World.World->SpawnActor<AEcoVegetationField>();
+    auto* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (!Field || !GridField || !Mesh) return false;
+    Field->Plants->SetStaticMesh(Mesh);
+    Field->DryResidue->SetStaticMesh(Mesh);
+    Field->Tracks->SetStaticMesh(Mesh);
+    Field->NaturalProfile = NewObject<UEcoNaturalHabitatProfile>(Field);
+    Field->RegionId = TEXT("ProfileIsolation");
+    Field->VisualCellSizeCm = 400;
+    auto& Cell = Field->Cells.AddDefaulted_GetRef();
+    Cell.Food = FEcoVegetationVisualCell::EncodeAmount(.25);
+    Cell.Capacity = FEcoVegetationVisualCell::EncodeAmount(.5);
+    Cell.FoodFraction = 128;
+    Cell.SiteFood[0] = 128;
+    auto& Site = Field->GroundSites.AddDefaulted_GetRef();
+    Site.Position = FVector(200,200,0);
+    Site.Normal = FVector::UpVector;
+    Field->MovementMarks.AddDefaulted();
+    Field->OnRep_Cells();
+    TestEqual(TEXT("Profile renderer retains its ground-verified site"), Field->Plants->GetInstanceCount(), 1);
+    TestEqual(TEXT("Movement evidence survives site rendering"), Field->Tracks->GetInstanceCount(), 1);
+    Field->RefreshPlants(FVector(200,200,500), 0);
+    TestEqual(TEXT("Grid refresh cannot evict profile instances"), Field->Plants->GetInstanceCount(), 1);
+    TestTrue(TEXT("Profile mode does not create a second grid instance cache"), Field->RenderedPlants.IsEmpty());
+    Cell.SiteFood[0] = 0;
+    Field->OnRep_Cells();
+    TestEqual(TEXT("Local browse removes its site while cell biomass stays positive"), Field->Plants->GetInstanceCount(), 0);
+    Cell.Food = 0; Cell.FoodFraction = 0; Cell.Stress = 200;
+    Field->OnRep_Cells();
+    TestEqual(TEXT("Non-edible dry residue remains visible"), Field->DryResidue->GetInstanceCount(), 1);
+    GridField->Plants->SetStaticMesh(Mesh);
+    GridField->Plants->AddInstance(FTransform::Identity);
+    GridField->OnRep_Cells();
+    TestEqual(TEXT("Profile callback cannot clear generic grid instances"), GridField->Plants->GetInstanceCount(), 1);
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoGrassAmountEncoding, "AdaptiveEcosystem.Vegetation.GrassAmountEncoding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FEcoGrassAmountEncoding::RunTest(const FString&)
@@ -199,6 +244,105 @@ bool FEcoGrassVisualLifecycle::RunTest(const FString&)
     Field->RefreshPlants(Near, 11.75);
     TestEqual(TEXT("Changed anchor completes bounded ground retry"), Field->Plants->GetInstanceCount(), 9);
     return CheckGroundPositions();
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoPairedBrowseRecovery,
+    "AdaptiveEcosystem.Vegetation.PairedBrowseRecovery", EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoPairedBrowseRecovery::RunTest(const FString&)
+{
+    using namespace EcoVegetationV3;
+    FConfig Config;Config.bEnabled=true;Config.bHabitatDynamics=true;
+    FHabitat Habitat;Habitat.bNatural=true;
+    FCell Control, Browsed;
+    for(int Bite=0;Bite<16;++Bite)Browsed.RecordBrowse(.15,1);
+    // Match the initial biomass and visible cohort so the comparison isolates prior browse pressure.
+    Control.Development=Browsed.Development=.6;
+    FOutcome A{.35},B{.35};
+    double LargestGap=0;
+    AddInfo(TEXT("PairedBrowse t=0 control=0.350000 browsed=0.350000"));
+    for(int Step=1;Step<=900;++Step)
+    {
+        const FWeather Weather{Step>150&&Step<=450?.42:0.,18.,.8};
+        const double BeforeA=A.Food,BeforeB=B.Food;
+        A=Advance(Config,Weather,Habitat,Control,BeforeA,1,.006,EcoRepertoireV3::kStepSeconds);
+        B=Advance(Config,Weather,Habitat,Browsed,BeforeB,1,.006,EcoRepertoireV3::kStepSeconds);
+        if(!FMath::IsNearlyEqual(BeforeA+A.Growth-A.Loss,A.Food,1e-10)
+            ||!FMath::IsNearlyEqual(BeforeB+B.Growth-B.Loss,B.Food,1e-10))
+        {
+            AddError(TEXT("A paired cell lost conservation"));return false;
+        }
+        LargestGap=FMath::Max(LargestGap,A.Food-B.Food);
+        if(Step==150||Step==450||Step==900)
+            AddInfo(FString::Printf(TEXT("PairedBrowse t=%.0f control=%.6f browsed=%.6f pressure=%.6f"),
+                Step*EcoRepertoireV3::kStepSeconds,A.Food,B.Food,Browsed.BrowsePressure));
+    }
+    TestTrue(TEXT("Prior pressure alone delays recovery under the same rainfall"),LargestGap>.04&&B.Food<A.Food);
+    TestTrue(TEXT("The browsed plot still recovers"),B.Food>.35);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoHabitatDynamics,
+    "AdaptiveEcosystem.Vegetation.HabitatDynamics", EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoHabitatDynamics::RunTest(const FString&)
+{
+    using namespace EcoVegetationV3;
+    FConfig Config;Config.bEnabled=true;Config.bHabitatDynamics=true;
+    Config.Evaporation=Config.Drainage=Config.Uptake=0;
+    FHabitat Grass;Grass.bNatural=true;
+    FHabitat Shrub=Grass;Shrub.Plant=EPlant::Shrub;
+    const FWeather Mild{0,18,1};
+    constexpr double Dt=EcoRepertoireV3::kStepSeconds;
+    FCell Control, Grazed, BrowsedShrub;
+    for(int Bite=0;Bite<16;++Bite){
+        Grazed.RecordBrowse(.2,1);
+        BrowsedShrub.RecordBrowse(.2,1);
+    }
+    auto Reference=Advance(Config,Mild,Grass,Control,.35,1,.02,Dt);
+    auto Pressured=Advance(Config,Mild,Grass,Grazed,.35,1,.02,Dt);
+    TestTrue(TEXT("Repeated actual intake delays recovery at equal biomass and weather"),
+        Grazed.BrowsePressure>.65 && Grazed.Development<Control.Development && Pressured.Growth<Reference.Growth);
+    TestTrue(TEXT("Chewed plants retain a visible browse trace longer"),BrowseTraceSeconds(Grazed)>BrowseTraceSeconds(Control));
+    double GrassFood=Pressured.Food,ShrubFood=Pressured.Food;
+    for(int Step=0;Step<1500;++Step){
+        GrassFood=Advance(Config,Mild,Grass,Grazed,GrassFood,1,.02,Dt).Food;
+        ShrubFood=Advance(Config,Mild,Shrub,BrowsedShrub,ShrubFood,1,.02,Dt).Food;
+    }
+    TestTrue(TEXT("Grass recovers sooner than repeatedly browsed shrubs"),
+        Grazed.BrowsePressure<BrowsedShrub.BrowsePressure && GrassFood>.35);
+
+    FCell Low, Edge;FHabitat Basin=Grass;Basin.Drainage=.05;
+    FHabitat Slope=Grass;Slope.Drainage=.65;
+    for(int Step=0;Step<300;++Step){
+        Advance(Config,{.65,18,1},Basin,Low,.5,1,0,Dt);
+        Advance(Config,{.65,18,1},Slope,Edge,.5,1,0,Dt);
+    }
+    const double Wet=Low.SurfaceWater;
+    Advance(Config,Mild,Basin,Low,.5,1,0,Dt);
+    TestTrue(TEXT("Rain pools on retentive ground and persists after rain stops"),
+        Edge.SurfaceWater==0 && Low.SurfaceWater>.3 && Low.SurfaceWater<Wet);
+
+    FCell Fresh, Cured;Fresh.FreshFraction=1;Cured.FreshFraction=0;Cured.Stress=.8;
+    TestTrue(TEXT("Equal eaten biomass can produce different energy"),
+        EcoRepertoireV3::EnergyAfterIntake(.4,.2*Fresh.NutritionMultiplier())
+        > EcoRepertoireV3::EnergyAfterIntake(.4,.2*Cured.NutritionMultiplier()));
+    TestTrue(TEXT("Season is periodic and reaches distinct thermal conditions"),
+        SeasonalTemperatureOffset(240)>5 && SeasonalTemperatureOffset(720)<-5
+        && FMath::IsNearlyEqual(SeasonalTemperatureOffset(240),SeasonalTemperatureOffset(1200),1e-9));
+
+    FCell Clearing;TestTrue(TEXT("Queue clearing"),Clearing.QueueDisturbance(.6));
+    TestFalse(TEXT("Reject duplicate before commit"),Clearing.QueueDisturbance(.6));
+    const auto Cleared=Advance(Config,Mild,Shrub,Clearing,.8,1,.02,Dt);
+    const auto Next=Advance(Config,Mild,Shrub,Clearing,Cleared.Food,1,.02,Dt);
+    TestTrue(TEXT("One clearing enters explicit loss, with no repeat charge"),
+        Cleared.Loss>=.48 && Next.Loss<.01 && Clearing.PendingDisturbance==0
+        && Clearing.Development<.5 && FMath::IsNearlyEqual(.8-Cleared.Loss+Cleared.Growth,Cleared.Food,1e-9));
+
+    EcoLifeV3::FMemory Witness, Unaware;
+    Witness.RememberHunt(40,20,30);Witness.RememberHunt(40,20,45);
+    TestTrue(TEXT("Only witnesses avoid the site, and they can return after decay"),
+        Witness.HuntRisk(40,20,45)>.42 && Witness.HuntRisk(65,20,45)==0
+        && Witness.HuntRisk(40,20,270)<.2 && Unaware.HuntRisk(40,20,45)==0);
+    return true;
 }
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoVegetationWeather, "AdaptiveEcosystem.Vegetation.WaterBudgetAndPlantTolerance", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)

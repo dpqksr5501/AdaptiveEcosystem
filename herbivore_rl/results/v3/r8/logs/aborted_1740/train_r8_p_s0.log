@@ -1,0 +1,38 @@
+[r8_p_s0] 시작 2026-11-05 17:10:34 설정 configs/v3_r8_pilot.yaml 시드 0 목표 250M 상한 10.0h 개체 1024 관측 65 git 7632e308
+[r8_p_s0] 1.0M 1.0분 17489/s 잡힘 0.33 굶음 0.20 번식 0.00 먹음 0.30 뛰기 0.59 은신 0.21 살핌 0.11 도망(늑대 0.8319816080209465 짐승 0.8279195535359469)
+[r8_p_s0] 5.0M 5.0분 16556/s 잡힘 0.51 굶음 0.09 번식 11.47 먹음 6.49 뛰기 0.18 은신 0.07 살핌 0.07 도망(늑대 0.16330088445958257 짐승 0.16210438969781057)
+[r8_p_s0] 10.0M 10.0분 16625/s 잡힘 0.68 굶음 0.05 번식 16.55 먹음 9.08 뛰기 0.25 은신 0.02 살핌 0.04 도망(늑대 0.23977716284717043 짐승 0.23215024774518056)
+[r8_p_s0] 15.0M 14.9분 17060/s 잡힘 0.45 굶음 0.02 번식 17.76 먹음 9.78 뛰기 0.26 은신 0.01 살핌 0.02 도망(늑대 0.3219733327676755 짐승 0.26074181442901706)
+[r8_p_s0] 20.0M 20.0분 16301/s 잡힘 0.36 굶음 0.02 번식 19.10 먹음 10.33 뛰기 0.22 은신 0.01 살핌 0.02 도망(늑대 0.2829094052457674 짐승 0.22275236203502308)
+[r8_p_s0] 25.0M 24.9분 16918/s 잡힘 0.33 굶음 0.02 번식 20.00 먹음 10.76 뛰기 0.22 은신 0.01 살핌 0.02 도망(늑대 0.27862677747668546 짐승 0.22231347650967104)
+[r8_p_s0] 30.0M 30.1분 16199/s 잡힘 0.28 굶음 0.01 번식 20.60 먹음 11.10 뛰기 0.23 은신 0.01 살핌 0.01 도망(늑대 0.29058961283943685 짐승 0.23384751985379237)
+Traceback (most recent call last):
+  File "C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r8\train_r8.py", line 216, in <module>
+    sys.exit(main())
+             ~~~~^^
+  File "C:\kwon\univ\3-1\GameContentsCapstoneDesign\AdaptiveEcosystem\herbivore_rl\results\v3\r8\train_r8.py", line 192, in main
+    model.learn(total_timesteps=total, callback=cb, progress_bar=False)
+    ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sinhyeok\anaconda3\Lib\site-packages\stable_baselines3\ppo\ppo.py", line 311, in learn
+    return super().learn(
+           ~~~~~~~~~~~~~^
+        total_timesteps=total_timesteps,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    ...<4 lines>...
+        progress_bar=progress_bar,
+        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    )
+    ^
+  File "C:\Users\Sinhyeok\anaconda3\Lib\site-packages\stable_baselines3\common\on_policy_algorithm.py", line 337, in learn
+    self.train()
+    ~~~~~~~~~~^^
+  File "C:\Users\Sinhyeok\anaconda3\Lib\site-packages\stable_baselines3\ppo\ppo.py", line 207, in train
+    for rollout_data in self.rollout_buffer.get(self.batch_size):
+                        ~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sinhyeok\anaconda3\Lib\site-packages\stable_baselines3\common\buffers.py", line 505, in get
+    yield self._get_samples(indices[start_idx : start_idx + batch_size])
+          ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Sinhyeok\anaconda3\Lib\site-packages\stable_baselines3\common\buffers.py", line 514, in _get_samples
+    self.observations[batch_inds],
+    ~~~~~~~~~~~~~~~~~^^^^^^^^^^^^
+numpy._core._exceptions._ArrayMemoryError: Unable to allocate 1.02 MiB for an array with shape (4096, 65) and data type float32

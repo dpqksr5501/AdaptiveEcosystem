@@ -13,6 +13,9 @@ class UFXSystemAsset;
 class UFXSystemComponent;
 class USoundBase;
 class UEcoV3WeatherPresenterSubsystem;
+class UDirectionalLightComponent;
+class USkyLightComponent;
+struct FEcoServerTimeSnapshot;
 
 // 통합 v3 모드의 비·눈 연출 (10-18 사용자 '일단 우리 테스트 레벨에도 날씨 적용되게 해 줘').
 //
@@ -33,6 +36,8 @@ class UEcoV3WeatherPresenterSubsystem;
 
 namespace EcoV3WeatherFx
 {
+    /** Same symmetric twilight as the integrated 60+60 native clock. -1 means no valid clock. */
+    ADAPTIVEECOSYSTEM_API double ClockDarkness(const FEcoServerTimeSnapshot& Time);
 	inline constexpr double kFadeInSeconds = 1.5;    // 들어가서 다 세질 때까지 (팀 블루프린트 타임라인 5 초보다 짧게 — 경계를 넘자마자 날씨로 읽히게, 어림)
 	inline constexpr double kFadeOutSeconds = 1.0;   // 나와서 꺼질 때까지
 	inline const TCHAR* const kRainSystemPath = TEXT("/Game/SHC/ART/FX/Rain_System.Rain_System");
@@ -122,6 +127,7 @@ public:
 	/** 한 프레임 (카메라 갱신 뒤). DeltaSeconds = 월드 프레임 초. */
 	void TickPresenter(float DeltaSeconds);
 	const AEcoV3WeatherFxActor* GetFxActor() const { return Fx; }
+	bool DrivesDayNightLighting() const { return bLifeLighting; }
 
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
@@ -136,6 +142,23 @@ private:
 	/** 모두 끈다 (연출 없음 — 꺼짐·통합 모드 아님·카메라 없음). */
 	void FadeAll(double DeltaSeconds);
 	void Apply(double RainTarget, double SnowTarget, double DeltaSeconds);
+    void TickLighting();
+    void RestoreLighting();
+    bool bLifeLighting=false;
+    TWeakObjectPtr<class UEcoNaturalHabitatProfile> NaturalViewProfile;
+    TWeakObjectPtr<class APostProcessVolume> ExposureVolume;
+    float ExposureBias=0;
+    bool bExposureOverride=false;
+    bool bMoonCastShadows=true;
+    TWeakObjectPtr<UDirectionalLightComponent> Sun;
+    float SunIntensity=0;
+    FRotator SunRotation=FRotator::ZeroRotator;
+    TWeakObjectPtr<UDirectionalLightComponent> Moon;
+    float MoonIntensity=0;
+    FRotator MoonRotation=FRotator::ZeroRotator;
+    FLinearColor MoonColor=FLinearColor::White;
+    struct FSkyBaseline { TWeakObjectPtr<USkyLightComponent> Light;float Intensity=0; };
+    TArray<FSkyBaseline> SkyLights;
 
 	double RainDensity = 1.0;         // 빗줄기 수 배수 (eco.IntegratedV3.WeatherRainDensity — 화면 전용)
 

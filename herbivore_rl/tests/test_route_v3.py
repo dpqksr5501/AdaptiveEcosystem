@@ -93,6 +93,8 @@ def _traj_hash(cfg, seed, steps, acts_seed=7):
     f = w.flight_stats()
     f.pop("route", None)
     f.pop("quiet_ends", None)
+    f.pop("hide", None)                 # 10-23 숨은 뒤 지켜보기 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
+    f.pop("episode", None)              # 10-24 쫓김 사건 칸 (HEAD 뒤에 더한 통계 전용 칸 — 궤적과 옛 칸은 그대로)
     ws = w.wild_stats()
     ws.pop("panic_quiet_ends", None)
     st = json.dumps(dict(flight=f, wild=ws, hunt=w.hunt_stats(), rng=str(w.rng.bit_generator.state)), sort_keys=True, default=str)
@@ -422,7 +424,11 @@ def test_route_redecide_for_oracle(forest):
 
 def test_optional_keys_and_validation(forest):
     """선택 키 기본값은 끔(null·0), 잘못된 값은 멈춘다."""
-    assert dict(F.OPTIONAL_KEYS["wild_flight"]) == {"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0}
+    assert dict(F.OPTIONAL_KEYS["wild_flight"]) == {"hold_awake": False, "edge_r": 0.0, "flight_cost": 0.0, "route_fixed": None, "quiet_end": 0,
+                                                    "route": False,      # 10-22 두뇌 길(tests/test_route2_v3.py)
+                                                    "brain_flee_outside_reflex": True,   # 10-23 R7 반사 밖 FLEE 막음(tests/test_r7_mask5.py)
+                                                    "rest_keep": False, "rest_keep_margin": 2.0, "rest_keep_band": 0.0,
+                                                    "rest_keep_asleep": False}           # 10-27 거리 두기(tests/test_calm_v3.py)
     assert F.with_optional("wild_flight", {})["route_fixed"] is None and F.with_optional("wild_flight", {})["quiet_end"] == 0
     for bad in (dict(route_fixed="forest"), dict(route_fixed=1), dict(quiet_end=-1), dict(quiet_end=1.5), dict(quiet_end=True)):
         with pytest.raises(ValueError, match="route_fixed|quiet_end"):

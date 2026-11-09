@@ -61,7 +61,8 @@ void AEcoCreatureIntegrationSpawner::UpdateHitProxies()
     if (!IsInGameThread() || GetNetMode() == NM_Client) return;
     auto& EM = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
     if (EM.IsProcessing()) return;
-    const int32 Epoch = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().WorldEpoch;
+    const auto Time = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime();
+    const int32 Epoch = Time.WorldEpoch;
     if (!bEnableEcosystemLife || !bEnablePlayerCombat) { ResetCombat(); return; }
     if (CombatEpoch != Epoch) { ResetCombat(); CombatEpoch = Epoch; }
     auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
@@ -69,22 +70,37 @@ void AEcoCreatureIntegrationSpawner::UpdateHitProxies()
     TArray<APawn*> Players;
     for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
         if (auto* PC = It->Get(); PC && EcoCreatureCombat::AlivePlayer(PC->GetPawn())) Players.Add(PC->GetPawn());
-    struct FCandidate { int64 Id; FVector Position; float Scale; bool bWolf; double Distance; };
+    struct FCandidate { int64 Id; FVector Position; float Radius; float HalfHeight; double Distance; };
     TArray<FCandidate> Candidates;
     const double AddDistance = FMath::Clamp(HitProxyDistance, 500.f, 5000.f);
     for (const auto Entity : Owned)
     {
         if (!EM.IsEntityValid(Entity) || EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).HP <= 0) continue;
         const auto* Link = EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entity);
-        if (!Link || !Link->bAdopted || Link->bDead || !Native->GetContext(Link->ContextIndex)) continue;
-        const int64 Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity).StableAgentId;
-        const FVector Position = EcoCreatureCombat::NativePosition(EM, Entity, *Native);
+        const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
+        if (!Fauna && (!Link || !Link->bAdopted || Link->bDead || !Native->GetContext(Link->ContextIndex))) continue;
+        const auto& Identity = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity);
+        const int64 Id = Identity.StableAgentId;
+        const FVector Position = Fauna ? EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetTransform().GetLocation()
+            : EcoCreatureCombat::NativePosition(EM, Entity, *Native);
         double Distance = MAX_dbl;
         for (const auto* Player : Players) Distance = FMath::Min(Distance, FVector::DistSquared(Position, Player->GetActorLocation()));
         if (Distance > FMath::Square(AddDistance + (HitProxies.Contains(Id) ? 400. : 0.))) continue;
-        const auto* C = Native->GetContext(Link->ContextIndex);
-        const float Scale = Link->Individual.bInitialized ? float(Link->Individual.BodyScale(C->Sim.T * EcoRepertoireV3::kStepSeconds)) : 1.f;
-        Candidates.Add({Id, Position, Scale, EM.GetFragmentDataPtr<FEcoThreatStateFragment>(Entity) != nullptr, Distance});
+        if (Fauna)
+        {
+            const auto* Profile = FindFauna(Identity.SpeciesId);
+            if (!Profile) continue;
+            const float Scale = float(Fauna->Life.BodyScale(Time.ServerTimeSeconds));
+            Candidates.Add({Id, Position, Profile->BodyRadius * Scale, Profile->EyeHeight * .7f * Scale, Distance});
+        }
+        else
+        {
+            const auto* C = Native->GetContext(Link->ContextIndex);
+            const float Scale = Link->Individual.bInitialized ? FMath::Clamp(
+                float(Link->Individual.BodyScale(C->Sim.T * EcoRepertoireV3::kStepSeconds)), .25f, 2.f) : 1.f;
+            const bool bWolf = EM.GetFragmentDataPtr<FEcoThreatStateFragment>(Entity) != nullptr;
+            Candidates.Add({Id, Position, (bWolf ? 48.f : 42.f) * Scale, (bWolf ? 52.f : 80.f) * Scale, Distance});
+        }
     }
     Candidates.Sort([](const auto& A, const auto& B) { return A.Distance == B.Distance ? A.Id < B.Id : A.Distance < B.Distance; });
     if (Candidates.Num() > FMath::Clamp(MaxHitProxies, 1, 512)) Candidates.SetNum(FMath::Clamp(MaxHitProxies, 1, 512));
@@ -106,7 +122,7 @@ void AEcoCreatureIntegrationSpawner::UpdateHitProxies()
             if (!Proxy) continue;
             Proxy->Bind(this, Epoch, Candidate.Id); HitProxies.Add(Candidate.Id, Proxy);
         }
-        Proxy->Sync(Candidate.Position, Candidate.Scale, Candidate.bWolf);
+        Proxy->SyncCapsule(Candidate.Position, Candidate.Radius, Candidate.HalfHeight);
     }
     // All socket queries see the same completed logical-position snapshot, after native movement.
     for (auto* Player : Players) if (auto* Hit = Player->FindComponentByClass<UEcoMeleeHitComponent>()) Hit->EvaluateAtEcologyBoundary();

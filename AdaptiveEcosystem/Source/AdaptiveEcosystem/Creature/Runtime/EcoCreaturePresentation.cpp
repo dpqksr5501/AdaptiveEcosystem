@@ -89,7 +89,8 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		if (!Existing || !Existing->Actor.IsValid())
 		{
 			if (Adds >= Budget.MaxAddsPerUpdate) continue;
-			const auto Class = Input.Species == TEXT("Wolf") ? WolfActorClass : HerbivoreActorClass;
+            const auto* Fauna = FindFauna(Input.Species);
+            const auto Class = Fauna ? Fauna->VisualClass : Input.Species == TEXT("Wolf") ? WolfActorClass : HerbivoreActorClass;
 			AEcoCreatureRepresentationActor* Actor = nullptr;
 			for (int32 I = VisualPool.Num() - 1; I >= 0; --I)
 				if (IsValid(VisualPool[I]) && VisualPool[I]->GetClass() == Class.Get())
@@ -116,10 +117,11 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		Binding.MovementRevision = Input.ResetRevision;
 		State.Velocity = Input.Visual.Velocity; State.bAlive = (Input.Visual.Flags & 1) != 0;
 		State.bEating = (Input.Visual.Flags & 2) != 0; State.bPursuingPrey = (Input.Visual.Flags & 4) != 0;
-		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::Investigate) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
+		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::CorpseSettled) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
 		State.SenseSource = EEcoSenseSource((Input.Visual.Flags>>4)&3);
 		State.FocusYawDegrees = float(Input.Visual.FocusYaw)/182.0389f;
-        State.BodyScale=Input.Visual.BodyScale/128.f;
+        State.BodyScale=Input.Visual.BodyScale/128.f;State.Maturity=Input.Visual.Maturity/255.f;State.CoatTone=Input.Visual.CoatTone/255.f;
+        State.Appearance=EcoPresentationFlags::Appearance(Input.Visual.Flags);
 		State.bHasVitals = (Input.Visual.Flags & 8) != 0;
 		State.NormalizedHealth = Input.Visual.Health / 255.f; State.NormalizedEnergy = Input.Visual.Energy / 255.f;
 		Binding.Actor->Footsteps->AudioSet = FootstepAudioSet;

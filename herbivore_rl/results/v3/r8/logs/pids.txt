@@ -1,0 +1,21 @@
+﻿train r8_p_s0 cmd_pid 35596 python_pid 32972 log results\v3\r8\logs\train_r8_p_s0.log started 2026-11-05T16:59:18
+train r8_p_s1 cmd_pid 32424 python_pid 16408 log results\v3\r8\logs\train_r8_p_s1.log started 2026-11-05T16:59:19
+train r8_p_s2 cmd_pid 24504 python_pid 36236 log results\v3\r8\logs\train_r8_p_s2.log started 2026-11-05T16:59:19
+train r8_h0_s0 cmd_pid 27876 python_pid 22152 log results\v3\r8\logs\train_r8_h0_s0.log started 2026-11-05T16:59:20
+watch cmd_pid 21140 python_pid 5608 log results\v3\r8\logs\watch.log started 2026-11-05T17:04:43
+train r8_p_s0 cmd_pid 23856 python_pid 21564 log results/v3/r8/logs/train_r8_p_s0.log started 2026-11-05T17:10:31 no_window breakaway=1
+train r8_p_s1 cmd_pid 24424 python_pid 35920 log results/v3/r8/logs/train_r8_p_s1.log started 2026-11-05T17:10:32 no_window breakaway=1
+train r8_p_s2 cmd_pid 22896 python_pid 38924 log results/v3/r8/logs/train_r8_p_s2.log started 2026-11-05T17:10:33 no_window breakaway=1
+train r8_h0_s0 cmd_pid 27884 python_pid 2752 log results/v3/r8/logs/train_r8_h0_s0.log started 2026-11-05T17:10:35 no_window breakaway=1
+watch cmd_pid 5768 python_pid 3380 log results/v3/r8/logs/watch.log started 2026-11-05T17:10:56 no_window breakaway=1
+train r8_p_s0 cmd_pid 32928 python_pid 26808 log results/v3/r8/logs/train_r8_p_s0.log started 2026-11-05T18:24:50 no_window breakaway=1
+train r8_p_s1 cmd_pid 12328 python_pid 16924 log results/v3/r8/logs/train_r8_p_s1.log started 2026-11-05T18:24:51 no_window breakaway=1
+train r8_p_s0 cmd_pid 24856 python_pid 30836 log results/v3/r8/logs/train_r8_p_s0.log started 2026-11-05T18:25:42 no_window breakaway=1
+train r8_p_s1 cmd_pid 33952 python_pid 27456 log results/v3/r8/logs/train_r8_p_s1.log started 2026-11-05T18:25:43 no_window breakaway=1
+train r8_p_s0 cmd_pid 33816 python_pid 38296 log results/v3/r8/logs/train_r8_p_s0.log started 2026-11-05T18:26:49 no_window breakaway=1
+train r8_p_s1 cmd_pid 33532 python_pid 20036 log results/v3/r8/logs/train_r8_p_s1.log started 2026-11-05T18:26:50 no_window breakaway=1
+train r8_p_s0 cmd_pid 33104 python_pid 36376 log results/v3/r8/logs/train_r8_p_s0.log started 2026-11-05T19:27:23 no_window breakaway=1
+train r8_p_s1 cmd_pid 34856 python_pid 3556 log results/v3/r8/logs/train_r8_p_s1.log started 2026-11-05T19:27:24 no_window breakaway=1
+train r8_p_s2 cmd_pid 7812 python_pid 14856 log results/v3/r8/logs/train_r8_p_s2.log started 2026-11-05T19:27:25 no_window breakaway=1
+train r8_h0_s0 cmd_pid 16748 python_pid 33664 log results/v3/r8/logs/train_r8_h0_s0.log started 2026-11-05T19:27:27 no_window breakaway=1
+watch cmd_pid 12624 python_pid 31276 log results/v3/r8/logs/watch.log started 2026-11-05T19:27:29 no_window breakaway=1

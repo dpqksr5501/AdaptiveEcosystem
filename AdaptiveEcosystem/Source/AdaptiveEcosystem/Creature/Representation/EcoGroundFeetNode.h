@@ -21,6 +21,10 @@ struct ADAPTIVEECOSYSTEM_API FAnimNode_EcoGroundFeet : public FAnimNode_Skeletal
     UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundPoint1=FVector::ZeroVector;
     UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundPoint2=FVector::ZeroVector;
     UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundPoint3=FVector::ZeroVector;
+    UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundNormal0=FVector::ZeroVector;
+    UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundNormal1=FVector::ZeroVector;
+    UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundNormal2=FVector::ZeroVector;
+    UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundNormal3=FVector::ZeroVector;
     UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundRootPoint=FVector::ZeroVector;
     UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) FVector GroundUp=FVector::UpVector;
     UPROPERTY(EditAnywhere,Category="Input",meta=(PinShownByDefault)) float GroundValid0=0;
@@ -32,6 +36,7 @@ protected:
     float UpdateSeconds=0;
     float BodyDrop=0;
     float Offsets[4]={};
+    FVector LastBend[4]={FVector::ZeroVector,FVector::ZeroVector,FVector::ZeroVector,FVector::ZeroVector};
     virtual void UpdateInternal(const FAnimationUpdateContext& Context) override;
     virtual void InitializeBoneReferences(const FBoneContainer& RequiredBones) override;
     virtual bool IsValidToEvaluate(const USkeleton* Skeleton,const FBoneContainer& RequiredBones) override;

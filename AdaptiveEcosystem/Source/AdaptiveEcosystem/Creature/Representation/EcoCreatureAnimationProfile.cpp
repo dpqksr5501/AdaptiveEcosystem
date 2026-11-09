@@ -2,16 +2,20 @@
 #include "Animation/Skeleton.h"
 bool UEcoCreatureAnimationProfile::IsValidProfile() const
 {
-    if (!Locomotion || !Locomotion->GetSkeleton() || Poses.Num()!=9 || !FMath::IsFinite(StationarySpeed) || StationarySpeed<0
+    if (!Locomotion || !Locomotion->GetSkeleton() || (Poses.Num()!=9 && Poses.Num()!=12) || !FMath::IsFinite(StationarySpeed) || StationarySpeed<0
         || !FMath::IsFinite(MinimumPoseHoldSeconds) || MinimumPoseHoldSeconds<0
+        ||MorphScale.ContainsNaN()||MorphScale.GetMin()<.7||MorphScale.GetMax()>1.3
         || !FMath::IsFinite(MaxFootCorrectionCm) || MaxFootCorrectionCm<0 || MaxFootCorrectionCm>50
         || !FMath::IsFinite(FootClearanceCm) || FootClearanceCm<0 || FootClearanceCm>20
-        || (bEnableGroundIK && (FootBones.Num()!=4 || IKEndBones.Num()!=4 || ContactHeights.Num()!=4))) return false;
+        || (bEnableGroundIK && ((FootBones.Num()!=2 && FootBones.Num()!=4)
+            || IKEndBones.Num()!=FootBones.Num() || ContactHeights.Num()!=FootBones.Num()))) return false;
+    if(!MorphBone.IsNone()&&Locomotion->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(MorphBone)==INDEX_NONE)return false;
+    if (!TurnHeadBone.IsNone() && Locomotion->GetSkeleton()->GetReferenceSkeleton().FindBoneIndex(TurnHeadBone) == INDEX_NONE) return false;
     if(bEnableGroundIK) {
         const auto& Rig=Locomotion->GetSkeleton()->GetReferenceSkeleton();const int32 Body=Rig.FindBoneIndex(BodyBone);
         if(Body==INDEX_NONE)return false;
         TSet<int32> ChainBones;
-        for(int32 Leg=0;Leg<4;++Leg) {
+        for(int32 Leg=0;Leg<FootBones.Num();++Leg) {
             const int32 Contact=Rig.FindBoneIndex(FootBones[Leg]),End=Rig.FindBoneIndex(IKEndBones[Leg]);
             if(Contact==INDEX_NONE||End==INDEX_NONE||Rig.GetParentIndex(Contact)!=End)return false;
             int32 Bone=End;

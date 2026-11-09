@@ -25,6 +25,7 @@
 #include "MassSpawnerSubsystem.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityTemplate.h"
+#include "Mass/EntityFragments.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
 #include "World/EcoWorldClockSubsystem.h"
@@ -44,6 +45,11 @@ struct FEcoCombatTestAccess
     static void Consume(AEcoCreatureIntegrationSpawner& S, const FEcoServerTimeSnapshot& T) { S.ProcessComboDamage(T); }
     static void Configure(UEcoAbilityAvatarComponent& C, UEcoAbilityInputConfig* Config) { C.InputConfig=Config; }
     static void Proxies(AEcoCreatureIntegrationSpawner& S) { S.UpdateHitProxies(); }
+    static void Predation(AEcoCreatureIntegrationSpawner& S, double Now) { S.ProcessFaunaPredation(Now); }
+    static void MoveFauna(AEcoCreatureIntegrationSpawner& S, double Now) { S.MoveFauna(.05f, Now); }
+    static bool CanHunt(const AEcoCreatureIntegrationSpawner& S, const FMassEntityManager& Manager,
+        FMassEntityHandle Hunter, FMassEntityHandle Prey, double Now)
+    { return S.CanHuntFauna(Manager, Hunter, Prey, S.FaunaSpecies[0], Now, true); }
 };
 
 namespace EcoCombatTest
@@ -231,10 +237,30 @@ bool FEcoGunPresentationHit::RunTest(const FString&)
         EM.GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(E).Body.Pos={5.+I*3.,0};
         EM.GetFragmentDataChecked<FEcoVitalsRuntimeFragment>(E).WorldEpoch=7;
     }
+    auto* FaunaAsset=NewObject<UMassEntityConfigAsset>(W.World);
+    FaunaAsset->GetMutableConfig().AddTrait(*NewObject<UEcoFaunaTrait>(FaunaAsset));
+    TArray<FMassEntityHandle> FaunaEntities;
+    {auto Creation=Mass->SpawnEntities(FaunaAsset->GetOrCreateEntityTemplate(*W.World),1,FaunaEntities);}
+    if (!TestEqual(TEXT("One rule-driven animal spawned"),FaunaEntities.Num(),1)) return false;
+    const auto Rat=FaunaEntities[0];
+    Entities.Add(Rat);
+    auto& RatIdentity=EM.GetFragmentDataChecked<FEcoIdentityFragment>(Rat);
+    RatIdentity.StableAgentId=103;
+    RatIdentity.SpeciesId=TEXT("Rat");
+    auto& RatRegion=EM.GetFragmentDataChecked<FEcoRegionFragment>(Rat);
+    RatRegion.CurrentRegionId=TEXT("Gun");
+    RatRegion.CurrentRegionIndex=0;
+    EM.GetFragmentDataChecked<FTransformFragment>(Rat).GetMutableTransform().SetLocation(FVector(180,0,60));
+    EM.GetFragmentDataChecked<FEcoVitalsRuntimeFragment>(Rat).WorldEpoch=7;
+    auto& RatProfile=S->FaunaSpecies.AddDefaulted_GetRef();
+    RatProfile.SpeciesId=RatIdentity.SpeciesId;
+    RatProfile.BodyRadius=3.5f;
+    RatProfile.EyeHeight=6.f;
+    EM.GetFragmentDataChecked<FEcoFaunaFragment>(Rat).Life.Born=-180.;
     FEcoCombatTestAccess::Ready(*S,Entities);W.World->GetSubsystem<UEcoWorldClockSubsystem>()->StartClock(7,60,60);
     FEcoCombatTestAccess::Proxies(*S);
     auto* R=NewObject<UEcoCombatRelevanceComponent>(P.Pawn);P.Pawn->AddInstanceComponent(R);R->RegisterComponent();
-    R->Offer.Coordinator=S;R->Offer.Epoch=7;R->Offer.Revision=1;R->Offer.Agents={101,102};
+    R->Offer.Coordinator=S;R->Offer.Epoch=7;R->Offer.Revision=1;R->Offer.Agents={101,102,103};
     auto* Equipment=NewObject<UEcoEquipmentComponent>(P.Pawn);P.Pawn->AddInstanceComponent(Equipment);Equipment->RegisterComponent();
     auto* Aim=NewObject<UEcoAimComponent>(P.Pawn);P.Pawn->AddInstanceComponent(Aim);Aim->RegisterComponent();
     auto* Fire=NewObject<UEcoWeaponFireComponent>(P.Pawn);P.Pawn->AddInstanceComponent(Fire);Fire->RegisterComponent();
@@ -260,6 +286,121 @@ bool FEcoGunPresentationHit::RunTest(const FString&)
     auto* Fire3=NewObject<UEcoWeaponFireComponent>(P.Pawn);P.Pawn->AddInstanceComponent(Fire3);Fire3->RegisterComponent();
     Fire3->ServerFire_Implementation(FVector(0,0,64),FVector::ForwardVector,Weapon);FEcoCombatTestAccess::Consume(*S,Time);
     TestEqual(TEXT("World blocker prevents damage to represented target"),EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entities[1]).HP,60.f);
+    auto& RatVitals=EM.GetFragmentDataChecked<FEcoVitalsFragment>(Rat);
+    TestEqual(TEXT("Unpresented rule-driven animal ignores all earlier shots"),RatVitals.HP,100.f);
+    R->ServerPresented_Implementation(1,{103});
+    auto* RatShot=NewObject<UEcoWeaponFireComponent>(P.Pawn);
+    P.Pawn->AddInstanceComponent(RatShot);RatShot->RegisterComponent();
+    RatShot->ServerFire_Implementation(FVector(0,0,64),FVector::ForwardVector,Weapon);
+    FEcoCombatTestAccess::Consume(*S,Time);
+    TestEqual(TEXT("Admitted shot traces the rat-sized authority proxy"),RatVitals.HP,70.f);
+    TestTrue(TEXT("Surviving rat has recent threat evidence"),EM.GetFragmentDataChecked<FEcoFaunaFragment>(Rat).ThreatUntil>0.);
+    RatVitals.HP=20.f;
+    auto* LethalShot=NewObject<UEcoWeaponFireComponent>(P.Pawn);
+    P.Pawn->AddInstanceComponent(LethalShot);LethalShot->RegisterComponent();
+    LethalShot->ServerFire_Implementation(FVector(0,0,64),FVector::ForwardVector,Weapon);
+    FEcoCombatTestAccess::Consume(*S,Time);
+    TestEqual(TEXT("Lethal shot marks the rule-driven target dead"),RatVitals.HP,0.f);
+    TArray<FEcoDeathOutcome> Deaths;
+    FEcoSurvivalSettings Survival;Survival.bEnabled=false;
+    TestTrue(TEXT("Survival consumes the hunting death"),EcoMassSurvival::Advance(EM,Time,1,1,Survival,Deaths,true));
+    TestEqual(TEXT("One hunting death"),Deaths.Num(),1);
+    if (Deaths.Num()==1) TestTrue(TEXT("Hunting death retains rat identity and cause"),
+        Deaths[0].StableAgentId==103&&Deaths[0].SpeciesId==TEXT("Rat")&&Deaths[0].Cause==EEcoDeathCause::ExternalDamage);
+    return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaCounterTest, "AdaptiveEcosystem.Creature.Fauna.ContestedContact",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoFaunaCounterTest::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* S = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Mass = W.World->GetSubsystem<UMassSpawnerSubsystem>();
+    auto& EM = Mass->GetEntityManagerChecked();
+    auto* Asset = NewObject<UMassEntityConfigAsset>(W.World);
+    Asset->GetMutableConfig().AddTrait(*NewObject<UEcoFaunaTrait>(Asset));
+    TArray<FMassEntityHandle> Entities;
+    { auto Creation = Mass->SpawnEntities(Asset->GetOrCreateEntityTemplate(*W.World), 4, Entities); }
+    if (!TestEqual(TEXT("Hunter and three rule-driven family members"), Entities.Num(), 4)) return false;
+    S->FaunaSpecies.SetNum(2);
+    const FName Names[] = {TEXT("Leopard"), TEXT("Pig"), TEXT("Pig"), TEXT("Pig")};
+    for (int32 Index = 0; Index < Entities.Num(); ++Index)
+    {
+        auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entities[Index]);
+        Id.StableAgentId = Index + 1;
+        Id.SpeciesId = Names[Index];
+        EM.GetFragmentDataChecked<FEcoRegionFragment>(Entities[Index]).CurrentRegionId = TEXT("Meadow");
+        EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[Index]).Life.Born = -200.;
+        EM.GetFragmentDataChecked<FTransformFragment>(Entities[Index]).GetMutableTransform().SetLocation(FVector(60. * Index, 0, 0));
+        if (Index < 2)
+        {
+            S->FaunaSpecies[Index].SpeciesId = Names[Index];
+            S->FaunaSpecies[Index].AdultMass = 60.f;
+        }
+    }
+    auto& Rule = S->FaunaSpecies[0].PreyRules.AddDefaulted_GetRef();
+    Rule.SpeciesId = Names[1]; Rule.MaxPreyMassRatio = 2.f; Rule.MaxHealthyMaturity = 1.f;
+    S->FaunaSpecies[0].AttackReach = 120.f;
+    S->FaunaSpecies[1].DefenseDamage = 18.f;
+    FEcoCombatTestAccess::Ready(*S, Entities);
+    auto& Hunt = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[0]);
+    auto& PreyTransform = EM.GetFragmentDataChecked<FTransformFragment>(Entities[1]).GetMutableTransform();
+    auto& PreyHP = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entities[1]).HP;
+    auto& HunterHP = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entities[0]).HP;
+    PreyTransform.SetRotation(FRotator(0, 180, 0).Quaternion());
+    Hunt.AttackContact = 1.; Hunt.TargetId = 2;
+    FEcoCombatTestAccess::Predation(*S, 1.);
+    TestEqual(TEXT("Frontal defense hurts the hunter"), HunterHP, 82.f);
+    TestEqual(TEXT("Counter prevented the capture"), PreyHP, 100.f);
+    PreyTransform.SetRotation(FQuat::Identity);
+    Hunt.AttackContact = 6.; Hunt.TargetId = 2;
+    FEcoCombatTestAccess::Predation(*S, 6.);
+    TestEqual(TEXT("Flank hit wounds resilient prey"), PreyHP, 55.f);
+    auto& Young = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[1]);
+    Young.Life.Born = 6.;
+    Young.Life.Caregiver = Young.Life.ParentA = 3;
+    Young.Life.ParentB = 4;
+    S->FaunaSpecies[1].OffspringGuardRange = 400.f;
+    EM.GetFragmentDataChecked<FTransformFragment>(Entities[2]).GetMutableTransform().SetLocation(FVector(30, 0, 0));
+    EM.GetFragmentDataChecked<FTransformFragment>(Entities[3]).GetMutableTransform().SetLocation(FVector(32, 0, 0));
+    Hunt.TargetId = 2;
+    Hunt.AttackContact = 12.;
+    FEcoCombatTestAccess::MoveFauna(*S, 11.95);
+    TestEqual(TEXT("Movement selects the caregiver for the threatened juvenile"),
+        EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[2]).GuardThreatId, int64(1));
+    Hunt.AttackContact = 12.; Hunt.TargetId = 2;
+    FEcoCombatTestAccess::Predation(*S, 12.);
+    TestEqual(TEXT("Caregiver already in the attack lane intercepts"), HunterHP, 64.f);
+    TestEqual(TEXT("The intercepted attack does not wound the young"), PreyHP, 55.f);
+    EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[2]).Stamina = .1f;
+    S->FaunaSpecies[1].bAllowSecondParentGuard = true;
+    Hunt.AttackContact = 18.; Hunt.TargetId = 2;
+    FEcoCombatTestAccess::Predation(*S, 18.);
+    TestEqual(TEXT("Enabled second parent substitutes for the exhausted caregiver"), HunterHP, 46.f);
+    S->FaunaSpecies[1].bAllowSecondParentGuard = false;
+    Hunt.AttackContact = 24.; Hunt.TargetId = 2;
+    FEcoCombatTestAccess::Predation(*S, 24.);
+    TestEqual(TEXT("Caregiver-only profile does not recruit the second parent"), HunterHP, 46.f);
+    TestEqual(TEXT("Without a valid screen the young can be wounded"), PreyHP, 10.f);
+    auto& Patch = S->FaunaHabitatPatches.AddDefaulted_GetRef();
+    Patch.RegionId = TEXT("Meadow");
+    Patch.ShelteredSpecies = Names[1];
+    Patch.Center = PreyTransform.GetLocation();
+    Patch.ShelterRadius = 25.f;
+    Patch.EntranceRadius = 7.f;
+    TestTrue(TEXT("The original phase retains contact"), FEcoCombatTestAccess::CanHunt(*S, EM, Entities[0], Entities[1], 24.));
+    S->FaunaHabitatStage = 1;
+    TestFalse(TEXT("A larger hunter cannot make contact inside the narrow shelter"),
+        FEcoCombatTestAccess::CanHunt(*S, EM, Entities[0], Entities[1], 24.));
+    PreyTransform.SetLocation(FVector(95, 0, 0));
+    TestTrue(TEXT("Shelter does not protect prey outside its footprint"),
+        FEcoCombatTestAccess::CanHunt(*S, EM, Entities[0], Entities[1], 24.));
+    float Stock = 3.5f;
+    TestEqual(TEXT("A patch credits only the requested energy"), Patch.TakeMeal(Stock, 1.f), 1.f);
+    TestEqual(TEXT("The next eater receives only the remaining stock"), Patch.TakeMeal(Stock, 8.f), 2.5f);
+    TestEqual(TEXT("An exhausted patch cannot issue another meal"), Patch.TakeMeal(Stock, 8.f), 0.f);
+    TestTrue(TEXT("Nearby safe carrion beats costly hunt"), EcoFaunaFeeding::Value(12., .5) > EcoFaunaFeeding::Value(15., 2., 5.));
+    TestTrue(TEXT("Nearby viable prey beats distant depleted carrion"), EcoFaunaFeeding::Value(15., .5, 2.) > EcoFaunaFeeding::Value(4., 4.));
     return true;
 }
 #endif

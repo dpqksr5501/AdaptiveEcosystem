@@ -78,6 +78,9 @@ void AEcoCreatureIntegrationSpawner::BeginPlay()
 	PostTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &AEcoCreatureIntegrationSpawner::OnWorldPostActorTick);
 	StartedAt = GetWorld()->GetTimeSeconds();
 #if WITH_DEV_AUTOMATION_TESTS
+    int32 HabitatStageOverride = INDEX_NONE;
+    if (FaunaHabitatStage > 0 && FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaHabitatStage="), HabitatStageOverride)
+        && HabitatStageOverride >= 0 && HabitatStageOverride <= 3) FaunaHabitatStage = HabitatStageOverride;
 	FParse::Value(FCommandLine::Get(), TEXT("EcoIntegrationExitAfter="), TestExitAfter);
 	FParse::Value(FCommandLine::Get(), TEXT("EcoIntegrationCaptureAt="), TestCaptureAt);
 	bTestObserverCycle = TestExitAfter > 0 && FParse::Param(FCommandLine::Get(), TEXT("EcoIntegrationObserverCycle"));
@@ -126,6 +129,8 @@ void AEcoCreatureIntegrationSpawner::UpdateHabitatStreaming()
 		{
 			for (const FVector& Point : Group.HerbivoreSpawnPoints) AddPoint(Point);
 			for (const FVector& Point : Group.WolfSpawnPoints) AddPoint(Point);
+            for (const auto& Placement : Group.Fauna)
+                for (const FVector& Point : Placement.SpawnPoints) AddPoint(Point);
 		}
 	}
 	else if (auto* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>())

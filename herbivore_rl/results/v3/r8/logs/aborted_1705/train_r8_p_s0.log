@@ -1,0 +1,8 @@
+[r8_p_s0] 시작 2026-11-05 16:59:22 설정 configs/v3_r8_pilot.yaml 시드 0 목표 250M 상한 10.0h 개체 1024 관측 65 git 7632e308
+[r8_p_s0] 1.0M 0.9분 17859/s 잡힘 0.33 굶음 0.20 번식 0.00 먹음 0.30 뛰기 0.59 은신 0.21 살핌 0.11 도망(늑대 0.8319816080209465 짐승 0.8279195535359469)
+[r8_p_s0] 5.0M 5.0분 16558/s 잡힘 0.51 굶음 0.09 번식 11.47 먹음 6.49 뛰기 0.18 은신 0.07 살핌 0.07 도망(늑대 0.16330088445958257 짐승 0.16210438969781057)
+forrtl: error (200): program aborting due to window-CLOSE event
+Image              PC                Routine            Line        Source             
+KERNELBASE.dll     00007FFCEDA263ED  Unknown               Unknown  Unknown
+KERNEL32.DLL       00007FFCEFA5DDA7  Unknown               Unknown  Unknown
+ntdll.dll          00007FFCF065EE4C  Unknown               Unknown  Unknown

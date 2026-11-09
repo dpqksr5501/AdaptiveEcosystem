@@ -10,6 +10,7 @@ struct FEcoNoiseEvent
 	int64 Id = 0;
 	int64 SourceAgentId = 0; // 0 for Actor-based emissions.
 	FName SourceSpeciesId;
+	FName RegionId;
 	double EmittedAt = 0;
 	FVector Position = FVector::ZeroVector;
 	float Loudness = 0;
@@ -33,13 +34,16 @@ public:
 	void GatherRecent(TArray<FEcoNoiseEvent>& Out);
 	/** Logical Mass source: no representation Actor is required, including on dedicated servers. */
 	int64 ReportCreatureFootstep(FVector Position, float Loudness, float MaxRange, float ThreatStrength,
-		int64 StableAgentId, FName SpeciesId);
+		int64 StableAgentId, FName SpeciesId, FName RegionId = NAME_None);
 	/** Presentation alarm emission; authority position and logical identity only. */
 	int64 ReportCreatureAlarm(FVector Position,int64 StableAgentId,FName SpeciesId);
 	static constexpr int32 MaxEvents = 128;
 	static constexpr double EventLifetime = 0.6;
 private:
+    int64 Accept(FEcoNoiseEvent Event, bool bProfiledCreature);
 	void Prune(double Now);
 	int64 NextId = 1;
 	TArray<FEcoNoiseEvent> Events;
+    // Latest contact per creature, with separate capacity for player and alarm events.
+    TMap<int64, FEcoNoiseEvent> ProfiledFootsteps;
 };

@@ -17,8 +17,10 @@ namespace
 {
 	int Print(const char* Name, const FC::FReport& R)
 	{
-		std::printf("%-8s n=%d mismatch=%d first=%d field=%d c0=%lld c1=%lld c2=%lld\n", Name, R.Cases, R.Failures, R.FirstCase, R.FirstField,
-					static_cast<long long>(R.Count0), static_cast<long long>(R.Count1), static_cast<long long>(R.Count2));
+		std::printf("%-8s n=%d mismatch=%d first=%d field=%d c0=%lld c1=%lld c2=%lld hidden=%lld cover_died=%lld ep_joined=%lld ep_hidden=%lld ep_other=%lld\n",
+					Name, R.Cases, R.Failures, R.FirstCase, R.FirstField, static_cast<long long>(R.Count0), static_cast<long long>(R.Count1),
+					static_cast<long long>(R.Count2), static_cast<long long>(R.Hidden), static_cast<long long>(R.CoverDied), static_cast<long long>(R.EpJoined),
+					static_cast<long long>(R.EpHidden), static_cast<long long>(R.EpOther));
 		return R.Passed() ? 0 : 1;
 	}
 }
@@ -27,7 +29,10 @@ int main()
 {
 	int Fail = 0;
 	Fail += Print("defs", FC::CheckDefinitions());
-	Fail += Print("scenes", FC::CheckScenes());
+	const FC::FReport Scenes = FC::CheckScenes();
+	Fail += Print("scenes", Scenes);
+	Fail += (Scenes.Hidden > 0 && Scenes.CoverDied > 0) ? 0 : 1;   // 10-23 숨은 뒤 지켜보기: 숨음·지켜보는 동안 죽음이 장면에 있다
+	Fail += (Scenes.EpJoined > 0 && Scenes.EpHidden > 0 && Scenes.EpOther > 0) ? 0 : 1;   // 10-24 쫓김 사건: 이어진 도망·숨음·그 밖·잘림이 장면에 있다
 	Fail += Print("loop", FC::CheckLoop());
 	const FC::FReport Pairs = FC::CheckPairs();
 	Fail += Print("pairs", Pairs);
@@ -35,12 +40,22 @@ int main()
 	EcoWorldV3::FFlightReport Rp;
 	const FC::FReport Run = FC::CheckRunIdentity(900, &Rp);
 	Fail += Print("same", Run);
-	std::printf("run: started=%lld own=%lld flee=%lld reflex=%lld causes=", static_cast<long long>(Rp.Started), static_cast<long long>(Rp.OwnN),
-				static_cast<long long>(Rp.FleeSteps), static_cast<long long>(Rp.ReflexSteps));
+	std::printf("run: started=%lld own=%lld flee=%lld reflex=%lld chased=%lld hidden=%lld watching=%lld cover_caught=%lld cover_starved=%lld causes=",
+				static_cast<long long>(Rp.Started), static_cast<long long>(Rp.OwnN), static_cast<long long>(Rp.FleeSteps), static_cast<long long>(Rp.ReflexSteps),
+				static_cast<long long>(Rp.Chased), static_cast<long long>(Rp.Hidden), static_cast<long long>(Rp.Watching), static_cast<long long>(Rp.CoverCaught),
+				static_cast<long long>(Rp.CoverStarved));
 	for (std::int32_t c = 0; c < EcoWorldV3::kNumFlightCauses; ++c)
 	{
 		std::printf("%s:%lld ", EcoWorldV3::FlightCauseName(c), static_cast<long long>(Rp.Num[c]));
 	}
+	// 10-24 쫓김 사건 (파이썬 flight_stats 의 episode 와 같은 칸)
+	std::printf("\nepisode: started=%lld chased=%lld hidden=%lld caught=%lld starved=%lld other=%lld truncated=%lld watching=%lld other_chased=%lld joined=%lld "
+				"(cover %lld · other %lld) window_caught=%lld window_starved=%lld",
+				static_cast<long long>(Rp.EpStarted), static_cast<long long>(Rp.EpChased), static_cast<long long>(Rp.EpHidden),
+				static_cast<long long>(Rp.EpCaught), static_cast<long long>(Rp.EpStarved), static_cast<long long>(Rp.EpOther),
+				static_cast<long long>(Rp.EpTruncated), static_cast<long long>(Rp.EpWatching), static_cast<long long>(Rp.EpOtherChased),
+				static_cast<long long>(Rp.EpJoined), static_cast<long long>(Rp.EpJoinedCover), static_cast<long long>(Rp.EpJoinedOther),
+				static_cast<long long>(Rp.EpWindowCaught), static_cast<long long>(Rp.EpWindowStarved));
 	std::printf("\n%s\n", Fail == 0 ? "PASS" : "FAIL");
 	return Fail == 0 ? 0 : 1;
 }

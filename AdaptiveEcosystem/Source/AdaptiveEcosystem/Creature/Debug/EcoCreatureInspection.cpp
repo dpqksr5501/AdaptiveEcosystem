@@ -133,10 +133,35 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                             J->SetStringField(TEXT("parent_a"),LexToString(Life.ParentA));J->SetStringField(TEXT("parent_b"),LexToString(Life.ParentB));
                             J->SetNumberField(TEXT("generation"),Life.Generation);J->SetNumberField(TEXT("offspring"),Life.Offspring);
                             J->SetNumberField(TEXT("born"),Life.Born);J->SetNumberField(TEXT("speed_gene"),Life.Genome.Speed);J->SetNumberField(TEXT("size_gene"),Life.Genome.Size);
+                            J->SetNumberField(TEXT("caution_gene"),Life.Genome.Caution);J->SetNumberField(TEXT("sociability_gene"),Life.Genome.Sociability);J->SetNumberField(TEXT("coat_gene"),Life.Genome.Coat);
                             J->SetNumberField(TEXT("growth"),Life.Growth(W.T*EcoRepertoireV3::kStepSeconds));
+                            J->SetNumberField(TEXT("age_seconds"),FMath::Max(0.,W.T*EcoRepertoireV3::kStepSeconds-Life.Born));
+                            J->SetNumberField(TEXT("maturity"),Life.AgeFraction(W.T*EcoRepertoireV3::kStepSeconds));
+                            J->SetNumberField(TEXT("maturity_seconds"),Life.MaturitySeconds);J->SetNumberField(TEXT("sex"),int32(Life.Sex));
+                            J->SetStringField(TEXT("caregiver"),LexToString(Life.Caregiver));J->SetNumberField(TEXT("family_mode"),Life.FamilyMode);
+                            J->SetStringField(TEXT("family_observed"),LexToString(Life.FamilyObserved));
+                            J->SetNumberField(TEXT("family_last_seen"),Life.FamilySeen);J->SetNumberField(TEXT("family_follow_steps"),double(Life.FamilyFollowSteps));
+                            J->SetNumberField(TEXT("family_hide_steps"),double(Life.FamilyHideSteps));
                             J->SetNumberField(TEXT("familiarity"),Life.Memory.Familiarity);J->SetNumberField(TEXT("curiosity"),Life.Memory.Curiosity);
                             J->SetNumberField(TEXT("fear"),Life.Memory.Fear);J->SetNumberField(TEXT("hostility"),Life.Memory.Hostility);
                             J->SetNumberField(TEXT("unknown_fear"),Life.Memory.UnknownFear);
+                            J->SetNumberField(TEXT("hunt_time"),Life.Memory.HuntTime);
+                            J->SetNumberField(TEXT("hunt_x"),Life.Memory.HuntX);
+                            J->SetNumberField(TEXT("hunt_y"),Life.Memory.HuntY);
+                            J->SetNumberField(TEXT("hunt_pressure"),Life.Memory.HuntPressure);
+                            J->SetNumberField(TEXT("local_forage_cell"),Life.ForageCell);
+                            J->SetNumberField(TEXT("motion_reason"),Life.MotionReason);
+                            J->SetNumberField(TEXT("world_rules_version"),EcoLifeV3::kWorldRulesVersion);
+                            J->SetNumberField(TEXT("contact_blocked_steps"),double(Life.ContactBlockedSteps));
+                            J->SetNumberField(TEXT("habitat_phase"),Life.Residence.Phase);J->SetNumberField(TEXT("habitat_cover"),Life.Residence.Cover);
+                            J->SetNumberField(TEXT("habitat_target_x"),Life.Residence.X);J->SetNumberField(TEXT("habitat_target_y"),Life.Residence.Y);
+                            J->SetNumberField(TEXT("habitat_settled_since"),Life.Residence.SettledSince);
+                            J->SetNumberField(TEXT("habitat_interior_rest_steps"),double(Life.Residence.InteriorRestSteps));
+                            J->SetNumberField(TEXT("habitat_edge_rest_steps"),double(Life.Residence.EdgeRestSteps));
+                            J->SetNumberField(TEXT("habitat_search_failures"),double(Life.Residence.SearchFailures));
+                            J->SetBoolField(TEXT("natural_habitats"),W.Config.bNaturalHabitats);J->SetBoolField(TEXT("wild_refuges"),W.Config.bWildRefuges);
+                            const TCHAR* MotionNames[]={TEXT("Policy"),TEXT("LocalForage"),TEXT("ContactSeparation"),TEXT("BoundarySteering")};
+                            J->SetStringField(TEXT("motion_reason_name"),MotionNames[FMath::Clamp(int32(Life.MotionReason),0,3)]);
                             J->SetBoolField(TEXT("last_damage_attacker_known"),Life.Memory.bLastDamageKnown);
                             J->SetNumberField(TEXT("nutrition"),Life.Nutrition);J->SetNumberField(TEXT("meat_issued"),Life.MeatIssued);
                             J->SetNumberField(TEXT("meat_consumed"),Life.MeatConsumed);J->SetNumberField(TEXT("meat_wasted"),Life.MeatWasted);
@@ -147,13 +172,15 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                             J->SetNumberField(TEXT("role_until"),Life.Investigation.Until);J->SetNumberField(TEXT("hunt_window_captures"),W.HuntWindowCaptures);
                             Data->SetObjectField(TEXT("life"),J);
                         }
-                        Data->SetBoolField(TEXT("refuge_safety_enabled"),W.Config.bProtectedRefuges);
+                        Data->SetBoolField(TEXT("refuge_safety_enabled"),W.Config.bShelterSafe||EcoWorldV3::RefugeOwnsSafety(W.Config));
                         Data->SetNumberField(TEXT("refuge_protected_prey_steps"),double(W.Stats.RefugeProtectedPreySteps));
                         Data->SetNumberField(TEXT("refuge_constrained_moves"),double(W.Stats.RefugeConstrainedMoves));
                         Data->SetNumberField(TEXT("refuge_capture_violations"),double(W.Stats.RefugeCaptureViolations));
+                        Data->SetNumberField(TEXT("caught_in_cover"),double(W.Stats.CaughtInCover));
                         Data->SetNumberField(TEXT("refuge_inside_predator_steps"),double(W.Stats.RefugeInsidePredatorSteps));
                         if(const auto* Body=Manager.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E)){
-                            Data->SetBoolField(TEXT("refuge_protected_here"),W.Config.bProtectedRefuges&&EcoRefugeV3::Contains(W.Config.Covers,Body->Body.Pos));
+                            Data->SetNumberField(TEXT("last_plant_intake"),Body->Body.LastIntake);
+                            Data->SetBoolField(TEXT("refuge_protected_here"),(W.Config.bShelterSafe||EcoWorldV3::RefugeOwnsSafety(W.Config))&&EcoRefugeV3::Contains(W.Config.Covers,Body->Body.Pos));
                             const auto P=Ctx->UnitsToCm(Body->Body.Pos.X,Body->Body.Pos.Y,Link->GroundZ);
                             Data->SetArrayField(TEXT("native_world_position"),{MakeShared<FJsonValueNumber>(P.X),MakeShared<FJsonValueNumber>(P.Y),MakeShared<FJsonValueNumber>(P.Z)});
                         }
@@ -190,11 +217,15 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetNumberField(TEXT("social_cohesion"),Request->EffectiveAction.Cohesion);
             }
             if(const auto* P=Manager.GetFragmentDataPtr<FEcoBehaviorStateFragment>(E)){
-                Data->SetStringField(TEXT("brain"),TEXT("PPO_V3_builtin"));
                 Data->SetStringField(TEXT("movement"),TEXT("NativeV3_single_writer"));
-                Data->SetNumberField(TEXT("policy_obs_dim"),EcoPolicyV3::kObsDim);
-                Data->SetNumberField(TEXT("policy_mask_version"),EcoPolicyV3::kMaskVersion);
-                Data->SetStringField(TEXT("policy_contract"),LexToString(EcoPolicyV3::kContractHash));
+                if (const auto* Sub = World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>())
+                {
+                    const auto& Brain = Sub->GetActiveBrain();
+                    Data->SetStringField(TEXT("brain"), Brain.Id);
+                    Data->SetNumberField(TEXT("policy_obs_dim"), Brain.ObsDim);
+                    Data->SetNumberField(TEXT("policy_mask_version"), Brain.MaskVersion);
+                    Data->SetStringField(TEXT("policy_contract"), LexToString(Brain.ContractHash));
+                }
                 Data->SetBoolField(TEXT("committed_policy_read"),P->Decision.bCommittedReads);
                 Data->SetBoolField(TEXT("next_policy_read"),P->Decision.Prep.bReads);
                 Data->SetNumberField(TEXT("next_request"),P->Decision.Request);

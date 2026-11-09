@@ -57,9 +57,12 @@ def tick(dt):
         if not actor.get_editor_property('bound'):continue
         v=actor.get_editor_property('visual_state')
         scale=actor.get_actor_scale3d()
+        mesh=actor.get_editor_property('creature_mesh');asset=mesh.get_skeletal_mesh_asset();animation=mesh.get_anim_instance()
         visuals.append(dict(id=str(v.get_editor_property('stable_agent_id')),
             region=str(v.get_editor_property('region_id')),activity=str(v.get_editor_property('activity')),
-            body_scale=v.get_editor_property('body_scale'),actor_scale=[scale.x,scale.y,scale.z]))
+            coat_tone=v.get_editor_property('coat_tone'),maturity=v.get_editor_property('maturity'),adult_visible=mesh.is_visible(),young_visible=actor.get_editor_property('immature_mesh').is_visible(),
+            body_scale=v.get_editor_property('body_scale'),actor_scale=[scale.x,scale.y,scale.z],appearance=v.get_editor_property('appearance'),
+            mesh=asset.get_path_name() if asset else None,animation=animation.get_class().get_name() if animation else None))
     camera=unreal.GameplayStatics.get_player_camera_manager(game,0)
     pawn=unreal.GameplayStatics.get_player_pawn(game,0)
     c=camera.get_camera_location() if camera else None;p=pawn.get_actor_location() if pawn else None
@@ -89,9 +92,13 @@ def tick(dt):
     if native is not None:result['native_performance']=json.loads(native.capture_step_performance())
     result['scale_payload_matches_actor']=all(abs(v['body_scale']-v['actor_scale'][0])<1e-5 for s in state['samples'] for v in s['visuals'])
     result['received_visual_ids']=sorted({v['id'] for s in state['samples'] for v in s['visuals']})
+    result['received_appearances']=sorted({v['appearance'] for s in state['samples'] for v in s['visuals']})
+    result['morph_matches_payload']=all(v['appearance']==0 or (v['animation'] and v['mesh'] and
+        ('SK_DeerStag' in v['mesh'] if v['appearance']==1 else 'SK_DeerDoe' in v['mesh'])) for s in state['samples'] for v in s['visuals'])
     result['passed'] = len(ids)==0 and migration_subsystems==0 and len(best['fields'])>0 and all(not f['authority'] for f in best['fields']) and sum(f['instances'] for f in best['fields'])>0 and result['scale_payload_matches_actor']
     if map_name=='LV_JYU_Ecosystem':
         result['passed']=result['passed'] and bool(result['received_visual_ids']) and result.get('native_performance',{}).get('native_steps_total',-1)==0
+        if any(f.get('natural_profile','None')!='None' for f in best['fields']):result['passed']=result['passed'] and result['morph_matches_payload']
     if grass_travel:
         visits=[]
         for sample in state['samples']:

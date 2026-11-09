@@ -1,0 +1,37 @@
+{
+ "config": "configs/v3_r8_pilot.yaml",
+ "seeds": [
+  41400,
+  41449
+ ],
+ "steps": 3000,
+ "n": 1005234,
+ "n_wolf": 125213,
+ "auc": 0.5222951047446023,
+ "single_auc": {
+  "speed": 0.47563756512699096,
+  "size": 0.48385347925590266,
+  "turn": 0.5014127813400497
+ },
+ "swap_ok": true,
+ "swapped_worlds": 8,
+ "ok": true,
+ "tired_vs_beast_roam": {
+  "auc_speed_tree": 0.5417854255987715,
+  "n_tired": 7977,
+  "mean_speed_tired": 0.46037175498086963,
+  "mean_speed_beast_roam": 0.42197831827515736
+ },
+ "mean_speed": {
+  "wolf": 0.414495872759572,
+  "beast": 0.42197831827515736
+ },
+ "mean_size": {
+  "wolf": 1.015101449378716,
+  "beast": 1.0237688171268235
+ },
+ "mean_turn": {
+  "wolf": 0.08947486930190182,
+  "beast": 0.08513479562299772
+ }
+}

@@ -6,7 +6,7 @@
 #include "EcoCreatureAnimationProfile.generated.h"
 
 UENUM(BlueprintType)
-enum class EEcoPresentationPose : uint8 { Locomotion, Graze, Look, Hide, Freeze, Sleep, Attack, Recover, Dead };
+enum class EEcoPresentationPose : uint8 { Locomotion, Graze, Look, Hide, Freeze, Sleep, Attack, Recover, Dead, Takeoff, Fly, Land };
 
 USTRUCT(BlueprintType)
 struct FEcoCreaturePoseClip
@@ -37,6 +37,12 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadOnly) FName BodyBone;
     /** Optional neck branch used to layer head-up vigilance over moving legs. */
     UPROPERTY(EditAnywhere,BlueprintReadOnly) FName AlertHeadBone;
+    /** Optional neck joint turned towards the current movement direction ahead of the torso. */
+    UPROPERTY(EditAnywhere, BlueprintReadOnly) FName TurnHeadBone;
+    /** Optional presentation-only growth silhouette correction, e.g. immature head proportions. */
+    UPROPERTY(EditAnywhere,BlueprintReadOnly) FName MorphBone;
+    UPROPERTY(EditAnywhere,BlueprintReadOnly) FVector MorphScale=FVector::OneVector;
+    UPROPERTY(EditAnywhere,BlueprintReadOnly) bool bAgeDrivenMorph=false;
     UPROPERTY(EditAnywhere, BlueprintReadOnly) TArray<float> ContactHeights;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0",ClampMax="40")) float MaxFootCorrectionCm = 12;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, meta=(ClampMin="0",ClampMax="20")) float FootClearanceCm = .5f;

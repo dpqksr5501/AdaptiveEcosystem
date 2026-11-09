@@ -30,7 +30,11 @@ void AEcoCreatureHitProxy::ClearBinding()
 void AEcoCreatureHitProxy::Sync(const FVector& GroundPosition, float BodyScale, bool bPredator)
 {
     const float Scale = FMath::Clamp(BodyScale, .25f, 2.f);
-    const float HalfHeight = (bPredator ? 52.f : 80.f) * Scale;
-    Shape->SetCapsuleSize((bPredator ? 48.f : 42.f) * Scale, HalfHeight);
+    SyncCapsule(GroundPosition, (bPredator ? 48.f : 42.f) * Scale, (bPredator ? 52.f : 80.f) * Scale);
+}
+void AEcoCreatureHitProxy::SyncCapsule(const FVector& GroundPosition, float Radius, float HalfHeight)
+{
+    HalfHeight = FMath::Max(HalfHeight, Radius);
+    Shape->SetCapsuleSize(Radius, HalfHeight);
     SetActorLocation(GroundPosition + FVector(0, 0, HalfHeight), false, nullptr, ETeleportType::TeleportPhysics);
 }

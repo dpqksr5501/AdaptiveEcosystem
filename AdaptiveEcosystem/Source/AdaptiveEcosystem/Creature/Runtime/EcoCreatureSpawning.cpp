@@ -17,6 +17,8 @@
 #include "MassEntityTemplate.h"
 #include "Network/EcoGameState.h"
 #include "World/EcologyRegion.h"
+#include "World/EcoNaturalHabitatProfile.h"
+#include "Misc/Crc.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcoWorldClockSubsystem.h"
 #include "EngineUtils.h"
@@ -79,17 +81,21 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 	{
 		if (Group.RegionId.IsNone() || GroupIds.Contains(Group.RegionId) || Group.Herbivores < 0 || Group.Wolves < 0 || !Group.Schedule.IsValid()) return false;
 		GroupIds.Add(Group.RegionId); Total += (IsSpeciesEnabled(false) ? int64(Group.Herbivores) : 0) + (IsSpeciesEnabled(true) ? Group.Wolves : 0);
+        for (const auto& Placement : Group.Fauna) Total += Placement.SpawnPoints.Num();
 		if (!Regions.ContainsByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; })) return false;
 		if (Group.bUseFoodPatchPosition && (Group.FoodPatchPosition.ContainsNaN()
 			|| !(*Regions.FindByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; }))->ContainsPosition(Group.FoodPatchPosition))) return false;
 	}
 	if (Total > GlobalPopulationLimit || (IsSpeciesEnabled(false) && !HerbivoreActorClass) || (IsSpeciesEnabled(true) && !WolfActorClass)) return false;
+    if (!InitializeFaunaHabitat()) return false;
 	// Validate every habitat before starting clock/resources or creating any Entity.
 	for (const auto& Group : Groups)
 	{
 		TArray<FVector> Positions;
 		if ((IsSpeciesEnabled(false) && !BuildSpawnPositions(Group, Group.Herbivores, false, Positions))
 			|| (IsSpeciesEnabled(true) && !BuildSpawnPositions(Group, Group.Wolves, true, Positions))) return false;
+        for (const auto& Placement : Group.Fauna)
+            if (!BuildFaunaPositions(Group.RegionId, Placement, Positions)) return false;
 	}
 	if (!Ecology->ConfigurePopulationLimit(GlobalPopulationLimit)) return false;
 	PopulationPressure.bEnabled = bEnablePopulationPressure;
@@ -115,9 +121,17 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 		FEcoSpawnRequest Request;
 		const int32 DeerCount = IsSpeciesEnabled(false) ? Group.Herbivores : 0;
 		const int32 WolfCount = IsSpeciesEnabled(true) ? Group.Wolves : 0;
-		if (DeerCount + WolfCount == 0) continue;
-		if (!Ecology->RequestInitialSpawn(Group.RegionId, DeerCount + WolfCount, Clock->GetServerTime(), Request)) return false;
-		const int32 Actual = Spawn(Group.RegionId, DeerCount, false) + Spawn(Group.RegionId, WolfCount, true);
+        int32 Count = DeerCount + WolfCount;
+        for (const auto& Placement : Group.Fauna) Count += Placement.SpawnPoints.Num();
+		if (Count == 0) continue;
+		if (!Ecology->RequestInitialSpawn(Group.RegionId, Count, Clock->GetServerTime(), Request)) return false;
+		int32 Actual = Spawn(Group.RegionId, DeerCount, false) + Spawn(Group.RegionId, WolfCount, true);
+        for (const auto& Placement : Group.Fauna)
+        {
+            TArray<FVector> Positions;
+            if (!BuildFaunaPositions(Group.RegionId, Placement, Positions)) break;
+            Actual += SpawnFauna(Group.RegionId, *FindFauna(Placement.SpeciesId), Positions);
+        }
 		PublishSummary(); // Commit population before releasing this group's spawn reservation.
 		if (!Ecology->CompleteSpawnRequest(Request.RequestId, Actual) || Actual != Request.Count) return false;
 	}
@@ -153,6 +167,20 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
             Life.Genome=EcoLifeV3::Founder(N?N->GetSettings().Seed:101,Id.StableAgentId);
             Life.Origin=bReady?EcoLifeV3::EOrigin::Recovery:EcoLifeV3::EOrigin::Initial;
             Life.Born=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds-180;
+            const auto* Habitat=NaturalHabitatProfile.Get();
+            if(const auto* Regional=RegionHabitatProfiles.Find(RegionId))Habitat=Regional->Get();
+            if(!bPredator&&Habitat){
+                const uint64 Seed=uint64(Habitat->LayoutSeed)^FCrc::StrCrc32(*RegionId.ToString());
+                Life.Genome=EcoLifeV3::NaturalFounder(Seed,Id.StableAgentId,Habitat->FounderBodyVariation);
+                const EcoLifeV3::FPopulationProfile Profile{Habitat->MaturitySeconds,Habitat->InitialJuvenileFraction,Habitat->FemaleFraction,Habitat->MaxFounderAgeSeconds};
+                Life.bNaturalPopulation=true;Life.MaturitySeconds=Profile.MaturitySeconds;Life.FemaleBirthFraction=Profile.FemaleFraction;Life.Sex=Profile.Sex(Seed,Id.StableAgentId);
+                int32 Stride=31;while(FMath::GreatestCommonDivisor(Stride,Count)!=1)++Stride;
+                const int32 Rank=(I*Stride+int32(EcoLifeV3::Mix(Seed)%uint64(Count)))%Count;
+                const double Age=Profile.FounderAge(Seed,Rank,Count);
+                Life.Born=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds-Age;
+                // Desynchronize breeding and avoid every adult pairing at world startup.
+                Life.NextBirth=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds+15+60*EcoLifeV3::Unit(Seed^uint64(Id.StableAgentId));
+            }
         }
 		auto& Membership = EM.GetFragmentDataChecked<FEcoRegionFragment>(Entities[I]);
 		Membership.CurrentRegionId = RegionId; Membership.CurrentRegionIndex = Ecology->GetRegionRuntimeIndex(RegionId);
@@ -182,6 +210,17 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 			Id.StableAgentId, *RegionId.ToString(), *Species.ToString(), *Position.ToCompactString());
 	}
 	Creation.Reset();
+    // Initial social bonds do not invent genetic parents. Natural births receive their actual mother below.
+    if(!bPredator)for(const auto E:Entities)if(auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bNaturalPopulation){
+        auto& Child=Link->Individual;const double Now=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+        if(Child.AgeFraction(Now)>=1)continue;
+        const FVector P=EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation();double Best=FMath::Square(3000.);
+        for(const auto Adult:Entities){
+            const auto* Other=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Adult);if(!Other||Other->Individual.Sex!=EcoLifeV3::ESex::Female||Other->Individual.AgeFraction(Now)<1)continue;
+            const double Dist=FVector::DistSquared(P,EM.GetFragmentDataChecked<FTransformFragment>(Adult).GetTransform().GetLocation());
+            if(Dist<Best){Best=Dist;Child.Caregiver=EM.GetFragmentDataChecked<FEcoIdentityFragment>(Adult).StableAgentId;}
+        }
+    }
 	SuccessfulBirths += Entities.Num();
 	SpeciesTotals.FindOrAdd(RegionId).FindOrAdd(Species).Births += Entities.Num();
 	return Entities.Num();
