@@ -1,5 +1,13 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
+사슴 이주 첫 구현(2026-11-09): [지역 순차 이주 구현/테스트](Architecture/REGIONAL_DEER_MIGRATION_IMPLEMENTATION_20261109.md)는 `eco.HerdMigration.Regional 1`에서 개별 순차 승인·지역 출발 예산을 제공한다. Editor 빌드/관련 자동화13개는 성공했고 실제1102 지형 도착·저장 왕복·멀티 검증은 남았다. 기본OFF이며 다음 ‘계획만 작성’ 설명은 첫 구현 이전 이력이다.
+
+후속 사슴 이주 계획(2026-11-09): [지역 생태 기반 순차 이주](Architecture/REGIONAL_DEER_MIGRATION_PLAN_20261109.md)는 지역별 등록 순서로 개체를 평가하고 예상 잔류 인원·목적지 예약·부족 기간 누적 승인 한도로 추가 출발을 중단한다. 단독 개체도 평가하며 Herd 규모는 자격 조건이 아니다. 현재는 계획만 작성했고 기존 런타임은 아직 변경하지 않았다. 다음 사슴 이주 구현은 이 상세 계획을 우선 적용한다.
+
+후속 요청(2026-11-08): 기존 `/Game/JWJ/1102_Integration_JWJ`의 풀/카메라 표현·사슴 부족 이주·늑대 추적 이주·포만 생활 행동은 [JWJ 1102 단계별 개발 계획](Architecture/JWJ_1102_FOOD_MIGRATION_SATIETY_PLAN_20261108.md)을 따른다. 4지역 배치와 기존 풀/카메라 기준선은 검증했고 새 행동 구현은 남아 있다. 최신 선행 작업은 [공유 풀 패치·실제 위치 섭식 명세](Architecture/FOOD_PATCH_GRAZING_IMPLEMENTATION_SPEC_20261108.md)의 S0~S6이다. [S0/S1 첫 구현](Architecture/FOOD_PATCH_GRAZING_S0_S1_20261108.md)은 writer 조사/로컬 기준선·기본OFF 공통 배치/권위 지면까지다. 패치별 먹이 배분·검색·예약·도착 소비는 아직 미구현이며 현재 소비는 셀 단위다. 기존 Actor/컴포넌트/Native 경로를 확장하고 루트 PROGRESS의 최신 재개 우선순위를 확인한다.
+
+후속 개발(2026-11-08): 서버 먹이 격자를 실제 풀밭으로 표현하는 [단계별 구현 계획](Architecture/FOOD_GRASS_IMPLEMENTATION_PLAN_20261108.md)과 [기존 맵 테스트 안내](Architecture/FOOD_GRASS_TEST_GUIDE_20261108.md)를 따른다. 기존 Field/ISM·Region·Inspector HUD에 전체 셀 변경분, 안정적인 배치, 환경 디버그를 연결하는 중이다. 현재 개발 재개 기준은 [루트 PROGRESS.md](../../PROGRESS.md)다. 실제 branch/HEAD·diff와 검증 범위를 확인해 미완료 항목부터 진행한다.
+
 갱신일 **2026-10-24**. 팀원과 각 AI agent가 대화 기록 없이 프로젝트의 목표·제품 방향·구현 경계를 이해하기 위한 공통 진입 문서다. 개인 담당 인수인계보다 먼저 읽고 작업 분야의 Source/계약으로 이어간다. 종 이름과 예시는 교체 가능한 표현이며 현재 구현을 과장하는 근거가 아니다.
 
 사용자의 후속 전체 구현은 원래 저장소에서 진행해 **`d095948`**로 기록했다. 최신 시작점은 [팀 AI 공통 안내](Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [전체 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행/팀 API 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)이다. owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 식생·경험/흔적·출생/유전/성장·사체 영양·저장/운영 복구를 opt-in한다. 아래의 soil 최초 구축·미연결 설명은 당시 이력이다. 기존 맵/기본 SocialControl=0·단일 Native writer·모델 차원을 보존하며 재학습/임의 종 지원 완료로 확대하지 않는다.
