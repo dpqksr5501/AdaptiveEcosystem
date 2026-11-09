@@ -31,6 +31,17 @@ public:
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection") bool SelectAgentForInspection(int64 AgentId);
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection") void FocusMigrationPlan(int64 PlanId) { MigrationFocus=PlanId; }
 private:
+#if !UE_BUILD_SHIPPING
+    void DrawGrassInspection();
+    bool bGrassInspection = false;
+    FName GrassRegion;
+    double NextGrassRead = 0;
+    FString GrassReadout;
+#endif
+    UPROPERTY(EditDefaultsOnly, Category="Ecology|Grass Debug")
+    FVector2D GrassDryClimate = FVector2D(0, 30);
+    UPROPERTY(EditDefaultsOnly, Category="Ecology|Grass Debug")
+    FVector2D GrassRecoveryClimate = FVector2D(.5, 20);
     FEcoHerdMigrationDebugSnapshot MigrationSnapshot;
     double NextMigrationCapture=0;
     int64 MigrationFocus=0,LastMigrationSelectedAgent=0;

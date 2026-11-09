@@ -70,6 +70,14 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Region")
 	void SetEnvironmentState(const FRegionEnvironmentState& InState) { EnvironmentState = InState; }
 
+	/** Effective runtime climate. The normal environment writer continues behind a development override. */
+	FRegionEnvironmentState GetEffectiveEnvironmentState() const;
+#if !UE_BUILD_SHIPPING
+	bool SetGrassTestClimate(float Rainfall, float Temperature);
+	void ClearGrassTestClimate();
+	bool HasGrassTestClimate() const { return GrassTestClimate.IsSet(); }
+#endif
+
 	/**
 	 * Consumes vegetation in this region due to grazing or harvesting.
 	 * Effective vegetation density loss is mitigated by GrazingResistance.
@@ -85,4 +93,8 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "Ecology|Region|Legacy", meta = (DeprecatedFunction, DeprecationMessage = "Legacy only. Active runtime regenerates food in UEcologySimulationSubsystem."))
 	void ApplyVegetationRegrowth(float DeltaTime, float GrowthRate, float RegenerationRate);
 
+private:
+#if !UE_BUILD_SHIPPING
+	TOptional<FVector2f> GrassTestClimate;
+#endif
 };

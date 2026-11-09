@@ -3165,14 +3165,27 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 			Ctx->bSpatialFoodRegistered = Ecology->RegisterSpatialFood(G.RegionId, Ctx->StartFood, Ctx->StartFood);
 		if (!Ctx->bSpatialFoodRegistered)
 		{ UE_LOG(LogEcoPolicyV3I, Error, TEXT("[EcoV3I] Spatial food registration rejected: %s"), *G.RegionId.ToString()); bActive = false; return; }
-		if (Config.Vegetation.bEnabled)
+		if (Config.Vegetation.bEnabled || AEcoVegetationField::IsVisualRequested() || (Spawner.IsValid() && Spawner->bEnableFoodGrass))
 		{
 			const auto FieldClass = Spawner.IsValid() && Spawner->VegetationFieldClass
 				? Spawner->VegetationFieldClass : TSubclassOf<AEcoVegetationField>(AEcoVegetationField::StaticClass());
 			auto* Field = World->SpawnActor<AEcoVegetationField>(FieldClass, Origin, FRotator::ZeroRotator);
-			if (!Field) { RejectResourceContract(); return; }
-			Field->RegionId = G.RegionId; Field->ContextIndex = Ctx->Index;
-			UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoVegetation] Enabled %s: soil-v1, existing PPO unchanged, Python parity pending"), *G.RegionId.ToString());
+			if (Field)
+			{
+				Field->RegionId = G.RegionId;
+				Field->ContextIndex = Ctx->Index;
+				Field->ConfigureGrid(Ctx->Sim.Food.Cell * EcoRepertoireV3::kUnitCm, Ctx->SizeCm(), int32(Config.Seed));
+				UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoVegetation] Food grass enabled in %s (soil=%d)"), *G.RegionId.ToString(), Config.Vegetation.bEnabled);
+			}
+			else if (Config.Vegetation.bEnabled)
+			{
+				RejectResourceContract();
+				return;
+			}
+			else
+			{
+				UE_LOG(LogEcoPolicyV3I, Warning, TEXT("[EcoVegetation] Visual field unavailable in %s"), *G.RegionId.ToString());
+			}
 		}
 		UE_LOG(LogEcoPolicyV3I, Log,
 			   TEXT("[EcoV3I] 지역 무대 %s (지역 번호 %d): 원점 (%.0f, %.0f, %.0f), 한 변 %.0f m | 사슴 %d 늑대 %d | 은신처 %d (레벨 %d + v3 %d, v3 반경 %.0f m, ")

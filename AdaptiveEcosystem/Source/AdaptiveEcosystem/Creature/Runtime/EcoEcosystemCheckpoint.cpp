@@ -145,6 +145,9 @@ struct FEcoEcosystemCheckpoint
         if(!M||!E||!N||!N->IsActive()||!Clock||!Herds||!Journeys||M->GetEntityManagerChecked().IsProcessing()
             ||E->bResourceStepOpen||!E->PendingSpawns.IsEmpty()||!S.BuildAgentLookup())return Reject(TEXT("not a completed authority boundary"));
         auto& EM=M->GetEntityManagerChecked();const int32 NewEpoch=Clock->Current.WorldEpoch;
+        for(int32 I=0;I<N->NumContexts();++I)
+            if(N->GetContext(I)->FoodPatchCache.Layout.IsValid())
+                return Reject(TEXT("S1 patch anchors are experimental; patch checkpoint schema is pending S5"));
         TStrongObjectPtr<UEcologySimulationSubsystem> Staged(NewObject<UEcologySimulationSubsystem>(W));
         TArray<FAgent> Agents;TArray<FRegion> Regions;TArray<FHerd> SavedHerds;
         TMap<int64,FEcoHerdJourney> Plans;TMap<int64,double> Shortage,Attempts;

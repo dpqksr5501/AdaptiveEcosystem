@@ -6,7 +6,200 @@
 #include "World/EcoVegetationField.h"
 #include "Components/BoxComponent.h"
 #include "World/EcoRegionEnvironmentAdapter.h"
+#include "World/EcologyRegion.h"
+#include "Engine/StaticMeshActor.h"
+#include "Components/StaticMeshComponent.h"
+#include "Components/InstancedStaticMeshComponent.h"
 #include <limits>
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoGrassAmountEncoding, "AdaptiveEcosystem.Vegetation.GrassAmountEncoding", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoGrassAmountEncoding::RunTest(const FString&)
+{
+    using FCell = FEcoVegetationVisualCell;
+    TestEqual(TEXT("Zero remains depleted"), FCell::EncodeAmount(0), uint16(0));
+    TestEqual(TEXT("Negative amount is hidden"), FCell::EncodeAmount(-.1), uint16(0));
+    TestEqual(TEXT("NaN is hidden"), FCell::EncodeAmount(std::numeric_limits<double>::quiet_NaN()), uint16(0));
+    TestEqual(TEXT("Infinite amount cannot appear fully grown"), FCell::EncodeAmount(std::numeric_limits<double>::infinity()), uint16(0));
+    TestEqual(TEXT("Positive sub-quantum food stays distinct from zero"), FCell::EncodeAmount(1.e-12), uint16(1));
+    TestEqual(TEXT("Full native patch is exactly represented"), FCell::EncodeAmount(1), uint16(65535));
+    TestEqual(TEXT("Display saturation preserves the bounded wire format"), FCell::EncodeAmount(2), uint16(65535));
+
+    FCell Cell;
+    Cell.Capacity = FCell::EncodeAmount(.5);
+    TestFalse(TEXT("Depleted food renders no candidates"), Cell.HasRenderableFood());
+    Cell.Food = FCell::EncodeAmount(1.e-12);
+    TestTrue(TEXT("Positive tiny food permits a candidate"), Cell.HasRenderableFood());
+    Cell.Capacity = 0;
+    TestFalse(TEXT("Zero-capacity cell cannot render food"), Cell.HasRenderableFood());
+
+    uint16 Previous = 0;
+    for (int32 Index = 0; Index <= 4096; ++Index)
+    {
+        const double Amount = Index / 4096.;
+        const uint16 Encoded = FCell::EncodeAmount(Amount);
+        if (Encoded < Previous || FMath::Abs(Encoded / 65535. - Amount) > 1. / 65535.)
+        {
+            AddError(TEXT("Visual encoding must be monotonic and remain within one quantum"));
+            return false;
+        }
+        if (FCell::EncodeAmount(Amount * .5) > Encoded)
+        {
+            AddError(TEXT("Food below capacity cannot exceed its encoded capacity"));
+            return false;
+        }
+        Previous = Encoded;
+    }
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoGrassGroundRefreshFairness, "AdaptiveEcosystem.Vegetation.GrassGroundRefreshFairness", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoGrassGroundRefreshFairness::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld World;
+    auto* Field = World.World->SpawnActor<AEcoVegetationField>();
+    if (!TestNotNull(TEXT("Existing Field owns refresh scheduling"), Field)) return false;
+    constexpr int32 Count = 1200;
+    constexpr int32 Budget = 24;
+    for (int32 Index = Count - 1; Index >= 0; --Index)
+        Field->RenderedPlants.Add(Index).NextGroundCheck = 0;
+
+    TestTrue(TEXT("Zero budget performs no ground work"), Field->GetDueGroundCandidates(0, 0).IsEmpty());
+    TSet<int64> Visited;
+    for (int32 Frame = 0; Frame < Count / Budget; ++Frame)
+    {
+        const double Now = Frame * .25;
+        const auto Due = Field->GetDueGroundCandidates(Now, Budget);
+        if (!TestEqual(TEXT("Refresh work stays within its reserved budget"), Due.Num(), Budget)) return false;
+        for (int64 Key : Due)
+        {
+            if (Visited.Contains(Key))
+            {
+                AddError(TEXT("A previously checked candidate displaced an older waiting candidate"));
+                return false;
+            }
+            Visited.Add(Key);
+            // Both a missing streamed surface and a successful check schedule a retry.
+            Field->RenderedPlants.FindChecked(Key).NextGroundCheck = Now + (Key % 2 ? 1. : 5.);
+        }
+    }
+    TestEqual(TEXT("Every candidate, including the tail, receives its first check"), Visited.Num(), Count);
+    Field->RenderedPlants.Reset();
+    Field->RenderedPlants.Add(10).NextGroundCheck = 30;
+    Field->RenderedPlants.Add(20).NextGroundCheck = 5;
+    Field->RenderedPlants.Add(5).NextGroundCheck = 5;
+    const auto Due = Field->GetDueGroundCandidates(10, 24);
+    if (!TestEqual(TEXT("Future checks remain deferred"), Due.Num(), 2)) return false;
+    TestEqual(TEXT("Equal deadlines use stable candidate order"), Due[0], int64(5));
+    TestEqual(TEXT("Later equal-deadline candidate follows"), Due[1], int64(20));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoGrassVisualLifecycle, "AdaptiveEcosystem.Vegetation.GrassVisualLifecycle", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoGrassVisualLifecycle::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld World;
+    auto* Field = World.World->SpawnActor<AEcoVegetationField>();
+    auto* Floor = World.World->SpawnActor<AStaticMeshActor>();
+    auto* Mesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cube.Cube"));
+    if (!Field || !Floor || !Mesh)
+    {
+        AddError(TEXT("Existing Field, floor fixture and engine mesh are required"));
+        return false;
+    }
+    auto* Surface = Floor->GetStaticMeshComponent();
+    Surface->SetMobility(EComponentMobility::Movable);
+    Surface->SetStaticMesh(Mesh);
+    Floor->SetActorScale3D(FVector(20, 20, 1));
+    Floor->SetActorLocation(FVector(200, 200, -50));
+    Surface->SetCollisionProfileName(TEXT("BlockAll"));
+    FHitResult InitialGround;
+    if (!TestTrue(TEXT("Actual collision floor is ready"),
+        World.World->LineTraceSingleByChannel(InitialGround, FVector(200,200,400), FVector(200,200,-400), ECC_WorldStatic)))
+        return false;
+
+    Field->Plants->SetStaticMesh(Mesh);
+    Field->RegionId = TEXT("GrassLifecycleFixture");
+    Field->ConfigureGrid(400, 400, 23);
+    Field->CandidatesPerCell = 9;
+    Field->CandidateTracesPerUpdate = 128;
+    auto& Cell = Field->VisualGrid.Cells.AddDefaulted_GetRef();
+    Cell.Cell = 0;
+    Cell.Position = FVector_NetQuantize10(FVector(200,200,0));
+    Cell.Food = FEcoVegetationVisualCell::EncodeAmount(1);
+    Cell.Capacity = FEcoVegetationVisualCell::EncodeAmount(1);
+    const FVector Near(200,200,500);
+    Field->RefreshPlants(Near, 0);
+    if (!TestEqual(TEXT("Full cell creates actual ISM candidates"), Field->Plants->GetInstanceCount(), 9))
+        return false;
+
+    TMap<int64, FVector> OriginalGround;
+    TMap<int64, FPrimitiveInstanceId> OriginalIds;
+    for (const auto& Entry : Field->RenderedPlants)
+    {
+        const FVector Ground = Entry.Value.GroundPosition;
+        TestTrue(TEXT("Generated candidate stays in its food cell"),
+            Ground.X >= 0 && Ground.X <= 400 && Ground.Y >= 0 && Ground.Y <= 400);
+        OriginalGround.Add(Entry.Key, Ground);
+        OriginalIds.Add(Entry.Key, Entry.Value.Instance);
+    }
+    const auto CheckGroundPositions = [this, Field, &OriginalGround]()
+    {
+        for (const auto& Entry : Field->RenderedPlants)
+        {
+            const auto* Expected = OriginalGround.Find(Entry.Key);
+            if (!Expected || !Entry.Value.bGroundReady || !Entry.Value.GroundPosition.Equals(*Expected, .01))
+            {
+                AddError(TEXT("A retained or recreated candidate changed its seeded ground position"));
+                return false;
+            }
+        }
+        return true;
+    };
+
+    Field->RefreshPlants(Near, .25);
+    for (const auto& Entry : Field->RenderedPlants)
+        TestTrue(TEXT("Unchanged candidate keeps its actual ISM ID"), Entry.Value.Instance == OriginalIds.FindChecked(Entry.Key));
+    Cell.Food = FEcoVegetationVisualCell::EncodeAmount(.3);
+    Field->RefreshPlants(Near, .5);
+    TestEqual(TEXT("Reduced food changes actual candidate density"), Field->Plants->GetInstanceCount(), 3);
+    for (const auto& Entry : Field->RenderedPlants)
+        TestTrue(TEXT("Surviving candidate keeps its ISM ID"), Entry.Value.Instance == OriginalIds.FindChecked(Entry.Key));
+    if (!CheckGroundPositions()) return false;
+
+    Cell.Food = 0;
+    Field->RefreshPlants(Near, .75);
+    TestEqual(TEXT("Depletion removes all actual ISM instances"), Field->Plants->GetInstanceCount(), 0);
+    TestTrue(TEXT("Depleted candidates leave no stale mapping"), Field->RenderedPlants.IsEmpty());
+    Cell.Food = FEcoVegetationVisualCell::EncodeAmount(1.e-12);
+    Field->RefreshPlants(Near, 1);
+    TestEqual(TEXT("Positive tiny food renders one candidate"), Field->Plants->GetInstanceCount(), 1);
+    if (!CheckGroundPositions()) return false;
+    Cell.Food = Cell.Capacity;
+    Field->RefreshPlants(Near, 1.25);
+    TestEqual(TEXT("Recovered food returns full density"), Field->Plants->GetInstanceCount(), 9);
+    if (!CheckGroundPositions()) return false;
+
+    Field->RefreshPlants(FVector(1000000,200,500), 1.5);
+    TestEqual(TEXT("Leaving visual range removes instances"), Field->Plants->GetInstanceCount(), 0);
+    Field->RefreshPlants(Near, 2);
+    TestEqual(TEXT("Reentry regenerates candidates"), Field->Plants->GetInstanceCount(), 9);
+    if (!CheckGroundPositions()) return false;
+
+    Surface->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Field->RefreshPlants(Near, 10);
+    TestEqual(TEXT("Missing ground removes actual instances"), Field->Plants->GetInstanceCount(), 0);
+    Surface->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+    Field->RefreshPlants(Near, 11.25);
+    TestEqual(TEXT("Restored ground permits retry and display"), Field->Plants->GetInstanceCount(), 9);
+    if (!CheckGroundPositions()) return false;
+
+    Cell.Position = FVector_NetQuantize10(FVector(200,200,50));
+    Field->RefreshPlants(Near, 11.5);
+    TestEqual(TEXT("Changed anchor hides old surface instances before retry"), Field->Plants->GetInstanceCount(), 0);
+    Field->RefreshPlants(Near, 11.75);
+    TestEqual(TEXT("Changed anchor completes bounded ground retry"), Field->Plants->GetInstanceCount(), 9);
+    return CheckGroundPositions();
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoVegetationWeather, "AdaptiveEcosystem.Vegetation.WaterBudgetAndPlantTolerance", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FEcoVegetationWeather::RunTest(const FString&)
@@ -128,4 +321,36 @@ bool FEcoVegetationClimate::RunTest(const FString&)
     A->bApplyAuthoredWeather=false;A->RainCycleSeconds=0;TestFalse(TEXT("Invalid period rejected"),A->EvaluateCycleRainfall(60,Rain));
     return true;
 }
+#if !UE_BUILD_SHIPPING
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoGrassDebugClimate, "AdaptiveEcosystem.Vegetation.GrassDebugClimate", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoGrassDebugClimate::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld World;
+    auto* Region = World.World->SpawnActor<AEcologyRegion>();
+    auto* Neighbor = World.World->SpawnActor<AEcologyRegion>();
+    if (!Region || !Neighbor) return false;
+
+    FRegionEnvironmentState Authored;
+    Authored.Rainfall = .25f;
+    Authored.Temperature = 18.f;
+    Region->SetEnvironmentState(Authored);
+    Neighbor->SetEnvironmentState(Authored);
+    TestTrue(TEXT("Authority accepts valid climate"), Region->SetGrassTestClimate(0, 30));
+    TestFalse(TEXT("Out-of-range climate rejected"), Region->SetGrassTestClimate(1.1f, 20));
+    TestFalse(TEXT("Nonfinite climate rejected"), Region->SetGrassTestClimate(0, std::numeric_limits<float>::quiet_NaN()));
+
+    Authored.Rainfall = .65f;
+    Region->SetEnvironmentState(Authored);
+    const auto Effective = Region->GetEffectiveEnvironmentState();
+    TestEqual(TEXT("Automatic producer does not displace effective rain"), Effective.Rainfall, 0.f);
+    TestEqual(TEXT("Temperature override"), Effective.Temperature, 30.f);
+    TestEqual(TEXT("Other region unaffected"), Neighbor->GetEffectiveEnvironmentState().Rainfall, .25f);
+
+    Region->ClearGrassTestClimate();
+    const auto Resumed = Region->GetEffectiveEnvironmentState();
+    TestEqual(TEXT("Resume uses latest automatic value"), Resumed.Rainfall, .65f);
+    TestEqual(TEXT("Resume restores normal temperature"), Resumed.Temperature, 18.f);
+    return true;
+}
+#endif
 #endif

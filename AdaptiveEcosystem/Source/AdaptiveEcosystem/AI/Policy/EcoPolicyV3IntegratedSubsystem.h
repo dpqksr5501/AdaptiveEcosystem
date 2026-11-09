@@ -170,6 +170,7 @@
 #include "EcoV3FlightTally.h"
 #include "EcoWorldV3.h"
 #include "TreeLayoutV3.h"
+#include "Core/EcoFoodPatchLayout.h"
 
 #include "EcoPolicyV3IntegratedSubsystem.generated.h"
 
@@ -617,6 +618,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	int32 RegionRuntimeIndex = INDEX_NONE;
 	int32 Index = INDEX_NONE;                 // 컨텍스트 색인 (FEcoIntegratedV3Fragment::ContextIndex)
 	EcoWorldV3::FWorldState Sim;
+    /** Authority layout/ground snapshot; survives visual hiding. S1 only, no food writer. */
+    FEcoFoodPatchCache FoodPatchCache;
     /** GT gathered authority pawn samples; never implicitly included in policy threat inputs in life-v1. */
     std::vector<EcoObservationV3::FThreatInput> PlayerSamples;
     TArray<double> PlayerEyeZ;
@@ -1031,6 +1034,7 @@ public:
 	FEcoV3RegionContext* GetContext(int32 Index) { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	const FEcoV3RegionContext* GetContext(int32 Index) const { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	FEcoV3RegionContext* FindContext(FName RegionId);
+    FEcoFoodPatchTraceBudget FoodPatchGroundBudget;
 
 	/** 처리기가 한 컨텍스트의 결정 스텝 하나를 마칠 때마다 부른다 (포획 표시·기록). */
 	void NotifyContextStep(FEcoV3RegionContext& Ctx, const EcoWorldV3::FStepReport& Report);
