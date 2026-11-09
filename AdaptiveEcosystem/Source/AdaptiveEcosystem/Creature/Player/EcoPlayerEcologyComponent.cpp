@@ -6,12 +6,15 @@
 #include "Creature/Representation/EcoCreatureVisualState.h"
 #include "GameFramework/Character.h"
 #include "GameFramework/CharacterMovementComponent.h"
+#include "Components/CapsuleComponent.h"
 #include "GameFramework/PlayerController.h"
+#include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "Engine/World.h"
 #include "InputCoreTypes.h"
 #include "World/EcologyRegion.h"
 #include "EngineUtils.h"
+#include "Player/EcoPlayerState.h"
 #include "HAL/IConsoleManager.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 static TAutoConsoleVariable<int32> CVarPlayerGaitLog(TEXT("eco.Player.GaitLog"),0,TEXT("Log accepted player gait changes and server movement speed."));
@@ -23,6 +26,12 @@ UEcoPlayerEcologyComponent::UEcoPlayerEcologyComponent()
 void UEcoPlayerEcologyComponent::BeginPlay()
 {
     Super::BeginPlay();OnRep_Gait();
+    for (TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld()); It; ++It)
+        if (auto* Set = It->FootstepAudioSet.Get(); Set && Set->FindProfile(EcoFootsteps::Player))
+        {
+            AudioSet = Set;
+            break;
+        }
     if(GetOwner()->HasAuthority()) {
         ThreatSource=NewObject<UEcoThreatSourceComponent>(GetOwner());
         GetOwner()->AddInstanceComponent(ThreatSource);ThreatSource->bThreatEnabled=bThreatEnabled;ThreatSource->RegisterComponent();
@@ -52,32 +61,60 @@ void UEcoPlayerEcologyComponent::ServerSetGait_Implementation(EEcoPlayerGait New
 void UEcoPlayerEcologyComponent::TryStrike()
 {if(GetOwner()->HasAuthority())ServerTryStrike_Implementation();else ServerTryStrike();}
 void UEcoPlayerEcologyComponent::ServerTryStrike_Implementation()
-{if(auto* P=Cast<APawn>(GetOwner());P&&P->HasAuthority()&&P->IsPlayerControlled())
+{if(auto* P=Cast<APawn>(GetOwner());P&&P->HasAuthority()&&P->IsPlayerControlled()&&!P->GetPlayerState<AEcoPlayerState>())
     for(TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld());It;++It){It->QueuePlayerStrike(*P);break;}}
 void UEcoPlayerEcologyComponent::TickComponent(float Dt,ELevelTick Type,FActorComponentTickFunction* Function)
 {
     Super::TickComponent(Dt,Type,Function);
-    auto* Pawn=Cast<ACharacter>(GetOwner());if(!Pawn||!Pawn->IsPlayerControlled())return;
+    auto* Pawn = Cast<ACharacter>(GetOwner());
+    if (!Pawn) return;
+    const auto* PlayerState = Pawn->GetPlayerState();
+    // Controllers are private to their owning peer. Simulated player pawns still have replicated PlayerState.
+    const bool bRemotePlayer = Pawn->GetNetMode() == NM_Client && PlayerState && !PlayerState->IsABot();
+    if (!Pawn->IsPlayerControlled() && !bRemotePlayer) return;
     if(Pawn->IsLocallyControlled())if(auto* PC=Cast<APlayerController>(Pawn->GetController())){
         const bool Pressed=PC->IsInputKeyDown(EKeys::F);
-        if(Pressed&&!bStrikeHeld)for(TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld());It;++It)
+        if(Pressed&&!bStrikeHeld&&!Pawn->GetPlayerState<AEcoPlayerState>())for(TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld());It;++It)
             if(It->bEnableEcosystemLife){TryStrike();break;}
         bStrikeHeld=Pressed;
     }
     if(bUseKeyboardGait&&Pawn->IsLocallyControlled()) if(auto* PC=Cast<APlayerController>(Pawn->GetController()))
         SetGait(PC->IsInputKeyDown(EKeys::LeftControl)?EEcoPlayerGait::Sneak:PC->IsInputKeyDown(EKeys::LeftShift)?EEcoPlayerGait::Run:EEcoPlayerGait::Walk);
+    const auto* Health=Pawn->GetPlayerState<AEcoPlayerState>();
+    const bool Alive=!Health||Health->IsAlive();
+    if(ThreatSource)ThreatSource->bThreatEnabled=bThreatEnabled&&Alive;
+    if(!Alive){ServerCadence.Reset();if(LocalAudio)LocalAudio->ResetCadence();return;}
     const float Speed=Pawn->GetVelocity().Size2D();
-    const FVector Pos=Pawn->GetActorLocation()-FVector(0,0,90);
+    const FVector Pos=Pawn->GetActorLocation()-FVector(0,0,Pawn->GetCapsuleComponent()->GetScaledCapsuleHalfHeight());
     const bool Grounded=Pawn->GetCharacterMovement()->IsMovingOnGround();
+    const auto* Profile = AudioSet ? AudioSet->FindProfile(EcoFootsteps::Player) : nullptr;
+    const float Gain = Gait == EEcoPlayerGait::Sneak ? .26f : Gait == EEcoPlayerGait::Run ? 1.f : .85f;
+    FName Region;
+    if (Profile || LocalAudio)
+        for (TActorIterator<AEcologyRegion> It(GetWorld()); It; ++It)
+            if (It->ContainsPosition(Pos)) { Region = It->RegionId; break; }
     if(Pawn->HasAuthority()) {
         if(ThreatSource)ThreatSource->bThreatEnabled=bThreatEnabled;
-        if(ServerCadence.Advance(Pos,Speed,Grounded,Dt,Gait==EEcoPlayerGait::Run?220.f:140.f,40.f))
+        const float Spacing = Profile ? AudioSet->Evaluate(*Profile, EEcoFootstepSurface::Dry, Speed, 1.f, Gain).Spacing
+            : Gait==EEcoPlayerGait::Run?220.f:140.f;
+        if(ServerCadence.Advance(Pos,Speed,Grounded,Dt,Spacing,40.f))
             if(auto* Noise=GetWorld()->GetSubsystem<UEcoNoiseSubsystem>())
-                Noise->ReportNoise(Pos,Gait==EEcoPlayerGait::Sneak?.12f:Gait==EEcoPlayerGait::Run?1.f:.4f,2000.f,1.f,Pawn,TEXT("Player.Footstep"));
+            {
+                if (Profile)
+                {
+                    FEcoFootstepContact Contact;
+                    if (AudioSet->ResolveContact(*GetWorld(), Pos, Region, Pawn, Contact))
+                    {
+                        const auto Levels = AudioSet->Evaluate(*Profile, Contact.Surface, Speed, 1.f, Gain);
+                        Noise->ReportNoise(Contact.Position, Levels.Loudness, Levels.NoiseRange, Profile->Threat, Pawn, TEXT("Player.Footstep"));
+                    }
+                }
+                else Noise->ReportNoise(Pos,Gait==EEcoPlayerGait::Sneak?.12f:Gait==EEcoPlayerGait::Run?1.f:.4f,2000.f,1.f,Pawn,TEXT("Player.Footstep"));
+            }
     }
     if(LocalAudio) {
         FEcoCreatureVisualState S;S.bAlive=Grounded;S.Position=Pos;S.Velocity=Pawn->GetVelocity();S.WorldTime=GetWorld()->GetTimeSeconds();
-        for(TActorIterator<AEcologyRegion> It(GetWorld());It;++It)if(It->ContainsPosition(Pos)){S.RegionId=It->RegionId;break;}
-        LocalAudio->Consume(S,Dt,false);
+        S.RegionId=Region;S.SpeciesId=EcoFootsteps::Player;
+        LocalAudio->Consume(S,Dt,false,Gain,Gait==EEcoPlayerGait::Run);
     }
 }

@@ -2,12 +2,29 @@
 미리 적은 빠른 관문(results/v3/live/LIVE_GATE.md)을 넘은 두뇌만 언리얼이 지켜보는 폴더에 두뇌 파일로 쓴다 (10-20·10-21 사용자 '게임 중 실시간
 두뇌 교체'). 환경을 바꾸는 규칙은 만들지 않는다 — 레벨이 바꾼 것을 옮길 뿐이다(10-20 '환경이 변하는 규칙은 우리가 만들지 않는다 — 레벨(팀) 작업').
 한 판의 변환·세계 돌리기·끼임 세기·두뇌 파일 확인은 results/v3/adapt/adapt.py 를 그대로 쓴다.
-10-21 (3) 사용자 기준 바꿈: 1차 = '잘 안 잡히는 두뇌'가 아니라 '똑같이 도망을 가도 숲속으로 잘 숨어 늑대 시야에서 벗어나 도망 시간이 짧은 두뇌'
-— 포만 없는 세계에서 스스로 벗어난 도망(은신처에 숨거나·나무 줄기·바위가 늑대 눈길을 가리거나·늑대 시야각·시야 반경 밖으로 빠져 쫓기를 끝냄)의
-쫓긴 시간(도망 시작부터 늑대가 이 사슴을 마지막으로 표적으로 둔 순간까지)이 유의하게 짧다. 잡힘·도망 횟수·달린 시간·잡혀 끝난 도망은 지킴(유의하게
-나빠지지 않음)이다. 도망 = FLEE 를 실행한 스텝 묶음(도주 반사·두뇌가 고른 FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 기록
-(World.flight_stats, 판정 실행기가 켠다). 이 기준의 크기는 예비 측정 뒤 확정한다 — 확정 전(LIVE flight_sizes_confirmed 거짓)에는 실제 폴더에서 판·감시를
-돌리지 않는다.
+10-23 사람 결정 (LIVE_GATE.md 변경 기록 (6) — 10-21 (3) '쫓긴 시간' 1차를 바꿈): 1차 = 포만 없는 세계에서 늑대에게 쫓긴 도망 하나하나가 잡혔는가,
+살아서 은신처에 숨었는가의 비율 — 쫓긴 도망(끝난 도망 가운데 끝 까닭이 안 쫓김·잘림이 아닌 것) 가운데 은신처에 들어 끝나고(cover) 그 뒤 10 초(75 스텝)
+안에 잡히지 않은 몫(숨음 비율)이 유의하게 크다. 새 지킴 GH = 쫓긴 도망 가운데 잡힘 몫이 유의하게 나빠지지 않음. 옛 1차 쫓긴 시간(스스로 벗어난 도망)은
+판정에서 빼고 보고만 한다. 잡힘·도망 횟수·달린 시간·잡혀 끝난 도망·게임 세계는 지킴 그대로다. 도망 = FLEE 를 실행한 스텝 묶음(도주 반사·두뇌가 고른
+FLEE 모두) — env_v2/world.py 모듈 docstring '야생 1단계' (w3) 도망 기록·숨은 뒤 지켜보기(World.flight_stats 의 hide, 판정 실행기가 켠다).
+10-24 사람 결정 (LIVE_GATE.md 변경 기록 (7) — R7 결과를 본 뒤 '은신처 들락날락'이 숨음을 두 번 세는 것을 막으려고 바꿈): '쫓김 사건' 단위로 센다 — 같은
+사슴의 이어진 도망(앞 도망이 은신처로 끝났으면 10 초 지켜보기 안, 그 밖이면 GR 과 같은 5 초 안에 다음 도망이 시작)을 한 사건으로 묶어, 1차 P1 = 쫓긴
+사건 가운데 숨음 사건 몫(사건 숨음 비율), 지킴 GH = 쫓긴 사건 가운데 잡힘 사건 몫, 새 지킴 GE = 1000 산 사슴-스텝당 사건 시작(GR 자리 — GF 는 그대로).
+옛 도망 단위 숨음·잡힘 비율과 쫓긴 시간은 보고만 한다. 사건 정의는 env_v2/world.py 모듈 docstring '쫓김 사건'(World.flight_stats 의 episode).
+판정 실행기는 C++ 평가기다(LIVE evaluator 'ceval' — 10-24 같은 날 쫓김 사건 셈을 C++ 도망 기록에 옮겨 파이썬과 flight.episode 까지 같다. 옮기기 전
+잠깐 'python' 이었다. 10-23 에도 숨은 뒤 지켜보기를 C++ 에 옮기는 동안 잠깐 'python' 이었다).
+이 기준의 크기는 예비 측정 뒤 확정한다 — 확정 전(LIVE flight_sizes_confirmed 거짓)에는 실제 폴더에서 판·감시를 돌리지 않는다.
+10-27 (LIVE_GATE.md 변경 기록 (10) — 사람 결정 '실제 폴더 잠금 풀자'): 판 5 묶음(R7e 지금 두뇌) 예비 측정(results/v3/live/pilot_mask5/)으로 크기를
+확정했다 — H_N 1800 · n 80 · H_G 3600 · n_G 40 · K 1 · 중간 판정(앞 1/2, 짝 t ≤ 0 기각) · 도주 비용 0 그대로, S 2M → 1M, δ_H 0 → 1 %p,
+flight_sizes_confirmed 참. 실제 폴더에서는 크기를 확정한 두뇌 묶음(PROFILES sizes_confirmed — 지금은 판 5 route5 만)의 지금 두뇌일 때만 판을 돌린다.
+관측 18·21 지금 두뇌(묶음 obs21 — 내장 R1b-F 포함)는 사건 숨음 비율 기준 예비 측정이 없어 실제 폴더에서 거부(refused)한다(시험 폴더에서는 그대로 돈다).
+10-29 (사용자 결정 '기본 두뇌 R7e로' — Docs/RL_Policy/LIVE_ADAPT_SPEC.md 5.6): 게임 기본 두뇌(통합 v3 Play 시작 두뇌, 적응 고리 판 0)가 R7e(판 5, 묶음 route5)라
+아무것도 고르지 않은 AutoAdapt Play 의 스냅숏을 실제 폴더에서 바로 받는다. 언리얼 스냅숏 brain.default 참 = 빌드에 넣은 같은 바이트(같은 id·가중치 sha256).
+10-24 (LIVE_GATE.md 변경 기록 (8) — R7e 판정 통과·C++ 이식 뒤): 게임에 판 5 두뇌(관측 24 두 길 + 반사 밖 두뇌 FLEE 막음, 계약 0xad7bad5e1acaf071 —
+EcoBrains/v3_r7_g995_s1_20m.json)를 불러 쓰는 Play 의 스냅숏이면 그 두뇌를 '지금 두뇌'로 받아 판 5 세계(G·N 바탕 configs/v3_wild3_route5_mirror.yaml)에서
+판정하고 판 5 학습 세계(R7 조리법 configs/v3_r7_train.yaml 의 train 블록, PPO configs/ppo_r6_lam098.yaml)에서 이어 배운다 — 묶음은 시작 모델 계약이 정한다
+(PROFILES). 관측 18·21 지금 두뇌는 옛 길 그대로(관측 21)이고 판 4 두뇌(route0·R6)는 받지 않는다. 관문 표는 그대로이고, 설계 12절 길 지킴 GT·GTr·GR 은 두 길
+판에서 gate.md '길 기록' 절에 보고만 한다(GR 자리는 10-24 (7) 의 GE, GT = 60 × GV).
 
     # herbivore_rl/ 에서 (Anaconda base python, PYTHONUTF8=1)
     python results/v3/live/live.py watch                        # 감시: <프로젝트>/Saved/EcoAdapt/snapshots 를 2초마다 보고, 새 환경이면 한 판
@@ -27,12 +44,13 @@
 
 세계 셋 (사람 결정 10-21 '포만 없는 세계 1차 (추천)', 10-20 '학습할 때는 늑대 포만을 끈다 (게임은 그대로)'):
   G 게임 세계  = 스냅숏 세계(늑대 포만은 게임 값 그대로, 부활 없음, 사슴 = 입양 수)                     → 지킴 GG·G4·G5·G6
-  N 포만 없는 세계 = G + features.wild_satiation.enabled false                                    → 1차 P1(쫓긴 시간)·지킴 GN·GF·GV·GC·G4
+  N 포만 없는 세계 = G + features.wild_satiation.enabled false                                    → 1차 P1(사건 숨음 비율)·지킴 GH·GN·GF·GE·GV·GC·G4
   T 학습 세계  = N + R5 학습 조리법(학습 전용 40 m 밖 부활·학습 시드 32000~32049·지역 섞기, 무작위 숲 없음) + 스냅숏 먹이 지도
                  (+ LIVE train_flight_cost > 0 이면 FLEE 를 실행한 스텝마다 보상에서 그만큼 뺀다 — wild_flight.flight_cost, 기본 0)
 두뇌는 관측 21 계약(R5 장애물 관측 0xbc4fc2d45c47c5fd)으로 배운다(사람 결정 10-21 '관측 21로 올려 배움'): 스냅숏의 지금 두뇌가 R1b-F(관측 18)면
 R1b-F + 0 열(ckpt/v3/v3_r1_g995_s3_obs21zero.zip — 결정이 비트 단위로 같다)에서, 관측 21 두뇌면 그 두뇌 파일의 모델 zip 에서 시작한다(가중치 sha256 을
-다시 맞춰 본다). 다른 관측 18 파일 두뇌는 거부(refused). 판정의 '지금 두뇌' = 시작 zip.
+다시 맞춰 본다). 다른 관측 18 파일 두뇌는 거부(refused). 판정의 '지금 두뇌' = 시작 zip. 10-24 (8): 관측 24 · 판 5 두뇌면 그 두뇌 파일의 모델 zip 에서
+판 5 계약 그대로 이어 배운다(위 문단).
 
 한 판: 변환(converting) → 재현 확인 R(checking, 환경 판 0·두뇌 바꿈 없음일 때만) → 학습 K 모델 × S 스텝 ‖ 지금 두뇌 판정 N·G·끼임(training —
 같은 환경·같은 두뇌·같은 크기·같은 셈 길로 잰 결과가 live/cache/ 에 있으면 다시 쓴다) → 후보 고르기(K > 1, N 고르기 시드) → 후보 판정(evaluating — 10-21 (4)
@@ -89,9 +107,27 @@ PPO_CONFIG = ROOT / "configs" / "ppo_best.yaml"
 LIVE_GATE_MD = HERE.parent / "LIVE_GATE.md"
 CONTRACT_OBS18 = "0x7eea0107339be4ce"                                         # 관측 18 계약 (빌드 내장 R1b)
 CONTRACT_OBS21 = "0xbc4fc2d45c47c5fd"                                         # 관측 21 계약 (R5 장애물 관측)
+CONTRACT_OBS24_M4 = "0xe302dee198197444"                                      # 관측 24 · 마스크 판 4 (두 길 — route0·R6). 고리는 받지 않는다 (변경 기록 (8))
+CONTRACT_OBS24_M5 = "0xad7bad5e1acaf071"                                      # 관측 24 · 마스크 판 5 (두 길 + 반사 밖 두뇌 FLEE 막음 — R7e)
+TEMPLATE_ROUTE5 = ROOT / "configs" / "v3_wild3_route5_mirror.yaml"            # 판 5 거울 (= 관측 21 거울 + wild_flight.route true + brain_flee_outside_reflex false)
+R7_TRAIN = ROOT / "configs" / "v3_r7_train.yaml"                              # 판 5 학습 조리법 (R7 — train 블록 f_dec 0.714694·부활 계수)
+PPO_ROUTE5 = ROOT / "configs" / "ppo_r6_lam098.yaml"                          # 판 5 PPO 설정 (R7 과 같은 λ 0.98)
+# 10-24 (LIVE_GATE.md 변경 기록 (8)) 이어 배우는 두뇌 묶음: 시작 모델의 계약 → 판정 세계 바탕(template — G·N), 학습 조리법(recipe — T 의 train 블록·부활 계수),
+# PPO 설정. 판 5 두뇌가 '지금 두뇌'면 G·N·T 모두 두 길·반사 밖 FLEE 막음 세계다. 계약이 이 표에 없는 시작 모델은 거부한다(판 4·판 6·관측 18 파일 두뇌).
+# 10-27 (변경 기록 (10)) sizes_confirmed: 관문 크기(LIVE)를 그 묶음의 지금 두뇌로 예비 측정해 확정했는가 — 거짓인 묶음은 실제 폴더(Saved/EcoAdapt)에서
+# 판을 돌리지 않는다(prepare real_root — 상태 refused). sizes_basis = 그 근거(LIVE_GATE.md 에 같은 글).
+PROFILES = {
+    CONTRACT_OBS21: dict(name="obs21", obs_dim=21, mask_version=2, route=False, flee_gate=False, template=TEMPLATE_OBS, recipe=R5_TRAIN, ppo=PPO_CONFIG,
+                         label="관측 21 (R5 장애물 관측, 마스크 판 2)", sizes_confirmed=False,
+                         sizes_basis="사건 숨음 비율 기준 예비 측정 없음 — 실제 폴더 잠금 유지"),
+    CONTRACT_OBS24_M5: dict(name="route5", obs_dim=24, mask_version=5, route=True, flee_gate=True, template=TEMPLATE_ROUTE5, recipe=R7_TRAIN,
+                            ppo=PPO_ROUTE5, label="관측 24 두 길·반사 밖 도망 막음 (마스크 판 5)", sizes_confirmed=True,
+                            sizes_basis="10-27 예비 측정 results/v3/live/pilot_mask5 (변경 기록 (10))"),
+}
 STATUS_FORMAT, STATE_FORMAT, ROUND_FORMAT = "eco_v3_live_status", "eco_v3_live_state", "eco_v3_live_round"
 
-# 빠른 관문 (LIVE_GATE.md 와 같은 값 — 10-21 예비 측정 p_20261021T050321 뒤 확정. 바꾸면 LIVE_GATE.md 변경 기록에 먼저 적는다)
+# 빠른 관문 (LIVE_GATE.md 와 같은 값 — 10-21 예비 측정 p_20261021T050321 뒤 확정, 10-27 (변경 기록 (10)) 판 5 묶음 예비 측정 pilot_mask5 로 사건 숨음 비율
+# 기준 크기 확정. 바꾸면 LIVE_GATE.md 변경 기록에 먼저 적는다)
 LIVE = dict(
     horizon=1800,                           # H_N: 포만 없는 세계 N 판정 길이 1800 스텝 = 4 분 (P1·GN)
     judge_seeds=(35000, 35079),             # N 판정: 시드 n = 80 × 지역, 짝 = 시드(지역 합) — 문턱 t_crit(n − 1)
@@ -100,27 +136,42 @@ LIVE = dict(
     select_seeds=(35100, 35119),            # 후보 고르기 (K > 1 일 때만, N 세계, H_N): 시드 20 × 지역
     stuck_seeds=(35000, 35004),             # 끼임 세기 (G 세계, H_G): 판정 시드 앞 5 × 지역
     check_seeds=(35180, 35199),             # 재현 확인 R (G 세계, 스냅숏 시각까지): 시드 20 × 지역
-    train_steps=2_000_000,                  # S: 모델마다 학습 스텝
+    train_steps=1_000_000,                  # S: 모델마다 학습 스텝 (10-27 (10): 2M → 1M — 판 5 예비 측정에서 1차 차이가 덜 나빴다 −1.25 대 −1.73 %p, 판 1.8 분 짧음)
     model_seeds=(0,),                       # K = 1
     shelter_x=2.0, use_min=0.01,            # G6: 은신처 안 몫 ≤ 지금의 2배, 먹기·도망·숨기 모두 1% 넘게
-    f_dec=None,                             # T 세계 f_dec — None = R5 조리법 값 그대로 (예비 측정 T 값 0.885549 는 기록만: 예비 후보가 R5 값으로 배웠다)
-    # 10-21 (3) 사용자 기준 바꿈 — 1차 = 쫓긴 시간 (LIVE_GATE.md 변경 기록 (3), 크기는 이 기준의 예비 측정 뒤 다시 정한다)
-    flight_own=("cover", "obstacle", "fov", "range"),   # P1: 스스로 벗어난 도망 = 이 끝 까닭 (env_v2/world.py FLIGHT_OWN 과 같다)
+    f_dec=None,                             # T 세계 f_dec — None = 묶음 조리법 값 그대로 (관측 21 = R5 0.858922 — 예비 측정 T 값 0.885549 는 기록만: 예비 후보가 R5
+                                            #   값으로 배웠다. 판 5 = R7 0.714694 — 10-27 (10) 예비 측정 T 값 0.680748 은 기록만, 같은 까닭)
+    # 10-23 사람 결정 — 1차 = 숨음 비율 (LIVE_GATE.md 변경 기록 (6)): 쫓긴 도망(끝난 도망 가운데 끝 까닭이 unchased·truncated 아님 — env_v2/world.py
+    # FLIGHT_NOT_CHASED) 가운데 은신처에 들어 끝나고(cover) 그 뒤 10 초(75 스텝) 안에 잡히지 않은 몫. 시드마다 지역 셋의 분자·분모를 더한 뒤 나눈다.
+    # 10-24 사람 결정 (변경 기록 (7)): 같은 셈을 '쫓김 사건' 단위로 — 쫓긴 사건 가운데 숨음 사건 몫(env_v2/world.py '쫓김 사건', flight.episode)
+    hide_min_chased=1,                      # P1·GH 짝: 두 두뇌 모두 쫓긴 사건(10-24 — 그 전은 쫓긴 도망)이 이만큼 있는 시드만 (C = 0 이면 그 시드 값 없음 —
+                                            #   빠진 시드로 기록). 보고만 하는 옛 도망 단위 숨음·잡힘 비율 짝도 같은 수(쫓긴 도망)를 쓴다
+    hide_min_effect=0.01,                   # P1 최소 차이 δ_H (몫 0~1): 후보 − 지금 ≥ δ_H (옛 쫓긴 시간 δ 초를 바꿈). 10-27 (10): 0 → 0.01 (1 %p — 가장 작은
+                                            #   관심 크기 2 %p 의 절반, 효과 없는 두뇌 우연 통과 2.44% → 0.07%, 참 +2 %p 거의 모두·+1 %p 절반 통과)
+    # 10-21 (3) 쫓긴 시간 (10-23 부터 1차가 아니라 보고만 — 쫓긴 시간 보고 줄·GG_chase·GC 의 재료)
+    flight_own=("cover", "obstacle", "fov", "range"),   # 쫓긴 시간 보고: 스스로 벗어난 도망 = 이 끝 까닭 (env_v2/world.py FLIGHT_OWN 과 같다)
     flight_unsafe=("caught", "starved", "truncated"),   # GC: 잡힘·굶음·잘림으로 끝난 도망 (env_v2/world.py FLIGHT_UNSAFE 와 같다)
-    flight_min_episodes=1,                  # P1 짝: 두 두뇌 모두 스스로 벗어난 도망이 이만큼 있는 시드만 (빠진 시드는 기록)
-    flight_min_effect_s=0.0,                # P1 최소 차이 δ (초): 후보 − 지금 ≤ −δ — 0 = 유의성만, 예비 측정 뒤 정한다
-    train_flight_cost=0.0,                  # T 세계 wild_flight.flight_cost (FLEE 를 실행한 스텝마다 보상에서 뺌) — 0 = 끔, 예비 측정 뒤 정한다
-    flight_sizes_confirmed=False,           # 위 크기·δ·도주 비용과 H·n·S·K 를 이 기준의 예비 측정으로 확정해 LIVE_GATE.md 에 적기 전에는 거짓 —
-                                            #   거짓이면 실제 폴더(Saved/EcoAdapt)에서 판·감시를 돌리지 않는다 (plan_from_args)
-    # 10-21 (4) 사용자 '중간에 미리 판정'·'지금 두뇌 시험 재사용'·네이티브 판정기 자리 (LIVE_GATE.md 변경 기록 (4), 5-3 — 시점·기각 경계는 예비 측정 뒤 확정)
+    flight_min_episodes=1,                  # 쫓긴 시간 짝(보고·GG_chase): 두 두뇌 모두 스스로 벗어난 도망이 이만큼 있는 시드만 (빠진 시드는 기록)
+    train_flight_cost=0.0,                  # T 세계 wild_flight.flight_cost (FLEE 를 실행한 스텝마다 보상에서 뺌) — 0 = 끔. 10-27 (10): 0 그대로 확정 (판 5 는 반사
+                                            #   밖 두뇌 FLEE 를 막아 비용이 막으려던 '반사 전에 먼저 달아나기'가 없다 — 달린 시간은 GV 가 지킨다)
+    flight_sizes_confirmed=True,            # 위 크기·δ·도주 비용과 H·n·S·K 를 이 기준의 예비 측정으로 확정해 LIVE_GATE.md 에 적기 전에는 거짓 —
+                                            #   거짓이면 실제 폴더(Saved/EcoAdapt)에서 판·감시를 돌리지 않는다 (plan_from_args). 10-27 (10) 판 5 묶음 예비 측정
+                                            #   pilot_mask5 로 확정해 참 — 그래도 실제 폴더에서는 크기를 확정한 묶음(PROFILES sizes_confirmed)의 지금 두뇌만 받는다
+    # 10-21 (4) 사용자 '중간에 미리 판정'·'지금 두뇌 시험 재사용'·네이티브 판정기 자리 (LIVE_GATE.md 변경 기록 (4), 5-3 — 시점·기각 경계는 10-27 (10) 판 5
+    # 예비 측정 뒤 그대로 확정: 효과 없는 두뇌 흉내에서 49.9% 를 중간에 끝내고 통과 몫은 2.04 → 2.02%)
     seq_interim_frac=0.5,                   # 중간 판정: N 판정 시드 앞 이 몫(반올림 — n 80 이면 앞 40 = 35000~35039)을 먼저 돌려 1차 P1 을 한 번 본다. None = 끔
     seq_alpha=0.025,                        # 1차 P1 한쪽 α (지금 양쪽 5% 문턱과 같은 엄격함) — 두 번 봐도 '같은 두뇌가 우연히 통과할 몫' 합이 이 값 이하
     seq_spending="obf",                     # α 쓰기 함수: Lan–DeMets O'Brien–Fleming 꼴 (중간에는 아주 조금만 쓴다 — 끝 문턱이 거의 그대로)
-    seq_efficacy=False,                     # 중간 앞서 통과(켜면): 앞 절반 짝 t ≤ −b₁(쓴 α₁ 에서 셈)이면 1차만 중간에 통과로 정한다 — 지킴은 N 전체·G 전체·끼임으로
+    seq_efficacy=False,                     # 중간 앞서 통과(켜면): 앞 절반 짝 t ≥ +b₁(쓴 α₁ 에서 셈)이면 1차만 중간에 통과로 정한다 — 지킴은 N 전체·G 전체·끼임으로
                                             #   봐야 느슨해지지 않아 뒤 절반까지 돌리므로 시간이 줄지 않는다. 그래서 끔(10-21 검토 — 끝 문턱 = 옛 한 번 보기 그대로)
-    seq_futility_t=0.0,                     # 중간 기각(나아지지 않음): 앞 절반 짝 t ≥ 이 값이면 뒤 절반·G·끼임 없이 기각 — 구속력 없음(끝 문턱 셈에 넣지 않는다). None = 끔
+    seq_futility_t=0.0,                     # 중간 기각(나아지지 않음): 앞 절반 숨음 비율 짝 t ≤ −이 값(0 이면 t ≤ 0)이면 뒤 절반·G·끼임 없이 기각 — 구속력 없음
+                                            #   (끝 문턱 셈에 넣지 않는다). None = 끔. 10-23: 1차가 클수록 좋은 숨음 비율이 되어 부호만 뒤집었다(쫓긴 시간 때는 t ≥ 이 값)
     evaluator="ceval",                      # 판정 실행기 (eval_runner 의 갈림): 'ceval' = 게임과 같은 C++ 세계 코드의 네이티브 판정기(Tools/EcoV3Eval, 변경 기록 (5)),
-                                            # 'python' = 파이썬 워커 풀. 네이티브가 못 받는 일(끼임 세기 등)은 ceval 이 파이썬으로 돌린다
+                                            # 'python' = 파이썬 워커 풀. 네이티브가 못 받는 일(끼임 세기 등)은 ceval 이 파이썬으로 돌린다. 10-23 (변경 기록 (6)):
+                                            # 1차 숨음 비율은 숨은 뒤 10 초 지켜보기(flight.hide)를 세는 실행기만 쓴다(require_hide_watch) — 그 칸을 C++ 에 옮기기 전
+                                            # 잠깐 'python' 이었고, 같은 날 옮겨(ceval HIDE_WATCH 참, compare 의 flight.hide 까지 같음) 'ceval' 로 되돌렸다.
+                                            # 10-24 (변경 기록 (7)): 1차·GH·GE 는 쫓김 사건 셈(flight.episode)을 세는 실행기만 쓴다(require_episode). 그 셈을 C++ 에
+                                            # 옮기기 전 잠깐 'python' 이었고, 같은 날 옮겨(ceval EPISODE 참, compare 의 flight.episode 까지 같음) 'ceval' 로 되돌렸다
     cache_current=True,                     # 지금 두뇌 판정 결과 다시 쓰기 (live/cache — 환경·세계·두뇌·시드·길이·실행기·셈 길 판이 모두 같을 때만)
 )
 STEP_S = 2.0 / 15.0                         # 1 스텝 = 2/15 초 (게임 결정 간격 — 1800 스텝 = 240 초)
@@ -138,8 +189,13 @@ LOCK_STALE_S = 10.0                         # 내용이 아직 안 쓰인 잠금
 TERMINAL = ("exported", "rejected", "refused", "error")
 MSG_MAX = 90                                # 상태 줄 한 줄 길이 (글자)
 CACHE_FORMAT = "eco_v3_live_evalcache"      # live/cache/<세계>_<열쇠>.json
+CACHE_VERSION = 3                           # 저장 판 — 10-23 (변경 기록 (6)) 2: 1차 숨음 비율이 쓰는 도망 기록 hide 가 없는 옛 저장(판 1)은 다시 쓰지 않는다.
+                                            #   10-24 (변경 기록 (7)) 3: 1차·GH·GE 가 쓰는 쫓김 사건(flight.episode)이 없는 옛 저장(판 2)은 다시 쓰지 않는다
 CACHE_KEEP = 200                            # 판정 저장 파일을 이만큼만 남긴다 (오래된 것부터 지운다)
-EVAL_CODE_TAG = "live-eval-1"               # 셈 길 판 — 판정 결과를 바꾸는 손 고침이 아래 파일 밖에 있으면 올린다
+EVAL_CODE_TAG = "live-eval-3"               # 셈 길 판 — 판정 결과를 바꾸는 손 고침이 아래 파일 밖에 있으면 올린다 (10-23 2: 숨은 뒤 지켜보기·1차 숨음 비율,
+                                            #   10-24 3: 쫓김 사건·1차 사건 숨음 비율·GH 사건 잡힘 비율·GE)
+GATE_CRITERION = "hide-episode-v1"          # 1차 기준 판 (10-24 사건 숨음 비율 — 쫓김 사건, 10-23 은 'hide-10s-v1'). 저장 열쇠에 넣는다: 기준이 바뀌면 지금 두뇌 판정도
+                                            #   새로 잰다
 EVAL_CODE_FILES = ("env/*.py", "env_v2/*.py", "policies/*.py", "results/v3/mirror/run_mirror.py", "results/v3/r4/r4_eval.py",
                    "results/v3/wild2/stuck_check.py", "results/v3/adapt/adapt.py")       # python 판정 셈 길 (바이트 지문 — 하나라도 바뀌면 새로 잰다)
 EVAL_CODE_FUNCS = ("_job", "_world_multi", "eval_items", "stuck_items")                  # 이 파일 안의 판정 셈 길 (함수 원문 지문)
@@ -430,8 +486,9 @@ def seq_sizes(n_total: int, frac=None) -> int | None:
 
 
 def seq_interim_bound(n1: int, n_planned: int) -> dict:
-    """중간 앞서 통과 경계: n1 = 앞 절반에서 두 두뇌 모두 스스로 벗어난 도망이 있는 시드 수, n_planned = N 판정 시드 수.
-    정보 몫 n1/n_planned 까지 쓴 α₁ = 쓰기 함수, z 경계 c₁ = z_{1−α₁}, t 경계 bound = t_{α₁}(n1 − 1). 앞서 통과를 끄거나 n1 < 2 면 α₁ 0·경계 +∞."""
+    """중간 앞서 통과 경계: n1 = 앞 절반에서 두 두뇌 모두 쫓긴 도망이 있는 시드 수(1차 숨음 비율 짝), n_planned = N 판정 시드 수.
+    정보 몫 n1/n_planned 까지 쓴 α₁ = 쓰기 함수, z 경계 c₁ = z_{1−α₁}, t 경계 bound = t_{α₁}(n1 − 1) (숨음 비율은 짝 t ≥ +bound 로 넘는다).
+    앞서 통과를 끄거나 n1 < 2 면 α₁ 0·경계 +∞."""
     frac = min(int(n1) / max(int(n_planned), 1), 1.0)
     if not LIVE["seq_efficacy"] or int(n1) < 2:
         return dict(frac=frac, alpha1=0.0, c1=math.inf, bound=math.inf)
@@ -457,19 +514,19 @@ def seq_final_bound(n1: int, look: dict | None) -> dict:
 
 
 def seq_interim(p: dict, n_total: int, n_int: int) -> dict:
-    """중간 판정 (p = 앞 절반 flight_pair 짝: 후보 − 지금 쫓긴 시간). action = 'futility'(기각 — 나아지지 않음: 짝 t ≥ LIVE seq_futility_t),
-    'efficacy'(앞서 통과를 켰을 때 그 경계를 넘음: 차이 < 0·≤ −δ·짝 t ≤ −bound — 1차만 통과로 정하고 지킴은 뒤 절반까지 전체로 본다), 'continue'.
-    짝 t 를 셀 수 없으면(n1 < 2) 보지 않는다(α₁ 0)."""
+    """중간 판정 (p = 앞 절반 episode_pair 짝: 후보 − 지금 사건 숨음 비율 — 10-23 변경 기록 (6)·10-24 (7) 사건 단위, 클수록 좋다). action = 'futility'(기각 — 나아지지 않음:
+    짝 t ≤ −LIVE seq_futility_t, 0 이면 t ≤ 0), 'efficacy'(앞서 통과를 켰을 때 그 경계를 넘음: 차이 > 0·≥ δ_H·짝 t ≥ +bound — 1차만 통과로 정하고 지킴은
+    뒤 절반까지 전체로 본다), 'continue'. 짝 t 를 셀 수 없으면(n1 < 2) 보지 않는다(α₁ 0)."""
     n1 = int(p["n"])
     can = n1 >= 2 and math.isfinite(p["se"])
     bd = seq_interim_bound(n1, n_total) if can else dict(frac=min(n1 / max(int(n_total), 1), 1.0), alpha1=0.0, c1=math.inf, bound=math.inf)
     fut = LIVE["seq_futility_t"]
-    dl = float(LIVE["flight_min_effect_s"])
+    dl = float(LIVE["hide_min_effect"])
     if not can:
         action = "continue"
-    elif fut is not None and p["t"] >= float(fut):
+    elif fut is not None and p["t"] <= -float(fut):
         action = "futility"
-    elif bd["alpha1"] > 0.0 and p["diff"] < 0 and p["diff"] <= -dl and p["t"] <= -bd["bound"]:
+    elif bd["alpha1"] > 0.0 and p["diff"] > 0 and p["diff"] >= dl and p["t"] >= bd["bound"]:
         action = "efficacy"
     else:
         action = "continue"
@@ -909,9 +966,10 @@ def brain_folders(root: Path) -> tuple:
 
 
 def resolve_start(snap: dict, folders) -> dict:
-    """스냅숏의 지금 두뇌 → 이어 배울 시작 모델 (명세 6절). 관측 18 이고 가중치가 R1b-F 면 R1b-F + 0 열, 관측 21 이면 두뇌 파일들에서 같은 가중치의
-    모델 zip. 스냅숏 두뇌 계약(brain.contract_hash, 옛 스냅숏은 맨 위 contract_hash)이 그 두뇌의 모델 계약과 같아야 하고, 시작 모델은 관측 21 계약이어야
-    한다. 아니면 adapt.Refused."""
+    """스냅숏의 지금 두뇌 → 이어 배울 시작 모델 (명세 6절). 관측 18 이고 가중치가 R1b-F 면 R1b-F + 0 열, 관측 21·24 면 두뇌 파일들에서 같은 가중치의
+    모델 zip. 스냅숏 두뇌 계약(brain.contract_hash, 옛 스냅숏은 맨 위 contract_hash)이 그 두뇌의 모델 계약과 같아야 하고, 시작 모델 계약은 PROFILES 에
+    있어야 한다 — 관측 21(판 2) 또는 10-24 (변경 기록 (8)) 관측 24 · 판 5(두 길·반사 밖 FLEE 막음 — R7e). 관측 24 · 판 4(route0·R6)는 받지 않는다.
+    스냅숏 brain.mask_version(10-24 이식 뒤 스냅숏)이 있으면 그 묶음의 판과 같아야 한다. 아니면 adapt.Refused. 반환의 profile = PROFILES 이름."""
     b = snap["brain"]
     want = brain_sha(snap)
     obs = int(b.get("obs_dim") or 18)
@@ -920,23 +978,54 @@ def resolve_start(snap: dict, folders) -> dict:
         if want != zip_weights_sha(ad.R1BF):
             raise ad.Refused(f"지금 두뇌 {b.get('id')} 는 R1b-F 가 아닌 관측 18 두뇌다 — 관측 21 로 올려 배울 시작점은 R1b-F(+ 0 열)뿐이다")
         cur, start, why = ad.R1BF, OBS21ZERO, "R1b-F(관측 18) → R1b-F + 0 열(관측 21, 결정 같음)"
-    elif obs == 21:
+    elif obs in (21, 24):
+        if obs == 24 and bc == CONTRACT_OBS24_M4:
+            raise ad.Refused(f"지금 두뇌 {b.get('id')} 는 관측 24 · 마스크 판 4(두 길 — route0·R6, 계약 {CONTRACT_OBS24_M4}) 다 — 고리가 이어 배우는 관측 24 두뇌는 "
+                             f"판 5(반사 밖 도망 막음, 계약 {CONTRACT_OBS24_M5})뿐이다 (LIVE_GATE.md 변경 기록 (8))")
         z = find_brain_zip(want, folders)
         if z is None:
-            raise ad.Refused(f"관측 21 두뇌 {b.get('id')} (가중치 sha256 {want[:16]}) 의 모델 zip 을 두뇌 파일 폴더에서 찾지 못했다 — 이어 배울 시작점이 없다")
-        cur, start, why = z, z, "관측 21 두뇌 → 그 두뇌 파일의 모델 zip"
+            raise ad.Refused(f"관측 {obs} 두뇌 {b.get('id')} (가중치 sha256 {want[:16]}) 의 모델 zip 을 두뇌 파일 폴더에서 찾지 못했다 — 이어 배울 시작점이 없다")
+        cur, start, why = z, z, f"관측 {obs} 두뇌 → 그 두뇌 파일의 모델 zip"
     else:
-        raise ad.Refused(f"관측 {obs} 칸 두뇌는 받지 않는다 (관측 18·21 만)")
+        raise ad.Refused(f"관측 {obs} 칸 두뇌는 받지 않는다 (관측 18·21·24 만)")
     if not Path(start).exists():
         raise ad.Refused(f"시작 모델 {start} 가 없다")
     cc = zip_contract(cur)
     if cc != bc:
         raise ad.Refused(f"계약 해시가 다르다: 스냅숏 두뇌 {bc} 대 모델 {cc} ({path_text(cur)})")
     sc = zip_contract(start)
-    if sc != CONTRACT_OBS21:
-        raise ad.Refused(f"시작 모델 계약 {sc} 이 관측 21 계약 {CONTRACT_OBS21} 이 아니다")
+    prof = PROFILES.get(sc)
+    if prof is None:
+        raise ad.Refused(f"시작 모델 계약 {sc} 은 고리가 이어 배우는 계약이 아니다 (관측 21 {CONTRACT_OBS21} · 관측 24 판 5 {CONTRACT_OBS24_M5} 만 — "
+                         f"LIVE_GATE.md 변경 기록 (8))")
+    if prof["obs_dim"] != (21 if obs == 18 else obs):
+        raise ad.Refused(f"시작 모델 계약 {sc} 은 관측 {prof['obs_dim']} 이다 — 스냅숏 두뇌 관측 {obs} 와 맞지 않는다")
+    mv = b.get("mask_version")
+    if mv is not None and obs != 18 and int(mv) != int(prof["mask_version"]):
+        raise ad.Refused(f"스냅숏 두뇌 마스크 판 {mv} 이 시작 모델 계약 {sc} 의 판 {prof['mask_version']} 과 다르다")
     return dict(zip=Path(start), current_model=Path(cur), obs_dim=obs, brain=str(b.get("id", "")), brain_contract=bc, start_contract=sc,
-                weights_sha256=want, why=why)
+                weights_sha256=want, why=why, profile=prof["name"])
+
+
+def profile_of(contract: str) -> dict:
+    """계약 해시 → 이어 배우는 두뇌 묶음 (PROFILES). 없으면 ValueError."""
+    prof = PROFILES.get(str(contract))
+    if prof is None:
+        raise ValueError(f"계약 {contract} 은 고리가 이어 배우는 두뇌 묶음이 아니다 ({', '.join(PROFILES)})")
+    return prof
+
+
+def check_snapshot_route(snap: dict, prof: dict) -> None:
+    """10-24 (변경 기록 (8)): 스냅숏 지역 world.wild_flight 의 route·brain_flee_outside_reflex(게임이 지금 두뇌로 실제로 건 값 — 이식 2/2 뒤 스냅숏만,
+    없으면 보지 않는다)가 시작 모델 묶음과 같아야 한다 — 두 길을 건 게임 세계를 길 없는 세계로(또는 그 반대로) 조용히 옮기지 않는다. 다르면 adapt.Refused."""
+    for r in snap["regions"]:
+        wf = (r.get("world") or {}).get("wild_flight") or {}
+        if "route" in wf and bool(wf["route"]) != bool(prof["route"]):
+            raise ad.Refused(f"지역 {r.get('region')} 세계의 두 길(wild_flight.route {bool(wf['route'])})이 시작 모델 묶음 {prof['name']}(두 길 "
+                             f"{'켬' if prof['route'] else '끔'})과 다르다")
+        if "brain_flee_outside_reflex" in wf and bool(wf["brain_flee_outside_reflex"]) != (not prof["flee_gate"]):
+            raise ad.Refused(f"지역 {r.get('region')} 세계의 반사 밖 도망 막음(brain_flee_outside_reflex {bool(wf['brain_flee_outside_reflex'])})이 "
+                             f"시작 모델 묶음 {prof['name']}(막음 {'켬' if prof['flee_gate'] else '끔'})과 다르다")
 
 
 # --------------------------------------------------------------------- #
@@ -944,16 +1033,43 @@ def resolve_start(snap: dict, folders) -> dict:
 # --------------------------------------------------------------------- #
 
 
-def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None = None, flight_cost: float | None = None) -> dict:
+def is_real_root(root) -> bool:
+    """<root> 가 실제 폴더(DEFAULT_ROOT = AdaptiveEcosystem/Saved/EcoAdapt — 언리얼이 두뇌를 받아 끼우는 곳)인가."""
+    return Path(root).resolve() == Path(DEFAULT_ROOT).resolve()
+
+
+def check_profile_sizes(prof: dict) -> None:
+    """10-27 (변경 기록 (10)): 실제 폴더에서는 관문 크기(LIVE)를 예비 측정으로 확정한 두뇌 묶음(PROFILES sizes_confirmed)의 지금 두뇌만 판을 돌린다.
+    아니면 adapt.Refused — 상태 줄 '거부 — …' (그 환경은 처리한 것으로 적혀 다시 하지 않는다). 시험 폴더(--root 다른 곳)는 보지 않는다."""
+    if not prof.get("sizes_confirmed"):
+        ok = ", ".join(f"{p['name']}({p['label']})" for p in PROFILES.values() if p.get("sizes_confirmed")) or "없음"
+        raise ad.Refused(f"지금 두뇌 묶음 {prof['name']} 은 실제 폴더 관문 크기 미확정 — 판 5 두뇌(R7e 등)를 건 Play 만 판을 돈다 "
+                         f"({prof.get('sizes_basis', '')}. 크기를 확정한 묶음: {ok} — LIVE_GATE.md 변경 기록 (10))")
+
+
+def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None = None, flight_cost: float | None = None,
+            real_root: bool = False) -> dict:
     """스냅숏 → 판 폴더 rd: snapshot.json(그대로)·world.yaml(G)·train.yaml(T)·regions.json·convert.json. N 은 G + NOSAT 변형(판정 때 덮는다).
     flight_cost (None = LIVE train_flight_cost) > 0 이면 T 에 wild_flight.flight_cost 를 적는다(0 이면 적지 않는다 — train.yaml 이 그대로).
-    반환 = adapt 의 run 정보 꼴 {record, regions, dir} + start. 거부는 adapt.Refused (도주 반사를 끈 세계도 — 관문이 도망 기록을 쓴다)."""
+    반환 = adapt 의 run 정보 꼴 {record, regions, dir} + start. 거부는 adapt.Refused (도주 반사를 끈 세계도 — 관문이 도망 기록을 쓴다).
+    10-24 (변경 기록 (8)): 바탕 설정·학습 조리법·PPO 설정은 시작 모델 계약의 묶음(PROFILES)이 정한다 — 관측 21 이면 관측 21 거울·R5 조리법·ppo_best(옛것
+    그대로), 관측 24 · 판 5 면 판 5 거울(두 길·반사 밖 FLEE 막음)·R7 조리법(f_dec 0.714694)·λ 0.98. G·N·T 가 모두 그 판의 세계다.
+    10-27 (변경 기록 (10)): real_root(실제 폴더의 판)면 그 묶음의 크기가 확정됐는지 본다(check_profile_sizes — 변환 전에 거부, rd 를 만들지 않는다)."""
     start = resolve_start(snap, folders)
+    prof = profile_of(start["start_contract"])
+    if real_root:
+        check_profile_sizes(prof)
+    check_snapshot_route(snap, prof)
     ref = json.loads(ad.REFERENCE.read_text(encoding="utf-8")) if ad.REFERENCE.exists() else None
-    out = ad.convert(snap, ref, template=TEMPLATE_OBS, start=start["zip"], contract=CONTRACT_OBS21, recipe=R5_TRAIN)
+    out = ad.convert(snap, ref, template=prof["template"], start=start["zip"], contract=start["start_contract"], recipe=prof["recipe"])
     world, train = out["world"], out["train"]
     if not bool(world["features"]["wild_flight"]["enabled"]):
-        raise ad.Refused("도주 반사(wild_flight)를 끈 세계다 — 1차 쫓긴 시간·지킴 도망 기록을 잴 수 없다 (LIVE_GATE.md 5-1)")
+        raise ad.Refused("도주 반사(wild_flight)를 끈 세계다 — 1차 숨음 비율·지킴 도망 기록을 잴 수 없다 (LIVE_GATE.md 5-1)")
+    for name, d in (("G·N", world), ("T", train)):                   # 바탕 설정의 두 길 칸이 묶음과 같은가 (판 5 두뇌를 판 5 가 아닌 세계에 걸지 않는다)
+        wf = d["features"]["wild_flight"]
+        if bool(wf.get("route", False)) != bool(prof["route"]) or bool(wf.get("brain_flee_outside_reflex", True)) != (not prof["flee_gate"]):
+            raise ad.Refused(f"{name} 세계의 두 길 칸(route {wf.get('route', False)} · brain_flee_outside_reflex {wf.get('brain_flee_outside_reflex', True)})이 "
+                             f"시작 모델 묶음 {prof['name']} 과 다르다 — 바탕 설정 {path_text(prof['template'])} 을 본다")
     sat_g = bool(world["features"]["wild_satiation"]["enabled"])
     train["features"]["wild_satiation"]["enabled"] = False             # T: 학습할 때는 늑대 포만을 끈다 (게임 G 는 그대로)
     fc = float(LIVE["train_flight_cost"] if flight_cost is None else flight_cost)
@@ -964,7 +1080,8 @@ def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None 
     train["version"] = "3.live.train"
     rep = train["train"]["repertoire"]
     fd = LIVE["f_dec"] if f_dec is None else f_dec
-    fd_src = "R5 학습 조리법 값 그대로 (포만 켠 R5 세계에서 잰 값 — 예비 측정의 measure-fdec 로 T 값을 잰다)"
+    fd_src = ("R5 학습 조리법 값 그대로 (포만 켠 R5 세계에서 잰 값 — 예비 측정의 measure-fdec 로 T 값을 잰다)" if prof["name"] == "obs21" else
+              f"{path_text(prof['recipe'])} 값 그대로 (그 학습 세계에서 시작 정책으로 잰 값 — 변경 기록 (8))")
     if fd is not None:
         rep["f_dec"] = float(fd)
         rep["ent_coef_base"] = round(0.01 * float(fd), 8)              # 범주 엔트로피 계수 0.01 그대로 (R5 와 같은 셈)
@@ -977,15 +1094,18 @@ def prepare(snap_path: Path, snap: dict, rd: Path, folders, f_dec: float | None 
             f"# 스냅숏 {Path(snap_path).name}: 지도 {snap.get('map')} 세션 {snap['session_seed']} 전역 스텝 {snap['global_step']} 환경 #{e['revision']}, "
             f"두뇌 {snap['brain'].get('id')}\n")
     ad.write_yaml(rd / "world.yaml", world, head + f"# G 게임 세계 (부활 없음, 늑대 포만 = 게임 값 {'켬' if sat_g else '끔'}) = "
-                                                   "configs/v3_wild3_obs_mirror.yaml + convert.json 'changed'. N = 이 세계 + wild_satiation 끔\n")
-    ad.write_yaml(rd / "train.yaml", train, head + "# T 학습 세계 = world.yaml + 늑대 포만 끔 + R5 학습 조리법(학습 전용 40 m 밖 부활·학습 시드 "
-                                                   "32000~32049·지역 섞기, 무작위 숲 없음)"
+                                                   f"{path_text(prof['template'])} + convert.json 'changed' (두뇌 묶음 {prof['name']} — {prof['label']}). "
+                                                   "N = 이 세계 + wild_satiation 끔\n")
+    ad.write_yaml(rd / "train.yaml", train, head + f"# T 학습 세계 = world.yaml + 늑대 포만 끔 + 학습 조리법 {path_text(prof['recipe'])} 의 train 블록·부활 계수"
+                                                   f"(학습 전용 40 m 밖 부활·학습 시드 32000~32049·지역 섞기, 무작위 숲 없음, PPO {path_text(prof['ppo'])})"
                   + (f" + 도주 비용 wild_flight.flight_cost {fc:g}" if fc > 0.0 else "") + "\n")
     (rd / "regions.json").write_text(json.dumps(out["regions"], ensure_ascii=False) + "\n", encoding="utf-8", newline="\n")
     rec = dict(out["record"])
     rec["f_dec_note"] = fd_src
     rec["live"] = dict(start=path_text(start["zip"]), start_why=start["why"], current_brain=start["brain"], brain_contract=start["brain_contract"],
-                       start_contract=start["start_contract"], satiation_game=sat_g, f_dec=float(rep["f_dec"]), flight_cost=fc,
+                       start_contract=start["start_contract"], profile=prof["name"], profile_label=prof["label"], template=path_text(prof["template"]),
+                       recipe=path_text(prof["recipe"]), ppo_config=path_text(prof["ppo"]),
+                       satiation_game=sat_g, f_dec=float(rep["f_dec"]), flight_cost=fc,
                        worlds=dict(G="world.yaml (늑대 포만 게임 값)", N="world.yaml + wild_satiation.enabled false", T="train.yaml (늑대 포만 끔)"),
                        env=e, env_summary=env_summary(snap), env_digest=env_digest(snap), brain_weights_sha256=brain_sha(snap))
     (rd / "convert.json").write_text(json.dumps(rec, ensure_ascii=False, indent=1) + "\n", encoding="utf-8", newline="\n")
@@ -1141,14 +1261,19 @@ class Pool:
 # 판정 실행기 갈림 (10-21 (4) — 네이티브 C++ 판정기를 끼울 자리)
 # --------------------------------------------------------------------- #
 
-# 종류 → dict(run=fn(items, workers, on_done) → [(꼬리표, 결과)] (items 순서 그대로, 결과는 _job 과 같은 꼴), version=fn() → 셈 길 판 글자).
-# 'python' 은 여기 워커 풀이다. 다른 실행기는 이 표에 등록하거나, 이 파일 옆 <이름>.py (예: ceval.py)가 run_items(items, workers, on_done)·version() 을
-# 내면 LIVE evaluator 를 그 이름으로 바꾸는 것만으로 처음 쓸 때 불러 등록한다. 판정 저장 열쇠에 실행기 이름·판이 들어가므로 바꾸면 지금 두뇌 판정도 새로 잰다.
+# 종류 → dict(run=fn(items, workers, on_done) → [(꼬리표, 결과)] (items 순서 그대로, 결과는 _job 과 같은 꼴), version=fn() → 셈 길 판 글자,
+# hide_watch=참이면 도망 기록에 숨은 뒤 10 초 지켜보기(flight.hide — 10-23 1차 숨음 비율의 재료)를 낸다).
+# 'python' 은 여기 워커 풀이다. 다른 실행기는 이 표에 등록하거나, 이 파일 옆 <이름>.py (예: ceval.py)가 run_items(items, workers, on_done)·version()
+# (·HIDE_WATCH) 을 내면 LIVE evaluator 를 그 이름으로 바꾸는 것만으로 처음 쓸 때 불러 등록한다. 판정 저장 열쇠에 실행기 이름·판이 들어가므로 바꾸면 지금 두뇌
+# 판정도 새로 잰다. hide_watch 가 참이 아닌 실행기는 판정에 쓰지 않는다(require_hide_watch — 10-23 C++ 평가기 'ceval' 은 같은 날 그 칸을 옮겨 참이다).
+# 10-24 (변경 기록 (7)): episode = 참이면 도망 기록에 쫓김 사건(flight.episode — 1차 사건 숨음 비율·GH·GE 의 재료)을 낸다(옆 파일의 EPISODE). 참이 아닌
+# 실행기도 판정에 쓰지 않는다(require_episode — C++ 평가기 'ceval' 은 같은 날 그 셈을 옮겨 참이다).
 EVALUATORS: dict = {}
 
 
 def evaluator(kind: str) -> dict:
-    """판정 실행기 kind ('python' 밖) — EVALUATORS 에 있으면 그것, 없으면 이 파일 옆 <kind>.py 의 run_items·version 을 불러 등록한다. 없으면 ValueError."""
+    """판정 실행기 kind ('python' 밖) — EVALUATORS 에 있으면 그것, 없으면 이 파일 옆 <kind>.py 의 run_items·version·HIDE_WATCH·EPISODE 를 불러 등록한다.
+    없으면 ValueError."""
     ev = EVALUATORS.get(kind)
     if ev is None and re.fullmatch(r"[A-Za-z_][A-Za-z0-9_]*", kind) and (HERE.parent / f"{kind}.py").exists():
         import importlib.util
@@ -1157,11 +1282,44 @@ def evaluator(kind: str) -> dict:
         mod = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(mod)
         if callable(getattr(mod, "run_items", None)):
-            ev = EVALUATORS[kind] = dict(run=mod.run_items, version=getattr(mod, "version", None))
+            ev = EVALUATORS[kind] = dict(run=mod.run_items, version=getattr(mod, "version", None), hide_watch=bool(getattr(mod, "HIDE_WATCH", False)),
+                                         episode=bool(getattr(mod, "EPISODE", False)))
     if ev is None:
         raise ValueError(f"모르는 판정 실행기 {kind!r} — 'python' 이거나 EVALUATORS 에 등록한 것, 또는 live.py 옆 {kind}.py 의 run_items "
                          f"({', '.join(EVALUATORS) or '등록 없음'})")
     return ev
+
+
+def require_hide_watch(kind: str | None = None) -> None:
+    """10-23 (LIVE_GATE.md 변경 기록 (6)): 1차 숨음 비율·지킴 GH 는 도망 기록의 숨은 뒤 10 초 지켜보기(flight.hide — cover_then_caught)를 쓴다.
+    그것을 세지 못하는 판정 실행기(hide_watch 거짓 — 등록한 실행기·옆 파일의 HIDE_WATCH)는 분명한 말로 거부한다(ValueError). 'python' 은 늘 센다.
+    C++ 평가기 'ceval' 은 10-23 같은 날 그 칸을 옮겨 받는다(ceval.HIDE_WATCH 참)."""
+    kind = str(kind or LIVE["evaluator"])
+    if kind == "python" or evaluator(kind).get("hide_watch"):
+        return
+    what = "C++ 평가기 'ceval'(AdaptiveEcosystem/Tools/EcoV3Eval)" if kind == "ceval" else f"판정 실행기 {kind!r}"
+    raise ValueError(f"{what} 은(는) 은신처에서 끝난 도망 뒤 10 초 지켜보기(flight.hide — cover_then_caught)를 아직 세지 못한다 — 10-23 1차 숨음 비율·"
+                     f"지킴 GH(LIVE_GATE.md 변경 기록 (6))를 잴 수 없어 이 실행기로는 판정하지 않는다. LIVE evaluator 를 그 칸을 세는 실행기 "
+                     f"('ceval' — C++ 평가기, 또는 'python')로 둔다")
+
+
+def require_episode(kind: str | None = None) -> None:
+    """10-24 (LIVE_GATE.md 변경 기록 (7)): 1차 사건 숨음 비율·지킴 GH(사건 잡힘 비율)·GE(사건 시작)는 도망 기록의 쫓김 사건(flight.episode)을 쓴다.
+    그것을 세지 못하는 판정 실행기(episode 거짓 — 등록한 실행기·옆 파일의 EPISODE)는 분명한 말로 거부한다(ValueError). 'python' 은 늘 센다.
+    C++ 평가기 'ceval' 은 10-24 같은 날 그 셈을 옮겨 받는다(ceval.EPISODE 참)."""
+    kind = str(kind or LIVE["evaluator"])
+    if kind == "python" or evaluator(kind).get("episode"):
+        return
+    what = "C++ 평가기 'ceval'(AdaptiveEcosystem/Tools/EcoV3Eval)" if kind == "ceval" else f"판정 실행기 {kind!r}"
+    raise ValueError(f"{what} 은(는) 쫓김 사건(flight.episode — 같은 사슴의 이어진 도망을 한 사건으로 묶은 셈)을 아직 세지 못한다 — 10-24 1차 사건 숨음 비율·"
+                     f"지킴 GH·GE(LIVE_GATE.md 변경 기록 (7))를 잴 수 없어 이 실행기로는 판정하지 않는다. LIVE evaluator 를 그 셈을 하는 실행기 "
+                     f"('ceval' — C++ 평가기, 또는 'python')로 둔다")
+
+
+def require_gate_records(kind: str | None = None) -> None:
+    """관문이 쓰는 도망 기록 칸을 판정 실행기가 모두 세는가 — 숨은 뒤 지켜보기(require_hide_watch, 10-23)와 쫓김 사건(require_episode, 10-24)."""
+    require_hide_watch(kind)
+    require_episode(kind)
 
 
 def open_pool(workers: int, kind: str | None = None):
@@ -1174,10 +1332,12 @@ def open_pool(workers: int, kind: str | None = None):
 def eval_runner(items: list, workers: int, kind: str | None = None, on_done=None, pool=None) -> list:
     """판정 일(종류, 꼬리표, 세계 job) 목록을 돌리는 단 하나의 갈림 → [(꼬리표, 결과)] (items 순서). kind = 판정 실행기(기본 LIVE evaluator):
     'python' = 워커 풀(pool 을 주면 그 풀, 아니면 이번만 min(workers, 일 수) 개), 그 밖은 EVALUATORS 에 등록한 실행기 — 결과 수·꼬리표·순서와 일마다
-    시드·지역이 맞아야 받는다(아니면 ValueError). on_done = 일 하나 끝날 때마다."""
+    시드·지역이 맞아야 받는다(아니면 ValueError). on_done = 일 하나 끝날 때마다. 숨은 뒤 지켜보기(10-23)·쫓김 사건(10-24)을 세지 못하는 실행기는
+    거부한다(require_gate_records)."""
     kind = str(kind or LIVE["evaluator"])
     if not items:
         return []
+    require_gate_records(kind)
     if kind == "python":
         if pool is not None:
             return pool.run(items, on_done=on_done)
@@ -1260,14 +1420,16 @@ def eval_code_tag(kind: str | None = None) -> str:
 
 def eval_cache_key(info: dict, items: list, model: Path, world: str, kind: str | None = None) -> dict:
     """판정 묶음 하나(세계 'N'·'G'·'stuck')의 저장 열쇠: 스냅숏 환경 지문(env_digest), 세계 지문(일마다 세계 설정·시드·길이·지역·먹이 지도 —
-    두뇌 경로 빼고), 두뇌 가중치 sha256·계약·허용 행동, 시드, 길이, 판정 실행기·셈 길 판. 하나라도 다르면 다른 열쇠(= 새로 잰다)."""
+    두뇌 경로 빼고), 두뇌 가중치 sha256·계약·허용 행동, 시드, 길이, 판정 실행기·셈 길 판, 저장 판(CACHE_VERSION)·1차 기준 판(GATE_CRITERION — 10-23
+    숨음 비율: 도망 기록 hide 가 없는 옛 저장을 쓰지 않는다). 하나라도 다르면 다른 열쇠(= 새로 잰다)."""
     kind = str(kind or LIVE["evaluator"])
     h = hashlib.sha256()
     for k, _, j in items:
         d = {kk: vv for kk, vv in j.items() if kk != "model"}
         h.update(json.dumps(jsonable(dict(d, _kind=k)), sort_keys=True, separators=(",", ":")).encode() + b"\n")
     jobs = [j for _, _, j in items]
-    return dict(format=CACHE_FORMAT, version=1, world=str(world), env_digest=str(info["record"]["live"]["env_digest"]), world_digest=h.hexdigest()[:24],
+    return dict(format=CACHE_FORMAT, version=CACHE_VERSION, criterion=GATE_CRITERION, world=str(world), env_digest=str(info["record"]["live"]["env_digest"]),
+                world_digest=h.hexdigest()[:24],
                 brain_weights_sha256=zip_weights_sha(Path(model)), brain_contract=zip_contract(Path(model)), brain_allowed=zip_allowed(Path(model)),
                 seeds=sorted({int(j["seed"]) for j in jobs}), horizon=sorted({int(j["steps"]) for j in jobs}),
                 regions=sorted({str(j["region"]) for j in jobs}), items=len(items), evaluator=kind, code=eval_code_tag(kind))
@@ -1289,7 +1451,7 @@ def _row_where(items: list) -> list:
 def cache_get(root: Path, key: dict, items: list) -> list | None:
     """저장된 판정 → [(꼬리표, 결과)] (items 의 꼬리표·순서). 없거나 깨졌거나 열쇠·일(시드·지역 순서)이 하나라도 다르면 None (= 새로 잰다)."""
     d = read_json(cache_path(root, key))
-    if not isinstance(d, dict) or d.get("format") != CACHE_FORMAT or d.get("version") != 1 or d.get("key") != jsonable(key):
+    if not isinstance(d, dict) or d.get("format") != CACHE_FORMAT or d.get("version") != CACHE_VERSION or d.get("key") != jsonable(key):
         return None
     rows = d.get("rows")
     if not isinstance(rows, list) or len(rows) != len(items):
@@ -1313,7 +1475,7 @@ def cache_put(root: Path, key: dict, items: list, rows: list, source: str = "") 
     if len(by) != len(rows) or sorted(by) != sorted(want):
         return None
     p = cache_path(root, key)
-    atomic_write_json(p, dict(format=CACHE_FORMAT, version=1, key=jsonable(key), rows=jsonable([by[w] for w in want]), created_utc=utc_now(),
+    atomic_write_json(p, dict(format=CACHE_FORMAT, version=CACHE_VERSION, key=jsonable(key), rows=jsonable([by[w] for w in want]), created_utc=utc_now(),
                               source=str(source)), indent=None)
     try:
         old = sorted(cache_dir(root).glob("*.json"), key=lambda q: q.stat().st_mtime)
@@ -1366,6 +1528,15 @@ def gather(results: list, models: dict, steps: dict) -> dict:
 # --------------------------------------------------------------------- #
 
 
+def ppo_config_of(info: dict) -> Path:
+    """판의 PPO 설정 (변경 기록 (8) — 두뇌 묶음이 정한다: convert.json live.ppo_config, 없으면(옛 판 폴더) ppo_best)."""
+    t = (info["record"].get("live") or {}).get("ppo_config")
+    if not t:
+        return PPO_CONFIG
+    p = Path(t)
+    return p if p.is_absolute() else ROOT / p
+
+
 def launch_training(info: dict, rd: Path, start: Path, rid: str, seeds, steps: int, every: int, ckpt: Path, config: Path | None = None,
                     tag: str = "") -> list[dict]:
     """train_v3.py 를 live.py train-one 으로 띄운다 (스냅숏 먹이 지도 + 진행 파일). config = T 세계 설정(기본 판 폴더 train.yaml — 예비 측정의
@@ -1373,6 +1544,7 @@ def launch_training(info: dict, rd: Path, start: Path, rid: str, seeds, steps: i
     rec = info["record"]
     (rd / "logs").mkdir(parents=True, exist_ok=True)
     config = Path(config) if config is not None else rd / "train.yaml"
+    ppo = ppo_config_of(info)
     procs = []
     for s in seeds:
         name = f"live_{rid}_cand{tag}_s{int(s)}"
@@ -1383,7 +1555,7 @@ def launch_training(info: dict, rd: Path, start: Path, rid: str, seeds, steps: i
                f"{rec['snapshot']['brain']} — 포만 없는 학습 세계 T ({config.name}), 시작 {rec['live']['start']}")
         args = ["--config", str(config), "--seed", str(int(s)), "--steps", str(int(steps)), "--init-from-model", str(start),
                 "--init-source", src, "--run-name", name, "--out", str(out), "--tb", str(TB), "--threads", "1",
-                "--ppo-config", str(PPO_CONFIG), "--every", str(int(every))]
+                "--ppo-config", str(ppo), "--every", str(int(every))]
         cmd = [sys.executable, str(HERE), "train-one", "--dir", str(rd), "--progress", str(prog), "--"] + args
         fh = open(log, "w", encoding="utf-8")
         p = subprocess.Popen(cmd, cwd=str(ROOT), stdout=fh, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONUTF8="1"), **own_group())
@@ -1466,36 +1638,73 @@ def stop_procs(procs: list) -> None:
 
 
 # --------------------------------------------------------------------- #
-# 도망 기록 (10-21 (3) 1차 = 쫓긴 시간 — env_v2/world.py World.flight_stats, r4_eval._one 'flight')
+# 도망 기록 (10-23 1차 = 숨음 비율·10-21 (3) 쫓긴 시간(보고) — env_v2/world.py World.flight_stats, r4_eval._one 'flight')
 # --------------------------------------------------------------------- #
 
 NAN = float("nan")
+GUARD_PREFIXES = ("GH_", "GN_", "GF_", "GE_", "GV_", "GC_", "GG_", "G4", "G5", "G6")      # 관문 지킴 칸 (하나라도 통과가 아니면 기각 — 10-24 GE 더함)
 FLIGHT_SUMS = ("started", "live_steps", "flee_steps", "reflex_steps", "shelter_end")     # 시드 합으로 더하는 도망 기록 칸
+HIDE_KEYS = ("chased", "hidden", "watching", "cover_then_caught", "cover_then_starved")    # 숨은 뒤 지켜보기 칸 (flight.hide — 시드 합으로 더한다)
+# 10-24 쫓김 사건 칸 (flight.episode — env_v2/world.py '쫓김 사건', 시드 합으로 더한다. 결과 hidden·caught·starved·other·truncated 합 = started)
+EPISODE_KEYS = ("started", "chased", "hidden", "caught", "starved", "other", "truncated", "watching", "other_chased", "joined", "joined_cover",
+                "joined_other", "window_caught", "window_starved")
 
 
 def ratio(x: float, y: float) -> float:
     return x / y if y else NAN
 
 
-def flight_of(w: dict) -> dict:
-    """세계 요약 하나의 도망 기록 (env_v2/world.py World.flight_stats). 없거나 옛 꼴이면 ValueError — 관문은 도망 기록 없는 판을 받지 않는다."""
+def has_hide(f: dict) -> bool:
+    """도망 기록에 숨은 뒤 지켜보기(hide — 10-23)가 있나."""
+    h = f.get("hide")
+    return isinstance(h, dict) and all(k in h for k in HIDE_KEYS)
+
+
+def has_episode(f: dict) -> bool:
+    """도망 기록에 쫓김 사건(episode — 10-24)이 있나."""
+    e = f.get("episode")
+    return isinstance(e, dict) and all(k in e for k in EPISODE_KEYS)
+
+
+def flight_of(w: dict, hide: bool = False, episode: bool = False) -> dict:
+    """세계 요약 하나의 도망 기록 (env_v2/world.py World.flight_stats). 없거나 옛 꼴이면 ValueError — 관문은 도망 기록 없는 판을 받지 않는다.
+    hide 참(옛 도망 단위 숨음·잡힘 비율 — hide_pair): 숨은 뒤 지켜보기(hide)가 없는 기록(옛 실행기·옛 저장·10-23 전 C++ 평가기)도 받지 않는다.
+    episode 참(10-24 1차 사건 숨음 비율·GH·GE — episode_pair·GE): 쫓김 사건(episode)이 없는 기록(옛 실행기·옛 저장·10-24 이식 전 C++ 평가기)도
+    받지 않는다. 쫓긴 시간 셈(flight_pair — 보고·GG_chase, 도망길 측정 route_rules 의 옛 raw 기록)은 hide·episode 없이도 읽는다."""
     f = w.get("flight")
     if not isinstance(f, dict):
         raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 에 도망 기록 flight 가 없다 — wild_flight 세계를 지금 실행기(run_mirror.run_world)로 돌린다")
     if not all(k in f for k in FLIGHT_SUMS + ("contact",)):
         raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 의 도망 기록이 옛 꼴이다(쫓긴 시간·산 사슴-스텝 없음) — 지금 실행기로 다시 돌린다")
+    if hide and not has_hide(f):
+        raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 의 도망 기록에 숨은 뒤 지켜보기(hide — 10-23 1차 숨음 비율)가 없다 — 옛 실행기·"
+                         f"옛 저장이거나 그 칸을 세지 못하는 실행기 기록이다(C++ 평가기는 10-23 부터 센다 — 옛 실행 파일이면 다시 빌드). 지금 실행기로 다시 돌린다")
+    if episode and not has_episode(f):
+        raise ValueError(f"세계 (시드 {w.get('seed')}, {w.get('region')}) 의 도망 기록에 쫓김 사건(episode — 10-24 1차 사건 숨음 비율·GH·GE)이 없다 — 옛 실행기·"
+                         f"옛 저장이거나 그 칸을 세지 못하는 실행기 기록이다(C++ 평가기는 10-24 부터 센다 — 옛 실행 파일이면 다시 빌드). 지금 실행기로 다시 돌린다")
     return f
 
 
-def flight_seed(res: dict) -> dict:
+def flight_seed(res: dict, hide: bool = False, episode: bool = False) -> dict:
     """판 {meta, worlds} → 시드마다 도망 합(지역 합): FLIGHT_SUMS 칸, own_n·own_contact = 스스로 벗어난 도망(LIVE flight_own) 수·쫓긴 스텝,
-    unsafe_n = 잡힘·굶음·잘림(LIVE flight_unsafe) 수, n·steps·contact = 끝 까닭별 수·FLEE 스텝·쫓긴 스텝."""
+    unsafe_n = 잡힘·굶음·잘림(LIVE flight_unsafe) 수, caught = 잡힘으로 끝난 도망 수(n['caught'] — 옛 도망 단위 잡힘 비율의 분자), n·steps·contact = 끝
+    까닭별 수·FLEE 스텝·쫓긴 스텝. hide 참이면 HIDE_KEYS 칸 = 숨은 뒤 지켜보기(10-23 — chased 쫓긴 도망·hidden 숨어 살아남음·…)도 더한다(없는 기록은
+    ValueError). episode 참이면 ep_<EPISODE_KEYS> 칸 = 쫓김 사건(10-24 — ep_chased 쫓긴 사건·ep_hidden 숨음 사건·ep_caught 잡힘 사건·ep_started 사건 시작·…)도
+    더한다(없는 기록은 ValueError)."""
     out: dict = {}
     for w in res["worlds"]:
-        f = flight_of(w)
-        a = out.setdefault(int(w["seed"]), dict({k: 0 for k in FLIGHT_SUMS}, own_n=0, own_contact=0, unsafe_n=0, n={}, steps={}, contact={}))
+        f = flight_of(w, hide, episode)
+        a = out.setdefault(int(w["seed"]), dict({k: 0 for k in FLIGHT_SUMS + (HIDE_KEYS if hide else ())}, own_n=0, own_contact=0, unsafe_n=0, caught=0,
+                                                n={}, steps={}, contact={}, **({f"ep_{k}": 0 for k in EPISODE_KEYS} if episode else {})))
         for k in FLIGHT_SUMS:
             a[k] += int(f[k])
+        if hide:
+            for k in HIDE_KEYS:
+                a[k] += int(f["hide"][k])
+        if episode:
+            for k in EPISODE_KEYS:
+                a[f"ep_{k}"] += int(f["episode"][k])
+        a["caught"] += int(f["n"]["caught"])
         a["own_n"] += sum(int(f["n"][c]) for c in LIVE["flight_own"])
         a["own_contact"] += sum(int(f["contact"][c]) for c in LIVE["flight_own"])
         a["unsafe_n"] += sum(int(f["n"][c]) for c in LIVE["flight_unsafe"])
@@ -1506,9 +1715,9 @@ def flight_seed(res: dict) -> dict:
 
 
 def flight_pair(cand: dict, cur: dict) -> dict:
-    """1차 P1 의 짝: 시드마다 스스로 벗어난 도망(LIVE flight_own — 은신처·원판·시야각·반경)의 쫓긴 시간 평균(초) = (그 시드 지역 셋의 쫓긴 스텝 합 ÷ 수)
-    × 2/15, 후보 − 지금. 두 두뇌 모두 그런 도망이 flight_min_episodes 이상인 시드만 쓴다 — 빠진 시드는 dropped. 시드 목록이 다르면 멈춘다.
-    쓸 시드가 없으면 n 0·nan."""
+    """쫓긴 시간의 짝 (10-21 (3) 의 1차 — 10-23 부터 보고만(REPORT_N_chase)·G 지킴 GG_chase): 시드마다 스스로 벗어난 도망(LIVE flight_own — 은신처·원판·
+    시야각·반경)의 쫓긴 시간 평균(초) = (그 시드 지역 셋의 쫓긴 스텝 합 ÷ 수) × 2/15, 후보 − 지금. 두 두뇌 모두 그런 도망이 flight_min_episodes 이상인
+    시드만 쓴다 — 빠진 시드는 dropped. 시드 목록이 다르면 멈춘다. 쓸 시드가 없으면 n 0·nan."""
     import r4_eval as re_
 
     a, b = flight_seed(cand), flight_seed(cur)
@@ -1523,11 +1732,50 @@ def flight_pair(cand: dict, cur: dict) -> dict:
     return dict(p, dropped=[s for s in sorted(a) if s not in both], seeds=len(a))
 
 
+HIDE_PAIR_NUM = {"hide": "hidden", "caught": "caught"}       # hide_pair·episode_pair key → 분자 칸 (분모는 늘 쫓긴 도망·쫓긴 사건 chased)
+
+
+def _chased_ratio_pair(a: dict, b: dict, num: str, den: str) -> dict:
+    """시드 합 a·b(flight_seed) 의 비율 num / den 짝 (후보 − 지금): 두 두뇌 모두 den 이 LIVE hide_min_chased(≥ 1) 이상인 시드만 쓴다 — 빠진 시드는
+    dropped. 시드 목록이 다르면 멈춘다. 쓸 시드가 없으면 n 0·nan."""
+    import r4_eval as re_
+
+    if sorted(a) != sorted(b):
+        raise ValueError("두 판의 시드가 다르다 — 같은 세계끼리만 견준다")
+    k = max(1, int(LIVE["hide_min_chased"]))
+    both = [s for s in sorted(a) if a[s][den] >= k and b[s][den] >= k]
+    if both:
+        p = re_.paired({s: a[s][num] / a[s][den] for s in both}, {s: b[s][num] / b[s][den] for s in both})
+    else:
+        p = dict(a=NAN, b=NAN, diff=NAN, se=NAN, t=NAN, n=0)
+    return dict(p, dropped=[s for s in sorted(a) if s not in both], seeds=len(a))
+
+
+def hide_pair(cand: dict, cur: dict, key: str = "hide") -> dict:
+    """10-23 (LIVE_GATE.md 변경 기록 (6)) 쫓긴 도망(도망 단위) 비율의 짝: key 'hide' = 숨음 비율(숨어 살아남은 도망 ÷ 쫓긴 도망 — (6) 의 1차 P1), 'caught' =
+    잡힘 비율(잡힘으로 끝난 도망 ÷ 쫓긴 도망 — (6) 의 GH). 10-24 (변경 기록 (7)) 부터 관문에서는 보고만(REPORT_N_flight_hide·REPORT_N_flight_caught)이고
+    1차·GH 는 episode_pair(사건 단위)다. 시드마다 지역 셋의 분자·분모를 각각 더한 뒤 나눈다, 후보 − 지금. 두 두뇌 모두 쫓긴 도망이 LIVE hide_min_chased(≥ 1)
+    이상인 시드만 쓴다 — 빠진 시드는 dropped (쫓긴 도망 C = 0 이면 그 시드 값이 없다). 시드 목록이 다르면 멈춘다. 쓸 시드가 없으면 n 0·nan."""
+    p = _chased_ratio_pair(flight_seed(cand, True), flight_seed(cur, True), HIDE_PAIR_NUM[key], "chased")
+    return dict(p, key=key, unit="flight")
+
+
+def episode_pair(cand: dict, cur: dict, key: str = "hide") -> dict:
+    """10-24 (LIVE_GATE.md 변경 기록 (7)) 쫓긴 사건 비율의 짝: key 'hide' = 1차 P1 사건 숨음 비율(숨음 사건 ÷ 쫓긴 사건), 'caught' = 지킴 GH 사건 잡힘 비율
+    (잡힘 사건 ÷ 쫓긴 사건) — 사건 정의는 env_v2/world.py '쫓김 사건'(flight.episode). 시드마다 지역 셋의 분자·분모를 각각 더한 뒤 나눈다, 후보 − 지금.
+    두 두뇌 모두 쫓긴 사건이 LIVE hide_min_chased(≥ 1) 이상인 시드만 쓴다 — 빠진 시드는 dropped. 시드 목록이 다르면 멈춘다. 쓸 시드가 없으면 n 0·nan."""
+    p = _chased_ratio_pair(flight_seed(cand, episode=True), flight_seed(cur, episode=True), f"ep_{HIDE_PAIR_NUM[key]}", "ep_chased")
+    return dict(p, key=key, unit="episode")
+
+
 def flight_rate(a: dict, key: str) -> float:
-    """시드 합 하나의 지킴 몫: starts = 1000 산 사슴-스텝당 시작한 도망(GF), flee = 산 사슴-스텝 가운데 FLEE 를 실행한 몫(GV — 반사·스스로 고른 것 모두),
-    unsafe = 시작한 도망 가운데 잡힘·굶음·잘림으로 끝난 몫(GC). 분모가 0 이면 0."""
+    """시드 합 하나의 지킴 몫: starts = 1000 산 사슴-스텝당 시작한 도망(GF), episodes = 1000 산 사슴-스텝당 시작한 쫓김 사건(GE — 10-24, flight_seed 를
+    episode 참으로 낸 합), flee = 산 사슴-스텝 가운데 FLEE 를 실행한 몫(GV — 반사·스스로 고른 것 모두), unsafe = 시작한 도망 가운데 잡힘·굶음·잘림으로
+    끝난 몫(GC). 분모가 0 이면 0."""
     if key == "starts":
         return 1000.0 * a["started"] / a["live_steps"] if a["live_steps"] else 0.0
+    if key == "episodes":
+        return 1000.0 * a["ep_started"] / a["live_steps"] if a["live_steps"] else 0.0
     if key == "flee":
         return a["flee_steps"] / a["live_steps"] if a["live_steps"] else 0.0
     if key == "unsafe":
@@ -1536,24 +1784,37 @@ def flight_rate(a: dict, key: str) -> float:
 
 
 def flight_rate_pair(cand: dict, cur: dict, key: str) -> dict:
-    """지킴 GF·GV·GC 의 짝: 시드마다 flight_rate(key), 후보 − 지금."""
+    """지킴 GF·GE·GV·GC 의 짝: 시드마다 flight_rate(key), 후보 − 지금 (GE 는 쫓김 사건이 없는 기록을 받지 않는다)."""
     import r4_eval as re_
 
-    a, b = flight_seed(cand), flight_seed(cur)
+    ep = key == "episodes"
+    a, b = flight_seed(cand, episode=ep), flight_seed(cur, episode=ep)
     return re_.paired({s: flight_rate(v, key) for s, v in a.items()}, {s: flight_rate(v, key) for s, v in b.items()})
 
 
 def flight_pooled(res: dict) -> dict:
     """판 전체 도망 합 (보고 — 시드 평균이 아니라 전체 합의 비율이라 1차 P1 의 시드 평균과 셈이 다르다): 시작한 도망 수·시드당·1000 산 사슴-스텝당,
     끝 까닭 몫(시작한 도망 가운데)·까닭별 평균 도망 초·쫓긴 초, 스스로 벗어난 도망 수·몫·쫓긴 시간 평균 초(own_contact_s), 잡힘·굶음·잘림 몫·잘림 몫,
-    은신처 원 안에서 끝난 몫(살아 끝난 도망 가운데), 산 사슴-스텝 가운데 실행 FLEE 몫(반사 포함)·반사 몫·스스로 고른 FLEE 몫, 쫓긴 시간 칸."""
+    은신처 원 안에서 끝난 몫(살아 끝난 도망 가운데), 산 사슴-스텝 가운데 실행 FLEE 몫(반사 포함)·반사 몫·스스로 고른 FLEE 몫, 쫓긴 시간 칸.
+    10-23 숨은 뒤 지켜보기(쫓긴 도망 가운데 몫 — 10-24 부터 보고만): chased·hidden·hide_share(도망 단위 숨음 비율)·caught_share_chased(도망 단위 잡힘
+    비율)·cover_share_chased(은신처 끝 몫 — 지켜보기 전)·cover_then_caught·cover_then_starved·watching.
+    10-24 쫓김 사건(ep — 1차·GH·GE 의 재료, 전체 합): ep_started·ep_per_1k(1000 산 사슴-스텝당 사건 시작)·ep_chased·ep_hidden·ep_caught·ep_starved·ep_other·
+    ep_truncated·ep_watching·ep_hide_share(사건 숨음 비율)·ep_caught_share(사건 잡힘 비율)·ep_joined·ep_joined_cover·ep_joined_other·flights_per_episode
+    (도망 시작 ÷ 사건 시작)·ep_window_caught·ep_window_starved. 사건이 없는 옛 기록이 섞이면 그 칸은 nan·0."""
     W = res["worlds"]
-    t = {k: 0 for k in FLIGHT_SUMS}
+    t = {k: 0 for k in FLIGHT_SUMS + HIDE_KEYS}
+    e = {k: 0 for k in EPISODE_KEYS}
     n, st, ct, hist = {}, {}, {}, None
+    hd = all(has_hide(flight_of(w)) for w in W)             # 숨은 뒤 지켜보기가 없는 옛 기록이 섞이면 그 칸은 nan (관문은 hide_pair 가 먼저 거부한다)
+    he = all(has_episode(flight_of(w)) for w in W)          # 쫓김 사건이 없는 옛 기록이 섞이면 그 칸은 nan (관문은 episode_pair 가 먼저 거부한다)
     for w in W:
         f = flight_of(w)
         for k in FLIGHT_SUMS:
             t[k] += int(f[k])
+        for k in (HIDE_KEYS if hd else ()):
+            t[k] += int(f["hide"][k])
+        for k in (EPISODE_KEYS if he else ()):
+            e[k] += int(f["episode"][k])
         for d, key in ((n, "n"), (st, "steps"), (ct, "contact")):
             for c, v in f[key].items():
                 d[c] = d.get(c, 0) + int(v)
@@ -1562,16 +1823,107 @@ def flight_pooled(res: dict) -> dict:
     S, live = t["started"], t["live_steps"]
     own, uns = tuple(LIVE["flight_own"]), tuple(LIVE["flight_unsafe"])
     on, oc, un = sum(n.get(c, 0) for c in own), sum(ct.get(c, 0) for c in own), sum(n.get(c, 0) for c in uns)
-    return dict(started=S, started_per_seed=S / max(len({int(w["seed"]) for w in W}), 1), starts_per_1k=ratio(1000.0 * S, live), live_steps=live,
+    C = t["chased"] if hd else 0
+    EC = e["chased"] if he else 0
+    ep = dict(ep_started=e["started"], ep_per_1k=ratio(1000.0 * e["started"], live) if he else NAN, ep_chased=EC,
+              ep_hide_share=ratio(e["hidden"], EC), ep_caught_share=ratio(e["caught"], EC), flights_per_episode=ratio(S, e["started"]) if he else NAN,
+              **{f"ep_{k}": e[k] for k in EPISODE_KEYS if k not in ("started", "chased")})
+    return dict(**ep, started=S, started_per_seed=S / max(len({int(w["seed"]) for w in W}), 1), starts_per_1k=ratio(1000.0 * S, live), live_steps=live,
                 n=n, share={c: ratio(v, S) for c, v in n.items()}, mean_s={c: ratio(st[c] * STEP_S, v) for c, v in n.items()},
                 contact_s={c: ratio(ct[c] * STEP_S, v) for c, v in n.items()}, own_n=on, own_share=ratio(on, S), own_contact_s=ratio(oc * STEP_S, on),
                 unsafe_share=ratio(un, S), truncated_share=ratio(n.get("truncated", 0), S), shelter_end_share=ratio(t["shelter_end"], S - un),
                 flee_share=ratio(t["flee_steps"], live), reflex_share=ratio(t["reflex_steps"], live),
-                self_flee_share=ratio(t["flee_steps"] - t["reflex_steps"], live), hist=[] if hist is None else hist.tolist())
+                self_flee_share=ratio(t["flee_steps"] - t["reflex_steps"], live), hist=[] if hist is None else hist.tolist(),
+                chased=C, hidden=t["hidden"], hide_share=ratio(t["hidden"], C), caught_share_chased=ratio(n.get("caught", 0), C),
+                cover_share_chased=ratio(n.get("cover", 0), C), cover_then_caught=t["cover_then_caught"], cover_then_starved=t["cover_then_starved"],
+                watching=t["watching"])
 
 
 # --------------------------------------------------------------------- #
-# 관문 (LIVE_GATE.md 5절 — 10-21 변경 기록 (3) 1차 = 쫓긴 시간)
+# 길 기록 (10-24 변경 기록 (8) — 판 5 두뇌 판의 보고만: 길 지킴 GT·GTr·GR 은 관문 칸이 아니다)
+# --------------------------------------------------------------------- #
+
+ROUTE_REPORT_KEYS = ("GT_flight_time", "GTr_truncated", "GR_reflee")       # 설계 12절 길 지킴 이름 그대로 (r6_eval.route_guards 와 같은 셈) — 여기서는 보고만
+
+
+def route_seed(res: dict) -> dict:
+    """시드 → 길 보고 재료 (지역 셋 합, r6_eval.route_seed 와 같은 셈): flee·live (GT), truncated (GTr), refled (GR — 길 켬 세계만), route(모든 세계에
+    길 기록 flight.route 가 있나)."""
+    out: dict = {}
+    for w in res["worlds"]:
+        f = flight_of(w)
+        a = out.setdefault(int(w["seed"]), dict(flee=0, live=0, truncated=0, refled=0, route=True))
+        a["flee"] += int(f["flee_steps"])
+        a["live"] += int(f["live_steps"])
+        a["truncated"] += int(f["n"]["truncated"])
+        r = f.get("route")
+        if r is None:
+            a["route"] = False
+        else:
+            a["refled"] += int(r["refled"])
+    return out
+
+
+def route_pooled(res: dict) -> dict:
+    """판 전체 길 통계 (보고 — 세계 기록 flight.route 의 합): 실행한 반사 도주 스텝(RUN·SHELTER)과 SHELTER 몫, 시작한 도주·시작 때 SHELTER 가능, 길 결정·
+    그 가운데 SHELTER 가 열린 결정(choice)·SHELTER 고름·가능 바뀜 다시 고름·길 바꿈·무효, GR(refled)."""
+    t = dict(run_steps=0, shelter_steps=0, onsets=0, onset_shelter=0, decisions=0, choice=0, picked_shelter=0, picked_run=0, redecide_feas=0,
+             switches=0, invalid=0, refled=0)
+    for w in res["worlds"]:
+        r = flight_of(w).get("route")
+        if r is None:
+            continue
+        t["run_steps"] += int(r["steps"]["run"])
+        t["shelter_steps"] += int(r["steps"]["shelter"])
+        for k in ("onsets", "onset_shelter", "decisions", "redecide_feas", "switches", "refled"):
+            t[k] += int(r[k])
+        t["choice"] += int(r.get("choice", 0))
+        t["picked_shelter"] += int(r["picked"]["shelter"])
+        t["picked_run"] += int(r["picked"]["run"])
+        t["invalid"] += sum(int(v) for v in r["invalid"].values())
+    return dict(t, shelter_step_share=ratio(t["shelter_steps"], t["run_steps"] + t["shelter_steps"]))
+
+
+def route_report(cand: dict, cur: dict) -> dict | None:
+    """10-24 (LIVE_GATE.md 변경 기록 (8)) 길 보고: 두 판의 모든 세계에 길 기록(flight.route — 두 길 세계)이 있을 때만, 아니면 None(관측 21 판은 보고하지
+    않는다 — gate.md 그대로). 설계 12절 길 지킴 셋을 같은 셈(r6_eval.route_guards)으로 짝 차이만 적는다 — 관문 칸이 아니다(ok None):
+    GT 사슴-분당 총 도주 초(= 60 × GV — 짝 t 가 GV 와 같아 GV 지킴이 이미 본다), GTr 잘린 도망 수(시드마다 지역 셋 합 — 잘림 쪽 쏠림은 GC 지킴이 본다),
+    GR 살아 끝난 도망 뒤 5 초 안 다시 도망 수(10-24 (7) 사건 단위에서 그 자리는 GE 지킴). 그리고 두 판의 길 통계(route_pooled)."""
+    import r4_eval as re_
+
+    ws = list(cand.get("worlds") or []) + list(cur.get("worlds") or [])
+    if not cand.get("worlds") or not all(isinstance(w.get("flight"), dict) and isinstance(w["flight"].get("route"), dict) for w in ws):
+        return None
+    a, b = route_seed(cand), route_seed(cur)
+    c = {}
+    for name, fn, why in (("GT_flight_time", lambda x: 60.0 * x["flee"] / x["live"] if x["live"] else 0.0,
+                           "사슴-분당 총 도주 초 (= 60 × GV — GV 지킴과 짝 t 가 같다)"),
+                          ("GTr_truncated", lambda x: float(x["truncated"]), "잘린 도망 수 (잘림 쪽 쏠림은 GC 지킴)"),
+                          ("GR_reflee", lambda x: float(x["refled"]), "살아 끝난 도망 뒤 5 초 안 다시 도망 수 (10-24 (7) 그 자리는 GE 지킴)")):
+        q = re_.paired({s: fn(v) for s, v in a.items()}, {s: fn(v) for s, v in b.items()})
+        c[name] = dict(q, ok=None, rule=f"보고만 (변경 기록 (8) — 설계 12절 길 지킴, 관문 칸 아님): N {why}, 시드 {q['n']}")
+    return dict(criteria=c, pooled=dict(candidate=route_pooled(cand), current=route_pooled(cur)))
+
+
+def fmt_route_report(rr: dict | None) -> str:
+    """gate.md '길 기록 (보고만)' 절 — route_report 가 None 이면 빈 글."""
+    if not rr:
+        return ""
+    L = ["", "## 길 기록 (보고만 — 두 길 두뇌 판, LIVE_GATE.md 변경 기록 (8). 설계 12절 길 지킴 GT·GTr·GR 은 관문 칸이 아니다)", "",
+         "| 칸 | 후보 | 지금 두뇌 | 차이 | t | 규칙 |", "|---|---|---|---|---|---|"]
+    for k, v in rr["criteria"].items():
+        L.append(f"| {k} | {v['a']:.4f} | {v['b']:.4f} | {v['diff']:+.4f} ± {v['se']:.4f} | {tfmt(v['t'])} | {v['rule']} |")
+    L += ["", "| N 세계 두뇌 | 반사 도주 스텝 RUN·SHELTER (SHELTER 몫) | 시작한 도주 (시작 때 SHELTER 가능) | 길 결정 (SHELTER 열린 결정) | SHELTER 고름·RUN 고름 | "
+              "다시 고름·길 바꿈·무효 | GR 다시 도망 |", "|---|---|---|---|---|---|---|"]
+    for b, nm in (("current", "지금"), ("candidate", "후보")):
+        p = rr["pooled"][b]
+        L.append(f"| {nm} | {p['run_steps']}·{p['shelter_steps']} ({pct(p['shelter_step_share'])}) | {p['onsets']} ({p['onset_shelter']}) | "
+                 f"{p['decisions']} ({p['choice']}) | {p['picked_shelter']}·{p['picked_run']} | {p['redecide_feas']}·{p['switches']}·{p['invalid']} | {p['refled']} |")
+    return "\n".join(L)
+
+
+# --------------------------------------------------------------------- #
+# 관문 (LIVE_GATE.md 5절 — 10-23 변경 기록 (6) 1차 = 숨음 비율, 지킴 GH, 쫓긴 시간은 보고만 · 10-24 (7) 쫓김 사건 단위, GE, 옛 도망 단위는 보고만)
 # --------------------------------------------------------------------- #
 
 
@@ -1582,15 +1934,21 @@ def r_check_criterion(check: dict | None) -> dict:
     return dict(ok=bool(check["ok"]), steps=check.get("steps"), rule="재현 확인 (adapt GATE.md 변경 기록 (1) 규칙)")
 
 
-def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1_note: str = "", p1_interim: dict | None = None) -> dict:
-    """빠른 관문 (LIVE_GATE.md 5절, 변경 기록 (3) 사용자 10-21 '도망 시간' — 1차 = 쫓긴 시간). ev = {'N': {'current', 'candidate'}, 'G': {...}} (판 {meta, worlds},
-    세계마다 도망 기록 flight), stuck = {'current', 'candidate'} (끼임 {summary}), check = 재현 확인 결과(ok None = 건너뜀).
-    1차 P1 = N 세계 시드마다 스스로 벗어난 도망(은신처·원판·시야각·반경)의 쫓긴 시간 평균 초: 후보 − 지금 < 0 이고 ≤ −δ(LIVE flight_min_effect_s),
-    짝 t ≤ −t_crit(n₁ − 1), n₁ = 두 두뇌 모두 그런 도망이 있는 시드 수. p1_crit(n₁) 을 주면 그 문턱(두 번 보기 — 중간 앞서 통과 경계·끝 문턱,
-    변경 기록 (4))을 쓰고 p1_note 를 규칙 글에 적는다. 주지 않으면 옛 한 번 보기 그대로. p1_interim = 앞서 통과 경계를 넘은 중간 판정(seq_interim,
-    action 'efficacy' — 앞서 통과를 켰을 때만)이면 1차는 그것으로 통과(군 순차 검정: 중간 또는 끝 가운데 하나를 넘으면) — 지킴은 ev 그대로(전체) 본다.
-    지킴 (문턱 t_crit(n − 1), n = 짝 시드 수) = N: GN(잡힘 — 옛 1차 — ·굶음·산), GF(1000 산 사슴-스텝당 시작한 도망), GV(실행 FLEE 몫),
-    GC(잡힘·굶음·잘림으로 끝난 도망 몫) / G: GG(잡힘·굶음·산·쫓긴 시간) / G4·G5·G6. 통과 = R(했으면)·P1·지킴 모두 — A5 는 내보낼 때."""
+def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1_note: str = "", p1_interim: dict | None = None,
+              hide_min_effect: float | None = None) -> dict:
+    """빠른 관문 (LIVE_GATE.md 5절, 변경 기록 (6) 사람 결정 10-23 — 1차 = 숨음 비율, 변경 기록 (7) 사람 결정 10-24 — 쫓김 사건 단위로 셈).
+    ev = {'N': {'current', 'candidate'}, 'G': {...}} (판 {meta, worlds}, 세계마다 도망 기록 flight — 숨은 뒤 지켜보기 hide·쫓김 사건 episode 포함),
+    stuck = {'current', 'candidate'} (끼임 {summary}), check = 재현 확인 결과(ok None = 건너뜀).
+    1차 P1 (P1_N_hide) = N 세계 시드마다(지역 셋의 분자·분모 합) 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율 — episode_pair, 사건 정의 env_v2/world.py
+    '쫓김 사건'): 후보 − 지금 > 0 이고 ≥ δ_H(LIVE hide_min_effect), 짝 t ≥ +t_crit(n₁ − 1), n₁ = 두 두뇌 모두 쫓긴 사건이 있는 시드 수. p1_crit(n₁) 을
+    주면 그 문턱(두 번 보기 — 끝 문턱, 변경 기록 (4))을 쓰고 p1_note 를 규칙 글에 적는다. 주지 않으면 옛 한 번 보기 그대로. p1_interim = 앞서 통과 경계를
+    넘은 중간 판정(seq_interim, action 'efficacy' — 앞서 통과를 켰을 때만)이면 1차는 그것으로 통과(군 순차 검정) — 지킴은 ev 그대로(전체) 본다.
+    지킴 (문턱 t_crit(n − 1), n = 짝 시드 수) = N: GH(GH_flight_caught — 쫓긴 사건 가운데 잡힘 사건 몫, 1차와 같은 시드, 문턱 t_crit(그 시드 수 − 1)),
+    GN(잡힘·굶음·산), GF(1000 산 사슴-스텝당 시작한 도망), GE(GE_episode_starts — 1000 산 사슴-스텝당 시작한 사건, 10-24 GR 자리), GV(실행 FLEE 몫),
+    GC(잡힘·굶음·잘림으로 끝난 도망 몫) / G: GG(잡힘·굶음·산·쫓긴 시간) / G4·G5·G6.
+    보고만 (ok None): REPORT_N_flight_hide·REPORT_N_flight_caught(옛 도망 단위 숨음·잡힘 비율 — 10-23 (6) 의 1차·GH), REPORT_N_chase(옛 1차 N 쫓긴 시간).
+    통과 = R(했으면)·P1·지킴 모두 — A5 는 내보낼 때.
+    hide_min_effect = 1차 최소 차이 δ_H (None = LIVE 값 — 실시간 고리). 미리 적힌 오프라인 판정(R6·R7·R7e PREREG, δ 0)은 0 을 넘긴다 (10-27 (10) 뒤 LIVE 값이 0.01 이 되어서)."""
     import r4_eval as re_
 
     N, G = ev["N"], ev["G"]
@@ -1600,34 +1958,48 @@ def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1
     T = t_crit(n - 1)
     n_g = int(re_.paired(re_.per_seed(G["candidate"], "caught"), re_.per_seed(G["current"], "caught"))["n"])
     TG = t_crit(n_g - 1)                                     # G 세계는 판정 시드 수가 따로다 (LIVE judge_seeds_g)
-    p = flight_pair(N["candidate"], N["current"])
+    p = episode_pair(N["candidate"], N["current"], "hide")
     n1 = int(p["n"])
-    T1 = t_crit(n1 - 1) if p1_crit is None else float(p1_crit(n1))   # 1차 문턱은 두 두뇌 모두 스스로 벗어난 도망이 있는 시드 수에서
-    dl = float(LIVE["flight_min_effect_s"])
+    T1 = t_crit(n1 - 1) if p1_crit is None else float(p1_crit(n1))   # 1차 문턱은 두 두뇌 모두 쫓긴 사건이 있는 시드 수에서
+    dl = float(LIVE["hide_min_effect"] if hide_min_effect is None else hide_min_effect)
 
     def t_ok(q: dict, cond: bool) -> bool:
         # 시드 하나면 표준오차가 nan 이고 t 가 ±∞ 라 어느 쪽 문턱도 넘는다 — 짝 t 를 셀 수 없으면 어떤 t 기준도 통과로 두지 않는다
         return bool(int(q["n"]) >= 2 and math.isfinite(q["se"]) and cond)
 
-    c["P1_N_chase"] = dict(p, ok=t_ok(p, p["diff"] < 0 and p["diff"] <= -dl and p["t"] <= -T1),
-                           rule=("N: 스스로 벗어난 도망의 쫓긴 시간 평균 초 후보 − 지금 < 0" + (f" 이고 ≤ −{dl:g}초" if dl > 0 else "")
-                                 + f", 짝 t ≤ −{T1:.3f} (" + (f"{p1_note}, " if p1_note else "") + f"시드 {n1}, 빠진 시드 {len(p['dropped'])})"))
+    c["P1_N_hide"] = dict(p, ok=t_ok(p, p["diff"] > 0 and p["diff"] >= dl and p["t"] >= T1),
+                          rule=("N: 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율 — 마지막 도망이 은신처 끝 + 10 초 안 안 잡힘·다시 안 뜀) 후보 − 지금 > 0"
+                                + (f" 이고 ≥ +{dl * 100:g}%p" if dl > 0 else "")
+                                + f", 짝 t ≥ +{T1:.3f} (" + (f"{p1_note}, " if p1_note else "") + f"시드 {n1}, 빠진 시드 {len(p['dropped'])})"))
     early = p1_interim is not None and p1_interim.get("action") == "efficacy"
-    if early:                                                # 중간에 앞서 통과 경계를 넘었다 — 1차는 그것으로 통과(전체 차이도 줄어드는 쪽일 때만), 끝 짝은 기록
+    if early:                                                # 중간에 앞서 통과 경계를 넘었다 — 1차는 그것으로 통과(전체 차이도 나아지는 쪽일 때만), 끝 짝은 기록
         li = p1_interim
-        fin = c["P1_N_chase"]["ok"]
-        c["P1_N_chase"].update(ok_final=fin, ok=bool(fin or (t_ok(p, True) and p["diff"] < 0 and p["diff"] <= -dl)),
-                               interim=dict(n_int=li["n_int"], n1=li["n1"], a=li["a"], b=li["b"], diff=li["diff"], se=li["se"], t=li["t"], bound=li["bound"]),
-                               rule=c["P1_N_chase"]["rule"] + f" — 또는 중간 판정 앞서 통과 경계: 앞 시드 {li['n_int']} 짝 t {tfmt(li['t'])} ≤ −{li['bound']:.3f} "
-                                                              f"(짝 시드 {li['n1']}) → 중간에 넘음, 그리고 전체 차이 < 0" + (f" · ≤ −{dl:g}초" if dl > 0 else ""))
-    c["GN_caught"] = dict(pc, ok=t_ok(pc, pc["t"] < T), rule=f"N: 짝 t < +{T:.3f} (옛 1차 — 유의하게 더 잡히지 않는다)")
+        fin = c["P1_N_hide"]["ok"]
+        c["P1_N_hide"].update(ok_final=fin, ok=bool(fin or (t_ok(p, True) and p["diff"] > 0 and p["diff"] >= dl)),
+                              interim=dict(n_int=li["n_int"], n1=li["n1"], a=li["a"], b=li["b"], diff=li["diff"], se=li["se"], t=li["t"], bound=li["bound"]),
+                              rule=c["P1_N_hide"]["rule"] + f" — 또는 중간 판정 앞서 통과 경계: 앞 시드 {li['n_int']} 짝 t {tfmt(li['t'])} ≥ +{li['bound']:.3f} "
+                                                            f"(짝 시드 {li['n1']}) → 중간에 넘음, 그리고 전체 차이 > 0" + (f" · ≥ +{dl * 100:g}%p" if dl > 0 else ""))
+    q = episode_pair(N["candidate"], N["current"], "caught")
+    TH = t_crit(int(q["n"]) - 1)
+    c["GH_flight_caught"] = dict(q, ok=t_ok(q, q["t"] < TH),
+                                 rule=(f"N: 쫓긴 사건 가운데 잡힘 사건 몫(사건 잡힘 비율) 짝 t < +{TH:.3f} (1차와 같은 시드 {q['n']}, 빠진 시드 {len(q['dropped'])} — "
+                                       f"숨는 쪽이 늘어도 쫓긴 사건이 더 잡히지 않는다)"))
+    for key, name, what in (("hide", "REPORT_N_flight_hide", "숨음 비율"), ("caught", "REPORT_N_flight_caught", "잡힘 비율")):
+        qf = hide_pair(N["candidate"], N["current"], key)
+        c[name] = dict(qf, ok=None, rule=(f"보고만 (10-24 — 판정에 쓰지 않는다): N 옛 도망 단위 {what}(쫓긴 도망 가운데 — 10-23 (6) 의 "
+                                          f"{'1차' if key == 'hide' else 'GH'}) 후보 − 지금 (시드 {qf['n']}, 빠진 시드 {len(qf['dropped'])})"))
+    qc = flight_pair(N["candidate"], N["current"])
+    c["REPORT_N_chase"] = dict(qc, ok=None, rule=(f"보고만 (10-23 — 판정에 쓰지 않는다): N 스스로 벗어난 도망의 쫓긴 시간 평균 초 후보 − 지금 (옛 1차, "
+                                                  f"시드 {qc['n']}, 빠진 시드 {len(qc['dropped'])})"))
+    c["GN_caught"] = dict(pc, ok=t_ok(pc, pc["t"] < T), rule=f"N: 짝 t < +{T:.3f} (유의하게 더 잡히지 않는다 — 10-21 (3) 전의 1차)")
     for key, sign in (("starved", 1), ("alive", -1)):
         q = re_.paired(re_.per_seed(N["candidate"], key), re_.per_seed(N["current"], key))
         c[f"GN_{key}"] = dict(q, ok=t_ok(q, q["t"] < T if sign > 0 else q["t"] > -T),
                               rule=f"N: 짝 t {'<' if sign > 0 else '>'} {'+' if sign > 0 else '−'}{T:.3f}")
-    for key, name, why in (("starts", "GF_flight_starts", "1000 산 사슴-스텝당 시작한 도망 — 짧게 자주 도망쳐 평균만 줄이지 않는다"),
+    for key, name, why in (("starts", "GF_flight_starts", "1000 산 사슴-스텝당 시작한 도망 — 짧게 자주 도망쳐 몫만 바꾸지 않는다"),
+                           ("episodes", "GE_episode_starts", "1000 산 사슴-스텝당 시작한 쫓김 사건 — 10-24 GR 자리: 사건을 잘게 쪼개거나 더 자주 쫓기지 않는다"),
                            ("flee", "GV_flee_time", "산 사슴-스텝 가운데 실행 FLEE 몫(반사·스스로 고른 것) — 더 오래·일찍 달려 쫓김을 피하지 않는다"),
-                           ("unsafe", "GC_flight_unsafe", "시작한 도망 가운데 잡힘·굶음·잘림 몫 — 긴 추격을 잡힘·잘림으로 바꿔 1차 평균에서 빼지 않는다")):
+                           ("unsafe", "GC_flight_unsafe", "시작한 도망 가운데 잡힘·굶음·잘림 몫 — 긴 추격을 잡힘·잘림으로 바꾸지 않는다")):
         q = flight_rate_pair(N["candidate"], N["current"], key)
         c[name] = dict(q, ok=t_ok(q, q["t"] < T), rule=f"N: 짝 t < +{T:.3f} ({why})")
     for key, sign in (("caught", 1), ("starved", 1), ("alive", -1)):
@@ -1636,7 +2008,7 @@ def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1
                               rule=f"G: 짝 t {'<' if sign > 0 else '>'} {'+' if sign > 0 else '−'}{TG:.3f}")
     q = flight_pair(G["candidate"], G["current"])
     TGc = t_crit(int(q["n"]) - 1)
-    c["GG_chase"] = dict(q, ok=t_ok(q, q["t"] < TGc), rule=f"G: 쫓긴 시간(1차와 같은 셈) 짝 t < +{TGc:.3f} (시드 {q['n']}, 빠진 시드 {len(q['dropped'])})")
+    c["GG_chase"] = dict(q, ok=t_ok(q, q["t"] < TGc), rule=f"G: 쫓긴 시간(REPORT_N_chase 와 같은 셈) 짝 t < +{TGc:.3f} (시드 {q['n']}, 빠진 시드 {len(q['dropped'])})")
     an, ag, bg = re_.pooled(N["candidate"]), re_.pooled(G["candidate"]), re_.pooled(G["current"])
     c["G4_catch_in_shelter"] = dict(N=an["catch_cover"], G=ag["catch_cover"], ok=bool(an["catch_cover"] == 0 and ag["catch_cover"] == 0),
                                     rule="후보 N·G 판정 세계 모두 0")
@@ -1649,42 +2021,43 @@ def gate_live(ev: dict, stuck: dict | None, check: dict | None, p1_crit=None, p1
     c["G6_no_exploit"] = dict(shelter=ag["shelter"], shelter_current=bg["shelter"], beh=ag["beh"],
                               ok=bool(ag["shelter"] <= LIVE["shelter_x"] * bg["shelter"] and use_ok),
                               rule="G: 은신처 안 몫 ≤ 지금의 2배, 먹기·도망(실행 FLEE — 반사 포함)·숨기 모두 1% 넘게")
-    p1 = c["P1_N_chase"]
+    p1 = c["P1_N_hide"]
     drop = len(p1["dropped"])
-    bad = [k for k, v in c.items() if k.startswith(("GN_", "GF_", "GV_", "GC_", "GG_", "G4", "G5", "G6")) and v["ok"] is not True]
+    bad = [k for k, v in c.items() if k.startswith(GUARD_PREFIXES) and v["ok"] is not True]
     if c["R_check"]["ok"] is False:
         verdict, why, brief = "기각", "재현 확인 실패 — 거울이 지금 게임과 다르다", "재현 확인 실패"
     elif n < 2 or not math.isfinite(pc["se"]):
         verdict, why, brief = "기각", f"판정 시드 {n}개 — 짝 t 를 셀 수 없다 (2개 이상이어야 한다)", f"판정 시드 {n}개 (2개 이상)"
     elif n1 < 2 or not math.isfinite(p1["se"]):
         verdict = "기각"
-        why = f"쫓긴 시간을 잴 시드 {n1}개 — 두 두뇌 모두 스스로 벗어난 도망이 있는 시드가 2개 이상이어야 한다 (빠진 시드 {drop})"
-        brief = f"쫓긴 시간 잴 시드 {n1}개 (2개 이상)"
+        why = f"숨음 비율을 잴 시드 {n1}개 — 두 두뇌 모두 쫓긴 사건이 있는 시드가 2개 이상이어야 한다 (빠진 시드 {drop})"
+        brief = f"숨음 비율 잴 시드 {n1}개 (2개 이상)"
     elif not p1["ok"]:
         verdict = "기각"
-        why = (f"1차 P1 실패: 포만 없는 세계 스스로 벗어난 도망의 쫓긴 시간 평균 후보 {p1['a']:.2f}초 대 지금 {p1['b']:.2f}초 (짝 t {tfmt(p1['t'])}, "
-               f"문턱 −{T1:.3f}" + (f", 최소 차이 −{dl:g}초" if dl > 0 else "") + f", 시드 {n1}, 빠진 시드 {drop})")
-        brief = f"1차 쫓긴 시간 {p1['b']:.1f}→{p1['a']:.1f}초 t {tfmt(p1['t'], 1)} (문턱 −{T1:.2f})"
+        why = (f"1차 P1 실패: 포만 없는 세계 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율) 후보 {pct(p1['a'], 2)} 대 지금 {pct(p1['b'], 2)} (짝 t {tfmt(p1['t'])}, "
+               f"문턱 +{T1:.3f}" + (f", 최소 차이 +{dl * 100:g}%p" if dl > 0 else "") + f", 시드 {n1}, 빠진 시드 {drop})")
+        brief = f"1차 사건 숨음 비율 {pct(p1['b'])}→{pct(p1['a'])} t {tfmt(p1['t'], 1)} (문턱 +{T1:.2f})"
     elif bad:
         verdict, why = "기각", "지킴 기준 실패: " + ", ".join(bad)
         brief = "지킴 " + ", ".join(f"{k} (t {tfmt(c[k]['t'], 1)})" if "t" in c[k] else k for k in bad)
     else:
-        verdict, why = "통과", ("1차 P1(쫓긴 시간)·지킴 GN·GF·GV·GC·GG·G4·G5·G6 모두 통과" + (" (1차는 중간 판정 앞서 통과 경계로, 지킴은 전체로)" if early else "")
+        verdict, why = "통과", ("1차 P1(사건 숨음 비율)·지킴 GH·GN·GF·GE·GV·GC·GG·G4·G5·G6 모두 통과" + (" (1차는 중간 판정 앞서 통과 경계로, 지킴은 전체로)" if early else "")
                                 + ("" if c["R_check"]["ok"] else " (재현 확인 없음 — 중간 변화)"))
         brief = ""
-    summary = (f"포만 없는 세계 쫓긴 시간 {p1['b']:.1f}→{p1['a']:.1f}초 (t {tfmt(p1['t'], 1)})" + (", 잡힘·도망 나빠짐 없음" if not bad else ", 지킴 실패")
+    summary = (f"포만 없는 세계 사건 숨음 비율 {pct(p1['b'])}→{pct(p1['a'])} (t {tfmt(p1['t'], 1)})" + (", 잡힘·도망 나빠짐 없음" if not bad else ", 지킴 실패")
                + (f" — 1차 중간 판정 (시드 {p1_interim['n_int']})" if early and verdict == "통과" else ""))
     rep = dict(pooled_N=dict(candidate=an, current=re_.pooled(N["current"])), pooled_G=dict(candidate=ag, current=bg),
                shelter_G=re_.paired(re_.per_seed(G["candidate"], "shelter"), re_.per_seed(G["current"], "shelter")),
                flight={w: dict(candidate=flight_pooled(ev[w]["candidate"]), current=flight_pooled(ev[w]["current"])) for w in ("N", "G")})
     return dict(verdict=verdict, passed=verdict == "통과", why=why, brief=brief, summary=summary, n=n, t_crit=T, n_g=n_g, t_crit_g=TG,
-                n_flight=n1, t_crit_flight=T1, dropped_flight=p1["dropped"], criteria=c, report=rep,
+                n_flight=n1, t_crit_flight=T1, dropped_flight=p1["dropped"], criteria=c, report=rep, criterion=GATE_CRITERION, unit="episode",
                 rules={k: v for k, v in LIVE.items()},
                 live_gate_md_sha256=hashlib.sha256(LIVE_GATE_MD.read_bytes()).hexdigest() if LIVE_GATE_MD.exists() else None)
 
 
-def pct(x: float) -> str:
-    return "—" if x != x else f"{x * 100:.1f}%"
+def pct(x: float, nd: int = 1) -> str:
+    """몫 → '12.3%' (nan 은 '—')."""
+    return "—" if x != x else f"{x * 100:.{nd}f}%"
 
 
 def cause_parts(f: dict, causes) -> str:
@@ -1700,44 +2073,79 @@ def flight_groups(f: dict) -> tuple:
 
 
 def fmt_flight(g: dict) -> str:
-    """gate.md 도망 기록 표 (보고 — 전체 합의 비율): 세계·두뇌마다 시작한 도망(1000 산 사슴-스텝당), 스스로 벗어난 도망의 쫓긴 시간(전체 합),
-    끝 까닭 묶음 몫(시작한 도망 가운데), 은신처에서 끝난 몫, 실행 FLEE 몫(반사 포함)·스스로 고른 FLEE 몫. 아래 줄에 1차 P1·GG_chase 의 시드 평균."""
+    """gate.md 도망 기록 표 (보고 — 전체 합의 비율): 세계·두뇌마다 10-24 쫓김 사건(사건 시작(1000 산 사슴-스텝당)·쫓긴 사건·사건 숨음 비율·사건 잡힘 비율·
+    잘림 사건·이어진 도망(은신처 뒤·그 밖 뒤)), 시작한 도망(1000 산 사슴-스텝당), 10-23 쫓긴 도망과 그 가운데 도망 단위 숨음·잡힘 비율(보고만)·은신처 끝 뒤
+    10 초 안 잡힘·굶음, 스스로 벗어난 도망의 쫓긴 시간(보고만, 전체 합), 끝 까닭 묶음 몫(시작한 도망 가운데), 은신처에서 끝난 몫, 실행 FLEE 몫(반사 포함)·
+    스스로 고른 FLEE 몫. 아래 줄에 1차 P1·GH·GE·옛 도망 단위 비율(보고)·쫓긴 시간(보고)·GG_chase 의 시드 평균."""
     rep = g["report"]
-    L = ["", "## 도망 기록 (보고 — 전체 합. 끝 까닭 몫은 시작한 도망 가운데, 정의 env_v2/world.py '야생 1단계' (w3) 도망 기록)", "",
-         "| 세계 | 두뇌 | 시작 (1000 산 사슴-스텝당) | 쫓긴 시간 초 (스스로 벗어남, 전체 합) | 스스로 벗어남 (은신처·원판·시야각·반경) | "
-         "그 밖 살아 끝남 (바꿈·그만둠·끝까지·안 쫓김) | 잡힘·굶음·잘림 | 은신처에서 끝 (살아 끝난 도망 가운데) | 실행 FLEE 몫 (반사 포함) | 스스로 고른 FLEE 몫 |",
-         "|---|---|---|---|---|---|---|---|---|---|"]
+    L = ["", "## 쫓김 사건 (10-24 — 1차·GH·GE 의 재료, 전체 합. 정의 env_v2/world.py '쫓김 사건')", "",
+         "| 세계 | 두뇌 | 사건 시작 (1000 산 사슴-스텝당) | 쫓긴 사건 | 사건 숨음 비율 (쫓긴 사건 가운데, 전체 합) | 사건 잡힘 비율 | 굶음·그 밖·잘림 사건 | "
+         "이어진 도망 (은신처 뒤·그 밖 뒤) | 도망 ÷ 사건 |",
+         "|---|---|---|---|---|---|---|---|---|"]
     for w in ("N", "G"):
         if w not in rep["flight"]:                           # 중간 기각(나아지지 않음)은 G 를 돌리지 않았다
             continue
         for b, nm in (("current", "지금"), ("candidate", "후보")):
             f = rep["flight"][w][b]
+            L.append(f"| {w} | {nm} | {f['ep_started']} ({f['ep_per_1k']:.2f}) | {f['ep_chased']} | {pct(f['ep_hide_share'])} ({f['ep_hidden']}) | "
+                     f"{pct(f['ep_caught_share'])} ({f['ep_caught']}) | {f['ep_starved']}·{f['ep_other']}·{f['ep_truncated']} | "
+                     f"{f['ep_joined_cover']}·{f['ep_joined_other']} | {f['flights_per_episode']:.2f} |")
+    L += ["", "## 도망 기록 (보고 — 전체 합. 끝 까닭 몫은 시작한 도망 가운데, 정의 env_v2/world.py '야생 1단계' (w3) 도망 기록·숨은 뒤 지켜보기. "
+              "도망 단위 숨음·잡힘 비율은 10-24 부터 보고만)", "",
+          "| 세계 | 두뇌 | 시작 (1000 산 사슴-스텝당) | 쫓긴 도망 | 숨음 비율 (도망 단위, 쫓긴 도망 가운데, 전체 합) | 잡힘 비율 (도망 단위) | "
+          "은신처 끝 뒤 10 초 안 잡힘·굶음 | 쫓긴 시간 초 (보고만 — 스스로 벗어남, 전체 합) | 스스로 벗어남 (은신처·원판·시야각·반경) | "
+          "그 밖 살아 끝남 (바꿈·그만둠·끝까지·안 쫓김) | 잡힘·굶음·잘림 | 은신처에서 끝 (살아 끝난 도망 가운데) | 실행 FLEE 몫 (반사 포함) | 스스로 고른 FLEE 몫 |",
+          "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+    for w in ("N", "G"):
+        if w not in rep["flight"]:
+            continue
+        for b, nm in (("current", "지금"), ("candidate", "후보")):
+            f = rep["flight"][w][b]
             own, oth, uns = flight_groups(f)
-            L.append(f"| {w} | {nm} | {f['started']} ({f['starts_per_1k']:.2f}) | {f['own_contact_s']:.2f} | {cause_parts(f, own)} | {cause_parts(f, oth)} | "
-                     f"{cause_parts(f, uns)} | {pct(f['shelter_end_share'])} | {pct(f['flee_share'])} | {pct(f['self_flee_share'])} |")
-    p1, gg, dr = g["criteria"]["P1_N_chase"], g["criteria"].get("GG_chase"), g["dropped_flight"]
-    L += ["", f"- 1차 P1 (시드마다 평균을 낸 뒤 평균 — 위 표의 전체 합과 셈이 다르다): N 지금 {p1['b']:.2f}초 → 후보 {p1['a']:.2f}초, "
+            L.append(f"| {w} | {nm} | {f['started']} ({f['starts_per_1k']:.2f}) | {f['chased']} | {pct(f['hide_share'])} ({f['hidden']}) | "
+                     f"{pct(f['caught_share_chased'])} | {f['cover_then_caught']}·{f['cover_then_starved']} | {f['own_contact_s']:.2f} | {cause_parts(f, own)} | "
+                     f"{cause_parts(f, oth)} | {cause_parts(f, uns)} | {pct(f['shelter_end_share'])} | {pct(f['flee_share'])} | {pct(f['self_flee_share'])} |")
+    cr = g["criteria"]
+    p1, gh, ch, gg, dr = cr["P1_N_hide"], cr.get("GH_flight_caught"), cr.get("REPORT_N_chase"), cr.get("GG_chase"), g["dropped_flight"]
+    ge, fh, fc = cr.get("GE_episode_starts"), cr.get("REPORT_N_flight_hide"), cr.get("REPORT_N_flight_caught")
+    L += ["", f"- 1차 P1 사건 숨음 비율 (시드마다 지역 셋 합으로 낸 몫의 평균 — 위 표의 전체 합과 셈이 다르다): N 지금 {pct(p1['b'], 2)} → 후보 {pct(p1['a'], 2)}, "
               f"짝 시드 {g['n_flight']} (빠진 시드 {len(dr)}{': ' + ', '.join(map(str, dr)) if dr else ''})"]
+    if gh is not None:
+        L.append(f"- 사건 잡힘 비율 (지킴 GH, 같은 셈): N 지금 {pct(gh['b'], 2)} → 후보 {pct(gh['a'], 2)} (짝 t {tfmt(gh['t'])}, 시드 {gh['n']})")
+    if ge is not None and "t" in ge:
+        L.append(f"- 사건 시작 (지킴 GE, 1000 산 사슴-스텝당 — 10-24 GR 자리): N 지금 {ge['b']:.4f} → 후보 {ge['a']:.4f} (짝 t {tfmt(ge['t'])}, 시드 {ge['n']})")
+    for q, what in ((fh, "숨음 비율"), (fc, "잡힘 비율")):
+        if q is not None:
+            L.append(f"- 도망 단위 {what} (보고만 — 10-23 (6) 의 셈, 시드 평균): N 지금 {pct(q['b'], 2)} → 후보 {pct(q['a'], 2)} (짝 t {tfmt(q['t'])}, 시드 {q['n']})")
+    if ch is not None:
+        L.append(f"- 쫓긴 시간 (보고만 — 10-21 (3) 의 옛 1차, 시드 평균): N 지금 {ch['b']:.2f}초 → 후보 {ch['a']:.2f}초 (짝 t {tfmt(ch['t'])}, 시드 {ch['n']})")
     if gg is not None:
         L.append(f"- G 쫓긴 시간 (지킴 GG_chase, 같은 셈): 지금 {gg['b']:.2f}초 → 후보 {gg['a']:.2f}초 (짝 t {tfmt(gg['t'])}, 시드 {gg['n']})")
     return "\n".join(L)
 
 
+def fut_bound_text(fut) -> str:
+    """중간 기각 경계 글 (10-23 숨음 비율 — 짝 t ≤ −LIVE seq_futility_t, 0 이면 't ≤ 0'). None 이면 '끔'."""
+    if fut is None:
+        return "끔"
+    return f"t ≤ {(0.0 - float(fut)):g}".replace("-", "−")
+
+
 def fmt_seq(g: dict) -> str:
-    """gate.md '중간 판정' 절 (두 번 보기 — LIVE_GATE.md 5-3): 앞 절반 크기·짝, 세 경계, 결정."""
+    """gate.md '중간 판정' 절 (두 번 보기 — LIVE_GATE.md 5-3): 앞 절반 크기·짝(1차 사건 숨음 비율 — 10-24), 세 경계, 결정."""
     s = g.get("seq")
     if not s:
         return "\n## 중간 판정\n\n- 한 번 보기 (LIVE seq_interim_frac 끔, 또는 앞 절반 2개·뒤 1개가 안 되는 시험 크기) — 옛 순서 그대로"
-    fut = "끔" if s["futility"] is None else f"짝 t ≥ {tfmt(s['futility'])}"
-    eff = (f"짝 t ≤ −{s['bound']:.3f} (정보 몫 {s['frac']:.2f} 까지 쓴 α₁ {s['alpha1']:.5f} — 넘으면 1차만 통과, 지킴은 전체)" if s["alpha1"] > 0
+    fut = "끔" if s["futility"] is None else f"짝 {fut_bound_text(s['futility'])}"
+    eff = (f"짝 t ≥ +{s['bound']:.3f} (정보 몫 {s['frac']:.2f} 까지 쓴 α₁ {s['alpha1']:.5f} — 넘으면 1차만 통과, 지킴은 전체)" if s["alpha1"] > 0
            else ("끔 (LIVE seq_efficacy 거짓 — 기본)" if not LIVE["seq_efficacy"] else "보지 않음 (짝 t 를 셀 시드 2개 미만)"))
-    L = ["", "## 중간 판정 (두 번 보기 — LIVE_GATE.md 5-3·변경 기록 (4))", "",
+    L = ["", "## 중간 판정 (두 번 보기 — LIVE_GATE.md 5-3·변경 기록 (4)·(6)·(7))", "",
          f"- 앞 절반: N 판정 시드 앞 {s['n_int']}/{s['n_total']}개 ({s.get('seeds_int', ['?', '?'])[0]}~{s.get('seeds_int', ['?', '?'])[1]}). "
-         f"1차 짝 시드 {s['n1']} (빠진 시드 {len(s['dropped'])}): 쫓긴 시간 지금 {s['b']:.2f}초 → 후보 {s['a']:.2f}초, 짝 t {tfmt(s['t'])}",
+         f"1차 짝 시드 {s['n1']} (빠진 시드 {len(s['dropped'])}): 사건 숨음 비율 지금 {pct(s['b'], 2)} → 후보 {pct(s['a'], 2)}, 짝 t {tfmt(s['t'])}",
          f"- 경계: 기각(나아지지 않음) {fut} · 앞서 통과 {eff}, 한쪽 α {s['alpha']} ({s['spending']} 쓰기)"]
     fin = s.get("final")
     if fin is not None:
-        L.append(f"- 끝 문턱: 짝 t ≤ −{fin['bound']:.3f} (짝 시드 {g['n_flight']}, 꼬리 몫 {fin['alpha2']:.5f}"
+        L.append(f"- 끝 문턱: 짝 t ≥ +{fin['bound']:.3f} (짝 시드 {g['n_flight']}, 꼬리 몫 {fin['alpha2']:.5f}"
                  + (f" = α − α₁ — 두 번 합 ≤ α. 참고 z 경계 c₂ {fin['c2']:.3f}·상관 ρ {fin['rho']:.3f} 로 옮긴 값 {fin['bound_z']:.3f} 은 쓰지 않음)"
                     if fin.get("rho") is not None else " — 중간에 α 를 쓰지 않아 옛 한 번 보기 문턱 그대로)"))
     act = {"futility": "기각(나아지지 않음) — 뒤 절반·게임 세계·끼임을 돌리지 않았다",
@@ -1748,14 +2156,32 @@ def fmt_seq(g: dict) -> str:
 
 
 def p1_head(g: dict) -> str:
-    """gate.md 머리의 1차 문턱 글: 중간 기각이면 그때 쓴 기각 경계(t ≥ seq_futility_t), 앞서 통과면 끝 문턱과 넘은 중간 경계, 아니면 끝 문턱."""
+    """gate.md 머리의 1차 문턱 글: 중간 기각이면 그때 쓴 기각 경계(t ≤ −seq_futility_t), 앞서 통과면 끝 문턱과 넘은 중간 경계, 아니면 끝 문턱."""
     if g.get("stage") == "interim_futility":
-        return f"1차 쫓긴 시간 앞 절반 짝 시드 {g['n_flight']}·중간 기각 경계 t ≥ {g['t_futility_flight']:g}"
-    s = f"1차 쫓긴 시간 시드 {g['n_flight']}·문턱 {g['t_crit_flight']:.3f}"
-    li = (g.get("criteria", {}).get("P1_N_chase") or {}).get("interim")
+        return f"1차 사건 숨음 비율 앞 절반 짝 시드 {g['n_flight']}·중간 기각 경계 {fut_bound_text(g['t_futility_flight'])}"
+    s = f"1차 사건 숨음 비율 시드 {g['n_flight']}·문턱 +{g['t_crit_flight']:.3f}"
+    li = (g.get("criteria", {}).get("P1_N_hide") or {}).get("interim")
     if g.get("stage") == "interim_efficacy" and li:
-        s += f" (중간 앞서 통과 경계 {li['bound']:.3f} 를 앞 시드 {li['n_int']} 에서 넘음)"
+        s += f" (중간 앞서 통과 경계 +{li['bound']:.3f} 를 앞 시드 {li['n_int']} 에서 넘음)"
     return s
+
+
+def fmt_gate_live(g: dict) -> str:
+    """gate.md 관문 표 (adapt.fmt_gate 와 같은 꼴 — 10-23: 보고만 칸(ok None — REPORT_N_*)은 통과 칸에 '— (보고만)'). 숨음·잡힘 비율 칸(사건·도망 단위)은 % 로."""
+    lines = ["| 기준 | 후보 | 지금 두뇌 | 차이 | t | 규칙 | 통과 |", "|---|---|---|---|---|---|---|"]
+    for k, v in g["criteria"].items():
+        if "diff" in v:
+            okt = "— (보고만)" if v["ok"] is None else ("예" if v["ok"] else "아니오")
+            if v.get("key") in HIDE_PAIR_NUM:                # 몫 (0~1) — %·%p
+                a, b, d, se = (f"{v['a'] * 100:.2f}%", f"{v['b'] * 100:.2f}%", f"{v['diff'] * 100:+.2f} %p", f"{v['se'] * 100:.2f}")
+                lines.append(f"| {k} | {a} | {b} | {d} ± {se} | {v['t']:+.2f} | {v['rule']} | {okt} |")
+            else:
+                lines.append(f"| {k} | {v['a']:.4f} | {v['b']:.4f} | {v['diff']:+.4f} ± {v['se']:.4f} | {v['t']:+.2f} | {v['rule']} | {okt} |")
+        else:
+            val = {x: y for x, y in v.items() if x not in ("ok", "rule")}
+            lines.append(f"| {k} | {json.dumps(val, ensure_ascii=False)} | | | | {v['rule']} | {'—' if v['ok'] is None else ('예' if v['ok'] else '아니오')} |")
+    lines += ["", f"**{g['verdict']}** — {g['why']}"]
+    return "\n".join(lines)
 
 
 def gate_md(rid: str, g: dict, cache_note: str = "") -> str:
@@ -1763,32 +2189,42 @@ def gate_md(rid: str, g: dict, cache_note: str = "") -> str:
     head = (f"# 실시간 관문 {rid}\n\n후보 `{g['candidate']}` 대 지금 두뇌 `{g['current']}` (규칙 LIVE_GATE.md, {g['profile']}, "
             f"판정 단계 {STAGE_KO.get(g.get('stage'), g.get('stage'))}, N 시드 {g['n']}·문턱 {g['t_crit']:.3f}, {p1_head(g)}"
             + (f", G 시드 {g['n_g']}·문턱 {g['t_crit_g']:.3f})" if g.get("n_g") else ", G 돌리지 않음)"))
-    return f"{head}\n\n{ad.fmt_gate(g)}\n{fmt_flight(g)}\n{fmt_seq(g)}\n" + (f"\n## 지금 두뇌 시험\n\n{cache_note}\n" if cache_note else "")
+    rr = fmt_route_report(g.get("route_report"))                     # 10-24 (8): 두 길 두뇌 판만 (관측 21 판은 이 절이 없다 — 옛 gate.md 그대로)
+    return (f"{head}\n\n{fmt_gate_live(g)}\n{fmt_flight(g)}\n" + (f"{rr}\n" if rr else "") + f"{fmt_seq(g)}\n"
+            + (f"\n## 지금 두뇌 시험\n\n{cache_note}\n" if cache_note else ""))
 
 
 def futility_gate(look: dict, check: dict | None, cand_n: dict, cur_n: dict) -> dict:
-    """중간 판정 기각(나아지지 않음)의 관문 결과 (gate_live 와 같은 꼴 — G·끼임·뒤 절반은 돌리지 않아 1차 P1 중간 짝과 N 앞 절반 도망 기록만)."""
-    p = flight_pair(cand_n, cur_n)
+    """중간 판정 기각(나아지지 않음)의 관문 결과 (gate_live 와 같은 꼴 — G·끼임·뒤 절반은 돌리지 않아 1차 P1 중간 짝(사건 숨음 비율)·앞 절반 사건 잡힘 비율·
+    옛 도망 단위 숨음·잡힘 비율·쫓긴 시간(보고만)과 N 앞 절반 도망 기록만)."""
+    p = episode_pair(cand_n, cur_n, "hide")
     k, n1, fut = look["n_int"], int(p["n"]), look["futility"]
+    q, qc = episode_pair(cand_n, cur_n, "caught"), flight_pair(cand_n, cur_n)
+    qh, qf = hide_pair(cand_n, cur_n, "hide"), hide_pair(cand_n, cur_n, "caught")
     c = {"R_check": r_check_criterion(check),
-         "P1_N_chase": dict(p, ok=False, rule=(f"N 중간 판정 (앞 시드 {k}/{look['n_total']}): 짝 t {tfmt(p['t'])} ≥ {tfmt(fut)} — 후보가 나아지는 쪽도 아니다 → 기각 "
-                                               f"(시드 {n1}, 빠진 시드 {len(p['dropped'])})"))}
-    why = (f"중간 판정 기각(나아지지 않음): 포만 없는 세계 앞 시드 {k}/{look['n_total']} 스스로 벗어난 도망의 쫓긴 시간 평균 후보 {p['a']:.2f}초 대 지금 "
-           f"{p['b']:.2f}초 (짝 t {tfmt(p['t'])}, 기각 경계 t ≥ {tfmt(fut)}, 짝 시드 {n1}, 빠진 시드 {len(p['dropped'])}) — 뒤 절반·게임 세계·끼임은 돌리지 않았다")
-    brief = f"중간 판정 — 1차 쫓긴 시간 {p['b']:.1f}→{p['a']:.1f}초 t {tfmt(p['t'], 1)} (나아지지 않음)"
-    return dict(verdict="기각", passed=False, why=why, brief=brief, summary=f"중간 판정 기각 — 포만 없는 세계 쫓긴 시간 {p['b']:.1f}→{p['a']:.1f}초 (t {tfmt(p['t'], 1)})",
-                note=f"쫓긴 시간 {p['b']:.1f}→{p['a']:.1f}초 t {tfmt(p['t'], 1)}",
+         "P1_N_hide": dict(p, ok=False, rule=(f"N 중간 판정 (앞 시드 {k}/{look['n_total']}): 사건 숨음 비율 짝 t {tfmt(p['t'])} — 기각 경계 {fut_bound_text(fut)} 안 "
+                                              f"— 후보가 나아지는 쪽도 아니다 → 기각 (시드 {n1}, 빠진 시드 {len(p['dropped'])})")),
+         "GH_flight_caught": dict(q, ok=None, rule=f"보고만 — 중간 기각이라 판정하지 않았다 (앞 시드 {k}, 사건 잡힘 비율 짝 시드 {q['n']})"),
+         "REPORT_N_flight_hide": dict(qh, ok=None, rule=f"보고만 (10-24 — 판정에 쓰지 않는다): N 앞 시드 {k} 옛 도망 단위 숨음 비율 (시드 {qh['n']})"),
+         "REPORT_N_flight_caught": dict(qf, ok=None, rule=f"보고만 (10-24 — 판정에 쓰지 않는다): N 앞 시드 {k} 옛 도망 단위 잡힘 비율 (시드 {qf['n']})"),
+         "REPORT_N_chase": dict(qc, ok=None, rule=f"보고만 (10-23 — 판정에 쓰지 않는다): N 앞 시드 {k} 쫓긴 시간 평균 초 (시드 {qc['n']})")}
+    why = (f"중간 판정 기각(나아지지 않음): 포만 없는 세계 앞 시드 {k}/{look['n_total']} 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율) 후보 {pct(p['a'], 2)} 대 지금 "
+           f"{pct(p['b'], 2)} (짝 t {tfmt(p['t'])}, 기각 경계 {fut_bound_text(fut)}, 짝 시드 {n1}, 빠진 시드 {len(p['dropped'])}) — 뒤 절반·게임 세계·끼임은 돌리지 않았다")
+    brief = f"중간 판정 — 1차 사건 숨음 비율 {pct(p['b'])}→{pct(p['a'])} t {tfmt(p['t'], 1)} (나아지지 않음)"
+    return dict(verdict="기각", passed=False, why=why, brief=brief, summary=f"중간 판정 기각 — 포만 없는 세계 사건 숨음 비율 {pct(p['b'])}→{pct(p['a'])} (t {tfmt(p['t'], 1)})",
+                note=f"사건 숨음 비율 {pct(p['b'])}→{pct(p['a'])} t {tfmt(p['t'], 1)}",
                 n=int(k), t_crit=t_crit(int(k) - 1), n_g=0, t_crit_g=NAN, n_flight=n1, dropped_flight=p["dropped"],
-                t_crit_flight=NAN, t_futility_flight=float(fut),     # 통과 문턱은 쓰지 않았다 — 판정을 정한 것은 중간 기각 경계(t ≥ fut)
-                criteria=c, report=dict(flight=dict(N=dict(candidate=flight_pooled(cand_n), current=flight_pooled(cur_n)))),
-                rules={k_: v for k_, v in LIVE.items()},
+                t_crit_flight=NAN, t_futility_flight=float(fut),     # 통과 문턱은 쓰지 않았다 — 판정을 정한 것은 중간 기각 경계(t ≤ −fut)
+                criteria=c, report=dict(flight=dict(N=dict(candidate=flight_pooled(cand_n), current=flight_pooled(cur_n)))), criterion=GATE_CRITERION,
+                unit="episode", rules={k_: v for k_, v in LIVE.items()},
                 live_gate_md_sha256=hashlib.sha256(LIVE_GATE_MD.read_bytes()).hexdigest() if LIVE_GATE_MD.exists() else None)
 
 
 def judge_candidate(info: dict, cand: Path, cur: dict, plan: dict, check: dict | None, st=None, runner=None) -> dict:
     """후보 판정 + 관문 (LIVE_GATE.md 5절·5-3, 변경 기록 (4) 두 번 보기). cur = 지금 두뇌 판 {'current:N'(N 판정 시드 모두), 'current:G', 'current:stuck'}.
     runner(items, on_done) → [(꼬리표, 결과)] (기본 eval_runner — 부르는 쪽이 워커 풀 하나를 열어 넘긴다).
-    1) N 판정 시드 앞 n_int 개(LIVE seq_interim_frac)만 후보를 돌려 중간 판정(seq_interim): 기각(나아지지 않음) → G·끼임·뒤 절반 없이 기각.
+    1) N 판정 시드 앞 n_int 개(LIVE seq_interim_frac)만 후보를 돌려 중간 판정(seq_interim — 1차 사건 숨음 비율 짝, 변경 기록 (6)·(7)): 기각(나아지지 않음:
+       짝 t ≤ 0) → G·끼임·뒤 절반 없이 기각.
     2) 그 밖이면 뒤 절반 + G·끼임 → 전체로 관문, 1차 = 끝 문턱(seq_final_bound — 앞서 통과를 끈 기본이면 옛 한 번 보기 문턱 그대로). 지킴은 그대로.
        앞서 통과를 켜고 중간에 그 경계를 넘었으면(stage interim_efficacy) 1차는 그것으로 통과지만, 지킴은 똑같이 N 전체·G 전체·끼임으로 본다
        (앞 절반만으로 지킴을 보면 뒤 절반의 나빠짐·은신처 안 잡힘을 놓쳐 관문이 느슨해진다 — 10-21 검토).
@@ -1821,8 +2257,11 @@ def judge_candidate(info: dict, cand: Path, cur: dict, plan: dict, check: dict |
     def stk(cnd: dict) -> dict:
         return dict(current=cur.get("current:stuck"), candidate=cnd.get("candidate:stuck"))
 
-    def out(g, cnd, stage, complete, look=None) -> dict:
+    def out(g, cnd, stage, complete, look=None, cur_n=None) -> dict:
         g.update(stage=stage, seq=look)
+        rr = route_report(cnd["candidate:N"], cur["current:N"] if cur_n is None else cur_n)   # 10-24 (8) 길 보고 (두 길 판만 — 관문 칸 아님)
+        if rr is not None:
+            g["route_report"] = rr
         return dict(gate=g, cand=cnd, raw=raw, stage=stage, complete=complete, ran=ran, times=times)
 
     k = seq_sizes(len(judge))
@@ -1833,17 +2272,17 @@ def judge_candidate(info: dict, cand: Path, cur: dict, plan: dict, check: dict |
     first, second = judge[:k], judge[k:]
     cnd = run("N1", eval_items(info, "candidate", cand, first, H, "N"), f"후보 판정 앞 절반 (시드 {k}/{len(judge)})")
     cur_n1 = subset(cur["current:N"], first)
-    look = seq_interim(flight_pair(cnd["candidate:N"], cur_n1), len(judge), k)
+    look = seq_interim(episode_pair(cnd["candidate:N"], cur_n1, "hide"), len(judge), k)
     look["seeds_int"] = [first[0], first[-1]]
-    print(f"중간 판정 (앞 시드 {k}/{len(judge)}): 쫓긴 시간 지금 {look['b']:.2f}초 → 후보 {look['a']:.2f}초, 짝 t {tfmt(look['t'])} (짝 시드 {look['n1']}) "
-          f"— 기각 경계 t ≥ {look['futility']}, 앞서 통과 경계 " + (f"t ≤ −{look['bound']:.3f}" if math.isfinite(look["bound"]) else "끔") + f" → {look['action']}",
-          flush=True)
+    print(f"중간 판정 (앞 시드 {k}/{len(judge)}): 사건 숨음 비율 지금 {pct(look['b'], 2)} → 후보 {pct(look['a'], 2)}, 짝 t {tfmt(look['t'])} (짝 시드 {look['n1']}) "
+          f"— 기각 경계 {fut_bound_text(look['futility'])}, 앞서 통과 경계 "
+          + (f"t ≥ +{look['bound']:.3f}" if math.isfinite(look["bound"]) else "끔") + f" → {look['action']}", flush=True)
     if look["action"] == "futility":
         g = futility_gate(look, check, cnd["candidate:N"], cur_n1)
         if st is not None:
-            st.set(state="gating", message=f"중간 판정: 기각(나아지지 않음) — 쫓긴 시간 {look['b']:.1f}→{look['a']:.1f}초 t {tfmt(look['t'], 1)}", progress=-1.0)
-        return out(g, cnd, "interim_futility", False, look)
-    # 앞서 통과(켰을 때)여도 지킴(GN·GF·GV·GC·G4 의 N 몫)은 뒤 절반까지 N 전체로 봐야 느슨해지지 않는다 — 뒤 절반·G·끼임을 끝까지 돌린다(10-21 검토)
+            st.set(state="gating", message=f"중간 판정: 기각(나아지지 않음) — 사건 숨음 비율 {pct(look['b'])}→{pct(look['a'])} t {tfmt(look['t'], 1)}", progress=-1.0)
+        return out(g, cnd, "interim_futility", False, look, cur_n=cur_n1)
+    # 앞서 통과(켰을 때)여도 지킴(GH·GN·GF·GE·GV·GC·G4 의 N 몫)은 뒤 절반까지 N 전체로 봐야 느슨해지지 않는다 — 뒤 절반·G·끼임을 끝까지 돌린다(10-21 검토)
     early = look["action"] == "efficacy"
     if early:
         print("중간 판정: 1차 앞서 통과 경계를 넘음 — 1차는 통과로 정하고 지킴은 뒤 절반까지 전체로 본다", flush=True)
@@ -1864,7 +2303,9 @@ def export_brain(model: Path, brains: Path, round_no: int, attempt: int, rid: st
                  play_id: str = "") -> dict:
     """두뇌 파일 brains/live_r<판>_<시도 이름>.json 을 쓴다: model.name = live_r<판>_<시도 이름>(언리얼 id = <이름>@<sha8>), adapt 블록(명세 3절).
     play_id = 스냅숏의 Play 번호 (언리얼은 적응 고리 Play 마다 새 번호를 정하고, 다른 Play 의 번호가 적힌 두뇌는 받지 않는다 — 앞 Play 에서 시작한 판이 늦게 끝난 경우).
-    <이름>.json.tmp 에 써서 다시 읽어 확인(sha256·골든·행동·유한, 관측 21 계약)한 뒤에만 os.replace. 같은 이름이 있으면 쓰지 않는다."""
+    <이름>.json.tmp 에 써서 다시 읽어 확인(sha256·골든·행동·유한, 계약)한 뒤에만 os.replace. 같은 이름이 있으면 쓰지 않는다.
+    10-24 (변경 기록 (8)): 계약 확인 = 모델 계약이 두뇌 묶음(PROFILES — 관측 21, 관측 24 · 판 5)에 있고 파일의 계약 해시·관측 수·마스크 판이 그 묶음과 같다.
+    골든 세계는 모델 관측·마스크 판으로 고른다(판 5 면 판 5 거울 — export_weights_v3.brain_golden_config_for)."""
     import torch as th
 
     import export_weights_v3 as ex
@@ -1875,11 +2316,13 @@ def export_brain(model: Path, brains: Path, round_no: int, attempt: int, rid: st
     final, tmp = brains / f"{name}.json", brains / f"{name}.json.tmp"
     if final.exists():
         raise FileExistsError(f"두뇌 파일 {final} 이 이미 있다 — 같은 이름은 덮지 않는다")
+    want_c = zip_contract(Path(model))
+    prof = profile_of(want_c)
     prev = th.get_num_threads()
     th.set_num_threads(1)
     try:
         m = ex.load_model(Path(model))
-        d = ex.brain_dict(m, Path(model), ex.brain_golden_config_for(m.policy.rep_obs_names),
+        d = ex.brain_dict(m, Path(model), ex.brain_golden_config_for(m.policy.rep_obs_names, int(getattr(m.policy, "rep_mask_version", 1))),
                           world_label=f"실시간 적응 {rid} (포만 없는 스냅숏 세계 T)")
     finally:
         th.set_num_threads(prev)
@@ -1894,7 +2337,10 @@ def export_brain(model: Path, brains: Path, round_no: int, attempt: int, rid: st
         ex.write_brain_file(tmp, d)
         v = ad.verify_brain_file(tmp)
         back = read_json(tmp) or {}
-        v["contract_ok"] = bool(back.get("contract_hash") == CONTRACT_OBS21 and int(back.get("obs_dim", 0)) == 21)
+        v["contract_ok"] = bool(back.get("contract_hash") == want_c and int(back.get("obs_dim", 0)) == prof["obs_dim"]
+                                and int(back.get("mask_version", 0)) == prof["mask_version"])
+        v.update(contract_hash=back.get("contract_hash"), obs_dim=back.get("obs_dim"), mask_version=back.get("mask_version"), profile=prof["name"],
+                 golden_world=(back.get("golden") or {}).get("world_config"))
         v["adapt_ok"] = back.get("adapt") == d["adapt"] and (back.get("model") or {}).get("name") == name
         v["ok"] = bool(v["ok"] and v["finite"] and v["contract_ok"] and v["adapt_ok"])
         if not v["ok"]:
@@ -1949,12 +2395,16 @@ def plan_from_args(a) -> dict:
                                                 "flight_cost")) \
         or pl["skip_check"] \
         or pl["force_export"]
-    if pl["test"] and Path(a.root).resolve() == DEFAULT_ROOT.resolve():
+    if pl["test"] and is_real_root(a.root):
         raise SystemExit("시험 크기·시험 깃발은 --root 로 실제 폴더(Saved/EcoAdapt)가 아닌 곳을 줄 때만 쓴다 — 미리 적은 관문이 아니다")
-    if not LIVE["flight_sizes_confirmed"] and Path(a.root).resolve() == DEFAULT_ROOT.resolve():
-        raise SystemExit("1차 쫓긴 시간 기준의 크기(H·n·S·K·δ·도주 비용)를 아직 예비 측정으로 확정하지 않았다 (LIVE flight_sizes_confirmed 거짓, "
-                         "LIVE_GATE.md 변경 기록 (3)) — 확정해 LIVE_GATE.md 와 LIVE 에 먼저 적기 전에는 실제 폴더에서 판·감시를 돌리지 않는다. "
+    if not LIVE["flight_sizes_confirmed"] and is_real_root(a.root):
+        raise SystemExit("1차 사건 숨음 비율 기준의 크기(H·n·S·K·δ_H·도주 비용)를 아직 예비 측정으로 확정하지 않았다 (LIVE flight_sizes_confirmed 거짓, "
+                         "LIVE_GATE.md 변경 기록 (3)·(6)·(7)) — 확정해 LIVE_GATE.md 와 LIVE 에 먼저 적기 전에는 실제 폴더에서 판·감시를 돌리지 않는다. "
                          "시험은 --root 로 다른 폴더를 준다")
+    try:
+        require_gate_records()                               # 10-23·10-24: 판정 실행기가 숨은 뒤 지켜보기·쫓김 사건을 세지 못하면 판·감시를 시작하지 않는다
+    except ValueError as e:
+        raise SystemExit(str(e)) from None
     return pl
 
 
@@ -2041,7 +2491,7 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
                message=f"변환 중 — 시도 {attempt}, 환경 #{e['revision']}")
         st.start_heartbeat()                                 # 재현 확인·판정처럼 긴 단계에서도 HEARTBEAT_S 마다 다시 쓴다
         try:
-            info = prepare(snap_path, snap, rd, brain_folders(root), flight_cost=plan["flight_cost"])
+            info = prepare(snap_path, snap, rd, brain_folders(root), flight_cost=plan["flight_cost"], real_root=is_real_root(root))
         except ad.Refused as ex_:
             res.update(state="refused", why=str(ex_), last_result=f"거부: {short(ex_, 60)}")
             mark("convert", t0)
@@ -2049,8 +2499,9 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         mark("convert", t0)
         start = Path(ad.ROOT / info["record"]["anchor"])
         res["start"] = info["record"]["anchor"]
-        print(f"시도 {attempt} ({rid}): 스냅숏 {Path(snap_path).name} · 환경 #{e['revision']} {env_txt} · 두뇌 {snap['brain'].get('id')} → 시작 {res['start']}",
-              flush=True)
+        res["brain_profile"] = info["record"]["live"]["profile"]     # 10-24 (8) 두뇌 묶음 (obs21 · route5 — 판정 크기 이름 gate profile 과 다르다)
+        print(f"시도 {attempt} ({rid}): 스냅숏 {Path(snap_path).name} · 환경 #{e['revision']} {env_txt} · 두뇌 {snap['brain'].get('id')} → 시작 {res['start']} "
+              f"(묶음 {res['brain_profile']} — {info['record']['live']['profile_label']})", flush=True)
 
         # R 재현 확인 (환경·두뇌가 처음 그대로일 때만)
         ok_r, why_r = r_applicable(snap)
@@ -2076,6 +2527,7 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         procs = launch_training(info, rd, start, rid, plan["model_seeds"], plan["steps"], plan["steps"], plan["ckpt"])
         judge, judge_g = seeds_of(plan["judge"]), seeds_of(plan["judge_g"])
         kind = str(LIVE["evaluator"])
+        require_gate_records(kind)                           # 10-23·10-24: 숨은 뒤 지켜보기(HIDE_WATCH)·쫓김 사건(EPISODE)을 세지 못하는 실행기는 판정 전에 거부한다
         groups = [("N", eval_items(info, "current", start, judge, H, "N")), ("G", eval_items(info, "current", start, judge_g, HG, "G")),
                   ("stuck", stuck_items(info, "current", start, seeds_of(plan["stuck"]), HG))]
         keys, hits, cache_rows = {}, {}, {}
@@ -2132,7 +2584,7 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         if not okr:
             raise RuntimeError("학습에 성공한 후보가 없다: " + ", ".join(f"s{r['seed']} rc {r['rc']}" for r in rows))
 
-        # 후보 고르기 (K > 1 — N 세계 고르기 시드, 스스로 벗어난 도망의 쫓긴 시간 최저 → 잡힌 몫 → 굶은 몫 → 모델 시드. 10-21 (3) 뒤 1차와 같은 잣대)
+        # 후보 고르기 (K > 1 — N 세계 고르기 시드, 숨음 비율(쫓긴 도망 가운데, 전체 합) 최고 → 잡힌 몫 → 굶은 몫 → 모델 시드. 10-23 (6) 뒤 1차와 같은 잣대)
         import r4_eval as re_
 
         if len(okr) > 1:
@@ -2147,11 +2599,12 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
             srows = []
             for r in okr:
                 p = re_.pooled(sres[f"s{r['seed']}:N"])
-                fs = flight_pooled(sres[f"s{r['seed']}:N"])["own_contact_s"]
-                srows.append(dict(seed=r["seed"], model=r["model"], flight_s=fs, caught=p["caught"], starved=p["starved"], alive=p["alive"]))
-            srows.sort(key=lambda x: (x["flight_s"] if x["flight_s"] == x["flight_s"] else math.inf, x["caught"], x["starved"], x["seed"]))
-            atomic_write_json(rd / "select.json", dict(chosen=srows[0]["model"], rule="N 세계 고르기 시드 쫓긴 시간(스스로 벗어난 도망) 최저 → 잡힌 몫 → 굶은 몫 → 모델 시드",
-                                                        rows=srows))
+                fp = flight_pooled(sres[f"s{r['seed']}:N"])
+                srows.append(dict(seed=r["seed"], model=r["model"], hide_share=fp["ep_hide_share"], flight_hide_share=fp["hide_share"],
+                                  flight_s=fp["own_contact_s"], caught=p["caught"], starved=p["starved"], alive=p["alive"]))
+            srows.sort(key=lambda x: (-x["hide_share"] if x["hide_share"] == x["hide_share"] else math.inf, x["caught"], x["starved"], x["seed"]))
+            atomic_write_json(rd / "select.json", dict(chosen=srows[0]["model"], rule="N 세계 고르기 시드 사건 숨음 비율(쫓긴 사건 가운데 숨음 사건 — 10-24, "
+                                                                                         "전체 합) 최고 → 잡힌 몫 → 굶은 몫 → 모델 시드", rows=srows))
             cand = Path(srows[0]["model"])
             mark("select", t0)
         else:
@@ -2177,14 +2630,14 @@ def run_round(snap_path: Path, root: Path, attempt: int, rid: str, plan: dict, s
         # 관문 (판정은 judge_candidate 가 했다 — 여기서는 기록)
         t0 = time.perf_counter()
         st.set(state="gating", message=f"관문 — {STAGE_KO[jc['stage']]}", progress=-1.0)
-        g.update(candidate=ad._rel(cand), current=ad._rel(start), plan=plan_record(plan), current_cache=cache_rows,
+        g.update(candidate=ad._rel(cand), current=ad._rel(start), plan=plan_record(plan), current_cache=cache_rows, brain_profile=res["brain_profile"],
                  profile="시험 크기 (관문 상수 아님 — 판정 아님)" if plan["test"] else "LIVE_GATE.md 관문 상수")
         atomic_write_json(rd / "gate.json", g)
         cache_note = cache_note_md(cache_rows, reuse)
         (rd / "gate.md").write_text(gate_md(rid, g, cache_note), encoding="utf-8", newline="\n")
         mark("gate", t0)
         res.update(verdict=g["verdict"], why=g["why"], gate_summary=g["summary"], stage_note=g.get("note", ""))
-        print(f"1차 P1 쫓긴 시간: 짝 시드 {g['n_flight']}/{g['n']} (두 두뇌 모두 스스로 벗어난 도망이 없어 빠진 시드 {len(g['dropped_flight'])}) — "
+        print(f"1차 P1 사건 숨음 비율: 짝 시드 {g['n_flight']}/{g['n']} (두 두뇌 가운데 하나라도 쫓긴 사건이 없어 빠진 시드 {len(g['dropped_flight'])}) — "
               f"{STAGE_KO[jc['stage']]}", flush=True)
         print(f"관문 {g['verdict']} — {g['why']}", flush=True)
         if not g["passed"] and not plan["force_export"]:
@@ -2550,11 +3003,17 @@ def cmd_watch(a) -> int:
     try:
         w = Watcher(Path(a.root), pl, new_only=not a.existing)
         w.log(f"감시 시작: {w.snapdir} (워커 {pl['workers']}, 학습 {fmt_steps(pl['steps'])} × 모델 {len(pl['model_seeds'])}, 판정 시드 "
-              f"N {pl['judge'][0]}~{pl['judge'][1]} × {pl['horizon']} 스텝 · G {pl['judge_g'][0]}~{pl['judge_g'][1]} × {pl['horizon_g']} 스텝, 1차 = 쫓긴 시간"
+              f"N {pl['judge'][0]}~{pl['judge'][1]} × {pl['horizon']} 스텝 · G {pl['judge_g'][0]}~{pl['judge_g'][1]} × {pl['horizon_g']} 스텝, 1차 = 사건 숨음 비율"
               + (", 도주 비용 {:g}".format(pl["flight_cost"]) if pl["flight_cost"] > 0 else "") + (", 시험 크기)" if pl["test"] else ")"))
         k = seq_sizes(len(seeds_of(pl["judge"])))
         w.log(("중간 판정 앞 " + f"{k}/{len(seeds_of(pl['judge']))} 시드" if k else "한 번 보기") + f", 판정 실행기 {LIVE['evaluator']}"
-              + (", 지금 두뇌 판정 다시 쓰기 켬" if LIVE["cache_current"] else ""))
+              + (", 지금 두뇌 판정 다시 쓰기 켬" if LIVE["cache_current"] else "")
+              + (f", 1차 최소 차이 +{float(LIVE['hide_min_effect']) * 100:g}%p" if float(LIVE["hide_min_effect"]) > 0 else ""))
+        if is_real_root(a.root):                            # 10-27 (변경 기록 (10)): 실제 폴더는 크기를 확정한 두뇌 묶음의 지금 두뇌만 받는다
+            ok_p = [f"{p['name']} ({p['label']})" for p in PROFILES.values() if p.get("sizes_confirmed")]
+            no_p = [p["name"] for p in PROFILES.values() if not p.get("sizes_confirmed")]
+            w.log("실제 폴더: 판을 돌리는 지금 두뇌 묶음 = " + (", ".join(ok_p) or "없음")
+                  + (f" — 그 밖({', '.join(no_p)}{' — 내장 R1b-F 포함, 10-29 부터 게임 기본은 판 5 R7e' if 'obs21' in no_p else ''})은 거부" if no_p else ""))
         try:
             while True:
                 try:
@@ -2598,8 +3057,12 @@ def pilot_pair(a: dict, b: dict, h: int) -> dict:
 
 
 def pilot_flight_pair(a: dict, b: dict, h: int) -> dict:
-    """a − b 쫓긴 시간 짝 차이 (판정 길이 h, 관문 1차 P1 과 같은 셈 `flight_pair` — 빠진 시드 dropped): 평균·sd(시드마다 차이)·t, 그 sd 로
-    0.25·0.5·1 초를 5%·검정력 80% 로 가를 시드 수, 지킴 GF·GV·GC 와 같은 셈의 짝 차이(starts·flee·unsafe)."""
+    """a − b 도망 짝 차이 (판정 길이 h — 끊은 기록 at[h].flight): 쫓긴 시간(보고 — `flight_pair`, 빠진 시드 dropped)의 평균·sd(시드마다 차이)·t, 그 sd 로
+    0.25·0.5·1 초를 5%·검정력 80% 로 가를 시드 수, 지킴 GF·GV·GC 와 같은 셈의 짝 차이(starts·flee·unsafe). 10-23 (변경 기록 (6)): hide = 1차 P1 숨음 비율
+    (`hide_pair` 'hide')·hide_caught = 지킴 GH 잡힘 비율 짝 — 평균·sd·t·시드(빠짐), 숨음 비율은 2·5·10 %p 를 가를 시드 수도 (판정 길이 h 에서 끊을 때
+    아직 지켜보는 도망은 지켜본 만큼 — 숨음으로 센다). 10-23 의 hide·hide_caught 는 10-24 부터 옛 도망 단위(보고만)다.
+    10-24 (변경 기록 (7)): 두 판 모두 쫓김 사건(flight.episode)이 있으면 ep_hide = 1차 P1 사건 숨음 비율(`episode_pair` 'hide' — 2·5·10 %p 가를 시드 수도)·
+    ep_caught = 지킴 GH 사건 잡힘 비율·ep_starts = 지킴 GE(1000 산 사슴-스텝당 사건 시작) 짝도 낸다."""
     A, B = at_horizon(a, h), at_horizon(b, h)
     p = flight_pair(A, B)
     sd = float(p["se"] * math.sqrt(p["n"])) if p["n"] > 1 else NAN
@@ -2608,6 +3071,23 @@ def pilot_flight_pair(a: dict, b: dict, h: int) -> dict:
     for key in ("starts", "flee", "unsafe"):
         q = flight_rate_pair(A, B, key)
         guards[key] = dict(a=q["a"], b=q["b"], diff=q["diff"], t=q["t"], n=q["n"])
+    for name, key in (("hide", "hide"), ("hide_caught", "caught")):
+        q = hide_pair(A, B, key)
+        qsd = float(q["se"] * math.sqrt(q["n"])) if q["n"] > 1 else NAN
+        guards[name] = dict(a=q["a"], b=q["b"], diff=q["diff"], t=q["t"], n=q["n"], sd=qsd, dropped=q["dropped"])
+        if name == "hide":
+            guards[name]["n_needed"] = {f"{d * 100:g}%p": (int(math.ceil(((_Z975 + 0.8416) * qsd / d) ** 2)) if qsd == qsd else None)
+                                        for d in (0.02, 0.05, 0.10)}
+    if all(has_episode(flight_of(w)) for w in A["worlds"] + B["worlds"]):
+        for name, key in (("ep_hide", "hide"), ("ep_caught", "caught")):
+            q = episode_pair(A, B, key)
+            qsd = float(q["se"] * math.sqrt(q["n"])) if q["n"] > 1 else NAN
+            guards[name] = dict(a=q["a"], b=q["b"], diff=q["diff"], t=q["t"], n=q["n"], sd=qsd, dropped=q["dropped"])
+            if name == "ep_hide":
+                guards[name]["n_needed"] = {f"{d * 100:g}%p": (int(math.ceil(((_Z975 + 0.8416) * qsd / d) ** 2)) if qsd == qsd else None)
+                                            for d in (0.02, 0.05, 0.10)}
+        q = flight_rate_pair(A, B, "episodes")
+        guards["ep_starts"] = dict(a=q["a"], b=q["b"], diff=q["diff"], t=q["t"], n=q["n"])
     return dict(p, sd=sd, n_needed=need, **guards)
 
 
@@ -2645,8 +3125,9 @@ def scale_summary(rows: list, train_yaml: Path) -> dict:
 
 
 def cmd_pilot(a) -> int:
-    """예비 측정 (명세 6절 — LIVE_GATE.md 변경 기록 (3) 뒤 '쫓긴 시간' 기준): 지금 두뇌 대 R5 s3·--extra-models 두뇌(N·G, 판정 길이마다 — 잡힘과
-    쫓긴 시간의 시드마다 짝 차이 sd, 0.25·0.5·1 초를 가를 시드 수, 지킴 GF·GV·GC 차이, 끝 까닭 몫), T 세계 measure-fdec, 도주 비용 기준 크기(scale),
+    """예비 측정 (명세 6절 — LIVE_GATE.md 변경 기록 (6) 뒤 '숨음 비율' 기준, (3) 쫓긴 시간은 보고): 지금 두뇌 대 R5 s3·--extra-models 두뇌(N·G, 판정 길이마다 —
+    잡힘·숨음 비율·잡힘 비율(쫓긴 도망)·쫓긴 시간의 시드마다 짝 차이 sd, 숨음 비율 2·5·10 %p·쫓긴 시간 0.25·0.5·1 초를 가를 시드 수, 지킴 GF·GV·GC 차이,
+    끝 까닭 몫), T 세계 measure-fdec, 도주 비용 기준 크기(scale),
     --flight-cost 값마다 K 모델 × S 후보 대 지금 두뇌, 단계별 시간. 시드 34900~34999 만 쓴다 (관문 시드 35000~35199 는 쓰지 않는다). 결과로 LIVE_GATE.md
     크기를 고른다 — 판정이 아니다."""
     import r4_eval as re_
@@ -2689,7 +3170,10 @@ def cmd_pilot(a) -> int:
     res: dict = {}
     out_rows: dict = dict(pilot=pid, snapshot=Path(a.snapshot).name, seeds=list(seeds_lh), cand_seeds=list(cand_lh), horizons=hs, steps=S_list,
                           model_seeds=K, flight_costs=fcs, extra_models={k: path_text(v) for k, v in extras.items()}, workers=W, times=times,
-                          criterion="1차 = 포만 없는 세계 스스로 벗어난 도망의 쫓긴 시간 (LIVE_GATE.md 변경 기록 (3))")
+                          profile=info["record"]["live"]["profile"], f_dec_recipe=float(info["record"]["live"]["f_dec"]),
+                          criterion=("1차 = 포만 없는 세계 쫓긴 사건 가운데 숨음 사건 몫 — 사건 숨음 비율, 지킴 GH = 쫓긴 사건 가운데 잡힘 사건 몫, GE = "
+                                     "1000 산 사슴-스텝당 사건 시작 (LIVE_GATE.md 변경 기록 (7) — 쫓김 사건). 도망 단위 숨음·잡힘 비율(변경 기록 (6))·"
+                                     "쫓긴 시간(변경 기록 (3))은 보고만"))
     try:
         t_train = time.perf_counter()
         if "cands" in parts:
@@ -2708,7 +3192,8 @@ def cmd_pilot(a) -> int:
             fproc = subprocess.Popen(fcmd, cwd=str(ROOT), stdout=fh, stderr=subprocess.STDOUT, env=dict(os.environ, PYTHONUTF8="1"), **own_group())
         busy = len(procs) + (1 if fproc is not None else 0)
         seeds = seeds_of(seeds_lh)
-        models = {"current": start, "r5": R5S3} | extras
+        # 'r5' 견줌(R5 s3 — 관측 21·판 2)은 관측 21 묶음 판만 (10-24 (8): 판 5 지금 두뇌의 세계에는 판 2 두뇌를 걸 수 없다 — 마스크 판이 다르다)
+        models = {"current": start} | ({"r5": R5S3} if info["record"]["live"].get("profile", "obs21") == "obs21" else {}) | extras
         if "brains" in parts or "scale" in parts:
             items = []
             if "brains" in parts:
@@ -2830,22 +3315,50 @@ def fmt_pilot(r: dict) -> str:
 
     def causes(f):
         own, oth, uns = flight_groups(f)
-        return (f"{f['starts_per_1k']:.2f} | {f['own_contact_s']:.2f} | {cause_parts(f, own)} | {cause_parts(f, oth)} | {cause_parts(f, uns)} | "
-                f"{pct(f['shelter_end_share'])} | {pct(f['flee_share'])} | {pct(f['self_flee_share'])}")
+        return (f"{f['starts_per_1k']:.2f} | {f['chased']} | {pct(f['hide_share'])} | {pct(f['caught_share_chased'])} | {pct(f['cover_share_chased'])} | "
+                f"{f['cover_then_caught']}·{f['cover_then_starved']} | {f['own_contact_s']:.2f} | {cause_parts(f, own)} | {cause_parts(f, oth)} | "
+                f"{cause_parts(f, uns)} | {pct(f['shelter_end_share'])} | {pct(f['flee_share'])} | {pct(f['self_flee_share'])}")
+
+    def hide(f, hk="hide", ck="hide_caught"):
+        h, q = f[hk], f[ck]
+        return (f"{pct(h['b'], 2)} | {pct(h['a'], 2)} | {tfmt(h['diff'] * 100)} %p | {h['sd'] * 100:.2f} | {tfmt(h['t'])} | {h['n']} ({len(h['dropped'])}) | "
+                f"{' · '.join('—' if v is None else str(v) for v in h['n_needed'].values())} | {tfmt(q['diff'] * 100)} %p ({tfmt(q['t'])})")
 
     def guards(f):
         return " · ".join(f"{tfmt(f[k]['diff'], nd)} ({tfmt(f[k]['t'])})" for k, nd in (("starts", 2), ("flee", 4), ("unsafe", 4)))
 
-    head_c = ("| 두뇌 | 세계 | 길이 | 시작 /1000 산 사슴-스텝 | 쫓긴 시간 초 (스스로 벗어남, 전체 합) | 스스로 벗어남 (은신처·원판·시야각·반경) | "
-              "그 밖 살아 끝남 (바꿈·그만둠·끝까지·안 쫓김) | 잡힘·굶음·잘림 | 은신처에서 끝 | 실행 FLEE 몫 (반사 포함) | 스스로 고른 FLEE 몫 |",
-              "|---|---|---|---|---|---|---|---|---|---|---|")
+    head_c = ("| 두뇌 | 세계 | 길이 | 시작 /1000 산 사슴-스텝 | 쫓긴 도망 | 숨음 비율 (쫓긴 도망 가운데, 전체 합) | 잡힘 비율 (쫓긴 도망 가운데) | "
+              "은신처 끝 몫 (쫓긴 도망 가운데 — 지켜보기 전) | 은신처 끝 뒤 10 초 안 잡힘·굶음 | 쫓긴 시간 초 (보고 — 스스로 벗어남, 전체 합) | "
+              "스스로 벗어남 (은신처·원판·시야각·반경) | 그 밖 살아 끝남 (바꿈·그만둠·끝까지·안 쫓김) | 잡힘·굶음·잘림 | 은신처에서 끝 | 실행 FLEE 몫 (반사 포함) | "
+              "스스로 고른 FLEE 몫 |",
+              "|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|")
     L = [f"# 실시간 고리 예비 측정 {r['pilot']} (보고만 — 관문 크기를 고르는 자료, 시드 {r['seeds'][0]}~{r['seeds'][1]})", "",
          f"- 기준: {r.get('criterion', '')}. 끝 까닭 몫은 시작한 도망 가운데, 끝 까닭 표는 전체 합(정의 env_v2/world.py '야생 1단계' (w3) 도망 기록)",
          f"- 스냅숏 {r['snapshot']}, 워커 {r['workers']}, 더 견줄 두뇌 {r.get('extra_models') or {}}, 도주 비용 후보 {r.get('flight_costs')}",
          f"- 시간 {json.dumps(r['times'], ensure_ascii=False)}",
-         f"- T 세계(늑대 포만 끔, 스냅숏 먹이 지도) f_dec = {r.get('f_dec_T')} (R5 조리법 값 0.858922)", ""]
+         f"- T 세계(늑대 포만 끔, 스냅숏 먹이 지도) f_dec = {r.get('f_dec_T')} ("
+         + (f"학습에 쓴 조리법 값 {r['f_dec_recipe']:g} — 두뇌 묶음 {r.get('profile')}" if r.get("f_dec_recipe") is not None else "R5 조리법 값 0.858922") + ")", ""]
     if r.get("vs_current"):
-        L += ["## 두뇌 − 지금 두뇌 (시드마다 짝 차이 — 1차 P1·지킴 GF·GV·GC 와 같은 셈)", "",
+        if any("ep_hide" in x["flight"] for by in r["vs_current"].values() for hh in by.values() for x in hh.values()):
+            L += ["## 두뇌 − 지금 두뇌: 1차 사건 숨음 비율·지킴 GH·GE (시드마다 짝 차이 — 관문과 같은 셈, 10-24 변경 기록 (7) 쫓김 사건)", "",
+                  "| 두뇌 | 세계 | 길이(스텝) | 사건 숨음 비율 지금 | 두뇌 | 차이 | sd (%p) | t | 시드 (빠짐) | 2·5·10 %p 가를 시드 수 | 사건 잡힘 비율 차이 (t) | "
+                  "GE 사건 시작/1000 차이 (t) |", "|---|---|---|---|---|---|---|---|---|---|---|---|"]
+            for t, by in r["vs_current"].items():
+                for w, hh in by.items():
+                    for h, x in hh.items():
+                        if "ep_hide" in x["flight"]:
+                            ge = x["flight"]["ep_starts"]
+                            L.append(f"| {t} | {w} | {h} | {hide(x['flight'], 'ep_hide', 'ep_caught')} | {tfmt(ge['diff'], 4)} ({tfmt(ge['t'])}) |")
+            L.append("")
+        L += ["## 두뇌 − 지금 두뇌: 도망 단위 숨음 비율·잡힘 비율 (시드마다 짝 차이 — 10-23 변경 기록 (6) 의 1차·GH 셈, 10-24 부터 보고만)", "",
+              "| 두뇌 | 세계 | 길이(스텝) | 숨음 비율 지금 | 두뇌 | 차이 | sd (%p) | t | 시드 (빠짐) | 2·5·10 %p 가를 시드 수 | 잡힘 비율 (쫓긴 도망) 차이 (t) |",
+              "|---|---|---|---|---|---|---|---|---|---|---|"]
+        for t, by in r["vs_current"].items():
+            for w, hh in by.items():
+                for h, x in hh.items():
+                    if "hide" in x["flight"]:
+                        L.append(f"| {t} | {w} | {h} | {hide(x['flight'])} |")
+        L += ["", "## 두뇌 − 지금 두뇌: 쫓긴 시간(보고만)·지킴 GF·GV·GC·잡힘 (시드마다 짝 차이)", "",
               "| 두뇌 | 세계 | 길이(스텝) | 쫓긴 시간 지금 초 | 두뇌 초 | 차이 | sd | t | 시드 (빠짐) | 0.25·0.5·1 초 가를 시드 수 | "
               "GF 시작/1000 · GV FLEE 몫 · GC 잡힘·잘림 몫 차이 (t) | 잡힘 차이 (t) | 잡힘 0.5·1·2%p 가를 시드 수 |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for t, by in r["vs_current"].items():
@@ -2864,12 +3377,16 @@ def fmt_pilot(r: dict) -> str:
         L.append("")
     if r.get("candidates"):
         L += ["## 후보 − 지금 두뇌 (후보 시드)", "",
-              "| 후보 | 세계 | 길이 | 쫓긴 시간 차이 초 | sd | t | 시드 (빠짐) | GF · GV · GC 차이 (t) | 잡힘 차이 | sd | t |", "|---|---|---|---|---|---|---|---|---|---|---|"]
+              "| 후보 | 세계 | 길이 | 숨음 비율 차이 (t, 시드) | 잡힘 비율 (쫓긴 도망) 차이 (t) | 쫓긴 시간 차이 초 (보고) | sd | t | 시드 (빠짐) | GF · GV · GC 차이 (t) | "
+              "잡힘 차이 | sd | t |", "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
         for tag, by in r["candidates"].items():
             for w, hh in by.items():
                 for h, p in hh.items():
                     f = r["candidates_flight"][tag][w][h]
-                    L.append(f"| {tag} | {w} | {h} | {tfmt(f['diff'])} | {f['sd']:.2f} | {tfmt(f['t'])} | {f['n']} ({len(f['dropped'])}) | "
+                    hd, hc = f.get("hide"), f.get("hide_caught")
+                    hs_ = f"{tfmt(hd['diff'] * 100)} %p ({tfmt(hd['t'])}, {hd['n']})" if hd else "—"
+                    hc_ = f"{tfmt(hc['diff'] * 100)} %p ({tfmt(hc['t'])})" if hc else "—"
+                    L.append(f"| {tag} | {w} | {h} | {hs_} | {hc_} | {tfmt(f['diff'])} | {f['sd']:.2f} | {tfmt(f['t'])} | {f['n']} ({len(f['dropped'])}) | "
                              f"{guards(f)} | {tfmt(p['diff'] * 100)} %p | {p['sd'] * 100:.2f} | {tfmt(p['t'])} |")
         L += ["", "### 후보 도망 끝 까닭 (후보 시드)", "", *head_c]
         for tag, by in r.get("candidate_flight_pooled", {}).items():

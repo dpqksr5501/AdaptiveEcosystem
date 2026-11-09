@@ -64,7 +64,7 @@
 //                                  켜면 나무인 원판마다 잎 원(반지름 R)을 두고 눈길이 그 합집합 안을 Block 이상 지나면 줄기처럼 가린다 — 파이썬과 같은 네 곳 가운데
 //                                  셋: E 사슴의 위협 보임(ObserveHerb·UpdateWildFlight·TallySense — Detail::EyeBlocked), C2 늑대 표적 고르기(Step 의
 //                                  FThreatStepInput::bFoliage, 무리 미리 보기 포함), E 관측 threat_hidden(FObstacleObsInput::bFoliage). 넷째 도망길 COVER 그늘은
-//                                  파이썬 전용이다(C++ 에 도망길이 없다). 도망 기록 FFlightStats::LostFoliage (원판 놓침 가운데 잎 때문). 골든 FoliageGoldenVectorsV3.h
+//                                  파이썬 전용이다(C++ 도망길은 두뇌 길의 RUN·SHELTER 뿐 — COVER 를 셈하지 않는다). 도망 기록 FFlightStats::LostFoliage (원판 놓침 가운데 잎 때문). 골든 FoliageGoldenVectorsV3.h
 //                                  (herbivore_rl/export_golden_v3_foliage.py), 시험 Policy.V3.Foliage.*. 통합 모드 eco.IntegratedV3.Foliage (기본 0, 개발 빌드)
 //   FObstacleConfig::Detour        10-17 장애물 돌아가기 (파이썬 obstacles.detour). 기본 끔 = 미끄러짐만. 켜면 C1 에서 ApplyMove 바로 앞에 사슴마다
 //                                  EcoThreatV3::DetourStep 으로 제어 출력의 속도 방향을 바꾸고(FHerbBody::Detour), C2 에서 위협 Step 에 넘긴다(Step 7′·8″ —
@@ -76,10 +76,22 @@
 //   FWorldConfig::bSenseStats      감지 기록 (FWorldStats::Sense* — 산 사슴 × 깨어 있는 늑대 쌍의 거리 띠별 감지, 들어서만 안 사슴). 기록만, 통합 모드가 켠다
 //   FWorldConfig::bFlightStats     야생 (w3) 도망 기록 (10-21, FWorldStats::Flight·FHerbDecision::Flight — world.py track_flight·flight_stats). 기록만, WildFlight 를
 //                                  켠 세계만. C2 의 위협 Step 바로 앞에 지난 표적과의 표적 고르기 쌍을 재고(FlightPairOf), H 의 UpdateWildFlight 앞에 한 스텝을 센다.
-//                                  통합 모드가 켠다. 골든 FlightGoldenVectorsV3.h (herbivore_rl/export_golden_v3_flight.py), 시험 Tests/EcoFlightV3Test.cpp
-//   FWorldState::ObsDim            R5 장애물 관측 (10-19, 계약 2-4). 지금 두뇌의 관측 칸 수 18·21 (SetModelObsDim — 통합 모드 두뇌 바꾸기가 정한다). 21 이면 E 에서
+//                                  통합 모드가 켠다. 골든 FlightGoldenVectorsV3.h (herbivore_rl/export_golden_v3_flight.py), 시험 Tests/EcoFlightV3Test.cpp.
+//                                  10-23 숨은 뒤 10 초 지켜보기(옛 1차 숨음 비율 — FFlightReport::Hidden 등, world.py flight_stats 의 hide)와 10-24 쫓김 사건(실시간
+//                                  관문 1차 사건 숨음 비율·GH·GE — FFlightReport::Ep*, world.py flight_stats 의 episode)도 같은 훅이 센다
+//   FWorldState::ObsDim            R5 장애물 관측 (10-19, 계약 2-4). 지금 두뇌의 관측 칸 수 18·21·24 (SetModelObsDim — 통합 모드 두뇌 바꾸기가 정한다). 21·24 이면 E 에서
 //                                  사슴마다 세 칸(FHerbPerception::ObstacleObs — EcoObservationV3::ObstacleObsValues)을 더 만들고 H 의 망 입력이 18 + 3 칸이다.
 //                                  bObstacleObsProbe 는 관측 18 두뇌여도 세 칸을 만든다(대조 기록 전용). 기본 18·끔 = 지금 그대로 (조각 바이트도 같다)
+//   FWildFlightConfig::bRoute      두 길 두뇌 (10-22 설계 RL_V3_FLIGHT_ROUTE_DESIGN.md 16절, 이식 계획서 RL_V3_ROUTE_CPP_PORT_PLAN.md — 파이썬 wild_flight.route,
+//                                  world.py `_route_step`·`_route_apply`·`flight_route_geometry` SHELTER·`route_stats`). 세계 설정이 아니라 두뇌가 정한다(SetModelRoute —
+//                                  관측 24·마스크 판 4·5 두뇌일 때만, WildFlight 를 켠 세계만). 도주 반사(덮기 도주) 중 두뇌가 '어디로'를 고른다: RUN = 반사 방향 그대로,
+//                                  SHELTER = 늑대보다 먼저 닿는 은신처(경주 여유 μ ≥ 2 로 들어가 μ ≥ 0 이면 유지). 실행 행동은 늘 FLEE 다 — 덮기 방향 KeepDir 만 바꾼다.
+//                                  H 의 UpdateWildFlight 가 사슴마다 길 단계(Detail::RouteStep — 결정 = 시작 ∨ 길 없음 ∨ SHELTER 무효 ∨ RUN 길에서 2 초 잠금 뒤 가능 바뀜)와
+//                                  관측 21~23(FHerbPerception::RouteObs)을 정하고, 결정 줄이면 DecideHerb 가 망을 돌려(관측 24 + 판 4 마스크 {1, 4}) D.RouteRequest 에
+//                                  두고, 다음 A 첫머리의 Detail::RouteApply 가 그 칸으로 길을 정한다(파이썬도 두뇌 출력을 다음 step 첫머리에 적용한다 — 셈 시점까지 같다).
+//                                  통계 FWorldStats::Route(route_stats)·FlightRoute(도망 기록의 길별 칸 — FlightUpdate 의 선택 인자). 기본 끔 = 지금 그대로 (새 줄은 모두 bRoute 안)
+//   FWorldState::bFleeGate         10-23 R7 마스크 판 5 = 판 4 + 반사 밖 두뇌 FLEE 막음 (설계 17절, 이식 계획서 13절 — 파이썬 wild_flight.brain_flee_outside_reflex false).
+//                                  두뇌가 정한다(SetModelFleeGate — 판 5 두뇌일 때만). 덮기 밖 결정 줄(DecideHerb 의 bReads)에서 칸 1(FLEE)을 막는다. 동역학은 그대로다
 // 계약 문서의 0번(요청 준비)을 H 로 옮긴 것은 계약 10-2 끝 주석('G 뒤에 두어도 된다')을 따른 것이다. Prepare 는 Commit 전까지
 // 다른 무엇도 상태를 바꾸지 않으므로 Arbitrate 한 번과 비트 단위로 같다(계약 5-6).
 //
@@ -93,6 +105,8 @@
 
 #include <cmath>
 #include <cstdint>
+#include <limits>
+#include <memory>
 #include <vector>
 
 #include "EcoObservationV3.h"
@@ -101,6 +115,7 @@
 #include "EcoThreatModel.h"
 #include "EcoRefugeSafetyV3.h"
 #include "EcoVegetationV3.h"
+#include "EcoV3Island.h"
 
 namespace EcoWorldV3
 {
@@ -162,6 +177,15 @@ namespace EcoWorldV3
 	//   bHoldAwake  지난 도주를 붙잡는 늑대 = 깨어 있는 늑대 전부(사냥·먹기·배부름 — 자는 늑대 말고). 도주 방향도 그 늑대들 반대. 도주 시작은 그대로
 	//   EdgeR > 0   경계·도주 방향(은신처 쪽 도주 말고)을 벽 여유 처리 앞에 WildEdgeSteer 로 굽힌다 — 가장자리 EdgeR 안에서 벽을 따라, 모서리에서 빠져나오게
 	// 값 = configs/v3_wild1_mirror.yaml wild_flight (단위: 1 = 2 m). 골든 WildGoldenVectorsV3.h '도주 장면'·'고친 도주 장면'·'가장자리 굽히기'
+	// 10-27 거리 두기(쉬는 늑대) (사용자 '늑대가 쉬고 있어도 아주 잘 보이는 데서 사슴이 멈춰 있는 게 이상하다 — 늑대 시야 밖까지 물러난 뒤 쉬게', 파이썬 선택 키
+	// rest_keep·rest_keep_margin·rest_keep_band·rest_keep_asleep — world.py 모듈 docstring '거리 두기', 기본 끔 = 위 그대로):
+	//   bRestKeep   덮기 kKeepRest. 쉬는 늑대(사냥 중이 아님 — 먹기·배부름·플레이어 휴식, 깨어 있음 — bRestKeepAsleep 이면 자는 늑대도, 죽은 늑대 말고) V = 늑대 시야
+	//               반경(WolfViewNow, 늑대 시야각 안 씀) 안에서 눈길이 트이고 사슴이 알아채면(고개 든 시야 SeePredNow·위협 시야각, 또는 관측 보임) 다음 덮기가
+	//               없음이고 은신처 밖이면 거리 두기 — V + RestKeepMargin 밖(또는 가림·사냥·잠)이 될 때까지 걸어서 물러난다(방향 = 경계 방향 줄, 이어지는 거리 두기는
+	//               지난 방향 관성 kRestKeepInertia 를 굽히기 앞에 더한다). 켜면 bRestAlert 의 쉬는 늑대 경계는 쓰지 않는다. 실행(B, FlightRestControl): 두뇌가 GRAZE 면
+	//               걷기·n(덮기 방향 + 1.35·분리 — 분리의 늑대 쪽 성분은 지운다) → 벽 여유·시야 배수 1
+	//   RestKeepBand > 0  다가가지 않기 띠 (FlightRestBand): 거리 두기가 아닌 GRAZE 걷기는 실거리 ≤ min(V + 여유 + 띠, SeePredNow)·눈길 트임인 쉬는 늑대 쪽 성분을 지운다
+	// 골든 CalmGoldenVectorsV3.h (herbivore_rl/export_golden_v3_calm.py). 통합 모드 eco.IntegratedV3.RestKeep (기본 1 — 여유 2·띠 4)
 	struct FWildFlightConfig
 	{
 		bool bEnabled = false;              // 끄면 아래 칸을 아무도 읽지 않는다
@@ -177,6 +201,25 @@ namespace EcoWorldV3
 		double WallMargin = 1.0;            // 무대 벽 여유 (2 m)
 		bool bHoldAwake = false;            // 10-16 hold_awake (설정 true): 도주는 깨어 있는 늑대 모두가 SafeR 밖일 때까지
 		double EdgeR = 0.0;                 // 10-16 edge_r (설정 5 = 10 m): 가장자리 굽히기 거리. 0 = 끔
+		// 10-22 두 길 두뇌 (파이썬 선택 키 route — 머리 주석 FWildFlightConfig::bRoute). InitWorld·SetModelRoute 가 bEnabled 와 묶는다. 기본 끔 = 지금 그대로
+		bool bRoute = false;
+		// 10-27 거리 두기(쉬는 늑대) (파이썬 선택 키 rest_keep·rest_keep_margin·rest_keep_band·rest_keep_asleep — 위 주석). 기본 끔 = 지금 그대로
+		bool bRestKeep = false;
+		double RestKeepMargin = 2.0;        // 나올 때 V + 이 값 (4 m — 들어갈 때 V 와의 히스테리시스)
+		double RestKeepBand = 0.0;          // 다가가지 않기 띠 (설정 4 = 8 m). 0 = 끔
+		bool bRestKeepAsleep = false;       // 자는 늑대도 넣는다 (자는 늑대는 굴에 있어 안 보인다는 규칙과 어긋나 기본 끔)
+	};
+
+	/**
+	 * 10-27 먹기 걷기 고침 (파이썬 선택 키 repertoire.graze_* — EcoRepertoire.h GrazeCalmDir). InitWorld 가 W.RepCfg 의 GrazeEdgeR·GrazeEdgeW·GrazeInertia·
+	 * GrazeWallMargin 으로 옮긴다 (0 이상 유한한 값만). 기본 0 = R1b 세계 그대로. 통합 모드 eco.IntegratedV3.GrazeCalm (기본 1 = 2·2.5·0.5·1)
+	 */
+	struct FGrazeCalmConfig
+	{
+		double EdgeR = 0.0;                 // graze_edge_r (단위)
+		double EdgeW = 0.0;                 // graze_edge_w
+		double Inertia = 0.0;               // graze_inertia
+		double WallMargin = 0.0;            // graze_wall_margin (단위)
 	};
 
 	/**
@@ -238,7 +281,60 @@ namespace EcoWorldV3
 	inline constexpr std::int32_t kKeepAlert = 1;     // 경계: 두뇌 행동 그대로, GRAZE 면 걸으며 먹고 멀어짐
 	inline constexpr std::int32_t kKeepPanic = 2;     // 도주(안전해질 때까지): FLEE + 뛰기
 	inline constexpr std::int32_t kKeepShelter = 3;   // 은신처 안 웅크림: HIDE 도착
-	inline constexpr std::int32_t kNumKeepModes = 4;
+	inline constexpr std::int32_t kKeepRest = 4;      // 10-27 거리 두기(쉬는 늑대): 두뇌 행동 그대로, GRAZE 면 걸어서 늑대 시야 밖으로 (bRestKeep 일 때만)
+	// 10-27 적대적 검토 — 이어지는 거리 두기의 방향 관성 (world.py WF_REST_INERTIA): 지난 덮기도 거리 두기면 n(새 반대 방향 + 이 값·지난 KeepDir)(0 이면 새
+	// 반대 방향). 가장자리 굽히기·벽 여유 앞. 없으면 고른 늑대가 V + 여유 경계에서 들고 나거나 벽 앞 굽히는 쪽 부호가 바뀔 때 방향이 스텝마다 뒤집혔다
+	inline constexpr double kRestKeepInertia = 1.0;
+	inline constexpr std::int32_t kNumKeepModes = 5;
+	static_assert(kKeepNone == EcoPolicyV3::kMaskOverrideNone && kKeepPanic == EcoPolicyV3::kMaskOverridePanic
+					  && kKeepShelter == EcoPolicyV3::kMaskOverrideCrouch,
+				  "마스크 판 4·5 덮기 줄 번호는 덮기 번호와 같다 (파이썬 rep_peek override = WF_*)");
+
+	// ---- 두 길 두뇌 계약 상수 (world.py 1443-1464 와 같은 값 — 계약 해시가 지킨다. 머리 주석 FWildFlightConfig::bRoute, 이식 계획서 1-3) ----
+	// 길 번호는 파이썬 ROUTE_* 와 같다(기록 칸 번호까지). COVER·OPEN 은 번호 자리만 — 두뇌 길은 셈하지 않는다(설계 16-2)
+	inline constexpr std::int32_t kRouteNone = -1;
+	inline constexpr std::int32_t kRouteRun = 0;
+	inline constexpr std::int32_t kRouteCover = 1;      // 자리만
+	inline constexpr std::int32_t kRouteShelter = 2;
+	inline constexpr std::int32_t kRouteOpen = 3;       // 자리만
+	inline constexpr std::int32_t kNumRoutes = 4;
+	inline constexpr std::int32_t kRouteLockSteps = 15;                 // 결정 뒤 이 도주 스텝(2 초) 동안은 무효일 때만 다시 고른다
+	inline constexpr double kRouteShelterMaxEdgeU = 20.0;               // 은신처 가장자리까지 0 < e ≤ 20 단위(40 m)
+	inline constexpr double kRouteShelterCosMin = 0.0;                  // (c − p)·a₀ / |c − p| ≥ 0 — 늑대 쪽으로 가지 않는다
+	inline constexpr double kRouteShelterEnterU = 2.0;                  // 경주 여유 μ = min_m |q_m − 입구| − e: 들어갈 때 ≥ 2 단위(4 m)
+	inline constexpr double kRouteShelterExitU = 0.0;                   // 유지 ≥ 0
+	inline constexpr double kRouteShelterReachU = EcoObservationV3::kRouteShelterReachNorm;    // 관측 22 = clip(μ* / 10)
+	inline constexpr double kRouteShelterEdgeNormU = EcoObservationV3::kRouteShelterEdgeNorm;  // 관측 23 = clip(e* / 20)
+	inline constexpr std::int32_t kRouteFeasShelter = 2;                // 가능 비트 (COVER 비트 1 은 쓰지 않는다)
+	inline constexpr std::int32_t kRouteSlotRun = EcoPolicyV3::kRouteSlotRun;            // 칸 1 (FLEE 자리)
+	inline constexpr std::int32_t kRouteSlotShelter = EcoPolicyV3::kRouteSlotShelter;    // 칸 4 (SLEEP 자리)
+	inline constexpr std::int32_t kRouteSlotReserved = EcoPolicyV3::kRouteSlotReserved;  // 칸 3 (FREEZE 자리 — 늘 막힘)
+	static_assert(kRouteSlotRun == EcoRepertoireV3::kFlee && kRouteSlotShelter == EcoRepertoireV3::kSleep
+					  && kRouteSlotReserved == EcoRepertoireV3::kFreeze,
+				  "길 칸은 행동 번호 자리다 (rep_policy.py ROUTE_SLOT_*)");
+
+	/** 길 이름 (파이썬 ROUTE_NAMES + 'none' — 기록 칸 이름). */
+	inline const char* RouteName(std::int32_t Route)
+	{
+		static const char* const Names[kNumRoutes + 1] = {"run", "cover", "shelter", "open", "none"};
+		return Route >= 0 && Route <= kNumRoutes ? Names[Route] : "none";
+	}
+
+	/** 길 통계 (world.py `route_stats` 의 두뇌 길 칸 — FWorldStats::Route). 기록만, 어떤 계산에도 쓰지 않는다. */
+	struct FRouteStats
+	{
+		std::int64_t Steps[kNumRoutes] = {};    // 실행한 반사 도주 사슴-스텝 (길별, 스텝 첫머리 산 사슴 — H 에서 센다, steps)
+		std::int64_t Onsets = 0;                // 도주 시작 (onsets)
+		std::int64_t OnsetShelter = 0;          // 그 가운데 시작 때 SHELTER 가능 (onset_shelter. onset_cover·onset_both 는 늘 0)
+		std::int64_t Decisions = 0;             // 길 결정 (H, decisions)
+		std::int64_t RedecideFeas = 0;          // 그 가운데 RUN 길에서 잠금 뒤 가능 바뀜 (redecide_feas)
+		std::int64_t Invalid[kNumRoutes] = {};  // 무효 (지금 길별 — SHELTER 칸만, invalid)
+		// 아래는 두뇌가 고른 칸을 적용할 때(다음 A 첫머리 — RouteApply) 센다. 판 끝 마지막 H 의 결정은 들지 않는다(파이썬 `_route_apply` 와 같다)
+		std::int64_t Picked[kNumRoutes] = {};   // 고른 길 (picked)
+		std::int64_t Switches = 0;              // 결정 전 길(시작 아님)과 고른 길이 다름 (switches)
+		std::int64_t Choice = 0;                // SHELTER 가 열린(두 칸) 결정 (choice)
+		std::int64_t BadShelter = 0;            // 가능하지 않은데 칸 4 를 낸 결정 (마스크 밖 — 늘 0, bad_shelter)
+	};
 
 	// ---- 야생 1단계 (w1) 지방 비축 (사람 결정 10-15 (7), 명세 Docs/RL_Policy/RL_V3_WILD1_SPEC.md 3-1, 파이썬 world.py
 	//      '야생 1단계' (w1)·`_wild_reserve_step`). 기본 끔 = R1b 학습 세계 그대로 ----
@@ -534,6 +630,45 @@ namespace EcoWorldV3
 	// 숲 시야 (FObstacleConfig::Foliage, 10-21): 원판 가림 = 줄기 ∨ 잎이라 잎이 가려 놓친 것도 원판(스스로 벗어남)이다. 그 스텝 원판 놓침이 모두 잎만 가린 쌍
 	//   (FFlightWolfStep::bFolOnly — 줄기는 안 가림)인 도망을 LostFoliage (수·FLEE 스텝·쫓긴 스텝 — 원판 칸의 일부)로 따로 센다 (world.py `_fl_why_fol`·
 	//   flight_stats lost_foliage). 끈 세계는 늘 0 이고 보고에 칸이 없다
+	// 숨은 뒤 지켜보기 (10-23 사람 결정 '사슴 하나가 늑대에게 쫓겼을 때 잡히는지 아니면 살아서 은신처에 잘 숨는지 비율로' — 실시간 관문 1차 숨음 비율,
+	//   herbivore_rl/results/v3/live/LIVE_GATE.md 변경 기록 (6). 같은 기록 훅 안의 통계 전용 칸, world.py '숨은 뒤 지켜보기'·`flight_stats` 의 hide 와 같다):
+	//   쫓긴 도망(Chased) = 끝난 도망 가운데 끝 까닭이 안 쫓김·잘림(kFlightNotChased)이 아닌 것(잡힘·굶음 포함). 끝 까닭 은신처인 도망은 닫는 스텝(끝 스텝 다음
+	//   스텝)부터 kFlightHideWatchSteps(75 스텝 = 10 초) 동안 그 사슴을 지켜본다: 그 안에 잡히면 CoverCaught, 굶어 죽으면 CoverStarved(실패 — 따로 센다), 끝까지
+	//   살면 숨어 살아남음(Hidden). 닫는 스텝에 죽은 것도 그 안이다. 보고(FlightReportOf) 때 아직 지켜보는 도망은 지켜본 만큼만 본다 — 잡히지 않았으니 Hidden 에
+	//   넣고 Watching 으로도 따로 적는다(세계는 그대로). 지켜보는 동안 그 사슴이 다시 도망을 시작해도 지켜보기는 이어진다(새 도망은 따로 — 또 은신처로 끝나면
+	//   지켜보기가 하나 더 열린다). 시계 = FlightUpdate 를 부른 횟수(FFlightStats::Clock). 죽은 사슴(평면 맵은 그 칸에 다시 난 개체)의 지켜보기는 죽음 스텝에
+	//   끝낸다. Hidden + CoverCaught + CoverStarved = 끝 까닭 은신처 수 — 보고(FlightReportOf)의 Hidden 은 이 식(은신처 끝 − 지켜보는 동안 잡힘·굶음)으로 낸다.
+	//   사슴 칸이 모두 있으면 '끝까지 지켜본 숨음(FFlightStats::Hidden) + 지금 지켜보는 것(Watching)'과 같은 값이다(파이썬 _fl_hidden + _fl_watch_open).
+	//   파이썬과 같은 꼴: 지켜보기는 사슴 × (마지막으로 보는 스텝 mod 75) 칸이다(world.py `_fl_watch` 의 한 행 — FFlightTrack::Watch 비트). 사슴 하나는 한 스텝에
+	//   도망 하나만 닫으므로 칸마다 0·1 이다(새 칸 = 지금 + 74 의 칸은 지난 스텝에 끝난 칸이라 늘 비어 있다). 통합 모드에서 죽음 기록 없이 목록에서 빠진 사슴
+	//   (팀 규칙이 HP 를 0 으로 하거나 개체를 지움 — 단계 함수 밖)의 지켜보기는 Watching 에서 빠지고 Hidden 에는 지켜본 만큼 남는다(판 끝과 같은 셈 — 화면
+	//   집계 EcoV3FlightTally.h FSum 과 같은 값. 단계 함수 안의 죽음은 죽은 스텝에 끝내므로 이 경우가 아니다)
+	// 쫓김 사건 (10-24 사람 결정 "'쫓김 사건' 단위로 셈" — 실시간 관문 1차 사건 숨음 비율·지킴 GH·GE, herbivore_rl/results/v3/live/LIVE_GATE.md 변경 기록 (7).
+	//   R7 결과를 본 뒤 정한 규칙 변경이다: 도망 하나하나를 세면 은신처로 끝난 도망 뒤 몇 초 만에 도주 반사가 다시 켜져 또 뛴 '은신처 들락날락'이 숨음을 두 번
+	//   세어 숨음 비율을 부풀릴 수 있다. 같은 기록 훅 안의 통계 전용 칸, world.py 모듈 docstring '쫓김 사건'·`_fl_update` 의 5)·`flight_stats` 의 episode 와 같다.
+	//   위 도망 한 번·숨은 뒤 지켜보기 셈은 그대로 두고 옆에 더한다):
+	//   같은 사슴의 도망이 이어지는 조건(사전 등록): 앞 도망이 은신처로 끝났으면 그 마지막 FLEE 스텝 뒤 kEpisodeLinkCoverSteps(= kFlightHideWatchSteps 75 —
+	//   10 초 지켜보기와 같은 스텝들), 그 밖 끝 까닭으로 살아 끝났으면 kEpisodeLinkOtherSteps(= kFlightRefleeSteps 38 — GR '살아 끝난 도망 뒤 5 초 안 다시
+	//   도망'과 같은 경계: 다음 도망의 첫 FLEE 스텝 − 앞 도망의 마지막 FLEE 스텝 ≤ 38) 안(그 스텝 포함)에 다음 도망이 시작하면 같은 사건, 아니면 새 사건.
+	//   사건 결과 (서로 겹치지 않는다, kEpisode* — 합 = 사건 시작):
+	//     잡힘·굶음: 사건 안 어느 도망이 FLEE 스텝에 잡힘·굶음으로 끝남, 또는 마지막 도망이 은신처로 끝난 뒤 이음 창(10 초 지켜보기) 안에 잡힘·굶음 (그 사슴이
+	//       죽으면 사건은 그 스텝에 닫는다 — 닫는 스텝에 죽은 것도 그 안이다. 평면 맵에서 죽은 칸에 다시 난 개체는 새 사건이다)
+	//     숨음: 마지막 도망이 은신처로 끝났고 이음 창을 다음 도망 없이 잡히지·굶지 않고 지남. 보고 때 아직 그 창 안이면 지켜본 만큼 본다 — 숨음에 넣고
+	//       Watching 으로도 적는다(잘림이 아니다)
+	//     그 밖: 마지막 도망이 은신처 밖 까닭으로 살아 끝났고 이음 창(5 초)을 다음 도망 없이 지남. 그 창 안에 도망 없이 죽어도 사건은 그 스텝에 닫고 결과는
+	//       그 밖이다(사전 등록 정의가 말하지 않아 파이썬 코드가 정한 칸 — 도망 밖 죽음은 은신처 뒤 10 초만 잡힘·굶음). 그 죽음은 WindowCaught·WindowStarved
+	//       로 따로 적는다(보고만)
+	//     잘림: 보고 때 닫히지 않은 사건 — 마지막 도망이 아직 열려 있거나, 마지막 도망이 은신처 밖 까닭으로 끝나 5 초 이음 창 안
+	//   쫓긴 사건 = 잘림이 아니고 사건 안에 끝 까닭이 안 쫓김이 아닌 도망이 하나라도 있는 사건 (숨음·잡힘·굶음은 모두 쫓긴 사건이다 — 그 밖 가운데 쫓긴 것
+	//   OtherChased). 사건 숨음 비율 = 숨음 / 쫓긴 사건, 사건 잡힘 비율 = 잡힘 / 쫓긴 사건 (관문은 시드마다 지역 셋의 분자·분모를 각각 더해 나눈다).
+	//   GE = 1000 × 사건 시작 / 산 사슴-스텝. 보고 칸 EpJoinedCover·EpJoinedOther = 은신처 뒤·그 밖 뒤 이음 창 안에서 시작해 앞 사건에 이어진 도망 수.
+	//   시계 = FFlightStats::Clock (지켜보기와 같다). 사슴마다 열린 사건 하나(FFlightTrack::bEpOpen — 도망 중이거나, 마지막 도망이 살아 끝나 이음 창
+	//   EpUntil 까지 안). 파이썬과 같은 꼴: 사건이 닫혀도 bEpOpen 만 내리고 bEpChased·bEpCover·EpUntil 은 남긴다(열린 사건에서만 읽는다 — `_fe_*` 와 같다).
+	//   보고(FlightReportOf)의 숨음은 누적 식 '은신처로 끝난 도망 − 그 뒤 이음 창 안 이어진 도망(EpJoined[0]) − 그 창 안 잡힘·굶음(EpCoverDied)'으로 낸다
+	//   (사슴 칸이 모두 있으면 '닫힌 숨음(EpClosed[kEpisodeHidden]) + 지금 은신처 뒤 창 안(Watching)'과 같은 값 — 파이썬 n[0] + watching. 은신처로 끝난
+	//   도망은 늘 열린 사건 안에서 닫히고, 그 사건은 이어짐·죽음·숨음으로 닫힘·아직 창 안 가운데 하나로만 그 상태를 떠난다), 잘림은 '사건 시작 − 숨음 − 잡힘 −
+	//   굶음 − 그 밖'이다. 그래서 통합 모드에서 죽음 기록 없이 목록에서 빠진 사슴의 열린 사건도 합 = 사건 시작이 늘 선다(은신처 뒤 창 안이던 것은 지켜본 만큼
+	//   숨음, 그 밖은 잘림 — 숨은 뒤 지켜보기의 Hidden 과 같은 셈). 화면 집계(EcoV3FlightTally.h FSum)는 닫힌 사건만 센다(EpClosed — 창·두뇌 판 차이가 늘 0 이상)
 	inline constexpr std::int32_t kNumFlightCauses = 11;
 	inline constexpr std::int32_t kFlightCover = 0;       // 스스로: 은신처 (끝 스텝 원 안, 또는 원 안이라 표적에서 빠짐)
 	inline constexpr std::int32_t kFlightObstacle = 1;    // 스스로: 원판(나무 줄기·바위)이 늑대 눈길을 가림
@@ -550,6 +685,27 @@ namespace EcoWorldV3
 	inline constexpr std::int32_t kNumFlightHistEdges = 7;
 	inline constexpr std::int32_t kFlightHistSteps[kNumFlightHistEdges] = {8, 15, 38, 75, 150, 300, 600};   // 쫓긴 시간 칸 경계 (스텝, 약 1·2·5·10·20·40·80 초)
 	inline constexpr std::int32_t kFlightMaxWolves = 64;
+	// 숨은 뒤 지켜보기 (10-23 — world.py FLIGHT_HIDE_WATCH_STEPS·FLIGHT_NOT_CHASED): 10 초 ÷ (1 스텝 = 2/15 초) = 75 스텝, 쫓긴 도망에서 빼는 끝 까닭
+	inline constexpr std::int32_t kFlightHideWatchSteps = 75;
+	inline constexpr std::int32_t kNumFlightNotChased = 2;
+	inline constexpr std::int32_t kFlightNotChased[kNumFlightNotChased] = {kFlightUnchased, kFlightTruncated};
+	static_assert(kFlightHideWatchSteps > 1 && kFlightHideWatchSteps <= 128, "지켜보기 칸은 사슴마다 64 비트 둘 (FFlightTrack::Watch)");
+	// 쫓김 사건 (10-24 — world.py EPISODE_LINK_COVER_STEPS·EPISODE_LINK_OTHER_STEPS·FLIGHT_REFLEE_STEPS·EPISODE_OUTCOMES, 머리 주석 '쫓김 사건'):
+	// 앞 도망의 마지막 FLEE 스텝 뒤 이 스텝 수 안(그 스텝 포함)에 같은 사슴의 다음 도망이 시작하면 같은 사건. 은신처 끝 = 10 초 지켜보기와 같은 75 스텝,
+	// 그 밖 끝 = GR(살아 끝난 도망 뒤 5 초 안 다시 도망 — 파이썬 도망길 기록 refled. C++ 도망 길 기록 FFlightRouteStats::Refled 도 같은 경계)과 같은 38 스텝
+	inline constexpr std::int32_t kFlightRefleeSteps = 38;
+	inline constexpr std::int64_t kFlightNotLast = -1000000000LL;   // 도망 길 기록: 살아 끝난 지난 도망 없음 (reset·죽음 — world.py _fl_last_t 의 −10⁹)
+	inline constexpr std::int32_t kNumFlightRouteRows = kNumRoutes + 1;   // 도망 길 기록 칸: 길 넷 + 'none' (반사 스텝이 없는 두뇌 FLEE 도망)
+	inline constexpr std::int32_t kFlightRouteNone = kNumRoutes;
+	inline constexpr std::int32_t kEpisodeLinkCoverSteps = kFlightHideWatchSteps;
+	inline constexpr std::int32_t kEpisodeLinkOtherSteps = kFlightRefleeSteps;
+	inline constexpr std::int32_t kNumEpisodeOutcomes = 5;   // 사건 결과 (서로 겹치지 않는다, 합 = 사건 시작) — 앞 넷은 닫힌 사건(FFlightStats::EpClosed)
+	inline constexpr std::int32_t kEpisodeHidden = 0;
+	inline constexpr std::int32_t kEpisodeCaught = 1;
+	inline constexpr std::int32_t kEpisodeStarved = 2;
+	inline constexpr std::int32_t kEpisodeOther = 3;
+	inline constexpr std::int32_t kEpisodeTruncated = 4;      // 보고 때 닫히지 않은 사건 (보고만 낸다)
+	inline constexpr std::int32_t kNumEpisodeClosed = 4;
 	// 놓침 까닭 (FL_DROP_*): 뒤 번호가 앞선다
 	inline constexpr std::int32_t kFlDropNone = 0;
 	inline constexpr std::int32_t kFlDropRange = 1;
@@ -576,6 +732,13 @@ namespace EcoWorldV3
 		return Cause >= 0 && Cause < kNumFlightCauses ? Names[Cause] : "?";
 	}
 
+	/** 사건 결과 이름 (파이썬 EPISODE_OUTCOMES 와 같은 글자 — 스냅숏·골든). */
+	inline const char* EpisodeOutcomeName(std::int32_t Outcome)
+	{
+		static const char* const Names[kNumEpisodeOutcomes] = {"hidden", "caught", "starved", "other", "truncated"};
+		return Outcome >= 0 && Outcome < kNumEpisodeOutcomes ? Names[Outcome] : "?";
+	}
+
 	/** 사슴 하나의 열린 도망 (FHerbDecision::Flight — world.py `_fl_*` 칸의 한 행). */
 	struct FFlightTrack
 	{
@@ -588,7 +751,51 @@ namespace EcoWorldV3
 		bool bEndCov = false;        // 그 스텝 끝 위치가 은신처 원 안이었나
 		bool bWhyFol = false;        // 마지막 놓침이 잎 때문 (숲 시야 켬 세계만 — 그 스텝 원판 놓침이 모두 잎만 가림. world.py _fl_why_fol)
 		std::uint64_t PrevBy = 0;    // 지난 스텝 끝에 이 사슴을 표적으로 둔 사냥 중인 늑대 (비트 m = 위협 색인 m. 죽은 사슴은 0)
+		// 10-23 숨은 뒤 지켜보기 (머리 주석): 비트 j = 마지막으로 보는 스텝(FFlightStats::Clock 시계) mod kFlightHideWatchSteps 가 j 인 지켜보기
+		// (world.py `_fl_watch` 의 이 사슴 행 — 칸마다 0·1). 도망이 닫혀도 남는다(FlightClose 는 건드리지 않는다)
+		std::uint64_t Watch[2] = {0, 0};
+		// 10-24 쫓김 사건 (머리 주석 — world.py `_fe_*` 의 이 사슴 행). 도망이 닫혀도 남고(FlightClose 는 건드리지 않는다), 사건이 닫혀도 bEpOpen 만 내린다
+		bool bEpOpen = false;        // 열린 사건이 있나 (도망 중이거나, 마지막 도망이 살아 끝나 이음 창 안 — _fe_open)
+		bool bEpChased = false;      // 열린 사건 안에 끝 까닭이 안 쫓김이 아닌 닫힌 도망이 있나 (_fe_chased)
+		bool bEpCover = false;       // 열린 사건의 마지막 도망이 은신처로 살아 끝났나 — 도망 중이면 거짓 (_fe_cover)
+		std::int64_t EpUntil = 0;    // 이음 창의 마지막 스텝 (FFlightStats::Clock 시계 — 다음 도망이 이 스텝까지 시작하면 같은 사건, _fe_until)
+		// 10-22 두 길 두뇌 도망 길 기록 (FlightUpdate 에 FFlightRouteStats 를 넘길 때만 — world.py `_fl_rsteps`·`_fl_last_t` 의 이 사슴 행. 끄면 늘 기본값)
+		std::int32_t RouteSteps[kNumRoutes] = {};   // 열린 도망의 길별 반사 스텝 (가장 많은 길 = 그 도망의 길, 같으면 앞 번호, 없으면 none — FlightRouteRow)
+		std::int64_t LastEndT = kFlightNotLast;    // 살아 끝난 지난 도망의 마지막 FLEE 스텝 번호 (FlightUpdate 의 StepNow 시계 — Step 은 FFlightStats::Clock. refled — 죽으면 kFlightNotLast)
 	};
+
+	/** 도망의 길 칸 (world.py `_fl_close` 의 dom): 반사 스텝이 있으면 가장 많은 길(같으면 앞 번호 — np.argmax), 없으면 none(kFlightRouteNone). */
+	inline std::int32_t FlightRouteRow(const FFlightTrack& T)
+	{
+		std::int64_t Sum = 0;
+		std::int32_t Best = 0;
+		for (std::int32_t r = 0; r < kNumRoutes; ++r)
+		{
+			Sum += T.RouteSteps[r];
+			Best = T.RouteSteps[r] > T.RouteSteps[Best] ? r : Best;
+		}
+		return Sum > 0 ? Best : kFlightRouteNone;
+	}
+
+	/** 지켜보기 칸 Col (0 ≤ Col < kFlightHideWatchSteps)이 열려 있나. */
+	inline bool FlightWatchHas(const FFlightTrack& T, std::int32_t Col)
+	{
+		return ((T.Watch[Col >> 6] >> (Col & 63)) & 1ULL) != 0ULL;
+	}
+
+	/** 열린 지켜보기 수 (비트 수). */
+	inline std::int32_t FlightWatchCount(const FFlightTrack& T)
+	{
+		std::int32_t K = 0;
+		for (const std::uint64_t W : T.Watch)
+		{
+			for (std::uint64_t B = W; B != 0; B &= B - 1ULL)
+			{
+				++K;
+			}
+		}
+		return K;
+	}
 
 	/** 누적 도망 기록 (FWorldStats::Flight). 열린 도망은 사슴 쪽(FFlightTrack)에 있다 — 보고는 FlightReportOf. */
 	struct FFlightStats
@@ -602,6 +809,34 @@ namespace EcoWorldV3
 		std::int64_t ShelterEnd = 0;                     // 살아 끝난 도망 가운데 끝 스텝 끝 위치가 은신처 원 안 (끝 까닭과 겹친다)
 		std::int64_t Hist[kNumFlightHistEdges + 1] = {}; // 스스로 벗어난 도망의 쫓긴 시간 칸 (칸 k = 경계 가운데 쫓긴 시간 이하인 수)
 		std::int64_t LostFoliage[3] = {};                // 숲 시야: 끝 까닭 원판 가운데 마지막 놓침이 잎 때문인 도망 — 수·FLEE 스텝 합·쫓긴 스텝 합 (lost_foliage)
+		// 10-23 숨은 뒤 지켜보기 (머리 주석 — 지금 지켜보는 도망은 사슴 쪽 FFlightTrack::Watch 에 있다, 보고는 FlightReportOf)
+		std::int64_t Clock = 0;                          // FlightUpdate 를 부른 횟수 (world.py _fl_clock — 지켜보기 칸의 시계)
+		std::int64_t Hidden = 0;                         // 75 스텝을 끝까지 지켜본 숨어 살아남은 도망 (_fl_hidden)
+		std::int64_t CoverCaught = 0;                    // 끝 까닭 은신처이고 지켜보는 동안 잡힘 (cover_then_caught)
+		std::int64_t CoverStarved = 0;                   // 끝 까닭 은신처이고 지켜보는 동안 굶음 (cover_then_starved)
+		// 10-24 쫓김 사건 (머리 주석 — 열린 사건은 사슴 쪽 FFlightTrack::bEpOpen, 보고는 FlightReportOf). 모두 늘기만 하는 누적이다
+		std::int64_t EpStarted = 0;                      // 시작한 사건 (_fe_started — 도망 시작 = 사건 시작 + 이어진 도망)
+		std::int64_t EpClosed[kNumEpisodeClosed] = {};   // 닫힌 사건 수 — 결과 숨음·잡힘·굶음·그 밖 (kEpisode* 차례, _fe_n)
+		std::int64_t EpOtherChased = 0;                  // 닫힌 그 밖 가운데 쫓긴 사건 (_fe_other_chased)
+		std::int64_t EpJoined[2] = {};                   // 앞 사건에 이어진 도망 — 은신처 끝 뒤·그 밖 끝 뒤 이음 창 안에서 시작 (_fe_joined)
+		std::int64_t EpCoverDied[2] = {};                // 은신처 끝 뒤 이음 창 안에 도망 없이 잡힘·굶음 (결과 잡힘·굶음의 일부 — 보고의 숨음 식 재료, C++ 만)
+		std::int64_t EpWinDied[2] = {};                  // 그 밖 끝 뒤 이음 창 안에 도망 없이 잡힘·굶음 (결과 그 밖의 일부 — _fe_win_died, 보고만)
+	};
+
+	/**
+	 * 10-22 두 길 두뇌 도망 길 기록 (FWorldStats::FlightRoute — world.py `_flr_*`·`_flight_route_block`, 이식 계획서 6-2). 도망 기록 FFlightStats 를 하나도 바꾸지 않는
+	 * 덧붙임 칸이다. 칸 번호 = 길(kRoute*) 넷 + none(kFlightRouteNone — 반사 스텝이 없는 두뇌 FLEE). 보고는 FlightRouteReportOf (열린 도망은 잘림).
+	 */
+	struct FFlightRouteStats
+	{
+		std::int64_t N[kNumFlightRouteRows][kNumFlightCauses] = {};        // 끝난 도망 수 (그 도망의 길 × 끝 까닭)
+		std::int64_t Steps[kNumFlightRouteRows][kNumFlightCauses] = {};    // 그 FLEE 스텝 합
+		std::int64_t Contact[kNumFlightRouteRows][kNumFlightCauses] = {};  // 그 쫓긴 스텝 합
+		std::int64_t DropObstacle[kNumFlightRouteRows] = {};   // 원판이 늑대 눈길을 가려 놓친 사건 (그 스텝에 실행한 길 — 늑대마다)
+		std::int64_t DropFoliage[kNumFlightRouteRows] = {};    // 그 가운데 잎만 가린 사건 (숲 시야 켬 세계만 보고)
+		std::int64_t Chased[kNumFlightRouteRows] = {};         // 쫓기는 FLEE 스텝 (지난 스텝 표적, 실행한 길 — 사슴마다)
+		std::int64_t Hidden[kNumFlightRouteRows] = {};         // 그 가운데 쫓는 늑대 모두의 눈길을 원판이 가린 스텝
+		std::int64_t Refled = 0;                               // 살아 끝난 도망 뒤 kFlightRefleeSteps 안(경계 포함)에 다시 시작한 도망
 	};
 
 	/** 한 스텝의 사슴 재료 (world.py `_fl_update` 인자의 한 행). 단계 함수는 산 사슴만 넘기므로 bAlive0 은 늘 참이다 (골든 되풀이만 거짓을 쓴다). */
@@ -613,6 +848,7 @@ namespace EcoWorldV3
 		bool bDone = false;          // 이번 스텝에 죽음
 		bool bCaught = false;        // 그 가운데 잡힘 (아니면 굶음)
 		bool bInCov = false;         // 스텝 끝 은신처 원 안 (관측 E 의 지각)
+		std::int32_t Route = -1;     // 10-22 두 길 두뇌: 이번 스텝에 실행한 길 (반사 스텝만 — 아니면 kRouteNone. 도망 길 기록 FFlightRouteStats 만 읽는다)
 	};
 
 	/** 한 스텝의 늑대 재료: 스텝 끝 표적·사냥, 그리고 지난 스텝 표적과의 표적 고르기 때 쌍 (world.py `_fl_pred` 의 (m, 지난 표적) 칸). */
@@ -685,8 +921,11 @@ namespace EcoWorldV3
 		return !Wf.bRange ? kFlDropRange : Wf.bBlocked ? kFlDropObstacle : !Wf.bVis0 ? kFlDropFov : Wf.bCover ? kFlDropCover : kFlDropSwitch;
 	}
 
-	/** 도망 하나를 끝 까닭 Cause 로 닫고 칸을 비운다 (world.py `_fl_close`). PrevBy 는 그대로다. */
-	inline void FlightClose(FFlightStats& S, FFlightTrack& T, std::int32_t Cause)
+	/**
+	 * 도망 하나를 끝 까닭 Cause 로 닫고 칸을 비운다 (world.py `_fl_close`). PrevBy 는 그대로다. RS (두 길 두뇌 도망 길 기록, 없으면 nullptr — 지금 그대로)를
+	 * 주면 그 도망의 길 칸(FlightRouteRow)에 끝 까닭·FLEE 스텝·쫓긴 스텝을 더한다. 길별 반사 스텝 칸은 늘 비운다(길 끈 세계는 늘 0 이라 그대로다).
+	 */
+	inline void FlightClose(FFlightStats& S, FFlightTrack& T, std::int32_t Cause, FFlightRouteStats* RS = nullptr)
 	{
 		++S.Num[Cause];
 		S.Steps[Cause] += T.Len;
@@ -702,6 +941,18 @@ namespace EcoWorldV3
 			++S.LostFoliage[0];
 			S.LostFoliage[1] += T.Len;
 			S.LostFoliage[2] += T.Contact;
+		}
+		if (RS != nullptr)
+		{
+			// 10-22 도망 길 기록: 그 도망의 길(반사 스텝이 가장 많은 길, 없으면 none)별 끝 까닭·스텝 (world.py `_fl_close` 의 _flr_*)
+			const std::int32_t Row = FlightRouteRow(T);
+			++RS->N[Row][Cause];
+			RS->Steps[Row][Cause] += T.Len;
+			RS->Contact[Row][Cause] += T.Contact;
+		}
+		for (std::int32_t& V : T.RouteSteps)
+		{
+			V = 0;
 		}
 		T.bWhyFol = false;
 		T.Len = 0;
@@ -739,12 +990,20 @@ namespace EcoWorldV3
 	/**
 	 * 도망 기록 한 스텝 (world.py `_fl_update` 와 줄마다 같다 — 기록만, 덮기·동역학·난수를 바꾸지 않는다). Tracks·Deer 는 사슴 N, Wolves 는 늑대 M (같은 스텝의
 	 * 배열 순서). 늑대 m 의 쌍 칸은 그 늑대의 지난 표적(FlightPrevTarget)과의 값이어야 한다.
+	 * RS = 10-22 두 길 두뇌 도망 길 기록 (world.py `_fl_update` 의 rt 줄 — 이식 계획서 6-2). nullptr(기본)이면 지금 줄 그대로다. 주면 사슴마다 길 칸 Ri = 반사 ∧ 길 ≥ 0 ?
+	 * 실행한 길 : none 으로 원판 놓침(늑대마다)·쫓기는 스텝·가려진 스텝(사슴마다 — 지난 표적이 이 사슴인 늑대가 모두 원판에 가렸다)·길별 반사 스텝을 세고, StepNow
+	 * (이번 스텝 번호 — 차이만 쓴다. 파이썬은 self.t − 1)로 살아 끝난 도망의 끝 스텝(StepNow − 1)과 새 도망의 refled(StepNow − 끝 스텝 ≤ 38)를 잰다.
+	 * Step 의 H 는 이 도망 기록 시계 S.Clock(FlightUpdate 를 부른 횟수 — 스텝마다 1 씩 늘어 W.T − 1 과 차이가 같다)을 넘긴다: 통합 모드의 W.T 는 팀 시계에
+	 * 다시 맞출 때 뛸 수 있어(CheckClockDrift) 그 시계로 재면 refled 가 틀린다. 쫓김 사건의 이음 창(EpUntil)과 같은 시계다.
 	 */
 	inline void FlightUpdate(FFlightStats& S, FFlightTrack* const* Tracks, const FFlightDeerStep* Deer, std::int32_t N, const FFlightWolfStep* Wolves,
-							 std::int32_t M)
+							 std::int32_t M, FFlightRouteStats* RS = nullptr, std::int64_t StepNow = 0)
 	{
 		const std::int32_t Mc = M < kFlightMaxWolves ? M : kFlightMaxWolves;
 		const std::uint64_t Valid = FlightWolfMask(Mc);
+		// 숨은 뒤 지켜보기 칸: 이번 스텝에 여는 지켜보기의 마지막 스텝(지금 + 74)의 칸, 이번 스텝이 마지막인 지켜보기의 칸 (world.py `_fl_update` 의 1)·4))
+		const std::int32_t OpenCol = static_cast<std::int32_t>((S.Clock + kFlightHideWatchSteps - 1) % kFlightHideWatchSteps);
+		const std::int32_t EndCol = static_cast<std::int32_t>(S.Clock % kFlightHideWatchSteps);
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			FFlightTrack& T = *Tracks[i];
@@ -757,6 +1016,9 @@ namespace EcoWorldV3
 				Now |= (Wolves[m].bHuntEnd && Wolves[m].Target == i) ? (1ULL << m) : 0ULL;
 			}
 			const std::uint64_t Prev = T.PrevBy & Valid;
+			// 10-22 도망 길 기록의 길 칸 (반사 스텝이면 실행한 길, 아니면 none — world.py `_fl_update` 의 re_·ri)
+			const bool bRouteStep = Dd.bReflex && Dd.Route >= 0 && Dd.Route < kNumRoutes;
+			const std::int32_t Ri = bRouteStep ? Dd.Route : kFlightRouteNone;
 			// 1) 지난 스텝까지 FLEE 였고 이번 스텝은 아님: 살아 끝난 도망 — 끝 스텝 끝에 떠 둔 상태로 닫는다
 			if (T.Len > 0 && !bEx)
 			{
@@ -770,7 +1032,21 @@ namespace EcoWorldV3
 					Cause = kFlightUnchased;
 				}
 				S.ShelterEnd += T.bEndCov ? 1 : 0;
-				FlightClose(S, T, Cause);
+				if (Cause == kFlightCover)
+				{
+					// 10-23 숨은 뒤 지켜보기: 이번 스텝(끝 스텝 다음)부터 kFlightHideWatchSteps 스텝 — 마지막으로 보는 스텝의 칸 (늘 비어 있다 — 머리 주석)
+					T.Watch[OpenCol >> 6] |= 1ULL << (OpenCol & 63);
+				}
+				// 10-24 쫓김 사건: 살아 끝난 도망의 사건은 이음 창에 든다 — 마지막 FLEE 스텝(= 지금 시계 − 1) 뒤 은신처면 kEpisodeLinkCoverSteps(10 초
+				// 지켜보기와 같은 마지막 스텝 지금 + 74), 그 밖이면 kEpisodeLinkOtherSteps(GR 과 같은 경계) 스텝까지 다음 도망이 시작하면 같은 사건
+				T.bEpChased = T.bEpChased || Cause != kFlightUnchased;
+				T.bEpCover = Cause == kFlightCover;
+				T.EpUntil = S.Clock - 1 + (T.bEpCover ? kEpisodeLinkCoverSteps : kEpisodeLinkOtherSteps);
+				FlightClose(S, T, Cause, RS);
+				if (RS != nullptr)
+				{
+					T.LastEndT = StepNow - 1;   // 10-22 끝난 도망의 마지막 FLEE 스텝 번호 (= 지난 스텝 — world.py self.t − 2)
+				}
 			}
 			if (bEx)
 			{
@@ -778,6 +1054,22 @@ namespace EcoWorldV3
 				if (T.Len == 0)
 				{
 					++S.Started;
+					if (RS != nullptr && StepNow - T.LastEndT <= kFlightRefleeSteps)
+					{
+						++RS->Refled;   // 10-22 살아 끝난 도망 뒤 38 스텝 안(경계 포함) 새 도망 (world.py _flr_refled)
+					}
+					// 10-24 쫓김 사건: 열린 사건(이음 창 안 — 창이 지난 사건은 지난 스텝 끝에 닫았다)이면 그 사건에 잇고, 아니면 새 사건
+					if (T.bEpOpen)
+					{
+						++S.EpJoined[T.bEpCover ? 0 : 1];
+					}
+					else
+					{
+						++S.EpStarted;
+						T.bEpOpen = true;
+						T.bEpChased = false;
+					}
+					T.bEpCover = false;
 					T.bChased = Prev != 0;
 					T.Why = kFlDropNone;
 					T.bWhyFol = false;
@@ -799,12 +1091,42 @@ namespace EcoWorldV3
 					{
 						bFo = bFo || Wolves[m].bFolOnly;
 						bTr = bTr || !Wolves[m].bFolOnly;
+						if (RS != nullptr)
+						{
+							// 10-22 도망 길 기록: 원판 놓침은 늑대마다 그 스텝 실행한 길에 (잎만 가린 것은 숲 시야 켬 세계만 보고한다 — 끈 세계는 bFolOnly 가 늘 거짓)
+							++RS->DropObstacle[Ri];
+							RS->DropFoliage[Ri] += Wolves[m].bFolOnly ? 1 : 0;
+						}
 					}
 				}
 				if (Why > kFlDropNone)
 				{
 					T.Why = Why;
 					T.bWhyFol = Why == kFlDropObstacle && bFo && !bTr;
+				}
+				if (RS != nullptr)
+				{
+					// 10-22 도망 길 기록: 길별 반사 스텝, 쫓기는 스텝(지난 스텝 표적)과 그 가운데 쫓던 늑대 모두의 눈길을 원판이 가린 스텝 (이번 표적 고르기 때 —
+					// 이번 스텝에 사냥을 그만둔 늑대도 지난 표적이면 든다. world.py `_fl_update` 의 _fl_rsteps·_flr_chased·_flr_hidden)
+					if (bRouteStep)
+					{
+						++T.RouteSteps[Dd.Route];
+					}
+					if (Prev != 0)
+					{
+						++RS->Chased[Ri];
+						bool bSeen = false;
+						for (std::uint64_t Pm = Prev; Pm != 0 && !bSeen; Pm &= Pm - 1ULL)
+						{
+							std::int32_t m = 0;
+							while (((Pm >> m) & 1ULL) == 0ULL)
+							{
+								++m;
+							}
+							bSeen = !Wolves[m].bBlocked;
+						}
+						RS->Hidden[Ri] += bSeen ? 0 : 1;
+					}
 				}
 				++T.Len;
 				T.Reflex += Dd.bReflex ? 1 : 0;
@@ -818,12 +1140,67 @@ namespace EcoWorldV3
 				// 3) FLEE 를 실행한 스텝에 죽음: 그 스텝에 닫는다 (학습 세계의 새 개체는 다음 스텝부터 새 도망)
 				if (Dd.bDone)
 				{
-					FlightClose(S, T, Dd.bCaught ? kFlightCaught : kFlightStarved);
+					FlightClose(S, T, Dd.bCaught ? kFlightCaught : kFlightStarved, RS);
+				}
+			}
+			if (RS != nullptr && Dd.bDone)
+			{
+				T.LastEndT = kFlightNotLast;   // 10-22 죽은(평면 맵은 다시 난) 사슴은 다시 도망 셈을 잇지 않는다 (world.py _fl_last_t[done])
+			}
+			// 4) 10-23 숨은 뒤 지켜보기: 이번 스텝에 죽으면 이 사슴의 지켜보기를 모두 잡힘·굶음으로 끝내고(평면 맵의 새 개체에 잇지 않는다), 마지막으로
+			//    보는 스텝이 이번 스텝인 지켜보기는 숨어 살아남음으로 끝낸다
+			if (Dd.bDone)
+			{
+				(Dd.bCaught ? S.CoverCaught : S.CoverStarved) += FlightWatchCount(T);
+				T.Watch[0] = 0;
+				T.Watch[1] = 0;
+			}
+			if (FlightWatchHas(T, EndCol))
+			{
+				++S.Hidden;
+				T.Watch[EndCol >> 6] &= ~(1ULL << (EndCol & 63));
+			}
+			// 5) 10-24 쫓김 사건: 이번 스텝에 죽은 사슴의 사건을 닫고(평면 맵의 새 개체에 잇지 않는다), 이음 창의 마지막 스텝이 이번 스텝이고 다음 도망이
+			//    없는 사건을 닫는다 (머리 주석 '쫓김 사건' — world.py `_fl_update` 의 5))
+			if (T.bEpOpen)
+			{
+				if (Dd.bDone)
+				{
+					const std::int32_t Dk = Dd.bCaught ? 0 : 1;
+					if (bEx || T.bEpCover)
+					{
+						// 도망 중 죽음(그 도망이 잡힘·굶음) 또는 은신처 끝 뒤 10 초 지켜보기 안 죽음 (도망 중이면 bEpCover 는 늘 거짓이다)
+						++S.EpClosed[Dd.bCaught ? kEpisodeCaught : kEpisodeStarved];
+						S.EpCoverDied[Dk] += bEx ? 0 : 1;
+					}
+					else
+					{
+						// 은신처 밖 끝 뒤 5 초 이음 창 안에 도망 없이 죽음 → 그 밖 (사전 등록 그대로)
+						++S.EpClosed[kEpisodeOther];
+						S.EpOtherChased += T.bEpChased ? 1 : 0;
+						++S.EpWinDied[Dk];
+					}
+					T.bEpOpen = false;
+				}
+				else if (T.Len == 0 && T.EpUntil <= S.Clock)
+				{
+					// 은신처 끝 → 숨음, 그 밖 끝 → 그 밖
+					if (T.bEpCover)
+					{
+						++S.EpClosed[kEpisodeHidden];
+					}
+					else
+					{
+						++S.EpClosed[kEpisodeOther];
+						S.EpOtherChased += T.bEpChased ? 1 : 0;
+					}
+					T.bEpOpen = false;
 				}
 			}
 			// 다음 스텝의 지난 표적. 죽은(평면 맵은 다시 난) 사슴을 쫓던 기록은 잇지 않는다
 			T.PrevBy = Dd.bDone ? 0ULL : Now;
 		}
+		++S.Clock;
 	}
 
 	/** 열린 도망 합 (보고의 잘림 — 사슴 쪽 FFlightTrack 에서 모은다). */
@@ -833,6 +1210,13 @@ namespace EcoWorldV3
 		std::int64_t Steps = 0;
 		std::int64_t Contact = 0;
 		std::int64_t Reflex = 0;
+		std::int64_t Watching = 0;   // 10-23 지금 지켜보는 도망 (숨은 뒤 지켜보기 — 도망이 닫힌 사슴에도 있다, world.py _fl_watch_open. 보고의 Watching 칸)
+		std::int64_t EpOpen = 0;     // 10-24 지금 열린 쫓김 사건 (_fe_open 합)
+		std::int64_t EpWatching = 0; // 그 가운데 마지막 도망이 은신처로 끝나 이음 창(10 초 지켜보기) 안인 사건 (보고의 사건 Watching 칸 — 지켜본 만큼 숨음)
+		// 10-22 두 길 두뇌 도망 길 기록의 잘림 (열린 도망을 그 길 칸에 — world.py `_flight_route_block` 의 op. 길 끈 세계는 모두 none 칸이고 보고하지 않는다)
+		std::int64_t RouteNum[kNumFlightRouteRows] = {};
+		std::int64_t RouteSteps[kNumFlightRouteRows] = {};
+		std::int64_t RouteContact[kNumFlightRouteRows] = {};
 
 		void Add(const FFlightTrack& T)
 		{
@@ -842,6 +1226,16 @@ namespace EcoWorldV3
 				Steps += T.Len;
 				Contact += T.Contact;
 				Reflex += T.Reflex;
+				const std::int32_t Row = FlightRouteRow(T);
+				++RouteNum[Row];
+				RouteSteps[Row] += T.Len;
+				RouteContact[Row] += T.Contact;
+			}
+			Watching += FlightWatchCount(T);
+			if (T.bEpOpen)
+			{
+				++EpOpen;
+				EpWatching += (T.Len == 0 && T.bEpCover) ? 1 : 0;   // world.py `_episode_block` 의 wa = 열림 ∧ 도망 없음 ∧ 은신처 끝
 			}
 		}
 	};
@@ -862,6 +1256,28 @@ namespace EcoWorldV3
 		std::int64_t ShelterEnd = 0;
 		std::int64_t Hist[kNumFlightHistEdges + 1] = {};
 		std::int64_t LostFoliage[3] = {};   // 숲 시야 (FFlightStats::LostFoliage — 열린 도망은 넣지 않는다, 파이썬 lost_foliage 와 같다)
+		// 10-23 숨은 뒤 지켜보기 (파이썬 flight_stats 의 hide 와 같은 칸 — 머리 주석). Hidden + CoverCaught + CoverStarved = Num[kFlightCover]
+		std::int64_t Chased = 0;         // 쫓긴 도망 (끝난 도망 가운데 안 쫓김·잘림이 아닌 것 — 열린 도망은 빠진다, chased)
+		std::int64_t Hidden = 0;         // 끝 까닭 은신처이고 지켜보는 75 스텝 안에 죽지 않은 도망 (지금 지켜보는 것 포함 — 지켜본 만큼만, hidden)
+		std::int64_t Watching = 0;       // 그 가운데 아직 지켜보는 것 (watching)
+		std::int64_t CoverCaught = 0;    // 끝 까닭 은신처이고 지켜보는 동안 잡힘 (cover_then_caught)
+		std::int64_t CoverStarved = 0;   // 끝 까닭 은신처이고 지켜보는 동안 굶음 (cover_then_starved)
+		// 10-24 쫓김 사건 (파이썬 flight_stats 의 episode 와 같은 칸·같은 이름 차례 — 머리 주석 '쫓김 사건'). 결과 숨음·잡힘·굶음·그 밖·잘림 합 = EpStarted,
+		// EpChased = 숨음 + 잡힘 + 굶음 + EpOtherChased, 도망 시작 Started = EpStarted + EpJoined
+		std::int64_t EpStarted = 0;        // 시작한 사건 (started)
+		std::int64_t EpChased = 0;         // 쫓긴 사건 (잘림 아님 ∧ 안 쫓김 밖 끝 도망 있음, chased)
+		std::int64_t EpHidden = 0;         // 결과 숨음 (보고 때 은신처 뒤 이음 창 안인 사건 포함 = EpWatching, hidden)
+		std::int64_t EpCaught = 0;         // 결과 잡힘 (caught)
+		std::int64_t EpStarved = 0;        // 결과 굶음 (starved)
+		std::int64_t EpOther = 0;          // 결과 그 밖 (other)
+		std::int64_t EpTruncated = 0;      // 결과 잘림 (truncated — 보고 때 닫히지 않은 사건)
+		std::int64_t EpWatching = 0;       // 숨음 가운데 아직 은신처 뒤 이음 창 안 (watching)
+		std::int64_t EpOtherChased = 0;    // 그 밖 가운데 쫓긴 사건 (other_chased)
+		std::int64_t EpJoined = 0;         // 앞 사건에 이어진 도망 (joined = joined_cover + joined_other)
+		std::int64_t EpJoinedCover = 0;    // 은신처 끝 뒤 이음 창 안에서 이어짐 (joined_cover)
+		std::int64_t EpJoinedOther = 0;    // 그 밖 끝 뒤 이음 창 안에서 이어짐 (joined_other)
+		std::int64_t EpWindowCaught = 0;   // 그 밖 끝 뒤 5 초 이음 창 안 도망 없이 잡힘 (결과 그 밖의 일부, window_caught)
+		std::int64_t EpWindowStarved = 0;  // 같은 창 안 굶음 (window_starved)
 	};
 
 	inline FFlightReport FlightReportOf(const FFlightStats& S, const FFlightOpen& Open)
@@ -898,6 +1314,78 @@ namespace EcoWorldV3
 		{
 			R.LostFoliage[k] = S.LostFoliage[k];
 		}
+		// 10-23 숨은 뒤 지켜보기 (쫓긴 도망은 끝난 도망만 — S.Num 에는 열린 도망(잘림)이 없다)
+		for (std::int32_t c = 0; c < kNumFlightCauses; ++c)
+		{
+			R.Chased += S.Num[c];
+		}
+		for (const std::int32_t c : kFlightNotChased)
+		{
+			R.Chased -= S.Num[c];
+		}
+		// 숨음 = 은신처 끝 − 지켜보는 동안 잡힘·굶음 (머리 주석 — 사슴 칸이 모두 있으면 S.Hidden + Open.Watching 과 같고, 통합 모드에서 죽음 기록 없이 빠진
+		// 사슴의 지켜보기도 지켜본 만큼 숨음으로 남아 Hidden + CoverCaught + CoverStarved = Num[kFlightCover] 가 늘 선다 — 화면 집계 FSum 과 같은 값)
+		R.Hidden = S.Num[kFlightCover] - S.CoverCaught - S.CoverStarved;
+		R.Watching = Open.Watching;
+		R.CoverCaught = S.CoverCaught;
+		R.CoverStarved = S.CoverStarved;
+		// 10-24 쫓김 사건 (머리 주석 — 숨음은 누적 식 '은신처 끝 − 그 뒤 이어진 도망 − 그 창 안 잡힘·굶음', 잘림은 '사건 시작 − 나머지 결과'. 사슴 칸이 모두
+		// 있으면 숨음 = 닫힌 숨음 + Open.EpWatching, 잘림 = Open.EpOpen − Open.EpWatching 과 같다 — 파이썬 `_episode_block`)
+		R.EpStarted = S.EpStarted;
+		R.EpHidden = S.Num[kFlightCover] - S.EpJoined[0] - S.EpCoverDied[0] - S.EpCoverDied[1];
+		R.EpCaught = S.EpClosed[kEpisodeCaught];
+		R.EpStarved = S.EpClosed[kEpisodeStarved];
+		R.EpOther = S.EpClosed[kEpisodeOther];
+		R.EpTruncated = S.EpStarted - R.EpHidden - R.EpCaught - R.EpStarved - R.EpOther;
+		R.EpWatching = Open.EpWatching;
+		R.EpOtherChased = S.EpOtherChased;
+		R.EpChased = R.EpHidden + R.EpCaught + R.EpStarved + R.EpOtherChased;
+		R.EpJoinedCover = S.EpJoined[0];
+		R.EpJoinedOther = S.EpJoined[1];
+		R.EpJoined = R.EpJoinedCover + R.EpJoinedOther;
+		R.EpWindowCaught = S.EpWinDied[0];
+		R.EpWindowStarved = S.EpWinDied[1];
+		return R;
+	}
+
+	/**
+	 * 10-22 두 길 두뇌 도망 길 보고 (world.py `flight_stats()['route']` = `_flight_route_block` — route_stats 칸 + 길별 끝 까닭·스텝·쫓긴 스텝, 원판 놓침·쫓기는 스텝·
+	 * 가려진 스텝, refled). 지금 열린 도망은 그 길 칸의 잘림으로 센다(세계는 그대로). 칸 번호 = 길 넷 + none (RouteName).
+	 */
+	struct FFlightRouteReport
+	{
+		FRouteStats Route;   // route_stats 칸 (fixed null·quiet_end 0·fallback 0·onset_cover·onset_both 0·brain true 는 늘 같은 값이라 쓰는 쪽이 적는다)
+		std::int64_t N[kNumFlightRouteRows][kNumFlightCauses] = {};
+		std::int64_t Steps[kNumFlightRouteRows][kNumFlightCauses] = {};
+		std::int64_t Contact[kNumFlightRouteRows][kNumFlightCauses] = {};
+		std::int64_t DropObstacle[kNumFlightRouteRows] = {};
+		std::int64_t DropFoliage[kNumFlightRouteRows] = {};
+		std::int64_t Chased[kNumFlightRouteRows] = {};
+		std::int64_t Hidden[kNumFlightRouteRows] = {};
+		std::int64_t Refled = 0;
+	};
+
+	inline FFlightRouteReport FlightRouteReportOf(const FRouteStats& Rs, const FFlightRouteStats& S, const FFlightOpen& Open)
+	{
+		FFlightRouteReport R;
+		R.Route = Rs;
+		for (std::int32_t r = 0; r < kNumFlightRouteRows; ++r)
+		{
+			for (std::int32_t c = 0; c < kNumFlightCauses; ++c)
+			{
+				R.N[r][c] = S.N[r][c];
+				R.Steps[r][c] = S.Steps[r][c];
+				R.Contact[r][c] = S.Contact[r][c];
+			}
+			R.N[r][kFlightTruncated] += Open.RouteNum[r];
+			R.Steps[r][kFlightTruncated] += Open.RouteSteps[r];
+			R.Contact[r][kFlightTruncated] += Open.RouteContact[r];
+			R.DropObstacle[r] = S.DropObstacle[r];
+			R.DropFoliage[r] = S.DropFoliage[r];
+			R.Chased[r] = S.Chased[r];
+			R.Hidden[r] = S.Hidden[r];
+		}
+		R.Refled = S.Refled;
 		return R;
 	}
 
@@ -916,6 +1404,10 @@ namespace EcoWorldV3
 	{
         /** Opt-in integrated life cycle owns actual birth costs instead of the legacy energy-only event. */
         bool bEcosystemLife = false;
+        bool bNaturalHabitats = false;
+        bool bWildRefuges = false;
+        std::uint32_t HabitatSignature=0;
+        EcoNaturalHabitat::FGroundTraversal NaturalGround;
 		EcoVegetationV3::FConfig Vegetation; // opt-in; schema/weights are unchanged
 		double WorldSize = 100.0;           // 정사각 맵 한 변 (단위, 학습 60~110). 100 = 200 m
 		std::int64_t Seed = 20000;          // 지연 해시 Seed(계약 5-5) 이자 세계 난수 시드
@@ -976,6 +1468,8 @@ namespace EcoWorldV3
 		std::uint8_t WorldAllowed[EcoRepertoireV3::kNumBehaviors] = {1, 1, 1, 1, 1};
 		// 야생 1단계 (w3) 도주 반사 거리 (통합 모드 eco.IntegratedV3.WildFlight — 경계 거리 실험 KeepAway 를 바꿨다). 기본 끔 = 지금 그대로
 		FWildFlightConfig WildFlight;
+		// 10-27 먹기 걷기 고침 (통합 모드 eco.IntegratedV3.GrazeCalm). 기본 0 = 지금 그대로 (평면 맵·기준 루프·골든)
+		FGrazeCalmConfig GrazeCalm;
 		// 야생 1단계 (w1) 지방 비축 (사람 결정 10-15 (7), 통합 모드 eco.IntegratedV3.WildReserve). 기본 끔 = 지금 그대로 (평면 맵·기준 루프·골든).
 		// 낮 고정 세계(DayPeriod ≤ 0)에서는 InitWorld 가 끈다 (파이썬도 daynight 없이 켤 수 없다)
 		FWildReserveConfig WildReserve;
@@ -997,6 +1491,15 @@ namespace EcoWorldV3
 		// 야생 (w3) 도망 기록 (10-21, FWorldStats::Flight·FHerbDecision::Flight — world.py track_flight, 통합 모드가 켠다). 기록만, WildFlight 를 켠
 		// 세계만 센다. 끄면(기본) 아무것도 세지 않는다 (평면 맵·기준 루프·골든 그대로)
 		bool bFlightStats = false;
+		// 섬 무대 땅/물 지도 (11-05, 통합 모드 eco.IntegratedV3.Island — EcoV3Island.h). 있으면 막힌 칸이 못 가는 곳이다: 먹이 용량 0, 사슴 미끄러짐·해안 굽힘,
+		// 늑대 반사, 관측 escape_room 의 첫 막힌 칸. 없으면(기본 nullptr) 지금 그대로 — 평면 맵·기준 루프·골든·다른 맵 모두 비트 단위로 같다
+		std::shared_ptr<const EcoV3Island::FLandMask> Island;
+		// 섬 무대 먹이 패치 타일 (11-05 확인 뒤, 칸 수). Island 가 있고 0 보다 크며 먹이 격자가 이보다 크면: 패치 잡음 정규화의 최소·최대를 격자 전체 대신
+		// 이 크기 정사각 타일(꽉 찬 것만)들의 최소·최대 평균으로 쓴다. 전체 최소·최대는 격자가 클수록 넓어져(표본 수) 섬 격자(700²)의 먹이 칸 비율·용량이
+		// 학습 무대(30²)의 절반·4 분의 1 이 됐다. 타일 = 무리 자리 무대 크기면 학습 무대와 같은 통계다. 0(기본)·격자가 타일 이하면 지금 그대로
+		std::int32_t IslandFoodTile = 0;
+		// 섬 무대 먹이 장 읽는 칸만 (11-05 확인 뒤, FFoodGrid::bLazyFields). Island 가 있고 참이면 관측 상자 평균·기울기를 사슴이 선 칸에서만 센다. 거짓(기본)이면 지금 그대로
+		bool bIslandLazyFields = false;
 
 		std::int32_t NumBaseThreats() const { return NumStalkers + NumChasers + NumRanged; }
 		std::int32_t NumThreats() const { return NumBaseThreats() + (bPlayerProxy ? 1 : 0); }
@@ -1006,7 +1509,7 @@ namespace EcoWorldV3
 	 * 10-17 통합: 팀 실제 은신처 규칙이 안전(원 안 사슴 표적·포획 제외, 늑대 몸 여유 1 m·쓸고 지나가기 막기·갇힌 늑대 꺼내기)을 맡는가.
 	 * 파이썬 규칙 bShelterSafe 가 켜져 있으면 거짓 — 같은 일을 두 규칙이 한꺼번에 하지 않는다 (밤잠 '가까운 사슴' 판정도 파이썬 그대로 남는다).
 	 */
-	inline bool RefugeOwnsSafety(const FWorldConfig& C) { return C.bProtectedRefuges && !C.bShelterSafe; }
+    inline bool RefugeOwnsSafety(const FWorldConfig& C) { return C.bProtectedRefuges && !C.bShelterSafe && !C.bWildRefuges; }
 
 	/** 평면 시험 맵의 기본 은신처: 맵 1/4·3/4 지점 네 곳, 반경 Radius (단위). */
 	inline std::vector<EcoObservationV3::FCoverInput> QuadCovers(double WorldSize, double Radius)
@@ -1163,6 +1666,35 @@ namespace EcoWorldV3
 				}
 			}
 		}
+
+		/** BoxMean 의 한 칸 (x, y) — 같은 식 (섬 무대 FFoodGrid::bLazyFields 가 읽는 칸에서만 쓴다). */
+		inline double BoxMeanAt(const std::vector<double>& Sat, std::int32_t G, std::int32_t Br, std::int32_t x, std::int32_t y)
+		{
+			const std::int32_t S = G + 1;
+			const std::int32_t R0 = ClampI(y - Br, 0, G);
+			const std::int32_t R1 = ClampI(y + Br + 1, 0, G);
+			const std::int32_t C0 = ClampI(x - Br, 0, G);
+			const std::int32_t C1 = ClampI(x + Br + 1, 0, G);
+			const double Box = Sat[static_cast<size_t>(R1) * S + C1] - Sat[static_cast<size_t>(R0) * S + C1]
+							   - Sat[static_cast<size_t>(R1) * S + C0] + Sat[static_cast<size_t>(R0) * S + C0];
+			return Box / static_cast<double>((R1 - R0) * (C1 - C0));
+		}
+
+		/** Gradient(BoxMean(Sat, Br)) 의 한 칸 (x, y) — 같은 식 (가장자리 한쪽 차분). G < 2 면 0. */
+		inline void GradientAt(const std::vector<double>& Sat, std::int32_t G, std::int32_t Br, std::int32_t x, std::int32_t y, double& Gx, double& Gy)
+		{
+			Gx = 0.0;
+			Gy = 0.0;
+			if (G < 2)
+			{
+				return;
+			}
+			const double F = BoxMeanAt(Sat, G, Br, x, y);
+			Gx = x == 0 ? BoxMeanAt(Sat, G, Br, x + 1, y) - F
+						: (x == G - 1 ? F - BoxMeanAt(Sat, G, Br, x - 1, y) : (BoxMeanAt(Sat, G, Br, x + 1, y) - BoxMeanAt(Sat, G, Br, x - 1, y)) / 2.0);
+			Gy = y == 0 ? BoxMeanAt(Sat, G, Br, x, y + 1) - F
+						: (y == G - 1 ? F - BoxMeanAt(Sat, G, Br, x, y - 1) : (BoxMeanAt(Sat, G, Br, x, y + 1) - BoxMeanAt(Sat, G, Br, x, y - 1)) / 2.0);
+		}
 	}
 
 	struct FFoodGrid
@@ -1173,6 +1705,8 @@ namespace EcoWorldV3
 		std::vector<EcoVegetationV3::FHabitat> Habitats;
 		double EnvironmentLost = 0.0; // cumulative, distinct from feeding
 		double VegetationGrown = 0.0;
+        std::int64_t LastExpansionStep=0;
+        std::int32_t ColonizedCells=0;
 		bool HasValidVegetationLayout() const
 		{
 			return !Vegetation.bEnabled || (Vegetation.IsValid() && Gw > 0 && std::isfinite(Cell) && Cell > 0
@@ -1195,6 +1729,10 @@ namespace EcoWorldV3
 		std::vector<double> Tmp;
 		std::vector<double> Tmp2;
 		std::vector<double> Demand;
+		// 섬 무대 (11-05 확인 뒤, FWorldConfig::bIslandLazyFields): Blur·GradX·GradY 를 격자 전체로 만들지 않고 BlurAt·GradAt 가 읽는 칸에서만 같은 식으로 센다
+		// (합계표 Sat 는 그대로 격자 전체). 섬 격자 700² 에서 스텝마다 격자 전체 세 번(상자 평균 둘·기울기)이 결정 스텝 비용의 대부분이었다. 끄면(기본) 지금 그대로
+		bool bLazyFields = false;
+		std::int32_t LazyRb = 1;              // 관측 상자 반경 (ComputeFields 가 SeeR 로 정한다)
 
         /** Visual-density-dependent foliage, not refuge safety or capture immunity. */
         bool BlocksSight(double Ax,double Ay,double Bx,double By) const
@@ -1207,7 +1745,9 @@ namespace EcoWorldV3
                 if(X<0||Y<0||X>=Gw*Cell||Y>=Gw*Cell)continue;
                 const auto I=size_t(CellOf({X,Y}));const auto& H=Habitats[I];
                 if(H.Plant==EcoVegetationV3::EPlant::Grass||Cap[I]<=0)continue;
-                Occlusion+=Length/Steps*H.Shade*(Food[I]/Cap[I]);
+                const double Cover = Vegetation.bHabitatDynamics && H.bNatural
+                    ? VegetationCells[I].Development : 1.;
+                Occlusion+=Length/Steps*H.Shade*(Food[I]/Cap[I])*Cover;
             }
             return Occlusion>=3;
         }
@@ -1222,10 +1762,25 @@ namespace EcoWorldV3
 		}
 
 		double FoodAt(const FVec2& P) const { return Food[static_cast<size_t>(CellOf(P))]; }
-		double BlurAt(const FVec2& P) const { return Blur[static_cast<size_t>(CellOf(P))]; }
+		double BlurAt(const FVec2& P) const
+		{
+			if (bLazyFields)
+			{
+				const std::int32_t k = CellOf(P);
+				return Detail::BoxMeanAt(Sat, Gw, LazyRb, k % Gw, k / Gw);
+			}
+			return Blur[static_cast<size_t>(CellOf(P))];
+		}
 
 		FVec2 GradAt(const FVec2& P) const
 		{
+			if (bLazyFields)
+			{
+				const std::int32_t k = CellOf(P);
+				double Gx = 0.0, Gy = 0.0;
+				Detail::GradientAt(Sat, Gw, GradBlur > 1 ? GradBlur : 1, k % Gw, k / Gw, Gx, Gy);
+				return EcoRepertoireV3::Normalize({Gx, Gy});
+			}
 			const size_t k = static_cast<size_t>(CellOf(P));
 			return EcoRepertoireV3::Normalize({GradX[k], GradY[k]});
 		}
@@ -1245,8 +1800,10 @@ namespace EcoWorldV3
 		{
 			Vegetation = C.Vegetation;
 			EnvironmentLost = VegetationGrown = 0;
+            LastExpansionStep=0;ColonizedCells=0;
 			Cell = C.FoodCell > 0.0 ? C.FoodCell : 2.0;
 			GradBlur = C.FoodGradBlur;
+			bLazyFields = C.Island != nullptr && C.bIslandLazyFields;
 			Gw = static_cast<std::int32_t>(std::ceil(C.WorldSize / Cell));
 			Gw = Gw < 1 ? 1 : Gw;
 			const size_t Cells = static_cast<size_t>(Gw) * Gw;
@@ -1267,6 +1824,37 @@ namespace EcoWorldV3
 				Lo = V < Lo ? V : Lo;
 				Hi = V > Hi ? V : Hi;
 			}
+			if (C.Island && C.IslandFoodTile > 0 && Gw > C.IslandFoodTile)
+			{
+				// 섬 무대 (11-05 확인 뒤): 꽉 찬 타일들의 최소·최대 평균 (타일 차례 — 행 우선). 잡음·흐림은 위 그대로
+				const std::int32_t T = C.IslandFoodTile;
+				double SumLo = 0.0, SumHi = 0.0;
+				std::int64_t Tiles = 0;
+				for (std::int32_t Ty = 0; Ty + T <= Gw; Ty += T)
+				{
+					for (std::int32_t Tx = 0; Tx + T <= Gw; Tx += T)
+					{
+						double TLo = M[static_cast<size_t>(Ty) * Gw + Tx], THi = TLo;
+						for (std::int32_t y = Ty; y < Ty + T; ++y)
+						{
+							for (std::int32_t x = Tx; x < Tx + T; ++x)
+							{
+								const double V = M[static_cast<size_t>(y) * Gw + x];
+								TLo = V < TLo ? V : TLo;
+								THi = V > THi ? V : THi;
+							}
+						}
+						SumLo += TLo;
+						SumHi += THi;
+						++Tiles;
+					}
+				}
+				if (Tiles > 0)
+				{
+					Lo = SumLo / static_cast<double>(Tiles);
+					Hi = SumHi / static_cast<double>(Tiles);
+				}
+			}
 			const double Den = (Hi - Lo) > EcoRepertoireV3::kEps ? (Hi - Lo) : EcoRepertoireV3::kEps;
 			const double Th = C.FoodPatchThreshold;
 			Cap.assign(Cells, 0.0);
@@ -1275,6 +1863,20 @@ namespace EcoWorldV3
 				const double Mn = (M[k] - Lo) / Den;
 				const double V = (Mn - Th) / (1.0 - Th);
 				Cap[k] = V < 0.0 ? 0.0 : (V > 1.0 ? 1.0 : V);
+			}
+			if (C.Island)
+			{
+				// 섬 무대 (11-05): 막힌 칸(바다·호수·가파름·숲·바위)은 용량 0 — 칸 가운데로 판정. 패치 잡음은 위에서 Gw² 개를 다 뽑았다 (순서 그대로)
+				for (std::int32_t y = 0; y < Gw; ++y)
+				{
+					for (std::int32_t x = 0; x < Gw; ++x)
+					{
+						if (!C.Island->IsOpen((static_cast<double>(x) + 0.5) * Cell, (static_cast<double>(y) + 0.5) * Cell))
+						{
+							Cap[static_cast<size_t>(y) * Gw + x] = 0.0;
+						}
+					}
+				}
 			}
 			if (C.Obstacles.Active() && C.Obstacles.bNoFood)
 			{
@@ -1417,20 +2019,29 @@ namespace EcoWorldV3
 		{
 			Detail::BuildSat(Food, Gw, Sat, Tmp);
 			const std::int32_t Rb = static_cast<std::int32_t>(std::lround(SeeR / Cell));
+			if (bLazyFields)
+			{
+				LazyRb = Rb > 1 ? Rb : 1;   // 섬 무대: 상자 평균·기울기는 읽는 칸에서만 (BlurAt·GradAt)
+				return;
+			}
 			Detail::BoxMean(Sat, Gw, Rb > 1 ? Rb : 1, Blur);
 			Detail::BoxMean(Sat, Gw, GradBlur > 1 ? GradBlur : 1, Tmp2);
 			Detail::Gradient(Tmp2, Gw, GradX, GradY);
 		}
 
 		/** 먹이 재생 (world.step 7): food ← clip(food + regen·(cap − food), 0, cap). */
-		void Regrow()
+		void Regrow(double SimulationSeconds = 0)
 		{
 			if (!HasValidVegetationLayout()) return; // ON never falls back to a different world's regeneration.
+			auto GrowthWeather = VegetationWeather;
+			if (Vegetation.bHabitatDynamics)
+				GrowthWeather.Temperature = std::clamp(GrowthWeather.Temperature
+					+ EcoVegetationV3::SeasonalTemperatureOffset(SimulationSeconds), -100., 100.);
 			for (size_t k = 0; k < Food.size(); ++k)
 			{
 				if (Vegetation.bEnabled)
 				{
-					const auto Result = EcoVegetationV3::Advance(Vegetation, VegetationWeather, Habitats[k],
+					const auto Result = EcoVegetationV3::Advance(Vegetation, GrowthWeather, Habitats[k],
 						VegetationCells[k], Food[k], Cap[k], Regen[k], EcoRepertoireV3::kStepSeconds);
 					Food[k] = Result.Food;
 					EnvironmentLost += Result.Loss;
@@ -1482,6 +2093,9 @@ namespace EcoWorldV3
 		// Obs 는 18 칸 그대로 둔다 (팀 진단 EcoCreatureInspection 이 이 배열 길이를 관측 칸 수로 쓴다)
 		float ObstacleObs[EcoObservationV3::kNumObstacleObs] = {};
 		EcoObservationV3::FObstacleObs Obstacle;   // 그 원시 거리 (기록·시험. 채우지 않으면 기본값)
+		// 10-22 두 길 두뇌 관측 21~23 (in_panic·shelter_reach·shelter_edge — EcoObservationV3::WriteRouteObs). E 가 아니라 H 의 길 단계(Detail::RouteStep)가 쓰고
+		// 도주 밖·죽음·길 끈 두뇌면 0 이다. 망 입력 = Obs 18 · ObstacleObs 3 · 이 3 (관측 24 두뇌만 읽는다)
+		float RouteObs[EcoObservationV3::kNumRouteObs] = {};
 	};
 
 	/** 요청과 결정 기록 (FEcoBehaviorStateFragment 안). */
@@ -1511,6 +2125,23 @@ namespace EcoWorldV3
 
 		// 야생 (w3) 도망 기록 (FWorldConfig::bFlightStats 일 때만 쓴다 — 기록만. 끄면 늘 기본값)
 		FFlightTrack Flight;
+
+		// 10-22 두 길 두뇌 (FWildFlightConfig::bRoute 일 때만 쓴다. 끄면 늘 기본값 — 이식 계획서 2-8, world.py `_route_*` 칸의 이 사슴 행)
+		std::int32_t Route = kRouteNone;       // 다음 스텝에 쓰는 길 (도주 덮기일 때만 RUN·SHELTER, 결정 스텝은 RUN — 다음 A 의 RouteApply 가 고른 칸으로 바꾼다)
+		std::int32_t RouteK = -1;              // SHELTER 길의 은신처 번호 (route_k)
+		std::int32_t RouteAge = 0;             // 지난 길 결정 뒤 도주 스텝 수 (route_age)
+		std::int32_t RouteFeas = 0;            // 지난 결정 때 가능 비트 (kRouteFeasShelter — route_feas)
+		bool bRouteDecide = false;             // 이번 H 가 길 결정으로 표시했다 (route_decide — 다음 A 까지 남는다)
+		bool bRouteSok = false;                // 이번 H 에 SHELTER 가 가능했다 (들어갈 때 문턱 — route_cand_ok[SHELTER])
+		std::int32_t RouteCandK = -1;          // 그때 고를 수 있는 은신처 k* (route_cand_k, 불가 −1)
+		FVec2 RouteShelterDir;                 // k* 쪽 방향 (벽 여유 뒤 — route_cand_dir[SHELTER], 불가 0)
+		FVec2 RouteRunDir;                     // 이번 H 의 반사 방향 (RUN — 판 4·5 두뇌를 길 없는 두뇌로 바꾼 경계 스텝이 쓴다, 이식 계획서 8-2)
+		double RouteMu = 0.0;                  // SHELTER 가능이면 μ* (아니면 0 — 기록·관측 22 의 재료)
+		double RouteE = 0.0;                   // SHELTER 가능이면 e* (아니면 0 — 관측 23 의 재료)
+		std::int32_t RouteDecPrev = kRouteNone;   // 결정 스텝의 결정 전 길 (시작이면 −1 — 길 바꿈 셈, _rt_dec_prev)
+		std::int32_t RouteRequest = -1;        // 길 결정 줄의 두뇌 출력 칸 (1 RUN·4 SHELTER, 아니면 −1 — DecideHerb 가 정하고 다음 A 가 읽는다)
+		bool bRouteReads = false;              // 이번 DecideHerb 가 길 결정으로 망을 돌렸다
+		bool bCommittedRouteReads = false;     // 이번 A 에 적용한 길 결정 (결정 수 FWorldStats::Decisions 에 든다 — world.py `_rep_accumulate`)
 	};
 
 	/** 위협 하나 (FEcoThreatStateFragment). */
@@ -1552,6 +2183,12 @@ namespace EcoWorldV3
 		std::int64_t MaskViolations = 0;     // 마스크가 막은 행동이 실행됐다 (늘 0 이어야 한다)
 		std::int64_t BlockedHerbMoves = 0;   // 이동 제약 콜백이 막은 사슴 이동 (통합 모드만. 평면 맵은 늘 0)
 		std::int64_t BlockedThreatMoves = 0; // 이동 제약 콜백이 막은 위협 이동
+		// 섬 무대 (FWorldConfig::Island 가 있을 때만 — 기록만)
+		std::int64_t IslandDeerSteers = 0;   // 해안 굽힘으로 방향을 바꾼 사슴·스텝
+		std::int64_t IslandDeerSlides = 0;   // 막힌 칸 앞에서 미끄러진 사슴·스텝
+		std::int64_t IslandDeerStops = 0;    // 미끄러지지도 못해 제자리인 사슴·스텝
+		std::int64_t IslandWolfReflects = 0; // 막힌 칸 앞에서 반사한 늑대·스텝
+		std::int64_t IslandDeerHookAlts = 0; // 팀 이동 제약이 막아 ±35°·±70° 돌린 걸음으로 간 사슴·스텝 (11-05 확인 뒤)
 		// 섭식 기록 (통합 모드 화면·기록용. 논리에 쓰지 않으므로 평면 맵·기준 루프의 상태는 그대로다)
 		double FoodEaten = 0.0;              // 누적 먹은 먹이 (먹이 단위, C4 에서 셀마다 덜어 낸 양의 셀 순서 합)
 		std::int64_t EatSteps = 0;           // 실제로 먹은 개체·스텝 (먹은 양 > 0)
@@ -1569,6 +2206,10 @@ namespace EcoWorldV3
 		std::int64_t KeepAlertStarts = 0;    // 경계(멀어짐) 시작
 		std::int64_t KeepPanicStarts = 0;    // 도망 시작
 		std::int64_t KeepShelterStarts = 0;  // 은신처 웅크림 시작
+		std::int64_t KeepRestStarts = 0;     // 10-27 거리 두기(쉬는 늑대) 시작 (bRestKeep 일 때만)
+		std::int64_t KeepRestEnds = 0;       // 끝난 거리 두기 (산 사슴 — 죽음은 세지 않는다)
+		std::int64_t RestBandTurnSteps = 0;  // 다가가지 않기 띠가 방향을 바꾼 사슴·스텝 (RestKeepBand > 0 일 때만 — 파이썬 band_turn_steps)
+		std::int64_t RestBandStopSteps = 0;  // 그 가운데 다 지워져 멈춘 사슴·스텝 (band_stop_steps)
 		std::int64_t KeepPanicEnds = 0;      // 끝난 도망 (안전 거리 밖 또는 은신처)
 		std::int64_t KeepPanicEndShelter = 0; // 그중 은신처에서 끝남
 		std::int64_t KeepPanicEndSteps = 0;  // 끝난 도망의 길이 합 (스텝)
@@ -1636,6 +2277,9 @@ namespace EcoWorldV3
 		std::int64_t ObsLayoutMismatch = 0;
 		// 야생 (w3) 도망 기록 (FWorldConfig::bFlightStats ∧ WildFlight 일 때만 — 머리 주석 '도망 기록'. 보고는 FlightReportOf)
 		FFlightStats Flight;
+		// 10-22 두 길 두뇌 (FWildFlightConfig::bRoute 일 때만 센다 — 기록만). 길 통계 (route_stats), 도망 길 기록 (bFlightStats 도 켰을 때 — 보고는 FlightRouteReportOf)
+		FRouteStats Route;
+		FFlightRouteStats FlightRoute;
 	};
 
 	/**
@@ -1687,6 +2331,8 @@ namespace EcoWorldV3
 		// bObstacleObsProbe = 관측 18 두뇌여도 세 칸을 만든다 (기록·대조 전용 — 망은 18 칸만 읽으므로 결정은 그대로). 기본 18·끔 = 지금 그대로
 		std::int32_t ObsDim = EcoObservationV3::kObsDim;
 		bool bObstacleObsProbe = false;
+		// 10-23 R7 마스크 판 5 (반사 밖 두뇌 FLEE 막음 — 머리 주석). 두뇌가 정한다 (SetModelFleeGate). 기본 끔 = 지금 그대로
+		bool bFleeGate = false;
 		EcoObservationV3::FObstacleObsConfig ObstacleObsCfg = EcoObservationV3::kR5ObstacleObsConfig;
 		FWorldStats Stats;
 		std::vector<EcoObservationV3::FThreatInput> ExternalThreats;
@@ -1773,6 +2419,7 @@ namespace EcoWorldV3
 			W.Config.TwilightSteps = Tw > 1 ? Tw : 1;
 		}
 		W.RepCfg = EcoRepertoireV3::kR1bConfig;
+        if(C.bNaturalHabitats){W.RepCfg.bFootprintArrival=false;W.RepCfg.HideTravelMax=150;} // bounded 20s interior approach, not footprint re-locks
 		W.ObsCfg = EcoObservationV3::kR1bObsConfig;
 		W.ThreatCfg = EcoThreatV3::FThreatConfig();
 		W.ThreatCfg.bRealismNight = C.bRealismNight;
@@ -1785,6 +2432,23 @@ namespace EcoWorldV3
 		W.ThreatCfg.bShelterBlock = C.bShelterSafe;
 		// 늑대 몸 여유: 0 이상 유한한 값만 (파이썬 _rz_shelter_params 가 음수·무한을 거부한다). 막지 않으면 뜻이 없어 0
 		W.Config.ShelterWolfMargin = C.bShelterSafe && std::isfinite(C.ShelterWolfMargin) && C.ShelterWolfMargin > 0.0 ? C.ShelterWolfMargin : 0.0;
+		// 10-22 두 길 두뇌: 도주 반사가 없는 세계에서는 켜지 않는다 (파이썬도 wild_flight 없이 route 를 켤 수 없다)
+		W.Config.WildFlight.bRoute = C.WildFlight.bRoute && C.WildFlight.bEnabled;
+		// 10-27 거리 두기: 도주 반사가 없는 세계에서는 켜지 않는다 (파이썬 선택 키는 wild_flight 블록 안). 여유·띠는 0 이상 유한한 값만 (파이썬이 거부하는 값은 끈다)
+		{
+			FWildFlightConfig& K = W.Config.WildFlight;
+			K.bRestKeep = K.bRestKeep && K.bEnabled && std::isfinite(K.RestKeepMargin) && K.RestKeepMargin >= 0.0 && std::isfinite(K.RestKeepBand)
+						  && K.RestKeepBand >= 0.0;
+			K.bRestKeepAsleep = K.bRestKeepAsleep && K.bRestKeep;
+		}
+		// 10-27 먹기 걷기 고침: 0 이상 유한한 값만 W.RepCfg 로 (파이썬 parse_params 가 음수·무한을 거부한다 — 그런 값은 0 = 끔)
+		{
+			auto Ok = [](double V) { return std::isfinite(V) && V > 0.0 ? V : 0.0; };
+			W.RepCfg.GrazeEdgeR = Ok(C.GrazeCalm.EdgeR);
+			W.RepCfg.GrazeEdgeW = Ok(C.GrazeCalm.EdgeW);
+			W.RepCfg.GrazeInertia = Ok(C.GrazeCalm.Inertia);
+			W.RepCfg.GrazeWallMargin = Ok(C.GrazeCalm.WallMargin);
+		}
 		// 야생 (w1): 하루 단위 계수라 낮 고정 세계에서는 끈다 (파이썬 _wild_reserve_params 가 daynight 없이 켜기를 거부한다)
 		W.Config.WildReserve.bEnabled = C.WildReserve.bEnabled && W.Config.DayPeriod > 0;
 		W.ReserveCap = W.Config.WildReserve.bEnabled
@@ -1839,13 +2503,29 @@ namespace EcoWorldV3
 	}
 
 	/**
-	 * R5 장애물 관측: 지금 두뇌가 받는 관측 칸 수를 정한다 (두뇌의 망 FPolicyNetV3::ObsDim — 18 또는 21, 그 밖은 18). 실행 중 두뇌 바꾸기가 SetModelAllowed 와
+	 * R5 장애물 관측: 지금 두뇌가 받는 관측 칸 수를 정한다 (두뇌의 망 FPolicyNetV3::ObsDim — 18·21·24, 그 밖은 18). 실행 중 두뇌 바꾸기가 SetModelAllowed 와
 	 * 함께 부른다. 다음 관측(스텝 끝 E·입양 첫 관측)부터 그 칸 수로 만든다 — 바꾸는 경계(결정 스텝 앞)에서 부르면 그 스텝 끝 결정이 새 두뇌·새 관측이다.
-	 * InitWorld 는 18 이다 (내장 R1b — 지금 그대로).
+	 * 24(두 길 두뇌)는 E 에서 21 과 같은 장애물 세 칸을 만든다(길 세 칸은 H 의 길 단계가 쓴다 — SetModelRoute). InitWorld 는 18 이다 (내장 R1b — 지금 그대로).
 	 */
 	inline void SetModelObsDim(FWorldState& W, std::int32_t ObsDim)
 	{
-		W.ObsDim = ObsDim == EcoObservationV3::kObsDimObstacle ? EcoObservationV3::kObsDimObstacle : EcoObservationV3::kObsDim;
+		W.ObsDim = (ObsDim == EcoObservationV3::kObsDimObstacle || ObsDim == EcoObservationV3::kObsDimRoute) ? ObsDim : EcoObservationV3::kObsDim;
+	}
+
+	/**
+	 * 10-22 두 길 두뇌를 켜고 끈다 (두뇌가 정한다 — 관측 24·마스크 판 4·5 두뇌일 때만 참으로 부른다. 이식 계획서 1-2·8-2). WildFlight 를 끈 세계에서는 켜지 않는다
+	 * (InitWorld 와 같은 묶음 — 거부는 부르는 쪽이 먼저 한다). 끄면 남은 길 상태는 다음 H 가 지우고, 그 사이 A 는 고른 칸을 적용하지 않고 열린 도주를 반사
+	 * 방향(RUN)으로 둔다(RouteApply). 판 4·5 두뇌를 걸 때 부르는 쪽이 실제 허용(W.Allowed — SetModelAllowed 뒤)의 얼기·잠이 0 인지 본다.
+	 */
+	inline void SetModelRoute(FWorldState& W, bool bRoute)
+	{
+		W.Config.WildFlight.bRoute = bRoute && W.Config.WildFlight.bEnabled;
+	}
+
+	/** 10-23 R7 마스크 판 5 (반사 밖 두뇌 FLEE 막음 — 판 5 두뇌일 때만 참). WildFlight 를 끈 세계에서는 켜지 않는다 (이식 계획서 13-3). */
+	inline void SetModelFleeGate(FWorldState& W, bool bGate)
+	{
+		W.bFleeGate = bGate && W.Config.WildFlight.bEnabled;
 	}
 
 	/** 세로 장애물 밀어내기를 걸고 기록한다 (원판이 없으면 아무것도 안 한다). */
@@ -2110,6 +2790,7 @@ namespace EcoWorldV3
 			Oi.NumDiscs = Ob.Active() ? Ob.Num() : 0;
 			Oi.BodyR = Ob.bEnabled ? Ob.BodyR : 0.0;
 			Oi.StageSize = W.Config.WorldSize;
+			Oi.Island = W.Config.Island.get();   // 섬 무대 (11-05): escape_room 이 첫 막힌 칸도 본다 (없으면 nullptr — 지금 그대로)
 			Oi.bBlockSight = Ob.bEnabled && Ob.bBlockSight;
 			// 숲 시야 (10-21): 가림 = 줄기 ∨ 잎 (world.py obstacle_obs_values 의 foliage — 끄면 줄기만)
 			Oi.bFoliage = Ob.FoliageOn();
@@ -2206,12 +2887,47 @@ namespace EcoWorldV3
 
 	// ---- 다음 요청 (계약 5-6 Prepare → 마스크 → 망) ----
 
+	namespace Detail
+	{
+		/**
+		 * 망 입력 (관측 칸 수 NetObsDim): 18 이하면 관측 18 그대로, 넘으면 Buf(0 으로 채운 kMaxObsDim 칸)에 [관측 18 | 장애물 세 칸 | (24 두뇌면) 길 세 칸]을
+		 * 이어 놓고 돌려준다 (R5 계약 2-4·두 길 두뇌 이식 계획서 3절 — 파이썬 obs_names 순서).
+		 */
+		inline const float* NetInputOf(const FHerbPerception& P, std::int32_t NetObsDim, float Buf[EcoPolicyV3::kMaxObsDim])
+		{
+			if (NetObsDim <= EcoObservationV3::kObsDim)
+			{
+				return P.Obs;
+			}
+			for (std::int32_t i = 0; i < EcoObservationV3::kObsDim; ++i)
+			{
+				Buf[i] = P.Obs[i];
+			}
+			for (std::int32_t i = 0; i < EcoObservationV3::kNumObstacleObs; ++i)
+			{
+				Buf[EcoObservationV3::kObsDim + i] = P.ObstacleObs[i];
+			}
+			if (NetObsDim >= EcoObservationV3::kObsDimRoute)
+			{
+				for (std::int32_t i = 0; i < EcoObservationV3::kNumRouteObs; ++i)
+				{
+					Buf[EcoObservationV3::kObsDimObstacle + i] = P.RouteObs[i];
+				}
+			}
+			return Buf;
+		}
+	}
+
 	/** 초식 하나의 다음 요청: 결정 관측 → Prepare → 가능·결정 마스크 → reads 면 망 argmax, 아니면 지금 행동. */
 	inline void DecideHerb(FWorldState& W, const FHerbView& H, const EcoPolicyV3::FPolicyNetV3& Net = EcoPolicyV3::kBuiltinNet)
 	{
+		static_assert(EcoObservationV3::kObsDimRoute <= EcoPolicyV3::kMaxObsDim, "관측 24 가 망 입력 상한을 넘는다");
 		FHerbDecision& D = *H.Decision;
 		EcoRepertoireV3::FRepState& S = *H.Rep;
 		const FHerbPerception& P = *H.Perception;
+		// 10-22 두 길 두뇌: 지난 결정의 길 요청이 남지 않게 모든 갈래 첫머리에 지운다 (도주가 끝난 사슴의 읽음이 다음 A 의 결정 수에 다시 들지 않게 — 이식 계획서 2-7 (나))
+		D.RouteRequest = -1;
+		D.bRouteReads = false;
 		const double E01 = H.Body->Energy / W.RepCfg.MaxEnergy;
 		D.DecisionObs = EcoObservationV3::ToDecisionObs(P.Threat, P.Cover, E01 < 0.0 ? 0.0 : (E01 > 1.0 ? 1.0 : E01), W.Dark);
 		D.Prep = EcoRepertoireV3::Prepare(S, D.DecisionObs, W.RepCfg);
@@ -2229,28 +2945,36 @@ namespace EcoWorldV3
 				D.Mask[b] = 0;
 				D.Logits[b] = 0.0f;
 			}
+			if (W.Config.WildFlight.bRoute && D.KeepMode == kKeepPanic && D.bRouteDecide)
+			{
+				// 10-22 두 길 두뇌 길 결정 줄 (마스크 판 4·5 — rep_policy.py `_route_rows`): 칸 1 RUN·칸 4 SHELTER(관측 22 > 0) 가운데 망 argmax. 실행 요청은
+				// FLEE 그대로이고(덮기 실행기), 고른 칸은 다음 A 첫머리의 RouteApply 가 길로 읽는다. 도주 비결정·웅크림 줄은 망을 부르지 않는다(한 칸이라 결과가 같다)
+				EcoPolicyV3::ApplyRouteMaskRows(W.bFleeGate ? EcoPolicyV3::kMaskVersionRouteGate : EcoPolicyV3::kMaskVersionRoute, EcoPolicyV3::kMaskOverridePanic,
+												true, false, P.RouteObs[1], false, D.Mask);
+				W.Stats.ObsLayoutMismatch += W.ObsDim < Net.ObsDim ? 1 : 0;
+				float NetIn[EcoPolicyV3::kMaxObsDim] = {};
+				D.RouteRequest = EcoPolicyV3::RunPolicyV3(Net, Detail::NetInputOf(P, Net.ObsDim, NetIn), D.Mask, D.Logits);
+				D.bRouteReads = true;
+			}
 			D.bPrepared = true;
 			return;
 		}
 		EcoPolicyV3::ComputeFeasibleMask(P.Obs, D.Feasible);
 		// 허용 = 모델 ∧ 세계 (W.Allowed). 세계 칸이 모두 1 이면 kAllowedMask 그대로라 지금까지와 비트 단위로 같다
 		EcoPolicyV3::ComposeActionMask(W.Allowed, D.Feasible, D.Prep.bReads, D.Prep.bWakeDecide, S.Behavior, D.Mask);
+		if (W.bFleeGate)
+		{
+			// 10-23 R7 마스크 판 5: 덮기 밖 결정 줄(경계 포함)에서 칸 1(FLEE)을 막는다 — 도주는 반사만 시작한다 (rep_policy.py `_gate_free_rows`)
+			EcoPolicyV3::ApplyRouteMaskRows(EcoPolicyV3::kMaskVersionRouteGate, EcoPolicyV3::kMaskOverrideNone, false, false, 0.0f, D.Prep.bReads, D.Mask);
+		}
 		if (D.Prep.bReads)
 		{
 			if (Net.ObsDim > EcoObservationV3::kObsDim)
 			{
-				// R5 관측 21 두뇌 (계약 2-4): 망 입력 = 관측 18 + 장애물 세 칸 (마스크는 앞 18 칸만 본다 — 판 2 그대로)
+				// R5 관측 21 두뇌 (계약 2-4): 망 입력 = 관측 18 + 장애물 세 칸 (마스크는 앞 18 칸만 본다 — 판 2 그대로). 관측 24 두뇌는 + 길 세 칸 (도주 밖이라 0)
 				W.Stats.ObsLayoutMismatch += W.ObsDim < Net.ObsDim ? 1 : 0;
-				float NetIn[EcoPolicyV3::kMaxObsDim] = {};   // 망 칸 수 상한 (로더는 21 까지만 받는다)
-				for (std::int32_t i = 0; i < EcoObservationV3::kObsDim; ++i)
-				{
-					NetIn[i] = P.Obs[i];
-				}
-				for (std::int32_t i = 0; i < EcoObservationV3::kNumObstacleObs; ++i)
-				{
-					NetIn[EcoObservationV3::kObsDim + i] = P.ObstacleObs[i];
-				}
-				D.Request = EcoPolicyV3::RunPolicyV3(Net, NetIn, D.Mask, D.Logits);
+				float NetIn[EcoPolicyV3::kMaxObsDim] = {};   // 망 칸 수 상한 (로더는 24 까지만 받는다)
+				D.Request = EcoPolicyV3::RunPolicyV3(Net, Detail::NetInputOf(P, Net.ObsDim, NetIn), D.Mask, D.Logits);
 			}
 			else
 			{
@@ -2347,6 +3071,10 @@ namespace EcoWorldV3
 			In.bFoodOk = EcoRepertoireV3::IsFoodOk(W.Food.FoodAt(B.Pos), W.RepCfg);
 			In.bInCover = H.Decision->DecisionObs.bInCover;
 			In.Dark = W.Dark;
+			// 10-27 먹기 걷기 고침의 입력 (GrazeCalmOn 일 때만 읽는다 — 끈 세계는 값만 채운다): 결정 때 위치·이번 이동 전 heading·무대 한 변
+			In.Pos = B.Pos;
+			In.Head = B.Head;
+			In.WorldSize = W.Config.WorldSize;
 			return In;
 		}
 
@@ -2359,11 +3087,252 @@ namespace EcoWorldV3
 
 		// ---- 야생 1단계 (w3) 도주 반사 거리 (FWorldConfig::WildFlight 를 켠 세계만 부른다) ----
 
+		/**
+		 * 무대 벽 여유 (world.py `wf_wall_keep` = UpdateWildFlight 의 벽 여유 줄): 축마다 위치가 벽 여유 Mg 안이고 방향이 그 벽 쪽이면 그 성분을 지우고 단위화한다
+		 * (다 지워지면 D 그대로). 지운 성분이 없어도 늘 Normalize 를 거친다 — 빼면 끝자리가 바뀐다(이식 계획서 9절 R2).
+		 */
+		inline FVec2 WallKeep(const FVec2& P, const FVec2& D, double Size, double Mg)
+		{
+			return EcoRepertoireV3::WallKeepDir(P, D, Size, Mg);   // 식은 하나 (10-27 먹기 걷기 고침의 벽 여유도 같은 함수)
+		}
+
+		// ---- 10-22 두 길 두뇌 (FWildFlightConfig::bRoute 일 때만 — 머리 주석, 이식 계획서 2절) ----
+
+		/** SHELTER 기하 한 사슴 (world.py `_route_shelter` 의 한 줄 — 이식 계획서 2-4). */
+		struct FRouteShelterGeo
+		{
+			std::int32_t K = -1;          // k* = 후보 가운데 가장자리 거리 e 가 가장 작은 은신처 (같으면 낮은 번호, 없으면 −1)
+			double Mu = 0.0;              // μ* (후보 없음 0)
+			double E = 0.0;               // e* (후보 없음 0)
+			FVec2 Dir;                    // k* 쪽 단위 방향 → WallKeep (후보 없음 0)
+			double KeepMu = -std::numeric_limits<double>::infinity();   // 유지 은신처의 μ (유지 없음 −∞)
+			bool bKeepOk = false;         // 유지: KeepMu ≥ kRouteShelterExitU (C++ 전용 — 유지 은신처가 목록 밖이거나 반경 0 이면 거짓)
+			FVec2 KeepDir;                // 유지 은신처 쪽 → WallKeep (유지 없음 0)
+		};
+
+		/**
+		 * SHELTER 가능·유지 기하 (world.py `_route_shelter` 와 같은 식·같은 차례 — 이식 계획서 2-4·9절). 사슴 P(스텝 끝), a₀ = 은신처 굽히기 전 반사 방향 A0,
+		 * 늑대 자리 Q (x, y) × M 가운데 SBits 비트 = S (안전 거리 안 붙잡는 늑대 — near_h), 은신처 원 Covers, 유지 은신처 KeepK(없으면 −1), 무대 Size·벽 여유 Mg.
+		 * 은신처 k 마다: v = c − p, |v| = √(vx² + vy²), e = |v| − r, ds = max(|v|, EPS), u = v ÷ ds, 입구 x = p + e·u, μ = min_{m∈S} |q_m − x| − e (S 가 비면 +∞),
+		 *   cos = (vx·a₀x + vy·a₀y) ÷ ds. 후보 = |v| > EPS ∧ 0 < e ≤ 20 ∧ cos ≥ 0 ∧ μ ≥ 2. 유지 = μ_keep ≥ 0 (후보 조건은 보지 않는다).
+		 * C++ 전용 (파이썬 세계에 없는 경우 — 비트 일치와 무관): 반경 0 원(통합 모드 지워진 은신처)은 후보에서 빼고, 유지 은신처가 반경 0·목록 밖이면 유지 거짓.
+		 */
+		inline FRouteShelterGeo RouteShelterGeometry(const FVec2& P, const FVec2& A0, const double* Q, std::uint64_t SBits, std::int32_t M,
+													 const EcoObservationV3::FCoverInput* Covers, std::int32_t NumCovers, std::int32_t KeepK, double Size,
+													 double Mg)
+		{
+			namespace R3 = EcoRepertoireV3;
+			const double Inf = std::numeric_limits<double>::infinity();
+			const std::int32_t Mc = M < 64 ? M : 64;
+			FRouteShelterGeo G;
+			for (std::int32_t k = 0; k < NumCovers; ++k)
+			{
+				const EcoObservationV3::FCoverInput& Cv = Covers[k];
+				const bool bLive = Cv.Radius > 0.0;
+				if (!bLive && k != KeepK)
+				{
+					continue;
+				}
+				const double Vx = Cv.X - P.X;
+				const double Vy = Cv.Y - P.Y;
+				const double Dc = std::sqrt(Vx * Vx + Vy * Vy);
+				const double Ed = Dc - Cv.Radius;
+				const double Ds = Dc > R3::kEps ? Dc : R3::kEps;
+				const double Ux = Vx / Ds;
+				const double Uy = Vy / Ds;
+				const double Xx = P.X + Ed * Ux;
+				const double Xy = P.Y + Ed * Uy;
+				double Md = Inf;
+				for (std::int32_t m = 0; m < Mc; ++m)
+				{
+					if (((SBits >> m) & 1ULL) == 0ULL)
+					{
+						continue;
+					}
+					const double Dx = Q[2 * m] - Xx;
+					const double Dy = Q[2 * m + 1] - Xy;
+					const double Dm = std::sqrt(Dx * Dx + Dy * Dy);
+					Md = Dm < Md ? Dm : Md;
+				}
+				const double Mu = Md - Ed;
+				const double Cs = (Vx * A0.X + Vy * A0.Y) / Ds;
+				const bool bCand = bLive && Dc > R3::kEps && Ed > 0.0 && Ed <= kRouteShelterMaxEdgeU && Cs >= kRouteShelterCosMin && Mu >= kRouteShelterEnterU;
+				if (bCand && (G.K < 0 || Ed < G.E))
+				{
+					G.K = k;
+					G.Mu = Mu;
+					G.E = Ed;
+					G.Dir = WallKeep(P, FVec2{Ux, Uy}, Size, Mg);
+				}
+				if (k == KeepK)
+				{
+					G.KeepMu = Mu;
+					G.bKeepOk = bLive && Mu >= kRouteShelterExitU;
+					G.KeepDir = WallKeep(P, FVec2{Ux, Uy}, Size, Mg);
+				}
+			}
+			return G;
+		}
+
+		/** 길 상태를 지운다 (도주 아님·도주 끝·웅크림·죽음·길 끈 두뇌 — world.py `_route_step` 의 도주 아님 줄·`_route_clear`). 관측 21~23 도 0. */
+		inline void ClearRoute(FHerbDecision& D, float RouteObs[EcoObservationV3::kNumRouteObs])
+		{
+			D.Route = kRouteNone;
+			D.RouteK = -1;
+			D.RouteAge = 0;
+			D.RouteFeas = 0;
+			D.bRouteDecide = false;
+			D.bRouteSok = false;
+			D.RouteCandK = -1;
+			D.RouteShelterDir = FVec2{};
+			D.RouteRunDir = FVec2{};
+			D.RouteMu = 0.0;
+			D.RouteE = 0.0;
+			D.RouteDecPrev = kRouteNone;
+			for (std::int32_t i = 0; i < EcoObservationV3::kNumRouteObs; ++i)
+			{
+				RouteObs[i] = 0.0f;
+			}
+		}
+
+		/** 길 단계 한 사슴의 입력 (H — UpdateWildFlight 가 다음 덮기·반사 방향을 정한 뒤). */
+		struct FRouteStepInput
+		{
+			std::int32_t Prev = kKeepNone;    // 이번 스텝에 실행한 덮기 (KeepActive — 파이썬 prev = wf_mode)
+			std::int32_t Next = kKeepNone;    // 다음 스텝 덮기 (도주가 아니면 길 상태를 지운다)
+			FVec2 P;                          // 스텝 끝 자리
+			FVec2 A0;                         // 은신처 굽히기 전 반사 방향 a₀ (world.py `_wf_update` 의 a0)
+			const double* Q = nullptr;        // 늑대 자리 (x, y) × M (스텝 끝)
+			std::uint64_t SBits = 0;          // S = 안전 거리 안 붙잡는 늑대 (UpdateWildFlight 의 NearH)
+			std::int32_t M = 0;
+			const EcoObservationV3::FCoverInput* Covers = nullptr;
+			std::int32_t NumCovers = 0;
+			double Size = 0.0;                // 무대 한 변
+			double Mg = 0.0;                  // 벽 여유 (FWildFlightConfig::WallMargin)
+		};
+
+		/** 길 단계 진단 (골든·시험 — 세계는 쓰지 않는다). */
+		struct FRouteStepResult
+		{
+			bool bOnset = false;      // 도주 시작
+			bool bDecide = false;     // 길 결정 (시작 ∨ 길 없음 ∨ SHELTER 무효 ∨ RUN 길 잠금 뒤 가능 바뀜)
+			bool bInvalid = false;    // SHELTER 무효 (유지 μ < 0)
+			bool bRefeas = false;     // RUN 길 잠금 뒤 가능 바뀜
+			bool bKeepOk = false;     // 지금 길이 SHELTER 이고 유지
+			double KeepMu = 0.0;      // 지금 길이 SHELTER 면 유지 μ (아니면 0)
+		};
+
+		/**
+		 * 길 단계 한 사슴 (world.py `_route_step` 의 두뇌 길 줄 — 이식 계획서 2-2·2-3). Dir = 반사 최종 방향(RUN)을 받아 다음 스텝 덮기 방향으로 고친다(SHELTER 유지면
+		 * 유지 은신처 쪽, 그 밖 그대로). D 의 길 칸·관측 21~23 을 쓰고 Stats 에 시작·결정·가능 바뀜·무효를 센다. 도주가 아니면(In.Next ≠ 도주) 길 상태를 지운다.
+		 *   onset = Prev ≠ 도주, cur = onset ? NONE : D.Route, keep = cur SHELTER ? D.RouteK : −1, feas = SHELTER 가능 ? 2 : 0, invalid = cur SHELTER ∧ ¬유지,
+		 *   age = onset ? 0 : D.RouteAge + 1 (먼저 더하고 본다), refeas = cur ≥ 0 ∧ ¬invalid ∧ age ≥ 15 ∧ feas ≠ D.RouteFeas ∧ cur ≠ SHELTER,
+		 *   decide = onset ∨ cur < 0 ∨ invalid ∨ refeas. 결정 스텝의 길은 RUN(반사 방향) — 두뇌가 고른 칸은 다음 A 의 RouteApply 가 적용한다.
+		 */
+		inline FRouteStepResult RouteStep(FHerbDecision& D, float RouteObs[EcoObservationV3::kNumRouteObs], const FRouteStepInput& In, FVec2& Dir,
+										  FRouteStats& Stats)
+		{
+			FRouteStepResult R;
+			if (In.Next != kKeepPanic)
+			{
+				ClearRoute(D, RouteObs);
+				return R;
+			}
+			R.bOnset = In.Prev != kKeepPanic;
+			const std::int32_t Cur = R.bOnset ? kRouteNone : D.Route;
+			const std::int32_t KeepK = Cur == kRouteShelter ? D.RouteK : -1;
+			const FRouteShelterGeo G = RouteShelterGeometry(In.P, In.A0, In.Q, In.SBits, In.M, In.Covers, In.NumCovers, KeepK, In.Size, In.Mg);
+			const bool bSok = G.K >= 0;
+			const std::int32_t Feas = bSok ? kRouteFeasShelter : 0;
+			R.bKeepOk = KeepK >= 0 && G.bKeepOk;
+			R.KeepMu = Cur == kRouteShelter ? G.KeepMu : 0.0;
+			R.bInvalid = Cur == kRouteShelter && !R.bKeepOk;
+			const std::int32_t Age = R.bOnset ? 0 : D.RouteAge + 1;
+			R.bRefeas = Cur >= 0 && !R.bInvalid && Age >= kRouteLockSteps && Feas != D.RouteFeas && Cur != kRouteShelter;
+			R.bDecide = R.bOnset || Cur < 0 || R.bInvalid || R.bRefeas;
+			const std::int32_t New = R.bDecide ? kRouteRun : Cur;
+			D.RouteRunDir = Dir;
+			if (New == kRouteShelter)
+			{
+				Dir = G.KeepDir;   // SHELTER 유지: 유지 은신처 쪽 (이 스텝 자리로 다시 잰 값, 벽 여유 뒤)
+			}
+			D.RouteK = New == kRouteShelter ? D.RouteK : -1;
+			D.Route = New;
+			D.RouteAge = R.bDecide ? 0 : Age;
+			D.RouteFeas = R.bDecide ? Feas : D.RouteFeas;
+			D.bRouteDecide = R.bDecide;
+			D.bRouteSok = bSok;
+			D.RouteCandK = G.K;
+			D.RouteShelterDir = G.Dir;
+			D.RouteMu = bSok ? G.Mu : 0.0;
+			D.RouteE = bSok ? G.E : 0.0;
+			D.RouteDecPrev = R.bDecide ? Cur : kRouteNone;
+			EcoObservationV3::WriteRouteObs(true, bSok, G.Mu, G.E, RouteObs);
+			Stats.Onsets += R.bOnset ? 1 : 0;
+			Stats.OnsetShelter += (R.bOnset && bSok) ? 1 : 0;
+			Stats.Decisions += R.bDecide ? 1 : 0;
+			Stats.RedecideFeas += R.bRefeas ? 1 : 0;
+			if (R.bInvalid)
+			{
+				++Stats.Invalid[Cur];
+			}
+			return R;
+		}
+
+		/**
+		 * A 첫머리 (Commit 앞): 지난 H 가 길 결정으로 표시한 도주 사슴에 두뇌가 고른 칸을 적용한다 (world.py `_route_apply` — 이식 계획서 2-7 (다)). 칸 4 이고
+		 * 결정 때 SHELTER 가 가능했으면 SHELTER(결정 때 k* — RouteCandK·RouteShelterDir), 아니면 RUN(H 가 둔 반사 방향 그대로). 고른 길·바꿈·choice·bad 는
+		 * 여기서 센다(파이썬과 같은 셈 시점 — 판 끝 마지막 H 의 결정은 들지 않는다). bRoute 가 거짓(판 4·5 → 길 없는 두뇌로 바꾼 경계 — 이식 계획서 8-2)이면
+		 * 고른 칸을 버리고 열린 도주를 그 H 의 반사 방향(RouteRunDir)으로 둔다 — 남은 길 상태는 이번 H 가 지운다. 길 끈 세계는 Route 가 늘 NONE 이라 그대로다.
+		 */
+		inline void RouteApply(FHerbDecision& D, bool bRoute, FRouteStats& Stats)
+		{
+			D.bCommittedRouteReads = bRoute && D.bRouteReads;
+			if (!bRoute)
+			{
+				if (D.Route != kRouteNone && D.KeepMode == kKeepPanic)
+				{
+					D.KeepDir = D.RouteRunDir;
+				}
+				return;
+			}
+			if (!(D.bRouteDecide && D.KeepMode == kKeepPanic))
+			{
+				return;
+			}
+			const bool bWant = D.RouteRequest == kRouteSlotShelter;
+			const bool bSh = bWant && D.bRouteSok;
+			Stats.BadShelter += (bWant && !bSh) ? 1 : 0;
+			Stats.Choice += D.bRouteSok ? 1 : 0;
+			const std::int32_t Chosen = bSh ? kRouteShelter : kRouteRun;
+			++Stats.Picked[Chosen];
+			Stats.Switches += (D.RouteDecPrev >= 0 && Chosen != D.RouteDecPrev) ? 1 : 0;
+			if (bSh)
+			{
+				D.Route = kRouteShelter;
+				D.RouteK = D.RouteCandK;
+				D.KeepDir = D.RouteShelterDir;
+			}
+		}
+
 		/** 사냥 중인 위협 (world.py `_wf_hunting`): 먹는 중(쿨다운)·잠·배부름이 아니고 플레이어 휴식 모드가 아니다. */
 		inline bool FlightHunting(const FWorldState& W, const FThreatAgent& A)
 		{
 			return A.State.Cooldown == 0 && !ThreatAsleepNow(W, A) && (!W.ThreatCfg.bWildSatiation || A.State.SatLeft == 0)
 				   && !(A.Spec.Type == EcoThreatV3::EThreatType::Player && A.State.PlayerMode == EcoThreatV3::EPlayerMode::Rest);
+		}
+
+		/** 10-27 거리 두기의 쉬는 늑대 (world.py `_wf_rest_wolves`): 죽지 않았고 사냥 중이 아니고(먹기·배부름·플레이어 휴식) 깨어 있다 (bRestKeepAsleep 이면 자는 늑대도). */
+		inline bool RestWolf(const FWorldState& W, const FThreatAgent& A)
+		{
+			return !A.bDead && !FlightHunting(W, A) && (W.Config.WildFlight.bRestKeepAsleep || !ThreatAsleepNow(W, A));
+		}
+
+		/** 사슴 P → 위협 자리 (X, Y) 눈길이 트였나 (world.py `_wf_los` — 줄기 원판·숲 시야 잎. 통합 모드 식생 가림도 — 관측 보임과 같은 가림). */
+		inline bool EyeClear(const FWorldState& W, const FVec2& P, double X, double Y)
+		{
+			const FObstacleConfig& Ob = W.Config.Obstacles;
+			return !((Ob.Active() && Ob.bBlockSight && EyeBlocked(Ob, P.X, P.Y, X, Y)) || (W.Config.bEcosystemLife && W.Food.BlocksSight(P.X, P.Y, X, Y)));
 		}
 
 		/**
@@ -2382,12 +3351,31 @@ namespace EcoWorldV3
 			const bool bSightBlock = W.Config.Obstacles.Active() && W.Config.Obstacles.bBlockSight;
 			constexpr std::int32_t kMaxM = 64;
 			const std::int32_t Mc = M < kMaxM ? M : kMaxM;
+			// 10-27 거리 두기 (머리 주석 FWildFlightConfig::bRestKeep): 늑대 시야 반경 V (× 날씨 — world.py `_wf_view`), 나올 때 V + 여유
+			const bool bRestKeep = F.bRestKeep;
+			const double RestV = WolfViewNow(W);
+			const double RestOut = RestV + F.RestKeepMargin;
+			// 10-22 두 길 두뇌 (머리 주석 FWildFlightConfig::bRoute): 늑대 자리 (스텝 끝 — world.py pred_pos, SHELTER 경주 여유의 q_m)
+			const bool bRoute = F.bRoute;
+			double Q[2 * kMaxM] = {};
+			if (bRoute)
+			{
+				for (std::int32_t m = 0; m < Mc; ++m)
+				{
+					Q[2 * m] = Threats[m]->State.PosX;
+					Q[2 * m + 1] = Threats[m]->State.PosY;
+				}
+			}
 			for (std::int32_t i = 0; i < N; ++i)
 			{
 				const FHerbView& H = Herbs[i];
 				FHerbDecision& D = *H.Decision;
 				R3::FRepState& S = *H.Rep;
 				const std::int32_t Prev = D.KeepActive;
+				if (bRoute && D.Route >= 0 && D.Route < kNumRoutes)
+				{
+					++W.Stats.Route.Steps[D.Route];   // 10-22 이번 스텝에 실행한 길 (스텝 첫머리 산 사슴 — world.py `_route_step` 의 _rt_steps, 죽음 분기 앞)
+				}
 				if (H.Body->DeathCause != kDeathNone)
 				{
 					W.Stats.KeepPanicDied += Prev == kKeepPanic ? 1 : 0;
@@ -2398,13 +3386,17 @@ namespace EcoWorldV3
 					{
 						D.KeepActive = kKeepNone;   // 새 세대 (평면 맵 부활 — 통합 모드는 부활하지 않는다)
 					}
+					if (bRoute || D.Route != kRouteNone)
+					{
+						ClearRoute(D, H.Perception->RouteObs);   // 10-22 죽은 사슴의 길 상태·관측 21~23 (파이썬 nxt[~live] = WF_NONE → 도주 아님 줄, terminal_obs 0)
+					}
 					continue;
 				}
 				const FVec2 P = H.Body->Pos;
 				const bool bInCov = H.Perception->Cover.bInCover;
 				bool bNoticedH = false, bAnyNr = false, bAnyNearH = false, bPanicNow = false;
 				// 위협마다 판정을 먼저 모은다 (방향은 다음 덮기가 정해진 뒤 고른 늑대들로)
-				bool Nh[kMaxM] = {}, Nr[kMaxM] = {}, NearH[kMaxM] = {};
+				bool Nh[kMaxM] = {}, Nr[kMaxM] = {}, NearH[kMaxM] = {}, Pv[kMaxM] = {}, Rs[kMaxM] = {};
 				double Ex[kMaxM] = {}, Ey[kMaxM] = {}, Pd[kMaxM] = {}, Inv[kMaxM] = {};
 				for (std::int32_t m = 0; m < Mc; ++m)
 				{
@@ -2416,6 +3408,7 @@ namespace EcoWorldV3
                         &&((bSightBlock&&EyeBlocked(W.Config.Obstacles,P.X,P.Y,Ti.X,Ti.Y))
                             ||(W.Config.bEcosystemLife&&W.Food.BlocksSight(P.X,P.Y,Ti.X,Ti.Y)));
 					const bool bPv = EcoObservationV3::PerceiveThreats(P, H.Body->Head, SeePred, S.SeeMult, S.SeeMult, &Ti, 1, W.ObsCfg).PredCount == 1;
+					Pv[m] = bPv;
 					Ex[m] = A.State.PosX - P.X;
 					Ey[m] = A.State.PosY - P.Y;
 					Pd[m] = std::sqrt(Ex[m] * Ex[m] + Ey[m] * Ey[m]);
@@ -2424,7 +3417,7 @@ namespace EcoWorldV3
 					const bool bLocked = A.Last.bHasTarget && A.Last.Target == i;   // 이번 스텝 이 사슴을 쫓음 (world.py pred_target)
 					const bool bComing = bHunt && (bLocked || bAppr);
 					Nh[m] = bPv && bHunt && Pd[m] <= F.AlertR;
-					Nr[m] = F.bRestAlert && bPv && !bHunt && Pd[m] <= F.AlertR;
+					Nr[m] = F.bRestAlert && !bRestKeep && bPv && !bHunt && Pd[m] <= F.AlertR;   // 10-27 거리 두기를 켜면 쉬는 늑대 경계는 쓰지 않는다
 					// 지난 도주를 붙잡는 늑대: 사냥 중 (10-16 bHoldAwake 면 깨어 있는 늑대 전부 — 먹기·배부름 포함, 자는 늑대 말고)
 					NearH[m] = (F.bHoldAwake ? !ThreatAsleepNow(W, A) : bHunt) && Pd[m] <= F.SafeR;
 					bPanicNow = bPanicNow || (Nh[m] && (Pd[m] <= F.FlightR || bComing));
@@ -2445,16 +3438,37 @@ namespace EcoWorldV3
 				{
 					Next = kKeepAlert;
 				}
+				if (bRestKeep && Next == kKeepNone && !bInCov)
+				{
+					// 10-27 거리 두기 (world.py `_wf_update` 의 rest_keep 줄): 쉬는 늑대마다 눈길 트임 ∧ (시작: d ≤ V ∧ (고개 든 시야 — SeePredNow·위협 시야각, 행동 배수
+					// 없음 — 로 보임 ∨ 지금 알아챔) ∨ 이어짐: 지난 덮기 거리 두기 ∧ d ≤ V + 여유). 하나라도 고르면 다음 덮기 = 거리 두기
+					const FVec2 Hd = H.Body->Head;
+					bool bAnyRs = false;
+					for (std::int32_t m = 0; m < Mc; ++m)
+					{
+						const FThreatAgent& A = *Threats[m];
+						if (!(Pd[m] <= RestOut) || !RestWolf(W, A) || !EyeClear(W, P, A.State.PosX, A.State.PosY))
+						{
+							continue;
+						}
+						const bool bEye = Pd[m] <= SeePred && (Ex[m] * Hd.X + Ey[m] * Hd.Y) * Inv[m] >= W.ObsCfg.ThreatFovCos;
+						Rs[m] = (Pd[m] <= RestV && (bEye || Pv[m])) || Prev == kKeepRest;
+						bAnyRs = bAnyRs || Rs[m];
+					}
+					Next = bAnyRs ? kKeepRest : kKeepNone;
+				}
 				FVec2 Dir;
+				FVec2 A0;   // 10-22 두 길 두뇌: 은신처 굽히기 전 반사 방향 a₀ (world.py `_wf_update` 의 a0 — SHELTER 후보의 cos 기준)
 				bool bToShelter = false;
-				if (Next == kKeepAlert || Next == kKeepPanic)
+				if (Next == kKeepAlert || Next == kKeepPanic || Next == kKeepRest)
 				{
 					// 도주 = 안전 거리 안 사냥 중인 늑대들, 경계 = 알아챈 늑대들의 반대 (거리 역수 가중 합). 0 이면 가장 가까운 그 늑대 반대
+					// 10-27 거리 두기 = 고른 쉬는 늑대들의 반대 (같은 식)
 					double Sx = 0.0, Sy = 0.0;
 					std::int32_t J = -1;
 					for (std::int32_t m = 0; m < Mc; ++m)
 					{
-						const bool bSel = Next == kKeepPanic ? NearH[m] : (Nh[m] || Nr[m]);
+						const bool bSel = Next == kKeepPanic ? NearH[m] : (Next == kKeepRest ? Rs[m] : (Nh[m] || Nr[m]));
 						if (!bSel)
 						{
 							continue;
@@ -2471,6 +3485,17 @@ namespace EcoWorldV3
 					if (!(Dir.X * Dir.X + Dir.Y * Dir.Y > Eps2) && J >= 0)
 					{
 						Dir = FVec2{-Ex[J] * Inv[J], -Ey[J] * Inv[J]};
+					}
+					A0 = Dir;
+					if (Next == kKeepRest && Prev == kKeepRest && (D.KeepDir.X != 0.0 || D.KeepDir.Y != 0.0))
+					{
+						// 10-27 적대적 검토 — 이어지는 거리 두기는 지난 덮기 방향을 이어받는다 (world.py `_wf_update` 의 WF_REST_INERTIA 줄): n(반대 방향 + 관성·지난 방향),
+						// 0 이면 반대 방향 그대로. 가장자리 굽히기·벽 여유 앞 (굽히는 쪽도 지난 쪽을 따른다)
+						const FVec2 Held = R3::Normalize(FVec2{Dir.X + kRestKeepInertia * D.KeepDir.X, Dir.Y + kRestKeepInertia * D.KeepDir.Y});
+						if (Held.X * Held.X + Held.Y * Held.Y > Eps2)
+						{
+							Dir = Held;
+						}
 					}
 					if (Next == kKeepPanic && K > 0)
 					{
@@ -2506,20 +3531,37 @@ namespace EcoWorldV3
 					{
 						Dir = WildEdgeSteer(P, Dir, Size, F.EdgeR);
 					}
-					// 무대 벽 여유 안이면 벽 쪽 성분을 지운다 (다 지워지면 그대로)
-					const double Mg = F.WallMargin;
-					FVec2 Sl = Dir;
-					if ((P.X <= Mg && Sl.X < 0.0) || (P.X >= Size - Mg && Sl.X > 0.0))
-					{
-						Sl.X = 0.0;
-					}
-					if ((P.Y <= Mg && Sl.Y < 0.0) || (P.Y >= Size - Mg && Sl.Y > 0.0))
-					{
-						Sl.Y = 0.0;
-					}
-					Sl = R3::Normalize(Sl);
-					Dir = (Sl.X * Sl.X + Sl.Y * Sl.Y > Eps2) ? Sl : Dir;
+					// 무대 벽 여유 안이면 벽 쪽 성분을 지운다 (다 지워지면 그대로 — WallKeep, 두 길의 SHELTER 방향과 같은 줄)
+					Dir = WallKeep(P, Dir, Size, F.WallMargin);
 				}
+				if (bRoute)
+				{
+					// 10-22 두 길 두뇌 길 단계 (world.py `_wf_update` 끝의 `_route_step`): 도주 사슴은 결정·무효·잠금·관측 21~23 을 정하고 SHELTER 유지면 덮기 방향을
+					// 유지 은신처 쪽으로 바꾼다(RUN·결정 스텝은 반사 방향 그대로). 도주가 아니면 길 상태를 지운다. S = 안전 거리 안 붙잡는 늑대(NearH)
+					std::uint64_t SBits = 0;
+					for (std::int32_t m = 0; m < Mc; ++m)
+					{
+						SBits |= NearH[m] ? (1ULL << m) : 0ULL;
+					}
+					FRouteStepInput In;
+					In.Prev = Prev;
+					In.Next = Next;
+					In.P = P;
+					In.A0 = A0;
+					In.Q = Q;
+					In.SBits = SBits;
+					In.M = Mc;
+					In.Covers = W.Config.Covers.data();
+					In.NumCovers = K;
+					In.Size = Size;
+					In.Mg = F.WallMargin;
+					RouteStep(D, H.Perception->RouteObs, In, Dir, W.Stats.Route);
+				}
+				else if (D.Route != kRouteNone)
+				{
+					ClearRoute(D, H.Perception->RouteObs);   // 판 4·5 → 길 없는 두뇌로 바꾼 뒤 남은 길 상태 (길 끈 세계는 늘 NONE 이라 그대로)
+				}
+				W.Stats.KeepRestEnds += (Prev == kKeepRest && Next != kKeepRest) ? 1 : 0;   // 10-27 기록만 (산 사슴)
 				if (Prev == kKeepPanic && Next != kKeepPanic)
 				{
 					++W.Stats.KeepPanicEnds;
@@ -2530,7 +3572,8 @@ namespace EcoWorldV3
 				if ((Prev == kKeepPanic || Prev == kKeepShelter) && Next != kKeepPanic && Next != kKeepShelter)
 				{
 					// 풀림: 두뇌의 다음 결정을 깨끗하게 연다 (잠금이 끝난 것으로, 미뤄 둔 사건 결정 없음)
-					S.LockLeft = S.LockLeft < 0 ? S.LockLeft : 0;
+					if(!W.Config.bNaturalHabitats||S.Behavior!=EcoRepertoireV3::kHide||S.bArrived)
+                        S.LockLeft = S.LockLeft < 0 ? S.LockLeft : 0;
 					S.EvWait = -1;
 				}
 				D.KeepDir = Dir;
@@ -2552,7 +3595,7 @@ namespace EcoWorldV3
 			R.bEvent = D.Prep.bEvent;
 			R.bFire = D.Prep.bFire;
 			R.EventBits = D.Prep.EventBits;
-			if (S.Behavior != Target || S.bWaking || (Target == R3::kHide && !S.bArrived))
+			if (S.Behavior != Target || S.bWaking || (Target == R3::kHide && !S.bArrived && W.RepCfg.bFootprintArrival))
 			{
 				R3::Enter(S, Target, D.DecisionObs, W.RepCfg);
 				R.bSwitch = true;
@@ -2646,6 +3689,8 @@ namespace EcoWorldV3
 											 R3::Scale(In.Separation, RC.SepWeight)),
 									 R3::Scale(D.KeepDir, W.Config.WildFlight.AlertW));
 			FVec2 Nv = R3::Normalize(Dv);
+			// 10-27 먹기 걷기 고침(GrazeCalmDir)은 여기에 쓰지 않는다 — 경계 방향은 이미 늑대 반대·가장자리 굽히기·벽 여유를 거친 KeepDir 가 이끈다
+			// (10-27 적대적 검토: 처음 판은 걸었는데 가장자리 되돌림이 AlertW 를 이겨 가장자리에서 사냥 늑대 쪽으로 걷는 몫이 늘었다 — world.py `_wf_alert_control`)
 			if (!(Nv.X * Nv.X + Nv.Y * Nv.Y > R3::kEps * R3::kEps))
 			{
 				Nv = D.KeepDir;
@@ -2656,6 +3701,103 @@ namespace EcoWorldV3
 			O.EatMult = RC.GaitEat[R3::kGaitWalk];
 			O.DrainMult = RC.GaitDrain[R3::kGaitWalk];
 			O.SeeMult = 1.0;
+		}
+
+		/**
+		 * B 의 거리 두기 제어 (world.py `_wf_rest_control`): 덮기가 거리 두기이고 두뇌 행동이 GRAZE 인 사슴은 걸으며 먹고(보행·섭식·대사 = 걷기) 물러나며
+		 * 고개를 든다(시야 배수 1). 방향: D = 덮기 방향, S = 분리, c = S·D < 0 이면 S ← S − c·D (분리의 늑대 쪽 성분을 지운다), n(D + SepWeight·S)(0 이면 D),
+		 * 그다음 벽 여유(WallMargin — 위치는 결정 때 자리 H.Body->Pos). 다른 행동(두뇌의 FLEE·HIDE·SLEEP)은 그대로다.
+		 * 10-27 적대적 검토: 처음 판(n(D + SepWeight·S) 만)은 앞을 막은 동료의 분리가 D 를 지워 걸음이 스텝마다 앞뒤로 뒤집혔고, 벽을 따라 물러나는 사슴을
+		 * 분리가 벽으로 밀어 제자리에 붙잡았다.
+		 */
+		inline void FlightRestControl(const FWorldState& W, const FHerbView& H, const EcoRepertoireV3::FControlInput& In)
+		{
+			namespace R3 = EcoRepertoireV3;
+			const FHerbDecision& D = *H.Decision;
+			if (D.KeepActive != kKeepRest || H.Rep->Behavior != R3::kGraze || !(D.KeepDir.X != 0.0 || D.KeepDir.Y != 0.0))
+			{
+				return;
+			}
+			const R3::FRepertoireConfig& RC = W.RepCfg;
+			const FVec2 Dk = D.KeepDir;
+			FVec2 S = In.Separation;
+			const double C = S.X * Dk.X + S.Y * Dk.Y;
+			if (C < 0.0)
+			{
+				S = FVec2{S.X - C * Dk.X, S.Y - C * Dk.Y};   // 분리의 늑대 쪽(덮기 방향 반대) 성분을 지운다 — 옆으로 비켜 가게만
+			}
+			FVec2 Nv = R3::Normalize(R3::Add(Dk, R3::Scale(S, RC.SepWeight)));
+			if (!(Nv.X * Nv.X + Nv.Y * Nv.Y > R3::kEps * R3::kEps))
+			{
+				Nv = Dk;
+			}
+			Nv = R3::WallKeepDir(H.Body->Pos, Nv, W.Config.WorldSize, W.Config.WildFlight.WallMargin);   // 벽으로 밀지 않는다
+			R3::FControlOutput& O = *H.Control;
+			O.Velocity = R3::Scale(Nv, RC.HerbSpeed * RC.GaitSpeed[R3::kGaitWalk]);
+			O.Gait = R3::kGaitWalk;
+			O.EatMult = RC.GaitEat[R3::kGaitWalk];
+			O.DrainMult = RC.GaitDrain[R3::kGaitWalk];
+			O.SeeMult = 1.0;
+		}
+
+		/**
+		 * B 의 다가가지 않기 띠 (world.py `_wf_rest_band`, RestKeepBand > 0): 거리 두기가 아닌 GRAZE 걷기(평소·경계) 사슴은 쉬는 늑대(번호 오름차순) 가운데
+		 * 실거리 ≤ min(V + 여유 + 띠, SeePredNow)·눈길 트임인 것마다 차례로 속도의 그 늑대 쪽 성분 c = v·u > 0 을 지운다. 하나라도 지웠으면 걷기 속력으로
+		 * 다시 맞추고, 다 지워졌으면 정지(보행·섭식·대사 = 정지). 위협 자리는 지난 스텝 끝(H 와 같은 자리 — 아직 움직이지 않았다).
+		 */
+		inline void FlightRestBand(FWorldState& W, const FHerbView& H, FThreatAgent* const* Threats, std::int32_t M)
+		{
+			namespace R3 = EcoRepertoireV3;
+			R3::FControlOutput& O = *H.Control;
+			if (H.Decision->KeepActive == kKeepRest || H.Rep->Behavior != R3::kGraze || O.Gait != R3::kGaitWalk)
+			{
+				return;
+			}
+			const FWildFlightConfig& F = W.Config.WildFlight;
+			const double Out = WolfViewNow(W) + F.RestKeepMargin + F.RestKeepBand;
+			const double See = SeePredNow(W);
+			const double Lim = Out < See ? Out : See;
+			const FVec2 P = H.Body->Pos;
+			FVec2 V = O.Velocity;
+			bool bHit = false;
+			for (std::int32_t m = 0; m < M; ++m)
+			{
+				const FThreatAgent& A = *Threats[m];
+				const double Ex = A.State.PosX - P.X;
+				const double Ey = A.State.PosY - P.Y;
+				const double Pd = std::sqrt(Ex * Ex + Ey * Ey);
+				if (!(Pd <= Lim) || !RestWolf(W, A) || !EyeClear(W, P, A.State.PosX, A.State.PosY))
+				{
+					continue;
+				}
+				const double Inv = 1.0 / (Pd > R3::kEps ? Pd : R3::kEps);
+				const double Ux = Ex * Inv;
+				const double Uy = Ey * Inv;
+				const double C = V.X * Ux + V.Y * Uy;
+				if (C > 0.0)
+				{
+					V.X = V.X - C * Ux;
+					V.Y = V.Y - C * Uy;
+					bHit = true;
+				}
+			}
+			if (!bHit)
+			{
+				return;
+			}
+			++W.Stats.RestBandTurnSteps;
+			const FVec2 Nv = R3::Normalize(V);
+			const R3::FRepertoireConfig& RC = W.RepCfg;
+			if (Nv.X * Nv.X + Nv.Y * Nv.Y > R3::kEps * R3::kEps)
+			{
+				O.Velocity = R3::Scale(Nv, RC.HerbSpeed * RC.GaitSpeed[R3::kGaitWalk]);
+				return;
+			}
+			++W.Stats.RestBandStopSteps;
+			O.Velocity = FVec2{};
+			O.Gait = R3::kGaitStop;
+			O.EatMult = RC.GaitEat[R3::kGaitStop];
+			O.DrainMult = RC.GaitDrain[R3::kGaitStop];
 		}
 
 		// ---- 야생 (w3) 도망 기록 (FWorldConfig::bFlightStats ∧ WildFlight — 기록만. 머리 주석 '도망 기록') ----
@@ -2717,6 +3859,7 @@ namespace EcoWorldV3
 				Dd.bDone = H.Body->DeathCause != kDeathNone;
 				Dd.bCaught = H.Body->DeathCause == kDeathCaught;
 				Dd.bInCov = H.Perception->Cover.bInCover;
+				Dd.Route = D.KeepActive == kKeepPanic ? D.Route : kRouteNone;   // 10-22 이번 스텝에 실행한 길 (반사 스텝만 — world.py rt_exec·re_)
 				W.FlightTracks[static_cast<size_t>(i)] = &H.Decision->Flight;
 			}
 			W.FlightWolves.resize(static_cast<size_t>(M > 0 ? M : 0));
@@ -2727,7 +3870,11 @@ namespace EcoWorldV3
 				Wf.Target = A.Last.bHasTarget ? A.Last.Target : -1;
 				Wf.bHuntEnd = FlightHunting(W, A);
 			}
-			FlightUpdate(W.Stats.Flight, W.FlightTracks.data(), W.FlightDeer.data(), N, W.FlightWolves.data(), M);
+			// 10-22 두 길 두뇌면 도망 길 기록도. 이번 스텝 번호 = 도망 기록 시계 S.Clock (FlightUpdate 를 부른 횟수 — 스텝마다 1 씩 늘어 world.py self.t − 1 과
+			// 차이가 같다. W.T − 1 은 통합 모드가 팀 시계에 다시 맞출 때 뛰어 refled 를 틀리게 잰다 — 10-24 적대적 검토). 끈 세계는 지금 줄 그대로
+			const bool bRoute = W.Config.WildFlight.bRoute;
+			FlightUpdate(W.Stats.Flight, W.FlightTracks.data(), W.FlightDeer.data(), N, W.FlightWolves.data(), M, bRoute ? &W.Stats.FlightRoute : nullptr,
+						 W.Stats.Flight.Clock);
 		}
 	}
 
@@ -2759,6 +3906,7 @@ namespace EcoWorldV3
 		const bool bReserve = W.Config.WildReserve.bEnabled;   // 야생 (w1) 지방 비축 (끄면 아래 bReserve 줄은 모두 건너뛴다 — 지금 그대로)
 		const bool bWeather = W.Config.Weather.bEnabled;       // 야생 3단계 지역 날씨 (끄면 아래 bWeather 줄은 모두 건너뛴다 — 지금 그대로)
 		const bool bFlight = bKeep && W.Config.bFlightStats;   // 야생 (w3) 도망 기록 (기록만 — 끄면 아래 bFlight 줄은 모두 건너뛴다)
+		const bool bRoute = bKeep && W.Config.WildFlight.bRoute;   // 10-22 두 길 두뇌 (끄면 A 의 RouteApply 는 남은 상태가 없어 아무것도 하지 않는다)
 		if (bWeather)
 		{
 			++W.Stats.WeatherSteps[W.WeatherKind];   // 기록만: 이 스텝 이동에 쓰는 결정 때 날씨 (world.py weather_stats steps_<날씨>)
@@ -2775,6 +3923,8 @@ namespace EcoWorldV3
 				// 방어: 첫 관측 없이 스텝이 왔다. 지금 지각으로 준비한다 (보통 경로는 ObserveAndDecideAll·지난 스텝 H 가 한다)
 				DecideHerb(W, H, Net);
 			}
+			// 10-22 두 길 두뇌: 지난 H 의 길 결정에 두뇌가 고른 칸을 적용한다 (world.py `step` 첫머리의 `_route_apply` — 덮기 방향 KeepDir 만 바꾼다. 끈 세계는 그대로)
+			Detail::RouteApply(D, bRoute, W.Stats.Route);
 			D.PrevBehavior = S.Behavior;
 			D.CommittedRequest = D.Request;
 			D.bCommittedReads = D.Prep.bReads;
@@ -2800,6 +3950,7 @@ namespace EcoWorldV3
 					W.Stats.KeepAlertStarts += D.KeepActive == kKeepAlert ? 1 : 0;
 					W.Stats.KeepPanicStarts += D.KeepActive == kKeepPanic ? 1 : 0;
 					W.Stats.KeepShelterStarts += D.KeepActive == kKeepShelter ? 1 : 0;
+					W.Stats.KeepRestStarts += D.KeepActive == kKeepRest ? 1 : 0;
 				}
 				D.KeepPanicSteps += D.KeepActive == kKeepPanic ? 1 : 0;
 				++W.Stats.KeepSteps[D.KeepActive];
@@ -2813,7 +3964,8 @@ namespace EcoWorldV3
 								  : D.bCommittedReads ? D.CommittedMask[S.Behavior] != 0
 													  : (S.Behavior == D.PrevBehavior || D.Prep.bWoke);
 			W.Stats.MaskViolations += bAllowed ? 0 : 1;
-			W.Stats.Decisions += D.bCommittedReads ? 1 : 0;
+			// 결정 수: Arbiter 가 읽은 결정(덮기 스텝은 아니다) + 10-22 길 결정 (world.py `_rep_accumulate` 의 (decide ∧ ¬덮기) ∨ 길 결정 — 판 4·5)
+			W.Stats.Decisions += (D.bCommittedReads || D.bCommittedRouteReads) ? 1 : 0;
 			if (D.Result.bSwitch)
 			{
 				++W.Stats.Entries[S.Behavior];
@@ -2842,6 +3994,15 @@ namespace EcoWorldV3
 				Detail::FlightControlInput(H, In);
 				*H.Control = R3::Control(*H.Rep, In, RC);
 				Detail::FlightAlertControl(W, H, In);
+				if (W.Config.WildFlight.bRestKeep)
+				{
+					// 10-27 거리 두기: 덮기 거리 두기 ∧ GRAZE 는 걸어서 물러나고, 그 밖 GRAZE 걷기는 쉬는 늑대 쪽으로 다가가지 않는다 (world.py _rep_step 의 rest 줄)
+					Detail::FlightRestControl(W, H, In);
+					if (W.Config.WildFlight.RestKeepBand > 0.0)
+					{
+						Detail::FlightRestBand(W, H, Threats, M);
+					}
+				}
 			}
 			else
 			{
@@ -2905,6 +4066,13 @@ namespace EcoWorldV3
 				W.Stats.DetourDeerStart += Dr.bStart ? 1 : 0;
 				W.Stats.DetourDeerFail += Dr.bFail ? 1 : 0;
 			}
+			const EcoV3Island::FLandMask* const Isl = W.Config.Island.get();
+			if (Isl && !Traveling)
+			{
+				// 섬 무대 (11-05): 해안 거리 kShoreEdgeR 안에서 해안 쪽으로 가면 해안을 따라가는 쪽으로 굽힌다 (크기 그대로 — 적용 속도·heading 도 굽힌 값)
+				EcoRepertoireV3::FControlOutput& Ctl = *Herbs[i].Control;
+				W.Stats.IslandDeerSteers += Isl->ShoreSteer(B.Pos.X, B.Pos.Y, Ctl.Velocity.X, Ctl.Velocity.Y) ? 1 : 0;
+			}
 			if(Traveling){
                 const auto V=Herbs[i].Control->Velocity;B.Pos=R3::Add(B.Pos,V);
                 if(R3::IsNonZero(V))B.Head=R3::Normalize(V);
@@ -2919,12 +4087,43 @@ namespace EcoWorldV3
 				W.Stats.ObstacleDeerHit += Sl.bHit ? 1 : 0;
 				W.Stats.ObstacleDeerBack += Sl.bBack ? 1 : 0;
 			}
+			if (Isl && !Traveling)
+			{
+				// 섬 무대 (11-05): 다음 자리가 막힌 칸이면 x 만 → y 만 순서로 미끄러지고, 둘 다 안 되면 제자리 (heading 은 가려던 쪽 그대로 — 원판 미끄러짐과 같은 꼴)
+				const std::int32_t Sl = Isl->Slide(B.PrevPos.X, B.PrevPos.Y, B.Pos.X, B.Pos.Y);
+				W.Stats.IslandDeerSlides += Sl == 1 ? 1 : 0;
+				W.Stats.IslandDeerStops += Sl == 2 ? 1 : 0;
+			}
 			// 통합 모드: 지형·장애물 제약. 막히면 이동 전 자리 (heading 은 가려던 쪽 그대로)
 			if (Hooks && Hooks->HerbMove && (B.Pos.X != B.PrevPos.X || B.Pos.Y != B.PrevPos.Y)
 				&& !Hooks->HerbMove(Hooks->User, i, B.PrevPos, B.Pos))
 			{
-				B.Pos = B.PrevPos;
-				++W.Stats.BlockedHerbMoves;
+				bool bAlt = false;
+				if (Isl && !Traveling)
+				{
+					// 섬 무대 (11-05 확인 뒤): 팀 이동 제약(4 m 지도보다 잘게 보는 벼랑·비탈)이 막으면 같은 길이 걸음을 +35°·−35°·+70°·−70° 돌려 차례로
+					// 다시 묻는다 (땅 칸·세계 안만 — 통합 이동 길의 우회와 같은 각). 그래도 막히면 지금처럼 제자리. heading 은 가려던 쪽 그대로
+					static const double kAltCos[4] = {std::cos(0.6108652381980153), std::cos(-0.6108652381980153), std::cos(1.2217304763960306), std::cos(-1.2217304763960306)};
+					static const double kAltSin[4] = {std::sin(0.6108652381980153), std::sin(-0.6108652381980153), std::sin(1.2217304763960306), std::sin(-1.2217304763960306)};
+					const double Dx = B.Pos.X - B.PrevPos.X;
+					const double Dy = B.Pos.Y - B.PrevPos.Y;
+					const double Ws = W.Config.WorldSize;
+					for (std::int32_t a = 0; a < 4 && !bAlt; ++a)
+					{
+						const FVec2 To{B.PrevPos.X + kAltCos[a] * Dx - kAltSin[a] * Dy, B.PrevPos.Y + kAltSin[a] * Dx + kAltCos[a] * Dy};
+						if (To.X >= 0.0 && To.Y >= 0.0 && To.X <= Ws && To.Y <= Ws && Isl->IsOpen(To.X, To.Y) && Hooks->HerbMove(Hooks->User, i, B.PrevPos, To))
+						{
+							B.Pos = To;
+							bAlt = true;
+						}
+					}
+					W.Stats.IslandDeerHookAlts += bAlt ? 1 : 0;
+				}
+				if (!bAlt)
+				{
+					B.Pos = B.PrevPos;
+					++W.Stats.BlockedHerbMoves;
+				}
 			}
 		}
 
@@ -2939,11 +4138,17 @@ namespace EcoWorldV3
 			P.Behavior = static_cast<std::uint8_t>(H.Rep->Behavior);
 			P.bHideArrived = H.Rep->bArrived;
 			P.bInCover = Detail::InAnyCover(W, H.Body->Pos);   // 이동 뒤 위치로 다시 판정 (world.py:2026)
+            P.bNaturalCover=W.Config.bWildRefuges;P.CoverDensity=0;
+            if(P.bNaturalCover&&P.bInCover)for(const auto& Cover:W.Config.Covers){
+                if(Cover.Radius<=0)continue;
+                const double Depth=Cover.Radius-std::hypot(P.X-Cover.X,P.Y-Cover.Y);
+                P.CoverDensity=std::max(P.CoverDensity,std::clamp(Depth/(Cover.Radius*.5),0.,.8));
+            }
 			P.MoveX = H.Body->Pos.X - H.Body->PrevPos.X;      // 이번 스텝 이동 (막힌 이동은 0). 늑대 무리 협동의 도주 방향만 읽는다
 			P.MoveY = H.Body->Pos.Y - H.Body->PrevPos.Y;
 			// 파이썬처럼 늘 산 개체다(죽은 슬롯은 지난 스텝 끝에 리스폰했다). 팀 안전 규칙일 때만 원 안 사슴을 후보에서 뺀다 (ShelterSafe 면 위협 모델이 뺀다)
 			P.bAlive = !(RefugeOwnsSafety(W.Config) && P.bInCover);
-			W.Stats.RefugeProtectedPreySteps += (W.Config.bProtectedRefuges && P.bInCover) ? 1 : 0;   // 기록만 (어느 규칙이든 원 안 = 보호)
+			W.Stats.RefugeProtectedPreySteps += ((W.Config.bShelterSafe||RefugeOwnsSafety(W.Config)) && P.bInCover) ? 1 : 0;
 			W.Stats.ShelterDeerSteps += P.bInCover ? 1 : 0;   // 야생 2단계 기록만: 은신처 안 시간
 		}
 		W.Stats.LiveDeerSteps += N;
@@ -3148,6 +4353,17 @@ namespace EcoWorldV3
 				W.Stats.WolfEatingSteps += PreCd - 1 > 0 ? 1 : 0;
 				W.Stats.WolfKills += A.Last.Caught >= 0 ? 1 : 0;
 			}
+			if (const EcoV3Island::FLandMask* const Isl = W.Config.Island.get();
+				Isl && (A.State.PosX != A.PrevX || A.State.PosY != A.PrevY) && !Isl->IsOpen(A.State.PosX, A.State.PosY) && Isl->IsOpen(A.PrevX, A.PrevY))
+			{
+				// 섬 무대 (11-05): 다음 자리가 막힌 칸이면 제자리·변위 0, heading 은 해안 안쪽 법선으로 반사 (벽 반사의 꼴). 포획은 이미 이동 전 위치로 판정했다
+				A.State.PosX = A.PrevX;
+				A.State.PosY = A.PrevY;
+				A.State.VelX = 0.0;
+				A.State.VelY = 0.0;
+				Isl->Reflect(A.PrevX, A.PrevY, A.State.HeadX, A.State.HeadY);
+				++W.Stats.IslandWolfReflects;
+			}
 			// 통합 모드: 지형·장애물 제약. 포획은 이동 전 위치로 이미 판정했다(위 Step 9). 막히면 이동 전 자리·변위 0·heading 반전
 			// (학습의 벽 반사를 흉내 낸 근사 — 장애물의 법선은 모른다)
 			if (Hooks && Hooks->ThreatMove && (A.State.PosX != A.PrevX || A.State.PosY != A.PrevY)
@@ -3201,7 +4417,7 @@ namespace EcoWorldV3
 				}
 			}
 		}
-		if(W.Config.bProtectedRefuges)for(std::int32_t I=0;I<N;++I)
+		if(W.Config.bShelterSafe||RefugeOwnsSafety(W.Config))for(std::int32_t I=0;I<N;++I)
 			if(W.Catcher[I]>=0&&W.Prey[I].bInCover)++W.Stats.RefugeCaptureViolations;
 
 		// C4. 섭식·대사 (이동 뒤 셀, 셀마다 수요 합을 슬롯 순서로 쌓는다 — np.bincount)
@@ -3229,20 +4445,25 @@ namespace EcoWorldV3
 			const double Taken = Dm < F.Food[k] ? Dm : F.Food[k];
 			F.Demand[k] = Dm > 0.0 ? Taken / Dm : 0.0;   // 이제 이 칸은 비율이다
 			F.Food[k] -= Taken;
+			if (F.Vegetation.bHabitatDynamics && F.Habitats[k].bNatural)
+				F.VegetationCells[k].RecordBrowse(Taken, F.Cap[k]);
 			W.Stats.FoodEaten += Taken;                   // 기록만 (아래 계산에 쓰지 않는다)
 		}
 		std::int32_t NumCaught = 0;
 		for (std::int32_t i = 0; i < N; ++i)
 		{
 			FHerbBody& B = *Herbs[i].Body;
-			const double Gain = W.Want[static_cast<size_t>(i)] * F.Demand[static_cast<size_t>(W.CellIdx[static_cast<size_t>(i)])];
-			B.Energy = R3::EnergyAfterIntake(W.EDrained[static_cast<size_t>(i)], Gain, RC);
+			const size_t Cell = static_cast<size_t>(W.CellIdx[static_cast<size_t>(i)]);
+			const double Gain = W.Want[static_cast<size_t>(i)] * F.Demand[Cell];
+			const double Nutrition = F.Vegetation.bHabitatDynamics && F.Habitats[Cell].bNatural
+				? Gain * F.VegetationCells[Cell].NutritionMultiplier() : Gain;
+			B.Energy = R3::EnergyAfterIntake(W.EDrained[static_cast<size_t>(i)], Nutrition, RC);
 			B.LastIntake = Gain;                          // 기록만
 			W.Stats.EatSteps += Gain > 0.0 ? 1 : 0;
 			if (bReserve)
 			{
 				// 야생 (w1): 모자람은 비축에서, 남음은 비축으로 (world.py step 3) 의 _wild_reserve_step — 번식 C5 앞)
-				const FWildReserveDelta Dr = WildReserveStep(B.Energy, B.Reserve, Gain * RC.FoodEnergyPerUnit, W.ReserveCap, W.Config.WildReserve);
+				const FWildReserveDelta Dr = WildReserveStep(B.Energy, B.Reserve, Nutrition * RC.FoodEnergyPerUnit, W.ReserveCap, W.Config.WildReserve);
 				W.Stats.ReserveUsed += Dr.Used;
 				W.Stats.ReserveRefill += Dr.Refill;
 				++W.Stats.ReserveLiveSteps;
@@ -3302,7 +4523,7 @@ namespace EcoWorldV3
 		// C7. 피식 EMA (분모 N 고정 — 파이썬 128 과 같은 꼴, 열린 질문 7. 통합 모드는 PredEmaDenominator 고정값). C8. 먹이 재생
 		const std::int32_t EmaDen = W.Config.PredEmaDenominator > 0 ? W.Config.PredEmaDenominator : (N > 0 ? N : 1);
 		W.PredEma = EcoObservationV3::UpdatePredationEma(W.PredEma, NumCaught, EmaDen, W.ObsCfg);
-		F.Regrow();
+		F.Regrow(W.T * EcoRepertoireV3::kStepSeconds);
 
 		// D. t ← t + 1, Tick. D′. 새 t 의 어둠
 		++W.T;

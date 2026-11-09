@@ -7,8 +7,68 @@ class USoundBase;
 class USoundAttenuation;
 class USoundConcurrency;
 class UPhysicalMaterial;
+class AActor;
 UENUM(BlueprintType)
-enum class EEcoFootstepSurface : uint8 { Grass, Dry, Snow, Water, Wet };
+enum class EEcoFootstepSurface : uint8 { Grass, Dry, Snow, Water, Wet, Stone, Wood };
+
+USTRUCT(BlueprintType)
+struct FEcoFootstepProfile
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, Category="Gait") float WalkSpeed = 150.f;
+    UPROPERTY(EditAnywhere, Category="Gait") float RunSpeed = 400.f;
+    UPROPERTY(EditAnywhere, Category="Gait") float WalkSpacing = 55.f;
+    UPROPERTY(EditAnywhere, Category="Gait") float RunSpacing = 85.f;
+    UPROPERTY(EditAnywhere, Category="Audio") float Volume = .6f;
+    UPROPERTY(EditAnywhere, Category="Audio") float PlaybackRange = 1800.f;
+    UPROPERTY(EditAnywhere, Category="Audio") float Pitch = 1.f;
+    UPROPERTY(EditAnywhere, Category="Audio") bool bHoof = false;
+    UPROPERTY(EditAnywhere, Category="Noise") float NoiseRange = 900.f;
+    UPROPERTY(EditAnywhere, Category="Noise") float Threat = 0.f;
+    UPROPERTY(EditAnywhere, Category="Hearing") float HearingRange = 1500.f;
+    UPROPERTY(EditAnywhere, Category="Hearing") float OccludedHearing = .3f;
+    UPROPERTY(EditAnywhere, Category="Hearing") float HearingThreshold = .12f;
+
+    bool IsValid() const;
+};
+
+USTRUCT(BlueprintType)
+struct FEcoFootstepSurfaceAudio
+{
+    GENERATED_BODY()
+    UPROPERTY(EditAnywhere, Category="Surface") TArray<TObjectPtr<UPhysicalMaterial>> Materials;
+    UPROPERTY(EditAnywhere, Category="Surface") TArray<TObjectPtr<USoundBase>> Animal;
+    UPROPERTY(EditAnywhere, Category="Surface") TArray<TObjectPtr<USoundBase>> Hoof;
+    UPROPERTY(EditAnywhere, Category="Surface") TArray<TObjectPtr<USoundBase>> PlayerWalk;
+    UPROPERTY(EditAnywhere, Category="Surface") TArray<TObjectPtr<USoundBase>> PlayerRun;
+    UPROPERTY(EditAnywhere, Category="Surface") float NoiseMultiplier = 1.f;
+    UPROPERTY(EditAnywhere, Category="Surface") float VolumeMultiplier = 1.f;
+};
+
+struct FEcoFootstepContact
+{
+    FVector Position = FVector::ZeroVector;
+    UPhysicalMaterial* Material = nullptr;
+    EEcoFootstepSurface Surface = EEcoFootstepSurface::Dry;
+};
+
+struct FEcoFootstepLevels
+{
+    float Spacing;
+    float Volume;
+    float PlaybackRange;
+    float Pitch;
+    float NoiseRange;
+    float Loudness;
+};
+
+namespace EcoFootsteps
+{
+    inline const FName Player(TEXT("Player"));
+    bool IsGroundActivity(uint8 Activity);
+    float HearingStrength(const FEcoFootstepProfile& Listener, float Distance, float Range, float Loudness,
+        float WeatherMultiplier, bool bOccluded);
+}
 
 /** Shared authored playback/range configuration. Owns no AI state or network transport. */
 UCLASS(BlueprintType)
@@ -36,8 +96,19 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Footsteps", meta=(ClampMin="0",Units="cm/s")) float MinimumSpeed = 40;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI Noise", meta=(ClampMin="1",ClampMax="10000",Units="cm")) float NoiseRange = 2000;
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="AI Noise", meta=(ClampMin="0",ClampMax="1")) float PredatorThreat = 0.8f;
+    /** Optional opt-in by species. Existing sets retain legacy cadence, levels and cues. */
+    UPROPERTY(EditAnywhere, Category="Footsteps|Profiles") TMap<FName, FEcoFootstepProfile> Profiles;
+    UPROPERTY(EditAnywhere, Category="Footsteps|Profiles") TMap<EEcoFootstepSurface, FEcoFootstepSurfaceAudio> Surfaces;
+    UPROPERTY(EditAnywhere, Category="Footsteps|Profiles") float RainWetThreshold = .65f;
+    const FEcoFootstepProfile* FindProfile(FName Species) const { return Profiles.Find(Species); }
+    FEcoFootstepLevels Evaluate(const FEcoFootstepProfile& Profile, EEcoFootstepSurface Surface,
+        float Speed, float BodyScale, float GaitGain = 1.f) const;
+    bool ResolveContact(UWorld& World, const FVector& Source, FName RegionId, const AActor* Ignore,
+        FEcoFootstepContact& Out) const;
+    const TArray<TObjectPtr<USoundBase>>& SelectSounds(EEcoFootstepSurface S, bool bPlayer, bool bRun, bool bHoof) const;
     EEcoFootstepSurface GetSurface(const UPhysicalMaterial* M,FName RegionId) const
     {
+        if (M) for (const auto& Pair : Surfaces) if (Pair.Value.Materials.Contains(M)) return Pair.Key;
         if(M&&SnowMaterials.Contains(M))return EEcoFootstepSurface::Snow;
         if(M&&WaterMaterials.Contains(M))return EEcoFootstepSurface::Water;
         if(M&&WetMaterials.Contains(M))return EEcoFootstepSurface::Wet;

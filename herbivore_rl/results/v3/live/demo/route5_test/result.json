@@ -1,0 +1,108 @@
+{
+ "format": "eco_v3_live_round",
+ "version": 1,
+ "attempt": 1,
+ "run": "a1_20261024T185534_e1",
+ "snapshot": "eco_v3_snapshot_s20004_t473_e1.json",
+ "state": "exported",
+ "plan": {
+  "horizon": 600,
+  "judge": [
+   35000,
+   35001
+  ],
+  "horizon_g": 600,
+  "judge_g": [
+   35000,
+   35001
+  ],
+  "select": [
+   35100,
+   35119
+  ],
+  "stuck": [
+   35000,
+   35000
+  ],
+  "check": [
+   35180,
+   35199
+  ],
+  "steps": 20000,
+  "model_seeds": [
+   0
+  ],
+  "workers": 10,
+  "flight_cost": 0.0,
+  "skip_check": true,
+  "force_export": true,
+  "ckpt": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v3\\live",
+  "test": true
+ },
+ "plan_test": true,
+ "stages": {
+  "convert": 2.0,
+  "eval_current": 10.0,
+  "train_learn": 3.0,
+  "train_and_eval_current": 10.2,
+  "eval_candidate_N_G": 14.1,
+  "eval_candidate": 15.1,
+  "gate": 0.0,
+  "export": 4.7
+ },
+ "started_utc": "2026-10-24T09:55:36Z",
+ "key": "657d0ca1ef6efba7|40d8710d5cb5ed80|p20261024T095430_d6553818",
+ "env_digest": "657d0ca1ef6efba7",
+ "brain_weights_sha256": "40d8710d5cb5ed80081b2c6651458cfb545e42418e4193ffbd31ca70c92999c9",
+ "env": "Barren 나무 0→20, 비 1.0",
+ "env_revision": 1,
+ "play_id": "p20261024T095430_d6553818",
+ "brain": "v3_r7_g995_s1_20m@40d8710d",
+ "start": "ckpt/v3/v3_r7_g995_s1_20m.zip",
+ "brain_profile": "route5",
+ "check": {
+  "ok": null,
+  "why": "시험: 재현 확인 건너뜀 (--skip-check)"
+ },
+ "current_cache": {
+  "N": {
+   "state": "saved",
+   "file": "N_6638259536b0f1d42d9b5b3b.json",
+   "why": null
+  },
+  "G": {
+   "state": "saved",
+   "file": "G_9e3dbbea22dab7c0fe2d5e47.json",
+   "why": null
+  },
+  "stuck": {
+   "state": "saved",
+   "file": "stuck_81fed9682c69b0ad3d2bc518.json",
+   "why": null
+  }
+ },
+ "candidate": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\v3\\live\\a1_20261024T185534_e1\\live_a1_20261024T185534_e1_cand_s0.zip",
+ "stage": "single",
+ "ran": [
+  {
+   "stage": "N_G",
+   "items": 15,
+   "tags": [
+    "candidate:G",
+    "candidate:N",
+    "candidate:stuck"
+   ]
+  }
+ ],
+ "verdict": "기각",
+ "why": "1차 P1 실패: 포만 없는 세계 쫓긴 사건 가운데 숨음 사건 몫(사건 숨음 비율) 후보 21.86% 대 지금 19.54% (짝 t +1.64, 문턱 +12.706, 시드 2, 빠진 시드 0)",
+ "gate_summary": "포만 없는 세계 사건 숨음 비율 19.5%→21.9% (t +1.6), 지킴 실패",
+ "stage_note": "",
+ "round": 1,
+ "brain_file": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\AdaptiveEcosystem\\Saved\\EcoAdapt_route5_test\\brains\\live_r1_a1_20261024T185534_e1.json",
+ "brain_id": "live_r1_a1_20261024T185534_e1@11a05ada",
+ "exported_weights_sha256": "11a05ada7e2b311f651b6a8d3db86b1528f19d61b20d4f48d07128cf28515e99",
+ "last_result": "시험 내보내기: 판 1 (관문 기각)",
+ "wall_s": 32.2,
+ "ended_utc": "2026-10-24T09:56:08Z"
+}

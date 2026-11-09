@@ -1,0 +1,101 @@
+{
+ "snapshot": {
+  "map": "LV_Ecosystem_IntegrationTest",
+  "session_seed": 20004,
+  "global_step": 473,
+  "sim_seconds": 63.06666666666666,
+  "why": "예비 측정 합성 (pilot_mask5 I_t10 — 통합 맵 Barren 나무 0→10, 10-27 게임 기본 GrazeCalm·RestKeep 켬)",
+  "brain": "v3_r7_g995_s1_20m@40d8710d",
+  "tree_layout": "trees-1017a 21218665c114"
+ },
+ "anchor": "ckpt/v3/v3_r7_g995_s1_20m.zip",
+ "anchor_weights_sha256": "40d8710d5cb5ed80081b2c6651458cfb545e42418e4193ffbd31ca70c92999c9",
+ "N": 128,
+ "regions": [
+  "Forest",
+  "Barren",
+  "Highland"
+ ],
+ "changed": [
+  {
+   "key": "features.wild_flight.rest_keep",
+   "template": false,
+   "snapshot": true,
+   "src": "world.wild_flight.rest_keep"
+  },
+  {
+   "key": "features.wild_flight.rest_keep_band",
+   "template": 0.0,
+   "snapshot": 4.0,
+   "src": "world.wild_flight.rest_keep_band"
+  },
+  {
+   "key": "features.repertoire.graze_edge_r",
+   "template": 0.0,
+   "snapshot": 2.0,
+   "src": "world.graze_calm.graze_edge_r"
+  },
+  {
+   "key": "features.repertoire.graze_edge_w",
+   "template": 0.0,
+   "snapshot": 2.5,
+   "src": "world.graze_calm.graze_edge_w"
+  },
+  {
+   "key": "features.repertoire.graze_inertia",
+   "template": 0.0,
+   "snapshot": 0.5,
+   "src": "world.graze_calm.graze_inertia"
+  },
+  {
+   "key": "features.repertoire.graze_wall_margin",
+   "template": 0.0,
+   "snapshot": 1.0,
+   "src": "world.graze_calm.graze_wall_margin"
+  }
+ ],
+ "checks": [
+  "계약 해시 0xad7bad5e1acaf071 = 시작 모델",
+  "시작 모델 ckpt/v3/v3_r7_g995_s1_20m.zip (가중치 sha256 40d8710d5cb5ed80) — 지금 두뇌 v3_r7_g995_s1_20m@40d8710d 에서 부르는 쪽이 골랐다",
+  "팀 은신처 생명주기(ProtectedRefuges) 켬 — 지워진 은신처 없음이라 세계가 같다",
+  "먹이 규칙(셀·패치·문턱·기울기·재생) = 파이썬 상수",
+  "대응표 밖 칸 5 + 지역마다 1 개 = 기준 게임 값",
+  "Forest 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "Barren 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0.0222 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "Highland 먹이 용량 ↔ C++ 난수로 다시 만든 지도: 최대 차이 0 (보고만 — 0 이면 풀이 처음 지도 그대로)",
+  "은신처 원 = 파이썬 세계 (지역마다)"
+ ],
+ "template": "configs/v3_wild3_route5_mirror.yaml",
+ "f_dec_note": "configs/v3_r7_train.yaml 값 그대로 (그 학습 세계에서 시작 정책으로 잰 값 — 변경 기록 (8))",
+ "live": {
+  "start": "ckpt/v3/v3_r7_g995_s1_20m.zip",
+  "start_why": "관측 24 두뇌 → 그 두뇌 파일의 모델 zip",
+  "current_brain": "v3_r7_g995_s1_20m@40d8710d",
+  "brain_contract": "0xad7bad5e1acaf071",
+  "start_contract": "0xad7bad5e1acaf071",
+  "profile": "route5",
+  "profile_label": "관측 24 두 길·반사 밖 도망 막음 (마스크 판 5)",
+  "template": "configs/v3_wild3_route5_mirror.yaml",
+  "recipe": "configs/v3_r7_train.yaml",
+  "ppo_config": "configs/ppo_r6_lam098.yaml",
+  "satiation_game": true,
+  "f_dec": 0.714694,
+  "flight_cost": 0.0,
+  "worlds": {
+   "G": "world.yaml (늑대 포만 게임 값)",
+   "N": "world.yaml + wild_satiation.enabled false",
+   "T": "train.yaml (늑대 포만 끔)"
+  },
+  "env": {
+   "watch": true,
+   "revision": 1,
+   "changed_step": 473,
+   "first_changed_step": 473,
+   "trigger": "env_change",
+   "changes": 1
+  },
+  "env_summary": "Barren 나무 0→10",
+  "env_digest": "49c44cdd85a4d26e",
+  "brain_weights_sha256": "40d8710d5cb5ed80081b2c6651458cfb545e42418e4193ffbd31ca70c92999c9"
+ }
+}

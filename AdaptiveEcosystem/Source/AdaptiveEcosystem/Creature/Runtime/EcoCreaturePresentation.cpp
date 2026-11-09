@@ -11,6 +11,7 @@
 #include "MassEntityQuery.h"
 #include "MassExecutionContext.h"
 #include "GameFramework/PlayerController.h"
+#include "Player/EcoCombatRelevanceComponent.h"
 #include "ProfilingDebugging/CpuProfilerTrace.h"
 
 void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
@@ -58,6 +59,10 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 			double Distance = Viewers.IsEmpty() ? 0.0 : TNumericLimits<double>::Max();
 			for (const auto& Viewer : Viewers) Distance = FMath::Min(Distance, FVector::DistSquared(Viewer, Position));
 			if (GetNetMode() != NM_Client && !Viewers.IsEmpty() && Distance > FMath::Square(HostVisualDistance)) continue;
+			// Filter before retention bias/combat priority: neither may keep a distant visual alive.
+			// Client proxies and the authority simulation remain independent of local Actor selection.
+			if (GetNetMode() == NM_Client && ClientVisualDistance > 0.0f
+				&& (Viewers.IsEmpty() || Distance > FMath::Square(ClientVisualDistance))) continue;
 			const uint32 Revision = Samples.IsEmpty() ? (Resets.IsEmpty() ? 0 : Resets[I].Revision) : Samples[I].Current.MovementDiscontinuityRevision;
 			// A small retention bias prevents swapping equal-distance actors at the budget boundary.
 			if (Visuals.Contains(Ids[I].StableAgentId)) Distance *= .81;
@@ -65,6 +70,10 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		}
 	});
 	if (!bReady) return;
+    for (auto& Input:Inputs)
+        for (auto It=GetWorld()->GetPlayerControllerIterator();It;++It)
+            if (auto* PC=It->Get(); PC && PC->IsLocalController() && PC->GetPawn())
+                if (auto* R=PC->GetPawn()->FindComponentByClass<UEcoCombatRelevanceComponent>();R && R->IsOffered(Input.Id)) { Input.Distance=-1; break; }
 	Inputs.Sort([](const FInput& A, const FInput& B) { return A.Distance == B.Distance ? A.Id < B.Id : A.Distance < B.Distance; });
 	if (Inputs.Num() > Budget.MaxActorRepresentations) Inputs.SetNum(Budget.MaxActorRepresentations);
 	TSet<int64> Selected; for (const auto& Input : Inputs) Selected.Add(Input.Id);
@@ -80,7 +89,8 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		if (!Existing || !Existing->Actor.IsValid())
 		{
 			if (Adds >= Budget.MaxAddsPerUpdate) continue;
-			const auto Class = Input.Species == TEXT("Wolf") ? WolfActorClass : HerbivoreActorClass;
+            const auto* Fauna = FindFauna(Input.Species);
+            const auto Class = Fauna ? Fauna->VisualClass : Input.Species == TEXT("Wolf") ? WolfActorClass : HerbivoreActorClass;
 			AEcoCreatureRepresentationActor* Actor = nullptr;
 			for (int32 I = VisualPool.Num() - 1; I >= 0; --I)
 				if (IsValid(VisualPool[I]) && VisualPool[I]->GetClass() == Class.Get())
@@ -107,15 +117,23 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		Binding.MovementRevision = Input.ResetRevision;
 		State.Velocity = Input.Visual.Velocity; State.bAlive = (Input.Visual.Flags & 1) != 0;
 		State.bEating = (Input.Visual.Flags & 2) != 0; State.bPursuingPrey = (Input.Visual.Flags & 4) != 0;
-		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::Investigate) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
+		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::CorpseSettled) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
 		State.SenseSource = EEcoSenseSource((Input.Visual.Flags>>4)&3);
 		State.FocusYawDegrees = float(Input.Visual.FocusYaw)/182.0389f;
-        State.BodyScale=Input.Visual.BodyScale/128.f;
+        State.BodyScale=Input.Visual.BodyScale/128.f;State.Maturity=Input.Visual.Maturity/255.f;State.CoatTone=Input.Visual.CoatTone/255.f;
+        State.Appearance=EcoPresentationFlags::Appearance(Input.Visual.Flags);
 		State.bHasVitals = (Input.Visual.Flags & 8) != 0;
 		State.NormalizedHealth = Input.Visual.Health / 255.f; State.NormalizedEnergy = Input.Visual.Energy / 255.f;
 		Binding.Actor->Footsteps->AudioSet = FootstepAudioSet;
 		Binding.Actor->ConsumeVisualState(State, Delta);
 	}
+    TArray<int64> PresentedIds;
+    for (const auto& Pair:Visuals)
+        if (const auto* Actor=Pair.Value.Actor.Get(); Actor && Actor->bBound && !Actor->IsHidden() && Actor->VisualState.bAlive) PresentedIds.Add(Pair.Key);
+    PresentedIds.Sort();
+    for (auto It=GetWorld()->GetPlayerControllerIterator();It;++It)
+        if (auto* PC=It->Get(); PC && PC->IsLocalController() && PC->GetPawn())
+            if (auto* R=PC->GetPawn()->FindComponentByClass<UEcoCombatRelevanceComponent>()) R->SetPresented(this,PresentedIds);
 	// Bound hidden pool separately: changing species mix must not grow retained actors without limit.
 	const int32 MaxPool = FMath::Max(0, Budget.MaxActorRepresentations - Visuals.Num());
 	while (VisualPool.Num() > MaxPool) { AEcoCreatureRepresentationActor* Actor = VisualPool.Pop(); if (Actor) Actor->Destroy(); }

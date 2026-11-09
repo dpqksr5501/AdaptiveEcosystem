@@ -22,6 +22,14 @@
 //                      뒤에 나타난 파일만), 오래된 깨진 파일은
 //                      거부 번호 + 1, 쓰는 중인 새 깨진 파일(3 초 안)은 기억하지 않고 같은 (경로, 시각) 을 다시 읽는다
 //   Brain.LiveStatus   적응 고리 상태 파일(eco_v3_live_status 판 1) 읽기·화면 글자(120 초 안 메시지·응답 없음·파이썬 감시 없음)·2 초 주기·깨지면 앞 상태
+//   Brain.LoadObs24Route (10-24 두 길 두뇌, 이식 계획서 5절·13-2) 계약 표 넷(관측 24 판 4·5, 판 6 은 받지 않음)·이름 24 차례, route0(판 4 — 내장 + 0 열 + 칸 4 = 칸 1 − 2,
+//                      가중치 078c56be…, 골든 34·길 8 사례, 길 결정은 늘 RUN)·R7e s1(판 5 — 골든 26, 길 결정에서 SHELTER 를 고름, 덮기 밖 다중 칸 결정에서 칸 1 막힘)
+//                      받음, 판·두 길·반사 밖 FLEE 막음 표시, 설명 '관측 24 도망길', 내장·옛 18·21 두뇌는 판 2 그대로
+//   Brain.RejectRoute  판 4·5 파일의 어긋남 27 가지(관측 칸 수·이름 차례·마스크 판·판 6·flight_route 칸·brain_flee_outside_reflex·허용에 얼기·잠·층·골든)를
+//                      맞는 까닭으로 거부, RouteContractDiff 칸 이름, 옛 파일 그대로 받음, 대기 두뇌 버리기(DiscardPending — 대기 되돌림이면 쌓개 복구)
+//   Brain.Default      (10-29 기본 두뇌 R7e) 빌드에 넣은 바이트 = 헤더 sha256 = 저장소 파일(LF), 같은 Parse 검사(골든 26), 파일 두뇌와 같은 가중치·id·허용,
+//                      표시(기본·이름표·판 0·설명), 이름 default·기본·R7e / builtin·내장·R1b·R1b-F, Play 시작 고르기 PickStart(처음·적응 고리·Startup·거부·
+//                      건 뒤·대기), 처음 Play 뒤 쌓개 = [내장], 콘솔 eco.V3Brain.Load default
 
 #include "Misc/AutomationTest.h"
 
@@ -30,6 +38,7 @@
 #include "../EcoObservationV3.h"
 #include "../EcoSha256.h"
 #include "../EcoV3Brain.h"
+#include "../PolicyBrainV3Default.h"
 #include "../PolicyGoldenVectorsV3.h"
 #include "Dom/JsonObject.h"
 #include "HAL/FileManager.h"
@@ -1217,6 +1226,487 @@ bool FEcoV3BrainLiveStatusTest::RunTest(const FString& Parameters)
 	TestTrue(TEXT("다른 파일 → 곧바로 읽어 봄"), Reg.PollStatus(24.5));
 	TestTrue(TEXT("… 없는 파일 → 상태 비움·파이썬 감시 없음"), !Reg.GetLiveStatus().bValid
 														  && Reg.GetLiveStatusText(EcoV3Brain::NowUnixSeconds()) == TEXT("적응 고리 | 파이썬 감시 없음"));
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 10-24 두 길 두뇌 (이식 계획서 Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 5절·13-2): 관측 24 · 마스크 판 4 (route0 — 내장 R1b-F + 새 여섯 열 0 + 칸 4 = 칸 1 − 2,
+// herbivore_rl/results/v3/route/route_extend.py)와 판 5 (R7e 판정 통과 s1 — herbivore_rl/results/v3/r7e/brains) 두뇌 파일
+
+namespace EcoV3BrainTestImpl
+{
+	const TCHAR* const kRoute0File = TEXT("v3_r1_g995_s3_obs24route0");   // 판 4 (EcoBrains — 결정 = R1b-F 와 같다)
+	const TCHAR* const kR7eFile = TEXT("v3_r7_g995_s1_20m");              // 판 5 (R7e 판정 통과 두뇌 — 10-29 부터 같은 바이트가 빌드에 든 기본 두뇌, Brain.Default)
+
+	TArray<TSharedPtr<FJsonValue>> ObsNameValues(int32 Dim)
+	{
+		TArray<TSharedPtr<FJsonValue>> Out;
+		const EcoV3Brain::FContract& C = EcoV3Brain::Contract(2);
+		for (int32 i = 0; i < Dim; ++i)
+		{
+			Out.Add(MakeShared<FJsonValueString>(UTF8_TO_TCHAR(EcoV3Brain::ContractObsName(C, i))));
+		}
+		return Out;
+	}
+
+	TSharedPtr<FJsonObject> FlightRoute(const TSharedPtr<FJsonObject>& Root)
+	{
+		return Root->GetObjectField(TEXT("contract"))->GetObjectField(TEXT("flight_route"));
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3BrainLoadObs24RouteTest, "AdaptiveEcosystem.Policy.V3.Brain.LoadObs24Route",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3BrainLoadObs24RouteTest::RunTest(const FString& Parameters)
+{
+	namespace O3 = EcoObservationV3;
+	const FRegistryGuard Guard;
+	// 계약 표: 넷째까지 받고, 셋째·넷째 줄이 관측 24 · 판 4·5 (이름 24 = 관측 18 · 장애물 세 칸 · 길 세 칸)
+	TestEqual(TEXT("받는 계약 4"), EcoV3Brain::kNumContracts, 4);
+	{
+		const EcoV3Brain::FContract* C4 = EcoV3Brain::FindContract(P3::kContractHashObs24Mask4);
+		const EcoV3Brain::FContract* C5 = EcoV3Brain::FindContract(P3::kContractHashObs24Mask5);
+		TestTrue(TEXT("계약 0xe302dee198197444 = 관측 24 · 판 4"), C4 && C4->ObsDim == O3::kObsDimRoute && C4->MaskVersion == P3::kMaskVersionRoute && C4->NumExtra == 6);
+		TestTrue(TEXT("계약 0xad7bad5e1acaf071 = 관측 24 · 판 5"), C5 && C5->ObsDim == O3::kObsDimRoute && C5->MaskVersion == P3::kMaskVersionRouteGate && C5->NumExtra == 6);
+		TestNull(TEXT("판 6 (R7 대조 관측 21 — 0xe4b66ac546da1d77) 은 받지 않는다"), EcoV3Brain::FindContract(0xe4b66ac546da1d77ULL));
+		if (C4)
+		{
+			FString Names;
+			for (int32 i = 0; i < O3::kObsDimRoute; ++i)
+			{
+				Names += FString(UTF8_TO_TCHAR(EcoV3Brain::ContractObsName(*C4, i))) + TEXT(",");
+			}
+			TestTrue(TEXT("관측 24 이름 차례 (… threat_recency · escape_room·obstacle_near·threat_hidden · in_panic·shelter_reach·shelter_edge)"),
+					 Names.EndsWith(TEXT("threat_recency,escape_room,obstacle_near,threat_hidden,in_panic,shelter_reach,shelter_edge,")));
+		}
+	}
+	const FEcoV3BrainLoad Z = FEcoV3BrainRegistry::LoadFile(kRoute0File);
+	const FEcoV3BrainLoad S1 = FEcoV3BrainRegistry::LoadFile(kR7eFile);
+	if (!TestTrue(FString::Printf(TEXT("route0 (판 4) 파일 검사 통과 (%s: %s)"), EcoV3Brain::RejectName(Z.Reason), *Z.Message), Z.Ok())
+		|| !TestTrue(FString::Printf(TEXT("R7e s1 (판 5) 파일 검사 통과 (%s: %s)"), EcoV3Brain::RejectName(S1.Reason), *S1.Message), S1.Ok()))
+	{
+		return false;
+	}
+	const FEcoV3Brain& B4 = *Z.Brain;
+	const FEcoV3Brain& B5 = *S1.Brain;
+	AddInfo(FString::Printf(TEXT("%s | 골든 %d 최대 오차 %.3e | 학습 %s"), *B4.Describe(), B4.GoldenCount, B4.GoldenMaxError, *B4.TrainWorld));
+	AddInfo(FString::Printf(TEXT("%s | 골든 %d 최대 오차 %.3e | 학습 %s"), *B5.Describe(), B5.GoldenCount, B5.GoldenMaxError, *B5.TrainWorld));
+	TestTrue(TEXT("route0: 관측 24 · 판 4 · 계약 0xe302…"), B4.ObsDim == O3::kObsDimRoute && B4.Net.ObsDim == O3::kObsDimRoute && B4.MaskVersion == P3::kMaskVersionRoute
+															  && B4.ContractHash == P3::kContractHashObs24Mask4);
+	TestTrue(TEXT("route0: 두 길 켬 · 판 5 막음 아님"), B4.bRoute() && !B4.bFleeGate());
+	TestTrue(TEXT("R7e: 관측 24 · 판 5 · 계약 0xad7b…"), B5.ObsDim == O3::kObsDimRoute && B5.MaskVersion == P3::kMaskVersionRouteGate
+														   && B5.ContractHash == P3::kContractHashObs24Mask5);
+	TestTrue(TEXT("R7e: 두 길 켬 · 반사 밖 FLEE 막음"), B5.bRoute() && B5.bFleeGate());
+	TestTrue(TEXT("route0 가중치 sha256 078c56be… (계획서 5-3)"), B4.WeightsSha256.StartsWith(TEXT("078c56be3d4b")));
+	TestEqual(TEXT("R7e id = 모델 이름@가중치 앞 8"), B5.Id, FString(TEXT("v3_r7_g995_s1_20m@40d8710d")));
+	TestTrue(TEXT("route0 골든 34 사례"), B4.GoldenCount == 34 && B4.GoldenMaxError <= B4.GoldenTolerance);
+	TestTrue(TEXT("R7e 골든 26 사례"), B5.GoldenCount == 26 && B5.GoldenMaxError <= B5.GoldenTolerance);
+	const uint8 Want[P3::kNumBehaviors] = {1, 1, 1, 0, 0};
+	TestTrue(TEXT("허용 = 먹기·도망·숨기 (얼기·잠 막힘 — 칸 3·4 는 도주 중 길 칸)"),
+			 FMemory::Memcmp(B4.Allowed, Want, sizeof(Want)) == 0 && FMemory::Memcmp(B5.Allowed, Want, sizeof(Want)) == 0);
+	TestTrue(TEXT("설명 '관측 24 도망길' (판 4)"), B4.Describe().Contains(TEXT("관측 24 도망길")) && !B4.Describe().Contains(TEXT("반사 밖")));
+	TestTrue(TEXT("설명 '관측 24 도망길·반사 밖 도망 막음' (판 5)"), B5.Describe().Contains(TEXT("관측 24 도망길·반사 밖 도망 막음")));
+	// 내장·옛 두뇌는 판 2 그대로 (18·21 줄 바이트 그대로 — 옛 파일을 그대로 받는다)
+	{
+		const FEcoV3BrainRef Bi = FEcoV3BrainRegistry::Builtin();
+		TestTrue(TEXT("내장: 판 2 · 두 길 아님"), Bi->MaskVersion == 2 && !Bi->bRoute() && !Bi->bFleeGate());
+		for (const TCHAR* Old : {kR1bFile, kR4File, kZeroObs21File})
+		{
+			const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(Old);
+			TestTrue(FString::Printf(TEXT("옛 두뇌 %s 그대로 받음 (판 2 · 두 길 아님)"), Old), L.Ok() && L.Brain->MaskVersion == 2 && !L.Brain->bRoute()
+																					 && !L.Brain->Describe().Contains(TEXT("도망길")));
+		}
+	}
+	// route0 가중치 = 내장 R1b + 첫 층 새 여섯 열 0 + 출력층 칸 4 = 칸 1 (편향 칸 4 = 칸 1 − 2) — 비트 단위
+	{
+		int32 Bad = 0;
+		for (int32 j = 0; j < P3::kHiddenDim; ++j)
+		{
+			for (int32 i = 0; i < O3::kObsDimRoute; ++i)
+			{
+				const float W = B4.Net.W0[j * O3::kObsDimRoute + i];
+				const float WantW = i < P3::kObsDim ? P3::kW0[j * P3::kObsDim + i] : 0.0f;
+				Bad += FMemory::Memcmp(&W, &WantW, sizeof(float)) != 0 ? 1 : 0;
+			}
+		}
+		for (int32 i = 0; i < P3::kHiddenDim; ++i)
+		{
+			Bad += B4.Net.W2[P3::kSleep * P3::kHiddenDim + i] != B4.Net.W2[P3::kFlee * P3::kHiddenDim + i] ? 1 : 0;
+			Bad += B4.Net.W2[P3::kFlee * P3::kHiddenDim + i] != P3::kW2[P3::kFlee * P3::kHiddenDim + i] ? 1 : 0;
+		}
+		const float WantB4 = P3::kB2[P3::kFlee] - 2.0f;
+		Bad += FMemory::Memcmp(&B4.Net.B2[P3::kSleep], &WantB4, sizeof(float)) != 0 ? 1 : 0;
+		TestEqual(TEXT("route0 = 내장 + 0 열 + 칸 4 = 칸 1 − 2 (비트 단위)"), Bad, 0);
+	}
+	// 파일 골든을 따로 다시 센다: 길 결정 사례(마스크 {1, 4} 또는 {1})가 들어 있고, 판 5 다중 칸 결정은 칸 1 이 늘 막혀 있다
+	for (const TCHAR* Name : {kRoute0File, kR7eFile})
+	{
+		FString Text;
+		if (!ReadBrainText(*this, Name, Text))
+		{
+			return false;
+		}
+		const TSharedPtr<FJsonObject> Root = ToJson(Text);
+		const FEcoV3BrainLoad L = FEcoV3BrainRegistry::Parse(Text, Name);
+		int32 RouteCases = 0;
+		int32 ShelterPicked = 0;
+		int32 GateOpen = 0;
+		int32 BadAction = 0;
+		for (const TSharedPtr<FJsonValue>& Cv : Root->GetObjectField(TEXT("golden"))->GetArrayField(TEXT("cases")))
+		{
+			const TSharedPtr<FJsonObject> C = Cv->AsObject();
+			float Obs[P3::kMaxObsDim] = {};
+			uint8 Mask[P3::kNumBehaviors];
+			const TArray<TSharedPtr<FJsonValue>>& O = C->GetArrayField(TEXT("obs"));
+			const TArray<TSharedPtr<FJsonValue>>& M = C->GetArrayField(TEXT("mask"));
+			for (int32 i = 0; i < O3::kObsDimRoute; ++i)
+			{
+				Obs[i] = static_cast<float>(O[i]->AsNumber());
+			}
+			for (int32 b = 0; b < P3::kNumBehaviors; ++b)
+			{
+				Mask[b] = M[b]->AsNumber() != 0.0 ? 1 : 0;
+			}
+			float Lg[P3::kNumBehaviors];
+			const int32 A = P3::RunPolicyV3(L.Brain->Net, Obs, Mask, Lg);
+			BadAction += A != static_cast<int32>(C->GetNumberField(TEXT("action"))) ? 1 : 0;
+			const bool bRouteRow = Mask[P3::kGraze] == 0 && Mask[P3::kFlee] == 1 && Mask[P3::kHide] == 0 && Mask[P3::kFreeze] == 0;
+			RouteCases += bRouteRow ? 1 : 0;
+			ShelterPicked += (bRouteRow && A == P3::kRouteSlotShelter) ? 1 : 0;
+			GateOpen += (!bRouteRow && Mask[P3::kGraze] == 1 && Mask[P3::kFlee] == 1 && C->GetStringField(TEXT("kind")) == TEXT("rollout")) ? 1 : 0;
+		}
+		AddInfo(FString::Printf(TEXT("%s: 길 결정 사례 %d (SHELTER 고름 %d), 행동 다름 %d"), Name, RouteCases, ShelterPicked, BadAction));
+		TestEqual(FString::Printf(TEXT("%s: 행동이 파이썬과 같다"), Name), BadAction, 0);
+		TestTrue(FString::Printf(TEXT("%s: 길 결정 사례가 있다"), Name), RouteCases >= 6);
+		if (FCString::Strcmp(Name, kRoute0File) == 0)
+		{
+			TestEqual(TEXT("route0: 길 결정은 늘 RUN (칸 4 = 칸 1 − 2 — 배포 결정이 R1b-F 와 같다)"), ShelterPicked, 0);
+			TestEqual(TEXT("route0: 길 사례 8 (route 4·route_edge 2·route_single 2 — 계획서 5-2 의 6)"), RouteCases, 8);
+		}
+		else
+		{
+			TestTrue(TEXT("R7e: 길 결정에서 SHELTER 를 고르는 사례가 있다"), ShelterPicked > 0);
+			TestEqual(TEXT("R7e (판 5): 덮기 밖 다중 칸 결정(rollout)에서 칸 1(FLEE)이 늘 막혀 있다"), GateOpen, 0);
+		}
+	}
+	TestTrue(TEXT("불러오기만으로는 지금 두뇌가 바뀌지 않는다"), &*FEcoV3BrainRegistry::Get().GetActive() == &*FEcoV3BrainRegistry::Builtin());
+	return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3BrainRejectRouteTest, "AdaptiveEcosystem.Policy.V3.Brain.RejectRoute",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3BrainRejectRouteTest::RunTest(const FString& Parameters)
+{
+	const FRegistryGuard Guard;
+	FString Text4;
+	FString Text5;
+	FString Text21;
+	if (!ReadBrainText(*this, kRoute0File, Text4) || !ReadBrainText(*this, kR7eFile, Text5) || !ReadBrainText(*this, kZeroObs21File, Text21))
+	{
+		return false;
+	}
+	// 바탕: JSON 왕복도 통과한다
+	for (const FString* T : {&Text4, &Text5})
+	{
+		const FEcoV3BrainLoad L = FEcoV3BrainRegistry::Parse(ToText(ToJson(*T)), TEXT("왕복"));
+		if (!TestTrue(FString::Printf(TEXT("두 길 두뇌 JSON 왕복 통과 (%s: %s)"), EcoV3Brain::RejectName(L.Reason), *L.Message), L.Ok()))
+		{
+			return false;
+		}
+	}
+	struct FBad
+	{
+		const TCHAR* Name;
+		const FString* Base;
+		EReject Want;
+		TFunction<void(const TSharedPtr<FJsonObject>&)> Edit;
+	};
+	auto SetAllowed = [](const TSharedPtr<FJsonObject>& R, std::initializer_list<const TCHAR*> Names, std::initializer_list<double> Mask)
+	{
+		R->SetArrayField(TEXT("allowed"), Strings(Names));
+		R->SetArrayField(TEXT("allowed_mask"), Numbers(Mask));
+	};
+	const TArray<FBad> Cases = {
+		{TEXT("판 4 해시에 obs_dim 21"), &Text4, EReject::Dims, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("obs_dim"), 21); }},
+		{TEXT("판 5 해시에 obs_dim 18"), &Text5, EReject::Dims, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("obs_dim"), 18); }},
+		{TEXT("관측 21 파일에 판 4 해시"), &Text21, EReject::Dims,
+		 [](const TSharedPtr<FJsonObject>& R) { R->SetStringField(TEXT("contract_hash"), TEXT("0xe302dee198197444")); }},
+		{TEXT("길 칸 차례 (in_panic ↔ shelter_reach)"), &Text4, EReject::Names,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 {
+			 TArray<TSharedPtr<FJsonValue>> N = ObsNameValues(24);
+			 N.Swap(21, 22);
+			 R->SetArrayField(TEXT("obs_names"), N);
+		 }},
+		{TEXT("장애물·길 칸 차례 (threat_hidden ↔ in_panic)"), &Text5, EReject::Names,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 {
+			 TArray<TSharedPtr<FJsonValue>> N = ObsNameValues(24);
+			 N.Swap(20, 21);
+			 R->SetArrayField(TEXT("obs_names"), N);
+		 }},
+		{TEXT("관측 이름 21 개뿐"), &Text4, EReject::Names, [](const TSharedPtr<FJsonObject>& R) { R->SetArrayField(TEXT("obs_names"), ObsNameValues(21)); }},
+		{TEXT("판 4 해시에 mask_version 2"), &Text4, EReject::Mask, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("mask_version"), 2); }},
+		{TEXT("판 4 해시에 mask_version 5"), &Text4, EReject::Mask, [](const TSharedPtr<FJsonObject>& R) { R->SetNumberField(TEXT("mask_version"), 5); }},
+		{TEXT("판 5 파일에 판 4 해시 (mask_version 5)"), &Text5, EReject::Mask,
+		 [](const TSharedPtr<FJsonObject>& R) { R->SetStringField(TEXT("contract_hash"), TEXT("0xe302dee198197444")); }},
+		{TEXT("판 6 (R7 대조 관측 21 — 두뇌 파일을 만들지 않는 계약)"), &Text5, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { R->SetStringField(TEXT("contract_hash"), TEXT("0xe4b66ac546da1d77")); }},
+		{TEXT("flight_route 없음"), &Text4, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { R->GetObjectField(TEXT("contract"))->RemoveField(TEXT("flight_route")); }},
+		{TEXT("flight_route.slots.shelter 3"), &Text4, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { FlightRoute(R)->GetObjectField(TEXT("slots"))->SetNumberField(TEXT("shelter"), 3); }},
+		{TEXT("flight_route.obs 차례"), &Text5, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 { FlightRoute(R)->SetArrayField(TEXT("obs"), Strings({TEXT("shelter_reach"), TEXT("in_panic"), TEXT("shelter_edge")})); }},
+		{TEXT("flight_route.decide.lock_steps 14"), &Text4, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { FlightRoute(R)->GetObjectField(TEXT("decide"))->SetNumberField(TEXT("lock_steps"), 14); }},
+		{TEXT("flight_route.decide.on 에 invalid 없음"), &Text4, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 { FlightRoute(R)->GetObjectField(TEXT("decide"))->SetArrayField(TEXT("on"), Strings({TEXT("onset"), TEXT("lock_and_feasible_changed")})); }},
+		{TEXT("flight_route.decide.refeas_from [run, shelter]"), &Text5, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 { FlightRoute(R)->GetObjectField(TEXT("decide"))->SetArrayField(TEXT("refeas_from"), Strings({TEXT("run"), TEXT("shelter")})); }},
+		{TEXT("flight_route.shelter.enter_margin_u 2.5"), &Text4, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { FlightRoute(R)->GetObjectField(TEXT("shelter"))->SetNumberField(TEXT("enter_margin_u"), 2.5); }},
+		{TEXT("flight_route.shelter.reach_norm_u 12"), &Text5, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { FlightRoute(R)->GetObjectField(TEXT("shelter"))->SetNumberField(TEXT("reach_norm_u"), 12.0); }},
+		{TEXT("freeze_sleep_must_be_blocked 'model'"), &Text4, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { FlightRoute(R)->SetStringField(TEXT("freeze_sleep_must_be_blocked"), TEXT("model")); }},
+		{TEXT("판 5 인데 brain_flee_outside_reflex 참"), &Text5, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { R->GetObjectField(TEXT("contract"))->SetBoolField(TEXT("brain_flee_outside_reflex"), true); }},
+		{TEXT("판 5 인데 brain_flee_outside_reflex 없음"), &Text5, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { R->GetObjectField(TEXT("contract"))->RemoveField(TEXT("brain_flee_outside_reflex")); }},
+		{TEXT("판 4 인데 brain_flee_outside_reflex 거짓 (판 4 에는 없다)"), &Text4, EReject::Contract,
+		 [](const TSharedPtr<FJsonObject>& R) { R->GetObjectField(TEXT("contract"))->SetBoolField(TEXT("brain_flee_outside_reflex"), false); }},
+		{TEXT("판 4 허용에 잠"), &Text4, EReject::Allowed,
+		 [SetAllowed](const TSharedPtr<FJsonObject>& R) { SetAllowed(R, {TEXT("graze"), TEXT("flee"), TEXT("hide"), TEXT("sleep")}, {1, 1, 1, 0, 1}); }},
+		{TEXT("판 5 허용에 얼기"), &Text5, EReject::Allowed,
+		 [SetAllowed](const TSharedPtr<FJsonObject>& R) { SetAllowed(R, {TEXT("graze"), TEXT("flee"), TEXT("hide"), TEXT("freeze")}, {1, 1, 1, 1, 0}); }},
+		{TEXT("첫 층 64×21 (관측 24 계약)"), &Text4, EReject::Shape, [](const TSharedPtr<FJsonObject>& R) { Layer(R, 0)->SetNumberField(TEXT("in"), 21); }},
+		{TEXT("골든 관측 21 칸"), &Text5, EReject::Golden,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 {
+			 const TSharedPtr<FJsonObject> C = Case(R, 0);
+			 TArray<TSharedPtr<FJsonValue>> O = C->GetArrayField(TEXT("obs"));
+			 O.SetNum(21);
+			 C->SetArrayField(TEXT("obs"), O);
+		 }},
+		{TEXT("길 열에 값 + sha256 맞춤 (골든이 길 칸을 읽어 잡는다)"), &Text4, EReject::Golden,
+		 [](const TSharedPtr<FJsonObject>& R)
+		 {
+			 EditWeightsKeepSha(R,
+								[](FLayers& Ly)
+								{
+									for (int32 j = 0; j < P3::kHiddenDim; ++j)
+									{
+										Ly.W[0][j * EcoObservationV3::kObsDimRoute + EcoObservationV3::kObsInPanic] = (j % 2) ? 3.0f : -3.0f;
+									}
+								});
+		 }},
+	};
+	int32 Wrong = 0;
+	for (const FBad& Bad : Cases)
+	{
+		const TSharedPtr<FJsonObject> Root = ToJson(*Bad.Base);
+		Bad.Edit(Root);
+		const FEcoV3BrainLoad L = FEcoV3BrainRegistry::Parse(ToText(Root), Bad.Name);
+		const bool bOk = L.Reason == Bad.Want && !L.Brain.IsValid();
+		Wrong += bOk ? 0 : 1;
+		AddInfo(FString::Printf(TEXT("%s → %s: %s"), Bad.Name, EcoV3Brain::RejectName(L.Reason), *L.Message));
+		TestTrue(FString::Printf(TEXT("%s → 거부 '%s' (받은 까닭 '%s')"), Bad.Name, EcoV3Brain::RejectName(Bad.Want), EcoV3Brain::RejectName(L.Reason)), bOk);
+	}
+	TestEqual(TEXT("모든 어긋난 두 길 두뇌 파일이 맞는 까닭으로 거부된다"), Wrong, 0);
+	// 계약 dict 대조 함수 자체 (평가기와 같은 칸 이름)
+	{
+		const TSharedPtr<FJsonObject> R4 = ToJson(Text4);
+		const TSharedPtr<FJsonObject> R5 = ToJson(Text5);
+		TestTrue(TEXT("RouteContractDiff: route0 판 4 같음 · R7e 판 5 같음"), EcoV3Brain::RouteContractDiff(*R4, 4).IsEmpty() && EcoV3Brain::RouteContractDiff(*R5, 5).IsEmpty());
+		TestEqual(TEXT("RouteContractDiff: route0 을 판 5 로 → brain_flee_outside_reflex"), EcoV3Brain::RouteContractDiff(*R4, 5),
+				  FString(TEXT("brain_flee_outside_reflex (판 5 는 false)")));
+		FlightRoute(R4)->GetObjectField(TEXT("decide"))->SetNumberField(TEXT("lock_steps"), 16);
+		TestEqual(TEXT("RouteContractDiff: 잠금 16 → flight_route.decide"), EcoV3Brain::RouteContractDiff(*R4, 4), FString(TEXT("flight_route.decide")));
+	}
+	// 옛 파일은 그대로 받는다 (18·21 줄 바이트 그대로)
+	for (const TCHAR* Old : {kR1bFile, kR4File, kZeroObs21File})
+	{
+		TestTrue(FString::Printf(TEXT("옛 두뇌 %s 받음"), Old), FEcoV3BrainRegistry::LoadFile(Old).Ok());
+	}
+	TestTrue(TEXT("거부해도 지금 두뇌는 그대로"), &*FEcoV3BrainRegistry::Get().GetActive() == &*FEcoV3BrainRegistry::Builtin()
+												   && !FEcoV3BrainRegistry::Get().GetPending().IsValid());
+	// 대기 두뇌 버리기 (SyncBrain 걸기 전 검사가 쓴다): 지금 두뇌·세대 그대로, 대기 되돌림이면 쌓개 복구
+	{
+		FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+		const FEcoV3BrainLoad R4 = FEcoV3BrainRegistry::LoadFile(kR4File);
+		const FEcoV3BrainLoad S1 = FEcoV3BrainRegistry::LoadFile(kR7eFile);
+		AddExpectedMessagePlain(TEXT("를 버린다"), ELogVerbosity::Warning, EAutomationExpectedMessageFlags::Contains, 2);
+		TestFalse(TEXT("대기가 없으면 버릴 것도 없다"), Reg.DiscardPending(TEXT("시험")));
+		Reg.Queue(R4.Brain.ToSharedRef(), TEXT("시험 R4"));
+		Reg.CommitPending();
+		const uint32 G0 = Reg.GetGeneration();
+		Reg.Queue(S1.Brain.ToSharedRef(), TEXT("시험 R7e"));
+		TestTrue(TEXT("대기 R7e 버림"), Reg.DiscardPending(TEXT("시험 — 도주 반사 끔")));
+		TestTrue(TEXT("… 지금 두뇌 R4·세대 그대로·대기 없음"), Reg.GetActive()->Id == R4.Brain->Id && Reg.GetGeneration() == G0 && !Reg.GetPending().IsValid());
+		const int32 H0 = Reg.GetHistory().Num();
+		TestTrue(TEXT("되돌리기 대기"), Reg.Rollback(TEXT("시험")) && Reg.IsPendingRollback() && Reg.GetHistory().Num() == H0 - 1);
+		TestTrue(TEXT("대기 되돌림 버림 → 쌓개 복구"), Reg.DiscardPending(TEXT("시험")) && !Reg.IsPendingRollback() && Reg.GetHistory().Num() == H0);
+	}
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 10-29 기본 두뇌 R7e (사용자 결정 '기본 두뇌 R7e로' — EcoV3Brain.h '기본 두뇌', PolicyBrainV3Default.h): 빌드에 넣은 두뇌 파일 바이트 = 저장소 파일,
+// 같은 Parse 검사, 파일 두뇌와 같은 가중치·id, 이름(default·기본·R7e / builtin·내장·R1b·R1b-F), Play 시작 고르기(PickStart) 규칙
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoV3BrainDefaultTest, "AdaptiveEcosystem.Policy.V3.Brain.Default",
+								 EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoV3BrainDefaultTest::RunTest(const FString& Parameters)
+{
+	namespace O3 = EcoObservationV3;
+	const FRegistryGuard Guard;
+	FEcoV3BrainRegistry& Reg = FEcoV3BrainRegistry::Get();
+	const FEcoV3BrainRef Def = FEcoV3BrainRegistry::Default();
+	const FEcoV3BrainRef Bi = FEcoV3BrainRegistry::Builtin();
+	const FEcoV3Brain& D = *Def;
+	AddInfo(FString::Printf(TEXT("%s | 골든 %d 최대 오차 %.3e | 학습 %s"), *D.Describe(), D.GoldenCount, D.GoldenMaxError, *D.TrainWorld));
+
+	// --- 기본 두뇌 = R7e (빌드에 넣은 바이트, 검사 통과) ---
+	TestTrue(TEXT("기본 두뇌 표시 (내장 아님)"), D.bDefault && !D.bBuiltin && &D != &*Bi);
+	TestEqual(TEXT("기본 두뇌 id = R7e"), D.Id, FString(TEXT("v3_r7_g995_s1_20m@40d8710d")));
+	TestEqual(TEXT("헤더 id 와 같다"), D.Id, FString(UTF8_TO_TCHAR(EcoPolicyV3Default::kBrainId)));
+	TestTrue(TEXT("관측 24 · 마스크 판 5 · 계약 0xad7b… · 두 길·반사 밖 FLEE 막음"),
+			 D.ObsDim == O3::kObsDimRoute && D.Net.ObsDim == O3::kObsDimRoute && D.MaskVersion == P3::kMaskVersionRouteGate
+				 && D.ContractHash == P3::kContractHashObs24Mask5 && D.bRoute() && D.bFleeGate());
+	const uint8 WantAllowed[P3::kNumBehaviors] = {1, 1, 1, 0, 0};
+	TestTrue(TEXT("허용 = 먹기·도망·숨기"), FMemory::Memcmp(D.Allowed, WantAllowed, sizeof(WantAllowed)) == 0);
+	TestTrue(TEXT("골든 26 사례 통과 (Parse 검사 그대로)"), D.GoldenCount == 26 && D.GoldenMaxError <= D.GoldenTolerance);
+	TestTrue(TEXT("이름표 R7e · 출처 글자 '기본 두뇌 R7e' · 판 0 · 디스크 파일 아님"),
+			 D.Label == TEXT("R7e") && D.OriginText() == TEXT("기본 두뇌 R7e") && D.RoundTag() == TEXT("판 0") && D.SourceFile.IsEmpty());
+	TestTrue(TEXT("설명에 '기본 두뇌 R7e — 빌드에 넣은 v3_r7_g995_s1_20m.json' · '관측 24 도망길·반사 밖 도망 막음'"),
+			 D.Describe().Contains(TEXT("기본 두뇌 R7e — 빌드에 넣은 v3_r7_g995_s1_20m.json")) && D.Describe().Contains(TEXT("관측 24 도망길·반사 밖 도망 막음")));
+	TestTrue(TEXT("부를 때마다 같은 객체"), &*FEcoV3BrainRegistry::Default() == &D);
+	TestTrue(TEXT("내장 두뇌는 그대로 R1b (관측 18 · 판 2 · 이름표 R1b · 출처 '내장 두뇌')"),
+			 Bi->bBuiltin && !Bi->bDefault && Bi->ObsDim == P3::kObsDim && Bi->MaskVersion == 2 && Bi->Label == TEXT("R1b") && Bi->OriginText() == TEXT("내장 두뇌"));
+	{
+		// 넣은 바이트 = 헤더 sha256 = 저장소 파일 (줄 끝 LF 로 맞춰 — git core.autocrlf 가 CRLF 로 꺼냈어도)
+		char Hex[65];
+		EcoSha256::HashHex(EcoPolicyV3Default::kFile, static_cast<size_t>(EcoPolicyV3Default::kFileBytes), Hex);
+		TestEqual(TEXT("넣은 바이트 sha256 = 헤더 kFileSha256"), FString(ANSI_TO_TCHAR(Hex)), FString(UTF8_TO_TCHAR(EcoPolicyV3Default::kFileSha256)));
+		TArray<uint8> FileBytes;
+		const FString Path = FEcoV3BrainRegistry::Resolve(kR7eFile);
+		if (TestFalse(TEXT("저장소 R7e 두뇌 파일"), Path.IsEmpty()) && TestTrue(TEXT("읽기"), FFileHelper::LoadFileToArray(FileBytes, *Path)))
+		{
+			TArray<uint8> Lf;
+			Lf.Reserve(FileBytes.Num());
+			for (int32 i = 0; i < FileBytes.Num(); ++i)
+			{
+				if (!(FileBytes[i] == 13 && i + 1 < FileBytes.Num() && FileBytes[i + 1] == 10))
+				{
+					Lf.Add(FileBytes[i]);
+				}
+			}
+			TestTrue(TEXT("넣은 바이트 = 저장소 파일 (LF) — 다르면 python export_weights_v3.py --default-brain 로 헤더를 다시 만든다"),
+					 Lf.Num() == EcoPolicyV3Default::kFileBytes && FMemory::Memcmp(Lf.GetData(), EcoPolicyV3Default::kFile, Lf.Num()) == 0);
+		}
+	}
+	{
+		// 파일 두뇌와 같은 가중치 (비트 단위)·같은 id·같은 허용 — 파이썬 고리(live.py find_brain_zip)가 가중치 sha256 으로 같은 모델 zip 을 찾는다
+		const FEcoV3BrainLoad F = FEcoV3BrainRegistry::LoadFile(kR7eFile);
+		if (TestTrue(TEXT("R7e 파일 검사 통과"), F.Ok()))
+		{
+			const P3::FPolicyNetV3& A = D.Net;
+			const P3::FPolicyNetV3& B = F.Brain->Net;
+			const bool bSame = A.ObsDim == B.ObsDim && FMemory::Memcmp(A.W0, B.W0, sizeof(float) * P3::kHiddenDim * A.ObsDim) == 0
+							   && FMemory::Memcmp(A.B0, B.B0, sizeof(float) * P3::kHiddenDim) == 0
+							   && FMemory::Memcmp(A.W1, B.W1, sizeof(float) * P3::kHiddenDim * P3::kHiddenDim) == 0
+							   && FMemory::Memcmp(A.B1, B.B1, sizeof(float) * P3::kHiddenDim) == 0
+							   && FMemory::Memcmp(A.W2, B.W2, sizeof(float) * P3::kNumBehaviors * P3::kHiddenDim) == 0
+							   && FMemory::Memcmp(A.B2, B.B2, sizeof(float) * P3::kNumBehaviors) == 0;
+			TestTrue(TEXT("가중치 = R7e 파일 (비트 단위)"), bSame);
+			TestTrue(TEXT("id·가중치 sha256·계약·허용 = R7e 파일, 파일 두뇌는 기본 표시 없음"),
+					 F.Brain->Id == D.Id && F.Brain->WeightsSha256 == D.WeightsSha256 && F.Brain->ContractHash == D.ContractHash
+						 && FMemory::Memcmp(F.Brain->Allowed, D.Allowed, sizeof(D.Allowed)) == 0 && !F.Brain->bDefault && F.Brain->Label.IsEmpty());
+		}
+	}
+
+	// --- 이름 ---
+	for (const TCHAR* N : {TEXT("default"), TEXT(" Default "), TEXT("기본"), TEXT("R7e"), TEXT("r7e")})
+	{
+		const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(N);
+		TestTrue(FString::Printf(TEXT("'%s' → 기본 두뇌"), N), FEcoV3BrainRegistry::IsDefaultName(N) && L.Ok() && &*L.Brain == &D);
+	}
+	for (const TCHAR* N : {TEXT("builtin"), TEXT("내장"), TEXT("R1b"), TEXT("r1b-f"), TEXT("R1b-F")})
+	{
+		const FEcoV3BrainLoad L = FEcoV3BrainRegistry::LoadFile(N);
+		TestTrue(FString::Printf(TEXT("'%s' → 내장 두뇌"), N), FEcoV3BrainRegistry::IsBuiltinName(N) && L.Ok() && &*L.Brain == &*Bi);
+	}
+	TestFalse(TEXT("파일 이름은 기본·내장 이름이 아니다"), FEcoV3BrainRegistry::IsDefaultName(kR7eFile) || FEcoV3BrainRegistry::IsBuiltinName(kR1bFile));
+
+	// --- Play 시작 고르기 (PickStart — 읽기만, 기록 줄 없음) ---
+	Reg.ResetForTest();
+	TestTrue(TEXT("처음: 지금 = 내장, 건 적 없음"), &*Reg.GetActive() == &*Bi && !Reg.HasCommitted() && !Reg.GetPending().IsValid());
+	{
+		const FEcoV3StartPick P = Reg.PickStart(TEXT(""), false);
+		TestTrue(TEXT("빈 Startup · 처음 Play → 기본 두뇌"), P.Brain.IsValid() && &*P.Brain == &D && !P.bStartupRejected && P.Why.Contains(TEXT("처음 Play")));
+		const FEcoV3StartPick A = Reg.PickStart(TEXT(""), true);
+		TestTrue(TEXT("빈 Startup · 적응 고리 Play → 기본 두뇌 (판 0)"), A.Brain.IsValid() && &*A.Brain == &D && A.Why.Contains(TEXT("판 0")));
+		const FEcoV3StartPick S = Reg.PickStart(TEXT("builtin"), true);
+		TestTrue(TEXT("Startup builtin → 내장 R1b-F (적응 고리여도 사람이 고른 두뇌)"), S.Brain.IsValid() && &*S.Brain == &*Bi && !S.bStartupRejected);
+		const FEcoV3StartPick F = Reg.PickStart(kR4File, false);
+		TestTrue(TEXT("Startup 파일 → 그 파일 두뇌"), F.Brain.IsValid() && !F.Brain->bDefault && !F.Brain->bBuiltin && F.Why.Contains(kR4File));
+		const FEcoV3StartPick X = Reg.PickStart(TEXT("없는_두뇌"), false);
+		TestTrue(TEXT("Startup 거부 → 빈 값처럼 (처음 Play 면 기본 두뇌), 까닭 기록"),
+				 X.bStartupRejected && X.StartupLoad.Reason == EcoV3Brain::EReject::File && X.Brain.IsValid() && &*X.Brain == &D && X.Why.Contains(TEXT("거부")));
+		// 10-29 확인: 거부된 Startup 을 '빔' 이라 적지 않는다 (빈 Startup 만 '빔')
+		TestTrue(TEXT("Startup 거부 까닭에 'Startup 빔' 없음 · 빈 Startup 까닭에는 있음"),
+				 X.Why.Contains(TEXT("처음 Play")) && !X.Why.Contains(TEXT("Startup 빔")) && P.Why.Contains(TEXT("Startup 빔")));
+		TestTrue(TEXT("PickStart 는 저장소를 바꾸지 않는다"), !Reg.GetPending().IsValid() && &*Reg.GetActive() == &*Bi && !Reg.HasCommitted());
+	}
+	// 처음 Play 처럼 기본 두뇌를 걸면: 저장소 처음 두뇌(내장)가 되돌리기 쌓개에 남는다 (되돌리기로 R1b-F 로 갈 수 있다)
+	Reg.Queue(Def, TEXT("시험 처음 Play"));
+	TestTrue(TEXT("걸면 지금 = 기본, 건 적 있음"), Reg.CommitPending() && &*Reg.GetActive() == &D && Reg.HasCommitted());
+	TestTrue(TEXT("쌓개 = [내장]"), HistoryIs(Reg, {&*Bi}));
+	{
+		const FEcoV3StartPick P = Reg.PickStart(TEXT(""), false);
+		TestTrue(TEXT("다음 Play (빈 Startup) → 지금 두뇌 그대로"), !P.Brain.IsValid() && P.Why.Contains(TEXT("지금 두뇌 그대로")));
+		const FEcoV3StartPick A = Reg.PickStart(TEXT(""), true);
+		TestTrue(TEXT("적응 고리 Play 인데 이미 기본 → 그대로"), !A.Brain.IsValid() && A.Why.Contains(TEXT("이미 기본")));
+		const FEcoV3StartPick X = Reg.PickStart(TEXT("없는_두뇌"), false);
+		TestTrue(TEXT("Startup 거부 · 건 적 있음 → 지금 두뇌 그대로"), X.bStartupRejected && !X.Brain.IsValid());
+	}
+	// 앞 Play 에 파일 두뇌(R4)를 걸었다
+	const FEcoV3BrainLoad R4 = FEcoV3BrainRegistry::LoadFile(kR4File);
+	if (TestTrue(TEXT("R4 파일"), R4.Ok()))
+	{
+		Reg.Queue(R4.Brain.ToSharedRef(), TEXT("시험 앞 Play 의 R4"));
+		Reg.CommitPending();
+		const FEcoV3StartPick A = Reg.PickStart(TEXT(""), true);
+		TestTrue(TEXT("적응 고리 Play → 기본 두뇌로 다시 (앞 Play 의 두뇌는 앞 환경의 것)"), A.Brain.IsValid() && &*A.Brain == &D);
+		const FEcoV3StartPick P = Reg.PickStart(TEXT(""), false);
+		TestTrue(TEXT("그 밖 Play → R4 그대로"), !P.Brain.IsValid());
+		const FEcoV3StartPick S = Reg.PickStart(TEXT("default"), false);
+		TestTrue(TEXT("Startup default → 기본 두뇌"), S.Brain.IsValid() && &*S.Brain == &D);
+	}
+	// 대기가 있으면 (Play 전 콘솔 eco.V3Brain.Load): 처음이어도 그 대기 그대로, 적응 고리는 대기가 기본이 아니면 기본
+	Reg.ResetForTest();
+	if (R4.Ok())
+	{
+		Reg.Queue(R4.Brain.ToSharedRef(), TEXT("시험 Play 전 Load"));
+		TestFalse(TEXT("처음 · 대기 R4 → 그대로 (대기가 이긴다)"), Reg.PickStart(TEXT(""), false).Brain.IsValid());
+		const FEcoV3StartPick A = Reg.PickStart(TEXT(""), true);
+		TestTrue(TEXT("적응 고리 · 대기 R4 → 기본 두뇌"), A.Brain.IsValid() && &*A.Brain == &D);
+		Reg.Queue(Def, TEXT("시험 대기 기본"));
+		TestFalse(TEXT("적응 고리 · 대기가 이미 기본 → 그대로"), Reg.PickStart(TEXT(""), true).Brain.IsValid());
+	}
+	// 콘솔 eco.V3Brain.Load default
+	Reg.ResetForTest();
+	IConsoleManager::Get().ProcessUserConsoleInput(TEXT("eco.V3Brain.Load default"), *GLog, nullptr);
+	TestTrue(TEXT("eco.V3Brain.Load default → 대기 기본 두뇌"), Reg.GetPending().IsValid() && &*Reg.GetPending() == &D);
+	IConsoleManager::Get().ProcessUserConsoleInput(TEXT("eco.V3Brain.Info"), *GLog, nullptr);
+	IConsoleManager::Get().ProcessUserConsoleInput(TEXT("eco.V3Brain.List"), *GLog, nullptr);
 	return true;
 }
 

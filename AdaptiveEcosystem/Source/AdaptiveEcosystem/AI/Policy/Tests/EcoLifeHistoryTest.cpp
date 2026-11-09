@@ -5,6 +5,60 @@
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include <limits>
+#include "Network/Mass/EcoMassReplicationTypes.h"
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoNaturalIndividualTraits,"AdaptiveEcosystem.Life.IndividualTraitsInheritanceAndPolicyBoundary",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoNaturalIndividualTraits::RunTest(const FString&)
+{
+    using namespace EcoLifeV3;const auto A=NaturalFounder(47,12,.08),B=NaturalFounder(47,13,.08);
+    TestTrue(TEXT("Natural traits are bounded, reproducible and individually distinct"),A.IsValid()&&B.IsValid()&&A.Size==NaturalFounder(47,12,.08).Size&&A.Caution!=B.Caution&&A.Coat!=B.Coat);
+    auto Child=A;for(int I=0;I<10000;++I){Child=Inherit(Child,B,I);if(!Child.IsValid()){AddError(TEXT("Inheritance escaped the safe trait envelope"));return false;}}
+    TestEqual(TEXT("Parents never acquire the offspring mutations"),A.Size,NaturalFounder(47,12,.08).Size);
+    EcoLifeV3::FMemory Unseen;
+    TestEqual(TEXT("Inherited caution is data and does not introduce a new decision writer"),int(Unseen.Decide(10,10,true,false)),int(EResponse::Policy));
+    FIndividual Parent;Parent.bInitialized=true;Parent.Born=-500;Parent.bNaturalPopulation=true;
+    TestFalse(TEXT("Food alone cannot make an injured animal a breeding candidate"),Parent.CanParent(0,1,true,.3));
+    TestTrue(TEXT("Healthy mature residents retain breeding eligibility"),Parent.CanParent(0,1,true,.8));
+    FReplicatedEcoMassAgent Dto;Dto.SetPresentation(FVector::ZeroVector,1,255,255);
+    TestTrue(TEXT("Inherited coat-only changes replicate"),Dto.SetPresentation(FVector::ZeroVector,1,255,255,0,0,128,255,90));
+    TestEqual(TEXT("Coat payload is stable through late join"),Dto.GetCoatTone(),uint8(90));
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoNaturalAgeComposition,"AdaptiveEcosystem.Life.NaturalAgeCompositionAndContinuity",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoNaturalAgeComposition::RunTest(const FString&)
+{
+    using namespace EcoLifeV3;FPopulationProfile P;int Young=0;double Min=1e9,Max=0;
+    for(int I=0;I<48;++I){const double Age=P.FounderAge(123,I,48);Young+=Age<P.MaturitySeconds;Min=std::min(Min,Age);Max=std::max(Max,Age);
+        TestEqual(TEXT("Seeded ages remain reproducible"),Age,P.FounderAge(123,I,48));}
+    TestEqual(TEXT("Small groups have the requested juvenile cohort"),Young,12);
+    TestTrue(TEXT("Founders span juveniles through older adults"),Min<100&&Max>1000);
+    FIndividual Deer;Deer.bNaturalPopulation=true;Deer.bInitialized=true;Deer.MaturitySeconds=P.MaturitySeconds;Deer.Born=-50;
+    double Before=Deer.Growth(0);
+    for(int I=1;I<500;++I){double Next=Deer.Growth(I);TestTrue(TEXT("Growth is continuous and monotone through maturity"),Next>=Before&&Next-Before<.002);Before=Next;}
+    TestFalse(TEXT("Natural juveniles cannot breed at legacy maturity"),Deer.CanParent(130,1,true));
+    TestTrue(TEXT("Individual maturity, not region after migration, gates breeding"),Deer.CanParent(310,1,true));
+    FReplicatedEcoMassAgent Dto;Dto.SetPresentation(FVector::ZeroVector,1,255,255);
+    TestTrue(TEXT("Age-only changes must replicate even with identical size/genes"),Dto.SetPresentation(FVector::ZeroVector,1,255,255,0,0,128,100));
+    TestEqual(TEXT("Late join carries age without client time simulation"),Dto.GetMaturity(),uint8(100));
+    P.MaturitySeconds=std::numeric_limits<double>::quiet_NaN();TestFalse(TEXT("Non-finite age profiles fail authoring"),P.IsValid());
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoNaturalPlantRecruitment,"AdaptiveEcosystem.Life.NaturalPlantRecruitmentConservesFood",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
+bool FEcoNaturalPlantRecruitment::RunTest(const FString&)
+{
+    using namespace EcoVegetationV3;FConfig C;C.bEnabled=true;FWeather W;W.Rain=.5;FHabitat H;H.bNatural=true;H.MaturationSeconds=60;
+    FCell S;S.Development=0;double Food=.001,Issued=Food,Growth=0,Loss=0;
+    for(int I=0;I<300;++I){auto O=Advance(C,W,H,S,Food,1,.005,.2);Food=O.Food;Growth+=O.Growth;Loss+=O.Loss;}
+    TestTrue(TEXT("A living young stand develops on suitable simulated time"),S.Development>0&&S.Development<=1);
+    TestTrue(TEXT("Cohort development preserves the existing food ledger"),std::abs(Issued+Growth-Loss-Food)<1.e-12);
+    const double Age=S.Development;W.Light=0;
+    for(int I=0;I<50;++I)Advance(C,W,H,S,Food,1,.005,.2);
+    TestEqual(TEXT("Complete darkness cannot silently mature a natural stand"),S.Development,Age);
+    W.Light=1;Advance(C,W,H,S,0,1,.005,.2);TestTrue(TEXT("Complete depletion recruits from the young stand again"),S.Development<.01);
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoLifeBirthEnergy,"AdaptiveEcosystem.Life.NaturalBirthCannotCreateAdultFatReserve",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoLifeBirthEnergy::RunTest(const FString&)

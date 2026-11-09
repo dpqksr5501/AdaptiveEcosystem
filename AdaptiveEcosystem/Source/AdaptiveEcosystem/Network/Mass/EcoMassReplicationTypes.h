@@ -32,12 +32,14 @@ struct FReplicatedEcoMassAgent : public FReplicatedAgentBase
 	uint8 GetEnergy() const { return Energy; }
 	uint8 GetActivity() const { return Activity; }
 	int16 GetFocusYaw() const { return FocusYaw; }
+    uint8 GetCoatTone() const { return CoatTone; }
+    uint8 GetMaturity() const { return Maturity; }
     uint8 GetBodyScale() const { return BodyScale; }
-	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy, uint8 InActivity = 0, int16 InFocusYaw = 0, uint8 InBodyScale=128)
+	bool SetPresentation(const FVector& InVelocity, uint8 InFlags, uint8 InHealth, uint8 InEnergy, uint8 InActivity = 0, int16 InFocusYaw = 0, uint8 InBodyScale=128, uint8 InMaturity=255, uint8 InCoatTone=128)
 	{
-		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy && Activity == InActivity && FocusYaw == InFocusYaw && BodyScale==InBodyScale) return false;
+		if (Velocity.Equals(InVelocity, 1.0f) && VisualFlags == InFlags && Health == InHealth && Energy == InEnergy && Activity == InActivity && FocusYaw == InFocusYaw && BodyScale==InBodyScale && Maturity==InMaturity && CoatTone==InCoatTone) return false;
 		Velocity = InVelocity; VisualFlags = InFlags; Health = InHealth; Energy = InEnergy; Activity = InActivity; FocusYaw = InFocusYaw;
-        BodyScale=InBodyScale;
+        BodyScale=InBodyScale;Maturity=InMaturity;CoatTone=InCoatTone;
 		++VisualRevision;
 		return true;
 	}
@@ -112,6 +114,8 @@ private:
 	UPROPERTY(Transient) uint8 Energy = 255;
 	UPROPERTY(Transient) uint8 Activity = 0;
 	UPROPERTY(Transient) int16 FocusYaw = 0;
+    UPROPERTY(Transient) uint8 CoatTone = 128;
+    UPROPERTY(Transient) uint8 Maturity = 255;
     UPROPERTY(Transient) uint8 BodyScale = 128;
 };
 

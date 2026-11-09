@@ -7,7 +7,7 @@
 #include "AdaptiveEcosystemGameMode.generated.h"
 
 /** Server-only coordinator for world lifecycle and Mass network bootstrap. */
-UCLASS(Abstract)
+UCLASS(Blueprintable)
 class ADAPTIVEECOSYSTEM_API AAdaptiveEcosystemGameMode : public AGameModeBase
 {
 	GENERATED_BODY()
@@ -22,9 +22,9 @@ public:
 	virtual void Logout(AController* Exiting) override;
 
 protected:
-	/** Default used when the travel URL does not provide ?MaxPlayers=. */
-	UPROPERTY(EditDefaultsOnly, Category = "Ecology|Match", meta = (ClampMin = "1"))
-	int32 DefaultMaxPlayers = 4;
+	/** Legacy asset field. Admission now uses project EcoSessionSettings on the server. */
+	UPROPERTY(meta = (DeprecatedProperty, DeprecationMessage = "Use EcoSessionSettings.MaxRemoteClients."))
+	int32 DefaultMaxPlayers = 11;
 
 	/** Keep the world in BootstrappingMass when no configured bootstrap succeeds. */
 	UPROPERTY(EditDefaultsOnly, Category = "Ecology|Mass")
@@ -33,7 +33,7 @@ protected:
 private:
 	void RefreshConnectedPlayerCount();
 
-	int32 ConfiguredMaxPlayers = 4;
+	int32 ConfiguredMaxPlayers = 11;
 	int32 WorldEpoch = 1;
 };
 

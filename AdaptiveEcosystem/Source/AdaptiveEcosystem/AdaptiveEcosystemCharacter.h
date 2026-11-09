@@ -4,12 +4,21 @@
 
 #include "CoreMinimal.h"
 #include "GameFramework/Character.h"
+#include "AbilitySystemInterface.h"
 #include "Logging/LogMacros.h"
 #include "AdaptiveEcosystemCharacter.generated.h"
 
 class USpringArmComponent;
 class UCameraComponent;
 class UInputAction;
+class UEcoAbilityAvatarComponent;
+class UEcoPlayerCombatComponent;
+class UEcoMeleeHitComponent;
+class UEcoEquipmentComponent;
+class UEcoAimComponent;
+class UEcoWeaponFireComponent;
+class UEcoCombatRelevanceComponent;
+class UEcoGASDamageReceiverComponent;
 struct FInputActionValue;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
@@ -19,7 +28,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogTemplateCharacter, Log, All);
  *  Implements a controllable orbiting camera
  */
 UCLASS(abstract)
-class AAdaptiveEcosystemCharacter : public ACharacter
+class AAdaptiveEcosystemCharacter : public ACharacter, public IAbilitySystemInterface
 {
 	GENERATED_BODY()
 
@@ -52,8 +61,28 @@ protected:
 public:
 
 	/** Constructor */
-	AAdaptiveEcosystemCharacter();	
+	AAdaptiveEcosystemCharacter();
+    UAbilitySystemComponent* GetAbilitySystemComponent() const override;
+    void PossessedBy(AController* NewController) override;
+    void UnPossessed() override;
+    void OnRep_PlayerState() override;
+    void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
+private:
+    UPROPERTY(VisibleAnywhere, Category="Abilities")
+    TObjectPtr<UEcoAbilityAvatarComponent> AbilityAvatar;
+
+    UPROPERTY(VisibleAnywhere, Category="Combat")
+    TObjectPtr<UEcoPlayerCombatComponent> Combat;
+
+    UPROPERTY(VisibleAnywhere, Category="Combat")
+    TObjectPtr<UEcoMeleeHitComponent> MeleeHit;
+
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true")) TObjectPtr<UEcoEquipmentComponent> Equipment;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true")) TObjectPtr<UEcoAimComponent> Aim;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true")) TObjectPtr<UEcoWeaponFireComponent> WeaponFire;
+    UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category="Combat", meta=(AllowPrivateAccess="true")) TObjectPtr<UEcoCombatRelevanceComponent> CombatRelevance;
+    UPROPERTY(VisibleAnywhere, Category="Combat") TObjectPtr<UEcoGASDamageReceiverComponent> DamageReceiver;
 protected:
 
 	/** Initialize input action bindings */

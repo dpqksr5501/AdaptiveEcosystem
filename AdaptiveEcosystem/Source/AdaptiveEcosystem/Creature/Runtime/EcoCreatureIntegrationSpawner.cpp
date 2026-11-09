@@ -22,6 +22,8 @@
 #include "MassCommandBuffer.h"
 #include "MassMovementFragments.h"
 #include "Network/EcoGameState.h"
+#include "Network/Session/EcoGameSession.h"
+#include "Engine/Engine.h"
 #include "World/EcologyRegion.h"
 #include "World/EcologyWorldSubsystem.h"
 #include "World/EcoWorldClockSubsystem.h"
@@ -40,12 +42,8 @@
 static TAutoConsoleVariable<int32> EcoIntegrationLogDetails(TEXT("eco.Integration.LogDetails"), 0,
 	TEXT("Read-only agent/region/receive audit at the existing five-second integration log interval. Disable for profiling."));
 
-AEcoCreatureIntegrationGameMode::AEcoCreatureIntegrationGameMode() { GameStateClass = AEcoGameState::StaticClass(); }
-void AEcoCreatureIntegrationGameMode::InitGameState()
-{
-	Super::InitGameState();
-	if (auto* State = GetGameState<AEcoGameState>()) State->InitializeAuthorityState(FMath::Max(1, int32(GetTypeHash(FGuid::NewGuid()) & MAX_int32)), 8);
-}
+AEcoCreatureIntegrationGameMode::AEcoCreatureIntegrationGameMode() {}
+void AEcoCreatureIntegrationGameMode::InitGameState() { Super::InitGameState(); }
 
 AEcoCreatureIntegrationSpawner::AEcoCreatureIntegrationSpawner()
 {
@@ -68,11 +66,21 @@ void AEcoCreatureIntegrationSpawner::PostInitializeComponents()
 void AEcoCreatureIntegrationSpawner::BeginPlay()
 {
 	Super::BeginPlay();
+	bAuthorityWorld = GetNetMode() != NM_Client;
+    if (bAuthorityWorld)
+        for (TActorIterator<AEcoMassNetworkBootstrap> It(GetWorld()); It; ++It)
+        {
+            FailRuntime(TEXT("Mixed integration and legacy Mass bootstrap: select a single world coordinator"));
+            return;
+        }
     int32 LifeOverride=-1;
     if(FParse::Value(FCommandLine::Get(),TEXT("EcoEcosystemLife="),LifeOverride)&&(LifeOverride==0||LifeOverride==1))bEnableEcosystemLife=LifeOverride!=0;
 	PostTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &AEcoCreatureIntegrationSpawner::OnWorldPostActorTick);
 	StartedAt = GetWorld()->GetTimeSeconds();
 #if WITH_DEV_AUTOMATION_TESTS
+    int32 HabitatStageOverride = INDEX_NONE;
+    if (FaunaHabitatStage > 0 && FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaHabitatStage="), HabitatStageOverride)
+        && HabitatStageOverride >= 0 && HabitatStageOverride <= 3) FaunaHabitatStage = HabitatStageOverride;
 	FParse::Value(FCommandLine::Get(), TEXT("EcoIntegrationExitAfter="), TestExitAfter);
 	FParse::Value(FCommandLine::Get(), TEXT("EcoIntegrationCaptureAt="), TestCaptureAt);
 	bTestObserverCycle = TestExitAfter > 0 && FParse::Param(FCommandLine::Get(), TEXT("EcoIntegrationObserverCycle"));
@@ -121,6 +129,8 @@ void AEcoCreatureIntegrationSpawner::UpdateHabitatStreaming()
 		{
 			for (const FVector& Point : Group.HerbivoreSpawnPoints) AddPoint(Point);
 			for (const FVector& Point : Group.WolfSpawnPoints) AddPoint(Point);
+            for (const auto& Placement : Group.Fauna)
+                for (const FVector& Point : Placement.SpawnPoints) AddPoint(Point);
 		}
 	}
 	else if (auto* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>())
@@ -148,6 +158,10 @@ void AEcoCreatureIntegrationSpawner::Tick(float Delta)
 		}
 	}
 #endif
+	// ClientTravel assigns a pending net driver before destroying the standalone world.
+	// Its authority entities belong to that outgoing world, not to the incoming client proxy world.
+	if (const FWorldContext* Context = GEngine ? GEngine->GetWorldContextFromWorld(GetWorld()) : nullptr)
+		if (Context->PendingNetGame) return;
 	if (bWaitingForHabitat)
 	{
 		if (GetWorld()->GetTimeSeconds() - StartedAt > 30.0)
@@ -160,7 +174,8 @@ void AEcoCreatureIntegrationSpawner::Tick(float Delta)
 	if (bUseHabitatStreaming && GetNetMode() != NM_Client && GetWorld()->GetTimeSeconds() >= NextStreamingUpdate)
 	{ NextStreamingUpdate = GetWorld()->GetTimeSeconds() + 1.0; UpdateHabitatStreaming(); }
 	if (GetNetMode() != NM_Client) Reconcile(Delta);
-	SyncVisuals(Delta);
+    if (GetNetMode() != NM_Client && bReady) UpdateHitProxies();
+    SyncVisuals(Delta);
     if (OnRuntimeSample.IsBound() && GetWorld()->GetTimeSeconds() >= NextAuditSample)
     {
         NextAuditSample = GetWorld()->GetTimeSeconds() + 2.0;
@@ -247,6 +262,7 @@ void AEcoCreatureIntegrationSpawner::UpdateTestObserver()
 
 void AEcoCreatureIntegrationSpawner::FailRuntime(const TCHAR* Reason)
 {
+	 ResetCombat();
 	 bReady = false;
 	if (GetNetMode() != NM_Client) if (auto* State = GetWorld()->GetGameState<AEcoGameState>()) State->SetMassReplicationReady(false);
 	UE_LOG(LogTemp, Error, TEXT("[Eco Integration] Runtime stopped: %s Step=%lld Owned=%d WorldTime=%.3f"), Reason, Step, Owned.Num(), GetWorld()->GetTimeSeconds());
@@ -255,6 +271,7 @@ void AEcoCreatureIntegrationSpawner::FailRuntime(const TCHAR* Reason)
 void AEcoCreatureIntegrationSpawner::EndPlay(const EEndPlayReason::Type Reason)
 {
 	FWorldDelegates::OnWorldPostActorTick.Remove(PostTickHandle);
+    ResetCombat();
 	bReady = false;
 	bWaitingForHabitat = false;
 	HabitatStreamingSource->DisableStreamingSource();
@@ -262,7 +279,7 @@ void AEcoCreatureIntegrationSpawner::EndPlay(const EEndPlayReason::Type Reason)
 	Visuals.Reset();
 	for (AEcoCreatureRepresentationActor* Actor : VisualPool) if (Actor) Actor->Destroy();
 	VisualPool.Reset();
-	if (GetWorld() && GetNetMode() != NM_Client)
+	if (GetWorld() && bAuthorityWorld)
 	{
 		if (auto* Registry = GetWorld()->GetSubsystem<UEcoWorldProviderRegistry>())
 		{

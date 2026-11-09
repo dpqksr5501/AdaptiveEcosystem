@@ -38,6 +38,9 @@ struct FEcoHerdMigrationDebugSnapshot
     TArray<FEcoMigrationDebugRoute> Routes;
     TArray<FEcoMigrationDebugPlan> Plans;
     TArray<FEcoMigrationDebugMember> Members;
+    // Presentation markers only; do not enter herd membership/arrival accounting.
+    TArray<FVector> Wolves;
+    TArray<FVector> Players;
 };
 namespace EcoHerdMigrationDebug
 {

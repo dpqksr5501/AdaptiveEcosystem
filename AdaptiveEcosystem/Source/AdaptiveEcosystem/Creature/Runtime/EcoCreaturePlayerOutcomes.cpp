@@ -10,11 +10,16 @@
 #include "World/EcoWorldClockSubsystem.h"
 #include "GameFramework/Pawn.h"
 #include "Engine/World.h"
+#include "Player/EcoPlayerState.h"
+#include "Player/EcoMeleeHitComponent.h"
+#include "Player/EcoCombatRelevanceComponent.h"
 
 bool AEcoCreatureIntegrationSpawner::QueuePlayerStrike(APawn& Player)
 {
     if(!IsInGameThread()||GetNetMode()==NM_Client||!bEnableEcosystemLife||!bReady||Player.GetWorld()!=GetWorld()
         ||!Player.HasAuthority()||!Player.IsPlayerControlled()||PlayerStrikes.Num()>=32)return false;
+    if (const auto* State=Player.GetPlayerState<AEcoPlayerState>();State&&!State->IsAlive()) return false;
+    if (const auto* Hit=Player.FindComponentByClass<UEcoMeleeHitComponent>();Hit&&Hit->AttackData) return false;
     const double Now=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
     const double RealNow=GetWorld()->GetTimeSeconds();
     for(auto It=StrikeCooldown.CreateIterator();It;++It)if(!It.Key().IsValid())It.RemoveCurrent();
@@ -39,7 +44,10 @@ void AEcoCreatureIntegrationSpawner::ProcessPlayerStrikes(const FEcoServerTimeSn
         const FVector From=Player->GetActorLocation();const FVector Forward=Player->GetActorForwardVector().GetSafeNormal2D();
         FVector PlayerEye;FRotator PlayerEyeRotation;Player->GetActorEyesViewPoint(PlayerEye,PlayerEyeRotation);
         FMassEntityHandle Best;double Distance=300;
+        const auto* Relevance=Player->FindComponentByClass<UEcoCombatRelevanceComponent>();
         for(const auto Entity:Owned){
+            const int64 TargetId=EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity).StableAgentId;
+            if (!Relevance || !Relevance->CanAttack(this,Time.WorldEpoch,TargetId) || !HitProxies.Contains(TargetId)) continue;
             const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(Entity);
             if(!Link||!Link->bAdopted||Link->bDead||EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity).HP<=0)continue;
             const FVector Point=Position(Entity)+FVector(0,0,65),Delta=Point-From;
@@ -47,6 +55,40 @@ void AEcoCreatureIntegrationSpawner::ProcessPlayerStrikes(const FEcoServerTimeSn
             Best=Entity;Distance=Delta.Size2D();
         }
         if(!Best.IsSet())continue;
+        ApplyPlayerDamage(*Player,Best,30.f);
+    }
+}
+
+void AEcoCreatureIntegrationSpawner::ApplyPlayerDamage(APawn& Attacker, FMassEntityHandle Best, float Damage)
+{
+    APawn* Player=&Attacker;
+    auto* Native=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+    auto& EM=GetWorld()->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    const FVector From=Player->GetActorLocation();
+    if (auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Best))
+    {
+        auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Best);
+        Vitals.HP = FMath::Max(0.f, Vitals.HP - Damage);
+        if (Vitals.HP <= 0.f)
+            EM.GetFragmentDataChecked<FEcoDeathFragment>(Best).Cause = EEcoDeathCause::ExternalDamage;
+        else
+        {
+            const auto& Body = EM.GetFragmentDataChecked<FTransformFragment>(Best).GetTransform();
+            const FVector Start = Body.GetLocation() + FVector(0, 0, 10);
+            Fauna->LastThreatPosition = GetWorld()->LineTraceTestByObjectType(Start, From,
+                FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaHit)))
+                ? Body.GetLocation() - Body.GetRotation().GetForwardVector() * 100. : From;
+            Fauna->ThreatUntil = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds + 3.;
+        }
+        return;
+    }
+    FVector PlayerEye; FRotator EyeRotation; Player->GetActorEyesViewPoint(PlayerEye,EyeRotation);
+    auto Position=[&](FMassEntityHandle E){
+        const auto& L=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(E);const auto* C=Native->GetContext(L.ContextIndex);
+        if(const auto* B=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E))return C->UnitsToCm(B->Body.Pos.X,B->Body.Pos.Y,L.GroundZ);
+        const auto& Wolf=EM.GetFragmentDataChecked<FEcoThreatStateFragment>(E).Agent.State;return C->UnitsToCm(Wolf.PosX,Wolf.PosY,L.GroundZ);
+    };
+    auto ClearLine=[&](const FVector& A,const FVector& B){return !GetWorld()->LineTraceTestByObjectType(A,B,FCollisionObjectQueryParams(ECC_WorldStatic),FCollisionQueryParams(SCENE_QUERY_STAT(EcoPlayerStrike),false));};
         auto* Context=Native->GetContext(EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Best).ContextIndex);
         const double Now=Context->Sim.T*EcoRepertoireV3::kStepSeconds;
         const uint64 Episode=EcoLifeV3::Mix(++StrikeSequence)^0xA771ACCE55000000ULL;
@@ -69,8 +111,18 @@ void AEcoCreatureIntegrationSpawner::ProcessPlayerStrikes(const FEcoServerTimeSn
         auto& Memory=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Best).Individual.Memory;
         const auto PlayerLocal=Context->CmToUnits(From);
         Memory.Suffer(Episode,Now,Known,PlayerLocal.X,PlayerLocal.Y,Known&&Memory.LastKind==EcoLifeV3::EEncounter::Pursuit);
-        auto& Vitals=EM.GetFragmentDataChecked<FEcoVitalsFragment>(Best);Vitals.HP=FMath::Max(0.f,Vitals.HP-30.f);
-        if(Vitals.HP<=0)EM.GetFragmentDataChecked<FEcoDeathFragment>(Best).Cause=EEcoDeathCause::ExternalDamage;
+        if(Known&&Context->Sim.Food.Vegetation.bHabitatDynamics)
+            Memory.RememberHunt(From.X/EcoRepertoireV3::kUnitCm,From.Y/EcoRepertoireV3::kUnitCm,Now);
+        auto& Vitals=EM.GetFragmentDataChecked<FEcoVitalsFragment>(Best);Vitals.HP=FMath::Max(0.f,Vitals.HP-Damage);
+        if(Vitals.HP<=0)
+        {
+            EM.GetFragmentDataChecked<FEcoDeathFragment>(Best).Cause=EEcoDeathCause::ExternalDamage;
+            auto& Link=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Best);
+            Link.bDead=true;Link.DeathCause=3; // Integration-only external damage; not a PPO/native death rule.
+            if(auto* Body=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(Best)) Body->Body.PrevPos=Body->Body.Pos;
+            if(auto* Wolf=EM.GetFragmentDataPtr<FEcoThreatStateFragment>(Best))
+            { Wolf->Agent.bDead=true;Wolf->Agent.PrevX=Wolf->Agent.State.PosX;Wolf->Agent.PrevY=Wolf->Agent.State.PosY; }
+        }
         TSet<int32> InformedHerds;
         if(Known)if(const auto* H=EM.GetFragmentDataPtr<FEcoHerdMemberFragment>(Best);H&&H->HerdRuntimeIndex>=0)InformedHerds.Add(H->HerdRuntimeIndex);
         bool Recognized=Known;
@@ -81,6 +133,8 @@ void AEcoCreatureIntegrationSpawner::ProcessPlayerStrikes(const FEcoServerTimeSn
             Recognized=true;
             const auto* C=Native->GetContext(Link->ContextIndex);const auto P=C->CmToUnits(From);
             Link->Individual.Memory.Observe(Vitals.HP<=0?EcoLifeV3::EEncounter::WitnessLoss:EcoLifeV3::EEncounter::Surprise,Episode,Now,Now,P.X,P.Y,.7);
+            if(C->Sim.Food.Vegetation.bHabitatDynamics)
+                Link->Individual.Memory.RememberHunt(From.X/EcoRepertoireV3::kUnitCm,From.Y/EcoRepertoireV3::kUnitCm,Now);
             if(const auto* H=EM.GetFragmentDataPtr<FEcoHerdMemberFragment>(E);H&&H->HerdRuntimeIndex>=0)InformedHerds.Add(H->HerdRuntimeIndex);
         }
         for(const auto E:Owned){
@@ -90,7 +144,6 @@ void AEcoCreatureIntegrationSpawner::ProcessPlayerStrikes(const FEcoServerTimeSn
             L->Individual.Memory.ReceiveReport(Episode,Now,Now,.5);
         }
         if(Recognized)Context->KnownHumanDanger.Record(Episode,Now);
-        UE_LOG(LogTemp,Log,TEXT("[EcoLife][PlayerStrike] Episode=%llu Victim=%lld Damage=30 HP=%.1f AttackerKnown=%d Kind=%d"),Episode,
-            EM.GetFragmentDataChecked<FEcoIdentityFragment>(Best).StableAgentId,Vitals.HP,Known,int32(Memory.LastKind));
-    }
+        UE_LOG(LogTemp,Log,TEXT("[EcoLife][PlayerStrike] Episode=%llu Victim=%lld Damage=%.1f HP=%.1f AttackerKnown=%d Kind=%d"),Episode,
+            EM.GetFragmentDataChecked<FEcoIdentityFragment>(Best).StableAgentId,Damage,Vitals.HP,Known,int32(Memory.LastKind));
 }

@@ -38,7 +38,7 @@ namespace EcoCheckpoint
     inline void Config(FArchive& A,EcoWorldV3::FWorldConfig& C)
     {
 #define P(X) Pod(A,C.X)
-        P(bEcosystemLife);P(Vegetation);P(WorldSize);P(Seed);P(NumHerbivores);P(NumStalkers);P(NumChasers);P(NumRanged);P(NumNocturnal);
+        P(bEcosystemLife);P(bNaturalHabitats);P(bWildRefuges);P(HabitatSignature);P(NaturalGround);P(Vegetation);P(WorldSize);P(Seed);P(NumHerbivores);P(NumStalkers);P(NumChasers);P(NumRanged);P(NumNocturnal);
         P(bPlayerProxy);P(bShelterSafe);P(ShelterWolfMargin);P(PredSpeedMult);P(DayPeriod);P(DayOffset);P(TwilightSteps);
         Vector(A,C.Covers,1024);P(bProtectedRefuges);P(PredatorRefugeMargin);P(FoodCell);P(FoodPatchBlur);P(FoodPatchThreshold);
         P(FoodGradBlur);P(FoodRegenBase);P(FoodRegenMult);P(FoodCoverRegenMult);P(RngStream);P(bRespawnDead);P(PredEmaDenominator);
@@ -54,7 +54,7 @@ namespace EcoCheckpoint
     {
 #define P(X) Pod(A,G.X)
 #define V(X) Vector(A,G.X)
-        P(Vegetation);P(VegetationWeather);V(VegetationCells);V(Habitats);P(EnvironmentLost);P(VegetationGrown);
+        P(Vegetation);P(VegetationWeather);V(VegetationCells);V(Habitats);P(EnvironmentLost);P(VegetationGrown);P(LastExpansionStep);P(ColonizedCells);
         P(Gw);P(Cell);P(GradBlur);V(Cap);V(Food);V(Regen);V(CoverCell);V(CoverFoodCell);V(Cap0);
         V(Blur);V(GradX);V(GradY);V(Sat);V(Tmp);V(Tmp2);V(Demand);
 #undef V
@@ -66,6 +66,9 @@ namespace EcoCheckpoint
 #define P(X) Pod(A,W.X)
         P(RepCfg);P(ObsCfg);P(ThreatCfg);P(Allowed);P(Rng.State);P(T);P(HuntWindow);P(HuntWindowCaptures);P(Dark);P(StepsToTransition);P(PredEma);
         P(WeatherKind);P(WeatherIntensity);P(Weather);P(ReserveCap);P(ObsDim);P(bObstacleObsProbe);P(ObstacleObsCfg);P(Stats);
+        // 10-29: the active brain also sets the mask-5 gate (SetModelFleeGate — default v3 brain R7e). Without it a restored
+        // world would keep ObsDim 24/route but silently allow brain FLEE outside the reflex (mask 4 rows).
+        P(bFleeGate);
 #undef P
         // External observations and Step scratch contain live-frame data/pointers.
         // They are reconstructed before consumption, never deserialized as handles.
@@ -74,13 +77,13 @@ namespace EcoCheckpoint
     inline bool ValidGrid(const EcoWorldV3::FFoodGrid& G)
     {
         const size_t N=G.Food.size();
-        if(G.Gw<1||G.Gw>256||N!=size_t(G.Gw)*G.Gw||!std::isfinite(G.Cell)||G.Cell<=0||G.Cap.size()!=N||G.Regen.size()!=N
+        if(G.LastExpansionStep<0||G.ColonizedCells<0||size_t(G.ColonizedCells)>N||G.Gw<1||G.Gw>256||N!=size_t(G.Gw)*G.Gw||!std::isfinite(G.Cell)||G.Cell<=0||G.Cap.size()!=N||G.Regen.size()!=N
             ||G.CoverCell.size()!=N||G.Blur.size()!=N||G.GradX.size()!=N||G.GradY.size()!=N
-            ||(!G.Demand.empty()&&G.Demand.size()!=N)||!G.HasValidVegetationLayout())return false;
+            ||(!G.Demand.empty()&&G.Demand.size()!=N)||(!G.Cap0.empty()&&G.Cap0.size()!=N)||!G.HasValidVegetationLayout())return false;
         for(size_t I=0;I<N;++I){
             if(!std::isfinite(G.Food[I])||!std::isfinite(G.Cap[I])||!std::isfinite(G.Regen[I])||G.Cap[I]<0||G.Food[I]<0||G.Food[I]>G.Cap[I]+1e-9||G.Regen[I]<0)return false;
-            if(G.Vegetation.bEnabled&&(!G.Habitats[I].IsValid()||!std::isfinite(G.VegetationCells[I].Moisture)||G.VegetationCells[I].Moisture<0
-                ||G.VegetationCells[I].Moisture>1||!std::isfinite(G.VegetationCells[I].Stress)||G.VegetationCells[I].Stress<0||G.VegetationCells[I].Stress>1))return false;
+            if(!G.Cap0.empty()&&(!std::isfinite(G.Cap0[I])||G.Cap0[I]<G.Cap[I]))return false;
+            if(G.Vegetation.bEnabled&&(!G.Habitats[I].IsValid()||!G.VegetationCells[I].IsValid()))return false;
         }
         return true;
     }

@@ -1,4 +1,5 @@
 #include "Mass/EcoMassLifecycleSubsystem.h"
+#include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Mass/EcoMassNetworkBootstrap.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EcoMassTags.h"
@@ -74,6 +75,8 @@ bool UEcoMassLifecycleSubsystem::InitializePopulation()
 {
 	if (!IsInGameThread() || !GetWorld() || !GetWorld()->IsGameWorld() || GetWorld()->GetNetMode() == NM_Client || bFailed) return false;
 	if (bInitialized) return true;
+    for (TActorIterator<AEcoCreatureIntegrationSpawner> It(GetWorld()); It; ++It)
+        return Fail(TEXT("Mixed integration and legacy Mass bootstrap: select a single world coordinator"));
 	const UEcoRuntimeSettings* Settings = GetDefault<UEcoRuntimeSettings>();
 	FeedingSettings = Settings->Feeding;
 	MigrationSettings = Settings->Migration;

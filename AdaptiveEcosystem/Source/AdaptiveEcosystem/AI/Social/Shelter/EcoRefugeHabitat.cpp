@@ -6,6 +6,7 @@
 #include "UObject/ConstructorHelpers.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "TimerManager.h"
+#include "AI/Policy/EcoNaturalHabitat.h"
 
 AEcoRefugeHabitat::AEcoRefugeHabitat()
 {
@@ -16,8 +17,8 @@ AEcoRefugeHabitat::AEcoRefugeHabitat()
     Brush=CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("RefugeBrush"));Brush->SetupAttachment(SceneRoot);
     Boulders=CreateDefaultSubobject<UHierarchicalInstancedStaticMeshComponent>(TEXT("RefugeBoulders"));Boulders->SetupAttachment(SceneRoot);
     for(auto* C:{Brush.Get(),Boulders.Get()}) {C->SetCollisionEnabled(ECollisionEnabled::NoCollision);C->SetCanEverAffectNavigation(false);C->SetCastShadow(true);}
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> Grass(TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA"));
-    static ConstructorHelpers::FObjectFinder<UStaticMesh> Stone(TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Cover/SM_MWAM_StoneA"));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> Grass(TEXT("/Game/SHC/Fab/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA"));
+    static ConstructorHelpers::FObjectFinder<UStaticMesh> Stone(TEXT("/Game/SHC/Fab/MWLandscapeAutoMaterial/Meshes/Cover/SM_MWAM_StoneA"));
     BrushMesh=Grass.Object;BoulderMesh=Stone.Object;
 }
 
@@ -27,6 +28,9 @@ void AEcoRefugeHabitat::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Ou
     DOREPLIFETIME_CONDITION(AEcoRefugeHabitat,LayoutRadius,COND_InitialOnly);
     DOREPLIFETIME_CONDITION(AEcoRefugeHabitat,ReplicatedSeed,COND_InitialOnly);
     DOREPLIFETIME(AEcoRefugeHabitat,bRegistrationReady);
+    DOREPLIFETIME(AEcoRefugeHabitat,bNaturalLayout);
+    DOREPLIFETIME(AEcoRefugeHabitat,NaturalBrushLayout);
+    DOREPLIFETIME(AEcoRefugeHabitat,NaturalStoneLayout);
 }
 void AEcoRefugeHabitat::OnConstruction(const FTransform& Transform)
 {
@@ -38,6 +42,7 @@ void AEcoRefugeHabitat::OnConstruction(const FTransform& Transform)
 void AEcoRefugeHabitat::OnRep_Layout(){Radius=LayoutRadius;LayoutSeed=ReplicatedSeed;RebuildHabitat();}
 void AEcoRefugeHabitat::BeginPlay()
 {
+    if(bNaturalLayout){bAlwaysRelevant=false;SetNetCullDistanceSquared(FMath::Square(50000.f));}
     if(GetNetMode()!=NM_Client){LayoutRadius=Radius;ReplicatedSeed=LayoutSeed;if(!IsNetStartupActor())NetDormancy=DORM_Awake;}
     Super::BeginPlay();
     if(HasAuthority()) {
@@ -46,6 +51,7 @@ void AEcoRefugeHabitat::BeginPlay()
         ForceNetUpdate();
     }
     OnRep_Ready();
+    if(bNaturalLayout&&bRegistrationReady)RebuildHabitat();
     if(GetNetMode()!=NM_DedicatedServer&&Brush->GetInstanceCount()==0)RebuildHabitat();
 }
 void AEcoRefugeHabitat::OnRep_Ready()
@@ -63,6 +69,7 @@ void AEcoRefugeHabitat::TryRegisterGrounded()
         if(!bRegistrationReady)UE_LOG(LogTemp,Warning,TEXT("[EcoRefuge] Ground registration unavailable: %s"),*GetName());
     }
     OnRep_Ready();ForceNetUpdate();
+    if(bRegistrationReady&&bNaturalLayout)RebuildHabitat();
 }
 void AEcoRefugeHabitat::EndPlay(const EEndPlayReason::Type Reason)
 {
@@ -70,18 +77,47 @@ void AEcoRefugeHabitat::EndPlay(const EEndPlayReason::Type Reason)
 }
 void AEcoRefugeHabitat::RebuildHabitat()
 {
-    if(!GetWorld()||GetNetMode()==NM_DedicatedServer||!BrushMesh||!BoulderMesh||!FMath::IsFinite(Radius)||Radius<50)return;
+    if(!GetWorld()||(!bNaturalLayout&&GetNetMode()==NM_DedicatedServer)||!BrushMesh||!BoulderMesh||!FMath::IsFinite(Radius)||Radius<50)return;
+    if(bNaturalLayout&&HasActorBegunPlay()&&GetNetMode()==NM_Client){OnRep_NaturalLayout();return;}
     Brush->ClearInstances();Boulders->ClearInstances();Brush->SetStaticMesh(BrushMesh);Boulders->SetStaticMesh(BoulderMesh);
+    NaturalBrushLayout.Reset();NaturalStoneLayout.Reset();
     FRandomStream Random(LayoutSeed);
     const float R=FMath::Clamp(Radius,50.f,2500.f),Spacing=FMath::Clamp(BrushSpacing,80.f,250.f);
     auto Place=[&](UHierarchicalInstancedStaticMeshComponent* Component,float X,float Y,FVector Scale,FRotator Rotation){
         FVector P=GetActorLocation()+FVector(X,Y,0);
         FHitResult Hit;FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoRefugeAuthorGround),true,this);
-        if(GetWorld()->LineTraceSingleByChannel(Hit,P+FVector(0,0,2000),P-FVector(0,0,4000),ECC_WorldStatic,Params))P.Z=Hit.ImpactPoint.Z;
+        const bool Grounded=GetWorld()->LineTraceSingleByChannel(Hit,P+FVector(0,0,bNaturalLayout?600:2000),P-FVector(0,0,bNaturalLayout?1200:4000),ECC_WorldStatic,Params);
+        if(bNaturalLayout&&(!Grounded||Hit.ImpactNormal.Z<.75||FMath::Abs(Hit.ImpactPoint.Z-GetActorLocation().Z)>400))return;
+        if(Grounded)P.Z=Hit.ImpactPoint.Z;
         const auto Bounds=Component->GetStaticMesh()->GetBounds();
         P.Z-=(Bounds.Origin.Z-Bounds.BoxExtent.Z)*Scale.Z+5;
-        Component->AddInstance(FTransform(Rotation,P,Scale),true);
+        const FTransform T(Rotation,P,Scale);
+        if(bNaturalLayout)(Component==Brush.Get()?NaturalBrushLayout:NaturalStoneLayout).Add(T);
+        if(GetNetMode()!=NM_DedicatedServer)Component->AddInstance(T,true);
     };
+    if(bNaturalLayout){
+        // Bounded irregular clumps with soft edges; no stone ring or cardinal garden paths.
+        for(int32 I=0;I<240&&NaturalBrushLayout.Num()<160;++I){
+            const float Angle=Random.FRand()*2*PI,Length=FMath::Sqrt(Random.FRand())*R;
+            const float X=FMath::Cos(Angle)*Length,Y=FMath::Sin(Angle)*Length;
+            const double Density=EcoNaturalHabitat::PatchDensity(X,Y,R*.65,uint32(LayoutSeed));
+            if(Random.FRand()>Density*(.25+.75*EcoNaturalHabitat::Smooth((R-Length)/(R*.35))))continue;
+            bool Close=false;for(const auto& T:NaturalBrushLayout)if(FVector::DistSquared2D(T.GetLocation(),GetActorLocation()+FVector(X,Y,0))<Spacing*Spacing*.35){Close=true;break;}
+            if(Close)continue;
+            const float Height=FMath::Clamp(BrushHeight,60.f,200.f)*Random.FRandRange(.65f,1.2f);
+            const FVector Size=BrushMesh->GetBoundingBox().GetSize();
+            const float Width=Random.FRandRange(150,240)/FMath::Max(1.,FMath::Max(Size.X,Size.Y));
+            Place(Brush,X,Y,{Width,Width,Height/FMath::Max(1.,Size.Z)},{0,Random.FRandRange(0,360),0});
+        }
+        for(int32 I=0;I<FMath::Clamp(NaturalBoulderCount,0,8);++I){
+            const float Angle=Random.FRand()*2*PI,Length=Random.FRandRange(.25f,.9f)*R;
+            const FVector Size=BoulderMesh->GetBoundingBox().GetSize();
+            const float Scale=Random.FRandRange(120,260)/FMath::Max(1.,FMath::Max(Size.X,Size.Y));
+            Place(Boulders,FMath::Cos(Angle)*Length,FMath::Sin(Angle)*Length,{Scale,Scale*.8f,Scale*.65f},{0,Random.FRandRange(0,360),0});
+        }
+        if(HasAuthority())ForceNetUpdate();
+        return;
+    }
     // Cardinal passages stay legible; occupants stand in clear pockets surrounded by tall brush.
     for(float Y=-R;Y<=R;Y+=Spacing)for(float X=-R;X<=R;X+=Spacing) {
         const float PX=X+Random.FRandRange(-Spacing*.22f,Spacing*.22f),PY=Y+Random.FRandRange(-Spacing*.22f,Spacing*.22f);
@@ -109,4 +145,11 @@ void AEcoRefugeHabitat::RebuildHabitat()
         const float Ring=FMath::Max(0.f,R+50.f-MeshRadius*Scale);
         Place(Boulders,FMath::Cos(Angle)*Ring-Offset.X,FMath::Sin(Angle)*Ring-Offset.Y,{Scale,Scale*.8f,Scale*.95f},Rotation);
     }
+}
+void AEcoRefugeHabitat::OnRep_NaturalLayout()
+{
+    if(!bNaturalLayout||GetNetMode()==NM_DedicatedServer||!BrushMesh||!BoulderMesh)return;
+    Brush->ClearInstances();Boulders->ClearInstances();Brush->SetStaticMesh(BrushMesh);Boulders->SetStaticMesh(BoulderMesh);
+    Brush->AddInstances(NaturalBrushLayout,false,true,false);Boulders->AddInstances(NaturalStoneLayout,false,true,false);
+    OnRep_Ready();
 }

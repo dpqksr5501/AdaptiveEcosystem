@@ -33,7 +33,8 @@ bool AEcoCreatureIntegrationSpawner::ReconcilePopulation()
             || V.MaxEnergy <= 0 || !FMath::IsFinite(V.HP)) return false;
 		Ids.Add(Id.StableAgentId); ++Alive;
 		auto& M = Metrics[I]; ++M.Population;
-		const bool Consumer = Id.SpeciesId == TEXT("Herbivore");
+        const auto* Fauna = FindFauna(Id.SpeciesId);
+        const bool Consumer = Id.SpeciesId == TEXT("Herbivore") || (Fauna && Fauna->UsesPlantFood());
 		M.FoodConsumerCount += Consumer;
 		M.AverageEnergy += FMath::Clamp(V.Energy / V.MaxEnergy, 0.f, 1.f);
 		M.ResidentCount += Travel.State == EEcoResidenceState::Resident;

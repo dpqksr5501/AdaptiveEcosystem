@@ -147,8 +147,46 @@
 //      eco.IntegratedV3.EnvWatch (-EcoV3EnvWatch=, 기본 1)·EnvWatchSeconds (실시간 1 초): Play 중 레벨 나무(꼬리표 EcoV3Trunk 줄기 막이)와 지역 날씨(우리 날씨 콘솔
 //      변수·팀 FRegionEnvironmentState)를 읽어 다음 전역 결정 스텝 경계에서 지역 세계에 넣는다 — 세계 원판 = 그 나무로 Play 를 시작했을 때와 같은 목록, 새 원판 안
 //      사슴·늑대 밀어내기, 먹이 격자 그대로. 넣은 묶음마다 환경 판 + 1, '[EcoV3I] 환경 바뀜 #n |'. 바뀐 것이 없으면 비트 단위로 지금과 같다. 0 = 시작 때 고정.
+//      10-27 (C) 시작 날씨: 팀 날씨 출처(지역을 맡아 실제로 쓰는 팀 환경 어댑터 — 조연우 BP_JYU_EcosystemWeather 등)가 있는 지역은 팀 지역 환경으로 시작
+//      (eco.IntegratedV3.TeamWeatherStart, 기본 1 — 감시 0 이면 쓰지 않는다), 없는 지역은 우리 고정 날씨.
 //      자동 스냅숏 eco.IntegratedV3.AutoSnapshot (-1 = AutoAdapt 따름)·SnapshotEvery·AutoSnapshotSettle·AutoSnapshotOut (EcoV3Snapshot.cpp, 'env' 블록).
 //      시험용 대역 eco.IntegratedV3.Test.AddTrees·Test.RemoveTrees·Test.At (-EcoV3TestAt= -EcoV3TestCmd=), 보기 eco.IntegratedV3.EnvInfo.
+//  22. 10-24 두 길 두뇌 (이식 계획서 Docs/RL_Policy/RL_V3_ROUTE_CPP_PORT_PLAN.md 8절·13절·15절, R7e 판정 통과): 관측 24·마스크 판 4·5 두뇌 파일(EcoV3Brain.h)을
+//      eco.V3Brain.Load 로 걸면 도주 반사 중 두뇌가 '어디로'(RUN = 반사 방향·SHELTER = 늑대보다 먼저 닿는 은신처)를 고른다. 게임 기본 두뇌는 그대로 내장 R1b-F 다
+//      (두 길은 그 두뇌를 걸 때만 — 콘솔 변수가 없다). SyncBrain 이 걸기 전에 지역마다 도주 반사(eco.IntegratedV3.WildFlight)·실제 허용의 얼기·잠 0 을 보고
+//      (RouteBrainBlocker — 어긋나면 대기 두뇌를 버리고 거부 알림), 걸 때 ApplyBrainToWorld 가 허용·관측 칸 수·SetModelRoute·SetModelFleeGate 를 함께 정한다.
+//      열린 도망: 길 없는 두뇌 → 두 길 = 그 스텝 끝 H 에서 새 두뇌가 곧바로 고름(길 없음 결정), 두 길 → 길 없는 두뇌 = 경계 스텝 A 가 반사 방향(RUN)으로 두고 H 가 길
+//      상태를 지운다. 화면: 사슴 '도주(트인 쪽)'(연노랑)·'도주(은신처)'(하늘색), 지역 넷째 줄 '길 <지역> | 최근 60초 …'(FEcoV3RouteTally), 상태 줄 '두 길(마스크 판 n)',
+//      맨 위 줄 '두뇌 <이름> 두 길'. 10초 기록 '[EcoV3I] <지역> 길 |'(길 통계가 있을 때만), 스냅숏 brain.mask_version·route, world.wild_flight.route·
+//      brain_flee_outside_reflex, flight.route (world.py flight_stats 의 route 와 같은 칸). 실행 행동은 늘 FLEE 라 Social 인계·애니메이션·복제는 그대로다
+//      (eco.IntegratedV3.SocialControl 1 이면 Social 훅이 SHELTER 길보다 나중에 와서 슬롯 쪽이 이긴다 — 기본 0).
+//  23. 10-27 사용자 보고 두 고침 (세계 규칙 — 파이썬 configs/v3_wild3_calm_mirror.yaml 과 같은 값, 골든 CalmGoldenVectorsV3.h):
+//      먹기 걷기 고침 eco.IntegratedV3.GrazeCalm (-EcoV3GrazeCalm=, 기본 1 — FWorldConfig::GrazeCalm 2·2.5·0.5·1): 먹이를 찾아 걷는 사슴은 무대 가장자리 4 m 안에서
+//      안쪽으로 되돌아오고 몸이 향한 쪽으로 이어 걷고 벽 2 m 안에서는 벽 쪽으로 가지 않는다 ('평소 사슴이 벽에 붙어 제자리에서 방향만 뒤집는다').
+//      거리 두기 eco.IntegratedV3.RestKeep (-EcoV3RestKeep=, 기본 1 — FWildFlightConfig::bRestKeep 여유 2·띠 4, WildFlight 1 일 때만): 쉬는 늑대(먹기·배부름)의
+//      시야 안에서 그 늑대를 알아챈 사슴은 걸어서 늑대 시야 + 4 m 밖까지 물러난 뒤 쉬고, 그 밖 8 m 띠에서는 그 늑대 쪽으로 다가가지 않는다(덮기 kKeepRest,
+//      화면 '거리 두기(쉬는 늑대)' 옅은 주황, 10초 기록 '[EcoV3I] <지역> 거리 두기 |'). 둘 다 학습 세계(R1b·R7e)에는 없던 규칙이라 0 이면 10-26 그대로다
+//      (파이썬 짝 비교·unreal_parity 는 -EcoV3GrazeCalm=0 -EcoV3RestKeep=0 이면 옛 거울 설정, 켜면 calm 거울 설정).
+//      측정 전용 10초 기록 '[EcoV3I] <지역> 쉬는 늑대 시야 |' (켬·끔 모두): 쉬는 늑대 시야 안 산 사슴·스텝 몫과 그중 멈춘 몫 (세계는 읽지 않는다 — 처리기 TallyRestWolfView).
+//  24. 10-27 레벨 바뀜에 반응하기 (사용자 결정 '변화하는 레벨은 팀에 맡기고 나는 변했을 때 어떻게 반응할지에 대해서만 설계하자', 설계·구현 기록
+//      Docs/RL_Policy/FOREST_GROWTH_MODE.md, LIVE_ADAPT_SPEC.md 5.2·5.3·5.5):
+//      숲 자람 모드 eco.IntegratedV3.ForestGrowth (-EcoV3ForestGrowth, 기본 0 — 시험 모드, 세계 규칙 아님. EcoV3ForestGrowth.{h,cpp}·EcoV3ForestTree.{h,cpp}):
+//      고른 지역(기본 메마른 땅)에 묘목이 단계마다 돋아 자라고, 다 자라는 결정 스텝 경계(ForestStepBoundary — 처리기 스텝 고리, 환경 넣기 바로 앞)에서 줄기 막이를 켜
+//      지금 레벨 나무와 같은 길(꼬리표 EcoV3Trunk → 나무만 다시 읽기 → ApplyEnvChange, 출처 forest_growth)로 세계에 들어간다. 복제 액터라 리슨·데디케이티드에서도 같다.
+//      끄면 숲 코드가 하나도 돌지 않는다 (액터·강제 읽기·스냅숏 칸 없음).
+//      '큰 변화만' 다시 배우기 eco.IntegratedV3.AutoSnapshotRule (기본 1 — EcoV3BigChange.h·EcoV3Snapshot.cpp): 자동 스냅숏은 나무가 BigTrees(10) 이상 바뀌었거나
+//      날씨 종류가 WeatherHold(120 초) 이상 바뀐 채일 때만, 바뀜이 BigSettle(20 초) 멈춘 뒤 한 번, 숲이 자라는 동안은 기다린다(상한 BigMaxWait 300 초). 0 = 판마다 (옛 동작).
+//      규칙이 돌 때 세기만 바뀐 환경 판은 화면 알림을 내지 않는다 (eco.IntegratedV3.EnvNoticeMinor 1 = 옛 동작). 세계에 넣는 것은 그대로다.
+//      파이썬 감시 자동 시작 eco.IntegratedV3.AutoWatch (기본 1 = AutoAdapt 를 따름 — EcoV3WatchLauncher.{h,cpp}): AutoAdapt Play 를 시작하면 live.py watch 를 창 없이
+//      띄우고 Play 가 끝나면 학습 자식까지 프로세스 나무째 끝낸다. 학습 파이프라인을 따로 띄우는 개발용 도구다 — 런타임 추론은 그대로 C++ 네이티브만.
+//      적응 고리 폴더 eco.IntegratedV3.AdaptRoot (-EcoV3AdaptRoot=, 빈 값 = Saved/EcoAdapt) 하나가 스냅숏·두뇌·상태 파일·감시 --root 의 기본을 묶는다.
+//  25. 10-29 기본 두뇌 R7e (사용자 결정 '기본 두뇌 R7e로', EcoV3Brain.h '기본 두뇌', 문서 Docs/RL_Policy/LIVE_ADAPT_SPEC.md 5.6): 아무것도 고르지 않은 Play 의
+//      사슴 두뇌는 빌드에 넣은 기본 두뇌 R7e(v3_r7_g995_s1_20m@40d8710d, 관측 24·마스크 판 5 — PolicyBrainV3Default.h)다. 위 19·20·22 의 '처음은 내장'·
+//      '적응 고리 Play 는 내장 두뇌(판 0)에서'·'게임 기본 두뇌는 그대로 내장 R1b-F' 는 그때의 이력이다. OnWorldBeginPlay 가 FEcoV3BrainRegistry::PickStart 로 고른
+//      두뇌를 줄에 넣고, 첫 SyncBrain 이 걸기 전 검사(RouteBrainBlocker)를 지나면 건다 — 못 걸면(도주 반사 끔 등) 대기를 버리고 내장 R1b-F 로 돈다(기록 Warning·
+//      화면 알림). 내장 R1b-F 로 시작 = eco.V3Brain.Startup builtin (-EcoV3Brain=builtin), Play 중 eco.V3Brain.Load builtin. 처리기 시험(ActivateForTest)은
+//      PickStart 를 지나지 않아 저장소 처음 두뇌(내장 R1b-F)로 돈다. 화면: 맨 위 줄 '기본 R7e 두 길·반사 밖 도망 막음', 상태 줄 '두뇌 판 0 (기본 R7e)',
+//      알림 '새 두뇌 — 기본 두뇌 R7e (판 0) · …'·'두뇌 되돌림 → 기본 두뇌 R7e (판 0)'. 스냅숏 brain.default 참.
 //
 // 실제 스텝·입양·화면은 EcoPolicyV3IntegratedProcessors 가 한다.
 
@@ -166,8 +204,11 @@
 #include "Templates/UniquePtr.h"
 
 #include "EcoPolicyClock.h"
+#include "EcoV3BigChange.h"
 #include "EcoV3Brain.h"
 #include "EcoV3FlightTally.h"
+#include "EcoV3ForestGrowth.h"
+#include "EcoV3WatchLauncher.h"
 #include "EcoWorldV3.h"
 #include "TreeLayoutV3.h"
 
@@ -239,9 +280,26 @@ namespace EcoV3Integrated
 	 * '도주(안전해질 때까지)'(진한 주황)·'웅크림(은신처·경계)'(파랑). 0 이면 지금 그대로.
 	 * bReserveOn = 지방 비축을 켠 세계 (야생 w1): 에너지 15% 아래면 ' 굶주림' 대신 ' 배고픔 비축 63%'(빨강, 비축으로 버티는 중),
 	 * 비축 0 이면 ' 비축 바닥', 배 10% 밑이면 ' 약함(느림)'. 배는 괜찮은데 비축이 25% 밑이면 ' 비축 20%'. 거짓이면 지금 그대로.
+	 * Route = 10-24 두 길 두뇌의 고른 길 (FHerbDecision::Route — 도주 덮기일 때만 읽는다): RUN 이면 '도주(트인 쪽) 58%'(연노랑 255,240,120),
+	 * SHELTER 면 '도주(은신처) 58%'(하늘색 110,230,255 — 웅크림 파랑 60,150,255 과 다르다, 이식 계획서 12절 질문 9). 길이 없으면(kRouteNone) 지금 그대로.
 	 */
 	ADAPTIVEECOSYSTEM_API FString DeerLabel(const EcoRepertoireV3::FRepState& Rep, const EcoWorldV3::FHerbBody& Body, bool bRecentRepro,
-											FColor& OutColor, int32 KeepMode = EcoWorldV3::kKeepNone, bool bReserveOn = false);
+											FColor& OutColor, int32 KeepMode = EcoWorldV3::kKeepNone, bool bReserveOn = false,
+											int32 Route = EcoWorldV3::kRouteNone);
+	/** 10-24 두 길 두뇌 도주 글자 (기록·화면): RUN '도주(트인 쪽)', SHELTER '도주(은신처)', 그 밖 nullptr. */
+	ADAPTIVEECOSYSTEM_API const TCHAR* RouteNameKo(int32 Route);
+	/**
+	 * 화면에 보일 고른 길 (스텝 끝 H 뒤 — 길 결정 스텝은 두뇌가 고른 칸을 다음 A 가 적용하므로, 그 칸이 SHELTER 이고 열렸으면 SHELTER, 아니면 지금 길 D.Route).
+	 * 세계 상태는 바꾸지 않는다 (EcoWorldV3::Detail::RouteApply 와 같은 판정).
+	 */
+	inline int32 ShownRoute(const EcoWorldV3::FHerbDecision& D)
+	{
+		return (D.bRouteDecide && D.KeepMode == EcoWorldV3::kKeepPanic && D.RouteRequest == EcoWorldV3::kRouteSlotShelter && D.bRouteSok)
+				   ? EcoWorldV3::kRouteShelter
+				   : D.Route;
+	}
+	/** 두 길 두뇌 도주 색 (RUN 연노랑·SHELTER 하늘색 — 그 밖은 FColor(0) 이 아니라 Fallback). */
+	ADAPTIVEECOSYSTEM_API FColor RouteColor(int32 Route, const FColor& Fallback);
 	/** 도주 반사 덮기 이름 (기록·화면): 두뇌 / 경계(먹으며 멀어짐) / 도주(안전해질 때까지) / 웅크림(은신처·경계). */
 	ADAPTIVEECOSYSTEM_API const TCHAR* KeepModeNameKo(int32 KeepMode);
 
@@ -283,6 +341,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 	bool bWildFlight = true;            // 사슴 도주 반사 거리 (eco.IntegratedV3.WildFlight 기본 1, 야생 w3 — 경계 거리 KeepAway 를 바꿨다). 거짓 = 두뇌 그대로
 	bool bFlightHoldAwake = true;       // 도주 붙잡기 (eco.IntegratedV3.FlightHoldAwake 기본 1, 10-16 hold_awake). 거짓 = 사냥 중인 늑대만 도주를 붙잡는다 (857da45)
 	bool bFlightEdgeAvoid = true;       // 가장자리 굽히기 (eco.IntegratedV3.FlightEdgeAvoid 기본 1, 10-16 edge_r 5). 거짓 = 굽히지 않는다 (857da45)
+	bool bRestKeep = true;              // 거리 두기(쉬는 늑대) (eco.IntegratedV3.RestKeep 기본 1, 10-27 — 파이썬 wild_flight.rest_keep 여유 2·띠 4). bWildFlight 일 때만.
+										// 거짓 = 쉬는 늑대는 경계(먹으며 멀어짐)만 (10-26 그대로)
+	bool bGrazeCalm = true;             // 먹기 걷기 고침 (eco.IntegratedV3.GrazeCalm 기본 1, 10-27 — 파이썬 repertoire.graze_* 2·2.5·0.5·1). 거짓 = 10-26 그대로
 	double AlertDistM = 30.0;           // 경계 거리 alert_r (m, eco.IntegratedV3.AlertDistM) — 사냥 중인 늑대를 이 안에서 알아채면 먹으며 멀어진다
 	double PanicDistM = 15.0;           // 도주 거리 flight_r (m, eco.IntegratedV3.PanicDistM) — 이 안이거나 다가오면 뛰어서 달아난다
 	double SafeDistM = 40.0;            // 안전 거리 safe_r (m, eco.IntegratedV3.SafeDistM) — 사냥 중인 늑대가 모두 이 밖일 때까지 도주
@@ -393,7 +454,30 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 		// 두 고침은 따로 끌 수 있다 (eco.IntegratedV3.FlightHoldAwake·FlightEdgeAvoid, 고치기 전·뒤 영상용). 끄면 857da45 와 같다
 		K.bHoldAwake = bFlightHoldAwake;
 		K.EdgeR = bFlightEdgeAvoid ? 5.0 : 0.0;
+		// 10-27 거리 두기(쉬는 늑대) (eco.IntegratedV3.RestKeep — 파이썬 configs/v3_wild3_calm_mirror.yaml wild_flight.rest_keep·rest_keep_margin 2·rest_keep_band 4).
+		// 끄면 FWildFlightConfig 기본(끔) = 10-26 그대로
+		K.bRestKeep = bRestKeep;
+		K.RestKeepMargin = 2.0;
+		K.RestKeepBand = bRestKeep ? 4.0 : 0.0;
+		K.bRestKeepAsleep = false;
 		return K;
+	}
+
+	/**
+	 * 10-27 먹기 걷기 고침의 세계 칸 (eco.IntegratedV3.GrazeCalm — 파이썬 configs/v3_wild3_calm_mirror.yaml repertoire.graze_edge_r 2·graze_edge_w 2.5·
+	 * graze_inertia 0.5·graze_wall_margin 1). 끄면 0 = 10-26 그대로.
+	 */
+	EcoWorldV3::FGrazeCalmConfig GrazeCalmConfig() const
+	{
+		EcoWorldV3::FGrazeCalmConfig G;
+		if (bGrazeCalm)
+		{
+			G.EdgeR = 2.0;
+			G.EdgeW = 2.5;
+			G.Inertia = 0.5;
+			G.WallMargin = 1.0;
+		}
+		return G;
 	}
 
 	/** 사슴 Deer 마리가 한 변 SizeUnits 무대에서 학습 밀도 하한(128 / 110² 마리/단위²) 아래인가. */
@@ -417,6 +501,30 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3IntegratedSettings
 
 	/** 콘솔 변수 eco.IntegratedV3.* 에서 읽는다 (명령줄 -EcoV3Seed= -EcoV3DeerPerRegion= 은 그 콘솔 변수의 시작값이다). */
 	static FEcoV3IntegratedSettings FromConsole();
+};
+
+/**
+ * 섬 무대 설정 (11-05, Docs/RL_Policy/ISLAND_STAGE.md 12절, EcoV3IslandStage.cpp). Play 시작 때 한 번 읽는다. 끔(기본 — 맵 조정자 bV3IslandStage 가 없는 맵)이면
+ * 지금 통합 v3 그대로다. 켜면 지역 하나(Region)가 섬 전체 정사각 세계가 되고 땅/물 지도(EcoV3Island.h)가 벽 대신 못 가는 곳을 정한다.
+ */
+struct ADAPTIVEECOSYSTEM_API FEcoV3IslandSettings
+{
+	int32 Mode = -1;                    // eco.IntegratedV3.Island: −1 = 맵 조정자 bV3IslandStage 를 따름, 0 = 끔, 1 = 켬
+	FName Region = TEXT("Island");      // 섬 무대가 될 지역 (조정자 그룹이 이 지역 하나여야 한다)
+	int32 Herds = 4;                    // 무리 자리 수 (1~8)
+	int32 DeerPerHerd = 120;            // 무리마다 사슴 (1~128)
+	int32 WolvesPerHerd = 4;            // 무리마다 늑대 (0~12)
+	double HerdGapM = 400.0;            // 무리 자리 가운데끼리 가장 가까운 거리
+	double HerdClearM = 30.0;           // 무리 자리 둘레 여유 (해안·숲·호수에서 더 떨어진다)
+	double ShoreM = 0.5;                // 바다·호수 수면 위 이 높이까지는 물
+	double SlopeZ = 0.65;               // 가파름 문턱 (법선 Z — 팀 이동 제약과 같은 값)
+	bool bForest = true;                // 소나무 칸 막힘 (1단계). 거짓 = 숲을 무시
+	double ForestRadiusM = 3.0;         // 칸 가운데에서 이 거리 안에 나무가 있으면 숲 칸
+	double RockMarginM = 0.5;           // 큰 바위 상자 + 이 여유
+	bool bMarkers = true;               // 먼 개체 표식 (그리는 단독·리슨 호스트)
+
+	/** 콘솔 변수 eco.IntegratedV3.Island* 에서 읽는다 (명령줄 -EcoV3Island= 등은 그 콘솔 변수의 시작값). 값은 범위로 자른다. */
+	static FEcoV3IslandSettings FromConsole();
 };
 
 /** 한 지역 무대 계획 (조정자 시작 전에 정한다). */
@@ -559,6 +667,16 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3BrainTally
 	int64 KnowSteps[EcoRepertoireV3::kNumBehaviors] = {};   // 그중 늑대를 앎
 	int64 Reflex = 0;                                       // 도주 반사가 덮은 스텝
 	int64 ReflexKnow = 0;                                   // 그중 늑대를 앎
+	// 10-24 두 길 두뇌 (이식 계획서 8-3): 반사 스텝 가운데 그 스텝에 실행한 길 (세계 길 통계 FRouteStats::Steps 의 스텝 차 — 길 켬 세계만, 끄면 0)
+	int64 ReflexRun = 0;                                    // RUN (반사 방향 그대로)
+	int64 ReflexShelter = 0;                                // SHELTER (늑대보다 먼저 닿는 은신처 쪽)
+
+	/** 이번 결정 스텝 지역 세계의 길 통계 차 (실행한 RUN·SHELTER 사슴-스텝). */
+	void AddRoute(int64 Run, int64 Shelter)
+	{
+		ReflexRun += Run;
+		ReflexShelter += Shelter;
+	}
 
 	void Add(int32 Behavior, bool bKnows, bool bReflex)
 	{
@@ -604,8 +722,100 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3BrainTally
 		}
 		D.Reflex = Reflex - O.Reflex;
 		D.ReflexKnow = ReflexKnow - O.ReflexKnow;
+		D.ReflexRun = ReflexRun - O.ReflexRun;
+		D.ReflexShelter = ReflexShelter - O.ReflexShelter;
 		return D;
 	}
+};
+
+/**
+ * 두 길 두뇌 화면·기록 합 (10-24 이식 계획서 8-3 — 기록만, 규칙이 아니다). 재료는 지역 세계의 누적 길 통계 EcoWorldV3::FWorldStats::Route
+ * (world.py route_stats 와 같은 칸 — 길 켬 세계만 센다). 누적끼리 빼면 구간 합이다.
+ */
+struct ADAPTIVEECOSYSTEM_API FEcoV3RouteSum
+{
+	int64 RunSteps = 0;        // 실행한 RUN 반사 사슴-스텝 (steps.run)
+	int64 ShelterSteps = 0;    // 실행한 SHELTER 반사 사슴-스텝 (steps.shelter)
+	int64 Onsets = 0;          // 도주 시작 (onsets)
+	int64 Decisions = 0;       // 길 결정 (decisions — 시작·SHELTER 무효·RUN 길 잠금 뒤 가능 바뀜·길 없음)
+	int64 Choice = 0;          // 그 가운데 SHELTER 가 열린 결정 (적용 때 센다 — choice)
+	int64 PickedRun = 0;       // 두뇌가 RUN 을 고른 결정 (적용 때 — picked.run)
+	int64 PickedShelter = 0;   // 두뇌가 SHELTER 를 고른 결정 (picked.shelter)
+	int64 Invalid = 0;         // SHELTER 무효 (늑대가 문에 먼저 닿음·은신처 지워짐 — invalid.shelter)
+	int64 Switches = 0;        // 결정 전 길과 고른 길이 다름 (switches)
+
+	static FEcoV3RouteSum Of(const EcoWorldV3::FRouteStats& S)
+	{
+		FEcoV3RouteSum R;
+		R.RunSteps = S.Steps[EcoWorldV3::kRouteRun];
+		R.ShelterSteps = S.Steps[EcoWorldV3::kRouteShelter];
+		R.Onsets = S.Onsets;
+		R.Decisions = S.Decisions;
+		R.Choice = S.Choice;
+		R.PickedRun = S.Picked[EcoWorldV3::kRouteRun];
+		R.PickedShelter = S.Picked[EcoWorldV3::kRouteShelter];
+		R.Invalid = S.Invalid[EcoWorldV3::kRouteShelter];
+		R.Switches = S.Switches;
+		return R;
+	}
+	FEcoV3RouteSum Plus(const FEcoV3RouteSum& O, int64 Sign = 1) const
+	{
+		FEcoV3RouteSum R;
+		R.RunSteps = RunSteps + Sign * O.RunSteps;
+		R.ShelterSteps = ShelterSteps + Sign * O.ShelterSteps;
+		R.Onsets = Onsets + Sign * O.Onsets;
+		R.Decisions = Decisions + Sign * O.Decisions;
+		R.Choice = Choice + Sign * O.Choice;
+		R.PickedRun = PickedRun + Sign * O.PickedRun;
+		R.PickedShelter = PickedShelter + Sign * O.PickedShelter;
+		R.Invalid = Invalid + Sign * O.Invalid;
+		R.Switches = Switches + Sign * O.Switches;
+		return R;
+	}
+	FEcoV3RouteSum Minus(const FEcoV3RouteSum& O) const { return Plus(O, -1); }
+	/** 실행한 반사 길 스텝 (RUN + SHELTER). */
+	int64 RouteSteps() const { return RunSteps + ShelterSteps; }
+	/**
+	 * 화면·기록 글자: '길 RUN 82% · 은신처 18% (반사 사슴-스텝 410) · 길 결정 37 · 은신처 고름 6/9 (열린 결정) · 무효 1'. 길 스텝이 없으면
+	 * '길 반사 스텝 없음 · 길 결정 0'.
+	 */
+	FString Text() const;
+};
+
+/** 두 길 두뇌 최근 60 초 창 (FEcoV3RouteSum — 결정 스텝마다 누적을 한 번 넣는다, EcoV3Flight::FTally 의 창과 같은 450 결정 스텝). */
+struct ADAPTIVEECOSYSTEM_API FEcoV3RouteTally
+{
+	static constexpr int32 kWindowSteps = 450;   // 최근 60 초 (1 결정 스텝 = 2/15 초)
+
+	/** 결정 스텝 하나 끝의 누적 (지역 세계 Sim.Stats.Route). */
+	void Push(const EcoWorldV3::FRouteStats& Cumulative)
+	{
+		if (Ring.Num() != kWindowSteps + 1)
+		{
+			Ring.Init(FEcoV3RouteSum(), kWindowSteps + 1);   // 0 번 칸 = Play 시작 (지역 세계의 길 통계는 0 에서 센다)
+			Pushes = 0;
+		}
+		++Pushes;
+		Now = FEcoV3RouteSum::Of(Cumulative);
+		Ring[static_cast<int32>(Pushes % (kWindowSteps + 1))] = Now;
+	}
+	/** 최근 60 초 합 (Play 시작이 450 스텝 안이면 시작부터). */
+	FEcoV3RouteSum Window() const
+	{
+		if (Ring.Num() != kWindowSteps + 1)
+		{
+			return FEcoV3RouteSum();
+		}
+		const int32 Base = Pushes >= kWindowSteps ? static_cast<int32>((Pushes - kWindowSteps) % (kWindowSteps + 1)) : 0;
+		return Now.Minus(Ring[Base]);
+	}
+	/** 넣은 결정 스텝 수와 창 길이 (스텝). */
+	int64 Pushes = 0;
+	int64 WindowSteps() const { return Pushes < kWindowSteps ? Pushes : kWindowSteps; }
+	FEcoV3RouteSum Now;
+
+private:
+	TArray<FEcoV3RouteSum> Ring;   // 누적 (Pushes % (kWindowSteps + 1) 칸) — 450 스텝 전 누적이 덮이지 않게 한 칸 더
 };
 
 /** One-frame authority sound snapshot, with native evidence time. Not persistent. */
@@ -622,6 +832,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
     TArray<double> PlayerEyeZ;
     TArray<FEcoLifeNoiseSample> PlayerNoises;
     EcoTracesV3::FField MovementTraces;
+    EcoNaturalHabitat::FBrowseEvidence BrowseEvidence;
     EcoLifeV3::FRegionalDanger KnownHumanDanger;
 	bool bSpatialFoodRegistered = false;
 	int64 ResourceReceiptSequence = 0;
@@ -716,7 +927,16 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	// 경계 거리 기록 (사람 결정 10-15 (C), 처리기가 채운다. 규칙 켬·끔 모두 센다)
 	int64 NearEatingDeerSteps = 0;            // 식사 중(쿨다운 > 0)인 깨어 있는 늑대의 15 m 안에 있던 산 사슴 (개체·스텝, 스텝 끝)
 	int64 LastLogNearEatingDeerSteps = 0;
+	// 10-27 쉬는 늑대 시야 기록 (측정 전용 — 세계가 읽지 않는다. 거리 두기 eco.IntegratedV3.RestKeep 켬·끔 모두 센다). 스텝 끝 산 사슴 가운데
+	// 쉬는 늑대(죽지 않았고 깨어 있고 사냥 중이 아님 — Detail::FlightHunting 거짓)의 시야(WolfViewNow) 안 ∧ 눈길 트임 ∧ 은신처 밖 ∧ 경계 거리 안 사냥 늑대 없음 (개체·스텝)
+	int64 RestViewLiveSteps = 0;              // 산 사슴 개체·스텝 (분모)
+	int64 RestViewDeerSteps = 0;              // 쉬는 늑대 시야 안
+	int64 RestViewStopSteps = 0;              // 그중 이번 스텝 이동이 0.001 단위 밑 (멈춤)
+	int64 LastLogRestViewLiveSteps = 0;
+	int64 LastLogRestViewDeerSteps = 0;
+	int64 LastLogRestViewStopSteps = 0;
 	int32 KeepNow[EcoWorldV3::kNumKeepModes] = {};   // 프레임 끝 산 사슴의 덮기 (화면 집계)
+	int32 RouteNow[2] = {};                   // 10-24 두 길 두뇌: 프레임 끝 도주 덮기 산 사슴의 다음 스텝 길 [RUN, SHELTER] (화면 집계 — 길 끔이면 0)
 
 	// 두뇌 행동 몫 (10-18 두뇌 바꾸기, 처리기가 결정 스텝마다 채운다 — FEcoV3BrainTally)
 	FEcoV3BrainTally BrainTally;              // 누적 (Play 시작부터)
@@ -729,6 +949,13 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	EcoV3Flight::FTally FlightTally;          // 최근 60 초 창·두뇌 판 합
 	/** 도망 기록을 세는 세계인가 (기록 켬 ∧ 도주 반사 켬 — 파이썬도 wild_flight 세계에만 있다). */
 	bool FlightOn() const { return Sim.Config.bFlightStats && Sim.Config.WildFlight.bEnabled; }
+
+	// 10-24 두 길 두뇌 화면·기록 (이식 계획서 8-3 — 처리기가 결정 스텝마다 세계 길 통계 누적 Sim.Stats.Route 를 넣는다. 길은 두뇌가 켠다: SyncBrain → SetModelRoute)
+	FEcoV3RouteTally RouteTally;              // 최근 60 초 창
+	/** 지금 두 길 두뇌가 이 세계의 길을 켰나 (Sim.Config.WildFlight.bRoute). */
+	bool RouteOn() const { return Sim.Config.WildFlight.bRoute; }
+	/** 길 통계가 하나라도 있나 (지금 켰거나, 앞서 켰던 두뇌가 센 것 — 기록 줄·스냅숏의 'route' 칸). */
+	bool RouteSeen() const { return RouteOn() || Sim.Stats.Route.Onsets > 0 || Sim.Stats.Route.Decisions > 0; }
 
 	// R5 장애물 관측 대조 기록 (10-19, eco.IntegratedV3.ObsParityLog — LogObsParity)
 	bool bObsParityDiscsLogged = false;       // 이 무대의 원판 줄을 남겼다
@@ -744,6 +971,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 	bool bEnvTeamKnown = false;               // 팀 지역 환경(FRegionEnvironmentState)을 읽었다
 	uint8 EnvTeamWeather = 0;                 // 그때 날씨 (EEcoWeatherState)
 	float EnvTeamRainfall = 0.0f;             // 그때 비 세기
+	bool bEnvTeamSource = false;              // 팀 날씨 출처가 있다 (이 지역을 맡아 실제로 쓰는 팀 환경 어댑터 — 10-27 (C). AddContext 때, 늦게 등록된 지역은 처음 읽을 때 판정)
+	FString EnvTeamSourceWho;                 // 그 어댑터 (이름·종류·쓰는 길 — 기록·EnvInfo)
+	bool bEnvStartFromTeam = false;           // 시작 날씨를 팀 값으로 넣었다 (eco.IntegratedV3.TeamWeatherStart 1 ∧ 감시 켬 ∧ 덮기 글자 없음)
 	bool bEnvTreesIgnoredLogged = false;      // 장애물 끔·가져온 원판이라 나무 바뀜을 넣지 않는다고 적었다
 	bool bEnvWeatherIgnoredLogged = false;    // 날씨 끔이라 날씨 바뀜을 넣지 않는다고 적었다
 
@@ -781,7 +1011,7 @@ struct FEcoV3EnvChange
 	FName Region;
 	FString Kind;            // trees · weather
 	FString Detail;          // '나무 0→20 (+20 −0)' · '맑음→비 1.00'
-	FString Source;          // level · test · cvar:<콘솔 변수> · team_env
+	FString Source;          // level · test · forest_growth · cvar:<콘솔 변수> · team_env
 };
 
 /** 지역 하나의 대기 환경 변화 (PollEnvironment 가 만들고 ApplyEnvChange 가 결정 스텝 경계에서 넣는다). */
@@ -792,7 +1022,7 @@ struct FEcoV3EnvPending
 	int32 InStage = 0;            // 무대 안 줄기 막이 (은신처 원 안 포함)
 	int32 Snapped = 0;            // 넣는 줄기 가운데 배치 표 값으로 바꾼 수
 	double MaxSnapCm = 0.0;       // 그 차이 최대 (cm)
-	FString TreeSource;           // level · test
+	FString TreeSource;           // level · test · forest_growth
 	bool bWeather = false;
 	int32 WeatherKind = 0;        // EcoWorldV3::kWeather*
 	double WeatherIntensity = 0.0;
@@ -1031,6 +1261,7 @@ public:
 	FEcoV3RegionContext* GetContext(int32 Index) { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	const FEcoV3RegionContext* GetContext(int32 Index) const { return Contexts.IsValidIndex(Index) ? Contexts[Index].Get() : nullptr; }
 	FEcoV3RegionContext* FindContext(FName RegionId);
+    const FEcoV3RegionContext* FindContext(FName RegionId) const;
 
 	/** 처리기가 한 컨텍스트의 결정 스텝 하나를 마칠 때마다 부른다 (포획 표시·기록). */
 	void NotifyContextStep(FEcoV3RegionContext& Ctx, const EcoWorldV3::FStepReport& Report);
@@ -1050,6 +1281,19 @@ public:
 	 * '[EcoV3I] 두뇌 바꿈' 한 줄을 남긴다 (처음 한 번은 '[EcoV3I] 두뇌 시작'). 사슴 몸·행동 상태·요청은 건드리지 않는다.
 	 */
 	void SyncBrain(bool bPollWatch);
+	/**
+	 * 10-24 두 길 두뇌 걸기 전 검사 (이식 계획서 8-2 의 1·4절·12절 질문 12) — 지역 세계 하나에 두뇌 B 를 걸 수 있나. 판 4·5 두뇌만 보고(그 밖은 빈 값), 걸 수
+	 * 없으면 까닭: 도주 반사(WildFlight)를 끈 세계('도주 반사가 없다'), 실제 허용(두뇌 ∧ 세계 칸 WorldAllowed)에 얼기·잠이 남음, 실제 허용에 먹기가 없음(판 5 막기로 빈 줄).
+	 * 세계는 바꾸지 않는다 (읽기만).
+	 */
+	static FString RouteBrainBlocker(const EcoWorldV3::FWorldState& W, const FEcoV3Brain& B);
+	/** 모든 지역 세계에 두뇌 B 를 걸 수 있나 (RouteBrainBlocker 를 지역마다 — 걸 수 없으면 '<지역>: <까닭>', 빈 값 = 걸 수 있다). */
+	FString BrainBlocker(const FEcoV3Brain& B) const;
+	/**
+	 * 두뇌 B 를 지역 세계 하나에 건다: 허용 칸(두뇌 ∧ 세계)·관측 칸 수·10-24 두 길(SetModelRoute — 판 4·5)·반사 밖 FLEE 막음(SetModelFleeGate — 판 5).
+	 * 사슴 상태는 건드리지 않는다 — 열린 도망의 길 상태는 다음 스텝 A·H 가 정한다 (길 없는 두뇌 → 두 길: 그 H 에서 길 없음 결정, 두 길 → 길 없는 두뇌: A 는 반사 방향, H 가 지움).
+	 */
+	static void ApplyBrainToWorld(EcoWorldV3::FWorldState& W, const FEcoV3Brain& B);
 	/** 이 월드가 지금 쓰는 두뇌 (SyncBrain 전에는 저장소의 지금 두뇌). */
 	const FEcoV3Brain& GetActiveBrain() const;
 	const EcoPolicyV3::FPolicyNetV3& ActiveNet() const { return GetActiveBrain().Net; }
@@ -1069,6 +1313,8 @@ public:
 	void PostNotice(EcoV3Integrated::ENotice Kind, const FString& Text);
 	/** 환경 바뀜 판 (Play 시작부터 적용한 환경 변경 묶음 수, 0 = 그대로 — EcoV3EnvWatch 가 올린다. 상태 줄 '환경 #n'). */
 	int32 GetEnvRevision() const { return EnvRevision; }
+	/** 마지막 환경 바뀜 화면 알림 글 ('환경 바뀜 #n — …', 없으면 빈 값 — 10-27 확인 고침의 자동화 시험이 본다). */
+	const FString& GetLastEnvNotice() const { return LastEnvNotice; }
 	/** 적응 고리 Play 번호 (eco.IntegratedV3.AutoAdapt 일 때 Play 시작마다 새로 — 스냅숏 play_id, 감시는 다른 Play 의 두뇌를 받지 않는다). 끄면 빈 값. */
 	const FString& GetPlayId() const { return PlayId; }
 
@@ -1078,10 +1324,13 @@ public:
 	static bool IsEnvWatchEnabled();
 	/**
 	 * 환경 읽기 (HandlePreActorTick 이 프레임마다, 시험은 직접): eco.IntegratedV3.EnvWatchSeconds(실시간)마다, 액터가 생기거나 지워진 다음 읽기, 또는 bForce 면
-	 * 레벨 줄기 막이(GatherLevelTrunks — 무대마다 시작 레벨 읽기와 같은 셈)와 날씨 원천(지역 날씨 콘솔 변수 — 바뀐 값만, 팀 FRegionEnvironmentState — 바뀐 값만)을
+	 * 레벨 줄기 막이(GatherLevelTrunks — 무대마다 시작 레벨 읽기와 같은 셈)와 날씨 원천(지역 날씨 콘솔 변수 — 바뀐 값만, 팀 FRegionEnvironmentState — 바뀐 값만,
+	 * 늦게 등록된 지역은 팀 날씨 출처가 맡으면 처음 값도)을
 	 * 읽어 지역마다 대기 변화를 정한다. 세계는 바꾸지 않는다 (ApplyEnvChange). 감시가 꺼졌거나 지역 세계가 없거나 때가 아니면 거짓.
+	 * bTreesOnly (10-27 숲 자람 — ForestStepBoundary 가 결정 스텝 경계에서): 나무만 곧바로 다시 읽고 출처를 forest_growth 로 적는다. 날씨 칸·실시간 읽기 주기·
+	 * 액터 알림 표시는 건드리지 않는다 (앞서 대기한 날씨 바뀜은 그대로 둔다).
 	 */
-	bool PollEnvironment(bool bForce);
+	bool PollEnvironment(bool bForce, bool bTreesOnly = false);
 	/** 결정 스텝 경계에서 넣을 환경 변화가 있나 (처리기가 보고 ApplyEnvChange 를 부른다). */
 	bool HasPendingEnvChange() const { return bEnvPending; }
 	/**
@@ -1140,6 +1389,73 @@ public:
 	/** 명령줄에서 예약 쌍을 읽는다 (ApplyCommandLineToConsole). 하나라도 찾으면 CommandLineTestAts 를 바꾼다. 명령은 따옴표 안 ';'·공백을 그대로 둔다. */
 	static void ParseCommandLineTestAts(const TCHAR* CmdLine);
 
+	// ---- 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp — 설계 FOREST_GROWTH_MODE.md 1절. 시험 모드 — 세계 규칙이 아니다) ----
+
+	/** 콘솔 변수 eco.IntegratedV3.ForestGrowth·ForestRegion·ForestPerStage·ForestStageSeconds·ForestGrowSeconds·ForestTarget·ForestStartSeconds·ForestSeed·ForestSapling (Shipping 은 늘 끔). */
+	static EcoV3Forest::FSettings ForestSettingsFromConsole();
+	/**
+	 * 결정 스텝 경계 (처리기가 HasPendingEnvChange 바로 앞에서 — 프레임 나눔·fps·실시간 읽기와 무관한 정확한 스텝): 다 자랄 단계면 그 단계 나무를 다 자람으로 바꾸고
+	 * (그새 생긴 다른 줄기와 겹치는 그루는 뺀다 — 묘목을 지운다), 나무만 다시 읽는다 (PollEnvironment(true, true) — 출처 forest_growth). 같은 경계의 ApplyEnvChange 가 넣는다.
+	 * 숲이 꺼졌으면 아무것도 하지 않는다.
+	 */
+	void ForestStepBoundary();
+	/** 프레임 앞 (HandlePreActorTick — Mass 처리 밖, 시험은 직접): 돋을 차례가 된 단계의 묘목(숲 나무 액터)을 놓고, 숲 화면 줄을 그린다. */
+	void ForestPreActorTick();
+	/** 시험: 숲을 지금 켠다 (지역 세계가 생긴 뒤 — TryCreateContexts 끝과 같은 계획). 거부하면 거짓 (OutWhy). */
+	bool StartForestForTest(const EcoV3Forest::FSettings& InSettings, FString& OutWhy);
+	bool IsForestOn() const { return bForestOn; }
+	/** 아직 다 자라지 않은 단계가 남았나 ('레벨 바뀜 진행 중' — 큰 변화 규칙이 기다린다). */
+	bool IsForestGrowing() const;
+	const EcoV3Forest::FSettings& GetForestSettings() const { return ForestSettings; }
+	const TArray<EcoV3Forest::FSlot>& GetForestSlots() const { return ForestSlots; }
+	/** 자리마다 상태 (0 계획 · 1 묘목 · 2 다 자람 · 3 뺌). */
+	const TArray<uint8>& GetForestSlotStates() const { return ForestState; }
+	int32 ForestMatureCount() const;
+	int32 ForestSaplingCount() const;
+	/** 다음 다 자람 전역 스텝 (다 자랐으면 -1). */
+	int64 ForestNextMatureStep() const;
+	/** 숲 나무 액터 (자리 순 — 없으면 nullptr). */
+	AActor* GetForestActor(int32 Slot) const;
+	/** 보기 eco.IntegratedV3.ForestInfo (서버·단독): 계획·단계·다 자람 스텝·자리·액터마다 다 자람·줄기 충돌·줄기 변환 지문. */
+	TArray<FString> ForestInfoLines() const;
+
+	// ---- '큰 변화만' 다시 배우기 (10-27, EcoV3BigChange.h·EcoV3Snapshot.cpp — 설계 FOREST_GROWTH_MODE.md 2절) ----
+
+	/** eco.IntegratedV3.AutoSnapshotRule (1 = 큰 변화만, 기본 / 0 = 환경 판마다 — 옛 동작). Shipping 은 0 (자동 스냅숏이 늘 끔). */
+	static int32 AutoSnapshotRule();
+	/** eco.IntegratedV3.BigTrees·WeatherHold·BigSettle·BigMaxWait. */
+	static EcoV3BigChange::FConfig BigChangeConfig();
+	/** 자동 스냅숏이 켜졌나 (eco.IntegratedV3.AutoSnapshot — -1 = AutoAdapt 따름). */
+	static bool IsAutoSnapshotOn();
+	const EcoV3BigChange::FState& GetBigState() const { return BigState; }
+	/**
+	 * '레벨 바뀜 진행 중' 표시 (일반 꼴 — 지금은 숲 자람 모드만 쓴다. 레벨 팀이 여러 번에 나눠 바꾸는 동안 켜 두면 큰 변화 규칙이 끝날 때까지 기다린다, 상한 BigMaxWait).
+	 * Who = 표시 이름 (켜고 끄는 쪽이 같은 이름).
+	 */
+	void SetLevelChangeHold(FName Who, bool bOn);
+	/** 진행 중인가 (숲이 자라는 중 ∨ 표시가 하나라도 켜짐). OutWhat = 화면 글 ('숲이 다 자랄 때까지' 등). */
+	bool IsLevelChangeHeld(FString* OutWhat = nullptr) const;
+	/** 상태 줄 칸: 규칙 1 이면 EcoV3BigChange::ProgressText, 0 이면 '다시 배우기: 환경 판마다 (eco.IntegratedV3.AutoSnapshotRule 0)'. */
+	FString BigChangeStatusText() const;
+
+	// ---- 적응 고리 폴더·파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.{h,cpp} — 설계 FOREST_GROWTH_MODE.md 3절. 개발용 도구 — 추론 아님) ----
+
+	/** eco.IntegratedV3.AdaptRoot (빈 값 = <프로젝트>/Saved/EcoAdapt, 상대 경로는 프로젝트 폴더 기준) — 절대 경로. */
+	static FString AdaptRootDir();
+	/** 자동·주기 스냅숏 폴더 (eco.IntegratedV3.AutoSnapshotOut, 비면 <AdaptRoot>/snapshots) — 절대 경로. */
+	static FString AutoSnapshotDir();
+	/** 상태 줄 '적응 고리 | …' 칸 (FOREST_GROWTH_MODE.md 3.8 — 우리가 띄운 감시·사람 감시·못 켬·그 밖은 Live 그대로). */
+	FString WatchStatusText(const FString& Live) const;
+	/** 이 Play 의 자동 감시 판정 (기록·시험). */
+	EcoV3Watch::EDecide GetWatchDecision() const { return WatchDecision; }
+	/**
+	 * 통합 v3 모드가 Play 중 꺼졌는데(Deactivate·자원 계약 거부 등) 이 서브시스템이 띄운 감시가 남았으면 프로세스 나무째 끝낸다 — HandlePreActorTick 이 꺼진 뒤
+	 * 프레임마다 (10-27 적대적 검토: 꺼진 뒤에는 스냅숏·두뇌 교체·감시 살핌이 모두 멈추는데 감시와 학습 자식은 Play 끝까지 돌았다). 끝냈으면 참.
+	 */
+	bool StopAutoWatchIfInactive();
+	/** 시험: 판정 없이(자동화 시험 중에도) 이 서브시스템이 띄운 감시로 Exe Args 를 띄운다 (작업 폴더·기록·root = Root). 띄웠으면 참. */
+	bool LaunchWatchForTest(const FString& Exe, const FString& Args, const FString& Root, FString& OutWhy);
+
 	// ---- R5 장애물 관측 대조 기록 (10-19, 계약 2-4) ----
 
 	/** eco.IntegratedV3.ObsParityLog (전역 스텝 간격, 0 = 끔). 켜면 관측 18 두뇌여도 세계가 장애물 세 칸을 만든다 (EcoWorldV3::FWorldState::bObstacleObsProbe — 결정은 그대로). */
@@ -1172,6 +1488,8 @@ public:
 	 * 지면·물) 을 부른다. 통과하면 OutZ = 끝 지면 높이, 막히면 거짓 (OutZ = FromCm.Z).
 	 */
 	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false, float BodyRadiusCm=30.f) const;
+    /** Serialized M4 boundary for opt-in fauna sharing the Native spatial food ledger. */
+    bool ConsumeFaunaFood(FName RegionId, const FVector& Position, double Requested, double& OutNutrition);
 
 	// ---- 시험·조정자 없이 쓰는 길 ----
 
@@ -1187,6 +1505,20 @@ public:
 	/** 팀 늑대 표현 액터의 동작을 센다 (읽기만. 프레임마다 HandlePreActorTick 이 부르고, 시험도 부른다): 식사 깃발이 선 늑대가 '먹는 중' 동작인가. */
 	void TallyTeamWolfVisuals();
 	const TArray<FEcoV3StagePlan>& GetPlans() const { return Plans; }
+
+	// ---- 섬 무대 (11-05, EcoV3IslandStage.cpp — 끄면 모두 비어 있다) ----
+	/** 이 Play 가 섬 무대 모드인가 (OnWorldBeginPlay 에서 정한다). */
+	bool IsIslandStage() const { return bIsland; }
+	const FEcoV3IslandSettings& GetIslandSettings() const { return IslandSettings; }
+	/** 무리 자리 계획 (시작 직전 지면 검사 뒤 — 자리마다 시작 자리). */
+	const TArray<FEcoV3StagePlan>& GetIslandHerdPlans() const { return IslandHerdPlans; }
+	/** 땅/물 지도 (훑기 뒤 — 없으면 nullptr). */
+	const EcoV3Island::FLandMask* GetIslandMask() const { return IslandMask.get(); }
+	/** 섬 땅 경계 상자 (cm, 훑기 뒤 — 카메라 탑뷰). 없으면 거짓. */
+	bool GetIslandLandBoxCm(FBox& Out) const;
+	/** 섬 무대 땅/물 지도 훑기 (서브시스템 상태를 바꾸지 않는다). 무대 원점·한 변(단위)으로 칸을 만들고 기록 줄 글을 OutLine 에 쓴다. */
+	static std::shared_ptr<EcoV3Island::FLandMask> ScanIslandMask(UWorld& World, const FVector& OriginCm, double SizeUnits, const FEcoV3IslandSettings& S,
+																  FString& OutLine);
 
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
@@ -1213,7 +1545,12 @@ private:
 	/** 상태 줄의 도망 요약 (모든 지역 합: 최근 60 초 창·두뇌 판 비교 — EcoV3FlightTally.h). 도망 기록을 세는 지역이 없으면 빈 글. */
 	FString FlightStatusText() const;
 	// 환경 바뀜 감시 (10-21, EcoV3EnvWatch.cpp)
-	/** 지역 세계의 환경 바탕을 적는다 (AddContext): 시작 은신처 원, 지금 레벨 줄기 원판, 날씨 콘솔 변수의 Play 시작 값, 팀 지역 환경. */
+	/**
+	 * 지역 세계의 환경 바탕을 적는다 (AddContext): 시작 은신처 원, 지금 레벨 줄기 원판, 날씨 콘솔 변수의 Play 시작 값, 팀 지역 환경.
+	 * 세계는 읽기만 하되 시작 날씨 하나는 바꿀 수 있다 (10-27 사용자 결정 (C)): 팀 날씨 출처(이 지역을 맡아 실제로 쓰는 팀 환경 어댑터 — EcoV3EnvWatch.cpp
+	 * FindTeamWeatherSource)가 있고 감시가 켜졌고 eco.IntegratedV3.TeamWeatherStart 1 이고 Play 시작 덮기 글자가 날씨를 고르지 않으면 팀 지역 환경을 세계 설정
+	 * 날씨로 넣고 UpdateDayNight (그 날씨로 세계를 만든 것과 같다). 출처가 없는 지역은 우리 고정 날씨 그대로.
+	 */
 	void InitContextEnv(FEcoV3RegionContext& Ctx);
 	/** Play 시작 (OnWorldBeginPlay — 켜졌을 때): 액터 생김·지움 알림을 걸고 명령줄 예약을 옮기고 시작 줄을 남긴다. */
 	void BeginEnvWatch(UWorld& InWorld);
@@ -1223,6 +1560,42 @@ private:
 	void HandleEnvActorChanged(AActor* Actor);
 	/** HandlePreActorTick (지역 세계가 생긴 뒤 프레임마다): 예약 명령, 환경 읽기. */
 	void TickEnvWatch();
+	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp)
+	/** 숲 계획 (자리 고르기 — 지역 세계가 생긴 직후). 거부하면 거짓 (OutWhy, 아무것도 놓지 않는다). */
+	bool PlanForest(const EcoV3Forest::FSettings& InSettings, FString& OutWhy);
+	/** 자리 하나의 숲 나무 액터를 놓는다 (묘목). 놓았으면 참. */
+	bool SpawnForestTree(int32 Slot);
+	/** 숲 화면 줄 (1 초마다, 키 732005 — 그리는 실행·서버·단독). */
+	void DrawForestNotice();
+	/** Play 끝: 숲 상태를 지운다 (액터는 월드와 함께 없어진다). */
+	void EndForest();
+	/** 큰 변화 규칙 기준선에 지역 하나를 더한다 (AddContext — 지역 세계를 만든 때). */
+	void BigAddRegion(const FEcoV3RegionContext& Ctx);
+	// 섬 무대 (11-05, EcoV3IslandStage.cpp)
+	/** 섬 무대 모드를 켤지 정한다 (OnWorldBeginPlay — Settings·IslandSettings 를 읽은 뒤). 켜면 참, 거부하면 까닭을 한 줄 남기고 거짓. */
+	bool IslandResolve(const AEcoCreatureIntegrationSpawner& S);
+	/** ApplyToSpawner 의 섬 계획: 섬 정사각을 덮는 스트리밍 힌트 자리 (조정자가 섬 전체를 불러오게). */
+	bool IslandPlanHints(AEcoCreatureIntegrationSpawner& S, TArray<FEcoV3StagePlan>& NewPlans, TArray<FEcoCreatureSpawnGroup>& NewGroups, int64& OutTotal);
+	/** 시작 직전 (섬 전체가 불린 프레임): 땅/물 지도 훑기 → 무리 자리 → 자리마다 시작 자리 → 그룹 하나에 합쳐 쓴다. 실패하면 RestoreTeamValues. */
+	bool IslandValidateNow();
+	/** 은신처 원이 모두 땅 칸 위인가 (cm). 섬 무대가 아니면 참. */
+	bool IslandCoverOnLand(const FVector& CenterCm, double RadiusCm) const;
+	/** 먼 개체 표식 (HandlePreActorTick — 4 Hz). */
+	void IslandTickMarkers();
+	/** 섬 기록 줄 (HandlePreActorTick — 시뮬레이션 10 초마다, 그리지 않는 실행도): 막힌 칸 위 개체·무리 자리별 사슴·쫓김·사냥·섬 규칙 셈. */
+	void IslandTickStats();
+	/** 섬 무대 시작 줄 (TryCreateContexts 끝). */
+	void IslandLogStart(const FEcoV3RegionContext& Ctx) const;
+	// 파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.cpp)
+	/** OnWorldBeginPlay (PlayId 뒤): 판정하고 띄운다. 기록 '[EcoV3I] 파이썬 감시 | …'. */
+	void BeginAutoWatch();
+	/** DrawBrainNotices (2 초마다 — 그릴 수 없는 실행도): 우리가 띄운 감시가 끝났나 보고 까닭을 기록·알림 (한 번). */
+	void PollAutoWatch();
+	/**
+	 * Deinitialize (Why = 'Play 끝') · Play 중 통합 v3 모드가 꺼진 첫 프레임 (HandlePreActorTick — 10-27 적대적 검토, Why = '통합 v3 모드가 꺼짐'):
+	 * 우리가 띄운 감시를 프로세스 나무째 끝낸다. 사람·다른 언리얼이 띄운 감시는 건드리지 않는다.
+	 */
+	void EndAutoWatch(const TCHAR* Why = TEXT("Play 끝"));
 	/**
 	 * 보기 환경 (Play 동안만, 끝나면 되돌린다).
 	 * - 엔진은 한 액터에 디버그 글자를 128개까지만 그린다(r.DebugSafeZone.MaxDebugTextStringsPerActor). 우리 글자는 모두 WorldSettings 에
@@ -1300,6 +1673,7 @@ private:
 	int64 EnvChangedStep = 0;             // 마지막 환경 바뀜을 넣은 전역 스텝 (없으면 0)
 	int64 EnvFirstChangedStep = 0;        // 처음 환경 바뀜을 넣은 전역 스텝 (없으면 0)
 	TArray<FEcoV3EnvChange> EnvChanges;   // 넣은 바뀜 (오래된 것부터)
+	FString LastEnvNotice;                // 마지막 환경 바뀜 화면 알림 글 (GetLastEnvNotice)
 	FDelegateHandle EnvSpawnHandle;
 	FDelegateHandle EnvDestroyHandle;
 	TArray<FEcoV3TestAt> TestAts;         // 시험용 예약 명령 (아직 안 돌린 것)
@@ -1310,6 +1684,46 @@ private:
 	int32 AutoSnapshotRevision = 0;       // 자동 스냅숏을 쓴 마지막 환경 판
 	double PeriodicNextSeconds = -1.0;    // 다음 주기 스냅숏 시뮬레이션 초 (음수 = 아직 정하지 않음)
 	double PeriodicEverySeen = 0.0;       // 그 주기를 정한 eco.IntegratedV3.SnapshotEvery 값
+	// '큰 변화만' 다시 배우기 (10-27, EcoV3BigChange.h — AddContext·ApplyEnvChange 가 채우고 MaybeAutoSnapshot 이 판정)
+	EcoV3BigChange::FState BigState;
+	TSet<FName> LevelChangeHolds;         // '레벨 바뀜 진행 중' 표시 (SetLevelChangeHold)
+
+	// 섬 무대 (11-05, EcoV3IslandStage.cpp — 끄면 모두 비어 있다)
+	FEcoV3IslandSettings IslandSettings;
+	bool bIsland = false;                    // 이 Play 가 섬 무대 모드
+	FVector IslandOriginCm = FVector::ZeroVector;   // 섬 정사각 (0, 0) 의 cm
+	double IslandSizeUnits = 0.0;            // 섬 정사각 한 변 (단위)
+	std::shared_ptr<EcoV3Island::FLandMask> IslandMask;
+	TArray<FEcoV3StagePlan> IslandHerdPlans; // 무리 자리마다 계획 (시작 자리 — 은신처·기록·카메라)
+	FString IslandScanLine;                  // 땅 지도 기록 줄 (시작 줄에 다시 쓴다)
+	FString IslandSiteLine;                  // 무리 자리 고른 방법
+	UPROPERTY(Transient)
+	TObjectPtr<AActor> IslandMarkerActor;    // 먼 개체 표식 (인스턴스 메시 셋)
+	double NextIslandMarker = 0.0;           // 다음 표식 갱신 (실시간)
+	double NextIslandStats = 0.0;            // 다음 섬 기록 줄 (월드 초)
+	int64 IslandStatsPrev[5] = {0, 0, 0, 0, 0}; // 지난 줄의 섬 규칙 셈 (굽힘·미끄러짐·제자리·반사·팀 제약 돌림)
+	TMap<int64, TPair<FVector2D, int32>> IslandShoreStill;   // 11-05 확인용 (읽기만): 산 사슴 id → (지난 줄 자리 cm, 1 m 안에 머문 10 초 구간 수)
+
+	// 숲 자람 모드 (10-27, EcoV3ForestGrowth.cpp — 끄면 모두 비어 있다)
+	EcoV3Forest::FSettings ForestSettings;   // Play 시작 때 읽은 값 (Sanitize 뒤)
+	bool bForestOn = false;                  // 계획이 섰다 (거부·끔이면 거짓 — 숲 코드가 돌지 않는다)
+	int32 ForestCtx = INDEX_NONE;            // 숲 지역 컨텍스트 색인
+	TArray<EcoV3Forest::FSlot> ForestSlots;  // 고른 자리 (순번 = F<nn>)
+	TArray<uint8> ForestState;               // 자리마다 0 계획 · 1 묘목 · 2 다 자람 · 3 뺌
+	TArray<TWeakObjectPtr<AActor>> ForestActors;   // 자리마다 숲 나무 액터 (AEcoV3ForestTree)
+	int32 ForestNextSprout = 0;              // 다음 묘목 돋을 단계
+	int32 ForestNextMature = 0;              // 다음 다 자랄 단계
+	double ForestDoneRealTime = -1.0;        // 다 자란 실시간 (화면 줄 10 초)
+	double NextForestNotice = 0.0;
+
+	// 파이썬 감시 자동 시작 (10-27, EcoV3WatchLauncher.cpp)
+	EcoV3Watch::EDecide WatchDecision = EcoV3Watch::EDecide::NoAdapt;
+	FString WatchWhy;                     // 못 켬·안 띄움 까닭 (화면·기록)
+	int32 WatchOtherPid = 0;              // 사람·다른 언리얼이 띄운 감시 pid
+	bool bWatchOurs = false;              // 이 서브시스템이 띄웠다
+	bool bWatchEndReported = false;       // 끝난 까닭을 알렸다
+	double NextWatchPoll = 0.0;           // 다음 살핌 (실시간)
+	FString LastWatchLine;                // 기록한 마지막 '적응 고리' 감시 글
 
 	FDelegateHandle PreTickHandle;
 

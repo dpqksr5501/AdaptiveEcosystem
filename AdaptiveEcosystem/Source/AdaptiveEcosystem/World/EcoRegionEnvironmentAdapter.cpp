@@ -84,9 +84,8 @@ void AEcoRegionEnvironmentAdapter::Tick(float DeltaSeconds)
 	{
 		if (bApplyAuthoredWeather && !bCycleRainfall) ApplyWeather(AuthoredWeather);
 		const auto* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
-		if (!Clock || !Clock->IsClockRunning()) return;
-		Time = Clock->GetServerTime();
-		if (bCycleRainfall)
+		if (Clock && Clock->IsClockRunning()) Time = Clock->GetServerTime();
+		if (bCycleRainfall && Time.WorldEpoch > 0)
 		{
 			float Rain = 0;
 			const bool bValid = EvaluateCycleRainfall(Time.ServerTimeSeconds, Rain);
@@ -98,7 +97,9 @@ void AEcoRegionEnvironmentAdapter::Tick(float DeltaSeconds)
 	if (GameState)
 	{
 		const auto Summary = GameState->GetEcologySummary();
-		if (!bAuthorityWorld) Time = Summary.Time;
+		FEcoServerTimeSnapshot Presentation;
+        if (GameState->GetSynchronizedClock(Presentation)) Time = Presentation;
+        else if (!bAuthorityWorld) return;
 		if (Summary.Time.WorldEpoch != LastSummaryEpoch || Summary.Revision != LastSummaryRevision)
 		{
 			LastSummaryEpoch = Summary.Time.WorldEpoch;

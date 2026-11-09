@@ -6,7 +6,8 @@
 - 같은 시작 상태에서 C++ 세계가 파이썬 세계(world.py 그대로)와 비트 단위로 같다 — 궤적 모든 칸·기록 칸 전체. 10-22 world.py 가 동족 무리 중심·분리를
   C++ PerceiveKin 과 같은 j 차례 합으로 더한다(`_seq_sum`). 그 전에는 행렬곱이라 시작 지각의 그 두 칸만 끝 비트가 달랐고, 이 시험은 그 두 칸만 바꾼
   진단 기하(옛 ceval.seq_kin_geometry)로 같음을 보았다 — 진단은 world.py 와 같아져 지웠다.
-- Pool.run 기록 칸 = 파이썬 판정 기록 칸 (+ native), 'multi' 는 판정 길이마다 at.
+- Pool.run 기록 칸 = 파이썬 판정 기록 칸 (+ native), 'multi' 는 판정 길이마다 at. 10-23 부터 도망 기록의 숨은 뒤 10 초 지켜보기(flight.hide),
+  10-24 부터 쫓김 사건(flight.episode)까지 같다(평가기 HIDE_WATCH·EPISODE 참 — 실시간 관문 판정 실행기 'ceval').
 평가기 실행 파일이 없으면 건너뛴다 (빌드: AdaptiveEcosystem/Tools/EcoV3Eval/build.ps1).
 """
 
@@ -121,9 +122,12 @@ def test_records_equal_python_judge(ce, prepared, monkeypatch):
         diff = [k for k in py if k not in ("wall_s", "native") and k in r and not ce._same(py[k], r[k])]
         assert not diff, (kind, job["region"], {k: (py[k], r[k]) for k in diff})
         assert r["flight"] == {k: py["flight"][k] for k in r["flight"]}, (kind, job["region"])     # 네이티브 도망 칸은 모두 파이썬과 같다
+        assert r["flight"]["hide"] == py["flight"]["hide"], (kind, job["region"])                   # 10-23 숨은 뒤 10 초 지켜보기도 (빠진 칸 없이)
+        assert r["flight"]["episode"] == py["flight"]["episode"], (kind, job["region"])             # 10-24 쫓김 사건도 (빠진 칸 없이)
         if kind == "multi":
             for h in ("150", "300"):
                 assert r["at"][h]["flight"] == {k: py["at"][h]["flight"][k] for k in r["at"][h]["flight"]}, (job["region"], h)
+                assert r["at"][h]["flight"]["episode"] == py["at"][h]["flight"]["episode"], (job["region"], h)     # 판정 길이마다 사건
         f = r["flight"]
         tot["started"] += f["started"]
         tot["own_n"] += f["own_n"]
@@ -164,12 +168,91 @@ def test_world_block_refuses_unported_settings(ce, prepared):
         ce.world_block(ce.make_world(job))
 
 
+ROUTE_SHELTER_BRAIN = ROOT / "results" / "v3" / "route" / "port" / "brains" / "v3_obs24route_shelter2.json"   # 판 4 늘 SHELTER 시험 두뇌 (zip 은 git 밖)
+
+
+def test_route_world_block_and_pairing(ce, prepared):
+    """10-24 두 길 두뇌 C++ 이식 (이식 계획서 7-1·13-3): world 블록이 wild_flight.route·brain_flee_outside_reflex 를 넘기고(끔 세계는 false·true), 판 6(막기만 —
+    route 끔)은 C++ 에 없어 거부한다. 두뇌 판 ≠ 세계 판이면 native_job 이 일을 만들지 않고, 평가기도 그 일을 오류로 낸다(판 2 두뇌 × 길 켬 세계)."""
+    import adapt as ad
+
+    def job_of(sets):
+        return ad.make_jobs(prepared["info"], prepared["zip"], [34900], 1, True, dict(name="t", sets=sets))[0]
+
+    def block(sets):
+        return ce.world_block(ce.make_world(job_of(sets)))
+
+    off = block({})["wild_flight"]
+    assert (off["route"], off["brain_flee_outside_reflex"]) == (False, True)
+    on = block({"wild_flight.route": True})["wild_flight"]
+    assert (on["route"], on["brain_flee_outside_reflex"]) == (True, True)
+    g5 = block({"wild_flight.route": True, "wild_flight.brain_flee_outside_reflex": False})["wild_flight"]
+    assert (g5["route"], g5["brain_flee_outside_reflex"]) == (True, False)
+    with pytest.raises(ValueError, match="판 6"):
+        block({"wild_flight.brain_flee_outside_reflex": False})
+    j4 = job_of({"wild_flight.route": True})
+    with pytest.raises(ValueError, match="마스크 판"):
+        ce.native_job(j4, 0, brain_mask_version=2)
+    with pytest.raises(ValueError, match="마스크 판"):
+        ce.native_job(job_of({}), 0, brain_mask_version=4)
+    nj = ce.native_job(j4, 0, brain_mask_version=4)
+    assert nj["world"]["wild_flight"]["route"] is True
+    with pytest.raises(RuntimeError, match="마스크 판"):
+        ce.run_native([nj], BRAIN21, 1)                                  # 평가기 Init 의 짝 검사 (세계 route true · 두뇌 판 2)
+
+
+@pytest.mark.skipif(not (ROUTE_SHELTER_BRAIN.with_suffix(".zip")).exists(), reason="늘 SHELTER 시험 두뇌 zip 이 없다 (results/v3/route/port/make_traces.py 가 만든다)")
+def test_route_bit_identical_to_python_world(ce, prepared):
+    """10-24 두 길 두뇌: 판 4 늘 SHELTER 시험 두뇌 × 길 켬 세계 150 스텝 궤적이 파이썬과 첫 비트 차이가 없고(관측 24·길 칸 route·route_k·route_age·
+    route_feas·route_decide·route_req 까지), 세계 기록의 flight.route 가 파이썬 flight_stats 의 route 와 같다."""
+    import copy
+
+    import adapt as ad
+
+    zp = ROUTE_SHELTER_BRAIN.with_suffix(".zip")
+    kind, tag, job = ce.eval_items(prepared["info"], "t", zp, [34901], 150, "N", world_set={"features.wild_flight.route": True})[0]
+    row = ce.run_native([ce.native_job(job, 0, trace=150, brain_mask_version=4)], ROUTE_SHELTER_BRAIN, 1)[0]
+    real = ce.trace_diff(ce.python_trace(job, zp, 150), row)
+    assert real["first_bit_difference"] is None, real["rows"][real["first_bit_difference"]]
+    assert all(r["route"] == 0 and r["route_req"] == 0 for r in real["rows"])
+    nat = ce.shape("world", job, row, 0.0, ROUTE_SHELTER_BRAIN)
+    py = ad._world_one(copy.deepcopy(job))
+    assert nat["flight"]["route"] == py["flight"]["route"] and py["flight"]["route"]["picked"]["shelter"] > 0
+
+
+def test_trace_diff_split_gap_uses_top2_gap(ce):
+    """10-24 이식 적대적 검토: 갈린 결정의 근접 동점 잣대 split_gap 은 C++ trace 의 'gap'(열린 칸 1·2 위 로짓 차 ≥ 0)만 읽는다 — 부호 있는 'route_gap'
+    (ℓ4 − ℓ1, RUN 을 고르면 음수)을 섞으면 갈림의 차가 음수로 적혀 근접 동점처럼 보였다. 짜 맞춘 두 스텝 궤적: 1 스텝 째 사슴 0 의 길 요청만 갈리고
+    (파이썬 SHELTER·C++ RUN — C++ gap 0.5 = |ℓ4 − ℓ1|, route_gap −0.5)."""
+    n = 2
+
+    def state(t, route_req, gap=None, route_gap=None):
+        d = dict(t=t, dark=0.0, pred_ema=0.0, x=[1.0] * n, y=[1.0] * n, hx=[1.0] * n, hy=[0.0] * n, energy=[1.0] * n, reserve=[0.0] * n,
+                 behavior=[1] * n, request=[1] * n, keep=[2] * n, cause=[0] * n, obs=[[0.0] * 24 for _ in range(n)],
+                 wolves=dict(x=[0.0], y=[0.0], hx=[1.0], hy=[0.0], cd=[0], sat=[0], asleep=[False], target=[-1]),
+                 route=[0] * n, route_k=[-1] * n, route_age=[0] * n, route_feas=[2] * n, route_decide=[True] * n, route_req=route_req)
+        if gap is not None:
+            d.update(gap=gap, route_gap=route_gap)
+        return d
+
+    py = [state(0, [-1, -1]), state(1, [4, 4])]
+    nat = dict(init=state(0, [-1, -1], [None, None], [None, None]), trace=[state(1, [1, 4], [0.5, 0.25], [-0.5, 0.25])])
+    d = ce.trace_diff(py, nat)
+    r = d["rows"][1]
+    assert r["route_req"] == 1 and r["split_deer"] == [0]
+    assert r["split_gap"] == 0.5
+
+
 def test_live_evaluator_hook(ce):
     """live.py 판정 실행기 갈림이 이 파일을 'ceval' 로 불러 쓴다: run_items·version (판정 저장 열쇠 — 실행 파일·C++ 소스·파이썬 셈 길 지문)."""
     import live
 
     ev = live.evaluator("ceval")
-    assert callable(ev["run"]) and callable(ev["version"])
+    assert callable(ev["run"]) and callable(ev["version"]) and ev["hide_watch"] is True and ce.HIDE_WATCH is True     # 10-23 숨은 뒤 지켜보기를 센다
+    assert ev["episode"] is True and ce.EPISODE is True                                                               # 10-24 쫓김 사건을 센다
+    live.require_hide_watch("ceval")
+    live.require_episode("ceval")
+    live.require_gate_records("ceval")
     tag = live.eval_code_tag("ceval")
     assert isinstance(tag, str) and len(tag) == 24 and tag != live.eval_code_tag("python")
     names = {p.name for p in ce.native_sources()}
@@ -199,7 +282,17 @@ def test_pool_record_schema(ce, prepared, monkeypatch):
     py = ad._world_one(dict(job))
     assert set(py) | {"native"} == set(out[0][1])
     assert py["hunt"].keys() == out[0][1]["hunt"].keys() and py["weather"].keys() == out[0][1]["weather"].keys()
-    # 도망 기록: 10-21 정의 칸은 모두 같다. 파이썬에 뒤에 더한 칸(도망길 등 — C++ 에 아직 없는 기능)은 네이티브에 없을 수 있다 (compare 가 python_only 로 적는다)
+    # 도망 기록: 10-21 정의 칸과 10-23 숨은 뒤 지켜보기(hide)·10-24 쫓김 사건(episode)은 모두 같다. 파이썬에 뒤에 더한 칸(도망길 등 — C++ 에 아직 없는
+    # 기능)은 네이티브에 없을 수 있다 (compare 가 python_only 로 적는다)
     core = {"started", "live_steps", "flee_steps", "reflex_steps", "n", "steps", "contact", "own_n", "own_steps", "own_contact", "shelter_end", "hist",
-            "hist_edges"}
+            "hist_edges", "hide", "episode"}
     assert set(out[0][1]["flight"]) == core and core <= set(py["flight"])
+    assert set(out[0][1]["flight"]["hide"]) == {"chased", "hidden", "watching", "cover_then_caught", "cover_then_starved", "watch_steps"}
+    assert out[0][1]["flight"]["hide"] == py["flight"]["hide"] and out[0][1]["flight"]["hide"]["watch_steps"] == 75
+    # 10-24 쫓김 사건(flight.episode — LIVE_GATE.md 변경 기록 (7)): 같은 날 C++ 도망 기록에 옮겨 평가기가 같은 칸·같은 차례로 낸다(EPISODE 참),
+    # compare 에 파이썬에만 있는 칸이 없다
+    ep = out[0][1]["flight"]["episode"]
+    assert list(ep) == list(py["flight"]["episode"]) and ep == py["flight"]["episode"] and ce.EPISODE is True
+    assert ep["link_cover_steps"] == 75 and ep["link_other_steps"] == 38 and ep["started"] == sum(ep[k] for k in ("hidden", "caught", "starved", "other",
+                                                                                                                  "truncated"))
+    assert ce.exact_worlds([py], [out[0][1]])["python_only"] == []

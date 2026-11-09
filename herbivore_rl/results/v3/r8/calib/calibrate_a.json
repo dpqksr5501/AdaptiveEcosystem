@@ -1,0 +1,833 @@
+{
+ "config": "configs/v3_r8_pilot.yaml",
+ "sets": [
+  "deer.repro_cd=40",
+  "beasts.count=[2,8]"
+ ],
+ "seeds": [
+  41400,
+  41449
+ ],
+ "steps": 3000,
+ "policies": {
+  "always_eat": {
+   "worlds": 50,
+   "deer_steps": 4800000,
+   "caught_wolf_1k": 1.0579166666666666,
+   "caught_bear_1k": 0.0,
+   "starved_1k": 0.00375,
+   "repro_1k": 11.106041666666666,
+   "eaten_x1000": 6.780391805828659,
+   "in_shelter": 0.024684375,
+   "act_eat": 1.0,
+   "act_run": 0.0,
+   "act_shelter": 0.0,
+   "act_watch": 0.0,
+   "act_hist": {
+    "EAT": 1.0,
+    "RUN_0": 0.0,
+    "RUN_45": 0.0,
+    "RUN_90": 0.0,
+    "RUN_135": 0.0,
+    "RUN_180": 0.0,
+    "RUN_225": 0.0,
+    "RUN_270": 0.0,
+    "RUN_315": 0.0,
+    "SHELTER": 0.0,
+    "WATCH": 0.0
+   },
+   "flee_dir_cos": 0.0,
+   "flee_dir_n": 0,
+   "caught_1k": 1.0579166666666666,
+   "delta": 0.0,
+   "rho": Infinity,
+   "F_wolf": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "F_beast": [
+    0.0,
+    0.0,
+    0.0
+   ],
+   "n_wolf": [
+    220920,
+    195241,
+    49838
+   ],
+   "n_beast": [
+    147471,
+    257374,
+    106584
+   ],
+   "extra": {
+    "only_one": {
+     "delta": 0.0,
+     "rho": Infinity,
+     "n_wolf": 306485,
+     "n_beast": 377833
+    },
+    "kin_still": {
+     "delta": 0.0,
+     "rho": Infinity,
+     "n_wolf": 465999,
+     "n_beast": 511429
+    },
+    "approach_matched": {
+     "delta": 0.0,
+     "rho": Infinity,
+     "n_wolf": 465999,
+     "n_beast": 511429
+    },
+    "eating_wolf_vs_beast": {
+     "delta": 0.0,
+     "rho": Infinity,
+     "n_wolf": 383814,
+     "n_beast": 511429
+    },
+    "hunting_wolf_vs_beast": {
+     "delta": 0.0,
+     "rho": Infinity,
+     "n_wolf": 80619,
+     "n_beast": 511429
+    },
+    "flight_start_dist_median": null,
+    "flight_start_n": 0
+   },
+   "eaten_x1000_h2": 6.780391805828659
+  },
+  "rule_blind": {
+   "worlds": 50,
+   "deer_steps": 4800000,
+   "caught_wolf_1k": 0.36291666666666667,
+   "caught_bear_1k": 0.0,
+   "starved_1k": 0.009791666666666667,
+   "repro_1k": 11.654375,
+   "eaten_x1000": 7.082283269344913,
+   "in_shelter": 0.1507225,
+   "act_eat": 0.86577625,
+   "act_run": 0.03807208333333333,
+   "act_shelter": 0.09615166666666666,
+   "act_watch": 0.0,
+   "act_hist": {
+    "EAT": 0.86577625,
+    "RUN_0": 0.016439583333333334,
+    "RUN_45": 0.00232625,
+    "RUN_90": 0.00096625,
+    "RUN_135": 0.0018170833333333333,
+    "RUN_180": 0.011277916666666667,
+    "RUN_225": 0.0019058333333333334,
+    "RUN_270": 0.00097,
+    "RUN_315": 0.0023691666666666666,
+    "SHELTER": 0.09615166666666666,
+    "WATCH": 0.0
+   },
+   "flee_dir_cos": 0.5277459852987773,
+   "flee_dir_n": 27668,
+   "caught_1k": 0.36291666666666667,
+   "delta": 0.0074685681524972545,
+   "rho": 1.0357672268850089,
+   "F_wolf": [
+    0.12917387559735677,
+    0.17817982110054098,
+    0.3909627467157454
+   ],
+   "F_beast": [
+    0.11504034113856876,
+    0.20010679653124866,
+    0.33472960250211437
+   ],
+   "n_wolf": [
+    131203,
+    158413,
+    78785
+   ],
+   "n_beast": [
+    106467,
+    234090,
+    125334
+   ],
+   "extra": {
+    "only_one": {
+     "delta": 0.013588689248981576,
+     "rho": 1.0682961943770417,
+     "n_wolf": 229602,
+     "n_beast": 309180
+    },
+    "kin_still": {
+     "delta": -0.010072990099040433,
+     "rho": 0.889328677184706,
+     "n_wolf": 213065,
+     "n_beast": 254501
+    },
+    "approach_matched": {
+     "delta": -0.055068151060442605,
+     "rho": 0.7680000808863773,
+     "n_wolf": 368401,
+     "n_beast": 465891
+    },
+    "eating_wolf_vs_beast": {
+     "delta": -0.19061989747051922,
+     "rho": 0.07487149097656665,
+     "n_wolf": 137807,
+     "n_beast": 465891
+    },
+    "hunting_wolf_vs_beast": {
+     "delta": 0.3068296883976698,
+     "rho": 2.4048131406024273,
+     "n_wolf": 113887,
+     "n_beast": 465891
+    },
+    "flight_start_dist_median": 19.762942683076506,
+    "flight_start_n": 15274
+   },
+   "eaten_x1000_h2": 7.082283269344913
+  },
+  "rule_oracle": {
+   "worlds": 50,
+   "deer_steps": 4800000,
+   "caught_wolf_1k": 0.33125,
+   "caught_bear_1k": 0.0,
+   "starved_1k": 0.01625,
+   "repro_1k": 11.963333333333333,
+   "eaten_x1000": 7.169527350460415,
+   "in_shelter": 0.104749375,
+   "act_eat": 0.92647,
+   "act_run": 0.02623125,
+   "act_shelter": 0.04729875,
+   "act_watch": 0.0,
+   "act_hist": {
+    "EAT": 0.92647,
+    "RUN_0": 0.014935833333333334,
+    "RUN_45": 0.0018608333333333333,
+    "RUN_90": 0.0004341666666666667,
+    "RUN_135": 0.0006566666666666666,
+    "RUN_180": 0.0052854166666666666,
+    "RUN_225": 0.0006983333333333334,
+    "RUN_270": 0.00046833333333333335,
+    "RUN_315": 0.0018916666666666667,
+    "SHELTER": 0.04729875,
+    "WATCH": 0.0
+   },
+   "flee_dir_cos": 0.6269593355869052,
+   "flee_dir_n": 27704,
+   "caught_1k": 0.33125,
+   "delta": 0.18222844082455475,
+   "rho": 5.371087784716223,
+   "F_wolf": [
+    0.12680113012086014,
+    0.1835988060332303,
+    0.44817414546636647
+   ],
+   "F_beast": [
+    0.0507435828894438,
+    0.0393145089933532,
+    0.03411683966715278
+   ],
+   "n_wolf": [
+    127420,
+    151428,
+    83057
+   ],
+   "n_beast": [
+    153379,
+    282542,
+    116570
+   ],
+   "extra": {
+    "only_one": {
+     "delta": 0.22760331298140962,
+     "rho": Infinity,
+     "n_wolf": 235461,
+     "n_beast": 394072
+    },
+    "kin_still": {
+     "delta": 0.06323348611381628,
+     "rho": 8.298127763291784,
+     "n_wolf": 233858,
+     "n_beast": 489474
+    },
+    "approach_matched": {
+     "delta": 0.15398172662776458,
+     "rho": 4.695842866265025,
+     "n_wolf": 361905,
+     "n_beast": 552491
+    },
+    "eating_wolf_vs_beast": {
+     "delta": -0.026901151900773003,
+     "rho": 0.36024053576205556,
+     "n_wolf": 130161,
+     "n_beast": 552491
+    },
+    "hunting_wolf_vs_beast": {
+     "delta": 0.4786259816481899,
+     "rho": 12.63179513699172,
+     "n_wolf": 122818,
+     "n_beast": 552491
+    },
+    "flight_start_dist_median": 23.222126092333998,
+    "flight_start_n": 13443
+   },
+   "eaten_x1000_h2": 7.169527350460415
+  },
+  "random": {
+   "worlds": 50,
+   "deer_steps": 4800000,
+   "caught_wolf_1k": 0.555625,
+   "caught_bear_1k": 0.0,
+   "starved_1k": 0.2914583333333333,
+   "repro_1k": 0.00020833333333333335,
+   "eaten_x1000": 0.5032743668997793,
+   "in_shelter": 0.48682916666666665,
+   "act_eat": 0.09110458333333334,
+   "act_run": 0.7268058333333334,
+   "act_shelter": 0.09122333333333334,
+   "act_watch": 0.09086625,
+   "act_hist": {
+    "EAT": 0.09110458333333334,
+    "RUN_0": 0.09065333333333334,
+    "RUN_45": 0.09109958333333333,
+    "RUN_90": 0.0909725,
+    "RUN_135": 0.09059208333333334,
+    "RUN_180": 0.09089333333333334,
+    "RUN_225": 0.090935,
+    "RUN_270": 0.09092125,
+    "RUN_315": 0.09073875,
+    "SHELTER": 0.09122333333333334,
+    "WATCH": 0.09086625
+   },
+   "flee_dir_cos": -0.0007318789927160444,
+   "flee_dir_n": 351850,
+   "caught_1k": 0.555625,
+   "delta": 2.1737924444425143e-05,
+   "rho": 1.0000265590121113,
+   "F_wolf": [
+    0.8203773317256543,
+    0.8185929473427879,
+    0.817233742211838
+   ],
+   "F_beast": [
+    0.8192691362975588,
+    0.8187335661522496,
+    0.8177203370799797
+   ],
+   "n_wolf": [
+    56396,
+    86237,
+    82176
+   ],
+   "n_beast": [
+    99745,
+    171521,
+    169218
+   ],
+   "extra": {
+    "only_one": {
+     "delta": -9.00571482875115e-05,
+     "rho": 0.9998900270131192,
+     "n_wolf": 131629,
+     "n_beast": 269460
+    },
+    "kin_still": {
+     "delta": -7.609287094369365e-05,
+     "rho": 0.9999071234699605,
+     "n_wolf": 2843,
+     "n_beast": 5217
+    },
+    "approach_matched": {
+     "delta": 0.00014600358175554095,
+     "rho": 1.000178413323747,
+     "n_wolf": 224809,
+     "n_beast": 440484
+    },
+    "eating_wolf_vs_beast": {
+     "delta": 0.0024322576594445963,
+     "rho": 1.0029716679917604,
+     "n_wolf": 84258,
+     "n_beast": 440484
+    },
+    "hunting_wolf_vs_beast": {
+     "delta": -0.001343174332582111,
+     "rho": 0.9983589114582667,
+     "n_wolf": 58905,
+     "n_beast": 440484
+    },
+    "flight_start_dist_median": 16.60399500551855,
+    "flight_start_n": 5847
+   },
+   "eaten_x1000_h2": 0.5032743668997793
+  }
+ },
+ "gates": {
+  "C0-1": {
+   "ok": true,
+   "oracle": 0.33125,
+   "always_eat": 1.0579166666666666,
+   "ratio": 0.3131153997636865
+  },
+  "C0-2": {
+   "ok": false,
+   "blind": 7.082283269344913,
+   "oracle": 7.169527350460415,
+   "ratio": 0.987831264621663,
+   "worlds_h2": 50
+  },
+  "C0-4": {
+   "ok": true,
+   "always_eat": 1.0579166666666666
+  }
+ },
+ "worlds": [
+  {
+   "seed": 41400,
+   "wolves": 2,
+   "beasts": 3,
+   "wolf_speed_mult": 0.8027862030551971,
+   "food_regen_mult": 1.539170348560229,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41401,
+   "wolves": 3,
+   "beasts": 4,
+   "wolf_speed_mult": 0.8546031030272461,
+   "food_regen_mult": 1.6645033104893099,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41402,
+   "wolves": 4,
+   "beasts": 8,
+   "wolf_speed_mult": 0.8633444991591827,
+   "food_regen_mult": 1.4816775642185498,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41403,
+   "wolves": 4,
+   "beasts": 4,
+   "wolf_speed_mult": 0.8456051150793926,
+   "food_regen_mult": 1.2552002491689196,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41404,
+   "wolves": 3,
+   "beasts": 6,
+   "wolf_speed_mult": 0.7373071846502529,
+   "food_regen_mult": 0.971101997626937,
+   "stalkers": 3,
+   "bears": 0
+  },
+  {
+   "seed": 41405,
+   "wolves": 1,
+   "beasts": 6,
+   "wolf_speed_mult": 0.9860668440692317,
+   "food_regen_mult": 1.3610469476637388,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41406,
+   "wolves": 4,
+   "beasts": 3,
+   "wolf_speed_mult": 0.8414354697208518,
+   "food_regen_mult": 0.9586887779083425,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41407,
+   "wolves": 1,
+   "beasts": 3,
+   "wolf_speed_mult": 0.7889986552441759,
+   "food_regen_mult": 1.6046605945081114,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41408,
+   "wolves": 1,
+   "beasts": 6,
+   "wolf_speed_mult": 0.7561627237092265,
+   "food_regen_mult": 1.4381584255028919,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41409,
+   "wolves": 3,
+   "beasts": 4,
+   "wolf_speed_mult": 0.7917570172878,
+   "food_regen_mult": 1.6522537799901729,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41410,
+   "wolves": 4,
+   "beasts": 3,
+   "wolf_speed_mult": 0.9116644012158348,
+   "food_regen_mult": 1.9296754547851283,
+   "stalkers": 3,
+   "bears": 0
+  },
+  {
+   "seed": 41411,
+   "wolves": 1,
+   "beasts": 2,
+   "wolf_speed_mult": 0.9498170569779059,
+   "food_regen_mult": 0.9245820882672462,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41412,
+   "wolves": 1,
+   "beasts": 3,
+   "wolf_speed_mult": 0.8121232427160647,
+   "food_regen_mult": 1.1672590559696683,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41413,
+   "wolves": 1,
+   "beasts": 7,
+   "wolf_speed_mult": 0.9250351511129478,
+   "food_regen_mult": 1.1947395383892698,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41414,
+   "wolves": 4,
+   "beasts": 4,
+   "wolf_speed_mult": 0.7638221677241509,
+   "food_regen_mult": 1.8375811049833544,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41415,
+   "wolves": 3,
+   "beasts": 6,
+   "wolf_speed_mult": 0.9692025842088908,
+   "food_regen_mult": 1.6492707476001833,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41416,
+   "wolves": 2,
+   "beasts": 6,
+   "wolf_speed_mult": 0.9955098385027397,
+   "food_regen_mult": 1.0336416766065577,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41417,
+   "wolves": 1,
+   "beasts": 7,
+   "wolf_speed_mult": 0.9343094863454714,
+   "food_regen_mult": 1.2186358649779074,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41418,
+   "wolves": 4,
+   "beasts": 6,
+   "wolf_speed_mult": 0.7890984477450279,
+   "food_regen_mult": 1.5332714236767022,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41419,
+   "wolves": 2,
+   "beasts": 8,
+   "wolf_speed_mult": 0.7124935843231923,
+   "food_regen_mult": 1.5647789924756634,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41420,
+   "wolves": 2,
+   "beasts": 4,
+   "wolf_speed_mult": 0.9042590043669048,
+   "food_regen_mult": 0.7608612383321045,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41421,
+   "wolves": 3,
+   "beasts": 6,
+   "wolf_speed_mult": 0.9750036350518525,
+   "food_regen_mult": 1.3851116890548107,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41422,
+   "wolves": 2,
+   "beasts": 6,
+   "wolf_speed_mult": 0.8502504024521791,
+   "food_regen_mult": 1.9391405513487805,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41423,
+   "wolves": 4,
+   "beasts": 7,
+   "wolf_speed_mult": 0.9470128482822953,
+   "food_regen_mult": 1.435267080427118,
+   "stalkers": 4,
+   "bears": 0
+  },
+  {
+   "seed": 41424,
+   "wolves": 1,
+   "beasts": 4,
+   "wolf_speed_mult": 0.9701499437670265,
+   "food_regen_mult": 1.2688471669990462,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41425,
+   "wolves": 1,
+   "beasts": 2,
+   "wolf_speed_mult": 0.888904178810709,
+   "food_regen_mult": 0.9716547000822024,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41426,
+   "wolves": 2,
+   "beasts": 2,
+   "wolf_speed_mult": 0.9521081916729768,
+   "food_regen_mult": 0.5105644176591038,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41427,
+   "wolves": 1,
+   "beasts": 6,
+   "wolf_speed_mult": 0.9640416876219218,
+   "food_regen_mult": 0.5849384732629604,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41428,
+   "wolves": 4,
+   "beasts": 6,
+   "wolf_speed_mult": 0.702823724305258,
+   "food_regen_mult": 1.3807693861077885,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41429,
+   "wolves": 3,
+   "beasts": 3,
+   "wolf_speed_mult": 0.7126594811522357,
+   "food_regen_mult": 1.6744027823282512,
+   "stalkers": 3,
+   "bears": 0
+  },
+  {
+   "seed": 41430,
+   "wolves": 2,
+   "beasts": 4,
+   "wolf_speed_mult": 0.910187705692397,
+   "food_regen_mult": 1.1173940034629126,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41431,
+   "wolves": 2,
+   "beasts": 5,
+   "wolf_speed_mult": 0.9134106348795281,
+   "food_regen_mult": 0.6995388542395082,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41432,
+   "wolves": 2,
+   "beasts": 3,
+   "wolf_speed_mult": 0.8353654995740158,
+   "food_regen_mult": 0.9028015563571734,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41433,
+   "wolves": 1,
+   "beasts": 2,
+   "wolf_speed_mult": 0.974234285416787,
+   "food_regen_mult": 0.8874860380862825,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41434,
+   "wolves": 2,
+   "beasts": 5,
+   "wolf_speed_mult": 0.9896671299873636,
+   "food_regen_mult": 0.9823991228298978,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41435,
+   "wolves": 4,
+   "beasts": 7,
+   "wolf_speed_mult": 0.7620781076475573,
+   "food_regen_mult": 0.7328521377438824,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41436,
+   "wolves": 2,
+   "beasts": 8,
+   "wolf_speed_mult": 0.7076635288308383,
+   "food_regen_mult": 1.9319113870357363,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41437,
+   "wolves": 4,
+   "beasts": 5,
+   "wolf_speed_mult": 0.8569448068620629,
+   "food_regen_mult": 0.9715532258202157,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41438,
+   "wolves": 3,
+   "beasts": 6,
+   "wolf_speed_mult": 0.7551871363690686,
+   "food_regen_mult": 1.026374273249077,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41439,
+   "wolves": 4,
+   "beasts": 8,
+   "wolf_speed_mult": 0.7541516451417619,
+   "food_regen_mult": 1.6787878674521195,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41440,
+   "wolves": 1,
+   "beasts": 3,
+   "wolf_speed_mult": 0.8946498136175765,
+   "food_regen_mult": 1.667784890391835,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41441,
+   "wolves": 4,
+   "beasts": 8,
+   "wolf_speed_mult": 0.9991494827956806,
+   "food_regen_mult": 0.5178377817412823,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41442,
+   "wolves": 4,
+   "beasts": 4,
+   "wolf_speed_mult": 0.7887844197950009,
+   "food_regen_mult": 1.0717129709445254,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41443,
+   "wolves": 4,
+   "beasts": 7,
+   "wolf_speed_mult": 0.779544551250785,
+   "food_regen_mult": 1.239298102170193,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41444,
+   "wolves": 3,
+   "beasts": 8,
+   "wolf_speed_mult": 0.7556437170068709,
+   "food_regen_mult": 1.927456886885957,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41445,
+   "wolves": 2,
+   "beasts": 8,
+   "wolf_speed_mult": 0.9143596608040316,
+   "food_regen_mult": 1.668341058019022,
+   "stalkers": 2,
+   "bears": 0
+  },
+  {
+   "seed": 41446,
+   "wolves": 2,
+   "beasts": 2,
+   "wolf_speed_mult": 0.8580256680941346,
+   "food_regen_mult": 1.2590652145866816,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41447,
+   "wolves": 3,
+   "beasts": 8,
+   "wolf_speed_mult": 0.7080944152517781,
+   "food_regen_mult": 0.5628032019615872,
+   "stalkers": 1,
+   "bears": 0
+  },
+  {
+   "seed": 41448,
+   "wolves": 1,
+   "beasts": 3,
+   "wolf_speed_mult": 0.8040396642852415,
+   "food_regen_mult": 1.1708167216486147,
+   "stalkers": 0,
+   "bears": 0
+  },
+  {
+   "seed": 41449,
+   "wolves": 2,
+   "beasts": 3,
+   "wolf_speed_mult": 0.7002037224536654,
+   "food_regen_mult": 1.9507826975833429,
+   "stalkers": 1,
+   "bears": 0
+  }
+ ]
+}

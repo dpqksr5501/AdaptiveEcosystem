@@ -24,6 +24,10 @@ public:
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Ecology|Refuge",meta=(ClampMin="80",ClampMax="250")) float BrushSpacing=145;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Ecology|Refuge",meta=(ClampMin="60",ClampMax="200")) float BrushHeight=130;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Ecology|Refuge") int32 LayoutSeed=1701;
+    /** Irregular brush/outcrop mosaic. Cosmetic rocks are not physical predator barriers. */
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,ReplicatedUsing=OnRep_Layout,Category="Ecology|Refuge") bool bNaturalLayout=false;
+    /** Optional cosmetic outcrops; use separately authored collision for physical rocks. */
+    UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Ecology|Refuge",meta=(ClampMin="0",ClampMax="8")) int32 NaturalBoulderCount=0;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Ecology|Refuge") TObjectPtr<UHierarchicalInstancedStaticMeshComponent> Brush;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,Category="Ecology|Refuge") TObjectPtr<UHierarchicalInstancedStaticMeshComponent> Boulders;
     UPROPERTY(VisibleAnywhere,BlueprintReadOnly,ReplicatedUsing=OnRep_Ready,Category="Ecology|Refuge") bool bRegistrationReady=false;
@@ -34,6 +38,9 @@ private:
     UPROPERTY(ReplicatedUsing=OnRep_Layout) int32 ReplicatedSeed=1701;
     UFUNCTION() void OnRep_Layout();
     UFUNCTION() void OnRep_Ready();
+    UFUNCTION() void OnRep_NaturalLayout();
+    UPROPERTY(ReplicatedUsing=OnRep_NaturalLayout) TArray<FTransform> NaturalBrushLayout;
+    UPROPERTY(ReplicatedUsing=OnRep_NaturalLayout) TArray<FTransform> NaturalStoneLayout;
     void TryRegisterGrounded();
     FTimerHandle RegistrationTimer;
     int32 RegistrationAttempts=0;

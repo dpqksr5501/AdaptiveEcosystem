@@ -146,3 +146,27 @@ PR #14는 2026-10-23 사용자 요청으로 기능·디버그를 push하고 Read
 서버·네트워킹은 [역할별 안내](AdaptiveEcosystem/Docs/Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), 학습은 [역할별 안내](AdaptiveEcosystem/Docs/RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md)를 따른다. 복사 가능한 [작업 시작 프롬프트](AdaptiveEcosystem/Docs/Team/ECOSYSTEM_AGENT_START_PROMPTS_20261024.md)와 [실제 부분 예제](AdaptiveEcosystem/Docs/RL_Policy/Examples/README.md)를 제공한다. 예제는 training_ready=false이며 진단 정답/부분 cell을 기존 정책 관측이나 전체 복원 상태로 사용하지 않는다. 현재 Client proxy와 권위 논리를 구분하고 새 학습/임의 종/분산 서버 완료로 확대하지 않는다.
 
 225개 자동화·PIE/멀티·저장·패키지 수치는2026-10-23 실행의 근거다. 10-24 안내/공유 갱신은 새 UBT/PIE 실행을 뜻하지 않는다. 새 담당자가 코드를 변경하면 기존3절 빌드 규칙과 해당 역할의 실제 acceptance를 적용한다. 다른 PC의 같은 Git SHA라도 checkpoint의 runtime image hash가 달라질 수 있으므로 재빌드 간 자동 복원을 가정하지 않는다.
+
+## 15. 2026-10-29 실제 플레이 후속 수정
+
+사용자 요청으로 owned `LV_JYU_Ecosystem`의 단독 무리 이주, 접촉/경계 정체, 로컬 섭식, 식생 표시와 서식 용량 확장, 낮밤 표현, Highland 통로를 보완한 **life rules v2 작업 트리**가 있다. 현재 범위·진단과 수정 분류·실행 근거는 [플레이 흐름 수정](AdaptiveEcosystem/Docs/조연우/JYU_PLAYFLOW_FIX_20261029.md)을 따른다. 기존 모델/V1·v3 관측과 raw request·SocialControl=0을 보존하며 Native가 유일한 위치/대사/섭식 writer다. 식생 확장은 M4 용량 거래 이후 기존 Native 재생으로만 먹이를 만든다. Client는 받은 시계/표현만 소비한다.
+
+새 경로/인접성 변경은 owned 맵과 해당 World Partition external actors에 한정한다. 원본 팀 맵을 수정하거나 기존 맵 전체에 life를 활성화하지 않는다. 새 세계의 Python mirror/재학습·모든 seed 기아0·영구 평형·분산 서버 완료로 확대하지 않는다. 코드의 push/main 반영은 실제 Git 상태로 별도 확인한다.
+
+## 16. 2026-10-30 자연 서식지·레벨 입력 구조
+
+후속 작업 트리는 [자연 서식지 계약](AdaptiveEcosystem/Docs/Architecture/NATURAL_HABITAT_CONTRACT_20261030.md), [레벨 담당 적용 순서](AdaptiveEcosystem/Docs/Team/NATURAL_HABITAT_LEVEL_HANDOFF_20261030.md), [실제 실행 기록](AdaptiveEcosystem/Docs/조연우/JYU_NATURAL_HABITAT_20261030.md)을 따른다. NaturalHabitatProfile/지역별 profile과 고유 ID·우선순위·XYZ 서식지 입력을 새 레벨에 연결한다. 실제 지면·경사/단차·연결 수원/수면을 확인하고 Native 단일 writer·M4 수지·기존 모델/관측·SocialControl=0을 보존한다. 자연 profile은 내부 자리→경계→휴식/재도주와 취약한 은폐를 사용한다. 기존 protected fixture와 구분한다.
+
+owned Ecosystem 및 별도 작은 transfer fixture의 검증은 미래 팀 통합 레벨의 acceptance를 대신하지 않는다. 현재 지면 backend는 2.5D이며 겹친 동굴층/수영·유체·자동 수문 연결·실재 식물 종 전체·새 세계 Python mirror/재학습·영구 평형은 미완료다. 물/나무/장식 mesh만으로 생태 입력을 자동 추측하지 않는다. 새 코드/에셋의 build/PIE/서버·Client/저장·cook·streaming 검증 여부는 실행 기록을 확인한다.
+
+## 17. 2026-10-30 자연 개체군·세부 기획 대조와 학습 경계
+
+후속은 [개체군/성장 계약](AdaptiveEcosystem/Docs/Architecture/NATURAL_POPULATION_CONTRACT_20261030.md), [기획 대조](AdaptiveEcosystem/Docs/Architecture/INDIVIDUAL_TRAIT_DESIGN_AUDIT_20261030.md), [실행 기록](AdaptiveEcosystem/Docs/조연우/JYU_NATURAL_POPULATION_20261030.md)을 따른다. 자연 사슴의 초기 혼합 나이·성별, 제한된 체격/속도/털색·기질 유전, 권위 성숙/털색 DTO와 성장 표현, 가족 관계/현재 관찰 분리, 기존 건강/안전 번식 조건과 군락 cohort 발달을 연결한다. 현재 Native 사슴 예제와 새 owned 표현 범위를 임의 종의 전체 생애/완전한 새끼·뿔 아트로 확대하지 않는다.
+
+사용자는 학습 담당 역할 침범을 금지했다. 모델·관측 schema/정규화·mask·행동 의미·reward·학습/가중치/추론을 임의 변경하거나 새 Caution 기반 행동기를 추가하지 않는다. Caution은 데이터/진단만 제공한다. Sociability의 현재 소비는 이미 선택된 Graze 안의 혼잡/국소 간격이며 Raw Request를 덮어쓰지 않는다. 기존 생존/여행/Social 예약과 Native 단일 writer/M4 경계를 유지한다. 새 특성을 학습에 사용할지는 RL 담당의 별도 계약이며 현재 training_ready=false다.
+
+## 18. 2026-10-29 v3 기본 두뇌 R7e
+
+사용자 결정("기본 두뇌 R7e로")에 따라 통합 v3 모드에서 시작 두뇌를 고르지 않은 Play(적응 고리 판 0 포함)의 사슴 두뇌는 R7e `v3_r7_g995_s1_20m@40d8710d`(**24관측/5행동·mask5**, 두 길·반사 밖 도망 막음)다. 4절의 'R1b 18관측/5행동·mask2'는 당시 이력이다. 저장소 두뇌 파일을 바이트 그대로 빌드에 넣었고(`PolicyBrainV3Default.h`) 파일 두뇌와 같은 검사를 지난다. 런타임 추론은 그대로 C++ Native이고 V1 7관측/4출력·`eco.IntegratedPolicyVersion` 기본값·내장 R1b(`PolicyWeightsV3.h`)·평가기·Python 거울은 바꾸지 않았다. R7e를 걸 수 없는 세계(도주 반사 끔 등)는 내장 R1b-F로 돈다. 맵 조정자 `bUseV3Policy`로 v3를 켜는 맵(조연우 life 맵 등)도 콘솔 변수와 무관하게 같은 규칙으로 R7e에서 시작한다. 같은 날 검토에서 저장 체크포인트가 두뇌의 반사 밖 도망 막음(`bFleeGate`)을 싣지 않던 것을 고쳤다.
+
+R1b-F로 되돌리려면 Play 전 `eco.V3Brain.Startup builtin`(명령줄 `-EcoV3Brain=builtin`), Play 중 `eco.V3Brain.Load builtin`을 쓴다. 고르기 규칙·실시간 고리·검증은 [LIVE_ADAPT_SPEC.md 5.6](AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md)을 따른다.

@@ -6,6 +6,7 @@
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoFauna.h"
 #include "Creature/Representation/EcoCreatureAnimationProfile.h"
 #include "Creature/Representation/EcoCreatureAnimInstance.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
@@ -239,5 +240,38 @@ bool FEcoJYUPlayerGait::RunTest(const FString&) {
     struct { EEcoPlayerGait NewGait; } Params{EEcoPlayerGait::Run};
     Bridge->ProcessEvent(Bridge->FindFunctionChecked(TEXT("SetGait")),&Params);
     TestTrue(TEXT("Reflected gait input reaches the movement bridge"),Bridge->Gait==EEcoPlayerGait::Run&&Character->GetCharacterMovement()->MaxWalkSpeed==900.f);return true;
+}
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUFaunaCarrion, "AdaptiveEcosystem.Creature.JYU.FaunaCarrionConservation",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoJYUFaunaCarrion::RunTest(const FString&)
+{
+    FEcoFaunaCarcass Stock;
+    Stock.Region = TEXT("Meadow");
+    Stock.Species = TEXT("Pig");
+    Stock.OpenAt = 3.;
+    Stock.ExpiresAt = 20.;
+    Stock.ExclusiveUntil = 3.5;
+    Stock.KillerId = 1;
+    Stock.FeedingPlaces = 1;
+    Stock.Remaining = 9.f;
+
+    FEcoFaunaSpecies Eater;
+    Eater.SpeciesId = TEXT("Crow");
+    TestFalse(TEXT("Early access is withheld"), Stock.IsAvailable(Stock.Region, Eater, 2.99));
+    TestFalse(TEXT("A different region has no access"), Stock.IsAvailable(TEXT("Hill"), Eater, 3.));
+    TestFalse(TEXT("Expiry closes access at the boundary"), Stock.IsAvailable(Stock.Region, Eater, 20.));
+    TestTrue(TEXT("A crow can reach another species' open stock"), Stock.IsAvailable(Stock.Region, Eater, 3.));
+    TestEqual(TEXT("Outsiders wait during the killer's exclusive window"), Stock.Bite(2, 3., 3.5f), 0.f);
+    TestEqual(TEXT("The first bite debits exactly the granted amount"), Stock.Bite(1, 3., 3.5f), 3.5f);
+    TestEqual(TEXT("An early boundary does not create another feeding place"), Stock.Bite(2, 3.9, 3.5f), 0.f);
+    Eater.SpeciesId = Stock.Species;
+    TestFalse(TEXT("Fresh conspecific carrion is excluded by default"), Stock.IsAvailable(Stock.Region, Eater, 3.));
+    Eater.bAllowConspecificCarrion = true;
+    TestTrue(TEXT("The species profile can explicitly permit conspecific carrion"), Stock.IsAvailable(Stock.Region, Eater, 3.));
+    TestEqual(TEXT("The last bite receives only the remaining stock"), Stock.Bite(2, 4., 9.f), 5.5f);
+    TestEqual(TEXT("Competing requests cannot overdraw a carcass"), Stock.Bite(2, 5., 1.f), 0.f);
+    TestFalse(TEXT("Depleted stock is no longer a candidate"), Stock.IsAvailable(Stock.Region, Eater, 3.));
+    return true;
 }
 #endif

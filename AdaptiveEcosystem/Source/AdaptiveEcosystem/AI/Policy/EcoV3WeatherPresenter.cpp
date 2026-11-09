@@ -17,10 +17,27 @@
 
 #include "EcoPolicyV3IntegratedSubsystem.h"
 #include "EcoWorldV3.h"
+#include "Engine/DirectionalLight.h"
+#include "Engine/SkyLight.h"
+#include "Components/DirectionalLightComponent.h"
+#include "Components/SkyLightComponent.h"
+#include "World/EcoWorldClockSubsystem.h"
+#include "World/EcoNaturalHabitatProfile.h"
+#include "Engine/PostProcessVolume.h"
 
 // -----------------------------------------------------------------------------
 // 순수 함수 (시험 Policy.V3.Weather.Presenter)
 // -----------------------------------------------------------------------------
+
+double EcoV3WeatherFx::ClockDarkness(const FEcoServerTimeSnapshot& Time)
+{
+    const auto& Phase=Time.DayCycle;const double Duration=Phase.PhaseEndSeconds-Phase.PhaseStartSeconds;
+    if(Time.WorldEpoch<=0||!FMath::IsFinite(Time.ServerTimeSeconds)||Duration<=0
+        ||Time.ServerTimeSeconds<Phase.PhaseStartSeconds||Time.ServerTimeSeconds>Phase.PhaseEndSeconds
+        ||(Phase.Phase!=EEcoDayPhase::Day&&Phase.Phase!=EEcoDayPhase::Night))return -1;
+    const double Edge=FMath::Min(Time.ServerTimeSeconds-Phase.PhaseStartSeconds,Phase.PhaseEndSeconds-Time.ServerTimeSeconds);
+    return FMath::Clamp(.5+(Phase.Phase==EEcoDayPhase::Night?1.:-1.)*Edge/(Duration*.2),0.,1.);
+}
 
 double EcoV3WeatherFx::Approach(double Alpha, double Target, double DeltaSeconds, double FadeInSeconds, double FadeOutSeconds)
 {
@@ -204,8 +221,12 @@ void UEcoV3WeatherPresenterSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	{
 		return;
 	}
-	for (TActorIterator<AEcoCreatureIntegrationSpawner> It(&InWorld); It; ++It)
+	for (TActorIterator<AEcoCreatureIntegrationSpawner> It(&InWorld); It; ++It){
 		bEcologyWeatherView = bEcologyWeatherView || (It->bUseV3Policy && It->bEnableVegetation);
+        bLifeLighting|=It->bUseV3Policy&&It->bEnableEcosystemLife;
+        if(It->NaturalHabitatProfile)NaturalViewProfile=It->NaturalHabitatProfile;
+    }
+    if(const auto* Profile=NaturalViewProfile.Get())bLifeLighting=Profile->bDriveDayNightLighting;
 	if (InWorld.GetNetMode() == NM_Client && !bEcologyWeatherView) return;
 	if (!UEcoPolicyV3IntegratedSubsystem::IsRequested())
 	{
@@ -231,6 +252,7 @@ void UEcoV3WeatherPresenterSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 
 void UEcoV3WeatherPresenterSubsystem::Deinitialize()
 {
+    RestoreLighting();
 	if (bTickRegistered)
 	{
 		TickFn.UnRegisterTickFunction();
@@ -304,6 +326,10 @@ bool UEcoV3WeatherPresenterSubsystem::EnsureFx()
 	}
 	RainAsset = LoadObject<UFXSystemAsset>(nullptr, EcoV3WeatherFx::kRainSystemPath);
 	SnowAsset = LoadObject<UFXSystemAsset>(nullptr, EcoV3WeatherFx::kSnowSystemPath);
+    if(const auto* Profile=NaturalViewProfile.Get()){
+        if(!Profile->RainVisual.IsNull())RainAsset=Profile->RainVisual.LoadSynchronous();
+        if(!Profile->SnowVisual.IsNull())SnowAsset=Profile->SnowVisual.LoadSynchronous();
+    }
 	RainCue = LoadObject<USoundBase>(nullptr, EcoV3WeatherFx::kRainSoundPath);
 	FActorSpawnParameters Params;
 	Params.Name = MakeUniqueObjectName(World->PersistentLevel, AEcoV3WeatherFxActor::StaticClass(), TEXT("EcoV3WeatherFx"));
@@ -413,8 +439,68 @@ void UEcoV3WeatherPresenterSubsystem::FadeAll(double DeltaSeconds)
 	}
 }
 
+void UEcoV3WeatherPresenterSubsystem::RestoreLighting()
+{
+    if(auto* Light=Sun.Get()){Light->SetIntensity(SunIntensity);Light->SetWorldRotation(SunRotation);}
+    if(auto* Light=Moon.Get()){Light->SetIntensity(MoonIntensity);Light->SetWorldRotation(MoonRotation);Light->SetLightColor(MoonColor);Light->SetCastShadows(bMoonCastShadows);}
+    if(auto* Volume=ExposureVolume.Get()){Volume->Settings.AutoExposureBias=ExposureBias;Volume->Settings.bOverride_AutoExposureBias=bExposureOverride;}
+    ExposureVolume.Reset();
+    for(const auto& Saved:SkyLights)if(auto* Light=Saved.Light.Get())Light->SetIntensity(Saved.Intensity);
+    Sun.Reset();Moon.Reset();SkyLights.Reset();
+}
+
+void UEcoV3WeatherPresenterSubsystem::TickLighting()
+{
+    if(!bLifeLighting)return;
+    auto* World=GetWorld();if(!World)return;
+    FEcoServerTimeSnapshot Time;
+    if(World->GetNetMode()!=NM_Client){
+        const auto* Clock=World->GetSubsystem<UEcoWorldClockSubsystem>();if(!Clock||!Clock->IsClockRunning())return;
+        Time=Clock->GetServerTime();
+    }else{
+        const auto* State=World->GetGameState<AEcoGameState>();if(!State)return;Time=State->GetEcologySummary().Time;
+    }
+    const double Dark=EcoV3WeatherFx::ClockDarkness(Time);if(Dark<0)return;
+    const auto* Profile=NaturalViewProfile.Get();
+    if(!Sun.IsValid()){
+        // One local presentation owner. Reuse authored lights, never spawn a
+        // second sun or create an authority/native subsystem on a client.
+        RestoreLighting();
+        TArray<ADirectionalLight*> Lights;for(TActorIterator<ADirectionalLight> It(World);It;++It)Lights.Add(*It);
+        Lights.Sort([](const auto& A,const auto& B){
+            const float X=A.GetComponent()->Intensity,Y=B.GetComponent()->Intensity;
+            return X==Y?A.GetPathName()<B.GetPathName():X>Y;
+        });
+        if(Profile){
+            ADirectionalLight* TaggedSun=nullptr;ADirectionalLight* TaggedMoon=nullptr;
+            for(auto* Light:Lights){if(Light->ActorHasTag(Profile->SunTag))TaggedSun=Light;if(Light->ActorHasTag(Profile->MoonTag))TaggedMoon=Light;}
+            Lights.Reset();if(TaggedSun)Lights.Add(TaggedSun);else return;if(TaggedMoon)Lights.Add(TaggedMoon);
+            for(TActorIterator<APostProcessVolume> It(World);It;++It)if(It->ActorHasTag(Profile->ExposureTag)){
+                ExposureVolume=*It;ExposureBias=It->Settings.AutoExposureBias;bExposureOverride=It->Settings.bOverride_AutoExposureBias;break;
+            }
+        }
+        if(Lights.IsEmpty())return;
+        Sun=Lights[0]->GetComponent();SunIntensity=Sun->Intensity;SunRotation=Sun->GetComponentRotation();
+        if(Lights.Num()>1){Moon=Lights[1]->GetComponent();MoonIntensity=Moon->Intensity;MoonRotation=Moon->GetComponentRotation();MoonColor=Moon->GetLightColor();bMoonCastShadows=Moon->CastShadows;}
+        for(TActorIterator<ASkyLight> It(World);It;++It)if(!Profile||It->ActorHasTag(TEXT("Eco.Sky")))if(auto* Light=It->GetLightComponent())SkyLights.Add({Light,Light->Intensity});
+    }
+    const double Day=1-Dark;
+    Sun->SetIntensity(SunIntensity*Day*Day);
+    FRotator Rotation=SunRotation;Rotation.Pitch=FMath::Lerp(SunRotation.Pitch,15.,Dark);Sun->SetWorldRotation(Rotation);
+    if(auto* Light=Moon.Get()){
+        Light->SetIntensity(Profile?SunIntensity*Profile->MoonSunFraction*Dark:MoonIntensity+SunIntensity*.05*Dark);
+        if(Profile)Light->SetCastShadows(false);
+        FRotator MoonPose=MoonRotation;MoonPose.Pitch=FMath::Lerp(MoonRotation.Pitch,-35.,Dark);Light->SetWorldRotation(MoonPose);
+        Light->SetLightColor(FMath::Lerp(MoonColor,FLinearColor(.5f,.65f,1.f),float(Dark)));
+    }
+    for(const auto& Saved:SkyLights)if(auto* Light=Saved.Light.Get())Light->SetIntensity(Saved.Intensity*((Profile?.007:.025)+(Profile?.993:.975)*Day));
+    if(Profile)if(auto* Volume=ExposureVolume.Get()){Volume->Settings.bOverride_AutoExposureBias=true;Volume->Settings.AutoExposureBias=ExposureBias+Profile->NightExposureBias*Dark;}
+}
+
 void UEcoV3WeatherPresenterSubsystem::TickPresenter(float DeltaSeconds)
 {
+    // Rain's local OFF switch must not stop time-of-day lighting.
+    TickLighting();
 	UWorld* World = GetWorld();
 	UEcoPolicyV3IntegratedSubsystem* Sub = World && !bEcologyWeatherView ? World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
 	const double DeltaS = static_cast<double>(DeltaSeconds);

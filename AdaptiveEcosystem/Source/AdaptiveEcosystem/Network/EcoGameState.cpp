@@ -9,6 +9,9 @@
 AEcoGameState::AEcoGameState()
 {
 	bReplicates = true;
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.TickGroup = TG_PostUpdateWork;
+    ServerWorldTimeSecondsUpdateFrequency = 1.0f;
 }
 
 void AEcoGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
@@ -23,6 +26,7 @@ void AEcoGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	DOREPLIFETIME(AEcoGameState, StateRevision);
 	DOREPLIFETIME(AEcoGameState, bMassReplicationReady);
 	DOREPLIFETIME(AEcoGameState, EcologySummary);
+    DOREPLIFETIME(AEcoGameState, ClockSchedule);
 }
 
 void AEcoGameState::InitializeAuthorityState(const int32 InWorldEpoch, const int32 InMaxPlayers)
