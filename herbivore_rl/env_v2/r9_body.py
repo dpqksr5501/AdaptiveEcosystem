@@ -1,0 +1,651 @@
+"""R9 body table and I/O contract (design AdaptiveEcosystem/Docs/RL_Policy/RL_R9_MULTISPECIES_DESIGN.md 3-3, 4, 5, 3-9, 7-10, 11, 14).
+
+This module is the single source of the species-independent contract shared by the world (`r9_world.py`), life (`r9_life.py`)
+and brains (`r9_brains.py`). Nothing here runs a world step.
+
+  - species numbers (deer → wolf → boar, the slot block order of 3절), food kinds, sex codes (EcoLifeV3::ESex order), gaits
+  - 19 actions (5절) and the literal 8-direction / golden-angle tables (3-9: no trig inside a step)
+  - 107 observation columns (4절): names, slices, column helpers and the normalisation constants
+  - config loading (`inherit:` merge like R8) and the body table (3-3) expanded to (n_species,) arrays and to (K, S) slot arrays
+  - two contract hashes (7-10, 14-2): I/O (all species the same) and body (per species; reject a brain trained on another body)
+
+Units are R8/Unreal v3: 1 unit = 2 m, 1 step = 2/15 s, decision = 2 steps, day = 900 steps. Speeds in the R9 config are
+absolute units/step (R8 wrote multiples of the deer run speed).
+
+Body hash = canonical JSON of `species.<name>` + `body_common` only. Train-only randomisation and judge-only birth limits live in
+other blocks, so `v3_r9.yaml` and `v3_r9_judge.yaml` give the same body hash (a trained brain is accepted by the judge world).
+"""
+
+from __future__ import annotations
+
+import copy
+import hashlib
+import json
+import math
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any
+
+import numpy as np
+import yaml
+
+# --------------------------------------------------------------------------- #
+# species / food / sex / gait
+# --------------------------------------------------------------------------- #
+
+DEER, WOLF, BOAR = 0, 1, 2
+SPECIES = ("deer", "wolf", "boar")           # slot block order inside one world (3-6: 사슴 → 늑대 → 멧돼지)
+N_SPECIES = 3
+SPECIES_INDEX = {n: i for i, n in enumerate(SPECIES)}
+
+GRASS, ROOT, MEAT = 0, 1, 2
+FOODS = ("grass", "root", "meat")
+N_FOODS = 3
+GRID_FOODS = (GRASS, ROOT)
+
+SEX_NONE, SEX_FEMALE, SEX_MALE = 0, 1, 2      # EcoLifeV3::ESex {Unspecified, Female, Male}
+
+G_STAND, G_WALK, G_RUN = 0, 1, 2              # gait index into body_common.gait_drain
+
+# founder genome kinds (LH 49~56)
+FOUNDER_PLAIN, FOUNDER_NATURAL = 0, 1
+# sex modes (3-3 성별, 3-7)
+SEXMODE_NONE, SEXMODE_NATURAL, SEXMODE_ALTERNATE = 0, 1, 2
+# child ring centre (3-7 새끼 자리)
+CHILD_AT_PARENT_A, CHILD_AT_MIDPOINT = 0, 1
+
+# --------------------------------------------------------------------------- #
+# units
+# --------------------------------------------------------------------------- #
+
+UNIT_M = 2.0
+STEP_S = 2.0 / 15.0
+STEPS_PER_S = 7.5
+DAY_STEPS = 900
+DECISION_STEPS = 2
+
+# --------------------------------------------------------------------------- #
+# actions (5절)
+# --------------------------------------------------------------------------- #
+
+EAT = 0
+WALK_FIRST, WALK_LAST = 1, 8                  # WALK_k: head rotated ccw (left) by (k − 1) × 45°
+RUN_FIRST, RUN_LAST = 9, 16                   # RUN_k : head rotated ccw by (k − 9) × 45°
+SHELTER = 17
+WATCH = 18
+N_ACTIONS = 19
+ACTION_NAMES = (("EAT",) + tuple(f"WALK_{j * 45}" for j in range(8)) + tuple(f"RUN_{j * 45}" for j in range(8))
+                + ("SHELTER", "WATCH"))
+ACTION_GROUPS = {"eat": (EAT,), "walk": tuple(range(WALK_FIRST, WALK_LAST + 1)), "run": tuple(range(RUN_FIRST, RUN_LAST + 1)),
+                 "shelter": (SHELTER,), "watch": (WATCH,)}
+
+
+def action_dir_index(a) -> np.ndarray:
+    """Direction index j (0..7) of WALK/RUN actions, −1 for the others. Works on scalars and arrays."""
+    a = np.asarray(a)
+    return np.where((a >= WALK_FIRST) & (a <= WALK_LAST), a - WALK_FIRST,
+                    np.where((a >= RUN_FIRST) & (a <= RUN_LAST), a - RUN_FIRST, -1))
+
+
+def action_mask(groups) -> np.ndarray:
+    """(19,) bool from group names ('eat', 'walk', 'run', 'shelter', 'watch')."""
+    m = np.zeros(N_ACTIONS, dtype=bool)
+    for g in groups:
+        if g not in ACTION_GROUPS:
+            raise ValueError(f"unknown action group {g!r} (known: {sorted(ACTION_GROUPS)})")
+        m[list(ACTION_GROUPS[g])] = True
+    return m
+
+
+# --------------------------------------------------------------------------- #
+# literal rotation tables (3-9: 스텝 안 삼각함수 금지)
+# --------------------------------------------------------------------------- #
+
+SQRT_HALF = 0.7071067811865476                # float64 nearest to 1/√2 (= math.sqrt(0.5))
+
+# DIR8[j] = (cos j·45°, sin j·45°). Rotating head h by j: (h_x c − h_y s, h_x s + h_y c). free_j (obs 13+j) uses the same j.
+DIR8 = np.array([
+    [1.0, 0.0],
+    [SQRT_HALF, SQRT_HALF],
+    [0.0, 1.0],
+    [-SQRT_HALF, SQRT_HALF],
+    [-1.0, 0.0],
+    [-SQRT_HALF, -SQRT_HALF],
+    [0.0, -1.0],
+    [SQRT_HALF, -SQRT_HALF],
+], dtype=np.float64)
+DIR8.setflags(write=False)
+
+# Golden-angle ring for child / newborn-respawn spots (3-7, NB 59~70: Angle = K × 2.399963). Values = math.cos/sin(k × 2.399963)
+# written out as float64 literals. Unreal also adds a per-birth hash rotation Unit(A ^ B) × 2π — R9 drops it (open issue in the
+# contract: the design asks for a literal table; a hash rotation needs a trig call or a second table).
+GOLDEN_ANGLE_RAD = 2.399963
+GOLDEN8 = np.array([
+    [1.0, 0.0],
+    [-0.7373687228988248, 0.6754904636562651],
+    [0.08742526701888792, -0.9961710810331106],
+    [0.6084394079172122, 0.7936003319639882],
+    [-0.9847136453733523, -0.17418104551162786],
+    [0.8437546783027774, -0.5367290217998061],
+    [-0.25960297378670444, 0.9657154322061441],
+    [-0.4609084518190998, -0.8874476880592571],
+], dtype=np.float64)
+GOLDEN8.setflags(write=False)
+
+
+def rotate(h: np.ndarray, cs: np.ndarray) -> np.ndarray:
+    """Rotate vectors h (..., 2) ccw by table rows cs (..., 2) = (cos, sin). Products and sums only — no trig."""
+    hx, hy = h[..., 0], h[..., 1]
+    c, s = cs[..., 0], cs[..., 1]
+    return np.stack([hx * c - hy * s, hx * s + hy * c], -1)
+
+
+# --------------------------------------------------------------------------- #
+# observation layout (4절, 107 columns)
+# --------------------------------------------------------------------------- #
+
+OBS_SELF_NAMES = ("energy", "reserve", "stamina", "health", "own_size", "age_frac", "birth_wait", "food_density", "food_here",
+                  "in_shelter", "shelter_x", "shelter_y", "shelter_edge",
+                  "free_0", "free_1", "free_2", "free_3", "free_4", "free_5", "free_6", "free_7",
+                  "own_speed", "mating")
+OBS_OTHER_FIELDS = ("present", "rel_x", "rel_y", "dist", "vel_x", "vel_y", "approach", "approach_mem", "facing", "size",
+                    "not_seen")
+N_OTHER = 6
+OBS_KINSUM_NAMES = ("kin_count", "kin_run_frac", "kin_flow_x", "kin_flow_y")
+OBS_KIN_FIELDS = ("present", "rel_x", "rel_y", "vel_x", "vel_y", "size", "mate_ok")
+N_KIN = 2
+
+N_SELF = len(OBS_SELF_NAMES)                  # 23
+N_OF = len(OBS_OTHER_FIELDS)                  # 11
+N_KF = len(OBS_KIN_FIELDS)                    # 7
+SELF0 = 0
+OTHER0 = SELF0 + N_SELF                       # 23
+KINSUM0 = OTHER0 + N_OTHER * N_OF             # 89
+KIN0 = KINSUM0 + len(OBS_KINSUM_NAMES)        # 93
+OBS_NAMES = (OBS_SELF_NAMES
+             + tuple(f"o{j}_{f}" for j in range(N_OTHER) for f in OBS_OTHER_FIELDS)
+             + OBS_KINSUM_NAMES
+             + tuple(f"k{j}_{f}" for j in range(N_KIN) for f in OBS_KIN_FIELDS))
+OBS_DIM = len(OBS_NAMES)                      # 107
+OBS_INDEX = {n: i for i, n in enumerate(OBS_NAMES)}
+
+SL_SELF = slice(SELF0, OTHER0)
+SL_OTHER = slice(OTHER0, KINSUM0)
+SL_KINSUM = slice(KINSUM0, KIN0)
+SL_KIN = slice(KIN0, OBS_DIM)
+
+# named self columns
+(O_ENERGY, O_RESERVE, O_STAMINA, O_HEALTH, O_OWN_SIZE, O_AGE_FRAC, O_BIRTH_WAIT, O_FOOD_DENSITY, O_FOOD_HERE, O_IN_SHELTER,
+ O_SHELTER_X, O_SHELTER_Y, O_SHELTER_EDGE) = range(13)
+O_FREE0 = 13                                  # free_j = O_FREE0 + j
+O_OWN_SPEED = 21
+O_MATING = 22
+
+
+def other_col(j: int, f: str) -> int:
+    """Column of field f of other-species slot j (0..5)."""
+    return OTHER0 + j * N_OF + OBS_OTHER_FIELDS.index(f)
+
+
+def kin_col(j: int, f: str) -> int:
+    """Column of field f of near-kin slot j (0..1)."""
+    return KIN0 + j * N_KF + OBS_KIN_FIELDS.index(f)
+
+
+# Normalisation and sensing constants — species independent, part of the I/O hash. Body-specific scales (food refs) are in the
+# body table. All observation values are clipped to [−1, 1] after normalisation (4절).
+OBS_NORM = {
+    "pos": 20.0,            # rel_x·rel_y·dist (other and kin slots) / 20
+    "vel": 0.9,             # vel_x·vel_y·approach (other and kin slots) / 0.9 (R8 1.5 × 0.6)
+    "size": 2.0,            # own_size·size / 2
+    "kin_count": 20.0,
+    "kin_run_speed": 0.39,  # kin_run_frac: |disp| > 0.39 units/step (R8 0.65 × 0.6)
+    "flow": 0.6,            # kin_flow mean displacement / 0.6
+    "free": 10.0,
+    "edge": 20.0,
+    "speed": 0.6,           # own_speed = |disp| / 0.6
+    "birth_wait": 2250.0,   # max(0, next_birth − t) / 2250
+    "food_r": 20.0,         # food_density window: grid box mean radius 10 cells (20 units) + sensed carcasses within 20 units
+    "food_box_cells": 441,  # (2 × 10 + 1)² — carcass meat is divided by this to give a per-cell density
+    "here_r": 1.0,          # food_here: meat of carcasses within 1.0 unit; grids use the current cell
+}
+SENSE = {
+    "hear_silent": 0.03,    # 4-1: R(s) = 0 if s < 0.03
+    "hear_quiet": 0.18,     #      else 2 + 18 × clip((s − 0.18) / 0.42, 0, 1)
+    "hear_span": 0.42,
+    "hear_r_quiet": 2.0,
+    "hear_r_loud": 20.0,
+    "mem_keep": 0.8,        # approach_mem: perceived m ← 0.8 m + 0.2 a, else m ← 0.9 m
+    "mem_gain": 0.2,
+    "mem_decay": 0.9,
+}
+
+# Human-readable formula per column family (enters the I/O hash so a silent meaning change is caught).
+OBS_SPEC = {
+    "energy": "E (stomach 0..1)",
+    "reserve": "fat fraction R (0..1)",
+    "stamina": "stamina (0..1)",
+    "health": "HP (deer always 1)",
+    "own_size": "size0 × g_size × growth / 2",
+    "age_frac": "clip((t − born) / maturity, 0, 1)",
+    "birth_wait": "max(0, next_birth − t) / 2250",
+    "food_density": "(Σ_grid-diet e_f × boxmean_r10(grid_f) + e_meat × Σ sensed carcass meat within 20 / 441) / food_density_ref",
+    "food_here": "(Σ_grid-diet e_f × cell(grid_f) + e_meat × Σ carcass meat within 1.0 (other species)) / food_here_ref",
+    "in_shelter": "edge distance to nearest shelter ≤ 0",
+    "shelter_xy": "unit vector to nearest (edge distance) shelter centre in self frame, 0 inside",
+    "shelter_edge": "max(edge, 0) / 20",
+    "free_j": "ray length to wall along DIR8[j] applied to head / 10",
+    "own_speed": "|disp| / 0.6 (disp = total last-step displacement incl. contact)",
+    "mating": "paired and waiting for birth (0/1)",
+    "other": "perceived (eye ∪ ear ∪ nose) other-kin individuals, distance asc, ties lower slot, 6 slots",
+    "kin": "perceived same-kin individuals; summary of all + 2 nearest slots",
+    "approach": "−(disp_j · (p_j − p_i)) / |p_j − p_i| / 0.9",
+    "facing": "head_j · (p_i − p_j) / |p_i − p_j|",
+    "not_seen": "perceived and not in eye",
+    "mate_ok": "alive, same kin, mature_j, sex compatible (both none, or both set and different), judge: not related",
+    "frame": "x = head, y = left (ccw)",
+}
+
+
+def hear_radius(s: np.ndarray) -> np.ndarray:
+    """Sound radius (units) of a maker whose last-step speed is s (units/step), 4-1. Depends on actual speed only."""
+    s = np.asarray(s, dtype=np.float64)
+    t = np.clip((s - SENSE["hear_quiet"]) / SENSE["hear_span"], 0.0, 1.0)
+    return np.where(s < SENSE["hear_silent"], 0.0, SENSE["hear_r_quiet"] + (SENSE["hear_r_loud"] - SENSE["hear_r_quiet"]) * t)
+
+
+def quadrant_of(P: np.ndarray, size: float, quadrants: int) -> np.ndarray:
+    """Quadrant index of positions P (..., 2): 1 region → 0; 4 → (x ≥ size/2) + 2 (y ≥ size/2) (3-1)."""
+    if int(quadrants) == 1:
+        return np.zeros(np.asarray(P).shape[:-1], dtype=np.int8)
+    if int(quadrants) != 4:
+        raise ValueError(f"quadrants must be 1 or 4: {quadrants}")
+    h = 0.5 * float(size)
+    return ((P[..., 0] >= h).astype(np.int8) + 2 * (P[..., 1] >= h).astype(np.int8)).astype(np.int8)
+
+
+# --------------------------------------------------------------------------- #
+# config
+# --------------------------------------------------------------------------- #
+
+SPECIES_KEYS = ("mass_kg", "founder", "founder_variation", "growth", "walk_speed", "run_speed", "run_mult", "accel",
+                "stamina_run_steps", "stamina_recover_steps", "see_r", "fov_deg", "head_down", "smell_r", "drain",
+                "reserve_days", "refill_e", "refill_frac", "weak_e", "weak_speed", "diet", "eat_rate", "e_per_unit",
+                "has_hp", "hp_regen_per_day", "shelter_enter", "bites", "bite_r", "counter", "maturity_steps", "sex",
+                "female_frac", "child_female_frac", "max_founder_age_steps", "first_birth", "mate_r", "birth_r",
+                "birth_grace_steps", "pair_block", "birth_block", "pending_needs_parent", "child_ring", "food_density_ref",
+                "food_here_ref")
+COMMON_KEYS = ("gait_drain", "stamina_lock", "stamina_unlock", "wound_speed", "eat_min", "walk_eat_mult", "graze", "bite",
+               "counter", "bite_damage", "carcass", "shelter_push", "breed")
+REQUIRED = {
+    "world": ("mode", "size", "decision_steps", "quadrants", "slots", "carcass_slots", "shelters", "wall_band"),
+    "placement": ("wolf_gap", "prey_from_wolf", "shelter_margin", "tries", "pack_r"),
+    "counts": ("deer", "wolf", "boar"),
+    "learner_counts": ("deer", "wolf", "boar"),
+    "randomize": ("grass_regen_mult", "root_regen_mult", "juvenile_frac", "fat_init", "start_energy", "rule_deer_facing"),
+    "respawn": ("newborn_frac", "far_r", "candidates"),
+    "food": ("cell", "grass", "root", "quadrant_grass_total"),
+    "body_common": COMMON_KEYS,
+    "species": SPECIES,
+    "reward": ("alive", "energy", "birth", "death", "fallback_f"),
+    "rules": ("deer", "boar", "wolf", "hide"),
+    "train": ("seeds", "reset_steps", "worlds", "n_steps", "opponents", "opponent_stochastic", "ppo"),
+}
+JUDGE_KEYS = ("steps", "steps_long", "worlds", "worlds_long", "start_per_quadrant", "wolf_packs", "grass_regen_mult",
+              "root_regen_mult", "wolf_run_mult", "greedy", "founders", "start", "limits", "plant_budget")
+
+
+def _deep_merge(a: dict, b: dict) -> dict:
+    out = copy.deepcopy(a)
+    for k, v in b.items():
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = copy.deepcopy(v)
+    return out
+
+
+def check_r9_config(cfg: dict) -> dict:
+    """Required keys and a few range checks. No defaults — every value is written in the YAML (R8 rule)."""
+    for sec, keys in REQUIRED.items():
+        if sec not in cfg or not isinstance(cfg[sec], dict):
+            raise ValueError(f"R9 config has no '{sec}' block")
+        miss = [k for k in keys if k not in cfg[sec]]
+        if miss:
+            raise ValueError(f"R9 config '{sec}' misses keys {miss}")
+    for sp in SPECIES:
+        miss = [k for k in SPECIES_KEYS if k not in cfg["species"][sp]]
+        if miss:
+            raise ValueError(f"R9 config species.{sp} misses keys {miss}")
+    w = cfg["world"]
+    if w["mode"] not in ("train", "judge"):
+        raise ValueError(f"world.mode must be train|judge: {w['mode']!r}")
+    if int(w["decision_steps"]) != DECISION_STEPS:
+        raise ValueError(f"world.decision_steps is part of the I/O contract and must be {DECISION_STEPS}")
+    if int(w["quadrants"]) not in (1, 4):
+        raise ValueError(f"world.quadrants must be 1 or 4: {w['quadrants']}")
+    for sp in SPECIES:
+        cap = int(w["slots"][sp])
+        lo, hi = (int(x) for x in cfg["counts"][sp])
+        if not (0 <= lo <= hi <= cap):
+            raise ValueError(f"counts.{sp} {cfg['counts'][sp]} must satisfy 0 ≤ lo ≤ hi ≤ world.slots.{sp} = {cap}")
+        if max(int(x) for x in cfg["learner_counts"][sp]) > cap:
+            raise ValueError(f"learner_counts.{sp} exceeds world.slots.{sp} = {cap}")
+        s = cfg["species"][sp]
+        for d in s["diet"]:
+            if d not in FOODS:
+                raise ValueError(f"species.{sp}.diet has unknown food {d!r}")
+            if d not in s["eat_rate"] or d not in s["e_per_unit"]:
+                raise ValueError(f"species.{sp}: diet {d!r} needs eat_rate and e_per_unit")
+        for p in s["bites"]:
+            if p not in SPECIES or p == sp:
+                raise ValueError(f"species.{sp}.bites must name other species: {s['bites']}")
+        if s["founder"] not in ("plain", "natural") or s["growth"] not in ("smooth", "linear"):
+            raise ValueError(f"species.{sp}: founder plain|natural, growth smooth|linear")
+        if s["sex"] not in ("none", "natural", "alternate"):
+            raise ValueError(f"species.{sp}.sex must be none|natural|alternate")
+        if s["child_ring"]["center"] not in ("parent_a", "midpoint"):
+            raise ValueError(f"species.{sp}.child_ring.center must be parent_a|midpoint")
+        action_mask(s["pair_block"])
+        action_mask(s["birth_block"])
+    lo, hi = (int(x) for x in cfg["train"]["seeds"])
+    if not (lo < hi):
+        raise ValueError(f"train.seeds [lo, hi) is empty: {cfg['train']['seeds']}")
+    if w["mode"] == "judge":
+        if "judge" not in cfg or not isinstance(cfg["judge"], dict):
+            raise ValueError("judge mode needs a 'judge' block")
+        miss = [k for k in JUDGE_KEYS if k not in cfg["judge"]]
+        if miss:
+            raise ValueError(f"R9 config 'judge' misses keys {miss}")
+        if cfg["food"]["quadrant_grass_total"] is None:
+            raise ValueError("judge mode needs food.quadrant_grass_total")
+    return cfg
+
+
+def load_r9_config(path) -> dict:
+    """R9 YAML. A top-level `inherit: file` (same folder) is read first and overridden by this file (R8 `load_r8_config`)."""
+    p = Path(path)
+    raw = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    if "inherit" in raw:
+        base = load_r9_config(p.parent / raw.pop("inherit"))
+        base.pop("_path", None)
+        raw = _deep_merge(base, raw)
+    raw["_path"] = str(p)
+    return check_r9_config(raw)
+
+
+def override(cfg: dict, patch: dict) -> dict:
+    """Checked copy of cfg with patch merged in (variants such as judge L0/L1, calibration candidates)."""
+    out = _deep_merge(cfg, patch)
+    return check_r9_config(out)
+
+
+# --------------------------------------------------------------------------- #
+# body table (3-3)
+# --------------------------------------------------------------------------- #
+
+@dataclass(frozen=True)
+class Body:
+    """Body table expanded to (n_species,) arrays (index = species number). (n_species, n_foods) / (n_species, n_actions) where noted.
+
+    Derived values: size0 = (mass/60)^(1/3); reserve_cap = reserve_days × 900 × drain; stam_drain = (1 − lock)/run_steps per
+    effective RUN step; stam_recover = (unlock − lock)/recover_steps per non-RUN step; fov_cos = cos(fov/2) (computed once here,
+    never inside a step); hp_regen = hp_regen_per_day / 900 per step.
+    """
+    mass_kg: np.ndarray
+    size0: np.ndarray
+    founder_kind: np.ndarray          # FOUNDER_PLAIN | FOUNDER_NATURAL
+    founder_variation: np.ndarray     # natural only (0 for plain)
+    growth_smooth: np.ndarray         # bool
+    walk_speed: np.ndarray
+    run_speed: np.ndarray
+    run_mult_lo: np.ndarray           # per-world run multiplier range (wolf U[0.90, 1.05], others 1)
+    run_mult_hi: np.ndarray
+    accel: np.ndarray                 # max |Δ self velocity| per step
+    stam_run_steps: np.ndarray
+    stam_recover_steps: np.ndarray
+    stam_drain: np.ndarray
+    stam_recover: np.ndarray
+    see_r: np.ndarray
+    fov_deg: np.ndarray
+    fov_cos: np.ndarray
+    head_down: np.ndarray
+    smell_r: np.ndarray
+    drain: np.ndarray                 # walking metabolism E/step (× gait_drain × maintenance)
+    reserve_days: np.ndarray
+    reserve_cap: np.ndarray           # C in reward Δ(E + R × C)
+    refill_e: np.ndarray
+    refill_frac: np.ndarray
+    weak_e: np.ndarray
+    weak_speed: np.ndarray
+    eats: np.ndarray                  # (S, F) bool
+    diet_order: tuple                 # per species tuple of food numbers in priority order
+    eat_rate: np.ndarray              # (S, F) food units per standing step (0 if not eaten)
+    e_per_unit: np.ndarray            # (S, F) E per food unit (0 if not eaten)
+    has_hp: np.ndarray                # bool
+    hp_regen: np.ndarray              # per step
+    shelter_enter: np.ndarray         # bool
+    bites: np.ndarray                 # (S, S) bool [biter, bitten]
+    can_bite: np.ndarray              # bool
+    bite_r: np.ndarray                # × g_size × growth
+    counter: np.ndarray               # bool (frontal counter when bitten)
+    maturity: np.ndarray              # steps
+    sex_mode: np.ndarray              # SEXMODE_*
+    female_frac: np.ndarray
+    child_female_frac: np.ndarray
+    max_founder_age: np.ndarray       # steps
+    first_birth_base: np.ndarray      # steps after founding / respawn
+    first_birth_spread: np.ndarray    # × Unit(S_q ^ uid)
+    mate_r: np.ndarray
+    birth_r: np.ndarray
+    birth_grace: np.ndarray           # steps a due birth may wait for eligibility (boar 150)
+    pair_block: np.ndarray            # (S, A) bool: decision actions that block pairing
+    birth_block: np.ndarray           # (S, A) bool: decision actions that block delivery
+    pending_needs_parent: np.ndarray  # bool: pending checks E·HP eligibility (deer, wolf) or alive·quadrant only (boar)
+    child_center: np.ndarray          # CHILD_AT_*
+    child_r0: np.ndarray
+    child_dr: np.ndarray
+    child_avoid_shelter: np.ndarray   # bool
+    food_density_ref: np.ndarray
+    food_here_ref: np.ndarray
+    common: dict = field(default_factory=dict)   # body_common block as read (floats/ints/lists/dicts)
+
+    @property
+    def plant_eater(self) -> np.ndarray:
+        """Species counted as plant eaters in the judge birth budget (3-7 출생 예산): eats grass."""
+        return self.eats[:, GRASS].copy()
+
+
+def _f(x) -> float:
+    return float(x)
+
+
+def load_body(cfg: dict) -> Body:
+    """Body table from cfg['species'] and cfg['body_common'] (3-3)."""
+    sp_cfg = [cfg["species"][n] for n in SPECIES]
+    cm = cfg["body_common"]
+    lock, unlock = _f(cm["stamina_lock"]), _f(cm["stamina_unlock"])
+    arr = lambda key, conv=_f: np.array([conv(s[key]) for s in sp_cfg], dtype=np.float64)  # noqa: E731
+    barr = lambda key: np.array([bool(s[key]) for s in sp_cfg], dtype=bool)  # noqa: E731
+    mass = arr("mass_kg")
+    drain = arr("drain")
+    run_steps, rec_steps = arr("stamina_run_steps"), arr("stamina_recover_steps")
+    eats = np.zeros((N_SPECIES, N_FOODS), dtype=bool)
+    rate = np.zeros((N_SPECIES, N_FOODS))
+    epu = np.zeros((N_SPECIES, N_FOODS))
+    order = []
+    for i, s in enumerate(sp_cfg):
+        o = []
+        for d in s["diet"]:
+            fi = FOODS.index(d)
+            eats[i, fi] = True
+            rate[i, fi] = _f(s["eat_rate"][d])
+            epu[i, fi] = _f(s["e_per_unit"][d])
+            o.append(fi)
+        order.append(tuple(o))
+    bites = np.zeros((N_SPECIES, N_SPECIES), dtype=bool)
+    for i, s in enumerate(sp_cfg):
+        for p in s["bites"]:
+            bites[i, SPECIES_INDEX[p]] = True
+    fov = arr("fov_deg")
+    ring = [s["child_ring"] for s in sp_cfg]
+    fvar = np.array([0.0 if s["founder"] == "plain" else _f(s["founder_variation"]) for s in sp_cfg])
+    return Body(
+        mass_kg=mass,
+        size0=(mass / 60.0) ** (1.0 / 3.0),
+        founder_kind=np.array([FOUNDER_NATURAL if s["founder"] == "natural" else FOUNDER_PLAIN for s in sp_cfg], dtype=np.int64),
+        founder_variation=fvar,
+        growth_smooth=np.array([s["growth"] == "smooth" for s in sp_cfg], dtype=bool),
+        walk_speed=arr("walk_speed"),
+        run_speed=arr("run_speed"),
+        run_mult_lo=np.array([_f(s["run_mult"][0]) for s in sp_cfg]),
+        run_mult_hi=np.array([_f(s["run_mult"][1]) for s in sp_cfg]),
+        accel=arr("accel"),
+        stam_run_steps=run_steps,
+        stam_recover_steps=rec_steps,
+        stam_drain=(1.0 - lock) / run_steps,
+        stam_recover=(unlock - lock) / rec_steps,
+        see_r=arr("see_r"),
+        fov_deg=fov,
+        fov_cos=np.array([math.cos(math.radians(x / 2.0)) for x in fov]),
+        head_down=arr("head_down"),
+        smell_r=arr("smell_r"),
+        drain=drain,
+        reserve_days=arr("reserve_days"),
+        reserve_cap=arr("reserve_days") * DAY_STEPS * drain,
+        refill_e=arr("refill_e"),
+        refill_frac=arr("refill_frac"),
+        weak_e=arr("weak_e"),
+        weak_speed=arr("weak_speed"),
+        eats=eats,
+        diet_order=tuple(order),
+        eat_rate=rate,
+        e_per_unit=epu,
+        has_hp=barr("has_hp"),
+        hp_regen=arr("hp_regen_per_day") / DAY_STEPS,
+        shelter_enter=barr("shelter_enter"),
+        bites=bites,
+        can_bite=bites.any(1),
+        bite_r=arr("bite_r"),
+        counter=barr("counter"),
+        maturity=arr("maturity_steps"),
+        sex_mode=np.array([{"none": SEXMODE_NONE, "natural": SEXMODE_NATURAL, "alternate": SEXMODE_ALTERNATE}[s["sex"]]
+                           for s in sp_cfg], dtype=np.int64),
+        female_frac=arr("female_frac"),
+        child_female_frac=arr("child_female_frac"),
+        max_founder_age=arr("max_founder_age_steps"),
+        first_birth_base=np.array([_f(s["first_birth"][0]) for s in sp_cfg]),
+        first_birth_spread=np.array([_f(s["first_birth"][1]) for s in sp_cfg]),
+        mate_r=arr("mate_r"),
+        birth_r=arr("birth_r"),
+        birth_grace=arr("birth_grace_steps"),
+        pair_block=np.stack([action_mask(s["pair_block"]) for s in sp_cfg]),
+        birth_block=np.stack([action_mask(s["birth_block"]) for s in sp_cfg]),
+        pending_needs_parent=barr("pending_needs_parent"),
+        child_center=np.array([CHILD_AT_PARENT_A if r["center"] == "parent_a" else CHILD_AT_MIDPOINT for r in ring], dtype=np.int64),
+        child_r0=np.array([_f(r["r0"]) for r in ring]),
+        child_dr=np.array([_f(r["dr"]) for r in ring]),
+        child_avoid_shelter=np.array([bool(r["avoid_shelter"]) for r in ring], dtype=bool),
+        food_density_ref=arr("food_density_ref"),
+        food_here_ref=arr("food_here_ref"),
+        common=copy.deepcopy(cm),
+    )
+
+
+# Per-slot fields `expand_body` gathers (K, S) [or (K, S, F) for the food arrays]. The observation function reads these and
+# kin_id — never the species number (4-4, 4-6, test 2·3).
+SLOT_FIELDS = ("size0", "growth_smooth", "walk_speed", "run_speed", "accel", "stam_drain", "stam_recover", "see_r", "fov_cos",
+               "head_down", "smell_r", "drain", "reserve_cap", "refill_e", "refill_frac", "weak_e", "weak_speed", "has_hp",
+               "hp_regen", "shelter_enter", "can_bite", "bite_r", "counter", "maturity", "mass_kg", "food_density_ref",
+               "food_here_ref", "mate_r", "birth_r")
+SLOT_FOOD_FIELDS = ("eats", "eat_rate", "e_per_unit")
+
+
+def expand_body(body: Body, sp: np.ndarray) -> dict[str, np.ndarray]:
+    """Gather body values for a species-number array sp (any shape, e.g. (K, S)) → {field: array of sp.shape} and
+    {food field: array of sp.shape + (F,)}. Empty slots still carry their block's species (slots never change species)."""
+    sp = np.asarray(sp, dtype=np.int64)
+    out = {f: getattr(body, f)[sp] for f in SLOT_FIELDS}
+    for f in SLOT_FOOD_FIELDS:
+        out[f] = getattr(body, f)[sp]
+    return out
+
+
+# --------------------------------------------------------------------------- #
+# contract hashes (7-10, 14-2)
+# --------------------------------------------------------------------------- #
+
+BODY_CONTRACT = "eco_r9_body"
+IO_CONTRACT = "eco_r9_io"
+CONTRACT_VERSION = 1
+
+
+def _canon(v: Any) -> Any:
+    """Canonical JSON value: numbers → float (YAML 60 and 60.0 hash the same), dicts sorted by json.dumps, tuples → lists."""
+    if isinstance(v, bool) or v is None or isinstance(v, str):
+        return v
+    if isinstance(v, (int, float, np.integer, np.floating)):
+        return float(v)
+    if isinstance(v, dict):
+        return {str(k): _canon(x) for k, x in v.items()}
+    if isinstance(v, (list, tuple)):
+        return [_canon(x) for x in v]
+    raise TypeError(f"cannot hash value {v!r} of type {type(v)}")
+
+
+def _h64(d: dict) -> int:
+    s = json.dumps(d, sort_keys=True, separators=(",", ":"), ensure_ascii=True)
+    return int(hashlib.sha256(s.encode("utf-8")).hexdigest()[:16], 16)
+
+
+def hash_hex(h: int) -> str:
+    return f"0x{int(h):016x}"
+
+
+def body_contract_dict(cfg: dict, sp: int | str) -> dict:
+    """Body contract of one species = its species block + body_common (both worlds read the same values)."""
+    name = SPECIES[sp] if isinstance(sp, (int, np.integer)) else str(sp)
+    if name not in SPECIES:
+        raise ValueError(f"unknown species {sp!r}")
+    return {"contract": BODY_CONTRACT, "version": CONTRACT_VERSION, "species": name,
+            "body": _canon(cfg["species"][name]), "common": _canon(cfg["body_common"])}
+
+
+def body_hash(cfg: dict, sp: int | str) -> int:
+    """uint64 body hash of one species (npz brains carry it; the world rejects a brain whose species hash differs — test 27)."""
+    return _h64(body_contract_dict(cfg, sp))
+
+
+def body_table_hash(cfg: dict) -> int:
+    """uint64 hash of all three species blocks + common (recorded in brain meta: the bodies the brain was trained against)."""
+    return _h64({"contract": BODY_CONTRACT + "_table", "version": CONTRACT_VERSION,
+                 "species": {n: _canon(cfg["species"][n]) for n in SPECIES}, "common": _canon(cfg["body_common"])})
+
+
+def io_contract_dict() -> dict:
+    """I/O contract shared by all three species (4·5절, 7-10): observation names/normalisation, action names, decision phase,
+    net shape and selection rule. No species, no weights."""
+    return {
+        "contract": IO_CONTRACT,
+        "version": CONTRACT_VERSION,
+        "obs_names": list(OBS_NAMES),
+        "obs_norm": _canon(OBS_NORM),
+        "sense": _canon(SENSE),
+        "obs_spec": dict(OBS_SPEC),
+        "obs_clip": [-1.0, 1.0],
+        "obs_dtype": "float32",
+        "n_other": N_OTHER,
+        "n_kin": N_KIN,
+        "slot_order": "perceived, distance ascending, ties lower slot (stable sort over gathered alive slots in slot order)",
+        "actions": list(ACTION_NAMES),
+        "directions": {"rule": "head rotated ccw by j*45deg", "table": _canon(DIR8.tolist())},
+        "decision_steps": DECISION_STEPS,
+        "decision_phase": "global t mod 2 == 0",
+        "net": {"obs_dim": OBS_DIM, "hidden": [64, 64], "activation": "tanh", "n_actions": N_ACTIONS, "head": "logits"},
+        "select": "argmax_lowest_index",
+        "mask": None,
+    }
+
+
+def io_hash() -> int:
+    return _h64(io_contract_dict())

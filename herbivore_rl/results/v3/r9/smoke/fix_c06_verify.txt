@@ -1,0 +1,4 @@
+boar EAT share 0.81 boar starve/1000 0.115 eaten E by food [grass, root, meat] [7.1, 64.9, 12.1]
+rate 0.012 regen 0.002: RULE_DEER EAT share 0.98 (C0-6 band 0.3–0.6); deer starve/1000 0.268; grass stock/capacity at end 0.41; deer counts [41, 30, 56, 59, 47, 28, 63, 51]
+boar EAT share 0.83 boar starve/1000 0.119 eaten E by food [grass, root, meat] [6.0, 65.2, 14.9]
+rate 0.02 regen 0.002: RULE_DEER EAT share 0.96 (C0-6 band 0.3–0.6); deer starve/1000 0.272; grass stock/capacity at end 0.34; deer counts [41, 30, 56, 59, 47, 28, 63, 51]

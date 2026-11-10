@@ -1,0 +1,14 @@
+{
+ "mode": "train",
+ "worlds": 10,
+ "steps": 1000,
+ "alive_mean_first": 62.3,
+ "alive_mean_last": 62.3,
+ "alive_mean_avg": 62.29999999999999,
+ "elapsed_s": 11.684503555297852,
+ "ms_per_world_step": 1.1684503555297852,
+ "peak_wset_mb": 61.41015625,
+ "private_mb": 38.62890625,
+ "end_mean": null,
+ "time": "2026-11-11 03:00:26"
+}

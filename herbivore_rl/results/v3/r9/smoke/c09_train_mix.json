@@ -1,0 +1,88 @@
+{
+ "set": "mix",
+ "wall_s": 372.38428235054016,
+ "min_available_gb": 11.56488037109375,
+ "min_free_commit_gb": 12.122455596923828,
+ "max_r9_python": 5,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "deer_A",
+   "species": "deer",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1024000,
+   "wall_s": 82.56344628334045,
+   "dec_per_s": 12402.5830569844,
+   "log_dec_per_s": [
+    12525,
+    8717
+   ],
+   "num_envs": 1280,
+   "memory": [
+    {
+     "pid": 7140,
+     "peak_mb": 375.87109375,
+     "private_mb": 358.68359375
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "boar_A",
+   "species": "boar",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 282.49621748924255,
+   "dec_per_s": 3653.8259137551313,
+   "log_dec_per_s": [
+    3662,
+    3424
+   ],
+   "num_envs": 768,
+   "memory": [
+    {
+     "pid": 9768,
+     "peak_mb": 439.9140625,
+     "private_mb": 391.25
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "wolf_A_s2",
+   "species": "wolf",
+   "round": 0,
+   "shards": 2,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 365.1432776451111,
+   "dec_per_s": 2826.813646020905,
+   "log_dec_per_s": [
+    2821,
+    3006
+   ],
+   "num_envs": 384,
+   "memory": [
+    {
+     "pid": 26204,
+     "peak_mb": 396.6484375,
+     "private_mb": 369.1171875
+    },
+    {
+     "pid": 29408,
+     "peak_mb": 296.859375,
+     "private_mb": 251.69140625
+    }
+   ],
+   "error": ""
+  }
+ ],
+ "time": "2026-11-11 02:32:50"
+}

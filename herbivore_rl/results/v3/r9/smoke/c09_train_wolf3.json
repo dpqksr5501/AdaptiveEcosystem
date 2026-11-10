@@ -1,0 +1,69 @@
+{
+ "set": "wolf3",
+ "wall_s": 284.2792594432831,
+ "min_available_gb": 11.684383392333984,
+ "min_free_commit_gb": 12.322364807128906,
+ "max_r9_python": 5,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "wolf_A_s3",
+   "species": "wolf",
+   "round": 0,
+   "shards": 3,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 274.6539876461029,
+   "dec_per_s": 3758.1540644878596,
+   "log_dec_per_s": [
+    3754,
+    3883
+   ],
+   "num_envs": 384,
+   "memory": [
+    {
+     "pid": 37424,
+     "peak_mb": 379.5,
+     "private_mb": 364.8046875
+    },
+    {
+     "pid": 23788,
+     "peak_mb": 275.28515625,
+     "private_mb": 240.171875
+    },
+    {
+     "pid": 34420,
+     "peak_mb": 275.66796875,
+     "private_mb": 240.734375
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "deer_A_load",
+   "species": "deer",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3031040,
+   "wall_s": 246.66710829734802,
+   "dec_per_s": 12287.97799966988,
+   "log_dec_per_s": [
+    12993,
+    11968
+   ],
+   "num_envs": 1280,
+   "memory": [
+    {
+     "pid": 17056,
+     "peak_mb": 381.6484375,
+     "private_mb": 363.39453125
+    }
+   ],
+   "error": ""
+  }
+ ],
+ "time": "2026-11-11 02:50:01"
+}
