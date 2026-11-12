@@ -14,6 +14,10 @@
 | 통로 경유점·지면 도착·목적지 섭취 | `Saved/ProjectAudit_20261112/SharedBoundaryApproachPIE.json`, `Saved/Logs/SharedBoundaryApproachPIE.log` |
 | 공통 시계 빌드의 자동화 | `Saved/SharedBoundary/Automation/index.json`, `Saved/Logs/SharedBoundary_Automation.log` |
 | 전용 서버 근접 사냥과 늦은 접속 | `Saved/PlayerHunting_20261105/SharedBoundaryMeleeIsolated/`의 서버 및 두 Client 결과 |
+| 같은 두뇌에서 서식지 단계 비교 | `Saved/ProjectAudit_20261112/HabitatCause_20000_Stage*.json`와 `HabitatCause_20017_Stage*.json`, 대응하는 `Saved/Logs/` 권위 로그 |
+| 통합 맵에서 대체 먹이 구역만 바꾼 비교 | `Saved/ProjectAudit_20261112/HabitatCause_Integration_*.json`, 대응하는 `Saved/Logs/` 권위 로그 |
+| 서식지 스트리밍·먹이 이주 회귀 | `Saved/HabitatCauseFinal/Automation/index.json`, `Saved/Logs/HabitatCauseFinal_Automation.log` |
+| 여우의 지면 통과와 목적지 대체 먹이 섭취 | `Saved/ProjectAudit_20261112/HabitatCause_PassageFoodPIE.json`, 대응하는 `Saved/Logs/` 권위 로그 |
 
 맵별 결과, 모델·시드·배속, 섭취 단위와 미검증 범위는 [개체군 비교와 재현](../Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존)에 있다. 재현용 복사 맵 두 개와 각각의 World Partition 외부 액터는 에셋과 함께 사용한다. 원본 에셋, 저장 슬롯, Git·LFS 데이터는 원시 로그와 용도가 다르다.
 

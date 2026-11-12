@@ -563,11 +563,29 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
         }
         FRegionEcologyState Origin;
         if (!Ecology->GetRegionState(Region.CurrentRegionId, Origin)) { CancelTravel(); continue; }
-        const auto EstimateMeals = [&](FName Area, const FRegionEcologyState& State, double ETA, bool bNewResident)
+        const auto EstimateMeals = [&](FName Area, const FRegionEcologyState& State,
+            const FVector& AccessPoint, double ETA, bool bNewResident)
         {
             const int32 Extra = bNewResident ? 1 : 0;
             const double PlantMeals = Species->UsesPlantFood()
                 ? State.FoodAmount / (Species->FoodPerMeal * FMath::Max(1, State.ProjectedFoodConsumers + Extra)) : 0.;
+            double PatchMeals = 0.;
+            const auto* AreaResidents = FaunaLoad.Find(Area);
+            for (int32 Index = 0; Index < FaunaPatchStock.Num(); ++Index)
+            {
+                const auto& Patch = FaunaHabitatPatches[Index];
+                const float Stock = FaunaPatchStock[Index];
+                if (Patch.RegionId != Area || Patch.Stage > FaunaHabitatStage || FMath::Min(Stock, Patch.EnergyPerMeal) < .2f
+                    || !Patch.Consumers.Contains(Id.SpeciesId)
+                    || (Fauna->BlockedPatch == Index && ETA < Fauna->PatchBlockedUntil)
+                    || FVector::DistSquared(AccessPoint, Patch.Center) > FMath::Square(1.5 * Species->SightRange)
+                    || !HasClearSight(*GetWorld(), AccessPoint, Patch.Center, Species->EyeHeight, 5.f)) continue;
+                int32 Competitors = Extra;
+                if (AreaResidents)
+                    for (const auto& Resident : *AreaResidents)
+                        if (Patch.Consumers.Contains(Resident.Key)) Competitors += Resident.Value;
+                PatchMeals += Stock / (Patch.EnergyPerMeal * FMath::Max(1, Competitors));
+            }
             double AnimalMeals = 0.;
             if (Species->CarrionEnergyPerMeal > 0.f)
                 for (const auto& Pair : FaunaCarcasses)
@@ -586,9 +604,9 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
                             AnimalMeals += 1.;
                     }
             const int32 AnimalConsumers = FMath::Max(1, Load.FindRef(Area) - State.ProjectedFoodConsumers + Extra);
-            return PlantMeals + AnimalMeals / AnimalConsumers;
+            return PlantMeals + PatchMeals + AnimalMeals / AnimalConsumers;
         };
-        const double LocalFood = EstimateMeals(Region.CurrentRegionId, Origin, Now, false);
+        const double LocalFood = EstimateMeals(Region.CurrentRegionId, Origin, Position, Now, false);
         const FPassage* Chosen = nullptr;
         int32 ChosenWaypoint = INDEX_NONE;
         double ChosenTravelSeconds = 0.;
@@ -633,7 +651,7 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
             for (int32 Index = Waypoint + 1; Index < Passage.Approach.Num(); ++Index)
                 Distance += FVector::Dist2D(Passage.Approach[Index - 1], Passage.Approach[Index]);
             const double TravelSeconds = Distance / Species->WalkSpeed;
-            const double Gain = EstimateMeals(Passage.To, Target, Now + TravelSeconds, !bTraveling) - LocalFood;
+            const double Gain = EstimateMeals(Passage.To, Target, Passage.Exit, Now + TravelSeconds, !bTraveling) - LocalFood;
             if (Gain <= 1.) { RejectAt(3, TEXT("InsufficientFoodGain")); continue; }
             const double Score = Gain / (1. + TravelSeconds);
             if (Score > Best || (Score == Best && Chosen && Passage.To.LexicalLess(Chosen->To)))

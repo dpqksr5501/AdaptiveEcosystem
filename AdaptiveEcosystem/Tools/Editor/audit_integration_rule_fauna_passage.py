@@ -22,8 +22,12 @@ if u.EditorAssetLibrary.get_metadata_tag(world, "EcoAuditOwner") != OWNER:
 run = re.search(r"-DeerAuditPassageName=(\w+)", u.SystemLibrary.get_command_line())
 name = run.group(1) if run else "Continuation_PassagePIE"
 waypoint_fixture = "-DeerAuditPassageApproach" in u.SystemLibrary.get_command_line()
+patch_fixture = "-DeerAuditPassagePatch" in u.SystemLibrary.get_command_line()
 out = Path(u.Paths.project_saved_dir()).resolve() / "ProjectAudit_20261112" / (name + ".json")
-state = {"completed": False, "samples": [], "fixture": "Unsaved PIE, same roster, one fox and two rats placed at a measured ground seam"}
+state = {"completed": False, "samples": [], "fixture": (
+    "Unsaved PIE, same roster, one fox and a temporary food patch at a measured ground seam"
+    if patch_fixture else "Unsaved PIE, same roster, one fox and two rats placed at a measured ground seam"
+)}
 
 
 def ground(x, y):
@@ -67,7 +71,17 @@ def setup():
     if len(fox_points) < 2 or len(rat_points) < 2 or origin.get_editor_property("Fauna"):
         raise RuntimeError("Expected the original audit roster")
     fox.set_editor_property("SpawnPoints", fox_points[1:])
-    rat.set_editor_property("SpawnPoints", [rat_start_a, rat_start_b, *rat_points[2:]])
+    if patch_fixture:
+        patch = u.EcoFaunaHabitatPatch()
+        for key, value in dict(Id="PassageAuditInsects", RegionId="Forest", Center=rat_start_a, Stage=2,
+                               Consumers=["Fox", "Crow", "Pig"], Capacity=24., RegrowthPerSecond=.44,
+                               EnergyPerMeal=4.).items():
+            patch.set_editor_property(key, value)
+        spawner.set_editor_property("FaunaHabitatStage", 2)
+        spawner.set_editor_property("FaunaHabitatPatches", [patch])
+        state["patch_center"] = xyz(rat_start_a)
+    else:
+        rat.set_editor_property("SpawnPoints", [rat_start_a, rat_start_b, *rat_points[2:]])
     destination.set_editor_property("Fauna", placements)
     emigrant = u.EcoFaunaPlacement()
     emigrant.set_editor_property("SpeciesId", "Fox")
@@ -140,11 +154,14 @@ def tick(_):
         if "arrival" in state:
             if waypoint_fixture and not state.get("observed_waypoint"):
                 raise RuntimeError("The distant-start fixture did not observe a waypoint advance")
+            meal_reason = "HabitatPatchEaten" if patch_fixture else "CarrionEaten"
             meals = [event for event in row.get("gameplay_reason_history", [])
-                     if event["reason"] == "CarrionEaten" and event["region"] == "Forest"
+                     if event["reason"] == meal_reason and event["region"] == "Forest"
                      and event["time"] >= state["arrival"]["time"]]
             if not meals and now < state["arrival"]["time"] + 90.:
                 return
+            if patch_fixture and not meals:
+                raise RuntimeError("The fox crossed the seam but did not eat from the destination patch")
             state["post_arrival_food_records"] = meals
             u.unregister_slate_post_tick_callback(handle)
             finish()

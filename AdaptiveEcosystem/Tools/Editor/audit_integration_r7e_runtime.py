@@ -1,4 +1,4 @@
-"""Headless long-run measurement on the configured map, with optional transient deer-only setup."""
+"""Headless long-run measurement and transient configuration comparisons on owned maps."""
 import json
 from pathlib import Path
 import re
@@ -88,6 +88,42 @@ def sample_region_seams(world, regions):
                             row["examples"].append(endpoints)
                 samples.append(row)
     return samples
+
+
+def configure_food_comparison(world, spawner, with_patches):
+    if world.get_name() != "LV_JYU_IntegrationR7eFauna":
+        raise RuntimeError("Food comparison requires the owned integration fauna copy")
+    if not spawner.get_editor_property("FaunaSpecies") or spawner.get_editor_property("FaunaHabitatPatches"):
+        raise RuntimeError("Food comparison requires the original mixed roster and no authored patches")
+    forest = next(group for group in spawner.get_editor_property("Groups")
+                  if str(group.get_editor_property("RegionId")) == "Forest")
+    anchor = forest.get_editor_property("HerbivoreSpawnPoints")[0]
+    patches, placements = [], []
+    if with_patches:
+        # Identical map coordinates for all seeds. No animal positions, outcomes or learned scores enter placement.
+        for column, dx in enumerate((-1200., 0., 1200.)):
+            for row, dy in enumerate((-1650., -750., 150.)):
+                ground = u.EcoCreatureAnimationBuilder.project_placement_point(world, anchor + u.Vector(dx, dy, 0.))
+                if isinstance(ground, tuple):
+                    if any(isinstance(value, bool) and not value for value in ground):
+                        continue
+                    ground = next((value for value in ground if isinstance(value, u.Vector)), None)
+                if not isinstance(ground, u.Vector):
+                    continue
+                name = f"AuditForage_{column}_{row}"
+                patch = u.EcoFaunaHabitatPatch()
+                consumers = ["Fox", "Crow", "Pig"] + (["Rat"] if (column + row) % 2 else [])
+                for key, value in dict(Id=name, RegionId="Forest", Center=ground, Stage=2, Consumers=consumers,
+                                       Capacity=24., RegrowthPerSecond=.44, EnergyPerMeal=4.).items():
+                    patch.set_editor_property(key, value)
+                patches.append(patch)
+                placements.append({"id": name, "position_cm": [ground.x, ground.y, ground.z], "consumers": consumers})
+        if not patches:
+            raise RuntimeError("Food comparison found no projected ground")
+    # The stage gates some behaviors, so both conditions must run the same stage.
+    spawner.set_editor_property("FaunaHabitatStage", 2)
+    spawner.set_editor_property("FaunaHabitatPatches", patches)
+    state["food_comparison"] = {"stage": 2, "patches": placements}
 
 
 def record_reasons(world):
@@ -188,6 +224,10 @@ def tick(_):
                 spawner.set_editor_property("EnabledSpecies", u.EcoEnabledSpecies.DEER_ONLY)
                 if spawner.get_editor_property("FaunaSpecies"):
                     raise RuntimeError("Deer-only fixture requires an empty rule-fauna roster")
+            elif mode in ("food_control", "food_patches"):
+                if ready:
+                    raise RuntimeError("Authority initialized before the food comparison setup")
+                configure_food_comparison(world, spawner, mode == "food_patches")
             configured = True
             state["map"] = world.get_path_name()
             state["configuration"] = {}

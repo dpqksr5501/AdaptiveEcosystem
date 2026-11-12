@@ -22,6 +22,7 @@
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/BoxComponent.h"
+#include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "MassSpawnerSubsystem.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityTemplate.h"
@@ -74,7 +75,52 @@ struct FEcoCombatTestAccess
     static bool CanHunt(const AEcoCreatureIntegrationSpawner& S, const FMassEntityManager& Manager,
         FMassEntityHandle Hunter, FMassEntityHandle Prey, double Now)
     { return S.CanHuntFauna(Manager, Hunter, Prey, S.FaunaSpecies[0], Now, true); }
+    static void RefreshHabitatStreaming(AEcoCreatureIntegrationSpawner& S) { S.UpdateHabitatStreaming(); }
+    static bool InitializeHabitat(AEcoCreatureIntegrationSpawner& S) { return S.InitializeFaunaHabitat(); }
+    static TArray<float>& PatchStock(AEcoCreatureIntegrationSpawner& S) { return S.FaunaPatchStock; }
 };
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaHabitatStreaming, "AdaptiveEcosystem.Fauna.Habitat.StreamingSources",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoFaunaHabitatStreaming::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    Spawner->bUseHabitatStreaming = true;
+    Spawner->bEnableHerdJourneys = false;
+    Spawner->FaunaSpecies.AddDefaulted();
+    Spawner->FaunaHabitatStage = 2;
+    auto* Route = W.World->SpawnActor<AEcoHerdMigrationRoute>();
+    Route->FromRegion = TEXT("Source");
+    Route->ToRegion = TEXT("Destination");
+    Route->Points = {FVector(20000., 0., 0.), FVector(30000., 0., 0.)};
+    Route->bAllowRuleFaunaPassage = true;
+    auto& Active = Spawner->FaunaHabitatPatches.AddDefaulted_GetRef();
+    Active.Center = FVector(40000., 0., 0.);
+    auto& Inactive = Spawner->FaunaHabitatPatches.AddDefaulted_GetRef();
+    Inactive.Center = FVector(50000., 0., 0.);
+    Inactive.Stage = 3;
+
+    const auto HasPoint = [&](const FVector& Point)
+    {
+        return Spawner->HabitatStreamingSource->Shapes.ContainsByPredicate(
+            [&](const auto& Shape) { return Shape.Location.Equals(Point); });
+    };
+    FEcoCombatTestAccess::RefreshHabitatStreaming(*Spawner);
+    TestTrue(TEXT("Rule-fauna route keeps both endpoints and intermediate terrain loaded"),
+        HasPoint(Route->Points[0]) && HasPoint(FVector(25000., 0., 0.)) && HasPoint(Route->Points[1]));
+    TestTrue(TEXT("Authored food patch loads collision before its startup validation"), HasPoint(FVector(40000., 0., 0.)));
+    TestFalse(TEXT("Inactive stage does not request patch collision"), HasPoint(Inactive.Center));
+
+    FEcoCombatTestAccess::Ready(*Spawner, {});
+    FEcoCombatTestAccess::RefreshHabitatStreaming(*Spawner);
+    TestFalse(TEXT("Initial patch source is released after validation"), HasPoint(FVector(40000., 0., 0.)));
+    TestTrue(TEXT("Rule-fauna route remains loaded after initialization"), HasPoint(Route->Points[1]));
+    Route->bSharesHabitatReports = false;
+    FEcoCombatTestAccess::RefreshHabitatStreaming(*Spawner);
+    TestFalse(TEXT("A route unavailable to either backend releases its source"), HasPoint(Route->Points[1]));
+    return true;
+}
 
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaSpawnTimestamp, "AdaptiveEcosystem.Fauna.MotionClock.SpawnTimestamp",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
@@ -107,10 +153,16 @@ bool FEcoFaunaSpawnTimestamp::RunTest(const FString&)
     return true;
 }
 
-IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRuleFaunaPassageMovement, "AdaptiveEcosystem.Fauna.Passage.GroundTransfer",
+IMPLEMENT_COMPLEX_AUTOMATION_TEST(FEcoRuleFaunaPassageMovement, "AdaptiveEcosystem.Fauna.Passage.GroundTransfer",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
-bool FEcoRuleFaunaPassageMovement::RunTest(const FString&)
+void FEcoRuleFaunaPassageMovement::GetTests(TArray<FString>& Names, TArray<FString>& Commands) const
 {
+    Names = Commands = {TEXT("RegionalFood"), TEXT("HabitatPatch")};
+}
+
+bool FEcoRuleFaunaPassageMovement::RunTest(const FString& Parameters)
+{
+    const bool bHabitatPatch = Parameters == TEXT("HabitatPatch");
     EcoTest::FScopedTestWorld W;
     auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
     auto* Source = W.World->SpawnActor<AEcologyRegion>();
@@ -145,7 +197,7 @@ bool FEcoRuleFaunaPassageMovement::RunTest(const FString&)
     Region.FoodCapacity = 100.;
     if (!Ecology->RegisterRegionState(Region)) return false;
     Region.RegionId = Destination->RegionId;
-    Region.FoodAmount = Region.FoodCapacity;
+    Region.FoodAmount = bHabitatPatch ? 0. : Region.FoodCapacity;
     if (!Ecology->RegisterRegionState(Region)) return false;
     FEcoServerTimeSnapshot Time;
     Time.ServerTimeSeconds = 1.;
@@ -156,6 +208,36 @@ bool FEcoRuleFaunaPassageMovement::RunTest(const FString&)
     Vitals.Energy = .2f * Vitals.MaxEnergy;
     FEcoCombatTestAccess::SetPassageRegions(*Spawner, *Source, *Destination);
     TArray<FEcoMigrationOutcome> Arrivals;
+    if (bHabitatPatch)
+    {
+        Spawner->FaunaSpecies[0].Diet = EEcoFaunaDiet::Carnivore;
+        Spawner->FaunaHabitatStage = 1;
+        for (const auto* Area : {Source, Destination})
+        {
+            auto& Patch = Spawner->FaunaHabitatPatches.AddDefaulted_GetRef();
+            Patch.Id = Patch.RegionId = Area->RegionId;
+            Patch.Center = Area->GetActorLocation();
+            Patch.Consumers = {TEXT("Rat")};
+            Patch.Capacity = 18.f;
+        }
+        if (!TestTrue(TEXT("Both food patches project to the test ground"),
+            FEcoCombatTestAccess::InitializeHabitat(*Spawner))) return false;
+        const auto IsTraveling = [&]()
+        {
+            return EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity).State == EEcoResidenceState::Traveling;
+        };
+        auto& Stock = FEcoCombatTestAccess::PatchStock(*Spawner);
+        FEcoCombatTestAccess::Passages(*Spawner, EM, Time, Arrivals);
+        TestFalse(TEXT("A stocked local patch prevents a journey to equal food"), IsTraveling());
+        Stock[0] = Stock[1] = 0.f;
+        FEcoCombatTestAccess::Passages(*Spawner, EM, Time, Arrivals);
+        TestFalse(TEXT("Empty patches do not pull an animal across the boundary"), IsTraveling());
+        Stock[1] = 18.f;
+        Spawner->FaunaHabitatPatches[1].Consumers.Reset();
+        FEcoCombatTestAccess::Passages(*Spawner, EM, Time, Arrivals);
+        TestFalse(TEXT("Stock reserved for other species is not a food gain"), IsTraveling());
+        Spawner->FaunaHabitatPatches[1].Consumers.Add(TEXT("Rat"));
+    }
     FEcoCombatTestAccess::Passages(*Spawner, EM, Time, Arrivals);
     TestTrue(TEXT("A hungry agent reserves an actual food destination"),
         EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity).State == EEcoResidenceState::Traveling);
