@@ -22,6 +22,7 @@
 | 공격 준비 첫 이동과 유효 접촉 회귀 | `Saved/PreyWindupFinal/Automation/index.json`, `Saved/Logs/PreyWindupFinal_Automation.log` |
 | 공격 준비 수정 후 저FPS·멀티 근접 회귀 | `Saved/ProjectAudit_20261112/PreyWindupParity_*.json`, `Saved/PlayerHunting_20261105/PreyWindupMelee/`의 세 프로세스 결과 |
 | 공용 사체 영양 예약과 두 시드 30분 비교 | `Saved/ProjectAudit_20261112/EssentialCarcass_*.json`, 대응하는 권위 로그와 `Saved/EssentialCarcass/Automation/index.json` |
+| 신규 종 사냥 설정과 실행 경계 자동화 | `Saved/NewFaunaEssential/Automation/index.json`, `Saved/Logs/NewFaunaEssential_Automation.log` |
 
 맵별 결과, 모델·시드·배속, 섭취 단위와 미검증 범위는 [개체군 비교와 재현](../Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존)에 있다. 재현용 복사 맵 두 개와 각각의 World Partition 외부 액터는 에셋과 함께 사용한다. 원본 에셋, 저장 슬롯, Git·LFS 데이터는 원시 로그와 용도가 다르다.
 

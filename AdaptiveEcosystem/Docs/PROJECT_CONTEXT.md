@@ -1,8 +1,8 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
-**다종 생태계 작업 진입점.** [팀 인수인계](Team/FAUNA_TEAM_HANDOFF.md)에서 로컬 재현, 역할별 다음 작업, 완료 기준과 최신 검증을 확인한다.
+**새 채팅에서 작업을 재개할 때.** 이 문서와 저장소 루트 `AGENTS.md`를 읽은 뒤, [다종 생태계 재개 안내](Team/FAUNA_TEAM_HANDOFF.md#새-채팅에서-재개)를 연다. 현재 다음 작업은 새로 확보한 **동물 에셋의 리깅·애니메이션·생태계 연결**이다. 복사할 요청, 실제 작업 브랜치 기준, 종별 담당 경계와 기존 검증을 한곳에서 확인할 수 있다.
 
-**2026-11-12 현재 통합 레벨 검증.** 기본 `Integration_JwJ`는 Legacy 실행이며 Native v3와 자연 출생이 꺼져 있다. 로컬 소유 복사본 두 개에서 R7e와 자연 출생을 함께 켜고 4배속으로 두 시드의 게임 시간 60분을 검증했다. 사슴은 모든 복사본에서 유지됐다. 여덟 종을 넣은 복사본에서는 사슴이 두 시드 모두 28마리 남았고, 늑대·여우·표범은 모두 기아로 사라졌다. 원본 레벨에는 설정을 적용하지 않았다. [결과·재현 조건](Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존) · [로컬 증거와 복원](Team/LOCAL_TEST_EVIDENCE.md)
+**2026-11-12 다종 작업 기준.** 기본 `/Game/JWJ/Integration_JwJ`는 Legacy 실행이며 Native v3와 자연 출생이 꺼져 있다. 로컬 소유 복사본 `/Game/JYU/Maps/LV_JYU_IntegrationR7eFauna`에서는 사슴 R7e, 늑대 Native 규칙, 여섯 종의 규칙 실행기가 함께 작동한다. 기존 시작 배치의 최신 4배속 30분 비교에서 사슴은 시드별로 25·34마리 남았고 늑대·여우·표범은 모두 기아로 사라졌다. 지상 통로·섭취, 고정 30·60 FPS 비교와 전용 서버 근접 사냥은 각각 문서에 적힌 별도 조건에서 확인했다. [최신 30분 결과](Architecture/FAUNA_POPULATION_BALANCE.md#다종-공용-사체의-영양-예약) · [검증별 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과)
 
 **2026-11-05 체형 설계와 확인 범위.** [세대·체형 설계](Architecture/INHERITED_MORPHOLOGY_DESIGN_20261105.md)에 현재 유전·표현의 근거와 질주·은폐·사냥 체형 제안을 구분한다. 새 축의 런타임 및 학습 적용은 보류 상태다. 새 작업은 해당 문서의 역할별 인계와 검증 순서를 따른다.
 
@@ -12,11 +12,11 @@
 
 **2026-10-29 후속 작업 트리:** 사용자 실제 플레이 점검 후 [플레이 흐름 수정과 life rules v2](조연우/JYU_PLAYFLOW_FIX_20261029.md)를 추가했다. 단독 무리 이주·접촉/경계·로컬 섭식·식생 표시/용량 확장·낮밤 표현과 owned Highland 통로를 보완한다. `bEnableEcosystemLife` 세계에 한정하며 기존 모델/관측·SocialControl=0·Native 단일 writer를 유지한다. 아래 life-v1은 최초 구현 이력이고, 현재 검증은 새 기록/evidence를 우선한다. main/push 완료를 뜻하지 않으며 전체 Python 세계 mirror/재학습·영구 생태 평형은 미완료다.
 
-갱신일 **2026-10-24**. 팀원과 각 AI agent가 대화 기록 없이 프로젝트의 목표·제품 방향·구현 경계를 이해하기 위한 공통 진입 문서다. 개인 담당 인수인계보다 먼저 읽고 작업 분야의 Source/계약으로 이어간다. 종 이름과 예시는 교체 가능한 표현이며 현재 구현을 과장하는 근거가 아니다.
+공통 설명은 2026-10-24에 작성했고, 상단의 작업 재개 안내를 2026-11-12에 갱신했다. 팀원과 AI agent는 이 문서에서 프로젝트 목표와 계층별 책임을 확인한 뒤 현재 Source와 담당별 계약을 대조한다.
 
-사용자의 후속 전체 구현은 원래 저장소에서 진행해 **`d095948`**로 기록했다. 최신 시작점은 [팀 AI 공통 안내](Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [전체 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행/팀 API 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)이다. owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 식생·경험/흔적·출생/유전/성장·사체 영양·저장/운영 복구를 opt-in한다. 아래의 soil 최초 구축·미연결 설명은 당시 이력이다. 기존 맵/기본 SocialControl=0·단일 Native writer·모델 차원을 보존하며 재학습/임의 종 지원 완료로 확대하지 않는다.
+`d095948` 당시 life-v1 최초 적용 맵은 소유 `/Game/JYU/Maps/LV_JYU_Ecosystem`이었다. 당시의 식생·흔적·출생·유전·사체·저장 계약과 역할별 배경은 [팀 AI 공통 안내](Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [당시 구현 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)에 있다. 현재 다종 맵과 정책 상태는 위 재개 안내를 따른다.
 
-대화 없이 이어갈 때는 [life-v1 최신 인수인계](Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)의 §1–27 대응·직전 실패 수정·실행 도구·후속 경계도 읽는다.
+life-v1 기반을 수정할 때는 [2026-10-23 life-v1 인수인계](Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)에서 초기 실행 도구와 당시 문제를 확인한다.
 
 서버·네트워킹 담당은 [역할별 서버 안내](Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), 학습 담당은 [역할별 RL 안내](RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md)와 [실제 부분 예제](RL_Policy/Examples/README.md)를 따른다. [시작 프롬프트](Team/ECOSYSTEM_AGENT_START_PROMPTS_20261024.md)에는 작업 요청·검증·인계 양식이 있다. 2026-10-24는 Source/문서/샘플·링크 감사를 수행한 날이며 이전225개 자동화·PIE/멀티/패키지를 새로 실행한 날로 기록하지 않는다.
 
