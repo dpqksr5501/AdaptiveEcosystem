@@ -7,6 +7,10 @@
 // 맵 전체 땅 모드 (2026-11-13, CORE_API.md): Config.Whole 이 있으면 장면 파일(scene.txt)은 몸 표·상수만 쓰고(LoadParams), 언리얼이 훑은 땅 지도 위에
 // 코어 큰 세계 장면 생성기(EcoR9Scene.h BuildBigScene)로 무리 자리·은신처·먹이·시작 개체를 만든다. 생성기가 없는 코어면 WholeAvailable() 거짓 →
 // Init 이 까닭과 함께 실패하고, 화면 쪽은 예전 한 무대(120 m)로 돈다. 큰 세계는 먹이 격자가 커서 프레임에 격자를 싣지 않는다 — ReadFood 로 창만 읽는다.
+//
+// 동물 세계 (2026-11-13, scratchpad/r9/ue_demo/fauna/UE_FAUNA.md): 장면 파일이 동물 세계 판(파이썬 v3_r9_fauna.yaml 덤프 — 6 종·body_common.fauna)이면
+// 코어가 종 수 6 과 동물 몸 규칙을 켠다 (Params::NumSpecies · Params::FaunaOn). 이 원천은 그 종 수만큼 두뇌를 읽는다 (종 차례 = 파이썬 ALL_SPECIES).
+// 어느 장면을 쓸지(두뇌가 다 있나)는 언리얼 쪽(UEcoR9DemoSubsystem)이 고른다. 세 종 장면은 지금과 같은 길 그대로다.
 
 #pragma once
 
@@ -29,7 +33,7 @@ namespace EcoR9Demo
 		std::vector<double> Anchor;                // 은신처 곁 후보점 (x0, y0, x1, y1, …) — 나무 덩어리·큰 바위 가운데. 비면 코어가 장애물 칸을 씀
 		std::vector<double> Sites;                 // 사람이 놓은 무리 자리 (x0, y0, …). 비면 코어가 고른다
 		std::int32_t Herds = 6;                    // eco.R9Demo.Herds
-		std::int32_t PerHerd[3] = {24, 2, 8};      // 자리마다 사슴·늑대·멧돼지 (eco.R9Demo.PerHerd)
+		std::int32_t PerHerd[kNumSpecies] = {24, 2, 8, 0, 0, 0};   // 자리마다 사슴·늑대·멧돼지 (eco.R9Demo.PerHerd) · 물소·표범·여우 (eco.R9Demo.FaunaPerHerd — 동물 장면만)
 		std::int32_t MaxAnimals = 400;             // 총수 상한
 		double PrefX = -1.0;                       // 첫 무리 자리를 이 점 가까이 (플레이어 시작점, 코어 단위 — 음수 = 코어가 가장 트인 곳)
 		double PrefY = -1.0;
@@ -38,10 +42,10 @@ namespace EcoR9Demo
 	struct FR9LiveConfig
 	{
 		std::string ScenePath;      // 파이썬 장면 파일 (R9DUMP 1 의 @scene, py/dump_scene.py --decisions 0)
-		std::string BrainDir;       // {deer,wolf,boar}.r9brain 이 있는 폴더 (export_brains.py)
+		std::string BrainDir;       // <종>.r9brain 이 있는 폴더 (export_brains.py — 세 종 장면 deer·wolf·boar, 동물 장면은 + buffalo·leopard·fox)
 		// 언리얼 쪽이 미리 읽어 넘기면 이것을 쓴다 (한글 경로도 되게). 비면 위 경로를 std::ifstream 으로 읽는다
 		std::string SceneText;
-		std::vector<std::uint8_t> BrainBytes[3];   // 사슴·늑대·멧돼지 차례
+		std::vector<std::uint8_t> BrainBytes[kNumSpecies];   // 종 차례 (사슴·늑대·멧돼지·물소·표범·여우). 장면 종 수 뒤 칸은 읽지 않는다
 		std::uint64_t Seed = 1;     // 코어 난수 (물기 순서·다시 남·확률 뽑기)
 		bool bSample = true;        // 참 = 확률대로 뽑기 (학습 때와 같음), 거짓 = 가장 높은 칸
 		std::shared_ptr<const FR9WholeSpec> Whole;   // 있으면 맵 전체 땅 모드 (큰 세계 장면 생성기)

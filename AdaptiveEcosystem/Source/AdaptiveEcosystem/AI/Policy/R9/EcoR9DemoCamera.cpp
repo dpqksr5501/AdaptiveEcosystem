@@ -46,6 +46,10 @@ TConstArrayView<EcoR9DemoCam::FKeyBind> EcoR9DemoCam::Keys()
 		{EKeys::Hyphen, EAction::ZoomOut},	 {EKeys::Subtract, EAction::ZoomOut},	  {EKeys::MouseScrollDown, EAction::ZoomOut},
 		{EKeys::Equals, EAction::ZoomIn},	 {EKeys::Add, EAction::ZoomIn},			  {EKeys::MouseScrollUp, EAction::ZoomIn},
 		{EKeys::H, EAction::Help},
+		// 동물 세계 (11-13 05:00): 8 물소 · 9 표범 · J 여우 — 팀 입력 매핑·BP·C++ 키 읽기에 없는 키 (fauna/UE_FAUNA.md)
+		{EKeys::Eight, EAction::Buffalo},	 {EKeys::NumPadEight, EAction::Buffalo},
+		{EKeys::Nine, EAction::Leopard},	 {EKeys::NumPadNine, EAction::Leopard},
+		{EKeys::J, EAction::Fox},
 	};
 	return Table;
 }
@@ -74,15 +78,18 @@ bool EcoR9DemoCam::ModeOf(EAction Action, EEcoR9DemoCam& Out)
 	case EAction::Quarter: Out = EEcoR9DemoCam::Quarter; return true;
 	case EAction::Auto: Out = EEcoR9DemoCam::Auto; return true;
 	case EAction::Boar: Out = EEcoR9DemoCam::Boar; return true;
+	case EAction::Buffalo: Out = EEcoR9DemoCam::Buffalo; return true;
+	case EAction::Leopard: Out = EEcoR9DemoCam::Leopard; return true;
+	case EAction::Fox: Out = EEcoR9DemoCam::Fox; return true;
 	default: return false;
 	}
 }
 
 bool EcoR9DemoCam::ModeFromInt(int32 Value, EEcoR9DemoCam& Out)
 {
-	if (Value < 0 || Value > static_cast<int32>(EEcoR9DemoCam::Boar))
+	if (Value < 0 || Value > static_cast<int32>(EEcoR9DemoCam::Fox) || Value == 7)
 	{
-		return false;
+		return false;   // 7 은 모드가 아니다 (다음 무리 자리)
 	}
 	Out = static_cast<EEcoR9DemoCam>(Value);
 	return true;
@@ -99,20 +106,27 @@ const TCHAR* EcoR9DemoCam::ModeNameKo(EEcoR9DemoCam Mode)
 	case EEcoR9DemoCam::Quarter: return TEXT("쿼터뷰");
 	case EEcoR9DemoCam::Auto: return TEXT("자동 추적");
 	case EEcoR9DemoCam::Boar: return TEXT("멧돼지 시점");
+	case EEcoR9DemoCam::Buffalo: return TEXT("물소 시점");
+	case EEcoR9DemoCam::Leopard: return TEXT("표범 시점");
+	case EEcoR9DemoCam::Fox: return TEXT("여우 시점");
 	default: return TEXT("?");
 	}
 }
 
-TArray<FString> EcoR9DemoCam::KeyHelpLines(bool bSites)
+TArray<FString> EcoR9DemoCam::KeyHelpLines(bool bSites, bool bFauna)
 {
-	// 옛 EcoV3Observe::KeyHelpLines 꼴 (같은 키 같은 글) + R9 의 6 · 7 · G
+	// 옛 EcoV3Observe::KeyHelpLines 꼴 (같은 키 같은 글) + R9 의 6 · 7 · G (+ 동물 세계 8 · 9 · J)
 	TArray<FString> L = {
 		TEXT("1   늑대 시점 (다시 누르면 다음 늑대)"),
 		TEXT("2   사슴 시점 (다시 누르면 다음 사슴)"),
 		TEXT("3   탑뷰          4   쿼터뷰 (45°)"),
-		TEXT("5   자동 추적 (사냥·물기·반격·사체 먹기)"),
+		bFauna ? TEXT("5   자동 추적 (사냥·물기·반격·들이받기·사체 먹기)") : TEXT("5   자동 추적 (사냥·물기·반격·사체 먹기)"),
 		TEXT("6   멧돼지 시점 (다시 누르면 다음 멧돼지)"),
 	};
+	if (bFauna)
+	{
+		L.Add(TEXT("8   물소 · 9   표범 · J   여우 시점"));
+	}
 	if (bSites)
 	{
 		L.Add(TEXT("7  G   다음 무리 자리 (끝에 섬 전체)"));
@@ -213,17 +227,27 @@ namespace EcoR9DemoCameraImpl
 
 	const TCHAR* SpeciesKo(uint8 Sp)
 	{
-		return Sp == EcoR9Demo::kDeer ? TEXT("사슴") : (Sp == EcoR9Demo::kWolf ? TEXT("늑대") : TEXT("멧돼지"));
+		static const TCHAR* const Names[EcoR9Demo::kNumSpecies] = {TEXT("사슴"), TEXT("늑대"), TEXT("멧돼지"), TEXT("물소"), TEXT("표범"), TEXT("여우")};
+		return Sp < EcoR9Demo::kNumSpecies ? Names[Sp] : TEXT("멧돼지");
 	}
 
 	uint8 SpeciesOfMode(EEcoR9DemoCam M)
 	{
-		return M == EEcoR9DemoCam::Deer ? EcoR9Demo::kDeer : (M == EEcoR9DemoCam::Boar ? EcoR9Demo::kBoar : EcoR9Demo::kWolf);
+		switch (M)
+		{
+		case EEcoR9DemoCam::Deer: return EcoR9Demo::kDeer;
+		case EEcoR9DemoCam::Boar: return EcoR9Demo::kBoar;
+		case EEcoR9DemoCam::Buffalo: return EcoR9Demo::kBuffalo;
+		case EEcoR9DemoCam::Leopard: return EcoR9Demo::kLeopard;
+		case EEcoR9DemoCam::Fox: return EcoR9Demo::kFox;
+		default: return EcoR9Demo::kWolf;
+		}
 	}
 
 	bool IsFollowMode(EEcoR9DemoCam M)
 	{
-		return M == EEcoR9DemoCam::Wolf || M == EEcoR9DemoCam::Deer || M == EEcoR9DemoCam::Boar;
+		return M == EEcoR9DemoCam::Wolf || M == EEcoR9DemoCam::Deer || M == EEcoR9DemoCam::Boar || M == EEcoR9DemoCam::Buffalo || M == EEcoR9DemoCam::Leopard ||
+			   M == EEcoR9DemoCam::Fox;
 	}
 
 	/** 화면 속도 글 (정수면 '12', 아니면 '14.4' — 옛 SpeedText). */
@@ -251,7 +275,7 @@ namespace EcoR9DemoCameraImpl
 		else if (IsRun(A.Action))
 		{
 			T = TEXT("뛰기");
-			OutColor = A.Species == kWolf ? FColor(255, 95, 95) : FColor(255, 130, 40);
+			OutColor = IsBiter(A.Species) ? FColor(255, 95, 95) : FColor(255, 130, 40);
 		}
 		else if (IsWalk(A.Action))
 		{
@@ -277,7 +301,7 @@ namespace EcoR9DemoCameraImpl
 		{
 			T += FString::Printf(TEXT(" · 에너지 %.0f%%"), 100.0f * A.Energy);
 		}
-		if (A.Species != kDeer && A.Hp >= 0.0f && A.Hp < 0.999f)
+		if (A.Hp >= 0.0f && A.Hp < 0.999f)   // S′ 사슴은 늘 1 (체력 없음) — 동물 세계는 사슴도 체력
 		{
 			T += FString::Printf(TEXT(" · 체력 %.0f%%"), 100.0f * A.Hp);
 		}
@@ -301,6 +325,7 @@ namespace EcoR9DemoCameraImpl
 	/**
 	 * 볼 만한 것 모으기 (11-13 자동 카메라 그대로) [어림 — 점수는 화면 고르기용]: 최근 4 초 사건(죽임 6 · 반격 5 · 상처 4.5), 사체를 먹는 늑대 2.6,
 	 * 먹잇감 쪽 12 단위(24 m) 안에서 뛰는 늑대 3~4, 먹잇감 5 단위 안 늑대 2.6, 늑대 12 단위 안 은신처 속 사슴 2.2.
+	 * 동물 세계 (11-13 05:00): 물소 들이받기 5.5 · 받아 죽임 6, 무는 종(표범·여우)도 늑대와 같은 점수 (S′ 판에는 늑대만 있어 지금과 같다).
 	 */
 	void GatherInterests(const FEcoR9DemoState& S, double Now, TArray<FInterest>& Out)
 	{
@@ -330,14 +355,36 @@ namespace EcoR9DemoCameraImpl
 				I.Score = 4.5;
 				I.What = TEXT("물기");
 				break;
+			case ER9Event::GoreKill:
+				I.Score = 6.0;
+				I.What = TEXT("물소가 들이받아 죽임");
+				break;
+			case ER9Event::Gore:
+				I.Score = 5.5;
+				I.What = TEXT("물소 들이받기");
+				break;
 			default:
 				continue;
+			}
+			if (S.Info.NumSpecies > kNumOldSpecies && (R.Kind == ER9Event::BiteKill || R.Kind == ER9Event::BiteWound))
+			{
+				if (const FR9Agent* Who = S.FindCur(I.A))
+				{
+					I.What = FString::Printf(TEXT("%s %s"), SpeciesKo(Who->Species), *I.What);   // 동물 세계: 늑대·표범·여우 가운데 누가 물었나
+				}
+			}
+			else if (S.Info.NumSpecies > kNumOldSpecies && R.Kind == ER9Event::Counter)
+			{
+				if (const FR9Agent* Who = S.FindCur(I.B))
+				{
+					I.What = FString::Printf(TEXT("%s 반격"), SpeciesKo(Who->Species));   // 동물 세계: 멧돼지·물소 가운데 누가 받아쳤나 (B = 받아친 개체)
+				}
 			}
 			Out.Add(I);
 		}
 		for (const FR9Agent& W : F.Agents)
 		{
-			if (!W.Alive() || W.Species != kWolf)
+			if (!W.Alive() || !IsBiter(W.Species))
 			{
 				continue;
 			}
@@ -345,7 +392,7 @@ namespace EcoR9DemoCameraImpl
 			double Best = TNumericLimits<double>::Max();
 			for (const FR9Agent& O : F.Agents)
 			{
-				if (O.Alive() && O.Species != kWolf)
+				if (O.Alive() && O.Species != W.Species)
 				{
 					const double D = UnitDist(W, O);
 					if (D < Best)
@@ -387,13 +434,13 @@ namespace EcoR9DemoCameraImpl
 			}
 			for (const FR9Agent& W : F.Agents)
 			{
-				if (W.Alive() && W.Species == kWolf && UnitDist(D, W) < 12.0)
+				if (W.Alive() && IsBiter(W.Species) && UnitDist(D, W) < 12.0)
 				{
 					FInterest I;
 					I.A = D.Id;
 					I.B = W.Id;
 					I.Score = 2.2;
-					I.What = TEXT("은신처 안 사슴 · 늑대 곁");
+					I.What = FString::Printf(TEXT("은신처 안 사슴 · %s 곁"), SpeciesKo(W.Species));
 					Out.Add(I);
 					break;
 				}
@@ -826,6 +873,18 @@ void UEcoR9DemoSubsystem::SetCamMode(EEcoR9DemoCam NewMode, const TCHAR* Why)
 		EnterFreeCam(Why);
 		return;
 	}
+	if (IsFollowMode(NewMode) && static_cast<int32>(SpeciesOfMode(NewMode)) >= S.Info.NumSpecies)
+	{
+		// 이 판에 없는 종의 시점 (세 종 판에서 8 · 9 · J · eco.R9Demo.Cam 8~10): 대상 없는 카메라로 바꾸지 않는다 (검토 11-13 06:10 — 발표 중 실수로 눌러도 화면이 비지 않게).
+		// 시작 모드가 그 종이면 (eco.R9Demo.Cam 8 인데 세 종 판) 자동 추적으로 시작한다
+		UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 카메라: 이 판(종 %d)에는 %s 가 없다 — %s"), S.Info.NumSpecies, SpeciesKo(SpeciesOfMode(NewMode)),
+			   S.CamMode == NewMode ? TEXT("자동 추적으로 시작") : TEXT("카메라 그대로"));
+		if (S.CamMode != NewMode)
+		{
+			return;
+		}
+		NewMode = EEcoR9DemoCam::Auto;
+	}
 	const double Now = GetWorld()->GetTimeSeconds();
 	const EEcoR9DemoCam Prev = S.CamMode;
 	const bool bFromFree = Prev == EEcoR9DemoCam::Free;
@@ -850,6 +909,9 @@ void UEcoR9DemoSubsystem::SetCamMode(EEcoR9DemoCam NewMode, const TCHAR* Why)
 	case EEcoR9DemoCam::Wolf:
 	case EEcoR9DemoCam::Deer:
 	case EEcoR9DemoCam::Boar:
+	case EEcoR9DemoCam::Buffalo:
+	case EEcoR9DemoCam::Leopard:
+	case EEcoR9DemoCam::Fox:
 	{
 		const uint8 Sp = SpeciesOfMode(NewMode);
 		if (bCur && bCurAlive && CurSp == Sp)
@@ -868,7 +930,7 @@ void UEcoR9DemoSubsystem::SetCamMode(EEcoR9DemoCam NewMode, const TCHAR* Why)
 			{
 				// 지금 보던 개체가 있으면 그 곁에서 가장 가까운 것 (검토 11-13 04:20 — 사슴을 보다 1 을 누르면 그 사슴 곁 늑대: 사용자가 '늑대 곁 사슴이 안 도망감'을
 				// 살필 때 그 둘을 오가게. 옛 카메라는 여기서도 사냥 중인 늑대를 먼저 골랐다). 보던 개체가 없으면 보는 자리의 무리 자리에서 늑대는 뛰는 것을 먼저 (옛 그대로)
-				NewA = bCur ? NearestOfSpecies(Sp, CurAt, false) : NearestOfSpecies(Sp, CamReferencePoint(), Sp == kWolf);
+				NewA = bCur ? NearestOfSpecies(Sp, CurAt, false) : NearestOfSpecies(Sp, CamReferencePoint(), IsBiter(Sp));
 				Pick = bCur ? TEXT("보던 개체 곁") : TEXT("보는 자리 곁");
 			}
 		}
@@ -1090,9 +1152,12 @@ void UEcoR9DemoSubsystem::CycleCamSite()
 	case EEcoR9DemoCam::Wolf:
 	case EEcoR9DemoCam::Deer:
 	case EEcoR9DemoCam::Boar:
+	case EEcoR9DemoCam::Buffalo:
+	case EEcoR9DemoCam::Leopard:
+	case EEcoR9DemoCam::Fox:
 	{
 		const uint8 Sp = SpeciesOfMode(S.CamMode);
-		S.FollowA = NearestOfSpecies(Sp, C, Sp == kWolf);   // 그 자리에서 가장 가까운 그 종 (옛 SetRegion)
+		S.FollowA = NearestOfSpecies(Sp, C, IsBiter(Sp));   // 그 자리에서 가장 가까운 그 종 (옛 SetRegion)
 		S.FollowB = 0;
 		S.FollowSpecies = Sp;
 		break;
@@ -1281,7 +1346,7 @@ void UEcoR9DemoSubsystem::MaintainCamSubject(double Now)
 		// 따라갈 개체가 없었다 (그 종이 모두 죽음 · 판 다시 시작) — 0.5 초마다 다시 찾는다
 		S.NextSubjectSearch = Now + 0.5;
 		const uint8 Sp = SpeciesOfMode(M);
-		S.FollowA = NearestOfSpecies(Sp, CamReferencePoint(), Sp == EcoR9Demo::kWolf);
+		S.FollowA = NearestOfSpecies(Sp, CamReferencePoint(), EcoR9Demo::IsBiter(Sp));
 		S.FollowSpecies = Sp;
 	}
 }
@@ -1401,6 +1466,9 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 			TDist = EcoR9DemoCam::kDeerDistCm * Zoom;
 			break;
 		case EEcoR9DemoCam::Boar:
+		case EEcoR9DemoCam::Buffalo:   // 동물 세계 셋은 멧돼지 값 (사슴과 같은 11 m · −18°)
+		case EEcoR9DemoCam::Leopard:
+		case EEcoR9DemoCam::Fox:
 			TYaw = Heading;
 			TPitch = EcoR9DemoCam::kBoarPitch;
 			TDist = EcoR9DemoCam::kBoarDistCm * Zoom;
@@ -1526,7 +1594,8 @@ void UEcoR9DemoSubsystem::BuildCamLines()
 							Mul > 1.05 ? *FString::Printf(TEXT(" · 높이 ×%.1f"), Mul) : TEXT("")),
 			White);
 		Add(FString::Printf(TEXT("자리   땅에서 %.0f m%s"), HeightM, N > 0 ? *FString::Printf(TEXT(" · 무리 자리 %d 곁"), NearestSite(S.CamFocus) + 1) : TEXT("")), White);
-		Add(TEXT("1~6   여기서 다시 관찰 (화면 가운데 대상)"), FColor(200, 200, 200));
+		Add(S.Info.NumSpecies > kNumOldSpecies ? TEXT("1~6 · 8 · 9 · J   여기서 다시 관찰 (화면 가운데 대상)") : TEXT("1~6   여기서 다시 관찰 (화면 가운데 대상)"),
+			FColor(200, 200, 200));
 		S.CamLabel = FString::Printf(TEXT("자유 카메라 (%.0f, %.0f, %.0f) m"), S.FreeLoc.X / 100.0, S.FreeLoc.Y / 100.0, S.FreeLoc.Z / 100.0);
 		return;
 	}
@@ -1561,6 +1630,10 @@ void UEcoR9DemoSubsystem::BuildCamLines()
 		}
 		Add(FString::Printf(TEXT("대상   %s"), *Name), White);
 		Add(FString::Printf(TEXT("개체   사슴 %d · 늑대 %d · 멧돼지 %d"), Count[kDeer], Count[kWolf], Count[kBoar]), White);
+		if (S.Info.NumSpecies > kNumOldSpecies)
+		{
+			Add(FString::Printf(TEXT("      물소 %d · 표범 %d · 여우 %d"), Count[kBuffalo], Count[kLeopard], Count[kFox]), White);
+		}
 		S.CamLabel = FString::Printf(TEXT("%s · %s"), ModeName, *Name);
 	}
 	else
@@ -1585,13 +1658,17 @@ void UEcoR9DemoSubsystem::BuildCamLines()
 		}
 		Add(FString::Printf(TEXT("행동   %s"), *Act), ActColor);
 		// 가까운 상대: 늑대 → 먹잇감(사슴·멧돼지), 사슴·멧돼지 → 늑대 (옛 '가까운 늑대·사슴' 줄)
+		// 동물 세계: 무는 종(늑대·표범·여우) → 다른 종 아무나, 그 밖(사슴·멧돼지·물소) → 무는 종 아무나
+		const bool bFaunaHud = S.Info.NumSpecies > kNumOldSpecies;
 		if (A)
 		{
 			const FR9Agent* Near = nullptr;
 			double Best = TNumericLimits<double>::Max();
 			for (const FR9Agent& O : S.Cur.Agents)
 			{
-				if (!O.Alive() || O.Id == A->Id || (A->Species == kWolf ? O.Species == kWolf : O.Species != kWolf))
+				const bool bSkip = bFaunaHud ? (IsBiter(A->Species) ? O.Species == A->Species : !IsBiter(O.Species))
+											 : (A->Species == kWolf ? O.Species == kWolf : O.Species != kWolf);
+				if (!O.Alive() || O.Id == A->Id || bSkip)
 				{
 					continue;
 				}
@@ -1602,7 +1679,8 @@ void UEcoR9DemoSubsystem::BuildCamLines()
 					Near = &O;
 				}
 			}
-			const TCHAR* Label = A->Species == kWolf ? TEXT("가까운 먹잇감") : TEXT("가까운 늑대");
+			const TCHAR* Label = bFaunaHud ? (IsBiter(A->Species) ? TEXT("가까운 먹잇감") : TEXT("가까운 포식자"))
+										   : (A->Species == kWolf ? TEXT("가까운 먹잇감") : TEXT("가까운 늑대"));
 			if (Near)
 			{
 				FColor NearColor = White;

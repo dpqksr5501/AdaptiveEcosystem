@@ -73,7 +73,7 @@ namespace EcoR9DemoSubsystemImpl
 	static TAutoConsoleVariable<int32> CVarText(TEXT("eco.R9Demo.Text"), 1, TEXT("R9 데모 오른쪽 위 글 묶음 (0 = 모두 끔). H 키는 그 안의 단축키 목록만 숨기고 보인다 (옛 관찰 카메라와 같음)."));
 	static TAutoConsoleVariable<int32> CVarCam(TEXT("eco.R9Demo.Cam"), 5,
 		TEXT("R9 데모 카메라 (키 숫자와 같다 — 옛 관찰 카메라 꼴, EcoR9DemoCam.h): 0 자유 카메라 · 1 늑대 시점 · 2 사슴 시점 · 3 탑뷰 · 4 쿼터뷰 · ")
-			TEXT("5 자동 추적 (기본 — 사냥·물기·반격·사체 먹기) · 6 멧돼지 시점. 무대가 서는 때·바뀔 때 읽는다."));
+			TEXT("5 자동 추적 (기본 — 사냥·물기·반격·사체 먹기) · 6 멧돼지 시점 · 8 물소 · 9 표범 · 10 여우 (J 키 — 동물 세계). 무대가 서는 때·바뀔 때 읽는다."));
 	static TAutoConsoleVariable<FString> CVarOnlyMap(TEXT("eco.R9Demo.OnlyMap"), TEXT(""),
 		TEXT("R9 데모를 Play 시작 때 저절로 켜는 맵 (빈 값 = 모든 맵). 맵 경로 '/Game/EcoTest/Maps/LV_EcoV3_Island'·오브젝트 경로·짧은 이름, 쉼표로 여럿. ")
 			TEXT("다른 맵은 예전처럼 아무것도 만들지 않는다. 명령줄 -EcoR9Demo= 깃발과 Play 중 직접 친 eco.R9Demo 1 은 거르지 않는다."));
@@ -101,6 +101,12 @@ namespace EcoR9DemoSubsystemImpl
 		TEXT("R9 데모 맵 전체 땅: 무리 자리 수 (1 ~ 8). 땅 위에서 서로 먼 자리 — 맵이 작으면 그보다 적게 선다. 시작할 때 읽는다."));
 	static TAutoConsoleVariable<FString> CVarPerHerd(TEXT("eco.R9Demo.PerHerd"), TEXT("24,2,8"),
 		TEXT("R9 데모 맵 전체 땅: 무리 자리마다 '사슴,늑대,멧돼지' (기본 24,2,8 — 학습 세계 24·4·8 둘레, 늑대는 자리마다 한 쌍). 총수 상한 400. 시작할 때 읽는다."));
+	// 동물 세계 (2026-11-13 05:00 — 물소·표범·여우)
+	static TAutoConsoleVariable<int32> CVarFauna(TEXT("eco.R9Demo.Fauna"), 1,
+		TEXT("R9 데모 동물 세계: 1 (기본) = <두뇌 폴더>/fauna/ 에 buffalo·leopard·fox.r9brain 과 scene.txt(파이썬 동물 세계 장면)가 다 있으면 물소·표범·여우도 함께 푼다 ")
+		TEXT("(없거나 시작에 실패하면 세 종만). 0 = 늘 사슴·늑대·멧돼지만. 시작할 때 읽는다 (명령줄 -EcoR9Fauna=)."));
+	static TAutoConsoleVariable<FString> CVarFaunaPerHerd(TEXT("eco.R9Demo.FaunaPerHerd"), TEXT("4,1,2"),
+		TEXT("R9 데모 동물 세계 맵 전체 땅: 무리 자리마다 '물소,표범,여우' (기본 4,1,2 — 파이썬 동물 세계 세계당 물소 0~6 · 표범 0~2 · 여우 0~4 둘레). 시작할 때 읽는다."));
 	static TAutoConsoleVariable<int32> CVarHideOthers(TEXT("eco.R9Demo.HideOthers"), 1,
 		TEXT("R9 데모: 1 (기본) = 맵에 이미 있는 예전 v3·Fauna 동물 몸(표현 액터)·섬 무대 먼 표식을 데모 동안 숨긴다 (보이는 것만 — 그쪽 시뮬레이션·코드·에셋은 그대로, 끄면 되돌림). 0 = 그대로."));
 	static TAutoConsoleVariable<float> CVarBodyNear(TEXT("eco.R9Demo.BodyNear"), 220.0f,
@@ -124,7 +130,7 @@ namespace EcoR9DemoSubsystemImpl
 	const TCHAR* const kRockWords[] = {TEXT("rock"), TEXT("cliff"), TEXT("boulder"), TEXT("stone")};
 
 	/** '사슴,늑대,멧돼지' → 세 수 (틀리면 거짓). */
-	bool ParseTriple(const FString& Text, int32 Out[3])
+	bool ParseTriple(const FString& Text, int32 Out[3], bool bAllowZero = false)
 	{
 		TArray<FString> F;
 		Text.ParseIntoArray(F, TEXT(","), true);
@@ -141,7 +147,7 @@ namespace EcoR9DemoSubsystemImpl
 			}
 			Out[k] = FMath::Clamp(FCString::Atoi(*F[k]), 0, 128);
 		}
-		return Out[0] + Out[1] + Out[2] > 0;
+		return bAllowZero || Out[0] + Out[1] + Out[2] > 0;
 	}
 
 	bool AnyWordIn(const FString& Lower, TConstArrayView<const TCHAR*> Words)
@@ -232,6 +238,31 @@ namespace EcoR9DemoSubsystemImpl
 	std::string ToUtf8(const FString& S)
 	{
 		return std::string(TCHAR_TO_UTF8(*S));
+	}
+
+	/** 동물 세계 파일 (EcoR9DemoWhole.h PickFaunaFiles 결과를 언리얼 글로). */
+	struct FR9FaunaFiles
+	{
+		FString Dir;
+		FString ScenePath;
+		FString BrainPath[EcoR9Demo::kNumSpecies];
+		FString Line;   // 기록 줄
+	};
+
+	/** 이번 판을 동물 장면으로 시작해 볼까 (파일이 다 있나). 아니면 거짓 + 까닭 (Out.Line). */
+	bool ChooseFaunaFiles(const FEcoR9DemoSettings& Set, FR9FaunaFiles& Out)
+	{
+		const EcoR9Demo::FR9FaunaPick P = EcoR9Demo::PickFaunaFiles(Set.Fauna, Set.bSceneExplicit, ToUtf8(Set.BrainDir),
+																	  [](const std::string& Path) { return FPaths::FileExists(Utf8(Path)); });
+		Out = FR9FaunaFiles();
+		Out.Dir = Utf8(P.Dir);
+		Out.ScenePath = Utf8(P.ScenePath);
+		for (int32 k = 0; k < EcoR9Demo::kNumSpecies; ++k)
+		{
+			Out.BrainPath[k] = Utf8(P.BrainPath[k]);
+		}
+		Out.Line = Utf8(P.Why);
+		return P.bUse;
 	}
 
 	bool ParseXY(const FString& Text, FVector2D& Out)
@@ -490,6 +521,7 @@ FEcoR9DemoSettings FEcoR9DemoSettings::Resolve(const TCHAR* CommandLine)
 	{
 		S.ScenePath = CVarScene.GetValueOnGameThread();
 	}
+	S.bSceneExplicit = !S.ScenePath.IsEmpty();
 	if (S.ScenePath.IsEmpty() && !S.BrainDir.IsEmpty())
 	{
 		S.ScenePath = FPaths::Combine(S.BrainDir, TEXT("scene.txt"));
@@ -550,6 +582,17 @@ FEcoR9DemoSettings FEcoR9DemoSettings::Resolve(const TCHAR* CommandLine)
 			S.PerHerd[k] = Triple[k];
 		}
 	}
+	int32 FaunaTriple[3] = {4, 1, 2};
+	if (ParseTriple(CVarFaunaPerHerd.GetValueOnGameThread(), FaunaTriple, /*bAllowZero*/ true))
+	{
+		for (int32 k = 0; k < 3; ++k)
+		{
+			S.PerHerd[3 + k] = FaunaTriple[k];
+		}
+	}
+	S.Fauna = CVarFauna.GetValueOnGameThread();
+	FParse::Value(Cmd, TEXT("EcoR9Fauna="), S.Fauna);
+	S.Fauna = S.Fauna != 0 ? 1 : 0;
 	S.bHideOthers = CVarHideOthers.GetValueOnGameThread() != 0;
 	return S;
 }
@@ -592,6 +635,11 @@ bool FEcoR9DemoSettings::MapAllowed(const FString& OnlyMap, const FString& World
 FString FEcoR9DemoSettings::DefaultDir()
 {
 	return FPaths::ConvertRelativePathToFull(FPaths::Combine(FPaths::ProjectSavedDir(), TEXT("R9Demo")));
+}
+
+FString FEcoR9DemoSettings::FaunaDir() const
+{
+	return BrainDir.IsEmpty() ? FString() : FPaths::Combine(BrainDir, TEXT("fauna"));
 }
 
 // -----------------------------------------------------------------------------
@@ -914,6 +962,38 @@ FString UEcoR9DemoSubsystem::BoarBodyLine() const
 	return State ? State->BoarLine : FString();
 }
 
+bool UEcoR9DemoSubsystem::IsFaunaScene() const
+{
+	return State && State->Info.NumSpecies > EcoR9Demo::kNumOldSpecies;
+}
+
+int32 UEcoR9DemoSubsystem::NumSceneSpecies() const
+{
+	return State && State->Phase == EEcoR9DemoPhase::Running ? State->Info.NumSpecies : 0;
+}
+
+int32 UEcoR9DemoSubsystem::NumShownOfSpecies(uint8 Species) const
+{
+	int32 N = 0;
+	if (State && Species < EcoR9Demo::kNumSpecies)
+	{
+		for (const TPair<uint32, FEcoR9DemoBody>& P : State->Bodies)
+		{
+			N += P.Value.Species == Species && !P.Value.bDead && (P.Value.Rep.IsValid() || P.Value.Boar.IsValid()) ? 1 : 0;
+		}
+		if (const UInstancedStaticMeshComponent* Ism = State->FarIsm[Species].Get())
+		{
+			N += Ism->GetInstanceCount();
+		}
+	}
+	return N;
+}
+
+FString UEcoR9DemoSubsystem::FaunaChoiceLine() const
+{
+	return State ? State->FaunaLine : FString();
+}
+
 void UEcoR9DemoSubsystem::DescribeTeamEco(UWorld& World)
 {
 	using namespace EcoR9DemoSubsystemImpl;
@@ -1142,6 +1222,7 @@ void UEcoR9DemoSubsystem::OnWorldBeginPlayImpl(UWorld& InWorld)
 			   TEXT("두뇌 %s · 고르기 %s · 시드 %llu"),
 		   ModeName, *Pkg, InWorld.IsPartitionedWorld() ? TEXT("예") : TEXT("아님"), NumLand, S.Info.W, S.Info.H, S.Info.StepSeconds,
 		   static_cast<int32>(S.Info.Shelters.size()), S.Info.G, *Utf8(S.Info.Brains), *Utf8(S.Info.Policy), static_cast<unsigned long long>(S.Info.Seed));
+	// 동물 세계 고르기 줄 (종 수·몸 규칙·까닭) 은 OpenSource 가 판을 열 때마다 찍는다 (맵 전체 땅·다시 시작도 — 검토 11-13 06:10)
 	if (!S.TeamEcoNote.IsEmpty())
 	{
 		UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] %s"), *S.TeamEcoNote);
@@ -1214,34 +1295,90 @@ bool UEcoR9DemoSubsystem::OpenSource(FString& OutError)
 			C.Whole = S.WholeSpec;   // 맵 전체 땅: 장면 파일은 몸 표·상수만, 땅 지도 위에 큰 세계 장면 (다시 시작하면 새 시드로 새 장면, 땅 지도는 그대로)
 		}
 		// 파일은 언리얼이 읽어 바이트로 넘긴다 (한글 경로도 되게). 실행 중 파이썬 없음 — 두뇌 파일은 미리 바꿔 둔 float32 묶음
+		// 동물 세계 (11-13 05:00): eco.R9Demo.Fauna 1 이고 <두뇌 폴더>/fauna/ 에 새 종 두뇌 셋 + scene.txt 가 다 있으면 그 장면 (ChooseFaunaFiles).
+		// 동물 장면이 시작에 실패하면 까닭을 기록 줄에 남기고 세 종 장면으로 한 번 더 (발표 중 깨지지 않게 — 세 종 길은 지금과 같은 파일·같은 순서)
+		FR9FaunaFiles Ff;
+		const bool bTryFauna = ChooseFaunaFiles(S.Settings, Ff);
+		S.FaunaLine = Ff.Line;
 		TArray<uint8> Bytes;
-		if (!FFileHelper::LoadFileToArray(Bytes, *S.Settings.ScenePath))
+		auto LoadInto = [&Bytes](const FString& Path, std::vector<std::uint8_t>& Out) -> bool
 		{
-			OutError = FString::Printf(TEXT("장면 파일을 못 읽음: '%s' (-EcoR9Scene= 또는 <두뇌 폴더>/scene.txt)"), *S.Settings.ScenePath);
-			return false;
-		}
-		C.SceneText.assign(reinterpret_cast<const char*>(Bytes.GetData()), static_cast<std::size_t>(Bytes.Num()));
-		static const TCHAR* const BrainFiles[3] = {TEXT("deer.r9brain"), TEXT("wolf.r9brain"), TEXT("boar.r9brain")};
-		for (int32 k = 0; k < 3; ++k)
-		{
-			const FString BrainPath = FPaths::Combine(S.Settings.BrainDir, BrainFiles[k]);
 			Bytes.Reset();
-			if (!FFileHelper::LoadFileToArray(Bytes, *BrainPath))
+			if (!FFileHelper::LoadFileToArray(Bytes, *Path))
 			{
-				OutError = FString::Printf(TEXT("두뇌 파일을 못 읽음: '%s'"), *BrainPath);
 				return false;
 			}
-			C.BrainBytes[k].assign(Bytes.GetData(), Bytes.GetData() + Bytes.Num());
-		}
-		S.Live = std::make_unique<FR9LiveSource>();
-		std::string E;
-		FR9Frame First;
-		if (!S.Live->Init(C, S.Info, First, E))
+			Out.assign(Bytes.GetData(), Bytes.GetData() + Bytes.Num());
+			return true;
+		};
+		auto TryStart = [&](bool bFauna, FString& OutWhy) -> bool
 		{
-			OutError = FString::Printf(TEXT("코어 시작 실패 (장면 %s, 두뇌 %s): %s"), *S.Settings.ScenePath, *S.Settings.BrainDir, *Utf8(E));
+			FR9LiveConfig Cf = C;
+			const FString ScenePath = bFauna ? Ff.ScenePath : S.Settings.ScenePath;
+			std::vector<std::uint8_t> SceneBytes;
+			if (!LoadInto(ScenePath, SceneBytes))
+			{
+				OutWhy = FString::Printf(TEXT("장면 파일을 못 읽음: '%s' (-EcoR9Scene= 또는 <두뇌 폴더>/scene.txt)"), *ScenePath);
+				return false;
+			}
+			Cf.SceneText.assign(SceneBytes.begin(), SceneBytes.end());
+			const int32 NumSp = bFauna ? kNumSpecies : kNumOldSpecies;
+			for (int32 k = 0; k < NumSp; ++k)
+			{
+				const FString BrainPath =
+					bFauna ? Ff.BrainPath[k] : FPaths::Combine(S.Settings.BrainDir, FString(UTF8_TO_TCHAR(SpeciesKey(static_cast<uint8>(k)))) + TEXT(".r9brain"));
+				if (!LoadInto(BrainPath, Cf.BrainBytes[k]))
+				{
+					OutWhy = FString::Printf(TEXT("두뇌 파일을 못 읽음: '%s'"), *BrainPath);
+					return false;
+				}
+			}
+			if (!bFauna && S.Settings.bSceneExplicit)
+			{
+				// 장면을 직접 준 판: 그 장면이 동물 세계 판(6 종)일 수도 있어 새 종 두뇌도 있으면 실어 둔다 (세 종 장면이면 코어가 읽지 않음)
+				for (int32 k = kNumOldSpecies; k < kNumSpecies; ++k)
+				{
+					const FString Name = FString(UTF8_TO_TCHAR(SpeciesKey(static_cast<uint8>(k)))) + TEXT(".r9brain");
+					if (!LoadInto(FPaths::Combine(Ff.Dir, Name), Cf.BrainBytes[k]))
+					{
+						LoadInto(FPaths::Combine(S.Settings.BrainDir, Name), Cf.BrainBytes[k]);
+					}
+				}
+			}
+			S.Live = std::make_unique<FR9LiveSource>();
+			std::string E;
+			FR9Frame First;
+			if (!S.Live->Init(Cf, S.Info, First, E))
+			{
+				OutWhy = FString::Printf(TEXT("코어 시작 실패 (장면 %s, 두뇌 %s): %s"), *ScenePath, bFauna ? *Ff.Dir : *S.Settings.BrainDir, *Utf8(E));
+				S.Live.reset();
+				return false;
+			}
+			if (bFauna && S.Info.NumSpecies <= kNumOldSpecies)
+			{
+				OutWhy = FString::Printf(TEXT("동물 장면 '%s' 를 코어가 세 종 장면으로 읽음 (6 종 장면 덤프가 아님)"), *ScenePath);
+				S.Live.reset();
+				return false;
+			}
+			S.Cur = MoveTemp(First);
+			return true;
+		};
+		FString Why;
+		bool bStarted = bTryFauna && TryStart(true, Why);
+		if (bTryFauna && !bStarted)
+		{
+			S.FaunaLine = FString::Printf(TEXT("동물 장면 시작 실패 — 세 종으로 돈다: %s"), *Why);
+			UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] %s"), *S.FaunaLine);
+		}
+		if (!bStarted && !TryStart(false, Why))
+		{
+			OutError = Why;
 			return false;
 		}
-		S.Cur = MoveTemp(First);
+		// 동물 세계 고르기 (11-13 05:00): 종 수·몸 규칙·쓴 파일 또는 세 종으로 도는 까닭. 판을 열 때마다 (첫 Play · 맵 전체 땅 · 다시 시작) — Play 로그만 보고
+		// '종 6 · 동물 세계 몸 규칙 켬' 인지 알 수 있게 (검토 11-13 06:10: 맵 전체 땅·다시 시작 길에서는 이 줄이 안 찍혔다)
+		UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 판 %d · 종 %d (%s) | %s"), S.RunIndex, S.Info.NumSpecies, S.Info.bFauna ? TEXT("동물 세계 몸 규칙 켬") : TEXT("S′ 세계 규칙"),
+			   *S.FaunaLine);
 		S.bFoodKnown = S.Info.G > 0 && (S.Info.bWhole || !S.Cur.Grass.empty());
 		S.bEventsKnown = true;
 	}
@@ -1516,6 +1653,10 @@ void UEcoR9DemoSubsystem::RestartRun(const TCHAR* Why)
 	S.Recent.Reset();
 	S.DeerKilled = S.BoarKilled = S.BoarWounded = S.Counters = S.WolvesKilled = S.Starved = S.Respawns = 0;
 	FMemory::Memzero(S.Eats);
+	FMemory::Memzero(S.BittenSp);
+	FMemory::Memzero(S.StruckSp);
+	FMemory::Memzero(S.StarvedSp);
+	S.Gores = S.GoreKills = 0;
 	for (double& D : S.DugUntil)
 	{
 		D = -1.0;
@@ -1526,6 +1667,10 @@ void UEcoR9DemoSubsystem::RestartRun(const TCHAR* Why)
 	{
 		Fail(Err);
 		return;
+	}
+	if (S.Info.NumSpecies > EcoR9Demo::kNumOldSpecies)
+	{
+		LoadFaunaAssets();   // 세 종 판으로 시작했다가 새 두뇌가 생겨 동물 장면으로 바뀐 판 (처음 한 번만 읽음)
 	}
 	S.bAutoFollowing = false;
 	S.FollowA = S.FollowB = 0;
@@ -2375,9 +2520,9 @@ bool UEcoR9DemoSubsystem::ScanWhole()
 		Spec->PrefY = Py;
 	}
 	Spec->Herds = S.Settings.Herds;
-	for (int32 k = 0; k < 3; ++k)
+	for (int32 k = 0; k < EcoR9Demo::kNumSpecies; ++k)
 	{
-		Spec->PerHerd[k] = S.Settings.PerHerd[k];
+		Spec->PerHerd[k] = S.Settings.PerHerd[k];   // 뒤 셋(물소·표범·여우)은 동물 장면에서만 쓰인다 — 세 종 장면은 코어가 보지 않음
 	}
 	Spec->MaxAnimals = 400;
 	S.WholeSpec = Spec;
@@ -2499,7 +2644,7 @@ void UEcoR9DemoSubsystem::BuildStage()
 	S.NextLog = S.RunningSince + 10.0;
 	S.CamModeSince = S.RunningSince;
 	// 처음 카메라 (옛 관찰 카메라 꼴 — EcoR9DemoCam.h): 콘솔 eco.R9Demo.Cam (키 숫자, 기본 5 자동 추적), 명령줄 -EcoR9Cam=<이름> 이 먼저.
-	// 이름: free·wolf·deer·top·quarter·auto·boar (옛 이름 wide = 섬 전체 사선 보기, site = 첫 무리 자리 사선 보기)
+	// 이름: free·wolf·deer·top·quarter·auto·boar · buffalo·leopard·fox (옛 이름 wide = 섬 전체 사선 보기, site = 첫 무리 자리 사선 보기)
 	{
 		const int32 Cv = EcoR9DemoCVars::Cam();
 		EEcoR9DemoCam Start = EEcoR9DemoCam::Auto;
@@ -2515,6 +2660,10 @@ void UEcoR9DemoSubsystem::BuildStage()
 					Start = static_cast<EEcoR9DemoCam>(i);
 				}
 			}
+			// 동물 세계 (11-13 05:00) — 모드 값 8 · 9 · 10
+			Start = CamParam.Equals(TEXT("buffalo"), ESearchCase::IgnoreCase) ? EEcoR9DemoCam::Buffalo : Start;
+			Start = CamParam.Equals(TEXT("leopard"), ESearchCase::IgnoreCase) ? EEcoR9DemoCam::Leopard : Start;
+			Start = CamParam.Equals(TEXT("fox"), ESearchCase::IgnoreCase) ? EEcoR9DemoCam::Fox : Start;
 			if (CamParam.Equals(TEXT("wide"), ESearchCase::IgnoreCase) || CamParam.Equals(TEXT("site"), ESearchCase::IgnoreCase))
 			{
 				Start = EEcoR9DemoCam::Quarter;   // 대상 없는 사선 보기
@@ -2785,12 +2934,16 @@ void UEcoR9DemoSubsystem::LogSummary(const TCHAR* Tag)
 	FEcoR9DemoState& S = *State;
 	int32 Alive[EcoR9Demo::kNumSpecies] = {};
 	EcoR9Demo::CountAlive(S.Cur, Alive);
+	// 동물 장면에서는 옛 셈이 더 넓은 뜻이다 (검토 11-13 06:10): 잡힌 사슴·멧돼지 = 늑대·표범·여우가 잡음, 상처 = 모든 종의 물려 다침,
+	// 죽은 늑대 = 반격·표범·여우의 물기·물소 들이받기. 셈 값은 그대로 두고 이름만 바꾼다 (세 종 판은 글이 예전과 바이트 같음)
+	const bool bFaunaNames = S.Info.NumSpecies > EcoR9Demo::kNumOldSpecies;
 	UE_LOG(LogEcoR9Demo, Log,
-		   TEXT("[EcoR9Demo] %s | %s 판 %d · 시간 %.1f 초 (스텝 %lld) | 산: 사슴 %d · 늑대 %d · 멧돼지 %d | 늑대가 잡음: 사슴 %d · 멧돼지 %d · 멧돼지 상처 %d | 반격 %d · ")
-			   TEXT("반격에 죽은 늑대 %d | 굶어 죽음 %d · 다시 남 %d | 몸 액터 %d | 카메라 %s"),
+		   TEXT("[EcoR9Demo] %s | %s 판 %d · 시간 %.1f 초 (스텝 %lld) | 산: 사슴 %d · 늑대 %d · 멧돼지 %d | %s: 사슴 %d · 멧돼지 %d · %s %d | 반격 %d · ")
+			   TEXT("%s %d | 굶어 죽음 %d · 다시 남 %d | 몸 액터 %d | 카메라 %s"),
 		   Tag, S.Settings.Mode == FEcoR9DemoSettings::EMode::Live ? TEXT("실시간") : TEXT("재생"), S.RunIndex, S.SimSeconds,
-		   static_cast<long long>(S.StepsShown), Alive[0], Alive[1], Alive[2], S.DeerKilled, S.BoarKilled, S.BoarWounded, S.Counters, S.WolvesKilled, S.Starved,
-		   S.Respawns, S.Bodies.Num(), *S.CamLabel);
+		   static_cast<long long>(S.StepsShown), Alive[0], Alive[1], Alive[2], bFaunaNames ? TEXT("물려 죽음(모든 포식자)") : TEXT("늑대가 잡음"), S.DeerKilled,
+		   S.BoarKilled, bFaunaNames ? TEXT("물려 다침(모든 종)") : TEXT("멧돼지 상처"), S.BoarWounded, S.Counters,
+		   bFaunaNames ? TEXT("반격·물기·들이받기에 죽은 늑대") : TEXT("반격에 죽은 늑대"), S.WolvesKilled, S.Starved, S.Respawns, S.Bodies.Num(), *S.CamLabel);
 	// 먹기 (실제로 먹은 개체·스텝 — 풀/땅속/고기). 늑대 고기 = 사체 먹기
 	const auto& E = S.Eats;
 	const int32 Unknown = E[0][0] + E[1][0] + E[2][0];
@@ -2799,6 +2952,19 @@ void UEcoR9DemoSubsystem::LogSummary(const TCHAR* Tag)
 		   TEXT("[EcoR9Demo] %s | 먹기(개체·스텝, 풀/땅속/고기): 사슴 %d/%d/%d · 늑대 %d/%d/%d (사체 먹기 %d) · 멧돼지 %d/%d/%d%s | 사체 지금 %d"), Tag,
 		   E[0][1], E[0][2], E[0][3], E[1][1], E[1][2], E[1][3], E[1][3], E[2][1], E[2][2], E[2][3], *UnknownText,
 		   static_cast<int32>(S.Cur.Carcasses.size()));
+	if (S.Info.NumSpecies > EcoR9Demo::kNumOldSpecies)
+	{
+		// 동물 세계 (물소·표범·여우): 산 · 물려/받혀/굶어 죽음 · 들이받기 · 먹기 (풀/땅속/고기)
+		const auto& B = S.BittenSp;
+		const auto& K = S.StruckSp;
+		const auto& V = S.StarvedSp;
+		UE_LOG(LogEcoR9Demo, Log,
+			   TEXT("[EcoR9Demo] %s | 동물 세계: 산 물소 %d · 표범 %d · 여우 %d | 물려 죽음 사슴 %d · 늑대 %d · 멧돼지 %d · 물소 %d · 표범 %d · 여우 %d | ")
+				   TEXT("받혀·받아침에 죽음 사슴 %d · 늑대 %d · 멧돼지 %d · 물소 %d · 표범 %d · 여우 %d | 굶어 죽음 물소 %d · 표범 %d · 여우 %d | 물소 들이받기 %d (죽임 %d) | ")
+				   TEXT("먹기 물소 %d/%d/%d · 표범 %d/%d/%d · 여우 %d/%d/%d"),
+			   Tag, Alive[3], Alive[4], Alive[5], B[0], B[1], B[2], B[3], B[4], B[5], K[0], K[1], K[2], K[3], K[4], K[5], V[3], V[4], V[5], S.Gores, S.GoreKills,
+			   E[3][1], E[3][2], E[3][3], E[4][1], E[4][2], E[4][3], E[5][1], E[5][2], E[5][3]);
+	}
 	if (S.Settings.Mode == FEcoR9DemoSettings::EMode::Live)
 	{
 		// 결정 계산 비용 (코어 한 스텝 평균 — 결정 스텝은 관측·두뇌 포함). 실시간 필요량 초당 7.5 스텝
@@ -3234,10 +3400,10 @@ void UEcoR9DemoSubsystem::TickCapture(float DeltaTime)
 		const FString Manifest = FString::Printf(
 			TEXT("{\n  \"mode\": \"%s\",\n  \"frames\": %d,\n  \"fps\": %.3f,\n  \"seconds\": %.3f,\n  \"sim_seconds_end\": %.3f,\n  \"steps_shown\": %lld,\n")
 				TEXT("  \"stage_center_cm\": [%.1f, %.1f, %.1f],\n  \"seed\": %llu,\n  \"policy\": \"%s\",\n  \"deer_killed\": %d,\n  \"boar_killed\": %d,\n")
-				TEXT("  \"counters\": %d,\n  \"starved\": %d,\n  \"note\": \"%s\"\n}\n"),
+				TEXT("  \"counters\": %d,\n  \"starved\": %d,\n  \"num_species\": %d,\n  \"note\": \"%s\"\n}\n"),
 			Cfg.Mode == FEcoR9DemoSettings::EMode::Live ? TEXT("live") : TEXT("replay"), S.CaptureFrames, Cfg.CaptureFps, S.CaptureClock, S.SimSeconds,
 			static_cast<long long>(S.StepsShown), S.StageCenter.X, S.StageCenter.Y, S.StageCenter.Z, static_cast<unsigned long long>(S.Info.Seed),
-			*EcoR9DemoSubsystemImpl::Utf8(S.Info.Policy), S.DeerKilled, S.BoarKilled, S.Counters, S.Starved,
+			*EcoR9DemoSubsystemImpl::Utf8(S.Info.Policy), S.DeerKilled, S.BoarKilled, S.Counters, S.Starved, S.Info.NumSpecies,   // 6 = 동물 장면 (deer/boar_killed 는 모든 포식자)
 			Cfg.Mode == FEcoR9DemoSettings::EMode::Live ? TEXT("실시간: 파이썬에서 배운 두뇌를 언리얼 C++ 로 추론") : TEXT("파이썬 실행 기록 재생 (언리얼 실시간 추론 아님)"));
 		FFileHelper::SaveStringToFile(Manifest, *FPaths::Combine(Cfg.CaptureDir, TEXT("capture.json")), FFileHelper::EEncodingOptions::ForceUTF8WithoutBOM);
 		LogSummary(TEXT("녹화 끝"));
@@ -3304,7 +3470,7 @@ void UEcoR9DemoSubsystem::DrawOverlay(UCanvas* Canvas, APlayerController* PC)
 		Lines.Add({S.bShowKeys ? FString(TEXT("R9 관찰 카메라      H  단축키 숨기기")) : FString(TEXT("R9 관찰 카메라      H  단축키 보이기")), Title});
 		if (S.bShowKeys)
 		{
-			for (const FString& L : EcoR9DemoCam::KeyHelpLines(SiteCount > 0))
+			for (const FString& L : EcoR9DemoCam::KeyHelpLines(SiteCount > 0, S.Info.NumSpecies > EcoR9Demo::kNumOldSpecies))
 			{
 				Lines.Add({L, KeyColor});
 			}
@@ -3317,7 +3483,26 @@ void UEcoR9DemoSubsystem::DrawOverlay(UCanvas* Canvas, APlayerController* PC)
 		Lines.Add({FString::Printf(TEXT("산   사슴 %d · 늑대 %d · 멧돼지 %d%s"), Alive[0], Alive[1], Alive[2],
 								   SiteCount > 0 ? *FString::Printf(TEXT(" · 무리 자리 %d"), SiteCount) : TEXT("")),
 				   White});
-		Lines.Add({FString::Printf(TEXT("잡힘   사슴 %d · 멧돼지 %d · 반격 %d · 굶음 %d"), S.DeerKilled, S.BoarKilled, S.Counters, S.Starved), White});
+		if (S.Info.NumSpecies > EcoR9Demo::kNumOldSpecies)
+		{
+			// 동물 세계 (11-13 05:00): 새 종 마릿수 · 종별 잡힘 · 물소 들이받기 (세 종 판은 아래 옛 줄 그대로)
+			const auto& B = S.BittenSp;
+			const auto& K = S.StruckSp;
+			int32 StarvedAll = 0;
+			for (const int32 V : S.StarvedSp)
+			{
+				StarvedAll += V;
+			}
+			Lines.Add({FString::Printf(TEXT("      물소 %d · 표범 %d · 여우 %d"), Alive[3], Alive[4], Alive[5]), White});
+			Lines.Add({FString::Printf(TEXT("잡힘   사슴 %d · 늑대 %d · 멧돼지 %d · 물소 %d · 표범 %d · 여우 %d"), B[0], B[1], B[2], B[3], B[4], B[5]), White});
+			Lines.Add({FString::Printf(TEXT("받기   물소 들이받기 %d (죽임 %d) · 반격 %d · 받혀 죽음 %d · 굶음 %d"), S.Gores, S.GoreKills, S.Counters,
+									   K[0] + K[1] + K[2] + K[3] + K[4] + K[5], StarvedAll),
+					   White});
+		}
+		else
+		{
+			Lines.Add({FString::Printf(TEXT("잡힘   사슴 %d · 멧돼지 %d · 반격 %d · 굶음 %d"), S.DeerKilled, S.BoarKilled, S.Counters, S.Starved), White});
+		}
 		// 카메라 (모드·대상·행동·가까운 상대·자동 추적 — EcoR9DemoCamera.cpp BuildCamLines)
 		for (int32 i = 0; i < S.CamLines.Num(); ++i)
 		{

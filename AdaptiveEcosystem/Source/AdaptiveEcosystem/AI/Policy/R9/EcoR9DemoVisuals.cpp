@@ -10,6 +10,9 @@
 //   큰 세계(맵 전체 땅)는 카메라 둘레 창만 그린다 (인스턴스 재사용 — 바뀐 칸만 다시 씀).
 // 큰 세계 몸: 카메라에서 eco.R9Demo.BodyNear(220 m) 안 가까운 eco.R9Demo.BodyBudget(90) 마리만 몸 액터, 나머지는 작은 공 표식 (섬 무대 먼 표식 꼴,
 //   EcoV3IslandStage.cpp IslandTickMarkers — 크기는 카메라 거리 × 0.012, 최소 1.5 m).
+// 동물 세계 (2026-11-13 05:00): 물소·표범·여우 = 조연우 /Game/JYU/Fauna/{Buffalo,Leopard,Fox}/BP_* (BP_Pig 와 같은 표현 BP — 부모 EcoCreatureRepresentationActor,
+//   메시·애님 BP·크기 VisualMeshScale 은 BP 그대로, 읽기만). 사슴·늑대처럼 표현 상태를 넘기면 애님 BP 가 자세를 고른다. 크기 = 코어 몸 크기 배율 (g_size × 성장).
+//   BP 를 못 읽으면 그 종은 먼 표식(공)만 — 기록 줄에 남긴다.
 
 #include "EcoR9DemoSubsystem.h"
 
@@ -78,6 +81,10 @@ namespace EcoR9DemoVisualsImpl
 	const TCHAR* const kWolfTeam = TEXT("/Game/Creatures/Integrated/BP_EcoWolf.BP_EcoWolf_C");
 	// 멧돼지 몸 찾는 차례 (사용자 11-13: 팀 돼지 = 라이선스 AnimalVarietyPack Pig — 이 PC 에 없을 수 있음)
 	const TCHAR* const kBoarRoots[] = {TEXT("/Game/AnimalVarietyPack/Pig"), TEXT("/Game/JYU/Fauna"), TEXT("/Game")};
+	// 동물 세계 몸 (조연우 표현 BP — 2026-11-08 JYU.Fauna, 메시: 물소·표범 = JYU/Fauna/*/Imported, 여우 = AnimalVarietyPack/Fox)
+	const TCHAR* const kBuffaloJyu = TEXT("/Game/JYU/Fauna/Buffalo/BP_Buffalo.BP_Buffalo_C");
+	const TCHAR* const kLeopardJyu = TEXT("/Game/JYU/Fauna/Leopard/BP_Leopard.BP_Leopard_C");
+	const TCHAR* const kFoxJyu = TEXT("/Game/JYU/Fauna/Fox/BP_Fox.BP_Fox_C");
 
 	UClass* LoadRepClass(const TCHAR* Path)
 	{
@@ -112,6 +119,8 @@ namespace EcoR9DemoVisualsImpl
 	}
 
 	bool IsPrey(uint8 Species) { return Species == kDeer || Species == kBoar; }
+	/** 쫓음 표시용 먹잇감: S′ = 사슴·멧돼지 (지금 그대로), 동물 세계 = 무는 종에게 다른 종 모두 (몸 표 bites — 늑대·표범·여우 모두 다른 다섯 종을 문다). */
+	bool IsPreyOf(uint8 Biter, uint8 Other, bool bFauna) { return bFauna ? Other != Biter : IsPrey(Other); }
 
 	/** 기준 자세에서 뼈 하나의 컴포넌트 공간 자리 (부모 사슬을 곱함). 없으면 거짓. */
 	bool RefBonePos(const FReferenceSkeleton& Ref, int32 Bone, FVector& Out)
@@ -181,8 +190,36 @@ void UEcoR9DemoSubsystem::LoadVisualAssets()
 	CylinderMesh = LoadObject<UStaticMesh>(nullptr, TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
 	BasicMaterial = LoadObject<UMaterialInterface>(nullptr, TEXT("/Engine/BasicShapes/BasicShapeMaterial.BasicShapeMaterial"));
 	LoadBoarAssets();
-	UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 몸: 사슴 %s · 늑대 %s · 멧돼지 %s | 풀 %s + %s | 수풀 %s · 돌 %s"), *GetNameSafe(DeerClass), *GetNameSafe(WolfClass),
-		   *State->BoarLine, *GetNameSafe(GrassMesh), *GetNameSafe(GrassMaterial), *GetNameSafe(ShrubMesh), *GetNameSafe(StoneMesh));
+	// 동물 세계 몸: 동물 장면일 때만 읽는다 (검토 11-13 06:10 — 세 종 판에서 BP·메시·애님 BP 를 게임 스레드에서 동기로 읽지 않게).
+	// 다시 시작(RestartRun)에서 동물 장면으로 바뀌면 그때 읽는다. 못 읽으면 그 종은 먼 표식만
+	if (State->Info.NumSpecies > kNumOldSpecies)
+	{
+		LoadFaunaAssets();
+	}
+	else
+	{
+		State->FaunaBodyLine = TEXT("물소·표범·여우 몸은 동물 장면에서만 읽음 (세 종 판)");
+	}
+	UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 몸: 사슴 %s · 늑대 %s · 멧돼지 %s · %s | 풀 %s + %s | 수풀 %s · 돌 %s"), *GetNameSafe(DeerClass), *GetNameSafe(WolfClass),
+		   *State->BoarLine, *State->FaunaBodyLine, *GetNameSafe(GrassMesh), *GetNameSafe(GrassMaterial), *GetNameSafe(ShrubMesh), *GetNameSafe(StoneMesh));
+}
+
+void UEcoR9DemoSubsystem::LoadFaunaAssets()
+{
+	using namespace EcoR9DemoVisualsImpl;
+	if (!bFaunaAssetsTried)
+	{
+		bFaunaAssetsTried = true;   // 한 번만 읽는다 (못 읽은 종을 판마다 다시 찾지 않음)
+		BuffaloClass = LoadRepClass(kBuffaloJyu);
+		LeopardClass = LoadRepClass(kLeopardJyu);
+		FoxClass = LoadRepClass(kFoxJyu);
+	}
+	State->FaunaBodyLine = FString::Printf(TEXT("물소 %s · 표범 %s · 여우 %s"), BuffaloClass ? *GetNameSafe(BuffaloClass) : TEXT("없음(먼 표식만)"),
+										   LeopardClass ? *GetNameSafe(LeopardClass) : TEXT("없음(먼 표식만)"), FoxClass ? *GetNameSafe(FoxClass) : TEXT("없음(먼 표식만)"));
+	if (!BuffaloClass || !LeopardClass || !FoxClass)
+	{
+		UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] 동물 세계 몸 BP 를 다 못 읽음 — 그 종은 먼 표식만: %s"), *State->FaunaBodyLine);
+	}
 }
 
 void UEcoR9DemoSubsystem::LoadBoarAssets()
@@ -624,9 +661,11 @@ void UEcoR9DemoSubsystem::SpawnStaticDecor()
 			S.MarkIsm[k] = MakeIsm(Decor, Names[k], SphereMesh, Mid, 0, false);
 		}
 		// 6. 먼 개체 표식 (큰 세계 — 몸 액터가 없는 산 개체): 사슴 갈색 · 늑대 회색 · 멧돼지 검은 갈색 (섬 무대 먼 표식과 같은 꼴)
-		const FLinearColor Far[3] = {FLinearColor(0.45f, 0.26f, 0.10f), FLinearColor(0.35f, 0.35f, 0.38f), FLinearColor(0.12f, 0.08f, 0.06f)};
-		const TCHAR* FarNames[3] = {TEXT("R9FarDeer"), TEXT("R9FarWolf"), TEXT("R9FarBoar")};
-		for (int32 k = 0; k < 3; ++k)
+		//    · 동물 세계: 물소 검정 · 표범 금빛 노랑 · 여우 주황 [어림 — 털빛]
+		const FLinearColor Far[kNumSpecies] = {FLinearColor(0.45f, 0.26f, 0.10f), FLinearColor(0.35f, 0.35f, 0.38f), FLinearColor(0.12f, 0.08f, 0.06f),
+											   FLinearColor(0.03f, 0.03f, 0.035f), FLinearColor(0.85f, 0.62f, 0.15f), FLinearColor(0.95f, 0.38f, 0.06f)};
+		const TCHAR* FarNames[kNumSpecies] = {TEXT("R9FarDeer"), TEXT("R9FarWolf"), TEXT("R9FarBoar"), TEXT("R9FarBuffalo"), TEXT("R9FarLeopard"), TEXT("R9FarFox")};
+		for (int32 k = 0; k < kNumSpecies; ++k)
 		{
 			UMaterialInstanceDynamic* Mid = UMaterialInstanceDynamic::Create(BasicMaterial, Decor);
 			Mid->SetVectorParameterValue(TEXT("Color"), Far[k]);
@@ -840,6 +879,17 @@ void UEcoR9DemoSubsystem::OnFrameAdvanced()
 		case ER9Event::Starve:
 			AddMarker(2, E.B, FVector::ZeroVector, 1.0);
 			break;
+		case ER9Event::Gore:
+		case ER9Event::GoreKill:
+			// 물소 들이받기 (동물 세계 R2): 받힌 개체에 주황 점, 물소는 받는 자세 (표현 BP 의 Attack)
+			AddMarker(1, E.B, FVector::ZeroVector, E.Kind == ER9Event::GoreKill ? 1.0 : 0.8);
+			++S.Gores;
+			S.GoreKills += E.Kind == ER9Event::GoreKill ? 1 : 0;
+			if (Wolf)
+			{
+				Wolf->RearUntil = Now + 0.7;   // A = 받은 물소
+			}
+			break;
 		default:
 			break;
 		}
@@ -862,6 +912,12 @@ void UEcoR9DemoSubsystem::OnFrameAdvanced()
 			{
 				continue;   // 이미 센 죽음 (같은 uid 가 두 번 나오면 안 됨)
 			}
+			// 종별 누계 (동물 세계 글자·기록 줄 — 옛 누계는 아래 그대로)
+			if (A.Species < kNumSpecies)
+			{
+				int32* Tally = (A.Flags & kFlagBittenDead) ? S.BittenSp : ((A.Flags & kFlagBite) ? S.StruckSp : S.StarvedSp);
+				++Tally[A.Species];
+			}
 			if (A.Flags & kFlagBittenDead)
 			{
 				if (A.Species == kDeer)
@@ -872,9 +928,9 @@ void UEcoR9DemoSubsystem::OnFrameAdvanced()
 				{
 					++S.BoarKilled;
 				}
-				else
+				else if (A.Species == kWolf)
 				{
-					++S.WolvesKilled;
+					++S.WolvesKilled;   // 동물 세계: 표범·여우에게 물린 늑대 (S′ 에는 늑대를 무는 종이 없음 — 예전과 같은 칸)
 				}
 				if (!bFrameEvents && B)
 				{
@@ -884,6 +940,15 @@ void UEcoR9DemoSubsystem::OnFrameAdvanced()
 			else if (A.Species == kWolf && (A.Flags & kFlagBite))
 			{
 				++S.WolvesKilled;   // 반격에 죽은 늑대 (bit7 + bit4)
+			}
+			else if (S.Info.NumSpecies > kNumOldSpecies && (A.Flags & kFlagBite))
+			{
+				// 동물 세계: 물소에게 받혀 죽음 (bit7 + bit4 — 코어 CauseCounter). 굶음으로 세지 않는다 (위 종별 누계 StruckSp).
+				// 동물 장면에서만 (검토 11-13 06:10): 세 종 판(재생 포함)의 굶음 셈·표식은 예전 그대로
+				if (!bFrameEvents && B)
+				{
+					AddMarker(1, A.Id, FVector::ZeroVector, 1.0);
+				}
 			}
 			else
 			{
@@ -913,7 +978,7 @@ void UEcoR9DemoSubsystem::OnFrameAdvanced()
 		}
 		if (B && (A.Flags & kFlagBite) && !bFrameEvents)
 		{
-			if (A.Species == kWolf)
+			if (IsBiter(A.Species))
 			{
 				B->AttackUntil = Now + 0.7;
 				S.Recent.Add({Now, ER9Event::BiteWound, A.Id, 0});
@@ -1221,7 +1286,7 @@ void UEcoR9DemoSubsystem::UpdateFarMarkers(const TArray<FVector>* Where)
 {
 	// 큰 세계: 몸 액터가 없는 산 개체를 종마다 작은 공으로 (크기 = 카메라 거리 × 0.012, 최소 1.5 m — 섬 무대 먼 표식과 같은 식)
 	FEcoR9DemoState& S = *State;
-	TArray<FTransform> Ts[3];
+	TArray<FTransform> Ts[EcoR9Demo::kNumSpecies];
 	if (Where)
 	{
 		const FVector Eye = CameraEye();
@@ -1238,7 +1303,7 @@ void UEcoR9DemoSubsystem::UpdateFarMarkers(const TArray<FVector>* Where)
 		}
 	}
 	S.NumFar = 0;
-	for (int32 k = 0; k < 3; ++k)
+	for (int32 k = 0; k < EcoR9Demo::kNumSpecies; ++k)
 	{
 		S.NumFar += Ts[k].Num();
 		UInstancedStaticMeshComponent* Ism = S.FarIsm[k].Get();
@@ -1279,6 +1344,13 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 	std::vector<double> Dist(static_cast<std::size_t>(NA), -1.0);
 	std::vector<std::uint8_t> Has(static_cast<std::size_t>(NA), 0);
 	const FVector Eye = CameraEye();
+	// 몸 클래스가 없는 종 (동물 세계 BP 를 못 읽은 PC — 예: AnimalVarietyPack 없음): 몸 예산(BodyBudget)에서 빼고 먼 표식으로 그린다.
+	// 작은 무대도 그 종만 먼 표식으로 (검토 11-13 06:10 — 예전에는 예산 자리만 차지하고 몸은 끝내 안 생겨, 작은 무대에서는 아예 안 보였다)
+	bool bNoBody[kNumSpecies] = {};
+	bNoBody[kBuffalo] = !BuffaloClass;
+	bNoBody[kLeopard] = !LeopardClass;
+	bNoBody[kFox] = !FoxClass;
+	bool bAnyNoBody = false;
 	for (int32 i = 0; i < NA; ++i)
 	{
 		const FR9Agent& A = S.Cur.Agents[static_cast<std::size_t>(i)];
@@ -1293,7 +1365,8 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 		double X = 0.0, Y = 0.0;
 		S.Map.ToWorld(Ux, Uy, X, Y);
 		Where[i] = FVector(X, Y, GroundZ(X, Y));
-		Dist[static_cast<std::size_t>(i)] = bLod ? FVector::Dist(Eye, Where[i]) : 0.0;
+		bAnyNoBody = bAnyNoBody || bNoBody[A.Species];
+		Dist[static_cast<std::size_t>(i)] = bNoBody[A.Species] ? -1.0 : (bLod ? FVector::Dist(Eye, Where[i]) : 0.0);   // −1 = 몸 고르기에서 뺌
 		const FEcoR9DemoBody* B = S.Bodies.Find(A.Id);
 		Has[static_cast<std::size_t>(i)] = static_cast<std::uint8_t>(B && !B->bDead ? 1 : 0);
 	}
@@ -1370,12 +1443,13 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 		}
 		else
 		{
-			UClass* Cls = A.Species == kWolf ? WolfClass.Get() : (A.Species == kBoar ? BoarClass.Get() : DeerClass.Get());
+			UClass* const Classes[kNumSpecies] = {DeerClass.Get(), WolfClass.Get(), BoarClass.Get(), BuffaloClass.Get(), LeopardClass.Get(), FoxClass.Get()};
+			UClass* Cls = Classes[A.Species];
 			if (!Cls)
 			{
-				continue;
+				continue;   // 동물 세계 BP 를 못 읽은 종 — 먼 표식만 (UpdateFarMarkers 가 몸 없는 개체를 그린다)
 			}
-			static const TCHAR* const Names[3] = {TEXT("Deer"), TEXT("Wolf"), TEXT("Boar")};
+			static const TCHAR* const Names[kNumSpecies] = {TEXT("Deer"), TEXT("Wolf"), TEXT("Boar"), TEXT("Buffalo"), TEXT("Leopard"), TEXT("Fox")};
 			FActorSpawnParameters P;
 			P.Name = MakeUniqueObjectName(World->PersistentLevel, Cls, *FString::Printf(TEXT("EcoR9Demo_%s_%u"), Names[A.Species], A.Id));
 			P.ObjectFlags |= RF_Transient;
@@ -1402,13 +1476,14 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 		S.Bodies.Add(A.Id, B);
 		++Spawned;
 	}
-	// 늑대마다 가장 가까운 산 먹잇감 거리 (단위)
-	auto NearestPrey = [&S](const FR9Agent& W) -> double
+	// 무는 종마다 가장 가까운 산 먹잇감 거리 (단위)
+	const bool bFauna = S.Info.NumSpecies > kNumOldSpecies;
+	auto NearestPrey = [&S, bFauna](const FR9Agent& W) -> double
 	{
 		double Best = TNumericLimits<double>::Max();
 		for (const FR9Agent& O : S.Cur.Agents)
 		{
-			if (O.Alive() && IsPrey(O.Species))
+			if (O.Alive() && IsPreyOf(W.Species, O.Species, bFauna))
 			{
 				Best = FMath::Min(Best, FMath::Sqrt(FMath::Square(static_cast<double>(O.X - W.X)) + FMath::Square(static_cast<double>(O.Y - W.Y))));
 			}
@@ -1467,7 +1542,7 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 		const float Scale = B.bDead ? B.Scale * (0.7f + 0.3f * B.CorpseFrac) : B.Scale;
 		if (AEcoCreatureRepresentationActor* Rep = B.Rep.Get())
 		{
-			const bool bWolf = B.Species == kWolf;
+			const bool bWolf = IsBiter(B.Species);   // 무는 종 (늑대 · 동물 세계 표범·여우) — 물기 자세·고기 먹기·쫓음
 			const bool bPursue = bWolf && bRunning && NearestPrey(*Cur) <= kPursueUnits;
 			EEcoSpeciesActivity Activity = EEcoSpeciesActivity::Hold;
 			if (B.bDead)
@@ -1480,18 +1555,21 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 			}
 			else if (!bWolf && Now < B.RearUntil)
 			{
-				Activity = EEcoSpeciesActivity::Attack;   // 멧돼지 표현 BP 의 받아치기 (BP 가 있을 때)
+				Activity = EEcoSpeciesActivity::Attack;   // 멧돼지 표현 BP 의 받아치기 · 물소 들이받기 (BP 가 있을 때)
 			}
 			else if (bEat)
 			{
-				Activity = bEating ? (bWolf ? EEcoSpeciesActivity::Eat : EEcoSpeciesActivity::Graze) : EEcoSpeciesActivity::Hold;
+				// 무는 종이 고기(사체)를 먹을 때만 고기 먹기 자세 — 여우가 땅속 먹이(뿌리)·풀을 먹으면 풀 뜯기 자세 (검토 11-13 06:10. Food 모름(-1, 재생) = 예전처럼 고기)
+				const bool bMeat = bWolf && Cur->Food != 0 && Cur->Food != 1;
+				Activity = bEating ? (bMeat ? EEcoSpeciesActivity::Eat : EEcoSpeciesActivity::Graze) : EEcoSpeciesActivity::Hold;
 			}
 			else if (IsWalk(Cur->Action) || IsRun(Cur->Action))
 			{
 				Activity = bPursue ? EEcoSpeciesActivity::Pursue : (bRunning ? EEcoSpeciesActivity::Travel : EEcoSpeciesActivity::Wander);
 			}
-			else if (Cur->Action == kActShelter && bInShelter && !bWolf)
+			else if (Cur->Action == kActShelter && bInShelter && B.Species < kNumSpecies && S.Info.ShelterEnter[B.Species])
 			{
+				// 은신처에 들어갈 수 있는 몸만 웅크림 (세 종 판 = 사슴·멧돼지 — 예전 '무는 종이 아님' 과 같음, 동물 장면 = + 표범·여우, 물소는 못 들어감)
 				Activity = EEcoSpeciesActivity::ShelterHold;   // 은신처 안 웅크림
 			}
 			else
@@ -1512,7 +1590,7 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 			V.CoatTone = 0.5f;
 			V.Appearance = 0;
 			const bool bHpKnown = !B.bDead && Cur->Hp >= 0.0f;
-			V.bHasVitals = bHpKnown && EcoR9DemoCVars::HpBars() && B.Species != kDeer && Cur->Hp < 0.999f;
+			V.bHasVitals = bHpKnown && EcoR9DemoCVars::HpBars() && (B.Species != kDeer || bFauna) && Cur->Hp < 0.999f;   // 동물 세계는 사슴도 체력 (R5)
 			V.NormalizedHealth = bHpKnown ? FMath::Clamp(Cur->Hp, 0.0f, 1.0f) : 1.0f;
 			V.NormalizedEnergy = (!B.bDead && Cur->Energy >= 0.0f) ? FMath::Clamp(Cur->Energy, 0.0f, 1.0f) : 1.0f;
 			V.bEating = bEating;
@@ -1660,6 +1738,6 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 		S.Bodies.Remove(Id);
 	}
 	S.NumBodyActors = BodyActors;
-	// 4. 먼 개체 표식 (큰 세계 — 몸이 없는 산 개체)
-	UpdateFarMarkers(bLod ? &Where : nullptr);
+	// 4. 먼 개체 표식 (큰 세계 — 몸이 없는 산 개체. 작은 무대는 몸 클래스가 없는 종이 있을 때만 — 그 종만 몸이 없다)
+	UpdateFarMarkers(bLod || bAnyNoBody ? &Where : nullptr);
 }

@@ -10,6 +10,8 @@
 // 근거: herbivore_rl/env_v2/r9_world.py 846-1172 (_init_world·_patch·_place_try·_place_founders), r9_life.py 90-216 (시작 개체 해시),
 //       configs/v3_r9.yaml world·placement·food (장면 덤프에 없는 생성 값 — 아래 GenRules 기본값).
 // 지킴: 세계 규칙·관측·두뇌는 EcoR9Core.h 그대로. 이 파일은 시작 장면만 만든다. 길찾기·손규칙 없음. 표준 라이브러리만, 예외 없음.
+// 동물 세계 (2026-11-13): 종 고리는 장면 종 수 Base.NumSpecies (세 종 장면 3 — 지금과 같은 차례·같은 값, 동물 장면 6 = + 물소·표범·여우).
+//       새 종도 파이썬 _place_founders 와 같이 '늑대가 아닌 종' 규칙으로 놓는다 (늑대에서 14.5 이상, 은신처 못 들어가는 몸은 원 + 0.5 밖).
 #pragma once
 
 #include "EcoR9Core.h"
@@ -59,6 +61,7 @@ struct GenRules
     double RootRegenQ = 1.0;                      // food.root.regen_q
     double RootCoverMult = 0.15;                  // food.root.cover_mult
     double TrainGrassTotal = 70.0;                // food.train_grass_total (학습 세계 900 칸의 풀 용량 합, 은신처 배수 전)
+    double TrainGrassTotalFauna = 90.0;           // 동물 세계 v3_r9_fauna.yaml food.train_grass_total (물소 몫 — 장면에 fauna_on 이 있을 때만)
     double TrainCells = 900.0;                    // 학습 세계 칸 수 (30 × 30)
     double WolfGap = 10.0;                        // placement.wolf_gap
     double PreyFromWolf = 14.5;                   // placement.prey_from_wolf
@@ -71,7 +74,8 @@ struct BigSpec
 {
     uint64_t Seed = 1;                 // 장면 난수 (같은 땅·같은 시드 → 같은 장면)
     int Herds = 6;                     // 무리 자리 수 K
-    int PerHerd[3] = {24, 2, 8};       // 자리마다 사슴·늑대·멧돼지 [어림 — 학습 세계 시작(24·4·8) 둘레, 늑대는 한 쌍]
+    int PerHerd[kMaxSpecies] = {24, 2, 8, 0, 0, 0};   // 자리마다 사슴·늑대·멧돼지 [어림 — 학습 세계 시작(24·4·8) 둘레, 늑대는 한 쌍]
+                                                      // · 물소·표범·여우 (동물 장면만 — 세 종 장면은 뒤 셋을 보지 않음)
     int MaxAnimals = 400;              // 총수 상한 (넘으면 자리 수를 줄임)
     double Tile = 60.0;                // 학습 세계 한 변 (단위) = 패치 정규화 타일 = 무리 둘레 정사각 한 변
     int CarcassPerHerd = 48;           // 사체 칸 = 이 값 × 자리 수 (학습 세계 한 세계 48)
@@ -86,7 +90,7 @@ struct BigInfo
     double Size = 0.0;
     int64_t OpenCells = 0, MainCells = 0;    // 열린 칸 · 가장 큰 이어진 땅 칸
     int64_t Components = 0;                  // 열린 땅 덩어리 수
-    int Counts[3] = {0, 0, 0};
+    int Counts[kMaxSpecies] = {0, 0, 0, 0, 0, 0};
     std::vector<double> Sites;               // 무리 자리 (x, y 단위)
     std::vector<double> SiteOpen;            // 자리 둘레 Tile 정사각의 시작 가능 칸 비율
     int Shelters = 0, ShelterAnchored = 0;
@@ -383,7 +387,9 @@ inline bool BuildBigScene(const Params& Base, const LandMap& Land, const BigSpec
     };
 
     // ---- 2 무리 자리 ----
-    const int PerTot = std::max(0, Spec.PerHerd[0]) + std::max(0, Spec.PerHerd[1]) + std::max(0, Spec.PerHerd[2]);
+    const int NS = std::min(std::max(Base.NumSpecies, 1), kMaxSpecies);   // 장면 종 수 (세 종 장면 3 — 아래 고리가 지금과 같다)
+    int PerTot = 0;
+    for (int k = 0; k < NS; ++k) { PerTot += std::max(0, Spec.PerHerd[k]); }
     if (PerTot <= 0 || Spec.Herds <= 0)
     {
         Detail::SetErr(Err, "no animals requested");
@@ -648,7 +654,8 @@ inline bool BuildBigScene(const Params& Base, const LandMap& Land, const BigSpec
             RCap[c] *= Ru.RootCoverMult;
         }
     }
-    const double Scale = PreSum > 0.0 ? Ru.TrainGrassTotal / Ru.TrainCells * static_cast<double>(Info.OpenCells) / PreSum : 1.0;
+    const double GrassTotal = Base.FaunaOn ? Ru.TrainGrassTotalFauna : Ru.TrainGrassTotal;   // 세 종 장면은 70 그대로
+    const double Scale = PreSum > 0.0 ? GrassTotal / Ru.TrainCells * static_cast<double>(Info.OpenCells) / PreSum : 1.0;
     const double Gm = Base.GrassRegenMult, Rm = Base.RootRegenMult;
 
     // ---- 5 Params ----
@@ -674,7 +681,7 @@ inline bool BuildBigScene(const Params& Base, const LandMap& Land, const BigSpec
     OutP.HerdSide = Tile;
     OutP.BigWorld = true;
     int Lo = 0;
-    for (int k = 0; k < 3; ++k)
+    for (int k = 0; k < NS; ++k)
     {
         OutP.Counts[k] = K * std::max(0, Spec.PerHerd[k]);
         OutP.SpLo[k] = Lo;
@@ -686,7 +693,7 @@ inline bool BuildBigScene(const Params& Base, const LandMap& Land, const BigSpec
     OutP.NumCarcass = std::max(1, Spec.CarcassPerHerd) * K;
     const size_t S = static_cast<size_t>(OutP.NumSlots);
     OutP.SlotHerd.assign(S, -1);
-    for (int k = 0; k < 3; ++k)
+    for (int k = 0; k < NS; ++k)
     {
         for (int h = 0; h < K; ++h)
         {
@@ -763,7 +770,7 @@ inline bool BuildBigScene(const Params& Base, const LandMap& Land, const BigSpec
     St.CarcT.assign(M, 0.0);
     St.CarcKin.assign(M, -1);
     St.Pairs.clear();
-    for (int k = 0; k < 3; ++k)
+    for (int k = 0; k < NS; ++k)
     {
         for (int s = OutP.SpLo[k]; s < OutP.SpHi[k]; ++s)
         {
@@ -771,7 +778,7 @@ inline bool BuildBigScene(const Params& Base, const LandMap& Land, const BigSpec
             St.KinId[static_cast<size_t>(s)] = OutP.KinPerm[k];
         }
     }
-    // 칸 차례 = uid 차례 (학습 세계 train: 종 차례 사슴 → 늑대 → 멧돼지, 종 안에서는 무리 차례)
+    // 칸 차례 = uid 차례 (학습 세계 train: 종 차례 사슴 → 늑대 → 멧돼지 (→ 물소 → 표범 → 여우), 종 안에서는 무리 차례)
     for (size_t s = 0; s < S; ++s) { St.Uid[s] = static_cast<int64_t>(s) + 1; }
     St.NextUid = static_cast<int64_t>(S) + 1;
 

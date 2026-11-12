@@ -21,14 +21,28 @@
 
 namespace EcoR9Demo
 {
-	/** 종 번호 (재생 파일·코어 같은 차례). */
+	/** 종 번호 (재생 파일·코어 같은 차례 = 파이썬 ALL_SPECIES 차례). 재생 판·S′ 세 종 장면은 앞 셋만, 동물 세계 장면(2026-11-13)은 여섯. */
 	enum ER9Species : std::uint8_t
 	{
 		kDeer = 0,
 		kWolf = 1,
 		kBoar = 2,
-		kNumSpecies = 3
+		kBuffalo = 3,   // 물소 (동물 세계 1 단계 — 이하 셋은 코어 동물 장면에서만 나온다)
+		kLeopard = 4,   // 표범
+		kFox = 5,       // 여우
+		kNumSpecies = 6,   // 화면 쪽 배열 크기 (종 최대 수 — 코어 kMaxSpecies 와 같다)
+		kNumOldSpecies = 3 // S′ 세 종 (사슴·늑대·멧돼지)
 	};
+
+	/** 종 이름 (두뇌 파일 <이름>.r9brain · 장면 파일 · 코어 SpeciesName 과 같은 글). */
+	inline const char* SpeciesKey(std::uint8_t Sp)
+	{
+		static const char* const Names[kNumSpecies] = {"deer", "wolf", "boar", "buffalo", "leopard", "fox"};
+		return Sp < kNumSpecies ? Names[Sp] : "?";
+	}
+
+	/** 무는 종 (늑대·표범·여우 — 동물 세계 몸 표 bites 가 빈 칸이 아닌 종). 화면 자세·글자만 가른다 (규칙은 코어). */
+	inline bool IsBiter(std::uint8_t Sp) { return Sp == kWolf || Sp == kLeopard || Sp == kFox; }
 
 	/** 개체 깃발 (재생 파일 v1 의 flags 와 같은 비트). */
 	enum ER9Flag : std::uint8_t
@@ -93,17 +107,19 @@ namespace EcoR9Demo
 	/** 사건 (실시간 판만 — 재생 판은 깃발로 대신한다). */
 	enum class ER9Event : std::uint8_t
 	{
-		BiteKill = 0,    // 늑대 A 가 B 를 물어 죽임
-		BiteWound = 1,   // 늑대 A 가 멧돼지 B 를 물어 다치게 함
+		BiteKill = 0,    // 늑대(동물 세계: 표범·여우도) A 가 B 를 물어 죽임
+		BiteWound = 1,   // 늑대(동물 세계: 표범·여우도) A 가 B 를 물어 다치게 함 (S′ = 멧돼지만 체력)
 		Counter = 2,     // 멧돼지 B 가 늑대 A 를 받아침 (A 가 밀려남)
-		Starve = 3       // B 굶어 죽음
+		Starve = 3,      // B 굶어 죽음
+		Gore = 4,        // 물소 A 가 뛰다 B 를 들이받아 다치게 함 (동물 세계 R2 — 코어 EvGore GoreWound)
+		GoreKill = 5     // 물소 A 가 들이받아 B 가 죽음 (코어 EvGore GoreKill)
 	};
 
 	struct FR9Event
 	{
 		ER9Event Kind = ER9Event::BiteKill;
-		std::uint32_t A = 0;   // 늑대 uid (없으면 0)
-		std::uint32_t B = 0;   // 먹잇감·죽은 개체 uid
+		std::uint32_t A = 0;   // 문 개체(늑대·표범·여우)·받은 물소 uid (없으면 0)
+		std::uint32_t B = 0;   // 먹잇감·받힌·죽은 개체 uid
 		float X = 0.0f;        // 일어난 자리 (단위)
 		float Y = 0.0f;
 	};
@@ -150,6 +166,12 @@ namespace EcoR9Demo
 		std::int64_t LandCells = 0;            // 열린 칸 · 가장 큰 이어진 땅 칸 (기록 줄)
 		std::int64_t MainCells = 0;
 		std::int32_t ShelterAnchored = 0;      // 나무·바위 곁에 둔 은신처 수
+		// 동물 세계 장면 (2026-11-13) — S′ 세 종 장면·재생 판은 3 · 거짓
+		std::int32_t NumSpecies = kNumOldSpecies;   // 이 판에 나오는 종 수 (3 = 사슴·늑대·멧돼지, 6 = + 물소·표범·여우)
+		bool bFauna = false;                   // 동물 세계 몸 규칙 (파이썬 body_common.fauna — 코어 Params::FaunaOn)
+		std::int32_t Counts[kNumSpecies] = {}; // 시작 마릿수 (종 차례 — 칸 수와 같다)
+		// 은신처에 들어갈 수 있는 몸 (코어 Params::ShelterEnter — 화면 웅크림 자세만). 기본값 = 무는 종이 아님 (재생 판·세 종 장면과 같은 뜻)
+		std::uint8_t ShelterEnter[kNumSpecies] = {1, 0, 1, 1, 0, 0};
 	};
 
 	// -------------------------------------------------------------------------

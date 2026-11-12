@@ -9,6 +9,10 @@
 // 맵 전체 땅 모드 (2026-11-13, scratchpad/r9/ue_demo/whole/CORE_API.md): Config.Whole 이 있으면 scene.txt 는 LoadParams(몸 표·상수)만 쓰고,
 // 코어 큰 세계 장면 생성기 BuildBigScene(EcoR9Scene.h) 이 땅 지도 위에 무리 자리·은신처·먹이·시작 개체를 만든다. 먹이 격자가 커서
 // (섬 약 700² 칸) 프레임에 격자를 싣지 않고 ReadFood 로 창만 읽는다.
+//
+// 동물 세계 (2026-11-13, scratchpad/r9/ue_demo/fauna/CONTRACT_NOTES.md): 종 수·동물 몸 규칙은 코어가 장면 파일에서 정한다 (Params::NumSpecies 3 또는 6,
+// Params::FaunaOn). 이 파일은 그 종 수만큼 두뇌를 읽어 넘기고, 물소 들이받기(EvGore)를 화면 사건으로 옮긴다. 코어 이름에 기대는 곳은 아래 LiveImpl::NumSp·IsFauna 와
+// EvGore 한 곳뿐이다.
 
 #include "EcoR9DemoLiveSource.h"
 
@@ -47,10 +51,16 @@ namespace EcoR9Demo
 {
 #if ECO_R9_DEMO_HAS_CORE
 
+	static_assert(static_cast<int>(kNumSpecies) == EcoR9::kMaxSpecies, "화면 종 수 = 코어 종 최대 수 (종 번호 = 파이썬 ALL_SPECIES 차례)");
+	static_assert(static_cast<int>(kBuffalo) == static_cast<int>(EcoR9::SpBuffalo) && static_cast<int>(kLeopard) == static_cast<int>(EcoR9::SpLeopard) &&
+				  static_cast<int>(kFox) == static_cast<int>(EcoR9::SpFox),
+			  "종 번호가 코어와 같아야 한다");
+
 	struct FR9LiveSource::FImpl
 	{
 		EcoR9::World World;
-		EcoR9::Brain Brains[3];
+		EcoR9::Brain Brains[kNumSpecies];
+		int NumSp = kNumOldSpecies;            // 이 장면의 종 수 (코어 Params::NumSpecies)
 		EcoR9::Pcg32Random Rng;
 		std::vector<float> Obs;
 		std::vector<std::int64_t> UidBefore;   // 스텝 앞 칸 → uid (사건·죽은 개체용)
@@ -92,6 +102,11 @@ namespace EcoR9Demo
 		}
 
 		inline std::uint32_t U32(std::int64_t V) { return V > 0 ? static_cast<std::uint32_t>(V) : 0u; }
+
+		/** 장면 종 수 (코어 Params::NumSpecies — 세 종 장면 3, 동물 장면 6). 화면 배열 크기로 자른다. */
+		inline int NumSp(const EcoR9::Params& P) { return P.NumSpecies < 1 ? 1 : (P.NumSpecies > kNumSpecies ? kNumSpecies : P.NumSpecies); }
+		/** 동물 세계 몸 규칙이 켜졌나 (코어 Params::FaunaOn — 파이썬 body_common.fauna). */
+		inline bool IsFauna(const EcoR9::Params& P) { return P.FaunaOn; }
 
 		/** 세계 상태 + 이번 스텝 사건 → 화면 프레임. UidBefore 가 비면 첫 장면 (사건 없음). */
 		inline void Fill(FR9LiveSource::FImpl& I, std::uint32_t Step, FR9Frame& Out)
@@ -184,7 +199,7 @@ namespace EcoR9Demo
 					}
 					FR9Agent D;
 					D.Id = U32(I.UidBefore[static_cast<std::size_t>(E.A)]);
-					D.Species = static_cast<std::uint8_t>(E.B >= 0 && E.B < 3 ? E.B : 0);
+					D.Species = static_cast<std::uint8_t>(E.B >= 0 && E.B < I.NumSp ? E.B : 0);
 					D.Action = EcoR9::ActWatch;
 					D.Flags = static_cast<std::uint8_t>(E.Code == EcoR9::CauseBite ? static_cast<int>(kFlagBittenDead)
 																				   : static_cast<int>(kFlagOtherDead) | (E.Code == EcoR9::CauseCounter ? static_cast<int>(kFlagBite) : 0));
@@ -201,6 +216,19 @@ namespace EcoR9Demo
 					{
 						FR9Event Ev;
 						Ev.Kind = E.Code == EcoR9::BiteKill ? ER9Event::BiteKill : (E.Code == EcoR9::BiteWound ? ER9Event::BiteWound : ER9Event::Counter);
+						Ev.A = U32(I.UidBefore[static_cast<std::size_t>(E.A)]);
+						Ev.B = U32(I.UidBefore[static_cast<std::size_t>(E.B)]);
+						Ev.X = static_cast<float>(E.X);
+						Ev.Y = static_cast<float>(E.Y);
+						Out.Events.push_back(Ev);
+						BiteSlot[static_cast<std::size_t>(E.A)] = 1;
+						BiteSlot[static_cast<std::size_t>(E.B)] = 1;
+					}
+					else if (E.Kind == EcoR9::EvGore && E.A >= 0 && E.B >= 0 && static_cast<std::size_t>(E.A) < S && static_cast<std::size_t>(E.B) < S)
+					{
+						// 물소 들이받기 (동물 세계 R2): A 받은 물소, B 받힌 개체 — 받혀 죽으면 EvDeath CauseCounter 도 따로 온다
+						FR9Event Ev;
+						Ev.Kind = E.Code == EcoR9::GoreKill ? ER9Event::GoreKill : ER9Event::Gore;
 						Ev.A = U32(I.UidBefore[static_cast<std::size_t>(E.A)]);
 						Ev.B = U32(I.UidBefore[static_cast<std::size_t>(E.B)]);
 						Ev.X = static_cast<float>(E.X);
@@ -228,7 +256,9 @@ namespace EcoR9Demo
 					const std::uint32_t Id = U32(I.UidBefore[s]);
 					for (FR9Agent& A : Out.Agents)
 					{
-						if (A.Id == Id)
+						// 산 개체에만 (검토 11-13 06:10): 죽은 개체의 bit4 는 죽음 원인(CauseCounter = 받아침·들이받기에 죽음)만 뜻한다 — 같은 스텝에 물기·들이받기에 끼었다가
+						// 굶어 죽은 개체가 '받혀 죽음'·'반격에 죽은 늑대' 로 세어지지 않게
+						if (A.Id == Id && A.Alive())
 						{
 							A.Flags = static_cast<std::uint8_t>(A.Flags | kFlagBite);
 						}
@@ -340,9 +370,9 @@ namespace EcoR9Demo
 			EcoR9::BigSpec B;
 			B.Seed = Config.Seed;
 			B.Herds = Ws.Herds;
-			for (int k = 0; k < 3; ++k)
+			for (int k = 0; k < kNumSpecies && k < EcoR9::kMaxSpecies; ++k)
 			{
-				B.PerHerd[k] = Ws.PerHerd[k];
+				B.PerHerd[k] = Ws.PerHerd[k];   // 장면 종 수 뒤 칸은 생성기가 보지 않는다 (세 종 장면 = 지금 그대로)
 			}
 			B.MaxAnimals = Ws.MaxAnimals;
 			B.Sites = Ws.Sites;
@@ -358,8 +388,13 @@ namespace EcoR9Demo
 			BigLand = Bi.OpenCells;
 			BigMain = Bi.MainCells;
 			BigAnchored = Bi.ShelterAnchored;
+			std::string Fauna;
+			if (LiveImpl::NumSp(Base) > kNumOldSpecies)
+			{
+				Fauna = " · 물소 " + std::to_string(Bi.Counts[kBuffalo]) + " · 표범 " + std::to_string(Bi.Counts[kLeopard]) + " · 여우 " + std::to_string(Bi.Counts[kFox]);
+			}
 			BigLine = " | 큰 세계 " + std::to_string(Bi.G) + "² 칸 · 무리 자리 " + std::to_string(Bi.Sites.size() / 2) + " · 사슴 " + std::to_string(Bi.Counts[0]) + " · 늑대 " +
-					  std::to_string(Bi.Counts[1]) + " · 멧돼지 " + std::to_string(Bi.Counts[2]) + " · 은신처 " + std::to_string(Bi.Shelters) + " (나무·바위 곁 " +
+					  std::to_string(Bi.Counts[1]) + " · 멧돼지 " + std::to_string(Bi.Counts[2]) + Fauna + " · 은신처 " + std::to_string(Bi.Shelters) + " (나무·바위 곁 " +
 					  std::to_string(Bi.ShelterAnchored) + ")" + (Bi.Note.empty() ? std::string() : " · " + Bi.Note);
 			for (char& Ch : BigLine)
 			{
@@ -375,13 +410,15 @@ namespace EcoR9Demo
 			Err = "장면 상수·상태 읽기 실패: " + Err;
 			return false;
 		}
-		static const char* const Names[3] = {"deer.r9brain", "wolf.r9brain", "boar.r9brain"};
-		static const char* const Species[3] = {"deer", "wolf", "boar"};
+		// 두뇌: 장면 종 수만큼 (세 종 장면 = deer·wolf·boar 그대로, 동물 장면 = + buffalo·leopard·fox). 동물 장면의 세 옛 종 두뇌는 S′ 에서 배운 가중치를
+		// 그대로 쓴다 (파이썬 rebody 와 같은 뜻 — 메타만 다름). 몸 해시는 보지 않는다 (CONTRACT_NOTES 6)
+		I.NumSp = LiveImpl::NumSp(P);
 		std::string Summary;
-		for (int k = 0; k < 3; ++k)
+		for (int k = 0; k < I.NumSp; ++k)
 		{
+			const std::string Name = std::string(SpeciesKey(static_cast<std::uint8_t>(k))) + ".r9brain";
 			std::vector<std::uint8_t> Bytes = Config.BrainBytes[k];
-			const std::string Path = LiveImpl::JoinPath(Config.BrainDir, Names[k]);
+			const std::string Path = LiveImpl::JoinPath(Config.BrainDir, Name.c_str());
 			if (Bytes.empty() && !LiveImpl::ReadAll(Path, Bytes))
 			{
 				Err = "두뇌 파일을 못 읽음: " + Path;
@@ -389,15 +426,15 @@ namespace EcoR9Demo
 			}
 			if (Bytes.empty() || !EcoR9::LoadBrain(Bytes.data(), Bytes.size(), I.Brains[k], &Err) || !I.Brains[k].Valid())
 			{
-				Err = std::string("두뇌 파일 ") + Names[k] + " 읽기 실패: " + Err;
+				Err = "두뇌 파일 " + Name + " 읽기 실패: " + Err;
 				return false;
 			}
-			if (I.Brains[k].Species != Species[k])
+			if (I.Brains[k].Species != SpeciesKey(static_cast<std::uint8_t>(k)))
 			{
-				Err = std::string("두뇌 파일 ") + Names[k] + " 의 종이 " + I.Brains[k].Species + " 이다";
+				Err = "두뇌 파일 " + Name + " 의 종이 " + I.Brains[k].Species + " 이다";
 				return false;
 			}
-			Summary += (k ? ", " : "") + std::string(Species[k]) + "=" + I.Brains[k].PayloadSha256.substr(0, 8);
+			Summary += (k ? ", " : "") + std::string(SpeciesKey(static_cast<std::uint8_t>(k))) + "=" + I.Brains[k].PayloadSha256.substr(0, 8);
 		}
 		if (!I.World.Init(P, S0, &Err))
 		{
@@ -457,6 +494,13 @@ namespace EcoR9Demo
 		OutInfo.LandCells = BigLand;
 		OutInfo.MainCells = BigMain;
 		OutInfo.ShelterAnchored = BigAnchored;
+		OutInfo.NumSpecies = I.NumSp;
+		OutInfo.bFauna = LiveImpl::IsFauna(P);
+		for (int k = 0; k < I.NumSp && k < EcoR9::kMaxSpecies; ++k)
+		{
+			OutInfo.Counts[k] = P.Counts[k];
+			OutInfo.ShelterEnter[k] = static_cast<std::uint8_t>(P.ShelterEnter[k] ? 1 : 0);   // 동물 장면: 표범·여우도 들어감, 물소는 못 들어감
+		}
 #if ECO_R9_DEMO_HAS_BIG
 		for (std::size_t k = 0; k < P.HerdX.size() && k < P.HerdY.size(); ++k)
 		{
@@ -467,7 +511,7 @@ namespace EcoR9Demo
 		OutInfo.Seed = Config.Seed;
 		OutInfo.Policy = Config.bSample ? "sample" : "argmax";
 		OutInfo.Brains = Summary + " (scene seed " + std::to_string(P.Seed) + ")" + BigLine;
-		OutInfo.Note = "실시간: 파이썬에서 배운 두뇌 셋을 언리얼 C++ 로 추론";
+		OutInfo.Note = I.NumSp > kNumOldSpecies ? "실시간: 파이썬에서 배운 두뇌 여섯을 언리얼 C++ 로 추론 (동물 세계 몸 규칙)" : "실시간: 파이썬에서 배운 두뇌 셋을 언리얼 C++ 로 추론";
 		for (int a = 0; a < kNumActions; ++a)
 		{
 			OutInfo.ActionNames.push_back(ActionName(static_cast<std::uint8_t>(a)));
@@ -485,7 +529,11 @@ namespace EcoR9Demo
 		}
 		FImpl& I = *Impl;
 		I.UidBefore = I.World.St.Uid;
-		const EcoR9::Brain* BrainPtrs[3] = {&I.Brains[0], &I.Brains[1], &I.Brains[2]};
+		const EcoR9::Brain* BrainPtrs[kNumSpecies] = {};
+		for (int k = 0; k < I.NumSp; ++k)
+		{
+			BrainPtrs[k] = &I.Brains[k];   // 장면 종 수 뒤 칸은 nullptr (코어가 읽지 않음)
+		}
 		I.World.Tick(BrainPtrs, I.Rng, I.bSample, I.Obs);
 		++I.StepCount;
 #if ECO_R9_DEMO_HAS_BIG

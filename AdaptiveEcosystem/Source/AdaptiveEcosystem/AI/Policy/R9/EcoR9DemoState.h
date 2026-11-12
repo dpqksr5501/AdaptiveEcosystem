@@ -24,7 +24,7 @@ DECLARE_LOG_CATEGORY_EXTERN(LogEcoR9Demo, Log, All);
 /** 콘솔 값 읽기 (정의는 EcoR9DemoSubsystem.cpp — 파일 셋이 같은 값을 본다). */
 namespace EcoR9DemoCVars
 {
-	int32 Cam();          // eco.R9Demo.Cam : 키 숫자와 같다 — 0 자유 · 1 늑대 · 2 사슴 · 3 탑뷰 · 4 쿼터뷰 · 5 자동 추적 (기본) · 6 멧돼지
+	int32 Cam();          // eco.R9Demo.Cam : 키 숫자와 같다 — 0 자유 · 1 늑대 · 2 사슴 · 3 탑뷰 · 4 쿼터뷰 · 5 자동 추적 (기본) · 6 멧돼지 · 8 물소 · 9 표범 · 10 여우(J)
 	float HudScale();     // eco.Cam.HudScale (옛 관찰 카메라 글 배율 — 같은 값을 읽는다, 없으면 1)
 	float Speed();        // eco.R9Demo.Speed : 시간 배율 (0 = 멈춤)
 	bool Text();          // eco.R9Demo.Text : 작은 글자
@@ -181,7 +181,7 @@ struct FEcoR9DemoState
 	TArray<int16> WinQuant;                      // 창 칸마다 그린 풀 양 (0..64, −1 숨김, −2 아직)
 	bool bWinPrevValid = false;
 	// 몸 배정 (큰 세계: 카메라에 가까운 개체만 몸, 나머지는 작은 표식)
-	TWeakObjectPtr<UInstancedStaticMeshComponent> FarIsm[3];
+	TWeakObjectPtr<UInstancedStaticMeshComponent> FarIsm[EcoR9Demo::kNumSpecies];   // 종마다 (동물 장면 = 여섯)
 	int32 NumFar = 0;
 	int32 NumBodyActors = 0;
 	// 프레임 색인 (uid → 프레임 안 번호)
@@ -193,6 +193,9 @@ struct FEcoR9DemoState
 	double NextHide = 0.0;
 	// 멧돼지 몸
 	FString BoarLine;
+	// 동물 세계 (2026-11-13 05:00)
+	FString FaunaLine;           // 동물 장면을 골랐나·왜 아닌가 (기록 줄)
+	FString FaunaBodyLine;       // 물소·표범·여우 몸 (표현 BP 이름 — 기록 줄)
 	// 결정 비용 (기록 줄)
 	double AdvanceMsSum = 0.0;
 	int32 AdvanceCount = 0;
@@ -225,7 +228,13 @@ struct FEcoR9DemoState
 	int32 WolvesKilled = 0;
 	int32 Starved = 0;
 	int32 Respawns = 0;
-	int32 Eats[3][4] = {};       // 실제로 먹은 개체·스텝 [종][먹이 + 1] (0 = 모름 — 재생 판, 1 풀 · 2 땅속 · 3 고기 = 사체). 기록 줄 셈용
+	int32 Eats[EcoR9Demo::kNumSpecies][4] = {};   // 실제로 먹은 개체·스텝 [종][먹이 + 1] (0 = 모름 — 재생 판, 1 풀 · 2 땅속 · 3 고기 = 사체). 기록 줄 셈용
+	// 동물 세계 누계 (종별 — 세 종 판에서도 같이 센다, 위 옛 누계는 그대로)
+	int32 BittenSp[EcoR9Demo::kNumSpecies] = {};    // 물려 죽은 수 [죽은 종]
+	int32 StruckSp[EcoR9Demo::kNumSpecies] = {};    // 받혀·받아침에 죽은 수 [죽은 종] (늑대 = 멧돼지·물소 반격, 그 밖 = 물소 들이받기)
+	int32 StarvedSp[EcoR9Demo::kNumSpecies] = {};   // 굶어·기타 죽은 수
+	int32 Gores = 0;                                // 물소 들이받기 (다치게 함)
+	int32 GoreKills = 0;                            // 물소 들이받기로 죽음
 
 	// 카메라 (2026-11-13 03:30 — 옛 관찰 카메라 꼴, EcoR9DemoCam.h)
 	EEcoR9DemoCam CamMode = EEcoR9DemoCam::Auto;

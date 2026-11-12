@@ -22,6 +22,10 @@
 //                                             0 = 그 자리 자유 카메라 (다시 0 도 자유 카메라), 자유 카메라 속도 = -, 다시 누름·. , = 다음·이전 대상, 줌, H, 콘솔 eco.R9Demo.Cam
 //   AdaptiveEcosystem.R9Demo.OnlyMap          맵 거르기 (패키지·오브젝트 경로·짧은 이름·PIE 머리·여럿), 명령줄 깃발은 거르지 않음,
 //                                             OnlyMap 밖 시험 월드 = Play 시작 때 아무것도 안 만듦 (옛 관찰 카메라 값도 그대로) · Play 중 직접 eco.R9Demo 1 은 켬 · 목록 안 = 켬
+//   (2026-11-13 05:00 동물 세계 — 물소·표범·여우)
+//   AdaptiveEcosystem.R9Demo.FaunaPick        종 번호·이름, 동물 세계 파일 고르기 (하나라도 없으면 세 종), 무리 자리 마릿수 합, 설정 (Fauna·FaunaPerHerd·장면 직접 줌)
+//   AdaptiveEcosystem.R9Demo.FaunaKeys        8 물소 · 9 표범 · J 여우 (0~7 그대로), 모드 8·9·10, 팀·옛 카메라·자유 카메라 키와 안 겹침, 화면 줄
+//   AdaptiveEcosystem.R9Demo.FaunaScene       세 종 장면은 새 종 마릿수를 줘도 비트 그대로 · 종 3, fauna/ 파일이 있으면 6 종 큰 세계 600 스텝
 
 #include "Misc/AutomationTest.h"
 
@@ -41,12 +45,25 @@
 #include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
+#include "HAL/FileManager.h"
 #include "HAL/IConsoleManager.h"
+#include "HAL/PlatformTime.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
 #include "Misc/Paths.h"
 
 #include <limits>
+
+// 이어 돌리기 대조 (엔진 없음 — 코어가 있는 빌드만, ParityChain 시험)
+#if defined(__has_include)
+#if __has_include("EcoR9Core.h") && __has_include("EcoR9ChainCheck.h")
+#include "EcoR9ChainCheck.h"
+#define ECO_R9_TEST_HAS_CHAIN 1
+#endif
+#endif
+#ifndef ECO_R9_TEST_HAS_CHAIN
+#define ECO_R9_TEST_HAS_CHAIN 0
+#endif
 
 namespace EcoR9DemoTestImpl
 {
@@ -143,6 +160,34 @@ namespace EcoR9DemoTestImpl
 			World.RealTimeSeconds += Dt;
 			World.UnpausedTimeSeconds += Dt;
 			Sub.Tick(Dt);
+		}
+	}
+
+	/** <Dir>/fauna/ 에 동물 세계 장면·새 종 두뇌 셋이 다 있나 (옛 세 종 두뇌는 <Dir> 에 있다고 봄 — 서브시스템 PickFaunaFiles 와 같은 조건). */
+	bool HaveFaunaFiles(const FString& Dir)
+	{
+		const FString FaunaDir = FPaths::Combine(Dir, TEXT("fauna"));
+		bool bAll = FPaths::FileExists(FPaths::Combine(FaunaDir, TEXT("scene.txt")));
+		for (int32 k = kNumOldSpecies; k < kNumSpecies; ++k)
+		{
+			bAll = bAll && FPaths::FileExists(FPaths::Combine(FaunaDir, FString(UTF8_TO_TCHAR(SpeciesKey(static_cast<std::uint8_t>(k)))) + TEXT(".r9brain")));
+		}
+		return bAll;
+	}
+
+	/**
+	 * 동물 세계 파일이 없어 6 종 길을 못 볼 때 (검토 11-13 06:10): 명령줄 -EcoR9RequireFauna 면 실패, 아니면 경고만.
+	 * Build 확인(fauna/ 를 내보낸 뒤)은 이 깃발로 돌려 '6 종 길을 건너뛰고 초록불' 이 되지 않게 한다.
+	 */
+	void FaunaMissing(FAutomationTestBase& Test, const FString& What)
+	{
+		if (FParse::Param(FCommandLine::Get(), TEXT("EcoR9RequireFauna")))
+		{
+			Test.AddError(What + TEXT(" (-EcoR9RequireFauna)"));
+		}
+		else
+		{
+			Test.AddWarning(What);
 		}
 	}
 
@@ -957,7 +1002,10 @@ bool FEcoR9DemoWholeMap::RunTest(const FString& Parameters)
 	Restore.Set(TEXT("eco.R9Demo.Area"), TEXT("0"));
 	Restore.Set(TEXT("eco.R9Demo.Herds"), TEXT("2"));
 	Restore.Set(TEXT("eco.R9Demo.HideOthers"), TEXT("1"));
+	Restore.Set(TEXT("eco.R9Demo.Fauna"), TEXT("1"));            // 섬 Play 기본 길 그대로 (fauna/ 가 있으면 6 종)
+	Restore.Set(TEXT("eco.R9Demo.FaunaPerHerd"), TEXT("4,1,2"));
 	Restore.Set(TEXT("eco.R9Demo"), TEXT("1"));
+	const bool bFaunaFiles = HaveFaunaFiles(FPaths::Combine(FEcoR9DemoSettings::DefaultDir(), TEXT("brains")));
 	UWorld* World = UWorld::CreateWorld(EWorldType::Game, /*bInformEngineOfWorld*/ true);
 	if (!TestNotNull(TEXT("시험 월드"), World))
 	{
@@ -1035,6 +1083,25 @@ bool FEcoR9DemoWholeMap::RunTest(const FString& Parameters)
 		else
 		{
 			AddWarning(TEXT("코어에 큰 세계 장면 생성기가 없거나 시작을 못 해 예전 한 무대로 돌았다 (기록 줄 [EcoR9Demo] 참고)"));
+		}
+		// 동물 세계 (검토 11-13 06:10 — 실제 Play 길: ChooseFaunaFiles → TryStart → 새 종 몸·먼 표식). fauna/ 가 있으면 6 종, 없으면 세 종
+		AddInfo(FString::Printf(TEXT("종 %d · %s"), Sub->NumSceneSpecies(), *Sub->FaunaChoiceLine()));
+		if (bFaunaFiles)
+		{
+			TestEqual(TEXT("fauna/ 가 있으면 동물 장면 (종 6)"), Sub->NumSceneSpecies(), 6);
+			TestTrue(TEXT("동물 장면이라고 앎"), Sub->IsFaunaScene());
+			for (int32 k = kNumOldSpecies; k < kNumSpecies; ++k)
+			{
+				TestTrue(FString::Printf(TEXT("%s 가 보인다 (몸 또는 먼 표식, 지금 %d)"), UTF8_TO_TCHAR(SpeciesKey(static_cast<std::uint8_t>(k))),
+										 Sub->NumShownOfSpecies(static_cast<uint8>(k))),
+						 Sub->NumShownOfSpecies(static_cast<uint8>(k)) >= 1);
+			}
+		}
+		else
+		{
+			TestEqual(TEXT("fauna/ 가 없으면 세 종"), Sub->NumSceneSpecies(), 3);
+			TestEqual(TEXT("세 종 판에 물소 없음"), Sub->NumShownOfSpecies(static_cast<uint8>(kBuffalo)), 0);
+			FaunaMissing(*this, TEXT("<Saved>/R9Demo/brains/fauna/ 에 동물 세계 파일이 없어 6 종 Play 길은 보지 않았다 (세 종만)"));
 		}
 		AddInfo(FString::Printf(TEXT("큰 세계 %s · 무리 자리 %d · 몸 %d · 먼 표식 %d · 스텝 %lld · 멧돼지 몸 %s"), Sub->IsWhole() ? TEXT("예") : TEXT("아니오"), Sub->NumHerdSites(),
 								Sub->NumBodyActors(), Sub->NumFarMarkers(), static_cast<long long>(Sub->NumStepsShown()), *Sub->BoarBodyLine()));
@@ -1586,6 +1653,431 @@ bool FEcoR9DemoOnlyMap::RunTest(const FString& Parameters)
 		World->DestroyWorld(false);
 		GEngine->DestroyWorldContext(World);
 	}
+	return true;
+}
+
+// =============================================================================
+// 동물 세계 (2026-11-13 05:00 — 물소·표범·여우, scratchpad/r9/ue_demo/fauna/UE_FAUNA.md)
+// =============================================================================
+
+// 엔진 월드 없이: 종 번호·이름 (코어·파이썬 ALL_SPECIES 차례), 동물 세계 파일 고르기 (새 종 두뇌 셋 + fauna/scene.txt 가 다 있어야 6 종 — 하나라도 없으면 세 종),
+// 무리 자리 마릿수 합 (세 종 장면은 뒤 셋을 세지 않음), 설정 읽기 (eco.R9Demo.Fauna · -EcoR9Fauna= · eco.R9Demo.FaunaPerHerd · 장면 직접 줌).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoFaunaPick, "AdaptiveEcosystem.R9Demo.FaunaPick", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoFaunaPick::RunTest(const FString& Parameters)
+{
+	using namespace EcoR9Demo;
+	using namespace EcoR9DemoTestImpl;
+	// 1. 종 번호·이름
+	TestEqual(TEXT("종 최대 6"), static_cast<int32>(kNumSpecies), 6);
+	TestEqual(TEXT("옛 세 종"), static_cast<int32>(kNumOldSpecies), 3);
+	const char* const Want[6] = {"deer", "wolf", "boar", "buffalo", "leopard", "fox"};
+	for (int32 k = 0; k < 6; ++k)
+	{
+		TestEqual(FString::Printf(TEXT("종 %d 이름"), k), FString(UTF8_TO_TCHAR(SpeciesKey(static_cast<std::uint8_t>(k)))), FString(UTF8_TO_TCHAR(Want[k])));
+	}
+	TestTrue(TEXT("무는 종 = 늑대·표범·여우"), IsBiter(kWolf) && IsBiter(kLeopard) && IsBiter(kFox) && !IsBiter(kDeer) && !IsBiter(kBoar) && !IsBiter(kBuffalo));
+	// 2. 파일 고르기 (Exists 를 흉내 — 실제 파일을 건드리지 않음)
+	const std::string Dir = "D:/brains";
+	auto MakeExists = [](std::vector<std::string> Have)
+	{
+		return [Have](const std::string& P) { return std::find(Have.begin(), Have.end(), P) != Have.end(); };
+	};
+	const std::vector<std::string> All = {"D:/brains/deer.r9brain", "D:/brains/wolf.r9brain", "D:/brains/boar.r9brain", "D:/brains/fauna/buffalo.r9brain",
+										  "D:/brains/fauna/leopard.r9brain", "D:/brains/fauna/fox.r9brain", "D:/brains/fauna/scene.txt"};
+	{
+		const FR9FaunaPick P = PickFaunaFiles(1, false, Dir, MakeExists(All));
+		TestTrue(TEXT("다 있으면 동물 장면"), P.bUse);
+		TestEqual(TEXT("장면 = fauna/scene.txt"), FString(UTF8_TO_TCHAR(P.ScenePath.c_str())), FString(TEXT("D:/brains/fauna/scene.txt")));
+		TestEqual(TEXT("새 종 두뇌 = fauna/"), FString(UTF8_TO_TCHAR(P.BrainPath[kLeopard].c_str())), FString(TEXT("D:/brains/fauna/leopard.r9brain")));
+		TestEqual(TEXT("옛 종 두뇌가 fauna/ 에 없으면 S′ 두뇌 (rebody 뜻)"), FString(UTF8_TO_TCHAR(P.BrainPath[kWolf].c_str())), FString(TEXT("D:/brains/wolf.r9brain")));
+	}
+	{
+		std::vector<std::string> WithFaunaWolf = All;
+		WithFaunaWolf.push_back("D:/brains/fauna/wolf.r9brain");
+		const FR9FaunaPick P = PickFaunaFiles(1, false, Dir, MakeExists(WithFaunaWolf));
+		TestEqual(TEXT("fauna/ 에 늑대가 있으면 그것 (동물 세계에서 배운 늑대)"), FString(UTF8_TO_TCHAR(P.BrainPath[kWolf].c_str())),
+				  FString(TEXT("D:/brains/fauna/wolf.r9brain")));
+	}
+	for (int32 Drop = 3; Drop < 7; ++Drop)
+	{
+		std::vector<std::string> Some = All;
+		Some.erase(Some.begin() + Drop);
+		const FR9FaunaPick P = PickFaunaFiles(1, false, Dir, MakeExists(Some));
+		TestFalse(FString::Printf(TEXT("%s 가 없으면 세 종"), UTF8_TO_TCHAR(All[static_cast<std::size_t>(Drop)].c_str())), P.bUse);
+		TestTrue(TEXT("까닭에 빠진 파일 이름"), P.Why.find(All[static_cast<std::size_t>(Drop)].substr(10)) != std::string::npos);
+	}
+	TestFalse(TEXT("eco.R9Demo.Fauna 0 = 세 종"), PickFaunaFiles(0, false, Dir, MakeExists(All)).bUse);
+	TestFalse(TEXT("장면을 직접 주면 바꾸지 않음"), PickFaunaFiles(1, true, Dir, MakeExists(All)).bUse);
+	TestFalse(TEXT("아무 파일도 없으면 세 종"), PickFaunaFiles(1, false, Dir, MakeExists({})).bUse);
+	// 3. 무리 자리 마릿수 합
+	const std::int32_t Per[kNumSpecies] = {24, 2, 8, 4, 1, 2};
+	TestEqual(TEXT("세 종 장면은 뒤 셋을 세지 않음"), PerHerdTotal(Per, 3), 34);
+	TestEqual(TEXT("동물 장면 = 여섯 합"), PerHerdTotal(Per, 6), 41);
+	// 4. 설정 읽기 (명령줄 글로 — 콘솔 eco.R9Demo 는 건드리지 않음)
+	FCVarRestore Restore;
+	Restore.Set(TEXT("eco.R9Demo.Fauna"), TEXT("1"));
+	Restore.Set(TEXT("eco.R9Demo.FaunaPerHerd"), TEXT("4,1,2"));
+	Restore.Set(TEXT("eco.R9Demo.PerHerd"), TEXT("24,2,8"));
+	Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
+	{
+		const FEcoR9DemoSettings S = FEcoR9DemoSettings::Resolve(TEXT("-EcoR9Demo"));
+		TestTrue(TEXT("기본 = 동물 세계 켬 (파일이 있으면)"), S.Fauna == 1 && !S.bSceneExplicit);
+		TestTrue(TEXT("자리마다 24,2,8 + 4,1,2"), S.PerHerd[0] == 24 && S.PerHerd[1] == 2 && S.PerHerd[2] == 8 && S.PerHerd[3] == 4 && S.PerHerd[4] == 1 && S.PerHerd[5] == 2);
+		TestTrue(TEXT("fauna 폴더 = <두뇌 폴더>/fauna"), S.FaunaDir().EndsWith(TEXT("fauna")));
+	}
+	TestEqual(TEXT("-EcoR9Fauna=0 = 세 종만"), FEcoR9DemoSettings::Resolve(TEXT("-EcoR9Demo -EcoR9Fauna=0")).Fauna, 0);
+	TestTrue(TEXT("-EcoR9Scene= = 장면 직접 줌"), FEcoR9DemoSettings::Resolve(TEXT("-EcoR9Demo -EcoR9Scene=D:/x/scene.txt")).bSceneExplicit);
+	Restore.Set(TEXT("eco.R9Demo.FaunaPerHerd"), TEXT("0,0,0"));
+	{
+		const FEcoR9DemoSettings S = FEcoR9DemoSettings::Resolve(TEXT("-EcoR9Demo"));
+		TestTrue(TEXT("FaunaPerHerd 0,0,0 도 받는다 (새 종 없이)"), S.PerHerd[3] == 0 && S.PerHerd[4] == 0 && S.PerHerd[5] == 0 && S.PerHerd[0] == 24);
+	}
+	return true;
+}
+
+// 카메라 키: 8 물소 · 9 표범 · J 여우 (옛 0~7 뜻 그대로), 모드 값 8·9·10 (7 은 모드 아님), 팀 입력·옛 관찰 카메라·자유 카메라 키와 안 겹침, 화면 줄.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoFaunaKeys, "AdaptiveEcosystem.R9Demo.FaunaKeys", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoFaunaKeys::RunTest(const FString& Parameters)
+{
+	using namespace EcoR9DemoTestImpl;
+	using EcoR9DemoCam::EAction;
+	TestTrue(TEXT("8 = 물소 시점"), KeyIs(EKeys::Eight, EAction::Buffalo) && KeyIs(EKeys::NumPadEight, EAction::Buffalo));
+	TestTrue(TEXT("9 = 표범 시점"), KeyIs(EKeys::Nine, EAction::Leopard) && KeyIs(EKeys::NumPadNine, EAction::Leopard));
+	TestTrue(TEXT("J = 여우 시점"), KeyIs(EKeys::J, EAction::Fox));
+	// 옛 뜻 그대로 (0~7)
+	TestTrue(TEXT("0~7 은 그대로"), KeyIs(EKeys::Zero, EAction::Free) && KeyIs(EKeys::One, EAction::Wolf) && KeyIs(EKeys::Two, EAction::Deer) &&
+										KeyIs(EKeys::Three, EAction::Top) && KeyIs(EKeys::Four, EAction::Quarter) && KeyIs(EKeys::Five, EAction::Auto) &&
+										KeyIs(EKeys::Six, EAction::Boar) && KeyIs(EKeys::Seven, EAction::NextSite));
+	const struct
+	{
+		FKey Key;
+		int32 Mode;
+		const TCHAR* Name;
+	} New[] = {{EKeys::Eight, 8, TEXT("물소 시점")}, {EKeys::Nine, 9, TEXT("표범 시점")}, {EKeys::J, 10, TEXT("여우 시점")}};
+	for (const auto& N : New)
+	{
+		EAction A = EAction::Count;
+		EEcoR9DemoCam M = EEcoR9DemoCam::Auto;
+		EEcoR9DemoCam Mi = EEcoR9DemoCam::Auto;
+		TestTrue(FString::Printf(TEXT("%s → 모드 %d"), *N.Key.ToString(), N.Mode),
+				 EcoR9DemoCam::ActionOf(N.Key, A) && EcoR9DemoCam::ModeOf(A, M) && static_cast<int32>(M) == N.Mode && EcoR9DemoCam::ModeFromInt(N.Mode, Mi) && Mi == M);
+		TestEqual(FString::Printf(TEXT("모드 %d 이름"), N.Mode), FString(EcoR9DemoCam::ModeNameKo(M)), FString(N.Name));
+		for (const FKey& K : EcoV3Observe::TeamReservedKeys())
+		{
+			TestFalse(FString::Printf(TEXT("%s 는 팀 키가 아님"), *N.Key.ToString()), K == N.Key);
+		}
+		for (const EcoV3Observe::FKeyBind& B : EcoV3Observe::Keys())
+		{
+			TestFalse(FString::Printf(TEXT("%s 는 옛 관찰 카메라 키가 아님"), *N.Key.ToString()), B.Key == N.Key);
+		}
+		for (const EcoV3Observe::FFreeKey& F : EcoV3Observe::FreeMoveKeys())
+		{
+			TestFalse(FString::Printf(TEXT("%s 는 자유 카메라 이동 키가 아님"), *N.Key.ToString()), F.Key == N.Key);
+		}
+	}
+	{
+		EEcoR9DemoCam M = EEcoR9DemoCam::Auto;
+		TestFalse(TEXT("모드 7·11 은 없다"), EcoR9DemoCam::ModeFromInt(7, M) || EcoR9DemoCam::ModeFromInt(11, M));
+	}
+	const FString Fauna = FString::Join(EcoR9DemoCam::KeyHelpLines(true, true), TEXT("\n"));
+	for (const TCHAR* Token : {TEXT("8   물소"), TEXT("9   표범"), TEXT("J   여우"), TEXT("들이받기"), TEXT("6   멧돼지"), TEXT("7  G")})
+	{
+		TestTrue(FString::Printf(TEXT("동물 세계 화면 줄에 '%s'"), Token), Fauna.Contains(Token));
+	}
+	TestFalse(TEXT("세 종 판 화면 줄에는 8 · 9 · J 줄 없음"), FString::Join(EcoR9DemoCam::KeyHelpLines(true), TEXT("\n")).Contains(TEXT("8   물소")));
+	return true;
+}
+
+namespace EcoR9DemoTestImpl
+{
+	/** 평평한 열린 땅 지도 (코어 칸, 둘레 한 칸은 물) — 큰 세계 장면 생성기 시험용. */
+	std::shared_ptr<EcoR9Demo::FR9WholeSpec> FlatWhole(int32 G, const std::int32_t PerHerd[EcoR9Demo::kNumSpecies])
+	{
+		auto W = std::make_shared<EcoR9Demo::FR9WholeSpec>();
+		W->G = G;
+		W->CellUnits = 2.0;
+		W->Kind.assign(static_cast<std::size_t>(G) * static_cast<std::size_t>(G), EcoR9Demo::kLandOpen);
+		for (int32 i = 0; i < G; ++i)
+		{
+			W->Kind[static_cast<std::size_t>(i)] = W->Kind[static_cast<std::size_t>((G - 1) * G + i)] = EcoR9Demo::kLandVoid;
+			W->Kind[static_cast<std::size_t>(i * G)] = W->Kind[static_cast<std::size_t>(i * G + G - 1)] = EcoR9Demo::kLandVoid;
+		}
+		W->Herds = 2;
+		for (int32 k = 0; k < EcoR9Demo::kNumSpecies; ++k)
+		{
+			W->PerHerd[k] = PerHerd[k];
+		}
+		W->MaxAnimals = 400;
+		return W;
+	}
+
+	bool LoadBrains(const FString& Dir, const FString& FaunaDir, int32 NumSp, EcoR9Demo::FR9LiveConfig& C)
+	{
+		for (int32 k = 0; k < NumSp; ++k)
+		{
+			const FString Name = FString(UTF8_TO_TCHAR(EcoR9Demo::SpeciesKey(static_cast<std::uint8_t>(k)))) + TEXT(".r9brain");
+			FString Path = FaunaDir.IsEmpty() ? FString() : FPaths::Combine(FaunaDir, Name);
+			if (Path.IsEmpty() || !FPaths::FileExists(Path))
+			{
+				Path = FPaths::Combine(Dir, Name);
+			}
+			TArray<uint8> Bytes;
+			if (!FFileHelper::LoadFileToArray(Bytes, *Path))
+			{
+				return false;
+			}
+			C.BrainBytes[k].assign(Bytes.GetData(), Bytes.GetData() + Bytes.Num());
+		}
+		return true;
+	}
+}
+
+// 코어 실시간 원천 (엔진 월드 없이): (1) 세 종 장면은 새 종 마릿수(PerHerd 뒤 셋)를 줘도 비트 그대로 — 같은 시드 같은 프레임 (세 종 길 지킴),
+// (2) 세 종 장면 + 두뇌 셋만 = 종 3 · 동물 몸 규칙 꺼짐 (새 종 두뇌가 없을 때 떨어지는 길), (3) <두뇌 폴더>/fauna/ 에 동물 세계 장면·두뇌가 있으면
+// 6 종 큰 세계 장면: 종별 마릿수 = 자리 수 × 자리마다, 새 종이 프레임에 나오고 600 스텝 돌며 종 번호가 6 밖으로 나가지 않는다 (없으면 경고 뒤 건너뜀).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoFaunaScene, "AdaptiveEcosystem.R9Demo.FaunaScene", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoFaunaScene::RunTest(const FString& Parameters)
+{
+	using namespace EcoR9Demo;
+	using namespace EcoR9DemoTestImpl;
+	if (!FR9LiveSource::Available() || !FR9LiveSource::WholeAvailable())
+	{
+		AddWarning(TEXT("이 빌드에는 R9 코어·큰 세계 생성기가 없다 — 건너뜀"));
+		return true;
+	}
+	const FString Dir = FindBrainDir();
+	if (Dir.IsEmpty() || !FPaths::FileExists(FPaths::Combine(Dir, TEXT("scene.txt"))))
+	{
+		AddWarning(TEXT("두뇌 폴더·장면 파일을 못 찾음 (<Saved>/R9Demo/brains/scene.txt) — 건너뜀"));
+		return true;
+	}
+	TArray<uint8> Bytes;
+	FR9LiveConfig C3;
+	if (!TestTrue(TEXT("세 종 장면 읽기"), FFileHelper::LoadFileToArray(Bytes, *FPaths::Combine(Dir, TEXT("scene.txt")))) ||
+		!TestTrue(TEXT("세 종 두뇌 읽기"), LoadBrains(Dir, FString(), 3, C3)))
+	{
+		return false;
+	}
+	C3.SceneText.assign(reinterpret_cast<const char*>(Bytes.GetData()), static_cast<std::size_t>(Bytes.Num()));
+	C3.Seed = 21;
+	C3.bSample = true;
+	const std::int32_t Old[kNumSpecies] = {24, 2, 8, 0, 0, 0};
+	const std::int32_t With[kNumSpecies] = {24, 2, 8, 4, 1, 2};
+	// (1)·(2) 세 종 장면: 새 종 마릿수를 줘도 같다 · 종 3
+	{
+		FR9LiveConfig A = C3;
+		FR9LiveConfig B = C3;
+		A.Whole = FlatWhole(160, Old);
+		B.Whole = FlatWhole(160, With);
+		FR9LiveSource Sa, Sb;
+		FR9WorldInfo Ia, Ib;
+		FR9Frame Fa, Fb;
+		std::string Err;
+		if (!TestTrue(TEXT("세 종 큰 세계 시작"), Sa.Init(A, Ia, Fa, Err) && Sb.Init(B, Ib, Fb, Err)))
+		{
+			AddError(FString(UTF8_TO_TCHAR(Err.c_str())));
+			return false;
+		}
+		TestEqual(TEXT("세 종 장면 = 종 3 (새 종 두뇌 없이 떨어지는 길)"), Ia.NumSpecies, 3);
+		TestFalse(TEXT("세 종 장면 = 동물 몸 규칙 꺼짐"), Ia.bFauna);
+		TestTrue(TEXT("시작 장면 같음 (PerHerd 뒤 셋을 보지 않음)"), SameFrame(Fa, Fb));
+		int32 Mismatch = 0;
+		for (int32 t = 0; t < 200; ++t)
+		{
+			Sa.Next(Fa, Err);
+			Sb.Next(Fb, Err);
+			Mismatch += SameFrame(Fa, Fb) ? 0 : 1;
+		}
+		TestEqual(TEXT("세 종 장면 200 스텝 비트 같음"), Mismatch, 0);
+		bool bOnlyOld = true;
+		for (const FR9Agent& Ag : Fa.Agents)
+		{
+			bOnlyOld = bOnlyOld && Ag.Species < kNumOldSpecies;
+		}
+		TestTrue(TEXT("세 종 장면에 새 종 없음"), bOnlyOld);
+	}
+	// (3) 동물 세계 장면 (파일이 있을 때만)
+	const FString FaunaDir = FPaths::Combine(Dir, TEXT("fauna"));
+	const FString FaunaScene = FPaths::Combine(FaunaDir, TEXT("scene.txt"));
+	bool bFaunaFiles = FPaths::FileExists(FaunaScene);
+	for (int32 k = kNumOldSpecies; k < kNumSpecies; ++k)
+	{
+		bFaunaFiles = bFaunaFiles && FPaths::FileExists(FPaths::Combine(FaunaDir, FString(UTF8_TO_TCHAR(SpeciesKey(static_cast<std::uint8_t>(k)))) + TEXT(".r9brain")));
+	}
+	if (!bFaunaFiles)
+	{
+		FaunaMissing(*this, FString::Printf(TEXT("%s 에 동물 세계 장면·새 종 두뇌가 없다 — 6 종 장면 시험은 건너뜀 (세 종 길만 봄)"), *FaunaDir));
+		return true;
+	}
+	FR9LiveConfig C6;
+	Bytes.Reset();
+	if (!TestTrue(TEXT("동물 세계 장면 읽기"), FFileHelper::LoadFileToArray(Bytes, *FaunaScene)) || !TestTrue(TEXT("여섯 두뇌 읽기"), LoadBrains(Dir, FaunaDir, 6, C6)))
+	{
+		return false;
+	}
+	C6.SceneText.assign(reinterpret_cast<const char*>(Bytes.GetData()), static_cast<std::size_t>(Bytes.Num()));
+	C6.Seed = 21;
+	C6.bSample = true;
+	C6.Whole = FlatWhole(160, With);
+	FR9LiveSource S6;
+	FR9WorldInfo I6;
+	FR9Frame F6;
+	std::string Err;
+	if (!TestTrue(TEXT("동물 세계 큰 세계 시작"), S6.Init(C6, I6, F6, Err)))
+	{
+		AddError(FString(UTF8_TO_TCHAR(Err.c_str())));
+		return false;
+	}
+	TestEqual(TEXT("동물 장면 = 종 6"), I6.NumSpecies, 6);
+	TestTrue(TEXT("동물 장면 = 동물 몸 규칙 켬"), I6.bFauna);
+	const int32 K = static_cast<int32>(I6.HerdXY.size() / 2);
+	for (int32 k = 0; k < kNumSpecies; ++k)
+	{
+		TestEqual(FString::Printf(TEXT("%s 마릿수 = 자리 %d × %d"), UTF8_TO_TCHAR(SpeciesKey(static_cast<std::uint8_t>(k))), K, With[k]), I6.Counts[k], K * With[k]);
+	}
+	std::int32_t Alive0[kNumSpecies];
+	CountAlive(F6, Alive0);
+	TestTrue(TEXT("새 종이 프레임에 나옴"), Alive0[kBuffalo] > 0 && Alive0[kLeopard] > 0 && Alive0[kFox] > 0);
+	int32 BadSpecies = 0, Steps = 0, Gores = 0;
+	for (int32 t = 0; t < 600; ++t)
+	{
+		if (!S6.Next(F6, Err))
+		{
+			break;
+		}
+		++Steps;
+		for (const FR9Agent& Ag : F6.Agents)
+		{
+			BadSpecies += Ag.Species >= kNumSpecies ? 1 : 0;
+		}
+		for (const FR9Event& E : F6.Events)
+		{
+			Gores += (E.Kind == ER9Event::Gore || E.Kind == ER9Event::GoreKill) ? 1 : 0;
+		}
+	}
+	TestEqual(TEXT("600 스텝 돎"), Steps, 600);
+	TestEqual(TEXT("종 번호가 6 밖으로 나가지 않음"), BadSpecies, 0);
+	AddInfo(FString::Printf(TEXT("동물 세계 600 스텝: 무리 자리 %d · 들이받기 사건 %d · %s"), K, Gores, UTF8_TO_TCHAR(S6.CostLine().c_str())));
+	return true;
+}
+
+// 동물 장면이 깨졌을 때 세 종으로 돌아가는 실제 Play 길 (검토 11-13 06:10 — 서브시스템 ChooseFaunaFiles → TryStart(동물) 실패 → TryStart(세 종)).
+// 자동화 임시 폴더에 기본 폴더의 세 종 두뇌·장면을 베끼고, fauna/ 에는 종 이름이 다른 두뇌 (buffalo.r9brain = 멧돼지 두뇌 · leopard·fox = 늑대 두뇌) 와
+// 장면 (기본 폴더 fauna/scene.txt, 없으면 세 종 장면) 을 둔다. 콘솔 eco.R9Demo.Brains 로 그 폴더를 주고 켜면 파일 조건은 채워 동물 장면을 고르지만
+// 코어 시작에서 실패해야 하고 (두뇌 종 이름 다름 · 또는 세 종 장면), 세 종으로 다시 서야 한다 (종 3 · 물소 안 보임 · 까닭 줄). 기본 두뇌 폴더는 건드리지 않는다.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoFaunaFallback, "AdaptiveEcosystem.R9Demo.FaunaFallback", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoFaunaFallback::RunTest(const FString& Parameters)
+{
+	using namespace EcoR9DemoTestImpl;
+	using namespace EcoR9Demo;
+	FString Why;
+	if (!CanRunConsoleWorld(Why))
+	{
+		AddWarning(Why + TEXT(" — 건너뜀"));
+		return true;
+	}
+	const FString Src = FPaths::Combine(FEcoR9DemoSettings::DefaultDir(), TEXT("brains"));
+	const FString Tmp = FPaths::Combine(FPaths::AutomationTransientDir(), TEXT("R9FaunaFallback"));
+	const FString TmpFauna = FPaths::Combine(Tmp, TEXT("fauna"));
+	IFileManager& Fm = IFileManager::Get();
+	Fm.DeleteDirectory(*Tmp, /*RequireExists*/ false, /*Tree*/ true);
+	Fm.MakeDirectory(*TmpFauna, /*Tree*/ true);
+	const FString SrcFaunaScene = FPaths::Combine(Src, TEXT("fauna"), TEXT("scene.txt"));
+	const TPair<FString, FString> Copies[] = {
+		{FPaths::Combine(Src, TEXT("deer.r9brain")), FPaths::Combine(Tmp, TEXT("deer.r9brain"))},
+		{FPaths::Combine(Src, TEXT("wolf.r9brain")), FPaths::Combine(Tmp, TEXT("wolf.r9brain"))},
+		{FPaths::Combine(Src, TEXT("boar.r9brain")), FPaths::Combine(Tmp, TEXT("boar.r9brain"))},
+		{FPaths::Combine(Src, TEXT("scene.txt")), FPaths::Combine(Tmp, TEXT("scene.txt"))},
+		{FPaths::Combine(Src, TEXT("boar.r9brain")), FPaths::Combine(TmpFauna, TEXT("buffalo.r9brain"))},
+		{FPaths::Combine(Src, TEXT("wolf.r9brain")), FPaths::Combine(TmpFauna, TEXT("leopard.r9brain"))},
+		{FPaths::Combine(Src, TEXT("wolf.r9brain")), FPaths::Combine(TmpFauna, TEXT("fox.r9brain"))},
+		{FPaths::FileExists(SrcFaunaScene) ? SrcFaunaScene : FPaths::Combine(Src, TEXT("scene.txt")), FPaths::Combine(TmpFauna, TEXT("scene.txt"))},
+	};
+	for (const TPair<FString, FString>& C : Copies)
+	{
+		if (!TestEqual(FString::Printf(TEXT("시험 폴더로 베낌: %s"), *C.Value), static_cast<int32>(Fm.Copy(*C.Value, *C.Key)), static_cast<int32>(COPY_OK)))
+		{
+			Fm.DeleteDirectory(*Tmp, false, true);
+			return false;
+		}
+	}
+	TestTrue(TEXT("시험 폴더는 동물 장면 파일 조건을 채움 (ChooseFaunaFiles 가 동물 장면을 고름)"), HaveFaunaFiles(Tmp));
+	{
+		FCVarRestore Restore;
+		Restore.Set(TEXT("eco.R9Demo.AllowInTests"), TEXT("1"));
+		Restore.Set(TEXT("eco.R9Demo.OnlyMap"), TEXT(""));   // 시작 맵 거르기 끔 (이 PC UserEngine.ini 가 섬 맵만 켜도 시험 월드에서 돈다)
+		Restore.Set(TEXT("eco.R9Demo.Brains"), *Tmp);
+		Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
+		Restore.Set(TEXT("eco.R9Demo.At"), TEXT("0,0"));    // 땅 없는 시험 월드 — 자리 훑기 건너뜀 (ConsoleStart 와 같음)
+		Restore.Set(TEXT("eco.R9Demo.Fauna"), TEXT("1"));
+		Restore.Set(TEXT("eco.R9Demo"), TEXT("1"));
+		UWorld* World = UWorld::CreateWorld(EWorldType::Game, /*bInformEngineOfWorld*/ true);
+		if (TestNotNull(TEXT("시험 월드"), World))
+		{
+			FWorldContext& Ctx = GEngine->CreateNewWorldContext(EWorldType::Game);
+			Ctx.SetCurrentWorld(World);
+			UEcoR9DemoSubsystem* Sub = World->GetSubsystem<UEcoR9DemoSubsystem>();
+			if (TestNotNull(TEXT("서브시스템"), Sub))
+			{
+				Sub->OnWorldBeginPlay(*World);
+				TestTrue(TEXT("시작함 (동물 장면이 깨져도 멈추지 않음)"), Sub->IsActive());
+				TickDemo(*World, *Sub, 150);   // 월드 5 초
+				TestTrue(TEXT("세 종 장면으로 도는 중"), Sub->IsRunning());
+				TestEqual(TEXT("종 3 으로 돌아감"), Sub->NumSceneSpecies(), 3);
+				TestFalse(TEXT("동물 장면 아님"), Sub->IsFaunaScene());
+				TestEqual(TEXT("물소가 보이지 않음"), Sub->NumShownOfSpecies(static_cast<uint8>(kBuffalo)), 0);
+				TestTrue(TEXT("세 종 동물 몸이 생김 (사슴 24 · 늑대 4 · 멧돼지 8)"), Sub->NumBodies() >= 30);
+				TestTrue(FString::Printf(TEXT("까닭 줄에 '세 종으로 돈다' (%s)"), *Sub->FaunaChoiceLine()), Sub->FaunaChoiceLine().Contains(TEXT("세 종으로 돈다")));
+			}
+			// 월드를 먼저 지운다 (서브시스템이 액터를 치울 때 월드 컨텍스트가 있어야 경고가 없다)
+			World->DestroyWorld(false);
+			GEngine->DestroyWorldContext(World);
+		}
+	}
+	Fm.DeleteDirectory(*Tmp, false, true);
+	return true;
+}
+
+// 언리얼 모듈 안에서 컴파일된 코어 = 파이썬 (검토 11-13 06:10 — 그동안 대조는 언리얼 밖 g++·MSVC 대조기로만 했다): <Saved>/R9Demo/parity/ 의 작은 이어 돌리기 덤프
+// (chain_sprime.txt = 세 종 S′ 세계, chain_fauna.txt = 동물 세계 여섯 종 — 각 300 결정 = 600 스텝) 를 처음 장면에서 코어 혼자 이어 돌려 파이썬 상태·관측과 견준다
+// (EcoR9ChainCheck.h — scratchpad 대조기 chain 과 같은 셈·같은 허용 차). UBT 의 실제 빌드 옵션·unity 묶음에서 곱하기·더하기 묶음(FMA) 등으로 갈라지는지 본다.
+// 덤프는 저장소에 넣지 않는다 (scratchpad/r9/ue_demo/fauna/fix_cov/make_cov.sh 의 ue_chain_* 를 이름만 바꿔 둠). 없으면 건너뜀 (-EcoR9RequireFauna 면 실패).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoParityChain, "AdaptiveEcosystem.R9Demo.ParityChain", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoParityChain::RunTest(const FString& Parameters)
+{
+#if ECO_R9_TEST_HAS_CHAIN
+	using namespace EcoR9DemoTestImpl;
+	const FString Dir = FPaths::Combine(FEcoR9DemoSettings::DefaultDir(), TEXT("parity"));
+	const TCHAR* const Names[2] = {TEXT("chain_sprime.txt"), TEXT("chain_fauna.txt")};
+	for (int32 i = 0; i < 2; ++i)
+	{
+		const bool bFaunaDump = i == 1;
+		const FString Path = FPaths::Combine(Dir, Names[i]);
+		TArray<uint8> Bytes;
+		if (!FPaths::FileExists(Path) || !FFileHelper::LoadFileToArray(Bytes, *Path))
+		{
+			FaunaMissing(*this, FString::Printf(TEXT("대조 덤프 %s 가 없다 — 이 판은 건너뜀"), *Path));
+			continue;
+		}
+		const std::string Text(reinterpret_cast<const char*>(Bytes.GetData()), static_cast<std::size_t>(Bytes.Num()));
+		const double T0 = FPlatformTime::Seconds();
+		const EcoR9ChainCheck::FChainResult R = EcoR9ChainCheck::RunChain(Text);
+		const double Ms = 1000.0 * (FPlatformTime::Seconds() - T0);
+		AddInfo(FString::Printf(TEXT("%s: %s (%.0f ms)"), Names[i], UTF8_TO_TCHAR(R.Line().c_str()), Ms));
+		TestTrue(FString::Printf(TEXT("%s 를 끝까지 돌림"), Names[i]), R.bRan);
+		TestTrue(FString::Printf(TEXT("%s: 언리얼 빌드 코어 = 파이썬 (상태·관측·죽은 칸·난수 쓰임 어긋남 0)"), Names[i]), R.Pass());
+		TestTrue(FString::Printf(TEXT("%s: 상태를 두 곳 넘게 견줌"), Names[i]), R.Checks >= 2);
+		TestEqual(FString::Printf(TEXT("%s: 종 수"), Names[i]), R.NumSpecies, bFaunaDump ? 6 : 3);
+		TestTrue(FString::Printf(TEXT("%s: 동물 몸 규칙 %s"), Names[i], bFaunaDump ? TEXT("켬") : TEXT("끔")), R.bFauna == bFaunaDump);
+	}
+#else
+	AddWarning(TEXT("이 빌드에는 R9 코어(EcoR9Core.h)가 없다 — 건너뜀"));
+#endif
 	return true;
 }
 

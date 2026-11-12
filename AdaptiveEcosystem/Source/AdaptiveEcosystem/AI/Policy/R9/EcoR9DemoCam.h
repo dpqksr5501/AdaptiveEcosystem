@@ -7,6 +7,8 @@
 //
 //   1 늑대 시점 · 2 사슴 시점 · 3 탑뷰 · 4 쿼터뷰 · 5 자동 추적 · 0 자유 카메라          ← 옛 키 그대로 (숫자패드도)
 //   6 멧돼지 시점 · 7 (= G) 다음 무리 자리 (끝에 섬 전체)                                 ← R9 만 (옛 키·옛 문서에 없는 숫자, G 는 옛 '지역 바꾸기')
+//   8 물소 · 9 표범 · J 여우 시점 (동물 세계 2026-11-13 05:00)                            ← R9 만. 숫자가 모자라 여우는 J — 팀 입력 매핑(IMC_*)·플레이어/컨트롤러 BP·
+//                                                                                        C++ 키 읽기 어디에도 Eight·Nine·J 이름이 없음을 확인 (fauna/UE_FAUNA.md)
 //   , . 이전·다음 대상 · - = 휠 줌 (자유 카메라: 이동 속도) · H 단축키 목록 숨기기/보이기   ← 옛 키 그대로
 //   자유 카메라: W A S D·방향키 이동 · Q E 아래·위 · 마우스 시야 · Shift 4 배           ← 옛 자유 카메라 그대로 (EcoV3Observe::FreeFlyStep·FreeLookStep)
 // 옛 카메라와 다른 것 (사용자 11-13 요청):
@@ -29,7 +31,11 @@ enum class EEcoR9DemoCam : uint8
 	Top = 3,       // 3 탑뷰 (대상 위, 대상이 없으면 무리 자리·섬 전체 위)
 	Quarter = 4,   // 4 쿼터뷰 (45° 사선)
 	Auto = 5,      // 5 자동 추적 (사냥·물기·반격·사체 먹기 — 없으면 무리 자리 전체)
-	Boar = 6       // 6 멧돼지 시점 (R9 만)
+	Boar = 6,      // 6 멧돼지 시점 (R9 만)
+	// 7 은 모드가 아니다 (다음 무리 자리)
+	Buffalo = 8,   // 8 물소 시점 (동물 세계)
+	Leopard = 9,   // 9 표범 시점
+	Fox = 10       // J 여우 시점 (콘솔 eco.R9Demo.Cam 10)
 };
 
 namespace EcoR9DemoCam
@@ -50,6 +56,9 @@ namespace EcoR9DemoCam
 		ZoomOut,    // - · 휠 아래 · 숫자패드 -
 		ZoomIn,     // = · 휠 위 · 숫자패드 +
 		Help,       // H
+		Buffalo,    // 8 (동물 세계 — 뒤에 붙여 옛 동작 번호는 그대로)
+		Leopard,    // 9
+		Fox,        // J
 		Count
 	};
 
@@ -63,13 +72,13 @@ namespace EcoR9DemoCam
 	TConstArrayView<FKeyBind> Keys();
 	/** 키 → 동작 (카메라 키가 아니면 거짓). */
 	bool ActionOf(const FKey& Key, EAction& Out);
-	/** 모드를 고르는 동작이면 그 모드 (0~6). */
+	/** 모드를 고르는 동작이면 그 모드 (0~6 · 8 · 9 · 10). */
 	bool ModeOf(EAction Action, EEcoR9DemoCam& Out);
-	/** 0~6 → 모드 (밖이면 거짓). */
+	/** 0~6 · 8~10 → 모드 (밖·7 이면 거짓). */
 	bool ModeFromInt(int32 Value, EEcoR9DemoCam& Out);
 	const TCHAR* ModeNameKo(EEcoR9DemoCam Mode);
-	/** 오른쪽 위 단축키 줄 (위에서 아래로). bSites = 무리 자리가 있는 맵 전체 땅 (7 · G 줄). */
-	TArray<FString> KeyHelpLines(bool bSites);
+	/** 오른쪽 위 단축키 줄 (위에서 아래로). bSites = 무리 자리가 있는 맵 전체 땅 (7 · G 줄), bFauna = 동물 세계 판 (8 · 9 · J 줄). */
+	TArray<FString> KeyHelpLines(bool bSites, bool bFauna = false);
 
 	// 따라가기 거리·숙임·방위 — 옛 관찰 카메라 그대로 (EcoV3ObserverCamera.cpp:77-82, OBSERVER_CAMERA.md 4절 표). 멧돼지는 사슴 값을 쓴다
 	inline constexpr float kFov = 70.0f;

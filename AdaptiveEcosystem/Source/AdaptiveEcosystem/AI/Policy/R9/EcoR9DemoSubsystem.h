@@ -37,6 +37,13 @@
 // 2026-11-13 03:30 시작 맵에서만 저절로 켜기 (사용자 — 편집기 시작 맵 /Game/EcoTest/Maps/LV_EcoV3_Island 에서만 씀):
 //   콘솔 eco.R9Demo.OnlyMap (기본 빈 값 = 모든 맵) 에 맵 경로(쉼표로 여럿)를 두면 Play 시작 때 그 맵에서만 켠다 — 다른 맵은 예전처럼 아무것도 만들지 않는다.
 //   명령줄 깃발(-EcoR9Demo= 등)·Play 중 직접 친 콘솔 eco.R9Demo 1 은 거르지 않는다 (직접 켠 것).
+//
+// 2026-11-13 05:00 동물 세계 (사용자 '나머지 동물들도 학습시켜서 생태계에 넣고 … 지금 언리얼 기본맵에서만'):
+//   <두뇌 폴더>/fauna/ 에 buffalo·leopard·fox.r9brain 과 scene.txt(파이썬 동물 세계 v3_r9_fauna.yaml 장면)가 다 있으면 Play 할 때 물소·표범·여우도
+//   섬 땅에 함께 푼다 (eco.R9Demo.Fauna 1 기본 · 0 = 세 종만 · 명령줄 -EcoR9Fauna=0/1). 세계 몸 규칙은 코어가 장면 파일로 켠다 (파이썬과 비트 같음 — 손 규칙 없음).
+//   사슴·늑대·멧돼지 두뇌는 fauna/ 에 있으면 그것, 없으면 <두뇌 폴더> 의 S′ 두뇌 (파이썬 rebody 와 같은 뜻 — 가중치 그대로). 하나라도 없거나 동물 장면이
+//   시작에 실패하면 기록 줄을 남기고 지금 세 종 장면으로 돈다. 자리마다 eco.R9Demo.FaunaPerHerd (물소,표범,여우 기본 4,1,2).
+//   몸 = 조연우 /Game/JYU/Fauna/{Buffalo,Leopard,Fox}/BP_* (표현 BP — 읽기만). 카메라 8 물소 · 9 표범 · J 여우 (EcoR9DemoCam.h).
 
 #pragma once
 
@@ -94,7 +101,9 @@ struct ADAPTIVEECOSYSTEM_API FEcoR9DemoSettings
 	// 맵 전체 땅 모드 (2026-11-13)
 	int32 AreaM = 0;                 // eco.R9Demo.Area · -EcoR9DemoArea= : 0 = 맵 전체 땅 · 1 ~ 120 = 예전 한 무대 · 그 밖 = 시작점 둘레 그 크기 정사각
 	int32 Herds = 6;                 // eco.R9Demo.Herds : 무리 자리 수 (1 ~ 8)
-	int32 PerHerd[3] = {24, 2, 8};   // eco.R9Demo.PerHerd : 자리마다 사슴·늑대·멧돼지
+	int32 PerHerd[6] = {24, 2, 8, 4, 1, 2};   // eco.R9Demo.PerHerd : 자리마다 사슴·늑대·멧돼지 · eco.R9Demo.FaunaPerHerd : 물소·표범·여우 (동물 장면만)
+	int32 Fauna = 1;                 // eco.R9Demo.Fauna · -EcoR9Fauna= : 1 = 새 종 두뇌·동물 장면이 다 있으면 켬 · 0 = 세 종만
+	bool bSceneExplicit = false;     // 장면 파일을 직접 줌 (-EcoR9Scene= · eco.R9Demo.Scene) — 동물 장면으로 저절로 바꾸지 않는다
 	bool bHideOthers = true;         // eco.R9Demo.HideOthers : 예전 동물 몸·먼 표식 숨김
 	// 시작 맵에서만 (2026-11-13 03:30)
 	bool bFromCommandLine = false;   // 판을 명령줄 깃발(-EcoR9Demo= · -EcoR9Demo · -EcoR9Replay=)이 정했다 — 맵 거르기를 하지 않는다
@@ -113,6 +122,8 @@ struct ADAPTIVEECOSYSTEM_API FEcoR9DemoSettings
 	static bool MapAllowed(const FString& OnlyMap, const FString& WorldPackage);
 	/** 기본 폴더 <프로젝트>/Saved/R9Demo (커밋되지 않는 곳). 경로를 주지 않으면 두뇌 = brains/ (장면 = brains/scene.txt), 재생 = replay/demo.r9rp. */
 	static FString DefaultDir();
+	/** 동물 세계 폴더 <두뇌 폴더>/fauna (buffalo·leopard·fox.r9brain + scene.txt, 있으면 deer·wolf·boar.r9brain 도). */
+	FString FaunaDir() const;
 };
 
 /** 카메라 상태 한 장 (시험·기록용 — 읽기만). */
@@ -120,7 +131,7 @@ struct ADAPTIVEECOSYSTEM_API FEcoR9DemoCamProbe
 {
 	int32 Mode = -1;                 // EEcoR9DemoCam 값 (= 키 숫자, 0 자유 … 6 멧돼지)
 	uint32 Subject = 0;              // 따라가는 R9 uid (0 = 없음)
-	int32 SubjectSpecies = -1;       // 0 사슴 · 1 늑대 · 2 멧돼지 (없으면 −1)
+	int32 SubjectSpecies = -1;       // 0 사슴 · 1 늑대 · 2 멧돼지 · 3 물소 · 4 표범 · 5 여우 (없으면 −1)
 	uint32 Partner = 0;
 	FVector Focus = FVector::ZeroVector;         // 지금 초점
 	FVector TargetFocus = FVector::ZeroVector;   // 이번 프레임 목표 초점
@@ -175,6 +186,14 @@ public:
 	int32 NumStarts() const;
 	FVector WholeCenterCm() const;   // 땅 지도 정사각 가운데 (cm) — 코어 칸 ↔ 언리얼 자리 (FR9StageMap, W = H = G × 2 단위)
 	FString BoarBodyLine() const;
+	/** 이번 판이 동물 세계 장면인가 (물소·표범·여우 함께 — 시험·기록용). */
+	bool IsFaunaScene() const;
+	/** 이번 판 종 수 (3 또는 6, 시작 전 0). */
+	int32 NumSceneSpecies() const;
+	/** 지금 그 종을 그린 수 (산 몸 액터 + 먼 표식 — 시험용, 종 번호 = EcoR9Demo::kDeer..kFox). */
+	int32 NumShownOfSpecies(uint8 Species) const;
+	/** 동물 장면을 골랐나·왜 아닌가 (기록 줄 FaunaLine — 시험용). */
+	FString FaunaChoiceLine() const;
 	/** Play 중 켜기/끄기 (콘솔 eco.R9Demo 바뀜 콜백이 부름 — 시험도 부름). 이미 켜져 있으면 다시 만들지 않는다. */
 	void StartDemo(const TCHAR* Why);
 	void StopDemo(const TCHAR* Why);
@@ -242,6 +261,8 @@ private:
 	AActor* SpawnBoarPlaceholder(uint32 Id, const FVector& Location, float YawDeg);
 	AActor* SpawnBoarSkeletal(uint32 Id, const FVector& Location, float YawDeg, USkeletalMeshComponent*& OutMesh);
 	void LoadBoarAssets();
+	/** 물소·표범·여우 표현 BP (동물 장면일 때만 — LoadVisualAssets·RestartRun 이 부름. 읽기는 한 번, 기록 줄 FaunaBodyLine 은 늘 다시 씀). */
+	void LoadFaunaAssets();
 	void UpdateFarMarkers(const TArray<FVector>* Where);
 	FVector CameraEye() const;
 	UInstancedStaticMeshComponent* MakeIsm(AActor* Owner, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Material, int32 NumCustom,
@@ -294,6 +315,10 @@ private:
 	UPROPERTY(Transient) TObjectPtr<UClass> DeerClass;
 	UPROPERTY(Transient) TObjectPtr<UClass> WolfClass;
 	UPROPERTY(Transient) TObjectPtr<UClass> BoarClass;                  // 멧돼지 표현 BP (찾았을 때 — 사슴·늑대처럼 표현 액터)
+	UPROPERTY(Transient) TObjectPtr<UClass> BuffaloClass;               // 동물 세계: 조연우 BP_Buffalo · BP_Leopard · BP_Fox (표현 BP — 없으면 그 종은 먼 표식만)
+	UPROPERTY(Transient) TObjectPtr<UClass> LeopardClass;
+	UPROPERTY(Transient) TObjectPtr<UClass> FoxClass;
+	bool bFaunaAssetsTried = false;                                     // 물소·표범·여우 BP 를 읽어 봤나 (동물 장면이 처음 섰을 때 한 번 — LoadFaunaAssets)
 	UPROPERTY(Transient) TObjectPtr<USkeletalMesh> BoarMesh;            // 멧돼지 스켈레탈 메시 (BP 가 없을 때)
 	UPROPERTY(Transient) TArray<TObjectPtr<UAnimSequence>> BoarAnims;   // 쓰임(EcoR9Demo::ER9AnimRole)별 애니
 	float BoarYawOffset = -90.0f;     // 메시 앞 = +Y 인 팩(AnimalVarietyPack)은 −90° (CREATURE_PRODUCTION_INTEGRATION.md:36)

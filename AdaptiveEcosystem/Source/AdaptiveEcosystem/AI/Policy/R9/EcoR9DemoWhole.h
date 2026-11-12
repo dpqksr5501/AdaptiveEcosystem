@@ -11,6 +11,7 @@
 //   4. 풀 그리기 창 (카메라 둘레 칸만 — 큰 세계 격자 전체를 그리지 않음)
 //   5. 몸 액터 배정 (카메라에 가까운 개체만 몸, 나머지는 작은 표식 — 늘었다 줄었다 깜빡이지 않게 여유를 둠)
 //   6. 멧돼지 에셋 이름 고르기 (Pig·Boar·Hog·Swine·villsvin) · 애니 이름 → 상태 (Idle·Walk·Trot·Run·Eat·Death …)
+//   7. 동물 세계 파일 고르기 (2026-11-13 05:00 — 물소·표범·여우 두뇌와 동물 장면이 다 있으면 6 종, 아니면 지금 세 종) · 무리 자리마다 마릿수 합
 // 규칙(코어)은 바꾸지 않는다 — 땅 지도를 만들어 넘기고, 화면에 무엇을 그릴지만 고른다.
 
 #pragma once
@@ -401,6 +402,97 @@ namespace EcoR9Demo
 			Score -= 5;   // 새끼 메시보다 어른 메시
 		}
 		return Score;
+	}
+
+	// -------------------------------------------------------------------------
+	// 동물 세계 파일 고르기 (2026-11-13 05:00) — <두뇌 폴더>/fauna/ 에 새 종 두뇌 셋 + scene.txt 가 다 있어야 6 종 장면
+	// -------------------------------------------------------------------------
+
+	inline std::string JoinDir(const std::string& Dir, const std::string& Name)
+	{
+		if (Dir.empty())
+		{
+			return Name;
+		}
+		const char Last = Dir.back();
+		return (Last == '/' || Last == '\\') ? Dir + Name : Dir + "/" + Name;
+	}
+
+	struct FR9FaunaPick
+	{
+		bool bUse = false;                     // 동물 장면을 쓴다
+		std::string Dir;                       // <두뇌 폴더>/fauna
+		std::string ScenePath;                 // <두뇌 폴더>/fauna/scene.txt
+		std::string BrainPath[kNumSpecies];    // 종 차례 — 옛 세 종은 fauna/ 에 있으면 그것, 없으면 <두뇌 폴더> 의 S′ 두뇌 (rebody 뜻)
+		std::string Why;                       // 안 쓰는 까닭 또는 쓰는 파일 (기록 줄, 한국어 한 줄)
+	};
+
+	/**
+	 * FaunaOn = eco.R9Demo.Fauna (0 끔), bSceneExplicit = 장면 파일을 직접 줌 (그때는 저절로 바꾸지 않음). Exists(경로) = 파일이 있나.
+	 * 새 종 두뇌(buffalo·leopard·fox) 셋과 fauna/scene.txt 가 다 있고, 옛 세 종 두뇌도 (fauna/ 또는 <두뇌 폴더> 에) 있으면 bUse.
+	 */
+	template <typename FExists>
+	inline FR9FaunaPick PickFaunaFiles(int FaunaOn, bool bSceneExplicit, const std::string& BrainDir, FExists&& Exists)
+	{
+		FR9FaunaPick P;
+		P.Dir = JoinDir(BrainDir, "fauna");
+		P.ScenePath = JoinDir(P.Dir, "scene.txt");
+		if (FaunaOn == 0)
+		{
+			P.Why = "동물 세계 끔 (eco.R9Demo.Fauna 0) — 사슴·늑대·멧돼지만";
+			return P;
+		}
+		if (bSceneExplicit)
+		{
+			P.Why = "장면 파일을 직접 줌 (-EcoR9Scene= · eco.R9Demo.Scene) — 동물 장면으로 바꾸지 않음";
+			return P;
+		}
+		std::string Missing;
+		for (std::uint8_t k = 0; k < kNumSpecies; ++k)
+		{
+			const std::string Name = std::string(SpeciesKey(k)) + ".r9brain";
+			const std::string InFauna = JoinDir(P.Dir, Name);
+			if (Exists(InFauna))
+			{
+				P.BrainPath[k] = InFauna;
+			}
+			else if (k < kNumOldSpecies && Exists(JoinDir(BrainDir, Name)))
+			{
+				P.BrainPath[k] = JoinDir(BrainDir, Name);
+			}
+			else
+			{
+				Missing += (Missing.empty() ? "" : ", ") + (k < kNumOldSpecies ? Name : "fauna/" + Name);
+			}
+		}
+		if (!Exists(P.ScenePath))
+		{
+			Missing += std::string(Missing.empty() ? "" : ", ") + "fauna/scene.txt";
+		}
+		if (!Missing.empty())
+		{
+			P.Why = "동물 세계 파일 없음 (" + Missing + ") — 사슴·늑대·멧돼지만";
+			return P;
+		}
+		P.bUse = true;
+		P.Why = "동물 세계: " + P.Dir + " (옛 세 종 두뇌:";
+		for (std::uint8_t k = 0; k < kNumOldSpecies; ++k)
+		{
+			P.Why += std::string(" ") + SpeciesKey(k) + (P.BrainPath[k].rfind(P.Dir, 0) == 0 ? "=fauna" : "=S′");
+		}
+		P.Why += ")";
+		return P;
+	}
+
+	/** 무리 자리 하나의 마릿수 합 (앞 NumSpecies 종만 — 세 종 장면은 뒤 셋을 세지 않는다). */
+	inline int PerHerdTotal(const std::int32_t PerHerd[kNumSpecies], int NumSpecies)
+	{
+		int T = 0;
+		for (int k = 0; k < NumSpecies && k < kNumSpecies; ++k)
+		{
+			T += PerHerd[k] > 0 ? PerHerd[k] : 0;
+		}
+		return T;
 	}
 
 	/** 애니 쓰임. */

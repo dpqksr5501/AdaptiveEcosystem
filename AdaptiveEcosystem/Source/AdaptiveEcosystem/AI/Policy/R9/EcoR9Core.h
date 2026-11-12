@@ -3,6 +3,9 @@
 // 무엇: 세계 상태 · 한 스텝(이동 → 물기 → 먹기 → 대사 → [짝 맺기] → 죽음·사체 → 다시 자람 → 다시 남 → 감각 기억) ·
 //       관측 115 칸 · 행동 19 개 실행 · MLP 추론(115 → 64 → 64 → 19, tanh, float32 가중치) · 두뇌 파일(.r9brain) 읽기 ·
 //       장면/대조 덤프(R9DUMP 1) 읽기 · 화면용 사건 목록.
+// 동물 세계 (2026-11-13): 장면 덤프에 fauna_on 이 있으면 저장소 파이썬 configs/v3_r9_fauna.yaml 세계 (6 종: + 물소·표범·여우,
+//       R1 몸무게 상처 · P1 은신처 안 물기 · R2 들이받기(2b) · R3 무늬 · R6 사체 먹는 자리 · R7 종별 번식 쉼 — RL_R9_SPECIES_TRAITS.md 4 절,
+//       r9_world.py `if self.body.fauna` 갈래). 없으면 S′ 줄 그대로 (세 종 장면은 예전과 비트 같음). 대조: scratchpad/r9/ue_demo/fauna/CORE_FAUNA.md.
 // 근거: scratchpad/r9/ue_demo/SPEC_PORT.md 5·6·7 절, 견본 py/ref_step.py · py/ref_obs.py (줄 차례를 그대로 따름).
 // 지킴: 표준 라이브러리만, 예외·RTTI 없음(언리얼 모듈에서도 컴파일), 실행 중 파이썬 없음, 새 손규칙 없음(학습 세계 그대로).
 // 수치: 상태는 double, 관측은 double 로 셈 → [-1, 1] 자름 → float32. 합은 파이썬과 같은 차례로 더함(행렬곱·두 갈래 합 없음).
@@ -31,20 +34,58 @@ namespace EcoR9
 // --------------------------------------------------------------------------------------------------------------------
 constexpr int kObsDim = 115;
 constexpr int kNumActions = 19;
-constexpr int kNumSpecies = 3;
+constexpr int kNumSpecies = 3;       // S′ 세 종 (사슴·늑대·멧돼지). 장면이 쓰는 종 수는 Params::NumSpecies (3 또는 6)
+constexpr int kMaxSpecies = 6;       // 동물 세계 1 단계: + 물소·표범·여우 (파이썬 ALL_SPECIES 앞 6 — 쥐·까마귀는 3 단계라 없음)
 constexpr int kNumFoods = 3;
 constexpr double kEps = 1e-9;
 
-enum ESpecies : int { SpDeer = 0, SpWolf = 1, SpBoar = 2 };
+enum ESpecies : int { SpDeer = 0, SpWolf = 1, SpBoar = 2, SpBuffalo = 3, SpLeopard = 4, SpFox = 5 };
 enum EFood : int { FoodGrass = 0, FoodRoot = 1, FoodMeat = 2 };
 enum EAction : int { ActEat = 0, ActWalk0 = 1, ActRun0 = 9, ActShelter = 17, ActWatch = 18 };
-enum ECause : int { CauseNone = 0, CauseBite = 1, CauseCounter = 2, CauseStarve = 3 };
+enum ECause : int { CauseNone = 0, CauseBite = 1, CauseCounter = 2, CauseStarve = 3 };   // 동물 R2 들이받기 죽음 = CauseCounter (앞 무기 상처)
 enum EBiteOutcome : int { BiteKill = 0, BiteWound = 1, BiteCounter = 2 };
+enum EGoreOutcome : int { GoreWound = 0, GoreKill = 1 };
 enum EGait : int { GaitStand = 0, GaitWalk = 1, GaitRun = 2 };
 
+// 종 이름 = 파이썬 ALL_SPECIES 차례 (두뇌 파일 <이름>.r9brain · 덤프 종 번호)
 inline const char* SpeciesName(int Sp)
 {
-    return Sp == SpDeer ? "deer" : (Sp == SpWolf ? "wolf" : (Sp == SpBoar ? "boar" : "?"));
+    static const char* const Names[kMaxSpecies] = {"deer", "wolf", "boar", "buffalo", "leopard", "fox"};
+    return (Sp >= 0 && Sp < kMaxSpecies) ? Names[Sp] : "?";
+}
+
+// 이름 → 종 번호 (없으면 -1)
+inline int SpeciesIndex(const char* Name)
+{
+    for (int k = 0; k < kMaxSpecies; ++k)
+    {
+        if (Name && std::strcmp(Name, SpeciesName(k)) == 0) { return k; }
+    }
+    return -1;
+}
+
+// 동물 R1 AGE23[i] = (0.12 + 0.88 i / 64)^(2/3), i = 0..64 — r9_life.AGE23 와 비트 같은 리터럴 표 (스텝 안 초월함수 없음).
+// 장면 덤프의 fauna_age23 가 있으면 LoadParams 가 이 표와 비트로 맞춰 본다.
+constexpr int kAgeSteps = 64;
+inline const double* Age23Table()
+{
+    static const double T[kAgeSteps + 1] = {
+        // r9_life.AGE23 (repr — 되읽으면 비트 같음)
+        0.24328807982293602, 0.26153462489381174, 0.2791652434273126, 0.29625554120917763, 0.3128662372837987,
+        0.32904702875048814, 0.3448392445770989, 0.36027772422164656, 0.3753921822977319, 0.39020822214313605,
+        0.40474810328071, 0.4190313324446481, 0.4330751255952941, 0.4468947739306174, 0.46050393733004835,
+        0.47391488216834066, 0.48713867593828164, 0.5001853479504513, 0.5130640231073832, 0.5257830340989972,
+        0.5383500161503573, 0.5507719875460606, 0.5630554184715868, 0.5752062901905356, 0.5872301461753295,
+        0.5991321364971819, 0.6109170565368951, 0.6225893808851991, 0.6341532931479239, 0.6456127122484134,
+        0.6569713157204956, 0.6682325604049393, 0.6793997008967243, 0.690475806036628, 0.7014637736962304,
+        0.7123663440686385, 0.723186111646582, 0.7339255360438897, 0.7445869517948185, 0.7551725772475343,
+        0.7656845226526584, 0.7761247975347162, 0.7864953174231691, 0.7967979100101663, 0.8070343207939528,
+        0.8172062182598147, 0.8273151986443402, 0.8373627903234936, 0.8473504578604057, 0.8572796057447937,
+        0.8671515818524191, 0.8769676806499508, 0.8867291461679031, 0.8964371747619719, 0.906092917681004,
+        0.9156974834580003, 0.9252519401389316, 0.9347573173626941, 0.9442146083042591, 0.9536247714919266,
+        0.9629887325085715, 0.9723073855858682, 0.9815815950996584, 0.9908121969739031, 1.0,
+    };
+    return T;
 }
 
 // 두뇌 파일 머리의 obs_names 와 맞춰 보는 표 (s_world S′ 관측 115 칸 — SPEC_PORT 6-2).
@@ -287,33 +328,49 @@ inline bool ParseDump(const std::string& Text, std::vector<DumpBlock>& Out, std:
 struct Params
 {
     int64_t Seed = 0;
-    int Counts[3] = {0, 0, 0};
+    int NumSpecies = 3;               // 장면의 종 수 (덤프 sp_lo 길이): S′ 3 · 동물 세계 6. 종 번호 = 파이썬 ALL_SPECIES 차례
+    int Counts[kMaxSpecies] = {};
     double Size = 60.0;
     double Cell = 2.0;
     int G = 30;
-    int SpLo[3] = {0, 0, 0};
-    int SpHi[3] = {0, 0, 0};
+    int SpLo[kMaxSpecies] = {};
+    int SpHi[kMaxSpecies] = {};
     int NumSlots = 0;
     int NumCarcass = 0;
-    double RunMult[3] = {1, 1, 1};
-    double JuvFrac[3] = {0, 0, 0};
+    double RunMult[kMaxSpecies] = {1, 1, 1, 1, 1, 1};
+    double JuvFrac[kMaxSpecies] = {};
     uint64_t SeedW = 0;
     uint64_t SeedQ[4] = {0, 0, 0, 0};
     std::vector<double> ShelX, ShelY, ShelR;
-    // 몸 표 [종]
-    double Size0[3], WalkSpeed[3], RunSpeed[3], Accel[3], StamDrain[3], StamRecover[3], SeeR[3], FovCos[3], HeadDown[3],
-        SmellR[3], Drain[3], ReserveCap[3], RefillE[3], RefillFrac[3], WeakE[3], WeakSpeed[3], HpRegen[3], BiteR[3],
-        Maturity[3], MassKg[3], FoodDensityRef[3], FoodHereRef[3], MaxFounderAge[3], FounderVariation[3],
-        FirstBirthBase[3], FirstBirthSpread[3], FemaleFrac[3], ChildFemaleFrac[3], MateR[3], BirthR[3], BirthGrace[3];
-    bool HasHp[3], ShelterEnter[3], CounterOn[3], GrowthSmooth[3], PendingNeedsParent[3];
-    int FounderKind[3], SexMode[3];
-    bool Eats[3][3];
-    double EatRate[3][3], EPerUnit[3][3];
-    bool Bites[3][3];
-    int DietRank[3][3];
-    bool PairBlock[3][kNumActions], BirthBlock[3][kNumActions];
+    // 몸 표 [종] (NumSpecies 칸까지 씀)
+    double Size0[kMaxSpecies], WalkSpeed[kMaxSpecies], RunSpeed[kMaxSpecies], Accel[kMaxSpecies], StamDrain[kMaxSpecies],
+        StamRecover[kMaxSpecies], SeeR[kMaxSpecies], FovCos[kMaxSpecies], HeadDown[kMaxSpecies], SmellR[kMaxSpecies], Drain[kMaxSpecies],
+        ReserveCap[kMaxSpecies], RefillE[kMaxSpecies], RefillFrac[kMaxSpecies], WeakE[kMaxSpecies], WeakSpeed[kMaxSpecies],
+        HpRegen[kMaxSpecies], BiteR[kMaxSpecies], Maturity[kMaxSpecies], MassKg[kMaxSpecies], FoodDensityRef[kMaxSpecies],
+        FoodHereRef[kMaxSpecies], MaxFounderAge[kMaxSpecies], FounderVariation[kMaxSpecies], FirstBirthBase[kMaxSpecies],
+        FirstBirthSpread[kMaxSpecies], FemaleFrac[kMaxSpecies], ChildFemaleFrac[kMaxSpecies], MateR[kMaxSpecies], BirthR[kMaxSpecies],
+        BirthGrace[kMaxSpecies];
+    bool HasHp[kMaxSpecies], ShelterEnter[kMaxSpecies], CounterOn[kMaxSpecies], GrowthSmooth[kMaxSpecies], PendingNeedsParent[kMaxSpecies];
+    int FounderKind[kMaxSpecies], SexMode[kMaxSpecies];
+    bool Eats[kMaxSpecies][3];
+    double EatRate[kMaxSpecies][3], EPerUnit[kMaxSpecies][3];
+    bool Bites[kMaxSpecies][kMaxSpecies];
+    int DietRank[kMaxSpecies][3];
+    bool PairBlock[kMaxSpecies][kNumActions], BirthBlock[kMaxSpecies][kNumActions];
     double GaitDrain[3];
     bool LifeOn = false;
+    // 출산 뒤 다음 번식까지 (동물 R7 종별 recover). 덤프에 body_recover 가 없으면(옛 S′ 장면) 모두 const_breed_recover
+    double Recover[kMaxSpecies];
+    // ---- 동물 세계 (파이썬 body_common.fauna, RL_R9_SPECIES_TRAITS.md 4 절). 거짓이면 S′ 줄 그대로 (비트 같음) ----
+    bool FaunaOn = false;
+    double BiteK[kMaxSpecies] = {}, Hide[kMaxSpecies] = {}, StrikeK[kMaxSpecies] = {}, GoreR[kMaxSpecies] = {}, Camo[kMaxSpecies] = {};
+    bool Gore[kMaxSpecies] = {};
+    double C23[kMaxSpecies][kMaxSpecies] = {};   // (kg_a / kg_b)^(2/3) — 파이썬 load_body 가 셈한 값을 덤프에서 받음 (스텝 안 거듭제곱 없음)
+    double FaunaGoreCone = 0.5, FaunaGoreAppr = 0.03;
+    int FaunaGoreCd = 8;
+    double FaunaCamoS0 = 0.18, FaunaCamoSpan = 0.42, FaunaCpPer = 3.0;
+    int FaunaCpMin = 1, FaunaCpMax = 8;
+    bool CamoOn = false;                         // FaunaOn 이고 어느 종이든 camo < 1 (파이썬 _camo_on)
     // const_*
     double StaminaLock, StaminaUnlock, WoundSpeed, EatMin, BiteConeCos, BiteApproachMin;
     int BiteCooldown;
@@ -343,9 +400,16 @@ struct Params
     bool BigWorld = false;            // 참 = 먹이 밀도(관측 7)를 산 개체 칸에서만 직접 셈 (뜻 같음, 덧셈 차례가 달라 비트는 다름)
     // 장면 덤프에 있으면 읽는 세계 값 (세계 규칙은 쓰지 않음 — 큰 세계 생성기가 먹이 재생·친족 번호를 같게 만들 때 씀)
     double GrassRegenMult = 1.0, RootRegenMult = 1.0;
-    int KinPerm[3] = {0, 1, 2};
+    int KinPerm[kMaxSpecies] = {0, 1, 2, 3, 4, 5};
 
-    bool BitesAny(int Sp) const { return Bites[Sp][0] || Bites[Sp][1] || Bites[Sp][2]; }
+    bool BitesAny(int Sp) const
+    {
+        for (int k = 0; k < NumSpecies; ++k)
+        {
+            if (Bites[Sp][k]) { return true; }
+        }
+        return false;
+    }
 };
 
 namespace Detail
@@ -404,17 +468,29 @@ struct Getter
 inline bool LoadParams(const DumpBlock& Blk, Params& P, std::string* Err)
 {
     Detail::Getter Gt{Blk, Err};
+    {
+        // 종 수 = sp_lo 길이 (S′ 3 · 동물 세계 6). 몸 표 줄은 모두 이 길이로 읽는다.
+        const DumpEntry* E = Blk.Find("sp_lo");
+        const int Ns = E ? static_cast<int>(E->Count()) : 0;
+        if (Ns < kNumSpecies || Ns > kMaxSpecies)
+        {
+            Detail::SetErr(Err, "sp_lo: species count must be 3..6");
+            return false;
+        }
+        P.NumSpecies = Ns;
+    }
+    const size_t NS = static_cast<size_t>(P.NumSpecies);
     P.Seed = Gt.I("seed");
-    Gt.I3("counts", P.Counts);
+    Gt.I3("counts", P.Counts, NS);
     P.Size = Gt.D("world_size");
     P.Cell = Gt.D("cell");
     P.G = static_cast<int>(Gt.I("G"));
-    Gt.I3("sp_lo", P.SpLo);
-    Gt.I3("sp_hi", P.SpHi);
-    P.NumSlots = P.SpHi[2];
+    Gt.I3("sp_lo", P.SpLo, NS);
+    Gt.I3("sp_hi", P.SpHi, NS);
+    P.NumSlots = P.SpHi[NS - 1];
     P.NumCarcass = static_cast<int>(Gt.I("carcass_slots"));
-    Gt.D3("run_mult", P.RunMult);
-    Gt.D3("juv_frac", P.JuvFrac);
+    Gt.D3("run_mult", P.RunMult, NS);
+    Gt.D3("juv_frac", P.JuvFrac, NS);
     if (const DumpEntry* E = Gt.Need("s_w", 1)) { P.SeedW = E->Kind == 'u' ? E->U[0] : static_cast<uint64_t>(E->AsInt(0)); }
     if (const DumpEntry* E = Gt.Need("s_q", 4))
     {
@@ -433,63 +509,64 @@ inline bool LoadParams(const DumpBlock& Blk, Params& P, std::string* Err)
             P.ShelR.push_back(E->F[3 * K + 2]);
         }
     }
-    Gt.D3("body_size0", P.Size0);
-    Gt.D3("body_walk_speed", P.WalkSpeed);
-    Gt.D3("body_run_speed", P.RunSpeed);
-    Gt.D3("body_accel", P.Accel);
-    Gt.D3("body_stam_drain", P.StamDrain);
-    Gt.D3("body_stam_recover", P.StamRecover);
-    Gt.D3("body_see_r", P.SeeR);
-    Gt.D3("body_fov_cos", P.FovCos);
-    Gt.D3("body_head_down", P.HeadDown);
-    Gt.D3("body_smell_r", P.SmellR);
-    Gt.D3("body_drain", P.Drain);
-    Gt.D3("body_reserve_cap", P.ReserveCap);
-    Gt.D3("body_refill_e", P.RefillE);
-    Gt.D3("body_refill_frac", P.RefillFrac);
-    Gt.D3("body_weak_e", P.WeakE);
-    Gt.D3("body_weak_speed", P.WeakSpeed);
-    Gt.D3("body_hp_regen", P.HpRegen);
-    Gt.D3("body_bite_r", P.BiteR);
-    Gt.D3("body_maturity", P.Maturity);
-    Gt.D3("body_mass_kg", P.MassKg);
-    Gt.D3("body_food_density_ref", P.FoodDensityRef);
-    Gt.D3("body_food_here_ref", P.FoodHereRef);
-    Gt.D3("body_max_founder_age", P.MaxFounderAge);
-    Gt.D3("body_founder_variation", P.FounderVariation);
-    Gt.D3("body_first_birth_base", P.FirstBirthBase);
-    Gt.D3("body_first_birth_spread", P.FirstBirthSpread);
-    Gt.D3("body_female_frac", P.FemaleFrac);
-    Gt.D3("body_child_female_frac", P.ChildFemaleFrac);
-    Gt.D3("body_mate_r", P.MateR);
-    Gt.D3("body_birth_r", P.BirthR);
-    Gt.D3("body_birth_grace", P.BirthGrace);
-    Gt.B3("body_has_hp", P.HasHp);
-    Gt.B3("body_shelter_enter", P.ShelterEnter);
-    Gt.B3("body_counter", P.CounterOn);
-    Gt.B3("body_growth_smooth", P.GrowthSmooth);
-    Gt.B3("body_pending_needs_parent", P.PendingNeedsParent);
-    Gt.I3("body_founder_kind", P.FounderKind);
-    Gt.I3("body_sex_mode", P.SexMode);
+    Gt.D3("body_size0", P.Size0, NS);
+    Gt.D3("body_walk_speed", P.WalkSpeed, NS);
+    Gt.D3("body_run_speed", P.RunSpeed, NS);
+    Gt.D3("body_accel", P.Accel, NS);
+    Gt.D3("body_stam_drain", P.StamDrain, NS);
+    Gt.D3("body_stam_recover", P.StamRecover, NS);
+    Gt.D3("body_see_r", P.SeeR, NS);
+    Gt.D3("body_fov_cos", P.FovCos, NS);
+    Gt.D3("body_head_down", P.HeadDown, NS);
+    Gt.D3("body_smell_r", P.SmellR, NS);
+    Gt.D3("body_drain", P.Drain, NS);
+    Gt.D3("body_reserve_cap", P.ReserveCap, NS);
+    Gt.D3("body_refill_e", P.RefillE, NS);
+    Gt.D3("body_refill_frac", P.RefillFrac, NS);
+    Gt.D3("body_weak_e", P.WeakE, NS);
+    Gt.D3("body_weak_speed", P.WeakSpeed, NS);
+    Gt.D3("body_hp_regen", P.HpRegen, NS);
+    Gt.D3("body_bite_r", P.BiteR, NS);
+    Gt.D3("body_maturity", P.Maturity, NS);
+    Gt.D3("body_mass_kg", P.MassKg, NS);
+    Gt.D3("body_food_density_ref", P.FoodDensityRef, NS);
+    Gt.D3("body_food_here_ref", P.FoodHereRef, NS);
+    Gt.D3("body_max_founder_age", P.MaxFounderAge, NS);
+    Gt.D3("body_founder_variation", P.FounderVariation, NS);
+    Gt.D3("body_first_birth_base", P.FirstBirthBase, NS);
+    Gt.D3("body_first_birth_spread", P.FirstBirthSpread, NS);
+    Gt.D3("body_female_frac", P.FemaleFrac, NS);
+    Gt.D3("body_child_female_frac", P.ChildFemaleFrac, NS);
+    Gt.D3("body_mate_r", P.MateR, NS);
+    Gt.D3("body_birth_r", P.BirthR, NS);
+    Gt.D3("body_birth_grace", P.BirthGrace, NS);
+    Gt.B3("body_has_hp", P.HasHp, NS);
+    Gt.B3("body_shelter_enter", P.ShelterEnter, NS);
+    Gt.B3("body_counter", P.CounterOn, NS);
+    Gt.B3("body_growth_smooth", P.GrowthSmooth, NS);
+    Gt.B3("body_pending_needs_parent", P.PendingNeedsParent, NS);
+    Gt.I3("body_founder_kind", P.FounderKind, NS);
+    Gt.I3("body_sex_mode", P.SexMode, NS);
     {
-        bool Tmp[9];
-        double TmpD[9];
-        int TmpI[9];
-        Gt.B3("body_eats", Tmp, 9);
-        for (int K = 0; K < 9; ++K) { P.Eats[K / 3][K % 3] = Tmp[K]; }
-        Gt.D3("body_eat_rate", TmpD, 9);
-        for (int K = 0; K < 9; ++K) { P.EatRate[K / 3][K % 3] = TmpD[K]; }
-        Gt.D3("body_e_per_unit", TmpD, 9);
-        for (int K = 0; K < 9; ++K) { P.EPerUnit[K / 3][K % 3] = TmpD[K]; }
-        Gt.B3("body_bites", Tmp, 9);
-        for (int K = 0; K < 9; ++K) { P.Bites[K / 3][K % 3] = Tmp[K]; }
-        Gt.I3("diet_rank", TmpI, 9);
-        for (int K = 0; K < 9; ++K) { P.DietRank[K / 3][K % 3] = TmpI[K]; }
-        bool Blk19[3 * kNumActions];
-        Gt.B3("body_pair_block", Blk19, 3 * kNumActions);
-        for (int K = 0; K < 3 * kNumActions; ++K) { P.PairBlock[K / kNumActions][K % kNumActions] = Blk19[K]; }
-        Gt.B3("body_birth_block", Blk19, 3 * kNumActions);
-        for (int K = 0; K < 3 * kNumActions; ++K) { P.BirthBlock[K / kNumActions][K % kNumActions] = Blk19[K]; }
+        const int Ns = P.NumSpecies;
+        bool Tmp[kMaxSpecies * kMaxSpecies];
+        double TmpD[kMaxSpecies * kMaxSpecies];
+        int TmpI[kMaxSpecies * 3];
+        Gt.B3("body_eats", Tmp, NS * 3);
+        for (int K = 0; K < Ns * 3; ++K) { P.Eats[K / 3][K % 3] = Tmp[K]; }
+        Gt.D3("body_eat_rate", TmpD, NS * 3);
+        for (int K = 0; K < Ns * 3; ++K) { P.EatRate[K / 3][K % 3] = TmpD[K]; }
+        Gt.D3("body_e_per_unit", TmpD, NS * 3);
+        for (int K = 0; K < Ns * 3; ++K) { P.EPerUnit[K / 3][K % 3] = TmpD[K]; }
+        Gt.B3("body_bites", Tmp, NS * NS);
+        for (int K = 0; K < Ns * Ns; ++K) { P.Bites[K / Ns][K % Ns] = Tmp[K]; }
+        Gt.I3("diet_rank", TmpI, NS * 3);
+        for (int K = 0; K < Ns * 3; ++K) { P.DietRank[K / 3][K % 3] = TmpI[K]; }
+        bool Blk19[kMaxSpecies * kNumActions];
+        Gt.B3("body_pair_block", Blk19, NS * kNumActions);
+        for (int K = 0; K < Ns * kNumActions; ++K) { P.PairBlock[K / kNumActions][K % kNumActions] = Blk19[K]; }
+        Gt.B3("body_birth_block", Blk19, NS * kNumActions);
+        for (int K = 0; K < Ns * kNumActions; ++K) { P.BirthBlock[K / kNumActions][K % kNumActions] = Blk19[K]; }
         double D16[16];
         Gt.D3("dir8", D16, 16);
         for (int K = 0; K < 16; ++K) { P.Dir8[K / 2][K % 2] = D16[K]; }
@@ -545,7 +622,66 @@ inline bool LoadParams(const DumpBlock& Blk, Params& P, std::string* Err)
     if (const DumpEntry* E = Blk.Find("const_root_regen_mult")) { if (E->Count() == 1) { P.RootRegenMult = E->AsDouble(0); } }
     if (const DumpEntry* E = Blk.Find("kin_perm"))
     {
-        if (E->Count() == 3) { for (size_t K = 0; K < 3; ++K) { P.KinPerm[K] = static_cast<int>(E->AsInt(K)); } }
+        if (E->Count() == NS) { for (size_t K = 0; K < NS; ++K) { P.KinPerm[K] = static_cast<int>(E->AsInt(K)); } }
+    }
+    // 동물 R7: 종별 출산 뒤 쉼 (옛 장면 = 모두 const_breed_recover)
+    for (size_t K = 0; K < static_cast<size_t>(kMaxSpecies); ++K) { P.Recover[K] = P.BreedRecover; }
+    if (const DumpEntry* E = Blk.Find("body_recover"))
+    {
+        if (E->Count() == NS) { for (size_t K = 0; K < NS; ++K) { P.Recover[K] = E->AsDouble(K); } }
+    }
+    // 동물 세계 (fauna_on 줄이 있을 때만 — 없으면 S′ 그대로). 종이 넷 이상인 장면은 동물 세계여야 한다 (파이썬 v3_r9_fauna.yaml)
+    P.FaunaOn = false;
+    P.CamoOn = false;
+    if (const DumpEntry* E = Blk.Find("fauna_on"))
+    {
+        P.FaunaOn = E->Count() == 1 && E->AsInt(0) != 0;
+    }
+    if (P.NumSpecies > kNumSpecies && !P.FaunaOn)
+    {
+        Detail::SetErr(Err, "scene has more than three species but no fauna_on");
+        return false;
+    }
+    if (P.FaunaOn)
+    {
+        Gt.D3("body_bite_k", P.BiteK, NS);
+        Gt.D3("body_hide", P.Hide, NS);
+        Gt.D3("body_strike_k", P.StrikeK, NS);
+        Gt.D3("body_gore_r", P.GoreR, NS);
+        Gt.D3("body_camo", P.Camo, NS);
+        Gt.B3("body_gore", P.Gore, NS);
+        double C[kMaxSpecies * kMaxSpecies];
+        Gt.D3("fauna_c23", C, NS * NS);
+        for (size_t K = 0; K < NS * NS; ++K) { P.C23[K / NS][K % NS] = C[K]; }
+        P.FaunaGoreCone = Gt.D("const_fauna_gore_cone");
+        P.FaunaGoreAppr = Gt.D("const_fauna_gore_appr");
+        P.FaunaGoreCd = static_cast<int>(Gt.D("const_fauna_gore_cd"));
+        P.FaunaCamoS0 = Gt.D("const_fauna_camo_s0");
+        P.FaunaCamoSpan = Gt.D("const_fauna_camo_span");
+        P.FaunaCpPer = Gt.D("const_fauna_cp_per");
+        P.FaunaCpMin = static_cast<int>(Gt.D("const_fauna_cp_min"));
+        P.FaunaCpMax = static_cast<int>(Gt.D("const_fauna_cp_max"));
+        if (const DumpEntry* E = Gt.Need("fauna_age23", static_cast<size_t>(kAgeSteps + 1)))
+        {
+            const double* T = Age23Table();
+            for (int K = 0; K <= kAgeSteps; ++K)
+            {
+                if (E->AsDouble(static_cast<size_t>(K)) != T[K])
+                {
+                    Detail::SetErr(Err, "fauna_age23 differs from the literal AGE23 table at " + std::to_string(K));
+                    return false;
+                }
+            }
+        }
+        for (size_t K = 0; K < NS; ++K)
+        {
+            if (!(P.Hide[K] > 0.0))
+            {
+                Detail::SetErr(Err, "fauna: hide must be > 0");
+                return false;
+            }
+            if (P.Camo[K] < 1.0) { P.CamoOn = true; }
+        }
     }
     P.NormPos = Gt.D("norm_pos");
     P.NormVel = Gt.D("norm_vel");
@@ -568,7 +704,8 @@ inline bool LoadParams(const DumpBlock& Blk, Params& P, std::string* Err)
     P.MemKeep = Gt.D("sense_mem_keep");
     P.MemGain = Gt.D("sense_mem_gain");
     P.MemDecay = Gt.D("sense_mem_decay");
-    if (Gt.Ok && (P.NumSlots <= 0 || P.G <= 0 || P.NumCarcass <= 0 || P.RespawnCandidates <= 0 || P.BreedScanDen <= 0))
+    if (Gt.Ok && (P.NumSlots <= 0 || P.G <= 0 || P.NumCarcass <= 0 || P.RespawnCandidates <= 0 || P.BreedScanDen <= 0 ||
+                  (P.FaunaOn && !(P.FaunaCamoSpan > 0.0))))
     {
         Detail::SetErr(Err, "bad scene sizes");
         return false;
@@ -585,6 +722,7 @@ struct Pair
     int64_t UA = 0, UB = 0;
     double Due = 0.0;
     int Sp = 0;
+    int Slot = 0;     // 파이썬 LifeState 짝 칸 번호 p. St.Pairs 는 이 차례 — 새 짝은 비어 있는 가장 낮은 칸 (r9_life._scan 의 free[nf])
 };
 
 struct State
@@ -595,6 +733,7 @@ struct State
     std::vector<double> E, R, Stam, Hp, Born, NextBirth, GSpeed, GSize, RespT;
     std::vector<int64_t> KinId, Uid, Sex, Generation, ParentA, ParentB, Offspring;
     std::vector<int> Act, BiteCd, KnockLeft;
+    std::vector<int> GoreCd;          // 동물 R2 들이받기 쉼 (덤프에 gore_cd 가 없으면 0)
     std::vector<uint8_t> Alive, StamLock, Mating;
     std::vector<double> Mem;   // [i * S + j]
     std::vector<double> Grass, GrassCap, GrassRegen, Root, RootCap, RootRegen;   // [iy * G + ix]
@@ -603,6 +742,7 @@ struct State
     std::vector<Vec2d> CarcPos;
     std::vector<double> CarcMeat, CarcMeat0, CarcT;
     std::vector<int64_t> CarcKin;
+    std::vector<int> CarcPlaces;      // 동물 R6 사체마다 먹는 자리 (덤프에 carc_places 가 없으면 const_carc_places — S′ 는 읽지 않음)
     int64_t NextUid = 1;
     std::vector<Pair> Pairs;
 };
@@ -687,6 +827,17 @@ inline bool LoadState(const DumpBlock& Blk, const Params& P, State& St, std::str
     V1("carc_meat0", St.CarcMeat0, M);
     V1("carc_t", St.CarcT, M);
     VI("carc_kin", St.CarcKin, M);
+    // 동물 세계 줄 (있을 때만 — 옛 S′ 덤프에는 없음)
+    St.GoreCd.assign(S, 0);
+    if (const DumpEntry* E = Blk.Find("gore_cd"))
+    {
+        if (E->Count() == S) { for (size_t K = 0; K < S; ++K) { St.GoreCd[K] = static_cast<int>(E->AsInt(K)); } }
+    }
+    St.CarcPlaces.assign(M, P.CarcPlaces);
+    if (const DumpEntry* E = Blk.Find("carc_places"))
+    {
+        if (E->Count() == M) { for (size_t K = 0; K < M; ++K) { St.CarcPlaces[K] = static_cast<int>(E->AsInt(K)); } }
+    }
     St.NextUid = Gt.I("next_uid");
     St.Pairs.clear();
     if (const DumpEntry* E = Blk.Find("pair"))
@@ -706,14 +857,23 @@ inline bool LoadState(const DumpBlock& Blk, const Params& P, State& St, std::str
             Pr.UA = St.Uid[static_cast<size_t>(Pr.A)];
             Pr.UB = St.Uid[static_cast<size_t>(Pr.B)];
             Pr.Sp = St.Sp[static_cast<size_t>(Pr.A)];
+            Pr.Slot = static_cast<int>(K);
             St.Pairs.push_back(Pr);
+        }
+        // 짝 칸 번호 (덤프에 pair_slot 이 있으면 — 없으면 줄 차례 0, 1, …)
+        if (const DumpEntry* Ps = Blk.Find("pair_slot"))
+        {
+            if (Ps->Count() == St.Pairs.size())
+            {
+                for (size_t K = 0; K < N; ++K) { St.Pairs[K].Slot = static_cast<int>(Ps->AsInt(K)); }
+            }
         }
     }
     if (Gt.Ok)
     {
         for (size_t K = 0; K < S; ++K)
         {
-            if (St.Sp[K] < 0 || St.Sp[K] > 2 || St.Act[K] < 0 || St.Act[K] >= kNumActions)
+            if (St.Sp[K] < 0 || St.Sp[K] >= P.NumSpecies || St.Act[K] < 0 || St.Act[K] >= kNumActions)
             {
                 Detail::SetErr(Err, "bad slot species/action");
                 return false;
@@ -742,6 +902,8 @@ public:
     // Out[0..N) = 0..N-1 의 순열 (늑대 칸 물기 순서)
     virtual void BitePermutation(int N, int* Out) = 0;
     virtual void Respawn(const Params& P, RespawnDraw& Out) = 0;
+    // 동물 R2: 들이받는 칸 순서 (파이썬 rng_gore). 들이받는 몸이 있는 장면만 스텝마다 부른다 (S′ 장면은 부르지 않음 — 난수 흐름 그대로)
+    virtual void GorePermutation(int N, int* Out) = 0;
 };
 
 class Pcg32Random final : public IStepRandom
@@ -797,6 +959,8 @@ public:
         }
     }
 
+    void GorePermutation(int N, int* Out) override { BitePermutation(N, Out); }
+
     void Respawn(const Params& P, RespawnDraw& Out) override
     {
         Out.UForm = NextDouble();
@@ -817,15 +981,31 @@ class InjectedRandom final : public IStepRandom
 {
 public:
     std::vector<int> Perm;
+    std::vector<int> GorePerm;
     std::vector<RespawnDraw> Draws;
     size_t NextDraw = 0;
     bool Underflow = false;
+    bool GoreUsed = false;
 
     void BitePermutation(int N, int* Out) override
     {
         for (int K = 0; K < N; ++K)
         {
             if (static_cast<size_t>(K) < Perm.size()) { Out[K] = Perm[static_cast<size_t>(K)]; }
+            else
+            {
+                Out[K] = K;
+                Underflow = true;
+            }
+        }
+    }
+
+    void GorePermutation(int N, int* Out) override
+    {
+        GoreUsed = true;
+        for (int K = 0; K < N; ++K)
+        {
+            if (static_cast<size_t>(K) < GorePerm.size()) { Out[K] = GorePerm[static_cast<size_t>(K)]; }
             else
             {
                 Out[K] = K;
@@ -1176,7 +1356,8 @@ inline int GumbelPick(const float* Logits, int N, const double* U)
 // --------------------------------------------------------------------------------------------------------------------
 enum EEventKind : int
 {
-    EvBite = 1,          // A 늑대 칸, B 먹이 칸, Code EBiteOutcome, X/Y 먹이 자리
+    EvBite = 1,          // A 문 칸(늑대·표범·여우), B 물린 칸, Code EBiteOutcome, X/Y 물린 자리. 동물 세계: Value 깎인 HP(상처 = 물린 몸 · 반격 = 문 몸),
+                         //   Value2 1 = 물린 몸이 은신처 안 (P1: 들어갈 수 있는 몸만 안을 묾)
     EvDeath = 2,         // A 칸, Code ECause, X/Y 자리, Value 머리 x, Value2 머리 y, B 종
     EvCarcassAdd = 3,    // A 사체 번호, B 죽은 칸, Code 죽은 종, X/Y, Value 고기
     EvCarcassGone = 4,   // A 사체 번호 (다 먹힘·썩음·덮어씀)
@@ -1184,6 +1365,7 @@ enum EEventKind : int
     EvRespawn = 6,       // A 칸, Code 1 갓난 꼴 · 0 먼 꼴, X/Y
     EvPairStart = 7,     // A, B 칸 (짝 맺기 켬)
     EvBirthCredit = 8,   // A, B 칸 (출산 몫, 새 몸은 생기지 않음)
+    EvGore = 9,          // 동물 R2: A 들이받은 칸(물소), B 받힌 칸, Code EGoreOutcome, X/Y 받힌 자리, Value 깎인 HP, Value2 다가간 속력
 };
 
 struct Event
@@ -1200,15 +1382,21 @@ struct Stats
 {
     int64_t Steps = 0;
     int64_t Decisions = 0;
-    double EatenUnits[3][3] = {};   // [먹은 종][풀·땅속·고기]
-    double EatenE[3][3] = {};
-    int64_t BitesOut[3][3] = {};    // [물린 종][죽임·상처·반격]
-    int64_t Deaths[3][4] = {};      // [종][없음·물림·반격·굶음]
-    int64_t Respawns[3] = {};
-    int64_t Actions[3][kNumActions] = {};
-    double ESum[3] = {};
-    int64_t ENum[3] = {};
-    int64_t BirthCredits[3] = {};
+    double EatenUnits[kMaxSpecies][3] = {};   // [먹은 종][풀·땅속·고기]
+    double EatenE[kMaxSpecies][3] = {};
+    int64_t BitesOut[kMaxSpecies][3] = {};    // [물린 종][죽임·상처·반격]
+    int64_t Deaths[kMaxSpecies][4] = {};      // [종][없음·물림·반격(들이받기 포함)·굶음]
+    int64_t Respawns[kMaxSpecies] = {};
+    int64_t Actions[kMaxSpecies][kNumActions] = {};
+    double ESum[kMaxSpecies] = {};
+    int64_t ENum[kMaxSpecies] = {};
+    int64_t BirthCredits[kMaxSpecies] = {};
+    // 동물 세계만 (파이썬 st bite_pairs·bite_in_shelter·gore·gore_hp·strike_hp_by 와 같은 뜻)
+    int64_t BitePairs[kMaxSpecies][kMaxSpecies][3] = {};   // [문 종][물린 종][죽임·상처·반격]
+    int64_t BiteInShelter[kMaxSpecies][kMaxSpecies] = {};  // [문 종][물린 종] 은신처 안 물기
+    int64_t Gores[kMaxSpecies][kMaxSpecies][2] = {};       // [들이받은 종][받힌 종][상처·죽임]
+    double GoreHp[kMaxSpecies][kMaxSpecies] = {};          // [들이받은 종][받힌 종] 깎인 HP 합
+    double StrikeHpBy[kMaxSpecies] = {};                   // 반격·들이받기로 깎인 HP 합 (깎인 몸의 종)
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1263,24 +1451,33 @@ public:
                 }
             }
         }
+        if (St.GoreCd.size() != S) { St.GoreCd.assign(S, 0); }
+        if (St.CarcPlaces.size() != St.CarcOk.size()) { St.CarcPlaces.assign(St.CarcOk.size(), P.CarcPlaces); }
         BiterSlots.clear();
+        GorerSlots.clear();
         Events.clear();
-        for (int Sp = 0; Sp < 3; ++Sp)
+        for (int Sp = 0; Sp < P.NumSpecies; ++Sp)
         {
             if (P.BitesAny(Sp))
             {
                 for (int K = P.SpLo[Sp]; K < P.SpHi[Sp]; ++K) { BiterSlots.push_back(K); }
             }
+            // 동물 R2: 들이받는 몸 (파이썬 _gorers — S′ 에는 없음)
+            if (P.FaunaOn && P.Gore[Sp])
+            {
+                for (int K = P.SpLo[Sp]; K < P.SpHi[Sp]; ++K) { GorerSlots.push_back(K); }
+            }
         }
         // 물기 순서는 '물 수 있는 종의 칸' 차례 (ref_step biters) — 칸 차례로 다시 모음
         std::sort(BiterSlots.begin(), BiterSlots.end());
+        std::sort(GorerSlots.begin(), GorerSlots.end());
         Resize();
         Tot = Stats{};
         LastCost = CostStats{};
         // 감각이 닿는 가장 먼 거리 (눈·코·소리) → 이웃 찾기 칸 격자 한 변 (+1 여유: 칸 경계에서 반올림 차가 나도 이웃을 놓치지 않게)
         SenseR = std::max(P.HearRQuiet, P.HearRLoud);
         // 눈 = SeeR × (먹는 중이면 HeadDown). 지금 장면은 HeadDown 0.6 (≤ 1) 이라 값이 같지만, 1 넘는 장면에서도 이웃을 놓치지 않게 (검토 11-13)
-        for (int k = 0; k < 3; ++k) { SenseR = std::max(SenseR, std::max(P.SeeR[k] * std::max(1.0, P.HeadDown[k]), P.SmellR[k])); }
+        for (int k = 0; k < P.NumSpecies; ++k) { SenseR = std::max(SenseR, std::max(P.SeeR[k] * std::max(1.0, P.HeadDown[k]), P.SmellR[k])); }
         HashB = std::max(1.0, SenseR + 1.0);
         HashN = std::max(1, static_cast<int>(std::ceil(P.Size / HashB)) + 1);
         BuildShelterIndex();
@@ -1579,6 +1776,8 @@ public:
         }
         // 2 물기·반격 (5-3)
         StepBite(Rng);
+        // 2b 들이받기 (동물 R2 — 들이받는 몸이 없는 장면은 난수도 뽑지 않음)
+        if (!GorerSlots.empty()) { StepGore(Rng); }
         // 3 먹기 (5-4)
         StepEat();
         // 4 대사 (5-5)
@@ -1614,6 +1813,7 @@ public:
         Out.assign(S * static_cast<size_t>(kObsDim), 0.0f);
         const double Tf = static_cast<double>(St.T);
         std::vector<double> AfL(S), SizeObs(S), Spd(S), Hr(S);
+        // (VisF: 동물 R3 — 아래 Spd 다음에 셈)
         std::vector<uint8_t> MatureL(S);
         for (size_t s = 0; s < S; ++s)
         {
@@ -1626,6 +1826,8 @@ public:
             Spd[s] = std::sqrt(St.Disp[s].x * St.Disp[s].x + St.Disp[s].y * St.Disp[s].y);
             Hr[s] = HearR(Spd[s]);
         }
+        std::vector<double> VisF;
+        if (P.CamoOn) { CamoVis(Spd, VisF); }
         const int Br = std::max(1, static_cast<int>(std::nearbyint(P.NormFoodR / Cell)));
         std::vector<double> Fbg, Fbr;
         if (!P.BigWorld)
@@ -1663,6 +1865,7 @@ public:
             const double See = P.SeeR[k] * (St.Act[i] == ActEat ? P.HeadDown[k] : 1.0);
             const double Fov = P.FovCos[k], Smr = P.SmellR[k];
             Rows.clear();
+            // 동물 R3: 보이는 거리 = See × VisF[j] (무늬 — 귀·코·사체 감각은 그대로)
             // 느낄 수 있는 개체는 칸 격자 이웃(SenseR 안)뿐. 아래에서 (거리, 칸) 차례로 정렬하므로 찾는 차례는 결과와 무관하다.
             int Bx = 0, By = 0;
             BucketOf(Px, Py, Bx, By);
@@ -1680,7 +1883,7 @@ public:
                         const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
                         const double Invd = 1.0 / std::max(Dist, kEps);
                         const double CosA = (Dx * Hx + Dy * Hy) * Invd;
-                        const bool Vis = Dist <= See && CosA >= Fov;
+                        const bool Vis = (P.CamoOn ? Dist <= See * VisF[j] : Dist <= See) && CosA >= Fov;
                         const bool Perc = Vis || Dist <= Hr[j] || Dist <= Smr;
                         if (!Perc) { continue; }
                         const double Appr = Clamp((-(St.Disp[j].x * Dx + St.Disp[j].y * Dy)) * Invd / P.NormVel, -1.0, 1.0);
@@ -1912,8 +2115,25 @@ public:
         return St.GSize[s] * g;
     }
 
+    // 동물 R1: (M_a / M_b)^(2/3) = C23[종a][종b] × ((g_a·g_a) / (g_b·g_b)) × (AGE23[i_a] / AGE23[i_b]), i = floor(af × 64 + 0.5)
+    // (파이썬 r9_world._p23 — 곱·나눗셈 차례 그대로). Af 는 이 스텝 Derive 값.
+    double P23(size_t a, size_t b) const
+    {
+        const double* T = Age23Table();
+        const double Ga = St.GSize[a], Gb = St.GSize[b];
+        const int Ia = AgeIndex(Af[a]), Ib = AgeIndex(Af[b]);
+        return P.C23[St.Sp[a]][St.Sp[b]] * ((Ga * Ga) / (Gb * Gb)) * (T[Ia] / T[Ib]);
+    }
+
+    static int AgeIndex(double A)
+    {
+        const int I = static_cast<int>(std::floor(A * static_cast<double>(kAgeSteps) + 0.5));
+        return std::min(std::max(I, 0), kAgeSteps);
+    }
+
 private:
     std::vector<int> BiterSlots;
+    std::vector<int> GorerSlots;
     std::vector<double> Af, Gr, BScale, SpdScale, Maint, DrainStep;
     std::vector<uint8_t> Mature;
     std::vector<Vec2d> P0, V1;
@@ -1962,6 +2182,18 @@ private:
         const double Inv = 1.0 / P.Cell;
         Ix = std::min(std::max(static_cast<int>(X * Inv), 0), P.G - 1);
         Iy = std::min(std::max(static_cast<int>(Y * Inv), 0), P.G - 1);
+    }
+
+    // 동물 R3: vis_j = camo_j + (1 − camo_j) × clip((s_j − s0) / span, 0, 1), s_j = 지난 스텝 변위 크기 (소리 곡선과 같은 '움직임 크기')
+    void CamoVis(const std::vector<double>& Spd, std::vector<double>& Out) const
+    {
+        const size_t S = Spd.size();
+        Out.assign(S, 1.0);
+        for (size_t j = 0; j < S; ++j)
+        {
+            const double Cm = P.Camo[St.Sp[j]];
+            Out[j] = Cm + (1.0 - Cm) * Clamp((Spd[j] - P.FaunaCamoS0) / P.FaunaCamoSpan, 0.0, 1.0);
+        }
     }
 
     double HearR(double Spd) const
@@ -2121,9 +2353,11 @@ private:
             if (!(St.Alive[w] && St.BiteCd[w] == 0)) { continue; }
             const int k = St.Sp[w];
             const double Reach = P.BiteR[k] * BScale[w];
+            // 동물 P1: 은신처에 들어갈 수 있는 몸은 안의 몸도 묾 (S′: 은신처 밖만)
+            const bool InsideOk = P.FaunaOn && P.ShelterEnter[k];
             for (size_t j = 0; j < S; ++j)
             {
-                if (!St.Alive[j] || !P.Bites[k][St.Sp[j]] || !(LastEdge1[j] > 0.0)) { continue; }
+                if (!St.Alive[j] || !P.Bites[k][St.Sp[j]] || !((LastEdge1[j] > 0.0) || InsideOk)) { continue; }
                 const double Dx = St.Pos[j].x - St.Pos[w].x, Dy = St.Pos[j].y - St.Pos[w].y;
                 const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
                 const double Invd = 1.0 / std::max(Dist, kEps);
@@ -2162,6 +2396,11 @@ private:
 
     void ResolveBite(size_t w, size_t j)
     {
+        if (P.FaunaOn)
+        {
+            ResolveBiteFauna(w, j);
+            return;
+        }
         const int kj = St.Sp[j];
         int Outcome = BiteWound;
         if (!P.HasHp[kj])
@@ -2208,6 +2447,178 @@ private:
         Ev.Code = Outcome;
         Ev.X = St.Pos[j].x;
         Ev.Y = St.Pos[j].y;
+        Events.push_back(Ev);
+    }
+
+    // 동물 R1 물기 (파이썬 _resolve_bite_fauna): 상처 = min(1, bite_k[문 몸] × P23(문, 물린) / hide[물린 몸]). 정면 반격(S′ 와 같은 조건)은
+    // 문 몸에 strike_k[물린 몸] × P23(물린, 문) / hide[문 몸] — 밀림·물기 쉼·반격 자기 상처는 S′ 값. HP 없는 몸은 바로 죽음.
+    void ResolveBiteFauna(size_t w, size_t j)
+    {
+        const int kj = St.Sp[j], kw = St.Sp[w];
+        int Outcome = BiteWound;
+        double Lost = 0.0;
+        const bool Inside = !(LastEdge1[j] > 0.0);
+        if (!P.HasHp[kj])
+        {
+            Kill(j, CauseBite);
+            St.BiteCd[w] = P.BiteCooldown;
+            Outcome = BiteKill;
+        }
+        else
+        {
+            const double Twx = St.Pos[w].x - St.Pos[j].x, Twy = St.Pos[w].y - St.Pos[j].y;
+            const double Tl = std::sqrt(Twx * Twx + Twy * Twy);
+            Vec2d Tu{1.0, 0.0};
+            if (Tl > kEps) { Tu = Vec2d{Twx / Tl, Twy / Tl}; }
+            const double Front = St.Head[j].x * Tu.x + St.Head[j].y * Tu.y;
+            if (P.CounterOn[kj] && St.Hp[j] >= P.CounterHpMin && Front >= P.CounterConeCos)
+            {
+                const double Dmg = P.StrikeK[kj] * P23(j, w) / P.Hide[kw];
+                St.Hp[w] = std::max(0.0, St.Hp[w] - Dmg);
+                Tot.StrikeHpBy[kw] += Dmg;
+                St.KnockDir[w] = Tu;
+                St.KnockLeft[w] = P.CounterKnockSteps;
+                St.BiteCd[w] = P.CounterNobiteSteps;
+                St.Hp[j] = std::max(0.0, St.Hp[j] - P.CounterSelfDamage);
+                Outcome = BiteCounter;
+                Lost = Dmg;
+                if (St.Hp[w] <= 0.0) { Kill(w, CauseCounter); }
+            }
+            else
+            {
+                const double Loss = std::min(1.0, P.BiteK[kw] * P23(w, j) / P.Hide[kj]);
+                St.Hp[j] = std::max(0.0, St.Hp[j] - Loss);
+                St.BiteCd[w] = P.BiteCooldown;
+                Lost = Loss;
+                if (St.Hp[j] <= 0.0)
+                {
+                    Kill(j, CauseBite);
+                    Outcome = BiteKill;
+                }
+            }
+        }
+        Tot.BitesOut[kj][Outcome] += 1;
+        Tot.BitePairs[kw][kj][Outcome] += 1;
+        if (Inside) { Tot.BiteInShelter[kw][kj] += 1; }
+        Event Ev;
+        Ev.Kind = EvBite;
+        Ev.A = static_cast<int>(w);
+        Ev.B = static_cast<int>(j);
+        Ev.Code = Outcome;
+        Ev.X = St.Pos[j].x;
+        Ev.Y = St.Pos[j].y;
+        Ev.Value = Lost;
+        Ev.Value2 = Inside ? 1.0 : 0.0;
+        Events.push_back(Ev);
+    }
+
+    // 동물 R2 들이받기 (파이썬 _gore, 물기 다음 2b). 순서 = 들이받는 칸의 순열(스텝마다 뽑음). 이번 스텝 걸음이 뛰기이고 살아 있고
+    // gore_cd == 0 인 몸만. 목표 = 머리 앞 원뿔(cos >= cone) · gore_r × g_size × 자람 안 · 그쪽으로 자기 속도 성분 > approach_min 인
+    // 다른 종의 산 몸 중 가장 가까운 것 (같으면 낮은 칸), 은신처 안 몸은 들이받는 몸이 들어갈 수 있을 때만 (P1). 어느 몸에 뛸지는 두뇌가 정함.
+    void StepGore(IStepRandom& Rng)
+    {
+        const size_t S = static_cast<size_t>(P.NumSlots);
+        const size_t NG = GorerSlots.size();
+        std::vector<int> Perm(NG, 0);
+        Rng.GorePermutation(static_cast<int>(NG), Perm.data());
+        for (int g : GorerSlots)
+        {
+            const size_t gs = static_cast<size_t>(g);
+            St.GoreCd[gs] = std::max(St.GoreCd[gs] - 1, 0);
+        }
+        struct GCand
+        {
+            double D;
+            int J;
+            double Vt;
+        };
+        std::vector<std::vector<GCand>> Can(NG);
+        bool Any = false;
+        for (size_t gi = 0; gi < NG; ++gi)
+        {
+            const size_t g = static_cast<size_t>(GorerSlots[gi]);
+            if (!(St.Alive[g] && St.GoreCd[g] == 0 && LastGait[g] == GaitRun)) { continue; }
+            const int k = St.Sp[g];
+            const double Reach = P.GoreR[k] * BScale[g];
+            const bool InsideOk = P.ShelterEnter[k];
+            for (size_t j = 0; j < S; ++j)
+            {
+                if (!St.Alive[j] || St.Sp[j] == k || !((LastEdge1[j] > 0.0) || InsideOk)) { continue; }
+                const double Dx = St.Pos[j].x - St.Pos[g].x, Dy = St.Pos[j].y - St.Pos[g].y;
+                const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
+                const double Invd = 1.0 / std::max(Dist, kEps);
+                const bool Cone = (Dx * St.Head[g].x + Dy * St.Head[g].y) * Invd >= P.FaunaGoreCone;
+                const double Vt = (Dx * St.Vel[g].x + Dy * St.Vel[g].y) * Invd;
+                if (Dist <= Reach && Cone && Vt > P.FaunaGoreAppr)
+                {
+                    Can[gi].push_back(GCand{Dist, static_cast<int>(j), Vt});
+                    Any = true;
+                }
+            }
+        }
+        if (!Any) { return; }
+        for (size_t q = 0; q < NG; ++q)
+        {
+            const int Gi = Perm[q];
+            if (Gi < 0 || static_cast<size_t>(Gi) >= NG) { continue; }
+            const size_t gi = static_cast<size_t>(Gi);
+            const size_t g = static_cast<size_t>(GorerSlots[gi]);
+            if (Can[gi].empty() || !St.Alive[g]) { continue; }
+            const GCand* Best = nullptr;
+            for (const GCand& C : Can[gi])
+            {
+                if (!St.Alive[static_cast<size_t>(C.J)]) { continue; }
+                if (!Best || C.D < Best->D || (C.D == Best->D && C.J < Best->J)) { Best = &C; }
+            }
+            if (!Best) { continue; }
+            ResolveGore(g, static_cast<size_t>(Best->J), Best->Vt);
+        }
+    }
+
+    // 동물 R2 결과 (파이썬 _resolve_gore): 받힌 HP − strike_k[들이받은 몸] × P23(들이받은, 받힌) / hide[받힌 몸] × clip(vt / run_speed, 0, 1),
+    // 받힌 몸 밀림(반격 밀림 값), 받힌 몸이 무는 몸이면 물기 쉼 max(bite_cd, nobite), 들이받은 몸은 반격 자기 상처 · gore_cd 쉼.
+    // 죽음 = CauseCounter (앞 무기 상처). 들이받은 몸의 자기 상처로는 죽음을 보지 않는다 (파이썬 그대로).
+    void ResolveGore(size_t g, size_t j, double Vt)
+    {
+        const int kg = St.Sp[g], kj = St.Sp[j];
+        const double Share = std::min(std::max(Vt / P.RunSpeed[kg], 0.0), 1.0);
+        int Outcome = GoreWound;
+        double Dmg = 0.0;
+        if (!P.HasHp[kj])
+        {
+            Dmg = 1.0;
+            Kill(j, CauseCounter);
+            Outcome = GoreKill;
+        }
+        else
+        {
+            Dmg = P.StrikeK[kg] * P23(g, j) / P.Hide[kj] * Share;
+            St.Hp[j] = std::max(0.0, St.Hp[j] - Dmg);
+            const double Tx = St.Pos[j].x - St.Pos[g].x, Ty = St.Pos[j].y - St.Pos[g].y;
+            const double Tl = std::sqrt(Tx * Tx + Ty * Ty);
+            St.KnockDir[j] = Tl > kEps ? Vec2d{Tx / Tl, Ty / Tl} : Vec2d{1.0, 0.0};
+            St.KnockLeft[j] = P.CounterKnockSteps;
+            if (P.BitesAny(kj)) { St.BiteCd[j] = std::max(St.BiteCd[j], P.CounterNobiteSteps); }
+            if (St.Hp[j] <= 0.0)
+            {
+                Kill(j, CauseCounter);
+                Outcome = GoreKill;
+            }
+        }
+        St.Hp[g] = std::max(0.0, St.Hp[g] - P.CounterSelfDamage);
+        St.GoreCd[g] = P.FaunaGoreCd;
+        Tot.Gores[kg][kj][Outcome] += 1;
+        Tot.GoreHp[kg][kj] += Dmg;
+        Tot.StrikeHpBy[kj] += Dmg;
+        Event Ev;
+        Ev.Kind = EvGore;
+        Ev.A = static_cast<int>(g);
+        Ev.B = static_cast<int>(j);
+        Ev.Code = Outcome;
+        Ev.X = St.Pos[j].x;
+        Ev.Y = St.Pos[j].y;
+        Ev.Value = Dmg;
+        Ev.Value2 = Vt;
         Events.push_back(Ev);
     }
 
@@ -2328,7 +2739,9 @@ private:
                 }
                 if (Grp.empty()) { continue; }
                 std::sort(Grp.begin(), Grp.end());
-                for (size_t q = 0; q < Grp.size() && q < static_cast<size_t>(P.CarcPlaces); ++q) { Keep[static_cast<size_t>(Grp[q].second)] = 1; }
+                // 먹는 자리: S′ = const_carc_places · 동물 R6 = 사체마다 (죽은 몸 크기)
+                const size_t Places = static_cast<size_t>(std::max(P.FaunaOn ? St.CarcPlaces[c] : P.CarcPlaces, 0));
+                for (size_t q = 0; q < Grp.size() && q < Places; ++q) { Keep[static_cast<size_t>(Grp[q].second)] = 1; }
             }
             std::vector<double> CDemand(M, 0.0), CFrac(M, 0.0);
             std::vector<uint8_t> CHas(M, 0);
@@ -2492,7 +2905,7 @@ private:
                     for (size_t q : Two)
                     {
                         St.E[q] = St.E[q] - P.BreedCost;
-                        St.NextBirth[q] = Tf + P.BreedRecover;
+                        St.NextBirth[q] = Tf + P.Recover[k];   // 동물 R7 종별 (S′ 장면은 모두 const_breed_recover)
                         St.Offspring[q] = St.Offspring[q] + 1;
                     }
                     Tot.BirthCredits[k] += 2;
@@ -2519,7 +2932,7 @@ private:
         {
             std::vector<uint8_t> Elig2(S);
             for (size_t s = 0; s < S; ++s) { Elig2[s] = CanParent(s) ? 1 : 0; }
-            for (int k = 0; k < 3; ++k)
+            for (int k = 0; k < P.NumSpecies; ++k)
             {
                 std::vector<int> Idx;
                 for (int s = P.SpLo[k]; s < P.SpHi[k]; ++s)
@@ -2552,7 +2965,35 @@ private:
                             Np.UB = St.Uid[b];
                             Np.Due = Tf + P.BreedGestation;
                             Np.Sp = k;
-                            St.Pairs.push_back(Np);
+                            // 비어 있는 가장 낮은 짝 칸에 넣고 칸 차례를 지킴 (파이썬 free[nf] — 짝 차례가 파이썬 줄 차례와 같게)
+                            {
+                                int FreeSlot = 0;
+                                for (;;)
+                                {
+                                    bool Taken = false;
+                                    for (const Pair& Q : St.Pairs)
+                                    {
+                                        if (Q.Slot == FreeSlot)
+                                        {
+                                            Taken = true;
+                                            break;
+                                        }
+                                    }
+                                    if (!Taken) { break; }
+                                    ++FreeSlot;
+                                }
+                                Np.Slot = FreeSlot;
+                                size_t At = St.Pairs.size();
+                                for (size_t Q = 0; Q < St.Pairs.size(); ++Q)
+                                {
+                                    if (St.Pairs[Q].Slot > FreeSlot)
+                                    {
+                                        At = Q;
+                                        break;
+                                    }
+                                }
+                                St.Pairs.insert(St.Pairs.begin() + static_cast<std::ptrdiff_t>(At), Np);
+                            }
                             MatingV[a] = 1;
                             MatingV[b] = 1;
                             Event Ev;
@@ -2621,6 +3062,7 @@ private:
             St.CarcMeat0[C] = Meat;
             St.CarcT[C] = static_cast<double>(St.T);
             St.CarcKin[C] = St.KinId[s];
+            St.CarcPlaces[C] = P.FaunaOn ? CarcassPlacesOf(s) : P.CarcPlaces;
             Event Ev;
             Ev.Kind = EvCarcassAdd;
             Ev.A = static_cast<int>(C);
@@ -2632,6 +3074,13 @@ private:
             Ev.Value2 = std::atan2(St.Head[s].y, St.Head[s].x);
             Events.push_back(Ev);
         }
+    }
+
+    // 동물 R6: clamp(floor(per_size × size0 × g_size × 자람 + 0.5), min, max) (파이썬 _carcass_places — 이 스텝 BScale)
+    int CarcassPlacesOf(size_t s) const
+    {
+        const int V = static_cast<int>(std::floor(P.FaunaCpPer * P.Size0[St.Sp[s]] * BScale[s] + 0.5));
+        return std::min(std::max(V, P.FaunaCpMin), P.FaunaCpMax);
     }
 
     void StepRegrow()
@@ -2841,6 +3290,7 @@ private:
         St.Mating[s] = 0;
         St.Act[s] = ActWatch;
         St.BiteCd[s] = 0;
+        St.GoreCd[s] = 0;
         St.KnockLeft[s] = 0;
         St.RespT[s] = Tf;
         for (size_t q = 0; q < S; ++q)
@@ -2875,13 +3325,15 @@ private:
     void PerceiveMem()
     {
         const size_t S = static_cast<size_t>(P.NumSlots);
-        std::vector<double> Hr(S, 0.0);
+        std::vector<double> Hr(S, 0.0), SpdM(S, 0.0), VisF;
         for (size_t j = 0; j < S; ++j)
         {
             if (!St.Alive[j]) { continue; }
             const double Sp = std::sqrt(St.Disp[j].x * St.Disp[j].x + St.Disp[j].y * St.Disp[j].y);
+            SpdM[j] = Sp;
             Hr[j] = HearR(Sp);
         }
+        if (P.CamoOn) { CamoVis(SpdM, VisF); }   // 동물 R3 (관측과 같은 식)
         // 느낄 수 있는 짝은 칸 격자 이웃(SenseR 안)뿐 — 나머지는 '못 느낌' 식(감쇠) 그대로. 식·값은 전수 비교와 같다.
         BuildHash();
         PercStamp.assign(S, 0);
@@ -2910,7 +3362,8 @@ private:
                         const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
                         const double Invd = 1.0 / std::max(Dist, kEps);
                         const double CosA = (Dx * Hx + Dy * Hy) * Invd;
-                        const bool Perc = (Dist <= See && CosA >= P.FovCos[k]) || Dist <= Hr[j] || Dist <= P.SmellR[k];
+                        const bool Seen = P.CamoOn ? Dist <= See * VisF[j] : Dist <= See;
+                        const bool Perc = (Seen && CosA >= P.FovCos[k]) || Dist <= Hr[j] || Dist <= P.SmellR[k];
                         if (Perc)
                         {
                             PercStamp[j] = Stamp;
