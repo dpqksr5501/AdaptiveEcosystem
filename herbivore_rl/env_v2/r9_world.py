@@ -57,20 +57,23 @@ State table (dtype, shape, meaning). K worlds, S slots, G grid cells per side, C
   controllers (order 0)
     ctrl[k][sp] r9_brains.Controller | None · bstate[k][sp] int64 (slots of sp, n_state) · rng_act[k][sp] Generator
   per-world RNG Generators: rng_bite[k] · rng_resp[k]   (TAG table below)
-  last decision: _obs f32 (K, S, 107) · _rew f64 (K, S) · _done bool (K, S) · _info dict ; stats: st dict ; record: events dict
+  last decision: _obs f32 (K, S, 115) · _rew f64 (K, S) · _done bool (K, S) · _info dict ; stats: st dict ; record: events dict
 
 Step order (3-9; one `step(actions)` = one decision = D = 2 steps; decisions happen at global t mod 2 == 0)
   0 decide      decide(): every species decides from the last observation; fixed brains run once per world on the same-shape
                 block obs[k, lo:hi] (7-10) via r9_brains.decide_block; dir_cmd fixed for the decision
   1 move        action → target velocity (body table × spd_scale × wound (0.5 + 0.5 HP) × weak 0.75 × stamina lock → walk)
                 → acceleration clip |Δvel| ≤ accel → self move + wall slide (clip to [0, size]) → contact displacement (counter
-                knock 0.25 per step × 4) → wolf shelter push-out (radius + 0.5). All from previous positions (simultaneous)
+                knock 0.25 per step × 4) → wolf shelter push-out (radius + 0.5). All from previous positions (simultaneous).
+                S′ (2026-11-12): only WALK_j / RUN_j move; EAT · SHELTER · WATCH have target 0 (stand gait) — no automatic walk
+                to food, carcass or shelter inside an action (사용자 원칙 2026-11-11)
   2 bite        wolves in a per-step random order (rng_bite permutation of the biter slots, drawn every step); a wolf with
                 bite_cd == 0 bites the nearest other-species prey with: outside shelter, dist ≤ bite_r × g_size × gr, in the head
                 cone (dot ≥ 0.5), own self-velocity toward it > 0.03. Deer die; boar counter (HP ≥ 0.35, wolf in its ±75.5°
                 front) or HP loss; one death per individual, one bite per wolf; cooldown 8 / 30 (counter). The dead are marked
                 at once (alive False, dead_cause) and skip orders 3~5
-  3 eat         grids: R8 demand split (bincount of want, taken = min(demand, food), frac); meat: nearest eatable carcass within
+  3 eat         EAT eats only what is here (S′: no residue eating — nothing ≥ eat_min here and no carcass within 1.0 → nothing).
+                grids: R8 demand split (bincount of want, taken = min(demand, food), frac); meat: nearest eatable carcass within
                 1.0, 3 places nearest first (ties lower slot), not own kin; boar takes the first available of root → meat → grass
   4 metabolism  e_new = min(E − drain × gait_drain × maint + gain, 1) then R8 `_reserve` (deficit from fat, refill 0.25 of gain
                 when E ≥ 0.7); stamina drain (effective RUN) / recover; HP regen
@@ -83,6 +86,7 @@ Step order (3-9; one `step(actions)` = one decision = D = 2 steps; decisions hap
   8 respawn     train only: new uid; 20% newborn form, 80% far from all other-species individuals; references cleared
                 (mem row/column, r9_life.on_slot_reset, brain state row)
   9 perceive    eye ∪ ear ∪ nose over gathered alive slots; approach memory update; t += 1
+  obs           at the end of the decision: build_obs (115 columns incl. food_dir 23~30, see `food_dir_rows`)
   Within a decision, steps after a death are not added (R8 `step` 634~638).
 
 Numerics (3-9): geometry float64, obs float32; sums between individuals are sequential species → slot sums (`seq_sum` = np.cumsum
@@ -227,6 +231,9 @@ class ObsInputs(NamedTuple):
     cov_r: np.ndarray
     cov_ok: np.ndarray
     mem: np.ndarray          # (K, S, S)
+    act: np.ndarray          # (K, S) decision actions — the observer's own (EAT → eye × head_down in food_dir, as in perception)
+    eat_min: float           # body_common.eat_min (grid food a body can eat)
+    fd_fast: bool            # food_dir path (bincount) or reference path (seq_sum) — bit-identical
 
 
 def _cells(P: np.ndarray, cell: float, G: int):
@@ -262,8 +269,220 @@ def _topk_min(key: np.ndarray, n: int, own: bool = False) -> np.ndarray:
     return out
 
 
+# --------------------------------------------------------------------------- #
+# S′ sense food_dir (4-2, observation columns 23~30) — information only, never a direction the world walks
+# --------------------------------------------------------------------------- #
+#
+# food_dir_j (j = 0..7). Sector j centre = head rotated left (ccw) by j × 45° = the direction of WALK_{j+1} / RUN_{j+9}
+# (`B.rotate(head, DIR8[j])`, the dir_cmd expression of `step`).
+#   sensing = 4-1 rules, own diet only. eye: d ≤ R_eye = see_r × (head_down if the decision action is EAT else 1) and
+#     (v · h) / max(d, 1e-9) ≥ fov_cos; nose: d ≤ smell_r; eye ∪ nose.
+#   grid food: cells c other than my own cell with food ≥ eat_min of a food I eat; v = cell centre − my position.
+#   carcasses: other kin_id, meat > 0, distance > here_r (1.0 — food_here covers those).
+#   weight w(d) = max(eye ? 1 − d/R_eye : 0, nose ? 1 − d/smell_r : 0) [어림].
+#   sector = argmax_j (v · rotate(h, DIR8[j])), ties lower j (np.argmax).
+#   x_j = ((0 + Σ_grass cells g·w·e_grass) + Σ_root cells g·w·e_root) + Σ_carcass meat·w·e_meat — cells in the fixed offset table
+#     order (row-major: oy outer, ox inner, from (−n, −n)), carcasses in gathered carcass order; one partial sum per food.
+#   food_dir_j = x_j / (x_j + food_here_ref) [어림] — food_here_ref of the observer's body row (deer 0.5 · wolf 4.0 · boar 0.2).
+# Reads the observer's own body row and kin_id equality only (no species number, 4-4·4-6). Determinism (3-9): no trig in a step
+# (DIR8 literal table, fov_cos from the body table), sequential sums (fast path np.bincount in row-major order == reference path
+# seq_sum, bit for bit), and the offset table may grow with the batch's largest radius without changing the order of the non-zero
+# terms (cells beyond the radius add +0.0), so a world's values do not depend on the batch. The fast path visits only the terms that
+# can be non-zero (offset distance lower bound ≤ the row's radius, inside the grid, food ≥ eat_min, weight > 0) — the skipped terms
+# are exactly +0.0 additions to non-negative partial sums, so skipping them keeps every bit (2026-11-12 speed-up; C++ may skip too).
+# C++ (Unreal Native port): per body loop the same offset table (deer R 20 → n = 11, 23 × 23 cells) in the same order, acc[j] += …,
+# grass → root → carcass partial sums kept apart and added in that order, then x / (x + ref).
+
+_OFFSETS: dict = {}
+
+
+def offset_table(n: int) -> tuple[np.ndarray, np.ndarray]:
+    """Fixed cell offset table (row-major: oy = −n..n outer, ox = −n..n inner). A larger n keeps the order of the common cells."""
+    if n not in _OFFSETS:
+        oy, ox = np.mgrid[-n:n + 1, -n:n + 1]
+        _OFFSETS[n] = (ox.reshape(-1).astype(np.int64), oy.reshape(-1).astype(np.int64))
+    return _OFFSETS[n]
+
+
+FD_RADIUS_GROUPS = 16  # fast path: distinct row radii up to this are blocked per radius, else one (rows × offsets) mask
+FD_LB_SLACK = 1e-6     # units added to a row's radius in the fast-path offset pre-filter (a pre-filter only — weights decide)
+_OFFSET_LB: dict = {}
+
+
+def offset_lower_bound(n: int, cell: float) -> np.ndarray:
+    """(L,) lower bound of |cell centre − position| for each offset of `offset_table(n)` whatever the position inside the own
+    cell: cell × √(max(|ox| − ½, 0)² + max(|oy| − ½, 0)²); the own cell (0, 0) is inf (never a grid term). Fast-path pre-filter."""
+    key = (n, float(cell))
+    if key not in _OFFSET_LB:
+        ox, oy = offset_table(n)
+        ax = np.maximum(np.abs(ox) - 0.5, 0.0)
+        ay = np.maximum(np.abs(oy) - 0.5, 0.0)
+        lb = float(cell) * np.sqrt(ax * ax + ay * ay)
+        lb[(ox == 0) & (oy == 0)] = np.inf
+        lb.setflags(write=False)
+        _OFFSET_LB[key] = lb
+    return _OFFSET_LB[key]
+
+
+def _fd_weights(d, cosang, Re, Rs, fc):
+    seen = (d <= Re) & (cosang >= fc)
+    smelt = d <= Rs
+    ws = np.where(seen, 1.0 - d / np.maximum(Re, 1e-9), 0.0)
+    wn = np.where(smelt, 1.0 - d / np.maximum(Rs, 1e-9), 0.0)
+    return np.maximum(ws, wn), seen | smelt
+
+
+def _fd_sector(vx, vy, Dx, Dy):
+    """argmax_j (v · D_j), ties lower j. v (...,), D (..., 8)."""
+    dots = vx[..., None] * Dx + vy[..., None] * Dy
+    return np.argmax(dots, axis=-1)
+
+
+def _fd_sector_half(vx, vy, Dx4, Dy4):
+    """`_fd_sector` from the first four directions: DIR8[j + 4] = −DIR8[j] exactly, so v · D_{j+4} = −(v · D_j) exactly
+    (negation is exact in IEEE products and sums; only the sign of a zero may differ and argmax compares values) — the same
+    argmax, ties lower j. v (m,), D4 (m, 4)."""
+    q = vx[:, None] * Dx4 + vy[:, None] * Dy4
+    return np.argmax(np.concatenate([q, -q], axis=1), axis=1)
+
+
+if not np.array_equal(B.DIR8[4:], -B.DIR8[:4]):                    # `_fd_sector_half` needs the opposite rows exactly
+    raise AssertionError("r9_body.DIR8 rows 4..7 must be the exact negatives of rows 0..3")
+
+
+def food_dir_rows(pc: dict, act: np.ndarray, sb: dict, grass: np.ndarray, root: np.ndarray, eat_min: float, cell: float, G: int,
+                  here_r: float | None = None, fast: bool = True) -> np.ndarray:
+    """(K, Mx, 8) float64 food_dir of the gathered alive rows of the perception `pc` (`R9World._perceive`). act (K, S) decision
+    actions (EAT → eye × head_down), sb per-slot body arrays. fast = bincount path, else the seq_sum reference path (bit-identical)."""
+    here_r = float(B.OBS_NORM["here_r"]) if here_r is None else float(here_r)
+    nfd = B.N_FOOD_DIR
+    ic, valid = pc["ic"], pc["valid"]
+    K, Mx = ic.shape
+    out = np.zeros((K, Mx, nfd))
+    rk, ri = np.nonzero(valid)
+    n = len(rk)
+    if not n:
+        return out
+    si = ic[rk, ri]
+    P = pc["P"][rk, ri]
+    H = pc["H"][rk, ri]
+    hd = np.where(act[rk, si] == B.EAT, sb["head_down"][rk, si], 1.0)       # the `_perceive` expression
+    Re = sb["see_r"][rk, si] * hd
+    Rs, fc = sb["smell_r"][rk, si], sb["fov_cos"][rk, si]
+    eats, epu, ref = sb["eats"][rk, si], sb["e_per_unit"][rk, si], sb["food_here_ref"][rk, si]
+    Dd = B.rotate(H[:, None, :], B.DIR8[None, :, :])                     # (n, 8, 2) = WALK_{j+1} directions
+    Dx, Dy = Dd[..., 0], Dd[..., 1]
+    acc = np.zeros(n * nfd)
+    # --- grid foods (grass → root) ---
+    gr = np.nonzero(eats[:, B.GRASS] | eats[:, B.ROOT])[0]
+    if len(gr):
+        Rg = np.maximum(Re[gr], Rs[gr])
+        nn = int(math.ceil(float(np.max(Rg)) / cell)) + 1
+        ox, oy = offset_table(nn)
+        ix, iy = _cells(P[gr], cell, G)
+        kg = rk[gr]
+        foods = [(grid, wf) for grid, wf in ((grass, np.where(eats[gr, B.GRASS], epu[gr, B.GRASS], 0.0)),
+                                              (root, np.where(eats[gr, B.ROOT], epu[gr, B.ROOT], 0.0))) if (wf > 0).any()]
+        if foods and fast:
+            # Only (row, offset) pairs that can carry a non-zero term: offsets whose distance lower bound (`offset_lower_bound`,
+            # own cell = inf) is within the row's sensing radius, cells inside the grid (grids padded with −inf), food ≥ eat_min,
+            # then weight > 0. Every dropped term would add +0.0 to a non-negative partial sum, and np.bincount keeps the order of
+            # the kept terms inside each row (offset table order), so the sums are bit-identical to the full table (S-fd-fast).
+            lb = offset_lower_bound(nn, cell)
+            Gp = G + 2 * nn
+            base = (kg * Gp + (iy + nn)) * Gp + (ix + nn)                 # flat index of the own cell in the padded grids
+            olin = oy * Gp + ox
+            Rk = Rg + FD_LB_SLACK
+            uR, inv = np.unique(Rk, return_inverse=True)
+            if len(uR) <= FD_RADIUS_GROUPS:                              # rows grouped by radius: (rows × kept offsets) blocks
+                rs, cs = [], []
+                for q in range(len(uR)):
+                    rows = np.nonzero(inv == q)[0]
+                    offs = np.nonzero(lb <= uR[q])[0]
+                    rs.append(np.repeat(rows, len(offs)))
+                    cs.append(np.tile(offs, len(rows)))
+                r = np.concatenate(rs)
+                c = np.concatenate(cs)
+            else:
+                r, c = np.nonzero(lb[None, :] <= Rk[:, None])
+            idx = base[r] + olin[c]
+            gs, oks = [], []
+            cand = None
+            for grid, wf in foods:
+                gp = np.full((grid.shape[0], Gp, Gp), -np.inf, dtype=grid.dtype)
+                gp[:, nn:nn + G, nn:nn + G] = grid
+                g = gp.reshape(-1)[idx]
+                ok = g >= eat_min
+                if not (wf > 0).all():
+                    ok &= (wf > 0)[r]
+                cand = ok.copy() if cand is None else (cand | ok)
+                gs.append(g)
+                oks.append(ok)
+            sel = np.nonzero(cand)[0]
+            r, c = r[sel], c[sel]
+            rr = gr[r]
+            vx = (ix[r] + ox[c] + 0.5) * cell - P[rr, 0]
+            vy = (iy[r] + oy[c] + 0.5) * cell - P[rr, 1]
+            d = np.sqrt(vx * vx + vy * vy)
+            invd = 1.0 / np.maximum(d, 1e-9)
+            cosang = (vx * H[rr, 0] + vy * H[rr, 1]) * invd
+            wd, _s = _fd_weights(d, cosang, Re[rr], Rs[rr], fc[rr])
+            pos = np.nonzero(wd > 0.0)[0]
+            sel, r, rr, vx, vy, wd = sel[pos], r[pos], rr[pos], vx[pos], vy[pos], wd[pos]
+            key = rr * nfd + _fd_sector_half(vx, vy, Dx[rr, :4], Dy[rr, :4])
+            for (grid, wf), g, ok in zip(foods, gs, oks):
+                val = np.where(ok[sel], g[sel], 0.0) * wd * wf[r]
+                acc = acc + (np.bincount(key, weights=val, minlength=n * nfd) + 0.0)
+        elif foods:                                                       # reference path: whole offset table + seq_sum
+            cx = ix[:, None] + ox[None, :]
+            cy = iy[:, None] + oy[None, :]
+            inside = (cx >= 0) & (cx < G) & (cy >= 0) & (cy < G) & ~((ox == 0) & (oy == 0))[None, :]
+            cxc, cyc = np.clip(cx, 0, G - 1), np.clip(cy, 0, G - 1)
+            vx = (cxc + 0.5) * cell - P[gr, 0:1]
+            vy = (cyc + 0.5) * cell - P[gr, 1:2]
+            d = np.sqrt(vx * vx + vy * vy)
+            invd = 1.0 / np.maximum(d, 1e-9)
+            cosang = (vx * H[gr, 0:1] + vy * H[gr, 1:2]) * invd
+            wd, _s = _fd_weights(d, cosang, Re[gr][:, None], Rs[gr][:, None], fc[gr][:, None])
+            sec = _fd_sector(vx, vy, Dx[gr][:, None, :], Dy[gr][:, None, :])
+            acc2 = acc.reshape(n, nfd)
+            for grid, wf in foods:
+                g = grid[kg[:, None], cyc, cxc]
+                ok = (g >= eat_min) & inside & (wf > 0)[:, None]
+                val = np.where(ok, g, 0.0) * wd * wf[:, None]
+                part = np.zeros((n, nfd))
+                for j in range(nfd):
+                    part[gr, j] = seq_sum(np.where(sec == j, val, 0.0), -1) + 0.0
+                acc2 = acc2 + part
+            acc = acc2.reshape(-1)
+    # --- carcass meat ---
+    mr = np.nonzero(eats[:, B.MEAT])[0]
+    if len(mr) and pc["cvalid"].any():
+        rk_m, ri_m = rk[mr], ri[mr]
+        cdx, cdy, cdist = pc["cdx"][rk_m, ri_m], pc["cdy"][rk_m, ri_m], pc["cdist"][rk_m, ri_m]
+        cother = pc["cother"][rk_m, ri_m]
+        cmeat = pc["cmeat"][rk_m]
+        ccos = (cdx * H[mr, 0:1] + cdy * H[mr, 1:2]) / np.maximum(cdist, EPS)          # the `_perceive` ccos expression
+        wd, sens = _fd_weights(cdist, ccos, Re[mr][:, None], Rs[mr][:, None], fc[mr][:, None])
+        ok = cother & (cmeat > 0.0) & (cdist > here_r) & sens
+        sec = _fd_sector(cdx, cdy, Dx[mr][:, None, :], Dy[mr][:, None, :])
+        val = np.where(ok, cmeat * wd * epu[mr, B.MEAT][:, None], 0.0)
+        if fast:
+            r, c = np.nonzero(ok)
+            key = mr[r] * nfd + sec[r, c]
+            acc = acc + (np.bincount(key, weights=val[r, c], minlength=n * nfd) + 0.0)
+        else:
+            part = np.zeros((n, nfd))
+            for j in range(nfd):
+                part[mr, j] = seq_sum(np.where(sec == j, val, 0.0), -1) + 0.0
+            acc = (acc.reshape(n, nfd) + part).reshape(-1)
+    x = acc.reshape(n, nfd)
+    out[rk, ri] = x / (x + ref[:, None])
+    return out
+
+
 def build_obs(inp: ObsInputs) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Observation (K, S, 107) float32 (4절, column layout r9_body.OBS_NAMES) + hidden slot maps (K, S, 6) other and (K, S, 2) kin
+    """Observation (K, S, 115) float32 (4절, column layout r9_body.OBS_NAMES) + hidden slot maps (K, S, 6) other and (K, S, 2) kin
     (slot numbers, −1 empty). Dead slots get zeros. All columns are computed on the gathered alive rows of `inp.pc` and scattered
     back to their slots (gathered order = slot order)."""
     nm = B.OBS_NORM
@@ -328,6 +547,8 @@ def build_obs(inp: ObsInputs) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     spd = np.sqrt(_len2(Dp))
     og[..., B.O_OWN_SPEED] = spd / nm["speed"]
     og[..., B.O_MATING] = g(inp.mating)
+    # --- food_dir 23~30 (S′ 4-2): values in [0, 1), unchanged by the final clip ---
+    og[..., B.SL_FOOD_DIR] = food_dir_rows(pc, inp.act, sb, inp.grass, inp.root, inp.eat_min, inp.cell, G, fast=inp.fd_fast)
     # --- other-species slots (4-3) and kin (4-4) ---
     perc, same = pc["perc"], pc["same"]
     dx, dy, dist, invd = pc["dx"], pc["dy"], pc["dist"], pc["invd"]
@@ -403,7 +624,7 @@ def build_obs(inp: ObsInputs) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 
 class R9World:
-    """K worlds of the R9 ecosystem. `step(actions (K, S) int)` = one decision (2 steps) → (obs (K, S, 107) f32, rew (K, S) f64,
+    """K worlds of the R9 ecosystem. `step(actions (K, S) int)` = one decision (2 steps) → (obs (K, S, 115) f32, rew (K, S) f64,
     done (K, S) bool, info dict). See the module docstring for the state table and step order."""
 
     def __init__(self, cfg: dict, seeds: Sequence[int], *, counts: np.ndarray | None = None, record: bool = False,
@@ -449,10 +670,6 @@ class R9World:
         self._unlock = float(cm["stamina_unlock"])
         self._wound = float(cm["wound_speed"])
         self._eat_min = float(cm["eat_min"])
-        self._walk_eat = float(cm["walk_eat_mult"])
-        gz = cm["graze"]
-        self._graze = (float(gz["forage"]), float(gz["cohesion"]), float(gz["separation"]), float(gz["sep_radius"]),
-                       int(gz["grad_blur"]))
         bt, ct, bd, cc_ = cm["bite"], cm["counter"], cm["bite_damage"], cm["carcass"]
         self._bite_cone, self._bite_appr, self._bite_cd = float(bt["cone_cos"]), float(bt["approach_min"]), int(bt["cooldown"])
         self._ct = dict(hp_min=float(ct["hp_min"]), cone=float(ct["cone_cos"]), damage=float(ct["damage"]),
@@ -474,17 +691,12 @@ class R9World:
         self._biters = np.nonzero(self.body.can_bite[self.slot_sp.astype(np.int64)])[0].astype(np.int64)
         self._bite_mat = self.body.bites[self.slot_sp[self._biters].astype(np.int64)][:, self.slot_sp.astype(np.int64)]
         rank = np.full((self.S, B.N_FOODS), 99, dtype=np.int64)
-        first_grid = np.full(self.S, -1, dtype=np.int64)
         for s in range(self.S):
             order = self.body.diet_order[int(self.slot_sp[s])]
             for r_, f in enumerate(order):
                 rank[s, f] = r_
-            grids = [f for f in order if f in B.GRID_FOODS]
-            first_grid[s] = grids[0] if grids else -1
         self._diet_rank = rank
-        self._first_grid = first_grid
-        eats_s = self.body.eats[self.slot_sp.astype(np.int64)]
-        self._meat_only = eats_s[:, B.MEAT] & ~eats_s[:, B.GRASS] & ~eats_s[:, B.ROOT]
+        self.food_dir_fast = True        # food_dir: bincount path (True) or the seq_sum reference path (False) — bit-identical
         self.record = bool(record)
         self.pairs_full = bool(pairs_full)
         self.step_hook = None
@@ -735,6 +947,17 @@ class R9World:
         rcap = np.where(cvr, rcap * cmr, rcap)
         self.grass_cap[k] = cap
         self.grass[k] = cap
+        tg = fd["train_grass_total"]
+        if not self.judge and tg is not None:
+            # S′ 연습 세계 분포 N (사용자 결정 2026-11-12): learning-world grass capacity sum = train_grass_total, the same meaning as
+            # the judge quadrant sum 70 (counted before the shelter × cover_mult). [해석] counted on the covered map with the shelter
+            # cells divided back by cover_mult, then the covered map is scaled — the exact arithmetic of the S′ measurement
+            # (fin_bundle.install_capnorm), so the measured numbers carry over bit for bit. Regrowth rates are not scaled.
+            pre = np.where(cvr, cap / cmg, cap)
+            s_ = float(seq_sum(pre.reshape(-1)))
+            if s_ > 0.0:
+                self.grass_cap[k] = cap * (float(tg) / s_)
+                self.grass[k] = self.grass_cap[k]
         self.grass_regen[k] = float(g_["regen_base"]) * gm * np.where(cvr, cmg, 1.0)          # r8_world 313 (same order)
         self.root_cap[k] = rcap
         self.root[k] = rcap
@@ -1063,7 +1286,7 @@ class R9World:
 
     # --- read-only views ---
     def obs(self) -> np.ndarray:
-        """Last observation (K, S, 107) float32."""
+        """Last observation (K, S, 115) float32."""
         return self._obs
 
     def observe(self) -> np.ndarray:
@@ -1256,77 +1479,19 @@ class R9World:
         best = np.take_along_axis(rank, f[..., None], -1)[..., 0]
         return np.where(best < 99, f, -1)
 
-    def _graze_dir(self, need: np.ndarray) -> np.ndarray:
-        """EAT walking direction (K, S, 2) for the slots in `need` (5절, R8 식): unit(0.83 food gradient + 0.71 kin cohesion +
-        1.35 separation) from the last perception, computed on those gathered rows only. Food gradient = Σ_grid-diet e_f
-        ∇boxmean_2(grid_f); meat-only bodies: toward the nearest sensed carcass (none → cohesion and separation only). Separation
-        from all alive same-kin within sep_radius (R8 used all deer) [해석]."""
-        pc = self._pc
-        K = self.K
-        out = np.zeros((K, self.S, 2))
-        fw, cw, sw, sep_r, gb = self._graze
-        ic, valid = pc["ic"], pc["valid"]
-        kk = np.arange(K)[:, None]
-        rk, ri = np.nonzero(valid & need[kk, ic])
-        if not len(rk):
-            return out
-        si = ic[rk, ri]
-        same, perc, pair = pc["same"][rk, ri], pc["perc"][rk, ri], pc["pair"][rk, ri]
-        dx, dy, dist, invd = pc["dx"][rk, ri], pc["dy"][rk, ri], pc["dist"][rk, ri], pc["invd"][rk, ri]
-        Pn = pc["P"][rk]
-        Pi = pc["P"][rk, ri]
-        pk = perc & same
-        kf = pk.astype(np.float64)
-        cnt = pk.sum(-1)
-        cf = np.maximum(cnt, 1).astype(np.float64)
-        cx = (seq_sum(kf * Pn[..., 0], -1) + 0.0) / cf
-        cy = (seq_sum(kf * Pn[..., 1], -1) + 0.0) / cf
-        to_c = np.where((cnt > 0)[..., None], _unit(np.stack([cx, cy], -1) - Pi), 0.0)
-        wgt = np.clip(1.0 - dist / sep_r, 0.0, None)
-        wgt = np.where(pair & same, wgt, 0.0)
-        c = wgt * invd
-        sep = -np.stack([seq_sum(c * dx, -1) + 0.0, seq_sum(c * dy, -1) + 0.0], -1)
-        n = np.sqrt(_len2(sep))[..., None]
-        sep = sep * np.minimum(1.0, 1.0 / np.maximum(n, EPS))
-        sb = self.sb
-        eats, epu = sb["eats"][rk, si], sb["e_per_unit"][rk, si]
-        ix, iy = _cells(Pi, self.cell, self.G)
-        fgx = np.zeros(len(rk))
-        fgy = np.zeros(len(rk))
-        for f, grid in ((B.GRASS, self.grass), (B.ROOT, self.root)):
-            wf = np.where(eats[..., f], epu[..., f], 0.0)
-            if not (wf > 0).any():
-                continue
-            bm = _box_mean(grid, max(1, int(gb)))
-            gy, gx = np.gradient(bm, axis=(1, 2))
-            fgx = fgx + wf * gx[rk, iy, ix]
-            fgy = fgy + wf * gy[rk, iy, ix]
-        fg = _unit(np.stack([fgx, fgy], -1))
-        mo = self._meat_only[si]
-        if mo.any():
-            key = np.where(pc["csens"][rk, ri], pc["cdist"][rk, ri], np.inf)
-            jc = key.argmin(-1)
-            hasc = np.take_along_axis(key, jc[..., None], -1)[..., 0] < np.inf
-            vx = np.take_along_axis(pc["cdx"][rk, ri], jc[..., None], -1)[..., 0]
-            vy = np.take_along_axis(pc["cdy"][rk, ri], jc[..., None], -1)[..., 0]
-            tm = np.where(hasc[..., None], _unit(np.stack([vx, vy], -1)), 0.0)
-            fg = np.where(mo[..., None], tm, fg)
-        raw = fw * fg + cw * to_c + sw * sep
-        out[rk, si] = _unit(raw)
-        return out
-
     def _move(self) -> None:
         """Order 1 (3-9): action → target velocity → acceleration clip → self move + wall slide → knock (contact) → shelter push
         (contact, non-entering bodies). Simultaneous from the previous positions. [해석] the multipliers (growth·gene·wound·weak·
-        lock → walk) scale the target and the acceleration limit clips the change, so |Δvel| ≤ accel every step."""
+        lock → walk) scale the target and the acceleration limit clips the change, so |Δvel| ≤ accel every step.
+        S′ (사용자 원칙 2026-11-11: 몸 = 할 수 있는 것, 행동 실행 안에 자동 길찾기 없음): only WALK_j / RUN_j have a target velocity.
+        EAT, SHELTER and WATCH have target 0 with the stand gait — a moving body slides to a stop under the acceleration limit exactly
+        like WATCH. EAT eats only what `_first_food` finds here (nothing → eats nothing). SHELTER protects only through 'inside a
+        shelter' (bite rule, wolf push-out), never by moving."""
         K, S = self.K, self.S
         sb = self.sb
         alive = self.alive
         act = self.act
         P0 = self.pos
-        kk = np.arange(K)[:, None]
-        jsh, edge0 = _shelter_edge(P0, self.cov_c, self.cov_r, self.cov_ok)
-        inside0 = edge0 <= 0.0
         gait = np.zeros((K, S), dtype=np.int64)
         base = np.zeros((K, S))
         dirv = np.zeros((K, S, 2))
@@ -1335,28 +1500,14 @@ class R9World:
         lockd = self.stam_lock
         walk_sp = sb["walk_speed"]
         run_sp = sb["run_speed"] * self._rmult
-        # EAT (5절)
+        # EAT (S′ 5절): stand and eat the first food of the diet available here (grid cell ≥ eat_min, or an eatable carcass within
+        # carcass.eat_r); none → eat nothing. No movement: gait stand, target speed 0 (eye × head_down is applied by `_perceive`).
         is_eat = alive & (act == B.EAT)
         if is_eat.any():
             kind = self._first_food(P0, is_eat)
-            ok = kind >= 0
-            need = is_eat & ~ok
-            if need.any():
-                dg = self._graze_dir(need)
-                has = _len2(dg) > EPS * EPS
-            else:
-                dg = np.zeros((K, S, 2))
-                has = np.zeros((K, S), dtype=bool)
-            walk = need & has
-            stand = is_eat & ~walk
-            ekind = np.where(is_eat & ok, kind, ekind)
-            ekind = np.where(walk, np.where(sb["eats"][..., B.GRASS], B.GRASS, -1), ekind)
-            # R8: standing EAT without food ≥ eat_min (no direction) still eats its cell at rate 1 — first grid food of the diet
-            ekind = np.where(stand & ~ok, self._first_grid[None, :], ekind)
-            emult = np.where(stand, 1.0, np.where(walk, self._walk_eat, 0.0))
-            gait = np.where(walk, B.G_WALK, gait)
-            base = np.where(walk, walk_sp, base)
-            dirv = np.where(walk[..., None], dg, dirv)
+            ok = is_eat & (kind >= 0)
+            ekind = np.where(ok, kind, ekind)
+            emult = np.where(ok, 1.0, emult)
         # WALK_j / RUN_j: direction fixed at the decision (dir_cmd)
         wk = alive & (act >= B.WALK_FIRST) & (act <= B.WALK_LAST)
         rn = alive & (act >= B.RUN_FIRST) & (act <= B.RUN_LAST)
@@ -1364,14 +1515,8 @@ class R9World:
         rok, rlk = rn & ~lockd, rn & lockd
         gait = np.where(wk | rlk, B.G_WALK, np.where(rok, B.G_RUN, gait))
         base = np.where(wk | rlk, walk_sp, np.where(rok, run_sp, base))
-        # SHELTER: entering bodies outside run to the nearest (edge) shelter centre; inside or non-entering (wolf) stand (3-5)
-        sh = alive & (act == B.SHELTER) & sb["shelter_enter"] & ~inside0 & np.isfinite(edge0)
-        if sh.any():
-            cpos = self.cov_c[kk, jsh]
-            dirv = np.where(sh[..., None], _unit(cpos - P0), dirv)
-            sok, slk = sh & ~lockd, sh & lockd
-            gait = np.where(slk, B.G_WALK, np.where(sok, B.G_RUN, gait))
-            base = np.where(slk, walk_sp, np.where(sok, run_sp, base))
+        # SHELTER (S′ 3-5): stand where you are (no automatic run to a shelter). Going to a shelter is WALK/RUN chosen by the brain
+        # from shelter_x · shelter_y · shelter_edge; the protection is the body rule 'inside a shelter' (no bite, wolf push-out).
         hp_f = self._wound + (1.0 - self._wound) * self.hp
         weak = np.where(self.E < sb["weak_e"], sb["weak_speed"], 1.0)
         tsp = base * self.spd_scale * hp_f * weak
@@ -1971,7 +2116,8 @@ class R9World:
                         sb=self.sb, E=self.E, R=self.R, stam=self.stam, hp=self.hp, size_obs=self.size_obs, af=self.af,
                         next_birth=self.next_birth, mating=self.mating, sex=self.sex, mature=self.mature, uid=self.uid,
                         parent_a=self.parent_a, parent_b=self.parent_b, check_related=self.judge, size=self.size, cell=self.cell,
-                        grass=self.grass, root=self.root, cov_c=self.cov_c, cov_r=self.cov_r, cov_ok=self.cov_ok, mem=self.mem)
+                        grass=self.grass, root=self.root, cov_c=self.cov_c, cov_r=self.cov_r, cov_ok=self.cov_ok, mem=self.mem,
+                        act=self.act, eat_min=self._eat_min, fd_fast=bool(self.food_dir_fast))
         obs, oth, kin = build_obs(inp)
         self._other_slots, self._kin_slots = oth, kin
         return obs

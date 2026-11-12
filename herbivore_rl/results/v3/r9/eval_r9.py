@@ -5,12 +5,16 @@
     python results/v3/r9/eval_r9.py calibrate --phase pick                 # C0-6 → 5 → 7 → 1 → 2 → 3 → 4 → 11 → 7b·7c (고르기 시드)
     python results/v3/r9/eval_r9.py calibrate --phase confirm              # 확인 시드에서 모든 관문 한 번 더 (고침은 관문마다 한 번)
     python results/v3/r9/eval_r9.py calibrate --gates C0-10 --c010-commands  # C0-10 짧은 학습 명령만 적는다 (여기서 돌리지 않음)
-    python results/v3/r9/eval_r9.py calibrate --gates C0-10 --gamma 0.997 --brain -:deer=ckpt/r9/c010/deer_g0997.npz ...
-    python results/v3/r9/eval_r9.py leak [--brain -:deer=...]               # 4-6 이름표 새는 길 (개발 시드)
+    python results/v3/r9/eval_r9.py calibrate --gates C0-10 --gamma 0.997 --brain -:deer=<npz> -:boar=<npz> -:wolf=<npz>
+    #   C0-10 은 밤에만: run_night.py (밤 창 안에서 학습 6 묶음 → 이 잼 → --c010-choose → C0_STATE → 리그)
+관문 정의 (2026-11-12 측정 전 등록, STATUS 2-1 문장 그대로 — S′ 세계·S4 규칙 두뇌): C0-6·C0-4 보고만, C0-5 먹은 양 기준(d 점수·동점 0.01),
+C0-7 띠 ∧ 멸종 없음 ∧ |L0 끝 수 변화| < 20% · max(|log 비|) 점수·동점 0.05 · 0.012 등록 대조·0.005 보고, C0-1 섞인 무리(떨어지면 묻기),
+C0-2 strict 사냥 성공률(한 번만 고침), C0-10 늑대 셋 조건 + 음성 대조 셋. 사냥 시도 = strict (r9_eval_core.strict_stats), 막힘 = L0 짝 비교.
+    python results/v3/r9/eval_r9.py leak [--brain -:deer=...]               # 4-6 이름표 새는 길 (기본 스모크 시드 44180~44199)
     python results/v3/r9/eval_r9.py mixed --brain A:deer=… ×6               # 8-1 J1 (판정 시드 44800~44899, 잠금 파일)
     python results/v3/r9/eval_r9.py judge --brain A:deer=… ×6 --long --variants L0 L1 LS regen_0.5 regen_2.0 ratio   # 8-2 J2·J3
-    python results/v3/r9/eval_r9.py scenes --form judge --seeds 44100 44109     # 8-3 (보고만)
-    python results/v3/r9/eval_r9.py anomaly --form train --seeds 44000 44019    # 8-4
+    python results/v3/r9/eval_r9.py scenes --form judge --seeds 44180 44189     # 8-3 (보고만, 스모크 시드)
+    python results/v3/r9/eval_r9.py anomaly --form train --seeds 44180 44199    # 8-4 (스모크 시드)
     python results/v3/r9/eval_r9.py check --round 10 --brain A:deer=… ×6 --prev results/v3/r9/check/round08.json   # 8-5·9-4
     #   league_r9.py --check-cmd "results/v3/r9/eval_r9.py check --round {round} --branches {branch} --league-state {state}"
     #   (갈래마다 불림 → check/round10_A.json·_B.json, 둘 다 모이면 round10.json 에 멈춤 규칙. 직전 점검은 점검 폴더에서 찾는다)
@@ -54,25 +58,39 @@ LOCK_PATH = OUT_EVAL / C.LOCK_NAME
 # --------------------------------------------------------------------------- #
 
 C0_ORDER = ("C0-6", "C0-5", "C0-7", "C0-1", "C0-2", "C0-3", "C0-4", "C0-11", "C0-7b", "C0-7c")
+# 2026-11-12 측정 전 등록 (S′, 사용자 11-12 "1. 실전 세계랑 맞추고 2. 그렇게 해 3. 다 해") — 문장은 results/v3/r9/STATUS.md 2-1 그대로.
 C0_SPEC = {
-    "C0-6": dict(kind="decide", path=("species", "deer", "eat_rate", "grass"), cands=[0.012, 0.009, 0.016, 0.007, 0.020], form="train",
-                 rule="띠 [0.3, 0.6] 안 후보 가운데 RULE_DEER 먹는 시간 몫이 0.4 에 가장 가까운 것"),
-    "C0-5": dict(kind="decide", path=("food", "root", "regen_q"), cands=[1.0, 0.5, 2.0, 0.25, 4.0], form="train",
-                 rule="땅속 몫 ∈ [0.5, 0.8]·Pianka ∈ [0.2, 0.5] 인 후보 가운데 Pianka 가 0.4 에 가장 가까운 것"),
-    "C0-7": dict(kind="decide", path=("food", "grass", "regen_base"), cands=[0.002, 0.0015, 0.0025, 0.001, 0.003], form="judge",
-                 rule="끝 수 [0.7, 2.5] 배·멸종 없음·막힘 몫 < 0.2 인 후보 가운데 끝 수 비 기하평균이 1.0 에 가장 가까운 것"),
-    "C0-1": dict(kind="ordered", path=("species", "deer", "stamina_run_steps"), cands=[90.0, 120.0, 60.0], form="train",
-                 rule="차례대로 처음 통과하는 것 (RULE_DEER 잡힘 ≤ 0.5 × ALWAYS_EAT)"),
+    "C0-6": dict(kind="report", form="train",
+                 rule="보고만 (11-12): 먹는 속도 0.012 고정 — EAT 결정 몫·서서 먹은 몫·헛 EAT 몫·먹이 활동 몫·쉬는 시간 몫·기운 중앙·굶음"),
+    "C0-5": dict(kind="decide", path=("food", "root", "regen_q"), cands=[1.0, 0.5, 2.0, 0.25, 4.0], tie=0.01, form="train",
+                 rule="먹은 양 기준: 땅속 몫 ∈ [0.5, 0.8] ∧ Pianka(먹은 양) ∈ [0.2, 0.5] 후보 가운데 d = max(|땅속 − 0.65|, |Pianka − 0.35|) 가 "
+                      "가장 작은 것, d 차 0.01 안은 표 차례 (1 → 0.5 → 2 → 0.25 → 4)"),
+    "C0-7": dict(kind="decide", path=("food", "grass", "regen_base"), cands=[0.002, 0.0015, 0.0025, 0.001, 0.003], tie=0.05, form="judge",
+                 neg_control=0.012, report_value=0.005,
+                 rule="끝 수 비 [0.7, 2.5](두 종)·멸종 없음·|L0 끝 수 변화| < 20%(두 종) 후보 가운데 max(|log 사슴비|, |log 멧돼지비|) 가 가장 "
+                      "작은 것, 0.05 안은 표 차례. 등록 조건: 0.012 는 띠에서 떨어져야, 0.005 는 보고"),
+    "C0-1": dict(kind="check", form="train",
+                 rule="섞인 무리: RULE_DEER ÷ ALWAYS_EAT 잡힘 비 ≤ 0.7 ∧ 세계 짝 차 95% 위 끝 < 0 — 떨어지면 멈추고 묻는다 (고칠 값 없음)"),
     "C0-2": dict(kind="direction", path=("species", "wolf", "run_mult"), base=[0.90, 1.05], high=[0.85, 1.00], low=[0.95, 1.10],
-                 form="train", rule="성공률 ∈ [0.10, 0.50]·ALWAYS_EAT 잡힘 ∈ [0.5, 20], 어긋난 쪽으로 한 칸"),
+                 form="train", rule="strict 사냥 성공률 ∈ [0.10, 0.50]. 위로 넘치면 U[0.85, 1.00]·아래로 떨어지면 U[0.95, 1.10] 로 한 번만, "
+                                    "그래도 띠 밖이면 멈추고 묻는다"),
     "C0-3": dict(kind="direction", path=("body_common", "counter", "cone_cos"), base=0.25, high=0.5, low=0.0, form="train",
                  rule="성체 물기 반격 몫 ∈ [0.2, 0.8]·성체 잡힘 > 0, 75.5° → 높으면 60°·낮으면 90°"),
-    "C0-4": dict(kind="direction", path=("body_common", "carcass", "meat_frac"), base=0.6, high=0.45, low=0.75, form="train",
-                 rule="규칙 늑대 E 중앙값 ∈ [0.3, 0.9], 0.6 → 높으면 0.45·낮으면 0.75"),
+    "C0-4": dict(kind="report", form="train", rule="보고만 (11-12): 규칙 늑대 E 중앙 (처음 띠 [0.3, 0.9] 와 견준 값 함께)"),
     "C0-11": dict(kind="reward", form="train", rule="RULE − HIDE 개체당 1,000 스텝 전체 보상 차 95% 아래 끝 > 0 (사슴·멧돼지), 못 넘으면 F 한 번"),
     "C0-7b": dict(kind="report", form="judge", rule="규칙 셋 30 분 공존 세계 몫·막힘 몫 (보고만)"),
     "C0-7c": dict(kind="report", form="judge", rule="(가) RANDOM 늑대 공존 ≤ 0.3 이어야 J2 가 떨어질 수 있는 판, 아니면 J2 주 기준 = 2 시간 판"),
+    # 밤에만 (run_night.py). C0_STATE 에 고른 γ 를 적고 judge·mixed·check·리그가 YAML 과 다르면 거부한다(check_c0_state).
+    "C0-10": dict(kind="night", path=("train", "ppo", "gamma"), cands=[0.997, 0.99], form="train",
+                  rule="짧은 학습: 사슴 20M·멧돼지 10M 먹이 기준 + 늑대 10M 셋 조건(보상 짝 차 − RANDOM·− 늘 살피기 아래 끝 > 0, strict 성공률 "
+                       "≥ 0.5 × 규칙, strict 사냥 죽임 κ ≥ 0.5 × 규칙), 음성 대조 RANDOM·NOHUNT·NOHUNT_RUN 이 떨어져야(등록 조건)"),
 }
+C05_BANDS = dict(root=(0.5, 0.8), pianka=(0.2, 0.5))
+C05_CENTER = dict(root=0.65, pianka=0.35)
+C07_BAND = (0.7, 2.5)
+C07_L0_MAX = 0.20
+C01_RATIO_MAX = 0.7
+C02_BAND = (0.10, 0.50)
 EVAL_FACING = {"randomize": {"rule_deer_facing": [0.9, 0.9]}}          # 7-5 평가·판정 f = 0.9 (뽑는 개수는 그대로)
 REGEN_ONE = {"randomize": {"grass_regen_mult": [1.0, 1.0], "root_regen_mult": [1.0, 1.0]}}
 PREY_MIX_RULE = 0.7                                                    # 7-4 0 바퀴 늑대 묶음 먹이: 규칙 70%·늘 먹기 30% (세계 번호로 [어림])
@@ -239,14 +257,54 @@ class GateCtx:
             print(*a, flush=True)
 
 
-def m_c06(ctx: GateCtx, v) -> dict:
-    cfg = B.override(gate_value_cfg(ctx.cfg_t, "C0-6", v), {**REGEN_ONE, **EVAL_FACING})
+def c06_report(rec: dict) -> dict:
+    """C0-6 보고 (S′ 2-1): 사슴·멧돼지마다 EAT 결정 몫, 서서 먹은 몫(산 스텝 중 EAT 이고 발밑에 먹을 것이 있음), 헛 EAT 몫(EAT 인데 발밑에
+    없음), 먹이 활동 몫(EAT 결정 + E < 0.9 이고 food_dir 칸 하나라도 > 0 일 때의 걷기 결정 [어림]), 쉬는 시간 몫(WATCH 결정), 걷기 몫, 기운 중앙,
+    굶음 / 1,000 개체-스텝. 처음 띠([0.3, 0.6]·멧돼지 [0.2, 0.6])와 견준 값도."""
+    sm = C.species_metrics(rec)
+    es = np.asarray(rec["eat_steps"]).sum(0)
+    fd = np.asarray(rec["forage_dec"]).sum(0)
+    out = {}
+    for sp in (DEER, BOAR):
+        nm = SPECIES[sp]
+        s = sm[nm]
+        al = max(float(es[sp, 0]), 1.0)
+        dec = max(float(fd[sp, 0]), 1.0)
+        out[nm] = dict(eat_dec_share=s["act_eat"], stand_eat_share=float(es[sp, 1]) / al, null_eat_share=float(es[sp, 2]) / al,
+                       forage_share=float(fd[sp, 1]) / dec, rest_share=s["act_watch"], walk_share=s["act_walk"], run_share=s["act_run"],
+                       shelter_share=s["act_shelter"], E_median=s["E_median"], starved_1k=s["starved_1k"])
+    out["old_band"] = dict(deer=bool(0.3 <= out["deer"]["eat_dec_share"] <= 0.6), boar=bool(0.2 <= out["boar"]["eat_dec_share"] <= 0.6))
+    return out
+
+
+def m_c06(ctx: GateCtx, v=None) -> dict:
+    """보고만 (11-12) — 고르지도 멈추지도 않는다. 학습 세계 꼴·늑대 없음·재생 배수 1·f 0.9, RULE_DEER·RULE_BOAR (S4)."""
+    cfg = B.override(ctx.cfg_t, {**REGEN_ONE, **EVAL_FACING})
     K = len(ctx.seeds_t)
     rec = C.run(cfg, ctx.seeds_t, ctx.steps_t, spec_fn(cfg, rule_specs(), {}), counts=counts_with(K, wolf=0), scenes=False, chunk=ctx.chunk)
-    sm = C.species_metrics(rec)
-    share, boar = sm["deer"]["act_eat"], sm["boar"]["act_eat"]
-    return dict(value=v, eat_share=share, boar_eat_share=boar, boar_ok=bool(0.2 <= boar <= 0.6), deer_E_median=sm["deer"]["E_median"],
-                deer_starved_1k=sm["deer"]["starved_1k"], ok=bool(0.3 <= share <= 0.6), score=abs(share - 0.4))
+    rp = c06_report(rec)
+    return dict(value=float(cfg["species"]["deer"]["eat_rate"]["grass"]), eat_share=rp["deer"]["eat_dec_share"],
+                rest_share=rp["deer"]["rest_share"], forage_share=rp["deer"]["forage_share"], deer_E_median=rp["deer"]["E_median"],
+                report=rp, ok=True)
+
+
+def c05_units(eaten_e: np.ndarray, cfg: dict) -> dict:
+    """C0-5 먹은 양 기준 (11-12, '2. 그렇게 해'): 먹은 양 = 먹은 에너지 ÷ 그 몸의 단위당 E (멧돼지 풀 0.05·땅속 0.15·고기 0.9, 사슴 풀 0.5).
+    eaten_e (3 종, 3 먹이) = 세계 합. 통과 = 멧돼지 땅속 몫 ∈ [0.5, 0.8] ∧ Pianka(먹은 양 몫: 풀·땅속·고기) ∈ [0.2, 0.5].
+    점수 d = max(|땅속 − 0.65|, |Pianka − 0.35|) (두 띠 반폭 0.15 — 같은 눈금)."""
+    ee = np.asarray(eaten_e, dtype=np.float64)
+    sh = {}
+    for sp in (DEER, BOAR):
+        epu = cfg["species"][SPECIES[sp]]["e_per_unit"]
+        u = np.array([ee[sp, f] / float(epu[n]) if (n in epu and ee[sp, f] > 0) else 0.0 for f, n in enumerate(B.FOODS)])
+        sh[sp] = u / u.sum() if u.sum() > 0 else np.full(3, np.nan)
+    root = float(sh[BOAR][B.ROOT])
+    pk = C.pianka(sh[DEER], sh[BOAR]) if np.isfinite(sh[DEER]).all() and np.isfinite(sh[BOAR]).all() else float("nan")
+    ok = bool(math.isfinite(root) and C05_BANDS["root"][0] <= root <= C05_BANDS["root"][1]
+              and math.isfinite(pk) and C05_BANDS["pianka"][0] <= pk <= C05_BANDS["pianka"][1])
+    d = max(abs(root - C05_CENTER["root"]), abs(pk - C05_CENTER["pianka"])) if (math.isfinite(root) and math.isfinite(pk)) else float("inf")
+    return dict(root_share=root, pianka=pk, ok=ok, score=d,
+                units={SPECIES[sp]: {n: float(sh[sp][f]) for f, n in enumerate(B.FOODS)} for sp in (DEER, BOAR)})
 
 
 def m_c05(ctx: GateCtx, v) -> dict:
@@ -255,50 +313,96 @@ def m_c05(ctx: GateCtx, v) -> dict:
     rec = C.run(cfg, ctx.seeds_t, ctx.steps_t, spec_fn(cfg, {DEER: "ALWAYS_EAT", WOLF: "RULE_WOLF", BOAR: "ALWAYS_EAT"}, {}),
                 counts=counts_with(K, wolf=0), scenes=True, chunk=ctx.chunk)
     ee = rec["st"]["eaten_e"].sum(0)
+    u = c05_units(ee, cfg)
     tot = float(ee[BOAR].sum())
-    root = float(ee[BOAR, B.ROOT]) / tot if tot > 0 else float("nan")
-    pk = C.pianka(ee[DEER] / max(ee[DEER].sum(), 1e-12), ee[BOAR] / max(tot, 1e-12)) if tot > 0 and ee[DEER].sum() > 0 else float("nan")
-    ok = bool(math.isfinite(root) and 0.5 <= root <= 0.8 and math.isfinite(pk) and 0.2 <= pk <= 0.5)
+    root_e = float(ee[BOAR, B.ROOT]) / tot if tot > 0 else float("nan")
+    pk_e = C.pianka(ee[DEER] / max(ee[DEER].sum(), 1e-12), ee[BOAR] / max(tot, 1e-12)) if tot > 0 and ee[DEER].sum() > 0 else float("nan")
     cell = float(np.nanmean(rec["sc_cells_pianka"])) if np.isfinite(rec["sc_cells_pianka"]).any() else float("nan")
-    return dict(value=v, root_share=root, pianka=pk, cell_pianka=cell, ok=ok, score=abs(pk - 0.4) if math.isfinite(pk) else float("inf"))
+    sm = C.species_metrics(rec)
+    return dict(value=v, root_share=u["root_share"], pianka=u["pianka"], units=u["units"], ok=u["ok"], score=u["score"],
+                energy=dict(root_share=root_e, pianka=pk_e, boar={n: (float(ee[BOAR, f]) / tot if tot > 0 else float("nan"))
+                                                                  for f, n in enumerate(B.FOODS)}),
+                cell_pianka=cell, deer_starved_1k=sm["deer"]["starved_1k"], boar_starved_1k=sm["boar"]["starved_1k"])
 
 
-def m_c07(ctx: GateCtx, v) -> dict:
+def _c07_run(ctx: GateCtx, v, L0: bool) -> tuple[dict, dict]:
     cfg = B.override(gate_value_cfg(ctx.cfg_j, "C0-7", v), {"judge": {"wolf_packs": {"per_pack": 0}}})
-    rec = C.run(cfg, ctx.seeds_j, ctx.steps_j, spec_fn(cfg, rule_specs(), {}), scenes=False, chunk=ctx.chunk, progress=f"C0-7 {v}")
-    pm = C.population_metrics(rec)
+    if L0:
+        cfg = B.override(cfg, ctx.cfg_j["judge"]["variants"]["L0"])
+    rec = C.run(cfg, ctx.seeds_j, ctx.steps_j, spec_fn(cfg, rule_specs(), {}), scenes=False, chunk=ctx.chunk,
+                progress=f"C0-7 {v}{' L0' if L0 else ''}")
+    return rec, C.population_metrics(rec)
+
+
+def m_c07(ctx: GateCtx, v, with_l0: bool = True, train_form: bool = True) -> dict:
+    """C0-7 (11-12): 판정 세계, 규칙 사슴·멧돼지(S4)만, 늑대 없음, 30 분. 상한 켬 판과 같은 시드 L0 판(상한 끔)을 짝으로.
+    통과 = 끝 수 비(end_ratio) 두 종 ∈ [0.7, 2.5] ∧ 멸종 없음 ∧ |L0 끝 수 변화| < 20% (두 종, (L0 − 켬) ÷ 켬 — 고른 세계 합).
+    점수 = max(|log 사슴비|, |log 멧돼지비|). 잔량·막힘 몫(scan·once)·L0 출생 증가·까닭별 막힌 기회·두 세계 번식률·새끼 굶음은 적기만."""
+    rec, pm = _c07_run(ctx, v, False)
     sm = C.species_metrics(rec)
     rd, rb = pm["end_ratio"]["deer"], pm["end_ratio"]["boar"]
     ext = bool(pm["extinct_share"]["deer"] > 0 or pm["extinct_share"]["boar"] > 0)        # [해석] 세계 하나라도 멸종하면 실패
-    bs = pm["block_share"]
-    ok = bool(0.7 <= rd <= 2.5 and 0.7 <= rb <= 2.5 and not ext and (not math.isfinite(bs) or bs < C.BLOCK_SHARE_FLAG))
-    gm = math.sqrt(rd * rb) if rd > 0 and rb > 0 else 0.0
-    # 두 세계의 개체당 번식률: 학습 세계 꼴(늑대 없음, 같은 규칙 두뇌, 고르기 학습 시드) [해석]
-    ct = B.override(gate_value_cfg(ctx.cfg_t, "C0-7", v), EVAL_FACING)
-    rt = C.run(ct, ctx.seeds_t, ctx.steps_t, spec_fn(ct, rule_specs(), {}), counts=counts_with(len(ctx.seeds_t), wolf=0), scenes=False,
-               chunk=ctx.chunk)
-    smt = C.species_metrics(rt)
-    return dict(value=v, end_ratio=dict(deer=rd, boar=rb), extinct=ext, block_share=bs, block_def=pm["block_def"],
-                block_share_scan=pm["block_share_scan"], block_share_once=pm["block_share_once"], blocked_by_reason=pm["blocked_by_reason"],
-                food_end=pm["food_end"], newborn_300=pm["newborn_300"], ok=ok, score=abs(math.log(gm)) if gm > 0 else float("inf"),
-                births_per_1k_eligible=dict(judge={s: sm[s]["births_per_1k_eligible"] for s in ("deer", "boar")},
-                                            train={s: smt[s]["births_per_1k_eligible"] for s in ("deer", "boar")}),
-                all_block_fail=bool(math.isfinite(bs) and bs >= C.BLOCK_SHARE_FLAG))
+    lo, hi = C07_BAND
+    band = bool(lo <= rd <= hi and lo <= rb <= hi)
+    res = dict(value=v, end_ratio=dict(deer=rd, boar=rb), band_ok=band, extinct=ext, block_share_scan=pm["block_share_scan"],
+               block_share_once=pm["block_share_once"], blocked_by_reason=pm["blocked_by_reason"], food_end=pm["food_end"],
+               newborn_300=pm["newborn_300"], newborns=pm["newborns"], end_worlds=pm["end_worlds"],
+               births_per_1k_eligible=dict(judge={s: sm[s]["births_per_1k_eligible"] for s in ("deer", "boar")}))
+    l0_ok = None
+    if with_l0:
+        rec0, pm0 = _c07_run(ctx, v, True)
+        ch = C.l0_change(pm["end_worlds"], pm0["end_worlds"])
+        binc = {s: (pm0["newborns"][s] / pm["newborns"][s] - 1.0 if pm["newborns"][s] > 0 else float("nan")) for s in ("deer", "boar")}
+        l0_ok = bool(all(math.isfinite(ch[s]) and abs(ch[s]) < C07_L0_MAX for s in ("deer", "boar")))
+        res.update(L0_change={s: ch[s] for s in ("deer", "boar")}, L0_births_increase=binc, L0_end_ratio=pm0["end_ratio"],
+                   L0_extinct=pm0["extinct_share"], L0_ok=l0_ok, L0_slot_cap_blocks=pm0["slot_cap_blocks"])
+    res["ok"] = bool(band and not ext and bool(l0_ok))
+    res["score"] = max(abs(math.log(rd)), abs(math.log(rb))) if (rd > 0 and rb > 0) else float("inf")
+    if train_form:
+        # 두 세계의 개체당 번식률: 학습 세계 꼴(늑대 없음, 같은 규칙 두뇌, 고르기 학습 시드) [해석]
+        ct = B.override(gate_value_cfg(ctx.cfg_t, "C0-7", v), EVAL_FACING)
+        rt = C.run(ct, ctx.seeds_t, ctx.steps_t, spec_fn(ct, rule_specs(), {}), counts=counts_with(len(ctx.seeds_t), wolf=0), scenes=False,
+                   chunk=ctx.chunk)
+        smt = C.species_metrics(rt)
+        res["births_per_1k_eligible"]["train"] = {s: smt[s]["births_per_1k_eligible"] for s in ("deer", "boar")}
+    return res
 
 
-def m_c01(ctx: GateCtx, v) -> dict:
-    cfg = B.override(gate_value_cfg(ctx.cfg_t, "C0-1", v), EVAL_FACING)
-    r = {}
+def m_c07_controls(ctx: GateCtx) -> dict:
+    """C0-7 등록 조건 (11-12): 같은 고르기 시드에서 재생 0.012 판이 띠([0.7, 2.5], 두 종)에서 떨어져야 한다 — 통과하면 멈추고 묻는다.
+    재생 0.005 판(켬·L0)은 기준 결과를 그대로 보고한다."""
+    sp = C0_SPEC["C0-7"]
+    neg = m_c07(ctx, sp["neg_control"], with_l0=False, train_form=False)
+    rep = m_c07(ctx, sp["report_value"], with_l0=True, train_form=False)
+    return dict(neg=neg, neg_fails_band=bool(not neg["band_ok"]), report=rep)
+
+
+def m_c01(ctx: GateCtx, v=None) -> dict:
+    """C0-1 (11-12, 섞인 무리): 학습 세계 꼴, 규칙 늑대·규칙 멧돼지 상대, 같은 세계 안 사슴을 RULE_DEER 반·ALWAYS_EAT 반(J1 해시·층 배정).
+    통과 = 잡힘(1,000 사슴-스텝) 비 RULE ÷ ALWAYS_EAT ≤ 0.7 ∧ 세계 짝 차(RULE − ALWAYS_EAT) 95% 위 끝 < 0. 처음 정의(무리 따로·0.5)는 보고."""
+    cfg = B.override(ctx.cfg_t, EVAL_FACING)
+    rec = C.run(cfg, ctx.seeds_t, ctx.steps_t, spec_fn(cfg, rule_specs(), {}), scenes=False, chunk=ctx.chunk,
+                split=dict(sp=DEER, first=C.rule_brain("RULE_DEER", cfg, DEER), second=C.rule_brain("ALWAYS_EAT", cfg, DEER)),
+                progress="C0-1 섞인 무리")
+    smx = C.split_metrics(rec)
+    b = smx["d_bite"]
+    ratio = b["first"] / b["second"] if b["second"] > 0 else float("nan")
+    ok = bool(math.isfinite(ratio) and ratio <= C01_RATIO_MAX and math.isfinite(b["ci"][1]) and b["ci"][1] < 0)
+    old = {}
     for nm in ("RULE_DEER", "ALWAYS_EAT"):
-        rec = C.run(cfg, ctx.seeds_t, ctx.steps_t, spec_fn(cfg, {DEER: nm, WOLF: "RULE_WOLF", BOAR: "RULE_BOAR"}, {}), scenes=False,
-                    chunk=ctx.chunk)
-        r[nm] = C.species_metrics(rec)["deer"]["caught_1k"]
-    ok = bool(r["RULE_DEER"] <= 0.5 * r["ALWAYS_EAT"])
-    return dict(value=v, caught_rule=r["RULE_DEER"], caught_always_eat=r["ALWAYS_EAT"],
-                ratio=r["RULE_DEER"] / r["ALWAYS_EAT"] if r["ALWAYS_EAT"] > 0 else float("nan"), ok=ok)
+        r = C.run(cfg, ctx.seeds_t, ctx.steps_t, spec_fn(cfg, {DEER: nm, WOLF: "RULE_WOLF", BOAR: "RULE_BOAR"}, {}), scenes=False,
+                  chunk=ctx.chunk)
+        old[nm] = C.species_metrics(r)["deer"]["caught_1k"]
+    old_ratio = old["RULE_DEER"] / old["ALWAYS_EAT"] if old["ALWAYS_EAT"] > 0 else float("nan")
+    kills = sum(1 for e in rec["kills"] if int(e["prey_sp"]) == DEER)
+    return dict(value=None, caught_rule=b["first"], caught_always_eat=b["second"], ratio=ratio, diff=b["diff"], diff_ci=b["ci"],
+                deer_kills=kills, ok=ok, old=dict(caught_rule=old["RULE_DEER"], caught_always_eat=old["ALWAYS_EAT"], ratio=old_ratio,
+                                                   ok=bool(math.isfinite(old_ratio) and old_ratio <= 0.5)))
 
 
 def m_c02(ctx: GateCtx, v) -> dict:
+    """C0-2 (11-12): 규칙 늑대 대 (규칙 70%·늘 먹기 30%) 먹이, 학습 세계 꼴. 통과 = strict 사냥 성공률 ∈ [0.10, 0.50].
+    ALWAYS_EAT 사슴 잡힘·pair 성공률·사냥 죽임 κ 는 보고만."""
     cfg = B.override(gate_value_cfg(ctx.cfg_t, "C0-2", v), EVAL_FACING)
     is_rule = lambda k: (k % 10) < int(round(PREY_MIX_RULE * 10))     # noqa: E731  [어림] 세계 번호로 규칙 70%·늘 먹기 30%
     specs = {DEER: lambda k: "RULE_DEER" if is_rule(k) else "ALWAYS_EAT", WOLF: "RULE_WOLF",
@@ -308,13 +412,15 @@ def m_c02(ctx: GateCtx, v) -> dict:
     ae = np.array([not is_rule(k) for k in range(int(rec["K"]))])
     num, den = _rate_world(rec, DEER, "caught")
     caught = 1000.0 * C.ratio(num[ae], den[ae]) if ae.any() else float("nan")
-    sr = j3["success_rate"]
-    ok = bool(math.isfinite(sr) and 0.10 <= sr <= 0.50 and math.isfinite(caught) and 0.5 <= caught <= 20.0)
-    hi_ = (math.isfinite(sr) and sr > 0.50) or (math.isfinite(caught) and caught > 20.0)
-    lo_ = (math.isfinite(sr) and sr < 0.10) or (math.isfinite(caught) and caught < 0.5)
-    return dict(value=v, success_rate=sr, hunt_def=j3["hunt_def"], attempts=j3["attempts"], success_rate_pair=j3["success_rate_pair"],
-                segments=j3["segments"], success_rate_episode=j3["success_rate_episode"], episodes=j3["episodes"], caught_always_eat=caught,
-                ok=ok, direction=None if ok or (hi_ and lo_) else ("high" if hi_ else ("low" if lo_ else None)))
+    sr = j3["success_rate_strict"]
+    lo, hi = C02_BAND
+    ok = bool(math.isfinite(sr) and lo <= sr <= hi)
+    direction = None if ok or not math.isfinite(sr) else ("high" if sr > hi else "low")
+    return dict(value=v, success_rate=sr, success_ci=j3["success_strict_ci"], attempts=j3["strict_attempts"],
+                enough_100=bool(j3["strict_attempts"] >= C.J3_MIN_STRICT), success_rate_pair=j3["success_rate_pair"],
+                segments=j3["segments"], success_rate_episode=j3["success_rate_episode"], episodes=j3["episodes"],
+                caught_always_eat=caught, kappa_all=j3["daily_kill"], kappa_hunt=j3["kappa_hunt"], kappa_run=j3["kappa_run"],
+                kappa_traj4=j3["kappa_traj4"], kappa_incidental=j3["kappa_incidental"], ok=ok, direction=direction)
 
 
 def m_c03(ctx: GateCtx, v) -> dict:
@@ -333,12 +439,12 @@ def m_c03(ctx: GateCtx, v) -> dict:
                 ok=ok, direction=None if ok else ("high" if hi_ else ("low" if lo_ else None)))
 
 
-def m_c04(ctx: GateCtx, v) -> dict:
-    cfg = B.override(gate_value_cfg(ctx.cfg_t, "C0-4", v), EVAL_FACING)
+def m_c04(ctx: GateCtx, v=None) -> dict:
+    """보고만 (11-12): 규칙 늑대(학습 세계) E 중앙값 — 처음 띠 [0.3, 0.9] 와 견준 값 함께. 사체 고기 계수 0.6 그대로."""
+    cfg = B.override(ctx.cfg_t, EVAL_FACING)
     rec = C.run(cfg, ctx.seeds_t, ctx.steps_t, spec_fn(cfg, rule_specs(), {}), scenes=False, chunk=ctx.chunk)
     med = C.species_metrics(rec)["wolf"]["E_median"]                    # [해석] 늑대 결정마다의 E 를 모은 중앙값
-    ok = bool(math.isfinite(med) and 0.3 <= med <= 0.9)
-    return dict(value=v, wolf_E_median=med, ok=ok, direction=None if ok else ("high" if med > 0.9 else "low"))
+    return dict(value=None, wolf_E_median=med, old_band_ok=bool(math.isfinite(med) and 0.3 <= med <= 0.9), ok=True)
 
 
 def m_c011(ctx: GateCtx, v=None) -> dict:
@@ -346,7 +452,7 @@ def m_c011(ctx: GateCtx, v=None) -> dict:
     out = {}
     for sp, (a, b) in ((DEER, ("RULE_DEER", "HIDE_DEER")), (BOAR, ("RULE_BOAR", "HIDE_BOAR"))):
         rec = C.run(cfg, ctx.seeds_t, ctx.steps_c011, spec_fn(cfg, rule_specs(), {}), scenes=False, chunk=ctx.chunk, keep_rewards=True,
-                    split=dict(sp=sp, first=C.rule_brain(a, cfg), second=C.rule_brain(b, cfg)), progress=f"C0-11 {SPECIES[sp]}")
+                    split=dict(sp=sp, first=C.rule_brain(a, cfg, sp), second=C.rule_brain(b, cfg, sp)), progress=f"C0-11 {SPECIES[sp]}")
         smx = C.split_metrics(rec)
         kp = rec["kept"]
         disc = {}
@@ -388,25 +494,50 @@ def _with_state(ctx: GateCtx, base_t: dict, base_j: dict, state: dict) -> GateCt
     return ctx
 
 
+def pick_by_rule(tried: list[dict], cands: list, tie: float = 0.0) -> dict | None:
+    """정하는 관문의 고르기 (9-1, 11-12 등록): 통과한 후보 가운데 점수가 가장 작은 것, 그 점수와 차가 `tie` 안(< tie)인 후보는 동점 →
+    표 차례에서 앞의 것. tie = 0 이면 같은 점수만 동점. 통과한 후보가 없으면 None."""
+    okc = [r for r in tried if r["ok"]]
+    if not okc:
+        return None
+    best = min(float(r["score"]) for r in okc)
+    near = [r for r in okc if (float(r["score"]) - best < tie if tie > 0 else float(r["score"]) == best)]
+    return min(near, key=lambda r: list(cands).index(r["value"]))
+
+
 def pick_gate(gate: str, ctx: GateCtx, state: dict, cands=None) -> dict:
-    """고르기 시드 (9-1): decide = 후보 모두 재고 규칙대로 고름 (고침 횟수에 안 넣음), ordered (C0-1) = 차례대로 처음 통과,
-    direction = 지금 값 → 못 넘으면 어긋난 쪽으로 한 번 고침, reward (C0-11) = 못 넘으면 F 한 번, report = 적기만."""
+    """고르기 시드 (9-1): decide = 후보 모두 재고 규칙대로 고름 (고침 횟수에 안 넣음; C0-7 은 등록 조건 대조 0.012·보고 0.005 도 잰다),
+    check (C0-1) = 통과·실패만, 떨어지면 멈추고 묻기, direction = 지금 값 → 못 넘으면 어긋난 쪽으로 한 번 고침, reward (C0-11) = 못 넘으면 F
+    한 번, report = 적기만."""
     sp = C0_SPEC[gate]
     kind = sp["kind"]
     res = dict(gate=gate, kind=kind, rule=sp["rule"], tried=[])
     if kind == "decide":
-        for v in (cands or sp["cands"]):
+        cl = list(cands or sp["cands"])
+        for v in cl:
             r = MEASURE[gate](ctx, v)
             res["tried"].append(r)
             ctx.log(f"  {gate} {v}: {'띠 안' if r['ok'] else '띠 밖'} " + _brief(r))
-        okc = [r for r in res["tried"] if r["ok"]]
-        if okc:
-            best = min(okc, key=lambda r: (r["score"], (cands or sp["cands"]).index(r["value"])))
+        best = pick_by_rule(res["tried"], cl, float(sp.get("tie", 0.0)))
+        if best is not None:
             res.update(status="pass", value=best["value"])
         else:
-            ask = gate == "C0-7" and all(r.get("all_block_fail") for r in res["tried"])
-            res.update(status="ask_user" if ask else "fail", value=None,
-                       note="모든 후보 막힘 몫 ≥ 0.2 → 고칠 값이 없어 띄우기 전에 묻는다(15-2 질문 2)" if ask else "모든 후보가 기준 밖")
+            res.update(status="ask_user", value=None, note="통과한 후보가 없다 — 표에 없는 값을 바꾸지 않고 멈추고 묻는다 (9-1)")
+        if gate == "C0-7" and not cands:
+            ctl = m_c07_controls(ctx)
+            res["controls"] = ctl
+            ctx.log(f"  C0-7 등록 조건: 0.012 띠 {'밖 (맞음)' if ctl['neg_fails_band'] else '안 → 멈추고 묻는다'} " + _brief(ctl["neg"])
+                    + f" / 0.005 (보고) {'통과' if ctl['report']['ok'] else '못 넘음'} " + _brief(ctl["report"]))
+            if not ctl["neg_fails_band"]:
+                res.update(status="ask_user", value=None,
+                           note="등록 조건 깨짐: 재생 0.012 판이 끝 수 띠를 통과 — 기준이 체 구실을 못 해 값을 고치지 않고 묻는다 (9-1)")
+        return res
+    if kind == "check":
+        r = MEASURE[gate](ctx)
+        res["tried"].append(r)
+        ctx.log(f"  {gate}: {'통과' if r['ok'] else '못 넘음'} " + _brief(r))
+        res.update(status="pass" if r["ok"] else "ask_user", value=None,
+                   note=None if r["ok"] else "떨어지면 다른 후보로 넘어가지 않고 멈추고 사용자에게 묻는다 (11-12 등록)")
         return res
     if kind == "ordered":
         for i, v in enumerate(cands or sp["cands"]):
@@ -427,13 +558,14 @@ def pick_gate(gate: str, ctx: GateCtx, state: dict, cands=None) -> dict:
             res.update(status="pass", value=v)
             return res
         if state.get("fixed", {}).get(gate) or r.get("direction") is None:
-            res.update(status="fail", value=v, note="이미 고친 관문이거나 어긋난 쪽을 정할 수 없음")
+            res.update(status="ask_user", value=v, note="이미 고친 관문이거나 어긋난 쪽을 정할 수 없음 — 멈추고 묻는다")
             return res
         v2 = sp[r["direction"]]
         r2 = MEASURE[gate](ctx, v2)
         res["tried"].append(r2)
         ctx.log(f"  {gate} {v2} (한 번 고침): {'통과' if r2['ok'] else '못 넘음'} " + _brief(r2))
-        res.update(status="fixed_pass" if r2["ok"] else "fail", value=v2, fixed=True)
+        res.update(status="fixed_pass" if r2["ok"] else "ask_user", value=v2, fixed=True,
+                   note=None if r2["ok"] else "미리 적은 후보로 한 번 고쳐도 띠 밖 — 멈추고 묻는다 (11-12 등록)")
         return res
     if kind == "reward":
         r = MEASURE[gate](ctx)
@@ -454,9 +586,11 @@ def pick_gate(gate: str, ctx: GateCtx, state: dict, cands=None) -> dict:
 
 
 def _brief(r: dict) -> str:
-    keys = ("eat_share", "boar_eat_share", "root_share", "pianka", "end_ratio", "block_share", "caught_rule", "caught_always_eat",
-            "success_rate", "counter_share_adult", "adult_caught", "wolf_E_median", "coexist", "j2_primary")
-    return " ".join(f"{k} {_fmt(r[k])}" for k in keys if k in r)
+    keys = ("eat_share", "forage_share", "rest_share", "deer_E_median", "root_share", "pianka", "end_ratio", "L0_change", "extinct",
+            "score", "ratio", "diff_ci", "caught_rule", "caught_always_eat", "success_rate", "attempts", "kappa_hunt", "counter_share_adult",
+            "adult_caught", "wolf_E_median", "coexist", "j2_primary")
+    return " ".join(f"{k} {_fmt(r[k]) if not isinstance(r[k], dict) else {a: round(b, 3) if isinstance(b, float) else b for a, b in r[k].items()}}"
+                    for k in keys if k in r)
 
 
 def _next_cand(gate: str, value):
@@ -477,7 +611,7 @@ def cmd_calibrate(args) -> int:
     st_t = args.seeds_train or (C.SEED_RANGES["pick_train"] if phase == "pick" else C.SEED_RANGES["confirm_train"])
     st_j = args.seeds_judge or (C.SEED_RANGES["pick_judge"] if phase == "pick" else C.SEED_RANGES["confirm_judge"])
     seeds_t, seeds_j = _seeds(st_t), _seeds(st_j)
-    C.assert_not_judge_seeds(seeds_t + seeds_j, "calibrate")
+    C.assert_calib_seeds(seeds_t + seeds_j, "calibrate")
     state_path = _p(args.state) if args.state else out_dir / "C0_STATE.json"
     state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else dict(values={}, fixed={}, f_enabled=False,
                                                                                                 j2_primary="short", history=[])
@@ -519,25 +653,36 @@ def cmd_calibrate(args) -> int:
             if attempt == 1 or any(state.get("fixed", {}).get(g) for g in fails):
                 status = "ask_user"
                 break
-            for g in fails:                                   # 고친 적 없는 관문만 한 번 고친다 → 확인 시드에서 모두 다시
+            # 고친 적 없는 관문만 한 번 고친다 → 확인 시드에서 모두 다시. S′ 검토 low: 고칠 내용은 사본에 모으고, 떨어진 관문이 모두 고칠 수 있을
+            # 때만 상태에 넣는다 — 하나라도 묻기(C0-1 등)로 끝나면 잰 적 없는 값이 '지금 값'·'이미 고침'으로 남지 않게 history 에 제안으로만 적는다.
+            new_values, new_fixed, new_f = dict(state["values"]), dict(state.get("fixed", {})), bool(state.get("f_enabled", False))
+            proposed = {}
+            for g in fails:
                 sp = C0_SPEC[g]
+                if sp["kind"] == "check":                     # C0-1 (11-12): 고칠 값이 없다 → 묻는다
+                    status = "ask_user"
+                    continue
                 if sp["kind"] == "reward":
-                    state["f_enabled"] = True
+                    new_f = True
+                    proposed[g] = "F"
                 elif sp["kind"] == "direction":
                     d = next((x["result"].get("direction") for x in results if x["gate"] == g), None)
                     if d is None:
                         status = "ask_user"
-                        break
-                    state["values"][g] = sp[d]
+                        continue
+                    new_values[g] = proposed[g] = sp[d]
                 elif sp["kind"] in ("decide", "ordered"):
                     nv = _next_cand(g, _current_value(g, state, base_t))
                     if nv is None:
                         status = "ask_user"
-                        break
-                    state["values"][g] = nv
-                state.setdefault("fixed", {})[g] = True
+                        continue
+                    new_values[g] = proposed[g] = nv
+                new_fixed[g] = True
             if status == "ask_user":
+                state.setdefault("proposed", []).append(dict(time=time.strftime("%Y-%m-%d %H:%M:%S"), fails=fails, proposed=proposed,
+                                                             note="묻기로 끝나 넣지 않음 — 사람이 정한 뒤 넣는다"))
                 break
+            state["values"], state["fixed"], state["f_enabled"] = new_values, new_fixed, new_f
     state["history"].append(dict(phase=phase, time=time.strftime("%Y-%m-%d %H:%M:%S"), seeds_train=st_t, seeds_judge=st_j,
                                  gates=gates, status=status, values=dict(state["values"]), fixed=dict(state.get("fixed", {})),
                                  f_enabled=state.get("f_enabled", False)))
@@ -587,6 +732,12 @@ def _calib_md(phase, gates, results, state, status, st_t, st_j, args) -> list[st
         rows = r.get("tried") or [r.get("result", {})]
         for x in rows:
             L.append(f"  - {r['gate']} {_fmt(x.get('value'))}: " + _brief(x))
+        if r.get("controls"):
+            ctl = r["controls"]
+            L.append(f"  - {r['gate']} 등록 조건 0.012: 띠 {'밖 (맞음)' if ctl['neg_fails_band'] else '안 — 등록 조건 깨짐'} " + _brief(ctl["neg"]))
+            L.append(f"  - {r['gate']} 보고 0.005: {'기준 통과' if ctl['report']['ok'] else '기준 못 넘음'} " + _brief(ctl["report"]))
+        if r.get("note"):
+            L.append(f"  - {r['gate']}: {r['note']}")
     if status == "ask_user":
         L.append("- **못 넘은 관문이 있다 — 표에 없는 값을 바꾸지 않고 띄우기 전에 사용자에게 묻는다 (9-1).**")
     return L
@@ -594,26 +745,113 @@ def _calib_md(phase, gates, results, state, status, st_t, st_j, args) -> list[st
 
 # --- C0-10 ------------------------------------------------------------------
 
-def c010_commands(gammas=(0.997, 0.99)) -> list[str]:
-    """C0-10 짧은 학습 명령 (9-1): 두 γ 를 같은 시드로 따로 — 사슴 20M(규칙 상대), 멧돼지 10M(규칙 상대), 늑대 10M(규칙 70%·늘 먹기 30% 먹이).
-    train_r9.py 의 0 바퀴 상대 몫(train.opponents.round0 / round0_wolf_prey)이 곧 이 상대라 --round 0 으로 부른다. 학습 세계 시드 = 학습 풀
-    (train_r9 기본값 train.seeds). 갈래 이름 C0_10_* 는 train.model_seeds 에 없어 --model-seed 0 을 준다 [해석: 두 γ 같은 모델 시드].
-    --wall-hours = 안전 상한 = C0-9 속도(STATUS 3절: 사슴 1.19만·멧돼지 0.35만·늑대 조각 3 0.38만 결정/초)로 잰 시간의 2 배, 늑대는 등록한
-    조각 수 3. 먹이 넷(γ 둘 × 사슴·멧돼지 = 프로세스 4)을 먼저, 그다음 늑대 둘(프로세스 6)을 함께 띄운다 (약 50 분 + 50 분). 여기서 돌리지 않는다."""
-    out = []
-    for g in gammas:
-        tag = f"g{str(g).replace('.', '')}"
-        for sp, dec, wh, extra in (("deer", 20_000_000, 1.0, ""), ("boar", 10_000_000, 1.6, ""), ("wolf", 10_000_000, 1.5, " --shards 3")):
-            out.append(f"python results/v3/r9/train_r9.py --species {sp} --branch C0_10_{tag} --model-seed 0 --round 0 --decisions {dec} "
-                       f"--wall-hours {wh} --gamma {g}{extra} --run-name r9_c010_{tag}_{sp} --out ckpt/r9/c010")
+C010_DECISIONS = dict(deer=20_000_000, boar=10_000_000, wolf=10_000_000)
+C010_WOLF_SHARDS = 3
+C010_WOLF_CONTROLS = ("RANDOM", "NOHUNT", "NOHUNT_RUN")          # 등록 조건 (11-12): 이 셋은 늑대 기준에서 떨어져야 한다
+# 11-11 C0-9 (처음 세계, STATUS 3-0) 0 바퀴 꼴 결정/초 — S′ 세계-스텝이 1.8~2.3 배라 2.3 으로 나눈 값을 C0-9 다시 잴 때까지 [어림]으로 쓴다
+C09_OLD_DPS = dict(deer=11_900.0, boar=3_530.0, wolf=3_758.0)
+S_SLOWDOWN = 2.3
+C010_WALL_FACTOR = 2.0                                          # 벽시계 안전 상한 = 2 × 어림 시간 (train.wall_cap_factor 와 같은 뜻)
+
+
+def registered_speeds(decisions_json: str | None = None) -> tuple[dict, str]:
+    """0 바퀴 꼴 결정/초 {deer, boar, wolf}: bundle_decisions.json 의 `speed_dps.round0` (C0-9 다시 등록 때 적는다) — 없으면
+    11-11 값 ÷ 2.3 [어림]. (speeds, 출처)."""
+    p = _p(decisions_json) if decisions_json else HERE.parent / "bundle_decisions.json"
+    try:
+        d = json.loads(Path(p).read_text(encoding="utf-8"))
+        sp = (d.get("speed_dps") or {}).get("round0")
+        if sp and all(n in sp for n in SPECIES):
+            return {n: float(sp[n]) for n in SPECIES}, f"{p} speed_dps.round0"
+    except (OSError, ValueError):
+        pass
+    return {n: C09_OLD_DPS[n] / S_SLOWDOWN for n in SPECIES}, "11-11 C0-9 ÷ 2.3 [어림 — C0-9 다시 잰 뒤 speed_dps 로]"
+
+
+def c010_plan(gammas=(0.997, 0.99), speeds: dict | None = None, fallback_f: bool = False, out: str = "ckpt/r9/c010",
+              log_dir: str = "results/v3/r9/logs", config: str | None = None) -> list[dict]:
+    """C0-10 짧은 학습 계획 (9-1): 두 γ 를 같은 시드로 따로 — 사슴 20M(규칙 상대), 멧돼지 10M(규칙 상대), 늑대 10M(규칙 70%·늘 먹기 30% 먹이,
+    조각 3). train_r9.py 의 0 바퀴 상대 몫이 곧 이 상대라 --round 0. 학습 세계 시드 = 학습 풀(train.seeds). 갈래 C0_10_* 는 train.model_seeds 에
+    없어 --model-seed 0 [해석: 두 γ 같은 모델 시드]. 차례: 먹이 넷(프로세스 4) → 늑대 둘(프로세스 6). est_s = 결정 ÷ 속도 × 1.1 (밤 창 판단),
+    wall_hours = 2 × 결정 ÷ 속도 (안전 상한). F 를 걸면 --fallback-f 와 갈래 이름 끝 _F. config 를 주면 train_r9 에 --config 로 넘긴다
+    (run_night --config — S′ 검토 low: 옮겨 적는 파일과 배우는 파일이 같게)."""
+    if speeds is None:
+        speeds, _src = registered_speeds()
+    plan = []
+    for stage, sps in (("prey", ("deer", "boar")), ("wolf", ("wolf",))):
+        for g in gammas:
+            tag = f"g{str(g).replace('.', '')}{'_F' if fallback_f else ''}"
+            for sp in sps:
+                dec = C010_DECISIONS[sp]
+                hours = dec / float(speeds[sp]) / 3600.0
+                wall = math.ceil(C010_WALL_FACTOR * hours * 10.0) / 10.0
+                shards = C010_WOLF_SHARDS if sp == "wolf" else 1
+                run = f"r9_c010_{tag}_{sp}"
+                args = ["results/v3/r9/train_r9.py", "--species", sp, "--branch", f"C0_10_{tag}", "--model-seed", "0", "--round", "0",
+                        "--decisions", str(dec), "--wall-hours", f"{wall:.1f}", "--gamma", str(g), "--run-name", run, "--out", out,
+                        "--log-dir", log_dir]
+                if shards > 1:
+                    args += ["--shards", str(shards)]
+                if fallback_f:
+                    args.append("--fallback-f")
+                if config:
+                    args += ["--config", config]
+                plan.append(dict(stage=stage, gamma=float(g), species=sp, branch=f"C0_10_{tag}", run=run, decisions=dec, procs=shards,
+                                 est_s=hours * 3600.0 * 1.1, wall_hours=wall, args=args, out=out))
+    return plan
+
+
+def c010_commands(gammas=(0.997, 0.99), speeds: dict | None = None, fallback_f: bool = False) -> list[str]:
+    """C0-10 짧은 학습 명령 (c010_plan 을 글로). 여기서 돌리지 않는다 — 밤 창 안에서 run_night.py 가 띄운다."""
+    out = ["python " + " ".join(p["args"]) for p in c010_plan(gammas, speeds, fallback_f)]
     out.append("# 잼 (확인 시드 44050~44099): python results/v3/r9/eval_r9.py calibrate --gates C0-10 --gamma <γ> "
                "--brain -:deer=<npz> -:boar=<npz> -:wolf=<npz> ; 고르기: --c010-choose calib/C0-10_g0.997.json calib/C0-10_g0.99.json")
+    out.append("# 밤 실행기: python -X utf8 results/v3/r9/spawn_detached.py --log results/v3/r9/logs/night.log --what \"night r9\" -- "
+               "results/v3/r9/run_night.py --decisions-json results/v3/r9/bundle_decisions.json")
     return out
+
+
+def _wolf_rew_world(rec: dict) -> tuple[np.ndarray, np.ndarray]:
+    """Per-world wolf reward per 1,000 wolf-steps (개체당 보상 — 결정을 시작한 늑대의 보상 합 ÷ 늑대-스텝) and the step counts."""
+    rew = np.asarray(rec["rew_sp"])[:, WOLF].astype(np.float64)
+    stp = np.asarray(rec["steps_sp"])[:, WOLF].astype(np.float64)
+    return np.where(stp > 0, 1000.0 * rew / np.maximum(stp, 1.0), np.nan), stp
+
+
+def c010_wolf_side(rec: dict) -> dict:
+    j3 = C.j3_metrics(rec)
+    rw, stp = _wolf_rew_world(rec)
+    num, den = _rate_world(rec, WOLF, "daily_kill")
+    return dict(rew_1k_world=rw.tolist(), rew_1k=float(np.nansum(np.where(np.isfinite(rw), rw * stp, 0.0)) / max(float(stp.sum()), 1.0)),
+                success_rate=j3["success_rate_strict"], attempts=j3["strict_attempts"], kappa_hunt=j3["kappa_hunt"],
+                kappa_all=C.ratio(num, den), kappa_incidental=j3["kappa_incidental"], kappa_run=j3["kappa_run"],
+                kappa_traj4=j3["kappa_traj4"], kills=j3["kills"], E_median=C.species_metrics(rec)["wolf"]["E_median"],
+                scavenge_share=j3["scavenge_share"])
+
+
+def _paired_diff(a: dict, b: dict) -> dict:
+    x, y = np.asarray(a["rew_1k_world"], dtype=np.float64), np.asarray(b["rew_1k_world"], dtype=np.float64)
+    m = np.isfinite(x) & np.isfinite(y)
+    d, ci = C.boot_mean(x[m] - y[m])
+    return dict(diff=d, ci=ci, worlds=int(m.sum()))
+
+
+def c010_wolf_verdict(side: dict, rule: dict, random: dict, watch: dict) -> dict:
+    """늑대 셋 조건 (11-12): (가) 개체당 보상 − RANDOM, − 늘 살피기 의 세계 짝 95% 아래 끝 둘 다 > 0 ∧ (나) strict 사냥 성공률 ≥ 0.5 ×
+    RULE_WOLF ∧ (다) strict 사냥 죽임 κ ≥ 0.5 × RULE_WOLF. RANDOM 자신은 (가)의 RANDOM 차가 0 이라 늘 떨어진다."""
+    dr, dw = _paired_diff(side, random), _paired_diff(side, watch)
+    ga = bool(math.isfinite(dr["ci"][0]) and dr["ci"][0] > 0 and math.isfinite(dw["ci"][0]) and dw["ci"][0] > 0)
+    sr, rr = side["success_rate"], rule["success_rate"]
+    kh, rk = side["kappa_hunt"], rule["kappa_hunt"]
+    gb = bool(math.isfinite(sr) and math.isfinite(rr) and sr >= 0.5 * rr)
+    gc = bool(math.isfinite(kh) and math.isfinite(rk) and kh >= 0.5 * rk)
+    return dict(minus_random=dr, minus_watch=dw, a_reward=ga, b_success=gb, c_kappa=gc, ok=bool(ga and gb and gc))
 
 
 def c010_measure(cfg_t: dict, brains: dict, seeds, steps: int, chunk) -> dict:
     """C0-10 잼 (확인 시드): 짧게 배운 두뇌를 규칙 상대와 — 사슴 잡힘 ≤ 0.7 × ALWAYS_EAT·먹음 ≥ 0.7 ×·은신처 ≤ 0.6, 멧돼지 먹음 ≥ 0.7 ×·
-    은신처 ≤ 0.6, 늑대 하루 잡이 ≥ 0.5 × RULE_WOLF 이고 95% 아래 끝 > RANDOM 늑대 값."""
+    은신처 ≤ 0.6 (사양서 그대로). 늑대 (11-12): 먹이 규칙 70%·늘 먹기 30% 판에서 늑대 자리에 학습 늑대 / RULE_WOLF / RANDOM / 늘 살피기 /
+    NOHUNT(사체 쪽 걷기) / NOHUNT_RUN(사체 쪽 뛰기) 을 같은 세계로 — 학습 늑대의 셋 조건과 음성 대조 셋이 떨어지는지(등록 조건)."""
     cfg = B.override(cfg_t, EVAL_FACING)
     out = {}
 
@@ -630,23 +868,35 @@ def c010_measure(cfg_t: dict, brains: dict, seeds, steps: int, chunk) -> dict:
         if sp == DEER:
             ok = ok and (m["caught_1k"] <= 0.7 * ae["caught_1k"])
         out[SPECIES[sp]] = dict(brain=m, always_eat=ae, ok=bool(ok))
-    if "-:wolf" in brains:
-        is_rule = lambda k: (k % 10) < int(round(PREY_MIX_RULE * 10))   # noqa: E731
-        prey = {DEER: lambda k: "RULE_DEER" if is_rule(k) else "ALWAYS_EAT", BOAR: lambda k: "RULE_BOAR" if is_rule(k) else "ALWAYS_EAT"}
-        r = {}
-        for nm in ("-", "RULE_WOLF", "RANDOM"):
-            rec = C.run(cfg, seeds, steps, spec_fn(cfg, {**prey, WOLF: nm}, brains), scenes=False, chunk=chunk)
-            num, den = _rate_world(rec, WOLF, "daily_kill")
-            pt, ci = C.boot_ratio(num, den)
-            r[nm] = dict(daily_kill=pt, ci=ci)
-        ok = r["-"]["daily_kill"] >= 0.5 * r["RULE_WOLF"]["daily_kill"] and r["-"]["ci"][0] > r["RANDOM"]["daily_kill"]
-        out["wolf"] = dict(brain=r["-"], rule=r["RULE_WOLF"], random=r["RANDOM"], ok=bool(ok))
+    is_rule = lambda k: (k % 10) < int(round(PREY_MIX_RULE * 10))   # noqa: E731
+    prey = {DEER: lambda k: "RULE_DEER" if is_rule(k) else "ALWAYS_EAT", BOAR: lambda k: "RULE_BOAR" if is_rule(k) else "ALWAYS_EAT"}
+    names = (["-"] if "-:wolf" in brains else []) + ["RULE_WOLF", "RANDOM", C.WATCH_ONLY, *[c for c in C010_WOLF_CONTROLS if c != "RANDOM"]]
+    side = {}
+    for nm in names:
+        rec = C.run(cfg, seeds, steps, spec_fn(cfg, {**prey, WOLF: nm}, brains), scenes=False, chunk=chunk, progress=f"C0-10 늑대 {nm}")
+        side[nm] = c010_wolf_side(rec)
+    ref = (side["RULE_WOLF"], side["RANDOM"], side[C.WATCH_ONLY])
+    controls = {c: c010_wolf_verdict(side[c], *ref) for c in C010_WOLF_CONTROLS}
+    wolf = dict(rule=side["RULE_WOLF"], random=side["RANDOM"], watch=side[C.WATCH_ONLY],
+                nohunt=side["NOHUNT"], nohunt_run=side["NOHUNT_RUN"], controls=controls,
+                registration_ok=bool(not any(v["ok"] for v in controls.values())),
+                scavenger_minus_rule=_paired_diff(side["NOHUNT"], side["RULE_WOLF"]))
+    if "-" in side:
+        wolf["brain"] = side["-"]
+        wolf["learned"] = c010_wolf_verdict(side["-"], *ref)
+        wolf["ok"] = bool(wolf["learned"]["ok"])
+    else:
+        wolf["ok"] = False
+    out["wolf"] = wolf
     return out
 
 
 def c010_choose(res: dict[str, dict]) -> dict:
-    """9-1 C0-10 고르는 규칙: 두 γ 모두 넘으면 0.997, 하나만이면 그것. 먹이 종 기준을 둘 다 못 넘으면 F 걸고 둘 다 다시.
-    늑대만 못 넘으면 0 바퀴 첫 10M 은 늘 먹기 먹이 100%."""
+    """9-1 C0-10 고르는 규칙: 두 γ 모두 넘으면 0.997, 하나만이면 그것. 먹이 종 기준을 둘 다 못 넘으면 F 걸고 둘 다 다시. 늑대만 못 넘으면 0 바퀴
+    첫 10M 은 늘 먹기 먹이 100%. 11-12 등록 조건: 음성 대조 늑대(RANDOM·NOHUNT·NOHUNT_RUN)가 하나라도 기준을 통과하면 고르지 않고 묻는다."""
+    reg = {g: r.get("wolf", {}).get("registration_ok", True) for g, r in res.items()}
+    if not all(reg.values()):
+        return dict(gamma=None, action="ask_user", why="음성 대조 늑대가 늑대 기준을 통과 — 기준이 체 구실을 못 함 (등록 조건, 11-12)")
     prey_ok = {g: all(r.get(s, {}).get("ok", False) for s in ("deer", "boar")) for g, r in res.items()}
     wolf_ok = {g: r.get("wolf", {}).get("ok", False) for g, r in res.items()}
     both = {g: prey_ok[g] and wolf_ok[g] for g in res}
@@ -661,9 +911,12 @@ def c010_choose(res: dict[str, dict]) -> dict:
 
 def cmd_c010(args, base_t, base_j, out_dir) -> int:
     if args.c010_commands:
-        cmds = c010_commands()
+        speeds, src = registered_speeds(getattr(args, "decisions_json", None))
+        cmds = c010_commands(speeds=speeds)
         print("\n".join(cmds))
-        _write(out_dir, "C0-10_commands", dict(commands=cmds, note="학습 풀 43000~43999, 잼은 확인 시드 44050~44099 (9-1). 여기서 돌리지 않는다."))
+        _write(out_dir, "C0-10_commands", dict(commands=cmds, plan=c010_plan(speeds=speeds), speeds=speeds, speeds_from=src,
+                                               note="학습 풀 43000~43999, 잼은 확인 시드 44050~44099 (9-1). 여기서 돌리지 않는다 — 밤 창 안에서만 "
+                                                    "(run_night.py, STATUS 5절)."))
         return 0
     if args.c010_choose:
         res = {}
@@ -675,10 +928,13 @@ def cmd_c010(args, base_t, base_j, out_dir) -> int:
         _write(out_dir, "C0-10_choice", dict(inputs=args.c010_choose, choice=ch))
         return 0
     seeds = _seeds(args.seeds_train or C.SEED_RANGES["confirm_train"])
-    C.assert_not_judge_seeds(seeds, "calibrate C0-10")
+    C.assert_calib_seeds(seeds, "calibrate C0-10")
     state_path = _p(args.state) if args.state else out_dir / "C0_STATE.json"
     state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else dict(values={})
-    ct, _cj = _state_cfgs(base_t, base_j, state)
+    # S′ 검토 medium: the short training read the YAML only — measure in the same world (C0 values already in the YAML; the γ
+    # itself is not a world value). run_night's F attempt passes `--set reward.fallback_f.enabled=true`, so F matches as well.
+    check_c0_state(base_t, base_j, "calibrate C0-10", path=state_path, skip_gates=("C0-10",))
+    ct, _cj = _state_cfgs(base_t, base_j, {**state, "values": {g: v for g, v in state.get("values", {}).items() if g != "C0-10"}})
     brains = C.load_brains(C.parse_brain_args(args.brain), ct)
     r = c010_measure(ct, brains, seeds, args.steps_train, args.chunk)
     _write(out_dir, f"C0-10_g{args.gamma}{args.tag}", dict(gamma=args.gamma, seeds=[seeds[0], seeds[-1]], result=r))
@@ -753,6 +1009,7 @@ def cmd_leak(args) -> int:
     ct, _cj = load_cfgs(args)
     seeds = _seeds(args.seeds)
     C.assert_not_judge_seeds(seeds, "leak")
+    C.warn_calib_seeds(seeds, "leak")
     cfg = B.override(ct, EVAL_FACING)
     brains = C.load_brains(C.parse_brain_args(args.brain), cfg)
     out = dict(seeds=args.seeds, steps=args.steps, species={})
@@ -854,10 +1111,12 @@ def _under_temp(p: Path) -> bool:
         return False
 
 
-def check_c0_state(ct: dict, cj: dict, who: str, path: Path | None = None) -> dict | None:
+def check_c0_state(ct: dict, cj: dict, who: str, path: Path | None = None, skip_gates=(), skip_f: bool = False) -> dict | None:
     """Fix 단계 검토 low: the calibrated values (C0_STATE.json values · f_enabled) must already be written into the YAML that
     judge · mixed · check · league read — otherwise they would run with the first candidates silently. None = no C0_STATE yet
-    (보정 전 시운전)."""
+    (보정 전 시운전). S′ 검토 medium: the C0-10 short training (run_night) and the C0-10 measurement check the same way so the
+    trained world and the measured world are the same — they skip the C0-10 γ itself (`skip_gates`) and, in run_night's F attempt,
+    the F flag run_night wrote before training with --fallback-f (`skip_f`)."""
     p = Path(path) if path is not None else OUT_CALIB / "C0_STATE.json"
     if not p.exists():
         return None
@@ -865,7 +1124,7 @@ def check_c0_state(ct: dict, cj: dict, who: str, path: Path | None = None) -> di
     bad = []
     for g, v in st.get("values", {}).items():
         sp = C0_SPEC.get(g)
-        if not sp or "path" not in sp or v is None:
+        if not sp or "path" not in sp or v is None or g in skip_gates:
             continue
         for name, cfg in (("train", ct), ("judge", cj)):
             cur = cfg
@@ -877,7 +1136,7 @@ def check_c0_state(ct: dict, cj: dict, who: str, path: Path | None = None) -> di
             a, b = np.asarray(cur, dtype=np.float64), np.asarray(v, dtype=np.float64)
             if a.shape != b.shape or not np.allclose(a, b, rtol=0.0, atol=1e-12):
                 bad.append(f"{g} {name}: 설정 {cur} ≠ C0_STATE {v}")
-    if bool(st.get("f_enabled", False)) != bool(ct["reward"]["fallback_f"]["enabled"]):
+    if not skip_f and bool(st.get("f_enabled", False)) != bool(ct["reward"]["fallback_f"]["enabled"]):
         bad.append(f"대비책 F: 설정 {ct['reward']['fallback_f']['enabled']} ≠ C0_STATE {st.get('f_enabled')}")
     if bad:
         raise SystemExit(f"{who}: 보정 관문 값(C0_STATE {p})이 설정 파일에 옮겨지지 않았다 — " + "; ".join(bad)
@@ -1152,8 +1411,17 @@ def judge_verdict(out: dict, calib: dict) -> dict:
         ja = bool(short >= C.J2_SHORT_MIN)
         jb = bool(long_ is not None and long_ >= C.J2_LONG_MIN)
         j2 = jb if primary == "long" else bool(ja and jb)
+        # 9-2 J2 읽기 (11-12): 같은 판정 시드 L0(상한 끔) 짝 비교가 주 기준 — 어느 종이든 |L0 끝 수 변화| ≥ 20% 면 '규칙이 받친 공존'.
+        # L0 판이 없으면 None(미판정). 막힘 몫 ≥ 0.2 는 적기만 (rule_backed_block).
+        L0v = out["variants"].get("L0", {}).get(f"L_{b}")
+        l0c = None
+        rb = None
+        if L0v is not None and "end_worlds" in L_["population"] and "end_worlds" in L0v["population"]:
+            l0c = C.l0_change(L_["population"]["end_worlds"], L0v["population"]["end_worlds"])
+            rb = bool(any(math.isfinite(x) and abs(x) >= C.BLOCK_SHARE_FLAG for x in l0c.values()))
         v["branches"][b] = dict(J2_a=ja, J2_b=jb if long_ is not None else None, J2=j2 if long_ is not None else None,
-                                coexist_short=short, coexist_long=long_, rule_backed=L_["population"]["rule_backed"],
+                                coexist_short=short, coexist_long=long_, rule_backed=rb, l0_change=l0c,
+                                rule_backed_block=L_["population"].get("rule_backed_block"),
                                 block_share=L_["population"]["block_share"], J3=L_["j3"]["J3"], J3_ok=L_["j3"]["ok"],
                                 J3_insufficient=L_["j3"]["insufficient"], J4=L_.get("anomaly", {}).get("J4", []))
         reading = []
@@ -1168,9 +1436,10 @@ def judge_verdict(out: dict, calib: dict) -> dict:
                 reading.append("W 공존 높고 L 낮음 → 학습한 먹이가 늑대를 굶긴다(먹이 쪽) — 늑대 굶음 몫·성공률 함께")
             if R["population"]["coexist_share"] < C.J2_SHORT_MIN:
                 reading.append("RULE 도 공존 낮음 → 세계 탓일 수도 규칙 늑대 탓일 수도 (2 × 2 로 본다)")
-        L0 = out["variants"].get("L0", {}).get(f"L_{b}")
-        if L0 is not None and L0["population"]["coexist_share"] < short - 0.15:          # [어림] '크게 떨어짐' = 0.15 넘게
-            reading.append("L0(상한 끔)에서 크게 떨어짐 → 공존이 콘텐츠 상한에 기댄다 ('규칙이 받친 공존')")
+        if rb:
+            reading.append(f"L0(상한 끔) 끝 수 변화 {({k: round(x, 3) for k, x in l0c.items()})} — 20% 넘는 종이 있어 '규칙이 받친 공존'")
+        if L0v is not None and L0v["population"]["coexist_share"] < short - 0.15:          # [어림] '크게 떨어짐' = 0.15 넘게 (보고)
+            reading.append("L0(상한 끔)에서 공존 몫이 크게 떨어짐 (보고)")
         LS = out["variants"].get("LS", {}).get(f"L_{b}")
         if LS is not None and abs(LS["population"]["coexist_share"] - short) > 0.15:
             reading.append("L 과 LS(확률 행동)가 크게 다름 → 결정적 행동끼리 교착·동기화 — 리플레이로 장면을 본다")
@@ -1211,7 +1480,8 @@ def _judge_md(out: dict) -> list[str]:
     L += ["", f"판정 (J2 주 기준: {'2 시간 판' if ver.get('j2_primary') == 'long' else '30 분 + 2 시간'})", ""]
     for b, x in ver.get("branches", {}).items():
         L.append(f"- 갈래 {b}: J2 (가) 30 분 ≥ 0.6 {_fmt(x['J2_a'])}, (나) 2 시간 ≥ 0.4 {_fmt(x['J2_b'])} → J2 {_fmt(x['J2'])}"
-                 f"{' — 규칙이 받친 공존(막힘 몫 ≥ 0.2)' if x['rule_backed'] else ''}; J3 {_fmt(x['J3'])} {x['J3_ok']}"
+                 f"{' — 규칙이 받친 공존(L0 끝 수 변화 ≥ 20%: ' + str(x.get('l0_change')) + ')' if x['rule_backed'] else ''}"
+                 f"{' — L0 짝 판 없음(상한 기대 미판정)' if x['rule_backed'] is None else ''}; J3 {_fmt(x['J3'])} {x['J3_ok']}"
                  f"{' 표본 모자람 ' + str(list(x['J3_insufficient'])) if x['J3_insufficient'] else ''}; J4 꼼수 {x['J4'] or '없음'}")
         for s in x.get("reading_9_3", []):
             L.append(f"  - 9-3: {s}")
@@ -1229,6 +1499,7 @@ def _scenario(args):
     ct, cj = load_cfgs(args)
     seeds = _seeds(args.seeds)
     C.assert_not_judge_seeds(seeds, args.cmd)
+    C.warn_calib_seeds(seeds, args.cmd)
     cfg = cj if args.form == "judge" else B.override(ct, EVAL_FACING)
     brains = C.load_brains(C.parse_brain_args(args.brain), cfg)
     specs = {DEER: args.deer, WOLF: args.wolf, BOAR: args.boar}
@@ -1490,7 +1761,8 @@ def cmd_summary(args) -> int:
     j2 = {b: x.get("J2") for b, x in ver.get("branches", {}).items()}
     j3 = {b: x.get("J3") for b, x in ver.get("branches", {}).items()}
     j4 = {b: x.get("J4") for b, x in ver.get("branches", {}).items()}
-    rb = any(x.get("rule_backed") for x in ver.get("branches", {}).values())
+    rbs = [x.get("rule_backed") for x in ver.get("branches", {}).values()]
+    rb = True if any(v is True for v in rbs) else (None if (not rbs or any(v is None for v in rbs)) else False)
     J2, J3 = _tri(j2), _tri(j3)
     sent = sentence(j1, J2, J3, rb, judge)
     S.update(J1=j1, J2=j2, J3=j3, J4=j4, rule_backed=rb, sentence=sent, calib=dict(values=calib.get("values"), f_enabled=calib.get("f_enabled"),
@@ -1514,7 +1786,7 @@ def _tri(by_branch: dict) -> bool | None:
     return all(v is True for v in by_branch.values())
 
 
-def sentence(j1, J2: bool | None, J3: bool | None, rule_backed: bool, judge) -> str:
+def sentence(j1, J2: bool | None, J3: bool | None, rule_backed: bool | None, judge) -> str:
     """9-2 결과 문장. J1·J2·J3 = True / False / None (안 잼)."""
     if j1 is False:
         return "J1 실패 — 실패한 종과 그 까닭(학습 곡선·이상 신호)을 적는다."
@@ -1531,9 +1803,11 @@ def sentence(j1, J2: bool | None, J3: bool | None, rule_backed: bool, judge) -> 
     if j1 and J2 and J3:
         s = "세 종이 각자 배운 두뇌로 한 무대에서 30 분·2 시간 함께 살았고, 사냥 모습이 보정한 현실 범위 안에 남았다."
         if rule_backed:
-            l0 = (judge or {}).get("variants", {}).get("L0", {})
-            s += " 다만 공존은 언리얼 출생 상한이 받쳤다(상한 끈 판: " + ", ".join(
-                f"{k} {_fmt(v['population']['coexist_share'])}" for k, v in l0.items()) + ")."
+            br = (judge or {}).get("verdict", {}).get("branches", {})
+            s += " 다만 공존은 언리얼 출생 상한이 받쳤다(상한 끈 판 끝 수 변화: " + ", ".join(
+                f"{b} {({k: round(x, 3) for k, x in (v.get('l0_change') or {}).items()})}" for b, v in br.items()) + ")."
+        elif rule_backed is None:
+            s += " (상한 끈 L0 짝 판이 없어 상한이 받쳤는지는 판정하지 않았다.)"
         return s
     return "판정에 필요한 결과가 다 모이지 않았다 (J1·J2·J3 중 빈 것이 있다)."
 
@@ -1554,10 +1828,11 @@ def build_parser() -> argparse.ArgumentParser:
         p.add_argument("--chunk", type=int, default=25, help="한 번에 돌리는 세계 수 (결과와 무관, 메모리용)")
         p.add_argument("--out", default=None)
         p.add_argument("--tag", default="")
-        p.add_argument("--hunt-def", choices=C.HUNT_DEFS, default="pair",
-                       help="사냥 시도 정의: pair = 8-2 문장(늑대-표적 쌍마다, 기본) · episode = 같은 늑대의 겹친 구간을 하나로 [사용자 확인 필요]")
+        p.add_argument("--hunt-def", choices=C.HUNT_DEFS, default="strict",
+                       help="사냥 시도 정의: strict = 8-2 (11-12 정함, 기본 — 사냥 구간을 같은 늑대끼리 묶음) · pair = 처음 문장(늑대-표적 쌍마다) · "
+                            "episode = 거르기 없이 묶음 (pair·episode 는 보고만)")
         p.add_argument("--block-def", choices=C.BLOCK_DEFS, default="scan",
-                       help="막힘 셈: scan = 8-2 문장(5 초 짝 찾기마다, 기본) · once = 대기 한 번·상한 연속에 한 번 [사용자 확인 필요]")
+                       help="막힘 몫 셈 (보고만 — 주 기준은 같은 시드 L0 짝 비교, 11-12): scan = 5 초 짝 찾기마다 · once = 대기 한 번·상한 연속에 한 번")
         if seeds == "required":
             p.add_argument("--seeds", nargs=2, type=int, default=None, help="꼭 적는다 (판정 시드 기본값 없음)")
         elif seeds is not None:
@@ -1579,8 +1854,9 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--gamma", type=float, default=0.997)
     p.add_argument("--c010-commands", action="store_true")
     p.add_argument("--c010-choose", nargs="*", default=None)
+    p.add_argument("--decisions-json", default=None, help="C0-10 명령의 속도 (bundle_decisions.json 의 speed_dps.round0, C0-9 등록)")
     p = sub.add_parser("leak")
-    common(p, C.SEED_RANGES["pick_train"], 2000)
+    common(p, C.SEED_RANGES["smoke"], 2000)              # S′ 검토 low: 기본값이 고르기 시드 44000~44049 를 소리 없이 쓰던 것 → 스모크
     p = sub.add_parser("mixed")
     common(p, "required", None)
     p.add_argument("--steps", type=int, default=None)
@@ -1600,7 +1876,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--lock", default=None)
     for nm in ("scenes", "anomaly"):
         p = sub.add_parser(nm)
-        common(p, C.SEED_RANGES["pick_judge"], 3000)
+        common(p, C.SEED_RANGES["smoke"], 3000)          # S′ 검토 low: 처음 기본값 = 고르기 시드 44100~44139 → 스모크
         p.add_argument("--form", choices=("train", "judge"), default="judge")
         p.add_argument("--deer", default="RULE_DEER")
         p.add_argument("--wolf", default="RULE_WOLF")

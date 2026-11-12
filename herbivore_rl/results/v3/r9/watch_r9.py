@@ -6,7 +6,8 @@ RL_R9_MULTISPECIES_DESIGN.md 7-9, 9-5). Read-only: it never stops or starts a pr
 
 Page `results/v3/r9/logs/progress.md`:
   - league: round · stage · halted, league process alive (pids.txt `league` line, command-line check), Unreal/UBT running, free
-    commit memory, last league events.
+    commit memory, last league events, the league's waiting reason (night window · Unreal · memory — state `waiting`) and the night
+    runner phase (ckpt/r9/night_state.json, run_night.py).
   - runs of the current round (and the last finished ones): status, process alive, bundle decisions / target, %, speed, ETA, wall
     cap, latest learner numbers (bite / counter / starve / births per 1,000 agent-steps, eaten energy, run / shelter shares, wolf
     kills per wolf-day, E median, toward-wolf share for boar, entropy, explained variance).
@@ -184,6 +185,12 @@ def page(args, base: dict, seen: dict) -> tuple[str, bool]:
     L.append(f"- 리그: {st['round']} 바퀴 · {st['stage']} 묶음 · 멈춤 {st.get('halted') or '아님'} · 프로세스 "
              f"{'살아 있음' if lg_alive else ('모름' if lg_alive is None else '없음')}")
     L.append(f"- 기계: {machine()}")
+    wt = st.get("waiting")
+    if wt:
+        L.append(f"- **기다림** (밤 창·언리얼·메모리, STATUS 5절): {wt.get('reason')} — {wt.get('since')} 부터, 마지막 확인 {wt.get('at')}")
+    ns = read_json(out_dir / "night_state.json")
+    if ns:
+        L.append(f"- 밤 실행기(C0-10 → 리그): 단계 {ns.get('phase')} · {ns.get('note') or ''} · 마지막 {(ns.get('events') or ['—'])[-1]}")
     L.append("")
     L.append("| 실행 | 상태 | 프로세스 | 결정 / 목표 | % | 결정/초 | 예상 끝 | 물림 | 반격 | 굶음 | 출산 | 먹음×1e3 | 뛰기 | 은신 | 하루잡이 | E 중앙 | 늑대 쪽 | 엔트로피 | 설명 분산 |")
     L.append("|" + "---|" * 19)

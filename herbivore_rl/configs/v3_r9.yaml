@@ -3,9 +3,11 @@
 # 단위: 1 단위 = 2 m, 1 스텝 = 2/15 초, 결정 = 2 스텝, 하루 = 900 스텝. 속력은 단위/스텝 절대값이다(R8 처럼 사슴 뛰기 배수가 아니다).
 #
 # 몸 계약 해시는 species·body_common 두 블록만 본다. 판정 세계도 같은 두 블록을 써야 학습한 두뇌를 받는다 — 판정 전용 값은 judge 블록에 둔다.
-# [C0-x] = 보정 관문이 고칠 값(설계 9-1). 지금 값 = 문서 첫 후보. 정하는 관문(C0-6·5·7)은 '앞 관문은 뒤 관문의 가운데 후보로 잰다' 규칙이라
+# [C0-x] = 보정 관문이 고칠 값(설계 9-1). 지금 값 = 문서 첫 후보. 정하는 관문(C0-5·7 — C0-6 은 11-12 부터 보고만)은 '앞 관문은 뒤 관문의 가운데 후보로 잰다' 규칙이라
 #          풀 재생은 가운데 후보 0.002 를 둔다(후보 차례의 첫 값과 같다).
 # [어림] = 문서에 수가 없어 정한 값(계약 문서 impl_contract.md 와 보고서에 적음).
+# S′ (사용자 결정 2026-11-12 '실전 세계랑 맞추고·그렇게 해·다 해'): 몸 = 할 수 있는 것만. EAT = 그 자리에서 서서 먹기, SHELTER = 제자리 서기
+#   (EAT 걷기·SHELTER 자동 뛰기·찌꺼기 먹기 없음), 새 감각 food_dir 8 칸(관측 115). 연습 세계 분포 N: 풀 용량 합 70 · 사슴 16~40.
 
 world:
   mode: train                   # train | judge (3-6)
@@ -32,12 +34,12 @@ placement:                      # [어림] 시작 배치 — 문서에 규칙이
   pack_r: 2.0                   # 판정 세계 늑대 무리: 둘째 늑대는 첫 늑대에서 이 거리 안
 
 counts:                         # 상대 종 마릿수 범위 (3-8, 세계 시드가 정함)
-  deer: [16, 64]
+  deer: [16, 40]                # S′ N (2026-11-12): 실전 사분면 사슴 24 둘레로 (예전 [16, 64])
   wolf: [1, 6]
   boar: [4, 14]
 
 learner_counts:                 # 배우는 종 마릿수 = 세계 번호 k 로 (7-3: k mod 길이)
-  deer: [16, 32, 48, 64]
+  deer: [16, 24, 32, 40]        # S′ N: 32 세계 × 평균 28 = 학습 칸 896, 롤아웃 896 × n_steps 32 = 28,672 = 7 × 4,096 (예전 16·32·48·64)
   wolf: [1, 2, 3, 4, 6]
   boar: [4, 6, 8, 14]
 
@@ -67,6 +69,8 @@ food:
     regen_q: 1.0                # [C0-5] 재생 = 풀 재생 기본값 × q. 후보 1, 0.5, 2, 0.25, 4
     cover_mult: 0.15
   quadrant_grass_total: null    # 판정 세계 70.0 (사분면 용량 합, 은신처 0.15 배 전)
+  train_grass_total: 70.0       # S′ N (2026-11-12): 학습 세계 풀 용량 합 = 70 (판정 사분면과 같은 뜻, 은신처 0.15 배 전 합). null = 맞추지 않음.
+                                # 판정 세계(mode judge)는 이 값을 읽지 않는다 (quadrant_grass_total 이 맡음)
 
 body_common:                    # 세 종 공통 몸 규칙 (몸 해시에 들어간다)
   gait_drain: [0.714, 1.0, 2.5] # 서기·걷기·뛰기 대사 배수 (3-3, R8)
@@ -74,8 +78,7 @@ body_common:                    # 세 종 공통 몸 규칙 (몸 해시에 들�
   stamina_unlock: 0.55          # 이상이면 풀림
   wound_speed: 0.5              # 속력 × (0.5 + 0.5 × HP)
   eat_min: 0.06                 # 격자 먹이가 셀에 이만큼이면 서서 먹는다 (R8 graze_eat_min). 땅속 먹이도 같은 값 [어림]
-  walk_eat_mult: 0.5            # EAT 인데 지금 자리에 먹이가 없으면 걸으며 풀만 0.5 배
-  graze: {forage: 0.83, cohesion: 0.71, separation: 1.35, sep_radius: 5.0, grad_blur: 2}   # 5절 EAT 걸음 (R8)
+                                # S′: EAT 는 이것(또는 1.0 안 사체)이 발밑에 있을 때만 먹는다. 없으면 그냥 선다 (EAT 걷기 walk_eat_mult·graze 삭제)
   bite: {cone_cos: 0.5, approach_min: 0.03, cooldown: 8}  # 3-4: 머리 앞 ±60°, 이번 스텝 다가감 > 0.03, 문 뒤 8 스텝
   counter:                      # 3-4 멧돼지 정면 반격 (EcoFaunaMovement.cpp 208~223)
     hp_min: 0.35
@@ -91,7 +94,7 @@ body_common:                    # 세 종 공통 몸 규칙 (몸 해시에 들�
     meat_frac: 0.6              # [C0-4] 고기 = 질량 × 0.6 ÷ 9 kg. 높으면 0.45, 낮으면 0.75
     kg_per_unit: 9.0            # 고기 1 단위 = 늑대 E 1
     places: 3                   # 먹는 자리 3 (Native 사체)
-    eat_r: 1.0                  # 1.0 단위 안에서 서서
+    eat_r: 1.0                  # 1.0 단위 안에서 서서 — 관측 here_r(food_here·food_dir 경계)와 같아야 한다(r9_body 검사)
     decay_steps: 1350           # 처음 고기의 1/1350 씩 사라짐 (1.5 일)
   shelter_push: 0.5             # 못 들어가는 몸은 은신처 원(r + 0.5) 밖으로 (접촉 변위)
   breed:                        # 3-7 (두 세계 같음)
@@ -122,7 +125,7 @@ species:                        # 몸 표 3-3 (성체 기준). 몸 해시에 들
     stamina_recover_steps: 60   # 0.15 → 0.55 [어림]
     see_r: 20.0
     fov_deg: 300.0
-    head_down: 0.6              # EAT 중 눈 × 0.6
+    head_down: 0.6              # EAT 중 눈 × 0.6 (감각·food_dir 모두)
     smell_r: 3.0
     drain: 0.002                # 걷기 E/스텝
     reserve_days: 3.0           # 지방 용량 = 3 일 × 900 × 대사 = 5.4
@@ -131,7 +134,7 @@ species:                        # 몸 표 3-3 (성체 기준). 몸 해시에 들
     weak_e: 0.1
     weak_speed: 0.75
     diet: [grass]
-    eat_rate: {grass: 0.012}    # [C0-6] 단위/스텝. 후보 0.012, 0.009, 0.016, 0.007, 0.020
+    eat_rate: {grass: 0.012}    # 단위/스텝. C0-6 보고만 — 0.012 고정(11-12, 처음 후보 표 0.009·0.016·0.007·0.020 은 쓰지 않음)
     e_per_unit: {grass: 0.5}
     has_hp: false               # 물리면 죽음
     hp_regen_per_day: 0.0
@@ -153,7 +156,7 @@ species:                        # 몸 표 3-3 (성체 기준). 몸 해시에 들
     pending_needs_parent: true  # 대기 중: 살아 있음·사분면·E·HP 자격
     child_ring: {center: parent_a, r0: 1.1, dr: 0.2, avoid_shelter: false}
     food_density_ref: 0.5       # [어림] 문서 '종별 기준값' 미정 — 풀만이면 R8 food_density(블러 평균 단위)와 같아지게
-    food_here_ref: 0.5          # [어림]
+    food_here_ref: 0.5          # [어림] food_here 와 food_dir(x / (x + 이 값)) 기준값
   wolf:
     mass_kg: 40.0
     founder: plain              # Founder(씨앗, ID): 0.95~1.05 (LH 49~50)
@@ -272,11 +275,15 @@ train:                          # 7절
   seeds: [43000, 44000]         # 학습 세계 풀 [하, 상) — 시험·스모크는 이 범위를 쓰지 않는다
   reset_steps: 5000             # 세계 교체 (스텝), 엇갈림 (R8)
   worlds: {deer: 32, wolf: 120, boar: 96}
-  n_steps: {deer: 32, wolf: 96, boar: 48}
-  wolf_shards: 3                # C0-9 등록 (2026-11-11, STATUS 3절): 조각 3 은 같은 부하에서 조각 2 보다 1.46 배 빠름. 학습 전 등록 — 바꾸지 않음
-  bundle_decisions:             # C0-9 등록 (2026-11-11, STATUS 3절) = 잰 결정/초 × 45 분 (0 바퀴: 먹이 3.5 시간 · 늑대 4 시간). 학습 전 등록 — 바꾸지 않음
-    round0: {deer: 150000000, boar: 44500000, wolf: 54100000}   # 11,900 · 3,530 · 3,758 결정/초 (0 바퀴 꼴, 프로세스 4 개 함께)
-    later: {deer: 33700000, boar: 10000000, wolf: 10600000}     # 12,470 · 3,701 · 3,942 결정/초 (1 바퀴 꼴: 이어 배우기 + npz 상대)
+  n_steps: {deer: 32, wolf: 96, boar: 48}   # 롤아웃 = 학습 칸 × n_steps: 사슴 896 × 32 = 28,672 (S′ N) · 늑대 384 × 96 · 멧돼지 768 × 48 (모두 4,096 의 배수)
+  wolf_shards: 3                # C0-9 등록 (11-12 S′, STATUS 3절): 같은 부하에서 조각 3 이 조각 2 보다 1.42 배 빠름 (11-11 처음 세계 1.46 배). 학습 전 등록 — 바꾸지 않음
+  bundle_decisions:             # C0-9 등록 (11-12 S′, STATUS 3절) = 잰 결정/초 × 45 분 (0 바퀴: 먹이 3.5 시간 · 늑대 4 시간), 가까운 십만. 학습 전 등록 — 바꾸지 않음
+    round0: {deer: 80300000, boar: 30300000, wolf: 38800000}    # 6,376 · 2,404 · 2,693 결정/초 (0 바퀴 꼴, 프로세스 4 개 함께)
+    later: {deer: 19400000, boar: 7200000, wolf: 7300000}       # 7,199 · 2,659 · 2,704 결정/초 (1 바퀴 꼴: 이어 배우기 + npz 상대)
+    speed_dps:                  # 위 결정 수의 근거 속도 = 밤 창 묶음 어림(× 1.1)·C0-10 벽시계 상한 (league_r9 / run_night / eval_r9)
+      round0: {deer: 6376, boar: 2404, wolf: 2693}
+      later: {deer: 7199, boar: 2659, wolf: 2704}
+    # 11-11 등록(107 칸 세계) — 폐기: round0 150,000,000 / 44,500,000 / 54,100,000 · later 33,700,000 / 10,000,000 / 10,600,000
   wall_cap_factor: 2.0
   snapshot_every: {deer: 10000000, wolf: 5000000, boar: 5000000}
   model_seeds: {A: 0, B: 1}

@@ -1,6 +1,7 @@
 """R9 몸 표·입출력 계약 시험 (설계 AdaptiveEcosystem/Docs/RL_Policy/RL_R9_MULTISPECIES_DESIGN.md 3-3·4·5·3-9·7-10·11절, 12절 6 의 표 부분).
 
-1. 관측 107 칸: 4절 배치(자기 23 + 다른 종 6 × 11 + 동족 요약 4 + 가까운 동족 2 × 7), 슬라이스·칸 도움 함수, 이름에 종 이름표가 없다.
+1. 관측 115 칸 (S′ 2026-11-12): 4절 배치(자기 31 = 23 + food_dir 8 + 다른 종 6 × 11 + 동족 요약 4 + 가까운 동족 2 × 7), 슬라이스·칸 도움
+   함수, 이름에 종 이름표가 없다. (예전 107 칸 시험의 뜻을 바꿈: 자기 칸 0~22 번호는 그대로, food_dir 23~30, 뒤 블록 8 칸 밀림)
 2. 행동 19 칸: 5절 번호·이름, 걷기·뛰기 방향 번호, 묶음 마스크.
 3. 8 방향·황금각 리터럴 표가 cos·sin 과 1e-15 안에서 같고 단위 벡터다. 표로 돌린 벡터 = 삼각함수로 돌린 벡터(1e-15).
 4. 몸 표: 3-3 값과 파생 값(몸 크기·지방 용량·지구력 고리·시야각), (K, S) 펼치기.
@@ -22,7 +23,7 @@ JCFG = ROOT / "configs" / "v3_r9_judge.yaml"
 
 # 입출력 계약 해시 고정값. 관측 이름·정규화·행동·결정 간격·망 모양 가운데 하나라도 바뀌면 이 값이 바뀐다 —
 # 일부러 바꿨으면 여기를 고치고 계약 문서·두뇌 npz 를 함께 다시 만든다.
-IO_HASH_PINNED = 0xFFA0833A08D7A81A
+IO_HASH_PINNED = 0x0FA76480FE9465E0                # S′ 115 칸 (2026-11-12, 예전 107 칸 0xFFA0833A08D7A81A)
 
 
 @pytest.fixture(scope="module")
@@ -38,10 +39,11 @@ def jcfg():
 # --------------------------------------------------------------------------- 1
 
 
-def test_obs_layout_107():
-    assert B.OBS_DIM == 107 and len(B.OBS_NAMES) == 107 and len(set(B.OBS_NAMES)) == 107
-    assert (B.N_SELF, B.N_OTHER, B.N_OF, len(B.OBS_KINSUM_NAMES), B.N_KIN, B.N_KF) == (23, 6, 11, 4, 2, 7)
-    assert (B.OTHER0, B.KINSUM0, B.KIN0) == (23, 89, 93)
+def test_obs_layout_115():
+    assert B.OBS_DIM == 115 and len(B.OBS_NAMES) == 115 and len(set(B.OBS_NAMES)) == 115
+    assert (B.N_SELF, B.N_OTHER, B.N_OF, len(B.OBS_KINSUM_NAMES), B.N_KIN, B.N_KF) == (31, 6, 11, 4, 2, 7)
+    assert (B.OTHER0, B.KINSUM0, B.KIN0) == (31, 97, 101)
+    assert B.OBS_NAMES[B.SL_FOOD_DIR] == tuple(f"food_dir_{j}" for j in range(8)) and B.O_FOOD_DIR0 == 23
     assert B.OBS_NAMES[B.SL_SELF] == B.OBS_SELF_NAMES
     assert all(n.startswith(f"o{j}_") for j in range(6) for n in B.OBS_NAMES[B.OTHER0 + 11 * j: B.OTHER0 + 11 * (j + 1)])
     assert B.OBS_NAMES[B.SL_KINSUM] == ("kin_count", "kin_run_frac", "kin_flow_x", "kin_flow_y")
@@ -222,7 +224,8 @@ def test_contract_hashes_stable(cfg, jcfg):
 def test_io_hash_pinned():
     d = B.io_contract_dict()
     assert d["obs_names"] == list(B.OBS_NAMES) and d["actions"] == list(B.ACTION_NAMES)
-    assert d["net"] == {"obs_dim": 107, "hidden": [64, 64], "activation": "tanh", "n_actions": 19, "head": "logits"}
+    assert d["net"] == {"obs_dim": 115, "hidden": [64, 64], "activation": "tanh", "n_actions": 19, "head": "logits"}
+    assert d["obs_names"][23:31] == [f"food_dir_{j}" for j in range(8)] and "food_dir" in d["obs_spec"]
     assert d["decision_steps"] == 2 and d["mask"] is None and "species" not in d
     assert B.io_hash() == B.io_hash()
     assert B.io_hash() == IO_HASH_PINNED, f"입출력 계약이 바뀌었다: {B.hash_hex(B.io_hash())}"
@@ -236,6 +239,7 @@ def test_config_inherit_and_checks(cfg, jcfg):
     assert jcfg["world"]["mode"] == "judge" and jcfg["world"]["size"] == 120.0 and jcfg["world"]["quadrants"] == 4
     assert jcfg["world"]["slots"] == {"deer": 400, "wolf": 24, "boar": 56}
     assert jcfg["food"]["quadrant_grass_total"] == 70.0 and cfg["food"]["quadrant_grass_total"] is None
+    assert cfg["food"]["train_grass_total"] == 70.0 and jcfg["food"]["train_grass_total"] is None      # S′ N (학습 세계만)
     assert jcfg["train"] == cfg["train"] and jcfg["species"] == cfg["species"]
     # 대비책 F 는 스위치만 있고 기본 끔 (6-1, 사용자 답 11-10)
     assert cfg["reward"]["fallback_f"]["enabled"] is False
@@ -254,3 +258,16 @@ def test_config_inherit_and_checks(cfg, jcfg):
         B.override(cfg, {"species": {"deer": {"diet": ["bark"]}}})
     with pytest.raises(ValueError):
         B.override(cfg, {"world": {"mode": "judge"}})                 # 판정 블록 없음
+    with pytest.raises(ValueError, match="here_r"):
+        B.override(cfg, {"body_common": {"carcass": {"eat_r": 1.2}}})   # S′ 검토 low: 관측 '발밑' 경계 = EAT 가 사체를 먹는 거리
+
+
+def test_fov_cos_literals_for_cpp(cfg, jcfg):
+    """S′ 검토 low (C++ 옮김): 시야 cos 는 float64 리터럴 표 — 비트까지 고정 (늑대 250° · 사슴·멧돼지 300°), 표 = math.radians 꼴."""
+    want = {"deer": "-0x1.bb67ae8584cabp-1", "wolf": "-0x1.25abcf87c4979p-1", "boar": "-0x1.bb67ae8584cabp-1"}
+    for c in (cfg, jcfg):
+        body = B.load_body(c)
+        for i, sp in enumerate(B.SPECIES):
+            assert float(body.fov_cos[i]).hex() == want[sp]
+    for f, v in B.FOV_COS_LITERAL.items():
+        assert v == math.cos(math.radians(f / 2.0))

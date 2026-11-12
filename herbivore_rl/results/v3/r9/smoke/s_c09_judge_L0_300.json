@@ -1,0 +1,19 @@
+{
+ "mode": "L0_300",
+ "worlds": 10,
+ "steps": 1000,
+ "alive_mean_first": 300.0,
+ "alive_mean_last": 297.9,
+ "alive_mean_avg": 298.7,
+ "elapsed_s": 146.8703875541687,
+ "ms_per_world_step": 14.68703875541687,
+ "peak_wset_mb": 299.796875,
+ "private_mb": 45.83984375,
+ "end_mean": {
+  "deer": 242.7,
+  "wolf": 6.0,
+  "boar": 49.3
+ },
+ "time": "2026-11-12 17:11:49",
+ "note": "S′ C0-9 판정 세계 스모크 (r9_eval_core.run = record + 기록기 + 장면 셈, 규칙 두뇌, 가장 높은 칸): start·pop300·L0_300·L0_800 4 개 함께, train 혼자. 언리얼 꺼짐, 사용자 브라우저 CPU 부하 큼(시스템 85~88%)"
+}

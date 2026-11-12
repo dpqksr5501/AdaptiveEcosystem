@@ -14,9 +14,15 @@ Round r (7-1·7-3):
                   records 'check skipped'. The stop rule (9-4) is read by people/eval; the league halts after `--rounds`.
 Branches never share pools (7-2). Pool entries = every snapshot of a finished bundle (in-bundle 10M / 5M + end), versions in order.
 
-Before each launch (7-9): (1) no live process already carries the run name (same check as R8 watch_train `alive`: command line),
-(2) no Unreal Editor / UBT / ShaderCompileWorker is running — the league waits and logs, it never stops them, (3) free commit
-memory ≥ 1.5 × (--proc-mem-gb × processes to start) + 6 GB (Windows GetPerformanceInfo). Running processes ≤ --max-procs (6).
+Before each launch (7-9, STATUS 5절 밤 창 — 사용자 11-10 '학습은 밤에만'): (1) no live process already carries the run name (same
+check as R8 watch_train `alive`: command line), (2) night window (--window HH:MM-HH:MM, default 22:00-09:00, may wrap midnight):
+a bundle starts only inside the window and only when its estimated wall clock (registered decisions ÷ registered speed × 1.1 —
+`speed_dps` in the decisions JSON, C0-9; without it the wall cap / 2) ends before the window end, else it waits for the next window
+start, (3) no Unreal Editor / UBT / ShaderCompileWorker / LiveCodingConsole / MSBuild (any project) is running — the league waits and
+logs, it never stops them, (4) free commit memory ≥ 1.5 × (--proc-mem-gb × processes to start) + 6 GB (Windows GetPerformanceInfo).
+Running processes ≤ --max-procs (6). A bundle already running is never stopped (a window end does not cut it). Waiting reasons go to
+league_events.log, the state file (`waiting`) and logs/progress.md. The even-round check follows the same window rule unless
+--check-anytime (a check is not training).
 
 State `ckpt/r9/league_state.json` (atomic rewrite): round, stage, runs (status, pid, start copy + sha256, pool file), pools per branch
 and species (zip, npz, sha256), latest zip per branch·species, prescriptions (9-4 shares per branch from a round), events. The meta
@@ -34,6 +40,7 @@ from __future__ import annotations
 
 import argparse
 import ctypes
+import datetime as dt
 import hashlib
 import json
 import os
@@ -60,7 +67,9 @@ PREY, WOLF_STAGE = "prey", "wolf"
 STAGES = (PREY, WOLF_STAGE)
 STAGE_SPECIES = {PREY: ("deer", "boar"), WOLF_STAGE: ("wolf",)}
 PLANNED_H = {(0, PREY): 3.5, (0, WOLF_STAGE): 4.0, "later": 0.75}          # 7-3 표
-UNREAL_NAMES = ("unrealeditor", "unrealbuildtool", "ue4editor", "shadercompileworker")
+UNREAL_NAMES = ("unrealeditor", "unrealbuildtool", "ue4editor", "shadercompileworker", "livecodingconsole", "msbuild")
+WINDOW_DEFAULT = "22:00-09:00"                     # STATUS 5절 밤 창 (11-12 등록)
+EST_FACTOR = 1.1                                   # 묶음 어림 벽시계 = 등록 결정 수 ÷ 등록 속도 × 1.1
 GB = 1024 ** 3
 
 
@@ -90,6 +99,92 @@ def sha256(path: Path) -> str:
 
 def run_name(branch: str, species: str, round_: int) -> str:
     return f"r9_{branch}_{species}_r{round_}"
+
+
+# --------------------------------------------------------------------------- #
+# night window (STATUS 5절, 11-12 등록) — pure functions (clock injected, tests)
+# --------------------------------------------------------------------------- #
+
+def parse_window(text: str) -> tuple[int, int]:
+    """'HH:MM-HH:MM' → (start minute, end minute) of the day. start == end is refused (no window). Hours 0~23 and minutes 0~59
+    are checked separately (검토 low: '22:60' used to be read as 23:00)."""
+    try:
+        a, b = str(text).split("-")
+        sa, sb = [int(x) for x in a.split(":")], [int(x) for x in b.split(":")]
+        if len(sa) != 2 or len(sb) != 2:
+            raise ValueError("HH:MM")
+    except (ValueError, IndexError) as e:
+        raise ValueError(f"창은 HH:MM-HH:MM 꼴 (받음 {text!r})") from e
+    if not all(0 <= h < 24 and 0 <= m < 60 for h, m in (sa, sb)):
+        raise ValueError(f"창 {text!r}: 시는 0~23, 분은 0~59")
+    st, en = sa[0] * 60 + sa[1], sb[0] * 60 + sb[1]
+    if st == en:
+        raise ValueError(f"창 {text!r}: 시작 ≠ 끝")
+    return st, en
+
+
+def window_length_s(win: tuple[int, int]) -> float:
+    st, en = win
+    return float(((en - st) % 1440) * 60)
+
+
+def current_window(now: dt.datetime, win: tuple[int, int]) -> tuple[dt.datetime, dt.datetime] | None:
+    """(start, end) datetimes of the window that contains `now`, or None (outside). Wrapping windows (22:00-09:00) work."""
+    st, en = win
+    day0 = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    for back in (0, 1):
+        s0 = day0 - dt.timedelta(days=back) + dt.timedelta(minutes=st)
+        e0 = s0 + dt.timedelta(seconds=window_length_s(win))
+        if s0 <= now < e0:
+            return s0, e0
+    return None
+
+
+def next_window_start(now: dt.datetime, win: tuple[int, int]) -> dt.datetime:
+    """First window start strictly after `now` (or today's start if still ahead)."""
+    st, _en = win
+    s0 = now.replace(hour=0, minute=0, second=0, microsecond=0) + dt.timedelta(minutes=st)
+    return s0 if s0 > now else s0 + dt.timedelta(days=1)
+
+
+def window_check(now: dt.datetime, win: tuple[int, int], est_s: float, grace_s: float = 1800.0) -> tuple[bool, str]:
+    """May a bundle of estimated wall clock `est_s` start at `now`? Inside the window and now + est ≤ window end. A bundle longer than
+    the whole window can never fit — it may start only in the first `grace_s` of a window [해석: 막히지 않게, 기록함]."""
+    cw = current_window(now, win)
+    nxt = next_window_start(now, win)
+    if cw is None:
+        return False, f"밤 창 밖 (다음 창 시작 {nxt:%m-%d %H:%M})"
+    s0, e0 = cw
+    if now + dt.timedelta(seconds=float(est_s)) <= e0:
+        return True, ""
+    if float(est_s) > window_length_s(win) and (now - s0).total_seconds() <= grace_s:
+        return True, f"어림 {est_s / 3600:.1f} h 가 창 길이보다 길어 창 시작 {grace_s / 60:.0f} 분 안에만 띄운다"
+    return False, f"어림 {est_s / 3600:.2f} h 로는 창 끝 {e0:%H:%M} 전에 못 끝남 (다음 창 시작 {nxt:%m-%d %H:%M})"
+
+
+def launch_gate(now: dt.datetime, win: tuple[int, int] | None, est_s: float, unreal: list[str], free_bytes: int | None, n_procs: int,
+                proc_mem_gb: float) -> str | None:
+    """None if a bundle may start now, else the reason to wait (STATUS 5절 (1)~(4), 7-9). win None = no window (점검 --check-anytime)."""
+    if win is not None:
+        ok, why = window_check(now, win, est_s)
+        if not ok:
+            return why
+    if unreal:
+        return "언리얼/UBT/셰이더/라이브 코딩/MSBuild 가 돌고 있다 (끄지 않고 기다림): " + ", ".join(unreal[:4])
+    need = 1.5 * float(proc_mem_gb) * int(n_procs) * GB + 6.0 * GB
+    if free_bytes is not None and free_bytes < need:
+        return f"남은 커밋 메모리 {free_bytes / GB:.1f} GB < 필요 {need / GB:.1f} GB"
+    return None
+
+
+def append_progress(log_dir: Path, line: str) -> None:
+    """logs/progress.md 에 한 줄 덧붙인다 (지켜보기 watch_r9 가 다시 쓰면 그 쪽 '기다림' 칸이 상태 파일의 `waiting` 을 보여 준다)."""
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        with (log_dir / "progress.md").open("a", encoding="utf-8") as f:
+            f.write(line.rstrip() + "\n")
+    except OSError:
+        pass
 
 
 # --------------------------------------------------------------------------- #
@@ -181,6 +276,11 @@ class League:
         self.branches = list(args.branches)
         self.shards = int(args.shards if args.shards is not None else tr["wolf_shards"])
         self.wall_factor = float(tr["wall_cap_factor"])
+        self.window = None if getattr(args, "no_window", False) else parse_window(getattr(args, "window", WINDOW_DEFAULT))
+        self.clock = dt.datetime.now                  # injected in tests
+        self._unreal = unreal_running
+        self._free = commit_free_bytes
+        self.speeds = None
         self.decisions = self._decisions()
         self._check_c0_state()
         self.state = self._load_state()
@@ -210,7 +310,18 @@ class League:
         for key in ("round0", "later"):
             if key not in d or any(n not in d[key] for n in B.SPECIES):
                 raise ValueError(f"bundle decisions need {{round0, later}} × {{deer, wolf, boar}}: {d}")
+        sp = d.get("speed_dps")                        # C0-9 등록 속도 (결정/초) — 없으면 밤 창 어림은 벽시계 상한 / 2
+        if sp and all(k in sp and all(n in sp[k] for n in B.SPECIES) for k in ("round0", "later")):
+            self.speeds = {k: {n: float(v) for n, v in sp[k].items()} for k in ("round0", "later")}
         return {k: {n: int(v) for n, v in d[k].items()} for k in ("round0", "later")}
+
+    def est_seconds(self, spec: dict) -> float:
+        """밤 창 판단용 묶음 어림 벽시계 (STATUS 5절): 등록 결정 수 ÷ 등록 속도 × 1.1, 속도 미등록이면 벽시계 상한 / 2."""
+        if self.speeds is not None and spec.get("decisions"):
+            v = self.speeds["round0" if int(spec["round"]) == 0 else "later"][spec["species"]]
+            if v > 0:
+                return float(spec["decisions"]) / v * EST_FACTOR
+        return float(spec["wall_hours"]) * 3600.0 / 2.0
 
     def bundle_decisions(self, round_: int, species: str) -> int | None:
         if self.decisions is None:
@@ -362,16 +473,19 @@ class League:
         rs["pool_file"] = spec["pool_file"]
 
     # --- launching ---
-    def precheck(self, n_procs: int) -> str | None:
-        """None if launching n_procs processes is fine now, else the reason to wait (7-9 (2)·(3))."""
-        ue = unreal_running()
-        if ue:
-            return "언리얼/UBT 가 돌고 있다: " + ", ".join(ue[:4])
-        free = commit_free_bytes()
-        need = 1.5 * float(self.args.proc_mem_gb) * n_procs * GB + 6.0 * GB
-        if free is not None and free < need:
-            return f"남은 커밋 메모리 {free / GB:.1f} GB < 필요 {need / GB:.1f} GB"
-        return None
+    def precheck(self, n_procs: int, est_s: float = 0.0, window: bool = True) -> str | None:
+        """None if launching n_procs processes is fine now, else the reason to wait (STATUS 5절 밤 창 · 7-9)."""
+        return launch_gate(self.clock(), self.window if window else None, est_s, self._unreal(), self._free(), n_procs,
+                           float(self.args.proc_mem_gb))
+
+    def note_wait(self, why: str) -> None:
+        """기다리는 까닭을 이벤트·상태 파일(`waiting` — watch_r9 가 progress.md 에 보여 줌)·progress.md 에 남긴다."""
+        self.event(f"기다림: {why}")
+        if self.args.dry_run:
+            return
+        self.state["waiting"] = dict(since=self.state.get("waiting", {}).get("since") or now_s(), reason=why, at=now_s())
+        self.save()
+        append_progress(self.logs, f"- {now_s()} 리그 기다림: {why}")
 
     def launch(self, spec: dict) -> subprocess.Popen:
         self.logs.mkdir(parents=True, exist_ok=True)
@@ -485,12 +599,14 @@ class League:
                     queue.pop(0)
                     self.event(f"{s['run']}: 이미 도는 프로세스 pid {dup[s['run']]} 를 기다린다 (두 벌 막음)")
                     continue
-                why = self.precheck(s["procs"])
+                why = self.precheck(s["procs"], self.est_seconds(s))
                 if why:
                     if time.time() - last_wait > 600.0:
-                        self.event(f"기다림: {why}")
+                        self.note_wait(f"{s['run']} — {why}")
                         last_wait = time.time()
                     break
+                if self.state.get("waiting"):
+                    self.state["waiting"] = None
                 running[s["run"]] = (s, self.launch(queue.pop(0)))
             if queue or running:
                 time.sleep(float(self.args.poll))
@@ -521,11 +637,17 @@ class League:
         brs = self.branches if per_branch else ["+".join(self.branches)]
         # Fix 단계 (C0-9): the per-branch checks run AT THE SAME TIME (7-9 '점검은 학습이 쉬는 동안 따로, 프로세스 4 개') — one after
         # the other they took ~2 × the C0-9 check time. --check-procs counts the processes of all branches together.
-        why = self.precheck(int(self.args.check_procs))
+        est = float(self.args.check_est_hours) * 3600.0 * EST_FACTOR
+        why = self.precheck(int(self.args.check_procs), est, window=not self.args.check_anytime)
+        last_wait = 0.0
         while why:
-            self.event(f"점검 기다림: {why}")
+            if time.time() - last_wait > 600.0:
+                self.note_wait(f"점검 {round_} 바퀴 — {why}")
+                last_wait = time.time()
             time.sleep(max(60.0, float(self.args.poll)))
-            why = self.precheck(int(self.args.check_procs))
+            why = self.precheck(int(self.args.check_procs), est, window=not self.args.check_anytime)
+        if self.state.get("waiting"):
+            self.state["waiting"] = None
         env = dict(os.environ, PYTHONUTF8="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
         flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0
         kids = []
@@ -555,8 +677,15 @@ class League:
         if self.decisions is None:
             print("묶음 결정 수: 미등록 (C0-9 뒤 STATUS.md·--decisions-json 에 등록해야 띄운다)")
         free = commit_free_bytes()
-        print(f"지금 확인: 언리얼/UBT {unreal_running() or '없음'}, 남은 커밋 메모리 "
+        print(f"지금 확인: 언리얼/UBT/MSBuild {unreal_running() or '없음'}, 남은 커밋 메모리 "
               f"{'모름' if free is None else f'{free / GB:.1f} GB'}")
+        if self.window is None:
+            print("밤 창: 없음 (--no-window — 시험·스모크만)")
+        else:
+            cw = current_window(self.clock(), self.window)
+            print(f"밤 창 {self.args.window} (길이 {window_length_s(self.window) / 3600:.1f} h): 지금 {'창 안 — 끝 ' + f'{cw[1]:%H:%M}' if cw else '창 밖'}, "
+                  f"다음 창 시작 {next_window_start(self.clock(), self.window):%m-%d %H:%M}. 속도 "
+                  f"{'등록 (speed_dps)' if self.speeds else '미등록 → 어림 = 벽시계 상한 / 2'}")
         tr = self.cfg["train"]
         for r in range(r0, r0 + n):
             print(f"\n## {r} 바퀴")
@@ -587,8 +716,11 @@ class League:
                           f"lr {tr['ppo']['learning_rate_round0'] if r == 0 else tr['ppo']['learning_rate']}"
                           f"{', 첫 롤아웃 가치망만' if r > 0 else ''}")
                     print(f"     상대: {'; '.join(opp)}; 방식 확률 {tr['opponent_stochastic']}")
+                    print(f"     밤 창 어림 {self.est_seconds(s) / 3600:.2f} h → 지금 띄우면: "
+                          f"{self.precheck(s['procs'], self.est_seconds(s)) or '띄움'}")
                     print(f"     명령: {' '.join(s['cmd'][1:])}")
-                print("   띄우기 전 확인: 두 벌(실행 이름) · 언리얼/UBT · 커밋 메모리 ≥ 1.5 × 어림 × 프로세스 + 6 GB")
+                print("   띄우기 전 확인: 두 벌(실행 이름) · 밤 창(어림이 창 끝 전에 끝남) · 언리얼/UBT/셰이더/라이브 코딩/MSBuild · "
+                      "커밋 메모리 ≥ 1.5 × 어림 × 프로세스 + 6 GB")
                 print(f"   끝나면: 판(zip·npz) sha256 → 풀 {self.branches} 각 {STAGE_SPECIES[stage]} 에 차례로 추가, 다음 묶음 시작 사본")
             print(f"3. 점검: {'짝수 바퀴 — ' + (self.args.check_cmd or 'eval_r9.py check (--check-cmd 없으면 건너뜀)') if r % 2 == 0 else '없음(홀수 바퀴)'}")
         print(f"\n멈춤: --rounds {self.args.rounds} 바퀴 끝에 멈추고 멈춤 규칙(9-4)을 본다 (최대 {self.args.max_rounds})")
@@ -664,6 +796,10 @@ def build_parser() -> argparse.ArgumentParser:
     ap.add_argument("--check-cmd", default=None, help="짝수 바퀴 점검 명령 (python 인자; {round} {branch} {state} {out}). 예: "
                     "'results/v3/r9/eval_r9.py check --round {round} --league-state {state}' ({branch} 가 없으면 한 번만)")
     ap.add_argument("--check-procs", type=int, default=4)
+    ap.add_argument("--check-anytime", action="store_true", help="점검은 학습이 아니라 밤 창 밖에서도 띄운다 (언리얼·메모리 조건은 그대로)")
+    ap.add_argument("--check-est-hours", type=float, default=2.4, help="점검 하나의 어림 벽시계 (STATUS 3-0: 50 세계 1.2~2.4 시간)")
+    ap.add_argument("--window", default=WINDOW_DEFAULT, help="밤 창 HH:MM-HH:MM (STATUS 5절, 자정 넘김 됨). 묶음은 이 안에서만 시작")
+    ap.add_argument("--no-window", action="store_true", help="[시험·스모크 전용] 밤 창을 보지 않는다 — 실제 학습에는 쓰지 않는다")
     ap.add_argument("--train-extra", default=None, help="train_r9.py 에 덧붙일 인자 (스모크용)")
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument("--plan-rounds", type=int, default=1, help="dry-run 이 그릴 바퀴 수")

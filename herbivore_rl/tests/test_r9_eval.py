@@ -295,10 +295,11 @@ def test_c0_state_must_be_in_the_yaml(tmp_path, cfg, jcfg):
     """Fix 단계 검토 low: 보정 값(C0_STATE values·f_enabled)이 YAML 에 없으면 judge·mixed·check·league 가 거부한다."""
     sp = tmp_path / "C0_STATE.json"
     assert EV.check_c0_state(cfg, jcfg, "t", sp) is None                                # 보정 전 = 시운전
-    sp.write_text(json.dumps(dict(values={"C0-6": 0.012, "C0-2": [0.90, 1.05]}, f_enabled=False)), encoding="utf-8")
-    assert EV.check_c0_state(cfg, jcfg, "t", sp)["values"]["C0-6"] == 0.012
-    sp.write_text(json.dumps(dict(values={"C0-6": 0.016}, f_enabled=False)), encoding="utf-8")
-    with pytest.raises(SystemExit, match="C0-6"):
+    # S′ 11-12: C0-6 은 보고만(고칠 값 없음) → 정하는 관문 C0-5 (땅속 재생 q) 로 본다
+    sp.write_text(json.dumps(dict(values={"C0-5": 1.0, "C0-2": [0.90, 1.05]}, f_enabled=False)), encoding="utf-8")
+    assert EV.check_c0_state(cfg, jcfg, "t", sp)["values"]["C0-5"] == 1.0
+    sp.write_text(json.dumps(dict(values={"C0-5": 0.5}, f_enabled=False)), encoding="utf-8")
+    with pytest.raises(SystemExit, match="C0-5"):
         EV.check_c0_state(cfg, jcfg, "t", sp)
     sp.write_text(json.dumps(dict(values={}, f_enabled=True)), encoding="utf-8")
     with pytest.raises(SystemExit, match="대비책 F"):
@@ -319,12 +320,16 @@ def test_summary_tri_state_and_sentences():
 
 
 def test_metric_definitions_switch():
-    """Fix 단계 (검토 medium 둘, 사용자 확인 필요): 기본은 8-2 문장(늑대-표적 쌍마다 시도·5 초마다 막힘), --hunt-def episode /
-    --block-def once 로 바꾸면 게이트 값이 그 정의를 쓴다. 다른 정의는 늘 함께 보고한다."""
+    """Fix 단계 (검토 medium 둘) → 11-12 정함: 기본 사냥 시도 = strict (STATUS 0절 2 — test_r9_eval_s 가 셈을 본다). --hunt-def pair /
+    episode / --block-def once 로 바꾸면 게이트 값이 그 정의를 쓴다. 다른 정의는 늘 함께 보고한다. (S′ 11-12: 기본값만 바뀜)"""
     hunts = [dict(k=0, wolf_uid=9, target_uid=t, target_sp=D_, t0=10, t1=40, n_close=8, ran=False, end="gap") for t in (1, 2, 3, 4)]
     kills = [dict(k=0, wolf_uid=9, prey_uid=2, t=30, prey_sp=D_, wolf_act=B.WALK_FIRST, prey_af=1.0, juv_share=0.0)]
     rec = dict(K=1, hunts=hunts, kills=kills, st=dict(alive_steps=np.array([[0, 900, 0]])), att=np.zeros((1, 2)))
+    assert C.DEFS == {"hunt": "strict", "block": "scan"}
     try:
+        j = C.j3_metrics(rec)
+        assert j["hunt_def"] == "strict" and j["strict_attempts"] == 1                  # 구간에 hunting 표시가 없으면 사냥 구간 아님 → 구간 밖 걷기 죽임 1
+        C.DEFS["hunt"] = "pair"
         j = C.j3_metrics(rec)
         assert j["hunt_def"] == "pair" and j["success_rate"] == pytest.approx(0.25) and j["attempts"] == 4
         assert j["success_rate_episode"] == pytest.approx(1.0) and j["episodes"] == 1
@@ -342,7 +347,7 @@ def test_metric_definitions_switch():
         C.DEFS["block"] = "once"
         assert C.block_share(life)["content"].sum() == 1 and C.block_share(life, "scan")["content"].sum() == 6
     finally:
-        C.DEFS.update(hunt="pair", block="scan")
+        C.DEFS.update(hunt="strict", block="scan")
 
 
 def test_blocked_once_counts_a_pending_pair_once(jcfg):
@@ -461,7 +466,7 @@ def test_split_brain_mixed_herd(cfg):
     """J1 섞인 무리: 두 두뇌가 칸마다 갈리고, 다시 난 개체도 층 균형으로 배정되며, 개체당 보상 셈이 세계 보상과 맞는다."""
     seeds = [44375, 44376]
     rec = C.run(B.override(cfg, EV.EVAL_FACING), seeds, 600, EV.spec_fn(cfg, EV.rule_specs(), {}), scenes=False,
-                split=dict(sp=D_, first=C.rule_brain("ALWAYS_EAT", cfg), second=C.rule_brain("RULE_DEER", cfg)))
+                split=dict(sp=D_, first=C.rule_brain("ALWAYS_EAT", cfg, D_), second=C.rule_brain("RULE_DEER", cfg, D_)))
     s = C.split_metrics(rec)
     assert s["steps"][0] > 0 and s["steps"][1] > 0
     assert abs(s["steps"][0] - s["steps"][1]) / (s["steps"][0] + s["steps"][1]) < 0.1
@@ -506,7 +511,9 @@ def test_subcommands_small(tmp_path, brains_dir, monkeypatch):
     assert set(jd["variants"]) == {"L0", "LS"} and "paired_coexist_diff" in jd["variants"]["L0"]["L_A"]
     assert set(jd["verdict"]["branches"]) == {"A", "B"}
     assert (tmp_path / "judge_pop.npz").exists()
-    assert jd["metric_defs"] == {"hunt": "pair", "block": "scan"}
+    assert jd["metric_defs"] == {"hunt": "strict", "block": "scan"}
+    assert "success_rate_strict" in jd["batches"]["L_A"]["j3"] and "end_worlds" in jd["batches"]["L_A"]["population"]
+    assert jd["verdict"]["branches"]["A"]["rule_backed"] in (True, False)        # L0 판이 있으면 L0 짝 비교 (11-12)
     assert "block_share_once" in jd["batches"]["L_A"]["population"] and "success_rate_pair" in jd["batches"]["L_A"]["j3"]
     assert EV.main(["summary", "--out", o]) == 0
     sm = json.loads((tmp_path / "summary.json").read_text(encoding="utf-8"))

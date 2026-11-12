@@ -1,6 +1,7 @@
 # R9 판정 세계 (설계 RL_R9_MULTISPECIES_DESIGN.md 3-1·3-2·3-6·3-7·8-2). 학습 세계 v3_r9.yaml 을 물려받고 모드·무대·시작 수만 바꾼다.
 # species·body_common 은 바꾸지 않는다 — 몸 해시가 학습 세계와 같아야 학습한 두뇌를 받는다(r9_body.body_hash, 시험 tests/test_r9_body.py).
 # 판정 시드 44800~44999 는 판정 때 한 번만(잠금 파일, 9-2). 이 파일에는 시드를 적지 않는다.
+# S′ (2026-11-12): 몸 규칙(EAT 서서 먹기·SHELTER 서기·food_dir 관측 115)은 학습 세계에서 물려받는다 — 두 세계 몸 해시가 같다.
 inherit: v3_r9.yaml
 
 world:
@@ -15,6 +16,7 @@ world:
 
 food:
   quadrant_grass_total: 70.0    # 사분면마다 따로 만들고 용량 합을 70 으로 (은신처 0.15 배 전, 3-2). 땅속 먹이는 사분면마다 따로 만들되 합은 맞추지 않는다 [어림]
+  train_grass_total: null       # 학습 세계 전용 맞춤(S′ N) — 판정 세계는 쓰지 않는다 (모드 judge 는 읽지 않지만 뜻을 적어 둠)
 
 judge:                          # 판정 전용 (몸 해시 밖)
   steps: 13500                  # 30 분 = 게임 15 일

@@ -1,10 +1,12 @@
 """R9 두뇌 시험 (설계 AdaptiveEcosystem/Docs/RL_Policy/RL_R9_MULTISPECIES_DESIGN.md 7-4·7-5·7-10, 12절 시험 16·27).
 
-16. numpy 고정 두뇌 = SB3 `predict(deterministic=True)`: 작은 PPO(107 → 64 → 64 → 19, tanh — 학습은 안 함)에서 세 층을 꺼내 관측 1,024 개의
+16. numpy 고정 두뇌 = SB3 `predict(deterministic=True)`: 작은 PPO(115 → 64 → 64 → 19, tanh — 학습은 안 함)에서 세 층을 꺼내 관측 1,024 개의
     로짓 차 < 1e-5, 행동이 같다. Gumbel-max 표본의 분포 = softmax(20 만 번).
 27. npz 몸 해시가 다르면 세계(load_brain)가 거부한다(입출력 해시·종·이름·모양·형식도). 상대 두뇌 종류(규칙·학습·확률·가장 높은 칸)를
     바꿔도 decide_block 의 난수 소비가 같다(세계 없이 볼 수 있는 부분 — 세계를 붙인 판은 21 과 함께 나중 단계).
-규칙 두뇌 7 개(7-5): 관측 107 칸만 읽고 정해진 대로 고르는지 손 관측으로 본다.
+규칙 두뇌 9 개(7-5, S′ S4 2026-11-12): 관측 115 칸만 읽고 정해진 대로 고르는지 손 관측으로 본다. S′ 세계는 EAT = 그 자리에서 먹기,
+SHELTER = 제자리 서기라 규칙 두뇌가 먹이(food_dir)·은신처(shelter_x·y) 쪽으로 직접 걷거나 뛴다 — 예전 시험의 '도망 → SHELTER',
+'배고픔 → EAT', '사체 느낌(food_density) → EAT' 기대값을 S4 뜻으로 바꿨다(목록은 s_impl/WORLD.md). 모든 규칙에 막힘 기억 2 칸이 붙는다.
 시드는 시험 범위 44350~44399 만 쓴다.
 """
 
@@ -189,7 +191,8 @@ def _all_brains(cfg, ppo):
     w = R.extract_sb3(ppo)
     mlp = R.MlpBrain(name="m", kind="mlp", species=B.DEER, weights=w)
     out = [R.Controller(mlp, True, "current"), R.Controller(mlp, False, "current")]
-    out += [R.Controller(R.make_rule(n, cfg), st, "rule") for n in R.RULE_NAMES for st in (True, False)]
+    out += [R.Controller(R.make_rule(n, cfg, R.RULE_SPECIES[n] if R.RULE_SPECIES[n] is not None else B.DEER), st, "rule")
+            for n in R.RULE_NAMES for st in (True, False)]
     return out
 
 
@@ -234,12 +237,16 @@ def test_27_stochastic_uses_u(cfg, ppo):
 # --------------------------------------------------------------------------- rules (7-5)
 
 
-def _obs(n=1, E=0.5, stamina=1.0, health=1.0, age=1.0, edge=1.0, sx=1.0, sy=0.0, free=1.0, food=0.0):
+def _obs(n=1, E=0.5, stamina=1.0, health=1.0, age=1.0, edge=1.0, sx=1.0, sy=0.0, free=1.0, here=0.5, fd=None, inside=0.0):
+    """here = food_here (기본 0.5: 발밑에 먹을 것 있음 — 사슴 문턱 0.06·멧돼지 0.045·늑대 1e-9 위), fd = {j: food_dir_j}."""
     o = np.zeros((n, B.OBS_DIM), np.float32)
     o[:, B.O_ENERGY], o[:, B.O_STAMINA], o[:, B.O_HEALTH], o[:, B.O_AGE_FRAC] = E, stamina, health, age
     o[:, B.O_SHELTER_EDGE], o[:, B.O_SHELTER_X], o[:, B.O_SHELTER_Y] = edge, sx, sy
     o[:, B.O_FREE0:B.O_FREE0 + 8] = free
-    o[:, B.O_FOOD_DENSITY] = food
+    o[:, B.O_FOOD_HERE] = here
+    o[:, B.O_IN_SHELTER] = inside
+    for j, v in (fd or {}).items():
+        o[:, B.O_FOOD_DIR0 + j] = v
     return o
 
 
@@ -257,7 +264,10 @@ def _kin(o, j, x, y, size=0.4, row=0):
 
 
 def _one(brain, o, ctx=None, state=None):
+    """state=None → 새 기억 (S4 막힘 기억이 앞 호출의 EAT 를 기억하지 않게); 이어지는 기억은 state 를 넘긴다."""
     u = np.full((o.shape[0], B.N_ACTIONS), 0.5)
+    if state is None:
+        state = brain.new_state(o.shape[0])
     return brain.act(o, u, False, state, ctx or {})
 
 
@@ -269,7 +279,10 @@ def test_rule_deer(cfg):
     assert _one(br, o, {"facing_f": 0.97})[0] == B.EAT                 # f = 0.97 이면 바라봄 부족, 10 단위 밖
     o = _obs(edge=6 / 20)
     _other(o, 0, 0, 8, appr=0.2, facing=0.0)                          # 10 단위 안 다가옴 (바라봄 무관)
-    assert _one(br, o)[0] == B.SHELTER                                # 은신처 가장자리 8 단위 안
+    assert _one(br, o)[0] == B.RUN_FIRST                              # 은신처 가장자리 8 단위 안 → 은신처(앞, shelter_x 1) 쪽 뛰기
+    o = _obs(edge=0.0, sx=0.0, inside=1.0)
+    _other(o, 0, 0, 8, appr=0.2, facing=0.0)
+    assert _one(br, o)[0] == B.SHELTER                                # 은신처 안 → 제자리 서기(SHELTER)
     o = _obs()
     _other(o, 0, 0, 8, appr=0.2)
     assert _one(br, o)[0] == B.RUN_FIRST + 6                          # 왼쪽에서 → 오른쪽(270°)으로
@@ -281,29 +294,35 @@ def test_rule_deer(cfg):
     _other(o, 0, 8, 0, appr=0.1)                                      # 10 단위 안이어도 approach 0.1 ≤ 0.15, 바라봄 0
     assert _one(br, o)[0] == B.EAT
     assert _one(br, _obs(E=0.95))[0] == B.WATCH and _one(br, _obs(E=0.5))[0] == B.EAT
+    # S4 먹이 찾기 (관측만): 발밑에 없으면 food_dir 가장 큰 칸 쪽 걷기, 아무것도 못 느끼면 앞으로(찾기)
+    assert _one(br, _obs(here=0.0, fd={3: 0.2, 5: 0.4}))[0] == B.WALK_FIRST + 5
+    assert _one(br, _obs(here=0.0))[0] == B.WALK_FIRST
+    assert _one(br, _obs(here=0.05, fd={1: 0.1}))[0] == B.WALK_FIRST + 1            # 0.05 < 사슴 문턱 0.06
+    assert br.params["here_min"] == R.here_min_of(cfg, B.DEER) and br.n_state == 2
 
 
 def test_rule_wolf(cfg):
     br = R.make_rule("RULE_WOLF", cfg)
-    assert br.n_state == 1
-    assert _one(br, _obs(E=0.9, food=0.5))[0] == B.EAT                # 느낀 사체 + E < 0.98
-    assert _one(br, _obs(E=0.98, food=0.5))[0] == B.WATCH
-    o = _obs(E=0.5)
+    assert br.n_state == 1 + 2
+    assert _one(br, _obs(E=0.9, here=0.5))[0] == B.EAT                # 발밑(1.0 안) 사체 + E < 0.98 → 먹기
+    assert _one(br, _obs(E=0.9, here=0.0, fd={2: 0.3}))[0] == B.WALK_FIRST + 2   # 느낀 사체 쪽 걷기 (S4)
+    assert _one(br, _obs(E=0.98, here=0.5))[0] == B.WATCH
+    o = _obs(E=0.5, here=0.0)
     _other(o, 0, 6, 0, size=0.5)                                      # 가까운 큰 몸
     _other(o, 1, 0, 10, size=0.4)                                     # 작은 몸 우선
     assert _one(br, o)[0] == B.WALK_FIRST + 2                         # 10 단위 > 6 → 걷기(몰래) 90°
-    o = _obs(E=0.5)
+    o = _obs(E=0.5, here=0.0)
     _other(o, 0, 0, 5.9, size=0.4)
     assert _one(br, o)[0] == B.RUN_FIRST + 2                          # 6 단위 안 → 뛰기
     # '은신처 밖': 내 은신처 중심 어림 (2 + 5.5) 단위 앞 — 그 안의 표적은 뺀다
-    o = _obs(E=0.5, edge=2 / 20, sx=1.0, sy=0.0)
+    o = _obs(E=0.5, edge=2 / 20, sx=1.0, sy=0.0, here=0.0)
     _other(o, 0, 8, 0, size=0.3)
     _other(o, 1, -10, 0, size=0.6)
     assert _one(br, o)[0] == B.WALK_FIRST + 4
-    assert _one(br, _obs(E=0.95))[0] == B.WATCH
+    assert _one(br, _obs(E=0.95, here=0.0))[0] == B.WATCH
     # 배고픈데 표적 없음 → 순찰 [어림]
-    assert _one(br, _obs(E=0.5))[0] == B.WALK_FIRST
-    o = _obs(E=0.5, free=0.5)
+    assert _one(br, _obs(E=0.5, here=0.0))[0] == B.WALK_FIRST
+    o = _obs(E=0.5, free=0.5, here=0.0)
     o[0, B.O_FREE0] = 0.1
     o[0, B.O_FREE0 + 2] = 0.9
     assert _one(br, o)[0] == B.WALK_FIRST + 2
@@ -311,7 +330,7 @@ def test_rule_wolf(cfg):
     st = br.new_state(1)
     seq = []
     for stam in (1.0, 0.1, 0.4, 0.54, 0.55, 0.4):
-        o = _obs(E=0.5, stamina=stam)
+        o = _obs(E=0.5, stamina=stam, here=0.0)
         _other(o, 0, 0, 4, size=0.4)
         seq.append(int(_one(br, o, state=st)[0]))
     assert seq == [B.RUN_FIRST + 2, B.WALK_FIRST + 2, B.WALK_FIRST + 2, B.WALK_FIRST + 2, B.RUN_FIRST + 2, B.RUN_FIRST + 2]
@@ -321,7 +340,7 @@ def test_rule_wolf(cfg):
 
 def test_rule_boar(cfg):
     br = R.make_rule("RULE_BOAR", cfg)
-    assert br.n_state == 3
+    assert br.n_state == 3 + 2 and br.params["here_min"] == R.here_min_of(cfg, B.BOAR)
     # 뛰어서 바라보며 다가옴 + 성체·HP 충분·새끼 2 단위 안 → 그쪽으로 걷기(마주 서기)
     st = br.new_state(1)
     o = _obs()
@@ -369,10 +388,31 @@ def test_rule_hide_always_random(cfg):
         br = R.make_rule(name, cfg)
         o = _obs(E=0.1)
         _other(o, 3, 15, 15)
-        assert _one(br, o)[0] == B.SHELTER
-        assert _one(br, _obs(E=0.2))[0] == B.EAT and _one(br, _obs(E=0.5))[0] == B.SHELTER
-    br = R.make_rule("ALWAYS_EAT", cfg)
-    assert np.all(_one(br, _obs(n=5, E=1.0)) == B.EAT)
+        assert _one(br, o)[0] == B.RUN_FIRST                          # 누군가 느낌 → 은신처(shelter_x 1 = 앞) 쪽 뛰기 (S4)
+        o = _obs(E=0.1, edge=0.0, sx=0.0, inside=1.0)
+        _other(o, 3, 15, 15)
+        assert _one(br, o)[0] == B.SHELTER                            # 안이면 제자리 서기
+        assert _one(br, _obs(E=0.2))[0] == B.EAT and _one(br, _obs(E=0.5))[0] == B.RUN_FIRST
+        assert _one(br, _obs(E=0.2, here=0.0, fd={6: 0.3}))[0] == B.WALK_FIRST + 6
+    for sp in (B.DEER, B.BOAR):
+        br = R.make_rule("ALWAYS_EAT", cfg, sp)
+        assert np.all(_one(br, _obs(n=5, E=1.0)) == B.EAT)
+        o = _obs(n=2, E=0.5, here=0.0, fd={4: 0.2})
+        _other(o, 0, 2, 0, appr=0.5, facing=0.95)
+        assert np.all(_one(br, o) == B.WALK_FIRST + 4)                # 도망 없이 먹이 찾기만
+    with pytest.raises(ValueError):
+        R.make_rule("ALWAYS_EAT", cfg)                                # 종이 있어야 발밑 문턱을 안다
+    for name, first in (("NOHUNT", B.WALK_FIRST), ("NOHUNT_RUN", B.RUN_FIRST)):
+        br = R.make_rule(name, cfg)
+        assert br.species == B.WOLF and br.n_state == 2
+        o = _obs(E=0.5, here=0.0, fd={2: 0.3})
+        _other(o, 0, 3, 0, size=0.3)                                  # 산 먹이가 앞에 있어도 사체 쪽으로만
+        assert _one(br, o)[0] == first + 2
+        assert _one(br, _obs(E=0.5, here=0.5))[0] == B.EAT
+        o = _obs(E=0.5, here=0.0)
+        _other(o, 0, 3, 0, size=0.3)
+        assert _one(br, o)[0] == B.WATCH                              # 사체를 못 느끼면 산 먹이로 가지 않는다
+        assert _one(br, _obs(E=0.99, here=0.5))[0] == B.WATCH
     rnd = R.make_rule("RANDOM", cfg)
     u = np.random.default_rng(44362).random((4000, B.N_ACTIONS))
     a = rnd.act(_obs(n=4000), u, False, None, {})
@@ -382,12 +422,13 @@ def test_rule_hide_always_random(cfg):
 
 
 def test_rules_read_observation_only(cfg):
-    """규칙 두뇌는 관측 107 칸만 받는다: 같은 관측이면 같은 행동(종 이름표가 들어올 길이 없다), 죽은 칸(관측 0)도 정해진 값."""
+    """규칙 두뇌는 관측 115 칸만 받는다: 같은 관측이면 같은 행동(종 이름표가 들어올 길이 없다), 죽은 칸(관측 0)도 정해진 값."""
     o = np.random.default_rng(44363).uniform(-1, 1, (256, B.OBS_DIM)).astype(np.float32)
     u = np.random.default_rng(44364).random((256, B.N_ACTIONS))
     for name in R.RULE_NAMES:
-        a1 = R.make_rule(name, cfg).act(o, u, False, None, {"facing_f": 0.9})
-        a2 = R.make_rule(name, cfg).act(o.copy(), u.copy(), True, None, {"facing_f": 0.9})
+        sp = R.RULE_SPECIES[name] if R.RULE_SPECIES[name] is not None else B.DEER
+        a1 = R.make_rule(name, cfg, sp).act(o, u, False, None, {"facing_f": 0.9})
+        a2 = R.make_rule(name, cfg, sp).act(o.copy(), u.copy(), True, None, {"facing_f": 0.9})
         assert np.array_equal(a1, a2), name
-        z = R.make_rule(name, cfg).act(np.zeros((3, B.OBS_DIM), np.float32), u[:3], False, None, {})
+        z = R.make_rule(name, cfg, sp).act(np.zeros((3, B.OBS_DIM), np.float32), u[:3], False, None, {})
         assert z.shape == (3,) and z.min() >= 0 and z.max() < B.N_ACTIONS

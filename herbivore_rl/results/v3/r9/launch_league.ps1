@@ -7,6 +7,10 @@
 # 다른 python·언리얼 프로세스는 건드리지 않는다. 언리얼/UBT 가 돌면 리그가 띄우지 않고 기다린다(끄지 않는다).
 #   powershell -ExecutionPolicy Bypass -File results/v3/r9/launch_league.ps1 -DecisionsJson results/v3/r9/bundle_decisions.json -Rounds 10
 #   -DryRun 이면 리그 차례만 그린다(league_r9.py --dry-run, 이 셸에서). -NoWatch 면 지켜보기를 띄우지 않는다.
+# 밤 창(STATUS 5절, 사용자 11-10 '학습은 밤에만'): 리그는 -Window(기본 22:00-09:00) 안에서, 묶음 어림 벽시계가 창 끝 전에 끝날 때만 묶음을 시작한다.
+#   -CheckAnytime 이면 짝수 바퀴 점검(학습 아님)은 창 밖에서도 띄운다. 언리얼·UBT·셰이더·라이브 코딩·MSBuild 가 돌면 끄지 않고 기다린다.
+# -Night: 리그 대신 밤 실행기 run_night.py 를 띄운다 — C0-10 짧은 학습 6 묶음(밤 창) → 잼 → γ 고르기 → C0_STATE → 통과하면 같은 인자로 리그 + 지켜보기.
+#   powershell -ExecutionPolicy Bypass -File results/v3/r9/launch_league.ps1 -Night -DecisionsJson results/v3/r9/bundle_decisions.json -Rounds 10 -CheckCmd "…"
 param(
     [string]$DecisionsJson = '',
     [int]$Rounds = 10,
@@ -16,7 +20,10 @@ param(
     [string]$CheckCmd = '',
     [string]$Baseline = '',
     [switch]$NoWatch,
-    [switch]$DryRun
+    [switch]$DryRun,
+    [string]$Window = '22:00-09:00',
+    [switch]$CheckAnytime,
+    [switch]$Night
 )
 
 $root = Split-Path -Parent (Split-Path -Parent (Split-Path -Parent (Split-Path -Parent $MyInvocation.MyCommand.Path)))
@@ -24,10 +31,18 @@ $py = 'C:\Users\Sinhyeok\anaconda3\python.exe'
 $logDir = Join-Path $root 'results\v3\r9\logs'
 $pidFile = Join-Path $logDir 'pids.txt'
 
-$leagueArgs = "results/v3/r9/league_r9.py --rounds $Rounds --max-procs $MaxProcs --proc-mem-gb $ProcMemGB"
+$leagueArgs = "results/v3/r9/league_r9.py --rounds $Rounds --max-procs $MaxProcs --proc-mem-gb $ProcMemGB --window $Window"
 if ($DecisionsJson) { $leagueArgs += " --decisions-json $DecisionsJson" }
 if ($Shards -gt 0) { $leagueArgs += " --shards $Shards" }
 if ($CheckCmd) { $leagueArgs += " --check-cmd `"$CheckCmd`"" }
+if ($CheckAnytime) { $leagueArgs += " --check-anytime" }
+if ($Night) {
+    $leagueArgs = "results/v3/r9/run_night.py --rounds $Rounds --max-procs $MaxProcs --proc-mem-gb $ProcMemGB --window $Window"
+    if ($DecisionsJson) { $leagueArgs += " --decisions-json $DecisionsJson" }
+    if ($CheckCmd) { $leagueArgs += " --check-cmd `"$CheckCmd`"" }
+    if ($CheckAnytime) { $leagueArgs += " --check-anytime" }
+    if ($NoWatch) { $leagueArgs += " --no-watch" }
+}
 
 if ($DryRun) {
     Push-Location $root
@@ -52,6 +67,10 @@ function Launch([string]$argsText, [string]$log, [string]$what) {
     Write-Output $line
 }
 
+if ($Night) {
+    Launch $leagueArgs "results\v3\r9\logs\night.log" "night r9"
+    return
+}
 Launch $leagueArgs "results\v3\r9\logs\league.log" "league r9"
 if (-not $NoWatch) {
     $watchArgs = "results/v3/r9/watch_r9.py --interval 300"

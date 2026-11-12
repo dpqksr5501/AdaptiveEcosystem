@@ -4,7 +4,8 @@ AdaptiveEcosystem/Docs/RL_Policy/RL_R9_MULTISPECIES_DESIGN.md 7-3·7-4·7-7·7-1
     venv = R9VecEnv(cfg, learner="deer", model_seed=0, round_=1, pool={"wolf": [npz…], "boar": [npz…]})
 
 - Learner slots (7-3): world k holds `learner_counts[sp][k mod len]` learners — every individual of the learning species is a
-  learner slot. SB3 envs = Σ_k counts (deer 1,280 · boar 768 · wolf 384), world-major then slot order (`R9World.learner_index`).
+  learner slot. SB3 envs = Σ_k counts (deer 896 (S′ N: 32 worlds × 16·24·32·40) · boar 768 · wolf 384), world-major then slot
+  order (`R9World.learner_index`). Observation = 115 columns (S′ 4절).
   Train worlds respawn at once, so the learner slots are always alive and the env count never changes.
 - Staggered renew (R8 `r8_vec_env.py` `_staggered`·`_pick`·`_renew`): world k starts aged k·T/K decisions, T = reset_steps / 2
   = 2,500 decisions; a renewed world gets a new seed (meta RNG, from the train pool, not one of the other running seeds) AND a
@@ -21,12 +22,14 @@ AdaptiveEcosystem/Docs/RL_Policy/RL_R9_MULTISPECIES_DESIGN.md 7-3·7-4·7-7·7-1
   in-bundle snapshots already written; the trainer calls `set_segment(i)` at each snapshot, so the picks after snapshot i come from
   the stream (model, round, i, species). The first segment is 0 (bundle start). Same arguments → same seeds and opponents.
 - Wolf world shards (7-3, test 21): `shards = n` splits the K worlds into n contiguous blocks; block 0 runs in this process,
-  blocks 1.. in worker processes (`python -m env_v2.r9_vec_env --shard-worker`, no window, MKL/OMP 1 thread, named pipe). All meta
+  blocks 1.. in worker processes (`python -m env_v2.r9_vec_env --shard-worker`, no window, MKL/OMP 1 thread, named pipe, no
+  bytecode written into the repository). Workers import the same repository modules (r9_world · r9_brains · r9_body), so every
+  shard runs the same S′ world as block 0 (test: tests/test_r9_s_world.py worker check). All meta
   decisions (seeds, opponents, renew times) are made here in world order, and a world's trajectory depends only on its seed,
   counts and controllers (worlds own their RNG streams; fixed brains run one same-shape block per world, 7-10), so the result
   does not depend on the shard count. Concatenation order is fixed (block 0, 1, …).
 - Hidden-label stats for the training log only (never part of the observation): learner prey decisions whose nearest sensed
-  other is a wolf within 10 units (flee share = RUN or SHELTER), boar decisions walking toward a non-approaching wolf (9-5).
+  other is a wolf within 10 units (flee share = RUN — S′: SHELTER is standing, not fleeing), boar decisions walking toward a non-approaching wolf (9-5).
 - Judge seeds 44800~44999 are refused (9-2 판정 시드 잠금, test 25).
 """
 
@@ -174,7 +177,7 @@ class _ShardCore:
         b = self._brains.get(key)
         if b is None:
             if kind == "rule":
-                b = BR.make_rule(name, self.cfg)
+                b = BR.make_rule(name, self.cfg, sp)                # sp: food_here threshold (ALWAYS_EAT serves deer and boar)
             elif kind == "mlp":
                 b = BR.load_brain(Path(name), self.cfg, sp)      # body-hash check (test 27)
             else:
@@ -210,7 +213,7 @@ class _ShardCore:
         dist = ob[:, B.other_col(0, "dist")].astype(np.float64) * float(B.OBS_NORM["pos"])
         near = is_wolf & (dist <= NEAR_WOLF_R)
         act = a[ek, es]
-        flee = np.isin(act, B.ACTION_GROUPS["run"]) | (act == B.SHELTER)
+        flee = np.isin(act, B.ACTION_GROUPS["run"])            # S′ 검토 low: SHELTER = 제자리 서기라 도망이 아니다
         st["near_wolf"] += float(near.sum())
         st["near_wolf_flee"] += float((near & flee).sum())
         if self.sp == B.BOAR:
@@ -228,7 +231,7 @@ class _ShardCore:
 
     def step(self, la: np.ndarray, renews: list) -> tuple:
         """la (n,) learner actions in learner_index order; renews [(k_local, seed, counts_row, specs)] applied after the step.
-        Returns (obs_post (n, 107), rew (n,), done (n,), term {k_local: obs_pre block})."""
+        Returns (obs_post (n, 115), rew (n,), done (n,), term {k_local: obs_pre block})."""
         w = self.world
         a = w.decide(learner_sp=self.sp, learner_actions=np.asarray(la, dtype=np.int64))
         if self.online:
@@ -318,7 +321,8 @@ class _RemoteShard:
         key = secrets.token_bytes(16)
         tag = f"r9shard-{os.getpid()}-{secrets.token_hex(6)}"
         address = rf"\\.\pipe\{tag}" if os.name == "nt" else str(Path("/tmp") / tag)
-        env = dict(os.environ, PYTHONUTF8="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1")
+        env = dict(os.environ, PYTHONUTF8="1", OMP_NUM_THREADS="1", MKL_NUM_THREADS="1", OPENBLAS_NUM_THREADS="1",
+                   PYTHONDONTWRITEBYTECODE="1")
         flags = 0
         if os.name == "nt":
             flags = subprocess.CREATE_NO_WINDOW

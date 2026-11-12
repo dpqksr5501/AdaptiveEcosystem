@@ -1,0 +1,99 @@
+{
+ "set": "mix",
+ "note": "앞 시도 측정 (2026-11-12 14:25~15:01, 같은 코드): 다른 세션의 무거운 python 이 겹쳐 돈 때가 있다(other_python) — 기록만, 등록에 쓰지 않음",
+ "time": "2026-11-12 14:33:33",
+ "wall_s": 479.22552585601807,
+ "min_available_gb": 10.452068328857422,
+ "min_free_commit_gb": 7.941005706787109,
+ "cpu_sys_mean": null,
+ "ue_seen": null,
+ "aborted_low_commit": null,
+ "other_python_at_start": [
+  "사용자 python ortholoc",
+  "다른 세션의 무거운 python: bench_e_obs.py"
+ ],
+ "other_python_at_end": [
+  "사용자 python ortholoc"
+ ],
+ "max_r9_python": 4,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "deer_A",
+   "species": "deer",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1003520,
+   "wall_s": 132.53031730651855,
+   "dec_per_s": 7572.003300037685,
+   "log_dec_per_s": [
+    7648,
+    1629
+   ],
+   "num_envs": 896,
+   "memory": [
+    {
+     "pid": 1812,
+     "peak_mb": 367.05078125,
+     "private_mb": 325.72265625
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "boar_A",
+   "species": "boar",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 357.7109169960022,
+   "dec_per_s": 2885.547940969148,
+   "log_dec_per_s": [
+    2894,
+    2642
+   ],
+   "num_envs": 768,
+   "memory": [
+    {
+     "pid": 36524,
+     "peak_mb": 462.62109375,
+     "private_mb": 357.25390625
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "wolf_A_s2",
+   "species": "wolf",
+   "round": 0,
+   "shards": 2,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 463.8399097919464,
+   "dec_per_s": 2225.3195083255896,
+   "log_dec_per_s": [
+    2225,
+    2236
+   ],
+   "num_envs": 384,
+   "memory": [
+    {
+     "pid": 16096,
+     "peak_mb": 422.14453125,
+     "private_mb": 349.94921875
+    },
+    {
+     "pid": 41688,
+     "peak_mb": 330.90234375,
+     "private_mb": 242.2109375
+    }
+   ],
+   "error": ""
+  }
+ ]
+}

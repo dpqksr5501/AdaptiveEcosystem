@@ -1,13 +1,39 @@
 {
- "registered": "2026-11-11 C0-9 (results/v3/r9/STATUS.md 3절) — 학습 전 등록, 바꾸지 않음",
+ "registered": "2026-11-12 C0-9 다시 등록 (S′ 세계, results/v3/r9/STATUS.md 3절) — 학습 전 등록, 바꾸지 않음",
  "round0": {
-  "deer": 150000000,
-  "boar": 44500000,
-  "wolf": 54100000
+  "deer": 80300000,
+  "boar": 30300000,
+  "wolf": 38800000
  },
  "later": {
-  "deer": 33700000,
-  "boar": 10000000,
-  "wolf": 10600000
+  "deer": 19400000,
+  "boar": 7200000,
+  "wolf": 7300000
+ },
+ "speed_dps": {
+  "round0": {
+   "deer": 6376,
+   "boar": 2404,
+   "wolf": 2693
+  },
+  "later": {
+   "deer": 7199,
+   "boar": 2659,
+   "wolf": 2704
+  }
+ },
+ "wolf_shards": 3,
+ "superseded": {
+  "registered": "2026-11-11 C0-9 (처음 세계, 관측 107·EAT 걷기) — 폐기",
+  "round0": {
+   "deer": 150000000,
+   "boar": 44500000,
+   "wolf": 54100000
+  },
+  "later": {
+   "deer": 33700000,
+   "boar": 10000000,
+   "wolf": 10600000
+  }
  }
 }

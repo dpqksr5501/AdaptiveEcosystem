@@ -109,7 +109,7 @@ def test_17_learner_slice_counts_and_actions(cfg):
     # 7-3: the design's learner env totals with the configured world counts
     tot = {n: sum(cfg["learner_counts"][n][k % len(cfg["learner_counts"][n])] for k in range(cfg["train"]["worlds"][n]))
            for n in B.SPECIES}
-    assert tot == {"deer": 1280, "wolf": 384, "boar": 768}
+    assert tot == {"deer": 896, "wolf": 384, "boar": 768}                 # S′ N (2026-11-12): 사슴 16·24·32·40 (예전 1,280)
     for n in B.SPECIES:
         assert (cfg["train"]["n_steps"][n] * tot[n]) % 4096 == 0
 

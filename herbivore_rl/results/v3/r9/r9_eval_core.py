@@ -15,6 +15,7 @@ Rules
 from __future__ import annotations
 
 import bisect
+import collections
 import hashlib
 import json
 import math
@@ -62,15 +63,22 @@ BLOCK_SHARE_FLAG = 0.2
 # attempt per (wolf, target) approach segment, a block per 5 s scan. Fix 단계 검토(medium 둘)는 둘 다 실제 뜻보다 부풀려진다고
 # 보았다 — 고르는 것은 사용자 몫이라 기본은 문서대로 두고, 다른 정의(같은 늑대의 겹친 구간을 묶은 시도 · 대기 한 번에 한 번
 # 센 막힘)는 늘 함께 계산해 보고한다. eval_r9.py --hunt-def episode / --block-def once 로 바꾼다 (결과 파일에 defs 로 남김).
-DEFS = dict(hunt="pair", block="scan")
-HUNT_DEFS = ("pair", "episode")
+# S′ (2026-11-12 정함, STATUS 0절 2·3, 사양서 8-2): 사냥 시도의 주 정의는 strict(같은 늑대의 겹친 '사냥 구간' 묶음 — 거르기 → 묶기,
+# '느낀 사체 칸 쪽 걷기·뛰기'는 사체로 가는 중). pair·episode 는 보고만. 막힘의 주 기준은 같은 시드 L0 짝 비교(eval_r9 m_c07·judge_verdict)이고
+# scan·once 막힘 몫은 적기만 한다 (block 은 그 적는 몫의 셈).
+DEFS = dict(hunt="strict", block="scan")
+HUNT_DEFS = ("strict", "pair", "episode")
 BLOCK_DEFS = ("scan", "once")
-OUT_OF_RANGE = (64, 6, 14)            # 3-6 학습 범위 밖: 사분면 사슴 > 64·늑대 > 6·멧돼지 > 14
+OUT_OF_RANGE = (40, 6, 14)            # 3-6 학습 범위 밖 (S′ N: 학습 사슴 16~40): 사분면 사슴 > 40·늑대 > 6·멧돼지 > 14
+SHIELD_LAG = 450                      # 8-4 방패 우연 기준: 같은 세계 450 스텝 전 성체 멧돼지 자리 (시간 밀기, 11-12 정함)
+WOLF_RING = 1024                      # 늑대 결정 기록 고리 (결정 수) — strict 구간 거르기용. 구간이 이보다 길면 ring_overflow 로 센다
+J3_MIN_STRICT = 100                   # 8-2 최소 표본: strict 사냥 시도 100
 NEWBORN_WINDOW = 300                  # 새끼 첫 300 스텝
 RESPAWN_EXCLUDE = 300                 # 8-4 구석 지키기: 다시 난 뒤 300 스텝 뺌
 ARENA_WINDOW = 200                    # 8-4 무대 악용: 다시 난 뒤 200 스텝
 WALL_BAND = 4.0
-FLEE_ACTIONS = tuple(range(B.RUN_FIRST, B.RUN_LAST + 1)) + (B.SHELTER,)
+# 8-3 '도망' = 뛰기 (S′ 검토 low: S′ 에서 SHELTER 는 제자리 서기라 도망으로 세지 않는다 — 처음 판은 RUN + SHELTER)
+FLEE_ACTIONS = tuple(range(B.RUN_FIRST, B.RUN_LAST + 1))
 SPLIT_SALT = 0x5239_4A31_0000_0001    # J1 해시 배정 (8-1) — 값 자체는 [어림](고정 상수면 됨)
 SPLIT_SALT2 = 0x5239_4A31_0000_0002
 
@@ -102,6 +110,32 @@ def assert_not_judge_seeds(seeds, who: str) -> None:
     if bad:
         raise JudgeSeedError(f"{who}: 판정 시드 {bad[:5]}{'…' if len(bad) > 5 else ''} (44800~44999) 는 판정(eval_r9.py judge·mixed, "
                              f"잠금 파일)만 쓴다 — 개발 44000~44199·점검 44200~44299·시험 44350~44399 를 쓴다")
+
+
+def assert_calib_seeds(seeds, who: str) -> None:
+    """S′ 검토 low: calibration (C0 gates, C0-10 measurement) refuses judge seeds and also the league check range 44200~44299 and the
+    training pool 43000~43999 (10절 — 점검·학습 시드는 그 용도만). Pick 44000~44049·44100~44139, confirm 44050~44099·44140~44179,
+    smoke 44180~44199 and the test range 44350~44399 (unit tests) stay allowed."""
+    assert_not_judge_seeds(seeds, who)
+    s = np.asarray(list(seeds), dtype=np.int64).reshape(-1)
+    for name in ("check", "train_pool"):
+        lo, hi = SEED_RANGES[name]
+        bad = [int(x) for x in s if lo <= x <= hi]
+        if bad:
+            raise JudgeSeedError(f"{who}: 시드 {bad[:5]}{'…' if len(bad) > 5 else ''} 는 {name} 범위 {lo}~{hi} — 보정 관문은 고르기·확인·스모크 "
+                                 f"시드만 쓴다 (10절)")
+
+
+def warn_calib_seeds(seeds, who: str) -> bool:
+    """S′ 검토 low: dev tools (leak · scenes · anomaly) print a warning when they use the calibration pick/confirm seeds 44000~44179
+    (STATUS keeps them unused until the C0 gates). Returns True when it warned."""
+    s = np.asarray(list(seeds), dtype=np.int64).reshape(-1)
+    lo, hi = SEED_RANGES["pick_train"][0], SEED_RANGES["confirm_judge"][1]
+    hit = [int(x) for x in s if lo <= x <= hi]
+    if hit:
+        print(f"[경고] {who}: 보정 관문 고르기·확인 시드 {hit[0]}…({len(hit)} 개, {lo}~{hi}) 를 쓴다 — 보정 전에는 스모크 44180~44199 를 쓴다 (10절)",
+              flush=True)
+    return bool(hit)
 
 
 def judge_seed_mode(seeds, allowed: tuple[int, int], who: str) -> bool:
@@ -305,19 +339,35 @@ def load_brains(paths: dict[str, str], cfg: dict) -> dict[str, BR.Brain]:
 _RULE_CACHE: dict = {}
 
 
-def rule_brain(name: str, cfg: dict) -> BR.RuleBrain:
-    key = (name, id(cfg))
+def rule_brain(name: str, cfg: dict, sp: int | None = None) -> BR.RuleBrain:
+    """S′ rule brain (r9_brains.make_rule). sp = the species it decides for (food_here threshold; ALWAYS_EAT needs it)."""
+    key = (name, id(cfg), None if sp is None else int(sp))
     if key not in _RULE_CACHE:
-        _RULE_CACHE[key] = BR.make_rule(name, cfg)
+        _RULE_CACHE[key] = BR.make_rule(name, cfg, sp)
     return _RULE_CACHE[key]
 
 
+@dataclass
+class WatchBrain(BR.Brain):
+    """'늘 살피기' (늘 WATCH, 고정 행동) — C0-10 늑대 보상 짝 차의 대조 두뇌(9-1). 규칙 두뇌 이름(RULE_NAMES)이 아니라 평가 전용."""
+
+    def decide(self, obs, u, stochastic, state, ctx):
+        n = np.asarray(obs).shape[0]
+        return np.full(n, B.WATCH, np.int64), np.full(n, np.inf)
+
+
+WATCH_ONLY = "WATCH_ONLY"
+
+
 def brain_for(spec: str, sp: int, cfg: dict, brains: dict[str, BR.Brain]) -> BR.Brain:
-    """spec = rule name (RULE_NAMES) | 'rule' (the species' RULE_*) | branch 'A'/'B'/'-' (from --brain) | path.npz."""
+    """spec = rule name (RULE_NAMES) | 'rule' (the species' RULE_*) | 'WATCH_ONLY' (늘 살피기 대조) | branch 'A'/'B'/'-' (from --brain)
+    | path.npz."""
     if spec == "rule":
         spec = RULE_OF[sp]
+    if spec == WATCH_ONLY:
+        return WatchBrain(name=WATCH_ONLY, kind="rule", species=int(sp))
     if spec in BR.RULE_NAMES:
-        return rule_brain(spec, cfg)
+        return rule_brain(spec, cfg, sp)
     key = f"{spec}:{SPECIES[sp]}"
     if key in brains:
         return brains[key]
@@ -473,13 +523,27 @@ class Recorder:
         self.att_kill = z(K, nW, dt=bool)
         self.att_uid = w.uid[:, self.lo[WOLF]:self.hi[WOLF]].copy()
         self.pack_times: dict[tuple[int, int], list[int]] = {}
+        # strict 사냥 (8-2, S′): 늑대 결정마다 '바꿔 적은 행동 종류' 고리 — 0 서기·EAT·SHELTER, 1 걷기·뛰기, 2 사체로 가는 중(느낀 사체가
+        # 가장 큰 food_dir 칸 쪽 걷기·뛰기), −1 죽어 있음. 관측(food_dir)과 고른 방향만 본다 — 어떤 두뇌에도 같은 식.
+        self._wr_kind = np.full((K, nW, WOLF_RING), -1, dtype=np.int8)
+        self._wr_uid = np.zeros((K, nW, WOLF_RING), dtype=np.int64)
+        self._wk_cur = np.full((K, nW), -1, dtype=np.int8)
+        self._last_dec = -1
+        self._hunt_ptr = 0
+        self._hunt_info: dict[int, tuple[int, int, bool]] = {}
+        self.wolf_dec = z(K, 3)                             # alive wolf decisions, of them move (walk/run), carcass-bound move
+        self.wolf_meat = z(K, 2, dt=np.float64)             # wolf meat units eaten from carcasses: own kill, other (청소, J3 보고)
+        # C0-6 보고 (S′): EAT 스텝 (산 스텝, 서서 먹음, 헛 EAT) · 결정 (산 결정, 먹이 활동 = EAT + 배고프고(E < 0.9) 먹이를 느끼며 걷기)
+        self.eat_steps = z(K, 3, 3)
+        self.forage_dec = z(K, 3, 2)
         # anomaly (8-4) per world
         self.an_corner = z(K, 2)                            # wolf steps (≥ 300 after spawn), in two-wall band
         self.an_edge_stand = z(K, 2)                        # wolf steps, standing within 2 of a shelter edge
         self.an_arena = z(K, 2, 4)                          # [deer, boar] × (steps new, steps other, bites new, bites other)
         self._rflag = z(K, S, dt=bool)
         self._rt = w.resp_t.copy()
-        self.an_shield = z(K, 4)                            # deer n, deer within 3 of adult boar, random n, random within
+        self.an_shield = z(K, 4)                            # deer n, deer within 3 of adult boar, lagged n, within 3 of lagged boars
+        self._shield_hist = collections.deque(maxlen=max(SHIELD_LAG // int(w.D), 1) + 1)   # adult boar spots per decision
         self.an_fight = z(K, 2)                             # adult boar decisions near a non-approaching wolf, walking toward it
         self.resp_far: list[tuple[int, int, float]] = []    # (k, sp, min distance to other species) far-form respawns (4-6)
         # scenes (8-3) per world
@@ -580,10 +644,19 @@ class Recorder:
         self._dec_steps[:] = 0
         self._dec_mating = w.mating.copy()
         self._dec_group = self.group.copy()
+        self._last_dec = self.n_dec
         ki, si = np.nonzero(w.alive)
         if len(ki):
             bins = np.clip((w.E[ki, si] * 100.0).astype(np.int64), 0, 100)
             np.add.at(self.ehist, (ki, self.ssp[si], bins), 1)
+            # C0-6 먹이 활동 몫 (9-1, [어림]): EAT 결정 + (숨은 E < 0.9 이고 food_dir 칸 하나라도 > 0 일 때의 걷기 결정)
+            o = w.obs()
+            ai = np.asarray(a)[ki, si]
+            walk = (ai >= B.WALK_FIRST) & (ai <= B.WALK_LAST)
+            sense = (o[ki, si][:, B.SL_FOOD_DIR] > 0.0).any(-1)
+            forage = (ai == B.EAT) | (walk & (w.E[ki, si] < 0.9) & sense)
+            np.add.at(self.forage_dec, (ki, self.ssp[si], 0), 1)
+            np.add.at(self.forage_dec, (ki, self.ssp[si], 1), forage.astype(np.int64))
         for k in self.traj_worlds:
             tr = self.traj[k]
             tr["pos"].append(w.pos[k].astype(np.float32).copy())
@@ -608,6 +681,19 @@ class Recorder:
         alive = w.alive[:, lo:hi]
         cond = alive & pres & (dd <= 10.0) & run
         uid = w.uid[:, lo:hi]
+        # strict 사냥 (8-2 2): 걷기·뛰기의 방향이 그 결정 관측의 food_dir 가장 큰 칸(0 보다 큼, 같으면 낮은 번호)과 같으면 '사체로 가는 중'.
+        # 늑대의 food_dir 는 사체만 센다. 스크래치 measure_s.Probe(R3) 와 같은 식 (np.argmax = 같으면 낮은 번호).
+        fd = o[:, lo:hi, B.SL_FOOD_DIR]
+        move = (aw >= B.WALK_FIRST) & (aw <= B.RUN_LAST)
+        carc = move & (fd.max(-1) > 0.0) & (fd.argmax(-1) == B.action_dir_index(aw))
+        kind = np.where(~alive, -1, np.where(carc, 2, np.where(move, 1, 0))).astype(np.int8)
+        ri = self.n_dec % WOLF_RING
+        self._wr_kind[:, :, ri] = kind
+        self._wr_uid[:, :, ri] = uid
+        self._wk_cur = kind
+        self.wolf_dec[:, 0] += alive.sum(1)
+        self.wolf_dec[:, 1] += (alive & move).sum(1)
+        self.wolf_dec[:, 2] += (alive & carc).sum(1)
         changed = uid != self.att_uid
         close = (self.att_n > 0) & (~cond | changed)
         if close.any():
@@ -680,9 +766,12 @@ class Recorder:
             mf = vB & adult & (dmin <= 10.0) & ~wappr
             self.an_fight[:, 0] += mf.sum(1)
             self.an_fight[:, 1] += (mf & toward).sum(1)
-        # 8-4 방패: deer within 3 of an adult boar vs the same number of random points (eval RNG per world)
+        # 8-4 방패 (11-12 정함): deer within 3 of an adult boar now ÷ deer within 3 of the adult boar spots of the same world SHIELD_LAG
+        # (450) steps earlier (시간 밀기 — 같은 풀 패치에 모이기만 하는 규칙 두뇌는 1 근처). 지금 몫은 모든 결정, 기준 몫은 밀린 자리가 있는
+        # 결정만 (스크래치 fix_explore synthesis/syn_run.ShieldProbe 와 같은 셈, 결정마다).
         ad = w.alive[:, self.lo[BOAR]:self.hi[BOAR]] & (af[:, self.lo[BOAR]:self.hi[BOAR]] >= 1.0)
         iA, vA = _compact(ad, self.lo[BOAR])
+        self._shield_hist.append((P[kk, iA].copy(), vA.copy()))
         nd = vD.sum(1)
         if vD.any():
             if vA.any():
@@ -692,15 +781,12 @@ class Recorder:
                 within = np.zeros(K, dtype=np.int64)
             self.an_shield[:, 0] += nd
             self.an_shield[:, 1] += within
-            for k in range(K):
-                n = int(nd[k])
-                pts = self.rng_eval[k].uniform(0.0, self.size, (n, 2))
-                self.an_shield[k, 2] += n
-                if n and vA[k].any():
-                    bp = P[k, iA[k, vA[k]]]
-                    dx = pts[:, None, 0] - bp[None, :, 0]
-                    dy = pts[:, None, 1] - bp[None, :, 1]
-                    self.an_shield[k, 3] += int(((dx * dx + dy * dy) <= 9.0).any(1).sum())
+            if len(self._shield_hist) == self._shield_hist.maxlen:
+                PB, vB0 = self._shield_hist[0]
+                self.an_shield[:, 2] += nd
+                if vB0.any():
+                    dist, _ = _pair_dist(P[kk, iD], vD, PB, vB0)
+                    self.an_shield[:, 3] += ((dist <= 3.0).any(-1) & vD).sum(1)
         self._displacement(w)
 
     def _displacement(self, w) -> None:
@@ -761,7 +847,31 @@ class Recorder:
             self.pair_t.append(int(self.n_dec + 1) * self.D)
         if self.split_sp is not None:
             self._split_after(w, rew, done, info)
+        self._scan_hunts(w)
         self.n_dec += 1
+
+    def _scan_hunts(self, w) -> None:
+        """strict 사냥 (8-2 3): 새로 닫힌 다가감 구간마다 그 구간 결정(t0 ~ t1 − D)의 바꿔 적은 행동을 고리에서 센다
+        (스크래치 wolf_s.strict_stats 의 `range(t0 + 2, t1 + 1, 2)` 결정 키 = 결정 시각 + D 와 같은 결정들)."""
+        ev = w.events["hunts"]
+        D = self.D
+        last = self._last_dec
+        while self._hunt_ptr < len(ev):
+            i = self._hunt_ptr
+            h = ev[i]
+            self._hunt_ptr += 1
+            k = int(h["k"])
+            d0 = (int(h["t0"]) - int(self.t0[k])) // D
+            d1 = (int(h["t1"]) - int(self.t0[k])) // D - 1
+            lo_ok = max(d0, last - WOLF_RING + 1, 0)
+            if d1 < lo_ok:
+                self._hunt_info[i] = (0, 0, bool(d0 < lo_ok))
+                continue
+            ds = np.arange(lo_ok, d1 + 1) % WOLF_RING
+            kd = self._wr_kind[k][:, ds]
+            m = (self._wr_uid[k][:, ds] == int(h["wolf_uid"])) & (kd >= 0)
+            v = kd[m]
+            self._hunt_info[i] = (int(len(v)), int((v == 1).sum()), bool(d0 < lo_ok))
 
     def _split_after(self, w, rew, done, info) -> None:
         g = self._dec_group
@@ -837,6 +947,14 @@ class Recorder:
                 np.add.at(self.acc[:, :, :, self.ACC_FIELDS.index("elig")], (ki, self.ssp[si], self._dec_group[ki, si].astype(np.int64)), 1.0)
             self._split_pairs(w, dead, births, t_step)
         self._done_dec |= dead
+        ek = getattr(w, "_ekind", None)
+        if ek is not None:
+            is_eat = alive0 & (w.act == B.EAT)
+            for s in range(3):
+                sl = slice(self.lo[s], self.hi[s])
+                self.eat_steps[:, s, 0] += alive0[:, sl].sum(1)
+                self.eat_steps[:, s, 1] += (is_eat[:, sl] & (ek[:, sl] >= 0)).sum(1)
+                self.eat_steps[:, s, 2] += (is_eat[:, sl] & (ek[:, sl] < 0)).sum(1)
         ev = w.events["bites"]
         while self._bite_ptr < len(ev):
             e = ev[self._bite_ptr]
@@ -918,8 +1036,10 @@ class Recorder:
         lo, hi = self.lo[WOLF], self.hi[WOLF]
         wsl = np.nonzero(w.uid[k, lo:hi] == wu)[0]
         seen = [0, 0, 0]
+        rel_kind = -1
         if len(wsl):
             ws = int(wsl[0]) + lo
+            rel_kind = int(self._wk_cur[k, ws - lo])
             if self.att_n[k, ws - lo] > 0:
                 self.att_kill[k, ws - lo] = True
             pc = self._prev_pc
@@ -936,7 +1056,7 @@ class Recorder:
             share = juv / float(int(m.sum()) + 1)
         self.kills.append(dict(k=k, t=int(e["t"]), wolf_uid=wu, prey_uid=int(e["prey_uid"]), prey_sp=int(e["prey_sp"]),
                                prey_af=float(e["prey_af"]), quad=int(e["quad"]), wolf_E=float(e["wolf_E"]),
-                               wolf_act=int(e["wolf_act"]), seen=seen, juv_share=share))
+                               wolf_act=int(e["wolf_act"]), wolf_rel=rel_kind, seen=seen, juv_share=share))
 
     def _scene_step(self, w, surv, t_step) -> None:
         gu = w._gain_u
@@ -963,6 +1083,8 @@ class Recorder:
                     continue
                 cu = int(w.carc_uid[k, c])
                 if int(self.ssp[s]) == WOLF:
+                    own = int(w.carc_killer[k, c]) == int(w.uid[k, s])
+                    self.wolf_meat[k, 0 if own else 1] += float(gu[k, s, B.MEAT])
                     self.carc_first.setdefault((int(k), cu), float(t_step[k] - w.carc_t[k, c]))
                     key = (int(k), int(w.uid[k, s]), cu)
                     last = self._carc_last.get(key)
@@ -973,15 +1095,18 @@ class Recorder:
     # --- end of run ------------------------------------------------------------
     def finish(self, w: W.R9World) -> dict:
         w.flush_hunts()
+        self._scan_hunts(w)
         close = self.att_n > 2
         self.att[:, 0] += close.sum(1)
         self.att[:, 1] += (close & self.att_kill).sum(1)
         hunts = []
-        for h in w.events["hunts"]:
+        for hi_, h in enumerate(w.events["hunts"]):
             tt = self.pack_times.get((int(h["k"]), int(h["wolf_uid"])), [])
             i = bisect.bisect_left(tt, int(h["t0"]))
             hh = dict(h)
             hh["pack"] = bool(i < len(tt) and tt[i] <= int(h["t1"]))
+            nd, nm, ov = self._hunt_info.get(hi_, (0, 0, False))
+            hh.update(hunt_dec=nd, hunt_move=nm, ring_overflow=ov, hunting=bool(nd > 0 and nm > 0.5 * nd))
             hunts.append(hh)
         G = self.G
         em = float(w.cfg["body_common"]["eat_min"])
@@ -1016,6 +1141,7 @@ class Recorder:
             split_sp=self.split_sp, acc=self.acc, pair_combo=self.pair_combo, birth_combo=self.birth_combo,
             uid_group=[dict(d) for d in self.uid_group],
             band_share=band_shares(w),
+            wolf_dec=self.wolf_dec, wolf_meat=self.wolf_meat, eat_steps=self.eat_steps, forage_dec=self.forage_dec,
             traj={k: {n: np.asarray(v) for n, v in tr.items()} for k, tr in self.traj.items()},
             cov=[(w.cov_c[k][w.cov_ok[k]].copy(), w.cov_r[k][w.cov_ok[k]].copy()) for k in self.traj_worlds],
             grass_cap=[w.grass_cap[k].copy() for k in self.traj_worlds],
@@ -1122,7 +1248,8 @@ def merge_records(recs: list[dict]) -> dict:
     off = np.cumsum([0] + [r["K"] for r in recs[:-1]])
     out["K"] = int(sum(r["K"] for r in recs))
     cat0 = ("start_counts", "final_pair", "food_end", "ehist", "elig", "att", "boar_bites", "rew_sp", "steps_sp", "an_corner", "an_edge_stand", "an_arena", "an_shield",
-            "an_fight", "sc_sated", "sc_pend", "sc_face", "sc_disp", "sc_kin", "sc_cells_pianka", "acc", "pair_combo", "birth_combo")
+            "an_fight", "sc_sated", "sc_pend", "sc_face", "sc_disp", "sc_kin", "sc_cells_pianka", "acc", "pair_combo", "birth_combo",
+            "wolf_dec", "wolf_meat", "eat_steps", "forage_dec")
     for n in cat0:
         out[n] = np.concatenate([r[n] for r in recs], 0)
     for n in ("pop", "pair_hist"):
@@ -1227,6 +1354,93 @@ def hunt_episodes(hunts: list[dict], kills: list[dict], K: int, min_close: int =
     for (k, _u), out in eps.items():
         n_succ[k] += sum(1 for ep in out if ep[2])
     return dict(episodes=n_ep + n_extra, successes=n_succ + n_extra)
+
+
+def _rel_kind(e: dict) -> int:
+    """Kill → the killer's relabelled action kind at that decision (Recorder `wolf_rel`: 0 서기·EAT·SHELTER, 1 걷기·뛰기, 2 사체로 가는 중).
+    Older records without it: the recorded action (walk/run → 1) [대용 — 바꿔 적기 없음]."""
+    r = int(e.get("wolf_rel", -1))
+    if r >= 0:
+        return r
+    a = int(e.get("wolf_act", -1))
+    return 1 if B.WALK_FIRST <= a <= B.RUN_LAST else 0
+
+
+def strict_stats(hunts: list[dict], kills: list[dict], K: int, min_close: int = W.HUNT_MIN_DECISIONS) -> dict:
+    """8-2 strict 사냥 (S′, 2026-11-12 정함 — STATUS 0절 2·사양서 8-2 1~5). 스크래치 arm_wolf/wolf_s.strict_stats 와 같은 차례:
+    1 다가감 구간(늑대-표적 쌍, n_close > 4) 가운데 2 그 구간 결정의 절반 넘게 걷기·뛰기(사체로 가는 중은 빼고 — Recorder 가 `hunting` 으로
+    적음)인 것만 남기고 3 같은 늑대의 겹친 구간을 하나로 묶는다 = 시도. 4 성공 = 안에 죽임이 있는 묶은 구간 + 구간 밖이어도 걷기·뛰기(바꿔 적은
+    뒤) 중 죽임 하나마다 시도 1·성공 1. 그 밖의 죽임은 우연 죽임. 5 사냥 죽임 = 구간 안 죽임 + 구간 밖 걷기·뛰기 중 죽임.
+    Per-world arrays (K,) for the bootstrap."""
+    seg = [h for h in hunts if int(h["n_close"]) > min_close]
+    by: dict[tuple[int, int], list[list[int]]] = {}
+    z = lambda: np.zeros(K)  # noqa: E731
+    not_hunting = z()
+    for h in seg:
+        if bool(h.get("hunting", False)):
+            by.setdefault((int(h["k"]), int(h["wolf_uid"])), []).append([int(h["t0"]), int(h["t1"])])
+        else:
+            not_hunting[int(h["k"])] += 1
+    eps: dict[tuple[int, int], list[list[int]]] = {}
+    for key, iv in by.items():
+        iv.sort()
+        mm: list[list[int]] = []
+        for a_, b_ in iv:
+            if mm and a_ <= mm[-1][1]:
+                mm[-1][1] = max(mm[-1][1], b_)
+            else:
+                mm.append([a_, b_])
+        eps[key] = mm
+    att, suc, inside, out_move, inc, n_ep = z(), z(), z(), z(), z(), z()
+    for (k, _u), mm in eps.items():
+        att[k] += len(mm)
+        n_ep[k] += len(mm)
+    hit = set()
+    for e in kills:
+        k = int(e["k"])
+        key = (k, int(e["wolf_uid"]))
+        found = None
+        for i, (a_, b_) in enumerate(eps.get(key, [])):
+            if a_ <= int(e["t"]) <= b_:
+                found = i
+                break
+        if found is not None:
+            inside[k] += 1
+            if (key, found) not in hit:
+                hit.add((key, found))
+                suc[k] += 1
+            continue
+        if _rel_kind(e) == 1:
+            att[k] += 1
+            suc[k] += 1
+            out_move[k] += 1
+        else:
+            inc[k] += 1
+    return dict(attempts=att, successes=suc, kills_inside=inside, kills_outside_move=out_move, hunt_kills=inside + out_move,
+                incidental=inc, episodes=n_ep,
+                segments=len(seg), segments_not_hunting=not_hunting,
+                ring_overflow=int(sum(1 for h in seg if h.get("ring_overflow"))))
+
+
+def kill_kappas(rec: dict) -> dict:
+    """8-2 κ (죽임 / 늑대-일) 묶음: 모든 죽임(= 하루 잡이), strict 사냥 죽임, 우연 죽임, 보고만 — 죽인 순간 뛰던 죽임(RUN 중), 같은 먹잇감에
+    4 결정 넘게 다가간 죽임(궤적 κ: 그 늑대·그 표적 구간이 죽임으로 끝남, n_close > 4). 세계 되뽑기 구간."""
+    K = int(rec["K"])
+    wd = rec["st"]["alive_steps"][:, WOLF].astype(np.float64) / float(B.DAY_STEPS)
+    ss = strict_stats(rec["hunts"], rec["kills"], K)
+    seg = {(int(h["k"]), int(h["wolf_uid"]), int(h["target_uid"])): h for h in rec["hunts"] if h.get("end") == "kill"}
+    allk, run, traj = np.zeros(K), np.zeros(K), np.zeros(K)
+    for e in rec["kills"]:
+        k = int(e["k"])
+        allk[k] += 1
+        run[k] += B.RUN_FIRST <= int(e.get("wolf_act", -1)) <= B.RUN_LAST
+        h = seg.get((k, int(e["wolf_uid"]), int(e["prey_uid"])))
+        traj[k] += h is not None and int(h["n_close"]) > W.HUNT_MIN_DECISIONS
+    out = dict(wolf_days=float(wd.sum()))
+    for nm, num in (("all", allk), ("hunt", ss["hunt_kills"]), ("incidental", ss["incidental"]), ("run", run), ("traj4", traj)):
+        v, ci = boot_ratio(num, wd)
+        out[nm] = dict(kappa=v, ci=ci, n=int(num.sum()))
+    return out
 
 
 def juvenile_index(kills: list[dict], K: int) -> dict:
@@ -1363,18 +1577,25 @@ def j3_metrics(rec: dict) -> dict:
     sr_pair, sr_pair_ci = boot_ratio(h["successes"], h["segments"])
     he = hunt_episodes(rec["hunts"], rec["kills"], K)
     sre, sre_ci = boot_ratio(he["successes"], he["episodes"])
+    ss = strict_stats(rec["hunts"], rec["kills"], K)
+    srs, srs_ci = boot_ratio(ss["successes"], ss["attempts"])
     hunt_def = DEFS["hunt"]
     if hunt_def == "episode":
         sr, sr_ci, n_att = sre, sre_ci, float(he["episodes"].sum())
-    else:
+    elif hunt_def == "pair":
         sr, sr_ci, n_att = sr_pair, sr_pair_ci, float(h["segments"].sum())
+    else:
+        sr, sr_ci, n_att = srs, srs_ci, float(ss["attempts"].sum())
+    kk = kill_kappas(rec)
+    wm = np.asarray(rec.get("wolf_meat", np.zeros((K, 2))), dtype=np.float64)
+    scav = float(wm[:, 1].sum() / wm.sum()) if wm.sum() > 0 else float("nan")
     dk, dk_ci = boot_ratio(h["kills"], wolf_steps / float(B.DAY_STEPS))
     jv = juvenile_index(rec["kills"], K)
     ji, ji_ci = boot_ratio(jv["young"], jv["share"])
     n_seg, n_kill, n_boar = float(h["segments"].sum()), float(h["kills"].sum()), float(jv["n"].sum())
     lo_s, hi_s = J3_BANDS["success"]
     lo_d, hi_d = J3_BANDS["daily_kill"]
-    ok = dict(success=bool(n_att >= J3_MIN_N["segments"] and math.isfinite(sr) and lo_s <= sr <= hi_s),
+    ok = dict(success=bool(n_att >= (J3_MIN_STRICT if hunt_def == "strict" else J3_MIN_N["segments"]) and math.isfinite(sr) and lo_s <= sr <= hi_s),
               daily_kill=bool(n_kill >= J3_MIN_N["kills"] and math.isfinite(dk) and lo_d <= dk <= hi_d),
               juv_index=bool(n_boar >= J3_MIN_N["boar_kills"] and math.isfinite(ji) and ji >= J3_BANDS["juv_index_min"]))
     comp = np.zeros(3)
@@ -1382,6 +1603,12 @@ def j3_metrics(rec: dict) -> dict:
         comp[int(e["prey_sp"])] += 1
     return dict(
         success_rate=sr, success_ci=sr_ci, hunt_def=hunt_def, attempts=int(n_att),
+        success_rate_strict=srs, success_strict_ci=srs_ci, strict_attempts=int(ss["attempts"].sum()),
+        strict_successes=int(ss["successes"].sum()), strict_kills_inside=int(ss["kills_inside"].sum()),
+        strict_kills_outside_move=int(ss["kills_outside_move"].sum()), incidental_kills=int(ss["incidental"].sum()),
+        segments_not_hunting=int(ss["segments_not_hunting"].sum()), hunt_ring_overflow=ss["ring_overflow"],
+        kappa_hunt=kk["hunt"]["kappa"], kappa_hunt_ci=kk["hunt"]["ci"], kappa_incidental=kk["incidental"]["kappa"],
+        kappa_run=kk["run"]["kappa"], kappa_traj4=kk["traj4"]["kappa"], scavenge_share=scav,
         success_rate_pair=sr_pair, success_pair_ci=sr_pair_ci, segments=int(n_seg), successes=int(h["successes"].sum()),
         short_kills=int(h["short_kills"].sum()), success_rate_episode=sre, success_episode_ci=sre_ci,
         episodes=int(he["episodes"].sum()), daily_kill=dk, daily_kill_ci=dk_ci, kills=int(n_kill),
@@ -1392,11 +1619,13 @@ def j3_metrics(rec: dict) -> dict:
         juv_raw_share=float(jv["young"].sum()) / n_boar if n_boar else float("nan"),
         prey_share={SPECIES[s]: (float(comp[s]) / n_kill if n_kill else float("nan")) for s in (DEER, BOAR)},
         old_attempts=int(rec["att"][:, 0].sum()), old_success=ratio(rec["att"][:, 1], rec["att"][:, 0]),
-        ok=ok, insufficient={k: v for k, v in dict(success=n_att < J3_MIN_N["segments"], daily_kill=n_kill < J3_MIN_N["kills"],
+        ok=ok, insufficient={k: v for k, v in dict(success=n_att < (J3_MIN_STRICT if hunt_def == "strict" else J3_MIN_N["segments"]),
+                                                       daily_kill=n_kill < J3_MIN_N["kills"],
                                                        juv_index=n_boar < J3_MIN_N["boar_kills"]).items() if v},
         passed=int(sum(ok.values())), J3=bool(sum(ok.values()) >= 2),
         per_world=dict(segments=h["segments"].tolist(), successes=h["successes"].tolist(), kills=h["kills"].tolist(),
-                       wolf_steps=wolf_steps.tolist()),
+                       wolf_steps=wolf_steps.tolist(), strict_attempts=ss["attempts"].tolist(), strict_successes=ss["successes"].tolist(),
+                       hunt_kills=ss["hunt_kills"].tolist()),
     )
 
 
@@ -1475,6 +1704,7 @@ def population_metrics(rec: dict) -> dict:
         start={SPECIES[s]: float(start[:, s].mean()) for s in range(3)},
         end_mean={SPECIES[s]: (float(tot[-1, :, s].mean()) if T else float("nan")) for s in range(3)},
         end_ratio={SPECIES[s]: (float(tot[-1, :, s].sum() / max(start[:, s].sum(), 1.0)) if T else float("nan")) for s in range(3)},
+        end_worlds=(tot[-1].astype(int).tolist() if T else start.astype(int).tolist()),
         cv_second_half={SPECIES[s]: float(np.nanmedian(cv[:, s])) if np.isfinite(cv[:, s]).any() else float("nan") for s in range(3)},
         minmax_second_half={SPECIES[s]: float(np.nanmedian(mm[:, s])) if np.isfinite(mm[:, s]).any() else float("nan") for s in range(3)},
         wolf_lag_steps_median=float(np.median(lags)) if lags else float("nan"),
@@ -1490,7 +1720,8 @@ def population_metrics(rec: dict) -> dict:
         paired={SPECIES[s]: int(paired_s) for s, paired_s in enumerate(bs["paired"].sum(0))},
         failed={SPECIES[s]: int(np.asarray(life["failed"])[:, :, s].sum()) for s in range(3)},
         cancelled={SPECIES[s]: int(np.asarray(life["cancelled"])[:, :, s].sum()) for s in range(3)},
-        rule_backed=bool(math.isfinite(sh_all) and sh_all >= BLOCK_SHARE_FLAG),
+        # S′ (11-12): '규칙이 받친 공존'의 주 기준은 같은 시드 L0 짝 비교(l0_change) — 막힘 몫 ≥ 0.2 는 적기만 (rule_backed_block)
+        rule_backed_block=bool(math.isfinite(sh_all) and sh_all >= BLOCK_SHARE_FLAG),
         food_end=dict(grass_mean=float(np.mean(rec["food_end"][:, 0])), root_mean=float(np.mean(rec["food_end"][:, 1])),
                       grass_empty=float(np.nanmean(rec["food_end"][:, 2])), root_empty=float(np.nanmean(rec["food_end"][:, 3]))),
         out_of_train_range=oor, near_ties=int(st["near_ties"].sum()),
@@ -1518,7 +1749,10 @@ def scene_metrics(rec: dict) -> dict:
         return logistic_slope(xs[r], ys[r])
     slope_ci = boot_ci(_sl, K, B_=500) if len(xs) >= 10 else [float("nan"), float("nan")]
     ee = rec["st"]["eaten_e"].sum(0)                                   # (3, 3)
-    pk = pianka(ee[DEER] / max(ee[DEER].sum(), 1e-12), ee[BOAR] / max(ee[BOAR].sum(), 1e-12)) if ee[DEER].sum() > 0 and ee[BOAR].sum() > 0 else float("nan")
+    pk_e = pianka(ee[DEER] / max(ee[DEER].sum(), 1e-12), ee[BOAR] / max(ee[BOAR].sum(), 1e-12)) if ee[DEER].sum() > 0 and ee[BOAR].sum() > 0 else float("nan")
+    # 8-3 (11-12): 식단 겹침은 먹은 양(먹이 단위) 몫 — C0-5 와 같은 단위. 세계가 센 단위(eaten_units = 에너지 ÷ 그 몸의 단위당 E). 에너지 몫은 함께
+    eu = rec["st"]["eaten_units"].sum(0)
+    pk = pianka(eu[DEER] / max(eu[DEER].sum(), 1e-12), eu[BOAR] / max(eu[BOAR].sum(), 1e-12)) if eu[DEER].sum() > 0 and eu[BOAR].sum() > 0 else float("nan")
     disp = rec["sc_disp"].sum(0)                                       # (2 types, 2)
     sated = rec["sc_sated"].sum(0)
     d_sated, rho_sated = delta_strata(sated)
@@ -1535,7 +1769,7 @@ def scene_metrics(rec: dict) -> dict:
         return [float(x) / n for x in c] if n else [float("nan")] * len(c)
     return dict(
         prey_switch_slope=slope, prey_switch_ci=slope_ci, prey_switch_n=int(len(xs)),
-        diet_pianka=pk, cell_pianka=float(np.nanmean(rec["sc_cells_pianka"])) if np.isfinite(rec["sc_cells_pianka"]).any() else float("nan"),
+        diet_pianka=pk, diet_pianka_energy=pk_e, cell_pianka=float(np.nanmean(rec["sc_cells_pianka"])) if np.isfinite(rec["sc_cells_pianka"]).any() else float("nan"),
         leave_after_boar=float(disp[0, 1] / disp[0].sum()) if disp[0].sum() else float("nan"),
         leave_after_deer=float(disp[1, 1] / disp[1].sum()) if disp[1].sum() else float("nan"),
         leave_n=[int(disp[0].sum()), int(disp[1].sum())],
@@ -1560,6 +1794,19 @@ def scene_metrics(rec: dict) -> dict:
         nearest_kin={SPECIES[s]: (float(kin[s, 0] / kin[s, 1]) if kin[s, 1] else float("nan")) for s in (DEER, BOAR)},
         pack_segment_share=j3_metrics(rec)["pack_segment_share"],
     )
+
+
+def l0_change(on_end_worlds, l0_end_worlds) -> dict:
+    """같은 시드 L0(상한 끔) 짝 비교 (S′ 주 기준, 8-2·9-2): 종마다 ΣL0 끝 수 ÷ Σ켬 끝 수 − 1 (고른 세계 합). 켬 끝 수 합이 0 이면 nan."""
+    a = np.asarray(on_end_worlds, dtype=np.float64).reshape(-1, 3)
+    b = np.asarray(l0_end_worlds, dtype=np.float64).reshape(-1, 3)
+    if a.shape != b.shape:
+        raise ValueError(f"L0 짝 비교는 같은 세계끼리 — {a.shape} ≠ {b.shape}")
+    out = {}
+    for s in range(3):
+        den = float(a[:, s].sum())
+        out[SPECIES[s]] = float(b[:, s].sum() / den - 1.0) if den > 0 else float("nan")
+    return out
 
 
 def anomaly_metrics(rec: dict) -> dict:

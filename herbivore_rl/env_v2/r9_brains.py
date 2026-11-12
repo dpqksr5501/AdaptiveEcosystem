@@ -4,8 +4,11 @@ Owner: brains agent. Tests: tests/test_r9_brains.py (12절 16·27 + rule brains 
 step — `R9World.step(actions)` takes actions from outside; `R9World.act()` (order 0) is the only caller.
 
 Contract (impl_contract.md §7)
-  - Every brain reads the same 107 observation columns (r9_body.OBS_NAMES, float32) and returns one of 19 actions. No species
+  - Every brain reads the same 115 observation columns (r9_body.OBS_NAMES, float32) and returns one of 19 actions. No species
     number, no hidden state of others. Rule thresholds compare observation values (normalised, 4절; distances in units / 20).
+  - Rule brains (7-5, S′ 'S4' 2026-11-12) are yardsticks, not learners: rules are allowed, but they read the observation only (and
+    their own memory). In the S′ world EAT eats only what is here and SHELTER stands, so a rule that wants food walks toward the
+    largest food_dir column and a rule that wants a shelter walks / runs toward shelter_x·shelter_y — the world never walks for them.
   - `decide_block(ctrl, obs_block, rng, state, ctx)` is called by the world ONCE PER WORLD PER SPECIES with the block
     obs[k, lo_sp:hi_sp] (n = that species' slot cap, dead slots included) so the MKL result does not depend on how many worlds are
     batched (7-10, test 21). It ALWAYS draws `rng.random((n, N_ACTIONS))` first, whatever the brain kind and mode, so swapping
@@ -14,11 +17,12 @@ Contract (impl_contract.md §7)
     logits. Ties → lowest index (np.argmax). Rule brains ignore `stochastic` (RANDOM uses u: argmax(u) = uniform over 19).
   - Near ties (7-10): `gap` = difference of the two largest values the decision maximised (greedy: logits, stochastic: z). The
     world counts gap < NEAR_TIE. Rule brains return inf.
-  - npz: weights W0 (64, 107), B0 (64,), W1 (64, 64), B1, W2 (19, 64), B2 (19,) float32 + `meta_json` (0-d unicode array, no
+  - npz: weights W0 (64, 115), B0 (64,), W1 (64, 64), B1, W2 (19, 64), B2 (19,) float32 + `meta_json` (0-d unicode array, no
     pickle): format, species, branch, round, decisions, obs_names, action_names, io_hash, body_hash, body_table_hash,
     src_zip_sha256, config_digest. `load_brain` rejects format / shape / name / io_hash / species / body_hash (of that species in
     the world config) mismatches with BrainContractError (test 27).
-  - Rule-brain memory (RULE_BOAR flee count-down and face-off flag, RULE_WOLF stamina-lock copy) is int64 (n, n_state) per slot.
+  - Rule-brain memory (RULE_BOAR flee count-down and face-off flag, RULE_WOLF stamina-lock copy, and for every S4 rule two 'stuck'
+    columns: last decision was EAT, food_here × 1e6 then) is int64 (n, n_state) per slot.
     The world keeps it per world·species (bstate[k][sp], zeroes a row when a slot is reset — `Brain.reset_state`). When `state` is
     None the brain uses its own array (`Brain.state`, one world; `Brain.reset(rows)` clears rows) — for tests and single-world use.
 """
@@ -33,9 +37,9 @@ from pathlib import Path
 import numpy as np
 
 from . import r9_body as B
-from .r9_body import (ACTION_NAMES, DIR8, EAT, N_ACTIONS, O_AGE_FRAC, O_ENERGY, O_FOOD_DENSITY, O_FREE0, O_HEALTH, O_SHELTER_EDGE,
-                      O_SHELTER_X, O_SHELTER_Y, O_STAMINA, OBS_DIM, OBS_NAMES, RUN_FIRST, SHELTER, SPECIES, WALK_FIRST, WATCH,
-                      kin_col, other_col)
+from .r9_body import (ACTION_NAMES, DIR8, EAT, N_ACTIONS, O_AGE_FRAC, O_ENERGY, O_FOOD_HERE, O_FREE0, O_HEALTH, O_IN_SHELTER,
+                      O_SHELTER_EDGE, O_SHELTER_X, O_SHELTER_Y, O_STAMINA, OBS_DIM, OBS_NAMES, RUN_FIRST, RUN_LAST, SHELTER,
+                      SL_FOOD_DIR, SPECIES, WALK_FIRST, WALK_LAST, WATCH, kin_col, other_col)
 
 HIDDEN = 64
 NPZ_FORMAT = "eco_r9_brain"
@@ -46,22 +50,29 @@ NPZ_SHAPES = {"W0": (HIDDEN, OBS_DIM), "B0": (HIDDEN,), "W1": (HIDDEN, HIDDEN), 
 META_KEYS = ("species", "branch", "round", "decisions", "obs_names", "action_names", "io_hash", "body_hash", "body_table_hash",
              "src_zip_sha256", "config_digest")
 
-RULE_NAMES = ("RULE_DEER", "RULE_BOAR", "RULE_WOLF", "HIDE_DEER", "HIDE_BOAR", "ALWAYS_EAT", "RANDOM")   # 7-5
+# 7-5 (S′ S4). NOHUNT · NOHUNT_RUN = wolf negative controls of C0-10 (never go to live prey; walk / run toward the sensed carcass).
+RULE_NAMES = ("RULE_DEER", "RULE_BOAR", "RULE_WOLF", "HIDE_DEER", "HIDE_BOAR", "ALWAYS_EAT", "RANDOM", "NOHUNT", "NOHUNT_RUN")
 RULE_SPECIES = {"RULE_DEER": B.DEER, "RULE_BOAR": B.BOAR, "RULE_WOLF": B.WOLF, "HIDE_DEER": B.DEER, "HIDE_BOAR": B.BOAR,
-                "ALWAYS_EAT": None, "RANDOM": None}
-RULE_CFG = {"RULE_DEER": "deer", "RULE_BOAR": "boar", "RULE_WOLF": "wolf", "HIDE_DEER": "hide", "HIDE_BOAR": "hide"}
-RULE_N_STATE = {"RULE_BOAR": 3, "RULE_WOLF": 1}
+                "ALWAYS_EAT": None, "RANDOM": None, "NOHUNT": B.WOLF, "NOHUNT_RUN": B.WOLF}
+RULE_CFG = {"RULE_DEER": "deer", "RULE_BOAR": "boar", "RULE_WOLF": "wolf", "HIDE_DEER": "hide", "HIDE_BOAR": "hide", "NOHUNT": "wolf",
+            "NOHUNT_RUN": "wolf"}
+RULE_N_BASE = {"RULE_BOAR": 3, "RULE_WOLF": 1}          # rule-specific memory columns; every rule adds the 2 stuck columns behind
+N_STUCK = 2
+RULE_N_STATE = {n: RULE_N_BASE.get(n, 0) + N_STUCK for n in RULE_NAMES}
 NEAR_TIE = 1e-5                     # 7-10: decisions whose top-2 gap < 1e-5 are counted
 
 # RULE_BOAR state columns · RULE_WOLF state column
 BS_FLEE_LEFT, BS_FACED, BS_FLEE_DIR = 0, 1, 2
 WS_LOCKED = 0
 PATROL_FREE_MIN = 0.2               # [어림] RULE_WOLF hungry without a target walks straight; if free_0 ≤ this, toward the freest side
+FLOW_MIN = 0.1                      # [어림] search: follow the kin flow when |kin_flow| (/0.6) > this (mean displacement 0.06 units/step)
+KIN_FAR = 5.0                       # [어림] search without flow: toward the nearest kin when it is farther than this (units)
+STUCK_Q = 1e6                       # food_here in the int64 memory at 1e-6 resolution (eating lowers it ≥ 0.008 per decision)
 
 POS_N = float(B.OBS_NORM["pos"])     # 20: observation distance unit
 
 # observation columns used by the rules
-_OC = {f: np.array([other_col(j, f) for j in range(B.N_OTHER)]) for f in B.OBS_OTHER_FIELDS}
+_OC = {f: np.array([other_col(j, f) for j in range(B.N_OTHER)]) for f in B.OBS_OTHER_FIELDS}       # 31 + 11 j + field
 _KC = {f: np.array([kin_col(j, f) for j in range(B.N_KIN)]) for f in B.OBS_KIN_FIELDS}
 _FREE = np.arange(O_FREE0, O_FREE0 + 8)
 
@@ -139,7 +150,7 @@ class Brain:
     state: np.ndarray | None = field(default=None, repr=False)   # own memory when the caller passes state=None
 
     def logits(self, obs: np.ndarray) -> np.ndarray | None:
-        """(n, 107) float32 → (n, 19) float32 logits; rule brains return None."""
+        """(n, 115) float32 → (n, 19) float32 logits; rule brains return None."""
         return None
 
     def new_state(self, n: int) -> np.ndarray:
@@ -172,7 +183,7 @@ class Brain:
         return state
 
     def act(self, obs: np.ndarray, u: np.ndarray, stochastic: bool, state: np.ndarray | None, ctx: dict) -> np.ndarray:
-        """(n, 107) float32 obs, (n, 19) float64 uniforms (already drawn), per-slot state (n, n_state) int64 (mutated in place),
+        """(n, 115) float32 obs, (n, 19) float64 uniforms (already drawn), per-slot state (n, n_state) int64 (mutated in place),
         ctx (e.g. {'facing_f': 0.9}) → actions (n,) int64 in 0..18."""
         return self.decide(obs, u, stochastic, state, ctx)[0]
 
@@ -199,15 +210,32 @@ class MlpBrain(Brain):
 
 @dataclass
 class RuleBrain(Brain):
-    params: dict = field(default_factory=dict)    # cfg['rules'][...] thresholds (distances in units; brain divides by POS_N)
+    """S4 rule brain (observation only). params = cfg['rules'][...] thresholds (distances in units; the brain divides by POS_N) +
+    here_min (the species' food_here threshold, `here_min_of`). Memory = the rule's own n_base columns, then 2 stuck columns:
+    [last decision was EAT, food_here × 1e6 then] — EAT that did not lower food_here (nothing eatable here: food_here also counts
+    residue below eat_min and mixed foods, so the threshold alone cannot tell) is 'stuck' and the seek goes on (time difference of
+    the observation only). blind = [diagnostic] decide with the food_dir columns set to 0."""
+    params: dict = field(default_factory=dict)
+    n_base: int = 0
+    blind: bool = False
 
     def decide(self, obs, u, stochastic, state, ctx):
         o = np.asarray(obs, dtype=np.float64)
+        if o.ndim != 2 or o.shape[1] != OBS_DIM:
+            raise ValueError(f"{self.name}: rule brains need ({OBS_DIM},) observations, got {o.shape}")
+        if self.blind:
+            o = o.copy()
+            o[:, SL_FOOD_DIR] = 0.0
         n = o.shape[0]
         mem = self._mem(n, state)
-        fn = _RULES[self.name]
-        a = fn(o, np.asarray(u, dtype=np.float64), mem, ctx or {}, self.params)
-        return np.asarray(a, dtype=np.int64), np.full(n, np.inf)
+        c0 = self.n_base
+        fhq = np.round(o[:, O_FOOD_HERE] * STUCK_Q).astype(np.int64)
+        p = dict(self.params)
+        p["_stuck"] = (mem[:, c0] == 1) & (fhq >= mem[:, c0 + 1])
+        a = np.asarray(_RULES[self.name](o, np.asarray(u, dtype=np.float64), mem[:, :c0], ctx or {}, p), dtype=np.int64)
+        mem[:, c0] = (a == EAT).astype(np.int64)
+        mem[:, c0 + 1] = fhq
+        return a, np.full(n, np.inf)
 
 
 @dataclass
@@ -231,21 +259,63 @@ def decide_block(ctrl: Controller, obs_block: np.ndarray, rng: np.random.Generat
 
 
 # --------------------------------------------------------------------------- #
-# rule brains (7-5) — observation columns only
+# rule brains (7-5, S′ S4) — observation columns only
 # --------------------------------------------------------------------------- #
 
+_FD = SL_FOOD_DIR
+
+
+def _search(o, p):
+    """No food sensed at all — deterministic search from the observation: follow the kin flow, else toward a far nearest kin, else
+    straight on (toward the freest side when the wall is within 2 units)."""
+    free = o[:, _FREE]
+    ks = B.KINSUM0
+    cnt = o[:, ks] > 0.0
+    fx, fy = o[:, ks + 2], o[:, ks + 3]
+    flow_on = cnt & (fx * fx + fy * fy > FLOW_MIN * FLOW_MIN)
+    j_flow = _dir_index(fx, fy, free, PATROL_FREE_MIN)
+    kx, ky = o[:, kin_col(0, "rel_x")], o[:, kin_col(0, "rel_y")]
+    kfar = (o[:, kin_col(0, "present")] > 0.5) & (kx * kx + ky * ky > (KIN_FAR / POS_N) ** 2)
+    j_kin = _dir_index(kx, ky, free, PATROL_FREE_MIN)
+    j_str = np.where(free[:, 0] > PATROL_FREE_MIN, 0, np.argmax(free, axis=1))
+    j = np.where(flow_on, j_flow, np.where(kfar, j_kin, j_str))
+    return WALK_FIRST + j
+
+
+def seek_obs(o, p):
+    """Food seeking: food_here ≥ here_min and not stuck → EAT; else WALK toward the largest food_dir column; nothing sensed →
+    `_search`."""
+    fh = (o[:, O_FOOD_HERE] >= p["here_min"]) & ~p.get("_stuck", np.zeros(o.shape[0], dtype=bool))
+    fd = o[:, _FD]
+    has = fd.max(1) > 0.0
+    best = np.argmax(fd, axis=1)
+    return np.where(fh, EAT, np.where(has, WALK_FIRST + best, _search(o, p)))
+
+
+def _to_shelter(o, run=True):
+    """(going action, inside, shelter direction known): inside → SHELTER (stand), outside → RUN (or WALK) toward shelter_x·y."""
+    inside = o[:, O_IN_SHELTER] > 0.5
+    sx, sy = o[:, O_SHELTER_X], o[:, O_SHELTER_Y]
+    known = (sx * sx + sy * sy) > 0.25
+    j = _dir_index(sx, sy)
+    go = (RUN_FIRST if run else WALK_FIRST) + j
+    return np.where(inside, SHELTER, np.where(known, go, SHELTER)), inside, known
+
+
 def _rule_deer(o, u, mem, ctx, p):
-    """RULE_DEER: nearest other within 15 and (facing > f and approach > 0.1), or within 10 and approach > 0.15 → flee: SHELTER if
-    the shelter edge is within 8, else the RUN direction closest to 'away' among free_j > 0.2. Otherwise E < 0.9 → EAT, else WATCH.
-    f = ctx['facing_f'] (train world U[0.8, 0.97]) else facing_eval 0.9."""
+    """RULE_DEER: nearest other within 15 and (facing > f and approach > 0.1), or within 10 and approach > 0.15 → flee: inside a
+    shelter → SHELTER; shelter edge within 8 → RUN toward shelter_x·y; else the RUN direction closest to 'away' among free_j > 0.2.
+    Otherwise E < 0.9 → food seeking (`seek_obs`), else WATCH. f = ctx['facing_f'] (train world U[0.8, 0.97]) else facing_eval 0.9."""
     f = float(ctx.get("facing_f", p["facing_eval"]))
     pres = o[:, other_col(0, "present")] > 0.5
     dist, appr, fac = o[:, other_col(0, "dist")], o[:, other_col(0, "approach")], o[:, other_col(0, "facing")]
     trig = pres & (((dist < p["near"] / POS_N) & (fac > f) & (appr > p["approach_far"]))
                    | ((dist < p["close"] / POS_N) & (appr > p["approach_close"])))
     j = _dir_index(-o[:, other_col(0, "rel_x")], -o[:, other_col(0, "rel_y")], o[:, _FREE], p["free_min"])
-    flee = np.where(o[:, O_SHELTER_EDGE] < p["shelter_edge"] / POS_N, SHELTER, RUN_FIRST + j)
-    idle = np.where(o[:, O_ENERGY] < p["full_e"], EAT, WATCH)
+    go_sh, inside, known = _to_shelter(o, run=True)
+    near_sh = o[:, O_SHELTER_EDGE] < p["shelter_edge"] / POS_N
+    flee = np.where(inside, SHELTER, np.where(near_sh & known, go_sh, RUN_FIRST + j))
+    idle = np.where(o[:, O_ENERGY] < p["full_e"], seek_obs(o, p), WATCH)
     return np.where(trig, flee, idle)
 
 
@@ -255,7 +325,7 @@ def _rule_boar(o, u, mem, ctx, p):
         (size < 0.45) within 2 → WALK toward it (face-off); else RUN away for 6 decisions (count-down in memory).
       2 flee count-down left → RUN away from the nearest perceived other (none: straight on, RUN_0, or the freest side).
       3 another within 3.25 walks in (0.1 < approach ≤ 0.33 [어림 approach_walk]) → one decision WALK toward it, then WATCH.
-      4 otherwise E < 0.9 → EAT, else WATCH."""
+      4 otherwise E < 0.9 → food seeking (`seek_obs`), else WATCH."""
     near = p["near"] / POS_N
     pres = o[:, _OC["present"]] > 0.5
     dist, appr, fac = o[:, _OC["dist"]], o[:, _OC["approach"]], o[:, _OC["facing"]]
@@ -280,24 +350,29 @@ def _rule_boar(o, u, mem, ctx, p):
     faced = mem[:, BS_FACED]
     cont = ~has_run & (left > 0)
     walk = ~has_run & ~cont & has_walk
-    a = np.where(o[:, O_ENERGY] < p["full_e"], EAT, WATCH)
+    a = np.where(o[:, O_ENERGY] < p["full_e"], seek_obs(o, p), WATCH)
     a = np.where(walk, np.where(faced == 0, WALK_FIRST + jw_t, WATCH), a)
     a = np.where(cont, RUN_FIRST + j_cont, a)
     a = np.where(has_run, np.where(defend, WALK_FIRST + j_toward, RUN_FIRST + j_away), a)
     n_flee = int(p["flee_decisions"])
-    new_left = np.where(has_run, np.where(defend, 0, n_flee - 1), np.where(cont, left - 1, 0))
-    new_faced = np.where(walk, 1, 0)
-    new_dir = np.where(has_run & ~defend, j_away, np.where(cont, j_cont, mem[:, BS_FLEE_DIR]))
-    mem[:, BS_FLEE_LEFT] = new_left
-    mem[:, BS_FACED] = new_faced
-    mem[:, BS_FLEE_DIR] = new_dir
+    mem[:, BS_FLEE_LEFT] = np.where(has_run, np.where(defend, 0, n_flee - 1), np.where(cont, left - 1, 0))
+    mem[:, BS_FACED] = np.where(walk, 1, 0)
+    mem[:, BS_FLEE_DIR] = np.where(has_run & ~defend, j_away, np.where(cont, j_cont, mem[:, BS_FLEE_DIR]))
     return a
 
 
+def _carcass(o, p, other):
+    """Carcass seeking for a meat-only body: food_here (meat within 1.0) and not stuck → EAT; else WALK toward the largest food_dir
+    column (a sensed carcass); nothing sensed → `other`."""
+    fh = (o[:, O_FOOD_HERE] >= p["here_min"]) & ~p.get("_stuck", np.zeros(o.shape[0], dtype=bool))
+    fd = o[:, _FD]
+    return np.where(fh, EAT, np.where(fd.max(1) > 0.0, WALK_FIRST + np.argmax(fd, axis=1), other))
+
+
 def _rule_wolf(o, u, mem, ctx, p):
-    """RULE_WOLF: a sensed carcass (food_density > 0 — a wolf's diet is meat only and only sensed carcasses count) and E < 0.98 →
-    EAT. E < 0.9 → hunt: target = nearest other outside shelters, preferring size < 0.47 (body < 0.94); beyond 6 → WALK toward it
-    (stalk), within → RUN; stamina locked → WALK. Satiated → WATCH.
+    """RULE_WOLF: E < 0.98 and a carcass here (food_here) → EAT, a sensed carcass (food_dir) → WALK toward it. Otherwise E < 0.9 →
+    hunt: target = nearest other outside shelters, preferring size < 0.47 (body < 0.94); beyond 6 → WALK toward it (stalk), within →
+    RUN; stamina locked → WALK. Satiated → WATCH.
     '은신처 밖' is not observable for others — DECISION [어림, open issue]: my nearest shelter centre is estimated as
     (shelter_x, shelter_y) × (shelter_edge + r_est / 20) with r_est = 5.5 (mean radius); targets within r_est of it are skipped.
     The stamina lock is not observed either: the brain keeps a copy (lock at ≤ stamina_lock, unlock at ≥ stamina_unlock, the body
@@ -326,17 +401,34 @@ def _rule_wolf(o, u, mem, ctx, p):
     free = o[:, _FREE]
     patrol = WALK_FIRST + np.where(free[:, 0] > PATROL_FREE_MIN, 0, np.argmax(free, axis=1))
     a = np.where(E < p["hunt_e"], np.where(has_any, hunt, patrol), WATCH)
-    return np.where((o[:, O_FOOD_DENSITY] > 0) & (E < p["eat_e"]), EAT, a)
+    return np.where(E < p["eat_e"], _carcass(o, p, a), a)
+
+
+def _nohunt(o, u, mem, ctx, p):
+    """NOHUNT (C0-10 negative control, '사체 쪽 걷기'): E < 0.98 → carcass seeking only (food_here → EAT, sensed carcass → WALK
+    toward it), else WATCH. Never goes to live prey (it may still bite by contact — the body rule)."""
+    E = o[:, O_ENERGY]
+    return np.where(E < p["eat_e"], _carcass(o, p, np.full(o.shape[0], WATCH)), WATCH)
+
+
+def _nohunt_run(o, u, mem, ctx, p):
+    """NOHUNT_RUN (C0-10 negative control, '사체 쪽 뛰기'): NOHUNT with every WALK_j replaced by RUN_j."""
+    x = np.asarray(_nohunt(o, u, mem, ctx, p), dtype=np.int64)
+    w = (x >= WALK_FIRST) & (x <= WALK_LAST)
+    return np.where(w, x + (RUN_FIRST - WALK_FIRST), x)
 
 
 def _rule_hide(o, u, mem, ctx, p):
-    """HIDE_DEER · HIDE_BOAR (C0-11 only): any perceived other → SHELTER; none and E < 0.3 → EAT; otherwise SHELTER."""
+    """HIDE_DEER · HIDE_BOAR (C0-11 only): any perceived other → go to a shelter (inside → SHELTER, outside → RUN toward
+    shelter_x·y); none and E < 0.3 → food seeking; otherwise go to a shelter."""
     any_o = (o[:, _OC["present"]] > 0.5).any(1)
-    return np.where(any_o, SHELTER, np.where(o[:, O_ENERGY] < p["eat_e"], EAT, SHELTER))
+    go, _in, _kn = _to_shelter(o, run=True)
+    return np.where(any_o, go, np.where(o[:, O_ENERGY] < p["eat_e"], seek_obs(o, p), go))
 
 
 def _always_eat(o, u, mem, ctx, p):
-    return np.full(o.shape[0], EAT, np.int64)
+    """ALWAYS_EAT: food seeking always (no flight, no shelter, whatever E) — the S′ meaning of the old 'always EAT'."""
+    return seek_obs(o, p)
 
 
 def _random(o, u, mem, ctx, p):
@@ -345,20 +437,41 @@ def _random(o, u, mem, ctx, p):
 
 
 _RULES = {"RULE_DEER": _rule_deer, "RULE_BOAR": _rule_boar, "RULE_WOLF": _rule_wolf, "HIDE_DEER": _rule_hide,
-          "HIDE_BOAR": _rule_hide, "ALWAYS_EAT": _always_eat, "RANDOM": _random}
+          "HIDE_BOAR": _rule_hide, "ALWAYS_EAT": _always_eat, "RANDOM": _random, "NOHUNT": _nohunt, "NOHUNT_RUN": _nohunt_run}
 
 
-def make_rule(name: str, cfg: dict) -> RuleBrain:
-    """Rule brain by name (RULE_NAMES) with thresholds from cfg['rules'] (7-5). RULE_WOLF also copies the body stamina hysteresis
-    (body_common.stamina_lock / stamina_unlock) — the lock it mirrors."""
+def here_min_of(cfg: dict, sp: int) -> float:
+    """Smallest food_here meaning 'something eatable here' for species sp, from its body table (computed once, not in a step):
+    max over its grid foods of e_f × eat_min / food_here_ref (deer 0.06, boar 0.045); a meat-only body: > 0 (1e-9)."""
+    s = cfg["species"][SPECIES[int(sp)]]
+    em = float(cfg["body_common"]["eat_min"])
+    ref = float(s["food_here_ref"])
+    vals = [float(s["e_per_unit"][f]) * em / ref for f in s["diet"] if f in ("grass", "root")]
+    if not vals:
+        return 1e-9
+    return max(vals)
+
+
+def make_rule(name: str, cfg: dict, sp: int | None = None, blind: bool = False) -> RuleBrain:
+    """Rule brain by name (RULE_NAMES) with thresholds from cfg['rules'] (7-5). sp = the species whose block it decides (its body
+    table gives the food_here threshold `here_min_of`); default = the rule's own species. ALWAYS_EAT serves deer and boar, so it needs
+    sp. RULE_WOLF / NOHUNT* also copy the body stamina hysteresis (body_common.stamina_lock / stamina_unlock)."""
     if name not in RULE_NAMES:
         raise ValueError(f"unknown rule brain {name!r} (known: {RULE_NAMES})")
+    own = RULE_SPECIES[name]
+    if sp is None:
+        if name == "ALWAYS_EAT":
+            raise ValueError("ALWAYS_EAT needs the species it decides for (make_rule(name, cfg, sp)) — food_here threshold")
+        sp = own
     params = dict(cfg["rules"][RULE_CFG[name]]) if name in RULE_CFG else {}
-    if name == "RULE_WOLF":
+    if name in ("RULE_WOLF", "NOHUNT", "NOHUNT_RUN"):
         params["stamina_lock"] = float(cfg["body_common"]["stamina_lock"])
         params["stamina_unlock"] = float(cfg["body_common"]["stamina_unlock"])
     params = {k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v) for k, v in params.items()}
-    return RuleBrain(name=name, kind="rule", species=RULE_SPECIES[name], n_state=RULE_N_STATE.get(name, 0), params=params)
+    params["here_min"] = here_min_of(cfg, sp) if sp is not None else 1e-9
+    nb = RULE_N_BASE.get(name, 0)
+    return RuleBrain(name=name, kind="rule", species=(own if own is not None else (None if sp is None else int(sp))),
+                     n_state=nb + N_STUCK, params=params, n_base=nb, blind=bool(blind))
 
 
 # --------------------------------------------------------------------------- #
@@ -367,7 +480,7 @@ def make_rule(name: str, cfg: dict) -> RuleBrain:
 
 def extract_sb3(model) -> dict:
     """SB3 PPO MlpPolicy → W0..B2 float32 from mlp_extractor.policy_net[0], [2] and action_net (7-10). Checks the net shape
-    (107 → 64 → 64 → 19, tanh) and that the features extractor is a plain flatten (no observation transform outside the 3 layers).
+    (115 → 64 → 64 → 19, tanh) and that the features extractor is a plain flatten (no observation transform outside the 3 layers).
     R9's own function — export_weights_v3.extract is RepertoirePolicy-only."""
     import torch as th
     from stable_baselines3.common.torch_layers import FlattenExtractor
@@ -396,7 +509,7 @@ def _check_weights(w: dict) -> None:
             raise BrainContractError(f"weights miss {k}")
         a = np.asarray(w[k])
         if a.shape != NPZ_SHAPES[k]:
-            raise BrainContractError(f"{k} shape {a.shape} != {NPZ_SHAPES[k]} (net contract 107 → 64 → 64 → 19)")
+            raise BrainContractError(f"{k} shape {a.shape} != {NPZ_SHAPES[k]} (net contract 115 → 64 → 64 → 19)")
         if a.dtype != np.float32:
             raise BrainContractError(f"{k} dtype {a.dtype} is not float32")
         if not np.all(np.isfinite(a)):

@@ -5,7 +5,8 @@ and brains (`r9_brains.py`). Nothing here runs a world step.
 
   - species numbers (deer → wolf → boar, the slot block order of 3절), food kinds, sex codes (EcoLifeV3::ESex order), gaits
   - 19 actions (5절) and the literal 8-direction / golden-angle tables (3-9: no trig inside a step)
-  - 107 observation columns (4절): names, slices, column helpers and the normalisation constants
+  - 115 observation columns (4절, S′ 2026-11-12: 107 + food_dir_0..7 at 23~30): names, slices, column helpers and the normalisation
+    constants
   - config loading (`inherit:` merge like R8) and the body table (3-3) expanded to (n_species,) arrays and to (K, S) slot arrays
   - two contract hashes (7-10, 14-2): I/O (all species the same) and body (per species; reject a brain trained on another body)
 
@@ -103,7 +104,9 @@ def action_mask(groups) -> np.ndarray:
 
 SQRT_HALF = 0.7071067811865476                # float64 nearest to 1/√2 (= math.sqrt(0.5))
 
-# DIR8[j] = (cos j·45°, sin j·45°). Rotating head h by j: (h_x c − h_y s, h_x s + h_y c). free_j (obs 13+j) uses the same j.
+# DIR8[j] = (cos j·45°, sin j·45°). Rotating head h by j: (h_x c − h_y s, h_x s + h_y c). free_j (obs 13+j), food_dir_j (obs 23+j,
+# sector centre) and WALK_{j+1} / RUN_{j+9} (the decision direction) all use the same j — the largest food_dir column names the
+# WALK that moves toward that food (S′ 3-9 / 4-2).
 DIR8 = np.array([
     [1.0, 0.0],
     [SQRT_HALF, SQRT_HALF],
@@ -141,13 +144,16 @@ def rotate(h: np.ndarray, cs: np.ndarray) -> np.ndarray:
 
 
 # --------------------------------------------------------------------------- #
-# observation layout (4절, 107 columns)
+# observation layout (4절, 115 columns — S′: the 8 food_dir columns close the self block, the blocks behind move by 8)
 # --------------------------------------------------------------------------- #
 
-OBS_SELF_NAMES = ("energy", "reserve", "stamina", "health", "own_size", "age_frac", "birth_wait", "food_density", "food_here",
-                  "in_shelter", "shelter_x", "shelter_y", "shelter_edge",
-                  "free_0", "free_1", "free_2", "free_3", "free_4", "free_5", "free_6", "free_7",
-                  "own_speed", "mating")
+N_FOOD_DIR = 8
+FOOD_DIR_NAMES = tuple(f"food_dir_{j}" for j in range(N_FOOD_DIR))
+OBS_SELF_NAMES = (("energy", "reserve", "stamina", "health", "own_size", "age_frac", "birth_wait", "food_density", "food_here",
+                   "in_shelter", "shelter_x", "shelter_y", "shelter_edge",
+                   "free_0", "free_1", "free_2", "free_3", "free_4", "free_5", "free_6", "free_7",
+                   "own_speed", "mating")
+                  + FOOD_DIR_NAMES)
 OBS_OTHER_FIELDS = ("present", "rel_x", "rel_y", "dist", "vel_x", "vel_y", "approach", "approach_mem", "facing", "size",
                     "not_seen")
 N_OTHER = 6
@@ -155,18 +161,18 @@ OBS_KINSUM_NAMES = ("kin_count", "kin_run_frac", "kin_flow_x", "kin_flow_y")
 OBS_KIN_FIELDS = ("present", "rel_x", "rel_y", "vel_x", "vel_y", "size", "mate_ok")
 N_KIN = 2
 
-N_SELF = len(OBS_SELF_NAMES)                  # 23
+N_SELF = len(OBS_SELF_NAMES)                  # 31 (23 + food_dir 8)
 N_OF = len(OBS_OTHER_FIELDS)                  # 11
 N_KF = len(OBS_KIN_FIELDS)                    # 7
 SELF0 = 0
-OTHER0 = SELF0 + N_SELF                       # 23
-KINSUM0 = OTHER0 + N_OTHER * N_OF             # 89
-KIN0 = KINSUM0 + len(OBS_KINSUM_NAMES)        # 93
+OTHER0 = SELF0 + N_SELF                       # 31
+KINSUM0 = OTHER0 + N_OTHER * N_OF             # 97
+KIN0 = KINSUM0 + len(OBS_KINSUM_NAMES)        # 101
 OBS_NAMES = (OBS_SELF_NAMES
              + tuple(f"o{j}_{f}" for j in range(N_OTHER) for f in OBS_OTHER_FIELDS)
              + OBS_KINSUM_NAMES
              + tuple(f"k{j}_{f}" for j in range(N_KIN) for f in OBS_KIN_FIELDS))
-OBS_DIM = len(OBS_NAMES)                      # 107
+OBS_DIM = len(OBS_NAMES)                      # 115
 OBS_INDEX = {n: i for i, n in enumerate(OBS_NAMES)}
 
 SL_SELF = slice(SELF0, OTHER0)
@@ -180,10 +186,12 @@ SL_KIN = slice(KIN0, OBS_DIM)
 O_FREE0 = 13                                  # free_j = O_FREE0 + j
 O_OWN_SPEED = 21
 O_MATING = 22
+O_FOOD_DIR0 = 23                              # food_dir_j = O_FOOD_DIR0 + j (j = 0..7)
+SL_FOOD_DIR = slice(O_FOOD_DIR0, O_FOOD_DIR0 + N_FOOD_DIR)
 
 
 def other_col(j: int, f: str) -> int:
-    """Column of field f of other-species slot j (0..5)."""
+    """Column of field f of other-species slot j (0..5) — 31 + 11 j + field."""
     return OTHER0 + j * N_OF + OBS_OTHER_FIELDS.index(f)
 
 
@@ -207,7 +215,7 @@ OBS_NORM = {
     "birth_wait": 2250.0,   # max(0, next_birth − t) / 2250
     "food_r": 20.0,         # food_density window: grid box mean radius 10 cells (20 units) + sensed carcasses within 20 units
     "food_box_cells": 441,  # (2 × 10 + 1)² — carcass meat is divided by this to give a per-cell density
-    "here_r": 1.0,          # food_here: meat of carcasses within 1.0 unit; grids use the current cell
+    "here_r": 1.0,          # food_here: meat of carcasses within 1.0 unit; grids use the current cell (food_dir leaves both out)
 }
 SENSE = {
     "hear_silent": 0.03,    # 4-1: R(s) = 0 if s < 0.03
@@ -237,6 +245,9 @@ OBS_SPEC = {
     "free_j": "ray length to wall along DIR8[j] applied to head / 10",
     "own_speed": "|disp| / 0.6 (disp = total last-step displacement incl. contact)",
     "mating": "paired and waiting for birth (0/1)",
+    "food_dir": ("food_dir_j: sensed (eye see_r x head_down-if-EAT & fov, or nose smell_r) own-diet food, own cell / carcasses within "
+                 "here_r excluded, cell -> argmax_j v.rotate(head, DIR8[j]) (ties lower j), x_j = sum food x energy x max(1-d/R_eye, "
+                 "1-d/R_nose); value x_j / (x_j + food_here_ref)"),
     "other": "perceived (eye ∪ ear ∪ nose) other-kin individuals, distance asc, ties lower slot, 6 slots",
     "kin": "perceived same-kin individuals; summary of all + 2 nearest slots",
     "approach": "−(disp_j · (p_j − p_i)) / |p_j − p_i| / 0.9",
@@ -275,8 +286,10 @@ SPECIES_KEYS = ("mass_kg", "founder", "founder_variation", "growth", "walk_speed
                 "female_frac", "child_female_frac", "max_founder_age_steps", "first_birth", "mate_r", "birth_r",
                 "birth_grace_steps", "pair_block", "birth_block", "pending_needs_parent", "child_ring", "food_density_ref",
                 "food_here_ref")
-COMMON_KEYS = ("gait_drain", "stamina_lock", "stamina_unlock", "wound_speed", "eat_min", "walk_eat_mult", "graze", "bite",
-               "counter", "bite_damage", "carcass", "shelter_push", "breed")
+COMMON_KEYS = ("gait_drain", "stamina_lock", "stamina_unlock", "wound_speed", "eat_min", "bite", "counter", "bite_damage", "carcass",
+               "shelter_push", "breed")
+# S′ (2026-11-12): EAT = stand and eat what is here, SHELTER = stand — the R8 EAT walk values (walk_eat_mult, graze) are gone.
+REMOVED_COMMON_KEYS = ("walk_eat_mult", "graze")
 REQUIRED = {
     "world": ("mode", "size", "decision_steps", "quadrants", "slots", "carcass_slots", "shelters", "wall_band"),
     "placement": ("wolf_gap", "prey_from_wolf", "shelter_margin", "tries", "pack_r"),
@@ -284,7 +297,7 @@ REQUIRED = {
     "learner_counts": ("deer", "wolf", "boar"),
     "randomize": ("grass_regen_mult", "root_regen_mult", "juvenile_frac", "fat_init", "start_energy", "rule_deer_facing"),
     "respawn": ("newborn_frac", "far_r", "candidates"),
-    "food": ("cell", "grass", "root", "quadrant_grass_total"),
+    "food": ("cell", "grass", "root", "quadrant_grass_total", "train_grass_total"),
     "body_common": COMMON_KEYS,
     "species": SPECIES,
     "reward": ("alive", "energy", "birth", "death", "fallback_f"),
@@ -317,6 +330,14 @@ def check_r9_config(cfg: dict) -> dict:
         miss = [k for k in SPECIES_KEYS if k not in cfg["species"][sp]]
         if miss:
             raise ValueError(f"R9 config species.{sp} misses keys {miss}")
+    old = [k for k in REMOVED_COMMON_KEYS if k in cfg["body_common"]]
+    if old:
+        raise ValueError(f"body_common {old}: the S′ world has no EAT walk (EAT = stand and eat here) — remove these keys")
+    eat_r = float(cfg["body_common"]["carcass"]["eat_r"])
+    if eat_r != float(OBS_NORM["here_r"]):
+        # S′ 검토 low: '발밑 사체' has one meaning — the observation's food_here / food_dir boundary (here_r, a code literal in the I/O
+        # contract) must be the distance EAT actually eats a carcass from, or the sense would disagree with the body.
+        raise ValueError(f"body_common.carcass.eat_r {eat_r} must equal the observation here_r {OBS_NORM['here_r']} (food_here · food_dir)")
     w = cfg["world"]
     if w["mode"] not in ("train", "judge"):
         raise ValueError(f"world.mode must be train|judge: {w['mode']!r}")
@@ -351,6 +372,9 @@ def check_r9_config(cfg: dict) -> dict:
     lo, hi = (int(x) for x in cfg["train"]["seeds"])
     if not (lo < hi):
         raise ValueError(f"train.seeds [lo, hi) is empty: {cfg['train']['seeds']}")
+    tg = cfg["food"]["train_grass_total"]
+    if tg is not None and not float(tg) > 0.0:
+        raise ValueError(f"food.train_grass_total must be null or > 0: {tg}")
     if w["mode"] == "judge":
         if "judge" not in cfg or not isinstance(cfg["judge"], dict):
             raise ValueError("judge mode needs a 'judge' block")
@@ -460,6 +484,21 @@ def _f(x) -> float:
     return float(x)
 
 
+# S′ 검토 low (C++ 옮김): eye field-of-view cos = cos(fov/2) as float64 literals, so the Unreal port uses the same bits instead of its
+# own trig (math.radians(125) vs 125·π/180 already differ by 3 ulp; UE's float PI more). Values = math.cos(math.radians(fov / 2)) —
+# the form used for any fov not listed (calibration never changes fov). Test: tests/test_r9_body.py pins the bits.
+FOV_COS_LITERAL = {
+    300.0: -0.8660254037844387,     # deer, boar (-0x1.bb67ae8584cabp-1)
+    250.0: -0.5735764363510462,     # wolf       (-0x1.25abcf87c4979p-1)
+}
+
+
+def fov_cos_of(fov_deg: float) -> float:
+    """cos(fov/2): the literal table above, else math.cos(math.radians(fov/2)) (the same form the literals were taken from)."""
+    f = float(fov_deg)
+    return FOV_COS_LITERAL[f] if f in FOV_COS_LITERAL else math.cos(math.radians(f / 2.0))
+
+
 def load_body(cfg: dict) -> Body:
     """Body table from cfg['species'] and cfg['body_common'] (3-3)."""
     sp_cfg = [cfg["species"][n] for n in SPECIES]
@@ -507,7 +546,7 @@ def load_body(cfg: dict) -> Body:
         stam_recover=(unlock - lock) / rec_steps,
         see_r=arr("see_r"),
         fov_deg=fov,
-        fov_cos=np.array([math.cos(math.radians(x / 2.0)) for x in fov]),
+        fov_cos=np.array([fov_cos_of(x) for x in fov]),
         head_down=arr("head_down"),
         smell_r=arr("smell_r"),
         drain=drain,

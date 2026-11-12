@@ -3,6 +3,8 @@
 12절 번호 그대로: 1 결정성·묶음 무관 · 2 관측 함수가 종 번호를 안 읽음 · 3 종 바꿔치기(관계 보존) · 4 보상식 · 5 행동 19 칸 × 3 종 ·
 6 스텝 안 삼각함수 없음(표 부분은 test_r9_body.py) · 7 차례 합 = 명시 고리 · 8 물기·반격 · 9 사체 · 10 지구력·상처·약함 · 11 은신처 ·
 12 다시 남 · 19 속력 집합·접촉 변위 · 20 R8 과 풀 생성·재생·셀 수요 나누기 비트 같음 · 22 산 개체 모으기 = (K, S, S) · 23 장부.
+S′ (2026-11-12) 로 뜻을 바꾼 시험: 02b (관측 입력에 act·eat_min·fd_fast, 115 칸) · 05 (EAT·SHELTER = 제자리 서기) · 20 (풀 생성기 비교는
+학습 세계 풀 맞춤을 끄고) · 23 (고기 장부: 늑대가 관측으로 사체에 가서 먹음). S′ 전용 시험은 tests/test_r9_s_world.py.
 시드: 44350~44399 만 쓴다(10절). 장면 시험은 장면 꼴(배치·머리·속도)을 손으로 놓고 `refresh()` 한다.
 """
 
@@ -189,7 +191,7 @@ def test_02_obs_function_never_reads_species(cfg, jcfg):
 def test_02b_obs_reads_only_the_observers_body_row(cfg, jcfg):
     """Fix 단계 검토 low: build_obs gets the per-slot body arrays `sb` of every slot, so tests 2·3 could not catch an observation
     that reads another individual's body value (e.g. mass_kg = a species label). Here, for each observer i, every OTHER slot's
-    `sb` row is replaced by the row of a slot of another species (size_obs·disp·head·kin_id untouched) — observer i's 107
+    `sb` row is replaced by the row of a slot of another species (size_obs·disp·head·kin_id untouched) — observer i's 115
     columns must stay bit-identical. So only the observer's own body row (diet, e_per_unit, food refs) reaches its observation."""
     for c, seeds in ((cfg, [44358]), (jcfg, [44359])):
         w = R9World(c, seeds)
@@ -205,7 +207,8 @@ def test_02b_obs_reads_only_the_observers_body_row(cfg, jcfg):
                                R=w.R, stam=w.stam, hp=w.hp, size_obs=w.size_obs, af=w.af, next_birth=w.next_birth, mating=w.mating,
                                sex=w.sex, mature=w.mature, uid=w.uid, parent_a=w.parent_a, parent_b=w.parent_b,
                                check_related=w.judge, size=w.size, cell=w.cell, grass=w.grass, root=w.root, cov_c=w.cov_c,
-                               cov_r=w.cov_r, cov_ok=w.cov_ok, mem=w.mem)
+                               cov_r=w.cov_r, cov_ok=w.cov_ok, mem=w.mem, act=w.act, eat_min=w._eat_min,
+                               fd_fast=w.food_dir_fast)
             return RW.build_obs(inp)[0]
 
         assert same_bits(obs_with(base), w.obs())
@@ -422,16 +425,10 @@ def test_05_action_semantics_all_species(cfg):
                 u = B.rotate(h0[s], B.DIR8[j])
                 assert np.allclose(dp, u * (v1 + v2), atol=1e-12), (a, sp)
                 assert np.allclose(x.vel[0, s], u * v2, atol=1e-12)
-            elif a == B.WATCH or (a == B.SHELTER and not b.shelter_enter[sp]):
-                assert np.array_equal(dp, np.zeros(2)), (a, sp)      # 늑대 SHELTER = 제자리 서기 = WATCH
-            elif a == B.SHELTER:
-                c = np.array([55.0, 55.0])
-                u = (c - p0[s]) / np.linalg.norm(c - p0[s])
-                v1 = min(acc, b.run_speed[sp])
-                assert np.allclose(dp / np.linalg.norm(dp), u, atol=2e-3) and np.linalg.norm(dp) <= 2 * v1 + 1e-9 + acc
-            elif a == B.EAT:
-                sp_ = np.linalg.norm(dp)
-                assert sp_ <= b.walk_speed[sp] + min(acc, b.walk_speed[sp]) + 1e-12     # no food here: graze walk
+            elif a in (B.WATCH, B.SHELTER, B.EAT):
+                # S′: WATCH · SHELTER (은신처로 자동으로 뛰지 않음) · EAT (먹이 없으면 걷지 않음) = 제자리 서기, 모든 종
+                assert np.array_equal(dp, np.zeros(2)), (a, sp)
+                assert x._gait[0, s] == B.G_STAND
     # EAT on food stands still (any body with that food under it)
     x = copy.deepcopy(base)
     x.grass[:] = 0.5
@@ -953,7 +950,8 @@ def test_20_grass_matches_r8(cfg):
                                       "eat_rate": cfg["species"]["deer"]["eat_rate"]["grass"]},
                              "deer": {"repro_threshold": 2.0}})
     r9c = B.override(cfg, {"world": {"shelters": {"fixed": [c + [6.0] for c in covers]}},
-                           "randomize": {"grass_regen_mult": [1.0, 1.0]}})
+                           "randomize": {"grass_regen_mult": [1.0, 1.0]},
+                           "food": {"train_grass_total": None}})       # S′ N 맞춤(용량 합 70)은 끄고 복사한 생성기만 비교
     seeds = [44380, 44381, 44382]
     a = RW8.R8World(r8c, seeds)
     b = R9World(r9c, seeds, counts=np.array([[n, 0, 0]] * len(seeds)))
@@ -1126,6 +1124,11 @@ def test_23_ledgers(cfg, jcfg):
         a = rand_act(rng, w)
         a[:, :lo(w, W_)] = np.where(rng.random((w.K, lo(w, W_))) < 0.5, B.EAT, a[:, :lo(w, W_)])
         a[:, lo(w, R_):] = np.where(rng.random((w.K, w.S - lo(w, R_))) < 0.5, B.EAT, a[:, lo(w, R_):])
+        # S′: EAT 는 걷지 않으므로 고기 길을 지나가려면 늑대가 관측으로 사체에 간다 — 발밑(food_here) EAT, 느낀 사체(food_dir) 쪽 걷기
+        ow = w.obs()[:, lo(w, W_):lo(w, R_)]
+        fdw = ow[..., B.SL_FOOD_DIR]
+        a[:, lo(w, W_):lo(w, R_)] = np.where(ow[..., B.O_FOOD_HERE] > 0, B.EAT,
+                                             np.where(fdw.max(-1) > 0, B.WALK_FIRST + fdw.argmax(-1), a[:, lo(w, W_):lo(w, R_)]))
         _, _, done, info = w.step(a)
         assert (w.alive.sum(1) == w.counts.sum(1)).all()
         dead_n += int(done.sum())

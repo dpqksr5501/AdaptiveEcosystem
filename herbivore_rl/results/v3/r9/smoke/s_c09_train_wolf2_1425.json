@@ -1,0 +1,85 @@
+{
+ "set": "wolf2",
+ "note": "앞 시도 측정 (2026-11-12 14:25~15:01, 같은 코드): 다른 세션의 무거운 python 이 겹쳐 돈 때가 있다(other_python) — 기록만, 등록에 쓰지 않음",
+ "time": "2026-11-12 14:54:10",
+ "wall_s": 690.318062543869,
+ "min_available_gb": 8.839153289794922,
+ "min_free_commit_gb": 6.400566101074219,
+ "cpu_sys_mean": null,
+ "ue_seen": null,
+ "aborted_low_commit": null,
+ "other_python_at_start": [
+  "다른 세션의 무거운 python: b",
+  "다른 세션의 무거운 python: d",
+  "다른 세션의 무거운 python: c",
+  "사용자 python ortholoc",
+  "다른 세션의 무거운 python: rich_bench_horizon.py",
+  "다른 세션의 무거운 python: a"
+ ],
+ "other_python_at_end": [
+  "사용자 python ortholoc",
+  "다른 세션의 무거운 python: a"
+ ],
+ "max_r9_python": 4,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "wolf_A_s2",
+   "species": "wolf",
+   "round": 0,
+   "shards": 2,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 668.6409165859222,
+   "dec_per_s": 1543.71647680547,
+   "log_dec_per_s": [
+    1536,
+    1817
+   ],
+   "num_envs": 384,
+   "memory": [
+    {
+     "pid": 24472,
+     "peak_mb": 420.2890625,
+     "private_mb": 339.70703125
+    },
+    {
+     "pid": 26020,
+     "peak_mb": 327.3828125,
+     "private_mb": 242.82421875
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "wolf_B_s2",
+   "species": "wolf",
+   "round": 0,
+   "shards": 2,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 670.916401386261,
+   "dec_per_s": 1538.4807971116284,
+   "log_dec_per_s": [
+    1529,
+    1893
+   ],
+   "num_envs": 384,
+   "memory": [
+    {
+     "pid": 35316,
+     "peak_mb": 419.9765625,
+     "private_mb": 351.59375
+    },
+    {
+     "pid": 25052,
+     "peak_mb": 316.70703125,
+     "private_mb": 236.671875
+    }
+   ],
+   "error": ""
+  }
+ ]
+}
