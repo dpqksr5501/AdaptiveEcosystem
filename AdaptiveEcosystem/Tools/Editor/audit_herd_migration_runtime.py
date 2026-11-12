@@ -11,6 +11,7 @@ name=arg('HerdAuditName','PIE')
 duration=float(arg('HerdAuditDuration','120'))
 pie='-HerdAuditPIE' in cmd
 headless='-server' in cmd.lower()
+apply_loss='-HerdAuditNoLoss' not in cmd
 out=Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()))/'HerdMigration_20261022'
 out.mkdir(parents=True,exist_ok=True)
 state={'samples':[],'start':None,'next':0,'loss':False,'camera':None,'shots':0,'refuge_shot':False,'last':{},'transfers':[], 'error':None}
@@ -38,7 +39,9 @@ def finish(result):
         'plan_ids':sorted(set(r.get('migration_plan',0) for r in rows if r.get('migration_plan',0)>0)),
         'arrived_ids':sorted(set(r['stable_id'] for r in rows if r.get('migration_reason')=='Arrived')),
         'region_transfers':state['transfers'],'history_records':sum(len(r.get('reason_history',[])) for r in rows),
-        'observation_wall_seconds':duration,'fixture':'Sustained Barren drought (receipted food loss and suspended regeneration), observers disabled; model weights unchanged'}
+        'observation_wall_seconds':duration,
+        'fixture':'Sustained Barren drought (receipted food loss and suspended regeneration), observers disabled; model weights unchanged'
+            if apply_loss else 'No food loss or suspended regeneration, observers disabled; model weights unchanged'}
     (out/(name+'_Runtime.json')).write_text(json.dumps({'summary':summary,'samples':state['samples']},ensure_ascii=False,indent=2),encoding='utf-8')
     unreal.log('HERD_RUNTIME_FINISHED '+json.dumps(summary))
     if pie:
@@ -68,7 +71,7 @@ def tick(dt):
             for cls in (unreal.EcoPlayerEcologyComponent,unreal.EcoThreatSourceComponent):
                 for c in pawn.get_components_by_class(cls):c.set_editor_property('threat_enabled',False)
         keys=unreal.EcoCreatureInspectionLibrary.get_authority_agent_ids(game)
-        if elapsed>3 and not state['loss']:
+        if apply_loss and elapsed>3 and not state['loss']:
             migration=next((s for s in unreal.ObjectIterator(unreal.EcoHerdMigrationSubsystem) if s.get_outer()==game),None)
             if not migration:raise RuntimeError('Missing authoritative herd subsystem')
             state['loss']=migration.apply_food_fraction_for_audit('Barren',0,True)
@@ -84,7 +87,10 @@ def tick(dt):
                 state['transfers'].append({'id':key,'from':old.get('region'),'to':row.get('region'),
                     'distance_cm':math.dist(p,q) if p and q else None,'sample_seconds':2})
             state['last'][str(key)]=row
-        state['samples'].append({'elapsed':elapsed,'authority_agents':len(keys),'agents':rows})
+        summary=unreal.GameplayStatics.get_game_state(game).get_ecology_summary()
+        food={str(region.get_editor_property('region_id')):region.get_editor_property('food_amount')
+              for region in summary.get_editor_property('regions')}
+        state['samples'].append({'elapsed':elapsed,'authority_agents':len(keys),'food':food,'agents':rows})
         progress={'elapsed':elapsed,'food_loss_fixture':state['loss'],'agents':[
             {k:r.get(k) for k in ('stable_id','region','migration_plan','migration_active','migration_state','migration_reason','migration_waypoint','decision_reason')}
             for r in rows if r.get('species')=='Herbivore']}

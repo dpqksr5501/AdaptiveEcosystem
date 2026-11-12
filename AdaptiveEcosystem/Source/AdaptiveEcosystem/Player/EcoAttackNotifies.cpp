@@ -1,13 +1,20 @@
 #include "Player/EcoAttackNotifies.h"
 #include "Components/SkeletalMeshComponent.h"
+#include "Engine/World.h"
 #include "GameFramework/Actor.h"
 namespace
 {
 void Send(USkeletalMeshComponent* Mesh, UAnimSequenceBase* Animation, EEcoAttackWindow Window, bool bOpen)
 {
-    if (!Mesh || !Mesh->GetOwner() || !Mesh->GetWorld()->IsGameWorld()) return;
-    for (auto* Component : Mesh->GetOwner()->GetComponents())
-        if (auto* Receiver = Cast<IEcoAttackWindowReceiver>(Component)) Receiver->ReceiveAttackWindow(Window, bOpen, Animation);
+    auto* Owner = Mesh ? Mesh->GetOwner() : nullptr;
+    if (!Owner || !Owner->GetWorld() || !Owner->GetWorld()->IsGameWorld()) return;
+    // A receiver can create or remove components while handling this notify.
+    TInlineComponentArray<UActorComponent*> Components;
+    Owner->GetComponents(Components);
+    for (auto* Component : Components)
+        if (IsValid(Component) && Owner->GetComponents().Contains(Component))
+            if (auto* Receiver = Cast<IEcoAttackWindowReceiver>(Component))
+                Receiver->ReceiveAttackWindow(Window, bOpen, Animation);
 }
 }
 void UEcoAnimNotifyState_AttackWindow::NotifyBegin(USkeletalMeshComponent* Mesh, UAnimSequenceBase* Animation, float Duration, const FAnimNotifyEventReference& Ref) { Send(Mesh, Animation, Window, true); }

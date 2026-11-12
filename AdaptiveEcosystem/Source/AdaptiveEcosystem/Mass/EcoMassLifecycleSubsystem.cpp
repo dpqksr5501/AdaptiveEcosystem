@@ -362,8 +362,8 @@ bool UEcoMassLifecycleSubsystem::ProcessEcologyStep(const FEcoServerTimeSnapshot
 	TArray<FName> RegionOrder;
 	Ecology->GetRegionIds(RegionOrder);
 	TArray<FEcoRegionSpatialSnapshot> Spaces;
-	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionOrder, Spaces))
-		return Fail(TEXT("Invalid/unloaded region geometry or adjacency at migration boundary."));
+	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionOrder, Spaces, true))
+		return Fail(TEXT("Invalid region geometry or adjacency at migration boundary."));
 	TArray<FEcoResourceSnapshot> Resources;
 	Ecology->GetResourceSnapshots(Resources);
 	// Arrival commits first, then the decision snapshot includes the newly resident agents.

@@ -8,7 +8,7 @@ match=re.search(r'-HuntingNetworkClient=(\w+)',cmd)
 name='Server' if is_server else match.group(1)
 out=Path(u.Paths.convert_relative_path_to_full(u.Paths.project_saved_dir()))/'PlayerHunting_20261105/Network'
 out.mkdir(parents=True,exist_ok=True)
-state=dict(start=None,world=None,next=0,samples=[],events=[],bound=False,next_attack=0,sent=set(),deadline=time.monotonic()+150,finished=False,target=None)
+state=dict(start=None,world=None,next=0,samples=[],events=[],bound=False,next_attack=0,sent=set(),deadline=time.monotonic()+150,finished=False,target=None,attack_inputs=0)
 action=u.load_asset('/Game/Variant_Combat/Input/Actions/IA_ComboAttack')
 data=u.load_asset('/Game/JWJ/Gameplay/DA_EcoUnarmedCombo')
 montage=data.get_editor_property('montage')
@@ -18,10 +18,11 @@ def event(value):
 def finish(ok,error=None):
     if state['finished']:return
     state['finished']=True
-    (out/(name+'.json')).write_text(json.dumps(dict(result='PASS' if ok else 'FAIL',error=error,samples=state['samples'],events=state['events'],fixture='Authority player placement; client configured actions over GAS RPC; no HP/animal writes'),indent=2),encoding='utf-8')
+    (out/(name+'.json')).write_text(json.dumps(dict(result='PASS' if ok else 'FAIL',error=error,samples=state['samples'],events=state['events'],
+        attack_inputs=state['attack_inputs'],fixture='Authority player placement; Enhanced Input and GAS RPC; no HP/animal writes'),indent=2),encoding='utf-8')
     u.log('HUNTING_NETWORK_'+name+'_'+('PASS' if ok else 'FAIL'))
-    u.unregister_slate_post_tick_callback(handle)
     if state['world']:u.SystemLibrary.execute_console_command(state['world'],'QUIT')
+    else:u.SystemLibrary.quit_editor()
 def inspect(world,key):
     raw=u.EcoCreatureInspectionLibrary.capture_agent(world,key)
     if isinstance(raw,tuple):raw=next((v for v in raw if isinstance(v,str)),None)
@@ -29,16 +30,14 @@ def inspect(world,key):
 def tick(dt):
     try:
         if time.monotonic()>state['deadline']:raise AssertionError('Network audit timeout')
-        world=state['world']
-        if world is None:
-            world=next((w for w in u.ObjectIterator(u.World) if w.get_name()=='1102_Integration_JWJ' and u.GameplayStatics.get_game_state(w)
-                        and (is_server or u.GameplayStatics.get_player_controller(w,0))),None)
-            state['world']=world
+        world=next((w for w in u.ObjectIterator(u.World) if w.get_name()=='1102_Integration_JWJ' and u.GameplayStatics.get_game_state(w)
+                    and (is_server or u.GameplayStatics.get_player_controller(w,0))),None)
+        state['world']=world
         if not world:return
         runtimes=u.GameplayStatics.get_all_actors_of_class(world,u.EcoCreatureIntegrationSpawner)
         if not runtimes or not runtimes[0].is_runtime_ready():return
         runtime=runtimes[0]
-        pcs=[pc for pc in u.GameplayStatics.get_all_actors_of_class(world,u.PlayerController) if pc.get_pawn()]
+        pcs=[pc for pc in u.GameplayStatics.get_all_actors_of_class(world,u.PlayerController) if pc.get_controlled_pawn()]
         if not pcs and state['start'] is None:return
         now=time.monotonic()
         if state['start'] is None:state['start']=now
@@ -55,20 +54,26 @@ def tick(dt):
                     state['alt']=next((int(a['stable_id']) for a in candidates if a.get('species')=='Wolf' and a.get('region')=='JWJ_WildlifeTest' and a.get('hp',0)>0),None)
                 animal=inspect(world,state['alt']) if state.get('alt') else {}
             for index,pc in enumerate(pcs):
-                pawn=pc.get_pawn()
+                pawn=pc.get_controlled_pawn()
                 if not animal.get('native_world_position') or animal.get('hp',0)<=0:continue
                 pawn.get_editor_property('player_state').set_invulnerable(not health_phase)
                 # Only A is placed in contact range; B observes the same death and late-join summary.
                 offset=(u.Vector(140*math.cos(elapsed*.5),140*math.sin(elapsed*.5),96) if health_phase else u.Vector(-60,0,96)) if index==0 else u.Vector(-1500,0,96)
                 pawn.set_actor_location(u.Vector(*animal['native_world_position'])+offset,False,True)
                 pawn.character_movement.stop_movement_immediately();pawn.set_actor_rotation(u.Rotator(0,0,0),True)
+                pc.set_control_rotation(u.Rotator(0,0,0))
         else:
-            pc=u.GameplayStatics.get_player_controller(world,0);pawn=pc.get_pawn()
+            pc=u.GameplayStatics.get_player_controller(world,0);pawn=pc.get_controlled_pawn()
+            if not pawn:return
             hit=pawn.get_component_by_class(u.EcoMeleeHitComponent)
             if not state['bound']:hit.on_damage_outcome.add_callable(event);state['bound']=True
-            avatar=pawn.get_component_by_class(u.EcoAbilityAvatarComponent);avatar.release_configured_action(action)
             anim=pawn.mesh.get_anim_instance()
-            def press():avatar.press_configured_action(action)
+            subsystem=next((s for s in u.ObjectIterator(u.EnhancedInputLocalPlayerSubsystem)
+                            if isinstance(s.get_outer(),u.LocalPlayer)),None)
+            if not anim or not subsystem:return
+            def press():
+                subsystem.inject_input_vector_for_action(action,u.Vector(1,0,0),[],[])
+                state['attack_inputs']+=1
             if name=='ClientA' and not any('DEATH_COMMITTED' in e['result'] for e in state['events']):
                 if not anim.montage_is_playing(montage) and elapsed>=state['next_attack']:
                     press();state['next_attack']=elapsed+2;state['sent'].clear()
@@ -96,8 +101,17 @@ def tick(dt):
                 assert max(s['visuals'] for s in state['samples'])>0,'Received animal presentation required'
                 assert any(any(r['deaths']>0 for r in s['species'] if r['region']=='JWJ_WildlifeTest' and r['species']=='Wolf') for s in state['samples']),'Committed species death summary missing'
                 if name=='ClientA':
+                    assert state['attack_inputs']>0,'Configured attack input not injected'
                     assert any('DEATH_COMMITTED' in e['result'] for e in state['events']),'Owner damage outcome RPC missing'
                     assert any(s.get('local_hp',100)<100 for s in state['samples']),'Replicated owner HP never changed'
             finish(True)
     except Exception:finish(False,traceback.format_exc())
-handle=u.register_slate_post_tick_callback(tick)
+def ticker(dt):
+    # Synchronous engine calls can pump the ticker again.
+    if state['finished'] or state.get('in_tick'):return not state['finished']
+    state['in_tick']=True
+    try:tick(dt)
+    finally:state['in_tick']=False
+    return not state['finished']
+
+handle=u.register_ticker_callback(ticker,0.0)

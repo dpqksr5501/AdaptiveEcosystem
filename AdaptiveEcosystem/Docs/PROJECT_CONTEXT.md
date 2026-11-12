@@ -2,6 +2,8 @@
 
 **다종 생태계 작업 진입점.** [팀 인수인계](Team/FAUNA_TEAM_HANDOFF.md)에서 로컬 재현, 역할별 다음 작업, 완료 기준과 최신 검증을 확인한다.
 
+**2026-11-12 현재 통합 레벨 검증.** 기본 `Integration_JwJ`는 Legacy 실행이며 Native v3와 자연 출생이 꺼져 있다. 로컬 소유 복사본 두 개에서 R7e와 자연 출생을 함께 켜고 4배속으로 두 시드의 게임 시간 60분을 검증했다. 사슴은 모든 복사본에서 유지됐다. 여덟 종을 넣은 복사본에서는 사슴이 두 시드 모두 28마리 남았고, 늑대·여우·표범은 모두 기아로 사라졌다. 원본 레벨에는 설정을 적용하지 않았다. [결과·재현 조건](Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존) · [로컬 증거와 복원](Team/LOCAL_TEST_EVIDENCE.md)
+
 **2026-11-05 체형 설계와 확인 범위.** [세대·체형 설계](Architecture/INHERITED_MORPHOLOGY_DESIGN_20261105.md)에 현재 유전·표현의 근거와 질주·은폐·사냥 체형 제안을 구분한다. 새 축의 런타임 및 학습 적용은 보류 상태다. 새 작업은 해당 문서의 역할별 인계와 검증 순서를 따른다.
 
 **2026-10-30 개체군·기획 대조 후속:** [개체군/성장 계약](Architecture/NATURAL_POPULATION_CONTRACT_20261030.md), [세부 기획 대조](Architecture/INDIVIDUAL_TRAIT_DESIGN_AUDIT_20261030.md), [실행 기록](조연우/JYU_NATURAL_POPULATION_20261030.md)을 함께 읽는다. 자연 사슴의 혼합 초기 나이/성별·제한 유전/털색·연속 성장·가족 관계/관찰 분리·군락 발달을 다룬다. 학습 담당의 관측/행동·보상·가중치/추론은 보존하며 Caution은 인계 데이터만 제공한다. 현재 Native 사슴 예제를 임의 종/전체 기획/MMO 완료로 확대하지 않는다.

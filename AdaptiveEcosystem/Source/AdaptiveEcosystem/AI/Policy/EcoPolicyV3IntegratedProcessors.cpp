@@ -1,6 +1,7 @@
 #include "EcoPolicyV3IntegratedProcessors.h"
 
 #include "AI/Policy/EcoBehaviorFragments.h"
+#include "AI/Behavior/EcoSpeciesAIFragments.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "Creature/Audio/EcoFootstepAudioSet.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
@@ -34,6 +35,20 @@
 
 namespace EcoPolicyV3IntegratedProcImpl
 {
+    const FName NativeDeerSpecies(TEXT("Herbivore"));
+    const FName NativeWolfSpecies(TEXT("Wolf"));
+
+    void ExcludeOtherWriters(FMassEntityQuery& Query)
+    {
+        Query.AddTagRequirement<FEcoAuthorityTag>(EMassFragmentPresence::All);
+        Query.AddRequirement<FEcoFaunaFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::None);
+        Query.AddTagRequirement<FEcoHerbivoreTag>(EMassFragmentPresence::None);
+        Query.AddTagRequirement<FEcoPredatorTag>(EMassFragmentPresence::None);
+        Query.AddTagRequirement<FEcoStateTreeBehaviorTag>(EMassFragmentPresence::None);
+        Query.AddTagRequirement<FEcoGroundedNavigationTag>(EMassFragmentPresence::None);
+        Query.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+    }
+
 	struct FMoveAdapter
 	{
 		const UEcoPolicyV3IntegratedSubsystem* Sub = nullptr;
@@ -365,7 +380,10 @@ namespace EcoPolicyV3IntegratedProcImpl
         namespace R=EcoRepertoireV3;
         if(!A.Ctx->Sim.Config.bNaturalHabitats)return;
         const auto& D=(*A.Deer)[(*A.Rows)[Index]];auto& Life=D.Int->Individual;auto& S=Life.Residence;
-        if(Traveling(const_cast<FMoveAdapter*>(&A),Index)||(A.Sub->GetSettings().bSocialControl&&D.SocialAudit&&D.SocialAudit->AppliedReservation>0)){
+        if(Traveling(const_cast<FMoveAdapter*>(&A),Index)
+            || (A.Sub->GetSettings().bSocialControl&&D.SocialAudit&&D.SocialAudit->AppliedReservation>0)
+            || H.Decision->KeepActive == EcoWorldV3::kKeepPanic
+            || Life.Memory.Response != EcoLifeV3::EResponse::Policy){
             S.Cover=-1;S.Phase=0;S.SettledSince=-1;return;
         }
         const bool Hide=H.Rep->Behavior==R::kHide,Sleep=H.Rep->Behavior==R::kSleep;
@@ -470,10 +488,22 @@ namespace EcoPolicyV3IntegratedProcImpl
 
     void IntegratedControlHook(void* User,int32 Index,const EcoWorldV3::FHerbView& H){
         const auto& A=*static_cast<const FMoveAdapter*>(User);
-        if(Traveling(User,Index))JourneyControlHook(User,Index,H);
-        else if(A.Sub->GetSettings().bSocialControl)SocialControlHook(User,Index,H);
+        const auto& DeerRow = (*A.Deer)[(*A.Rows)[Index]];
+        const bool bTraveling = Traveling(User,Index);
+        const bool bWaitingForRegion = DeerRow.Journey && DeerRow.Journey->IsWaitingForRegion();
+        const bool bUseSocialControl = !bTraveling && A.Sub->GetSettings().bSocialControl;
+        if (bUseSocialControl)
+            SocialControlHook(User,Index,H);
+        else if (auto* Audit = DeerRow.SocialAudit)
+        {
+            // A lease applied in an earlier step must not claim the current journey.
+            Audit->Applied = EEcoV3SocialControl::None;
+            Audit->AppliedReservation = 0;
+            Audit->bRejectedUnsafeShelter = false;
+        }
+        if (bTraveling && !bWaitingForRegion) JourneyControlHook(User,Index,H);
+        auto& Life = DeerRow.Int->Individual;
         if(A.Ctx->Sim.Config.bEcosystemLife){
-            auto& Life=(*A.Deer)[(*A.Rows)[Index]].Int->Individual;
             if(Life.bInitialized){
                 const double SimTime=A.Ctx->Sim.T*EcoRepertoireV3::kStepSeconds;
                 auto& Memory=Life.Memory;
@@ -481,9 +511,11 @@ namespace EcoPolicyV3IntegratedProcImpl
                 if(Awake)ObservePlayers(A,Memory,H.Body->Pos,H.Body->Head,(*A.Deer)[(*A.Rows)[Index]].Int->GroundZ,SimTime,A.Ctx->Sim.ObsCfg.ThreatFovCos,EcoWorldV3::SeePredNow(A.Ctx->Sim),TEXT("Herbivore"));
                 const double X=Memory.LastX-H.Body->Pos.X,Y=Memory.LastY-H.Body->Pos.Y;
                 const double Distance=FMath::Sqrt(X*X+Y*Y);
+                const bool bSocialOwnsControl = bUseSocialControl && DeerRow.SocialAudit
+                    && (DeerRow.SocialAudit->AppliedReservation > 0 || DeerRow.SocialAudit->Applied == EEcoV3SocialControl::Flee);
                 const bool Safe=H.Decision->KeepActive!=EcoWorldV3::kKeepPanic&&H.Decision->KeepActive!=EcoWorldV3::kKeepShelter
-                    &&Awake&&H.Perception->Threat.PredCount==0&&H.Body->Energy>.25;
-                const auto Response=Memory.Decide(SimTime,Distance,Safe,Traveling(User,Index));
+                    &&Awake&&H.Perception->Threat.PredCount==0&&H.Body->Energy>.25&&!bSocialOwnsControl;
+                const auto Response=Memory.Decide(SimTime,Distance,Safe,bTraveling);
                 if(Response!=EcoLifeV3::EResponse::Policy){
                     const double Direction=Response==EcoLifeV3::EResponse::Retreat?-1:Response==EcoLifeV3::EResponse::Curious?1:0;
                     const double V=A.Ctx->Sim.RepCfg.HerbSpeed*(Direction<0?A.Ctx->Sim.RepCfg.GaitSpeed[EcoRepertoireV3::kGaitRun]:.3);
@@ -506,10 +538,51 @@ namespace EcoPolicyV3IntegratedProcImpl
                 }
                 LifeLocomotion(A,Index,H);
                 NaturalShelterControl(A,Index,H);
+                Life.bMealRestApplied = false;
+                if (A.Combat && A.Combat->UsesAdaptiveRoutine(EEcoAdaptiveRoutine::DeerMeal))
+                {
+                    constexpr double MealStop = .9;
+                    const double EnergyFraction = H.Body->Energy / A.Ctx->Sim.RepCfg.MaxEnergy;
+                    const bool bLowReserve = A.Ctx->Sim.ReserveCap > 0. && H.Body->Reserve < .2;
+                    const double Start = bLowReserve ? .8 : .65;
+                    const bool bWasSeeking = Life.MealCycle.bSeeking;
+                    Life.MealCycle.Update(EnergyFraction, SimTime, Start, MealStop, 4.);
+                    if (bWasSeeking != Life.MealCycle.bSeeking)
+                        UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco MealCycle] Id=%lld Species=Herbivore Seeking=%d Energy=%.3f"),
+                            (*A.Deer)[(*A.Rows)[Index]].Id, Life.MealCycle.bSeeking, H.Body->Energy);
+                    const bool bOrdinaryGraze = Awake && !bTraveling && H.Perception->Threat.PredCount == 0
+                        && H.Decision->KeepActive == EcoWorldV3::kKeepNone && Response == EcoLifeV3::EResponse::Policy
+                        && H.Rep->Behavior == EcoRepertoireV3::kGraze && H.Control->EatMult > 0.;
+                    if (bOrdinaryGraze && !Life.MealCycle.bSeeking)
+                    {
+                        H.Control->EatMult = 0.;
+                        if (Life.MealCycle.IsResting(SimTime))
+                        {
+                            H.Control->Velocity = {};
+                            H.Control->Gait = EcoRepertoireV3::kGaitStop;
+                            H.Control->DrainMult = A.Ctx->Sim.RepCfg.GaitDrain[EcoRepertoireV3::kGaitStop];
+                            H.Control->bStill = true;
+                            Life.bMealRestApplied = true;
+                        }
+                    }
+                    // The same meal rule owns the ceiling for alert grazing and journey pauses.
+                    if (EnergyFraction >= MealStop && !bLowReserve)
+                        H.Control->EatMult = 0.;
+                }
                 const double Speed=Life.SpeedScale(SimTime);
                 H.Control->Velocity.X*=Speed;H.Control->Velocity.Y*=Speed;
                 H.Control->DrainMult*=Life.Maintenance();
             }
+        }
+        if (bWaitingForRegion)
+        {
+            // Keep sensing and basal metabolism while the route geometry is unavailable.
+            H.Control->Velocity = {};
+            H.Control->Gait = EcoRepertoireV3::kGaitStop;
+            H.Control->DrainMult = A.Ctx->Sim.RepCfg.GaitDrain[EcoRepertoireV3::kGaitStop]
+                * (A.Ctx->Sim.Config.bEcosystemLife && Life.bInitialized ? Life.Maintenance() : 1.);
+            H.Control->EatMult = 0.;
+            H.Control->bStill = true;
         }
     }
 
@@ -526,14 +599,26 @@ namespace EcoPolicyV3IntegratedProcImpl
             FVector Ignored;
             A.Combat->SelectWolfCarrion(WolfId, A.RegionId, FVector::ZeroVector, false, Ignored);
         }
-        if(!Life.PredatorStep(Now,Threat.State.PosX,Threat.State.PosY,Threat.Last.bRunning,EcoRepertoireV3::kStepSeconds)){
+        const bool bAdaptive = A.Combat && A.Combat->UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal);
+        Life.bMealRestApplied = false;
+        if (bAdaptive)
+        {
+            const bool bWasSeeking = Life.MealCycle.bSeeking;
+            Life.MealCycle.Update(Life.Nutrition, Now, .75, .92, 6.);
+            if (bWasSeeking != Life.MealCycle.bSeeking)
+                UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco MealCycle] Id=%lld Species=Wolf Seeking=%d Energy=%.3f"),
+                    WolfId, Life.MealCycle.bSeeking, Life.Nutrition);
+        }
+        const bool bMayFeed = !bAdaptive || Life.MealCycle.bSeeking;
+        if(!Life.PredatorStep(Now,Threat.State.PosX,Threat.State.PosY,Threat.Last.bRunning,EcoRepertoireV3::kStepSeconds,
+            bMayFeed,bAdaptive?.92:1.)){
             Threat.bDead=true;I.Cancel(Now);Life.AbandonMeat();Input.bHuntingAllowed=false;return;
         }
         if(Life.BaseSpeed<=0){Life.BaseSpeed=Threat.Spec.BaseSpeed;Life.BaseCatchRadius=Threat.Spec.CatchRadius;}
         Threat.Spec.BaseSpeed=Life.BaseSpeed*Life.SpeedScale(Now)*(Life.Nutrition<.15?.7:1.);
         Threat.Spec.CatchRadius=Life.BaseCatchRadius*Life.BodyScale(Now);
-        Input.bHuntingAllowed=Input.bHuntingAllowed&&Life.Nutrition<.9;
-        if(Life.MealRemaining>0&&Now<Life.MealExpires&&(Life.Nutrition<.9||Life.bFeedingMeat)){
+        Input.bHuntingAllowed=Input.bHuntingAllowed&&(bAdaptive?bMayFeed:Life.Nutrition<.9);
+        if(Life.MealRemaining>0&&Now<Life.MealExpires&&(bAdaptive?bMayFeed:(Life.Nutrition<.9||Life.bFeedingMeat))){
             const double X=Life.MealX-Threat.State.PosX,Y=Life.MealY-Threat.State.PosY,D=FMath::Sqrt(X*X+Y*Y);
             Input.bHuntingAllowed=false;Input.bResourceApproach=true;Input.bResourceWait=D<=2.5;
             Input.ResourceDirX=X/FMath::Max(.01,D);Input.ResourceDirY=Y/FMath::Max(.01,D);
@@ -559,7 +644,8 @@ namespace EcoPolicyV3IntegratedProcImpl
             if (A.Combat->GuideWolfPlayerCombat((*A.WolfKeys)[Index],*A.Ctx,P,FVector(Threat.State.HeadX,Threat.State.HeadY,0),Now,Available,Life.Memory.bLastDamageKnown && Life.Memory.LastDamage>=0 && Now-Life.Memory.LastDamage<20,Input))
             { I.Cancel(Now); return; }
         }
-        if (A.Combat && WolfId > 0 && !Input.bResourceApproach && !Threat.State.bAsleep && Life.Nutrition < .75)
+        if (A.Combat && WolfId > 0 && !Input.bResourceApproach && !Threat.State.bAsleep
+            && (bAdaptive ? bMayFeed : Life.Nutrition < .75))
         {
             const FVector Position = A.Ctx->UnitsToCm(Threat.State.PosX, Threat.State.PosY, Link.GroundZ);
             FVector Food;
@@ -574,6 +660,14 @@ namespace EcoPolicyV3IntegratedProcImpl
                 I.Cancel(Now);
                 return;
             }
+        }
+        if (bAdaptive && Life.MealCycle.IsResting(Now) && !Input.bResourceApproach && !Threat.State.bAsleep)
+        {
+            Input.bResourceApproach = true;
+            Input.bResourceWait = true;
+            Life.bMealRestApplied = true;
+            I.Cancel(Now);
+            return;
         }
         auto ClearLine=[&](double X,double Y,double Z){
             const FVector Start=A.Ctx->UnitsToCm(Threat.State.PosX,Threat.State.PosY,Link.GroundZ)+FVector(0,0,65);
@@ -868,8 +962,9 @@ void UEcoPolicyV3IntegratedStepProcessor::ConfigureQueries(const TSharedRef<FMas
 	DeerQuery.AddRequirement<FEcoHerbivoreBodyV3Fragment>(EMassFragmentAccess::ReadWrite);
 	DeerQuery.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadWrite);
 	DeerQuery.AddTagRequirement<FEcoIntegratedPolicyV3Tag>(EMassFragmentPresence::All);
+	DeerQuery.AddTagRequirement<FEcoIntegratedThreatV3Tag>(EMassFragmentPresence::None);
 	DeerQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
-	DeerQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	EcoPolicyV3IntegratedProcImpl::ExcludeOtherWriters(DeerQuery);
 
 	WolfQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	WolfQuery.AddRequirement<FEcoRegionFragment>(EMassFragmentAccess::ReadOnly);
@@ -881,8 +976,9 @@ void UEcoPolicyV3IntegratedStepProcessor::ConfigureQueries(const TSharedRef<FMas
 	WolfQuery.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadWrite);
 	WolfQuery.AddRequirement<FEcoPredatorStateFragment>(EMassFragmentAccess::ReadWrite);
 	WolfQuery.AddTagRequirement<FEcoIntegratedThreatV3Tag>(EMassFragmentPresence::All);
+	WolfQuery.AddTagRequirement<FEcoIntegratedPolicyV3Tag>(EMassFragmentPresence::None);
 	WolfQuery.AddTagRequirement<FEcoAliveTag>(EMassFragmentPresence::All);
-	WolfQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	EcoPolicyV3IntegratedProcImpl::ExcludeOtherWriters(WolfQuery);
 }
 
 void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
@@ -928,7 +1024,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		const TArrayView<FEcoIntegratedV3Fragment> Ints = Ctx.GetMutableFragmentView<FEcoIntegratedV3Fragment>();
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
-			if (Ids[i].StableAgentId <= 0 || Vits[i].HP <= 0.0f || Ints[i].bDead)
+			if (Ids[i].SpeciesId != NativeDeerSpecies || Ids[i].StableAgentId <= 0 || Vits[i].HP <= 0.0f || Ints[i].bDead)
 			{
 				continue;   // 아직 정체성이 없거나, 이미 죽었다 (조정자가 Alive 를 떼고 지운다)
 			}
@@ -966,7 +1062,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		const TArrayView<FEcoPredatorStateFragment> Preds = Ctx.GetMutableFragmentView<FEcoPredatorStateFragment>();
 		for (int32 i = 0; i < Ctx.GetNumEntities(); ++i)
 		{
-			if (Ids[i].StableAgentId <= 0 || Vits[i].HP <= 0.0f)
+			if (Ids[i].SpeciesId != NativeWolfSpecies || Ids[i].StableAgentId <= 0 || Vits[i].HP <= 0.0f)
 			{
 				continue;
 			}
@@ -1146,6 +1242,9 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		// 밖으로 민다. 대기 변화가 없으면 아무것도 하지 않는다 (지금까지와 비트 단위로 같다)
 		if (Sub->HasPendingEnvChange())
 		{
+#if UE_BUILD_SHIPPING
+			Sub->ApplyEnvChange({}, {});
+#else
 			TArray<TArray<EcoWorldV3::FHerbBody*>> EnvBodies;
 			TArray<TArray<EcoWorldV3::FThreatAgent*>> EnvAgents;
 			EnvBodies.SetNum(NumCtx);
@@ -1162,6 +1261,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 				}
 			}
 			Sub->ApplyEnvChange(EnvBodies, EnvAgents);
+#endif
 		}
 		// 전역 스텝 경계마다: 예정 바꾸기(eco.V3Brain.SwapAtSeconds)가 한 프레임 안의 정확한 스텝에서 걸리게. 이 스텝의 모든 지역이 같은 두뇌다
 		Sub->SyncBrain(/*bPollWatch*/ false);
@@ -1434,20 +1534,24 @@ UEcoPolicyV3IntegratedVisualProcessor::UEcoPolicyV3IntegratedVisualProcessor()
 void UEcoPolicyV3IntegratedVisualProcessor::ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager)
 {
 	// Alive 를 요구하지 않는다 — 죽은 개체도 조정자가 지울 때까지 죽은 자리에 멈춰 있어야 한다
+	DeerQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	DeerQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 	DeerQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadWrite);
 	DeerQuery.AddRequirement<FEcoHerbivoreBodyV3Fragment>(EMassFragmentAccess::ReadOnly);
 	DeerQuery.AddRequirement<FEcoBehaviorStateFragment>(EMassFragmentAccess::ReadOnly);
 	DeerQuery.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadOnly);
 	DeerQuery.AddTagRequirement<FEcoIntegratedPolicyV3Tag>(EMassFragmentPresence::All);
-	DeerQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	DeerQuery.AddTagRequirement<FEcoIntegratedThreatV3Tag>(EMassFragmentPresence::None);
+	EcoPolicyV3IntegratedProcImpl::ExcludeOtherWriters(DeerQuery);
 
+	WolfQuery.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
 	WolfQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 	WolfQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadWrite);
 	WolfQuery.AddRequirement<FEcoThreatStateFragment>(EMassFragmentAccess::ReadOnly);
 	WolfQuery.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadOnly);
 	WolfQuery.AddTagRequirement<FEcoIntegratedThreatV3Tag>(EMassFragmentPresence::All);
-	WolfQuery.AddTagRequirement<FEcoClientProxyTag>(EMassFragmentPresence::None);
+	WolfQuery.AddTagRequirement<FEcoIntegratedPolicyV3Tag>(EMassFragmentPresence::None);
+	EcoPolicyV3IntegratedProcImpl::ExcludeOtherWriters(WolfQuery);
 }
 
 void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
@@ -1466,6 +1570,7 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 
 	DeerQuery.ForEachEntityChunk(Context, [Sub, Alpha, bDebug, K, World, NowStep, bReserveOn](FMassExecutionContext& Ctx)
 	{
+		const auto Ids = Ctx.GetFragmentView<FEcoIdentityFragment>();
 		const TArrayView<FTransformFragment> Xfs = Ctx.GetMutableFragmentView<FTransformFragment>();
 		const TArrayView<FMassVelocityFragment> Vels = Ctx.GetMutableFragmentView<FMassVelocityFragment>();
 		const TConstArrayView<FEcoHerbivoreBodyV3Fragment> Bodies = Ctx.GetFragmentView<FEcoHerbivoreBodyV3Fragment>();
@@ -1475,7 +1580,7 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 		{
 			const FEcoIntegratedV3Fragment& Int = Ints[i];
 			const FEcoV3RegionContext* Rc = Int.bAdopted ? Sub->GetContext(Int.ContextIndex) : nullptr;
-			if (!Rc)
+			if (!Rc || Ids[i].SpeciesId != EcoPolicyV3IntegratedProcImpl::NativeDeerSpecies)
 			{
 				continue;   // 아직 입양 전 — 조정자가 놓은 자리 그대로
 			}
@@ -1518,6 +1623,7 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 
 	WolfQuery.ForEachEntityChunk(Context, [Sub, Alpha, bDebug, K, World](FMassExecutionContext& Ctx)
 	{
+		const auto Ids = Ctx.GetFragmentView<FEcoIdentityFragment>();
 		const TArrayView<FTransformFragment> Xfs = Ctx.GetMutableFragmentView<FTransformFragment>();
 		const TArrayView<FMassVelocityFragment> Vels = Ctx.GetMutableFragmentView<FMassVelocityFragment>();
 		const TConstArrayView<FEcoThreatStateFragment> Agents = Ctx.GetFragmentView<FEcoThreatStateFragment>();
@@ -1526,7 +1632,7 @@ void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityMa
 		{
 			const FEcoIntegratedV3Fragment& Int = Ints[i];
 			const FEcoV3RegionContext* Rc = Int.bAdopted ? Sub->GetContext(Int.ContextIndex) : nullptr;
-			if (!Rc)
+			if (!Rc || Ids[i].SpeciesId != EcoPolicyV3IntegratedProcImpl::NativeWolfSpecies)
 			{
 				continue;
 			}

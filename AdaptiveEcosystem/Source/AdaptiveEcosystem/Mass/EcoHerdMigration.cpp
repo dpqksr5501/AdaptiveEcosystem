@@ -86,7 +86,8 @@ const TCHAR* UEcoHerdMigrationSubsystem::StateName(EEcoHerdJourneyState S)
     case EEcoHerdJourneyState::Settled:return TEXT("Settled");case EEcoHerdJourneyState::Abandoned:return TEXT("Abandoned");default:return TEXT("Blocked");}
 }
 
-bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEcoServerTimeSnapshot& Time,int64 Step,TArray<FEcoMigrationOutcome>& Arrivals)
+bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEcoServerTimeSnapshot& Time,int64 Step,
+    TArray<FEcoMigrationOutcome>& Arrivals,TConstArrayView<FEcoRegionSpatialSnapshot> Spaces)
 {
     if(!IsInGameThread()||Manager.IsProcessing()||GetWorld()->GetNetMode()==NM_Client)return false;
     auto* Native=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
@@ -96,6 +97,12 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
     // Existing journeys finish even if new departures are disabled at runtime.
     if(!IsEnabled()&&Plans.IsEmpty())return true;
     const double Now=Time.ServerTimeSeconds;
+    auto RegionAvailable = [&](FName Region) {
+        // The context-only automation harness has no streamed geometry.
+        if (Spaces.IsEmpty()) return true;
+        const int32 Index = Ecology->GetRegionRuntimeIndex(Region);
+        return Spaces.IsValidIndex(Index) && Spaces[Index].RegionId == Region && Spaces[Index].bAvailable;
+    };
     struct FMember { int64 Id=0,Herd=0;FEcoRegionFragment* Region=nullptr;FEcoTravelFragment* Travel=nullptr;
         FEcoHerdTravelFragment* Journey=nullptr;FEcoIntegratedV3Fragment* Link=nullptr;FEcoHerbivoreBodyV3Fragment* Body=nullptr;
         FEcoBehaviorStateFragment* Behavior=nullptr;FVector Position;FMassEntityHandle Entity; };
@@ -139,6 +146,46 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
     for(auto& Entry:Plans){
         auto& P=Entry.Value;if(IsTerminal(P.State))continue;
         auto* Target=Native->FindContext(P.Destination);if(!Target)return false;
+        const FName WaitReason = FEcoHerdTravelFragment::UnavailableRegionReason();
+        const bool bReady = RegionAvailable(P.Origin) && RegionAvailable(P.Destination)
+            && !P.Members.ContainsByPredicate([&](int64 Id) {
+                const int32* K = ById.Find(Id);
+                if (!K) return false;
+                const auto& A = Agents[*K];
+                return A.Journey->bActive && A.Journey->PlanId == P.Id && !RegionAvailable(A.Region->CurrentRegionId);
+            });
+        if (!bReady)
+        {
+            bool bWaiting = false;
+            for (const int64 Id : P.Members)
+            {
+                const int32* K = ById.Find(Id);
+                if (!K) continue;
+                auto& J = *Agents[*K].Journey;
+                if (!J.bActive || J.PlanId != P.Id) continue;
+                J.bPause = true;
+                J.Reason = WaitReason;
+                J.MembershipUntil = GetWorld()->GetTimeSeconds() + 10;
+                bWaiting = true;
+            }
+            if (bWaiting)
+            {
+                Change(P, P.State, WaitReason);
+                continue;
+            }
+        }
+        if (P.Reason == WaitReason)
+        {
+            const double PausedFor = FMath::Max(0., Now - P.Changed);
+            P.Started += PausedFor;
+            for (const int64 Id : P.Members)
+            {
+                const int32* K = ById.Find(Id);
+                if (!K) continue;
+                auto& J = *Agents[*K].Journey;
+                if (J.PlanId == P.Id && J.IsWaitingForRegion()) J.LastProgressTime += PausedFor;
+            }
+        }
         const bool DestinationEmpty=Target->Sim.Food.Total()<.5;
         bool NeedsReturn=DestinationEmpty;
         for(const int64 Id:P.Members)if(const auto* K=ById.Find(Id)){
@@ -246,10 +293,11 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
     };
     TArray<int64> HerdIds;Groups.GetKeys(HerdIds);HerdIds.Sort();
     for(const int64 Herd:HerdIds){
-        const auto& Members=Groups.FindChecked(Herd);if(Members.IsEmpty())continue;
+        const auto Members=Groups.FindChecked(Herd).FilterByPredicate([&](int32 I){return !Agents[I].Journey->bStranded;});
+        if(Members.IsEmpty())continue;
         if(const auto* P=Plans.Find(Herd);P&&(!IsTerminal(P->State)||Now<P->CooldownUntil))continue;
-        if(Members.ContainsByPredicate([&](int32 I){return Agents[I].Journey->bStranded;}))continue;
-        const FName Origin=Agents[Members[0]].Region->CurrentRegionId;auto* Source=Native->FindContext(Origin);if(!Source)continue;
+        const FName Origin=Agents[Members[0]].Region->CurrentRegionId;auto* Source=Native->FindContext(Origin);
+        if(!Source||!RegionAvailable(Origin)){ShortageSince.Remove(Herd);continue;}
         // A persistent herd may have one survivor. Life worlds use the same
         // journey/receipts for that individual; never invent a replacement herd.
         if(Members.Num()<2&&!Source->Sim.Config.bEcosystemLife)continue;
@@ -275,7 +323,7 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
             const bool Reverse=Route->bBidirectional&&Route->ToRegion==Origin;
             if(Route->FromRegion!=Origin&&!Reverse)continue;
             const FName Dest=Reverse?Route->FromRegion:Route->ToRegion;auto* Target=Native->FindContext(Dest);
-            if(!Target||Dest==Origin||Route->Points.Num()<2)continue;
+            if(!Target||Dest==Origin||!RegionAvailable(Dest)||Route->Points.Num()<2)continue;
             if(Native->UsesTerrain()){
                 const auto* Registry=GetWorld()->GetSubsystem<UEcologyWorldSubsystem>();
                 const auto* Region=Registry?Registry->GetRegion(Origin):nullptr;

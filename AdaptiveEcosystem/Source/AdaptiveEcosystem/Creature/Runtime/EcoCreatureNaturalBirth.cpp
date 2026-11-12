@@ -24,7 +24,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if(const auto* B=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E))return B->Body.Pos;
         const auto& W=EM.GetFragmentDataChecked<FEcoThreatStateFragment>(E).Agent.State;return EcoWorldV3::FVec2{W.PosX,W.PosY};
     };
-    auto Eligible=[&](int64 Id,FName Region,bool Predator)->FMassEntityHandle {
+    auto Eligible=[&](int64 Id,FName Region,bool Predator,int32* EnergyOnly=nullptr)->FMassEntityHandle {
         const auto* E=AgentLookup.Find(Id);if(!E||!EM.IsEntityValid(*E))return {};
         const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(*E);
         const auto* Body=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(*E);
@@ -38,15 +38,30 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if(!Link||Link->bDead||!Link->bAdopted||(Predator?(!Wolf||Wolf->Agent.bDead):(!Body||Body->Body.DeathCause!=0))
             ||EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).HP<=0
             ||EM.GetFragmentDataChecked<FEcoRegionFragment>(*E).CurrentRegionId!=Region
-            ||Link->Individual.Generation>=64||!Link->Individual.CanParent(Now,Predator?Link->Individual.Nutrition:Body->Body.Energy,!(J&&(J->bActive||J->bStranded)),
-                Link->Individual.bNaturalPopulation?EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).HP/FMath::Max(1.f,EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E).MaxHP):1.))return {};
+            ||Link->Individual.Generation==MAX_uint32)return {};
+        const auto& Vitals=EM.GetFragmentDataChecked<FEcoVitalsFragment>(*E);
+        const bool bResident=!(J&&(J->bActive||J->bStranded));
+        const double Health=Link->Individual.bNaturalPopulation?Vitals.HP/FMath::Max(1.f,Vitals.MaxHP):1.;
+        const double Energy=Predator?Link->Individual.Nutrition:Body->Body.Energy;
+        if(!Link->Individual.CanParent(Now,Energy,bResident,Health))
+        {
+            if(EnergyOnly&&Link->Individual.CanParent(Now,1.,bResident,Health))++*EnergyOnly;
+            return {};
+        }
         return *E;
     };
     // At most one incubation per region and one scan/5s. Reservation is acquired
     // only at delivery; every terminal outcome completes/releases it this boundary.
     for(int32 I=PendingBirths.Num()-1;I>=0;--I){
-        const auto P=PendingBirths[I];const auto A=Eligible(P.ParentA,P.Region,P.bPredator),B=Eligible(P.ParentB,P.Region,P.bPredator);
-        if(!A.IsSet()||!B.IsSet()){PendingBirths.RemoveAtSwap(I);continue;}
+        const auto P=PendingBirths[I];
+        int32 EnergyOnly=0;
+        auto* Audit=bAuditFaunaBirths?&EnergyOnly:nullptr;
+        const auto A=Eligible(P.ParentA,P.Region,P.bPredator,Audit),B=Eligible(P.ParentB,P.Region,P.bPredator,Audit);
+        if(!A.IsSet()||!B.IsSet()){
+            if(Audit)UE_LOG(LogTemp,Log,TEXT("[Eco Birth Audit] Region=%s Predator=%d Event=Cancelled EnergyOnly=%d"),
+                *P.Region.ToString(),P.bPredator,EnergyOnly);
+            PendingBirths.RemoveAtSwap(I);continue;
+        }
         if(Now<P.Due)continue;
         PendingBirths.RemoveAtSwap(I);
         auto& LA=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(A).Individual;
@@ -113,7 +128,11 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
     for(const auto& G:Groups)for(const bool Predator:{false,true}){
         if(PendingBirths.ContainsByPredicate([&](const FPendingBirth& P){return P.Region==G.RegionId&&P.bPredator==Predator;}))continue;
         TArray<int64> Candidates;
-        for(const auto& E:AgentLookup)if(Eligible(E.Key,G.RegionId,Predator).IsSet())Candidates.Add(E.Key);
+        int32 EnergyOnly=0;
+        auto* Audit=bAuditFaunaBirths?&EnergyOnly:nullptr;
+        for(const auto& E:AgentLookup)if(Eligible(E.Key,G.RegionId,Predator,Audit).IsSet())Candidates.Add(E.Key);
+        if(Audit)UE_LOG(LogTemp,Log,TEXT("[Eco Birth Audit] Region=%s Predator=%d Event=Scan Eligible=%d EnergyOnly=%d"),
+            *G.RegionId.ToString(),Predator,Candidates.Num(),EnergyOnly);
         Candidates.Sort();bool Found=false;
         for(int32 I=0;I<Candidates.Num()&&!Found;++I)for(int32 J=I+1;J<Candidates.Num()&&!Found;++J){
             const auto A=AgentLookup.FindChecked(Candidates[I]),B=AgentLookup.FindChecked(Candidates[J]);

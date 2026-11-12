@@ -33,12 +33,28 @@ void UEcoCombatRelevanceComponent::TickComponent(float Delta,ELevelTick Type,FAc
         }
         if (Next.Coordinator!=Offer.Coordinator || Next.Epoch!=Offer.Epoch || Next.Agents!=Offer.Agents)
         {
-            if (Next.Coordinator!=Offer.Coordinator || Next.Epoch!=Offer.Epoch) Presented.Reset();
-            Next.Revision=Offer.Revision+1; Offer=Next; Ready.Reset(); LastReady=-10;
+            UpdateOffer(MoveTemp(Next));
             GetOwner()->ForceNetUpdate(); if (P->IsLocallyControlled()) ReportPresented();
         }
     }
     if (P->IsLocallyControlled() && Now>=NextReport) { NextReport=Now+.2; ReportPresented(); }
+}
+void UEcoCombatRelevanceComponent::UpdateOffer(FEcoCombatOffer Next)
+{
+    if (Next.Coordinator!=Offer.Coordinator || Next.Epoch!=Offer.Epoch)
+    {
+        Presented.Reset();
+        Ready.Reset();
+        LastReady=-10;
+    }
+    else
+    {
+        // Keep the acknowledgement for targets continuously offered in this epoch.
+        for (auto It=Ready.CreateIterator(); It; ++It)
+            if (!Next.Agents.Contains(*It)) It.RemoveCurrent();
+    }
+    Next.Revision=Offer.Revision+1;
+    Offer=MoveTemp(Next);
 }
 void UEcoCombatRelevanceComponent::SetPresented(AEcoCreatureIntegrationSpawner* C,const TArray<int64>& Ids)
 {
@@ -46,7 +62,11 @@ void UEcoCombatRelevanceComponent::SetPresented(AEcoCreatureIntegrationSpawner* 
     const bool Changed=Presented!=Ids; Presented=Ids;
     if (Changed) ReportPresented();
 }
-void UEcoCombatRelevanceComponent::OnRep_Offer() { Presented.Reset(); ReportPresented(); }
+void UEcoCombatRelevanceComponent::OnRep_Offer(const FEcoCombatOffer& Previous)
+{
+    if (Previous.Coordinator!=Offer.Coordinator || Previous.Epoch!=Offer.Epoch) Presented.Reset();
+    ReportPresented();
+}
 void UEcoCombatRelevanceComponent::ReportPresented()
 {
     const auto* P=Cast<APawn>(GetOwner()); if (!P || !P->IsLocallyControlled()) return;

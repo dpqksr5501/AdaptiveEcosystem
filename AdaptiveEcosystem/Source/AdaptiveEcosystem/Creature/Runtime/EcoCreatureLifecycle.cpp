@@ -76,7 +76,8 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 			const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
 			const auto& Travel = EM.GetFragmentDataChecked<FEcoTravelFragment>(E);
 			const double Due = EM.GetFragmentDataChecked<FEcoLifetimeFragment>(E).NextFeedTimeSeconds;
-			if (V.HP > 0 && Id.SpeciesId == TEXT("Herbivore") && Travel.State == EEcoResidenceState::Resident && Due > LastResourceTime)
+			if (V.HP > 0 && Id.SpeciesId == TEXT("Herbivore") && Travel.State == EEcoResidenceState::Resident && Due > LastResourceTime
+                && !EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E))
 				NextTime = FMath::Min(NextTime, Due);
             if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E);
                 Fauna && V.HP > 0 && Fauna->AttackContact > LastResourceTime)
@@ -235,14 +236,15 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	TArray<FName> RegionIds; Ecology->GetRegionIds(RegionIds);
 	TArray<FEcoResourceSnapshot> Resources; Ecology->GetResourceSnapshots(Resources);
 	TArray<FEcoRegionSpatialSnapshot> Spaces;
-	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionIds, Spaces)) return false;
+	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionIds, Spaces, true)) return false;
 	TArray<FEcoMigrationOutcome> Arrivals;
 	if(auto* HerdMigration=GetWorld()->GetSubsystem<UEcoHerdMigrationSubsystem>())
-        if(!HerdMigration->Reconcile(EM,Time,Step,Arrivals))return false;
+        if(!HerdMigration->Reconcile(EM,Time,Step,Arrivals,Spaces))return false;
     TArray<FEcoMigrationOutcome> LegacyArrivals;
 	if (!EcoMassMigration::Reconcile(EM, Time, ObservedTime, Step, Resources, Spaces, Migration,
 		false, 1.0, nullptr, nullptr, {}, 0.0, &LegacyArrivals, false))return false;
     Arrivals.Append(LegacyArrivals);
+    ReconcileFaunaPassages(EM, Time, ObservedTime, Step, Arrivals);
     if (!Ecology->RecordMigrations(Arrivals) || !ReconcilePopulation()
 		|| !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return false;
 	for (const auto& Arrival : Arrivals)
@@ -359,6 +361,13 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 if(!J->bPause)Present.Flags&=~uint8(2);
             }
             if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized){
+                if (UsesAdaptiveRoutine(EEcoAdaptiveRoutine::DeerMeal))
+                {
+                    if (const auto* Body = EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E); Body && Body->Body.LastIntake <= 1.e-9)
+                        Present.Flags &= ~uint8(2);
+                    if (Link->Individual.bMealRestApplied)
+                        Present.Activity = uint8(EEcoSpeciesActivity::SatedRest);
+                }
                 if(NaturalHabitatProfile){
                     switch(Link->Individual.Residence.Phase){
                         case 1:case 5:Present.Activity=uint8(EEcoSpeciesActivity::ShelterTravel);Present.Flags&=~uint8(2);break;
@@ -386,6 +395,10 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
             Present.Activity = uint8(StateIndex < UE_ARRAY_COUNT(Activities) ? Activities[StateIndex] : EEcoSpeciesActivity::Hold);
             if(Threat->Agent.State.SatLeft>0&&Threat->Agent.State.Cooldown<=0&&!Threat->Agent.State.bAsleep)
                 Present.Activity=uint8(EEcoSpeciesActivity::SatedRest);
+            if (UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal))
+                if (const auto* Link = EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);
+                    Link && Link->Individual.bMealRestApplied && !Threat->Agent.State.bAsleep)
+                    Present.Activity = uint8(EEcoSpeciesActivity::SatedRest);
             if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);
                 Link&&Link->Individual.Investigation.Role==EcoTracesV3::ERole::Investigate)Present.Activity=uint8(EEcoSpeciesActivity::Investigate);
             if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);

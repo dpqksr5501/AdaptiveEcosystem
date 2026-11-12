@@ -158,11 +158,35 @@ namespace EcoLifeV3
             Fear=std::min(1.,Fear+.12*Confidence);return true; // no direct position/time, no rebroadcast
         }
     };
+    struct FMealCycle
+    {
+        double RestUntil = 0.;
+        bool bSeeking = false;
+
+        void Update(double Energy, double Now, double Start, double Stop, double RestSeconds)
+        {
+            if (bSeeking && Energy >= Stop)
+            {
+                bSeeking = false;
+                RestUntil = Now + RestSeconds;
+            }
+            else if (!bSeeking && (Energy <= .25 || (Now >= RestUntil && Energy <= Start)))
+            {
+                bSeeking = true;
+                RestUntil = 0.;
+            }
+        }
+
+        bool IsResting(double Now) const { return !bSeeking && Now < RestUntil; }
+    };
+
     struct FIndividual
     {
         FGenome Genome;
         FMemory Memory;
         EcoTracesV3::FInvestigation Investigation;
+        FMealCycle MealCycle;
+        bool bMealRestApplied = false;
         double NextTrace=0;
         // Predator-only nutrition. Plant-feeding bodies continue owning their native Energy/Reserve.
         double Nutrition=1,MealRemaining=0,MealExpires=0,MealX=0,MealY=0,MealZ=0;
@@ -201,9 +225,10 @@ namespace EcoLifeV3
         double BodyScale(double Now) const { return Genome.Size*Growth(Now); }
         double SpeedScale(double Now) const { return Genome.Speed*(.8+.2*Growth(Now)); }
         double Maintenance() const { return Genome.Size*Genome.Size*Genome.Size*(1+std::max(0.,Genome.Speed-1)*2); }
+        static constexpr double MinimumParentEnergy = .7;
         bool CanParent(double Now,double Energy,bool Resident,double Health=1) const
         { return bInitialized&&Resident&&std::isfinite(Health)&&Health>=.7&&Health<=1
-            &&Now-Born>=MaturitySeconds&&Now>=NextBirth&&Energy>=.7&&Genome.IsValid(); }
+            &&Now-Born>=MaturitySeconds&&Now>=NextBirth&&Energy>=MinimumParentEnergy&&Genome.IsValid(); }
         bool AssignMeat(std::int64_t Prey,double Amount,double Now,double X,double Y,double Z)
         {
             if(Prey<=0||Prey==MealSource||!std::isfinite(Amount)||Amount<=0||Amount>.6||!std::isfinite(Now)
@@ -211,17 +236,17 @@ namespace EcoLifeV3
             MeatWasted+=MealRemaining;MealRemaining=Amount;MeatIssued+=Amount;MealSource=Prey;MealExpires=Now+20;bFeedingMeat=false;
             MealX=X;MealY=Y;MealZ=Z;return true;
         }
-        bool PredatorStep(double Now,double X,double Y,bool Running,double Dt)
+        bool PredatorStep(double Now,double X,double Y,bool Running,double Dt,bool bMayFeed=true,double Full=1.)
         {
             if(!std::isfinite(Dt)||Dt<=0||Dt>.25)return Nutrition>0;
             LastMeatIntake=0;
             Nutrition=std::max(0.,Nutrition-.00225*Maintenance()*(Running?2:1)*Dt);
             if(MealRemaining>0&&Now>=MealExpires){MeatWasted+=MealRemaining;MealRemaining=0;bFeedingMeat=false;}
             if(Nutrition<.9)bFeedingMeat=true;
-            if(bFeedingMeat&&MealRemaining>0&&(MealX-X)*(MealX-X)+(MealY-Y)*(MealY-Y)<=6.25){
-                const double Bite=std::min({MealRemaining,.12*Dt,1-Nutrition});
+            if(bMayFeed&&bFeedingMeat&&MealRemaining>0&&(MealX-X)*(MealX-X)+(MealY-Y)*(MealY-Y)<=6.25){
+                const double Bite=std::min({MealRemaining,.12*Dt,std::max(0.,Full-Nutrition)});
                 MealRemaining-=Bite;MeatConsumed+=Bite;Nutrition+=Bite;LastMeatIntake=Bite;
-                if(Nutrition>=.98||MealRemaining<=0)bFeedingMeat=false;
+                if(Nutrition>=std::min(.98,Full)||MealRemaining<=0)bFeedingMeat=false;
             }
             return Nutrition>0;
         }

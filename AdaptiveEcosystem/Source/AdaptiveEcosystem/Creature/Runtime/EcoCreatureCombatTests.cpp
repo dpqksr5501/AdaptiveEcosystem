@@ -214,6 +214,19 @@ bool FEcoCombatPresentationAdmission::RunTest(const FString&)
     TestFalse(TEXT("Presentation removal revokes damage"),RA->CanAttack(S,7,101));
     RA->ServerPresented_Implementation(1,{999});
     TestFalse(TEXT("Unassigned logical identity cannot be admitted"),RA->CanAttack(S,7,999));
+    RA->ServerPresented_Implementation(1,{101,102});
+    FEcoCombatOffer Next=RA->Offer;
+    Next.Agents={101,103};
+    RA->UpdateOffer(Next);
+    TestTrue(TEXT("Retained target keeps its acknowledgement during unrelated churn"),RA->CanAttack(S,7,101));
+    TestFalse(TEXT("Removed target loses its acknowledgement"),RA->CanAttack(S,7,102));
+    TestFalse(TEXT("New target still needs its own acknowledgement"),RA->CanAttack(S,7,103));
+    Next.Agents={101,102};
+    RA->UpdateOffer(Next);
+    TestFalse(TEXT("Returning target cannot reuse its removed acknowledgement"),RA->CanAttack(S,7,102));
+    Next.Epoch=8;
+    RA->UpdateOffer(Next);
+    TestFalse(TEXT("World epoch change clears retained acknowledgements"),RA->CanAttack(S,8,101));
     return true;
 }
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoGunPresentationHit,"AdaptiveEcosystem.Combat.GunPresentationTraceAndDamage",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
@@ -399,6 +412,39 @@ bool FEcoFaunaCounterTest::RunTest(const FString&)
     TestEqual(TEXT("A patch credits only the requested energy"), Patch.TakeMeal(Stock, 1.f), 1.f);
     TestEqual(TEXT("The next eater receives only the remaining stock"), Patch.TakeMeal(Stock, 8.f), 2.5f);
     TestEqual(TEXT("An exhausted patch cannot issue another meal"), Patch.TakeMeal(Stock, 8.f), 0.f);
+    EcoLifeV3::FMealCycle Cycle;
+    Cycle.Update(.65, 1., .7, .9, 4.);
+    TestTrue(TEXT("Hunger starts a meal"), Cycle.bSeeking);
+    Cycle.Update(.8, 2., .7, .9, 4.);
+    TestTrue(TEXT("Eating continues above the start threshold"), Cycle.bSeeking);
+    Cycle.Update(.91, 3., .7, .9, 4.);
+    TestTrue(TEXT("A completed meal starts a bounded rest"), Cycle.IsResting(3.));
+    Cycle.Update(.69, 4., .7, .9, 4.);
+    TestTrue(TEXT("Minor energy loss does not interrupt rest"), Cycle.IsResting(4.));
+    Cycle.Update(.24, 5., .7, .9, 4.);
+    TestTrue(TEXT("Critical hunger interrupts rest"), Cycle.bSeeking);
+    FEcoFaunaCarcass Kill;
+    Kill.KillerId = 1;
+    Kill.OpenAt = 2.;
+    Kill.ExclusiveUntil = 4.;
+    Kill.ExpiresAt = 12.;
+    Kill.Remaining = 10.f;
+    TestTrue(TEXT("A hunter can keep approaching its kill when the sharing window opens"),
+        Kill.RetainsKillerTarget(1, 5., true));
+    TestTrue(TEXT("Keeping the target does not extend the exclusive reservation"), Kill.CanApproach(2, 5.));
+    TestFalse(TEXT("A different animal does not own the kill"), Kill.RetainsKillerTarget(2, 5., true));
+    TestFalse(TEXT("An expired kill cannot retain the target"), Kill.RetainsKillerTarget(1, 12., true));
+    const FEcoFaunaPersistenceSettings Persistence;
+    TestTrue(TEXT("Local encounters increase expected hunting value"),
+        EcoFaunaFeeding::EncounterWeight(1, Persistence) < EcoFaunaFeeding::EncounterWeight(4, Persistence));
+    FEcoFaunaFragment Forager;
+    Forager.RecordForageIntake(FVector(200., 20., 0.), 10., 20.f, Persistence.ForageMemorySeconds);
+    TestEqual(TEXT("Feeding records only the credited intake"), Forager.RecentForageIntake(10., Persistence.ForageMemorySeconds), 20.f);
+    TestTrue(TEXT("Old intake loses relevance"), Forager.RecentForageIntake(100., Persistence.ForageMemorySeconds) < 8.f);
+    TestEqual(TEXT("Stored surplus supports a well-fed parent between meals"),
+        EcoFaunaFeeding::BreedingReserve(90., 100., 0.), 20.);
+    TestEqual(TEXT("A parent at the minimum has only recent intake to forecast"),
+        EcoFaunaFeeding::BreedingReserve(70., 100., 4.), 4.);
     TestTrue(TEXT("Nearby safe carrion beats costly hunt"), EcoFaunaFeeding::Value(12., .5) > EcoFaunaFeeding::Value(15., 2., 5.));
     TestTrue(TEXT("Nearby viable prey beats distant depleted carrion"), EcoFaunaFeeding::Value(15., .5, 2.) > EcoFaunaFeeding::Value(4., 4.));
     return true;

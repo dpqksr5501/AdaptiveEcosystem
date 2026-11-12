@@ -78,6 +78,25 @@ void AEcoCreatureIntegrationSpawner::BeginPlay()
 	PostTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &AEcoCreatureIntegrationSpawner::OnWorldPostActorTick);
 	StartedAt = GetWorld()->GetTimeSeconds();
 #if WITH_DEV_AUTOMATION_TESTS
+    int32 RoutinesOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoAdaptiveRoutines="), RoutinesOverride)
+        && (RoutinesOverride == 0 || RoutinesOverride == 1)) bEnableAdaptiveRoutines = RoutinesOverride != 0;
+    int32 RoutineMask = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoAdaptiveRoutineMask="), RoutineMask)
+        && RoutineMask >= 0 && RoutineMask <= int32(EEcoAdaptiveRoutine::All)) AdaptiveRoutineOverride = uint16(RoutineMask);
+    int32 PursuitOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaPursuitFix="), PursuitOverride)
+        && (PursuitOverride == 0 || PursuitOverride == 1)) bFaunaPursuitFix = PursuitOverride != 0;
+    int32 CarrionOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaCarrionAccess="), CarrionOverride)
+        && (CarrionOverride == 0 || CarrionOverride == 1)) bFaunaCarrionAccess = CarrionOverride != 0;
+    bFaunaAttackAdvance = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaAttackAdvance"));
+    bFaunaFollowWounded = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaFollowWounded"));
+    bAuditFaunaHunts = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaHuntAudit"));
+    bAuditFaunaBirths = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaBirthAudit"));
+    int32 PersistenceOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaPersistence="), PersistenceOverride)
+        && (PersistenceOverride == 0 || PersistenceOverride == 1)) FaunaPersistence.bEnabled = PersistenceOverride != 0;
     int32 HabitatStageOverride = INDEX_NONE;
     if (FaunaHabitatStage > 0 && FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaHabitatStage="), HabitatStageOverride)
         && HabitatStageOverride >= 0 && HabitatStageOverride <= 3) FaunaHabitatStage = HabitatStageOverride;

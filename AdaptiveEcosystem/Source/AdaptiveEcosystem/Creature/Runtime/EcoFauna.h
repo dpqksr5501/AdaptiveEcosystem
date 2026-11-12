@@ -25,6 +25,26 @@ enum class EEcoFaunaLocomotion : uint8 { Ground, Flight };
 enum class EEcoFaunaFlightPhase : uint8 { Grounded, Takeoff, Cruise, Landing };
 
 USTRUCT(BlueprintType)
+struct FEcoFaunaPersistenceSettings
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere) bool bEnabled = false;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="s")) float ActivityMemorySeconds = 4.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="s")) float ForageMemorySeconds = 90.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="1")) float ScarcePreyValue = .35f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="1")) float PreyHalfSaturation = 3.f;
+
+    bool IsValid() const
+    {
+        return FMath::IsFinite(ActivityMemorySeconds) && ActivityMemorySeconds >= 1.f
+            && FMath::IsFinite(ForageMemorySeconds) && ForageMemorySeconds >= 1.f
+            && FMath::IsFinite(ScarcePreyValue) && ScarcePreyValue >= 0.f && ScarcePreyValue <= 1.f
+            && FMath::IsFinite(PreyHalfSaturation) && PreyHalfSaturation >= 1.f;
+    }
+};
+
+USTRUCT(BlueprintType)
 struct FEcoFaunaPreyRule
 {
     GENERATED_BODY()
@@ -71,6 +91,8 @@ struct FEcoFaunaSpecies
     UPROPERTY(EditAnywhere, meta=(ClampMin="0")) float SprintDrain = .10f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0")) float FatigueRecovery = .13f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0")) float Maintenance = EcoFaunaNutrition::MaintenancePerSecond;
+    /** Fraction of full-activity maintenance while resting. Only used by adaptive persistence. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0.1", ClampMax="1")) float RestingMaintenanceFraction = .35f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="1200")) float ScentRange = 0.f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="100")) float DefenseDamage = 0.f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="cm")) float OffspringGuardRange = 0.f;
@@ -88,6 +110,18 @@ struct FEcoFaunaSpecies
     /** Zero disables use of shared carrion. */
     UPROPERTY(EditAnywhere, meta=(ClampMin="0")) float CarrionEnergyPerMeal = 0.f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="0.9")) float CarrionHungerFraction = .82f;
+    /** Zero uses the diet's default meal start. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="0.95")) float MealStartFraction = 0.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0.3", ClampMax="1")) float MealStopFraction = .9f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="s")) float PostMealRestSeconds = 4.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0.1", Units="s")) float PursuitLimitSeconds = 12.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm")) float ThreatSenseRange = 650.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="1", ClampMax="180", Units="deg")) float ThreatSightHalfAngle = 90.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="cm")) float ThreatNearAwarenessRange = 280.f;
+    /** Soft radius for routine wandering. Threats, family and resources can lead beyond it. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm")) float RoutineHomeRadius = 520.f;
+    float MealStart() const
+    { return MealStartFraction > 0.f ? MealStartFraction : UsesPlantFood() ? .72f : FMath::Max(.8f, CarrionHungerFraction); }
     UPROPERTY(EditAnywhere) bool bAllowConspecificCarrion = false;
     /** Zero estimates edible energy from body mass. */
     UPROPERTY(EditAnywhere, meta=(ClampMin="0")) float AdultCarrionEnergy = 0.f;
@@ -100,6 +134,7 @@ struct FEcoFaunaSpecies
     UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm/s")) float FlightSpeed = 650.f;
 
     bool UsesPlantFood() const { return Diet != EEcoFaunaDiet::Carnivore; }
+    float CarrionReach() const { return FMath::Clamp(AttackReach, 24.f, 100.f); }
 };
 
 USTRUCT(BlueprintType)
@@ -158,6 +193,7 @@ struct FEcoFaunaFragment : public FMassFragment
     FVector LandingPoint = FVector::ZeroVector;
     FVector LastPreyPosition = FVector::ZeroVector;
     FVector LastThreatPosition = FVector::ZeroVector;
+    FVector ForageMemoryPosition = FVector::ZeroVector;
     FVector HeardPreyPosition = FVector::ZeroVector;
     double NextDecision = 0.;
     double NextSense = 0.;
@@ -166,6 +202,9 @@ struct FEcoFaunaFragment : public FMassFragment
     double BlockedCarrionUntil = 0.;
     double LastMeal = -1.;
     double LastCarrionMeal = -1.;
+    double LastForageIntakeAt = -1.;
+    float ForageIntake = 0.f;
+    float MaintenanceScale = 1.f;
     double PatchBlockedUntil = 0.;
     int32 PatchTarget = INDEX_NONE;
     int32 BlockedPatch = INDEX_NONE;
@@ -194,10 +233,33 @@ struct FEcoFaunaFragment : public FMassFragment
     bool bStalking = false;
     bool bFollowingCaregiver = false;
     EEcoFaunaFlightPhase Flight = EEcoFaunaFlightPhase::Grounded;
+
+    float RecentForageIntake(double Now, float MemorySeconds) const
+    {
+        return LastForageIntakeAt >= 0.
+            ? ForageIntake * float(FMath::Exp(-FMath::Max(0., Now - LastForageIntakeAt) / MemorySeconds)) : 0.f;
+    }
+
+    void RecordForageIntake(const FVector& Site, double Now, float Energy, float MemorySeconds)
+    {
+        ForageIntake = RecentForageIntake(Now, MemorySeconds) + Energy;
+        ForageMemoryPosition = Site;
+        LastForageIntakeAt = Now;
+    }
 };
 
 namespace EcoFaunaFeeding
 {
+    inline double BreedingReserve(double Energy, double MaxEnergy, double RecentIntake)
+    {
+        return FMath::Max(0., Energy - MaxEnergy * EcoLifeV3::FIndividual::MinimumParentEnergy) + RecentIntake;
+    }
+
+    inline double EncounterWeight(int32 Available, const FEcoFaunaPersistenceSettings& Settings)
+    {
+        return FMath::Lerp(double(Settings.ScarcePreyValue), 1., Available / (Available + double(Settings.PreyHalfSaturation)));
+    }
+
     inline double Value(double Energy, double Seconds, double Risk = 0.)
     {
         return FMath::Max(0., Energy - Risk) / (1. + Seconds);
@@ -230,6 +292,12 @@ struct FEcoFaunaCarcass
     {
         return bGrounded && Now >= OpenAt && Now < ExpiresAt && Remaining > UE_SMALL_NUMBER
             && (Now >= ExclusiveUntil || KillerId == AgentId);
+    }
+
+    bool RetainsKillerTarget(int64 AgentId, double Now, bool bAfterSharing) const
+    {
+        return KillerId == AgentId && (Now < ExclusiveUntil
+            || (bAfterSharing && bGrounded && Now < ExpiresAt && Remaining > UE_SMALL_NUMBER));
     }
 
     float Bite(int64 AgentId, double Now, float Requested)

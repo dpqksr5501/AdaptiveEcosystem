@@ -31,6 +31,20 @@ namespace EcoThreatV3 { struct FThreatStepInput; }
 struct FEcoV3RegionContext;
 struct FEcoDeathOutcome;
 
+enum class EEcoAdaptiveRoutine : uint16
+{
+    DeerMeal = 1 << 0,
+    WolfMeal = 1 << 1,
+    FaunaMeal = 1 << 2,
+    ThreatVision = 1 << 3,
+    ShelterApproach = 1 << 4,
+    Roam = 1 << 5,
+    RoutineSprint = 1 << 6,
+    PreyValue = 1 << 7,
+    PursuitLimit = 1 << 8,
+    All = (1 << 9) - 1
+};
+
 USTRUCT(BlueprintType)
 struct FEcoCreatureSpawnGroup
 {
@@ -71,6 +85,13 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") bool bEnableVegetation = false;
     /** Owned scene opt-in: deterministic diversity, observed encounters and conditional offspring. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Creature|Life") bool bEnableEcosystemLife = false;
+    UPROPERTY(EditAnywhere, Category="Creature|Life") bool bEnableAdaptiveRoutines = false;
+    uint16 GetAdaptiveRoutineMask() const
+    {
+        return bEnableEcosystemLife
+            ? AdaptiveRoutineOverride.Get(bEnableAdaptiveRoutines ? uint16(EEcoAdaptiveRoutine::All) : 0) : 0;
+    }
+    bool UsesAdaptiveRoutine(EEcoAdaptiveRoutine Rule) const { return (GetAdaptiveRoutineMask() & uint16(Rule)) != 0; }
     /** Explicit level opt-in; null preserves all legacy/life-v2 habitat and safety rules. */
     UPROPERTY(EditAnywhere, Category="Creature|Habitat") TObjectPtr<UEcoNaturalHabitatProfile> NaturalHabitatProfile;
     UPROPERTY(EditAnywhere, Category="Creature|Habitat") TMap<FName,TObjectPtr<UEcoNaturalHabitatProfile>> RegionHabitatProfiles;
@@ -92,6 +113,7 @@ public:
     UPROPERTY(EditAnywhere, Category="Creature|Population") TArray<FEcoFaunaSpecies> FaunaSpecies;
     UPROPERTY(EditAnywhere, Category="Creature|Population", meta=(ClampMin="0", ClampMax="3")) int32 FaunaHabitatStage = 0;
     UPROPERTY(EditAnywhere, Category="Creature|Population") TArray<FEcoFaunaHabitatPatch> FaunaHabitatPatches;
+    UPROPERTY(EditAnywhere, Category="Creature|Population") FEcoFaunaPersistenceSettings FaunaPersistence;
 	UPROPERTY(EditAnywhere, Category="Creature|Population", meta=(ClampMin="1",ClampMax="512")) int32 GlobalPopulationLimit = 128;
 	UPROPERTY(EditAnywhere, Category="Creature|Time", meta=(ClampMin="1")) double DaySeconds = 60;
 	UPROPERTY(EditAnywhere, Category="Creature|Time", meta=(ClampMin="1")) double NightSeconds = 60;
@@ -159,6 +181,18 @@ public:
 	virtual FVector GetCoverDirection(const FVector& Location) const override;
 	virtual bool IsInCover(const FVector& Location) const override;
 private:
+    bool UsesFaunaPersistence() const { return FaunaHabitatStage > 0 && FaunaPersistence.bEnabled; }
+    TOptional<uint16> AdaptiveRoutineOverride;
+    bool bFaunaPursuitFix = false;
+    bool bFaunaCarrionAccess = true;
+    bool bFaunaAttackAdvance = false;
+    bool bFaunaFollowWounded = false;
+    bool bAuditFaunaHunts = false;
+    bool bAuditFaunaBirths = false;
+    bool UsesFaunaPursuitFix() const { return FaunaHabitatStage >= 3 && bFaunaPursuitFix; }
+    bool UsesFaunaCarrionAccess() const { return FaunaHabitatStage >= 3 && bFaunaCarrionAccess; }
+    bool UsesFaunaAttackAdvance() const { return FaunaHabitatStage >= 3 && bFaunaAttackAdvance; }
+    bool UsesFaunaFollowWounded() const { return FaunaHabitatStage >= 3 && bFaunaFollowWounded; }
 	friend struct FEcoEcosystemCheckpoint;
     friend struct FEcoCombatTestAccess;
 	friend class UEcoPolicyV3IntegratedSubsystem;
@@ -168,7 +202,8 @@ private:
     bool RegisterFaunaTemplate();
     bool BuildFaunaPositions(FName RegionId, const FEcoFaunaPlacement& Placement, TArray<FVector>& Out) const;
     bool InitializeFaunaHabitat();
-    const FEcoFaunaHabitatPatch* FindFaunaShelter(FName Region, FName Species, const FVector& Position, double Range) const;
+    const FEcoFaunaHabitatPatch* FindFaunaShelter(FName Region, FName Species, const FVector& Position, double Range,
+        float ApproachEyeHeight = 0.f) const;
     TArray<float> FaunaPatchStock;
     double LastFaunaPatchUpdate = 0.;
     const FEcoFaunaSpecies* FindFauna(FName SpeciesId) const;
@@ -176,6 +211,8 @@ private:
     FIntPoint CountFaunaDiets(FName RegionId) const;
     int32 SpawnFauna(FName RegionId, const FEcoFaunaSpecies& Species, const TArray<FVector>& Positions);
     void MoveFauna(float Delta, double Now);
+    void ReconcileFaunaPassages(FMassEntityManager& EM, const FEcoServerTimeSnapshot& Time, double ObservedTime, int64 Step,
+        TArray<FEcoMigrationOutcome>& Arrivals);
     void ProcessFaunaPredation(double Now);
     FMassEntityHandle SelectFaunaGuard(const FMassEntityManager& Manager, FMassEntityHandle Child,
         FMassEntityHandle Hunter, double Now) const;

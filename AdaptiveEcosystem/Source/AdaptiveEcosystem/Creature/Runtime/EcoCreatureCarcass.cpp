@@ -99,7 +99,10 @@ void AEcoCreatureIntegrationSpawner::FeedWolvesFromCarrion(double Now)
             || EM.GetFragmentDataChecked<FMassVelocityFragment>(*Handle).Value.SizeSquared2D() > FMath::Square(35.)
             || GetWorld()->LineTraceTestByObjectType(Position + FVector(0, 0, 55), Stock->Position + FVector(0, 0, 20),
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfCarrionContact)))) continue;
-        const float Meal = Stock->Bite(WolfId, Now, float(FMath::Min(8., (1. - Link->Individual.Nutrition) * 100.)));
+        const bool bAdaptive = UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal);
+        if (bAdaptive && !Link->Individual.MealCycle.bSeeking) continue;
+        const double Full = bAdaptive ? .92 : 1.;
+        const float Meal = Stock->Bite(WolfId, Now, float(FMath::Min(8., (Full - Link->Individual.Nutrition) * 100.)));
         if (Meal <= 0.f) continue;
         Lifetime.NextFeedTimeSeconds = Now + 1.;
         Link->Individual.Nutrition = FMath::Min(1., Link->Individual.Nutrition + Meal / 100.);
@@ -155,9 +158,16 @@ void AEcoCreatureIntegrationSpawner::CommitFaunaCarcass(const FEcoDeathOutcome& 
     Stock.Region = Death.RegionId;
     Stock.Species = Death.SpeciesId;
     Stock.OpenAt = Death.Time + Settle;
-    Stock.ExclusiveUntil = Stock.OpenAt + (Stock.KillerId > 0 ? 2.5 : 0.);
     if (NativeReserved > 0.f) Stock.OpenAt = FMath::Max(Stock.OpenAt, Death.Time + 3.);
+    Stock.ExclusiveUntil = Stock.OpenAt + (Stock.KillerId > 0 ? 2.5 : 0.);
     Stock.ExpiresAt = Stock.OpenAt + (Species ? Species->CarrionLifetime : 18.f);
+    if (UsesFaunaCarrionAccess())
+    {
+        // Larger stocks give animals time to arrive and take more than a single bite.
+        Stock.ExpiresAt += FMath::Min(15.f, Stock.Remaining / 8.f);
+        auto& DeathState = EM.GetFragmentDataChecked<FEcoDeathFragment>(*Victim);
+        DeathState.RemoveAfter = FMath::Max(DeathState.RemoveAfter, Stock.ExpiresAt + 2.);
+    }
     Stock.FeedingPlaces = Species ? Species->FeedingPlaces : 3;
     Stock.bGrounded = (!Fauna || Fauna->Flight == EEcoFaunaFlightPhase::Grounded)
         && EcoCreatureMovement::IsWadeableGround(*GetWorld(), Stock.Position, 0.f);

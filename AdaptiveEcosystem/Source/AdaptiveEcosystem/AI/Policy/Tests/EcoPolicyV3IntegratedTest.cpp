@@ -633,6 +633,31 @@ bool FEcoPolicyV3IntegratedSwitchTest::RunTest(const FString& Parameters)
 
 // -----------------------------------------------------------------------------
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoPolicyV3IntegratedSpeciesIsolation,
+	"AdaptiveEcosystem.Policy.V3.Integrated.SpeciesIsolation",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoPolicyV3IntegratedSpeciesIsolation::RunTest(const FString&)
+{
+	using namespace EcoPolicyV3IntegratedTestImpl;
+	FIntegratedHarness H;
+	if (!H.Setup(*this, TestSettings())) return false;
+	if (!H.AddRegion(TEXT("TestA"), 0, FVector::ZeroVector, 2, 2)) return false;
+	H.Spawn(false, TEXT("TestA"), 0, {FVector(500,500,0), FVector(700,500,0)}, {11,12});
+	H.Spawn(true, TEXT("TestA"), 0, {FVector(2000,2000,0), FVector(2300,2000,0)}, {21,22});
+	if (H.Deer.Num() != 2 || H.Wolves.Num() != 2) return false;
+	H.EM->GetFragmentDataChecked<FEcoIdentityFragment>(H.Deer[1]).SpeciesId = TEXT("Fox");
+	H.EM->GetFragmentDataChecked<FEcoIdentityFragment>(H.Wolves[1]).SpeciesId = TEXT("Leopard");
+	H.DecisionStep();
+	TestTrue(TEXT("Deer uses the native policy body"), H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Deer[0]).bAdopted);
+	TestTrue(TEXT("Wolf uses the native threat body"), H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Wolves[0]).bAdopted);
+	TestFalse(TEXT("Fox cannot enter the deer policy by carrying its tags"), H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Deer[1]).bAdopted);
+	TestFalse(TEXT("Leopard cannot enter the wolf threat backend by carrying its tags"), H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(H.Wolves[1]).bAdopted);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(
 	FEcoPolicyV3IntegratedTemplateTest,
 	"AdaptiveEcosystem.Policy.V3.Integrated.TemplateComposition",
@@ -3159,12 +3184,30 @@ bool FEcoHerdJourneyNative::RunTest(const FString&){
     FString DebugJson;TestTrue(TEXT("Debug snapshot serializes for reproducible captures"),EcoHerdMigrationDebug::ToJson(Debug,DebugJson));
     TestEqual(TEXT("Debug capture cannot create or alter plans"),Journeys->GetPlans().Num(),1);
     for(const auto Entity:H.Deer)TestTrue(TEXT("Both members travel together"),H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(Entity).bActive);
+    TArray<FEcoRegionSpatialSnapshot> Spaces;
+    Spaces.SetNum(2);
+    Spaces[0].RegionId=A->RegionId;
+    Spaces[1].RegionId=B->RegionId;
+    Spaces[1].bAvailable=false;
+    Time.ServerTimeSeconds=1.;
+    if(!Journeys->Reconcile(*H.EM,Time,2,Receipts,Spaces))return false;
+    Time.ServerTimeSeconds=120.;
+    if(!Journeys->Reconcile(*H.EM,Time,3,Receipts,Spaces))return false;
+    TestEqual(TEXT("No arrival receipt while the destination is unavailable"),Receipts.Num(),0);
+    for(const auto Entity:H.Deer)
+        TestTrue(TEXT("The active member waits for region geometry"),H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(Entity).IsWaitingForRegion());
+    Spaces[1].bAvailable=true;
+    if(!Journeys->Reconcile(*H.EM,Time,4,Receipts,Spaces))return false;
+    const auto* Resumed=Journeys->GetPlans().Find(HerdData.PersistentHerdId);
+    if(!TestNotNull(TEXT("The same plan resumes after stream-in"),Resumed))return false;
+    TestFalse(TEXT("The unload interval is not a stall or return"),Resumed->bReturning);
+    TestEqual(TEXT("The plan clock excludes the unload interval"),Resumed->Started,119.);
     // Turning off new departures must not clamp or abandon an existing journey.
     Enable->Set(0,ECVF_SetByCode);
     bool CrossedBoundary=false;int32 Arrivals=0;
     for(int32 I=1;I<=1200;++I){
-        H.DecisionStep();Time.ServerTimeSeconds=I*EcoBehaviorConfig::StepSeconds;Receipts.Reset();
-        if(!Journeys->Reconcile(*H.EM,Time,I+1,Receipts))return false;
+        H.DecisionStep();Time.ServerTimeSeconds=120.+I*EcoBehaviorConfig::StepSeconds;Receipts.Reset();
+        if(!Journeys->Reconcile(*H.EM,Time,I+4,Receipts,Spaces))return false;
         Arrivals+=Receipts.Num();
         for(const auto Entity:H.Deer){const auto& Link=H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Entity);
             const auto& Body=H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Entity).Body;

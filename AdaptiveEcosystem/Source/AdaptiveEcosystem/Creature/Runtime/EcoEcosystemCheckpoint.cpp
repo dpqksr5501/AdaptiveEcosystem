@@ -37,7 +37,9 @@
 
 namespace EcoCheckpoint
 {
-    constexpr uint32 CheckpointVersion = 4;
+    constexpr uint32 CheckpointVersion = 7;
+    constexpr int32 CheckpointHeaderBytes = 4 * sizeof(uint32);
+    constexpr int32 MaxCheckpointPayloadBytes = 16 * 1024 * 1024;
     template<class T,class F> void Array(FArchive& A,TArray<T>& Values,int32 Limit,F Item)
     {
         int32 N=Values.Num();A<<N;if(A.IsError()||N<0||N>Limit){A.SetError();return;}
@@ -163,6 +165,14 @@ struct FEcoEcosystemCheckpoint
         TMap<FName, EcoTracesV3::FField> FaunaScent;
         double FaunaBirthScan=0.;
         int32 HabitatStage=S.FaunaHabitatStage;
+        uint16 AdaptiveRoutineMask=S.GetAdaptiveRoutineMask();
+        bool FaunaPursuitFix=S.UsesFaunaPursuitFix();
+        bool FaunaCarrionAccess=S.UsesFaunaCarrionAccess();
+        bool FaunaAttackAdvance=S.UsesFaunaAttackAdvance();
+        bool FaunaFollowWounded=S.UsesFaunaFollowWounded();
+        bool FaunaPersistence=S.UsesFaunaPersistence();
+        float ActivityWindow=S.FaunaPersistence.ActivityMemorySeconds, ForageWindow=S.FaunaPersistence.ForageMemorySeconds;
+        float RareWeight=S.FaunaPersistence.ScarcePreyValue, EncounterHalf=S.FaunaPersistence.PreyHalfSaturation;
         double PatchUpdate=0.;
         TArray<float> PatchStock;
         TArray<FName> PatchIds;
@@ -199,8 +209,8 @@ struct FEcoEcosystemCheckpoint
                 A.Death=EM.GetFragmentDataChecked<FEcoDeathFragment>(Entity);A.Lifecycle=EM.GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(Entity);
                 if(Link)A.Link=*Link;
                 if(const auto* Motion=EM.GetFragmentDataPtr<FMassVelocityFragment>(Entity))A.Velocity=Motion->Value;
-                if(Fauna){A.bFauna=true;A.Fauna=*Fauna;continue;}
                 A.Travel=EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity);
+                if(Fauna){A.bFauna=true;A.Fauna=*Fauna;continue;}
                 if(const auto* Member=EM.GetFragmentDataPtr<FEcoHerdMemberFragment>(Entity)){FEcoHerdRuntimeData Data;if(Herds->GetHerdData(Member->HerdRuntimeIndex,Data))A.Herd=Data.PersistentHerdId;}
                 if(const auto* J=EM.GetFragmentDataPtr<FEcoHerdTravelFragment>(Entity))A.Journey=*J;
                 if(const auto* B=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(Entity)){
@@ -245,7 +255,8 @@ struct FEcoEcosystemCheckpoint
                 A<<C.Position<<C.Region<<C.Species<<C.OpenAt<<C.ExpiresAt<<C.ExclusiveUntil<<C.KillerId
                     <<C.PlacesResetAt<<C.UsedPlaces<<C.FeedingPlaces<<C.bGrounded<<C.Remaining;});
             Map(A,FaunaScent,64,[&](auto& F){Pod(A,F.Events);Pod(A,F.Serial);Pod(A,F.Cursor);});
-            A<<HabitatStage<<PatchUpdate;
+            A<<HabitatStage<<PatchUpdate<<AdaptiveRoutineMask<<FaunaPursuitFix<<FaunaCarrionAccess<<FaunaAttackAdvance<<FaunaFollowWounded;
+            A<<FaunaPersistence<<ActivityWindow<<ForageWindow<<RareWeight<<EncounterHalf;
             Array(A,PatchIds,64,[&](FName& Id){A<<Id;});
             Array(A,PatchStock,64,[&](float& Stock){A<<Stock;});
             Map(A,Totals,64,[&](auto& T){Map(A,T,64,[&](auto& V){Pod(A,V);});});
@@ -254,7 +265,7 @@ struct FEcoEcosystemCheckpoint
         TArray<uint8> Bytes;
         if(!Loading){
             FMemoryWriter Memory(Bytes);FObjectAndNameAsStringProxyArchive A(Memory,false);Serialize(A);
-            if(A.IsError()||Bytes.Num()>16*1024*1024)return Reject(TEXT("serialization budget"));
+            if(A.IsError()||Bytes.Num()>MaxCheckpointPayloadBytes)return Reject(TEXT("serialization budget"));
             const uint32 Crc=FCrc::MemCrc32(Bytes.GetData(),Bytes.Num());uint32 Magic=0x45434f31,Version=CheckpointVersion,Length=Bytes.Num();
             TArray<uint8> Output;FMemoryWriter Header(Output);Header<<Magic<<Version<<Length;uint32 Check=Crc;Header<<Check;Header.Serialize(Bytes.GetData(),Bytes.Num());
             IFileManager::Get().MakeDirectory(*FPaths::GetPath(File),true);
@@ -265,10 +276,12 @@ struct FEcoEcosystemCheckpoint
             return true;
         }
         const int64 FileSize=IFileManager::Get().FileSize(*File);
-        if(FileSize<16||FileSize>16*1024*1024||!FFileHelper::LoadFileToArray(Bytes,*File))return Reject(TEXT("missing/oversized checkpoint"));
+        if(FileSize<CheckpointHeaderBytes||FileSize>CheckpointHeaderBytes+MaxCheckpointPayloadBytes
+            ||!FFileHelper::LoadFileToArray(Bytes,*File)||Bytes.Num()!=FileSize)return Reject(TEXT("missing/oversized checkpoint"));
         FMemoryReader Memory(Bytes);uint32 Magic=0,Version=0,Length=0,Crc=0;Memory<<Magic<<Version<<Length<<Crc;
-        if(Magic!=0x45434f31||Version!=CheckpointVersion||Length!=uint32(Bytes.Num()-16)||FCrc::MemCrc32(Bytes.GetData()+16,Length)!=Crc)return Reject(TEXT("version/length/checksum mismatch"));
-        FObjectAndNameAsStringProxyArchive A(Memory,false);A.ArMaxSerializeSize=16*1024*1024;Serialize(A);
+        if(Magic!=0x45434f31||Version!=CheckpointVersion||Length!=uint32(Bytes.Num()-CheckpointHeaderBytes)
+            ||FCrc::MemCrc32(Bytes.GetData()+CheckpointHeaderBytes,Length)!=Crc)return Reject(TEXT("version/length/checksum mismatch"));
+        FObjectAndNameAsStringProxyArchive A(Memory,false);A.ArMaxSerializeSize=MaxCheckpointPayloadBytes;Serialize(A);
         if(A.IsError()||Memory.Tell()!=Bytes.Num()||SavedMap!=MapName||Build!=RuntimeHash()||Brain!=N->GetActiveBrain().Id
             ||Regions.Num()!=N->NumContexts()||Agents.Num()>2*S.GlobalPopulationLimit||!FMath::IsFinite(Time.ServerTimeSeconds)||Time.ServerTimeSeconds<0
             ||Step<0||GlobalT<0||Successful<Deaths||Staged->bResourceStepOpen)return Reject(TEXT("incompatible build/map/model or invalid state"));
@@ -316,6 +329,18 @@ struct FEcoEcosystemCheckpoint
             if(!RegionNames.Contains(Pair.Key)||!std::isfinite(Pair.Value)||Pair.Value<0||Pair.Value>Time.ServerTimeSeconds)return Reject(TEXT("invalid recovery operation history"));
         TSet<int64> Ids;int32 Alive=0;for(const auto& V:Agents){
             const auto* C=N->FindContext(V.Region);const bool Herb=V.Species==TEXT("Herbivore");
+            const auto& TravelState = V.Travel;
+            if (uint8(TravelState.State) > uint8(EEcoResidenceState::WaitingForFood)
+                || uint8(TravelState.Reason) > uint8(EEcoMigrationReason::ReturnHome)
+                || TravelState.TargetPosition.ContainsNaN() || !FMath::IsFinite(TravelState.MoveSpeed)
+                || !FMath::IsFinite(TravelState.DepartureTime) || !FMath::IsFinite(TravelState.LastArrivalTime)
+                || !FMath::IsFinite(TravelState.NextDecisionTime) || !FMath::IsFinite(TravelState.FailedTargetUntil)
+                || (TravelState.State == EEcoResidenceState::Traveling
+                    && (!RegionNames.Contains(TravelState.TargetRegionId) || TravelState.DepartureTime < 0.
+                        || TravelState.DepartureTime > Time.ServerTimeSeconds
+                        || (V.bFauna && (TravelState.TargetRegionId == V.Region || TravelState.MoveSpeed <= 0.
+                            || TravelState.NextDecisionTime <= TravelState.DepartureTime)))))
+                return Reject(TEXT("invalid travel state"));
             if(V.bFauna){
                 const auto* Profile=S.FindFauna(V.Species);
                 const auto& F=V.Fauna;
@@ -323,6 +348,9 @@ struct FEcoEcosystemCheckpoint
                     ||V.Transform.ContainsNaN()||V.Velocity.ContainsNaN()||!FMath::IsFinite(V.Vitals.HP)||!FMath::IsFinite(V.Vitals.Energy)
                     ||!F.Life.bInitialized||!F.Life.Genome.IsValid()||!FMath::IsFinite(F.Life.Born)
                     ||F.Life.MaturitySeconds!=Profile->MaturitySeconds||F.Home.ContainsNaN()||F.Goal.ContainsNaN()
+                    ||F.ForageMemoryPosition.ContainsNaN()||!FMath::IsFinite(F.ForageIntake)||F.ForageIntake<0.f
+                    ||!FMath::IsFinite(F.LastForageIntakeAt)||F.LastForageIntakeAt< -1.||F.LastForageIntakeAt>Time.ServerTimeSeconds
+                    ||!FMath::IsFinite(F.MaintenanceScale)||F.MaintenanceScale<.1f||F.MaintenanceScale>1.f
                     ||F.LandingPoint.ContainsNaN()||!FMath::IsFinite(F.Stamina)||F.Stamina<0||F.Stamina>1
                     ||uint8(F.Flight)>uint8(EEcoFaunaFlightPhase::Landing))return Reject(TEXT("invalid fauna identity or state"));
                 Ids.Add(V.Id);Alive+=V.Vitals.HP>0;
@@ -356,7 +384,14 @@ struct FEcoEcosystemCheckpoint
         // Retained corpses consume snapshot rows, not living population capacity.
         if(Alive>S.GlobalPopulationLimit||Alive!=Successful-Deaths||NextHerd<=0||NextPlan<=0||Staged->RegionIds!=E->RegionIds||Staged->GlobalPopulationLimit!=S.GlobalPopulationLimit)return Reject(TEXT("population/identity allocator mismatch"));
         if(!FMath::IsFinite(FaunaBirthScan))return Reject(TEXT("invalid fauna birth schedule"));
-        if(HabitatStage!=S.FaunaHabitatStage||PatchIds!=ExpectedPatchIds||PatchStock.Num()!=PatchIds.Num()
+        if(HabitatStage!=S.FaunaHabitatStage||AdaptiveRoutineMask!=S.GetAdaptiveRoutineMask()
+            ||FaunaPursuitFix!=S.UsesFaunaPursuitFix()||FaunaCarrionAccess!=S.UsesFaunaCarrionAccess()
+            ||FaunaAttackAdvance!=S.UsesFaunaAttackAdvance()||FaunaFollowWounded!=S.UsesFaunaFollowWounded()
+            ||FaunaPersistence!=S.UsesFaunaPersistence()
+            ||(FaunaPersistence&&(ActivityWindow!=S.FaunaPersistence.ActivityMemorySeconds
+                ||ForageWindow!=S.FaunaPersistence.ForageMemorySeconds||RareWeight!=S.FaunaPersistence.ScarcePreyValue
+                ||EncounterHalf!=S.FaunaPersistence.PreyHalfSaturation))
+            ||PatchIds!=ExpectedPatchIds||PatchStock.Num()!=PatchIds.Num()
             ||!FMath::IsFinite(PatchUpdate)||PatchUpdate<0.||PatchUpdate>Time.ServerTimeSeconds)
             return Reject(TEXT("fauna habitat layout or clock mismatch"));
         for(int32 Index=0;Index<PatchStock.Num();++Index)
@@ -386,9 +421,27 @@ struct FEcoEcosystemCheckpoint
                     return Reject(TEXT("invalid fauna scent evidence"));
             Pair.Value.Rebuild();
         }
+        TMap<int64, const FEcoHerdJourney*> PlansById;
         for(const auto& Pair:Plans){const auto& P=Pair.Value;
             if(Pair.Key!=P.HerdId||P.Id<=0||P.Id>=NextPlan||P.Points.Num()<2||!RegionNames.Contains(P.Origin)||!RegionNames.Contains(P.Destination))return Reject(TEXT("invalid journey"));
-            for(const auto& V:Agents)if(V.Journey.bActive&&V.Journey.PlanId==P.Id&&(V.Journey.Waypoint<0||V.Journey.Waypoint>=P.Points.Num()))return Reject(TEXT("invalid waypoint"));
+            if (PlansById.Contains(P.Id) || uint8(P.State) > uint8(EEcoHerdJourneyState::Abandoned)
+                || !FMath::IsFinite(P.Started) || !FMath::IsFinite(P.Changed) || !FMath::IsFinite(P.CooldownUntil)
+                || P.Started < 0. || P.Started > Time.ServerTimeSeconds || P.Changed < 0. || P.Changed > Time.ServerTimeSeconds
+                || !FMath::IsFinite(P.CorridorWidth) || P.CorridorWidth <= 0.
+                || P.Points.ContainsByPredicate([](const FVector& Point) { return Point.ContainsNaN(); }))
+                return Reject(TEXT("invalid journey geometry or clock"));
+            PlansById.Add(P.Id, &P);
+        }
+        for (const auto& V : Agents)
+        {
+            if (!V.Journey.bActive || V.Vitals.HP <= 0.) continue;
+            const auto* P = PlansById.FindRef(V.Journey.PlanId);
+            if (V.bFauna || V.Species != TEXT("Herbivore") || !P || UEcoHerdMigrationSubsystem::IsTerminal(P->State)
+                || P->HerdId != V.Journey.PersistentHerdId || !P->Members.Contains(V.Id)
+                || !P->Points.IsValidIndex(V.Journey.Waypoint) || V.Journey.Goal.ContainsNaN()
+                || !FMath::IsFinite(V.Journey.LastProgressTime) || !FMath::IsFinite(V.Journey.BestDistance)
+                || V.Travel.State != EEcoResidenceState::Traveling || V.Travel.TargetRegionId != P->Destination)
+                return Reject(TEXT("invalid active journey membership or waypoint"));
         }
         // Prepare new entities before destroying anything. Roll back preparation on
         // allocation failure; malformed/incompatible snapshots never touch live state.
@@ -434,6 +487,7 @@ struct FEcoEcosystemCheckpoint
             EM.GetFragmentDataChecked<FEcoLifetimeFragment>(Entity)=V.Lifetime;EM.GetFragmentDataChecked<FEcoDeathFragment>(Entity)=V.Death;
             EM.GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(Entity)=V.Lifecycle;
             if(auto* Motion=EM.GetFragmentDataPtr<FMassVelocityFragment>(Entity))Motion->Value=V.Velocity;
+            auto& T=EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity);T=V.Travel;T.TargetRegionIndex=E->GetRegionRuntimeIndex(T.TargetRegionId);
             if(V.bFauna){
                 auto& F=EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entity);
                 F=V.Fauna;
@@ -443,7 +497,6 @@ struct FEcoEcosystemCheckpoint
                 continue;
             }
             auto& Link=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Entity);Link=V.Link;Link.ContextIndex=N->FindContext(V.Region)->Index;
-            auto& T=EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity);T=V.Travel;T.TargetRegionIndex=E->GetRegionRuntimeIndex(T.TargetRegionId);
             if(auto* J=EM.GetFragmentDataPtr<FEcoHerdTravelFragment>(Entity)){*J=V.Journey;J->MembershipUntil=J->bActive?W->GetTimeSeconds()+10:0;}
             if(auto* Member=EM.GetFragmentDataPtr<FEcoHerdMemberFragment>(Entity))Member->HerdRuntimeIndex=HerdIndices.Contains(V.Herd)?HerdIndices.FindChecked(V.Herd):INDEX_NONE;
             if(auto* B=EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(Entity)){

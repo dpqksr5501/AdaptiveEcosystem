@@ -15,19 +15,27 @@ $huntingServer=Start-HuntingPeer 'UnrealEditor-Cmd.exe' '/Game/JWJ/1102_Integrat
 $huntingDeadline=(Get-Date).AddSeconds(75)
 while($true){
     if($huntingServer.HasExited){throw 'Dedicated server exited before readiness'}
-    if((Test-Path "$huntingOut/Server.log") -and (Get-Content -Raw "$huntingOut/Server.log") -match 'Authority ready:'){break}
+    $serverLog=Get-Item -LiteralPath "$huntingOut/Server.log" -ErrorAction SilentlyContinue
+    if($serverLog -and $serverLog.LastWriteTime -ge $huntingStarted -and
+        (Select-String -LiteralPath $serverLog.FullName -Pattern 'Authority ready:' -Quiet)){break}
     if((Get-Date) -gt $huntingDeadline){throw 'Server readiness timeout; normal exit timer left running'}
     Start-Sleep -Seconds 1
 }
 $huntingA=Start-HuntingPeer 'UnrealEditor.exe' '127.0.0.1:7787?EcoProtocol=1' 'ClientA' @('-game','-HuntingNetworkClient=ClientA')
 Start-Sleep -Seconds 15
 $huntingB=Start-HuntingPeer 'UnrealEditor.exe' '127.0.0.1:7787?EcoProtocol=1' 'ClientB' @('-game','-HuntingNetworkClient=ClientB')
+$huntingFailures=[System.Collections.Generic.List[string]]::new()
 foreach($huntingPeer in @(@{Name='ClientA';Process=$huntingA},@{Name='ClientB';Process=$huntingB},@{Name='Server';Process=$huntingServer})){
     while(-not $huntingPeer.Process.WaitForExit(5000)){}
-    if($huntingPeer.Process.ExitCode -ne 0){throw "$($huntingPeer.Name) exited with $($huntingPeer.Process.ExitCode)"}
-    $huntingReport=Join-Path $huntingOut ($huntingPeer.Name+'.json')
-    if(-not(Test-Path $huntingReport) -or (Get-Item $huntingReport).LastWriteTime -lt $huntingStarted){throw "Fresh report missing: $($huntingPeer.Name)"}
-    $huntingResult=Get-Content -Raw $huntingReport | ConvertFrom-Json
-    if($huntingResult.result -ne 'PASS'){throw "$($huntingPeer.Name) failed: $($huntingResult.error)"}
-    Write-Output "HUNTING_NETWORK_PASS $($huntingPeer.Name)"
+    try{
+        if($huntingPeer.Process.ExitCode -ne 0){throw "$($huntingPeer.Name) exited with $($huntingPeer.Process.ExitCode)"}
+        $huntingReport=Join-Path $huntingOut ($huntingPeer.Name+'.json')
+        if(-not(Test-Path $huntingReport) -or (Get-Item $huntingReport).LastWriteTime -lt $huntingStarted){throw "Fresh report missing: $($huntingPeer.Name)"}
+        $huntingResult=Get-Content -Raw $huntingReport | ConvertFrom-Json
+        if($huntingResult.result -ne 'PASS'){throw "$($huntingPeer.Name) failed: $($huntingResult.error)"}
+        Write-Output "HUNTING_NETWORK_PASS $($huntingPeer.Name)"
+    }catch{
+        $huntingFailures.Add($_.Exception.Message)
+    }
 }
+if($huntingFailures.Count){throw ($huntingFailures -join [Environment]::NewLine)}

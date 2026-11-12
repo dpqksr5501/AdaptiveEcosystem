@@ -13,6 +13,7 @@
 #include "Engine/World.h"
 #include "InputCoreTypes.h"
 #include "World/EcologyRegion.h"
+#include "World/EcologyWorldSubsystem.h"
 #include "EngineUtils.h"
 #include "Player/EcoPlayerState.h"
 #include "HAL/IConsoleManager.h"
@@ -46,12 +47,18 @@ void UEcoPlayerEcologyComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProp
 void UEcoPlayerEcologyComponent::OnRep_Gait()
 {
     if(auto* C=Cast<ACharacter>(GetOwner())) C->GetCharacterMovement()->MaxWalkSpeed=
-        Gait==EEcoPlayerGait::Sneak?270.f:Gait==EEcoPlayerGait::Run?900.f:360.f;
+        Gait==EEcoPlayerGait::Sneak?SneakSpeed:Gait==EEcoPlayerGait::Run?RunSpeed:WalkSpeed;
 }
 void UEcoPlayerEcologyComponent::SetGait(EEcoPlayerGait NewGait)
 {
+    if (uint8(NewGait)>uint8(EEcoPlayerGait::Run)) return;
+    bHasExplicitGaitInput=true;
+    ApplyLocalGait(NewGait);
+}
+void UEcoPlayerEcologyComponent::ApplyLocalGait(EEcoPlayerGait NewGait)
+{
     if(CVarPlayerGaitLog.GetValueOnGameThread()&&NewGait!=Gait)UE_LOG(LogTemp,Log,TEXT("[Eco Player Gait Request] Owner=%s New=%d Current=%d"),*GetNameSafe(GetOwner()),uint8(NewGait),uint8(Gait));
-    if(uint8(NewGait)>uint8(EEcoPlayerGait::Run)||NewGait==Gait)return;
+    if(NewGait==Gait)return;
     Gait=NewGait;OnRep_Gait();
     if(CVarPlayerGaitLog.GetValueOnGameThread())UE_LOG(LogTemp,Log,TEXT("[Eco Player Gait] Owner=%s Authority=%d Gait=%d"),*GetNameSafe(GetOwner()),GetOwner()->HasAuthority(),uint8(Gait));
     if(!GetOwner()->HasAuthority())ServerSetGait(NewGait);
@@ -78,8 +85,9 @@ void UEcoPlayerEcologyComponent::TickComponent(float Dt,ELevelTick Type,FActorCo
             if(It->bEnableEcosystemLife){TryStrike();break;}
         bStrikeHeld=Pressed;
     }
-    if(bUseKeyboardGait&&Pawn->IsLocallyControlled()) if(auto* PC=Cast<APlayerController>(Pawn->GetController()))
-        SetGait(PC->IsInputKeyDown(EKeys::LeftControl)?EEcoPlayerGait::Sneak:PC->IsInputKeyDown(EKeys::LeftShift)?EEcoPlayerGait::Run:EEcoPlayerGait::Walk);
+    if(bUseKeyboardGait&&!bHasExplicitGaitInput&&Pawn->IsLocallyControlled())
+        if(auto* PC=Cast<APlayerController>(Pawn->GetController()))
+            ApplyLocalGait(PC->IsInputKeyDown(EKeys::LeftControl)?EEcoPlayerGait::Sneak:PC->IsInputKeyDown(EKeys::LeftShift)?EEcoPlayerGait::Run:EEcoPlayerGait::Walk);
     const auto* Health=Pawn->GetPlayerState<AEcoPlayerState>();
     const bool Alive=!Health||Health->IsAlive();
     if(ThreatSource)ThreatSource->bThreatEnabled=bThreatEnabled&&Alive;
@@ -91,8 +99,8 @@ void UEcoPlayerEcologyComponent::TickComponent(float Dt,ELevelTick Type,FActorCo
     const float Gain = Gait == EEcoPlayerGait::Sneak ? .26f : Gait == EEcoPlayerGait::Run ? 1.f : .85f;
     FName Region;
     if (Profile || LocalAudio)
-        for (TActorIterator<AEcologyRegion> It(GetWorld()); It; ++It)
-            if (It->ContainsPosition(Pos)) { Region = It->RegionId; break; }
+        if (const auto* Geography=GetWorld()->GetSubsystem<UEcologyWorldSubsystem>())
+            if (const auto* Found=Geography->FindRegionAtPosition(Pos)) Region=Found->RegionId;
     if(Pawn->HasAuthority()) {
         if(ThreatSource)ThreatSource->bThreatEnabled=bThreatEnabled;
         const float Spacing = Profile ? AudioSet->Evaluate(*Profile, EEcoFootstepSurface::Dry, Speed, 1.f, Gain).Spacing

@@ -24,13 +24,12 @@ bool UEcologySimulationSubsystem::CaptureEnvironmentInputs(const FEcoServerTimeS
 	const auto* Inputs = GetWorld()->GetSubsystem<UEcologyWorldSubsystem>();
 	TArray<FRegionEnvironmentState> Snapshots;
 	Snapshots.Reserve(RegionIds.Num());
-	// Validate every input first. Box/tests without World actors retain neutral growth.
+	// A streamed-out region keeps its last completed weather until its provider returns.
 	for (const FName Id : RegionIds)
 	{
 		const auto& State = RegionalStates.FindChecked(Id);
 		const auto* Region = Inputs ? Inputs->GetRegion(Id) : nullptr;
-		if (!Region && State.bRainfallAffectsRegeneration) return false;
-		auto Weather = Region ? Region->GetEnvironmentState() : FRegionEnvironmentState();
+		auto Weather = Region ? Region->GetEnvironmentState() : State.CompletedEnvironment;
 		if (!FMath::IsFinite(Weather.Rainfall) || Weather.Rainfall < 0 || Weather.Rainfall > 1
 			|| !FMath::IsFinite(Weather.Humidity) || Weather.Humidity < 0 || Weather.Humidity > 1
 			|| !FMath::IsFinite(Weather.Temperature)) return false;

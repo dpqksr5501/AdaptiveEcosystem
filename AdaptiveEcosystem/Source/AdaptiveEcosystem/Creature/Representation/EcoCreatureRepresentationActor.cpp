@@ -29,6 +29,7 @@ bool FEcoCreatureVisualState::IsValid() const
         &&FMath::IsFinite(BodyScale)&&BodyScale>=.65f&&BodyScale<=1.15f&&Appearance<=3
         &&FMath::IsFinite(Maturity)&&Maturity>=0&&Maturity<=1&&FMath::IsFinite(CoatTone)&&CoatTone>=0&&CoatTone<=1
 		&& !Position.ContainsNaN() && !Velocity.ContainsNaN() && FMath::IsFinite(FocusYawDegrees)
+        && (!bHasFacing || FMath::IsFinite(FacingYawDegrees))
         && uint8(SenseSource)<=uint8(EEcoSenseSource::Memory) && uint8(Activity)<=uint8(EEcoSpeciesActivity::CorpseSettled)
 		&& FMath::IsFinite(NormalizedHealth) && NormalizedHealth >= 0.0f && NormalizedHealth <= 1.0f
 		&& FMath::IsFinite(NormalizedEnergy) && NormalizedEnergy >= 0.0f && NormalizedEnergy <= 1.0f;
@@ -188,7 +189,9 @@ bool AEcoCreatureRepresentationActor::ConsumeVisualState(const FEcoCreatureVisua
         }
 		DirectionDegrees = FMath::FindDeltaAngleDegrees(Facing.Yaw, Desired.Yaw);
 	}
-	if(Speed<=IdleSpeed && State.SenseSource!=EEcoSenseSource::None)
+	if (Speed<=IdleSpeed && State.bHasFacing && (bSnap || !State.bAlive))
+        Facing=FRotator(0,State.FacingYawDegrees,0);
+	if(Speed<=IdleSpeed && State.bAlive && State.SenseSource!=EEcoSenseSource::None)
         Facing=FRotator(0,FMath::FixedTurn(Facing.Yaw,State.FocusYawDegrees,90.f*DeltaSeconds),0);
     const bool NewDirectCue=State.SenseSource!=VisualState.SenseSource&&(State.SenseSource==EEcoSenseSource::Sight||State.SenseSource==EEcoSenseSource::Hearing);
     const bool NewFlee=State.Activity!=VisualState.Activity&&State.Activity==EEcoSpeciesActivity::Flee;

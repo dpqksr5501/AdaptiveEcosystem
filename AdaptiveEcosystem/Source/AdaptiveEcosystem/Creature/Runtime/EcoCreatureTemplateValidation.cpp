@@ -61,6 +61,13 @@ bool AEcoCreatureIntegrationSpawner::RegisterTemplates()
 		Require.operator()<FEcoIdentityFragment>(); Require.operator()<FEcoRegionFragment>();
 		Require.operator()<FTransformFragment>(); Require.operator()<FEcoIntegratedCreatureTag>();
 		Require.operator()<FEcoCreaturePresentationFragment>();
+		Forbid.operator()<FEcoFaunaFragment>();
+		if (bClient || !bV3)
+		{
+			Forbid.operator()<FEcoIntegratedV3Fragment>();
+			Forbid.operator()<FEcoIntegratedPolicyV3Tag>(); Forbid.operator()<FEcoIntegratedThreatV3Tag>();
+			Forbid.operator()<FEcoHerbivoreBodyV3Fragment>(); Forbid.operator()<FEcoThreatStateFragment>();
+		}
 		if (bClient)
 		{
 			Require.operator()<FEcoClientProxyTag>(); Require.operator()<FEcoClientPresentationFragment>();
@@ -93,10 +100,20 @@ bool AEcoCreatureIntegrationSpawner::RegisterTemplates()
 			{
 				Require.operator()<FEcoIntegratedV3Fragment>();
 				Forbid.operator()<FEcoHerbivoreTag>(); Forbid.operator()<FEcoPredatorTag>();
+				Forbid.operator()<FEcoPolicyRuntimeFragment>();
 				Forbid.operator()<FEcoStateTreeBehaviorTag>(); Forbid.operator()<FEcoGroundedNavigationTag>();
+				Forbid.operator()<FMassStateTreeInstanceFragment>();
 				if (ConfigRoleIndex == 0)
-				{ Require.operator()<FEcoIntegratedPolicyV3Tag>(); Require.operator()<FEcoHerbivoreBodyV3Fragment>(); Require.operator()<FEcoBehaviorStateFragment>(); }
-				else { Require.operator()<FEcoIntegratedThreatV3Tag>(); Require.operator()<FEcoThreatStateFragment>(); }
+				{
+					Require.operator()<FEcoIntegratedPolicyV3Tag>(); Require.operator()<FEcoHerbivoreBodyV3Fragment>();
+					Require.operator()<FEcoBehaviorStateFragment>();
+					Forbid.operator()<FEcoIntegratedThreatV3Tag>(); Forbid.operator()<FEcoThreatStateFragment>();
+				}
+				else
+				{
+					Require.operator()<FEcoIntegratedThreatV3Tag>(); Require.operator()<FEcoThreatStateFragment>();
+					Forbid.operator()<FEcoIntegratedPolicyV3Tag>(); Forbid.operator()<FEcoHerbivoreBodyV3Fragment>();
+				}
 			}
 			else if (ConfigRoleIndex == 0)
 			{

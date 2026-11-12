@@ -2,6 +2,8 @@
 
 최신 다종 맵의 이 역할 작업과 완료 기준은 [다종 생태계 팀 인수인계](FAUNA_TEAM_HANDOFF.md)를 먼저 확인한다.
 
+현재 통합 레벨 검증은 원본 `Integration_JwJ`와 소유 복사본 `LV_JYU_IntegrationR7e`, `LV_JYU_IntegrationR7eFauna`를 사용한다. 다종 복사본의 추가 여섯 종은 Forest에 있으며 기존 다종 전용 맵의 먹이 패치를 옮기지 않았다. 포식자 기아와 출생 보류를 분리해 검증할 때는 이 초기 조건과 통로·실제 먹이 접근 조건을 함께 기록한다. [맵 작성과 검증 조건](../Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존)
+
 2026-11-05 제안은 [체형의 레벨 디자인 인계](MORPHOLOGY_LEVEL_DESIGN_HANDOFF_20261105.md)를 참고한다. 질주·은폐·근접 사냥을 비교할 지형과 체형의 실루엣·IK·실제 충돌 검증을 정리한다.
 
 **2026-10-30 후속:** 자연 식생/물가/생물군계/내부 휴식의 재사용 입력은 [자연 서식지 적용 순서](NATURAL_HABITAT_LEVEL_HANDOFF_20261030.md)와 [공통 계약](../Architecture/NATURAL_HABITAT_CONTRACT_20261030.md)을 추가로 읽는다. 아래 10-24 수치·검증은 당시 범위다. 새 팀 레벨에서 설정 연결과 실제 플레이 acceptance를 수행한다.
