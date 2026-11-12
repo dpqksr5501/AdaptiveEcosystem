@@ -37,7 +37,7 @@ enum class EEcoR9DemoPhase : uint8
 {
 	Off,
 	Refused,
-	WaitScan,    // 선호점 둘레를 불러오는 중 (훑기 전)
+	WaitScan,    // 자리 찾기: 시작점 둘레(고리 ScanRing)를 불러오는 중 (훑기 전)
 	WaitStage,   // 무대 자리를 불러오는 중
 	Running,
 	Failed
@@ -128,6 +128,17 @@ struct FEcoR9DemoState
 	FString StageLine;
 	TWeakObjectPtr<UWorldPartitionStreamingSourceComponent> Streamer;
 	TWeakObjectPtr<AActor> Decor;
+
+	// 자리 찾기 (맵 제한 없음 — 맵마다 설정 없이 그 맵에서 고른다)
+	int32 ScanRing = 0;                          // 지금 훑는 고리 (0 = 200 m · 1 = 400 m · 2 = 800 m)
+	FVector SearchOrigin = FVector::ZeroVector;  // 시작점 (cm): 플레이어 몸 → PlayerStart → 시점 → 원점
+	FString OriginLabel;                         // 시작점이 어디서 왔나 (기록 줄)
+	int32 NumAvoid = 0;                          // 피한 기존 생태 상자 수 (마지막 훑기)
+	TArray<TWeakObjectPtr<AActor>> ProbeIgnore;  // 바닥 선 검사에서 뺄 액터 (물 몸체 — 바다 충돌 상자가 바닥처럼 잡히지 않게)
+
+	// 맵에 이미 있는 팀 생태 (거부하지 않고 건드리지 않는다 — 알리기만)
+	bool bTeamEco = false;
+	FString TeamEcoNote;
 
 	// 보이는 것
 	TMap<uint32, FEcoR9DemoBody> Bodies;

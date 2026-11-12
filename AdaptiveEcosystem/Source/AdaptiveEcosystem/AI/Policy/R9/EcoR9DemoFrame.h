@@ -549,7 +549,7 @@ namespace EcoR9Demo
 	}
 
 	// -------------------------------------------------------------------------
-	// 무대 자리 고르기 — 섬 위 트인 평지
+	// 무대 자리 고르기 — 아무 맵의 트인 평지 (맵마다 설정 없음)
 	// -------------------------------------------------------------------------
 
 	/** 훑은 지도 (칸 가운데 높이·막힘). 칸 (ix, iy) 가운데 = (X0 + (ix + 0.5)·Cell, Y0 + (iy + 0.5)·Cell) cm. */
@@ -560,25 +560,183 @@ namespace EcoR9Demo
 		double CellCm = 400.0;
 		double X0 = 0.0;
 		double Y0 = 0.0;
-		std::vector<float> Height;          // cm, NaN = 지형 없음
-		std::vector<std::uint8_t> Blocked;  // 1 = 막힘 (물·가파름·나무·바위·지형 없음)
+		std::vector<float> Height;          // cm, NaN = 땅 없음 (지형·바닥 메시 모두 없음)
+		std::vector<std::uint8_t> Blocked;  // 1 = 막힘 (물·가파름·나무·바위·건물·땅 없음)
+		std::vector<std::uint8_t> Avoid;    // 1 = 되도록 피함 (맵에 이미 있는 생태 지역·서식지·동물 둘레). 비어 있으면 없음
 
 		bool Valid() const
 		{
 			const std::size_t N = static_cast<std::size_t>(Nx) * static_cast<std::size_t>(Ny);
 			return Nx > 0 && Ny > 0 && CellCm > 0.0 && Height.size() == N && Blocked.size() == N;
 		}
+		bool HasAvoid() const { return !Avoid.empty() && Avoid.size() == Height.size(); }
 		std::size_t Index(std::int32_t X, std::int32_t Y) const { return static_cast<std::size_t>(Y) * static_cast<std::size_t>(Nx) + static_cast<std::size_t>(X); }
+		double CellX(std::int32_t Ix) const { return X0 + (static_cast<double>(Ix) + 0.5) * CellCm; }
+		double CellY(std::int32_t Iy) const { return Y0 + (static_cast<double>(Iy) + 0.5) * CellCm; }
+		bool IsOpen(std::size_t K, bool bWithAvoid) const
+		{
+			return Blocked[K] == 0 && !std::isnan(Height[K]) && !(bWithAvoid && HasAvoid() && Avoid[K] != 0);
+		}
 	};
+
+	/** 상자 (cm). */
+	struct FR9Box
+	{
+		double MinX = 0.0;
+		double MinY = 0.0;
+		double MinZ = 0.0;
+		double MaxX = 0.0;
+		double MaxY = 0.0;
+		double MaxZ = 0.0;
+	};
+
+	namespace R9GridImpl
+	{
+		/** 칸 가운데가 상자 + Pad 안인 칸마다 Fn(칸 번호) — 격자 밖은 건너뜀. */
+		template <typename FnT>
+		inline void ForCellsIn(const FR9ScanGrid& G, const FR9Box& B, double Pad, FnT&& Fn)
+		{
+			if (!G.Valid())
+			{
+				return;
+			}
+			const double Lx = B.MinX - Pad;
+			const double Ly = B.MinY - Pad;
+			const double Hx = B.MaxX + Pad;
+			const double Hy = B.MaxY + Pad;
+			if (!(Hx >= Lx) || !(Hy >= Ly))
+			{
+				return;   // NaN·뒤집힌 상자
+			}
+			const double Fx0 = std::floor((Lx - G.X0) / G.CellCm);
+			const double Fy0 = std::floor((Ly - G.Y0) / G.CellCm);
+			const double Fx1 = std::floor((Hx - G.X0) / G.CellCm);
+			const double Fy1 = std::floor((Hy - G.Y0) / G.CellCm);
+			if (Fx1 < 0.0 || Fy1 < 0.0 || Fx0 >= static_cast<double>(G.Nx) || Fy0 >= static_cast<double>(G.Ny))
+			{
+				return;
+			}
+			const std::int32_t Ix0 = static_cast<std::int32_t>(std::max(0.0, Fx0));
+			const std::int32_t Iy0 = static_cast<std::int32_t>(std::max(0.0, Fy0));
+			const std::int32_t Ix1 = static_cast<std::int32_t>(std::min(static_cast<double>(G.Nx - 1), Fx1));
+			const std::int32_t Iy1 = static_cast<std::int32_t>(std::min(static_cast<double>(G.Ny - 1), Fy1));
+			for (std::int32_t y = Iy0; y <= Iy1; ++y)
+			{
+				for (std::int32_t x = Ix0; x <= Ix1; ++x)
+				{
+					const double Px = G.CellX(x);
+					const double Py = G.CellY(y);
+					if (Px >= Lx && Px <= Hx && Py >= Ly && Py <= Hy)
+					{
+						Fn(G.Index(x, y));
+					}
+				}
+			}
+		}
+	}
+
+	/**
+	 * 걸리는 것(나무·바위·건물) 상자를 막힘으로 표시. 칸 땅보다 ClearCm 넘게 솟고(바닥 메시·낮은 판은 빼기) 땅 위 ReachCm 안까지 내려온
+	 * (높이 뜬 지붕·하늘 장식은 빼기) 상자만. 땅 높이가 없는 칸은 이미 막힘이라 건드리지 않는다. Skip(칸 번호) 가 참인 칸도 건드리지 않는다
+	 * (그 칸의 땅이 바로 이 메시 — 지형 대신 언덕진 바닥 메시를 쓰는 맵에서, 바닥 메시 상자 꼭대기가 낮은 칸 땅보다 높다고 막지 않게). 새로 막은 칸 수.
+	 */
+	template <typename SkipT>
+	inline std::int64_t MarkObstacleIf(FR9ScanGrid& G, const FR9Box& B, double PadCm, double ClearCm, double ReachCm, SkipT&& Skip)
+	{
+		std::int64_t N = 0;
+		R9GridImpl::ForCellsIn(G, B, PadCm,
+							   [&](std::size_t K)
+							   {
+								   const float Ground = G.Height[K];
+								   if (std::isnan(Ground) || G.Blocked[K] != 0 || Skip(K))
+								   {
+									   return;
+								   }
+								   const double Gz = static_cast<double>(Ground);
+								   if (B.MaxZ > Gz + ClearCm && B.MinZ < Gz + ReachCm)
+								   {
+									   G.Blocked[K] = 1;
+									   ++N;
+								   }
+							   });
+		return N;
+	}
+
+	inline std::int64_t MarkObstacle(FR9ScanGrid& G, const FR9Box& B, double PadCm, double ClearCm = 30.0, double ReachCm = 300.0)
+	{
+		return MarkObstacleIf(G, B, PadCm, ClearCm, ReachCm, [](std::size_t) { return false; });
+	}
+
+	/** 되도록 피할 상자 (기존 생태 지역·서식지·동물 둘레) 표시 — 높이는 보지 않는다. 새로 표시한 칸 수. */
+	inline std::int64_t MarkAvoid(FR9ScanGrid& G, const FR9Box& B, double PadCm)
+	{
+		if (!G.Valid())
+		{
+			return 0;
+		}
+		if (!G.HasAvoid())
+		{
+			G.Avoid.assign(G.Height.size(), 0);
+		}
+		std::int64_t N = 0;
+		R9GridImpl::ForCellsIn(G, B, PadCm,
+							   [&](std::size_t K)
+							   {
+								   if (G.Avoid[K] == 0)
+								   {
+									   G.Avoid[K] = 1;
+									   ++N;
+								   }
+							   });
+		return N;
+	}
+
+	/** 가파름: 오른쪽·위 이웃 칸과 높이 차 / 칸 > MaxSlope 인 칸을 막음 (0.36 ≈ 20°). 새로 막은 칸 수. */
+	inline std::int64_t MarkSteep(FR9ScanGrid& G, double MaxSlope = 0.36)
+	{
+		std::int64_t N = 0;
+		if (!G.Valid())
+		{
+			return N;
+		}
+		for (std::int32_t y = 0; y < G.Ny; ++y)
+		{
+			for (std::int32_t x = 0; x < G.Nx; ++x)
+			{
+				const float Z = G.Height[G.Index(x, y)];
+				if (std::isnan(Z))
+				{
+					continue;
+				}
+				float Worst = 0.0f;
+				if (x + 1 < G.Nx && !std::isnan(G.Height[G.Index(x + 1, y)]))
+				{
+					Worst = std::max(Worst, std::fabs(G.Height[G.Index(x + 1, y)] - Z));
+				}
+				if (y + 1 < G.Ny && !std::isnan(G.Height[G.Index(x, y + 1)]))
+				{
+					Worst = std::max(Worst, std::fabs(G.Height[G.Index(x, y + 1)] - Z));
+				}
+				std::uint8_t& B = G.Blocked[G.Index(x, y)];
+				if (static_cast<double>(Worst) / G.CellCm > MaxSlope && B == 0)
+				{
+					B = 1;
+					++N;
+				}
+			}
+		}
+		return N;
+	}
 
 	struct FR9PickParams
 	{
 		double SideCm = 12000.0;     // 무대 한 변 (120 m)
 		double MarginCm = 2000.0;    // 무대 둘레 여유 (막힌 칸이 없어야 하는 띠)
-		double PrefX = 0.0;          // 선호점 (cm)
+		double PrefX = 0.0;          // 시작점 (cm) — 가까울수록 좋다
 		double PrefY = 0.0;
 		std::int32_t Stride = 5;     // 후보 간격 (칸)
-		double DistWeight = 0.02;    // 점수 = 높이 폭(m) + 선호점 거리(m) × 이 값
+		double DistWeight = 0.02;    // 점수 = 높이 폭(m) + 시작점 거리(m) × 이 값
+		bool bAvoid = false;         // 참이면 Avoid 칸도 막힌 칸처럼 본다 (기존 생태에서 떨어진 곳만)
 	};
 
 	struct FR9PickResult
@@ -590,12 +748,72 @@ namespace EcoR9Demo
 		double MeanCm = 0.0;
 		std::int64_t Candidates = 0;
 		double MarginUsed = 0.0;
+		std::int64_t BlockedCells = 0;   // (가장 덜 막힌 곳) 무대 안 막힌·땅 없는 칸
+		std::int64_t AvoidCells = 0;     // (가장 덜 막힌 곳) 무대 안 피할 칸
+		std::int64_t StageCells = 0;     // (가장 덜 막힌 곳) 무대 안 칸 전체
+		bool bHeightKnown = false;       // MeanCm·RangeCm 이 땅 높이에서 왔다 (거짓 = 무대 안 땅을 하나도 못 읽음)
 	};
 
+	namespace R9GridImpl
+	{
+		/** 누적합 (Nx+1)×(Ny+1) — Pred(칸 번호) 가 참인 칸 수. */
+		template <typename PredT>
+		inline std::vector<std::int32_t> PrefixSum(const FR9ScanGrid& M, PredT&& Pred)
+		{
+			const std::size_t Ws = static_cast<std::size_t>(M.Nx + 1);
+			std::vector<std::int32_t> S(Ws * static_cast<std::size_t>(M.Ny + 1), 0);
+			for (std::int32_t y = 0; y < M.Ny; ++y)
+			{
+				std::int32_t Row = 0;
+				for (std::int32_t x = 0; x < M.Nx; ++x)
+				{
+					Row += Pred(M.Index(x, y)) ? 1 : 0;
+					S[static_cast<std::size_t>(y + 1) * Ws + static_cast<std::size_t>(x + 1)] = S[static_cast<std::size_t>(y) * Ws + static_cast<std::size_t>(x + 1)] + Row;
+				}
+			}
+			return S;
+		}
+
+		/** 칸 [X0, X1) × [Y0, Y1) 안 개수. */
+		inline std::int64_t CountIn(const std::vector<std::int32_t>& S, std::int32_t Nx, std::int32_t X0, std::int32_t Y0, std::int32_t X1, std::int32_t Y1)
+		{
+			const std::size_t Ws = static_cast<std::size_t>(Nx + 1);
+			return static_cast<std::int64_t>(S[static_cast<std::size_t>(Y1) * Ws + static_cast<std::size_t>(X1)]) -
+				   S[static_cast<std::size_t>(Y0) * Ws + static_cast<std::size_t>(X1)] - S[static_cast<std::size_t>(Y1) * Ws + static_cast<std::size_t>(X0)] +
+				   S[static_cast<std::size_t>(Y0) * Ws + static_cast<std::size_t>(X0)];
+		}
+
+		/** 칸 [X0, X1) × [Y0, Y1) 안 높이 (땅 없는 칸 빼고) 가장 낮은·높은·평균. 없으면 거짓. */
+		inline bool HeightStats(const FR9ScanGrid& M, std::int32_t X0, std::int32_t Y0, std::int32_t X1, std::int32_t Y1, double& Lo, double& Hi, double& Mean)
+		{
+			Lo = std::numeric_limits<double>::infinity();
+			Hi = -std::numeric_limits<double>::infinity();
+			double Sum = 0.0;
+			std::int64_t N = 0;
+			for (std::int32_t yy = std::max(0, Y0); yy < std::min(M.Ny, Y1); ++yy)
+			{
+				for (std::int32_t xx = std::max(0, X0); xx < std::min(M.Nx, X1); ++xx)
+				{
+					const float H = M.Height[M.Index(xx, yy)];
+					if (std::isnan(H))
+					{
+						continue;
+					}
+					Lo = std::min(Lo, static_cast<double>(H));
+					Hi = std::max(Hi, static_cast<double>(H));
+					Sum += static_cast<double>(H);
+					++N;
+				}
+			}
+			Mean = N > 0 ? Sum / static_cast<double>(N) : 0.0;
+			return N > 0;
+		}
+	}
+
 	/**
-	 * 무대 고르기 (결정적): 후보 = Stride 칸 간격 점 가운데 (한 변 + 2·여유) 정사각 안 칸이 모두 열리고 높이가 있는 점.
-	 * 점수 = 무대 정사각 안 높이 폭(m) + 선호점까지 거리(m) × DistWeight. 가장 작은 것 (같으면 먼저 본 것 = y·x 가 작은 쪽).
-	 * 후보가 없으면 여유를 반씩 줄여 (0 까지) 다시 본다. 그래도 없으면 bOk 거짓.
+	 * 무대 고르기 (결정적): 후보 = Stride 칸 간격 점 가운데 (한 변 + 2·여유) 정사각 안 칸이 모두 열리고 높이가 있는 점
+	 * (bAvoid 면 피할 칸도 없어야 함). 점수 = 무대 정사각 안 높이 폭(m) + 시작점까지 거리(m) × DistWeight. 가장 작은 것
+	 * (같으면 먼저 본 것 = y·x 가 작은 쪽). 후보가 없으면 여유를 반씩 줄여 (0 까지) 다시 본다. 그래도 없으면 bOk 거짓.
 	 */
 	inline FR9PickResult PickStage(const FR9ScanGrid& M, const FR9PickParams& P)
 	{
@@ -606,24 +824,11 @@ namespace EcoR9Demo
 		}
 		const std::int32_t Nx = M.Nx;
 		const std::int32_t Ny = M.Ny;
-		// 막힘 누적합 (Nx+1)×(Ny+1)
-		std::vector<std::int32_t> S(static_cast<std::size_t>(Nx + 1) * static_cast<std::size_t>(Ny + 1), 0);
-		const std::size_t Ws = static_cast<std::size_t>(Nx + 1);
-		for (std::int32_t y = 0; y < Ny; ++y)
+		const bool bWithAvoid = P.bAvoid;
+		const std::vector<std::int32_t> S = R9GridImpl::PrefixSum(M, [&M, bWithAvoid](std::size_t k) { return !M.IsOpen(k, bWithAvoid); });
+		auto BlockedIn = [&S, Nx](std::int32_t X0, std::int32_t Y0, std::int32_t X1, std::int32_t Y1) -> std::int64_t
 		{
-			std::int32_t Row = 0;
-			for (std::int32_t x = 0; x < Nx; ++x)
-			{
-				const std::size_t k = M.Index(x, y);
-				Row += (M.Blocked[k] != 0 || std::isnan(M.Height[k])) ? 1 : 0;
-				S[static_cast<std::size_t>(y + 1) * Ws + static_cast<std::size_t>(x + 1)] = S[static_cast<std::size_t>(y) * Ws + static_cast<std::size_t>(x + 1)] + Row;
-			}
-		}
-		auto BlockedIn = [&S, Ws](std::int32_t X0, std::int32_t Y0, std::int32_t X1, std::int32_t Y1) -> std::int64_t
-		{
-			return static_cast<std::int64_t>(S[static_cast<std::size_t>(Y1) * Ws + static_cast<std::size_t>(X1)]) -
-				   S[static_cast<std::size_t>(Y0) * Ws + static_cast<std::size_t>(X1)] - S[static_cast<std::size_t>(Y1) * Ws + static_cast<std::size_t>(X0)] +
-				   S[static_cast<std::size_t>(Y0) * Ws + static_cast<std::size_t>(X0)];
+			return R9GridImpl::CountIn(S, Nx, X0, Y0, X1, Y1);
 		};
 		const std::int32_t Stride = std::max(1, P.Stride);
 		const std::int32_t HalfStage = static_cast<std::int32_t>(std::ceil(0.5 * P.SideCm / M.CellCm));
@@ -670,6 +875,7 @@ namespace EcoR9Demo
 						R.Cy = Cy;
 						R.RangeCm = Range;
 						R.MeanCm = N > 0 ? Sum / static_cast<double>(N) : 0.0;
+						R.bHeightKnown = N > 0;
 					}
 				}
 			}
@@ -685,6 +891,75 @@ namespace EcoR9Demo
 			}
 			Margin = Margin > 100.0 ? 0.5 * Margin : 0.0;
 		}
+		return R;
+	}
+
+	/**
+	 * 트인 평지가 없을 때의 마지막 길 (결정적): 무대 정사각(여유 없이) 안 막힌 칸(막힘·땅 없음)이 가장 적은 곳,
+	 * 같으면 피할 칸이 적은 곳, 같으면 시작점에 가까운 곳, 같으면 먼저 본 곳. 격자가 무대보다 작으면 bOk 거짓.
+	 */
+	inline FR9PickResult PickLeastBlocked(const FR9ScanGrid& M, const FR9PickParams& P)
+	{
+		FR9PickResult R;
+		if (!M.Valid() || P.SideCm <= 0.0)
+		{
+			return R;
+		}
+		const std::int32_t Nx = M.Nx;
+		const std::int32_t Ny = M.Ny;
+		const std::int32_t Hs = static_cast<std::int32_t>(std::ceil(0.5 * P.SideCm / M.CellCm));
+		if (2 * Hs > Nx || 2 * Hs > Ny)
+		{
+			return R;
+		}
+		const std::vector<std::int32_t> SB = R9GridImpl::PrefixSum(M, [&M](std::size_t k) { return !M.IsOpen(k, false); });
+		const bool bAv = M.HasAvoid();
+		const std::vector<std::int32_t> SA = R9GridImpl::PrefixSum(M, [&M, bAv](std::size_t k) { return bAv && M.Avoid[k] != 0; });
+		const std::int32_t Stride = std::max(1, P.Stride);
+		std::int64_t BestB = std::numeric_limits<std::int64_t>::max();
+		std::int64_t BestA = std::numeric_limits<std::int64_t>::max();
+		double BestD = std::numeric_limits<double>::infinity();
+		std::int32_t Bx = -1, By = -1;
+		std::int64_t Cands = 0;
+		for (std::int32_t y = Hs; y + Hs <= Ny; y += Stride)
+		{
+			for (std::int32_t x = Hs; x + Hs <= Nx; x += Stride)
+			{
+				++Cands;
+				const std::int64_t B = R9GridImpl::CountIn(SB, Nx, x - Hs, y - Hs, x + Hs, y + Hs);
+				const std::int64_t A = R9GridImpl::CountIn(SA, Nx, x - Hs, y - Hs, x + Hs, y + Hs);
+				const double Cx = M.X0 + static_cast<double>(x) * M.CellCm;
+				const double Cy = M.Y0 + static_cast<double>(y) * M.CellCm;
+				const double D = std::sqrt((Cx - P.PrefX) * (Cx - P.PrefX) + (Cy - P.PrefY) * (Cy - P.PrefY));
+				if (B < BestB || (B == BestB && (A < BestA || (A == BestA && D < BestD))))
+				{
+					BestB = B;
+					BestA = A;
+					BestD = D;
+					Bx = x;
+					By = y;
+				}
+			}
+		}
+		if (Bx < 0)
+		{
+			return R;
+		}
+		R.bOk = true;
+		R.Cx = M.X0 + static_cast<double>(Bx) * M.CellCm;
+		R.Cy = M.Y0 + static_cast<double>(By) * M.CellCm;
+		double Lo = 0.0, Hi = 0.0, Mean = 0.0;
+		if (R9GridImpl::HeightStats(M, Bx - Hs, By - Hs, Bx + Hs, By + Hs, Lo, Hi, Mean))
+		{
+			R.RangeCm = Hi - Lo;
+			R.MeanCm = Mean;
+			R.bHeightKnown = true;
+		}
+		R.Candidates = Cands;
+		R.MarginUsed = 0.0;
+		R.BlockedCells = BestB;
+		R.AvoidCells = BestA;
+		R.StageCells = static_cast<std::int64_t>(2 * Hs) * static_cast<std::int64_t>(2 * Hs);
 		return R;
 	}
 

@@ -1,14 +1,18 @@
-// R9 데모 플레이어 (2026-11-12, 발표용) — 파이썬에서 배운 사슴·늑대·멧돼지 두뇌가 팀 섬 원본 맵 위에서 움직이는 화면.
+// R9 데모 플레이어 (2026-11-12, 발표용) — 파이썬에서 배운 사슴·늑대·멧돼지 두뇌가 언리얼 맵 위에서 움직이는 화면.
 //
 // 기본 꺼짐. 켜는 길은 둘뿐이다 (둘 다 없으면 이 서브시스템은 만들어지지도 않는다):
 //   명령줄  -EcoR9Demo=<두뇌 폴더>          실시간 판 (R9 코어 C++ 추론, 두뇌 폴더 = {deer,wolf,boar}.r9brain)
 //           -EcoR9Replay=<파일.r9rp>        재생 판 (파이썬 실행 기록 재생 — 화면에 그렇게 밝힌다). 곁 파일 .r9fd·.events.json 은 있으면 읽는다
 //   콘솔    eco.R9Demo 1 (실시간) · 2 (재생) — PIE 는 Play 전에. 경로는 eco.R9Demo.Brains·Scene·Replay (비면 <프로젝트>/Saved/R9Demo/brains · replay/demo.r9rp)
-// 도는 곳: 서버·단독(넷 모드가 클라이언트·데디케이티드가 아닌 곳), 맵 = 팀 섬 원본 /Game/Map/LV_SHC_IslandEcosystem1_WP (eco.R9Demo.AnyMap 1 이면 아무 맵).
-// 거부: 통합 조정자·생태 지역이 있거나 통합 v3 가 켜졌으면 한 줄 남기고 아무것도 하지 않는다 (라이브 맵 워크플로와 섞이지 않게).
+// 도는 곳: 서버·단독(넷 모드가 클라이언트·데디케이티드가 아닌 곳). **맵 제한 없음 (2026-11-12 22:30)** — 지형(Landscape)이나 바닥 메시가 있는 아무 맵
+//   (World Partition 맵·일반 맵 둘 다). 맵마다 설정할 것이 없다: 무대 자리는 그 맵에서 자동으로 고른다.
+// 맵에 통합 조정자·생태 지역·서식지·통합 v3 가 이미 있어도 거부하지 않는다 — 그쪽은 건드리지 않고 데모만 따로 돈다 (R9 개체는 Mass 개체가 아니라
+//   팀 시뮬레이션이 보지 못하고, 데모도 팀 개체를 읽지 않는다). 무대는 그 지역 상자·동물에서 떨어진 곳을 먼저 고르고, 기록 줄로 알린다.
 //
 // 하는 일 (모두 실행 중에만, 저장하지 않는다 — 액터는 RF_Transient, 팀 맵·에셋·Config 는 그대로):
-//   1. 섬 위 트인 평지 자리 고르기 (선호점 둘레를 불러와 높이·물·나무·바위를 훑음, -EcoR9DemoAt=x,y(m) 로 덮어쓰기) → 그 자리 스트리밍
+//   1. 무대 자리 고르기: 플레이어 시작점(플레이어 몸 → PlayerStart → 시점 → 원점) 둘레를 200 · 400 · 800 m 로 넓혀 가며 불러와 4 m 칸으로
+//      땅 높이(지형, 없으면 바닥 메시)·물·가파름·나무/바위/건물을 훑어 120 m 열린 평지를 찾는다 (기존 생태 둘레는 되도록 피함). 못 찾으면 가장 덜 막힌
+//      곳 + 기록 줄. 콘솔 eco.R9Demo.At x,y (m) · 명령줄 -EcoR9DemoAt=x,y 로 덮어쓰기 → 그 자리 스트리밍 (World Partition 맵만, 아니면 그대로)
 //   2. 프레임 원천: 실시간 = R9 코어 한 스텝(2/15 초)씩, 재생 = 파일 프레임. 스텝 사이는 이어 그린다
 //   3. 보이는 것: 사슴·늑대 = 조연우 BP_JYU_Deer/Wolf (없으면 팀 BP_EcoDeer/Wolf), 멧돼지 = 갈색 자리표시, 풀 덩어리(조연우 식생과 같은 메시·재질·
 //      custom data 꼴), 멧돼지가 판 자리, 사체(누운 몸), 은신처 수풀·바위, 무대 가장자리 돌, 물기 표시(작은 점 — 번쩍임·소리 없음)
@@ -48,21 +52,17 @@ struct ADAPTIVEECOSYSTEM_API FEcoR9DemoSettings
 	FString ReplayPath;        // 재생: .r9rp
 	uint64 Seed = 1;
 	bool bSample = true;       // 실시간 고르기: 참 = 확률대로 (학습 때와 같음), 거짓 = 가장 높은 칸
-	bool bHasAt = false;       // 무대 가운데를 직접 줌
+	bool bHasAt = false;       // 무대 가운데를 직접 줌 (콘솔 eco.R9Demo.At · 명령줄 -EcoR9DemoAt=, m)
 	FVector2D AtM = FVector2D::ZeroVector;
-	FVector2D PrefM = FVector2D(759.0, -156.0);   // 자동 고르기 선호점 (m)
+	bool bHasPref = false;     // 자동 고르기 시작점을 직접 줌 (명령줄 -EcoR9DemoPref=x,y, m — 창 없는 실행·시험용). 없으면 플레이어 시작점
+	FVector2D PrefM = FVector2D::ZeroVector;
 	FString CaptureDir;        // 녹화 (비면 안 함)
 	float CaptureFps = 30.0f;
 	float CaptureSeconds = 0.0f;
 	float ExitAfterSeconds = 0.0f;   // 무대가 선 뒤 이만큼 지나면 끝냄 (0 = 안 끝냄)
-	bool bAnyMap = false;
 
-	/** 명령줄 글과 콘솔 값(eco.R9Demo …)에서 읽는다. 둘 다 없으면 Mode = Off. */
+	/** 명령줄 글과 콘솔 값(eco.R9Demo …)에서 읽는다. 둘 다 없으면 Mode = Off. 맵 제한은 없다. */
 	static FEcoR9DemoSettings Resolve(const TCHAR* CommandLine);
-	/** 이 맵에서 도는가 (팀 섬 원본, 또는 bAnyMap). PIE 앞붙이는 뗀 이름. */
-	static bool MapAllowed(const FString& PackageName, bool bAnyMap);
-	/** 팀 섬 원본 맵 (복사하지 않음). */
-	static const TCHAR* IslandMap() { return TEXT("/Game/Map/LV_SHC_IslandEcosystem1_WP"); }
 	/** 기본 폴더 <프로젝트>/Saved/R9Demo (커밋되지 않는 곳). 경로를 주지 않으면 두뇌 = brains/ (장면 = brains/scene.txt), 재생 = replay/demo.r9rp. */
 	static FString DefaultDir();
 };
@@ -89,15 +89,23 @@ public:
 	/** 지금 그리는 동물 몸 수 · 이번 판에 보여 준 스텝 수 (시험용). */
 	int32 NumBodies() const;
 	int64 NumStepsShown() const;
+	/** 무대 정사각 가운데 (cm, z = 땅 높이) · 자리 찾기 시작점 · 피한 기존 생태 상자 수 · 맵에 팀 생태 장치가 있는가 (시험·기록용). */
+	FVector StageCenterCm() const;
+	FVector SearchOriginCm() const;
+	int32 NumAvoidZones() const;
+	bool HasTeamEco() const;
 
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
 
 private:
 	// --- EcoR9DemoSubsystem.cpp: 켜기·무대 자리·프레임 원천·녹화·글자
-	bool RefuseReason(UWorld& World, FString& OutWhy) const;
+	void DescribeTeamEco(UWorld& World);
+	void ChooseSearchOrigin(UWorld& World);
+	void RefreshProbeIgnore();
 	void BeginStreamingAt(const FVector& CenterCm, float RadiusCm);
-	void ScanAndPick();
+	/** 자리 찾기 고리 Ring (0 = 200 m, 1 = 400 m, 2 = 800 m) 를 훑는다. 자리를 정했으면 참 (마지막 고리는 늘 정한다). */
+	bool ScanAndPick(int32 Ring);
 	void BuildStage();
 	bool OpenSource(FString& OutError);
 	bool AdvanceFrame();

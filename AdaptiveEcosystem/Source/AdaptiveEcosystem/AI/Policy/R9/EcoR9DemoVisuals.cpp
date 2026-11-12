@@ -33,6 +33,10 @@ namespace EcoR9DemoVisualsImpl
 	constexpr double kCorpseSettle = 2.5;       // 쓰러지는 클립 뒤 누운 몸으로
 	constexpr double kCorpseNoFoodSeconds = 40.0;   // 사체 정보가 없는 재생에서 누운 몸을 두는 시간 [어림]
 	constexpr double kPursueUnits = 10.0;       // 뛰는 늑대가 이 거리(20 m) 안 먹잇감이면 '쫓음' 표시 [해석]
+	// 표현 액터 신원 = 이 수 + R9 uid. 팀 맵에서 팀 개체(StableAgentId 는 작은 양수)와 같은 번호가 되지 않게 따로 둔다
+	// (팀 살피기 HUD·관찰 카메라가 신원 번호로 표현 액터를 찾음 — EcoCreatureInspection.cpp:41, EcoV3ObserverCamera.cpp:529). 그리기만 바뀐다
+	constexpr int64 kStableIdBase = 9000000000000LL;
+	const FName kDemoRegionId(TEXT("R9Demo"));
 
 	const TCHAR* const kDeerJyu = TEXT("/Game/JYU/Creatures/BP_JYU_Deer.BP_JYU_Deer_C");
 	const TCHAR* const kWolfJyu = TEXT("/Game/JYU/Creatures/BP_JYU_Wolf.BP_JYU_Wolf_C");
@@ -776,7 +780,7 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 				continue;
 			}
 			Rep->SetReplicates(false);
-			if (!Rep->BindIdentity(static_cast<int64>(A.Id), Rep->VisualSpeciesId))
+			if (!Rep->BindIdentity(kStableIdBase + static_cast<int64>(A.Id), Rep->VisualSpeciesId))
 			{
 				Rep->Destroy();
 				continue;
@@ -886,8 +890,9 @@ void UEcoR9DemoSubsystem::SyncBodies(double Alpha, float DeltaTime)
 				Activity = EEcoSpeciesActivity::Vigilant;      // WATCH·밖에서 SHELTER = 서서 둘러봄
 			}
 			FEcoCreatureVisualState V;
-			V.StableAgentId = static_cast<int64>(B.Id);
+			V.StableAgentId = kStableIdBase + static_cast<int64>(B.Id);
 			V.SpeciesId = B.VisualSpecies;
+			V.RegionId = kDemoRegionId;   // 팀 지역 이름과 겹치지 않는 이름 — 팀 v3 가 표현 액터를 지역별로 셀 때(TallyTeamWolfVisuals) 어느 지역에도 들지 않게
 			V.Sequence = ++B.Sequence;
 			V.WorldTime = Now;
 			V.Position = Pos;
