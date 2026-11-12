@@ -24,6 +24,7 @@
 #include "Components/BoxComponent.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "MassSpawnerSubsystem.h"
+#include "MassMovementFragments.h"
 #include "MassEntityConfigAsset.h"
 #include "MassEntityTemplate.h"
 #include "Mass/EntityFragments.h"
@@ -69,6 +70,7 @@ struct FEcoCombatTestAccess
             S.Groups.AddDefaulted_GetRef().RegionId = Region->RegionId;
         S.BuildAgentLookup();
     }
+    static void SetSingleRegion(AEcoCreatureIntegrationSpawner& S, AEcologyRegion& Region) { S.Regions = {&Region}; }
     static void Passages(AEcoCreatureIntegrationSpawner& S, FMassEntityManager& EM,
         const FEcoServerTimeSnapshot& Time, TArray<FEcoMigrationOutcome>& Arrivals)
     { S.ReconcileFaunaPassages(EM, Time, Time.ServerTimeSeconds, 1, Arrivals); }
@@ -529,6 +531,76 @@ bool FEcoGunPresentationHit::RunTest(const FString&)
         Deaths[0].StableAgentId==103&&Deaths[0].SpeciesId==TEXT("Rat")&&Deaths[0].Cause==EEcoDeathCause::ExternalDamage);
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaWindupMomentum, "AdaptiveEcosystem.Creature.Fauna.WindupMomentum",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoFaunaWindupMomentum::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* S = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Region = W.World->SpawnActor<AEcologyRegion>();
+    Region->RegionId = TEXT("Meadow");
+    Region->RegionBounds->SetBoxExtent(FVector(1000., 1000., 100.));
+    FEcoCombatTestAccess::SetSingleRegion(*S, *Region);
+    auto* Ground = W.World->SpawnActor<AActor>();
+    auto* Box = NewObject<UBoxComponent>(Ground);
+    Ground->SetRootComponent(Box);
+    Ground->AddInstanceComponent(Box);
+    Box->SetBoxExtent(FVector(1000., 1000., 10.));
+    Box->SetCollisionObjectType(ECC_WorldStatic);
+    Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    Box->SetCollisionResponseToAllChannels(ECR_Block);
+    Box->RegisterComponent();
+    Ground->SetActorLocation(FVector(0., 0., -10.));
+
+    auto* Mass = W.World->GetSubsystem<UMassSpawnerSubsystem>();
+    auto& EM = Mass->GetEntityManagerChecked();
+    auto* Asset = NewObject<UMassEntityConfigAsset>(W.World);
+    Asset->GetMutableConfig().AddTrait(*NewObject<UEcoFaunaTrait>(Asset));
+    TArray<FMassEntityHandle> Entities;
+    { auto Creation = Mass->SpawnEntities(Asset->GetOrCreateEntityTemplate(*W.World), 2, Entities); }
+    if (!TestEqual(TEXT("Two rule fauna"), Entities.Num(), 2)) return false;
+    const FName Names[] = {TEXT("Leopard"), TEXT("Pig")};
+    S->FaunaSpecies.SetNum(2);
+    for (int32 Index = 0; Index < Entities.Num(); ++Index)
+    {
+        auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entities[Index]);
+        Id.StableAgentId = Index + 1;
+        Id.SpeciesId = Names[Index];
+        S->FaunaSpecies[Index].SpeciesId = Names[Index];
+        EM.GetFragmentDataChecked<FEcoRegionFragment>(Entities[Index]).CurrentRegionId = Region->RegionId;
+        auto& Life = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[Index]).Life;
+        Life.Born = -200.;
+        Life.MaturitySeconds = 60.;
+    }
+    auto& Hunter = S->FaunaSpecies[0];
+    Hunter.Diet = EEcoFaunaDiet::Carnivore;
+    Hunter.CarrionEnergyPerMeal = 9.f;
+    Hunter.RunSpeed = 530.f;
+    Hunter.AttackReach = 125.f;
+    Hunter.PreyRules.AddDefaulted_GetRef().SpeciesId = Names[1];
+    auto& HunterVitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entities[0]);
+    HunterVitals.Energy = .3f * HunterVitals.MaxEnergy;
+    auto& HunterTransform = EM.GetFragmentDataChecked<FTransformFragment>(Entities[0]).GetMutableTransform();
+    auto& PreyTransform = EM.GetFragmentDataChecked<FTransformFragment>(Entities[1]).GetMutableTransform();
+    HunterTransform = FTransform::Identity;
+    PreyTransform.SetLocation(FVector(105., 0., 0.));
+    EM.GetFragmentDataChecked<FMassVelocityFragment>(Entities[0]).Value = FVector(350., 0., 0.);
+    EM.GetFragmentDataChecked<FMassVelocityFragment>(Entities[1]).Value = FVector::ZeroVector;
+    FEcoCombatTestAccess::Ready(*S, Entities);
+    FEcoCombatTestAccess::MoveFauna(*S, 1.);
+    const double Contact = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Entities[0]).AttackContact;
+    TestTrue(TEXT("Wind-up advances on its first swept step"), HunterTransform.GetLocation().X > 10.);
+    if (!TestTrue(TEXT("Strike is scheduled after movement"), Contact > 1.)) return false;
+    auto& PreyVitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entities[1]);
+    const float StartHP = PreyVitals.HP;
+    FEcoCombatTestAccess::Predation(*S, 1.);
+    TestEqual(TEXT("No early strike on wind-up"), PreyVitals.HP, StartHP);
+    PreyTransform.SetLocation(FVector(300., 0., 0.));
+    FEcoCombatTestAccess::Predation(*S, Contact);
+    TestEqual(TEXT("Prey that escapes range before contact takes no damage"), PreyVitals.HP, StartHP);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaCounterTest, "AdaptiveEcosystem.Creature.Fauna.ContestedContact",
     EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FEcoFaunaCounterTest::RunTest(const FString&)

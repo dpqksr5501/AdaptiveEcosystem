@@ -18,6 +18,9 @@
 | 통합 맵에서 대체 먹이 구역만 바꾼 비교 | `Saved/ProjectAudit_20261112/HabitatCause_Integration_*.json`, 대응하는 `Saved/Logs/` 권위 로그 |
 | 서식지 스트리밍·먹이 이주 회귀 | `Saved/HabitatCauseFinal/Automation/index.json`, `Saved/Logs/HabitatCauseFinal_Automation.log` |
 | 여우의 지면 통과와 목적지 대체 먹이 섭취 | `Saved/ProjectAudit_20261112/HabitatCause_PassageFoodPIE.json`, 대응하는 `Saved/Logs/` 권위 로그 |
+| 멧돼지 배치와 표범 공격 접촉 비교 | `Saved/ProjectAudit_20261112/PreyAccess_*.json`와 `PreyWindup_*.json`, 대응하는 `Saved/Logs/` 권위 로그 |
+| 공격 준비 첫 이동과 유효 접촉 회귀 | `Saved/PreyWindupFinal/Automation/index.json`, `Saved/Logs/PreyWindupFinal_Automation.log` |
+| 공격 준비 수정 후 저FPS·멀티 근접 회귀 | `Saved/ProjectAudit_20261112/PreyWindupParity_*.json`, `Saved/PlayerHunting_20261105/PreyWindupMelee/`의 세 프로세스 결과 |
 
 맵별 결과, 모델·시드·배속, 섭취 단위와 미검증 범위는 [개체군 비교와 재현](../Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존)에 있다. 재현용 복사 맵 두 개와 각각의 World Partition 외부 액터는 에셋과 함께 사용한다. 원본 에셋, 저장 슬롯, Git·LFS 데이터는 원시 로그와 용도가 다르다.
 

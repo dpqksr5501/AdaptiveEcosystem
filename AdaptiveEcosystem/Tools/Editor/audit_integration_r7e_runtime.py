@@ -126,6 +126,27 @@ def configure_food_comparison(world, spawner, with_patches):
     state["food_comparison"] = {"stage": 2, "patches": placements}
 
 
+def configure_prey_comparison(world, spawner, overlap):
+    if world.get_name() != "LV_JYU_IntegrationR7eFauna":
+        raise RuntimeError("Prey comparison requires the owned integration fauna copy")
+    groups = list(spawner.get_editor_property("Groups"))
+    forest = next(group for group in groups if str(group.get_editor_property("RegionId")) == "Forest")
+    placements = list(forest.get_editor_property("Fauna"))
+    pig = next(placement for placement in placements if str(placement.get_editor_property("SpeciesId")) == "Pig")
+    leopard = next(placement for placement in placements if str(placement.get_editor_property("SpeciesId")) == "Leopard")
+    original = list(pig.get_editor_property("SpawnPoints"))
+    points = original
+    if overlap:
+        # Move the entire existing boar group by one fixed offset; keep individual spacing and roster.
+        anchor = leopard.get_editor_property("SpawnPoints")[0]
+        offset = u.Vector(anchor.x + 500. - original[0].x, anchor.y + 350. - original[0].y, 0.)
+        points = [point + offset for point in original]
+        pig.set_editor_property("SpawnPoints", points)
+        forest.set_editor_property("Fauna", placements)
+        spawner.set_editor_property("Groups", groups)
+    state["prey_comparison"] = {"changed": overlap, "pig_spawn_points": [[p.x, p.y, p.z] for p in points]}
+
+
 def record_reasons(world):
     living = set(u.EcoCreatureInspectionLibrary.get_authority_agent_ids(world))
     for agent in sorted(living | reason_windows.keys()):
@@ -228,6 +249,10 @@ def tick(_):
                 if ready:
                     raise RuntimeError("Authority initialized before the food comparison setup")
                 configure_food_comparison(world, spawner, mode == "food_patches")
+            elif mode in ("prey_control", "prey_overlap"):
+                if ready:
+                    raise RuntimeError("Authority initialized before the prey comparison setup")
+                configure_prey_comparison(world, spawner, mode == "prey_overlap")
             configured = True
             state["map"] = world.get_path_name()
             state["configuration"] = {}

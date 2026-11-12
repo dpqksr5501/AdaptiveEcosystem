@@ -250,8 +250,13 @@ void AEcoCreatureIntegrationSpawner::ProcessFaunaPredation(double Now)
             RecordGameplayReason(HunterId.StableAgentId, HunterRegion, Now, Rejection, AttemptedTarget);
             if (UsesFaunaPursuitFix()) Fauna->AttackReady = Now + FMath::Min(.5f, Profile->AttackRecovery);
             if (bAuditFaunaHunts)
-                UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Species=%s Event=Miss Reason=%s"),
-                    HunterId.StableAgentId, *HunterId.SpeciesId.ToString(), *Rejection.ToString());
+            {
+                const double Gap = Prey && EM.IsEntityValid(*Prey)
+                    ? FVector::Dist(EM.GetFragmentDataChecked<FTransformFragment>(Hunter).GetTransform().GetLocation(),
+                        EM.GetFragmentDataChecked<FTransformFragment>(*Prey).GetTransform().GetLocation()) : -1.;
+                UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Species=%s Event=Miss Reason=%s Prey=%lld GapCm=%.1f ReachCm=%.1f"),
+                    HunterId.StableAgentId, *HunterId.SpeciesId.ToString(), *Rejection.ToString(), AttemptedTarget, Gap, Profile->AttackReach);
+            }
             continue;
         }
         const auto& PreyId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(*Prey);
@@ -1044,45 +1049,41 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 if (!Away.IsNearlyZero() && TryLaunch(Position + Away * 2000.)) continue;
                 Fauna->PhaseUntil = Now + .5;
             }
+            const auto AdvanceDuringWindup = [&](FMassEntityHandle Target)
+            {
+                const auto* PreyProfile = FindFauna(EM.GetFragmentDataChecked<FEcoIdentityFragment>(Target).SpeciesId);
+                if (!PreyProfile) return;
+                const FVector TargetPosition = EM.GetFragmentDataChecked<FTransformFragment>(Target).GetTransform().GetLocation();
+                const FVector ToTarget = TargetPosition - Position;
+                const FVector Heading = ToTarget.GetSafeNormal2D();
+                const auto& TargetVelocity = EM.GetFragmentDataChecked<FMassVelocityFragment>(Target).Value;
+                const bool bCommittedCharge = bAttackAdvance && Species->bFlankDefendedPrey && PreyProfile->DefenseDamage > 0.f;
+                if (ToTarget.SizeSquared2D() > FMath::Square((bCommittedCharge ? 2.f : 1.25f) * Species->AttackReach)
+                    || !HasClearSight(*GetWorld(), Position, TargetPosition, Species->EyeHeight, PreyProfile->EyeHeight)) return;
+
+                const double Scale = Fauna->Life.SpeedScale(Now);
+                const double ForwardSpeed = FVector::DotProduct(PreviousVelocity, Heading);
+                const double RetreatSpeed = FMath::Max(0., FVector::DotProduct(TargetVelocity, Heading));
+                const double FollowSpeed = FMath::Min(FMath::Max(Species->WalkSpeed * Scale, ForwardSpeed), RetreatSpeed);
+                const double BrakeSpeed = FMath::Max(0., ForwardSpeed - Species->GroundAcceleration * Scale * Dt);
+                const double Speed = bCommittedCharge ? Species->RunSpeed * Scale : FMath::Max(FollowSpeed, BrakeSpeed);
+                const double Gap = (bCommittedCharge ? .4 : .65) * Species->AttackReach;
+                const double AdvanceDistance = FMath::Clamp(ToTarget.Size2D() - Gap, 0., Speed * Dt);
+                FVector Destination = Position + Heading * AdvanceDistance;
+                if (AdvanceDistance <= UE_SMALL_NUMBER || !CanMoveOnGround(Destination)) return;
+                if (bAuditFaunaHunts && PreviousVelocity.IsNearlyZero())
+                    UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Species=%s Event=Advance Prey=%lld"),
+                        Id.StableAgentId, *Id.SpeciesId.ToString(), Fauna->TargetId);
+                Velocity = (Destination - Position) / Delta;
+                Transform.SetLocation(Destination);
+                const float Demand = float(FMath::Clamp(Speed / (Species->RunSpeed * Scale), 0., 1.));
+                Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - Species->SprintDrain * Demand * float(Dt));
+                Transform.SetRotation(Heading.ToOrientationQuat());
+            };
             if (!Guard && !bFleeing && Fauna->AttackContact >= 0. && !Fauna->bRecovering)
             {
                 const auto* Target = AgentLookup.Find(Fauna->TargetId);
-                if (Target && CanHuntFauna(EM, Entity, *Target, *Species, Now, false, false))
-                {
-                    const auto* PreyProfile = FindFauna(EM.GetFragmentDataChecked<FEcoIdentityFragment>(*Target).SpeciesId);
-                    const FVector TargetPosition = EM.GetFragmentDataChecked<FTransformFragment>(*Target).GetTransform().GetLocation();
-                    const FVector ToTarget = TargetPosition - Position;
-                    const FVector Heading = ToTarget.GetSafeNormal2D();
-                    const auto& TargetVelocity = EM.GetFragmentDataChecked<FMassVelocityFragment>(*Target).Value;
-                    const bool bCommittedCharge = bAttackAdvance && Species->bFlankDefendedPrey
-                        && PreyProfile && PreyProfile->DefenseDamage > 0.f;
-                    const double RetreatSpeed = FVector::DotProduct(TargetVelocity, Heading);
-                    if (PreyProfile && (bCommittedCharge || RetreatSpeed > 0.)
-                        && ToTarget.SizeSquared2D() <= FMath::Square((bCommittedCharge ? 2.f : 1.25f) * Species->AttackReach)
-                        && HasClearSight(*GetWorld(), Position, TargetPosition, Species->EyeHeight, PreyProfile->EyeHeight))
-                    {
-                        // Follow a withdrawing target during wind-up, using the same sweep and bite reach.
-                        const double Scale = Fauna->Life.SpeedScale(Now);
-                        const double CarrySpeed = FMath::Max(double(Species->WalkSpeed) * Scale,
-                            FVector::DotProduct(PreviousVelocity, Heading));
-                        const double Speed = bCommittedCharge ? Species->RunSpeed * Scale
-                            : FMath::Min(CarrySpeed, RetreatSpeed);
-                        const double Gap = (bCommittedCharge ? .4 : .65) * Species->AttackReach;
-                        const double AdvanceDistance = FMath::Clamp(ToTarget.Size2D() - Gap, 0., Speed * Dt);
-                        FVector Destination = Position + Heading * AdvanceDistance;
-                        if (AdvanceDistance > UE_SMALL_NUMBER && CanMoveOnGround(Destination))
-                        {
-                            if (bAuditFaunaHunts && PreviousVelocity.IsNearlyZero())
-                                UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Species=%s Event=Advance Prey=%lld"),
-                                    Id.StableAgentId, *Id.SpeciesId.ToString(), Fauna->TargetId);
-                            Velocity = (Destination - Position) / Delta;
-                            Transform.SetLocation(Destination);
-                            const float Demand = float(FMath::Clamp(Speed / (Species->RunSpeed * Scale), 0., 1.));
-                            Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - Species->SprintDrain * Demand * float(Dt));
-                            Transform.SetRotation(ToTarget.GetSafeNormal2D().ToOrientationQuat());
-                        }
-                    }
-                }
+                if (Target && CanHuntFauna(EM, Entity, *Target, *Species, Now, false, false)) AdvanceDuringWindup(*Target);
                 continue;
             }
             if (!Guard && (Now < Fauna->RootingUntil || Fauna->AttackContact >= 0.
@@ -1426,8 +1427,10 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     {
                         Fauna->AttackContact = Now + Windup;
                         if (bAuditFaunaHunts)
-                            UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Species=%s Event=Windup Prey=%lld"),
-                                Id.StableAgentId, *Id.SpeciesId.ToString(), Fauna->TargetId);
+                            UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Species=%s Event=Windup Prey=%lld GapCm=%.1f RetreatCmSec=%.1f CarryCmSec=%.1f"),
+                                Id.StableAgentId, *Id.SpeciesId.ToString(), Fauna->TargetId, FromPrey.Size(), RetreatSpeed, CarrySpeed);
+                        // The range prediction just used this motion. Do not erase it on the first wind-up step.
+                        AdvanceDuringWindup(*Prey);
                         continue;
                     }
                 }

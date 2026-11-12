@@ -39,6 +39,10 @@ def summarize(report_path, log_path):
                     captured_targets[prey] += 1
                     species_by_id[hunter_id] = hunter
                     species_by_id[prey_id] = prey
+            if hunter := species_by_id.get(fields.get("Hunter")):
+                for event in ("Wounded", "Counterattack", "GuardIntercept"):
+                    if f"[Eco Fauna][{event}]" in line:
+                        hunts[hunter][event] += 1
             if species and "Amount" in fields:
                 for meal in ("Scavenge", "PatchMeal", "PlantMeal", "ParentMeal"):
                     if f"[Eco Fauna][{meal}]" in line:
