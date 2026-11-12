@@ -12,6 +12,8 @@ duration=float(arg('HerdAuditDuration','120'))
 pie='-HerdAuditPIE' in cmd
 headless='-server' in cmd.lower()
 apply_loss='-HerdAuditNoLoss' not in cmd
+renewable_loss='-HerdAuditRenewableLoss' in cmd
+game_clock='-HerdAuditGameClock' in cmd
 out=Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir()))/'HerdMigration_20261022'
 out.mkdir(parents=True,exist_ok=True)
 state={'samples':[],'start':None,'next':0,'loss':False,'camera':None,'shots':0,'refuge_shot':False,'last':{},'transfers':[], 'error':None}
@@ -39,14 +41,17 @@ def finish(result):
         'plan_ids':sorted(set(r.get('migration_plan',0) for r in rows if r.get('migration_plan',0)>0)),
         'arrived_ids':sorted(set(r['stable_id'] for r in rows if r.get('migration_reason')=='Arrived')),
         'region_transfers':state['transfers'],'history_records':sum(len(r.get('reason_history',[])) for r in rows),
-        'observation_wall_seconds':duration,
+        'observation_seconds':duration,'uses_game_clock':game_clock,
         'fixture':'Sustained Barren drought (receipted food loss and suspended regeneration), observers disabled; model weights unchanged'
+            if apply_loss and not renewable_loss else 'Receipted Barren food loss with existing regeneration enabled'
             if apply_loss else 'No food loss or suspended regeneration, observers disabled; model weights unchanged'}
     (out/(name+'_Runtime.json')).write_text(json.dumps({'summary':summary,'samples':state['samples']},ensure_ascii=False,indent=2),encoding='utf-8')
     unreal.log('HERD_RUNTIME_FINISHED '+json.dumps(summary))
     if pie:
         if state['camera']:state['camera'].destroy_actor()
         levels.editor_request_end_play();unreal.SystemLibrary.quit_editor()
+    elif game_clock and world():
+        unreal.SystemLibrary.execute_console_command(world(),'QUIT')
 
 def tick(dt):
     try:
@@ -56,9 +61,10 @@ def tick(dt):
         if not game:return
         runtime=unreal.GameplayStatics.get_all_actors_of_class(game,unreal.EcoCreatureIntegrationSpawner)
         if not runtime or not runtime[0].is_runtime_ready():return
-        now=time.monotonic()
+        now=unreal.GameplayStatics.get_time_seconds(game) if game_clock else time.monotonic()
         if state['start'] is None:
             state['start']=now
+            if game_clock:unreal.GameplayStatics.set_global_time_dilation(game,4.)
             # Explicit observer fixture; both native player observation and generic threat source are disabled.
             for pawn in unreal.GameplayStatics.get_all_actors_of_class(game,unreal.Pawn):
                 for cls in (unreal.EcoPlayerEcologyComponent,unreal.EcoThreatSourceComponent):
@@ -74,7 +80,7 @@ def tick(dt):
         if apply_loss and elapsed>3 and not state['loss']:
             migration=next((s for s in unreal.ObjectIterator(unreal.EcoHerdMigrationSubsystem) if s.get_outer()==game),None)
             if not migration:raise RuntimeError('Missing authoritative herd subsystem')
-            state['loss']=migration.apply_food_fraction_for_audit('Barren',0,True)
+            state['loss']=migration.apply_food_fraction_for_audit('Barren',0,not renewable_loss)
             if not state['loss']:raise RuntimeError('Receipted food-loss fixture rejected')
         rows=[]
         for key in keys:

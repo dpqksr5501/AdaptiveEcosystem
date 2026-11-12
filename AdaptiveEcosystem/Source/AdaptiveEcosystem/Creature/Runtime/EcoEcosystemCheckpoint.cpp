@@ -187,6 +187,8 @@ struct FEcoEcosystemCheckpoint
         FString SavedMap=MapName,Build=RuntimeHash(),Brain=N->GetActiveBrain().Id;
         if(Build.IsEmpty())return Reject(TEXT("runtime image hash unavailable"));
         if(!Loading){
+            if (S.FaunaMotionTime >= 0. && Clock->GetServerTime().ServerTimeSeconds - S.FaunaMotionTime > UE_SMALL_NUMBER)
+                return Reject(TEXT("pending fauna motion; retry after the simulation catches up"));
             for(int32 I=0;I<N->NumContexts();++I){const auto& C=*N->GetContext(I);
                 if(!C.bSpatialFoodRegistered||C.Sim.Rng.External||!ValidGrid(C.Sim.Food))return Reject(TEXT("unsupported native context"));
                 auto& R=Regions.AddDefaulted_GetRef();R.Id=C.RegionId;R.Origin=C.OriginCm;R.StartFood=C.StartFood;R.Sequence=C.ResourceReceiptSequence;R.Sim=C.Sim;R.Traces=C.MovementTraces;
@@ -511,6 +513,8 @@ struct FEcoEcosystemCheckpoint
             if(V.Vitals.HP<=0)EM.RemoveTagFromEntity(Entity,FEcoAliveTag::StaticStruct());
         }
         S.Step=Step;S.SuccessfulBirths=Successful;S.CommittedDeaths=Deaths;S.LastResourceTime=ResourceTime;S.NextMigrationTime=MigrationTime;
+        S.FaunaMotionTime=S.FaunaSpecies.IsEmpty()?-1.:Time.ServerTimeSeconds;
+        S.GameplayReasons.Reset();
         S.PendingBirths=MoveTemp(Births);S.NextBirthScan=BirthScan;S.SpeciesTotals=MoveTemp(Totals);S.CompletedTime=Completed;S.CompletedTime.WorldEpoch=NewEpoch;
         S.FaunaBirths=MoveTemp(FaunaBirths);S.NextFaunaBirthScan=FaunaBirthScan;
         S.FaunaCarcasses=MoveTemp(FaunaCarcasses);S.FaunaScent=MoveTemp(FaunaScent);

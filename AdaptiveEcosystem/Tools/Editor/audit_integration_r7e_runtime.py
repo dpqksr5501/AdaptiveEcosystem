@@ -10,6 +10,8 @@ command = u.SystemLibrary.get_command_line()
 name = re.search(r"-DeerAuditRun=(\w+)", command).group(1)
 duration = int(re.search(r"-DeerAuditSeconds=(\d+)", command).group(1))
 mode = re.search(r"-DeerAuditMode=(\w+)", command).group(1)
+speed_match = re.search(r"-DeerAuditDilation=(1|4)\b", command)
+dilation = float(speed_match.group(1)) if speed_match else 4.
 out = Path(u.Paths.project_saved_dir()).resolve() / "ProjectAudit_20261112" / f"{name}.json"
 state = {"name": name, "mode": mode, "target_seconds": duration, "samples": [], "completed": False}
 started = time.monotonic()
@@ -17,6 +19,7 @@ configured = False
 origin = None
 next_sample = 0.
 track_intake = "-DeerAuditTrackIntake" in command
+track_reasons = "-DeerAuditTrackReasons" in command
 legacy_feed = "-DeerAuditLegacyFeed" in command
 native = None
 previous_step = 0
@@ -28,6 +31,9 @@ intake = {"total": 0., "steps_captured": 0, "missed_steps": 0, "by_region": {},
           "brain_ids": [], "other_writers": {}, "capture_errors": 0}
 brains = set()
 other_writers = {}
+reason_totals = {}
+reason_windows = {}
+next_reason_sample = 0.
 
 
 def capture_agent(world, agent):
@@ -35,6 +41,26 @@ def capture_agent(world, agent):
     if isinstance(raw, tuple):
         raw = next((item for item in raw if isinstance(item, str)), "")
     return json.loads(raw) if raw else None
+
+
+def record_reasons(world):
+    living = set(u.EcoCreatureInspectionLibrary.get_authority_agent_ids(world))
+    for agent in sorted(living | reason_windows.keys()):
+        row = capture_agent(world, agent)
+        if not row:
+            reason_windows.pop(agent, None)
+            continue
+        previous = reason_windows.get(agent, set())
+        current = {
+            (event["time"], event["region"], event["reason"], event["related_id"], event["amount"])
+            for event in row.get("gameplay_reason_history", [])
+        }
+        if current:
+            reason_windows[agent] = current
+        if current - previous:
+            totals = reason_totals.setdefault(row["species"], {})
+            for _, _, reason, _, _ in current - previous:
+                totals[reason] = totals.get(reason, 0) + 1
 
 
 def record_intake(world):
@@ -85,7 +111,7 @@ def write():
 
 
 def tick(_):
-    global configured, origin, next_sample, last_legacy_dump
+    global configured, origin, next_sample, last_legacy_dump, next_reason_sample
     world = None
     try:
         world = next((world for world in u.ObjectIterator(u.World)
@@ -124,12 +150,18 @@ def tick(_):
                 raise RuntimeError("Authority not ready or stopped")
             return True
         if origin is None:
-            u.GameplayStatics.set_global_time_dilation(world, 4.)
+            if track_reasons:
+                u.SystemLibrary.execute_console_command(world, "eco.Inspection.GameplayReasons 1")
+                state["sampled_gameplay_reasons"] = reason_totals
+            u.GameplayStatics.set_global_time_dilation(world, dilation)
             state["dilation"] = u.GameplayStatics.get_global_time_dilation(world)
             origin = now
         elapsed = now - origin
         if track_intake:
             record_intake(world)
+        if track_reasons and elapsed >= next_reason_sample:
+            record_reasons(world)
+            next_reason_sample = elapsed + 1.
         if legacy_feed and elapsed - last_legacy_dump >= 1.:
             u.SystemLibrary.execute_console_command(world, "eco.Integration.Dump details")
             last_legacy_dump = elapsed
@@ -170,6 +202,8 @@ def tick(_):
             while next_sample <= elapsed:
                 next_sample += 30.
             state["completed"] = elapsed >= duration
+            if state["completed"]:
+                u.SystemLibrary.execute_console_command(world, "eco.Integration.Dump")
             if track_intake:
                 intake["brain_ids"] = sorted(brains)
                 intake["other_writers"] = {key: sorted(values) for key, values in other_writers.items()}

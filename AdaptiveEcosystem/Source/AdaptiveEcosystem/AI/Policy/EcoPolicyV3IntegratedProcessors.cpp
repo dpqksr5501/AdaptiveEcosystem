@@ -169,7 +169,7 @@ namespace EcoPolicyV3IntegratedProcImpl
         }
         if(!Seen){
             Memory.PursuitExposure=FMath::Max(0.,Memory.PursuitExposure-1);
-            // Actual footstep emission, never a hidden live player location.
+            // Read the position of the recorded emission.
             const FEcoLifeNoiseSample* Heard=nullptr;double Nearest=MAX_dbl;float BestSignal=0.f;
             for(const auto& N:A.Ctx->PlayerNoises){
                 const double D=FMath::Sqrt(FMath::Square(N.X-Position.X)+FMath::Square(N.Y-Position.Y));
@@ -194,13 +194,13 @@ namespace EcoPolicyV3IntegratedProcImpl
                 else if(Blocked&&D>N.Range*A.Ctx->Sim.Weather.Hear*.25)continue;
                 Heard=&N;Nearest=D;
             }
-            if (Heard && Memory.Observe(EcoLifeV3::EEncounter::Noise,EcoLifeV3::Mix(Heard->Id)^0xF00757E950000000ULL,
+            if (Heard && Memory.Observe(Heard->bShot ? EcoLifeV3::EEncounter::Surprise : EcoLifeV3::EEncounter::Noise,EcoLifeV3::Mix(Heard->Id)^0xF00757E950000000ULL,
                 Heard->Time,Now,Heard->X,Heard->Y,Listener?BestSignal:Heard->Confidence) && Listener)
             {
                 const auto* Log = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Footsteps.HearingLog"));
                 if (Log && Log->GetInt()) UE_LOG(LogTemp, Log,
-                    TEXT("[Eco Footstep Hearing] Species=%s Source=Player.Footstep Signal=%.3f Reaction=Memory"),
-                    *Species.ToString(), BestSignal);
+                    TEXT("[Eco Footstep Hearing] Species=%s Source=%s Signal=%.3f Reaction=Memory"),
+                    *Species.ToString(), Heard->bShot ? TEXT("Player.Shot") : TEXT("Player.Footstep"), BestSignal);
             }
             return;
         }
@@ -1161,11 +1161,11 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
         if(Region.Sim.Config.bEcosystemLife)for(int32 K=RecentNoises.Num()-1;K>=0&&Region.PlayerNoises.Num()<16;--K){
             const auto& Noise=RecentNoises[K];const auto* Pawn=Cast<APawn>(Noise.Instigator.Get());
             const auto* Bridge=Pawn?Pawn->FindComponentByClass<UEcoPlayerEcologyComponent>():nullptr;
-            if(Noise.Tag!=TEXT("Player.Footstep")||!Pawn||!Pawn->IsPlayerControlled()||!Bridge||!Bridge->bThreatEnabled)continue;
+            if(!EcoNoise::IsPlayerThreat(Noise.Tag)||!Pawn||!Pawn->IsPlayerControlled()||!Bridge||!Bridge->bThreatEnabled)continue;
             const double Age=World->GetTimeSeconds()-Noise.EmittedAt;if(Age<0||Age>UEcoNoiseSubsystem::EventLifetime)continue;
             const auto P=Region.CmToUnits(Noise.Position);
             Region.PlayerNoises.Add({uint64(Noise.Id),P.X,P.Y,Noise.Position.Z,FMath::Max(0.,Region.Sim.T*EcoRepertoireV3::kStepSeconds-Age),
-                Noise.MaxRange*Noise.Loudness/EcoRepertoireV3::kUnitCm,Noise.Loudness});
+                Noise.MaxRange*Noise.Loudness/EcoRepertoireV3::kUnitCm,Noise.Loudness,EcoNoise::IsPlayerShot(Noise.Tag)});
         }
     }
     // --- 3. 입양 (조정자가 막 만든 개체). 늑대 먼저 — 새 사슴의 첫 관측이 늑대를 보게 ---

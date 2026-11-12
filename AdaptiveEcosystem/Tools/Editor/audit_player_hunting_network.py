@@ -19,7 +19,7 @@ def finish(ok,error=None):
     if state['finished']:return
     state['finished']=True
     (out/(name+'.json')).write_text(json.dumps(dict(result='PASS' if ok else 'FAIL',error=error,samples=state['samples'],events=state['events'],
-        attack_inputs=state['attack_inputs'],fixture='Authority player placement; Enhanced Input and GAS RPC; no HP/animal writes'),indent=2),encoding='utf-8')
+        attack_inputs=state['attack_inputs'],fixture='Authority player placement; configured-action GAS RPC; no HP/animal writes'),indent=2),encoding='utf-8')
     u.log('HUNTING_NETWORK_'+name+'_'+('PASS' if ok else 'FAIL'))
     if state['world']:u.SystemLibrary.execute_console_command(state['world'],'QUIT')
     else:u.SystemLibrary.quit_editor()
@@ -64,15 +64,15 @@ def tick(dt):
                 pc.set_control_rotation(u.Rotator(0,0,0))
         else:
             pc=u.GameplayStatics.get_player_controller(world,0);pawn=pc.get_controlled_pawn()
-            if not pawn:return
+            if not pawn or not pawn.player_state:return
             hit=pawn.get_component_by_class(u.EcoMeleeHitComponent)
             if not state['bound']:hit.on_damage_outcome.add_callable(event);state['bound']=True
             anim=pawn.mesh.get_anim_instance()
-            subsystem=next((s for s in u.ObjectIterator(u.EnhancedInputLocalPlayerSubsystem)
-                            if isinstance(s.get_outer(),u.LocalPlayer)),None)
-            if not anim or not subsystem:return
+            avatar=pawn.get_component_by_class(u.EcoAbilityAvatarComponent)
+            if not anim or not avatar:return
             def press():
-                subsystem.inject_input_vector_for_action(action,u.Vector(1,0,0),[],[])
+                avatar.release_configured_action(action)
+                avatar.press_configured_action(action)
                 state['attack_inputs']+=1
             if name=='ClientA' and not any('DEATH_COMMITTED' in e['result'] for e in state['events']):
                 if not anim.montage_is_playing(montage) and elapsed>=state['next_attack']:

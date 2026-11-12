@@ -51,13 +51,15 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 	if (EM.IsProcessing() || !Clock->AdvanceClock(Delta)) return;
 	const double Now = Clock->GetServerTime().ServerTimeSeconds;
 	if (!BuildAgentLookup()) { FailRuntime(TEXT("Duplicate or invalid stable agent identity")); return; }
-    MoveFauna(Delta, Now);
 	// Bounded chronological catch-up: unfinished logical time remains as observable debt.
 	const auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
-	for (int32 Pass = 0; Pass < MaxCatchUpSteps; ++Pass)
+    int32 RemainingResourceSteps = MaxCatchUpSteps;
+    const auto AdvanceResources = [&](double Through)
+    {
+	for (; RemainingResourceSteps > 0; --RemainingResourceSteps)
 	{
 		FEcoServerTimeSnapshot Previous;
-		if (!Clock->GetSnapshotAt(LastResourceTime, Previous)) { FailRuntime(TEXT("Historical clock snapshot")); return; }
+		if (!Clock->GetSnapshotAt(LastResourceTime, Previous)) { FailRuntime(TEXT("Historical clock snapshot")); return false; }
 		double NextTime = FMath::Min(LastResourceTime + 1.0, Ecology->GetNextScheduledTime(Previous, bEnableWaves && IsSpeciesEnabled(false)));
         if (Migration.bEnabled) NextTime = FMath::Min(NextTime, NextMigrationTime);
         // Combat requests wake the existing serialized transaction rather than waiting a full resource second.
@@ -83,13 +85,42 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
                 Fauna && V.HP > 0 && Fauna->AttackContact > LastResourceTime)
                 NextTime = FMath::Min(NextTime, Fauna->AttackContact);
 		}
-		if (NextTime > Now) break;
+		if (NextTime > Through) break;
 		FEcoServerTimeSnapshot Time;
-		if (!Clock->GetSnapshotAt(NextTime, Time) || !ProcessResourceStep(Time, Now))
-		{ FailRuntime(TEXT("Creature resource/survival step")); return; }
+        const int32 BeforeCount = Owned.Num();
+		if (!Clock->GetSnapshotAt(NextTime, Time) || !ProcessResourceStep(Time, Through)
+            || (Owned.Num() != BeforeCount && !BuildAgentLookup()))
+		{ FailRuntime(TEXT("Creature resource/survival step")); return false; }
 		LastResourceTime = Time.ServerTimeSeconds;
 	}
-	if (!EcoMassSurvival::RemoveExpired(EM, Now, true) || !BuildAgentLookup())
+        return true;
+    };
+    if (FaunaSpecies.IsEmpty())
+    {
+        if (!AdvanceResources(Now)) return;
+    }
+    else
+    {
+        if (FaunaMotionTime < 0.) FaunaMotionTime = FMath::Max(0., Now - Delta);
+        constexpr double MaxMotionStep = .1;
+        constexpr int32 MaxMotionStepsPerFrame = 8;
+        if (Now - FaunaMotionTime > MaxMotionStep && !AdvanceResources(FaunaMotionTime)) return;
+        for (int32 Pass = 0; Pass < MaxMotionStepsPerFrame && RemainingResourceSteps > 0
+            && Now - FaunaMotionTime > UE_SMALL_NUMBER; ++Pass)
+        {
+            double End = FMath::Min(Now, FaunaMotionTime + MaxMotionStep);
+            if (Now - FaunaMotionTime > MaxMotionStep)
+                for (const auto Entity : Owned)
+                    if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
+                        Fauna && Fauna->AttackContact > FaunaMotionTime + UE_SMALL_NUMBER)
+                        End = FMath::Min(End, Fauna->AttackContact);
+            MoveFauna(float(End - FaunaMotionTime), End);
+            FaunaMotionTime = End;
+            if (!AdvanceResources(End)) return;
+        }
+    }
+	const double CleanupTime = FaunaSpecies.IsEmpty() ? Now : FaunaMotionTime;
+	if (!EcoMassSurvival::RemoveExpired(EM, CleanupTime, true) || !BuildAgentLookup())
 	{ FailRuntime(TEXT("Creature death cleanup")); return; }
 	UpdateSimulationLOD();
 	UpdateSensoryPresentation();

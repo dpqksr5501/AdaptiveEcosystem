@@ -33,7 +33,7 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		if (const auto* PC = It->Get(); PC && PC->IsLocalController())
 		{
 			FVector P; FRotator R; PC->GetPlayerViewPoint(P, R); Viewers.Add(P);
-			if (const auto* Pawn = PC->GetPawn())
+			if (const APawn* Pawn = PC->GetPawn())
 				if (const auto* Relevance = Pawn->FindComponentByClass<UEcoCombatRelevanceComponent>())
 					CombatViewers.Add(Relevance);
 		}

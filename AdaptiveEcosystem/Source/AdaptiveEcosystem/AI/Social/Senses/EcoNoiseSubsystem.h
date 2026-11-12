@@ -4,6 +4,16 @@
 #include "Subsystems/WorldSubsystem.h"
 #include "EcoNoiseSubsystem.generated.h"
 
+namespace EcoNoise
+{
+    inline bool IsPlayerShot(FName Tag) { static const FName Shot(TEXT("Player.Shot")); return Tag == Shot; }
+    inline bool IsPlayerThreat(FName Tag)
+    {
+        static const FName Footstep(TEXT("Player.Footstep"));
+        return Tag == Footstep || IsPlayerShot(Tag);
+    }
+}
+
 /** A short-lived, immutable emission snapshot. Audio playback is not its authority. */
 struct FEcoNoiseEvent
 {

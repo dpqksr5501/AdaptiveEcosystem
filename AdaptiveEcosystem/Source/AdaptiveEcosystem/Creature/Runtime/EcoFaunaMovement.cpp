@@ -91,32 +91,42 @@ namespace
 }
 
 bool AEcoCreatureIntegrationSpawner::CanHuntFauna(const FMassEntityManager& EM, FMassEntityHandle Hunter,
-    FMassEntityHandle Prey, const FEcoFaunaSpecies& Profile, double Now, bool bContact, bool bCheckVisibility) const
+    FMassEntityHandle Prey, const FEcoFaunaSpecies& Profile, double Now, bool bContact, bool bCheckVisibility, FName* Rejection) const
 {
-    if (Hunter == Prey || !EM.IsEntityValid(Prey)) return false;
+    const auto Reject = [Rejection](const TCHAR* Reason) { if (Rejection) *Rejection = FName(Reason); return false; };
+    if (Hunter == Prey || !EM.IsEntityValid(Prey)) return Reject(TEXT("HuntTargetUnavailable"));
     const auto* Target = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Prey);
-    if (!Target || Target->Flight != EEcoFaunaFlightPhase::Grounded) return false;
+    if (!Target) return Reject(TEXT("HuntTargetBackend"));
+    if (Target->Flight != EEcoFaunaFlightPhase::Grounded) return Reject(TEXT("HuntTargetAirborne"));
     const auto& Health = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Prey);
     const auto& PreyId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Prey);
     const auto* Rule = Profile.PreyRules.FindByPredicate([&](const auto& Entry) { return Entry.SpeciesId == PreyId.SpeciesId; });
     const auto& Region = EM.GetFragmentDataChecked<FEcoRegionFragment>(Hunter);
-    if (!Rule || Health.HP <= 0.f || EM.GetFragmentDataChecked<FEcoRegionFragment>(Prey).CurrentRegionId != Region.CurrentRegionId)
-        return false;
+    if (!Rule) return Reject(TEXT("HuntDiet"));
+    if (Health.HP <= 0.f) return Reject(TEXT("HuntTargetUnavailable"));
+    if (EM.GetFragmentDataChecked<FEcoRegionFragment>(Prey).CurrentRegionId != Region.CurrentRegionId)
+        return Reject(TEXT("HuntTargetOutsideRegion"));
     const auto& HunterLife = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Hunter).Life;
     const auto* TargetProfile = FindFauna(PreyId.SpeciesId);
-    if (!TargetProfile || !FitsFaunaPrey(*Rule, Profile, *TargetProfile, HunterLife, Target->Life, Health, Now)) return false;
+    if (!TargetProfile || !FitsFaunaPrey(*Rule, Profile, *TargetProfile, HunterLife, Target->Life, Health, Now))
+        return Reject(TEXT("HuntTargetSizeOrMaturity"));
     const auto& HunterTransform = EM.GetFragmentDataChecked<FTransformFragment>(Hunter).GetTransform();
     const FVector Start = HunterTransform.GetLocation();
     const FVector End = EM.GetFragmentDataChecked<FTransformFragment>(Prey).GetTransform().GetLocation();
     if (bCheckVisibility)
         if (const auto* Shelter = FindFaunaShelter(Region.CurrentRegionId, PreyId.SpeciesId, End, 0.);
-            Shelter && Profile.BodyRadius * HunterLife.BodyScale(Now) > Shelter->EntranceRadius) return false;
+            Shelter && Profile.BodyRadius * HunterLife.BodyScale(Now) > Shelter->EntranceRadius) return Reject(TEXT("HuntTargetInRefuge"));
     const double Radius = bContact ? Profile.AttackReach
         : Rule->MaxPursuitStart > 0.f ? FMath::Min(Profile.SightRange, Rule->MaxPursuitStart) : Profile.SightRange;
     const double FovCos = FMath::Cos(FMath::DegreesToRadians(Profile.SightHalfAngle));
-    if (bCheckVisibility && (FVector::DistSquared(Start, End) > FMath::Square(Radius)
-        || (!bContact && FVector::DotProduct((End - Start).GetSafeNormal2D(), HunterTransform.GetRotation().GetForwardVector()) < FovCos)
-        || !HasClearSight(*GetWorld(), Start, End, Profile.EyeHeight, TargetProfile->EyeHeight))) return false;
+    if (bCheckVisibility)
+    {
+        if (FVector::DistSquared(Start, End) > FMath::Square(Radius)) return Reject(TEXT("HuntOutOfReach"));
+        if (!bContact && FVector::DotProduct((End - Start).GetSafeNormal2D(), HunterTransform.GetRotation().GetForwardVector()) < FovCos)
+            return Reject(TEXT("HuntOutsideView"));
+        if (!HasClearSight(*GetWorld(), Start, End, Profile.EyeHeight, TargetProfile->EyeHeight))
+            return Reject(TEXT("HuntOccluded"));
+    }
     if (TargetProfile->OffspringGuardRange <= 0.f && Rule->GuardRadius > 0.f && Target->Life.AgeFraction(Now) < 1.)
     {
         for (const auto Guard : Owned)
@@ -128,7 +138,7 @@ bool AEcoCreatureIntegrationSpawner::CanHuntFauna(const FMassEntityManager& EM, 
             const auto& GuardHealth = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Guard);
             if (GuardHealth.HP >= .7f * GuardHealth.MaxHP && FVector::DistSquared(End,
                     EM.GetFragmentDataChecked<FTransformFragment>(Guard).GetTransform().GetLocation()) <= FMath::Square(Rule->GuardRadius))
-                return false;
+                return Reject(TEXT("HuntTargetGuarded"));
         }
     }
     return true;
@@ -174,15 +184,19 @@ void AEcoCreatureIntegrationSpawner::ProcessFaunaPredation(double Now)
         auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Hunter);
         if (!Fauna || Fauna->AttackContact < 0. || Now < Fauna->AttackContact) continue;
         Fauna->AttackContact = -1.;
-        const auto* Prey = AgentLookup.Find(Fauna->TargetId);
+        const int64 AttemptedTarget = Fauna->TargetId;
+        const auto* Prey = AgentLookup.Find(AttemptedTarget);
         Fauna->TargetId = 0;
         const auto& HunterId = EM.GetFragmentDataChecked<FEcoIdentityFragment>(Hunter);
         const auto* Profile = FindFauna(HunterId.SpeciesId);
         Fauna->AttackReady = Now + Profile->AttackRecovery;
         Fauna->ChaseBegan = -1.;
+        FName Rejection = TEXT("HuntTargetUnavailable");
+        const FName HunterRegion = EM.GetFragmentDataChecked<FEcoRegionFragment>(Hunter).CurrentRegionId;
         if (!Prey || EM.GetFragmentDataChecked<FEcoVitalsFragment>(Hunter).HP <= 0.
-            || !CanHuntFauna(EM, Hunter, *Prey, *Profile, Now, true))
+            || !CanHuntFauna(EM, Hunter, *Prey, *Profile, Now, true, true, &Rejection))
         {
+            RecordGameplayReason(HunterId.StableAgentId, HunterRegion, Now, Rejection, AttemptedTarget);
             if (UsesFaunaPursuitFix()) Fauna->AttackReady = Now + FMath::Min(.5f, Profile->AttackRecovery);
             if (bAuditFaunaHunts)
                 UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Species=%s Event=Miss"), HunterId.StableAgentId, *HunterId.SpeciesId.ToString());
@@ -254,6 +268,7 @@ void AEcoCreatureIntegrationSpawner::ProcessFaunaPredation(double Now)
         auto& Death = EM.GetFragmentDataChecked<FEcoDeathFragment>(*Prey);
         Death.Cause = EEcoDeathCause::Predation;
         Death.PredatorStableAgentId = HunterId.StableAgentId;
+        RecordGameplayReason(HunterId.StableAgentId, HunterRegion, Now, TEXT("HuntCaptured"), PreyId.StableAgentId);
         EM.GetFragmentDataChecked<FEcoCreatureLifecycleFragment>(*Prey).bPredated = true;
         UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Predation] Hunter=%lld %s Prey=%lld %s"),
             HunterId.StableAgentId, *HunterId.SpeciesId.ToString(), PreyId.StableAgentId, *PreyId.SpeciesId.ToString());
@@ -557,6 +572,7 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
         --FaunaLoad.FindOrAdd(Region.CurrentRegionId).FindOrAdd(Id.SpeciesId);
         Region.CurrentRegionId = Chosen->To;
         Region.CurrentRegionIndex = Travel.TargetRegionIndex;
+        RecordGameplayReason(Id.StableAgentId, Chosen->To, Now, TEXT("PassageArrived"));
         GroundedResidents.FindOrAdd(Chosen->To).Add(Entity);
         Transform.SetLocation(Exit);
         EM.GetFragmentDataChecked<FMassVelocityFragment>(Entity).Value = FVector::ZeroVector;
@@ -758,7 +774,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                         Newest = FMath::Max(Newest, Noise.Id);
                         if (Noise.SourceAgentId == Id.StableAgentId
                             || (!Noise.RegionId.IsNone() && Noise.RegionId != Region.CurrentRegionId)) continue;
-                        const bool bPlayer = Noise.Tag == TEXT("Player.Footstep");
+                        const bool bPlayer = EcoNoise::IsPlayerThreat(Noise.Tag);
                         const bool bCreature = Noise.Tag == TEXT("Footstep") && Noise.SourceAgentId > 0;
                         if (!bPlayer && !bCreature) continue;
                         const float Distance = float(FVector::Dist(Position, Noise.Position));
@@ -803,6 +819,9 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                     {
                         Fauna->LastThreatPosition = ThreatNoise->Position;
                         Fauna->ThreatUntil = Now + 1.5;
+                        RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now,
+                            EcoNoise::IsPlayerShot(ThreatNoise->Tag) ? TEXT("ShotHeard") : TEXT("ThreatHeard"),
+                            ThreatNoise->SourceAgentId, BestThreatSignal);
                         LogEvidence(*ThreatNoise, BestThreatSignal, TEXT("Avoid"));
                     }
                     if (PreyNoise && Now >= Fauna->ThreatUntil)
@@ -1196,6 +1215,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                         if (Fauna->ChaseBegan < 0. || (bPursuitFix && Fauna->TargetId != PreviousTarget))
                         {
                             Fauna->ChaseBegan = Now;
+                            RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("HuntTargetAcquired"), Fauna->TargetId);
                             if (bAuditFaunaHunts)
                                 UE_LOG(LogTemp, Log, TEXT("[Eco Hunt Audit] Hunter=%lld Species=%s Event=Acquire Prey=%lld %s"),
                                     Id.StableAgentId, *Id.SpeciesId.ToString(), Fauna->TargetId,

@@ -4963,7 +4963,8 @@ bool FEcoHerdReturnFailure::RunTest(const FString&)
     const int32 Herd=H.Scoped.World->GetSubsystem<UEcoHerdSubsystem>()->AllocateHerd(0,FVector(5000,5000,0));
     for(const auto Entity:H.Deer){H.EM->GetFragmentDataChecked<FEcoHerdMemberFragment>(Entity).HerdRuntimeIndex=Herd;H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Entity).Body.Energy=.3;}
     for(auto& F:A->Sim.Food.Food)F=0;
-    auto* Route=H.Scoped.World->SpawnActor<AEcoHerdMigrationRoute>();Route->FromRegion=A->RegionId;Route->ToRegion=B->RegionId;Route->Points={FVector(5000,5000,0),FVector(18000,5000,0)};
+    auto* Route=H.Scoped.World->SpawnActor<AEcoHerdMigrationRoute>();Route->FromRegion=A->RegionId;Route->ToRegion=B->RegionId;
+    Route->Points={FVector(5000,5000,0),A->UnitsToCm(65.,25.5,0.),FVector(18000,5000,0)};
     auto* Migration=H.Scoped.World->GetSubsystem<UEcoHerdMigrationSubsystem>();FEcoServerTimeSnapshot Time;TArray<FEcoMigrationOutcome> Outcomes;
     if(!Migration->Reconcile(*H.EM,Time,1,Outcomes))return false;
     auto& Body=H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(H.Deer[1]).Body;Body.Pos.X=65;
@@ -4971,9 +4972,24 @@ bool FEcoHerdReturnFailure::RunTest(const FString&)
     Time.ServerTimeSeconds=102;if(!Migration->Reconcile(*H.EM,Time,3,Outcomes))return false;
     const auto& J=H.EM->GetFragmentDataChecked<FEcoHerdTravelFragment>(H.Deer[1]);
     TestFalse(TEXT("The impossible journey terminates"),J.bActive);TestTrue(TEXT("Off-stage body retains the no-clamp guard"),J.bStranded);
-    TestEqual(TEXT("A terminal plan releases destination capacity"),int(Migration->GetPlans().CreateConstIterator().Value().State),int(EEcoHerdJourneyState::Abandoned));
+    if(!TestEqual(TEXT("The existing journey remains tracked"),Migration->GetPlans().Num(),1))return false;
+    const auto& Abandoned=Migration->GetPlans().CreateConstIterator().Value();
+    TestEqual(TEXT("A terminal plan releases destination capacity"),int(Abandoned.State),int(EEcoHerdJourneyState::Abandoned));
     H.DecisionStep();TestEqual(TEXT("Next native Step cannot teleport the stranded body"),Body.Pos.X,65.);
     TestEqual(TEXT("An off-stage stranded body cannot eat clamped boundary food"),Body.LastIntake,0.);
+    const double RetryAt=Abandoned.CooldownUntil;
+    const int64 PlanId=Abandoned.Id;
+    const auto PositionBefore=Body.Pos;
+    Time.ServerTimeSeconds=RetryAt-.01;
+    if(!Migration->Reconcile(*H.EM,Time,4,Outcomes))return false;
+    TestTrue(TEXT("Stranded member waits until the retry cooldown"),J.bStranded && !J.bActive);
+    Time.ServerTimeSeconds=RetryAt+.01;
+    if(!Migration->Reconcile(*H.EM,Time,5,Outcomes))return false;
+    TestTrue(TEXT("Reachable corridor resumes the existing stranded member"),J.bActive && !J.bStranded && J.PlanId==PlanId);
+    TestEqual(TEXT("Rejoining preserves position"),Body.Pos.X,PositionBefore.X);
+    TestEqual(TEXT("Return intent belongs to the existing movement path"),
+        int(H.EM->GetFragmentDataChecked<FEcoTravelFragment>(H.Deer[1]).Reason),int(EEcoMigrationReason::ReturnHome));
+    TestTrue(TEXT("A rejoined path alone never commits an arrival"),Outcomes.IsEmpty());
     return true;
 }
 #endif // WITH_DEV_AUTOMATION_TESTS

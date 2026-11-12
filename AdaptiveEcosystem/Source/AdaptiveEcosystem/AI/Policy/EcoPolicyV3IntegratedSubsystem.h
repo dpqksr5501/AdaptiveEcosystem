@@ -819,7 +819,7 @@ private:
 };
 
 /** One-frame authority sound snapshot, with native evidence time. Not persistent. */
-struct FEcoLifeNoiseSample { uint64 Id=0;double X=0,Y=0,Z=0,Time=0,Range=0,Confidence=0; };
+struct FEcoLifeNoiseSample { uint64 Id=0;double X=0,Y=0,Z=0,Time=0,Range=0,Confidence=0;bool bShot=false; };
 /** 한 지역의 v3 세계 (무대 하나 = 학습 세계 하나). */
 struct ADAPTIVEECOSYSTEM_API FEcoV3RegionContext
 {

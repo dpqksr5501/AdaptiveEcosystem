@@ -1,6 +1,7 @@
 #include "Creature/Debug/EcoCreatureInspection.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/EcoPolicyV3SocialBridge.h"
@@ -61,6 +62,10 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
     if(!World||AgentId<=0||!IsInGameThread())return false;
     auto* Mass=World->GetSubsystem<UMassEntitySubsystem>();if(!Mass)return false;
     auto& Manager=Mass->GetMutableEntityManager();if(Manager.IsProcessing())return false;
+    const FEcoBehaviorReasonHistory* GameplayHistory = nullptr;
+    if (World->GetNetMode() != NM_Client)
+        for (TActorIterator<AEcoCreatureIntegrationSpawner> It(World); It; ++It)
+            if ((GameplayHistory = It->FindGameplayReasons(AgentId))) break;
     TSharedPtr<FJsonObject> Data;
     FMassEntityQuery Query(Manager.AsShared());
     Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
@@ -87,6 +92,21 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetStringField(TEXT("last_known"),Cue->Memory.LastKnownPosition.ToCompactString());
             }
             if(World->GetNetMode()==NM_Client)return;
+            if (GameplayHistory)
+            {
+                TArray<TSharedPtr<FJsonValue>> Events;
+                for (const auto& Event : *GameplayHistory)
+                {
+                    auto Row = MakeShared<FJsonObject>();
+                    Row->SetNumberField(TEXT("time"), Event.Time);
+                    Row->SetStringField(TEXT("region"), Event.Region.ToString());
+                    Row->SetStringField(TEXT("reason"), Event.Reason.ToString());
+                    Row->SetStringField(TEXT("related_id"), LexToString(Event.RelatedAgent));
+                    Row->SetNumberField(TEXT("amount"), Event.Amount);
+                    Events.Add(MakeShared<FJsonValueObject>(Row));
+                }
+                Data->SetArrayField(TEXT("gameplay_reason_history"), Events);
+            }
             if(const auto* Region=Manager.GetFragmentDataPtr<FEcoRegionFragment>(E))Data->SetStringField(TEXT("region"),Region->CurrentRegionId.ToString());
             if(const auto* Audit=Manager.GetFragmentDataPtr<FEcoV3SocialBridgeFragment>(E)){
                 TArray<TSharedPtr<FJsonValue>> Events;

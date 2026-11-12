@@ -1,6 +1,7 @@
 """Run PIE with audio enabled. Exercises real player movement and all eight presentation rigs."""
 
 import json
+import re
 import time
 from pathlib import Path
 
@@ -11,6 +12,9 @@ editor = u.get_editor_subsystem(u.UnrealEditorSubsystem)
 levels = u.get_editor_subsystem(u.LevelEditorSubsystem)
 builder = u.EcoCreatureAnimationBuilder
 out = Path(u.Paths.convert_relative_path_to_full(u.Paths.project_saved_dir())) / "FaunaFootsteps"
+run_name = re.search(r"-FaunaFootstepsName=([A-Za-z0-9_]+)", u.SystemLibrary.get_command_line())
+if run_name:
+    out /= run_name.group(1)
 out.mkdir(parents=True, exist_ok=True)
 surfaces = ("Grass", "Dry", "Snow", "Water", "Wet", "Stone", "Wood")
 walk_speed = {"Rat": 55., "Fox": 130., "Pig": 130., "Leopard": 150., "Crow": 70.,

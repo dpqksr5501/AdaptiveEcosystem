@@ -467,6 +467,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 Vitals.Energy += Meal;
                 Fauna->LastMeal = Now;
                 Fauna->LastCarrionMeal = Now;
+                RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("CarrionEaten"), Fauna->CarrionTargetId, Meal);
                 if (bPersistence) Fauna->RecordForageIntake(Position, Now, Meal, FaunaPersistence.ForageMemorySeconds);
                 UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Scavenge] Eater=%lld Species=%s Carcass=%lld Amount=%.3f Remaining=%.3f At=%.3f Energy=%.3f MaxEnergy=%.3f"),
                     AgentId, *Species->SpeciesId.ToString(), Fauna->CarrionTargetId, Meal, Carcass->Remaining, Now, Vitals.Energy, Vitals.MaxEnergy);
@@ -607,7 +608,11 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             })) break;
             SpawnPoints.Reset();
         }
-        if (SpawnPoints.IsEmpty()) continue;
+        if (SpawnPoints.IsEmpty())
+        {
+            RecordGameplayReason(Birth.ParentA, Birth.Region, Now, TEXT("BirthNoGround"), Birth.ParentB);
+            continue;
+        }
 
         const uint64 Seed = uint64(Birth.ParentA) ^ EcoLifeV3::Mix(Birth.ParentB) ^ EcoLifeV3::Mix(ParentA.Offspring);
         const auto Genome = EcoLifeV3::Inherit(ParentA.Genome, ParentB.Genome, Seed);
@@ -625,11 +630,15 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         if (!Ecology->CompleteSpawnRequest(Reservation.RequestId, Actual) || !bReconciled) return false;
         if (!Actual)
         {
+            RecordGameplayReason(Birth.ParentA, Birth.Region, Now,
+                Reservation.DiagnosticReason.IsNone() ? FName(TEXT("BirthSpawnFailed")) : Reservation.DiagnosticReason, Birth.ParentB);
             UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][BirthDeferred] Species=%s Region=%s Food=%.3f Population=%d Reservation=%d"),
                 *Birth.Species.ToString(), *Birth.Region.ToString(), Region.FoodAmount, Region.Population, Reservation.Count);
             continue;
         }
         const auto Child = Owned.Last();
+        RecordGameplayReason(Birth.ParentA, Birth.Region, Now, TEXT("BirthCommitted"),
+            EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId);
         auto& Life = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Child).Life;
         Life.Genome = Genome;
         Life.Born = Now;

@@ -8,6 +8,7 @@
 #include "Core/EcoSurvivalTypes.h"
 #include "Core/EcoCombatTypes.h"
 #include "AI/Behavior/EcoSpeciesAIProfile.h"
+#include "Core/EcoBehaviorReasonHistory.h"
 #include "Ecology/EcoSpawnSchedule.h"
 #include "Mass/EntityHandle.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
@@ -72,6 +73,8 @@ public:
 	AEcoCreatureIntegrationSpawner();
     /** Passive diagnostics at completed runtime boundaries, including headless servers. */
     UPROPERTY(BlueprintAssignable, Category="Creature|Inspection") FEcoRuntimeSample OnRuntimeSample;
+    void RecordGameplayReason(int64 Agent, FName Region, double At, FName Reason, int64 RelatedAgent=0, double Amount=0);
+    const FEcoBehaviorReasonHistory* FindGameplayReasons(int64 Agent) const { return GameplayReasons.Find(Agent); }
 	UPROPERTY(EditAnywhere, Category="Creature|Config") EEcoEnabledSpecies EnabledSpecies = EEcoEnabledSpecies::Both;
 	UPROPERTY(EditAnywhere, Category="Creature|Config") bool bEnableSpeciesAIFixtures = false;
 	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bUseV3Policy = false;
@@ -217,7 +220,7 @@ private:
     FMassEntityHandle SelectFaunaGuard(const FMassEntityManager& Manager, FMassEntityHandle Child,
         FMassEntityHandle Hunter, double Now) const;
     bool CanHuntFauna(const FMassEntityManager& Manager, FMassEntityHandle Predator, FMassEntityHandle Prey,
-        const FEcoFaunaSpecies& Profile, double Now, bool bContact, bool bCheckVisibility = true) const;
+        const FEcoFaunaSpecies& Profile, double Now, bool bContact, bool bCheckVisibility = true, FName* Rejection = nullptr) const;
     bool MoveFaunaFlight(const FEcoFaunaSpecies& Profile, FName Region, FEcoFaunaFragment& Fauna,
         const FVector& Position, double Now, double Delta, FVector& Destination) const;
     bool ProcessFauna(const FEcoServerTimeSnapshot& Time);
@@ -313,6 +316,7 @@ private:
 	bool bWaitingForHabitat = false;
 	double NextStreamingUpdate = 0;
 	double LastResourceTime = 0;
+    double FaunaMotionTime = -1.;
 	double NextLog = 0;
     double NextAuditSample = 0;
 	int64 Step = 0;
@@ -323,6 +327,7 @@ private:
 	int64 CommittedDeaths = 0;
 	struct FSpeciesTotals { int64 Births = 0, Deaths = 0, Incoming = 0, Outgoing = 0; };
 	TMap<FName, TMap<FName, FSpeciesTotals>> SpeciesTotals;
+    TMap<int64, FEcoBehaviorReasonHistory> GameplayReasons;
 	double TestExitAfter = 0;
 	double TestCaptureAt = 0;
 	double StartedAt = 0;

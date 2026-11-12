@@ -16,6 +16,7 @@
 #include "World/EcologyWorldSubsystem.h"
 #include "EngineUtils.h"
 #include "Player/EcoPlayerState.h"
+#include "Player/EcoWeaponFireComponent.h"
 #include "HAL/IConsoleManager.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 static TAutoConsoleVariable<int32> CVarPlayerGaitLog(TEXT("eco.Player.GaitLog"),0,TEXT("Log accepted player gait changes and server movement speed."));
@@ -34,6 +35,11 @@ void UEcoPlayerEcologyComponent::BeginPlay()
             break;
         }
     if(GetOwner()->HasAuthority()) {
+        if (auto* Fire = GetOwner()->FindComponentByClass<UEcoWeaponFireComponent>())
+        {
+            ShotSource = Fire;
+            Fire->OnShot.AddUniqueDynamic(this, &UEcoPlayerEcologyComponent::ObserveConfirmedShot);
+        }
         ThreatSource=NewObject<UEcoThreatSourceComponent>(GetOwner());
         GetOwner()->AddInstanceComponent(ThreatSource);ThreatSource->bThreatEnabled=bThreatEnabled;ThreatSource->RegisterComponent();
     }
@@ -41,6 +47,23 @@ void UEcoPlayerEcologyComponent::BeginPlay()
         LocalAudio=NewObject<UEcoFootstepAudioComponent>(GetOwner());
         GetOwner()->AddInstanceComponent(LocalAudio);LocalAudio->AudioSet=AudioSet;LocalAudio->RegisterComponent();
     }
+}
+void UEcoPlayerEcologyComponent::EndPlay(const EEndPlayReason::Type EndPlayReason)
+{
+    if (auto* Fire = ShotSource.Get())
+        Fire->OnShot.RemoveDynamic(this, &UEcoPlayerEcologyComponent::ObserveConfirmedShot);
+    Super::EndPlay(EndPlayReason);
+}
+
+void UEcoPlayerEcologyComponent::ObserveConfirmedShot(int64 Execution, FVector Muzzle, FVector)
+{
+    const auto* Fire = ShotSource.Get();
+    // ServerFire broadcasts synchronously while its authoritative shot scope is open.
+    if (!GetOwner()->HasAuthority() || !bThreatEnabled || !Fire || !Fire->HasAuthoritativeShot()
+        || Execution != Fire->GetExecution() || Execution <= LastShotExecution || ShotNoiseRange <= 0.f) return;
+    LastShotExecution = Execution;
+    if (auto* Noise = GetWorld()->GetSubsystem<UEcoNoiseSubsystem>())
+        Noise->ReportNoise(Muzzle, 1.f, ShotNoiseRange, 1.f, GetOwner(), TEXT("Player.Shot"));
 }
 void UEcoPlayerEcologyComponent::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {Super::GetLifetimeReplicatedProps(OutLifetimeProps);DOREPLIFETIME(UEcoPlayerEcologyComponent,Gait);}

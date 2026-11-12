@@ -55,10 +55,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
     for(int32 I=PendingBirths.Num()-1;I>=0;--I){
         const auto P=PendingBirths[I];
         int32 EnergyOnly=0;
-        auto* Audit=bAuditFaunaBirths?&EnergyOnly:nullptr;
-        const auto A=Eligible(P.ParentA,P.Region,P.bPredator,Audit),B=Eligible(P.ParentB,P.Region,P.bPredator,Audit);
+        const auto A=Eligible(P.ParentA,P.Region,P.bPredator,&EnergyOnly),B=Eligible(P.ParentB,P.Region,P.bPredator,&EnergyOnly);
         if(!A.IsSet()||!B.IsSet()){
-            if(Audit)UE_LOG(LogTemp,Log,TEXT("[Eco Birth Audit] Region=%s Predator=%d Event=Cancelled EnergyOnly=%d"),
+            RecordGameplayReason(P.ParentA, P.Region, Now, EnergyOnly ? TEXT("BirthParentEnergy") : TEXT("BirthParentUnavailable"), P.ParentB);
+            if(bAuditFaunaBirths)UE_LOG(LogTemp,Log,TEXT("[Eco Birth Audit] Region=%s Predator=%d Event=Cancelled EnergyOnly=%d"),
                 *P.Region.ToString(),P.bPredator,EnergyOnly);
             PendingBirths.RemoveAtSwap(I);continue;
         }
@@ -83,7 +83,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
                 &&FVector::DistSquared2D(Ground,EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation())<10000){Clear=false;break;}
             if(Clear){Positions.Add(Ground);break;}
         }
-        if(Positions.IsEmpty())continue;
+        if(Positions.IsEmpty()){
+            RecordGameplayReason(P.ParentA, P.Region, Now, TEXT("BirthNoGround"), P.ParentB);
+            continue;
+        }
         // Copy before spawning: entity creation may move/reallocate fragment storage.
         const auto Genome=EcoLifeV3::Inherit(LA.Genome,LB.Genome,uint64(P.ParentA)^EcoLifeV3::Mix(P.ParentB)^uint64(LA.Offspring));
         const bool NaturalPopulation=LA.bNaturalPopulation&&!P.bPredator;
@@ -99,6 +102,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if(!ReconcilePopulation()||!Ecology->CompleteSpawnRequest(Reservation.RequestId,Actual))return false;
         if(!Actual)
         {
+            RecordGameplayReason(P.ParentA, P.Region, Now,
+                Reservation.DiagnosticReason.IsNone() ? FName(TEXT("BirthSpawnFailed")) : Reservation.DiagnosticReason, P.ParentB);
             FRegionEcologyState State;
             if (Ecology->GetRegionState(P.Region, State))
                 UE_LOG(LogTemp, Log, TEXT("[EcoLife][BirthDeferred] Region=%s Predator=%d Food=%.3f Consumers=%d Population=%d"),
@@ -106,6 +111,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
             continue;
         }
         const auto Child=Owned.Last();auto& ChildLife=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Child).Individual;
+        RecordGameplayReason(P.ParentA, P.Region, Now, TEXT("BirthCommitted"),
+            EM.GetFragmentDataChecked<FEcoIdentityFragment>(Child).StableAgentId);
         ChildLife={};ChildLife.bInitialized=true;ChildLife.Genome=Genome;ChildLife.Born=Now;
         ChildLife.ParentA=P.ParentA;ChildLife.ParentB=P.ParentB;ChildLife.Generation=Generation;ChildLife.Origin=EcoLifeV3::EOrigin::NaturalBirth;
         if(NaturalPopulation){

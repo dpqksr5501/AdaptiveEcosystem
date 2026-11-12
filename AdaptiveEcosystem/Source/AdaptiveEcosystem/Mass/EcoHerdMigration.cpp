@@ -128,9 +128,10 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
         for(int32 I=0;I<C.GetNumEntities();++I){
             auto* R=Native->GetContext(Links[I].ContextIndex);FEcoHerdRuntimeData H;
             const bool HasHerd=Herds->GetHerdData(Members[I].HerdRuntimeIndex,H);
+            const bool bJourneyMember = Js[I].bActive || Js[I].bStranded;
             if(!Links[I].bAdopted||Links[I].bDead||Bodies[I].Body.DeathCause!=EcoWorldV3::kDeathNone||!R
-                ||(!HasHerd&&!Js[I].bActive))continue;
-            FMember A;A.Id=Ids[I].StableAgentId;A.Herd=Js[I].bActive?Js[I].PersistentHerdId:H.PersistentHerdId;A.Region=&Regions[I];A.Travel=&Travels[I];
+                ||(!HasHerd&&!bJourneyMember))continue;
+            FMember A;A.Id=Ids[I].StableAgentId;A.Herd=bJourneyMember?Js[I].PersistentHerdId:H.PersistentHerdId;A.Region=&Regions[I];A.Travel=&Travels[I];
             A.Journey=&Js[I];A.Link=&Links[I];A.Body=&Bodies[I];A.Behavior=&Behaviors[I];A.Entity=C.GetEntity(I);
             A.Position=R->UnitsToCm(Bodies[I].Body.Pos.X,Bodies[I].Body.Pos.Y,Links[I].GroundZ);Agents.Add(A);
         }
@@ -144,7 +145,55 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 P.Id,P.HerdId,StateName(State),*Reason.ToString(),*P.Origin.ToString(),*P.Destination.ToString(),P.Arrived,P.Members.Num());}
     };
     for(auto& Entry:Plans){
-        auto& P=Entry.Value;if(IsTerminal(P.State))continue;
+        auto& P=Entry.Value;
+        if (P.State == EEcoHerdJourneyState::Settled) continue;
+        if (P.State == EEcoHerdJourneyState::Abandoned)
+        {
+            if (!P.bReturning || Now < P.CooldownUntil || !RegionAvailable(P.Origin)) continue;
+            const auto* Home = Native->FindContext(P.Origin);
+            if (!Home) continue;
+            bool bResumed = false, bHasStrandedMember = false;
+            for (const int64 Id : P.Members)
+            {
+                const int32* Index = ById.Find(Id);
+                if (!Index) continue;
+                auto& A = Agents[*Index];
+                auto& J = *A.Journey;
+                if (!J.bStranded || J.PlanId != P.Id) continue;
+                bHasStrandedMember = true;
+                if (!RegionAvailable(A.Region->CurrentRegionId)) continue;
+                const double MaxDistance = FMath::Max(500., double(P.CorridorWidth) * 2.);
+                double Best = FMath::Square(MaxDistance);
+                int32 Waypoint = INDEX_NONE;
+                for (int32 I = 0; I < P.Points.Num(); ++I)
+                {
+                    const double Distance = FVector::DistSquared2D(A.Position, P.Points[I]);
+                    if (Distance >= Best) continue;
+                    double GroundZ = A.Position.Z;
+                    if (Native->UsesTerrain() && !Native->TraceMove(A.Region->CurrentRegionId, A.Position, P.Points[I], GroundZ, true)) continue;
+                    Waypoint = I;
+                    Best = Distance;
+                }
+                if (Waypoint == INDEX_NONE) continue;
+                J.bStranded = false;
+                J.bActive = true;
+                J.bPause = false;
+                J.Waypoint = Waypoint;
+                J.Goal = P.Points[Waypoint];
+                J.LastProgressTime = Now;
+                J.BestDistance = MAX_dbl;
+                A.Travel->State = EEcoResidenceState::Traveling;
+                A.Travel->TargetRegionId = P.Origin;
+                A.Travel->TargetRegionIndex = Home->RegionRuntimeIndex;
+                A.Travel->TargetPosition = P.Points.Last();
+                A.Travel->DepartureTime = Now;
+                A.Travel->Reason = EEcoMigrationReason::ReturnHome;
+                bResumed = true;
+            }
+            if (bHasStrandedMember) P.CooldownUntil = Now + 5.;
+            if (!bResumed) continue;
+            Change(P, EEcoHerdJourneyState::Regrouping, TEXT("ReturnRouteReopened"));
+        }
         auto* Target=Native->FindContext(P.Destination);if(!Target)return false;
         const FName WaitReason = FEcoHerdTravelFragment::UnavailableRegionReason();
         const bool bReady = RegionAvailable(P.Origin) && RegionAvailable(P.Destination)
@@ -201,6 +250,7 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 for(int32 I=0;I<P.Points.Num();++I){const double D=FVector::DistSquared2D(A.Position,P.Points[I]);if(D<Best){Nearest=I;Best=D;}}
                 A.Journey->Waypoint=Nearest;A.Journey->BestDistance=MAX_dbl;A.Journey->LastProgressTime=Now;
                 A.Travel->TargetRegionId=P.Origin;A.Travel->TargetRegionIndex=Target->RegionRuntimeIndex;A.Travel->TargetPosition=P.Points.Last();
+                A.Travel->Reason=EEcoMigrationReason::ReturnHome;
             }
             Change(P,EEcoHerdJourneyState::Regrouping,DestinationEmpty?TEXT("DestinationDepletedReturn"):TEXT("BlockedRouteReturn"));
         }
@@ -239,7 +289,8 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
             const bool InsideTarget=Local.X>=0&&Local.Y>=0&&Local.X<=Target->Sim.Config.WorldSize&&Local.Y<=Target->Sim.Config.WorldSize;
             if(InsideTarget&&A.Region->CurrentRegionId!=P.Destination){
                 FEcoMigrationOutcome O;O.WorldEpoch=Time.WorldEpoch;O.StepId=Step;O.StableAgentId=A.Id;
-                O.OriginRegionId=A.Region->CurrentRegionId;O.DestinationRegionId=P.Destination;O.Reason=EEcoMigrationReason::FoodShortage;
+                O.OriginRegionId=A.Region->CurrentRegionId;O.DestinationRegionId=P.Destination;
+                O.Reason=P.bReturning?EEcoMigrationReason::ReturnHome:EEcoMigrationReason::FoodShortage;
                 O.DepartureTime=A.Travel->DepartureTime;O.ArrivalTime=Now;
                 // Context rebase preserves actual world position, identity, energy, reserve and herd.
                 A.Body->Body.Pos=A.Body->Body.PrevPos=Local;A.Body->Body.Detour={};
@@ -278,7 +329,8 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
                 AnyAbandoned?TEXT("ReturnFailedNoTeleport"):TEXT("JourneyComplete"));
             P.CooldownUntil=Now+FMath::Max(1.f,CVarCooldown.GetValueOnGameThread());
         }else Change(P,Preparing?EEcoHerdJourneyState::Preparing:P.Failed?EEcoHerdJourneyState::Failed:Rest?EEcoHerdJourneyState::Resting:Spread?EEcoHerdJourneyState::Regrouping:EEcoHerdJourneyState::Traveling,
-            Preparing?FName(TEXT("GatheringForJourney")):P.Failed?FName(TEXT("PathBlocked")):Rest?FName(TEXT("LowEnergyRest")):Spread?FName(TEXT("HerdSpread")):FName(TEXT("FoodShortage")));
+            Preparing?FName(TEXT("GatheringForJourney")):P.Failed?FName(TEXT("PathBlocked")):Rest?FName(TEXT("LowEnergyRest")):Spread?FName(TEXT("HerdSpread")):
+            P.bReturning?FName(TEXT("Returning")):FName(TEXT("FoodShortage")));
     }
     for(auto It=Plans.CreateIterator();It;++It)if(IsTerminal(It.Value().State)&&Now>It.Value().CooldownUntil
         &&!Groups.Contains(It.Key()))It.RemoveCurrent();
