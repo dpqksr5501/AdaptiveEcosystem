@@ -16,8 +16,8 @@
 //   2. 프레임 원천: 실시간 = R9 코어 한 스텝(2/15 초)씩, 재생 = 파일 프레임. 스텝 사이는 이어 그린다
 //   3. 보이는 것: 사슴·늑대 = 조연우 BP_JYU_Deer/Wolf (없으면 팀 BP_EcoDeer/Wolf), 멧돼지 = 갈색 자리표시, 풀 덩어리(조연우 식생과 같은 메시·재질·
 //      custom data 꼴), 멧돼지가 판 자리, 사체(누운 몸), 은신처 수풀·바위, 무대 가장자리 돌, 물기 표시(작은 점 — 번쩍임·소리 없음)
-//   4. 카메라: 자동(사냥·물기·반격·사체 먹기를 따라가고 없으면 전체 보기) · 전체 · 종별 따라가기 · 위에서
-//   5. 작은 글자 (종별 마릿수·시간·판) — H 또는 eco.R9Demo.Text 0 으로 끔
+//   4. 카메라: 옛 관찰 카메라 꼴 (11-13 03:30 — 아래 '카메라' 줄, EcoR9DemoCam.h)
+//   5. 오른쪽 위 글 묶음 (단축키 · 실시간 · 마릿수 · 잡힘·반격·굶음 · 카메라 대상·행동) — H = 단축키 목록 숨기기/보이기, eco.R9Demo.Text 0 = 글 모두 끔
 //   6. 녹화: -EcoR9Capture=<폴더>,<fps>,<초> — 창 없는 실행(-RenderOffscreen)에서 프레임 PNG 를 남기고 끝낸다
 // 행동 규칙은 코어(학습 세계 그대로)가 정한다. 이 파일은 그리기만 한다 — 위치·먹이·죽음은 프레임 값 그대로다.
 //
@@ -31,11 +31,17 @@
 //   - 맵의 예전 v3·Fauna 동물 몸·먼 표식은 데모 동안 보이는 것만 숨긴다 (eco.R9Demo.HideOthers 1 — 그쪽 시뮬레이션·코드·에셋은 그대로).
 //   - 멧돼지 몸: 에셋 레지스트리에서 /Game/AnimalVarietyPack/Pig → /Game/JYU/Fauna → /Game 차례로 Pig·Boar·Hog·Swine·villsvin 이름의 표현 BP·스켈레탈
 //     메시를 찾아 상태별 애니를 재생한다 (eco.R9Demo.BoarMesh 로 덮어쓰기). 없으면 자리표시 + 기록 줄 한 줄.
-//   - 카메라: 1 자동 (가까운 사냥·물기·반격·사체 먹기) · 2 섬 전체 · 3/4/5 종 · 6 위에서 · 7 다음 무리 자리.
+//   - 카메라: (11-13 03:30 옛 관찰 카메라 꼴로 바꿈 — EcoR9DemoCam.h) 1 늑대 · 2 사슴 · 3 탑뷰 · 4 쿼터뷰 · 5 자동 추적 · 0 자유 카메라 ·
+//     6 멧돼지 · 7(G) 다음 무리 자리 · , . 대상 · - = 휠 줌 · H 단축키 목록. 키로 바꾸면 한 번에 그 자리로. 글은 오른쪽 위 묶음 하나.
+//
+// 2026-11-13 03:30 시작 맵에서만 저절로 켜기 (사용자 — 편집기 시작 맵 /Game/EcoTest/Maps/LV_EcoV3_Island 에서만 씀):
+//   콘솔 eco.R9Demo.OnlyMap (기본 빈 값 = 모든 맵) 에 맵 경로(쉼표로 여럿)를 두면 Play 시작 때 그 맵에서만 켠다 — 다른 맵은 예전처럼 아무것도 만들지 않는다.
+//   명령줄 깃발(-EcoR9Demo= 등)·Play 중 직접 친 콘솔 eco.R9Demo 1 은 거르지 않는다 (직접 켠 것).
 
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EcoR9DemoCam.h"
 #include "Subsystems/WorldSubsystem.h"
 #include "Templates/SharedPointer.h"
 #include "EcoR9DemoSubsystem.generated.h"
@@ -83,19 +89,53 @@ struct ADAPTIVEECOSYSTEM_API FEcoR9DemoSettings
 	float CaptureFps = 30.0f;
 	float CaptureSeconds = 0.0f;
 	float ExitAfterSeconds = 0.0f;   // 무대가 선 뒤 이만큼 지나면 끝냄 (0 = 안 끝냄)
+	bool bCaptureUI = false;         // -EcoR9CaptureUI : 녹화 프레임에 오른쪽 위 글 묶음도 넣는다 (확인용 — 없으면 예전처럼 그림만)
+	FString CamKeys;                 // -EcoR9CamKeys=<초>:<키>[,<초>:<키>…] : 무대가 선 뒤 그 초에 카메라 키를 누른 것처럼 (확인용 — 키 이름은 One·Zero·G 꼴)
 	// 맵 전체 땅 모드 (2026-11-13)
 	int32 AreaM = 0;                 // eco.R9Demo.Area · -EcoR9DemoArea= : 0 = 맵 전체 땅 · 1 ~ 120 = 예전 한 무대 · 그 밖 = 시작점 둘레 그 크기 정사각
 	int32 Herds = 6;                 // eco.R9Demo.Herds : 무리 자리 수 (1 ~ 8)
 	int32 PerHerd[3] = {24, 2, 8};   // eco.R9Demo.PerHerd : 자리마다 사슴·늑대·멧돼지
 	bool bHideOthers = true;         // eco.R9Demo.HideOthers : 예전 동물 몸·먼 표식 숨김
+	// 시작 맵에서만 (2026-11-13 03:30)
+	bool bFromCommandLine = false;   // 판을 명령줄 깃발(-EcoR9Demo= · -EcoR9Demo · -EcoR9Replay=)이 정했다 — 맵 거르기를 하지 않는다
+	FString OnlyMap;                 // eco.R9Demo.OnlyMap : 비면 모든 맵 · 맵 경로(쉼표로 여럿)면 Play 시작 때 그 맵에서만 켠다
 
 	/** 이 설정이 맵 전체 땅(큰 세계) 길인가 (실시간 판 + 무대 자리 덮어쓰기 없음 + Area 0 또는 120 넘음). */
 	bool WantsWhole() const { return Mode == EMode::Live && !bHasAt && (AreaM <= 0 || AreaM > 120); }
 
-	/** 명령줄 글과 콘솔 값(eco.R9Demo …)에서 읽는다. 둘 다 없으면 Mode = Off. 맵 제한은 없다. */
+	/** 명령줄 글과 콘솔 값(eco.R9Demo …)에서 읽는다. 둘 다 없으면 Mode = Off. 맵 거르기(OnlyMap)는 여기서 하지 않는다 (OnWorldBeginPlay). */
 	static FEcoR9DemoSettings Resolve(const TCHAR* CommandLine);
+	/**
+	 * 맵 거르기: OnlyMap 이 비면(공백뿐 포함) 참. 아니면 쉼표·쌍반점으로 나눈 항목 가운데 하나가 월드 패키지와 같으면 참 (대소문자 무시).
+	 * 항목 꼴: 패키지 경로 '/Game/EcoTest/Maps/LV_EcoV3_Island' · 오브젝트 경로 '….LV_EcoV3_Island' · 짧은 이름 'LV_EcoV3_Island'.
+	 * 월드 패키지의 PIE 머리(UEDPIE_0_)는 떼고 견준다.
+	 */
+	static bool MapAllowed(const FString& OnlyMap, const FString& WorldPackage);
 	/** 기본 폴더 <프로젝트>/Saved/R9Demo (커밋되지 않는 곳). 경로를 주지 않으면 두뇌 = brains/ (장면 = brains/scene.txt), 재생 = replay/demo.r9rp. */
 	static FString DefaultDir();
+};
+
+/** 카메라 상태 한 장 (시험·기록용 — 읽기만). */
+struct ADAPTIVEECOSYSTEM_API FEcoR9DemoCamProbe
+{
+	int32 Mode = -1;                 // EEcoR9DemoCam 값 (= 키 숫자, 0 자유 … 6 멧돼지)
+	uint32 Subject = 0;              // 따라가는 R9 uid (0 = 없음)
+	int32 SubjectSpecies = -1;       // 0 사슴 · 1 늑대 · 2 멧돼지 (없으면 −1)
+	uint32 Partner = 0;
+	FVector Focus = FVector::ZeroVector;         // 지금 초점
+	FVector TargetFocus = FVector::ZeroVector;   // 이번 프레임 목표 초점
+	double Yaw = 0.0, TargetYaw = 0.0;
+	double Pitch = 0.0, TargetPitch = 0.0;
+	double Dist = 0.0, TargetDist = 0.0;
+	double Arm = 0.0;                            // 가림 피하기 뒤 실제 거리
+	bool bHaveCamera = false;
+	FVector CameraLocation = FVector::ZeroVector;
+	FRotator CameraRotation = FRotator::ZeroRotator;
+	double FreeSpeedMps = 0.0;
+	int32 SiteIndex = 0;
+	bool bShowKeys = true;
+	double Zoom = 1.0;
+	int32 NumLines = 0;                          // 오른쪽 위 카메라 줄 수
 };
 
 UCLASS()
@@ -140,6 +180,16 @@ public:
 	void StopDemo(const TCHAR* Why);
 	/** 콘솔 eco.R9Demo 가 바뀌면: 지금 도는 게임·PIE 월드마다 시작·정지. */
 	static void OnDemoCVarChanged(IConsoleVariable* Var);
+	/** Play 시작 때 맵 거르기(eco.R9Demo.OnlyMap)로 켜지 않았는가 (시험·기록용). */
+	bool WasMapFiltered() const;
+
+	/**
+	 * 카메라 키 하나 누름 (HandleKeys 가 키마다 부른다 — 시험도 같은 길로 부른다). 카메라 키면 참 (무대가 도는 중이 아니면 아무 일 없이 거짓).
+	 * 키 뜻은 EcoR9DemoCam.h. 시점을 바꾸는 키는 다음 프레임에 끊어 옮긴다 (부드럽게 옮겨 가지 않음).
+	 */
+	bool PressCamKey(const FKey& Key);
+	/** 지금 카메라 상태 (시험용 — 읽기만). */
+	FEcoR9DemoCamProbe CamProbe() const;
 
 protected:
 	virtual bool DoesSupportWorldType(const EWorldType::Type WorldType) const override;
@@ -178,6 +228,8 @@ private:
 	void RequestQuit(const TCHAR* Why);
 	void HoldDaylight();
 	void ReleaseDaylight();
+	/** 옛 관찰 카메라 끄기 (eco.Cam.Enable 0 — 데모가 켜지는 때부터, 끌 때 TeardownDemo 가 되돌림). 같은 숫자 키를 두 카메라가 같이 읽지 않게. */
+	void HoldObserverCamera();
 
 	// --- EcoR9DemoVisuals.cpp: 몸·먹이·은신처·표시
 	void LoadVisualAssets();
@@ -195,10 +247,46 @@ private:
 	UInstancedStaticMeshComponent* MakeIsm(AActor* Owner, const TCHAR* Name, UStaticMesh* Mesh, UMaterialInterface* Material, int32 NumCustom,
 										   bool bShadow);
 
-	// --- EcoR9DemoCamera.cpp: 카메라·키
+	// --- EcoR9DemoCamera.cpp: 카메라·키 (옛 관찰 카메라 꼴 — EcoR9DemoCam.h)
 	void EnsureCamera();
 	void HandleKeys();
 	void UpdateCamera(float DeltaTime);
+	void DoCamAction(EcoR9DemoCam::EAction Action);
+	/** 모드 바꾸기 (대상 고르기 + 다음 프레임 끊어 옮김). Free = EnterFreeCam. */
+	void SetCamMode(EEcoR9DemoCam NewMode, const TCHAR* Why);
+	/** 자유 카메라로: 지금 화면 카메라 자리·방향 그대로 추적을 푼다. 이미 자유 카메라면 아무 일 없음. */
+	void EnterFreeCam(const TCHAR* Why);
+	/** 이전·다음 대상 (자동 추적이면 다른 사건). */
+	void StepCamSubject(int32 Dir);
+	/** 7 · G: 다음 무리 자리 (맵 전체 땅 — 끝에 섬 전체). */
+	void CycleCamSite();
+	/** 대상 유지: 사라짐·죽음(3 초 머묾)·없음이면 가까운 같은 종 (따라가기), 자동 추적은 사건 고르기. */
+	void MaintainCamSubject(double Now);
+	void MaintainAuto(double Now, bool bPickNow);
+	void UpdateFreeCam(double Dt, APlayerController* PC);
+	void BuildCamLines();
+	/** 확인용 (-EcoR9CamKeys): 차례가 된 키를 누른다 (HandleKeys 바로 뒤). 꺼짐이면 아무 일 없음. */
+	void TickCamKeyPlan(double Now);
+	/** 확인용 (-EcoR9CamKeys): 누른 프레임과 그 뒤 3 프레임의 카메라 자리를 기록 줄로 (UpdateCamera 뒤 — 읽기만). */
+	void LogCamKeyProbe();
+	/** 개체 자리 (보이는 몸이 있으면 그 자리, cm) · 종 · 산가. 없으면 거짓. */
+	bool CamWhere(uint32 Id, FVector& Out, uint8* OutSpecies = nullptr, bool* bOutAlive = nullptr) const;
+	/** 개체 속도 (프레임 차이, cm/s). */
+	FVector CamVelocity(uint32 Id) const;
+	/** 그 종(0 사슴 · 1 늑대 · 2 멧돼지)의 산 개체 가운데 From 에 가장 가까운 것 (bPreferRunning 이면 뛰는 것을 먼저 · 같으면 uid 작은 것). 없으면 0. */
+	uint32 NearestOfSpecies(uint8 Species, const FVector& From, bool bPreferRunning) const;
+	/** 자유 카메라 화면 가운데 그 종(−1 아무 종) 대상 (반각 20° · 300 m — 옛 CenterSubject). 없으면 0. */
+	uint32 CenterOfView(int32 Species) const;
+	/** 자유 카메라 화면 가운데 땅 (높이 표를 따라 500 m 까지, 없으면 카메라 밑). */
+	FVector FreeViewCenter() const;
+	/** 대상 없는 보기 자리: 무리 자리 · 섬 전체 · 무대 (가운데 cm · 한 변 cm). 이름은 화면 글. */
+	void OverviewRegion(FVector& OutCenter, double& OutSizeCm, FString& OutName) const;
+	int32 NumSites() const;
+	/** 점에서 가장 가까운 무리 자리 (없으면 0). */
+	int32 NearestSite(const FVector& P) const;
+	/** 초점→카메라 사이를 막는 보이는 WorldStatic 앞 길이 (옛 ClearArmCm — 트이면 WantCm). */
+	double ClearArmCm(const FVector& From, const FVector& Dir, double WantCm) const;
+	FVector CamReferencePoint() const;
 
 	TSharedPtr<FEcoR9DemoState> State;
 

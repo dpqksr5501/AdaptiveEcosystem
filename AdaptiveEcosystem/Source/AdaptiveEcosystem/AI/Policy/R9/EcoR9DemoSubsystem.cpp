@@ -4,6 +4,7 @@
 
 #include "EcoR9DemoState.h"
 
+#include "AI/Policy/EcoV3ObserverCamera.h"
 #include "Camera/CameraActor.h"
 #include "CanvasItem.h"
 #include "ContentStreaming.h"
@@ -36,6 +37,7 @@
 #include "LandscapeProxy.h"
 #include "Misc/CommandLine.h"
 #include "Misc/FileHelper.h"
+#include "Misc/PackageName.h"
 #include "Misc/Parse.h"
 #include "Misc/Paths.h"
 #include "Serialization/JsonReader.h"
@@ -68,9 +70,13 @@ namespace EcoR9DemoSubsystemImpl
 	static TAutoConsoleVariable<FString> CVarPolicy(TEXT("eco.R9Demo.Policy"), TEXT("sample"),
 		TEXT("R9 데모 실시간 판 행동 고르기: sample = 확률대로 (학습 때와 같음) · argmax = 가장 높은 칸."));
 	static TAutoConsoleVariable<float> CVarSpeed(TEXT("eco.R9Demo.Speed"), 1.0f, TEXT("R9 데모 시간 배율 (0 = 멈춤). 보기만 바뀐다 — 스텝 규칙은 그대로."));
-	static TAutoConsoleVariable<int32> CVarText(TEXT("eco.R9Demo.Text"), 1, TEXT("R9 데모 작은 글자 (마릿수·시간·판). H 키로도 끈다."));
-	static TAutoConsoleVariable<int32> CVarCam(TEXT("eco.R9Demo.Cam"), 0,
-		TEXT("R9 데모 카메라: 0 자동 (사냥·물기·반격·사체 먹기 따라가기, 없으면 전체) · 1 전체 · 2 사슴 · 3 늑대 · 4 멧돼지 · 5 위에서. 키 1~6 과 같다."));
+	static TAutoConsoleVariable<int32> CVarText(TEXT("eco.R9Demo.Text"), 1, TEXT("R9 데모 오른쪽 위 글 묶음 (0 = 모두 끔). H 키는 그 안의 단축키 목록만 숨기고 보인다 (옛 관찰 카메라와 같음)."));
+	static TAutoConsoleVariable<int32> CVarCam(TEXT("eco.R9Demo.Cam"), 5,
+		TEXT("R9 데모 카메라 (키 숫자와 같다 — 옛 관찰 카메라 꼴, EcoR9DemoCam.h): 0 자유 카메라 · 1 늑대 시점 · 2 사슴 시점 · 3 탑뷰 · 4 쿼터뷰 · ")
+			TEXT("5 자동 추적 (기본 — 사냥·물기·반격·사체 먹기) · 6 멧돼지 시점. 무대가 서는 때·바뀔 때 읽는다."));
+	static TAutoConsoleVariable<FString> CVarOnlyMap(TEXT("eco.R9Demo.OnlyMap"), TEXT(""),
+		TEXT("R9 데모를 Play 시작 때 저절로 켜는 맵 (빈 값 = 모든 맵). 맵 경로 '/Game/EcoTest/Maps/LV_EcoV3_Island'·오브젝트 경로·짧은 이름, 쉼표로 여럿. ")
+			TEXT("다른 맵은 예전처럼 아무것도 만들지 않는다. 명령줄 -EcoR9Demo= 깃발과 Play 중 직접 친 eco.R9Demo 1 은 거르지 않는다."));
 	static TAutoConsoleVariable<int32> CVarHpBars(TEXT("eco.R9Demo.HpBars"), 1, TEXT("R9 데모: 다친 늑대·멧돼지 체력 막대 (실시간 판만 체력을 안다)."));
 	static TAutoConsoleVariable<int32> CVarGrass(TEXT("eco.R9Demo.Grass"), 1, TEXT("R9 데모: 보이는 풀 (먹이 격자 값 그대로 — 먹으면 줄고 다시 자람)."));
 	static TAutoConsoleVariable<int32> CVarLoop(TEXT("eco.R9Demo.Loop"), 1, TEXT("R9 데모: 재생 끝·실시간 다시 시작 스텝에서 처음부터 다시."));
@@ -415,6 +421,11 @@ namespace EcoR9DemoCVars
 	int32 BodyBudget() { return FMath::Clamp(EcoR9DemoSubsystemImpl::CVarBodyBudget.GetValueOnGameThread(), 0, 400); }
 	float GrassRadiusM() { return FMath::Clamp(EcoR9DemoSubsystemImpl::CVarGrassRadius.GetValueOnGameThread(), 32.0f, 400.0f); }
 	FString BoarMesh() { return EcoR9DemoSubsystemImpl::CVarBoarMesh.GetValueOnGameThread().TrimStartAndEnd(); }
+	float HudScale()
+	{
+		const IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Cam.HudScale"));   // 옛 관찰 카메라 글 배율 (같은 값)
+		return V ? V->GetFloat() : 1.0f;
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -427,19 +438,23 @@ FEcoR9DemoSettings FEcoR9DemoSettings::Resolve(const TCHAR* CommandLine)
 	FEcoR9DemoSettings S;
 	const TCHAR* Cmd = CommandLine ? CommandLine : TEXT("");
 	FString V;
+	S.OnlyMap = CVarOnlyMap.GetValueOnGameThread().TrimStartAndEnd();
 	if (FParse::Value(Cmd, TEXT("EcoR9Replay="), V, false) && !V.IsEmpty())
 	{
 		S.Mode = EMode::Replay;
 		S.ReplayPath = V;
+		S.bFromCommandLine = true;
 	}
 	else if (FParse::Value(Cmd, TEXT("EcoR9Demo="), V, false))
 	{
 		S.Mode = EMode::Live;
 		S.BrainDir = V;
+		S.bFromCommandLine = true;
 	}
 	else if (FParse::Param(Cmd, TEXT("EcoR9Demo")))
 	{
 		S.Mode = EMode::Live;
+		S.bFromCommandLine = true;
 	}
 	else
 	{
@@ -519,6 +534,9 @@ FEcoR9DemoSettings FEcoR9DemoSettings::Resolve(const TCHAR* CommandLine)
 		}
 	}
 	FParse::Value(Cmd, TEXT("EcoR9DemoExitAfter="), S.ExitAfterSeconds);
+	// 확인용 (11-13 04:40): 녹화에 화면 글 넣기 · 카메라 키 차례 — 둘 다 명령줄에만, 없으면 예전 그대로
+	S.bCaptureUI = FParse::Param(Cmd, TEXT("EcoR9CaptureUI"));
+	FParse::Value(Cmd, TEXT("EcoR9CamKeys="), S.CamKeys, false);
 	// 맵 전체 땅 모드 (2026-11-13)
 	S.AreaM = CVarArea.GetValueOnGameThread();
 	FParse::Value(Cmd, TEXT("EcoR9DemoArea="), S.AreaM);
@@ -534,6 +552,41 @@ FEcoR9DemoSettings FEcoR9DemoSettings::Resolve(const TCHAR* CommandLine)
 	}
 	S.bHideOthers = CVarHideOthers.GetValueOnGameThread() != 0;
 	return S;
+}
+
+bool FEcoR9DemoSettings::MapAllowed(const FString& OnlyMap, const FString& WorldPackage)
+{
+	FString List = OnlyMap;
+	List.ReplaceInline(TEXT(";"), TEXT(","));
+	TArray<FString> Items;
+	List.ParseIntoArray(Items, TEXT(","), true);
+	const FString Pkg = UWorld::RemovePIEPrefix(WorldPackage);   // PIE 월드 '/Game/…/UEDPIE_0_LV_…' → '/Game/…/LV_…'
+	const FString Short = FPackageName::GetShortName(Pkg);
+	bool bAny = false;
+	for (FString Item : Items)
+	{
+		Item.TrimStartAndEndInline();
+		Item.TrimQuotesInline();
+		if (Item.IsEmpty())
+		{
+			continue;
+		}
+		bAny = true;
+		if (Item.StartsWith(TEXT("/")))
+		{
+			// 오브젝트 경로 '/Game/X/LV.LV' → 패키지 '/Game/X/LV'
+			const FString ItemPkg = FPackageName::ObjectPathToPackageName(Item);
+			if (ItemPkg.Equals(Pkg, ESearchCase::IgnoreCase))
+			{
+				return true;
+			}
+		}
+		else if (Item.Equals(Short, ESearchCase::IgnoreCase))
+		{
+			return true;   // 짧은 이름 'LV_EcoV3_Island'
+		}
+	}
+	return !bAny;   // 항목이 하나도 없으면 (빈 값·공백뿐) 모든 맵
 }
 
 FString FEcoR9DemoSettings::DefaultDir()
@@ -1001,7 +1054,24 @@ void UEcoR9DemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	{
 		return;   // 꺼짐 — 아무것도 만들지 않는다 (Play 중 eco.R9Demo 1 이면 그때 시작)
 	}
+	// 시작 맵에서만 (2026-11-13 03:30 사용자 — 편집기 시작 맵에서만 쓴다): 콘솔 값으로 켠 판은 eco.R9Demo.OnlyMap 밖 맵에서 아무것도 만들지 않는다.
+	// 명령줄 깃발로 켠 판은 거르지 않는다. Play 중 직접 친 eco.R9Demo 1 도 거르지 않는다 (OnDemoCVarChanged → StartDemo)
+	const FString Pkg = UWorld::RemovePIEPrefix(InWorld.GetPackage()->GetName());
+	if (!State->Settings.bFromCommandLine && !FEcoR9DemoSettings::MapAllowed(State->Settings.OnlyMap, Pkg))
+	{
+		State->bMapFiltered = true;
+		UE_LOG(LogEcoR9Demo, Log,
+			   TEXT("[EcoR9Demo] 이 맵(%s)은 eco.R9Demo.OnlyMap(%s) 밖 — 켜지 않는다 (예전 그대로). 이 맵에서도 보려면 Play 중 콘솔 eco.R9Demo 1, ")
+				   TEXT("어느 맵에서나 늘 켜려면 eco.R9Demo.OnlyMap 을 비운다"),
+			   *Pkg, *State->Settings.OnlyMap);
+		return;
+	}
 	StartDemo(TEXT("Play 시작"));
+}
+
+bool UEcoR9DemoSubsystem::WasMapFiltered() const
+{
+	return State && State->bMapFiltered;
 }
 
 void UEcoR9DemoSubsystem::OnWorldBeginPlayImpl(UWorld& InWorld)
@@ -1017,7 +1087,9 @@ void UEcoR9DemoSubsystem::OnWorldBeginPlayImpl(UWorld& InWorld)
 		UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] 거부 — %s. 아무것도 만들지 않는다."), *S.Why);
 		return;
 	}
-	// 맵 제한 없음 (맵 이름을 보지 않는다). 팀 생태 장치·통합 v3 는 세어 알리기만 한다
+	// 옛 관찰 카메라는 데모가 켜지는 때부터 끈다 (같은 숫자 키 0~5·H 를 두 카메라가 같이 읽지 않게, 우상단 글이 겹치지 않게 — 끌 때 되돌림)
+	HoldObserverCamera();
+	// 맵 이름 거르기는 OnWorldBeginPlay (eco.R9Demo.OnlyMap). 팀 생태 장치·통합 v3 는 세어 알리기만 한다
 	DescribeTeamEco(InWorld);
 	// 맵 전체 땅 (기본): 훑은 땅 지도가 있어야 코어를 시작할 수 있어 원천은 훑은 뒤에 연다 (ScanWhole). 생성기가 없는 코어면 예전 한 무대
 	S.bWhole = S.Settings.WantsWhole() && EcoR9Demo::FR9LiveSource::Available();
@@ -1457,6 +1529,8 @@ void UEcoR9DemoSubsystem::RestartRun(const TCHAR* Why)
 	}
 	S.bAutoFollowing = false;
 	S.FollowA = S.FollowB = 0;
+	S.CamWhat.Reset();
+	S.SubjectDeadAt = -1.0;
 	if (S.Info.bWhole)
 	{
 		// 검토 (11-13): 큰 세계는 시드마다 은신처·무리 자리가 새로 생긴다 (EcoR9Scene.h BuildBigScene — Spec.Seed 로 은신처·패치·자리를 고름). 작은 세계는 장면 파일의
@@ -1469,6 +1543,7 @@ void UEcoR9DemoSubsystem::RestartRun(const TCHAR* Why)
 		S.Decor.Reset();
 		SpawnStaticDecor();
 		S.SiteIndex = 0;
+		S.bSiteLocked = false;   // 새 판은 무리 자리가 새로 생긴다 — 고른 자리 번호를 들고 가지 않는다
 	}
 	UpdateFood();
 	UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 다시 시작 (%s) — 판 %d, 시드 %llu"), Why, S.RunIndex, static_cast<unsigned long long>(S.Info.Seed));
@@ -2393,11 +2468,14 @@ void UEcoR9DemoSubsystem::BuildStage()
 	double Mean = 0.0, Lo = 0.0, Hi = 0.0;
 	const bool bAny = H.Stats(Mean, Lo, Hi);
 	H.Fallback = bAny ? Mean : S.StageCenter.Z;
+	S.HeightHi = bAny ? Hi : H.Fallback;   // 카메라 섬 전체 보기 초점 높이 (가장 높은 땅 + 30 m)
+	S.bHeightHi = bAny;
 	S.StageCenter.Z = S.Info.bWhole ? S.WholeCenter.Z : H.At(S.StageCenter.X, S.StageCenter.Y);
 	if (S.Info.bWhole && !S.Info.HerdXY.empty())
 	{
-		// 카메라 7: 첫 무리 자리 (플레이어 시작점에 가장 가까운 자리 — 코어가 그 차례로 고름)
+		// 카메라 7 · G: 첫 무리 자리 (플레이어 시작점에 가장 가까운 자리 — 코어가 그 차례로 고름)
 		S.SiteIndex = 0;
+		S.bSiteLocked = false;
 	}
 	if (!bAny)
 	{
@@ -2420,19 +2498,69 @@ void UEcoR9DemoSubsystem::BuildStage()
 	S.RunningSince = World->GetTimeSeconds();
 	S.NextLog = S.RunningSince + 10.0;
 	S.CamModeSince = S.RunningSince;
-	const int32 Cv = EcoR9DemoCVars::Cam();
-	FString CamParam;
-	if (FParse::Value(FCommandLine::Get(), TEXT("EcoR9Cam="), CamParam))
+	// 처음 카메라 (옛 관찰 카메라 꼴 — EcoR9DemoCam.h): 콘솔 eco.R9Demo.Cam (키 숫자, 기본 5 자동 추적), 명령줄 -EcoR9Cam=<이름> 이 먼저.
+	// 이름: free·wolf·deer·top·quarter·auto·boar (옛 이름 wide = 섬 전체 사선 보기, site = 첫 무리 자리 사선 보기)
 	{
-		static const TCHAR* const Names[] = {TEXT("auto"), TEXT("wide"), TEXT("deer"), TEXT("wolf"), TEXT("boar"), TEXT("top")};
-		for (int32 i = 0; i < 6; ++i)
+		const int32 Cv = EcoR9DemoCVars::Cam();
+		EEcoR9DemoCam Start = EEcoR9DemoCam::Auto;
+		EcoR9DemoCam::ModeFromInt(Cv, Start);
+		FString CamParam;
+		if (FParse::Value(FCommandLine::Get(), TEXT("EcoR9Cam="), CamParam))
 		{
-			if (CamParam.Equals(Names[i], ESearchCase::IgnoreCase))
+			static const TCHAR* const Names[] = {TEXT("free"), TEXT("wolf"), TEXT("deer"), TEXT("top"), TEXT("quarter"), TEXT("auto"), TEXT("boar")};
+			for (int32 i = 0; i < 7; ++i)
 			{
-				S.CamMode = static_cast<EEcoR9DemoCam>(i);
+				if (CamParam.Equals(Names[i], ESearchCase::IgnoreCase))
+				{
+					Start = static_cast<EEcoR9DemoCam>(i);
+				}
+			}
+			if (CamParam.Equals(TEXT("wide"), ESearchCase::IgnoreCase) || CamParam.Equals(TEXT("site"), ESearchCase::IgnoreCase))
+			{
+				Start = EEcoR9DemoCam::Quarter;   // 대상 없는 사선 보기
+				if (S.Info.bWhole && !S.Info.HerdXY.empty())
+				{
+					S.SiteIndex = CamParam.Equals(TEXT("wide"), ESearchCase::IgnoreCase) ? static_cast<int32>(S.Info.HerdXY.size() / 2) : 0;
+					S.bSiteLocked = true;
+				}
 			}
 		}
-		S.LastCamCVar = Cv;
+		S.CamMode = Start == EEcoR9DemoCam::Free ? EEcoR9DemoCam::Auto : Start;   // 자유 카메라는 지금 카메라 자리에서 시작하므로 한 번 자리를 잡은 뒤
+		S.FollowA = S.FollowB = 0;
+		S.bCamInit = false;
+		S.bCamSnap = true;
+		SetCamMode(S.CamMode, TEXT("시작"));
+		if (Start == EEcoR9DemoCam::Free)
+		{
+			UpdateCamera(0.0f);
+			EnterFreeCam(TEXT("시작"));
+		}
+		S.LastCamCVar = EcoR9DemoCVars::Cam();
+	}
+	// 확인용 카메라 키 차례 (-EcoR9CamKeys=<초>:<키>,… — 무대가 선 때부터 센 초). 잘못된 항목은 기록 한 줄 남기고 건너뛴다
+	S.CamKeyPlan.Reset();
+	S.CamKeyNext = 0;
+	S.CamKeyProbeLeft = 0;
+	if (!S.Settings.CamKeys.IsEmpty())
+	{
+		TArray<FString> Items;
+		S.Settings.CamKeys.ParseIntoArray(Items, TEXT(","), true);
+		for (const FString& Item : Items)
+		{
+			FString Sec, KeyName;
+			const FKey Key = Item.Split(TEXT(":"), &Sec, &KeyName) ? FKey(FName(*KeyName.TrimStartAndEnd())) : FKey();
+			EcoR9DemoCam::EAction Ignored = EcoR9DemoCam::EAction::Help;
+			if (Sec.IsNumeric() && Key.IsValid() && EcoR9DemoCam::ActionOf(Key, Ignored))
+			{
+				S.CamKeyPlan.Add(TPair<double, FKey>(FCString::Atod(*Sec), Key));
+			}
+			else
+			{
+				UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] -EcoR9CamKeys 항목 '%s' 를 못 읽음 (꼴: <초>:<키 이름>, 예 20:One) — 건너뜀"), *Item);
+			}
+		}
+		S.CamKeyPlan.StableSort([](const TPair<double, FKey>& A, const TPair<double, FKey>& B) { return A.Key < B.Key; });
+		UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 확인용 카메라 키 차례 %d 개 (-EcoR9CamKeys)"), S.CamKeyPlan.Num());
 	}
 	UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 무대 — %s | 높이 %d×%d 표본 (%.0f ~ %.0f m) | 몸 %d · 풀 덩어리 %d · 은신처 %d | %.2f 초"), *S.StageLine, H.Nx,
 		   H.Ny, bAny ? Lo / 100.0 : H.Fallback / 100.0, bAny ? Hi / 100.0 : H.Fallback / 100.0, S.Bodies.Num(), S.TuftBase.Num(),
@@ -2588,6 +2716,7 @@ void UEcoR9DemoSubsystem::TickRunning(float DeltaTime)
 	ApplyViewEnvironment();
 	ParkPawn();
 	HandleKeys();
+	TickCamKeyPlan(Now);   // 확인용 (-EcoR9CamKeys) — 없으면 아무 일 없음
 	if (EcoR9DemoCVars::Daylight())
 	{
 		HoldDaylight();
@@ -2628,6 +2757,7 @@ void UEcoR9DemoSubsystem::TickRunning(float DeltaTime)
 	SyncBodies(S.Alpha, static_cast<float>(Dt));
 	UpdateMarkers(Now);
 	UpdateCamera(static_cast<float>(Dt));
+	LogCamKeyProbe();      // 확인용 (-EcoR9CamKeys) — 읽기만
 	if (S.Info.bWhole)
 	{
 		UpdateFood();   // 큰 세계: 카메라가 움직이면 풀 창을 옮긴다 (바뀐 칸만 다시 씀)
@@ -2715,25 +2845,32 @@ void UEcoR9DemoSubsystem::ApplyViewEnvironment()
 	{
 		return;
 	}
-	if (S.PrevCamEnable == MIN_int32)
-	{
-		// 관찰 카메라(EcoV3ObserverCamera)는 키 1~5 를 쓰고 보기 대상을 잡는다 — 데모 동안만 끈다 (Deinitialize 에서 되돌림)
-		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Cam.Enable")))
-		{
-			S.PrevCamEnable = V->GetInt();
-			V->Set(0, ECVF_SetByCode);
-		}
-		else
-		{
-			S.PrevCamEnable = MIN_int32 + 1;   // 없음 — 되돌릴 것 없음 표시
-		}
-	}
+	HoldObserverCamera();
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (AHUD* Hud = PC ? PC->GetHUD() : nullptr)
 	{
 		S.bHudHidden = Hud->bShowHUD;
 		Hud->bShowHUD = false;   // 팀 개체 살피기 HUD 는 R9 개체를 모른다 — 데모 글자만 둔다
 		S.bEnvApplied = true;
+	}
+}
+
+void UEcoR9DemoSubsystem::HoldObserverCamera()
+{
+	FEcoR9DemoState& S = *State;
+	if (S.PrevCamEnable != MIN_int32)
+	{
+		return;   // 이미 끔 (또는 없음)
+	}
+	// 관찰 카메라(EcoV3ObserverCamera)는 키 0~5·H 를 쓰고 보기 대상을 잡는다 — 데모 동안만 끈다 (TeardownDemo 에서 되돌림)
+	if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Cam.Enable")))
+	{
+		S.PrevCamEnable = V->GetInt();
+		V->Set(0, ECVF_SetByCode);
+	}
+	else
+	{
+		S.PrevCamEnable = MIN_int32 + 1;   // 없음 — 되돌릴 것 없음 표시
 	}
 }
 
@@ -3088,7 +3225,7 @@ void UEcoR9DemoSubsystem::TickCapture(float DeltaTime)
 	if (S.CaptureFrames < Due)
 	{
 		const FString Path = FPaths::Combine(Cfg.CaptureDir, FString::Printf(TEXT("f_%05d.png"), S.CaptureFrames));
-		FScreenshotRequest::RequestScreenshot(Path, /*bInShowUI*/ false, /*bAddFilenameSuffix*/ false);
+		FScreenshotRequest::RequestScreenshot(Path, /*bInShowUI*/ Cfg.bCaptureUI, /*bAddFilenameSuffix*/ false);   // -EcoR9CaptureUI 면 오른쪽 위 글도
 		++S.CaptureFrames;
 	}
 	if (S.CaptureClock >= Cfg.CaptureSeconds)
@@ -3110,7 +3247,9 @@ void UEcoR9DemoSubsystem::TickCapture(float DeltaTime)
 }
 
 // -----------------------------------------------------------------------------
-// 작은 글자
+// 화면 글 — 오른쪽 위 묶음 하나 (2026-11-13 03:30 사용자 '좌상단에 띄우지 말고 옛날처럼 우상단에'). 옛 관찰 카메라 DrawPanel 꼴 그대로:
+// 어두운 반투명 바탕 · 흰 글자 · 엔진 작은 글꼴 · 맨 윗줄 'H 단축키 숨기기' · 단축키 목록 · 가는 줄 · 상태. 자리·배율은 옛 EcoV3Observe::LayoutPanel.
+// 팀 HUD 는 데모 동안 숨겨 두므로(ApplyViewEnvironment) 팀 판 자리를 비킬 것이 없다.
 // -----------------------------------------------------------------------------
 
 void UEcoR9DemoSubsystem::DrawOverlay(UCanvas* Canvas, APlayerController* PC)
@@ -3123,100 +3262,123 @@ void UEcoR9DemoSubsystem::DrawOverlay(UCanvas* Canvas, APlayerController* PC)
 	const FEcoR9DemoState& S = *State;
 	if (S.Phase == EEcoR9DemoPhase::Off || (S.Phase == EEcoR9DemoPhase::Refused && GetWorld()->GetNetMode() == NM_Client))
 	{
-		return;   // 클라이언트 화면에는 아무것도 그리지 않는다 (거부 글도)
+		return;   // 꺼짐·맵 거르기 · 클라이언트 화면에는 아무것도 그리지 않는다 (거부 글도)
 	}
 	const bool bLive = S.Settings.Mode == FEcoR9DemoSettings::EMode::Live;
 	struct FLine
 	{
 		FString Text;
 		FLinearColor Color;
-		bool bBig = false;
+		bool bGapBefore = false;   // 이 줄 앞에 가는 줄 (단축키와 상태 사이)
 	};
 	TArray<FLine> Lines;
-	const FLinearColor White(0.95f, 0.95f, 0.95f);
-	const FLinearColor Gray(0.72f, 0.72f, 0.72f);
-	const FLinearColor Gold(1.0f, 0.84f, 0.43f);
+	const FLinearColor Title = FLinearColor(FColor(255, 215, 110));
+	const FLinearColor KeyColor = FLinearColor(FColor(240, 240, 240));
+	const FLinearColor White = FLinearColor(FColor(235, 235, 235));
+	const FLinearColor Gray = FLinearColor(FColor(175, 175, 175));
+	const double Wait = GetWorld() ? GetWorld()->GetTimeSeconds() - S.PhaseStart : 0.0;
 	if (S.Phase == EEcoR9DemoPhase::Refused || S.Phase == EEcoR9DemoPhase::Failed)
 	{
-		Lines.Add({FString::Printf(TEXT("R9 데모 %s — %s"), S.Phase == EEcoR9DemoPhase::Failed ? TEXT("실패") : TEXT("꺼짐"), *S.Why), Gold, false});
+		Lines.Add({S.Phase == EEcoR9DemoPhase::Failed ? FString(TEXT("R9 데모 실패")) : FString(TEXT("R9 데모 꺼짐")), Title});
+		Lines.Add({S.Why, White});
 	}
 	else if (S.Phase == EEcoR9DemoPhase::WaitWhole)
 	{
-		const double Wait = GetWorld() ? GetWorld()->GetTimeSeconds() - S.PhaseStart : 0.0;
-		Lines.Add({FString::Printf(TEXT("R9 데모 — 맵 땅을 불러오는 중 (%.0f × %.0f m · %.0f 초) — 다 불리면 땅을 훑고 사슴·늑대·멧돼지를 푼다"), S.AreaBox.GetSize().X / 100.0,
-								   S.AreaBox.GetSize().Y / 100.0, Wait),
-				   Gold, false});
+		Lines.Add({TEXT("R9 데모 — 맵 땅을 불러오는 중"), Title});
+		Lines.Add({FString::Printf(TEXT("%.0f × %.0f m · %.0f 초"), S.AreaBox.GetSize().X / 100.0, S.AreaBox.GetSize().Y / 100.0, Wait), White});
+		Lines.Add({TEXT("다 불리면 땅을 훑고 사슴·늑대·멧돼지를 푼다"), Gray});
 	}
 	else if (S.Phase == EEcoR9DemoPhase::WaitScan)
 	{
-		const double Wait = GetWorld() ? GetWorld()->GetTimeSeconds() - S.PhaseStart : 0.0;
-		Lines.Add({FString::Printf(TEXT("R9 데모 — 무대 자리를 찾는 중: 시작점 둘레 %.0f m (%d/%d) · %.0f 초"), EcoR9DemoSubsystemImpl::kRingHalfCm[S.ScanRing] / 100.0,
-								   S.ScanRing + 1, EcoR9DemoSubsystemImpl::kNumRings, Wait),
-				   Gold, false});
+		Lines.Add({TEXT("R9 데모 — 무대 자리를 찾는 중"), Title});
+		Lines.Add({FString::Printf(TEXT("시작점 둘레 %.0f m (%d/%d) · %.0f 초"), kRingHalfCm[S.ScanRing] / 100.0, S.ScanRing + 1, kNumRings, Wait), White});
 	}
 	else if (S.Phase != EEcoR9DemoPhase::Running)
 	{
-		const double Wait = GetWorld() ? GetWorld()->GetTimeSeconds() - S.PhaseStart : 0.0;
-		Lines.Add({FString::Printf(TEXT("R9 데모 — 무대 자리를 불러오는 중 (%.0f 초)"), Wait), Gold, false});
+		Lines.Add({TEXT("R9 데모 — 무대 자리를 불러오는 중"), Title});
+		Lines.Add({FString::Printf(TEXT("%.0f 초"), Wait), White});
 	}
 	else
 	{
+		const int32 SiteCount = S.Info.bWhole ? static_cast<int32>(S.Info.HerdXY.size() / 2) : 0;
+		Lines.Add({S.bShowKeys ? FString(TEXT("R9 관찰 카메라      H  단축키 숨기기")) : FString(TEXT("R9 관찰 카메라      H  단축키 보이기")), Title});
+		if (S.bShowKeys)
+		{
+			for (const FString& L : EcoR9DemoCam::KeyHelpLines(SiteCount > 0))
+			{
+				Lines.Add({L, KeyColor});
+			}
+		}
+		// 요약 (실시간·마릿수·잡힘·반격·굶음 — 11-13 왼쪽 위 글을 줄임)
 		int32 Alive[EcoR9Demo::kNumSpecies] = {};
 		EcoR9Demo::CountAlive(S.Cur, Alive);
-		Lines.Add({bLive ? FString(TEXT("실시간 · 파이썬에서 배운 두뇌(사슴·늑대·멧돼지)를 언리얼 C++ 로 추론"))
-						 : FString(TEXT("파이썬 실행 기록 재생 (언리얼 실시간 추론 아님)")),
-				   Gold, true});
-		Lines.Add({FString::Printf(TEXT("%s   사슴 %d · 늑대 %d · 멧돼지 %d%s"), *Clock(S.SimSeconds), Alive[0], Alive[1], Alive[2],
-								   S.Info.bWhole ? *FString::Printf(TEXT("   (맵 전체 · 무리 자리 %d)"), static_cast<int32>(S.Info.HerdXY.size() / 2)) : TEXT("")),
+		Lines.Add({FString::Printf(TEXT("%s   %s · 판 %d"), bLive ? TEXT("실시간 (언리얼 C++ 추론)") : TEXT("재생 (파이썬 기록 — 실시간 추론 아님)"), *Clock(S.SimSeconds), S.RunIndex + 1),
 				   White, true});
-		Lines.Add({FString::Printf(TEXT("늑대가 잡음: 사슴 %d · 멧돼지 %d   |   멧돼지 반격 %d   |   굶어 죽음 %d"), S.DeerKilled, S.BoarKilled, S.Counters, S.Starved),
-				   White, false});
-		if (!S.CamLabel.IsEmpty())
+		Lines.Add({FString::Printf(TEXT("산   사슴 %d · 늑대 %d · 멧돼지 %d%s"), Alive[0], Alive[1], Alive[2],
+								   SiteCount > 0 ? *FString::Printf(TEXT(" · 무리 자리 %d"), SiteCount) : TEXT("")),
+				   White});
+		Lines.Add({FString::Printf(TEXT("잡힘   사슴 %d · 멧돼지 %d · 반격 %d · 굶음 %d"), S.DeerKilled, S.BoarKilled, S.Counters, S.Starved), White});
+		// 카메라 (모드·대상·행동·가까운 상대·자동 추적 — EcoR9DemoCamera.cpp BuildCamLines)
+		for (int32 i = 0; i < S.CamLines.Num(); ++i)
 		{
-			Lines.Add({S.CamLabel, White, false});
+			Lines.Add({S.CamLines[i], FLinearColor(S.CamColors.IsValidIndex(i) ? S.CamColors[i] : FColor::White), i == 0});
 		}
-		const FString Pick = S.Info.Policy == "argmax" ? TEXT("가장 높은 칸") : (S.Info.Policy == "sample" ? TEXT("확률대로 (학습 때와 같음)") : TEXT("?"));
-		Lines.Add({FString::Printf(TEXT("행동 고르기: %s · 멧돼지 몸 = %s%s"), *Pick, S.BoarLine.IsEmpty() ? TEXT("갈색 자리표시 (에셋 없음)") : *S.BoarLine,
-								   S.bFoodKnown ? TEXT(" · 풀 = 먹이 격자 값") : TEXT("")),
-				   Gray, false});
-		Lines.Add({S.Info.bWhole ? FString(TEXT("1 자동 · 2 섬 전체 · 3 사슴 · 4 늑대 · 5 멧돼지 · 6 위 · 7 다음 무리 자리 · H 글자 끄기 · 끄기: 콘솔 eco.R9Demo 0"))
-								 : FString(TEXT("1 자동 · 2 전체 · 3 사슴 · 4 늑대 · 5 멧돼지 · 6 위 · H 글자 끄기 · 끄기: 콘솔 eco.R9Demo 0")),
-				   Gray, false});
+		if (S.bShowKeys)
+		{
+			Lines.Add({TEXT("끄기   콘솔 eco.R9Demo 0"), Gray});
+		}
 	}
-	// 화면 메시지와 같은 글꼴 (한글 됨 — EcoV3ObserverCamera.cpp:2493). 큰 줄은 배율만 키운다
+	// 화면 메시지와 같은 글꼴 (한글 됨 — 옛 관찰 카메라와 같음)
 	UFont* Font = GEngine->GetSmallFont();
 	if (!Font)
 	{
 		return;
 	}
-	const float Scale = FMath::Clamp(Canvas->ClipY / 1080.0f, 0.6f, 2.5f) * 1.25f;
-	const float Pad = 10.0f * Scale;
+	float LineH = 0.0f;
 	float MaxW = 0.0f;
-	float TotalH = 0.0f;
-	TArray<float> Heights;
-	TArray<float> Scales;
 	for (const FLine& L : Lines)
 	{
-		const float Sc = L.bBig ? Scale * 1.3f : Scale;
 		float XL = 0.0f, YL = 0.0f;
-		Canvas->TextSize(Font, L.Text, XL, YL, Sc, Sc);
+		Canvas->TextSize(Font, L.Text, XL, YL, 1.0f, 1.0f);
 		MaxW = FMath::Max(MaxW, XL);
-		Heights.Add(YL * 1.15f);
-		Scales.Add(Sc);
-		TotalH += YL * 1.15f;
+		LineH = FMath::Max(LineH, YL);
 	}
-	const float X0 = 16.0f * Scale;
-	const float Y0 = 16.0f * Scale;
-	FCanvasTileItem Back(FVector2D(X0 - Pad, Y0 - Pad), FVector2D(MaxW + 2.0f * Pad, TotalH + 2.0f * Pad), FLinearColor(0.0f, 0.0f, 0.0f, 0.42f));
+	if (LineH <= 0.0f)
+	{
+		return;
+	}
+	constexpr float Pad = 9.0f;
+	constexpr float Spacing = 1.2f;
+	const float GapH = 0.5f * LineH;
+	float ContentH = 2.0f * Pad;
+	for (const FLine& L : Lines)
+	{
+		ContentH += LineH * Spacing + (L.bGapBefore ? GapH : 0.0f);
+	}
+	const FVector2D Size(Canvas->ClipX, Canvas->ClipY);
+	const FVector2D Content(MaxW + 2.0f * Pad, ContentH);
+	// 1280×720 에서 1.15 배, 1080p 에서 1.7 배 — eco.Cam.HudScale 로 더 키우고 줄인다 (옛 그대로)
+	const float Base = FMath::Clamp(static_cast<float>(Size.Y) / 720.0f * 1.15f, 1.0f, 2.4f) * FMath::Clamp(EcoR9DemoCVars::HudScale(), 0.5f, 3.0f);
+	const EcoV3Observe::FPanelLayout L = EcoV3Observe::LayoutPanel(Size, Content, Base, nullptr);
+	FCanvasTileItem Back(FVector2D(L.X, L.Y), FVector2D(Content.X * L.Scale, Content.Y * L.Scale), FLinearColor(0.012f, 0.016f, 0.024f, 0.74f));
 	Back.BlendMode = SE_BLEND_Translucent;
 	Canvas->DrawItem(Back);
-	float Y = Y0;
-	for (int32 i = 0; i < Lines.Num(); ++i)
+	float Y = L.Y + Pad * L.Scale;
+	for (const FLine& Line : Lines)
 	{
-		FCanvasTextItem Item(FVector2D(X0, Y), FText::FromString(Lines[i].Text), Font, Lines[i].Color);
-		Item.Scale = FVector2D(Scales[i], Scales[i]);
-		Item.EnableShadow(FLinearColor::Black);
-		Canvas->DrawItem(Item);
-		Y += Heights[i];
+		if (Line.bGapBefore)
+		{
+			// 단축키와 상태 사이 가는 줄
+			Y += 0.5f * GapH * L.Scale;
+			FCanvasTileItem Rule(FVector2D(L.X + Pad * L.Scale, Y), FVector2D((Content.X - 2.0f * Pad) * L.Scale, 1.0f), FLinearColor(1.0f, 1.0f, 1.0f, 0.25f));
+			Rule.BlendMode = SE_BLEND_Translucent;
+			Canvas->DrawItem(Rule);
+			Y += 0.5f * GapH * L.Scale;
+		}
+		FCanvasTextItem Text(FVector2D(L.X + Pad * L.Scale, Y), FText::FromString(Line.Text), Font, Line.Color);
+		Text.Scale = FVector2D(L.Scale, L.Scale);
+		Text.EnableShadow(FLinearColor(0.0f, 0.0f, 0.0f, 0.9f));
+		Canvas->DrawItem(Text);
+		Y += LineH * Spacing * L.Scale;
 	}
 }

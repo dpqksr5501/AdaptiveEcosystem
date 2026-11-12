@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "EcoR9DemoCam.h"
 #include "EcoR9DemoFrame.h"
 #include "EcoR9DemoLiveSource.h"
 #include "EcoR9DemoSubsystem.h"
@@ -23,7 +24,8 @@ DECLARE_LOG_CATEGORY_EXTERN(LogEcoR9Demo, Log, All);
 /** 콘솔 값 읽기 (정의는 EcoR9DemoSubsystem.cpp — 파일 셋이 같은 값을 본다). */
 namespace EcoR9DemoCVars
 {
-	int32 Cam();          // eco.R9Demo.Cam : 0 자동 · 1 전체 · 2 사슴 · 3 늑대 · 4 멧돼지 · 5 위
+	int32 Cam();          // eco.R9Demo.Cam : 키 숫자와 같다 — 0 자유 · 1 늑대 · 2 사슴 · 3 탑뷰 · 4 쿼터뷰 · 5 자동 추적 (기본) · 6 멧돼지
+	float HudScale();     // eco.Cam.HudScale (옛 관찰 카메라 글 배율 — 같은 값을 읽는다, 없으면 1)
 	float Speed();        // eco.R9Demo.Speed : 시간 배율 (0 = 멈춤)
 	bool Text();          // eco.R9Demo.Text : 작은 글자
 	bool HpBars();        // eco.R9Demo.HpBars : 다친 늑대·멧돼지 체력 막대 (실시간 판)
@@ -51,17 +53,6 @@ enum class EEcoR9DemoPhase : uint8
 	WaitStage,   // 무대 자리를 불러오는 중
 	Running,
 	Failed
-};
-
-enum class EEcoR9DemoCam : uint8
-{
-	Auto = 0,
-	Wide = 1,
-	FollowDeer = 2,
-	FollowWolf = 3,
-	FollowBoar = 4,
-	Top = 5,
-	Site = 6     // 무리 자리 하나 (키 7 = 다음 자리)
 };
 
 /** 보이는 몸 하나 (R9 uid 하나). */
@@ -130,6 +121,7 @@ struct FEcoR9DemoState
 	FEcoR9DemoSettings Settings;
 	int32 Starts = 0;            // 이 월드에서 시작한 횟수 (Play 중 켜기/끄기 — 두 번 만들지 않음 시험)
 	bool bWorldBegan = false;    // OnWorldBeginPlay 를 지났다 (그 순간에는 UWorld::HasBegunPlay 가 아직 거짓 — 게임 모드 StartPlay 앞)
+	bool bMapFiltered = false;   // Play 시작 때 eco.R9Demo.OnlyMap 밖 맵이라 켜지 않았다 (Play 중 직접 친 eco.R9Demo 1 은 켠다)
 	EEcoR9DemoPhase Phase = EEcoR9DemoPhase::Off;
 	double PhaseStart = 0.0;
 	FString Why;
@@ -177,7 +169,10 @@ struct FEcoR9DemoState
 	FVector WholeCenter = FVector::ZeroVector;   // 땅 지도 정사각 가운데 (cm)
 	FBox LandBox = FBox(ForceInit);              // 열린 땅 경계 (cm) — 카메라 2 (섬 전체)
 	FString WholeLine;                           // 훑기 기록 줄
-	int32 SiteIndex = 0;                         // 카메라 7: 지금 보는 무리 자리
+	int32 SiteIndex = 0;                         // 카메라 7 · G: 지금 보는 무리 자리 (0 ~ 자리 수 − 1, 자리 수 = 섬 전체)
+	bool bSiteLocked = false;                    // 사용자가 7 · G 로 자리를 골랐다 (대상 없는 보기가 그 자리에 머문다 — 옛 bRegionLocked)
+	double HeightHi = 0.0;                       // 높이 표 가장 높은 땅 (섬 전체 보기 초점 = 이것 + 30 m — 옛 섬 무대 LandTopZ)
+	bool bHeightHi = false;
 	// 풀 그리기 창 (큰 세계 — 카메라 둘레 칸만)
 	EcoR9Demo::FR9FoodWindow FoodWin;
 	std::vector<float> WinGrass;
@@ -232,26 +227,60 @@ struct FEcoR9DemoState
 	int32 Respawns = 0;
 	int32 Eats[3][4] = {};       // 실제로 먹은 개체·스텝 [종][먹이 + 1] (0 = 모름 — 재생 판, 1 풀 · 2 땅속 · 3 고기 = 사체). 기록 줄 셈용
 
-	// 카메라
+	// 카메라 (2026-11-13 03:30 — 옛 관찰 카메라 꼴, EcoR9DemoCam.h)
 	EEcoR9DemoCam CamMode = EEcoR9DemoCam::Auto;
 	int32 LastCamCVar = -1;
 	bool bAutoFollowing = false;
 	double CamModeSince = 0.0;
 	double LastInterest = 0.0;
 	double NextPick = 0.0;
-	uint32 FollowA = 0;
-	uint32 FollowB = 0;
-	FString CamLabel;
+	double AutoIdleSince = -1.0e9;   // 자동 추적: 사건이 끝난 때 (옛 kLingerSeconds 2.5 초 머문 뒤 다음 사건 — 키를 누르면 바로 고름)
+	uint32 FollowA = 0;          // 대상 (0 = 없음 — 무리 자리·섬 전체·무대 보기)
+	uint32 FollowB = 0;          // 짝 (자동 추적)
+	uint8 FollowSpecies = 0;     // 대상 종 (죽어 프레임에서 빠져도 다음 대상을 같은 종에서 고른다)
+	double SubjectDeadAt = -1.0; // 대상이 죽은 때 (옛 kDeadHoldSeconds 3 초 머문 뒤 가까운 같은 종)
+	FVector LastSubjectLoc = FVector::ZeroVector;
+	double NextSubjectSearch = 0.0;
+	FString CamLabel;            // 기록 줄 한 줄
 	FString CamWhat;             // 자동 추적 대상이 하는 일 (글자용)
+	bool bShowKeys = true;       // H: 오른쪽 위 단축키 목록
+	double CamZoom = 1.0;        // - = 휠 (모드를 바꾸면 1)
+	bool bCamSnap = true;        // 다음 프레임에 끊어 옮김 — 키로 시점을 바꾸면 한 번에 (사용자 11-13)
 	bool bCamInit = false;
-	FVector CamFocus = FVector::ZeroVector;
+	FVector CamFocus = FVector::ZeroVector;   // 초점 (풀 그리기 창 가운데 — 자유 카메라는 화면 가운데 땅)
 	FVector CamFocusVel = FVector::ZeroVector;
-	double CamYaw = 225.0;
+	double CamYaw = 45.0;
 	double CamYawVel = 0.0;
-	double CamArm = 4000.0;
+	double CamPitch = -40.0;
+	double CamPitchVel = 0.0;
+	double CamDist = 4000.0;
+	double CamDistVel = 0.0;
+	double CamArm = -1.0;        // 가림 피하기로 줄인 실제 거리 (음수 = 다음 프레임에 바로 정함)
 	double CamArmVel = 0.0;
-	double CamHeight = 2000.0;
-	double CamHeightVel = 0.0;
+	FVector CamTargetFocus = FVector::ZeroVector;   // 이번 프레임 목표 (시험·화면 글)
+	double CamTargetYaw = 45.0;
+	double CamTargetPitch = -40.0;
+	double CamTargetDist = 4000.0;
+	// 자유 카메라 (옛 EcoV3Observe::FreeFlyStep·FreeLookStep)
+	FVector FreeLoc = FVector::ZeroVector;
+	FVector FreeVel = FVector::ZeroVector;
+	double FreeYaw = 0.0;
+	double FreePitch = 0.0;
+	double FreeSpeedCm = 1200.0;
+	bool bFreeFast = false;
+	double FreeGroundZ = 0.0;
+	FRotator LastControlRot = FRotator::ZeroRotator;
+	bool bHasLastControl = false;
+	// 오른쪽 위 글 (카메라 줄 — EcoR9DemoCamera.cpp BuildCamLines)
+	TArray<FString> CamLines;
+	TArray<FColor> CamColors;
+	// 확인용 카메라 키 차례 (명령줄 -EcoR9CamKeys — 창 없는 실행에서 키를 누른 것처럼 PressCamKey 를 부르고 앞뒤 프레임 카메라 자리를 기록만 한다)
+	TArray<TPair<double, FKey>> CamKeyPlan;   // (무대가 선 뒤 초, 키)
+	int32 CamKeyNext = 0;
+	int32 CamKeyProbeLeft = 0;                // 누른 뒤 더 기록할 프레임
+	int32 CamKeyProbeFrame = 0;
+	FString CamKeyLabel;
+	FVector CamKeyPrevLoc = FVector::ZeroVector;
 
 	// 글자
 	FDelegateHandle DrawHandle;
@@ -267,7 +296,7 @@ struct FEcoR9DemoState
 
 	// 보기 환경
 	bool bEnvApplied = false;
-	int32 PrevCamEnable = MIN_int32;
+	int32 PrevCamEnable = MIN_int32;   // 옛 관찰 카메라 eco.Cam.Enable 앞 값 (데모가 켜지는 때 0 으로 — 같은 숫자 키를 두 카메라가 같이 읽지 않게)
 	bool bPawnFrozen = false;   // 무대를 불러오는 동안 폰이 원점 땅 밑으로 떨어지거나 팀 날씨 트리거에 닿지 않게 먼저 멈춤
 	bool bPawnParked = false;
 	TWeakObjectPtr<APawn> FrozenPawn;   // 끌 때 되돌릴 폰 (Play 중 끄기)

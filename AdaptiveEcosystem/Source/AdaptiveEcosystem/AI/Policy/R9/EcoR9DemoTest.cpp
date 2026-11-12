@@ -15,11 +15,20 @@
 //   AdaptiveEcosystem.R9Demo.WholeMap         맵 전체 모드: 바닥 400 m + 기둥(막힌 칸) + 무리 자리 TargetPoint + 팀 동물 몸 → 땅 지도에 막힌 칸이 그 자리로 넘어가고,
 //                                             사람이 놓은 무리 자리가 넘어가고, 예전 동물 몸은 숨었다가 끄면 다시 보인다. 코어에 큰 세계 생성기가 있으면 큰 세계로 돈다
 //   AdaptiveEcosystem.R9Demo.PlayToggle       Play 중 켜기/끄기: eco.R9Demo 0 으로 시작한 월드에서 1 → 시작, 다시 1 → 두 번 만들지 않음, 0 → 다 치움, 1 → 다시 시작
+//   (2026-11-13 03:30 옛 관찰 카메라 꼴 · 시작 맵에서만)
+//   AdaptiveEcosystem.R9Demo.CamKeys          키 → 동작 (옛 키 1~5·0·, .·- =·휠·G·H 는 옛 뜻 그대로, R9 만 6·7), 모드 값 = 키 숫자, 한 키 한 동작,
+//                                             팀·기본 입력 키·자유 카메라 이동 키와 안 겹침, 화면 줄, 거리·숙임 = 옛 값, 화면 가운데 고르기
+//   AdaptiveEcosystem.R9Demo.CamSwitch        도는 데모에서 키 → 모드·대상, 키로 바꾸면 한 프레임 만에 그 시점 (초점·방위·숙임·거리 = 목표),
+//                                             0 = 그 자리 자유 카메라 (다시 0 도 자유 카메라), 자유 카메라 속도 = -, 다시 누름·. , = 다음·이전 대상, 줌, H, 콘솔 eco.R9Demo.Cam
+//   AdaptiveEcosystem.R9Demo.OnlyMap          맵 거르기 (패키지·오브젝트 경로·짧은 이름·PIE 머리·여럿), 명령줄 깃발은 거르지 않음,
+//                                             OnlyMap 밖 시험 월드 = Play 시작 때 아무것도 안 만듦 (옛 관찰 카메라 값도 그대로) · Play 중 직접 eco.R9Demo 1 은 켬 · 목록 안 = 켬
 
 #include "Misc/AutomationTest.h"
 
 #if WITH_DEV_AUTOMATION_TESTS
 
+#include "AI/Policy/EcoV3ObserverCamera.h"
+#include "EcoR9DemoCam.h"
 #include "EcoR9DemoFrame.h"
 #include "EcoR9DemoLiveSource.h"
 #include "EcoR9DemoSubsystem.h"
@@ -625,6 +634,7 @@ bool FEcoR9DemoConsoleStart::RunTest(const FString& Parameters)
 	}
 	EcoR9DemoTestImpl::FCVarRestore Restore;
 	Restore.Set(TEXT("eco.R9Demo.AllowInTests"), TEXT("1"));   // 자동화 시험 중에는 이 값이 있어야 서브시스템이 생긴다
+	Restore.Set(TEXT("eco.R9Demo.OnlyMap"), TEXT(""));   // 시작 맵 거르기 끔 (이 PC UserEngine.ini 가 섬 맵만 켜도 시험 월드에서 돈다)
 	Restore.Set(TEXT("eco.R9Demo.Brains"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.At"), TEXT("0,0"));
@@ -688,6 +698,7 @@ bool FEcoR9DemoAnyMap::RunTest(const FString& Parameters)
 	}
 	FCVarRestore Restore;
 	Restore.Set(TEXT("eco.R9Demo.AllowInTests"), TEXT("1"));
+	Restore.Set(TEXT("eco.R9Demo.OnlyMap"), TEXT(""));   // 시작 맵 거르기 끔 (이 PC UserEngine.ini 가 섬 맵만 켜도 시험 월드에서 돈다)
 	Restore.Set(TEXT("eco.R9Demo.Brains"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.At"), TEXT(""));
@@ -749,6 +760,7 @@ bool FEcoR9DemoAtOverride::RunTest(const FString& Parameters)
 	}
 	FCVarRestore Restore;
 	Restore.Set(TEXT("eco.R9Demo.AllowInTests"), TEXT("1"));
+	Restore.Set(TEXT("eco.R9Demo.OnlyMap"), TEXT(""));   // 시작 맵 거르기 끔 (이 PC UserEngine.ini 가 섬 맵만 켜도 시험 월드에서 돈다)
 	Restore.Set(TEXT("eco.R9Demo.Brains"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.At"), TEXT("37.5, -12"));
@@ -938,6 +950,7 @@ bool FEcoR9DemoWholeMap::RunTest(const FString& Parameters)
 	}
 	FCVarRestore Restore;
 	Restore.Set(TEXT("eco.R9Demo.AllowInTests"), TEXT("1"));
+	Restore.Set(TEXT("eco.R9Demo.OnlyMap"), TEXT(""));   // 시작 맵 거르기 끔 (이 PC UserEngine.ini 가 섬 맵만 켜도 시험 월드에서 돈다)
 	Restore.Set(TEXT("eco.R9Demo.Brains"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.At"), TEXT(""));
@@ -1062,6 +1075,7 @@ bool FEcoR9DemoPlayToggle::RunTest(const FString& Parameters)
 	}
 	FCVarRestore Restore;
 	Restore.Set(TEXT("eco.R9Demo.AllowInTests"), TEXT("1"));
+	Restore.Set(TEXT("eco.R9Demo.OnlyMap"), TEXT(""));   // 시작 맵 거르기 끔 (이 PC UserEngine.ini 가 섬 맵만 켜도 시험 월드에서 돈다)
 	Restore.Set(TEXT("eco.R9Demo.Brains"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
 	Restore.Set(TEXT("eco.R9Demo.At"), TEXT("0,0"));
@@ -1111,6 +1125,467 @@ bool FEcoR9DemoPlayToggle::RunTest(const FString& Parameters)
 	}
 	World->DestroyWorld(false);
 	GEngine->DestroyWorldContext(World);
+	return true;
+}
+
+// -----------------------------------------------------------------------------
+// 2026-11-13 03:30 옛 관찰 카메라 꼴 (EcoR9DemoCam.h) · 시작 맵에서만 (eco.R9Demo.OnlyMap)
+// -----------------------------------------------------------------------------
+
+namespace EcoR9DemoTestImpl
+{
+	bool KeyIs(const FKey& Key, EcoR9DemoCam::EAction Want)
+	{
+		EcoR9DemoCam::EAction A = EcoR9DemoCam::EAction::Count;
+		return EcoR9DemoCam::ActionOf(Key, A) && A == Want;
+	}
+
+	/** 옛 관찰 카메라 동작 → R9 동작 (같은 키는 같은 뜻이어야 한다). */
+	EcoR9DemoCam::EAction FromOld(EcoV3Observe::EAction Old)
+	{
+		using EcoR9DemoCam::EAction;
+		switch (Old)
+		{
+		case EcoV3Observe::EAction::Wolf: return EAction::Wolf;
+		case EcoV3Observe::EAction::Deer: return EAction::Deer;
+		case EcoV3Observe::EAction::Top: return EAction::Top;
+		case EcoV3Observe::EAction::Quarter: return EAction::Quarter;
+		case EcoV3Observe::EAction::Auto: return EAction::Auto;
+		case EcoV3Observe::EAction::Player: return EAction::Free;      // 옛 0: 관찰 중 = 자유 카메라 (R9 는 늘 자유 카메라)
+		case EcoV3Observe::EAction::Prev: return EAction::Prev;
+		case EcoV3Observe::EAction::Next: return EAction::Next;
+		case EcoV3Observe::EAction::ZoomOut: return EAction::ZoomOut;
+		case EcoV3Observe::EAction::ZoomIn: return EAction::ZoomIn;
+		case EcoV3Observe::EAction::Region: return EAction::NextSite;  // 옛 G 지역 바꾸기 = R9 무리 자리 바꾸기 (ISLAND_STAGE.md 11절 설계)
+		case EcoV3Observe::EAction::Help: return EAction::Help;
+		default: return EAction::Count;
+		}
+	}
+
+	int32 CountDemoActors(UWorld& World)
+	{
+		int32 N = 0;
+		for (TActorIterator<AActor> It(&World); It; ++It)
+		{
+			N += It->GetName().StartsWith(TEXT("EcoR9Demo_")) ? 1 : 0;
+		}
+		return N;
+	}
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoCamKeys, "AdaptiveEcosystem.R9Demo.CamKeys", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoCamKeys::RunTest(const FString& Parameters)
+{
+	using namespace EcoR9DemoTestImpl;
+	using EcoR9DemoCam::EAction;
+	// 1. 옛 키 그대로 (OBSERVER_CAMERA.md 2절 · ISLAND_STAGE.md I.2 '보기')
+	TestTrue(TEXT("1 = 늑대 시점"), KeyIs(EKeys::One, EAction::Wolf) && KeyIs(EKeys::NumPadOne, EAction::Wolf));
+	TestTrue(TEXT("2 = 사슴 시점"), KeyIs(EKeys::Two, EAction::Deer) && KeyIs(EKeys::NumPadTwo, EAction::Deer));
+	TestTrue(TEXT("3 = 탑뷰"), KeyIs(EKeys::Three, EAction::Top) && KeyIs(EKeys::NumPadThree, EAction::Top));
+	TestTrue(TEXT("4 = 쿼터뷰"), KeyIs(EKeys::Four, EAction::Quarter) && KeyIs(EKeys::NumPadFour, EAction::Quarter));
+	TestTrue(TEXT("5 = 자동 추적"), KeyIs(EKeys::Five, EAction::Auto) && KeyIs(EKeys::NumPadFive, EAction::Auto));
+	TestTrue(TEXT("0 = 자유 카메라"), KeyIs(EKeys::Zero, EAction::Free) && KeyIs(EKeys::NumPadZero, EAction::Free));
+	TestTrue(TEXT(", . = 이전·다음 대상"), KeyIs(EKeys::Comma, EAction::Prev) && KeyIs(EKeys::Period, EAction::Next));
+	TestTrue(TEXT("- · 숫자패드 - · 휠 아래 = 멀리 (자유 카메라: 느리게)"),
+			 KeyIs(EKeys::Hyphen, EAction::ZoomOut) && KeyIs(EKeys::Subtract, EAction::ZoomOut) && KeyIs(EKeys::MouseScrollDown, EAction::ZoomOut));
+	TestTrue(TEXT("= · 숫자패드 + · 휠 위 = 가까이 (자유 카메라: 빠르게)"),
+			 KeyIs(EKeys::Equals, EAction::ZoomIn) && KeyIs(EKeys::Add, EAction::ZoomIn) && KeyIs(EKeys::MouseScrollUp, EAction::ZoomIn));
+	TestTrue(TEXT("H = 단축키 목록"), KeyIs(EKeys::H, EAction::Help));
+	// 2. R9 만 (옛 키·옛 문서에 없는 숫자) — 6 멧돼지 · 7 다음 무리 자리 (G 는 옛 '지역 바꾸기' 와 같은 자리 차례)
+	TestTrue(TEXT("6 = 멧돼지 시점"), KeyIs(EKeys::Six, EAction::Boar) && KeyIs(EKeys::NumPadSix, EAction::Boar));
+	TestTrue(TEXT("7 · G = 다음 무리 자리"), KeyIs(EKeys::Seven, EAction::NextSite) && KeyIs(EKeys::NumPadSeven, EAction::NextSite) && KeyIs(EKeys::G, EAction::NextSite));
+	// 3. 모드 값 = 키 숫자 (콘솔 eco.R9Demo.Cam 도 같은 수)
+	const FKey Digits[7] = {EKeys::Zero, EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six};
+	for (int32 k = 0; k < 7; ++k)
+	{
+		EEcoR9DemoCam M = EEcoR9DemoCam::Auto;
+		TestTrue(FString::Printf(TEXT("모드 %d 가 있다"), k), EcoR9DemoCam::ModeFromInt(k, M) && static_cast<int32>(M) == k);
+		EAction A = EAction::Count;
+		EEcoR9DemoCam Mk = EEcoR9DemoCam::Auto;
+		TestTrue(FString::Printf(TEXT("키 %d → 모드 %d (%s)"), k, k, EcoR9DemoCam::ModeNameKo(M)),
+				 EcoR9DemoCam::ActionOf(Digits[k], A) && EcoR9DemoCam::ModeOf(A, Mk) && static_cast<int32>(Mk) == k);
+	}
+	{
+		EEcoR9DemoCam M = EEcoR9DemoCam::Auto;
+		TestFalse(TEXT("모드 7·−1 은 없다"), EcoR9DemoCam::ModeFromInt(7, M) || EcoR9DemoCam::ModeFromInt(-1, M));
+	}
+	// 4. 한 키 한 동작 · 모든 동작에 키
+	TSet<FKey> Seen;
+	TSet<int32> Actions;
+	for (const EcoR9DemoCam::FKeyBind& B : EcoR9DemoCam::Keys())
+	{
+		TestFalse(FString::Printf(TEXT("키 %s 가 두 번 나오지 않음"), *B.Key.ToString()), Seen.Contains(B.Key));
+		Seen.Add(B.Key);
+		Actions.Add(static_cast<int32>(B.Action));
+	}
+	for (int32 a = 0; a < static_cast<int32>(EAction::Count); ++a)
+	{
+		TestTrue(FString::Printf(TEXT("동작 %d 에 키가 있다"), a), Actions.Contains(a));
+	}
+	// 5. 팀·기본 입력 키(Tab·R·M·[ ]·마우스 가운데·F·Shift·Ctrl·W A S D·Space·방향키)와 겹치지 않음 — 옛 카메라와 같은 표
+	for (const FKey& K : EcoV3Observe::TeamReservedKeys())
+	{
+		EAction A = EAction::Count;
+		TestFalse(FString::Printf(TEXT("팀 키 %s 는 카메라 키가 아님"), *K.ToString()), EcoR9DemoCam::ActionOf(K, A));
+	}
+	// 6. 옛 관찰 카메라와 겹치는 키는 같은 뜻 · R9 만 쓰는 키(6·7)는 옛 표에 없음 (옛 키와 충돌 없음)
+	for (const EcoV3Observe::FKeyBind& B : EcoV3Observe::Keys())
+	{
+		EAction A = EAction::Count;
+		TestTrue(FString::Printf(TEXT("옛 키 %s 가 R9 에서도 같은 뜻"), *B.Key.ToString()), EcoR9DemoCam::ActionOf(B.Key, A) && A == FromOld(B.Action));
+	}
+	const FKey R9Only[4] = {EKeys::Six, EKeys::Seven, EKeys::NumPadSix, EKeys::NumPadSeven};
+	for (const FKey& K : R9Only)
+	{
+		bool bOld = false;
+		for (const EcoV3Observe::FKeyBind& B : EcoV3Observe::Keys())
+		{
+			bOld = bOld || B.Key == K;
+		}
+		TestFalse(FString::Printf(TEXT("R9 만 쓰는 키 %s 는 옛 관찰 카메라 키가 아님"), *K.ToString()), bOld);
+	}
+	// 7. 자유 카메라 이동 키 (W A S D·방향키·Q E·Shift) 는 단축키가 아님 (누른 채로 읽는다)
+	for (const EcoV3Observe::FFreeKey& F : EcoV3Observe::FreeMoveKeys())
+	{
+		EAction A = EAction::Count;
+		TestFalse(FString::Printf(TEXT("자유 카메라 이동 키 %s 는 단축키가 아님"), *F.Key.ToString()), EcoR9DemoCam::ActionOf(F.Key, A));
+	}
+	for (const FKey& K : EcoV3Observe::FreeFastKeys())
+	{
+		EAction A = EAction::Count;
+		TestFalse(TEXT("Shift 는 단축키가 아님"), EcoR9DemoCam::ActionOf(K, A));
+	}
+	// 8. 오른쪽 위 화면 줄에 키가 다 있다 (무리 자리가 있을 때만 7 · G 줄)
+	const FString Help = FString::Join(EcoR9DemoCam::KeyHelpLines(true), TEXT("\n"));
+	const TCHAR* const Tokens[] = {TEXT("1   늑대"), TEXT("2   사슴"), TEXT("3   탑뷰"), TEXT("4   쿼터뷰"), TEXT("5   자동 추적"), TEXT("6   멧돼지"), TEXT("7  G"),
+								   TEXT(",  ."), TEXT("-  =  휠"), TEXT("0   자유 카메라"), TEXT("W A S D"), TEXT("Q E"), TEXT("Shift")};
+	for (const TCHAR* Token : Tokens)
+	{
+		TestTrue(FString::Printf(TEXT("화면 줄에 '%s'"), Token), Help.Contains(Token));
+	}
+	TestFalse(TEXT("무리 자리가 없으면 7 · G 줄 없음"), FString::Join(EcoR9DemoCam::KeyHelpLines(false), TEXT("\n")).Contains(TEXT("7  G")));
+	// 9. 거리·숙임·시야 = 옛 관찰 카메라 (OBSERVER_CAMERA.md 4절 표)
+	TestTrue(TEXT("시야 70°"), FMath::IsNearlyEqual(EcoR9DemoCam::kFov, 70.0f));
+	TestTrue(TEXT("늑대 14 m · −20°"), FMath::IsNearlyEqual(EcoR9DemoCam::kWolfDistCm, 1400.0) && FMath::IsNearlyEqual(EcoR9DemoCam::kWolfPitch, -20.0));
+	TestTrue(TEXT("사슴 11 m · −18°"), FMath::IsNearlyEqual(EcoR9DemoCam::kDeerDistCm, 1100.0) && FMath::IsNearlyEqual(EcoR9DemoCam::kDeerPitch, -18.0));
+	TestTrue(TEXT("탑뷰 45 m · −89°"), FMath::IsNearlyEqual(EcoR9DemoCam::kTopDistCm, 4500.0) && FMath::IsNearlyEqual(EcoR9DemoCam::kTopPitch, -89.0));
+	TestTrue(TEXT("쿼터뷰 30 m · −45° · 45°"), FMath::IsNearlyEqual(EcoR9DemoCam::kQuarterDistCm, 3000.0) && FMath::IsNearlyEqual(EcoR9DemoCam::kQuarterPitch, -45.0) &&
+												 FMath::IsNearlyEqual(EcoR9DemoCam::kQuarterYaw, 45.0));
+	TestTrue(TEXT("자동 추적 24 m · −35° · 120 m 까지"), FMath::IsNearlyEqual(EcoR9DemoCam::kAutoDistCm, 2400.0) && FMath::IsNearlyEqual(EcoR9DemoCam::kAutoPitch, -35.0) &&
+														FMath::IsNearlyEqual(EcoR9DemoCam::kAutoMaxCm, 12000.0));
+	TestTrue(TEXT("탑뷰 전체: 한 변 1.1 배가 세로 화면에 드는 높이 (120 m → 약 168 m)"), FMath::IsNearlyEqual(EcoR9DemoCam::FitTopCm(12000.0), 16757.0, 50.0));
+	TestTrue(TEXT("섬 전체 한 변 = max(가로 × 9/16, 세로)"), FMath::IsNearlyEqual(EcoR9DemoCam::IslandViewSizeCm(160000.0, 50000.0), 90000.0) &&
+															   FMath::IsNearlyEqual(EcoR9DemoCam::IslandViewSizeCm(50000.0, 70000.0), 70000.0));
+	// 10. 화면 가운데 고르기 (옛 CenterSubject 규칙: 반각 20° · 300 m 안 · 각이 가장 작은 것 · 같으면 가까운 것 · 그다음 uid 작은 것)
+	{
+		const FVector Eye = FVector::ZeroVector;
+		const FVector Fwd(1.0, 0.0, 0.0);
+		const TArray<FVector> Pts = {FVector(1000.0, 300.0, 0.0), FVector(2000.0, 0.0, 0.0), FVector(0.0, 1000.0, 0.0), FVector(40000.0, 0.0, 0.0), FVector(1000.0, 0.0, 0.0)};
+		const TArray<uint32> Ids = {5, 9, 7, 2, 11};
+		TestEqual(TEXT("가운데에 가장 가까운 각 (같은 각이면 가까운 것)"), EcoR9DemoCam::CenterPick(Pts, Ids, Eye, Fwd, 20.0, 30000.0), 4);
+		const TArray<FVector> Side = {FVector(0.0, 1000.0, 0.0), FVector(40000.0, 0.0, 0.0)};
+		const TArray<uint32> SideIds = {1, 2};
+		TestEqual(TEXT("원뿔 밖·300 m 밖이면 없음"), EcoR9DemoCam::CenterPick(Side, SideIds, Eye, Fwd, 20.0, 30000.0), static_cast<int32>(INDEX_NONE));
+		const TArray<FVector> Tie = {FVector(1000.0, 0.0, 0.0), FVector(1000.0, 0.0, 0.0)};
+		const TArray<uint32> TieIds = {8, 3};
+		TestEqual(TEXT("같은 자리면 uid 작은 것"), EcoR9DemoCam::CenterPick(Tie, TieIds, Eye, Fwd, 20.0, 30000.0), 1);
+	}
+	return true;
+}
+
+// 도는 데모(예전 한 무대 — eco.R9Demo.At 0,0, 시험 월드에는 땅이 없다)에서 키를 누른다 (HandleKeys 와 같은 길 PressCamKey — 시험 월드에는 플레이어 컨트롤러가 없다).
+// 키로 시점·대상을 바꾸면 다음 한 프레임 만에 카메라 초점·방위·숙임·거리가 그 시점의 목표와 같아야 한다 (예전: 0.5~1.4 초 시간 상수로 천천히 옮겨 감).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoCamSwitch, "AdaptiveEcosystem.R9Demo.CamSwitch", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoCamSwitch::RunTest(const FString& Parameters)
+{
+	using namespace EcoR9DemoTestImpl;
+	FString Why;
+	if (!CanRunConsoleWorld(Why))
+	{
+		AddWarning(Why + TEXT(" — 건너뜀"));
+		return true;
+	}
+	FCVarRestore Restore;
+	Restore.Set(TEXT("eco.R9Demo.AllowInTests"), TEXT("1"));
+	Restore.Set(TEXT("eco.R9Demo.OnlyMap"), TEXT(""));
+	Restore.Set(TEXT("eco.R9Demo.Brains"), TEXT(""));
+	Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
+	Restore.Set(TEXT("eco.R9Demo.At"), TEXT("0,0"));
+	Restore.Set(TEXT("eco.R9Demo.Cam"), TEXT("5"));
+	Restore.Set(TEXT("eco.R9Demo"), TEXT("1"));
+	UWorld* World = UWorld::CreateWorld(EWorldType::Game, /*bInformEngineOfWorld*/ true);
+	if (!TestNotNull(TEXT("시험 월드"), World))
+	{
+		return false;
+	}
+	FWorldContext& Ctx = GEngine->CreateNewWorldContext(EWorldType::Game);
+	Ctx.SetCurrentWorld(World);
+	UEcoR9DemoSubsystem* Sub = World->GetSubsystem<UEcoR9DemoSubsystem>();
+	TestNotNull(TEXT("서브시스템"), Sub);
+	if (Sub)
+	{
+		Sub->OnWorldBeginPlay(*World);
+		TickDemo(*World, *Sub, 90);
+		if (TestTrue(TEXT("무대가 서서 도는 중"), Sub->IsRunning()))
+		{
+			auto Step = [World, Sub]()
+			{
+				TickDemo(*World, *Sub, 1);
+				return Sub->CamProbe();
+			};
+			auto Snapped = [this](const TCHAR* What, const FEcoR9DemoCamProbe& P)
+			{
+				const double DF = FVector::Dist(P.Focus, P.TargetFocus);
+				const double DY = FMath::Abs(FMath::FindDeltaAngleDegrees(P.Yaw, P.TargetYaw));
+				const double DP = FMath::Abs(P.Pitch - P.TargetPitch);
+				const double DD = FMath::Abs(P.Dist - P.TargetDist);
+				TestTrue(FString::Printf(TEXT("%s: 한 프레임 만에 그 시점 (초점 차 %.2f cm · 방위 차 %.3f° · 숙임 차 %.3f° · 거리 차 %.2f cm)"), What, DF, DY, DP, DD),
+						 DF < 1.0 && DY < 0.01 && DP < 0.01 && DD < 1.0);
+				if (P.bHaveCamera && P.Arm >= P.TargetDist - 1.0)
+				{
+					// 카메라 액터도 그 자리 (초점 − 보는 방향 × 거리 — 땅 2 m 위로 올렸으면 높이만 다를 수 있어 가로만 본다)
+					const FVector Want = P.TargetFocus - FRotator(P.TargetPitch, P.TargetYaw, 0.0).Vector() * P.TargetDist;
+					TestTrue(FString::Printf(TEXT("%s: 카메라 액터가 그 자리 (가로 차 %.2f cm)"), What, FVector::Dist2D(P.CameraLocation, Want)),
+							 FVector::Dist2D(P.CameraLocation, Want) < 5.0);
+				}
+			};
+			FEcoR9DemoCamProbe P = Sub->CamProbe();
+			TestEqual(TEXT("처음 = 5 자동 추적 (eco.R9Demo.Cam 5)"), P.Mode, 5);
+			TestTrue(TEXT("카메라 액터가 있다"), P.bHaveCamera);
+			TestTrue(TEXT("오른쪽 위 카메라 줄이 있다"), P.NumLines >= 2);
+			// 1 늑대 시점
+			TestTrue(TEXT("1 은 카메라 키"), Sub->PressCamKey(EKeys::One));
+			P = Sub->CamProbe();
+			TestTrue(TEXT("1 → 늑대 시점 · 대상 늑대"), P.Mode == 1 && P.Subject != 0 && P.SubjectSpecies == 1);
+			const uint32 Wolf1 = P.Subject;
+			P = Step();
+			Snapped(TEXT("1 늑대 시점"), P);
+			TestTrue(TEXT("늑대 시점 14 m · −20°"), FMath::IsNearlyEqual(P.TargetDist, 1400.0, 1.0) && FMath::IsNearlyEqual(P.TargetPitch, -20.0, 0.01));
+			// 다시 1 = 다음 늑대
+			Sub->PressCamKey(EKeys::One);
+			P = Step();
+			TestTrue(TEXT("다시 1 = 다른 늑대"), P.Mode == 1 && P.SubjectSpecies == 1 && P.Subject != 0 && P.Subject != Wolf1);
+			Snapped(TEXT("다시 1"), P);
+			// 2 사슴 시점
+			Sub->PressCamKey(EKeys::Two);
+			P = Step();
+			TestTrue(TEXT("2 → 사슴 시점 · 대상 사슴"), P.Mode == 2 && P.SubjectSpecies == 0);
+			TestTrue(TEXT("사슴 시점 11 m · −18°"), FMath::IsNearlyEqual(P.TargetDist, 1100.0, 1.0) && FMath::IsNearlyEqual(P.TargetPitch, -18.0, 0.01));
+			Snapped(TEXT("2 사슴 시점"), P);
+			// 6 멧돼지 시점
+			Sub->PressCamKey(EKeys::Six);
+			P = Step();
+			TestTrue(TEXT("6 → 멧돼지 시점 · 대상 멧돼지"), P.Mode == 6 && P.SubjectSpecies == 2);
+			Snapped(TEXT("6 멧돼지 시점"), P);
+			const uint32 Boar = P.Subject;
+			// 3 탑뷰 — 보던 멧돼지 위
+			Sub->PressCamKey(EKeys::Three);
+			P = Step();
+			TestTrue(TEXT("3 → 탑뷰 · 보던 멧돼지 위 45 m · −89°"), P.Mode == 3 && P.Subject == Boar && FMath::IsNearlyEqual(P.TargetDist, 4500.0, 1.0) &&
+															   FMath::IsNearlyEqual(P.TargetPitch, -89.0, 0.01));
+			Snapped(TEXT("3 탑뷰"), P);
+			// 4 쿼터뷰
+			Sub->PressCamKey(EKeys::Four);
+			P = Step();
+			TestTrue(TEXT("4 → 쿼터뷰 30 m · −45° · 방위 45°"), P.Mode == 4 && FMath::IsNearlyEqual(P.TargetDist, 3000.0, 1.0) &&
+															   FMath::IsNearlyEqual(P.TargetPitch, -45.0, 0.01) && FMath::IsNearlyEqual(P.TargetYaw, 45.0, 0.01));
+			Snapped(TEXT("4 쿼터뷰"), P);
+			// 5 자동 추적
+			Sub->PressCamKey(EKeys::Five);
+			P = Step();
+			TestEqual(TEXT("5 → 자동 추적"), P.Mode, 5);
+			Snapped(TEXT("5 자동 추적"), P);
+			// 0 자유 카메라 — 그 자리·방향 그대로
+			const FVector Before = P.CameraLocation;
+			const FRotator BeforeRot = P.CameraRotation;
+			TestTrue(TEXT("0 은 카메라 키"), Sub->PressCamKey(EKeys::Zero));
+			P = Sub->CamProbe();
+			TestTrue(TEXT("0 → 자유 카메라 · 대상 없음"), P.Mode == 0 && P.Subject == 0);
+			P = Step();
+			TestTrue(FString::Printf(TEXT("0 = 그 자리 그대로 (자리 차 %.2f cm)"), FVector::Dist(P.CameraLocation, Before)),
+					 FVector::Dist(P.CameraLocation, Before) < 1.0 && P.CameraRotation.Equals(BeforeRot, 0.05));
+			// 다시 0 = 그대로 자유 카메라 (옛: 원래 카메라 — R9 데모는 폰을 숨겨 두어 0 은 늘 자유 시점)
+			Sub->PressCamKey(EKeys::Zero);
+			P = Step();
+			TestTrue(TEXT("다시 0 = 그대로 자유 카메라 · 그 자리"), P.Mode == 0 && FVector::Dist(P.CameraLocation, Before) < 1.0);
+			// 자유 카메라 속도: = 빠르게 · - 느리게 (한 번에 1.2 배, 처음 12 m/s)
+			TestTrue(TEXT("자유 카메라 처음 12 m/s"), FMath::IsNearlyEqual(P.FreeSpeedMps, 12.0, 1e-6));
+			Sub->PressCamKey(EKeys::Equals);
+			TestTrue(TEXT("= → 14.4 m/s"), FMath::IsNearlyEqual(Sub->CamProbe().FreeSpeedMps, 14.4, 1e-6));
+			Sub->PressCamKey(EKeys::Hyphen);
+			TestTrue(TEXT("- → 12 m/s"), FMath::IsNearlyEqual(Sub->CamProbe().FreeSpeedMps, 12.0, 1e-6));
+			// , . 는 자유 카메라에서 아무 일 없음
+			Sub->PressCamKey(EKeys::Period);
+			TestTrue(TEXT(". 는 자유 카메라에서 아무 일 없음"), Sub->CamProbe().Mode == 0 && Sub->CamProbe().Subject == 0);
+			// 자유 카메라에서 2 = 사슴 (화면 가운데, 없으면 보는 자리 곁) — 옮겨 가지 않고 한 번에
+			Sub->PressCamKey(EKeys::Two);
+			P = Step();
+			TestTrue(TEXT("자유 카메라에서 2 → 사슴 시점"), P.Mode == 2 && P.SubjectSpecies == 0);
+			Snapped(TEXT("자유 카메라에서 2"), P);
+			// H = 단축키 목록 숨기기·보이기
+			const bool bKeys = Sub->CamProbe().bShowKeys;
+			Sub->PressCamKey(EKeys::H);
+			TestTrue(TEXT("H → 단축키 목록 바뀜"), Sub->CamProbe().bShowKeys != bKeys);
+			Sub->PressCamKey(EKeys::H);
+			TestTrue(TEXT("다시 H → 되돌림"), Sub->CamProbe().bShowKeys == bKeys);
+			// 숫자패드 1 = 늑대 · . , = 다음·이전 늑대
+			Sub->PressCamKey(EKeys::NumPadOne);
+			P = Step();
+			TestEqual(TEXT("숫자패드 1 → 늑대 시점"), P.Mode, 1);
+			Snapped(TEXT("숫자패드 1"), P);
+			const uint32 W = P.Subject;
+			Sub->PressCamKey(EKeys::Period);
+			P = Step();
+			TestTrue(TEXT(". → 다음 늑대"), P.Subject != 0 && P.Subject != W && P.SubjectSpecies == 1);
+			Snapped(TEXT(". 다음 대상"), P);
+			Sub->PressCamKey(EKeys::Comma);
+			P = Step();
+			TestTrue(TEXT(", → 이전 늑대 (처음 늑대로)"), P.Subject == W);
+			// 줌: = 가까이 (기본 거리 ÷ 1.2) — 모드를 바꾸면 1
+			Sub->PressCamKey(EKeys::Equals);
+			P = Step();
+			TestTrue(TEXT("= → 늑대 시점 거리 14 m ÷ 1.2"), FMath::IsNearlyEqual(P.Zoom, 1.0 / 1.2, 1e-6) && FMath::IsNearlyEqual(P.TargetDist, 1400.0 / 1.2, 1.0));
+			Sub->PressCamKey(EKeys::Two);
+			TestTrue(TEXT("모드를 바꾸면 줌 1"), FMath::IsNearlyEqual(Sub->CamProbe().Zoom, 1.0, 1e-9));
+			// 7 · G: 키는 먹는다 (예전 한 무대는 무리 자리가 없어 그 무대 그대로)
+			TestTrue(TEXT("7 은 카메라 키"), Sub->PressCamKey(EKeys::Seven));
+			TestTrue(TEXT("G 는 카메라 키"), Sub->PressCamKey(EKeys::G));
+			// 카메라 키가 아닌 것
+			TestFalse(TEXT("W 는 카메라 키가 아님 (자유 카메라 이동 — 누른 채로 읽음)"), Sub->PressCamKey(EKeys::W));
+			TestFalse(TEXT("F 는 카메라 키가 아님 (팀 플레이어 키)"), Sub->PressCamKey(EKeys::F));
+			// 콘솔 eco.R9Demo.Cam 4 = 쿼터뷰 (키 숫자와 같은 수)
+			if (IConsoleVariable* Cam = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.R9Demo.Cam")))
+			{
+				Cam->Set(TEXT("4"), ECVF_SetByConsole);
+				P = Step();
+				TestEqual(TEXT("콘솔 eco.R9Demo.Cam 4 → 쿼터뷰"), P.Mode, 4);
+				Snapped(TEXT("콘솔 4"), P);
+			}
+			// 끄기: 카메라도 치움
+			Sub->StopDemo(TEXT("시험"));
+			TestEqual(TEXT("끄면 데모 액터 0 (카메라 포함)"), CountDemoActors(*World), 0);
+		}
+	}
+	World->DestroyWorld(false);
+	GEngine->DestroyWorldContext(World);
+	return true;
+}
+
+// 시작 맵에서만 (사용자 11-13 — 편집기 시작 맵 /Game/EcoTest/Maps/LV_EcoV3_Island 에서만 씀): eco.R9Demo.OnlyMap 밖 맵은 Play 시작 때 아무것도 만들지 않는다.
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoOnlyMap, "AdaptiveEcosystem.R9Demo.OnlyMap", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoOnlyMap::RunTest(const FString& Parameters)
+{
+	using namespace EcoR9DemoTestImpl;
+	const FString Island = TEXT("/Game/EcoTest/Maps/LV_EcoV3_Island");
+	// 1. 맵 거르기 (월드 없이)
+	TestTrue(TEXT("빈 값 = 모든 맵"), FEcoR9DemoSettings::MapAllowed(TEXT(""), TEXT("/Game/Map/LV_SHC_IslandEcosystem1_WP")));
+	TestTrue(TEXT("공백·쉼표뿐 = 모든 맵"), FEcoR9DemoSettings::MapAllowed(TEXT("  , "), Island));
+	TestTrue(TEXT("같은 맵"), FEcoR9DemoSettings::MapAllowed(Island, Island));
+	TestTrue(TEXT("PIE 머리를 떼고 견줌 (편집기 Play)"), FEcoR9DemoSettings::MapAllowed(Island, TEXT("/Game/EcoTest/Maps/UEDPIE_0_LV_EcoV3_Island")));
+	TestTrue(TEXT("오브젝트 경로 (…/LV_EcoV3_Island.LV_EcoV3_Island)"), FEcoR9DemoSettings::MapAllowed(Island + TEXT(".LV_EcoV3_Island"), Island));
+	TestTrue(TEXT("짧은 이름 · 대소문자 무시"), FEcoR9DemoSettings::MapAllowed(TEXT("lv_ecov3_island"), Island));
+	TestTrue(TEXT("쉼표·쌍반점으로 여럿"), FEcoR9DemoSettings::MapAllowed(FString(TEXT("/Game/A/B; ")) + Island, Island));
+	TestFalse(TEXT("팀 섬 원본 맵은 아님"), FEcoR9DemoSettings::MapAllowed(Island, TEXT("/Game/Map/LV_SHC_IslandEcosystem1_WP")));
+	TestFalse(TEXT("이름이 이어지는 다른 맵은 아님"), FEcoR9DemoSettings::MapAllowed(Island, Island + TEXT("_Copy")));
+	TestFalse(TEXT("같은 폴더 다른 맵은 아님"), FEcoR9DemoSettings::MapAllowed(Island, TEXT("/Game/EcoTest/Maps/LV_EcoV3_JYUEcosystem")));
+	TestFalse(TEXT("팀 통합 맵은 아님"), FEcoR9DemoSettings::MapAllowed(Island, TEXT("/Game/JWJ/Integration_JwJ")));
+	TestFalse(TEXT("시험 월드는 아님"), FEcoR9DemoSettings::MapAllowed(Island, TEXT("/Temp/Untitled_1")));
+	// 2. 판 출처: 명령줄 깃발은 거르지 않는다 (bFromCommandLine)
+	TestTrue(TEXT("-EcoR9Demo= = 명령줄"), FEcoR9DemoSettings::Resolve(TEXT("-EcoR9Demo=C:/b")).bFromCommandLine);
+	TestTrue(TEXT("-EcoR9Replay= = 명령줄"), FEcoR9DemoSettings::Resolve(TEXT("-EcoR9Replay=C:/r/demo.r9rp")).bFromCommandLine);
+	{
+		FCVarRestore R;
+		R.Set(TEXT("eco.R9Demo"), TEXT("1"));
+		R.Set(TEXT("eco.R9Demo.OnlyMap"), *Island);
+		const FEcoR9DemoSettings C = FEcoR9DemoSettings::Resolve(TEXT(""));
+		TestTrue(TEXT("콘솔 eco.R9Demo 1 = 콘솔 (거른다) · OnlyMap 을 읽음"), C.Mode == FEcoR9DemoSettings::EMode::Live && !C.bFromCommandLine && C.OnlyMap == Island);
+	}
+	// 3. 월드 (두뇌·장면이 있어야)
+	FString Why;
+	if (!CanRunConsoleWorld(Why))
+	{
+		AddWarning(Why + TEXT(" — 월드 부분 건너뜀"));
+		return true;
+	}
+	IConsoleVariable* Demo = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.R9Demo"));
+	IConsoleVariable* OnlyMap = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.R9Demo.OnlyMap"));
+	if (!TestNotNull(TEXT("콘솔 값 eco.R9Demo"), Demo) || !TestNotNull(TEXT("콘솔 값 eco.R9Demo.OnlyMap"), OnlyMap))
+	{
+		return false;
+	}
+	FCVarRestore Restore;
+	Restore.Set(TEXT("eco.R9Demo.AllowInTests"), TEXT("1"));
+	Restore.Set(TEXT("eco.R9Demo.Brains"), TEXT(""));
+	Restore.Set(TEXT("eco.R9Demo.Scene"), TEXT(""));
+	Restore.Set(TEXT("eco.R9Demo.At"), TEXT("0,0"));
+	Restore.Set(TEXT("eco.R9Demo.OnlyMap"), *Island);
+	Restore.Set(TEXT("eco.R9Demo"), TEXT("1"));
+	// 3-1. 섬 맵이 아닌 시험 월드: Play 시작 때 아무것도 만들지 않는다
+	{
+		UWorld* World = UWorld::CreateWorld(EWorldType::Game, /*bInformEngineOfWorld*/ true);
+		if (!TestNotNull(TEXT("시험 월드"), World))
+		{
+			return false;
+		}
+		FWorldContext& Ctx = GEngine->CreateNewWorldContext(EWorldType::Game);
+		Ctx.SetCurrentWorld(World);
+		UEcoR9DemoSubsystem* Sub = World->GetSubsystem<UEcoR9DemoSubsystem>();
+		TestNotNull(TEXT("서브시스템 (Play 중 켜려고 늘 있다)"), Sub);
+		if (Sub)
+		{
+			const IConsoleVariable* CamEnable = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Cam.Enable"));
+			const int32 CamBefore = CamEnable ? CamEnable->GetInt() : 0;
+			Sub->OnWorldBeginPlay(*World);
+			TestFalse(FString::Printf(TEXT("OnlyMap 밖 맵 (%s) = Play 시작 때 켜지 않음"), *World->GetPackage()->GetName()), Sub->IsActive());
+			TestTrue(TEXT("맵 거르기로 안 켰다고 앎"), Sub->WasMapFiltered());
+			TestEqual(TEXT("시작 0 번"), Sub->NumStarts(), 0);
+			Sub->Tick(1.0f / 30.0f);
+			TestEqual(TEXT("데모 액터 0"), CountDemoActors(*World), 0);
+			if (CamEnable)
+			{
+				TestEqual(TEXT("옛 관찰 카메라 eco.Cam.Enable 그대로 (예전 그대로)"), CamEnable->GetInt(), CamBefore);
+			}
+			// Play 중 직접 친 eco.R9Demo 1 은 켠다 (직접 켠 것 — 거르지 않음)
+			Demo->Set(TEXT("1"), ECVF_SetByConsole);
+			TestTrue(TEXT("Play 중 직접 eco.R9Demo 1 → 이 맵에서도 켬"), Sub->IsActive());
+			TickDemo(*World, *Sub, 90);
+			TestTrue(TEXT("무대가 서서 도는 중"), Sub->IsRunning());
+			Sub->StopDemo(TEXT("시험"));
+			TestEqual(TEXT("끄면 데모 액터 0"), CountDemoActors(*World), 0);
+			if (CamEnable)
+			{
+				TestEqual(TEXT("끄면 eco.Cam.Enable 되돌림"), CamEnable->GetInt(), CamBefore);
+			}
+		}
+		World->DestroyWorld(false);
+		GEngine->DestroyWorldContext(World);
+	}
+	// 3-2. 목록에 이 맵이 있으면 Play 시작 때 켠다
+	{
+		UWorld* World = UWorld::CreateWorld(EWorldType::Game, /*bInformEngineOfWorld*/ true);
+		if (!TestNotNull(TEXT("시험 월드 2"), World))
+		{
+			return false;
+		}
+		FWorldContext& Ctx = GEngine->CreateNewWorldContext(EWorldType::Game);
+		Ctx.SetCurrentWorld(World);
+		const FString Pkg = World->GetPackage()->GetName();
+		OnlyMap->Set(*FString::Printf(TEXT("%s, %s"), *Island, *Pkg), ECVF_SetByConsole);
+		UEcoR9DemoSubsystem* Sub = World->GetSubsystem<UEcoR9DemoSubsystem>();
+		TestNotNull(TEXT("서브시스템"), Sub);
+		if (Sub)
+		{
+			Sub->OnWorldBeginPlay(*World);
+			TestTrue(FString::Printf(TEXT("목록 안 맵 (%s) = Play 시작 때 켬"), *Pkg), Sub->IsActive() && !Sub->WasMapFiltered());
+			TickDemo(*World, *Sub, 90);
+			TestTrue(TEXT("무대가 서서 도는 중"), Sub->IsRunning());
+		}
+		World->DestroyWorld(false);
+		GEngine->DestroyWorldContext(World);
+	}
 	return true;
 }
 
