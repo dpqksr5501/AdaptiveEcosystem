@@ -2,8 +2,10 @@
 //
 // 관찰 카메라(EcoV3ObserverCamera)는 Mass 통합 개체만 찾아 R9 개체를 따라가지 못한다 — 그래서 우리 카메라 액터를 쓰고,
 // 따라가기 수학(임계 감쇠 SmoothDamp — Game Programming Gems 4)만 같은 꼴로 따로 둔다 (그쪽 헤더는 다른 워크플로가 고칠 수 있어 포함하지 않음).
-// 모드: 0 자동 (사냥·물기·반격·사체 먹기·은신처 안 사슴을 따라가고, 없으면 전체 보기) · 1 전체 · 2 사슴 · 3 늑대 · 4 멧돼지 · 5 위에서.
-// 키: 1~6 = 모드 (2~4 를 다시 누르면 다음 개체), H = 글자. 콘솔 eco.R9Demo.Cam 0~5 도 같다.
+// 모드: 0 자동 (사냥·물기·반격·사체 먹기·은신처 안 사슴을 따라가고, 없으면 전체 보기) · 1 전체 · 2 사슴 · 3 늑대 · 4 멧돼지 · 5 위에서 · 6 무리 자리.
+// 키: 1~6 = 모드 (3~5 를 다시 누르면 다음 개체), 7 = 다음 무리 자리, H = 글자. 콘솔 eco.R9Demo.Cam 0~6 도 같다.
+// 맵 전체 땅 (2026-11-13): 1 자동은 지금 초점에서 가까운 사건을 먼저 (점수 − 거리/250 m), 사건이 없으면 지금 무리 자리 보기 · 2 섬(맵 땅) 전체 ·
+//   3/4/5 처음 누르면 초점에서 가장 가까운 그 종 · 6 지금 무리 자리 위에서 · 7 다음 무리 자리.
 
 #include "EcoR9DemoSubsystem.h"
 
@@ -57,6 +59,24 @@ namespace EcoR9DemoCameraImpl
 		double Score = 0.0;
 		FString What;
 	};
+
+	/** 맵 전체 땅: 자동 카메라가 같은 점수면 지금 초점에 가까운 사건을 먼저 (250 m 에 1 점) [어림]. */
+	constexpr double kNearPerCm = 1.0 / 25000.0;
+
+	/** 무리 자리 k 가운데 (언리얼 cm, z = 땅). 자리가 없으면 거짓. */
+	bool SiteCenter(const FEcoR9DemoState& S, int32 K, FVector& Out)
+	{
+		const int32 N = static_cast<int32>(S.Info.HerdXY.size() / 2);
+		if (N <= 0)
+		{
+			return false;
+		}
+		const int32 I = ((K % N) + N) % N;
+		double X = 0.0, Y = 0.0;
+		S.Map.ToWorld(S.Info.HerdXY[static_cast<std::size_t>(2 * I)], S.Info.HerdXY[static_cast<std::size_t>(2 * I + 1)], X, Y);
+		Out = FVector(X, Y, S.Heights.At(X, Y));
+		return true;
+	}
 
 	const TCHAR* SpeciesKo(uint8 Sp)
 	{
@@ -220,18 +240,28 @@ void UEcoR9DemoSubsystem::HandleKeys()
 	if (Cv != S.LastCamCVar)
 	{
 		S.LastCamCVar = Cv;
-		SetMode(static_cast<EEcoR9DemoCam>(FMath::Clamp(Cv, 0, 5)));
+		SetMode(static_cast<EEcoR9DemoCam>(FMath::Clamp(Cv, 0, 6)));
 	}
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (!PC)
 	{
 		return;
 	}
-	static const FKey Keys[6] = {EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six};
-	for (int32 i = 0; i < 6; ++i)
+	static const FKey Keys[7] = {EKeys::One, EKeys::Two, EKeys::Three, EKeys::Four, EKeys::Five, EKeys::Six, EKeys::Seven};
+	for (int32 i = 0; i < 7; ++i)
 	{
 		if (!PC->WasInputKeyJustPressed(Keys[i]))
 		{
+			continue;
+		}
+		if (i == 6)
+		{
+			// 키 7 = 다음 무리 자리 (맵 전체 땅). 자리가 없으면 무대 하나 보기
+			const int32 N = static_cast<int32>(S.Info.HerdXY.size() / 2);
+			S.SiteIndex = N > 0 ? (S.SiteIndex + 1) % N : 0;
+			SetMode(EEcoR9DemoCam::Site);
+			S.LastCamCVar = 6;
+			EcoR9DemoCVars::SetCam(6);
 			continue;
 		}
 		// 키 1 = 자동(0), 2 = 전체(1), 3 사슴(2), 4 늑대(3), 5 멧돼지(4), 6 위(5)
@@ -293,7 +323,7 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 				return true;
 			}
 		}
-		if (const FR9Agent* A = FindAgent(S.Cur, Id))
+		if (const FR9Agent* A = S.FindCur(Id))
 		{
 			double X = 0.0, Y = 0.0;
 			S.Map.ToWorld(A->X, A->Y, X, Y);
@@ -307,6 +337,26 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 	double Height = 0.55 * Side;
 	double Yaw = 225.0 + 1.5 * (Now - S.RunningSince);
 	bool bTop = false;
+	const bool bWhole = S.Info.bWhole;
+	// 맵 전체 땅: '전체' = 맵 땅 경계, '무리 자리' = 학습 세계 한 판 크기 (120 m) 정사각
+	const double SiteSide = 60.0 * S.Info.UnitCm;
+	FVector SiteFocus = Center;
+	const bool bHaveSite = bWhole && SiteCenter(S, S.SiteIndex, SiteFocus);
+	auto SiteView = [&]()
+	{
+		Focus = SiteFocus;
+		Arm = 0.95 * SiteSide;
+		Height = 0.55 * SiteSide;
+	};
+	if (bWhole)
+	{
+		// 2 섬 전체: 땅 경계 가운데, 긴 변에 맞춰 (초당 1.5° 천천히 돎)
+		const FBox& L = S.LandBox;
+		const double LandSide = L.IsValid ? FMath::Max(L.GetSize().X, L.GetSize().Y) : Side;
+		Focus = L.IsValid ? FVector(L.GetCenter().X, L.GetCenter().Y, S.WholeCenter.Z) : Center;
+		Arm = 0.75 * LandSide;
+		Height = 0.60 * LandSide;
+	}
 	auto Follow = [&](uint32 A, uint32 B) -> bool
 	{
 		FVector Pa;
@@ -345,11 +395,22 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 			GatherInterests(S, Now, All);
 			const FInterest* Best = nullptr;
 			const FInterest* Mine = nullptr;
-			for (const FInterest& I : All)
+			double BestEff = -TNumericLimits<double>::Max();
+			for (FInterest& I : All)
 			{
-				if (!Best || I.Score > Best->Score)
+				if (bWhole)
+				{
+					// 맵 전체 땅: 지금 초점에서 가까운 사건을 먼저 (점수 − 거리 / 250 m)
+					FVector Pa;
+					if (Where(I.A, Pa))
+					{
+						I.Score -= FVector::Dist2D(Pa, S.bCamInit ? S.CamFocus : Center) * kNearPerCm;
+					}
+				}
+				if (!Best || I.Score > BestEff)
 				{
 					Best = &I;
+					BestEff = I.Score;
 				}
 				if (S.bAutoFollowing && I.A == S.FollowA && (!Mine || I.Score > Mine->Score))
 				{
@@ -358,7 +419,7 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 			}
 			if (!S.bAutoFollowing)
 			{
-				if (Best && Best->Score >= 2.5 && Now - S.CamModeSince >= 4.0)
+				if (Best && Best->Score >= (bWhole ? 1.5 : 2.5) && Now - S.CamModeSince >= 4.0)
 				{
 					S.bAutoFollowing = true;
 					S.CamModeSince = Now;
@@ -376,7 +437,7 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 					S.FollowB = Mine->B != 0 ? Mine->B : S.FollowB;
 					S.CamWhat = Mine->What;
 				}
-				const bool bBetter = Best && Best->Score >= 5.0 && Best->A != S.FollowA && Now - S.CamModeSince >= 5.0;
+				const bool bBetter = Best && Best->Score >= (bWhole ? 4.0 : 5.0) && Best->A != S.FollowA && Now - S.CamModeSince >= 5.0;
 				if (bBetter)
 				{
 					S.CamModeSince = Now;
@@ -395,27 +456,61 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 		}
 		const bool bFollowed = S.bAutoFollowing && Follow(S.FollowA, S.FollowB);
 		const FEcoR9DemoBody* Main = S.Bodies.Find(S.FollowA);
-		S.CamLabel = bFollowed ? FString::Printf(TEXT("카메라 자동 — %s #%u: %s"), Main ? SpeciesKo(Main->Species) : TEXT("?"), S.FollowA, *S.CamWhat)
-							   : FString(TEXT("카메라 자동 — 전체 보기 (사건을 기다림)"));
+		const FR9Agent* MainA = S.FindCur(S.FollowA);
+		if (!bFollowed && bHaveSite)
+		{
+			SiteView();   // 맵 전체 땅: 사건이 없으면 지금 무리 자리 (섬 전체는 동물이 너무 작다)
+		}
+		S.CamLabel = bFollowed ? FString::Printf(TEXT("카메라 자동 — %s #%u: %s"), Main ? SpeciesKo(Main->Species) : (MainA ? SpeciesKo(MainA->Species) : TEXT("?")),
+												 S.FollowA, *S.CamWhat)
+					 : bHaveSite ? FString::Printf(TEXT("카메라 자동 — 무리 자리 %d/%d (가까운 사냥·물기·반격·사체 먹기를 기다림)"), S.SiteIndex + 1,
+												   static_cast<int32>(S.Info.HerdXY.size() / 2))
+								 : FString(TEXT("카메라 자동 — 전체 보기 (사건을 기다림)"));
 		break;
 	}
 	case EEcoR9DemoCam::Wide:
-		S.CamLabel = TEXT("카메라 — 전체 보기");
+		S.CamLabel = bWhole ? FString(TEXT("카메라 — 섬(맵 땅) 전체 (멀리 있는 동물은 작은 공 · 7 = 무리 자리로)")) : FString(TEXT("카메라 — 전체 보기"));
+		break;
+	case EEcoR9DemoCam::Site:
+		if (bHaveSite)
+		{
+			SiteView();
+			S.CamLabel = FString::Printf(TEXT("카메라 — 무리 자리 %d/%d (7 = 다음 자리)"), S.SiteIndex + 1, static_cast<int32>(S.Info.HerdXY.size() / 2));
+		}
+		else
+		{
+			S.CamLabel = TEXT("카메라 — 무대 (무리 자리 없음)");
+		}
 		break;
 	case EEcoR9DemoCam::FollowDeer:
 	case EEcoR9DemoCam::FollowWolf:
 	case EEcoR9DemoCam::FollowBoar:
 	{
 		const uint8 Sp = static_cast<uint8>(static_cast<int32>(S.CamMode) - 2);
-		const FR9Agent* Cur = FindAgent(S.Cur, S.FollowA);
+		const FR9Agent* Cur = S.FindCur(S.FollowA);
 		if (!Cur || !Cur->Alive() || Cur->Species != Sp)
 		{
+			// 처음 (또는 따라가던 개체가 죽음): 작은 세계는 가장 작은 번호, 맵 전체 땅은 지금 초점에서 가장 가까운 그 종
 			S.FollowA = 0;
+			double BestD = TNumericLimits<double>::Max();
+			const FVector From = S.bCamInit ? S.CamFocus : Center;
 			for (const FR9Agent& A : S.Cur.Agents)
 			{
-				if (A.Alive() && A.Species == Sp && (S.FollowA == 0 || A.Id < S.FollowA))
+				if (!A.Alive() || A.Species != Sp)
+				{
+					continue;
+				}
+				double D = static_cast<double>(A.Id);
+				if (bWhole)
+				{
+					double X = 0.0, Y = 0.0;
+					S.Map.ToWorld(A.X, A.Y, X, Y);
+					D = FVector::Dist2D(FVector(X, Y, 0.0), From);
+				}
+				if (S.FollowA == 0 || D < BestD)
 				{
 					S.FollowA = A.Id;
+					BestD = D;
 				}
 			}
 		}
@@ -424,7 +519,7 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 		{
 			Arm = 1800.0;
 			Height = 900.0;
-			const FR9Agent* A = FindAgent(S.Cur, S.FollowA);
+			const FR9Agent* A = S.FindCur(S.FollowA);
 			S.CamLabel = FString::Printf(TEXT("카메라 — %s #%u 따라가기 (같은 키 = 다음) · 행동 %s"), SpeciesKo(Sp), S.FollowA,
 										 A ? UTF8_TO_TCHAR(ActionName(A->Action)) : TEXT("?"));
 		}
@@ -438,10 +533,16 @@ void UEcoR9DemoSubsystem::UpdateCamera(float DeltaTime)
 	{
 		bTop = true;
 		const double HalfV = FMath::Atan(FMath::Tan(FMath::DegreesToRadians(0.5 * kFov)) * 9.0 / 16.0);
-		Height = 0.56 * Side / FMath::Tan(HalfV);
+		const double TopSide = bHaveSite ? 1.4 * SiteSide : Side;
+		if (bHaveSite)
+		{
+			Focus = SiteFocus;   // 맵 전체 땅: 지금 무리 자리 위 (자리 정사각 × 1.4 가 화면 세로에)
+		}
+		Height = 0.56 * TopSide / FMath::Tan(HalfV);
 		Arm = 1.0;
 		Yaw = S.CamYaw;
-		S.CamLabel = TEXT("카메라 — 위에서 (위 = R9 +y, 오른쪽 = +x)");
+		S.CamLabel = bHaveSite ? FString::Printf(TEXT("카메라 — 무리 자리 %d 위에서 (위 = R9 +y, 오른쪽 = +x · 7 = 다음 자리)"), S.SiteIndex + 1)
+							   : FString(TEXT("카메라 — 위에서 (위 = R9 +y, 오른쪽 = +x)"));
 		break;
 	}
 	default:

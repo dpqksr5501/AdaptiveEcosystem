@@ -6,13 +6,16 @@
 #include "EcoR9DemoFrame.h"
 #include "EcoR9DemoLiveSource.h"
 #include "EcoR9DemoSubsystem.h"
+#include "EcoR9DemoWhole.h"
 #include "UObject/WeakObjectPtrTemplates.h"
 
 #include <memory>
 
 class AEcoCreatureRepresentationActor;
+class APawn;
 class UInstancedStaticMeshComponent;
 class USceneComponent;
+class USkeletalMeshComponent;
 class UWorldPartitionStreamingSourceComponent;
 
 DECLARE_LOG_CATEGORY_EXTERN(LogEcoR9Demo, Log, All);
@@ -31,6 +34,12 @@ namespace EcoR9DemoCVars
 	bool Daylight();      // eco.R9Demo.Daylight : 팀 하늘의 해 돌기를 데모 동안만 멈추고 낮에 둠
 	void SetText(bool bOn);
 	void SetCam(int32 Mode);
+	// 맵 전체 땅 모드 (2026-11-13)
+	bool HideOthers();    // eco.R9Demo.HideOthers : 맵에 있던 예전 v3·Fauna 동물 몸·먼 표식을 데모 동안 숨김 (보이는 것만 — 그쪽 시뮬레이션은 그대로)
+	float BodyNearM();    // eco.R9Demo.BodyNear : 카메라에서 이만큼(m) 안 개체만 몸 액터 (나머지는 작은 표식)
+	int32 BodyBudget();   // eco.R9Demo.BodyBudget : 몸 액터 상한
+	float GrassRadiusM(); // eco.R9Demo.GrassRadius : 큰 세계에서 풀을 그리는 카메라 둘레 반 변 (m)
+	FString BoarMesh();   // eco.R9Demo.BoarMesh : 멧돼지 몸 덮어쓰기 (스켈레탈 메시 또는 표현 BP 경로)
 }
 
 enum class EEcoR9DemoPhase : uint8
@@ -38,6 +47,7 @@ enum class EEcoR9DemoPhase : uint8
 	Off,
 	Refused,
 	WaitScan,    // 자리 찾기: 시작점 둘레(고리 ScanRing)를 불러오는 중 (훑기 전)
+	WaitWhole,   // 맵 전체 땅: 맵 땅을 불러오는 중 (훑기 전)
 	WaitStage,   // 무대 자리를 불러오는 중
 	Running,
 	Failed
@@ -50,7 +60,8 @@ enum class EEcoR9DemoCam : uint8
 	FollowDeer = 2,
 	FollowWolf = 3,
 	FollowBoar = 4,
-	Top = 5
+	Top = 5,
+	Site = 6     // 무리 자리 하나 (키 7 = 다음 자리)
 };
 
 /** 보이는 몸 하나 (R9 uid 하나). */
@@ -59,9 +70,11 @@ struct FEcoR9DemoBody
 	uint32 Id = 0;
 	uint8 Species = 0;
 	TWeakObjectPtr<AEcoCreatureRepresentationActor> Rep;   // 사슴·늑대
-	TWeakObjectPtr<AActor> Boar;                            // 멧돼지 자리표시
+	TWeakObjectPtr<AActor> Boar;                            // 멧돼지 자리표시 또는 스켈레탈 몸
 	TWeakObjectPtr<USceneComponent> BoarPivot;
 	TWeakObjectPtr<USceneComponent> BoarHead;
+	TWeakObjectPtr<USkeletalMeshComponent> BoarSkel;        // 멧돼지 스켈레탈 몸 (돼지 메시를 찾았을 때 — 애니는 상태별 한 마디 재생)
+	uint8 BoarAnim = 0;                                     // 지금 재생 중인 애니 쓰임 (EcoR9Demo::ER9AnimRole)
 	FName VisualSpecies;
 	int64 Sequence = 0;
 	bool bSnapNext = true;
@@ -98,9 +111,25 @@ struct FEcoR9DemoRecent
 	uint32 B = 0;
 };
 
+/** 4 m 훑기 셈 (기록 줄). */
+struct FEcoR9ScanCounts
+{
+	int32 FromLand = 0;
+	int32 FromMesh = 0;
+	int32 NoGround = 0;
+	int32 Sea = 0;
+	int32 Water = 0;
+	int32 Steep = 0;
+	int64 Objects = 0;
+	int64 Trees = 0;
+	int64 Rocks = 0;
+};
+
 struct FEcoR9DemoState
 {
 	FEcoR9DemoSettings Settings;
+	int32 Starts = 0;            // 이 월드에서 시작한 횟수 (Play 중 켜기/끄기 — 두 번 만들지 않음 시험)
+	bool bWorldBegan = false;    // OnWorldBeginPlay 를 지났다 (그 순간에는 UWorld::HasBegunPlay 가 아직 거짓 — 게임 모드 StartPlay 앞)
 	EEcoR9DemoPhase Phase = EEcoR9DemoPhase::Off;
 	double PhaseStart = 0.0;
 	FString Why;
@@ -139,6 +168,46 @@ struct FEcoR9DemoState
 	// 맵에 이미 있는 팀 생태 (거부하지 않고 건드리지 않는다 — 알리기만)
 	bool bTeamEco = false;
 	FString TeamEcoNote;
+
+	// 맵 전체 땅 모드 (eco.R9Demo.Area 0 = 맵 전체 · > 120 = 시작점 둘레 그 크기)
+	bool bWhole = false;                         // 이번 판은 큰 세계 (땅 지도 + 큰 세계 장면 생성기)
+	FBox AreaBox = FBox(ForceInit);              // 훑는 사각 (cm)
+	FString AreaLine;                            // 어디서 왔나 (기록 줄)
+	std::shared_ptr<const EcoR9Demo::FR9WholeSpec> WholeSpec;   // 훑은 땅 지도 (다시 시작할 때 그대로 다시 쓴다 — 다시 훑지 않음)
+	FVector WholeCenter = FVector::ZeroVector;   // 땅 지도 정사각 가운데 (cm)
+	FBox LandBox = FBox(ForceInit);              // 열린 땅 경계 (cm) — 카메라 2 (섬 전체)
+	FString WholeLine;                           // 훑기 기록 줄
+	int32 SiteIndex = 0;                         // 카메라 7: 지금 보는 무리 자리
+	// 풀 그리기 창 (큰 세계 — 카메라 둘레 칸만)
+	EcoR9Demo::FR9FoodWindow FoodWin;
+	std::vector<float> WinGrass;
+	std::vector<float> WinRoot;
+	std::vector<float> WinPrevRoot;
+	TArray<int16> WinQuant;                      // 창 칸마다 그린 풀 양 (0..64, −1 숨김, −2 아직)
+	bool bWinPrevValid = false;
+	// 몸 배정 (큰 세계: 카메라에 가까운 개체만 몸, 나머지는 작은 표식)
+	TWeakObjectPtr<UInstancedStaticMeshComponent> FarIsm[3];
+	int32 NumFar = 0;
+	int32 NumBodyActors = 0;
+	// 프레임 색인 (uid → 프레임 안 번호)
+	TMap<uint32, int32> CurIndex;
+	TMap<uint32, int32> PrevIndex;
+	// 숨긴 예전 동물 (eco.R9Demo.HideOthers) — 끌 때 되돌린다
+	TArray<TWeakObjectPtr<AActor>> HiddenOthers;
+	TArray<TWeakObjectPtr<USceneComponent>> HiddenComps;
+	double NextHide = 0.0;
+	// 멧돼지 몸
+	FString BoarLine;
+	// 결정 비용 (기록 줄)
+	double AdvanceMsSum = 0.0;
+	int32 AdvanceCount = 0;
+	// 확인용 (11-13 빌드·확인): 실제 프레임 간격·데모 틱 일 시간 (10 초 기록 줄마다 다시 셈, 읽기만)
+	double FrameLastReal = 0.0;
+	double FrameMsSum = 0.0;
+	double FrameMsMax = 0.0;
+	double TickMsSum = 0.0;
+	double TickMsMax = 0.0;
+	int32 FrameCount = 0;
 
 	// 보이는 것
 	TMap<uint32, FEcoR9DemoBody> Bodies;
@@ -201,6 +270,12 @@ struct FEcoR9DemoState
 	int32 PrevCamEnable = MIN_int32;
 	bool bPawnFrozen = false;   // 무대를 불러오는 동안 폰이 원점 땅 밑으로 떨어지거나 팀 날씨 트리거에 닿지 않게 먼저 멈춤
 	bool bPawnParked = false;
+	TWeakObjectPtr<APawn> FrozenPawn;   // 끌 때 되돌릴 폰 (Play 중 끄기)
+	bool bPawnWasHidden = false;
+	bool bPawnHadCollision = true;
+	bool bPawnMoveWasActive = true;
+	FVector PawnStart = FVector::ZeroVector;
+	bool bHudHidden = false;
 	FString PrevRes;   // 녹화 전 해상도 명령 (끝날 때 되돌림)
 	int8 PrevOnScreenMsgs = -1;   // 녹화 동안 화면 메시지를 끈 앞 값 (-1 = 안 바꿈, 끝날 때 되돌림)
 
@@ -212,4 +287,40 @@ struct FEcoR9DemoState
 	bool bSunLogged = false;      // '해를 낮에 고정' 을 적었다
 	double PrevSunSpeed = 0.0;
 	int32 SunSpeedKind = 0;       // 0 못 찾음 · 1 double · 2 float
+
+	/** 프레임에서 uid 로 찾기 (색인 — 개체가 수백이라 선형 찾기를 피한다). */
+	const EcoR9Demo::FR9Agent* FindCur(uint32 Id) const
+	{
+		const int32* I = CurIndex.Find(Id);
+		return I && Cur.Agents.size() > static_cast<std::size_t>(*I) ? &Cur.Agents[static_cast<std::size_t>(*I)] : nullptr;
+	}
+	const EcoR9Demo::FR9Agent* FindPrev(uint32 Id) const
+	{
+		const int32* I = PrevIndex.Find(Id);
+		return I && Prev.Agents.size() > static_cast<std::size_t>(*I) ? &Prev.Agents[static_cast<std::size_t>(*I)] : nullptr;
+	}
+	void RebuildIndex()
+	{
+		PrevIndex = MoveTemp(CurIndex);
+		CurIndex.Reset();
+		CurIndex.Reserve(static_cast<int32>(Cur.Agents.size()));
+		for (std::size_t i = 0; i < Cur.Agents.size(); ++i)
+		{
+			const EcoR9Demo::FR9Agent& A = Cur.Agents[i];
+			int32& Slot = CurIndex.FindOrAdd(A.Id, static_cast<int32>(i));
+			if (A.Alive())
+			{
+				Slot = static_cast<int32>(i);   // 같은 uid 가 죽은 기록과 산 기록 둘이면 (없어야 함) 산 쪽
+			}
+		}
+	}
+	void RebuildBothIndex()
+	{
+		RebuildIndex();
+		PrevIndex.Reset();
+		for (std::size_t i = 0; i < Prev.Agents.size(); ++i)
+		{
+			PrevIndex.FindOrAdd(Prev.Agents[i].Id, static_cast<int32>(i));
+		}
+	}
 };

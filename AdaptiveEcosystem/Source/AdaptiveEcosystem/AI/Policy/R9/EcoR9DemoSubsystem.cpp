@@ -20,6 +20,7 @@
 #include "Engine/Engine.h"
 #include "Engine/Font.h"
 #include "Engine/StaticMesh.h"
+#include "Engine/TargetPoint.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
 #include "GameFramework/HUD.h"
@@ -42,6 +43,9 @@
 #include "UObject/UnrealType.h"
 #include "UnrealClient.h"
 #include "UnrealEngine.h"
+#include "WorldPartition/WorldPartition.h"
+#include "WorldPartition/WorldPartitionRuntimeCell.h"
+#include "WorldPartition/WorldPartitionRuntimeHash.h"
 #include "WorldPartition/WorldPartitionStreamingSource.h"
 
 #include <limits>
@@ -52,8 +56,10 @@ namespace EcoR9DemoSubsystemImpl
 {
 	static TAutoConsoleVariable<int32> CVarDemo(TEXT("eco.R9Demo"), 0,
 		TEXT("R9 데모 플레이어 (EcoR9DemoSubsystem.h): 0 끔(기본) · 1 실시간 (eco.R9Demo.Brains 두뇌 폴더) · 2 재생 (eco.R9Demo.Replay 파일). ")
-		TEXT("Play 전에 바꾼다. 명령줄 -EcoR9Demo=<폴더>·-EcoR9Replay=<파일> 이 있으면 그것이 먼저다. 맵 제한 없음 — 지형·바닥이 있는 아무 맵에서 ")
-		TEXT("무대 자리를 스스로 고른다 (팀 생태 장치가 있어도 건드리지 않고 따로 돈다)."));
+		TEXT("명령 없이 늘 켜려면 이 PC 의 Config/UserEngine.ini [ConsoleVariables] 에 eco.R9Demo=1. Play 중에 바꾸면 그 자리에서 시작·정지한다. ")
+		TEXT("명령줄 -EcoR9Demo=<폴더>·-EcoR9Replay=<파일> 이 있으면 그것이 먼저다. 맵 제한 없음 — 기본은 그 맵의 땅 전체에 사슴·늑대·멧돼지를 푼다 ")
+		TEXT("(eco.R9Demo.Area). 팀 생태 장치가 있어도 건드리지 않고 따로 돈다."),
+		FConsoleVariableDelegate::CreateStatic(&UEcoR9DemoSubsystem::OnDemoCVarChanged));
 	static TAutoConsoleVariable<FString> CVarBrains(TEXT("eco.R9Demo.Brains"), TEXT(""), TEXT("R9 데모 실시간 판 두뇌 폴더 ({deer,wolf,boar}.r9brain). 비면 <프로젝트>/Saved/R9Demo/brains."));
 	static TAutoConsoleVariable<FString> CVarScene(TEXT("eco.R9Demo.Scene"), TEXT(""), TEXT("R9 데모 실시간 판 장면 파일 (비면 <두뇌 폴더>/scene.txt)."));
 	static TAutoConsoleVariable<FString> CVarReplay(TEXT("eco.R9Demo.Replay"), TEXT(""), TEXT("R9 데모 재생 판 파일 (.r9rp — 파이썬 실행 기록). 비면 <프로젝트>/Saved/R9Demo/replay/demo.r9rp."));
@@ -80,6 +86,69 @@ namespace EcoR9DemoSubsystemImpl
 	// 자동화 시험 중에는 이 값이 1 일 때만 서브시스템을 만든다 (R9 데모 시험만 켠다)
 	static TAutoConsoleVariable<int32> CVarAllowInTests(TEXT("eco.R9Demo.AllowInTests"), 0,
 		TEXT("R9 데모: 자동화 시험이 도는 동안에는 이 값이 1 일 때만 데모를 만든다 (R9 데모 시험이 잠깐 켠다 — 다른 팀 시험 월드에 데모가 끼지 않게). 평소 Play 에는 상관없음."));
+
+	// 맵 전체 땅 모드 (2026-11-13)
+	static TAutoConsoleVariable<int32> CVarArea(TEXT("eco.R9Demo.Area"), 0,
+		TEXT("R9 데모 세계 크기: 0 = 그 맵의 쓸 수 있는 땅 전체 (기본 — 4 m 로 훑은 땅 지도 위에 무리 자리 여럿) · 1 ~ 120 = 예전 한 무대 (학습 세계 120 m, 장면 파일 그대로) · ")
+		TEXT("그 밖 = 시작점 둘레 그 크기(m) 정사각만 큰 세계로 (상한 4000). 시작할 때 읽는다 (명령줄 -EcoR9DemoArea=)."));
+	static TAutoConsoleVariable<int32> CVarHerds(TEXT("eco.R9Demo.Herds"), 6,
+		TEXT("R9 데모 맵 전체 땅: 무리 자리 수 (1 ~ 8). 땅 위에서 서로 먼 자리 — 맵이 작으면 그보다 적게 선다. 시작할 때 읽는다."));
+	static TAutoConsoleVariable<FString> CVarPerHerd(TEXT("eco.R9Demo.PerHerd"), TEXT("24,2,8"),
+		TEXT("R9 데모 맵 전체 땅: 무리 자리마다 '사슴,늑대,멧돼지' (기본 24,2,8 — 학습 세계 24·4·8 둘레, 늑대는 자리마다 한 쌍). 총수 상한 400. 시작할 때 읽는다."));
+	static TAutoConsoleVariable<int32> CVarHideOthers(TEXT("eco.R9Demo.HideOthers"), 1,
+		TEXT("R9 데모: 1 (기본) = 맵에 이미 있는 예전 v3·Fauna 동물 몸(표현 액터)·섬 무대 먼 표식을 데모 동안 숨긴다 (보이는 것만 — 그쪽 시뮬레이션·코드·에셋은 그대로, 끄면 되돌림). 0 = 그대로."));
+	static TAutoConsoleVariable<float> CVarBodyNear(TEXT("eco.R9Demo.BodyNear"), 220.0f,
+		TEXT("R9 데모 큰 세계: 카메라에서 이만큼(m) 안 개체만 동물 몸 액터를 띄운다 (나머지는 작은 표식 — 기존 섬 무대 먼 표식 꼴)."));
+	static TAutoConsoleVariable<int32> CVarBodyBudget(TEXT("eco.R9Demo.BodyBudget"), 90, TEXT("R9 데모 큰 세계: 동물 몸 액터 상한 (가까운 차례)."));
+	static TAutoConsoleVariable<float> CVarGrassRadius(TEXT("eco.R9Demo.GrassRadius"), 128.0f,
+		TEXT("R9 데모 큰 세계: 풀을 그리는 카메라 둘레 반 변 (m, 32 ~ 400). 먹이 격자 값은 세계 전체에 있고 그리기만 줄인다."));
+	static TAutoConsoleVariable<FString> CVarBoarMesh(TEXT("eco.R9Demo.BoarMesh"), TEXT(""),
+		TEXT("R9 데모 멧돼지 몸 덮어쓰기: 스켈레탈 메시 경로 (예 /Game/AnimalVarietyPack/Pig/Meshes/SK_Pig.SK_Pig) 또는 표현 BP 클래스 경로 (…_C). ")
+		TEXT("비면 /Game/AnimalVarietyPack/Pig → /Game/JYU/Fauna → /Game 차례로 Pig·Boar·Hog·Swine·villsvin 이름을 찾는다. 무대를 세울 때 읽는다."));
+	constexpr double kWholeCellCm = 400.0;           // 땅 지도 칸 4 m (코어 칸 = 2 단위)
+	constexpr double kWholeMaxSideCm = 400000.0;     // 맵 전체 땅 상한 4 km (코어 2000 단위) [어림 — 섬 2.7 km 를 덮고 격자 100 만 칸 안]
+	constexpr double kWholeMarginCm = 5000.0;        // 땅 경계 둘레 여유 50 m (ISLAND_STAGE.md 3.1 과 같음)
+	constexpr double kWholeStreamTimeout = 75.0;     // 맵 전체 불러오기 상한 (처음 Nanite 지형 짓기 포함)
+	constexpr double kWholeSteep = 1.17;             // 큰 세계 가파름: 이웃 칸 기울기 > 1.17 (법선 Z < 0.65 — 팀 이동 제약·섬 무대 ISLAND_STAGE.md 3.2 와 같은 문턱)
+	constexpr double kTreeTrunkCm = 300.0;           // 큰 세계 나무: 줄기 둘레 3 m 칸만 막힘 (섬 무대 숲 칸 규칙 ISLAND_STAGE.md 7.1)
+	const FName kHerdTagR9(TEXT("EcoR9Herd"));       // 사람이 놓은 무리 자리 (TargetPoint 꼬리표)
+	const FName kHerdTagV3(TEXT("EcoV3IslandHerd")); // 예전 섬 무대 무리 자리 꼬리표 (있으면 같이 씀)
+	const TCHAR* const kTreeWords[] = {TEXT("pine"), TEXT("tree"), TEXT("spruce"), TEXT("birch"), TEXT("beech"), TEXT("oak"), TEXT("fir"), TEXT("palm"),
+									   TEXT("cactus"), TEXT("maple"), TEXT("cedar"), TEXT("willow")};
+	const TCHAR* const kRockWords[] = {TEXT("rock"), TEXT("cliff"), TEXT("boulder"), TEXT("stone")};
+
+	/** '사슴,늑대,멧돼지' → 세 수 (틀리면 거짓). */
+	bool ParseTriple(const FString& Text, int32 Out[3])
+	{
+		TArray<FString> F;
+		Text.ParseIntoArray(F, TEXT(","), true);
+		if (F.Num() != 3)
+		{
+			return false;
+		}
+		for (int32 k = 0; k < 3; ++k)
+		{
+			F[k].TrimStartAndEndInline();
+			if (!F[k].IsNumeric())
+			{
+				return false;
+			}
+			Out[k] = FMath::Clamp(FCString::Atoi(*F[k]), 0, 128);
+		}
+		return Out[0] + Out[1] + Out[2] > 0;
+	}
+
+	bool AnyWordIn(const FString& Lower, TConstArrayView<const TCHAR*> Words)
+	{
+		for (const TCHAR* W : Words)
+		{
+			if (Lower.Contains(W))
+			{
+				return true;
+			}
+		}
+		return false;
+	}
 
 	// 자동 고르기: 시작점 둘레 정사각을 고리마다 넓혀 훑는다 — 반 변 200 · 400 · 800 m [어림]. 앞 고리에서 (기존 생태를 피한) 자리를 찾으면 멈춘다
 	constexpr int32 kNumRings = 3;
@@ -341,6 +410,11 @@ namespace EcoR9DemoCVars
 	bool Daylight() { return EcoR9DemoSubsystemImpl::CVarDaylight.GetValueOnGameThread() != 0; }
 	void SetText(bool bOn) { EcoR9DemoSubsystemImpl::CVarText->Set(bOn ? 1 : 0, ECVF_SetByConsole); }
 	void SetCam(int32 Mode) { EcoR9DemoSubsystemImpl::CVarCam->Set(Mode, ECVF_SetByConsole); }
+	bool HideOthers() { return EcoR9DemoSubsystemImpl::CVarHideOthers.GetValueOnGameThread() != 0; }
+	float BodyNearM() { return FMath::Clamp(EcoR9DemoSubsystemImpl::CVarBodyNear.GetValueOnGameThread(), 20.0f, 2000.0f); }
+	int32 BodyBudget() { return FMath::Clamp(EcoR9DemoSubsystemImpl::CVarBodyBudget.GetValueOnGameThread(), 0, 400); }
+	float GrassRadiusM() { return FMath::Clamp(EcoR9DemoSubsystemImpl::CVarGrassRadius.GetValueOnGameThread(), 32.0f, 400.0f); }
+	FString BoarMesh() { return EcoR9DemoSubsystemImpl::CVarBoarMesh.GetValueOnGameThread().TrimStartAndEnd(); }
 }
 
 // -----------------------------------------------------------------------------
@@ -445,6 +519,20 @@ FEcoR9DemoSettings FEcoR9DemoSettings::Resolve(const TCHAR* CommandLine)
 		}
 	}
 	FParse::Value(Cmd, TEXT("EcoR9DemoExitAfter="), S.ExitAfterSeconds);
+	// 맵 전체 땅 모드 (2026-11-13)
+	S.AreaM = CVarArea.GetValueOnGameThread();
+	FParse::Value(Cmd, TEXT("EcoR9DemoArea="), S.AreaM);
+	S.AreaM = FMath::Clamp(S.AreaM, 0, 4000);
+	S.Herds = FMath::Clamp(CVarHerds.GetValueOnGameThread(), 1, 8);
+	int32 Triple[3] = {24, 2, 8};
+	if (ParseTriple(CVarPerHerd.GetValueOnGameThread(), Triple))
+	{
+		for (int32 k = 0; k < 3; ++k)
+		{
+			S.PerHerd[k] = Triple[k];
+		}
+	}
+	S.bHideOthers = CVarHideOthers.GetValueOnGameThread() != 0;
 	return S;
 }
 
@@ -459,13 +547,14 @@ FString FEcoR9DemoSettings::DefaultDir()
 
 bool UEcoR9DemoSubsystem::ShouldCreateSubsystem(UObject* Outer) const
 {
-	// 깃발이 없으면 만들지 않는다 — 보통 게임·에디터·자동화 시험에는 이 서브시스템이 없다. 데디케이티드·클라이언트 전용 실행에도 만들지 않는다
-	// (같은 프로세스의 PIE 클라이언트 월드는 OnWorldBeginPlay 의 넷 모드 검사가 거부한다)
-	if (IsRunningDedicatedServer() || IsRunningClientOnly() || FEcoR9DemoSettings::Resolve(FCommandLine::Get()).Mode == FEcoR9DemoSettings::EMode::Off)
+	// 데디케이티드·클라이언트 전용 실행에는 만들지 않는다 (같은 프로세스의 PIE 클라이언트 월드는 StartDemo 의 넷 모드 검사가 거부한다).
+	// 2026-11-13: Play 중 eco.R9Demo 를 켜고 끌 수 있게 게임·PIE 월드에는 늘 만든다 — 꺼져 있으면 아무것도 만들지 않고 틱도 바로 돌아간다
+	// (액터 0 · 그리기 0. 시험 FlagOffNoop·PlayToggle)
+	if (IsRunningDedicatedServer() || IsRunningClientOnly())
 	{
 		return false;
 	}
-	// 맵 제한이 없어졌으니, 자동화 시험 중에는 R9 데모 시험이 eco.R9Demo.AllowInTests 1 로 켠 때만 만든다 (다른 팀 시험 월드에 끼지 않게)
+	// 자동화 시험 중에는 R9 데모 시험이 eco.R9Demo.AllowInTests 1 로 켠 때만 만든다 (다른 팀 시험 월드에 끼지 않게 — UserEngine.ini 에 eco.R9Demo=1 이 있어도)
 	if (GIsAutomationTesting && EcoR9DemoSubsystemImpl::CVarAllowInTests.GetValueOnGameThread() == 0)
 	{
 		return false;
@@ -495,41 +584,165 @@ void UEcoR9DemoSubsystem::Deinitialize()
 			UDebugDrawService::Unregister(State->DrawHandle);
 			State->DrawHandle.Reset();
 		}
-		if (State->PrevCamEnable != MIN_int32)
-		{
-			if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Cam.Enable")))
-			{
-				V->Set(State->PrevCamEnable, ECVF_SetByCode);
-			}
-		}
-		if (!State->PrevRes.IsEmpty() && GEngine)
-		{
-			GEngine->Exec(GetWorld(), *State->PrevRes);   // 녹화 해상도를 앞 값으로 (설정 파일에 쓰지 않음)
-		}
-		if (State->PrevOnScreenMsgs >= 0 && GEngine)
-		{
-			GEngine->bEnableOnScreenDebugMessages = State->PrevOnScreenMsgs != 0;
-		}
-		ReleaseDaylight();
-		const UWorld* World = GetWorld();
-		if (World && !World->bIsTearingDown)
-		{
-			ClearBodies();
-			for (AActor* A : SpawnedActors)
-			{
-				if (IsValid(A))
-				{
-					A->Destroy();
-				}
-			}
-		}
-		State->Live.reset();
+		TeardownDemo(/*bRestoreView*/ false);
 	}
+	State.Reset();
+	Super::Deinitialize();
+}
+
+void UEcoR9DemoSubsystem::TeardownDemo(bool bRestoreView)
+{
+	// 데모가 만든 것·바꾼 실행 중 값을 모두 되돌린다 (월드가 끝날 때 · Play 중 eco.R9Demo 0). 저장하는 것 없음
+	if (!State)
+	{
+		return;
+	}
+	FEcoR9DemoState& S = *State;
+	if (S.PrevCamEnable != MIN_int32 && S.PrevCamEnable != MIN_int32 + 1)
+	{
+		if (IConsoleVariable* V = IConsoleManager::Get().FindConsoleVariable(TEXT("eco.Cam.Enable")))
+		{
+			V->Set(S.PrevCamEnable, ECVF_SetByCode);
+		}
+	}
+	S.PrevCamEnable = MIN_int32;
+	if (!S.PrevRes.IsEmpty() && GEngine)
+	{
+		GEngine->Exec(GetWorld(), *S.PrevRes);   // 녹화 해상도를 앞 값으로 (설정 파일에 쓰지 않음)
+	}
+	S.PrevRes.Reset();
+	if (S.PrevOnScreenMsgs >= 0 && GEngine)
+	{
+		GEngine->bEnableOnScreenDebugMessages = S.PrevOnScreenMsgs != 0;
+	}
+	S.PrevOnScreenMsgs = -1;
+	ReleaseDaylight();
+	const UWorld* World = GetWorld();
+	const bool bWorldAlive = World && !World->bIsTearingDown;
+	if (bWorldAlive)
+	{
+		HideOtherVisuals(false);
+		ClearBodies();
+		for (AActor* A : SpawnedActors)
+		{
+			if (IsValid(A))
+			{
+				A->Destroy();
+			}
+		}
+		if (bRestoreView)
+		{
+			RestorePawn();
+		}
+	}
+	S.HiddenOthers.Reset();
+	S.HiddenComps.Reset();
+	S.FrameLastReal = 0.0;   // 확인용 프레임 셈: 다시 켤 때 꺼져 있던 시간을 한 프레임으로 세지 않게
+	S.Live.reset();
 	SpawnedActors.Reset();
 	Manager = nullptr;
 	Camera = nullptr;
-	State.Reset();
-	Super::Deinitialize();
+}
+
+void UEcoR9DemoSubsystem::StartDemo(const TCHAR* Why)
+{
+	using namespace EcoR9DemoSubsystemImpl;
+	if (!State)
+	{
+		return;
+	}
+	UWorld* World = GetWorld();
+	if (!World || !(State->bWorldBegan || World->HasBegunPlay()))
+	{
+		return;   // Play 전 (OnWorldBeginPlay 가 부른다)
+	}
+	if (IsActive())
+	{
+		return;   // 이미 켜져 있다 — 두 번 만들지 않는다
+	}
+	if (State->Phase == EEcoR9DemoPhase::Refused)
+	{
+		// 검토 (11-13): 클라이언트·데디케이티드 월드는 넷 모드가 월드가 사는 동안 바뀌지 않는다 — 콘솔 값이 바뀔 때마다 정리(보기 대상 되돌리기 포함)·다시 거부하지 않는다
+		return;
+	}
+	if (State->Phase == EEcoR9DemoPhase::Failed)
+	{
+		StopDemo(TEXT("다시 켜기 전 정리"));   // 상태를 새로 만든다 — 아래에서 다시 잡는다
+	}
+	FEcoR9DemoState& S = *State;
+	S.Settings = FEcoR9DemoSettings::Resolve(FCommandLine::Get());
+	if (S.Settings.Mode == FEcoR9DemoSettings::EMode::Off)
+	{
+		return;
+	}
+	++S.Starts;
+	UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 시작 (%s) — 이 월드 %d 번째"), Why, S.Starts);
+	OnWorldBeginPlayImpl(*World);
+}
+
+void UEcoR9DemoSubsystem::StopDemo(const TCHAR* Why)
+{
+	if (!State || State->Phase == EEcoR9DemoPhase::Off || State->Phase == EEcoR9DemoPhase::Refused)
+	{
+		return;   // 거부된 월드(클라이언트·데디케이티드)는 아무것도 만들거나 바꾸지 않았다 — 클라이언트 보기 대상을 건드리지 않는다
+	}
+	if (State->Phase == EEcoR9DemoPhase::Running)
+	{
+		LogSummary(Why);
+	}
+	UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 정지 (%s) — 만든 액터를 치우고 숨긴 것·카메라·플레이어 몸을 되돌린다"), Why);
+	TeardownDemo(/*bRestoreView*/ true);
+	// 상태를 새로 (설정·그리기 손잡이·시작 횟수·훑은 땅 지도는 남긴다 — 다시 켤 때 다시 훑지 않음)
+	const TSharedPtr<FEcoR9DemoState> Old = State;
+	State = MakeShared<FEcoR9DemoState>();
+	State->Settings = Old->Settings;
+	State->DrawHandle = Old->DrawHandle;
+	State->Starts = Old->Starts;
+	State->bWorldBegan = Old->bWorldBegan;
+	State->WholeSpec = Old->WholeSpec;
+	State->WholeCenter = Old->WholeCenter;
+	State->LandBox = Old->LandBox;
+	State->WholeLine = Old->WholeLine;
+	State->AreaBox = Old->AreaBox;
+	State->AreaLine = Old->AreaLine;
+	State->Phase = EEcoR9DemoPhase::Off;
+}
+
+void UEcoR9DemoSubsystem::OnDemoCVarChanged(IConsoleVariable* Var)
+{
+	// Play 중 eco.R9Demo 를 바꾸면 지금 도는 게임·PIE 월드에서 바로 시작·정지 (UserEngine.ini 를 읽을 때도 불리지만 그때는 월드가 없다)
+	if (!GEngine)
+	{
+		return;
+	}
+	for (const FWorldContext& Ctx : GEngine->GetWorldContexts())
+	{
+		UWorld* W = Ctx.World();
+		if (!W || (W->WorldType != EWorldType::Game && W->WorldType != EWorldType::PIE) || W->bIsTearingDown)
+		{
+			continue;
+		}
+		UEcoR9DemoSubsystem* Sub = W->GetSubsystem<UEcoR9DemoSubsystem>();
+		if (!Sub || !Sub->State || !(Sub->State->bWorldBegan || W->HasBegunPlay()))
+		{
+			continue;   // Play 전 월드 — OnWorldBeginPlay 가 그때 콘솔 값을 읽는다
+		}
+		const FEcoR9DemoSettings Want = FEcoR9DemoSettings::Resolve(FCommandLine::Get());
+		if (Want.Mode == FEcoR9DemoSettings::EMode::Off)
+		{
+			Sub->StopDemo(TEXT("콘솔 eco.R9Demo 0"));
+		}
+		else if (Sub->State->Phase != EEcoR9DemoPhase::Off && Sub->State->Settings.Mode != Want.Mode)
+		{
+			Sub->StopDemo(TEXT("콘솔 eco.R9Demo 판 바뀜"));
+			Sub->StartDemo(TEXT("콘솔 eco.R9Demo 판 바뀜"));
+		}
+		else
+		{
+			Sub->StartDemo(TEXT("콘솔 eco.R9Demo"));
+		}
+	}
+	(void)Var;
 }
 
 TStatId UEcoR9DemoSubsystem::GetStatId() const
@@ -544,7 +757,8 @@ bool UEcoR9DemoSubsystem::IsRunning() const
 
 bool UEcoR9DemoSubsystem::IsActive() const
 {
-	return State && (State->Phase == EEcoR9DemoPhase::WaitScan || State->Phase == EEcoR9DemoPhase::WaitStage || State->Phase == EEcoR9DemoPhase::Running);
+	return State && (State->Phase == EEcoR9DemoPhase::WaitScan || State->Phase == EEcoR9DemoPhase::WaitWhole || State->Phase == EEcoR9DemoPhase::WaitStage ||
+					 State->Phase == EEcoR9DemoPhase::Running);
 }
 
 int32 UEcoR9DemoSubsystem::NumSpawnedActors() const
@@ -592,6 +806,59 @@ int32 UEcoR9DemoSubsystem::NumAvoidZones() const
 bool UEcoR9DemoSubsystem::HasTeamEco() const
 {
 	return State && State->bTeamEco;
+}
+
+bool UEcoR9DemoSubsystem::IsWhole() const
+{
+	return State && State->bWhole && State->Info.bWhole;
+}
+
+const EcoR9Demo::FR9WholeSpec* UEcoR9DemoSubsystem::WholeSpecForTest() const
+{
+	return State ? State->WholeSpec.get() : nullptr;
+}
+
+int32 UEcoR9DemoSubsystem::NumHerdSites() const
+{
+	return State ? static_cast<int32>(State->Info.HerdXY.size() / 2) : 0;
+}
+
+int32 UEcoR9DemoSubsystem::NumHiddenOthers() const
+{
+	int32 N = 0;
+	if (State)
+	{
+		for (const TWeakObjectPtr<AActor>& A : State->HiddenOthers)
+		{
+			N += A.IsValid() && A->IsHidden() ? 1 : 0;
+		}
+	}
+	return N;
+}
+
+int32 UEcoR9DemoSubsystem::NumBodyActors() const
+{
+	return State ? State->NumBodyActors : 0;
+}
+
+int32 UEcoR9DemoSubsystem::NumFarMarkers() const
+{
+	return State ? State->NumFar : 0;
+}
+
+int32 UEcoR9DemoSubsystem::NumStarts() const
+{
+	return State ? State->Starts : 0;
+}
+
+FVector UEcoR9DemoSubsystem::WholeCenterCm() const
+{
+	return State ? State->WholeCenter : FVector::ZeroVector;
+}
+
+FString UEcoR9DemoSubsystem::BoarBodyLine() const
+{
+	return State ? State->BoarLine : FString();
 }
 
 void UEcoR9DemoSubsystem::DescribeTeamEco(UWorld& World)
@@ -723,12 +990,23 @@ void UEcoR9DemoSubsystem::RefreshProbeIgnore()
 
 void UEcoR9DemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 {
-	using namespace EcoR9DemoSubsystemImpl;
 	Super::OnWorldBeginPlay(InWorld);
 	if (!State)
 	{
 		return;
 	}
+	State->bWorldBegan = true;
+	State->Settings = FEcoR9DemoSettings::Resolve(FCommandLine::Get());
+	if (State->Settings.Mode == FEcoR9DemoSettings::EMode::Off)
+	{
+		return;   // 꺼짐 — 아무것도 만들지 않는다 (Play 중 eco.R9Demo 1 이면 그때 시작)
+	}
+	StartDemo(TEXT("Play 시작"));
+}
+
+void UEcoR9DemoSubsystem::OnWorldBeginPlayImpl(UWorld& InWorld)
+{
+	using namespace EcoR9DemoSubsystemImpl;
 	FEcoR9DemoState& S = *State;
 	const ENetMode Net = InWorld.GetNetMode();
 	const FString Pkg = UWorld::RemovePIEPrefix(InWorld.GetPackage()->GetName());
@@ -741,11 +1019,21 @@ void UEcoR9DemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 	}
 	// 맵 제한 없음 (맵 이름을 보지 않는다). 팀 생태 장치·통합 v3 는 세어 알리기만 한다
 	DescribeTeamEco(InWorld);
-	FString Err;
-	if (!OpenSource(Err))
+	// 맵 전체 땅 (기본): 훑은 땅 지도가 있어야 코어를 시작할 수 있어 원천은 훑은 뒤에 연다 (ScanWhole). 생성기가 없는 코어면 예전 한 무대
+	S.bWhole = S.Settings.WantsWhole() && EcoR9Demo::FR9LiveSource::Available();
+	if (S.bWhole && !EcoR9Demo::FR9LiveSource::WholeAvailable())
 	{
-		Fail(Err);
-		return;
+		S.bWhole = false;
+		UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] 이 빌드의 코어에 큰 세계 장면 생성기(EcoR9Scene.h)가 없다 — 맵 전체 땅 대신 예전 한 무대(120 m)로 돈다"));
+	}
+	if (!S.bWhole)
+	{
+		FString Err;
+		if (!OpenSource(Err))
+		{
+			Fail(Err);
+			return;
+		}
 	}
 	// 무대를 불러오는 30~90 초 동안 폰(원점 땅 밑에 남)이 떨어지거나 원점 둘레 팀 날씨 트리거에 겹치지 않게 먼저 멈춘다.
 	// 이 시점(액터 BeginPlay 앞)에 충돌을 끄면 시작 겹침도 생기지 않는다. 자리 옮기기는 무대가 선 뒤 ParkPawn.
@@ -763,6 +1051,13 @@ void UEcoR9DemoSubsystem::OnWorldBeginPlay(UWorld& InWorld)
 		// 녹화 프레임에 다른 코드의 화면 메시지가 끼지 않게 (촬영 감독과 같은 처리, EcoV3FilmDirector.cpp ApplyViewEnvironment). 우리 글자는 디버그 그리기라 그대로 보인다
 		S.PrevOnScreenMsgs = GEngine->bEnableOnScreenDebugMessages ? 1 : 0;
 		GEngine->bEnableOnScreenDebugMessages = false;
+	}
+	if (S.bWhole)
+	{
+		// 맵 전체 땅: 땅을 불러와 훑은 뒤(ScanWhole) 코어 큰 세계를 연다
+		ChooseSearchOrigin(InWorld);
+		BeginWhole(InWorld);
+		return;
 	}
 	const TCHAR* ModeName = S.Settings.Mode == FEcoR9DemoSettings::EMode::Live ? TEXT("실시간 (언리얼 C++ 추론)") : TEXT("재생 (파이썬 실행 기록)");
 	int32 NumLand = 0;
@@ -812,6 +1107,9 @@ void UEcoR9DemoSubsystem::Fail(const FString& Why)
 	State->Phase = EEcoR9DemoPhase::Failed;
 	State->Why = Why;
 	UE_LOG(LogEcoR9Demo, Error, TEXT("[EcoR9Demo] 실패 — %s"), *Why);
+	// 검토 (11-13): 이제 Play 마다 저절로 켜지므로 (UserEngine.ini eco.R9Demo=1) 실패하면 멈추고 숨긴 플레이어 몸·숨긴 팀 동물·데모 카메라에 갇히지 않게
+	// 데모가 만든 것·바꾼 것을 그 자리에서 되돌린다 (화면에는 실패 글만 남는다 — 상태(Phase·Why)는 그대로)
+	TeardownDemo(/*bRestoreView*/ true);
 	if (!State->Settings.CaptureDir.IsEmpty() || State->Settings.ExitAfterSeconds > 0.0f)
 	{
 		State->QuitCountdown = 10;   // 창 없는 실행이 멈춰 있지 않게
@@ -839,6 +1137,10 @@ bool UEcoR9DemoSubsystem::OpenSource(FString& OutError)
 		C.ScenePath = ToUtf8(S.Settings.ScenePath);
 		C.Seed = S.Settings.Seed + static_cast<uint64>(S.RunIndex);
 		C.bSample = S.Settings.bSample;
+		if (S.bWhole)
+		{
+			C.Whole = S.WholeSpec;   // 맵 전체 땅: 장면 파일은 몸 표·상수만, 땅 지도 위에 큰 세계 장면 (다시 시작하면 새 시드로 새 장면, 땅 지도는 그대로)
+		}
 		// 파일은 언리얼이 읽어 바이트로 넘긴다 (한글 경로도 되게). 실행 중 파이썬 없음 — 두뇌 파일은 미리 바꿔 둔 float32 묶음
 		TArray<uint8> Bytes;
 		if (!FFileHelper::LoadFileToArray(Bytes, *S.Settings.ScenePath))
@@ -868,7 +1170,7 @@ bool UEcoR9DemoSubsystem::OpenSource(FString& OutError)
 			return false;
 		}
 		S.Cur = MoveTemp(First);
-		S.bFoodKnown = S.Info.G > 0 && !S.Cur.Grass.empty();
+		S.bFoodKnown = S.Info.G > 0 && (S.Info.bWhole || !S.Cur.Grass.empty());
 		S.bEventsKnown = true;
 	}
 	else
@@ -1062,7 +1364,7 @@ bool UEcoR9DemoSubsystem::OpenSource(FString& OutError)
 		S.ReplayCursor = 0;
 		S.Cur = S.Replay.Frames[0];
 	}
-	float CapMax = 0.0f;
+	float CapMax = S.Info.GrassCapMax;
 	for (const float C : S.Info.GrassCap)
 	{
 		CapMax = FMath::Max(CapMax, C);
@@ -1081,10 +1383,13 @@ bool UEcoR9DemoSubsystem::OpenSource(FString& OutError)
 		return false;
 	}
 	S.Prev = S.Cur;
+	S.RebuildBothIndex();
 	S.bHavePrev = true;
 	S.Accum = 0.0;
 	S.Alpha = 0.0;
 	S.StepsShown = 0;
+	S.FoodWin = EcoR9Demo::FR9FoodWindow();   // 새 판 — 풀 창을 다시 읽는다
+	S.bWinPrevValid = false;
 	return true;
 }
 
@@ -1100,11 +1405,14 @@ bool UEcoR9DemoSubsystem::AdvanceFrame()
 		}
 		S.Prev = S.Cur;
 		std::string E;
+		const double T0 = FPlatformTime::Seconds();
 		if (!S.Live || !S.Live->Next(S.Cur, E))
 		{
 			Fail(FString::Printf(TEXT("코어 스텝 실패: %s"), *EcoR9DemoSubsystemImpl::Utf8(E)));
 			return false;
 		}
+		S.AdvanceMsSum += 1000.0 * (FPlatformTime::Seconds() - T0);
+		++S.AdvanceCount;
 	}
 	else
 	{
@@ -1122,6 +1430,7 @@ bool UEcoR9DemoSubsystem::AdvanceFrame()
 		S.Cur = S.Replay.Frames[static_cast<std::size_t>(S.ReplayCursor)];
 	}
 	++S.StepsShown;
+	S.RebuildIndex();
 	OnFrameAdvanced();
 	return true;
 }
@@ -1148,6 +1457,19 @@ void UEcoR9DemoSubsystem::RestartRun(const TCHAR* Why)
 	}
 	S.bAutoFollowing = false;
 	S.FollowA = S.FollowB = 0;
+	if (S.Info.bWhole)
+	{
+		// 검토 (11-13): 큰 세계는 시드마다 은신처·무리 자리가 새로 생긴다 (EcoR9Scene.h BuildBigScene — Spec.Seed 로 은신처·패치·자리를 고름). 작은 세계는 장면 파일의
+		// 은신처 그대로라 장식을 한 번만 세웠지만, 큰 세계는 보이는 수풀·바위가 옛 판 자리에 남아 '안 보이는 은신처'에 숨게 된다 — 장식·표식 액터를 새 판으로 다시 세운다
+		if (AActor* OldDecor = S.Decor.Get())
+		{
+			SpawnedActors.Remove(OldDecor);
+			OldDecor->Destroy();
+		}
+		S.Decor.Reset();
+		SpawnStaticDecor();
+		S.SiteIndex = 0;
+	}
 	UpdateFood();
 	UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 다시 시작 (%s) — 판 %d, 시드 %llu"), Why, S.RunIndex, static_cast<unsigned long long>(S.Info.Seed));
 }
@@ -1201,34 +1523,18 @@ void UEcoR9DemoSubsystem::BeginStreamingAt(const FVector& CenterCm, float Radius
 		   S.Streamer.IsValid() ? TEXT("") : TEXT(" (World Partition 아님 — 기다리지 않음)"));
 }
 
-bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
+void UEcoR9DemoSubsystem::ScanCells(EcoR9Demo::FR9ScanGrid& G, TArray<uint8>* Kinds, TArray<EcoR9Demo::FR9CoverPoint>* Cover, FEcoR9ScanCounts& Out)
 {
+	// 훑기 격자 칸마다: 1 땅 높이 (지형, 없으면 바닥 메시) · 2 물 (바다·호수·강) · 3 가파름 · 4 걸리는 것 (나무·바위·건물). 고리 훑기와 맵 전체 훑기가 같이 쓴다
 	using namespace EcoR9DemoSubsystemImpl;
 	using namespace EcoR9Demo;
 	FEcoR9DemoState& S = *State;
 	UWorld* World = GetWorld();
-	const double T0 = FPlatformTime::Seconds();
-	if (!S.bTeamEco)
-	{
-		// World Partition 맵은 팀 지역·조정자가 시작 때 아직 안 불렸을 수 있다 — 고리를 불러온 뒤 다시 센다
-		DescribeTeamEco(*World);
-		if (S.bTeamEco)
-		{
-			UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] %s"), *S.TeamEcoNote);
-		}
-	}
-	Ring = FMath::Clamp(Ring, 0, kNumRings - 1);
-	const bool bLast = Ring + 1 >= kNumRings;
-	const double Half = kRingHalfCm[Ring];
-	const FVector2D Pref(S.SearchOrigin.X, S.SearchOrigin.Y);
-	FR9ScanGrid G;
-	G.CellCm = kScanCellCm;
-	G.Nx = G.Ny = FMath::RoundToInt32(2.0 * Half / kScanCellCm);
-	G.X0 = Pref.X - Half;
-	G.Y0 = Pref.Y - Half;
 	const int32 N = G.Nx * G.Ny;
-	G.Height.assign(static_cast<std::size_t>(N), std::numeric_limits<float>::quiet_NaN());
-	G.Blocked.assign(static_cast<std::size_t>(N), 0);
+	if (Kinds)
+	{
+		Kinds->Init(kLandOpen, N);
+	}
 	// 1. 땅 높이: 지형, 없으면 바닥 메시 (지형 없는 일반 맵도). 바닥 메시 칸은 그 메시(인스턴스)를 적어 둔다 — 4 에서 제 땅을 걸리는 것으로 막지 않게
 	RefreshProbeIgnore();
 	const FGroundProbe Ground(*World, S.ProbeIgnore);
@@ -1260,6 +1566,21 @@ bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
 	}
 	const int32 NoGround = N - FromLand - FromMesh;
 	int32 Sea = 0, Water = 0;
+	// 칸 종류 적기 (맵 전체 땅 — 코어 ELand): 이 단계에서 새로 막힌 칸에 종류를 붙인다
+	auto Tag = [&G, Kinds](uint8 Kind)
+	{
+		if (!Kinds)
+		{
+			return;
+		}
+		for (int32 k = 0; k < Kinds->Num(); ++k)
+		{
+			if (G.Blocked[static_cast<std::size_t>(k)] != 0 && (*Kinds)[k] == EcoR9Demo::kLandOpen)
+			{
+				(*Kinds)[k] = Kind;
+			}
+		}
+	};
 	auto Mark = [&G](int32 X, int32 Y, int32& Counter)
 	{
 		uint8& B = G.Blocked[G.Index(X, Y)];
@@ -1356,8 +1677,10 @@ bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
 			}
 		}
 	}
-	// 3. 가파름: 이웃 칸 높이 차 / 칸 > 0.36 (약 20°) [어림]
-	const int32 Steep = static_cast<int32>(MarkSteep(G, 0.36));
+	Tag(EcoR9Demo::kLandVoid);   // 바다·호수·강
+	// 3. 가파름: 이웃 칸 높이 차 / 칸 > 0.36 (약 20° — 평지 무대 고르기) [어림]. 맵 전체 땅은 1.17 (법선 Z < 0.65 — 팀 이동 제약·섬 무대와 같은 문턱)
+	const int32 Steep = static_cast<int32>(MarkSteep(G, Kinds ? kWholeSteep : 0.36));
+	Tag(EcoR9Demo::kLandSteep);
 	// 4. 나무·바위·선인장·야자·건물 (정적·인스턴스 메시 경계 상자). 풀·눈 덮개 같은 낮은 장식은 뺀다.
 	//    땅보다 30 cm 넘게 솟은 것만 막는다 — 지형 없는 맵의 바닥 메시(위가 곧 땅)는 막지 않는다
 	static const TCHAR* const kDecorWords[] = {TEXT("grass"), TEXT("snow"), TEXT("flower"), TEXT("clover"), TEXT("fern"), TEXT("weed"), TEXT("decal"), TEXT("pebble")};
@@ -1375,10 +1698,10 @@ bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
 			continue;
 		}
 		TInlineComponentArray<UStaticMeshComponent*> Comps(A);
-		for (UStaticMeshComponent* C : Comps)
+		for (UStaticMeshComponent* Comp : Comps)
 		{
-			const UStaticMesh* Mesh = C ? C->GetStaticMesh() : nullptr;
-			if (!Mesh || !C->IsRegistered() || !C->IsVisible() || !Overlaps2D(C->Bounds.GetBox()))
+			const UStaticMesh* Mesh = Comp ? Comp->GetStaticMesh() : nullptr;
+			if (!Mesh || !Comp->IsRegistered() || !Comp->IsVisible() || !Overlaps2D(Comp->Bounds.GetBox()))
 			{
 				continue;
 			}
@@ -1392,10 +1715,13 @@ bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
 			{
 				continue;
 			}
-			if (const UInstancedStaticMeshComponent* Ism = Cast<UInstancedStaticMeshComponent>(C))
+			if (const UInstancedStaticMeshComponent* Ism = Cast<UInstancedStaticMeshComponent>(Comp))
 			{
 				const FBox MeshBox = Mesh->GetBoundingBox();
 				const int32 Count = Ism->GetInstanceCount();
+				// 맵 전체 땅: 나무는 줄기 둘레 3 m 만 막고(섬 무대 숲 칸 규칙), 나무·큰 바위는 은신처 곁 후보점으로 적는다
+				const bool bTree = Cover && AnyWordIn(MeshName, kTreeWords);
+				const bool bRock = Cover && !bTree && AnyWordIn(MeshName, kRockWords);
 				for (int32 i = 0; i < Count; ++i)
 				{
 					FTransform T;
@@ -1409,6 +1735,26 @@ bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
 					{
 						continue;
 					}
+					if (bTree)
+					{
+						const FVector L = T.GetLocation();
+						EcoR9Demo::FR9Box Trunk;
+						Trunk.MinX = L.X - kTreeTrunkCm;
+						Trunk.MaxX = L.X + kTreeTrunkCm;
+						Trunk.MinY = L.Y - kTreeTrunkCm;
+						Trunk.MaxY = L.Y + kTreeTrunkCm;
+						Trunk.MinZ = B.Min.Z;
+						Trunk.MaxZ = B.Max.Z;
+						Objects += MarkObstacle(G, Trunk, 0.0, kObstacleClearCm, kObstacleReachCm);
+						Cover->Add(EcoR9Demo::FR9CoverPoint{L.X, L.Y, 1.0});
+						++Out.Trees;
+						continue;
+					}
+					if (bRock && FMath::Max(Size.X, Size.Y) >= 200.0)
+					{
+						Cover->Add(EcoR9Demo::FR9CoverPoint{B.GetCenter().X, B.GetCenter().Y, FMath::Clamp(FMath::Max(Size.X, Size.Y) / 200.0, 1.0, 8.0)});
+						++Out.Rocks;
+					}
 					// 넓은 조각(10 m 넘게)이 그 칸의 땅이면 (바닥 조각을 인스턴스로 깐 맵) 그 칸은 막지 않는다. 나무·덤불 줄기 꼭대기가 땅으로 읽힌 칸은
 					// 작은 조각이라 그대로 막는다
 					const bool bWide = FMath::Max(Size.X, Size.Y) >= kGroundPieceCm;
@@ -1419,19 +1765,73 @@ bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
 			}
 			else
 			{
-				const FBox B = C->Bounds.GetBox();
+				const FBox B = Comp->Bounds.GetBox();
 				const FVector Size = B.GetSize();
 				if (FMath::Max(Size.X, Size.Y) > 20000.0 || FMath::Max(Size.X, Size.Y) < 80.0 || Size.Z < 40.0)
 				{
 					continue;
 				}
+				if (Cover && FMath::Max(Size.X, Size.Y) >= 200.0 && (AnyWordIn(MeshName, kRockWords) || AnyWordIn(MeshName, kTreeWords)))
+				{
+					Cover->Add(EcoR9Demo::FR9CoverPoint{B.GetCenter().X, B.GetCenter().Y, FMath::Clamp(FMath::Max(Size.X, Size.Y) / 200.0, 1.0, 8.0)});
+					++Out.Rocks;
+				}
 				// 넓은 메시(10 m 넘게)가 그 칸의 땅이면 (지형 대신 언덕진 바닥 메시) 그 칸은 막지 않는다 — 가파름(3)이 언덕 비탈을 따로 막는다
 				const bool bWide = FMath::Max(Size.X, Size.Y) >= kGroundPieceCm;
 				Objects += MarkObstacleIf(G, ToR9Box(B), kObstaclePadCm, kObstacleClearCm, kObstacleReachCm,
-										  [&GroundComp, C, bWide](std::size_t Cell) { return bWide && GroundComp[static_cast<int32>(Cell)] == C; });
+										  [&GroundComp, Comp, bWide](std::size_t Cell) { return bWide && GroundComp[static_cast<int32>(Cell)] == Comp; });
 			}
 		}
 	}
+	Tag(EcoR9Demo::kLandObstacle);   // 나무·바위·건물
+	Out.FromLand = FromLand;
+	Out.FromMesh = FromMesh;
+	Out.NoGround = NoGround;
+	Out.Sea = Sea;
+	Out.Water = Water;
+	Out.Steep = Steep;
+	Out.Objects += Objects;
+}
+
+
+bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
+{
+	using namespace EcoR9DemoSubsystemImpl;
+	using namespace EcoR9Demo;
+	FEcoR9DemoState& S = *State;
+	UWorld* World = GetWorld();
+	const double T0 = FPlatformTime::Seconds();
+	if (!S.bTeamEco)
+	{
+		// World Partition 맵은 팀 지역·조정자가 시작 때 아직 안 불렸을 수 있다 — 고리를 불러온 뒤 다시 센다
+		DescribeTeamEco(*World);
+		if (S.bTeamEco)
+		{
+			UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] %s"), *S.TeamEcoNote);
+		}
+	}
+	Ring = FMath::Clamp(Ring, 0, kNumRings - 1);
+	const bool bLast = Ring + 1 >= kNumRings;
+	const double Half = kRingHalfCm[Ring];
+	const FVector2D Pref(S.SearchOrigin.X, S.SearchOrigin.Y);
+	FR9ScanGrid G;
+	G.CellCm = kScanCellCm;
+	G.Nx = G.Ny = FMath::RoundToInt32(2.0 * Half / kScanCellCm);
+	G.X0 = Pref.X - Half;
+	G.Y0 = Pref.Y - Half;
+	const int32 N = G.Nx * G.Ny;
+	G.Height.assign(static_cast<std::size_t>(N), std::numeric_limits<float>::quiet_NaN());
+	G.Blocked.assign(static_cast<std::size_t>(N), 0);
+	FEcoR9ScanCounts Counts;
+	ScanCells(G, nullptr, nullptr, Counts);
+	const int32 FromLand = Counts.FromLand, FromMesh = Counts.FromMesh, NoGround = Counts.NoGround, Sea = Counts.Sea, Water = Counts.Water, Steep = Counts.Steep;
+	const int64 Objects = Counts.Objects;
+	const FGroundProbe Ground(*World, S.ProbeIgnore);
+	const FBox ScanBox(FVector(G.X0, G.Y0, -1e7), FVector(G.X0 + G.Nx * G.CellCm, G.Y0 + G.Ny * G.CellCm, 1e7));
+	auto Overlaps2D = [&ScanBox](const FBox& B)
+	{
+		return B.IsValid && B.Max.X >= ScanBox.Min.X && B.Min.X <= ScanBox.Max.X && B.Max.Y >= ScanBox.Min.Y && B.Min.Y <= ScanBox.Max.Y;
+	};
 	// 5. 맵에 이미 있는 생태 (지역 상자·서식지·은신처·팀 동물·무리 이주 길) — 막지는 않고 '되도록 피함' 칸으로 둔다 (섞여 보이지 않게)
 	int32 Zones = 0;
 	int64 AvoidCells = 0;
@@ -1586,6 +1986,342 @@ bool UEcoR9DemoSubsystem::ScanAndPick(int32 Ring)
 	return true;
 }
 
+// -----------------------------------------------------------------------------
+// 맵 전체 땅 모드 (2026-11-13) — 맵 땅을 불러와 4 m 로 훑고, 땅 지도를 코어 큰 세계 장면 생성기에 넘긴다
+// -----------------------------------------------------------------------------
+
+void UEcoR9DemoSubsystem::BeginWhole(UWorld& World)
+{
+	using namespace EcoR9DemoSubsystemImpl;
+	FEcoR9DemoState& S = *State;
+	const FVector O = S.SearchOrigin;
+	const double MaxHalf = 0.5 * kWholeMaxSideCm;
+	FBox Area(ForceInit);
+	FString From;
+	if (S.WholeSpec && S.AreaBox.IsValid)
+	{
+		// Play 중 다시 켬: 앞에 훑은 땅 지도를 그대로 쓴다 (다시 훑지 않음)
+		Area = S.AreaBox;
+		From = TEXT("앞에 훑은 땅 지도 그대로");
+	}
+	else if (S.Settings.AreaM > 120)
+	{
+		const double Half = 50.0 * FMath::Min(static_cast<double>(S.Settings.AreaM), kWholeMaxSideCm / 100.0);
+		Area = FBox(FVector(O.X - Half, O.Y - Half, -1e7), FVector(O.X + Half, O.Y + Half, 1e7));
+		From = FString::Printf(TEXT("eco.R9Demo.Area %d — 시작점 둘레 %d m 정사각"), S.Settings.AreaM, S.Settings.AreaM);
+	}
+	else
+	{
+		// 맵 전체: World Partition 이면 실행 세계 경계 (모든 셀 — 바다 몸체가 크면 넓을 수 있어 시작점 둘레 4 km 로 자름), 아니면 불린 지형 경계,
+		// 지형이 없으면 폰이 설 수 있는 넓은 바닥 메시 경계, 그것도 없으면 시작점 둘레 240 m
+		// 검토 (11-13): 위 '실행 세계 경계' 는 UWorldPartition::GetRuntimeWorldBounds 가 아니라 실행 해시의 스트리밍 칸 내용 경계 합으로 읽는다 (안 불린 칸 포함,
+		// 늘 불리는 칸 — 바다·하늘·물 구역 — 은 빼서 바다 몸체로 넓어지지 않게). GetRuntimeWorldBounds 는 편집기 해시(EditorHash)가 있어야 값이 있는데
+		// PIE·-game 월드에는 없다 (엔진 WorldPartition.h:514 DuplicateTransient · WorldPartition.cpp:787 -game 이면 nullptr) — 그대로면 Play 순간 불린
+		// 지형 조각 몇 개 경계로 떨어져 섬 일부만 훑는다. 칸 경계가 비면 그때만 GetRuntimeWorldBounds (편집기 해시가 있는 월드)
+		if (const UWorldPartition* WP = World.GetWorldPartition())
+		{
+			FBox B(ForceInit);
+			int32 NumCells = 0;
+			if (const UWorldPartitionRuntimeHash* Hash = WP->RuntimeHash.Get())
+			{
+				Hash->ForEachStreamingCells(
+					[&B, &NumCells](const UWorldPartitionRuntimeCell* Cell)
+					{
+						if (Cell && !Cell->IsAlwaysLoaded())
+						{
+							const FBox& CellBox = Cell->GetContentBounds();
+							if (CellBox.IsValid)
+							{
+								B += CellBox;
+								++NumCells;
+							}
+						}
+						return true;
+					});
+			}
+			const TCHAR* BoundsFrom = TEXT("스트리밍 칸 내용 경계");
+			if (!B.IsValid || B.GetSize().X <= 100.0 || B.GetSize().Y <= 100.0)
+			{
+				B = WP->GetRuntimeWorldBounds();   // 편집기 해시가 있는 월드에서만 값이 있다
+				BoundsFrom = TEXT("실행 세계 경계");
+			}
+			if (B.IsValid && B.GetSize().X > 100.0 && B.GetSize().Y > 100.0)
+			{
+				// 늘 불리는 지형(스트리밍 칸에 들지 않음)은 지금 불린 경계로 더한다 — 지형을 늘 불리게 둔 WP 맵에서 땅이 빠지지 않게
+				for (TActorIterator<ALandscapeProxy> It(&World); It; ++It)
+				{
+					FVector LC = FVector::ZeroVector, LE = FVector::ZeroVector;
+					It->GetActorBounds(false, LC, LE);
+					if (LE.X > 1.0 && LE.Y > 1.0)
+					{
+						B += FBox(LC - LE, LC + LE);
+					}
+				}
+				Area = B;
+				From = FString::Printf(TEXT("World Partition %s (칸 %d) + 불린 지형 %.0f × %.0f m"), BoundsFrom, NumCells, B.GetSize().X / 100.0, B.GetSize().Y / 100.0);
+			}
+		}
+		if (!Area.IsValid)
+		{
+			for (TActorIterator<ALandscapeProxy> It(&World); It; ++It)
+			{
+				FVector C = FVector::ZeroVector, E = FVector::ZeroVector;
+				It->GetActorBounds(false, C, E);
+				if (E.X > 1.0 && E.Y > 1.0)
+				{
+					Area += FBox(C - E, C + E);
+				}
+			}
+			if (Area.IsValid)
+			{
+				From = FString::Printf(TEXT("불린 지형 경계 %.0f × %.0f m"), Area.GetSize().X / 100.0, Area.GetSize().Y / 100.0);
+			}
+		}
+		if (!Area.IsValid)
+		{
+			for (TActorIterator<AActor> It(&World); It; ++It)
+			{
+				TInlineComponentArray<UStaticMeshComponent*> Comps(*It);
+				for (const UStaticMeshComponent* Comp : Comps)
+				{
+					if (!Comp || !Comp->IsRegistered() || Comp->GetCollisionResponseToChannel(ECC_Pawn) != ECR_Block)
+					{
+						continue;
+					}
+					const FBox B = Comp->Bounds.GetBox();
+					if (FMath::Min(B.GetSize().X, B.GetSize().Y) >= 1000.0)
+					{
+						Area += B;
+					}
+				}
+			}
+			if (Area.IsValid)
+			{
+				From = FString::Printf(TEXT("지형 없음 — 넓은 바닥 메시 경계 %.0f × %.0f m"), Area.GetSize().X / 100.0, Area.GetSize().Y / 100.0);
+			}
+		}
+		if (!Area.IsValid)
+		{
+			Area = FBox(O - FVector(12000.0, 12000.0, 1e7), O + FVector(12000.0, 12000.0, 1e7));
+			From = TEXT("땅 경계를 모름 — 시작점 둘레 240 m");
+		}
+	}
+	// 4 km 상한 (시작점 둘레로 자름 — 시작점이 상자 밖이면 상자 가운데 둘레)
+	const FVector2D Pivot = Area.IsInsideOrOnXY(O) ? FVector2D(O.X, O.Y) : FVector2D(Area.GetCenter().X, Area.GetCenter().Y);
+	FBox Clip(FVector(FMath::Max(Area.Min.X, Pivot.X - MaxHalf), FMath::Max(Area.Min.Y, Pivot.Y - MaxHalf), -1e7),
+			  FVector(FMath::Min(Area.Max.X, Pivot.X + MaxHalf), FMath::Min(Area.Max.Y, Pivot.Y + MaxHalf), 1e7));
+	if (!Clip.IsValid || Clip.Max.X <= Clip.Min.X || Clip.Max.Y <= Clip.Min.Y)
+	{
+		Clip = FBox(O - FVector(12000.0, 12000.0, 1e7), O + FVector(12000.0, 12000.0, 1e7));
+	}
+	S.AreaBox = Clip;
+	S.AreaLine = From;
+	const double Radius = 0.5 * FVector2D(Clip.GetSize().X, Clip.GetSize().Y).Size() + 5000.0;
+	UE_LOG(LogEcoR9Demo, Log,
+		   TEXT("[EcoR9Demo] 켬 — 실시간 (언리얼 C++ 추론) · 맵 전체 땅 | 맵 %s (World Partition %s) | 훑을 사각 x %.0f ~ %.0f m, y %.0f ~ %.0f m (%s) | ")
+			   TEXT("시작점 (%.1f, %.1f) m — %s | 무리 자리 %d × (사슴 %d · 늑대 %d · 멧돼지 %d) | 두뇌 %s"),
+		   *UWorld::RemovePIEPrefix(World.GetPackage()->GetName()), World.IsPartitionedWorld() ? TEXT("예") : TEXT("아님"), Clip.Min.X / 100.0, Clip.Max.X / 100.0,
+		   Clip.Min.Y / 100.0, Clip.Max.Y / 100.0, *From, O.X / 100.0, O.Y / 100.0, *S.OriginLabel, S.Settings.Herds, S.Settings.PerHerd[0], S.Settings.PerHerd[1],
+		   S.Settings.PerHerd[2], *S.Settings.BrainDir);
+	if (!S.TeamEcoNote.IsEmpty())
+	{
+		UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] %s"), *S.TeamEcoNote);
+	}
+	BeginStreamingAt(FVector(Clip.GetCenter().X, Clip.GetCenter().Y, O.Z), static_cast<float>(Radius));
+	S.Phase = EEcoR9DemoPhase::WaitWhole;
+	S.PhaseStart = World.GetTimeSeconds();
+}
+
+bool UEcoR9DemoSubsystem::ScanWhole()
+{
+	using namespace EcoR9DemoSubsystemImpl;
+	using namespace EcoR9Demo;
+	FEcoR9DemoState& S = *State;
+	UWorld* World = GetWorld();
+	if (S.WholeSpec)
+	{
+		return true;   // 앞에 훑은 땅 지도 (Play 중 다시 켬)
+	}
+	const double T0 = FPlatformTime::Seconds();
+	if (!S.bTeamEco)
+	{
+		DescribeTeamEco(*World);   // 불러온 뒤 다시 센다 (플레이어 몸을 옮기지 않을지 정함)
+	}
+	// 1. 훑을 사각 전체를 4 m 칸으로 (지형 높이·물·가파름·나무·바위·건물)
+	FR9ScanGrid G;
+	G.CellCm = kWholeCellCm;
+	G.X0 = FMath::FloorToDouble(S.AreaBox.Min.X / kWholeCellCm) * kWholeCellCm;
+	G.Y0 = FMath::FloorToDouble(S.AreaBox.Min.Y / kWholeCellCm) * kWholeCellCm;
+	G.Nx = FMath::Clamp(FMath::CeilToInt32((S.AreaBox.Max.X - G.X0) / kWholeCellCm), 1, FMath::RoundToInt32(kWholeMaxSideCm / kWholeCellCm));
+	G.Ny = FMath::Clamp(FMath::CeilToInt32((S.AreaBox.Max.Y - G.Y0) / kWholeCellCm), 1, FMath::RoundToInt32(kWholeMaxSideCm / kWholeCellCm));
+	const int32 N = G.Nx * G.Ny;
+	G.Height.assign(static_cast<std::size_t>(N), std::numeric_limits<float>::quiet_NaN());
+	G.Blocked.assign(static_cast<std::size_t>(N), 0);
+	TArray<uint8> Kinds;
+	TArray<FR9CoverPoint> Cover;
+	FEcoR9ScanCounts Counts;
+	ScanCells(G, &Kinds, &Cover, Counts);
+	const double T1 = FPlatformTime::Seconds();
+	// 2. 열린 땅 경계 → 세계 정사각 (둘레 50 m, 4 m 배수, 4 km 상한 — 훑기 칸과 모서리를 맞춤)
+	int32 Ix0 = MAX_int32, Iy0 = MAX_int32, Ix1 = -1, Iy1 = -1;
+	double ZSum = 0.0;
+	int64 OpenN = 0;
+	for (int32 y = 0; y < G.Ny; ++y)
+	{
+		for (int32 x = 0; x < G.Nx; ++x)
+		{
+			const std::size_t K = G.Index(x, y);
+			if (G.IsOpen(K, false))
+			{
+				Ix0 = FMath::Min(Ix0, x);
+				Iy0 = FMath::Min(Iy0, y);
+				Ix1 = FMath::Max(Ix1, x);
+				Iy1 = FMath::Max(Iy1, y);
+				ZSum += G.Height[K];
+				++OpenN;
+			}
+		}
+	}
+	if (OpenN == 0)
+	{
+		UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] 맵 전체 땅: 열린 땅 칸이 하나도 없다 (땅: 지형 %d · 바닥 메시 %d · 없음 %d) — 예전 한 무대로 돈다"), Counts.FromLand,
+			   Counts.FromMesh, Counts.NoGround);
+		return false;
+	}
+	const double MinSide = S.Settings.AreaM > 120 ? 100.0 * S.Settings.AreaM : 12000.0;
+	double Cx = 0.0, Cy = 0.0;
+	const int32 Gf = SquareFromBounds(G.X0 + Ix0 * G.CellCm, G.Y0 + Iy0 * G.CellCm, G.X0 + (Ix1 + 1) * G.CellCm, G.Y0 + (Iy1 + 1) * G.CellCm, kWholeMarginCm,
+									  kWholeCellCm, FMath::Min(MinSide, kWholeMaxSideCm), kWholeMaxSideCm, Cx, Cy);
+	const double HalfSide = 0.5 * Gf * kWholeCellCm;
+	const int32 Ox = FMath::RoundToInt32((Cx - HalfSide - G.X0) / kWholeCellCm);   // 정사각 모서리 = 훑기 칸 (Ox, Oy) — 훑기 밖이면 음수
+	const int32 Oy = FMath::RoundToInt32((Cy - HalfSide - G.Y0) / kWholeCellCm);
+	Cx = G.X0 + Ox * kWholeCellCm + HalfSide;
+	Cy = G.Y0 + Oy * kWholeCellCm + HalfSide;
+	FR9ScanGrid F;
+	F.Nx = F.Ny = Gf;
+	F.CellCm = kWholeCellCm;
+	F.X0 = Cx - HalfSide;
+	F.Y0 = Cy - HalfSide;
+	F.Height.assign(static_cast<std::size_t>(Gf) * static_cast<std::size_t>(Gf), std::numeric_limits<float>::quiet_NaN());
+	F.Blocked.assign(F.Height.size(), 1);
+	std::vector<std::uint8_t> KindF(F.Height.size(), kLandVoid);
+	for (int32 fy = 0; fy < Gf; ++fy)
+	{
+		const int32 sy = fy + Oy;
+		if (sy < 0 || sy >= G.Ny)
+		{
+			continue;
+		}
+		for (int32 fx = 0; fx < Gf; ++fx)
+		{
+			const int32 sx = fx + Ox;
+			if (sx < 0 || sx >= G.Nx)
+			{
+				continue;   // 훑기 밖 = 땅 없음
+			}
+			const std::size_t Ks = G.Index(sx, sy);
+			const std::size_t Kf = F.Index(fx, fy);
+			F.Height[Kf] = G.Height[Ks];
+			F.Blocked[Kf] = G.Blocked[Ks];
+			KindF[Kf] = Kinds[static_cast<int32>(Ks)];
+		}
+	}
+	// 3. 코어 땅 지도 (y 뒤집음 — 화면 FR9StageMap 과 같은 차례, EcoR9DemoWhole.h)
+	auto Spec = std::make_shared<FR9WholeSpec>();
+	Spec->G = Gf;
+	Spec->CellUnits = 2.0;
+	FR9LandCounts Lc;
+	if (!ScanToLand(F, KindF, Spec->Kind, &Lc))
+	{
+		UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] 맵 전체 땅: 땅 지도를 못 만듦 (G %d) — 예전 한 무대로 돈다"), Gf);
+		return false;
+	}
+	int64 Comps = 0;
+	const int64 Main = LargestOpenComponent(Spec->Kind, Gf, &Comps);
+	FR9StageMap M;
+	M.Cx = Cx;
+	M.Cy = Cy;
+	M.W = M.H = Gf * Spec->CellUnits;
+	M.UnitCm = 200.0;
+	// 4. 은신처 곁 후보: 나무 덩어리 (16 m 묶음에 나무 3 그루 이상) · 큰 바위 (가로 2 m 넘음, 무게 = 크기) — 코어가 그 곁에 은신처를 먼저 둔다
+	std::vector<FR9CoverPoint> Pts;
+	Pts.reserve(static_cast<std::size_t>(Cover.Num()));
+	for (const FR9CoverPoint& P : Cover)
+	{
+		double Ux = 0.0, Uy = 0.0;
+		M.ToUnits(P.X, P.Y, Ux, Uy);
+		if (Ux >= 0.0 && Uy >= 0.0 && Ux < M.W && Uy < M.H)
+		{
+			Pts.push_back(FR9CoverPoint{Ux, Uy, P.Weight});
+		}
+	}
+	ClusterAnchors(Pts, 8.0, 3.0, 4000, Spec->Anchor);
+	// 5. 사람이 놓은 무리 자리 (TargetPoint 꼬리표 EcoR9Herd, 없으면 예전 섬 무대 EcoV3IslandHerd — 이름 차례)
+	TArray<ATargetPoint*> Points;
+	for (TActorIterator<ATargetPoint> It(World); It; ++It)
+	{
+		if (It->Tags.Contains(kHerdTagR9))
+		{
+			Points.Add(*It);
+		}
+	}
+	FString SiteFrom = TEXT("코어가 고름 (가장 큰 이어진 땅 안, 서로 가장 먼 점)");
+	if (Points.IsEmpty())
+	{
+		for (TActorIterator<ATargetPoint> It(World); It; ++It)
+		{
+			if (It->Tags.Contains(kHerdTagV3))
+			{
+				Points.Add(*It);
+			}
+		}
+	}
+	Points.Sort([](const ATargetPoint& A, const ATargetPoint& B) { return A.GetFName().LexicalLess(B.GetFName()); });
+	for (const ATargetPoint* Pt : Points)
+	{
+		double Ux = 0.0, Uy = 0.0;
+		M.ToUnits(Pt->GetActorLocation().X, Pt->GetActorLocation().Y, Ux, Uy);
+		if (Ux >= 0.0 && Uy >= 0.0 && Ux < M.W && Uy < M.H && static_cast<int32>(Spec->Sites.size() / 2) < S.Settings.Herds)
+		{
+			Spec->Sites.push_back(Ux);
+			Spec->Sites.push_back(Uy);
+		}
+	}
+	if (!Spec->Sites.empty())
+	{
+		SiteFrom = FString::Printf(TEXT("사람이 놓은 TargetPoint %d 곳 (꼬리표 %s)"), static_cast<int32>(Spec->Sites.size() / 2), *Points[0]->Tags[0].ToString());
+	}
+	// 6. 첫 무리 자리는 플레이어 시작점 가까이 (보자마자 동물이 보이게)
+	double Px = -1.0, Py = -1.0;
+	M.ToUnits(S.SearchOrigin.X, S.SearchOrigin.Y, Px, Py);
+	if (Px >= 0.0 && Py >= 0.0 && Px < M.W && Py < M.H)
+	{
+		Spec->PrefX = Px;
+		Spec->PrefY = Py;
+	}
+	Spec->Herds = S.Settings.Herds;
+	for (int32 k = 0; k < 3; ++k)
+	{
+		Spec->PerHerd[k] = S.Settings.PerHerd[k];
+	}
+	Spec->MaxAnimals = 400;
+	S.WholeSpec = Spec;
+	S.WholeCenter = FVector(Cx, Cy, ZSum / static_cast<double>(OpenN));
+	S.LandBox = FBox(FVector(G.X0 + Ix0 * G.CellCm, G.Y0 + Iy0 * G.CellCm, S.WholeCenter.Z), FVector(G.X0 + (Ix1 + 1) * G.CellCm, G.Y0 + (Iy1 + 1) * G.CellCm, S.WholeCenter.Z));
+	const double CellKm2 = (kWholeCellCm / 100000.0) * (kWholeCellCm / 100000.0);
+	S.WholeLine = FString::Printf(
+		TEXT("땅 지도 %d×%d (4 m, %.2f km 정사각, 가운데 (%.0f, %.0f) m) | 열림 %lld (%.2f km²) · 물·땅 없음 %lld · 가파름 %lld · 나무·바위·건물 %lld | 가장 큰 이어진 땅 %lld 칸 (덩어리 %lld) | ")
+			TEXT("땅 경계 x %.0f ~ %.0f m, y %.0f ~ %.0f m | 훑기 %d×%d 칸: 지형 %d · 바닥 메시 %d · 없음 %d · 바다 %d · 호수·강 %d · 가파름 %d · 걸리는 것 %lld (나무 %lld · 큰 바위 %lld) | ")
+			TEXT("은신처 곁 후보 %d | 무리 자리: %s | %.2f 초 (훑기 %.2f)"),
+		Gf, Gf, Gf * kWholeCellCm / 100000.0, Cx / 100.0, Cy / 100.0, static_cast<long long>(Lc.Open), Lc.Open * CellKm2, static_cast<long long>(Lc.Void),
+		static_cast<long long>(Lc.Steep), static_cast<long long>(Lc.Obstacle), static_cast<long long>(Main), static_cast<long long>(Comps), S.LandBox.Min.X / 100.0,
+		S.LandBox.Max.X / 100.0, S.LandBox.Min.Y / 100.0, S.LandBox.Max.Y / 100.0, G.Nx, G.Ny, Counts.FromLand, Counts.FromMesh, Counts.NoGround, Counts.Sea, Counts.Water,
+		Counts.Steep, static_cast<long long>(Counts.Objects), static_cast<long long>(Counts.Trees), static_cast<long long>(Counts.Rocks),
+		static_cast<int32>(Spec->Anchor.size() / 2), *SiteFrom, FPlatformTime::Seconds() - T0, T1 - T0);
+	UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 맵 전체 땅 — %s"), *S.WholeLine);
+	return true;
+}
+
 double UEcoR9DemoSubsystem::GroundZ(double XCm, double YCm) const
 {
 	using namespace EcoR9DemoSubsystemImpl;
@@ -1626,17 +2362,18 @@ void UEcoR9DemoSubsystem::BuildStage()
 	S.Map.W = S.Info.W;
 	S.Map.H = S.Info.H;
 	S.Map.UnitCm = S.Info.UnitCm;
-	// 높이 표: 무대 + 40 m 띠, 1 m 간격 (보이는 높이만 — 행동은 평평한 세계 그대로)
+	// 높이 표: 무대 + 40 m 띠, 1 m 간격 (보이는 높이만 — 행동은 평평한 세계 그대로). 맵 전체 땅은 지형이면 2 m, 바닥 메시면 4 m 간격
+	// (섬 2.8 km 정사각 ≈ 1440² = 207 만 표본 — 지형 높이장 읽기라 물리 쿼리가 아니다)
+	RefreshProbeIgnore();
+	const FGroundProbe Ground(*World, S.ProbeIgnore);   // 지형, 없으면 바닥 메시 (지형 없는 맵도)
 	EcoR9Demo::FR9HeightTable& H = S.Heights;
 	H = EcoR9Demo::FR9HeightTable();
-	H.Step = kHeightStepCm;
+	H.Step = !S.Info.bWhole ? kHeightStepCm : (Ground.Lands.IsEmpty() ? 400.0 : 200.0);
 	H.X0 = S.Map.Cx - 0.5 * S.Map.SideXCm() - kHeightMarginCm;
 	H.Y0 = S.Map.Cy - 0.5 * S.Map.SideYCm() - kHeightMarginCm;
 	H.Nx = FMath::CeilToInt32((S.Map.SideXCm() + 2.0 * kHeightMarginCm) / H.Step) + 1;
 	H.Ny = FMath::CeilToInt32((S.Map.SideYCm() + 2.0 * kHeightMarginCm) / H.Step) + 1;
 	H.Z.assign(static_cast<std::size_t>(H.Nx) * static_cast<std::size_t>(H.Ny), std::numeric_limits<float>::quiet_NaN());
-	RefreshProbeIgnore();
-	const FGroundProbe Ground(*World, S.ProbeIgnore);   // 지형, 없으면 바닥 메시 (지형 없는 맵도)
 	int32 NoGround = 0;
 	for (int32 y = 0; y < H.Ny; ++y)
 	{
@@ -1656,7 +2393,12 @@ void UEcoR9DemoSubsystem::BuildStage()
 	double Mean = 0.0, Lo = 0.0, Hi = 0.0;
 	const bool bAny = H.Stats(Mean, Lo, Hi);
 	H.Fallback = bAny ? Mean : S.StageCenter.Z;
-	S.StageCenter.Z = H.At(S.StageCenter.X, S.StageCenter.Y);
+	S.StageCenter.Z = S.Info.bWhole ? S.WholeCenter.Z : H.At(S.StageCenter.X, S.StageCenter.Y);
+	if (S.Info.bWhole && !S.Info.HerdXY.empty())
+	{
+		// 카메라 7: 첫 무리 자리 (플레이어 시작점에 가장 가까운 자리 — 코어가 그 차례로 고름)
+		S.SiteIndex = 0;
+	}
 	if (!bAny)
 	{
 		UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] 무대 둘레 땅 높이(지형·바닥 메시)를 하나도 못 읽음 — 평평한 z=%.0f 로 그린다 (땅 없는 맵이거나 스트리밍 덜 됨)"),
@@ -1711,9 +2453,9 @@ void UEcoR9DemoSubsystem::Tick(float DeltaTime)
 	}
 	FEcoR9DemoState& S = *State;
 	UWorld* World = GetWorld();
-	if (!World)
+	if (!World || S.Phase == EEcoR9DemoPhase::Off)
 	{
-		return;
+		return;   // 꺼짐 — 아무것도 하지 않는다 (Play 중 eco.R9Demo 1 이면 StartDemo)
 	}
 	if (S.QuitCountdown >= 0)
 	{
@@ -1726,12 +2468,59 @@ void UEcoR9DemoSubsystem::Tick(float DeltaTime)
 	const double Now = World->GetTimeSeconds();
 	const UWorldPartitionStreamingSourceComponent* Src = S.Streamer.Get();
 	const bool bStreamed = !Src || Src->IsStreamingCompleted();
-	if (S.Phase == EEcoR9DemoPhase::WaitScan || S.Phase == EEcoR9DemoPhase::WaitStage)
+	if (S.Phase == EEcoR9DemoPhase::WaitScan || S.Phase == EEcoR9DemoPhase::WaitStage || S.Phase == EEcoR9DemoPhase::WaitWhole)
 	{
 		FreezePawn();   // 폰이 OnWorldBeginPlay 뒤에 생기는 게임 모드도 있어 기다리는 동안 다시 본다
 	}
+	// 예전 v3·Fauna 동물 몸·먼 표식 숨기기 (보이는 것만, 틱마다 — 팀 코드가 카메라 둘레 몸을 새로 묶으면(BindIdentity) 다시 보이므로 계속 본다.
+	// 표현 액터 수십 개 · 액터 수백 개 훑기라 가볍다)
+	if (IsActive())
+	{
+		HideOtherVisuals(S.Settings.bHideOthers && EcoR9DemoCVars::HideOthers());
+	}
 	switch (S.Phase)
 	{
+	case EEcoR9DemoPhase::WaitWhole:
+		if (Now - S.PhaseStart >= 0.5 && (bStreamed || Now - S.PhaseStart > kWholeStreamTimeout))
+		{
+			if (!bStreamed)
+			{
+				UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] 맵 전체 땅 스트리밍이 %.0f 초 안에 안 끝남 — 불린 만큼 훑는다"), kWholeStreamTimeout);
+			}
+			bool bOk = ScanWhole();
+			FString Err;
+			if (bOk)
+			{
+				S.StageCenter = S.WholeCenter;
+				bOk = OpenSource(Err);
+				if (!bOk)
+				{
+					UE_LOG(LogEcoR9Demo, Warning, TEXT("[EcoR9Demo] 맵 전체 땅 코어 시작 실패: %s — 예전 한 무대로 돈다"), *Err);
+					S.WholeSpec.reset();
+				}
+			}
+			if (bOk)
+			{
+				S.StageLine = FString::Printf(TEXT("맵 전체 땅 — 정사각 가운데 (%.0f, %.0f) m · 한 변 %.0f m · 무리 자리 %d · %s"), S.WholeCenter.X / 100.0, S.WholeCenter.Y / 100.0,
+											  S.Info.W * S.Info.UnitCm / 100.0, static_cast<int32>(S.Info.HerdXY.size() / 2), *Utf8(S.Info.Brains));
+				BuildStage();
+			}
+			else
+			{
+				// 예전 한 무대 (장면 파일 그대로 · 시작점 둘레 평지 고르기)
+				S.bWhole = false;
+				FString Err2;
+				if (!OpenSource(Err2))
+				{
+					Fail(Err2);
+					break;
+				}
+				S.ScanRing = 0;
+				BeginStreamingAt(S.SearchOrigin, RingStreamRadius(0));
+				S.Phase = EEcoR9DemoPhase::WaitScan;
+			}
+		}
+		break;
 	case EEcoR9DemoPhase::WaitScan:
 		if (Now - S.PhaseStart >= 0.5 && (bStreamed || Now - S.PhaseStart > kStreamTimeout))
 		{
@@ -1807,6 +2596,16 @@ void UEcoR9DemoSubsystem::TickRunning(float DeltaTime)
 	{
 		ReleaseDaylight();
 	}
+	// 확인용 (읽기만): 실제 프레임 간격 — 기록 줄 '프레임'
+	const double RealNow = FPlatformTime::Seconds();
+	if (S.FrameLastReal > 0.0)
+	{
+		const double FrameMs = 1000.0 * (RealNow - S.FrameLastReal);
+		S.FrameMsSum += FrameMs;
+		S.FrameMsMax = FMath::Max(S.FrameMsMax, FrameMs);
+		++S.FrameCount;
+	}
+	S.FrameLastReal = RealNow;
 	const double Step = S.Info.StepSeconds > 0.0 ? S.Info.StepSeconds : 2.0 / 15.0;
 	const double Dt = FMath::IsFinite(DeltaTime) ? FMath::Clamp(static_cast<double>(DeltaTime), 0.0, 0.25) : 0.0;
 	S.Accum += Dt * FMath::Max(0.0f, EcoR9DemoCVars::Speed());
@@ -1829,6 +2628,15 @@ void UEcoR9DemoSubsystem::TickRunning(float DeltaTime)
 	SyncBodies(S.Alpha, static_cast<float>(Dt));
 	UpdateMarkers(Now);
 	UpdateCamera(static_cast<float>(Dt));
+	if (S.Info.bWhole)
+	{
+		UpdateFood();   // 큰 세계: 카메라가 움직이면 풀 창을 옮긴다 (바뀐 칸만 다시 씀)
+	}
+	{
+		const double TickMs = 1000.0 * (FPlatformTime::Seconds() - RealNow);   // 확인용: 데모 틱 일 (스텝·몸·표식·카메라·풀)
+		S.TickMsSum += TickMs;
+		S.TickMsMax = FMath::Max(S.TickMsMax, TickMs);
+	}
 	TickCapture(static_cast<float>(Dt));
 	if (Now >= S.NextLog)
 	{
@@ -1844,7 +2652,7 @@ void UEcoR9DemoSubsystem::TickRunning(float DeltaTime)
 
 void UEcoR9DemoSubsystem::LogSummary(const TCHAR* Tag)
 {
-	const FEcoR9DemoState& S = *State;
+	FEcoR9DemoState& S = *State;
 	int32 Alive[EcoR9Demo::kNumSpecies] = {};
 	EcoR9Demo::CountAlive(S.Cur, Alive);
 	UE_LOG(LogEcoR9Demo, Log,
@@ -1861,6 +2669,39 @@ void UEcoR9DemoSubsystem::LogSummary(const TCHAR* Tag)
 		   TEXT("[EcoR9Demo] %s | 먹기(개체·스텝, 풀/땅속/고기): 사슴 %d/%d/%d · 늑대 %d/%d/%d (사체 먹기 %d) · 멧돼지 %d/%d/%d%s | 사체 지금 %d"), Tag,
 		   E[0][1], E[0][2], E[0][3], E[1][1], E[1][2], E[1][3], E[1][3], E[2][1], E[2][2], E[2][3], *UnknownText,
 		   static_cast<int32>(S.Cur.Carcasses.size()));
+	if (S.Settings.Mode == FEcoR9DemoSettings::EMode::Live)
+	{
+		// 결정 계산 비용 (코어 한 스텝 평균 — 결정 스텝은 관측·두뇌 포함). 실시간 필요량 초당 7.5 스텝
+		const FString Cost = S.Live ? EcoR9DemoSubsystemImpl::Utf8(S.Live->CostLine()) : FString();
+		UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] %s | 비용: 코어 스텝 평균 %.2f ms (%d 스텝)%s%s | 몸 액터 %d · 먼 표식 %d%s"), Tag,
+			   S.AdvanceCount > 0 ? S.AdvanceMsSum / S.AdvanceCount : 0.0, S.AdvanceCount, Cost.IsEmpty() ? TEXT("") : TEXT(" · 마지막 결정 "), *Cost, S.NumBodyActors,
+			   S.NumFar, S.Info.bWhole ? *FString::Printf(TEXT(" · 무리 자리 %d"), static_cast<int32>(S.Info.HerdXY.size() / 2)) : TEXT(""));
+		if (S.Info.bWhole && S.Live)
+		{
+			// 확인용 (11-13 빌드·확인): 막힌 칸 위 산 개체(코어 double 좌표, 누적)·숨긴 예전 동물 (읽기만)
+			std::int64_t OnBlocked = 0;
+			std::int64_t AgentSteps = 0;
+			S.Live->OnBlockedStats(OnBlocked, AgentSteps);
+			int32 CompsHidden = 0;
+			for (const TWeakObjectPtr<USceneComponent>& C : S.HiddenComps)
+			{
+				CompsHidden += C.IsValid() && !C->IsVisible() ? 1 : 0;
+			}
+			const int32 NF = S.FrameCount;
+			UE_LOG(LogEcoR9Demo, Log,
+				   TEXT("[EcoR9Demo] %s | 확인: 막힌 칸 위 산 개체 %lld (센 개체-스텝 %lld) · 숨긴 예전 동물 몸 %d · 숨긴 먼 표식 묶음 %d | 프레임 평균 %.2f ms (최대 %.1f ms, %d 프레임) · ")
+					   TEXT("데모 틱 일 평균 %.2f ms (최대 %.1f ms)"),
+				   Tag, static_cast<long long>(OnBlocked), static_cast<long long>(AgentSteps), NumHiddenOthers(), CompsHidden, NF > 0 ? S.FrameMsSum / NF : 0.0,
+				   S.FrameMsMax, NF, NF > 0 ? S.TickMsSum / NF : 0.0, S.TickMsMax);
+		}
+		S.FrameMsSum = 0.0;
+		S.FrameMsMax = 0.0;
+		S.TickMsSum = 0.0;
+		S.TickMsMax = 0.0;
+		S.FrameCount = 0;
+		S.AdvanceMsSum = 0.0;
+		S.AdvanceCount = 0;
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -1890,6 +2731,7 @@ void UEcoR9DemoSubsystem::ApplyViewEnvironment()
 	APlayerController* PC = GetWorld()->GetFirstPlayerController();
 	if (AHUD* Hud = PC ? PC->GetHUD() : nullptr)
 	{
+		S.bHudHidden = Hud->bShowHUD;
 		Hud->bShowHUD = false;   // 팀 개체 살피기 HUD 는 R9 개체를 모른다 — 데모 글자만 둔다
 		S.bEnvApplied = true;
 	}
@@ -1909,7 +2751,15 @@ void UEcoR9DemoSubsystem::FreezePawn()
 	{
 		return;
 	}
-	// 이 실행에서만: 이동을 끄고(떨어지지 않음) 충돌을 끄고(트리거에 겹치지 않음) 숨긴다. 저장하지 않는다
+	// 이 실행에서만: 이동을 끄고(떨어지지 않음) 충돌을 끄고(트리거에 겹치지 않음) 숨긴다. 저장하지 않는다 — 끌 때(StopDemo) 앞 상태로 되돌린다
+	if (S.FrozenPawn.Get() != Pawn)
+	{
+		S.FrozenPawn = Pawn;
+		S.bPawnWasHidden = Pawn->IsHidden();
+		S.bPawnHadCollision = Pawn->GetActorEnableCollision();
+		S.bPawnMoveWasActive = Pawn->GetMovementComponent() ? Pawn->GetMovementComponent()->IsActive() : false;
+		S.PawnStart = Pawn->GetActorLocation();
+	}
 	if (UPawnMovementComponent* Move = Pawn->GetMovementComponent())
 	{
 		Move->StopMovementImmediately();
@@ -2069,6 +2919,12 @@ void UEcoR9DemoSubsystem::ParkPawn()
 	// 원점 땅 밑에서 떨어지지 않게: 이동을 끄고 숨긴 채 무대 가장자리 땅 위에 둔다 (카메라가 보기 대상)
 	S.bPawnFrozen = false;
 	FreezePawn();
+	if (S.bWhole)
+	{
+		// 맵 전체 땅: 무대 가장자리가 바다일 수 있어 옮기지 않는다 — 시작 자리에 숨기고 멈춰 둔다
+		S.bPawnParked = true;
+		return;
+	}
 	if (S.bTeamEco)
 	{
 		// 팀 생태가 있는 맵: 몸을 옮기지 않는다. 팀 v3 는 플레이어 몸 자리를 위협으로 읽어서(EcoPolicyV3IntegratedProcessors.cpp TActorIterator<APawn>),
@@ -2082,6 +2938,108 @@ void UEcoR9DemoSubsystem::ParkPawn()
 	const double Y = S.StageCenter.Y;
 	Pawn->SetActorLocation(FVector(X, Y, GroundZ(X, Y) + 200.0), false, nullptr, ETeleportType::TeleportPhysics);
 	S.bPawnParked = true;
+}
+
+void UEcoR9DemoSubsystem::RestorePawn()
+{
+	// Play 중 끄기: 숨긴·멈춘 플레이어 몸과 보기 대상·팀 HUD 를 앞 상태로 (옮겼으면 처음 자리로)
+	FEcoR9DemoState& S = *State;
+	UWorld* World = GetWorld();
+	APlayerController* PC = World ? World->GetFirstPlayerController() : nullptr;
+	if (APawn* Pawn = S.FrozenPawn.Get())
+	{
+		if (S.bPawnParked && !S.bTeamEco && !S.bWhole)
+		{
+			Pawn->SetActorLocation(S.PawnStart, false, nullptr, ETeleportType::TeleportPhysics);
+		}
+		Pawn->SetActorHiddenInGame(S.bPawnWasHidden);
+		Pawn->SetActorEnableCollision(S.bPawnHadCollision);
+		if (UPawnMovementComponent* Move = Pawn->GetMovementComponent(); Move && S.bPawnMoveWasActive)
+		{
+			Move->Activate(true);
+		}
+		if (PC && PC->GetPawn() == Pawn)
+		{
+			PC->SetViewTarget(Pawn);
+		}
+	}
+	else if (PC && PC->GetPawn())
+	{
+		PC->SetViewTarget(PC->GetPawn());
+	}
+	if (S.bHudHidden)
+	{
+		if (AHUD* Hud = PC ? PC->GetHUD() : nullptr)
+		{
+			Hud->bShowHUD = true;
+		}
+	}
+	S.FrozenPawn.Reset();
+	S.bPawnFrozen = false;
+	S.bPawnParked = false;
+	S.bHudHidden = false;
+}
+
+void UEcoR9DemoSubsystem::HideOtherVisuals(bool bHide)
+{
+	// 예전 v3·Fauna 동물 몸(우리 것이 아닌 표현 액터)·섬 무대 먼 표식을 보이는 것만 숨긴다. 그쪽 시뮬레이션·코드·에셋은 건드리지 않는다
+	// (숨김은 실행 중 값 — 저장 안 함). bHide 거짓이면 숨긴 것을 되돌린다 (표현 액터는 아직 묶여 있을 때만 — 풀에 돌아간 것은 팀 코드가 숨긴 그대로)
+	FEcoR9DemoState& S = *State;
+	UWorld* World = GetWorld();
+	if (!bHide)
+	{
+		for (const TWeakObjectPtr<AActor>& W : S.HiddenOthers)
+		{
+			if (AActor* A = W.Get())
+			{
+				const AEcoCreatureRepresentationActor* Rep = Cast<AEcoCreatureRepresentationActor>(A);
+				if (!Rep || Rep->bBound)
+				{
+					A->SetActorHiddenInGame(false);
+				}
+			}
+		}
+		for (const TWeakObjectPtr<USceneComponent>& W : S.HiddenComps)
+		{
+			if (USceneComponent* C = W.Get())
+			{
+				C->SetVisibility(true);
+			}
+		}
+		S.HiddenOthers.Reset();
+		S.HiddenComps.Reset();
+		return;
+	}
+	if (!World)
+	{
+		return;
+	}
+	for (TActorIterator<AEcoCreatureRepresentationActor> It(World); It; ++It)
+	{
+		AEcoCreatureRepresentationActor* Rep = *It;
+		if (!Rep || Rep->IsHidden() || Rep->VisualState.StableAgentId >= 9000000000000LL || Rep->GetFName().ToString().StartsWith(TEXT("EcoR9Demo_")))
+		{
+			continue;   // 이미 숨음 · 우리 몸 (신원 9,000,000,000,000 + R9 uid — EcoR9DemoVisuals.cpp kStableIdBase)
+		}
+		Rep->SetActorHiddenInGame(true);
+		S.HiddenOthers.AddUnique(Rep);
+	}
+	for (TActorIterator<AActor> It(World); It; ++It)
+	{
+		if (It->GetClass() != AActor::StaticClass() || !It->GetName().StartsWith(TEXT("EcoV3_IslandMarkers")))
+		{
+			continue;   // 예전 섬 무대 먼 표식 (EcoV3IslandStage.cpp IslandTickMarkers — 액터 숨김을 4 Hz 로 되돌리므로 컴포넌트를 숨긴다)
+		}
+		TInlineComponentArray<UInstancedStaticMeshComponent*> Isms(*It);
+		for (UInstancedStaticMeshComponent* Ism : Isms)
+		{
+			if (Ism && Ism->IsVisible())
+			{
+				Ism->SetVisibility(false);
+				S.HiddenComps.AddUnique(Ism);
+			}
+		}
+	}
 }
 
 // -----------------------------------------------------------------------------
@@ -2182,6 +3140,13 @@ void UEcoR9DemoSubsystem::DrawOverlay(UCanvas* Canvas, APlayerController* PC)
 	{
 		Lines.Add({FString::Printf(TEXT("R9 데모 %s — %s"), S.Phase == EEcoR9DemoPhase::Failed ? TEXT("실패") : TEXT("꺼짐"), *S.Why), Gold, false});
 	}
+	else if (S.Phase == EEcoR9DemoPhase::WaitWhole)
+	{
+		const double Wait = GetWorld() ? GetWorld()->GetTimeSeconds() - S.PhaseStart : 0.0;
+		Lines.Add({FString::Printf(TEXT("R9 데모 — 맵 땅을 불러오는 중 (%.0f × %.0f m · %.0f 초) — 다 불리면 땅을 훑고 사슴·늑대·멧돼지를 푼다"), S.AreaBox.GetSize().X / 100.0,
+								   S.AreaBox.GetSize().Y / 100.0, Wait),
+				   Gold, false});
+	}
 	else if (S.Phase == EEcoR9DemoPhase::WaitScan)
 	{
 		const double Wait = GetWorld() ? GetWorld()->GetTimeSeconds() - S.PhaseStart : 0.0;
@@ -2201,7 +3166,9 @@ void UEcoR9DemoSubsystem::DrawOverlay(UCanvas* Canvas, APlayerController* PC)
 		Lines.Add({bLive ? FString(TEXT("실시간 · 파이썬에서 배운 두뇌(사슴·늑대·멧돼지)를 언리얼 C++ 로 추론"))
 						 : FString(TEXT("파이썬 실행 기록 재생 (언리얼 실시간 추론 아님)")),
 				   Gold, true});
-		Lines.Add({FString::Printf(TEXT("%s   사슴 %d · 늑대 %d · 멧돼지 %d"), *Clock(S.SimSeconds), Alive[0], Alive[1], Alive[2]), White, true});
+		Lines.Add({FString::Printf(TEXT("%s   사슴 %d · 늑대 %d · 멧돼지 %d%s"), *Clock(S.SimSeconds), Alive[0], Alive[1], Alive[2],
+								   S.Info.bWhole ? *FString::Printf(TEXT("   (맵 전체 · 무리 자리 %d)"), static_cast<int32>(S.Info.HerdXY.size() / 2)) : TEXT("")),
+				   White, true});
 		Lines.Add({FString::Printf(TEXT("늑대가 잡음: 사슴 %d · 멧돼지 %d   |   멧돼지 반격 %d   |   굶어 죽음 %d"), S.DeerKilled, S.BoarKilled, S.Counters, S.Starved),
 				   White, false});
 		if (!S.CamLabel.IsEmpty())
@@ -2209,9 +3176,12 @@ void UEcoR9DemoSubsystem::DrawOverlay(UCanvas* Canvas, APlayerController* PC)
 			Lines.Add({S.CamLabel, White, false});
 		}
 		const FString Pick = S.Info.Policy == "argmax" ? TEXT("가장 높은 칸") : (S.Info.Policy == "sample" ? TEXT("확률대로 (학습 때와 같음)") : TEXT("?"));
-		Lines.Add({FString::Printf(TEXT("행동 고르기: %s · 멧돼지 몸 = 갈색 자리표시 (에셋 없음)%s"), *Pick, S.bFoodKnown ? TEXT(" · 풀 = 먹이 격자 값") : TEXT("")),
+		Lines.Add({FString::Printf(TEXT("행동 고르기: %s · 멧돼지 몸 = %s%s"), *Pick, S.BoarLine.IsEmpty() ? TEXT("갈색 자리표시 (에셋 없음)") : *S.BoarLine,
+								   S.bFoodKnown ? TEXT(" · 풀 = 먹이 격자 값") : TEXT("")),
 				   Gray, false});
-		Lines.Add({TEXT("1 자동 · 2 전체 · 3 사슴 · 4 늑대 · 5 멧돼지 · 6 위 · H 글자 끄기"), Gray, false});
+		Lines.Add({S.Info.bWhole ? FString(TEXT("1 자동 · 2 섬 전체 · 3 사슴 · 4 늑대 · 5 멧돼지 · 6 위 · 7 다음 무리 자리 · H 글자 끄기 · 끄기: 콘솔 eco.R9Demo 0"))
+								 : FString(TEXT("1 자동 · 2 전체 · 3 사슴 · 4 늑대 · 5 멧돼지 · 6 위 · H 글자 끄기 · 끄기: 콘솔 eco.R9Demo 0")),
+				   Gray, false});
 	}
 	// 화면 메시지와 같은 글꼴 (한글 됨 — EcoV3ObserverCamera.cpp:2493). 큰 줄은 배율만 키운다
 	UFont* Font = GEngine->GetSmallFont();

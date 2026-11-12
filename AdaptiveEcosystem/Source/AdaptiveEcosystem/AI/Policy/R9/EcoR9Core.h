@@ -10,6 +10,7 @@
 #pragma once
 
 #include <algorithm>
+#include <chrono>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -333,6 +334,17 @@ struct Params
     double HearSilent, HearQuiet, HearSpan, HearRQuiet, HearRLoud, MemKeep, MemGain, MemDecay;
     double Dir8[8][2], Golden8[8][2];
 
+    // ---- 큰 세계 (EcoR9Scene.h BuildBigScene 이 채움). 파이썬 장면은 모두 비어 있고 BigWorld 거짓 → 지금과 비트 같음 ----
+    std::vector<uint8_t> Blocked;     // G*G, 1 = 막힌 칸 (물·가파름·나무/바위/건물·땅 없음). 비면 막힌 칸 없음
+    std::vector<uint8_t> Spawnable;   // G*G, 1 = 시작·다시 남 자리 (가장 큰 이어진 땅의 열린 칸). 비면 막히지 않은 모든 칸
+    std::vector<int> SlotHerd;        // NumSlots, 칸 → 무리 자리 번호 (−1 = 없음). 비면 무리 없음 (다시 남 = 학습 세계 전체)
+    std::vector<double> HerdX, HerdY; // 무리 자리 가운데 (단위)
+    double HerdSide = 60.0;           // 무리 둘레 정사각 한 변 (다시 남 먼 꼴 후보 구역, 학습 세계 한 변)
+    bool BigWorld = false;            // 참 = 먹이 밀도(관측 7)를 산 개체 칸에서만 직접 셈 (뜻 같음, 덧셈 차례가 달라 비트는 다름)
+    // 장면 덤프에 있으면 읽는 세계 값 (세계 규칙은 쓰지 않음 — 큰 세계 생성기가 먹이 재생·친족 번호를 같게 만들 때 씀)
+    double GrassRegenMult = 1.0, RootRegenMult = 1.0;
+    int KinPerm[3] = {0, 1, 2};
+
     bool BitesAny(int Sp) const { return Bites[Sp][0] || Bites[Sp][1] || Bites[Sp][2]; }
 };
 
@@ -529,6 +541,12 @@ inline bool LoadParams(const DumpBlock& Blk, Params& P, std::string* Err)
     P.RespawnCandidates = static_cast<int>(Gt.D("const_respawn_candidates"));
     P.RespawnRingR0 = Gt.D("const_respawn_ring_r0");
     P.RespawnRingDr = Gt.D("const_respawn_ring_dr");
+    if (const DumpEntry* E = Blk.Find("const_grass_regen_mult")) { if (E->Count() == 1) { P.GrassRegenMult = E->AsDouble(0); } }
+    if (const DumpEntry* E = Blk.Find("const_root_regen_mult")) { if (E->Count() == 1) { P.RootRegenMult = E->AsDouble(0); } }
+    if (const DumpEntry* E = Blk.Find("kin_perm"))
+    {
+        if (E->Count() == 3) { for (size_t K = 0; K < 3; ++K) { P.KinPerm[K] = static_cast<int>(E->AsInt(K)); } }
+    }
     P.NormPos = Gt.D("norm_pos");
     P.NormVel = Gt.D("norm_vel");
     P.NormSize = Gt.D("norm_size");
@@ -1220,6 +1238,31 @@ public:
             Detail::SetErr(Err, "state size mismatch");
             return false;
         }
+        {
+            const size_t GG = static_cast<size_t>(P.G) * static_cast<size_t>(P.G);
+            if ((!P.Blocked.empty() && P.Blocked.size() != GG) || (!P.Spawnable.empty() && P.Spawnable.size() != GG) ||
+                St.Grass.size() != GG || St.Root.size() != GG || St.GrassCap.size() != GG || St.RootCap.size() != GG)
+            {
+                Detail::SetErr(Err, "grid size mismatch");
+                return false;
+            }
+            if (!P.SlotHerd.empty())
+            {
+                if (P.SlotHerd.size() != S || P.HerdX.size() != P.HerdY.size() || !(P.HerdSide > 0.0))
+                {
+                    Detail::SetErr(Err, "herd table mismatch");
+                    return false;
+                }
+                for (int H : P.SlotHerd)
+                {
+                    if (H >= static_cast<int>(P.HerdX.size()))
+                    {
+                        Detail::SetErr(Err, "bad herd index");
+                        return false;
+                    }
+                }
+            }
+        }
         BiterSlots.clear();
         Events.clear();
         for (int Sp = 0; Sp < 3; ++Sp)
@@ -1233,10 +1276,70 @@ public:
         std::sort(BiterSlots.begin(), BiterSlots.end());
         Resize();
         Tot = Stats{};
+        LastCost = CostStats{};
+        // 감각이 닿는 가장 먼 거리 (눈·코·소리) → 이웃 찾기 칸 격자 한 변 (+1 여유: 칸 경계에서 반올림 차가 나도 이웃을 놓치지 않게)
+        SenseR = std::max(P.HearRQuiet, P.HearRLoud);
+        // 눈 = SeeR × (먹는 중이면 HeadDown). 지금 장면은 HeadDown 0.6 (≤ 1) 이라 값이 같지만, 1 넘는 장면에서도 이웃을 놓치지 않게 (검토 11-13)
+        for (int k = 0; k < 3; ++k) { SenseR = std::max(SenseR, std::max(P.SeeR[k] * std::max(1.0, P.HeadDown[k]), P.SmellR[k])); }
+        HashB = std::max(1.0, SenseR + 1.0);
+        HashN = std::max(1, static_cast<int>(std::ceil(P.Size / HashB)) + 1);
+        BuildShelterIndex();
+        ResetGrowLists();
         return true;
     }
 
     int NumSlots() const { return P.NumSlots; }
+
+    // ---- 큰 세계 도움 함수 ----
+    // 막힌 칸 위인가 (막힌 칸이 없으면 늘 거짓). 격자 밖 좌표는 가장자리 칸으로 본다 (CellOf 와 같음).
+    bool IsBlockedAt(double X, double Y) const
+    {
+        if (P.Blocked.empty()) { return false; }
+        int Ix = 0, Iy = 0;
+        CellOf(X, Y, Ix, Iy);
+        return P.Blocked[static_cast<size_t>(Iy) * static_cast<size_t>(P.G) + static_cast<size_t>(Ix)] != 0;
+    }
+
+    // 시작·다시 남 자리로 쓸 수 있나 (Spawnable 이 있으면 그것, 없으면 막히지 않은 칸)
+    bool SpawnOkAt(double X, double Y) const
+    {
+        if (P.Spawnable.empty()) { return !IsBlockedAt(X, Y); }
+        int Ix = 0, Iy = 0;
+        CellOf(X, Y, Ix, Iy);
+        return P.Spawnable[static_cast<size_t>(Iy) * static_cast<size_t>(P.G) + static_cast<size_t>(Ix)] != 0;
+    }
+
+    int HerdOf(int Slot) const
+    {
+        return (Slot >= 0 && static_cast<size_t>(Slot) < P.SlotHerd.size()) ? P.SlotHerd[static_cast<size_t>(Slot)] : -1;
+    }
+
+    // 다시 자람이 도는 칸 목록을 다시 만든다 (용량 0 칸은 값도 0 이라 건너뛰어도 비트 같다). 바깥에서 GrassCap·RootCap 을 바꿨으면 부른다.
+    void ResetGrowLists()
+    {
+        GrowGrass.clear();
+        GrowRoot.clear();
+        for (size_t c = 0; c < St.GrassCap.size(); ++c)
+        {
+            if (St.GrassCap[c] != 0.0 || St.Grass[c] != 0.0) { GrowGrass.push_back(static_cast<int>(c)); }
+            if (St.RootCap[c] != 0.0 || St.Root[c] != 0.0) { GrowRoot.push_back(static_cast<int>(c)); }
+        }
+        GrowFor = St.GrassCap.size();
+    }
+
+    // 마지막 Tick 의 계산 비용 (결정 스텝만 관측·두뇌가 0 이 아님)
+    struct CostStats
+    {
+        double ObsMs = 0.0, BrainMs = 0.0, StepMs = 0.0;
+        int64_t PairChecks = 0;    // 감각 이웃 후보 짝 (관측 + 기억)
+        int64_t BrainCalls = 0;
+        int64_t RegrowCells = 0;
+        bool Decision = false;
+    };
+    CostStats LastCost;
+
+    // 은신처가 이보다 많으면 칸 색인을 쓴다 (Init 전에 바꾸면 적용 — 시험에서 전수 비교용). 결과는 같다.
+    size_t ShelterIndexMin = 32;
 
     // ---- 4 절 파생값 (지금 t 기준) ----
     void Derive()
@@ -1317,14 +1420,32 @@ public:
     // 실시간 한 스텝: t 가 짝수면 먼저 관측 → 두뇌 → 결정, 그다음 Step. ObsScratch 는 S*115.
     void Tick(const Brain* const* Brains, Pcg32Random& Rng, bool bStochastic, std::vector<float>& ObsScratch)
     {
+        using Clock = std::chrono::steady_clock;
+        CostStats Cost;
+        PairCount = 0;
         if ((St.T % 2) == 0)
         {
+            const Clock::time_point T0 = Clock::now();
             BuildObs(ObsScratch);
+            const Clock::time_point T1 = Clock::now();
             std::vector<int> Acts(static_cast<size_t>(P.NumSlots), ActWatch);
             ChooseActions(ObsScratch.data(), Brains, &Rng, bStochastic, Acts.data());
             Decide(Acts.data());
+            const Clock::time_point T2 = Clock::now();
+            Cost.Decision = true;
+            Cost.ObsMs = std::chrono::duration<double, std::milli>(T1 - T0).count();
+            Cost.BrainMs = std::chrono::duration<double, std::milli>(T2 - T1).count();
+            for (size_t s = 0; s < St.Alive.size(); ++s)
+            {
+                if (St.Alive[s] && Brains[St.Sp[s]] && Brains[St.Sp[s]]->Valid()) { Cost.BrainCalls += 1; }
+            }
         }
+        const Clock::time_point T3 = Clock::now();
         Step(Rng);
+        Cost.StepMs = std::chrono::duration<double, std::milli>(Clock::now() - T3).count();
+        Cost.PairChecks = PairCount;
+        Cost.RegrowCells = static_cast<int64_t>(GrowGrass.size() + GrowRoot.size());
+        LastCost = Cost;
     }
 
     // ---- 5-1 한 스텝 ----
@@ -1395,27 +1516,35 @@ public:
         {
             if (St.Alive[s] && !P.ShelterEnter[St.Sp[s]]) { AnyNe = true; }
         }
+        const bool Blk = !P.Blocked.empty();
+        std::vector<int>& ShCand = ShScratch;
         for (size_t s = 0; s < S; ++s)
         {
             Vec2d P1;
             {
+                // 벽과 막힌 칸 모두 축마다 따로 (x 먼저, 그다음 y) — 막히면 지금 칸 경계까지만 가고 다른 축은 그대로 미끄러진다
                 const double Psx = P0[s].x + V1[s].x;
                 P1.x = Clamp(Psx, 0.0, Sz);
+                if (Blk) { P1.x = SlideX(P0[s].x, P0[s].y, P1.x); }
                 if (P1.x != Psx) { V1[s].x = P1.x - P0[s].x; }
                 const double Psy = P0[s].y + V1[s].y;
                 P1.y = Clamp(Psy, 0.0, Sz);
+                if (Blk) { P1.y = SlideY(P1.x, P0[s].y, P1.y); }
                 if (P1.y != Psy) { V1[s].y = P1.y - P0[s].y; }
             }
             Vec2d P2 = P1;
             if (St.Alive[s] && St.KnockLeft[s] > 0)
             {
                 P2 = Vec2d{Clamp(P1.x + St.KnockDir[s].x * P.CounterKnockStep, 0.0, Sz), Clamp(P1.y + St.KnockDir[s].y * P.CounterKnockStep, 0.0, Sz)};
+                if (Blk) { P2 = SlideTo(P1, P2); }
                 St.KnockLeft[s] -= 1;
             }
             if (AnyNe && St.Alive[s] && !P.ShelterEnter[St.Sp[s]])
             {
-                for (size_t c = 0; c < P.ShelX.size(); ++c)
+                ShelterCandidates(P2.x, P2.y, 2.0 * (ShMaxR + P.ShelterPush) + 1.0, ShCand);
+                for (int Ci : ShCand)
                 {
+                    const size_t c = static_cast<size_t>(Ci);
                     const double Rr = P.ShelR[c] + P.ShelterPush;
                     const double Vx = P2.x - P.ShelX[c], Vy = P2.y - P.ShelY[c];
                     const double Dd = std::sqrt(Vx * Vx + Vy * Vy);
@@ -1427,7 +1556,8 @@ public:
                             Ux = Vx / std::max(Dd, kEps);
                             Uy = Vy / std::max(Dd, kEps);
                         }
-                        P2 = Vec2d{P.ShelX[c] + Ux * Rr, P.ShelY[c] + Uy * Rr};
+                        const Vec2d Pushed{P.ShelX[c] + Ux * Rr, P.ShelY[c] + Uy * Rr};
+                        P2 = Blk ? SlideTo(P2, Vec2d{Clamp(Pushed.x, 0.0, Sz), Clamp(Pushed.y, 0.0, Sz)}) : Pushed;
                     }
                 }
                 P2 = Vec2d{Clamp(P2.x, 0.0, Sz), Clamp(P2.y, 0.0, Sz)};
@@ -1498,8 +1628,13 @@ public:
         }
         const int Br = std::max(1, static_cast<int>(std::nearbyint(P.NormFoodR / Cell)));
         std::vector<double> Fbg, Fbr;
-        BoxMean(St.Grass, Br, G, Fbg);
-        BoxMean(St.Root, Br, G, Fbr);
+        if (!P.BigWorld)
+        {
+            BoxMean(St.Grass, Br, G, Fbg);
+            BoxMean(St.Root, Br, G, Fbr);
+        }
+        const bool Blk = !P.Blocked.empty();
+        BuildHash();
         struct Row
         {
             double Dist;
@@ -1528,18 +1663,30 @@ public:
             const double See = P.SeeR[k] * (St.Act[i] == ActEat ? P.HeadDown[k] : 1.0);
             const double Fov = P.FovCos[k], Smr = P.SmellR[k];
             Rows.clear();
-            for (size_t j = 0; j < S; ++j)
+            // 느낄 수 있는 개체는 칸 격자 이웃(SenseR 안)뿐. 아래에서 (거리, 칸) 차례로 정렬하므로 찾는 차례는 결과와 무관하다.
+            int Bx = 0, By = 0;
+            BucketOf(Px, Py, Bx, By);
+            for (int Qy = std::max(By - 1, 0); Qy <= std::min(By + 1, HashN - 1); ++Qy)
             {
-                if (j == i || !St.Alive[j]) { continue; }
-                const double Dx = St.Pos[j].x - Px, Dy = St.Pos[j].y - Py;
-                const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
-                const double Invd = 1.0 / std::max(Dist, kEps);
-                const double CosA = (Dx * Hx + Dy * Hy) * Invd;
-                const bool Vis = Dist <= See && CosA >= Fov;
-                const bool Perc = Vis || Dist <= Hr[j] || Dist <= Smr;
-                if (!Perc) { continue; }
-                const double Appr = Clamp((-(St.Disp[j].x * Dx + St.Disp[j].y * Dy)) * Invd / P.NormVel, -1.0, 1.0);
-                Rows.push_back(Row{Dist, static_cast<int>(j), Dx, Dy, Invd, Vis, Appr});
+                for (int Qx = std::max(Bx - 1, 0); Qx <= std::min(Bx + 1, HashN - 1); ++Qx)
+                {
+                    for (int jj = HashHead[static_cast<size_t>(Qy) * static_cast<size_t>(HashN) + static_cast<size_t>(Qx)]; jj >= 0;
+                         jj = HashNext[static_cast<size_t>(jj)])
+                    {
+                        const size_t j = static_cast<size_t>(jj);
+                        if (j == i) { continue; }
+                        PairCount += 1;
+                        const double Dx = St.Pos[j].x - Px, Dy = St.Pos[j].y - Py;
+                        const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
+                        const double Invd = 1.0 / std::max(Dist, kEps);
+                        const double CosA = (Dx * Hx + Dy * Hy) * Invd;
+                        const bool Vis = Dist <= See && CosA >= Fov;
+                        const bool Perc = Vis || Dist <= Hr[j] || Dist <= Smr;
+                        if (!Perc) { continue; }
+                        const double Appr = Clamp((-(St.Disp[j].x * Dx + St.Disp[j].y * Dy)) * Invd / P.NormVel, -1.0, 1.0);
+                        Rows.push_back(Row{Dist, static_cast<int>(j), Dx, Dy, Invd, Vis, Appr});
+                    }
+                }
             }
             CRows.clear();
             for (size_t c = 0; c < St.CarcOk.size(); ++c)
@@ -1566,7 +1713,14 @@ public:
             const double Wg = P.Eats[k][0] ? P.EPerUnit[k][0] : 0.0;
             const double Wr = P.Eats[k][1] ? P.EPerUnit[k][1] : 0.0;
             const double Wm = P.Eats[k][2] ? P.EPerUnit[k][2] : 0.0;
-            const double DensGrid = Wg * Fbg[CellI] + Wr * Fbr[CellI];
+            double DensGrid;
+            if (!P.BigWorld) { DensGrid = Wg * Fbg[CellI] + Wr * Fbr[CellI]; }
+            else
+            {
+                const double Bg = Wg != 0.0 ? BoxAt(St.Grass, Ix, Iy, Br) : 0.0;
+                const double Bro = Wr != 0.0 ? BoxAt(St.Root, Ix, Iy, Br) : 0.0;
+                DensGrid = Wg * Bg + Wr * Bro;
+            }
             const double HereGrid = Wg * St.Grass[CellI] + Wr * St.Root[CellI];
             double Dm = 0.0, Hm = 0.0;
             for (const CRow& Cr : CRows)
@@ -1577,17 +1731,7 @@ public:
             O[7] = (DensGrid + Wm * Dm / P.NormFoodBoxCells) / P.FoodDensityRef[k];
             O[8] = (HereGrid + Wm * Hm) / P.FoodHereRef[k];
             int Best = -1;
-            double EdgeV = std::numeric_limits<double>::infinity();
-            for (size_t n = 0; n < P.ShelX.size(); ++n)
-            {
-                const double Ex = Px - P.ShelX[n], Ey = Py - P.ShelY[n];
-                const double Ev = std::sqrt(Ex * Ex + Ey * Ey) - P.ShelR[n];
-                if (Ev < EdgeV)
-                {
-                    Best = static_cast<int>(n);
-                    EdgeV = Ev;
-                }
-            }
+            const double EdgeV = NearestShelter(Px, Py, Best);
             const bool Inside = EdgeV <= 0.0;
             O[9] = Inside ? 1.0 : 0.0;
             if (Best >= 0 && !Inside)
@@ -1605,7 +1749,10 @@ public:
                 const double Inf = std::numeric_limits<double>::infinity();
                 const double Tx = Ux > kEps ? (Sz - Px) / Ux : (Ux < -kEps ? Px / -Ux : Inf);
                 const double Ty = Uy > kEps ? (Sz - Py) / Uy : (Uy < -kEps ? Py / -Uy : Inf);
-                O[13 + j8] = std::min(Tx, Ty) / P.NormFree;
+                double Tf8 = std::min(Tx, Ty);
+                // 막힌 칸이 있으면 '벽 또는 첫 막힌 칸' 까지 (NormFree 넘으면 관측이 1 로 잘리므로 그 안만 찾는다)
+                if (Blk) { Tf8 = std::min(Tf8, RayBlocked(Px, Py, Ux, Uy, P.NormFree)); }
+                O[13 + j8] = Tf8 / P.NormFree;
             }
             O[21] = Spd[i] / P.NormSpeed;
             O[22] = St.Mating[i] ? 1.0 : 0.0;
@@ -1826,6 +1973,11 @@ private:
 
     double Edge(double X, double Y) const
     {
+        if (ShIndexed)
+        {
+            int Best = -1;
+            return NearestShelter(X, Y, Best);
+        }
         double E = std::numeric_limits<double>::infinity();
         for (size_t c = 0; c < P.ShelX.size(); ++c)
         {
@@ -1837,6 +1989,18 @@ private:
 
     bool Outside(double X, double Y, double Margin) const
     {
+        if (ShIndexed)
+        {
+            std::vector<int> Cand;
+            ShelterCandidates(X, Y, ShMaxR + std::max(Margin, 0.0) + 1.0, Cand);
+            for (int Ci : Cand)
+            {
+                const size_t c = static_cast<size_t>(Ci);
+                const double Dx = X - P.ShelX[c], Dy = Y - P.ShelY[c];
+                if (!(std::sqrt(Dx * Dx + Dy * Dy) > P.ShelR[c] + Margin)) { return false; }
+            }
+            return true;
+        }
         for (size_t c = 0; c < P.ShelX.size(); ++c)
         {
             const double Dx = X - P.ShelX[c], Dy = Y - P.ShelY[c];
@@ -2472,9 +2636,18 @@ private:
 
     void StepRegrow()
     {
-        const size_t GG = St.Grass.size();
-        for (size_t c = 0; c < GG; ++c) { St.Grass[c] = St.Grass[c] + St.GrassRegen[c] * (St.GrassCap[c] - St.Grass[c]); }
-        for (size_t c = 0; c < GG; ++c) { St.Root[c] = St.Root[c] + St.RootRegen[c] * (St.RootCap[c] - St.Root[c]); }
+        // 칸마다 따로인 식이라 차례는 상관없다. 용량 0·값 0 인 칸(막힌 칸·먹이 안 나는 칸)은 x + r(0 − 0) = x 라 건너뛰어도 비트 같다.
+        if (GrowFor != St.GrassCap.size()) { ResetGrowLists(); }
+        for (int Ci : GrowGrass)
+        {
+            const size_t c = static_cast<size_t>(Ci);
+            St.Grass[c] = St.Grass[c] + St.GrassRegen[c] * (St.GrassCap[c] - St.Grass[c]);
+        }
+        for (int Ci : GrowRoot)
+        {
+            const size_t c = static_cast<size_t>(Ci);
+            St.Root[c] = St.Root[c] + St.RootRegen[c] * (St.RootCap[c] - St.Root[c]);
+        }
         for (size_t c = 0; c < St.CarcOk.size(); ++c)
         {
             if (!St.CarcOk[c]) { continue; }
@@ -2498,11 +2671,16 @@ private:
         const bool Enter = P.ShelterEnter[k];
         bool HavePos = false, Newborn = false;
         Vec2d NewPos;
+        // 큰 세계: 무리 자리가 있으면 갓난 꼴은 같은 무리 성체 곁, 먼 꼴은 무리 자리 둘레 정사각 안. 자리는 Spawnable 칸만.
+        const int Herd = HerdOf(static_cast<int>(s));
+        const bool HasHerd = Herd >= 0 && static_cast<size_t>(Herd) < P.HerdX.size();
+        const bool Land = !P.Blocked.empty() || !P.Spawnable.empty();
         if (Dr.UForm < P.RespawnNewbornFrac)
         {
             std::vector<int> Adults;
             for (int q = P.SpLo[k]; q < P.SpHi[k]; ++q)
             {
+                if (HasHerd && HerdOf(q) != Herd) { continue; }
                 if (St.Alive[static_cast<size_t>(q)] && Mature[static_cast<size_t>(q)]) { Adults.push_back(q); }
             }
             if (!Adults.empty())
@@ -2515,6 +2693,7 @@ private:
                     const double Qx = St.Pos[a].x + Rr * P.Golden8[jj][0];
                     const double Qy = St.Pos[a].y + Rr * P.Golden8[jj][1];
                     if (!(0.0 <= Qx && Qx <= P.Size && 0.0 <= Qy && Qy <= P.Size)) { continue; }
+                    if (Land && !SpawnOkAt(Qx, Qy)) { continue; }
                     if (!Enter && !Outside(Qx, Qy, 0.0)) { continue; }
                     bool Crowded = false;
                     for (size_t q = 0; q < S; ++q)
@@ -2541,10 +2720,29 @@ private:
             int BestOk = -1, BestI = 0;
             double BestV = -std::numeric_limits<double>::infinity();
             const int NC = P.RespawnCandidates;
+            // 후보 c ∈ [0, Size) 를 무리 둘레 정사각 [X0, X0 + Side) 로 옮긴다 (무리 없으면 그대로 — 학습 세계)
+            double HX0 = 0.0, HY0 = 0.0, HSide = P.Size;
+            if (HasHerd)
+            {
+                HSide = std::min(P.HerdSide, P.Size);
+                HX0 = Clamp(P.HerdX[static_cast<size_t>(Herd)] - 0.5 * HSide, 0.0, P.Size - HSide);
+                HY0 = Clamp(P.HerdY[static_cast<size_t>(Herd)] - 0.5 * HSide, 0.0, P.Size - HSide);
+            }
+            auto CandAt = [&](int ci, double& Cx, double& Cy) {
+                Cx = Dr.Cand[static_cast<size_t>(2 * ci)];
+                Cy = Dr.Cand[static_cast<size_t>(2 * ci + 1)];
+                if (HasHerd)
+                {
+                    Cx = HX0 + Cx / P.Size * HSide;
+                    Cy = HY0 + Cy / P.Size * HSide;
+                }
+            };
             for (int ci = 0; ci < NC; ++ci)
             {
-                const double Cx = Dr.Cand[static_cast<size_t>(2 * ci)], Cy = Dr.Cand[static_cast<size_t>(2 * ci + 1)];
-                const bool Out = Outside(Cx, Cy, Margin);
+                double Cx = 0.0, Cy = 0.0;
+                CandAt(ci, Cx, Cy);
+                const bool LandOk = !Land || SpawnOkAt(Cx, Cy);
+                const bool Out = LandOk && Outside(Cx, Cy, Margin);
                 double DMin = 1e9;
                 bool Any = false;
                 for (size_t q = 0; q < S; ++q)
@@ -2559,7 +2757,7 @@ private:
                     }
                 }
                 if (Out && DMin >= P.RespawnFarR && BestOk < 0) { BestOk = ci; }
-                const double V = Out ? DMin : DMin - 1e6;
+                const double V = Out ? DMin : (LandOk ? DMin - 1e6 : DMin - 2e6);
                 if (V > BestV)
                 {
                     BestI = ci;
@@ -2567,7 +2765,16 @@ private:
                 }
             }
             const int Ci = BestOk >= 0 ? BestOk : BestI;
-            NewPos = Vec2d{Dr.Cand[static_cast<size_t>(2 * Ci)], Dr.Cand[static_cast<size_t>(2 * Ci + 1)]};
+            CandAt(Ci, NewPos.x, NewPos.y);
+            if (Land && !SpawnOkAt(NewPos.x, NewPos.y))
+            {
+                // 후보 64 개가 모두 막힌 칸 — 무리 자리(없으면 그 후보) 곁 가장 가까운 Spawnable 칸.
+                // 반경은 격자 전체 (검토 11-13: 64 칸이면 무리 없는 세계에서 바다 한가운데 후보가 뽑힐 때 못 찾고 막힌 칸에 남을 수 있었다.
+                // 처음 찾은 고리에서 멈추므로 보통은 곧 끝난다)
+                const Vec2d From = HasHerd ? Vec2d{P.HerdX[static_cast<size_t>(Herd)], P.HerdY[static_cast<size_t>(Herd)]} : NewPos;
+                Vec2d Near;
+                if (NearestSpawnable(From.x, From.y, P.G, Near)) { NewPos = Near; }
+            }
         }
         const uint64_t Sq = P.SeedQ[0];
         const uint64_t Uu = static_cast<uint64_t>(Uid);
@@ -2675,30 +2882,50 @@ private:
             const double Sp = std::sqrt(St.Disp[j].x * St.Disp[j].x + St.Disp[j].y * St.Disp[j].y);
             Hr[j] = HearR(Sp);
         }
+        // 느낄 수 있는 짝은 칸 격자 이웃(SenseR 안)뿐 — 나머지는 '못 느낌' 식(감쇠) 그대로. 식·값은 전수 비교와 같다.
+        BuildHash();
+        PercStamp.assign(S, 0);
+        PercAppr.assign(S, 0.0);
+        int64_t Stamp = 0;
         for (size_t i = 0; i < S; ++i)
         {
             if (!St.Alive[i]) { continue; }
             const int k = St.Sp[i];
             const double See = P.SeeR[k] * (St.Act[i] == ActEat ? P.HeadDown[k] : 1.0);
             const double Hx = St.Head[i].x, Hy = St.Head[i].y;
+            Stamp += 1;
+            int Bx = 0, By = 0;
+            BucketOf(St.Pos[i].x, St.Pos[i].y, Bx, By);
+            for (int Qy = std::max(By - 1, 0); Qy <= std::min(By + 1, HashN - 1); ++Qy)
+            {
+                for (int Qx = std::max(Bx - 1, 0); Qx <= std::min(Bx + 1, HashN - 1); ++Qx)
+                {
+                    for (int jj = HashHead[static_cast<size_t>(Qy) * static_cast<size_t>(HashN) + static_cast<size_t>(Qx)]; jj >= 0;
+                         jj = HashNext[static_cast<size_t>(jj)])
+                    {
+                        const size_t j = static_cast<size_t>(jj);
+                        if (j == i) { continue; }
+                        PairCount += 1;
+                        const double Dx = St.Pos[j].x - St.Pos[i].x, Dy = St.Pos[j].y - St.Pos[i].y;
+                        const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
+                        const double Invd = 1.0 / std::max(Dist, kEps);
+                        const double CosA = (Dx * Hx + Dy * Hy) * Invd;
+                        const bool Perc = (Dist <= See && CosA >= P.FovCos[k]) || Dist <= Hr[j] || Dist <= P.SmellR[k];
+                        if (Perc)
+                        {
+                            PercStamp[j] = Stamp;
+                            PercAppr[j] = Clamp((-(St.Disp[j].x * Dx + St.Disp[j].y * Dy)) * Invd / P.NormVel, -1.0, 1.0);
+                        }
+                    }
+                }
+            }
             for (size_t j = 0; j < S; ++j)
             {
                 if (!St.Alive[j]) { continue; }
                 double& Mv = St.Mem[i * S + j];
-                if (j == i)
+                if (j != i && PercStamp[j] == Stamp)
                 {
-                    Mv = P.MemDecay * Mv;
-                    continue;
-                }
-                const double Dx = St.Pos[j].x - St.Pos[i].x, Dy = St.Pos[j].y - St.Pos[i].y;
-                const double Dist = std::sqrt(Dx * Dx + Dy * Dy);
-                const double Invd = 1.0 / std::max(Dist, kEps);
-                const double CosA = (Dx * Hx + Dy * Hy) * Invd;
-                const bool Perc = (Dist <= See && CosA >= P.FovCos[k]) || Dist <= Hr[j] || Dist <= P.SmellR[k];
-                if (Perc)
-                {
-                    const double Appr = Clamp((-(St.Disp[j].x * Dx + St.Disp[j].y * Dy)) * Invd / P.NormVel, -1.0, 1.0);
-                    Mv = P.MemKeep * Mv + P.MemGain * Appr;
+                    Mv = P.MemKeep * Mv + P.MemGain * PercAppr[j];
                 }
                 else
                 {
@@ -2706,6 +2933,273 @@ private:
                 }
             }
         }
+    }
+
+    // ---- 이웃 찾기 칸 격자 (공간 해시) — 산 개체만, 한 변 HashB = SenseR + 1 ----
+    double SenseR = 20.0, HashB = 21.0;
+    int HashN = 1;
+    mutable std::vector<int> HashHead, HashNext;
+    std::vector<int64_t> PercStamp;
+    std::vector<double> PercAppr;
+    mutable int64_t PairCount = 0;
+
+    void BucketOf(double X, double Y, int& Bx, int& By) const
+    {
+        Bx = std::min(std::max(static_cast<int>(std::floor(X / HashB)), 0), HashN - 1);
+        By = std::min(std::max(static_cast<int>(std::floor(Y / HashB)), 0), HashN - 1);
+    }
+
+    void BuildHash() const
+    {
+        const size_t S = static_cast<size_t>(P.NumSlots);
+        HashHead.assign(static_cast<size_t>(HashN) * static_cast<size_t>(HashN), -1);
+        HashNext.assign(S, -1);
+        for (size_t s = S; s-- > 0;)
+        {
+            if (!St.Alive[s]) { continue; }
+            int Bx = 0, By = 0;
+            BucketOf(St.Pos[s].x, St.Pos[s].y, Bx, By);
+            const size_t B = static_cast<size_t>(By) * static_cast<size_t>(HashN) + static_cast<size_t>(Bx);
+            HashNext[s] = HashHead[B];
+            HashHead[B] = static_cast<int>(s);
+        }
+    }
+
+    // ---- 은신처 칸 색인 (은신처가 많을 때만; 결과는 전수와 같다 — 같은 식, 같은 차례, 같은 동점 처리) ----
+    double ShB = 16.0, ShMaxR = 0.0;
+    int ShN = 0;
+    bool ShIndexed = false;
+    std::vector<int> ShStart, ShList;   // 칸 b 의 은신처 = ShList[ShStart[b] .. ShStart[b+1]) (번호 오름차순)
+    std::vector<int> ShScratch;
+
+    void ShBucketOf(double X, double Y, int& Bx, int& By) const
+    {
+        Bx = std::min(std::max(static_cast<int>(std::floor(X / ShB)), 0), ShN - 1);
+        By = std::min(std::max(static_cast<int>(std::floor(Y / ShB)), 0), ShN - 1);
+    }
+
+    void BuildShelterIndex()
+    {
+        const size_t NS = P.ShelX.size();
+        ShMaxR = 0.0;
+        for (size_t c = 0; c < NS; ++c) { ShMaxR = std::max(ShMaxR, P.ShelR[c]); }
+        ShIndexed = NS > ShelterIndexMin;
+        ShStart.clear();
+        ShList.clear();
+        if (!ShIndexed) { return; }
+        ShN = std::max(1, static_cast<int>(std::ceil(P.Size / ShB)) + 1);
+        const size_t NB = static_cast<size_t>(ShN) * static_cast<size_t>(ShN);
+        ShStart.assign(NB + 1u, 0);
+        std::vector<size_t> Bk(NS);
+        for (size_t c = 0; c < NS; ++c)
+        {
+            int Bx = 0, By = 0;
+            ShBucketOf(P.ShelX[c], P.ShelY[c], Bx, By);
+            Bk[c] = static_cast<size_t>(By) * static_cast<size_t>(ShN) + static_cast<size_t>(Bx);
+            ShStart[Bk[c] + 1u] += 1;
+        }
+        for (size_t b = 0; b < NB; ++b) { ShStart[b + 1u] += ShStart[b]; }
+        ShList.assign(NS, 0);
+        std::vector<int> Fill(ShStart.begin(), ShStart.end() - 1);
+        for (size_t c = 0; c < NS; ++c) { ShList[static_cast<size_t>(Fill[Bk[c]]++)] = static_cast<int>(c); }
+    }
+
+    // 가운데가 (X, Y) 에서 Radius 안일 수 있는 은신처 번호 (오름차순). 색인이 없으면 모두.
+    void ShelterCandidates(double X, double Y, double Radius, std::vector<int>& Out) const
+    {
+        Out.clear();
+        const size_t NS = P.ShelX.size();
+        if (!ShIndexed)
+        {
+            for (size_t c = 0; c < NS; ++c) { Out.push_back(static_cast<int>(c)); }
+            return;
+        }
+        const int Rb = static_cast<int>(std::ceil(Radius / ShB)) + 1;
+        int Bx = 0, By = 0;
+        ShBucketOf(X, Y, Bx, By);
+        for (int Qy = std::max(By - Rb, 0); Qy <= std::min(By + Rb, ShN - 1); ++Qy)
+        {
+            for (int Qx = std::max(Bx - Rb, 0); Qx <= std::min(Bx + Rb, ShN - 1); ++Qx)
+            {
+                const size_t B = static_cast<size_t>(Qy) * static_cast<size_t>(ShN) + static_cast<size_t>(Qx);
+                for (int q = ShStart[B]; q < ShStart[B + 1u]; ++q) { Out.push_back(ShList[static_cast<size_t>(q)]); }
+            }
+        }
+        std::sort(Out.begin(), Out.end());
+    }
+
+    // 가장자리 거리(√(dx²+dy²) − r)가 가장 작은 은신처 (같으면 번호 작은 쪽) — BuildObs 의 Best·EdgeV 와 Edge() 의 값.
+    double NearestShelter(double X, double Y, int& Best) const
+    {
+        Best = -1;
+        double BestE = std::numeric_limits<double>::infinity();
+        const size_t NS = P.ShelX.size();
+        auto Try = [&](size_t n) {
+            const double Ex = X - P.ShelX[n], Ey = Y - P.ShelY[n];
+            const double Ev = std::sqrt(Ex * Ex + Ey * Ey) - P.ShelR[n];
+            if (Ev < BestE || (Ev == BestE && Best >= 0 && static_cast<int>(n) < Best))
+            {
+                Best = static_cast<int>(n);
+                BestE = Ev;
+            }
+        };
+        if (!ShIndexed)
+        {
+            for (size_t n = 0; n < NS; ++n) { Try(n); }
+            return BestE;
+        }
+        int Bx = 0, By = 0;
+        ShBucketOf(X, Y, Bx, By);
+        const int KMax = std::max(std::max(Bx, ShN - 1 - Bx), std::max(By, ShN - 1 - By));
+        for (int K = 0; K <= KMax; ++K)
+        {
+            // 고리 K 의 은신처 가운데까지 ≥ (K − 1)·ShB → 가장자리 ≥ (K − 1)·ShB − 가장 큰 반지름. 한 고리 더 여유를 두고 멈춘다.
+            if (Best >= 0 && static_cast<double>(K - 2) * ShB - ShMaxR > BestE) { break; }
+            for (int Qy = By - K; Qy <= By + K; ++Qy)
+            {
+                if (Qy < 0 || Qy >= ShN) { continue; }
+                const bool EdgeRow = (Qy == By - K || Qy == By + K);
+                for (int Qx = Bx - K; Qx <= Bx + K; Qx += (EdgeRow || K == 0) ? 1 : 2 * K)
+                {
+                    if (Qx < 0 || Qx >= ShN) { continue; }
+                    const size_t B = static_cast<size_t>(Qy) * static_cast<size_t>(ShN) + static_cast<size_t>(Qx);
+                    for (int q = ShStart[B]; q < ShStart[B + 1u]; ++q) { Try(static_cast<size_t>(ShList[static_cast<size_t>(q)])); }
+                }
+            }
+        }
+        return BestE;
+    }
+
+    // ---- 막힌 칸 미끄러짐 (축 하나씩). 지금 칸에서 목표 칸 쪽으로 칸을 하나씩 보며, 처음 막힌 칸 앞 경계에서 멈춘다 ----
+    bool CellBlockedIdx(int Ix, int Iy) const
+    {
+        if (Ix < 0 || Iy < 0 || Ix >= P.G || Iy >= P.G) { return false; }
+        return P.Blocked[static_cast<size_t>(Iy) * static_cast<size_t>(P.G) + static_cast<size_t>(Ix)] != 0;
+    }
+
+    double SlideAxis(double From, double To, double Other, bool bX) const
+    {
+        const double Inv = 1.0 / P.Cell;
+        auto CellC = [this, Inv](double V) { return std::min(std::max(static_cast<int>(V * Inv), 0), P.G - 1); };
+        const int C0 = CellC(From), C1 = CellC(To), Co = CellC(Other);
+        if (C0 == C1) { return To; }
+        const int Dir = C1 > C0 ? 1 : -1;
+        for (int c = C0 + Dir;; c += Dir)
+        {
+            if (bX ? CellBlockedIdx(c, Co) : CellBlockedIdx(Co, c))
+            {
+                // 앞 칸(c − Dir)의 경계까지. 오른쪽(위)으로 가면 경계 바로 아래 값, 왼쪽(아래)으로 가면 경계 값 그대로
+                double V = Dir > 0 ? std::nextafter(static_cast<double>(c) * P.Cell, -std::numeric_limits<double>::infinity())
+                                   : static_cast<double>(c + 1) * P.Cell;
+                for (int Guard = 0; Guard < 4 && CellC(V) != c - Dir; ++Guard)
+                {
+                    V = std::nextafter(V, From);
+                }
+                if (CellC(V) != c - Dir) { V = From; }
+                return V;
+            }
+            if (c == C1) { break; }
+        }
+        return To;
+    }
+
+    double SlideX(double X0, double Y0, double X1) const { return SlideAxis(X0, X1, Y0, true); }
+    double SlideY(double X1, double Y0, double Y1) const { return SlideAxis(Y0, Y1, X1, false); }
+
+    // A → B 를 x 먼저, 그다음 y 로 미끄러지며 옮김 (반격 밀림·은신처 밀어냄용)
+    Vec2d SlideTo(const Vec2d& A, const Vec2d& B) const
+    {
+        Vec2d R;
+        R.x = SlideX(A.x, A.y, B.x);
+        R.y = SlideY(R.x, A.y, B.y);
+        return R;
+    }
+
+    // (X, Y) 에서 단위 방향 (Ux, Uy) 로 처음 막힌 칸에 들어가는 거리 (MaxT 안에 없으면 무한). 출발 칸은 보지 않는다.
+    double RayBlocked(double X, double Y, double Ux, double Uy, double MaxT) const
+    {
+        const double Inf = std::numeric_limits<double>::infinity();
+        const double Cl = P.Cell;
+        int Ix = 0, Iy = 0;
+        CellOf(X, Y, Ix, Iy);
+        const int StepX = Ux > kEps ? 1 : (Ux < -kEps ? -1 : 0);
+        const int StepY = Uy > kEps ? 1 : (Uy < -kEps ? -1 : 0);
+        double TMaxX = StepX > 0 ? (static_cast<double>(Ix + 1) * Cl - X) / Ux : (StepX < 0 ? (X - static_cast<double>(Ix) * Cl) / -Ux : Inf);
+        double TMaxY = StepY > 0 ? (static_cast<double>(Iy + 1) * Cl - Y) / Uy : (StepY < 0 ? (Y - static_cast<double>(Iy) * Cl) / -Uy : Inf);
+        const double TDx = StepX != 0 ? Cl / std::fabs(Ux) : Inf;
+        const double TDy = StepY != 0 ? Cl / std::fabs(Uy) : Inf;
+        for (int Guard = 0; Guard < 4 * P.G + 8; ++Guard)
+        {
+            double T;
+            if (TMaxX < TMaxY)
+            {
+                T = TMaxX;
+                Ix += StepX;
+                TMaxX += TDx;
+            }
+            else
+            {
+                T = TMaxY;
+                Iy += StepY;
+                TMaxY += TDy;
+            }
+            if (!(T <= MaxT)) { return Inf; }
+            if (Ix < 0 || Iy < 0 || Ix >= P.G || Iy >= P.G) { return Inf; }
+            if (CellBlockedIdx(Ix, Iy)) { return std::max(T, 0.0); }
+        }
+        return Inf;
+    }
+
+    // 큰 세계: 칸 (Ix, Iy) 둘레 반경 Br 칸 평균 (BoxMean 과 같은 창·같은 나눗수, 덧셈 차례만 다름)
+    double BoxAt(const std::vector<double>& F, int Ix, int Iy, int Br) const
+    {
+        const int G = P.G;
+        const int X0 = std::min(std::max(Ix - Br, 0), G), X1 = std::min(std::max(Ix + Br + 1, 0), G);
+        const int Y0 = std::min(std::max(Iy - Br, 0), G), Y1 = std::min(std::max(Iy + Br + 1, 0), G);
+        double Sum = 0.0;
+        for (int y = Y0; y < Y1; ++y)
+        {
+            const double* Row = &F[static_cast<size_t>(y) * static_cast<size_t>(G)];
+            for (int x = X0; x < X1; ++x) { Sum += Row[x]; }
+        }
+        return Sum / static_cast<double>((Y1 - Y0) * (X1 - X0));
+    }
+
+    // 다시 자람 칸 목록
+    std::vector<int> GrowGrass, GrowRoot;
+    size_t GrowFor = 0;
+
+    // 가장 가까운 Spawnable 칸 가운데 (나선, 반경 MaxR 칸). 없으면 거짓.
+    bool NearestSpawnable(double X, double Y, int MaxR, Vec2d& Out) const
+    {
+        int Ix = 0, Iy = 0;
+        CellOf(X, Y, Ix, Iy);
+        // 고리 R 의 칸만 본다 (윗줄·아랫줄은 모두, 가운데 줄은 양 끝 둘만 — 같은 차례). 반경을 격자 전체로 늘려도 O(G²) 안에서 끝난다 (검토 11-13).
+        for (int R = 0; R <= MaxR; ++R)
+        {
+            double BestD = std::numeric_limits<double>::infinity();
+            bool Found = false;
+            for (int Qy = Iy - R; Qy <= Iy + R; ++Qy)
+            {
+                if (Qy < 0 || Qy >= P.G) { continue; }
+                const bool EdgeRow = Qy == Iy - R || Qy == Iy + R;
+                for (int Qx = Ix - R; Qx <= Ix + R; Qx += (EdgeRow || R == 0) ? 1 : 2 * R)
+                {
+                    if (Qx < 0 || Qx >= P.G) { continue; }
+                    const double Cx = (Qx + 0.5) * P.Cell, Cy = (Qy + 0.5) * P.Cell;
+                    if (!SpawnOkAt(Cx, Cy)) { continue; }
+                    const double D = (Cx - X) * (Cx - X) + (Cy - Y) * (Cy - Y);
+                    if (D < BestD)
+                    {
+                        BestD = D;
+                        Out = Vec2d{Cx, Cy};
+                        Found = true;
+                    }
+                }
+            }
+            if (Found) { return true; }
+        }
+        return false;
     }
 };
 

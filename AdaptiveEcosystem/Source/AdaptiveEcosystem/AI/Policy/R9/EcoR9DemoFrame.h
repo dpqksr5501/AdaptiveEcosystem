@@ -143,6 +143,13 @@ namespace EcoR9Demo
 		std::string Brains;                    // 두뇌 설명 (기록 줄·화면 글)
 		std::string Note;
 		std::vector<std::string> ActionNames;  // 19 개 (재생 머리에서)
+		// 맵 전체 땅 모드 (2026-11-13) — 작은 세계는 비거나 기본값
+		bool bWhole = false;                   // 큰 세계 (프레임에 먹이 격자를 싣지 않음 — FR9LiveSource::ReadFood)
+		float GrassCapMax = 0.0f;              // 가장 큰 풀 용량 (큰 세계는 GrassCap 을 싣지 않고 이 값만)
+		std::vector<double> HerdXY;            // 무리 자리 가운데 (x0, y0, … 단위) — 카메라 7 번
+		std::int64_t LandCells = 0;            // 열린 칸 · 가장 큰 이어진 땅 칸 (기록 줄)
+		std::int64_t MainCells = 0;
+		std::int32_t ShelterAnchored = 0;      // 나무·바위 곁에 둔 은신처 수
 	};
 
 	// -------------------------------------------------------------------------

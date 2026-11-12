@@ -5,8 +5,14 @@
 //   bit0 산 · bit1 이 스텝 실제로 먹이 얻음 · bit2 실제 걸음 뛰기 · bit3 은신처 안 · bit4 이 스텝 물기 사건(문 늑대와 물린 먹이 둘 다, 반격 포함) ·
 //   bit5 새로 남 · bit6 물려 죽음 · bit7 굶어/기타 죽음(반격으로 죽은 늑대 = bit7 + bit4). 죽은 개체는 죽은 스텝에만 bit0 꺼진 채 한 번 나온다.
 // 학습 세계는 죽은 칸을 같은 스텝에 다시 채우므로(다시 남) 죽은 개체의 uid 는 스텝 앞 uid 표에서 찾는다.
+//
+// 맵 전체 땅 모드 (2026-11-13, scratchpad/r9/ue_demo/whole/CORE_API.md): Config.Whole 이 있으면 scene.txt 는 LoadParams(몸 표·상수)만 쓰고,
+// 코어 큰 세계 장면 생성기 BuildBigScene(EcoR9Scene.h) 이 땅 지도 위에 무리 자리·은신처·먹이·시작 개체를 만든다. 먹이 격자가 커서
+// (섬 약 700² 칸) 프레임에 격자를 싣지 않고 ReadFood 로 창만 읽는다.
 
 #include "EcoR9DemoLiveSource.h"
+
+#include <cstdio>
 
 #if defined(__has_include)
 #if __has_include("EcoR9Core.h")
@@ -16,6 +22,16 @@
 #endif
 #ifndef ECO_R9_DEMO_HAS_CORE
 #define ECO_R9_DEMO_HAS_CORE 0
+#endif
+// 큰 세계 장면 생성기 (코어 갈래가 더하는 새 헤더 — 없으면 맵 전체 땅 모드만 안 되고 예전 한 무대는 그대로)
+#if ECO_R9_DEMO_HAS_CORE && defined(__has_include)
+#if __has_include("EcoR9Scene.h")
+#include "EcoR9Scene.h"
+#define ECO_R9_DEMO_HAS_BIG 1
+#endif
+#endif
+#ifndef ECO_R9_DEMO_HAS_BIG
+#define ECO_R9_DEMO_HAS_BIG 0
 #endif
 
 // 언리얼 빌드(WITH_ENGINE)는 파일을 FFileHelper 로 읽어 바이트로 넘긴다 — 이 파일은 std 파일 읽기를 g++ 시험에서만 쓴다
@@ -40,7 +56,10 @@ namespace EcoR9Demo
 		std::vector<std::int64_t> UidBefore;   // 스텝 앞 칸 → uid (사건·죽은 개체용)
 		std::vector<int> KinToSpecies;         // 친족 id → 종 (사체 종)
 		bool bSample = true;
+		bool bBig = false;                     // 큰 세계 (프레임에 먹이 격자를 싣지 않음)
 		std::uint32_t StepCount = 0;
+		std::int64_t OnBlocked = 0;            // 확인용: 스텝 끝 막힌 칸 위 산 개체 (큰 세계만, 읽기만)
+		std::int64_t AgentSteps = 0;           // 확인용: 센 산 개체-스텝
 	};
 
 	namespace LiveImpl
@@ -234,6 +253,13 @@ namespace EcoR9Demo
 														  : 0);
 				Out.Carcasses.push_back(C);
 			}
+			if (I.bBig)
+			{
+				// 큰 세계: 격자 전체를 스텝마다 베끼지 않는다 (섬 약 49만 칸 × 2) — 화면은 ReadFood 로 카메라 둘레 창만 읽는다
+				Out.Grass.clear();
+				Out.Root.clear();
+				return;
+			}
 			Out.Grass.resize(St.Grass.size());
 			for (std::size_t k = 0; k < St.Grass.size(); ++k)
 			{
@@ -251,6 +277,8 @@ namespace EcoR9Demo
 	FR9LiveSource::~FR9LiveSource() = default;
 
 	bool FR9LiveSource::Available() { return true; }
+
+	bool FR9LiveSource::WholeAvailable() { return ECO_R9_DEMO_HAS_BIG != 0; }
 
 	bool FR9LiveSource::Init(const FR9LiveConfig& Config, FR9WorldInfo& OutInfo, FR9Frame& OutFirst, std::string& Err)
 	{
@@ -284,7 +312,65 @@ namespace EcoR9Demo
 		}
 		EcoR9::Params P;
 		EcoR9::State S0;
-		if (!EcoR9::LoadParams(*Scene, P, &Err) || !EcoR9::LoadState(*Scene, P, S0, &Err))
+		std::string BigLine;
+		std::int64_t BigLand = 0, BigMain = 0;
+		std::int32_t BigAnchored = 0;
+		if (Config.Whole)
+		{
+#if ECO_R9_DEMO_HAS_BIG
+			// 맵 전체 땅: 장면 파일은 몸 표·상수만 (LoadParams), 땅 지도 위에 큰 세계 장면을 만든다 (CORE_API.md 2 절)
+			const FR9WholeSpec& Ws = *Config.Whole;
+			const std::size_t Cells = static_cast<std::size_t>(Ws.G) * static_cast<std::size_t>(Ws.G);
+			if (Ws.G <= 0 || Ws.Kind.size() != Cells)
+			{
+				Err = "땅 지도 크기가 이상하다 (G " + std::to_string(Ws.G) + ", 칸 " + std::to_string(Ws.Kind.size()) + ")";
+				return false;
+			}
+			EcoR9::Params Base;
+			if (!EcoR9::LoadParams(*Scene, Base, &Err))
+			{
+				Err = "장면 상수 읽기 실패: " + Err;
+				return false;
+			}
+			EcoR9::LandMap Land;
+			Land.G = Ws.G;
+			Land.Cell = Ws.CellUnits;
+			Land.Kind = Ws.Kind;
+			Land.Anchor = Ws.Anchor;
+			EcoR9::BigSpec B;
+			B.Seed = Config.Seed;
+			B.Herds = Ws.Herds;
+			for (int k = 0; k < 3; ++k)
+			{
+				B.PerHerd[k] = Ws.PerHerd[k];
+			}
+			B.MaxAnimals = Ws.MaxAnimals;
+			B.Sites = Ws.Sites;
+			B.PrefX = Ws.PrefX;
+			B.PrefY = Ws.PrefY;
+			EcoR9::BigInfo Bi;
+			if (!EcoR9::BuildBigScene(Base, Land, B, P, S0, Bi, &Err))
+			{
+				Err = "큰 세계 장면 만들기 실패: " + Err;
+				return false;
+			}
+			I.bBig = true;
+			BigLand = Bi.OpenCells;
+			BigMain = Bi.MainCells;
+			BigAnchored = Bi.ShelterAnchored;
+			BigLine = " | 큰 세계 " + std::to_string(Bi.G) + "² 칸 · 무리 자리 " + std::to_string(Bi.Sites.size() / 2) + " · 사슴 " + std::to_string(Bi.Counts[0]) + " · 늑대 " +
+					  std::to_string(Bi.Counts[1]) + " · 멧돼지 " + std::to_string(Bi.Counts[2]) + " · 은신처 " + std::to_string(Bi.Shelters) + " (나무·바위 곁 " +
+					  std::to_string(Bi.ShelterAnchored) + ")" + (Bi.Note.empty() ? std::string() : " · " + Bi.Note);
+			for (char& Ch : BigLine)
+			{
+				Ch = Ch == '\n' ? ' ' : Ch;   // 생성기 경고는 줄마다 줄바꿈 — 기록 줄 한 줄로
+			}
+#else
+			Err = "이 빌드의 코어에는 큰 세계 장면 생성기(EcoR9Scene.h)가 없다 — 맵 전체 땅 모드를 못 한다";
+			return false;
+#endif
+		}
+		else if (!EcoR9::LoadParams(*Scene, P, &Err) || !EcoR9::LoadState(*Scene, P, S0, &Err))
 		{
 			Err = "장면 상수·상태 읽기 실패: " + Err;
 			return false;
@@ -350,17 +436,37 @@ namespace EcoR9Demo
 			Sh.R = P.ShelR[k];
 			OutInfo.Shelters.push_back(Sh);
 		}
+		double CapMax = 0.0;
 		for (const double V : St.GrassCap)
 		{
-			OutInfo.GrassCap.push_back(static_cast<float>(V));
+			CapMax = V > CapMax ? V : CapMax;
 		}
-		for (const double V : St.RootCap)
+		OutInfo.GrassCapMax = static_cast<float>(CapMax);
+		if (!I.bBig)
 		{
-			OutInfo.RootCap.push_back(static_cast<float>(V));
+			for (const double V : St.GrassCap)
+			{
+				OutInfo.GrassCap.push_back(static_cast<float>(V));
+			}
+			for (const double V : St.RootCap)
+			{
+				OutInfo.RootCap.push_back(static_cast<float>(V));
+			}
 		}
+		OutInfo.bWhole = I.bBig;
+		OutInfo.LandCells = BigLand;
+		OutInfo.MainCells = BigMain;
+		OutInfo.ShelterAnchored = BigAnchored;
+#if ECO_R9_DEMO_HAS_BIG
+		for (std::size_t k = 0; k < P.HerdX.size() && k < P.HerdY.size(); ++k)
+		{
+			OutInfo.HerdXY.push_back(P.HerdX[k]);
+			OutInfo.HerdXY.push_back(P.HerdY[k]);
+		}
+#endif
 		OutInfo.Seed = Config.Seed;
 		OutInfo.Policy = Config.bSample ? "sample" : "argmax";
-		OutInfo.Brains = Summary + " (scene seed " + std::to_string(P.Seed) + ")";
+		OutInfo.Brains = Summary + " (scene seed " + std::to_string(P.Seed) + ")" + BigLine;
 		OutInfo.Note = "실시간: 파이썬에서 배운 두뇌 셋을 언리얼 C++ 로 추론";
 		for (int a = 0; a < kNumActions; ++a)
 		{
@@ -382,11 +488,108 @@ namespace EcoR9Demo
 		const EcoR9::Brain* BrainPtrs[3] = {&I.Brains[0], &I.Brains[1], &I.Brains[2]};
 		I.World.Tick(BrainPtrs, I.Rng, I.bSample, I.Obs);
 		++I.StepCount;
+#if ECO_R9_DEMO_HAS_BIG
+		if (I.bBig)
+		{
+			// 확인용 셈 (읽기만): 산 개체가 막힌 칸 위에 섰나 — 코어 double 좌표 그대로
+			const EcoR9::State& St = I.World.St;
+			for (std::size_t s = 0; s < St.Alive.size() && s < St.Pos.size(); ++s)
+			{
+				if (!St.Alive[s])
+				{
+					continue;
+				}
+				++I.AgentSteps;
+				I.OnBlocked += I.World.IsBlockedAt(St.Pos[s].x, St.Pos[s].y) ? 1 : 0;
+			}
+		}
+#endif
 		LiveImpl::Fill(I, I.StepCount, Out);
 		return true;
 	}
 
 	std::uint32_t FR9LiveSource::Steps() const { return Impl ? Impl->StepCount : 0u; }
+
+	void FR9LiveSource::OnBlockedStats(std::int64_t& OutOnBlocked, std::int64_t& OutAgentSteps) const
+	{
+		OutOnBlocked = Impl ? Impl->OnBlocked : 0;
+		OutAgentSteps = Impl ? Impl->AgentSteps : 0;
+	}
+
+	bool FR9LiveSource::ReadFood(const FR9FoodWindow& W, std::vector<float>& Grass, std::vector<float>& Root) const
+	{
+		Grass.assign(static_cast<std::size_t>(W.Valid() ? W.Cells() : 0), 0.0f);
+		Root.assign(Grass.size(), 0.0f);
+		if (!Impl || !W.Valid())
+		{
+			return false;
+		}
+		const EcoR9::State& St = Impl->World.St;
+		const std::int32_t G = Impl->World.P.G;
+		const std::size_t GG = static_cast<std::size_t>(G) * static_cast<std::size_t>(G);
+		if (G <= 0 || St.Grass.size() != GG || St.Root.size() != GG)
+		{
+			return false;
+		}
+		for (std::int32_t y = 0; y < W.Ny; ++y)
+		{
+			const std::int32_t Iy = W.Y0 + y;
+			if (Iy < 0 || Iy >= G)
+			{
+				continue;
+			}
+			for (std::int32_t x = 0; x < W.Nx; ++x)
+			{
+				const std::int32_t Ix = W.X0 + x;
+				if (Ix < 0 || Ix >= G)
+				{
+					continue;
+				}
+				const std::size_t K = static_cast<std::size_t>(Iy) * static_cast<std::size_t>(G) + static_cast<std::size_t>(Ix);
+				const std::size_t O = static_cast<std::size_t>(y) * static_cast<std::size_t>(W.Nx) + static_cast<std::size_t>(x);
+				Grass[O] = static_cast<float>(St.Grass[K]);
+				Root[O] = static_cast<float>(St.Root[K]);
+			}
+		}
+		return true;
+	}
+
+	bool FR9LiveSource::IsBlockedCell(std::int32_t Ix, std::int32_t Iy) const
+	{
+#if ECO_R9_DEMO_HAS_BIG
+		if (!Impl)
+		{
+			return false;
+		}
+		const EcoR9::Params& P = Impl->World.P;
+		if (Ix < 0 || Iy < 0 || Ix >= P.G || Iy >= P.G || P.Blocked.size() != static_cast<std::size_t>(P.G) * static_cast<std::size_t>(P.G))
+		{
+			return false;
+		}
+		return P.Blocked[static_cast<std::size_t>(Iy) * static_cast<std::size_t>(P.G) + static_cast<std::size_t>(Ix)] != 0;
+#else
+		(void)Ix;
+		(void)Iy;
+		return false;
+#endif
+	}
+
+	std::string FR9LiveSource::CostLine() const
+	{
+#if ECO_R9_DEMO_HAS_BIG
+		if (!Impl)
+		{
+			return std::string();
+		}
+		const auto& C = Impl->World.LastCost;
+		char Buf[256];
+		std::snprintf(Buf, sizeof(Buf), "obs %.2f ms, brain %.2f ms, step %.2f ms, pairs %lld, brain calls %lld, regrow cells %lld", C.ObsMs, C.BrainMs, C.StepMs,
+					  static_cast<long long>(C.PairChecks), static_cast<long long>(C.BrainCalls), static_cast<long long>(C.RegrowCells));
+		return Buf;
+#else
+		return std::string();
+#endif
+	}
 
 #else   // 코어 없음 — 재생 판만
 
@@ -417,8 +620,34 @@ namespace EcoR9Demo
 
 	std::uint32_t FR9LiveSource::Steps() const { return 0; }
 
+	void FR9LiveSource::OnBlockedStats(std::int64_t& OutOnBlocked, std::int64_t& OutAgentSteps) const
+	{
+		OutOnBlocked = 0;
+		OutAgentSteps = 0;
+	}
+
+	bool FR9LiveSource::WholeAvailable() { return false; }
+
+	bool FR9LiveSource::ReadFood(const FR9FoodWindow& W, std::vector<float>& Grass, std::vector<float>& Root) const
+	{
+		(void)W;
+		Grass.clear();
+		Root.clear();
+		return false;
+	}
+
+	bool FR9LiveSource::IsBlockedCell(std::int32_t Ix, std::int32_t Iy) const
+	{
+		(void)Ix;
+		(void)Iy;
+		return false;
+	}
+
+	std::string FR9LiveSource::CostLine() const { return std::string(); }
+
 #endif
 }
 
 #undef ECO_R9_DEMO_HAS_CORE
+#undef ECO_R9_DEMO_HAS_BIG
 #undef ECO_R9_DEMO_STD_FILES
