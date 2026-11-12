@@ -169,7 +169,8 @@ public:
     bool GuideWolfPlayerCombat(int64 Id, FEcoV3RegionContext& Context, const FVector& Position,
         const FVector& Heading, double Now, bool bAvailable, bool bProvoked, EcoThreatV3::FThreatStepInput& Input);
     /** Native movement keeps ownership. This query only selects a bounded, visible food destination. */
-    bool SelectWolfCarrion(int64 WolfId, FName Region, const FVector& Position, bool bCanScavenge, FVector& Out);
+    bool SelectWolfCarrion(int64 WolfId, FName Region, const FVector& Position, bool bCanScavenge,
+        double ApproachSpeedCmPerSecond, FVector& Out);
     /** Explicit authority operation only; two founders in an empty population, never a natural birth. */
     UFUNCTION(BlueprintCallable,BlueprintAuthorityOnly,Category="Creature|Life") bool QueuePopulationRecovery(FName RegionId,bool bPredator);
 	/** Read-only authoring report. Never creates Entities, edits actors, or saves the level. */

@@ -20,6 +20,7 @@ origin = None
 next_sample = 0.
 track_intake = "-DeerAuditTrackIntake" in command
 track_reasons = "-DeerAuditTrackReasons" in command
+probe_seams = "-DeerAuditProbeSeams" in command
 legacy_feed = "-DeerAuditLegacyFeed" in command
 native = None
 previous_step = 0
@@ -43,6 +44,50 @@ def capture_agent(world, agent):
     if isinstance(raw, tuple):
         raw = next((item for item in raw if isinstance(item, str)), "")
     return json.loads(raw) if raw else None
+
+
+def sample_region_seams(world, regions):
+    """Read terrain near adjacent AABB faces. Passage movement still needs a swept test."""
+    samples = []
+    for source in regions:
+        for target in regions:
+            if target["id"] <= source["id"] or not (
+                target["id"] in source["adjacent"] or source["id"] in target["adjacent"]
+            ):
+                continue
+            for axis, along in ((0, 1), (1, 0)):
+                center_a, center_b = source["center_cm"], target["center_cm"]
+                extent_a, extent_b = source["extent_cm"], target["extent_cm"]
+                side = 1 if center_b[axis] >= center_a[axis] else -1
+                face_a = center_a[axis] + side * extent_a[axis]
+                face_b = center_b[axis] - side * extent_b[axis]
+                if abs(face_a - face_b) > 10.:
+                    continue
+                low = max(center_a[along] - extent_a[along], center_b[along] - extent_b[along])
+                high = min(center_a[along] + extent_a[along], center_b[along] + extent_b[along])
+                if high <= low:
+                    continue
+                row = {"from": source["id"], "to": target["id"], "axis": axis,
+                       "face_cm": face_a, "tested": 0, "grounded_pairs": 0, "examples": []}
+                for index in range(1, 151):
+                    at = low + index * (high - low) / 151.
+                    endpoints = []
+                    row["tested"] += 1
+                    for cross in (face_a - side * 10., face_b + side * 10.):
+                        xy = (cross, at) if axis == 0 else (at, cross)
+                        hit = u.EcoCreatureAnimationBuilder.project_placement_point(world, u.Vector(*xy, center_a[2]))
+                        if isinstance(hit, tuple):
+                            hit = None if any(isinstance(v, bool) and not v for v in hit) else next(
+                                (v for v in hit if isinstance(v, u.Vector)), None)
+                        if not isinstance(hit, u.Vector):
+                            break
+                        endpoints.append([hit.x, hit.y, hit.z])
+                    if len(endpoints) == 2:
+                        row["grounded_pairs"] += 1
+                        if len(row["examples"]) < 12:
+                            row["examples"].append(endpoints)
+                samples.append(row)
+    return samples
 
 
 def record_reasons(world):
@@ -176,6 +221,31 @@ def tick(_):
             if track_reasons:
                 u.SystemLibrary.execute_console_command(world, "eco.Inspection.GameplayReasons 1")
                 state["sampled_gameplay_reasons"] = reason_totals
+                try:
+                    state["region_geometry"] = []
+                    for region in u.GameplayStatics.get_all_actors_of_class(world, u.EcologyRegion):
+                        center, extent = region.get_actor_bounds(False)
+                        state["region_geometry"].append({
+                            "id": str(region.get_editor_property("RegionId")),
+                            "adjacent": [str(key) for key in region.get_editor_property("AdjacentRegionIds")],
+                            "center_cm": [center.x, center.y, center.z],
+                            "extent_cm": [extent.x, extent.y, extent.z],
+                        })
+                    state["authored_passages"] = [{
+                        "from": str(route.get_editor_property("FromRegion")),
+                        "to": str(route.get_editor_property("ToRegion")),
+                        "enabled": route.get_editor_property("bEnabled"),
+                        "rule_fauna": route.get_editor_property("bAllowRuleFaunaPassage"),
+                        "shares_habitat_reports": route.get_editor_property("bSharesHabitatReports"),
+                        "waypoints": len(route.get_editor_property("Points")),
+                    } for route in u.GameplayStatics.get_all_actors_of_class(world, u.EcoHerdMigrationRoute)]
+                except Exception as exc:
+                    state["region_geometry_error"] = str(exc)
+                if probe_seams and "region_geometry_error" not in state:
+                    try:
+                        state["region_seam_samples"] = sample_region_seams(world, state["region_geometry"])
+                    except Exception as exc:
+                        state["region_seam_error"] = str(exc)
             u.GameplayStatics.set_global_time_dilation(world, dilation)
             state["dilation"] = u.GameplayStatics.get_global_time_dilation(world)
             origin = now

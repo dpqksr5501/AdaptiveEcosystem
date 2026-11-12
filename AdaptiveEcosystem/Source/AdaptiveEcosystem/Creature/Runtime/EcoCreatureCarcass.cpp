@@ -47,23 +47,29 @@ double AEcoCreatureIntegrationSpawner::CommitNativeCarcass(const FEcoDeathOutcom
 }
 
 bool AEcoCreatureIntegrationSpawner::SelectWolfCarrion(int64 WolfId, FName Region, const FVector& Position,
-    bool bCanScavenge, FVector& Out)
+    bool bCanScavenge, double ApproachSpeedCmPerSecond, FVector& Out)
 {
     if (FaunaSpecies.IsEmpty()) return false;
     WolfCarrionTargets.Remove(WolfId);
-    if (!bCanScavenge) return false;
+    if (!bCanScavenge || ApproachSpeedCmPerSecond <= UE_SMALL_NUMBER) return false;
     const double Now = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
-    double BestDistance = FMath::Square(1600.);
+    double BestValue = 0.;
     int64 BestId = 0;
     for (const auto& Pair : FaunaCarcasses)
     {
         const auto& Stock = Pair.Value;
-        const double Distance = FVector::DistSquared(Stock.Position, Position);
+        const double Distance = FVector::Dist(Stock.Position, Position);
         if (Stock.Region != Region || Stock.Species == TEXT("Wolf") || !Stock.CanApproach(WolfId, Now)
-            || Distance > BestDistance || (Distance == BestDistance && Pair.Key >= BestId)
+            || Distance > 1600.) continue;
+        const double TravelSeconds = FMath::Max(0., Distance - 95.) / ApproachSpeedCmPerSecond;
+        // Bites are separated by a one-second resource interval.
+        const double FeedingSeconds = Stock.ExpiresAt - Now - TravelSeconds;
+        if (FeedingSeconds <= 0.) continue;
+        const double Value = EcoFaunaFeeding::Value(FMath::Min(double(Stock.Remaining), 8. * FMath::CeilToDouble(FeedingSeconds)), TravelSeconds);
+        if (Value < BestValue || (Value == BestValue && Pair.Key >= BestId)
             || GetWorld()->LineTraceTestByObjectType(Position + FVector(0, 0, 55), Stock.Position + FVector(0, 0, 20),
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfCarrion)))) continue;
-        BestDistance = Distance;
+        BestValue = Value;
         BestId = Pair.Key;
         Out = Stock.Position;
     }

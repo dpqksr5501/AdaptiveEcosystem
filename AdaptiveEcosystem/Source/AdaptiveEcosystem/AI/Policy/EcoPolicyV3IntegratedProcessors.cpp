@@ -597,7 +597,7 @@ namespace EcoPolicyV3IntegratedProcImpl
         if (A.Combat && WolfId > 0)
         {
             FVector Ignored;
-            A.Combat->SelectWolfCarrion(WolfId, A.RegionId, FVector::ZeroVector, false, Ignored);
+            A.Combat->SelectWolfCarrion(WolfId, A.RegionId, FVector::ZeroVector, false, 0., Ignored);
         }
         const bool bAdaptive = A.Combat && A.Combat->UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal);
         Life.bMealRestApplied = false;
@@ -649,7 +649,8 @@ namespace EcoPolicyV3IntegratedProcImpl
         {
             const FVector Position = A.Ctx->UnitsToCm(Threat.State.PosX, Threat.State.PosY, Link.GroundZ);
             FVector Food;
-            if (A.Combat->SelectWolfCarrion(WolfId, A.RegionId, Position, true, Food))
+            const double ApproachSpeed = Threat.Spec.BaseSpeed * EcoRepertoireV3::kUnitCm / EcoRepertoireV3::kStepSeconds;
+            if (A.Combat->SelectWolfCarrion(WolfId, A.RegionId, Position, true, ApproachSpeed, Food))
             {
                 const FVector Direction = (Food - Position).GetSafeNormal2D();
                 Input.bHuntingAllowed = false;

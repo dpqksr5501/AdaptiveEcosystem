@@ -70,6 +70,15 @@ namespace
         return FVector::Dist2D(Entry, Exit) <= CrossingRadius;
     }
 
+    double LocalPlantStock(const FEcoV3RegionContext* Context, const FVector& Position)
+    {
+        if (!Context || !Context->bSpatialFoodRegistered) return 0.;
+        const auto Point = Context->CmToUnits(Position);
+        const double Size = Context->Sim.Config.WorldSize;
+        if (Point.X < 0. || Point.Y < 0. || Point.X > Size || Point.Y > Size) return 0.;
+        return Context->Sim.Food.Food[Context->Sim.Food.CellOf(Point)];
+    }
+
     bool FindNearbyForage(UWorld& World, const FEcoV3RegionContext* Context, const AEcologyRegion& Region,
         const FVector& Position, FVector& Out)
     {
@@ -1494,8 +1503,13 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 Goal = Position;
                 bRun = false;
             }
-            // Newborns inherit less than the ordinary hunger threshold. They can stay near
-            // their parent and still feed whenever they stop. Critical hunger releases following.
+            // A hungry dependent browser can stop and eat in its current cell.
+            else if (bHungry && Species->CaregiverFollowRange > 0.f && Fauna->Life.AgeFraction(Now) < 1.
+                && Species->UsesPlantFood() && LocalPlantStock(Context, Position) >= EcoFaunaNutrition::MinimumMeal)
+            {
+                Goal = Position;
+                bRun = false;
+            }
             else if (Species->CaregiverFollowRange > 0.f && Fauna->Life.AgeFraction(Now) < 1.
                 && Vitals.Energy > .25f * Vitals.MaxEnergy)
             {
