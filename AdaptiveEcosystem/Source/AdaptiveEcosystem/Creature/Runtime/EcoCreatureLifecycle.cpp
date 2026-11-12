@@ -14,6 +14,9 @@
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
+#include "AI/Policy/EcoPolicyV3IntegratedProcessors.h"
+#include "AI/Policy/EcoBehaviorConfig.h"
+#include "MassExecutionContext.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/EcoPolicyV3SocialBridge.h"
 #include "AI/Social/Herd/EcoHerdSubsystem.h"
@@ -103,6 +106,20 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 	else
 	{
 		using namespace EcoFaunaMotionClock;
+		auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+		if (!Native || !Native->IsActive() || !Native->UsesAuthorityBoundaries())
+		{ FailRuntime(TEXT("Mixed fauna requires the authority clock")); return; }
+		// Native contexts become ready in the pre-actor tick following authority startup.
+		// Retain the initial time debt until both backends can process it.
+		if (Native->NumContexts() == 0) return;
+		if (!MixedNativeStep)
+		{
+			AuthorityClockWorldOrigin = GetWorld()->GetTimeSeconds() - Now;
+			MixedNativeStep = NewObject<UEcoPolicyV3IntegratedStepProcessor>(this);
+			MixedNativeTransforms = NewObject<UEcoPolicyV3IntegratedVisualProcessor>(this);
+			MixedNativeStep->CallInitialize(GetWorld(), EM.AsShared());
+			MixedNativeTransforms->CallInitialize(GetWorld(), EM.AsShared());
+		}
 		if (FaunaMotionTime < 0.) FaunaMotionTime = 0.;
 		if (!AdvanceResources(FaunaMotionTime)) return;
 		const int64 LastReadyStep = CompletedStepAt(Now);
@@ -117,6 +134,17 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 					End = FMath::Min(End, Fauna->AttackContact);
 			MoveFauna(float(End - FaunaMotionTime), End);
 			FaunaMotionTime = End;
+			const int64 NativeBoundary = (Native->GetGlobalStep() + 1) * EcoBehaviorConfig::PolicyInterval;
+			if (NextStep == NativeBoundary && End == StepTime(NextStep))
+			{
+				auto Context = EM.CreateExecutionContext(EcoBehaviorConfig::StepSeconds);
+				Context.SetExecutionType(EMassExecutionContextType::Processor);
+				Context.SetFlushDeferredCommands(false);
+				MixedNativeStep->ExecuteAuthorityBoundary(EM, Context, AuthorityClockWorldOrigin + End, End);
+				if (!Native->IsActive() || Native->GetGlobalStep() * EcoBehaviorConfig::PolicyInterval != NextStep)
+				{ FailRuntime(TEXT("Native boundary did not advance")); return; }
+				MixedNativeTransforms->PublishAuthorityBoundary(EM, Context);
+			}
 			if (!AdvanceResources(End)) return;
 		}
 	}

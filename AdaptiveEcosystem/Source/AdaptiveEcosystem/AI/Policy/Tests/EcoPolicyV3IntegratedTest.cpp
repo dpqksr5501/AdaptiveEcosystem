@@ -4992,4 +4992,36 @@ bool FEcoHerdReturnFailure::RunTest(const FString&)
     TestTrue(TEXT("A rejoined path alone never commits an arrival"),Outcomes.IsEmpty());
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoIntegratedAuthorityBoundary,
+    "AdaptiveEcosystem.Policy.V3.Integrated.AuthorityBoundaryWriter",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoIntegratedAuthorityBoundary::RunTest(const FString&)
+{
+    using namespace EcoPolicyV3IntegratedTestImpl;
+    FIntegratedHarness H;
+    if (!H.Setup(*this, TestSettings())) return false;
+    auto* Region = H.AddRegion(TEXT("SharedClock"), 0, FVector::ZeroVector, 1, 0);
+    if (!Region) return false;
+    H.Spawn(false, Region->RegionId, 0, {FVector(5000., 5000., 0.)}, {91});
+    if (!TestEqual(TEXT("Expected one Native resident"), H.Deer.Num(), 1)) return false;
+    const auto Entity = H.Deer[0];
+    H.Sub->SetAuthorityBoundaries(true);
+    H.Frame(EcoBehaviorConfig::StepSeconds * 2.f);
+    TestEqual(TEXT("The ordinary Mass phase does not write in shared-clock mode"), H.Sub->GetGlobalStep(), int64(0));
+
+    auto Context = H.EM->CreateExecutionContext(EcoBehaviorConfig::StepSeconds);
+    Context.SetExecutionType(EMassExecutionContextType::Processor);
+    Context.SetFlushDeferredCommands(false);
+    H.StepProc->ExecuteAuthorityBoundary(*H.EM, Context, EcoBehaviorConfig::StepSeconds, EcoBehaviorConfig::StepSeconds);
+    H.VisualProc->PublishAuthorityBoundary(*H.EM, Context);
+    TestEqual(TEXT("The authority boundary performs one decision"), H.Sub->GetGlobalStep(), int64(1));
+    const auto& Body = H.EM->GetFragmentDataChecked<FEcoHerbivoreBodyV3Fragment>(Entity).Body;
+    const auto& Link = H.EM->GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Entity);
+    const FVector Published = H.EM->GetFragmentDataChecked<FTransformFragment>(Entity).GetTransform().GetLocation();
+    TestTrue(TEXT("The published authority position matches the current Native body"),
+        Published.Equals(Region->UnitsToCm(Body.Pos.X, Body.Pos.Y, Link.GroundZ), .01));
+    H.Frame(EcoBehaviorConfig::StepSeconds);
+    TestEqual(TEXT("A later Mass phase does not repeat the boundary"), H.Sub->GetGlobalStep(), int64(1));
+    return true;
+}
 #endif // WITH_DEV_AUTOMATION_TESTS

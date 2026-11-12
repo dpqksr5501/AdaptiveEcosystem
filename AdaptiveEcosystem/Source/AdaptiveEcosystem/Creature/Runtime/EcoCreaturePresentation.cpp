@@ -1,5 +1,9 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoFaunaMotionClock.h"
+#include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
+#include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
+#include "AI/Policy/EcoBehaviorConfig.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassSpawnerSubsystem.h"
@@ -22,6 +26,9 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 	auto& EM = Spawner->GetEntityManagerChecked();
 	const auto& Budget = GetDefault<UEcoRuntimeSettings>()->ConnectionBudget;
 	const double Now = GetWorld()->GetRealTimeSeconds();
+	const auto* Native = MixedNativeStep ? GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+	const double NativeAlpha = Native ? FMath::Clamp(FaunaMotionTime * EcoFaunaMotionClock::StepsPerSecond / EcoBehaviorConfig::PolicyInterval
+		- Native->GetGlobalStep(), 0., 1.) : 1.;
 	struct FInput
 	{
 		int64 Id; FName Species; FName Region; FVector Position; float FacingYaw; FEcoCreaturePresentationFragment Visual;
@@ -48,6 +55,7 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 	Query.AddRequirement<FEcoMovementDiscontinuityFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	Query.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	Query.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	if (Native) Query.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	FMassExecutionContext Context = EM.CreateExecutionContext(Delta);
 	Query.ForEachEntityChunk(Context, [&](FMassExecutionContext& C)
 	{
@@ -57,11 +65,17 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		const auto V = C.GetFragmentView<FEcoCreaturePresentationFragment>(); const auto RegionsView = C.GetFragmentView<FEcoRegionFragment>();
 		const auto Samples = C.GetFragmentView<FEcoClientPresentationFragment>();
 		const auto Resets = C.GetFragmentView<FEcoMovementDiscontinuityFragment>();
+		const auto NativeBodies = Native ? C.GetFragmentView<FEcoIntegratedV3Fragment>() : TConstArrayView<FEcoIntegratedV3Fragment>();
 		for (int32 I = 0; I < C.GetNumEntities(); ++I)
 		{
 			if (Ids[I].StableAgentId <= 0 || (!Samples.IsEmpty() && !Samples[I].bHasSample)) continue;
-			const FVector Position = Samples.IsEmpty() ? T[I].GetTransform().GetLocation()
+			FVector Position = Samples.IsEmpty() ? T[I].GetTransform().GetLocation()
 				: Samples[I].GetRenderPosition(Now, InterpolationDelaySeconds);
+			if (Samples.IsEmpty() && !NativeBodies.IsEmpty() && NativeBodies[I].bAdopted && !NativeBodies[I].bDead)
+			{
+				Position -= V[I].Velocity * ((1. - NativeAlpha) * EcoRepertoireV3::kStepSeconds);
+				Position.Z = FMath::Lerp(NativeBodies[I].PrevGroundZ, NativeBodies[I].GroundZ, NativeAlpha);
+			}
 			double Distance = Viewers.IsEmpty() ? 0.0 : TNumericLimits<double>::Max();
 			for (const auto& Viewer : Viewers) Distance = FMath::Min(Distance, FVector::DistSquared(Viewer, Position));
 			if (GetNetMode() != NM_Client && !Viewers.IsEmpty() && Distance > FMath::Square(HostVisualDistance)) continue;

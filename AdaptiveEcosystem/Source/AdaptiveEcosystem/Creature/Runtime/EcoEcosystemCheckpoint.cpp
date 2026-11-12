@@ -517,6 +517,7 @@ struct FEcoEcosystemCheckpoint
         }
         S.Step=Step;S.SuccessfulBirths=Successful;S.CommittedDeaths=Deaths;S.LastResourceTime=ResourceTime;S.NextMigrationTime=MigrationTime;
         S.FaunaMotionTime=S.FaunaSpecies.IsEmpty()?-1.:EcoFaunaMotionClock::CompletedTimeAt(Time.ServerTimeSeconds);
+        S.AuthorityClockWorldOrigin=S.GetWorld()->GetTimeSeconds()-Time.ServerTimeSeconds;
         S.GameplayReasons.Reset();
         S.PendingBirths=MoveTemp(Births);S.NextBirthScan=BirthScan;S.SpeciesTotals=MoveTemp(Totals);S.CompletedTime=Completed;S.CompletedTime.WorldEpoch=NewEpoch;
         S.FaunaBirths=MoveTemp(FaunaBirths);S.NextFaunaBirthScan=FaunaBirthScan;

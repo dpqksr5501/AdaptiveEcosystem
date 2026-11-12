@@ -28,6 +28,8 @@ class APawn;
 class AController;
 class AEcoCreatureHitProxy;
 class UEcoMeleeHitComponent;
+class UEcoPolicyV3IntegratedStepProcessor;
+class UEcoPolicyV3IntegratedVisualProcessor;
 namespace EcoThreatV3 { struct FThreatStepInput; }
 struct FEcoV3RegionContext;
 struct FEcoDeathOutcome;
@@ -170,7 +172,7 @@ public:
         const FVector& Heading, double Now, bool bAvailable, bool bProvoked, EcoThreatV3::FThreatStepInput& Input);
     /** Native movement keeps ownership. This query only selects a bounded, visible food destination. */
     bool SelectWolfCarrion(int64 WolfId, FName Region, const FVector& Position, bool bCanScavenge,
-        double ApproachSpeedCmPerSecond, FVector& Out);
+        double ApproachSpeedCmPerSecond, FVector& Out, double AuthoritySeconds = -1.);
     /** Explicit authority operation only; two founders in an empty population, never a natural birth. */
     UFUNCTION(BlueprintCallable,BlueprintAuthorityOnly,Category="Creature|Life") bool QueuePopulationRecovery(FName RegionId,bool bPredator);
 	/** Read-only authoring report. Never creates Entities, edits actors, or saves the level. */
@@ -320,6 +322,9 @@ private:
 	double NextStreamingUpdate = 0;
 	double LastResourceTime = 0;
     double FaunaMotionTime = -1.;
+    UPROPERTY(Transient) TObjectPtr<UEcoPolicyV3IntegratedStepProcessor> MixedNativeStep;
+    UPROPERTY(Transient) TObjectPtr<UEcoPolicyV3IntegratedVisualProcessor> MixedNativeTransforms;
+    double AuthorityClockWorldOrigin = 0.;
 	double NextLog = 0;
     double NextAuditSample = 0;
 	int64 Step = 0;

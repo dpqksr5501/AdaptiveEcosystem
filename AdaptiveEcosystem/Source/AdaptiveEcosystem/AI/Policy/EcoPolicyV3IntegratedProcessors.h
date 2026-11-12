@@ -92,12 +92,16 @@ class ADAPTIVEECOSYSTEM_API UEcoPolicyV3IntegratedStepProcessor : public UMassPr
 
 public:
 	UEcoPolicyV3IntegratedStepProcessor();
+	void ExecuteAuthorityBoundary(FMassEntityManager& EntityManager, FMassExecutionContext& Context,
+		double WorldSeconds, double AuthoritySeconds);
 
 protected:
 	virtual void ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager) override;
 	virtual void Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context) override;
 
 private:
+	void ExecuteSteps(FMassEntityManager& EntityManager, FMassExecutionContext& Context, int32 Steps,
+		double WorldSeconds, double AuthoritySeconds);
 	FMassEntityQuery DeerQuery;
 	FMassEntityQuery WolfQuery;
 
@@ -125,12 +129,14 @@ class ADAPTIVEECOSYSTEM_API UEcoPolicyV3IntegratedVisualProcessor : public UMass
 
 public:
 	UEcoPolicyV3IntegratedVisualProcessor();
+	void PublishAuthorityBoundary(FMassEntityManager& EntityManager, FMassExecutionContext& Context);
 
 protected:
 	virtual void ConfigureQueries(const TSharedRef<FMassEntityManager>& EntityManager) override;
 	virtual void Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context) override;
 
 private:
+	void PublishTransforms(FMassEntityManager& EntityManager, FMassExecutionContext& Context, bool bAuthorityBoundary);
 	FMassEntityQuery DeerQuery;
 	FMassEntityQuery WolfQuery;
 };

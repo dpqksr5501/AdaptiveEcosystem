@@ -21,6 +21,7 @@ if u.EditorAssetLibrary.get_metadata_tag(world, "EcoAuditOwner") != OWNER:
 
 run = re.search(r"-DeerAuditPassageName=(\w+)", u.SystemLibrary.get_command_line())
 name = run.group(1) if run else "Continuation_PassagePIE"
+waypoint_fixture = "-DeerAuditPassageApproach" in u.SystemLibrary.get_command_line()
 out = Path(u.Paths.project_saved_dir()).resolve() / "ProjectAudit_20261112" / (name + ".json")
 state = {"completed": False, "samples": [], "fixture": "Unsaved PIE, same roster, one fox and two rats placed at a measured ground seam"}
 
@@ -46,10 +47,14 @@ def setup():
     by_id = {str(group.get_editor_property("RegionId")): group for group in groups}
     origin, destination = by_id["Barren"], by_id["Forest"]
     for x in (32000., 32500., 31500., 33000., 31000., 33500.):
+        start_y = 22200. if waypoint_fixture else 24500.
         points = [ground(x + dx, y) for dx, y in (
-            (0., 24990.), (0., 25010.), (0., 24500.), (0., 25320.), (120., 25450.)
+            (0., 24990.), (0., 25010.), (0., start_y), (0., 25320.), (120., 25450.)
         )]
-        if all(points) and abs(points[0].z - points[1].z) <= 10. and abs(points[0].z - points[2].z) <= 180.:
+        approach = [ground(x, y) for y in (22800., 23500., 24200.)] if waypoint_fixture else []
+        if all(points) and all(approach) and abs(points[0].z - points[1].z) <= 10. and (
+            waypoint_fixture or abs(points[0].z - points[2].z) <= 180.
+        ):
             break
     else:
         raise RuntimeError("No available loaded ground near the seam")
@@ -74,10 +79,12 @@ def setup():
         raise RuntimeError("Could not create the unsaved route")
     route.set_editor_property("FromRegion", "Barren")
     route.set_editor_property("ToRegion", "Forest")
-    route.set_editor_property("Points", [entry, exit])
+    route.set_editor_property("Points", [*approach, entry, exit])
     route.set_editor_property("bAllowRuleFaunaPassage", True)
     route.set_editor_property("bSharesHabitatReports", True)
     state["entry"], state["exit"] = xyz(entry), xyz(exit)
+    state["fox_start"] = xyz(fox_start)
+    state["approach"] = [xyz(point) for point in approach]
 
 
 def inspect(game, key):
@@ -128,7 +135,11 @@ def tick(_):
             raise RuntimeError("The same journey issued more than one arrival")
         if len(arrivals) == 1 and row.get("region") == "Forest":
             state.setdefault("arrival", arrivals[0])
+        if any(event["reason"] == "PassageWaypoint" for event in row.get("gameplay_reason_history", [])):
+            state["observed_waypoint"] = True
         if "arrival" in state:
+            if waypoint_fixture and not state.get("observed_waypoint"):
+                raise RuntimeError("The distant-start fixture did not observe a waypoint advance")
             meals = [event for event in row.get("gameplay_reason_history", [])
                      if event["reason"] == "CarrionEaten" and event["region"] == "Forest"
                      and event["time"] >= state["arrival"]["time"]]

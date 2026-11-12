@@ -5,6 +5,7 @@
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Creature/Runtime/EcoCreatureNetworkTrait.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
+#include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Ecology/EcologySimulationSubsystem.h"
@@ -290,6 +291,8 @@ void AEcoCreatureIntegrationSpawner::FailRuntime(const TCHAR* Reason)
 void AEcoCreatureIntegrationSpawner::EndPlay(const EEndPlayReason::Type Reason)
 {
 	FWorldDelegates::OnWorldPostActorTick.Remove(PostTickHandle);
+	if (MixedNativeStep && GetWorld())
+		if (auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>()) Native->SetAuthorityBoundaries(false);
     ResetCombat();
 	bReady = false;
 	bWaitingForHabitat = false;

@@ -47,12 +47,13 @@ double AEcoCreatureIntegrationSpawner::CommitNativeCarcass(const FEcoDeathOutcom
 }
 
 bool AEcoCreatureIntegrationSpawner::SelectWolfCarrion(int64 WolfId, FName Region, const FVector& Position,
-    bool bCanScavenge, double ApproachSpeedCmPerSecond, FVector& Out)
+    bool bCanScavenge, double ApproachSpeedCmPerSecond, FVector& Out, double AuthoritySeconds)
 {
     if (FaunaSpecies.IsEmpty()) return false;
     WolfCarrionTargets.Remove(WolfId);
     if (!bCanScavenge || ApproachSpeedCmPerSecond <= UE_SMALL_NUMBER) return false;
-    const double Now = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+    const double Now = AuthoritySeconds >= 0. ? AuthoritySeconds
+        : GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
     double BestValue = 0.;
     int64 BestId = 0;
     for (const auto& Pair : FaunaCarcasses)

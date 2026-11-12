@@ -1250,6 +1250,8 @@ public:
 	int32 AdvanceClock(float DeltaSeconds);
 	float GetVisualAlpha() const;
 	int64 GetGlobalStep() const { return GlobalT; }
+	bool UsesAuthorityBoundaries() const { return bAuthorityBoundaries; }
+	void SetAuthorityBoundaries(bool bEnabled) { bAuthorityBoundaries = bEnabled; }
 	/** 모든 컨텍스트가 결정 스텝 하나를 마쳤다 → 전역 t + 1. */
 	void FinishGlobalStep() { ++GlobalT; }
 	/** 컨텍스트의 t 를 전역 t 에 맞춘다 (어둠 다시 계산). */
@@ -1634,6 +1636,7 @@ private:
 	int32 ValidationPasses = 0;       // 시작 직전 지면 검사 횟수 (많아야 kMaxValidationPasses)
 
 	int64 GlobalT = 0;
+	bool bAuthorityBoundaries = false;
 	EcoPolicy::FStepClock Clock;
 	int32 ClockPhase = 0;
 	int32 LogEverySteps = 75;

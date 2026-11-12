@@ -65,6 +65,7 @@ namespace EcoPolicyV3IntegratedProcImpl
         UEcoShelterSubsystem* Shelters = nullptr;
         const UEcoHerdMigrationSubsystem* Journeys=nullptr;
         double Now = 0;
+        double AuthorityNow = -1.;
         // Immutable pre-move positions, rebuilt once per native step. Contact
         // queries visit adjacent buckets, rather than every animal in the world.
         TMap<FIntPoint,TArray<int32>> BodyBuckets;
@@ -650,7 +651,7 @@ namespace EcoPolicyV3IntegratedProcImpl
             const FVector Position = A.Ctx->UnitsToCm(Threat.State.PosX, Threat.State.PosY, Link.GroundZ);
             FVector Food;
             const double ApproachSpeed = Threat.Spec.BaseSpeed * EcoRepertoireV3::kUnitCm / EcoRepertoireV3::kStepSeconds;
-            if (A.Combat->SelectWolfCarrion(WolfId, A.RegionId, Position, true, ApproachSpeed, Food))
+            if (A.Combat->SelectWolfCarrion(WolfId, A.RegionId, Position, true, ApproachSpeed, Food, A.AuthorityNow))
             {
                 const FVector Direction = (Food - Position).GetSafeNormal2D();
                 Input.bHuntingAllowed = false;
@@ -984,6 +985,21 @@ void UEcoPolicyV3IntegratedStepProcessor::ConfigureQueries(const TSharedRef<FMas
 
 void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
+    auto* World = GetWorld();
+    auto* Sub = World ? World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+    if (!Sub || !Sub->IsActive() || Sub->UsesAuthorityBoundaries()) return;
+    ExecuteSteps(EntityManager, Context, Sub->AdvanceClock(Context.GetDeltaTimeSeconds()), World->GetTimeSeconds(), -1.);
+}
+
+void UEcoPolicyV3IntegratedStepProcessor::ExecuteAuthorityBoundary(FMassEntityManager& EntityManager,
+    FMassExecutionContext& Context, double WorldSeconds, double AuthoritySeconds)
+{
+    ExecuteSteps(EntityManager, Context, 1, WorldSeconds, AuthoritySeconds);
+}
+
+void UEcoPolicyV3IntegratedStepProcessor::ExecuteSteps(FMassEntityManager& EntityManager, FMassExecutionContext& Context,
+    int32 Steps, double Now, double AuthoritySeconds)
+{
 	using namespace EcoPolicyV3IntegratedProcImpl;
 	UWorld* World = GetWorld();
 	UEcoPolicyV3IntegratedSubsystem* Sub = World ? World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
@@ -992,7 +1008,6 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 		return;   // 스위치 끔 (기본): 아무것도 하지 않는다
 	}
 	// 전역 결정 시계 (평면 시험 경로의 시계와 따로). 컨텍스트가 생기기 전 스텝은 버린다
-	const int32 Steps = Sub->AdvanceClock(Context.GetDeltaTimeSeconds());
 	const int32 NumCtx = Sub->NumContexts();
 	if (NumCtx == 0)
 	{
@@ -1163,7 +1178,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
             const auto& Noise=RecentNoises[K];const auto* Pawn=Cast<APawn>(Noise.Instigator.Get());
             const auto* Bridge=Pawn?Pawn->FindComponentByClass<UEcoPlayerEcologyComponent>():nullptr;
             if(!EcoNoise::IsPlayerThreat(Noise.Tag)||!Pawn||!Pawn->IsPlayerControlled()||!Bridge||!Bridge->bThreatEnabled)continue;
-            const double Age=World->GetTimeSeconds()-Noise.EmittedAt;if(Age<0||Age>UEcoNoiseSubsystem::EventLifetime)continue;
+            const double Age=Now-Noise.EmittedAt;if(Age<0||Age>UEcoNoiseSubsystem::EventLifetime)continue;
             const auto P=Region.CmToUnits(Noise.Position);
             Region.PlayerNoises.Add({uint64(Noise.Id),P.X,P.Y,Noise.Position.Z,FMath::Max(0.,Region.Sim.T*EcoRepertoireV3::kStepSeconds-Age),
                 Noise.MaxRange*Noise.Loudness/EcoRepertoireV3::kUnitCm,Noise.Loudness,EcoNoise::IsPlayerShot(Noise.Tag)});
@@ -1232,7 +1247,6 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
 	}
 
 	// --- 4. 결정 스텝: 모든 지역이 같은 전역 스텝 (계약 10-1) ---
-	const double Now = World->GetTimeSeconds();
 	const double CpuStart = FPlatformTime::Seconds();
 	for (int32 s = 0; s < Steps; ++s)
 	{
@@ -1315,7 +1329,7 @@ void UEcoPolicyV3IntegratedStepProcessor::Execute(FMassEntityManager& EntityMana
                 Adapter.BodyBuckets.FindOrAdd(FIntPoint(FMath::FloorToInt((P.X+BodyContext->OriginCm.X/EcoRepertoireV3::kUnitCm)/2),
                     FMath::FloorToInt((P.Y+BodyContext->OriginCm.Y/EcoRepertoireV3::kUnitCm)/2))).Add(Row);
             }
-            Adapter.Shelters=World->GetSubsystem<UEcoShelterSubsystem>();Adapter.Now=Now;
+            Adapter.Shelters=World->GetSubsystem<UEcoShelterSubsystem>();Adapter.Now=Now;Adapter.AuthorityNow=AuthoritySeconds;
             Adapter.Journeys=World->GetSubsystem<UEcoHerdMigrationSubsystem>();
 			EcoWorldV3::FStepHooks Hooks;
 			Hooks.User = &Adapter;
@@ -1557,13 +1571,27 @@ void UEcoPolicyV3IntegratedVisualProcessor::ConfigureQueries(const TSharedRef<FM
 
 void UEcoPolicyV3IntegratedVisualProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
 {
+    const auto* World = GetWorld();
+    const auto* Sub = World ? World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+    if (!Sub || Sub->UsesAuthorityBoundaries()) return;
+    PublishTransforms(EntityManager, Context, false);
+}
+
+void UEcoPolicyV3IntegratedVisualProcessor::PublishAuthorityBoundary(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
+{
+    PublishTransforms(EntityManager, Context, true);
+}
+
+void UEcoPolicyV3IntegratedVisualProcessor::PublishTransforms(FMassEntityManager& EntityManager,
+    FMassExecutionContext& Context, bool bAuthorityBoundary)
+{
 	UWorld* World = GetWorld();
 	UEcoPolicyV3IntegratedSubsystem* Sub = World ? World->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
 	if (!Sub || !Sub->IsActive() || Sub->NumContexts() == 0)
 	{
 		return;
 	}
-	const double Alpha = FMath::Clamp(static_cast<double>(Sub->GetVisualAlpha()), 0.0, 1.0);
+	const double Alpha = bAuthorityBoundary ? 1.0 : FMath::Clamp(static_cast<double>(Sub->GetVisualAlpha()), 0.0, 1.0);
 	const bool bDebug = UEcoPolicyV3IntegratedSubsystem::IsDebugDrawEnabled();
 	const double K = EcoRepertoireV3::kUnitCm / EcoRepertoireV3::kStepSeconds;   // 단위/스텝 → cm/s
 	const int64 NowStep = Sub->GetGlobalStep();

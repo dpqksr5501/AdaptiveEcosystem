@@ -448,6 +448,7 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
     {
         FName From, To;
         FVector Entry, Exit;
+        TArray<FVector> Approach;
     };
     TArray<FPassage> Passages;
     // This route opt-in is independent of legacy Mass migration, which cannot run with rule fauna.
@@ -466,10 +467,17 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
             // Keep each end in its own region and leave the swept crossing to the movement writer.
             if (!ResolvePassageSeam(Entry, Exit, Migration.ArrivalRadius, [&](const FVector& P, bool bOrigin)
                 { return FindRegion(P) == (bOrigin ? From : To); })) continue;
-            if (From->AdjacentRegionIds.Contains(Route.ToRegion))
-                Passages.Add({Route.FromRegion, Route.ToRegion, Entry, Exit});
-            if (Route.bBidirectional && To->AdjacentRegionIds.Contains(Route.FromRegion))
-                Passages.Add({Route.ToRegion, Route.FromRegion, Exit, Entry});
+            const auto AddPassage = [&](const AEcologyRegion& Source, const AEcologyRegion& Destination,
+                const FVector& Seam, const FVector& FarSide, int32 Index, int32 Direction)
+            {
+                if (!Source.AdjacentRegionIds.Contains(Destination.RegionId)) return;
+                auto& Passage = Passages.Add_GetRef(FPassage{Source.RegionId, Destination.RegionId, Seam, FarSide, {Seam}});
+                for (; Route.Points.IsValidIndex(Index) && FindRegion(Route.Points[Index]) == &Source; Index += Direction)
+                    if (!Route.Points[Index].Equals(Passage.Approach[0], 1.))
+                        Passage.Approach.Insert(Route.Points[Index], 0);
+            };
+            AddPassage(*From, *To, Entry, Exit, I - 1, -1);
+            if (Route.bBidirectional) AddPassage(*To, *From, Exit, Entry, I, 1);
         }
     }
     if (Passages.IsEmpty() && !bAuditFaunaHunts && !Owned.ContainsByPredicate([&](FMassEntityHandle Entity)
@@ -582,6 +590,8 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
         };
         const double LocalFood = EstimateMeals(Region.CurrentRegionId, Origin, Now, false);
         const FPassage* Chosen = nullptr;
+        int32 ChosenWaypoint = INDEX_NONE;
+        double ChosenTravelSeconds = 0.;
         const TCHAR* Rejection = TEXT("NoOutgoingSeam");
         int32 Progress = 0;
         const auto RejectAt = [&](int32 Stage, const TCHAR* Reason)
@@ -601,17 +611,37 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
                 || Load.FindRef(Passage.To) - int32(bTraveling) >= Group->Schedule.RegionPopulationLimit
                 || SpeciesLoad - int32(bTraveling) >= Species->RegionalLimit)
             { RejectAt(1, TEXT("DestinationCapacityOrUnavailable")); continue; }
-            const double Distance = FVector::Dist2D(Position, Passage.Entry);
-            if (Distance > Species->SightRange
-                || (!bTraveling && !HasClearSight(*GetWorld(), Position, Passage.Entry, Species->EyeHeight, 5.f)))
-            { RejectAt(2, TEXT("SeamOutOfSight")); continue; }
-            const double Gain = EstimateMeals(Passage.To, Target, Now + Distance / Species->WalkSpeed, !bTraveling) - LocalFood;
+            int32 Waypoint = INDEX_NONE;
+            if (bTraveling)
+            {
+                Waypoint = Passage.Approach.IndexOfByPredicate([&](const FVector& Point) { return Point.Equals(Fauna->Goal, .1); });
+                if (Waypoint != INDEX_NONE && Waypoint + 1 < Passage.Approach.Num()
+                    && FVector::DistSquared2D(Position, Passage.Approach[Waypoint]) <= FMath::Square(25.))
+                    ++Waypoint;
+            }
+            else
+                for (int32 Index = Passage.Approach.Num() - 1; Index >= 0; --Index)
+                {
+                    const auto& Point = Passage.Approach[Index];
+                    if (FVector::DistSquared2D(Position, Point) > FMath::Square(Species->SightRange)
+                        || !HasClearSight(*GetWorld(), Position, Point, Species->EyeHeight, 5.f)) continue;
+                    Waypoint = Index;
+                    break;
+                }
+            if (Waypoint == INDEX_NONE) { RejectAt(2, TEXT("PassageApproachUnavailable")); continue; }
+            double Distance = FVector::Dist2D(Position, Passage.Approach[Waypoint]);
+            for (int32 Index = Waypoint + 1; Index < Passage.Approach.Num(); ++Index)
+                Distance += FVector::Dist2D(Passage.Approach[Index - 1], Passage.Approach[Index]);
+            const double TravelSeconds = Distance / Species->WalkSpeed;
+            const double Gain = EstimateMeals(Passage.To, Target, Now + TravelSeconds, !bTraveling) - LocalFood;
             if (Gain <= 1.) { RejectAt(3, TEXT("InsufficientFoodGain")); continue; }
-            const double Score = Gain / (1. + Distance / Species->WalkSpeed);
+            const double Score = Gain / (1. + TravelSeconds);
             if (Score > Best || (Score == Best && Chosen && Passage.To.LexicalLess(Chosen->To)))
             {
                 Best = Score;
                 Chosen = &Passage;
+                ChosenWaypoint = Waypoint;
+                ChosenTravelSeconds = TravelSeconds;
             }
         }
         if (!Chosen) { ReportNoPassage(Rejection); CancelTravel(); continue; }
@@ -621,16 +651,23 @@ void AEcoCreatureIntegrationSpawner::ReconcileFaunaPassages(FMassEntityManager& 
             Travel.TargetRegionId = Chosen->To;
             Travel.TargetRegionIndex = Ecology->GetRegionRuntimeIndex(Chosen->To);
             Travel.TargetPosition = Chosen->Entry;
+            Fauna->Goal = Chosen->Approach[ChosenWaypoint];
             Travel.MoveSpeed = Species->WalkSpeed;
             Travel.Reason = EEcoMigrationReason::FoodShortage;
             Travel.DepartureTime = Now;
-            Travel.NextDecisionTime = Now + FMath::Max(10., 2. * Species->SightRange / Species->WalkSpeed);
+            Travel.NextDecisionTime = Now + FMath::Max(10., 2. * ChosenTravelSeconds + 5.);
             ++Load.FindOrAdd(Chosen->To);
             ++FaunaLoad.FindOrAdd(Chosen->To).FindOrAdd(Id.SpeciesId);
             ReportNoPassage(TEXT("Departed"));
             continue;
         }
         if (Now >= Travel.NextDecisionTime) { CancelTravel(); continue; }
+        if (!Fauna->Goal.Equals(Chosen->Approach[ChosenWaypoint], .1))
+        {
+            Fauna->Goal = Chosen->Approach[ChosenWaypoint];
+            RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("PassageWaypoint"));
+        }
+        if (ChosenWaypoint + 1 < Chosen->Approach.Num()) continue;
         FVector Exit = Chosen->Exit;
         const double Scale = Fauna->Life.BodyScale(Now);
         if (FVector::Dist2D(Position, Exit) > FMath::Min(double(Species->WalkSpeed) * .5, Migration.ArrivalRadius)
@@ -1454,7 +1491,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
             }
             else if (bPassageTravel)
             {
-                Goal = Travel.TargetPosition;
+                Goal = Fauna->Goal;
                 bRun = false;
             }
             else if (FaunaHabitatPatches.IsValidIndex(Fauna->PatchTarget))
@@ -1576,7 +1613,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                 Fauna->NextFoodSense = Now + 1.;
                 if (InvestigatedUntil) *InvestigatedUntil = -1.;
                 Fauna->NextDecision = FMath::Min(Fauna->NextDecision, Now + .75);
-                Fauna->Goal = Position;
+                if (!bPassageTravel) Fauna->Goal = Position;
                 continue;
             }
             Velocity = (Destination - Position) / Delta;

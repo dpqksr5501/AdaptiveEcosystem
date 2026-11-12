@@ -3006,7 +3006,8 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 	bPointsFinal = true;
 
 	// 전역 t 를 팀 시계에 맞춘다 (낮 시작 = 스텝 0, 60 초 = 450 스텝 — v3 어둠 식의 낮 시작과 같다)
-	if (const UEcoWorldClockSubsystem* TeamClock = World->GetSubsystem<UEcoWorldClockSubsystem>(); TeamClock && TeamClock->IsClockRunning())
+	if (const UEcoWorldClockSubsystem* TeamClock = World->GetSubsystem<UEcoWorldClockSubsystem>();
+		!UsesAuthorityBoundaries() && TeamClock && TeamClock->IsClockRunning())
 	{
 		GlobalT = FMath::Max<int64>(0, FMath::RoundToInt64(TeamClock->GetServerTime().ServerTimeSeconds / EcoPolicyV3IntegratedImpl::kStepSeconds));
 	}
@@ -3535,6 +3536,7 @@ const FEcoV3RegionContext* UEcoPolicyV3IntegratedSubsystem::FindContext(FName Re
 
 void UEcoPolicyV3IntegratedSubsystem::CheckClockDrift()
 {
+	if (UsesAuthorityBoundaries()) return;
 	const UWorld* World = GetWorld();
 	const UEcoWorldClockSubsystem* TeamClock = World ? World->GetSubsystem<UEcoWorldClockSubsystem>() : nullptr;
 	if (!TeamClock || !TeamClock->IsClockRunning())

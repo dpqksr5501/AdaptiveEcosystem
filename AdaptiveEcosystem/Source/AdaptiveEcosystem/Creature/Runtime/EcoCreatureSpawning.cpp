@@ -136,6 +136,12 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 		PublishSummary(); // Commit population before releasing this group's spawn reservation.
 		if (!Ecology->CompleteSpawnRequest(Request.RequestId, Actual) || Actual != Request.Count) return false;
 	}
+	if (!FaunaSpecies.IsEmpty())
+	{
+		auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+		if (!Native) return false;
+		Native->SetAuthorityBoundaries(true);
+	}
 	GameState->SetMassReplicationReady(true); GameState->SetWorldPhase(EEcoWorldPhase::Running);
 	UE_LOG(LogTemp, Log, TEXT("[Eco Integration] Authority ready: Agents=%d Regions=%d PPO+Social+MassBubble"), Owned.Num(), Regions.Num());
 	return true;

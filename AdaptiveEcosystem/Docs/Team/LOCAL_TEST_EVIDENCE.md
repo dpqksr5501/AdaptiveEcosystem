@@ -10,6 +10,10 @@
 | 복사본 작성·월드 파티션 | `Saved/ProjectAudit_20261112/IntegrationR7eAuthoring.json`, `Saved/Logs/IntegrationR7eAuthoring.log` |
 | 사슴 단독·기존 다종 참조 | `Saved/ProjectAudit_20261112/DeerLong_Summary.json`과 완료된 `DeerLong_*.json`, 대응하는 `Saved/Logs/`의 로그 |
 | 기존 바이너리 정책 회귀 | `Saved/ProjectAudit_20261112/PolicyV3Baseline/index.json` |
+| 다종 공통 시계, 시드 두 개와 4배속 30·60 FPS | `Saved/ProjectAudit_20261112/SharedBoundaryLong_*.json`, 대응하는 `Saved/Logs/` 권위 로그 |
+| 통로 경유점·지면 도착·목적지 섭취 | `Saved/ProjectAudit_20261112/SharedBoundaryApproachPIE.json`, `Saved/Logs/SharedBoundaryApproachPIE.log` |
+| 공통 시계 빌드의 자동화 | `Saved/SharedBoundary/Automation/index.json`, `Saved/Logs/SharedBoundary_Automation.log` |
+| 전용 서버 근접 사냥과 늦은 접속 | `Saved/PlayerHunting_20261105/SharedBoundaryMeleeIsolated/`의 서버 및 두 Client 결과 |
 
 맵별 결과, 모델·시드·배속, 섭취 단위와 미검증 범위는 [개체군 비교와 재현](../Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존)에 있다. 재현용 복사 맵 두 개와 각각의 World Partition 외부 액터는 에셋과 함께 사용한다. 원본 에셋, 저장 슬롯, Git·LFS 데이터는 원시 로그와 용도가 다르다.
 

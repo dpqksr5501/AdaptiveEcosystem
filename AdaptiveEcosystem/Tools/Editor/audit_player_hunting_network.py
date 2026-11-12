@@ -46,6 +46,8 @@ def event(value):
                    damage=value.applied_damage, step=value.step_id, execution=value.attack_execution_id)
     state["events"].append(receipt)
     u.log("HUNTING_NETWORK_OWNER_RECEIPT "+json.dumps(receipt))
+    if name == "ClientA" and "DEATH_COMMITTED" in receipt["result"]:
+        write("ClientADeathReceived.json", dict(target=receipt["id"]))
 
 
 def finish(ok, error=None):
@@ -120,6 +122,16 @@ def server_tick(world, runtime, players, ids, now):
         state["death_at"] = now
         u.log("HUNTING_NETWORK_DEATH "+str(state["target"]))
     if "death_at" in state and "retaliation" not in state:
+        # The previous combo can still have an active hit window after the killing blow.
+        # Keep the next wolf out of the fixture until the owner and authority have finished that attack.
+        death_receipt = read("ClientADeathReceived.json")
+        pawn = attacker.get_controlled_pawn()
+        anim = pawn.mesh.get_anim_instance()
+        hit = pawn.get_component_by_class(u.EcoMeleeHitComponent)
+        if (not death_receipt or death_receipt["target"] != state["target"]
+                or not anim or anim.montage_is_playing(montage)
+                or hit.get_editor_property("active_step") >= 0):
+            return
         alternate = choose_wolf(world, ids)
         assert alternate, "No surviving wolf for retaliation"
         state["retaliation"] = int(alternate["stable_id"])
