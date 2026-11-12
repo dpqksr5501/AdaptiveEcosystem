@@ -36,8 +36,13 @@ import yaml
 
 DEER, WOLF, BOAR = 0, 1, 2
 SPECIES = ("deer", "wolf", "boar")           # slot block order inside one world (3-6: 사슴 → 늑대 → 멧돼지)
-N_SPECIES = 3
-SPECIES_INDEX = {n: i for i, n in enumerate(SPECIES)}
+N_SPECIES = 3                                # 'S′ 세 종' (eval / league / run_night and the old tests keep this meaning — 동물 9-1 B6)
+# 동물 세계 (RL_R9_SPECIES_TRAITS.md 3·9-2): species numbers continue after the S′ three. A config names a prefix of ALL_SPECIES
+# (`species_of`); world / body / life / brains / VecEnv / training read the config's list, never N_SPECIES.
+BUFFALO, LEOPARD, FOX, RAT, CROW = 3, 4, 5, 6, 7
+ALL_SPECIES = ("deer", "wolf", "boar", "buffalo", "leopard", "fox", "rat", "crow")
+STAGE1_MAX_SPECIES = 6                       # 쥐·까마귀는 3 단계 (굴·날기 몸 규칙이 생긴 뒤)
+SPECIES_INDEX = {n: i for i, n in enumerate(ALL_SPECIES)}
 
 GRASS, ROOT, MEAT = 0, 1, 2
 FOODS = ("grass", "root", "meat")
@@ -304,6 +309,11 @@ REQUIRED = {
     "rules": ("deer", "boar", "wolf", "hide"),
     "train": ("seeds", "reset_steps", "worlds", "n_steps", "opponents", "opponent_stochastic", "ppo"),
 }
+# 동물 세계 몸 칸 (9-2): body_common.fauna 가 있을 때만, 그때는 모든 종 블록에 필수. 없으면 어느 종 블록에도 있으면 안 된다.
+FAUNA_SPECIES_KEYS = ("bite_k", "hide", "strike_k", "gore", "gore_r", "camo", "recover")
+FAUNA_COMMON_KEYS = ("damage", "age_steps", "shelter_guard", "gore", "camo_curve", "carcass_places")
+FAUNA_AGE_STEPS = 64                         # = r9_life.AGE_STEPS (AGE23 literal table; checked like eat_r)
+NEW_SPECIES_SECTIONS = ("world.slots", "counts", "learner_counts", "randomize.juvenile_frac", "rules")
 JUDGE_KEYS = ("steps", "steps_long", "worlds", "worlds_long", "start_per_quadrant", "wolf_packs", "grass_regen_mult",
               "root_regen_mult", "wolf_run_mult", "greedy", "founders", "start", "limits", "plant_budget")
 
@@ -318,6 +328,101 @@ def _deep_merge(a: dict, b: dict) -> dict:
     return out
 
 
+def species_of(cfg: dict) -> tuple:
+    """Species of a config = the names of its `species` block, which must be a prefix of ALL_SPECIES (deer, wolf, boar first, then
+    buffalo, leopard, fox — slot block order). S′ configs give the three; rat and crow are refused (3 단계)."""
+    names = list(cfg["species"].keys())
+    n = len(names)
+    if n > STAGE1_MAX_SPECIES:
+        raise ValueError("쥐·까마귀는 3 단계 — 굴·날기 몸 규칙 없이 넣지 않는다 (species: " + ", ".join(names) + ")")
+    if n < len(SPECIES) or set(names) != set(ALL_SPECIES[:n]):
+        raise ValueError(f"species must be the first n of {ALL_SPECIES} (n ≥ 3, any order in the YAML): {names}")
+    return ALL_SPECIES[:n]
+
+
+def _check_fauna(cfg: dict, names: tuple) -> None:
+    """body_common.fauna block (R1·P1·R2·R3·R6) and the per-species body cells (9-2)."""
+    fa = cfg["body_common"].get("fauna")
+    if fa is None:
+        for n in names:
+            bad = [k for k in FAUNA_SPECIES_KEYS if k in cfg["species"][n]]
+            if bad:
+                raise ValueError(f"species.{n} has animal-world keys {bad} but body_common.fauna is missing")
+        return
+    if not isinstance(fa, dict):
+        raise ValueError("body_common.fauna must be a mapping")
+    miss = [k for k in FAUNA_COMMON_KEYS if k not in fa]
+    if miss:
+        raise ValueError(f"body_common.fauna misses keys {miss}")
+    if fa["damage"] != "mass":
+        raise ValueError(f"body_common.fauna.damage must be 'mass': {fa['damage']!r}")
+    if fa["shelter_guard"] != "enter":
+        raise ValueError(f"body_common.fauna.shelter_guard must be 'enter': {fa['shelter_guard']!r}")
+    if float(fa["age_steps"]) != float(FAUNA_AGE_STEPS):
+        raise ValueError(f"body_common.fauna.age_steps {fa['age_steps']} must equal the code literal {FAUNA_AGE_STEPS} (AGE23 table)")
+    g = fa["gore"]
+    for k in ("cone_cos", "approach_min", "cooldown", "run_only"):
+        if k not in g:
+            raise ValueError(f"body_common.fauna.gore misses {k!r}")
+    if g["run_only"] is not True:
+        raise ValueError("body_common.fauna.gore.run_only must be true (P6: 들이받기는 뛰기 걸음일 때만)")
+    if int(g["cooldown"]) < 0:
+        raise ValueError("body_common.fauna.gore.cooldown must be ≥ 0")
+    if not float(fa["camo_curve"]["span"]) > 0.0:
+        raise ValueError("body_common.fauna.camo_curve.span must be > 0")
+    cp = fa["carcass_places"]
+    if not (float(cp["per_size"]) > 0.0 and 1 <= int(cp["min"]) <= int(cp["max"])):
+        raise ValueError(f"body_common.fauna.carcass_places must have per_size > 0 and 1 ≤ min ≤ max: {cp}")
+    for n in names:
+        s = cfg["species"][n]
+        miss = [k for k in FAUNA_SPECIES_KEYS if k not in s]
+        if miss:
+            raise ValueError(f"species.{n} misses animal-world keys {miss} (body_common.fauna is set — 모든 종에 필수)")
+        if not float(s["hide"]) > 0.0:
+            raise ValueError(f"species.{n}.hide must be > 0")
+        if not (0.0 < float(s["camo"]) <= 1.0):
+            raise ValueError(f"species.{n}.camo must be in (0, 1]")
+        if float(s["bite_k"]) < 0.0 or float(s["strike_k"]) < 0.0:
+            raise ValueError(f"species.{n}: bite_k and strike_k must be ≥ 0")
+        if not float(s["recover"]) > 0.0:
+            raise ValueError(f"species.{n}.recover must be > 0")
+        if not isinstance(s["gore"], bool):
+            raise ValueError(f"species.{n}.gore must be true|false")
+        if s["gore"] and not float(s["gore_r"]) > 0.0:
+            raise ValueError(f"species.{n}: gore needs gore_r > 0")
+
+
+def _check_variants(cfg: dict, names: tuple) -> None:
+    """train.variants (9-5): world-number variants of the learning world (counts only — no behaviour, no RNG)."""
+    vs = cfg["train"].get("variants")
+    if vs is None:
+        return
+    if not isinstance(vs, list):
+        raise ValueError("train.variants must be a list")
+    caps = cfg["world"]["slots"]
+    seen = set()
+    for v in vs:
+        for k in ("name", "learners", "every"):
+            if k not in v:
+                raise ValueError(f"train.variants item misses {k!r}: {v}")
+        if v["name"] in seen:
+            raise ValueError(f"train.variants: duplicate name {v['name']!r}")
+        seen.add(v["name"])
+        if float(v["every"]) != int(v["every"]) or int(v["every"]) < 2:
+            raise ValueError(f"train.variants.{v['name']}.every must be an integer ≥ 2")
+        bad = [n for n in v["learners"] if n not in names]
+        if bad or not v["learners"]:
+            raise ValueError(f"train.variants.{v['name']}.learners must name config species: {v['learners']}")
+        for blk in ("counts", "learner_counts"):
+            for n, lst in (v.get(blk) or {}).items():
+                if n not in names:
+                    raise ValueError(f"train.variants.{v['name']}.{blk}: unknown species {n!r}")
+                if blk == "learner_counts" and n not in v["learners"]:
+                    raise ValueError(f"train.variants.{v['name']}.learner_counts.{n}: not a learner of this variant")
+                if not lst or any(float(x) != int(x) or int(x) < 0 or int(x) > int(caps[n]) for x in lst):
+                    raise ValueError(f"train.variants.{v['name']}.{blk}.{n} must be integers 0..world.slots.{n}: {lst}")
+
+
 def check_r9_config(cfg: dict) -> dict:
     """Required keys and a few range checks. No defaults — every value is written in the YAML (R8 rule)."""
     for sec, keys in REQUIRED.items():
@@ -326,7 +431,15 @@ def check_r9_config(cfg: dict) -> dict:
         miss = [k for k in keys if k not in cfg[sec]]
         if miss:
             raise ValueError(f"R9 config '{sec}' misses keys {miss}")
-    for sp in SPECIES:
+    names = species_of(cfg)
+    for sp in names[len(SPECIES):]:
+        for path in NEW_SPECIES_SECTIONS:
+            d = cfg
+            for part in path.split("."):
+                d = d.get(part, {}) if isinstance(d, dict) else {}
+            if not isinstance(d, dict) or sp not in d:
+                raise ValueError(f"R9 config: new species {sp!r} needs {path}.{sp}")
+    for sp in names:
         miss = [k for k in SPECIES_KEYS if k not in cfg["species"][sp]]
         if miss:
             raise ValueError(f"R9 config species.{sp} misses keys {miss}")
@@ -345,7 +458,7 @@ def check_r9_config(cfg: dict) -> dict:
         raise ValueError(f"world.decision_steps is part of the I/O contract and must be {DECISION_STEPS}")
     if int(w["quadrants"]) not in (1, 4):
         raise ValueError(f"world.quadrants must be 1 or 4: {w['quadrants']}")
-    for sp in SPECIES:
+    for sp in names:
         cap = int(w["slots"][sp])
         lo, hi = (int(x) for x in cfg["counts"][sp])
         if not (0 <= lo <= hi <= cap):
@@ -359,7 +472,7 @@ def check_r9_config(cfg: dict) -> dict:
             if d not in s["eat_rate"] or d not in s["e_per_unit"]:
                 raise ValueError(f"species.{sp}: diet {d!r} needs eat_rate and e_per_unit")
         for p in s["bites"]:
-            if p not in SPECIES or p == sp:
+            if p not in names or p == sp:
                 raise ValueError(f"species.{sp}.bites must name other species: {s['bites']}")
         if s["founder"] not in ("plain", "natural") or s["growth"] not in ("smooth", "linear"):
             raise ValueError(f"species.{sp}: founder plain|natural, growth smooth|linear")
@@ -375,6 +488,8 @@ def check_r9_config(cfg: dict) -> dict:
     tg = cfg["food"]["train_grass_total"]
     if tg is not None and not float(tg) > 0.0:
         raise ValueError(f"food.train_grass_total must be null or > 0: {tg}")
+    _check_fauna(cfg, names)
+    _check_variants(cfg, names)
     if w["mode"] == "judge":
         if "judge" not in cfg or not isinstance(cfg["judge"], dict):
             raise ValueError("judge mode needs a 'judge' block")
@@ -472,6 +587,19 @@ class Body:
     child_avoid_shelter: np.ndarray   # bool
     food_density_ref: np.ndarray
     food_here_ref: np.ndarray
+    # 동물 세계 (9-2). Without body_common.fauna: names = the three, fauna False and the neutral values below (unused by the old
+    # code paths — the world keeps its S′ lines literally, B4).
+    names: tuple = SPECIES            # species of the config (ALL_SPECIES prefix), index = species number
+    n: int = N_SPECIES
+    fauna: bool = False
+    bite_k: np.ndarray | None = None  # R1 teeth strength (0 = no teeth)
+    hide: np.ndarray | None = None    # R1 hide (divides the wound)
+    strike_k: np.ndarray | None = None   # R1 horns / tusks (counter and gore)
+    gore: np.ndarray | None = None    # R2 bool
+    gore_r: np.ndarray | None = None  # R2 reach × g_size × growth
+    camo: np.ndarray | None = None    # R3 (1 = plain)
+    recover: np.ndarray | None = None  # R7 steps from a delivery to the next breeding (= body_common.breed.recover without fauna)
+    c23: np.ndarray | None = None     # R1 (n, n) (kg_s / kg_t)^(2/3), computed once here (no transcendental inside a step)
     common: dict = field(default_factory=dict)   # body_common block as read (floats/ints/lists/dicts)
 
     @property
@@ -490,6 +618,8 @@ def _f(x) -> float:
 FOV_COS_LITERAL = {
     300.0: -0.8660254037844387,     # deer, boar (-0x1.bb67ae8584cabp-1)
     250.0: -0.5735764363510462,     # wolf       (-0x1.25abcf87c4979p-1)
+    200.0: -0.1736481776669303,     # leopard (동물 1 단계) = math.cos(math.radians(100.0))
+    260.0: -0.6427876096865394,     # fox     (동물 1 단계) = math.cos(math.radians(130.0))
 }
 
 
@@ -500,18 +630,21 @@ def fov_cos_of(fov_deg: float) -> float:
 
 
 def load_body(cfg: dict) -> Body:
-    """Body table from cfg['species'] and cfg['body_common'] (3-3)."""
-    sp_cfg = [cfg["species"][n] for n in SPECIES]
+    """Body table from cfg['species'] and cfg['body_common'] (3-3). Species = `species_of(cfg)` (S′: the three)."""
+    names = species_of(cfg)
+    nsp = len(names)
+    sp_cfg = [cfg["species"][n] for n in names]
     cm = cfg["body_common"]
+    fauna = cm.get("fauna") is not None
     lock, unlock = _f(cm["stamina_lock"]), _f(cm["stamina_unlock"])
     arr = lambda key, conv=_f: np.array([conv(s[key]) for s in sp_cfg], dtype=np.float64)  # noqa: E731
     barr = lambda key: np.array([bool(s[key]) for s in sp_cfg], dtype=bool)  # noqa: E731
     mass = arr("mass_kg")
     drain = arr("drain")
     run_steps, rec_steps = arr("stamina_run_steps"), arr("stamina_recover_steps")
-    eats = np.zeros((N_SPECIES, N_FOODS), dtype=bool)
-    rate = np.zeros((N_SPECIES, N_FOODS))
-    epu = np.zeros((N_SPECIES, N_FOODS))
+    eats = np.zeros((nsp, N_FOODS), dtype=bool)
+    rate = np.zeros((nsp, N_FOODS))
+    epu = np.zeros((nsp, N_FOODS))
     order = []
     for i, s in enumerate(sp_cfg):
         o = []
@@ -522,10 +655,17 @@ def load_body(cfg: dict) -> Body:
             epu[i, fi] = _f(s["e_per_unit"][d])
             o.append(fi)
         order.append(tuple(o))
-    bites = np.zeros((N_SPECIES, N_SPECIES), dtype=bool)
+    bites = np.zeros((nsp, nsp), dtype=bool)
     for i, s in enumerate(sp_cfg):
         for p in s["bites"]:
             bites[i, SPECIES_INDEX[p]] = True
+    if fauna:
+        fz = dict(bite_k=arr("bite_k"), hide=arr("hide"), strike_k=arr("strike_k"), gore=barr("gore"), gore_r=arr("gore_r"),
+                  camo=arr("camo"), recover=arr("recover"),
+                  c23=np.array([[(float(a) / float(b)) ** (2.0 / 3.0) for b in mass] for a in mass], dtype=np.float64))
+    else:
+        fz = dict(bite_k=np.zeros(nsp), hide=np.ones(nsp), strike_k=np.zeros(nsp), gore=np.zeros(nsp, dtype=bool),
+                  gore_r=np.zeros(nsp), camo=np.ones(nsp), recover=np.full(nsp, _f(cm["breed"]["recover"])), c23=None)
     fov = arr("fov_deg")
     ring = [s["child_ring"] for s in sp_cfg]
     fvar = np.array([0.0 if s["founder"] == "plain" else _f(s["founder_variation"]) for s in sp_cfg])
@@ -587,6 +727,10 @@ def load_body(cfg: dict) -> Body:
         child_avoid_shelter=np.array([bool(r["avoid_shelter"]) for r in ring], dtype=bool),
         food_density_ref=arr("food_density_ref"),
         food_here_ref=arr("food_here_ref"),
+        names=tuple(names),
+        n=nsp,
+        fauna=fauna,
+        **fz,
         common=copy.deepcopy(cm),
     )
 
@@ -598,6 +742,8 @@ SLOT_FIELDS = ("size0", "growth_smooth", "walk_speed", "run_speed", "accel", "st
                "hp_regen", "shelter_enter", "can_bite", "bite_r", "counter", "maturity", "mass_kg", "food_density_ref",
                "food_here_ref", "mate_r", "birth_r")
 SLOT_FOOD_FIELDS = ("eats", "eat_rate", "e_per_unit")
+# 동물 세계 칸 (9-2) — expand_body adds them only when body.fauna (the S′ `sb` dict keeps its keys).
+SLOT_FAUNA_FIELDS = ("bite_k", "hide", "strike_k", "gore", "gore_r", "camo")
 
 
 def expand_body(body: Body, sp: np.ndarray) -> dict[str, np.ndarray]:
@@ -607,6 +753,9 @@ def expand_body(body: Body, sp: np.ndarray) -> dict[str, np.ndarray]:
     out = {f: getattr(body, f)[sp] for f in SLOT_FIELDS}
     for f in SLOT_FOOD_FIELDS:
         out[f] = getattr(body, f)[sp]
+    if body.fauna:
+        for f in SLOT_FAUNA_FIELDS:
+            out[f] = getattr(body, f)[sp]
     return out
 
 
@@ -643,9 +792,9 @@ def hash_hex(h: int) -> str:
 
 def body_contract_dict(cfg: dict, sp: int | str) -> dict:
     """Body contract of one species = its species block + body_common (both worlds read the same values)."""
-    name = SPECIES[sp] if isinstance(sp, (int, np.integer)) else str(sp)
-    if name not in SPECIES:
-        raise ValueError(f"unknown species {sp!r}")
+    name = ALL_SPECIES[int(sp)] if isinstance(sp, (int, np.integer)) else str(sp)
+    if name not in ALL_SPECIES or name not in cfg["species"]:
+        raise ValueError(f"unknown species {sp!r} (config species {list(cfg['species'])})")
     return {"contract": BODY_CONTRACT, "version": CONTRACT_VERSION, "species": name,
             "body": _canon(cfg["species"][name]), "common": _canon(cfg["body_common"])}
 
@@ -656,9 +805,10 @@ def body_hash(cfg: dict, sp: int | str) -> int:
 
 
 def body_table_hash(cfg: dict) -> int:
-    """uint64 hash of all three species blocks + common (recorded in brain meta: the bodies the brain was trained against)."""
+    """uint64 hash of all species blocks of the config + common (recorded in brain meta: the bodies the brain was trained against).
+    S′ configs: the same dict as before (the three species)."""
     return _h64({"contract": BODY_CONTRACT + "_table", "version": CONTRACT_VERSION,
-                 "species": {n: _canon(cfg["species"][n]) for n in SPECIES}, "common": _canon(cfg["body_common"])})
+                 "species": {n: _canon(cfg["species"][n]) for n in species_of(cfg)}, "common": _canon(cfg["body_common"])})
 
 
 def io_contract_dict() -> dict:

@@ -57,8 +57,10 @@ OBS_SPACE = Box(-1.0, 1.0, (B.OBS_DIM,), np.float32)
 ACT_SPACE = Discrete(B.N_ACTIONS)
 
 JUDGE_SEEDS = (44800, 45000)                            # 10절 판정 범위 [lo, hi) — training code refuses it (test 25)
+FAUNA_JUDGE_SEEDS = (46900, 47000)                      # 동물 세계 판정 J2F·J3F (RL_R9_SPECIES_TRAITS.md 7-3) — also refused
 OPP_KINDS = ("current", "past", "rule", "always_eat")
-RULE_OF = {B.DEER: "RULE_DEER", B.WOLF: "RULE_WOLF", B.BOAR: "RULE_BOAR"}
+RULE_OF = {B.DEER: "RULE_DEER", B.WOLF: "RULE_WOLF", B.BOAR: "RULE_BOAR", B.BUFFALO: "RULE_BUFFALO", B.LEOPARD: "RULE_LEOPARD",
+           B.FOX: "RULE_FOX"}
 NEAR_WOLF_R = 10.0                                      # [어림] online flee / toward-wolf stats: nearest sensed wolf within 10 units
 WOLF_IDLE_APPROACH = 0.1                                # [어림] 'wolf not approaching' = approach obs ≤ 0.1 (RULE_BOAR walk threshold)
 TOWARD_COS = 0.9238795325112867                         # cos 22.5°: WALK_j direction within half a sector of the wolf direction
@@ -78,6 +80,14 @@ def check_train_seeds(seeds) -> None:
     bad = s[(s >= JUDGE_SEEDS[0]) & (s < JUDGE_SEEDS[1])]
     if len(bad):
         raise ValueError(f"judge seeds {JUDGE_SEEDS[0]}~{JUDGE_SEEDS[1] - 1} are locked for the final judgement (got {bad[:5].tolist()})")
+    bad = s[(s >= FAUNA_JUDGE_SEEDS[0]) & (s < FAUNA_JUDGE_SEEDS[1])]
+    if len(bad):
+        raise ValueError(f"animal-world judge seeds {FAUNA_JUDGE_SEEDS[0]}~{FAUNA_JUDGE_SEEDS[1] - 1} are locked (got {bad[:5].tolist()})")
+
+
+def can_bite_of(cfg: dict, sp: int) -> bool:
+    """A body with teeth (non-empty `bites`) — the same as r9_body.Body.can_bite, read from the config."""
+    return bool(cfg["species"][B.ALL_SPECIES[int(sp)]]["bites"])
 
 
 # --------------------------------------------------------------------------- #
@@ -87,12 +97,13 @@ def check_train_seeds(seeds) -> None:
 def opponent_shares(cfg: dict, round_: int, learner: int, opp: int, override: dict | None = None) -> dict:
     """Shares {kind: p} for opponent species `opp` when `learner` learns in round `round_` (cfg.train.opponents, 7-4)."""
     if override:
-        o = override.get(B.SPECIES[opp], override.get(opp, override.get("*")))
+        o = override.get(B.ALL_SPECIES[opp], override.get(opp, override.get("*")))
         if o is not None:
             return dict(o)
     op = cfg["train"]["opponents"]
     if int(round_) == 0:
-        if learner == B.WOLF and opp != B.WOLF:
+        # 'wolf bundle prey' = a body with teeth learning against a body without (S′: wolf vs deer / boar — the same pairs; 동물 9-5)
+        if can_bite_of(cfg, learner) and not can_bite_of(cfg, opp):
             return dict(op["round0_wolf_prey"])
         return dict(op["round0"])
     return dict(op["later"])
@@ -137,8 +148,9 @@ def pick_opponent(meta: np.random.Generator, shares: dict, n_versions: int, past
     return dict(kind=kind, v=v, stochastic=bool(u[2] < float(stoch_frac)), u=[float(x) for x in u])
 
 
-def controller_spec(pick: dict, opp: int, pool_paths: Sequence[str]) -> tuple:
-    """Picklable controller spec (kind, name_or_path, stochastic, label) for shards."""
+def controller_spec(pick: dict, opp: int, pool_paths: Sequence[str], can_bite: bool | None = None) -> tuple:
+    """Picklable controller spec (kind, name_or_path, stochastic, label) for shards. can_bite: the opponent has teeth (None = S′
+    meaning: the wolf) — always_eat is a prey baseline."""
     kd = pick["kind"]
     if kd in ("current", "past"):
         path = str(pool_paths[pick["v"]])
@@ -146,7 +158,7 @@ def controller_spec(pick: dict, opp: int, pool_paths: Sequence[str]) -> tuple:
     if kd == "rule":
         return ("rule", RULE_OF[opp], pick["stochastic"], f"rule:{RULE_OF[opp]}")
     if kd == "always_eat":
-        if opp == B.WOLF:
+        if (opp == B.WOLF) if can_bite is None else bool(can_bite):
             raise ValueError("always_eat is a prey baseline (7-5), not a wolf brain")
         return ("rule", "ALWAYS_EAT", pick["stochastic"], "always_eat:ALWAYS_EAT")
     raise ValueError(kd)
@@ -186,8 +198,8 @@ class _ShardCore:
         return b
 
     def _set_ctrls(self, k: int, sp_specs: dict) -> None:
-        for s in range(B.N_SPECIES):
-            if s == self.sp:
+        for s in range(self.world.NS):
+            if s == self.sp or sp_specs.get(s) is None:          # learner, or a species with 0 slots in this config (동물 B3)
                 self.world.set_controller(k, s, None)
                 continue
             kind, name, stoch, label = sp_specs[s]
@@ -202,7 +214,7 @@ class _ShardCore:
         ek, es = self.ek, self.es
         st = self.ost
         st["dec"] += float(self.n)
-        if self.sp == B.WOLF or not self.n:
+        if bool(w.body.can_bite[self.sp]) or not self.n:      # S′: the wolf (동물: every body with teeth)
             return
         oth, _ = w.obs_maps()
         j = oth[ek, es, 0]
@@ -434,8 +446,12 @@ class R9VecEnv(VecEnv):
         if str(cfg["world"]["mode"]) != "train":
             raise ValueError("R9VecEnv runs train worlds only (judge worlds are driven by the evaluation tools)")
         self.cfg = cfg
+        self.names = B.species_of(cfg)
+        self.NS = len(self.names)
         self.sp = species_index(learner)
-        self.name = B.SPECIES[self.sp]
+        if not 0 <= self.sp < self.NS:
+            raise ValueError(f"learner {learner!r} is not a species of this config {self.names}")
+        self.name = B.ALL_SPECIES[self.sp]
         self.model_seed, self.round, self.segment = int(model_seed), int(round_), int(segment)
         self.K = int(num_worlds if num_worlds is not None else tr["worlds"][self.name])
         steps = int(reset_steps if reset_steps is not None else tr["reset_steps"])
@@ -446,15 +462,21 @@ class R9VecEnv(VecEnv):
             seeds = range(int(lo), int(hi))
         self.pool = np.asarray(list(seeds), dtype=np.int64)
         check_train_seeds(self.pool)
-        self.brain_pool = {s: [] for s in range(B.N_SPECIES)}
+        self.brain_pool = {s: [] for s in range(self.NS)}
         for key, paths in (pool or {}).items():
-            self.brain_pool[species_index(key)] = [str(p) for p in paths]
+            si = species_index(key)
+            if si >= self.NS:
+                raise ValueError(f"pool species {key!r} is not in this config {self.names}")
+            self.brain_pool[si] = [str(p) for p in paths]
         self.share_override = shares
         self.past_from = float(tr["opponents"]["past_from"])
         self.stoch_frac = float(tr["opponent_stochastic"])
+        self._caps = np.array([int(cfg["world"]["slots"][n]) for n in self.names], dtype=np.int64)
+        self._bite = [can_bite_of(cfg, s) for s in range(self.NS)]
         lc = [int(x) for x in cfg["learner_counts"][self.name]]
-        self.counts = np.full((self.K, B.N_SPECIES), -1, dtype=np.int64)
+        self.counts = np.full((self.K, self.NS), -1, dtype=np.int64)
         self.counts[:, self.sp] = [lc[k % len(lc)] for k in range(self.K)]
+        self.variant = self._apply_variants()                         # 동물 9-5 (None everywhere without train.variants)
         self._meta = np.random.default_rng([self.model_seed, self.round, self.segment, self.sp])
         # first worlds: seed, then opponents, world by world (renew uses the same order)
         self.seeds_now: list[int] = []
@@ -465,7 +487,7 @@ class R9VecEnv(VecEnv):
             specs.append(sp_specs)
             picks.append(pk)
         self.seed_history: list[list[int]] = [[s] for s in self.seeds_now]
-        self.history: list[dict] = [dict(k=k, at=0, seed=self.seeds_now[k], opponents=picks[k]) for k in range(self.K)]
+        self.history: list[dict] = [self._hist(k, 0, self.seeds_now[k], picks[k]) for k in range(self.K)]
         self.num_resets = 0
         self.decisions = 0
         n_sh = max(1, min(int(shards), self.K))
@@ -497,6 +519,40 @@ class R9VecEnv(VecEnv):
         super().__init__(n_env, OBS_SPACE, ACT_SPACE)
 
     # --- meta choices (this process only) ---
+    def _apply_variants(self) -> list:
+        """동물 9-5 `train.variants`: world k takes the first variant whose learners include this learner and k % every == every − 1;
+        j = k // every picks counts[species][j % len] for opponent species and learner_counts[learner][j % len] for the learner (if
+        given). World composition only — no RNG, no behaviour. Returns the variant name per world (None = base)."""
+        out: list = [None] * self.K
+        vs = self.cfg["train"].get("variants") or []
+        for k in range(self.K):
+            for v in vs:
+                ev = int(v["every"])
+                if self.name not in v["learners"] or k % ev != ev - 1:
+                    continue
+                j = k // ev
+                for n, lst in (v.get("counts") or {}).items():
+                    s = self.names.index(n)
+                    if s != self.sp:
+                        self.counts[k, s] = int(lst[j % len(lst)])
+                lcs = (v.get("learner_counts") or {}).get(self.name)
+                if lcs:
+                    self.counts[k, self.sp] = int(lcs[j % len(lcs)])
+                out[k] = str(v["name"])
+                break
+        for k in range(self.K):
+            for s in range(self.NS):
+                if self.counts[k, s] > self._caps[s]:
+                    raise ValueError(f"world {k}: {self.names[s]} count {self.counts[k, s]} exceeds world.slots {self._caps[s]}")
+        return out
+
+    def _hist(self, k: int, at: int, seed: int, picks: dict) -> dict:
+        """One world history row; the variant name is written only when the config has variants (S′ rows keep their keys)."""
+        h = dict(k=int(k), at=int(at), seed=int(seed), opponents=picks)
+        if self.cfg["train"].get("variants"):
+            h["variant"] = self.variant[int(k)]
+        return h
+
     def _staggered(self) -> np.ndarray:
         return np.array([(k * self.T) // self.K for k in range(self.K)], dtype=np.int64)
 
@@ -511,15 +567,15 @@ class R9VecEnv(VecEnv):
 
     def _pick_opponents(self) -> tuple[dict, dict]:
         specs, picks = {}, {}
-        for s in range(B.N_SPECIES):
-            if s == self.sp:
+        for s in range(self.NS):
+            if s == self.sp or self._caps[s] == 0:                  # 동물 B3: a species without slots draws no meta uniforms
                 specs[s] = None
                 continue
             sh = opponent_shares(self.cfg, self.round, self.sp, s, self.share_override)
             pk = pick_opponent(self._meta, sh, len(self.brain_pool[s]), self.past_from, self.stoch_frac)
-            specs[s] = controller_spec(pk, s, self.brain_pool[s])
-            picks[B.SPECIES[s]] = dict(kind=pk["kind"], v=pk["v"], stochastic=pk["stochastic"], label=specs[s][3],
-                                       path=specs[s][1] if specs[s][0] == "mlp" else None)
+            specs[s] = controller_spec(pk, s, self.brain_pool[s], self._bite[s])
+            picks[self.names[s]] = dict(kind=pk["kind"], v=pk["v"], stochastic=pk["stochastic"], label=specs[s][3],
+                                        path=specs[s][1] if specs[s][0] == "mlp" else None)
         return specs, picks
 
     def set_segment(self, segment: int) -> None:
@@ -557,7 +613,7 @@ class R9VecEnv(VecEnv):
         specs, picks = self._pick_opponents()
         self.seeds_now[k] = s
         self.seed_history[k].append(s)
-        self.history.append(dict(k=int(k), at=int(self.decisions), seed=int(s), opponents=picks))
+        self.history.append(self._hist(k, self.decisions, s, picks))
         self.num_resets += 1
         return k, (s, self.counts[k].copy(), specs)
 

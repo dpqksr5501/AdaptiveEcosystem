@@ -97,7 +97,7 @@ def bundle_seed(model_seed: int, round_: int, sp: int) -> int:
 
 def ppo_kwargs(cfg: dict, sp: int, lr: float, n_steps: int | None = None, batch_size: int | None = None) -> dict:
     p = cfg["train"]["ppo"]
-    name = B.SPECIES[sp]
+    name = B.ALL_SPECIES[sp]
     net = [int(x) for x in p["net"]]
     return dict(n_steps=int(n_steps if n_steps is not None else cfg["train"]["n_steps"][name]),
                 batch_size=int(batch_size if batch_size is not None else p["batch_size"]), n_epochs=int(p["n_epochs"]),
@@ -127,8 +127,11 @@ def _sum0(d: dict, k: str):
 
 
 def stats_row(a: dict, b: dict, sp: int) -> dict:
-    """Learner-species numbers between two `R9VecEnv.stats_snapshot()` (world totals over all worlds)."""
+    """Learner-species numbers between two `R9VecEnv.stats_snapshot()` (world totals over all worlds). Species = the first NS of
+    r9_body.ALL_SPECIES (NS from the stat shapes — S′ three, 동물 세계 six). The S′ columns keep their meaning (kills = bite deaths of
+    deer and boar); the animal world adds `fauna` (kills by biter → bitten species, gores, HP lost to counters and gores)."""
     d = {k: _sum0(b, k) - _sum0(a, k) for k in b if k != "online"}
+    names = B.ALL_SPECIES[:int(np.asarray(d["alive_steps"]).shape[0])]
     on = {k: b["online"][k] - a["online"][k] for k in b["online"]}
     steps = max(int(d["alive_steps"][sp]), 1)
     dec = max(int(d["decisions"][sp]), 1)
@@ -142,7 +145,7 @@ def stats_row(a: dict, b: dict, sp: int) -> dict:
         return float(n) / float(m) if m else None
 
     row = dict(
-        species=B.SPECIES[sp], agent_steps=int(d["alive_steps"][sp]), decisions=int(d["decisions"][sp]),
+        species=names[sp], agent_steps=int(d["alive_steps"][sp]), decisions=int(d["decisions"][sp]),
         bite_per_1k=1000.0 * float(deaths[1]) / steps, counter_per_1k=1000.0 * float(deaths[2]) / steps,
         starve_per_1k=1000.0 * float(deaths[3]) / steps, births_per_1k=1000.0 * float(d["birth_credits"][sp]) / steps,
         eaten_e_x1000=1000.0 * float(eaten.sum()) / steps,
@@ -159,8 +162,20 @@ def stats_row(a: dict, b: dict, sp: int) -> dict:
         toward_wolf=frac(on.get("toward_wolf", 0.0), on.get("wolf_idle", 0.0)), n_wolf_idle=int(on.get("wolf_idle", 0.0)),
         rew_per_dec=frac(on.get("rew_sum", 0.0), on.get("rew_n", 0.0)),
         respawns=int(d["respawns"][sp].sum()), opp_near_ties=int(d["near_ties"].sum()),
-        pop_deaths={n: int(d["deaths"][s][1:].sum()) for s, n in enumerate(B.SPECIES)},
+        pop_deaths={n: int(d["deaths"][s][1:].sum()) for s, n in enumerate(names)},
     )
+    if "bite_pairs" in d:                                         # 동물 세계 (B1: the key exists only with body_common.fauna)
+        bp, gr = d["bite_pairs"], d["gore"]
+        row["fauna"] = dict(
+            kills_by={names[i]: {names[j]: int(bp[i, j, 0]) for j in range(len(names)) if bp[i, j, 0]}
+                      for i in range(len(names)) if bp[i, :, 0].any()},
+            bites_by={names[i]: {names[j]: int(bp[i, j].sum()) for j in range(len(names)) if bp[i, j].sum()}
+                      for i in range(len(names)) if bp[i].sum()},
+            gore={names[i]: {names[j]: [int(gr[i, j, 0]), int(gr[i, j, 1])] for j in range(len(names)) if gr[i, j].sum()}
+                  for i in range(len(names)) if gr[i].sum()},
+            bite_in_shelter=int(d["bite_in_shelter"].sum()),
+            strike_hp_by={names[i]: float(d["strike_hp_by"][i]) for i in range(len(names)) if d["strike_hp_by"][i]},
+        )
     return row
 
 
@@ -285,7 +300,9 @@ class Trainer:
         self.cfg = cfg
         tr = cfg["train"]
         self.sp = species_index(args.species)
-        self.name = B.SPECIES[self.sp]
+        self.name = B.ALL_SPECIES[self.sp]
+        if self.name not in B.species_of(cfg):
+            raise ValueError(f"--species {self.name} is not in the config species {B.species_of(cfg)} ({self.cfg_path})")
         self.branch = str(args.branch)
         self.round = int(args.round)
         if args.model_seed is None and self.branch not in tr["model_seeds"]:
@@ -327,12 +344,21 @@ class Trainer:
             self.lr = float(args.learning_rate)
         self.bseed = bundle_seed(self.model_seed, self.round, self.sp)
         self.init = None
+        self.init_species = None
         if args.init:
             ip = Path(args.init) if Path(args.init).is_absolute() else ROOT / args.init
             self.init = ip
             # learning_rate and gamma as keywords: load rebuilds the schedule / rollout buffer from them (7-7; γ = the config
             # value chosen by C0-10 — a zip saved with another γ follows the config, not the zip)
-            self.model = PPO.load(ip, env=self.venv, device="cpu", learning_rate=self.lr, gamma=float(p["gamma"]))
+            kw = dict(learning_rate=self.lr, gamma=float(p["gamma"]))
+            if args.init_species:
+                # 동물 6-1: a start copy of another (or the same) species' zip — the I/O is the same (115 → 19); the rollout length
+                # follows this learner's train.n_steps (the zip's own n_steps belongs to its old world size)
+                if args.init_species not in B.ALL_SPECIES:
+                    raise ValueError(f"--init-species {args.init_species!r} is not a species name {B.ALL_SPECIES}")
+                self.init_species = str(args.init_species)
+                kw["n_steps"] = int(args.n_steps if args.n_steps is not None else tr["n_steps"][self.name])
+            self.model = PPO.load(ip, env=self.venv, device="cpu", **kw)
             self.model.set_random_seed(self.bseed)
         else:
             self.model = PPO("MlpPolicy", self.venv, seed=self.bseed, device="cpu", verbose=0,
@@ -404,7 +430,10 @@ class Trainer:
                     gamma=float(self.model.gamma), learning_rate=float(self.model.learning_rate),
                     optimizer_lr=sorted({float(x["lr"]) for x in g}), lr_seen=sorted(set(cb.lr_seen)),
                     value_only_first=self.value_only_first, init=rel(self.init) if self.init else None,
-                    init_sha256=sha256(self.init) if self.init else None,
+                    init_sha256=sha256(self.init) if self.init else None, init_species=self.init_species,
+                    config_species=list(B.species_of(self.cfg)),
+                    variants=([dict(k=k, variant=v) for k, v in enumerate(self.venv.variant) if v]
+                              if self.cfg["train"].get("variants") else None),
                     pool_file=rel(self.pool_file) if self.pool_file else None,
                     pool={k: [dict(path=rel(Path(p)), sha256=sha256(Path(p))) for p in v] for k, v in self.pool.items()},
                     shares=self.shares, opponent_labels=labels, snapshots=self.snapshots,
@@ -422,13 +451,16 @@ class Trainer:
 def build_parser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--config", default=CFG_DEFAULT)
-    ap.add_argument("--species", required=True, choices=list(B.SPECIES))
+    ap.add_argument("--species", required=True, choices=list(B.ALL_SPECIES[:B.STAGE1_MAX_SPECIES]),
+                    help="배우는 종 (설정 species 에 있어야 함 — 물소·표범·여우는 configs/v3_r9_fauna.yaml)")
     ap.add_argument("--branch", required=True, help="갈래 A | B (모델 시드 = train.model_seeds)")
     ap.add_argument("--round", type=int, required=True)
     ap.add_argument("--decisions", type=int, required=True, help="묶음 결정 수 (SB3 timesteps, 이 묶음 안)")
     ap.add_argument("--wall-hours", type=float, required=True, help="벽시계 안전 상한")
     ap.add_argument("--run-name", required=True)
     ap.add_argument("--init", default=None, help="이어 배울 시작 사본 zip (없으면 새 모델)")
+    ap.add_argument("--init-species", default=None,
+                    help="동물 6-1: --init zip 이 배운 종 이름 (다른 종 zip 에서 출발 — 롤아웃 길이는 배우는 종 train.n_steps)")
     ap.add_argument("--pool", default=None, help="상대 풀 JSON {'pool': {종: [npz …]}} (묶음 시작 때 고정)")
     ap.add_argument("--shares", default=None, help="상대 몫 덮어쓰기 JSON {종: {current, past, rule, always_eat}} (9-4 처방, C0-10)")
     ap.add_argument("--shards", type=int, default=1, help="세계 조각 수 (늑대 묶음 2~3, 7-3)")

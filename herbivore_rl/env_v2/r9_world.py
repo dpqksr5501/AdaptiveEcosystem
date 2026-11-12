@@ -29,10 +29,10 @@ State table (dtype, shape, meaning). K worlds, S slots, G grid cells per side, C
   per world (K,)
     seeds int64 · t int64 (world-local step) · next_uid int64 (IDs start at 1, only increase, 3-6)
     s_w uint64 · s_q uint64 (K, 4)          life hash seeds (r9_life.life_seeds)
-    counts int64 (K, 3)                     species counts at (re)init (train: constant alive count)
-    kin_perm int8 (K, 3)                    kin_id = kin_perm[k, sp]
-    run_mult f64 (K, 3)                     per-world run multiplier (wolf U[0.90, 1.05], others 1)
-    grass_mult · root_mult f64 (K,)         regen multipliers · juv_frac f64 (K, 3) · rule_f f64 (K,) RULE_DEER facing f
+    counts int64 (K, NS)                    species counts at (re)init (train: constant alive count)
+    kin_perm int8 (K, NS)                   kin_id = kin_perm[k, sp]
+    run_mult f64 (K, NS)                    per-world run multiplier (wolf U[0.90, 1.05], others 1)
+    grass_mult · root_mult f64 (K,)         regen multipliers · juv_frac f64 (K, NS) · rule_f f64 (K,) RULE_DEER facing f
     n_cov int64 (K,)
   per slot (K, S)
     sp int8 [hidden] · kin_id int8 · alive bool · uid int64 (0 = empty)
@@ -135,8 +135,16 @@ TAG_ACT = 9110        # + species number: per-species action sampling (opponent 
 TAG_BITE = 9120       # per-step biter order permutation
 TAG_RESP = 9121       # respawn: form, adult choice, 64 candidates, head index, fat (fixed count per respawn event)
 TAG_EVAL = 9122       # evaluation-only randomness (reserved)
+TAG_GORE = 9123       # 동물 R2: per-step gorer order permutation (only when the config has a goring body — no stream otherwise)
 TAGS = dict(PARAM=TAG_PARAM, GRASS=TAG_GRASS, ROOT=TAG_ROOT, SHELTER=TAG_SHELTER, PLACE=TAG_PLACE, KIN=TAG_KIN, ACT=TAG_ACT,
-            BITE=TAG_BITE, RESP=TAG_RESP, EVAL=TAG_EVAL)
+            BITE=TAG_BITE, RESP=TAG_RESP, EVAL=TAG_EVAL, GORE=TAG_GORE)
+
+# 동물 세계 (RL_R9_SPECIES_TRAITS.md 4절, `body_common.fauna`): new body rules ride separate branches (`if self.body.fauna`), the S′ lines
+# stay literally as they were (9-1 B4) so a config without the fauna block is bit-identical to S′ (test_r9_fauna F-1).
+#   R1 wound = bite_k × P23(biter, bitten) / hide, counter / gore = strike_k × P23(striker, struck) / hide (× speed share for gore)
+#   P1 a body that cannot enter shelters cannot bite or gore a body inside one (bodies that can enter bite inside)
+#   R2 goring (gore bodies, RUN gait only), R3 camouflage (eye range × vis of the seen body), R6 carcass places by body size
+GORE_WOUND, GORE_KILL = 0, 1
 
 # death causes
 CAUSE_NONE, CAUSE_BITE, CAUSE_COUNTER, CAUSE_STARVE = 0, 1, 2, 3
@@ -641,12 +649,16 @@ class R9World:
         self.size = float(w["size"])
         self.Q = int(w["quadrants"])
         self.D = int(w["decision_steps"])
-        caps = np.array([int(w["slots"][n]) for n in B.SPECIES], dtype=np.int64)
+        self.names = B.species_of(cfg)                                  # S′: the three; 동물 세계: up to six (9-3)
+        self.NS = len(self.names)
+        if self.judge and self.NS > B.N_SPECIES:
+            raise NotImplementedError("6 종 판정 세계는 1b (동물 설계 9-7)")
+        caps = np.array([int(w["slots"][n]) for n in self.names], dtype=np.int64)
         self.caps = caps
         self.sp_hi = np.cumsum(caps).astype(np.int64)
         self.sp_lo = (self.sp_hi - caps).astype(np.int64)
         self.S = int(self.sp_hi[-1])
-        self.slot_sp = np.repeat(np.arange(B.N_SPECIES), caps).astype(np.int8)
+        self.slot_sp = np.repeat(np.arange(self.NS), caps).astype(np.int8)
         fd = cfg["food"]
         self.cell = float(fd["cell"])
         self.G = int(math.ceil(self.size / self.cell))
@@ -690,6 +702,19 @@ class R9World:
         # per-slot constants derived from the hidden slot species (physics only — never used by perception/observation)
         self._biters = np.nonzero(self.body.can_bite[self.slot_sp.astype(np.int64)])[0].astype(np.int64)
         self._bite_mat = self.body.bites[self.slot_sp[self._biters].astype(np.int64)][:, self.slot_sp.astype(np.int64)]
+        # 동물 세계 (fauna): goring slots (R2), camouflage on (R3) and the fauna constants; S′ has no gorer and no camouflage
+        self._gorers = np.nonzero(self.body.gore[self.slot_sp.astype(np.int64)])[0].astype(np.int64)
+        self._camo_on = bool(self.body.fauna and (np.asarray(self.body.camo) < 1.0).any())
+        if self.body.fauna:
+            fa = cm["fauna"]
+            g_ = fa["gore"]
+            self._fz = dict(gore_cone=float(g_["cone_cos"]), gore_appr=float(g_["approach_min"]), gore_cd=int(g_["cooldown"]),
+                            camo_s0=float(fa["camo_curve"]["s0"]), camo_span=float(fa["camo_curve"]["span"]),
+                            cp_per=float(fa["carcass_places"]["per_size"]), cp_min=int(fa["carcass_places"]["min"]),
+                            cp_max=int(fa["carcass_places"]["max"]))
+            self._age23 = L.AGE23
+            if int(fa["age_steps"]) != L.AGE_STEPS:
+                raise ValueError(f"body_common.fauna.age_steps must be {L.AGE_STEPS} (r9_life.AGE23)")
         rank = np.full((self.S, B.N_FOODS), 99, dtype=np.int64)
         for s in range(self.S):
             order = self.body.diet_order[int(self.slot_sp[s])]
@@ -703,7 +728,7 @@ class R9World:
         self.K = 0
         K = len(seeds)
         self._alloc(K)
-        cnt = None if counts is None else np.asarray(counts, dtype=np.int64).reshape(K, B.N_SPECIES)
+        cnt = None if counts is None else np.asarray(counts, dtype=np.int64).reshape(K, self.NS)
         for k, sd in enumerate(seeds):
             self._init_world(k, int(sd), None if cnt is None else cnt[k])
         self.reset_stats()
@@ -727,12 +752,13 @@ class R9World:
         self.next_uid = np.ones(K, dtype=np.int64)
         self.s_w = z(K, dt=np.uint64)
         self.s_q = z(K, 4, dt=np.uint64)
-        self.counts = z(K, 3, dt=np.int64)
-        self.kin_perm = z(K, 3, dt=np.int8)
-        self.run_mult = np.ones((K, 3))
+        NS = self.NS
+        self.counts = z(K, NS, dt=np.int64)
+        self.kin_perm = z(K, NS, dt=np.int8)
+        self.run_mult = np.ones((K, NS))
         self.grass_mult = np.ones(K)
         self.root_mult = np.ones(K)
-        self.juv_frac = z(K, 3)
+        self.juv_frac = z(K, NS)
         self.rule_f = np.full(K, float(self.cfg["rules"]["deer"]["facing_eval"]))
         self.n_cov = z(K, dt=np.int64)
         self._rmult = np.ones((K, S))
@@ -769,6 +795,7 @@ class R9World:
         self.act = np.full((K, S), B.WATCH, dtype=np.int64)
         self.prev_act = np.full((K, S), B.WATCH, dtype=np.int64)
         self.bite_cd = z(K, S, dt=np.int32)
+        self.gore_cd = z(K, S, dt=np.int32)               # 동물 R2 (always allocated; only gorers use it)
         self.knock_left = z(K, S, dt=np.int32)
         self.dead_cause = z(K, S, dt=np.int8)
         self.mem = z(K, S, S)
@@ -790,16 +817,18 @@ class R9World:
         self.carc_sp = np.full((K, M), -1, dtype=np.int8)
         self.carc_uid = z(K, M, dt=np.int64)
         self.carc_killer = z(K, M, dt=np.int64)
+        self.carc_places = z(K, M, dt=np.int64)           # 동물 R6 eating places per carcass (always allocated; fauna only reads it)
         # controllers, rng
-        n_sp = [int(self.sp_hi[s] - self.sp_lo[s]) for s in range(3)]
-        self.ctrl = [[None, None, None] for _ in range(K)]
-        self.bstate = [[np.zeros((n_sp[s], 0), dtype=np.int64) for s in range(3)] for _ in range(K)]
-        self.rng_act: list[list[np.random.Generator]] = [[None, None, None] for _ in range(K)]
+        n_sp = [int(self.sp_hi[s] - self.sp_lo[s]) for s in range(NS)]
+        self.ctrl = [[None] * NS for _ in range(K)]
+        self.bstate = [[np.zeros((n_sp[s], 0), dtype=np.int64) for s in range(NS)] for _ in range(K)]
+        self.rng_act: list[list[np.random.Generator]] = [[None] * NS for _ in range(K)]
         self.rng_bite: list[np.random.Generator] = [None] * K
         self.rng_resp: list[np.random.Generator] = [None] * K
+        self.rng_gore: list[np.random.Generator] = [None] * K
         self.sb = B.expand_body(self.body, self.sp)
         self.life = L.LifeState.alloc(K, S, self.rules)
-        self._near_ties = z(K, 3, dt=np.int64)
+        self._near_ties = z(K, NS, dt=np.int64)
         # hunt tracker (record mode)
         nb = len(self._biters)
         self._h_prev = np.full((K, nb, S), np.inf)
@@ -813,6 +842,8 @@ class R9World:
         self._h_wuid = z(K, nb, dt=np.int64)
         self._dec_kills: list[tuple] = []
         self.events = dict(deaths=[], bites=[], respawns=[], births=[], hunts=[])
+        if self.body.fauna:
+            self.events["gores"] = []
 
     def _judge_counts(self) -> list[list[int]]:
         """Judge start per quadrant: [[deer, wolf, boar] for q] (3-6 판정 세계)."""
@@ -862,6 +893,12 @@ class R9World:
         rmu = float(gp.uniform(*rz["root_regen_mult"]))
         jf = [float(gp.uniform(*rz["juvenile_frac"][n])) for n in B.SPECIES]
         rf = float(gp.uniform(*rz["rule_deer_facing"]))
+        # 동물 세계 (9-1 B3): the S′ draws above keep their order; each new species then draws (count, run mult, juvenile frac)
+        for s in range(B.N_SPECIES, self.NS):
+            n_ = self.names[s]
+            cnt.append(int(gp.integers(int(cfg["counts"][n_][0]), int(cfg["counts"][n_][1]) + 1)))
+            rm.append(float(gp.uniform(body.run_mult_lo[s], body.run_mult_hi[s])))
+            jf.append(float(gp.uniform(*rz["juvenile_frac"][n_])))
         per_q = None
         if self.judge:
             if counts_k is not None and (np.asarray(counts_k) >= 0).any():
@@ -876,12 +913,12 @@ class R9World:
             jf = [float(fo[n]["juvenile_frac"]) if isinstance(fo[n], dict) else 0.0 for n in B.SPECIES]
             rf = float(cfg["rules"]["deer"]["facing_eval"])
         elif counts_k is not None:
-            for s in range(3):
+            for s in range(self.NS):
                 if int(counts_k[s]) >= 0:
                     cnt[s] = int(counts_k[s])
-        for s in range(3):
+        for s in range(self.NS):
             if cnt[s] > int(self.caps[s]):
-                raise ValueError(f"world {k}: {B.SPECIES[s]} count {cnt[s]} exceeds slot cap {int(self.caps[s])}")
+                raise ValueError(f"world {k}: {self.names[s]} count {cnt[s]} exceeds slot cap {int(self.caps[s])}")
         self.counts[k] = cnt
         self.run_mult[k] = rm
         self._rmult[k] = np.asarray(rm)[self.slot_sp.astype(np.int64)]
@@ -965,14 +1002,19 @@ class R9World:
         # --- slots: clear, then founders ---
         self._clear_world_slots(k)
         gk = np.random.default_rng([seed, TAG_KIN])
-        self.kin_perm[k] = gk.permutation(3).astype(np.int8)
+        perm = gk.permutation(3)
+        if self.NS > 3:                                  # 동물 세계 (B3): new species keep kin_id = species number (3, 4, 5)
+            perm = np.concatenate([perm, np.arange(3, self.NS)])
+        self.kin_perm[k] = perm.astype(np.int8)
         self.kin_id[k] = self.kin_perm[k][self.slot_sp.astype(np.int64)]
         self._place_founders(k, cnt, per_q)
         # --- RNG streams ---
-        for s in range(3):
+        for s in range(self.NS):
             self.rng_act[k][s] = np.random.default_rng([seed, TAG_ACT + s])
         self.rng_bite[k] = np.random.default_rng([seed, TAG_BITE])
         self.rng_resp[k] = np.random.default_rng([seed, TAG_RESP])
+        if len(self._gorers):
+            self.rng_gore[k] = np.random.default_rng([seed, TAG_GORE])
         # --- carcasses, memory, pairs, brain states, hunt tracker ---
         self.carc_ok[k] = False
         self.carc_meat[k] = 0.0
@@ -981,9 +1023,10 @@ class R9World:
         self.carc_sp[k] = -1
         self.carc_uid[k] = 0
         self.carc_killer[k] = 0
+        self.carc_places[k] = 0
         self.mem[k] = 0.0
         self.life.reset_world(k)
-        for s in range(3):
+        for s in range(self.NS):
             self.bstate[k][s][:] = 0
         self._hunt_reset_world(k)
 
@@ -1010,7 +1053,8 @@ class R9World:
         self.g_size[k] = 1.0
         for n in ("stam_lock", "mating"):
             getattr(self, n)[k] = False
-        for n in ("sex", "quad", "generation", "parent_a", "parent_b", "offspring", "killer", "bite_cd", "knock_left", "dead_cause"):
+        for n in ("sex", "quad", "generation", "parent_a", "parent_b", "offspring", "killer", "bite_cd", "gore_cd", "knock_left",
+                  "dead_cause"):
             getattr(self, n)[k] = 0
         self.act[k] = B.WATCH
         self.prev_act[k] = B.WATCH
@@ -1046,6 +1090,7 @@ class R9World:
         self.act[k, s] = B.WATCH
         self.prev_act[k, s] = B.WATCH
         self.bite_cd[k, s] = 0
+        self.gore_cd[k, s] = 0
         self.knock_left[k, s] = 0
         self.resp_t[k, s] = float(self.t[k])
         self.mem[k, s, :] = 0.0
@@ -1080,15 +1125,15 @@ class R9World:
         tries = int(pl["tries"])
         rows = []                                            # (q, sp, index in group, group count)
         if per_q is None:
-            for s in range(3):
+            for s in range(self.NS):
                 for i in range(cnt[s]):
                     rows.append((0, s, i, cnt[s]))
         else:
             for q in range(self.Q):
-                for s in range(3):
+                for s in range(self.NS):
                     for i in range(per_q[q][s]):
                         rows.append((q, s, i, per_q[q][s]))
-        fill = [0, 0, 0]
+        fill = [0] * self.NS
         slots, uids = [], []
         for (q, s, i, n) in rows:
             slots.append(int(self.sp_lo[s]) + fill[s])
@@ -1176,7 +1221,7 @@ class R9World:
         sd = [int(s) for s in (self.seeds if seeds is None else seeds)]
         if len(sd) != self.K:
             self._alloc(len(sd))
-        cnt = None if counts is None else np.asarray(counts, dtype=np.int64).reshape(len(sd), 3)
+        cnt = None if counts is None else np.asarray(counts, dtype=np.int64).reshape(len(sd), self.NS)
         for k, s in enumerate(sd):
             self._init_world(k, s, None if cnt is None else cnt[k])
         self.reset_stats()
@@ -1216,7 +1261,7 @@ class R9World:
         draws (block, 19) uniforms every decision, whoever decides (test 27); blocks without a controller get default_action."""
         K, S = self.K, self.S
         a = np.full((K, S), int(default_action), dtype=np.int64)
-        near = np.zeros((K, 3), dtype=np.int64)
+        near = np.zeros((K, self.NS), dtype=np.int64)
         if learner_sp is not None:
             lo, hi = int(self.sp_lo[learner_sp]), int(self.sp_hi[learner_sp])
             la = np.asarray(learner_actions, dtype=np.int64)
@@ -1228,7 +1273,7 @@ class R9World:
                 if la.shape[0] != len(ek):
                     raise ValueError(f"learner actions: want (K, {hi - lo}) or ({len(ek)},), got {la.shape}")
                 a[ek, es] = la
-        for s in range(3):
+        for s in range(self.NS):
             lo, hi = int(self.sp_lo[s]), int(self.sp_hi[s])
             n = hi - lo
             for k in range(K):
@@ -1323,48 +1368,56 @@ class R9World:
     def world_params(self, k: int) -> dict:
         """Recorded world values: seed, counts, run mult, regen mults, juvenile fracs, shelters, rule f, controllers' labels."""
         ok = self.cov_ok[k]
-        return dict(seed=int(self.seeds[k]), mode=self.mode, counts={n: int(self.counts[k, s]) for s, n in enumerate(B.SPECIES)},
-                    run_mult={n: float(self.run_mult[k, s]) for s, n in enumerate(B.SPECIES)},
+        return dict(seed=int(self.seeds[k]), mode=self.mode, counts={n: int(self.counts[k, s]) for s, n in enumerate(self.names)},
+                    run_mult={n: float(self.run_mult[k, s]) for s, n in enumerate(self.names)},
                     grass_regen_mult=float(self.grass_mult[k]), root_regen_mult=float(self.root_mult[k]),
-                    juvenile_frac={n: float(self.juv_frac[k, s]) for s, n in enumerate(B.SPECIES)},
+                    juvenile_frac={n: float(self.juv_frac[k, s]) for s, n in enumerate(self.names)},
                     rule_f=float(self.rule_f[k]), kin_perm=self.kin_perm[k].tolist(),
                     shelters=[[float(c[0]), float(c[1]), float(r)] for c, r in zip(self.cov_c[k][ok], self.cov_r[k][ok])],
                     controllers={n: (None if self.ctrl[k][s] is None else
                                      dict(label=self.ctrl[k][s].label, brain=self.ctrl[k][s].brain.name,
-                                          stochastic=bool(self.ctrl[k][s].stochastic))) for s, n in enumerate(B.SPECIES)})
+                                          stochastic=bool(self.ctrl[k][s].stochastic))) for s, n in enumerate(self.names)})
 
     # ------------------------------------------------------------------ #
     # statistics
     # ------------------------------------------------------------------ #
 
     def reset_stats(self) -> None:
-        K = self.K
+        K, NS = self.K, self.NS
         z = lambda *sh, dt=np.int64: np.zeros(sh, dtype=dt)  # noqa: E731
         self.st = dict(
             steps=z(K),
-            alive_steps=z(K, 3),
-            decisions=z(K, 3),
-            actions=z(K, 3, B.N_ACTIONS),
-            run_steps=z(K, 3),                       # effective RUN gait
-            in_shelter_steps=z(K, 3),
-            wall_steps=z(K, 3),                      # within world.wall_band of any wall (8-4)
-            corner_steps=z(K, 3),                    # within the band of two walls (8-4 구석 지키기)
-            deaths=z(K, 3, 4),                       # [species, cause]
-            deaths_wall=z(K, 3),
-            bites=z(K, 3, 3),                        # [prey species, outcome]
-            wolf_hp_lost=z(K, dt=np.float64),
-            eaten_units=z(K, 3, 3, dt=np.float64),   # [eater species, food]
-            eaten_e=z(K, 3, 3, dt=np.float64),
+            alive_steps=z(K, NS),
+            decisions=z(K, NS),
+            actions=z(K, NS, B.N_ACTIONS),
+            run_steps=z(K, NS),                      # effective RUN gait
+            in_shelter_steps=z(K, NS),
+            wall_steps=z(K, NS),                     # within world.wall_band of any wall (8-4)
+            corner_steps=z(K, NS),                   # within the band of two walls (8-4 구석 지키기)
+            deaths=z(K, NS, 4),                      # [species, cause]
+            deaths_wall=z(K, NS),
+            bites=z(K, NS, 3),                       # [prey species, outcome]
+            wolf_hp_lost=z(K, dt=np.float64),        # HP lost by biters to counters (동물 세계: every biter, the name is kept — B1)
+            eaten_units=z(K, NS, 3, dt=np.float64),  # [eater species, food]
+            eaten_e=z(K, NS, 3, dt=np.float64),
             grid_regen=z(K, 2, dt=np.float64),       # food units regrown [grass, root]
-            meat_created=z(K, 3, dt=np.float64),     # by dead species
+            meat_created=z(K, NS, dt=np.float64),    # by dead species
             meat_decayed=z(K, dt=np.float64),
             meat_overflow=z(K),                      # carcasses dropped because the carcass table was full
             meat_overflow_lost=z(K, dt=np.float64),
-            birth_credits=z(K, 3),                   # parent credits (2 per delivery)
-            newborns=z(K, 3),
-            respawns=z(K, 3, 3),                     # [species, form]
-            near_ties=z(K, 3),
+            birth_credits=z(K, NS),                  # parent credits (2 per delivery)
+            newborns=z(K, NS),
+            respawns=z(K, NS, 3),                    # [species, form]
+            near_ties=z(K, NS),
         )
+        if self.body.fauna:                          # 동물 세계 통계 (B1: only with the fauna block — the S′ key set is unchanged)
+            self.st.update(
+                bite_pairs=z(K, NS, NS, 3),          # [biter species, bitten species, outcome kill|wound|counter]
+                bite_in_shelter=z(K, NS, NS),        # [biter, bitten] bites on a body inside a shelter (P1: biters that can enter)
+                strike_hp_by=z(K, NS, dt=np.float64),   # HP lost by biters / gored bodies to counters and gores, by their species
+                gore=z(K, NS, NS, 2),                # [gorer species, gored species, wound|kill]
+                gore_hp=z(K, NS, NS, dt=np.float64),  # HP taken by gores [gorer, gored]
+            )
 
     def stats_snapshot(self) -> dict:
         return {k: v.copy() for k, v in self.st.items() if isinstance(v, np.ndarray)}
@@ -1407,6 +1460,8 @@ class R9World:
         val0 = self.E + self.R * C
         self._move()                                       # 1
         self._bite()                                       # 2
+        if len(self._gorers):
+            self._gore()                                   # 2b (동물 R2 — no gorer in S′, no stream)
         gain_e = self._eat()                               # 3
         self._metabolism(gain_e)                           # 4
         ev = self._breed()                                 # 5
@@ -1442,7 +1497,7 @@ class R9World:
         nx = (P[..., 0] < band) | (P[..., 0] > self.size - band)
         ny = (P[..., 1] < band) | (P[..., 1] > self.size - band)
         edge = self._edge1                                 # after the move (a respawned slot keeps its old edge — stats only)
-        for s in range(3):
+        for s in range(self.NS):
             m = slice(int(self.sp_lo[s]), int(self.sp_hi[s]))
             a0 = alive0[:, m]
             st["alive_steps"][:, s] += a0.sum(1)
@@ -1614,7 +1669,12 @@ class R9World:
         cone = (dx * Hw[:, None, 0] + dy * Hw[:, None, 1]) * invd >= self._bite_cone
         appr = (dx * Vw[:, None, 0] + dy * Vw[:, None, 1]) * invd > self._bite_appr
         prey_ok = self.alive & (self._edge1 > 0.0)
-        can = (self._bite_mat[rw[:, None], icr] & valid[rk] & prey_ok[rk[:, None], icr] & (dist <= reach[:, None]) & cone & appr)
+        if self.body.fauna:
+            # 동물 P1 (4-2): a body that cannot enter shelters cannot bite a body inside one; a biter that can enter bites inside too
+            ok_t = self.alive[rk[:, None], icr] & ((self._edge1[rk[:, None], icr] > 0.0) | self.sb["shelter_enter"][rk, wsl][:, None])
+            can = (self._bite_mat[rw[:, None], icr] & valid[rk] & ok_t & (dist <= reach[:, None]) & cone & appr)
+        else:
+            can = (self._bite_mat[rw[:, None], icr] & valid[rk] & prey_ok[rk[:, None], icr] & (dist <= reach[:, None]) & cone & appr)
         if not can.any():
             return
         row = np.full((K, nb), -1, dtype=np.int64)
@@ -1652,7 +1712,11 @@ class R9World:
         appr = (dx * Vw[:, :, None, 0] + dy * Vw[:, :, None, 1]) * invd > self._bite_appr
         prey_ok = self.alive & (self._edge1 > 0.0)
         w_ok = self.alive[:, bs] & (self.bite_cd[:, bs] == 0)
-        can = (self._bite_mat[None] & prey_ok[:, None, :] & (dist <= reach[..., None]) & cone & appr & w_ok[..., None])
+        if self.body.fauna:                                            # 동물 P1 (same rule as `_bite`)
+            pk = self.alive[:, None, :] & ((self._edge1[:, None, :] > 0.0) | self.sb["shelter_enter"][:, bs][..., None])
+            can = (self._bite_mat[None] & pk & (dist <= reach[..., None]) & cone & appr & w_ok[..., None])
+        else:
+            can = (self._bite_mat[None] & prey_ok[:, None, :] & (dist <= reach[..., None]) & cone & appr & w_ok[..., None])
         if not can.any():
             return
         for k in np.nonzero(can.any((1, 2)))[0]:
@@ -1668,7 +1732,157 @@ class R9World:
                 j = int(np.argmin(np.where(cand, dist[k, wi], np.inf)))
                 self._resolve_bite(k, w, j, float(dist[k, wi, j]))
 
+    # --- 동물 세계 R1 · R2 (body_common.fauna) ----------------------------
+    def _p23(self, k: int, a: int, b: int) -> float:
+        """(M_a / M_b)^(2/3) of slots a, b in world k (동물 4-1): c23[sp_a, sp_b] × ((g_a·g_a) / (g_b·g_b)) × (AGE23[i_a] / AGE23[i_b]),
+        products and divisions in this order (the Unreal port uses the same literal tables)."""
+        sa, sb_ = int(self.slot_sp[a]), int(self.slot_sp[b])
+        ga, gb = float(self.g_size[k, a]), float(self.g_size[k, b])
+        ia, ib = L.age_index(self.af[k, a]), L.age_index(self.af[k, b])
+        return float(self.body.c23[sa, sb_]) * ((ga * ga) / (gb * gb)) * (float(self._age23[ia]) / float(self._age23[ib]))
+
+    def _resolve_bite_fauna(self, k: int, w: int, j: int, d: float) -> None:
+        """동물 세계 bite (4-1 R1): wound = min(1, bite_k[biter] × P23(biter, bitten) / hide[bitten]); a frontal counter (same
+        conditions as S′: counter body, HP ≥ hp_min, biter in the ±75.5° front) wounds the biter strike_k[bitten] × P23(bitten, biter)
+        / hide[biter] — knock, no-bite rest and the counter's own HP cost are the S′ values. Bodies without HP die at once (S′)."""
+        sb, ct, body = self.sb, self._ct, self.body
+        spj, spw = int(self.slot_sp[j]), int(self.slot_sp[w])
+        out = BITE_WOUND
+        inside = bool(self._edge1[k, j] <= 0.0)
+        if not bool(sb["has_hp"][k, j]):
+            self._kill(k, j, CAUSE_BITE, self.uid[k, w])
+            self.bite_cd[k, w] = self._bite_cd
+            out = BITE_KILL
+        else:
+            tw = self.pos[k, w] - self.pos[k, j]
+            tl = math.sqrt(tw[0] * tw[0] + tw[1] * tw[1])
+            tu = tw / tl if tl > EPS else np.array([1.0, 0.0])
+            front = float(self.head[k, j, 0] * tu[0] + self.head[k, j, 1] * tu[1])
+            if bool(sb["counter"][k, j]) and self.hp[k, j] >= ct["hp_min"] and front >= ct["cone"]:
+                dmg = float(body.strike_k[spj]) * self._p23(k, j, w) / float(body.hide[spw])
+                self.hp[k, w] = max(0.0, float(self.hp[k, w]) - dmg)
+                self.st["wolf_hp_lost"][k] += dmg
+                self.st["strike_hp_by"][k, spw] += dmg
+                self.knock_dir[k, w] = tu
+                self.knock_left[k, w] = ct["knock_steps"]
+                self.bite_cd[k, w] = ct["nobite"]
+                self.hp[k, j] = max(0.0, float(self.hp[k, j]) - ct["self_damage"])
+                out = BITE_COUNTER
+                if self.hp[k, w] <= 0.0:
+                    self._kill(k, w, CAUSE_COUNTER, self.uid[k, j])
+            else:
+                loss = min(1.0, float(body.bite_k[spw]) * self._p23(k, w, j) / float(body.hide[spj]))
+                self.hp[k, j] = max(0.0, float(self.hp[k, j]) - loss)
+                self.bite_cd[k, w] = self._bite_cd
+                if self.hp[k, j] <= 0.0:
+                    self._kill(k, j, CAUSE_BITE, self.uid[k, w])
+                    out = BITE_KILL
+        self.st["bites"][k, spj, out] += 1
+        self.st["bite_pairs"][k, spw, spj, out] += 1
+        if inside:
+            self.st["bite_in_shelter"][k, spw, spj] += 1
+        if out == BITE_KILL:
+            self._dec_kills.append((k, w, j, int(self.uid[k, w]), int(self._dead_uid[k, j])))
+        if self.record:
+            near_c = bool((self.carc_ok[k] & (np.sqrt(_len2(self.carc_pos[k] - self.pos[k, w])) <= 2.0)).any())
+            self.events["bites"].append(dict(k=k, t=int(self.t[k]), wolf_uid=int(self.uid[k, w]),
+                                             prey_uid=int(self.uid[k, j] if out != BITE_KILL else self._dead_uid[k, j]),
+                                             prey_sp=spj, outcome=BITE_NAMES[out], dist=d, wolf_E=float(self.E[k, w]),
+                                             wolf_hp=float(self.hp[k, w]), prey_af=float(self.af[k, j]),
+                                             prey_hp=float(self.hp[k, j]), near_carcass=near_c,
+                                             wolf_act=int(self.act[k, w]), quad=int(self.quad[k, j]), biter_sp=spw,
+                                             in_shelter=inside))
+
+    def _gore(self) -> None:
+        """Order 2b (동물 4-3 R2), after the bites. Gorer order = rng_gore permutation of the goring slots, drawn every step for every
+        world. A gorer goes only in the RUN gait of this step (stamina lock = walk → no goring, P6), when alive and gore_cd == 0;
+        target = the nearest alive body of another species in its head cone (cos ≥ cone_cos) within gore_r × g_size × growth,
+        toward which its own velocity component is > approach_min, and outside shelters unless the gorer can enter them (P1).
+        Reads physics only — which body to run at is the brain's choice."""
+        K = self.K
+        gs = self._gorers
+        ng = len(gs)
+        perms = [self.rng_gore[k].permutation(ng) for k in range(K)]
+        fz = self._fz
+        self.gore_cd[:, gs] = np.maximum(self.gore_cd[:, gs] - 1, 0)
+        ready = self.alive[:, gs] & (self.gore_cd[:, gs] == 0) & (self._gait[:, gs] == B.G_RUN)
+        rk, rg = np.nonzero(ready)
+        if not len(rk):
+            return
+        idx, _n = self.alive_index()
+        valid = idx >= 0
+        ic = np.where(valid, idx, 0)
+        gsl = gs[rg]
+        Pg, Hg, Vg = self.pos[rk, gsl], self.head[rk, gsl], self.vel[rk, gsl]
+        reach = self.body.gore_r[self.slot_sp[gsl].astype(np.int64)] * self.bscale[rk, gsl]
+        icr = ic[rk]
+        Pt = self.pos[rk[:, None], icr]
+        dx = Pt[..., 0] - Pg[:, None, 0]
+        dy = Pt[..., 1] - Pg[:, None, 1]
+        dist = np.sqrt(dx * dx + dy * dy)
+        invd = 1.0 / np.maximum(dist, EPS)
+        cone = (dx * Hg[:, None, 0] + dy * Hg[:, None, 1]) * invd >= fz["gore_cone"]
+        vt = (dx * Vg[:, None, 0] + dy * Vg[:, None, 1]) * invd
+        other = self.slot_sp[icr] != self.slot_sp[gsl][:, None]
+        guard = (self._edge1[rk[:, None], icr] > 0.0) | self.sb["shelter_enter"][rk, gsl][:, None]
+        can = valid[rk] & self.alive[rk[:, None], icr] & other & guard & (dist <= reach[:, None]) & cone & (vt > fz["gore_appr"])
+        if not can.any():
+            return
+        row = np.full((K, ng), -1, dtype=np.int64)
+        row[rk, rg] = np.arange(len(rk))
+        for k in np.unique(rk[can.any(1)]):
+            for gi in perms[k]:
+                r = int(row[k, gi])
+                if r < 0 or not can[r].any():
+                    continue
+                g = int(gs[gi])
+                if not self.alive[k, g]:
+                    continue
+                cand = can[r] & self.alive[k, icr[r]]
+                if not cand.any():
+                    continue
+                x = int(np.argmin(np.where(cand, dist[r], np.inf)))
+                self._resolve_gore(int(k), g, int(icr[r, x]), float(dist[r, x]), float(vt[r, x]))
+
+    def _resolve_gore(self, k: int, g: int, j: int, d: float, vt: float) -> None:
+        """동물 4-3 R2 result: gored HP − strike_k[gorer] × P23(gorer, gored) / hide[gored] × clip(vt / run_speed[gorer], 0, 1), knocked
+        4 × 0.25 (counter knock), a gored biter rests from biting (max(bite_cd, nobite)), the gorer pays the counter's own HP cost and
+        rests gore.cooldown steps. Death = CAUSE_COUNTER ('front weapon wound'), killer = the gorer."""
+        body, ct, fz = self.body, self._ct, self._fz
+        spg, spj = int(self.slot_sp[g]), int(self.slot_sp[j])
+        share = min(max(vt / float(body.run_speed[spg]), 0.0), 1.0)
+        out = GORE_WOUND
+        if not bool(self.sb["has_hp"][k, j]):
+            dmg = 1.0
+            self._kill(k, j, CAUSE_COUNTER, self.uid[k, g])
+            out = GORE_KILL
+        else:
+            dmg = float(body.strike_k[spg]) * self._p23(k, g, j) / float(body.hide[spj]) * share
+            self.hp[k, j] = max(0.0, float(self.hp[k, j]) - dmg)
+            tv = self.pos[k, j] - self.pos[k, g]
+            tl = math.sqrt(tv[0] * tv[0] + tv[1] * tv[1])
+            self.knock_dir[k, j] = tv / tl if tl > EPS else np.array([1.0, 0.0])
+            self.knock_left[k, j] = ct["knock_steps"]
+            if bool(body.can_bite[spj]):
+                self.bite_cd[k, j] = max(int(self.bite_cd[k, j]), int(ct["nobite"]))
+            if self.hp[k, j] <= 0.0:
+                self._kill(k, j, CAUSE_COUNTER, self.uid[k, g])
+                out = GORE_KILL
+        self.hp[k, g] = max(0.0, float(self.hp[k, g]) - ct["self_damage"])
+        self.gore_cd[k, g] = fz["gore_cd"]
+        self.st["gore"][k, spg, spj, out] += 1
+        self.st["gore_hp"][k, spg, spj] += dmg
+        self.st["strike_hp_by"][k, spj] += dmg
+        if self.record:
+            self.events["gores"].append(dict(k=k, t=int(self.t[k]), gorer_uid=int(self.uid[k, g]), gorer_sp=spg,
+                                             target_uid=int(self.uid[k, j] if out != GORE_KILL else self._dead_uid[k, j]),
+                                             target_sp=spj, dmg=dmg, appr_speed=vt, dist=d,
+                                             outcome=("kill" if out == GORE_KILL else "wound")))
+
     def _resolve_bite(self, k: int, w: int, j: int, d: float) -> None:
+        if self.body.fauna:
+            self._resolve_bite_fauna(k, w, j, d)
+            return
         sb, ct = self.sb, self._ct
         spj = int(self.slot_sp[j])
         out = BITE_WOUND
@@ -1761,7 +1975,10 @@ class R9World:
                 start = np.r_[0, np.nonzero(np.diff(grp))[0] + 1]
                 rank = np.arange(len(order)) - np.repeat(start, np.diff(np.r_[start, len(order)]))
                 keep = np.zeros(len(order), dtype=bool)
-                keep[order] = rank < self._carc["places"]
+                if self.body.fauna:                           # 동물 R6: places stored per carcass (body size of the dead)
+                    keep[order] = rank < self.carc_places[ki[order], cj[order]]
+                else:
+                    keep[order] = rank < self._carc["places"]
                 ki, si, cj = ki[keep], si[keep], cj[keep]
                 epu = sb["e_per_unit"][ki, si, B.MEAT]
                 want = np.clip((1.0 - e_dr[ki, si]) / epu, 0.0, sb["eat_rate"][ki, si, B.MEAT]) * mult[ki, si]
@@ -1843,7 +2060,8 @@ class R9World:
                                               quad=int(self.quad[k, s])))
 
     # --- 6 deaths -------------------------------------------------------
-    def _add_carcass(self, k: int, pos, meat: float, kin: int, sp: int, uid: int, killer: int) -> None:
+    def _add_carcass(self, k: int, pos, meat: float, kin: int, sp: int, uid: int, killer: int, places: int | None = None) -> None:
+        """places: eating places of this carcass (동물 R6; None = body_common.carcass.places — read only in the animal world)."""
         free = np.nonzero(~self.carc_ok[k])[0]
         if len(free):
             c = int(free[0])
@@ -1860,6 +2078,13 @@ class R9World:
         self.carc_sp[k, c] = sp
         self.carc_uid[k, c] = uid
         self.carc_killer[k, c] = killer
+        self.carc_places[k, c] = int(self._carc["places"]) if places is None else int(places)
+
+    def _carcass_places(self, k: int, s: int) -> int:
+        """동물 R6: clamp(floor(per_size × size0 × g_size × growth + 0.5), min, max) of the dead body in slot s [판단 — 둘레 ∝ 몸 길이]."""
+        fz = self._fz
+        v = int(math.floor(fz["cp_per"] * float(self.sb["size0"][k, s]) * float(self.bscale[k, s]) + 0.5))
+        return min(max(v, fz["cp_min"]), fz["cp_max"])
 
     def _deaths(self) -> np.ndarray:
         """Order 6: starvation (E ≤ 0 and R ≤ 0) joins this step's bite/counter deaths; every death leaves a carcass with meat =
@@ -1877,7 +2102,7 @@ class R9World:
             k, s = int(k), int(s)
             sp = int(self.slot_sp[s])
             self._add_carcass(k, self.pos[k, s].copy(), float(meat[k, s]), int(self.kin_id[k, s]), sp, int(self._dead_uid[k, s]),
-                              int(self.killer[k, s]))
+                              int(self.killer[k, s]), places=self._carcass_places(k, s) if self.body.fauna else None)
             self.st["meat_created"][k, sp] += float(meat[k, s])
             self.st["deaths"][k, sp, int(self.dead_cause[k, s])] += 1
             p = self.pos[k, s]
@@ -2050,7 +2275,15 @@ class R9World:
         np.multiply(cosang, invd, out=cosang)
         pair = valid[:, :, None] & valid[:, None, :]
         pair &= ~self._eye(Mx)[None]
-        vis = np.less_equal(dist, see[:, :, None])
+        if self._camo_on:
+            # 동물 R3 (4-4): the eye sees j within see_r_i × vis_j, vis_j = camo_j + (1 − camo_j) × clip((s_j − s0) / span, 0, 1), s_j = j's
+            # last-step displacement (the same 'movement size' as the sound curve). Ear, nose and carcass senses are unchanged.
+            spd = np.sqrt(_len2(Dp))
+            cam = sb["camo"][kk, ic]
+            visf = cam + (1.0 - cam) * np.clip((spd - self._fz["camo_s0"]) / self._fz["camo_span"], 0.0, 1.0)
+            vis = np.less_equal(dist, see[:, :, None] * visf[:, None, :])
+        else:
+            vis = np.less_equal(dist, see[:, :, None])
         vis &= np.greater_equal(cosang, fov[:, :, None])
         vis &= pair
         spd = np.sqrt(_len2(Dp))

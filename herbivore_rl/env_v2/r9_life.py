@@ -258,6 +258,19 @@ def mass_ratio(g_size, af):
     return g_size * g_size * g_size * (0.12 + (1.0 - 0.12) * np.asarray(af, dtype=np.float64))
 
 
+# 동물 세계 R1 (RL_R9_SPECIES_TRAITS.md 4-1, 언리얼 비트 같음 M9): (M_a / M_b)^(2/3) without a transcendental inside a step =
+# c23[species] (load time) × (g_a·g_a / g_b·g_b) × AGE23[i_a] / AGE23[i_b]. AGE23[i] = (0.12 + 0.88 i / 64)^(2/3) is a 65-cell literal
+# table (this module owns it; tests pin it bit for bit against the formula), i = floor(age_frac × 64 + 0.5) [판단 — 몸무게 오차 ≤ 0.7%].
+AGE_STEPS = 64
+AGE23 = np.array([(0.12 + 0.88 * i / 64) ** (2.0 / 3.0) for i in range(AGE_STEPS + 1)], dtype=np.float64)
+AGE23.setflags(write=False)
+
+
+def age_index(af: float) -> int:
+    """AGE23 index of an age fraction (1/64 steps, round half up)."""
+    return int(math.floor(float(af) * AGE_STEPS + 0.5))
+
+
 def genome_valid(g_speed, g_size) -> np.ndarray:
     """FGenome::IsValid speed/size part (LH 45): 0.9 ≤ speed, size ≤ 1.1 (Caution·Sociability·Coat are not modelled)."""
     sp, sz = np.asarray(g_speed, dtype=np.float64), np.asarray(g_size, dtype=np.float64)
@@ -305,7 +318,9 @@ class LifeRules:
     wolf_max: int
     wolf_prey_per: int
     boar_max: int
-    plant_budget: tuple           # (3,) per species: grass ≥ max(1, plant eaters + 1) × coef (0 = no plant budget)
+    plant_budget: tuple           # (n,) per species: grass ≥ max(1, plant eaters + 1) × coef (0 = no plant budget)
+    recover_sp: tuple = ()        # (n,) 동물 R7: per-species steps from a delivery to the next breeding (S′: all = recover)
+    ns: int = N_SPECIES           # species of the world (body.n)
 
     @classmethod
     def from_cfg(cls, cfg: dict, body: Body | None = None) -> "LifeRules":
@@ -326,7 +341,8 @@ class LifeRules:
                    shelter_push=float(cfg["body_common"]["shelter_push"]),
                    limits_on=on, one_pending=bool(lim.get("one_pending", False)) and on,
                    wolf_max=int(lim.get("wolf_max", 0)), wolf_prey_per=int(lim.get("wolf_prey_per", 0)), boar_max=int(lim.get("boar_max", 0)),
-                   plant_budget=tuple(float(pb.get(n, 0.0)) for n in ("deer", "wolf", "boar")))
+                   plant_budget=tuple(float(pb.get(n, 0.0)) for n in b.names),
+                   recover_sp=tuple(float(x) for x in b.recover), ns=int(b.n))
 
 
 @dataclass
@@ -364,14 +380,15 @@ class LifeState:
     @classmethod
     def alloc(cls, K: int, S: int, rules: LifeRules) -> "LifeState":
         Q = int(rules.quadrants)
-        P = (Q * N_SPECIES) if rules.one_pending else (S // 2 + 1)
+        NS = int(rules.ns)
+        P = (Q * NS) if rules.one_pending else (S // 2 + 1)
         z = lambda dt: np.zeros((K, P), dtype=dt)  # noqa: E731
-        c = lambda: np.zeros((K, Q, N_SPECIES), np.int64)  # noqa: E731
+        c = lambda: np.zeros((K, Q, NS), np.int64)  # noqa: E731
         return cls(K=K, S=S, Q=Q, P=P, pair_on=z(bool), pair_a=np.full((K, P), -1, np.int64), pair_b=np.full((K, P), -1, np.int64),
                    pair_ua=z(np.int64), pair_ub=z(np.int64), pair_due=z(np.float64), pair_quad=z(np.int8), pair_sp=z(np.int8),
-                   opportunities=c(), paired=c(), births=c(), blocked=np.zeros((K, Q, N_SPECIES, N_BLOCK), np.int64), failed=c(),
+                   opportunities=c(), paired=c(), births=c(), blocked=np.zeros((K, Q, NS, N_BLOCK), np.int64), failed=c(),
                    cancelled=c(), one_pending=bool(rules.one_pending),
-                   blocked_once=np.zeros((K, Q, N_SPECIES, N_BLOCK), np.int64), pend_counted=z(bool),
+                   blocked_once=np.zeros((K, Q, NS, N_BLOCK), np.int64), pend_counted=z(bool),
                    cap_streak=np.zeros((K, Q), bool))
 
     def reset_world(self, k: int) -> None:
@@ -426,7 +443,7 @@ def mate_scan_now(t) -> np.ndarray:
 def slot_species(w) -> np.ndarray:
     """(S,) species of each slot from the block bounds sp_lo/sp_hi."""
     out = np.full(int(w.S), -1, np.int64)
-    for s in range(N_SPECIES):
+    for s in range(len(w.sp_lo)):
         out[int(w.sp_lo[s]):int(w.sp_hi[s])] = s
     return out
 
@@ -488,8 +505,8 @@ class _JudgeCtx:
         m = live[k]
         self.pos = w.pos[k, m].copy()
         qd = np.asarray(w.quad[k], dtype=np.int64)
-        self.cnt = np.zeros((Q, N_SPECIES), np.int64)
-        for s in range(N_SPECIES):
+        self.cnt = np.zeros((Q, len(w.sp_lo)), np.int64)
+        for s in range(len(w.sp_lo)):
             for q in range(Q):
                 self.cnt[q, s] = int(np.count_nonzero(m & (ssp == s) & (qd == q)))
         self.taken: set[int] = set()
@@ -578,7 +595,7 @@ def _judge_deliver(w, L: LifeState, rules: LifeRules, ev: BreedEvents, ctx: _Jud
     if coef > 0:
         # ESS 406 (deer, MinimumMeal × 6 = 0.42) / FAc 552~556 (boar, × 5 = 0.35): quadrant grass (root excluded) ≥
         # coef × max(1, plant eaters + 1). Plant eaters = live grass-eating species in the quadrant (+ newborns this step).
-        eaters = int(sum(int(ctx.cnt[q, s]) for s in range(N_SPECIES) if bool(body.eats[s, GRASS])))
+        eaters = int(sum(int(ctx.cnt[q, s]) for s in range(int(body.n)) if bool(body.eats[s, GRASS])))
         if not (ctx.grass_q(q) >= coef * max(1, eaters + 1)):
             _block(L, k, q, sp, BLOCK_FOOD)
             return
@@ -611,17 +628,19 @@ def _judge_deliver(w, L: LifeState, rules: LifeRules, ev: BreedEvents, ctx: _Jud
     ctx.pos = np.concatenate([ctx.pos, nb.pos[None, :]], 0)
     nq = int(quadrant_of(nb.pos, float(w.size), int(L.Q)))
     ctx.cnt[nq, sp] += 1
-    _pay(w, ev, rules, k, a, b, tf)
+    _pay(w, ev, rules, k, a, b, tf, sp)
     L.births[k, q, sp] += 1
     L.log.append((k, int(tf), sp, q, uid, ua, ub))
 
 
-def _pay(w, ev: BreedEvents, rules: LifeRules, k, a, b, tf) -> None:
-    """Delivery costs (NB 101~107, FAc 576~587): both parents E − 0.2, next_birth = t + 2250, offspring + 1, reward credit.
+def _pay(w, ev: BreedEvents, rules: LifeRules, k, a, b, tf, sp=None) -> None:
+    """Delivery costs (NB 101~107, FAc 576~587): both parents E − 0.2, next_birth = t + recover (S′ 2250 for every species;
+    동물 R7 = the species' `recover`), offspring + 1, reward credit.
     [언리얼 값 그대로 — 근거 약함 (3-7 표 #9: 수컷도 암컷과 같은 비용)]"""
+    rec = rules.recover if sp is None or not rules.recover_sp else float(rules.recover_sp[int(sp)])
     for s in (a, b):
         w.E[k, s] = w.E[k, s] - rules.cost
-        w.next_birth[k, s] = tf + rules.recover
+        w.next_birth[k, s] = tf + rec
         w.offspring[k, s] = w.offspring[k, s] + 1
         ev.births[k, s] += 1
 
@@ -647,7 +666,7 @@ def _scan(w, L: LifeState, rules: LifeRules, ev: BreedEvents, k: int, elig: np.n
     body = rules.body
     Q = int(L.Q)
     qd = np.asarray(w.quad[k], dtype=np.int64)
-    for sp in range(N_SPECIES):
+    for sp in range(len(w.sp_lo)):
         lo, hi = int(w.sp_lo[sp]), int(w.sp_hi[sp])
         if hi <= lo:
             continue
@@ -670,7 +689,7 @@ def _scan(w, L: LifeState, rules: LifeRules, ev: BreedEvents, k: int, elig: np.n
                 L.cap_streak[k, q] = False
             if L.one_pending:
                 # [언리얼 값 그대로 — 근거 약함 (3-7 표 #12: 사분면·종마다 대기 1 건 — 큰 무리 증가가 직선으로 묶인다)]
-                p = q * N_SPECIES + sp
+                p = q * int(rules.ns) + sp
                 if L.pair_on[k, p]:
                     _block(L, k, q, sp, BLOCK_ONE_PENDING, once=not bool(L.pend_counted[k, p]))
                     L.pend_counted[k, p] = True
@@ -750,7 +769,7 @@ def breed_step(w, L: LifeState, rules: LifeRules) -> BreedEvents:
             kd, pd = kg[~far], pg[~far]
             if not judge:
                 for k, p in zip(kd.tolist(), pd.tolist()):                  # train: reward and costs only, no body (3-6)
-                    _pay(w, ev, rules, k, int(L.pair_a[k, p]), int(L.pair_b[k, p]), float(tf[k]))
+                    _pay(w, ev, rules, k, int(L.pair_a[k, p]), int(L.pair_b[k, p]), float(tf[k]), int(L.pair_sp[k, p]))
                     L.births[k, int(L.pair_quad[k, p]), int(L.pair_sp[k, p])] += 1
             else:
                 for k, p in zip(kd.tolist(), pd.tolist()):

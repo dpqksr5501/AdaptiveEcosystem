@@ -51,14 +51,20 @@ META_KEYS = ("species", "branch", "round", "decisions", "obs_names", "action_nam
              "src_zip_sha256", "config_digest")
 
 # 7-5 (S′ S4). NOHUNT · NOHUNT_RUN = wolf negative controls of C0-10 (never go to live prey; walk / run toward the sensed carcass).
+# RULE_NAMES keeps the S′ meaning (the S′ rule set the eval tools and the old tests walk — 동물 9-1 B6, like r9_body.SPECIES).
+# 동물 세계 1 단계 (RL_R9_SPECIES_TRAITS.md 6-4): RULE_BUFFALO · RULE_LEOPARD · RULE_FOX (FAUNA_RULE_NAMES) — yardsticks and round-0
+# opponents only, observation columns only (no species label exists in the observation); they need rules.<species> in the config.
 RULE_NAMES = ("RULE_DEER", "RULE_BOAR", "RULE_WOLF", "HIDE_DEER", "HIDE_BOAR", "ALWAYS_EAT", "RANDOM", "NOHUNT", "NOHUNT_RUN")
+FAUNA_RULE_NAMES = ("RULE_BUFFALO", "RULE_LEOPARD", "RULE_FOX")
+ALL_RULE_NAMES = RULE_NAMES + FAUNA_RULE_NAMES
 RULE_SPECIES = {"RULE_DEER": B.DEER, "RULE_BOAR": B.BOAR, "RULE_WOLF": B.WOLF, "HIDE_DEER": B.DEER, "HIDE_BOAR": B.BOAR,
-                "ALWAYS_EAT": None, "RANDOM": None, "NOHUNT": B.WOLF, "NOHUNT_RUN": B.WOLF}
+                "ALWAYS_EAT": None, "RANDOM": None, "NOHUNT": B.WOLF, "NOHUNT_RUN": B.WOLF,
+                "RULE_BUFFALO": B.BUFFALO, "RULE_LEOPARD": B.LEOPARD, "RULE_FOX": B.FOX}
 RULE_CFG = {"RULE_DEER": "deer", "RULE_BOAR": "boar", "RULE_WOLF": "wolf", "HIDE_DEER": "hide", "HIDE_BOAR": "hide", "NOHUNT": "wolf",
-            "NOHUNT_RUN": "wolf"}
-RULE_N_BASE = {"RULE_BOAR": 3, "RULE_WOLF": 1}          # rule-specific memory columns; every rule adds the 2 stuck columns behind
+            "NOHUNT_RUN": "wolf", "RULE_BUFFALO": "buffalo", "RULE_LEOPARD": "leopard", "RULE_FOX": "fox"}
+RULE_N_BASE = {"RULE_BOAR": 3, "RULE_WOLF": 1, "RULE_LEOPARD": 1}   # rule-specific memory columns; every rule adds the 2 stuck columns
 N_STUCK = 2
-RULE_N_STATE = {n: RULE_N_BASE.get(n, 0) + N_STUCK for n in RULE_NAMES}
+RULE_N_STATE = {n: RULE_N_BASE.get(n, 0) + N_STUCK for n in ALL_RULE_NAMES}
 NEAR_TIE = 1e-5                     # 7-10: decisions whose top-2 gap < 1e-5 are counted
 
 # RULE_BOAR state columns · RULE_WOLF state column
@@ -436,14 +442,99 @@ def _random(o, u, mem, ctx, p):
     return np.argmax(u, axis=1)
 
 
+# --- 동물 세계 규칙 두뇌 (6-4, 문턱 모두 [어림]; 관측만 읽는다) -------------------------------------------------------------
+
+def _flee_or_hide(o, rx, ry):
+    """Threat answer shared by RULE_LEOPARD / RULE_FOX: inside a shelter → SHELTER; a shelter direction known → RUN toward it;
+    else RUN away from (rx, ry) (closest open direction)."""
+    go_sh, inside, known = _to_shelter(o, run=True)
+    j_away = _dir_index(-rx, -ry, o[:, _FREE], PATROL_FREE_MIN)
+    return np.where(inside, SHELTER, np.where(known, go_sh, RUN_FIRST + j_away))
+
+
+def _rule_buffalo(o, u, mem, ctx, p):
+    """RULE_BUFFALO:
+      1 the nearest other within threat_r comes in (approach > approach): it is at the head (rel_x / |rel| ≥ face_cos) → RUN toward
+        it (a charge); else WALK toward it (turn to face).
+      2 E < full_e → food seeking (`seek_obs`).
+      3 the nearest kin farther than kin_far → WALK toward it.
+      4 WATCH."""
+    pres = o[:, other_col(0, "present")] > 0.5
+    rx, ry = o[:, other_col(0, "rel_x")], o[:, other_col(0, "rel_y")]
+    dist, appr = o[:, other_col(0, "dist")], o[:, other_col(0, "approach")]
+    thr = pres & (dist < p["threat_r"] / POS_N) & (appr > p["approach"])
+    rn = np.sqrt(rx * rx + ry * ry)
+    head_on = rx >= p["face_cos"] * rn
+    j = _dir_index(rx, ry)
+    face = np.where(head_on, RUN_FIRST + j, WALK_FIRST + j)
+    kx, ky = o[:, kin_col(0, "rel_x")], o[:, kin_col(0, "rel_y")]
+    kfar = (o[:, kin_col(0, "present")] > 0.5) & (kx * kx + ky * ky > (p["kin_far"] / POS_N) ** 2)
+    a = np.where(kfar, WALK_FIRST + _dir_index(kx, ky), WATCH)
+    a = np.where(o[:, O_ENERGY] < p["full_e"], seek_obs(o, p), a)
+    return np.where(thr, face, a)
+
+
+def _rule_leopard(o, u, mem, ctx, p):
+    """RULE_LEOPARD (stamina-lock copy in memory like RULE_WOLF):
+      1 threat = the nearest other within threat_r coming in (approach > threat_approach) with size ≥ threat_size_min → shelter
+        (inside SHELTER, known RUN toward it) else RUN away.
+      2 E < eat_e and a carcass here / sensed → `_carcass` (EAT / WALK toward it).
+      3 E < hunt_e: target = the nearest other with size < prey_size_max and approach ≤ prey_approach_max (inside a shelter too —
+        P1). Beyond stalk_r: WATCH while the target faces me (facing > watch_facing) else WALK toward it; within: RUN (locked → WALK).
+      4 stamina locked → WALK toward a shelter (inside: SHELTER).
+      5 WATCH."""
+    E = o[:, O_ENERGY]
+    st = o[:, O_STAMINA]
+    lock = mem[:, WS_LOCKED]
+    lock = np.where(st <= p["stamina_lock"], 1, np.where(st >= p["stamina_unlock"], 0, lock))
+    mem[:, WS_LOCKED] = lock
+    pres = o[:, _OC["present"]] > 0.5
+    sz = o[:, _OC["size"]]
+    dist, appr = o[:, _OC["dist"]], o[:, _OC["approach"]]
+    has_thr, jt = _first(pres & (dist < p["threat_r"] / POS_N) & (appr > p["threat_approach"]) & (sz >= p["threat_size_min"]))
+    flee = _flee_or_hide(o, _take(o, _OC["rel_x"], jt), _take(o, _OC["rel_y"], jt))
+    has_prey, jp = _first(pres & (sz < p["prey_size_max"]) & (appr <= p["prey_approach_max"]))
+    tx, ty = _take(o, _OC["rel_x"], jp), _take(o, _OC["rel_y"], jp)
+    td, tf = _take(o, _OC["dist"], jp), _take(o, _OC["facing"], jp)
+    j = _dir_index(tx, ty)
+    far = td > p["stalk_r"] / POS_N
+    hunt = np.where(far, np.where(tf > p["watch_facing"], WATCH, WALK_FIRST + j), np.where(lock == 1, WALK_FIRST + j, RUN_FIRST + j))
+    go_sh, _in, _kn = _to_shelter(o, run=False)
+    a = np.where(lock == 1, go_sh, WATCH)
+    a = np.where((E < p["hunt_e"]) & has_prey, hunt, a)
+    a = np.where(E < p["eat_e"], _carcass(o, p, a), a)
+    return np.where(has_thr, flee, a)
+
+
+def _rule_fox(o, u, mem, ctx, p):
+    """RULE_FOX (thresholds relative to the own size column):
+      1 the nearest other within flee_r coming in (approach > flee_approach) bigger than own × flee_size_ratio → shelter (inside
+        SHELTER, known RUN toward it) else RUN away.
+      2 E < eat_e: a smaller other (size < own × prey_size_ratio) within pounce_r → RUN toward it (stage 1 has no such body — the
+        rat of stage 3); else food seeking (`seek_obs`: carcass meat and root).
+      3 WATCH."""
+    own = o[:, B.O_OWN_SIZE]
+    pres = o[:, _OC["present"]] > 0.5
+    sz, dist, appr = o[:, _OC["size"]], o[:, _OC["dist"]], o[:, _OC["approach"]]
+    has_thr, jt = _first(pres & (dist < p["flee_r"] / POS_N) & (appr > p["flee_approach"])
+                         & (sz > own[:, None] * p["flee_size_ratio"]))
+    flee = _flee_or_hide(o, _take(o, _OC["rel_x"], jt), _take(o, _OC["rel_y"], jt))
+    has_prey, jp = _first(pres & (sz < own[:, None] * p["prey_size_ratio"]) & (dist < p["pounce_r"] / POS_N))
+    pounce = RUN_FIRST + _dir_index(_take(o, _OC["rel_x"], jp), _take(o, _OC["rel_y"], jp))
+    eat = np.where(has_prey, pounce, seek_obs(o, p))
+    a = np.where(o[:, O_ENERGY] < p["eat_e"], eat, WATCH)
+    return np.where(has_thr, flee, a)
+
+
 _RULES = {"RULE_DEER": _rule_deer, "RULE_BOAR": _rule_boar, "RULE_WOLF": _rule_wolf, "HIDE_DEER": _rule_hide,
-          "HIDE_BOAR": _rule_hide, "ALWAYS_EAT": _always_eat, "RANDOM": _random, "NOHUNT": _nohunt, "NOHUNT_RUN": _nohunt_run}
+          "HIDE_BOAR": _rule_hide, "ALWAYS_EAT": _always_eat, "RANDOM": _random, "NOHUNT": _nohunt, "NOHUNT_RUN": _nohunt_run,
+          "RULE_BUFFALO": _rule_buffalo, "RULE_LEOPARD": _rule_leopard, "RULE_FOX": _rule_fox}
 
 
 def here_min_of(cfg: dict, sp: int) -> float:
     """Smallest food_here meaning 'something eatable here' for species sp, from its body table (computed once, not in a step):
     max over its grid foods of e_f × eat_min / food_here_ref (deer 0.06, boar 0.045); a meat-only body: > 0 (1e-9)."""
-    s = cfg["species"][SPECIES[int(sp)]]
+    s = cfg["species"][B.ALL_SPECIES[int(sp)]]
     em = float(cfg["body_common"]["eat_min"])
     ref = float(s["food_here_ref"])
     vals = [float(s["e_per_unit"][f]) * em / ref for f in s["diet"] if f in ("grass", "root")]
@@ -456,15 +547,15 @@ def make_rule(name: str, cfg: dict, sp: int | None = None, blind: bool = False) 
     """Rule brain by name (RULE_NAMES) with thresholds from cfg['rules'] (7-5). sp = the species whose block it decides (its body
     table gives the food_here threshold `here_min_of`); default = the rule's own species. ALWAYS_EAT serves deer and boar, so it needs
     sp. RULE_WOLF / NOHUNT* also copy the body stamina hysteresis (body_common.stamina_lock / stamina_unlock)."""
-    if name not in RULE_NAMES:
-        raise ValueError(f"unknown rule brain {name!r} (known: {RULE_NAMES})")
+    if name not in ALL_RULE_NAMES:
+        raise ValueError(f"unknown rule brain {name!r} (known: {ALL_RULE_NAMES})")
     own = RULE_SPECIES[name]
     if sp is None:
         if name == "ALWAYS_EAT":
             raise ValueError("ALWAYS_EAT needs the species it decides for (make_rule(name, cfg, sp)) — food_here threshold")
         sp = own
     params = dict(cfg["rules"][RULE_CFG[name]]) if name in RULE_CFG else {}
-    if name in ("RULE_WOLF", "NOHUNT", "NOHUNT_RUN"):
+    if name in ("RULE_WOLF", "NOHUNT", "NOHUNT_RUN", "RULE_LEOPARD"):
         params["stamina_lock"] = float(cfg["body_common"]["stamina_lock"])
         params["stamina_unlock"] = float(cfg["body_common"]["stamina_unlock"])
     params = {k: (float(v) if isinstance(v, (int, float)) and not isinstance(v, bool) else v) for k, v in params.items()}
@@ -524,7 +615,7 @@ def config_digest(cfg: dict) -> str:
 
 def _species_index(species) -> int:
     if isinstance(species, (int, np.integer)):
-        if not 0 <= int(species) < B.N_SPECIES:
+        if not 0 <= int(species) < len(B.ALL_SPECIES):
             raise ValueError(f"unknown species {species!r}")
         return int(species)
     if species not in B.SPECIES_INDEX:
@@ -536,7 +627,7 @@ def brain_meta(cfg: dict, species, branch: str, round_: int, decisions: int, src
     """meta_json dict (META_KEYS) incl. r9_body.io_hash(), body_hash(cfg, species), body_table_hash(cfg)."""
     sp = _species_index(species)
     src = None if src_zip is None else hashlib.sha256(Path(src_zip).read_bytes()).hexdigest()
-    return {"format": NPZ_FORMAT, "format_version": NPZ_FORMAT_VERSION, "species": SPECIES[sp], "branch": str(branch),
+    return {"format": NPZ_FORMAT, "format_version": NPZ_FORMAT_VERSION, "species": B.ALL_SPECIES[sp], "branch": str(branch),
             "round": int(round_), "decisions": int(decisions), "obs_names": list(OBS_NAMES), "action_names": list(ACTION_NAMES),
             "io_hash": B.hash_hex(B.io_hash()), "body_hash": B.hash_hex(B.body_hash(cfg, sp)),
             "body_table_hash": B.hash_hex(B.body_table_hash(cfg)), "src_zip_sha256": src, "config_digest": config_digest(cfg)}
@@ -556,6 +647,47 @@ def save_brain(path: Path, weights: dict, meta: dict) -> None:
         np.savez(fh, **arrays)
 
 
+def _read_npz(path: Path, sp: int) -> tuple[dict, dict]:
+    """npz weights + meta with every check of `load_brain` except the body hash (format, shapes, names, io_hash, species)."""
+    with np.load(Path(path), allow_pickle=False) as z:
+        keys = set(z.files)
+        miss = [k for k in NPZ_WEIGHT_KEYS + ("meta_json",) if k not in keys]
+        if miss:
+            raise BrainContractError(f"{path}: npz misses {miss}")
+        weights = {k: np.array(z[k]) for k in NPZ_WEIGHT_KEYS}
+        meta = json.loads(str(z["meta_json"][()]))
+    _check_weights(weights)
+    miss = [k for k in META_KEYS if k not in meta]
+    if miss:
+        raise BrainContractError(f"{path}: meta misses {miss}")
+    if meta.get("format") != NPZ_FORMAT or int(meta.get("format_version", -1)) != NPZ_FORMAT_VERSION:
+        raise BrainContractError(f"{path}: format {meta.get('format')!r} v{meta.get('format_version')} is not {NPZ_FORMAT} v{NPZ_FORMAT_VERSION}")
+    if meta["species"] != B.ALL_SPECIES[sp]:
+        raise BrainContractError(f"{path}: brain species {meta['species']!r} != requested {B.ALL_SPECIES[sp]!r}")
+    if list(meta["obs_names"]) != list(OBS_NAMES) or list(meta["action_names"]) != list(ACTION_NAMES):
+        raise BrainContractError(f"{path}: observation / action names differ from the R9 I/O contract")
+    if meta["io_hash"] != B.hash_hex(B.io_hash()):
+        raise BrainContractError(f"{path}: io_hash {meta['io_hash']} != {B.hash_hex(B.io_hash())}")
+    return weights, meta
+
+
+def rebody_brain(src: Path, cfg: dict, species, out: Path) -> dict:
+    """동물 세계 6-1 `rebody`: carry a brain of the SAME species into a world with another body (e.g. the S′ demo brain into the animal
+    world). The npz is read with every `load_brain` check except the body hash (format, shapes, names, io_hash, species); the new
+    meta is `brain_meta(cfg, species, ...)` of the target world (its body hash, so `load_brain` accepts it there) plus `init_from`
+    = the original meta's path, sha256, species, body_hash, body_table_hash and config_digest. The only door that moves a brain
+    across bodies — and it writes that fact into the file. Returns the new meta."""
+    sp = _species_index(species)
+    src = Path(src)
+    weights, old = _read_npz(src, sp)
+    meta = brain_meta(cfg, sp, old["branch"], int(old["round"]), int(old["decisions"]), None)
+    meta["init_from"] = {"path": str(src), "sha256": hashlib.sha256(src.read_bytes()).hexdigest(), "species": old["species"],
+                         "body_hash": old["body_hash"], "body_table_hash": old["body_table_hash"],
+                         "config_digest": old["config_digest"]}
+    save_brain(Path(out), weights, meta)
+    return meta
+
+
 def load_brain(path: Path, cfg: dict, species) -> MlpBrain:
     """Read npz (allow_pickle=False), check shapes, names, io_hash, species and body_hash(cfg, species); BrainContractError on
     mismatch (test 27). The world calls this with ITS config, so a brain trained on another body is refused."""
@@ -573,15 +705,15 @@ def load_brain(path: Path, cfg: dict, species) -> MlpBrain:
         raise BrainContractError(f"{path}: meta misses {miss}")
     if meta.get("format") != NPZ_FORMAT or int(meta.get("format_version", -1)) != NPZ_FORMAT_VERSION:
         raise BrainContractError(f"{path}: format {meta.get('format')!r} v{meta.get('format_version')} is not {NPZ_FORMAT} v{NPZ_FORMAT_VERSION}")
-    if meta["species"] != SPECIES[sp]:
-        raise BrainContractError(f"{path}: brain species {meta['species']!r} != requested {SPECIES[sp]!r}")
+    if meta["species"] != B.ALL_SPECIES[sp]:
+        raise BrainContractError(f"{path}: brain species {meta['species']!r} != requested {B.ALL_SPECIES[sp]!r}")
     if list(meta["obs_names"]) != list(OBS_NAMES) or list(meta["action_names"]) != list(ACTION_NAMES):
         raise BrainContractError(f"{path}: observation / action names differ from the R9 I/O contract")
     if meta["io_hash"] != B.hash_hex(B.io_hash()):
         raise BrainContractError(f"{path}: io_hash {meta['io_hash']} != {B.hash_hex(B.io_hash())}")
     want = B.hash_hex(B.body_hash(cfg, sp))
     if meta["body_hash"] != want:
-        raise BrainContractError(f"{path}: body_hash {meta['body_hash']} != world {SPECIES[sp]} body {want} (trained on another body)")
+        raise BrainContractError(f"{path}: body_hash {meta['body_hash']} != world {B.ALL_SPECIES[sp]} body {want} (trained on another body)")
     name = f"{meta['species']}:{meta['branch']}:r{meta['round']}:{meta['decisions']}"
     return MlpBrain(name=name, kind="mlp", species=sp, n_state=0, weights=weights, meta=meta)
 
