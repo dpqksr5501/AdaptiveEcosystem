@@ -208,6 +208,11 @@ IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoLifeMeat,"AdaptiveEcosystem.Life.CommittedC
 bool FEcoLifeMeat::RunTest(const FString&)
 {
     EcoLifeV3::FIndividual Wolf;Wolf.bInitialized=true;Wolf.Nutrition=.5;
+    TestTrue(TEXT("A reservation is bounded by the existing feeding stop"), FMath::IsNearlyEqual(Wolf.RoomForReservedMeat(), .48, 1.e-12));
+    TestTrue(TEXT("Adaptive feeding stop gives a smaller reservation"), FMath::IsNearlyEqual(Wolf.RoomForReservedMeat(.92), .42, 1.e-12));
+    Wolf.Nutrition=.99;
+    TestEqual(TEXT("A satiated animal takes no private share"), Wolf.RoomForReservedMeat(), 0.);
+    Wolf.Nutrition=.5;
     TestTrue(TEXT("Committed source creates one bounded meal"),Wolf.AssignMeat(500,.6,0,5,5,0));
     TestFalse(TEXT("Same prey receipt cannot duplicate food"),Wolf.AssignMeat(500,.6,1,5,5,0));
     Wolf.PredatorStep(1,50,50,true,2./15);

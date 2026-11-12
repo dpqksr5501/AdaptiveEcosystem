@@ -38,8 +38,12 @@ double AEcoCreatureIntegrationSpawner::CommitNativeCarcass(const FEcoDeathOutcom
     }
     if(Receivers.IsEmpty())return 0.;
     const double Share=.6/Receivers.Num();double Issued=0;
+    const bool bSharedCarcass = !FaunaSpecies.IsEmpty();
+    const double Full = UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal) ? .92 : 1.;
     for(const auto Entity:Receivers){auto& Life=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Entity).Individual;
-        if(Life.AssignMeat(Death.StableAgentId,Share,Now,Body->Body.Pos.X,Body->Body.Pos.Y,SourceLink->GroundZ))Issued+=Share;
+        // Keep any share beyond the current meal's usable amount in the shared carcass.
+        const double Reserved = bSharedCarcass ? FMath::Min(Share, Life.RoomForReservedMeat(Full)) : Share;
+        if(Life.AssignMeat(Death.StableAgentId,Reserved,Now,Body->Body.Pos.X,Body->Body.Pos.Y,SourceLink->GroundZ))Issued+=Reserved;
     }
     UE_LOG(LogTemp,Log,TEXT("[EcoLife][Carcass] Prey=%lld Primary=%lld Receivers=%d NutritionIssued=%.9f Ledger=MeatNotVegetation"),
         Death.StableAgentId,Death.PredatorStableAgentId,Receivers.Num(),Issued);

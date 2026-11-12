@@ -236,6 +236,9 @@ namespace EcoLifeV3
             MeatWasted+=MealRemaining;MealRemaining=Amount;MeatIssued+=Amount;MealSource=Prey;MealExpires=Now+20;bFeedingMeat=false;
             MealX=X;MealY=Y;MealZ=Z;return true;
         }
+        static constexpr double PredatorSatiation=.98;
+        double RoomForReservedMeat(double Full=1.) const
+        { return std::max(0.,std::min(PredatorSatiation,Full)-Nutrition); }
         bool PredatorStep(double Now,double X,double Y,bool Running,double Dt,bool bMayFeed=true,double Full=1.)
         {
             if(!std::isfinite(Dt)||Dt<=0||Dt>.25)return Nutrition>0;
@@ -246,7 +249,7 @@ namespace EcoLifeV3
             if(bMayFeed&&bFeedingMeat&&MealRemaining>0&&(MealX-X)*(MealX-X)+(MealY-Y)*(MealY-Y)<=6.25){
                 const double Bite=std::min({MealRemaining,.12*Dt,std::max(0.,Full-Nutrition)});
                 MealRemaining-=Bite;MeatConsumed+=Bite;Nutrition+=Bite;LastMeatIntake=Bite;
-                if(Nutrition>=std::min(.98,Full)||MealRemaining<=0)bFeedingMeat=false;
+                if(Nutrition>=std::min(PredatorSatiation,Full)||MealRemaining<=0)bFeedingMeat=false;
             }
             return Nutrition>0;
         }
