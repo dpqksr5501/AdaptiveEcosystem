@@ -67,7 +67,7 @@ python -X utf8 results/v3/r9/spawn_detached.py --log results/v3/r9/logs/fauna_fl
 - 3 단계(약 30 분): `fauna_report.py --flight ckpt/r9_fauna/flight/A`.
 - 진행 보기: `Get-Content results/v3/r9/logs/fauna_flight_A.log -Tail 20`, 묶음별 화면 `results/v3/r9/logs/fl_A_<종>.log`, 학습 기록 줄 `results/v3/r9/logs/fl_A_<종>.log.jsonl`(5M 마다 한 줄 — `fauna` 칸에 종 사이 죽임·받기).
 - 단계 기록: `ckpt/r9_fauna/flight/A/flight.json`(명령·시작/끝·멈춤 이유·결과 판·sha256). 한 묶음이라도 `error`·`nan`·`cut` 이면 그 단계에서 멈추고 적는다.
-- 묶음 하나만 따로(예: 물소): `fauna_flight.py --dry-run` 이 찍은 줄 하나를 그대로 쓴다.
+- 묶음 하나만 따로(예: 물소): `fauna_flight.py --dry-run` 이 찍은 줄 하나를 PowerShell 에 그대로 붙여 넣는다. 줄은 `python.exe --% …` 꼴이다(`--%` 뒤는 PowerShell 이 손대지 않아 `--shares` JSON 의 큰따옴표가 산다 — 11-13 VERIFY 에서 고침). 상대 풀 `ckpt/r9_fauna/flight/A/pool_f0.json`(1 단계)·`pool_f1.json`(2 단계)은 시험 비행이 그 단계를 시작할 때 만들므로, 비행을 한 번도 안 띄웠으면 먼저 비행을 띄운다.
 
 ## 4. 보고만 다시 (시험 비행 뒤)
 

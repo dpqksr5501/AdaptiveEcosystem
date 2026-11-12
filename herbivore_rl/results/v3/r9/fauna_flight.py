@@ -50,6 +50,17 @@ def _rel(p: Path) -> str:
         return str(p)
 
 
+def show_cmd(cmd: list[str]) -> str:
+    """--dry-run 줄 = PowerShell(5.1·7)에 그대로 붙여 넣어 도는 꼴. `--%` 뒤는 PowerShell 이 손대지 않고 Windows 명령줄
+    규칙(subprocess.list2cmdline — Popen 이 실제로 쓰는 것)으로 넘어가 `--shares` JSON 의 큰따옴표가 살아남는다.
+    (예전 꼴 `"{"deer":…}"` 은 PowerShell 에서 따옴표가 빠지고 인자 둘로 갈라져 json 읽기가 깨졌다 — 2026-11-13 VERIFY.)"""
+    if os.name != "nt":
+        import shlex
+        return shlex.join(cmd)
+    exe = f'& "{cmd[0]}"' if " " in cmd[0] else cmd[0]
+    return f"{exe} --% {subprocess.list2cmdline(cmd[1:])}"
+
+
 def sha256(p: Path) -> str:
     h = hashlib.sha256()
     with open(p, "rb") as f:
@@ -116,7 +127,7 @@ class Flight:
         for name, cmd in cmds.items():
             st["commands"].append(dict(name=name, cmd=cmd))
             if self.a.dry_run:
-                print(" ".join(f'"{x}"' if (" " in x or "{" in x) else x for x in cmd))
+                print(show_cmd(cmd))
                 continue
             LOGS.mkdir(parents=True, exist_ok=True)
             lf = open(LOGS / f"fl_{self.branch}_{name}.log", "w", encoding="utf-8")
@@ -153,7 +164,7 @@ class Flight:
             st["commands"].append(dict(name=sp, cmd=cmd))
             v0[sp] = dst
             if self.a.dry_run:
-                print(" ".join(cmd))
+                print(show_cmd(cmd))
                 continue
             r = subprocess.run(cmd, cwd=str(ROOT), capture_output=True, text=True, encoding="utf-8",
                                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0)
@@ -211,7 +222,7 @@ class Flight:
         cmd = self.py() + [str(HERE.parent / "fauna_report.py"), "--flight", str(self.dir), "--config", self.cfg]
         st["commands"].append(dict(name="report", cmd=cmd))
         if a.dry_run:
-            print(" ".join(cmd))
+            print(show_cmd(cmd))
             return 0
         LOGS.mkdir(parents=True, exist_ok=True)
         with open(LOGS / f"fl_{self.branch}_report.log", "w", encoding="utf-8") as lf:
