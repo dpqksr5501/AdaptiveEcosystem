@@ -1,5 +1,6 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoFaunaMotionClock.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassSpawnerSubsystem.h"
@@ -53,72 +54,72 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 	if (!BuildAgentLookup()) { FailRuntime(TEXT("Duplicate or invalid stable agent identity")); return; }
 	// Bounded chronological catch-up: unfinished logical time remains as observable debt.
 	const auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
-    int32 RemainingResourceSteps = MaxCatchUpSteps;
-    const auto AdvanceResources = [&](double Through)
-    {
-	for (; RemainingResourceSteps > 0; --RemainingResourceSteps)
+	int32 RemainingResourceSteps = MaxCatchUpSteps;
+	const auto AdvanceResources = [&](double Through)
 	{
-		FEcoServerTimeSnapshot Previous;
-		if (!Clock->GetSnapshotAt(LastResourceTime, Previous)) { FailRuntime(TEXT("Historical clock snapshot")); return false; }
-		double NextTime = FMath::Min(LastResourceTime + 1.0, Ecology->GetNextScheduledTime(Previous, bEnableWaves && IsSpeciesEnabled(false)));
-        if (Migration.bEnabled) NextTime = FMath::Min(NextTime, NextMigrationTime);
-        // Combat requests wake the existing serialized transaction rather than waiting a full resource second.
-        // This remains the same survival/death/resource writer; no HP mutation occurs in Notify or Mass hooks.
-        if (bEnableEcosystemLife && bEnablePlayerCombat)
-        {
-            double ContactTime=MAX_dbl;
-            for(const auto& Request:ComboDamage)ContactTime=FMath::Min(ContactTime,Request.Issued);
-            for(const auto& Pair:WolfCombat)if(Pair.Value.bPending)ContactTime=FMath::Min(ContactTime,Pair.Value.ContactTime);
-            if(ContactTime<MAX_dbl)NextTime=FMath::Min(NextTime,FMath::Max(LastResourceTime+.001,ContactTime));
-        }
-		// Keep per-agent meal times aligned even when a phase/wave divides the second.
-		for (const auto E : Owned)
+		for (; RemainingResourceSteps > 0; --RemainingResourceSteps)
 		{
-			const auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
-			const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
-			const auto& Travel = EM.GetFragmentDataChecked<FEcoTravelFragment>(E);
-			const double Due = EM.GetFragmentDataChecked<FEcoLifetimeFragment>(E).NextFeedTimeSeconds;
-			if (V.HP > 0 && Id.SpeciesId == TEXT("Herbivore") && Travel.State == EEcoResidenceState::Resident && Due > LastResourceTime
-                && !EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E))
-				NextTime = FMath::Min(NextTime, Due);
-            if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E);
-                Fauna && V.HP > 0 && Fauna->AttackContact > LastResourceTime)
-                NextTime = FMath::Min(NextTime, Fauna->AttackContact);
+			FEcoServerTimeSnapshot Previous;
+			if (!Clock->GetSnapshotAt(LastResourceTime, Previous)) { FailRuntime(TEXT("Historical clock snapshot")); return false; }
+			double NextTime = FMath::Min(LastResourceTime + 1.0, Ecology->GetNextScheduledTime(Previous, bEnableWaves && IsSpeciesEnabled(false)));
+			if (Migration.bEnabled) NextTime = FMath::Min(NextTime, NextMigrationTime);
+			// Combat contacts wake the serialized survival/death/resource transaction.
+			if (bEnableEcosystemLife && bEnablePlayerCombat)
+			{
+				double ContactTime = MAX_dbl;
+				for (const auto& Request : ComboDamage) ContactTime = FMath::Min(ContactTime, Request.Issued);
+				for (const auto& Pair : WolfCombat)
+					if (Pair.Value.bPending) ContactTime = FMath::Min(ContactTime, Pair.Value.ContactTime);
+				if (ContactTime < MAX_dbl) NextTime = FMath::Min(NextTime, FMath::Max(LastResourceTime + .001, ContactTime));
+			}
+			// Keep per-agent meal times aligned when a phase or wave divides the second.
+			for (const auto E : Owned)
+			{
+				const auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
+				const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
+				const auto& Travel = EM.GetFragmentDataChecked<FEcoTravelFragment>(E);
+				const double Due = EM.GetFragmentDataChecked<FEcoLifetimeFragment>(E).NextFeedTimeSeconds;
+				if (V.HP > 0 && Id.SpeciesId == TEXT("Herbivore") && Travel.State == EEcoResidenceState::Resident && Due > LastResourceTime
+					&& !EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E))
+					NextTime = FMath::Min(NextTime, Due);
+				if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E);
+					Fauna && V.HP > 0 && Fauna->AttackContact > LastResourceTime)
+					NextTime = FMath::Min(NextTime, Fauna->AttackContact);
+			}
+			if (NextTime > Through) break;
+			FEcoServerTimeSnapshot Time;
+			const int32 BeforeCount = Owned.Num();
+			if (!Clock->GetSnapshotAt(NextTime, Time) || !ProcessResourceStep(Time, Through)
+				|| (Owned.Num() != BeforeCount && !BuildAgentLookup()))
+			{ FailRuntime(TEXT("Creature resource/survival step")); return false; }
+			LastResourceTime = Time.ServerTimeSeconds;
 		}
-		if (NextTime > Through) break;
-		FEcoServerTimeSnapshot Time;
-        const int32 BeforeCount = Owned.Num();
-		if (!Clock->GetSnapshotAt(NextTime, Time) || !ProcessResourceStep(Time, Through)
-            || (Owned.Num() != BeforeCount && !BuildAgentLookup()))
-		{ FailRuntime(TEXT("Creature resource/survival step")); return false; }
-		LastResourceTime = Time.ServerTimeSeconds;
+		return true;
+	};
+	if (FaunaSpecies.IsEmpty())
+	{
+		if (!AdvanceResources(Now)) return;
 	}
-        return true;
-    };
-    if (FaunaSpecies.IsEmpty())
-    {
-        if (!AdvanceResources(Now)) return;
-    }
-    else
-    {
-        if (FaunaMotionTime < 0.) FaunaMotionTime = FMath::Max(0., Now - Delta);
-        constexpr double MaxMotionStep = .1;
-        constexpr int32 MaxMotionStepsPerFrame = 8;
-        if (Now - FaunaMotionTime > MaxMotionStep && !AdvanceResources(FaunaMotionTime)) return;
-        for (int32 Pass = 0; Pass < MaxMotionStepsPerFrame && RemainingResourceSteps > 0
-            && Now - FaunaMotionTime > UE_SMALL_NUMBER; ++Pass)
-        {
-            double End = FMath::Min(Now, FaunaMotionTime + MaxMotionStep);
-            if (Now - FaunaMotionTime > MaxMotionStep)
-                for (const auto Entity : Owned)
-                    if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
-                        Fauna && Fauna->AttackContact > FaunaMotionTime + UE_SMALL_NUMBER)
-                        End = FMath::Min(End, Fauna->AttackContact);
-            MoveFauna(float(End - FaunaMotionTime), End);
-            FaunaMotionTime = End;
-            if (!AdvanceResources(End)) return;
-        }
-    }
+	else
+	{
+		using namespace EcoFaunaMotionClock;
+		if (FaunaMotionTime < 0.) FaunaMotionTime = 0.;
+		if (!AdvanceResources(FaunaMotionTime)) return;
+		const int64 LastReadyStep = CompletedStepAt(Now);
+		for (int32 Pass = 0; Pass < MaxStepsPerFrame && RemainingResourceSteps > 0; ++Pass)
+		{
+			const int64 NextStep = CompletedStepAt(FaunaMotionTime) + 1;
+			if (NextStep > LastReadyStep) break;
+			double End = StepTime(NextStep);
+			for (const auto Entity : Owned)
+				if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
+					Fauna && Fauna->AttackContact > FaunaMotionTime + UE_SMALL_NUMBER)
+					End = FMath::Min(End, Fauna->AttackContact);
+			MoveFauna(float(End - FaunaMotionTime), End);
+			FaunaMotionTime = End;
+			if (!AdvanceResources(End)) return;
+		}
+	}
 	const double CleanupTime = FaunaSpecies.IsEmpty() ? Now : FaunaMotionTime;
 	if (!EcoMassSurvival::RemoveExpired(EM, CleanupTime, true) || !BuildAgentLookup())
 	{ FailRuntime(TEXT("Creature death cleanup")); return; }
@@ -188,7 +189,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 		FEcoSpawnRequest Request;
 		while (Ecology->PollSpawnWave(G.RegionId, Time, Request))
 		{
-			const int32 Actual = Spawn(G.RegionId, Request.Count, false);
+			const int32 Actual = Spawn(G.RegionId, Request.Count, false, Time);
 			if (!ReconcilePopulation() || !Ecology->CompleteSpawnRequest(Request.RequestId, Actual) || Actual != Request.Count) return false;
 		}
 	}

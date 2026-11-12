@@ -217,7 +217,7 @@ bool AEcoCreatureIntegrationSpawner::BuildFaunaPositions(FName RegionId,
 bool AEcoCreatureIntegrationSpawner::InitializeFaunaHabitat()
 {
     if (FaunaHabitatStage < 0 || FaunaHabitatStage > 3 || FaunaHabitatPatches.Num() > 64
-        || (UsesFaunaPersistence() && !FaunaPersistence.IsValid())) return false;
+        || (!FaunaSpecies.IsEmpty() && !FaunaPersistence.IsValid())) return false;
     FaunaPatchStock.Init(0.f, FaunaHabitatPatches.Num());
     TSet<FName> Ids;
     for (int32 Index = 0; Index < FaunaHabitatPatches.Num(); ++Index)
@@ -307,12 +307,11 @@ FIntPoint AEcoCreatureIntegrationSpawner::CountFaunaDiets(FName RegionId) const
 }
 
 int32 AEcoCreatureIntegrationSpawner::SpawnFauna(FName RegionId, const FEcoFaunaSpecies& Species,
-    const TArray<FVector>& Positions)
+    const TArray<FVector>& Positions, const FEcoServerTimeSnapshot& Time)
 {
     if (!bAuthorityWorld || !FaunaConfig || Positions.IsEmpty()) return 0;
     auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
     auto* Spawner = GetWorld()->GetSubsystem<UMassSpawnerSubsystem>();
-    const auto Time = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime();
     const int32 SpeciesIndex = Ecology->RegisterSpecies(Species.SpeciesId);
     const uint64 FounderSeed = uint64(101) ^ uint64(FEcoV3IntegratedSettings::FromConsole().Seed)
         ^ uint64(FEcoV3IntegratedSettings{}.Seed);
@@ -444,7 +443,8 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 {
                     Vitals.Energy += Meal;
                     Fauna->LastMeal = Now;
-                    if (bPersistence) Fauna->RecordForageIntake(Position, Now, Meal, FaunaPersistence.ForageMemorySeconds);
+                    RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("HabitatPatchEaten"), 0, Meal);
+                    Fauna->RecordForageIntake(Position, Now, Meal, FaunaPersistence.ForageMemorySeconds);
                     UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][PatchMeal] Patch=%s Species=%s Agent=%lld Amount=%.3f Remaining=%.3f"),
                         *Patch.Id.ToString(), *Species->SpeciesId.ToString(), AgentId, Meal, Stock);
                     continue;
@@ -468,7 +468,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 Fauna->LastMeal = Now;
                 Fauna->LastCarrionMeal = Now;
                 RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("CarrionEaten"), Fauna->CarrionTargetId, Meal);
-                if (bPersistence) Fauna->RecordForageIntake(Position, Now, Meal, FaunaPersistence.ForageMemorySeconds);
+                Fauna->RecordForageIntake(Position, Now, Meal, FaunaPersistence.ForageMemorySeconds);
                 UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Scavenge] Eater=%lld Species=%s Carcass=%lld Amount=%.3f Remaining=%.3f At=%.3f Energy=%.3f MaxEnergy=%.3f"),
                     AgentId, *Species->SpeciesId.ToString(), Fauna->CarrionTargetId, Meal, Carcass->Remaining, Now, Vitals.Energy, Vitals.MaxEnergy);
                 continue;
@@ -497,6 +497,10 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 Adult.Energy -= Amount;
                 Vitals.Energy += Amount;
                 Fauna->LastMeal = Now;
+                RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("ParentProvisioned"), ParentId, Amount);
+                if (bAuditFaunaHunts)
+                    UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][ParentMeal] Species=%s Agent=%lld Amount=%.3f"),
+                        *Species->SpeciesId.ToString(), AgentId, Amount);
                 break;
             }
             continue;
@@ -509,8 +513,13 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         {
             const float Before = Vitals.Energy;
             Vitals.Energy = FMath::Min(Vitals.MaxEnergy, Before + float(Nutrition) * EcoFaunaNutrition::PlantEnergyPerUnit);
-            if (bPersistence && Vitals.Energy > Before)
-                Fauna->RecordForageIntake(Position, Now, Vitals.Energy - Before, FaunaPersistence.ForageMemorySeconds);
+            const float Gained = Vitals.Energy - Before;
+            RecordGameplayReason(AgentId, Region.CurrentRegionId, Now, TEXT("PlantsEaten"), 0, Gained);
+            if (bAuditFaunaHunts)
+                UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][PlantMeal] Species=%s Agent=%lld Amount=%.3f"),
+                    *Species->SpeciesId.ToString(), AgentId, Gained);
+            if (Gained > 0.f)
+                Fauna->RecordForageIntake(Position, Now, Gained, FaunaPersistence.ForageMemorySeconds);
             Fauna->LastMeal = Now;
         }
     }
@@ -544,25 +553,16 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
     };
     const auto HasBreedingFood = [&](FMassEntityHandle Hunter, const FEcoFaunaSpecies& Species)
     {
-        if (bPersistence)
-        {
-            const auto& Fauna = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Hunter);
-            const auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Hunter);
-            const float Demand = Species.Maintenance * Fauna.MaintenanceScale
-                * FMath::Min(Species.Gestation, FaunaPersistence.ForageMemorySeconds);
-            return EcoFaunaFeeding::BreedingReserve(Vitals.Energy, Vitals.MaxEnergy,
-                Fauna.RecentForageIntake(Now, FaunaPersistence.ForageMemorySeconds)) >= Demand;
-        }
-        if (Species.UsesPlantFood()) return true;
-        const FVector Center = Position(Hunter);
-        const double RangeSquared = FMath::Square(2. * Species.SightRange);
-        int32 PreyCount = 0;
-        for (const auto Other : Owned)
-            if (FVector::DistSquared(Center, Position(Other)) <= RangeSquared
-                && CanHuntFauna(EM, Hunter, Other, Species, Now, false, false) && ++PreyCount >= 2)
-                return true;
-        const double LastCarrion = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Hunter).LastCarrionMeal;
-        return LastCarrion >= 0. && Now - LastCarrion <= 25.;
+        if (!bPersistence && Species.UsesPlantFood()) return true;
+        const auto& Fauna = EM.GetFragmentDataChecked<FEcoFaunaFragment>(Hunter);
+        const auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Hunter);
+        const float Window = FaunaPersistence.ForageMemorySeconds;
+        const float Demand = Species.Maintenance * Fauna.MaintenanceScale * FMath::Min(Species.Gestation, Window);
+        const float Intake = Fauna.RecentForageIntake(Now, Window);
+        // A potential prey count does not demonstrate that either parent can feed.
+        if (!Species.UsesPlantFood() && (Fauna.LastForageIntakeAt < 0. || Now - Fauna.LastForageIntakeAt > Window))
+            return false;
+        return EcoFaunaFeeding::BreedingReserve(Vitals.Energy, Vitals.MaxEnergy, Intake) >= Demand;
     };
     for (int32 Index = FaunaBirths.Num() - 1; Index >= 0; --Index)
     {
@@ -583,8 +583,12 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
         auto& ParentB = EM.GetFragmentDataChecked<FEcoFaunaFragment>(B).Life;
         ParentA.NextBirth = ParentB.NextBirth = Now + 30.;
         const auto* Species = FindFauna(Birth.Species);
-        if (CountFauna(Birth.Region, Birth.Species) >= Species->RegionalLimit || !HasBreedingFood(A, *Species)
-            || (bPersistence && !HasBreedingFood(B, *Species))) continue;
+        if (CountFauna(Birth.Region, Birth.Species) >= Species->RegionalLimit) continue;
+        if (!HasBreedingFood(A, *Species) || !HasBreedingFood(B, *Species))
+        {
+            RecordGameplayReason(Birth.ParentA, Birth.Region, Now, TEXT("BirthForageReserve"), Birth.ParentB);
+            continue;
+        }
 
         TArray<FVector> SpawnPoints;
         const FVector Center = (Position(A) + Position(B)) * .5;
@@ -625,7 +629,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             : 0.;
         FEcoSpawnRequest Reservation;
         if (!Ecology->RequestFaunaBirth(Birth.Region, Time, Reservation, RequiredPlantReserve)) return false;
-        const int32 Actual = Reservation.Count ? SpawnFauna(Birth.Region, *Species, SpawnPoints) : 0;
+        const int32 Actual = Reservation.Count ? SpawnFauna(Birth.Region, *Species, SpawnPoints, Time) : 0;
         const bool bReconciled = ReconcilePopulation();
         if (!Ecology->CompleteSpawnRequest(Reservation.RequestId, Actual) || !bReconciled) return false;
         if (!Actual)
@@ -689,7 +693,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 for (int32 J = I + 1; J < Candidates.Num(); ++J)
                 {
                     const auto B = AgentLookup.FindChecked(Candidates[J]);
-                    if (bPersistence && !HasBreedingFood(B, *Species)) continue;
+                    if (!HasBreedingFood(B, *Species)) continue;
                     const auto& LB = EM.GetFragmentDataChecked<FEcoFaunaFragment>(B).Life;
                     if (LA.Sex == LB.Sex || LA.ParentA == Candidates[J] || LA.ParentB == Candidates[J]
                         || LB.ParentA == Candidates[I] || LB.ParentB == Candidates[I]

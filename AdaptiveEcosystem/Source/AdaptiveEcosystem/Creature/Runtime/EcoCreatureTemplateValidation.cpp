@@ -62,6 +62,7 @@ bool AEcoCreatureIntegrationSpawner::RegisterTemplates()
 		Require.operator()<FTransformFragment>(); Require.operator()<FEcoIntegratedCreatureTag>();
 		Require.operator()<FEcoCreaturePresentationFragment>();
 		Forbid.operator()<FEcoFaunaFragment>();
+		Forbid.operator()<FEcoPolicyV3Tag>(); Forbid.operator()<FEcoThreatV3Tag>();
 		if (bClient || !bV3)
 		{
 			Forbid.operator()<FEcoIntegratedV3Fragment>();

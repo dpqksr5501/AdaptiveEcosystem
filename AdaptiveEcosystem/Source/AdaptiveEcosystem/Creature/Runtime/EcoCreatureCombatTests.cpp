@@ -29,6 +29,9 @@
 #include "GameFramework/Character.h"
 #include "GameFramework/PlayerController.h"
 #include "World/EcoWorldClockSubsystem.h"
+#include "World/EcologyRegion.h"
+#include "Ecology/EcologySimulationSubsystem.h"
+#include "Mass/EcoHerdMigration.h"
 #include "Mass/EcoMassSurvival.h"
 #include <limits>
 
@@ -47,10 +50,132 @@ struct FEcoCombatTestAccess
     static void Proxies(AEcoCreatureIntegrationSpawner& S) { S.UpdateHitProxies(); }
     static void Predation(AEcoCreatureIntegrationSpawner& S, double Now) { S.ProcessFaunaPredation(Now); }
     static void MoveFauna(AEcoCreatureIntegrationSpawner& S, double Now) { S.MoveFauna(.05f, Now); }
+    static FMassEntityHandle SpawnFaunaAt(AEcoCreatureIntegrationSpawner& S, FName Region,
+        const FEcoServerTimeSnapshot& Time, const FVector& Position = FVector::ZeroVector)
+    {
+        S.bAuthorityWorld = true;
+        auto& Profile = S.FaunaSpecies.AddDefaulted_GetRef();
+        Profile.SpeciesId = TEXT("Rat");
+        if (!S.RegisterFaunaTemplate() || S.SpawnFauna(Region, Profile, {Position}, Time) != 1)
+            return {};
+        return S.Owned.Last();
+    }
+    static void SetPassageRegions(AEcoCreatureIntegrationSpawner& S, AEcologyRegion& Source, AEcologyRegion& Destination)
+    {
+        S.Regions = { &Source, &Destination };
+        S.Groups.Reset();
+        for (const auto* Region : { &Source, &Destination })
+            S.Groups.AddDefaulted_GetRef().RegionId = Region->RegionId;
+        S.BuildAgentLookup();
+    }
+    static void Passages(AEcoCreatureIntegrationSpawner& S, FMassEntityManager& EM,
+        const FEcoServerTimeSnapshot& Time, TArray<FEcoMigrationOutcome>& Arrivals)
+    { S.ReconcileFaunaPassages(EM, Time, Time.ServerTimeSeconds, 1, Arrivals); }
     static bool CanHunt(const AEcoCreatureIntegrationSpawner& S, const FMassEntityManager& Manager,
         FMassEntityHandle Hunter, FMassEntityHandle Prey, double Now)
     { return S.CanHuntFauna(Manager, Hunter, Prey, S.FaunaSpecies[0], Now, true); }
 };
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaSpawnTimestamp, "AdaptiveEcosystem.Fauna.MotionClock.SpawnTimestamp",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoFaunaSpawnTimestamp::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Clock = W.World->GetSubsystem<UEcoWorldClockSubsystem>();
+    auto* Ecology = W.World->GetSubsystem<UEcologySimulationSubsystem>();
+    FRegionEcologyState Region;
+    Region.RegionId = TEXT("SpawnClock");
+    Region.FoodAmount = Region.FoodCapacity = 10.;
+    if (!TestTrue(TEXT("Region is registered"), Ecology->RegisterRegionState(Region))
+        || !TestTrue(TEXT("World clock has advanced to the end of a slow frame"),
+            Clock->StartClock(7, 60., 60.) && Clock->AdvanceClock(1.25)))
+        return false;
+
+    FEcoServerTimeSnapshot TransactionTime;
+    if (!TestTrue(TEXT("Catch-up transaction timestamp is available"), Clock->GetSnapshotAt(1., TransactionTime)))
+        return false;
+    const auto Entity = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Region.RegionId, TransactionTime);
+    auto& EM = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    if (!TestTrue(TEXT("Rule-fauna spawn succeeds during catch-up"), EM.IsEntityValid(Entity))) return false;
+    const auto& Lifetime = EM.GetFragmentDataChecked<FEcoLifetimeFragment>(Entity);
+    const auto& Runtime = EM.GetFragmentDataChecked<FEcoVitalsRuntimeFragment>(Entity);
+    TestEqual(TEXT("Physical spawn is recorded at the transaction time"), Lifetime.SpawnTimeSeconds, 1.);
+    TestEqual(TEXT("Metabolism starts at the transaction time"), Runtime.LastTime, 1.);
+    TestEqual(TEXT("First feeding is due one second after the transaction"), Lifetime.NextFeedTimeSeconds, 2.);
+    TestEqual(TEXT("Spawn does not change the world clock"), Clock->GetServerTime().ServerTimeSeconds, 1.25);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRuleFaunaPassageMovement, "AdaptiveEcosystem.Fauna.Passage.GroundTransfer",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoRuleFaunaPassageMovement::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld W;
+    auto* Spawner = W.World->SpawnActor<AEcoCreatureIntegrationSpawner>();
+    auto* Source = W.World->SpawnActor<AEcologyRegion>();
+    auto* Destination = W.World->SpawnActor<AEcologyRegion>();
+    Source->RegionId = TEXT("ForageOrigin");
+    Destination->RegionId = TEXT("ForageDestination");
+    Source->AdjacentRegionIds.Add(Destination->RegionId);
+    Source->RegionBounds->SetBoxExtent(FVector(500., 500., 100.));
+    Destination->RegionBounds->SetBoxExtent(FVector(500., 500., 100.));
+    Source->SetActorLocation(FVector(-508., 0., 0.));
+    Destination->SetActorLocation(FVector(508., 0., 0.));
+    auto* Ground = W.World->SpawnActor<AActor>();
+    auto* Box = NewObject<UBoxComponent>(Ground);
+    Ground->SetRootComponent(Box);
+    Ground->AddInstanceComponent(Box);
+    Box->SetBoxExtent(FVector(1200., 600., 10.));
+    Box->SetCollisionObjectType(ECC_WorldStatic);
+    Box->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
+    Box->SetCollisionResponseToAllChannels(ECR_Block);
+    Box->RegisterComponent();
+    Ground->SetActorLocation(FVector(0., 0., -10.));
+    auto* Route = W.World->SpawnActor<AEcoHerdMigrationRoute>();
+    Route->FromRegion = Source->RegionId;
+    Route->ToRegion = Destination->RegionId;
+    Route->Points = { FVector(-300., 0., 0.), FVector(300., 0., 0.) };
+    Route->bAllowRuleFaunaPassage = true;
+
+    auto* Ecology = W.World->GetSubsystem<UEcologySimulationSubsystem>();
+    FRegionEcologyState Region;
+    Region.RegionId = Source->RegionId;
+    Region.FoodAmount = 0.;
+    Region.FoodCapacity = 100.;
+    if (!Ecology->RegisterRegionState(Region)) return false;
+    Region.RegionId = Destination->RegionId;
+    Region.FoodAmount = Region.FoodCapacity;
+    if (!Ecology->RegisterRegionState(Region)) return false;
+    FEcoServerTimeSnapshot Time;
+    Time.ServerTimeSeconds = 1.;
+    const auto Entity = FEcoCombatTestAccess::SpawnFaunaAt(*Spawner, Source->RegionId, Time, FVector(-110., 0., 0.));
+    auto& EM = W.World->GetSubsystem<UMassSpawnerSubsystem>()->GetEntityManagerChecked();
+    if (!TestTrue(TEXT("Rule-fauna agent starts in its origin"), EM.IsEntityValid(Entity))) return false;
+    auto& Vitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entity);
+    Vitals.Energy = .2f * Vitals.MaxEnergy;
+    FEcoCombatTestAccess::SetPassageRegions(*Spawner, *Source, *Destination);
+    TArray<FEcoMigrationOutcome> Arrivals;
+    FEcoCombatTestAccess::Passages(*Spawner, EM, Time, Arrivals);
+    TestTrue(TEXT("A hungry agent reserves an actual food destination"),
+        EM.GetFragmentDataChecked<FEcoTravelFragment>(Entity).State == EEcoResidenceState::Traveling);
+    TestTrue(TEXT("Planning alone issues no arrival"), Arrivals.IsEmpty());
+    for (int32 Step = 0; Step < 100 && Arrivals.IsEmpty(); ++Step)
+    {
+        Time.ServerTimeSeconds += .05;
+        FEcoCombatTestAccess::MoveFauna(*Spawner, Time.ServerTimeSeconds);
+        FEcoCombatTestAccess::Passages(*Spawner, EM, Time, Arrivals);
+    }
+    if (!TestEqual(TEXT("Ground movement produces one crossing receipt"), Arrivals.Num(), 1)) return false;
+    const auto& Transform = EM.GetFragmentDataChecked<FTransformFragment>(Entity).GetTransform();
+    TestTrue(TEXT("Arrival body is on the destination side"), Destination->ContainsPosition(Transform.GetLocation()));
+    TestEqual(TEXT("Receipt matches new resident region"), Arrivals[0].DestinationRegionId,
+        EM.GetFragmentDataChecked<FEcoRegionFragment>(Entity).CurrentRegionId);
+    Time.ServerTimeSeconds += .05;
+    FEcoCombatTestAccess::Passages(*Spawner, EM, Time, Arrivals);
+    TestEqual(TEXT("A completed transfer is not emitted again"), Arrivals.Num(), 1);
+    return true;
+}
 
 namespace EcoCombatTest
 {

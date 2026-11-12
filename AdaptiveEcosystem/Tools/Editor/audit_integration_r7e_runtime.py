@@ -25,6 +25,8 @@ native = None
 previous_step = 0
 last_legacy_dump = -1.
 deer_ids = set()
+wolf_ids = set()
+wolf_meat = {}
 previous_alive = set()
 species_by_id = {}
 intake = {"total": 0., "steps_captured": 0, "missed_steps": 0, "by_region": {},
@@ -77,13 +79,20 @@ def record_intake(world):
     previous_step = step
     intake["steps_captured"] += 1
     living = set(u.EcoCreatureInspectionLibrary.get_authority_agent_ids(world))
-    for agent in sorted((living - species_by_id.keys()) | (deer_ids & (living | previous_alive))):
+    for agent in sorted((living - species_by_id.keys()) | ((deer_ids | wolf_ids) & (living | previous_alive))):
         row = capture_agent(world, agent)
         if row is None:
             intake["capture_errors"] += 1
             continue
         kind = row["species"]
         species_by_id[agent] = kind
+        if kind == "Wolf":
+            wolf_ids.add(agent)
+            life = row.get("life")
+            if life:
+                totals = wolf_meat.setdefault(agent, {})
+                for key in ("meat_issued", "meat_consumed", "meat_wasted"):
+                    totals[key] = max(totals.get(key, 0.), life.get(key, 0.))
         if kind != "Herbivore":
             other_writers.setdefault(kind, set()).add(row.get("movement", "unreported"))
             continue
@@ -138,11 +147,25 @@ def tick(_):
             state["map"] = world.get_path_name()
             state["configuration"] = {}
             for key in ("EnabledSpecies", "bUseV3Policy", "bEnableEcosystemLife", "bEnableWaves",
-                        "bEnableHerdJourneys", "GlobalPopulationLimit"):
+                        "bEnableHerdJourneys", "GlobalPopulationLimit", "FaunaHabitatStage"):
                 try:
                     state["configuration"][key] = str(spawner.get_editor_property(key))
                 except Exception as exc:
                     state["configuration"][key] = str(exc)
+            if track_reasons:
+                try:
+                    state["fauna_profiles"] = [{
+                        "species": str(profile.get_editor_property("SpeciesId")),
+                        "diet": str(profile.get_editor_property("Diet")),
+                        "maintenance": profile.get_editor_property("Maintenance"),
+                        "prey": [str(rule.get_editor_property("SpeciesId"))
+                                 for rule in profile.get_editor_property("PreyRules")],
+                        "sight_cm": profile.get_editor_property("SightRange"),
+                        "scent_cm": profile.get_editor_property("ScentRange"),
+                        "carrion_scent_limit_cm": profile.get_editor_property("HabitatCarrionRange"),
+                    } for profile in spawner.get_editor_property("FaunaSpecies")]
+                except Exception as exc:
+                    state["fauna_profiles_error"] = str(exc)
             write()
         now = u.GameplayStatics.get_time_seconds(world)
         if not ready:
@@ -208,6 +231,10 @@ def tick(_):
                 intake["brain_ids"] = sorted(brains)
                 intake["other_writers"] = {key: sorted(values) for key, values in other_writers.items()}
                 state["native_deer_intake"] = intake
+                state["sampled_native_wolf_meat"] = {
+                    key: sum(totals.get(key, 0.) for totals in wolf_meat.values())
+                    for key in ("meat_issued", "meat_consumed", "meat_wasted")
+                }
             write()
         if state["completed"]:
             u.log(f"DEER_LONG_AUDIT Complete {name} {elapsed:.2f} game seconds")

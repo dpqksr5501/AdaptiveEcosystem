@@ -1,6 +1,7 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoEcosystemArchive.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoFaunaMotionClock.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
@@ -187,7 +188,8 @@ struct FEcoEcosystemCheckpoint
         FString SavedMap=MapName,Build=RuntimeHash(),Brain=N->GetActiveBrain().Id;
         if(Build.IsEmpty())return Reject(TEXT("runtime image hash unavailable"));
         if(!Loading){
-            if (S.FaunaMotionTime >= 0. && Clock->GetServerTime().ServerTimeSeconds - S.FaunaMotionTime > UE_SMALL_NUMBER)
+            const double MotionThrough = EcoFaunaMotionClock::CompletedTimeAt(Clock->GetServerTime().ServerTimeSeconds);
+            if (!S.FaunaSpecies.IsEmpty() && MotionThrough - FMath::Max(0., S.FaunaMotionTime) > UE_SMALL_NUMBER)
                 return Reject(TEXT("pending fauna motion; retry after the simulation catches up"));
             for(int32 I=0;I<N->NumContexts();++I){const auto& C=*N->GetContext(I);
                 if(!C.bSpatialFoodRegistered||C.Sim.Rng.External||!ValidGrid(C.Sim.Food))return Reject(TEXT("unsupported native context"));
@@ -448,10 +450,11 @@ struct FEcoEcosystemCheckpoint
         // Prepare new entities before destroying anything. Roll back preparation on
         // allocation failure; malformed/incompatible snapshots never touch live state.
         const auto OldOwned=S.Owned;const auto OldTotals=S.SpeciesTotals;const int64 OldBirths=S.SuccessfulBirths,OldAllocator=E->NextStableAgentId;
+        const auto PreparationTime=Clock->GetServerTime();
         TArray<FMassEntityHandle> NewEntities;
         for(const auto& V:Agents){TArray<FVector> Position{V.Transform.GetLocation()};
-            const int32 Created=V.bFauna?S.SpawnFauna(V.Region,*S.FindFauna(V.Species),Position)
-                :S.Spawn(V.Region,1,V.Species==TEXT("Wolf"),&Position);
+            const int32 Created=V.bFauna?S.SpawnFauna(V.Region,*S.FindFauna(V.Species),Position,PreparationTime)
+                :S.Spawn(V.Region,1,V.Species==TEXT("Wolf"),PreparationTime,&Position);
             if(Created!=1){
                 if(!NewEntities.IsEmpty())EM.BatchDestroyEntities(NewEntities);S.Owned=OldOwned;S.SpeciesTotals=OldTotals;S.SuccessfulBirths=OldBirths;E->NextStableAgentId=OldAllocator;
                 return Reject(TEXT("entity preparation failed; previous world retained"));
@@ -513,7 +516,7 @@ struct FEcoEcosystemCheckpoint
             if(V.Vitals.HP<=0)EM.RemoveTagFromEntity(Entity,FEcoAliveTag::StaticStruct());
         }
         S.Step=Step;S.SuccessfulBirths=Successful;S.CommittedDeaths=Deaths;S.LastResourceTime=ResourceTime;S.NextMigrationTime=MigrationTime;
-        S.FaunaMotionTime=S.FaunaSpecies.IsEmpty()?-1.:Time.ServerTimeSeconds;
+        S.FaunaMotionTime=S.FaunaSpecies.IsEmpty()?-1.:EcoFaunaMotionClock::CompletedTimeAt(Time.ServerTimeSeconds);
         S.GameplayReasons.Reset();
         S.PendingBirths=MoveTemp(Births);S.NextBirthScan=BirthScan;S.SpeciesTotals=MoveTemp(Totals);S.CompletedTime=Completed;S.CompletedTime.WorldEpoch=NewEpoch;
         S.FaunaBirths=MoveTemp(FaunaBirths);S.NextFaunaBirthScan=FaunaBirthScan;

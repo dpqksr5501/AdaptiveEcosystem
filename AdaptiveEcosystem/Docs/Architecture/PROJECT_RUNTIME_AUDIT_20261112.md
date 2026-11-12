@@ -178,3 +178,15 @@ UE 5.8에서 `AdaptiveEcosystemEditor Win64 Development`를 직접 빌드했다.
 | 행동 이유 | [같은 기록기](../../Tools/Editor/audit_integration_r7e_runtime.py) | 위 조건의 4배속·60 FPS에 `-DeerAuditSeconds=360 -DeerAuditTrackReasons`를 사용한다. |
 | 가뭄·회복 | [이주 기록기](../../Tools/Editor/audit_herd_migration_runtime.py) | 이주 맵에서 `-EcoV3Seed=20000 -benchmark -fps=60 -HerdAuditName=<실행명> -HerdAuditGameClock -HerdAuditDuration=150`. 대조군은 `-HerdAuditNoLoss`, 단발 손실은 `-HerdAuditRenewableLoss`, 지속 가뭄은 두 옵션 모두 생략한다. |
 | 총기·체력바·근접 사냥 | [총기](../../Tools/Editor/run_jwj_rifle_network.ps1) · [체력바](../../Tools/Editor/run_health_bar_network.ps1) · [근접](../../Tools/Editor/run_player_hunting_network.ps1) | 실행기는 전용 서버와 Client 두 개를 기동한다. 총기의 결과 폴더는 `-EvidenceTag <실행명>`으로 구분하고 체력바는 `-RenderedClients`를 사용한다. |
+
+## 이동 시계·근접 사냥·모델 실행 경계 후속
+
+규칙 종은 이제 시뮬레이션 시각 기준 60Hz 경계에서 이동한다. 공격 접촉 시각은 그 구간을 나눠 처리하고, 틱 예산을 넘은 시간은 다음 틱에 이어간다. 자연 출생·웨이브·복구 개체의 첫 대사와 섭식 시각은 스폰을 실행한 프레임 끝 대신 권위 거래 시각으로 정한다. 저장 형식 7은 유지하고 정상적인 1/60초 미만의 잔여 시간과 미처리 이동을 구분한다. [시계와 거래](../../Source/AdaptiveEcosystem/Creature/Runtime/EcoCreatureLifecycle.cpp) · [고정 경계 테스트](../../Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMotionClockTest.cpp)
+
+시드 20000의 120초 비교에서 1배속·60 FPS와 4배속·30 FPS는 사슴 섭취 94.111과 여덟 종의 종료 개체수·출생·사망이 일치했고 이동 지연은 0초였다. 같은 시드를 4배속 30분으로 늘리면 30 FPS와 60 FPS의 사슴은 25·28마리, 여우 포획은 2·7건이었다. 규칙 종의 이동 적분을 고정했어도 프레임 내 Native와 규칙 실행 순서, 소리와 플레이어 입력 시각은 서로 다를 수 있다. 여기까지의 테스트는 고정 프레임 간격으로 수행했다. [장기 비교](FAUNA_POPULATION_BALANCE.md#30분-종료-개체군과-실제-섭취)
+
+근접 사냥은 권위 콜리전 위치와 같은 높이로 공격자를 배치하고, 실제 설정된 GAS 콤보 입력을 사용하도록 재현 도구를 수정했다. Dedicated와 Client 두 개에서 같은 늑대에 30+30+30+10 피해, 서버 사망 확정 한 건, 공격자 전용 사망 결과 한 건을 확인했다. 늦게 접속한 관찰자는 사망 요약을 받았고 두 Client의 권위 개체·히트 프록시는 0이었다. 생존 늑대의 반격은 공격자의 권위 HP와 수신 HP를 낮췄다. `FollowupMeleeFinal`과 `FollowupReceiptFinal`에서 세 프로세스가 모두 통과했다. 변경 범위는 재현 도구다. [멀티 재현 실행기](../../Tools/Editor/run_player_hunting_network.ps1)
+
+통합 개체에 샌드박스 태그가 잘못 붙어 두 프로세서가 같은 몸과 위치를 쓰는 경로는 템플릿과 쿼리 양쪽에서 막았다. 사슴 외 학습 모델은 아직 연결되지 않았다. 후속 모델의 요청은 기존 실행기가 받도록 설계하며, 관측·후보·선택·실행·실제 결과를 별도로 기록한다. 종별 선택을 시험할 때 기존 규칙이 선호하는 행동을 모델의 강제 마스크로 옮기면 새 모델의 일반화를 판단할 수 없다. [종별 모델 인수 기준](../Team/FAUNA_TEAM_HANDOFF.md#다른-종-모델의-접점과-인수-기준)
+
+최종 직접 UE 5.8 빌드 후 자동화 307개를 실행했다. 성공 305, 경고 동반 성공 2, 실패 0이었다. 실제 지면에서 규칙 종의 경계 통과와 도착 영수증 한 건, 출생 거래 시각, 프레임별 이동 경계, 통합·샌드박스 실행 분리 회귀가 포함됐다. 로컬 보고서는 `Saved/FollowupVerified/Automation`에 있고 패키지·쿠킹은 이번 비교 범위 밖이다.

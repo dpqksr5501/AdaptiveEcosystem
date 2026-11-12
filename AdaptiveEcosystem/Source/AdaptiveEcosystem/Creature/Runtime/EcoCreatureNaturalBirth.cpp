@@ -98,7 +98,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessNaturalBirths(const FEcoServerTimeSn
         if (!Ecology->RequestNaturalBirth(P.Region, Time, Reservation, P.bPredator,
                 P.bPredator ? CountFaunaDiets(P.Region) : FIntPoint::ZeroValue,
                 FaunaSpecies.IsEmpty() ? 1. : EcoFaunaNutrition::MinimumMeal * 6.)) return false;
-        const int32 Actual=Reservation.Count?Spawn(P.Region,1,P.bPredator,&Positions):0;
+        const int32 Actual=Reservation.Count?Spawn(P.Region,1,P.bPredator,Time,&Positions):0;
         if(!ReconcilePopulation()||!Ecology->CompleteSpawnRequest(Reservation.RequestId,Actual))return false;
         if(!Actual)
         {

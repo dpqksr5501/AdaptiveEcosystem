@@ -106,6 +106,7 @@ void AEcoCreatureIntegrationSpawner::FeedWolvesFromCarrion(double Now)
         if (Meal <= 0.f) continue;
         Lifetime.NextFeedTimeSeconds = Now + 1.;
         Link->Individual.Nutrition = FMath::Min(1., Link->Individual.Nutrition + Meal / 100.);
+        RecordGameplayReason(WolfId, Context->RegionId, Now, TEXT("CarrionEaten"), StockId, Meal);
         if (auto* Presentation = EM.GetFragmentDataPtr<FEcoPredatorStateFragment>(*Handle)) Presentation->EatCooldown = 1.1f;
         UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Scavenge] Eater=%lld Species=Wolf Carcass=%lld Amount=%.3f Remaining=%.3f"),
             WolfId, StockId, Meal, Stock->Remaining);

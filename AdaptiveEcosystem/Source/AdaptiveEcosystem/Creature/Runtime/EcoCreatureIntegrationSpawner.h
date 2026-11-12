@@ -212,7 +212,8 @@ private:
     const FEcoFaunaSpecies* FindFauna(FName SpeciesId) const;
     int32 CountFauna(FName RegionId, FName SpeciesId = NAME_None) const;
     FIntPoint CountFaunaDiets(FName RegionId) const;
-    int32 SpawnFauna(FName RegionId, const FEcoFaunaSpecies& Species, const TArray<FVector>& Positions);
+    int32 SpawnFauna(FName RegionId, const FEcoFaunaSpecies& Species, const TArray<FVector>& Positions,
+        const FEcoServerTimeSnapshot& Time);
     void MoveFauna(float Delta, double Now);
     void ReconcileFaunaPassages(FMassEntityManager& EM, const FEcoServerTimeSnapshot& Time, double ObservedTime, int64 Step,
         TArray<FEcoMigrationOutcome>& Arrivals);
@@ -234,7 +235,8 @@ private:
     double NextFaunaBirthScan = 0.;
     UPROPERTY(Transient) TObjectPtr<UMassEntityConfigAsset> FaunaConfig;
 	bool StartAuthority();
-	int32 Spawn(FName RegionId, int32 Count, bool bPredator, const TArray<FVector>* PositionsOverride=nullptr);
+	int32 Spawn(FName RegionId, int32 Count, bool bPredator, const FEcoServerTimeSnapshot& Time,
+		const TArray<FVector>* PositionsOverride=nullptr);
     bool ProcessNaturalBirths(const FEcoServerTimeSnapshot& Time);
     struct FPendingBirth { int64 ParentA=0,ParentB=0; FName Region; double Due=0; bool bPredator=false; };
     TArray<FPendingBirth> PendingBirths;

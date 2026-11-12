@@ -1,4 +1,5 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
+#include "Creature/Runtime/EcoFaunaMotionClock.h"
 #include "Core/EcoRuntimeSettings.h"
 #include "Mass/EcoMassFragments.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
@@ -80,7 +81,7 @@ void AEcoCreatureIntegrationSpawner::DumpRuntime(bool bDetails) const
 	const auto* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
 	const double Debt = Clock ? FMath::Max(0.0, Clock->GetServerTime().ServerTimeSeconds - LastResourceTime) : 0;
     const double MotionDebt = Clock && FaunaMotionTime >= 0.
-        ? FMath::Max(0., Clock->GetServerTime().ServerTimeSeconds - FaunaMotionTime) : 0.;
+        ? FMath::Max(0., EcoFaunaMotionClock::CompletedTimeAt(Clock->GetServerTime().ServerTimeSeconds) - FaunaMotionTime) : 0.;
 	const auto& Budget = GetDefault<UEcoRuntimeSettings>()->ConnectionBudget;
 	UE_LOG(LogTemp, Log, TEXT("[Eco Integration Audit] World=%s Mode=%d Ready=%d Step=%lld Alive=%d Dead=%d Births=%lld Deaths=%lld ResourceDebt=%.3f PolicyDebt=%.3f FarPolicy=%d Actors=%d Pool=%d ActorBudget=%d AddBudget=%d MotionDebt=%.3f"),
 		*GetWorld()->GetName(), int32(GetNetMode()), bReady, Step, Alive, Dead, SuccessfulBirths, CommittedDeaths,
