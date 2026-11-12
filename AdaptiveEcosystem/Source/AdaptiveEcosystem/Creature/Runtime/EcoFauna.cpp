@@ -459,8 +459,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
                 Carcass->Position + FVector(0, 0, FMath::Min(15.f, Species->EyeHeight)),
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaMeal))))
         {
-            const float BiteSize = Species->CarrionEnergyPerMeal > 0.f ? Species->CarrionEnergyPerMeal
-                : Carcass->KillerId == AgentId ? 6.f : 0.f;
+            const float BiteSize = Carcass->KillerId == AgentId ? Species->PredationEnergyPerMeal() : Species->CarrionEnergyPerMeal;
             const float Meal = Carcass->Bite(AgentId, Now, FMath::Min(BiteSize, Headroom));
             if (Meal > 0.f)
             {

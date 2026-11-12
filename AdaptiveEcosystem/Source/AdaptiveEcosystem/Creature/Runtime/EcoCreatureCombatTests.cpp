@@ -574,10 +574,11 @@ bool FEcoFaunaWindupMomentum::RunTest(const FString&)
     }
     auto& Hunter = S->FaunaSpecies[0];
     Hunter.Diet = EEcoFaunaDiet::Carnivore;
-    Hunter.CarrionEnergyPerMeal = 9.f;
     Hunter.RunSpeed = 530.f;
     Hunter.AttackReach = 125.f;
     Hunter.PreyRules.AddDefaulted_GetRef().SpeciesId = Names[1];
+    TestEqual(TEXT("Hunting requires no scavenging setting"), Hunter.CarrionEnergyPerMeal, 0.f);
+    TestEqual(TEXT("Own kill keeps the existing default bite"), Hunter.PredationEnergyPerMeal(), 6.f);
     auto& HunterVitals = EM.GetFragmentDataChecked<FEcoVitalsFragment>(Entities[0]);
     HunterVitals.Energy = .3f * HunterVitals.MaxEnergy;
     auto& HunterTransform = EM.GetFragmentDataChecked<FTransformFragment>(Entities[0]).GetMutableTransform();

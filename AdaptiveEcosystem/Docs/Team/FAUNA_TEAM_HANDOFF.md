@@ -47,12 +47,14 @@
 6. 독립 감사에는 [전체 고려사항과 복사용 감사 프롬프트](ECOSYSTEM_INDEPENDENT_AUDIT_PROMPT.md)를 사용한다.
 7. 사슴의 포만 상태 섭취 재현, 여덟 종과 시스템 전반의 제약, 수정 우선순위는 [2026-11-12 행동·구조 점검](../Architecture/ECOSYSTEM_BEHAVIOR_AUDIT_20261112.md)에 있다.
 
-## 새 동물 리깅·애니메이션 연결 순서
+## 신규 동물 에셋 연결 순서
 
 1. 스켈레탈 메시, Blend Space, AnimBP의 스켈레톤을 맞춘다. 지상 종은 `EEcoPresentationPose` 순서대로 기본 9칸, 비행 종은 이륙·비행·착지를 더한 12칸을 설정한다. 이동 칸은 Blend Space가 담당한다. 사망 클립의 마지막 자세와 애니메이션 루트 위치를 먼저 확인한다. [자세 슬롯 순서](../../Source/AdaptiveEcosystem/Creature/Representation/EcoCreatureAnimationProfile.h) · [애니메이션 프로필 검증](../../Source/AdaptiveEcosystem/Creature/Representation/EcoCreatureAnimationProfile.cpp)
 2. 발 IK를 켠다면 몸통 기준 뼈, 다리 끝 뼈, 그 바로 아래 발 접촉 마커와 접촉 높이를 등록한다. 소유 복사본 PIE에서 평지·경사 걷기, 달리기→정지, 방향 전환과 사망 안착을 확인한다. 비행 종은 이륙·착지와 공중에서 발 IK가 꺼지는 시점도 본다. [애니메이션 회귀 도구](../../Tools/Editor/audit_jyu_fauna_motion.py)
 3. 표현 클래스와 `FaunaSpecies`, 지역 배치에 같은 `SpeciesId`를 사용한다. 몸체·눈높이·단차·수심, 이동 속도, 성숙·출생, 먹이 관계를 프로필에 넣는다. Native v3 life가 활성화된 소유 복사본의 유효 지면에 한 마리를 배치해 표현을 확인한 뒤, 섭취·출생은 각각 실제 먹이와 두 부모가 있는 조건으로 확인한다. 발소리가 필요한 종은 같은 ID의 음향 프로필로 표면 재생과 주변 동물의 감지를 확인한다. [종 프로필 검증](../../Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.cpp) · [발소리 회귀 도구](../../Tools/Editor/audit_jyu_fauna_footsteps.py)
 4. 두뇌를 받기 전에는 규칙 실행기로 월드 연결을 검증한다. 새 모델을 받을 때는 위 인수 기준에 따라 종별 선택을 연결하며 이동·피해·사체·개체군 결과는 공통 권위 경로에서 확정한다.
+
+사냥은 `PreyRules`로 설정한다. `CarrionEnergyPerMeal=0`이면 다른 개체의 사체는 먹지 않으며, 직접 포획한 먹이는 기존 기본 한 입 분량으로 먹는다.
 
 ## 역할별 다음 작업
 

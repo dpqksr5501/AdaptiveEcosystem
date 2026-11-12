@@ -1323,7 +1323,7 @@ void AEcoCreatureIntegrationSpawner::MoveFauna(float Delta, double Now)
                         const double Maturity = PreyLife.AgeFraction(Now);
                         const double Resistance = PreyProfile->DefenseDamage * FMath::Lerp(.2, 1., Maturity)
                             * (Health.HP / Health.MaxHP);
-                        const double Energy = FMath::Min(3. * Species->CarrionEnergyPerMeal,
+                        const double Energy = FMath::Min(3. * Species->PredationEnergyPerMeal(),
                             PreyProfile->AdultCarrionEnergy > 0.f ? double(PreyProfile->AdultCarrionEnergy)
                             : 20. + 10. * FMath::Sqrt(PreyProfile->AdultMass * FMath::Lerp(.12, 1., Maturity)));
                         const double Handling = bAdaptivePreyValue && PreyProfile->DefenseDamage > 0.f

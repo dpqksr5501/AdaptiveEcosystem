@@ -109,6 +109,7 @@ struct FEcoFaunaSpecies
     UPROPERTY(EditAnywhere, meta=(ClampMin="0.01")) float FoodPerMeal = .2f;
     /** Zero disables use of shared carrion. */
     UPROPERTY(EditAnywhere, meta=(ClampMin="0")) float CarrionEnergyPerMeal = 0.f;
+    float PredationEnergyPerMeal() const { return CarrionEnergyPerMeal > 0.f ? CarrionEnergyPerMeal : 6.f; }
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="0.9")) float CarrionHungerFraction = .82f;
     /** Zero uses the diet's default meal start. */
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="0.95")) float MealStartFraction = 0.f;
