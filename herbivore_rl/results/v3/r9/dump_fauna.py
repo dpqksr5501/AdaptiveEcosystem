@@ -17,6 +17,9 @@
   FULL     gore_cd (S) · carc_places (M) · pair_slot (짝 칸 번호 — 모든 덤프)
   @step    gore_permutation (그 스텝에 뽑은 들이받기 순서 — 들이받는 몸이 있는 장면은 스텝마다 뽑음)
   @scene   body_hash (NS, u64 — 종별 몸 해시 r9_body.body_hash: C++ 가 두뇌 머리글 body_hash 와 대조, 설계 7-2) — 모든 덤프
+           주의: 이 줄이 있는 장면은 C++ CheckBrainBody 가 몸 해시가 다른 두뇌를 거부한다. 지금 언리얼 S′ 세 두뇌(Saved/R9Demo/brains)는
+           v3_r9·v3_r9_fauna 어느 몸과도 해시가 달라, 이 도구로 Saved 장면을 다시 만들어 넣으면 데모가 그 두뇌를 거부한다 —
+           먼저 rebody_r9.py --config <그 장면 설정> 으로 옮겨 swap_brain.py 로 다시 내보낸다 (설계 문서 상태 줄)
 몸 움직임 줄 (body_common.motion 이 있을 때만 — 없으면 옛 줄 그대로, C++ 는 motion_on 이 없으면 꺼짐으로 읽음):
   @scene   motion_on · motion_turn · motion_effort (i64 0/1) · turn 이 켜지면 body_turn_c · body_turn_s · body_lat_u (NS, f64 %.17g —
            load_body 가 불러올 때 한 번 셈한 cos Δb · sin Δb · lat_accel_mps2/112.5, C++ 는 삼각함수를 부르지 않음, 설계 3-1)

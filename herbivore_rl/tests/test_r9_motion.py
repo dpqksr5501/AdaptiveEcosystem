@@ -668,10 +668,10 @@ def test_m13_block_with_both_rules_off_is_bit_identical(fcfg):
         res.append((h.hexdigest(), w))
     assert res[0][0] == res[1][0]
     a, b = res[0][1].st, res[1][1].st
-    assert set(b) - set(a) == {"move_steps", "wall_hit_steps", "turn_clip", "turn_over"}
+    assert set(b) - set(a) == {"move_steps", "wall_hit_steps"}      # θ 가 없으니 turn_clip·turn_over 키도 없다 (0 으로 '잰' 것처럼 보이지 않게)
     for k in a:
         assert same_bits(a[k], b[k]), k
-    assert int(b["turn_clip"].sum()) == 0 and int(b["move_steps"].sum()) > 0
+    assert int(b["move_steps"].sum()) > 0
 
 
 # --------------------------------------------------------------------------- M-14

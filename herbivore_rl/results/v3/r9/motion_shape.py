@@ -16,9 +16,10 @@ rebody_r9.py 로 옮기거나 --no-body-check 로 가중치만 실음 = '학습 
 
 잣대 (8-3, 종마다 · 시드마다):
   몸 기준 (스텝마다, 산 몸)
-    turn_over        벽 아닌 스텝에서 머리가 θ 넘게 돈 몸-스텝 (motion 세계 st, 0 이어야 함; 옛 몸은 θ 가 없어 None)
+    turn_over        벽 아닌 스텝에서 머리가 θ 넘게 돈 몸-스텝 (회전 한계가 켜진 세계 st, 0 이어야 함; 옛 몸·turn: false 는 θ 가 없어 None)
     over90_steps     벽 아닌 스텝에서 한 스텝에 90° 넘게 돈 몸-스텝 · flip_steps 움직이던 몸의 속도가 머리 반대로 뒤집힌 몸-스텝
-    wall_share       움직인 스텝(자기 속도 > EPS) 가운데 벽에 닿은 몫 · wall_turn 벽 스텝 머리 회전 분포(도) · wall_over_theta
+    wall_share       움직인 스텝(자기 속도 > EPS, move_steps) 가운데 벽에 닿은 몫 (wall_hit_steps — 세계 통계와 같은 이름·뜻, S′ 키
+                     wall_steps = 벽 띠 안 스텝과 다름) · wall_turn 벽 스텝 머리 회전 분포(도) · wall_over_theta
   몸 기준 (결정마다, 같은 개체끼리 — body_wiggle 꼴. 걸음 띠: 속력 < 0.3 걷기 = 서기, < (걷기+뛰기)/2 = 걷기, 그 위 = 뛰기)
     body_turn_per_decision 실제 머리 회전 크기(걷기·뛰기 따로 가운데·상위 10%), share_turn_gt20, body_alt_share(실제 회전 부호 번갈이,
     |각| > 3° 만), left_share, gait_band_switch_share, starts_per_min(서기 띠 → 움직임 띠, 몸-분당)
@@ -101,7 +102,7 @@ class ShapeWorld(R9World):
             m = slice(int(self.sp_lo[s]), int(self.sp_hi[s]))
             a["alive_steps"][:, s] += al[:, m].sum(1)
             a["move_steps"][:, s] += moving[:, m].sum(1)
-            a["wall_steps"][:, s] += hit[:, m].sum(1)
+            a["wall_hit_steps"][:, s] += hit[:, m].sum(1)
             a["over90_steps"][:, s] += over90[:, m].sum(1)
             a["flip_steps"][:, s] += flip[:, m].sum(1)
             for k in range(self.K):
@@ -131,7 +132,7 @@ def make_world(cfg: dict, seeds: list[int], counts) -> ShapeWorld:
     w = ShapeWorld(cfg, seeds, counts=cnt, record=True)
     K, NS = w.K, w.NS
     z = lambda *sh, dt=np.int64: np.zeros(sh, dtype=dt)  # noqa: E731
-    w._shape = dict(alive_steps=z(K, NS), move_steps=z(K, NS), wall_steps=z(K, NS), over90_steps=z(K, NS), flip_steps=z(K, NS),
+    w._shape = dict(alive_steps=z(K, NS), move_steps=z(K, NS), wall_hit_steps=z(K, NS), over90_steps=z(K, NS), flip_steps=z(K, NS),
                     wall_turn_hist=z(K, NS, len(WALL_BINS) - 1), wall_turn_sum=z(K, NS, dt=np.float64), wall_over_theta=z(K, NS))
     return w
 
@@ -364,10 +365,10 @@ def summarize(w, ds: DecisionShape, hs: dict, seeds: list[int]) -> dict:
             over90_steps=int(sh["over90_steps"][:, s].sum()),
             flip_steps=int(sh["flip_steps"][:, s].sum()),
             move_steps=int(sh["move_steps"][:, s].sum()),
-            wall_steps=int(sh["wall_steps"][:, s].sum()),
-            wall_share=_share(sh["wall_steps"][:, s].sum(), sh["move_steps"][:, s].sum()),
+            wall_hit_steps=int(sh["wall_hit_steps"][:, s].sum()),
+            wall_share=_share(sh["wall_hit_steps"][:, s].sum(), sh["move_steps"][:, s].sum()),
             wall_turn=dict(bins_deg=list(WALL_BINS[:-1]), hist=per(sh["wall_turn_hist"][:, s].sum(0)),
-                           mean=_share(sh["wall_turn_sum"][:, s].sum(), sh["wall_steps"][:, s].sum())),
+                           mean=_share(sh["wall_turn_sum"][:, s].sum(), sh["wall_hit_steps"][:, s].sum())),
             wall_over_theta=int(sh["wall_over_theta"][:, s].sum()) if w._motion_turn else None,
             # 몸 기준 — 결정
             body_turn_per_decision=dict(walk_median=_q(L["walk_abs"], 50), walk_p90=_q(L["walk_abs"], 90),
@@ -406,7 +407,7 @@ def summarize(w, ds: DecisionShape, hs: dict, seeds: list[int]) -> dict:
             seed=list(seeds),
             turn_over=per(st["turn_over"][:, s]) if "turn_over" in st else None,
             over90_steps=per(sh["over90_steps"][:, s]),
-            wall_share=per_r(sh["wall_steps"][:, s], sh["move_steps"][:, s]),
+            wall_share=per_r(sh["wall_hit_steps"][:, s], sh["move_steps"][:, s]),
             body_alt_share=per_r(c["alt"][:, s], c["alt_n"][:, s]),
             zigzag_share=per_r(c["zz"][:, s], c["zz_n"][:, s]),
             starts_per_min=[_share(a_, b_) for a_, b_ in zip(c["starts"][:, s], mins)],

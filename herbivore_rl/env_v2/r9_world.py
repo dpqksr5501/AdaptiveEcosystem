@@ -1435,9 +1435,12 @@ class R9World:
             self.st.update(
                 move_steps=z(K, NS),                 # alive bodies whose own (accel-limited) velocity was > EPS this step
                 wall_hit_steps=z(K, NS),             # of those, steps that touched a wall (wall slide — the M1 exception, 3-4)
-                turn_clip=z(K, NS),                  # WALK/RUN steps whose direction the turn limit cut (3-1)
-                turn_over=z(K, NS),                  # non-wall steps whose head turned more than θ (must stay 0)
             )
+            if self._motion_turn:                    # θ exists only with the turn limit — `turn: false` (M-13) has no turn keys (not 0)
+                self.st.update(
+                    turn_clip=z(K, NS),              # WALK/RUN steps whose direction the turn limit cut (3-1)
+                    turn_over=z(K, NS),              # non-wall steps whose head turned more than θ (must stay 0)
+                )
 
     def stats_snapshot(self) -> dict:
         return {k: v.copy() for k, v in self.st.items() if isinstance(v, np.ndarray)}
