@@ -17,7 +17,7 @@
 
 ## 팀 섬 지형의 강과 호안 적용
 
-다종 배치를 `LV_JYU_IslandEcosystem`으로 옮겼다. 이 작업용 World Partition 맵의 기반은 송해찬 담당 `LV_SHC_IslandEcosystem1_WP`다. 실제 하류 담수 구간의 수심과 수면을 사용하고, 호안과 양쪽 둑의 식생은 지형과 수면이 만나는 선을 따라 놓았다. 사슴·늑대의 Native v3 스폰과 하류 규칙 종의 초기 배치는 각 지역에 기록한다. [섬의 스폰·식생·검증 기록](JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#기존-강과-호안의-다종-배치)
+다종 배치는 최신 섬 복사본 `LV_JYU_IslandEcosystemRefreshed`에서 확인한다. 이 작업용 World Partition 맵의 기반은 송해찬 담당 `LV_SHC_IslandEcosystem1_WP`다. 실제 하류 담수 구간의 수심과 수면을 사용하고, 호안과 양쪽 둑의 식생은 지형과 수면이 만나는 선을 따라 놓았다. 사슴·늑대의 Native v3 스폰과 하류 규칙 종의 초기 배치는 각 지역에 기록한다. [섬의 스폰·식생·검증 기록](JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#기존-강과-호안의-다종-배치)
 
 ## 현재 통합 레벨에서 확인한 결과
 

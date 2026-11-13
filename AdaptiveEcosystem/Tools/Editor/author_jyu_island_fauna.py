@@ -14,8 +14,7 @@ import unreal as u
 common = runpy.run_path(str(Path(__file__).with_name("author_jyu_integration_fauna.py")))
 get, put, transform_at = (common[key] for key in ("get", "put", "transform_at"))
 editor, levels, actors, wp = (common[key] for key in ("editor", "levels", "actors", "wp"))
-REFRESH = "-EcoIslandRefresh" in u.SystemLibrary.get_command_line()
-TARGET = "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed" if REFRESH else "/Game/JYU/Maps/LV_JYU_IslandEcosystem"
+TARGET = "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed"
 TAG = "JYU.IslandFauna"
 REPORT = Path(u.Paths.project_saved_dir()).resolve() / "FaunaAudit/IslandFaunaAuthoring.json"
 
@@ -294,7 +293,7 @@ def author():
     groups = {str(get(g, "region_id")): g for g in group_list}
     existing = {a.get_actor_label(): a for a in actors.get_all_level_actors()}
     frames = river_frames(world, existing["WaterBodyRiver"])
-    lake_names = ("WaterBodyLake", "WaterBodyLake2", "WaterBodyLake3", "Oasis") if REFRESH else ("WaterBodyLake", "WaterBodyLake2")
+    lake_names = ("WaterBodyLake", "WaterBodyLake2", "WaterBodyLake3", "Oasis")
     lakes = [lake_shore(world, existing[name]) for name in lake_names]
     rng = random.Random(41293)
     river_region = "LowerRiver"
