@@ -27,6 +27,8 @@
 | `plot_r9.py` · `r9_replay.py` | 종별 학습 곡선·개체 수 곡선 · 위에서 본 궤적 PNG |
 | `spawn_detached.py` · `launch_league.ps1` | 창 없는 콘솔·새 프로세스 묶음·작업 묶음 밖으로 띄우기 (R8 복사). `launch_league.ps1 -Night` = 밤 실행기, `-Window`·`-CheckAnytime` |
 | `bundle_decisions.json` | C0-9 로 등록한 묶음 결정 수·근거 속도 `speed_dps` (STATUS 3-1, `configs/v3_r9.yaml` `train.bundle_decisions` 와 같은 값). **11-12 S′ 다시 등록**: 0 바퀴 80.3M / 30.3M / 38.8M, 1 바퀴부터 19.4M / 7.2M / 7.3M (사슴 / 멧돼지 / 늑대). 11-11 값(처음 세계)은 `superseded` 에 기록만 |
+| `motion_shape.py` | 몸 움직임 모양 재기(`RL_R9_TURN_EFFORT_DESIGN.md` 8-3): 설정·두뇌(규칙 이름·npz)·시드·스텝 → 벽 닿은 몫·`turn_over`·한 스텝 90° 넘음·머리 돌림 °/s·좌우 번갈이·1 분당 출발·뛰기 이어짐·서 있는 몫·굶음/잡힘/출생·엄격한 사냥 성공률, 시드별 값. 읽기만 (보고용) |
+| `dump_fauna.py` · `swap_brain.py` · `export_brains.py` | 언리얼 대조 덤프(R9DUMP 1, motion 줄·종별 `body_hash`) · npz → `.r9brain` 바꾸기(장면 `body_hash` 와 대조) · 내보내기. 11-13 세션 스크래치에서 옮김 |
 | `smoke/` | C0-9 측정 요약 — S′ 등록 근거 `s_c09_train_*.json`·`s_c09_judge_*.json`(11-12), 처음 세계 `c09_train_*.json`·`c09_judge_*.json`(11-11 기록)·Fix 단계 확인 (등록 근거, 판정 아님) |
 | `herbivore_rl/tests/test_r9*.py` | 시험 1~27 (12절) + S′ 시험 S1~S11 + Fix 단계 시험 |
 

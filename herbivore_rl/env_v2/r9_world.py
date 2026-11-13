@@ -145,6 +145,10 @@ TAGS = dict(PARAM=TAG_PARAM, GRASS=TAG_GRASS, ROOT=TAG_ROOT, SHELTER=TAG_SHELTER
 #   P1 a body that cannot enter shelters cannot bite or gore a body inside one (bodies that can enter bite inside)
 #   R2 goring (gore bodies, RUN gait only), R3 camouflage (eye range × vis of the seen body), R6 carcass places by body size
 GORE_WOUND, GORE_KILL = 0, 1
+# 몸 움직임 (RL_R9_TURN_EFFORT_DESIGN.md 3-1·7-4, `body_common.motion`): separate branches like fauna — without the block the old lines
+# run literally (test_r9_motion M-1). M1 turn limit: |head turn per step| ≤ min(Δb, asin(a_lat/|v0|)) for WALK_j / RUN_j; a wall
+# slide is the one exception (3-4). An exactly-behind command (|cross| ≤ TURN_TIE) turns by uid parity (even = left).
+TURN_TIE = 1e-12
 
 # death causes
 CAUSE_NONE, CAUSE_BITE, CAUSE_COUNTER, CAUSE_STARVE = 0, 1, 2, 3
@@ -715,6 +719,14 @@ class R9World:
             self._age23 = L.AGE23
             if int(fa["age_steps"]) != L.AGE_STEPS:
                 raise ValueError(f"body_common.fauna.age_steps must be {L.AGE_STEPS} (r9_life.AGE23)")
+        # 몸 움직임 (RL_R9_TURN_EFFORT_DESIGN.md 3-1, `body_common.motion`): new lines only with the block — without it `_move` keeps
+        # its old lines literally (M-1). M2 (effort) is refused by the config check (사용자 결정 전).
+        self._motion = bool(self.body.motion)
+        self._motion_turn = bool(self.body.motion_turn)
+        if self.body.motion_effort:
+            raise NotImplementedError("body_common.motion.effort (M2) 는 아직 구현하지 않았다")
+        # 3-1: the standing rule (|v0| ≤ EPS → 0) runs when turn or effort is on — a block with both off keeps the old bits (M-13)
+        self._motion_v0 = self._motion_turn or bool(self.body.motion_effort)
         rank = np.full((self.S, B.N_FOODS), 99, dtype=np.int64)
         for s in range(self.S):
             order = self.body.diet_order[int(self.slot_sp[s])]
@@ -1418,6 +1430,14 @@ class R9World:
                 gore=z(K, NS, NS, 2),                # [gorer species, gored species, wound|kill]
                 gore_hp=z(K, NS, NS, dt=np.float64),  # HP taken by gores [gorer, gored]
             )
+        if self._motion:                             # 몸 움직임 통계 (TURN_EFFORT 7-1·8-3: only with the motion block)
+            # The design's `wall_steps` is already an S′ key (inside world.wall_band, 8-4), so the move-wall count is `wall_hit_steps`.
+            self.st.update(
+                move_steps=z(K, NS),                 # alive bodies whose own (accel-limited) velocity was > EPS this step
+                wall_hit_steps=z(K, NS),             # of those, steps that touched a wall (wall slide — the M1 exception, 3-4)
+                turn_clip=z(K, NS),                  # WALK/RUN steps whose direction the turn limit cut (3-1)
+                turn_over=z(K, NS),                  # non-wall steps whose head turned more than θ (must stay 0)
+            )
 
     def stats_snapshot(self) -> dict:
         return {k: v.copy() for k, v in self.st.items() if isinstance(v, np.ndarray)}
@@ -1575,8 +1595,14 @@ class R9World:
         hp_f = self._wound + (1.0 - self._wound) * self.hp
         weak = np.where(self.E < sb["weak_e"], sb["weak_speed"], 1.0)
         tsp = base * self.spd_scale * hp_f * weak
+        if self._motion_v0:                                    # 몸 움직임 (TURN_EFFORT 3-1): standing = |v0|² ≤ EPS² → 0 (the
+            v0m = np.where((_len2(self.vel) > EPS * EPS)[..., None], self.vel, 0.0)   # head-update test); clip and accel use it
+            if self._motion_turn:
+                dirv, cl, clip = self._turn_limit(dirv, wk | rn, v0m)
         tv = dirv * tsp[..., None]
         v0 = self.vel
+        if self._motion_v0:
+            v0 = v0m
         dv = tv - v0
         n = np.sqrt(_len2(dv))
         acc = sb["accel"]
@@ -1613,6 +1639,8 @@ class R9World:
             P2 = np.clip(P2, 0.0, self.size)
         disp = np.where(alive[..., None], P2 - P0, 0.0)
         self._jsh1, self._edge1 = _shelter_edge(P2, self.cov_c, self.cov_r, self.cov_ok)
+        if self._motion:
+            h_prev = self.head
         mv = _len2(v1) > EPS * EPS
         self.head = np.where(mv[..., None], _unit(v1), self.head)
         self.pos = P2
@@ -1625,6 +1653,49 @@ class R9World:
         self._tspeed = tsp
         self._contact = disp - v1
         self._knocked, self._pushed = kn, pushed
+        if self._motion:                                       # statistics only (the world is not changed)
+            self._motion_stats(alive, h_prev, cl if self._motion_turn else None, clip if self._motion_turn else None)
+
+    def _turn_limit(self, dirv: np.ndarray, cmd: np.ndarray, v0: np.ndarray):
+        """M1 turn limit (RL_R9_TURN_EFFORT_DESIGN.md 3-1). One step of head turn ≤ θ = min(Δb, asin(a_lat / |v0|)): Δb = the body's own
+        limit (slow / standing), asin(a_lat / |v0|) = the no-slip limit (fast). cmd (K, S) = alive WALK_j / RUN_j; v0 = previous velocity
+        with |v0| ≤ EPS set to 0, so v0 is 0 or along the head. A command that the head cannot reach in one step is turned to the edge of
+        the cone, on the cross-product side; an exactly-behind command (cross product within 1e-12) turns left for an even uid, right
+        for an odd uid (fixed per body, no hidden state). Only products, sums, a division and sqrt — cos/sin Δb come from `load_body`.
+        Returns (dirv, cl (K, S) = cos θ, clip (K, S) bool)."""
+        sb = self.sb
+        h = self.head
+        s0 = np.sqrt(_len2(v0))
+        cb, sbt, au = sb["turn_c"], sb["turn_s"], sb["lat_u"]
+        fast = s0 * sbt > au                                   # fast → the no-slip limit is narrower
+        sl = np.where(fast, au / np.maximum(s0, au), sbt)      # (7-4 ③: no division by 0 / negative sqrt in the cells not picked)
+        cl = np.where(fast, np.sqrt(1.0 - sl * sl), cb)
+        d = dirv
+        clip = cmd & (_len2(d) > EPS * EPS) & (d[..., 0] * h[..., 0] + d[..., 1] * h[..., 1] < cl)
+        if clip.any():
+            x = h[..., 0] * d[..., 1] - h[..., 1] * d[..., 0]
+            left = (x > TURN_TIE) | ((np.abs(x) <= TURN_TIE) & ((self.uid & 1) == 0))
+            ss = np.where(left, sl, -sl)
+            rot = np.stack([h[..., 0] * cl - h[..., 1] * ss, h[..., 0] * ss + h[..., 1] * cl], -1)
+            dirv = np.where(clip[..., None], rot, dirv)
+        return dirv, cl, clip
+
+    def _motion_stats(self, alive: np.ndarray, h_prev: np.ndarray, cl: np.ndarray | None, clip: np.ndarray | None) -> None:
+        """TURN_EFFORT 7-1 / 8-3 counters (K, NS): moving steps, wall touches among them, turn-limit cuts, non-wall steps whose head
+        turned more than θ (cos < cl − 1e-12; 0 by construction — the mechanical check). Reads only, never changes the world."""
+        st = self.st
+        moving = alive & (_len2(self._vel_free) > EPS * EPS)
+        hit = moving & self._wall.any(-1)
+        if cl is not None:
+            hc = h_prev[..., 0] * self.head[..., 0] + h_prev[..., 1] * self.head[..., 1]
+            over = alive & ~self._wall.any(-1) & (hc < cl - 1e-12)
+        for s in range(self.NS):
+            m = slice(int(self.sp_lo[s]), int(self.sp_hi[s]))
+            st["move_steps"][:, s] += moving[:, m].sum(1)
+            st["wall_hit_steps"][:, s] += hit[:, m].sum(1)
+            if cl is not None:
+                st["turn_clip"][:, s] += clip[:, m].sum(1)
+                st["turn_over"][:, s] += over[:, m].sum(1)
 
     # --- 2 bite ---------------------------------------------------------
     def _kill(self, k: int, s: int, cause: int, killer_uid: int) -> None:

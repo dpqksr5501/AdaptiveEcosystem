@@ -1,0 +1,22 @@
+# R9 판정 세계 + 몸 움직임 M1 (설계 AdaptiveEcosystem/Docs/RL_Policy/RL_R9_TURN_EFFORT_DESIGN.md 6-1·8-2 ①·8-4). 판정 세계 v3_r9_judge.yaml
+# 을 물려받고 v3_r9_fauna_motion.yaml 과 같은 body_common.motion 블록과 사슴·늑대·멧돼지 세 종 값만 더한다(부록 A, 늑대 옆 가속 7.0).
+# 규칙 두뇌 전용 재기 세계다 — 몸 해시가 학습 세계(fauna_motion)와 달라 배운 두뇌는 그대로 실리지 않는다. 배운 두뇌를 1-2 숫자와
+# 견줄 때만 rebody_r9.py --config configs/v3_r9_judge_motion.yaml 로 임시 npz 를 스크래치에 만들어 싣는다(8-4).
+# 사용자 결정(2026-11-13): 첫 바퀴 M1 만 — effort: false.
+inherit: v3_r9_judge.yaml
+
+body_common:
+  motion:
+    turn: true                  # M1 회전 한계
+    effort: false               # M2 는 사용자 결정 뒤 (11-5)
+
+species:
+  deer:
+    turn_dps: 130               # [어림] (v3_r9_fauna_motion.yaml 과 같은 값)
+    lat_accel_mps2: 9.0         # [판단·약]
+  wolf:
+    turn_dps: 140               # [어림]
+    lat_accel_mps2: 7.0         # [중 — 들개 7.0]. 사용자 결정 11-13
+  boar:
+    turn_dps: 125               # [어림]
+    lat_accel_mps2: 7.0         # [어림]

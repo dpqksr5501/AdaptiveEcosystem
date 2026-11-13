@@ -313,6 +313,14 @@ REQUIRED = {
 FAUNA_SPECIES_KEYS = ("bite_k", "hide", "strike_k", "gore", "gore_r", "camo", "recover")
 FAUNA_COMMON_KEYS = ("damage", "age_steps", "shelter_guard", "gore", "camo_curve", "carcass_places")
 FAUNA_AGE_STEPS = 64                         # = r9_life.AGE_STEPS (AGE23 literal table; checked like eat_r)
+# 몸 움직임 (RL_R9_TURN_EFFORT_DESIGN.md 6-1): body_common.motion 이 있을 때만 새 줄. 깃발 둘은 필수 bool, 켜진 규칙의 종 칸은 모든 종에
+# 필수, 꺼진 규칙의 칸(공통·종)은 두면 안 된다 — 쓰지 않는 값이 몸 해시에 들어가지 않는다. M2(effort)는 사용자 결정 전이라 아직 없다
+# (2026-11-13 결정: 첫 바퀴 M1 만 — effort: true 는 거부).
+MOTION_FLAG_KEYS = ("turn", "effort")
+MOTION_EFFORT_KEYS = ("eta_up", "eta_down", "fit", "kappa")
+MOTION_TURN_SPECIES_KEYS = ("turn_dps", "lat_accel_mps2")
+MOTION_EFFORT_SPECIES_KEYS = ("walk_w_kg",)
+MPS2_PER_UNIT = 112.5                         # 1 단위/스텝² = UNIT_M / STEP_S² = 2 m / (2/15 s)² (옆 가속 m/s² → 단위/스텝²)
 NEW_SPECIES_SECTIONS = ("world.slots", "counts", "learner_counts", "randomize.juvenile_frac", "rules")
 JUDGE_KEYS = ("steps", "steps_long", "worlds", "worlds_long", "start_per_quadrant", "wolf_packs", "grass_regen_mult",
               "root_regen_mult", "wolf_run_mult", "greedy", "founders", "start", "limits", "plant_budget")
@@ -390,6 +398,60 @@ def _check_fauna(cfg: dict, names: tuple) -> None:
             raise ValueError(f"species.{n}.gore must be true|false")
         if s["gore"] and not float(s["gore_r"]) > 0.0:
             raise ValueError(f"species.{n}: gore needs gore_r > 0")
+
+
+def _num(x) -> bool:
+    return isinstance(x, (int, float)) and not isinstance(x, bool)
+
+
+def _check_motion(cfg: dict, names: tuple) -> None:
+    """body_common.motion block (RL_R9_TURN_EFFORT_DESIGN.md 6-1): flags bool, the keys of a rule that is on are required (every
+    species), the keys of a rule that is off must be absent (common and species), ranges of 6-1. No block → no motion key anywhere."""
+    mo = cfg["body_common"].get("motion")
+    sp_keys = MOTION_TURN_SPECIES_KEYS + MOTION_EFFORT_SPECIES_KEYS
+    if mo is None:
+        for n in names:
+            bad = [k for k in sp_keys if k in cfg["species"][n]]
+            if bad:
+                raise ValueError(f"species.{n} has motion keys {bad} but body_common.motion is missing")
+        return
+    if not isinstance(mo, dict):
+        raise ValueError("body_common.motion must be a mapping")
+    unknown = [k for k in mo if k not in MOTION_FLAG_KEYS + MOTION_EFFORT_KEYS]
+    if unknown:
+        raise ValueError(f"body_common.motion has unknown keys {unknown} (known: {MOTION_FLAG_KEYS + MOTION_EFFORT_KEYS})")
+    for k in MOTION_FLAG_KEYS:
+        if k not in mo:
+            raise ValueError(f"body_common.motion misses {k!r} (turn and effort are both required)")
+        if not isinstance(mo[k], bool):
+            raise ValueError(f"body_common.motion.{k} must be true|false (a YAML bool, not {mo[k]!r})")
+    if mo["effort"]:
+        raise ValueError("body_common.motion.effort: true — M2 (속도를 바꾸는 힘) 는 아직 구현하지 않았다. 사용자 결정(설계 11-5) 전이라 "
+                         "첫 바퀴는 M1 회전 한계만 (effort: false)")
+    bad = [k for k in MOTION_EFFORT_KEYS if k in mo]
+    if bad:
+        raise ValueError(f"body_common.motion {bad}: M2 keys must be absent when effort is false")
+    for n in names:
+        s = cfg["species"][n]
+        bad = [k for k in MOTION_EFFORT_SPECIES_KEYS if k in s]
+        if bad:
+            raise ValueError(f"species.{n} {bad}: M2 keys must be absent when body_common.motion.effort is false")
+        if mo["turn"]:
+            miss = [k for k in MOTION_TURN_SPECIES_KEYS if k not in s]
+            if miss:
+                raise ValueError(f"species.{n} misses motion keys {miss} (body_common.motion.turn is true — 모든 종에 필수)")
+            if not (_num(s["turn_dps"]) and _num(s["lat_accel_mps2"])):
+                raise ValueError(f"species.{n}: turn_dps and lat_accel_mps2 must be numbers")
+            step_deg = float(s["turn_dps"]) * STEP_S
+            if not (0.0 < step_deg < 45.0):
+                raise ValueError(f"species.{n}.turn_dps {s['turn_dps']}: per-step turn {step_deg} deg must be in (0, 45) "
+                                 "(below the DIR8 angle)")
+            if not float(s["lat_accel_mps2"]) > 0.0:
+                raise ValueError(f"species.{n}.lat_accel_mps2 must be > 0")
+        else:
+            bad = [k for k in MOTION_TURN_SPECIES_KEYS if k in s]
+            if bad:
+                raise ValueError(f"species.{n} {bad}: turn keys must be absent when body_common.motion.turn is false")
 
 
 def _check_variants(cfg: dict, names: tuple) -> None:
@@ -489,6 +551,7 @@ def check_r9_config(cfg: dict) -> dict:
     if tg is not None and not float(tg) > 0.0:
         raise ValueError(f"food.train_grass_total must be null or > 0: {tg}")
     _check_fauna(cfg, names)
+    _check_motion(cfg, names)
     _check_variants(cfg, names)
     if w["mode"] == "judge":
         if "judge" not in cfg or not isinstance(cfg["judge"], dict):
@@ -600,6 +663,13 @@ class Body:
     camo: np.ndarray | None = None    # R3 (1 = plain)
     recover: np.ndarray | None = None  # R7 steps from a delivery to the next breeding (= body_common.breed.recover without fauna)
     c23: np.ndarray | None = None     # R1 (n, n) (kg_s / kg_t)^(2/3), computed once here (no transcendental inside a step)
+    # 몸 움직임 (RL_R9_TURN_EFFORT_DESIGN.md 3-1·6-1). Without body_common.motion: motion False and None (the old lines stay literal).
+    motion: bool = False              # body_common.motion block present (v0 with |v0| ≤ EPS → 0 in `_move`)
+    motion_turn: bool = False         # M1 turn limit on
+    motion_effort: bool = False       # M2 — not implemented (the config check refuses effort: true)
+    turn_c: np.ndarray | None = None  # M1 cos Δb, Δb = turn_dps × STEP_S in radians (computed once here — no trig inside a step)
+    turn_s: np.ndarray | None = None  # M1 sin Δb
+    lat_u: np.ndarray | None = None   # M1 sideways acceleration lat_accel_mps2 / 112.5 (units/step²)
     common: dict = field(default_factory=dict)   # body_common block as read (floats/ints/lists/dicts)
 
     @property
@@ -666,6 +736,15 @@ def load_body(cfg: dict) -> Body:
     else:
         fz = dict(bite_k=np.zeros(nsp), hide=np.ones(nsp), strike_k=np.zeros(nsp), gore=np.zeros(nsp, dtype=bool),
                   gore_r=np.zeros(nsp), camo=np.ones(nsp), recover=np.full(nsp, _f(cm["breed"]["recover"])), c23=None)
+    mo = cm.get("motion")
+    mz = dict(motion=mo is not None, motion_turn=bool(mo is not None and mo["turn"]),
+              motion_effort=bool(mo is not None and mo["effort"]))
+    if mz["motion_turn"]:
+        # 회전 한계 (설계 3-1): 삼각함수는 불러올 때 이곳에서 한 번만 — 장면 덤프가 %.17g 로 실어 C++ 도 같은 비트를 쓴다
+        ang = [math.radians(_f(s["turn_dps"]) * STEP_S) for s in sp_cfg]
+        mz.update(turn_c=np.array([math.cos(a) for a in ang], dtype=np.float64),
+                  turn_s=np.array([math.sin(a) for a in ang], dtype=np.float64),
+                  lat_u=arr("lat_accel_mps2") / MPS2_PER_UNIT)
     fov = arr("fov_deg")
     ring = [s["child_ring"] for s in sp_cfg]
     fvar = np.array([0.0 if s["founder"] == "plain" else _f(s["founder_variation"]) for s in sp_cfg])
@@ -731,6 +810,7 @@ def load_body(cfg: dict) -> Body:
         n=nsp,
         fauna=fauna,
         **fz,
+        **mz,
         common=copy.deepcopy(cm),
     )
 
@@ -744,6 +824,8 @@ SLOT_FIELDS = ("size0", "growth_smooth", "walk_speed", "run_speed", "accel", "st
 SLOT_FOOD_FIELDS = ("eats", "eat_rate", "e_per_unit")
 # 동물 세계 칸 (9-2) — expand_body adds them only when body.fauna (the S′ `sb` dict keeps its keys).
 SLOT_FAUNA_FIELDS = ("bite_k", "hide", "strike_k", "gore", "gore_r", "camo")
+# 몸 움직임 칸 (TURN_EFFORT 7-1) — expand_body adds the turn fields only when body.motion_turn (M2 칸은 M2 를 정한 뒤).
+SLOT_MOTION_FIELDS = ("turn_c", "turn_s", "lat_u")
 
 
 def expand_body(body: Body, sp: np.ndarray) -> dict[str, np.ndarray]:
@@ -755,6 +837,9 @@ def expand_body(body: Body, sp: np.ndarray) -> dict[str, np.ndarray]:
         out[f] = getattr(body, f)[sp]
     if body.fauna:
         for f in SLOT_FAUNA_FIELDS:
+            out[f] = getattr(body, f)[sp]
+    if body.motion_turn:
+        for f in SLOT_MOTION_FIELDS:
             out[f] = getattr(body, f)[sp]
     return out
 
