@@ -1,5 +1,20 @@
 # 다종 생태계 팀 작업 요청
 
+## PR #19 후속 이슈
+
+[PR #19](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/19)는 팀 섬 작업본의 검증 기준 `fa0c04dd`를 공유한다. 각 이슈에 실제 확인 범위와 완료 기준을 둔다. 아래 담당 표기는 협의할 역할이다.
+
+| 진행 순서 | 작업 | 함께 볼 역할 |
+| --- | --- | --- |
+| 1 | [최신 팀 섬 지형 이식과 보금자리 침범 검사](https://github.com/dpqksr5501/AdaptiveEcosystem/issues/20) | 레벨 디자인·생태 |
+| 2 | [밍크 입수·상륙, 수생 섭취와 부화](https://github.com/dpqksr5501/AdaptiveEcosystem/issues/21) | 생태·레벨 디자인 |
+| 2 | [World Partition HLOD와 식생 재고 복원](https://github.com/dpqksr5501/AdaptiveEcosystem/issues/22) | 레벨 디자인·생태 |
+| 병행 | [경사 접지, 급회전과 사체 안착](https://github.com/dpqksr5501/AdaptiveEcosystem/issues/23) | 생태·표현 |
+| 3 | [섬에서 플레이어 발소리·사냥·사체 복제](https://github.com/dpqksr5501/AdaptiveEcosystem/issues/24) | 플레이어·레벨 디자인·생태 |
+| 3 | [동일 시드로 면적·기아·이주·정책 비교](https://github.com/dpqksr5501/AdaptiveEcosystem/issues/25) | 생태·학습·레벨 디자인 |
+
+기준 작업본에서 경사 재현과 장기 무개입 표본은 먼저 시작할 수 있다. 최신 지형을 쓰는 비교와 팀 멀티플레이 최종 확인은 1번의 맵과 버전을 고정한 뒤 진행한다.
+
 ## 공통 맥락
 
 현재 소유 테스트 맵에서 기존 8종과 신규 8종의 스폰·표현·권위 생태를 연결했다. 사슴은 Native R7e, 늑대는 Native 규칙, 나머지 종은 각 종의 규칙 실행을 사용한다. 16종의 출생·부화는 일반 실행과 별도 사례를 합쳐 확인했다. 지상과 수중의 실제 지역 도착은 통로가 있는 별도 맵에서 확인했다. 돼지 전용 맵에는 개체차, 성장, 낙과·토양 먹이·초본 뿌리, 이동·발 IK 후속 작업이 있다. 팀 원본 `Integration_JwJ`의 Legacy 설정과 소유 복사본의 실행을 구분한다. [다종 실행 기록](../조연우/JYU_EXPANDED_FAUNA_20261113.md#전체-표현생명주기-점검) · [돼지 전용 적용](../조연우/JYU_PIG_HANDOFF_20261113.md)

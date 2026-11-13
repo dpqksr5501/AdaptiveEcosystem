@@ -2,6 +2,8 @@
 
 **팀 섬 지형 복사본의 다종 적용.** 송해찬 담당 `/Game/Map/LV_SHC_IslandEcosystem1_WP`의 작업용 복사본 `/Game/JYU/Maps/LV_JYU_IslandEcosystem`에서 기존 강과 호안에 수초·먹이·수생동물을 배치했다. 초지와 고원에는 지형에 맞춘 개체군과 마른 보금자리를 배치했다. 기본 시작·세션 맵은 `/Game/JWJ/Integration_JwJ`다. [섬 맵 적용과 검증 범위](Team/JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#기존-강과-호안의-다종-배치)
 
+**공유 기준과 후속 이슈.** [PR #19](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/19)의 검증 기준은 `fa0c04dd`다. UE 5.8 직접 빌드와 자동화 320건, 작업용 섬에서 초기 16종 118마리와 175 게임초의 실행을 확인했다. 최신 팀 지형 이식, 밍크 입수·상륙, 스트리밍, 경사 접지, 플레이어 개입과 장시간 비교는 [담당별 후속 이슈](Team/FAUNA_TEAM_REQUESTS_20261113.md#pr-19-후속-이슈)에서 이어간다.
+
 **새 채팅에서 작업을 재개할 때.** 이 문서와 저장소 루트 `AGENTS.md`를 읽은 뒤, [다종 생태계 재개 안내](Team/FAUNA_TEAM_HANDOFF.md#새-채팅에서-재개)를 연다. 소유 맵의 16종 실행과 수변·식생 작업을 팀 레벨로 옮기기 위한 첫 단계는 **실제 접근 가능한 서식지·통로 확인과 같은 조건의 장기 비교**다. [담당별 작업 요청](Team/FAUNA_TEAM_REQUESTS_20261113.md) · [면적·배치·두뇌 비교 계획](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md)
 
 **2026-11-13 소유 다종 맵 기준.** `LV_JYU_ExpandedFauna`에 기존 8종과 신규 8종을 연결했다. `LV_JYU_HerbivoreForage`에서는 먹이 군락 15개의 재고와 외형을, `LV_JYU_RiparianReach`에서는 물가 17개 군락의 건조·강우·침수·섭취 반응과 수위별 연결 수심을 확인했다. 출생·이주, 장기 개체군, 식생 저장·네트워크, 수변 면적·렌더는 서로 다른 맵과 조건의 실행이다. 팀 적용은 송해찬 님의 레벨 디자인, 장원준 님의 플레이어 입력·사냥·발소리, 권신혁 님의 학습 계약과 연계한다. [맵별 완료·검증 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과) · [수변 실측과 팀 적용 조건](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md) · [돼지 전용 적용](조연우/JYU_PIG_HANDOFF_20261113.md)
