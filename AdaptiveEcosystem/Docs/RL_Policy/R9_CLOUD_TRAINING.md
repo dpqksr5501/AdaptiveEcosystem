@@ -94,6 +94,8 @@ PY=.venv-r9/bin/python
 $PY -m pytest -p no:cacheprovider -q tests/test_r9_chain.py tests/test_r9_fauna.py tests/test_r9_motion.py
 ```
 
+전체 R9 평가·리플레이 테스트까지 실행할 때는 같은 Python 환경에 `scikit-learn`과 `matplotlib`를 설치한다. 두 패키지는 클라우드 학습 전용 설치 목록에서 제외되어 있다.
+
 작은 학습 (약 5~10 분, 학습 줄과 섞이지 않게 `ckpt/r9_cloud_smoke/` 에 쓴다):
 
 ```bash
