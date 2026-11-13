@@ -29,10 +29,11 @@
 | `bundle_decisions.json` | C0-9 로 등록한 묶음 결정 수·근거 속도 `speed_dps` (STATUS 3-1, `configs/v3_r9.yaml` `train.bundle_decisions` 와 같은 값). **11-12 S′ 다시 등록**: 0 바퀴 80.3M / 30.3M / 38.8M, 1 바퀴부터 19.4M / 7.2M / 7.3M (사슴 / 멧돼지 / 늑대). 11-11 값(처음 세계)은 `superseded` 에 기록만 |
 | `motion_shape.py` | 몸 움직임 모양 재기(`RL_R9_TURN_EFFORT_DESIGN.md` 8-3): 설정·두뇌(규칙 이름·npz)·시드·스텝 → 벽 닿은 몫·`turn_over`·한 스텝 90° 넘음·머리 돌림 °/s·좌우 번갈이·1 분당 출발·뛰기 이어짐·서 있는 몫·굶음/잡힘/출생·엄격한 사냥 성공률, 시드별 값. 읽기만 (보고용) |
 | `dump_fauna.py` · `swap_brain.py` · `export_brains.py` | 언리얼 대조 덤프(R9DUMP 1, motion 줄·종별 `body_hash`) · npz → `.r9brain` 바꾸기(장면 `body_hash` 와 대조) · 내보내기. 11-13 세션 스크래치에서 옮김 |
+| `chain_r9.py` · `pack_r9.py` · `packs/` · `cloud_setup.sh` | **다른 컴퓨터·클라우드 이어 학습** (11-13): 팩에서 출발해 6 종이 바퀴마다 함께 이어 배우는 실행기(`check`·`run`·`status`·`stop`·`pack`, 끊기면 같은 명령으로 이어 감) · 두뇌 팩 만들기·확인(sha256·몸 해시) · 출발 팩 `fauna_r2`(지금 몸 바퀴 2 마지막 판 = M1 이어 학습 출발점) · 리눅스 sudo 없는 설치. 안내 `AdaptiveEcosystem/Docs/RL_Policy/R9_CLOUD_TRAINING.md` |
 | `smoke/` | C0-9 측정 요약 — S′ 등록 근거 `s_c09_train_*.json`·`s_c09_judge_*.json`(11-12), 처음 세계 `c09_train_*.json`·`c09_judge_*.json`(11-11 기록)·Fix 단계 확인 (등록 근거, 판정 아님) |
 | `herbivore_rl/tests/test_r9*.py` | 시험 1~27 (12절) + S′ 시험 S1~S11 + Fix 단계 시험 |
 
-모든 명령은 `herbivore_rl/` 에서 `PYTHONUTF8=1`, 파이썬 `C:/Users/Sinhyeok/anaconda3/python.exe`. 시드(10절): 학습 풀 43000~43999(학습 코드 기본값),
+모든 명령은 `herbivore_rl/` 에서 `PYTHONUTF8=1`, 파이썬 `C:/Users/Sinhyeok/anaconda3/python.exe`(RL 담당 PC — 다른 컴퓨터는 `cloud_setup.sh` 가 만든 `.venv-r9/bin/python`, `R9_CLOUD_TRAINING.md`). 시드(10절): 학습 풀 43000~43999(학습 코드 기본값),
 보정 44000~44179, 스모크·속도 44180~44199, 점검 44200~44299, 시험 44350~44399. **판정 44800~44999 는 학습·점검·보정 코드가 거부하고, judge·mixed 는 잠금 파일로 한 번만.**
 
 ## 1. 보정 관문 (띄우기 전, 9-1) — 차례 C0-6(보고만) → C0-5 → C0-7 → C0-1~4(C0-4 보고만) → C0-11 → C0-7b·7c, 그다음 밤에 C0-10
