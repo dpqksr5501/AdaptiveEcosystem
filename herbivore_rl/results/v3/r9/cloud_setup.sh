@@ -24,10 +24,12 @@ need_uv() {
 }
 
 if [ ! -x "$VENV/bin/python" ]; then
-  if python3 -m venv "$VENV" >/dev/null 2>&1 && "$VENV/bin/python" -m pip --version >/dev/null 2>&1; then
+  # 시스템 python3 가 3.12 이상이고 venv·pip 가 되면 그것으로, 아니면 uv 가 3.12 를 받아 만든다 (판정 도구 eval_r9.py 가 3.12 문법)
+  if python3 -c 'import sys; sys.exit(sys.version_info < (3, 12))' 2>/dev/null \
+     && python3 -m venv "$VENV" >/dev/null 2>&1 && "$VENV/bin/python" -m pip --version >/dev/null 2>&1; then
     echo "[setup] 가상 환경: python3 -m venv ($("$VENV/bin/python" --version))"
   else
-    echo "[setup] python3 -m venv 를 못 씀 (ensurepip 없음 등) — uv 로 만든다"
+    echo "[setup] 시스템 python3 로 3.12 이상 가상 환경을 못 만듦 (판이 낮거나 ensurepip 없음) — uv 로 만든다"
     rm -rf "$VENV"
     need_uv
     uv venv --python "$PYVER" "$VENV"

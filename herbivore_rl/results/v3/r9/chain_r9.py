@@ -54,6 +54,7 @@ SHARDS_FULL = {"deer": 1, "wolf": 2, "boar": 1, "buffalo": 2, "leopard": 2, "fox
 PROC_GB = 0.45                                       # 학습·조각 프로세스 하나 어림 (STATUS 3-1 · 11-13 이어 학습 0.35~0.41 GB)
 OK_STOPS = ("target", "wall_clock")
 MAX_ATTEMPTS = 3
+STOPPED = 3                                          # run_round: 사람이 stop --now 로 멈춤 (평가하지 않고 끝)
 FIXED = ("pack", "pack_manifest_sha256", "config", "config_digest", "species", "model_seed", "gamma", "decisions", "snapshot_every",
          "shares")
 POLL_S = 20
@@ -407,6 +408,8 @@ def run_chain(a) -> int:
                     return 0
             t0 = time.time()
             rc = run_round(line, plan, start, r, shards, wall_h)
+            if rc == STOPPED:
+                return 0
             if rc != 0:
                 return rc
             prev_wall = (time.time() - t0) / 3600
@@ -491,7 +494,7 @@ def run_round(line: Line, plan: dict, start: dict, r: int, shards: dict, wall_h:
                 line.log(f"stop --now — 바퀴 {r} 묶음 {sorted(left)} 끝냄 (다음에 이 바퀴를 처음부터)")
                 (line.dir / "STOP_NOW").unlink(missing_ok=True)
                 line.save_state(phase="stopped", round=r - 1, running={}, attempts=attempts)
-                return 0
+                return STOPPED
             for sp in list(left):
                 p, pid, out = left[sp]
                 end = (p.poll() is not None) if p is not None else not pid_alive(pid, line.run_name(sp, r))
@@ -522,6 +525,8 @@ def cmd_check(a) -> int:
     print(f"파이썬 {mc['python']} ({sys.executable}) · {mc['platform']} · CPU {mc['cpus']} · 메모리 {mc.get('avail_gb')}/{mc.get('ram_gb')} GB")
     if sys.version_info < (3, 10):
         bad.append("파이썬 3.10 이상이 필요하다")
+    elif sys.version_info < (3, 12):
+        warn.append("확인한 파이썬은 3.12·3.13 이다 — 학습 줄기는 3.10 문법이지만 판정 도구 eval_r9.py 는 3.12 문법 (cloud_setup.sh 는 3.12 를 받는다)")
     vers = {}
     for mod in ("numpy", "yaml", "torch", "stable_baselines3", "gymnasium", "psutil"):
         try:
