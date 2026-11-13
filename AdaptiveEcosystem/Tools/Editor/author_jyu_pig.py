@@ -30,12 +30,15 @@ def pig_profile():
     motion = ("IdleBreathe", "Walk", "Run", "IdleLookAround", "Chew", "Rest", "Death", "IdleLookAround")
     visual = build_representation("Pig", mesh, clips, motion, (130., 315.), True)
     return set_props(unreal.EcoFaunaSpecies(), species_id="Pig", visual_class=visual,
-                     diet=unreal.EcoFaunaDiet.OMNIVORE, adult_mass=75., body_radius=30.,
-                     walk_speed=130., run_speed=315., ground_acceleration=680., sight_range=1150.,
+                     diet=unreal.EcoFaunaDiet.OMNIVORE, adult_mass=75., body_radius=30., individual_response=True,
+                     walk_speed=130., run_speed=315., ground_acceleration=680., ground_turn_degrees_per_second=225.,
+                     eye_height=56., sweep_height=73., sight_range=1150.,
                      threat_sense_range=850., rooting_seconds=1.4, carrion_energy_per_meal=4.,
                      carrion_hunger_fraction=.83, scent_range=800., wade_depth=10., step_height=20.,
                      day_activity=.72, night_activity=.86, night_vision=.75, sprint_drain=.09,
                      defense_damage=18., offspring_guard_range=400., caregiver_follow_range=480.,
+                     social_neighbor_radius=640., social_spacing=138., adult_male_social_affinity=.18,
+                     heat_response_c=unreal.Vector2D(25., 36.),
                      maturity_seconds=120., gestation=32., birth_recovery=140.,
                      death_settle_seconds=clips["Death"].get_play_length() + .1,
                      food_per_meal=.27, regional_limit=14)
@@ -43,6 +46,36 @@ def pig_profile():
 
 def spawn(klass, x=0., y=0., z=0., pitch=0., yaw=0.):
     return actors.spawn_actor_from_class(klass, unreal.Vector(x, y, z), unreal.Rotator(pitch=pitch, yaw=yaw))
+
+
+def cooling_habitat():
+    existing = {actor.get_actor_label(): actor for actor in actors.get_all_level_actors()}
+    wet = unreal.Vector(-220., -880., 0.)
+    shade = unreal.Vector(460., -880., 0.)
+    for label, mesh, point, size, material in (
+        ("Pig Wet Bank", "Cylinder", wet - unreal.Vector(0., 0., 1.), (2.9, 2.9, .04),
+         "/Game/JYU/Materials/M_JYU_Surface_Wet"),
+        ("Pig Shade Canopy", "Cube", shade + unreal.Vector(0., 0., 172.), (5.8, 5.8, .16),
+         "/Game/JYU/Fauna/Audio/M_Fauna_Wood"),
+    ):
+        actor = existing.get(label) or spawn(unreal.StaticMeshActor, point.x, point.y, point.z)
+        actor.set_actor_label(label)
+        actor.set_actor_location(point, False, False)
+        actor.set_actor_scale3d(unreal.Vector(*size))
+        actor.static_mesh_component.set_static_mesh(require(f"/Engine/BasicShapes/{mesh}"))
+        actor.static_mesh_component.set_collision_profile_name("NoCollision")
+        if material:
+            actor.static_mesh_component.set_material(0, require(material))
+    pool_label = "Pig Shallow Water"
+    pool = existing.get(pool_label) or spawn(unreal.EcoVegetationHabitat, wet.x, wet.y - 235., 0.)
+    pool.set_actor_label(pool_label)
+    pool.get_editor_property("bounds").set_box_extent(unreal.Vector(185., 150., 45.), False)
+    set_props(pool, habitat_id="PigShallowWater", region_id="PigMeadow", connected_fresh_water=True,
+              water_surface_z=7., water_surface_size_cm=unreal.Vector2D(370., 300.),
+              water_material=require("/Game/JYU/Materials/M_JYU_Surface_Water"))
+    return [set_props(unreal.EcoFaunaCoolingSite(), id=name, region_id="PigMeadow", species_id="Pig",
+                      center=center, radius=135., dry_relief=dry, wet_relief=rain)
+            for name, center, dry, rain in (("PigWetBank", wet, .16, .94), ("PigShade", shade, .65, .65))]
 
 
 def make_map(profile):
@@ -85,10 +118,13 @@ def make_map(profile):
                          consumers=["Pig"], capacity=capacity, regrowth_per_second=regrowth, energy_per_meal=energy)
                for name, x, y, capacity, regrowth, energy in (
                    ("FallenMast", -540., -260., 16., .13, 4.),
-                   ("SoilInvertebrates", 700., -100., 10., .16, 3.))]
+                   ("SoilInvertebrates", 700., -100., 10., .16, 3.),
+                   ("HerbaceousRoots", 330., 420., 8., .11, 2.5))]
     set_props(runtime, use_v3_policy=True, enable_ecosystem_life=True, enable_waves=False,
               v3_deer_per_region=6, global_population_limit=40, fauna_habitat_stage=3,
-              fauna_species=[profile], fauna_habitat_patches=patches, groups=[group],
+              client_visual_distance=3500.,
+              footstep_audio_set=require("/Game/JYU/Fauna/Audio/DA_FaunaFootsteps"),
+              fauna_species=[profile], fauna_habitat_patches=patches, fauna_cooling_sites=cooling_habitat(), groups=[group],
               herbivore_config=require("/Game/JYU/Config/EC_JYU_V3_Deer"),
               wolf_config=require("/Game/JYU/Config/EC_JYU_V3_Wolf"),
               herbivore_actor_class=generated(require("/Game/JYU/Creatures/BP_JYU_Deer")),

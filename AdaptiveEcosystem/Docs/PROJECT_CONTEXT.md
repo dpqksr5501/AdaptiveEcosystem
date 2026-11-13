@@ -1,6 +1,10 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
-**새 채팅에서 작업을 재개할 때.** 이 문서와 저장소 루트 `AGENTS.md`를 읽은 뒤, [다종 생태계 재개 안내](Team/FAUNA_TEAM_HANDOFF.md#새-채팅에서-재개)를 연다. 현재 다음 작업은 새로 확보한 **동물 에셋의 리깅·애니메이션·생태계 연결**이다. 복사할 요청, 실제 작업 브랜치 기준, 종별 담당 경계와 기존 검증을 한곳에서 확인할 수 있다.
+**팀 섬 지형 복사본의 다종 적용.** 송해찬 담당 `/Game/Map/LV_SHC_IslandEcosystem1_WP`의 작업용 복사본 `/Game/JYU/Maps/LV_JYU_IslandEcosystem`에서 기존 강과 호안에 수초·먹이·수생동물을 배치했다. 초지와 고원에는 지형에 맞춘 개체군과 마른 보금자리를 배치했다. 기본 시작·세션 맵은 `/Game/JWJ/Integration_JwJ`다. [섬 맵 적용과 검증 범위](Team/JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#기존-강과-호안의-다종-배치)
+
+**새 채팅에서 작업을 재개할 때.** 이 문서와 저장소 루트 `AGENTS.md`를 읽은 뒤, [다종 생태계 재개 안내](Team/FAUNA_TEAM_HANDOFF.md#새-채팅에서-재개)를 연다. 소유 맵의 16종 실행과 수변·식생 작업을 팀 레벨로 옮기기 위한 첫 단계는 **실제 접근 가능한 서식지·통로 확인과 같은 조건의 장기 비교**다. [담당별 작업 요청](Team/FAUNA_TEAM_REQUESTS_20261113.md) · [면적·배치·두뇌 비교 계획](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md)
+
+**2026-11-13 소유 다종 맵 기준.** `LV_JYU_ExpandedFauna`에 기존 8종과 신규 8종을 연결했다. `LV_JYU_HerbivoreForage`에서는 먹이 군락 15개의 재고와 외형을, `LV_JYU_RiparianReach`에서는 물가 17개 군락의 건조·강우·침수·섭취 반응과 수위별 연결 수심을 확인했다. 출생·이주, 장기 개체군, 식생 저장·네트워크, 수변 면적·렌더는 서로 다른 맵과 조건의 실행이다. 팀 적용은 송해찬 님의 레벨 디자인, 장원준 님의 플레이어 입력·사냥·발소리, 권신혁 님의 학습 계약과 연계한다. [맵별 완료·검증 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과) · [수변 실측과 팀 적용 조건](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md) · [돼지 전용 적용](조연우/JYU_PIG_HANDOFF_20261113.md)
 
 **2026-11-12 다종 작업 기준.** 기본 `/Game/JWJ/Integration_JwJ`는 Legacy 실행이며 Native v3와 자연 출생이 꺼져 있다. 로컬 소유 복사본 `/Game/JYU/Maps/LV_JYU_IntegrationR7eFauna`에서는 사슴 R7e, 늑대 Native 규칙, 여섯 종의 규칙 실행기가 함께 작동한다. 기존 시작 배치의 최신 4배속 30분 비교에서 사슴은 시드별로 25·34마리 남았고 늑대·여우·표범은 모두 기아로 사라졌다. 지상 통로·섭취, 고정 30·60 FPS 비교와 전용 서버 근접 사냥은 각각 문서에 적힌 별도 조건에서 확인했다. [최신 30분 결과](Architecture/FAUNA_POPULATION_BALANCE.md#다종-공용-사체의-영양-예약) · [검증별 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과)
 
@@ -12,7 +16,7 @@
 
 **2026-10-29 후속 작업 트리:** 사용자 실제 플레이 점검 후 [플레이 흐름 수정과 life rules v2](조연우/JYU_PLAYFLOW_FIX_20261029.md)를 추가했다. 단독 무리 이주·접촉/경계·로컬 섭식·식생 표시/용량 확장·낮밤 표현과 owned Highland 통로를 보완한다. `bEnableEcosystemLife` 세계에 한정하며 기존 모델/관측·SocialControl=0·Native 단일 writer를 유지한다. 아래 life-v1은 최초 구현 이력이고, 현재 검증은 새 기록/evidence를 우선한다. main/push 완료를 뜻하지 않으며 전체 Python 세계 mirror/재학습·영구 생태 평형은 미완료다.
 
-공통 설명은 2026-10-24에 작성했고, 상단의 작업 재개 안내를 2026-11-12에 갱신했다. 팀원과 AI agent는 이 문서에서 프로젝트 목표와 계층별 책임을 확인한 뒤 현재 Source와 담당별 계약을 대조한다.
+공통 설명은 2026-10-24에 작성했고, 상단의 작업 재개 안내를 2026-11-13에 갱신했다. 팀원과 AI agent는 이 문서에서 프로젝트 목표와 계층별 책임을 확인한 뒤 현재 Source와 담당별 계약을 대조한다.
 
 `d095948` 당시 life-v1 최초 적용 맵은 소유 `/Game/JYU/Maps/LV_JYU_Ecosystem`이었다. 당시의 식생·흔적·출생·유전·사체·저장 계약과 역할별 배경은 [팀 AI 공통 안내](Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [당시 구현 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)에 있다. 현재 다종 맵과 정책 상태는 위 재개 안내를 따른다.
 

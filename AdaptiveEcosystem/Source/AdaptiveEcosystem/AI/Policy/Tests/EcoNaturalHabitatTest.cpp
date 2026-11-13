@@ -62,6 +62,51 @@ bool FEcoNaturalSites::RunTest(const FString&)
     return true;
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaWaterLevel,
+    "AdaptiveEcosystem.Fauna.Water.AuthoredLevelPhases",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoFaunaWaterLevel::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld World;
+    auto* Water = World.World->SpawnActor<AEcoVegetationHabitat>();
+    Water->bConnectedFreshWater = true;
+    Water->WaterSurfaceZ = 40.f;
+    TestEqual(TEXT("Legacy static water is unchanged"), Water->EvaluateWaterLevelZ(100.), 40.);
+    Water->WaterLevelRise = 30.f;
+    Water->WaterLowSeconds = 20.f;
+    Water->WaterRiseSeconds = 10.f;
+    Water->WaterHighSeconds = 15.f;
+    Water->WaterFallSeconds = 20.f;
+    TestEqual(TEXT("Water stays low before the rise"), Water->EvaluateWaterLevelZ(10.), 40.);
+    TestEqual(TEXT("Halfway through rise"), Water->EvaluateWaterLevelZ(25.), 55.);
+    TestEqual(TEXT("High-water hold"), Water->EvaluateWaterLevelZ(40.), 70.);
+    TestEqual(TEXT("Halfway through fall"), Water->EvaluateWaterLevelZ(55.), 55.);
+    TestEqual(TEXT("Cycle returns to low water"), Water->EvaluateWaterLevelZ(65.), 40.);
+    TestEqual(TEXT("The same simulation phase produces the same level"), Water->EvaluateWaterLevelZ(90.), 55.);
+    Water->WaterRainRiseCm = 12.f;
+    TestEqual(TEXT("At equal phase, rain raises the authored water level"), Water->EvaluateWaterLevelZ(25., .5f), 61.);
+    TestEqual(TEXT("Rain runoff never exceeds its authored limit"), Water->EvaluateWaterLevelZ(25., 2.f), 67.);
+    return true;
+}
+
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoFaunaWaterPlantCover, "AdaptiveEcosystem.Fauna.Water.PlantCoverByDepth",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoFaunaWaterPlantCover::RunTest(const FString&)
+{
+    EcoCreatureMovement::FFaunaWaterColumn Column;
+    Column.Bottom = 20.;
+    Column.Surface = 100.;
+    TestEqual(TEXT("Existing water defaults to no cover"), Column.VisualCoverAt(30.), 0.);
+    Column.CoverDensity = .75f;
+    Column.CoverHeightCm = 40.f;
+    TestEqual(TEXT("Water below the top of the plants has full authored cover"), Column.VisualCoverAt(40.), .75);
+    TestEqual(TEXT("Cover tapers near the tops of the plants"), Column.VisualCoverAt(55.), .375);
+    TestEqual(TEXT("Fish above the plants remain visible"), Column.VisualCoverAt(70.), 0.);
+    Column.Surface = 35.;
+    TestEqual(TEXT("Exposed plants do not provide underwater cover"), Column.VisualCoverAt(40.), 0.);
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoNaturalRefuge,"AdaptiveEcosystem.NaturalHabitat.InteriorRestAndVulnerableCover",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoNaturalRefuge::RunTest(const FString&)
 {

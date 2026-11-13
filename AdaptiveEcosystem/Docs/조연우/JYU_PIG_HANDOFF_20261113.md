@@ -4,7 +4,7 @@
 
 1. Epic Launcher의 Fab에서 [PROTOFACTOR ANIMAL VARIETY PACK](https://www.fab.com/listings/2dd7964c-a601-4264-a53d-465dcae1644c)을 해당 프로젝트에 추가한다. 이미 보유한 프로젝트에서 옮길 때는 Unreal Migrate로 `Pig`의 메시·스켈레톤·재질·텍스처·애니메이션을 가져와 `/Game/AnimalVarietyPack/Pig` 경로를 유지한다. 테스트용 원본 Overview 맵은 필요 없다.
 2. UE 5.8의 프로젝트 Editor 모듈을 빌드한 다음 Python Editor Script Plugin을 활성화한다. Editor의 **Output Log**에서 `py <프로젝트 절대 경로>/Tools/Editor/author_jyu_pig.py`를 실행한다. 스크립트가 `/Game/JYU/Pig`의 표현과 `/Game/JYU/Maps/LV_JYU_Pig`를 생성한다. 로그의 `ECO_PIG_FIXTURE_READY`를 확인하고 맵을 연다.
-3. 팀 맵에서는 기존 `EcoCreatureIntegrationSpawner`의 `FaunaSpecies`에 ID `Pig`와 `/Game/JYU/Pig/Pig/BP_Pig`를 연결하고, 해당 지역 Spawn Group의 `Fauna`에 같은 ID와 실제 지면 스폰 위치를 넣는다. 전용 맵의 구조체 값과 패치 항목을 참고한다. `ValidateEditorSetup` 후 Server/Standalone에서 각 StableAgentId와 Client의 표시를 확인한다.
+3. 팀 맵에서는 기존 `EcoCreatureIntegrationSpawner`의 `FaunaSpecies`에 ID `Pig`와 `/Game/JYU/Pig/Pig/BP_Pig`를 연결하고, 해당 지역 Spawn Group의 `Fauna`에 같은 ID와 실제 지면 스폰 위치를 넣는다. `FootstepAudioSet`에 기존 돼지·플레이어 프로필이 있는 세트를 사용한다. 필요하면 전용 맵의 `FaunaCoolingSites` 값을 복사해 실제 지면·수심을 다시 검증한다. `ValidateEditorSetup` 후 Server/Standalone에서 각 StableAgentId와 Client의 표시를 확인한다.
 
 외형은 가축형 Pig 팩이며, 게임 규칙은 야생화 돼지 `Sus scrofa`를 참조한다. 제작사 공개 사양은 약 11,020 tris, 35 bones, 재질 슬롯 2개, 4K 텍스처다. 팀 프로젝트 폴더의 기존 동일한 원본 21개는 지정한 폴더와 SHA-256이 일치했다. 필요한 12개 시퀀스에 동일 스켈레톤·양의 길이·root motion 꺼짐을 검사한다. 원본과 생성 바이너리는 각 팀원의 프로젝트에서 준비한다. [제작사 Fab 페이지](https://www.fab.com/listings/2dd7964c-a601-4264-a53d-465dcae1644c) · [Fab 라이선스](https://www.fab.com/eula)
 
@@ -25,3 +25,41 @@
 기존 `EcoFaunaSpecies`와 지상 이동·섭식·생명주기를 사용한다. 2D Blend Space는 좌우 보행·질주와 제동을 표현하며, AnimBP는 지면 접촉 IK·발소리 Notify·경계·땅 뒤지기·씹기·휴식·사망을 받는다. 이동은 서버 상태의 속도와 방향을 사용한다. 원본 `_RM` 버전은 참조하지 않는다. 발소리 이벤트는 기존 표현의 접촉 Notify와 팀 맵의 오디오 세트로 이어진다. 2.17초 사망 클립에 맞춰 사체 안착 전 대기 시간을 잡는다. 돼지 수영과 진흙목욕은 전용 클립이 필요하다.
 
 시드 20000에서 300 게임초 동안 초기 4개체, 자연 출생 5건, 두 종류 패치의 실제 재고 소비를 기록했다. StableAgentId 18은 낙과와 토양 무척추동물 패치를 모두 이용했다. 사슴은 기존 R7e `40d8710d`로 실행됐다. 별도 렌더 검증에서 12° 경사 보행의 발 접촉 4개, 급반전과 제동, 땅 뒤지기, 사망과 마지막 자세 유지를 확인했다. 돼지 포획 및 전용 서버의 Client 표현은 이 실행에서 검증하지 않았다.
+
+## 긴급 PR 이후 보강
+
+- 돼지 전용 프로필에서 개체별 유전 응답을 켰다. 크기·속도·경계·사회성의 개체차와 출생 후 성장 배율을 사용한다. 몸체 75kg은 게임의 성체 기준이며 실제 몸무게 범위와 구분한다. 보행·가감속은 기존 권위 실행을 이용하고, 최대 지상 선회 225°/초와 지면 검사 높이를 지정했다.
+- 야생화 돼지의 무리는 주로 암컷과 자손으로 구성되며 성체 수컷은 흔히 홀로 활동한다. 전용 맵에서 평상시 거리 조정의 기본 이웃 범위는 640cm, 성체 수컷의 가중치는 0.18로 설정했다. 가까이 접근한 수컷도 반응할 수 있다. 부모 추종, 번식, 먹이 자리의 접근은 별도 권위 조건을 그대로 쓴다. [USDA APHIS 야생화 돼지 기술 보고서](https://direct.aphis.usda.gov/sites/default/files/Feral%20Swine_WDM%20Technical%20Series_August%202020.pdf)
+- 기존 낙과·토양 무척추동물 외에 용량 8의 초본 뿌리 패치를 추가했다. 실제 에너지 차감은 기존 자원 거래로 처리한다. 계절·지역마다 달라지는 식물과 동물성 먹이 비율은 두 종류 이상의 후보를 동시에 둔 근거다. [USGS 계절별 위 내용물 DNA 연구](https://www.usgs.gov/publications/seasonal-variation-wild-pig-sus-scrofa-diet-revealed-dna-metabarcoding) [조지아 장벽섬 먹이 현장 연구](https://scijournals.onlinelibrary.wiley.com/doi/10.1002/ps.8093)
+
+야생 멧돼지 연구에서는 더운 조건에서 진흙이나 젖은 기질을 이용한 열 조절과 개체 간 접촉 감소를 관찰했다. 야생화 돼지의 물가 이용을 서식지 후보로 모델링하는 근거로 사용했다. [야생 멧돼지 열조절 실험](https://pmc.ncbi.nlm.nih.gov/articles/PMC10613136/) · [USDA 물가와 진흙목욕](https://www.aphis.usda.gov/operational-wildlife-activities/feral-swine/damage-natural-resources)
+
+시드 20000과 300초 실행에서 성체 4마리의 크기 유전자 0.993–1.028, 경계 유전자 0.863–1.092, 자연 출생 5건을 확인했다. 새끼 ID 16의 표시 크기는 초기 관측 0.766에서 1.023으로 자랐다. 초기 15초에 암컷 ID 11·13은 601cm에서 이웃 간격을 반영했다. 성체 수컷 14는 암컷 13과 91.6cm까지 가까워졌을 때 같은 규칙에 반응했다. 실제 패치 소비는 낙과 10회, 토양 무척추동물 6회, 초본 뿌리 6회였다. `Saved/ExpandedFaunaImport/PigSocialFollowup20000_status.json`.
+
+고정 평지와 12° 경사를 잇는 60fps 렌더에서 보행·선회·급반전·제동·달리기의 발 마커 2,160개를 확인했다. 최저는 +0.50cm였고 땅 뒤지기와 사망 후 마지막 자세 유지가 재생됐다. 사망 클립이 움직이는 중 발 마커 최저 −9.36cm를 기록했다. 경사에서 사망 자세의 접촉과 최종 안착은 후속으로 보정한다. `Saved/FaunaAudit/PigPhysicalSlopeFollowupMetrics.json`.
+
+UE 5.8 직접 UBT와 전체 자동화 314건을 통과했다. 일반 성공 312건, 경고 동반 성공 2건, 실패·미실행 0건이다. `Saved/PigSocialFollowupAutomation/AutomationFinal/index.json`.
+
+## 기온·그늘·젖은 물가
+
+돼지 전용 맵에서 기온 25–36°C에 따라 노출 부담을 계산한다. 그늘은 일정한 완화량을 가지며, 젖은 물가의 완화량은 권위 구역 강우 입력에 따라 연속적으로 변한다. 범위와 계수는 게임 초기값이다. 성체는 거리, 시야, 실제 도하 가능성, 허기, 현재 먹이 목적지를 함께 평가한다. 기존 보호·도주·이주와 공격 및 식사의 우선순위를 사용한다. 군락 내부의 휴식 지점은 안정 ID에 따라 분산하고 후보 지면과 수심을 검사한다. 도착 시 기존 지상 제동과 휴식 표현을 사용하고, 같은 권위 유지비 계산에 노출 상태를 반영한다. 돼지 전용 맵의 그늘과 젖은 둑은 소유 맵에서 편집할 수 있으며, 옆에 깊이 7cm의 물 영역을 작성했다.
+
+시드 20000을 고정한 40초 비교에서 19°C에는 열 회피 목적의 쉼터 도착이 없었다. 38°C에 비가 없으면 성체 네 마리가 그늘에 도착했다. 38°C에 강우 0.9를 입력하면 세 마리가 젖은 물가, 한 마리가 그늘에 도착했다. 테스트용 환경 입력은 저장하지 않았다. 재현은 `run_jyu_expanded_fauna_validation.ps1 -Mode PigThermal`이며 근거는 `Saved/ExpandedFaunaImport/PigThermal{Cool,Dry,Wet}20000_status.json`이다.
+
+에디터의 원본 애니메이션 12개에서 스켈레톤 일치, 양의 재생 길이, 인플레이스 설정을 다시 검사했다. 좌우 보행·질주 선회, 휴식, 먹이 탐색, 씹기, 사망 시퀀스가 있다. 제동은 속도와 방향을 사용하는 Blend Space·기존 전환으로 표현한다. 원본 패키지에는 전용 피격·수영·진흙목욕 시퀀스가 없다. 현재 물가 행동은 보행 접근 후 휴식으로 표현한다. 전용 피격 자세, 경사 사망 접촉과 진흙목욕 포즈는 후속 범위다.
+
+`-Mode PigPersistence`는 별도 PIE 세션에서 16개 권위 ID, 그중 규칙 돼지 5개의 위치·개체 상태, 세 먹이 패치 재고를 저장값과 대조했다. 근거는 `Saved/ExpandedFaunaImport/PigFollowupCheckpointState.json`이다.
+
+## 위협·사체·멀티플레이 회귀
+
+- `-Mode PigThreat`에서 플레이어의 실제 질주 발소리를 들은 초기 돼지 네 마리가 도주했다. 기존 오디오 세트의 돼지·플레이어 청각 프로필을 전용 맵에 연결했다. 최초 감지 시각은 게임 시간 1.35–2.40초였고, 확인한 도주 속도 표본은 153.7–313.2cm/s였다. 플레이어 입력·피해 실행 경로는 팀 계약을 사용했다. `Saved/ExpandedFaunaImport/PigFollowupThreat20000_status.json`.
+- `AdaptiveEcosystem.Fauna.Pig.SharedCarrionMeal`은 돼지의 실제 규칙 선택과 자원 거래를 실행한다. 초기 18인 다른 종 사체를 안착 이후에 선택해 돼지에 4를 지급하고, 공용 사체는 14가 됐다. 동종 사체 재고는 18을 유지했다. UE 5.8 직접 UBT와 전체 자동화 319건이 통과했다. 일반 성공 317, 경고 동반 성공 2, 실패·미실행 0이다. `Saved/Automation/PigFinal/index.json`.
+- `-Mode PigNetwork`에서 실시간 전용 서버 PIE의 Client 한 개가 권위 돼지 네 마리의 ID, 개체 크기, `SK_Pig`, `ABP_Pig_C`를 반복 수신했다. 전용 맵의 표시 거리를 기본 10m에서 시험 동선에 맞춘 35m로 작성했다. Client의 권위 개체와 생태 스텝은 0이었다. `Saved/ExpandedFaunaImport/PigFollowupNetwork20000_status.json`.
+- `-Mode PigPopulation`에서 초기 네 마리, 자연 출생 다섯 건, 새끼의 양육자 추종, 성체 성별 간 이웃 간격 차이를 확인했다. 300초 동안 낙과 10회, 토양 무척추동물 8회, 초본 뿌리 6회를 실제 소비했다. `Saved/ExpandedFaunaImport/PigFollowupCurrent20000_status.json`.
+- D3D11의 12° 경사 렌더에서 보행·달리기·급반전·제동과 땅 뒤지기·씹기·휴식·사망 자세를 확인했다. 땅 뒤지기·씹기·휴식의 AnimBP 선택 칸과 사망 마지막 자세 유지를 각각 확인했다. 발 마커 최저값은 이동 +0.38cm, 누워 쉬는 자세 −23.88cm, 사망 전환 −9.36cm였다. 경사에서 몸통을 지지하는 안착 표현과 전용 피격·수영·진흙목욕 포즈는 표현 개선 범위다. `Saved/FaunaAudit/PigPoseFinalMetrics.json`.
+
+사슴은 `v3_r7_g995_s1_20m@40d8710d`로 시작했고 돼지는 규칙 실행기를 사용했다. 돼지 전용 데이터와 소유 맵에 새 열 반응을 적용했다. 신규 8종 소유 맵은 자체 설정을 사용한다. 긴급 PR #18의 로컬 병합 이력 `ad086242` 이후 작업 트리의 후속이다.
+
+## 휴식과 사망의 경사 보정
+
+이전 12° 경사에서 발견한 휴식·사망 관통을 보완했다. 돼지 전용 맵에서 평지·오르막·가로 경사를 각각 렌더해 휴식, 기상, 사망 전환과 최종 사체를 확인했다. 세 조건에서 안착 후 몸통 마커 높이가 일정했고 최저 발 마커는 +0.25cm였다. 전용 피격·수영·진흙목욕은 여전히 새 클립이 필요한 항목이다. [수정 전후 측정과 재현](JYU_EXPANDED_FAUNA_20261113.md#휴식사망의-지면-지지와-보행-ik-회귀)

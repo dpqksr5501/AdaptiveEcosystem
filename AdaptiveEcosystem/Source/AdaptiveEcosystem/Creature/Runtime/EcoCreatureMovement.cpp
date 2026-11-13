@@ -5,6 +5,7 @@
 #include "Engine/World.h"
 #include "CollisionQueryParams.h"
 #include "CollisionShape.h"
+#include "Components/BoxComponent.h"
 #include "EngineUtils.h"
 #include "NavModifierVolume.h"
 #include "NavAreas/NavArea_Null.h"
@@ -70,7 +71,77 @@ bool EcoCreatureMovement::IsWadeableGround(UWorld& World,const FVector& Ground,f
     if(Ground.ContainsNaN()||!FMath::IsFinite(MaxDepthCm)||MaxDepthCm<0)return false;
     for(TActorIterator<AEcoVegetationHabitat> It(&World);It;++It){
         if(!It->bConnectedFreshWater||!It->ContainsGround(Ground))continue;
-        if(!It->IsValidHabitat()||It->WaterSurfaceZ-Ground.Z>MaxDepthCm)return false;
+        if(!It->IsValidHabitat()||It->GetWaterLevelZ()-Ground.Z>MaxDepthCm)return false;
     }
+    return true;
+}
+
+bool EcoCreatureMovement::IsWaterSurfaceCollision(const AActor* Actor)
+{
+    static const FName WaterBodyClass(TEXT("WaterBody"));
+    for (const UClass* Class = Actor ? Actor->GetClass() : nullptr; Class; Class = Class->GetSuperClass())
+    {
+        if (Class->GetFName() == WaterBodyClass) return true;
+    }
+    return false;
+}
+
+bool EcoCreatureMovement::HasClearWaterSight(const UWorld& World, const FVector& Start, const FVector& End)
+{
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(EcoFaunaWaterSight), false);
+    FHitResult Hit;
+    while (World.LineTraceSingleByObjectType(Hit, Start, End, FCollisionObjectQueryParams(ECC_WorldStatic), Query))
+    {
+        const AActor* Actor = Hit.GetActor();
+        if (!IsWaterSurfaceCollision(Actor)) return false;
+        Query.AddIgnoredActor(Actor);
+    }
+    return true;
+}
+
+bool EcoCreatureMovement::ProbeFaunaWaterColumn(UWorld& World, FName RegionId, const FVector& Point, FFaunaWaterColumn& Out,
+    double SimulationSeconds, float Rainfall)
+{
+    if (Point.ContainsNaN()) return false;
+    const AEcoVegetationHabitat* Source = nullptr;
+    double Surface = 0.;
+    for (TActorIterator<AEcoVegetationHabitat> It(&World); It; ++It)
+    {
+        if (!It->bSupportsFaunaSwimming || It->RegionId != RegionId || !It->IsValidHabitat() || !It->ContainsGround(Point)) continue;
+        const double Level = SimulationSeconds >= 0. ? It->EvaluateWaterLevelZ(SimulationSeconds, Rainfall) : It->GetWaterLevelZ();
+        if (!It->ContainsGround(FVector(Point.X, Point.Y, Level))) continue;
+        if (!Source || It->Priority > Source->Priority
+            || (It->Priority == Source->Priority && It->GetFName().LexicalLess(Source->GetFName())))
+        {
+            Source = *It;
+            Surface = Level;
+        }
+    }
+    if (!Source) return false;
+    const double Lowest = Source->Bounds->Bounds.GetBox().Min.Z;
+    FHitResult Bottom;
+    FCollisionQueryParams Query(SCENE_QUERY_STAT(EcoFaunaWaterBottom), false);
+    const FVector Start(Point.X, Point.Y, Source->Bounds->Bounds.GetBox().Max.Z + .1);
+    const FVector End(Point.X, Point.Y, Lowest - .1);
+    while (World.LineTraceSingleByObjectType(Bottom, Start, End, FCollisionObjectQueryParams(ECC_WorldStatic), Query))
+    {
+        const AActor* HitActor = Bottom.GetActor();
+        if (!IsWaterSurfaceCollision(HitActor)) break;
+        // Water-plugin query collision is WorldStatic, including the ocean under inland rivers.
+        Query.AddIgnoredActor(HitActor);
+    }
+    if (!Bottom.bBlockingHit || !Source->ContainsGround(Bottom.ImpactPoint)) return false;
+    Out = {Bottom.ImpactPoint.Z, Surface, Source->FaunaWaterCurrent, Source->FaunaWaterTemperatureC,
+        Source->FaunaWaterCoverDensity, Source->FaunaWaterCoverHeightCm};
+    return true;
+}
+
+bool EcoCreatureMovement::SampleFaunaWater(UWorld& World, FName RegionId, const FVector& Point,
+    double Clearance, FFaunaWaterColumn& Out)
+{
+    FFaunaWaterColumn Column;
+    if (!FMath::IsFinite(Clearance) || Clearance <= 0. || !ProbeFaunaWaterColumn(World, RegionId, Point, Column)
+        || Column.Surface - Column.Bottom < 2. * Clearance) return false;
+    Out = Column;
     return true;
 }

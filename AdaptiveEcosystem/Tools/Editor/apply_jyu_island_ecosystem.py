@@ -79,7 +79,9 @@ if team_lights:
     if sun is None:
         sun = max(team_lights, key=lambda actor: actor.get_component_by_class(unreal.DirectionalLightComponent).intensity)
         mark_presentation(sun, sun_tag)
-    sun.get_component_by_class(unreal.DirectionalLightComponent).set_mobility(unreal.ComponentMobility.MOVABLE)
+    component = sun.get_component_by_class(unreal.DirectionalLightComponent)
+    component.set_mobility(unreal.ComponentMobility.MOVABLE)
+    component.set_editor_property('forward_shading_priority', 1)
 if not any(moon_tag in [str(value) for value in actor.tags] for actor in team_lights):
     moon = spawn(unreal.DirectionalLight, 'Moon', unreal.Vector())
     mark_presentation(moon, moon_tag)

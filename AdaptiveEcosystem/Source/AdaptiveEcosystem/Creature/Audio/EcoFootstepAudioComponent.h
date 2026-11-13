@@ -35,7 +35,7 @@ public:
     void Consume(const FEcoCreatureVisualState& State, float Delta, bool bSnap, float GaitGain = 1.f, bool bRun = false);
     void NotifyContact(USkeletalMeshComponent* Mesh, FName FootBone);
 private:
-    void PlayContact(const FVector& Source, const TCHAR* Trigger, FName FootBone = NAME_None);
+    void PlayContact(const FVector& Source, const TCHAR* Trigger, FName FootBone = NAME_None, bool bWaterOnly = false);
     FEcoFootstepCadence Cadence;
     FEcoFootstepNotifyGate NotifyGate;
     FEcoCreatureVisualState CachedState;

@@ -368,7 +368,9 @@ bool UEcoHerdMigrationSubsystem::Reconcile(FMassEntityManager& Manager,const FEc
         }
         if(Now<NextPlanAttempt.FindRef(Herd))continue;
         NextPlanAttempt.Add(Herd,Now+3);
-        TArray<AEcoHerdMigrationRoute*> Routes;for(TActorIterator<AEcoHerdMigrationRoute> It(GetWorld());It;++It)if(It->bEnabled&&It->IsValidRoute())Routes.Add(*It);
+        TArray<AEcoHerdMigrationRoute*> Routes;
+        for (TActorIterator<AEcoHerdMigrationRoute> It(GetWorld()); It; ++It)
+            if (It->bEnabled && !It->bRuleFaunaWaterPassage && It->IsValidRoute()) Routes.Add(*It);
         Routes.Sort([](const AEcoHerdMigrationRoute& A,const AEcoHerdMigrationRoute& B){return A.GetPathName()<B.GetPathName();});
         TArray<FVector> BestPoints;FName Destination;float Width=600;double BestScore=0;bool BudgetRejected=false;
         for(const auto* Route:Routes){

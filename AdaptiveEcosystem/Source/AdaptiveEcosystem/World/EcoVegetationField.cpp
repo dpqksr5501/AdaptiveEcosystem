@@ -21,6 +21,9 @@
 #include "Misc/Crc.h"
 #include "Components/DecalComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
+#include "World/EcoWorldClockSubsystem.h"
+#include "World/EcologyWorldSubsystem.h"
+#include "Network/EcoGameState.h"
 
 namespace {
     TAutoConsoleVariable<int32> CVarVegetation(TEXT("eco.Vegetation"), 0,
@@ -37,6 +40,9 @@ namespace {
 
 AEcoVegetationHabitat::AEcoVegetationHabitat()
 {
+    PrimaryActorTick.bCanEverTick = true;
+    PrimaryActorTick.bStartWithTickEnabled = false;
+    PrimaryActorTick.TickInterval = .1f;
     Bounds = CreateDefaultSubobject<UBoxComponent>(TEXT("HabitatBounds"));
     SetRootComponent(Bounds); Bounds->SetBoxExtent(FVector(1000)); Bounds->SetCollisionEnabled(ECollisionEnabled::NoCollision);
     WaterSurface=CreateDefaultSubobject<UStaticMeshComponent>(TEXT("AuthoredShallowWater"));WaterSurface->SetupAttachment(Bounds);
@@ -47,7 +53,54 @@ AEcoVegetationHabitat::AEcoVegetationHabitat()
 void AEcoVegetationHabitat::OnConstruction(const FTransform& Transform)
 {Super::OnConstruction(Transform);RefreshWaterVisual();}
 void AEcoVegetationHabitat::BeginPlay()
-{Super::BeginPlay();RefreshWaterVisual();}
+{
+    Super::BeginPlay();
+    RefreshWaterVisual();
+    SetActorTickEnabled(bDrawWaterSurface && bConnectedFreshWater && (WaterLevelRise > 0.f || WaterRainRiseCm > 0.f)
+        && GetNetMode() != NM_DedicatedServer);
+}
+
+void AEcoVegetationHabitat::Tick(float DeltaSeconds)
+{
+    Super::Tick(DeltaSeconds);
+    if (WaterSurface && WaterSurface->IsVisible())
+        WaterSurface->SetWorldLocation(FVector(GetActorLocation().X, GetActorLocation().Y, GetWaterLevelZ()));
+}
+
+double AEcoVegetationHabitat::EvaluateWaterLevelZ(double SimulationSeconds, float Rainfall) const
+{
+    const double Base = WaterSurfaceZ + (FMath::IsFinite(Rainfall) && FMath::IsFinite(WaterRainRiseCm)
+        ? FMath::Max(0.f, WaterRainRiseCm) * FMath::Clamp(Rainfall, 0.f, 1.f) : 0.f);
+    if (WaterLevelRise <= 0.f || !FMath::IsFinite(SimulationSeconds) || SimulationSeconds <= 0.
+        || !FMath::IsFinite(WaterLevelRise) || !FMath::IsFinite(WaterRiseSeconds) || WaterRiseSeconds < 1.f
+        || !FMath::IsFinite(WaterHighSeconds) || WaterHighSeconds < 0.f
+        || !FMath::IsFinite(WaterFallSeconds) || WaterFallSeconds < 1.f
+        || !FMath::IsFinite(WaterLowSeconds) || WaterLowSeconds < 0.f)
+        return Base;
+    const double Duration = double(WaterLowSeconds) + WaterRiseSeconds + WaterHighSeconds + WaterFallSeconds;
+    const double Phase = FMath::Fmod(SimulationSeconds, Duration) - WaterLowSeconds;
+    const double Fraction = Phase < WaterRiseSeconds ? Phase / WaterRiseSeconds
+        : 1. - (Phase - WaterRiseSeconds - WaterHighSeconds) / WaterFallSeconds;
+    return Base + WaterLevelRise * FMath::Clamp(Fraction, 0., 1.);
+}
+
+double AEcoVegetationHabitat::GetWaterLevelZ() const
+{
+    if ((WaterLevelRise <= 0.f && WaterRainRiseCm <= 0.f) || !GetWorld()) return WaterSurfaceZ;
+    if (GetNetMode() == NM_Client)
+    {
+        FEcoServerTimeSnapshot Time;
+        const auto* State = GetWorld()->GetGameState<AEcoGameState>();
+        const auto* Region = State && WaterRainRiseCm > 0.f ? State->FindCompletedRegion(RegionId) : nullptr;
+        return EvaluateWaterLevelZ(State && State->GetSynchronizedClock(Time) ? Time.ServerTimeSeconds : 0.,
+            Region ? Region->Environment.Rainfall : 0.f);
+    }
+    const auto* Clock = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>();
+    FRegionEnvironmentState Environment;
+    const auto* Regions = WaterRainRiseCm > 0.f ? GetWorld()->GetSubsystem<UEcologyWorldSubsystem>() : nullptr;
+    const float Rainfall = Regions && Regions->GetEnvironmentState(RegionId, Environment) ? Environment.Rainfall : 0.f;
+    return EvaluateWaterLevelZ(Clock && Clock->IsClockRunning() ? Clock->GetServerTime().ServerTimeSeconds : 0., Rainfall);
+}
 void AEcoVegetationHabitat::RefreshWaterVisual()
 {
     if(SoilTransition){
@@ -64,13 +117,13 @@ void AEcoVegetationHabitat::RefreshWaterVisual()
         }
     }
     if(!WaterSurface)return;
-    const bool Visible=bConnectedFreshWater&&FMath::IsFinite(WaterSurfaceZ)&&FMath::IsFinite(WaterSurfaceSizeCm.X)&&FMath::IsFinite(WaterSurfaceSizeCm.Y)
+    const bool Visible=bDrawWaterSurface&&bConnectedFreshWater&&FMath::IsFinite(WaterSurfaceZ)&&FMath::IsFinite(WaterSurfaceSizeCm.X)&&FMath::IsFinite(WaterSurfaceSizeCm.Y)
         &&WaterSurfaceSizeCm.X>=100&&WaterSurfaceSizeCm.X<=4000&&WaterSurfaceSizeCm.Y>=100&&WaterSurfaceSizeCm.Y<=4000;
     WaterSurface->SetVisibility(Visible&&GetNetMode()!=NM_DedicatedServer);
     if(!Visible||GetNetMode()==NM_DedicatedServer)return;
     WaterSurface->SetStaticMesh(WaterMesh.IsNull()?LoadObject<UStaticMesh>(nullptr,TEXT("/Engine/BasicShapes/Plane.Plane")):WaterMesh.LoadSynchronous());
     if(!WaterMaterial.IsNull())WaterSurface->SetMaterial(0,WaterMaterial.LoadSynchronous());
-    WaterSurface->SetWorldLocation(FVector(GetActorLocation().X,GetActorLocation().Y,WaterSurfaceZ));
+    WaterSurface->SetWorldLocation(FVector(GetActorLocation().X,GetActorLocation().Y,GetWaterLevelZ()));
     WaterSurface->SetWorldScale3D(FVector(WaterSurfaceSizeCm.X/100.,WaterSurfaceSizeCm.Y/100.,1));
 }
 bool AEcoVegetationHabitat::IsValidHabitat() const
@@ -78,6 +131,20 @@ bool AEcoVegetationHabitat::IsValidHabitat() const
     return ValidHabitatBounds(Bounds) && Plant >= 0 && Plant <= 2 && FMath::IsFinite(Drainage) && Drainage >= 0 && Drainage <= 1
         &&FMath::IsFinite(BlendDistanceCm)&&BlendDistanceCm>=0&&BlendDistanceCm<=3000&&(!GrowthProfile||GrowthProfile->IsValidProfile())
         && FMath::IsFinite(Shade) && Shade >= 0 && Shade <= 1
+        && FMath::IsFinite(FaunaWaterCoverDensity) && FaunaWaterCoverDensity >= 0.f && FaunaWaterCoverDensity <= 1.f
+        && FMath::IsFinite(FaunaWaterCoverHeightCm) && FaunaWaterCoverHeightCm >= 0.f
+        && (FaunaWaterCoverDensity == 0.f || (bSupportsFaunaSwimming && FaunaWaterCoverHeightCm > 0.f))
+        && (!bSupportsFaunaSwimming || (bConnectedFreshWater && !FaunaWaterCurrent.ContainsNaN()
+            && FMath::IsNearlyZero(FaunaWaterCurrent.Z) && FMath::IsFinite(FaunaWaterTemperatureC)
+            && FaunaWaterTemperatureC >= 0.f && FaunaWaterTemperatureC <= 40.f))
+        && FMath::IsFinite(WaterLevelRise) && WaterLevelRise >= 0.f
+        && FMath::IsFinite(WaterRainRiseCm) && WaterRainRiseCm >= 0.f && WaterRainRiseCm <= 100.f
+        && (WaterRainRiseCm == 0.f || bConnectedFreshWater)
+        && (WaterLevelRise == 0.f || (bConnectedFreshWater
+            && FMath::IsFinite(WaterRiseSeconds) && WaterRiseSeconds >= 1.f
+            && FMath::IsFinite(WaterHighSeconds) && WaterHighSeconds >= 0.f
+            && FMath::IsFinite(WaterFallSeconds) && WaterFallSeconds >= 1.f
+            && FMath::IsFinite(WaterLowSeconds) && WaterLowSeconds >= 0.f))
         && (!bConnectedFreshWater || (FMath::IsFinite(WaterSurfaceZ) && FMath::IsFinite(MaxSupplyRiseCm)
             && MaxSupplyRiseCm > 0 && MaxSupplyRiseCm <= 200
             &&FMath::IsFinite(WaterSurfaceSizeCm.X)&&FMath::IsFinite(WaterSurfaceSizeCm.Y)
@@ -96,6 +163,13 @@ uint32 AEcoVegetationHabitat::Fingerprint() const
     uint32 Crc=FCrc::StrCrc32(*HabitatId.ToString());
     auto Add=[&](const auto& V){Crc=FCrc::MemCrc32(&V,sizeof(V),Crc);};
     Add(Priority);Add(BlendDistanceCm);Add(Plant);Add(Drainage);Add(Shade);Add(bConnectedFreshWater);Add(WaterSurfaceZ);Add(MaxSupplyRiseCm);
+    if (bSupportsFaunaSwimming) { Add(bSupportsFaunaSwimming); Add(FaunaWaterCurrent); Add(FaunaWaterTemperatureC); }
+    if (FaunaWaterCoverDensity > 0.f) { Add(FaunaWaterCoverDensity); Add(FaunaWaterCoverHeightCm); }
+    if (WaterLevelRise > 0.f)
+    {
+        Add(WaterLevelRise); Add(WaterRiseSeconds); Add(WaterHighSeconds); Add(WaterFallSeconds); Add(WaterLowSeconds);
+    }
+    if (WaterRainRiseCm > 0.f) Add(WaterRainRiseCm);
     const FTransform T=Bounds->GetComponentTransform();const FVector P=T.GetLocation(),S=T.GetScale3D(),E=Bounds->GetUnscaledBoxExtent();const FQuat Q=T.GetRotation();
     Add(P.X);Add(P.Y);Add(P.Z);Add(S.X);Add(S.Y);Add(S.Z);Add(E.X);Add(E.Y);Add(E.Z);Add(Q.X);Add(Q.Y);Add(Q.Z);Add(Q.W);
     if(GrowthProfile){const uint32 Profile=GrowthProfile->Fingerprint();Add(Profile);}

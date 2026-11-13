@@ -16,6 +16,10 @@ public:
     static TArray<int64> GetAuthorityAgentIds(UObject* WorldContext);
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection",meta=(WorldContext="WorldContext"))
     static bool CaptureAgent(UObject* WorldContext,int64 AgentId,FString& Json);
+    /** Uses the same authority clearance query as swimmers. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Inspection",meta=(WorldContext="WorldContext"))
+    static bool InspectFaunaWater(UObject* WorldContext, FName RegionId, FVector Point, float Clearance,
+        FVector2D& BottomAndSurface, FVector& Current);
     /** Authority-only copied debug values. Clients return false and no logical state. */
     UFUNCTION(BlueprintCallable,Category="Creature|Inspection",meta=(WorldContext="WorldContext"))
     static bool CaptureMigration(UObject* WorldContext,FString& Json);

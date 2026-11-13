@@ -139,7 +139,7 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		State.bHasFacing = true;
 		State.FacingYawDegrees = Input.FacingYaw;
 		State.bEating = (Input.Visual.Flags & 2) != 0; State.bPursuingPrey = (Input.Visual.Flags & 4) != 0;
-		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::CorpseSettled) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
+		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::ExitWater) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
 		State.SenseSource = EEcoSenseSource((Input.Visual.Flags>>4)&3);
 		State.FocusYawDegrees = float(Input.Visual.FocusYaw)/182.0389f;
         State.BodyScale=Input.Visual.BodyScale/128.f;State.Maturity=Input.Visual.Maturity/255.f;State.CoatTone=Input.Visual.CoatTone/255.f;

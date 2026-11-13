@@ -328,6 +328,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	}
 	if (!BuildAgentLookup() || !ReconcilePopulation() || !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return false;
     if(!ProcessNaturalBirths(Time)||!ProcessFauna(Time)||!ProcessPopulationRecovery(Time)||(bEnableEcosystemLife&&!ReconcilePopulation()))return false;
+    PublishForageVisuals();
 	CompletedTime = Time;
 	PublishSummary();
 	return bReady;
@@ -374,8 +375,12 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 case EEcoFaunaFlightPhase::Takeoff: Present.Activity = uint8(EEcoSpeciesActivity::Takeoff); break;
                 case EEcoFaunaFlightPhase::Cruise: Present.Activity = uint8(EEcoSpeciesActivity::Fly); break;
                 case EEcoFaunaFlightPhase::Landing: Present.Activity = uint8(EEcoSpeciesActivity::Land); break;
+                case EEcoFaunaFlightPhase::Dive: Present.Activity = uint8(EEcoSpeciesActivity::Attack); break;
                 default:
-                    if (Fauna->AttackContact >= 0.) Present.Activity = uint8(EEcoSpeciesActivity::Attack);
+                    if (Fauna->bSwimming)
+                        Present.Activity = uint8(Fauna->ShorePhase == EEcoFaunaShorePhase::Entering ? EEcoSpeciesActivity::EnterWater
+                            : Fauna->ShorePhase == EEcoFaunaShorePhase::Exiting ? EEcoSpeciesActivity::ExitWater : EEcoSpeciesActivity::Swim);
+                    else if (Fauna->AttackContact >= 0.) Present.Activity = uint8(EEcoSpeciesActivity::Attack);
                     else if (bMeal) Present.Activity = uint8(EEcoSpeciesActivity::Eat);
                     else if (Now < Fauna->ThreatUntil) Present.Activity = uint8(EEcoSpeciesActivity::Flee);
                     else if (Now < Fauna->RootingUntil) Present.Activity = uint8(EEcoSpeciesActivity::Forage);

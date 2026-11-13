@@ -2692,7 +2692,12 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 	}
 	const int32 Wolves = FMath::Clamp(Settings.WolvesPerRegion, 0, 12);
 	int32 Deer = FMath::Clamp(Settings.DeerPerRegion, 1, FEcoV3IntegratedSettings::kTrainDeer);
-	while (S.Groups.Num() * (Deer + Wolves) > 512 && Deer > 1)
+	int32 NativeGroupCount = 0;
+	for (const FEcoCreatureSpawnGroup& Group : S.Groups)
+	{
+		NativeGroupCount += Group.bRulesOnly ? 0 : 1;
+	}
+	while (NativeGroupCount * (Deer + Wolves) > 512 && Deer > 1)
 	{
 		--Deer;   // 조정자 개체 상한 512 안에 든다
 	}
@@ -2707,7 +2712,7 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 	TArray<FVector> LevelTrunks;
 	GatherLevelTrunks(*World, LevelTrunks);
 	// 섬 무대 (11-05): 그룹 하나(섬 지역)에 섬 정사각을 덮는 스트리밍 힌트 자리만 쓴다 — 진짜 시작 자리는 섬 전체가 불린 뒤 땅/물 지도로 고른다 (IslandValidateNow)
-	if (bIsland && !IslandPlanHints(S, NewPlans, NewGroups, Total))
+	if (bIsland && (NativeGroupCount != S.Groups.Num() || !IslandPlanHints(S, NewPlans, NewGroups, Total)))
 	{
 		return false;
 	}
@@ -2715,6 +2720,14 @@ bool UEcoPolicyV3IntegratedSubsystem::ApplyToSpawner(AEcoCreatureIntegrationSpaw
 	for (int32 g = 0; !bIsland && g < NewGroups.Num(); ++g)
 	{
 		FEcoCreatureSpawnGroup& G = NewGroups[g];
+		if (G.bRulesOnly)
+		{
+			G.Herbivores = 0;
+			G.Wolves = 0;
+			G.HerbivoreSpawnPoints.Reset();
+			G.WolfSpawnPoints.Reset();
+			continue;
+		}
 		AEcologyRegion* Region = FindRegion(World, G.RegionId);
 		if (!Region)
 		{

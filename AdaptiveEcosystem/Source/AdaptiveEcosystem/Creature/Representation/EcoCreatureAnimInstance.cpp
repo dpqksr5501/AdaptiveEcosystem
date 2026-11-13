@@ -10,6 +10,7 @@ void UEcoCreatureAnimInstance::NativeInitializeAnimation()
 {
 	Super::NativeInitializeAnimation();
 	AnimationIndex = 0; PoseAgeSeconds = 0; GroundIKAlpha = 0;
+    bLocomotionActive = false;
     SpeedCmPerSecond = 0.f;
     AlertHeadAlpha=0;
     TurnHeadRotation = FRotator::ZeroRotator;
@@ -26,11 +27,11 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     ImmatureProportionAlpha=Visual&&Visual->bBound?1-Visual->VisualState.Maturity:0;
 	bAlive = Visual && Visual->bBound && Visual->VisualState.bAlive;
     const float GroundSpeed = bAlive ? Visual->VisualState.Velocity.Size2D() / FMath::Max(.65f, Visual->VisualState.BodyScale) : 0.f;
-    const float GaitSpeed = bAlive && Visual->bSoftenAbruptFacing
+    const float GaitSpeed = bAlive && Visual->bSoftenAbruptFacing && !Visual->bAlwaysSwimming
         ? GroundSpeed * FMath::GetMappedRangeValueClamped(FVector2D(45., 135.), FVector2D(1., .18), FMath::Abs(Visual->DirectionDegrees))
         : GroundSpeed;
     SpeedCmPerSecond = !bAlive || Visual->VisualState.bDiscontinuity ? GroundSpeed
-        : FMath::FInterpTo(SpeedCmPerSecond, GaitSpeed, DeltaSeconds, 14.f);
+        : FMath::Lerp(SpeedCmPerSecond, GaitSpeed, 1.f - FMath::Exp(-14.f * FMath::Max(0.f, DeltaSeconds)));
 	DirectionDegrees = bAlive ? Visual->DirectionDegrees : 0.0f;
 	TurnAmount = bAlive ? Visual->VisualTurnAmount : 0.0f;
 	bEating = bAlive && Visual->VisualState.bEating;
@@ -40,7 +41,10 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     int32 Desired = 0;
     const auto* Profile = Visual ? Visual->AnimationProfile.Get() : nullptr;
     const float StationarySpeed = Profile ? Profile->StationarySpeed : 40.f;
-    const bool MovingAlert=bAlive&&Activity==EEcoSpeciesActivity::AlertGraze&&GroundSpeed>StationarySpeed;
+    const float MoveThreshold = StationarySpeed * (!bAlive || Visual->VisualState.bDiscontinuity
+        ? 1.f : bLocomotionActive ? .85f : 1.15f);
+    bLocomotionActive = bAlive && GroundSpeed > MoveThreshold;
+    const bool MovingAlert = bLocomotionActive && Activity == EEcoSpeciesActivity::AlertGraze;
     AlertHeadAlpha=FMath::FInterpTo(AlertHeadAlpha,MovingAlert?1.f:0.f,DeltaSeconds,5.f);
     const EEcoSenseSource Sense=bAlive?Visual->VisualState.SenseSource:EEcoSenseSource::None;
     const bool FreshCue=Sense!=PreviousSense&&(Sense==EEcoSenseSource::Sight||Sense==EEcoSenseSource::Hearing);
@@ -48,12 +52,15 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
     SensoryAlertSeconds=FreshCue?.8f:FMath::Max(0.f,SensoryAlertSeconds-FMath::Max(0.f,DeltaSeconds));
     if (Visual && Visual->bBound && !bAlive) Desired = 8;
     else if (bAlive) {
-        if (Profile && Profile->Poses.Num() == 12 && Activity >= EEcoSpeciesActivity::Takeoff && Activity <= EEcoSpeciesActivity::Land)
+        if (Profile && Profile->Poses.Num() == 12 && Activity >= EEcoSpeciesActivity::Swim && Activity <= EEcoSpeciesActivity::ExitWater)
+            Desired = int32(Activity == EEcoSpeciesActivity::EnterWater ? EEcoPresentationPose::Takeoff
+                : Activity == EEcoSpeciesActivity::ExitWater ? EEcoPresentationPose::Land : EEcoPresentationPose::Fly);
+        else if (Profile && Profile->Poses.Num() == 12 && Activity >= EEcoSpeciesActivity::Takeoff && Activity <= EEcoSpeciesActivity::Land)
             Desired = int32(EEcoPresentationPose::Takeoff) + int32(Activity) - int32(EEcoSpeciesActivity::Takeoff);
         else if(Activity==EEcoSpeciesActivity::Sleep) Desired=5;
         else if(Activity==EEcoSpeciesActivity::Freeze) Desired=4;
         else if(Activity==EEcoSpeciesActivity::Attack||Activity==EEcoSpeciesActivity::Pounce) Desired=6;
-        else if(GroundSpeed<=StationarySpeed) {
+        else if (!bLocomotionActive) {
             // The pig uses its unused Freeze slot for a distinct stationary rooting clip.
             if (Activity == EEcoSpeciesActivity::Forage && Visual->VisualSpeciesId == TEXT("Pig")) Desired = 4;
             else if(Activity==EEcoSpeciesActivity::ShelterHold)Desired=3;
@@ -66,8 +73,12 @@ void UEcoCreatureAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
             else if(Activity==EEcoSpeciesActivity::Search || Visual->VisualState.SenseSource==EEcoSenseSource::Hearing || Visual->VisualState.SenseSource==EEcoSenseSource::Memory)Desired=2;
         }
     }
-    const bool bTurning = bAlive && Desired == 0 && GroundSpeed > StationarySpeed;
-    const double HeadYaw = bTurning ? FMath::Clamp(DirectionDegrees * 1.2 + TurnAmount * 6., -24., 24.) : 0.;
+    const bool bTurning = bLocomotionActive && Desired == 0;
+    // At an about-face the signed yaw error can wrap. Lead with the visible turn in that range.
+    const double HeadingWeight = Visual && Visual->bSoftenAbruptFacing
+        ? FMath::GetMappedRangeValueClamped(FVector2D(120., 170.), FVector2D(1., 0.), FMath::Abs(DirectionDegrees)) : 1.;
+    const double HeadingLead = FMath::Lerp(TurnAmount * 18., DirectionDegrees * 1.2, HeadingWeight);
+    const double HeadYaw = bTurning ? FMath::Clamp(HeadingLead + TurnAmount * 6., -24., 24.) : 0.;
     TurnHeadRotation.Yaw = FMath::FInterpTo(TurnHeadRotation.Yaw, HeadYaw, DeltaSeconds, 13.);
     PoseAgeSeconds += FMath::Max(0.f,DeltaSeconds);
     if(Desired!=AnimationIndex && (Desired==8||(Desired==2&&FreshCue)||PoseAgeSeconds>=(Profile?Profile->MinimumPoseHoldSeconds:0))) {

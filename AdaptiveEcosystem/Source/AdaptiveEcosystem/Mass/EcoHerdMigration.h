@@ -44,8 +44,10 @@ public:
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") TArray<FVector> Points;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") bool bBidirectional=true;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") bool bEnabled=true;
-    /** Also permits rule fauna to cross a short ground seam on this route. */
+    /** Permits rule fauna to cross a short seam on this route. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") bool bAllowRuleFaunaPassage=false;
+    /** Water-column waypoints for obligate swimmers. Native herds use ground routes. */
+    UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") bool bRuleFaunaWaterPassage=false;
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration") float CorridorWidth=600;
     /** Explicit knowledge source for life-v1. With this off, unvisited destinations have no live habitat report. */
     UPROPERTY(EditAnywhere, BlueprintReadWrite, Category="Migration|Knowledge") bool bSharesHabitatReports=true;

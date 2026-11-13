@@ -157,6 +157,8 @@ void AEcoCreatureIntegrationSpawner::CommitFaunaCarcass(const FEcoDeathOutcome& 
             {
                 Stock.KillerId = Death.PredatorStableAgentId;
                 Hunter->CarrionTargetId = Death.StableAgentId;
+                if (Hunter->bSwimming)
+                    Hunter->PhaseUntil = FMath::Max(Hunter->PhaseUntil, Death.Time + Settle + 2.5);
             }
             else
             {
@@ -181,9 +183,15 @@ void AEcoCreatureIntegrationSpawner::CommitFaunaCarcass(const FEcoDeathOutcome& 
         DeathState.RemoveAfter = FMath::Max(DeathState.RemoveAfter, Stock.ExpiresAt + 2.);
     }
     Stock.FeedingPlaces = Species ? Species->FeedingPlaces : 3;
-    Stock.bGrounded = (!Fauna || Fauna->Flight == EEcoFaunaFlightPhase::Grounded)
+    EcoCreatureMovement::FFaunaWaterColumn Water;
+    Stock.bWaterborne = Fauna && Species && (Species->IsAquatic() || Fauna->bSwimming)
+        && EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Stock.Region, Stock.Position, 1., Water);
+    Stock.bFloats = Stock.bWaterborne && Species->Locomotion == EEcoFaunaLocomotion::Amphibious;
+    Stock.bGrounded = (!Species || !Species->IsAquatic())
+        && (!Fauna || (Fauna->Flight == EEcoFaunaFlightPhase::Grounded && !Fauna->bSwimming))
         && EcoCreatureMovement::IsWadeableGround(*GetWorld(), Stock.Position, 0.f);
     FaunaCarcasses.Add(Death.StableAgentId, Stock);
-    UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Carcass] Id=%lld Species=%s Total=%.3f Native=%.3f Killer=%.3f Remaining=%.3f"),
-        Death.StableAgentId, *Death.SpeciesId.ToString(), Total, NativeReserved, KillerMeal, Stock.Remaining);
+    UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Carcass] Id=%lld Species=%s Total=%.3f Native=%.3f Killer=%.3f Remaining=%.3f Medium=%s"),
+        Death.StableAgentId, *Death.SpeciesId.ToString(), Total, NativeReserved, KillerMeal, Stock.Remaining,
+        Stock.bWaterborne ? (Stock.bFloats ? TEXT("Floating") : TEXT("Sinking")) : (Stock.bGrounded ? TEXT("Ground") : TEXT("Unsettled")));
 }

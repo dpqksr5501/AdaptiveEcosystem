@@ -2,6 +2,7 @@
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
+#include "Creature/Runtime/EcoCreatureMovement.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/EcoPolicyV3SocialBridge.h"
@@ -32,6 +33,20 @@
 #include "HAL/IConsoleManager.h"
 
 static TAutoConsoleVariable<int32> CVarInspectorVisible(TEXT("eco.Inspector.Visible"),1,TEXT("Show the creature detail panel. Migration overview has its own M/debug switch."));
+bool UEcoCreatureInspectionLibrary::InspectFaunaWater(UObject* Context, FName RegionId, FVector Point,
+    float Clearance, FVector2D& BottomAndSurface, FVector& Current)
+{
+    BottomAndSurface = FVector2D::ZeroVector;
+    Current = FVector::ZeroVector;
+    UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(Context, EGetWorldErrorMode::ReturnNull) : nullptr;
+    EcoCreatureMovement::FFaunaWaterColumn Water;
+    if (!World || World->GetNetMode() == NM_Client
+        || !EcoCreatureMovement::SampleFaunaWater(*World, RegionId, Point, Clearance, Water)) return false;
+    BottomAndSurface = FVector2D(Water.Bottom, Water.Surface);
+    Current = Water.Current;
+    return true;
+}
+
 bool UEcoCreatureInspectionLibrary::CaptureMigration(UObject* Context,FString& Json)
 {
     Json.Reset();auto* W=GEngine?GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull):nullptr;
@@ -92,6 +107,33 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetStringField(TEXT("last_known"),Cue->Memory.LastKnownPosition.ToCompactString());
             }
             if(World->GetNetMode()==NM_Client)return;
+            if(const auto* Fauna=Manager.GetFragmentDataPtr<FEcoFaunaFragment>(E))
+            {
+                const auto& Life=Fauna->Life;
+                auto Details=MakeShared<FJsonObject>();
+                Details->SetNumberField(TEXT("size_gene"),Life.Genome.Size);
+                Details->SetNumberField(TEXT("speed_gene"),Life.Genome.Speed);
+                Details->SetNumberField(TEXT("caution_gene"),Life.Genome.Caution);
+                Details->SetNumberField(TEXT("sociability_gene"),Life.Genome.Sociability);
+                Details->SetNumberField(TEXT("coat_gene"),Life.Genome.Coat);
+                if (const auto* Vitals=Manager.GetFragmentDataPtr<FEcoVitalsFragment>(E))
+                {
+                    Details->SetNumberField(TEXT("health"),Vitals->HP);
+                    Details->SetNumberField(TEXT("energy"),Vitals->Energy);
+                }
+                Details->SetNumberField(TEXT("stamina"),Fauna->Stamina);
+                Details->SetStringField(TEXT("prey"),LexToString(Fauna->TargetId));
+                Details->SetStringField(TEXT("carcass"),LexToString(Fauna->CarrionTargetId));
+                Details->SetNumberField(TEXT("food_patch_index"),Fauna->PatchTarget);
+                Details->SetNumberField(TEXT("blocked_patch_index"),Fauna->BlockedPatch);
+                Details->SetNumberField(TEXT("flight_phase"),uint8(Fauna->Flight));
+                Details->SetNumberField(TEXT("shore_phase"),uint8(Fauna->ShorePhase));
+                Details->SetBoolField(TEXT("swimming"),Fauna->bSwimming);
+                Details->SetStringField(TEXT("goal"),Fauna->Goal.ToCompactString());
+                Details->SetStringField(TEXT("parent_a"),LexToString(Life.ParentA));
+                Details->SetStringField(TEXT("parent_b"),LexToString(Life.ParentB));
+                Data->SetObjectField(TEXT("rule_fauna"),Details);
+            }
             if (GameplayHistory)
             {
                 TArray<TSharedPtr<FJsonValue>> Events;

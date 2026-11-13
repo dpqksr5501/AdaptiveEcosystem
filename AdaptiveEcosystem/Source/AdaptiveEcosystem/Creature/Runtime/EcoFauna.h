@@ -20,9 +20,16 @@ UENUM(BlueprintType)
 enum class EEcoFaunaDiet : uint8 { Herbivore, Omnivore, Carnivore };
 
 UENUM(BlueprintType)
-enum class EEcoFaunaLocomotion : uint8 { Ground, Flight };
+enum class EEcoFaunaLocomotion : uint8 { Ground, Flight, Swimming, Amphibious };
 
-enum class EEcoFaunaFlightPhase : uint8 { Grounded, Takeoff, Cruise, Landing };
+enum class EEcoFaunaFlightPhase : uint8 { Grounded, Takeoff, Cruise, Landing, Dive };
+enum class EEcoFaunaShorePhase : uint8 { None, Entering, Exiting };
+
+UENUM(BlueprintType)
+enum class EEcoFaunaFoodIntent : uint8 { None, LivePrey, Carcass, HabitatPatch };
+
+UENUM(BlueprintType)
+enum class EEcoFaunaPlantGuild : uint8 { Unspecified, Grass, Forbs, Browse, WetMeadow };
 
 USTRUCT(BlueprintType)
 struct FEcoFaunaPersistenceSettings
@@ -69,6 +76,8 @@ struct FEcoFaunaSpecies
     UPROPERTY(EditAnywhere) TSubclassOf<AEcoCreatureRepresentationActor> VisualClass;
     UPROPERTY(EditAnywhere) EEcoFaunaDiet Diet = EEcoFaunaDiet::Herbivore;
     UPROPERTY(EditAnywhere) EEcoFaunaLocomotion Locomotion = EEcoFaunaLocomotion::Ground;
+    /** Relative forage value. An omitted guild remains an ordinary eligible food. */
+    UPROPERTY(EditAnywhere, Category="Forage") TMap<EEcoFaunaPlantGuild, float> PlantPreferences;
     /** Explicit relation. Only fauna residents can be selected by this backend. */
     UPROPERTY(EditAnywhere) TArray<FEcoFaunaPreyRule> PreyRules;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0.01", Units="kg")) float AdultMass = 40.f;
@@ -78,6 +87,14 @@ struct FEcoFaunaSpecies
     UPROPERTY(EditAnywhere, meta=(ClampMin="1")) float WalkSpeed = 150.f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="1")) float RunSpeed = 330.f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm/s^2")) float GroundAcceleration = 750.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0.65", ClampMax="1")) float MinGroundNormalZ = .65f;
+    /** Zero preserves unrestricted heading; positive values limit turning during locomotion. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0")) float GroundTurnDegreesPerSecond = 0.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="1")) float SwimDepthFraction = .5f;
+    UPROPERTY(EditAnywhere, Category="Spawning") FVector2D SpawningTemperatureC = FVector2D(0., 40.);
+    UPROPERTY(EditAnywhere, Category="Spawning", meta=(ClampMin="0", Units="cm/s")) float MaxNurseryCurrent = 120.f;
+    /** Uses inherited caution and current physical condition in rule decisions for this species. */
+    UPROPERTY(EditAnywhere) bool bIndividualResponse = false;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="cm")) float StalkRange = 0.f;
     UPROPERTY(EditAnywhere) bool bFlankDefendedPrey = false;
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="cm")) float HabitatCarrionRange = 0.f;
@@ -121,6 +138,13 @@ struct FEcoFaunaSpecies
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="cm")) float ThreatNearAwarenessRange = 280.f;
     /** Soft radius for routine wandering. Threats, family and resources can lead beyond it. */
     UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm")) float RoutineHomeRadius = 520.f;
+    /** Local conspecific spacing for ordinary movement. Zero keeps the current independent routine. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="cm")) float SocialNeighborRadius = 0.f;
+    /** Scales casual adult male grouping. Parent care and feeding retain their own checks. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="1")) float AdultMaleSocialAffinity = 1.f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm")) float SocialSpacing = 180.f;
+    /** Air temperatures where exposed heat pressure begins and reaches its maximum. Both zero disables it. */
+    UPROPERTY(EditAnywhere, Category="Habitat") FVector2D HeatResponseC = FVector2D::ZeroVector;
     float MealStart() const
     { return MealStartFraction > 0.f ? MealStartFraction : UsesPlantFood() ? .72f : FMath::Max(.8f, CarrionHungerFraction); }
     UPROPERTY(EditAnywhere) bool bAllowConspecificCarrion = false;
@@ -133,8 +157,18 @@ struct FEcoFaunaSpecies
     UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm")) float FlightCruiseHeight = 1200.f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm")) float FlightCeiling = 3000.f;
     UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm/s")) float FlightSpeed = 650.f;
+    UPROPERTY(EditAnywhere) bool bCanDiveHunt = false;
+    /** A positive duration requires a supported breeding site for natural hatches. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="s")) float NestlingSeconds = 0.f;
 
-    bool UsesPlantFood() const { return Diet != EEcoFaunaDiet::Carnivore; }
+    bool IsAquatic() const { return Locomotion == EEcoFaunaLocomotion::Swimming; }
+    bool CanSwim() const { return IsAquatic() || Locomotion == EEcoFaunaLocomotion::Amphibious; }
+    bool UsesPlantFood() const { return !IsAquatic() && Diet != EEcoFaunaDiet::Carnivore; }
+    float PlantPreference(EEcoFaunaPlantGuild Guild) const
+    {
+        const float* Value = PlantPreferences.Find(Guild);
+        return Value ? *Value : 1.f;
+    }
     float CarrionReach() const { return FMath::Clamp(AttackReach, 24.f, 100.f); }
 };
 
@@ -149,6 +183,33 @@ struct FEcoFaunaPlacement
     UPROPERTY(EditAnywhere) int32 HabitatSpawnStage = 1;
 };
 
+USTRUCT(BlueprintType)
+struct FEcoFaunaPerch
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere) FName RegionId;
+    UPROPERTY(EditAnywhere) FName SpeciesId;
+    UPROPERTY(EditAnywhere) FVector Location = FVector::ZeroVector;
+    /** Optional stable identifier for a breeding site. Ordinary roosts leave this empty. */
+    UPROPERTY(EditAnywhere) FName NestId;
+};
+
+USTRUCT(BlueprintType)
+struct FEcoFaunaCoolingSite
+{
+    GENERATED_BODY()
+
+    UPROPERTY(EditAnywhere) FName Id;
+    UPROPERTY(EditAnywhere) FName RegionId;
+    UPROPERTY(EditAnywhere) FName SpeciesId;
+    UPROPERTY(EditAnywhere) FVector Center = FVector::ZeroVector;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="1", Units="cm")) float Radius = 90.f;
+    /** Relief available in dry weather. Shade and perennial wet ground may use the same value at both endpoints. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="1")) float DryRelief = .5f;
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", ClampMax="1")) float WetRelief = .5f;
+};
+
 /** Finite, spatial food reserve with optional body-size shelter at its center. */
 USTRUCT(BlueprintType)
 struct FEcoFaunaHabitatPatch
@@ -158,6 +219,11 @@ struct FEcoFaunaHabitatPatch
     UPROPERTY(EditAnywhere) FName Id;
     UPROPERTY(EditAnywhere) FName RegionId;
     UPROPERTY(EditAnywhere) FVector Center = FVector::ZeroVector;
+    UPROPERTY(EditAnywhere) bool bSubmerged = false;
+    UPROPERTY(EditAnywhere) bool bAquaticNursery = false;
+    UPROPERTY(EditAnywhere) bool bHasShoreEntry = false;
+    UPROPERTY(EditAnywhere) FVector ShorePoint = FVector::ZeroVector;
+    UPROPERTY(EditAnywhere) FVector WaterEntryPoint = FVector::ZeroVector;
     UPROPERTY(EditAnywhere) int32 Stage = 1;
     UPROPERTY(EditAnywhere) FName ShelteredSpecies;
     UPROPERTY(EditAnywhere) float ShelterRadius = 0.f;
@@ -165,7 +231,35 @@ struct FEcoFaunaHabitatPatch
     UPROPERTY(EditAnywhere) TArray<FName> Consumers;
     UPROPERTY(EditAnywhere) float Capacity = 0.f;
     UPROPERTY(EditAnywhere) float RegrowthPerSecond = 0.f;
+    /** Optional ground forage. Unspecified keeps the existing patch contract. */
+    UPROPERTY(EditAnywhere, Category="Forage") EEcoFaunaPlantGuild PlantGuild = EEcoFaunaPlantGuild::Unspecified;
+    /** Minimum, optimum and maximum air temperature for recovery of this patch. */
+    UPROPERTY(EditAnywhere, Category="Forage") FVector PlantGrowthTemperature = FVector(0., 18., 42.);
+    /** Growth multipliers at zero and full normalized rainfall. */
+    UPROPERTY(EditAnywhere, Category="Forage") FVector2D PlantGrowthRainfall = FVector2D(.75, 1.25);
+    UPROPERTY(EditAnywhere, Category="Forage", meta=(ClampMin="0", ClampMax="1")) float PlantMoistureNeed = 0.f;
+    UPROPERTY(EditAnywhere, Category="Forage", meta=(ClampMin="0")) float PlantDryLossPerSecond = 0.f;
+    /** Positive on a submerged patch to scale recovery by water depth above its center. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="cm")) float SeasonalFullGrowthDepthCm = 0.f;
+    /** Stock lost per second while an inundation-dependent patch is exposed. */
+    UPROPERTY(EditAnywhere, meta=(ClampMin="0")) float SeasonalDryLossPerSecond = 0.f;
     UPROPERTY(EditAnywhere) float EnergyPerMeal = 3.f;
+
+    bool IsPlantForage() const { return PlantGuild != EEcoFaunaPlantGuild::Unspecified; }
+
+    double PlantRecoveryMultiplier(double Temperature, double Rainfall) const
+    {
+        const FVector& T = PlantGrowthTemperature;
+        const double Thermal = FMath::Min((Temperature - T.X) / (T.Y - T.X), (T.Z - Temperature) / (T.Z - T.Y));
+        return FMath::Clamp(Thermal, 0., 1.) * FMath::Lerp(PlantGrowthRainfall.X, PlantGrowthRainfall.Y, FMath::Clamp(Rainfall, 0., 1.));
+    }
+
+    double PlantDryStress(double Rainfall, double Humidity) const
+    {
+        if (PlantMoistureNeed <= 0.f) return 0.;
+        const double Moisture = FMath::Lerp(FMath::Clamp(Rainfall, 0., 1.), FMath::Clamp(Humidity, 0., 1.), .35);
+        return FMath::Clamp(1. - Moisture / PlantMoistureNeed, 0., 1.);
+    }
 
     bool Shelters(FName Species, const FVector& Position) const
     {
@@ -233,6 +327,9 @@ struct FEcoFaunaFragment : public FMassFragment
     uint32 DecisionCount = 0;
     bool bStalking = false;
     bool bFollowingCaregiver = false;
+    bool bSwimming = false;
+    EEcoFaunaShorePhase ShorePhase = EEcoFaunaShorePhase::None;
+    FVector SwimEntry = FVector::ZeroVector;
     EEcoFaunaFlightPhase Flight = EEcoFaunaFlightPhase::Grounded;
 
     float RecentForageIntake(double Now, float MemorySeconds) const
@@ -281,17 +378,20 @@ struct FEcoFaunaCarcass
     int32 UsedPlaces = 0;
     int32 FeedingPlaces = 2;
     bool bGrounded = true;
+    bool bWaterborne = false;
+    bool bFloats = false;
     float Remaining = 0.f;
 
-    bool IsAvailable(FName EaterRegion, const FEcoFaunaSpecies& Eater, double Now) const
+    bool IsAvailable(FName EaterRegion, const FEcoFaunaSpecies& Eater, double Now, bool bInWater = false) const
     {
-        return bGrounded && Region == EaterRegion && (Species != Eater.SpeciesId || Eater.bAllowConspecificCarrion)
+        return (bInWater ? bWaterborne : bGrounded) && Region == EaterRegion
+            && (Species != Eater.SpeciesId || Eater.bAllowConspecificCarrion)
             && Now >= OpenAt && Now < ExpiresAt && Remaining > UE_SMALL_NUMBER;
     }
 
-    bool CanApproach(int64 AgentId, double Now) const
+    bool CanApproach(int64 AgentId, double Now, bool bInWater = false) const
     {
-        return bGrounded && Now >= OpenAt && Now < ExpiresAt && Remaining > UE_SMALL_NUMBER
+        return (bInWater ? bWaterborne : bGrounded) && Now >= OpenAt && Now < ExpiresAt && Remaining > UE_SMALL_NUMBER
             && (Now >= ExclusiveUntil || KillerId == AgentId);
     }
 
@@ -301,9 +401,9 @@ struct FEcoFaunaCarcass
             || (bAfterSharing && bGrounded && Now < ExpiresAt && Remaining > UE_SMALL_NUMBER));
     }
 
-    float Bite(int64 AgentId, double Now, float Requested)
+    float Bite(int64 AgentId, double Now, float Requested, bool bInWater = false)
     {
-        if (!CanApproach(AgentId, Now) || Requested <= 0.f) return 0.f;
+        if (!CanApproach(AgentId, Now, bInWater) || Requested <= 0.f) return 0.f;
         if (Now >= PlacesResetAt) { PlacesResetAt = Now + 1.; UsedPlaces = 0; }
         if (UsedPlaces >= FeedingPlaces) return 0.f;
         ++UsedPlaces;

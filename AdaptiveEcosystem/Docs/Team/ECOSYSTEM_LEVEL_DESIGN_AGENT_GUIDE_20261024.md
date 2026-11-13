@@ -1,6 +1,6 @@
 # 레벨 디자인 담당·AI agent 작업 안내
 
-최신 다종 맵의 이 역할 작업과 완료 기준은 [다종 생태계 팀 인수인계](FAUNA_TEAM_HANDOFF.md)를 먼저 확인한다.
+최신 다종 맵을 팀 레벨에 적용할 때는 [송해찬 님의 작업 요청과 완료 기준](FAUNA_TEAM_REQUESTS_20261113.md#송해찬-님--레벨-디자인)과 [이용 가능 서식지와 통로 비교](../Architecture/FAUNA_HABITAT_CAPACITY_20261113.md)를 먼저 확인한다. 팀 통합 레벨 검증 이력과 다종 소유 맵 선택은 [다종 생태계 팀 인수인계](FAUNA_TEAM_HANDOFF.md)에 있다.
 
 현재 통합 레벨 검증은 원본 `Integration_JwJ`와 소유 복사본 `LV_JYU_IntegrationR7e`, `LV_JYU_IntegrationR7eFauna`를 사용한다. 다종 복사본의 추가 여섯 종은 Forest에 있으며 기존 다종 전용 맵의 먹이 패치를 옮기지 않았다. 포식자 기아와 출생 보류를 분리해 검증할 때는 이 초기 조건과 통로·실제 먹이 접근 조건을 함께 기록한다. [맵 작성과 검증 조건](../Architecture/FAUNA_POPULATION_BALANCE.md#integration_jwj-복사본의-r7e자연-출생과-다종-공존)
 
@@ -87,6 +87,8 @@ Shade는 현재 광원/그림자에서 자동 측정하지 않는다. 나무를 
 
 `bSharesHabitatReports`는 단순 디버그 옵션이 아니라 미방문 목적지 정보의 authoring된 공유 지식 입력이다. 레벨 편의로 켜기 전에 학습/생태 담당과 관측·기억 의미를 맞춘다. HUD 경로는 읽기 전용이며 선이 연결됐다고 실제 인계/정착이 성공한 것은 아니다. [이주 계약](../조연우/HERD_MIGRATION_AND_SIGNAL_CONTRACT.md)을 따른다.
 
+다종 수변 후보는 저수위·범람·퇴수마다 하상 깊이, 연결 구간, 입수·상륙과 피난 수역을 함께 기록한다. 위에서 첫 `WorldStatic` 충돌을 하상으로 읽는 현재 검사에서는 다리·유목·암반 아래의 깊이를 별도로 확인한다. 육상은 성체와 어린 개체가 출발점에서 실제 먹이와 휴식 지점에 닿는지 확인하고, 같은 초기 총량에서도 어느 패치가 먼저 비는지 기록한다. [이용 가능 공간의 작성과 측정](../Architecture/FAUNA_HABITAT_CAPACITY_20261113.md#레벨에서-작성하고-측정할-항목)
+
 ## 7. 변경 종류별 acceptance
 
 | 변경 | 최소 확인할 결과 |
@@ -106,6 +108,8 @@ Shade는 현재 광원/그림자에서 자동 측정하지 않는다. 나무를 
 날씨 담당에게 지역 ID/Bounds/날씨 writer·실내/수역·카메라 경계 조건을 넘긴다. 서버 담당에게 상시 로드할 논리 입력, streaming 수명, 표본/Actor 상한과 soft 참조를 넘긴다. 학습 담당에게 새 경사/수원/은신처/이주 공유 지식과 기존 세계와의 차이를 넘긴다. 식생 차폐의 실제 소비와 화면상의 불투명도를 동일시하지 않는다.
 
 성능은 장식 풀 밀도·ISM/HISM instance·그림자·translucency·LOD·streaming hitch와 논리 셀 비용을 나눠 비교한다. 화면을 풍성하게 만든 결과로 서버 food 잔고/개체 수를 늘리지 않는다. Nanite/HLOD/품질 설정을 켰다는 사실만으로 성능 목표를 통과했다고 쓰지 않는다.
+
+팀 World Partition 맵에서는 정적 수관·장식의 HLOD 전환 전후를 같은 경로로 비교하고, 강변을 지나 셀에서 나갔다 돌아올 때 원본·프록시 중복과 전환 hitch를 기록한다. 먹이 BP와 수면을 따라 움직이는 식생은 현재 권위·표현 경로를 사용한다. 셀을 다시 읽을 때 군락 재고·외형과 권위 수면의 일치를 검증한다. `LV_JYU_RiparianReach`의 D3D11 검증은 개별 LOD·컬링·인스턴싱 범위다. [수변 렌더 기준](../Architecture/FAUNA_HABITAT_CAPACITY_20261113.md#수변-식생의-hlodlod렌더-점검)
 
 최종 인계에는 맵/에셋 경로, 변경 전후 화면·좌표/범위, RegionId와 flags, 실제 실행 시간·개체/접속 수, 장부/접지/통행/late join·cook 결과, 미검증 항목을 적는다. World Partition 외부 에셋·LFS까지 push를 확인한다. 원시 Saved/개인 발표/빌드 출력은 제외한다. [공통 종료 양식](ECOSYSTEM_AGENT_START_PROMPTS_20261024.md#5-종료-인수인계-양식)을 사용한다.
 

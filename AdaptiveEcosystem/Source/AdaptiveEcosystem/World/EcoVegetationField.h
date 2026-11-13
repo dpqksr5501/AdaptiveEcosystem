@@ -22,6 +22,7 @@ public:
     AEcoVegetationHabitat();
     virtual void OnConstruction(const FTransform& Transform) override;
     virtual void BeginPlay() override;
+    virtual void Tick(float DeltaSeconds) override;
     UFUNCTION(BlueprintPure,Category="Habitat") bool IsValidHabitat() const;
     bool ContainsGround(const FVector& Point) const;
     UPROPERTY(VisibleAnywhere) TObjectPtr<UBoxComponent> Bounds;
@@ -47,6 +48,26 @@ public:
     UPROPERTY(EditAnywhere, Category="Habitat") bool bConnectedFreshWater = false;
     UPROPERTY(EditAnywhere, Category="Habitat") float WaterSurfaceZ = 0;
     UPROPERTY(EditAnywhere, Category="Habitat", meta=(ClampMin="0",ClampMax="200")) float MaxSupplyRiseCm = 100;
+    /** Opt-in water column for rule-fauna. The bottom is read from world collision. */
+    UPROPERTY(EditAnywhere, Category="Habitat|Water") bool bSupportsFaunaSwimming = false;
+    /** Disable on local water inputs that share an already rendered water surface. */
+    UPROPERTY(EditAnywhere, Category="Habitat|Water") bool bDrawWaterSurface = true;
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(Units="cm/s")) FVector FaunaWaterCurrent = FVector::ZeroVector;
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="0", ClampMax="40")) float FaunaWaterTemperatureC = 20.f;
+    /** Underwater visual cover at the bottom of a vegetated water column. */
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="0", ClampMax="1")) float FaunaWaterCoverDensity = 0.f;
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="0", Units="cm")) float FaunaWaterCoverHeightCm = 0.f;
+    /** Optional rise above the authored low-water surface. Zero keeps a static source. */
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="0", Units="cm")) float WaterLevelRise = 0.f;
+    /** Authored runoff response at full normalized regional rainfall. */
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="0", ClampMax="100", Units="cm"))
+    float WaterRainRiseCm = 0.f;
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="1", Units="s")) float WaterRiseSeconds = 30.f;
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="0", Units="s")) float WaterHighSeconds = 20.f;
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="1", Units="s")) float WaterFallSeconds = 45.f;
+    UPROPERTY(EditAnywhere, Category="Habitat|Water", meta=(ClampMin="0", Units="s")) float WaterLowSeconds = 40.f;
+    double GetWaterLevelZ() const;
+    double EvaluateWaterLevelZ(double SimulationSeconds, float Rainfall = 0.f) const;
 private:
     void RefreshWaterVisual();
 };
