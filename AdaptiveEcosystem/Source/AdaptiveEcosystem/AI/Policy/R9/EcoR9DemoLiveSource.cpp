@@ -411,7 +411,8 @@ namespace EcoR9Demo
 			return false;
 		}
 		// 두뇌: 장면 종 수만큼 (세 종 장면 = deer·wolf·boar 그대로, 동물 장면 = + buffalo·leopard·fox). 동물 장면의 세 옛 종 두뇌는 S′ 에서 배운 가중치를
-		// 그대로 쓴다 (파이썬 rebody 와 같은 뜻 — 메타만 다름). 몸 해시는 보지 않는다 (CONTRACT_NOTES 6)
+		// 그대로 쓴다 (파이썬 rebody 와 같은 뜻 — 메타만 다름). 몸 해시: 장면에 종별 body_hash 줄이 있을 때만 두뇌 머리글 body_hash 와 대조해 다르면 거부한다
+		// (RL_R9_TURN_EFFORT_DESIGN.md 7-2 — 움직임 장면은 늘 있음). 줄이 없는 옛 scene.txt 는 예전처럼 보지 않는다 (CONTRACT_NOTES 6)
 		I.NumSp = LiveImpl::NumSp(P);
 		std::string Summary;
 		for (int k = 0; k < I.NumSp; ++k)
@@ -432,6 +433,11 @@ namespace EcoR9Demo
 			if (I.Brains[k].Species != SpeciesKey(static_cast<std::uint8_t>(k)))
 			{
 				Err = "두뇌 파일 " + Name + " 의 종이 " + I.Brains[k].Species + " 이다";
+				return false;
+			}
+			if (!EcoR9::CheckBrainBody(P, k, I.Brains[k], &Err))
+			{
+				Err = "두뇌 파일 " + Name + " 이 장면 몸과 다르다: " + Err;
 				return false;
 			}
 			Summary += (k ? ", " : "") + std::string(SpeciesKey(static_cast<std::uint8_t>(k))) + "=" + I.Brains[k].PayloadSha256.substr(0, 8);

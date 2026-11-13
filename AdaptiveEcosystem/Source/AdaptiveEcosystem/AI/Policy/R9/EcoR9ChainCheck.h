@@ -23,6 +23,7 @@ namespace EcoR9ChainCheck
 		std::string Error;          // 못 돌린 까닭
 		int NumSpecies = 0;
 		bool bFauna = false;
+		bool bMotion = false;       // 몸 움직임 M1 회전 한계 켬 (장면 motion_on · motion_turn — RL_R9_TURN_EFFORT_DESIGN.md 7-2)
 		long Decisions = 0;
 		long Steps = 0;
 		long Checks = 0;            // 상태·관측을 견준 곳 (@decision·@final)
@@ -35,19 +36,30 @@ namespace EcoR9ChainCheck
 		long Bites = 0;
 		long Gores = 0;
 		long Deaths = 0;
+		long TurnClips = 0;         // 몸 움직임: 회전 한계가 방향을 자른 스텝 (코어 통계 Tot.TurnClip 합)
+		long TurnOver = 0;          // 몸 움직임: 벽 아닌 스텝에서 θ 넘게 돈 몸 (0 이어야 함)
+		long MoveSteps = 0;         // 몸 움직임: 움직인 몸-스텝 · 그 가운데 벽 닿음
+		long WallHitSteps = 0;
 		double MaxDiff = 0.0;       // 상태 값 가장 큰 차
 		std::string FirstBad;       // 처음 어긋난 곳
 
-		bool Pass() const { return bRan && Bad == 0 && ObsBad == 0 && DeadBad == 0 && Underflow == 0 && GoreMismatch == 0; }
+		bool Pass() const { return bRan && Bad == 0 && ObsBad == 0 && DeadBad == 0 && Underflow == 0 && GoreMismatch == 0 && TurnOver == 0; }
 
 		std::string Line() const
 		{
-			char Buf[512];
+			char Buf[640];
 			std::snprintf(Buf, sizeof(Buf),
-						  "종 %d (동물 세계 %s) · 결정 %ld · 스텝 %ld · 대조 %ld 곳 (상태 값 %ld) | 사건: 물기 %ld · 들이받기 %ld · 죽음 %ld | 어긋남: 상태 %ld (최대 차 %.3g) · "
+						  "종 %d (동물 세계 %s · 회전 한계 %s) · 결정 %ld · 스텝 %ld · 대조 %ld 곳 (상태 값 %ld) | 사건: 물기 %ld · 들이받기 %ld · 죽음 %ld | 어긋남: 상태 %ld (최대 차 %.3g) · "
 						  "관측 %ld · 죽은 칸 %ld · 난수 %ld · 들이받기 순서 %ld",
-						  NumSpecies, bFauna ? "켬" : "끔", Decisions, Steps, Checks, Compared, Bites, Gores, Deaths, Bad, MaxDiff, ObsBad, DeadBad, Underflow, GoreMismatch);
-			return std::string(Buf) + (FirstBad.empty() ? std::string() : " | 처음: " + FirstBad) + (Error.empty() ? std::string() : " | " + Error);
+						  NumSpecies, bFauna ? "켬" : "끔", bMotion ? "켬" : "끔", Decisions, Steps, Checks, Compared, Bites, Gores, Deaths, Bad, MaxDiff, ObsBad, DeadBad,
+						  Underflow, GoreMismatch);
+			std::string Out(Buf);
+			if (bMotion)
+			{
+				std::snprintf(Buf, sizeof(Buf), " | 회전 자름 %ld · θ 넘음 %ld · 벽 닿음 %ld / 움직인 %ld", TurnClips, TurnOver, WallHitSteps, MoveSteps);
+				Out += Buf;
+			}
+			return Out + (FirstBad.empty() ? std::string() : " | 처음: " + FirstBad) + (Error.empty() ? std::string() : " | " + Error);
 		}
 	};
 
@@ -303,6 +315,7 @@ namespace EcoR9ChainCheck
 		}
 		R.NumSpecies = P.NumSpecies;
 		R.bFauna = P.FaunaOn;
+		R.bMotion = P.MotionOn && P.MotionTurn;
 		EcoR9::World W;
 		if (!W.Init(P, St0, &Err))
 		{
@@ -385,6 +398,13 @@ namespace EcoR9ChainCheck
 				R.Gores += Ev.Kind == EcoR9::EvGore ? 1 : 0;
 				R.Deaths += Ev.Kind == EcoR9::EvDeath ? 1 : 0;
 			}
+		}
+		for (int k = 0; k < P.NumSpecies; ++k)
+		{
+			R.TurnClips += static_cast<long>(W.Tot.TurnClip[k]);
+			R.TurnOver += static_cast<long>(W.Tot.TurnOver[k]);
+			R.MoveSteps += static_cast<long>(W.Tot.MoveSteps[k]);
+			R.WallHitSteps += static_cast<long>(W.Tot.WallHitSteps[k]);
 		}
 		R.bRan = true;
 		return R;

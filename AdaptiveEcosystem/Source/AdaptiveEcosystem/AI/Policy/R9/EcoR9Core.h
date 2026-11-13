@@ -6,6 +6,9 @@
 // 동물 세계 (2026-11-13): 장면 덤프에 fauna_on 이 있으면 저장소 파이썬 configs/v3_r9_fauna.yaml 세계 (6 종: + 물소·표범·여우,
 //       R1 몸무게 상처 · P1 은신처 안 물기 · R2 들이받기(2b) · R3 무늬 · R6 사체 먹는 자리 · R7 종별 번식 쉼 — RL_R9_SPECIES_TRAITS.md 4 절,
 //       r9_world.py `if self.body.fauna` 갈래). 없으면 S′ 줄 그대로 (세 종 장면은 예전과 비트 같음). 대조: scratchpad/r9/ue_demo/fauna/CORE_FAUNA.md.
+// 몸 움직임 (2026-11-13, RL_R9_TURN_EFFORT_DESIGN.md 3-1·7-2): 장면 덤프에 motion_on 이 있으면 파이썬 body_common.motion 세계
+//       (configs/v3_r9_fauna_motion.yaml — M1 회전 한계만. M2 motion_effort 는 사용자 결정 전이라 LoadParams 가 거부). 없으면 옛 줄 그대로.
+//       장면에 종별 body_hash 가 있으면 CheckBrainBody 로 두뇌 머리글 body_hash 와 대조한다 (없으면 — 옛 scene.txt — 대조하지 않음).
 // 근거: scratchpad/r9/ue_demo/SPEC_PORT.md 5·6·7 절, 견본 py/ref_step.py · py/ref_obs.py (줄 차례를 그대로 따름).
 // 지킴: 표준 라이브러리만, 예외·RTTI 없음(언리얼 모듈에서도 컴파일), 실행 중 파이썬 없음, 새 손규칙 없음(학습 세계 그대로).
 // 수치: 상태는 double, 관측은 double 로 셈 → [-1, 1] 자름 → float32. 합은 파이썬과 같은 차례로 더함(행렬곱·두 갈래 합 없음).
@@ -38,6 +41,7 @@ constexpr int kNumSpecies = 3;       // S′ 세 종 (사슴·늑대·멧돼지)
 constexpr int kMaxSpecies = 6;       // 동물 세계 1 단계: + 물소·표범·여우 (파이썬 ALL_SPECIES 앞 6 — 쥐·까마귀는 3 단계라 없음)
 constexpr int kNumFoods = 3;
 constexpr double kEps = 1e-9;
+constexpr double kTurnTie = 1e-12;   // 몸 움직임 M1: |외적| 이 이 안이면 정확히 뒤 명령 → uid 홀짝으로 돌 쪽 (파이썬 r9_world.TURN_TIE, 설계 7-4 ①)
 
 enum ESpecies : int { SpDeer = 0, SpWolf = 1, SpBoar = 2, SpBuffalo = 3, SpLeopard = 4, SpFox = 5 };
 enum EFood : int { FoodGrass = 0, FoodRoot = 1, FoodMeat = 2 };
@@ -371,6 +375,16 @@ struct Params
     double FaunaCamoS0 = 0.18, FaunaCamoSpan = 0.42, FaunaCpPer = 3.0;
     int FaunaCpMin = 1, FaunaCpMax = 8;
     bool CamoOn = false;                         // FaunaOn 이고 어느 종이든 camo < 1 (파이썬 _camo_on)
+    // ---- 몸 움직임 (파이썬 body_common.motion, RL_R9_TURN_EFFORT_DESIGN.md 3-1·7-2). MotionOn 거짓이면 옛 줄 그대로 (비트 같음) ----
+    bool MotionOn = false;                       // 장면에 motion_on 1 (블록이 있음 — 통계 MoveSteps·WallHitSteps 를 셈)
+    bool MotionTurn = false;                     // M1 회전 한계 (motion_turn)
+    bool MotionEffort = false;                   // M2 속도를 바꾸는 힘 — 아직 구현하지 않음 (LoadParams 가 1 을 거부, 사용자 결정 11-13)
+    // M1 종별 값: cos Δb · sin Δb (Δb = turn_dps × 2/15 초) · 옆 가속 lat_accel_mps2 / 112.5 (단위/스텝²) — 파이썬 load_body 가 불러올 때 한 번
+    // 셈한 값을 덤프에서 받음 (스텝 안 삼각함수 없음, fauna_c23 과 같은 꼴)
+    double TurnC[kMaxSpecies] = {}, TurnS[kMaxSpecies] = {}, LatU[kMaxSpecies] = {};
+    // 종별 몸 해시 (덤프 body_hash — r9_body.body_hash, 설계 7-2). 있으면 CheckBrainBody 가 두뇌 머리글 body_hash 와 대조. 옛 장면은 줄이 없음 → 대조 안 함
+    bool HasBodyHash = false;
+    uint64_t BodyHash[kMaxSpecies] = {};
     // const_*
     double StaminaLock, StaminaUnlock, WoundSpeed, EatMin, BiteConeCos, BiteApproachMin;
     int BiteCooldown;
@@ -681,6 +695,59 @@ inline bool LoadParams(const DumpBlock& Blk, Params& P, std::string* Err)
                 return false;
             }
             if (P.Camo[K] < 1.0) { P.CamoOn = true; }
+        }
+    }
+    // 종별 몸 해시 (설계 7-2): body_hash 줄이 있을 때만 — 옛 scene.txt 에는 없다 (그때는 두뇌 몸 해시를 대조하지 않음)
+    P.HasBodyHash = false;
+    if (const DumpEntry* E = Blk.Find("body_hash"))
+    {
+        if (E->Kind != 'u' || E->Count() != NS)
+        {
+            Detail::SetErr(Err, "body_hash: need one u64 per species");
+            return false;
+        }
+        for (size_t K = 0; K < NS; ++K) { P.BodyHash[K] = E->U[K]; }
+        P.HasBodyHash = true;
+    }
+    // 몸 움직임 (설계 7-2): motion_on 줄이 있을 때만 — 없으면 꺼짐이라 옛 scene.txt 도 그대로 읽힌다
+    P.MotionOn = false;
+    P.MotionTurn = false;
+    P.MotionEffort = false;
+    if (const DumpEntry* E = Blk.Find("motion_on"))
+    {
+        P.MotionOn = E->Count() == 1 && E->AsInt(0) != 0;
+    }
+    if (P.MotionOn)
+    {
+        P.MotionTurn = Gt.I("motion_turn") != 0;
+        P.MotionEffort = Gt.I("motion_effort") != 0;
+        if (P.MotionEffort)
+        {
+            // 사용자 결정 (2026-11-13 11:55): 첫 바퀴는 M1 만. 파이썬 _check_motion 도 effort: true 를 거부한다
+            Detail::SetErr(Err, "motion_effort: M2 (speed-change effort) is not implemented yet (user decision pending); first round is M1 only");
+            return false;
+        }
+        if (!P.HasBodyHash)
+        {
+            // 움직임 세계의 두뇌는 늘 몸 해시로 대조한다 (회전 한계 없는 몸에서 배운 두뇌를 막음). dump_fauna.py 는 늘 body_hash 를 싣는다
+            Detail::SetErr(Err, "motion scene without body_hash");
+            return false;
+        }
+        if (P.MotionTurn)
+        {
+            Gt.D3("body_turn_c", P.TurnC, NS);
+            Gt.D3("body_turn_s", P.TurnS, NS);
+            Gt.D3("body_lat_u", P.LatU, NS);
+            for (size_t K = 0; K < NS && Gt.Ok; ++K)
+            {
+                // 0 < Δb < 45° (cos > sin > 0 — DIR8 각과 겹치지 않음, 파이썬 6-1 검사) · cos² + sin² = 1 · 옆 가속 > 0
+                const double C = P.TurnC[K], S = P.TurnS[K];
+                if (!(S > 0.0 && C > S && std::fabs(C * C + S * S - 1.0) <= 1e-12 && P.LatU[K] > 0.0))
+                {
+                    Detail::SetErr(Err, "motion: bad body_turn_c / body_turn_s / body_lat_u");
+                    return false;
+                }
+            }
         }
     }
     P.NormPos = Gt.D("norm_pos");
@@ -1287,6 +1354,36 @@ inline bool LoadBrain(const uint8_t* Data, size_t Len, Brain& Out, std::string* 
     return true;
 }
 
+// u64 → 파이썬 r9_body.hash_hex 꼴 "0x" + 소문자 16 자리 (두뇌 머리글 body_hash 와 같은 글)
+inline std::string BodyHashHex(uint64_t H)
+{
+    static const char Digits[] = "0123456789abcdef";
+    std::string Out = "0x";
+    for (int Sh = 60; Sh >= 0; Sh -= 4) { Out.push_back(Digits[(H >> Sh) & 15u]); }
+    return Out;
+}
+
+// 두뇌 몸 해시 대조 (RL_R9_TURN_EFFORT_DESIGN.md 7-2 — 파이썬 r9_brains.load_brain 의 body_hash 검사, swap_brain.py 와 같은 뜻). LoadBrain 뒤에 종마다 부른다.
+// 장면에 body_hash 줄이 있을 때만 본다: 옛 scene.txt (줄 없음) 와 그 두뇌는 그대로 받는다. 다르면 다른 몸(예: 회전 한계가 없던 몸)에서 배운 두뇌라
+// 거부한다 — 파이썬 rebody_r9.py 로 그 몸에 옮긴 npz 를 내보내야 한다. 움직임 장면은 body_hash 가 꼭 있다 (LoadParams).
+inline bool CheckBrainBody(const Params& P, int Sp, const Brain& Bn, std::string* Err)
+{
+    if (!P.HasBodyHash) { return true; }
+    if (Sp < 0 || Sp >= P.NumSpecies)
+    {
+        Detail::SetErr(Err, "brain body check: species out of range");
+        return false;
+    }
+    const std::string Want = BodyHashHex(P.BodyHash[Sp]);
+    if (Bn.BodyHash != Want)
+    {
+        Detail::SetErr(Err, std::string("brain ") + SpeciesName(Sp) + ": body_hash " + (Bn.BodyHash.empty() ? std::string("(none)") : Bn.BodyHash) +
+                                " != scene body " + Want + (P.MotionOn ? " (motion scene)" : "") + ": trained on another body (rebody it first)");
+        return false;
+    }
+    return true;
+}
+
 // logits = W2·tanh(W1·tanh(W0·x + B0) + B1) + B2. 가중치·입력·출력은 float32, 곱의 합은 double 로 모은 뒤 float32 로 내림
 // (numpy float32 BLAS 와 1e-6 수준 차 — SPEC_PORT 10-4 의 잰 값 2.5e-6).
 inline void BrainForward(const Brain& Bn, const float* X, float* Logits)
@@ -1397,6 +1494,11 @@ struct Stats
     int64_t Gores[kMaxSpecies][kMaxSpecies][2] = {};       // [들이받은 종][받힌 종][상처·죽임]
     double GoreHp[kMaxSpecies][kMaxSpecies] = {};          // [들이받은 종][받힌 종] 깎인 HP 합
     double StrikeHpBy[kMaxSpecies] = {};                   // 반격·들이받기로 깎인 HP 합 (깎인 몸의 종)
+    // 몸 움직임만 (파이썬 st move_steps·wall_hit_steps·turn_clip·turn_over — TURN_EFFORT 7-1·8-3. motion_on 장면에서만 셈, 세계는 바꾸지 않음)
+    int64_t MoveSteps[kMaxSpecies] = {};      // 제 속도(accel 자른 뒤·벽 앞)가 EPS 보다 큰 산 몸-스텝
+    int64_t WallHitSteps[kMaxSpecies] = {};   // 그 가운데 벽·막힌 칸에 닿은 스텝 (벽 미끄러짐 — M1 의 유일한 예외, 3-4)
+    int64_t TurnClip[kMaxSpecies] = {};       // 회전 한계가 방향을 자른 WALK/RUN 스텝 (motion_turn)
+    int64_t TurnOver[kMaxSpecies] = {};       // 벽 아닌 스텝에서 머리가 θ 넘게 돈 산 몸 (motion_turn — 0 이어야 함)
 };
 
 // --------------------------------------------------------------------------------------------------------------------
@@ -1415,6 +1517,10 @@ public:
     std::vector<double> LastEMult, LastEdge1, LastGainU;   // LastGainU[s * 3 + f]
     std::vector<uint8_t> LastDead;
     std::vector<int> LastCause;
+    // 몸 움직임 (TURN_EFFORT 3-1·3-4): 이 스텝 제 이동이 벽·막힌 칸에 닿아 미끄러졌나 (늘 셈) · 회전 한계가 방향을 잘랐나 ·
+    // 그 몸의 cos θ (motion_turn 일 때 산 몸마다 — 파이썬 _turn_limit 의 cl. 아니면 −2)
+    std::vector<uint8_t> LastWall, LastTurnClip;
+    std::vector<double> LastTurnCl;
 
     bool Init(const Params& InP, const State& InSt, std::string* Err)
     {
@@ -1659,6 +1765,10 @@ public:
         std::fill(LastGait.begin(), LastGait.end(), 0);
         std::fill(LastEKind.begin(), LastEKind.end(), -1);
         std::fill(LastEMult.begin(), LastEMult.end(), 0.0);
+        std::fill(LastTurnClip.begin(), LastTurnClip.end(), static_cast<uint8_t>(0));
+        std::fill(LastTurnCl.begin(), LastTurnCl.end(), -2.0);
+        // 몸 움직임 (TURN_EFFORT 3-1): turn 이나 effort 가 켜진 세계만 서 있음 규칙 (블록만 있고 둘 다 꺼지면 옛 비트 — 파이썬 _motion_v0, M-13)
+        const bool MotionV0 = P.MotionOn && (P.MotionTurn || P.MotionEffort);
         for (size_t s = 0; s < S; ++s)
         {
             V1[s] = Vec2d{};
@@ -1693,8 +1803,14 @@ public:
             const double HpF = P.WoundSpeed + (1.0 - P.WoundSpeed) * St.Hp[s];
             const double Weak = St.E[s] < P.WeakE[k] ? P.WeakSpeed[k] : 1.0;
             const double Tsp = Base * SpdScale[s] * HpF * Weak;
+            Vec2d V0 = St.Vel[s];
+            if (MotionV0)
+            {
+                // 서 있음 = |v0|² ≤ EPS² → 0 (머리 갱신과 같은 판정, 7-4 ⑤). 회전 자르기·accel 자르기 모두 이 v0 를 쓴다 (파이썬 v0m)
+                if (!(V0.x * V0.x + V0.y * V0.y > kEps * kEps)) { V0 = Vec2d{}; }
+                if (P.MotionTurn) { LastTurnClip[s] = TurnLimit(s, k, a >= 1 && a <= 16, V0, Dx, Dy) ? 1 : 0; }
+            }
             const double Tvx = Dx * Tsp, Tvy = Dy * Tsp;
-            const Vec2d V0 = St.Vel[s];
             const double Dvx = Tvx - V0.x, Dvy = Tvy - V0.y;
             const double N = std::sqrt(Dvx * Dvx + Dvy * Dvy);
             const double Acc = P.Accel[k];
@@ -1717,6 +1833,9 @@ public:
         std::vector<int>& ShCand = ShScratch;
         for (size_t s = 0; s < S; ++s)
         {
+            // 몸 움직임 통계 (파이썬 _motion_stats): 제 속도(accel 자른 뒤 · 벽 앞)가 움직이나
+            const bool Moving = P.MotionOn && St.Alive[s] && V1[s].x * V1[s].x + V1[s].y * V1[s].y > kEps * kEps;
+            const Vec2d H0 = St.Head[s];
             Vec2d P1;
             {
                 // 벽과 막힌 칸 모두 축마다 따로 (x 먼저, 그다음 y) — 막히면 지금 칸 경계까지만 가고 다른 축은 그대로 미끄러진다
@@ -1728,6 +1847,7 @@ public:
                 P1.y = Clamp(Psy, 0.0, Sz);
                 if (Blk) { P1.y = SlideY(P1.x, P0[s].y, P1.y); }
                 if (P1.y != Psy) { V1[s].y = P1.y - P0[s].y; }
+                LastWall[s] = (P1.x != Psx || P1.y != Psy) ? 1 : 0;   // 벽 미끄러짐 (파이썬 _wall.any) — M1 회전 한계의 유일한 예외 (3-4)
             }
             Vec2d P2 = P1;
             if (St.Alive[s] && St.KnockLeft[s] > 0)
@@ -1768,6 +1888,19 @@ public:
             }
             St.Pos[s] = P2;
             St.Vel[s] = V1[s];
+            if (P.MotionOn && St.Alive[s])
+            {
+                // 통계만 (세계는 바꾸지 않음): 움직인 스텝 · 그 가운데 벽 닿음 · 회전 한계가 자름 · 벽 아닌 스텝에서 θ 넘게 돎 (0 이어야 함)
+                const int k = St.Sp[s];
+                Tot.MoveSteps[k] += Moving ? 1 : 0;
+                Tot.WallHitSteps[k] += (Moving && LastWall[s]) ? 1 : 0;
+                if (P.MotionTurn)
+                {
+                    const double Hc = H0.x * St.Head[s].x + H0.y * St.Head[s].y;
+                    Tot.TurnClip[k] += LastTurnClip[s];
+                    Tot.TurnOver[k] += (!LastWall[s] && Hc < LastTurnCl[s] - 1e-12) ? 1 : 0;
+                }
+            }
         }
         for (size_t s = 0; s < S; ++s)
         {
@@ -2163,6 +2296,9 @@ private:
         LastGainU.assign(S * 3u, 0.0);
         LastDead.assign(S, 0);
         LastCause.assign(S, 0);
+        LastWall.assign(S, 0);
+        LastTurnClip.assign(S, 0);
+        LastTurnCl.assign(S, -2.0);
         CellDemand.assign(GG, 0.0);
         CellTouched.assign(GG, 0);
         TouchedList.clear();
@@ -2170,6 +2306,33 @@ private:
     }
 
     static Vec2d Rot(const Vec2d& H, double C, double Sn) { return Vec2d{H.x * C - H.y * Sn, H.x * Sn + H.y * C}; }
+
+    // 몸 움직임 M1 회전 한계 (RL_R9_TURN_EFFORT_DESIGN.md 3-1 — 파이썬 r9_world._turn_limit 과 같은 셈·같은 괄호 차례, 곱·합·나눗셈·sqrt 만).
+    // 한 스텝 머리 회전 ≤ θ = min(Δb, asin(a_lat / |v0|)): 빠르면 (s0 · sin Δb > a_u) 미끄럼 한계 sin θ = a_u / s0, 아니면 몸 한계 Δb.
+    // V0 = 서 있음 규칙 뒤 지난 속도 (0 이거나 머리와 나란함). cos θ 는 산 몸마다 LastTurnCl 에 남긴다 (통계 TurnOver).
+    // Cmd (WALK_j·RUN_j) 이고 한 스텝에 못 닿는 방향 (|D|² > EPS² 이고 D·H < cos θ) 이면 D 를 머리에서 θ 만큼 외적 쪽으로 돌린 방향으로 바꾸고 참.
+    // 정확히 뒤 명령 (|외적| ≤ 1e-12) 은 uid 짝수 = 왼쪽 · 홀수 = 오른쪽 (몸마다 고정, 숨은 상태 없음 — 7-4 ①).
+    bool TurnLimit(size_t s, int k, bool Cmd, const Vec2d& V0, double& Dx, double& Dy)
+    {
+        const Vec2d H = St.Head[s];
+        const double S0 = std::sqrt(V0.x * V0.x + V0.y * V0.y);
+        const double Au = P.LatU[k];
+        double Sl = P.TurnS[k];
+        double Cl = P.TurnC[k];
+        if (S0 * P.TurnS[k] > Au)
+        {
+            Sl = Au / std::max(S0, Au);   // 파이썬 au / np.maximum(s0, au) — 고른 칸에서는 s0 > au 라 au / s0 와 같음 (7-4 ③)
+            Cl = std::sqrt(1.0 - Sl * Sl);
+        }
+        LastTurnCl[s] = Cl;
+        if (!Cmd || !(Dx * Dx + Dy * Dy > kEps * kEps) || !(Dx * H.x + Dy * H.y < Cl)) { return false; }
+        const double X = H.x * Dy - H.y * Dx;
+        const bool Left = X > kTurnTie || (std::fabs(X) <= kTurnTie && (St.Uid[s] & 1) == 0);
+        const Vec2d R = Rot(H, Cl, Left ? Sl : -Sl);
+        Dx = R.x;
+        Dy = R.y;
+        return true;
+    }
 
     static Vec2d Unit(double Vx, double Vy)
     {

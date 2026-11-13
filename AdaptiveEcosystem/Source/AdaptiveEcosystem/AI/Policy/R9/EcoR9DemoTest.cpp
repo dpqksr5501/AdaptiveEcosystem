@@ -26,6 +26,10 @@
 //   AdaptiveEcosystem.R9Demo.FaunaPick        종 번호·이름, 동물 세계 파일 고르기 (하나라도 없으면 세 종), 무리 자리 마릿수 합, 설정 (Fauna·FaunaPerHerd·장면 직접 줌)
 //   AdaptiveEcosystem.R9Demo.FaunaKeys        8 물소 · 9 표범 · J 여우 (0~7 그대로), 모드 8·9·10, 팀·옛 카메라·자유 카메라 키와 안 겹침, 화면 줄
 //   AdaptiveEcosystem.R9Demo.FaunaScene       세 종 장면은 새 종 마릿수를 줘도 비트 그대로 · 종 3, fauna/ 파일이 있으면 6 종 큰 세계 600 스텝
+//   (2026-11-13 몸 움직임 M1 회전 한계 — RL_R9_TURN_EFFORT_DESIGN.md 7-2)
+//   AdaptiveEcosystem.R9Demo.ParityChain      <Saved>/R9Demo/parity/ 의 이어 돌리기 덤프 (S′ · 동물 세계 · chain_motion.txt = 동물 세계 + 회전 한계) 를 코어 혼자 돌려 파이썬과 견줌
+//   AdaptiveEcosystem.R9Demo.MotionBlocked    막힌 칸이 많은 큰 세계 장면 (chain_motion.txt 의 몸 표): 벽 아닌 스텝 머리 회전 ≤ θ (θ 넘음 0), 막힌 칸 벽 스텝 수·회전,
+//                                             회전 한계를 끈 대조 판은 θ 를 넘음 (시험이 무디지 않음). 덤프가 없으면 건너뜀
 
 #include "Misc/AutomationTest.h"
 
@@ -63,6 +67,16 @@
 #endif
 #ifndef ECO_R9_TEST_HAS_CHAIN
 #define ECO_R9_TEST_HAS_CHAIN 0
+#endif
+// 몸 움직임 막힌 칸 장면 시험 (엔진 없음 — 코어·큰 세계 생성기가 있는 빌드만, MotionBlocked 시험)
+#if defined(__has_include)
+#if __has_include("EcoR9Core.h") && __has_include("EcoR9Scene.h") && __has_include("EcoR9MotionCheck.h")
+#include "EcoR9MotionCheck.h"
+#define ECO_R9_TEST_HAS_MOTION 1
+#endif
+#endif
+#ifndef ECO_R9_TEST_HAS_MOTION
+#define ECO_R9_TEST_HAS_MOTION 0
 #endif
 
 namespace EcoR9DemoTestImpl
@@ -2046,6 +2060,9 @@ bool FEcoR9DemoFaunaFallback::RunTest(const FString& Parameters)
 // (chain_sprime.txt = 세 종 S′ 세계, chain_fauna.txt = 동물 세계 여섯 종 — 각 300 결정 = 600 스텝) 를 처음 장면에서 코어 혼자 이어 돌려 파이썬 상태·관측과 견준다
 // (EcoR9ChainCheck.h — scratchpad 대조기 chain 과 같은 셈·같은 허용 차). UBT 의 실제 빌드 옵션·unity 묶음에서 곱하기·더하기 묶음(FMA) 등으로 갈라지는지 본다.
 // 덤프는 저장소에 넣지 않는다 (scratchpad/r9/ue_demo/fauna/fix_cov/make_cov.sh 의 ue_chain_* 를 이름만 바꿔 둠). 없으면 건너뜀 (-EcoR9RequireFauna 면 실패).
+// 세 번째 chain_motion.txt (2026-11-13, RL_R9_TURN_EFFORT_DESIGN.md 7-2) = 동물 세계 여섯 종 + configs/v3_r9_fauna_motion.yaml (M1 회전 한계만):
+// 저장소 herbivore_rl/results/v3/r9/dump_fauna.py --config v3_r9_fauna_motion.yaml --chain-every 로 만든 덤프 (scratchpad/r9/motion_impl/cpp/make_motion.sh).
+// 회전 한계를 켠 덤프는 벽 아닌 스텝에서 θ 넘게 돈 몸 (코어 통계 TurnOver) 도 0 이어야 한다 (FChainResult::Pass).
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoParityChain, "AdaptiveEcosystem.R9Demo.ParityChain", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 
 bool FEcoR9DemoParityChain::RunTest(const FString& Parameters)
@@ -2053,10 +2070,11 @@ bool FEcoR9DemoParityChain::RunTest(const FString& Parameters)
 #if ECO_R9_TEST_HAS_CHAIN
 	using namespace EcoR9DemoTestImpl;
 	const FString Dir = FPaths::Combine(FEcoR9DemoSettings::DefaultDir(), TEXT("parity"));
-	const TCHAR* const Names[2] = {TEXT("chain_sprime.txt"), TEXT("chain_fauna.txt")};
-	for (int32 i = 0; i < 2; ++i)
+	const TCHAR* const Names[3] = {TEXT("chain_sprime.txt"), TEXT("chain_fauna.txt"), TEXT("chain_motion.txt")};
+	for (int32 i = 0; i < 3; ++i)
 	{
-		const bool bFaunaDump = i == 1;
+		const bool bFaunaDump = i >= 1;
+		const bool bMotionDump = i == 2;
 		const FString Path = FPaths::Combine(Dir, Names[i]);
 		TArray<uint8> Bytes;
 		if (!FPaths::FileExists(Path) || !FFileHelper::LoadFileToArray(Bytes, *Path))
@@ -2074,9 +2092,48 @@ bool FEcoR9DemoParityChain::RunTest(const FString& Parameters)
 		TestTrue(FString::Printf(TEXT("%s: 상태를 두 곳 넘게 견줌"), Names[i]), R.Checks >= 2);
 		TestEqual(FString::Printf(TEXT("%s: 종 수"), Names[i]), R.NumSpecies, bFaunaDump ? 6 : 3);
 		TestTrue(FString::Printf(TEXT("%s: 동물 몸 규칙 %s"), Names[i], bFaunaDump ? TEXT("켬") : TEXT("끔")), R.bFauna == bFaunaDump);
+		TestTrue(FString::Printf(TEXT("%s: 회전 한계 %s"), Names[i], bMotionDump ? TEXT("켬") : TEXT("끔")), R.bMotion == bMotionDump);
+		if (bMotionDump)
+		{
+			TestTrue(TEXT("chain_motion.txt: 회전 한계가 실제로 방향을 자름"), R.TurnClips > 0);
+			TestTrue(TEXT("chain_motion.txt: 벽 아닌 스텝에서 θ 넘게 돈 몸 0"), R.TurnOver == 0);
+		}
 	}
 #else
 	AddWarning(TEXT("이 빌드에는 R9 코어(EcoR9Core.h)가 없다 — 건너뜀"));
+#endif
+	return true;
+}
+
+// 몸 움직임 M1 막힌 칸 장면 (RL_R9_TURN_EFFORT_DESIGN.md 7-2): ParityChain 은 120 m 평지라 언리얼 섬의 막힌 칸 미끄럼을 지나지 않는다. 막힌 칸이 많은 작은 큰 세계 장면
+// (EcoR9MotionCheck.h — 둘레 물·2×2 나무/바위·+ 꼴 담·외톨 바위, 무리 자리 3 곳 · 600 스텝 · 무작위 행동) 에서 벽 아닌 스텝의 머리 회전 ≤ θ (θ 넘음 0, 코어 통계 TurnOver 도 0),
+// 코어가 남긴 cos θ 가 따로 셈한 값과 비트 같음, 막힌 칸 벽 스텝·회전 자름이 실제로 있었음을 본다. 회전 한계를 끈 대조 판은 벽 아닌 스텝에서도 θ 를 넘어야 한다.
+// 몸 표는 <Saved>/R9Demo/parity/chain_motion.txt 의 @scene (ParityChain 과 같은 파일). 없으면 건너뜀 (-EcoR9RequireFauna 면 실패).
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoR9DemoMotionBlocked, "AdaptiveEcosystem.R9Demo.MotionBlocked", EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoR9DemoMotionBlocked::RunTest(const FString& Parameters)
+{
+#if ECO_R9_TEST_HAS_MOTION
+	using namespace EcoR9DemoTestImpl;
+	const FString Path = FPaths::Combine(FEcoR9DemoSettings::DefaultDir(), TEXT("parity"), TEXT("chain_motion.txt"));
+	TArray<uint8> Bytes;
+	if (!FPaths::FileExists(Path) || !FFileHelper::LoadFileToArray(Bytes, *Path))
+	{
+		FaunaMissing(*this, FString::Printf(TEXT("움직임 장면 덤프 %s 가 없다 — 막힌 칸 시험은 건너뜀"), *Path));
+		return true;
+	}
+	const std::string Text(reinterpret_cast<const char*>(Bytes.GetData()), static_cast<std::size_t>(Bytes.Num()));
+	for (const std::uint64_t Seed : {7ull, 8ull})
+	{
+		const EcoR9MotionCheck::FBlockedResult On = EcoR9MotionCheck::RunBlocked(Text, true, Seed, 600);
+		const EcoR9MotionCheck::FBlockedResult Off = EcoR9MotionCheck::RunBlocked(Text, false, Seed, 600);
+		AddInfo(FString::Printf(TEXT("시드 %llu: %s"), static_cast<unsigned long long>(Seed), UTF8_TO_TCHAR(On.Line().c_str())));
+		AddInfo(FString::Printf(TEXT("시드 %llu: %s"), static_cast<unsigned long long>(Seed), UTF8_TO_TCHAR(Off.Line().c_str())));
+		TestTrue(FString::Printf(TEXT("시드 %llu: 회전 한계 켬 — 벽 아닌 스텝 θ 넘음 0 · cos θ 비트 같음 · 막힌 칸 벽 스텝과 자름이 있었음"), static_cast<unsigned long long>(Seed)), On.PassOn());
+		TestTrue(FString::Printf(TEXT("시드 %llu: 대조 판(회전 한계 끔)은 벽 아닌 스텝에서 θ 를 넘음"), static_cast<unsigned long long>(Seed)), Off.bRan && Off.Over > 0);
+	}
+#else
+	AddWarning(TEXT("이 빌드에는 R9 코어·큰 세계 생성기(EcoR9Scene.h)가 없다 — 건너뜀"));
 #endif
 	return true;
 }

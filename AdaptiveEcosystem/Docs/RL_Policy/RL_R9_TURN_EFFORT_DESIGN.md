@@ -28,7 +28,7 @@
 
 ---
 
-- 작성 2026-11-13, 같은 날 세 갈래 검토(근거·구현·생태)와 학습 전 모의를 반영해 고쳤다. **상태: 사용자 결정(11-13 11:55, 최종) 반영 — 첫 바퀴 M1 만. M1 파이썬 구현됨(브랜치 `r9-motion`). C++·학습 전 재기(8-2)·학습은 아직.**
+- 작성 2026-11-13, 같은 날 세 갈래 검토(근거·구현·생태)와 학습 전 모의를 반영해 고쳤다. **상태: 사용자 결정(11-13 11:55, 최종) 반영 — 첫 바퀴 M1 만. M1 파이썬·C++ 코어 구현됨(브랜치 `r9-motion`, C++ 는 UBT 빌드·언리얼 자동화 전 — 언리얼 밖 MSVC·g++ 대조기로만 확인). 학습 전 재기(8-2)·학습은 아직.**
   - 사용자 결정(11-13 11:55, 최종) — 자세히는 11 절:
     1. 첫 바퀴는 **M1 회전 한계만**. M2(속도를 바꾸는 힘)는 지금 구현하지 않는다(결정 대기). 설정 깃발 `effort` 는 있어야 하고 `false` 여야 한다. `effort: true` 는 "M2 는 아직 구현하지 않았다"는 ValueError 로 거부한다.
     2. 서서 도는 몸 한계(`turn_dps`)는 문서 값 그대로.
@@ -41,6 +41,8 @@
     - 시험 `H/tests/test_r9_motion.py`: M-1~M-6, M-9~M-14 와 `effort: true` 거부(16 개 통과). M2 전용 M-7·M-8·M-15·M-16 은 M2 결정 뒤. 옛 시험 `test_r9`·`test_r9_body`·`test_r9_brains`·`test_r9_life`(70)·`test_r9_fauna`·`test_r9_s_world`(58 + 건너뜀 1: F-9 rebody 는 ckpt 시작 판이 worktree 에 없음)·`test_r9_eval`·`test_r9_eval_s`·`test_r9_train`(55) 모두 통과.
     - 도구 `H/results/v3/r9/`: `motion_shape.py`(8-3 잣대·시드별 값, 스크래치 셋을 합침), `dump_fauna.py`(장면 덤프에 `motion_on`·`motion_turn`·`motion_effort`·`body_turn_c`·`body_turn_s`·`body_lat_u` %.17g, 종별 `body_hash` u64), `swap_brain.py`(장면 `body_hash` 와 두뇌 몸 해시 대조) + 그것이 쓰는 `export_brains.py`.
     - 확인: rebody(`rebody_r9.py --config configs/v3_r9_fauna_motion.yaml`, `H/ckpt/r9_fauna/chain/A` 의 6 종 npz → 스크래치)가 motion 세계에서 실리고 원래 npz 는 거부됨. `train_r9.py --config configs/v3_r9_fauna_motion.yaml --init <wolf zip> --init-species wolf --pool <rebody npz>` 스모크(4,480 결정) 통과, 판 npz 는 motion 세계에만 실림. 옛 설정 장면 덤프는 새 `body_hash` 줄 말고는 지금 언리얼 `scene.txt` 와 바이트 같음.
+    - C++ (7-2): `C/EcoR9Core.h` — `Params` 의 `MotionOn/MotionTurn/MotionEffort`·종별 `TurnC/TurnS/LatU`·`HasBodyHash/BodyHash`, `LoadParams` 는 `motion_on`·`body_hash` 줄이 있을 때만 읽음(옛 `scene.txt` 그대로 읽힘; `motion_effort 1` 과 `body_hash` 없는 움직임 장면은 거부), `Step` 첫 이동 루프의 EPS 서 있음 규칙과 `TurnLimit`(파이썬 `_turn_limit` 과 같은 셈 차례, 동점 `St.Uid & 1`), 통계 `Tot.MoveSteps/WallHitSteps/TurnClip/TurnOver`·`LastWall/LastTurnClip/LastTurnCl`, 두뇌 몸 해시 대조 `CheckBrainBody`(장면에 `body_hash` 가 있을 때만 — `EcoR9DemoLiveSource.cpp` 가 `LoadBrain` 뒤에 부름). `C/EcoR9ChainCheck.h` 는 `bMotion`·회전 통계, `C/EcoR9MotionCheck.h`(새) 는 막힌 칸 장면 시험, `C/EcoR9DemoTest.cpp` 는 ParityChain 세 번째 `chain_motion.txt` 와 새 자동화 `AdaptiveEcosystem.R9Demo.MotionBlocked`.
+    - C++ 확인 (언리얼 밖, `SP/r9/motion_impl/cpp/` — MSVC 2022 `/fp:fast /arch:AVX2`(옛 대조기 깃발, 헤더 안 precise)·`/fp:precise`·g++ `-ffp-contract=off`): 움직임 이어 돌리기 덤프 7 개(시드 48001~48005·48010·44193, 600~3,000 스텝) 상태 최대 차 0·관측 float32 어긋남 0, 배운 두뇌 가장 높은 칸 행동 163,200 몸-결정 모두 같음, 한 스텝 대조(48006) 106 스텝·logits 최대 차 2.86e-6·argmax 다름 0. 옛 이어 돌리기 덤프 23 개(S′ 3·동물 20, 131,200 스텝·상태 값 5,377,004 개) 어긋남 0, 옛 코어↔새 코어 실시간 상태 해시 12 판 같음(막힌 칸 큰 세계 포함). 막힌 칸 장면(땅 100² 칸, 막힌 칸 약 1,520, 몸 123): 벽 아닌 스텝 θ 넘음 0(5 판), 막힌 칸 벽 스텝은 θ 넘게 꺾이는 일이 있음(예외 3-4, 최대 113°), 회전 한계를 끈 대조 판은 벽 아닌 스텝 약 44% 가 θ 넘음.
     - 문서와 다르게 한 곳: (a) 7-1 의 통계 키 `wall_steps` 는 S′ 에 이미 있는 키(벽 띠 안 스텝, 8-4)라 `wall_hit_steps`(움직이며 벽에 닿은 스텝)와 분모 `move_steps` 로 두었다. `move_e`·`move_e_wall` 은 M2 라 없다. (b) EPS 서 있음 규칙은 3-1 대로 `turn` 이나 `effort` 가 켜졌을 때만 탄다(블록만 있고 둘 다 꺼지면 옛 비트, M-13). (c) motion 줄은 블록이 있을 때만 덤프에 싣고, `body_hash` 는 모든 덤프에 싣는다(C++ 는 이름으로 찾으므로 옛 코어도 그대로 읽음).
   - 지금 도는 6 종 이어 학습(`H/ckpt/r9_fauna/chain/`, 지금 몸)과 옛 설정에는 영향이 없다(M-1: 옛 세 설정 궤적·해시 비트 같음).
   - 검토에서 바꾼 것은 문서 끝 '검토 반영' 표에 모았다.
