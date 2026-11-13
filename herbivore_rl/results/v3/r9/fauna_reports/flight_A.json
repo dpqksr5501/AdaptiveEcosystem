@@ -1,0 +1,1232 @@
+{
+ "made": "2026-11-13 07:39:12",
+ "config": "configs/v3_r9_fauna.yaml",
+ "brains": {
+  "deer": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\r9_fauna\\start\\deer_v0.npz",
+  "wolf": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\r9_fauna\\flight\\A\\wolf_r0_10006528.npz",
+  "boar": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\r9_fauna\\start\\boar_v0.npz",
+  "buffalo": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\r9_fauna\\flight\\A\\buffalo_r0_10027008.npz",
+  "leopard": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\r9_fauna\\flight\\A\\leopard_r0_5013504.npz",
+  "fox": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\r9_fauna\\flight\\A\\fox_r0_5013504.npz"
+ },
+ "first_line": "1 단계 평지 — 물소 물가는 2 단계, 첫 밤 결과는 정식 판정이 아님",
+ "defs": {
+  "S1": "T-A 장면. See the module docstring. Front share = among wolf decisions within 3 units of an alive buffalo, the share inside that\nbuffalo's counter cone (head · unit(buffalo → wolf) ≥ body_common.counter.cone_cos).",
+  "N": "Per-decision analysis of a natural (train-form) world. All distances in units, approach = displacement toward / 0.9 (the\nobservation scale) > 0.1.\n  T-A attack episodes on a buffalo: a (wolf, buffalo) pair 'closes' when the wolf is within 3 units and approaches; the episode\n      opens when a pair has more than 4 closing decisions (cumulative since the last episode of that buffalo [해석]); participants =\n      wolves that closed during it; it ends when no alive wolf is within 6 units for 8 decisions, or the buffalo dies (success =\n      died by a wolf bite). Bins: pack size (participants 1·2·3·4·5+) × calf (af < 0.5 at the start) × world deer count ≤ 4 / > 4.\n      Per bin: episodes, success share, participants' HP lost (join → end, ≥ 0) and deaths; start means of wolf E and deer within 10.\n  T-C buffalo decisions with a threat (nearest alive wolf or leopard within 5 approaching): facing (head · unit(→threat) ≥ 0.7),\n      fleeing (a RUN action whose direction points away), goring (a gore by this buffalo in the decision), mean distance to the\n      other alive buffalo vs decisions without a threat.\n  T-D leopard prey: kills (bite kills by leopards) by species and by mass band (death mass = meat × kg_per_unit / meat_frac),\n      encounters = other-species bodies within 10 units of an alive leopard per decision; Jacobs D = (r − p) / (r + p − 2rp).\n  T-H kill table from bite / gore events: killer species × dead species × cause (bite | counter | gore), per killer-species day.\n  T-K deer decisions with an alive wolf or leopard within 10 units that the deer perceives (eye ∪ ear ∪ nose) but that is not\n      among its 6 other-species slots (pushed out by nearer others).\n  T-M leopards / foxes: nearest alive same-species distance per decision; joint attacks = target-decisions with ≥ 2 same-species\n      bodies of that kind within 5 units approaching it (share of target-decisions with ≥ 1).",
+  "SceneWorld": "Scene world: the train world without respawn (a dead slot stays empty) so a scene counts its own individuals. Body rules are\nthe world's; only the train-world 'instant respawn' bookkeeping is off.",
+  "seeds": "46680~46719 (7-3 fauna_report)",
+  "actions": "greedy (판정과 같음) unless --stochastic"
+ },
+ "sets": {
+  "learned": {
+   "labels": {
+    "deer": "mlp:deer_v0.npz",
+    "wolf": "mlp:wolf_r0_10006528.npz",
+    "boar": "mlp:boar_v0.npz",
+    "buffalo": "mlp:buffalo_r0_10027008.npz",
+    "leopard": "mlp:leopard_r0_5013504.npz",
+    "fox": "mlp:fox_r0_5013504.npz"
+   },
+   "S1": [
+    {
+     "n_wolf": 1,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.0,
+     "calf_kill_frac": 0.0,
+     "adult_kills": 0,
+     "calf_kills": 0,
+     "wolf_deaths": 0,
+     "wolf_death_frac": 0.0,
+     "wolf_hp_lost_per_wolf": 0.028283650689179606,
+     "gores": 0,
+     "gore_kills": 0,
+     "counters": 2,
+     "bites": 2,
+     "front_share": 0.1044776119402985,
+     "near_decisions": 268
+    },
+    {
+     "n_wolf": 2,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.0,
+     "calf_kill_frac": 0.0,
+     "adult_kills": 0,
+     "calf_kills": 0,
+     "wolf_deaths": 1,
+     "wolf_death_frac": 0.0125,
+     "wolf_hp_lost_per_wolf": 0.03503508107280781,
+     "gores": 1,
+     "gore_kills": 0,
+     "counters": 4,
+     "bites": 9,
+     "front_share": 0.44,
+     "near_decisions": 200
+    },
+    {
+     "n_wolf": 3,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.0,
+     "calf_kill_frac": 0.0,
+     "adult_kills": 0,
+     "calf_kills": 0,
+     "wolf_deaths": 0,
+     "wolf_death_frac": 0.0,
+     "wolf_hp_lost_per_wolf": 0.0,
+     "gores": 0,
+     "gore_kills": 0,
+     "counters": 0,
+     "bites": 0,
+     "front_share": 0.8181818181818182,
+     "near_decisions": 88
+    },
+    {
+     "n_wolf": 4,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.0,
+     "calf_kill_frac": 0.0,
+     "adult_kills": 0,
+     "calf_kills": 0,
+     "wolf_deaths": 0,
+     "wolf_death_frac": 0.0,
+     "wolf_hp_lost_per_wolf": 0.0035383542528180075,
+     "gores": 0,
+     "gore_kills": 0,
+     "counters": 1,
+     "bites": 1,
+     "front_share": 0.32941176470588235,
+     "near_decisions": 85
+    },
+    {
+     "n_wolf": 6,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.008333333333333333,
+     "calf_kill_frac": 0.025,
+     "adult_kills": 1,
+     "calf_kills": 1,
+     "wolf_deaths": 0,
+     "wolf_death_frac": 0.0,
+     "wolf_hp_lost_per_wolf": 0.006408316358050444,
+     "gores": 1,
+     "gore_kills": 0,
+     "counters": 2,
+     "bites": 8,
+     "front_share": 0.3707165109034268,
+     "near_decisions": 321
+    }
+   ],
+   "S2": {
+    "worlds": 40,
+    "decisions": 150,
+    "wolf_died": 0,
+    "leopard_died": 0,
+    "both_died": 0,
+    "none_died": 40,
+    "bites_wolf_on_leopard": 0,
+    "bites_leopard_on_wolf": 0,
+    "kills_wolf_on_leopard": 0,
+    "kills_leopard_on_wolf": 0,
+    "death_causes": {}
+   },
+   "N_base": {
+    "decisions": 1350,
+    "worlds": 20,
+    "alive_days": {
+     "deer": 1689.0,
+     "wolf": 207.0,
+     "boar": 471.0,
+     "buffalo": 216.0,
+     "leopard": 66.0,
+     "fox": 129.0
+    },
+    "deaths": {
+     "deer": {
+      "none": 0,
+      "bite": 101,
+      "counter": 1,
+      "starve": 147
+     },
+     "wolf": {
+      "none": 0,
+      "bite": 6,
+      "counter": 1,
+      "starve": 1
+     },
+     "boar": {
+      "none": 0,
+      "bite": 8,
+      "counter": 0,
+      "starve": 48
+     },
+     "buffalo": {
+      "none": 0,
+      "bite": 0,
+      "counter": 0,
+      "starve": 16
+     },
+     "leopard": {
+      "none": 0,
+      "bite": 2,
+      "counter": 0,
+      "starve": 2
+     },
+     "fox": {
+      "none": 0,
+      "bite": 8,
+      "counter": 0,
+      "starve": 27
+     }
+    },
+    "T_A": {
+     "episodes": 11,
+     "open_at_end": 2,
+     "bins": {
+      "pack2|adult|deer_gt4": {
+       "episodes": 3,
+       "success": 0,
+       "hp_lost": 0.14481028437873422,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.49778532027387695,
+       "deer10_mean": 3.3333333333333335
+      },
+      "pack5+|adult|deer_gt4": {
+       "episodes": 2,
+       "success": 0,
+       "hp_lost": 0.1352891310783424,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.7144655653028976,
+       "deer10_mean": 0.0
+      },
+      "pack1|adult|deer_gt4": {
+       "episodes": 3,
+       "success": 0,
+       "hp_lost": 0.5753629057442828,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.21547658333356767,
+       "deer10_mean": 1.6666666666666667
+      },
+      "pack1|calf|deer_gt4": {
+       "episodes": 1,
+       "success": 0,
+       "hp_lost": 0.0,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.17011400446827352,
+       "deer10_mean": 1.0
+      },
+      "pack3|adult|deer_gt4": {
+       "episodes": 2,
+       "success": 0,
+       "hp_lost": 0.0,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.6161643803616762,
+       "deer10_mean": 5.5
+      }
+     }
+    },
+    "T_C": {
+     "threat_decisions": 822,
+     "facing_share": 0.41849148418491483,
+     "flee_share": 0.006082725060827251,
+     "gore_share": 0.0,
+     "kin_mean_dist_threat": 37.28528400144235,
+     "kin_mean_dist_calm": 33.00626821420587
+    },
+    "T_D": {
+     "by_species": {
+      "boar": {
+       "kills": 0,
+       "enc": 12041,
+       "D": -1.0
+      },
+      "buffalo": {
+       "kills": 0,
+       "enc": 6845,
+       "D": -1.0
+      },
+      "deer": {
+       "kills": 10,
+       "enc": 32818,
+       "D": 0.047587262662245805
+      },
+      "fox": {
+       "kills": 2,
+       "enc": 5134,
+       "D": 0.1586537476698691
+      },
+      "wolf": {
+       "kills": 6,
+       "enc": 4858,
+       "D": 0.7080265648946719
+      }
+     },
+     "by_band": {
+      "20-80kg": {
+       "kills": 15,
+       "enc": 43517,
+       "D": 0.35248340921941496
+      },
+      "<20kg": {
+       "kills": 3,
+       "enc": 6090,
+       "D": 0.292321279167054
+      },
+      ">80kg": {
+       "kills": 0,
+       "enc": 12089,
+       "D": -1.0
+      }
+     }
+    },
+    "T_H": {
+     "kills": {
+      "leopard>deer:bite": 10,
+      "wolf>deer:bite": 91,
+      "wolf>fox:bite": 6,
+      "leopard>fox:bite": 2,
+      "wolf>boar:bite": 8,
+      "wolf>leopard:bite": 2,
+      "leopard>wolf:bite": 6,
+      "buffalo>wolf:counter": 1,
+      "buffalo>deer:gore": 1
+     },
+     "kills_per_killer_day": {
+      "leopard>deer:bite": 0.15151515151515152,
+      "wolf>deer:bite": 0.4396135265700483,
+      "wolf>fox:bite": 0.028985507246376812,
+      "leopard>fox:bite": 0.030303030303030304,
+      "wolf>boar:bite": 0.03864734299516908,
+      "wolf>leopard:bite": 0.00966183574879227,
+      "leopard>wolf:bite": 0.09090909090909091,
+      "buffalo>wolf:counter": 0.004629629629629629,
+      "buffalo>deer:gore": 0.004629629629629629
+     },
+     "leopard_death_causes": {
+      "bite": 2,
+      "starve": 2
+     },
+     "leopard_death_shelter_edge": [
+      19.92656058868213,
+      8.885171760759812,
+      25.467209052006986,
+      26.15529365891622
+     ],
+     "bites_in_shelter": {
+      "leopard>deer": 1
+     },
+     "buffalo_gore_hp_per_buffalo_day": {
+      "deer": 0.01078901922557278,
+      "wolf": 0.0015756437953186864,
+      "boar": 0.0,
+      "leopard": 0.0,
+      "fox": 0.0
+     }
+    },
+    "T_K": {
+     "deer_decisions_pred_within10": 102329,
+     "miss_share": 0.007290210986132964
+    },
+    "T_M": {
+     "leopard": {
+      "nearest_same": {
+       "n": 18900,
+       "p10": 11.646152610876499,
+       "median": 24.371237139388754,
+       "p90": 64.72133228450461,
+       "share_lt5": 0.02857142857142857
+      },
+      "target_decisions": 932,
+      "joint_share": 0.0
+     },
+     "fox": {
+      "nearest_same": {
+       "n": 54000,
+       "p10": 2.3810202739376183,
+       "median": 19.428767370696253,
+       "p90": 47.09905094003474,
+       "share_lt5": 0.2316111111111111
+      },
+      "target_decisions": 430,
+      "joint_share": 0.009302325581395349
+     }
+    },
+    "form": "base",
+    "seconds": 87.3
+   },
+   "N_buffalo_land": {
+    "decisions": 1350,
+    "worlds": 20,
+    "alive_days": {
+     "deer": 114.0,
+     "wolf": 300.0,
+     "boar": 471.0,
+     "buffalo": 354.0,
+     "leopard": 66.0,
+     "fox": 129.0
+    },
+    "deaths": {
+     "deer": {
+      "none": 0,
+      "bite": 6,
+      "counter": 0,
+      "starve": 5
+     },
+     "wolf": {
+      "none": 0,
+      "bite": 0,
+      "counter": 1,
+      "starve": 36
+     },
+     "boar": {
+      "none": 0,
+      "bite": 7,
+      "counter": 0,
+      "starve": 65
+     },
+     "buffalo": {
+      "none": 0,
+      "bite": 1,
+      "counter": 0,
+      "starve": 26
+     },
+     "leopard": {
+      "none": 0,
+      "bite": 1,
+      "counter": 0,
+      "starve": 3
+     },
+     "fox": {
+      "none": 0,
+      "bite": 9,
+      "counter": 0,
+      "starve": 27
+     }
+    },
+    "T_A": {
+     "episodes": 14,
+     "open_at_end": 1,
+     "bins": {
+      "pack1|adult|deer_le4": {
+       "episodes": 6,
+       "success": 0,
+       "hp_lost": 0.3740020653010292,
+       "wolf_dead": 1,
+       "success_share": null,
+       "wolf_e_mean": 0.17644386995779285,
+       "deer10_mean": 0.6666666666666666
+      },
+      "pack3|adult|deer_le4": {
+       "episodes": 5,
+       "success": 0,
+       "hp_lost": 0.7345015976502163,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.5830889895108098,
+       "deer10_mean": 0.6
+      },
+      "pack2|adult|deer_le4": {
+       "episodes": 1,
+       "success": 0,
+       "hp_lost": 0.46739580122374436,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.24998639103584966,
+       "deer10_mean": 0.0
+      },
+      "pack5+|adult|deer_le4": {
+       "episodes": 2,
+       "success": 1,
+       "hp_lost": 1.7240166002878121,
+       "wolf_dead": 1,
+       "success_share": null,
+       "wolf_e_mean": 0.32984986222722046,
+       "deer10_mean": 0.0
+      }
+     }
+    },
+    "T_C": {
+     "threat_decisions": 1396,
+     "facing_share": 0.2356733524355301,
+     "flee_share": 0.012177650429799427,
+     "gore_share": 0.0014326647564469914,
+     "kin_mean_dist_threat": 30.342424325563538,
+     "kin_mean_dist_calm": 33.15528821249454
+    },
+    "T_D": {
+     "by_species": {
+      "boar": {
+       "kills": 0,
+       "enc": 16869,
+       "D": -1.0
+      },
+      "buffalo": {
+       "kills": 0,
+       "enc": 12916,
+       "D": -1.0
+      },
+      "deer": {
+       "kills": 1,
+       "enc": 2180,
+       "D": 1.0
+      },
+      "fox": {
+       "kills": 0,
+       "enc": 8614,
+       "D": -1.0
+      },
+      "wolf": {
+       "kills": 0,
+       "enc": 2505,
+       "D": -1.0
+      }
+     },
+     "by_band": {
+      "20-80kg": {
+       "kills": 1,
+       "enc": 13390,
+       "D": 1.0
+      },
+      "<20kg": {
+       "kills": 0,
+       "enc": 8677,
+       "D": -1.0
+      },
+      ">80kg": {
+       "kills": 0,
+       "enc": 21017,
+       "D": -1.0
+      }
+     }
+    },
+    "T_H": {
+     "kills": {
+      "leopard>deer:bite": 1,
+      "wolf>fox:bite": 9,
+      "wolf>deer:bite": 5,
+      "wolf>leopard:bite": 1,
+      "wolf>boar:bite": 7,
+      "buffalo>wolf:counter": 1,
+      "wolf>buffalo:bite": 1
+     },
+     "kills_per_killer_day": {
+      "leopard>deer:bite": 0.015151515151515152,
+      "wolf>fox:bite": 0.03,
+      "wolf>deer:bite": 0.016666666666666666,
+      "wolf>leopard:bite": 0.0033333333333333335,
+      "wolf>boar:bite": 0.023333333333333334,
+      "buffalo>wolf:counter": 0.002824858757062147,
+      "wolf>buffalo:bite": 0.0033333333333333335
+     },
+     "leopard_death_causes": {
+      "bite": 1,
+      "starve": 3
+     },
+     "leopard_death_shelter_edge": [
+      23.082197090216265,
+      21.370326655981593,
+      4.748404589996,
+      12.173985724841716
+     ],
+     "bites_in_shelter": {},
+     "buffalo_gore_hp_per_buffalo_day": {
+      "deer": 0.006916216448797548,
+      "wolf": 0.0025251555166704563,
+      "boar": 0.0006479251414523847,
+      "leopard": 0.0,
+      "fox": 0.0
+     }
+    },
+    "T_K": {
+     "deer_decisions_pred_within10": 5166,
+     "miss_share": 0.04897406116918312
+    },
+    "T_M": {
+     "leopard": {
+      "nearest_same": {
+       "n": 18900,
+       "p10": 16.880990309979982,
+       "median": 28.44507279295574,
+       "p90": 60.42264017222041,
+       "share_lt5": 0.012698412698412698
+      },
+      "target_decisions": 87,
+      "joint_share": 0.0
+     },
+     "fox": {
+      "nearest_same": {
+       "n": 54000,
+       "p10": 1.297903248497252,
+       "median": 11.935547944490498,
+       "p90": 53.16790941471854,
+       "share_lt5": 0.21175925925925926
+      },
+      "target_decisions": 135,
+      "joint_share": 0.02962962962962963
+     }
+    },
+    "form": "buffalo_land",
+    "seconds": 55.3
+   }
+  },
+  "rules": {
+   "labels": {
+    "deer": "rule:RULE_DEER",
+    "wolf": "rule:RULE_WOLF",
+    "boar": "rule:RULE_BOAR",
+    "buffalo": "rule:RULE_BUFFALO",
+    "leopard": "rule:RULE_LEOPARD",
+    "fox": "rule:RULE_FOX"
+   },
+   "S1": [
+    {
+     "n_wolf": 1,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.0,
+     "calf_kill_frac": 0.0,
+     "adult_kills": 0,
+     "calf_kills": 0,
+     "wolf_deaths": 40,
+     "wolf_death_frac": 1.0,
+     "wolf_hp_lost_per_wolf": 1.1567283454104866,
+     "gores": 122,
+     "gore_kills": 36,
+     "counters": 36,
+     "bites": 37,
+     "front_share": 0.7564102564102564,
+     "near_decisions": 390
+    },
+    {
+     "n_wolf": 2,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.025,
+     "calf_kill_frac": 0.075,
+     "adult_kills": 3,
+     "calf_kills": 3,
+     "wolf_deaths": 77,
+     "wolf_death_frac": 0.9625,
+     "wolf_hp_lost_per_wolf": 1.135911893143892,
+     "gores": 249,
+     "gore_kills": 63,
+     "counters": 83,
+     "bites": 126,
+     "front_share": 0.7271589486858573,
+     "near_decisions": 1598
+    },
+    {
+     "n_wolf": 3,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.03333333333333333,
+     "calf_kill_frac": 0.1,
+     "adult_kills": 4,
+     "calf_kills": 4,
+     "wolf_deaths": 116,
+     "wolf_death_frac": 0.9666666666666667,
+     "wolf_hp_lost_per_wolf": 1.1412943728064942,
+     "gores": 373,
+     "gore_kills": 85,
+     "counters": 146,
+     "bites": 238,
+     "front_share": 0.7288859677949392,
+     "near_decisions": 3043
+    },
+    {
+     "n_wolf": 4,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.09166666666666666,
+     "calf_kill_frac": 0.15,
+     "adult_kills": 11,
+     "calf_kills": 6,
+     "wolf_deaths": 148,
+     "wolf_death_frac": 0.925,
+     "wolf_hp_lost_per_wolf": 1.1684935353084787,
+     "gores": 363,
+     "gore_kills": 74,
+     "counters": 241,
+     "bites": 450,
+     "front_share": 0.7093712930011863,
+     "near_decisions": 5058
+    },
+    {
+     "n_wolf": 6,
+     "worlds": 40,
+     "decisions": 300,
+     "adult_kill_frac": 0.3,
+     "calf_kill_frac": 0.45,
+     "adult_kills": 36,
+     "calf_kills": 18,
+     "wolf_deaths": 198,
+     "wolf_death_frac": 0.825,
+     "wolf_hp_lost_per_wolf": 1.1184755055484612,
+     "gores": 449,
+     "gore_kills": 80,
+     "counters": 379,
+     "bites": 785,
+     "front_share": 0.6819860484201887,
+     "near_decisions": 9748
+    }
+   ],
+   "S2": {
+    "worlds": 40,
+    "decisions": 150,
+    "wolf_died": 16,
+    "leopard_died": 24,
+    "both_died": 0,
+    "none_died": 0,
+    "bites_wolf_on_leopard": 73,
+    "bites_leopard_on_wolf": 54,
+    "kills_wolf_on_leopard": 24,
+    "kills_leopard_on_wolf": 16,
+    "death_causes": {
+     "leopard:bite": 24,
+     "wolf:bite": 16
+    }
+   },
+   "N_base": {
+    "decisions": 1350,
+    "worlds": 20,
+    "alive_days": {
+     "deer": 1689.0,
+     "wolf": 207.0,
+     "boar": 471.0,
+     "buffalo": 216.0,
+     "leopard": 66.0,
+     "fox": 129.0
+    },
+    "deaths": {
+     "deer": {
+      "none": 0,
+      "bite": 119,
+      "counter": 143,
+      "starve": 213
+     },
+     "wolf": {
+      "none": 0,
+      "bite": 9,
+      "counter": 3,
+      "starve": 0
+     },
+     "boar": {
+      "none": 0,
+      "bite": 20,
+      "counter": 0,
+      "starve": 16
+     },
+     "buffalo": {
+      "none": 0,
+      "bite": 2,
+      "counter": 0,
+      "starve": 19
+     },
+     "leopard": {
+      "none": 0,
+      "bite": 3,
+      "counter": 0,
+      "starve": 0
+     },
+     "fox": {
+      "none": 0,
+      "bite": 14,
+      "counter": 19,
+      "starve": 2
+     }
+    },
+    "T_A": {
+     "episodes": 12,
+     "open_at_end": 6,
+     "bins": {
+      "pack1|adult|deer_gt4": {
+       "episodes": 6,
+       "success": 0,
+       "hp_lost": 1.0482906881043406,
+       "wolf_dead": 1,
+       "success_share": null,
+       "wolf_e_mean": 0.8599081422099294,
+       "deer10_mean": 6.0
+      },
+      "pack2|adult|deer_gt4": {
+       "episodes": 4,
+       "success": 1,
+       "hp_lost": 0.4059737165658588,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.6331090072936498,
+       "deer10_mean": 3.25
+      },
+      "pack1|calf|deer_gt4": {
+       "episodes": 1,
+       "success": 0,
+       "hp_lost": 0.09675736854210643,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.9700382061425168,
+       "deer10_mean": 2.0
+      },
+      "pack3|adult|deer_gt4": {
+       "episodes": 1,
+       "success": 0,
+       "hp_lost": 0.0,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.9643954463700176,
+       "deer10_mean": 5.0
+      }
+     }
+    },
+    "T_C": {
+     "threat_decisions": 770,
+     "facing_share": 0.37402597402597404,
+     "flee_share": 0.005194805194805195,
+     "gore_share": 0.033766233766233764,
+     "kin_mean_dist_threat": 20.846485907853577,
+     "kin_mean_dist_calm": 27.801903088769908
+    },
+    "T_D": {
+     "by_species": {
+      "boar": {
+       "kills": 7,
+       "enc": 30223,
+       "D": -0.16700551350102574
+      },
+      "buffalo": {
+       "kills": 0,
+       "enc": 14089,
+       "D": -1.0
+      },
+      "deer": {
+       "kills": 43,
+       "enc": 127169,
+       "D": 0.1102752275996291
+      },
+      "fox": {
+       "kills": 7,
+       "enc": 8387,
+       "D": 0.4846780572158745
+      },
+      "wolf": {
+       "kills": 9,
+       "enc": 32183,
+       "D": -0.062439567675949895
+      }
+     },
+     "by_band": {
+      "20-80kg": {
+       "kills": 57,
+       "enc": 173817,
+       "D": 0.16427237183838098
+      },
+      "<20kg": {
+       "kills": 8,
+       "enc": 13039,
+       "D": 0.35592273409761205
+      },
+      ">80kg": {
+       "kills": 1,
+       "enc": 25195,
+       "D": -0.7951736638073017
+      }
+     }
+    },
+    "T_H": {
+     "kills": {
+      "leopard>deer:bite": 43,
+      "leopard>fox:bite": 7,
+      "boar>fox:counter": 8,
+      "leopard>boar:bite": 7,
+      "wolf>deer:bite": 75,
+      "buffalo>wolf:counter": 1,
+      "wolf>boar:bite": 13,
+      "wolf>fox:bite": 7,
+      "leopard>wolf:bite": 9,
+      "wolf>leopard:bite": 3,
+      "buffalo>fox:counter": 2,
+      "wolf>buffalo:bite": 2,
+      "fox>deer:bite": 1,
+      "boar>wolf:counter": 1,
+      "buffalo>fox:gore": 9,
+      "buffalo>deer:gore": 143,
+      "buffalo>wolf:gore": 1
+     },
+     "kills_per_killer_day": {
+      "leopard>deer:bite": 0.6515151515151515,
+      "leopard>fox:bite": 0.10606060606060606,
+      "boar>fox:counter": 0.016985138004246284,
+      "leopard>boar:bite": 0.10606060606060606,
+      "wolf>deer:bite": 0.36231884057971014,
+      "buffalo>wolf:counter": 0.004629629629629629,
+      "wolf>boar:bite": 0.06280193236714976,
+      "wolf>fox:bite": 0.033816425120772944,
+      "leopard>wolf:bite": 0.13636363636363635,
+      "wolf>leopard:bite": 0.014492753623188406,
+      "buffalo>fox:counter": 0.009259259259259259,
+      "wolf>buffalo:bite": 0.00966183574879227,
+      "fox>deer:bite": 0.007751937984496124,
+      "boar>wolf:counter": 0.0021231422505307855,
+      "buffalo>fox:gore": 0.041666666666666664,
+      "buffalo>deer:gore": 0.6620370370370371,
+      "buffalo>wolf:gore": 0.004629629629629629
+     },
+     "leopard_death_causes": {
+      "bite": 3
+     },
+     "leopard_death_shelter_edge": [
+      4.958326939198944,
+      1.4038662620245095,
+      0.15261385727413934
+     ],
+     "bites_in_shelter": {
+      "leopard>deer": 15,
+      "leopard>boar": 3,
+      "leopard>fox": 5,
+      "fox>deer": 11,
+      "fox>leopard": 5
+     },
+     "buffalo_gore_hp_per_buffalo_day": {
+      "deer": 1.5604269888563176,
+      "wolf": 0.03221931128214405,
+      "boar": 0.009174956253461741,
+      "leopard": 0.004016474175472291,
+      "fox": 0.08458036291176363
+     }
+    },
+    "T_K": {
+     "deer_decisions_pred_within10": 242296,
+     "miss_share": 0.09000561296926074
+    },
+    "T_M": {
+     "leopard": {
+      "nearest_same": {
+       "n": 18900,
+       "p10": 0.34093572301303465,
+       "median": 13.796609292437038,
+       "p90": 33.305923994009426,
+       "share_lt5": 0.38571428571428573
+      },
+      "target_decisions": 3214,
+      "joint_share": 0.020535158680771624
+     },
+     "fox": {
+      "nearest_same": {
+       "n": 54000,
+       "p10": 0.2101365030378106,
+       "median": 2.118395884936654,
+       "p90": 30.476181436450243,
+       "share_lt5": 0.5672222222222222
+      },
+      "target_decisions": 5903,
+      "joint_share": 0.14348636286633915
+     }
+    },
+    "form": "base",
+    "seconds": 132.4
+   },
+   "N_buffalo_land": {
+    "decisions": 1350,
+    "worlds": 20,
+    "alive_days": {
+     "deer": 114.0,
+     "wolf": 300.0,
+     "boar": 471.0,
+     "buffalo": 354.0,
+     "leopard": 66.0,
+     "fox": 129.0
+    },
+    "deaths": {
+     "deer": {
+      "none": 0,
+      "bite": 22,
+      "counter": 22,
+      "starve": 4
+     },
+     "wolf": {
+      "none": 0,
+      "bite": 17,
+      "counter": 66,
+      "starve": 0
+     },
+     "boar": {
+      "none": 0,
+      "bite": 56,
+      "counter": 1,
+      "starve": 23
+     },
+     "buffalo": {
+      "none": 0,
+      "bite": 11,
+      "counter": 0,
+      "starve": 23
+     },
+     "leopard": {
+      "none": 0,
+      "bite": 9,
+      "counter": 3,
+      "starve": 0
+     },
+     "fox": {
+      "none": 0,
+      "bite": 43,
+      "counter": 33,
+      "starve": 0
+     }
+    },
+    "T_A": {
+     "episodes": 61,
+     "open_at_end": 6,
+     "bins": {
+      "pack1|adult|deer_le4": {
+       "episodes": 28,
+       "success": 5,
+       "hp_lost": 5.2815569915313185,
+       "wolf_dead": 13,
+       "success_share": null,
+       "wolf_e_mean": 0.5609179259692296,
+       "deer10_mean": 0.39285714285714285
+      },
+      "pack4|adult|deer_le4": {
+       "episodes": 5,
+       "success": 1,
+       "hp_lost": 6.445594305003105,
+       "wolf_dead": 8,
+       "success_share": null,
+       "wolf_e_mean": 0.8112643107486888,
+       "deer10_mean": 0.0
+      },
+      "pack2|adult|deer_le4": {
+       "episodes": 19,
+       "success": 2,
+       "hp_lost": 18.25250033425429,
+       "wolf_dead": 25,
+       "success_share": null,
+       "wolf_e_mean": 0.5118767159806799,
+       "deer10_mean": 0.3684210526315789
+      },
+      "pack3|adult|deer_le4": {
+       "episodes": 7,
+       "success": 3,
+       "hp_lost": 5.127699041732816,
+       "wolf_dead": 8,
+       "success_share": null,
+       "wolf_e_mean": 0.8363414096683168,
+       "deer10_mean": 0.0
+      },
+      "pack2|calf|deer_le4": {
+       "episodes": 1,
+       "success": 0,
+       "hp_lost": 0.8333569332277982,
+       "wolf_dead": 0,
+       "success_share": null,
+       "wolf_e_mean": 0.8466051301701473,
+       "deer10_mean": 0.0
+      },
+      "pack5+|adult|deer_le4": {
+       "episodes": 1,
+       "success": 0,
+       "hp_lost": 3.2632684934355334,
+       "wolf_dead": 1,
+       "success_share": null,
+       "wolf_e_mean": 0.41497560923924254,
+       "deer10_mean": 0.0
+      }
+     }
+    },
+    "T_C": {
+     "threat_decisions": 2156,
+     "facing_share": 0.4387755102040816,
+     "flee_share": 0.004174397031539889,
+     "gore_share": 0.032467532467532464,
+     "kin_mean_dist_threat": 27.184758413215636,
+     "kin_mean_dist_calm": 29.16405642280735
+    },
+    "T_D": {
+     "by_species": {
+      "boar": {
+       "kills": 12,
+       "enc": 21768,
+       "D": -0.26182526432943787
+      },
+      "buffalo": {
+       "kills": 0,
+       "enc": 12067,
+       "D": -1.0
+      },
+      "deer": {
+       "kills": 5,
+       "enc": 5307,
+       "D": 0.08293778746778338
+      },
+      "fox": {
+       "kills": 18,
+       "enc": 7957,
+       "D": 0.5783385286783042
+      },
+      "wolf": {
+       "kills": 17,
+       "enc": 17117,
+       "D": 0.14401426511918325
+      }
+     },
+     "by_band": {
+      "20-80kg": {
+       "kills": 29,
+       "enc": 33177,
+       "D": 0.08240730831252013
+      },
+      "<20kg": {
+       "kills": 18,
+       "enc": 9432,
+       "D": 0.5092011019283746
+      },
+      ">80kg": {
+       "kills": 5,
+       "enc": 21607,
+       "D": -0.6531832840349869
+      }
+     }
+    },
+    "T_H": {
+     "kills": {
+      "buffalo>fox:counter": 3,
+      "leopard>deer:bite": 5,
+      "leopard>fox:bite": 18,
+      "leopard>boar:bite": 12,
+      "wolf>boar:bite": 44,
+      "boar>fox:counter": 23,
+      "wolf>fox:bite": 25,
+      "wolf>deer:bite": 17,
+      "wolf>leopard:bite": 9,
+      "leopard>wolf:bite": 17,
+      "buffalo>wolf:counter": 32,
+      "wolf>buffalo:bite": 11,
+      "boar>wolf:counter": 3,
+      "buffalo>leopard:counter": 2,
+      "boar>leopard:counter": 1,
+      "buffalo>fox:gore": 7,
+      "buffalo>deer:gore": 22,
+      "buffalo>wolf:gore": 31,
+      "buffalo>boar:gore": 1
+     },
+     "kills_per_killer_day": {
+      "buffalo>fox:counter": 0.00847457627118644,
+      "leopard>deer:bite": 0.07575757575757576,
+      "leopard>fox:bite": 0.2727272727272727,
+      "leopard>boar:bite": 0.18181818181818182,
+      "wolf>boar:bite": 0.14666666666666667,
+      "boar>fox:counter": 0.04883227176220807,
+      "wolf>fox:bite": 0.08333333333333333,
+      "wolf>deer:bite": 0.056666666666666664,
+      "wolf>leopard:bite": 0.03,
+      "leopard>wolf:bite": 0.25757575757575757,
+      "buffalo>wolf:counter": 0.0903954802259887,
+      "wolf>buffalo:bite": 0.03666666666666667,
+      "boar>wolf:counter": 0.006369426751592357,
+      "buffalo>leopard:counter": 0.005649717514124294,
+      "boar>leopard:counter": 0.0021231422505307855,
+      "buffalo>fox:gore": 0.01977401129943503,
+      "buffalo>deer:gore": 0.062146892655367235,
+      "buffalo>wolf:gore": 0.08757062146892655,
+      "buffalo>boar:gore": 0.002824858757062147
+     },
+     "leopard_death_causes": {
+      "bite": 9,
+      "counter": 3
+     },
+     "leopard_death_shelter_edge": [
+      16.451133983204297,
+      3.1674935081140534,
+      0.8383932911481722,
+      22.1015662733809,
+      11.309804388596435,
+      14.18602326871871,
+      19.977985601314955,
+      0.0827164869251229,
+      2.895425171484998,
+      0.3537527254387989,
+      0.2052546497817218,
+      8.774205786841657
+     ],
+     "bites_in_shelter": {
+      "leopard>deer": 1,
+      "leopard>boar": 3,
+      "leopard>fox": 11,
+      "fox>deer": 1,
+      "fox>leopard": 5
+     },
+     "buffalo_gore_hp_per_buffalo_day": {
+      "deer": 0.10590488804362058,
+      "wolf": 0.12033577306709906,
+      "boar": 0.00972964290270079,
+      "leopard": 0.0010731569764871357,
+      "fox": 0.07150676681511091
+     }
+    },
+    "T_K": {
+     "deer_decisions_pred_within10": 11530,
+     "miss_share": 0.10823937554206418
+    },
+    "T_M": {
+     "leopard": {
+      "nearest_same": {
+       "n": 18900,
+       "p10": 1.043020988052719,
+       "median": 26.66823102940121,
+       "p90": 36.53844405539364,
+       "share_lt5": 0.1948148148148148
+      },
+      "target_decisions": 1137,
+      "joint_share": 0.002638522427440633
+     },
+     "fox": {
+      "nearest_same": {
+       "n": 54000,
+       "p10": 0.5992164786523279,
+       "median": 13.983653134786916,
+       "p90": 45.09780219217127,
+       "share_lt5": 0.3809074074074074
+      },
+      "target_decisions": 3255,
+      "joint_share": 0.07741935483870968
+     }
+    },
+    "form": "buffalo_land",
+    "seconds": 95.6
+   }
+  }
+ },
+ "C0_F9": {
+  "buffalo": {
+   "dec_per_s": 1673.7418777890584,
+   "timesteps": 10027008,
+   "wall_s": 5990.773208856583,
+   "stop": "target"
+  },
+  "leopard": {
+   "dec_per_s": 1160.776793790235,
+   "timesteps": 5013504,
+   "wall_s": 4319.0939264297485,
+   "stop": "target"
+  },
+  "fox": {
+   "dec_per_s": 1147.3216367456398,
+   "timesteps": 5013504,
+   "wall_s": 4369.745884180069,
+   "stop": "target"
+  },
+  "wolf": {
+   "dec_per_s": 2772.6896474145647,
+   "timesteps": 10006528,
+   "wall_s": 3608.9607105255127,
+   "stop": "target"
+  }
+ }
+}

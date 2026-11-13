@@ -1,0 +1,18 @@
+{
+ "mode": "L0_800",
+ "worlds": 5,
+ "steps": 400,
+ "alive_mean_first": 800.0,
+ "alive_mean_last": 798.8,
+ "alive_mean_avg": 799.7,
+ "elapsed_s": 117.12051439285278,
+ "ms_per_world_step": 58.56025719642639,
+ "peak_wset_mb": 514.59375,
+ "private_mb": 39.5,
+ "end_mean": {
+  "deer": 693.2,
+  "wolf": 6.0,
+  "boar": 99.6
+ },
+ "time": "2026-11-11 03:04:17"
+}

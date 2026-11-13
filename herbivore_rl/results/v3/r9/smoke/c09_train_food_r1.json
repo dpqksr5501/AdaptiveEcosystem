@@ -1,0 +1,107 @@
+{
+ "set": "food_r1",
+ "wall_s": 291.89706778526306,
+ "min_available_gb": 11.40402603149414,
+ "min_free_commit_gb": 11.94680404663086,
+ "max_r9_python": 5,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "deer_A",
+   "species": "deer",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3031040,
+   "wall_s": 240.00195050239563,
+   "dec_per_s": 12629.230694396982,
+   "log_dec_per_s": [
+    13843,
+    12107
+   ],
+   "num_envs": 1280,
+   "memory": [
+    {
+     "pid": 30824,
+     "peak_mb": 378.2890625,
+     "private_mb": 366.07421875
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "deer_B",
+   "species": "deer",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3031040,
+   "wall_s": 246.18634486198425,
+   "dec_per_s": 12311.974499232467,
+   "log_dec_per_s": [
+    12889,
+    12047
+   ],
+   "num_envs": 1280,
+   "memory": [
+    {
+     "pid": 37704,
+     "peak_mb": 379.6640625,
+     "private_mb": 366.53515625
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "boar_A",
+   "species": "boar",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 275.86885046958923,
+   "dec_per_s": 3741.604020326989,
+   "log_dec_per_s": [
+    3732,
+    4091
+   ],
+   "num_envs": 768,
+   "memory": [
+    {
+     "pid": 23376,
+     "peak_mb": 443.25,
+     "private_mb": 404.50390625
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "boar_B",
+   "species": "boar",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 281.98905396461487,
+   "dec_per_s": 3660.397400139949,
+   "log_dec_per_s": [
+    3643,
+    4338
+   ],
+   "num_envs": 768,
+   "memory": [
+    {
+     "pid": 39296,
+     "peak_mb": 442.48828125,
+     "private_mb": 402.61328125
+    }
+   ],
+   "error": ""
+  }
+ ],
+ "time": "2026-11-11 02:55:20"
+}

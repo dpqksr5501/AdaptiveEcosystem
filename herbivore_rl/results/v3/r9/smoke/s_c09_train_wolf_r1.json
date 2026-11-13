@@ -1,0 +1,81 @@
+{
+ "set": "wolf_r1",
+ "note": "S′ C0-9 등록 측정 (2026-11-12 16:54~17:37): 무거운 python 4 개 함께, 언리얼 꺼짐(측정 중 UnrealEditor·UBT·MSBuild 없음), 시스템 CPU 평균 cpu_sys_mean(내 4 프로세스 약 20% 포함 [어림] — 나머지는 사용자 브라우저 등). 시드 44180~44199",
+ "time": "2026-11-12 17:09:13",
+ "wall_s": 444.57222390174866,
+ "min_available_gb": 11.395545959472656,
+ "min_free_commit_gb": 9.016197204589844,
+ "cpu_sys_mean": 87.32181818181817,
+ "ue_seen": [],
+ "aborted_low_commit": [],
+ "other_python_at_start": [
+  "이 측정의 자원 살피기(probe.py, 가벼움)",
+  "사용자 python ortholoc"
+ ],
+ "other_python_at_end": [
+  "이 측정의 자원 살피기(probe.py, 가벼움)",
+  "사용자 python ortholoc"
+ ],
+ "max_r9_python": 6,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "wolf_A_s3",
+   "species": "wolf",
+   "round": 1,
+   "shards": 3,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 381.7583956718445,
+   "dec_per_s": 2703.783365873272,
+   "log_dec_per_s": [
+    2705,
+    2668
+   ],
+   "num_envs": 384,
+   "memory": [
+    {
+     "pid": 40184,
+     "peak_mb": 386.58203125,
+     "private_mb": 363.52734375
+    },
+    {
+     "pid": 41780,
+     "peak_mb": 288.859375,
+     "private_mb": 245.921875
+    },
+    {
+     "pid": 33212,
+     "peak_mb": 288.70703125,
+     "private_mb": 248.66796875
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "deer_A_load",
+   "species": "deer",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3010560,
+   "wall_s": 428.39223313331604,
+   "dec_per_s": 7027.578389973077,
+   "log_dec_per_s": [
+    6980,
+    7052
+   ],
+   "num_envs": 896,
+   "memory": [
+    {
+     "pid": 32660,
+     "peak_mb": 370.8125,
+     "private_mb": 352.58984375
+    }
+   ],
+   "error": ""
+  }
+ ]
+}

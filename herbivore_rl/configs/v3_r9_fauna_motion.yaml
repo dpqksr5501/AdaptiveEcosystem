@@ -1,0 +1,32 @@
+# R9 몸 움직임 바퀴 1 (설계 AdaptiveEcosystem/Docs/RL_Policy/RL_R9_TURN_EFFORT_DESIGN.md 3·6-1·부록 A). 동물 세계 v3_r9_fauna.yaml 을 물려받고
+# M1 회전 한계만 켠다: 한 스텝 머리 회전 ≤ min(몸 한계 turn_dps, 미끄럼 한계 asin(옆 가속 ÷ 지금 속력)). 벽 미끄러짐만 예외(3-4).
+# 사용자 결정(2026-11-13): 첫 바퀴 M1 만 — effort(M2) 는 false (true 는 설정 검사가 거부, M2 미구현). 늑대 옆 가속 7.0(초안 8 아님).
+# 옛 설정 셋(v3_r9·v3_r9_judge·v3_r9_fauna)은 바이트 그대로 — 이 블록이 있을 때만 새 줄을 탄다(시험 M-1). 6 종 몸 해시가 바뀐다
+# (상대 npz 는 rebody_r9.py 로만 실림, 6-4). 관측 115·행동 19·입출력 해시는 그대로.
+# [어림] = 근거 수치 없이 정함, [판단] = 근거가 갈려 설계가 고름. 근거 강도는 설계 3-3.
+inherit: v3_r9_fauna.yaml
+
+body_common:
+  motion:                       # RL_R9_TURN_EFFORT_DESIGN.md — 이 블록이 있을 때만 새 줄 (옛 설정 셋은 비트 그대로)
+    turn: true                  # M1 회전 한계
+    effort: false               # M2 는 사용자 결정 뒤 (11-5). false 면 M2 키를 두지 않는다
+
+species:
+  deer:
+    turn_dps: 130               # [어림 — 사람 걸음 회전 95~156°/s·제자리 에너지 최적 약 84°/s. 사족 저속 최대 미확인, 낮은 쪽 어림]
+    lat_accel_mps2: 9.0         # [판단·약 — 범위 5.9(발굽 μ0.6)~12.7(임팔라 ≈ 치타 μ1.3)의 가운데]
+  wolf:
+    turn_dps: 140               # [어림 — 60 kg 130 × (40/60)^−0.17]
+    lat_accel_mps2: 7.0         # [중 — 아프리카 들개 최고 옆 가속 7.0 원문(Hubel 2016)]. 사용자 결정 11-13: 7.0 (초안 8 아님)
+  boar:
+    turn_dps: 125               # [어림]
+    lat_accel_mps2: 7.0         # [어림 — 직접 값 없음. accel 0.06(6.75) 이 먼저 걸림]
+  buffalo:
+    turn_dps: 90                # [어림]
+    lat_accel_mps2: 5.0         # [중-약 — 폴로 말 μ0.6 → 5.9 원문]
+  leopard:
+    turn_dps: 135               # [어림]
+    lat_accel_mps2: 11.0        # [약 — 치타 13.1(원문 안의 인용)이 위 끝, 표범 직접 값 없음]
+  fox:
+    turn_dps: 185               # [어림]
+    lat_accel_mps2: 10.0        # [어림 — 미끄럼 범위 안, 작은 개 μ 가 중간 개보다 낮음]

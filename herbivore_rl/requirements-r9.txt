@@ -1,0 +1,11 @@
+# R9 학습만 (클라우드·새 컴퓨터) — 그림·영상·튜닝 도구는 뺐다. 전체 목록은 requirements.txt.
+# 확인한 판: 2026-11-13 윈도우 파이썬 3.13 · WSL 우분투 24.04 파이썬 3.12 (results/v3/r9/cloud_setup.sh).
+#
+# torch 는 여기 넣지 않는다 — CPU 판을 먼저 따로 깐다 (CUDA 판은 수 GB 이고 이 학습은 GPU 를 안 쓴다):
+#   pip install --index-url https://download.pytorch.org/whl/cpu torch==2.11.0
+numpy==2.1.3
+PyYAML==6.0.2
+stable-baselines3==2.9.0      # gymnasium·cloudpickle·pandas·matplotlib 를 함께 끌어온다
+gymnasium==1.3.0
+psutil>=5.9                   # 조각 프로세스 메모리·실행기 프로세스 확인
+pytest>=8.0

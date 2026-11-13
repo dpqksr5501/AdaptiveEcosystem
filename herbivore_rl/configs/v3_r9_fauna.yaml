@@ -1,0 +1,234 @@
+# R9 동물 세계 1 단계 (설계 AdaptiveEcosystem/Docs/RL_Policy/RL_R9_SPECIES_TRAITS.md). S′ 세 종 세계 v3_r9.yaml 을 물려받고
+# 새 몸 규칙(body_common.fauna: R1 몸무게 상처·P1 은신처 보호·R2 들이받기·R3 무늬·R6 사체 자리)과 새 종 셋(물소·표범·여우)을 더한다.
+# 옛 두 파일은 바이트 그대로 — 이 파일이 있을 때만 새 규칙이 켜진다. 몸 해시가 S′ 와 다르다(옛 두뇌는 rebody 로만 실림).
+# [어림] = 근거 수치 없이 정함, [비례] = 크기 비례 식, [고정점 맞춤] = S′ 숫자를 지키려고 거꾸로 셈.
+inherit: v3_r9.yaml
+
+world:
+  slots: {deer: 64, wolf: 6, boar: 14, buffalo: 8, leopard: 4, fox: 4}
+
+counts:
+  buffalo: [0, 6]
+  leopard: [0, 2]
+  fox: [0, 4]
+
+learner_counts:
+  buffalo: [2, 3, 4, 6]
+  leopard: [2, 3, 4]
+  fox: [2, 3, 4]
+
+randomize:
+  juvenile_frac: {buffalo: [0.1, 0.4], leopard: [0.0, 0.3], fox: [0.1, 0.4]}
+
+food:
+  train_grass_total: 90.0       # [어림] 시험 비행 값 — 물소 한 마리 = 사슴 4.5 마리 풀. 1b C0-F7 이 70·90·110 에서 정함
+
+body_common:
+  fauna:
+    damage: mass                # R1: 상처 = 세기 × (M_a/M_b)^(2/3) ÷ 가죽 (c23 × (g_a/g_b)² × AGE23 비)
+    age_steps: 64               # AGE23 표 눈금 (코드 리터럴과 같아야 함)
+    shelter_guard: enter        # P1: 은신처에 못 들어가는 몸은 안의 몸을 못 묾·못 받음
+    gore: {cone_cos: 0.5, approach_min: 0.03, cooldown: 8, run_only: true}   # R2 (밀림·물기 쉼·자기 상처는 counter 값 재사용)
+    camo_curve: {s0: 0.18, span: 0.42}   # R3: 소리 곡선과 같은 '움직임 크기'
+    carcass_places: {per_size: 3.0, min: 1, max: 8}   # R6 [판단 — 둘레 ∝ 몸 길이]
+
+species:
+  deer:                         # 옛 블록에 덮어쓰는 칸만 (나머지는 v3_r9.yaml 그대로 물려받음)
+    has_hp: true                # R5 (S′ false)
+    hp_regen_per_day: 0.25      # [어림 = 늑대·멧돼지]
+    bite_k: 0.0
+    hide: 1.0
+    strike_k: 0.0
+    gore: false
+    gore_r: 0.0
+    camo: 1.0
+    recover: 2250
+  wolf:
+    bites: [deer, boar, buffalo, leopard, fox]   # R4 다른 종 모두
+    bite_k: 1.5000939941099485  # = 0.45 × 2.1 ÷ (40/80)^(2/3) [고정점 맞춤: 늑대 → 멧돼지 0.45, F-2 1e-12] (설계 표의 1.5 는 반올림 표기)
+    hide: 2.5                   # [어림 — 목 털, 표범에게 두 번]
+    strike_k: 0.0
+    gore: false
+    gore_r: 0.0
+    camo: 1.0
+    recover: 2250
+  boar:
+    bite_k: 0.0
+    hide: 2.1                   # [고정점 맞춤: 늑대 → 사슴 한 번 + 멧돼지 0.45]
+    strike_k: 0.28348223622634644   # = 0.18 × 2.5 ÷ 2^(2/3) [고정점 맞춤: 반격 → 늑대 0.18]
+    gore: false
+    gore_r: 0.0
+    camo: 1.0
+    recover: 2250
+  buffalo:                      # 아시아 물소(야생화) — RT 2 절·S18~S24
+    mass_kg: 450.0
+    founder: plain
+    founder_variation: null
+    growth: smooth
+    walk_speed: 0.10            # [어림]
+    run_speed: 0.48             # [어림 — 현실 비 0.8; 들소·아프리카물소 56~57 km/h 그대로면 0.54]
+    run_mult: [1.0, 1.0]
+    accel: 0.06                 # [어림 = 멧돼지]
+    stamina_run_steps: 60       # [어림] (C0-F12 에서 90 과 보고만)
+    stamina_recover_steps: 60   # [어림]
+    see_r: 10.0                 # [어림 — 눈에 덜 기댐 S18]
+    fov_deg: 300.0
+    head_down: 0.6
+    smell_r: 6.0                # [S18 냄새 좋음]
+    drain: 0.00121              # [비례 ← 사슴 × 7.5^−0.25]
+    reserve_days: 7.3           # [비례 ← 3 × 7.5^0.44]
+    refill_e: 0.7
+    refill_frac: 0.25
+    weak_e: 0.1
+    weak_speed: 0.75
+    diet: [grass]
+    eat_rate: {grass: 0.0544}   # [비례 ← 사슴 × 7.5^0.75]
+    e_per_unit: {grass: 0.0667} # [비례 ← 사슴 × 60/450]
+    has_hp: true
+    hp_regen_per_day: 0.25      # [어림]
+    shelter_enter: false        # [판단 — 큰 몸]
+    bites: []
+    bite_r: 0.0
+    counter: true
+    maturity_steps: 3375        # 1.5~3 년 [S18 S20]
+    sex: natural
+    female_frac: 0.5            # [어림]
+    child_female_frac: 0.5
+    max_founder_age_steps: 16875   # [어림] 5 × 성숙
+    first_birth: [112.5, 450.0] # [어림 = 사슴]
+    mate_r: 10.0
+    birth_r: 15.0
+    birth_grace_steps: 0
+    pair_block: [run]           # [어림 = 멧돼지]
+    birth_block: []
+    pending_needs_parent: true
+    child_ring: {center: parent_a, r0: 1.1, dr: 0.2, avoid_shelter: true}   # 은신처 못 들어가는 몸
+    food_density_ref: 0.0667    # [비례·어림] 사슴 0.5 × (0.0667 / 0.5)
+    food_here_ref: 0.0667
+    bite_k: 0.0
+    hide: 2.1                   # [어림 = 멧돼지] (C0-F12 에서 1.5·3.0 과 보고만)
+    strike_k: 0.28348223622634644   # [같은 계수 — 무게 차가 세기를 만듦]
+    gore: true
+    gore_r: 1.2                 # [어림 — 몸 길이 2.4~3 m 의 절반 + 뿔, S18]
+    camo: 1.0
+    recover: 3375               # 1~2 년 [S18]
+  leopard:                      # RT 2-5·S25~S29
+    mass_kg: 50.0
+    founder: plain
+    founder_variation: null
+    growth: linear
+    walk_speed: 0.15            # [어림]
+    run_speed: 0.57             # 58~60 km/h [S26]
+    run_mult: [1.0, 1.0]
+    accel: 0.15                 # [어림 — 포식자 가속 큼, Wilson 외 2018 기억]
+    stamina_run_steps: 30       # [어림 — 매복형 S25 S26]
+    stamina_recover_steps: 90   # [어림]
+    see_r: 20.0                 # [어림]
+    fov_deg: 200.0              # [어림 — 앞을 보는 눈]
+    head_down: 0.6
+    smell_r: 3.0                # [어림]
+    drain: 0.000284             # [비례 ← 늑대 × 1.25^−0.25]
+    reserve_days: 3.3           # [비례]
+    refill_e: 0.7
+    refill_frac: 0.25
+    weak_e: 0.1
+    weak_speed: 0.75
+    diet: [meat]
+    eat_rate: {meat: 0.0189}    # [비례 ← 늑대 × 1.25^0.75]
+    e_per_unit: {meat: 0.8}     # [비례 ← 늑대 × 40/50]
+    has_hp: true
+    hp_regen_per_day: 0.25      # [어림]
+    shelter_enter: true         # [판단 — 고양이과는 빽빽한 덮개를 지남]
+    bites: [deer, wolf, boar, buffalo, fox]
+    bite_r: 1.0                 # [어림 = 늑대]
+    counter: false
+    maturity_steps: 2900        # 2~2.3 년 [S26]
+    sex: natural
+    female_frac: 0.5
+    child_female_frac: 0.5
+    max_founder_age_steps: 14500
+    first_birth: [112.5, 450.0]
+    mate_r: 10.0
+    birth_r: 15.0
+    birth_grace_steps: 0
+    pair_block: []              # 뛰기는 사냥 (늑대와 같음)
+    birth_block: []
+    pending_needs_parent: true
+    child_ring: {center: parent_a, r0: 1.1, dr: 0.2, avoid_shelter: false}
+    food_density_ref: 0.00726   # [비례·어림] 늑대 × 0.8
+    food_here_ref: 3.2
+    bite_k: 1.5000939941099485  # [어림 = 늑대] (늑대와 같은 수)
+    hide: 2.5                   # [어림 — 늘어진 목 가죽, 늑대에게 두 번]
+    strike_k: 0.0
+    gore: false
+    gore_r: 0.0
+    camo: 0.4                   # [어림 — 덮개·어둠 대용. 고르지 않음]
+    recover: 3650               # 15~24 개월 [S26]
+  fox:                          # RT 2-6·S30~S32
+    mass_kg: 7.0
+    founder: plain
+    founder_variation: null
+    growth: linear
+    walk_speed: 0.15            # [어림]
+    run_speed: 0.47             # 48~50 km/h [S31]
+    run_mult: [1.0, 1.0]
+    accel: 0.12                 # [어림 = 사슴]
+    stamina_run_steps: 60       # [어림 — 전력 뛰기. S31 의 '오래 감'은 종종걸음]
+    stamina_recover_steps: 60
+    see_r: 12.0                 # [어림 — 움직임 위주 S31]
+    fov_deg: 260.0              # [어림]
+    head_down: 0.6
+    smell_r: 5.0                # [S31]
+    drain: 0.000464             # [비례 ← 늑대 × 0.175^−0.25] (현실 하루 0.5~1 kg [S30][S31] 과 맞음)
+    reserve_days: 1.4           # [비례]
+    refill_e: 0.7
+    refill_frac: 0.25
+    weak_e: 0.1
+    weak_speed: 0.75
+    diet: [meat, root]
+    eat_rate: {meat: 0.00433, root: 0.0029}   # [비례 ← 늑대 고기 · 멧돼지 땅속]
+    e_per_unit: {meat: 5.714, root: 1.714}
+    has_hp: true
+    hp_regen_per_day: 0.25      # [어림]
+    shelter_enter: true         # [판단 — 작은 몸]
+    bites: [deer, wolf, boar, buffalo, leopard]
+    bite_r: 0.55                # [어림 — 몸 길이 비례]
+    counter: false
+    maturity_steps: 1080        # 9~10 개월 [S31]
+    sex: natural
+    female_frac: 0.5
+    child_female_frac: 0.5
+    max_founder_age_steps: 5400
+    first_birth: [112.5, 450.0]
+    mate_r: 10.0
+    birth_r: 15.0
+    birth_grace_steps: 0
+    pair_block: []
+    birth_block: []
+    pending_needs_parent: true
+    child_ring: {center: parent_a, r0: 1.1, dr: 0.2, avoid_shelter: false}
+    food_density_ref: 0.0518    # [비례·어림] 늑대 × 5.714
+    food_here_ref: 22.86
+    bite_k: 0.2                 # [어림 — 작은 먹이 턱. 몸 사실 점검 F-10: 어른 사슴을 죽일 수 없음 (RT 2-6, Carbone 1999)]
+    hide: 1.0
+    strike_k: 0.0
+    gore: false
+    gore_r: 0.0
+    camo: 1.0
+    recover: 2250               # 1 년 [S31]
+
+rules:                          # 6-4 (문턱 모두 [어림])
+  buffalo: {threat_r: 5.0, approach: 0.1, face_cos: 0.7071067811865476, kin_far: 6.0, full_e: 0.9}
+  leopard: {eat_e: 0.98, hunt_e: 0.9, prey_size_max: 0.6, prey_approach_max: 0.1, stalk_r: 4.0, watch_facing: 0.5,
+            threat_r: 8.0, threat_approach: 0.2, threat_size_min: 0.4}
+  fox: {flee_r: 10.0, flee_approach: 0.1, flee_size_ratio: 1.5, prey_size_ratio: 1.0, pounce_r: 4.0, eat_e: 0.98}
+
+train:
+  seeds: [46000, 46500]         # 동물 세계 학습 풀 (7-3)
+  worlds: {wolf: 124, buffalo: 103, leopard: 96, fox: 96}
+  n_steps: {wolf: 64, buffalo: 96, leopard: 128, fox: 128}   # 학습 칸 448·384·288·288 → 롤아웃 28,672·36,864·36,864·36,864 (4,096 배수)
+  snapshot_every: {buffalo: 5000000, leopard: 5000000, fox: 5000000}
+  variants:                     # 세계 구성 갈래 [어림] — 행동 규칙 아님, 난수 쓰지 않음 (9-5)
+    - {name: buffalo_land, learners: [wolf, buffalo], every: 4, counts: {deer: [0, 2, 4], buffalo: [4, 6, 8]},
+       learner_counts: {wolf: [4, 6]}}
+    - {name: few_wolves, learners: [leopard], every: 3, counts: {wolf: [0, 1]}}

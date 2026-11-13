@@ -1,0 +1,63 @@
+# R9 판정 세계 (설계 RL_R9_MULTISPECIES_DESIGN.md 3-1·3-2·3-6·3-7·8-2). 학습 세계 v3_r9.yaml 을 물려받고 모드·무대·시작 수만 바꾼다.
+# species·body_common 은 바꾸지 않는다 — 몸 해시가 학습 세계와 같아야 학습한 두뇌를 받는다(r9_body.body_hash, 시험 tests/test_r9_body.py).
+# 판정 시드 44800~44999 는 판정 때 한 번만(잠금 파일, 9-2). 이 파일에는 시드를 적지 않는다.
+# S′ (2026-11-12): 몸 규칙(EAT 서서 먹기·SHELTER 서기·food_dir 관측 115)은 학습 세계에서 물려받는다 — 두 세계 몸 해시가 같다.
+inherit: v3_r9.yaml
+
+world:
+  mode: judge
+  size: 120.0                   # 240 m, 바깥만 벽. 셈(출생 예산·상한·대기 1 건)은 60 × 60 사분면 넷 (3-1)
+  quadrants: 4                  # q = (x ≥ 60) + 2 (y ≥ 60)
+  slots: {deer: 400, wolf: 24, boar: 56}   # 배열 상한 (3-6). 사슴 400 에 닿으면 '배열 상한 닿음'으로 기록
+  carcass_slots: 256            # [어림]
+  shelters:
+    count: [16, 16]             # = 사분면 4 × 4 (per_quadrant 가 0 이 아니면 그것을 쓴다)
+    per_quadrant: 4             # 같은 규칙(반지름 U[4, 7]·중심 18 이상) — 벽 8 단위는 사분면 경계 기준으로 읽었다(계약 문서 빈칸 표)
+
+food:
+  quadrant_grass_total: 70.0    # 사분면마다 따로 만들고 용량 합을 70 으로 (은신처 0.15 배 전, 3-2). 땅속 먹이는 사분면마다 따로 만들되 합은 맞추지 않는다 [어림]
+  train_grass_total: null       # 학습 세계 전용 맞춤(S′ N) — 판정 세계는 쓰지 않는다 (모드 judge 는 읽지 않지만 뜻을 적어 둠)
+
+judge:                          # 판정 전용 (몸 해시 밖)
+  steps: 13500                  # 30 분 = 게임 15 일
+  steps_long: 54000             # 2 시간 판 (J2 둘째 기준)
+  worlds: 100
+  worlds_long: 50
+  start_per_quadrant: {deer: 24, boar: 6}   # 합 96·24
+  wolf_packs: {quadrants: [0, 3], per_pack: 2}   # 2 마리 무리 둘을 대각 사분면에 (합 4)
+  grass_regen_mult: 1.0         # 판정 기준 1.0 (0.5·2.0 은 덧붙임 판)
+  root_regen_mult: 1.0
+  wolf_run_mult: null           # null = species.wolf.run_mult 범위에서 세계 시드로 뽑음 [어림 — 문서 미정]
+  greedy: true                  # 모든 종 가장 높은 칸 (언리얼과 같다). LS 판만 false
+  founders:                     # 3-6 시작 나이
+    deer: {juvenile_frac: 0.25} # 자연 개체군 FounderAge + Rank 식
+    wolf: just_mature           # 막 성숙한 성체 (born = t − 성숙)
+    boar: just_mature
+  start:
+    energy: {deer: 0.5, wolf: 1.0, boar: 1.0}
+    fat: 1.0
+  limits:                       # 콘텐츠 상한 (3-7). L0 판은 끈다
+    enabled: true
+    one_pending: true           # 사분면 × 종마다 대기 1 건
+    wolf_max: 6                 # 사분면 늑대 + 1 ≤ 6
+    wolf_prey_per: 8            # 사분면 사슴 ≥ 8 × (늑대 + 1) — 사슴만 센다
+    boar_max: 14                # 사분면 멧돼지 < 14
+  plant_budget: {deer: 0.42, boar: 0.35}   # 사분면 풀 ≥ (사분면 식물 먹는 개체 + 1) × 계수 (먹이 예산 — L0 에서도 남는다)
+  variants:                     # 8-2 덧붙임 판 — r9_body.override(cfg, variants[이름]) 로 쓴다
+    L0:
+      judge: {limits: {enabled: false}}
+      world: {slots: {deer: 800, wolf: 64, boar: 160}}
+    L1:
+      world: {size: 60.0, quadrants: 1, shelters: {count: [4, 4], per_quadrant: 4}}
+      judge: {start_per_quadrant: {deer: 24, boar: 6}, wolf_packs: {quadrants: [0], per_pack: 2}}
+      food: {quadrant_grass_total: 70.0}
+    LS:
+      judge: {greedy: false}
+    regen_0.5:
+      judge: {grass_regen_mult: 0.5, root_regen_mult: 0.5}
+    regen_2.0:
+      judge: {grass_regen_mult: 2.0, root_regen_mult: 2.0}
+    ratio_20_10:
+      judge: {start_per_quadrant: {deer: 20, boar: 10}}
+    ratio_27_3:
+      judge: {start_per_quadrant: {deer: 27, boar: 3}}

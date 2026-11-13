@@ -170,3 +170,9 @@ owned Ecosystem 및 별도 작은 transfer fixture의 검증은 미래 팀 통�
 사용자 결정("기본 두뇌 R7e로")에 따라 통합 v3 모드에서 시작 두뇌를 고르지 않은 Play(적응 고리 판 0 포함)의 사슴 두뇌는 R7e `v3_r7_g995_s1_20m@40d8710d`(**24관측/5행동·mask5**, 두 길·반사 밖 도망 막음)다. 4절의 'R1b 18관측/5행동·mask2'는 당시 이력이다. 저장소 두뇌 파일을 바이트 그대로 빌드에 넣었고(`PolicyBrainV3Default.h`) 파일 두뇌와 같은 검사를 지난다. 런타임 추론은 그대로 C++ Native이고 V1 7관측/4출력·`eco.IntegratedPolicyVersion` 기본값·내장 R1b(`PolicyWeightsV3.h`)·평가기·Python 거울은 바꾸지 않았다. R7e를 걸 수 없는 세계(도주 반사 끔 등)는 내장 R1b-F로 돈다. 맵 조정자 `bUseV3Policy`로 v3를 켜는 맵(조연우 life 맵 등)도 콘솔 변수와 무관하게 같은 규칙으로 R7e에서 시작한다. 같은 날 검토에서 저장 체크포인트가 두뇌의 반사 밖 도망 막음(`bFleeGate`)을 싣지 않던 것을 고쳤다.
 
 R1b-F로 되돌리려면 Play 전 `eco.V3Brain.Startup builtin`(명령줄 `-EcoV3Brain=builtin`), Play 중 `eco.V3Brain.Load builtin`을 쓴다. 고르기 규칙·실시간 고리·검증은 [LIVE_ADAPT_SPEC.md 5.6](AdaptiveEcosystem/Docs/RL_Policy/LIVE_ADAPT_SPEC.md)을 따른다.
+
+## 19. 2026-11-13 R9 다종 두뇌 클라우드 이어 학습
+
+R9 다종(사슴·늑대·멧돼지·물소·표범·여우) 파이썬 학습을 다른 컴퓨터나 OpenAI Dots 같은 리눅스 클라우드에서 돌릴 때는 [R9 클라우드 학습 안내](AdaptiveEcosystem/Docs/RL_Policy/R9_CLOUD_TRAINING.md)를 따른다. 언리얼 에셋(LFS) 없이 `herbivore_rl`만 sparse checkout한다. `chain_r9.py`가 저장소의 출발 팩(`herbivore_rl/results/v3/r9/packs/`)에서 이어 학습하고, 결과는 팩으로 `r9-train/<줄>` 가지에 돌려준다. `Branch_Sinhyeok`·`main`에 바로 push하지 않는다.
+
+세계 규칙·보상·관측·행동·몸 숫자·설정 YAML과 판정 시드(44800~44999)는 RL 담당만 바꾸거나 쓴다. 몸 해시 검사를 끄지 않는다. 이 학습은 런타임 Python 추론이 아니며 V1·v3 게임 기본 두뇌와 계약을 바꾸지 않는다. 돌려받은 팩은 학습 판이고 판정 결과가 아니다.
