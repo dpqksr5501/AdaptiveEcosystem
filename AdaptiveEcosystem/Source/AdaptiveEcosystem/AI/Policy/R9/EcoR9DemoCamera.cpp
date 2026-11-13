@@ -190,6 +190,61 @@ int32 EcoR9DemoCam::CenterPick(TConstArrayView<FVector> Points, TConstArrayView<
 	return Best;
 }
 
+int32 EcoR9DemoCam::StepPick(TConstArrayView<uint32> Ids, TConstArrayView<int32> Sites, uint32 CurId, int32 CurSite, int32 AnchorSite, uint32 AnchorId, int32 Dir)
+{
+	const int32 N = Ids.Num();
+	if (N == 0 || Sites.Num() != N)
+	{
+		return INDEX_NONE;
+	}
+	// 차례 열쇠 = 자리 × 2³² + 자리 안 차례 (자리 안 차례 = uid, 고리를 시작한 자리만 uid − AnchorId — 부호 없는 뺄셈이라 2³² 를 돈다)
+	const auto KeyAt = [](int32 Site, uint32 Rank) -> int64
+	{
+		return static_cast<int64>(FMath::Max(Site, 0)) * (static_cast<int64>(1) << 32) + static_cast<int64>(Rank);
+	};
+	const auto KeyOf = [&KeyAt, AnchorSite, AnchorId](int32 Site, uint32 Id) -> int64
+	{
+		return KeyAt(Site, Site == AnchorSite ? Id - AnchorId : Id);
+	};
+	// 지금 자리: 목록에 있으면 그 열쇠 (자기 자신은 건너뛴다), 없으면(죽음·사라짐) 그 자리·uid 가 있을 곳, 대상 없음이면 그 자리 처음 앞(앞으로)·끝 뒤(뒤로)
+	int64 Cur = 0;
+	bool bFound = false;
+	for (int32 i = 0; i < N && CurId != 0; ++i)
+	{
+		if (Ids[i] == CurId)
+		{
+			Cur = KeyOf(Sites[i], CurId);
+			bFound = true;
+			break;
+		}
+	}
+	if (!bFound)
+	{
+		Cur = CurId != 0 ? KeyOf(CurSite, CurId) : (Dir >= 0 ? KeyAt(CurSite, 0) - 1 : KeyAt(CurSite + 1, 0));
+	}
+	// 앞으로: Cur 보다 큰 열쇠 가운데 가장 작은 것, 없으면 한 바퀴 돌아 가장 작은 열쇠. 뒤로: 작은 것 가운데 가장 큰 것, 없으면 가장 큰 열쇠
+	const bool bFwd = Dir >= 0;
+	int32 Best = INDEX_NONE;
+	int32 Wrap = INDEX_NONE;
+	int64 BestKey = 0;
+	int64 WrapKey = 0;
+	for (int32 i = 0; i < N; ++i)
+	{
+		const int64 K = KeyOf(Sites[i], Ids[i]);
+		if ((bFwd ? K > Cur : K < Cur) && (Best == INDEX_NONE || (bFwd ? K < BestKey : K > BestKey)))
+		{
+			Best = i;
+			BestKey = K;
+		}
+		if (Wrap == INDEX_NONE || (bFwd ? K < WrapKey : K > WrapKey))
+		{
+			Wrap = i;
+			WrapKey = K;
+		}
+	}
+	return Best != INDEX_NONE ? Best : Wrap;
+}
+
 // =============================================================================
 // 안쪽 도우미
 // =============================================================================
@@ -1087,45 +1142,76 @@ void UEcoR9DemoSubsystem::StepCamSubject(int32 Dir)
 	uint8 CurSp = S.FollowSpecies;
 	const bool bCur = S.FollowA != 0 && CamWhere(S.FollowA, CurAt, &CurSp);
 	const uint8 Sp = IsFollowMode(S.CamMode) ? SpeciesOfMode(S.CamMode) : (bCur ? CurSp : kWolf);
-	// 같은 무리 자리(맵 전체 땅 — 지금 대상 곁 자리)의 산 개체를 uid 차례로 돈다 (옛: 같은 지역 id 차례). 그 자리에 없으면 모든 자리
-	const int32 Site = NumSites() > 0 ? NearestSite(bCur ? CurAt : CamReferencePoint()) : -1;
+	// 그 종의 산 개체를 섬 전체 고리로 돈다 (사용자 11-13 '1 을 눌러도 늑대 두 마리밖에 안 보여, 다른 애들한테는 왜 안 가' — 예전: 지금 대상 곁 무리 자리 안만
+	// uid 차례로 돌아 자리 6 곳 × 늑대 2 = 12 마리 가운데 둘만 오갔다. 옛 카메라: 같은 지역 id 차례). 지금 자리 안을 uid 차례로 먼저 돌고, 그 자리를 다 돌면
+	// 다음 자리(자리 +1, +2, … 끝에서 처음으로)의 개체로 넘어가 한 바퀴면 처음 대상으로 돌아온다. , 는 거꾸로 (EcoR9DemoCam::StepPick · StepAnchor).
+	// 작은 무대(무리 자리 없음)는 자리가 모두 0 — 모든 개체 uid 차례 그대로
+	const int32 NSites = NumSites();
 	TArray<uint32> Ids;
-	TArray<uint32> All;
+	TArray<int32> Sites;
+	int32 CurSite = INDEX_NONE;   // 지금 대상의 무리 자리 (산 대상은 목록과 같은 프레임 자리로)
 	for (const FR9Agent& A : S.Cur.Agents)
 	{
 		if (!A.Alive() || A.Species != Sp)
 		{
 			continue;
 		}
-		All.Add(A.Id);
-		if (Site >= 0)
+		int32 Site = 0;
+		if (NSites > 0)
 		{
 			double X = 0.0, Y = 0.0;
 			S.Map.ToWorld(A.X, A.Y, X, Y);
-			if (NearestSite(FVector(X, Y, 0.0)) != Site)
-			{
-				continue;
-			}
+			Site = NearestSite(FVector(X, Y, 0.0));
+		}
+		if (A.Id == S.FollowA)
+		{
+			CurSite = Site;
 		}
 		Ids.Add(A.Id);
-	}
-	if (Ids.IsEmpty())
-	{
-		Ids = MoveTemp(All);
+		Sites.Add(Site);
 	}
 	if (Ids.IsEmpty())
 	{
 		UE_LOG(LogEcoR9Demo, Log, TEXT("[EcoR9Demo] 카메라: 산 %s 가 없다"), SpeciesKo(Sp));
 		return;
 	}
-	Ids.Sort();
-	const int32 At = Ids.Find(S.FollowA);
-	const int32 N = Ids.Num();
-	const int32 Next = At == INDEX_NONE ? (Dir >= 0 ? 0 : N - 1) : (((At + (Dir >= 0 ? 1 : -1)) % N) + N) % N;
+	if (CurSite == INDEX_NONE)
+	{
+		// 지금 대상이 목록에 없다 (죽음·사라짐·대상 없음): 그 몸 자리, 없으면 보는 자리의 무리 자리
+		CurSite = NSites > 0 ? NearestSite(bCur ? CurAt : CamReferencePoint()) : 0;
+	}
+	// 지금 대상 (다른 종이면 없는 것으로 — 그 자리 처음·끝부터). 대상이 고리가 마지막으로 고른 그 개체가 아니면(모드·7 · G·죽은 대상 바꾸기·다시 시작) 새 고리:
+	// 앞으로면 지금 대상이 그 자리 처음, 뒤로면 끝 — 첫 누름은 예전처럼 같은 자리 이웃으로 간다
+	const uint32 CurId = S.FollowA != 0 && CurSp == Sp ? S.FollowA : 0;
+	const bool bChain = CurId != 0 && S.CamStepLast == CurId && S.CamStepSpecies == Sp && S.CamStepRun == S.RunIndex;
+	if (!bChain)
+	{
+		S.CamStepSite = CurSite;
+		S.CamStepAnchor = EcoR9DemoCam::StepAnchor(CurId, Dir);
+	}
+	const int32 Next = EcoR9DemoCam::StepPick(Ids, Sites, CurId, CurSite, S.CamStepSite, S.CamStepAnchor, Dir);
+	if (Next == INDEX_NONE)
+	{
+		return;
+	}
+	// 7 · G 가 다음 자리를 셀 자리 (CycleCamSite·OverviewRegion 과 같다): 고정이면 고른 자리, 아니면 보는 자리 = 지금 대상 자리.
+	// 대상 자리(CurSite)와만 견주면 고정된 자리(예: 7 · G 로 고른 섬 전체)에 다른 자리의 대상을 따라가며 그 자리 안을 돌 때 옛 고정이 남아
+	// 7 · G 가 새 대상 자리 다음이 아닌 고정 자리 다음으로 갔다 (검토 11-13)
+	const int32 ViewSite = S.bSiteLocked ? S.SiteIndex : CurSite;
+	if (NSites > 0 && Sites[Next] != ViewSite)
+	{
+		// 보는 자리와 다른 무리 자리의 대상: 그 자리를 지금 보는 자리로 (고정 풀기 — 자유 카메라가 다른 자리로 날아간 때와 같다, SetCamMode).
+		// 7 · G 는 이제 그 자리에서 다음 자리로, 대상 없는 보기도 그 자리 (화면 '대상 … 무리 자리 N 곁' 은 대상 자리에서 바로 센다)
+		S.SiteIndex = Sites[Next];
+		S.bSiteLocked = false;
+	}
 	S.FollowA = Ids[Next];
 	S.FollowB = 0;
 	S.FollowSpecies = Sp;
 	S.SubjectDeadAt = -1.0;
+	S.CamStepLast = S.FollowA;
+	S.CamStepSpecies = Sp;
+	S.CamStepRun = S.RunIndex;
 	S.bCamSnap = true;   // 대상을 바꾸면 한 번에
 }
 

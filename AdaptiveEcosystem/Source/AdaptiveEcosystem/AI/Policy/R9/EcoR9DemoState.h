@@ -250,6 +250,12 @@ struct FEcoR9DemoState
 	double SubjectDeadAt = -1.0; // 대상이 죽은 때 (옛 kDeadHoldSeconds 3 초 머문 뒤 가까운 같은 종)
 	FVector LastSubjectLoc = FVector::ZeroVector;
 	double NextSubjectSearch = 0.0;
+	// , . · 같은 종 키 다시: 섬 전체 차례 고리 (사용자 11-13 — EcoR9DemoCam::StepPick). 대상이 다른 길(모드·7 · G·죽은 대상 바꾸기·다시 시작)로 바뀌면 새 고리
+	uint32 CamStepLast = 0;      // 고리가 마지막으로 고른 대상 (지금 대상과 다르면 새 고리)
+	uint32 CamStepAnchor = 0;    // 고리를 시작한 자리 안 차례의 기준 uid (EcoR9DemoCam::StepAnchor)
+	int32 CamStepSite = 0;       // 고리를 시작한 무리 자리
+	uint8 CamStepSpecies = 0;    // 고리의 종
+	int32 CamStepRun = -1;       // 고리의 판 (RunIndex — 다시 시작하면 uid 가 새로 나 새 고리)
 	FString CamLabel;            // 기록 줄 한 줄
 	FString CamWhat;             // 자동 추적 대상이 하는 일 (글자용)
 	bool bShowKeys = true;       // H: 오른쪽 위 단축키 목록

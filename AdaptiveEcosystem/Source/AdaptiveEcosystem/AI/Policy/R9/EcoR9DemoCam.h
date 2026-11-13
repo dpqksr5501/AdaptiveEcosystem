@@ -15,6 +15,9 @@
 //   - 0 은 늘 자유 카메라다 (옛: 자유 카메라에서 다시 0 = 원래 카메라(폰). R9 데모는 폰을 숨겨 두어 돌아갈 원래 카메라가 없다).
 //   - 키로 시점을 바꾸면 그 프레임에 바로 그 자리로 간다 (옛: 150 m 안이면 0.18 초 시간 상수로 옮겨 감 — 자유 카메라에서 1~6 도 옮겨 감).
 //     바꾼 뒤 움직이는 대상을 따라가는 것은 옛 부드러운 따라가기 그대로다.
+//   - 같은 종 키 다시 · , . 는 그 종의 산 개체를 섬 전체에서 돈다 (사용자 11-13 '1 을 눌러도 늑대 두 마리밖에 안 보여, 다른 애들한테는 왜 안 가'):
+//     지금 무리 자리 안을 uid 차례로 먼저, 그 자리 끝이면 다음 자리(+1, +2, … 끝에서 처음으로) — 한 바퀴면 처음 대상으로 돌아온다 (StepPick).
+//     옛: 같은 지역 안만 id 차례 (R9 맵 전체 땅은 무리 자리 6 곳 × 늑대 2 라 12 마리 가운데 둘만 오갔다).
 
 #pragma once
 
@@ -101,4 +104,18 @@ namespace EcoR9DemoCam
 	 * 보는 방향과의 각이 가장 작은 것 (같으면 가까운 것, 그다음 Ids 가 작은 것). Points·Ids 는 같은 길이. 없으면 INDEX_NONE.
 	 */
 	int32 CenterPick(TConstArrayView<FVector> Points, TConstArrayView<uint32> Ids, const FVector& Eye, const FVector& Forward, double MaxAngleDeg, double MaxRangeCm);
+
+	/**
+	 * , . · 같은 종 키 다시 — 섬 전체 차례 고리 (사용자 11-13: 지금 무리 자리만 돌아 늑대 12 마리 가운데 둘만 봤다).
+	 * 차례 = (무리 자리, 자리 안 차례) 를 끝에서 처음으로 이은 고리. 자리 안 차례는 uid, 고리를 시작한 자리(AnchorSite)만 AnchorId 부터 uid 차례로 돈다
+	 * (uid − AnchorId, 2³² 를 돌아 — StepAnchor). Ids·Sites 는 같은 길이 (그 종 산 개체 · 그 무리 자리, 자리가 없는 무대는 모두 0).
+	 * 지금 대상 CurId 가 Ids 에 있으면 그 바로 다음(Dir ≥ 0)·앞(Dir < 0). 없으면(죽음·사라짐) 그 자리 CurSite · uid 가 있을 곳의 다음·앞,
+	 * CurId 0 (대상 없음) 이면 CurSite 의 처음(앞으로)·끝(뒤로). 고른 차례 번호 (Ids 가 비거나 길이가 다르면 INDEX_NONE).
+	 */
+	int32 StepPick(TConstArrayView<uint32> Ids, TConstArrayView<int32> Sites, uint32 CurId, int32 CurSite, int32 AnchorSite, uint32 AnchorId, int32 Dir);
+	/**
+	 * 고리를 새로 시작할 때 시작 자리의 AnchorId: 앞으로(.)면 지금 대상이 그 자리 처음, 뒤로(,)면 그 자리 끝이 되게 — 첫 누름은 옛처럼 같은 자리 안
+	 * 이웃 uid (앞으로 = 다음 uid, 끝이면 그 자리 가장 작은 uid · 뒤로 = 반대) 로 가고, 그 자리를 다 돌면 다음·앞 자리로 넘어간다. 대상 없음(0) = 0 (uid 차례 그대로).
+	 */
+	inline uint32 StepAnchor(uint32 CurId, int32 Dir) { return CurId == 0 ? 0u : (Dir >= 0 ? CurId : CurId + 1u); }
 }

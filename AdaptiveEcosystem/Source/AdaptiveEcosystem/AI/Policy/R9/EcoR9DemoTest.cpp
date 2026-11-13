@@ -1372,6 +1372,46 @@ bool FEcoR9DemoCamKeys::RunTest(const FString& Parameters)
 		const TArray<uint32> TieIds = {8, 3};
 		TestEqual(TEXT("같은 자리면 uid 작은 것"), EcoR9DemoCam::CenterPick(Tie, TieIds, Eye, Fwd, 20.0, 30000.0), 1);
 	}
+	// 11. , . · 같은 종 키 다시 = 섬 전체 고리 (사용자 11-13 '1 을 눌러도 늑대 두 마리밖에 안 보여'): 지금 무리 자리 안 uid 차례를 먼저, 그다음 자리 차례로 한 바퀴
+	{
+		// 무리 자리 0: 3 · 12, 자리 1: 7, 자리 2: 5 · 9 · 20, 자리 3: 없음 (프레임 차례는 uid 차례가 아니다)
+		const TArray<uint32> StepIds = {12, 3, 7, 20, 5, 9};
+		const TArray<int32> StepSites = {0, 0, 1, 2, 2, 2};
+		const auto StepWalk = [&StepIds, &StepSites](uint32 From, int32 StepDir)
+		{
+			// 같은 고리로 여섯 번 누름 (앵커는 첫 누름 때 한 번 — 카메라 StepCamSubject 와 같다)
+			const int32 FromSite = StepSites[StepIds.Find(From)];
+			const uint32 Anchor = EcoR9DemoCam::StepAnchor(From, StepDir);
+			TArray<uint32> Order;
+			uint32 Cur = From;
+			int32 CurSite = FromSite;
+			for (int32 p = 0; p < StepIds.Num(); ++p)
+			{
+				const int32 Pick = EcoR9DemoCam::StepPick(StepIds, StepSites, Cur, CurSite, FromSite, Anchor, StepDir);
+				if (Pick == INDEX_NONE)
+				{
+					break;
+				}
+				Cur = StepIds[Pick];
+				CurSite = StepSites[Pick];
+				Order.Add(Cur);
+			}
+			return Order;
+		};
+		TestTrue(TEXT("앞으로 12 부터: 같은 자리 3 → 다음 자리 7 → 5 · 9 · 20 → 처음 12 (모두 한 번씩)"), StepWalk(12, +1) == TArray<uint32>({3, 7, 5, 9, 20, 12}));
+		TestTrue(TEXT("뒤로 12 부터: 같은 자리 3 → 앞 자리(끝에서) 20 · 9 · 5 → 7 → 처음 12"), StepWalk(12, -1) == TArray<uint32>({3, 20, 9, 5, 7, 12}));
+		TestTrue(TEXT("앞으로 3 부터: 같은 자리 12 → 7 → 5 · 9 · 20 → 처음 3"), StepWalk(3, +1) == TArray<uint32>({12, 7, 5, 9, 20, 3}));
+		TestEqual(TEXT("대상 없음 · 앞으로 = 그 자리 처음 (자리 2 → 5)"), EcoR9DemoCam::StepPick(StepIds, StepSites, 0, 2, 2, 0, +1), 4);
+		TestEqual(TEXT("대상 없음 · 뒤로 = 그 자리 끝 (자리 2 → 20)"), EcoR9DemoCam::StepPick(StepIds, StepSites, 0, 2, 2, 0, -1), 3);
+		TestEqual(TEXT("빈 자리에서 앞으로 = 다음 자리 처음 (자리 3 → 끝에서 처음 자리 0 의 3)"), EcoR9DemoCam::StepPick(StepIds, StepSites, 0, 3, 3, 0, +1), 1);
+		TestEqual(TEXT("죽은 대상(8 · 자리 2) 다음 = 9"), EcoR9DemoCam::StepPick(StepIds, StepSites, 8, 2, 2, EcoR9DemoCam::StepAnchor(8, +1), +1), 5);
+		TestEqual(TEXT("죽은 대상(8 · 자리 2) 앞 = 5"), EcoR9DemoCam::StepPick(StepIds, StepSites, 8, 2, 2, EcoR9DemoCam::StepAnchor(8, -1), -1), 4);
+		const TArray<int32> NoSites = {0, 0, 0, 0, 0, 0};
+		TestEqual(TEXT("무리 자리 없는 무대 = 모든 개체 uid 차례 (3 다음 5)"), EcoR9DemoCam::StepPick(StepIds, NoSites, 3, 0, 0, EcoR9DemoCam::StepAnchor(3, +1), +1), 4);
+		const TArray<uint32> NoIds;
+		const TArray<int32> NoIdSites;
+		TestEqual(TEXT("개체가 없으면 없음"), EcoR9DemoCam::StepPick(NoIds, NoIdSites, 0, 0, 0, 0, +1), static_cast<int32>(INDEX_NONE));
+	}
 	return true;
 }
 

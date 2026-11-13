@@ -277,7 +277,7 @@ private:
 	void SetCamMode(EEcoR9DemoCam NewMode, const TCHAR* Why);
 	/** 자유 카메라로: 지금 화면 카메라 자리·방향 그대로 추적을 푼다. 이미 자유 카메라면 아무 일 없음. */
 	void EnterFreeCam(const TCHAR* Why);
-	/** 이전·다음 대상 (자동 추적이면 다른 사건). */
+	/** 이전·다음 대상 — 그 종의 산 개체를 섬 전체 고리로 (지금 무리 자리부터 다음 자리 차례 — EcoR9DemoCam::StepPick). 자동 추적이면 다른 사건. */
 	void StepCamSubject(int32 Dir);
 	/** 7 · G: 다음 무리 자리 (맵 전체 땅 — 끝에 섬 전체). */
 	void CycleCamSite();
