@@ -31,6 +31,7 @@
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 #include "HAL/IConsoleManager.h"
+#include "World/EcoVegetationField.h"
 
 static TAutoConsoleVariable<int32> CVarInspectorVisible(TEXT("eco.Inspector.Visible"),1,TEXT("Show the creature detail panel. Migration overview has its own M/debug switch."));
 bool UEcoCreatureInspectionLibrary::InspectFaunaWater(UObject* Context, FName RegionId, FVector Point,
@@ -401,9 +402,92 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
     if(!Data)return false;
     return FJsonSerializer::Serialize(Data.ToSharedRef(),TJsonWriterFactory<TCHAR,TCondensedJsonPrintPolicy<TCHAR>>::Create(&Json));
 }
+#if !UE_BUILD_SHIPPING
+void AEcoCreatureInspectorHUD::DrawGrassInspection()
+{
+    const bool bAlt = PlayerOwner->IsInputKeyDown(EKeys::LeftAlt) || PlayerOwner->IsInputKeyDown(EKeys::RightAlt);
+    if (bAlt && PlayerOwner->WasInputKeyJustPressed(EKeys::G)) bGrassInspection = !bGrassInspection;
+    if (!bGrassInspection) return;
+
+    TArray<AEcoVegetationField*> Fields;
+    for (TActorIterator<AEcoVegetationField> It(GetWorld()); It; ++It)
+        if (!It->RegionId.IsNone()) Fields.Add(*It);
+    Fields.Sort([](const AEcoVegetationField& A, const AEcoVegetationField& B) { return A.RegionId.LexicalLess(B.RegionId); });
+    const float X = FMath::Max(16.f, Canvas->SizeX - 520.f);
+    if (Fields.IsEmpty())
+    {
+        DrawText(TEXT("Grass: no food Field in this world"), FLinearColor::Yellow, X, 35);
+        return;
+    }
+    int32 Index = Fields.IndexOfByPredicate([this](const auto* Field) { return Field->RegionId == GrassRegion; });
+    if (Index == INDEX_NONE) Index = 0;
+    else if (bAlt && PlayerOwner->WasInputKeyJustPressed(EKeys::One)) Index = (Index + 1) % Fields.Num();
+    const auto* Field = Fields[Index];
+    if (GrassRegion != Field->RegionId) NextGrassRead = 0;
+    GrassRegion = Field->RegionId;
+    const FString RegionArg = FString::Printf(TEXT("\"%s\""), *GrassRegion.ToString());
+    const bool bAuthority = GetWorld()->GetNetMode() != NM_Client;
+    if (bAuthority && bAlt)
+    {
+        const bool bDry = PlayerOwner->WasInputKeyJustPressed(EKeys::Two);
+        const bool bRain = PlayerOwner->WasInputKeyJustPressed(EKeys::Three);
+        if (bDry || bRain)
+        {
+            const FVector2D Climate = bDry ? GrassDryClimate : GrassRecoveryClimate;
+            PlayerOwner->ConsoleCommand(FString::Printf(TEXT("eco.Grass.Climate %s %.4f %.2f"), *RegionArg, Climate.X, Climate.Y), false);
+        }
+        if (PlayerOwner->WasInputKeyJustPressed(EKeys::Four)) PlayerOwner->ConsoleCommand(TEXT("eco.Grass.Auto ") + RegionArg, false);
+        if (PlayerOwner->WasInputKeyJustPressed(EKeys::Five)) PlayerOwner->ConsoleCommand(TEXT("eco.Grass.Export ") + RegionArg, false);
+    }
+    if (GetWorld()->GetTimeSeconds() >= NextGrassRead)
+    {
+        NextGrassRead = GetWorld()->GetTimeSeconds() + .5;
+        TSharedPtr<FJsonObject> Snapshot;
+        const auto Reader = TJsonReaderFactory<>::Create(Field->CaptureDiagnostics());
+        if (FJsonSerializer::Deserialize(Reader, Snapshot) && Snapshot.IsValid())
+        {
+            const auto Number = [&Snapshot](const TCHAR* Key)
+            {
+                double Value = 0;
+                Snapshot->TryGetNumberField(Key, Value);
+                return Value;
+            };
+            GrassReadout = FString::Printf(TEXT("Cells %.0f | Grass instances %.0f"), Number(TEXT("visual_cells")), Number(TEXT("instances")));
+            if (bAuthority)
+            {
+                bool bSoil = false, bManual = false;
+                Snapshot->TryGetBoolField(TEXT("soil"), bSoil);
+                Snapshot->TryGetBoolField(TEXT("manual_climate"), bManual);
+                GrassReadout += FString::Printf(TEXT("\nFood %.3f / %.3f | Ledger difference %.6f\nConsumed %.3f | Grown %.3f | Lost %.3f"),
+                    Number(TEXT("food")), Number(TEXT("ledger_capacity")), Number(TEXT("food")) - Number(TEXT("ledger_amount")),
+                    Number(TEXT("ledger_consumed")), Number(TEXT("ledger_grown")), Number(TEXT("ledger_environment_lost")));
+                GrassReadout += bSoil
+                    ? FString::Printf(TEXT("\n%s | Rain %.2f | Temp %.1f C | Moisture %.2f | Wet cells %.0f"),
+                        bManual ? TEXT("Manual") : TEXT("Auto"), Number(TEXT("rain")), Number(TEXT("temperature")),
+                        Number(TEXT("mean_moisture")), Number(TEXT("connected_water_cells")))
+                    : TEXT("\nSoil simulation is disabled in this region");
+            }
+            FHitResult Hit;
+            if (PlayerOwner->GetHitResultAtScreenPosition(FVector2D(Canvas->SizeX * .5, Canvas->SizeY * .5),
+                Field->GroundTraceChannel, FCollisionQueryParams::DefaultQueryParam, Hit))
+                GrassReadout += TEXT("\n") + Field->DescribeGrassCell(Hit.ImpactPoint);
+        }
+    }
+    DrawRect(FLinearColor(0, 0, 0, .75f), X - 8, 26, 510, 130);
+    DrawText(FString::Printf(TEXT("Food grass | %s | %s"), *GrassRegion.ToString(), bAuthority ? TEXT("Authority") : TEXT("Client")),
+        FLinearColor::Green, X, 34);
+    DrawText(bAuthority ? TEXT("Alt+1 Region | Alt+2 Dry | Alt+3 Rain | Alt+4 Auto | Alt+5 Save") : TEXT("Alt+1 Region"),
+        FLinearColor::White, X, 55);
+    DrawText(GrassReadout, FLinearColor::White, X, 75);
+}
+#endif
+
 void AEcoCreatureInspectorHUD::DrawHUD()
 {
     Super::DrawHUD();if(!Canvas||!PlayerOwner)return;
+#if !UE_BUILD_SHIPPING
+    DrawGrassInspection();
+#endif
     if (const auto* State=PlayerOwner->GetPlayerState<AEcoPlayerState>())
         DrawText(FString::Printf(TEXT("HP %.0f%s"),State->GetHealth(),State->IsAlive()?TEXT(""):TEXT("  DEFEATED")),
             State->IsAlive()?FLinearColor::White:FLinearColor::Red,Canvas->SizeX-190,25,nullptr,1.f);

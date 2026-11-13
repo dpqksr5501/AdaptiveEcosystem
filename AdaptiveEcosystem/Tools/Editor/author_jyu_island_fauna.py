@@ -14,7 +14,8 @@ import unreal as u
 common = runpy.run_path(str(Path(__file__).with_name("author_jyu_integration_fauna.py")))
 get, put, transform_at = (common[key] for key in ("get", "put", "transform_at"))
 editor, levels, actors, wp = (common[key] for key in ("editor", "levels", "actors", "wp"))
-TARGET = "/Game/JYU/Maps/LV_JYU_IslandEcosystem"
+REFRESH = "-EcoIslandRefresh" in u.SystemLibrary.get_command_line()
+TARGET = "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed" if REFRESH else "/Game/JYU/Maps/LV_JYU_IslandEcosystem"
 TAG = "JYU.IslandFauna"
 REPORT = Path(u.Paths.project_saved_dir()).resolve() / "FaunaAudit/IslandFaunaAuthoring.json"
 
@@ -281,7 +282,7 @@ def author():
         raise RuntimeError(TARGET)
     world = editor.get_editor_world()
     descs = wp.get_actor_descs()
-    prefix = "/Game/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystem/"
+    prefix = TARGET.replace("/Game/", "/Game/__ExternalActors__/", 1) + "/"
     if not descs or any(not str(get(desc, "actor_package")).startswith(prefix) for desc in descs):
         raise RuntimeError("World Partition actors are not isolated in the owned island copy")
     wp.load_actors([get(desc, "guid") for desc in descs])
@@ -293,7 +294,8 @@ def author():
     groups = {str(get(g, "region_id")): g for g in group_list}
     existing = {a.get_actor_label(): a for a in actors.get_all_level_actors()}
     frames = river_frames(world, existing["WaterBodyRiver"])
-    lakes = [lake_shore(world, existing[name]) for name in ("WaterBodyLake", "WaterBodyLake2")]
+    lake_names = ("WaterBodyLake", "WaterBodyLake2", "WaterBodyLake3", "Oasis") if REFRESH else ("WaterBodyLake", "WaterBodyLake2")
+    lakes = [lake_shore(world, existing[name]) for name in lake_names]
     rng = random.Random(41293)
     river_region = "LowerRiver"
     first, last = frames[0][0], frames[-1][0]
@@ -423,13 +425,15 @@ def author():
         edge = bank(2, -1.)
     result["river_shore_view"] = [edge.x, edge.y, edge.z]
     result["lake_views"] = []
+    result["lakes"] = list(lake_names)
     for lake in lakes:
-        surface, outward = lake[0]
-        edge = find_shore(world, surface, outward, -1440, 960)
-        if edge is not None:
-            eye = edge + outward * 2400. + v(0, 0, 2300)
-            target = edge - outward * 1800.
-            result["lake_views"].append([[eye.x, eye.y, eye.z], [target.x, target.y, target.z]])
+        for surface, outward in lake:
+            edge = find_shore(world, surface, outward, -1440, 960)
+            if edge is not None:
+                eye = edge + outward * 2400. + v(0, 0, 2300)
+                target = edge - outward * 1800.
+                result["lake_views"].append([[eye.x, eye.y, eye.z], [target.x, target.y, target.z]])
+                break
     REPORT.parent.mkdir(parents=True, exist_ok=True)
     REPORT.write_text(json.dumps(result,indent=2),encoding="utf-8")
     u.log(f"ECO_ISLAND_FAUNA_AUTHORED {result}")

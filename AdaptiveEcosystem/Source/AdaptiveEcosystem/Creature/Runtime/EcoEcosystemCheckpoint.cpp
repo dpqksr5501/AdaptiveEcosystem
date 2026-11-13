@@ -38,7 +38,7 @@
 
 namespace EcoCheckpoint
 {
-    constexpr uint32 CheckpointVersion = 10;
+    constexpr uint32 CheckpointVersion = 11;
     constexpr int32 CheckpointHeaderBytes = 4 * sizeof(uint32);
     constexpr int32 MaxCheckpointPayloadBytes = 16 * 1024 * 1024;
     template<class T,class F> void Array(FArchive& A,TArray<T>& Values,int32 Limit,F Item)
@@ -155,10 +155,14 @@ struct FEcoEcosystemCheckpoint
         if(!M||!E||!N||!N->IsActive()||!Clock||!Herds||!Journeys||M->GetEntityManagerChecked().IsProcessing()
             ||E->bResourceStepOpen||!E->PendingSpawns.IsEmpty()||!S.BuildAgentLookup())return Reject(TEXT("not a completed authority boundary"));
         auto& EM=M->GetEntityManagerChecked();const int32 NewEpoch=Clock->Current.WorldEpoch;
+        for(int32 I=0;I<N->NumContexts();++I)
+            if(N->GetContext(I)->FoodPatchCache.Layout.IsValid())
+                return Reject(TEXT("S1 patch anchors are experimental; patch checkpoint schema is pending S5"));
         TStrongObjectPtr<UEcologySimulationSubsystem> Staged(NewObject<UEcologySimulationSubsystem>(W));
         TArray<FAgent> Agents;TArray<FRegion> Regions;TArray<FHerd> SavedHerds;
         TMap<int64,FEcoHerdJourney> Plans;TMap<int64,double> Shortage,Attempts;
         TMap<FName,FEcoKnownHabitat> HabitatReports;
+        TMap<FName,FEcoRegionalMigrationState> RegionalStates;
         TMap<FName,double> HerbRecovery,WolfRecovery;
         TArray<AEcoCreatureIntegrationSpawner::FPendingBirth> Births;
         TArray<AEcoCreatureIntegrationSpawner::FFaunaBirth> FaunaBirths;
@@ -227,7 +231,7 @@ struct FEcoEcosystemCheckpoint
             for(const auto& H:Herds->ActiveHerds)if(H.PersistentHerdId>0&&Herds->HerdSpeciesIndices.IsValidIndex(H.RuntimeIndex)
                 &&E->SpeciesIds.IsValidIndex(Herds->HerdSpeciesIndices[H.RuntimeIndex]))SavedHerds.Add({H.PersistentHerdId,E->SpeciesIds[Herds->HerdSpeciesIndices[H.RuntimeIndex]],H.Center});
             Plans=Journeys->Plans;Shortage=Journeys->ShortageSince;Attempts=Journeys->NextPlanAttempt;NextPlan=Journeys->NextPlan;NextHerd=Herds->NextPersistentHerdId;
-            HabitatReports=Journeys->KnownHabitats;
+            HabitatReports=Journeys->KnownHabitats;RegionalStates=Journeys->RegionalStates;
             Births=S.PendingBirths;BirthScan=S.NextBirthScan;Totals=S.SpeciesTotals;
             FaunaBirths=S.FaunaBirths;FaunaBirthScan=S.NextFaunaBirthScan;
             FaunaCarcasses=S.FaunaCarcasses;FaunaScent=S.FaunaScent;
@@ -250,6 +254,10 @@ struct FEcoEcosystemCheckpoint
             Array(A,SavedHerds,512,[&](FHerd& H){A<<H.Id<<H.Species<<H.Center;});
             Map(A,Plans,512,[&](FEcoHerdJourney& P){Plan(A,P);});Map(A,Shortage,512,[&](double& V){A<<V;});Map(A,Attempts,512,[&](double& V){A<<V;});
             Map(A,HabitatReports,64,[&](auto& V){Pod(A,V);});
+            Map(A,RegionalStates,64,[&](auto& R){
+                Array(A,R.Residents,1024,[&](int64& Id){A<<Id;});Array(A,R.Approved,1024,[&](int64& Id){A<<Id;});
+                A<<R.ShortageSince<<R.RecoverySince<<R.NextDeparture<<R.Initial<<R.KeepFloor<<R.Supported<<R.Projected<<R.bEpisode<<R.Reason;
+            });
             Map(A,HerbRecovery,64,[&](double& V){A<<V;});Map(A,WolfRecovery,64,[&](double& V){A<<V;});
             A<<NextPlan<<NextHerd;
             Array(A,Births,128,[&](auto& P){A<<P.ParentA<<P.ParentB<<P.Region<<P.Due<<P.bPredator;});
@@ -443,7 +451,7 @@ struct FEcoEcosystemCheckpoint
         }
         TMap<int64, const FEcoHerdJourney*> PlansById;
         for(const auto& Pair:Plans){const auto& P=Pair.Value;
-            if(Pair.Key!=P.HerdId||P.Id<=0||P.Id>=NextPlan||P.Points.Num()<2||!RegionNames.Contains(P.Origin)||!RegionNames.Contains(P.Destination))return Reject(TEXT("invalid journey"));
+            if(Pair.Key!=P.Id||P.Id<=0||P.Id>=NextPlan||P.Points.Num()<2||!RegionNames.Contains(P.Origin)||!RegionNames.Contains(P.Destination))return Reject(TEXT("invalid journey"));
             if (PlansById.Contains(P.Id) || uint8(P.State) > uint8(EEcoHerdJourneyState::Abandoned)
                 || !FMath::IsFinite(P.Started) || !FMath::IsFinite(P.Changed) || !FMath::IsFinite(P.CooldownUntil)
                 || P.Started < 0. || P.Started > Time.ServerTimeSeconds || P.Changed < 0. || P.Changed > Time.ServerTimeSeconds
@@ -462,6 +470,17 @@ struct FEcoEcosystemCheckpoint
                 || !FMath::IsFinite(V.Journey.LastProgressTime) || !FMath::IsFinite(V.Journey.BestDistance)
                 || V.Travel.State != EEcoResidenceState::Traveling || V.Travel.TargetRegionId != P->Destination)
                 return Reject(TEXT("invalid active journey membership or waypoint"));
+        }
+        TSet<int64> Registered;
+        for(const auto& Pair:RegionalStates){const auto& R=Pair.Value;
+            if(!RegionNames.Contains(Pair.Key)||R.Initial<0||R.KeepFloor<0||R.KeepFloor>R.Initial
+                ||!FMath::IsFinite(R.NextDeparture)||!FMath::IsFinite(R.ShortageSince)||!FMath::IsFinite(R.RecoverySince))return Reject(TEXT("invalid regional migration state"));
+            for(const int64 Id:R.Residents){
+                // Removed/dead residents may remain until the next completed reconcile; cleanup is deterministic.
+                if(Id<=0||Registered.Contains(Id))return Reject(TEXT("duplicate regional registration"));Registered.Add(Id);
+            }
+            TSet<int64> Approved;for(const int64 Id:R.Approved){if(Id<=0||Approved.Contains(Id))return Reject(TEXT("duplicate regional approval"));Approved.Add(Id);}
+            if(R.bEpisode&&R.Approved.Num()>R.Initial-R.KeepFloor)return Reject(TEXT("regional episode budget exceeded"));
         }
         // Prepare new entities before destroying anything. Roll back preparation on
         // allocation failure; malformed/incompatible snapshots never touch live state.
@@ -497,7 +516,7 @@ struct FEcoEcosystemCheckpoint
         for(const auto& H:SavedHerds){FEcoHerdRuntimeData Data;Data.PersistentHerdId=H.Id;Data.RuntimeIndex=Herds->ActiveHerds.Num();Data.Center=H.Center;
             HerdIndices.Add(H.Id,Data.RuntimeIndex);Herds->ActiveHerds.Add(Data);Herds->HerdSpeciesIndices.Add(E->SpeciesIds.Find(H.Species));}
         Herds->InjectedAlarms.Init({},SavedHerds.Num());Herds->ObservedAlarms.Init({},SavedHerds.Num());Herds->NativeV3Alarms.Init({},SavedHerds.Num());
-        Journeys->Plans=MoveTemp(Plans);Journeys->ShortageSince=MoveTemp(Shortage);Journeys->NextPlanAttempt=MoveTemp(Attempts);Journeys->NextPlan=NextPlan;
+        Journeys->RegionalStates=MoveTemp(RegionalStates);Journeys->Plans=MoveTemp(Plans);Journeys->ShortageSince=MoveTemp(Shortage);Journeys->NextPlanAttempt=MoveTemp(Attempts);Journeys->NextPlan=NextPlan;
         Journeys->KnownHabitats=MoveTemp(HabitatReports);
         for(int32 I=0;I<Agents.Num();++I){const auto& V=Agents[I];const auto Entity=NewEntities[I];
             auto& Identity=EM.GetFragmentDataChecked<FEcoIdentityFragment>(Entity);Identity.StableAgentId=V.Id;Identity.SpeciesId=V.Species;Identity.SpeciesRuntimeIndex=E->SpeciesIds.Find(V.Species);

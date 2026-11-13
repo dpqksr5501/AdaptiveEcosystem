@@ -933,7 +933,12 @@ bool AEcoCreatureIntegrationSpawner::ProcessFauna(const FEcoServerTimeSnapshot& 
             ? (Region.ProjectedFoodConsumers + 1) * EcoFaunaNutrition::MinimumMeal * FaunaBirthBufferSeconds
             : 0.;
         FEcoSpawnRequest Reservation;
-        if (!Ecology->RequestFaunaBirth(Birth.Region, Time, Reservation, RequiredPlantReserve)) return false;
+        if (!Ecology->RequestFaunaBirth(Birth.Region, Time, Reservation, RequiredPlantReserve))
+        {
+            UE_LOG(LogTemp, Error, TEXT("[Eco Fauna][BirthReservationRejected] Region=%s Species=%s PlantReserve=%.3f"),
+                *Birth.Region.ToString(), *Birth.Species.ToString(), RequiredPlantReserve);
+            return false;
+        }
         const int32 Actual = Reservation.Count ? SpawnFauna(Birth.Region, *Species, SpawnPoints, Time) : 0;
         const bool bReconciled = ReconcilePopulation();
         if (!Ecology->CompleteSpawnRequest(Reservation.RequestId, Actual) || !bReconciled) return false;

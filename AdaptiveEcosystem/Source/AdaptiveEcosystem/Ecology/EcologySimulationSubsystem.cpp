@@ -389,13 +389,15 @@ bool UEcologySimulationSubsystem::RequestNaturalBirth(FName RegionId,const FEcoS
 bool UEcologySimulationSubsystem::RequestFaunaBirth(FName RegionId, const FEcoServerTimeSnapshot& Time,
     FEcoSpawnRequest& Out, double RequiredPlantReserve)
 {
-    const auto* Spatial = SpatialFood.Find(RegionId);
-    if (!CanMutateAuthoritativeState(TEXT("RequestFaunaBirth")) || Time.WorldEpoch != ResourceEpoch
-        || !Spatial || !FMath::IsFinite(Time.ServerTimeSeconds) || Time.ServerTimeSeconds < 0.
+    const auto* State = RegionalStates.Find(RegionId);
+    if (!CanMutateAuthoritativeState(TEXT("RequestFaunaBirth")) || ResourceEpoch <= 0 || Time.WorldEpoch != ResourceEpoch
+        || !State || !FMath::IsFinite(Time.ServerTimeSeconds) || Time.ServerTimeSeconds < 0.
         || !FMath::IsFinite(RequiredPlantReserve) || RequiredPlantReserve < 0.) return false;
+    const auto* Spatial = SpatialFood.Find(RegionId);
+    const double AvailablePlantFood = Spatial ? Spatial->Amount : State->FoodAmount;
     Out = {};
     Out.WorldEpoch = Time.WorldEpoch;
-    Out.Count = Spatial->Amount >= RequiredPlantReserve ? 1 : 0;
+    Out.Count = AvailablePlantFood >= RequiredPlantReserve ? 1 : 0;
     if (Out.Count == 0) Out.DiagnosticReason = TEXT("BirthFoodBudget");
     Out.ScheduledTime = Time.ServerTimeSeconds;
     Out.Origin = EEcoSpawnOrigin::NaturalBirth;

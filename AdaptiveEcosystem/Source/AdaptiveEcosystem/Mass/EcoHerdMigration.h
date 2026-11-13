@@ -72,6 +72,16 @@ struct FEcoKnownHabitat
     int32 Population=0;
 };
 
+/** Authority registration order and a shortage episode. Reservations are derived from live plans. */
+struct FEcoRegionalMigrationState
+{
+    TArray<int64> Residents, Approved;
+    double ShortageSince=-1, RecoverySince=-1, NextDeparture=0;
+    int32 Initial=0, KeepFloor=0, Supported=0, Projected=0;
+    bool bEpisode=false;
+    FName Reason=NAME_None;
+};
+
 /** Game-thread coordination at completed M4 resource boundaries; no replication or position integration. */
 UCLASS()
 class ADAPTIVEECOSYSTEM_API UEcoHerdMigrationSubsystem : public UWorldSubsystem
@@ -82,6 +92,8 @@ public:
     bool Reconcile(FMassEntityManager& Manager, const FEcoServerTimeSnapshot& Time, int64 Step,
         TArray<FEcoMigrationOutcome>& Arrivals, TConstArrayView<FEcoRegionSpatialSnapshot> Spaces = {});
     bool IsEnabled() const;
+    void RegisterResident(FName Region,int64 Agent);
+    const TMap<FName,FEcoRegionalMigrationState>& GetRegionalStates() const { return RegionalStates; }
     /** Explicit copy-map test fixture; records food removal in the existing authority ledger. */
     UFUNCTION(BlueprintCallable,Category="Migration|Audit") bool ApplyFoodFractionForAudit(FName Region,float Fraction,bool bSuspendRegeneration=false);
     const TMap<int64,FEcoHerdJourney>& GetPlans() const { return Plans; }
@@ -93,5 +105,6 @@ private:
     TMap<int64,double> ShortageSince;
     TMap<int64,double> NextPlanAttempt;
     TMap<FName,FEcoKnownHabitat> KnownHabitats;
+    TMap<FName,FEcoRegionalMigrationState> RegionalStates;
     int64 NextPlan=1;
 };

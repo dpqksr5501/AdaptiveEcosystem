@@ -5,7 +5,8 @@ from pathlib import Path
 import unreal
 
 SOURCE = '/Game/Map/LV_SHC_IslandEcosystem1_WP'
-TARGET = '/Game/JYU/Maps/LV_JYU_IslandEcosystem'
+REFRESH = '-EcoIslandRefresh' in unreal.SystemLibrary.get_command_line()
+TARGET = '/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed' if REFRESH else '/Game/JYU/Maps/LV_JYU_IslandEcosystem'
 OWNER = 'JYU.IslandEcology'
 levels = unreal.get_editor_subsystem(unreal.LevelEditorSubsystem)
 actors = unreal.get_editor_subsystem(unreal.EditorActorSubsystem)
@@ -131,21 +132,21 @@ for ordinal, (name, hint, profile, temp, humidity, rain, plant, drainage) in enu
     region_profiles[name] = profiles[profile]
     report.append(dict(region=name, center_cm=[point.x, point.y, point.z], profile=profile))
 
-# Trim the protruding waterfall lip on the copy while retaining its basin contact.
-# This is a presentation adjustment. The waterfall remains outside the ecology volumes.
-falls = [actor for actor in existing if actor.get_actor_label() == 'SM_Waterfall_Base']
-if len(falls) != 1:
-    raise RuntimeError('Expected one waterfall mesh in the copied level')
-fall = falls[0]
-center, extent = fall.get_actor_bounds(False)
-bottom, height = center.z - extent.z, 2 * extent.z
-target_top = 3100.
-if center.z + extent.z > target_top + 5:
-    scale = fall.get_actor_scale3d()
-    scale.z *= (target_top - bottom) / height
-    fall.set_actor_scale3d(scale)
+# The original demonstration copy used a different waterfall presentation.
+if not REFRESH:
+    falls = [actor for actor in existing if actor.get_actor_label() == 'SM_Waterfall_Base']
+    if len(falls) != 1:
+        raise RuntimeError('Expected one waterfall mesh in the copied level')
+    fall = falls[0]
     center, extent = fall.get_actor_bounds(False)
-    fall.set_actor_location(fall.get_actor_location() + unreal.Vector(0, 0, bottom - center.z + extent.z), False, True)
+    bottom, height = center.z - extent.z, 2 * extent.z
+    target_top = 3100.
+    if center.z + extent.z > target_top + 5:
+        scale = fall.get_actor_scale3d()
+        scale.z *= (target_top - bottom) / height
+        fall.set_actor_scale3d(scale)
+        center, extent = fall.get_actor_bounds(False)
+        fall.set_actor_location(fall.get_actor_location() + unreal.Vector(0, 0, bottom - center.z + extent.z), False, True)
 
 start = ground(89400, 58100, -4000)
 spawn(unreal.PlayerStart, 'PlayerStart', start + unreal.Vector(0, 0, 120))

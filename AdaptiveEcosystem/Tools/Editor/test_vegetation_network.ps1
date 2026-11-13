@@ -1,9 +1,15 @@
 # Dedicated authority + two successive late joins. All exits are normal timed exits.
 param([string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8',
-    [ValidateSet('/Game/JYU/Maps/LV_JYU_HerdMigration','/Game/JYU/Maps/LV_JYU_Ecosystem')][string]$Map='/Game/JYU/Maps/LV_JYU_HerdMigration',
+    [ValidateSet('/Game/JYU/Maps/LV_JYU_HerdMigration','/Game/JYU/Maps/LV_JYU_Ecosystem','/Game/JWJ/1102_Integration_JWJ')][string]$Map='/Game/JYU/Maps/LV_JYU_HerdMigration',
     [switch]$AuthoredWeather,[ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='Vegetation_20261023',
     [double]$Duration=125,[double]$ExitAfter=180,
     [int]$Seed=23,
+    [ValidateRange(1,384)][int]$DeerPerRegion=48,
+    [switch]$PatchLayout,
+    [switch]$FoodPatchCheck,
+    [ValidateRange(-1,200000)][double]$ClientVisualDistanceCm=-1,
+    [switch]$GrassTravelCheck,[ValidateRange(370,550)][double]$TravelDuration=380,
+    [switch]$NetworkProfile,
     [switch]$OverlapClients,[switch]$ChildCoverage,[switch]$HabitatDynamics,
     [ValidateRange(10,600)][double]$ClientAAt=30,[ValidateRange(45,600)][double]$ClientBAt=95)
 $ErrorActionPreference='Stop'
@@ -12,6 +18,9 @@ foreach($taskValue in @($Duration,$ExitAfter,$ClientAAt,$ClientBAt)){
 }
 if($Duration -lt 20 -or $Duration -gt 3600 -or $ExitAfter -gt 7200 -or $ExitAfter -le $Duration+10){throw 'Observer must finish at least 10 seconds before the bounded server exit'}
 if($ClientBAt -le $ClientAAt+35 -or $ExitAfter -le $ClientBAt+45){throw 'Client join times must leave separate 30-second sessions before server exit'}
+if($GrassTravelCheck -and ($ExitAfter -le $ClientAAt+$TravelDuration+45 -or $Duration -lt $ClientAAt+$TravelDuration)){
+    throw 'Travel check needs authority observation and normal exit after the long ClientA run'
+}
 $taskRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 $taskOut=Join-Path $taskRoot ('Saved/'+$AuditFolder)
 New-Item -ItemType Directory -Path $taskOut -Force | Out-Null
@@ -29,11 +38,15 @@ $taskMode=if($AuthoredWeather){'-VegetationAuthored'}else{'-EcoVegetation'}
 $taskMapName=($Map -split '/')[-1]
 $taskObserverFlag=if($ChildCoverage){'-VegetationNetworkChildCoverage'}else{'-EcoIntegrationObserverCycle'}
 $taskConnectionMode=if($OverlapClients){'-VegetationOverlapExpected'}else{'-VegetationSequentialExpected'}
+$taskProfileArgument=if($NetworkProfile){'-VegetationNetworkProfile'}else{'-VegetationNetworkProfileDisabled'}
+$taskServerCommands=if($NetworkProfile){"netprofile enable,eco.Grass.NetAudit 1,py $taskRoot/Tools/Editor/audit_vegetation_runtime.py"}else{"py $taskRoot/Tools/Editor/audit_vegetation_runtime.py"}
+if($PatchLayout){$taskServerCommands="eco.Grass.PatchLayout 1,$taskServerCommands"}
+$taskPatchArgument=if($PatchLayout){'-VegetationPatchLayout'}else{'-VegetationPatchLayoutDisabled'}
 $taskServerArgs=@($taskProject,$Map,
-    '-server','-NullRHI','-unattended','-nop4','-nosteam','-port=7777',$taskMode,$taskConnectionMode,'-EcoV3DeerPerRegion=48','-EcoV3SocialControl=0',"-EcoV3Seed=$Seed",
+    '-server','-NullRHI','-unattended','-nop4','-nosteam','-port=7777',$taskMode,$taskConnectionMode,"-EcoV3DeerPerRegion=$DeerPerRegion",$taskPatchArgument,'-EcoV3SocialControl=0',"-EcoV3Seed=$Seed",
     "-EcoIntegrationExitAfter=$ExitAfter",$taskObserverFlag,'-VegetationAuditName=Server',"-VegetationAuditDuration=$Duration",
     "-VegetationMap=$taskMapName","-VegetationAuditFolder=$AuditFolder",
-    "-ExecCmds=py $taskRoot/Tools/Editor/audit_vegetation_runtime.py","-AbsLog=$taskServerLog")
+    $taskProfileArgument,"-ExecCmds=$taskServerCommands","-AbsLog=$taskServerLog")
 if($HabitatDynamics){$taskServerArgs+='-EcoHabitatDynamics'}
 $taskServer=Start-VegetationProcess "$taskEngine/UnrealEditor-Cmd.exe" $taskServerArgs
 $taskReadyDeadline=[DateTime]::UtcNow.AddSeconds(90)
@@ -53,11 +66,15 @@ foreach($entry in @(@{Name='ClientA';At=$ClientAAt},@{Name='ClientB';At=$ClientB
         Start-Sleep -Seconds 1
     }
     $taskClientStart=[DateTime]::UtcNow
-    $taskLifetime=if($OverlapClients -and $entry.Name -eq 'ClientA'){$ClientBAt-$ClientAAt+40}else{30}
+    $taskLifetime=if($GrassTravelCheck -and $entry.Name -eq 'ClientA'){$TravelDuration+4}elseif($OverlapClients -and $entry.Name -eq 'ClientA'){$ClientBAt-$ClientAAt+40}else{30}
     $taskProbe=$taskLifetime-4
-    $taskClient=Start-VegetationProcess "$taskEngine/UnrealEditor.exe" @($taskProject,'127.0.0.1:7777','-game','-d3d11','-unattended','-nop4','-nosteam','-windowed',
+    $taskTravelArgument=if($GrassTravelCheck -and $entry.Name -eq 'ClientA'){'-VegetationGrassTravelCheck'}else{'-VegetationGrassTravelDisabled'}
+    $taskAddress="127.0.0.1:7777?EcoProtocol=1?Name=Vegetation$($entry.Name)"
+    $taskClient=Start-VegetationProcess "$taskEngine/UnrealEditor.exe" @($taskProject,$taskAddress,'-game','-nosteam','-d3d11','-unattended','-nop4','-windowed',
         '-ResX=960','-ResY=540','-NoSound',"-EcoIntegrationExitAfter=$taskLifetime","-VegetationClientDuration=$taskProbe","-VegetationClientName=$($entry.Name)",
         "-VegetationMap=$taskMapName","-VegetationAuditFolder=$AuditFolder",
+        "-VegetationClientVisualDistance=$ClientVisualDistanceCm",
+        $taskTravelArgument,
         "-ExecCmds=py $taskRoot/Tools/Editor/audit_vegetation_client.py","-AbsLog=$(Join-Path $taskOut ($entry.Name+'.log'))")
     $taskClients+=@{Name=$entry.Name;Process=$taskClient;Started=$taskClientStart;Lifetime=$taskLifetime}
 }
@@ -86,11 +103,13 @@ $taskRuntime=Get-Content $taskRuntimePath -Raw|ConvertFrom-Json
 if($taskRuntime.result -ne 'FINISHED'){throw 'Server observer did not finish'}
 if($HabitatDynamics -and !$taskPuddleClients){throw 'No client received puddle presentation.'}
 $taskRaw=Get-Content $taskServerLog -Raw
-if($taskRaw -match 'Runtime stopped|receipt rejected|VEGETATION_AUDIT_ERROR'){throw 'Server contract/observer failure'}
+if($taskRaw -match 'Runtime stopped|receipt rejected|VEGETATION_AUDIT_ERROR|LogNetPartialBunch: Error'){throw 'Server contract/observer/bunch-size failure'}
 if($AuthoredWeather -and $taskRaw -match 'Accessed None|NULL AttachComponent'){throw 'Legacy visual weather still active in the authored map'}
-$taskResults+=@{Name='Server';ExitCode=$taskServer.ExitCode;Samples=$taskRuntime.samples.Count}
+$taskResults+=@{Name='Server';ProcessId=$taskServer.Id;ExitCode=$taskServer.ExitCode;Samples=$taskRuntime.samples.Count}
 $taskResults|ConvertTo-Json -Depth 10|Set-Content (Join-Path $taskOut 'NetworkProcesses.json') -Encoding utf8
 $taskPython=Join-Path $EngineRoot 'Engine/Binaries/ThirdParty/Python3/Win64/python.exe'
-& $taskPython (Join-Path $PSScriptRoot 'validate_vegetation_relevance.py') $taskOut
+$taskValidationArgs=@($taskOut)
+if($FoodPatchCheck){$taskValidationArgs+='--food-patch'}
+& $taskPython (Join-Path $PSScriptRoot 'validate_vegetation_relevance.py') @taskValidationArgs
 if($LASTEXITCODE -ne 0){throw 'Client near-field delivery/region-transition evidence failed; inspect Relevance.json'}
 Write-Output 'VEGETATION_NETWORK_FINISHED'

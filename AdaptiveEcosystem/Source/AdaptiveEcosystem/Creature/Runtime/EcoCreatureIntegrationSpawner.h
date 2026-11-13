@@ -97,6 +97,8 @@ public:
 	UPROPERTY(EditAnywhere, Category="Creature|V3") bool bV3IslandStage = false;
 	/** Owned-map opt-in; does not change other maps or policy schemas. */
 	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") bool bEnableVegetation = false;
+	/** Publish and display the native food grid even when soil simulation is disabled. */
+	UPROPERTY(EditAnywhere, Category="Creature|Vegetation") bool bEnableFoodGrass = false;
     /** Owned scene opt-in: deterministic diversity, observed encounters and conditional offspring. */
     UPROPERTY(EditAnywhere, BlueprintReadOnly, Category="Creature|Life") bool bEnableEcosystemLife = false;
     UPROPERTY(EditAnywhere, Category="Creature|Life") bool bEnableAdaptiveRoutines = false;

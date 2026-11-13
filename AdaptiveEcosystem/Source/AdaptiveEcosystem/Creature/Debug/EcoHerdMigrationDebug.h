@@ -11,6 +11,8 @@ struct FEcoMigrationDebugRegion
     FVector Minimum, Maximum;
     double FoodFraction=0;
     int32 Population=0;
+    int32 Projected=0,Supported=0,Keep=0,Approved=0,Budget=0;
+    FName RegionalReason=NAME_None;
 };
 struct FEcoMigrationDebugRoute { FName From,To; TArray<FVector> Points; };
 struct FEcoMigrationDebugMember

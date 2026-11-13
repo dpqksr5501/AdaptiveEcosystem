@@ -61,6 +61,8 @@ def tick(_):
         runtime = u.GameplayStatics.get_actor_of_class(world, u.EcoCreatureIntegrationSpawner)
         if not runtime or not runtime.is_runtime_ready():
             if now > 16.:
+                if result["samples"]:
+                    raise RuntimeError(f"Island authority stopped during PIE at {now:.2f} s")
                 result["water_on_failure"] = {name: str(inspect.inspect_fauna_water(world, authored["river"], u.Vector(*pos), 3.))
                     for name, pos in authored["water_samples"].items()}
                 raise RuntimeError("Island authority did not initialize")
@@ -122,13 +124,13 @@ def tick(_):
             set_camera(world, point + u.Vector(-1000., -1600., 750.), point + u.Vector(1600., 800., 0.))
         elif count == 26:
             capture(world, "IslandFauna_Highland")
-        elif count in (27, 31):
+        elif count >= 27 and (count - 27) % 4 == 0 and (count - 27) // 4 < len(authored["lake_views"]):
             index = (count - 27) // 4
             eye, target = authored["lake_views"][index]
             set_camera(world, u.Vector(*eye), u.Vector(*target))
-        elif count in (30, 34):
+        elif count >= 30 and (count - 30) % 4 == 0 and (count - 30) // 4 < len(authored["lake_views"]):
             capture(world, f"IslandFauna_Lake{(count - 30) // 4 + 1}")
-        if now >= 175.:
+        if now >= max(175., (26 + 4 * len(authored["lake_views"])) * 5.):
             first = result["samples"][0]
             if any(row["river_native"] for row in result["samples"]):
                 result["errors"].append("Native land animals entered the rules-only river region")
@@ -151,7 +153,7 @@ def tick(_):
 
 
 if __name__ == "__main__":
-    if editor.get_editor_world().get_name() != "LV_JYU_IslandEcosystem":
+    if editor.get_editor_world().get_name() != authored["map"].rsplit("/", 1)[-1]:
         raise RuntimeError("Open the island copy first")
     levels.editor_request_begin_play()
     handle = u.register_slate_post_tick_callback(tick)

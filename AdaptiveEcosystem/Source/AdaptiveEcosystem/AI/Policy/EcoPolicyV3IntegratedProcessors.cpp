@@ -1226,6 +1226,7 @@ void UEcoPolicyV3IntegratedStepProcessor::ExecuteSteps(FMassEntityManager& Entit
 			EcoWorldV3::AdoptHerb(Ctx.Sim, D.View, Ctx.CmToUnits(Loc), {Fwd.X, Fwd.Y}, EcoRepertoireV3::MakeAgentKeyFromStableId(D.Id),
                 Ctx.Sim.Config.bEcosystemLife&&D.Int->Individual.Origin==EcoLifeV3::EOrigin::NaturalBirth);
 			D.Int->bAdopted = true;
+            if(auto* Migration=GetWorld()->GetSubsystem<UEcoHerdMigrationSubsystem>())Migration->RegisterResident(Ctx.RegionId,D.Id);
 			D.Int->ContextIndex = Ctx.Index;
 			D.Int->GroundZ = Loc.Z;
 			D.Int->PrevGroundZ = Loc.Z;
@@ -1295,7 +1296,7 @@ void UEcoPolicyV3IntegratedStepProcessor::ExecuteSteps(FMassEntityManager& Entit
 				const auto* Regions = World->GetSubsystem<UEcologyWorldSubsystem>();
 				const auto* Region = Regions ? Regions->GetRegion(Ctx.RegionId) : nullptr;
 				if (!Region) { Sub->RejectResourceContract(); return; }
-				const auto Input = Region->GetEnvironmentState();
+				const auto Input = Region->GetEffectiveEnvironmentState();
 				auto& Weather = Ctx.Sim.Food.VegetationWeather;
 				Weather = {Input.Rainfall, Input.Temperature, 1.0 - Ctx.Sim.Dark};
 				if (!Weather.IsValid()) { Sub->RejectResourceContract(); return; }

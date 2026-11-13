@@ -29,7 +29,7 @@ bool UEcologySimulationSubsystem::CaptureEnvironmentInputs(const FEcoServerTimeS
 	{
 		const auto& State = RegionalStates.FindChecked(Id);
 		const auto* Region = Inputs ? Inputs->GetRegion(Id) : nullptr;
-		auto Weather = Region ? Region->GetEnvironmentState() : State.CompletedEnvironment;
+		auto Weather = Region ? Region->GetEffectiveEnvironmentState() : State.CompletedEnvironment;
 		if (!FMath::IsFinite(Weather.Rainfall) || Weather.Rainfall < 0 || Weather.Rainfall > 1
 			|| !FMath::IsFinite(Weather.Humidity) || Weather.Humidity < 0 || Weather.Humidity > 1
 			|| !FMath::IsFinite(Weather.Temperature)) return false;

@@ -1,5 +1,19 @@
 # 팀 섬 레벨의 생태계 적용
 
+## 2026-11-13 최신 팀 통합
+
+기준은 `origin/main` `9c961e48`과 조연우 `e81a2ac3`이다. 권신혁 `origin/Branch_Sinhyeok` `35179936`과 송해찬 `origin/feat/ecosystem-integration-map` `7e3fdce5`는 이미 기준 이력에 들어 있다. 장원준 `wonkii/jwj-1024` `ef44df15`를 병합해 Native 공간 검색, 식생 에셋 경로 복구와 공유 풀, 지역 순차 이주, 1102 4지역 맵을 가져왔다. 지역 순차 이주와 기존 무리 이주는 각각의 승인 조건을 지키며, 기존 이동과 도착 장부를 사용한다. 물길은 수생 규칙 종의 경로로 유지한다. 팀 날씨의 유효 상태를 사용하며 지역 액터가 스트리밍에서 빠지는 동안에는 마지막으로 완료한 환경 스냅샷을 유지한다.
+
+최신 실행 맵은 `/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`다. 송해찬 원본의 World Partition 지형, 눈·들판·고원, 네 호수(Oasis 포함), 세 강, 바다와 폭포를 복제하고 기존 수위와 지면에 맞춰 생태 배치를 다시 적용했다. 원본의 비식생 액터와 변환값을 대조해 빠지거나 변한 원본 배치가 없음을 확인했다. 원본 식생 19,818개를 포함해 복사본에 31,900개 인스턴스가 있다. 생태 배치는 강둑 20구간, 호안 91구간, 지상 먹이 12곳과 보금자리 8곳이다. 기존 송해찬 섬 맵, 조연우 초기 복사본, JWJ 1102 맵은 각자 브라우저에서 열 수 있다.
+
+재작성 시 복사본 생성은 `Tools/Editor/apply_jyu_island_ecosystem.py`, 다종 배치는 `Tools/Editor/author_jyu_island_fauna.py`에 각각 `-EcoIslandRefresh`를 사용한다. 검증은 새 맵에서 시드 20000과 `audit_jyu_island_fauna.py`로 실행했다. 실제 DX12 PIE에서 초기 16종 118마리, 사슴 R7e, 강의 물고기 16마리 이동, 세 물고기 그룹의 섭식, 육상과 수생 출생을 확인했다. 강의 첫 잉어 출생 시 사슴용 공간 먹이 격자를 요구해 권위 실행이 정지하던 문제를 고쳤다. 강의 출생은 기존 수생 산란장·먹이 조건 및 지역·전체 개체수 제한을 거친다. 같은 시드로 잉어 출생 후 210 게임초까지 실행했고 검증 오류는 0이었다. UE 5.8 직접 빌드와 AdaptiveEcosystem 자동화 332건이 통과했다.
+
+JWJ 1102 맵은 별도 DX12 PIE에서 55 실시간 초 동안 실행했다. 네 지역의 권위 식생 필드와 먹이 풀을 확인했다. 이 실행에는 이주 완료가 기록되지 않았다. 기록은 `Saved/TeamIslandIntegration/JWJ1102_Runtime.json`에 있다.
+
+섬 결과는 `Saved/FaunaAudit/IslandRefreshInventory.json`, `Saved/FaunaAudit/IslandFaunaPIE.json`, `Saved/Logs/IslandRefreshPIEAfterBirthFix.log`, `Saved/Logs/IslandRefreshAutomationFinal.log`에 있다. 장시간 개체군 균형, 이주 도착, 멀티플레이 접속, HLOD 재빌드·패키징은 후속 검증 항목이다. 체크포인트 포맷 11에 순차 이주 상태를 함께 싣는다. 이전 포맷의 체크포인트는 새 실행에서 불러올 수 없다.
+
+## 이전 섬 복사본 적용 기록
+
 - 원본은 `/Game/Map/LV_SHC_IslandEcosystem1_WP`이다.
 - 실행용 복사본은 `/Game/JYU/Maps/LV_JYU_IslandEcosystem`이다. 에디터의 New Level From Template으로 복제해 World Partition 외부 액터도 새 맵 경로에 저장했다. 원본 팀 맵과 공유 지형·물 재질은 그대로 참조한다.
 - `Tools/Editor/apply_jyu_island_ecosystem.py`는 복사본의 `JYU.IslandEcology` 태그를 가진 배치만 교체한다. 네 지역의 좌표는 전체 섬의 바이옴 경계가 아닌 시연용 초기 위치이며, 팀의 지역 경계가 확정되면 함께 맞춘다.
