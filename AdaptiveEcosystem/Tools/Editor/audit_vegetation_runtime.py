@@ -1,4 +1,4 @@
-"""Real owned-map observation: explicit rain fixture only, no food/agent/policy writes.
+"""Owned-map observation with optional rain or server-side camera coverage.
 Use -VegetationPIE for Editor PIE; otherwise binds to server completion relay.
 Outputs source verification data to Saved, never personal presentation files.
 """
@@ -44,11 +44,13 @@ folder = arg('VegetationAuditFolder','Vegetation_20261023')
 map_paths = {
     'LV_JYU_HerdMigration': '/Game/JYU/Maps/LV_JYU_HerdMigration',
     'LV_JYU_Ecosystem': '/Game/JYU/Maps/LV_JYU_Ecosystem',
+    'LV_JYU_IslandEcosystemRefreshed': '/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed',
     '1102_Integration_JWJ': '/Game/JWJ/1102_Integration_JWJ',
 }
 if map_name not in map_paths or not re.fullmatch(r'[A-Za-z0-9_]+',folder):raise RuntimeError('Approved map/output folder required')
 jwj = map_name == '1102_Integration_JWJ'
-expected_field_count = 4 if jwj else 3
+island = map_name == 'LV_JYU_IslandEcosystemRefreshed'
+expected_field_count = 4 if jwj or island else 3
 jwj_camera_check = '-vegetationjwjcameracheck' in cmd.lower().split()
 if jwj_camera_check and not (jwj and pie and authored and duration >= 52):
     raise RuntimeError('1102 camera check requires authored PIE for at least 52 seconds')
@@ -188,6 +190,7 @@ def finish(result):
     else: relay.on_runtime_sample.remove_callable(tick)
     fixture = ('Transient existing spawner: soil OFF, food grass ON; no asset save' if soil_off
                else 'Regional grass debug dry/rain/auto; no direct food writes' if grass_debug
+               else 'Authored BP climate; authority viewer coverage of the island' if island and not pie
                else 'Authored BP climate' if authored else 'World rainfall=0 then 0.65; no direct food removal/refill')
     if result == 'FINISHED' and patch_layout:
         latest = state['rows'][-1]['fields'] if state['rows'] else []
@@ -197,7 +200,7 @@ def finish(result):
                 and all(f.get('patch_world_ground_traces_this_frame', 97) <= 96
                         for s in state['rows'] for f in s['fields'])):
             result = 'FAILED'; state['error'] = 'S1 layout readiness/authority world trace budget failed'
-    report = dict(result=result, error=state['error'], fixture=fixture, patch_layout=patch_layout,
+    report = dict(result=result, error=state['error'], map=map_name, fixture=fixture, patch_layout=patch_layout,
                   duration_wall_seconds=duration, grass_profile=grass_profile, samples=state['rows'], screenshots=state['shots'], region_transfers=state['transfers'],child_visuals=state['child_visuals'],observer_targets=state['observer_targets'],overlap_expected='-vegetationoverlapexpected' in cmd.lower())
     (out / (name + '_Runtime.json')).write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf-8')
     unreal.log('VEGETATION_AUDIT_FINISHED ' + json.dumps(dict(result=result, error=state['error'], samples=len(state['rows']))))
@@ -379,9 +382,10 @@ def tick(dt):
                 region = state['water_region']
                 unreal.SystemLibrary.execute_console_command(game, f'eco.Grass.Water "{region}" ' + ('1' if connected else '0'))
                 state['water_connected'] = connected
-        for pawn in unreal.GameplayStatics.get_all_actors_of_class(game, unreal.Pawn):
-            for cls in (unreal.EcoPlayerEcologyComponent, unreal.EcoThreatSourceComponent):
-                for c in pawn.get_components_by_class(cls): c.set_editor_property('threat_enabled', False)
+        if not island:
+            for pawn in unreal.GameplayStatics.get_all_actors_of_class(game, unreal.Pawn):
+                for cls in (unreal.EcoPlayerEcologyComponent, unreal.EcoThreatSourceComponent):
+                    for c in pawn.get_components_by_class(cls): c.set_editor_property('threat_enabled', False)
         phase = 'AuthoredCycle' if authored else ('Dry' if elapsed < duration / 2 else 'Rain')
         if grass_debug:
             if 'grass_region' not in state:
@@ -427,6 +431,28 @@ def tick(dt):
                                                    previous=previous.get('native_world_position'), current=agent.get('native_world_position')))
                 state['last'][str(key)] = agent
                 agents.append(agent)
+        if island and '-vegetationislandnetworkobserver' in cmd.lower():
+            for controller in unreal.GameplayStatics.get_all_actors_of_class(game, unreal.PlayerController):
+                viewer = controller.get_controlled_pawn()
+                if not viewer:
+                    continue
+                first_seen = state.setdefault('observer_start', {}).setdefault(controller.get_path_name(), elapsed)
+                regions = ('Grassland', 'Riverbank', 'Highland', 'Snowfield', 'LowerRiver')
+                phase = int((elapsed - first_seen) / 5.) % len(regions)
+                region = regions[phase]
+                live = [a for a in agents if a['region'] == region and a['hp'] > 0.]
+                if not live:
+                    continue
+                if region == 'Grassland':
+                    young = [a for a in live if int(a.get('rule_fauna', {}).get('parent_a', '0')) > 0]
+                    candidates = young or live
+                else:
+                    candidates = live
+                target = min(candidates, key=lambda row: int(row['stable_id']))
+                point = unreal.Vector(*map(float, re.findall(r'[XYZ]=([-+\d.eE]+)', target['position'])))
+                view = point + unreal.Vector(350., 250., 290.)
+                viewer.set_actor_location(view, False, True)
+                controller.set_control_rotation(unreal.MathLibrary.find_look_at_rotation(view, point))
         if '-vegetationnetworkchildcoverage' in cmd.lower():
             # Explicit observer fixture: move server-owned viewers only. A regional
             # camera orbit around wolves does not necessarily cover a newborn's relevance bubble.

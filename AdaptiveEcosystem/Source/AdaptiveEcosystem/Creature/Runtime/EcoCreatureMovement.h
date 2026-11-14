@@ -37,7 +37,8 @@ inline FVector SelectVelocity(const FVector& Position, FVector PolicyVelocity, f
 ADAPTIVEECOSYSTEM_API bool ConstrainStep(UWorld& World, FName RegionId, bool bTraveling,
     const FVector& Position, FVector& Destination, float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f);
 /** Ground and clearance probe for authored spawn/arrival points; never changes logical state. */
-ADAPTIVEECOSYSTEM_API bool ProjectSpawnPoint(UWorld& World, const FVector& Hint, FVector& OutGround);
+ADAPTIVEECOSYSTEM_API bool ProjectSpawnPoint(UWorld& World, const FVector& Hint, FVector& OutGround,
+    bool bIgnoreWaterSurface = false);
 /** Shared physical ground constraint, also used by read-only copied-map route authoring. */
 ADAPTIVEECOSYSTEM_API bool ConstrainGroundStep(UWorld& World,const FVector& Position,FVector& Destination,
     float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f,float SweepHeightCm=0.f,float MaxRiseCm=-1.f);

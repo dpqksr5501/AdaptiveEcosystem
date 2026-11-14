@@ -17,7 +17,7 @@ if not math.isfinite(visual_distance) or not (-1 <= visual_distance <= 200000):
 if not math.isfinite(duration) or not 20<=duration<=600:raise RuntimeError('Bounded client duration required')
 if grass_travel and duration < 370:raise RuntimeError('Ten three-region circuits require at least 370 seconds')
 map_name=arg('VegetationMap','LV_JYU_HerdMigration')
-if map_name not in ('LV_JYU_HerdMigration','LV_JYU_Ecosystem','1102_Integration_JWJ') or not re.fullmatch(r'[A-Za-z0-9_]+',folder):raise RuntimeError('Owned map/output folder required')
+if map_name not in ('LV_JYU_HerdMigration','LV_JYU_Ecosystem','1102_Integration_JWJ','LV_JYU_IslandEcosystemRefreshed') or not re.fullmatch(r'[A-Za-z0-9_]+',folder):raise RuntimeError('Owned map/output folder required')
 out = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())) / folder
 out.mkdir(parents=True, exist_ok=True)
 state = dict(start=None, next=0, samples=[],world=None,frame_ms=[],csv=False)
@@ -59,6 +59,7 @@ def tick(dt):
         scale=actor.get_actor_scale3d()
         mesh=actor.get_editor_property('creature_mesh');asset=mesh.get_skeletal_mesh_asset();animation=mesh.get_anim_instance()
         visuals.append(dict(id=str(v.get_editor_property('stable_agent_id')),
+            species=str(v.get_editor_property('species_id')),
             region=str(v.get_editor_property('region_id')),activity=str(v.get_editor_property('activity')),
             coat_tone=v.get_editor_property('coat_tone'),maturity=v.get_editor_property('maturity'),adult_visible=mesh.is_visible(),young_visible=actor.get_editor_property('immature_mesh').is_visible(),
             body_scale=v.get_editor_property('body_scale'),actor_scale=[scale.x,scale.y,scale.z],appearance=v.get_editor_property('appearance'),
@@ -94,9 +95,10 @@ def tick(dt):
     result['received_visual_ids']=sorted({v['id'] for s in state['samples'] for v in s['visuals']})
     result['received_appearances']=sorted({v['appearance'] for s in state['samples'] for v in s['visuals']})
     result['morph_matches_payload']=all(v['appearance']==0 or (v['animation'] and v['mesh'] and
-        ('SK_DeerStag' in v['mesh'] if v['appearance']==1 else 'SK_DeerDoe' in v['mesh'])) for s in state['samples'] for v in s['visuals'])
+        ('SK_DeerStag' in v['mesh'] if v['appearance']==1 else 'SK_DeerDoe' in v['mesh']))
+        for s in state['samples'] for v in s['visuals'] if v['species'] == 'Herbivore')
     result['passed'] = len(ids)==0 and migration_subsystems==0 and len(best['fields'])>0 and all(not f['authority'] for f in best['fields']) and sum(f['instances'] for f in best['fields'])>0 and result['scale_payload_matches_actor']
-    if map_name=='LV_JYU_Ecosystem':
+    if map_name in ('LV_JYU_Ecosystem', 'LV_JYU_IslandEcosystemRefreshed'):
         result['passed']=result['passed'] and bool(result['received_visual_ids']) and result.get('native_performance',{}).get('native_steps_total',-1)==0
         if any(f.get('natural_profile','None')!='None' for f in best['fields']):result['passed']=result['passed'] and result['morph_matches_payload']
     if grass_travel:

@@ -551,7 +551,8 @@ class NatStats:
         )
 
 
-def natural(cfg, ctr, form: str, worlds: int, decisions: int) -> dict:
+def natural(cfg, ctr, form: str, worlds: int, decisions: int, trace_wolf_leopard: bool = False,
+            carcass_decay_steps: int | None = None) -> dict:
     names = B.species_of(cfg)
     counts = None
     if form == "buffalo_land":
@@ -561,6 +562,11 @@ def natural(cfg, ctr, form: str, worlds: int, decisions: int) -> dict:
             counts[k, B.BUFFALO] = (4, 6, 8)[k % 3]
             counts[k, B.WOLF] = (4, 6)[k % 2]
     w = R9World(cfg, [SEEDS[0] + i for i in range(worlds)], counts=counts, record=True)
+    if carcass_decay_steps is not None:
+        if carcass_decay_steps <= 0:
+            raise ValueError("Carcass decay steps must be positive")
+        # Diagnostic override after loading controllers against the unmodified body contract.
+        w._carc["decay"] = float(carcass_decay_steps)
     set_all(w, ctr)
     ns = NatStats(w)
     t0 = time.time()
@@ -570,6 +576,25 @@ def natural(cfg, ctr, form: str, worlds: int, decisions: int) -> dict:
     out = ns.summary()
     out["form"] = form
     out["seconds"] = round(time.time() - t0, 1)
+    if trace_wolf_leopard:
+        pair = {B.WOLF, B.LEOPARD}
+        out["wolf_leopard_bite_events"] = [
+            {**event, "seed": SEEDS[0] + event["k"], "biter": names[event["biter_sp"]],
+             "target": names[event["prey_sp"]], "biter_energy": event["wolf_E"],
+             "biter_health": event["wolf_hp"], "biter_action": B.ACTION_NAMES[event["wolf_act"]]}
+            for event in w.events["bites"] if {event["biter_sp"], event["prey_sp"]} == pair
+        ]
+        eaten = w.st["eaten_units"][:, :, B.MEAT]
+        created = w.st["meat_created"].sum(axis=1)
+        decayed = w.st["meat_decayed"]
+        overflow = w.st["meat_overflow_lost"]
+        remaining = w.carc_meat.sum(axis=1)
+        np.testing.assert_allclose(created, eaten.sum(axis=1) + decayed + overflow + remaining, rtol=0., atol=1e-8)
+        out["carcass_ledger"] = {
+            "decay_steps": w._carc["decay"], "created": float(created.sum()),
+            "eaten_by_species": dict(zip(names, eaten.sum(axis=0).tolist())),
+            "decayed": float(decayed.sum()), "overflow_lost": float(overflow.sum()), "remaining": float(remaining.sum()),
+        }
     return out
 
 
@@ -677,9 +702,13 @@ def main(argv=None) -> int:
     ap.add_argument("--wolves", default="1,2,3,4,6")
     ap.add_argument("--rules-only", action="store_true")
     ap.add_argument("--stochastic", action="store_true")
+    ap.add_argument("--trace-wolf-leopard", action="store_true", help="Add wolf–leopard bite events to natural-world JSON")
+    ap.add_argument("--trace-carcass-decay-steps", type=int, help="Override decay in the natural-world contact diagnostic")
     ap.add_argument("--name", default=None)
     ap.add_argument("--out-dir", default=str(HERE.parent / "fauna_reports"))
     a = ap.parse_args(argv)
+    if a.trace_carcass_decay_steps is not None and (not a.trace_wolf_leopard or a.trace_carcass_decay_steps <= 0):
+        ap.error("--trace-carcass-decay-steps requires --trace-wolf-leopard and a positive step count")
     cfg = B.load_r9_config(_abs(a.config))
     if len(B.species_of(cfg)) < 6:
         raise SystemExit("fauna_report needs the six-species animal config (configs/v3_r9_fauna.yaml)")
@@ -710,7 +739,9 @@ def main(argv=None) -> int:
             print(f"[{label}] S2 {time.time() - t0:.0f}s", flush=True)
         if "N" in only:
             for form in ("base", "buffalo_land"):
-                sec[f"N_{form}"] = natural(cfg, ctr, form, a.worlds or 20, a.decisions or 1350)
+                sec[f"N_{form}"] = natural(cfg, ctr, form, a.worlds or 20, a.decisions or 1350,
+                                           trace_wolf_leopard=a.trace_wolf_leopard,
+                                           carcass_decay_steps=a.trace_carcass_decay_steps)
                 print(f"[{label}] N {form} {time.time() - t0:.0f}s", flush=True)
         rep["sets"][label] = sec
     name = a.name or (f"flight_{flight.name}" if flight else time.strftime("report_%Y%m%d_%H%M"))

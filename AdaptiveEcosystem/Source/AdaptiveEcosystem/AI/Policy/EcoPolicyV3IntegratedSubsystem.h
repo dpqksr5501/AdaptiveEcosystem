@@ -1495,7 +1495,8 @@ public:
 	 */
 	bool TraceMove(FName RegionId, const FVector& FromCm, const FVector& ToCm, double& OutZ, bool bTraveling=false, float BodyRadiusCm=30.f) const;
     /** Serialized M4 boundary for opt-in fauna sharing the Native spatial food ledger. */
-    bool ConsumeFaunaFood(FName RegionId, const FVector& Position, double Requested, double& OutNutrition);
+    bool ConsumeFaunaFood(FName RegionId, const FVector& Position, double Requested, double NutritionHeadroom,
+        double& OutNutrition);
 
 	// ---- 시험·조정자 없이 쓰는 길 ----
 

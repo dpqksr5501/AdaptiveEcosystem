@@ -141,6 +141,203 @@ def water_habitat(label, region, center, extent, rotation, flow, cover):
         raise RuntimeError(f"Invalid authored habitat {label}")
 
 
+def configure_mink_high_bank(shore):
+    bank = v(89013.537, 38272.031, -4383.584)
+    entry = v(89013.537, 38392.031, -4421.405)
+    put(shore, shore_point=bank, water_entry_point=entry)
+    habitat, = (actor for actor in all_actors(u.EcoVegetationHabitat)
+                if str(get(actor, "habitat_id")) == "IslandLowerRiver05")
+    bounds = get(habitat, "bounds")
+    extent = bounds.get_unscaled_box_extent()
+    for point in (bank, entry, v(88953.537, 38302.031, -4404.932)):
+        local = u.MathLibrary.inverse_transform_location(bounds.get_world_transform(), point)
+        extent = v(max(extent.x, abs(local.x) + 35.), max(extent.y, abs(local.y) + 35.), extent.z)
+    habitat.modify()
+    bounds.modify()
+    bounds.set_box_extent(extent, True)
+    if not habitat.is_valid_habitat():
+        raise RuntimeError("Invalid high-bank swimming habitat")
+
+
+def add_mink_shore(patches, use_high_bank=True):
+    # Surveyed on the owned island. The stock is split between the deep nursery
+    # and the shallow shelf, keeping the original consumers and combined budget.
+    bank = v(88953.537, 38302.031, -4404.932)
+    entry = v(89029.868, 38400.123, -4421.405)
+    food = v(89121.986, 38518.504, -4442.210)
+    root, = (patch for patch in patches if str(get(patch, "id")) == "IslandRiverRoots")
+    if any(str(get(patch, "id")) == "IslandRiverRootsShore" for patch in patches):
+        raise RuntimeError("The island already has a Roots shore patch")
+    habitat, = (actor for actor in all_actors(u.EcoVegetationHabitat)
+                if str(get(actor, "habitat_id")) == "IslandLowerRiver05")
+    bounds = get(habitat, "bounds")
+    extent = bounds.get_unscaled_box_extent()
+    local_entry = u.MathLibrary.inverse_transform_location(bounds.get_world_transform(), entry)
+    habitat.modify()
+    bounds.modify()
+    bounds.set_box_extent(v(max(extent.x, abs(local_entry.x) + 75.), max(extent.y, abs(local_entry.y) + 75.), extent.z), True)
+    if not habitat.is_valid_habitat():
+        raise RuntimeError("Invalid mink swimming habitat")
+    shore = root.copy()
+    put(shore, id="IslandRiverRootsShore", center=food, aquatic_nursery=False,
+        has_shore_entry=True, shore_point=bank, water_entry_point=entry)
+    for name in ("capacity", "regrowth_per_second"):
+        total = get(root, name)
+        put(root, **{name: total * .625})
+        put(shore, **{name: total * .375})
+    if use_high_bank:
+        configure_mink_high_bank(shore)
+    patches.append(shore)
+    return food
+
+
+def save_mink_shore():
+    world = editor.get_editor_world()
+    if world.get_path_name().split(".")[0] != TARGET:
+        raise RuntimeError("Expected owned island")
+    evidence = json.loads((REPORT.parent / "IslandAccess_20000_saved_feeding_connector_near_split_startup"
+                           / "IslandFaunaPIE.json").read_text(encoding="utf-8"))
+    if evidence["errors"] or not evidence["samples"] or not evidence["validate_shore_on_start"]:
+        raise RuntimeError("Expected a successful island shore startup trial")
+    runtime = common["runtime"]()
+    patches = [patch.copy() for patch in get(runtime, "fauna_habitat_patches")]
+    runtime.modify()
+    add_mink_shore(patches, use_high_bank=False)
+    put(runtime, fauna_habitat_patches=patches)
+    if not levels.save_current_level():
+        raise RuntimeError("Unable to save island shore")
+    u.log("ECO_ISLAND_MINK_SHORE_SAVED")
+
+
+def save_mink_high_bank():
+    if editor.get_editor_world().get_path_name().split(".")[0] != TARGET:
+        raise RuntimeError("Expected owned island")
+    runtime = common["runtime"]()
+    patches = [patch.copy() for patch in get(runtime, "fauna_habitat_patches")]
+    shore, = (patch for patch in patches if str(get(patch, "id")) == "IslandRiverRootsShore")
+    runtime.modify()
+    configure_mink_high_bank(shore)
+    put(runtime, fauna_habitat_patches=patches)
+    if not levels.save_current_level():
+        raise RuntimeError("Unable to save island high bank")
+    u.log("ECO_ISLAND_MINK_HIGH_BANK_SAVED")
+
+
+def add_eagle_perch(runtime):
+    # This World Partition surface is loaded and checked by the in-game audit.
+    point = v(51314., 49330., 3137.07)
+    perches = [site.copy() for site in get(runtime, "fauna_perches")]
+    if not any(str(get(site, "species_id")) == "GoldenEagle" and (get(site, "location") - point).length() < 10.
+               for site in perches):
+        site = u.EcoFaunaPerch()
+        put(site, species_id="GoldenEagle", region_id="Highland", location=point)
+        runtime.modify()
+        put(runtime, fauna_perches=[*perches, site])
+
+
+def save_eagle_perch():
+    world = editor.get_editor_world()
+    if world.get_path_name().split(".")[0] != TARGET:
+        raise RuntimeError("Expected owned island")
+    add_eagle_perch(common["runtime"]())
+    if not levels.save_current_level():
+        raise RuntimeError("Unable to save island eagle perch")
+    u.log("ECO_ISLAND_EAGLE_PERCH_SAVED")
+
+
+def save_forage_soil():
+    world = editor.get_editor_world()
+    if world.get_path_name().split(".")[0] != TARGET:
+        raise RuntimeError("Expected owned island")
+    grassland_patches = {"IslandForageWestMeadow", "IslandForageOpenMeadow",
+                         "IslandForageFloodplainApproach", "IslandForageApproachForbs"}
+    for seed in (20000, 20017):
+        for pattern in ("block", "pulses"):
+            report_path = REPORT.parent / f"Island_{seed}_native_soil_{pattern}" / "IslandFaunaPIE.json"
+            report = json.loads(report_path.read_bytes())
+            if (report["errors"] or not report["trial_forage_soil"] or report["samples"][-1]["time"] < 210.
+                    or not all(grassland_patches <= sample.get("forage_soil_moisture", {}).keys()
+                               for sample in report["samples"][1:])):
+                raise RuntimeError(f"Incomplete forage soil comparison for {seed} {pattern}")
+    runtime = common["runtime"]()
+    runtime.modify()
+    put(runtime, use_native_soil_for_fauna_forage=True)
+    if not levels.save_current_level():
+        raise RuntimeError("Unable to save island forage soil input")
+    u.log("ECO_ISLAND_FORAGE_SOIL_SAVED")
+
+
+def save_local_forage_soil():
+    world = editor.get_editor_world()
+    if world.get_path_name().split(".")[0] != TARGET:
+        raise RuntimeError("Expected owned island")
+    browse = "IslandForageSouthBrowse"
+    verified = None
+    for seed in (20000, 20017):
+        reports = [json.loads((REPORT.parent / f"Island_{seed}_local_soil_{mode}/IslandFaunaPIE.json").read_bytes())
+                   for mode in ("rain", "water")]
+        rain, water = reports
+        names = set(water["local_forage_soil"]["tracked_patches"])
+        if (any(report["errors"] or report["samples"][-1]["time"] < 210. for report in reports)
+                or len(names) != 5 or browse not in names or (verified is not None and names != verified)
+                or rain["patch_budget"] != water["patch_budget"]
+                or rain["samples"][0]["stocks"] != water["samples"][0]["stocks"]
+                or water["samples"][-1]["forage_soil_moisture"][browse]
+                <= rain["samples"][-1]["forage_soil_moisture"][browse]):
+            raise RuntimeError(f"Local forage soil did not pass the drawdown comparison for {seed}")
+        verified = names
+    runtime = common["runtime"]()
+    patches = list(get(runtime, "fauna_habitat_patches"))
+    if not verified <= {str(get(patch, "id")) for patch in patches}:
+        raise RuntimeError("The verified forage patches are missing from the saved island")
+    for patch in patches:
+        key = str(get(patch, "id"))
+        if key in verified:
+            put(patch, track_local_soil_moisture=True,
+                forage_water_habitat_id="IslandLowerRiver05" if key == browse else "None")
+    runtime.modify()
+    put(runtime, fauna_habitat_patches=patches)
+    if not levels.save_current_level():
+        raise RuntimeError("Unable to save local forage soil settings")
+    u.log("ECO_ISLAND_LOCAL_FORAGE_SOIL_SAVED")
+
+
+def save_south_browse_access():
+    world = editor.get_editor_world()
+    if world.get_path_name().split(".")[0] != TARGET:
+        raise RuntimeError("Expected owned island")
+    point = None
+    for seed in (20000, 20017):
+        base = REPORT.parent
+        report = json.loads((base / f"Island_{seed}_land_forage_bank_access/IslandFaunaPIE.json").read_bytes())
+        log = (base / f"IslandAccessBaseline/{seed}_land_forage_bank_access.log").read_text(encoding="utf-8")
+        trial = report["lower_river_land_forage"]
+        if (report["errors"] or not trial["extra_access_cm"] or (point is not None and point != trial["extra_access_cm"])
+                or not any("Patch=IslandForageSouthBrowse Species=Horse Agent=41" in line and "Access=1" in line
+                           for line in log.splitlines())):
+            raise RuntimeError(f"SouthBrowse bank access was not verified for seed {seed}")
+        point = trial["extra_access_cm"]
+    access = u.Vector(*point)
+    runtime = common["runtime"]()
+    patches = list(get(runtime, "fauna_habitat_patches"))
+    patch, = (p for p in patches if str(get(p, "id")) == "IslandForageSouthBrowse")
+    visual, = (a for a in all_actors(u.EcoForagePatchVisual) if str(get(a, "patch_id")) == "IslandForageSouthBrowse")
+    transforms = list(get(visual, "full_plant_transforms"))
+    plant = transforms[1]
+    mesh_base = get(get(visual, "plants"), "static_mesh").get_bounding_box().min.z
+    plant.translation = access - visual.get_actor_location() - v(0., 0., mesh_base * plant.scale3d.z)
+    transforms[1] = plant
+    runtime.modify()
+    put(patch, forage_access_points=[access])
+    put(runtime, fauna_habitat_patches=patches)
+    visual.modify()
+    put(visual, full_plant_transforms=transforms)
+    visual.rebuild_forage_preview()
+    if not levels.save_current_level():
+        raise RuntimeError("Unable to save SouthBrowse bank access")
+    u.log("ECO_ISLAND_SOUTH_BROWSE_ACCESS_SAVED")
+
+
 def forage_visual(world, template, name, center):
     cls, _, _, transforms, residual, woody, components = template
     mesh = components[0][0]
@@ -374,7 +571,9 @@ def author():
     for name, index, side, height, consumers, nursery in (
         ("InletPlants",0,-120.,56.,["CommonCarp"],True), ("QuietMargin",1,140.,55.,["CommonCarp","UnidentifiedFish"],True),
         ("GravelInsects",2,-110.,27.,["AriakeCatfish"],False), ("Roots",5,140.,26.,["AriakeCatfish","Mink"],True),
-        ("Drift",6,120.,91.,["UnidentifiedFish","CommonCarp"],False), ("SlowShelf",9,-115.,57.,["CommonCarp","UnidentifiedFish"],True),
+        ("Drift",6,120.,91.,["UnidentifiedFish","CommonCarp"],False),
+        # Keep the upstream shelf within the water column during drawdown.
+        ("SlowShelf",0,-120.,24.,["CommonCarp","UnidentifiedFish"],True),
     ):
         point = river_point(index, side, height)
         patch = u.EcoFaunaHabitatPatch()
@@ -382,6 +581,7 @@ def author():
             stage=1, consumers=consumers, capacity=16. if nursery else 11., regrowth_per_second=.18 if nursery else .13, energy_per_meal=2.8)
         stock.append(patch)
         samples[name] = [point.x,point.y,point.z]
+    samples["RootsShore"] = list(add_mink_shore(stock).to_tuple())
     templates = {row[1]: row for row in donor["forage"]}
     fields = {str(row["id"]): row for row in donor["patches"]}
     forage = (
@@ -412,6 +612,7 @@ def author():
     put(runtime, groups=list(groups.values()), fauna_species=list(donor_profiles.values()), fauna_habitat_patches=stock,
         footstep_audio_set=donor["footstep_audio_set"], fauna_habitat_stage=1, global_population_limit=160,
         v3_use_authored_shelters=True)
+    add_eagle_perch(runtime)
     if not levels.save_current_level():
         raise RuntimeError("Unable to save island")
     result = {"map": TARGET, "river": river_region, "water_samples": samples, "forage": len(stock) - len(samples), "foliage": scenery,
@@ -440,7 +641,20 @@ def author():
 
 if __name__ == "__main__":
     try:
-        author()
+        if "-EcoIslandSaveMinkShore" in u.SystemLibrary.get_command_line().split():
+            save_mink_shore()
+        elif "-EcoIslandSaveMinkHighBank" in u.SystemLibrary.get_command_line().split():
+            save_mink_high_bank()
+        elif "-EcoIslandSaveEaglePerch" in u.SystemLibrary.get_command_line().split():
+            save_eagle_perch()
+        elif "-EcoIslandSaveForageSoil" in u.SystemLibrary.get_command_line().split():
+            save_forage_soil()
+        elif "-EcoIslandSaveLocalForageSoil" in u.SystemLibrary.get_command_line().split():
+            save_local_forage_soil()
+        elif "-EcoIslandSaveSouthBrowseAccess" in u.SystemLibrary.get_command_line().split():
+            save_south_browse_access()
+        else:
+            author()
     except Exception:
         u.log_error(traceback.format_exc())
     finally:

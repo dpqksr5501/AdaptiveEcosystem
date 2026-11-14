@@ -2,6 +2,19 @@
 
 `Saved/` 경로는 Unreal 프로젝트 폴더를 기준으로 한다. 이 기록은 실험한 PC에 저장된다. 다른 체크아웃에서는 문서의 맵 작성과 기록 도구로 다시 실행할 수 있다.
 
+## 공통 로그 보관 폴더
+
+이 PC에서는 `Saved/ValidationArchive/20261114/`에 완료된 섬 시험의 원시 JSON·로그·화면과 이전 Unreal 로그·프로파일링 CSV를 유형별 ZIP으로 보관한다. 묶음 안의 경로는 원래의 `Saved/` 상대 경로이며, `ValidationEvidenceManifest.json`에 파일별 원래 크기와 SHA-256이 있다. 현재 실행을 확인하는 최신 자동화·서버·장기 회귀 기록과 대표 화면은 기존 위치에서도 바로 열 수 있다. 팀에 공유하는 요약과 재현 스크립트는 Git에 두고 원시 ZIP은 로컬에서 보관한다.
+
+과거 기록 경로가 비어 있으면 해당 ZIP의 목록을 찾아 필요한 항목만 복원한다. 예를 들어 섬 보고서는 다음과 같이 읽는다. `-k`는 이미 있는 파일을 보존한다. 각 묶음의 목록과 정리 결과는 같은 폴더의 매니페스트와 정리 기록에 있다.
+
+```powershell
+$saved = (Resolve-Path -LiteralPath 'AdaptiveEcosystem/Saved').Path
+$archive = Join-Path $saved 'ValidationArchive/20261114/IslandReports.zip'
+tar.exe -tf $archive
+tar.exe -x -k -f $archive -C $saved -- 'FaunaAudit/Island_20000_water_small20/IslandFaunaPIE.json'
+```
+
 ## 바로 읽을 수 있는 최근 검증
 
 | 범위 | 로컬 기록 |

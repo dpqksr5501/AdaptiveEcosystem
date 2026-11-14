@@ -8,6 +8,7 @@ struct FEcoBehaviorReasonEvent
     FName Reason, Region;
     int64 NativeStep=0, RelatedAgent=0;
     double Amount=0;
+    FName ResourceId=NAME_None;
 };
 
 struct FEcoBehaviorReasonHistory

@@ -173,6 +173,9 @@ bool AEcoCreatureIntegrationSpawner::CollectSetupIssues(TArray<FString>& Errors,
 		if (!RegionPtr) { Errors.Add(FString::Printf(TEXT("Group %s: matching EcologyRegion is missing."), *Label)); continue; }
 		if (Group.Herbivores < 0 || Group.Wolves < 0 || !Group.Schedule.IsValid())
 			Errors.Add(FString::Printf(TEXT("Group %s: counts must be nonnegative and Schedule valid."), *Label));
+		if (Group.bFaunaTransit && (!Group.bRulesOnly || Group.Herbivores || Group.Wolves || !Group.Fauna.IsEmpty()
+			|| (bEnableWaves && (Group.Schedule.DayCount || Group.Schedule.NightCount))))
+			Errors.Add(FString::Printf(TEXT("Group %s: a fauna transit region requires Rules Only and no founder or wave spawns."), *Label));
 		int64 Count = (IsSpeciesEnabled(false) ? int64(Group.Herbivores) : 0) + (IsSpeciesEnabled(true) ? Group.Wolves : 0);
         for (const auto& Placement : Group.Fauna) Count += Placement.SpawnPoints.Num();
         Total += Count;

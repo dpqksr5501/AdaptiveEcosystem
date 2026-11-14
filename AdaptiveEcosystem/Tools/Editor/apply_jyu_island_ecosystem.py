@@ -19,7 +19,8 @@ assert world.get_path_name().split('.')[0] == TARGET
 assert unreal.EcoCreatureAnimationBuilder.prepare_copied_world(world)
 existing = actors.get_all_level_actors()
 for actor in existing:
-    if OWNER in [str(tag) for tag in actor.tags]:
+    if OWNER in [str(tag) for tag in actor.tags] or actor.get_class().get_name() in (
+            'BP_SHC_RainRegionalWeather_C', 'BP_SHC_SnowRegionalWeather_C'):
         actors.destroy_actor(actor)
     elif isinstance(actor, (unreal.EcologyRegion, unreal.EcoCreatureIntegrationSpawner, unreal.EcoRegionEnvironmentAdapter)):
         raise RuntimeError('Unexpected existing ecology writer: ' + actor.get_actor_label())
@@ -138,7 +139,7 @@ runtime = spawn(unreal.EcoCreatureIntegrationSpawner, 'Runtime', start,
                 enable_ecosystem_life=True, enable_vegetation=True, use_habitat_streaming=True,
                 habitat_streaming_radius=16000., global_population_limit=96,
                 herbivore_config=asset('Config/EC_JYU_V3_Deer'), wolf_config=asset('Config/EC_JYU_V3_Wolf'),
-                herbivore_actor_class=bp('Creatures/BP_JYU_Deer'), wolf_actor_class=bp('Creatures/BP_JYU_Wolf'),
+                herbivore_actor_class=bp('Ecosystem/Natural/BP_EcoNaturalDeer'), wolf_actor_class=bp('Creatures/BP_JYU_Wolf'),
                 footstep_audio_set=asset('Audio/DA_JYU_Footsteps'), vegetation_field_class=bp('Ecosystem/BP_JYU_VegetationField'),
                 natural_habitat_profile=profiles['TemperateMosaic'], region_habitat_profiles=region_profiles)
 world.get_world_settings().set_editor_property('default_game_mode', bp('Config/BP_JYU_IntegrationGameMode'))

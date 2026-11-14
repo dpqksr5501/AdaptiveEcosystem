@@ -8,7 +8,8 @@ def read(name):return json.loads((folder/name).read_text(encoding='utf-8-sig'))
 server=read('Server_Runtime.json')
 if server['result']!='FINISHED':raise RuntimeError('Completed authority observer required')
 origins={f['region']:(f['actor_location'],f['net_cull_distance_squared']) for f in server['samples'][0]['fields']}
-expected_fields = 4 if any(r.startswith('JWJ_') for r in origins) else 3
+island = server.get('map') == 'LV_JYU_IslandEcosystemRefreshed'
+expected_fields = 4 if island or any(r.startswith('JWJ_') for r in origins) else 3
 if len(origins)!=expected_fields:raise RuntimeError(f'{expected_fields} authority field origins required')
 result=dict(grace_seconds=3,clients=[],passed=True,scope='Food patch delivery/anchors only; life/three-region camera circuit not evaluated' if food_patch_check else 'Legacy vegetation/life/camera circuit')
 patch_layout=server.get('patch_layout',False)
@@ -53,6 +54,16 @@ for name in ('ClientA','ClientB'):
         passed &= travel['ten_stable_visits_per_region'] and travel['rendered_after_streaming']
     result['clients'].append(dict(name=name,passed=passed,checked_near_region_samples=checked,
         evaluated_regions=sorted(evaluated),received_regions=sorted(received),missing_after_grace=missing,missing_camera_samples=missing_camera,grass_travel=travel))
+    if island:
+        authority_species = {str(a['stable_id']): a['species'] for s in server['samples'] for a in s['agents']}
+        received_species = {str(v['id']): v['species'] for s in client['samples'] for v in s['visuals']}
+        mismatched = {key: value for key, value in received_species.items()
+                      if key in authority_species and authority_species[key] != value}
+        matched = {kind for key, kind in received_species.items() if authority_species.get(key) == kind}
+        island_pass = len(set(authority_species.values())) == 16 and len(matched) >= 2 and not mismatched
+        result['clients'][-1]['island_species'] = dict(matched=sorted(matched), mismatched=mismatched, passed=island_pass)
+        passed &= island_pass
+        result['clients'][-1]['passed'] = passed
     if patch_layout:
         matched=set();anchor_errors=[]
         for sample in client['samples']:
@@ -75,7 +86,9 @@ if server.get('overlap_expected'):
 children={}
 for sample in server['samples']:
     for a in sample.get('agents',[]):
-        if a.get('life',{}).get('origin')==1 and a.get('hp',0)>0:
+        rule = a.get('rule_fauna', {})
+        born = a.get('life',{}).get('origin')==1 or island and int(rule.get('parent_a', '0')) > 0 and int(rule.get('parent_b', '0')) > 0
+        if born and a.get('hp',0)>0:
             children.setdefault(a['stable_id'],[]).append(a['body_scale'])
 if not food_patch_check and any(a.get('ecosystem_life_enabled') for s in server['samples'] for a in s.get('agents',[])):
     late=read('ClientB_Client.json')

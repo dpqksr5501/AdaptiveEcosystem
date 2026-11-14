@@ -5,6 +5,7 @@
 #include "EcoCreatureAnimationBuilder.generated.h"
 class UAnimBlueprint;
 class AEcoCreatureRepresentationActor;
+class AEcoCreatureIntegrationSpawner;
 class UBlueprint;
 class UEcoCreatureAnimationProfile;
 class UEcoCreatureAnimInstance;
@@ -54,6 +55,21 @@ public:
     /** Read-only terrain/water capability check for any designer's open level. */
     UFUNCTION(BlueprintCallable,Category="Creature|Editor",meta=(WorldContext="WorldContext"))
     static bool ValidateHabitatGroundSegment(UObject* WorldContext,FVector From,FVector To);
+    /** Sample rule-fauna collision and wading. NAME_None measures terrain without checking region membership. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor",meta=(WorldContext="WorldContext"))
+    static bool ValidateFaunaGroundSegment(UObject* WorldContext,FName RegionId,FName SpeciesId,
+        FVector From,FVector To,float BodyScale);
+    /** Trace between two already elevated endpoints using rule fauna sight. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor",meta=(WorldContext="WorldContext"))
+    static bool HasFaunaAuditSight(UObject* WorldContext,FVector From,FVector To);
+    /** Reposition one founder before the first decision in the owned island PIE comparison. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor")
+    static bool SetIslandAuditFounderPlacement(AEcoCreatureIntegrationSpawner* Spawner,int64 StableId,
+        FName RegionId,FVector Location);
+    /** Split one existing plant patch before simulation advances in the owned island PIE comparison. */
+    UFUNCTION(BlueprintCallable,Category="Creature|Editor")
+    static bool SplitIslandAuditForage(AEcoCreatureIntegrationSpawner* Spawner,FName PatchId,FName NewId,
+        FVector Location,const TArray<FTransform>& OriginalPlants,const TArray<FTransform>& NewPlants);
     UFUNCTION(BlueprintCallable,Category="Creature|Editor")
     static bool ConfigureBehaviorRepresentation(UBlueprint* Blueprint,UEcoCreatureAnimationProfile* Profile,TSubclassOf<UEcoCreatureAnimInstance> AnimationClass);
 };

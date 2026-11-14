@@ -1,6 +1,6 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
-**팀 섬 지형 복사본의 다종 적용.** 최신 작업용 맵 `/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`는 송해찬 담당 `/Game/Map/LV_SHC_IslandEcosystem1_WP`에서 가져온 지형과 물길에 수초·먹이·수생동물을 연결한다. 초지와 고원에는 지형에 맞춘 개체군과 마른 보금자리를 배치했다. 기본 시작·세션 맵은 `/Game/JWJ/Integration_JwJ`다. [팀 브랜치와 최신 섬 검증](Team/JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#2026-11-13-최신-팀-통합)
+**팀 섬 지형 복사본의 다종 적용.** 최신 작업용 맵 `/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`는 송해찬 담당 `/Game/Map/LV_SHC_IslandEcosystem1_WP`에서 가져온 지형과 물길에 수초·먹이·수생동물을 연결한다. 초지와 고원에는 지형에 맞춘 개체군과 마른 보금자리를 배치했다. 기본 시작·세션 맵은 `/Game/JWJ/Integration_JwJ`다. [최신 로컬 섬의 적용과 인계](Team/JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#2026-11-14-로컬-섬-마무리)
 
 **공유 기준과 후속 이슈.** [PR #19](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/19)의 검증 기준은 `fa0c04dd`다. 최신 팀 통합 브랜치는 직접 빌드와 자동화 332건, 최신 섬에서 초기 16종 118마리와 210 게임초 실행을 별도로 확인했다. 밍크 입수·상륙, 스트리밍, 경사 접지, 플레이어 개입과 장시간 비교는 [담당별 후속 이슈](Team/FAUNA_TEAM_REQUESTS_20261113.md#pr-19-후속-이슈)에서 이어간다.
 
@@ -9,7 +9,7 @@
 **2026-11-13 소유 다종 맵 기준.** `LV_JYU_ExpandedFauna`에 기존 8종과 신규 8종을 연결했다. `LV_JYU_HerbivoreForage`에서는 먹이 군락 15개의 재고와 외형을, `LV_JYU_RiparianReach`에서는 물가 17개 군락의 건조·강우·침수·섭취 반응과 수위별 연결 수심을 확인했다. 출생·이주, 장기 개체군, 식생 저장·네트워크, 수변 면적·렌더는 서로 다른 맵과 조건의 실행이다. 팀 적용은 송해찬 님의 레벨 디자인, 장원준 님의 플레이어 입력·사냥·발소리, 권신혁 님의 학습 계약과 연계한다. [맵별 완료·검증 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과) · [수변 실측과 팀 적용 조건](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md) · [돼지 전용 적용](조연우/JYU_PIG_HANDOFF_20261113.md)
 
 **2026-11-12 다종 작업 기준.** 기본 `/Game/JWJ/Integration_JwJ`는 Legacy 실행이며 Native v3와 자연 출생이 꺼져 있다. 로컬 소유 복사본 `/Game/JYU/Maps/LV_JYU_IntegrationR7eFauna`에서는 사슴 R7e, 늑대 Native 규칙, 여섯 종의 규칙 실행기가 함께 작동한다. 기존 시작 배치의 최신 4배속 30분 비교에서 사슴은 시드별로 25·34마리 남았고 늑대·여우·표범은 모두 기아로 사라졌다. 지상 통로·섭취, 고정 30·60 FPS 비교와 전용 서버 근접 사냥은 각각 문서에 적힌 별도 조건에서 확인했다. [최신 30분 결과](Architecture/FAUNA_POPULATION_BALANCE.md#다종-공용-사체의-영양-예약) · [검증별 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과)
-PR #16 → JWJ 통합(2026-11-09~10)의 저장 포맷 5와 실행 결과는 [당시 통합 기록](Team/PR16_JWJ_MERGE_20261109.md)에 있다. 이번 팀 통합은 자연 서식지와 다종 기능, JWJ 공유 풀 S1과 지역 순차 이주를 함께 유지한다. 새 체크포인트 포맷은 **11**이다.
+PR #16 → JWJ 통합(2026-11-09~10)의 저장 포맷 5와 실행 결과는 [당시 통합 기록](Team/PR16_JWJ_MERGE_20261109.md)에 있다. 팀 통합 기록의 체크포인트 포맷은 **11**, 현재 로컬 포맷은 **16**이다. 로컬은 산란장 예약, 규칙 전용 지역 환경, 공용 먹이 재고 접근점, 격자 밖 토양 수분과 연결 수원에 더해 수중 먹이터와 입수·상륙·마른 둑 좌표를 저장한다. 기존 슬롯은 저장 당시 빌드에서 확인한다. [수변과 새 프로세스 복원 검증](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md#잉어-선반과-두-번째-밍크-출구-적용)
 
 사슴 이주 첫 구현(2026-11-09): [지역 순차 이주 구현/테스트](Architecture/REGIONAL_DEER_MIGRATION_IMPLEMENTATION_20261109.md)는 `eco.HerdMigration.Regional 1`에서 개별 순차 승인·지역 출발 예산을 제공한다. Editor 빌드/관련 자동화13개는 성공했고 실제1102 지형 도착·저장 왕복·멀티 검증은 남았다. 기본OFF이며 다음 ‘계획만 작성’ 설명은 첫 구현 이전 이력이다.
 

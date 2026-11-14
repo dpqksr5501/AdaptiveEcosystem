@@ -5,6 +5,7 @@
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Core/EcoRuntimeSettings.h"
 #include "Components/InstancedStaticMeshComponent.h"
+#include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/WorldPartitionStreamingSourceComponent.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
@@ -3416,6 +3417,154 @@ void UEcoPolicyV3IntegratedSubsystem::TryCreateContexts()
 		Ctx->ExtraCovers = Extra;
 		Ctx->CoverGroundZ = CoverZ;
 		Ctx->CoverShelterIndices=MoveTemp(CoverIndices);Ctx->CoverRegistrations=MoveTemp(Registrations);
+#if WITH_DEV_AUTOMATION_TESTS
+        const bool bSpreadSnowForage = FParse::Param(FCommandLine::Get(), TEXT("EcoIslandTrialSnowForageSpread"));
+        if (G.RegionId == FName(TEXT("Snowfield")) && World->GetMapName().EndsWith(TEXT("LV_JYU_IslandEcosystemRefreshed"))
+            && (bSpreadSnowForage || FParse::Param(FCommandLine::Get(), TEXT("EcoIslandTrialSnowForage"))))
+        {
+            auto& Grid = Ctx->Sim.Food;
+            const FBox2D TrialArea(FVector2D(15900, -12100), FVector2D(18600, -6200));
+            const auto CellPoint = [&](int32 Index)
+            {
+                return Ctx->UnitsToCm((Index % Grid.Gw + .5) * Grid.Cell, (Index / Grid.Gw + .5) * Grid.Cell, Origin.Z);
+            };
+            TArray<int32> Targets;
+            const FBox2D SpreadArea(FVector2D(15900, -14100), FVector2D(23700, -6200));
+            const auto InTrialArea = [&](const FVector& Point)
+            {
+                return (bSpreadSnowForage ? SpreadArea : TrialArea).IsInside(FVector2D(Point));
+            };
+            if (bSpreadSnowForage)
+            {
+                const FVector2D Sites[] = {{16800, -7100}, {18000, -10400}, {21400, -13000}, {22500, -8700}};
+                for (const FVector2D& Site : Sites)
+                {
+                    TArray<int32> Nearby;
+                    for (int32 Index = 0; Index < int32(Grid.Food.size()); ++Index)
+                        if (FVector2D::DistSquared(FVector2D(CellPoint(Index)), Site) < FMath::Square(1500.)) Nearby.Add(Index);
+                    Nearby.Sort([&](int32 A, int32 B){
+                        const double DA = FVector2D::DistSquared(FVector2D(CellPoint(A)), Site);
+                        const double DB = FVector2D::DistSquared(FVector2D(CellPoint(B)), Site);
+                        return DA == DB ? A < B : DA < DB;
+                    });
+                    int32 SiteCellCount = 0;
+                    for (const int32 Index : Nearby)
+                    {
+                        const double X = (Index % Grid.Gw + .5) * Grid.Cell;
+                        const double Y = (Index / Grid.Gw + .5) * Grid.Cell;
+                        FVector Ground;
+                        if (!InTrialArea(CellPoint(Index)) || Grid.Cap[Index] > 0.
+                            || Grid.CoverCell[Index] || (!Grid.CoverFoodCell.empty() && Grid.CoverFoodCell[Index])
+                            || (Config.Island && !Config.Island->IsOpen(X, Y))
+                            || !EcoCreatureMovement::ProjectSpawnPoint(*World, CellPoint(Index), Ground)
+                            || !EcoCreatureMovement::IsWadeableGround(*World, Ground, 0.f)) continue;
+                        if (Targets.Contains(Index)) continue;
+                        Targets.Add(Index);
+                        if (++SiteCellCount == 3) break;
+                    }
+                }
+            }
+            else
+                for (int32 Index = 0; Index < int32(Grid.Food.size()); ++Index) Targets.Add(Index);
+
+            // Both surveyed seeds can place this share without exceeding one unit per cell.
+            const double SpreadBudget = .05 * Ctx->StartFood;
+            const double PerTarget = Targets.IsEmpty() ? 0. : FMath::Min(1., SpreadBudget / Targets.Num());
+            double Transferred = 0.;
+            int32 Moved = 0;
+            for (const int32 Target : Targets)
+            {
+                if (Moved >= 12) break;
+                const FVector Point = CellPoint(Target);
+                if (!InTrialArea(Point) || Grid.Cap[Target] > 0.
+                    || (Config.Island && !Config.Island->IsOpen((Target % Grid.Gw + .5) * Grid.Cell, (Target / Grid.Gw + .5) * Grid.Cell))) continue;
+                FVector Ground;
+                if (!EcoCreatureMovement::ProjectSpawnPoint(*World, Point, Ground)
+                    || !EcoCreatureMovement::IsWadeableGround(*World, Ground, 0.f)) continue;
+                int32 Donor = INDEX_NONE;
+                double Far = FMath::Square(3000.);
+                if (bSpreadSnowForage)
+                {
+                    for (int32 Index = 0; Index < int32(Grid.Food.size()) && Grid.Food[Target] + 1.e-9 < PerTarget; ++Index)
+                    {
+                        if (InTrialArea(CellPoint(Index)) || Grid.Food[Index] <= 0. || Grid.Regen[Index] != Grid.Regen[Target]
+                            || Grid.CoverCell[Index] != Grid.CoverCell[Target]
+                            || (!Grid.CoverFoodCell.empty() && Grid.CoverFoodCell[Index] != Grid.CoverFoodCell[Target])) continue;
+                        const double Amount = FMath::Min(PerTarget - Grid.Food[Target], Grid.Food[Index]);
+                        Grid.Food[Target] += Amount;
+                        Grid.Food[Index] -= Amount;
+                        Grid.Cap[Target] += Amount;
+                        Grid.Cap[Index] -= Amount;
+                        if (!Grid.Cap0.empty())
+                        {
+                            Grid.Cap0[Target] += Amount;
+                            Grid.Cap0[Index] -= Amount;
+                        }
+                    }
+                    if (Grid.Food[Target] > 0.)
+                    {
+                        Transferred += Grid.Food[Target];
+                        ++Moved;
+                        UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Forage Spread] Target=%d Stock=%.9f Regen=%.9f X=%.1f Y=%.1f"),
+                            Target, Grid.Food[Target], Grid.Regen[Target], Ground.X, Ground.Y);
+                    }
+                    continue;
+                }
+                for (int32 Index = 0; Index < int32(Grid.Food.size()); ++Index)
+                {
+                    if (Grid.Food[Index] < .25 || TrialArea.IsInside(FVector2D(CellPoint(Index)))
+                        || Grid.Regen[Index] != Grid.Regen[Target] || Grid.CoverCell[Index] != Grid.CoverCell[Target]
+                        || (!Grid.CoverFoodCell.empty() && Grid.CoverFoodCell[Index] != Grid.CoverFoodCell[Target])) continue;
+                    const double Distance = FVector::DistSquared2D(Point, CellPoint(Index));
+                    if (Distance > Far) { Donor = Index; Far = Distance; }
+                }
+                if (Donor == INDEX_NONE) continue;
+                Swap(Grid.Food[Target], Grid.Food[Donor]);
+                Swap(Grid.Cap[Target], Grid.Cap[Donor]);
+                if (!Grid.Cap0.empty()) Swap(Grid.Cap0[Target], Grid.Cap0[Donor]);
+                ++Moved;
+                UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Forage Trial] Donor=%d Target=%d Stock=%.9f Regen=%.9f X=%.1f Y=%.1f"),
+                    Donor, Target, Grid.Food[Target], Grid.Regen[Target], Ground.X, Ground.Y);
+            }
+            Grid.ComputeFields(Ctx->Sim.ObsCfg.SeeR);
+            UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Forage Trial] Sites=%d StartFood=%.9f Total=%.9f"), Moved, Ctx->StartFood, Grid.Total());
+            if (bSpreadSnowForage)
+                UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Snow Forage Spread] Budget=%.9f Transferred=%.9f"), SpreadBudget, Transferred);
+        }
+#endif
+
+        if (Region && Region->RegionBounds && FParse::Param(FCommandLine::Get(), TEXT("EcoIslandAuditFoodBoundary")))
+        {
+            const auto& Grid = Ctx->Sim.Food;
+            double OutsideStock = 0.;
+            double OutsideCapacity = 0.;
+            int32 OutsideCells = 0;
+            int32 StockedCells = 0;
+            int32 DisjointCells = 0;
+            double DisjointStock = 0.;
+            const FBox Bounds = Region->RegionBounds->Bounds.GetBox();
+            const double HalfCell = EcoRepertoireV3::UnitsToCm(Grid.Cell) * .5;
+            for (int32 Index = 0; Index < int32(Grid.Food.size()); ++Index)
+            {
+                if (Grid.Cap[Index] <= 0.) continue;
+                ++StockedCells;
+                const auto Center = Ctx->UnitsToCm((Index % Grid.Gw + .5) * Grid.Cell,
+                    (Index / Grid.Gw + .5) * Grid.Cell, Origin.Z);
+                if (Region->ContainsPosition(Center)) continue;
+                OutsideStock += Grid.Food[Index];
+                OutsideCapacity += Grid.Cap[Index];
+                ++OutsideCells;
+                // A cell beyond even the region's world AABB cannot overlap its XY footprint.
+                if (Center.X + HalfCell < Bounds.Min.X || Center.X - HalfCell > Bounds.Max.X
+                    || Center.Y + HalfCell < Bounds.Min.Y || Center.Y - HalfCell > Bounds.Max.Y)
+                {
+                    ++DisjointCells;
+                    DisjointStock += Grid.Food[Index];
+                }
+            }
+            UE_LOG(LogEcoPolicyV3I, Log, TEXT("[Eco Food Boundary] Region=%s Total=%.9f Outside=%.9f OutsideCapacity=%.9f Cells=%d OutsideCells=%d Disjoint=%.9f DisjointCells=%d"),
+                *G.RegionId.ToString(), Grid.Total(), OutsideStock, OutsideCapacity, StockedCells, OutsideCells, DisjointStock, DisjointCells);
+        }
 		if (Ecology)
 			Ctx->bSpatialFoodRegistered = Ecology->RegisterSpatialFood(G.RegionId, Ctx->StartFood, Ctx->StartFood);
 		if (!Ctx->bSpatialFoodRegistered)

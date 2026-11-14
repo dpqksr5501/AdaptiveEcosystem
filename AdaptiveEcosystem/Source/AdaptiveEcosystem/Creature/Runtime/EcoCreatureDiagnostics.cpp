@@ -21,7 +21,7 @@ static TAutoConsoleVariable<int32> CVarEcoGameplayReasons(TEXT("eco.Inspection.G
     TEXT("Keep a bounded authority history of ecological outcome changes for the creature inspector."));
 
 void AEcoCreatureIntegrationSpawner::RecordGameplayReason(int64 Agent, FName Region, double At, FName Reason,
-    int64 RelatedAgent, double Amount)
+    int64 RelatedAgent, double Amount, FName ResourceId)
 {
     if (!CVarEcoGameplayReasons.GetValueOnGameThread() || Agent <= 0 || Reason.IsNone()) return;
     constexpr int32 MaxTrackedAgents = 512;
@@ -41,7 +41,7 @@ void AEcoCreatureIntegrationSpawner::RecordGameplayReason(int64 Agent, FName Reg
         GameplayReasons.Remove(Oldest);
     }
     auto& History = GameplayReasons.FindOrAdd(Agent);
-    History.Append({At, Reason, Region, 0, RelatedAgent, Amount});
+    History.Append({At, Reason, Region, 0, RelatedAgent, Amount, ResourceId});
 }
 
 void AEcoCreatureIntegrationSpawner::DumpRuntime(bool bDetails) const

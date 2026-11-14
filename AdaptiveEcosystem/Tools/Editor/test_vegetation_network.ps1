@@ -1,6 +1,6 @@
 # Dedicated authority + two successive late joins. All exits are normal timed exits.
 param([string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8',
-    [ValidateSet('/Game/JYU/Maps/LV_JYU_HerdMigration','/Game/JYU/Maps/LV_JYU_Ecosystem','/Game/JWJ/1102_Integration_JWJ')][string]$Map='/Game/JYU/Maps/LV_JYU_HerdMigration',
+    [ValidateSet('/Game/JYU/Maps/LV_JYU_HerdMigration','/Game/JYU/Maps/LV_JYU_Ecosystem','/Game/JWJ/1102_Integration_JWJ','/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed')][string]$Map='/Game/JYU/Maps/LV_JYU_HerdMigration',
     [switch]$AuthoredWeather,[ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='Vegetation_20261023',
     [double]$Duration=125,[double]$ExitAfter=180,
     [int]$Seed=23,
@@ -36,7 +36,12 @@ $taskStarted=[DateTime]::UtcNow
 $taskServerLog=Join-Path $taskOut 'Server.log'
 $taskMode=if($AuthoredWeather){'-VegetationAuthored'}else{'-EcoVegetation'}
 $taskMapName=($Map -split '/')[-1]
+$taskIsland=$taskMapName -eq 'LV_JYU_IslandEcosystemRefreshed'
+if($taskIsland -and (!$AuthoredWeather -or $PatchLayout -or $FoodPatchCheck -or $ChildCoverage -or $GrassTravelCheck)){
+    throw 'The island check uses the saved weather, placement and roster'
+}
 $taskObserverFlag=if($ChildCoverage){'-VegetationNetworkChildCoverage'}else{'-EcoIntegrationObserverCycle'}
+if($taskIsland){$taskObserverFlag='-VegetationIslandNetworkObserver'}
 $taskConnectionMode=if($OverlapClients){'-VegetationOverlapExpected'}else{'-VegetationSequentialExpected'}
 $taskProfileArgument=if($NetworkProfile){'-VegetationNetworkProfile'}else{'-VegetationNetworkProfileDisabled'}
 $taskServerCommands=if($NetworkProfile){"netprofile enable,eco.Grass.NetAudit 1,py $taskRoot/Tools/Editor/audit_vegetation_runtime.py"}else{"py $taskRoot/Tools/Editor/audit_vegetation_runtime.py"}
@@ -48,6 +53,10 @@ $taskServerArgs=@($taskProject,$Map,
     "-VegetationMap=$taskMapName","-VegetationAuditFolder=$AuditFolder",
     $taskProfileArgument,"-ExecCmds=$taskServerCommands","-AbsLog=$taskServerLog")
 if($HabitatDynamics){$taskServerArgs+='-EcoHabitatDynamics'}
+if($taskIsland){
+    $taskServerArgs=@($taskServerArgs | Where-Object { $_ -notmatch '^-EcoV3DeerPerRegion=' })
+    $taskServerArgs+="-EcoV3AutoAdapt=0"
+}
 $taskServer=Start-VegetationProcess "$taskEngine/UnrealEditor-Cmd.exe" $taskServerArgs
 $taskReadyDeadline=[DateTime]::UtcNow.AddSeconds(90)
 while($true){

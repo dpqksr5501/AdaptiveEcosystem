@@ -1,0 +1,825 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "scenario": "Temporary Grassland to LowerRiver passage with shared sedge stock and a nearer access point",
+  "partial": true,
+  "training_ready": false,
+  "restorable_world": false,
+  "golden_vector": false,
+  "time_basis": "PIE sampling times are separate from authority events. Transit loss is an observed average over in-corridor samples, not a forecast for an uphill return.",
+  "comparison_use": "Test arrival followed by access, competition, payment and an independent return opportunity. Horse uses local RuleFauna and is not in R9 M1.",
+  "runs": [
+    {
+      "seed": 20000,
+      "path_length_cm": 14400.64,
+      "nominal_horse_walk_cm_per_second": 150.0,
+      "authored_initial_stock": 215,
+      "destination_initial_stocks": {
+        "IslandForageNorthSedges": 13.0,
+        "IslandForageNorthForbs": 9.0
+      },
+      "founding_agents": 118,
+      "agents": [
+        {
+          "stable_id": 41,
+          "departure_approvals": [
+            {
+              "authority_seconds": 1.0,
+              "energy": 99.65,
+              "estimated_cost": 86.26,
+              "eta_seconds": 101.48
+            }
+          ],
+          "arrival_authority_seconds": 90.303,
+          "observed_transit_energy_loss_per_pie_second": 0.84,
+          "first_payment_delay_authority_seconds": 4.0,
+          "first_destination_payment": {
+            "patch": "IslandForageNorthSedges",
+            "energy": 2.8,
+            "remaining_stock": 10.2,
+            "access_index": 1,
+            "authority_seconds": 94.303
+          },
+          "total_destination_paid_energy": 34.373,
+          "destination_payments": [
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 10.2,
+              "access_index": 1,
+              "authority_seconds": 94.303
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 7.456,
+              "access_index": 1,
+              "authority_seconds": 95.303
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 4.72,
+              "access_index": 1,
+              "authority_seconds": 96.303
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 1.99,
+              "access_index": 1,
+              "authority_seconds": 97.303
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 2.8,
+              "remaining_stock": 6.2,
+              "access_index": 0,
+              "authority_seconds": 101.303
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 2.8,
+              "remaining_stock": 3.481,
+              "access_index": 0,
+              "authority_seconds": 102.303
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 2.8,
+              "remaining_stock": 0.762,
+              "access_index": 0,
+              "authority_seconds": 103.303
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 0.046,
+              "access_index": 1,
+              "authority_seconds": 108.303
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 1.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 114.253
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.545,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 121.0
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.625,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 128.737
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 136.737
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 144.737
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 152.737
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 160.737
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.727,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 169.737
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 177.737
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.815,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 182.0
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.748,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 187.0
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 1.002,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 192.0
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.808,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 197.0
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 1.019,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 202.0
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.808,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 207.0
+            }
+          ],
+          "energy_samples": [
+            {
+              "pie_seconds": 30.267,
+              "energy": 75.0,
+              "health": 100,
+              "region": "ZGrasslandRiverTransit"
+            },
+            {
+              "pie_seconds": 90.267,
+              "energy": 24.592,
+              "health": 100,
+              "region": "ZGrasslandRiverTransit"
+            },
+            {
+              "pie_seconds": 95.267,
+              "energy": 25.142,
+              "health": 100,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 100.267,
+              "energy": 31.792,
+              "health": 100,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 210.267,
+              "energy": 16.223,
+              "health": 100,
+              "region": "LowerRiver"
+            }
+          ],
+          "death": null,
+          "return_recorded": false,
+          "destination_diagnostics": {
+            "opt_in_agent": 40,
+            "counts": null,
+            "non_local_patch_target_samples": []
+          }
+        },
+        {
+          "stable_id": 40,
+          "departure_approvals": [
+            {
+              "authority_seconds": 1.0,
+              "energy": 99.65,
+              "estimated_cost": 98.05,
+              "eta_seconds": 115.35
+            },
+            {
+              "authority_seconds": 11.0,
+              "energy": 94.65,
+              "estimated_cost": 91.57,
+              "eta_seconds": 107.73
+            }
+          ],
+          "arrival_authority_seconds": 110.303,
+          "observed_transit_energy_loss_per_pie_second": 0.841,
+          "first_payment_delay_authority_seconds": 7.1,
+          "first_destination_payment": {
+            "patch": "IslandForageNorthSedges",
+            "energy": 0.817,
+            "remaining_stock": 0.0,
+            "access_index": 1,
+            "authority_seconds": 117.403
+          },
+          "total_destination_paid_energy": 6.009,
+          "destination_payments": [
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.817,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 117.403
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.637,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 124.737
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.709,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 132.737
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.723,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 140.737
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.737,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 148.737
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.75,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 156.737
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.859,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 165.737
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.777,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 173.737
+            }
+          ],
+          "energy_samples": [
+            {
+              "pie_seconds": 45.267,
+              "energy": 65.75,
+              "health": 100,
+              "region": "ZGrasslandRiverTransit"
+            },
+            {
+              "pie_seconds": 110.267,
+              "energy": 11.092,
+              "health": 100,
+              "region": "ZGrasslandRiverTransit"
+            },
+            {
+              "pie_seconds": 115.267,
+              "energy": 8.807,
+              "health": 100,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 120.267,
+              "energy": 7.665,
+              "health": 100,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 155.267,
+              "energy": 0,
+              "health": 75.904,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 175.267,
+              "energy": 0.427,
+              "health": 3.886,
+              "region": "LowerRiver"
+            }
+          ],
+          "death": {
+            "region": "LowerRiver",
+            "cause": "Starvation",
+            "authority_seconds": 176.733
+          },
+          "return_recorded": false,
+          "destination_diagnostics": {
+            "opt_in_agent": 40,
+            "counts": {
+              "LocalPatchTarget": 67,
+              "DecisionCooldown": 1
+            },
+            "non_local_patch_target_samples": [
+              {
+                "authority_seconds": 114.403,
+                "event": "DecisionCooldown",
+                "energy": 8.807,
+                "next_decision": 140.303
+              }
+            ]
+          }
+        }
+      ],
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_grassland_return_ground/IslandFaunaPIE.json": "f178f32b59b30178fa2fca30c245b827d6fe01ead6a53c48a075f667e47a7ee1",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_grassland_return_ground.log": "66282c31980ff396d4924a341031c472928a7e235e72a4063c1195fd19b38028"
+      },
+      "passage_arrivals": [
+        {
+          "stable_id": 41,
+          "authority_seconds": 90.303,
+          "region": "LowerRiver"
+        },
+        {
+          "stable_id": 40,
+          "authority_seconds": 110.303,
+          "region": "LowerRiver"
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "path_length_cm": 14400.64,
+      "nominal_horse_walk_cm_per_second": 150.0,
+      "authored_initial_stock": 215,
+      "destination_initial_stocks": {
+        "IslandForageNorthSedges": 13.0,
+        "IslandForageNorthForbs": 9.0
+      },
+      "founding_agents": 118,
+      "agents": [
+        {
+          "stable_id": 41,
+          "departure_approvals": [
+            {
+              "authority_seconds": 1.0,
+              "energy": 99.65,
+              "estimated_cost": 85.5,
+              "eta_seconds": 100.58
+            }
+          ],
+          "arrival_authority_seconds": 90.07,
+          "observed_transit_energy_loss_per_pie_second": 0.837,
+          "first_payment_delay_authority_seconds": 4.0,
+          "first_destination_payment": {
+            "patch": "IslandForageNorthSedges",
+            "energy": 2.8,
+            "remaining_stock": 10.2,
+            "access_index": 1,
+            "authority_seconds": 94.07
+          },
+          "total_destination_paid_energy": 26.446,
+          "destination_payments": [
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 10.2,
+              "access_index": 1,
+              "authority_seconds": 94.07
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 7.456,
+              "access_index": 1,
+              "authority_seconds": 95.07
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 4.72,
+              "access_index": 1,
+              "authority_seconds": 96.07
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.8,
+              "remaining_stock": 1.99,
+              "access_index": 1,
+              "authority_seconds": 97.07
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 2.8,
+              "remaining_stock": 6.2,
+              "access_index": 0,
+              "authority_seconds": 101.07
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 2.8,
+              "remaining_stock": 0.681,
+              "access_index": 0,
+              "authority_seconds": 102.07
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 1.327,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 110.07
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 118.07
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.641,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 126.0
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.62,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 133.67
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.586,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 140.92
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.565,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 147.92
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 155.92
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 163.92
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 171.92
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.87,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 185.0
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.807,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 193.0
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.818,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 201.0
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.828,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 209.0
+            }
+          ],
+          "energy_samples": [
+            {
+              "pie_seconds": 30.267,
+              "energy": 75.0,
+              "health": 100,
+              "region": "ZGrasslandRiverTransit"
+            },
+            {
+              "pie_seconds": 90.267,
+              "energy": 24.791,
+              "health": 100,
+              "region": "ZGrasslandRiverTransit"
+            },
+            {
+              "pie_seconds": 95.267,
+              "energy": 25.341,
+              "health": 100,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 100.267,
+              "energy": 31.991,
+              "health": 100,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 210.267,
+              "energy": 8.411,
+              "health": 100,
+              "region": "LowerRiver"
+            }
+          ],
+          "death": null,
+          "return_recorded": false,
+          "destination_diagnostics": {
+            "opt_in_agent": 40,
+            "counts": null,
+            "non_local_patch_target_samples": []
+          }
+        },
+        {
+          "stable_id": 40,
+          "departure_approvals": [
+            {
+              "authority_seconds": 1.0,
+              "energy": 99.65,
+              "estimated_cost": 95.5,
+              "eta_seconds": 112.35
+            }
+          ],
+          "arrival_authority_seconds": 97.07,
+          "observed_transit_energy_loss_per_pie_second": 0.837,
+          "first_payment_delay_authority_seconds": 5.0,
+          "first_destination_payment": {
+            "patch": "IslandForageNorthForbs",
+            "energy": 2.8,
+            "remaining_stock": 3.481,
+            "access_index": 0,
+            "authority_seconds": 102.07
+          },
+          "total_destination_paid_energy": 14.574,
+          "destination_payments": [
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 2.8,
+              "remaining_stock": 3.481,
+              "access_index": 0,
+              "authority_seconds": 102.07
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 2.69,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 106.07
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.676,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 114.07
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.685,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 122.0
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.676,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 129.67
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.721,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 137.687
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.571,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 143.92
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.744,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 151.92
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.757,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 159.92
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.77,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 167.92
+            },
+            {
+              "patch": "IslandForageNorthSedges",
+              "energy": 0.813,
+              "remaining_stock": 0.0,
+              "access_index": 1,
+              "authority_seconds": 176.237
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.733,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 181.0
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 189.0
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 197.0
+            },
+            {
+              "patch": "IslandForageNorthForbs",
+              "energy": 0.646,
+              "remaining_stock": 0.0,
+              "access_index": 0,
+              "authority_seconds": 205.0
+            }
+          ],
+          "energy_samples": [
+            {
+              "pie_seconds": 35.267,
+              "energy": 70.75,
+              "health": 100,
+              "region": "ZGrasslandRiverTransit"
+            },
+            {
+              "pie_seconds": 95.267,
+              "energy": 20.541,
+              "health": 100,
+              "region": "ZGrasslandRiverTransit"
+            },
+            {
+              "pie_seconds": 100.267,
+              "energy": 17.291,
+              "health": 100,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 105.267,
+              "energy": 18.341,
+              "health": 100,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 185.267,
+              "energy": 0,
+              "health": 97.876,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 195.267,
+              "energy": 0,
+              "health": 57.108,
+              "region": "LowerRiver"
+            },
+            {
+              "pie_seconds": 210.267,
+              "energy": 0,
+              "health": 0.573,
+              "region": "LowerRiver"
+            }
+          ],
+          "death": null,
+          "return_recorded": false,
+          "destination_diagnostics": {
+            "opt_in_agent": 40,
+            "counts": {
+              "LocalPatchTarget": 115,
+              "InsufficientFoodGain": 1
+            },
+            "non_local_patch_target_samples": [
+              {
+                "authority_seconds": 133.687,
+                "event": "InsufficientFoodGain",
+                "energy": 12.702,
+                "next_decision": 127.07
+              }
+            ]
+          }
+        }
+      ],
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_grassland_return_ground/IslandFaunaPIE.json": "60f642805a8709422d85a318df1f55834c2b3c452838e10c936763a32e251323",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_grassland_return_ground.log": "0b78059bf3300bff1294160910d2fb9aecd490c590c23f603e1f8178537be383"
+      },
+      "passage_arrivals": [
+        {
+          "stable_id": 41,
+          "authority_seconds": 90.07,
+          "region": "LowerRiver"
+        },
+        {
+          "stable_id": 40,
+          "authority_seconds": 97.07,
+          "region": "LowerRiver"
+        }
+      ]
+    }
+  ]
+}

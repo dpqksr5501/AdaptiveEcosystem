@@ -80,6 +80,8 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 	for (const auto& Group : Groups)
 	{
 		if (Group.RegionId.IsNone() || GroupIds.Contains(Group.RegionId) || Group.Herbivores < 0 || Group.Wolves < 0 || !Group.Schedule.IsValid()) return false;
+		if (Group.bFaunaTransit && (!Group.bRulesOnly || Group.Herbivores || Group.Wolves || !Group.Fauna.IsEmpty()
+			|| (bEnableWaves && (Group.Schedule.DayCount || Group.Schedule.NightCount)))) return false;
 		GroupIds.Add(Group.RegionId); Total += (IsSpeciesEnabled(false) ? int64(Group.Herbivores) : 0) + (IsSpeciesEnabled(true) ? Group.Wolves : 0);
         for (const auto& Placement : Group.Fauna) Total += Placement.SpawnPoints.Num();
 		if (!Regions.ContainsByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; })) return false;

@@ -23,7 +23,7 @@ UENUM(BlueprintType)
 enum class EEcoFaunaLocomotion : uint8 { Ground, Flight, Swimming, Amphibious };
 
 enum class EEcoFaunaFlightPhase : uint8 { Grounded, Takeoff, Cruise, Landing, Dive };
-enum class EEcoFaunaShorePhase : uint8 { None, Entering, Exiting };
+enum class EEcoFaunaShorePhase : uint8 { None, Entering, Exiting, ClearingBank };
 
 UENUM(BlueprintType)
 enum class EEcoFaunaFoodIntent : uint8 { None, LivePrey, Carcass, HabitatPatch };
@@ -219,15 +219,21 @@ struct FEcoFaunaHabitatPatch
     UPROPERTY(EditAnywhere) FName Id;
     UPROPERTY(EditAnywhere) FName RegionId;
     UPROPERTY(EditAnywhere) FVector Center = FVector::ZeroVector;
+    /** Additional feeding points sharing this patch's stock. Use ground points for plants and submerged points for aquatic forage. */
+    UPROPERTY(EditAnywhere, Category="Forage") TArray<FVector> ForageAccessPoints;
     UPROPERTY(EditAnywhere) bool bSubmerged = false;
     UPROPERTY(EditAnywhere) bool bAquaticNursery = false;
     UPROPERTY(EditAnywhere) bool bHasShoreEntry = false;
     UPROPERTY(EditAnywhere) FVector ShorePoint = FVector::ZeroVector;
     UPROPERTY(EditAnywhere) FVector WaterEntryPoint = FVector::ZeroVector;
+    /** Optional dry continuation for an exit that lands on a narrow shelf or ramp. */
+    UPROPERTY(EditAnywhere) FVector DryBankPoint = FVector::ZeroVector;
     UPROPERTY(EditAnywhere) int32 Stage = 1;
     UPROPERTY(EditAnywhere) FName ShelteredSpecies;
     UPROPERTY(EditAnywhere) float ShelterRadius = 0.f;
     UPROPERTY(EditAnywhere) float EntranceRadius = 0.f;
+    /** Ground waypoints outside covered mouths, leading to this shelter's center. */
+    UPROPERTY(EditAnywhere, Category="Shelter") TArray<FVector> ShelterApproachPoints;
     UPROPERTY(EditAnywhere) TArray<FName> Consumers;
     UPROPERTY(EditAnywhere) float Capacity = 0.f;
     UPROPERTY(EditAnywhere) float RegrowthPerSecond = 0.f;
@@ -239,6 +245,10 @@ struct FEcoFaunaHabitatPatch
     UPROPERTY(EditAnywhere, Category="Forage") FVector2D PlantGrowthRainfall = FVector2D(.75, 1.25);
     UPROPERTY(EditAnywhere, Category="Forage", meta=(ClampMin="0", ClampMax="1")) float PlantMoistureNeed = 0.f;
     UPROPERTY(EditAnywhere, Category="Forage", meta=(ClampMin="0")) float PlantDryLossPerSecond = 0.f;
+    /** Track soil water at the patch center when no Native soil cell covers it. */
+    UPROPERTY(EditAnywhere, Category="Forage") bool bTrackLocalSoilMoisture = false;
+    /** Optional connected freshwater habitat in this region that contains the patch center. */
+    UPROPERTY(EditAnywhere, Category="Forage", meta=(EditCondition="bTrackLocalSoilMoisture")) FName ForageWaterHabitatId;
     /** Positive on a submerged patch to scale recovery by water depth above its center. */
     UPROPERTY(EditAnywhere, meta=(ClampMin="0", Units="cm")) float SeasonalFullGrowthDepthCm = 0.f;
     /** Stock lost per second while an inundation-dependent patch is exposed. */
@@ -246,6 +256,8 @@ struct FEcoFaunaHabitatPatch
     UPROPERTY(EditAnywhere) float EnergyPerMeal = 3.f;
 
     bool IsPlantForage() const { return PlantGuild != EEcoFaunaPlantGuild::Unspecified; }
+    bool HasForagePoint(int32 Point) const { return Point == 0 || ForageAccessPoints.IsValidIndex(Point - 1); }
+    FVector ForagePoint(int32 Point) const { return Point == 0 ? Center : ForageAccessPoints[Point - 1]; }
 
     double PlantRecoveryMultiplier(double Temperature, double Rainfall) const
     {
@@ -256,9 +268,13 @@ struct FEcoFaunaHabitatPatch
 
     double PlantDryStress(double Rainfall, double Humidity) const
     {
-        if (PlantMoistureNeed <= 0.f) return 0.;
         const double Moisture = FMath::Lerp(FMath::Clamp(Rainfall, 0., 1.), FMath::Clamp(Humidity, 0., 1.), .35);
-        return FMath::Clamp(1. - Moisture / PlantMoistureNeed, 0., 1.);
+        return PlantDryStressFromMoisture(Moisture);
+    }
+
+    double PlantDryStressFromMoisture(double Moisture) const
+    {
+        return PlantMoistureNeed > 0.f ? FMath::Clamp(1. - Moisture / PlantMoistureNeed, 0., 1.) : 0.;
     }
 
     bool Shelters(FName Species, const FVector& Position) const
@@ -303,6 +319,8 @@ struct FEcoFaunaFragment : public FMassFragment
     double PatchBlockedUntil = 0.;
     int32 PatchTarget = INDEX_NONE;
     int32 BlockedPatch = INDEX_NONE;
+    int32 PatchAccessPoint = 0;
+    int32 BlockedPatchAccessPoint = 0;
     double AttackContact = -1.;
     double AttackReady = 0.;
     double ChaseBegan = -1.;

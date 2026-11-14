@@ -40,7 +40,11 @@ bool FEcoLifeLighting::RunTest(const FString&)
         if(!EcoClock::EvaluateFixedCycle(Time.ServerTimeSeconds,60,60,Time.DayCycle))return false;
         const auto Native=EcoObservationV3::DayNightPhase(Step,900,0,45);
         if(std::abs(EcoV3WeatherFx::ClockDarkness(Time)-Native.Dark)>1.e-12){AddError(TEXT("Presentation and native twilight disagree"));return false;}
+        if(std::abs(EcoClock::Darkness(Time)-Native.Dark)>1.e-12){AddError(TEXT("Authority and native twilight disagree"));return false;}
     }
+    Time.ServerTimeSeconds = 65.;
+    if (!EcoClock::EvaluateFixedCycle(Time.ServerTimeSeconds, 40., 80., Time.DayCycle)) return false;
+    TestEqual(TEXT("Unequal phases use the configured authority night"), EcoClock::Darkness(Time), 1.);
     return true;
 }
 

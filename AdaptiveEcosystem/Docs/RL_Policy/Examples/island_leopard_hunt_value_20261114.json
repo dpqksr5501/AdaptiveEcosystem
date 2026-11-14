@@ -1,0 +1,2076 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "authority_duration_seconds": 360,
+  "hunter_species": "Leopard",
+  "runs": [
+    {
+      "seed": 20000,
+      "report_sha256": "c3cdd0248584a9d66f7acd41863b59b2b3530b4f3f7cf54d47bd944b7a2c9500",
+      "log_sha256": "e6ec35541db26d909f4848f8d7338378296f54001a967b85095bc8badc373669",
+      "summary": {
+        "choices": 32,
+        "candidates_by_species": {
+          "Rat": 37
+        },
+        "outcomes": {
+          "all_candidates_zero": 32
+        }
+      },
+      "cases": [
+        {
+          "at": 60.033333333,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.790000916,
+              "Stamina": 0.817834556,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8500840266752068,
+              "Risk": 2.9108272194862366,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.790000916,
+              "Stamina": 0.817834556,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8625628204425696,
+              "Risk": 2.9108272194862366,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "77",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 115.516666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.59649843,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8928718496435881,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "126",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 115.966666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.59649843,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.7224380137262012,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "126",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 116.416666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.592998445,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5582830421258962,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "126",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 117.35,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.58949846,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6030817335084402,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "126",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 117.8,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.58949846,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5203383878678335,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "126",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 118.25,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.58949846,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5492937758910428,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "126",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 118.7,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.585998476,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5089020115700681,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "126",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 119.616666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.582498491,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.681499856929453,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "73",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.582498491,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9079814375630308,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "126",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 120.066666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.580001771,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5537315035551289,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "73",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 122.8,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.573001802,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9587617651616104,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 123.25,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.569501817,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8031280671317368,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 123.7,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.569501817,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6564581316826741,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 124.15,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.566001832,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5346303209102904,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 124.616666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.566001832,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9480438094965719,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "75",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 125.066666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.562501848,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9140901759631439,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "75",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.562501848,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6295648950556781,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 125.516666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.562501848,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8916995972862328,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "75",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.562501848,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.549371646627077,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 125.966666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.562501848,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8895435770312861,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "75",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.562501848,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6082431272105789,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 126.416666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.559001863,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.7937347337829415,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 126.883333333,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.559001863,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8622426284981451,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 134.55,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.530465305,
+              "Stamina": 0.930000782,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9345301769948409,
+              "Risk": 2.3499960899353027,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 135.0,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.530465305,
+              "Stamina": 0.930000782,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8103515661228378,
+              "Risk": 2.3499960899353027,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 135.45,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.526323676,
+              "Stamina": 0.940400898,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.7137662118232175,
+              "Risk": 2.2979955077171326,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 135.9,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.526323676,
+              "Stamina": 0.968567848,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6160927539759511,
+              "Risk": 2.157160758972168,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 136.35,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.526323676,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6390150590842247,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 136.8,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.522823691,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.7258665749094753,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 137.25,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.522823691,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.7904294508331933,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 137.7,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.519323707,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.7426842668474201,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 138.15,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.519323707,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5476281495734747,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 138.6,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.515823722,
+              "Stamina": 0.994000435,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5807060264809464,
+              "Risk": 2.0299978256225586,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 139.05,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.515823722,
+              "Stamina": 0.958334029,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5727253062839794,
+              "Risk": 2.2083298563957214,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 139.5,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.512323737,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6411479472515115,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "120",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "report_sha256": "ee60aa481444cbebce413d9eed266c10196bb7bc713c310cce63162451c2230e",
+      "log_sha256": "09302c7def1f5743705c7c84c42c996ea6c9cfc04819bf6cda4da3168577f261",
+      "summary": {
+        "choices": 48,
+        "candidates_by_species": {
+          "Rat": 58
+        },
+        "outcomes": {
+          "all_candidates_zero": 48
+        }
+      },
+      "cases": [
+        {
+          "at": 58.2,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.870486457976869,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "74",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8236741596075732,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "75",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9499572189651678,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6304763409832344,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "77",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 0.224,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9521465815748584,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "123",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 58.666666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.870486457976869,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "74",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8242788344355381,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "75",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9499572189651678,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6304763409832344,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "77",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 0.233333333,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.797000885,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9822589932620883,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "123",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 59.116666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.7935009,
+              "Stamina": 0.964500427,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8493074718481306,
+              "Risk": 2.1774978637695312,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 0.562333333,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.7935009,
+              "Stamina": 0.964500427,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.7264755941293983,
+              "Risk": 2.1774978637695312,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "119",
+              "target_species": "Rat"
+            },
+            {
+              "PreyMaturity": 0.242333333,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.7935009,
+              "Stamina": 0.964500427,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9669284282577307,
+              "Risk": 2.1774978637695312,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "123",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 111.95,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.698865056,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8789665192128632,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 112.4,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.698865056,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.725192748989261,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 112.866666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.695365071,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6032594556784301,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 113.316666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.695365071,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5369141127135656,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 114.216666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.691865087,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6159129408786127,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 114.666666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.691865087,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5362217538045398,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 115.133333333,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.688365102,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5090823360899726,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 115.6,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.688365102,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5704720029767741,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 116.05,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.684865117,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5053089716488358,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 116.5,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.684865117,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5605875747942334,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 117.4,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.681365132,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.578765070598644,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 117.866666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.677865148,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5013394618457692,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 118.316666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.677865148,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5025980132628064,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 118.766666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.677865148,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.49805903991119527,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 119.216666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.674365163,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.4973014092607502,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 119.666666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.674365163,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.49707542302427604,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 120.133333333,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.670001805,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5089174853875917,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 120.6,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.670001805,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.4967483686178295,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 121.05,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.66650182,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5030965996582766,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 121.95,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.66650182,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5385465678934754,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 122.866666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.663001835,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5342843133739165,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 123.316666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.659501851,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5102868843342638,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 123.766666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.659501851,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5243447884577265,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 124.216666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.656001866,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5105546405874971,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 124.666666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.656001866,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5168019022624729,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 125.133333333,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.652501881,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.577932277011274,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 125.6,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.652501881,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.503060484852579,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 126.05,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.649001896,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5448596154907664,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 126.5,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.649001896,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5006877926789333,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 126.95,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.649001896,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5623959824546177,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 127.866666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.645501912,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5913775385429096,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 128.316666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.642001927,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5148858084223086,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 128.766666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.642001927,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5437569761261377,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 129.666666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.638501942,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5834001590266519,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 130.116666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.635001957,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5069084289060467,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 130.566666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.635001957,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.502459883693057,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 132.816666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.628001988,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8633663686007766,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 133.716666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.625073671,
+              "Stamina": 0.983667493,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8887268122922931,
+              "Risk": 2.0816625356674194,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 134.166666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.621573687,
+              "Stamina": 0.983667493,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.7634606071469912,
+              "Risk": 2.0816625356674194,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 134.616666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.621573687,
+              "Stamina": 0.983667493,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6386465680728811,
+              "Risk": 2.0816625356674194,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 135.066666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.618073702,
+              "Stamina": 0.998500109,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5189065663183942,
+              "Risk": 2.0074994564056396,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 171.516666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.492074281,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.9312974050080982,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 171.966666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.488574296,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.8066521814505658,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 172.416666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.488574296,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.6829744311289603,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        },
+        {
+          "at": 172.866666667,
+          "hunter": "71",
+          "candidates": [
+            {
+              "PreyMaturity": 1.0,
+              "PreyHealth": 1.0,
+              "EnergyFraction": 0.485074311,
+              "Stamina": 1.0,
+              "ExpectedEnergy": 1.8200000077486038,
+              "CostSeconds": 0.5628004283006632,
+              "Risk": 2.0,
+              "BaseScore": 0.0,
+              "Score": 0.0,
+              "target": "76",
+              "target_species": "Rat"
+            }
+          ],
+          "live": 0.0,
+          "patch": 0.0,
+          "carrion": 0.0,
+          "selected": "0"
+        }
+      ]
+    }
+  ]
+}

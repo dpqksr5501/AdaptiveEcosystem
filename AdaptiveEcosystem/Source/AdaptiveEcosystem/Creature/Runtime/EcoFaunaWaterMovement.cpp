@@ -1,12 +1,15 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoCreatureMovement.h"
 #include "Creature/Runtime/EcoFaunaDecision.h"
+#include "Creature/Runtime/EcoFaunaSightChannel.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Engine/World.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassEntityManager.h"
 #include "MassMovementFragments.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "World/EcologyRegion.h"
 
 using EcoFaunaDecision::FitsFaunaPrey;
@@ -29,8 +32,10 @@ namespace EcoFaunaDecision
     bool HasClearSight(const UWorld& World, const FVector& Start, const FVector& End,
         float EyeHeight, float TargetHeight)
     {
+        FCollisionObjectQueryParams Occluders(ECC_WorldStatic);
+        Occluders.AddObjectTypesToQuery(SightCoverChannel);
         return !World.LineTraceTestByObjectType(Start + FVector(0, 0, EyeHeight), End + FVector(0, 0, TargetHeight),
-            FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaSight)));
+            Occluders, FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaSight)));
     }
 }
 
@@ -190,6 +195,10 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
     Velocity = FVector::ZeroVector;
     const double Clearance = FMath::Max(1., Species->BodyRadius * Fauna->Life.BodyScale(Now) * .65);
     const double WaterMargin = Clearance + .35;
+    const float Activity = Species->RoutineActivity(Darkness);
+    const double Speed = Species->WalkSpeed * Fauna->Life.SpeedScale(Now)
+        * PhysicalCondition * FMath::Lerp(.45, 1., double(Activity));
+    constexpr float SwimStaminaPerSecond = .025f;
     const FCollisionQueryParams Query(SCENE_QUERY_STAT(EcoFaunaSwim), false);
     const FCollisionObjectQueryParams Static(ECC_WorldStatic);
     const auto CanCross = [&](const FVector& Start, const FVector& End) {
@@ -225,37 +234,92 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
         {
             Fauna->NextDecision = Now + 1.;
             EcoCreatureMovement::FFaunaWaterColumn EntryWater;
+            EcoCreatureMovement::FFaunaWaterColumn CurrentWater;
+            EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId, Position, Clearance, CurrentWater);
+            const auto WithinSwimBudget = [&](const FVector& Entry) {
+                const FVector Offset = Entry - Position;
+                const double Travel = FMath::Max(0., Offset.Size() - 10.);
+                const double Progress = FMath::Max(0., Speed + FVector::DotProduct(CurrentWater.Current, Offset.GetSafeNormal()));
+                return Travel <= Progress * Fauna->Stamina / SwimStaminaPerSecond;
+            };
             const bool bRecentRouteBlock = Now < Fauna->PatchBlockedUntil;
-            const bool bCanUsePrevious = !bRecentRouteBlock
+            const bool bCanUsePrevious = !Fauna->LandingPoint.IsZero() && !bRecentRouteBlock
+                && WithinSwimBudget(Fauna->SwimEntry)
                 && EcoCreatureMovement::IsWadeableGround(*GetWorld(), Fauna->LandingPoint, 0.)
                 && EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId,
                     Fauna->SwimEntry, Clearance, EntryWater)
                 && Fauna->SwimEntry.Z >= EntryWater.Bottom + Clearance
                 && Fauna->SwimEntry.Z <= EntryWater.Surface - Clearance;
+            static const int64 ExitAuditAgent = [] {
+                int64 Agent = 0;
+                FParse::Value(FCommandLine::Get(), TEXT("EcoIslandWaterExitAuditAgent="), Agent);
+                return Agent;
+            }();
+            const bool bAuditExit = ExitAuditAgent > 0 && ExitAuditAgent == Id.StableAgentId;
+            if (bAuditExit)
+                UE_LOG(LogTemp, Log, TEXT("[Eco Water Exit][Decision] Agent=%lld At=%.9f Previous=%d RecentBlock=%d Clearance=%.9g"),
+                    Id.StableAgentId, Now, int32(bCanUsePrevious), int32(bRecentRouteBlock), Clearance);
             if (!bCanUsePrevious)
             {
                 double BestDistance = MAX_dbl;
+                FName BestPatch = NAME_None;
                 for (const auto& Patch : FaunaHabitatPatches)
                 {
                     if (!Patch.bHasShoreEntry || Patch.Stage > FaunaHabitatStage
-                        || Patch.RegionId != Region.CurrentRegionId || !Patch.Consumers.Contains(Species->SpeciesId)
-                        || (bRecentRouteBlock && FVector::DistSquared2D(Patch.WaterEntryPoint, Fauna->SwimEntry) < FMath::Square(16.))
-                        || !EcoCreatureMovement::IsWadeableGround(*GetWorld(), Patch.ShorePoint, 0.)
-                        || !EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId,
-                            Patch.WaterEntryPoint, Clearance, EntryWater)) continue;
+                        || Patch.RegionId != Region.CurrentRegionId || !Patch.Consumers.Contains(Species->SpeciesId)) continue;
+                    const auto AuditCandidate = [&](const TCHAR* Gate, double Distance = -1.) {
+                        if (bAuditExit)
+                            UE_LOG(LogTemp, Log, TEXT("[Eco Water Exit][Candidate] Agent=%lld At=%.9f Patch=%s Gate=%s DistanceSq=%.17g"),
+                                Id.StableAgentId, Now, *Patch.Id.ToString(), Gate, Distance);
+                    };
+                    if (bRecentRouteBlock && FVector::DistSquared2D(Patch.WaterEntryPoint, Fauna->SwimEntry) < FMath::Square(16.))
+                    {
+                        AuditCandidate(TEXT("RecentBlock"));
+                        continue;
+                    }
+                    if (!EcoCreatureMovement::IsWadeableGround(*GetWorld(), Patch.ShorePoint, 0.))
+                    {
+                        AuditCandidate(TEXT("Shore"));
+                        continue;
+                    }
+                    if (!EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId,
+                            Patch.WaterEntryPoint, Clearance, EntryWater))
+                    {
+                        AuditCandidate(TEXT("Depth"));
+                        continue;
+                    }
                     FVector Entry = Patch.WaterEntryPoint;
                     Entry.Z = FMath::Clamp(Entry.Z, EntryWater.Bottom + Clearance, EntryWater.Surface - Clearance);
                     const double Distance = FVector::DistSquared(Position, Entry);
-                    if (Distance >= BestDistance || !HasClearSight(*GetWorld(), Position, Entry, 0.f, 0.f)) continue;
+                    if (Distance >= BestDistance || !EcoCreatureMovement::HasClearWaterSight(*GetWorld(), Position, Entry)
+                        || GetWorld()->LineTraceTestByObjectType(Position, Entry,
+                            FCollisionObjectQueryParams(EcoFaunaDecision::SightCoverChannel),
+                            FCollisionQueryParams(SCENE_QUERY_STAT(EcoFaunaExitCover))))
+                    {
+                        AuditCandidate(Distance >= BestDistance ? TEXT("Farther") : TEXT("Occluded"), Distance);
+                        continue;
+                    }
+                    if (!WithinSwimBudget(Entry))
+                    {
+                        AuditCandidate(TEXT("Stamina"), Distance);
+                        continue;
+                    }
+                    AuditCandidate(TEXT("Clear"), Distance);
                     BestDistance = Distance;
+                    BestPatch = Patch.Id;
                     Fauna->SwimEntry = Entry;
                     Fauna->LandingPoint = Patch.ShorePoint;
                 }
+                if (bAuditExit)
+                    UE_LOG(LogTemp, Log, TEXT("[Eco Water Exit][Result] Agent=%lld At=%.9f Patch=%s"),
+                        Id.StableAgentId, Now, *BestPatch.ToString());
                 if (BestDistance < MAX_dbl)
                     RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("SwimAlternateExit"));
+                else
+                    Fauna->LandingPoint = FVector::ZeroVector;
             }
         }
-        if (FVector::DistSquared(Position, Fauna->SwimEntry) <= FMath::Square(10.)
+        if (!Fauna->LandingPoint.IsZero() && FVector::DistSquared(Position, Fauna->SwimEntry) <= FMath::Square(10.)
             && EcoCreatureMovement::IsWadeableGround(*GetWorld(), Fauna->LandingPoint, 0.))
             Fauna->ShorePhase = EEcoFaunaShorePhase::Exiting;
     }
@@ -272,18 +336,27 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
             Fauna->ShorePhase = EEcoFaunaShorePhase::None;
         else
         {
-            const FVector Goal = bEntering ? Fauna->SwimEntry : BankCenter;
+            const bool bUseLip = bEntering && FaunaHabitatPatches.ContainsByPredicate([&](const auto& Patch)
+            {
+                return Patch.bHasShoreEntry && !Patch.DryBankPoint.IsZero()
+                    && Patch.RegionId == Region.CurrentRegionId && Patch.ShorePoint.Equals(Fauna->LandingPoint, 1.)
+                    && FVector::DistSquared2D(Patch.WaterEntryPoint, Fauna->SwimEntry) <= 1.;
+            });
+            const bool bCrossLip = bUseLip && FVector::DistSquared2D(Position, Fauna->SwimEntry) > FMath::Square(.5);
+            const FVector Goal = bCrossLip ? FVector(Fauna->SwimEntry.X, Fauna->SwimEntry.Y, BankCenter.Z)
+                : bEntering ? Fauna->SwimEntry : BankCenter;
             const FVector Next = Position + (Goal - Position).GetClampedToMaxSize(Species->WalkSpeed * Dt * PhysicalCondition);
             const auto LiftFromGround = [&](FVector Point) {
                 Point.Z = FMath::Max(Point.Z, BankCenter.Z);
                 return Point;
             };
-            if (CanCross(LiftFromGround(Position), LiftFromGround(Next)))
+            if (bUseLip && !bCrossLip ? CanCross(Position, Next)
+                : CanCross(LiftFromGround(Position), LiftFromGround(Next)))
             {
                 Transform.SetLocation(Next);
                 Velocity = (Next - Position) / Delta;
                 if (!Velocity.IsNearlyZero()) Transform.SetRotation(Velocity.GetSafeNormal2D().ToOrientationQuat());
-                if (FVector::DistSquared(Next, Goal) <= FMath::Square(2.))
+                if (!bCrossLip && FVector::DistSquared(Next, Goal) <= FMath::Square(2.))
                 {
                     Fauna->ShorePhase = EEcoFaunaShorePhase::None;
                     Fauna->PhaseUntil = Now + 8.;
@@ -293,6 +366,22 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
                         Fauna->bSwimming = false;
                         Fauna->NextDecision = Now;
                         Fauna->PatchTarget = INDEX_NONE;
+                        const auto* Exit = FaunaHabitatPatches.FindByPredicate([&](const auto& Patch)
+                        {
+                            return Patch.bHasShoreEntry && !Patch.DryBankPoint.IsZero()
+                                && Patch.Stage <= FaunaHabitatStage && Patch.RegionId == Region.CurrentRegionId
+                                && Patch.Consumers.Contains(Species->SpeciesId)
+                                && Patch.ShorePoint.Equals(Fauna->LandingPoint, 1.)
+                                && FVector::DistSquared2D(Patch.WaterEntryPoint, Fauna->SwimEntry) <= 1.;
+                        });
+                        if (Exit && EcoCreatureMovement::IsWadeableGround(*GetWorld(), Exit->DryBankPoint, 0.))
+                        {
+                            Fauna->Goal = Exit->DryBankPoint;
+                            Fauna->ShorePhase = EEcoFaunaShorePhase::ClearingBank;
+                            const double GroundSeconds = FVector::Dist2D(Fauna->LandingPoint, Fauna->Goal)
+                                / FMath::Max(1., Species->WalkSpeed * PhysicalCondition);
+                            Fauna->PhaseUntil = FMath::Max(Fauna->PhaseUntil, Now + GroundSeconds + 1.);
+                        }
                         RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("SwimExit"));
                     }
                     else RecordGameplayReason(Id.StableAgentId, Region.CurrentRegionId, Now, TEXT("SwimEnter"));
@@ -330,7 +419,7 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
         }
         return;
     }
-    const float Activity = Species->RoutineActivity(Darkness);
+    if (bReturning && Fauna->LandingPoint.IsZero()) return;
     auto& Meal = Fauna->Life.MealCycle;
     if (bAdaptiveMeal)
         Meal.Update(Energy, Now, Species->MealStart(),
@@ -373,47 +462,80 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
     }
     if (!bAmphibious && !bPassageTravel && Now >= Fauna->NextDecision)
     {
+        static const int64 AuditAgent = [] {
+            int64 Requested = 0;
+            FParse::Value(FCommandLine::Get(), TEXT("EcoIslandWaterFoodAuditAgent="), Requested);
+            return Requested;
+        }();
+        const bool bAudit = AuditAgent > 0 && AuditAgent == Id.StableAgentId;
         Fauna->NextDecision = Now + 1.;
         Fauna->PatchTarget = INDEX_NONE;
+        Fauna->PatchAccessPoint = 0;
         Fauna->CarrionTargetId = 0;
         double BestScore = 0.;
-        if (bAdaptiveMeal ? Meal.bSeeking : Energy <= Species->MealStart())
+        const bool bSeeking = bAdaptiveMeal ? Meal.bSeeking : Energy <= Species->MealStart();
+        if (bSeeking)
         {
             const double Range = Species->SightRange * FMath::Lerp(.25, 1., double(Activity));
             for (int32 Index = 0; Index < FaunaHabitatPatches.Num(); ++Index)
             {
                 const auto& Patch = FaunaHabitatPatches[Index];
-                const double Distance = FVector::Dist(Patch.Center, Position);
                 if (!Patch.bSubmerged || Patch.Stage > FaunaHabitatStage || Patch.RegionId != Region.CurrentRegionId
-                    || !Patch.Consumers.Contains(Species->SpeciesId) || Distance > Range
-                    || !FaunaPatchStock.IsValidIndex(Index) || FaunaPatchStock[Index] < .2f
-                    || (Fauna->BlockedPatch == Index && Now < Fauna->PatchBlockedUntil))
+                    || !Patch.Consumers.Contains(Species->SpeciesId) || !FaunaPatchStock.IsValidIndex(Index))
                     continue;
-                EcoCreatureMovement::FFaunaWaterColumn PatchWater;
-                if (!EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId, Patch.Center,
-                        Clearance, PatchWater)
-                    || Patch.Center.Z <= PatchWater.Bottom || Patch.Center.Z >= PatchWater.Surface)
-                    continue;
-                if (!EcoCreatureMovement::HasClearWaterSight(*GetWorld(), Position, Patch.Center))
+                const float Stock = FaunaPatchStock[Index];
+                for (int32 Access = 0; Access <= Patch.ForageAccessPoints.Num(); ++Access)
                 {
-                    // Waterborne evidence is weaker and only useful through a continuous wet corridor.
-                    const int32 Segments = FMath::Clamp(FMath::CeilToInt(Distance / 25.), 2, 24);
-                    bool bConnected = true;
-                    for (int32 Segment = 1; Segment < Segments && bConnected; ++Segment)
+                    const FVector Point = Patch.ForagePoint(Access);
+                    const double Distance = FVector::Dist(Point, Position);
+                    const auto AuditCandidate = [&](const TCHAR* Gate, double Score = 0.) {
+                        if (bAudit)
+                            UE_LOG(LogTemp, Log, TEXT("[Eco Water Food][Candidate] Agent=%lld At=%.9f Patch=%s Distance=%.9g Range=%.9g Stock=%.9g Gate=%s Score=%.17g Access=%d"),
+                                Id.StableAgentId, Now, *Patch.Id.ToString(), Distance, Range, double(Stock), Gate, Score, Access);
+                    };
+                    if (Distance > Range || Stock < .2f || (Fauna->BlockedPatch == Index && Fauna->BlockedPatchAccessPoint == Access
+                        && Now < Fauna->PatchBlockedUntil))
                     {
-                        EcoCreatureMovement::FFaunaWaterColumn Crossing;
-                        bConnected = EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId,
-                            FMath::Lerp(Position, Patch.Center, double(Segment) / Segments), Clearance, Crossing);
+                        AuditCandidate(Distance > Range ? TEXT("Range") : Stock < .2f ? TEXT("Stock") : TEXT("RecentBlock"));
+                        continue;
                     }
-                    if (!bConnected) continue;
+                    EcoCreatureMovement::FFaunaWaterColumn PatchWater;
+                    if (!EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId, Point,
+                            Clearance, PatchWater)
+                        || Point.Z <= PatchWater.Bottom || Point.Z >= PatchWater.Surface)
+                    {
+                        AuditCandidate(TEXT("Depth"));
+                        continue;
+                    }
+                    bool bWaterborneEvidence = false;
+                    if (!EcoCreatureMovement::HasClearWaterSight(*GetWorld(), Position, Point))
+                    {
+                        // Waterborne evidence is weaker and only useful through a continuous wet corridor.
+                        const int32 Segments = FMath::Clamp(FMath::CeilToInt(Distance / 25.), 2, 24);
+                        bool bConnected = true;
+                        for (int32 Segment = 1; Segment < Segments && bConnected; ++Segment)
+                        {
+                            EcoCreatureMovement::FFaunaWaterColumn Crossing;
+                            bConnected = EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Region.CurrentRegionId,
+                                FMath::Lerp(Position, Point, double(Segment) / Segments), Clearance, Crossing);
+                        }
+                        if (!bConnected)
+                        {
+                            AuditCandidate(TEXT("WetCorridor"));
+                            continue;
+                        }
+                        bWaterborneEvidence = true;
+                    }
+                    const double Score = RankFaunaFood(EcoFaunaFeeding::Value(FMath::Min(Stock, Patch.EnergyPerMeal),
+                        Distance / Species->WalkSpeed), Id.StableAgentId, Region.CurrentRegionId, Now,
+                        EEcoFaunaFoodIntent::HabitatPatch, 0, Patch.Id);
+                    AuditCandidate(bWaterborneEvidence ? TEXT("Waterborne") : TEXT("Visible"), Score);
+                    if (Score <= BestScore) continue;
+                    BestScore = Score;
+                    Fauna->PatchTarget = Index;
+                    Fauna->PatchAccessPoint = Access;
+                    Fauna->Goal = Point;
                 }
-                const double Score = RankFaunaFood(EcoFaunaFeeding::Value(FMath::Min(FaunaPatchStock[Index], Patch.EnergyPerMeal),
-                    Distance / Species->WalkSpeed), Id.StableAgentId, Region.CurrentRegionId, Now,
-                    EEcoFaunaFoodIntent::HabitatPatch, 0, Patch.Id);
-                if (Score <= BestScore) continue;
-                BestScore = Score;
-                Fauna->PatchTarget = Index;
-                Fauna->Goal = Patch.Center;
             }
             if (Species->CarrionEnergyPerMeal > 0.f)
             {
@@ -421,12 +543,21 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
                 {
                     const auto& Stock = Pair.Value;
                     const double Distance = FVector::Dist(Stock.Position, Position);
-                    if (Distance > Range || !Stock.IsAvailable(Region.CurrentRegionId, *Species, Now, true)
-                        || !Stock.CanApproach(Id.StableAgentId, Now, true)
-                        || !EcoCreatureMovement::HasClearWaterSight(*GetWorld(), Position, Stock.Position)) continue;
-                    const double Score = RankFaunaFood(EcoFaunaFeeding::Value(FMath::Min(double(Stock.Remaining),
-                        double(Species->CarrionEnergyPerMeal)), Distance / Species->WalkSpeed),
-                        Id.StableAgentId, Region.CurrentRegionId, Now, EEcoFaunaFoodIntent::Carcass, Pair.Key);
+                    const TCHAR* Rejection = Distance > Range ? TEXT("Range")
+                        : !Stock.IsAvailable(Region.CurrentRegionId, *Species, Now, true) ? TEXT("Unavailable")
+                        : !Stock.CanApproach(Id.StableAgentId, Now, true) ? TEXT("Access")
+                        : !EcoCreatureMovement::HasClearWaterSight(*GetWorld(), Position, Stock.Position) ? TEXT("Occluded")
+                        : nullptr;
+                    if (Rejection && !bAudit) continue;
+                    const double AvailableMeal = FMath::Min(double(Stock.Remaining), double(Species->CarrionEnergyPerMeal));
+                    const double BaseScore = Rejection ? 0. : EcoFaunaFeeding::Value(AvailableMeal, Distance / Species->WalkSpeed);
+                    const double Score = Rejection ? 0. : RankFaunaFood(BaseScore, Id.StableAgentId, Region.CurrentRegionId,
+                        Now, EEcoFaunaFoodIntent::Carcass, Pair.Key);
+                    if (bAudit)
+                        UE_LOG(LogTemp, Log, TEXT("[Eco Water Food][CarcassCandidate] Agent=%lld At=%.9f Carcass=%lld Distance=%.9g Range=%.9g Stock=%.9g Meal=%.9g WalkSpeed=%.9g Gate=%s BaseScore=%.17g Score=%.17g"),
+                            Id.StableAgentId, Now, Pair.Key, Distance, Range, double(Stock.Remaining), AvailableMeal,
+                            double(Species->WalkSpeed), Rejection ? Rejection : TEXT("Visible"), BaseScore, Score);
+                    if (Rejection) continue;
                     if (Score <= BestScore) continue;
                     BestScore = Score;
                     Fauna->PatchTarget = INDEX_NONE;
@@ -434,6 +565,13 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
                     Fauna->Goal = Stock.Position;
                 }
             }
+        }
+        if (bAudit)
+        {
+            const FName Selected = Fauna->PatchTarget == INDEX_NONE ? NAME_None : FaunaHabitatPatches[Fauna->PatchTarget].Id;
+            UE_LOG(LogTemp, Log, TEXT("[Eco Water Food][Decision] Agent=%lld At=%.9f Seeking=%d Patch=%s Carcass=%lld Energy=%.9g Clearance=%.9g Position=%s Access=%d"),
+                Id.StableAgentId, Now, int32(bSeeking), *Selected.ToString(), Fauna->CarrionTargetId,
+                double(Energy), Clearance, *Position.ToString(), Fauna->PatchAccessPoint);
         }
         if (Fauna->PatchTarget == INDEX_NONE && Fauna->CarrionTargetId <= 0)
         {
@@ -451,8 +589,6 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
         Goal.Z = Water.DepthHeight(Species->SwimDepthFraction, Clearance);
     else if (!bReturning && FVector::DistSquared(Position, Goal) <= FMath::Square(Reach))
         return;
-    const double Speed = Species->WalkSpeed * Fauna->Life.SpeedScale(Now)
-        * PhysicalCondition * FMath::Lerp(.45, 1., double(Activity));
     FVector Destination = Position + ((Goal - Position).GetClampedToMaxSize(Speed * Dt)
         + Water.Current * Dt);
     EcoCreatureMovement::FFaunaWaterColumn Next;
@@ -489,11 +625,12 @@ void AEcoCreatureIntegrationSpawner::MoveFaunaInWater(FMassEntityManager& EM, FM
             Transform.SetLocation(Destination);
             if (Velocity.SizeSquared() > 1.)
                 Transform.SetRotation(FMath::RInterpConstantTo(Transform.Rotator(), Velocity.Rotation(), Dt, 180.).Quaternion());
-            if (bAmphibious) Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - .025f * float(Dt));
+            if (bAmphibious) Fauna->Stamina = FMath::Max(0.f, Fauna->Stamina - SwimStaminaPerSecond * float(Dt));
             return;
         }
     }
     Fauna->BlockedPatch = Fauna->PatchTarget;
+    Fauna->BlockedPatchAccessPoint = Fauna->PatchAccessPoint;
     Fauna->PatchBlockedUntil = Now + 3.;
     Fauna->PatchTarget = INDEX_NONE;
     Fauna->NextDecision = Now + .25;

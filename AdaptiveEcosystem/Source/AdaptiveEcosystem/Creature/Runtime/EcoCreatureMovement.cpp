@@ -21,13 +21,20 @@ bool EcoCreatureMovement::CrossesExcludedArea(UWorld& World, const FVector& Star
     return false;
 }
 
-bool EcoCreatureMovement::ProjectSpawnPoint(UWorld& World, const FVector& Hint, FVector& OutGround)
+bool EcoCreatureMovement::ProjectSpawnPoint(UWorld& World, const FVector& Hint, FVector& OutGround,
+    bool bIgnoreWaterSurface)
 {
     if (Hint.ContainsNaN()) return false;
     FHitResult Hit;
     FCollisionQueryParams Params(SCENE_QUERY_STAT(EcoCreatureSpawnGround), false);
-    if (!World.LineTraceSingleByObjectType(Hit, Hint + FVector(0,0,5000), Hint - FVector(0,0,20000), FCollisionObjectQueryParams(ECC_WorldStatic), Params)
-        || Hit.ImpactNormal.Z < 0.65f) return false;
+    while (World.LineTraceSingleByObjectType(Hit, Hint + FVector(0,0,5000), Hint - FVector(0,0,20000),
+        FCollisionObjectQueryParams(ECC_WorldStatic), Params))
+    {
+        const AActor* Actor = Hit.GetActor();
+        if (!bIgnoreWaterSurface || !IsWaterSurfaceCollision(Actor)) break;
+        Params.AddIgnoredActor(Actor);
+    }
+    if (!Hit.bBlockingHit || Hit.ImpactNormal.Z < 0.65f) return false;
     const FVector Ground = Hit.ImpactPoint;
     if (CrossesExcludedArea(World, Ground, Ground)
         || World.OverlapBlockingTestByChannel(Ground + FVector(0,0,65), FQuat::Identity,

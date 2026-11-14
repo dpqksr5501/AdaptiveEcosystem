@@ -1,0 +1,320 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "scope": "Observed water snapshots expanded at the recorded authority events, with a synthetic probe at the original due time for the continuous-submersion control.",
+  "nursery": [
+    {
+      "seed": 20000,
+      "source_report": {
+        "project_path": "Saved/FaunaAudit/Island_20000_nursery_reservation/IslandFaunaPIE.json",
+        "sha256": "88d9a3432f5df7ca283a1e891fee469cbf8d5b14ed7ae09c10ab331421989beb"
+      },
+      "source_log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20000_nursery_reservation.log",
+        "sha256": "cf1924dad5eee4f910c784e97ea0e0dd9e794c104259994a2b66edcd07eef736"
+      },
+      "site_elevation_report": {
+        "project_path": "Saved/FaunaAudit/Island_20000_nursery_depth/IslandFaunaPIE.json",
+        "sha256": "c3242a594bc94b38a662cb1a3b211179405e86a3ed54cf4a308da48af97416d9"
+      },
+      "observed_hatch": {
+        "time": 224.51999999880792,
+        "region": "LowerRiver",
+        "reason": "AquaticHatch",
+        "related_id": "133",
+        "amount": 0
+      },
+      "last_report_world_seconds": 240.26667919754982,
+      "reservations": [
+        {
+          "site": "IslandRiverInletPlants",
+          "site_z_cm": -4338.5226290330575,
+          "parents": [
+            "104",
+            "105"
+          ],
+          "reserved_at": 158.95333333214123,
+          "due_at": 193.95333333214123,
+          "probes": [
+            {
+              "at": 185.0,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            },
+            {
+              "at": 186,
+              "column_cm": [
+                -4394.5226290330575,
+                -4346.5224609375
+              ]
+            },
+            {
+              "at": 190.0,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            },
+            {
+              "at": 193.95333333214123,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            }
+          ],
+          "expected": [
+            "interrupted",
+            186
+          ]
+        },
+        {
+          "site": "IslandRiverQuietMargin",
+          "site_z_cm": -4367.3045266434365,
+          "parents": [
+            "107",
+            "108"
+          ],
+          "reserved_at": 189,
+          "due_at": 224,
+          "probes": [
+            {
+              "at": 190.0,
+              "column_cm": [
+                -4422.3045266434365,
+                -4272.1279296875
+              ]
+            },
+            {
+              "at": 224.51999999880792,
+              "column_cm": [
+                -4422.3045266434365,
+                -4272.1279296875
+              ]
+            }
+          ],
+          "expected": [
+            "hatch_eligible",
+            224.51999999880792
+          ]
+        },
+        {
+          "site": "IslandRiverInletPlants",
+          "site_z_cm": -4338.5226290330575,
+          "parents": [
+            "104",
+            "105"
+          ],
+          "reserved_at": 224.51999999880792,
+          "due_at": 259.5199999988079,
+          "probes": [
+            {
+              "at": 224.51999999880792,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            },
+            {
+              "at": 240,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            }
+          ],
+          "expected": [
+            "pending",
+            null
+          ]
+        }
+      ],
+      "initial_columns_cm": {
+        "IslandRiverInletPlants": [
+          -4394.5226290330575,
+          -4244.05810546875
+        ],
+        "IslandRiverQuietMargin": [
+          -4422.3045266434365,
+          -4272.1279296875
+        ]
+      },
+      "nursery_patches": {
+        "IslandRiverInletPlants": {
+          "capacity": 16.0,
+          "energy_per_meal": 2.799999952316284
+        },
+        "IslandRiverQuietMargin": {
+          "capacity": 16.0,
+          "energy_per_meal": 2.799999952316284
+        }
+      },
+      "fry_clearance_cm": 3.5546875,
+      "first_fry_receipt": {
+        "patch": "IslandRiverQuietMargin",
+        "amount": 0.681,
+        "remaining": 0.0,
+        "at": 236.52
+      }
+    },
+    {
+      "seed": 20017,
+      "source_report": {
+        "project_path": "Saved/FaunaAudit/Island_20017_nursery_reservation/IslandFaunaPIE.json",
+        "sha256": "795bf6e02f738ce3f3667cf44c45ea0d54e5d1c8f626d4e52178dca17975a897"
+      },
+      "source_log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20017_nursery_reservation.log",
+        "sha256": "2c9c08694a59cb65d2fd7e1372d67980a61bf9ed76ee4b088f47950b22be2d2d"
+      },
+      "site_elevation_report": {
+        "project_path": "Saved/FaunaAudit/Island_20017_nursery_depth/IslandFaunaPIE.json",
+        "sha256": "c83d0714b50b803ca639c143818ffe849e579bf07131c56ad6521f84246fb0db"
+      },
+      "observed_hatch": {
+        "time": 223.78666666547457,
+        "region": "LowerRiver",
+        "reason": "AquaticHatch",
+        "related_id": "132",
+        "amount": 0
+      },
+      "last_report_world_seconds": 240.26667919754982,
+      "reservations": [
+        {
+          "site": "IslandRiverInletPlants",
+          "site_z_cm": -4338.5226290330575,
+          "parents": [
+            "104",
+            "105"
+          ],
+          "reserved_at": 157.58666666547458,
+          "due_at": 192.58666666547458,
+          "probes": [
+            {
+              "at": 185.0,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            },
+            {
+              "at": 186,
+              "column_cm": [
+                -4394.5226290330575,
+                -4346.5224609375
+              ]
+            },
+            {
+              "at": 190.0,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            },
+            {
+              "at": 192.58666666547458,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            }
+          ],
+          "expected": [
+            "interrupted",
+            186
+          ]
+        },
+        {
+          "site": "IslandRiverQuietMargin",
+          "site_z_cm": -4367.3045266434365,
+          "parents": [
+            "107",
+            "108"
+          ],
+          "reserved_at": 188,
+          "due_at": 223,
+          "probes": [
+            {
+              "at": 190.0,
+              "column_cm": [
+                -4422.3045266434365,
+                -4272.1279296875
+              ]
+            },
+            {
+              "at": 223.78666666547457,
+              "column_cm": [
+                -4422.3045266434365,
+                -4272.1279296875
+              ]
+            }
+          ],
+          "expected": [
+            "hatch_eligible",
+            223.78666666547457
+          ]
+        },
+        {
+          "site": "IslandRiverInletPlants",
+          "site_z_cm": -4338.5226290330575,
+          "parents": [
+            "104",
+            "105"
+          ],
+          "reserved_at": 223.78666666547457,
+          "due_at": 258.78666666547457,
+          "probes": [
+            {
+              "at": 223.78666666547457,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            },
+            {
+              "at": 240,
+              "column_cm": [
+                -4394.5226290330575,
+                -4244.05810546875
+              ]
+            }
+          ],
+          "expected": [
+            "pending",
+            null
+          ]
+        }
+      ],
+      "initial_columns_cm": {
+        "IslandRiverInletPlants": [
+          -4394.5226290330575,
+          -4244.05810546875
+        ],
+        "IslandRiverQuietMargin": [
+          -4422.3045266434365,
+          -4272.1279296875
+        ]
+      },
+      "nursery_patches": {
+        "IslandRiverInletPlants": {
+          "capacity": 16.0,
+          "energy_per_meal": 2.799999952316284
+        },
+        "IslandRiverQuietMargin": {
+          "capacity": 16.0,
+          "energy_per_meal": 2.799999952316284
+        }
+      },
+      "fry_clearance_cm": 3.62578125,
+      "first_fry_receipt": {
+        "patch": "IslandRiverQuietMargin",
+        "amount": 0.401,
+        "remaining": 0.0,
+        "at": 232.787
+      }
+    }
+  ]
+}

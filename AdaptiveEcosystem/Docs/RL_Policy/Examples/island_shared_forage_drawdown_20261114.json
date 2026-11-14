@@ -1,0 +1,443 @@
+{
+  "schema_version": 1,
+  "training_ready": false,
+  "source": "Saved JYU baseline with opt-in runtime-only second Drift point; no food capacity or growth added",
+  "map_sha256": "5ae588a1b19184b8ed40eda5fd7aa1ca1508fe8ad2cb9c98213d2d51ce3674fa",
+  "replay_scope": "Point accessibility and shared ledger; later pre-transaction stock reconstructed from Unreal receipts",
+  "shared_forage_drawdown": [
+    {
+      "seed": 20000,
+      "checkpoint": {
+        "slot": "IslandGrassBounds_20000_wet_share",
+        "version": 16,
+        "payload_bytes": 1498100,
+        "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+        "runtime_md5": "83416669f252821cfd52529ea4825069",
+        "agents": 113,
+        "step": 190,
+        "native_step": 1387,
+        "native_region_stock": {
+          "Snowfield": "96.839631552",
+          "Grassland": "34.631206256",
+          "Riverbank": "47.928853554",
+          "Highland": "135.574347534"
+        },
+        "observed_agents": 112,
+        "authored_patches": 24,
+        "wet_patches": 9,
+        "resumed_hatches": [
+          "135"
+        ]
+      },
+      "source_sha256": {
+        "save": {
+          "report": "798d383f5c7cd5a7090efc1fd5527c89b8ba8254bacc95789e73e1bbf8066543",
+          "log": "b5fd237e224aff71c35033dc93a93cbe6e4c515e5a74ae77fe1a9369239dedc5"
+        },
+        "load": {
+          "report": "f494dbf75f3fc56983da5fb2275464f8898e3b8ef3a2a684b95ee6b93729f8ad",
+          "log": "c6779cbf2114d135f3d892881599b3ec1343ea3357fd542726aec21b1a598eb7"
+        },
+        "drop": {
+          "report": "e96e022d003e7c81bc4dda67611fd706d2c9b19418eeff0b126513d5d9010699",
+          "log": "de85aea1d1131c72c5efd8de60624b4cb9745e5171b56d0ec1bde7108fa2e238"
+        }
+      },
+      "point_z_cm": [
+        -4474.107756265673,
+        -4445.705404212948
+      ],
+      "access_points_cm": [
+        [
+          92985.54109125207,
+          41622.03552490922,
+          -4474.107756265673
+        ],
+        [
+          91588.33553418468,
+          41604.47413875362,
+          -4445.705404212948
+        ]
+      ],
+      "water": {
+        "before": {
+          "world_seconds": 5.266666941344738,
+          "authority_seconds": 185.0,
+          "sites": {
+            "main": {
+              "bottom_cm": -4565.107756265673,
+              "surface_cm": -4413.40478515625,
+              "submerged": true
+            },
+            "extra": {
+              "bottom_cm": -4563.112677044259,
+              "surface_cm": -4413.40478515625,
+              "submerged": true
+            }
+          }
+        },
+        "surfaces_cm": {
+          "IslandLowerRiver05": -4413.40478515625
+        },
+        "lowered": {
+          "world_seconds": 5.266666941344738,
+          "authority_seconds": 185.0,
+          "sites": {
+            "main": {
+              "bottom_cm": -4565.107756265673,
+              "surface_cm": -4451.70556640625,
+              "submerged": true
+            },
+            "extra": {
+              "bottom_cm": -4563.112677044259,
+              "surface_cm": -4451.70556640625,
+              "submerged": false
+            }
+          }
+        },
+        "restored": {
+          "world_seconds": 25.26666798442602,
+          "authority_seconds": 205.0,
+          "sites": {
+            "main": {
+              "bottom_cm": -4565.107756265673,
+              "surface_cm": -4413.40478515625,
+              "submerged": true
+            },
+            "extra": {
+              "bottom_cm": -4563.112677044259,
+              "surface_cm": -4413.40478515625,
+              "submerged": true
+            }
+          }
+        }
+      },
+      "restored_stock": 0.12024999409914017,
+      "capacity": 11.0,
+      "meal_cap": 2.8,
+      "initial_shared_receipts": [
+        {
+          "agent": 112,
+          "amount": 2.8,
+          "remaining": 8.2,
+          "access": 1,
+          "at": 183.0
+        },
+        {
+          "agent": 113,
+          "amount": 2.8,
+          "remaining": 5.4,
+          "access": 1,
+          "at": 183.0
+        },
+        {
+          "agent": 117,
+          "amount": 2.8,
+          "remaining": 2.6,
+          "access": 0,
+          "at": 183.0
+        }
+      ],
+      "post_load_receipts": [
+        {
+          "agent": 118,
+          "amount": 0.721,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 190.0
+        },
+        {
+          "agent": 114,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 1,
+          "at": 194.0
+        },
+        {
+          "agent": 114,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 1,
+          "at": 198.0
+        },
+        {
+          "agent": 115,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 202.0
+        },
+        {
+          "agent": 114,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 1,
+          "at": 206.0
+        },
+        {
+          "agent": 114,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 1,
+          "at": 210.0
+        }
+      ],
+      "drawdown_receipts": [
+        {
+          "agent": 118,
+          "amount": 0.721,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 190.0
+        },
+        {
+          "agent": 115,
+          "amount": 0.601,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 195.0
+        },
+        {
+          "agent": 118,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 199.0
+        },
+        {
+          "agent": 115,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 203.0
+        }
+      ],
+      "first_reopened_receipt": {
+        "agent": 114,
+        "amount": 0.481,
+        "remaining": 0.0,
+        "access": 1,
+        "at": 210.0
+      },
+      "drawdown_resumed_hatches": [
+        "138"
+      ]
+    },
+    {
+      "seed": 20017,
+      "checkpoint": {
+        "slot": "IslandGrassBounds_20017_wet_share",
+        "version": 16,
+        "payload_bytes": 1488474,
+        "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+        "runtime_md5": "83416669f252821cfd52529ea4825069",
+        "agents": 110,
+        "step": 187,
+        "native_step": 1387,
+        "native_region_stock": {
+          "Snowfield": "5.937289781",
+          "Grassland": "54.379214353",
+          "Riverbank": "48.757236349",
+          "Highland": "120.747807989"
+        },
+        "observed_agents": 108,
+        "authored_patches": 24,
+        "wet_patches": 9,
+        "resumed_hatches": [
+          "132"
+        ]
+      },
+      "source_sha256": {
+        "save": {
+          "report": "7bdc153d5bb1d2b87f4aa830a1d51b08c7f9f598dcf80748a5d48f4acfc72e73",
+          "log": "6eed4776278a2e7eb717f918bdc5d3bcd39a0521145fc0df2a099895ab3f1cef"
+        },
+        "load": {
+          "report": "9426ca9639ca1339125686bd2c2636aa54d365bbb7485b01081695debfc1cbf1",
+          "log": "14d097bd4d63d5e80d993a45d9ee51744433851d5ccd93412bbca8f515b57334"
+        },
+        "drop": {
+          "report": "f11783e9b0680beb0362a3b0cfae78f333463043b256e380be2b0665fd645eac",
+          "log": "4b7da2a51ff8ed7625ef2f5d02571cbcad4772726cb1789bda92659654a691d5"
+        }
+      },
+      "point_z_cm": [
+        -4474.107756265673,
+        -4445.705404212948
+      ],
+      "access_points_cm": [
+        [
+          92985.54109125207,
+          41622.03552490922,
+          -4474.107756265673
+        ],
+        [
+          91588.33553418468,
+          41604.47413875362,
+          -4445.705404212948
+        ]
+      ],
+      "water": {
+        "before": {
+          "world_seconds": 5.266666941344738,
+          "authority_seconds": 185.0,
+          "sites": {
+            "main": {
+              "bottom_cm": -4565.107756265673,
+              "surface_cm": -4413.40478515625,
+              "submerged": true
+            },
+            "extra": {
+              "bottom_cm": -4563.112677044259,
+              "surface_cm": -4413.40478515625,
+              "submerged": true
+            }
+          }
+        },
+        "surfaces_cm": {
+          "IslandLowerRiver05": -4413.40478515625
+        },
+        "lowered": {
+          "world_seconds": 5.266666941344738,
+          "authority_seconds": 185.0,
+          "sites": {
+            "main": {
+              "bottom_cm": -4565.107756265673,
+              "surface_cm": -4451.70556640625,
+              "submerged": true
+            },
+            "extra": {
+              "bottom_cm": -4563.112677044259,
+              "surface_cm": -4451.70556640625,
+              "submerged": false
+            }
+          }
+        },
+        "restored": {
+          "world_seconds": 25.26666798442602,
+          "authority_seconds": 204.80333333214125,
+          "sites": {
+            "main": {
+              "bottom_cm": -4565.107756265673,
+              "surface_cm": -4413.40478515625,
+              "submerged": true
+            },
+            "extra": {
+              "bottom_cm": -4563.112677044259,
+              "surface_cm": -4413.40478515625,
+              "submerged": true
+            }
+          }
+        }
+      },
+      "restored_stock": 0.12024999409914017,
+      "capacity": 11.0,
+      "meal_cap": 2.8,
+      "initial_shared_receipts": [
+        {
+          "agent": 112,
+          "amount": 2.8,
+          "remaining": 8.2,
+          "access": 1,
+          "at": 183.0
+        },
+        {
+          "agent": 113,
+          "amount": 2.8,
+          "remaining": 5.4,
+          "access": 1,
+          "at": 183.0
+        },
+        {
+          "agent": 117,
+          "amount": 2.8,
+          "remaining": 2.6,
+          "access": 0,
+          "at": 183.0
+        }
+      ],
+      "post_load_receipts": [
+        {
+          "agent": 118,
+          "amount": 0.721,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 190.0
+        },
+        {
+          "agent": 114,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 1,
+          "at": 194.0
+        },
+        {
+          "agent": 114,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 1,
+          "at": 198.0
+        },
+        {
+          "agent": 115,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 202.0
+        },
+        {
+          "agent": 115,
+          "amount": 0.457,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 205.803
+        },
+        {
+          "agent": 114,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 1,
+          "at": 209.803
+        }
+      ],
+      "drawdown_receipts": [
+        {
+          "agent": 118,
+          "amount": 0.721,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 190.0
+        },
+        {
+          "agent": 115,
+          "amount": 0.601,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 195.0
+        },
+        {
+          "agent": 118,
+          "amount": 0.481,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 199.0
+        },
+        {
+          "agent": 115,
+          "amount": 0.578,
+          "remaining": 0.0,
+          "access": 0,
+          "at": 203.803
+        }
+      ],
+      "first_reopened_receipt": {
+        "agent": 113,
+        "amount": 0.481,
+        "remaining": 0.0,
+        "access": 1,
+        "at": 211.803
+      },
+      "drawdown_resumed_hatches": []
+    }
+  ]
+}
