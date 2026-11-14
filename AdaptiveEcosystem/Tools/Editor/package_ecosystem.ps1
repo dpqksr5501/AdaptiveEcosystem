@@ -1,9 +1,11 @@
-param([string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8')
+param([string]$EngineRoot='C:/Program Files/Epic Games/UE_5.8',
+    [ValidatePattern('^[A-Za-z0-9_]+$')][string]$AuditFolder='EcosystemLife_20261023',
+    [ValidatePattern('^[A-Za-z0-9_]+$')][string]$ArchiveFolder='EcosystemLifePackage')
 $ErrorActionPreference='Stop'
 $taskRoot=(Resolve-Path (Join-Path $PSScriptRoot '../..')).Path
 if(Get-Process UnrealBuildTool,dotnet,UnrealEditor,UnrealEditor-Cmd,LiveCodingConsole,MSBuild,ShaderCompileWorker -ErrorAction SilentlyContinue){throw 'Engine/build busy; no process stopped'}
-$taskOut=Join-Path $taskRoot 'Saved/EcosystemLife_20261023'
-$taskArchive=Join-Path $taskRoot 'Saved/EcosystemLifePackage'
+$taskOut=Join-Path $taskRoot ('Saved/'+$AuditFolder)
+$taskArchive=Join-Path $taskRoot ('Saved/'+$ArchiveFolder)
 New-Item -ItemType Directory -Path $taskOut -Force|Out-Null
 $taskUba=Join-Path ([IO.Path]::GetTempPath()) ('AdaptiveEcosystemUBT/'+[guid]::NewGuid().ToString('N'))
 & (Join-Path $EngineRoot 'Engine/Binaries/DotNET/UnrealBuildTool/UnrealBuildTool.exe') AdaptiveEcosystem Win64 Development "-Project=$taskRoot/AdaptiveEcosystem.uproject" -WaitMutex -NoHotReload -NoUBA "-UBARootDir=$taskUba" 2>&1|Tee-Object (Join-Path $taskOut 'GameBuild.log')

@@ -1,0 +1,100 @@
+{
+ "phase": "pick",
+ "status": "fail",
+ "results": [
+  {
+   "gate": "C0-2",
+   "kind": "direction",
+   "rule": "성공률 ∈ [0.10, 0.50]·ALWAYS_EAT 잡힘 ∈ [0.5, 20], 어긋난 쪽으로 한 칸",
+   "tried": [
+    {
+     "value": [
+      0.9,
+      1.05
+     ],
+     "success_rate": 0.014056224899598393,
+     "hunt_def": "pair",
+     "attempts": 5478,
+     "success_rate_pair": 0.014056224899598393,
+     "segments": 5478,
+     "success_rate_episode": 0.0571870170015456,
+     "episodes": 1294,
+     "caught_always_eat": 0.05194805194805195,
+     "ok": false,
+     "direction": "low"
+    },
+    {
+     "value": [
+      0.95,
+      1.1
+     ],
+     "success_rate": 0.013245033112582781,
+     "hunt_def": "pair",
+     "attempts": 5889,
+     "success_rate_pair": 0.013245033112582781,
+     "segments": 5889,
+     "success_rate_episode": 0.061708860759493674,
+     "episodes": 1264,
+     "caught_always_eat": 0.06060606060606061,
+     "ok": false,
+     "direction": "low"
+    }
+   ],
+   "status": "fail",
+   "value": [
+    0.95,
+    1.1
+   ],
+   "fixed": true
+  }
+ ],
+ "state": {
+  "values": {},
+  "fixed": {
+   "C0-2": true
+  },
+  "f_enabled": false,
+  "j2_primary": "short",
+  "history": [
+   {
+    "phase": "pick",
+    "time": "2026-11-11 03:03:20",
+    "seeds_train": [
+     44180,
+     44189
+    ],
+    "seeds_judge": [
+     44100,
+     44139
+    ],
+    "gates": [
+     "C0-2"
+    ],
+    "status": "fail",
+    "values": {},
+    "fixed": {
+     "C0-2": true
+    },
+    "f_enabled": false
+   }
+  ]
+ },
+ "seeds_train": [
+  44180,
+  44189
+ ],
+ "seeds_judge": [
+  44100,
+  44139
+ ],
+ "steps": {
+  "train": 3000,
+  "judge": 13500,
+  "c011": 9000
+ },
+ "elapsed_s": 59.654944896698,
+ "metric_defs": {
+  "hunt": "pair",
+  "block": "scan"
+ }
+}

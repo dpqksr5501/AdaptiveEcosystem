@@ -1,0 +1,1337 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "carp": [
+    {
+      "seed": 20000,
+      "source": {
+        "project_path": "Saved/FaunaAudit/Island_20000_fry_shelf_restore/IslandFaunaPIE.json",
+        "sha256": "f3a52fcc94c98b94fff65896b57d98a502d9b595c23de0412687305e69e6916d"
+      },
+      "fry_clearance_cm": 3.5546875,
+      "previous_shelf_z_cm": -4298.5226290330575,
+      "lowered_shelf_z_cm": -4370.522544985279,
+      "phases": {
+        "before": {
+          "world_seconds": 194.43334347382188,
+          "completed_authority_seconds": 194.18666666547458,
+          "column_cm": [
+            -4394.5226290330575,
+            -4244.05810546875
+          ]
+        },
+        "drawdown": {
+          "world_seconds": 194.43334347382188,
+          "completed_authority_seconds": 194.18666666547458,
+          "column_cm": [
+            -4394.5226290330575,
+            -4346.5224609375
+          ]
+        },
+        "restored": {
+          "world_seconds": 202.4333438910544,
+          "completed_authority_seconds": 202.18666666547458,
+          "column_cm": [
+            -4394.5226290330575,
+            -4244.05810546875
+          ]
+        }
+      },
+      "fry_position_after_surface_drop": [
+        {
+          "world_seconds": 194.43334347382188,
+          "authority_seconds": 194.18666666547458,
+          "position_cm": [
+            84690.05,
+            39174.62,
+            -4327.65
+          ],
+          "clearance_estimate_cm": 3.5546875,
+          "water_column_cm": [
+            -4394.302014247317,
+            -4346.5224609375
+          ],
+          "expected_inside": false
+        },
+        {
+          "world_seconds": 194.7000101543963,
+          "authority_seconds": 194.18666666547458,
+          "position_cm": [
+            84692.15,
+            39175.27,
+            -4361.97
+          ],
+          "clearance_estimate_cm": 3.5546875,
+          "water_column_cm": [
+            -4394.324925140192,
+            -4346.5224609375
+          ],
+          "expected_inside": true
+        }
+      ],
+      "observed_drawdown_payments": [
+        {
+          "time": 196.18666666547458,
+          "region": "LowerRiver",
+          "reason": "HabitatPatchEaten",
+          "related_id": "0",
+          "amount": 2.799999952316284,
+          "resource_id": "IslandRiverSlowShelf"
+        },
+        {
+          "time": 197.18666666547458,
+          "region": "LowerRiver",
+          "reason": "HabitatPatchEaten",
+          "related_id": "0",
+          "amount": 2.799999952316284,
+          "resource_id": "IslandRiverSlowShelf"
+        },
+        {
+          "time": 198.18666666547458,
+          "region": "LowerRiver",
+          "reason": "HabitatPatchEaten",
+          "related_id": "0",
+          "amount": 2.799999952316284,
+          "resource_id": "IslandRiverSlowShelf"
+        }
+      ],
+      "drawdown_meal_geometry": {
+        "shelf_center_cm": [
+          84705.94008285584,
+          39200.06070119358,
+          -4370.522544985279
+        ],
+        "first_selected_in_reach": {
+          "world_seconds": 196.03334355726838,
+          "authority_seconds": 195.18666666547458,
+          "present": true,
+          "position_cm": [
+            84697.17,
+            39183.39,
+            -4372.11
+          ],
+          "clearance_estimate_cm": 3.5546875,
+          "hp": 100,
+          "energy": 39.880001068115234,
+          "water_column_cm": [
+            -4394.3948124093995,
+            -4346.5224609375
+          ],
+          "food_patch_index": 5
+        }
+      }
+    },
+    {
+      "seed": 20017,
+      "source": {
+        "project_path": "Saved/FaunaAudit/Island_20017_fry_shelf_restore/IslandFaunaPIE.json",
+        "sha256": "611679dbd9fac1ef5298692abd3c93910384ec8d108fda927905b4716c3db4ca"
+      },
+      "fry_clearance_cm": 3.62578125,
+      "previous_shelf_z_cm": -4298.5226290330575,
+      "lowered_shelf_z_cm": -4370.522544985279,
+      "phases": {
+        "before": {
+          "world_seconds": 193.1000100709498,
+          "completed_authority_seconds": 192.78666666547457,
+          "column_cm": [
+            -4394.5226290330575,
+            -4244.05810546875
+          ]
+        },
+        "drawdown": {
+          "world_seconds": 193.1000100709498,
+          "completed_authority_seconds": 192.78666666547457,
+          "column_cm": [
+            -4394.5226290330575,
+            -4346.5224609375
+          ]
+        },
+        "restored": {
+          "world_seconds": 201.1000104881823,
+          "completed_authority_seconds": 200.78666666547457,
+          "column_cm": [
+            -4394.5226290330575,
+            -4244.05810546875
+          ]
+        }
+      },
+      "fry_position_after_surface_drop": [
+        {
+          "world_seconds": 193.1000100709498,
+          "authority_seconds": 192.78666666547457,
+          "position_cm": [
+            84702.12,
+            39221.75,
+            -4327.89
+          ],
+          "clearance_estimate_cm": 3.62578125,
+          "water_column_cm": [
+            -4394.533616565417,
+            -4346.5224609375
+          ],
+          "expected_inside": false
+        },
+        {
+          "world_seconds": 193.3666767515242,
+          "authority_seconds": 192.78666666547457,
+          "position_cm": [
+            84705.55,
+            39216.44,
+            -4358.85
+          ],
+          "clearance_estimate_cm": 3.62578125,
+          "water_column_cm": [
+            -4394.5563662761315,
+            -4346.5224609375
+          ],
+          "expected_inside": true
+        }
+      ],
+      "observed_drawdown_payments": [
+        {
+          "time": 193.78666666547457,
+          "region": "LowerRiver",
+          "reason": "HabitatPatchEaten",
+          "related_id": "0",
+          "amount": 2.799999952316284,
+          "resource_id": "IslandRiverSlowShelf"
+        },
+        {
+          "time": 194.78666666547457,
+          "region": "LowerRiver",
+          "reason": "HabitatPatchEaten",
+          "related_id": "0",
+          "amount": 2.799999952316284,
+          "resource_id": "IslandRiverSlowShelf"
+        },
+        {
+          "time": 195.78666666547457,
+          "region": "LowerRiver",
+          "reason": "HabitatPatchEaten",
+          "related_id": "0",
+          "amount": 2.799999952316284,
+          "resource_id": "IslandRiverSlowShelf"
+        }
+      ],
+      "drawdown_meal_geometry": {
+        "shelf_center_cm": [
+          84705.94008285584,
+          39200.06070119358,
+          -4370.522544985279
+        ],
+        "first_selected_in_reach": {
+          "world_seconds": 193.3666767515242,
+          "authority_seconds": 192.78666666547457,
+          "present": true,
+          "position_cm": [
+            84705.55,
+            39216.44,
+            -4358.85
+          ],
+          "clearance_estimate_cm": 3.62578125,
+          "hp": 100,
+          "energy": 40,
+          "water_column_cm": [
+            -4394.5563662761315,
+            -4346.5224609375
+          ],
+          "food_patch_index": 5
+        }
+      }
+    }
+  ],
+  "mink": [
+    {
+      "seed": 20000,
+      "source": {
+        "project_path": "Saved/FaunaAudit/Island_20000_island_stone_high/IslandFaunaPIE.json",
+        "sha256": "507305e3554b32763ab5c1614a6e408bfd1a6f2ce5b47518421341c36d6d3760"
+      },
+      "previous_bank_source": {
+        "project_path": "Saved/FaunaAudit/Island_20000_mink_final_exit/IslandFaunaPIE.json",
+        "sha256": "89de626d31c0338568c5ff6d2ed6c16ed9fdf9aaaf93b2126e621d7d1bd84c3c"
+      },
+      "saved_geometry_source": {
+        "project_path": "Saved/FaunaAudit/Island_20000_reg1454_load/IslandFaunaPIE.json",
+        "sha256": "977a465a89a7ada7e37e5c8fb4a6f6da3272533161e955d8fe67c08f7b9d075e"
+      },
+      "normal_surface_cm": -4413.40478515625,
+      "raised_surface_cm": -4389.40478515625,
+      "previous_bank_z_cm": -4405.096698332069,
+      "saved_ramp_shore_z_cm": -4379.449226944,
+      "raise_world_seconds": 64.03333667293191,
+      "restore_world_seconds": 99.23333850875497,
+      "dry_ground_arrival_world_seconds": 80.03333750739694,
+      "observed_first_roundtrip": [
+        [
+          63.61666666666667,
+          "SwimEnter"
+        ],
+        [
+          67,
+          "HabitatPatchEaten"
+        ],
+        [
+          70.76666666666667,
+          "SwimExit"
+        ],
+        [
+          79.68333333333334,
+          "SwimDryBankReached"
+        ]
+      ],
+      "dry_bank_walk": {
+        "shore_cm": [
+          94326.00999258451,
+          43676.349990727125,
+          -4379.449226944
+        ],
+        "dry_bank_cm": [
+          94731.99740640649,
+          44183.96621904676,
+          -4376.2226722380565
+        ],
+        "samples": [
+          {
+            "at": 71.23333704844117,
+            "position_cm": [
+              94336.62,
+              43689.62,
+              -4379.49
+            ]
+          },
+          {
+            "at": 73.10000381246209,
+            "position_cm": [
+              94421.51,
+              43795.76,
+              -4379.79
+            ]
+          },
+          {
+            "at": 74.16667053475976,
+            "position_cm": [
+              94470.02,
+              43856.42,
+              -4379.96
+            ]
+          },
+          {
+            "at": 75.23333725705743,
+            "position_cm": [
+              94518.53,
+              43917.07,
+              -4380.13
+            ]
+          },
+          {
+            "at": 76.3000039793551,
+            "position_cm": [
+              94567.04,
+              43977.72,
+              -4380.31
+            ]
+          },
+          {
+            "at": 77.36667070165277,
+            "position_cm": [
+              94615.56,
+              44038.38,
+              -4380.48
+            ]
+          },
+          {
+            "at": 78.43333742395043,
+            "position_cm": [
+              94664.07,
+              44099.03,
+              -4380.65
+            ]
+          },
+          {
+            "at": 79.5000041462481,
+            "position_cm": [
+              94712.58,
+              44159.68,
+              -4379.06
+            ]
+          }
+        ],
+        "last_clearing_world_seconds": 79.76667082682252
+      }
+    },
+    {
+      "seed": 20017,
+      "source": {
+        "project_path": "Saved/FaunaAudit/Island_20017_island_stone_high/IslandFaunaPIE.json",
+        "sha256": "26e9fe9a98d38de3e27e0d70ba8e3e773b13670dee6282c2c869500464fc16e7"
+      },
+      "previous_bank_source": {
+        "project_path": "Saved/FaunaAudit/Island_20017_mink_final_exit/IslandFaunaPIE.json",
+        "sha256": "738a9e149b6d617d6a78828fc234d389e1855a67815ddabe046e24ec849f1818"
+      },
+      "saved_geometry_source": {
+        "project_path": "Saved/FaunaAudit/Island_20017_reg1454_load/IslandFaunaPIE.json",
+        "sha256": "a5c004e149ad691f0a7f83ef95b785b1d6b7a4f3146eae41cede3d3e7c30b6c3"
+      },
+      "normal_surface_cm": -4413.40478515625,
+      "raised_surface_cm": -4389.40478515625,
+      "previous_bank_z_cm": -4405.096698332069,
+      "saved_ramp_shore_z_cm": -4379.449226944,
+      "raise_world_seconds": 64.03333667293191,
+      "restore_world_seconds": 99.23333850875497,
+      "dry_ground_arrival_world_seconds": 78.96667078509927,
+      "observed_first_roundtrip": [
+        [
+          63.63333333333333,
+          "SwimEnter"
+        ],
+        [
+          66,
+          "HabitatPatchEaten"
+        ],
+        [
+          69.6,
+          "SwimExit"
+        ],
+        [
+          78.48333333333333,
+          "SwimDryBankReached"
+        ]
+      ],
+      "dry_bank_walk": {
+        "shore_cm": [
+          94326.00999258451,
+          43676.349990727125,
+          -4379.449226944
+        ],
+        "dry_bank_cm": [
+          94731.99740640649,
+          44183.96621904676,
+          -4376.2226722380565
+        ],
+        "samples": [
+          {
+            "at": 69.90000364556909,
+            "position_cm": [
+              94329.05,
+              43680.15,
+              -4379.46
+            ]
+          },
+          {
+            "at": 71.76667040959,
+            "position_cm": [
+              94414.15,
+              43786.56,
+              -4379.76
+            ]
+          },
+          {
+            "at": 72.83333713188767,
+            "position_cm": [
+              94462.78,
+              43847.36,
+              -4379.94
+            ]
+          },
+          {
+            "at": 73.90000385418534,
+            "position_cm": [
+              94511.41,
+              43908.16,
+              -4380.11
+            ]
+          },
+          {
+            "at": 74.96667057648301,
+            "position_cm": [
+              94560.04,
+              43968.97,
+              -4380.28
+            ]
+          },
+          {
+            "at": 76.03333729878068,
+            "position_cm": [
+              94608.67,
+              44029.77,
+              -4380.45
+            ]
+          },
+          {
+            "at": 77.10000402107835,
+            "position_cm": [
+              94657.3,
+              44090.57,
+              -4380.63
+            ]
+          },
+          {
+            "at": 78.16667074337602,
+            "position_cm": [
+              94705.93,
+              44151.37,
+              -4380.03
+            ]
+          }
+        ],
+        "last_clearing_world_seconds": 78.70000410452485
+      }
+    }
+  ],
+  "mink_alternate_exit": [
+    {
+      "seed": 20000,
+      "agent_id": 111,
+      "platform_patch": "IslandRiverSecondMinkShore",
+      "previous_bank_z_cm": -4405.096698332069,
+      "raised_surface_cm": -4389.40478515625,
+      "platform_z_cm": -4379.40478515625,
+      "alternate_exit_at": 62.016666666666666,
+      "swim_exit_at": 65.9,
+      "decisions": [
+        {
+          "at": 62.016666667,
+          "previous": false,
+          "recent_block": false,
+          "clearance_cm": 5.66434305,
+          "candidates": [
+            {
+              "patch": "IslandRiverRootsShore",
+              "gate": "Clear",
+              "distance_sq": 52510795.52949311
+            },
+            {
+              "patch": "IslandRiverSecondMinkShore",
+              "gate": "Clear",
+              "distance_sq": 23301.72161176363
+            }
+          ],
+          "selected": "IslandRiverSecondMinkShore"
+        },
+        {
+          "at": 63.016666667,
+          "previous": true,
+          "recent_block": false,
+          "clearance_cm": 5.66434305,
+          "candidates": [],
+          "selected": null
+        },
+        {
+          "at": 64.016666667,
+          "previous": true,
+          "recent_block": false,
+          "clearance_cm": 5.66434305,
+          "candidates": [],
+          "selected": null
+        }
+      ],
+      "source_sha256": {
+        "report": "41f5e2b80bdaffd6c6bceaa1c41290a86dfc94e124eb3c0742b8962e3e2eec96",
+        "authority_log": "3c71ec6dc96e3a84593ddefe3bb680418c26c302a6bc77173ca98146188e4353"
+      }
+    },
+    {
+      "seed": 20017,
+      "agent_id": 111,
+      "platform_patch": "IslandRiverSecondMinkShore",
+      "previous_bank_z_cm": -4405.096698332069,
+      "raised_surface_cm": -4389.40478515625,
+      "platform_z_cm": -4379.40478515625,
+      "alternate_exit_at": 61.016666666666666,
+      "swim_exit_at": 64.78333333333333,
+      "decisions": [
+        {
+          "at": 61.016666667,
+          "previous": false,
+          "recent_block": false,
+          "clearance_cm": 5.77190929,
+          "candidates": [
+            {
+              "patch": "IslandRiverRootsShore",
+              "gate": "Clear",
+              "distance_sq": 52510314.14153238
+            },
+            {
+              "patch": "IslandRiverSecondMinkShore",
+              "gate": "Clear",
+              "distance_sq": 23308.834214875144
+            }
+          ],
+          "selected": "IslandRiverSecondMinkShore"
+        },
+        {
+          "at": 62.016666667,
+          "previous": true,
+          "recent_block": false,
+          "clearance_cm": 5.77190929,
+          "candidates": [],
+          "selected": null
+        },
+        {
+          "at": 63.016666667,
+          "previous": true,
+          "recent_block": false,
+          "clearance_cm": 5.77190929,
+          "candidates": [],
+          "selected": null
+        }
+      ],
+      "source_sha256": {
+        "report": "b9be85efab8e701108fcc37a67252557044f5f08c514db01960dfd4663210a89",
+        "authority_log": "78761f61023d87efeced9dc9d41cfbd1da941a55e3f7cf8a65b51cc37e65f56c"
+      }
+    }
+  ],
+  "mink_exit_cover": [
+    {
+      "seed": 20000,
+      "cover_cm": [
+        94216.8868939877,
+        43567.2268939877,
+        -4438.533921589597
+      ],
+      "clear_decision": {
+        "at": 62.016666667,
+        "previous": false,
+        "recent_block": false,
+        "clearance_cm": 5.66434305,
+        "candidates": [
+          {
+            "patch": "IslandRiverRootsShore",
+            "gate": "Clear",
+            "distance_sq": 52510795.52949311
+          },
+          {
+            "patch": "IslandRiverSecondMinkShore",
+            "gate": "Clear",
+            "distance_sq": 23301.72161176363
+          }
+        ],
+        "selected": "IslandRiverSecondMinkShore"
+      },
+      "covered_decision": {
+        "candidates": [
+          {
+            "patch": "IslandRiverRootsShore",
+            "gate": "Clear",
+            "distance_sq": 52510795.52949311
+          },
+          {
+            "patch": "IslandRiverSecondMinkShore",
+            "gate": "Occluded",
+            "distance_sq": 23301.72161176363
+          }
+        ],
+        "at": 62.016666667,
+        "previous": false,
+        "recent_block": false,
+        "clearance_cm": 5.66434305,
+        "selected": "IslandRiverRootsShore"
+      },
+      "restore_world_seconds": 93.63333821669221,
+      "swimming_at_restore": true,
+      "stamina_at_restore": 0.1416318714618683,
+      "exited_before_restore": false,
+      "source_sha256": {
+        "report": "581b3061c5f9730f32841719bff918badf1b48aee296c1acb7f8c0fff07e1b49",
+        "authority_log": "b2e38aafba3c1212a943e6fbfe248eb09e2491457f1b28d0bbd75dce0219dff1"
+      }
+    },
+    {
+      "seed": 20017,
+      "cover_cm": [
+        94216.8868939877,
+        43567.2268939877,
+        -4438.533921589597
+      ],
+      "clear_decision": {
+        "at": 61.016666667,
+        "previous": false,
+        "recent_block": false,
+        "clearance_cm": 5.77190929,
+        "candidates": [
+          {
+            "patch": "IslandRiverRootsShore",
+            "gate": "Clear",
+            "distance_sq": 52510314.14153238
+          },
+          {
+            "patch": "IslandRiverSecondMinkShore",
+            "gate": "Clear",
+            "distance_sq": 23308.834214875144
+          }
+        ],
+        "selected": "IslandRiverSecondMinkShore"
+      },
+      "covered_decision": {
+        "candidates": [
+          {
+            "patch": "IslandRiverRootsShore",
+            "gate": "Clear",
+            "distance_sq": 52510314.14153238
+          },
+          {
+            "patch": "IslandRiverSecondMinkShore",
+            "gate": "Occluded",
+            "distance_sq": 23308.834214875144
+          }
+        ],
+        "at": 61.016666667,
+        "previous": false,
+        "recent_block": false,
+        "clearance_cm": 5.77190929,
+        "selected": "IslandRiverRootsShore"
+      },
+      "restore_world_seconds": 93.63333821669221,
+      "swimming_at_restore": true,
+      "stamina_at_restore": 0.12288177013397217,
+      "exited_before_restore": false,
+      "source_sha256": {
+        "report": "d1229a01d2288221b2ddf8498ef0fb3f0cfbeb87a0209fb20887165d699b5324",
+        "authority_log": "89c1a8f5e25c87007e22f54ca2d79991424ed819df68ed3c7cfac0f0d8263a16"
+      }
+    }
+  ],
+  "mink_exit_budget": [
+    {
+      "seed": 20000,
+      "reopened_after_seconds": 0.3833284499744565,
+      "resurfaced_stamina": 0.895824670791626,
+      "reopened_source_sha256": "4a7167c631d29404669660c14841aebaefce295e7cdc2b4c85c375fdcdffc1d8",
+      "far_gate": "Stamina",
+      "covered_near_gate": "Occluded",
+      "covered_selected": "None",
+      "clear_near_gate": "Clear",
+      "clear_selected": "IslandRiverSecondMinkShore",
+      "stamina_after_first_search": 0.926661491394043,
+      "stamina_at_restore": 0.926661491394043,
+      "clear_alternate_at": 62.016666667,
+      "clear_swim_exit_at": 65.9,
+      "source_sha256": {
+        "covered": {
+          "report": "cabe04afeebba524665257e721f8f57567efa0e45629b747b3699d7bb15c221d",
+          "authority_log": "acaefc5f3b1731b796390143ed680c27c93a1f650d6d091061c4d65fc9b85e8c"
+        },
+        "clear": {
+          "report": "122d691451c834faf6f889e281904d2f7f31ae4f16a536efe16e982835608e9a",
+          "authority_log": "f9eef4092ea3f39215db202d365fe549f504db26f70d6deb5620332463772efa"
+        }
+      }
+    },
+    {
+      "seed": 20017,
+      "reopened_after_seconds": 0.3833284499744565,
+      "resurfaced_stamina": 0.8906585574150085,
+      "reopened_source_sha256": "0d3f8ec919ac5fe63b37744e16add84ff9219317d9bf59cd9cba6a3625b9b7f3",
+      "far_gate": "Stamina",
+      "covered_near_gate": "Occluded",
+      "covered_selected": "None",
+      "clear_near_gate": "Clear",
+      "clear_selected": "IslandRiverSecondMinkShore",
+      "stamina_after_first_search": 0.9329119324684143,
+      "stamina_at_restore": 0.9329119324684143,
+      "clear_alternate_at": 61.016666667,
+      "clear_swim_exit_at": 64.78333333333333,
+      "source_sha256": {
+        "covered": {
+          "report": "488a16a5fcf37d8bd7e0f1644e90ea327df99031acea45de4b2caf3d9636c483",
+          "authority_log": "55a6c8dfdc9682d8e49b6d3612afe2f9b634e8f9c8dbbf9ed34af09d16d58082"
+        },
+        "clear": {
+          "report": "20f5b594df14825733535f39188652263ec47e5a1d54680f9b7f62fd4f14f93b",
+          "authority_log": "a5e0a704c5c224957c9204e7748aecfaf286c2ea5812da23a25305606e14e9cd"
+        }
+      }
+    }
+  ],
+  "mink_independent_exit": [
+    {
+      "seed": 20000,
+      "report": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_mink_python_inputs/IslandFaunaPIE.json",
+      "report_sha256": "b0ff28ad72aa3e777de9408ed38e723f33e66420def8cdb489502aa8cf13c44f",
+      "covered_log": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_mink_python_inputs.log",
+      "covered_log_sha256": "a0198f3ee2d3f7e7f7e8a8b4f5031e82479c4320c61baa9dd858c7250110d423",
+      "clear_log": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_mink_budget_clear.log",
+      "clear_log_sha256": "f9eef4092ea3f39215db202d365fe549f504db26f70d6deb5620332463772efa",
+      "decision_at": 62.016666667,
+      "sensed": {
+        "position_cm": [
+          94152.16,
+          43501.14,
+          -4469.13
+        ],
+        "current_cm_s": [
+          4.9758243865729295,
+          0.48972778813400314,
+          0.0
+        ],
+        "stamina": 0.926661491394043,
+        "exits": [
+          {
+            "id": "IslandRiverRootsShore",
+            "entry_cm": [
+              89013.537,
+              38392.031,
+              -4421.405
+            ],
+            "bank_cm": [
+              89013.537,
+              38272.031,
+              -4383.583926352714
+            ],
+            "column_cm": [
+              -4436.368990498972,
+              -4389.40478515625
+            ]
+          },
+          {
+            "id": "IslandRiverSecondMinkShore",
+            "entry_cm": [
+              94254.01,
+              43604.35,
+              -4421.40478515625
+            ],
+            "bank_cm": [
+              94326.01,
+              43676.35,
+              -4379.40478515625
+            ],
+            "column_cm": [
+              -4471.98124592012,
+              -4389.40478515625
+            ]
+          }
+        ],
+        "world_seconds": 61.633336547762156
+      },
+      "surface_cm": -4389.40478515625,
+      "cover_cm": [
+        94216.8868939877,
+        43567.2268939877,
+        -4438.533921589597
+      ],
+      "clearance_cm": 5.66434305,
+      "swim_speed_range_cm_s": [
+        32.0,
+        75.0
+      ],
+      "authority_distance_sq_cm": {
+        "IslandRiverRootsShore": 52510795.52949311,
+        "IslandRiverSecondMinkShore": 23301.72161176363
+      },
+      "covered_candidates": {
+        "IslandRiverRootsShore": "Stamina",
+        "IslandRiverSecondMinkShore": "Occluded"
+      },
+      "covered_selected": "None",
+      "clear_candidates": {
+        "IslandRiverRootsShore": "Stamina",
+        "IslandRiverSecondMinkShore": "Clear"
+      },
+      "clear_selected": "IslandRiverSecondMinkShore"
+    },
+    {
+      "seed": 20017,
+      "report": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_mink_python_inputs/IslandFaunaPIE.json",
+      "report_sha256": "655010b9ba7c8e6a9494afd56b786edc00e2422845e586007095a46f504621e5",
+      "covered_log": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_mink_python_inputs.log",
+      "covered_log_sha256": "4ecd77aac7426a17a566ab294dd57c87441f6daddb6d4128ab13b4a684a32383",
+      "clear_log": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_mink_budget_clear.log",
+      "clear_log_sha256": "a5e0a704c5c224957c9204e7748aecfaf286c2ea5812da23a25305606e14e9cd",
+      "decision_at": 61.016666667,
+      "sensed": {
+        "position_cm": [
+          94152.09,
+          43501.17,
+          -4469.1
+        ],
+        "current_cm_s": [
+          4.9758243865729295,
+          0.48972778813400314,
+          0.0
+        ],
+        "stamina": 0.9329119324684143,
+        "exits": [
+          {
+            "id": "IslandRiverRootsShore",
+            "entry_cm": [
+              89013.537,
+              38392.031,
+              -4421.405
+            ],
+            "bank_cm": [
+              89013.537,
+              38272.031,
+              -4383.583926352714
+            ],
+            "column_cm": [
+              -4436.368990498972,
+              -4389.40478515625
+            ]
+          },
+          {
+            "id": "IslandRiverSecondMinkShore",
+            "entry_cm": [
+              94254.01,
+              43604.35,
+              -4421.40478515625
+            ],
+            "bank_cm": [
+              94326.01,
+              43676.35,
+              -4379.40478515625
+            ],
+            "column_cm": [
+              -4471.98124592012,
+              -4389.40478515625
+            ]
+          }
+        ],
+        "world_seconds": 61.36666986718774
+      },
+      "surface_cm": -4389.40478515625,
+      "cover_cm": [
+        94216.8868939877,
+        43567.2268939877,
+        -4438.533921589597
+      ],
+      "clearance_cm": 5.77190929,
+      "swim_speed_range_cm_s": [
+        32.0,
+        75.0
+      ],
+      "authority_distance_sq_cm": {
+        "IslandRiverRootsShore": 52510314.14153238,
+        "IslandRiverSecondMinkShore": 23308.834214875144
+      },
+      "covered_candidates": {
+        "IslandRiverRootsShore": "Stamina",
+        "IslandRiverSecondMinkShore": "Occluded"
+      },
+      "covered_selected": "None",
+      "clear_candidates": {
+        "IslandRiverRootsShore": "Stamina",
+        "IslandRiverSecondMinkShore": "Clear"
+      },
+      "clear_selected": "IslandRiverSecondMinkShore"
+    }
+  ],
+  "mink_swim_track": [
+    {
+      "seed": 20000,
+      "source": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_mink_swim_samples/IslandFaunaPIE.json",
+      "source_sha256": "738e7776336cfa7b85efe5eaed4c885520ca9a0ef1254d14ee166531b110e231",
+      "clearance_cm": 5.66434305,
+      "entry_cm": [
+        94254.01,
+        43604.35,
+        -4421.40478515625
+      ],
+      "bank_cm": [
+        94326.00999258451,
+        43676.349990727125,
+        -4379.449226944
+      ],
+      "return_swim": [
+        {
+          "at": 67.50000352039933,
+          "position_cm": [
+            94164.52,
+            43512.74,
+            -4463.47
+          ],
+          "stamina": 0.9295783638954163,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4520.3773423781195,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 67.76667020097375,
+          "position_cm": [
+            94177.26,
+            43524.62,
+            -4457.77
+          ],
+          "stamina": 0.9229112267494202,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4514.331607358662,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 68.03333688154817,
+          "position_cm": [
+            94189.86,
+            43536.56,
+            -4452.03
+          ],
+          "stamina": 0.9162440896034241,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4508.259811055163,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 68.30000356212258,
+          "position_cm": [
+            94202.33,
+            43548.57,
+            -4446.25
+          ],
+          "stamina": 0.909576952457428,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4502.072010500115,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 68.566670242697,
+          "position_cm": [
+            94214.62,
+            43560.68,
+            -4440.41
+          ],
+          "stamina": 0.9029098153114319,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4495.476815976196,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 68.83333692327142,
+          "position_cm": [
+            94226.68,
+            43572.9,
+            -4434.49
+          ],
+          "stamina": 0.8962426781654358,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4488.841636449988,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 69.10000360384583,
+          "position_cm": [
+            94238.42,
+            43585.31,
+            -4428.45
+          ],
+          "stamina": 0.8895755410194397,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4482.132885906387,
+            -4389.40478515625
+          ]
+        }
+      ],
+      "exiting": [
+        {
+          "at": 69.36667028442025,
+          "position_cm": [
+            94249.66,
+            43598.04,
+            -4422.1
+          ],
+          "stamina": 0.8833250999450684
+        },
+        {
+          "at": 69.63333696499467,
+          "position_cm": [
+            94261.97,
+            43610.67,
+            -4413.98
+          ],
+          "stamina": 0.8833250999450684
+        },
+        {
+          "at": 69.90000364556909,
+          "position_cm": [
+            94274.29,
+            43623.3,
+            -4405.87
+          ],
+          "stamina": 0.8833250999450684
+        },
+        {
+          "at": 70.1666703261435,
+          "position_cm": [
+            94286.6,
+            43635.93,
+            -4397.76
+          ],
+          "stamina": 0.8833250999450684
+        },
+        {
+          "at": 70.43333700671792,
+          "position_cm": [
+            94298.91,
+            43648.56,
+            -4389.64
+          ],
+          "stamina": 0.8833250999450684
+        },
+        {
+          "at": 70.70000368729234,
+          "position_cm": [
+            94311.23,
+            43661.19,
+            -4381.53
+          ],
+          "stamina": 0.8833250999450684
+        },
+        {
+          "at": 70.96667036786675,
+          "position_cm": [
+            94323.54,
+            43673.82,
+            -4373.41
+          ],
+          "stamina": 0.8833250999450684
+        }
+      ],
+      "on_bank_at": 71.23333704844117
+    },
+    {
+      "seed": 20017,
+      "source": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_mink_swim_samples/IslandFaunaPIE.json",
+      "source_sha256": "21d309581feae486324ae733b8f566098c514235cbec534575cc2af47c4559d9",
+      "clearance_cm": 5.77190929,
+      "entry_cm": [
+        94254.01,
+        43604.35,
+        -4421.40478515625
+      ],
+      "bank_cm": [
+        94326.00999258451,
+        43676.349990727125,
+        -4379.449226944
+      ],
+      "return_swim": [
+        {
+          "at": 66.43333679810166,
+          "position_cm": [
+            94162.56,
+            43510.99,
+            -4464.32
+          ],
+          "stamina": 0.9366621971130371,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4521.269741479745,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 66.70000347867608,
+          "position_cm": [
+            94176.29,
+            43523.86,
+            -4458.15
+          ],
+          "stamina": 0.929995059967041,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4514.721763870451,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 66.9666701592505,
+          "position_cm": [
+            94189.89,
+            43536.8,
+            -4451.94
+          ],
+          "stamina": 0.9233279228210449,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4508.142651819637,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 67.23333683982491,
+          "position_cm": [
+            94203.33,
+            43549.82,
+            -4445.69
+          ],
+          "stamina": 0.9166607856750488,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4501.406913080797,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 67.50000352039933,
+          "position_cm": [
+            94216.58,
+            43562.93,
+            -4439.37
+          ],
+          "stamina": 0.9099936485290527,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4494.270310523003,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 67.76667020097375,
+          "position_cm": [
+            94229.56,
+            43576.19,
+            -4432.96
+          ],
+          "stamina": 0.9033265113830566,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4487.076638389791,
+            -4389.40478515625
+          ]
+        },
+        {
+          "at": 68.03333688154817,
+          "position_cm": [
+            94242.16,
+            43589.68,
+            -4426.4
+          ],
+          "stamina": 0.8966593742370605,
+          "current_cm_s": [
+            4.9758243865729295,
+            0.48972778813400314,
+            0.0
+          ],
+          "column_cm": [
+            -4479.793476928358,
+            -4389.40478515625
+          ]
+        }
+      ],
+      "exiting": [
+        {
+          "at": 68.30000356212258,
+          "position_cm": [
+            94254.32,
+            43602.98,
+            -4419.03
+          ],
+          "stamina": 0.8929091095924377
+        },
+        {
+          "at": 68.566670242697,
+          "position_cm": [
+            94266.67,
+            43615.62,
+            -4410.87
+          ],
+          "stamina": 0.8929091095924377
+        },
+        {
+          "at": 68.83333692327142,
+          "position_cm": [
+            94279.02,
+            43628.26,
+            -4402.71
+          ],
+          "stamina": 0.8929091095924377
+        },
+        {
+          "at": 69.10000360384583,
+          "position_cm": [
+            94291.37,
+            43640.9,
+            -4394.56
+          ],
+          "stamina": 0.8929091095924377
+        },
+        {
+          "at": 69.36667028442025,
+          "position_cm": [
+            94303.72,
+            43653.54,
+            -4386.4
+          ],
+          "stamina": 0.8929091095924377
+        },
+        {
+          "at": 69.63333696499467,
+          "position_cm": [
+            94316.08,
+            43666.18,
+            -4378.24
+          ],
+          "stamina": 0.8929091095924377
+        }
+      ],
+      "on_bank_at": 69.90000364556909
+    }
+  ]
+}

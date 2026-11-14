@@ -2,6 +2,7 @@
 
 #include "EcoPolicyV3Fragments.h"
 #include "EcoPolicyV3Subsystem.h"
+#include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Engine/World.h"
 #include "Mass/EntityFragments.h"
 #include "MassExecutionContext.h"
@@ -29,9 +30,11 @@ void UEcoPolicyV3StepProcessor::ConfigureQueries(const TSharedRef<FMassEntityMan
 	HerbivoreQuery.AddRequirement<FEcoControlOutFragment>(EMassFragmentAccess::ReadWrite);
 	HerbivoreQuery.AddRequirement<FEcoHerbivoreBodyV3Fragment>(EMassFragmentAccess::ReadWrite);
 	HerbivoreQuery.AddTagRequirement<FEcoPolicyV3Tag>(EMassFragmentPresence::All);
+	HerbivoreQuery.AddTagRequirement<FEcoIntegratedCreatureTag>(EMassFragmentPresence::None);
 
 	ThreatQuery.AddRequirement<FEcoThreatStateFragment>(EMassFragmentAccess::ReadWrite);
 	ThreatQuery.AddTagRequirement<FEcoThreatV3Tag>(EMassFragmentPresence::All);
+	ThreatQuery.AddTagRequirement<FEcoIntegratedCreatureTag>(EMassFragmentPresence::None);
 }
 
 void UEcoPolicyV3StepProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)
@@ -147,11 +150,13 @@ void UEcoPolicyV3VisualProcessor::ConfigureQueries(const TSharedRef<FMassEntityM
 	HerbivoreQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadWrite);
 	HerbivoreQuery.AddRequirement<FEcoHerbivoreBodyV3Fragment>(EMassFragmentAccess::ReadOnly);
 	HerbivoreQuery.AddTagRequirement<FEcoPolicyV3Tag>(EMassFragmentPresence::All);
+	HerbivoreQuery.AddTagRequirement<FEcoIntegratedCreatureTag>(EMassFragmentPresence::None);
 
 	ThreatQuery.AddRequirement<FTransformFragment>(EMassFragmentAccess::ReadWrite);
 	ThreatQuery.AddRequirement<FMassVelocityFragment>(EMassFragmentAccess::ReadWrite);
 	ThreatQuery.AddRequirement<FEcoThreatStateFragment>(EMassFragmentAccess::ReadOnly);
 	ThreatQuery.AddTagRequirement<FEcoThreatV3Tag>(EMassFragmentPresence::All);
+	ThreatQuery.AddTagRequirement<FEcoIntegratedCreatureTag>(EMassFragmentPresence::None);
 }
 
 void UEcoPolicyV3VisualProcessor::Execute(FMassEntityManager& EntityManager, FMassExecutionContext& Context)

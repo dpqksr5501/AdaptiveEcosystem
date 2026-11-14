@@ -25,6 +25,8 @@ struct FEcoCreatureVisualState
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") double WorldTime = 0.0;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") FVector Position = FVector::ZeroVector;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") FVector Velocity = FVector::ZeroVector;
+	bool bHasFacing = false;
+	float FacingYawDegrees = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") bool bHasVitals = false;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float NormalizedHealth = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Category="Creature|Visual") float NormalizedEnergy = 0.0f;

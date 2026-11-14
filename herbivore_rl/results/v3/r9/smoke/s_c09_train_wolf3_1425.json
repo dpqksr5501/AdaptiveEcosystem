@@ -1,0 +1,80 @@
+{
+ "set": "wolf3",
+ "note": "앞 시도 측정 (2026-11-12 14:25~15:01, 같은 코드): 다른 세션의 무거운 python 이 겹쳐 돈 때가 있다(other_python) — 기록만, 등록에 쓰지 않음",
+ "time": "2026-11-12 15:01:36",
+ "wall_s": 442.06857776641846,
+ "min_available_gb": 9.853893280029297,
+ "min_free_commit_gb": 7.520755767822266,
+ "cpu_sys_mean": null,
+ "ue_seen": null,
+ "aborted_low_commit": null,
+ "other_python_at_start": [
+  "사용자 python ortholoc",
+  "다른 세션의 무거운 python: a"
+ ],
+ "other_python_at_end": [
+  "사용자 python ortholoc"
+ ],
+ "max_r9_python": 4,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "wolf_A_s3",
+   "species": "wolf",
+   "round": 0,
+   "shards": 3,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 376.6535220146179,
+   "dec_per_s": 2740.428376931361,
+   "log_dec_per_s": [
+    2728,
+    3195
+   ],
+   "num_envs": 384,
+   "memory": [
+    {
+     "pid": 2912,
+     "peak_mb": 387.37890625,
+     "private_mb": 337.69140625
+    },
+    {
+     "pid": 36956,
+     "peak_mb": 291.66796875,
+     "private_mb": 235.2890625
+    },
+    {
+     "pid": 39436,
+     "peak_mb": 288.77734375,
+     "private_mb": 235.453125
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "deer_A_load",
+   "species": "deer",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3010560,
+   "wall_s": 434.39344120025635,
+   "dec_per_s": 6930.4913805365795,
+   "log_dec_per_s": [
+    6610,
+    7102
+   ],
+   "num_envs": 896,
+   "memory": [
+    {
+     "pid": 34864,
+     "peak_mb": 368.6171875,
+     "private_mb": 327.29296875
+    }
+   ],
+   "error": ""
+  }
+ ]
+}

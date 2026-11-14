@@ -7,6 +7,7 @@
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "TimerManager.h"
 #include "AI/Policy/EcoNaturalHabitat.h"
+#include "Creature/Runtime/EcoFaunaSightChannel.h"
 
 AEcoRefugeHabitat::AEcoRefugeHabitat()
 {
@@ -53,6 +54,16 @@ void AEcoRefugeHabitat::BeginPlay()
     OnRep_Ready();
     if(bNaturalLayout&&bRegistrationReady)RebuildHabitat();
     if(GetNetMode()!=NM_DedicatedServer&&Brush->GetInstanceCount()==0)RebuildHabitat();
+    if (bFaunaBoulderOcclusion) SetFaunaBoulderOcclusion(true);
+}
+
+void AEcoRefugeHabitat::SetFaunaBoulderOcclusion(bool bEnabled)
+{
+    if (!GetWorld() || GetNetMode() == NM_Client) return;
+    Boulders->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+    Boulders->SetCollisionObjectType(bEnabled ? EcoFaunaDecision::SightCoverChannel : ECC_WorldStatic);
+    Boulders->SetCollisionResponseToAllChannels(ECR_Ignore);
+    if (bEnabled) Boulders->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 }
 void AEcoRefugeHabitat::OnRep_Ready()
 {

@@ -61,6 +61,37 @@ bool FEcoJYUSpatialFood::RunTest(const FString&) {
     TestTrue(TEXT("Regeneration may refill restored capacity"),E->CommitSpatialFood(S.RegionId,6,45,0,40,85));
     return true;
 }
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUAquaticBirthBudget, "AdaptiveEcosystem.Creature.JYU.AquaticBirthWithoutNativeFoodGrid",
+    EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoJYUAquaticBirthBudget::RunTest(const FString&)
+{
+    EcoTest::FScopedTestWorld World;
+    auto* Ecology = World.World->GetSubsystem<UEcologySimulationSubsystem>();
+    FRegionEcologyState River;
+    River.RegionId = TEXT("LowerRiver");
+    River.FoodAmount = 0.f;
+    FEcoServerTimeSnapshot Time;
+    Time.WorldEpoch = 1;
+    FEcoFoodEventSettings NoFoodEvent;
+    NoFoodEvent.bEnabled = false;
+    if (!TestTrue(TEXT("Register the river"), Ecology->RegisterRegionState(River))
+        || !TestTrue(TEXT("Register the spawn schedule"), Ecology->RegisterSpawnSchedule(River.RegionId, {}))
+        || !TestTrue(TEXT("Start the resource ledger without a Native grid"),
+            Ecology->StartResourceSimulation(Time.WorldEpoch, NoFoodEvent, NoFoodEvent, false))) return false;
+
+    FEcoSpawnRequest Request;
+    if (!TestTrue(TEXT("A fish with habitat food may reserve birth in this river"),
+            Ecology->RequestFaunaBirth(River.RegionId, Time, Request, 0.))) return false;
+    TestEqual(TEXT("One birth reserved"), Request.Count, 1);
+    TestTrue(TEXT("Commit the reservation"), Ecology->CompleteSpawnRequest(Request.RequestId, Request.Count));
+    if (!TestTrue(TEXT("A plant reserve request is evaluated against the regional ledger"),
+            Ecology->RequestFaunaBirth(River.RegionId, Time, Request, 1.))) return false;
+    TestEqual(TEXT("Empty plant food defers the birth"), Request.DiagnosticReason, FName(TEXT("BirthFoodBudget")));
+    TestEqual(TEXT("No birth reserved without enough food"), Request.Count, 0);
+    TestTrue(TEXT("Close the deferred reservation"), Ecology->CompleteSpawnRequest(Request.RequestId, 0));
+    return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoJYUSavedAssets,"AdaptiveEcosystem.Creature.JYU.SavedProfilesAndBehaviorGraphs",EAutomationTestFlags::EditorContext|EAutomationTestFlags::EngineFilter)
 bool FEcoJYUSavedAssets::RunTest(const FString&) {
     EcoTest::FScopedTestWorld W;

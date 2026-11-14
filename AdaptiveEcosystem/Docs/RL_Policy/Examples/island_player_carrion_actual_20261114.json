@@ -1,0 +1,199 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "source_build": "local working tree based on fb9e440a",
+  "partial": true,
+  "training_ready": false,
+  "golden_vector": false,
+  "restorable_world": false,
+  "stock_unit": "Unreal vitality-energy units, rounded to 0.001 in authority log",
+  "cases": [
+    {
+      "seed": 20000,
+      "scenario": "team_carrion_rifle_ctrl",
+      "map_report": "Island_20000_team_carrion_rifle_ctrl/IslandFaunaPIE.json",
+      "report_sha256": "8a41e81fffd4a7b4791a444bc67e4db562e23c522e6d6ae2249912b5ae44649a",
+      "authority_log": "20000_team_carrion_rifle_ctrl.log",
+      "authority_log_sha256": "4f4186b72fab4be47bd952654995fea84fde5eb2900fd96ba16d35134e5fa85f",
+      "target_id": "49",
+      "target_hp_at_release": 100,
+      "carcass": null
+    },
+    {
+      "seed": 20000,
+      "scenario": "team_carrion_rifle_late",
+      "map_report": "Island_20000_team_carrion_rifle_late/IslandFaunaPIE.json",
+      "report_sha256": "6a1d0b2dc2ed9c14137da389fd0e03ec9839e4c982327ac13693dd7a20b093e5",
+      "authority_log": "20000_team_carrion_rifle_late.log",
+      "authority_log_sha256": "34f5f572ed3ae9e4124d53ed783be1112fe729d2a13aef4301820bfc3be19803",
+      "target_id": "49",
+      "target_hp_at_release": 0,
+      "carcass": {
+        "species": "Wolf",
+        "medium": "Ground",
+        "total": 100.0,
+        "native_reserved": 0.0,
+        "immediate_killer_payment": 0.0,
+        "initial_shared_stock": 100.0,
+        "death_cause": "ExternalDamage",
+        "primary_hunter_id": null,
+        "primary_hunter_received_shared_payment": null,
+        "shared_payments": 0,
+        "consumer_count": 0,
+        "energy_by_consumer_species": {},
+        "first_shared_payment": null,
+        "last_logged_shared_stock": 100.0,
+        "logged_stock_minus_payments_and_remaining": 0.0,
+        "closure": {
+          "unused_stock": 100.0,
+          "authority_seconds": 91.787,
+          "reason": "Expired"
+        },
+        "logged_stock_minus_payments_and_unused_at_closure": 0.0,
+        "release_events": []
+      }
+    },
+    {
+      "seed": 20000,
+      "scenario": "team_carrion_rat_late",
+      "map_report": "Island_20000_team_carrion_rat_late/IslandFaunaPIE.json",
+      "report_sha256": "0cf9930f5dadce8f02169c4e511d47863334e8c83275f7dedde6b78c0178a35c",
+      "authority_log": "20000_team_carrion_rat_late.log",
+      "authority_log_sha256": "7cb2e9e75abc632d876c7649e7816924d74326cd37df6699d4837511a015e1ed",
+      "target_id": "75",
+      "target_hp_at_release": 0,
+      "carcass": {
+        "species": "Rat",
+        "medium": "Ground",
+        "total": 11.711,
+        "native_reserved": 0.0,
+        "immediate_killer_payment": 0.0,
+        "initial_shared_stock": 11.711,
+        "death_cause": "ExternalDamage",
+        "primary_hunter_id": null,
+        "primary_hunter_received_shared_payment": null,
+        "shared_payments": 1,
+        "consumer_count": 1,
+        "energy_by_consumer_species": {
+          "Wolf": 8.0
+        },
+        "first_shared_payment": {
+          "agent_id": "52",
+          "species": "Wolf",
+          "amount": 8.0,
+          "remaining": 3.711,
+          "authority_seconds": null
+        },
+        "last_logged_shared_stock": 3.711,
+        "logged_stock_minus_payments_and_remaining": 0.0,
+        "closure": {
+          "unused_stock": 3.711,
+          "authority_seconds": 138.167,
+          "reason": "Expired"
+        },
+        "logged_stock_minus_payments_and_unused_at_closure": 0.0,
+        "release_events": []
+      }
+    },
+    {
+      "seed": 20017,
+      "scenario": "team_carrion_rifle_ctrl",
+      "map_report": "Island_20017_team_carrion_rifle_ctrl/IslandFaunaPIE.json",
+      "report_sha256": "bbf62ed150641b8809d1c3a5974648e7cf4d32c57190ba25acd813a864e705f3",
+      "authority_log": "20017_team_carrion_rifle_ctrl.log",
+      "authority_log_sha256": "c333ab54f3724f3d2bcfa271812b1b38992369f7580b4a64fbe04d7bd733eee3",
+      "target_id": "49",
+      "target_hp_at_release": 100,
+      "carcass": null
+    },
+    {
+      "seed": 20017,
+      "scenario": "team_carrion_rifle_late",
+      "map_report": "Island_20017_team_carrion_rifle_late/IslandFaunaPIE.json",
+      "report_sha256": "a2d5531c2c7924a07c3ae41c7b3c08c0d6b51b95520d07e78388e71667e1ed1d",
+      "authority_log": "20017_team_carrion_rifle_late.log",
+      "authority_log_sha256": "96e172e8352fff7ae0cd0d7a8ad9085aaf6066b9800b80c261e172dba20bf095",
+      "target_id": "49",
+      "target_hp_at_release": 0,
+      "carcass": {
+        "species": "Wolf",
+        "medium": "Ground",
+        "total": 100.0,
+        "native_reserved": 0.0,
+        "immediate_killer_payment": 0.0,
+        "initial_shared_stock": 100.0,
+        "death_cause": "ExternalDamage",
+        "primary_hunter_id": null,
+        "primary_hunter_received_shared_payment": null,
+        "shared_payments": 0,
+        "consumer_count": 0,
+        "energy_by_consumer_species": {},
+        "first_shared_payment": null,
+        "last_logged_shared_stock": 100.0,
+        "logged_stock_minus_payments_and_remaining": 0.0,
+        "closure": {
+          "unused_stock": 100.0,
+          "authority_seconds": 91.27,
+          "reason": "Expired"
+        },
+        "logged_stock_minus_payments_and_unused_at_closure": 0.0,
+        "release_events": []
+      }
+    },
+    {
+      "seed": 20017,
+      "scenario": "team_carrion_rat_late",
+      "map_report": "Island_20017_team_carrion_rat_late/IslandFaunaPIE.json",
+      "report_sha256": "3d7d724b9b442b8062e70f8e0b385dfe9d1e5cc645182d935703e1110b89b940",
+      "authority_log": "20017_team_carrion_rat_late.log",
+      "authority_log_sha256": "a8dc0529160557ca3039eb066d7cbfea301b8a7fdd2a801e19f925525d93b46a",
+      "target_id": "75",
+      "target_hp_at_release": 0,
+      "carcass": {
+        "species": "Rat",
+        "medium": "Ground",
+        "total": 12.253,
+        "native_reserved": 0.0,
+        "immediate_killer_payment": 0.0,
+        "initial_shared_stock": 12.253,
+        "death_cause": "ExternalDamage",
+        "primary_hunter_id": null,
+        "primary_hunter_received_shared_payment": null,
+        "shared_payments": 0,
+        "consumer_count": 0,
+        "energy_by_consumer_species": {},
+        "first_shared_payment": null,
+        "last_logged_shared_stock": 12.253,
+        "logged_stock_minus_payments_and_remaining": 0.0,
+        "closure": {
+          "unused_stock": 12.253,
+          "authority_seconds": 137.47,
+          "reason": "Expired"
+        },
+        "logged_stock_minus_payments_and_unused_at_closure": 0.0,
+        "release_events": [
+          {
+            "agent_id": "65",
+            "species": "Fox",
+            "reason": "LivePreyScore",
+            "authority_seconds": 126.883,
+            "remaining": 12.253
+          },
+          {
+            "agent_id": "65",
+            "species": "Fox",
+            "reason": "LivePreyScore",
+            "authority_seconds": 127.8,
+            "remaining": 12.253
+          },
+          {
+            "agent_id": "71",
+            "species": "Leopard",
+            "reason": "Threat",
+            "authority_seconds": 131.2,
+            "remaining": 12.253
+          }
+        ]
+      }
+    }
+  ]
+}

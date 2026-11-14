@@ -1,0 +1,132 @@
+{
+ "phase": "pick",
+ "status": "ask_user",
+ "results": [
+  {
+   "gate": "C0-7",
+   "kind": "decide",
+   "rule": "끝 수 [0.7, 2.5] 배·멸종 없음·막힘 몫 < 0.2 인 후보 가운데 끝 수 비 기하평균이 1.0 에 가장 가까운 것",
+   "tried": [
+    {
+     "value": 0.002,
+     "end_ratio": {
+      "deer": 0.46875,
+      "boar": 0.5833333333333334
+     },
+     "extinct": false,
+     "block_share": 0.6583541147132169,
+     "block_def": "scan",
+     "block_share_scan": 0.6583541147132169,
+     "block_share_once": 0.31840796019900497,
+     "blocked_by_reason": {
+      "deer": {
+       "wolf_budget": 0,
+       "boar_cap": 0,
+       "one_pending": 253,
+       "slot_cap": 0,
+       "food_budget": 24
+      },
+      "wolf": {
+       "wolf_budget": 0,
+       "boar_cap": 0,
+       "one_pending": 0,
+       "slot_cap": 0,
+       "food_budget": 0
+      },
+      "boar": {
+       "wolf_budget": 0,
+       "boar_cap": 0,
+       "one_pending": 11,
+       "slot_cap": 0,
+       "food_budget": 0
+      }
+     },
+     "food_end": {
+      "grass_mean": 0.05087770396497381,
+      "root_mean": 0.05708613169886267,
+      "grass_empty": 0.09279989823177712,
+      "root_empty": 0.017517196504926565
+     },
+     "newborn_300": {
+      "deer": {
+       "n": 65,
+       "starve": 0.0,
+       "bite": 0.0
+      },
+      "wolf": {
+       "n": 0,
+       "starve": NaN,
+       "bite": NaN
+      },
+      "boar": {
+       "n": 11,
+       "starve": 0.0,
+       "bite": 0.0
+      }
+     },
+     "ok": false,
+     "score": 0.6483411012151017,
+     "births_per_1k_eligible": {
+      "judge": {
+       "deer": 0.361713205272244,
+       "boar": 0.09479326450767825
+      },
+      "train": {
+       "deer": 0.0,
+       "boar": 1.5124779430299975
+      }
+     },
+     "all_block_fail": true
+    }
+   ],
+   "status": "ask_user",
+   "value": null,
+   "note": "모든 후보 막힘 몫 ≥ 0.2 → 고칠 값이 없어 띄우기 전에 묻는다(15-2 질문 2)"
+  }
+ ],
+ "state": {
+  "values": {},
+  "fixed": {},
+  "f_enabled": false,
+  "j2_primary": "short",
+  "history": [
+   {
+    "phase": "pick",
+    "time": "2026-11-11 03:03:33",
+    "seeds_train": [
+     44192,
+     44193
+    ],
+    "seeds_judge": [
+     44190,
+     44191
+    ],
+    "gates": [
+     "C0-7"
+    ],
+    "status": "ask_user",
+    "values": {},
+    "fixed": {},
+    "f_enabled": false
+   }
+  ]
+ },
+ "seeds_train": [
+  44192,
+  44193
+ ],
+ "seeds_judge": [
+  44190,
+  44191
+ ],
+ "steps": {
+  "train": 3000,
+  "judge": 13500,
+  "c011": 9000
+ },
+ "elapsed_s": 72.9431324005127,
+ "metric_defs": {
+  "hunt": "pair",
+  "block": "scan"
+ }
+}

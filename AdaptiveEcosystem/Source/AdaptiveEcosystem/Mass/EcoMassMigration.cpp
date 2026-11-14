@@ -117,7 +117,10 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 	if (!bValid) return false;
 	TArray<int32> ScopedPopulation; ScopedPopulation.Init(0, Spaces.Num());
 	for (const FAgent& A : Agents) ++ScopedPopulation[A.Region.CurrentRegionIndex];
-	const auto HasFood = [&](int32 I) { return Resources.IsValidIndex(I) && Resources[I].Food > Settings.FoodEpsilon; };
+	const auto HasFood = [&](int32 I)
+	{
+		return Resources.IsValidIndex(I) && Spaces[I].bAvailable && Resources[I].Food > Settings.FoodEpsilon;
+	};
 	// Arrival is independent of the slower decision cadence and precedes new departures.
 	for (FAgent& A : Agents)
 	{
@@ -135,11 +138,12 @@ bool EcoMassMigration::Reconcile(FMassEntityManager& Manager, const FEcoServerTi
 		A.bArrived = true;
 	}
 	TArray<int32> Projected;
-	// Release every failed incoming plan before any new candidate is scored.
-	if (bDecisionDue)
+	// Unloaded destinations revoke a trip even between food reevaluations.
 	for (FAgent& A : Agents)
 	{
-		if (A.Travel.State != EEcoResidenceState::Traveling || HasFood(A.Travel.TargetRegionIndex)) continue;
+		if (A.Travel.State != EEcoResidenceState::Traveling) continue;
+		if (Spaces[A.Travel.TargetRegionIndex].bAvailable
+			&& (!bDecisionDue || HasFood(A.Travel.TargetRegionIndex))) continue;
 		A.Travel.LastFailedTargetIndex = A.Travel.TargetRegionIndex;
 		A.Travel.FailedTargetUntil = ActualTime + (PressureSettings && PressureSettings->bEnabled ? PressureSettings->RetrySeconds : Settings.DecisionIntervalSeconds);
 		A.Travel.State = EEcoResidenceState::WaitingForFood;

@@ -1,0 +1,2 @@
+# 팩 파일은 manifest.json 의 sha256 으로 확인한다 — 윈도우 core.autocrlf 가 줄바꿈을 바꾸면 다른 컴퓨터에서 확인이 깨진다.
+* -text

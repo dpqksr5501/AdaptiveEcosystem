@@ -80,6 +80,8 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 	for (const auto& Group : Groups)
 	{
 		if (Group.RegionId.IsNone() || GroupIds.Contains(Group.RegionId) || Group.Herbivores < 0 || Group.Wolves < 0 || !Group.Schedule.IsValid()) return false;
+		if (Group.bFaunaTransit && (!Group.bRulesOnly || Group.Herbivores || Group.Wolves || !Group.Fauna.IsEmpty()
+			|| (bEnableWaves && (Group.Schedule.DayCount || Group.Schedule.NightCount)))) return false;
 		GroupIds.Add(Group.RegionId); Total += (IsSpeciesEnabled(false) ? int64(Group.Herbivores) : 0) + (IsSpeciesEnabled(true) ? Group.Wolves : 0);
         for (const auto& Placement : Group.Fauna) Total += Placement.SpawnPoints.Num();
 		if (!Regions.ContainsByPredicate([&](const AEcologyRegion* R) { return R->RegionId == Group.RegionId; })) return false;
@@ -116,6 +118,7 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
 			GetDefault<UEcoRuntimeSettings>()->bPrintResourceChanges)) return false;
 	Registry->SetFoodProvider(this); Registry->SetCoverProvider(this);
 	if (auto* Slots = GetWorld()->GetSubsystem<UEcoSpeciesAIInteractionSubsystem>()) Slots->bAllowFixtures = bEnableSpeciesAIFixtures;
+	const auto InitialTime = Clock->GetServerTime();
 	for (const auto& Group : Groups)
 	{
 		FEcoSpawnRequest Request;
@@ -124,23 +127,30 @@ bool AEcoCreatureIntegrationSpawner::StartAuthority()
         int32 Count = DeerCount + WolfCount;
         for (const auto& Placement : Group.Fauna) Count += Placement.SpawnPoints.Num();
 		if (Count == 0) continue;
-		if (!Ecology->RequestInitialSpawn(Group.RegionId, Count, Clock->GetServerTime(), Request)) return false;
-		int32 Actual = Spawn(Group.RegionId, DeerCount, false) + Spawn(Group.RegionId, WolfCount, true);
+		if (!Ecology->RequestInitialSpawn(Group.RegionId, Count, InitialTime, Request)) return false;
+		int32 Actual = Spawn(Group.RegionId, DeerCount, false, InitialTime) + Spawn(Group.RegionId, WolfCount, true, InitialTime);
         for (const auto& Placement : Group.Fauna)
         {
             TArray<FVector> Positions;
             if (!BuildFaunaPositions(Group.RegionId, Placement, Positions)) break;
-            Actual += SpawnFauna(Group.RegionId, *FindFauna(Placement.SpeciesId), Positions);
+            Actual += SpawnFauna(Group.RegionId, *FindFauna(Placement.SpeciesId), Positions, InitialTime);
         }
 		PublishSummary(); // Commit population before releasing this group's spawn reservation.
 		if (!Ecology->CompleteSpawnRequest(Request.RequestId, Actual) || Actual != Request.Count) return false;
+	}
+	if (!FaunaSpecies.IsEmpty())
+	{
+		auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+		if (!Native) return false;
+		Native->SetAuthorityBoundaries(true);
 	}
 	GameState->SetMassReplicationReady(true); GameState->SetWorldPhase(EEcoWorldPhase::Running);
 	UE_LOG(LogTemp, Log, TEXT("[Eco Integration] Authority ready: Agents=%d Regions=%d PPO+Social+MassBubble"), Owned.Num(), Regions.Num());
 	return true;
 }
 
-int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bPredator, const TArray<FVector>* PositionsOverride)
+int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bPredator,
+	const FEcoServerTimeSnapshot& Time, const TArray<FVector>* PositionsOverride)
 {
 	if (GetNetMode() == NM_Client || Count <= 0 || !IsSpeciesEnabled(bPredator)) return 0;
 	auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
@@ -166,7 +176,7 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
             const auto* N=GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
             Life.Genome=EcoLifeV3::Founder(N?N->GetSettings().Seed:101,Id.StableAgentId);
             Life.Origin=bReady?EcoLifeV3::EOrigin::Recovery:EcoLifeV3::EOrigin::Initial;
-            Life.Born=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds-180;
+            Life.Born=Time.ServerTimeSeconds-180;
             const auto* Habitat=NaturalHabitatProfile.Get();
             if(const auto* Regional=RegionHabitatProfiles.Find(RegionId))Habitat=Regional->Get();
             if(!bPredator&&Habitat){
@@ -177,14 +187,13 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
                 int32 Stride=31;while(FMath::GreatestCommonDivisor(Stride,Count)!=1)++Stride;
                 const int32 Rank=(I*Stride+int32(EcoLifeV3::Mix(Seed)%uint64(Count)))%Count;
                 const double Age=Profile.FounderAge(Seed,Rank,Count);
-                Life.Born=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds-Age;
+                Life.Born=Time.ServerTimeSeconds-Age;
                 // Desynchronize breeding and avoid every adult pairing at world startup.
-                Life.NextBirth=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds+15+60*EcoLifeV3::Unit(Seed^uint64(Id.StableAgentId));
+                Life.NextBirth=Time.ServerTimeSeconds+15+60*EcoLifeV3::Unit(Seed^uint64(Id.StableAgentId));
             }
         }
 		auto& Membership = EM.GetFragmentDataChecked<FEcoRegionFragment>(Entities[I]);
 		Membership.CurrentRegionId = RegionId; Membership.CurrentRegionIndex = Ecology->GetRegionRuntimeIndex(RegionId);
-		const auto Time = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime();
 		auto& Runtime = EM.GetFragmentDataChecked<FEcoVitalsRuntimeFragment>(Entities[I]);
 		Runtime.WorldEpoch = Time.WorldEpoch; Runtime.LastTime = Time.ServerTimeSeconds; Runtime.LastStepId = Step;
 		if (auto* Policy = EM.GetFragmentDataPtr<FEcoPolicyRuntimeFragment>(Entities[I]))
@@ -212,7 +221,7 @@ int32 AEcoCreatureIntegrationSpawner::Spawn(FName RegionId, int32 Count, bool bP
 	Creation.Reset();
     // Initial social bonds do not invent genetic parents. Natural births receive their actual mother below.
     if(!bPredator)for(const auto E:Entities)if(auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bNaturalPopulation){
-        auto& Child=Link->Individual;const double Now=GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+        auto& Child=Link->Individual;const double Now=Time.ServerTimeSeconds;
         if(Child.AgeFraction(Now)>=1)continue;
         const FVector P=EM.GetFragmentDataChecked<FTransformFragment>(E).GetTransform().GetLocation();double Best=FMath::Square(3000.);
         for(const auto Adult:Entities){

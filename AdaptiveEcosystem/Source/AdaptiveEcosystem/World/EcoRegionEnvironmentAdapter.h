@@ -40,7 +40,9 @@ public:
 	UFUNCTION(BlueprintImplementableEvent, Category="Environment")
 	void OnEnvironmentUpdated(FName RegionId, const FRegionEnvironmentState& Environment);
 private:
-	bool ResolveAuthorityRegions(TArray<AEcologyRegion*>& Targets) const;
+	bool ResolveAuthorityRegions(TArray<AEcologyRegion*>& Targets, bool bRequireAll) const;
+	bool ApplyWeatherToRegions(const FRegionEnvironmentState& Weather, bool bRequireAll);
+	bool ApplyRainfallToRegions(float Rainfall, EEcoWeatherState WeatherState, bool bRequireAll);
 	int32 LastSummaryEpoch = 0;
 	int32 LastSummaryRevision = 0;
 	bool bCycleRejected = false;

@@ -1,5 +1,9 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoFaunaMotionClock.h"
+#include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
+#include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
+#include "AI/Policy/EcoBehaviorConfig.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassSpawnerSubsystem.h"
@@ -22,15 +26,24 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 	auto& EM = Spawner->GetEntityManagerChecked();
 	const auto& Budget = GetDefault<UEcoRuntimeSettings>()->ConnectionBudget;
 	const double Now = GetWorld()->GetRealTimeSeconds();
+	const auto* Native = MixedNativeStep ? GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>() : nullptr;
+	const double NativeAlpha = Native ? FMath::Clamp(FaunaMotionTime * EcoFaunaMotionClock::StepsPerSecond / EcoBehaviorConfig::PolicyInterval
+		- Native->GetGlobalStep(), 0., 1.) : 1.;
 	struct FInput
 	{
-		int64 Id; FName Species; FName Region; FVector Position; FEcoCreaturePresentationFragment Visual;
+		int64 Id; FName Species; FName Region; FVector Position; float FacingYaw; FEcoCreaturePresentationFragment Visual;
 		uint32 ResetRevision = 0; double Distance = 0.0;
 	};
 	TArray<FVector> Viewers;
+	TArray<const UEcoCombatRelevanceComponent*> CombatViewers;
 	for (auto It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 		if (const auto* PC = It->Get(); PC && PC->IsLocalController())
-		{ FVector P; FRotator R; PC->GetPlayerViewPoint(P, R); Viewers.Add(P); }
+		{
+			FVector P; FRotator R; PC->GetPlayerViewPoint(P, R); Viewers.Add(P);
+			if (const APawn* Pawn = PC->GetPawn())
+				if (const auto* Relevance = Pawn->FindComponentByClass<UEcoCombatRelevanceComponent>())
+					CombatViewers.Add(Relevance);
+		}
 	TArray<FInput> Inputs;
 	FMassEntityQuery Query(EM.AsShared());
 	Query.AddTagRequirement<FEcoIntegratedCreatureTag>(EMassFragmentPresence::All);
@@ -42,6 +55,7 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 	Query.AddRequirement<FEcoMovementDiscontinuityFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	Query.AddRequirement<FEcoVitalsFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	Query.AddRequirement<FEcoPolicyOutputFragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
+	if (Native) Query.AddRequirement<FEcoIntegratedV3Fragment>(EMassFragmentAccess::ReadOnly, EMassFragmentPresence::Optional);
 	FMassExecutionContext Context = EM.CreateExecutionContext(Delta);
 	Query.ForEachEntityChunk(Context, [&](FMassExecutionContext& C)
 	{
@@ -51,11 +65,17 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		const auto V = C.GetFragmentView<FEcoCreaturePresentationFragment>(); const auto RegionsView = C.GetFragmentView<FEcoRegionFragment>();
 		const auto Samples = C.GetFragmentView<FEcoClientPresentationFragment>();
 		const auto Resets = C.GetFragmentView<FEcoMovementDiscontinuityFragment>();
+		const auto NativeBodies = Native ? C.GetFragmentView<FEcoIntegratedV3Fragment>() : TConstArrayView<FEcoIntegratedV3Fragment>();
 		for (int32 I = 0; I < C.GetNumEntities(); ++I)
 		{
 			if (Ids[I].StableAgentId <= 0 || (!Samples.IsEmpty() && !Samples[I].bHasSample)) continue;
-			const FVector Position = Samples.IsEmpty() ? T[I].GetTransform().GetLocation()
+			FVector Position = Samples.IsEmpty() ? T[I].GetTransform().GetLocation()
 				: Samples[I].GetRenderPosition(Now, InterpolationDelaySeconds);
+			if (Samples.IsEmpty() && !NativeBodies.IsEmpty() && NativeBodies[I].bAdopted && !NativeBodies[I].bDead)
+			{
+				Position -= V[I].Velocity * ((1. - NativeAlpha) * EcoRepertoireV3::kStepSeconds);
+				Position.Z = FMath::Lerp(NativeBodies[I].PrevGroundZ, NativeBodies[I].GroundZ, NativeAlpha);
+			}
 			double Distance = Viewers.IsEmpty() ? 0.0 : TNumericLimits<double>::Max();
 			for (const auto& Viewer : Viewers) Distance = FMath::Min(Distance, FVector::DistSquared(Viewer, Position));
 			if (GetNetMode() != NM_Client && !Viewers.IsEmpty() && Distance > FMath::Square(HostVisualDistance)) continue;
@@ -66,14 +86,14 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 			const uint32 Revision = Samples.IsEmpty() ? (Resets.IsEmpty() ? 0 : Resets[I].Revision) : Samples[I].Current.MovementDiscontinuityRevision;
 			// A small retention bias prevents swapping equal-distance actors at the budget boundary.
 			if (Visuals.Contains(Ids[I].StableAgentId)) Distance *= .81;
-			Inputs.Add({Ids[I].StableAgentId, Ids[I].SpeciesId, RegionsView[I].CurrentRegionId, Position, V[I], Revision, Distance});
+			const float FacingYaw = Samples.IsEmpty() ? T[I].GetTransform().Rotator().Yaw : Samples[I].Current.Rotation.Yaw;
+			Inputs.Add({Ids[I].StableAgentId, Ids[I].SpeciesId, RegionsView[I].CurrentRegionId, Position, FacingYaw, V[I], Revision, Distance});
 		}
 	});
 	if (!bReady) return;
-    for (auto& Input:Inputs)
-        for (auto It=GetWorld()->GetPlayerControllerIterator();It;++It)
-            if (auto* PC=It->Get(); PC && PC->IsLocalController() && PC->GetPawn())
-                if (auto* R=PC->GetPawn()->FindComponentByClass<UEcoCombatRelevanceComponent>();R && R->IsOffered(Input.Id)) { Input.Distance=-1; break; }
+	for (auto& Input : Inputs)
+		for (const auto* Relevance : CombatViewers)
+			if (Relevance->IsOffered(Input.Id)) { Input.Distance = -1; break; }
 	Inputs.Sort([](const FInput& A, const FInput& B) { return A.Distance == B.Distance ? A.Id < B.Id : A.Distance < B.Distance; });
 	if (Inputs.Num() > Budget.MaxActorRepresentations) Inputs.SetNum(Budget.MaxActorRepresentations);
 	TSet<int64> Selected; for (const auto& Input : Inputs) Selected.Add(Input.Id);
@@ -116,8 +136,10 @@ void AEcoCreatureIntegrationSpawner::SyncVisuals(float Delta)
 		State.bDiscontinuity = Binding.Sequence == 1 || Binding.MovementRevision != Input.ResetRevision;
 		Binding.MovementRevision = Input.ResetRevision;
 		State.Velocity = Input.Visual.Velocity; State.bAlive = (Input.Visual.Flags & 1) != 0;
+		State.bHasFacing = true;
+		State.FacingYawDegrees = Input.FacingYaw;
 		State.bEating = (Input.Visual.Flags & 2) != 0; State.bPursuingPrey = (Input.Visual.Flags & 4) != 0;
-		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::CorpseSettled) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
+		State.Activity = Input.Visual.Activity <= uint8(EEcoSpeciesActivity::ExitWater) ? EEcoSpeciesActivity(Input.Visual.Activity) : EEcoSpeciesActivity::Hold;
 		State.SenseSource = EEcoSenseSource((Input.Visual.Flags>>4)&3);
 		State.FocusYawDegrees = float(Input.Visual.FocusYaw)/182.0389f;
         State.BodyScale=Input.Visual.BodyScale/128.f;State.Maturity=Input.Visual.Maturity/255.f;State.CoatTone=Input.Visual.CoatTone/255.f;

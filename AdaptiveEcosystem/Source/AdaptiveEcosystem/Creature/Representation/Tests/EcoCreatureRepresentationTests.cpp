@@ -19,6 +19,39 @@
 #include "Network/Mass/EcoMassReplicationTypes.h"
 #include "Mass/EcoMassPresentationFragments.h"
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoPresentationJitterTest, "AdaptiveEcosystem.Creature.Visual.PacketJitterAndReset",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+bool FEcoPresentationJitterTest::RunTest(const FString& Parameters)
+{
+	FEcoClientPresentationFragment Client;
+	FEcoRepresentationSnapshot Sample;
+	Sample.StableAgentId = 7;
+	Sample.SampleSequence = 1;
+	Sample.ServerSampleRealTimeSeconds = 1.0;
+	Sample.Location = FVector::ZeroVector;
+	TestTrue(TEXT("First movement sample accepted"), Client.Receive(Sample, 1.08));
+	Sample.SampleSequence = 2;
+	Sample.ServerSampleRealTimeSeconds = 1.1;
+	Sample.Location = FVector(100.0, 0.0, 0.0);
+	TestTrue(TEXT("Second movement sample accepted"), Client.Receive(Sample, 1.18));
+	const FVector Before = Client.GetRenderPosition(1.22, .1);
+	Sample.SampleSequence = 3;
+	Sample.ServerSampleRealTimeSeconds = 1.2;
+	Sample.Location = FVector(200.0, 0.0, 0.0);
+	TestTrue(TEXT("Earlier than usual delivery is accepted"), Client.Receive(Sample, 1.22));
+	const FVector After = Client.GetRenderPosition(1.22, .1);
+	TestTrue(TEXT("A 60 ms delay change does not snap the render position"), FVector::Distance(Before, After) < 5.0);
+	++Sample.VisualRevision;
+	TestTrue(TEXT("Visual-only update accepted"), Client.Receive(Sample, 1.23));
+	TestTrue(TEXT("Visual-only update preserves the movement timeline"), Client.GetRenderPosition(1.22, .1).Equals(After));
+	++Sample.SampleSequence;
+	++Sample.MovementDiscontinuityRevision;
+	Sample.Location = FVector(900.0, 0.0, 0.0);
+	TestTrue(TEXT("Teleport accepted"), Client.Receive(Sample, 1.24));
+	TestTrue(TEXT("Teleport snaps and discards buffered movement"), Client.GetRenderPosition(1.24, .1).Equals(Sample.Location));
+	return true;
+}
+
 IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoHealthBarTest, "AdaptiveEcosystem.Creature.Visual.HealthBarReplicationAndPooling",
 	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
 bool FEcoHealthBarTest::RunTest(const FString&)
@@ -102,6 +135,12 @@ bool FEcoVisualBindingTest::RunTest(const FString& Parameters)
 	Visual->ClearBinding();
 	TestTrue(TEXT("Clearing detaches and hides representation"), !Visual->bBound && Visual->GetVelocity().IsZero() && Visual->IsHidden());
 	TestFalse(TEXT("Detached visual rejects late updates"), Visual->ConsumeVisualState(State, 0.016f));
+	TestTrue(TEXT("Pooled wolf accepts a new identity"), Visual->BindIdentity(8, TEXT("Wolf")));
+	State.StableAgentId = 8; State.Sequence = 1; State.WorldTime = 0;
+	State.Velocity = FVector::ZeroVector; State.bAlive = false;
+	State.bHasFacing = true; State.FacingYawDegrees = -45.f;
+	TestTrue(TEXT("Late corpse snapshot applies"), Visual->ConsumeVisualState(State, 0.016f));
+	TestTrue(TEXT("Reused corpse actor uses snapshot yaw"), FMath::IsNearlyEqual(Visual->GetActorRotation().Yaw, -45.0f, 0.001f));
 	return true;
 }
 

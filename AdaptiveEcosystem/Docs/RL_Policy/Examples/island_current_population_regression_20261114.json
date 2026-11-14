@@ -1,0 +1,293 @@
+{
+  "partial": true,
+  "training_ready": false,
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "map_package": {
+    "repository_path": "AdaptiveEcosystem/Content/JYU/Maps/LV_JYU_IslandEcosystemRefreshed.umap",
+    "sha256": "20c2f5e313693cb8b90ed6cb9606ec30839352150f7f4f6998164c5832768206"
+  },
+  "region_actor_packages": {
+    "Snowfield": {
+      "repository_path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystemRefreshed/9/4N/XJ68MBGNVBAFIG0M84NUVJ.uasset",
+      "sha256": "94a7f6d80be225fc3397146d7b01e4647d37cfcbb33f9a07d469aff0c5be957b"
+    },
+    "Grassland": {
+      "repository_path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystemRefreshed/A/WU/H403BIOH4ZJ4EK3C03ORCM.uasset",
+      "sha256": "440a3c61544196418fb21bfd55e91449e276a8a3ca65f72d2b8290de1c88fd71"
+    }
+  },
+  "editor_binary": {
+    "project_path": "Binaries/Win64/UnrealEditor-AdaptiveEcosystem.dll",
+    "sha256": "7f104ea2ade04d18bed91600a8472de621dff27405f2a457f6a5afe1a433df5e"
+  },
+  "authority_duration_seconds": 3600,
+  "dilation": 4,
+  "runs": [
+    {
+      "seed": 20000,
+      "wall_seconds": 231.1,
+      "samples": 121,
+      "initial_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "matched_prior_initial_observables": true,
+      "prior_report": {
+        "project_path": "Saved/FaunaAudit/Island_20000_saved_grass_population/IslandFaunaPIE.json",
+        "sha256": "efbc06ac13eaf9705a8c4e171138f63526d27cfde6545d3cdc90357e8d836924"
+      },
+      "report": {
+        "project_path": "Saved/FaunaAudit/Island_20000_current_regression_60m/IslandFaunaPIE.json",
+        "sha256": "ea0838093e2449f41662b4ba96b3b20687dd5c361d127a17af104ba1053f15d5"
+      },
+      "authority_log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20000_current_regression_60m.log",
+        "sha256": "882cae13a04e1324a7748baa05f0561bef26635d6356a80866362f50cfdcf9c5"
+      },
+      "snapshots": {
+        "1": {
+          "population": {
+            "AriakeCatfish": 3,
+            "Bighorn": 5,
+            "Buffalo": 4,
+            "CommonCarp": 6,
+            "Crow": 3,
+            "Fox": 2,
+            "GoldenEagle": 2,
+            "Herbivore": 48,
+            "Horse": 5,
+            "Jackrabbit": 4,
+            "Leopard": 1,
+            "Mink": 2,
+            "Pig": 4,
+            "Rat": 6,
+            "UnidentifiedFish": 7,
+            "Wolf": 16
+          },
+          "authored_stock": 215.00000023841858
+        },
+        "1800": {
+          "population": {
+            "AriakeCatfish": 2,
+            "Bighorn": 0,
+            "Buffalo": 0,
+            "CommonCarp": 3,
+            "Crow": 0,
+            "Fox": 0,
+            "GoldenEagle": 0,
+            "Herbivore": 29,
+            "Horse": 0,
+            "Jackrabbit": 0,
+            "Leopard": 0,
+            "Mink": 0,
+            "Pig": 1,
+            "Rat": 0,
+            "UnidentifiedFish": 1,
+            "Wolf": 0
+          },
+          "authored_stock": 121.39865443110466
+        },
+        "3600": {
+          "population": {
+            "AriakeCatfish": 2,
+            "Bighorn": 0,
+            "Buffalo": 0,
+            "CommonCarp": 3,
+            "Crow": 0,
+            "Fox": 0,
+            "GoldenEagle": 0,
+            "Herbivore": 49,
+            "Horse": 0,
+            "Jackrabbit": 0,
+            "Leopard": 0,
+            "Mink": 0,
+            "Pig": 0,
+            "Rat": 0,
+            "UnidentifiedFish": 1,
+            "Wolf": 0
+          },
+          "authored_stock": 157.41675592958927
+        }
+      }
+    },
+    {
+      "seed": 20017,
+      "wall_seconds": 221.3,
+      "samples": 121,
+      "initial_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "matched_prior_initial_observables": true,
+      "prior_report": {
+        "project_path": "Saved/FaunaAudit/Island_20017_saved_grass_population/IslandFaunaPIE.json",
+        "sha256": "25a97ecd01c6d7c481eb8c4bc55d855eed7a853123c73b604697efc05ea94bc6"
+      },
+      "report": {
+        "project_path": "Saved/FaunaAudit/Island_20017_current_regression_60m/IslandFaunaPIE.json",
+        "sha256": "dfdb5670e829707caaa8069bba2111990594b6be11f920599ca272793fb16664"
+      },
+      "authority_log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20017_current_regression_60m.log",
+        "sha256": "ae4180e08b20a0571129554296f04849921d4e33bccee3a405d9f72d6e299bb1"
+      },
+      "snapshots": {
+        "1": {
+          "population": {
+            "AriakeCatfish": 3,
+            "Bighorn": 5,
+            "Buffalo": 4,
+            "CommonCarp": 6,
+            "Crow": 3,
+            "Fox": 2,
+            "GoldenEagle": 2,
+            "Herbivore": 48,
+            "Horse": 5,
+            "Jackrabbit": 4,
+            "Leopard": 1,
+            "Mink": 2,
+            "Pig": 4,
+            "Rat": 6,
+            "UnidentifiedFish": 7,
+            "Wolf": 16
+          },
+          "authored_stock": 215.00000023841858
+        },
+        "1800": {
+          "population": {
+            "AriakeCatfish": 2,
+            "Bighorn": 0,
+            "Buffalo": 0,
+            "CommonCarp": 3,
+            "Crow": 0,
+            "Fox": 0,
+            "GoldenEagle": 0,
+            "Herbivore": 27,
+            "Horse": 0,
+            "Jackrabbit": 0,
+            "Leopard": 0,
+            "Mink": 0,
+            "Pig": 1,
+            "Rat": 0,
+            "UnidentifiedFish": 1,
+            "Wolf": 0
+          },
+          "authored_stock": 130.8750963229686
+        },
+        "3600": {
+          "population": {
+            "AriakeCatfish": 2,
+            "Bighorn": 0,
+            "Buffalo": 0,
+            "CommonCarp": 3,
+            "Crow": 0,
+            "Fox": 0,
+            "GoldenEagle": 0,
+            "Herbivore": 48,
+            "Horse": 0,
+            "Jackrabbit": 0,
+            "Leopard": 0,
+            "Mink": 0,
+            "Pig": 0,
+            "Rat": 0,
+            "UnidentifiedFish": 1,
+            "Wolf": 0
+          },
+          "authored_stock": 151.23541970737278
+        }
+      }
+    }
+  ]
+}

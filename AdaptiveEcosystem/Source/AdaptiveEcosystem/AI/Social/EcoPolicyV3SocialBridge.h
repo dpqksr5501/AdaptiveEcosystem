@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/EcoBehaviorReasonHistory.h"
 #include "MassProcessor.h"
 #include "MassEntityQuery.h"
 #include "AI/Social/EcoSocialFragments.h"
@@ -23,20 +24,6 @@ struct FEcoSocialSignalSnapshot
     int64 PersistentHerdId=0;
     uint64 SourceKey=0;
 };
-struct FEcoBehaviorReasonEvent { double Time=0;FName Reason;FName Region;int64 NativeStep=0; };
-struct FEcoBehaviorReasonHistory {
-    FEcoBehaviorReasonEvent Events[16];int32 Count=0;
-    bool IsEmpty() const { return Count==0; }
-    int32 Num() const { return Count; }
-    const FEcoBehaviorReasonEvent& Last() const { return Events[Count-1]; }
-    const FEcoBehaviorReasonEvent* begin() const { return Events; }
-    const FEcoBehaviorReasonEvent* end() const { return Events+Count; }
-    void Append(const FEcoBehaviorReasonEvent& Event){
-        if(Count==16){for(int32 I=1;I<16;++I)Events[I-1]=Events[I];--Count;}
-        Events[Count++]=Event;
-    }
-};
-
 // Separate from WildFlight: policy request, native world reflex, and Social override stay inspectable.
 enum class EEcoV3SocialControl : uint8 { None, Alert, Flee, ShelterTravel, ShelterHold, Regroup };
 USTRUCT()

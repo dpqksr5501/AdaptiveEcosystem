@@ -1,0 +1,1876 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "map_package": {
+    "repository_path": "AdaptiveEcosystem/Content/JYU/Maps/LV_JYU_IslandEcosystemRefreshed.umap",
+    "sha256": "20c2f5e313693cb8b90ed6cb9606ec30839352150f7f4f6998164c5832768206"
+  },
+  "region_actor_packages": {
+    "Snowfield": {
+      "repository_path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystemRefreshed/9/4N/XJ68MBGNVBAFIG0M84NUVJ.uasset",
+      "sha256": "94a7f6d80be225fc3397146d7b01e4647d37cfcbb33f9a07d469aff0c5be957b"
+    },
+    "Grassland": {
+      "repository_path": "AdaptiveEcosystem/Content/__ExternalActors__/JYU/Maps/LV_JYU_IslandEcosystemRefreshed/A/WU/H403BIOH4ZJ4EK3C03ORCM.uasset",
+      "sha256": "440a3c61544196418fb21bfd55e91449e276a8a3ca65f72d2b8290de1c88fd71"
+    }
+  },
+  "build_sha256": "0f93c703db0c289be6b2d638b22bd1544ee19fe908d83003014ab48e7921c930",
+  "authority_duration_seconds": 3600,
+  "runs": [
+    {
+      "seed": 20000,
+      "samples": 121,
+      "report_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_patch_baseline60/IslandFaunaPIE.json",
+      "report_sha256": "ca18bde15035c97be816f2bbc5bd4759e1bbe3b87533c930420d1f490ae06cea",
+      "authority_log_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_patch_baseline60.log",
+      "authority_log_sha256": "30ff73ffc189ee58b9121df8b57895b92882a5bf29cea0a8af2ec925ca0e3289",
+      "initial_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "population_by_authority_second": {
+        "1": {
+          "population": {
+            "Wolf": 16,
+            "Herbivore": 48,
+            "Buffalo": 4,
+            "Crow": 3,
+            "Horse": 5,
+            "Pig": 4,
+            "Fox": 2,
+            "Jackrabbit": 4,
+            "Leopard": 1,
+            "Rat": 6,
+            "Bighorn": 5,
+            "GoldenEagle": 2,
+            "AriakeCatfish": 3,
+            "CommonCarp": 6,
+            "Mink": 2,
+            "UnidentifiedFish": 7
+          },
+          "authored_stock": 215.00000023841858
+        },
+        "1800": {
+          "population": {
+            "Herbivore": 34,
+            "Pig": 1,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 121.83964771032333
+        },
+        "3600": {
+          "population": {
+            "Herbivore": 46,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 162.9353294968605
+        }
+      },
+      "confirmed_vitality_energy": {
+        "Bighorn": {
+          "PatchMeal": 32.293
+        },
+        "Horse": {
+          "PatchMeal": 70.488
+        },
+        "Buffalo": {
+          "PatchMeal": 86.036
+        },
+        "Jackrabbit": {
+          "PatchMeal": 56.634
+        },
+        "Mink": {
+          "PatchMeal": 25.877
+        },
+        "Fox": {
+          "Scavenge": 230.193
+        },
+        "Wolf": {
+          "Scavenge": 508.0
+        },
+        "AriakeCatfish": {
+          "PatchMeal": 676.801,
+          "Scavenge": 21.0
+        },
+        "CommonCarp": {
+          "PatchMeal": 1580.336
+        },
+        "UnidentifiedFish": {
+          "PatchMeal": 414.242
+        },
+        "Pig": {
+          "Scavenge": 554.743
+        },
+        "Crow": {
+          "Scavenge": 7.0
+        }
+      },
+      "deaths_by_species_and_cause": {
+        "Herbivore": {
+          "Predation": 19,
+          "Starvation": 48
+        },
+        "Rat": {
+          "Predation": 9
+        },
+        "Horse": {
+          "Starvation": 7
+        },
+        "Crow": {
+          "Starvation": 4
+        },
+        "Buffalo": {
+          "Starvation": 6
+        },
+        "Jackrabbit": {
+          "Starvation": 3,
+          "Predation": 2
+        },
+        "Pig": {
+          "Starvation": 6
+        },
+        "Bighorn": {
+          "Starvation": 7
+        },
+        "Leopard": {
+          "Starvation": 1
+        },
+        "GoldenEagle": {
+          "Starvation": 2
+        },
+        "Mink": {
+          "Starvation": 2
+        },
+        "Fox": {
+          "Starvation": 3
+        },
+        "Wolf": {
+          "Starvation": 16
+        },
+        "CommonCarp": {
+          "Starvation": 5
+        },
+        "UnidentifiedFish": {
+          "Starvation": 6
+        },
+        "AriakeCatfish": {
+          "Starvation": 1
+        }
+      },
+      "births_by_species": {
+        "Rat": 3,
+        "Bighorn": 2,
+        "Pig": 2,
+        "Horse": 2,
+        "Crow": 1,
+        "Buffalo": 2,
+        "Jackrabbit": 1,
+        "Herbivore": 65,
+        "Fox": 1,
+        "CommonCarp": 2
+      },
+      "native_deer_plant_units": 3919.75,
+      "native_wolf_reserved_nutrition": 6.918716,
+      "logged_carcass_balance": {
+        "created": 147,
+        "closed": 147,
+        "payments": 255,
+        "max_payment_residual": 0.0,
+        "shared_across_species_count": 4
+      },
+      "authority_ledger": {
+        "rows_by_region": {
+          "LowerRiver": 197
+        },
+        "max_printed_balance_residual": 1e-06,
+        "guard_intercepts": 0
+      },
+      "checkpoint_validation": {
+        "slot": "IslandGrassBounds_20000_patch_baseline60",
+        "version": 16,
+        "payload_bytes": 1508917,
+        "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+        "runtime_md5": "641ef1adaaa39f9e9adb2c472c4332a7",
+        "agents": 116,
+        "step": 177,
+        "native_step": 1312,
+        "native_region_stock": {
+          "Snowfield": "97.369307389",
+          "Grassland": "38.042251577",
+          "Riverbank": "48.484578957",
+          "Highland": "137.244267708"
+        },
+        "observed_agents": 115,
+        "authored_patches": 22,
+        "wet_patches": 9,
+        "resumed_hatches": [
+          "136"
+        ],
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/Ecosystem/IslandGrassBounds_20000_patch_baseline60.eco": "3a1d86901dde83717a52173442852efe7ac10abef9daa8459dd0953641179083",
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_patch_base_save/IslandFaunaPIE.json": "3339224bd98528548a336810c4190d9134192f5c057e5c4f7a5aa3d7907af1c2",
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_patch_base_load/IslandFaunaPIE.json": "9fa0d67daec0641fa68b57611df05e0ccb3e75ea87af45f0cecd67c294da1c3c",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_patch_base_save.log": "42b1e2d737b6896f203f6fd5b753539f5a870dfb5af1f55c7ae2ef8f96e845ec",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_patch_base_load.log": "6a39442d5714f6bf55d89ee10a4b00a3c2989e6ffd6679665f1daf432daf931b"
+        }
+      }
+    },
+    {
+      "seed": 20017,
+      "samples": 121,
+      "report_path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_patch_baseline60/IslandFaunaPIE.json",
+      "report_sha256": "7f1d895c6ed307bbadb273f6e3ab84ca066804e9b78ca1bf72ba4552a7aa7b78",
+      "authority_log_path": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_patch_baseline60.log",
+      "authority_log_sha256": "8b3ef9491b1f8a86fd822c2c3d4486f74727e392134ad504e14690ddce046e20",
+      "initial_backends": {
+        "Wolf": [
+          "NativeV3_threat_FSM"
+        ],
+        "Herbivore": [
+          "v3_r7_g995_s1_20m@40d8710d"
+        ],
+        "Buffalo": [
+          "RuleFauna"
+        ],
+        "Crow": [
+          "RuleFauna"
+        ],
+        "Horse": [
+          "RuleFauna"
+        ],
+        "Pig": [
+          "RuleFauna"
+        ],
+        "Fox": [
+          "RuleFauna"
+        ],
+        "Jackrabbit": [
+          "RuleFauna"
+        ],
+        "Leopard": [
+          "RuleFauna"
+        ],
+        "Rat": [
+          "RuleFauna"
+        ],
+        "Bighorn": [
+          "RuleFauna"
+        ],
+        "GoldenEagle": [
+          "RuleFauna"
+        ],
+        "AriakeCatfish": [
+          "RuleFauna"
+        ],
+        "CommonCarp": [
+          "RuleFauna"
+        ],
+        "Mink": [
+          "RuleFauna"
+        ],
+        "UnidentifiedFish": [
+          "RuleFauna"
+        ]
+      },
+      "population_by_authority_second": {
+        "1": {
+          "population": {
+            "Wolf": 16,
+            "Herbivore": 48,
+            "Buffalo": 4,
+            "Crow": 3,
+            "Horse": 5,
+            "Pig": 4,
+            "Fox": 2,
+            "Jackrabbit": 4,
+            "Leopard": 1,
+            "Rat": 6,
+            "Bighorn": 5,
+            "GoldenEagle": 2,
+            "AriakeCatfish": 3,
+            "CommonCarp": 6,
+            "Mink": 2,
+            "UnidentifiedFish": 7
+          },
+          "authored_stock": 215.00000023841858
+        },
+        "1800": {
+          "population": {
+            "Herbivore": 28,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 129.01280868425965
+        },
+        "3600": {
+          "population": {
+            "Herbivore": 49,
+            "AriakeCatfish": 2,
+            "CommonCarp": 3,
+            "UnidentifiedFish": 1
+          },
+          "authored_stock": 149.79679237492383
+        }
+      },
+      "confirmed_vitality_energy": {
+        "Horse": {
+          "PatchMeal": 110.544
+        },
+        "Bighorn": {
+          "PatchMeal": 31.562
+        },
+        "Buffalo": {
+          "PatchMeal": 46.251
+        },
+        "Jackrabbit": {
+          "PatchMeal": 56.928
+        },
+        "Mink": {
+          "PatchMeal": 25.275
+        },
+        "Leopard": {
+          "Scavenge": 9.0
+        },
+        "Fox": {
+          "Scavenge": 196.14
+        },
+        "Pig": {
+          "Scavenge": 274.118
+        },
+        "CommonCarp": {
+          "PatchMeal": 1521.67
+        },
+        "AriakeCatfish": {
+          "PatchMeal": 676.192,
+          "Scavenge": 21.0
+        },
+        "Wolf": {
+          "Scavenge": 486.299
+        },
+        "UnidentifiedFish": {
+          "PatchMeal": 416.04
+        },
+        "Crow": {
+          "Scavenge": 248.5
+        }
+      },
+      "deaths_by_species_and_cause": {
+        "Herbivore": {
+          "Predation": 19,
+          "Starvation": 27
+        },
+        "Rat": {
+          "Predation": 9
+        },
+        "Horse": {
+          "Starvation": 7
+        },
+        "Buffalo": {
+          "Starvation": 6
+        },
+        "Jackrabbit": {
+          "Starvation": 5
+        },
+        "Bighorn": {
+          "Starvation": 7
+        },
+        "GoldenEagle": {
+          "Starvation": 2
+        },
+        "Mink": {
+          "Starvation": 2
+        },
+        "Pig": {
+          "Starvation": 6
+        },
+        "Leopard": {
+          "Starvation": 1
+        },
+        "Crow": {
+          "Starvation": 3
+        },
+        "Fox": {
+          "Starvation": 3
+        },
+        "Wolf": {
+          "Starvation": 16
+        },
+        "CommonCarp": {
+          "Starvation": 5
+        },
+        "UnidentifiedFish": {
+          "Starvation": 6
+        },
+        "AriakeCatfish": {
+          "Starvation": 1
+        }
+      },
+      "births_by_species": {
+        "Rat": 3,
+        "Bighorn": 2,
+        "Pig": 2,
+        "Horse": 2,
+        "Buffalo": 2,
+        "Jackrabbit": 1,
+        "Herbivore": 47,
+        "Fox": 1,
+        "CommonCarp": 2
+      },
+      "native_deer_plant_units": 3414.63,
+      "native_wolf_reserved_nutrition": 5.52468,
+      "logged_carcass_balance": {
+        "created": 125,
+        "closed": 125,
+        "payments": 247,
+        "max_payment_residual": 0.0,
+        "shared_across_species_count": 5
+      },
+      "authority_ledger": {
+        "rows_by_region": {
+          "LowerRiver": 198
+        },
+        "max_printed_balance_residual": 1e-06,
+        "guard_intercepts": 0
+      },
+      "checkpoint_validation": {
+        "slot": "IslandGrassBounds_20017_patch_baseline60",
+        "version": 16,
+        "payload_bytes": 1496275,
+        "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+        "runtime_md5": "641ef1adaaa39f9e9adb2c472c4332a7",
+        "agents": 112,
+        "step": 182,
+        "native_step": 1350,
+        "native_region_stock": {
+          "Snowfield": "6.889043835",
+          "Grassland": "52.207565497",
+          "Riverbank": "46.204511869",
+          "Highland": "127.884164117"
+        },
+        "observed_agents": 111,
+        "authored_patches": 22,
+        "wet_patches": 9,
+        "resumed_hatches": [
+          "134"
+        ],
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/Ecosystem/IslandGrassBounds_20017_patch_baseline60.eco": "9d1c35a59f4902d7863e8f8b9a1f223bb92d92bedf1770e7b92ae37c1e941b34",
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_patch_base_save/IslandFaunaPIE.json": "44466981754d3c8a9751e4027aa0d5e013ce0866e6f753db3ddb805cb27b3680",
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_patch_base_load/IslandFaunaPIE.json": "c701f89f3258f2ee59e596f478c4514303574f791ff45733ec1d10a6fdf27a59",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_patch_base_save.log": "6f1609ad33dc05defc7d710f32f3d690369a82cdbf840632ea700709a4768f3f",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_patch_base_load.log": "3fc0ed339180fa54e5756ae5d0b80542236ad630812b341ba80d1227d765fe22"
+        }
+      }
+    }
+  ],
+  "initial_patch_inputs": {
+    "active_stage": 1,
+    "patch_order": [
+      "IslandRiverInletPlants",
+      "IslandRiverQuietMargin",
+      "IslandRiverGravelInsects",
+      "IslandRiverRoots",
+      "IslandRiverDrift",
+      "IslandRiverSlowShelf",
+      "IslandForageNorthSedges",
+      "IslandForageSouthBrowse",
+      "IslandForageNorthForbs",
+      "IslandForageEastSedges",
+      "IslandForageWestMeadow",
+      "IslandForageOpenMeadow",
+      "IslandForageFloodplainApproach",
+      "IslandForageApproachForbs",
+      "IslandForageUplandForbs",
+      "IslandForageScrubBrowse",
+      "IslandForageWestBrowse",
+      "IslandForageWestForbs",
+      "IslandRiverRootsShore",
+      "IslandTransitionForbs",
+      "IslandRiverGravelNearRoots",
+      "IslandRiverSecondMinkShore"
+    ],
+    "patches": {
+      "IslandRiverInletPlants": {
+        "stage": 1,
+        "capacity": 16.0,
+        "regrowth_per_second": 0.18000000715255737,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": true,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          84705.94008285584,
+          39200.06070119358,
+          -4338.5226290330575
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "CommonCarp"
+        ],
+        "forage_access_points": []
+      },
+      "IslandRiverQuietMargin": {
+        "stage": 1,
+        "capacity": 16.0,
+        "regrowth_per_second": 0.18000000715255737,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": true,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          85983.61496526303,
+          39931.08208023954,
+          -4367.3045266434365
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "CommonCarp",
+          "UnidentifiedFish"
+        ],
+        "forage_access_points": []
+      },
+      "IslandRiverGravelInsects": {
+        "stage": 1,
+        "capacity": 8.800000190734863,
+        "regrowth_per_second": 0.10399999469518661,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          87410.90886215823,
+          40260.32622990975,
+          -4440.107707546236
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "AriakeCatfish"
+        ],
+        "forage_access_points": []
+      },
+      "IslandRiverRoots": {
+        "stage": 1,
+        "capacity": 8.5,
+        "regrowth_per_second": 0.09562500566244125,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": true,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          91523.33553418468,
+          41604.47413875362,
+          -4536.705404212948
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "AriakeCatfish",
+          "Mink"
+        ],
+        "forage_access_points": []
+      },
+      "IslandRiverDrift": {
+        "stage": 1,
+        "capacity": 11.0,
+        "regrowth_per_second": 0.12999999523162842,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          92985.54109125207,
+          41622.03552490922,
+          -4474.107756265673
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "CommonCarp",
+          "UnidentifiedFish"
+        ],
+        "forage_access_points": []
+      },
+      "IslandRiverSlowShelf": {
+        "stage": 1,
+        "capacity": 16.0,
+        "regrowth_per_second": 0.18000000715255737,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": true,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          84705.94008285584,
+          39200.06070119358,
+          -4370.5226290330575
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "CommonCarp",
+          "UnidentifiedFish"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageNorthSedges": {
+        "stage": 1,
+        "capacity": 13.0,
+        "regrowth_per_second": 0.18000000715255737,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.5400000214576721,
+        "plant_dry_loss_per_second": 0.23999999463558197,
+        "track_local_soil_moisture": true,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.WET_MEADOW: 4>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          84934.16878479652,
+          42932.6351456719,
+          -4243.778475796385
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          2.0,
+          17.0,
+          36.0
+        ],
+        "plant_growth_rainfall": [
+          0.28,
+          1.36
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageSouthBrowse": {
+        "stage": 1,
+        "capacity": 10.0,
+        "regrowth_per_second": 0.11999999731779099,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.25,
+        "plant_dry_loss_per_second": 0.10000000149011612,
+        "track_local_soil_moisture": true,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.BROWSE: 3>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "IslandLowerRiver05",
+        "center": [
+          90718.38205761915,
+          38408.387527122206,
+          -4370.82750823324
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          -3.0,
+          21.0,
+          43.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.1
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": [
+          [
+            90718.38205761915,
+            38223.387527122206,
+            -4334.851126076825
+          ]
+        ]
+      },
+      "IslandForageNorthForbs": {
+        "stage": 1,
+        "capacity": 9.0,
+        "regrowth_per_second": 0.15000000596046448,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.4300000071525574,
+        "plant_dry_loss_per_second": 0.2199999988079071,
+        "track_local_soil_moisture": true,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.FORBS: 2>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          94974.01098502394,
+          44144.35240472885,
+          -4373.888664814462
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          5.0,
+          17.0,
+          33.0
+        ],
+        "plant_growth_rainfall": [
+          0.22,
+          1.27
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageEastSedges": {
+        "stage": 1,
+        "capacity": 13.0,
+        "regrowth_per_second": 0.18000000715255737,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.5400000214576721,
+        "plant_dry_loss_per_second": 0.23999999463558197,
+        "track_local_soil_moisture": true,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.WET_MEADOW: 4>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          96524.29110219117,
+          37815.7168213242,
+          -4344.265192220903
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          2.0,
+          17.0,
+          36.0
+        ],
+        "plant_growth_rainfall": [
+          0.28,
+          1.36
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageWestMeadow": {
+        "stage": 1,
+        "capacity": 12.0,
+        "regrowth_per_second": 0.17000000178813934,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.30000001192092896,
+        "plant_dry_loss_per_second": 0.1599999964237213,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "Grassland",
+        "plant_guild": "<EcoFaunaPlantGuild.GRASS: 1>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          89150.0,
+          59570.0,
+          -4280.813987436739
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          2.0,
+          19.0,
+          38.0
+        ],
+        "plant_growth_rainfall": [
+          0.48,
+          1.14
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageOpenMeadow": {
+        "stage": 1,
+        "capacity": 12.0,
+        "regrowth_per_second": 0.17000000178813934,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.30000001192092896,
+        "plant_dry_loss_per_second": 0.1599999964237213,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "Grassland",
+        "plant_guild": "<EcoFaunaPlantGuild.GRASS: 1>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          89620.0,
+          59820.0,
+          -4288.490056839857
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          2.0,
+          19.0,
+          38.0
+        ],
+        "plant_growth_rainfall": [
+          0.48,
+          1.14
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageFloodplainApproach": {
+        "stage": 1,
+        "capacity": 13.0,
+        "regrowth_per_second": 0.18000000715255737,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.5400000214576721,
+        "plant_dry_loss_per_second": 0.23999999463558197,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "Grassland",
+        "plant_guild": "<EcoFaunaPlantGuild.WET_MEADOW: 4>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          90780.0,
+          60510.0,
+          -4290.78125
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          2.0,
+          17.0,
+          36.0
+        ],
+        "plant_growth_rainfall": [
+          0.28,
+          1.36
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageApproachForbs": {
+        "stage": 1,
+        "capacity": 9.0,
+        "regrowth_per_second": 0.15000000596046448,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.4300000071525574,
+        "plant_dry_loss_per_second": 0.2199999988079071,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "Grassland",
+        "plant_guild": "<EcoFaunaPlantGuild.FORBS: 2>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          90390.0,
+          61070.0,
+          -4290.78125
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          5.0,
+          17.0,
+          33.0
+        ],
+        "plant_growth_rainfall": [
+          0.22,
+          1.27
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageUplandForbs": {
+        "stage": 1,
+        "capacity": 9.0,
+        "regrowth_per_second": 0.15000000596046448,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.4300000071525574,
+        "plant_dry_loss_per_second": 0.2199999988079071,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "Highland",
+        "plant_guild": "<EcoFaunaPlantGuild.FORBS: 2>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          50160.0,
+          49000.0,
+          3137.184245536737
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          5.0,
+          17.0,
+          33.0
+        ],
+        "plant_growth_rainfall": [
+          0.22,
+          1.27
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageScrubBrowse": {
+        "stage": 1,
+        "capacity": 10.0,
+        "regrowth_per_second": 0.11999999731779099,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.25,
+        "plant_dry_loss_per_second": 0.10000000149011612,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "Highland",
+        "plant_guild": "<EcoFaunaPlantGuild.BROWSE: 3>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          50750.0,
+          48950.0,
+          3137.0681744487683
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          -3.0,
+          21.0,
+          43.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.1
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageWestBrowse": {
+        "stage": 1,
+        "capacity": 10.0,
+        "regrowth_per_second": 0.11999999731779099,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.25,
+        "plant_dry_loss_per_second": 0.10000000149011612,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "Riverbank",
+        "plant_guild": "<EcoFaunaPlantGuild.BROWSE: 3>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          35780.0,
+          34620.0,
+          3098.5880159456783
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          -3.0,
+          21.0,
+          43.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.1
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandForageWestForbs": {
+        "stage": 1,
+        "capacity": 4.5,
+        "regrowth_per_second": 0.07500000298023224,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.4300000071525574,
+        "plant_dry_loss_per_second": 0.10999999940395355,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "Riverbank",
+        "plant_guild": "<EcoFaunaPlantGuild.FORBS: 2>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          37140.0,
+          35650.0,
+          3098.5880159456783
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          5.0,
+          17.0,
+          33.0
+        ],
+        "plant_growth_rainfall": [
+          0.22,
+          1.27
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandRiverRootsShore": {
+        "stage": 1,
+        "capacity": 6.0,
+        "regrowth_per_second": 0.06750000268220901,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": false,
+        "has_shore_entry": true,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          89121.986,
+          38518.504,
+          -4442.21
+        ],
+        "shore_point": [
+          89013.537,
+          38272.031,
+          -4383.583926352714
+        ],
+        "water_entry_point": [
+          89013.537,
+          38392.031,
+          -4421.405
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "AriakeCatfish",
+          "Mink"
+        ],
+        "forage_access_points": []
+      },
+      "IslandTransitionForbs": {
+        "stage": 1,
+        "capacity": 4.5,
+        "regrowth_per_second": 0.07500000298023224,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": false,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.4300000071525574,
+        "plant_dry_loss_per_second": 0.10999999940395355,
+        "track_local_soil_moisture": true,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "ZHighlandRiverTransition",
+        "plant_guild": "<EcoFaunaPlantGuild.FORBS: 2>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          41008.88884136696,
+          39348.57137719221,
+          3098.5880159456783
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          5.0,
+          17.0,
+          33.0
+        ],
+        "plant_growth_rainfall": [
+          0.22,
+          1.27
+        ],
+        "consumers": [
+          "Bighorn",
+          "Buffalo",
+          "Horse",
+          "Jackrabbit"
+        ],
+        "forage_access_points": []
+      },
+      "IslandRiverGravelNearRoots": {
+        "stage": 1,
+        "capacity": 2.200000047683716,
+        "regrowth_per_second": 0.025999998673796654,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": false,
+        "has_shore_entry": false,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          92968.58,
+          41462.64,
+          -4524.1
+        ],
+        "shore_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "water_entry_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "dry_bank_point": [
+          0.0,
+          0.0,
+          0.0
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "AriakeCatfish"
+        ],
+        "forage_access_points": []
+      },
+      "IslandRiverSecondMinkShore": {
+        "stage": 1,
+        "capacity": 1.5,
+        "regrowth_per_second": 0.016875000670552254,
+        "energy_per_meal": 2.799999952316284,
+        "submerged": true,
+        "aquatic_nursery": false,
+        "has_shore_entry": true,
+        "shelter_radius": 0.0,
+        "entrance_radius": 0.0,
+        "plant_moisture_need": 0.0,
+        "plant_dry_loss_per_second": 0.0,
+        "track_local_soil_moisture": false,
+        "seasonal_full_growth_depth_cm": 0.0,
+        "seasonal_dry_loss_per_second": 0.0,
+        "region_id": "LowerRiver",
+        "plant_guild": "<EcoFaunaPlantGuild.UNSPECIFIED: 0>",
+        "sheltered_species": "None",
+        "forage_water_habitat_id": "None",
+        "center": [
+          94147.943982822,
+          43498.28398282202,
+          -4470.345174965815
+        ],
+        "shore_point": [
+          94326.00999258451,
+          43676.349990727125,
+          -4379.449226944
+        ],
+        "water_entry_point": [
+          94254.01,
+          43604.35,
+          -4421.40478515625
+        ],
+        "dry_bank_point": [
+          94731.99740640649,
+          44183.96621904676,
+          -4376.2226722380565
+        ],
+        "plant_growth_temperature": [
+          0.0,
+          18.0,
+          42.0
+        ],
+        "plant_growth_rainfall": [
+          0.75,
+          1.25
+        ],
+        "consumers": [
+          "AriakeCatfish",
+          "Mink"
+        ],
+        "forage_access_points": []
+      }
+    }
+  },
+  "dedicated_server_validation": {
+    "seed": 20017,
+    "duration_seconds": 93,
+    "server_exit_code": 0,
+    "join_wall_seconds": [
+      22,
+      60
+    ],
+    "clients": [
+      {
+        "name": "ClientA",
+        "passed": true,
+        "checked_near_region_samples": 31,
+        "evaluated_regions": [
+          "Grassland",
+          "Highland",
+          "Riverbank"
+        ],
+        "received_regions": [
+          "Grassland",
+          "Highland",
+          "Riverbank",
+          "Snowfield"
+        ],
+        "missing_after_grace": [],
+        "missing_camera_samples": [],
+        "grass_travel": null,
+        "island_species": {
+          "matched": [
+            "AriakeCatfish",
+            "Buffalo",
+            "Herbivore",
+            "Jackrabbit",
+            "Pig",
+            "Wolf"
+          ],
+          "mismatched": {},
+          "passed": true
+        },
+        "authority_agents": 0,
+        "field_count": 4,
+        "exit_code": 0
+      },
+      {
+        "name": "ClientB",
+        "passed": true,
+        "checked_near_region_samples": 39,
+        "evaluated_regions": [
+          "Grassland",
+          "Highland",
+          "Riverbank"
+        ],
+        "received_regions": [
+          "Grassland",
+          "Highland",
+          "Riverbank",
+          "Snowfield"
+        ],
+        "missing_after_grace": [],
+        "missing_camera_samples": [],
+        "grass_travel": null,
+        "island_species": {
+          "matched": [
+            "AriakeCatfish",
+            "Buffalo",
+            "Herbivore",
+            "Pig",
+            "Wolf"
+          ],
+          "mismatched": {},
+          "passed": true
+        },
+        "authority_agents": 0,
+        "field_count": 4,
+        "exit_code": 0
+      }
+    ],
+    "late_join_life": {
+      "authority_child_ids": [
+        "119",
+        "120",
+        "121",
+        "122",
+        "123",
+        "124",
+        "125",
+        "126",
+        "127",
+        "128",
+        "129",
+        "130",
+        "131",
+        "132"
+      ],
+      "received_child_ids": [
+        "122",
+        "124"
+      ],
+      "scale_tolerance": 0.015625,
+      "scale_mismatches": [],
+      "passed": true
+    },
+    "source_sha256": {
+      "AdaptiveEcosystem/Saved/IslandNetworkPatchBaseline/Relevance.json": "9bc949409b1f3929b852f75cd5baeb77e13fc3f9a57fc65ac63dce827e3224c8",
+      "AdaptiveEcosystem/Saved/IslandNetworkPatchBaseline/NetworkProcesses.json": "1f7998b02fa37696b686e6df4633812063062dcc495d27bfd61d86675d1079fc",
+      "AdaptiveEcosystem/Saved/IslandNetworkPatchBaseline/Server_Runtime.json": "c049822e4db41b1582414c593d7558fddd08e79a012b65b4ba5fc29f57c74ea1",
+      "AdaptiveEcosystem/Saved/IslandNetworkPatchBaseline/ClientA_Client.json": "cdcf0dc6d9fc5330531c6199b9ef5721875da55aa7e7fd646f3e012cc0da2537",
+      "AdaptiveEcosystem/Saved/IslandNetworkPatchBaseline/ClientB_Client.json": "dec64dd0e3a416e0a7efece5f6276fd943b774e57654df6909373a4613b6ac8e"
+    }
+  }
+}

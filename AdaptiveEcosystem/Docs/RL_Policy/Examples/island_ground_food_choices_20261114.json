@@ -1,0 +1,2026 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "scope": "Rank only candidates already accepted by Unreal. Payments and rankings came from separate recorded trials.",
+  "rules": {
+    "walk_speed_cm_s": 150,
+    "plant_preference": {
+      "GRASS": 1.45,
+      "FORBS": 0.88,
+      "WET_MEADOW": 1.16
+    },
+    "minimum_stock": 0.2,
+    "request_lifetime": 2.0,
+    "request_multiplier": 1.75
+  },
+  "ranking": [
+    {
+      "seed": 20000,
+      "label": "20000_score_Control",
+      "report": {
+        "project_path": "Saved/FaunaAudit/Island_20000_score_Control/IslandFaunaPIE.json",
+        "sha256": "ca307528d7a4ca64d2cbfb945314c2f21ed611315d94cef0b6001b8576fa00f3"
+      },
+      "log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20000_score_Control.log",
+        "sha256": "7ae8f619ac08c8da6dee580ea4efb5d33ff690eab5d9427c5c56ac5f7f738e2a"
+      },
+      "requests": [],
+      "patches": {
+        "IslandForageApproachForbs": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "FORBS"
+        },
+        "IslandForageFloodplainApproach": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "WET_MEADOW"
+        },
+        "IslandForageOpenMeadow": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "GRASS"
+        },
+        "IslandForageWestMeadow": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "GRASS"
+        }
+      },
+      "decisions": [
+        {
+          "at": 37.2,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 265.403,
+              "stock": 2.379926,
+              "base_score": 0.915512443,
+              "ranked_score": 0.915512443
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 794.701,
+              "stock": 7.887367,
+              "base_score": 1.56709735,
+              "ranked_score": 1.56709735
+            },
+            {
+              "patch": "IslandForageFloodplainApproach",
+              "access_point": 0,
+              "distance_cm": 2141.308,
+              "stock": 2.753185,
+              "base_score": 0.196228437,
+              "ranked_score": 0.196228437
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2173.271,
+              "stock": 5.390804,
+              "base_score": 0.28771056,
+              "ranked_score": 0.28771056
+            }
+          ]
+        },
+        {
+          "at": 37.666666667,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 284.482,
+              "stock": 2.379926,
+              "base_score": 0.885628586,
+              "ranked_score": 0.885628586
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 815.751,
+              "stock": 7.887367,
+              "base_score": 1.53753205,
+              "ranked_score": 1.53753205
+            },
+            {
+              "patch": "IslandForageFloodplainApproach",
+              "access_point": 0,
+              "distance_cm": 2163.493,
+              "stock": 2.753185,
+              "base_score": 0.194461306,
+              "ranked_score": 0.194461306
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2199.912,
+              "stock": 5.390804,
+              "base_score": 0.284644433,
+              "ranked_score": 0.284644433
+            }
+          ]
+        },
+        {
+          "at": 38.116666667,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 284.95,
+              "stock": 2.392837,
+              "base_score": 0.889720537,
+              "ranked_score": 0.889720537
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 817.177,
+              "stock": 7.869682,
+              "base_score": 1.53212537,
+              "ranked_score": 1.53212537
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2216.027,
+              "stock": 5.317783,
+              "base_score": 0.278990368,
+              "ranked_score": 0.278990368
+            }
+          ]
+        },
+        {
+          "at": 38.566666667,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 249.663,
+              "stock": 2.392837,
+              "base_score": 0.946838009,
+              "ranked_score": 0.946838009
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 778.583,
+              "stock": 7.869682,
+              "base_score": 1.58694839,
+              "ranked_score": 1.58694839
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2191.891,
+              "stock": 5.317783,
+              "base_score": 0.28169261,
+              "ranked_score": 0.28169261
+            }
+          ]
+        },
+        {
+          "at": 39.033333333,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 181.726,
+              "stock": 2.405677,
+              "base_score": 1.08616699,
+              "ranked_score": 1.08616699
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 708.412,
+              "stock": 7.852095,
+              "base_score": 1.69358419,
+              "ranked_score": 1.69358419
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2127.068,
+              "stock": 5.24582,
+              "base_score": 0.285302316,
+              "ranked_score": 0.285302316
+            }
+          ]
+        },
+        {
+          "at": 39.483333333,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 113.901,
+              "stock": 2.405677,
+              "base_score": 1.26415516,
+              "ranked_score": 1.26415516
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 637.914,
+              "stock": 7.852095,
+              "base_score": 1.82088131,
+              "ranked_score": 1.82088131
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2060.031,
+              "stock": 5.24582,
+              "base_score": 0.29340638,
+              "ranked_score": 0.29340638
+            }
+          ]
+        },
+        {
+          "at": 39.95,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 51.775,
+              "stock": 2.405677,
+              "base_score": 1.4874112,
+              "ranked_score": 1.4874112
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 564.813,
+              "stock": 7.852095,
+              "base_score": 1.97479686,
+              "ranked_score": 1.97479686
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1990.767,
+              "stock": 5.24582,
+              "base_score": 0.302277958,
+              "ranked_score": 0.302277958
+            }
+          ]
+        },
+        {
+          "at": 40.416666667,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 55.46,
+              "stock": 2.418446,
+              "base_score": 1.47980785,
+              "ranked_score": 1.47980785
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 491.716,
+              "stock": 7.834605,
+              "base_score": 2.15232092,
+              "ranked_score": 2.15232092
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1921.787,
+              "stock": 5.1749,
+              "base_score": 0.307449246,
+              "ranked_score": 0.307449246
+            }
+          ]
+        },
+        {
+          "at": 40.866666667,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 116.523,
+              "stock": 2.418446,
+              "base_score": 1.26286456,
+              "ranked_score": 1.26286456
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 421.23,
+              "stock": 7.834605,
+              "base_score": 2.36266588,
+              "ranked_score": 2.36266588
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1855.57,
+              "stock": 5.1749,
+              "base_score": 0.316893749,
+              "ranked_score": 0.316893749
+            }
+          ]
+        },
+        {
+          "at": 41.316666667,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 184.432,
+              "stock": 2.431143,
+              "base_score": 1.09153373,
+              "ranked_score": 1.09153373
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 350.747,
+              "stock": 5.017213,
+              "base_score": 1.67690879,
+              "ranked_score": 1.67690879
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1789.68,
+              "stock": 5.105008,
+              "base_score": 0.322470876,
+              "ranked_score": 0.322470876
+            }
+          ]
+        },
+        {
+          "at": 41.783333333,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 256.329,
+              "stock": 2.431143,
+              "base_score": 0.950468941,
+              "ranked_score": 0.950468941
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 277.654,
+              "stock": 5.017213,
+              "base_score": 1.88909657,
+              "ranked_score": 1.88909657
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1721.734,
+              "stock": 5.105008,
+              "base_score": 0.333308425,
+              "ranked_score": 0.333308425
+            }
+          ]
+        },
+        {
+          "at": 42.233333333,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 326.156,
+              "stock": 2.44377,
+              "base_score": 0.848861642,
+              "ranked_score": 0.848861642
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 207.175,
+              "stock": 2.215473,
+              "base_score": 0.950096375,
+              "ranked_score": 0.950096375
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1656.631,
+              "stock": 5.036129,
+              "base_score": 0.339751893,
+              "ranked_score": 0.339751893
+            }
+          ]
+        },
+        {
+          "at": 42.7,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 398.809,
+              "stock": 2.44377,
+              "base_score": 0.760608095,
+              "ranked_score": 0.760608095
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 134.088,
+              "stock": 2.215473,
+              "base_score": 1.1100643,
+              "ranked_score": 1.1100643
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1589.601,
+              "stock": 5.036129,
+              "base_score": 0.351803918,
+              "ranked_score": 0.351803918
+            }
+          ]
+        }
+      ],
+      "observed_payments": [
+        {
+          "at": 33.0,
+          "patch": "IslandForageWestMeadow",
+          "paid": 2.8,
+          "remaining": 5.175
+        },
+        {
+          "at": 53.0,
+          "patch": "IslandForageOpenMeadow",
+          "paid": 0.27,
+          "remaining": 0.0
+        }
+      ]
+    },
+    {
+      "seed": 20000,
+      "label": "20000_score_Switch",
+      "report": {
+        "project_path": "Saved/FaunaAudit/Island_20000_score_Switch/IslandFaunaPIE.json",
+        "sha256": "6658ea0be4bddee15730c576bd0ace70b5ca56833aa3479d9b776240103f78c7"
+      },
+      "log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20000_score_Switch.log",
+        "sha256": "d4879821e547b1c59c25d6bf2d2aa8977345e3eb96d66fc55750e4a70a81a797"
+      },
+      "requests": [
+        {
+          "issued_at": 36.833335254,
+          "patch": "IslandForageWestMeadow",
+          "region": "Grassland"
+        },
+        {
+          "issued_at": 37.633335296,
+          "patch": "IslandForageWestMeadow",
+          "region": "Grassland"
+        },
+        {
+          "issued_at": 38.433335338,
+          "patch": "IslandForageWestMeadow",
+          "region": "Grassland"
+        },
+        {
+          "issued_at": 39.23333538,
+          "patch": "IslandForageWestMeadow",
+          "region": "Grassland"
+        },
+        {
+          "issued_at": 40.033335421,
+          "patch": "IslandForageWestMeadow",
+          "region": "Grassland"
+        },
+        {
+          "issued_at": 40.833335463,
+          "patch": "IslandForageWestMeadow",
+          "region": "Grassland"
+        },
+        {
+          "issued_at": 41.633335505,
+          "patch": "IslandForageWestMeadow",
+          "region": "Grassland"
+        },
+        {
+          "issued_at": 42.433335546,
+          "patch": "IslandForageWestMeadow",
+          "region": "Grassland"
+        }
+      ],
+      "patches": {
+        "IslandForageApproachForbs": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "FORBS"
+        },
+        "IslandForageFloodplainApproach": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "WET_MEADOW"
+        },
+        "IslandForageOpenMeadow": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "GRASS"
+        },
+        "IslandForageWestMeadow": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "GRASS"
+        }
+      },
+      "decisions": [
+        {
+          "at": 37.2,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 265.403,
+              "stock": 2.379926,
+              "base_score": 0.915512443,
+              "ranked_score": 1.60214677
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 794.701,
+              "stock": 7.887367,
+              "base_score": 1.56709735,
+              "ranked_score": 1.56709735
+            },
+            {
+              "patch": "IslandForageFloodplainApproach",
+              "access_point": 0,
+              "distance_cm": 2141.308,
+              "stock": 2.753185,
+              "base_score": 0.196228437,
+              "ranked_score": 0.196228437
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2173.271,
+              "stock": 5.390804,
+              "base_score": 0.28771056,
+              "ranked_score": 0.28771056
+            }
+          ]
+        },
+        {
+          "at": 37.666666667,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 285.442,
+              "stock": 2.379926,
+              "base_score": 0.884176067,
+              "ranked_score": 1.54730812
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 816.734,
+              "stock": 7.887367,
+              "base_score": 1.53617858,
+              "ranked_score": 1.53617858
+            },
+            {
+              "patch": "IslandForageFloodplainApproach",
+              "access_point": 0,
+              "distance_cm": 2164.49,
+              "stock": 2.753185,
+              "base_score": 0.19438265,
+              "ranked_score": 0.19438265
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2200.933,
+              "stock": 5.390804,
+              "base_score": 0.284528254,
+              "ranked_score": 0.284528254
+            }
+          ]
+        },
+        {
+          "at": 38.116666667,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 286.869,
+              "stock": 2.392837,
+              "base_score": 0.88681071,
+              "ranked_score": 1.55191874
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 819.09,
+              "stock": 7.869682,
+              "base_score": 1.52950702,
+              "ranked_score": 1.52950702
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2217.923,
+              "stock": 5.317783,
+              "base_score": 0.278780325,
+              "ranked_score": 0.278780325
+            }
+          ]
+        },
+        {
+          "at": 38.566666667,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 253.3,
+              "stock": 2.392837,
+              "base_score": 0.940614935,
+              "ranked_score": 1.64607614
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 782.287,
+              "stock": 7.869682,
+              "base_score": 1.58151766,
+              "ranked_score": 1.58151766
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2195.351,
+              "stock": 5.317783,
+              "base_score": 0.281302083,
+              "ranked_score": 0.281302083
+            }
+          ]
+        },
+        {
+          "at": 39.033333333,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 186.629,
+              "stock": 2.405677,
+              "base_score": 1.07522318,
+              "ranked_score": 1.88164057
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 714.476,
+              "stock": 7.852095,
+              "base_score": 1.68346152,
+              "ranked_score": 1.68346152
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2131.274,
+              "stock": 5.24582,
+              "base_score": 0.284808783,
+              "ranked_score": 0.284808783
+            }
+          ]
+        },
+        {
+          "at": 39.483333333,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 116.131,
+              "stock": 2.405677,
+              "base_score": 1.25737992,
+              "ranked_score": 2.20041485
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 645.396,
+              "stock": 7.852095,
+              "base_score": 1.80647131,
+              "ranked_score": 1.80647131
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2061.334,
+              "stock": 5.24582,
+              "base_score": 0.293244468,
+              "ranked_score": 0.293244468
+            }
+          ]
+        },
+        {
+          "at": 39.95,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 43.194,
+              "stock": 2.405677,
+              "base_score": 1.52460424,
+              "ranked_score": 2.66805742
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 574.287,
+              "stock": 7.852095,
+              "base_score": 1.95339729,
+              "ranked_score": 1.95339729
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1989.013,
+              "stock": 5.24582,
+              "base_score": 0.302509587,
+              "ranked_score": 0.302509587
+            }
+          ]
+        },
+        {
+          "at": 40.416666667,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 16.698,
+              "stock": 2.418446,
+              "base_score": 1.66092379,
+              "ranked_score": 2.90661662
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 548.574,
+              "stock": 7.834605,
+              "base_score": 2.00810507,
+              "ranked_score": 2.00810507
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1962.75,
+              "stock": 5.1749,
+              "base_score": 0.301883482,
+              "ranked_score": 0.301883482
+            }
+          ]
+        },
+        {
+          "at": 40.866666667,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 16.698,
+              "stock": 2.418446,
+              "base_score": 1.66092379,
+              "ranked_score": 2.90661662
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 548.574,
+              "stock": 7.834605,
+              "base_score": 2.00810507,
+              "ranked_score": 2.00810507
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1962.75,
+              "stock": 5.1749,
+              "base_score": 0.301883482,
+              "ranked_score": 0.301883482
+            }
+          ]
+        }
+      ],
+      "observed_payments": [
+        {
+          "at": 33.0,
+          "patch": "IslandForageWestMeadow",
+          "paid": 2.8,
+          "remaining": 5.175
+        },
+        {
+          "at": 41.0,
+          "patch": "IslandForageWestMeadow",
+          "paid": 2.431,
+          "remaining": 0.0
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "label": "20017_score_Control",
+      "report": {
+        "project_path": "Saved/FaunaAudit/Island_20017_score_Control/IslandFaunaPIE.json",
+        "sha256": "b7e06757ba556f3a91f4323f76fb294e8e8719ed8c046dbafad1bddb2b358db3"
+      },
+      "log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20017_score_Control.log",
+        "sha256": "c9831063d5cd3e704eb224cf24cad8ef1321d0f33e9a14007625e640b4ce05bf"
+      },
+      "requests": [],
+      "patches": {
+        "IslandForageApproachForbs": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "FORBS"
+        },
+        "IslandForageOpenMeadow": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "GRASS"
+        },
+        "IslandForageWestMeadow": {
+          "energy_per_meal": 2.799999952316284,
+          "guild": "GRASS"
+        }
+      },
+      "decisions": [
+        {
+          "at": 37.116666667,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 287.348,
+              "stock": 2.441289,
+              "base_score": 0.904030765,
+              "ranked_score": 0.904030765
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 772.077,
+              "stock": 7.917878,
+              "base_score": 1.60635684,
+              "ranked_score": 1.60635684
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2089.637,
+              "stock": 5.390804,
+              "base_score": 0.297780053,
+              "ranked_score": 0.297780053
+            }
+          ]
+        },
+        {
+          "at": 37.566666667,
+          "region": "Grassland",
+          "selected": "IslandForageOpenMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 310.095,
+              "stock": 2.441289,
+              "base_score": 0.870324061,
+              "ranked_score": 0.870324061
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 791.213,
+              "stock": 7.917878,
+              "base_score": 1.57818795,
+              "ranked_score": 1.57818795
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2100.023,
+              "stock": 5.390804,
+              "base_score": 0.296491348,
+              "ranked_score": 0.296491348
+            }
+          ]
+        },
+        {
+          "at": 38.033333333,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 334.26,
+              "stock": 2.45386,
+              "base_score": 0.841476293,
+              "ranked_score": 0.841476293
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 798.215,
+              "stock": 2.300023,
+              "base_score": 0.455516343,
+              "ranked_score": 0.455516343
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2086.431,
+              "stock": 5.317783,
+              "base_score": 0.294140998,
+              "ranked_score": 0.294140998
+            }
+          ]
+        },
+        {
+          "at": 38.483333333,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 331.29,
+              "stock": 2.45386,
+              "base_score": 0.845434679,
+              "ranked_score": 0.845434679
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 773.95,
+              "stock": 2.300023,
+              "base_score": 0.465808475,
+              "ranked_score": 0.465808475
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2047.794,
+              "stock": 5.317783,
+              "base_score": 0.298981716,
+              "ranked_score": 0.298981716
+            }
+          ]
+        },
+        {
+          "at": 38.95,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 291.578,
+              "stock": 2.45386,
+              "base_score": 0.90218847,
+              "ranked_score": 0.90218847
+            },
+            {
+              "patch": "IslandForageOpenMeadow",
+              "access_point": 0,
+              "distance_cm": 720.405,
+              "stock": 2.300023,
+              "base_score": 0.490251501,
+              "ranked_score": 0.490251501
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 2000.695,
+              "stock": 5.317783,
+              "base_score": 0.30510225,
+              "ranked_score": 0.30510225
+            }
+          ]
+        },
+        {
+          "at": 39.416666667,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 226.27,
+              "stock": 2.46636,
+              "base_score": 1.01931193,
+              "ranked_score": 1.01931193
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1980.71,
+              "stock": 5.24582,
+              "base_score": 0.303610875,
+              "ranked_score": 0.303610875
+            }
+          ]
+        },
+        {
+          "at": 39.866666667,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 161.214,
+              "stock": 2.46636,
+              "base_score": 1.16309122,
+              "ranked_score": 1.16309122
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1968.188,
+              "stock": 5.24582,
+              "base_score": 0.305287002,
+              "ranked_score": 0.305287002
+            }
+          ]
+        },
+        {
+          "at": 40.316666667,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 96.151,
+              "stock": 2.478792,
+              "base_score": 1.3609371,
+              "ranked_score": 1.3609371
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1957.747,
+              "stock": 5.1749,
+              "base_score": 0.302552409,
+              "ranked_score": 0.302552409
+            }
+          ]
+        },
+        {
+          "at": 40.783333333,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 31.111,
+              "stock": 2.478792,
+              "base_score": 1.6282681,
+              "ranked_score": 1.6282681
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1949.425,
+              "stock": 5.1749,
+              "base_score": 0.303671715,
+              "ranked_score": 0.303671715
+            }
+          ]
+        },
+        {
+          "at": 41.233333333,
+          "region": "Grassland",
+          "selected": "IslandForageWestMeadow",
+          "candidates": [
+            {
+              "patch": "IslandForageWestMeadow",
+              "access_point": 0,
+              "distance_cm": 16.808,
+              "stock": 2.491154,
+              "base_score": 1.71026443,
+              "ranked_score": 1.71026443
+            },
+            {
+              "patch": "IslandForageApproachForbs",
+              "access_point": 0,
+              "distance_cm": 1947.882,
+              "stock": 5.105008,
+              "base_score": 0.299775999,
+              "ranked_score": 0.299775999
+            }
+          ]
+        }
+      ],
+      "observed_payments": []
+    }
+  ],
+  "payment_gates": [
+    {
+      "seed": 20000,
+      "log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20000_forage_attempt_replay.log",
+        "sha256": "34ad61adedd380e7ac18c5872800a2e3d93e00c9d2bc2fa0dace74ed037f454d"
+      },
+      "patch": "IslandForageWestMeadow",
+      "energy_per_meal": 2.799999952316284,
+      "attempts": [
+        {
+          "at": 33.0,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 12.0,
+          "paid": 2.799999952316284,
+          "remaining": 9.199999809265137,
+          "distance_squared": 282.009829161843,
+          "headroom": 11.549949645996094
+        },
+        {
+          "at": 33.0,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 9.199999809265137,
+          "paid": 2.799999952316284,
+          "remaining": 6.399999618530273,
+          "distance_squared": 279.1176224793,
+          "headroom": 11.549949645996094
+        },
+        {
+          "at": 36.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 6.8521599769592285,
+          "paid": 2.799999952316284,
+          "remaining": 4.052160263061523,
+          "distance_squared": 279.6068223353951,
+          "headroom": 11.599945068359375
+        },
+        {
+          "at": 37.0,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 4.202880382537842,
+          "paid": 2.799999952316284,
+          "remaining": 1.4028804302215576,
+          "distance_squared": 281.0385429834736,
+          "headroom": 11.949943542480469
+        },
+        {
+          "at": 51.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 3.5129613876342773,
+          "paid": 2.799999952316284,
+          "remaining": 0.7129614353179932,
+          "distance_squared": 278.21422632137245,
+          "headroom": 34.04991912841797
+        },
+        {
+          "at": 52.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.863681435585022,
+          "paid": 0.863681435585022,
+          "remaining": 0.0,
+          "distance_squared": 278.21422632137245,
+          "headroom": 31.59991455078125
+        },
+        {
+          "at": 52.0,
+          "agent": 42,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 281.8581415194929,
+          "headroom": 11.59991455078125
+        },
+        {
+          "at": 52.0,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 281.5019224093433,
+          "headroom": 11.399917602539062
+        },
+        {
+          "at": 52.0,
+          "agent": 123,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 283.40254455239585,
+          "headroom": 62.09999084472656
+        },
+        {
+          "at": 60.0,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 1.2057600021362305,
+          "paid": 1.2057600021362305,
+          "remaining": 0.0,
+          "distance_squared": 278.49244631390576,
+          "headroom": 11.640548706054688
+        },
+        {
+          "at": 67.0,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 1.0550400018692017,
+          "paid": 1.0550400018692017,
+          "remaining": 0.0,
+          "distance_squared": 279.4662671924191,
+          "headroom": 12.884780883789062
+        },
+        {
+          "at": 75.0,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 1.2057600021362305,
+          "paid": 1.2057600021362305,
+          "remaining": 0.0,
+          "distance_squared": 280.2002326104168,
+          "headroom": 14.629730224609375
+        },
+        {
+          "at": 84.13666666547458,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 1.0197983980178833,
+          "paid": 1.0197983980178833,
+          "remaining": 0.0,
+          "distance_squared": 279.69417033187716,
+          "headroom": 41.98402404785156
+        },
+        {
+          "at": 84.13666666547458,
+          "agent": 42,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 281.27624138402257,
+          "headroom": 41.84770202636719
+        },
+        {
+          "at": 84.13666666547458,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 281.71338437983013,
+          "headroom": 41.647705078125
+        },
+        {
+          "at": 84.13666666547458,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.52249139465954,
+          "headroom": 16.621788024902344
+        },
+        {
+          "at": 84.13666666547458,
+          "agent": 128,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 283.28142855574123,
+          "headroom": 62.84782409667969
+        },
+        {
+          "at": 94.13666666547458,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.7679999470710754,
+          "paid": 0.7679999470710754,
+          "remaining": 0.0,
+          "distance_squared": 279.6692771006829,
+          "headroom": 44.464210510253906
+        },
+        {
+          "at": 94.13666666547458,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.0714489412517,
+          "headroom": 20.12177276611328
+        },
+        {
+          "at": 104.13666666547458,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.7679999470710754,
+          "paid": 0.7679999470710754,
+          "remaining": 0.0,
+          "distance_squared": 278.44670212516513,
+          "headroom": 47.19619369506836
+        },
+        {
+          "at": 104.13666666547458,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.0705769656155,
+          "headroom": 23.62175750732422
+        },
+        {
+          "at": 114.13666666547458,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.7679999470710754,
+          "paid": 0.7679999470710754,
+          "remaining": 0.0,
+          "distance_squared": 279.643981003085,
+          "headroom": 49.92817687988281
+        },
+        {
+          "at": 114.13666666547458,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.0705632837943,
+          "headroom": 27.121742248535156
+        },
+        {
+          "at": 121.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.5271040201187134,
+          "paid": 0.5271040201187134,
+          "remaining": 0.0,
+          "distance_squared": 279.6275098913965,
+          "headroom": 51.56233596801758
+        },
+        {
+          "at": 121.0,
+          "agent": 123,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 282.1052016511557,
+          "headroom": 85.84342193603516
+        },
+        {
+          "at": 127.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.4607999920845032,
+          "paid": 0.4607999920845032,
+          "remaining": 0.0,
+          "distance_squared": 278.0547350250075,
+          "headroom": 53.135223388671875
+        },
+        {
+          "at": 133.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.4607999920845032,
+          "paid": 0.4607999920845032,
+          "remaining": 0.0,
+          "distance_squared": 279.7605926336612,
+          "headroom": 54.7744140625
+        },
+        {
+          "at": 139.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.4607999920845032,
+          "paid": 0.4607999920845032,
+          "remaining": 0.0,
+          "distance_squared": 278.50948329362524,
+          "headroom": 56.413604736328125
+        },
+        {
+          "at": 145.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.4607999920845032,
+          "paid": 0.4607999920845032,
+          "remaining": 0.0,
+          "distance_squared": 279.22642560274556,
+          "headroom": 58.05279541015625
+        },
+        {
+          "at": 153.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.6143999695777893,
+          "paid": 0.6143999695777893,
+          "remaining": 0.0,
+          "distance_squared": 278.6916053686204,
+          "headroom": 60.39198303222656
+        },
+        {
+          "at": 161.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.6143999695777893,
+          "paid": 0.6143999695777893,
+          "remaining": 0.0,
+          "distance_squared": 279.3518533153906,
+          "headroom": 62.577571868896484
+        },
+        {
+          "at": 169.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.5934189558029175,
+          "paid": 0.5934189558029175,
+          "remaining": 0.0,
+          "distance_squared": 278.1917092115559,
+          "headroom": 64.7631607055664
+        },
+        {
+          "at": 177.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.49445775151252747,
+          "paid": 0.49445775151252747,
+          "remaining": 0.0,
+          "distance_squared": 278.17060718154323,
+          "headroom": 66.9697265625
+        },
+        {
+          "at": 186.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.455964058637619,
+          "paid": 0.455964058637619,
+          "remaining": 0.0,
+          "distance_squared": 278.1793498279603,
+          "headroom": 68.62525939941406
+        },
+        {
+          "at": 194.26999999880792,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.36020708084106445,
+          "paid": 0.36020708084106445,
+          "remaining": 0.0,
+          "distance_squared": 280.9615931894451,
+          "headroom": 73.8310775756836
+        },
+        {
+          "at": 194.26999999880792,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.47035306047223,
+          "headroom": 70.62660217285156
+        },
+        {
+          "at": 194.26999999880792,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 278.44805323835135,
+          "headroom": 55.16829299926758
+        },
+        {
+          "at": 205.7199999988079,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.42221391201019287,
+          "paid": 0.42221391201019287,
+          "remaining": 0.0,
+          "distance_squared": 279.3359173533376,
+          "headroom": 58.933128356933594
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "log": {
+        "project_path": "Saved/FaunaAudit/IslandAccessBaseline/20017_forage_attempt_replay.log",
+        "sha256": "9653c7f7da7b460fd5695366d4190edda6cd509daee0fe743dfb23852ff5fd8f"
+      },
+      "patch": "IslandForageWestMeadow",
+      "energy_per_meal": 2.799999952316284,
+      "attempts": [
+        {
+          "at": 32.0,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 12.0,
+          "paid": 2.799999952316284,
+          "remaining": 9.199999809265137,
+          "distance_squared": 282.62738230628474,
+          "headroom": 11.199951171875
+        },
+        {
+          "at": 33.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 9.350719451904297,
+          "paid": 2.799999952316284,
+          "remaining": 6.550719261169434,
+          "distance_squared": 277.7632638557244,
+          "headroom": 11.549949645996094
+        },
+        {
+          "at": 33.0,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 6.550719261169434,
+          "paid": 2.799999952316284,
+          "remaining": 3.7507193088531494,
+          "distance_squared": 279.02992756858015,
+          "headroom": 11.549949645996094
+        },
+        {
+          "at": 35.0,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 4.052159309387207,
+          "paid": 2.799999952316284,
+          "remaining": 1.2521593570709229,
+          "distance_squared": 279.7876751729986,
+          "headroom": 12.249946594238281
+        },
+        {
+          "at": 58.0,
+          "agent": 42,
+          "gate": "Transaction",
+          "stock": 4.718721389770508,
+          "paid": 2.799999952316284,
+          "remaining": 1.9187214374542236,
+          "distance_squared": 279.24583226794994,
+          "headroom": 14.699905395507812
+        },
+        {
+          "at": 59.0,
+          "agent": 42,
+          "gate": "Transaction",
+          "stock": 2.069441318511963,
+          "paid": 2.069441318511963,
+          "remaining": 0.0,
+          "distance_squared": 279.24583226794994,
+          "headroom": 12.249900817871094
+        },
+        {
+          "at": 59.0,
+          "agent": 123,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 281.60433561503714,
+          "headroom": 64.54998016357422
+        },
+        {
+          "at": 67.0,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 1.2057600021362305,
+          "paid": 1.2057600021362305,
+          "remaining": 0.0,
+          "distance_squared": 280.0013251025176,
+          "headroom": 37.849891662597656
+        },
+        {
+          "at": 74.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 1.0550400018692017,
+          "paid": 1.0550400018692017,
+          "remaining": 0.0,
+          "distance_squared": 277.624511156594,
+          "headroom": 40.491249084472656
+        },
+        {
+          "at": 80.0,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.9043200016021729,
+          "paid": 0.9043200016021729,
+          "remaining": 0.0,
+          "distance_squared": 280.772888384676,
+          "headroom": 41.19411087036133
+        },
+        {
+          "at": 90.45333333214124,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.8028159737586975,
+          "paid": 0.8028159737586975,
+          "remaining": 0.0,
+          "distance_squared": 281.2191260379705,
+          "headroom": 43.94844436645508
+        },
+        {
+          "at": 100.45333333214124,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.7679999470710754,
+          "paid": 0.7679999470710754,
+          "remaining": 0.0,
+          "distance_squared": 281.2247712907819,
+          "headroom": 46.64561462402344
+        },
+        {
+          "at": 108.45333333214124,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.6143999695777893,
+          "paid": 0.6143999695777893,
+          "remaining": 0.0,
+          "distance_squared": 279.65657045289225,
+          "headroom": 48.6776008605957
+        },
+        {
+          "at": 114.45333333214124,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.4607999920845032,
+          "paid": 0.4607999920845032,
+          "remaining": 0.0,
+          "distance_squared": 279.8391353054727,
+          "headroom": 50.16319274902344
+        },
+        {
+          "at": 114.45333333214124,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 278.6503713518199,
+          "headroom": 49.48472595214844
+        },
+        {
+          "at": 114.45333333214124,
+          "agent": 127,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 323.2739764240871,
+          "headroom": 73.4586410522461
+        },
+        {
+          "at": 121.0,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.502784013748169,
+          "paid": 0.502784013748169,
+          "remaining": 0.0,
+          "distance_squared": 279.67722623883634,
+          "headroom": 51.993717193603516
+        },
+        {
+          "at": 121.0,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.1194566178763,
+          "headroom": 51.77605056762695
+        },
+        {
+          "at": 127.20333333214124,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.4764159917831421,
+          "paid": 0.4764159917831421,
+          "remaining": 0.0,
+          "distance_squared": 279.9866462757739,
+          "headroom": 53.66209030151367
+        },
+        {
+          "at": 127.20333333214124,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.16755417157174,
+          "headroom": 53.947208404541016
+        },
+        {
+          "at": 133.20333333214126,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.4607999920845032,
+          "paid": 0.4607999920845032,
+          "remaining": 0.0,
+          "distance_squared": 281.28825887528785,
+          "headroom": 55.28566360473633
+        },
+        {
+          "at": 133.20333333214126,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.13566392305387,
+          "headroom": 56.04719924926758
+        },
+        {
+          "at": 140.33666666547458,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.5478399991989136,
+          "paid": 0.5478399991989136,
+          "remaining": 0.0,
+          "distance_squared": 281.3715859415364,
+          "headroom": 57.32151794433594
+        },
+        {
+          "at": 145.33666666547458,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.3840000033378601,
+          "paid": 0.3840000033378601,
+          "remaining": 0.0,
+          "distance_squared": 321.63311635365864,
+          "headroom": 58.5236701965332
+        },
+        {
+          "at": 150.33666666547458,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.3840000033378601,
+          "paid": 0.3840000033378601,
+          "remaining": 0.0,
+          "distance_squared": 323.2097255975192,
+          "headroom": 59.88966369628906
+        },
+        {
+          "at": 157.33666666547458,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.5375999808311462,
+          "paid": 0.5375999808311462,
+          "remaining": 0.0,
+          "distance_squared": 280.15634121395226,
+          "headroom": 61.95565414428711
+        },
+        {
+          "at": 164.33666666547458,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.5375999808311462,
+          "paid": 0.5375999808311462,
+          "remaining": 0.0,
+          "distance_squared": 280.44766012405057,
+          "headroom": 63.8680419921875
+        },
+        {
+          "at": 164.33666666547458,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.1636797735775,
+          "headroom": 66.57209777832031
+        },
+        {
+          "at": 171.33666666547458,
+          "agent": 35,
+          "gate": "Transaction",
+          "stock": 0.5374898314476013,
+          "paid": 0.5374898314476013,
+          "remaining": 0.0,
+          "distance_squared": 294.11498882929277,
+          "headroom": 74.53934478759766
+        },
+        {
+          "at": 171.33666666547458,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 281.27437188473914,
+          "headroom": 65.78042602539062
+        },
+        {
+          "at": 171.33666666547458,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 278.59983389402737,
+          "headroom": 71.5577392578125
+        },
+        {
+          "at": 171.33666666547458,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 282.3916125061528,
+          "headroom": 57.167572021484375
+        },
+        {
+          "at": 171.33666666547458,
+          "agent": 127,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 281.06568354562535,
+          "headroom": 93.36782836914062
+        },
+        {
+          "at": 177.33666666547458,
+          "agent": 35,
+          "gate": "Transaction",
+          "stock": 0.42429256439208984,
+          "paid": 0.42429256439208984,
+          "remaining": 0.0,
+          "distance_squared": 295.1222923783767,
+          "headroom": 76.10186004638672
+        },
+        {
+          "at": 185.0,
+          "agent": 35,
+          "gate": "Transaction",
+          "stock": 0.4687097668647766,
+          "paid": 0.4687097668647766,
+          "remaining": 0.0,
+          "distance_squared": 294.9854637881672,
+          "headroom": 78.35973358154297
+        },
+        {
+          "at": 185.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 278.8906734219509,
+          "headroom": 76.33991241455078
+        },
+        {
+          "at": 185.0,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 283.50568771003503,
+          "headroom": 61.9497184753418
+        },
+        {
+          "at": 185.0,
+          "agent": 127,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.6860033601315,
+          "headroom": 98.14999389648438
+        },
+        {
+          "at": 193.0,
+          "agent": 35,
+          "gate": "Transaction",
+          "stock": 0.4283478856086731,
+          "paid": 0.4283478856086731,
+          "remaining": 0.0,
+          "distance_squared": 294.2412671346847,
+          "headroom": 80.69102478027344
+        },
+        {
+          "at": 193.0,
+          "agent": 41,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 277.70524027204624,
+          "headroom": 79.1399154663086
+        },
+        {
+          "at": 193.0,
+          "agent": 44,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 283.11035990449153,
+          "headroom": 64.74971008300781
+        },
+        {
+          "at": 203.0,
+          "agent": 35,
+          "gate": "Transaction",
+          "stock": 0.4627726078033447,
+          "paid": 0.4627726078033447,
+          "remaining": 0.0,
+          "distance_squared": 294.5908264225969,
+          "headroom": 83.76268005371094
+        },
+        {
+          "at": 203.0,
+          "agent": 40,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 281.40098857469496,
+          "headroom": 76.86259460449219
+        },
+        {
+          "at": 203.0,
+          "agent": 42,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 279.15173476416214,
+          "headroom": 78.27861022949219
+        },
+        {
+          "at": 203.0,
+          "agent": 43,
+          "gate": "Transaction",
+          "stock": 0.0,
+          "paid": 0.0,
+          "remaining": 0.0,
+          "distance_squared": 277.5337609502326,
+          "headroom": 80.10427856445312
+        }
+      ]
+    }
+  ],
+  "controlled_switch": [
+    "20000_score_Control",
+    "20000_score_Switch"
+  ]
+}

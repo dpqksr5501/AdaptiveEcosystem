@@ -7,6 +7,8 @@ results/_*
 # 학습 산출물 (Phase 3 이후)
 runs/
 *.zip
+# R9 두뇌 팩(출발 판·돌려받는 판)은 다른 컴퓨터가 같은 출발점을 받도록 커밋한다 — Docs/RL_Policy/R9_CLOUD_TRAINING.md
+!results/v3/r9/packs/**/*.zip
 optuna*.db
 # ckpt/ 는 디렉터리째 무시하면 하위 예외가 안 먹는다. 내용물을 무시한다.
 ckpt/*
@@ -16,6 +18,7 @@ ckpt/*
 __pycache__/
 *.py[cod]
 .pytest_cache/
+.venv*/
 # V2 산출물 — 영상·학습 로그는 재생성 가능하다. 진단 결과(JSON·MD)는 남긴다.
 results/v2/*.mp4
 results/v2/*.gif

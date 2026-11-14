@@ -31,6 +31,9 @@ void UEcoFootstepAudioComponent::Consume(const FEcoCreatureVisualState& State, f
     const bool bGrounded = State.bAlive && EcoFootsteps::IsGroundActivity(uint8(State.Activity));
     const bool bTouchdown = Profile && !bSnap && bGrounded && CachedState.bAlive
         && CachedState.Activity == EEcoSpeciesActivity::Land;
+    const bool bSplash = Profile && !bSnap && State.bAlive && CachedState.bAlive
+        && ((CachedState.Activity == EEcoSpeciesActivity::EnterWater && State.Activity == EEcoSpeciesActivity::Swim)
+            || (CachedState.Activity == EEcoSpeciesActivity::Swim && State.Activity == EEcoSpeciesActivity::ExitWater));
     const float MinimumSpeed = Profile ? FMath::Min(AudioSet->MinimumSpeed, Profile->WalkSpeed * .35f) : AudioSet->MinimumSpeed;
     if (CVarFootstepDebug.GetValueOnGameThread() && AudioSet->Attenuation && State.bAlive)
     {
@@ -46,6 +49,7 @@ void UEcoFootstepAudioComponent::Consume(const FEcoCreatureVisualState& State, f
     CachedGaitGain = GaitGain;
     bCachedRun = bRun;
     if (bTouchdown) PlayContact(Source, TEXT("Touchdown"));
+    if (bSplash) PlayContact(Source, TEXT("WaterTransition"), NAME_None, true);
     if (bUseAnimationNotifies)
     {
         Cadence.Reset();
@@ -69,7 +73,7 @@ void UEcoFootstepAudioComponent::NotifyContact(USkeletalMeshComponent* Mesh, FNa
     PlayContact(Mesh->GetSocketLocation(FootBone), TEXT("Notify"), FootBone);
 }
 
-void UEcoFootstepAudioComponent::PlayContact(const FVector& Source, const TCHAR* Trigger, FName FootBone)
+void UEcoFootstepAudioComponent::PlayContact(const FVector& Source, const TCHAR* Trigger, FName FootBone, bool bWaterOnly)
 {
     if (Source.ContainsNaN() || !GetWorld() || !AudioSet) return;
     const auto* Profile = AudioSet->FindProfile(CachedState.SpeciesId);
@@ -91,6 +95,7 @@ void UEcoFootstepAudioComponent::PlayContact(const FVector& Source, const TCHAR*
         Contact.Position = Source;
     }
     const EEcoFootstepSurface Surface = Contact.Surface;
+    if (bWaterOnly && Surface != EEcoFootstepSurface::Water) return;
     const auto& Sounds = Profile ? AudioSet->SelectSounds(Surface, CachedState.SpeciesId == EcoFootsteps::Player, bCachedRun, Profile->bHoof) : AudioSet->GetSounds(Surface);
     const FName Names[] = {TEXT("Grass"),TEXT("Dry"),TEXT("Snow"),TEXT("Water"),TEXT("Wet"),TEXT("Stone"),TEXT("Wood")};
     LastSurface = Names[uint8(Surface)];
@@ -132,7 +137,8 @@ void UEcoFootstepAudioComponent::PlayContact(const FVector& Source, const TCHAR*
     if (LastPlayback)
     {
         ++PlayedCount;
-        if (bUseAnimationNotifies) ++NotifyPlayedCount; else ++DistancePlayedCount;
+        if (!FootBone.IsNone()) ++NotifyPlayedCount;
+        else if (FCString::Strcmp(Trigger, TEXT("Distance")) == 0) ++DistancePlayedCount;
         if (CVarFootstepLog.GetValueOnGameThread()) UE_LOG(LogTemp, Log,
             TEXT("[Eco Footstep Audio] NetMode=%d Id=%lld Region=%s Surface=%s Material=%s Trigger=%s Sound=%s Count=%d Position=%s Species=%s Volume=%.3f Range=%.0f Foot=%s"),
             int32(GetWorld()->GetNetMode()), CachedState.StableAgentId, *CachedState.RegionId.ToString(), *LastSurface.ToString(),

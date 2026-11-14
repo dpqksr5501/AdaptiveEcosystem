@@ -13,6 +13,7 @@ class ADAPTIVEECOSYSTEM_API UEcoCreatureAnimInstance : public UAnimInstance
 public:
 	virtual void NativeInitializeAnimation() override;
 	virtual void NativeUpdateAnimation(float DeltaSeconds) override;
+    float GetPoseAgeSeconds() const { return PoseAgeSeconds; }
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float SpeedCmPerSecond = 0.0f;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") int32 AnimationIndex = 0;
 	UPROPERTY(BlueprintReadOnly, Transient, Category="Creature|Animation") float DirectionDegrees = 0.0f;
@@ -42,6 +43,7 @@ public:
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") FVector GroundUp=FVector::UpVector;
     UPROPERTY(BlueprintReadOnly,Transient,Category="Creature|IK") float GroundWorldToComponent=1;
 private:
+    bool bLocomotionActive = false;
     float PoseAgeSeconds=0;
     float SensoryAlertSeconds=0;
     EEcoSenseSource PreviousSense=EEcoSenseSource::None;

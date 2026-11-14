@@ -5,6 +5,35 @@
 #include "Components/BoxComponent.h"
 #include "Engine/World.h"
 
+FRegionEnvironmentState AEcologyRegion::GetEffectiveEnvironmentState() const
+{
+	FRegionEnvironmentState Result = EnvironmentState;
+#if !UE_BUILD_SHIPPING
+	if (GrassTestClimate.IsSet())
+	{
+		Result.Rainfall = GrassTestClimate->X;
+		Result.Temperature = GrassTestClimate->Y;
+		Result.WeatherState = Result.Rainfall > 0 ? EEcoWeatherState::Rain : EEcoWeatherState::Drought;
+	}
+#endif
+	return Result;
+}
+
+#if !UE_BUILD_SHIPPING
+bool AEcologyRegion::SetGrassTestClimate(float Rainfall, float Temperature)
+{
+	if (!IsInGameThread() || !GetWorld() || !GetWorld()->IsGameWorld() || GetNetMode() == NM_Client ||
+		!FMath::IsFinite(Rainfall) || Rainfall < 0 || Rainfall > 1 ||
+		!FMath::IsFinite(Temperature) || Temperature < -100 || Temperature > 100) return false;
+	GrassTestClimate.Emplace(Rainfall, Temperature);
+	return true;
+}
+
+void AEcologyRegion::ClearGrassTestClimate()
+{
+	if (IsInGameThread() && GetWorld() && GetNetMode() != NM_Client) GrassTestClimate.Reset();
+}
+#endif
 AEcologyRegion::AEcologyRegion()
 {
 	PrimaryActorTick.bCanEverTick = false;

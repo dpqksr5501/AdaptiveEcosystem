@@ -1,0 +1,165 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "authority_duration_seconds": 360,
+  "stage_counts_are_not_one_to_one": true,
+  "runs": [
+    {
+      "seed": 20000,
+      "report_sha256": "560b97d8557e1a1dd139717752d926dba6a6780264c8e4b74f07d2eca49af784",
+      "log_sha256": "4be6e2cda20c3e711b6c4f0d095ad8bbcdd87f089df7c2a16c9dd58db9b71163",
+      "ground_scan_food_opportunities": {
+        "Leopard": {
+          "none": 517,
+          "live": 32,
+          "carrion": 1
+        },
+        "Mink": {
+          "none": 377
+        },
+        "Fox": {
+          "live": 119,
+          "none": 524,
+          "carrion": 32,
+          "live+carrion": 6
+        }
+      },
+      "hunt_logged_agent_counts": {
+        "Fox": {
+          "ground_scan": 3,
+          "Acquire": 3,
+          "Windup": 3,
+          "capture": 3
+        },
+        "Leopard": {
+          "ground_scan": 1
+        },
+        "Mink": {
+          "ground_scan": 2
+        }
+      },
+      "hunt_events": {
+        "Leopard": {
+          "scans": 550,
+          "scans_with_eligible": 32,
+          "scans_with_carrion": 1,
+          "scans_with_patch": 0
+        },
+        "Mink": {
+          "scans": 377,
+          "scans_with_eligible": 0,
+          "scans_with_carrion": 0,
+          "scans_with_patch": 0
+        },
+        "Fox": {
+          "scans": 681,
+          "scans_with_eligible": 125,
+          "scans_with_carrion": 38,
+          "scans_with_patch": 0,
+          "Acquire": 12,
+          "Windup": 11
+        }
+      },
+      "access_rejections": {
+        "Leopard": {
+          "HuntOutOfReach": 525,
+          "HuntOutsideView": 21,
+          "HuntTargetUnavailable": 133,
+          "HuntNightRange": 1
+        },
+        "Fox": {
+          "HuntTargetSizeOrMaturity": 273,
+          "HuntOutsideView": 174,
+          "HuntTargetUnavailable": 133,
+          "HuntNightRange": 10
+        }
+      },
+      "contact_rejections": {},
+      "captured_by": {
+        "Fox": 11
+      }
+    },
+    {
+      "seed": 20017,
+      "report_sha256": "bb917eae700841833783b85b2fb1ed4417b9841add3866a851286c5839f74876",
+      "log_sha256": "5167dbf19efe2b094a976b85de642760ccd273beede85b5f428b99e44e59fba2",
+      "ground_scan_food_opportunities": {
+        "Leopard": {
+          "live": 40,
+          "none": 539,
+          "carrion": 26
+        },
+        "Mink": {
+          "none": 391
+        },
+        "Fox": {
+          "live": 160,
+          "none": 748,
+          "carrion": 10
+        }
+      },
+      "hunt_logged_agent_counts": {
+        "Fox": {
+          "ground_scan": 3,
+          "Acquire": 2,
+          "Windup": 2,
+          "capture": 2,
+          "Miss": 1,
+          "Timeout": 1
+        },
+        "Leopard": {
+          "ground_scan": 1
+        },
+        "Mink": {
+          "ground_scan": 2
+        }
+      },
+      "hunt_events": {
+        "Leopard": {
+          "scans": 605,
+          "scans_with_eligible": 40,
+          "scans_with_carrion": 26,
+          "scans_with_patch": 0
+        },
+        "Mink": {
+          "scans": 391,
+          "scans_with_eligible": 0,
+          "scans_with_carrion": 0,
+          "scans_with_patch": 0
+        },
+        "Fox": {
+          "scans": 918,
+          "scans_with_eligible": 160,
+          "scans_with_carrion": 10,
+          "scans_with_patch": 0,
+          "Acquire": 12,
+          "Windup": 10,
+          "Miss": 1,
+          "Timeout": 1
+        }
+      },
+      "access_rejections": {
+        "Leopard": {
+          "HuntOutOfReach": 692,
+          "HuntOutsideView": 73,
+          "HuntNightRange": 4
+        },
+        "Fox": {
+          "HuntTargetSizeOrMaturity": 319,
+          "HuntNightRange": 21,
+          "HuntOutsideView": 88,
+          "HuntTargetUnavailable": 155
+        }
+      },
+      "contact_rejections": {
+        "Fox": {
+          "HuntTargetUnavailable": 1
+        }
+      },
+      "captured_by": {
+        "Fox": 9
+      }
+    }
+  ]
+}

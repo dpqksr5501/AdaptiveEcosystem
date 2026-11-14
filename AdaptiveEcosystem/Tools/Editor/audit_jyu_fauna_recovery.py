@@ -14,14 +14,37 @@ if not match:
 mode = match.group(1)
 run = re.search(r"-FaunaRecoveryRun=([A-Za-z0-9_]+)", command)
 prefix = run.group(1) if run else "PackRecovery"
-stage = re.search(r"-EcoFaunaHabitatStage=([0-3])", command)
+
+
+def requested_int(name):
+    match = re.search(rf"-{name}=([0-9]+)\b", command)
+    return int(match.group(1)) if match else None
+
+
 slot = f"{prefix}_1108" if run else "FaunaPackValidation_1108"
 output = Path(unreal.Paths.convert_relative_path_to_full(unreal.Paths.project_saved_dir())) / "FaunaAudit"
 output.mkdir(parents=True, exist_ok=True)
-state = {"samples": [], "action": None, "dilation": 1., "requested_stage": int(stage.group(1)) if stage else None}
+state = {"samples": [], "action": None, "dilation": 1.,
+         "requested_stage": requested_int("EcoFaunaHabitatStage"),
+         "seed": requested_int("EcoV3Seed"),
+         "persistence": requested_int("EcoFaunaPersistence"),
+         "routine_mask": requested_int("EcoAdaptiveRoutineMask"),
+         "pursuit_fix": requested_int("EcoFaunaPursuitFix"),
+         "carrion_access": requested_int("EcoFaunaCarrionAccess"),
+         "attack_advance": bool(re.search(r"-EcoFaunaAttackAdvance\b", command)),
+         "follow_wounded": bool(re.search(r"-EcoFaunaFollowWounded\b", command))}
 last_sample = -30.
 seen_juveniles = {}
 seen_mature = set()
+shock_at = requested_int("FaunaFoodShockAt")
+shock_until = shock_at + (requested_int("FaunaFoodShockDuration") or 0) if shock_at is not None else None
+next_shock = shock_at
+dilation = requested_int("CauseDilation")
+if dilation is None:
+    dilation = 4
+if dilation < 1:
+    raise RuntimeError("Specify a positive -CauseDilation")
+dilation_applied = False
 
 
 def write():
@@ -42,6 +65,7 @@ def snapshot(world):
     }
     if mode == "long":
         adult_counts = {}
+        activity_counts = {}
         predators = []
         for actor in unreal.GameplayStatics.get_all_actors_of_class(world, unreal.EcoCreatureRepresentationActor):
             visual = actor.get_editor_property("visual_state")
@@ -49,6 +73,9 @@ def snapshot(world):
                 continue
             agent = visual.get_editor_property("stable_agent_id")
             kind = str(visual.get_editor_property("species_id"))
+            activity = str(visual.get_editor_property("activity")).split(".")[-1].split(":")[0].rstrip(">")
+            counts = activity_counts.setdefault(kind, {})
+            counts[activity] = counts.get(activity, 0) + 1
             if kind in ("Fox", "Leopard"):
                 position = actor.get_actor_location()
                 predators.append({"id": agent, "species": kind, "xy": [round(position.x), round(position.y)],
@@ -60,6 +87,7 @@ def snapshot(world):
                 seen_mature.add(agent)
                 adult_counts[kind] = adult_counts.get(kind, 0) + 1
         row["visible_adults"] = adult_counts
+        row["visible_activities"] = activity_counts
         row["visible_predators"] = predators
         row["observed_maturation"] = {
             kind: sum(agent in seen_mature for agent, juvenile_kind in seen_juveniles.items() if juvenile_kind == kind)
@@ -69,18 +97,29 @@ def snapshot(world):
 
 
 def tick(_):
-    global last_sample
+    global last_sample, next_shock, dilation_applied
     world = next((w for w in unreal.ObjectIterator(unreal.World) if w.get_name() == "LV_JYU_Fauna"
                   and unreal.GameplayStatics.get_game_state(w)), None)
     if not world:
         return
     authority = unreal.GameplayStatics.get_actor_of_class(world, unreal.EcoCreatureIntegrationSpawner)
     now = unreal.GameplayStatics.get_time_seconds(world)
-    if not authority or not unreal.EcoCreatureInspectionLibrary.get_authority_agent_ids(world):
+    if not authority or (not state["samples"] and not unreal.EcoCreatureInspectionLibrary.get_authority_agent_ids(world)):
         return
-    if mode == "long" and state["dilation"] == 1.:
-        unreal.GameplayStatics.set_global_time_dilation(world, 4.)
+    if mode == "long" and not dilation_applied:
+        unreal.GameplayStatics.set_global_time_dilation(world, float(dilation))
         state["dilation"] = unreal.GameplayStatics.get_global_time_dilation(world)
+        dilation_applied = True
+    if mode == "long" and next_shock is not None and next_shock <= shock_until and now >= next_shock:
+        migration = next((item for item in unreal.ObjectIterator(unreal.EcoHerdMigrationSubsystem)
+                          if item.get_outer() == world), None)
+        ok = migration is not None and migration.apply_food_fraction_for_audit("FaunaMeadow", .25, False)
+        event = {"applied": ok, "seconds": round(now, 3), "remaining_fraction": .25}
+        state.setdefault("food_shocks", []).append(event)
+        next_shock += 30
+        write()
+        if not ok:
+            raise RuntimeError("Fauna food shock transaction rejected")
     if now >= last_sample + 30.:
         last_sample = now
         state["samples"].append(snapshot(world))

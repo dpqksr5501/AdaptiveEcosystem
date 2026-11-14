@@ -1,5 +1,24 @@
 # 프로젝트 공통 맥락과 작업 시작 안내
 
+**팀 섬 지형 복사본의 다종 적용.** 최신 작업용 맵 `/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed`는 송해찬 담당 `/Game/Map/LV_SHC_IslandEcosystem1_WP`에서 가져온 지형과 물길에 수초·먹이·수생동물을 연결한다. 초지와 고원에는 지형에 맞춘 개체군과 마른 보금자리를 배치했다. 기본 시작·세션 맵은 `/Game/JWJ/Integration_JwJ`다. [최신 로컬 섬의 적용과 인계](Team/JYU_ISLAND_ECOSYSTEM_HANDOFF_20261105.md#2026-11-14-로컬-섬-마무리)
+
+**공유 기준과 후속 이슈.** [PR #19](https://github.com/dpqksr5501/AdaptiveEcosystem/pull/19)의 검증 기준은 `fa0c04dd`다. 최신 팀 통합 브랜치는 직접 빌드와 자동화 332건, 최신 섬에서 초기 16종 118마리와 210 게임초 실행을 별도로 확인했다. 밍크 입수·상륙, 스트리밍, 경사 접지, 플레이어 개입과 장시간 비교는 [담당별 후속 이슈](Team/FAUNA_TEAM_REQUESTS_20261113.md#pr-19-후속-이슈)에서 이어간다.
+
+**새 채팅에서 작업을 재개할 때.** 이 문서와 저장소 루트 `AGENTS.md`를 읽은 뒤, [다종 생태계 재개 안내](Team/FAUNA_TEAM_HANDOFF.md#새-채팅에서-재개)를 연다. 소유 맵의 16종 실행과 수변·식생 작업을 팀 레벨로 옮기기 위한 첫 단계는 **실제 접근 가능한 서식지·통로 확인과 같은 조건의 장기 비교**다. [담당별 작업 요청](Team/FAUNA_TEAM_REQUESTS_20261113.md) · [면적·배치·두뇌 비교 계획](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md)
+
+**2026-11-13 소유 다종 맵 기준.** `LV_JYU_ExpandedFauna`에 기존 8종과 신규 8종을 연결했다. `LV_JYU_HerbivoreForage`에서는 먹이 군락 15개의 재고와 외형을, `LV_JYU_RiparianReach`에서는 물가 17개 군락의 건조·강우·침수·섭취 반응과 수위별 연결 수심을 확인했다. 출생·이주, 장기 개체군, 식생 저장·네트워크, 수변 면적·렌더는 서로 다른 맵과 조건의 실행이다. 팀 적용은 송해찬 님의 레벨 디자인, 장원준 님의 플레이어 입력·사냥·발소리, 권신혁 님의 학습 계약과 연계한다. [맵별 완료·검증 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과) · [수변 실측과 팀 적용 조건](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md) · [돼지 전용 적용](조연우/JYU_PIG_HANDOFF_20261113.md)
+
+**2026-11-12 다종 작업 기준.** 기본 `/Game/JWJ/Integration_JwJ`는 Legacy 실행이며 Native v3와 자연 출생이 꺼져 있다. 로컬 소유 복사본 `/Game/JYU/Maps/LV_JYU_IntegrationR7eFauna`에서는 사슴 R7e, 늑대 Native 규칙, 여섯 종의 규칙 실행기가 함께 작동한다. 기존 시작 배치의 최신 4배속 30분 비교에서 사슴은 시드별로 25·34마리 남았고 늑대·여우·표범은 모두 기아로 사라졌다. 지상 통로·섭취, 고정 30·60 FPS 비교와 전용 서버 근접 사냥은 각각 문서에 적힌 별도 조건에서 확인했다. [최신 30분 결과](Architecture/FAUNA_POPULATION_BALANCE.md#다종-공용-사체의-영양-예약) · [검증별 범위](Team/FAUNA_TEAM_HANDOFF.md#현재-통합-레벨에서-확인한-결과)
+PR #16 → JWJ 통합(2026-11-09~10)의 저장 포맷 5와 실행 결과는 [당시 통합 기록](Team/PR16_JWJ_MERGE_20261109.md)에 있다. 팀 통합 기록의 체크포인트 포맷은 **11**, 현재 로컬 포맷은 **16**이다. 로컬은 산란장 예약, 규칙 전용 지역 환경, 공용 먹이 재고 접근점, 격자 밖 토양 수분과 연결 수원에 더해 수중 먹이터와 입수·상륙·마른 둑 좌표를 저장한다. 기존 슬롯은 저장 당시 빌드에서 확인한다. [수변과 새 프로세스 복원 검증](Architecture/FAUNA_HABITAT_CAPACITY_20261113.md#잉어-선반과-두-번째-밍크-출구-적용)
+
+사슴 이주 첫 구현(2026-11-09): [지역 순차 이주 구현/테스트](Architecture/REGIONAL_DEER_MIGRATION_IMPLEMENTATION_20261109.md)는 `eco.HerdMigration.Regional 1`에서 개별 순차 승인·지역 출발 예산을 제공한다. Editor 빌드/관련 자동화13개는 성공했고 실제1102 지형 도착·저장 왕복·멀티 검증은 남았다. 기본OFF이며 다음 ‘계획만 작성’ 설명은 첫 구현 이전 이력이다.
+
+후속 사슴 이주 계획(2026-11-09): [지역 생태 기반 순차 이주](Architecture/REGIONAL_DEER_MIGRATION_PLAN_20261109.md)는 지역별 등록 순서로 개체를 평가하고 예상 잔류 인원·목적지 예약·부족 기간 누적 승인 한도로 추가 출발을 중단한다. 단독 개체도 평가하며 Herd 규모는 자격 조건이 아니다. 현재는 계획만 작성했고 기존 런타임은 아직 변경하지 않았다. 다음 사슴 이주 구현은 이 상세 계획을 우선 적용한다.
+
+후속 요청(2026-11-08): 기존 `/Game/JWJ/1102_Integration_JWJ`의 풀/카메라 표현·사슴 부족 이주·늑대 추적 이주·포만 생활 행동은 [JWJ 1102 단계별 개발 계획](Architecture/JWJ_1102_FOOD_MIGRATION_SATIETY_PLAN_20261108.md)을 따른다. 4지역 배치와 기존 풀/카메라 기준선은 검증했고 새 행동 구현은 남아 있다. 최신 선행 작업은 [공유 풀 패치·실제 위치 섭식 명세](Architecture/FOOD_PATCH_GRAZING_IMPLEMENTATION_SPEC_20261108.md)의 S0~S6이다. [S0/S1 첫 구현](Architecture/FOOD_PATCH_GRAZING_S0_S1_20261108.md)은 writer 조사/로컬 기준선·기본OFF 공통 배치/권위 지면까지다. 패치별 먹이 배분·검색·예약·도착 소비는 아직 미구현이며 현재 소비는 셀 단위다. 기존 Actor/컴포넌트/Native 경로를 확장하고 루트 PROGRESS의 최신 재개 우선순위를 확인한다.
+
+후속 개발(2026-11-08): 서버 먹이 격자를 실제 풀밭으로 표현하는 [단계별 구현 계획](Architecture/FOOD_GRASS_IMPLEMENTATION_PLAN_20261108.md)과 [기존 맵 테스트 안내](Architecture/FOOD_GRASS_TEST_GUIDE_20261108.md)를 따른다. 기존 Field/ISM·Region·Inspector HUD에 전체 셀 변경분, 안정적인 배치, 환경 디버그를 연결하는 중이다. 현재 개발 재개 기준은 [루트 PROGRESS.md](../../PROGRESS.md)다. 실제 branch/HEAD·diff와 검증 범위를 확인해 미완료 항목부터 진행한다.
+
 **다종 생태계 작업 진입점.** [팀 인수인계](Team/FAUNA_TEAM_HANDOFF.md)에서 로컬 재현, 역할별 다음 작업, 완료 기준과 최신 검증을 확인한다.
 
 **2026-11-05 체형 설계와 확인 범위.** [세대·체형 설계](Architecture/INHERITED_MORPHOLOGY_DESIGN_20261105.md)에 현재 유전·표현의 근거와 질주·은폐·사냥 체형 제안을 구분한다. 새 축의 런타임 및 학습 적용은 보류 상태다. 새 작업은 해당 문서의 역할별 인계와 검증 순서를 따른다.
@@ -10,11 +29,11 @@
 
 **2026-10-29 후속 작업 트리:** 사용자 실제 플레이 점검 후 [플레이 흐름 수정과 life rules v2](조연우/JYU_PLAYFLOW_FIX_20261029.md)를 추가했다. 단독 무리 이주·접촉/경계·로컬 섭식·식생 표시/용량 확장·낮밤 표현과 owned Highland 통로를 보완한다. `bEnableEcosystemLife` 세계에 한정하며 기존 모델/관측·SocialControl=0·Native 단일 writer를 유지한다. 아래 life-v1은 최초 구현 이력이고, 현재 검증은 새 기록/evidence를 우선한다. main/push 완료를 뜻하지 않으며 전체 Python 세계 mirror/재학습·영구 생태 평형은 미완료다.
 
-갱신일 **2026-10-24**. 팀원과 각 AI agent가 대화 기록 없이 프로젝트의 목표·제품 방향·구현 경계를 이해하기 위한 공통 진입 문서다. 개인 담당 인수인계보다 먼저 읽고 작업 분야의 Source/계약으로 이어간다. 종 이름과 예시는 교체 가능한 표현이며 현재 구현을 과장하는 근거가 아니다.
+공통 설명은 2026-10-24에 작성했고, 상단의 작업 재개 안내를 2026-11-13에 갱신했다. 팀원과 AI agent는 이 문서에서 프로젝트 목표와 계층별 책임을 확인한 뒤 현재 Source와 담당별 계약을 대조한다.
 
-사용자의 후속 전체 구현은 원래 저장소에서 진행해 **`d095948`**로 기록했다. 최신 시작점은 [팀 AI 공통 안내](Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [전체 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행/팀 API 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)이다. owned `/Game/JYU/Maps/LV_JYU_Ecosystem`만 식생·경험/흔적·출생/유전/성장·사체 영양·저장/운영 복구를 opt-in한다. 아래의 soil 최초 구축·미연결 설명은 당시 이력이다. 기존 맵/기본 SocialControl=0·단일 Native writer·모델 차원을 보존하며 재학습/임의 종 지원 완료로 확대하지 않는다.
+`d095948` 당시 life-v1 최초 적용 맵은 소유 `/Game/JYU/Maps/LV_JYU_Ecosystem`이었다. 당시의 식생·흔적·출생·유전·사체·저장 계약과 역할별 배경은 [팀 AI 공통 안내](Team/ECOSYSTEM_AI_COLLABORATION_20261024.md), [당시 구현 상태표](Architecture/ECOSYSTEM_IMPLEMENTATION_STATUS_20261023.md), [life-v1 실행 계약](Architecture/ECOSYSTEM_LIFE_IMPLEMENTATION_20261023.md)에 있다. 현재 다종 맵과 정책 상태는 위 재개 안내를 따른다.
 
-대화 없이 이어갈 때는 [life-v1 최신 인수인계](Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)의 §1–27 대응·직전 실패 수정·실행 도구·후속 경계도 읽는다.
+life-v1 기반을 수정할 때는 [2026-10-23 life-v1 인수인계](Architecture/ECOSYSTEM_LIFE_HANDOFF_20261023.md)에서 초기 실행 도구와 당시 문제를 확인한다.
 
 서버·네트워킹 담당은 [역할별 서버 안내](Network/ECOSYSTEM_SERVER_NETWORK_AGENT_GUIDE_20261024.md), 학습 담당은 [역할별 RL 안내](RL_Policy/ECOSYSTEM_RL_AGENT_GUIDE_20261024.md)와 [실제 부분 예제](RL_Policy/Examples/README.md)를 따른다. [시작 프롬프트](Team/ECOSYSTEM_AGENT_START_PROMPTS_20261024.md)에는 작업 요청·검증·인계 양식이 있다. 2026-10-24는 Source/문서/샘플·링크 감사를 수행한 날이며 이전225개 자동화·PIE/멀티/패키지를 새로 실행한 날로 기록하지 않는다.
 

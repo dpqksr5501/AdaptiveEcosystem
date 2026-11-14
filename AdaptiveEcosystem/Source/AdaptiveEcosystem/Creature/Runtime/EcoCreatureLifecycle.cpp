@@ -1,5 +1,6 @@
 #include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoFaunaMotionClock.h"
 #include "Mass/EcoMassFragments.h"
 #include "Mass/EntityFragments.h"
 #include "MassSpawnerSubsystem.h"
@@ -13,6 +14,9 @@
 #include "AI/Policy/EcoPolicyV3IntegratedFragments.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
+#include "AI/Policy/EcoPolicyV3IntegratedProcessors.h"
+#include "AI/Policy/EcoBehaviorConfig.h"
+#include "MassExecutionContext.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/EcoPolicyV3SocialBridge.h"
 #include "AI/Social/Herd/EcoHerdSubsystem.h"
@@ -51,44 +55,101 @@ void AEcoCreatureIntegrationSpawner::Reconcile(float Delta)
 	if (EM.IsProcessing() || !Clock->AdvanceClock(Delta)) return;
 	const double Now = Clock->GetServerTime().ServerTimeSeconds;
 	if (!BuildAgentLookup()) { FailRuntime(TEXT("Duplicate or invalid stable agent identity")); return; }
-    MoveFauna(Delta, Now);
 	// Bounded chronological catch-up: unfinished logical time remains as observable debt.
 	const auto* Ecology = GetWorld()->GetSubsystem<UEcologySimulationSubsystem>();
-	for (int32 Pass = 0; Pass < MaxCatchUpSteps; ++Pass)
+	int32 RemainingResourceSteps = MaxCatchUpSteps;
+	const auto AdvanceResources = [&](double Through)
 	{
-		FEcoServerTimeSnapshot Previous;
-		if (!Clock->GetSnapshotAt(LastResourceTime, Previous)) { FailRuntime(TEXT("Historical clock snapshot")); return; }
-		double NextTime = FMath::Min(LastResourceTime + 1.0, Ecology->GetNextScheduledTime(Previous, bEnableWaves && IsSpeciesEnabled(false)));
-        if (Migration.bEnabled) NextTime = FMath::Min(NextTime, NextMigrationTime);
-        // Combat requests wake the existing serialized transaction rather than waiting a full resource second.
-        // This remains the same survival/death/resource writer; no HP mutation occurs in Notify or Mass hooks.
-        if (bEnableEcosystemLife && bEnablePlayerCombat)
-        {
-            double ContactTime=MAX_dbl;
-            for(const auto& Request:ComboDamage)ContactTime=FMath::Min(ContactTime,Request.Issued);
-            for(const auto& Pair:WolfCombat)if(Pair.Value.bPending)ContactTime=FMath::Min(ContactTime,Pair.Value.ContactTime);
-            if(ContactTime<MAX_dbl)NextTime=FMath::Min(NextTime,FMath::Max(LastResourceTime+.001,ContactTime));
-        }
-		// Keep per-agent meal times aligned even when a phase/wave divides the second.
-		for (const auto E : Owned)
+		for (; RemainingResourceSteps > 0; --RemainingResourceSteps)
 		{
-			const auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
-			const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
-			const auto& Travel = EM.GetFragmentDataChecked<FEcoTravelFragment>(E);
-			const double Due = EM.GetFragmentDataChecked<FEcoLifetimeFragment>(E).NextFeedTimeSeconds;
-			if (V.HP > 0 && Id.SpeciesId == TEXT("Herbivore") && Travel.State == EEcoResidenceState::Resident && Due > LastResourceTime)
-				NextTime = FMath::Min(NextTime, Due);
-            if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E);
-                Fauna && V.HP > 0 && Fauna->AttackContact > LastResourceTime)
-                NextTime = FMath::Min(NextTime, Fauna->AttackContact);
+			FEcoServerTimeSnapshot Previous;
+			if (!Clock->GetSnapshotAt(LastResourceTime, Previous)) { FailRuntime(TEXT("Historical clock snapshot")); return false; }
+			double NextTime = FMath::Min(LastResourceTime + 1.0, Ecology->GetNextScheduledTime(Previous, bEnableWaves && IsSpeciesEnabled(false)));
+			if (Migration.bEnabled) NextTime = FMath::Min(NextTime, NextMigrationTime);
+			// Combat contacts wake the serialized survival/death/resource transaction.
+			if (bEnableEcosystemLife && bEnablePlayerCombat)
+			{
+				double ContactTime = MAX_dbl;
+				for (const auto& Request : ComboDamage) ContactTime = FMath::Min(ContactTime, Request.Issued);
+				for (const auto& Pair : WolfCombat)
+					if (Pair.Value.bPending) ContactTime = FMath::Min(ContactTime, Pair.Value.ContactTime);
+				if (ContactTime < MAX_dbl) NextTime = FMath::Min(NextTime, FMath::Max(LastResourceTime + .001, ContactTime));
+			}
+			// Keep per-agent meal times aligned when a phase or wave divides the second.
+			for (const auto E : Owned)
+			{
+				const auto& Id = EM.GetFragmentDataChecked<FEcoIdentityFragment>(E);
+				const auto& V = EM.GetFragmentDataChecked<FEcoVitalsFragment>(E);
+				const auto& Travel = EM.GetFragmentDataChecked<FEcoTravelFragment>(E);
+				const double Due = EM.GetFragmentDataChecked<FEcoLifetimeFragment>(E).NextFeedTimeSeconds;
+				if (V.HP > 0 && Id.SpeciesId == TEXT("Herbivore") && Travel.State == EEcoResidenceState::Resident && Due > LastResourceTime
+					&& !EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E))
+					NextTime = FMath::Min(NextTime, Due);
+				if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(E);
+					Fauna && V.HP > 0 && Fauna->AttackContact > LastResourceTime)
+					NextTime = FMath::Min(NextTime, Fauna->AttackContact);
+			}
+			if (NextTime > Through) break;
+			FEcoServerTimeSnapshot Time;
+			const int32 BeforeCount = Owned.Num();
+			if (!Clock->GetSnapshotAt(NextTime, Time) || !ProcessResourceStep(Time, Through)
+				|| (Owned.Num() != BeforeCount && !BuildAgentLookup()))
+			{ FailRuntime(TEXT("Creature resource/survival step")); return false; }
+			LastResourceTime = Time.ServerTimeSeconds;
 		}
-		if (NextTime > Now) break;
-		FEcoServerTimeSnapshot Time;
-		if (!Clock->GetSnapshotAt(NextTime, Time) || !ProcessResourceStep(Time, Now))
-		{ FailRuntime(TEXT("Creature resource/survival step")); return; }
-		LastResourceTime = Time.ServerTimeSeconds;
+		return true;
+	};
+	if (FaunaSpecies.IsEmpty())
+	{
+		if (!AdvanceResources(Now)) return;
 	}
-	if (!EcoMassSurvival::RemoveExpired(EM, Now, true) || !BuildAgentLookup())
+	else
+	{
+		using namespace EcoFaunaMotionClock;
+		auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>();
+		if (!Native || !Native->IsActive() || !Native->UsesAuthorityBoundaries())
+		{ FailRuntime(TEXT("Mixed fauna requires the authority clock")); return; }
+		// Native contexts become ready in the pre-actor tick following authority startup.
+		// Retain the initial time debt until both backends can process it.
+		if (Native->NumContexts() == 0) return;
+		if (!MixedNativeStep)
+		{
+			AuthorityClockWorldOrigin = GetWorld()->GetTimeSeconds() - Now;
+			MixedNativeStep = NewObject<UEcoPolicyV3IntegratedStepProcessor>(this);
+			MixedNativeTransforms = NewObject<UEcoPolicyV3IntegratedVisualProcessor>(this);
+			MixedNativeStep->CallInitialize(GetWorld(), EM.AsShared());
+			MixedNativeTransforms->CallInitialize(GetWorld(), EM.AsShared());
+		}
+		if (FaunaMotionTime < 0.) FaunaMotionTime = 0.;
+		if (!AdvanceResources(FaunaMotionTime)) return;
+		const int64 LastReadyStep = CompletedStepAt(Now);
+		for (int32 Pass = 0; Pass < MaxStepsPerFrame && RemainingResourceSteps > 0; ++Pass)
+		{
+			const int64 NextStep = CompletedStepAt(FaunaMotionTime) + 1;
+			if (NextStep > LastReadyStep) break;
+			double End = StepTime(NextStep);
+			for (const auto Entity : Owned)
+				if (const auto* Fauna = EM.GetFragmentDataPtr<FEcoFaunaFragment>(Entity);
+					Fauna && Fauna->AttackContact > FaunaMotionTime + UE_SMALL_NUMBER)
+					End = FMath::Min(End, Fauna->AttackContact);
+			MoveFauna(float(End - FaunaMotionTime), End);
+			FaunaMotionTime = End;
+			const int64 NativeBoundary = (Native->GetGlobalStep() + 1) * EcoBehaviorConfig::PolicyInterval;
+			if (NextStep == NativeBoundary && End == StepTime(NextStep))
+			{
+				auto Context = EM.CreateExecutionContext(EcoBehaviorConfig::StepSeconds);
+				Context.SetExecutionType(EMassExecutionContextType::Processor);
+				Context.SetFlushDeferredCommands(false);
+				MixedNativeStep->ExecuteAuthorityBoundary(EM, Context, AuthorityClockWorldOrigin + End, End);
+				if (!Native->IsActive() || Native->GetGlobalStep() * EcoBehaviorConfig::PolicyInterval != NextStep)
+				{ FailRuntime(TEXT("Native boundary did not advance")); return; }
+				MixedNativeTransforms->PublishAuthorityBoundary(EM, Context);
+			}
+			if (!AdvanceResources(End)) return;
+		}
+	}
+	const double CleanupTime = FaunaSpecies.IsEmpty() ? Now : FaunaMotionTime;
+	if (!EcoMassSurvival::RemoveExpired(EM, CleanupTime, true) || !BuildAgentLookup())
 	{ FailRuntime(TEXT("Creature death cleanup")); return; }
 	UpdateSimulationLOD();
 	UpdateSensoryPresentation();
@@ -156,7 +217,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 		FEcoSpawnRequest Request;
 		while (Ecology->PollSpawnWave(G.RegionId, Time, Request))
 		{
-			const int32 Actual = Spawn(G.RegionId, Request.Count, false);
+			const int32 Actual = Spawn(G.RegionId, Request.Count, false, Time);
 			if (!ReconcilePopulation() || !Ecology->CompleteSpawnRequest(Request.RequestId, Actual) || Actual != Request.Count) return false;
 		}
 	}
@@ -235,14 +296,15 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	TArray<FName> RegionIds; Ecology->GetRegionIds(RegionIds);
 	TArray<FEcoResourceSnapshot> Resources; Ecology->GetResourceSnapshots(Resources);
 	TArray<FEcoRegionSpatialSnapshot> Spaces;
-	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionIds, Spaces)) return false;
+	if (!GetWorld()->GetSubsystem<UEcologyWorldSubsystem>()->BuildSpatialSnapshots(RegionIds, Spaces, true)) return false;
 	TArray<FEcoMigrationOutcome> Arrivals;
 	if(auto* HerdMigration=GetWorld()->GetSubsystem<UEcoHerdMigrationSubsystem>())
-        if(!HerdMigration->Reconcile(EM,Time,Step,Arrivals))return false;
+        if(!HerdMigration->Reconcile(EM,Time,Step,Arrivals,Spaces))return false;
     TArray<FEcoMigrationOutcome> LegacyArrivals;
 	if (!EcoMassMigration::Reconcile(EM, Time, ObservedTime, Step, Resources, Spaces, Migration,
 		false, 1.0, nullptr, nullptr, {}, 0.0, &LegacyArrivals, false))return false;
     Arrivals.Append(LegacyArrivals);
+    ReconcileFaunaPassages(EM, Time, ObservedTime, Step, Arrivals);
     if (!Ecology->RecordMigrations(Arrivals) || !ReconcilePopulation()
 		|| !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return false;
 	for (const auto& Arrival : Arrivals)
@@ -266,6 +328,7 @@ bool AEcoCreatureIntegrationSpawner::ProcessResourceStep(const FEcoServerTimeSna
 	}
 	if (!BuildAgentLookup() || !ReconcilePopulation() || !Ecology->RefreshPopulationPressure(Time.ServerTimeSeconds)) return false;
     if(!ProcessNaturalBirths(Time)||!ProcessFauna(Time)||!ProcessPopulationRecovery(Time)||(bEnableEcosystemLife&&!ReconcilePopulation()))return false;
+    PublishForageVisuals();
 	CompletedTime = Time;
 	PublishSummary();
 	return bReady;
@@ -312,8 +375,12 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 case EEcoFaunaFlightPhase::Takeoff: Present.Activity = uint8(EEcoSpeciesActivity::Takeoff); break;
                 case EEcoFaunaFlightPhase::Cruise: Present.Activity = uint8(EEcoSpeciesActivity::Fly); break;
                 case EEcoFaunaFlightPhase::Landing: Present.Activity = uint8(EEcoSpeciesActivity::Land); break;
+                case EEcoFaunaFlightPhase::Dive: Present.Activity = uint8(EEcoSpeciesActivity::Attack); break;
                 default:
-                    if (Fauna->AttackContact >= 0.) Present.Activity = uint8(EEcoSpeciesActivity::Attack);
+                    if (Fauna->bSwimming)
+                        Present.Activity = uint8(Fauna->ShorePhase == EEcoFaunaShorePhase::Entering ? EEcoSpeciesActivity::EnterWater
+                            : Fauna->ShorePhase == EEcoFaunaShorePhase::Exiting ? EEcoSpeciesActivity::ExitWater : EEcoSpeciesActivity::Swim);
+                    else if (Fauna->AttackContact >= 0.) Present.Activity = uint8(EEcoSpeciesActivity::Attack);
                     else if (bMeal) Present.Activity = uint8(EEcoSpeciesActivity::Eat);
                     else if (Now < Fauna->ThreatUntil) Present.Activity = uint8(EEcoSpeciesActivity::Flee);
                     else if (Now < Fauna->RootingUntil) Present.Activity = uint8(EEcoSpeciesActivity::Forage);
@@ -359,6 +426,13 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
                 if(!J->bPause)Present.Flags&=~uint8(2);
             }
             if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);Link&&Link->Individual.bInitialized){
+                if (UsesAdaptiveRoutine(EEcoAdaptiveRoutine::DeerMeal))
+                {
+                    if (const auto* Body = EM.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E); Body && Body->Body.LastIntake <= 1.e-9)
+                        Present.Flags &= ~uint8(2);
+                    if (Link->Individual.bMealRestApplied)
+                        Present.Activity = uint8(EEcoSpeciesActivity::SatedRest);
+                }
                 if(NaturalHabitatProfile){
                     switch(Link->Individual.Residence.Phase){
                         case 1:case 5:Present.Activity=uint8(EEcoSpeciesActivity::ShelterTravel);Present.Flags&=~uint8(2);break;
@@ -386,6 +460,10 @@ void AEcoCreatureIntegrationSpawner::UpdatePresentationAndNoise(float Delta)
             Present.Activity = uint8(StateIndex < UE_ARRAY_COUNT(Activities) ? Activities[StateIndex] : EEcoSpeciesActivity::Hold);
             if(Threat->Agent.State.SatLeft>0&&Threat->Agent.State.Cooldown<=0&&!Threat->Agent.State.bAsleep)
                 Present.Activity=uint8(EEcoSpeciesActivity::SatedRest);
+            if (UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal))
+                if (const auto* Link = EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);
+                    Link && Link->Individual.bMealRestApplied && !Threat->Agent.State.bAsleep)
+                    Present.Activity = uint8(EEcoSpeciesActivity::SatedRest);
             if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);
                 Link&&Link->Individual.Investigation.Role==EcoTracesV3::ERole::Investigate)Present.Activity=uint8(EEcoSpeciesActivity::Investigate);
             if(bEnableEcosystemLife)if(const auto* Link=EM.GetFragmentDataPtr<FEcoIntegratedV3Fragment>(E);

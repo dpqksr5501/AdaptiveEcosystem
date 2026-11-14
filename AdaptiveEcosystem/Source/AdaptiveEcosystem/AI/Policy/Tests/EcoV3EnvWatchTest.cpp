@@ -221,6 +221,36 @@ namespace EcoV3EnvWatchTestImpl
 	}
 }
 
+IMPLEMENT_SIMPLE_AUTOMATION_TEST(FEcoRegionAvailabilityTest, "AdaptiveEcosystem.Vegetation.RegionAvailabilityAndOverlap",
+	EAutomationTestFlags::EditorContext | EAutomationTestFlags::EngineFilter)
+
+bool FEcoRegionAvailabilityTest::RunTest(const FString& Parameters)
+{
+	EcoTest::FScopedTestWorld W;
+	auto* Geography = W.World->GetSubsystem<UEcologyWorldSubsystem>();
+	using EcoV3EnvWatchTestImpl::TeamRegion;
+	auto* Valley = TeamRegion(*W.World, FName(TEXT("Valley")), 0., EEcoWeatherState::Clear, 0.f);
+	auto* Forest = TeamRegion(*W.World, FName(TEXT("Forest")), 0., EEcoWeatherState::Clear, 0.f);
+	if (!TestNotNull(TEXT("Valley"), Valley) || !TestNotNull(TEXT("Forest"), Forest)) return false;
+	const TArray<FName> Order{Forest->RegionId, Valley->RegionId};
+	Forest->AdjacentRegionIds.Add(Valley->RegionId);
+	Valley->AdjacentRegionIds.Add(Forest->RegionId);
+	TestTrue(TEXT("Overlap selects the same lexical winner when it registers last"),
+		Geography->FindRegionAtPosition(FVector::ZeroVector) == Forest);
+	TArray<FEcoRegionSpatialSnapshot> Snapshots;
+	Geography->UnregisterRegion(Valley);
+	TestFalse(TEXT("Bootstrap still rejects missing geometry"), Geography->BuildSpatialSnapshots(Order, Snapshots));
+	if (!TestTrue(TEXT("A live boundary can defer an unloaded region"), Geography->BuildSpatialSnapshots(Order, Snapshots, true))) return false;
+	if (!TestEqual(TEXT("Both ledger slots remain present"), Snapshots.Num(), 2)) return false;
+	TestEqual(TEXT("The unavailable slot retains its ID"), Snapshots[1].RegionId, Valley->RegionId);
+	TestFalse(TEXT("Unloaded slot has no traversable bounds"), Snapshots[1].Contains(FVector::ZeroVector));
+	TestTrue(TEXT("The resident region cannot send agents to the unloaded neighbor"), Snapshots[0].AdjacentIndices.IsEmpty());
+	Geography->RegisterRegion(Valley);
+	if (!TestTrue(TEXT("Reloaded region is available at the same index"), Geography->BuildSpatialSnapshots(Order, Snapshots, true))) return false;
+	TestTrue(TEXT("Reload restores adjacency"), Snapshots[1].bAvailable && Snapshots[0].AdjacentIndices.Contains(1));
+	return true;
+}
+
 // -----------------------------------------------------------------------------
 // 나무: 'A∪B 로 시작' = 'A 로 시작하고 Play 중에 B 를 더함'
 // -----------------------------------------------------------------------------

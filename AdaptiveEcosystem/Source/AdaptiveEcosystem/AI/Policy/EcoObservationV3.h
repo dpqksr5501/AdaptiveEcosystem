@@ -34,6 +34,7 @@
 #include <limits>
 
 #include "EcoRepertoire.h"
+#include "EcoSpatialIndexV3.h"
 #include "EcoThreatModel.h"
 #include "EcoV3Island.h"
 
@@ -227,7 +228,7 @@ namespace EcoObservationV3
 	 */
 	inline FThreatPerception PerceiveThreats(const FVec2& Pos, const FVec2& Head, double SeePred, double SeeMult,
 											 double SeeMultLast, const FThreatInput* Threats, std::int32_t NumThreats,
-											 const FObservationConfig& Cfg = kR1bObsConfig)
+											 const FObservationConfig& Cfg = kR1bObsConfig, EcoSpatialV3::FRows Rows = {})
 	{
 		FThreatPerception R;
 		const double SeeP = SeePred * SeeMult;
@@ -235,8 +236,9 @@ namespace EcoObservationV3
 		const double SeeEv = SeePred * Lo;
 		double BestEx = 0.0, BestEy = 0.0, BestInv = 0.0;
 		double BestEvEx = 0.0, BestEvEy = 0.0, BestEvInv = 0.0;
-		for (std::int32_t m = 0; m < NumThreats; ++m)
+		for (std::int32_t Row = 0; Row < Rows.Count(NumThreats); ++Row)
 		{
+			const std::int32_t m = Rows.At(Row);
 			const FThreatInput& T = Threats[m];
 			const double Ex = T.X - Pos.X;
 			const double Ey = T.Y - Pos.Y;
@@ -313,13 +315,14 @@ namespace EcoObservationV3
 	 * 파이썬 world.py `_seq_sum` 도 10-22 부터 같은 차례라 비트 단위로 같다(그 전 행렬곱은 끝 비트가 달랐다).
 	 */
 	inline FKinPerception PerceiveKin(std::int32_t Self, const FVec2& Pos, const FVec2& Head, const FKinInput* Agents,
-									  std::int32_t NumAgents, const FObservationConfig& Cfg = kR1bObsConfig)
+									  std::int32_t NumAgents, const FObservationConfig& Cfg = kR1bObsConfig, EcoSpatialV3::FRows Rows = {})
 	{
 		FKinPerception R;
 		double SumX = 0.0, SumY = 0.0;
 		double CX = 0.0, CY = 0.0, CSum = 0.0;
-		for (std::int32_t j = 0; j < NumAgents; ++j)
+		for (std::int32_t Row = 0; Row < Rows.Count(NumAgents); ++Row)
 		{
+			const std::int32_t j = Rows.At(Row);
 			if (j == Self)
 			{
 				continue;

@@ -1,0 +1,2278 @@
+{
+  "schema_version": 1,
+  "partial": true,
+  "training_ready": false,
+  "runs": [
+    {
+      "seed": 20000,
+      "condition": "clear",
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_eagle_scan_clear/IslandFaunaPIE.json": "72ed7615baabf51193f292bfd1089909a22776fb34c232b0cf0eaa6b1b45c8d4",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_scan_clear.log": "5b5ce13f33c10687b6150e109813db73abcc86dd6be056de31b3eeceafbf7cd5"
+      },
+      "attempts": [
+        {
+          "hunter": 100,
+          "prey": 76,
+          "selected_at": 59.31666666666667,
+          "queued_at": 62.38333333333333,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.667
+            },
+            {
+              "prey": 77,
+              "score": 0.653
+            },
+            {
+              "prey": 119,
+              "score": 0.666
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 114.5,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 100,
+          "prey": 119,
+          "selected_at": 84.8,
+          "queued_at": 86.78333333333333,
+          "candidates": [
+            {
+              "prey": 119,
+              "score": 0.764
+            }
+          ],
+          "outcome": {
+            "event": "HuntCaptured",
+            "at": 86.88333333482345,
+            "payments": [
+              {
+                "at": 87.883,
+                "amount": 5.0,
+                "remaining": 7.607
+              },
+              {
+                "at": 88.883,
+                "amount": 5.0,
+                "remaining": 2.607
+              },
+              {
+                "at": 89.883,
+                "amount": 2.607,
+                "remaining": 0.0
+              }
+            ],
+            "landing_and_stock": {
+              "event_log_lines": [
+                5331,
+                5349,
+                5376
+              ],
+              "initial_stock": 12.607,
+              "grounded_pie_seconds": 87.50000456348062,
+              "grounded_position_cm": [
+                53268.96,
+                48335.58,
+                3137.07
+              ],
+              "last_live_prey_position_cm": null,
+              "vertical_start": {
+                "at": 87.2333378829062,
+                "position_cm": [
+                  53268.96,
+                  48335.58,
+                  3179.38
+                ]
+              }
+            }
+          }
+        },
+        {
+          "hunter": 99,
+          "prey": 76,
+          "selected_at": 123.91666666666667,
+          "queued_at": 127.41666666666667,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.614
+            },
+            {
+              "prey": 77,
+              "score": 0.585
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 111.8,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 99,
+          "prey": 77,
+          "selected_at": 140.78333333333333,
+          "queued_at": 142.65,
+          "candidates": [
+            {
+              "prey": 77,
+              "score": 0.835
+            }
+          ],
+          "outcome": {
+            "event": "HuntCaptured",
+            "at": 142.75000000149012,
+            "payments": [
+              {
+                "at": 143.75,
+                "amount": 5.0,
+                "remaining": 7.457
+              },
+              {
+                "at": 144.75,
+                "amount": 5.0,
+                "remaining": 2.457
+              },
+              {
+                "at": 146.703,
+                "amount": 2.457,
+                "remaining": 0.0
+              }
+            ],
+            "landing_and_stock": {
+              "event_log_lines": [
+                7359,
+                7379,
+                7413
+              ],
+              "initial_stock": 12.457,
+              "grounded_pie_seconds": 143.2333408035338,
+              "grounded_position_cm": [
+                54326.69,
+                49524.94,
+                3165.77
+              ],
+              "last_live_prey_position_cm": [
+                54326.69,
+                49524.94,
+                3165.77
+              ],
+              "vertical_start": null
+            }
+          }
+        },
+        {
+          "hunter": 99,
+          "prey": 76,
+          "selected_at": 152.41666666666666,
+          "queued_at": 155.35,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.56
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 105.1,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 99,
+          "prey": 76,
+          "selected_at": 185.9,
+          "queued_at": 188.3,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.531
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 102.9,
+            "reach_cm": 95.0
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20000,
+      "condition": "cover",
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_eagle_scan_cover/IslandFaunaPIE.json": "ee4c98f7f83ad63fdfb5cab40b9b7e0f8a50bb9f607e854816c261da8e192af6",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_scan_cover.log": "68df4bcc34429a88513e415a8131bd15c13fe288f7852efafffd3f0ea5b4cf8c"
+      },
+      "attempts": [
+        {
+          "hunter": 100,
+          "prey": 119,
+          "selected_at": 59.31666666666667,
+          "queued_at": 62,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.653
+            },
+            {
+              "prey": 77,
+              "score": 0.668
+            },
+            {
+              "prey": 119,
+              "score": 0.714
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 104.2,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 100,
+          "prey": 76,
+          "selected_at": 99.25,
+          "queued_at": 101.6,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.643
+            },
+            {
+              "prey": 77,
+              "score": 0.632
+            },
+            {
+              "prey": 119,
+              "score": 0.591
+            }
+          ],
+          "outcome": {
+            "event": "HuntCaptured",
+            "at": 101.70000000149011,
+            "payments": [
+              {
+                "at": 102.7,
+                "amount": 5.0,
+                "remaining": 8.855
+              },
+              {
+                "at": 103.7,
+                "amount": 5.0,
+                "remaining": 3.855
+              },
+              {
+                "at": 104.7,
+                "amount": 3.855,
+                "remaining": 0.0
+              }
+            ],
+            "landing_and_stock": {
+              "event_log_lines": [
+                5893,
+                5917,
+                5941
+              ],
+              "initial_stock": 13.855,
+              "grounded_pie_seconds": 102.16667199507356,
+              "grounded_position_cm": [
+                54326.84,
+                49524.73,
+                3165.53
+              ],
+              "last_live_prey_position_cm": [
+                54326.84,
+                49524.73,
+                3165.53
+              ],
+              "vertical_start": null
+            }
+          }
+        },
+        {
+          "hunter": 100,
+          "prey": 77,
+          "selected_at": 125.76666666666667,
+          "queued_at": 129.28333333333333,
+          "candidates": [
+            {
+              "prey": 77,
+              "score": 0.509
+            },
+            {
+              "prey": 119,
+              "score": 0.488
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 98.4,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 100,
+          "prey": 77,
+          "selected_at": 146.81666666666666,
+          "queued_at": 148.75,
+          "candidates": [
+            {
+              "prey": 77,
+              "score": 0.727
+            }
+          ],
+          "outcome": {
+            "event": "HuntCaptured",
+            "at": 148.85000000149012,
+            "payments": [
+              {
+                "at": 149.85,
+                "amount": 5.0,
+                "remaining": 7.457
+              },
+              {
+                "at": 150.85,
+                "amount": 5.0,
+                "remaining": 2.457
+              },
+              {
+                "at": 151.85,
+                "amount": 2.457,
+                "remaining": 0.0
+              }
+            ],
+            "landing_and_stock": {
+              "event_log_lines": [
+                8044,
+                8060,
+                8100
+              ],
+              "initial_stock": 12.457,
+              "grounded_pie_seconds": 149.3666744567454,
+              "grounded_position_cm": [
+                54099.69,
+                46102.44,
+                3118.38
+              ],
+              "last_live_prey_position_cm": [
+                54099.69,
+                46102.44,
+                3118.38
+              ],
+              "vertical_start": null
+            }
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "condition": "clear",
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_eagle_scan_clear/IslandFaunaPIE.json": "9385e65470303f88b165b6a37531485e6d72386dc27ab2c8cbf8250352038ea3",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_scan_clear.log": "94129ce34f22498f382fd2c8e34120e055a79fcd09c703a76338dcee64a52df6"
+      },
+      "attempts": [
+        {
+          "hunter": 100,
+          "prey": 77,
+          "selected_at": 59.63333333333333,
+          "queued_at": 61.2,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.908
+            },
+            {
+              "prey": 77,
+              "score": 0.999
+            },
+            {
+              "prey": 119,
+              "score": 0.867
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 103.5,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 99,
+          "prey": 76,
+          "selected_at": 63.75,
+          "queued_at": 67.45,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.573
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 110.6,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 99,
+          "prey": 76,
+          "selected_at": 88.5,
+          "queued_at": 90.26666666666667,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.768
+            },
+            {
+              "prey": 77,
+              "score": 0.747
+            },
+            {
+              "prey": 119,
+              "score": 0.735
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 96.4,
+            "reach_cm": 95.0
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "condition": "cover",
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_eagle_scan_cover/IslandFaunaPIE.json": "ffd6eca2e226bc57684856f76b85e1eb908226c7255a60f7cb9ec6986b8a1cf9",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_scan_cover.log": "2f28400e22068e024a5a5ab1fbecfc58d044e62311e1d907b53da37d18767e4f"
+      },
+      "attempts": [
+        {
+          "hunter": 100,
+          "prey": 119,
+          "selected_at": 59.63333333333333,
+          "queued_at": 61.65,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.762
+            },
+            {
+              "prey": 77,
+              "score": 0.803
+            },
+            {
+              "prey": 119,
+              "score": 0.827
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 107.4,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 99,
+          "prey": 119,
+          "selected_at": 66.46666666666667,
+          "queued_at": 70.06666666666666,
+          "candidates": [
+            {
+              "prey": 119,
+              "score": 0.434
+            }
+          ],
+          "outcome": {
+            "event": "Miss",
+            "reason": "HuntOutOfReach",
+            "gap_cm": 115.1,
+            "reach_cm": 95.0
+          }
+        },
+        {
+          "hunter": 99,
+          "prey": 119,
+          "selected_at": 91.15,
+          "queued_at": 92.86666666666666,
+          "candidates": [
+            {
+              "prey": 76,
+              "score": 0.739
+            },
+            {
+              "prey": 77,
+              "score": 0.758
+            },
+            {
+              "prey": 119,
+              "score": 0.781
+            }
+          ],
+          "outcome": {
+            "event": "HuntCaptured",
+            "at": 92.96666666815678,
+            "payments": [
+              {
+                "at": 93.967,
+                "amount": 5.0,
+                "remaining": 8.561
+              },
+              {
+                "at": 94.967,
+                "amount": 5.0,
+                "remaining": 3.561
+              },
+              {
+                "at": 95.967,
+                "amount": 3.561,
+                "remaining": 0.0
+              }
+            ],
+            "landing_and_stock": {
+              "event_log_lines": [
+                5791,
+                5810,
+                5839
+              ],
+              "initial_stock": 13.561,
+              "grounded_pie_seconds": 93.63333821669221,
+              "grounded_position_cm": [
+                52502.26,
+                49700.37,
+                3137.07
+              ],
+              "last_live_prey_position_cm": null,
+              "vertical_start": {
+                "at": 93.36667153611779,
+                "position_cm": [
+                  52502.26,
+                  49700.37,
+                  3149.45
+                ]
+              }
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "mixed_species_stock": [
+    {
+      "seed": 20000,
+      "mode": "rat_final60",
+      "source": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_final60.log",
+      "source_sha256": "dd532c85f93a58b67a20ecd4edfcba9aeaac4a6605b1d83d2a6fc2eae10ab688",
+      "carcasses": [
+        {
+          "id": 128,
+          "payments": [
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 116.0,
+              "line": 4504,
+              "at": 219.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 112.0,
+              "line": 4505,
+              "at": 219.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 108.5,
+              "line": 4563,
+              "at": 220.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 104.5,
+              "line": 4564,
+              "at": 220.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 101.0,
+              "line": 4567,
+              "at": 221.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 97.0,
+              "line": 4568,
+              "at": 221.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 93.5,
+              "line": 4571,
+              "at": 222.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 89.5,
+              "line": 4572,
+              "at": 222.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 85.5,
+              "line": 4581,
+              "at": 223.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 81.5,
+              "line": 4582,
+              "at": 223.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 77.5,
+              "line": 4585,
+              "at": 224.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 73.5,
+              "line": 4586,
+              "at": 224.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 69.5,
+              "line": 4589,
+              "at": 225.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 65.5,
+              "line": 4590,
+              "at": 225.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 61.5,
+              "line": 4594,
+              "at": 226.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 57.5,
+              "line": 4595,
+              "at": 226.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 53.5,
+              "line": 4599,
+              "at": 227.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 49.5,
+              "line": 4600,
+              "at": 227.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 45.5,
+              "line": 4607,
+              "at": 228.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 41.5,
+              "line": 4608,
+              "at": 228.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 38.0,
+              "line": 4612,
+              "at": 229.937
+            },
+            {
+              "species": "Pig",
+              "agent": 46,
+              "amount": 4.0,
+              "remaining": 34.0,
+              "line": 4613,
+              "at": 229.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 30.0,
+              "line": 4676,
+              "at": 230.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 26.0,
+              "line": 4677,
+              "at": 230.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 22.0,
+              "line": 4683,
+              "at": 231.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 18.0,
+              "line": 4684,
+              "at": 231.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 14.0,
+              "line": 4690,
+              "at": 232.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 10.0,
+              "line": 4691,
+              "at": 232.937
+            }
+          ],
+          "prey": "Horse",
+          "initial_stock": 120.0,
+          "created_line": 4485,
+          "closure": {
+            "at": 238.937,
+            "unused_stock": 10.0,
+            "reason": "Expired",
+            "line": 4718
+          }
+        },
+        {
+          "id": 129,
+          "payments": [
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 116.0,
+              "line": 4699,
+              "at": 233.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 112.0,
+              "line": 4700,
+              "at": 234.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 108.0,
+              "line": 4705,
+              "at": 234.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 104.0,
+              "line": 4707,
+              "at": 235.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 100.0,
+              "line": 4708,
+              "at": 235.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 96.0,
+              "line": 4709,
+              "at": 236.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 92.0,
+              "line": 4710,
+              "at": 236.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 88.0,
+              "line": 4711,
+              "at": 237.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 84.0,
+              "line": 4715,
+              "at": 237.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 80.0,
+              "line": 4719,
+              "at": 238.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 76.0,
+              "line": 4724,
+              "at": 238.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 72.5,
+              "line": 4726,
+              "at": 239.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 68.5,
+              "line": 4727,
+              "at": 239.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 64.5,
+              "line": 4728,
+              "at": 239.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 60.5,
+              "line": 4729,
+              "at": 239.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 56.5,
+              "line": 4793,
+              "at": 241.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 52.5,
+              "line": 4796,
+              "at": 241.0
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 48.5,
+              "line": 4806,
+              "at": 242.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 44.5,
+              "line": 4807,
+              "at": 242.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 40.5,
+              "line": 4809,
+              "at": 242.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 36.5,
+              "line": 4815,
+              "at": 243.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 32.5,
+              "line": 4817,
+              "at": 243.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 28.5,
+              "line": 4827,
+              "at": 244.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 24.5,
+              "line": 4828,
+              "at": 244.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 20.5,
+              "line": 4829,
+              "at": 245.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 16.5,
+              "line": 4831,
+              "at": 245.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 12.5,
+              "line": 4836,
+              "at": 246.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 8.5,
+              "line": 4839,
+              "at": 247.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 4.5,
+              "line": 4843,
+              "at": 248.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 0.5,
+              "line": 4849,
+              "at": 249.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 0.5,
+              "remaining": 0.0,
+              "line": 4912,
+              "at": 250.0
+            }
+          ],
+          "prey": "Buffalo",
+          "initial_stock": 120.0,
+          "created_line": 4688,
+          "closure": {
+            "at": 251.0,
+            "unused_stock": 0.0,
+            "reason": "Depleted",
+            "line": 4916
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "mode": "rat_final60",
+      "source": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_final60.log",
+      "source_sha256": "4aaf62649e9685e4c36248bfb523b9eb4d663d4871352b52c671e402b2b09503",
+      "carcasses": [
+        {
+          "id": 128,
+          "payments": [
+            {
+              "species": "Wolf",
+              "agent": 80,
+              "amount": 8.0,
+              "remaining": 93.583,
+              "line": 4859,
+              "at": null
+            },
+            {
+              "species": "Wolf",
+              "agent": 80,
+              "amount": 8.0,
+              "remaining": 85.583,
+              "line": 4986,
+              "at": null
+            },
+            {
+              "species": "GoldenEagle",
+              "agent": 99,
+              "amount": 5.0,
+              "remaining": 80.583,
+              "line": 4988,
+              "at": 266.27
+            },
+            {
+              "species": "GoldenEagle",
+              "agent": 99,
+              "amount": 5.0,
+              "remaining": 75.583,
+              "line": 4994,
+              "at": 267.27
+            },
+            {
+              "species": "GoldenEagle",
+              "agent": 99,
+              "amount": 5.0,
+              "remaining": 70.583,
+              "line": 4997,
+              "at": 268.27
+            },
+            {
+              "species": "GoldenEagle",
+              "agent": 99,
+              "amount": 5.0,
+              "remaining": 65.583,
+              "line": 5003,
+              "at": 269.27
+            },
+            {
+              "species": "GoldenEagle",
+              "agent": 99,
+              "amount": 5.0,
+              "remaining": 60.583,
+              "line": 5066,
+              "at": 270.27
+            },
+            {
+              "species": "GoldenEagle",
+              "agent": 99,
+              "amount": 5.0,
+              "remaining": 55.583,
+              "line": 5070,
+              "at": 271.27
+            }
+          ],
+          "prey": "Bighorn",
+          "initial_stock": 101.583,
+          "created_line": 4847,
+          "closure": {
+            "at": 273.27,
+            "unused_stock": 55.583,
+            "reason": "Expired",
+            "line": 5077
+          }
+        },
+        {
+          "id": 129,
+          "payments": [
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 116.0,
+              "line": 4531,
+              "at": 223.0
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 112.0,
+              "line": 4538,
+              "at": 224.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 108.5,
+              "line": 4542,
+              "at": 225.0
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 104.5,
+              "line": 4543,
+              "at": 225.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 101.0,
+              "line": 4544,
+              "at": 226.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 97.5,
+              "line": 4547,
+              "at": 227.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 94.0,
+              "line": 4551,
+              "at": 228.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 90.5,
+              "line": 4557,
+              "at": 229.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 87.0,
+              "line": 4620,
+              "at": 230.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 83.5,
+              "line": 4623,
+              "at": 231.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 80.0,
+              "line": 4627,
+              "at": 232.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 76.5,
+              "line": 4628,
+              "at": 233.0
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 72.5,
+              "line": 4638,
+              "at": 235.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 69.0,
+              "line": 4643,
+              "at": 238.0
+            },
+            {
+              "species": "Wolf",
+              "agent": 19,
+              "amount": 8.0,
+              "remaining": 61.0,
+              "line": 4766,
+              "at": null
+            },
+            {
+              "species": "Wolf",
+              "agent": 19,
+              "amount": 8.0,
+              "remaining": 53.0,
+              "line": 4831,
+              "at": null
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 49.0,
+              "line": 4844,
+              "at": 251.0
+            }
+          ],
+          "prey": "Buffalo",
+          "initial_stock": 120.0,
+          "created_line": 4440,
+          "closure": {
+            "at": 253.0,
+            "unused_stock": 49.0,
+            "reason": "Expired",
+            "line": 4851
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20000,
+      "mode": "rat_final_repeat60",
+      "source": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_final_repeat60.log",
+      "source_sha256": "f93f8a1d25d59476497ceb38ffdfa939dae18d45f5053a5d1e4d9900567813f0",
+      "carcasses": [
+        {
+          "id": 128,
+          "payments": [
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 116.0,
+              "line": 4503,
+              "at": 219.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 112.0,
+              "line": 4504,
+              "at": 219.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 108.5,
+              "line": 4562,
+              "at": 220.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 104.5,
+              "line": 4563,
+              "at": 220.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 101.0,
+              "line": 4566,
+              "at": 221.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 97.0,
+              "line": 4567,
+              "at": 221.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 93.5,
+              "line": 4570,
+              "at": 222.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 89.5,
+              "line": 4571,
+              "at": 222.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 85.5,
+              "line": 4580,
+              "at": 223.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 81.5,
+              "line": 4581,
+              "at": 223.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 77.5,
+              "line": 4584,
+              "at": 224.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 73.5,
+              "line": 4585,
+              "at": 224.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 69.5,
+              "line": 4588,
+              "at": 225.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 65.5,
+              "line": 4589,
+              "at": 225.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 61.5,
+              "line": 4593,
+              "at": 226.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 57.5,
+              "line": 4594,
+              "at": 226.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 53.5,
+              "line": 4597,
+              "at": 227.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 49.5,
+              "line": 4598,
+              "at": 227.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 45.5,
+              "line": 4605,
+              "at": 228.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 41.5,
+              "line": 4606,
+              "at": 228.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 38.0,
+              "line": 4610,
+              "at": 229.937
+            },
+            {
+              "species": "Pig",
+              "agent": 46,
+              "amount": 4.0,
+              "remaining": 34.0,
+              "line": 4611,
+              "at": 229.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 30.0,
+              "line": 4674,
+              "at": 230.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 26.0,
+              "line": 4675,
+              "at": 230.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 22.0,
+              "line": 4681,
+              "at": 231.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 18.0,
+              "line": 4682,
+              "at": 231.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 14.0,
+              "line": 4688,
+              "at": 232.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 10.0,
+              "line": 4689,
+              "at": 232.937
+            }
+          ],
+          "prey": "Horse",
+          "initial_stock": 120.0,
+          "created_line": 4486,
+          "closure": {
+            "at": 238.937,
+            "unused_stock": 10.0,
+            "reason": "Expired",
+            "line": 4717
+          }
+        },
+        {
+          "id": 129,
+          "payments": [
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 116.0,
+              "line": 4697,
+              "at": 233.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 112.0,
+              "line": 4698,
+              "at": 234.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 108.0,
+              "line": 4703,
+              "at": 234.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 104.0,
+              "line": 4705,
+              "at": 235.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 100.0,
+              "line": 4706,
+              "at": 235.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 96.0,
+              "line": 4707,
+              "at": 236.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 92.0,
+              "line": 4708,
+              "at": 236.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 88.0,
+              "line": 4710,
+              "at": 237.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 84.0,
+              "line": 4714,
+              "at": 237.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 80.0,
+              "line": 4718,
+              "at": 238.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 76.0,
+              "line": 4723,
+              "at": 238.937
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 72.5,
+              "line": 4725,
+              "at": 239.937
+            },
+            {
+              "species": "Pig",
+              "agent": 47,
+              "amount": 4.0,
+              "remaining": 68.5,
+              "line": 4726,
+              "at": 239.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 64.5,
+              "line": 4727,
+              "at": 239.937
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 60.5,
+              "line": 4728,
+              "at": 239.937
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 56.5,
+              "line": 4792,
+              "at": 241.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 52.5,
+              "line": 4795,
+              "at": 241.0
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 48.5,
+              "line": 4805,
+              "at": 242.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 44.5,
+              "line": 4806,
+              "at": 242.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 40.5,
+              "line": 4808,
+              "at": 242.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 36.5,
+              "line": 4816,
+              "at": 243.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 32.5,
+              "line": 4818,
+              "at": 243.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 28.5,
+              "line": 4824,
+              "at": 244.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 24.5,
+              "line": 4825,
+              "at": 244.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 20.5,
+              "line": 4826,
+              "at": 245.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 16.5,
+              "line": 4828,
+              "at": 245.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 12.5,
+              "line": 4833,
+              "at": 246.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 8.5,
+              "line": 4836,
+              "at": 247.0
+            },
+            {
+              "species": "Pig",
+              "agent": 131,
+              "amount": 4.0,
+              "remaining": 4.5,
+              "line": 4838,
+              "at": 248.0
+            },
+            {
+              "species": "Wolf",
+              "agent": 17,
+              "amount": 4.5,
+              "remaining": 0.0,
+              "line": 4842,
+              "at": null
+            }
+          ],
+          "prey": "Buffalo",
+          "initial_stock": 120.0,
+          "created_line": 4686,
+          "closure": {
+            "at": 250.0,
+            "unused_stock": 0.0,
+            "reason": "Depleted",
+            "line": 4905
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "mode": "rat_final_repeat60",
+      "source": "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_final_repeat60.log",
+      "source_sha256": "6e081b9686b5db6f519393401408acf271045e9d8be699b78d071fabfa46cea5",
+      "carcasses": [
+        {
+          "id": 36,
+          "payments": [
+            {
+              "species": "Pig",
+              "agent": 128,
+              "amount": 4.0,
+              "remaining": 116.0,
+              "line": 4907,
+              "at": 255.0
+            },
+            {
+              "species": "Pig",
+              "agent": 128,
+              "amount": 4.0,
+              "remaining": 112.0,
+              "line": 4909,
+              "at": 256.0
+            },
+            {
+              "species": "Pig",
+              "agent": 128,
+              "amount": 4.0,
+              "remaining": 108.0,
+              "line": 4913,
+              "at": 257.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 104.5,
+              "line": 4916,
+              "at": 258.0
+            },
+            {
+              "species": "Pig",
+              "agent": 128,
+              "amount": 4.0,
+              "remaining": 100.5,
+              "line": 4918,
+              "at": 258.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 97.0,
+              "line": 4921,
+              "at": 259.0
+            },
+            {
+              "species": "Pig",
+              "agent": 128,
+              "amount": 4.0,
+              "remaining": 93.0,
+              "line": 4923,
+              "at": 259.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 89.5,
+              "line": 4981,
+              "at": 260.0
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 85.5,
+              "line": 4984,
+              "at": 260.0
+            },
+            {
+              "species": "Pig",
+              "agent": 128,
+              "amount": 4.0,
+              "remaining": 81.5,
+              "line": 4985,
+              "at": 260.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 78.0,
+              "line": 4988,
+              "at": 261.0
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 74.0,
+              "line": 4991,
+              "at": 261.0
+            },
+            {
+              "species": "Pig",
+              "agent": 128,
+              "amount": 4.0,
+              "remaining": 70.0,
+              "line": 4992,
+              "at": 261.0
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 66.0,
+              "line": 4997,
+              "at": 262.0
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 62.5,
+              "line": 5014,
+              "at": 267.0
+            },
+            {
+              "species": "Wolf",
+              "agent": 19,
+              "amount": 8.0,
+              "remaining": 54.5,
+              "line": 5019,
+              "at": null
+            },
+            {
+              "species": "Wolf",
+              "agent": 19,
+              "amount": 8.0,
+              "remaining": 46.5,
+              "line": 5024,
+              "at": null
+            },
+            {
+              "species": "Wolf",
+              "agent": 19,
+              "amount": 8.0,
+              "remaining": 38.5,
+              "line": 5085,
+              "at": null
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 34.5,
+              "line": 5142,
+              "at": 279.12
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 31.0,
+              "line": 5203,
+              "at": 281.12
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 27.5,
+              "line": 5207,
+              "at": 282.12
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 24.0,
+              "line": 5209,
+              "at": 283.12
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 20.5,
+              "line": 5216,
+              "at": 284.12
+            },
+            {
+              "species": "Crow",
+              "agent": 37,
+              "amount": 3.5,
+              "remaining": 17.0,
+              "line": 5221,
+              "at": 285.12
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 13.0,
+              "line": 5223,
+              "at": 285.12
+            },
+            {
+              "species": "Pig",
+              "agent": 128,
+              "amount": 4.0,
+              "remaining": 9.0,
+              "line": 5224,
+              "at": 285.12
+            }
+          ],
+          "prey": "Buffalo",
+          "initial_stock": 120.0,
+          "created_line": 4883,
+          "closure": {
+            "at": 287.12,
+            "unused_stock": 9.0,
+            "reason": "Expired",
+            "line": 5234
+          }
+        },
+        {
+          "id": 131,
+          "payments": [
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 96.0,
+              "line": 3579,
+              "at": 134.0
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 92.0,
+              "line": 3580,
+              "at": 134.0
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 88.0,
+              "line": 3582,
+              "at": 134.0
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 84.0,
+              "line": 3588,
+              "at": 135.337
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 80.0,
+              "line": 3589,
+              "at": 135.337
+            },
+            {
+              "species": "Pig",
+              "agent": 122,
+              "amount": 4.0,
+              "remaining": 76.0,
+              "line": 3591,
+              "at": 135.337
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 72.0,
+              "line": 3600,
+              "at": 136.753
+            },
+            {
+              "species": "Pig",
+              "agent": 46,
+              "amount": 4.0,
+              "remaining": 68.0,
+              "line": 3601,
+              "at": 136.753
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 64.0,
+              "line": 3602,
+              "at": 136.753
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 60.0,
+              "line": 3610,
+              "at": 137.753
+            },
+            {
+              "species": "Pig",
+              "agent": 46,
+              "amount": 4.0,
+              "remaining": 56.0,
+              "line": 3611,
+              "at": 137.753
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 52.0,
+              "line": 3612,
+              "at": 137.753
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 48.0,
+              "line": 3620,
+              "at": 138.753
+            },
+            {
+              "species": "Pig",
+              "agent": 46,
+              "amount": 4.0,
+              "remaining": 44.0,
+              "line": 3621,
+              "at": 138.753
+            },
+            {
+              "species": "Pig",
+              "agent": 48,
+              "amount": 4.0,
+              "remaining": 40.0,
+              "line": 3622,
+              "at": 138.753
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 36.5,
+              "line": 3687,
+              "at": 140.437
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 32.5,
+              "line": 3688,
+              "at": 140.437
+            },
+            {
+              "species": "Pig",
+              "agent": 46,
+              "amount": 4.0,
+              "remaining": 28.5,
+              "line": 3689,
+              "at": 140.437
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 25.0,
+              "line": 3694,
+              "at": 141.437
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 21.0,
+              "line": 3695,
+              "at": 141.437
+            },
+            {
+              "species": "Pig",
+              "agent": 46,
+              "amount": 4.0,
+              "remaining": 17.0,
+              "line": 3696,
+              "at": 141.437
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 13.5,
+              "line": 3707,
+              "at": 142.453
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 4.0,
+              "remaining": 9.5,
+              "line": 3709,
+              "at": 142.453
+            },
+            {
+              "species": "Pig",
+              "agent": 46,
+              "amount": 4.0,
+              "remaining": 5.5,
+              "line": 3710,
+              "at": 142.453
+            },
+            {
+              "species": "Crow",
+              "agent": 39,
+              "amount": 3.5,
+              "remaining": 2.0,
+              "line": 3714,
+              "at": 143.453
+            },
+            {
+              "species": "Pig",
+              "agent": 45,
+              "amount": 2.0,
+              "remaining": 0.0,
+              "line": 3715,
+              "at": 143.453
+            }
+          ],
+          "prey": "Herbivore",
+          "initial_stock": 100.0,
+          "created_line": 3489,
+          "closure": {
+            "at": 144.453,
+            "unused_stock": 0.0,
+            "reason": "Depleted",
+            "line": 3720
+          }
+        }
+      ]
+    }
+  ]
+}

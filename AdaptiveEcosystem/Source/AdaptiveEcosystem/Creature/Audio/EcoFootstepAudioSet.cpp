@@ -23,7 +23,8 @@ bool EcoFootsteps::IsGroundActivity(uint8 Activity)
 {
     const auto Kind = EEcoSpeciesActivity(Activity);
     return Kind != EEcoSpeciesActivity::Fly && Kind != EEcoSpeciesActivity::Takeoff
-        && Kind != EEcoSpeciesActivity::Land && Kind != EEcoSpeciesActivity::CorpseSettled;
+        && Kind != EEcoSpeciesActivity::Land && Kind != EEcoSpeciesActivity::CorpseSettled
+        && Kind != EEcoSpeciesActivity::Swim && Kind != EEcoSpeciesActivity::EnterWater && Kind != EEcoSpeciesActivity::ExitWater;
 }
 
 float EcoFootsteps::HearingStrength(const FEcoFootstepProfile& Listener, float Distance, float Range, float Loudness,

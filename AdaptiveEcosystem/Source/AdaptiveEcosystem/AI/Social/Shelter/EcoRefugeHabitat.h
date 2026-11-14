@@ -7,7 +7,7 @@ class UHierarchicalInstancedStaticMeshComponent;
 class UStaticMesh;
 
 /** An authored refuge: visible brush/boulders share the registered refuge footprint.
- * Components are cosmetic; native simulation owns predator exclusion and prey protection.
+ * Optional boulder sight queries do not block movement. Native simulation owns refuge protection.
  * Authored actors load from the map on clients; generated refuges replicate their static layout. */
 UCLASS(Blueprintable)
 class ADAPTIVEECOSYSTEM_API AEcoRefugeHabitat : public AEcoShelterAnchor
@@ -19,6 +19,8 @@ public:
     virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
     virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
     UFUNCTION(CallInEditor,BlueprintCallable,Category="Ecology|Refuge") void RebuildHabitat();
+    UFUNCTION(BlueprintCallable,Category="Ecology|Refuge") void SetFaunaBoulderOcclusion(bool bEnabled);
+    UPROPERTY(EditAnywhere,Category="Ecology|Refuge") bool bFaunaBoulderOcclusion = false;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Ecology|Refuge") TObjectPtr<UStaticMesh> BrushMesh;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Ecology|Refuge") TObjectPtr<UStaticMesh> BoulderMesh;
     UPROPERTY(EditAnywhere,BlueprintReadWrite,Category="Ecology|Refuge",meta=(ClampMin="80",ClampMax="250")) float BrushSpacing=145;

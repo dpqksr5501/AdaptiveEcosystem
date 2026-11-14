@@ -1,0 +1,2584 @@
+{
+  "schema_version": 1,
+  "training_ready": false,
+  "runs": [
+    {
+      "seed": 20047,
+      "layout": "straight",
+      "refuge_radius_cm": 65.0,
+      "sites": [
+        {
+          "site_index": 22,
+          "yaw_degrees": 0.0,
+          "mouths_cm": [
+            [
+              37550.0,
+              35870.0,
+              3098.5880159456783
+            ],
+            [
+              37870.0,
+              35870.0,
+              3098.5880159456783
+            ]
+          ],
+          "opening_cm": {
+            "length": 130.0,
+            "width": 50.0,
+            "height": 13.0,
+            "wall_thickness": 12.0
+          },
+          "bodies": {
+            "Rat": {
+              "body_radius_cm": 3.5,
+              "sweep_height_cm": 5.0,
+              "step_height_cm": 4.0
+            },
+            "Fox": {
+              "body_radius_cm": 23.0,
+              "sweep_height_cm": 65.0,
+              "step_height_cm": 20.0
+            }
+          },
+          "crossings": {
+            "Rat": {
+              "0.6": [
+                true,
+                true
+              ],
+              "1.0": [
+                true,
+                true
+              ]
+            },
+            "Fox": {
+              "0.6": [
+                false,
+                false
+              ],
+              "1.0": [
+                false,
+                false
+              ]
+            }
+          },
+          "mouth_sight_to_center": {
+            "Rat": [
+              true,
+              true
+            ],
+            "Fox": [
+              false,
+              false
+            ]
+          },
+          "rat_approaches": [
+            {
+              "start_cm": [
+                37870.0,
+                35870.0,
+                3098.5880159456783
+              ],
+              "direct": true,
+              "through_mouth": [
+                true,
+                true
+              ]
+            },
+            {
+              "start_cm": [
+                37710.0,
+                35970.0,
+                3098.5880159456783
+              ],
+              "direct": false,
+              "through_mouth": [
+                true,
+                true
+              ]
+            },
+            {
+              "start_cm": [
+                37870.0,
+                35970.0,
+                3098.5880159456783
+              ],
+              "direct": false,
+              "through_mouth": [
+                false,
+                true
+              ]
+            }
+          ]
+        },
+        {
+          "site_index": 23,
+          "yaw_degrees": 0.0,
+          "mouths_cm": [
+            [
+              37720.0,
+              36280.0,
+              3098.5880159456783
+            ],
+            [
+              38040.0,
+              36280.0,
+              3098.5880159456783
+            ]
+          ],
+          "opening_cm": {
+            "length": 130.0,
+            "width": 50.0,
+            "height": 13.0,
+            "wall_thickness": 12.0
+          },
+          "bodies": {
+            "Rat": {
+              "body_radius_cm": 3.5,
+              "sweep_height_cm": 5.0,
+              "step_height_cm": 4.0
+            },
+            "Fox": {
+              "body_radius_cm": 23.0,
+              "sweep_height_cm": 65.0,
+              "step_height_cm": 20.0
+            }
+          },
+          "crossings": {
+            "Rat": {
+              "0.6": [
+                true,
+                true
+              ],
+              "1.0": [
+                true,
+                true
+              ]
+            },
+            "Fox": {
+              "0.6": [
+                false,
+                false
+              ],
+              "1.0": [
+                false,
+                false
+              ]
+            }
+          },
+          "mouth_sight_to_center": {
+            "Rat": [
+              true,
+              true
+            ],
+            "Fox": [
+              false,
+              false
+            ]
+          },
+          "rat_approaches": [
+            {
+              "start_cm": [
+                38040.0,
+                36280.0,
+                3098.5880159456783
+              ],
+              "direct": true,
+              "through_mouth": [
+                true,
+                true
+              ]
+            },
+            {
+              "start_cm": [
+                37880.0,
+                36380.0,
+                3098.5880159456783
+              ],
+              "direct": false,
+              "through_mouth": [
+                true,
+                true
+              ]
+            },
+            {
+              "start_cm": [
+                38040.0,
+                36380.0,
+                3098.5880159456783
+              ],
+              "direct": false,
+              "through_mouth": [
+                false,
+                true
+              ]
+            }
+          ]
+        }
+      ],
+      "samples": [
+        {
+          "id": 75,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37940.61,
+            36296.2,
+            3098.59
+          ],
+          "world_seconds": 14.16666740551591
+        },
+        {
+          "id": 75,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37947.23,
+            36260.73,
+            3098.59
+          ],
+          "world_seconds": 16.03333416953683
+        }
+      ],
+      "observed_targeted_entry_ids": [],
+      "observed_under_roof_ids": [
+        75
+      ],
+      "source": {
+        "path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20047_rat_python_straight/IslandFaunaPIE.json",
+        "sha256": "d1c4f66c805ba2daca5c032e786e8157a122cb0515994ec97ad1b5d8c8c5ef0f"
+      },
+      "approach_source": {
+        "path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20047_rat_path_straight/IslandFaunaPIE.json",
+        "sha256": "55643992238b8c460f2cf911eb49a131a4b6d6e5abbf13fbf81fc6813b90f22b"
+      }
+    },
+    {
+      "seed": 20047,
+      "layout": "aligned",
+      "refuge_radius_cm": 65.0,
+      "sites": [
+        {
+          "site_index": 22,
+          "yaw_degrees": 75.0,
+          "mouths_cm": [
+            [
+              37668.5889527836,
+              35715.45186779375,
+              3098.5880159456783
+            ],
+            [
+              37751.4110472164,
+              36024.54813220625,
+              3098.5880159456783
+            ]
+          ],
+          "opening_cm": {
+            "length": 130.0,
+            "width": 50.0,
+            "height": 13.0,
+            "wall_thickness": 12.0
+          },
+          "bodies": {
+            "Rat": {
+              "body_radius_cm": 3.5,
+              "sweep_height_cm": 5.0,
+              "step_height_cm": 4.0
+            },
+            "Fox": {
+              "body_radius_cm": 23.0,
+              "sweep_height_cm": 65.0,
+              "step_height_cm": 20.0
+            }
+          },
+          "crossings": {
+            "Rat": {
+              "0.6": [
+                true,
+                true
+              ],
+              "1.0": [
+                true,
+                true
+              ]
+            },
+            "Fox": {
+              "0.6": [
+                false,
+                false
+              ],
+              "1.0": [
+                false,
+                false
+              ]
+            }
+          },
+          "mouth_sight_to_center": {
+            "Rat": [
+              true,
+              true
+            ],
+            "Fox": [
+              false,
+              false
+            ]
+          },
+          "rat_approaches": [
+            {
+              "start_cm": [
+                37751.4110472164,
+                36024.54813220625,
+                3098.5880159456783
+              ],
+              "direct": true,
+              "through_mouth": [
+                true,
+                true
+              ]
+            },
+            {
+              "start_cm": [
+                37613.407417633534,
+                35895.881905489696,
+                3098.5880159456783
+              ],
+              "direct": false,
+              "through_mouth": [
+                true,
+                true
+              ]
+            },
+            {
+              "start_cm": [
+                37654.81846484994,
+                36050.43003769594,
+                3098.5880159456783
+              ],
+              "direct": false,
+              "through_mouth": [
+                false,
+                true
+              ]
+            }
+          ]
+        },
+        {
+          "site_index": 23,
+          "yaw_degrees": 100.0,
+          "mouths_cm": [
+            [
+              37907.78370842671,
+              36122.43075951804,
+              3098.5880159456783
+            ],
+            [
+              37852.21629157329,
+              36437.56924048196,
+              3098.5880159456783
+            ]
+          ],
+          "opening_cm": {
+            "length": 130.0,
+            "width": 50.0,
+            "height": 13.0,
+            "wall_thickness": 12.0
+          },
+          "bodies": {
+            "Rat": {
+              "body_radius_cm": 3.5,
+              "sweep_height_cm": 5.0,
+              "step_height_cm": 4.0
+            },
+            "Fox": {
+              "body_radius_cm": 23.0,
+              "sweep_height_cm": 65.0,
+              "step_height_cm": 20.0
+            }
+          },
+          "crossings": {
+            "Rat": {
+              "0.6": [
+                true,
+                true
+              ],
+              "1.0": [
+                true,
+                true
+              ]
+            },
+            "Fox": {
+              "0.6": [
+                false,
+                false
+              ],
+              "1.0": [
+                false,
+                false
+              ]
+            }
+          },
+          "mouth_sight_to_center": {
+            "Rat": [
+              true,
+              true
+            ],
+            "Fox": [
+              false,
+              false
+            ]
+          },
+          "rat_approaches": [
+            {
+              "start_cm": [
+                37852.21629157329,
+                36437.56924048196,
+                3098.5880159456783
+              ],
+              "direct": true,
+              "through_mouth": [
+                true,
+                true
+              ]
+            },
+            {
+              "start_cm": [
+                37781.519224464006,
+                36262.635183564766,
+                3098.5880159456783
+              ],
+              "direct": false,
+              "through_mouth": [
+                true,
+                true
+              ]
+            },
+            {
+              "start_cm": [
+                37753.7355160373,
+                36420.20442404672,
+                3098.5880159456783
+              ],
+              "direct": false,
+              "through_mouth": [
+                false,
+                true
+              ]
+            }
+          ]
+        }
+      ],
+      "samples": [
+        {
+          "id": 75,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37940.61,
+            36296.2,
+            3098.59
+          ],
+          "world_seconds": 14.16666740551591
+        },
+        {
+          "id": 75,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37944.09,
+            36251.96,
+            3098.59
+          ],
+          "world_seconds": 16.566667530685663
+        },
+        {
+          "id": 75,
+          "site_index": 23,
+          "targeted": true,
+          "position_cm": [
+            37881.57,
+            36227.28,
+            3098.59
+          ],
+          "world_seconds": 44.83333567157388
+        },
+        {
+          "id": 75,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37880.09,
+            36274.43,
+            3098.59
+          ],
+          "world_seconds": 45.100002352148294
+        },
+        {
+          "id": 77,
+          "site_index": 23,
+          "targeted": true,
+          "position_cm": [
+            37873.92,
+            36292.33,
+            3098.59
+          ],
+          "world_seconds": 45.100002352148294
+        },
+        {
+          "id": 77,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37884.03,
+            36274.15,
+            3098.59
+          ],
+          "world_seconds": 46.16666907444596
+        },
+        {
+          "id": 77,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37889.16,
+            36349.13,
+            3098.59
+          ],
+          "world_seconds": 74.16667053475976
+        },
+        {
+          "id": 74,
+          "site_index": 22,
+          "targeted": true,
+          "position_cm": [
+            37718.75,
+            35885.08,
+            3098.59
+          ],
+          "world_seconds": 79.76667082682252
+        },
+        {
+          "id": 74,
+          "site_index": 22,
+          "targeted": false,
+          "position_cm": [
+            37711.2,
+            35870.74,
+            3098.59
+          ],
+          "world_seconds": 80.56667086854577
+        },
+        {
+          "id": 76,
+          "site_index": 23,
+          "targeted": true,
+          "position_cm": [
+            37880.48,
+            36304.75,
+            3098.59
+          ],
+          "world_seconds": 81.36667091026902
+        },
+        {
+          "id": 76,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37877.93,
+            36282.04,
+            3098.59
+          ],
+          "world_seconds": 82.16667095199227
+        },
+        {
+          "id": 76,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37871.9,
+            36346.72,
+            3098.59
+          ],
+          "world_seconds": 86.70000452175736
+        },
+        {
+          "id": 77,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37888.73,
+            36347.49,
+            3098.59
+          ],
+          "world_seconds": 89.10000464692712
+        },
+        {
+          "id": 74,
+          "site_index": 22,
+          "targeted": false,
+          "position_cm": [
+            37771.92,
+            35841.42,
+            3098.59
+          ],
+          "world_seconds": 110.43333909288049
+        },
+        {
+          "id": 74,
+          "site_index": 22,
+          "targeted": false,
+          "position_cm": [
+            37760.12,
+            35850.95,
+            3098.59
+          ],
+          "world_seconds": 110.7000057734549
+        },
+        {
+          "id": 74,
+          "site_index": 22,
+          "targeted": true,
+          "position_cm": [
+            37710.78,
+            35939.23,
+            3098.59
+          ],
+          "world_seconds": 122.43333971872926
+        },
+        {
+          "id": 74,
+          "site_index": 23,
+          "targeted": true,
+          "position_cm": [
+            37879.0,
+            36213.63,
+            3098.59
+          ],
+          "world_seconds": 167.23334205523133
+        },
+        {
+          "id": 74,
+          "site_index": 23,
+          "targeted": true,
+          "position_cm": [
+            37879.84,
+            36269.15,
+            3098.59
+          ],
+          "world_seconds": 167.50000873580575
+        },
+        {
+          "id": 74,
+          "site_index": 23,
+          "targeted": false,
+          "position_cm": [
+            37878.02,
+            36277.7,
+            3098.59
+          ],
+          "world_seconds": 168.83334213867784
+        }
+      ],
+      "observed_targeted_entry_ids": [
+        74,
+        75,
+        76,
+        77
+      ],
+      "observed_under_roof_ids": [
+        74,
+        75,
+        76,
+        77
+      ],
+      "source": {
+        "path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20047_rat_python_aligned/IslandFaunaPIE.json",
+        "sha256": "60053b22fc8babb4b365ee9b63c692f1729aada8003a243dd44177e7e6752a21"
+      },
+      "approach_source": {
+        "path": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20047_rat_path_aligned/IslandFaunaPIE.json",
+        "sha256": "2bb1d59604835d5e32ab7b80078489a2c19ab5476d434ee1661d0c9eb0817c19"
+      }
+    }
+  ],
+  "unreal_approach_trials": [
+    {
+      "seed": 20000,
+      "runs": {
+        "rat_approach_control": {
+          "hashes": {
+            "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_approach_control/IslandFaunaPIE.json": "a1a202fa5df48f167eedb61e832f46788e6b7a85f23e013a17b230f3d9bd5864",
+            "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_approach_control.log": "225d252d0e33dc0d8f3aab4dddee05868e9657a7fb1a38a6a1a78f9acd9168b5"
+          },
+          "body_checked_sites": [
+            {
+              "site_index": 22,
+              "yaw_degrees": 75.0,
+              "mouths_cm": [
+                [
+                  37668.5889527836,
+                  35715.45186779375,
+                  3098.5880159456783
+                ],
+                [
+                  37751.4110472164,
+                  36024.54813220625,
+                  3098.5880159456783
+                ]
+              ],
+              "opening_cm": {
+                "length": 130.0,
+                "width": 50.0,
+                "height": 13.0,
+                "wall_thickness": 12.0
+              },
+              "bodies": {
+                "Rat": {
+                  "body_radius_cm": 3.5,
+                  "sweep_height_cm": 5.0,
+                  "step_height_cm": 4.0
+                },
+                "Fox": {
+                  "body_radius_cm": 23.0,
+                  "sweep_height_cm": 65.0,
+                  "step_height_cm": 20.0
+                }
+              },
+              "rat_approaches": [
+                {
+                  "start_cm": [
+                    37751.4110472164,
+                    36024.54813220625,
+                    3098.5880159456783
+                  ],
+                  "direct": true,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37613.407417633534,
+                    35895.881905489696,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37654.81846484994,
+                    36050.43003769594,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    false,
+                    true
+                  ]
+                }
+              ],
+              "crossings": {
+                "Rat": {
+                  "0.6": [
+                    true,
+                    true
+                  ],
+                  "1.0": [
+                    true,
+                    true
+                  ]
+                },
+                "Fox": {
+                  "0.6": [
+                    false,
+                    false
+                  ],
+                  "1.0": [
+                    false,
+                    false
+                  ]
+                }
+              },
+              "mouth_sight_to_center": {
+                "Rat": [
+                  true,
+                  true
+                ],
+                "Fox": [
+                  false,
+                  false
+                ]
+              }
+            },
+            {
+              "site_index": 23,
+              "yaw_degrees": 100.0,
+              "mouths_cm": [
+                [
+                  37907.78370842671,
+                  36122.43075951804,
+                  3098.5880159456783
+                ],
+                [
+                  37852.21629157329,
+                  36437.56924048196,
+                  3098.5880159456783
+                ]
+              ],
+              "opening_cm": {
+                "length": 130.0,
+                "width": 50.0,
+                "height": 13.0,
+                "wall_thickness": 12.0
+              },
+              "bodies": {
+                "Rat": {
+                  "body_radius_cm": 3.5,
+                  "sweep_height_cm": 5.0,
+                  "step_height_cm": 4.0
+                },
+                "Fox": {
+                  "body_radius_cm": 23.0,
+                  "sweep_height_cm": 65.0,
+                  "step_height_cm": 20.0
+                }
+              },
+              "rat_approaches": [
+                {
+                  "start_cm": [
+                    37852.21629157329,
+                    36437.56924048196,
+                    3098.5880159456783
+                  ],
+                  "direct": true,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37781.519224464006,
+                    36262.635183564766,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37753.7355160373,
+                    36420.20442404672,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    false,
+                    true
+                  ]
+                }
+              ],
+              "crossings": {
+                "Rat": {
+                  "0.6": [
+                    true,
+                    true
+                  ],
+                  "1.0": [
+                    true,
+                    true
+                  ]
+                },
+                "Fox": {
+                  "0.6": [
+                    false,
+                    false
+                  ],
+                  "1.0": [
+                    false,
+                    false
+                  ]
+                }
+              },
+              "mouth_sight_to_center": {
+                "Rat": [
+                  true,
+                  true
+                ],
+                "Fox": [
+                  false,
+                  false
+                ]
+              }
+            }
+          ],
+          "successful_movement_steps_to_mouth": 0,
+          "first_mouth_movement_by_id": {},
+          "targeted_founder_entry_ids": [],
+          "founder_entry_after_mouth_motion_by_id": {},
+          "rat_predations": 6
+        },
+        "rat_mouth_verified": {
+          "hashes": {
+            "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_mouth_verified/IslandFaunaPIE.json": "ecd8c842b5609058bcca7d527882f8dcc0c4e2497cacda3afaef18c15b65d5b7",
+            "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_mouth_verified.log": "6009a1906b3e3c794bbf86b38ba2f3a8de1226c79d5e3eb669045bf38268fb73"
+          },
+          "body_checked_sites": [
+            {
+              "site_index": 22,
+              "yaw_degrees": 75.0,
+              "mouths_cm": [
+                [
+                  37668.5889527836,
+                  35715.45186779375,
+                  3098.5880159456783
+                ],
+                [
+                  37751.4110472164,
+                  36024.54813220625,
+                  3098.5880159456783
+                ]
+              ],
+              "opening_cm": {
+                "length": 130.0,
+                "width": 50.0,
+                "height": 13.0,
+                "wall_thickness": 12.0
+              },
+              "bodies": {
+                "Rat": {
+                  "body_radius_cm": 3.5,
+                  "sweep_height_cm": 5.0,
+                  "step_height_cm": 4.0
+                },
+                "Fox": {
+                  "body_radius_cm": 23.0,
+                  "sweep_height_cm": 65.0,
+                  "step_height_cm": 20.0
+                }
+              },
+              "rat_approaches": [
+                {
+                  "start_cm": [
+                    37751.4110472164,
+                    36024.54813220625,
+                    3098.5880159456783
+                  ],
+                  "direct": true,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37613.407417633534,
+                    35895.881905489696,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37654.81846484994,
+                    36050.43003769594,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    false,
+                    true
+                  ]
+                }
+              ],
+              "crossings": {
+                "Rat": {
+                  "0.6": [
+                    true,
+                    true
+                  ],
+                  "1.0": [
+                    true,
+                    true
+                  ]
+                },
+                "Fox": {
+                  "0.6": [
+                    false,
+                    false
+                  ],
+                  "1.0": [
+                    false,
+                    false
+                  ]
+                }
+              },
+              "mouth_sight_to_center": {
+                "Rat": [
+                  true,
+                  true
+                ],
+                "Fox": [
+                  false,
+                  false
+                ]
+              }
+            },
+            {
+              "site_index": 23,
+              "yaw_degrees": 100.0,
+              "mouths_cm": [
+                [
+                  37907.78370842671,
+                  36122.43075951804,
+                  3098.5880159456783
+                ],
+                [
+                  37852.21629157329,
+                  36437.56924048196,
+                  3098.5880159456783
+                ]
+              ],
+              "opening_cm": {
+                "length": 130.0,
+                "width": 50.0,
+                "height": 13.0,
+                "wall_thickness": 12.0
+              },
+              "bodies": {
+                "Rat": {
+                  "body_radius_cm": 3.5,
+                  "sweep_height_cm": 5.0,
+                  "step_height_cm": 4.0
+                },
+                "Fox": {
+                  "body_radius_cm": 23.0,
+                  "sweep_height_cm": 65.0,
+                  "step_height_cm": 20.0
+                }
+              },
+              "rat_approaches": [
+                {
+                  "start_cm": [
+                    37852.21629157329,
+                    36437.56924048196,
+                    3098.5880159456783
+                  ],
+                  "direct": true,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37781.519224464006,
+                    36262.635183564766,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37753.7355160373,
+                    36420.20442404672,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    false,
+                    true
+                  ]
+                }
+              ],
+              "crossings": {
+                "Rat": {
+                  "0.6": [
+                    true,
+                    true
+                  ],
+                  "1.0": [
+                    true,
+                    true
+                  ]
+                },
+                "Fox": {
+                  "0.6": [
+                    false,
+                    false
+                  ],
+                  "1.0": [
+                    false,
+                    false
+                  ]
+                }
+              },
+              "mouth_sight_to_center": {
+                "Rat": [
+                  true,
+                  true
+                ],
+                "Fox": [
+                  false,
+                  false
+                ]
+              }
+            }
+          ],
+          "successful_movement_steps_to_mouth": 343,
+          "first_mouth_movement_by_id": {
+            "75": {
+              "at": 65.35,
+              "patch": "IslandAuditRiverRatRefuge0"
+            },
+            "72": {
+              "at": 65.667,
+              "patch": "IslandAuditRiverRatRefuge0"
+            },
+            "126": {
+              "at": 67.3,
+              "patch": "IslandAuditRiverRatRefuge1"
+            },
+            "120": {
+              "at": 122.4,
+              "patch": "IslandAuditRiverRatRefuge0"
+            }
+          },
+          "targeted_founder_entry_ids": [
+            72,
+            75
+          ],
+          "founder_entry_after_mouth_motion_by_id": {
+            "72": {
+              "world_seconds": 67.50000352039933,
+              "completed_authority_seconds": 67.0,
+              "id": 72,
+              "position_cm": [
+                37701.85,
+                35854.74,
+                3098.59
+              ],
+              "fox_positions_cm": {
+                "65": [
+                  38268.0,
+                  35279.42,
+                  3098.59
+                ],
+                "66": [
+                  37164.53,
+                  36376.12,
+                  3098.59
+                ]
+              },
+              "activity": "EEcoSpeciesActivity::Flee",
+              "target": 22,
+              "gameplay_reasons": [
+                {
+                  "time": 31,
+                  "region": "Riverbank",
+                  "reason": "BirthCommitted",
+                  "related_id": "119",
+                  "amount": 0
+                },
+                {
+                  "time": 66.6,
+                  "region": "Riverbank",
+                  "reason": "ThreatHeard",
+                  "related_id": "52",
+                  "amount": 0.2071627974510193
+                },
+                {
+                  "time": 67.05,
+                  "region": "Riverbank",
+                  "reason": "ThreatHeard",
+                  "related_id": "52",
+                  "amount": 0.24382463097572327
+                }
+              ]
+            },
+            "75": {
+              "world_seconds": 67.76667020097375,
+              "completed_authority_seconds": 67.0,
+              "id": 75,
+              "position_cm": [
+                37698.37,
+                35850.77,
+                3098.59
+              ],
+              "fox_positions_cm": {
+                "65": [
+                  38234.53,
+                  35272.32,
+                  3098.59
+                ],
+                "66": [
+                  37168.45,
+                  36413.35,
+                  3098.59
+                ]
+              },
+              "activity": "EEcoSpeciesActivity::Flee",
+              "target": 22,
+              "gameplay_reasons": [
+                {
+                  "time": 65.8,
+                  "region": "Riverbank",
+                  "reason": "ThreatHeard",
+                  "related_id": "52",
+                  "amount": 0.15933741629123688
+                },
+                {
+                  "time": 66.25,
+                  "region": "Riverbank",
+                  "reason": "ThreatHeard",
+                  "related_id": "52",
+                  "amount": 0.20095334947109222
+                },
+                {
+                  "time": 66.7,
+                  "region": "Riverbank",
+                  "reason": "ThreatHeard",
+                  "related_id": "52",
+                  "amount": 0.27917784452438354
+                }
+              ]
+            }
+          },
+          "rat_predations": 6
+        }
+      }
+    },
+    {
+      "seed": 20047,
+      "runs": {
+        "rat_approach_control": {
+          "hashes": {
+            "AdaptiveEcosystem/Saved/FaunaAudit/Island_20047_rat_approach_control/IslandFaunaPIE.json": "12aee5bb84357d24782860b12ef81379ae2af07d6465c95e6a480f62ec5002d6",
+            "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20047_rat_approach_control.log": "a3094ef55b6de070c30d42bcda9bb1c65ee4a66c435f18a340e296b58b30d476"
+          },
+          "body_checked_sites": [
+            {
+              "site_index": 22,
+              "yaw_degrees": 75.0,
+              "mouths_cm": [
+                [
+                  37668.5889527836,
+                  35715.45186779375,
+                  3098.5880159456783
+                ],
+                [
+                  37751.4110472164,
+                  36024.54813220625,
+                  3098.5880159456783
+                ]
+              ],
+              "opening_cm": {
+                "length": 130.0,
+                "width": 50.0,
+                "height": 13.0,
+                "wall_thickness": 12.0
+              },
+              "bodies": {
+                "Rat": {
+                  "body_radius_cm": 3.5,
+                  "sweep_height_cm": 5.0,
+                  "step_height_cm": 4.0
+                },
+                "Fox": {
+                  "body_radius_cm": 23.0,
+                  "sweep_height_cm": 65.0,
+                  "step_height_cm": 20.0
+                }
+              },
+              "rat_approaches": [
+                {
+                  "start_cm": [
+                    37751.4110472164,
+                    36024.54813220625,
+                    3098.5880159456783
+                  ],
+                  "direct": true,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37613.407417633534,
+                    35895.881905489696,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37654.81846484994,
+                    36050.43003769594,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    false,
+                    true
+                  ]
+                }
+              ],
+              "crossings": {
+                "Rat": {
+                  "0.6": [
+                    true,
+                    true
+                  ],
+                  "1.0": [
+                    true,
+                    true
+                  ]
+                },
+                "Fox": {
+                  "0.6": [
+                    false,
+                    false
+                  ],
+                  "1.0": [
+                    false,
+                    false
+                  ]
+                }
+              },
+              "mouth_sight_to_center": {
+                "Rat": [
+                  true,
+                  true
+                ],
+                "Fox": [
+                  false,
+                  false
+                ]
+              }
+            },
+            {
+              "site_index": 23,
+              "yaw_degrees": 100.0,
+              "mouths_cm": [
+                [
+                  37907.78370842671,
+                  36122.43075951804,
+                  3098.5880159456783
+                ],
+                [
+                  37852.21629157329,
+                  36437.56924048196,
+                  3098.5880159456783
+                ]
+              ],
+              "opening_cm": {
+                "length": 130.0,
+                "width": 50.0,
+                "height": 13.0,
+                "wall_thickness": 12.0
+              },
+              "bodies": {
+                "Rat": {
+                  "body_radius_cm": 3.5,
+                  "sweep_height_cm": 5.0,
+                  "step_height_cm": 4.0
+                },
+                "Fox": {
+                  "body_radius_cm": 23.0,
+                  "sweep_height_cm": 65.0,
+                  "step_height_cm": 20.0
+                }
+              },
+              "rat_approaches": [
+                {
+                  "start_cm": [
+                    37852.21629157329,
+                    36437.56924048196,
+                    3098.5880159456783
+                  ],
+                  "direct": true,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37781.519224464006,
+                    36262.635183564766,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37753.7355160373,
+                    36420.20442404672,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    false,
+                    true
+                  ]
+                }
+              ],
+              "crossings": {
+                "Rat": {
+                  "0.6": [
+                    true,
+                    true
+                  ],
+                  "1.0": [
+                    true,
+                    true
+                  ]
+                },
+                "Fox": {
+                  "0.6": [
+                    false,
+                    false
+                  ],
+                  "1.0": [
+                    false,
+                    false
+                  ]
+                }
+              },
+              "mouth_sight_to_center": {
+                "Rat": [
+                  true,
+                  true
+                ],
+                "Fox": [
+                  false,
+                  false
+                ]
+              }
+            }
+          ],
+          "successful_movement_steps_to_mouth": 0,
+          "first_mouth_movement_by_id": {},
+          "targeted_founder_entry_ids": [
+            74,
+            75,
+            76,
+            77
+          ],
+          "founder_entry_after_mouth_motion_by_id": {},
+          "rat_predations": 5
+        },
+        "rat_mouth_verified": {
+          "hashes": {
+            "AdaptiveEcosystem/Saved/FaunaAudit/Island_20047_rat_mouth_verified/IslandFaunaPIE.json": "a5d589e84d2b9c0e77aa6b80fe941c4c44d88425c58c471e2555c5b109339fcf",
+            "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20047_rat_mouth_verified.log": "190fe8f6e556d707e9abb26957ea658f51d3f787e638e5fdfcfa0476da87d8d6"
+          },
+          "body_checked_sites": [
+            {
+              "site_index": 22,
+              "yaw_degrees": 75.0,
+              "mouths_cm": [
+                [
+                  37668.5889527836,
+                  35715.45186779375,
+                  3098.5880159456783
+                ],
+                [
+                  37751.4110472164,
+                  36024.54813220625,
+                  3098.5880159456783
+                ]
+              ],
+              "opening_cm": {
+                "length": 130.0,
+                "width": 50.0,
+                "height": 13.0,
+                "wall_thickness": 12.0
+              },
+              "bodies": {
+                "Rat": {
+                  "body_radius_cm": 3.5,
+                  "sweep_height_cm": 5.0,
+                  "step_height_cm": 4.0
+                },
+                "Fox": {
+                  "body_radius_cm": 23.0,
+                  "sweep_height_cm": 65.0,
+                  "step_height_cm": 20.0
+                }
+              },
+              "rat_approaches": [
+                {
+                  "start_cm": [
+                    37751.4110472164,
+                    36024.54813220625,
+                    3098.5880159456783
+                  ],
+                  "direct": true,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37613.407417633534,
+                    35895.881905489696,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37654.81846484994,
+                    36050.43003769594,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    false,
+                    true
+                  ]
+                }
+              ],
+              "crossings": {
+                "Rat": {
+                  "0.6": [
+                    true,
+                    true
+                  ],
+                  "1.0": [
+                    true,
+                    true
+                  ]
+                },
+                "Fox": {
+                  "0.6": [
+                    false,
+                    false
+                  ],
+                  "1.0": [
+                    false,
+                    false
+                  ]
+                }
+              },
+              "mouth_sight_to_center": {
+                "Rat": [
+                  true,
+                  true
+                ],
+                "Fox": [
+                  false,
+                  false
+                ]
+              }
+            },
+            {
+              "site_index": 23,
+              "yaw_degrees": 100.0,
+              "mouths_cm": [
+                [
+                  37907.78370842671,
+                  36122.43075951804,
+                  3098.5880159456783
+                ],
+                [
+                  37852.21629157329,
+                  36437.56924048196,
+                  3098.5880159456783
+                ]
+              ],
+              "opening_cm": {
+                "length": 130.0,
+                "width": 50.0,
+                "height": 13.0,
+                "wall_thickness": 12.0
+              },
+              "bodies": {
+                "Rat": {
+                  "body_radius_cm": 3.5,
+                  "sweep_height_cm": 5.0,
+                  "step_height_cm": 4.0
+                },
+                "Fox": {
+                  "body_radius_cm": 23.0,
+                  "sweep_height_cm": 65.0,
+                  "step_height_cm": 20.0
+                }
+              },
+              "rat_approaches": [
+                {
+                  "start_cm": [
+                    37852.21629157329,
+                    36437.56924048196,
+                    3098.5880159456783
+                  ],
+                  "direct": true,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37781.519224464006,
+                    36262.635183564766,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    true,
+                    true
+                  ]
+                },
+                {
+                  "start_cm": [
+                    37753.7355160373,
+                    36420.20442404672,
+                    3098.5880159456783
+                  ],
+                  "direct": false,
+                  "through_mouth": [
+                    false,
+                    true
+                  ]
+                }
+              ],
+              "crossings": {
+                "Rat": {
+                  "0.6": [
+                    true,
+                    true
+                  ],
+                  "1.0": [
+                    true,
+                    true
+                  ]
+                },
+                "Fox": {
+                  "0.6": [
+                    false,
+                    false
+                  ],
+                  "1.0": [
+                    false,
+                    false
+                  ]
+                }
+              },
+              "mouth_sight_to_center": {
+                "Rat": [
+                  true,
+                  true
+                ],
+                "Fox": [
+                  false,
+                  false
+                ]
+              }
+            }
+          ],
+          "successful_movement_steps_to_mouth": 299,
+          "first_mouth_movement_by_id": {
+            "75": {
+              "at": 43.367,
+              "patch": "IslandAuditRiverRatRefuge1"
+            },
+            "77": {
+              "at": 43.367,
+              "patch": "IslandAuditRiverRatRefuge1"
+            },
+            "74": {
+              "at": 43.667,
+              "patch": "IslandAuditRiverRatRefuge0"
+            },
+            "125": {
+              "at": 78.25,
+              "patch": "IslandAuditRiverRatRefuge1"
+            },
+            "76": {
+              "at": 78.567,
+              "patch": "IslandAuditRiverRatRefuge1"
+            },
+            "132": {
+              "at": 122.0,
+              "patch": "IslandAuditRiverRatRefuge1"
+            }
+          },
+          "targeted_founder_entry_ids": [
+            74,
+            75,
+            76,
+            77
+          ],
+          "founder_entry_after_mouth_motion_by_id": {
+            "75": {
+              "world_seconds": 44.56666899099946,
+              "completed_authority_seconds": 44.0,
+              "id": 75,
+              "position_cm": [
+                37890.39,
+                36222.23,
+                3098.59
+              ],
+              "fox_positions_cm": {
+                "65": [
+                  37188.41,
+                  35237.04,
+                  3098.59
+                ],
+                "66": [
+                  37864.55,
+                  35323.88,
+                  3098.59
+                ]
+              },
+              "activity": "EEcoSpeciesActivity::Flee",
+              "target": 23,
+              "gameplay_reasons": []
+            },
+            "77": {
+              "world_seconds": 45.100002352148294,
+              "completed_authority_seconds": 44.0,
+              "id": 77,
+              "position_cm": [
+                37875.16,
+                36291.21,
+                3098.59
+              ],
+              "fox_positions_cm": {
+                "65": [
+                  37188.41,
+                  35237.04,
+                  3098.59
+                ],
+                "66": [
+                  37864.55,
+                  35323.88,
+                  3098.59
+                ]
+              },
+              "activity": "EEcoSpeciesActivity::Flee",
+              "target": 23,
+              "gameplay_reasons": []
+            },
+            "74": {
+              "world_seconds": 45.63333571329713,
+              "completed_authority_seconds": 45.0,
+              "id": 74,
+              "position_cm": [
+                37709.61,
+                35885.6,
+                3098.59
+              ],
+              "fox_positions_cm": {
+                "65": [
+                  37188.41,
+                  35237.04,
+                  3098.59
+                ],
+                "66": [
+                  37864.55,
+                  35323.88,
+                  3098.59
+                ]
+              },
+              "activity": "EEcoSpeciesActivity::Flee",
+              "target": 22,
+              "gameplay_reasons": []
+            },
+            "76": {
+              "world_seconds": 80.03333750739694,
+              "completed_authority_seconds": 79.0,
+              "id": 76,
+              "position_cm": [
+                37878.07,
+                36292.05,
+                3098.59
+              ],
+              "fox_positions_cm": {
+                "65": [
+                  37719.29,
+                  35754.12,
+                  3098.59
+                ],
+                "66": [
+                  37996.57,
+                  34962.36,
+                  3098.59
+                ]
+              },
+              "activity": "EEcoSpeciesActivity::Flee",
+              "target": 23,
+              "gameplay_reasons": []
+            }
+          },
+          "rat_predations": 1
+        }
+      }
+    }
+  ],
+  "checkpoint_validation": {
+    "matching_layouts": [
+      {
+        "slot": "IslandGrassBounds_20000_rat_approach",
+        "version": 16,
+        "payload_bytes": 1497712,
+        "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+        "runtime_md5": "bd19460dc53a23c4ae00f425311fcac5",
+        "agents": 113,
+        "step": 179,
+        "native_step": 1312,
+        "native_region_stock": {
+          "Snowfield": "95.627825028",
+          "Grassland": "39.008369721",
+          "Riverbank": "49.267305763",
+          "Highland": "135.670358327"
+        },
+        "observed_agents": 113,
+        "authored_patches": 24,
+        "wet_patches": 9,
+        "resumed_hatches": [
+          "135"
+        ],
+        "seed": 20000,
+        "shelter_approach_points": {
+          "IslandAuditRiverRatRefuge0": [
+            [
+              37668.5889527836,
+              35715.45186779375,
+              3098.5880159456783
+            ],
+            [
+              37751.4110472164,
+              36024.54813220625,
+              3098.5880159456783
+            ]
+          ],
+          "IslandAuditRiverRatRefuge1": [
+            [
+              37907.78370842671,
+              36122.43075951804,
+              3098.5880159456783
+            ],
+            [
+              37852.21629157329,
+              36437.56924048196,
+              3098.5880159456783
+            ]
+          ]
+        },
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/Ecosystem/IslandGrassBounds_20000_rat_approach.eco": "47d0ac8915c0a820f2ed713ced417378553c2e942bf578ca6ab71dd854901268",
+          "AdaptiveEcosystem/Binaries/Win64/UnrealEditor-AdaptiveEcosystem.dll": "a3d451ff6b723c2d43d49427e881036315622d8d1a3ad32f2f732e37b18d85bc",
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_ck_save/IslandFaunaPIE.json": "a91eeb6c658809a6947f8201a8f4d62d7f406c2ca067820a80d6df246f912a0e",
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_ck_load/IslandFaunaPIE.json": "3d17219b766f2e9e56ab1136fe7388801785eb0998a3ddbe1425fec892761172",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_ck_save.log": "bf8d55c0a29e2130b4dd392993592e114340dfcfd133df94ee571a9fdd491362",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_ck_load.log": "4526113576341a1b0a4f66ddc1842fae402ec3ce8a16e2be5ef3cb1098b8f3ae"
+        }
+      },
+      {
+        "slot": "IslandGrassBounds_20017_rat_approach",
+        "version": 16,
+        "payload_bytes": 1507671,
+        "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+        "runtime_md5": "bd19460dc53a23c4ae00f425311fcac5",
+        "agents": 115,
+        "step": 178,
+        "native_step": 1312,
+        "native_region_stock": {
+          "Snowfield": "7.008645815",
+          "Grassland": "56.966276535",
+          "Riverbank": "49.287065712",
+          "Highland": "126.554047445"
+        },
+        "observed_agents": 114,
+        "authored_patches": 24,
+        "wet_patches": 9,
+        "resumed_hatches": [
+          "135"
+        ],
+        "seed": 20017,
+        "shelter_approach_points": {
+          "IslandAuditRiverRatRefuge0": [
+            [
+              37668.5889527836,
+              35715.45186779375,
+              3098.5880159456783
+            ],
+            [
+              37751.4110472164,
+              36024.54813220625,
+              3098.5880159456783
+            ]
+          ],
+          "IslandAuditRiverRatRefuge1": [
+            [
+              37907.78370842671,
+              36122.43075951804,
+              3098.5880159456783
+            ],
+            [
+              37852.21629157329,
+              36437.56924048196,
+              3098.5880159456783
+            ]
+          ]
+        },
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/Ecosystem/IslandGrassBounds_20017_rat_approach.eco": "a7e726237e98751c1e1b98f053f600451504baeeffaa7ac37e5bd49e5324d735",
+          "AdaptiveEcosystem/Binaries/Win64/UnrealEditor-AdaptiveEcosystem.dll": "a3d451ff6b723c2d43d49427e881036315622d8d1a3ad32f2f732e37b18d85bc",
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_rat_ck_save/IslandFaunaPIE.json": "1abbbd9f54c0ac882166aa4e10732c8a7a767c054238975319996b1936c70e0e",
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_rat_ck_load/IslandFaunaPIE.json": "e4f79e617a23f1024bc2c2ddc783b9898dcb62b28b2027afd3b3fad25b9be20a",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_ck_save.log": "9bb24794390c2e7beb86d8eaba415f3c41bc3561cb40e6ad1a950c42292e8ec7",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_rat_ck_load.log": "6e22cc6af73ff4225cba24d379075fd138bd37a28abd5bd5114273d1fe95dacb"
+        }
+      }
+    ],
+    "shifted_mouth": {
+      "seed": 20000,
+      "offset_cm": 20,
+      "rejection": "fauna habitat layout or clock mismatch",
+      "source_sha256": {
+        "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_ck_diff/IslandFaunaPIE.json": "9c5ccb1b4052cbf55a72652bbd4185c52a1f5a6195e1b600ac2fde5dbd361345",
+        "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_rat_ck_diff.log": "48d69c863582511042aab4e612d7f5b3a568b6778112e02d31ff9d4bb3a42bfb"
+      }
+    }
+  },
+  "saved_route_reference": [
+    {
+      "seed": 20000,
+      "log": "20000_rat_saved_floor.log",
+      "sha256": "d67ff01fdf0747b8963755b3b173fa7e41af02049d0489d9b16eea40e1cf908a",
+      "consecutive_pairs": 171,
+      "samples": [
+        {
+          "agent": 72,
+          "at": 65.683,
+          "start_cm": [
+            37466.098,
+            35668.715,
+            3098.588
+          ],
+          "site": 22,
+          "mouth_cm": [
+            37668.589,
+            35715.452,
+            3098.588
+          ]
+        },
+        {
+          "agent": 126,
+          "at": 67.317,
+          "start_cm": [
+            37783.711,
+            36210.357,
+            3098.588
+          ],
+          "site": 23,
+          "mouth_cm": [
+            37907.784,
+            36122.431,
+            3098.588
+          ]
+        },
+        {
+          "agent": 75,
+          "at": 65.367,
+          "start_cm": [
+            37368.498,
+            35566.413,
+            3098.588
+          ],
+          "site": 22,
+          "mouth_cm": [
+            37668.589,
+            35715.452,
+            3098.588
+          ]
+        }
+      ]
+    },
+    {
+      "seed": 20047,
+      "log": "20047_rat_saved_floor.log",
+      "sha256": "1960c9dd38e49064733f158d72e2b0728aac5ff5fe5dcd25b6a421e11f8ce1f3",
+      "consecutive_pairs": 235,
+      "samples": [
+        {
+          "agent": 76,
+          "at": 82.667,
+          "start_cm": [
+            37994.852,
+            36453.917,
+            3098.588
+          ],
+          "site": 23,
+          "mouth_cm": [
+            37852.216,
+            36437.569,
+            3098.588
+          ]
+        },
+        {
+          "agent": 77,
+          "at": 43.383,
+          "start_cm": [
+            37693.724,
+            36499.045,
+            3098.588
+          ],
+          "site": 23,
+          "mouth_cm": [
+            37852.216,
+            36437.569,
+            3098.588
+          ]
+        },
+        {
+          "agent": 74,
+          "at": 123.833,
+          "start_cm": [
+            37619.483,
+            36048.017,
+            3098.588
+          ],
+          "site": 22,
+          "mouth_cm": [
+            37751.411,
+            36024.548,
+            3098.588
+          ]
+        },
+        {
+          "agent": 75,
+          "at": 175.333,
+          "start_cm": [
+            38033.034,
+            36184.05,
+            3098.588
+          ],
+          "site": 23,
+          "mouth_cm": [
+            37907.784,
+            36122.431,
+            3098.588
+          ]
+        }
+      ]
+    }
+  ],
+  "saved_sight_reference": [
+    {
+      "seed": 20000,
+      "report": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_rat_sight_final/IslandFaunaPIE.json",
+      "sha256": "48d19e250ce8bd56f906d06ac3e2573c4a36c1f3d31d82f0cb9c176fcd569049",
+      "sites": [
+        {
+          "site_index": 22,
+          "mouths_cm": [
+            [
+              37668.5889527836,
+              35715.45186779375,
+              3098.5880159456783
+            ],
+            [
+              37751.4110472164,
+              36024.54813220625,
+              3098.5880159456783
+            ]
+          ],
+          "opening_cm": {
+            "length": 130.0,
+            "width": 50.0,
+            "height": 13.0,
+            "wall_thickness": 12.0
+          },
+          "bodies": {
+            "Rat": {
+              "body_radius_cm": 3.5,
+              "sweep_height_cm": 5.0,
+              "step_height_cm": 4.0
+            },
+            "Fox": {
+              "body_radius_cm": 23.0,
+              "sweep_height_cm": 65.0,
+              "step_height_cm": 20.0
+            }
+          },
+          "rat_vision": {
+            "eye_height": 5.0,
+            "night_vision": 0.800000011920929,
+            "threat_sense_range": 650.0,
+            "threat_sight_half_angle": 90.0,
+            "threat_near_awareness_range": 280.0
+          },
+          "sight_cases": [
+            {
+              "case": "through_wall",
+              "start_cm": [
+                37710.0,
+                35870.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37613.407417633534,
+                35895.881905489696,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": false
+            },
+            {
+              "case": "toward_mouth",
+              "start_cm": [
+                37710.0,
+                35870.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37751.4110472164,
+                36024.54813220625,
+                3098.5880159456783
+              ],
+              "target_height_cm": 5.0,
+              "clear": true
+            },
+            {
+              "case": "back_across_roof",
+              "start_cm": [
+                37710.0,
+                35870.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37735.88190451025,
+                35966.59258262891,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": false
+            },
+            {
+              "case": "outside_mouth",
+              "start_cm": [
+                37751.4110472164,
+                36024.54813220625,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37654.81846484994,
+                36050.43003769594,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": true
+            },
+            {
+              "case": "from_side_to_mouth",
+              "start_cm": [
+                37613.407417633534,
+                35895.881905489696,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37751.4110472164,
+                36024.54813220625,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": true
+            }
+          ]
+        },
+        {
+          "site_index": 23,
+          "mouths_cm": [
+            [
+              37907.78370842671,
+              36122.43075951804,
+              3098.5880159456783
+            ],
+            [
+              37852.21629157329,
+              36437.56924048196,
+              3098.5880159456783
+            ]
+          ],
+          "opening_cm": {
+            "length": 130.0,
+            "width": 50.0,
+            "height": 13.0,
+            "wall_thickness": 12.0
+          },
+          "bodies": {
+            "Rat": {
+              "body_radius_cm": 3.5,
+              "sweep_height_cm": 5.0,
+              "step_height_cm": 4.0
+            },
+            "Fox": {
+              "body_radius_cm": 23.0,
+              "sweep_height_cm": 65.0,
+              "step_height_cm": 20.0
+            }
+          },
+          "rat_vision": {
+            "eye_height": 5.0,
+            "night_vision": 0.800000011920929,
+            "threat_sense_range": 650.0,
+            "threat_sight_half_angle": 90.0,
+            "threat_near_awareness_range": 280.0
+          },
+          "sight_cases": [
+            {
+              "case": "through_wall",
+              "start_cm": [
+                37880.0,
+                36280.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37781.519224464006,
+                36262.635183564766,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": false
+            },
+            {
+              "case": "toward_mouth",
+              "start_cm": [
+                37880.0,
+                36280.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37852.21629157329,
+                36437.56924048196,
+                3098.5880159456783
+              ],
+              "target_height_cm": 5.0,
+              "clear": true
+            },
+            {
+              "case": "back_across_roof",
+              "start_cm": [
+                37880.0,
+                36280.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37862.63518223331,
+                36378.48077530122,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": false
+            },
+            {
+              "case": "outside_mouth",
+              "start_cm": [
+                37852.21629157329,
+                36437.56924048196,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37753.7355160373,
+                36420.20442404672,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": true
+            },
+            {
+              "case": "from_side_to_mouth",
+              "start_cm": [
+                37781.519224464006,
+                36262.635183564766,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37852.21629157329,
+                36437.56924048196,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": true
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "seed": 20047,
+      "report": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20047_rat_sight_final/IslandFaunaPIE.json",
+      "sha256": "d82cb5ba59f869518b45a7f82b08753a1e734729c595ae81fabd5698fcb8f076",
+      "sites": [
+        {
+          "site_index": 22,
+          "mouths_cm": [
+            [
+              37668.5889527836,
+              35715.45186779375,
+              3098.5880159456783
+            ],
+            [
+              37751.4110472164,
+              36024.54813220625,
+              3098.5880159456783
+            ]
+          ],
+          "opening_cm": {
+            "length": 130.0,
+            "width": 50.0,
+            "height": 13.0,
+            "wall_thickness": 12.0
+          },
+          "bodies": {
+            "Rat": {
+              "body_radius_cm": 3.5,
+              "sweep_height_cm": 5.0,
+              "step_height_cm": 4.0
+            },
+            "Fox": {
+              "body_radius_cm": 23.0,
+              "sweep_height_cm": 65.0,
+              "step_height_cm": 20.0
+            }
+          },
+          "rat_vision": {
+            "eye_height": 5.0,
+            "night_vision": 0.800000011920929,
+            "threat_sense_range": 650.0,
+            "threat_sight_half_angle": 90.0,
+            "threat_near_awareness_range": 280.0
+          },
+          "sight_cases": [
+            {
+              "case": "through_wall",
+              "start_cm": [
+                37710.0,
+                35870.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37613.407417633534,
+                35895.881905489696,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": false
+            },
+            {
+              "case": "toward_mouth",
+              "start_cm": [
+                37710.0,
+                35870.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37751.4110472164,
+                36024.54813220625,
+                3098.5880159456783
+              ],
+              "target_height_cm": 5.0,
+              "clear": true
+            },
+            {
+              "case": "back_across_roof",
+              "start_cm": [
+                37710.0,
+                35870.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37735.88190451025,
+                35966.59258262891,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": false
+            },
+            {
+              "case": "outside_mouth",
+              "start_cm": [
+                37751.4110472164,
+                36024.54813220625,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37654.81846484994,
+                36050.43003769594,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": true
+            },
+            {
+              "case": "from_side_to_mouth",
+              "start_cm": [
+                37613.407417633534,
+                35895.881905489696,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37751.4110472164,
+                36024.54813220625,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": true
+            }
+          ]
+        },
+        {
+          "site_index": 23,
+          "mouths_cm": [
+            [
+              37907.78370842671,
+              36122.43075951804,
+              3098.5880159456783
+            ],
+            [
+              37852.21629157329,
+              36437.56924048196,
+              3098.5880159456783
+            ]
+          ],
+          "opening_cm": {
+            "length": 130.0,
+            "width": 50.0,
+            "height": 13.0,
+            "wall_thickness": 12.0
+          },
+          "bodies": {
+            "Rat": {
+              "body_radius_cm": 3.5,
+              "sweep_height_cm": 5.0,
+              "step_height_cm": 4.0
+            },
+            "Fox": {
+              "body_radius_cm": 23.0,
+              "sweep_height_cm": 65.0,
+              "step_height_cm": 20.0
+            }
+          },
+          "rat_vision": {
+            "eye_height": 5.0,
+            "night_vision": 0.800000011920929,
+            "threat_sense_range": 650.0,
+            "threat_sight_half_angle": 90.0,
+            "threat_near_awareness_range": 280.0
+          },
+          "sight_cases": [
+            {
+              "case": "through_wall",
+              "start_cm": [
+                37880.0,
+                36280.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37781.519224464006,
+                36262.635183564766,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": false
+            },
+            {
+              "case": "toward_mouth",
+              "start_cm": [
+                37880.0,
+                36280.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37852.21629157329,
+                36437.56924048196,
+                3098.5880159456783
+              ],
+              "target_height_cm": 5.0,
+              "clear": true
+            },
+            {
+              "case": "back_across_roof",
+              "start_cm": [
+                37880.0,
+                36280.0,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37862.63518223331,
+                36378.48077530122,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": false
+            },
+            {
+              "case": "outside_mouth",
+              "start_cm": [
+                37852.21629157329,
+                36437.56924048196,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37753.7355160373,
+                36420.20442404672,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": true
+            },
+            {
+              "case": "from_side_to_mouth",
+              "start_cm": [
+                37781.519224464006,
+                36262.635183564766,
+                3098.5880159456783
+              ],
+              "end_cm": [
+                37852.21629157329,
+                36437.56924048196,
+                3098.5880159456783
+              ],
+              "target_height_cm": 35.0,
+              "clear": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

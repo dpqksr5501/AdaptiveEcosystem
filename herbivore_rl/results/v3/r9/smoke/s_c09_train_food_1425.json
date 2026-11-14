@@ -1,0 +1,122 @@
+{
+ "set": "food",
+ "note": "앞 시도 측정 (2026-11-12 14:25~15:01, 같은 코드): 다른 세션의 무거운 python 이 겹쳐 돈 때가 있다(other_python) — 기록만, 등록에 쓰지 않음",
+ "time": "2026-11-12 14:42:34",
+ "wall_s": 534.1422069072723,
+ "min_available_gb": 9.741569519042969,
+ "min_free_commit_gb": 7.08349609375,
+ "cpu_sys_mean": null,
+ "ue_seen": null,
+ "aborted_low_commit": null,
+ "other_python_at_start": [
+  "사용자 python ortholoc"
+ ],
+ "other_python_at_end": [
+  "다른 세션의 무거운 python: b",
+  "다른 세션의 무거운 python: d",
+  "다른 세션의 무거운 python: c",
+  "사용자 python ortholoc",
+  "다른 세션의 무거운 python: rich_bench_horizon.py",
+  "다른 세션의 무거운 python: a"
+ ],
+ "max_r9_python": 4,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "deer_A",
+   "species": "deer",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3010560,
+   "wall_s": 526.8267600536346,
+   "dec_per_s": 5714.5160957531925,
+   "log_dec_per_s": [
+    7194,
+    5184
+   ],
+   "num_envs": 896,
+   "memory": [
+    {
+     "pid": 39968,
+     "peak_mb": 367.6015625,
+     "private_mb": 325.1171875
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "deer_B",
+   "species": "deer",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3010560,
+   "wall_s": 526.6528887748718,
+   "dec_per_s": 5716.402708818945,
+   "log_dec_per_s": [
+    7320,
+    5154
+   ],
+   "num_envs": 896,
+   "memory": [
+    {
+     "pid": 40416,
+     "peak_mb": 368.66015625,
+     "private_mb": 325.01953125
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "boar_A",
+   "species": "boar",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 490.51329040527344,
+   "dec_per_s": 2104.309954878448,
+   "log_dec_per_s": [
+    2123,
+    1654
+   ],
+   "num_envs": 768,
+   "memory": [
+    {
+     "pid": 8068,
+     "peak_mb": 461.90625,
+     "private_mb": 356.71875
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "boar_B",
+   "species": "boar",
+   "round": 0,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 492.5017056465149,
+   "dec_per_s": 2095.8140614863964,
+   "log_dec_per_s": [
+    2114,
+    1640
+   ],
+   "num_envs": 768,
+   "memory": [
+    {
+     "pid": 31512,
+     "peak_mb": 461.70703125,
+     "private_mb": 356.9453125
+    }
+   ],
+   "error": ""
+  }
+ ]
+}

@@ -25,9 +25,11 @@ public:
     void TickComponent(float Delta,ELevelTick Type,FActorComponentTickFunction* Tick) override;
     void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& Out) const override;
     UFUNCTION(Server,Reliable) void ServerPresented(uint32 Revision,const TArray<int64>& Ids);
-    UFUNCTION() void OnRep_Offer();
+    UFUNCTION() void OnRep_Offer(const FEcoCombatOffer& Previous);
     void ReportPresented();
 private:
+    friend class FEcoCombatPresentationAdmission;
+    void UpdateOffer(FEcoCombatOffer Next);
     TArray<int64> Presented;
     TSet<int64> Ready;
     double LastReady=-10,NextRefresh=0,NextReport=0;

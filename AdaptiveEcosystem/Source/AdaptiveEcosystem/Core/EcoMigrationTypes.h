@@ -63,8 +63,10 @@ struct FEcoRegionSpatialSnapshot
 	FVector BoundsExtent = FVector::ZeroVector;
 	FVector ArrivalPosition = FVector::ZeroVector;
 	TArray<int32> AdjacentIndices;
+	bool bAvailable = true;
 	bool Contains(const FVector& Position) const
 	{
+		if (!bAvailable) return false;
 		const FVector Local = BoundsTransform.InverseTransformPosition(Position);
 		return !Local.ContainsNaN() && FMath::Abs(Local.X) <= BoundsExtent.X
 			&& FMath::Abs(Local.Y) <= BoundsExtent.Y && FMath::Abs(Local.Z) <= BoundsExtent.Z;

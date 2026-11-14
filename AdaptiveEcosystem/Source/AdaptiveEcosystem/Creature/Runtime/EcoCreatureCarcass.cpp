@@ -38,8 +38,12 @@ double AEcoCreatureIntegrationSpawner::CommitNativeCarcass(const FEcoDeathOutcom
     }
     if(Receivers.IsEmpty())return 0.;
     const double Share=.6/Receivers.Num();double Issued=0;
+    const bool bSharedCarcass = !FaunaSpecies.IsEmpty();
+    const double Full = UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal) ? .92 : 1.;
     for(const auto Entity:Receivers){auto& Life=EM.GetFragmentDataChecked<FEcoIntegratedV3Fragment>(Entity).Individual;
-        if(Life.AssignMeat(Death.StableAgentId,Share,Now,Body->Body.Pos.X,Body->Body.Pos.Y,SourceLink->GroundZ))Issued+=Share;
+        // Keep any share beyond the current meal's usable amount in the shared carcass.
+        const double Reserved = bSharedCarcass ? FMath::Min(Share, Life.RoomForReservedMeat(Full)) : Share;
+        if(Life.AssignMeat(Death.StableAgentId,Reserved,Now,Body->Body.Pos.X,Body->Body.Pos.Y,SourceLink->GroundZ))Issued+=Reserved;
     }
     UE_LOG(LogTemp,Log,TEXT("[EcoLife][Carcass] Prey=%lld Primary=%lld Receivers=%d NutritionIssued=%.9f Ledger=MeatNotVegetation"),
         Death.StableAgentId,Death.PredatorStableAgentId,Receivers.Num(),Issued);
@@ -47,23 +51,30 @@ double AEcoCreatureIntegrationSpawner::CommitNativeCarcass(const FEcoDeathOutcom
 }
 
 bool AEcoCreatureIntegrationSpawner::SelectWolfCarrion(int64 WolfId, FName Region, const FVector& Position,
-    bool bCanScavenge, FVector& Out)
+    bool bCanScavenge, double ApproachSpeedCmPerSecond, FVector& Out, double AuthoritySeconds)
 {
     if (FaunaSpecies.IsEmpty()) return false;
     WolfCarrionTargets.Remove(WolfId);
-    if (!bCanScavenge) return false;
-    const double Now = GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
-    double BestDistance = FMath::Square(1600.);
+    if (!bCanScavenge || ApproachSpeedCmPerSecond <= UE_SMALL_NUMBER) return false;
+    const double Now = AuthoritySeconds >= 0. ? AuthoritySeconds
+        : GetWorld()->GetSubsystem<UEcoWorldClockSubsystem>()->GetServerTime().ServerTimeSeconds;
+    double BestValue = 0.;
     int64 BestId = 0;
     for (const auto& Pair : FaunaCarcasses)
     {
         const auto& Stock = Pair.Value;
-        const double Distance = FVector::DistSquared(Stock.Position, Position);
+        const double Distance = FVector::Dist(Stock.Position, Position);
         if (Stock.Region != Region || Stock.Species == TEXT("Wolf") || !Stock.CanApproach(WolfId, Now)
-            || Distance > BestDistance || (Distance == BestDistance && Pair.Key >= BestId)
+            || Distance > 1600.) continue;
+        const double TravelSeconds = FMath::Max(0., Distance - 95.) / ApproachSpeedCmPerSecond;
+        // Bites are separated by a one-second resource interval.
+        const double FeedingSeconds = Stock.ExpiresAt - Now - TravelSeconds;
+        if (FeedingSeconds <= 0.) continue;
+        const double Value = EcoFaunaFeeding::Value(FMath::Min(double(Stock.Remaining), 8. * FMath::CeilToDouble(FeedingSeconds)), TravelSeconds);
+        if (Value < BestValue || (Value == BestValue && Pair.Key >= BestId)
             || GetWorld()->LineTraceTestByObjectType(Position + FVector(0, 0, 55), Stock.Position + FVector(0, 0, 20),
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfCarrion)))) continue;
-        BestDistance = Distance;
+        BestValue = Value;
         BestId = Pair.Key;
         Out = Stock.Position;
     }
@@ -99,10 +110,14 @@ void AEcoCreatureIntegrationSpawner::FeedWolvesFromCarrion(double Now)
             || EM.GetFragmentDataChecked<FMassVelocityFragment>(*Handle).Value.SizeSquared2D() > FMath::Square(35.)
             || GetWorld()->LineTraceTestByObjectType(Position + FVector(0, 0, 55), Stock->Position + FVector(0, 0, 20),
                 FCollisionObjectQueryParams(ECC_WorldStatic), FCollisionQueryParams(SCENE_QUERY_STAT(EcoWolfCarrionContact)))) continue;
-        const float Meal = Stock->Bite(WolfId, Now, float(FMath::Min(8., (1. - Link->Individual.Nutrition) * 100.)));
+        const bool bAdaptive = UsesAdaptiveRoutine(EEcoAdaptiveRoutine::WolfMeal);
+        if (bAdaptive && !Link->Individual.MealCycle.bSeeking) continue;
+        const double Full = bAdaptive ? .92 : 1.;
+        const float Meal = Stock->Bite(WolfId, Now, float(FMath::Min(8., (Full - Link->Individual.Nutrition) * 100.)));
         if (Meal <= 0.f) continue;
         Lifetime.NextFeedTimeSeconds = Now + 1.;
         Link->Individual.Nutrition = FMath::Min(1., Link->Individual.Nutrition + Meal / 100.);
+        RecordGameplayReason(WolfId, Context->RegionId, Now, TEXT("CarrionEaten"), StockId, Meal);
         if (auto* Presentation = EM.GetFragmentDataPtr<FEcoPredatorStateFragment>(*Handle)) Presentation->EatCooldown = 1.1f;
         UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Scavenge] Eater=%lld Species=Wolf Carcass=%lld Amount=%.3f Remaining=%.3f"),
             WolfId, StockId, Meal, Stock->Remaining);
@@ -142,6 +157,8 @@ void AEcoCreatureIntegrationSpawner::CommitFaunaCarcass(const FEcoDeathOutcome& 
             {
                 Stock.KillerId = Death.PredatorStableAgentId;
                 Hunter->CarrionTargetId = Death.StableAgentId;
+                if (Hunter->bSwimming)
+                    Hunter->PhaseUntil = FMath::Max(Hunter->PhaseUntil, Death.Time + Settle + 2.5);
             }
             else
             {
@@ -155,13 +172,26 @@ void AEcoCreatureIntegrationSpawner::CommitFaunaCarcass(const FEcoDeathOutcome& 
     Stock.Region = Death.RegionId;
     Stock.Species = Death.SpeciesId;
     Stock.OpenAt = Death.Time + Settle;
-    Stock.ExclusiveUntil = Stock.OpenAt + (Stock.KillerId > 0 ? 2.5 : 0.);
     if (NativeReserved > 0.f) Stock.OpenAt = FMath::Max(Stock.OpenAt, Death.Time + 3.);
+    Stock.ExclusiveUntil = Stock.OpenAt + (Stock.KillerId > 0 ? 2.5 : 0.);
     Stock.ExpiresAt = Stock.OpenAt + (Species ? Species->CarrionLifetime : 18.f);
+    if (UsesFaunaCarrionAccess())
+    {
+        // Larger stocks give animals time to arrive and take more than a single bite.
+        Stock.ExpiresAt += FMath::Min(15.f, Stock.Remaining / 8.f);
+        auto& DeathState = EM.GetFragmentDataChecked<FEcoDeathFragment>(*Victim);
+        DeathState.RemoveAfter = FMath::Max(DeathState.RemoveAfter, Stock.ExpiresAt + 2.);
+    }
     Stock.FeedingPlaces = Species ? Species->FeedingPlaces : 3;
-    Stock.bGrounded = (!Fauna || Fauna->Flight == EEcoFaunaFlightPhase::Grounded)
+    EcoCreatureMovement::FFaunaWaterColumn Water;
+    Stock.bWaterborne = Fauna && Species && (Species->IsAquatic() || Fauna->bSwimming)
+        && EcoCreatureMovement::SampleFaunaWater(*GetWorld(), Stock.Region, Stock.Position, 1., Water);
+    Stock.bFloats = Stock.bWaterborne && Species->Locomotion == EEcoFaunaLocomotion::Amphibious;
+    Stock.bGrounded = (!Species || !Species->IsAquatic())
+        && (!Fauna || (Fauna->Flight == EEcoFaunaFlightPhase::Grounded && !Fauna->bSwimming))
         && EcoCreatureMovement::IsWadeableGround(*GetWorld(), Stock.Position, 0.f);
     FaunaCarcasses.Add(Death.StableAgentId, Stock);
-    UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Carcass] Id=%lld Species=%s Total=%.3f Native=%.3f Killer=%.3f Remaining=%.3f"),
-        Death.StableAgentId, *Death.SpeciesId.ToString(), Total, NativeReserved, KillerMeal, Stock.Remaining);
+    UE_LOG(LogTemp, Log, TEXT("[Eco Fauna][Carcass] Id=%lld Species=%s Total=%.3f Native=%.3f Killer=%.3f Remaining=%.3f Medium=%s"),
+        Death.StableAgentId, *Death.SpeciesId.ToString(), Total, NativeReserved, KillerMeal, Stock.Remaining,
+        Stock.bWaterborne ? (Stock.bFloats ? TEXT("Floating") : TEXT("Sinking")) : (Stock.bGrounded ? TEXT("Ground") : TEXT("Unsettled")));
 }

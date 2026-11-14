@@ -37,7 +37,8 @@ inline FVector SelectVelocity(const FVector& Position, FVector PolicyVelocity, f
 ADAPTIVEECOSYSTEM_API bool ConstrainStep(UWorld& World, FName RegionId, bool bTraveling,
     const FVector& Position, FVector& Destination, float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f);
 /** Ground and clearance probe for authored spawn/arrival points; never changes logical state. */
-ADAPTIVEECOSYSTEM_API bool ProjectSpawnPoint(UWorld& World, const FVector& Hint, FVector& OutGround);
+ADAPTIVEECOSYSTEM_API bool ProjectSpawnPoint(UWorld& World, const FVector& Hint, FVector& OutGround,
+    bool bIgnoreWaterSurface = false);
 /** Shared physical ground constraint, also used by read-only copied-map route authoring. */
 ADAPTIVEECOSYSTEM_API bool ConstrainGroundStep(UWorld& World,const FVector& Position,FVector& Destination,
     float BodyRadiusCm=30.f,float MinGroundNormalZ=.65f,float SweepHeightCm=0.f,float MaxRiseCm=-1.f);
@@ -45,4 +46,33 @@ ADAPTIVEECOSYSTEM_API bool ConstrainGroundStep(UWorld& World,const FVector& Posi
 ADAPTIVEECOSYSTEM_API bool CrossesExcludedArea(UWorld& World, const FVector& Start, const FVector& End);
 /** Explicit authored water only. Never infers hydraulic connectivity from a blue mesh. */
 ADAPTIVEECOSYSTEM_API bool IsWadeableGround(UWorld& World,const FVector& Ground,float MaxDepthCm);
+bool IsWaterSurfaceCollision(const AActor* Actor);
+/** Solid-geometry visibility within a water column. WaterBody query volumes are transparent here. */
+bool HasClearWaterSight(const UWorld& World, const FVector& Start, const FVector& End);
+
+struct FFaunaWaterColumn
+{
+    double Bottom = 0.;
+    double Surface = 0.;
+    FVector Current = FVector::ZeroVector;
+    float TemperatureC = 20.f;
+    float CoverDensity = 0.f;
+    float CoverHeightCm = 0.f;
+
+    double VisualCoverAt(double Z) const
+    {
+        if (CoverHeightCm <= 0.f || Z < Bottom || Z > Surface) return 0.;
+        return CoverDensity * FMath::Clamp((Bottom + CoverHeightCm - Z) / (.25 * CoverHeightCm), 0., 1.);
+    }
+
+    double DepthHeight(double Fraction, double Clearance) const
+    {
+        return FMath::Lerp(Surface - Clearance, Bottom + Clearance, Fraction);
+    }
+};
+
+/** Samples authored terrain and water level even when the local column is exposed. */
+bool ProbeFaunaWaterColumn(UWorld& World, FName RegionId, const FVector& Point, FFaunaWaterColumn& Out,
+    double SimulationSeconds = -1., float Rainfall = 0.f);
+bool SampleFaunaWater(UWorld& World, FName RegionId, const FVector& Point, double Clearance, FFaunaWaterColumn& Out);
 }

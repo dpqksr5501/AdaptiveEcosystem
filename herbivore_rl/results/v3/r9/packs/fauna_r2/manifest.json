@@ -1,0 +1,104 @@
+{
+ "format": "r9-pack",
+ "version": 1,
+ "name": "fauna_r2",
+ "created": "2026-11-13T14:09:39",
+ "git_sha": "25af2cd9",
+ "config": "configs/v3_r9_fauna.yaml",
+ "config_digest": "20f694ec2a8a",
+ "body_table_hash": "0x10021edf18997ee3",
+ "source": "C:\\kwon\\univ\\3-1\\GameContentsCapstoneDesign\\AdaptiveEcosystem\\herbivore_rl\\ckpt\\r9_fauna\\chain\\A",
+ "note": "지금 몸(configs/v3_r9_fauna.yaml) 6 종 이어 학습 갈래 A 바퀴 2 마지막 판 (11-13 13:15 STOP). 11-13 M1 회전 한계 이어 학습(motion_chain)의 출발점과 같은 판. reports/eval = 바퀴 1·2 자연 세계 N 보고.",
+ "species": {
+  "deer": {
+   "zip": "deer/deer_r2_20931456.zip",
+   "versions": [
+    {
+     "npz": "deer/deer_r2_20931456.npz",
+     "round": 2,
+     "decisions": 20931456,
+     "body_hash": "0x2ffa857d6bb1b4b4"
+    }
+   ]
+  },
+  "wolf": {
+   "zip": "wolf/wolf_r2_6989248.zip",
+   "versions": [
+    {
+     "npz": "wolf/wolf_r2_6989248.npz",
+     "round": 2,
+     "decisions": 6989248,
+     "body_hash": "0x69532181ee44398b"
+    }
+   ]
+  },
+  "boar": {
+   "zip": "boar/boar_r2_7154688.zip",
+   "versions": [
+    {
+     "npz": "boar/boar_r2_7154688.npz",
+     "round": 2,
+     "decisions": 7154688,
+     "body_hash": "0xd68f2e620798ada3"
+    }
+   ]
+  },
+  "buffalo": {
+   "zip": "buffalo/buffalo_r2_7490688.zip",
+   "versions": [
+    {
+     "npz": "buffalo/buffalo_r2_7490688.npz",
+     "round": 2,
+     "decisions": 7490688,
+     "body_hash": "0x44e493d8cc7b39bf"
+    }
+   ]
+  },
+  "leopard": {
+   "zip": "leopard/leopard_r2_5633280.zip",
+   "versions": [
+    {
+     "npz": "leopard/leopard_r2_5633280.npz",
+     "round": 2,
+     "decisions": 5633280,
+     "body_hash": "0xc90ea238572238e3"
+    }
+   ]
+  },
+  "fox": {
+   "zip": "fox/fox_r2_5597568.zip",
+   "versions": [
+    {
+     "npz": "fox/fox_r2_5597568.npz",
+     "round": 2,
+     "decisions": 5597568,
+     "body_hash": "0xf8af612d4db1993b"
+    }
+   ]
+  }
+ },
+ "files": {
+  "boar/boar_r2_7154688.json": "f7536f0762a7648497f438cdb38a3f7a971af96944a85dcf18bae3bfe49ac7d2",
+  "boar/boar_r2_7154688.npz": "c092e86b6ffb74223ce3c4f9f4ece5d68b7f9f5df47c4b818ce15c0ea9e0eaea",
+  "boar/boar_r2_7154688.zip": "0d5da9d35593ca421f8c96da63b3fb927775b5adfe9ae95d85dc0bb18607c6dd",
+  "buffalo/buffalo_r2_7490688.json": "01d060c640fe739f3be7a9e06a36599e1640d47d5c6a9ea61ca07fcc9697c8a9",
+  "buffalo/buffalo_r2_7490688.npz": "e788c47817e83c2bbc844679243454fe611c36794983a40aadf6b3838e281cd4",
+  "buffalo/buffalo_r2_7490688.zip": "c8560077b4894d457be232b05ac4fd205dbd4ef608ad592a88fef33bee87a61a",
+  "deer/deer_r2_20931456.json": "b7ed11e4b279a82247cb247c3063cfb13be3bc2d4fbb4545f578bba60df8d533",
+  "deer/deer_r2_20931456.npz": "20e9a74c917b4a8f2c1f3bcd37182342910a80683bedb3712e09f2b8038fb2e9",
+  "deer/deer_r2_20931456.zip": "7db9b9c76d438d1a79eb1abc2d43204b33bc3d13617e47eb13a9248132d1e12c",
+  "fox/fox_r2_5597568.json": "ca2b069a1ec85d10aa0ca2a7663f3bf9b1c0ee96e598bd391e4de3ad3d574e92",
+  "fox/fox_r2_5597568.npz": "40e35e2aa6042c97edc504ca0f61eec8bae4413325cdfb1d9d04b01ed835ecd0",
+  "fox/fox_r2_5597568.zip": "2985460b4a11b18b6a026e034c3ff1bc32eea1677c5cf88d4dd58986a7277640",
+  "leopard/leopard_r2_5633280.json": "7e930f2666fa60dc6de1b666a3aad8d4a25adfd1afe069d464d759262564faaa",
+  "leopard/leopard_r2_5633280.npz": "0500317089e8d55891494e271f83849bb79f91b250212e9c43817a64f187beeb",
+  "leopard/leopard_r2_5633280.zip": "8875570e9b718ca7e75c6be45d194f41c2fa36d9663fe9f858d615a50eb84c6e",
+  "reports/eval/fc_r1.json": "43c5d1837e0401bb7829d4231c296960da08ff5a4eca0ad8e62dd3b15e7d8296",
+  "reports/eval/fc_r1.md": "d49ceb61dfb8e43923fa819f9a1ca7b71f16b1949ef7d6d9a4ae3c43d8baa85a",
+  "reports/eval/fc_r2.json": "9f7ce6ebd51338ce5cf21a911587b17fb1363ed63f0011f032f21a4a7be46b01",
+  "reports/eval/fc_r2.md": "42ff903bd09eba2300d41e1a7cbca3701126f1a8ae8d532f2ecbeafa36a5b36d",
+  "wolf/wolf_r2_6989248.json": "679770fca438583da8f720dc1fe79da46ee6821832ddf2481c69b23b174bc9d9",
+  "wolf/wolf_r2_6989248.npz": "e4e23b3fc77a3f3f6dc6017741ef305057297a70e33d2fb3233e4f16ee988a46",
+  "wolf/wolf_r2_6989248.zip": "d293b40d9c502d7006fc3f07397d738b6e22693188525d2f1008c722deef7856"
+ }
+}

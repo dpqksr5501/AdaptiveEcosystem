@@ -1,6 +1,8 @@
 #include "Creature/Debug/EcoCreatureInspection.h"
 #include "Creature/Representation/EcoCreatureRepresentationActor.h"
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
+#include "Creature/Runtime/EcoCreatureIntegrationSpawner.h"
+#include "Creature/Runtime/EcoCreatureMovement.h"
 #include "AI/Policy/EcoPolicyV3Fragments.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/EcoPolicyV3SocialBridge.h"
@@ -25,12 +27,31 @@
 #include "InputCoreTypes.h"
 #include "Misc/Paths.h"
 #include "Misc/FileHelper.h"
+#include "Misc/CommandLine.h"
+#include "Misc/Parse.h"
 #include "HAL/FileManager.h"
 #include "Dom/JsonObject.h"
 #include "Serialization/JsonSerializer.h"
 #include "HAL/IConsoleManager.h"
+#include "World/EcoVegetationField.h"
+#include "World/EcologyRegion.h"
+#include "World/EcologyWorldSubsystem.h"
 
 static TAutoConsoleVariable<int32> CVarInspectorVisible(TEXT("eco.Inspector.Visible"),1,TEXT("Show the creature detail panel. Migration overview has its own M/debug switch."));
+bool UEcoCreatureInspectionLibrary::InspectFaunaWater(UObject* Context, FName RegionId, FVector Point,
+    float Clearance, FVector2D& BottomAndSurface, FVector& Current)
+{
+    BottomAndSurface = FVector2D::ZeroVector;
+    Current = FVector::ZeroVector;
+    UWorld* World = GEngine ? GEngine->GetWorldFromContextObject(Context, EGetWorldErrorMode::ReturnNull) : nullptr;
+    EcoCreatureMovement::FFaunaWaterColumn Water;
+    if (!World || World->GetNetMode() == NM_Client
+        || !EcoCreatureMovement::SampleFaunaWater(*World, RegionId, Point, Clearance, Water)) return false;
+    BottomAndSurface = FVector2D(Water.Bottom, Water.Surface);
+    Current = Water.Current;
+    return true;
+}
+
 bool UEcoCreatureInspectionLibrary::CaptureMigration(UObject* Context,FString& Json)
 {
     Json.Reset();auto* W=GEngine?GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull):nullptr;
@@ -59,8 +80,17 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
 {
     Json.Reset();UWorld* World=GEngine?GEngine->GetWorldFromContextObject(Context,EGetWorldErrorMode::ReturnNull):nullptr;
     if(!World||AgentId<=0||!IsInGameThread())return false;
+    static const int64 FoodProbeAgent = []{
+        int64 Id = 0;
+        FParse::Value(FCommandLine::Get(), TEXT("EcoIslandNativeFoodProbe="), Id);
+        return Id;
+    }();
     auto* Mass=World->GetSubsystem<UMassEntitySubsystem>();if(!Mass)return false;
     auto& Manager=Mass->GetMutableEntityManager();if(Manager.IsProcessing())return false;
+    const FEcoBehaviorReasonHistory* GameplayHistory = nullptr;
+    if (World->GetNetMode() != NM_Client)
+        for (TActorIterator<AEcoCreatureIntegrationSpawner> It(World); It; ++It)
+            if ((GameplayHistory = It->FindGameplayReasons(AgentId))) break;
     TSharedPtr<FJsonObject> Data;
     FMassEntityQuery Query(Manager.AsShared());
     Query.AddRequirement<FEcoIdentityFragment>(EMassFragmentAccess::ReadOnly);
@@ -77,6 +107,7 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
             Data->SetStringField(TEXT("position"),C.GetFragmentView<FTransformFragment>()[I].GetTransform().GetLocation().ToCompactString());
             if(const auto* View=Manager.GetFragmentDataPtr<FEcoCreaturePresentationFragment>(E)){
                 Data->SetStringField(TEXT("activity"),UEnum::GetValueAsString(EEcoSpeciesActivity(View->Activity)));
+                Data->SetBoolField(TEXT("presentation_eating"),(View->Flags&2)!=0);
                 Data->SetStringField(TEXT("sense"),UEnum::GetValueAsString(EEcoSenseSource((View->Flags>>4)&3)));
                 Data->SetNumberField(TEXT("energy_fraction"),View->Energy/255.0);
                 Data->SetNumberField(TEXT("body_scale"),View->BodyScale/128.);
@@ -87,6 +118,52 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                 Data->SetStringField(TEXT("last_known"),Cue->Memory.LastKnownPosition.ToCompactString());
             }
             if(World->GetNetMode()==NM_Client)return;
+            if(const auto* Fauna=Manager.GetFragmentDataPtr<FEcoFaunaFragment>(E))
+            {
+                const auto& Life=Fauna->Life;
+                auto Details=MakeShared<FJsonObject>();
+                Details->SetNumberField(TEXT("size_gene"),Life.Genome.Size);
+                Details->SetNumberField(TEXT("speed_gene"),Life.Genome.Speed);
+                Details->SetNumberField(TEXT("caution_gene"),Life.Genome.Caution);
+                Details->SetNumberField(TEXT("sociability_gene"),Life.Genome.Sociability);
+                Details->SetNumberField(TEXT("coat_gene"),Life.Genome.Coat);
+                if (const auto* Vitals=Manager.GetFragmentDataPtr<FEcoVitalsFragment>(E))
+                {
+                    Details->SetNumberField(TEXT("health"),Vitals->HP);
+                    Details->SetNumberField(TEXT("energy"),Vitals->Energy);
+                }
+                Details->SetNumberField(TEXT("stamina"),Fauna->Stamina);
+                Details->SetStringField(TEXT("prey"),LexToString(Fauna->TargetId));
+                Details->SetStringField(TEXT("carcass"),LexToString(Fauna->CarrionTargetId));
+                Details->SetNumberField(TEXT("food_patch_index"),Fauna->PatchTarget);
+                Details->SetNumberField(TEXT("blocked_patch_index"),Fauna->BlockedPatch);
+                Details->SetNumberField(TEXT("flight_phase"),uint8(Fauna->Flight));
+                Details->SetNumberField(TEXT("threat_until"),Fauna->ThreatUntil);
+                Details->SetNumberField(TEXT("attack_ready"),Fauna->AttackReady);
+                Details->SetNumberField(TEXT("next_sense"),Fauna->NextSense);
+                Details->SetNumberField(TEXT("shore_phase"),uint8(Fauna->ShorePhase));
+                Details->SetBoolField(TEXT("swimming"),Fauna->bSwimming);
+                Details->SetStringField(TEXT("goal"),Fauna->Goal.ToCompactString());
+                Details->SetStringField(TEXT("parent_a"),LexToString(Life.ParentA));
+                Details->SetStringField(TEXT("parent_b"),LexToString(Life.ParentB));
+                Data->SetObjectField(TEXT("rule_fauna"),Details);
+            }
+            if (GameplayHistory)
+            {
+                TArray<TSharedPtr<FJsonValue>> Events;
+                for (const auto& Event : *GameplayHistory)
+                {
+                    auto Row = MakeShared<FJsonObject>();
+                    Row->SetNumberField(TEXT("time"), Event.Time);
+                    Row->SetStringField(TEXT("region"), Event.Region.ToString());
+                    Row->SetStringField(TEXT("reason"), Event.Reason.ToString());
+                    Row->SetStringField(TEXT("related_id"), LexToString(Event.RelatedAgent));
+                    Row->SetNumberField(TEXT("amount"), Event.Amount);
+                    if (!Event.ResourceId.IsNone()) Row->SetStringField(TEXT("resource_id"), Event.ResourceId.ToString());
+                    Events.Add(MakeShared<FJsonValueObject>(Row));
+                }
+                Data->SetArrayField(TEXT("gameplay_reason_history"), Events);
+            }
             if(const auto* Region=Manager.GetFragmentDataPtr<FEcoRegionFragment>(E))Data->SetStringField(TEXT("region"),Region->CurrentRegionId.ToString());
             if(const auto* Audit=Manager.GetFragmentDataPtr<FEcoV3SocialBridgeFragment>(E)){
                 TArray<TSharedPtr<FJsonValue>> Events;
@@ -179,6 +256,133 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
                         Data->SetNumberField(TEXT("refuge_inside_predator_steps"),double(W.Stats.RefugeInsidePredatorSteps));
                         if(const auto* Body=Manager.GetFragmentDataPtr<FEcoHerbivoreBodyV3Fragment>(E)){
                             Data->SetNumberField(TEXT("last_plant_intake"),Body->Body.LastIntake);
+                            const auto& Pos=Body->Body.Pos;
+                            if(!W.Food.Food.empty()&&Pos.X>=0.&&Pos.Y>=0.&&Pos.X<=W.Config.WorldSize&&Pos.Y<=W.Config.WorldSize){
+                                const auto Cell=W.Food.CellOf(Pos);
+                                Data->SetNumberField(TEXT("native_food_cell"),Cell);
+                                Data->SetNumberField(TEXT("native_food_remaining"),W.Food.FoodAt(Pos));
+                                if (AgentId == FoodProbeAgent && Body->Body.LastIntake <= 1.e-9)
+                                {
+                                    const auto& Grid = W.Food;
+                                    const double Range = EcoWorldV3::SeePredNow(W);
+                                    int32 Nearest = INDEX_NONE;
+                                    int32 VisibleCandidate = INDEX_NONE;
+                                    double NearestDist = TNumericLimits<double>::Max();
+                                    double CandidateDist = TNumericLimits<double>::Max();
+                                    for (int32 Index = 0; Index < int32(Grid.Food.size()); ++Index)
+                                    {
+                                        if (Grid.Food[Index] < .02 || (!Grid.Habitats.empty() && !Grid.Habitats[Index].bGroundUsable)) continue;
+                                        const double Dx = (Index % Grid.Gw + .5) * Grid.Cell - Pos.X;
+                                        const double Dy = (Index / Grid.Gw + .5) * Grid.Cell - Pos.Y;
+                                        const double Distance = FMath::Sqrt(Dx * Dx + Dy * Dy);
+                                        if (Distance < NearestDist) { Nearest = Index; NearestDist = Distance; }
+                                        if (Distance < .01 || Distance > Range || Distance >= CandidateDist
+                                            || (Dx * Body->Body.Head.X + Dy * Body->Body.Head.Y) / Distance < W.ObsCfg.ThreatFovCos
+                                            || Grid.BlocksSight(Pos.X, Pos.Y, Pos.X + Dx, Pos.Y + Dy)) continue;
+                                        VisibleCandidate = Index;
+                                        CandidateDist = Distance;
+                                    }
+                                    const auto InspectSite = [&](int32 Index, double Distance, const FVector& Start){
+                                        auto Site = MakeShared<FJsonObject>();
+                                        Site->SetNumberField(TEXT("cell"), Index);
+                                        Site->SetNumberField(TEXT("stock"), Grid.Food[Index]);
+                                        Site->SetNumberField(TEXT("distance_cm"), EcoRepertoireV3::UnitsToCm(Distance));
+                                        const auto Target = Ctx->UnitsToCm((Index % Grid.Gw + .5) * Grid.Cell,
+                                            (Index / Grid.Gw + .5) * Grid.Cell, Link->GroundZ);
+                                        double GroundZ = Start.Z;
+                                        const bool bGround = !Sub->UsesTerrain() || Sub->TraceMove(Ctx->RegionId, Start, Target, GroundZ);
+                                        Site->SetBoolField(TEXT("straight_ground"), bGround);
+                                        if (bGround)
+                                            Site->SetBoolField(TEXT("clear_world_static"), !World->LineTraceTestByObjectType(Start + FVector(0, 0, 60),
+                                                FVector(Target.X, Target.Y, GroundZ + 30), FCollisionObjectQueryParams(ECC_WorldStatic),
+                                                FCollisionQueryParams(SCENE_QUERY_STAT(EcoNativeFoodProbe), false)));
+                                        if (!bGround && Distance <= Range && EcoRepertoireV3::UnitsToCm(Distance) <= 1200.
+                                            && FParse::Param(FCommandLine::Get(), TEXT("EcoIslandFoodDetourProbe")))
+                                        {
+                                            // Controlled survey of routes with one intermediate point.
+                                            const FVector Side = FVector::CrossProduct(FVector::UpVector, (Target - Start).GetSafeNormal2D());
+                                            double BestLength = TNumericLimits<double>::Max();
+                                            FVector BestWaypoint = FVector::ZeroVector;
+                                            for (const double Offset : {-400., -200., 200., 400.})
+                                            {
+                                                FVector Waypoint = (Start + Target) * .5 + Side * Offset;
+                                                double WaypointZ;
+                                                if (!Sub->TraceMove(Ctx->RegionId, Start, Waypoint, WaypointZ)) continue;
+                                                Waypoint.Z = WaypointZ;
+                                                double TargetZ;
+                                                if (!Sub->TraceMove(Ctx->RegionId, Waypoint, Target, TargetZ)) continue;
+                                                const double Length = FVector::Dist2D(Start, Waypoint) + FVector::Dist2D(Waypoint, Target);
+                                                if (Length < BestLength) { BestLength = Length; BestWaypoint = Waypoint; }
+                                            }
+                                            const bool bFound = BestLength < TNumericLimits<double>::Max();
+                                            Site->SetBoolField(TEXT("one_waypoint_ground"), bFound);
+                                            if (bFound)
+                                            {
+                                                Site->SetNumberField(TEXT("detour_length_cm"), BestLength);
+                                                Site->SetStringField(TEXT("detour_waypoint"), BestWaypoint.ToCompactString());
+                                            }
+                                        }
+                                        return Site;
+                                    };
+                                    auto Probe = MakeShared<FJsonObject>();
+                                    Probe->SetNumberField(TEXT("range_cm"), EcoRepertoireV3::UnitsToCm(Range));
+                                    Probe->SetNumberField(TEXT("selected_cell"), Link->Individual.ForageCell);
+                                    const auto Start = Ctx->UnitsToCm(Pos.X, Pos.Y, Link->GroundZ);
+                                    if (Nearest >= 0) Probe->SetObjectField(TEXT("nearest_stock"), InspectSite(Nearest, NearestDist, Start));
+                                    if (VisibleCandidate >= 0) Probe->SetObjectField(TEXT("nearest_in_view"),
+                                        Nearest == VisibleCandidate ? Probe->GetObjectField(TEXT("nearest_stock")) : InspectSite(VisibleCandidate, CandidateDist, Start));
+                                    if (Ctx->RegionId == FName(TEXT("Snowfield")) && Grid.Gw == 30
+                                        && FParse::Param(FCommandLine::Get(), TEXT("EcoIslandFoodDetourProbe")))
+                                    {
+                                        // Replay the failed baseline segment independently of the current animal trajectory.
+                                        const FVector BaselineStart(24199.74, -13997.90, 3094.22);
+                                        constexpr int32 BaselineCell = 176;
+                                        const FVector End = Ctx->UnitsToCm((BaselineCell % Grid.Gw + .5) * Grid.Cell,
+                                            (BaselineCell / Grid.Gw + .5) * Grid.Cell, BaselineStart.Z);
+                                        auto Baseline = InspectSite(BaselineCell,
+                                            EcoRepertoireV3::CmToUnits(FVector::Dist2D(BaselineStart, End)), BaselineStart);
+                                        const auto* Regions = World->GetSubsystem<UEcologyWorldSubsystem>();
+                                        const auto* Region = Regions ? Regions->GetRegion(Ctx->RegionId) : nullptr;
+                                        if (Region)
+                                        {
+                                            Baseline->SetBoolField(TEXT("start_in_region"), Region->ContainsPosition(BaselineStart));
+                                            Baseline->SetBoolField(TEXT("target_in_region"), Region->ContainsPosition(End));
+                                            const int32 Pieces = FMath::CeilToInt(FVector::Dist2D(BaselineStart, End) / 30.);
+                                            FVector Current = BaselineStart;
+                                            for (int32 Piece = 1; Piece <= Pieces; ++Piece)
+                                            {
+                                                FVector Next = FMath::Lerp(BaselineStart, End, double(Piece) / Pieces);
+                                                Next.Z = Current.Z;
+                                                const bool bInsideBeforeGround = Region->ContainsPosition(Next);
+                                                const float Normal = W.Config.bNaturalHabitats
+                                                    ? float(FMath::Cos(FMath::DegreesToRadians(W.Config.NaturalGround.MaxSlopeDegrees))) : .65f;
+                                                const bool bPassesGround = EcoCreatureMovement::ConstrainGroundStep(*World, Current, Next, 30.f, Normal);
+                                                const bool bInsideAfterGround = bPassesGround && Region->ContainsPosition(Next);
+                                                if (!bInsideBeforeGround || !bInsideAfterGround)
+                                                {
+                                                    Baseline->SetNumberField(TEXT("first_rejected_piece"), Piece);
+                                                    Baseline->SetStringField(TEXT("rejected_point"), Next.ToCompactString());
+                                                    Baseline->SetBoolField(TEXT("inside_before_projection"), bInsideBeforeGround);
+                                                    Baseline->SetBoolField(TEXT("ground_without_region_gate"), bPassesGround);
+                                                    Baseline->SetBoolField(TEXT("inside_after_projection"), bInsideAfterGround);
+                                                    break;
+                                                }
+                                                if (W.Config.bNaturalHabitats && (!W.Config.NaturalGround.AllowsHeight(Current.Z, Next.Z, FVector::Dist2D(Current, Next))
+                                                    || !EcoCreatureMovement::IsWadeableGround(*World, Next, float(W.Config.NaturalGround.WadingDepthCm))))
+                                                {
+                                                    Baseline->SetNumberField(TEXT("first_rejected_piece"), Piece);
+                                                    Baseline->SetStringField(TEXT("rejected_point"), Next.ToCompactString());
+                                                    Baseline->SetBoolField(TEXT("height_or_wading_gate"), true);
+                                                    break;
+                                                }
+                                                Current = Next;
+                                            }
+                                        }
+                                        Probe->SetObjectField(TEXT("baseline_blocked_segment"), Baseline);
+                                    }
+                                    Data->SetObjectField(TEXT("native_food_probe"), Probe);
+                                }
+                            }
                             Data->SetBoolField(TEXT("refuge_protected_here"),(W.Config.bShelterSafe||EcoWorldV3::RefugeOwnsSafety(W.Config))&&EcoRefugeV3::Contains(W.Config.Covers,Body->Body.Pos));
                             const auto P=Ctx->UnitsToCm(Body->Body.Pos.X,Body->Body.Pos.Y,Link->GroundZ);
                             Data->SetArrayField(TEXT("native_world_position"),{MakeShared<FJsonValueNumber>(P.X),MakeShared<FJsonValueNumber>(P.Y),MakeShared<FJsonValueNumber>(P.Z)});
@@ -339,9 +543,92 @@ bool UEcoCreatureInspectionLibrary::CaptureAgent(UObject* Context,int64 AgentId,
     if(!Data)return false;
     return FJsonSerializer::Serialize(Data.ToSharedRef(),TJsonWriterFactory<TCHAR,TCondensedJsonPrintPolicy<TCHAR>>::Create(&Json));
 }
+#if !UE_BUILD_SHIPPING
+void AEcoCreatureInspectorHUD::DrawGrassInspection()
+{
+    const bool bAlt = PlayerOwner->IsInputKeyDown(EKeys::LeftAlt) || PlayerOwner->IsInputKeyDown(EKeys::RightAlt);
+    if (bAlt && PlayerOwner->WasInputKeyJustPressed(EKeys::G)) bGrassInspection = !bGrassInspection;
+    if (!bGrassInspection) return;
+
+    TArray<AEcoVegetationField*> Fields;
+    for (TActorIterator<AEcoVegetationField> It(GetWorld()); It; ++It)
+        if (!It->RegionId.IsNone()) Fields.Add(*It);
+    Fields.Sort([](const AEcoVegetationField& A, const AEcoVegetationField& B) { return A.RegionId.LexicalLess(B.RegionId); });
+    const float X = FMath::Max(16.f, Canvas->SizeX - 520.f);
+    if (Fields.IsEmpty())
+    {
+        DrawText(TEXT("Grass: no food Field in this world"), FLinearColor::Yellow, X, 35);
+        return;
+    }
+    int32 Index = Fields.IndexOfByPredicate([this](const auto* Field) { return Field->RegionId == GrassRegion; });
+    if (Index == INDEX_NONE) Index = 0;
+    else if (bAlt && PlayerOwner->WasInputKeyJustPressed(EKeys::One)) Index = (Index + 1) % Fields.Num();
+    const auto* Field = Fields[Index];
+    if (GrassRegion != Field->RegionId) NextGrassRead = 0;
+    GrassRegion = Field->RegionId;
+    const FString RegionArg = FString::Printf(TEXT("\"%s\""), *GrassRegion.ToString());
+    const bool bAuthority = GetWorld()->GetNetMode() != NM_Client;
+    if (bAuthority && bAlt)
+    {
+        const bool bDry = PlayerOwner->WasInputKeyJustPressed(EKeys::Two);
+        const bool bRain = PlayerOwner->WasInputKeyJustPressed(EKeys::Three);
+        if (bDry || bRain)
+        {
+            const FVector2D Climate = bDry ? GrassDryClimate : GrassRecoveryClimate;
+            PlayerOwner->ConsoleCommand(FString::Printf(TEXT("eco.Grass.Climate %s %.4f %.2f"), *RegionArg, Climate.X, Climate.Y), false);
+        }
+        if (PlayerOwner->WasInputKeyJustPressed(EKeys::Four)) PlayerOwner->ConsoleCommand(TEXT("eco.Grass.Auto ") + RegionArg, false);
+        if (PlayerOwner->WasInputKeyJustPressed(EKeys::Five)) PlayerOwner->ConsoleCommand(TEXT("eco.Grass.Export ") + RegionArg, false);
+    }
+    if (GetWorld()->GetTimeSeconds() >= NextGrassRead)
+    {
+        NextGrassRead = GetWorld()->GetTimeSeconds() + .5;
+        TSharedPtr<FJsonObject> Snapshot;
+        const auto Reader = TJsonReaderFactory<>::Create(Field->CaptureDiagnostics());
+        if (FJsonSerializer::Deserialize(Reader, Snapshot) && Snapshot.IsValid())
+        {
+            const auto Number = [&Snapshot](const TCHAR* Key)
+            {
+                double Value = 0;
+                Snapshot->TryGetNumberField(Key, Value);
+                return Value;
+            };
+            GrassReadout = FString::Printf(TEXT("Cells %.0f | Grass instances %.0f"), Number(TEXT("visual_cells")), Number(TEXT("instances")));
+            if (bAuthority)
+            {
+                bool bSoil = false, bManual = false;
+                Snapshot->TryGetBoolField(TEXT("soil"), bSoil);
+                Snapshot->TryGetBoolField(TEXT("manual_climate"), bManual);
+                GrassReadout += FString::Printf(TEXT("\nFood %.3f / %.3f | Ledger difference %.6f\nConsumed %.3f | Grown %.3f | Lost %.3f"),
+                    Number(TEXT("food")), Number(TEXT("ledger_capacity")), Number(TEXT("food")) - Number(TEXT("ledger_amount")),
+                    Number(TEXT("ledger_consumed")), Number(TEXT("ledger_grown")), Number(TEXT("ledger_environment_lost")));
+                GrassReadout += bSoil
+                    ? FString::Printf(TEXT("\n%s | Rain %.2f | Temp %.1f C | Moisture %.2f | Wet cells %.0f"),
+                        bManual ? TEXT("Manual") : TEXT("Auto"), Number(TEXT("rain")), Number(TEXT("temperature")),
+                        Number(TEXT("mean_moisture")), Number(TEXT("connected_water_cells")))
+                    : TEXT("\nSoil simulation is disabled in this region");
+            }
+            FHitResult Hit;
+            if (PlayerOwner->GetHitResultAtScreenPosition(FVector2D(Canvas->SizeX * .5, Canvas->SizeY * .5),
+                Field->GroundTraceChannel, FCollisionQueryParams::DefaultQueryParam, Hit))
+                GrassReadout += TEXT("\n") + Field->DescribeGrassCell(Hit.ImpactPoint);
+        }
+    }
+    DrawRect(FLinearColor(0, 0, 0, .75f), X - 8, 26, 510, 130);
+    DrawText(FString::Printf(TEXT("Food grass | %s | %s"), *GrassRegion.ToString(), bAuthority ? TEXT("Authority") : TEXT("Client")),
+        FLinearColor::Green, X, 34);
+    DrawText(bAuthority ? TEXT("Alt+1 Region | Alt+2 Dry | Alt+3 Rain | Alt+4 Auto | Alt+5 Save") : TEXT("Alt+1 Region"),
+        FLinearColor::White, X, 55);
+    DrawText(GrassReadout, FLinearColor::White, X, 75);
+}
+#endif
+
 void AEcoCreatureInspectorHUD::DrawHUD()
 {
     Super::DrawHUD();if(!Canvas||!PlayerOwner)return;
+#if !UE_BUILD_SHIPPING
+    DrawGrassInspection();
+#endif
     if (const auto* State=PlayerOwner->GetPlayerState<AEcoPlayerState>())
         DrawText(FString::Printf(TEXT("HP %.0f%s"),State->GetHealth(),State->IsAlive()?TEXT(""):TEXT("  DEFEATED")),
             State->IsAlive()?FLinearColor::White:FLinearColor::Red,Canvas->SizeX-190,25,nullptr,1.f);

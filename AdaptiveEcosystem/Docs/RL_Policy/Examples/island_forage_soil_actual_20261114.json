@@ -1,0 +1,1599 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "source_build": "local working tree based on fb9e440a",
+  "partial": true,
+  "training_ready": false,
+  "golden_vector": false,
+  "restorable_world": false,
+  "units": {
+    "pie_seconds": "PIE world seconds",
+    "completed_clock": "authority game seconds",
+    "rainfall": "normalized instantaneous rain",
+    "forage_soil_moisture": "normalized Native soil moisture",
+    "patch_stock": "authored resource stock",
+    "patch_payment_energy_total_from_log": "rounded granted vitality energy"
+  },
+  "patch_budget": {
+    "IslandForageWestMeadow": {
+      "region": "Grassland",
+      "consumers": [
+        "Bighorn",
+        "Buffalo",
+        "Horse",
+        "Jackrabbit"
+      ],
+      "capacity": 12.0,
+      "stage": 1,
+      "plant_guild": "<EcoFaunaPlantGuild.GRASS: 1>",
+      "regrowth_per_second": 0.17000000178813934,
+      "dry_loss_per_second": 0.1599999964237213,
+      "energy_per_meal": 2.799999952316284,
+      "submerged": false,
+      "nursery": false
+    },
+    "IslandForageOpenMeadow": {
+      "region": "Grassland",
+      "consumers": [
+        "Bighorn",
+        "Buffalo",
+        "Horse",
+        "Jackrabbit"
+      ],
+      "capacity": 12.0,
+      "stage": 1,
+      "plant_guild": "<EcoFaunaPlantGuild.GRASS: 1>",
+      "regrowth_per_second": 0.17000000178813934,
+      "dry_loss_per_second": 0.1599999964237213,
+      "energy_per_meal": 2.799999952316284,
+      "submerged": false,
+      "nursery": false
+    },
+    "IslandForageFloodplainApproach": {
+      "region": "Grassland",
+      "consumers": [
+        "Bighorn",
+        "Buffalo",
+        "Horse",
+        "Jackrabbit"
+      ],
+      "capacity": 13.0,
+      "stage": 1,
+      "plant_guild": "<EcoFaunaPlantGuild.WET_MEADOW: 4>",
+      "regrowth_per_second": 0.18000000715255737,
+      "dry_loss_per_second": 0.23999999463558197,
+      "energy_per_meal": 2.799999952316284,
+      "submerged": false,
+      "nursery": false
+    },
+    "IslandForageApproachForbs": {
+      "region": "Grassland",
+      "consumers": [
+        "Bighorn",
+        "Buffalo",
+        "Horse",
+        "Jackrabbit"
+      ],
+      "capacity": 9.0,
+      "stage": 1,
+      "plant_guild": "<EcoFaunaPlantGuild.FORBS: 2>",
+      "regrowth_per_second": 0.15000000596046448,
+      "dry_loss_per_second": 0.2199999988079071,
+      "energy_per_meal": 2.799999952316284,
+      "submerged": false,
+      "nursery": false
+    }
+  },
+  "initial_population": {
+    "Wolf": 16,
+    "Herbivore": 48,
+    "Buffalo": 4,
+    "Crow": 3,
+    "Horse": 5,
+    "Pig": 4,
+    "Fox": 2,
+    "Jackrabbit": 4,
+    "Leopard": 1,
+    "Rat": 6,
+    "Bighorn": 5,
+    "GoldenEagle": 2,
+    "AriakeCatfish": 3,
+    "CommonCarp": 6,
+    "Mink": 2,
+    "UnidentifiedFish": 7
+  },
+  "initial_total_authored_stock": 215.0,
+  "cases": [
+    {
+      "seed": 20000,
+      "rain_pattern": "block",
+      "uses_native_soil": false,
+      "source": "Saved/FaunaAudit/Island_20000_soil_control_block/IslandFaunaPIE.json",
+      "source_sha256": "57eda7f81960dd468e9f37fb21cf87c8166840d2a40094116519dbccaf5d7885",
+      "authority_log": "Saved/FaunaAudit/IslandAccessBaseline/20000_soil_control_block.log",
+      "authority_log_sha256": "75a0b0c71ba713fc20d2e8df254565c9610ec3a84ceaf472502276ce76af164c",
+      "source_sample_count": 43,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "rain_events_pie_seconds": [
+        {
+          "time": 0.2666666805744171,
+          "rain": 0.0
+        },
+        {
+          "time": 20.2666677236557,
+          "rain": 0.7
+        },
+        {
+          "time": 80.26667085289955,
+          "rain": 0.0
+        }
+      ],
+      "patch_payment_energy_total_from_log": {
+        "IslandForageWestMeadow": 22.112,
+        "IslandForageOpenMeadow": 21.818,
+        "IslandForageFloodplainApproach": 20.919,
+        "IslandForageApproachForbs": 14.941
+      },
+      "samples": [
+        {
+          "source_sample_index": 0,
+          "pie_seconds": 0.2666666805744171,
+          "patch_stock": {
+            "IslandForageWestMeadow": 12.0,
+            "IslandForageOpenMeadow": 12.0,
+            "IslandForageFloodplainApproach": 13.0,
+            "IslandForageApproachForbs": 9.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          }
+        },
+        {
+          "source_sample_index": 16,
+          "pie_seconds": 80.26667085289955,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.1507200002670288,
+            "IslandForageOpenMeadow": 0.8018304109573364,
+            "IslandForageFloodplainApproach": 0.0,
+            "IslandForageApproachForbs": 0.13429687917232513
+          },
+          "completed_clock": {
+            "authority_seconds": 79.3199999988079,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 600,
+            "habitat_dynamics": false,
+            "food": 34.35685320350362,
+            "capacity": 52.71873742911859,
+            "mean_moisture": 0.7085218605880955,
+            "rain": 0.699999988079071,
+            "grown": 13.561226164752052,
+            "environment_lost": 1.7536555418697912,
+            "consumed": 25.20923630571489,
+            "ledger_amount": 34.35685320350362,
+            "ledger_capacity": 52.718737429118605,
+            "ledger_consumed": 25.20923630571489,
+            "ledger_grown": 13.561226164752052,
+            "ledger_environment_lost": 1.7536555418697912,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 624
+          }
+        },
+        {
+          "source_sample_index": 22,
+          "pie_seconds": 110.26667241752148,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.23004049062728882,
+            "IslandForageOpenMeadow": 0.026133332401514053,
+            "IslandForageFloodplainApproach": 0.12613791227340698,
+            "IslandForageApproachForbs": 0.21204712986946106
+          },
+          "completed_clock": {
+            "authority_seconds": 109.3199999988079,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 825,
+            "habitat_dynamics": false,
+            "food": 20.584158633557355,
+            "capacity": 52.71873742911859,
+            "mean_moisture": 0.5895724347349349,
+            "rain": 0,
+            "grown": 13.561226164752052,
+            "environment_lost": 2.0244399398226514,
+            "consumed": 38.71114647770867,
+            "ledger_amount": 20.584158633557355,
+            "ledger_capacity": 52.718737429118605,
+            "ledger_consumed": 38.71114647770867,
+            "ledger_grown": 13.561226164752052,
+            "ledger_environment_lost": 2.0244399398226514,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 869
+          }
+        },
+        {
+          "source_sample_index": 42,
+          "pie_seconds": 210.2666776329279,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.10366543382406235,
+            "IslandForageOpenMeadow": 0.27961304783821106,
+            "IslandForageFloodplainApproach": 0.17168432474136353,
+            "IslandForageApproachForbs": 0.14261595904827118
+          },
+          "completed_clock": {
+            "authority_seconds": 210.0,
+            "phase": "night",
+            "phase_start_seconds": 180.0,
+            "phase_end_seconds": 240.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 1575,
+            "habitat_dynamics": false,
+            "food": 27.28577097733136,
+            "capacity": 52.92243594967415,
+            "mean_moisture": 0.24057782311752574,
+            "rain": 0,
+            "grown": 70.12321069001294,
+            "environment_lost": 4.330185748423278,
+            "consumed": 86.26577285059496,
+            "ledger_amount": 27.285770977331357,
+            "ledger_capacity": 52.92243594967414,
+            "ledger_consumed": 86.26577285059496,
+            "ledger_grown": 70.12321069001294,
+            "ledger_environment_lost": 4.330185748423278,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1756
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20000,
+      "rain_pattern": "block",
+      "uses_native_soil": true,
+      "source": "Saved/FaunaAudit/Island_20000_native_soil_block/IslandFaunaPIE.json",
+      "source_sha256": "2d033b51f3d0ca7c6d83ee3fb9b3bc19bc26460d8725978181ef8c1a9d0848f5",
+      "authority_log": "Saved/FaunaAudit/IslandAccessBaseline/20000_native_soil_block.log",
+      "authority_log_sha256": "d8fd851d23c87851a0a7893f902932b18ca92bd767506163d8ac594f85e260bb",
+      "source_sample_count": 43,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "rain_events_pie_seconds": [
+        {
+          "time": 0.2666666805744171,
+          "rain": 0.0
+        },
+        {
+          "time": 20.2666677236557,
+          "rain": 0.7
+        },
+        {
+          "time": 80.26667085289955,
+          "rain": 0.0
+        }
+      ],
+      "patch_payment_energy_total_from_log": {
+        "IslandForageWestMeadow": 27.45,
+        "IslandForageOpenMeadow": 27.052,
+        "IslandForageFloodplainApproach": 23.488,
+        "IslandForageApproachForbs": 17.683
+      },
+      "samples": [
+        {
+          "source_sample_index": 0,
+          "pie_seconds": 0.2666666805744171,
+          "patch_stock": {
+            "IslandForageWestMeadow": 12.0,
+            "IslandForageOpenMeadow": 12.0,
+            "IslandForageFloodplainApproach": 13.0,
+            "IslandForageApproachForbs": 9.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {}
+        },
+        {
+          "source_sample_index": 16,
+          "pie_seconds": 80.26667085289955,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.19643840193748474,
+            "IslandForageOpenMeadow": 0.6485984325408936,
+            "IslandForageFloodplainApproach": 0.0,
+            "IslandForageApproachForbs": 1.9208931922912598
+          },
+          "completed_clock": {
+            "authority_seconds": 79.30333333214124,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.6168831194400322,
+            "IslandForageOpenMeadow": 0.6238718887901457,
+            "IslandForageFloodplainApproach": 0.6680114630638933,
+            "IslandForageApproachForbs": 0.6680437929457149
+          },
+          "grassland_native_vegetation": {
+            "native_step": 600,
+            "habitat_dynamics": false,
+            "food": 36.61732451741881,
+            "capacity": 52.71873742911859,
+            "mean_moisture": 0.708399834270789,
+            "rain": 0.699999988079071,
+            "grown": 13.3119289034626,
+            "environment_lost": 1.7934230030189913,
+            "consumed": 22.659700269361107,
+            "ledger_amount": 36.61732451741881,
+            "ledger_capacity": 52.718737429118605,
+            "ledger_consumed": 22.659700269361107,
+            "ledger_grown": 13.3119289034626,
+            "ledger_environment_lost": 1.7934230030189913,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 626
+          }
+        },
+        {
+          "source_sample_index": 22,
+          "pie_seconds": 110.26667241752148,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.4607999920845032,
+            "IslandForageOpenMeadow": 0.07680000364780426,
+            "IslandForageFloodplainApproach": 0.04774736985564232,
+            "IslandForageApproachForbs": 0.3712499439716339
+          },
+          "completed_clock": {
+            "authority_seconds": 109.30333333214124,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.5024544794668715,
+            "IslandForageOpenMeadow": 0.5027785460853398,
+            "IslandForageFloodplainApproach": 0.5450293654494532,
+            "IslandForageApproachForbs": 0.5450562867407528
+          },
+          "grassland_native_vegetation": {
+            "native_step": 825,
+            "habitat_dynamics": false,
+            "food": 22.03987421446634,
+            "capacity": 52.71873742911859,
+            "mean_moisture": 0.5893535277704863,
+            "rain": 0,
+            "grown": 13.3119289034626,
+            "environment_lost": 2.103047815630192,
+            "consumed": 36.92752575970261,
+            "ledger_amount": 22.03987421446634,
+            "ledger_capacity": 52.718737429118605,
+            "ledger_consumed": 36.92752575970261,
+            "ledger_grown": 13.3119289034626,
+            "ledger_environment_lost": 2.103047815630192,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 885
+          }
+        },
+        {
+          "source_sample_index": 42,
+          "pie_seconds": 210.2666776329279,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.0,
+            "IslandForageOpenMeadow": 0.24016396701335907,
+            "IslandForageFloodplainApproach": 0.23580490052700043,
+            "IslandForageApproachForbs": 0.2651938199996948
+          },
+          "completed_clock": {
+            "authority_seconds": 209.18666666547458,
+            "phase": "night",
+            "phase_start_seconds": 180.0,
+            "phase_end_seconds": 240.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.18371894298560756,
+            "IslandForageOpenMeadow": 0.18222860471619232,
+            "IslandForageFloodplainApproach": 0.15744747907906967,
+            "IslandForageApproachForbs": 0.21398913442833678
+          },
+          "grassland_native_vegetation": {
+            "native_step": 1575,
+            "habitat_dynamics": false,
+            "food": 27.335832708410777,
+            "capacity": 52.95438335859163,
+            "mean_moisture": 0.23960208342637695,
+            "rain": 0,
+            "grown": 66.99685400310884,
+            "environment_lost": 4.503942437388848,
+            "consumed": 82.91559774364652,
+            "ledger_amount": 27.335832708410777,
+            "ledger_capacity": 52.95438335859163,
+            "ledger_consumed": 82.91559774364652,
+            "ledger_grown": 66.99685400310884,
+            "ledger_environment_lost": 4.503942437388848,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1764
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20000,
+      "rain_pattern": "pulses",
+      "uses_native_soil": false,
+      "source": "Saved/FaunaAudit/Island_20000_soil_control_pulses/IslandFaunaPIE.json",
+      "source_sha256": "af9849423f6c45a6061ba074d9a55e1470c0aa36be162d28d68cc66cf2cc47e1",
+      "authority_log": "Saved/FaunaAudit/IslandAccessBaseline/20000_soil_control_pulses.log",
+      "authority_log_sha256": "d7cc1f49b40c1ff36674068a21ba585ed8edec25a90e2298f71ebf5ee0d97d42",
+      "source_sample_count": 43,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "rain_events_pie_seconds": [
+        {
+          "time": 0.2666666805744171,
+          "rain": 0.0
+        },
+        {
+          "time": 20.2666677236557,
+          "rain": 0.7
+        },
+        {
+          "time": 40.266668766736984,
+          "rain": 0.0
+        },
+        {
+          "time": 50.266669288277626,
+          "rain": 0.7
+        },
+        {
+          "time": 70.26667033135891,
+          "rain": 0.0
+        },
+        {
+          "time": 80.26667085289955,
+          "rain": 0.7
+        },
+        {
+          "time": 100.26667189598083,
+          "rain": 0.0
+        }
+      ],
+      "patch_payment_energy_total_from_log": {
+        "IslandForageWestMeadow": 22.206,
+        "IslandForageOpenMeadow": 21.828,
+        "IslandForageFloodplainApproach": 20.97,
+        "IslandForageApproachForbs": 14.591
+      },
+      "samples": [
+        {
+          "source_sample_index": 0,
+          "pie_seconds": 0.2666666805744171,
+          "patch_stock": {
+            "IslandForageWestMeadow": 12.0,
+            "IslandForageOpenMeadow": 12.0,
+            "IslandForageFloodplainApproach": 13.0,
+            "IslandForageApproachForbs": 9.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          }
+        },
+        {
+          "source_sample_index": 20,
+          "pie_seconds": 100.26667189598083,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.753600001335144,
+            "IslandForageOpenMeadow": 0.1507200002670288,
+            "IslandForageFloodplainApproach": 1.9433181285858154,
+            "IslandForageApproachForbs": 0.5371875166893005
+          },
+          "completed_clock": {
+            "authority_seconds": 99.30333333214124,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 750,
+            "habitat_dynamics": false,
+            "food": 24.259429194723264,
+            "capacity": 52.71873742911859,
+            "mean_moisture": 0.6519651973357028,
+            "rain": 0.699999988079071,
+            "grown": 13.683902449252008,
+            "environment_lost": 2.0097970175453197,
+            "consumed": 35.17319512332006,
+            "ledger_amount": 24.259429194723264,
+            "ledger_capacity": 52.718737429118605,
+            "ledger_consumed": 35.17319512332006,
+            "ledger_grown": 13.683902449252008,
+            "ledger_environment_lost": 2.0097970175453197,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 795
+          }
+        },
+        {
+          "source_sample_index": 26,
+          "pie_seconds": 130.26667346060276,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.1121845692396164,
+            "IslandForageOpenMeadow": 0.25650787353515625,
+            "IslandForageFloodplainApproach": 0.11613404005765915,
+            "IslandForageApproachForbs": 0.093962661921978
+          },
+          "completed_clock": {
+            "authority_seconds": 129.4699999988079,
+            "phase": "day",
+            "phase_start_seconds": 120.0,
+            "phase_end_seconds": 180.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 975,
+            "habitat_dynamics": false,
+            "food": 27.74899262124236,
+            "capacity": 52.71873742911859,
+            "mean_moisture": 0.5284648080880594,
+            "rain": 0,
+            "grown": 28.49522278907848,
+            "environment_lost": 2.246505439280314,
+            "consumed": 46.258243614892464,
+            "ledger_amount": 27.74899262124236,
+            "ledger_capacity": 52.718737429118605,
+            "ledger_consumed": 46.258243614892464,
+            "ledger_grown": 28.49522278907848,
+            "ledger_environment_lost": 2.246505439280314,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1036
+          }
+        },
+        {
+          "source_sample_index": 42,
+          "pie_seconds": 210.2666776329279,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.026133332401514053,
+            "IslandForageOpenMeadow": 0.07796524465084076,
+            "IslandForageFloodplainApproach": 0.16459739208221436,
+            "IslandForageApproachForbs": 0.15912984311580658
+          },
+          "completed_clock": {
+            "authority_seconds": 209.4699999988079,
+            "phase": "night",
+            "phase_start_seconds": 180.0,
+            "phase_end_seconds": 240.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 1575,
+            "habitat_dynamics": false,
+            "food": 30.738248665399965,
+            "capacity": 52.92243594967415,
+            "mean_moisture": 0.2536366784140397,
+            "rain": 0,
+            "grown": 68.94635931710644,
+            "environment_lost": 4.319702614656002,
+            "consumed": 81.64692692338787,
+            "ledger_amount": 30.738248665399965,
+            "ledger_capacity": 52.92243594967414,
+            "ledger_consumed": 81.64692692338787,
+            "ledger_grown": 68.94635931710644,
+            "ledger_environment_lost": 4.319702614656002,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1778
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20000,
+      "rain_pattern": "pulses",
+      "uses_native_soil": true,
+      "source": "Saved/FaunaAudit/Island_20000_native_soil_pulses/IslandFaunaPIE.json",
+      "source_sha256": "63f4d953f8a40daec9e26077bfe077ab5c55e61c053475fea5a88866ebb307a9",
+      "authority_log": "Saved/FaunaAudit/IslandAccessBaseline/20000_native_soil_pulses.log",
+      "authority_log_sha256": "ba74c594e4b530b2ceff4438ec6a954b591236ee3c91f2c1ec110625ea6bd5f7",
+      "source_sample_count": 43,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "rain_events_pie_seconds": [
+        {
+          "time": 0.2666666805744171,
+          "rain": 0.0
+        },
+        {
+          "time": 20.2666677236557,
+          "rain": 0.7
+        },
+        {
+          "time": 40.266668766736984,
+          "rain": 0.0
+        },
+        {
+          "time": 50.266669288277626,
+          "rain": 0.7
+        },
+        {
+          "time": 70.26667033135891,
+          "rain": 0.0
+        },
+        {
+          "time": 80.26667085289955,
+          "rain": 0.7
+        },
+        {
+          "time": 100.26667189598083,
+          "rain": 0.0
+        }
+      ],
+      "patch_payment_energy_total_from_log": {
+        "IslandForageWestMeadow": 27.309,
+        "IslandForageOpenMeadow": 27.486,
+        "IslandForageFloodplainApproach": 23.227,
+        "IslandForageApproachForbs": 17.956
+      },
+      "samples": [
+        {
+          "source_sample_index": 0,
+          "pie_seconds": 0.2666666805744171,
+          "patch_stock": {
+            "IslandForageWestMeadow": 12.0,
+            "IslandForageOpenMeadow": 12.0,
+            "IslandForageFloodplainApproach": 13.0,
+            "IslandForageApproachForbs": 9.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {}
+        },
+        {
+          "source_sample_index": 20,
+          "pie_seconds": 100.26667189598083,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.3014400005340576,
+            "IslandForageOpenMeadow": 0.9043200016021729,
+            "IslandForageFloodplainApproach": 0.35333052277565,
+            "IslandForageApproachForbs": 0.4028906226158142
+          },
+          "completed_clock": {
+            "authority_seconds": 99.30333333214124,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.5729354855820858,
+            "IslandForageOpenMeadow": 0.5804620678557956,
+            "IslandForageFloodplainApproach": 0.6089301083636329,
+            "IslandForageApproachForbs": 0.6106593125811456
+          },
+          "grassland_native_vegetation": {
+            "native_step": 750,
+            "habitat_dynamics": false,
+            "food": 23.717065131864544,
+            "capacity": 52.782632246953554,
+            "mean_moisture": 0.6521830571994695,
+            "rain": 0.699999988079071,
+            "grown": 13.15937050179665,
+            "environment_lost": 1.9682223973572504,
+            "consumed": 35.232601858911494,
+            "ledger_amount": 23.717065131864544,
+            "ledger_capacity": 52.782632246953554,
+            "ledger_consumed": 35.232601858911494,
+            "ledger_grown": 13.15937050179665,
+            "ledger_environment_lost": 1.9682223973572504,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 801
+          }
+        },
+        {
+          "source_sample_index": 26,
+          "pie_seconds": 130.26667346060276,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.4607999920845032,
+            "IslandForageOpenMeadow": 0.0,
+            "IslandForageFloodplainApproach": 0.0,
+            "IslandForageApproachForbs": 0.2702906131744385
+          },
+          "completed_clock": {
+            "authority_seconds": 129.73666666547456,
+            "phase": "day",
+            "phase_start_seconds": 120.0,
+            "phase_end_seconds": 180.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.45323236006017775,
+            "IslandForageOpenMeadow": 0.45840145980488733,
+            "IslandForageFloodplainApproach": 0.48084595674474806,
+            "IslandForageApproachForbs": 0.48547169443032445
+          },
+          "grassland_native_vegetation": {
+            "native_step": 975,
+            "habitat_dynamics": false,
+            "food": 28.33870162884723,
+            "capacity": 52.782632246953554,
+            "mean_moisture": 0.5286359745668431,
+            "rain": 0,
+            "grown": 26.859749100745347,
+            "environment_lost": 2.1853259747238316,
+            "consumed": 44.09424038351102,
+            "ledger_amount": 28.33870162884723,
+            "ledger_capacity": 52.782632246953554,
+            "ledger_consumed": 44.09424038351102,
+            "ledger_grown": 26.859749100745347,
+            "ledger_environment_lost": 2.1853259747238316,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1035
+          }
+        },
+        {
+          "source_sample_index": 42,
+          "pie_seconds": 210.2666776329279,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.1693863719701767,
+            "IslandForageOpenMeadow": 0.24096566438674927,
+            "IslandForageFloodplainApproach": 0.15185226500034332,
+            "IslandForageApproachForbs": 0.1818118840456009
+          },
+          "completed_clock": {
+            "authority_seconds": 209.9866666654746,
+            "phase": "night",
+            "phase_start_seconds": 180.0,
+            "phase_end_seconds": 240.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.16553479642568503,
+            "IslandForageOpenMeadow": 0.19683464573544543,
+            "IslandForageFloodplainApproach": 0.1677502802524019,
+            "IslandForageApproachForbs": 0.22782958587345126
+          },
+          "grassland_native_vegetation": {
+            "native_step": 1575,
+            "habitat_dynamics": false,
+            "food": 25.626248997392132,
+            "capacity": 52.95438335859163,
+            "mean_moisture": 0.25440852589925234,
+            "rain": 0,
+            "grown": 68.46068799595187,
+            "environment_lost": 4.107722734737349,
+            "consumed": 86.4852351501609,
+            "ledger_amount": 25.626248997392132,
+            "ledger_capacity": 52.95438335859163,
+            "ledger_consumed": 86.4852351501609,
+            "ledger_grown": 68.46068799595187,
+            "ledger_environment_lost": 4.107722734737349,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1735
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "rain_pattern": "block",
+      "uses_native_soil": false,
+      "source": "Saved/FaunaAudit/Island_20017_soil_control_block/IslandFaunaPIE.json",
+      "source_sha256": "46ea1ced0c03a71376b65f3ba314f16cb80ead1f4050e1d71ca7a2760dfdf47a",
+      "authority_log": "Saved/FaunaAudit/IslandAccessBaseline/20017_soil_control_block.log",
+      "authority_log_sha256": "d46214a6dab96a84d865c3c63ecded21e72688617991755f762be4223e65b6c0",
+      "source_sample_count": 43,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "rain_events_pie_seconds": [
+        {
+          "time": 0.2666666805744171,
+          "rain": 0.0
+        },
+        {
+          "time": 20.2666677236557,
+          "rain": 0.7
+        },
+        {
+          "time": 80.26667085289955,
+          "rain": 0.0
+        }
+      ],
+      "patch_payment_energy_total_from_log": {
+        "IslandForageWestMeadow": 22.407,
+        "IslandForageOpenMeadow": 22.286,
+        "IslandForageFloodplainApproach": 21.016,
+        "IslandForageApproachForbs": 15.118
+      },
+      "samples": [
+        {
+          "source_sample_index": 0,
+          "pie_seconds": 0.2666666805744171,
+          "patch_stock": {
+            "IslandForageWestMeadow": 12.0,
+            "IslandForageOpenMeadow": 12.0,
+            "IslandForageFloodplainApproach": 13.0,
+            "IslandForageApproachForbs": 9.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          }
+        },
+        {
+          "source_sample_index": 16,
+          "pie_seconds": 80.26667085289955,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.0,
+            "IslandForageOpenMeadow": 0.753600001335144,
+            "IslandForageFloodplainApproach": 0.7066610455513,
+            "IslandForageApproachForbs": 0.0
+          },
+          "completed_clock": {
+            "authority_seconds": 80.0,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 600,
+            "habitat_dynamics": false,
+            "food": 56.57225060679331,
+            "capacity": 65.90324623317012,
+            "mean_moisture": 0.7023703672456227,
+            "rain": 0.699999988079071,
+            "grown": 13.6481621387708,
+            "environment_lost": 2.461436300243829,
+            "consumed": 15.360848582786781,
+            "ledger_amount": 56.57225060679331,
+            "ledger_capacity": 65.90324623317014,
+            "ledger_consumed": 15.360848582786781,
+            "ledger_grown": 13.6481621387708,
+            "ledger_environment_lost": 2.461436300243829,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 620
+          }
+        },
+        {
+          "source_sample_index": 22,
+          "pie_seconds": 110.26667241752148,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.1292228400707245,
+            "IslandForageOpenMeadow": 0.05212147906422615,
+            "IslandForageFloodplainApproach": 0.11936859786510468,
+            "IslandForageApproachForbs": 0.12226275354623795
+          },
+          "completed_clock": {
+            "authority_seconds": 109.0699999988079,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 825,
+            "habitat_dynamics": false,
+            "food": 53.50741869057441,
+            "capacity": 65.90324623317012,
+            "mean_moisture": 0.5808097000318024,
+            "rain": 0,
+            "grown": 13.6481621387708,
+            "environment_lost": 3.3907568478439467,
+            "consumed": 17.496359951405694,
+            "ledger_amount": 53.50741869057441,
+            "ledger_capacity": 65.90324623317014,
+            "ledger_consumed": 17.496359951405694,
+            "ledger_grown": 13.6481621387708,
+            "ledger_environment_lost": 3.3907568478439467,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 854
+          }
+        },
+        {
+          "source_sample_index": 42,
+          "pie_seconds": 210.2666776329279,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.10366543382406235,
+            "IslandForageOpenMeadow": 0.23004049062728882,
+            "IslandForageFloodplainApproach": 0.19807617366313934,
+            "IslandForageApproachForbs": 0.17311351001262665
+          },
+          "completed_clock": {
+            "authority_seconds": 210.0,
+            "phase": "night",
+            "phase_start_seconds": 180.0,
+            "phase_end_seconds": 240.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 1575,
+            "habitat_dynamics": false,
+            "food": 51.97661961765724,
+            "capacity": 66.10629067751167,
+            "mean_moisture": 0.22527108803056847,
+            "rain": 0,
+            "grown": 37.43383692607157,
+            "environment_lost": 8.0634695829488,
+            "consumed": 38.14012107651824,
+            "ledger_amount": 51.97661961765725,
+            "ledger_capacity": 66.10629067751167,
+            "ledger_consumed": 38.14012107651824,
+            "ledger_grown": 37.43383692607157,
+            "ledger_environment_lost": 8.0634695829488,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1693
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "rain_pattern": "block",
+      "uses_native_soil": true,
+      "source": "Saved/FaunaAudit/Island_20017_native_soil_block/IslandFaunaPIE.json",
+      "source_sha256": "500d64e2ad3ae45d147c14a7e330da1843ffb26f00ce5216dfbb47146588e750",
+      "authority_log": "Saved/FaunaAudit/IslandAccessBaseline/20017_native_soil_block.log",
+      "authority_log_sha256": "54d647f634f08b9da0dce253aad2a9aca0cd37e1f7e22b1b0cff1b8f76e9e172",
+      "source_sample_count": 43,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "rain_events_pie_seconds": [
+        {
+          "time": 0.2666666805744171,
+          "rain": 0.0
+        },
+        {
+          "time": 20.2666677236557,
+          "rain": 0.7
+        },
+        {
+          "time": 80.26667085289955,
+          "rain": 0.0
+        }
+      ],
+      "patch_payment_energy_total_from_log": {
+        "IslandForageWestMeadow": 28.199,
+        "IslandForageOpenMeadow": 27.538,
+        "IslandForageFloodplainApproach": 22.025,
+        "IslandForageApproachForbs": 17.845
+      },
+      "samples": [
+        {
+          "source_sample_index": 0,
+          "pie_seconds": 0.2666666805744171,
+          "patch_stock": {
+            "IslandForageWestMeadow": 12.0,
+            "IslandForageOpenMeadow": 12.0,
+            "IslandForageFloodplainApproach": 13.0,
+            "IslandForageApproachForbs": 9.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {}
+        },
+        {
+          "source_sample_index": 16,
+          "pie_seconds": 80.26667085289955,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.0,
+            "IslandForageOpenMeadow": 0.753600001335144,
+            "IslandForageFloodplainApproach": 1.7666528224945068,
+            "IslandForageApproachForbs": 0.4028906226158142
+          },
+          "completed_clock": {
+            "authority_seconds": 80.0,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.6679135154618356,
+            "IslandForageOpenMeadow": 0.6519263942007313,
+            "IslandForageFloodplainApproach": 0.6048307239496977,
+            "IslandForageApproachForbs": 0.6680437929457149
+          },
+          "grassland_native_vegetation": {
+            "native_step": 600,
+            "habitat_dynamics": false,
+            "food": 56.57225060679331,
+            "capacity": 65.90324623317012,
+            "mean_moisture": 0.7023703672456227,
+            "rain": 0.699999988079071,
+            "grown": 13.6481621387708,
+            "environment_lost": 2.461436300243829,
+            "consumed": 15.360848582786781,
+            "ledger_amount": 56.57225060679331,
+            "ledger_capacity": 65.90324623317014,
+            "ledger_consumed": 15.360848582786781,
+            "ledger_grown": 13.6481621387708,
+            "ledger_environment_lost": 2.461436300243829,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 620
+          }
+        },
+        {
+          "source_sample_index": 22,
+          "pie_seconds": 110.26667241752148,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.6911999583244324,
+            "IslandForageOpenMeadow": 0.30720001459121704,
+            "IslandForageFloodplainApproach": 0.07246308028697968,
+            "IslandForageApproachForbs": 0.030937500298023224
+          },
+          "completed_clock": {
+            "authority_seconds": 109.30333333214124,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.5449478038792087,
+            "IslandForageOpenMeadow": 0.5315846678729943,
+            "IslandForageFloodplainApproach": 0.4652922038774496,
+            "IslandForageApproachForbs": 0.5450562867407528
+          },
+          "grassland_native_vegetation": {
+            "native_step": 825,
+            "habitat_dynamics": false,
+            "food": 53.67541411547471,
+            "capacity": 65.90324623317012,
+            "mean_moisture": 0.580772788121503,
+            "rain": 0,
+            "grown": 13.6481621387708,
+            "environment_lost": 3.390977842917069,
+            "consumed": 17.328143531432268,
+            "ledger_amount": 53.67541411547471,
+            "ledger_capacity": 65.90324623317014,
+            "ledger_consumed": 17.328143531432268,
+            "ledger_grown": 13.6481621387708,
+            "ledger_environment_lost": 3.390977842917069,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 852
+          }
+        },
+        {
+          "source_sample_index": 42,
+          "pie_seconds": 210.2666776329279,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.11864788085222244,
+            "IslandForageOpenMeadow": 0.2561771869659424,
+            "IslandForageFloodplainApproach": 0.2594166398048401,
+            "IslandForageApproachForbs": 0.015359949320554733
+          },
+          "completed_clock": {
+            "authority_seconds": 210.0,
+            "phase": "night",
+            "phase_start_seconds": 180.0,
+            "phase_end_seconds": 240.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.21393020480030348,
+            "IslandForageOpenMeadow": 0.17617394360289199,
+            "IslandForageFloodplainApproach": 0.09705461123873582,
+            "IslandForageApproachForbs": 0.21398913442833678
+          },
+          "grassland_native_vegetation": {
+            "native_step": 1575,
+            "habitat_dynamics": false,
+            "food": 52.159761589660384,
+            "capacity": 66.10629067751167,
+            "mean_moisture": 0.22519404330431425,
+            "rain": 0,
+            "grown": 37.002387941695225,
+            "environment_lost": 8.047243485215851,
+            "consumed": 37.54175621787155,
+            "ledger_amount": 52.15976158966039,
+            "ledger_capacity": 66.10629067751167,
+            "ledger_consumed": 37.54175621787155,
+            "ledger_grown": 37.002387941695225,
+            "ledger_environment_lost": 8.047243485215851,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1686
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "rain_pattern": "pulses",
+      "uses_native_soil": false,
+      "source": "Saved/FaunaAudit/Island_20017_soil_control_pulses/IslandFaunaPIE.json",
+      "source_sha256": "2739ca4307601450850e3cb1fd10e939315019e4ed163144c78d046d41f7e310",
+      "authority_log": "Saved/FaunaAudit/IslandAccessBaseline/20017_soil_control_pulses.log",
+      "authority_log_sha256": "920a655e9bf56e8abaef2c17ba4dffac6c59c8bca5ed3048fabba7ea75a7fe7c",
+      "source_sample_count": 43,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "rain_events_pie_seconds": [
+        {
+          "time": 0.2666666805744171,
+          "rain": 0.0
+        },
+        {
+          "time": 20.2666677236557,
+          "rain": 0.7
+        },
+        {
+          "time": 40.266668766736984,
+          "rain": 0.0
+        },
+        {
+          "time": 50.266669288277626,
+          "rain": 0.7
+        },
+        {
+          "time": 70.26667033135891,
+          "rain": 0.0
+        },
+        {
+          "time": 80.26667085289955,
+          "rain": 0.7
+        },
+        {
+          "time": 100.26667189598083,
+          "rain": 0.0
+        }
+      ],
+      "patch_payment_energy_total_from_log": {
+        "IslandForageWestMeadow": 22.169,
+        "IslandForageOpenMeadow": 22.185,
+        "IslandForageFloodplainApproach": 20.927,
+        "IslandForageApproachForbs": 14.285
+      },
+      "samples": [
+        {
+          "source_sample_index": 0,
+          "pie_seconds": 0.2666666805744171,
+          "patch_stock": {
+            "IslandForageWestMeadow": 12.0,
+            "IslandForageOpenMeadow": 12.0,
+            "IslandForageFloodplainApproach": 13.0,
+            "IslandForageApproachForbs": 9.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          }
+        },
+        {
+          "source_sample_index": 20,
+          "pie_seconds": 100.26667189598083,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.3014400005340576,
+            "IslandForageOpenMeadow": 0.9043200016021729,
+            "IslandForageFloodplainApproach": 0.7066610455513,
+            "IslandForageApproachForbs": 0.4028906226158142
+          },
+          "completed_clock": {
+            "authority_seconds": 99.30333333214124,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 750,
+            "habitat_dynamics": false,
+            "food": 52.79125967537603,
+            "capacity": 65.90324623317012,
+            "mean_moisture": 0.644381299837795,
+            "rain": 0.699999988079071,
+            "grown": 13.870093619874561,
+            "environment_lost": 3.034844172566785,
+            "consumed": 18.790363122985006,
+            "ledger_amount": 52.79125967537603,
+            "ledger_capacity": 65.90324623317014,
+            "ledger_consumed": 18.790363122985006,
+            "ledger_grown": 13.870093619874561,
+            "ledger_environment_lost": 3.034844172566785,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 777
+          }
+        },
+        {
+          "source_sample_index": 26,
+          "pie_seconds": 130.26667346060276,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.2721155285835266,
+            "IslandForageOpenMeadow": 0.15463826060295105,
+            "IslandForageFloodplainApproach": 0.12508109211921692,
+            "IslandForageApproachForbs": 0.1105889230966568
+          },
+          "completed_clock": {
+            "authority_seconds": 130.0,
+            "phase": "day",
+            "phase_start_seconds": 120.0,
+            "phase_end_seconds": 180.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 975,
+            "habitat_dynamics": false,
+            "food": 54.46391738728354,
+            "capacity": 65.90324623317012,
+            "mean_moisture": 0.5186440770341991,
+            "rain": 0,
+            "grown": 20.76163905289193,
+            "environment_lost": 3.8633072015885745,
+            "consumed": 23.180787815072826,
+            "ledger_amount": 54.46391738728354,
+            "ledger_capacity": 65.90324623317014,
+            "ledger_consumed": 23.180787815072826,
+            "ledger_grown": 20.76163905289193,
+            "ledger_environment_lost": 3.8633072015885745,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1017
+          }
+        },
+        {
+          "source_sample_index": 42,
+          "pie_seconds": 210.2666776329279,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.12377060204744339,
+            "IslandForageOpenMeadow": 0.09818273037672043,
+            "IslandForageFloodplainApproach": 0.18195714056491852,
+            "IslandForageApproachForbs": 0.15351945161819458
+          },
+          "completed_clock": {
+            "authority_seconds": 209.78666666547457,
+            "phase": "night",
+            "phase_start_seconds": 180.0,
+            "phase_end_seconds": 240.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "grassland_native_vegetation": {
+            "native_step": 1575,
+            "habitat_dynamics": false,
+            "food": 52.19804214986106,
+            "capacity": 66.10629067751167,
+            "mean_moisture": 0.24082832331763002,
+            "rain": 0,
+            "grown": 40.443785773959384,
+            "environment_lost": 7.532218013376606,
+            "consumed": 41.45989896177548,
+            "ledger_amount": 52.19804214986106,
+            "ledger_capacity": 66.10629067751167,
+            "ledger_consumed": 41.45989896177548,
+            "ledger_grown": 40.443785773959384,
+            "ledger_environment_lost": 7.532218013376606,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1728
+          }
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "rain_pattern": "pulses",
+      "uses_native_soil": true,
+      "source": "Saved/FaunaAudit/Island_20017_native_soil_pulses/IslandFaunaPIE.json",
+      "source_sha256": "4065c4df3a8acf2d4744a1738a1bf171119e07557b04504b0a16562f55d9975e",
+      "authority_log": "Saved/FaunaAudit/IslandAccessBaseline/20017_native_soil_pulses.log",
+      "authority_log_sha256": "c1dc364f5d3436da79d1e4619e569405e2d57dc55e96ea3d7aa7781cec0bdcf5",
+      "source_sample_count": 43,
+      "deer_brain": "v3_r7_g995_s1_20m@40d8710d",
+      "rain_events_pie_seconds": [
+        {
+          "time": 0.2666666805744171,
+          "rain": 0.0
+        },
+        {
+          "time": 20.2666677236557,
+          "rain": 0.7
+        },
+        {
+          "time": 40.266668766736984,
+          "rain": 0.0
+        },
+        {
+          "time": 50.266669288277626,
+          "rain": 0.7
+        },
+        {
+          "time": 70.26667033135891,
+          "rain": 0.0
+        },
+        {
+          "time": 80.26667085289955,
+          "rain": 0.7
+        },
+        {
+          "time": 100.26667189598083,
+          "rain": 0.0
+        }
+      ],
+      "patch_payment_energy_total_from_log": {
+        "IslandForageWestMeadow": 28.485,
+        "IslandForageOpenMeadow": 27.745,
+        "IslandForageFloodplainApproach": 20.901,
+        "IslandForageApproachForbs": 17.836
+      },
+      "samples": [
+        {
+          "source_sample_index": 0,
+          "pie_seconds": 0.2666666805744171,
+          "patch_stock": {
+            "IslandForageWestMeadow": 12.0,
+            "IslandForageOpenMeadow": 12.0,
+            "IslandForageFloodplainApproach": 13.0,
+            "IslandForageApproachForbs": 9.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {}
+        },
+        {
+          "source_sample_index": 20,
+          "pie_seconds": 100.26667189598083,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.753600001335144,
+            "IslandForageOpenMeadow": 0.1507200002670288,
+            "IslandForageFloodplainApproach": 0.3403542935848236,
+            "IslandForageApproachForbs": 0.4028906226158142
+          },
+          "completed_clock": {
+            "authority_seconds": 99.0699999988079,
+            "phase": "night",
+            "phase_start_seconds": 60.0,
+            "phase_end_seconds": 120.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.6105440034032877,
+            "IslandForageOpenMeadow": 0.5893598171289978,
+            "IslandForageFloodplainApproach": 0.5360527546018763,
+            "IslandForageApproachForbs": 0.6106593125811456
+          },
+          "grassland_native_vegetation": {
+            "native_step": 750,
+            "habitat_dynamics": false,
+            "food": 53.63140394496723,
+            "capacity": 65.90324623317012,
+            "mean_moisture": 0.6443133432904191,
+            "rain": 0.699999988079071,
+            "grown": 13.674547470069307,
+            "environment_lost": 3.0725258495972865,
+            "consumed": 17.716991026558045,
+            "ledger_amount": 53.63140394496723,
+            "ledger_capacity": 65.90324623317014,
+            "ledger_consumed": 17.716991026558045,
+            "ledger_grown": 13.674547470069307,
+            "ledger_environment_lost": 3.0725258495972865,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 774
+          }
+        },
+        {
+          "source_sample_index": 26,
+          "pie_seconds": 130.26667346060276,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.8140799403190613,
+            "IslandForageOpenMeadow": 0.4354560375213623,
+            "IslandForageFloodplainApproach": 0.0979747474193573,
+            "IslandForageApproachForbs": 0.3279374837875366
+          },
+          "completed_clock": {
+            "authority_seconds": 129.6699999988079,
+            "phase": "day",
+            "phase_start_seconds": 120.0,
+            "phase_end_seconds": 180.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.48537567576920354,
+            "IslandForageOpenMeadow": 0.4542267574847474,
+            "IslandForageFloodplainApproach": 0.3962647992599936,
+            "IslandForageApproachForbs": 0.48547169443032445
+          },
+          "grassland_native_vegetation": {
+            "native_step": 975,
+            "habitat_dynamics": false,
+            "food": 55.918262335670526,
+            "capacity": 65.90324623317012,
+            "mean_moisture": 0.5182015829335035,
+            "rain": 0,
+            "grown": 19.8129016494275,
+            "environment_lost": 3.921367981636443,
+            "consumed": 20.719644683173772,
+            "ledger_amount": 55.918262335670526,
+            "ledger_capacity": 65.90324623317014,
+            "ledger_consumed": 20.719644683173772,
+            "ledger_grown": 19.8129016494275,
+            "ledger_environment_lost": 3.921367981636443,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1009
+          }
+        },
+        {
+          "source_sample_index": 42,
+          "pie_seconds": 210.2666776329279,
+          "patch_stock": {
+            "IslandForageWestMeadow": 0.0,
+            "IslandForageOpenMeadow": 0.0,
+            "IslandForageFloodplainApproach": 0.1704782247543335,
+            "IslandForageApproachForbs": 0.18884415924549103
+          },
+          "completed_clock": {
+            "authority_seconds": 209.60333333214123,
+            "phase": "night",
+            "phase_start_seconds": 180.0,
+            "phase_end_seconds": 240.0
+          },
+          "grassland_region_weather": {
+            "planned_rainfall": 0.0,
+            "rainfall": 0.0,
+            "temperature": 18.0,
+            "humidity": 0.5
+          },
+          "forage_soil_moisture": {
+            "IslandForageWestMeadow": 0.22777065624541848,
+            "IslandForageOpenMeadow": 0.18059484817876417,
+            "IslandForageFloodplainApproach": 0.1107249684195457,
+            "IslandForageApproachForbs": 0.22782958587345126
+          },
+          "grassland_native_vegetation": {
+            "native_step": 1575,
+            "habitat_dynamics": false,
+            "food": 54.469756437309925,
+            "capacity": 66.10629067751167,
+            "mean_moisture": 0.23955453110346786,
+            "rain": 0,
+            "grown": 36.32939983972933,
+            "environment_lost": 7.66692786813003,
+            "consumed": 34.93908888534266,
+            "ledger_amount": 54.469756437309925,
+            "ledger_capacity": 66.10629067751167,
+            "ledger_consumed": 34.93908888534266,
+            "ledger_grown": 36.32939983972933,
+            "ledger_environment_lost": 7.66692786813003,
+            "ledger_habitat_removed": 0,
+            "receipt_sequence": 1677
+          }
+        }
+      ]
+    }
+  ]
+}

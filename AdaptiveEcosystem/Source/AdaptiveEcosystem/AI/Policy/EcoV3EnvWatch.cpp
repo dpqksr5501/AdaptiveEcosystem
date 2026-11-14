@@ -170,7 +170,7 @@ namespace EcoV3EnvWatchImpl
 #endif
 	}
 
-	/** 시작 날씨를 팀 날씨 출처에서 가져오나 (eco.IntegratedV3.TeamWeatherStart — Shipping 은 감시가 늘 꺼져 쓰이지 않는다). */
+	/** Whether an authored region owns the initial weather. Shipping always honors this source. */
 	bool TeamWeatherStartEnabled()
 	{
 #if !UE_BUILD_SHIPPING
@@ -271,6 +271,18 @@ namespace EcoV3EnvWatchImpl
 			OutKind = EcoWorldV3::kWeatherClear;
 			OutIntensity = 0.0;
 		}
+	}
+
+	bool ApplyWeather(EcoWorldV3::FWorldState& World, int32 Kind, double Intensity)
+	{
+		auto& Weather = World.Config.Weather;
+		if (!Weather.bEnabled || Kind < EcoWorldV3::kWeatherClear || Kind >= EcoWorldV3::kNumWeatherKinds
+			|| !FMath::IsFinite(Intensity) || Intensity < 0.0 || Intensity > 1.0
+			|| (Kind == EcoWorldV3::kWeatherClear && Intensity != 0.0)) return false;
+		Weather.Kind = Kind;
+		Weather.Intensity = Intensity;
+		EcoWorldV3::UpdateDayNight(World);
+		return true;
 	}
 
 	/**
@@ -443,7 +455,7 @@ void UEcoPolicyV3IntegratedSubsystem::InitContextEnv(FEcoV3RegionContext& Ctx)
 	// 정하지 않고, 날씨 검사는 TeamWeather 의 값(맑음 0·비 (0, 1])이 늘 통과한다). 바뀜이 아니라 시작값이라 환경 판·기록·알림은 그대로다.
 	Ctx.bEnvTeamSource = FindTeamWeatherSource(*World, Ctx.RegionId, Ctx.EnvTeamSourceWho);
 	EcoWorldV3::FWorldState& W = Ctx.Sim;
-	if (!Ctx.bEnvTeamSource || !W.Config.Weather.bEnabled || !IsEnvWatchEnabled())
+	if (!Ctx.bEnvTeamSource || !W.Config.Weather.bEnabled || (!UE_BUILD_SHIPPING && !IsEnvWatchEnabled()))
 	{
 		return;   // 출처 없음 = 우리 고정 날씨 (지금까지와 같다). 날씨를 끈 세계·감시를 끈 실행(Play 시작 때 환경 고정 — 옛 동작)도 그대로
 	}
@@ -468,16 +480,14 @@ void UEcoPolicyV3IntegratedSubsystem::InitContextEnv(FEcoV3RegionContext& Ctx)
 			   *Region, *Ctx.EnvTeamSourceWho, *Ours, *TeamText);
 		return;
 	}
-	if (PicksWeather(Ctx.EnvWeatherCvarSeen))
+	if (!UE_BUILD_SHIPPING && PicksWeather(Ctx.EnvWeatherCvarSeen))
 	{
 		UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 시작 날씨 | 팀 날씨 출처 %s 가 있지만 Play 시작 덮기 글자 '%s' 의 %s 로 시작한다 (사람이 고른 값 — 팀 값 %s 은 다음 팀 바뀜부터 ")
 										 TEXT("따른다. 빈 값이면 팀 값으로 시작)"),
 			   *Region, *Ctx.EnvTeamSourceWho, *Ctx.EnvWeatherCvarSeen, *Ours, *TeamText);
 		return;
 	}
-	W.Config.Weather.Kind = Kind;
-	W.Config.Weather.Intensity = Intensity;
-	EcoWorldV3::UpdateDayNight(W);
+	if (!ApplyWeather(W, Kind, Intensity)) return;
 	Ctx.bEnvStartFromTeam = true;
 	UE_LOG(LogEcoPolicyV3I, Log, TEXT("[EcoV3I] %s 시작 날씨 | 팀 날씨 출처 %s → %s — 우리 고정 날씨 %s 대신 (eco.IntegratedV3.TeamWeatherStart 1, 10-27 (C))"), *Region,
 		   *Ctx.EnvTeamSourceWho, *TeamText, *Ours);
@@ -507,7 +517,8 @@ void UEcoPolicyV3IntegratedSubsystem::BeginEnvWatch(UWorld& InWorld)
 									 EcoV3EnvWatchImpl::TeamWeatherStartEnabled()
 										 ? TEXT("= 팀 날씨 출처(팀 환경 어댑터)가 맡는 지역은 팀 값, 없는 지역은 우리 고정 날씨 (eco.IntegratedV3.TeamWeatherStart 1)")
 										 : TEXT("= 우리 고정 날씨 (eco.IntegratedV3.TeamWeatherStart 0 — 10-27 전)"))
-				  : TEXT("끔 (eco.IntegratedV3.EnvWatch 0 — Play 시작 때 환경 고정)"),
+				  : UE_BUILD_SHIPPING ? TEXT("작성된 지역 날씨만 반영")
+									 : TEXT("끔 (eco.IntegratedV3.EnvWatch 0 — Play 시작 때 환경 고정)"),
 		   *DescribeAutoSnapshot(), TestAts.Num(), *Schedule);
 }
 
@@ -582,8 +593,10 @@ void UEcoPolicyV3IntegratedSubsystem::TickEnvWatch()
 bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce, bool bTreesOnly)
 {
 	using namespace EcoV3EnvWatchImpl;
+	constexpr bool bAuthoredWeatherOnly = UE_BUILD_SHIPPING != 0;
 	UWorld* World = GetWorld();
-	if (!bActive || !World || Contexts.IsEmpty() || !IsEnvWatchEnabled())
+	if (!bActive || !World || Contexts.IsEmpty()
+		|| (bAuthoredWeatherOnly ? bTreesOnly : !IsEnvWatchEnabled()))
 	{
 		return false;
 	}
@@ -606,7 +619,7 @@ bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce, bool bTreesOn
 	PendingEnv.SetNum(Contexts.Num());
 
 	TArray<FVector> Trunks;
-	GatherLevelTrunks(*World, Trunks);
+	if (!bAuthoredWeatherOnly) GatherLevelTrunks(*World, Trunks);
 	const UEcologyWorldSubsystem* Regions = World->GetSubsystem<UEcologyWorldSubsystem>();
 	bool bAny = false;
 	for (int32 c = 0; c < Contexts.Num(); ++c)
@@ -614,6 +627,29 @@ bool UEcoPolicyV3IntegratedSubsystem::PollEnvironment(bool bForce, bool bTreesOn
 		FEcoV3RegionContext& Ctx = *Contexts[c];
 		FEcoV3EnvPending& P = PendingEnv[c];
 		const EcoWorldV3::FWorldState& W = Ctx.Sim;
+
+		if (bAuthoredWeatherOnly)
+		{
+			// The production simulation consumes authored weather without enabling
+			// tree scans, console weather overrides or test edits.
+			FRegionEnvironmentState Team;
+			if (W.Config.Weather.bEnabled && Regions && Regions->GetEnvironmentState(Ctx.RegionId, Team))
+			{
+				if (!Ctx.bEnvTeamSource)
+					Ctx.bEnvTeamSource = FindTeamWeatherSource(*World, Ctx.RegionId, Ctx.EnvTeamSourceWho);
+				if (Ctx.bEnvTeamSource)
+				{
+					Ctx.bEnvTeamKnown = true;
+					Ctx.EnvTeamWeather = static_cast<uint8>(Team.WeatherState);
+					Ctx.EnvTeamRainfall = Team.Rainfall;
+					TeamWeather(Team, P.WeatherKind, P.WeatherIntensity);
+					P.bWeather = P.WeatherKind != W.Config.Weather.Kind || P.WeatherIntensity != W.Config.Weather.Intensity;
+					P.WeatherSource = TEXT("team_env");
+				}
+			}
+			bAny |= P.bWeather;
+			continue;
+		}
 
 		// 1. 나무: 무대 안 레벨 줄기 원판 (시작 레벨 읽기와 같은 셈) — 지금 넣은 줄기(또는 대기 줄기)와 다르면 대기
 		int32 InStage = 0;
@@ -770,6 +806,13 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 	bEnvPending = false;
 	TArray<FEcoV3EnvPending> Pending = MoveTemp(PendingEnv);
 	PendingEnv.Reset();
+#if UE_BUILD_SHIPPING
+	// Only authored weather is queued in Shipping. No developer change history
+	// or notices are needed to update the simulation's sensory multipliers.
+	for (int32 c = 0; c < Contexts.Num() && c < Pending.Num(); ++c)
+		if (Pending[c].bWeather)
+			ApplyWeather(Contexts[c]->Sim, Pending[c].WeatherKind, Pending[c].WeatherIntensity);
+#else
 	if (!IsEnvWatchEnabled())
 	{
 		return;   // 대기 중에 감시를 껐다 — 넣지 않는다 (옛 동작)
@@ -998,15 +1041,10 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 			// 날씨: 세계 설정의 고정 날씨를 바꾸고 같은 T 로 배수를 다시 (어둠은 그대로). InitWorld 와 같은 검사 — 맑음 = 세기 0, 세기 [0, 1].
 			// 시간표는 쓰지 않는다 (파이썬 adapt.py 가 schedule_rows ≠ 0 을 거부한다)
 			EcoWorldV3::FWeatherConfig& Wx = W.Config.Weather;
-			const bool bOk = P.WeatherKind >= EcoWorldV3::kWeatherClear && P.WeatherKind < EcoWorldV3::kNumWeatherKinds && P.WeatherIntensity >= 0.0
-							 && P.WeatherIntensity <= 1.0 && (P.WeatherKind != EcoWorldV3::kWeatherClear || P.WeatherIntensity == 0.0);
-			if (bOk)
+			const int32 OldKind = Wx.Kind;
+			const double OldIntensity = Wx.Intensity;
+			if (ApplyWeather(W, P.WeatherKind, P.WeatherIntensity))
 			{
-				const int32 OldKind = Wx.Kind;
-				const double OldIntensity = Wx.Intensity;
-				Wx.Kind = P.WeatherKind;
-				Wx.Intensity = P.WeatherIntensity;
-				EcoWorldV3::UpdateDayNight(W);
 				FEcoV3EnvChange& Ch = Changes.AddDefaulted_GetRef();
 				Ch.Revision = Rev;
 				Ch.Step = GlobalT;
@@ -1048,6 +1086,7 @@ void UEcoPolicyV3IntegratedSubsystem::ApplyEnvChange(TConstArrayView<TArray<EcoW
 		LastEnvNotice = FString::Printf(TEXT("환경 바뀜 #%d — %s"), Rev, *FString::Join(NoticeParts, TEXT(" · ")));
 		PostNotice(EcoV3Integrated::ENotice::Env, LastEnvNotice);
 	}
+#endif
 }
 
 TArray<FString> UEcoPolicyV3IntegratedSubsystem::EnvInfoLines() const

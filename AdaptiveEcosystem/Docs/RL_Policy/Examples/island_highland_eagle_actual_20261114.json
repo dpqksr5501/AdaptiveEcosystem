@@ -1,0 +1,1541 @@
+{
+  "map": "/Game/JYU/Maps/LV_JYU_IslandEcosystemRefreshed",
+  "partial": true,
+  "training_ready": false,
+  "restorable_world": false,
+  "golden_vector": false,
+  "conditions": {
+    "base": "Saved roster",
+    "near": "Only founders 76 and 77 moved to the measured Highland sites",
+    "sight": "Same placements plus the existing boulder sight channel"
+  },
+  "units": "Geometric rays use PIE sample time. Hunt and payment events use authority time. No facing, intent, or hunger filter on rays.",
+  "authored_food_capacity": 215.0,
+  "runs": [
+    {
+      "seed": 20000,
+      "condition": "base",
+      "sources": [
+        {
+          "path": "Saved/FaunaAudit/Island_20000_eagle_stone_base/IslandFaunaPIE.json",
+          "sha256": "82eba8691c2cbf9458af4503ffefced75da5a84ebba214e46b2ee54a779798ab"
+        },
+        {
+          "path": "Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_stone_base.log",
+          "sha256": "da7c90cb090e67eaf0307f3d28fce63854a418e2621190708edfc70cb2afbadf"
+        }
+      ],
+      "founders": {},
+      "horizon_game_seconds": 210.2666776329279,
+      "eagle_carrion_receipts_by_target": {},
+      "eagle_events": [],
+      "rat_76_77_sampled_plant_total": 0,
+      "rat_76_77_alive_at_end": [],
+      "cruise_rays_total": 0,
+      "cover_blocked_ray_samples": [],
+      "authority_air_occluded_rejections": 0
+    },
+    {
+      "seed": 20000,
+      "condition": "near",
+      "sources": [
+        {
+          "path": "Saved/FaunaAudit/Island_20000_eagle_stone_near/IslandFaunaPIE.json",
+          "sha256": "8fb843f5b9781ac8e6810d00cd1cd377880a7106b64268cfcbd1bd1920db8c39"
+        },
+        {
+          "path": "Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_stone_near.log",
+          "sha256": "d776ba192606f6e8592d05af4a9cd40cc57a564e0cb97c32c737b8d423d25880"
+        }
+      ],
+      "founders": {
+        "moved_rat_ids": [
+          76,
+          77
+        ],
+        "sites_cm": [
+          [
+            52812.127,
+            48524.082,
+            3137.057
+          ],
+          [
+            52768.811,
+            48304.862,
+            3136.88
+          ]
+        ],
+        "eagle_ids": [
+          99,
+          100
+        ],
+        "eagle_cover_profile": {
+          "eagle_eye_cm": 35.0,
+          "rat_eye_cm": 5.0,
+          "within_range_cm": 3200.0,
+          "attack_reach_cm": 95.0,
+          "cruise_height_cm": 2300.0
+        }
+      },
+      "horizon_game_seconds": 210.2666776329279,
+      "eagle_carrion_receipts_by_target": {
+        "119": 12.607,
+        "77": 12.457
+      },
+      "eagle_events": [
+        {
+          "eagle": 100,
+          "event": "DiveSelected",
+          "authority_seconds": 59.31666666666667,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "DiveContactQueued",
+          "authority_seconds": 62.38333333333333,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "DiveSelected",
+          "authority_seconds": 84.8,
+          "target": 119
+        },
+        {
+          "eagle": 100,
+          "event": "DiveContactQueued",
+          "authority_seconds": 86.78333333333333,
+          "target": 119
+        },
+        {
+          "eagle": 100,
+          "event": "HuntCaptured",
+          "authority_seconds": 86.88333333482345,
+          "target": 119
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 87.88333333482345,
+          "target": 119
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 88.88333333482345,
+          "target": 119
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 89.88333333482345,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "DiveSelected",
+          "authority_seconds": 123.91666666666667,
+          "target": 76
+        },
+        {
+          "eagle": 99,
+          "event": "DiveContactQueued",
+          "authority_seconds": 127.41666666666667,
+          "target": 76
+        },
+        {
+          "eagle": 99,
+          "event": "DiveSelected",
+          "authority_seconds": 140.78333333333333,
+          "target": 77
+        },
+        {
+          "eagle": 99,
+          "event": "DiveContactQueued",
+          "authority_seconds": 142.65,
+          "target": 77
+        },
+        {
+          "eagle": 99,
+          "event": "HuntCaptured",
+          "authority_seconds": 142.75000000149012,
+          "target": 77
+        },
+        {
+          "eagle": 99,
+          "event": "CarrionEaten",
+          "authority_seconds": 143.75000000149012,
+          "target": 77
+        },
+        {
+          "eagle": 99,
+          "event": "CarrionEaten",
+          "authority_seconds": 144.75000000149012,
+          "target": 77
+        },
+        {
+          "eagle": 99,
+          "event": "CarrionEaten",
+          "authority_seconds": 145.75000000149012,
+          "target": 77
+        },
+        {
+          "eagle": 99,
+          "event": "DiveSelected",
+          "authority_seconds": 152.41666666666666,
+          "target": 76
+        },
+        {
+          "eagle": 99,
+          "event": "DiveContactQueued",
+          "authority_seconds": 155.35,
+          "target": 76
+        },
+        {
+          "eagle": 99,
+          "event": "DiveSelected",
+          "authority_seconds": 185.9,
+          "target": 76
+        },
+        {
+          "eagle": 99,
+          "event": "DiveContactQueued",
+          "authority_seconds": 188.3,
+          "target": 76
+        }
+      ],
+      "rat_76_77_sampled_plant_total": 8.699,
+      "rat_76_77_alive_at_end": [
+        76
+      ],
+      "cruise_rays_total": 59,
+      "cover_blocked_ray_samples": [],
+      "authority_air_occluded_rejections": 0
+    },
+    {
+      "seed": 20000,
+      "condition": "sight",
+      "sources": [
+        {
+          "path": "Saved/FaunaAudit/Island_20000_eagle_stone_sight/IslandFaunaPIE.json",
+          "sha256": "c91d9bf305c16cf426e9e1f575fa97b0d5ee571e356361fd7e588d1efc77372c"
+        },
+        {
+          "path": "Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_stone_sight.log",
+          "sha256": "4ddf327118bff535df256db921502c1f601452ffd26e7b2995d57799ad1d710c"
+        }
+      ],
+      "founders": {
+        "moved_rat_ids": [
+          76,
+          77
+        ],
+        "sites_cm": [
+          [
+            52812.127,
+            48524.082,
+            3137.057
+          ],
+          [
+            52768.811,
+            48304.862,
+            3136.88
+          ]
+        ],
+        "eagle_ids": [
+          99,
+          100
+        ],
+        "eagle_cover_profile": {
+          "eagle_eye_cm": 35.0,
+          "rat_eye_cm": 5.0,
+          "within_range_cm": 3200.0,
+          "attack_reach_cm": 95.0,
+          "cruise_height_cm": 2300.0,
+          "baseline_sight_rays": "Actual sampled positions, no energy or facing filter"
+        }
+      },
+      "horizon_game_seconds": 210.2666776329279,
+      "eagle_carrion_receipts_by_target": {
+        "76": 13.855,
+        "77": 12.457
+      },
+      "eagle_events": [
+        {
+          "eagle": 100,
+          "event": "DiveSelected",
+          "authority_seconds": 59.31666666666667,
+          "target": 119
+        },
+        {
+          "eagle": 100,
+          "event": "DiveContactQueued",
+          "authority_seconds": 62,
+          "target": 119
+        },
+        {
+          "eagle": 100,
+          "event": "DiveSelected",
+          "authority_seconds": 99.25,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "DiveContactQueued",
+          "authority_seconds": 101.6,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "HuntCaptured",
+          "authority_seconds": 101.70000000149011,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 102.70000000149011,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 103.70000000149011,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 104.70000000149011,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "DiveSelected",
+          "authority_seconds": 125.76666666666667,
+          "target": 77
+        },
+        {
+          "eagle": 100,
+          "event": "DiveContactQueued",
+          "authority_seconds": 129.28333333333333,
+          "target": 77
+        },
+        {
+          "eagle": 100,
+          "event": "DiveSelected",
+          "authority_seconds": 146.81666666666666,
+          "target": 77
+        },
+        {
+          "eagle": 100,
+          "event": "DiveContactQueued",
+          "authority_seconds": 148.75,
+          "target": 77
+        },
+        {
+          "eagle": 100,
+          "event": "HuntCaptured",
+          "authority_seconds": 148.85000000149012,
+          "target": 77
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 149.85000000149012,
+          "target": 77
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 151.20333333214123,
+          "target": 77
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 152.20333333214123,
+          "target": 77
+        }
+      ],
+      "rat_76_77_sampled_plant_total": 1.6,
+      "rat_76_77_alive_at_end": [],
+      "cruise_rays_total": 60,
+      "cover_blocked_ray_samples": [
+        {
+          "time": 15.766667488962412,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2033.3114583358818,
+          "elevation_delta_cm": 966.0300000000002,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 16.03333416953683,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2111.8931901495375,
+          "elevation_delta_cm": 1122.0300000000002,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 16.300000850111246,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2199.383338370098,
+          "elevation_delta_cm": 1278.0300000000002,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 16.566667530685663,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2297.433716584656,
+          "elevation_delta_cm": 1434.02,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 16.83333421126008,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2401.7143929701556,
+          "elevation_delta_cm": 1590.0300000000002,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 17.100000891834497,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2511.442216297239,
+          "elevation_delta_cm": 1746.04,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 17.366667572408915,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2625.940218912077,
+          "elevation_delta_cm": 1902.06,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 17.63333425298333,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2880.8310607878393,
+          "elevation_delta_cm": 2058.06,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 17.90000093355775,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 3156.637768528404,
+          "elevation_delta_cm": 2214.06,
+          "clear": false,
+          "blocked_world_static": false
+        }
+      ],
+      "authority_air_occluded_rejections": 0
+    },
+    {
+      "seed": 20017,
+      "condition": "base",
+      "sources": [
+        {
+          "path": "Saved/FaunaAudit/Island_20017_eagle_stone_base/IslandFaunaPIE.json",
+          "sha256": "0ae4d56a361d20de296b4d01fbc71e0900c547f60ba06dbc12c39d506fa3484f"
+        },
+        {
+          "path": "Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_stone_base.log",
+          "sha256": "8ab02639bef02356666355e687b95a7f8605882f65825629946a4e24c12a3c30"
+        }
+      ],
+      "founders": {},
+      "horizon_game_seconds": 210.2666776329279,
+      "eagle_carrion_receipts_by_target": {},
+      "eagle_events": [],
+      "rat_76_77_sampled_plant_total": 8.312,
+      "rat_76_77_alive_at_end": [],
+      "cruise_rays_total": 0,
+      "cover_blocked_ray_samples": [],
+      "authority_air_occluded_rejections": 0
+    },
+    {
+      "seed": 20017,
+      "condition": "near",
+      "sources": [
+        {
+          "path": "Saved/FaunaAudit/Island_20017_eagle_stone_near/IslandFaunaPIE.json",
+          "sha256": "ae8619cd4dc5abcf5314bfbf2093aea3ae5220734b5db94056f4d94c930e3e61"
+        },
+        {
+          "path": "Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_stone_near.log",
+          "sha256": "8cda78589d76e7385857facf39b7abb3aebcf89084213b7fec644b6fb7961c5b"
+        }
+      ],
+      "founders": {
+        "moved_rat_ids": [
+          76,
+          77
+        ],
+        "sites_cm": [
+          [
+            52812.127,
+            48524.082,
+            3137.057
+          ],
+          [
+            52768.811,
+            48304.862,
+            3136.88
+          ]
+        ],
+        "eagle_ids": [
+          99,
+          100
+        ],
+        "eagle_cover_profile": {
+          "eagle_eye_cm": 35.0,
+          "rat_eye_cm": 5.0,
+          "within_range_cm": 3200.0,
+          "attack_reach_cm": 95.0,
+          "cruise_height_cm": 2300.0
+        }
+      },
+      "horizon_game_seconds": 210.2666776329279,
+      "eagle_carrion_receipts_by_target": {
+        "92": 35.0
+      },
+      "eagle_events": [
+        {
+          "eagle": 100,
+          "event": "DiveSelected",
+          "authority_seconds": 59.63333333333333,
+          "target": 77
+        },
+        {
+          "eagle": 100,
+          "event": "DiveContactQueued",
+          "authority_seconds": 61.2,
+          "target": 77
+        },
+        {
+          "eagle": 99,
+          "event": "DiveSelected",
+          "authority_seconds": 63.75,
+          "target": 76
+        },
+        {
+          "eagle": 99,
+          "event": "DiveContactQueued",
+          "authority_seconds": 67.45,
+          "target": 76
+        },
+        {
+          "eagle": 99,
+          "event": "DiveSelected",
+          "authority_seconds": 88.5,
+          "target": 76
+        },
+        {
+          "eagle": 99,
+          "event": "DiveContactQueued",
+          "authority_seconds": 90.26666666666667,
+          "target": 76
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 136,
+          "target": 92
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 137,
+          "target": 92
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 138,
+          "target": 92
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 139,
+          "target": 92
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 140,
+          "target": 92
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 141,
+          "target": 92
+        },
+        {
+          "eagle": 100,
+          "event": "CarrionEaten",
+          "authority_seconds": 142,
+          "target": 92
+        }
+      ],
+      "rat_76_77_sampled_plant_total": 15.99,
+      "rat_76_77_alive_at_end": [
+        76,
+        77
+      ],
+      "cruise_rays_total": 44,
+      "cover_blocked_ray_samples": [],
+      "authority_air_occluded_rejections": 0
+    },
+    {
+      "seed": 20017,
+      "condition": "sight",
+      "sources": [
+        {
+          "path": "Saved/FaunaAudit/Island_20017_eagle_stone_sight/IslandFaunaPIE.json",
+          "sha256": "b267120b5444e9c81677608c28a67812c86fdaff58ffc5f6afa04c24de4ca17c"
+        },
+        {
+          "path": "Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_stone_sight.log",
+          "sha256": "4210e49b2e3bb084fadcdf5feed975e409da9caf8b679acdeb4022a69d5b881e"
+        }
+      ],
+      "founders": {
+        "moved_rat_ids": [
+          76,
+          77
+        ],
+        "sites_cm": [
+          [
+            52812.127,
+            48524.082,
+            3137.057
+          ],
+          [
+            52768.811,
+            48304.862,
+            3136.88
+          ]
+        ],
+        "eagle_ids": [
+          99,
+          100
+        ],
+        "eagle_cover_profile": {
+          "eagle_eye_cm": 35.0,
+          "rat_eye_cm": 5.0,
+          "within_range_cm": 3200.0,
+          "attack_reach_cm": 95.0,
+          "cruise_height_cm": 2300.0,
+          "baseline_sight_rays": "Actual sampled positions, no energy or facing filter"
+        }
+      },
+      "horizon_game_seconds": 210.2666776329279,
+      "eagle_carrion_receipts_by_target": {
+        "119": 13.561
+      },
+      "eagle_events": [
+        {
+          "eagle": 100,
+          "event": "DiveSelected",
+          "authority_seconds": 59.63333333333333,
+          "target": 119
+        },
+        {
+          "eagle": 100,
+          "event": "DiveContactQueued",
+          "authority_seconds": 61.65,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "DiveSelected",
+          "authority_seconds": 66.46666666666667,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "DiveContactQueued",
+          "authority_seconds": 70.06666666666666,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "DiveSelected",
+          "authority_seconds": 91.15,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "DiveContactQueued",
+          "authority_seconds": 92.86666666666666,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "HuntCaptured",
+          "authority_seconds": 92.96666666815678,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "CarrionEaten",
+          "authority_seconds": 93.96666666815678,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "CarrionEaten",
+          "authority_seconds": 94.96666666815678,
+          "target": 119
+        },
+        {
+          "eagle": 99,
+          "event": "CarrionEaten",
+          "authority_seconds": 95.96666666815678,
+          "target": 119
+        }
+      ],
+      "rat_76_77_sampled_plant_total": 20.686,
+      "rat_76_77_alive_at_end": [
+        76,
+        77
+      ],
+      "cruise_rays_total": 48,
+      "cover_blocked_ray_samples": [
+        {
+          "time": 15.766667488962412,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2033.3028763319996,
+          "elevation_delta_cm": 966.0300000000002,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 16.03333416953683,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2111.8849274759227,
+          "elevation_delta_cm": 1122.0300000000002,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 16.300000850111246,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2199.4113090097517,
+          "elevation_delta_cm": 1278.0300000000002,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 16.566667530685663,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2297.695349888665,
+          "elevation_delta_cm": 1434.02,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 16.83333421126008,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2402.198190678694,
+          "elevation_delta_cm": 1590.04,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 17.100000891834497,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2512.1301663329446,
+          "elevation_delta_cm": 1746.0500000000002,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 17.366667572408915,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2626.8219685010995,
+          "elevation_delta_cm": 1902.06,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 17.63333425298333,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 2880.836744298432,
+          "elevation_delta_cm": 2058.06,
+          "clear": false,
+          "blocked_world_static": false
+        },
+        {
+          "time": 17.90000093355775,
+          "eagle": 100,
+          "rat": 76,
+          "distance_cm": 3156.642684593869,
+          "elevation_delta_cm": 2214.06,
+          "clear": false,
+          "blocked_world_static": false
+        }
+      ],
+      "authority_air_occluded_rejections": 0
+    }
+  ],
+  "authority_scan_followup": {
+    "time_basis": "Ray samples use PIE seconds. Scan and ThreatSeen use authority seconds.",
+    "interpretation": "Tracks and events are partial comparison data. No cover-related hunt interruption or intentional escape to cover was demonstrated.",
+    "runs": [
+      {
+        "seed": 20000,
+        "condition": "clear",
+        "eagle_id": 100,
+        "rat_id": 76,
+        "paired_initial_agents_brain_and_authored_patch_budget_match": true,
+        "ray_sample_count": 9,
+        "cover_only_blocked": 0,
+        "ray_window_pie_seconds": [
+          15.767,
+          17.9
+        ],
+        "eagle_energy_during_window": [
+          94.05,
+          94.75
+        ],
+        "rat_activities_during_window": [
+          "Rest",
+          "Wander"
+        ],
+        "rat_threat_until_during_window": [
+          -1
+        ],
+        "first_eagle_hunt_scan": {
+          "authority_seconds": 59.317,
+          "energy": 79.35,
+          "hunger_limit": 82.0,
+          "stamina": 0.968
+        },
+        "first_rat_visual_threat_from_eagle": {
+          "authority_seconds": 62.2,
+          "distance_cm": 232.7
+        },
+        "hunt_occluded": false,
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_eagle_scan_clear/IslandFaunaPIE.json": "72ed7615baabf51193f292bfd1089909a22776fb34c232b0cf0eaa6b1b45c8d4",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_scan_clear.log": "5b5ce13f33c10687b6150e109813db73abcc86dd6be056de31b3eeceafbf7cd5"
+        }
+      },
+      {
+        "seed": 20000,
+        "condition": "cover",
+        "eagle_id": 100,
+        "rat_id": 76,
+        "paired_initial_agents_brain_and_authored_patch_budget_match": true,
+        "ray_sample_count": 9,
+        "cover_only_blocked": 9,
+        "ray_window_pie_seconds": [
+          15.767,
+          17.9
+        ],
+        "eagle_energy_during_window": [
+          94.05,
+          94.75
+        ],
+        "rat_activities_during_window": [
+          "Rest",
+          "Wander"
+        ],
+        "rat_threat_until_during_window": [
+          -1
+        ],
+        "first_eagle_hunt_scan": {
+          "authority_seconds": 59.317,
+          "energy": 79.35,
+          "hunger_limit": 82.0,
+          "stamina": 0.968
+        },
+        "first_rat_visual_threat_from_eagle": null,
+        "hunt_occluded": false,
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_eagle_scan_cover/IslandFaunaPIE.json": "ee4c98f7f83ad63fdfb5cab40b9b7e0f8a50bb9f607e854816c261da8e192af6",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_scan_cover.log": "68df4bcc34429a88513e415a8131bd15c13fe288f7852efafffd3f0ea5b4cf8c"
+        }
+      },
+      {
+        "seed": 20017,
+        "condition": "clear",
+        "eagle_id": 100,
+        "rat_id": 76,
+        "paired_initial_agents_brain_and_authored_patch_budget_match": true,
+        "ray_sample_count": 9,
+        "cover_only_blocked": 0,
+        "ray_window_pie_seconds": [
+          15.767,
+          17.9
+        ],
+        "eagle_energy_during_window": [
+          94.05,
+          94.75
+        ],
+        "rat_activities_during_window": [
+          "Rest",
+          "Wander"
+        ],
+        "rat_threat_until_during_window": [
+          -1
+        ],
+        "first_eagle_hunt_scan": {
+          "authority_seconds": 59.633,
+          "energy": 79.35,
+          "hunger_limit": 82.0,
+          "stamina": 0.968
+        },
+        "first_rat_visual_threat_from_eagle": {
+          "authority_seconds": 61.283,
+          "distance_cm": 390.2
+        },
+        "hunt_occluded": false,
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_eagle_scan_clear/IslandFaunaPIE.json": "9385e65470303f88b165b6a37531485e6d72386dc27ab2c8cbf8250352038ea3",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_scan_clear.log": "94129ce34f22498f382fd2c8e34120e055a79fcd09c703a76338dcee64a52df6"
+        }
+      },
+      {
+        "seed": 20017,
+        "condition": "cover",
+        "eagle_id": 100,
+        "rat_id": 76,
+        "paired_initial_agents_brain_and_authored_patch_budget_match": true,
+        "ray_sample_count": 9,
+        "cover_only_blocked": 9,
+        "ray_window_pie_seconds": [
+          15.767,
+          17.9
+        ],
+        "eagle_energy_during_window": [
+          94.05,
+          94.75
+        ],
+        "rat_activities_during_window": [
+          "Rest",
+          "Wander"
+        ],
+        "rat_threat_until_during_window": [
+          -1
+        ],
+        "first_eagle_hunt_scan": {
+          "authority_seconds": 59.633,
+          "energy": 79.35,
+          "hunger_limit": 82.0,
+          "stamina": 0.968
+        },
+        "first_rat_visual_threat_from_eagle": null,
+        "hunt_occluded": false,
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_eagle_scan_cover/IslandFaunaPIE.json": "ffd6eca2e226bc57684856f76b85e1eb908226c7255a60f7cb9ec6986b8a1cf9",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_scan_cover.log": "2f28400e22068e024a5a5ab1fbecfc58d044e62311e1d907b53da37d18767e4f"
+        }
+      }
+    ]
+  },
+  "post_scan_geometry": {
+    "scope": "Cruise samples within the configured range and height envelope after each hunter's first authority hunt scan. Distances from the starting site use the nearest completed-clock sample to Eagle 100's first scan, not an exact movement or perception event.",
+    "runs": [
+      {
+        "seed": 20000,
+        "condition": "clear",
+        "first_scan_authority_seconds": {
+          "100": 59.317,
+          "99": 63.75
+        },
+        "first_scan_nearest_pie_sample": 59.233,
+        "first_scan_nearest_completed_authority_sample": 59.0,
+        "rat_samples": [
+          {
+            "id": 76,
+            "activity": "Wander",
+            "distance_from_initial_screened_site_cm": 1514.43
+          },
+          {
+            "id": 77,
+            "activity": "Rest",
+            "distance_from_initial_screened_site_cm": 1978.78
+          }
+        ],
+        "in_range_cruise_rays_after_first_scan": 41,
+        "covered_rays_after_first_scan": 0,
+        "world_static_blocked_rays_after_first_scan": 0,
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_eagle_scan_clear/IslandFaunaPIE.json": "72ed7615baabf51193f292bfd1089909a22776fb34c232b0cf0eaa6b1b45c8d4",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_scan_clear.log": "5b5ce13f33c10687b6150e109813db73abcc86dd6be056de31b3eeceafbf7cd5"
+        }
+      },
+      {
+        "seed": 20000,
+        "condition": "cover",
+        "first_scan_authority_seconds": {
+          "100": 59.317,
+          "99": 63.75
+        },
+        "first_scan_nearest_pie_sample": 59.233,
+        "first_scan_nearest_completed_authority_sample": 59.0,
+        "rat_samples": [
+          {
+            "id": 76,
+            "activity": "Eat",
+            "distance_from_initial_screened_site_cm": 1815.39
+          },
+          {
+            "id": 77,
+            "activity": "Wander",
+            "distance_from_initial_screened_site_cm": 1142.63
+          }
+        ],
+        "in_range_cruise_rays_after_first_scan": 42,
+        "covered_rays_after_first_scan": 0,
+        "world_static_blocked_rays_after_first_scan": 0,
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_eagle_scan_cover/IslandFaunaPIE.json": "ee4c98f7f83ad63fdfb5cab40b9b7e0f8a50bb9f607e854816c261da8e192af6",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20000_eagle_scan_cover.log": "68df4bcc34429a88513e415a8131bd15c13fe288f7852efafffd3f0ea5b4cf8c"
+        }
+      },
+      {
+        "seed": 20017,
+        "condition": "clear",
+        "first_scan_authority_seconds": {
+          "100": 59.633,
+          "99": 63.75
+        },
+        "first_scan_nearest_pie_sample": 60.3,
+        "first_scan_nearest_completed_authority_sample": 60.0,
+        "rat_samples": [
+          {
+            "id": 76,
+            "activity": "Eat",
+            "distance_from_initial_screened_site_cm": 835.41
+          },
+          {
+            "id": 77,
+            "activity": "Eat",
+            "distance_from_initial_screened_site_cm": 1418.51
+          }
+        ],
+        "in_range_cruise_rays_after_first_scan": 26,
+        "covered_rays_after_first_scan": 0,
+        "world_static_blocked_rays_after_first_scan": 0,
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_eagle_scan_clear/IslandFaunaPIE.json": "9385e65470303f88b165b6a37531485e6d72386dc27ab2c8cbf8250352038ea3",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_scan_clear.log": "94129ce34f22498f382fd2c8e34120e055a79fcd09c703a76338dcee64a52df6"
+        }
+      },
+      {
+        "seed": 20017,
+        "condition": "cover",
+        "first_scan_authority_seconds": {
+          "100": 59.633,
+          "99": 63.75
+        },
+        "first_scan_nearest_pie_sample": 60.3,
+        "first_scan_nearest_completed_authority_sample": 60.0,
+        "rat_samples": [
+          {
+            "id": 76,
+            "activity": "Rest",
+            "distance_from_initial_screened_site_cm": 609.18
+          },
+          {
+            "id": 77,
+            "activity": "Wander",
+            "distance_from_initial_screened_site_cm": 734.81
+          }
+        ],
+        "in_range_cruise_rays_after_first_scan": 30,
+        "covered_rays_after_first_scan": 0,
+        "world_static_blocked_rays_after_first_scan": 0,
+        "source_sha256": {
+          "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_eagle_scan_cover/IslandFaunaPIE.json": "ffd6eca2e226bc57684856f76b85e1eb908226c7255a60f7cb9ec6986b8a1cf9",
+          "AdaptiveEcosystem/Saved/FaunaAudit/IslandAccessBaseline/20017_eagle_scan_cover.log": "2f28400e22068e024a5a5ab1fbecfc58d044e62311e1d907b53da37d18767e4f"
+        }
+      }
+    ]
+  },
+  "saved_geometry": [
+    {
+      "seed": 20000,
+      "source": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20000_eagle_geometry/IslandFaunaPIE.json",
+      "source_sha256": "42a9d74e31d71e90d96541c40b9c62e4bf7bd153a115688c06f0b24bc9f1682c",
+      "eye_cm": 35.0,
+      "prey_eye_cm": 5.0,
+      "sweep_radius_cm": 10.8,
+      "attack_reach_cm": 95.0,
+      "rows": [
+        {
+          "case": "clear",
+          "start_cm": [
+            52112.127,
+            48524.082,
+            4637.057148974578
+          ],
+          "prey_cm": [
+            52812.127,
+            48524.082,
+            3137.057148974578
+          ],
+          "contact_cm": [
+            52812.127,
+            48524.082,
+            3173.157148974578
+          ],
+          "obstacle": null,
+          "clear": true,
+          "body_blocked": false
+        },
+        {
+          "case": "sight_only",
+          "start_cm": [
+            52112.127,
+            48524.082,
+            4637.057148974578
+          ],
+          "prey_cm": [
+            52812.127,
+            48524.082,
+            3137.057148974578
+          ],
+          "contact_cm": [
+            52812.127,
+            48524.082,
+            3173.157148974578
+          ],
+          "obstacle": {
+            "center_cm": [
+              52462.127,
+              48524.082,
+              3907.057148974578
+            ],
+            "half_extent_cm": 12.0,
+            "physical": false
+          },
+          "clear": false,
+          "body_blocked": false
+        },
+        {
+          "case": "body_only",
+          "start_cm": [
+            52112.127,
+            48524.082,
+            4637.057148974578
+          ],
+          "prey_cm": [
+            52812.127,
+            48524.082,
+            3137.057148974578
+          ],
+          "contact_cm": [
+            52812.127,
+            48524.082,
+            3173.157148974578
+          ],
+          "obstacle": {
+            "center_cm": [
+              52462.127,
+              48541.482,
+              3905.107148974578
+            ],
+            "half_extent_cm": 12.0,
+            "physical": true
+          },
+          "clear": true,
+          "body_blocked": true
+        },
+        {
+          "case": "solid",
+          "start_cm": [
+            52112.127,
+            48524.082,
+            4637.057148974578
+          ],
+          "prey_cm": [
+            52812.127,
+            48524.082,
+            3137.057148974578
+          ],
+          "contact_cm": [
+            52812.127,
+            48524.082,
+            3173.157148974578
+          ],
+          "obstacle": {
+            "center_cm": [
+              52462.127,
+              48524.082,
+              3907.057148974578
+            ],
+            "half_extent_cm": 12.0,
+            "physical": true
+          },
+          "clear": false,
+          "body_blocked": true
+        },
+        {
+          "case": "clear",
+          "start_cm": [
+            52068.811,
+            48304.862,
+            4636.87950764725
+          ],
+          "prey_cm": [
+            52768.811,
+            48304.862,
+            3136.8795076472497
+          ],
+          "contact_cm": [
+            52768.811,
+            48304.862,
+            3172.9795076472496
+          ],
+          "obstacle": null,
+          "clear": true,
+          "body_blocked": false
+        },
+        {
+          "case": "sight_only",
+          "start_cm": [
+            52068.811,
+            48304.862,
+            4636.87950764725
+          ],
+          "prey_cm": [
+            52768.811,
+            48304.862,
+            3136.8795076472497
+          ],
+          "contact_cm": [
+            52768.811,
+            48304.862,
+            3172.9795076472496
+          ],
+          "obstacle": {
+            "center_cm": [
+              52418.811,
+              48304.862,
+              3906.8795076472497
+            ],
+            "half_extent_cm": 12.0,
+            "physical": false
+          },
+          "clear": false,
+          "body_blocked": false
+        },
+        {
+          "case": "body_only",
+          "start_cm": [
+            52068.811,
+            48304.862,
+            4636.87950764725
+          ],
+          "prey_cm": [
+            52768.811,
+            48304.862,
+            3136.8795076472497
+          ],
+          "contact_cm": [
+            52768.811,
+            48304.862,
+            3172.9795076472496
+          ],
+          "obstacle": {
+            "center_cm": [
+              52418.811,
+              48322.262,
+              3904.92950764725
+            ],
+            "half_extent_cm": 12.0,
+            "physical": true
+          },
+          "clear": true,
+          "body_blocked": true
+        },
+        {
+          "case": "solid",
+          "start_cm": [
+            52068.811,
+            48304.862,
+            4636.87950764725
+          ],
+          "prey_cm": [
+            52768.811,
+            48304.862,
+            3136.8795076472497
+          ],
+          "contact_cm": [
+            52768.811,
+            48304.862,
+            3172.9795076472496
+          ],
+          "obstacle": {
+            "center_cm": [
+              52418.811,
+              48304.862,
+              3906.8795076472497
+            ],
+            "half_extent_cm": 12.0,
+            "physical": true
+          },
+          "clear": false,
+          "body_blocked": true
+        }
+      ]
+    },
+    {
+      "seed": 20017,
+      "source": "AdaptiveEcosystem/Saved/FaunaAudit/Island_20017_eagle_geometry/IslandFaunaPIE.json",
+      "source_sha256": "7a7a4893abfcd8107291dbdde8c3317f7cfb3dd6aea648f96170c87f3f7788f9",
+      "eye_cm": 35.0,
+      "prey_eye_cm": 5.0,
+      "sweep_radius_cm": 10.8,
+      "attack_reach_cm": 95.0,
+      "rows": [
+        {
+          "case": "clear",
+          "start_cm": [
+            52112.127,
+            48524.082,
+            4637.057148974578
+          ],
+          "prey_cm": [
+            52812.127,
+            48524.082,
+            3137.057148974578
+          ],
+          "contact_cm": [
+            52812.127,
+            48524.082,
+            3173.157148974578
+          ],
+          "obstacle": null,
+          "clear": true,
+          "body_blocked": false
+        },
+        {
+          "case": "sight_only",
+          "start_cm": [
+            52112.127,
+            48524.082,
+            4637.057148974578
+          ],
+          "prey_cm": [
+            52812.127,
+            48524.082,
+            3137.057148974578
+          ],
+          "contact_cm": [
+            52812.127,
+            48524.082,
+            3173.157148974578
+          ],
+          "obstacle": {
+            "center_cm": [
+              52462.127,
+              48524.082,
+              3907.057148974578
+            ],
+            "half_extent_cm": 12.0,
+            "physical": false
+          },
+          "clear": false,
+          "body_blocked": false
+        },
+        {
+          "case": "body_only",
+          "start_cm": [
+            52112.127,
+            48524.082,
+            4637.057148974578
+          ],
+          "prey_cm": [
+            52812.127,
+            48524.082,
+            3137.057148974578
+          ],
+          "contact_cm": [
+            52812.127,
+            48524.082,
+            3173.157148974578
+          ],
+          "obstacle": {
+            "center_cm": [
+              52462.127,
+              48541.482,
+              3905.107148974578
+            ],
+            "half_extent_cm": 12.0,
+            "physical": true
+          },
+          "clear": true,
+          "body_blocked": true
+        },
+        {
+          "case": "solid",
+          "start_cm": [
+            52112.127,
+            48524.082,
+            4637.057148974578
+          ],
+          "prey_cm": [
+            52812.127,
+            48524.082,
+            3137.057148974578
+          ],
+          "contact_cm": [
+            52812.127,
+            48524.082,
+            3173.157148974578
+          ],
+          "obstacle": {
+            "center_cm": [
+              52462.127,
+              48524.082,
+              3907.057148974578
+            ],
+            "half_extent_cm": 12.0,
+            "physical": true
+          },
+          "clear": false,
+          "body_blocked": true
+        },
+        {
+          "case": "clear",
+          "start_cm": [
+            52068.811,
+            48304.862,
+            4636.87950764725
+          ],
+          "prey_cm": [
+            52768.811,
+            48304.862,
+            3136.8795076472497
+          ],
+          "contact_cm": [
+            52768.811,
+            48304.862,
+            3172.9795076472496
+          ],
+          "obstacle": null,
+          "clear": true,
+          "body_blocked": false
+        },
+        {
+          "case": "sight_only",
+          "start_cm": [
+            52068.811,
+            48304.862,
+            4636.87950764725
+          ],
+          "prey_cm": [
+            52768.811,
+            48304.862,
+            3136.8795076472497
+          ],
+          "contact_cm": [
+            52768.811,
+            48304.862,
+            3172.9795076472496
+          ],
+          "obstacle": {
+            "center_cm": [
+              52418.811,
+              48304.862,
+              3906.8795076472497
+            ],
+            "half_extent_cm": 12.0,
+            "physical": false
+          },
+          "clear": false,
+          "body_blocked": false
+        },
+        {
+          "case": "body_only",
+          "start_cm": [
+            52068.811,
+            48304.862,
+            4636.87950764725
+          ],
+          "prey_cm": [
+            52768.811,
+            48304.862,
+            3136.8795076472497
+          ],
+          "contact_cm": [
+            52768.811,
+            48304.862,
+            3172.9795076472496
+          ],
+          "obstacle": {
+            "center_cm": [
+              52418.811,
+              48322.262,
+              3904.92950764725
+            ],
+            "half_extent_cm": 12.0,
+            "physical": true
+          },
+          "clear": true,
+          "body_blocked": true
+        },
+        {
+          "case": "solid",
+          "start_cm": [
+            52068.811,
+            48304.862,
+            4636.87950764725
+          ],
+          "prey_cm": [
+            52768.811,
+            48304.862,
+            3136.8795076472497
+          ],
+          "contact_cm": [
+            52768.811,
+            48304.862,
+            3172.9795076472496
+          ],
+          "obstacle": {
+            "center_cm": [
+              52418.811,
+              48304.862,
+              3906.8795076472497
+            ],
+            "half_extent_cm": 12.0,
+            "physical": true
+          },
+          "clear": false,
+          "body_blocked": true
+        }
+      ]
+    }
+  ]
+}

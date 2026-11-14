@@ -5,6 +5,7 @@
 #include "Creature/Runtime/EcoCreatureRuntimeTypes.h"
 #include "Creature/Runtime/EcoCreatureNetworkTrait.h"
 #include "AI/Policy/EcoBehaviorFragments.h"
+#include "AI/Policy/EcoPolicyV3IntegratedSubsystem.h"
 #include "AI/Social/EcoSocialFragments.h"
 #include "AI/Social/Shelter/EcoShelterSubsystem.h"
 #include "Ecology/EcologySimulationSubsystem.h"
@@ -78,6 +79,25 @@ void AEcoCreatureIntegrationSpawner::BeginPlay()
 	PostTickHandle = FWorldDelegates::OnWorldPostActorTick.AddUObject(this, &AEcoCreatureIntegrationSpawner::OnWorldPostActorTick);
 	StartedAt = GetWorld()->GetTimeSeconds();
 #if WITH_DEV_AUTOMATION_TESTS
+    int32 RoutinesOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoAdaptiveRoutines="), RoutinesOverride)
+        && (RoutinesOverride == 0 || RoutinesOverride == 1)) bEnableAdaptiveRoutines = RoutinesOverride != 0;
+    int32 RoutineMask = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoAdaptiveRoutineMask="), RoutineMask)
+        && RoutineMask >= 0 && RoutineMask <= int32(EEcoAdaptiveRoutine::All)) AdaptiveRoutineOverride = uint16(RoutineMask);
+    int32 PursuitOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaPursuitFix="), PursuitOverride)
+        && (PursuitOverride == 0 || PursuitOverride == 1)) bFaunaPursuitFix = PursuitOverride != 0;
+    int32 CarrionOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaCarrionAccess="), CarrionOverride)
+        && (CarrionOverride == 0 || CarrionOverride == 1)) bFaunaCarrionAccess = CarrionOverride != 0;
+    bFaunaAttackAdvance = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaAttackAdvance"));
+    bFaunaFollowWounded = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaFollowWounded"));
+    bAuditFaunaHunts = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaHuntAudit"));
+    bAuditFaunaBirths = FParse::Param(FCommandLine::Get(), TEXT("EcoFaunaBirthAudit"));
+    int32 PersistenceOverride = INDEX_NONE;
+    if (FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaPersistence="), PersistenceOverride)
+        && (PersistenceOverride == 0 || PersistenceOverride == 1)) FaunaPersistence.bEnabled = PersistenceOverride != 0;
     int32 HabitatStageOverride = INDEX_NONE;
     if (FaunaHabitatStage > 0 && FParse::Value(FCommandLine::Get(), TEXT("EcoFaunaHabitatStage="), HabitatStageOverride)
         && HabitatStageOverride >= 0 && HabitatStageOverride <= 3) FaunaHabitatStage = HabitatStageOverride;
@@ -113,15 +133,31 @@ void AEcoCreatureIntegrationSpawner::UpdateHabitatStreaming()
 		Shape.Radius = HabitatStreamingRadius;
 		Shape.Location = GetActorTransform().InverseTransformPosition(Point);
 	};
-	// Keep authored arrivals available for migration, plus current logical positions.
-    if(bEnableHerdJourneys)for(TActorIterator<AEcoHerdMigrationRoute> It(GetWorld());It;++It)if(It->bEnabled){
-        for(int32 I=0;I<It->Points.Num();++I){
-            AddPoint(It->Points[I]);if(I==0)continue;
-            const double Distance=FVector::Dist2D(It->Points[I-1],It->Points[I]);
-            const int32 Count=FMath::Clamp(FMath::CeilToInt(Distance/FMath::Max(1000.f,HabitatStreamingRadius*.75f)),1,256);
-            for(int32 K=1;K<Count;++K)AddPoint(FMath::Lerp(It->Points[I-1],It->Points[I],double(K)/Count));
+    const bool bHasRuleFauna = !FaunaSpecies.IsEmpty();
+    if (bEnableHerdJourneys || bHasRuleFauna)
+    {
+        const double SampleSpacing = FMath::Max(1000.f, HabitatStreamingRadius * .75f);
+        for (TActorIterator<AEcoHerdMigrationRoute> It(GetWorld()); It; ++It)
+        {
+            const auto& Route = **It;
+            const bool bRulePassage = bHasRuleFauna && Route.bAllowRuleFaunaPassage
+                && Route.bSharesHabitatReports && Route.IsValidRoute();
+            if (!Route.bEnabled || (!bEnableHerdJourneys && !bRulePassage)) continue;
+            for (int32 Index = 0; Index < Route.Points.Num(); ++Index)
+            {
+                AddPoint(Route.Points[Index]);
+                if (Index == 0) continue;
+                const FVector& Start = Route.Points[Index - 1];
+                const FVector& End = Route.Points[Index];
+                const int32 Count = FMath::Clamp(FMath::CeilToInt(FVector::Dist2D(Start, End) / SampleSpacing), 1, 256);
+                for (int32 Sample = 1; Sample < Count; ++Sample) AddPoint(FMath::Lerp(Start, End, double(Sample) / Count));
+            }
         }
     }
+	// Initial patch validation needs collision even where no animal starts. Later animal sources follow access.
+    if (!bReady && bHasRuleFauna)
+        for (const auto& Patch : FaunaHabitatPatches)
+            if (Patch.Stage <= FaunaHabitatStage) AddPoint(Patch.Center);
 	for (const AEcologyRegion* Region : Regions) AddPoint(Region->GetActorTransform().TransformPosition(Region->ArrivalOffset));
 	if (Owned.IsEmpty())
 	{
@@ -271,6 +307,8 @@ void AEcoCreatureIntegrationSpawner::FailRuntime(const TCHAR* Reason)
 void AEcoCreatureIntegrationSpawner::EndPlay(const EEndPlayReason::Type Reason)
 {
 	FWorldDelegates::OnWorldPostActorTick.Remove(PostTickHandle);
+	if (MixedNativeStep && GetWorld())
+		if (auto* Native = GetWorld()->GetSubsystem<UEcoPolicyV3IntegratedSubsystem>()) Native->SetAuthorityBoundaries(false);
     ResetCombat();
 	bReady = false;
 	bWaitingForHabitat = false;

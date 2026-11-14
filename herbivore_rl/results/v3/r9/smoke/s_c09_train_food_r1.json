@@ -1,0 +1,119 @@
+{
+ "set": "food_r1",
+ "note": "S′ C0-9 등록 측정 (2026-11-12 16:54~17:37): 무거운 python 4 개 함께, 언리얼 꺼짐(측정 중 UnrealEditor·UBT·MSBuild 없음), 시스템 CPU 평균 cpu_sys_mean(내 4 프로세스 약 20% 포함 [어림] — 나머지는 사용자 브라우저 등). 시드 44180~44199",
+ "time": "2026-11-12 17:01:44",
+ "wall_s": 432.76783084869385,
+ "min_available_gb": 10.370201110839844,
+ "min_free_commit_gb": 9.426292419433594,
+ "cpu_sys_mean": 87.4423076923077,
+ "ue_seen": [],
+ "aborted_low_commit": [],
+ "other_python_at_start": [
+  "이 측정의 자원 살피기(probe.py, 가벼움)",
+  "사용자 python ortholoc"
+ ],
+ "other_python_at_end": [
+  "이 측정의 자원 살피기(probe.py, 가벼움)",
+  "사용자 python ortholoc"
+ ],
+ "max_r9_python": 6,
+ "cpu_count": 20,
+ "runs": [
+  {
+   "run": "deer_A",
+   "species": "deer",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3010560,
+   "wall_s": 418.9812216758728,
+   "dec_per_s": 7185.429427978023,
+   "log_dec_per_s": [
+    7113,
+    7222
+   ],
+   "num_envs": 896,
+   "memory": [
+    {
+     "pid": 43888,
+     "peak_mb": 370.57421875,
+     "private_mb": 337.03515625
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "deer_B",
+   "species": "deer",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 3010560,
+   "wall_s": 417.4266769886017,
+   "dec_per_s": 7212.188788983908,
+   "log_dec_per_s": [
+    7027,
+    7309
+   ],
+   "num_envs": 896,
+   "memory": [
+    {
+     "pid": 36712,
+     "peak_mb": 369.41015625,
+     "private_mb": 332.2578125
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "boar_A",
+   "species": "boar",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 376.26771807670593,
+   "dec_per_s": 2743.238259386306,
+   "log_dec_per_s": [
+    2740,
+    2852
+   ],
+   "num_envs": 768,
+   "memory": [
+    {
+     "pid": 35456,
+     "peak_mb": 459.8125,
+     "private_mb": 384.33203125
+    }
+   ],
+   "error": ""
+  },
+  {
+   "run": "boar_B",
+   "species": "boar",
+   "round": 1,
+   "shards": 1,
+   "rc": 0,
+   "stop": "target",
+   "timesteps": 1032192,
+   "wall_s": 400.815354347229,
+   "dec_per_s": 2575.2306861623,
+   "log_dec_per_s": [
+    2579,
+    2458
+   ],
+   "num_envs": 768,
+   "memory": [
+    {
+     "pid": 26428,
+     "peak_mb": 461.43359375,
+     "private_mb": 386.078125
+    }
+   ],
+   "error": ""
+  }
+ ]
+}

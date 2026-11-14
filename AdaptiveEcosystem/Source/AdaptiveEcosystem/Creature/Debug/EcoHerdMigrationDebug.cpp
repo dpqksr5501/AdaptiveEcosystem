@@ -47,6 +47,10 @@ bool EcoHerdMigrationDebug::Capture(UWorld& W,FEcoHerdMigrationDebugSnapshot& Ou
         FRegionEcologyState State;FEcoMigrationDebugRegion R;R.Id=C->RegionId;R.Minimum=C->OriginCm;
         R.Maximum=C->UnitsToCm(C->Sim.Config.WorldSize,C->Sim.Config.WorldSize,C->OriginCm.Z);R.FoodFraction=C->FoodFraction();
         if(Ecology&&Ecology->GetRegionState(R.Id,State))R.Population=State.Population;
+        if(const auto* Regional=M->GetRegionalStates().Find(R.Id)){
+            R.Projected=Regional->Projected;R.Supported=Regional->Supported;R.Keep=Regional->KeepFloor;
+            R.Approved=Regional->Approved.Num();R.Budget=Regional->Initial-Regional->KeepFloor;R.RegionalReason=Regional->Reason;
+        }
         Out.Regions.Add(R);
     }
     Out.Regions.Sort([](const auto& A,const auto& B){return A.Id.LexicalLess(B.Id);});
@@ -108,6 +112,9 @@ bool EcoHerdMigrationDebug::ToJson(const FEcoHerdMigrationDebugSnapshot& S,FStri
     auto Vector=[](const FVector& P){TArray<TSharedPtr<FJsonValue>> V;for(double N:{P.X,P.Y,P.Z})V.Add(MakeShared<FJsonValueNumber>(N));return V;};
     TArray<TSharedPtr<FJsonValue>> Regions,Plans,Members;
     for(const auto& R:S.Regions){auto J=MakeShared<FJsonObject>();J->SetStringField(TEXT("region"),R.Id.ToString());
+        J->SetNumberField(TEXT("projected_deer"),R.Projected);J->SetNumberField(TEXT("supported_deer"),R.Supported);
+        J->SetNumberField(TEXT("keep_deer"),R.Keep);J->SetNumberField(TEXT("approved_deer"),R.Approved);J->SetNumberField(TEXT("episode_budget"),R.Budget);
+        J->SetStringField(TEXT("regional_reason"),R.RegionalReason.ToString());
         J->SetNumberField(TEXT("food_fraction"),R.FoodFraction);J->SetNumberField(TEXT("population"),R.Population);
         J->SetArrayField(TEXT("minimum"),Vector(R.Minimum));J->SetArrayField(TEXT("maximum"),Vector(R.Maximum));Regions.Add(MakeShared<FJsonValueObject>(J));}
     for(const auto& P:S.Plans){auto J=MakeShared<FJsonObject>();J->SetNumberField(TEXT("plan"),double(P.Id));J->SetNumberField(TEXT("herd"),double(P.Herd));
@@ -138,7 +145,7 @@ FLinearColor StateColor(EEcoHerdJourneyState S){
 void EcoHerdMigrationDebug::Draw(AHUD& H,APlayerController& Player,FVector2D Size,const FEcoHerdMigrationDebugSnapshot& S,int64 Focus,int32 DebugMode)
 {
     const float W=FMath::Min(FMath::Clamp(float(Size.X*.38),360.f,480.f),float(Size.X-32)),X=Size.X-W-16,Y=56;
-    const float RegionY=246,FooterY=RegionY+44*S.Regions.Num()+10;
+    const float RegionY=246,FooterY=RegionY+80*S.Regions.Num()+10;
     const auto* P=S.Plans.FindByPredicate([&](const auto& V){return V.Id==Focus;});
     H.DrawRect(FLinearColor(.015f,.025f,.04f,.9f),X,Y,W,FooterY+126);
     auto Text=[&](FString Value,FLinearColor Color,float OffsetY,float TextScale=.85f){
@@ -169,10 +176,12 @@ void EcoHerdMigrationDebug::Draw(AHUD& H,APlayerController& Player,FVector2D Siz
         const bool Target=P&&P->Destination==R.Id;const auto C=Target?Gold:Grey;
         Line(A,{A.X,B.Y},C,2);Line({A.X,B.Y},B,C,2);Line(B,{B.X,A.Y},C,2);Line({B.X,A.Y},A,C,2);
         // A dedicated row per region: equal world Y must never place labels on top of each other.
-        const float RowY=RegionY+44*RegionRow++;
+        const float RowY=RegionY+80*RegionRow++;
         Text(R.Id.ToString(),C,RowY);
         Text(FString::Printf(TEXT("Food %.0f%%   Pop %d"),100*R.FoodFraction,R.Population),
             R.FoodFraction<.25?Gold:FLinearColor::White,RowY+20);
+        Text(FString::Printf(TEXT("Stay %d  Support %d  Keep %d  Sent %d/%d"),R.Projected,R.Supported,R.Keep,R.Approved,R.Budget),Grey,RowY+38,.68f);
+        Text(R.RegionalReason.ToString(),Gold,RowY+55,.72f);
     }
     for(const auto& R:S.Routes)for(int32 I=1;I<R.Points.Num();++I){
         Line(Map(R.Points[I-1]),Map(R.Points[I]),Cyan,2);
