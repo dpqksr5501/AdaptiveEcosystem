@@ -49,12 +49,7 @@ def git_sha() -> str:
         return "?"
 
 
-def load_brain(path: str) -> dict:
-    with np.load(path, allow_pickle=False) as z:
-        meta = json.loads(str(z["meta_json"][()]))
-        if meta.get("io_hash") != C.io_hash():
-            raise ValueError(f"{path}: io_hash {meta.get('io_hash')} != contract {C.io_hash()}")
-        return {k: np.array(z[k]) for k in ("W0", "B0", "W1", "B1", "W2", "B2")}
+load_brain = P.load_brain
 
 
 def save_brain(path: Path, weights: dict, meta: dict) -> None:

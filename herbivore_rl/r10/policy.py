@@ -6,6 +6,8 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 
 from r10 import contract as C
@@ -42,6 +44,26 @@ def act_np(weights: dict, obs: np.ndarray) -> np.ndarray:
     lg = forward_np(weights, obs.astype(np.float32))
     lg = np.where(mask_from_obs(obs), lg, NEG)
     return np.argmax(lg, axis=1)
+
+
+def sample_np(weights: dict, obs: np.ndarray, rng: np.random.Generator) -> np.ndarray:
+    """확률 행동: 막히지 않은 칸의 softmax 에서 뽑기 (학습 때와 같은 방식, 평가 비교용)."""
+    lg = forward_np(weights, obs.astype(np.float32)).astype(np.float64)
+    lg = np.where(mask_from_obs(obs), lg, NEG)
+    lg -= lg.max(axis=1, keepdims=True)
+    pr = np.exp(lg)
+    pr /= pr.sum(axis=1, keepdims=True)
+    u = rng.random((pr.shape[0], 1))
+    return np.minimum((np.cumsum(pr, axis=1) < u).sum(axis=1), pr.shape[1] - 1)
+
+
+def load_brain(path) -> dict:
+    """npz 두뇌 → numpy 가중치. 계약 해시(io_hash)가 다르면 거부. torch 를 부르지 않는다 (평가·언리얼 내보내기용)."""
+    with np.load(path, allow_pickle=False) as z:
+        meta = json.loads(str(z["meta_json"][()]))
+        if meta.get("io_hash") != C.io_hash():
+            raise ValueError(f"{path}: io_hash {meta.get('io_hash')} != contract {C.io_hash()}")
+        return {k: np.array(z[k]) for k in ("W0", "B0", "W1", "B1", "W2", "B2")}
 
 
 def make_sb3_policy():

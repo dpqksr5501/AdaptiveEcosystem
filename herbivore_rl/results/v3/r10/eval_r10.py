@@ -33,15 +33,16 @@ from r10 import rule_brain as RB  # noqa: E402
 from r10 import senses as O  # noqa: E402
 from r10 import species as S  # noqa: E402
 from r10 import world as W  # noqa: E402
-from train_r10 import load_brain  # noqa: E402
 
 
-def run(cards: dict, brains: dict, seeds: list, decisions: int, n_each: int, overrides: dict | None, world_seed: int) -> dict:
+def run(cards: dict, brains: dict, seeds: list, decisions: int, n_each: int, overrides: dict | None, world_seed: int,
+        sample: bool = False) -> dict:
     ids = sorted(cards)
     maps = [G.make_map(s, "check", overrides) for s in seeds]
     ros = [W.Roster([(cards[s], n_each, n_each) for s in ids]) for _ in maps]
     w = W.World(maps, ros, slots=n_each * len(ids), seed=world_seed, train=False)
     o = O.observe(w)
+    rng = np.random.default_rng(world_seed + 1)
     alive_dec = Counter()
     eat_dec = Counter()
     e_sum = defaultdict(float)
@@ -53,7 +54,7 @@ def run(cards: dict, brains: dict, seeds: list, decisions: int, n_each: int, ove
             if len(idx) == 0:
                 continue
             wts = brains.get(sid)
-            a[idx] = P.act_np(wts, o[idx]) if wts is not None else RB.decide(o[idx])
+            a[idx] = (P.sample_np(wts, o[idx], rng) if sample else P.act_np(wts, o[idx])) if wts is not None else RB.decide(o[idx])
             alive_dec[sid] += len(idx)
             eat_dec[sid] += int((a[idx] == C.A_EAT).sum())
             e_sum[sid] += float(w.E[idx].sum())
@@ -92,6 +93,7 @@ def main(argv=None) -> int:
     ap.add_argument("--decisions", type=int, default=1350, help="결정 수 (1,350 ≈ 하루 반)")
     ap.add_argument("--n-each", type=int, default=6)
     ap.add_argument("--world-seed", type=int, default=7)
+    ap.add_argument("--sample", action="store_true", help="배운 두뇌를 학습 때처럼 확률로 뽑기 (기본: 가장 높은 칸)")
     ap.add_argument("--out", default=None, help="결과 JSON")
     a = ap.parse_args(argv)
     cards = S.load_all(a.cards)
@@ -100,10 +102,10 @@ def main(argv=None) -> int:
     brains = {}
     for spec in a.brain:
         sid, _, path = spec.partition("=")
-        brains[sid] = load_brain(path)
+        brains[sid] = P.load_brain(path)
     overrides = {"shape": "flat", "water": "none"} if a.flat else None
-    res = run(cards, brains, list(range(a.seeds[0], a.seeds[1])), a.decisions, a.n_each, overrides, a.world_seed)
-    head = f"두뇌 {({k: Path(v).name for k, v in (s.partition('=')[::2] for s in a.brain)}) or '모두 규칙'} · 맵 {a.seeds} · {a.decisions} 결정"
+    res = run(cards, brains, list(range(a.seeds[0], a.seeds[1])), a.decisions, a.n_each, overrides, a.world_seed, a.sample)
+    head = f"두뇌 {({k: Path(v).name for k, v in (s.partition('=')[::2] for s in a.brain)}) or '모두 규칙'} · 맵 {a.seeds} · {a.decisions} 결정{' · 확률 뽑기' if a.sample else ''}"
     print(head)
     print(f"{'종':10s} {'시작':>4s} {'끝':>4s} {'물림/k':>7s} {'굶음/k':>7s} {'물/k':>6s} {'기운':>5s} {'먹기몫':>6s} {'죽임/k':>7s}")
     for sid, r in res.items():
