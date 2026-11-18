@@ -41,7 +41,7 @@ FIELDS = {
     ("senses", "sight_m"): (0.05, 200.0, False), ("senses", "fov_deg"): (30.0, 360.0, False),
     ("senses", "smell_m"): (0.0, 200.0, False), ("senses", "hearing_m"): (0.0, 300.0, False),
     ("senses", "night_vision"): (0.0, 1.0, False),
-    ("eat", "rate_per_s"): (0.0, 10.0, False), ("eat", "energy_per_unit"): (0.0, 10.0, False),
+    ("eat", "rate_per_s"): (0.0, 10.0, False), ("eat", "energy_per_unit"): (0.0, 100.0, False),
     ("metabolism", "drain_per_day"): (0.0, 10.0, False), ("metabolism", "reserve_days"): (0.0, 60.0, False),
     ("metabolism", "run_cost"): (1.0, 20.0, False), ("metabolism", "swim_cost"): (1.0, 20.0, True),
     ("metabolism", "fly_cost"): (1.0, 20.0, True),

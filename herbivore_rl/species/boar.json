@@ -1,0 +1,123 @@
+{
+ "id": "boar",
+ "name_ko": "멧돼지",
+ "card_version": 1,
+ "medium": {
+  "ground": true,
+  "swim": false,
+  "fly": false,
+  "wade_depth_m": 0.1,
+  "swim_depth_frac": null,
+  "cruise_height_m": null,
+  "ceiling_m": null,
+  "takeoff_s": null,
+  "needs_water": false
+ },
+ "body": {
+  "mass_kg": 75.0,
+  "radius_m": 0.3,
+  "walk_mps": 1.3,
+  "run_mps": 3.15,
+  "swim_mps": null,
+  "swim_fast_mps": null,
+  "fly_mps": null,
+  "cruise_mps": null,
+  "dive_mps": null,
+  "accel_mps2": 6.8,
+  "turn_dps": 125.0,
+  "lat_accel_mps2": 7.0,
+  "max_slope_deg": 49.46,
+  "step_m": 0.2,
+  "stamina_s": 11.11,
+  "stamina_recover_s": 7.69
+ },
+ "senses": {
+  "sight_m": 15.0,
+  "fov_deg": 198.0,
+  "smell_m": 0.0,
+  "hearing_m": 15.4,
+  "night_vision": 0.75
+ },
+ "diet": {
+  "grass": 1.0,
+  "forbs": 1.0,
+  "browse": 1.0,
+  "wet_meadow": 1.0,
+  "roots": 1.0,
+  "insects": 0.0,
+  "aquatic": 0.0,
+  "drift": 0.0,
+  "meat": 0.0,
+  "carrion": 1.0
+ },
+ "eat": {
+  "rate_per_s": 0.05911,
+  "energy_per_unit": 0.2667
+ },
+ "metabolism": {
+  "drain_per_day": 0.4729,
+  "reserve_days": 3.0,
+  "run_cost": 3.0,
+  "swim_cost": null,
+  "fly_cost": null
+ },
+ "combat": {
+  "kill_mass_ratio": 0.0,
+  "reach_m": 0.65,
+  "attack_cd_s": 1.0,
+  "defense": 18.0,
+  "counter_reach_m": 0.9
+ },
+ "life": {
+  "maturity_days": 1.0,
+  "litter": 1.0,
+  "gestation_days": 0.25
+ },
+ "randomize": {
+  "frac": 0.15,
+  "keys": [
+   "body.mass_kg",
+   "body.radius_m",
+   "body.walk_mps",
+   "body.run_mps",
+   "body.swim_mps",
+   "body.fly_mps",
+   "body.cruise_mps",
+   "body.accel_mps2",
+   "body.turn_dps",
+   "senses.sight_m",
+   "eat.rate_per_s",
+   "metabolism.drain_per_day"
+  ]
+ },
+ "sources": {
+  "medium.ground": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:78 (unreal-default)",
+  "medium.swim": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:78 (unreal-default)",
+  "medium.fly": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:78 (unreal-default)",
+  "medium.wade_depth_m": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:665 (unreal-script)",
+  "body.mass_kg": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:610 (unreal-script)",
+  "body.radius_m": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:610 (unreal-script)",
+  "body.walk_mps": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:610 (unreal-script)",
+  "body.run_mps": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:610 (unreal-script)",
+  "body.accel_mps2": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:617 (unreal-script)",
+  "body.max_slope_deg": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:90 (unreal-default)",
+  "body.step_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:107 (unreal-default)",
+  "body.turn_dps": "정함: M1 회전 한계 (사용자 결정 11-13, RL_R9_TURN_EFFORT_DESIGN.md 3-2)",
+  "body.lat_accel_mps2": "정함: M1 회전 한계 (사용자 결정 11-13, RL_R9_TURN_EFFORT_DESIGN.md 3-2)",
+  "body.stamina_s": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:665; AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:109; lock/unlock AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:1522-1524 (unreal-script) — 1/SprintDrain, 1/Recovery",
+  "body.stamina_recover_s": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:665; AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:109; lock/unlock AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:1522-1524 (unreal-script) — 1/SprintDrain, 1/Recovery",
+  "senses.sight_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:85 (unreal-default)",
+  "senses.fov_deg": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:86 (unreal-default)",
+  "senses.smell_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:113 (unreal-default)",
+  "senses.hearing_m": "AdaptiveEcosystem/Tools/Editor/author_jyu_fauna_footsteps.py:35 (unreal-script)",
+  "senses.night_vision": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:619 (unreal-script)",
+  "diet": "초안 diet (선호 수치·True=1·목록=1) + 정함: {}",
+  "eat": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다",
+  "metabolism": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다",
+  "combat.kill_mass_ratio": "정함: 언리얼 사냥 표의 max_prey_mass_ratio 가운데 가장 큰 값 — 종 이름 목록 대신 몸무게 비율 하나 (사양 3 절)",
+  "combat.reach_m": "정함: 반지름 × 1.5 + 0.2",
+  "combat.defense": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:665 (unreal-script)",
+  "combat.attack_cd_s": "정함: R9 물기 쿨다운 8 걸음 ≈ 1 s",
+  "life": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:610 (unreal-script) · 초를 하루 120 s 로 나눔"
+ }
+}

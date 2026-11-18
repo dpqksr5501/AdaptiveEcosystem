@@ -1,0 +1,781 @@
+{
+ "id": "fox",
+ "unreal_id": "Fox",
+ "executor": "Unreal rule fauna backend (EcoFauna profile on LV_JYU_IslandEcosystemRefreshed)",
+ "island_chain": "setup_jyu_fauna.py/setup_jyu_expanded_fauna.py profile -> LV_JYU_Fauna -> LV_JYU_ExpandedFauna -> SeasonalWaterFood -> RiparianHabitat -> RiparianProjectJ -> RiparianReach (donor) -> island (author_jyu_island_fauna.py:549,612)",
+ "r9_id": "fox",
+ "medium": {
+  "ground": {
+   "v": true,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:78",
+   "kind": "unreal-default",
+   "note": "Locomotion=Ground"
+  },
+  "wade_depth_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:106",
+   "kind": "unreal-default",
+   "note": "0 = cannot wade"
+  },
+  "swim": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:78",
+   "kind": "unreal-default",
+   "note": "CanSwim() AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:165"
+  },
+  "swim_depth_frac": {
+   "v": null,
+   "na": true,
+   "note": "not a swimmer"
+  },
+  "needs_water": {
+   "v": null,
+   "na": true,
+   "note": "terrestrial/aerial; no drinking or thirst mechanic in the fauna backend"
+  },
+  "fly": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:78",
+   "kind": "unreal-default"
+  },
+  "cruise_height_m": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "ceiling_m": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "takeoff_s": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  }
+ },
+ "body": {
+  "mass_kg": {
+   "v": 7.0,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:611",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": 7.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:168",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "radius_m": {
+   "v": 0.23,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:611",
+   "kind": "unreal-script"
+  },
+  "sweep_height_m": {
+   "v": 0.65,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:105",
+   "kind": "unreal-default",
+   "note": "collision sweep height"
+  },
+  "shoulder_height_m": {
+   "v": "0.35-0.40",
+   "src": "AdaptiveEcosystem/Docs/RL_Policy/RL_R9_SPECIES_TRAITS.md:135",
+   "kind": "doc-only",
+   "note": "range string, metres"
+  },
+  "walk_mps": {
+   "v": 1.3,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:611",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": 2.25,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:172",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "run_mps": {
+   "v": 4.2,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:611",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": 7.05,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:173",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "swim_mps": {
+   "v": null,
+   "na": true,
+   "note": "not a swimmer"
+  },
+  "fly_mps": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "cruise_mps": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "dive_mps": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "accel_mps2": {
+   "v": 11.0,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:617",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": 13.5,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:175",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "turn_dps": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:92",
+   "kind": "unreal-default",
+   "note": "0 = unrestricted heading",
+   "alt": [
+    {
+     "v": 185.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna_motion.yaml:31",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "lat_accel_mps2": {
+   "v": 10.0,
+   "src": "herbivore_rl/configs/v3_r9_fauna_motion.yaml:32",
+   "kind": "r9-yaml",
+   "note": "no Unreal equivalent"
+  },
+  "max_slope_deg": {
+   "v": 49.46,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:90",
+   "kind": "unreal-default",
+   "note": "acos(MinGroundNormalZ=0.65)"
+  },
+  "step_m": {
+   "v": 0.2,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:107",
+   "kind": "unreal-default"
+  },
+  "stamina": {
+   "v": {
+    "model": "stamina 0..1; drains SprintDrain/s while running; locks <=0.15, unlocks >=0.55",
+    "sprint_drain_per_s": 0.095,
+    "recovery_per_s": 0.13,
+    "run_s_full_to_lock": 8.95,
+    "recover_s_lock_to_unlock": 3.08
+   },
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:668; AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:109; lock/unlock AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:1522-1524",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": {
+      "model": "R9 stamina 0..1; lock 0.15 / unlock 0.55 (v3_r9.yaml:77-78)",
+      "run_steps": 60,
+      "recover_steps": 60,
+      "run_s_full_to_lock": 8.0,
+      "recover_s_lock_to_unlock": 8.0
+     },
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:176-177",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "maintenance_energy_per_s": {
+   "v": 0.26,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:668",
+   "kind": "unreal-script",
+   "note": "vitals energy units/s at full activity; plant energy 5/unit (EcoFauna.h:15)",
+   "alt": [
+    {
+     "v": {
+      "drain_E_per_step": 0.000464,
+      "drain_E_per_s": 0.00348,
+      "reserve_days": 1.4
+     },
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:182; herbivore_rl/configs/v3_r9_fauna.yaml:183",
+     "kind": "r9-yaml",
+     "note": "R9 E units (stomach 0..1), not Unreal vitals units",
+     "cmp": false
+    }
+   ]
+  }
+ },
+ "senses": {
+  "sight_m": {
+   "v": 13.5,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:668",
+   "kind": "unreal-script",
+   "note": "food/prey/carrion sight (EcoFaunaMovement.cpp:255-266,844)",
+   "alt": [
+    {
+     "v": 24.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:178",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "fov_deg": {
+   "v": 200.0,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:668",
+   "kind": "unreal-script",
+   "note": "full angle = 2 x SightHalfAngle (prey sight)",
+   "alt": [
+    {
+     "v": 260.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:179",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "eye_height_m": {
+   "v": 0.35,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:104",
+   "kind": "unreal-default"
+  },
+  "smell_m": {
+   "v": 10.0,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:668",
+   "kind": "unreal-script",
+   "note": "scales with sqrt(stock/20) for carrion (EcoFaunaMovement.cpp:841-843)",
+   "alt": [
+    {
+     "v": 10.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:181",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "hearing_m": {
+   "v": 23.5,
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_fauna_footsteps.py:36",
+   "kind": "unreal-script",
+   "note": "footstep listener HearingRange (EcoFootstepAudioSet.h:28); heard footsteps cue prey/threat (EcoFaunaMovement.cpp:1572-1645)",
+   "alt": [
+    {
+     "v": {
+      "min_m": 4.0,
+      "max_m": 40.0
+     },
+     "src": "herbivore_rl/env_v2/r9_body.py:225-230",
+     "kind": "r9-yaml",
+     "note": "R9: radius set by the EMITTER's speed (species-independent), 2-20 u",
+     "cmp": false
+    }
+   ]
+  },
+  "threat_sense_m": {
+   "v": 6.5,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:136",
+   "kind": "unreal-default",
+   "note": "visual threat range; x Lerp(1,NightVision,darkness) (EcoFaunaMovement.cpp:1527-1528)"
+  },
+  "threat_fov_deg": {
+   "v": 180.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:137",
+   "kind": "unreal-default",
+   "note": "full angle = 2 x ThreatSightHalfAngle"
+  },
+  "threat_near_awareness_m": {
+   "v": 2.8,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:138",
+   "kind": "unreal-default",
+   "note": "omnidirectional near awareness"
+  },
+  "night_vision": {
+   "v": 0.85,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:619",
+   "kind": "unreal-script",
+   "note": "sight multiplier at full darkness"
+  },
+  "day_activity": {
+   "v": 0.53,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:619",
+   "kind": "unreal-script"
+  },
+  "night_activity": {
+   "v": 0.94,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:619",
+   "kind": "unreal-script"
+  },
+  "camo": {
+   "v": 1.0,
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:217",
+   "kind": "r9-yaml",
+   "note": "R9 R3: how far others see this body (1 = plain)"
+  },
+  "head_down_mult": {
+   "v": 0.6,
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:180",
+   "kind": "r9-yaml",
+   "note": "eyes x0.6 while eating"
+  }
+ },
+ "diet": {
+  "diet_class": {
+   "v": "Carnivore",
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:646",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": [
+      "meat",
+      "root"
+     ],
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:188",
+     "kind": "r9-yaml",
+     "note": "R9 diet order"
+    }
+   ]
+  },
+  "plant_native_grid": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:166 UsesPlantFood(); AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:1950-1952; AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.cpp:972",
+   "kind": "unreal-script",
+   "note": "does not eat land plants"
+  },
+  "grass": {
+   "v": null,
+   "na": true,
+   "note": "not a land-plant eater"
+  },
+  "forbs": {
+   "v": null,
+   "na": true,
+   "note": "not a land-plant eater"
+  },
+  "browse": {
+   "v": null,
+   "na": true,
+   "note": "not a land-plant eater"
+  },
+  "wet_meadow": {
+   "v": null,
+   "na": true,
+   "note": "not a land-plant eater"
+  },
+  "roots": {
+   "v": {
+    "eat_units_per_s": 0.02175,
+    "energy_per_unit": 1.714
+   },
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:189; herbivore_rl/configs/v3_r9_fauna.yaml:190",
+   "kind": "r9-yaml",
+   "note": "no root resource in Unreal island"
+  },
+  "insects": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:571-612",
+   "kind": "unreal-script",
+   "note": "island patch list has no land insect patch",
+   "alt": [
+    {
+     "v": true,
+     "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_fauna_balance.py:32",
+     "kind": "unreal-script",
+     "note": "LV_JYU_Fauna fixture GroundInsects patch (energy 4.5/meal); replaced on island"
+    }
+   ]
+  },
+  "fruit_mast": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:571-612",
+   "kind": "unreal-script",
+   "note": "no fruit patch on island",
+   "alt": [
+    {
+     "v": true,
+     "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_fauna_balance.py:34",
+     "kind": "unreal-script",
+     "note": "LV_JYU_Fauna FallenFruit fixture (4.0/meal); replaced on island"
+    }
+   ]
+  },
+  "aquatic_plants_drift": {
+   "v": null,
+   "na": true,
+   "note": "not aquatic"
+  },
+  "meat_live_prey": {
+   "v": true,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:650-651 + AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:500-504 (Jackrabbit rule added in ExpandedFauna)",
+   "kind": "unreal-script",
+   "note": "PredationEnergyPerMeal = 7.0 (AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:129)",
+   "alt": [
+    {
+     "v": true,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:194",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "carrion": {
+   "v": {
+    "eats": true,
+    "energy_per_meal": 7.0,
+    "hunger_start_frac": 0.86
+   },
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:668",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": {
+      "eat_units_per_s": 0.032475,
+      "energy_per_unit": 5.714
+     },
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:189; herbivore_rl/configs/v3_r9_fauna.yaml:190",
+     "kind": "r9-yaml",
+     "note": "R9 meat = carcass meat (kg/9 per unit)",
+     "cmp": false
+    }
+   ]
+  },
+  "food_per_meal_units": {
+   "v": 0.18,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:611",
+   "kind": "unreal-script",
+   "note": "Native grid food units per plant meal; energy = units x 5"
+  },
+  "meal_stop_frac": {
+   "v": 0.9,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:133",
+   "kind": "unreal-default"
+  },
+  "post_meal_rest_s": {
+   "v": 4.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:134",
+   "kind": "unreal-default"
+  },
+  "feeding_places_on_own_carcass": {
+   "v": 2,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:155",
+   "kind": "unreal-default"
+  },
+  "adult_carcass_energy": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:152",
+   "kind": "unreal-default",
+   "note": "0 = estimated from body mass"
+  }
+ },
+ "combat": {
+  "hunts": {
+   "v": [
+    {
+     "prey": "Crow",
+     "max_prey_mass_ratio": 0.45,
+     "preference": 1.0
+    },
+    {
+     "prey": "Rat",
+     "max_prey_mass_ratio": 0.4,
+     "preference": 1.9
+    },
+    {
+     "prey": "Jackrabbit",
+     "max_prey_mass_ratio": 0.7,
+     "preference": 0.7,
+     "max_healthy_maturity": 0.65
+    }
+   ],
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:650-651 + AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:500-504 (Jackrabbit rule added in ExpandedFauna)",
+   "kind": "unreal-script",
+   "note": "MaxPreyMassRatio: prey mass <= ratio x hunter mass (both x size^3 x Lerp(0.12,1,age)); maturity limits by prey HP<60% (EcoFaunaWaterMovement.cpp:24-30); fauna backend can only target fauna residents (EcoFauna.h:81)",
+   "alt": [
+    {
+     "v": [
+      "deer",
+      "wolf",
+      "boar",
+      "buffalo",
+      "leopard"
+     ],
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:194",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "attack_reach_m": {
+   "v": 0.75,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:661",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": 1.1,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:195",
+     "kind": "r9-yaml",
+     "note": "x genetic size x growth"
+    }
+   ]
+  },
+  "attack_windup_s": {
+   "v": 0.22,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:668",
+   "kind": "unreal-script"
+  },
+  "attack_recovery_s": {
+   "v": 2.8,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:668",
+   "kind": "unreal-script"
+  },
+  "pursuit_limit_s": {
+   "v": 12.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:135",
+   "kind": "unreal-default"
+  },
+  "stalk_range_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:98",
+   "kind": "unreal-default",
+   "note": "0 = no stalking"
+  },
+  "flank_defended_prey": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:99",
+   "kind": "unreal-default"
+  },
+  "bite_damage": {
+   "v": "prey HP - 100% MaxHP if prey DefenseDamage==0, else -45% MaxHP",
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:398",
+   "kind": "unreal-default",
+   "note": "same for every hunter",
+   "alt": [
+    {
+     "v": {
+      "bite_k": 0.2
+     },
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:212",
+     "kind": "r9-yaml",
+     "note": "R9 R1 wound = min(1, bite_k x (Ma/Mb)^(2/3) / hide_b)"
+    }
+   ]
+  },
+  "counterattack_damage_hp": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:114",
+   "kind": "unreal-default",
+   "note": "0 = no counterattack",
+   "alt": [
+    {
+     "v": 0.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:196; herbivore_rl/configs/v3_r9_fauna.yaml:214; AdaptiveEcosystem/Docs/RL_Policy/RL_R9_SPECIES_TRAITS.md:154-155",
+     "kind": "r9-yaml",
+     "note": "R9 counter/gore damage to an adult wolf in HP points (x100): strike_k x (M_self/M_wolf)^(2/3) / hide_wolf; 0 = no counter"
+    }
+   ]
+  },
+  "offspring_guard_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:115",
+   "kind": "unreal-default",
+   "note": "0 = no parental guarding"
+  },
+  "second_parent_guard": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:116",
+   "kind": "unreal-default"
+  },
+  "gore": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:324-410",
+   "kind": "unreal-default",
+   "note": "no gore/charge attack in Unreal fauna",
+   "alt": [
+    {
+     "v": {
+      "gore": false,
+      "gore_r_m": 0.0
+     },
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:215-216",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "hide": {
+   "v": 1.0,
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:213",
+   "kind": "r9-yaml",
+   "note": "R9 wound divisor"
+  }
+ },
+ "life": {
+  "maturity_s": {
+   "v": 135.0,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:611",
+   "kind": "unreal-script",
+   "alt": [
+    {
+     "v": 144.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:197",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "gestation_s": {
+   "v": 30.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:124",
+   "kind": "unreal-default",
+   "alt": [
+    {
+     "v": 30.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:103",
+     "kind": "r9-yaml",
+     "note": "body_common.breed.gestation (all species)"
+    }
+   ]
+  },
+  "birth_recovery_s": {
+   "v": 300.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:125",
+   "kind": "unreal-default",
+   "alt": [
+    {
+     "v": 300.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:218",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "litter": {
+   "v": 1,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Ecology/EcologySimulationSubsystem.cpp:400",
+   "kind": "unreal-default",
+   "note": "one young per natural-birth reservation",
+   "alt": [
+    {
+     "v": 1,
+     "src": "AdaptiveEcosystem/Docs/RL_Policy/RL_R9_SPECIES_TRAITS.md:139",
+     "kind": "doc-only",
+     "note": "R9: litter 1 for all species"
+    }
+   ]
+  },
+  "mate_radius_m": {
+   "v": 10.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.cpp:1301",
+   "kind": "unreal-default",
+   "note": "parents within 1000 cm",
+   "alt": [
+    {
+     "v": 20.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:203",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "birth_radius_m": {
+   "v": 30.0,
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:204",
+   "kind": "r9-yaml"
+  },
+  "female_frac": {
+   "v": 0.5,
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:199",
+   "kind": "r9-yaml"
+  },
+  "nestling_s": {
+   "v": null,
+   "na": true,
+   "note": "not a nester"
+  },
+  "spawning_temp_c": {
+   "v": null,
+   "na": true,
+   "note": "not a spawner"
+  },
+  "max_nursery_current_mps": {
+   "v": null,
+   "na": true,
+   "note": "not a spawner"
+  },
+  "lifespan_s": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "no ageing death in Unreal fauna; R9 has none either"
+  },
+  "regional_limit": {
+   "v": 8,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_fauna.py:611",
+   "kind": "unreal-script"
+  }
+ },
+ "social": {
+  "social_neighbor_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:142",
+   "kind": "unreal-default",
+   "note": "0 = independent routine"
+  },
+  "social_spacing_m": {
+   "v": 1.8,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:145",
+   "kind": "unreal-default"
+  },
+  "adult_male_social_affinity": {
+   "v": 1.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:144",
+   "kind": "unreal-default"
+  },
+  "caregiver_follow_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:101",
+   "kind": "unreal-default",
+   "note": "0 = young do not follow"
+  },
+  "guard_radius_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:115",
+   "kind": "unreal-default"
+  },
+  "routine_home_radius_m": {
+   "v": 5.2,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:140",
+   "kind": "unreal-default"
+  },
+  "individual_response": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:97",
+   "kind": "unreal-default"
+  }
+ },
+ "habitat": {
+  "island_region": {
+   "v": "Riverbank",
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:553",
+   "kind": "unreal-script"
+  },
+  "island_founders": {
+   "v": 2,
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:553",
+   "kind": "unreal-script"
+  },
+  "region_air_temp_c": {
+   "v": 14,
+   "src": "AdaptiveEcosystem/Tools/Editor/apply_jyu_island_ecosystem.py:105",
+   "kind": "unreal-script"
+  },
+  "heat_response_c": {
+   "v": [
+    0.0,
+    0.0
+   ],
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:147",
+   "kind": "unreal-default",
+   "note": "both 0 = disabled"
+  }
+ }
+}

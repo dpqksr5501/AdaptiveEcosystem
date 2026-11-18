@@ -1,0 +1,521 @@
+{
+ "id": "small_fish",
+ "unreal_id": "UnidentifiedFish",
+ "executor": "Unreal rule fauna backend (EcoFauna profile on LV_JYU_IslandEcosystemRefreshed)",
+ "island_chain": "setup_jyu_fauna.py/setup_jyu_expanded_fauna.py profile -> LV_JYU_Fauna -> LV_JYU_ExpandedFauna -> SeasonalWaterFood -> RiparianHabitat -> RiparianProjectJ -> RiparianReach (donor) -> island (author_jyu_island_fauna.py:549,612)",
+ "medium": {
+  "ground": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script",
+   "note": "Locomotion=Swimming"
+  },
+  "wade_depth_m": {
+   "v": null,
+   "na": true,
+   "note": "aquatic"
+  },
+  "swim": {
+   "v": true,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script",
+   "note": "CanSwim() AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:165"
+  },
+  "swim_depth_frac": {
+   "v": 0.21,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script",
+   "note": "fraction of local water column height the swimmer holds (EcoFaunaWaterMovement.cpp:589)"
+  },
+  "needs_water": {
+   "v": true,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script",
+   "note": "IsAquatic() AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:164 — Swimming locomotion never leaves water"
+  },
+  "fly": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  },
+  "cruise_height_m": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "ceiling_m": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "takeoff_s": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  }
+ },
+ "body": {
+  "mass_kg": {
+   "v": 0.05,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:32",
+   "kind": "unreal-script"
+  },
+  "radius_m": {
+   "v": 0.04,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:32",
+   "kind": "unreal-script"
+  },
+  "sweep_height_m": {
+   "v": 0.65,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:105",
+   "kind": "unreal-default",
+   "note": "collision sweep height"
+  },
+  "walk_mps": {
+   "v": 0.36,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:32",
+   "kind": "unreal-script",
+   "note": "swim speed in water (EcoFaunaWaterMovement.cpp:199 uses WalkSpeed)"
+  },
+  "run_mps": {
+   "v": 0.82,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:32",
+   "kind": "unreal-script",
+   "note": "not used by water movement (EcoFaunaWaterMovement.cpp:199); drives animation/footstep scale only"
+  },
+  "swim_mps": {
+   "v": 0.36,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:32; AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaWaterMovement.cpp:199",
+   "kind": "unreal-script",
+   "note": "swim = WalkSpeed x SpeedScale x Lerp(0.45,1,activity); no faster swim gait"
+  },
+  "fly_mps": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "cruise_mps": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "dive_mps": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "accel_mps2": {
+   "v": 7.5,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:89",
+   "kind": "unreal-default"
+  },
+  "turn_dps": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:92",
+   "kind": "unreal-default",
+   "note": "0 = unrestricted heading"
+  },
+  "lat_accel_mps2": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "no lateral-acceleration limit in Unreal fauna; not in R9"
+  },
+  "max_slope_deg": {
+   "v": null,
+   "na": true,
+   "note": "aquatic"
+  },
+  "step_m": {
+   "v": null,
+   "na": true,
+   "note": "aquatic"
+  },
+  "stamina": {
+   "v": {
+    "model": "stamina 0..1; drains SprintDrain/s while running; locks <=0.15, unlocks >=0.55",
+    "sprint_drain_per_s": 0.1,
+    "recovery_per_s": 0.13,
+    "run_s_full_to_lock": 8.5,
+    "recover_s_lock_to_unlock": 3.08
+   },
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:108; AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:109; lock/unlock AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:1522-1524",
+   "kind": "unreal-default"
+  },
+  "maintenance_energy_per_s": {
+   "v": 0.1,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script",
+   "note": "vitals energy units/s at full activity; plant energy 5/unit (EcoFauna.h:15)"
+  }
+ },
+ "senses": {
+  "sight_m": {
+   "v": 3.25,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script",
+   "note": "food/prey/carrion sight (EcoFaunaMovement.cpp:255-266,844)"
+  },
+  "fov_deg": {
+   "v": 198.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:86",
+   "kind": "unreal-default",
+   "note": "full angle = 2 x SightHalfAngle (prey sight)"
+  },
+  "eye_height_m": {
+   "v": 0.35,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:104",
+   "kind": "unreal-default"
+  },
+  "smell_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:113",
+   "kind": "unreal-default",
+   "note": "0 = no scent sensing"
+  },
+  "hearing_m": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "no footstep listener profile for this species -> no footstep hearing (EcoFaunaMovement.cpp:1572)"
+  },
+  "threat_sense_m": {
+   "v": 6.5,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:136",
+   "kind": "unreal-default",
+   "note": "visual threat range; x Lerp(1,NightVision,darkness) (EcoFaunaMovement.cpp:1527-1528)"
+  },
+  "threat_fov_deg": {
+   "v": 180.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:137",
+   "kind": "unreal-default",
+   "note": "full angle = 2 x ThreatSightHalfAngle"
+  },
+  "threat_near_awareness_m": {
+   "v": 2.8,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:138",
+   "kind": "unreal-default",
+   "note": "omnidirectional near awareness"
+  },
+  "night_vision": {
+   "v": 1.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:119",
+   "kind": "unreal-default",
+   "note": "sight multiplier at full darkness"
+  },
+  "day_activity": {
+   "v": 0.88,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  },
+  "night_activity": {
+   "v": 0.52,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  }
+ },
+ "diet": {
+  "diet_class": {
+   "v": "Omnivore",
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  },
+  "plant_native_grid": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:166 UsesPlantFood(); AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:1950-1952; AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.cpp:972",
+   "kind": "unreal-script",
+   "note": "does not eat land plants"
+  },
+  "grass": {
+   "v": null,
+   "na": true,
+   "note": "not a land-plant eater"
+  },
+  "forbs": {
+   "v": null,
+   "na": true,
+   "note": "not a land-plant eater"
+  },
+  "browse": {
+   "v": null,
+   "na": true,
+   "note": "not a land-plant eater"
+  },
+  "wet_meadow": {
+   "v": null,
+   "na": true,
+   "note": "not a land-plant eater"
+  },
+  "roots": {
+   "v": null,
+   "na": true,
+   "note": "aquatic; see aquatic_plants_drift (IslandRiverRoots is a submerged root-margin patch)"
+  },
+  "insects": {
+   "v": null,
+   "na": true,
+   "note": "see aquatic_plants_drift"
+  },
+  "aquatic_plants_drift": {
+   "v": [
+    "IslandRiverQuietMargin",
+    "IslandRiverDrift",
+    "IslandRiverSlowShelf"
+   ],
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:571-584 (+RootsShore split AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:162-191)",
+   "kind": "unreal-script",
+   "note": "island submerged patches; 2.8 energy/meal, capacity 16 nursery / 11 other"
+  },
+  "meat_live_prey": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:82",
+   "kind": "unreal-default"
+  },
+  "carrion": {
+   "v": {
+    "eats": false
+   },
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:128",
+   "kind": "unreal-default"
+  },
+  "food_per_meal_units": {
+   "v": 0.2,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:126",
+   "kind": "unreal-default",
+   "note": "Native grid food units per plant meal; energy = units x 5"
+  },
+  "meal_stop_frac": {
+   "v": 0.9,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:133",
+   "kind": "unreal-default"
+  },
+  "post_meal_rest_s": {
+   "v": 4.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:134",
+   "kind": "unreal-default"
+  },
+  "feeding_places_on_own_carcass": {
+   "v": 2,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:155",
+   "kind": "unreal-default"
+  },
+  "adult_carcass_energy": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:152",
+   "kind": "unreal-default",
+   "note": "0 = estimated from body mass"
+  }
+ },
+ "combat": {
+  "hunts": {
+   "v": [],
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:82",
+   "kind": "unreal-default",
+   "note": "MaxPreyMassRatio: prey mass <= ratio x hunter mass (both x size^3 x Lerp(0.12,1,age)); maturity limits by prey HP<60% (EcoFaunaWaterMovement.cpp:24-30); fauna backend can only target fauna residents (EcoFauna.h:81)"
+  },
+  "attack_reach_m": {
+   "v": null,
+   "na": true,
+   "note": "does not hunt"
+  },
+  "attack_windup_s": {
+   "v": null,
+   "na": true,
+   "note": "does not hunt"
+  },
+  "attack_recovery_s": {
+   "v": null,
+   "na": true,
+   "note": "does not hunt"
+  },
+  "pursuit_limit_s": {
+   "v": null,
+   "na": true,
+   "note": "does not hunt"
+  },
+  "stalk_range_m": {
+   "v": null,
+   "na": true,
+   "note": "does not hunt"
+  },
+  "bite_damage": {
+   "v": null,
+   "na": true,
+   "note": "does not hunt"
+  },
+  "counterattack_damage_hp": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:114",
+   "kind": "unreal-default",
+   "note": "0 = no counterattack"
+  },
+  "offspring_guard_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:115",
+   "kind": "unreal-default",
+   "note": "0 = no parental guarding"
+  },
+  "second_parent_guard": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:116",
+   "kind": "unreal-default"
+  },
+  "gore": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFaunaMovement.cpp:324-410",
+   "kind": "unreal-default",
+   "note": "no gore/charge attack in Unreal fauna"
+  }
+ },
+ "life": {
+  "maturity_s": {
+   "v": 125.0,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  },
+  "gestation_s": {
+   "v": 24.0,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  },
+  "birth_recovery_s": {
+   "v": 100.0,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  },
+  "litter": {
+   "v": 1,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Ecology/EcologySimulationSubsystem.cpp:400",
+   "kind": "unreal-default",
+   "note": "one young per natural-birth reservation"
+  },
+  "mate_radius_m": {
+   "v": 10.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.cpp:1301",
+   "kind": "unreal-default",
+   "note": "parents within 1000 cm"
+  },
+  "nestling_s": {
+   "v": null,
+   "na": true,
+   "note": "not a nester"
+  },
+  "spawning_temp_c": {
+   "v": [
+    0.0,
+    40.0
+   ],
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:94",
+   "kind": "unreal-default",
+   "note": "water temperature window for nursery spawning (EcoFauna.cpp:1021)"
+  },
+  "max_nursery_current_mps": {
+   "v": 0.1,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script",
+   "note": "EcoFauna.cpp:1022"
+  },
+  "nursery_patches": {
+   "v": [
+    "IslandRiverQuietMargin",
+    "IslandRiverSlowShelf"
+   ],
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:571-581",
+   "kind": "unreal-script",
+   "note": "aquatic_nursery patches"
+  },
+  "lifespan_s": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "no ageing death in Unreal fauna; R9 has none either"
+  },
+  "regional_limit": {
+   "v": 8,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  }
+ },
+ "social": {
+  "social_neighbor_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:142",
+   "kind": "unreal-default",
+   "note": "0 = independent routine"
+  },
+  "social_spacing_m": {
+   "v": 1.8,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:145",
+   "kind": "unreal-default"
+  },
+  "adult_male_social_affinity": {
+   "v": 1.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:144",
+   "kind": "unreal-default"
+  },
+  "caregiver_follow_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:101",
+   "kind": "unreal-default",
+   "note": "0 = young do not follow"
+  },
+  "guard_radius_m": {
+   "v": 0.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:115",
+   "kind": "unreal-default"
+  },
+  "routine_home_radius_m": {
+   "v": 2.3,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:341-345",
+   "kind": "unreal-script"
+  },
+  "individual_response": {
+   "v": true,
+   "src": "AdaptiveEcosystem/Tools/Editor/setup_jyu_expanded_fauna.py:325-328",
+   "kind": "unreal-script"
+  }
+ },
+ "habitat": {
+  "island_region": {
+   "v": "LowerRiver",
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:539",
+   "kind": "unreal-script"
+  },
+  "island_founders": {
+   "v": 7,
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:539",
+   "kind": "unreal-script"
+  },
+  "region_air_temp_c": {
+   "v": 16,
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:500",
+   "kind": "unreal-script",
+   "note": "LowerRiver rules-only region environment"
+  },
+  "water_temp_c": {
+   "v": 18.5,
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:138",
+   "kind": "unreal-script",
+   "note": "fauna_water_temperature_c of every IslandLowerRiver habitat"
+  },
+  "water_current_mps": {
+   "v": [
+    0.03,
+    0.14
+   ],
+   "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_island_fauna.py:511",
+   "kind": "unreal-script",
+   "note": "per-section river current 3-14 cm/s"
+  },
+  "heat_response_c": {
+   "v": [
+    0.0,
+    0.0
+   ],
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoFauna.h:147",
+   "kind": "unreal-default",
+   "note": "both 0 = disabled"
+  }
+ },
+ "note": "Unreal 'UnidentifiedFish' — provisional freshwater gameplay guild (setup_jyu_expanded_fauna.py:340)."
+}

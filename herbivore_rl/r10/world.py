@@ -178,6 +178,7 @@ class World:
         self.pregnant = b()
         self.breath, self.attack_cd = f(), f()
         self.dead_wait = np.zeros(N, np.int64)
+        self.respawn_wait = np.full(N, self.rules.respawn_decisions, np.int64)   # 학습 칸은 vec_env 가 1 로
         self.uid = np.zeros(N, np.int64)
         self._next_uid = 1
         self.reward = f()
@@ -752,7 +753,7 @@ class World:
         self.carcass["meat"][ci] = self.p["mass_kg"][i] * self.rules.carcass_meat_per_kg
         self.carcass["age"][ci] = 0.0
         self.carcass["kin"][ci] = self.sp[i]
-        self.dead_wait[i] = self.rules.respawn_decisions
+        self.dead_wait[i] = self.respawn_wait[i]
 
     def _deaths(self):
         starve = self.alive & (self.E <= 0.0) & (self.R <= 0.0)

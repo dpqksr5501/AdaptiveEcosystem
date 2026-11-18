@@ -1,0 +1,658 @@
+{
+ "id": "deer",
+ "unreal_id": "Herbivore (Native v3 deer)",
+ "r9_id": "deer",
+ "executor": "Unreal Native v3 (EcoWorldV3 / R7e brain) — conversion: 1 unit = 200 cm (EcoRepertoire.h:75), 1 step = 8/60 s (EcoRepertoire.h:76); u/step x 15 = m/s",
+ "medium": {
+  "ground": {
+   "v": true,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161",
+   "kind": "native"
+  },
+  "wade_depth_m": {
+   "v": 0.4,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:59",
+   "kind": "unreal-default",
+   "note": "UEcoNaturalHabitatProfile.MaxWadingDepthCm default (Native terrestrial backend)"
+  },
+  "swim": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:55",
+   "kind": "unreal-default",
+   "note": "'not swimming/flying support'"
+  },
+  "swim_depth_frac": {
+   "v": null,
+   "na": true,
+   "note": "not a swimmer"
+  },
+  "needs_water": {
+   "v": null,
+   "na": true,
+   "note": "no drinking mechanic"
+  },
+  "fly": {
+   "v": false,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:55",
+   "kind": "unreal-default"
+  },
+  "cruise_height_m": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "ceiling_m": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  },
+  "takeoff_s": {
+   "v": null,
+   "na": true,
+   "note": "does not fly"
+  }
+ },
+ "body": {
+  "mass_kg": {
+   "v": 60.0,
+   "src": "herbivore_rl/configs/v3_r9.yaml:116",
+   "kind": "r9-yaml",
+   "note": "Native has no mass; R9 only"
+  },
+  "radius_m": {
+   "v": 0.3,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoWorldV3.h:445",
+   "kind": "native",
+   "note": "obstacle sweep body radius 0.15 u (only with eco.IntegratedV3.Obstacles)"
+  },
+  "shoulder_height_m": {
+   "v": "0.9",
+   "src": "AdaptiveEcosystem/Docs/RL_Policy/RL_R9_SPECIES_TRAITS.md:135",
+   "kind": "doc-only"
+  },
+  "walk_mps": {
+   "v": 3.6,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161-162",
+   "kind": "native",
+   "note": "HerbSpeed 0.6 u/step x GaitSpeed[walk] 0.4 = 0.24 u/step; x genome SpeedScale 0.92-1.08",
+   "alt": [
+    {
+     "v": 3.6,
+     "src": "herbivore_rl/configs/v3_r9.yaml:120",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "run_mps": {
+   "v": 9.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161-162",
+   "kind": "native",
+   "note": "0.6 u/step; snow x0.6 (EcoWorldV3.h:505); weak x0.75 (EcoWorldV3.h:355)",
+   "alt": [
+    {
+     "v": 9.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:121",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "swim_mps": {
+   "v": null,
+   "na": true,
+   "note": "n/a"
+  },
+  "fly_mps": {
+   "v": null,
+   "na": true,
+   "note": "n/a"
+  },
+  "cruise_mps": {
+   "v": null,
+   "na": true,
+   "note": "n/a"
+  },
+  "dive_mps": {
+   "v": null,
+   "na": true,
+   "note": "n/a"
+  },
+  "accel_mps2": {
+   "v": "unlimited",
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161-166",
+   "kind": "native",
+   "note": "velocity set directly each step",
+   "alt": [
+    {
+     "v": 13.5,
+     "src": "herbivore_rl/configs/v3_r9.yaml:123",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "turn_dps": {
+   "v": "unlimited",
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161-166",
+   "kind": "native",
+   "note": "heading set directly each step",
+   "alt": [
+    {
+     "v": 130.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna_motion.yaml:16",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "lat_accel_mps2": {
+   "v": 9.0,
+   "src": "herbivore_rl/configs/v3_r9_fauna_motion.yaml:17",
+   "kind": "r9-yaml",
+   "note": "no Native equivalent"
+  },
+  "max_slope_deg": {
+   "v": 40.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:56",
+   "kind": "unreal-default",
+   "note": "WalkableSlopeDegrees default"
+  },
+  "step_m": {
+   "v": 0.35,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:57",
+   "kind": "unreal-default",
+   "note": "MaxStepUpCm; step down 0.60 m (line 58)"
+  },
+  "stamina": {
+   "v": "none",
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161-191",
+   "kind": "native",
+   "note": "Native deer have no stamina; run costs 2.5x drain (GaitDrain)",
+   "alt": [
+    {
+     "v": {
+      "model": "R9 stamina 0..1; lock 0.15 / unlock 0.55 (v3_r9.yaml:77-78)",
+      "run_steps": 90,
+      "recover_steps": 60,
+      "run_s_full_to_lock": 12.0,
+      "recover_s_lock_to_unlock": 8.0
+     },
+     "src": "herbivore_rl/configs/v3_r9.yaml:124-125",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "maintenance_energy_per_s": {
+   "v": {
+    "drain_E_per_step": 0.002,
+    "drain_E_per_s": 0.015,
+    "gait_drain": [
+     0.714,
+     1.0,
+     2.5
+    ],
+    "reserve_days": 3.0
+   },
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:166,184; AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoWorldV3.h:350",
+   "kind": "native",
+   "note": "E 0..1; fat reserve on (eco.IntegratedV3.WildReserve=1, EcoPolicyV3IntegratedSubsystem.cpp:146)",
+   "alt": [
+    {
+     "v": {
+      "drain_E_per_step": 0.002,
+      "drain_E_per_s": 0.015,
+      "reserve_days": 3.0
+     },
+     "src": "herbivore_rl/configs/v3_r9.yaml:130-131",
+     "kind": "r9-yaml"
+    }
+   ]
+  }
+ },
+ "senses": {
+  "sight_m": {
+   "v": 40.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:70",
+   "kind": "native",
+   "note": "SeeR 20 u (kin, food and threat); threat radius x(1-0.5 dark) x0.6 grazing x0.3 sleeping",
+   "alt": [
+    {
+     "v": 40.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:126",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "fov_deg": {
+   "v": 300.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoWorldV3.h:1397; AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoPolicyV3IntegratedSubsystem.cpp:322-324",
+   "kind": "native",
+   "note": "threat FOV with eco.IntegratedV3.RealismVision=1 (default); kin/food FOV 120 deg (EcoObservationV3.h:71)",
+   "alt": [
+    {
+     "v": 300.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:127",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "eye_height_m": {
+   "v": 0.75,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoPolicyV3IntegratedProcessors.cpp:166",
+   "kind": "native",
+   "note": "player-sight ray start height"
+  },
+  "smell_m": {
+   "v": "none",
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:68-86",
+   "kind": "native",
+   "note": "no smell in Native",
+   "alt": [
+    {
+     "v": 6.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:129",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "hearing_m": {
+   "v": {
+    "min_m": 4.0,
+    "max_m": 40.0
+   },
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:171-172; AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoPolicyV3IntegratedSubsystem.cpp:329-331",
+   "kind": "native",
+   "note": "RealismHearing=1: wolf footstep radius 4 m (roaming) to 40 m (running); rain x0.5 (EcoWorldV3.h:502)",
+   "alt": [
+    {
+     "v": {
+      "min_m": 4.0,
+      "max_m": 40.0
+     },
+     "src": "herbivore_rl/env_v2/r9_body.py:225-230",
+     "kind": "r9-yaml",
+     "note": "emitter-speed based (same model)"
+    },
+    {
+     "v": 22.5,
+     "src": "AdaptiveEcosystem/Tools/Editor/author_jyu_fauna_footsteps.py:33",
+     "kind": "unreal-script",
+     "note": "'Herbivore' footstep listener profile (player/creature footsteps)",
+     "cmp": false
+    }
+   ]
+  },
+  "threat_sense_m": {
+   "v": 40.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:70,76",
+   "kind": "native",
+   "note": "same SeeR; x(1 - 0.5 x darkness)"
+  },
+  "flight_distances_m": {
+   "v": {
+    "alert": 30.0,
+    "flight": 15.0,
+    "safe": 40.0
+   },
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoPolicyV3IntegratedSubsystem.cpp:127-145; AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoWorldV3.h:192-194",
+   "kind": "native",
+   "note": "WildFlight=1 default world rule"
+  },
+  "night_vision": {
+   "v": 0.5,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:76",
+   "kind": "native",
+   "note": "detect radius x(1 - 0.5 d): 0.5 at full dark"
+  },
+  "day_activity": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "Native deer have no activity curve; brain decides (SLEEP action)"
+  },
+  "night_activity": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "Native deer have no activity curve; brain decides (SLEEP action)"
+  },
+  "camo": {
+   "v": 1.0,
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:44",
+   "kind": "r9-yaml"
+  },
+  "head_down_mult": {
+   "v": 0.6,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:152",
+   "kind": "native",
+   "note": "GrazeHeadDown",
+   "alt": [
+    {
+     "v": 0.6,
+     "src": "herbivore_rl/configs/v3_r9.yaml:128",
+     "kind": "r9-yaml"
+    }
+   ]
+  }
+ },
+ "diet": {
+  "diet_class": {
+   "v": "Herbivore (grass grid)",
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:187-188",
+   "kind": "native",
+   "alt": [
+    {
+     "v": [
+      "grass"
+     ],
+     "src": "herbivore_rl/configs/v3_r9.yaml:136",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "plant_native_grid": {
+   "v": true,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:187",
+   "kind": "native"
+  },
+  "grass": {
+   "v": {
+    "eat_units_per_s": 0.45,
+    "energy_per_unit": 0.5,
+    "walk_eat_mult": 0.5
+   },
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:163,187-188",
+   "kind": "native",
+   "note": "FoodEatRate 0.06 u/step",
+   "alt": [
+    {
+     "v": {
+      "eat_units_per_s": 0.09,
+      "energy_per_unit": 0.5
+     },
+     "src": "herbivore_rl/configs/v3_r9.yaml:137-138",
+     "kind": "r9-yaml",
+     "note": "eat_rate 0.012 u/step; stand-only eating"
+    }
+   ]
+  },
+  "forbs": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "Native grid has no guild split (natural habitat guilds grass/riparian/shrub exist in EcoNaturalHabitatProfile.h:40)"
+  },
+  "browse": {
+   "v": null,
+   "src": null,
+   "kind": null
+  },
+  "wet_meadow": {
+   "v": null,
+   "src": null,
+   "kind": null
+  },
+  "roots": {
+   "v": null,
+   "na": true,
+   "note": "not eaten"
+  },
+  "insects": {
+   "v": null,
+   "na": true,
+   "note": "not eaten"
+  },
+  "aquatic_plants_drift": {
+   "v": null,
+   "na": true,
+   "note": "not eaten"
+  },
+  "meat_live_prey": {
+   "v": false,
+   "src": "herbivore_rl/configs/v3_r9.yaml:142",
+   "kind": "r9-yaml"
+  },
+  "carrion": {
+   "v": {
+    "eats": false
+   },
+   "src": "herbivore_rl/configs/v3_r9.yaml:136",
+   "kind": "r9-yaml"
+  }
+ },
+ "combat": {
+  "hunts": {
+   "v": [],
+   "src": "herbivore_rl/configs/v3_r9.yaml:142",
+   "kind": "r9-yaml",
+   "note": "deer never bite"
+  },
+  "attack_reach_m": {
+   "v": null,
+   "na": true,
+   "note": "does not hunt"
+  },
+  "counterattack_damage_hp": {
+   "v": "none",
+   "src": "herbivore_rl/configs/v3_r9.yaml:144",
+   "kind": "r9-yaml"
+  },
+  "offspring_guard_m": {
+   "v": null,
+   "src": null,
+   "kind": null
+  },
+  "gore": {
+   "v": false,
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:42",
+   "kind": "r9-yaml"
+  },
+  "hide": {
+   "v": 1.0,
+   "src": "herbivore_rl/configs/v3_r9_fauna.yaml:40",
+   "kind": "r9-yaml"
+  },
+  "hp": {
+   "v": "no HP vs wolves: a catch kills",
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoThreatModel.h:184",
+   "kind": "native",
+   "alt": [
+    {
+     "v": {
+      "has_hp": true,
+      "regen_per_day": 0.25
+     },
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:37-38",
+     "kind": "r9-yaml"
+    }
+   ]
+  }
+ },
+ "life": {
+  "maturity_s": {
+   "v": 360.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:44; AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoLifeHistoryV3.h:22",
+   "kind": "unreal-default",
+   "note": "natural-population profile default",
+   "alt": [
+    {
+     "v": 360.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:145",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "gestation_s": {
+   "v": 30.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoCreatureNaturalBirth.cpp:155",
+   "kind": "native",
+   "alt": [
+    {
+     "v": 30.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:103",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "birth_recovery_s": {
+   "v": 300.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoCreatureNaturalBirth.cpp:125",
+   "kind": "native",
+   "alt": [
+    {
+     "v": 300.0,
+     "src": "herbivore_rl/configs/v3_r9_fauna.yaml:45",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "litter": {
+   "v": 1,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Ecology/EcologySimulationSubsystem.cpp:400",
+   "kind": "unreal-default",
+   "alt": [
+    {
+     "v": 1,
+     "src": "AdaptiveEcosystem/Docs/RL_Policy/RL_R9_SPECIES_TRAITS.md:139",
+     "kind": "doc-only"
+    }
+   ]
+  },
+  "mate_radius_m": {
+   "v": 20.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoCreatureNaturalBirth.cpp:154",
+   "kind": "native",
+   "note": "100 = 10^2 u^2",
+   "alt": [
+    {
+     "v": 20.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:151",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "birth_radius_m": {
+   "v": 30.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/Creature/Runtime/EcoCreatureNaturalBirth.cpp:73",
+   "kind": "native",
+   "alt": [
+    {
+     "v": 30.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:152",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "female_frac": {
+   "v": 0.6,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:46",
+   "kind": "unreal-default",
+   "alt": [
+    {
+     "v": 0.6,
+     "src": "herbivore_rl/configs/v3_r9.yaml:147",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "parent_energy_min": {
+   "v": 0.7,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoLifeHistoryV3.h:228",
+   "kind": "native",
+   "alt": [
+    {
+     "v": 0.7,
+     "src": "herbivore_rl/configs/v3_r9.yaml:101",
+     "kind": "r9-yaml"
+    }
+   ]
+  },
+  "nestling_s": {
+   "v": null,
+   "na": true,
+   "note": "n/a"
+  },
+  "spawning_temp_c": {
+   "v": null,
+   "na": true,
+   "note": "n/a"
+  },
+  "max_nursery_current_mps": {
+   "v": null,
+   "na": true,
+   "note": "n/a"
+  },
+  "lifespan_s": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "no ageing death"
+  },
+  "max_founder_age_s": {
+   "v": 1800.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoLifeHistoryV3.h:22",
+   "kind": "unreal-default",
+   "alt": [
+    {
+     "v": 1800.0,
+     "src": "herbivore_rl/configs/v3_r9.yaml:149",
+     "kind": "r9-yaml"
+    }
+   ]
+  }
+ },
+ "social": {
+  "kin_separation_m": {
+   "v": 10.0,
+   "src": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:79",
+   "kind": "native",
+   "note": "SepRadius 5 u"
+  },
+  "social_neighbor_m": {
+   "v": null,
+   "src": null,
+   "kind": null
+  },
+  "caregiver_follow_m": {
+   "v": null,
+   "src": null,
+   "kind": null,
+   "note": "family follow exists (EcoLifeHistoryV3.h:213-217) but no radius constant found"
+  },
+  "guard_radius_m": {
+   "v": null,
+   "src": null,
+   "kind": null
+  }
+ },
+ "habitat": {
+  "island_region": {
+   "v": [
+    "Snowfield",
+    "Grassland",
+    "Riverbank",
+    "Highland"
+   ],
+   "src": "AdaptiveEcosystem/Tools/Editor/apply_jyu_island_ecosystem.py:103-106",
+   "kind": "unreal-script"
+  },
+  "island_founders": {
+   "v": 48,
+   "src": "AdaptiveEcosystem/Tools/Editor/apply_jyu_island_ecosystem.py:128",
+   "kind": "unreal-script",
+   "note": "12 per region"
+  },
+  "region_air_temp_c": {
+   "v": {
+    "Snowfield": -4,
+    "Grassland": 18,
+    "Riverbank": 14,
+    "Highland": 7
+   },
+   "src": "AdaptiveEcosystem/Tools/Editor/apply_jyu_island_ecosystem.py:103-106",
+   "kind": "unreal-script"
+  },
+  "heat_response_c": {
+   "v": null,
+   "src": null,
+   "kind": null
+  }
+ }
+}

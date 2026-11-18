@@ -139,3 +139,36 @@ def test_jitter_stays_in_trained_range():
             g, _, k = key.partition(".")
             assert lo <= j[g][k] <= hi
         assert not S.validate(j)
+
+
+# ----------------------------------------------------------------------------- 16 종 카드 (species/*.json)
+
+def test_sixteen_cards_load_and_bodies():
+    cards = S.load_all()
+    assert len(cards) == 16
+    for sid, c in cards.items():
+        v = S.body_vector(c)
+        assert v.min() >= 0.0 and v.max() <= 1.0, sid
+        assert c["sources"], sid
+    fish = [s for s, c in cards.items() if c["medium"]["needs_water"]]
+    fly = [s for s, c in cards.items() if c["medium"]["fly"]]
+    assert sorted(fish) == ["ariake_catfish", "common_carp", "small_fish"]
+    assert sorted(fly) == ["crow", "golden_eagle"]
+    assert cards["mink"]["medium"]["swim"] and cards["mink"]["medium"]["ground"]
+
+
+def test_prey_pairs_follow_mass_ratio():
+    """종 이름 목록 대신 몸무게 비율 하나로 언리얼 사냥 표의 핵심 짝이 나와야 한다 (사양 3 절)."""
+    cards = S.load_all()
+    mass = {s: c["body"]["mass_kg"] for s, c in cards.items()}
+
+    def can(a, b, frac=1.0):
+        return cards[a]["combat"]["kill_mass_ratio"] * mass[a] >= mass[b] * frac
+
+    assert can("wolf", "deer") and not can("wolf", "buffalo") and not can("wolf", "horse")
+    assert can("leopard", "boar") and can("leopard", "rat") and not can("leopard", "buffalo") and can("leopard", "buffalo", 0.2)
+    assert can("fox", "rat") and can("fox", "crow") and not can("fox", "deer")
+    assert can("golden_eagle", "jackrabbit") and can("golden_eagle", "rat")
+    assert can("mink", "small_fish") and can("mink", "ariake_catfish") and can("mink", "rat") and not can("mink", "common_carp")
+    for herb in ("deer", "buffalo", "horse", "bighorn", "jackrabbit", "rat", "common_carp"):
+        assert cards[herb]["combat"]["kill_mass_ratio"] == 0.0

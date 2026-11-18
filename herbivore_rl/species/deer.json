@@ -1,0 +1,123 @@
+{
+ "id": "deer",
+ "name_ko": "사슴",
+ "card_version": 1,
+ "medium": {
+  "ground": true,
+  "swim": false,
+  "fly": false,
+  "wade_depth_m": 0.4,
+  "swim_depth_frac": null,
+  "cruise_height_m": null,
+  "ceiling_m": null,
+  "takeoff_s": null,
+  "needs_water": false
+ },
+ "body": {
+  "mass_kg": 60.0,
+  "radius_m": 0.3,
+  "walk_mps": 3.6,
+  "run_mps": 9.0,
+  "swim_mps": null,
+  "swim_fast_mps": null,
+  "fly_mps": null,
+  "cruise_mps": null,
+  "dive_mps": null,
+  "accel_mps2": 20.0,
+  "turn_dps": 130.0,
+  "lat_accel_mps2": 9.0,
+  "max_slope_deg": 40.0,
+  "step_m": 0.35,
+  "stamina_s": 12.0,
+  "stamina_recover_s": 10.0
+ },
+ "senses": {
+  "sight_m": 40.0,
+  "fov_deg": 300.0,
+  "smell_m": 0.0,
+  "hearing_m": 40.0,
+  "night_vision": 0.5
+ },
+ "diet": {
+  "grass": 1.0,
+  "forbs": 0.8,
+  "browse": 0.5,
+  "wet_meadow": 0.8,
+  "roots": 0.0,
+  "insects": 0.0,
+  "aquatic": 0.0,
+  "drift": 0.0,
+  "meat": 0.0,
+  "carrion": 0.0
+ },
+ "eat": {
+  "rate_per_s": 0.05,
+  "energy_per_unit": 0.3333
+ },
+ "metabolism": {
+  "drain_per_day": 0.5,
+  "reserve_days": 3.0,
+  "run_cost": 3.0,
+  "swim_cost": null,
+  "fly_cost": null
+ },
+ "combat": {
+  "kill_mass_ratio": 0.0,
+  "reach_m": 0.65,
+  "attack_cd_s": 1.0,
+  "defense": 0.0,
+  "counter_reach_m": 0.9
+ },
+ "life": {
+  "maturity_days": 3.0,
+  "litter": 1.0,
+  "gestation_days": 0.25
+ },
+ "randomize": {
+  "frac": 0.15,
+  "keys": [
+   "body.mass_kg",
+   "body.radius_m",
+   "body.walk_mps",
+   "body.run_mps",
+   "body.swim_mps",
+   "body.fly_mps",
+   "body.cruise_mps",
+   "body.accel_mps2",
+   "body.turn_dps",
+   "senses.sight_m",
+   "eat.rate_per_s",
+   "metabolism.drain_per_day"
+  ]
+ },
+ "sources": {
+  "medium.ground": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161 (native)",
+  "medium.swim": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:55 (unreal-default)",
+  "medium.fly": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:55 (unreal-default)",
+  "medium.wade_depth_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:59 (unreal-default)",
+  "body.mass_kg": "herbivore_rl/configs/v3_r9.yaml:116 (r9-yaml)",
+  "body.radius_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoWorldV3.h:445 (native)",
+  "body.walk_mps": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161-162 (native)",
+  "body.run_mps": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoRepertoire.h:161-162 (native)",
+  "body.accel_mps2": "정함: 언리얼 Native 는 가속 제한 없음 → 큰 값",
+  "body.max_slope_deg": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:56 (unreal-default)",
+  "body.step_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:57 (unreal-default)",
+  "body.turn_dps": "정함: M1 회전 한계 (사용자 결정 11-13, RL_R9_TURN_EFFORT_DESIGN.md 3-2)",
+  "body.lat_accel_mps2": "정함: M1 회전 한계 (사용자 결정 11-13, RL_R9_TURN_EFFORT_DESIGN.md 3-2)",
+  "body.stamina_s": "정함: Native 는 지구력 없음 → R9 어림",
+  "body.stamina_recover_s": "정함: Native 는 지구력 없음 → R9 어림",
+  "senses.sight_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:70 (native)",
+  "senses.fov_deg": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoWorldV3.h:1397; AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoPolicyV3IntegratedSubsystem.cpp:322-324 (native)",
+  "senses.smell_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:68-86 (native)",
+  "senses.hearing_m": "AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoObservationV3.h:171-172; AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoPolicyV3IntegratedSubsystem.cpp:329-331 (native)",
+  "senses.night_vision": "정함: Native 는 낮밤 규칙만 있고 밤눈 값 없음",
+  "diet": "초안 diet (선호 수치·True=1·목록=1) + 정함: {\"grass\": 1.0, \"forbs\": 0.8, \"browse\": 0.5, \"wet_meadow\": 0.8}",
+  "eat": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다",
+  "metabolism": "정함: 크기 법칙 — 먹는 속도 ∝ 질량^0.75, 기운 소모/일 ∝ 질량^−0.25, 먹을 때 얻는 기운 = 소모의 4 배. 언리얼 식사·에너지 모형과 단위가 달라 1 단계 앞 관문에서 다시 맞춘다",
+  "combat.kill_mass_ratio": "정함: 언리얼 사냥 표의 max_prey_mass_ratio 가운데 가장 큰 값 — 종 이름 목록 대신 몸무게 비율 하나 (사양 3 절)",
+  "combat.reach_m": "정함: 반지름 × 1.5 + 0.2",
+  "combat.defense": "herbivore_rl/configs/v3_r9.yaml:144 (r9-yaml)",
+  "combat.attack_cd_s": "정함: R9 물기 쿨다운 8 걸음 ≈ 1 s",
+  "life": "AdaptiveEcosystem/Source/AdaptiveEcosystem/World/EcoNaturalHabitatProfile.h:44; AdaptiveEcosystem/Source/AdaptiveEcosystem/AI/Policy/EcoLifeHistoryV3.h:22 (unreal-default) · 초를 하루 120 s 로 나눔"
+ }
+}
