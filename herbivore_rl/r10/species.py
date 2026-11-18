@@ -2,7 +2,7 @@
 
 - 파일: herbivore_rl/species/<id>.json (SI: m·kg·s·°). 파이썬 학습 세계와 언리얼이 같은 파일을 읽는다.
 - 값 기준: 언리얼이 실제로 실행하는 값. 출처는 카드의 "sources" 에 칸마다 적는다(없는 값을 정했으면 '정함: 까닭').
-- 몸 벡터 16 칸(감각 S1 의 body 묶음)과 학습 흔들기·'배운 범위' 표, 이름 모를 동물 카드를 만든다.
+- 몸 벡터 17 칸(감각 S1 의 body 묶음)과 학습 흔들기·'배운 범위' 표, 이름 모를 동물 카드를 만든다.
 """
 
 from __future__ import annotations
@@ -136,7 +136,7 @@ def _v(card, g, k, default=0.0) -> float:
 
 
 def body_vector(card: dict) -> np.ndarray:
-    """감각 S1 body 묶음 16 칸 (0~1). 이름 차례는 contract.BODY_NAMES."""
+    """감각 S1 body 묶음 17 칸 (0~1). 이름 차례는 contract.BODY_NAMES."""
     m = card["medium"]
     d = card["diet"]
     tot = sum(float(d[k]) for k in DIET_KEYS) or 1.0
@@ -157,6 +157,7 @@ def body_vector(card: dict) -> np.ndarray:
         sum(float(d[k]) for k in PLANT_DIET) / tot,
         sum(float(d[k]) for k in WATER_DIET) / tot,
         sum(float(d[k]) for k in MEAT_DIET) / tot,
+        np.clip(_v(card, "combat", "kill_mass_ratio") / 4.0, 0, 1),                      # 물 수 있는 몸무게 비 (0 ~ 4 배)
     ]
     out = np.asarray([float(x) for x in v], dtype=np.float32)
     assert out.shape == (len(C.BODY_NAMES),)

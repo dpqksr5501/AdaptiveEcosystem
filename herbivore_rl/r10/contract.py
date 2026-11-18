@@ -1,7 +1,7 @@
 """R10 감각 S1·행동 A1 계약 (0 단계 사양 1·7·8 절).
 
 - 시간: 물리 한 걸음 STEP_S = 2/15 s (R9·언리얼 Native v3 와 같음), 결정은 DECISION_STEPS = 2 걸음마다, 하루 900 걸음.
-- 감각 206 칸 = 자기 14 + 몸 16 + 8 방향 × 6 + 발밑 6 + 다른 동물 8 × 12 + 같은 종 4 + 환경 6 + 예비 16. 모두 머리 기준(x 머리, y 왼쪽).
+- 감각 206 칸 = 자기 14 + 몸 17 + 8 방향 × 6 + 발밑 6 + 다른 동물 8 × 12 + 같은 종 4 + 환경 6 + 예비 15. 모두 머리 기준(x 머리, y 왼쪽).
   종 수·맵 크기와 상관없이 같은 크기다. 몸 값·맵은 계약 해시에 들어가지 않는다(설계 11 절 — 몸은 '배운 범위' 표로 대조).
 - 행동 24 칸 = 서서 먹기 · 천천히 8 방향 · 빠르게 8 방향 · 숨기 · 지켜보기 · 오르기 · 내리기 · 빠르게 내리기 · 예비 2.
   몸이 못 하는 행동은 마스크로 막는다(`action_mask`).
@@ -25,7 +25,7 @@ DAY_STEPS = 900
 
 N_DIR = 8                     # 머리에서 왼쪽 j × 45°
 N_OTHER = 8
-N_SPARE_OBS = 16
+N_SPARE_OBS = 15              # 처음 16 — 11-19 하나를 몸 칸 b_kill(물 수 있는 몸무게 비)로 씀 (예비 칸의 쓰임 그대로)
 
 DIR8 = np.array([[np.cos(np.radians(45.0 * j)), np.sin(np.radians(45.0 * j))] for j in range(N_DIR)], dtype=np.float64)
 DIR8[np.abs(DIR8) < 1e-12] = 0.0
@@ -33,7 +33,7 @@ DIR8[np.abs(DIR8) < 1e-12] = 0.0
 SELF_NAMES = ("energy", "reserve", "stamina", "health", "age_frac", "can_mate", "birth_wait", "speed", "air_height",
               "water_height_frac", "in_water", "in_shelter", "breath", "airborne")
 BODY_NAMES = ("b_mass", "b_radius", "b_walk", "b_run", "b_swim", "b_swim_speed", "b_fly", "b_cruise_height", "b_wade",
-              "b_slope", "b_turn", "b_sight", "b_fov", "b_diet_plant", "b_diet_water", "b_diet_meat")
+              "b_slope", "b_turn", "b_sight", "b_fov", "b_diet_plant", "b_diet_water", "b_diet_meat", "b_kill")
 DIR_FIELDS = ("free", "rise", "depth", "current", "cover", "food")
 DIR_NAMES = tuple(f"{f}_{j}" for j in range(N_DIR) for f in DIR_FIELDS)
 HERE_NAMES = ("food_here", "carcass_here", "to_surface", "to_bottom", "slope_here", "shelter_edge")

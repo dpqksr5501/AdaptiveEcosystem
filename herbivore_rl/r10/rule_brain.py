@@ -39,13 +39,16 @@ def decide(obs: np.ndarray, rng: np.random.Generator | None = None) -> np.ndarra
     airborne = obs[:, _IDX["airborne"]] > 0.5
     can_fly = obs[:, P.I_FLY] > 0.5
     meat = obs[:, _IDX["b_diet_meat"]]
+    kill = obs[:, _IDX["b_kill"]] * 4.0                      # 물 수 있는 몸무게 비 (몸 벡터)
     food_here = obs[:, _IDX["food_here"]] + obs[:, _IDX["carcass_here"]] * (meat > 0.2)
 
     o = obs[:, _OTH0:_OTH0 + C.N_OTHER * 12].reshape(n, C.N_OTHER, 12)
     present = o[:, :, _F["present"]] > 0.5
     other = present & (o[:, :, _F["same_kin"]] < 0.5)
     big = other & (o[:, :, _F["size_ratio"]] > BIG) & (o[:, :, _F["approach"]] > 0.05)
-    small = other & (o[:, :, _F["mass_ratio"]] < 0.0)
+    # 물 수 있는 상대: 질량 비 log2(상대/나)/10 ≤ log2(kill)/10
+    lim = np.where(kill > 0, np.log2(np.maximum(kill, 1e-6)) / C.NORM["ratio_log2_max"], -np.inf)
+    small = other & (o[:, :, _F["mass_ratio"]] <= lim[:, None])
 
     done = np.zeros(n, bool)
     # 1 도망
@@ -63,7 +66,7 @@ def decide(obs: np.ndarray, rng: np.random.Generator | None = None) -> np.ndarra
         act = np.where(fl, a, act)
         done |= fl
     # 2 사냥
-    hunt = ~done & (meat > 0.3) & (energy < 0.7) & small.any(axis=1)
+    hunt = ~done & (kill > 0) & (energy < 0.7) & small.any(axis=1)
     if hunt.any():
         d = np.where(small, np.hypot(o[:, :, _F["x"]], o[:, :, _F["y"]]), np.inf)
         k = np.argmin(d, axis=1)
